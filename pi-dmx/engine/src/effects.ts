@@ -123,26 +123,30 @@ function pickColor(
       // Brightness ahead of the head drops off sharply (leading edge is
       // crisp); behind the head decays exponentially over ~count/2 fixtures
       // (long fading tail). Position wraps so it loops forever.
-      const speed = 1.4 + audio * 2.5;                 // fixtures per second
+      const speed = 1.2 + audio * 2.2;                 // fixtures per second
       const head = (t * speed) % count;
       // Signed distance behind the head (positive = behind, in the tail)
       let behind = head - idx;
       if (behind < -count / 2) behind += count;         // wrap forward
       if (behind >  count / 2) behind -= count;         // wrap back
-      const tailLen = Math.max(2, count * 0.6);         // tail spans ~60% of rig
+      // Long, rich tail — spans the full rig with plenty of overlap so even
+      // small rigs get a proper trailing glow, not just 1–2 hot fixtures.
+      const tailLen = Math.max(3, count * 1.2);
       let v;
       if (behind >= 0) {
-        // Trailing tail — exponential fade
-        v = Math.exp(-behind / (tailLen * 0.35));
+        // Trailing tail — slow exponential fade with a tiny embers term
+        // that keeps distant fixtures from going pitch black.
+        v = Math.exp(-behind / (tailLen * 0.75)) + 0.08 * Math.exp(-behind / tailLen);
       } else {
         // Leading edge — quick falloff so the fireball has a sharp front
-        v = Math.exp(-(-behind) * 3);
+        v = Math.exp(-(-behind) * 2.5);
       }
-      // Fireball color: warm core (white-hot) → orange → deep red in the tail
-      const heat = Math.max(0, Math.min(1, v));         // 1 at head, 0 at tail end
-      const hue = 0.02 + (1 - heat) * 0.04;             // 0.02 (red-orange) → 0.06 (orange)
-      const sat = 0.4 + (1 - heat) * 0.6;               // white-hot core, saturated tail
-      const kickBoost = 1 + kickEnv * 0.4;
+      v = Math.min(1, v);
+      // Fireball color: white-hot core → orange → deep red in the tail
+      const heat = v;                                    // 1 at head, ~0 at tail end
+      const hue = 0.02 + (1 - heat) * 0.05;              // red-orange → deeper red
+      const sat = 0.35 + (1 - heat) * 0.65;              // white-hot core, saturated tail
+      const kickBoost = 1 + kickEnv * 0.35;
       return hsvToRgb(hue, sat, Math.min(1, v * kickBoost));
     }
     case "mono": {
