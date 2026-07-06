@@ -71,6 +71,7 @@ export const defaultConfig: EngineConfig = {
   mode: "auto",
   sensitivity: 0.6,
   master: 1.0,
+  modeButton: { chip: "gpiochip0", line: 17 },   // GPIO17 = physical pin 11
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
