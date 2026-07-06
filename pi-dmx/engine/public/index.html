@@ -376,7 +376,25 @@ document.getElementById("fxAdd").onclick = () => {
 };
 
 document.getElementById("fxAutoPack").onclick = () => {
-  // Repack all fixtures sequentially from address 1, in current list order.
+  // Reorder the list according to the chosen sort, then pack sequentially
+  // from address 1. Reordering (not just re-addressing) means the final
+  // layout in the UI matches the address order, which is what you'd expect
+  // when reading top-to-bottom.
+  const sort = document.getElementById("fxSort").value;
+  const cmp = {
+    list:      () => 0,
+    name:      (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
+    widest:    (a, b) => rolesOf(b).length - rolesOf(a).length,
+    narrowest: (a, b) => rolesOf(a).length - rolesOf(b).length,
+  }[sort] ?? (() => 0);
+  // Stable sort on a shallow copy, then mutate fxDraft in place so the
+  // dirty-tracking / render pipeline picks it up.
+  const ordered = fxDraft.map((fx, i) => ({ fx, i }))
+    .sort((a, b) => cmp(a.fx, b.fx) || (a.i - b.i))
+    .map((x) => x.fx);
+  fxDraft.length = 0;
+  fxDraft.push(...ordered);
+
   let addr = 1;
   for (const fx of fxDraft) {
     const w = rolesOf(fx).length;
@@ -385,6 +403,13 @@ document.getElementById("fxAutoPack").onclick = () => {
     addr += w;
   }
   markDirty();
+};
+
+document.getElementById("fxIdentifyAll").onclick = () => {
+  if (fxDirty) { fxHint.textContent = "Save changes before identifying"; return; }
+  // Toggle: if something is already blinking, stop it; otherwise start.
+  if (identifyingIndex >= 0) send({ type: "identifyStop" });
+  else send({ type: "identifyAll", stepMs: 700 });
 };
 
 fxSaveBtn.onclick = () => {
