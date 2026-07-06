@@ -30,6 +30,10 @@ const DYNAMIC_DAMPING = 0.8;
 const CENTER_ALPHA = 0.002;            // per tick, glidande centernivå
 
 export function useMockLive() {
+  const micEnabled = useDmx((s) => s.micEnabled);
+  const setMicError = useDmx((s) => s.setMicError);
+  const mic = useMic(micEnabled, setMicError);
+
   const raf = useRef<number | null>(null);
   const start = useRef(performance.now());
   const smoothedAudio = useRef(0);
