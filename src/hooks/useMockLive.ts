@@ -142,16 +142,6 @@ export function useMockLive() {
             r = g = b = on * 255 * briSlider;
             break;
           }
-          case "chill": {
-            // Aurora-drift: långsam palett som pendlar warm↔teal↔magenta.
-            const drift = Math.sin(hueBase * 0.15) * 140;               // 0..±140°
-            const hue = 20 + drift + Math.sin(hueBase * 0.4 + idx * 0.9) * 30;
-            const sat = 0.7 + Math.sin(hueBase * 0.25 + idx) * 0.2;
-            const v = Math.max(briFloor, briSlider * (0.65 + audio * 0.35));
-            const c = hsvToRgb(hue, Math.max(0.4, sat), v);
-            r = c[0]; g = c[1]; b = c[2];
-            break;
-          }
           case "party": {
             // Motrörelse: varannan fixture roterar åt motsatt håll → korsande band.
             const dir = idx % 2 === 0 ? 1 : -1;
