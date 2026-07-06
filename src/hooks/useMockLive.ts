@@ -65,22 +65,27 @@ export function useMockLive() {
       const releaseAlpha = softnessToAlpha(params.smoothness);
       const attackAlpha = 1.0;
 
-      // === Simulerad ljudkälla med musikstruktur ===
-      // Kontinuerlig bas + snärtiga "beats" (spikar) + sällsynta drops.
-      const base = 0.25 + 0.15 * Math.sin(t * 1.4);
-      let beatSpike = 0;
-      if (t >= nextBeat.current) {
-        beatSpike = 0.7 + Math.random() * 0.3;
-        nextBeat.current = t + 0.35 + Math.random() * 0.25;
+      // === Ljudkälla: riktig mic (om aktiv) eller syntetisk fejksignal ===
+      let rawEnergy: number;
+      if (mic.current.active) {
+        // Blanda RMS (dynamik) + basviktad spektral-energi (kick-känsla).
+        const m = mic.current.level * 0.6 + mic.current.energy * 0.8;
+        rawEnergy = Math.min(1, Math.max(0, m * (0.5 + sens)));
+      } else {
+        const base = 0.25 + 0.15 * Math.sin(t * 1.4);
+        let beatSpike = 0;
+        if (t >= nextBeat.current) {
+          beatSpike = 0.7 + Math.random() * 0.3;
+          nextBeat.current = t + 0.35 + Math.random() * 0.25;
+        }
+        if (t >= nextDrop.current) {
+          dropUntil.current = t + 1.5;
+          nextDrop.current = t + 8 + Math.random() * 6;
+        }
+        const dropBoost = t < dropUntil.current ? 0.35 : 0;
+        const noise = Math.random() * 0.05;
+        rawEnergy = Math.min(1, Math.max(0, (base + beatSpike * 0.6 + dropBoost + noise) * (0.5 + sens)));
       }
-      if (t >= nextDrop.current) {
-        // 1.5 sek förhöjd energi → trigar dropdetektorn
-        dropUntil.current = t + 1.5;
-        nextDrop.current = t + 8 + Math.random() * 6;
-      }
-      const dropBoost = t < dropUntil.current ? 0.35 : 0;
-      const noise = Math.random() * 0.05;
-      const rawEnergy = Math.min(1, Math.max(0, (base + beatSpike * 0.6 + dropBoost + noise) * (0.5 + sens)));
 
       // === Spectral flux → onset ===
       const flux = Math.max(0, rawEnergy - prevEnergy.current);
