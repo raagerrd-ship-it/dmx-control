@@ -46,6 +46,8 @@ interface DmxState {
   params: Params;
   fixtures: Fixture[];
   conn: ConnState;
+  micEnabled: boolean;
+  micError: string | null;
   audioLevel: number;   // 0..1 (smoothed)
   kick: number;         // 0..1 (decaying)
   frame: number[];      // DMX 1..512, values 0..255
@@ -56,6 +58,8 @@ interface DmxState {
   removeFixture: (id: string) => void;
   setLive: (audio: number, kick: number, frame: number[]) => void;
   setConn: (c: ConnState) => void;
+  setMicEnabled: (b: boolean) => void;
+  setMicError: (m: string | null) => void;
 }
 
 const LS_KEY = "dmx-config-v1";
