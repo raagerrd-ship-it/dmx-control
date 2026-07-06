@@ -1,0 +1,22 @@
+[Unit]
+Description=Audio → DMX engine (Node)
+After=network.target dmx-helper.service
+Requires=dmx-helper.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/audio-dmx-engine
+ExecStart=/usr/bin/node --enable-source-maps dist/index.js
+Environment=NODE_ENV=production
+Environment=PORT=80
+Restart=always
+RestartSec=2
+
+# Needs CAP_NET_BIND_SERVICE to bind :80 as non-root — grant via setcap on node
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+User=pi
+Group=pi
+SupplementaryGroups=audio dialout
+
+[Install]
+WantedBy=multi-user.target

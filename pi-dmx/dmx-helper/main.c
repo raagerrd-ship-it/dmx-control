@@ -160,7 +160,7 @@ static void *tx_thread(void *arg) {
 /* ── Unix socket receive ──────────────────────────────────────────────── */
 
 static int sock_open(const char *path) {
-    int s = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+    int s = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (s < 0) { perror("socket"); return -1; }
 
     unlink(path);
@@ -169,11 +169,10 @@ static int sock_open(const char *path) {
     if (bind(s, (struct sockaddr *)&a, sizeof(a)) < 0) {
         perror("bind"); close(s); return -1;
     }
-    chmod(path, 0666);  /* let the Node engine (any user) write to us */
-
-    /* Larger recv buffer avoids drops when engine bursts */
-    int rcv = 65536;
-    setsockopt(s, SOL_SOCKET, SO_RCVBUF, &rcv, sizeof(rcv));
+    if (listen(s, 1) < 0) {
+        perror("listen"); close(s); return -1;
+    }
+    chmod(path, 0666);
     return s;
 }
 
@@ -216,14 +215,30 @@ int main(void) {
     fprintf(stderr, "dmx-helper: listening on %s, output on %s @ 250k 8N2, %d Hz refresh\n",
             SOCK_PATH, UART_DEV, REFRESH_HZ);
 
+    /* Accept one client at a time (the Node engine). If it disconnects,
+     * we loop back and accept a new one. Frames are exactly 512 bytes,
+     * read as a fixed-size stream. */
     uint8_t buf[DMX_CHANNELS];
     while (g_running) {
-        ssize_t n = recv(sock, buf, sizeof(buf), 0);
-        if (n < 0) {
+        int client = accept(sock, NULL, NULL);
+        if (client < 0) {
             if (errno == EINTR) continue;
-            perror("recv"); break;
+            perror("accept"); break;
         }
-        handle_frame(buf, (size_t)n);
+        fprintf(stderr, "dmx-helper: engine connected\n");
+
+        while (g_running) {
+            size_t got = 0;
+            while (got < DMX_CHANNELS) {
+                ssize_t n = read(client, buf + got, DMX_CHANNELS - got);
+                if (n <= 0) { got = 0; break; }
+                got += (size_t)n;
+            }
+            if (got != DMX_CHANNELS) break;   /* disconnected */
+            handle_frame(buf, DMX_CHANNELS);
+        }
+        close(client);
+        fprintf(stderr, "dmx-helper: engine disconnected\n");
     }
 
     /* Wake tx thread so it can exit */
