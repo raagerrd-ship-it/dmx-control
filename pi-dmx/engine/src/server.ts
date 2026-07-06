@@ -11,7 +11,8 @@ import fastifyStatic from "@fastify/static";
 import fastifyWebsocket from "@fastify/websocket";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import type { EngineConfig, Mode } from "./config.js";
+import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
+import { fixtureRoles } from "./config.js";
 import type { Frame } from "./analyser.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
