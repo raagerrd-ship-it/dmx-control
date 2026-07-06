@@ -68,7 +68,7 @@ interface Persisted {
 
 const defaults: Persisted = {
   preset: "auto",
-  params: { brightness: 80, smoothness: 50, sensitivity: 60, staticHue: 200 },
+  params: { brightness: 80, smoothness: 50, sensitivity: 60 },
   fixtures: [
     { id: "f1", name: "PAR 1", startCh: 1,  mode: "rgb" },
     { id: "f2", name: "PAR 2", startCh: 4,  mode: "rgb" },
