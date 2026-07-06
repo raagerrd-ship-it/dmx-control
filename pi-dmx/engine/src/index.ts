@@ -6,16 +6,18 @@
  *                                                  dmx-helper → PL011 → MAX485
  *
  * Fastify serves the mobile control UI on :80 and pushes live state via WS.
+ * Runtime config is loaded from /var/lib/audio-dmx-engine/config.json and
+ * saved back (debounced) whenever the mobile UI changes it.
  */
 
-import { defaultConfig } from "./config.js";
 import { AudioCapture } from "./audio.js";
 import { Analyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
 import { DmxSender } from "./dmx.js";
 import { startServer } from "./server.js";
+import { loadConfig, scheduleSave } from "./persist.js";
 
-const cfg = defaultConfig;
+const cfg = await loadConfig();
 const analyser = new Analyser(cfg);
 const effects = new EffectEngine(cfg);
 const dmx = new DmxSender();
@@ -44,6 +46,7 @@ capture.start();
 startServer({
   cfg,
   getLatestFrame: () => latestFrame,
+  onConfigChanged: () => scheduleSave(cfg),
 }, Number(process.env.PORT ?? 80))
   .then((app) => console.log(`audio-dmx-engine listening on ${app.server.address()}`))
   .catch((e) => { console.error("server failed:", e); process.exit(1); });

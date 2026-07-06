@@ -8,10 +8,10 @@
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
   <style>
-    :root { --bg:#0a0a0f; --card:#15151f; --line:#252535; --fg:#e8e8f0; --dim:#7a7a90; --hot:#ff3a6b; --ok:#40e0a0; }
+    :root { --bg:#0a0a0f; --card:#15151f; --line:#252535; --fg:#e8e8f0; --dim:#7a7a90; --hot:#ff3a6b; --ok:#40e0a0; --warn:#ffb020; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin:0; padding:0; background:var(--bg); color:var(--fg); font: 15px -apple-system, system-ui, sans-serif; overscroll-behavior: none; }
-    body { padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom); }
+    body { padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 24px); }
     h1 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: 20px 0 10px; font-weight: 600; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
     .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -26,6 +26,27 @@
     .kick-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background: var(--line); margin-left: 6px; vertical-align: middle; transition: background 40ms; }
     .kick-dot.on { background: var(--hot); box-shadow: 0 0 12px var(--hot); }
     .status { font-size: 12px; color: var(--dim); margin-top: 8px; }
+
+    /* Fixture editor */
+    .fx { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+    .fx.dirty { border-color: var(--warn); }
+    .fx.err   { border-color: var(--hot); }
+    .fx-head { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .fx-head input.name { flex: 1; background: transparent; border: 0; color: var(--fg); font-size: 15px; font-weight: 500; padding: 6px 0; }
+    .fx-head button.del { background: transparent; border: 0; color: var(--dim); font-size: 18px; cursor: pointer; padding: 4px 8px; }
+    .fx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .fx-field label { display: block; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 3px; }
+    .fx-field input, .fx-field select { width: 100%; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); font-size: 15px; font-variant-numeric: tabular-nums; }
+    .fx-roles { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .fx-role { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+    .fx-role select { background: transparent; border: 0; color: var(--fg); font-size: 12px; }
+    .fx-role .rm { color: var(--dim); margin-left: 4px; cursor: pointer; }
+    .fx-meta { font-size: 11px; color: var(--dim); margin-top: 6px; }
+    .fx-err  { font-size: 11px; color: var(--hot); margin-top: 6px; }
+    .fx-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .btn { flex: 1; padding: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); font-size: 14px; font-weight: 500; cursor: pointer; }
+    .btn.primary { background: var(--hot); border-color: var(--hot); color: white; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
   </style>
 </head>
 <body>
@@ -53,7 +74,18 @@
     <input type="range" id="master" min="0" max="100" value="100" />
   </div>
 
+  <h1>Fixtures</h1>
+  <div class="card">
+    <div id="fixtures"></div>
+    <div class="fx-actions">
+      <button class="btn" id="fxAdd">+ Add fixture</button>
+      <button class="btn primary" id="fxSave" disabled>Save changes</button>
+    </div>
+    <div class="status" id="fxHint">Tap a fixture to edit. Changes are validated before saving.</div>
+  </div>
+
   <div class="status" id="conn">Connecting…</div>
+
 
 <script>
 const MODES = ["auto","chill","party","chase","fire","strobe","blackout"];
@@ -98,6 +130,9 @@ function applyConfig(cfg) {
   sensVal.textContent = sensEl.value + "%";
   masterEl.value = Math.round(cfg.master * 100);
   masterVal.textContent = masterEl.value + "%";
+  // Only replace local draft if server pushed something we don't already have
+  // pending edits for. Prevents stomping the user's in-progress edit.
+  if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
 }
 let kickTimer;
 function applyFrame(f) {
@@ -114,8 +149,186 @@ function applyFrame(f) {
 sensEl.oninput = () => { sensVal.textContent = sensEl.value + "%"; send({ type: "setSensitivity", value: sensEl.value / 100 }); };
 masterEl.oninput = () => { masterVal.textContent = masterEl.value + "%"; send({ type: "setMaster", value: masterEl.value / 100 }); };
 
+/* ── Fixture editor ─────────────────────────────────────────────────── */
+const PRESETS = ["rgb", "rgbw", "dimmer", "custom"];
+const PRESET_ROLES = {
+  rgb:    ["r","g","b"],
+  rgbw:   ["r","g","b","w"],
+  dimmer: ["dim"],
+};
+const ROLE_OPTIONS = ["r","g","b","w","dim","strobe","unused"];
+const fxEl = document.getElementById("fixtures");
+const fxSaveBtn = document.getElementById("fxSave");
+const fxHint = document.getElementById("fxHint");
+let fxDraft = [];
+let fxDirty = false;
+const deepClone = (x) => JSON.parse(JSON.stringify(x));
+const rolesOf = (fx) => fx.preset === "custom" ? (fx.roles ?? []) : PRESET_ROLES[fx.preset];
+
+function markDirty() {
+  fxDirty = true;
+  fxSaveBtn.disabled = validateAll().length > 0;
+  renderFixtures();
+}
+
+function validateAll() {
+  const errs = [];
+  const used = new Map(); // channel → fixture index
+  fxDraft.forEach((fx, i) => {
+    const width = rolesOf(fx).length;
+    if (!fx.name || fx.name.trim() === "") errs.push({ i, msg: "Name required" });
+    if (!Number.isInteger(fx.address) || fx.address < 1 || fx.address > 512)
+      errs.push({ i, msg: "Address 1–512" });
+    else if (fx.address + width - 1 > 512)
+      errs.push({ i, msg: `Overflows universe (needs ${width} ch)` });
+    else {
+      for (let c = fx.address; c < fx.address + width; c++) {
+        if (used.has(c)) errs.push({ i, msg: `Ch ${c} overlaps "${fxDraft[used.get(c)].name}"` });
+        else used.set(c, i);
+      }
+    }
+    if (fx.preset === "custom" && (!fx.roles || fx.roles.length === 0))
+      errs.push({ i, msg: "Add at least one channel" });
+  });
+  return errs;
+}
+
+function renderFixtures() {
+  const errs = validateAll();
+  const errByIdx = new Map();
+  errs.forEach((e) => {
+    if (!errByIdx.has(e.i)) errByIdx.set(e.i, []);
+    errByIdx.get(e.i).push(e.msg);
+  });
+
+  fxEl.innerHTML = "";
+  fxDraft.forEach((fx, i) => {
+    const width = rolesOf(fx).length;
+    const div = document.createElement("div");
+    div.className = "fx" + (fxDirty ? " dirty" : "") + (errByIdx.has(i) ? " err" : "");
+    div.innerHTML = `
+      <div class="fx-head">
+        <input class="name" type="text" value="${escapeHtml(fx.name)}" data-i="${i}" data-k="name" />
+        <button class="del" data-del="${i}" aria-label="Remove">×</button>
+      </div>
+      <div class="fx-grid">
+        <div class="fx-field">
+          <label>DMX address</label>
+          <input type="number" min="1" max="512" value="${fx.address}" data-i="${i}" data-k="address" inputmode="numeric" />
+        </div>
+        <div class="fx-field">
+          <label>Type</label>
+          <select data-i="${i}" data-k="preset">
+            ${PRESETS.map((p) => `<option value="${p}" ${p === fx.preset ? "selected" : ""}>${p.toUpperCase()}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      ${fx.preset === "custom" ? renderCustomRoles(fx, i) : ""}
+      <div class="fx-meta">Ch ${fx.address}–${fx.address + width - 1} · ${width} channel${width > 1 ? "s" : ""} · ${rolesOf(fx).join(" · ")}</div>
+      ${errByIdx.has(i) ? `<div class="fx-err">${errByIdx.get(i).join(" · ")}</div>` : ""}
+    `;
+    fxEl.appendChild(div);
+  });
+
+  fxHint.textContent = fxDirty
+    ? (errs.length ? `${errs.length} problem${errs.length > 1 ? "s" : ""} to fix before saving` : "Ready to save")
+    : "Tap a fixture to edit. Changes are validated before saving.";
+  fxSaveBtn.disabled = !fxDirty || errs.length > 0;
+
+  // Wire up
+  fxEl.querySelectorAll("[data-k]").forEach((el) => {
+    el.addEventListener("input", onFieldChange);
+    el.addEventListener("change", onFieldChange);
+  });
+  fxEl.querySelectorAll("[data-del]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      fxDraft.splice(Number(e.target.dataset.del), 1);
+      markDirty();
+    });
+  });
+  fxEl.querySelectorAll("[data-role-i]").forEach((el) => {
+    el.addEventListener("change", (e) => {
+      const i = Number(e.target.dataset.fxI);
+      const r = Number(e.target.dataset.roleI);
+      fxDraft[i].roles[r] = e.target.value;
+      markDirty();
+    });
+  });
+  fxEl.querySelectorAll("[data-role-rm]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      const i = Number(e.target.dataset.fxI);
+      const r = Number(e.target.dataset.roleRm);
+      fxDraft[i].roles.splice(r, 1);
+      markDirty();
+    });
+  });
+  fxEl.querySelectorAll("[data-role-add]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      const i = Number(e.target.dataset.roleAdd);
+      fxDraft[i].roles = fxDraft[i].roles ?? [];
+      fxDraft[i].roles.push("unused");
+      markDirty();
+    });
+  });
+}
+
+function renderCustomRoles(fx, i) {
+  const roles = fx.roles ?? [];
+  return `<div class="fx-roles">
+    ${roles.map((r, ri) => `
+      <span class="fx-role">
+        <select data-role-i="${ri}" data-fx-i="${i}">
+          ${ROLE_OPTIONS.map((opt) => `<option value="${opt}" ${opt === r ? "selected" : ""}>${opt}</option>`).join("")}
+        </select>
+        <span class="rm" data-role-rm="${ri}" data-fx-i="${i}">×</span>
+      </span>
+    `).join("")}
+    <span class="fx-role" style="cursor:pointer" data-role-add="${i}">+ ch</span>
+  </div>`;
+}
+
+function onFieldChange(e) {
+  const i = Number(e.target.dataset.i);
+  const k = e.target.dataset.k;
+  const fx = fxDraft[i];
+  if (k === "name")    fx.name = e.target.value;
+  if (k === "address") fx.address = parseInt(e.target.value, 10) || 0;
+  if (k === "preset") {
+    fx.preset = e.target.value;
+    if (fx.preset === "custom" && !fx.roles) fx.roles = ["r","g","b"];
+    if (fx.preset !== "custom") delete fx.roles;
+  }
+  markDirty();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]
+  ));
+}
+
+document.getElementById("fxAdd").onclick = () => {
+  // Suggest next free address: end of last fixture + 1
+  let nextAddr = 1;
+  fxDraft.forEach((fx) => {
+    const end = fx.address + rolesOf(fx).length - 1;
+    if (end >= nextAddr) nextAddr = end + 1;
+  });
+  fxDraft.push({ name: `Fixture ${fxDraft.length + 1}`, address: Math.min(nextAddr, 512), preset: "rgb" });
+  markDirty();
+};
+
+fxSaveBtn.onclick = () => {
+  if (validateAll().length > 0) return;
+  send({ type: "setFixtures", fixtures: fxDraft });
+  fxDirty = false;
+  fxSaveBtn.disabled = true;
+  renderFixtures();
+};
+
 renderModes("auto");
 connect();
+
 </script>
 </body>
 </html>

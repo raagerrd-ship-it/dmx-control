@@ -5,11 +5,24 @@
 
 export type Mode = "auto" | "chill" | "party" | "chase" | "fire" | "strobe" | "blackout";
 
+/**
+ * A fixture is placed at `address` and occupies channels in a defined role
+ * order. Preset "rgb"/"rgbw"/"dimmer" expand to standard layouts; "custom"
+ * takes an explicit `roles` array (e.g. ["dim","r","g","b","strobe"]) so
+ * odd fixtures can be mapped without code changes.
+ */
+export type ChannelRole = "r" | "g" | "b" | "w" | "dim" | "strobe" | "unused";
+export type FixturePreset = "rgb" | "rgbw" | "dimmer" | "custom";
+
 export interface FixtureConfig {
-  /** DMX start address (1..512) */
+  /** Human name shown in the mobile UI */
+  name: string;
+  /** DMX start address 1..512 */
   address: number;
-  /** 3 = RGB, 4 = RGBW, 1 = dimmer-only */
-  channels: 3 | 4 | 1;
+  /** Preset or "custom" (in which case `roles` is used) */
+  preset: FixturePreset;
+  /** Only used when preset === "custom" */
+  roles?: ChannelRole[];
 }
 
 export interface EngineConfig {
@@ -48,13 +61,23 @@ export const defaultConfig: EngineConfig = {
     kickCooldownMs: 90,
   },
   fixtures: [
-    // MVP: 4 RGB-par-lampor på adress 1, 4, 7, 10
-    { address: 1,  channels: 3 },
-    { address: 4,  channels: 3 },
-    { address: 7,  channels: 3 },
-    { address: 10, channels: 3 },
+    { name: "Par 1", address: 1,  preset: "rgb" },
+    { name: "Par 2", address: 4,  preset: "rgb" },
+    { name: "Par 3", address: 7,  preset: "rgb" },
+    { name: "Par 4", address: 10, preset: "rgb" },
   ],
   mode: "auto",
   sensitivity: 0.6,
   master: 1.0,
 };
+
+export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
+  rgb:    ["r", "g", "b"],
+  rgbw:   ["r", "g", "b", "w"],
+  dimmer: ["dim"],
+};
+
+export function fixtureRoles(fx: FixtureConfig): ChannelRole[] {
+  if (fx.preset === "custom") return fx.roles ?? [];
+  return PRESET_ROLES[fx.preset];
+}
