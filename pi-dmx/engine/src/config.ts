@@ -3,7 +3,7 @@
  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
  */
 
-export type Mode = "auto" | "chill" | "party" | "chase" | "fire" | "strobe" | "blackout";
+export type Mode = "auto" | "chill" | "party" | "chase" | "mono" | "strobe" | "blackout";
 
 /**
  * A fixture is placed at `address` and occupies channels in a defined role
@@ -47,6 +47,8 @@ export interface EngineConfig {
   mode: Mode;
   sensitivity: number;    // 0..1 user knob
   master: number;         // 0..1 master brightness
+  /** Hue 0..360 used by "mono" mode. 15 ≈ fire orange, 0 = red, 240 = blue. */
+  monoHue: number;
   /** Physical push-button that cycles through modes. Set null to disable. */
   modeButton: { chip: string; line: number } | null;
   /** Transient identify override — not persisted. index = fixture being lit. */
@@ -73,6 +75,7 @@ export const defaultConfig: EngineConfig = {
   mode: "auto",
   sensitivity: 0.6,
   master: 1.0,
+  monoHue: 15,   // warm orange — feels like fire, but the user can pick anything
   modeButton: { chip: "gpiochip0", line: 17 },   // GPIO17 = physical pin 11
 };
 

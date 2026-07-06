@@ -40,7 +40,7 @@ export class EffectEngine {
 
     for (let i = 0; i < this.cfg.fixtures.length; i++) {
       const fx = this.cfg.fixtures[i];
-      const rgb = pickColor(this.cfg.mode, t, i, this.cfg.fixtures.length, audio, kickEnv, frame);
+      const rgb = pickColor(this.cfg.mode, t, i, this.cfg.fixtures.length, audio, kickEnv, frame, this.cfg.monoHue);
       writeFixture(this.universe, fx, rgb, master);
     }
 
@@ -86,6 +86,7 @@ function pickColor(
   audio: number,
   kickEnv: number,
   frame: Frame,
+  monoHue: number,
 ): [number, number, number] {
   switch (mode) {
     case "auto": {
@@ -116,10 +117,16 @@ function pickColor(
       const hue = ((t * 20) % 360) / 360;
       return hsvToRgb(hue, 1, v);
     }
-    case "fire": {
-      const flicker = 0.7 + Math.random() * 0.3;
-      const hue = 0.02 + Math.random() * 0.05;
-      const v = flicker * (0.5 + audio * 0.5);
+    case "mono": {
+      // Single user-picked hue, brightness driven by audio + kick, with a
+      // subtle flicker so it never feels static. At warm hues (~15°) with a
+      // stronger flicker weight it reads as "fire".
+      const isWarm = monoHue < 40 || monoHue > 340;
+      const flicker = isWarm
+        ? 0.7 + Math.random() * 0.3            // fire-like jitter
+        : 0.9 + Math.random() * 0.1;           // gentle shimmer
+      const hue = (((monoHue + (isWarm ? (Math.random() - 0.5) * 12 : 0)) % 360) + 360) % 360 / 360;
+      const v = flicker * Math.min(1, 0.4 + audio * 0.6 + kickEnv * 0.3);
       return hsvToRgb(hue, 1, v);
     }
     case "strobe": {

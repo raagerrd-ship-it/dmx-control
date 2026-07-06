@@ -102,6 +102,8 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
             deps.cfg.sensitivity = clamp01(msg.value);
           } else if (msg.type === "setMaster") {
             deps.cfg.master = clamp01(msg.value);
+          } else if (msg.type === "setMonoHue" && typeof msg.value === "number") {
+            deps.cfg.monoHue = ((msg.value % 360) + 360) % 360;
           } else if (msg.type === "setFixtures" && Array.isArray(msg.fixtures)) {
             const cleaned = sanitizeFixtures(msg.fixtures);
             if (cleaned) { deps.cfg.fixtures = cleaned; stopIdentify(); }
@@ -140,7 +142,7 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
 
 function isMode(m: unknown): m is Mode {
   return typeof m === "string" &&
-    ["auto", "chill", "party", "chase", "fire", "strobe", "blackout"].includes(m);
+    ["auto", "chill", "party", "chase", "mono", "strobe", "blackout"].includes(m);
 }
 const clamp01 = (x: number) => typeof x === "number" && x >= 0 && x <= 1 ? x : 0;
 

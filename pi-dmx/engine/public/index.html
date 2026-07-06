@@ -80,6 +80,28 @@
     <input type="range" id="master" min="0" max="100" value="100" />
   </div>
 
+  <div id="monoCard" style="display:none">
+    <h1>Mono color</h1>
+    <div class="card">
+      <div class="row">
+        <label>Hue</label>
+        <span class="val"><span id="monoSwatch" style="display:inline-block;width:18px;height:18px;border-radius:4px;vertical-align:middle;border:1px solid var(--line);margin-right:6px"></span><span id="monoVal">–</span>°</span>
+      </div>
+      <input type="range" id="monoHue" min="0" max="359" value="15" style="background:linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);height:10px;border-radius:5px;-webkit-appearance:none;appearance:none" />
+      <div class="fx-actions" style="margin-top:10px">
+        <button class="btn" data-preset-hue="0">Red</button>
+        <button class="btn" data-preset-hue="15">Fire</button>
+        <button class="btn" data-preset-hue="60">Yellow</button>
+        <button class="btn" data-preset-hue="120">Green</button>
+        <button class="btn" data-preset-hue="200">Cyan</button>
+        <button class="btn" data-preset-hue="240">Blue</button>
+        <button class="btn" data-preset-hue="290">Purple</button>
+        <button class="btn" data-preset-hue="330">Pink</button>
+      </div>
+    </div>
+  </div>
+
+
   <h1>Fixtures</h1>
   <div class="card">
     <div id="fixtures"></div>
@@ -104,7 +126,7 @@
 
 
 <script>
-const MODES = ["auto","chill","party","chase","fire","strobe","blackout"];
+const MODES = ["auto","chill","party","chase","mono","strobe","blackout"];
 const modesEl = document.getElementById("modes");
 const kickDot = document.getElementById("kickDot");
 const levelBar = document.getElementById("levelBar");
@@ -114,6 +136,10 @@ const sensEl = document.getElementById("sens");
 const sensVal = document.getElementById("sensVal");
 const masterEl = document.getElementById("master");
 const masterVal = document.getElementById("masterVal");
+const monoCard = document.getElementById("monoCard");
+const monoHueEl = document.getElementById("monoHue");
+const monoValEl = document.getElementById("monoVal");
+const monoSwatch = document.getElementById("monoSwatch");
 const connEl = document.getElementById("conn");
 
 let ws;
@@ -146,13 +172,16 @@ function applyConfig(cfg) {
   sensVal.textContent = sensEl.value + "%";
   masterEl.value = Math.round(cfg.master * 100);
   masterVal.textContent = masterEl.value + "%";
-  // Track which fixture (if any) the engine is currently blinking so we can
-  // highlight it in the UI — server drives this, we just visualise.
+  // Mono color card: only meaningful when mode === "mono", but we keep the
+  // slider synced regardless so switching to mono lands on the right color.
+  const hue = Math.round(cfg.monoHue ?? 15);
+  monoHueEl.value = hue;
+  monoValEl.textContent = hue;
+  monoSwatch.style.background = `hsl(${hue} 100% 50%)`;
+  monoCard.style.display = cfg.mode === "mono" ? "" : "none";
   identifyingIndex = cfg.identify?.index ?? -1;
-  // Only replace local draft if server pushed something we don't already have
-  // pending edits for. Prevents stomping the user's in-progress edit.
   if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
-  else renderFixtures();  // still refresh highlight even mid-edit
+  else renderFixtures();
 }
 let kickTimer;
 function applyFrame(f) {
@@ -168,6 +197,19 @@ function applyFrame(f) {
 }
 sensEl.oninput = () => { sensVal.textContent = sensEl.value + "%"; send({ type: "setSensitivity", value: sensEl.value / 100 }); };
 masterEl.oninput = () => { masterVal.textContent = masterEl.value + "%"; send({ type: "setMaster", value: masterEl.value / 100 }); };
+monoHueEl.oninput = () => {
+  const h = Number(monoHueEl.value);
+  monoValEl.textContent = h;
+  monoSwatch.style.background = `hsl(${h} 100% 50%)`;
+  send({ type: "setMonoHue", value: h });
+};
+document.querySelectorAll("[data-preset-hue]").forEach((b) => {
+  b.onclick = () => {
+    const h = Number(b.dataset.presetHue);
+    monoHueEl.value = h;
+    monoHueEl.dispatchEvent(new Event("input"));
+  };
+});
 
 /* ── Fixture editor ─────────────────────────────────────────────────── */
 const PRESETS = ["rgb", "rgbw", "dimmer", "custom"];
