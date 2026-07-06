@@ -171,8 +171,10 @@ export function useMockLive() {
             const wrapDist = (a: number, b: number) => {
               let d = Math.abs(a - b); if (d > 0.5) d = 1 - d; return d;
             };
-            const head = Math.exp(-wrapDist(myPos, headPos) ** 2 * 40);  // stor komet
-            const tail = Math.exp(-wrapDist(myPos, tailPos) ** 2 * 90) * 0.4; // liten motström
+            const dHead = wrapDist(myPos, headPos);
+            const dTail = wrapDist(myPos, tailPos);
+            const head = Math.exp(-(dHead * dHead) * 40);   // stor komet
+            const tail = Math.exp(-(dTail * dTail) * 90) * 0.4; // liten motström
             const bump = Math.min(1, head + tail);
             const hue = (hueBase * 60 + idx * 30 + (tail > head ? 180 : 0)) % 360;
             const v = Math.max(briFloor, briSlider * (0.12 + bump * (0.65 + audio * 0.4)));
