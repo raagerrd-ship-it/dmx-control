@@ -101,6 +101,29 @@
     </div>
   </div>
 
+  <div id="cometCard" style="display:none">
+    <h1>Comet color</h1>
+    <div class="card">
+      <div class="row">
+        <label>Hue</label>
+        <span class="val"><span id="cometSwatch" style="display:inline-block;width:18px;height:18px;border-radius:4px;vertical-align:middle;border:1px solid var(--line);margin-right:6px"></span><span id="cometVal">–</span>°</span>
+      </div>
+      <input type="range" id="cometHue" min="0" max="359" value="15" style="background:linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);height:10px;border-radius:5px;-webkit-appearance:none;appearance:none" />
+      <div class="fx-actions" style="margin-top:10px">
+        <button class="btn" data-comet-hue="0">Red</button>
+        <button class="btn" data-comet-hue="15">Fire</button>
+        <button class="btn" data-comet-hue="60">Yellow</button>
+        <button class="btn" data-comet-hue="120">Green</button>
+        <button class="btn" data-comet-hue="200">Cyan</button>
+        <button class="btn" data-comet-hue="240">Blue</button>
+        <button class="btn" data-comet-hue="290">Purple</button>
+        <button class="btn" data-comet-hue="330">Pink</button>
+      </div>
+    </div>
+  </div>
+
+
+
 
   <h1>Fixtures</h1>
   <div class="card">
@@ -126,7 +149,7 @@
 
 
 <script>
-const MODES = ["auto","party","chase","comet","mono","strobe","blackout"];
+const MODES = ["auto","party","comet","mono","strobe","blackout"];
 const modesEl = document.getElementById("modes");
 const kickDot = document.getElementById("kickDot");
 const levelBar = document.getElementById("levelBar");
@@ -140,6 +163,10 @@ const monoCard = document.getElementById("monoCard");
 const monoHueEl = document.getElementById("monoHue");
 const monoValEl = document.getElementById("monoVal");
 const monoSwatch = document.getElementById("monoSwatch");
+const cometCard = document.getElementById("cometCard");
+const cometHueEl = document.getElementById("cometHue");
+const cometValEl = document.getElementById("cometVal");
+const cometSwatch = document.getElementById("cometSwatch");
 const connEl = document.getElementById("conn");
 
 let ws;
@@ -179,6 +206,11 @@ function applyConfig(cfg) {
   monoValEl.textContent = hue;
   monoSwatch.style.background = `hsl(${hue} 100% 50%)`;
   monoCard.style.display = cfg.mode === "mono" ? "" : "none";
+  const chue = Math.round(cfg.cometHue ?? 15);
+  cometHueEl.value = chue;
+  cometValEl.textContent = chue;
+  cometSwatch.style.background = `hsl(${chue} 100% 50%)`;
+  cometCard.style.display = cfg.mode === "comet" ? "" : "none";
   identifyingIndex = cfg.identify?.index ?? -1;
   if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
   else renderFixtures();
@@ -208,6 +240,19 @@ document.querySelectorAll("[data-preset-hue]").forEach((b) => {
     const h = Number(b.dataset.presetHue);
     monoHueEl.value = h;
     monoHueEl.dispatchEvent(new Event("input"));
+  };
+});
+cometHueEl.oninput = () => {
+  const h = Number(cometHueEl.value);
+  cometValEl.textContent = h;
+  cometSwatch.style.background = `hsl(${h} 100% 50%)`;
+  send({ type: "setCometHue", value: h });
+};
+document.querySelectorAll("[data-comet-hue]").forEach((b) => {
+  b.onclick = () => {
+    const h = Number(b.dataset.cometHue);
+    cometHueEl.value = h;
+    cometHueEl.dispatchEvent(new Event("input"));
   };
 });
 

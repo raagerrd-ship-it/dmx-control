@@ -153,40 +153,22 @@ export function useMockLive() {
             if (kick > 0.7 || flashActive) { r = g = b = 255 * briSlider; }
             break;
           }
-          case "chase": {
-            // Komet med lång svans + kort motström. Kicken puttar fram.
-            const headPos = (hueBase * 0.7 + kick * 0.5) % 1;
-            const tailPos = 1 - headPos;
-            const myPos = idx / fixtureCount;
-            const wrapDist = (a: number, b: number) => {
-              let d = Math.abs(a - b); if (d > 0.5) d = 1 - d; return d;
-            };
-            const dHead = wrapDist(myPos, headPos);
-            const dTail = wrapDist(myPos, tailPos);
-            const head = Math.exp(-(dHead * dHead) * 40);   // stor komet
-            const tail = Math.exp(-(dTail * dTail) * 90) * 0.4; // liten motström
-            const bump = Math.min(1, head + tail);
-            const hue = (hueBase * 60 + idx * 30 + (tail > head ? 180 : 0)) % 360;
-            const v = Math.max(briFloor, briSlider * (0.12 + bump * (0.65 + audio * 0.4)));
-            const c = hsvToRgb(hue, 1, Math.min(1, v));
-            r = c[0]; g = c[1]; b = c[2];
-            break;
-          }
           case "comet": {
             // Eldklot glider genom lamporna med lång, utfadande svans.
+            // Färg = användarvald hue (t.ex. blå komet, grön, magenta).
+            const cometHue = params.cometHue;
             const headPos = (hueBase * 0.3 + kick * 0.2) % 1;
             const myPos = idx / fixtureCount;
             // Signerat avstånd bakåt från huvudet (0..1), wrappat
             let behind = myPos - headPos; if (behind > 0) behind -= 1; behind = -behind;
-            // Lång svans + små glöder som håller resten från att bli helsvart
+            // Lång svans + små glöder så resten inte blir helsvart
             const tail = Math.exp(-behind * 1.4) + 0.1 * Math.exp(-behind * 0.5);
             const lead = Math.exp(-(1 - behind) * 20);       // skarp framkant
             const bump = Math.min(1, tail + lead);
-            // Vitglödgad kärna → orange → djupröd svans
-            const hue = 8 + behind * 22;
-            const sat = Math.min(1, 0.25 + behind * 1.1);
+            // Vitglödgad kärna (låg sat) → mättad vald färg i svansen
+            const sat = Math.min(1, 0.2 + behind * 1.1);
             const v = Math.max(briFloor, briSlider * bump * (0.55 + audio * 0.5));
-            const c = hsvToRgb(hue, sat, Math.min(1, v));
+            const c = hsvToRgb(cometHue, sat, Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
             break;
           }

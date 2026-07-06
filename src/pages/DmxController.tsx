@@ -3,7 +3,7 @@ import { PresetGrid } from "@/components/PresetGrid";
 import { LiveControls } from "@/components/LiveControls";
 import { FixtureSetup } from "@/components/FixtureSetup";
 import { LivePreview } from "@/components/LivePreview";
-import { MonoColorCard } from "@/components/MonoColorCard";
+import { HueColorCard } from "@/components/HueColorCard";
 import { useMockLive } from "@/hooks/useMockLive";
 import { useDmx, presetById } from "@/store/dmx";
 
@@ -14,6 +14,9 @@ export default function DmxController() {
   const [tab, setTab] = useState<Tab>("live");
   const preset = useDmx((s) => s.preset);
   const conn = useDmx((s) => s.conn);
+  const monoHue = useDmx((s) => s.params.monoHue);
+  const cometHue = useDmx((s) => s.params.cometHue);
+  const patch = useDmx((s) => s.patchParams);
   const p = presetById(preset);
 
   return (
@@ -68,7 +71,8 @@ export default function DmxController() {
         {tab === "live" ? (
           <>
             <PresetGrid />
-            {preset === "mono" && <MonoColorCard />}
+            {preset === "mono"  && <HueColorCard label="Mono-färg"  hue={monoHue}  onChange={(h) => patch({ monoHue: h })} />}
+            {preset === "comet" && <HueColorCard label="Comet-färg" hue={cometHue} onChange={(h) => patch({ cometHue: h })} />}
             <LiveControls />
             <LivePreview />
           </>

@@ -1,6 +1,6 @@
-import { useDmx } from "@/store/dmx";
+// Återanvänds för både Mono och Comet. Speglar knapparna i mobile-UI:t
+// (pi-dmx/engine/public/index.html).
 
-// Snabbval speglar mobile-UI:t i pi-dmx/engine/public/index.html
 const PRESETS: { name: string; hue: number }[] = [
   { name: "Red",    hue: 0   },
   { name: "Fire",   hue: 15  },
@@ -12,14 +12,16 @@ const PRESETS: { name: string; hue: number }[] = [
   { name: "Pink",   hue: 320 },
 ];
 
-export function MonoColorCard() {
-  const hue = useDmx((s) => s.params.monoHue);
-  const patch = useDmx((s) => s.patchParams);
-
+export function HueColorCard(props: {
+  label: string;
+  hue: number;
+  onChange: (h: number) => void;
+}) {
+  const { label, hue, onChange } = props;
   return (
     <div className="space-y-4 rounded-2xl border border-border bg-card p-5">
       <div className="flex items-baseline justify-between">
-        <div className="text-sm font-medium">Mono-färg</div>
+        <div className="text-sm font-medium">{label}</div>
         <div className="flex items-center gap-2">
           <span
             className="inline-block w-4 h-4 rounded border border-border"
@@ -34,7 +36,7 @@ export function MonoColorCard() {
         min={0}
         max={359}
         value={hue}
-        onChange={(e) => patch({ monoHue: Number(e.target.value) })}
+        onChange={(e) => onChange(Number(e.target.value))}
         className="w-full h-2.5 rounded-full appearance-none cursor-pointer"
         style={{
           background:
@@ -44,11 +46,11 @@ export function MonoColorCard() {
 
       <div className="grid grid-cols-4 gap-2">
         {PRESETS.map((p) => {
-          const active = Math.abs(((hue - p.hue + 540) % 360) - 180) > 175;
+          const active = Math.round(hue) === p.hue;
           return (
             <button
               key={p.name}
-              onClick={() => patch({ monoHue: p.hue })}
+              onClick={() => onChange(p.hue)}
               className={`py-2 rounded-lg text-xs font-medium border transition-colors ${
                 active ? "border-accent" : "border-border hover:border-muted-foreground/40"
               }`}
