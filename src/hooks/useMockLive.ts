@@ -201,14 +201,18 @@ export function useMockLive() {
             break;
           }
           case "mono": {
-            const flicker = 0.75 + Math.random() * 0.25;
-            const kickHue = 55 * kick;
-            const hue = 5 + Math.sin(hueBase * 1.1 + idx * 1.3) * 15 + kickHue;
-            const v = Math.max(briFloor, briSlider * flicker * (0.55 + audio * 0.55));
-            const sat = Math.max(0.6, 1 - kick * 0.5);
-            const c = hsvToRgb(hue, sat, Math.min(1, v));
+            // En användarvald hue. Vid varma toner (~15°) mer flimmer så det
+            // känns som eld; svalare toner får mjuk shimmer.
+            const monoHue = params.monoHue;
+            const isWarm = monoHue < 40 || monoHue > 340;
+            const flicker = isWarm
+              ? 0.7 + Math.random() * 0.3
+              : 0.9 + Math.random() * 0.1;
+            const hueJitter = isWarm ? (Math.random() - 0.5) * 12 : 0;
+            const hue = ((monoHue + hueJitter) % 360 + 360) % 360;
+            const v = Math.max(briFloor, briSlider * flicker * (0.4 + audio * 0.6 + kick * 0.3));
+            const c = hsvToRgb(hue, 1, Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
-            if (flashActive) { r = 255 * briSlider; g = 200 * briSlider; b = 80 * briSlider; }
             break;
           }
           case "auto":

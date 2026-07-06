@@ -39,6 +39,7 @@ export interface Params {
   brightness: number;   // 0..100
   smoothness: number;   // 0..100  (0 = snärtigt/snabbt release, 100 = mjukt/långsamt — mappar releaseAlpha)
   sensitivity: number;  // 0..100
+  monoHue: number;      // 0..360 hue för Mono-läget (15 ≈ eld-orange, 0 = röd, 240 = blå)
 }
 
 export type ConnState = "mock" | "connecting" | "connected" | "disconnected";
@@ -74,7 +75,7 @@ interface Persisted {
 
 const defaults: Persisted = {
   preset: "auto",
-  params: { brightness: 80, smoothness: 50, sensitivity: 60 },
+  params: { brightness: 80, smoothness: 50, sensitivity: 60, monoHue: 15 },
   fixtures: [
     { id: "f1", name: "PAR 1", startCh: 1,  mode: "rgb" },
     { id: "f2", name: "PAR 2", startCh: 4,  mode: "rgb" },
@@ -87,7 +88,12 @@ function load(): Persisted {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return defaults;
-    const merged = { ...defaults, ...JSON.parse(raw) } as Persisted;
+    const parsed = JSON.parse(raw) as Partial<Persisted>;
+    const merged: Persisted = {
+      ...defaults,
+      ...parsed,
+      params: { ...defaults.params, ...(parsed.params ?? {}) },
+    };
     // Migrera bort borttagna presets (static/blackout → auto)
     if (!PRESETS.some((p) => p.id === merged.preset)) merged.preset = "auto";
     return merged;

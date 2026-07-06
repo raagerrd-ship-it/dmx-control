@@ -3,6 +3,7 @@ import { PresetGrid } from "@/components/PresetGrid";
 import { LiveControls } from "@/components/LiveControls";
 import { FixtureSetup } from "@/components/FixtureSetup";
 import { LivePreview } from "@/components/LivePreview";
+import { MonoColorCard } from "@/components/MonoColorCard";
 import { useMockLive } from "@/hooks/useMockLive";
 import { useDmx, presetById } from "@/store/dmx";
 
@@ -67,6 +68,7 @@ export default function DmxController() {
         {tab === "live" ? (
           <>
             <PresetGrid />
+            {preset === "mono" && <MonoColorCard />}
             <LiveControls />
             <LivePreview />
           </>
