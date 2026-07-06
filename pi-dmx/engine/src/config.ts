@@ -78,6 +78,7 @@ export const defaultConfig: EngineConfig = {
   sensitivity: 0.6,
   master: 1.0,
   monoHue: 15,   // warm orange — feels like fire, but the user can pick anything
+  cometHue: 15,  // fireball default; pick e.g. 220 for a blue comet
   modeButton: { chip: "gpiochip0", line: 17 },   // GPIO17 = physical pin 11
 };
 
