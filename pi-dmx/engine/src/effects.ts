@@ -94,12 +94,6 @@ function pickColor(
       const v = Math.min(1, 0.3 + audio * 0.8 + kickEnv * 0.5);
       return hsvToRgb(hue, 1, v);
     }
-    case "chill": {
-      const drift = Math.sin(t * 0.15) * 140;
-      const hue = ((30 + drift + idx * 20) % 360 + 360) % 360 / 360;
-      const v = 0.4 + audio * 0.4;
-      return hsvToRgb(hue, 0.7, v);
-    }
     case "party": {
       const dir = idx % 2 === 0 ? 1 : -1;
       const hue = ((t * 90 * dir + idx * 137) % 360 + 360) % 360 / 360;
