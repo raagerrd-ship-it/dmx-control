@@ -84,3 +84,38 @@ function isMode(m: unknown): m is Mode {
     ["auto", "chill", "party", "chase", "fire", "strobe", "blackout"].includes(m);
 }
 const clamp01 = (x: number) => typeof x === "number" && x >= 0 && x <= 1 ? x : 0;
+
+const VALID_PRESETS: FixturePreset[] = ["rgb", "rgbw", "dimmer", "custom"];
+const VALID_ROLES: ChannelRole[] = ["r", "g", "b", "w", "dim", "strobe", "unused"];
+
+/** Validate + normalize a fixtures[] patch. Returns null if any entry is bogus. */
+function sanitizeFixtures(input: unknown[]): FixtureConfig[] | null {
+  const out: FixtureConfig[] = [];
+  for (const raw of input) {
+    if (!raw || typeof raw !== "object") return null;
+    const r = raw as Record<string, unknown>;
+    const name = typeof r.name === "string" ? r.name.slice(0, 40) : "Fixture";
+    const address = Math.floor(Number(r.address));
+    const preset = r.preset as FixturePreset;
+    if (!Number.isFinite(address) || address < 1 || address > 512) return null;
+    if (!VALID_PRESETS.includes(preset)) return null;
+
+    let roles: ChannelRole[] | undefined;
+    if (preset === "custom") {
+      if (!Array.isArray(r.roles) || r.roles.length === 0 || r.roles.length > 32) return null;
+      roles = [];
+      for (const role of r.roles) {
+        if (!VALID_ROLES.includes(role as ChannelRole)) return null;
+        roles.push(role as ChannelRole);
+      }
+    }
+    const fx: FixtureConfig = { name, address, preset, ...(roles ? { roles } : {}) };
+
+    // Check the fixture fits within the universe
+    const width = fixtureRoles(fx).length;
+    if (address + width - 1 > 512) return null;
+
+    out.push(fx);
+  }
+  return out;
+}
