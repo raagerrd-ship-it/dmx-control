@@ -13,6 +13,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/space-grotesk": "^5.2.10",
     "@lovable.dev/cloud-auth-js": "^1.0.0",
     "@radix-ui/react-slot": "^1.2.3",
     "@supabase/supabase-js": "^2.99.0",
@@ -23,7 +25,8 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.30.1",
     "tailwind-merge": "^2.6.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
