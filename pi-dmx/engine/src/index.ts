@@ -20,7 +20,7 @@ import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 import type { Mode } from "./config.js";
 
-const MODE_CYCLE: Mode[] = ["auto", "party", "chase", "comet", "mono", "strobe", "blackout"];
+const MODE_CYCLE: Mode[] = ["auto", "party", "comet", "mono", "strobe", "blackout"];
 
 const cfg = await loadConfig();
 const analyser = new Analyser(cfg);
