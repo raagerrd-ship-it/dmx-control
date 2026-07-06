@@ -270,6 +270,14 @@ function renderFixtures() {
       markDirty();
     });
   });
+  fxEl.querySelectorAll("[data-id]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      // Only useful on saved fixtures — the engine renders from cfg.fixtures,
+      // not fxDraft. Warn if there are unsaved edits.
+      if (fxDirty) { fxHint.textContent = "Save changes before identifying"; return; }
+      send({ type: "identifyOne", index: Number(e.target.dataset.id) });
+    });
+  });
   fxEl.querySelectorAll("[data-role-i]").forEach((el) => {
     el.addEventListener("change", (e) => {
       const i = Number(e.target.dataset.fxI);
