@@ -23,7 +23,13 @@ export interface ServerDeps {
   onConfigChanged?: () => void;
 }
 
-export async function startServer(deps: ServerDeps, port = 80): Promise<FastifyInstance> {
+export interface Server {
+  app: FastifyInstance;
+  /** Push current config to all connected clients (e.g. after a physical button press) */
+  broadcastConfig: () => void;
+}
+
+export async function startServer(deps: ServerDeps, port = 80): Promise<Server> {
   const app = Fastify({ logger: false });
   await app.register(fastifyWebsocket);
   await app.register(fastifyStatic, {
