@@ -101,45 +101,28 @@ function pickColor(
       const v = Math.min(1, 0.5 + audio * 0.5 + kickEnv * 0.5);
       return hsvToRgb(hue, 1, v);
     }
-    case "chase": {
-      const head = (t * 1.5) % count;
-      const dist = Math.min(
-        Math.abs(idx - head),
-        Math.abs(idx - head - count),
-        Math.abs(idx - head + count),
-      );
-      const v = Math.exp(-dist * dist * 2) * (0.6 + audio * 0.4);
-      const hue = ((t * 20) % 360) / 360;
-      return hsvToRgb(hue, 1, v);
-    }
     case "comet": {
       // A fireball glides through the fixtures with a long trailing tail.
-      // The head advances at ~1 fixture / 0.7s baseline, sped up by audio.
-      // Brightness ahead of the head drops off sharply (leading edge is
-      // crisp); behind the head decays exponentially over ~count/2 fixtures
-      // (long fading tail). Position wraps so it loops forever.
+      // Head speed sped up by audio; head hue is user-picked (cometHue).
       const speed = 1.2 + audio * 2.2;                 // fixtures per second
       const head = (t * speed) % count;
       // Signed distance behind the head (positive = behind, in the tail)
       let behind = head - idx;
       if (behind < -count / 2) behind += count;         // wrap forward
       if (behind >  count / 2) behind -= count;         // wrap back
-      // Long, rich tail — spans the full rig with plenty of overlap so even
-      // small rigs get a proper trailing glow, not just 1–2 hot fixtures.
       const tailLen = Math.max(3, count * 1.2);
       let v;
       if (behind >= 0) {
-        // Trailing tail — slow exponential fade with a tiny embers term
-        // that keeps distant fixtures from going pitch black.
+        // Trailing tail — slow exponential fade + faint embers
         v = Math.exp(-behind / (tailLen * 0.75)) + 0.08 * Math.exp(-behind / tailLen);
       } else {
         // Leading edge — quick falloff so the fireball has a sharp front
         v = Math.exp(-(-behind) * 2.5);
       }
       v = Math.min(1, v);
-      // Fireball color: white-hot core → orange → deep red in the tail
+      // Head = white-hot (low sat) glowing into fully-saturated picked hue.
       const heat = v;                                    // 1 at head, ~0 at tail end
-      const hue = 0.02 + (1 - heat) * 0.05;              // red-orange → deeper red
+      const hue = (((cometHue % 360) + 360) % 360) / 360;
       const sat = 0.35 + (1 - heat) * 0.65;              // white-hot core, saturated tail
       const kickBoost = 1 + kickEnv * 0.35;
       return hsvToRgb(hue, sat, Math.min(1, v * kickBoost));
