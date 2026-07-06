@@ -146,6 +146,8 @@ export const useDmx = create<DmxState>((set, get) => ({
   },
   setLive: (audioLevel, kick, frame) => set({ audioLevel, kick, frame }),
   setConn: (conn) => set({ conn }),
+  setMicEnabled: (micEnabled) => set({ micEnabled, micError: micEnabled ? get().micError : null }),
+  setMicError: (micError) => set({ micError }),
 }));
 
 export function channelsFor(mode: FixtureMode): number {
