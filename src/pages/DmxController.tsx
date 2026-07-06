@@ -71,7 +71,8 @@ export default function DmxController() {
         {tab === "live" ? (
           <>
             <PresetGrid />
-            {preset === "mono" && <MonoColorCard />}
+            {preset === "mono"  && <HueColorCard label="Mono-färg"  hue={monoHue}  onChange={(h) => patch({ monoHue: h })} />}
+            {preset === "comet" && <HueColorCard label="Comet-färg" hue={cometHue} onChange={(h) => patch({ cometHue: h })} />}
             <LiveControls />
             <LivePreview />
           </>
