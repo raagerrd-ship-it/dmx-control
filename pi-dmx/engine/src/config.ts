@@ -49,6 +49,8 @@ export interface EngineConfig {
   master: number;         // 0..1 master brightness
   /** Hue 0..360 used by "mono" mode. 15 ≈ fire orange, 0 = red, 240 = blue. */
   monoHue: number;
+  /** Hue 0..360 used by "comet" mode for the fireball head. */
+  cometHue: number;
   /** Physical push-button that cycles through modes. Set null to disable. */
   modeButton: { chip: string; line: number } | null;
   /** Transient identify override — not persisted. index = fixture being lit. */
