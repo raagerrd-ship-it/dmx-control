@@ -206,6 +206,11 @@ function applyConfig(cfg) {
   monoValEl.textContent = hue;
   monoSwatch.style.background = `hsl(${hue} 100% 50%)`;
   monoCard.style.display = cfg.mode === "mono" ? "" : "none";
+  const chue = Math.round(cfg.cometHue ?? 15);
+  cometHueEl.value = chue;
+  cometValEl.textContent = chue;
+  cometSwatch.style.background = `hsl(${chue} 100% 50%)`;
+  cometCard.style.display = cfg.mode === "comet" ? "" : "none";
   identifyingIndex = cfg.identify?.index ?? -1;
   if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
   else renderFixtures();
