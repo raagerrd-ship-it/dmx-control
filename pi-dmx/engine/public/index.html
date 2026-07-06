@@ -168,13 +168,16 @@ function applyConfig(cfg) {
   sensVal.textContent = sensEl.value + "%";
   masterEl.value = Math.round(cfg.master * 100);
   masterVal.textContent = masterEl.value + "%";
-  // Track which fixture (if any) the engine is currently blinking so we can
-  // highlight it in the UI — server drives this, we just visualise.
+  // Mono color card: only meaningful when mode === "mono", but we keep the
+  // slider synced regardless so switching to mono lands on the right color.
+  const hue = Math.round(cfg.monoHue ?? 15);
+  monoHueEl.value = hue;
+  monoValEl.textContent = hue;
+  monoSwatch.style.background = `hsl(${hue} 100% 50%)`;
+  monoCard.style.display = cfg.mode === "mono" ? "" : "none";
   identifyingIndex = cfg.identify?.index ?? -1;
-  // Only replace local draft if server pushed something we don't already have
-  // pending edits for. Prevents stomping the user's in-progress edit.
   if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
-  else renderFixtures();  // still refresh highlight even mid-edit
+  else renderFixtures();
 }
 let kickTimer;
 function applyFrame(f) {
