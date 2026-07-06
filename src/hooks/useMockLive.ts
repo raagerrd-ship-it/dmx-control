@@ -115,25 +115,18 @@ export function useMockLive() {
 
       const frame = new Array(512).fill(0);
       const briSlider = params.brightness / 100;
-      // Golv så lampan aldrig går helt svart i tystnad (utom Blackout).
-      const briFloor = preset === "blackout" ? 0 : BRIGHTNESS_FLOOR * briSlider;
+      const briFloor = BRIGHTNESS_FLOOR * briSlider;
 
       // Hue-fasackumulator, tempo bromsas med smoothness (tick-rate-oberoende).
       const speedFac = 0.2 + (1 - params.smoothness / 100) * 2.5;
       huePhase.current += dt * speedFac;
       const hueBase = huePhase.current;
+      const fixtureCount = Math.max(1, fixtures.length);
 
       fixtures.forEach((f, idx) => {
         let r = 0, g = 0, b = 0, w = 0;
 
         switch (preset) {
-          case "blackout":
-            break;
-          case "static": {
-            const c = hsvToRgb(params.staticHue, 1, briSlider);
-            r = c[0]; g = c[1]; b = c[2];
-            break;
-          }
           case "strobe": {
             const on = Math.sin(hueBase * 6) > 0.5 ? 1 : 0;
             r = g = b = on * 255 * briSlider;
@@ -152,6 +145,31 @@ export function useMockLive() {
             const c = hsvToRgb(hue, 1, Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
             if (kick > 0.7 || flashActive) { r = g = b = 255 * briSlider; }
+            break;
+          }
+          case "chase": {
+            // Färgvåg sveper genom lamporna; kick puttar fram vågen.
+            const headPos = (hueBase * 0.8 + kick * 0.6) % 1;
+            const myPos = idx / fixtureCount;
+            let dist = Math.abs(myPos - headPos);
+            if (dist > 0.5) dist = 1 - dist;                // wrap
+            const bump = Math.exp(-dist * dist * 60);       // smal svans
+            const hue = (hueBase * 40 + idx * 25) % 360;
+            const v = Math.max(briFloor, briSlider * (0.15 + bump * (0.6 + audio * 0.4)));
+            const c = hsvToRgb(hue, 1, Math.min(1, v));
+            r = c[0]; g = c[1]; b = c[2];
+            break;
+          }
+          case "fire": {
+            // Varm bas 5–35°, kick sparkar upp gult, snabb flimmer via rand.
+            const flicker = 0.75 + Math.random() * 0.25;
+            const kickHue = 55 * kick;                       // röd → gul på slag
+            const hue = 5 + Math.sin(hueBase * 1.1 + idx * 1.3) * 15 + kickHue;
+            const v = Math.max(briFloor, briSlider * flicker * (0.55 + audio * 0.55));
+            const sat = Math.max(0.6, 1 - kick * 0.5);
+            const c = hsvToRgb(hue, sat, Math.min(1, v));
+            r = c[0]; g = c[1]; b = c[2];
+            if (flashActive) { r = 255 * briSlider; g = 200 * briSlider; b = 80 * briSlider; }
             break;
           }
           case "auto":
@@ -185,8 +203,7 @@ export function useMockLive() {
       st.setLive(Math.min(1, audio), kick, frame);
 
       const p = presetById(preset);
-      const hue = preset === "static" ? params.staticHue : p.hue;
-      document.documentElement.style.setProperty("--accent-h", String(hue));
+      document.documentElement.style.setProperty("--accent-h", String(p.hue));
 
       raf.current = requestAnimationFrame(tick);
     };

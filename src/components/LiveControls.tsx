@@ -36,21 +36,12 @@ function Slider(props: {
 export function LiveControls() {
   const params = useDmx((s) => s.params);
   const patch = useDmx((s) => s.patchParams);
-  const preset = useDmx((s) => s.preset);
 
   return (
     <div className="space-y-5 rounded-2xl border border-border bg-card p-5">
       <Slider label="Ljusstyrka" value={params.brightness} onChange={(v) => patch({ brightness: v })} />
       <Slider label="Mjukhet"    value={params.smoothness} onChange={(v) => patch({ smoothness: v })} />
       <Slider label="Känslighet" value={params.sensitivity} onChange={(v) => patch({ sensitivity: v })} />
-      {preset === "static" && (
-        <Slider
-          label="Färg (hue)"
-          value={params.staticHue}
-          min={0} max={360} suffix="°"
-          onChange={(v) => patch({ staticHue: v })}
-        />
-      )}
     </div>
   );
 }
