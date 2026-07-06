@@ -5,11 +5,24 @@
 
 export type Mode = "auto" | "chill" | "party" | "chase" | "fire" | "strobe" | "blackout";
 
+/**
+ * A fixture is placed at `address` and occupies channels in a defined role
+ * order. Preset "rgb"/"rgbw"/"dimmer" expand to standard layouts; "custom"
+ * takes an explicit `roles` array (e.g. ["dim","r","g","b","strobe"]) so
+ * odd fixtures can be mapped without code changes.
+ */
+export type ChannelRole = "r" | "g" | "b" | "w" | "dim" | "strobe" | "unused";
+export type FixturePreset = "rgb" | "rgbw" | "dimmer" | "custom";
+
 export interface FixtureConfig {
-  /** DMX start address (1..512) */
+  /** Human name shown in the mobile UI */
+  name: string;
+  /** DMX start address 1..512 */
   address: number;
-  /** 3 = RGB, 4 = RGBW, 1 = dimmer-only */
-  channels: 3 | 4 | 1;
+  /** Preset or "custom" (in which case `roles` is used) */
+  preset: FixturePreset;
+  /** Only used when preset === "custom" */
+  roles?: ChannelRole[];
 }
 
 export interface EngineConfig {
