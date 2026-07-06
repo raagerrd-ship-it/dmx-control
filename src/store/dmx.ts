@@ -35,7 +35,7 @@ export const PRESETS: Preset[] = [
 
 export interface Params {
   brightness: number;   // 0..100
-  speed: number;        // 0..100
+  smoothness: number;   // 0..100  (0 = snärtigt/snabbt release, 100 = mjukt/långsamt — mappar releaseAlpha)
   sensitivity: number;  // 0..100
   staticHue: number;    // 0..360 (för Static)
 }
@@ -69,7 +69,7 @@ interface Persisted {
 
 const defaults: Persisted = {
   preset: "auto",
-  params: { brightness: 80, speed: 50, sensitivity: 60, staticHue: 200 },
+  params: { brightness: 80, smoothness: 50, sensitivity: 60, staticHue: 200 },
   fixtures: [
     { id: "f1", name: "PAR 1", startCh: 1,  mode: "rgb" },
     { id: "f2", name: "PAR 2", startCh: 4,  mode: "rgb" },

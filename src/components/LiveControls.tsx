@@ -41,7 +41,7 @@ export function LiveControls() {
   return (
     <div className="space-y-5 rounded-2xl border border-border bg-card p-5">
       <Slider label="Ljusstyrka" value={params.brightness} onChange={(v) => patch({ brightness: v })} />
-      <Slider label="Hastighet"  value={params.speed}      onChange={(v) => patch({ speed: v })} />
+      <Slider label="Mjukhet"    value={params.smoothness} onChange={(v) => patch({ smoothness: v })} />
       <Slider label="Känslighet" value={params.sensitivity} onChange={(v) => patch({ sensitivity: v })} />
       {preset === "static" && (
         <Slider

@@ -24,7 +24,9 @@ export function useMockLive() {
 
       // simulerad kick ~ var 0.5–1.2s
       let kick = st.kick * 0.85;
-      const period = 0.6 + (1 - params.speed / 100) * 0.8;
+      // Mjukhet inverterar tempo: hög mjukhet = långsammare/mjukare rörelser
+      const soft = params.smoothness / 100;
+      const period = 0.6 + soft * 0.8;
       if (t - lastKick.current > period) {
         lastKick.current = t + Math.random() * 0.15;
         kick = 1;
@@ -32,7 +34,7 @@ export function useMockLive() {
 
       const frame = new Array(512).fill(0);
       const bri = params.brightness / 100;
-      const speedFac = 0.2 + (params.speed / 100) * 2.5;
+      const speedFac = 0.2 + (1 - soft) * 2.5;
 
       fixtures.forEach((f, idx) => {
         let r = 0, g = 0, b = 0, w = 0;
