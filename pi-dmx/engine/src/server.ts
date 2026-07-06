@@ -138,17 +138,6 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
   return { app, broadcastConfig };
 }
 
-  await app.listen({ port, host: "0.0.0.0" });
-
-  const broadcastConfig = () => {
-    const payload = JSON.stringify({ type: "config", config: deps.cfg });
-    for (const c of app.websocketServer.clients) {
-      if (c.readyState === 1) c.send(payload);
-    }
-  };
-  return { app, broadcastConfig };
-}
-
 function isMode(m: unknown): m is Mode {
   return typeof m === "string" &&
     ["auto", "chill", "party", "chase", "fire", "strobe", "blackout"].includes(m);
