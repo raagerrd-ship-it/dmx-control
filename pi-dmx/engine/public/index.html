@@ -130,6 +130,9 @@ function applyConfig(cfg) {
   sensVal.textContent = sensEl.value + "%";
   masterEl.value = Math.round(cfg.master * 100);
   masterVal.textContent = masterEl.value + "%";
+  // Only replace local draft if server pushed something we don't already have
+  // pending edits for. Prevents stomping the user's in-progress edit.
+  if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
 }
 let kickTimer;
 function applyFrame(f) {
@@ -146,8 +149,186 @@ function applyFrame(f) {
 sensEl.oninput = () => { sensVal.textContent = sensEl.value + "%"; send({ type: "setSensitivity", value: sensEl.value / 100 }); };
 masterEl.oninput = () => { masterVal.textContent = masterEl.value + "%"; send({ type: "setMaster", value: masterEl.value / 100 }); };
 
+/* ── Fixture editor ─────────────────────────────────────────────────── */
+const PRESETS = ["rgb", "rgbw", "dimmer", "custom"];
+const PRESET_ROLES = {
+  rgb:    ["r","g","b"],
+  rgbw:   ["r","g","b","w"],
+  dimmer: ["dim"],
+};
+const ROLE_OPTIONS = ["r","g","b","w","dim","strobe","unused"];
+const fxEl = document.getElementById("fixtures");
+const fxSaveBtn = document.getElementById("fxSave");
+const fxHint = document.getElementById("fxHint");
+let fxDraft = [];
+let fxDirty = false;
+const deepClone = (x) => JSON.parse(JSON.stringify(x));
+const rolesOf = (fx) => fx.preset === "custom" ? (fx.roles ?? []) : PRESET_ROLES[fx.preset];
+
+function markDirty() {
+  fxDirty = true;
+  fxSaveBtn.disabled = validateAll().length > 0;
+  renderFixtures();
+}
+
+function validateAll() {
+  const errs = [];
+  const used = new Map(); // channel → fixture index
+  fxDraft.forEach((fx, i) => {
+    const width = rolesOf(fx).length;
+    if (!fx.name || fx.name.trim() === "") errs.push({ i, msg: "Name required" });
+    if (!Number.isInteger(fx.address) || fx.address < 1 || fx.address > 512)
+      errs.push({ i, msg: "Address 1–512" });
+    else if (fx.address + width - 1 > 512)
+      errs.push({ i, msg: `Overflows universe (needs ${width} ch)` });
+    else {
+      for (let c = fx.address; c < fx.address + width; c++) {
+        if (used.has(c)) errs.push({ i, msg: `Ch ${c} overlaps "${fxDraft[used.get(c)].name}"` });
+        else used.set(c, i);
+      }
+    }
+    if (fx.preset === "custom" && (!fx.roles || fx.roles.length === 0))
+      errs.push({ i, msg: "Add at least one channel" });
+  });
+  return errs;
+}
+
+function renderFixtures() {
+  const errs = validateAll();
+  const errByIdx = new Map();
+  errs.forEach((e) => {
+    if (!errByIdx.has(e.i)) errByIdx.set(e.i, []);
+    errByIdx.get(e.i).push(e.msg);
+  });
+
+  fxEl.innerHTML = "";
+  fxDraft.forEach((fx, i) => {
+    const width = rolesOf(fx).length;
+    const div = document.createElement("div");
+    div.className = "fx" + (fxDirty ? " dirty" : "") + (errByIdx.has(i) ? " err" : "");
+    div.innerHTML = `
+      <div class="fx-head">
+        <input class="name" type="text" value="${escapeHtml(fx.name)}" data-i="${i}" data-k="name" />
+        <button class="del" data-del="${i}" aria-label="Remove">×</button>
+      </div>
+      <div class="fx-grid">
+        <div class="fx-field">
+          <label>DMX address</label>
+          <input type="number" min="1" max="512" value="${fx.address}" data-i="${i}" data-k="address" inputmode="numeric" />
+        </div>
+        <div class="fx-field">
+          <label>Type</label>
+          <select data-i="${i}" data-k="preset">
+            ${PRESETS.map((p) => `<option value="${p}" ${p === fx.preset ? "selected" : ""}>${p.toUpperCase()}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      ${fx.preset === "custom" ? renderCustomRoles(fx, i) : ""}
+      <div class="fx-meta">Ch ${fx.address}–${fx.address + width - 1} · ${width} channel${width > 1 ? "s" : ""} · ${rolesOf(fx).join(" · ")}</div>
+      ${errByIdx.has(i) ? `<div class="fx-err">${errByIdx.get(i).join(" · ")}</div>` : ""}
+    `;
+    fxEl.appendChild(div);
+  });
+
+  fxHint.textContent = fxDirty
+    ? (errs.length ? `${errs.length} problem${errs.length > 1 ? "s" : ""} to fix before saving` : "Ready to save")
+    : "Tap a fixture to edit. Changes are validated before saving.";
+  fxSaveBtn.disabled = !fxDirty || errs.length > 0;
+
+  // Wire up
+  fxEl.querySelectorAll("[data-k]").forEach((el) => {
+    el.addEventListener("input", onFieldChange);
+    el.addEventListener("change", onFieldChange);
+  });
+  fxEl.querySelectorAll("[data-del]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      fxDraft.splice(Number(e.target.dataset.del), 1);
+      markDirty();
+    });
+  });
+  fxEl.querySelectorAll("[data-role-i]").forEach((el) => {
+    el.addEventListener("change", (e) => {
+      const i = Number(e.target.dataset.fxI);
+      const r = Number(e.target.dataset.roleI);
+      fxDraft[i].roles[r] = e.target.value;
+      markDirty();
+    });
+  });
+  fxEl.querySelectorAll("[data-role-rm]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      const i = Number(e.target.dataset.fxI);
+      const r = Number(e.target.dataset.roleRm);
+      fxDraft[i].roles.splice(r, 1);
+      markDirty();
+    });
+  });
+  fxEl.querySelectorAll("[data-role-add]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      const i = Number(e.target.dataset.roleAdd);
+      fxDraft[i].roles = fxDraft[i].roles ?? [];
+      fxDraft[i].roles.push("unused");
+      markDirty();
+    });
+  });
+}
+
+function renderCustomRoles(fx, i) {
+  const roles = fx.roles ?? [];
+  return `<div class="fx-roles">
+    ${roles.map((r, ri) => `
+      <span class="fx-role">
+        <select data-role-i="${ri}" data-fx-i="${i}">
+          ${ROLE_OPTIONS.map((opt) => `<option value="${opt}" ${opt === r ? "selected" : ""}>${opt}</option>`).join("")}
+        </select>
+        <span class="rm" data-role-rm="${ri}" data-fx-i="${i}">×</span>
+      </span>
+    `).join("")}
+    <span class="fx-role" style="cursor:pointer" data-role-add="${i}">+ ch</span>
+  </div>`;
+}
+
+function onFieldChange(e) {
+  const i = Number(e.target.dataset.i);
+  const k = e.target.dataset.k;
+  const fx = fxDraft[i];
+  if (k === "name")    fx.name = e.target.value;
+  if (k === "address") fx.address = parseInt(e.target.value, 10) || 0;
+  if (k === "preset") {
+    fx.preset = e.target.value;
+    if (fx.preset === "custom" && !fx.roles) fx.roles = ["r","g","b"];
+    if (fx.preset !== "custom") delete fx.roles;
+  }
+  markDirty();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => (
+    { "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]
+  ));
+}
+
+document.getElementById("fxAdd").onclick = () => {
+  // Suggest next free address: end of last fixture + 1
+  let nextAddr = 1;
+  fxDraft.forEach((fx) => {
+    const end = fx.address + rolesOf(fx).length - 1;
+    if (end >= nextAddr) nextAddr = end + 1;
+  });
+  fxDraft.push({ name: `Fixture ${fxDraft.length + 1}`, address: Math.min(nextAddr, 512), preset: "rgb" });
+  markDirty();
+};
+
+fxSaveBtn.onclick = () => {
+  if (validateAll().length > 0) return;
+  send({ type: "setFixtures", fixtures: fxDraft });
+  fxDirty = false;
+  fxSaveBtn.disabled = true;
+  renderFixtures();
+};
+
 renderModes("auto");
 connect();
+
 </script>
 </body>
 </html>
