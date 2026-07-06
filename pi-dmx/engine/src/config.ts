@@ -61,13 +61,23 @@ export const defaultConfig: EngineConfig = {
     kickCooldownMs: 90,
   },
   fixtures: [
-    // MVP: 4 RGB-par-lampor på adress 1, 4, 7, 10
-    { address: 1,  channels: 3 },
-    { address: 4,  channels: 3 },
-    { address: 7,  channels: 3 },
-    { address: 10, channels: 3 },
+    { name: "Par 1", address: 1,  preset: "rgb" },
+    { name: "Par 2", address: 4,  preset: "rgb" },
+    { name: "Par 3", address: 7,  preset: "rgb" },
+    { name: "Par 4", address: 10, preset: "rgb" },
   ],
   mode: "auto",
   sensitivity: 0.6,
   master: 1.0,
 };
+
+export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
+  rgb:    ["r", "g", "b"],
+  rgbw:   ["r", "g", "b", "w"],
+  dimmer: ["dim"],
+};
+
+export function fixtureRoles(fx: FixtureConfig): ChannelRole[] {
+  if (fx.preset === "custom") return fx.roles ?? [];
+  return PRESET_ROLES[fx.preset];
+}
