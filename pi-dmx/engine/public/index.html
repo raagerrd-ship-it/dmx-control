@@ -83,12 +83,21 @@
   <h1>Fixtures</h1>
   <div class="card">
     <div id="fixtures"></div>
+    <div class="fx-pack">
+      <select id="fxSort" title="How Auto-address orders fixtures">
+        <option value="list">Sort: list order</option>
+        <option value="name">Sort: by name (A→Z)</option>
+        <option value="widest">Sort: widest first</option>
+        <option value="narrowest">Sort: narrowest first</option>
+      </select>
+      <button class="btn" id="fxAutoPack" style="flex:0 0 auto">Auto-address</button>
+    </div>
     <div class="fx-actions">
       <button class="btn" id="fxAdd">+ Add fixture</button>
-      <button class="btn" id="fxAutoPack" title="Repack all addresses sequentially">Auto-address</button>
+      <button class="btn ok" id="fxIdentifyAll" title="Blink each fixture in order">Identify all</button>
       <button class="btn primary" id="fxSave" disabled>Save changes</button>
     </div>
-    <div class="status" id="fxHint">Tap a fixture to edit. Changes are validated before saving.</div>
+    <div class="status" id="fxHint">Tap a fixture to edit. Use Identify to locate lamps in the room.</div>
   </div>
 
   <div class="status" id="conn">Connecting…</div>
