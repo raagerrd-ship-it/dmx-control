@@ -43,9 +43,15 @@
     .fx-role .rm { color: var(--dim); margin-left: 4px; cursor: pointer; }
     .fx-meta { font-size: 11px; color: var(--dim); margin-top: 6px; }
     .fx-err  { font-size: 11px; color: var(--hot); margin-top: 6px; }
-    .fx-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .fx.identifying { border-color: var(--ok); box-shadow: 0 0 0 2px rgba(64,224,160,.25); }
+    .fx-head button.id { background: transparent; border: 1px solid var(--line); border-radius: 6px; color: var(--dim); font-size: 11px; padding: 4px 8px; cursor: pointer; margin-right: 4px; text-transform: uppercase; letter-spacing: .06em; }
+    .fx-head button.id:hover { color: var(--ok); border-color: var(--ok); }
+    .fx-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .fx-pack { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+    .fx-pack select { flex: 1; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); font-size: 13px; }
     .btn { flex: 1; padding: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); font-size: 14px; font-weight: 500; cursor: pointer; }
     .btn.primary { background: var(--hot); border-color: var(--hot); color: white; }
+    .btn.ok { background: transparent; border-color: var(--ok); color: var(--ok); }
     .btn:disabled { opacity: .4; cursor: not-allowed; }
   </style>
 </head>
