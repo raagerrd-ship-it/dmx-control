@@ -184,16 +184,17 @@ export function useMockLive() {
           }
           case "comet": {
             // Eldklot glider genom lamporna med lång, utfadande svans.
-            const headPos = (hueBase * 0.35 + kick * 0.25) % 1;
+            const headPos = (hueBase * 0.3 + kick * 0.2) % 1;
             const myPos = idx / fixtureCount;
             // Signerat avstånd bakåt från huvudet (0..1), wrappat
             let behind = myPos - headPos; if (behind > 0) behind -= 1; behind = -behind;
-            const tail = Math.exp(-behind * 3.5);            // lång svans bakåt
-            const lead = Math.exp(-(1 - behind) * 25);       // skarp framkant
+            // Lång svans + små glöder som håller resten från att bli helsvart
+            const tail = Math.exp(-behind * 1.4) + 0.1 * Math.exp(-behind * 0.5);
+            const lead = Math.exp(-(1 - behind) * 20);       // skarp framkant
             const bump = Math.min(1, tail + lead);
             // Vitglödgad kärna → orange → djupröd svans
-            const hue = 8 + behind * 18;
-            const sat = Math.min(1, 0.2 + behind * 1.2);
+            const hue = 8 + behind * 22;
+            const sat = Math.min(1, 0.25 + behind * 1.1);
             const v = Math.max(briFloor, briSlider * bump * (0.55 + audio * 0.5));
             const c = hsvToRgb(hue, sat, Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
