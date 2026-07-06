@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { channelsFor, presetById, useDmx } from "@/store/dmx";
 import { smoothStep, softnessToAlpha } from "@/lib/audioCurve";
+import { useMic } from "@/hooks/useMic";
 
 /**
  * Mock live-loop: simulerar mic-nivå + kick och genererar DMX-frame
