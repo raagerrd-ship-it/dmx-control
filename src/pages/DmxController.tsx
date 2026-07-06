@@ -14,6 +14,9 @@ export default function DmxController() {
   const [tab, setTab] = useState<Tab>("live");
   const preset = useDmx((s) => s.preset);
   const conn = useDmx((s) => s.conn);
+  const monoHue = useDmx((s) => s.params.monoHue);
+  const cometHue = useDmx((s) => s.params.cometHue);
+  const patch = useDmx((s) => s.patchParams);
   const p = presetById(preset);
 
   return (
