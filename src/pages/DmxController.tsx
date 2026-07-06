@@ -68,6 +68,7 @@ export default function DmxController() {
         {tab === "live" ? (
           <>
             <PresetGrid />
+            {preset === "mono" && <MonoColorCard />}
             <LiveControls />
             <LivePreview />
           </>
