@@ -39,6 +39,7 @@ export interface Params {
   brightness: number;   // 0..100
   smoothness: number;   // 0..100  (0 = snärtigt/snabbt release, 100 = mjukt/långsamt — mappar releaseAlpha)
   sensitivity: number;  // 0..100
+  monoHue: number;      // 0..360 hue för Mono-läget (15 ≈ eld-orange, 0 = röd, 240 = blå)
 }
 
 export type ConnState = "mock" | "connecting" | "connected" | "disconnected";
