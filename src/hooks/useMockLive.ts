@@ -182,7 +182,24 @@ export function useMockLive() {
             r = c[0]; g = c[1]; b = c[2];
             break;
           }
-          case "fire": {
+          case "comet": {
+            // Eldklot glider genom lamporna med lång, utfadande svans.
+            const headPos = (hueBase * 0.35 + kick * 0.25) % 1;
+            const myPos = idx / fixtureCount;
+            // Signerat avstånd bakåt från huvudet (0..1), wrappat
+            let behind = myPos - headPos; if (behind > 0) behind -= 1; behind = -behind;
+            const tail = Math.exp(-behind * 3.5);            // lång svans bakåt
+            const lead = Math.exp(-(1 - behind) * 25);       // skarp framkant
+            const bump = Math.min(1, tail + lead);
+            // Vitglödgad kärna → orange → djupröd svans
+            const hue = 8 + behind * 18;
+            const sat = Math.min(1, 0.2 + behind * 1.2);
+            const v = Math.max(briFloor, briSlider * bump * (0.55 + audio * 0.5));
+            const c = hsvToRgb(hue, sat, Math.min(1, v));
+            r = c[0]; g = c[1]; b = c[2];
+            break;
+          }
+          case "mono": {
             const flicker = 0.75 + Math.random() * 0.25;
             const kickHue = 55 * kick;
             const hue = 5 + Math.sin(hueBase * 1.1 + idx * 1.3) * 15 + kickHue;
