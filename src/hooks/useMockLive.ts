@@ -206,7 +206,6 @@ export function useMockLive() {
             if (kick > 0.85 || flashActive) { r = g = b = 255 * briSlider; }
           }
         }
-        }
 
         const ch = f.startCh - 1;
         const chans = channelsFor(f.mode);
