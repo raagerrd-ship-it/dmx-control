@@ -1,0 +1,26 @@
+[Unit]
+Description=DMX-512 output sidecar (PL011 → MAX485)
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/dmx-helper
+Restart=always
+RestartSec=1
+
+# Realtime scheduling — capability granted via `setcap` on the binary
+AmbientCapabilities=CAP_SYS_NICE
+NoNewPrivileges=true
+
+# Pin to isolated core (see isolcpus=3 in cmdline.txt)
+CPUAffinity=3
+
+# Locked memory for mlockall()
+LimitMEMLOCK=infinity
+
+# Runs as root so it can bind /run/dmx.sock; drops caps otherwise.
+# If you prefer non-root: chown the socket dir to a service user + add
+# that user to the dialout group for /dev/ttyAMA0 access.
+
+[Install]
+WantedBy=multi-user.target
