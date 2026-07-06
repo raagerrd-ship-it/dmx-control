@@ -242,6 +242,19 @@ document.querySelectorAll("[data-preset-hue]").forEach((b) => {
     monoHueEl.dispatchEvent(new Event("input"));
   };
 });
+cometHueEl.oninput = () => {
+  const h = Number(cometHueEl.value);
+  cometValEl.textContent = h;
+  cometSwatch.style.background = `hsl(${h} 100% 50%)`;
+  send({ type: "setCometHue", value: h });
+};
+document.querySelectorAll("[data-comet-hue]").forEach((b) => {
+  b.onclick = () => {
+    const h = Number(b.dataset.cometHue);
+    cometHueEl.value = h;
+    cometHueEl.dispatchEvent(new Event("input"));
+  };
+});
 
 /* ── Fixture editor ─────────────────────────────────────────────────── */
 const PRESETS = ["rgb", "rgbw", "dimmer", "custom"];
