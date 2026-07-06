@@ -47,6 +47,8 @@ export interface EngineConfig {
   mode: Mode;
   sensitivity: number;    // 0..1 user knob
   master: number;         // 0..1 master brightness
+  /** Physical push-button that cycles through modes. Set null to disable. */
+  modeButton: { chip: string; line: number } | null;
 }
 
 export const defaultConfig: EngineConfig = {
