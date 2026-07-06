@@ -74,19 +74,19 @@ export function useMockLive() {
             break;
           }
           case "strobe": {
-            const on = Math.sin(t * speedFac * 6) > 0.5 ? 1 : 0;
+            const on = Math.sin(hueBase * 6) > 0.5 ? 1 : 0;
             r = g = b = on * 255 * bri;
             break;
           }
           case "chill": {
-            const hue = 20 + Math.sin(t * 0.3 * speedFac + idx * 0.7) * 25;
+            const hue = 20 + Math.sin(hueBase * 0.3 + idx * 0.7) * 25;
             const v = bri * (0.7 + audio * 0.3);
             const c = hsvToRgb(hue, 0.9, v);
             r = c[0]; g = c[1]; b = c[2];
             break;
           }
           case "party": {
-            const hue = (t * 90 * speedFac + idx * 90 + kick * 60) % 360;
+            const hue = (hueBase * 90 + idx * 90 + kick * 60) % 360;
             const v = bri * (0.6 + audio * 0.5);
             const c = hsvToRgb(hue, 1, Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
@@ -95,7 +95,7 @@ export function useMockLive() {
           }
           case "auto":
           default: {
-            const hue = (t * 30 * speedFac + idx * 45) % 360;
+            const hue = (hueBase * 30 + idx * 45) % 360;
             const v = bri * (0.5 + audio * 0.6);
             const c = hsvToRgb(hue, 0.95, Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
