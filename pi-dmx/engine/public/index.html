@@ -226,10 +226,13 @@ function renderFixtures() {
   fxDraft.forEach((fx, i) => {
     const width = rolesOf(fx).length;
     const div = document.createElement("div");
-    div.className = "fx" + (fxDirty ? " dirty" : "") + (errByIdx.has(i) ? " err" : "");
+    div.className = "fx" + (fxDirty ? " dirty" : "")
+                  + (errByIdx.has(i) ? " err" : "")
+                  + (i === identifyingIndex ? " identifying" : "");
     div.innerHTML = `
       <div class="fx-head">
         <input class="name" type="text" value="${escapeHtml(fx.name)}" data-i="${i}" data-k="name" />
+        <button class="id" data-id="${i}" title="Blink this fixture">Identify</button>
         <button class="del" data-del="${i}" aria-label="Remove">×</button>
       </div>
       <div class="fx-grid">
