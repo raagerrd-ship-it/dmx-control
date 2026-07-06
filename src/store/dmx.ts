@@ -11,7 +11,6 @@ export interface Fixture {
 
 export type PresetId =
   | "auto"
-  | "chill"
   | "party"
   | "strobe"
   | "chase"
@@ -27,7 +26,6 @@ export interface Preset {
 
 export const PRESETS: Preset[] = [
   { id: "auto",   name: "Auto",   hue: 280, description: "Färghjul, kick → blixt" },
-  { id: "chill",  name: "Chill",  hue: 20,  description: "Varma toner, långsam" },
   { id: "party",  name: "Party",  hue: 320, description: "Regnbåge, snabb, kick" },
   { id: "strobe", name: "Strobe", hue: 0,   description: "Vit blink i takt" },
   { id: "chase",  name: "Chase",  hue: 160, description: "Färgvåg sveper genom lamporna" },
