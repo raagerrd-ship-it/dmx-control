@@ -46,19 +46,52 @@ export function useMic(
         onError?.(null);
         sample.current.active = true;
 
+        // Auto-gain: långsam RMS-envelope styr en gain-faktor så snittet
+        // hålls nära TARGET även om volymen i lokalen ändras under kvällen.
+        const TARGET = 0.18;          // önskad genomsnittlig level
+        const MIN_GAIN = 0.5;
+        const MAX_GAIN = 20;
+        const NOISE_FLOOR = 0.003;    // under detta räknas som tystnad
+        // Tidskonstanter i sekunder — attack långsammare än release inte,
+        // vi vill sänka snabbt vid hög volym, höja långsamt vid tystnad.
+        const T_UP = 8;               // tid att öka gain (tystare)
+        const T_DOWN = 2;             // tid att minska gain (högre)
+        let gain = 1;
+        let envelope = TARGET;
+        let lastT = performance.now();
+
         const loop = () => {
           if (cancelled) return;
+          const now = performance.now();
+          const dt = Math.min(0.1, (now - lastT) / 1000);
+          lastT = now;
+
           analyser.getFloatTimeDomainData(timeBuf);
           analyser.getByteFrequencyData(freqBuf);
           let sum = 0;
           for (let i = 0; i < timeBuf.length; i++) sum += timeBuf[i] * timeBuf[i];
           const rms = Math.sqrt(sum / timeBuf.length);
-          // Basviktad energi: låga bins bidrar mer (kick/snare).
           let e = 0;
           const bassCount = Math.min(32, freqBuf.length);
           for (let i = 0; i < bassCount; i++) e += freqBuf[i];
-          const energy = e / (bassCount * 255);
-          sample.current = { level: Math.min(1, rms * 4), energy, active: true };
+          const energyRaw = e / (bassCount * 255);
+
+          // Uppdatera envelope endast över brusgolvet, annars driver gain iväg.
+          if (rms > NOISE_FLOOR) {
+            const tau = rms * gain > envelope ? T_DOWN : T_UP;
+            const a = 1 - Math.exp(-dt / tau);
+            envelope += (rms * gain - envelope) * a;
+            const desired = TARGET / Math.max(1e-4, envelope) * gain;
+            const gTau = desired > gain ? T_UP : T_DOWN;
+            const ga = 1 - Math.exp(-dt / gTau);
+            gain += (desired - gain) * ga;
+            if (gain < MIN_GAIN) gain = MIN_GAIN;
+            else if (gain > MAX_GAIN) gain = MAX_GAIN;
+          }
+
+          const level = Math.min(1, rms * 4 * gain);
+          const energy = Math.min(1, energyRaw * gain);
+          sample.current = { level, energy, active: true };
           raf = requestAnimationFrame(loop);
         };
         raf = requestAnimationFrame(loop);
