@@ -1,0 +1,37 @@
+{
+  "key": "lotus-light",
+  "name": "Lotus Light Link",
+  "repo": "https://github.com/raagerrd-ship-it/lotus-light-link.git",
+  "releaseUrl": "https://api.github.com/repos/raagerrd-ship-it/lotus-light-link/releases",
+  "releaseAsset": "dist.tar.gz",
+  "installDir": "/opt/lotus-light",
+  "installScript": "pi/setup-lotus.sh",
+  "runInstallOnRelease": false,
+  "autoUpdate": false,
+  "manualUpdateOnly": true,
+  "updateScript": "/opt/lotus-light/pi/update-services.sh",
+  "uninstallScript": "pi/uninstall-lotus.sh",
+  "permissions": ["bluetooth", "audio", "network"],
+  "components": {
+    "engine": {
+      "type": "node",
+      "entrypoint": "pi/dist/index.js",
+      "service": "lotus-light-engine",
+      "alwaysOn": true,
+      "manageService": false,
+      "resources": {
+        "memoryMax": "320M",
+        "memoryHigh": "240M",
+        "memoryLow": "0",
+        "profile": "fixed"
+      },
+      "nodeOptions": "--max-old-space-size=224"
+    },
+    "ui": {
+      "type": "static",
+      "entrypoint": "dist/",
+      "service": "lotus-light-ui",
+      "alwaysOn": false
+    }
+  }
+}

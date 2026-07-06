@@ -1,0 +1,152 @@
+# Build and Release workflow
+name: Build and Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/release.yml'
+      - 'pi/**'
+      - 'src/**'
+      - 'index.html'
+      - 'vite.config.ts'
+      - 'package.json'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      # Extract BLE_BUILD_TAG from source so the release note can carry it.
+      # update-services.sh på Pi:n parsar denna rad för att verifiera att rätt
+      # kod faktiskt deployades (se hard health-check i update-services.sh).
+      - name: Extract BLE_BUILD_TAG
+        id: bletag
+        run: |
+          TAG=$(grep -oE "BLE_BUILD_TAG\s*=\s*['\"]([^'\"]+)['\"]" pi/src/ble-driver/state.ts | head -1 | sed -E "s/.*['\"]([^'\"]+)['\"].*/\1/")
+          if [ -z "$TAG" ]; then
+            echo "❌ Kunde inte extrahera BLE_BUILD_TAG från pi/src/ble-driver/state.ts"
+            exit 1
+          fi
+          echo "ble_build_tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "🏷  BLE_BUILD_TAG: $TAG"
+
+      # Determine version: prefer valid semver tags, recover from legacy malformed tags if needed
+      - name: Determine version
+        id: version
+        run: |
+          LATEST=$(git tag -l --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)
+
+          if [ -n "$LATEST" ]; then
+            MAJOR=$(echo "$LATEST" | sed -E 's/^v([0-9]+)\..*/\1/')
+            MINOR=$(echo "$LATEST" | sed -E 's/^v[0-9]+\.([0-9]+)\..*/\1/')
+            PATCH=$(echo "$LATEST" | sed -E 's/^v[0-9]+\.[0-9]+\.([0-9]+)$/\1/')
+            VERSION="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+            PREVIOUS="$LATEST"
+          else
+            LEGACY_PATCH=$(git tag -l | sed -nE 's/^vlatest\.latest\.([0-9]+)$/\1/p' | sort -nr | head -n1 || true)
+            if [ -n "$LEGACY_PATCH" ]; then
+              VERSION="v1.0.$((LEGACY_PATCH + 1))"
+              PREVIOUS="vlatest.latest.${LEGACY_PATCH}"
+            else
+              VERSION="v1.0.0"
+              PREVIOUS="none"
+            fi
+          fi
+
+          echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION#v}" >> "$GITHUB_OUTPUT"
+          echo "📦 Release: $VERSION (previous: $PREVIOUS)"
+
+      # Build web app (vite)
+      - run: npm install --no-audit --no-fund
+      - run: npx vite build
+
+      # ALSA headers needed for alsa-capture native addon (node-gyp)
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq libasound2-dev
+
+      # Build Pi backend (TypeScript)
+      - run: cd pi && npm install --no-audit --no-fund
+      - run: cd pi && npx tsc
+
+      # Production-only deps for Pi (included in tarball)
+      - run: cd pi && npm install --omit=dev --package-lock=false
+
+      # Build vendored alsa-capture (native ARM64 addon, matches Pi arch).
+      # CI-runner är ubuntu-24.04-arm vilket matchar Pi:ns aarch64.
+      - name: Build vendored alsa-capture
+        run: |
+          echo "=== Environment ==="
+          node --version
+          npm --version
+          python3 --version
+          uname -m
+
+          echo ""
+          echo "=== Install node-gyp@10 + vendor deps (node-addon-api) ==="
+          npm install -g node-gyp@10 --no-audit --no-fund
+          cd pi/vendor/alsa-capture
+          npm install --no-audit --no-fund --ignore-scripts --no-save
+
+          echo ""
+          echo "=== node-gyp rebuild (N-API addon) ==="
+          node-gyp rebuild --release 2>&1 | tail -30 || {
+            echo "❌ node-gyp rebuild FAILED"
+            exit 1
+          }
+
+          if [ -f build/Release/capture.node ]; then
+            echo "✓ capture.node byggd ($(stat -c%s build/Release/capture.node) bytes)"
+          else
+            echo "❌ capture.node saknas efter build"
+            exit 1
+          fi
+
+      # Write VERSION file for non-git installs
+      - run: |
+          echo '{"tag":"${{ steps.version.outputs.tag }}","version":"${{ steps.version.outputs.version }}","commit":"'$(git rev-parse HEAD)'","commitShort":"'$(git rev-parse --short HEAD)'","branch":"'$(git rev-parse --abbrev-ref HEAD)'","nodeVersion":"'$(node -v)'","arch":"'$(uname -m)'"}' > VERSION.json
+
+      # Package everything needed for Pi deployment
+      # OBS: pi/vendor/ måste med — innehåller pre-built capture.node för ARM64.
+      - run: |
+          chmod +x pi/setup-lotus.sh pi/uninstall-lotus.sh pi/update-services.sh
+          chmod +x pi/scripts/*.mjs pi/scripts/*.sh 2>/dev/null || true
+          tar czf dist.tar.gz VERSION.json dist/ pi/dist/ pi/node_modules/ pi/vendor/ pi/package.json pi/services.json pi/setup-lotus.sh pi/uninstall-lotus.sh pi/update-services.sh pi/scripts/
+
+      # Create versioned release + update "latest" pointer.
+      # Release-noten innehåller en maskinläsbar `BLE_BUILD_TAG: <tag>`-rad
+      # som update-services.sh på Pi:n parsar för att verifiera att rätt
+      # kod faktiskt deployades.
+      - uses: softprops/action-gh-release@v2.3.2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          body: |
+            BLE_BUILD_TAG: ${{ steps.bletag.outputs.ble_build_tag }}
+          append_body: true
+          files: dist.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: softprops/action-gh-release@v2.3.2
+        with:
+          tag_name: latest
+          name: Latest (${{ steps.version.outputs.tag }})
+          body: |
+            BLE_BUILD_TAG: ${{ steps.bletag.outputs.ble_build_tag }}
+          files: dist.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
