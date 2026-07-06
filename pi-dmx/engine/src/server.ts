@@ -31,6 +31,43 @@ export interface Server {
 
 export async function startServer(deps: ServerDeps, port = 80): Promise<Server> {
   const app = Fastify({ logger: false });
+
+  // Identify runner: blinks fixtures in order (or one specific fixture) so the
+  // user can visually locate them. All state lives on cfg.identify so the
+  // effect engine picks it up on the next frame.
+  let identifyTimer: NodeJS.Timeout | null = null;
+  const stopIdentify = () => {
+    if (identifyTimer) { clearInterval(identifyTimer); identifyTimer = null; }
+    deps.cfg.identify = null;
+    broadcast();
+  };
+  const startIdentifyAll = (stepMs = 700) => {
+    stopIdentify();
+    if (deps.cfg.fixtures.length === 0) return;
+    let i = 0;
+    deps.cfg.identify = { index: 0 };
+    broadcast();
+    identifyTimer = setInterval(() => {
+      i++;
+      if (i >= deps.cfg.fixtures.length) { stopIdentify(); return; }
+      deps.cfg.identify = { index: i };
+      broadcast();
+    }, stepMs);
+  };
+  const identifyOne = (index: number, holdMs = 1500) => {
+    stopIdentify();
+    if (index < 0 || index >= deps.cfg.fixtures.length) return;
+    deps.cfg.identify = { index };
+    broadcast();
+    identifyTimer = setTimeout(() => stopIdentify(), holdMs);
+  };
+  const broadcast = () => {
+    const payload = JSON.stringify({ type: "config", config: deps.cfg });
+    for (const c of app.websocketServer.clients) {
+      if (c.readyState === 1) c.send(payload);
+    }
+  };
+
   await app.register(fastifyWebsocket);
   await app.register(fastifyStatic, {
     root: join(__dirname, "..", "public"),
@@ -67,7 +104,16 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
             deps.cfg.master = clamp01(msg.value);
           } else if (msg.type === "setFixtures" && Array.isArray(msg.fixtures)) {
             const cleaned = sanitizeFixtures(msg.fixtures);
-            if (cleaned) deps.cfg.fixtures = cleaned;
+            if (cleaned) { deps.cfg.fixtures = cleaned; stopIdentify(); }
+          } else if (msg.type === "identifyAll") {
+            startIdentifyAll(typeof msg.stepMs === "number" ? msg.stepMs : 700);
+            return; // broadcast already handled
+          } else if (msg.type === "identifyOne" && typeof msg.index === "number") {
+            identifyOne(msg.index);
+            return;
+          } else if (msg.type === "identifyStop") {
+            stopIdentify();
+            return;
           }
           deps.onConfigChanged?.();
           // Echo back

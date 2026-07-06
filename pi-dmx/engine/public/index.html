@@ -43,9 +43,15 @@
     .fx-role .rm { color: var(--dim); margin-left: 4px; cursor: pointer; }
     .fx-meta { font-size: 11px; color: var(--dim); margin-top: 6px; }
     .fx-err  { font-size: 11px; color: var(--hot); margin-top: 6px; }
-    .fx-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .fx.identifying { border-color: var(--ok); box-shadow: 0 0 0 2px rgba(64,224,160,.25); }
+    .fx-head button.id { background: transparent; border: 1px solid var(--line); border-radius: 6px; color: var(--dim); font-size: 11px; padding: 4px 8px; cursor: pointer; margin-right: 4px; text-transform: uppercase; letter-spacing: .06em; }
+    .fx-head button.id:hover { color: var(--ok); border-color: var(--ok); }
+    .fx-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .fx-pack { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+    .fx-pack select { flex: 1; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); font-size: 13px; }
     .btn { flex: 1; padding: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); font-size: 14px; font-weight: 500; cursor: pointer; }
     .btn.primary { background: var(--hot); border-color: var(--hot); color: white; }
+    .btn.ok { background: transparent; border-color: var(--ok); color: var(--ok); }
     .btn:disabled { opacity: .4; cursor: not-allowed; }
   </style>
 </head>
@@ -77,12 +83,21 @@
   <h1>Fixtures</h1>
   <div class="card">
     <div id="fixtures"></div>
+    <div class="fx-pack">
+      <select id="fxSort" title="How Auto-address orders fixtures">
+        <option value="list">Sort: list order</option>
+        <option value="name">Sort: by name (A→Z)</option>
+        <option value="widest">Sort: widest first</option>
+        <option value="narrowest">Sort: narrowest first</option>
+      </select>
+      <button class="btn" id="fxAutoPack" style="flex:0 0 auto">Auto-address</button>
+    </div>
     <div class="fx-actions">
       <button class="btn" id="fxAdd">+ Add fixture</button>
-      <button class="btn" id="fxAutoPack" title="Repack all addresses sequentially">Auto-address</button>
+      <button class="btn ok" id="fxIdentifyAll" title="Blink each fixture in order">Identify all</button>
       <button class="btn primary" id="fxSave" disabled>Save changes</button>
     </div>
-    <div class="status" id="fxHint">Tap a fixture to edit. Changes are validated before saving.</div>
+    <div class="status" id="fxHint">Tap a fixture to edit. Use Identify to locate lamps in the room.</div>
   </div>
 
   <div class="status" id="conn">Connecting…</div>
@@ -131,9 +146,13 @@ function applyConfig(cfg) {
   sensVal.textContent = sensEl.value + "%";
   masterEl.value = Math.round(cfg.master * 100);
   masterVal.textContent = masterEl.value + "%";
+  // Track which fixture (if any) the engine is currently blinking so we can
+  // highlight it in the UI — server drives this, we just visualise.
+  identifyingIndex = cfg.identify?.index ?? -1;
   // Only replace local draft if server pushed something we don't already have
   // pending edits for. Prevents stomping the user's in-progress edit.
   if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
+  else renderFixtures();  // still refresh highlight even mid-edit
 }
 let kickTimer;
 function applyFrame(f) {
@@ -163,6 +182,7 @@ const fxSaveBtn = document.getElementById("fxSave");
 const fxHint = document.getElementById("fxHint");
 let fxDraft = [];
 let fxDirty = false;
+let identifyingIndex = -1;    // -1 = no identify in progress
 const deepClone = (x) => JSON.parse(JSON.stringify(x));
 const rolesOf = (fx) => fx.preset === "custom" ? (fx.roles ?? []) : PRESET_ROLES[fx.preset];
 
@@ -206,10 +226,13 @@ function renderFixtures() {
   fxDraft.forEach((fx, i) => {
     const width = rolesOf(fx).length;
     const div = document.createElement("div");
-    div.className = "fx" + (fxDirty ? " dirty" : "") + (errByIdx.has(i) ? " err" : "");
+    div.className = "fx" + (fxDirty ? " dirty" : "")
+                  + (errByIdx.has(i) ? " err" : "")
+                  + (i === identifyingIndex ? " identifying" : "");
     div.innerHTML = `
       <div class="fx-head">
         <input class="name" type="text" value="${escapeHtml(fx.name)}" data-i="${i}" data-k="name" />
+        <button class="id" data-id="${i}" title="Blink this fixture">Identify</button>
         <button class="del" data-del="${i}" aria-label="Remove">×</button>
       </div>
       <div class="fx-grid">
@@ -245,6 +268,14 @@ function renderFixtures() {
     el.addEventListener("click", (e) => {
       fxDraft.splice(Number(e.target.dataset.del), 1);
       markDirty();
+    });
+  });
+  fxEl.querySelectorAll("[data-id]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      // Only useful on saved fixtures — the engine renders from cfg.fixtures,
+      // not fxDraft. Warn if there are unsaved edits.
+      if (fxDirty) { fxHint.textContent = "Save changes before identifying"; return; }
+      send({ type: "identifyOne", index: Number(e.target.dataset.id) });
     });
   });
   fxEl.querySelectorAll("[data-role-i]").forEach((el) => {
@@ -345,7 +376,25 @@ document.getElementById("fxAdd").onclick = () => {
 };
 
 document.getElementById("fxAutoPack").onclick = () => {
-  // Repack all fixtures sequentially from address 1, in current list order.
+  // Reorder the list according to the chosen sort, then pack sequentially
+  // from address 1. Reordering (not just re-addressing) means the final
+  // layout in the UI matches the address order, which is what you'd expect
+  // when reading top-to-bottom.
+  const sort = document.getElementById("fxSort").value;
+  const cmp = {
+    list:      () => 0,
+    name:      (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
+    widest:    (a, b) => rolesOf(b).length - rolesOf(a).length,
+    narrowest: (a, b) => rolesOf(a).length - rolesOf(b).length,
+  }[sort] ?? (() => 0);
+  // Stable sort on a shallow copy, then mutate fxDraft in place so the
+  // dirty-tracking / render pipeline picks it up.
+  const ordered = fxDraft.map((fx, i) => ({ fx, i }))
+    .sort((a, b) => cmp(a.fx, b.fx) || (a.i - b.i))
+    .map((x) => x.fx);
+  fxDraft.length = 0;
+  fxDraft.push(...ordered);
+
   let addr = 1;
   for (const fx of fxDraft) {
     const w = rolesOf(fx).length;
@@ -354,6 +403,13 @@ document.getElementById("fxAutoPack").onclick = () => {
     addr += w;
   }
   markDirty();
+};
+
+document.getElementById("fxIdentifyAll").onclick = () => {
+  if (fxDirty) { fxHint.textContent = "Save changes before identifying"; return; }
+  // Toggle: if something is already blinking, stop it; otherwise start.
+  if (identifyingIndex >= 0) send({ type: "identifyStop" });
+  else send({ type: "identifyAll", stepMs: 700 });
 };
 
 fxSaveBtn.onclick = () => {

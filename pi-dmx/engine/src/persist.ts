@@ -29,7 +29,9 @@ export function scheduleSave(cfg: EngineConfig, path = DEFAULT_PATH, delayMs = 5
   saveTimer = setTimeout(async () => {
     try {
       await mkdir(dirname(path), { recursive: true });
-      await writeFile(path, JSON.stringify(cfg, null, 2), "utf8");
+      // Strip transient fields (identify override) from the persisted copy.
+      const { identify: _omit, ...persist } = cfg;
+      await writeFile(path, JSON.stringify(persist, null, 2), "utf8");
     } catch (e) {
       console.error("[persist] save failed:", e);
     }

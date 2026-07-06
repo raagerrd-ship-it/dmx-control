@@ -27,6 +27,14 @@ export class EffectEngine {
 
     if (this.cfg.mode === "blackout") return this.universe;
 
+    // Identify override: light only the target fixture(s) at full white so the
+    // user can visually locate each fixture in the room. Bypasses audio/mode.
+    const id = this.cfg.identify;
+    if (id && id.index >= 0 && id.index < this.cfg.fixtures.length) {
+      writeFixture(this.universe, this.cfg.fixtures[id.index], [1, 1, 1], 1);
+      return this.universe;
+    }
+
     const audio = frame.level * this.cfg.sensitivity;
     const master = this.cfg.master;
 

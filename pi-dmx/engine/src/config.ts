@@ -49,6 +49,8 @@ export interface EngineConfig {
   master: number;         // 0..1 master brightness
   /** Physical push-button that cycles through modes. Set null to disable. */
   modeButton: { chip: string; line: number } | null;
+  /** Transient identify override — not persisted. index = fixture being lit. */
+  identify?: { index: number } | null;
 }
 
 export const defaultConfig: EngineConfig = {
