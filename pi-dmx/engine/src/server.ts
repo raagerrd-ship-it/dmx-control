@@ -104,7 +104,16 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
             deps.cfg.master = clamp01(msg.value);
           } else if (msg.type === "setFixtures" && Array.isArray(msg.fixtures)) {
             const cleaned = sanitizeFixtures(msg.fixtures);
-            if (cleaned) deps.cfg.fixtures = cleaned;
+            if (cleaned) { deps.cfg.fixtures = cleaned; stopIdentify(); }
+          } else if (msg.type === "identifyAll") {
+            startIdentifyAll(typeof msg.stepMs === "number" ? msg.stepMs : 700);
+            return; // broadcast already handled
+          } else if (msg.type === "identifyOne" && typeof msg.index === "number") {
+            identifyOne(msg.index);
+            return;
+          } else if (msg.type === "identifyStop") {
+            stopIdentify();
+            return;
           }
           deps.onConfigChanged?.();
           // Echo back
@@ -117,6 +126,17 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
       conn.socket.on("close", () => clearInterval(push));
     });
   });
+
+  await app.listen({ port, host: "0.0.0.0" });
+
+  const broadcastConfig = () => {
+    const payload = JSON.stringify({ type: "config", config: deps.cfg });
+    for (const c of app.websocketServer.clients) {
+      if (c.readyState === 1) c.send(payload);
+    }
+  };
+  return { app, broadcastConfig };
+}
 
   await app.listen({ port, host: "0.0.0.0" });
 
