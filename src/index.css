@@ -1,49 +1,66 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 7%;
-    --foreground: 0 0% 92%;
+    /* Surfaces */
+    --background: 240 22% 5%;         /* #0a0a0f */
+    --foreground: 240 10% 92%;
 
+    --card: 240 16% 10%;              /* #15151d */
+    --card-foreground: 240 10% 92%;
 
-    --primary: 0 0% 92%;
-    --primary-foreground: 0 0% 7%;
+    --muted: 240 12% 14%;
+    --muted-foreground: 240 6% 55%;
 
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 92%;
+    --border: 240 10% 18%;
+    --input: 240 10% 18%;
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 45%;
+    /* Preset accent — updated at runtime */
+    --accent-h: 280;
+    --accent-s: 90%;
+    --accent-l: 60%;
+    --accent: var(--accent-h) var(--accent-s) var(--accent-l);
+    --accent-foreground: 240 22% 5%;
 
-    --accent: 0 0% 20%;
-    --accent-foreground: 0 0% 92%;
+    --primary: var(--accent);
+    --primary-foreground: 240 22% 5%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 92%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 240 10% 96%;
 
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 0 0% 92%;
+    --ring: var(--accent);
 
-    --radius: 0.75rem;
-
+    --radius: 1rem;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
+
+  html, body, #root { height: 100%; }
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Space Mono', monospace;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
     -webkit-user-select: none;
     user-select: none;
     overscroll-behavior: none;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: 'Space Grotesk', 'Inter', sans-serif;
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  .accent-glow {
+    box-shadow: 0 0 32px -8px hsl(var(--accent) / 0.55);
+  }
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
 }

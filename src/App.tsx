@@ -1,12 +1,11 @@
-import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
-import PiMobile from "./pages/PiMobile.tsx";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import DmxController from "./pages/DmxController.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const App = () => (
-  <BrowserRouter basename="/">
+  <BrowserRouter>
     <Routes>
-      <Route path="/" element={<PiMobile />} />
-      <Route path="/pi-mobile" element={<Navigate to="/" replace />} />
+      <Route path="/" element={<DmxController />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   </BrowserRouter>
