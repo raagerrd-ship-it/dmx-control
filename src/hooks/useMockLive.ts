@@ -143,37 +143,46 @@ export function useMockLive() {
             break;
           }
           case "chill": {
-            const hue = 20 + Math.sin(hueBase * 0.3 + idx * 0.7) * 25;
-            const v = Math.max(briFloor, briSlider * (0.7 + audio * 0.3));
-            const c = hsvToRgb(hue, 0.9, v);
+            // Aurora-drift: långsam palett som pendlar warm↔teal↔magenta.
+            const drift = Math.sin(hueBase * 0.15) * 140;               // 0..±140°
+            const hue = 20 + drift + Math.sin(hueBase * 0.4 + idx * 0.9) * 30;
+            const sat = 0.7 + Math.sin(hueBase * 0.25 + idx) * 0.2;
+            const v = Math.max(briFloor, briSlider * (0.65 + audio * 0.35));
+            const c = hsvToRgb(hue, Math.max(0.4, sat), v);
             r = c[0]; g = c[1]; b = c[2];
             break;
           }
           case "party": {
-            const hue = (hueBase * 90 + idx * 90 + kick * 60) % 360;
-            const v = Math.max(briFloor, briSlider * (0.6 + audio * 0.5));
+            // Motrörelse: varannan fixture roterar åt motsatt håll → korsande band.
+            const dir = idx % 2 === 0 ? 1 : -1;
+            const hue = (hueBase * 120 * dir + idx * 137 + kick * 90) % 360;
+            const wave = 0.5 + 0.5 * Math.sin(hueBase * 3 + idx * 1.7);  // extra puls
+            const v = Math.max(briFloor, briSlider * (0.45 + audio * 0.55) * (0.6 + wave * 0.4));
             const c = hsvToRgb(hue, 1, Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
             if (kick > 0.7 || flashActive) { r = g = b = 255 * briSlider; }
             break;
           }
           case "chase": {
-            // Färgvåg sveper genom lamporna; kick puttar fram vågen.
-            const headPos = (hueBase * 0.8 + kick * 0.6) % 1;
+            // Komet med lång svans + kort motström. Kicken puttar fram.
+            const headPos = (hueBase * 0.7 + kick * 0.5) % 1;
+            const tailPos = 1 - headPos;
             const myPos = idx / fixtureCount;
-            let dist = Math.abs(myPos - headPos);
-            if (dist > 0.5) dist = 1 - dist;                // wrap
-            const bump = Math.exp(-dist * dist * 60);       // smal svans
-            const hue = (hueBase * 40 + idx * 25) % 360;
-            const v = Math.max(briFloor, briSlider * (0.15 + bump * (0.6 + audio * 0.4)));
+            const wrapDist = (a: number, b: number) => {
+              let d = Math.abs(a - b); if (d > 0.5) d = 1 - d; return d;
+            };
+            const head = Math.exp(-wrapDist(myPos, headPos) ** 2 * 40);  // stor komet
+            const tail = Math.exp(-wrapDist(myPos, tailPos) ** 2 * 90) * 0.4; // liten motström
+            const bump = Math.min(1, head + tail);
+            const hue = (hueBase * 60 + idx * 30 + (tail > head ? 180 : 0)) % 360;
+            const v = Math.max(briFloor, briSlider * (0.12 + bump * (0.65 + audio * 0.4)));
             const c = hsvToRgb(hue, 1, Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
             break;
           }
           case "fire": {
-            // Varm bas 5–35°, kick sparkar upp gult, snabb flimmer via rand.
             const flicker = 0.75 + Math.random() * 0.25;
-            const kickHue = 55 * kick;                       // röd → gul på slag
+            const kickHue = 55 * kick;
             const hue = 5 + Math.sin(hueBase * 1.1 + idx * 1.3) * 15 + kickHue;
             const v = Math.max(briFloor, briSlider * flicker * (0.55 + audio * 0.55));
             const sat = Math.max(0.6, 1 - kick * 0.5);
@@ -184,12 +193,17 @@ export function useMockLive() {
           }
           case "auto":
           default: {
-            const hue = (hueBase * 30 + idx * 45) % 360;
+            // Två lager: snabb hue-spin + långsam palett-drift + audio-hue-modulation.
+            const paletteDrift = Math.sin(hueBase * 0.12) * 90;
+            const audioHue = audio * 40;
+            const hue = (hueBase * 45 + idx * 55 + paletteDrift + audioHue) % 360;
+            const sat = 0.85 + Math.sin(hueBase * 0.6 + idx * 0.5) * 0.15;
             const v = Math.max(briFloor, briSlider * (0.5 + audio * 0.6));
-            const c = hsvToRgb(hue, 0.95, Math.min(1, v));
+            const c = hsvToRgb(hue, Math.max(0.6, sat), Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
             if (kick > 0.85 || flashActive) { r = g = b = 255 * briSlider; }
           }
+        }
         }
 
         const ch = f.startCh - 1;
