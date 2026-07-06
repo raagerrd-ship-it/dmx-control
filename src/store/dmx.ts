@@ -105,6 +105,8 @@ export const useDmx = create<DmxState>((set, get) => ({
   params: initial.params,
   fixtures: initial.fixtures,
   conn: "mock",
+  micEnabled: false,
+  micError: null,
   audioLevel: 0,
   kick: 0,
   frame: new Array(512).fill(0),
