@@ -288,6 +288,22 @@ function renderCustomRoles(fx, i) {
   </div>`;
 }
 
+/** Find the lowest address where a fixture of `width` channels fits without
+ *  overlapping any of the fixtures in `others`. Returns 0 if universe is full. */
+function nextFreeAddress(width, others) {
+  const occupied = new Set();
+  others.forEach((fx) => {
+    const w = rolesOf(fx).length;
+    for (let c = fx.address; c < fx.address + w; c++) occupied.add(c);
+  });
+  for (let start = 1; start + width - 1 <= 512; start++) {
+    let ok = true;
+    for (let c = start; c < start + width; c++) if (occupied.has(c)) { ok = false; break; }
+    if (ok) return start;
+  }
+  return 0;
+}
+
 function onFieldChange(e) {
   const i = Number(e.target.dataset.i);
   const k = e.target.dataset.k;
@@ -298,6 +314,19 @@ function onFieldChange(e) {
     fx.preset = e.target.value;
     if (fx.preset === "custom" && !fx.roles) fx.roles = ["r","g","b"];
     if (fx.preset !== "custom") delete fx.roles;
+    // If the new preset width would overlap another fixture at the current
+    // address, auto-jump to the next free slot so the user doesn't have to
+    // think about channel counts.
+    const width = rolesOf(fx).length;
+    const others = fxDraft.filter((_, idx) => idx !== i);
+    const fits = nextFreeAddress(width, others);
+    const overlapsHere = others.some((o) => {
+      const ow = rolesOf(o).length;
+      return !(fx.address + width - 1 < o.address || fx.address > o.address + ow - 1);
+    });
+    if (overlapsHere || fx.address + width - 1 > 512) {
+      if (fits > 0) fx.address = fits;
+    }
   }
   markDirty();
 }
@@ -309,13 +338,21 @@ function escapeHtml(s) {
 }
 
 document.getElementById("fxAdd").onclick = () => {
-  // Suggest next free address: end of last fixture + 1
-  let nextAddr = 1;
-  fxDraft.forEach((fx) => {
-    const end = fx.address + rolesOf(fx).length - 1;
-    if (end >= nextAddr) nextAddr = end + 1;
-  });
-  fxDraft.push({ name: `Fixture ${fxDraft.length + 1}`, address: Math.min(nextAddr, 512), preset: "rgb" });
+  const addr = nextFreeAddress(3, fxDraft);
+  if (addr === 0) { fxHint.textContent = "Universe full — remove a fixture first"; return; }
+  fxDraft.push({ name: `Fixture ${fxDraft.length + 1}`, address: addr, preset: "rgb" });
+  markDirty();
+};
+
+document.getElementById("fxAutoPack").onclick = () => {
+  // Repack all fixtures sequentially from address 1, in current list order.
+  let addr = 1;
+  for (const fx of fxDraft) {
+    const w = rolesOf(fx).length;
+    if (addr + w - 1 > 512) { fxHint.textContent = "Universe full — can't fit all fixtures"; return; }
+    fx.address = addr;
+    addr += w;
+  }
   markDirty();
 };
 
