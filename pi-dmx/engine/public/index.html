@@ -74,7 +74,18 @@
     <input type="range" id="master" min="0" max="100" value="100" />
   </div>
 
+  <h1>Fixtures</h1>
+  <div class="card">
+    <div id="fixtures"></div>
+    <div class="fx-actions">
+      <button class="btn" id="fxAdd">+ Add fixture</button>
+      <button class="btn primary" id="fxSave" disabled>Save changes</button>
+    </div>
+    <div class="status" id="fxHint">Tap a fixture to edit. Changes are validated before saving.</div>
+  </div>
+
   <div class="status" id="conn">Connecting…</div>
+
 
 <script>
 const MODES = ["auto","chill","party","chase","fire","strobe","blackout"];
