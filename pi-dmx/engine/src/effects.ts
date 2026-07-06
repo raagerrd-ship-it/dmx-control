@@ -42,28 +42,31 @@ export class EffectEngine {
 
 function writeFixture(
   u: Uint8Array,
-  addr: number,
-  channels: 3 | 4 | 1,
+  fx: FixtureConfig,
   rgb: [number, number, number],
   master: number,
 ) {
-  const base = addr - 1;  // DMX addresses are 1-indexed
+  const roles = fixtureRoles(fx);
+  const base = fx.address - 1;   // DMX is 1-indexed
   const m = clamp01(master);
-  if (channels === 1) {
-    // Dimmer: use perceived brightness
-    const b = Math.max(rgb[0], rgb[1], rgb[2]) * m;
-    u[base] = to255(b);
-  } else if (channels === 3) {
-    u[base]     = to255(rgb[0] * m);
-    u[base + 1] = to255(rgb[1] * m);
-    u[base + 2] = to255(rgb[2] * m);
-  } else {
-    // RGBW: extract white as min(r,g,b)
-    const w = Math.min(rgb[0], rgb[1], rgb[2]);
-    u[base]     = to255((rgb[0] - w) * m);
-    u[base + 1] = to255((rgb[1] - w) * m);
-    u[base + 2] = to255((rgb[2] - w) * m);
-    u[base + 3] = to255(w * m);
+
+  const [r, g, b] = rgb;
+  // White = min(r,g,b) so RGBW fixtures keep saturation on the color chans
+  const w = Math.min(r, g, b);
+  const dim = Math.max(r, g, b);
+
+  for (let i = 0; i < roles.length; i++) {
+    const ch = base + i;
+    if (ch < 0 || ch >= 512) continue;
+    switch (roles[i]) {
+      case "r":      u[ch] = to255((r - (roles.includes("w") ? w : 0)) * m); break;
+      case "g":      u[ch] = to255((g - (roles.includes("w") ? w : 0)) * m); break;
+      case "b":      u[ch] = to255((b - (roles.includes("w") ? w : 0)) * m); break;
+      case "w":      u[ch] = to255(w * m); break;
+      case "dim":    u[ch] = to255(dim * m); break;
+      case "strobe": u[ch] = 0; break;  // off unless mode adds it later
+      case "unused": break;
+    }
   }
 }
 
