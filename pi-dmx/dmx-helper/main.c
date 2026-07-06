@@ -160,7 +160,7 @@ static void *tx_thread(void *arg) {
 /* ── Unix socket receive ──────────────────────────────────────────────── */
 
 static int sock_open(const char *path) {
-    int s = socket(AF_UNIX, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+    int s = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (s < 0) { perror("socket"); return -1; }
 
     unlink(path);
@@ -169,11 +169,10 @@ static int sock_open(const char *path) {
     if (bind(s, (struct sockaddr *)&a, sizeof(a)) < 0) {
         perror("bind"); close(s); return -1;
     }
-    chmod(path, 0666);  /* let the Node engine (any user) write to us */
-
-    /* Larger recv buffer avoids drops when engine bursts */
-    int rcv = 65536;
-    setsockopt(s, SOL_SOCKET, SO_RCVBUF, &rcv, sizeof(rcv));
+    if (listen(s, 1) < 0) {
+        perror("listen"); close(s); return -1;
+    }
+    chmod(path, 0666);
     return s;
 }
 
