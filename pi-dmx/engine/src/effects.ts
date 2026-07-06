@@ -117,6 +117,34 @@ function pickColor(
       const hue = ((t * 20) % 360) / 360;
       return hsvToRgb(hue, 1, v);
     }
+    case "comet": {
+      // A fireball glides through the fixtures with a long trailing tail.
+      // The head advances at ~1 fixture / 0.7s baseline, sped up by audio.
+      // Brightness ahead of the head drops off sharply (leading edge is
+      // crisp); behind the head decays exponentially over ~count/2 fixtures
+      // (long fading tail). Position wraps so it loops forever.
+      const speed = 1.4 + audio * 2.5;                 // fixtures per second
+      const head = (t * speed) % count;
+      // Signed distance behind the head (positive = behind, in the tail)
+      let behind = head - idx;
+      if (behind < -count / 2) behind += count;         // wrap forward
+      if (behind >  count / 2) behind -= count;         // wrap back
+      const tailLen = Math.max(2, count * 0.6);         // tail spans ~60% of rig
+      let v;
+      if (behind >= 0) {
+        // Trailing tail — exponential fade
+        v = Math.exp(-behind / (tailLen * 0.35));
+      } else {
+        // Leading edge — quick falloff so the fireball has a sharp front
+        v = Math.exp(-(-behind) * 3);
+      }
+      // Fireball color: warm core (white-hot) → orange → deep red in the tail
+      const heat = Math.max(0, Math.min(1, v));         // 1 at head, 0 at tail end
+      const hue = 0.02 + (1 - heat) * 0.04;             // 0.02 (red-orange) → 0.06 (orange)
+      const sat = 0.4 + (1 - heat) * 0.6;               // white-hot core, saturated tail
+      const kickBoost = 1 + kickEnv * 0.4;
+      return hsvToRgb(hue, sat, Math.min(1, v * kickBoost));
+    }
     case "mono": {
       // Single user-picked hue, brightness driven by audio + kick, with a
       // subtle flicker so it never feels static. At warm hues (~15°) with a
