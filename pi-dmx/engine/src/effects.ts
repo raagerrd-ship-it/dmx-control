@@ -86,6 +86,7 @@ function pickColor(
   audio: number,
   kickEnv: number,
   frame: Frame,
+  monoHue: number,
 ): [number, number, number] {
   switch (mode) {
     case "auto": {
