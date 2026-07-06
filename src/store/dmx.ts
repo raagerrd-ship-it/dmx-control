@@ -14,8 +14,8 @@ export type PresetId =
   | "chill"
   | "party"
   | "strobe"
-  | "static"
-  | "blackout";
+  | "chase"
+  | "fire";
 
 export interface Preset {
   id: PresetId;
@@ -25,19 +25,18 @@ export interface Preset {
 }
 
 export const PRESETS: Preset[] = [
-  { id: "auto",     name: "Auto",     hue: 280, description: "Färghjul, kick → blixt" },
-  { id: "chill",    name: "Chill",    hue: 20,  description: "Varma toner, långsam" },
-  { id: "party",    name: "Party",    hue: 320, description: "Regnbåge, snabb, kick" },
-  { id: "strobe",   name: "Strobe",   hue: 0,   description: "Vit blink i takt" },
-  { id: "static",   name: "Static",   hue: 200, description: "En färg, inget mer" },
-  { id: "blackout", name: "Blackout", hue: 240, description: "Allt av" },
+  { id: "auto",   name: "Auto",   hue: 280, description: "Färghjul, kick → blixt" },
+  { id: "chill",  name: "Chill",  hue: 20,  description: "Varma toner, långsam" },
+  { id: "party",  name: "Party",  hue: 320, description: "Regnbåge, snabb, kick" },
+  { id: "strobe", name: "Strobe", hue: 0,   description: "Vit blink i takt" },
+  { id: "chase",  name: "Chase",  hue: 160, description: "Färgvåg sveper genom lamporna" },
+  { id: "fire",   name: "Fire",   hue: 15,  description: "Varma flammor, flimrande" },
 ];
 
 export interface Params {
   brightness: number;   // 0..100
   smoothness: number;   // 0..100  (0 = snärtigt/snabbt release, 100 = mjukt/långsamt — mappar releaseAlpha)
   sensitivity: number;  // 0..100
-  staticHue: number;    // 0..360 (för Static)
 }
 
 export type ConnState = "mock" | "connecting" | "connected" | "disconnected";
