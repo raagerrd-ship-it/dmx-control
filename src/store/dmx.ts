@@ -81,7 +81,10 @@ function load(): Persisted {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return defaults;
-    return { ...defaults, ...JSON.parse(raw) };
+    const merged = { ...defaults, ...JSON.parse(raw) } as Persisted;
+    // Migrera bort borttagna presets (static/blackout → auto)
+    if (!PRESETS.some((p) => p.id === merged.preset)) merged.preset = "auto";
+    return merged;
   } catch {
     return defaults;
   }
