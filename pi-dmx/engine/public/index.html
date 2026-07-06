@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <title>DMX Control</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <style>
+    :root { --bg:#0a0a0f; --card:#15151f; --line:#252535; --fg:#e8e8f0; --dim:#7a7a90; --hot:#ff3a6b; --ok:#40e0a0; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin:0; padding:0; background:var(--bg); color:var(--fg); font: 15px -apple-system, system-ui, sans-serif; overscroll-behavior: none; }
+    body { padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom); }
+    h1 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: 20px 0 10px; font-weight: 600; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+    .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .mode-btn { padding: 14px 8px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); font-size: 14px; font-weight: 500; cursor: pointer; text-transform: capitalize; }
+    .mode-btn.active { background: var(--hot); border-color: var(--hot); color: white; }
+    .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+    .row label { color: var(--dim); font-size: 13px; }
+    .row .val { font-variant-numeric: tabular-nums; color: var(--fg); font-size: 13px; }
+    input[type=range] { width: 100%; accent-color: var(--hot); }
+    .meter { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+    .meter > div { height: 100%; background: linear-gradient(90deg, var(--ok), var(--hot)); transition: width 60ms linear; }
+    .kick-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background: var(--line); margin-left: 6px; vertical-align: middle; transition: background 40ms; }
+    .kick-dot.on { background: var(--hot); box-shadow: 0 0 12px var(--hot); }
+    .status { font-size: 12px; color: var(--dim); margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Mode</h1>
+  <div class="card">
+    <div class="modes" id="modes"></div>
+  </div>
+
+  <h1>Level <span class="kick-dot" id="kickDot"></span></h1>
+  <div class="card">
+    <div class="row"><label>Input</label><span class="val" id="levelVal">–</span></div>
+    <div class="meter"><div id="levelBar" style="width:0%"></div></div>
+    <div class="status">Auto-gain: <span id="gainVal">–</span>×</div>
+  </div>
+
+  <h1>Sensitivity</h1>
+  <div class="card">
+    <div class="row"><label>How reactive</label><span class="val" id="sensVal">–</span></div>
+    <input type="range" id="sens" min="0" max="100" value="60" />
+  </div>
+
+  <h1>Master brightness</h1>
+  <div class="card">
+    <div class="row"><label>Overall level</label><span class="val" id="masterVal">–</span></div>
+    <input type="range" id="master" min="0" max="100" value="100" />
+  </div>
+
+  <div class="status" id="conn">Connecting…</div>
+
+<script>
+const MODES = ["auto","chill","party","chase","fire","strobe","blackout"];
+const modesEl = document.getElementById("modes");
+const kickDot = document.getElementById("kickDot");
+const levelBar = document.getElementById("levelBar");
+const levelVal = document.getElementById("levelVal");
+const gainVal = document.getElementById("gainVal");
+const sensEl = document.getElementById("sens");
+const sensVal = document.getElementById("sensVal");
+const masterEl = document.getElementById("master");
+const masterVal = document.getElementById("masterVal");
+const connEl = document.getElementById("conn");
+
+let ws;
+function connect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen  = () => connEl.textContent = "Connected";
+  ws.onclose = () => { connEl.textContent = "Disconnected — retrying…"; setTimeout(connect, 1500); };
+  ws.onmessage = (ev) => {
+    const m = JSON.parse(ev.data);
+    if (m.type === "config") applyConfig(m.config);
+    else if (m.type === "frame") applyFrame(m);
+  };
+}
+function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+function renderModes(current) {
+  modesEl.innerHTML = "";
+  for (const m of MODES) {
+    const b = document.createElement("button");
+    b.className = "mode-btn" + (m === current ? " active" : "");
+    b.textContent = m;
+    b.onclick = () => send({ type: "setMode", mode: m });
+    modesEl.appendChild(b);
+  }
+}
+function applyConfig(cfg) {
+  renderModes(cfg.mode);
+  sensEl.value = Math.round(cfg.sensitivity * 100);
+  sensVal.textContent = sensEl.value + "%";
+  masterEl.value = Math.round(cfg.master * 100);
+  masterVal.textContent = masterEl.value + "%";
+}
+let kickTimer;
+function applyFrame(f) {
+  const pct = Math.round(f.level * 100);
+  levelBar.style.width = pct + "%";
+  levelVal.textContent = pct + "%";
+  gainVal.textContent = f.gain.toFixed(1);
+  if (f.kick) {
+    kickDot.classList.add("on");
+    clearTimeout(kickTimer);
+    kickTimer = setTimeout(() => kickDot.classList.remove("on"), 120);
+  }
+}
+sensEl.oninput = () => { sensVal.textContent = sensEl.value + "%"; send({ type: "setSensitivity", value: sensEl.value / 100 }); };
+masterEl.oninput = () => { masterVal.textContent = masterEl.value + "%"; send({ type: "setMaster", value: masterEl.value / 100 }); };
+
+renderModes("auto");
+connect();
+</script>
+</body>
+</html>
