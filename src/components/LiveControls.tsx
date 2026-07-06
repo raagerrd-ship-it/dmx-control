@@ -36,9 +36,28 @@ function Slider(props: {
 export function LiveControls() {
   const params = useDmx((s) => s.params);
   const patch = useDmx((s) => s.patchParams);
+  const micEnabled = useDmx((s) => s.micEnabled);
+  const micError = useDmx((s) => s.micError);
+  const setMicEnabled = useDmx((s) => s.setMicEnabled);
 
   return (
     <div className="space-y-5 rounded-2xl border border-border bg-card p-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-sm font-medium">Ljudkälla</div>
+          <div className="text-xs text-muted-foreground">
+            {micEnabled ? (micError ? `Mic fel: ${micError}` : "Datorns mic") : "Syntetisk fejksignal"}
+          </div>
+        </div>
+        <button
+          onClick={() => setMicEnabled(!micEnabled)}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+            micEnabled ? "bg-accent text-accent-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
+          }`}
+        >
+          {micEnabled ? "Mic PÅ" : "Mic AV"}
+        </button>
+      </div>
       <Slider label="Ljusstyrka" value={params.brightness} onChange={(v) => patch({ brightness: v })} />
       <Slider label="Mjukhet"    value={params.smoothness} onChange={(v) => patch({ smoothness: v })} />
       <Slider label="Känslighet" value={params.sensitivity} onChange={(v) => patch({ sensitivity: v })} />

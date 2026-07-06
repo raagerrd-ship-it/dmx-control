@@ -46,6 +46,8 @@ interface DmxState {
   params: Params;
   fixtures: Fixture[];
   conn: ConnState;
+  micEnabled: boolean;
+  micError: string | null;
   audioLevel: number;   // 0..1 (smoothed)
   kick: number;         // 0..1 (decaying)
   frame: number[];      // DMX 1..512, values 0..255
@@ -56,6 +58,8 @@ interface DmxState {
   removeFixture: (id: string) => void;
   setLive: (audio: number, kick: number, frame: number[]) => void;
   setConn: (c: ConnState) => void;
+  setMicEnabled: (b: boolean) => void;
+  setMicError: (m: string | null) => void;
 }
 
 const LS_KEY = "dmx-config-v1";
@@ -101,6 +105,8 @@ export const useDmx = create<DmxState>((set, get) => ({
   params: initial.params,
   fixtures: initial.fixtures,
   conn: "mock",
+  micEnabled: false,
+  micError: null,
   audioLevel: 0,
   kick: 0,
   frame: new Array(512).fill(0),
@@ -140,6 +146,8 @@ export const useDmx = create<DmxState>((set, get) => ({
   },
   setLive: (audioLevel, kick, frame) => set({ audioLevel, kick, frame }),
   setConn: (conn) => set({ conn }),
+  setMicEnabled: (micEnabled) => set({ micEnabled, micError: micEnabled ? get().micError : null }),
+  setMicError: (micError) => set({ micError }),
 }));
 
 export function channelsFor(mode: FixtureMode): number {
