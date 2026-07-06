@@ -48,14 +48,13 @@ export function useMic(
 
         // Auto-gain: långsam RMS-envelope styr en gain-faktor så snittet
         // hålls nära TARGET även om volymen i lokalen ändras under kvällen.
-        const TARGET = 0.18;          // önskad genomsnittlig level
+        const TARGET = 0.5;           // sikta mot "loud" — nära max
         const MIN_GAIN = 0.5;
         const MAX_GAIN = 20;
         const NOISE_FLOOR = 0.003;    // under detta räknas som tystnad
-        // Tidskonstanter i sekunder — attack långsammare än release inte,
-        // vi vill sänka snabbt vid hög volym, höja långsamt vid tystnad.
-        const T_UP = 8;               // tid att öka gain (tystare)
-        const T_DOWN = 2;             // tid att minska gain (högre)
+        // Grundvolymen ändras sällan — kör mycket långsam adaptation.
+        const T_UP = 90;              // ~1.5 min att öka gain
+        const T_DOWN = 30;            // ~30s att minska gain
         let gain = 1;
         let envelope = TARGET;
         let lastT = performance.now();
