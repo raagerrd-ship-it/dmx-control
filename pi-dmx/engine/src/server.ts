@@ -82,7 +82,14 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
   });
 
   await app.listen({ port, host: "0.0.0.0" });
-  return app;
+
+  const broadcastConfig = () => {
+    const payload = JSON.stringify({ type: "config", config: deps.cfg });
+    for (const c of app.websocketServer.clients) {
+      if (c.readyState === 1) c.send(payload);
+    }
+  };
+  return { app, broadcastConfig };
 }
 
 function isMode(m: unknown): m is Mode {
