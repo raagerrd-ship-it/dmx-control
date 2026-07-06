@@ -40,7 +40,7 @@ export class EffectEngine {
 
     for (let i = 0; i < this.cfg.fixtures.length; i++) {
       const fx = this.cfg.fixtures[i];
-      const rgb = pickColor(this.cfg.mode, t, i, this.cfg.fixtures.length, audio, kickEnv, frame, this.cfg.monoHue);
+      const rgb = pickColor(this.cfg.mode, t, i, this.cfg.fixtures.length, audio, kickEnv, frame, this.cfg.monoHue, this.cfg.cometHue);
       writeFixture(this.universe, fx, rgb, master);
     }
 
