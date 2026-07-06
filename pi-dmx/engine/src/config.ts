@@ -47,6 +47,8 @@ export interface EngineConfig {
   mode: Mode;
   sensitivity: number;    // 0..1 user knob
   master: number;         // 0..1 master brightness
+  /** Physical push-button that cycles through modes. Set null to disable. */
+  modeButton: { chip: string; line: number } | null;
 }
 
 export const defaultConfig: EngineConfig = {
@@ -69,6 +71,7 @@ export const defaultConfig: EngineConfig = {
   mode: "auto",
   sensitivity: 0.6,
   master: 1.0,
+  modeButton: { chip: "gpiochip0", line: 17 },   // GPIO17 = physical pin 11
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {

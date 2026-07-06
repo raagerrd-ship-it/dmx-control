@@ -46,6 +46,7 @@ audio/effect/UI logic.
 | MAX485 breakout | RS-485 transceiver (DE + RE tied HIGH for TX-only) |
 | 3-pin XLR female | DMX output |
 | 120 Ω resistor | DMX line termination (across A/B at last fixture) |
+| Push-button (NO) | Optional: physical mode-cycle button — GPIO17 (pin 11) to GND |
 
 ### MAX485 wiring (TX-only, no RDM)
 
@@ -57,6 +58,21 @@ MAX485 A                ────► XLR pin 3 (+)
 MAX485 B                ────► XLR pin 2 (−)
 Pi GND                  ────► XLR pin 1 (shield)
 ```
+
+### Mode button (optional)
+
+```
+Pi GPIO17 (pin 11) ──[ push-button ]── Pi GND (pin 9)
+```
+
+Nothing else needed — the engine enables the Pi's internal pull-up, so a
+single normally-open button between GPIO17 and GND is enough. Each press
+cycles: Auto → Chill → Party → Chase → Fire → Strobe → Blackout → Auto…
+
+Requires `gpiod` package (`sudo apt install -y gpiod`). Pick a different
+GPIO by editing `modeButton.line` in `/var/lib/audio-dmx-engine/config.json`,
+or set `modeButton` to `null` to disable it entirely.
+
 
 ## System setup (one-time)
 
