@@ -60,7 +60,8 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<FastifyI
           } else if (msg.type === "setMaster") {
             deps.cfg.master = clamp01(msg.value);
           } else if (msg.type === "setFixtures" && Array.isArray(msg.fixtures)) {
-            deps.cfg.fixtures = msg.fixtures;
+            const cleaned = sanitizeFixtures(msg.fixtures);
+            if (cleaned) deps.cfg.fixtures = cleaned;
           }
           deps.onConfigChanged?.();
           // Echo back
