@@ -75,6 +75,7 @@ export const defaultConfig: EngineConfig = {
   mode: "auto",
   sensitivity: 0.6,
   master: 1.0,
+  monoHue: 15,   // warm orange — feels like fire, but the user can pick anything
   modeButton: { chip: "gpiochip0", line: 17 },   // GPIO17 = physical pin 11
 };
 
