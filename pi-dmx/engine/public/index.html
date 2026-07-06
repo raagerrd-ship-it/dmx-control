@@ -197,6 +197,19 @@ function applyFrame(f) {
 }
 sensEl.oninput = () => { sensVal.textContent = sensEl.value + "%"; send({ type: "setSensitivity", value: sensEl.value / 100 }); };
 masterEl.oninput = () => { masterVal.textContent = masterEl.value + "%"; send({ type: "setMaster", value: masterEl.value / 100 }); };
+monoHueEl.oninput = () => {
+  const h = Number(monoHueEl.value);
+  monoValEl.textContent = h;
+  monoSwatch.style.background = `hsl(${h} 100% 50%)`;
+  send({ type: "setMonoHue", value: h });
+};
+document.querySelectorAll("[data-preset-hue]").forEach((b) => {
+  b.onclick = () => {
+    const h = Number(b.dataset.presetHue);
+    monoHueEl.value = h;
+    monoHueEl.dispatchEvent(new Event("input"));
+  };
+});
 
 /* ── Fixture editor ─────────────────────────────────────────────────── */
 const PRESETS = ["rgb", "rgbw", "dimmer", "custom"];
