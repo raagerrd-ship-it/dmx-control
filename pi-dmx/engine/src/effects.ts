@@ -7,7 +7,8 @@
  * channel-layout is honored (RGB / RGBW / dimmer).
  */
 
-import type { EngineConfig, Mode } from "./config.js";
+import type { EngineConfig, FixtureConfig, Mode } from "./config.js";
+import { fixtureRoles } from "./config.js";
 import type { Frame } from "./analyser.js";
 
 export class EffectEngine {
@@ -32,7 +33,7 @@ export class EffectEngine {
     for (let i = 0; i < this.cfg.fixtures.length; i++) {
       const fx = this.cfg.fixtures[i];
       const rgb = pickColor(this.cfg.mode, t, i, this.cfg.fixtures.length, audio, kickEnv, frame);
-      writeFixture(this.universe, fx.address, fx.channels, rgb, master);
+      writeFixture(this.universe, fx, rgb, master);
     }
 
     return this.universe;
