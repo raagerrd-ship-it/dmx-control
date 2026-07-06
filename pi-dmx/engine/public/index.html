@@ -182,6 +182,7 @@ const fxSaveBtn = document.getElementById("fxSave");
 const fxHint = document.getElementById("fxHint");
 let fxDraft = [];
 let fxDirty = false;
+let identifyingIndex = -1;    // -1 = no identify in progress
 const deepClone = (x) => JSON.parse(JSON.stringify(x));
 const rolesOf = (fx) => fx.preset === "custom" ? (fx.roles ?? []) : PRESET_ROLES[fx.preset];
 
