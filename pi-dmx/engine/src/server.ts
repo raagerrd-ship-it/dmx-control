@@ -102,6 +102,8 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
             deps.cfg.sensitivity = clamp01(msg.value);
           } else if (msg.type === "setMaster") {
             deps.cfg.master = clamp01(msg.value);
+          } else if (msg.type === "setMonoHue" && typeof msg.value === "number") {
+            deps.cfg.monoHue = ((msg.value % 360) + 360) % 360;
           } else if (msg.type === "setFixtures" && Array.isArray(msg.fixtures)) {
             const cleaned = sanitizeFixtures(msg.fixtures);
             if (cleaned) { deps.cfg.fixtures = cleaned; stopIdentify(); }
