@@ -144,7 +144,7 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
 
 function isMode(m: unknown): m is Mode {
   return typeof m === "string" &&
-    ["auto", "party", "chase", "comet", "mono", "strobe", "blackout"].includes(m);
+    ["auto", "party", "comet", "mono", "strobe", "blackout"].includes(m);
 }
 const clamp01 = (x: number) => typeof x === "number" && x >= 0 && x <= 1 ? x : 0;
 
