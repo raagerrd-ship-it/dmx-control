@@ -15,6 +15,8 @@ export default function DmxController() {
   const preset = useDmx((s) => s.preset);
   const monoHue = useDmx((s) => s.params.monoHue);
   const cometHue = useDmx((s) => s.params.cometHue);
+  const splitHueA = useDmx((s) => s.params.splitHueA);
+  const splitHueB = useDmx((s) => s.params.splitHueB);
   const patch = useDmx((s) => s.patchParams);
   const p = presetById(preset);
 
