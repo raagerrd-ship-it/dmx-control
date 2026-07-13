@@ -19,13 +19,13 @@ REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 BOOT_DIR="/boot/firmware"
 [[ -d $BOOT_DIR ]] || BOOT_DIR="/boot"
 
-echo "==> [1/8] apt packages"
+echo "==> [1/9] apt packages"
 apt-get update -qq
 apt-get install -y --no-install-recommends \
   build-essential nodejs npm \
   alsa-utils gpiod libcap2-bin
 
-echo "==> [2/8] /boot config — UART, Codec Zero, force_turbo"
+echo "==> [2/9] /boot config — UART, Codec Zero, force_turbo"
 CFG="$BOOT_DIR/config.txt"
 touch "$CFG"
 ensure_line() { grep -qxF "$1" "$CFG" || echo "$1" >> "$CFG"; }
@@ -35,7 +35,7 @@ ensure_line "init_uart_clock=48000000"
 ensure_line "dtoverlay=iqaudio-codec"
 ensure_line "force_turbo=1"
 
-echo "==> [3/8] /boot cmdline — isolate CPU3 for dmx-helper, drop serial console"
+echo "==> [3/9] /boot cmdline — isolate CPU3 for dmx-helper, drop serial console"
 CMD="$BOOT_DIR/cmdline.txt"
 if [[ -f $CMD ]]; then
   sed -i 's/console=serial0,115200 \?//g; s/console=ttyAMA0,115200 \?//g' "$CMD"
