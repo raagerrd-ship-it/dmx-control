@@ -57,6 +57,8 @@ export interface EngineConfig {
   splitHueB: number;
   /** "chase" sub-pattern: sweep (L→R loop) or ping-pong (bounce). */
   chaseStyle: "sweep" | "pingpong";
+  /** Which modes are included in the physical button / WS cycle. */
+  rotation: Partial<Record<Mode, boolean>>;
   /** Physical push-button that cycles through modes. Set null to disable. */
   modeButton: { chip: string; line: number } | null;
   /** Transient identify override — not persisted. index = fixture being lit. */
