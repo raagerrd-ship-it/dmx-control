@@ -145,7 +145,6 @@ export const useDmx = create<DmxState>((set, get) => ({
     save({ preset: get().preset, params: get().params, fixtures });
   },
   setLive: (audioLevel, kick, frame) => set({ audioLevel, kick, frame }),
-  setConn: (conn) => set({ conn }),
   setMicEnabled: (micEnabled) => set({ micEnabled, micError: micEnabled ? get().micError : null }),
   setMicError: (micError) => set({ micError }),
 }));
