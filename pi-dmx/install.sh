@@ -122,4 +122,5 @@ echo
 echo "Done. Reboot once so /boot config + isolcpus take effect:"
 echo "    sudo reboot"
 echo
-echo "After reboot, open http://<pi-ip>/ from your phone."
+echo "After reboot, join WiFi '$AP_SSID' (password: $AP_PASS)"
+echo "and open http://192.168.4.1/ from your phone."
