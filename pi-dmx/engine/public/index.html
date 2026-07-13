@@ -266,6 +266,12 @@ document.querySelectorAll("[data-comet-hue]").forEach((b) => {
     cometHueEl.dispatchEvent(new Event("input"));
   };
 });
+dmxHzEl.oninput = () => {
+  const v = Number(dmxHzEl.value);
+  dmxHzVal.textContent = v;
+  send({ type: "setDmxMaxHz", value: v });
+};
+
 
 /* ── Fixture editor ─────────────────────────────────────────────────── */
 const PRESETS = ["rgb", "rgbw", "dimmer", "custom"];
