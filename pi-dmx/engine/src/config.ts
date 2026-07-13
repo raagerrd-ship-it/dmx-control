@@ -81,7 +81,7 @@ export const defaultConfig: EngineConfig = {
   master: 1.0,
   monoHue: 15,   // warm orange — feels like fire, but the user can pick anything
   cometHue: 15,  // fireball default; pick e.g. 220 for a blue comet
-  modeButton: { chip: "gpiochip0", line: 17 },   // GPIO17 = physical pin 11
+  modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   dmxMaxHz: 200, // safe max for typical fixtures; helper caps automatically
 };
 

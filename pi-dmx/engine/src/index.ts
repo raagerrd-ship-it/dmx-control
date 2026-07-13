@@ -20,7 +20,8 @@ import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 import { activeSlots, type Mode } from "./config.js";
 
-const MODE_CYCLE: Mode[] = ["auto", "party", "comet", "mono", "strobe", "blackout"];
+// Physical button cycles through the fun modes (skips blackout so the button never kills the show).
+const MODE_CYCLE: Mode[] = ["auto", "party", "comet", "mono", "strobe"];
 
 const cfg = await loadConfig();
 const analyser = new Analyser(cfg);
@@ -61,7 +62,7 @@ const server = await startServer({
 }, Number(process.env.PORT ?? 80));
 console.log(`audio-dmx-engine listening on ${server.app.server.address()}`);
 
-// Physical mode button — cycles Auto → Chill → Party → Chase → Fire → Strobe → Blackout → Auto…
+// Physical mode button — cycles Auto → Party → Comet → Mono → Strobe → Auto…
 let button: Button | null = null;
 if (cfg.modeButton) {
   button = new Button({ chip: cfg.modeButton.chip, line: cfg.modeButton.line });
