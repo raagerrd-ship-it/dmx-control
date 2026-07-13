@@ -8,7 +8,7 @@
  * Debounced: ignores repeat edges within `debounceMs`.
  */
 
-import { spawn, type ChildProcessByStdio } from "node:child_process";
+import { spawn, execFileSync, type ChildProcessByStdio } from "node:child_process";
 import type { Readable } from "node:stream";
 import { EventEmitter } from "node:events";
 

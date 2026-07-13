@@ -32,7 +32,10 @@ ensure_line() { grep -qxF "$1" "$CFG" || echo "$1" >> "$CFG"; }
 ensure_line "enable_uart=1"
 ensure_line "dtoverlay=disable-bt"
 ensure_line "init_uart_clock=48000000"
-ensure_line "dtoverlay=iqaudio-codec"
+# rpi-codeczero (not iqaudio-codec) — the generic IQaudIO overlay gives
+# "I2S SYNC error" / EIO on capture with the Codec Zero on newer kernels.
+sed -i '/^dtoverlay=iqaudio-codec$/d' "$CFG"
+ensure_line "dtoverlay=rpi-codeczero"
 ensure_line "force_turbo=1"
 
 echo "==> [3/9] /boot cmdline — isolate CPU3 for dmx-helper, drop serial console"
