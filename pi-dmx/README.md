@@ -69,19 +69,17 @@ Note: the Codec Zero HAT occupies the 40-pin header. Solder or plug the
 three WPM432 wires onto the pass-through stacking pins (2, 6, 8) above the
 HAT, or use a stacking header.
 
-### Mode button (optional)
+### Mode button
 
-```
-Pi GPIO17 (pin 11) ──[ push-button ]── Pi GND (pin 9)
-```
+The Codec Zero HAT has a built-in push-button (SW1) wired to **GPIO27**.
+Each press cycles: **Auto → Party → Comet → Mono → Strobe → Auto…**
+(Blackout is intentionally skipped so a button press never kills the show —
+you can still select it from the mobile UI.)
 
-Nothing else needed — the engine enables the Pi's internal pull-up, so a
-single normally-open button between GPIO17 and GND is enough. Each press
-cycles: Auto → Party → Comet → Mono → Strobe → Blackout → Auto…
-
-Requires `gpiod` package (`sudo apt install -y gpiod`). Pick a different
-GPIO by editing `modeButton.line` in `/var/lib/audio-dmx-engine/config.json`,
-or set `modeButton` to `null` to disable it entirely.
+Requires `gpiod` (`sudo apt install -y gpiod`). To use a different GPIO
+(e.g. an external button on GPIO17), edit `modeButton.line` in
+`/var/lib/audio-dmx-engine/config.json`, or set `modeButton` to `null` to
+disable it entirely.
 
 
 ## System setup (one-time)
