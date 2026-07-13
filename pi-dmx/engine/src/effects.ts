@@ -26,6 +26,10 @@ export class EffectEngine {
   private lastDropAdvance = 0;
   private dropFired: number[] = [];
   private dropHue: number[] = [];
+  /** Wave mode: integrated phase — speed may vary per frame without the
+   *  wave jumping (t*speed would re-scale all elapsed time on every change). */
+  private wavePhase = 0;
+  private lastRenderMs = performance.now();
 
   constructor(private cfg: EngineConfig) {}
 
@@ -95,6 +99,11 @@ export class EffectEngine {
       }
     }
 
+    // Advance the wave phase by dt so speed changes glide instead of jumping.
+    const dtSec = Math.min(0.1, (now - this.lastRenderMs) / 1000);
+    this.lastRenderMs = now;
+    if (this.cfg.mode === "wave") this.wavePhase += dtSec * (1.6 + audio * 4);
+
     // Drops: each beat/kick fires the next lamp in a fresh pure color.
     if (this.cfg.mode === "drops" && count > 0 && (frame.kick || beatTick) && now - this.lastDropAdvance > 140) {
       this.lastDropAdvance = now;
@@ -106,7 +115,7 @@ export class EffectEngine {
 
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
-      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue);
+      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase);
       writeFixture(this.universe, fx, rgb, master);
     }
 
@@ -163,6 +172,7 @@ function pickColor(
   fx?: FixtureConfig,
   dropFired: number[] = [],
   dropHue: number[] = [],
+  wavePhase = 0,
 ): [number, number, number] {
   const { mode, monoHue, cometHue, splitHueA, splitHueB } = cfg;
   // Dynamics: lower floors + gamma on the audio-driven part, so quiet passages
@@ -207,8 +217,7 @@ function pickColor(
     case "wave": {
       // A soft brightness wave rolling across the rig at music speed; the whole
       // rig shares one hue that steps onward every few seconds.
-      const speed = 1.6 + audio * 4;
-      const base = 0.5 + 0.5 * Math.sin(t * speed - idx * 1.1);
+      const base = 0.5 + 0.5 * Math.sin(wavePhase - idx * 1.1);
       const hue = snapHue(101, ((t * 14) % 360) / 360);
       const v = shaped(0.1, base * (0.3 + audio * 0.8) + kickEnv * 0.25);
       return hsvToRgb(hue, 1, v);
