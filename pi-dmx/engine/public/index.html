@@ -68,6 +68,20 @@
     <div class="status">Auto-gain: <span id="gainVal">–</span>×</div>
   </div>
 
+  <h1>Auto-gain</h1>
+  <div class="card">
+    <div class="row"><label>Target level</label><span class="val"><span id="agcTargetVal">–</span>%</span></div>
+    <input type="range" id="agcTarget" min="10" max="90" value="50" />
+    <div class="row" style="margin-top:14px"><label>Aggressiveness</label><span class="val"><span id="agcAggVal">–</span>%</span></div>
+    <input type="range" id="agcAgg" min="0" max="100" value="35" />
+    <div class="status">
+      Low = slow drift (follows floor volume, ignores transients).
+      High = fast reaction to loud/quiet passages.
+      <span id="agcTauDetail" style="display:block;margin-top:4px;opacity:.7"></span>
+    </div>
+  </div>
+
+
   <h1>Sensitivity</h1>
   <div class="card">
     <div class="row"><label>How reactive</label><span class="val" id="sensVal">–</span></div>
