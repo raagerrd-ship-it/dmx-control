@@ -95,7 +95,7 @@ export class EffectEngine {
       // CH-strobe rate follows the music: quiet = slow flashes, loud = machine gun.
       const strobeVal = hwStrobe ? Math.round(100 + audio * 155) : 0;
       // Hardware strobe: steady white on the color channels, CH-strobe does the flashing.
-      const rgb = hwStrobe ? ([1, 1, 1] as [number, number, number]) : pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos);
+      const rgb = hwStrobe ? ([1, 1, 1] as [number, number, number]) : pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx);
       writeFixture(this.universe, fx, rgb, master, strobeVal);
     }
 
@@ -149,6 +149,7 @@ function pickColor(
   kickEnv: number,
   frame: Frame,
   chasePos: number,
+  fx?: FixtureConfig,
 ): [number, number, number] {
   const { mode, monoHue, cometHue, splitHueA, splitHueB } = cfg;
   // Dynamics: lower floors + gamma on the audio-driven part, so quiet passages
@@ -163,7 +164,8 @@ function pickColor(
     Math.min(1, frame.treble * norm * 1.1),
     Math.min(1, frame.energy * norm * 0.45 + kickEnv),
   ];
-  const band = bands[idx % bands.length];
+  const BAND_IDX = { bass: 0, mid: 1, treble: 2, kick: 3 } as const;
+  const band = bands[fx?.band ? BAND_IDX[fx.band] : idx % bands.length];
   const dyn = Math.max(0, Math.min(1, cfg.dynamics ?? 0.6));
   const shaped = (floor: number, x: number) => {
     const f = floor * (1 - dyn);

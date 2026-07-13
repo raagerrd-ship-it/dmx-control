@@ -472,6 +472,12 @@ function renderFixtures() {
           </select>
         </div>
       </div>
+      <div class="fx-field" style="margin-top:8px">
+        <label>Musikband (auto/party/mono)</label>
+        <select data-i="${i}" data-k="band">
+          ${["auto","bass","mid","treble","kick"].map((b) => `<option value="${b}" ${(fx.band ?? "auto") === b ? "selected" : ""}>${{auto:"Auto (listordning)",bass:"Bas",mid:"Mellan",treble:"Diskant",kick:"Kick"}[b]}</option>`).join("")}
+        </select>
+      </div>
       ${fx.preset === "custom" ? renderCustomRoles(fx, i) : ""}
       <div class="fx-meta">Ch ${fx.address}–${fx.address + width - 1} · ${width} channel${width > 1 ? "s" : ""} · ${rolesOf(fx).join(" · ")}</div>
       ${errByIdx.has(i) ? `<div class="fx-err">${errByIdx.get(i).join(" · ")}</div>` : ""}
@@ -566,6 +572,7 @@ function onFieldChange(e) {
   const fx = fxDraft[i];
   if (k === "name")    fx.name = e.target.value;
   if (k === "address") fx.address = parseInt(e.target.value, 10) || 0;
+  if (k === "band") { if (e.target.value === "auto") delete fx.band; else fx.band = e.target.value; }
   if (k === "preset") {
     fx.preset = e.target.value;
     if (fx.preset === "custom" && !fx.roles) fx.roles = ["r","g","b"];

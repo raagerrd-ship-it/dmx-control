@@ -315,7 +315,8 @@ function sanitizeFixtures(input: unknown[]): FixtureConfig[] | null {
         roles.push(role as ChannelRole);
       }
     }
-    const fx: FixtureConfig = { name, address, preset, ...(roles ? { roles } : {}) };
+    const band = ["bass", "mid", "treble", "kick"].includes(r.band as string) ? (r.band as FixtureConfig["band"]) : undefined;
+    const fx: FixtureConfig = { name, address, preset, ...(roles ? { roles } : {}), ...(band ? { band } : {}) };
 
     // Check the fixture fits within the universe
     const width = fixtureRoles(fx).length;

@@ -23,6 +23,8 @@ export interface FixtureConfig {
   preset: FixturePreset;
   /** Only used when preset === "custom" */
   roles?: ChannelRole[];
+  /** Which spectrum band drives this lamp in auto/party/mono. Unset = by list order. */
+  band?: "bass" | "mid" | "treble" | "kick";
 }
 
 export interface EngineConfig {
