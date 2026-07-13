@@ -28,6 +28,7 @@ export class Button extends EventEmitter {
   private proc: ChildProcessWithoutNullStreams | null = null;
   private stopped = false;
   private lastEdge = 0;
+  private lastPressEmit = 0;
   private pressedAt: number | null = null;
 
   constructor(private opts: ButtonOptions) { super(); }
