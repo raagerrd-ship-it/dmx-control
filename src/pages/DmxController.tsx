@@ -6,6 +6,8 @@ import { LivePreview } from "@/components/LivePreview";
 import { HueColorCard } from "@/components/HueColorCard";
 import { SmartSyncPanel } from "@/components/SmartSyncPanel";
 import { LiveAnalysisPanel } from "@/components/LiveAnalysisPanel";
+import { MicCalibration } from "@/components/MicCalibration";
+
 import { useMockLive } from "@/hooks/useMockLive";
 import { useDmx, presetById } from "@/store/dmx";
 
