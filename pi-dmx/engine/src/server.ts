@@ -11,6 +11,8 @@ import fastifyStatic from "@fastify/static";
 import fastifyWebsocket from "@fastify/websocket";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { spawn, execFileSync } from "node:child_process";
+import { readFileSync, existsSync } from "node:fs";
 import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import type { Frame } from "./analyser.js";
@@ -74,6 +76,46 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
   await app.register(fastifyStatic, {
     root: join(__dirname, "..", "public"),
     prefix: "/",
+  });
+
+  // ---- Self-update ---------------------------------------------------------
+  // The repo lives at /root/pi-dmx-src (or wherever `git clone` put it).
+  // Override with PI_DMX_REPO=/path if you cloned elsewhere.
+  const REPO = process.env.PI_DMX_REPO ?? "/root/pi-dmx-src";
+  const UPDATE_LOG = "/var/log/pi-dmx-update.log";
+
+  const gitInfo = () => {
+    try {
+      const sha = execFileSync("git", ["-C", REPO, "rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim();
+      const msg = execFileSync("git", ["-C", REPO, "log", "-1", "--pretty=%s"], { encoding: "utf8" }).trim();
+      const date = execFileSync("git", ["-C", REPO, "log", "-1", "--pretty=%cI"], { encoding: "utf8" }).trim();
+      return { sha, msg, date, repo: REPO };
+    } catch (e) {
+      return { error: (e as Error).message, repo: REPO };
+    }
+  };
+
+  app.get("/update/status", async () => {
+    const log = existsSync(UPDATE_LOG)
+      ? readFileSync(UPDATE_LOG, "utf8").split("\n").slice(-40).join("\n")
+      : "";
+    return { ...gitInfo(), log };
+  });
+
+  app.post("/update", async (_req, reply) => {
+    // Detach via systemd-run so the install.sh restart of audio-dmx-engine
+    // doesn't kill the updater mid-run.
+    try {
+      spawn("systemd-run", [
+        "--unit=pi-dmx-update",
+        "--collect",
+        "--quiet",
+        "/bin/bash", `${REPO}/pi-dmx/update.sh`,
+      ], { detached: true, stdio: "ignore" }).unref();
+      return reply.send({ started: true });
+    } catch (e) {
+      return reply.code(500).send({ error: (e as Error).message });
+    }
   });
 
   app.register(async (f) => {
