@@ -47,17 +47,19 @@
 
 #define UART_DEV        "/dev/ttyAMA0"
 #define SOCK_PATH       "/run/dmx.sock"
-#define DMX_CHANNELS    512
-#define FRAME_BYTES     (DMX_CHANNELS + 1)   /* start code + channels */
+#define DMX_MAX_SLOTS   512
+#define DMX_MIN_SLOTS   24        /* spec-recommended minimum */
 #define BREAK_US        100
 #define MAB_US          12
-#define REFRESH_HZ      44           /* DMX-512 spec max (~44.1 Hz for 512 slots) */
-#define REFRESH_NS      (1000000000L / REFRESH_HZ)
+#define MBB_US          50        /* mark-between-breaks (post-frame idle) */
+#define REFRESH_HZ_CAP  200       /* safe upper bound for typical fixtures */
+#define BYTE_US         44        /* 1 start + 8 data + 2 stop @ 250k */
 
 static volatile sig_atomic_t g_running = 1;
 
-/* Shared universe. Two buffers + atomic index for lock-free swap. */
-static uint8_t g_universe[2][DMX_CHANNELS];
+/* Shared universe. Two buffers + atomic slot-count + atomic active index. */
+static uint8_t  g_universe[2][DMX_MAX_SLOTS];
+static _Atomic int g_slots[2] = { DMX_MIN_SLOTS, DMX_MIN_SLOTS };
 static _Atomic int g_active_idx = 0;
 
 /* Trigger from main thread → tx thread when new frame arrives */
