@@ -27,7 +27,7 @@ export interface FixtureConfig {
 
 export interface EngineConfig {
   audio: {
-    device: string;       // e.g. "hw:1,0" for UCA202
+    device: string;       // "hw:0,0" — Codec Zero (line-in via 3.5mm AUX)
     rate: number;         // 48000
     channels: 1 | 2;      // 2 for stereo line-in (summed to mono internally)
   };
@@ -58,7 +58,7 @@ export interface EngineConfig {
 }
 
 export const defaultConfig: EngineConfig = {
-  audio: { device: "hw:1,0", rate: 48000, channels: 2 },
+  audio: { device: "hw:0,0", rate: 48000, channels: 2 },
   fft: { size: 512, hop: 128 },
   detection: {
     autoGainTarget: 0.5,
