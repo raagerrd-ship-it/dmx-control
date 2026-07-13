@@ -47,12 +47,12 @@ fi
 echo "==> [4/9] disable Bluetooth stack + serial-getty"
 systemctl disable --now hciuart bluetooth serial-getty@ttyAMA0 2>/dev/null || true
 
+AP_SSID="${AP_SSID:-pi-dmx}"
+AP_PASS="${AP_PASS:-dmx12345}"       # WPA2 requires 8+ chars
 echo "==> [5/9] WiFi AP — SSID=$AP_SSID, gateway=192.168.4.1"
 # Bookworm ships NetworkManager. `ipv4.method shared` = NM runs its own
 # dnsmasq for DHCP/DNS, so no separate hostapd/dnsmasq config needed.
 if command -v nmcli >/dev/null; then
-  AP_SSID="${AP_SSID:-pi-dmx}"
-  AP_PASS="${AP_PASS:-dmx12345}"       # WPA2 requires 8+ chars
   AP_CON="pi-dmx-ap"
   nmcli con delete "$AP_CON" 2>/dev/null || true
   nmcli con add type wifi ifname wlan0 mode ap con-name "$AP_CON" \
