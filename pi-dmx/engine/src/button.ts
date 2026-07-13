@@ -81,8 +81,13 @@ export class Button extends EventEmitter {
           if (this.pressedAt == null) continue;
           const held = now - this.pressedAt;
           this.pressedAt = null;
-          if (held >= longPressMs) this.emit("longPress");
-          else this.emit("press");
+          if (held >= longPressMs) {
+            this.emit("longPress");
+          } else if (now - this.lastPressEmit >= minPressIntervalMs) {
+            // Rate-limit short presses so bounce or panic-tapping can't skip modes.
+            this.lastPressEmit = now;
+            this.emit("press");
+          }
         }
       }
     });
