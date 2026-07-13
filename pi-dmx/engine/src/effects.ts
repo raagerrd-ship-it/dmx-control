@@ -91,12 +91,8 @@ export class EffectEngine {
 
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
-      const hwStrobe = this.cfg.mode === "strobe" && fixtureRoles(fx).includes("strobe");
-      // CH-strobe rate follows the music: quiet = slow flashes, loud = machine gun.
-      const strobeVal = hwStrobe ? Math.round(100 + audio * 155) : 0;
-      // Hardware strobe: steady white on the color channels, CH-strobe does the flashing.
-      const rgb = hwStrobe ? ([1, 1, 1] as [number, number, number]) : pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx);
-      writeFixture(this.universe, fx, rgb, master, strobeVal);
+      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx);
+      writeFixture(this.universe, fx, rgb, master);
     }
 
     return this.universe;
@@ -176,16 +172,6 @@ function pickColor(
     return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.2));
   };
   switch (mode) {
-    case "auto": {
-      // Two counter-drifting hue layers blended by treble → richer variety
-      // than a single spinning wheel, but still calm.
-      const hueA = (t * 45 + idx * (360 / count) + frame.energy * 40);
-      const hueB = (-t * 30 + idx * (360 / count) * 1.5 + frame.treble * 90);
-      const mix  = 0.35 + frame.treble * 0.5;
-      const hue  = snapHue(idx, (((hueA * (1 - mix) + hueB * mix) % 360) + 360) % 360 / 360);
-      const v = shaped(0.15, band * 0.9 + kickEnv * 0.3);
-      return hsvToRgb(hue, 1, v);
-    }
     case "party": {
       // Counter-rotating hues + white punch on kick for a real "flash" feel.
       const dir = idx % 2 === 0 ? 1 : -1;
@@ -194,25 +180,30 @@ function pickColor(
       const sat = Math.max(0, 1 - kickEnv * 0.8);   // punch flashes white on kicks
       return hsvToRgb(hue, sat, v);
     }
-    case "comet": {
-      const speed = 1.2 + audio * 2.2;
-      const head = (t * speed) % count;
-      let behind = head - idx;
-      if (behind < -count / 2) behind += count;
-      if (behind >  count / 2) behind -= count;
-      const tailLen = Math.max(3, count * 1.2);
-      let v;
-      if (behind >= 0) v = Math.exp(-behind / (tailLen * 0.75)) + 0.08 * Math.exp(-behind / tailLen);
-      else             v = Math.exp(-(-behind) * 2.5);
-      v = Math.min(1, v);
-      const heat = v;
-      const hue = snapHue(idx, (((cometHue % 360) + 360) % 360) / 360);
-      const sat = 0.35 + (1 - heat) * 0.65;
-      const kickBoost = 1 + kickEnv * 0.35;
-      // The tail shape is positional — scale the whole comet with the music so
-      // it breathes instead of burning at constant brightness.
-      const breathe = 0.25 + 0.75 * shaped(0.2, audio * 0.9 + kickEnv * 0.2);
-      return hsvToRgb(hue, sat, Math.min(1, v * kickBoost * breathe));
+    case "pulse": {
+      // Whole rig pumps on the beat (tempo-locked when SmartSync is synced,
+      // kick-driven otherwise). Color steps one pure hue at a time.
+      const hue = snapHue(100, ((t * 25) % 360) / 360);  // shared slot: all lamps same color
+      const v = shaped(0.06, Math.max(kickEnv, audio * 0.35));
+      return hsvToRgb(hue, 1, v);
+    }
+    case "spectrum": {
+      // Band -> fixed color: bass red, mids green, treble blue, kick magenta,
+      // low-glow amber. Calm, readable — the music laid out in space.
+      const bi = fx?.bands?.length ? BAND_IDX[fx.bands[0]] : idx % 4;
+      const SPECTRUM_HUES = [0, 120, 240, 300, 45];
+      const hue = (SPECTRUM_HUES[bi] ?? 0) / 360;
+      const v = shaped(0.1, band * 0.95 + kickEnv * 0.2);
+      return hsvToRgb(hue, 1, v);
+    }
+    case "vu": {
+      // The rig as a VU meter: fixtures light in list order with the level,
+      // green through yellow to a red top.
+      const th = (idx + 0.5) / count;
+      const drive = Math.min(1, Math.max(audio, kickEnv * 0.6) * 1.15);
+      const lit = Math.min(1, Math.max(0, (drive - th + 0.25) / 0.25));
+      const hue = idx === count - 1 ? 0 : idx === count - 2 ? 60 / 360 : 120 / 360;
+      return hsvToRgb(hue, 1, lit * lit);
     }
     case "chase": {
       // Bright head at chasePos with short trailing tail. Neighbouring fixtures
@@ -223,16 +214,6 @@ function pickColor(
       const v = Math.min(1, tail * shaped(0.35, audio * 0.7 + kickEnv * 0.5));
       return hsvToRgb(hue, 0.9, v);
     }
-    case "split": {
-      // Groups A/B by index parity. A = bass-driven (kick+energy), B = treble.
-      const isA = idx % 2 === 0;
-      const hue = snapHue(idx, (((isA ? splitHueA : splitHueB) % 360) + 360) % 360 / 360);
-      const drive = isA
-        ? Math.min(1, frame.energy * norm + kickEnv * 0.8)
-        : Math.min(1, frame.treble * norm * 1.2 + audio * 0.3);
-      const v = shaped(0.15, drive);
-      return hsvToRgb(hue, 1, v);
-    }
     case "mono": {
       const isWarm = monoHue < 40 || monoHue > 340;
       const flicker = isWarm ? 0.7 + Math.random() * 0.3 : 0.9 + Math.random() * 0.1;
@@ -240,10 +221,6 @@ function pickColor(
       // One color, four lamps — each breathing with its own spectrum band.
       const v = flicker * shaped(0.25, band * 0.8 + kickEnv * 0.25);
       return hsvToRgb(hue, 1, v);
-    }
-    case "strobe": {
-      const on = Math.floor(t * (6 + audio * 14)) % 2 === 0;
-      return on ? [1, 1, 1] : [0, 0, 0];
     }
     default:
       return [0, 0, 0];

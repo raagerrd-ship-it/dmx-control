@@ -51,7 +51,9 @@ interface Deps {
   onState: (s: SmartSyncPublicState) => void;
 }
 
-const VALID_MODES: Mode[] = ["auto", "party", "comet", "chase", "split", "mono", "strobe"];
+const VALID_MODES: Mode[] = ["pulse", "party", "chase", "spectrum", "vu", "mono"];
+// The Spotify edge function still speaks the old mode names.
+const PRESET_MAP: Record<string, Mode> = { auto: "spectrum", comet: "pulse", split: "party" };
 
 export class SmartSync {
   private enabled = false;
@@ -215,7 +217,8 @@ export class SmartSync {
 
   private applySection(preset: string, primaryHue: number, secondaryHue: number) {
     const cfg = this.deps.cfg;
-    cfg.mode = (VALID_MODES as string[]).includes(preset) ? (preset as Mode) : "auto";
+    const mapped = PRESET_MAP[preset] ?? preset;
+    cfg.mode = (VALID_MODES as string[]).includes(mapped) ? (mapped as Mode) : "spectrum";
     cfg.monoHue = primaryHue;
     cfg.cometHue = primaryHue;
     cfg.splitHueA = primaryHue;

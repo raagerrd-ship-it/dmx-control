@@ -141,7 +141,7 @@
   </div>
 
   <div id="cometCard" style="display:none">
-    <h1>Comet color</h1>
+    <h1>Chase-färg</h1>
     <div class="card">
       <div class="row">
         <label>Hue</label>
@@ -229,7 +229,7 @@
 
 
 <script>
-const MODES = ["auto","party","comet","chase","split","mono","strobe","blackout"];
+const MODES = ["pulse","party","chase","spectrum","vu","mono","blackout"];
 const modesEl = document.getElementById("modes");
 const kickDot = document.getElementById("kickDot");
 const levelBar = document.getElementById("levelBar");
@@ -327,7 +327,7 @@ function applyConfig(cfg) {
   cometHueEl.value = chue;
   cometValEl.textContent = chue;
   cometSwatch.style.background = `hsl(${chue} 100% 50%)`;
-  cometCard.style.display = cfg.mode === "comet" ? "" : "none";
+  cometCard.style.display = cfg.mode === "chase" ? "" : "none";
   const hz = Math.round(cfg.dmxMaxHz ?? 200);
   dmxHzEl.value = hz;
   dmxHzVal.textContent = hz;
