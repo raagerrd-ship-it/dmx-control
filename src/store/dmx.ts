@@ -37,10 +37,12 @@ export const PRESETS: Preset[] = [
 
 export interface Params {
   brightness: number;   // 0..100
-  smoothness: number;   // 0..100  (0 = snärtigt/snabbt release, 100 = mjukt/långsamt — mappar releaseAlpha)
+  smoothness: number;   // 0..100
   sensitivity: number;  // 0..100
-  monoHue: number;      // 0..360 hue för Mono-läget (15 ≈ eld-orange, 0 = röd, 240 = blå)
-  cometHue: number;     // 0..360 hue för Comet-huvudet (15 ≈ eld-orange)
+  monoHue: number;      // 0..360
+  cometHue: number;     // 0..360 (delas av Chase-huvudet)
+  splitHueA: number;    // 0..360 — Split: grupp A (bas)
+  splitHueB: number;    // 0..360 — Split: grupp B (diskant)
 }
 
 interface DmxState {
