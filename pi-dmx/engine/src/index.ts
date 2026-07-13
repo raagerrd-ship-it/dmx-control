@@ -53,7 +53,11 @@ capture.start();
 const server = await startServer({
   cfg,
   getLatestFrame: () => latestFrame,
-  onConfigChanged: () => scheduleSave(cfg),
+  onConfigChanged: () => {
+    scheduleSave(cfg);
+    curSlots = activeSlots(cfg.fixtures);
+    dmx.setMaxHz(cfg.dmxMaxHz);
+  },
 }, Number(process.env.PORT ?? 80));
 console.log(`audio-dmx-engine listening on ${server.app.server.address()}`);
 
