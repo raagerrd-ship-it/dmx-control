@@ -204,6 +204,12 @@ function pickColor(
 }
 
 function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
+  // Physical PARs with big discrete R/G/B LEDs can't blend hues — anything
+  // between the six pure corner colors lights the LED groups unevenly and
+  // looks muddy. Snap hue to 60° steps and saturation to pure color/white;
+  // all smoothness lives in brightness (v) instead.
+  h = (Math.round(h * 6) % 6) / 6;
+  s = s >= 0.5 ? 1 : 0;
   const i = Math.floor(h * 6);
   const f = h * 6 - i;
   const p = v * (1 - s);
