@@ -14,6 +14,10 @@ export class EffectEngine {
   private universe = new Uint8Array(512);
   private t0 = performance.now();
   private lastKickBoost = 0;
+  /** Chase mode: fixture-index of the currently lit head. Advanced on kick and slow-time. */
+  private chasePos = 0;
+  private chaseDir = 1;
+  private lastChaseAdvance = 0;
 
   constructor(private cfg: EngineConfig) {}
 
@@ -36,10 +40,27 @@ export class EffectEngine {
 
     const audio = frame.level * this.cfg.sensitivity;
     const master = this.cfg.master;
+    const count = this.cfg.fixtures.length;
 
-    for (let i = 0; i < this.cfg.fixtures.length; i++) {
+    // Chase state machine — kick advances one step, plus a slow auto-advance
+    // so it never stalls in silence. Runs regardless of mode so the head
+    // stays coherent when the user switches into it.
+    const now = performance.now();
+    const autoAdvanceMs = 320;   // ~185 bpm floor
+    if (count > 0 && (frame.kick || now - this.lastChaseAdvance > autoAdvanceMs)) {
+      this.lastChaseAdvance = now;
+      if (this.cfg.chaseStyle === "pingpong" && count > 1) {
+        this.chasePos += this.chaseDir;
+        if (this.chasePos >= count - 1) { this.chasePos = count - 1; this.chaseDir = -1; }
+        else if (this.chasePos <= 0)    { this.chasePos = 0;         this.chaseDir =  1; }
+      } else {
+        this.chasePos = (this.chasePos + 1) % Math.max(1, count);
+      }
+    }
+
+    for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
-      const rgb = pickColor(this.cfg.mode, t, i, this.cfg.fixtures.length, audio, kickEnv, frame, this.cfg.monoHue, this.cfg.cometHue);
+      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos);
       writeFixture(this.universe, fx, rgb, master);
     }
 
@@ -78,62 +99,74 @@ function writeFixture(
 }
 
 function pickColor(
-  mode: Mode,
+  cfg: EngineConfig,
   t: number,
   idx: number,
   count: number,
   audio: number,
   kickEnv: number,
   frame: Frame,
-  monoHue: number,
-  cometHue: number,
+  chasePos: number,
 ): [number, number, number] {
+  const { mode, monoHue, cometHue, splitHueA, splitHueB } = cfg;
   switch (mode) {
     case "auto": {
-      const hue = ((t * 45 + idx * (360 / count) + frame.energy * 40) % 360) / 360;
+      // Two counter-drifting hue layers blended by treble → richer variety
+      // than a single spinning wheel, but still calm.
+      const hueA = (t * 45 + idx * (360 / count) + frame.energy * 40);
+      const hueB = (-t * 30 + idx * (360 / count) * 1.5 + frame.treble * 90);
+      const mix  = 0.35 + frame.treble * 0.5;
+      const hue  = (((hueA * (1 - mix) + hueB * mix) % 360) + 360) % 360 / 360;
       const v = Math.min(1, 0.3 + audio * 0.8 + kickEnv * 0.5);
       return hsvToRgb(hue, 1, v);
     }
     case "party": {
+      // Counter-rotating hues + white punch on kick for a real "flash" feel.
       const dir = idx % 2 === 0 ? 1 : -1;
       const hue = ((t * 90 * dir + idx * 137) % 360 + 360) % 360 / 360;
       const v = Math.min(1, 0.5 + audio * 0.5 + kickEnv * 0.5);
-      return hsvToRgb(hue, 1, v);
+      const sat = Math.max(0, 1 - kickEnv * 0.8);   // punch flashes white on kicks
+      return hsvToRgb(hue, sat, v);
     }
     case "comet": {
-      // A fireball glides through the fixtures with a long trailing tail.
-      // Head speed sped up by audio; head hue is user-picked (cometHue).
-      const speed = 1.2 + audio * 2.2;                 // fixtures per second
+      const speed = 1.2 + audio * 2.2;
       const head = (t * speed) % count;
-      // Signed distance behind the head (positive = behind, in the tail)
       let behind = head - idx;
-      if (behind < -count / 2) behind += count;         // wrap forward
-      if (behind >  count / 2) behind -= count;         // wrap back
+      if (behind < -count / 2) behind += count;
+      if (behind >  count / 2) behind -= count;
       const tailLen = Math.max(3, count * 1.2);
       let v;
-      if (behind >= 0) {
-        // Trailing tail — slow exponential fade + faint embers
-        v = Math.exp(-behind / (tailLen * 0.75)) + 0.08 * Math.exp(-behind / tailLen);
-      } else {
-        // Leading edge — quick falloff so the fireball has a sharp front
-        v = Math.exp(-(-behind) * 2.5);
-      }
+      if (behind >= 0) v = Math.exp(-behind / (tailLen * 0.75)) + 0.08 * Math.exp(-behind / tailLen);
+      else             v = Math.exp(-(-behind) * 2.5);
       v = Math.min(1, v);
-      // Head = white-hot (low sat) glowing into fully-saturated picked hue.
-      const heat = v;                                    // 1 at head, ~0 at tail end
+      const heat = v;
       const hue = (((cometHue % 360) + 360) % 360) / 360;
-      const sat = 0.35 + (1 - heat) * 0.65;              // white-hot core, saturated tail
+      const sat = 0.35 + (1 - heat) * 0.65;
       const kickBoost = 1 + kickEnv * 0.35;
       return hsvToRgb(hue, sat, Math.min(1, v * kickBoost));
     }
+    case "chase": {
+      // Bright head at chasePos with short trailing tail. Neighbouring fixtures
+      // glow briefly so the move reads even on 4 fixtures. Hue = cometHue.
+      const d = Math.abs(idx - chasePos);
+      const tail = Math.exp(-d * 1.4);
+      const hue = (((cometHue % 360) + 360) % 360) / 360;
+      const v = Math.min(1, tail * (0.6 + audio * 0.5 + kickEnv * 0.4));
+      return hsvToRgb(hue, 0.9, v);
+    }
+    case "split": {
+      // Groups A/B by index parity. A = bass-driven (kick+energy), B = treble.
+      const isA = idx % 2 === 0;
+      const hue = (((isA ? splitHueA : splitHueB) % 360) + 360) % 360 / 360;
+      const drive = isA
+        ? Math.min(1, frame.energy * 1.4 + kickEnv * 0.8)
+        : Math.min(1, frame.treble * 1.6 + audio * 0.3);
+      const v = Math.min(1, 0.15 + drive);
+      return hsvToRgb(hue, 1, v);
+    }
     case "mono": {
-      // Single user-picked hue, brightness driven by audio + kick, with a
-      // subtle flicker so it never feels static. At warm hues (~15°) with a
-      // stronger flicker weight it reads as "fire".
       const isWarm = monoHue < 40 || monoHue > 340;
-      const flicker = isWarm
-        ? 0.7 + Math.random() * 0.3            // fire-like jitter
-        : 0.9 + Math.random() * 0.1;           // gentle shimmer
+      const flicker = isWarm ? 0.7 + Math.random() * 0.3 : 0.9 + Math.random() * 0.1;
       const hue = (((monoHue + (isWarm ? (Math.random() - 0.5) * 12 : 0)) % 360) + 360) % 360 / 360;
       const v = flicker * Math.min(1, 0.4 + audio * 0.6 + kickEnv * 0.3);
       return hsvToRgb(hue, 1, v);

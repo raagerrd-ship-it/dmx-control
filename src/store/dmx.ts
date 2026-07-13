@@ -14,6 +14,8 @@ export type PresetId =
   | "party"
   | "strobe"
   | "comet"
+  | "chase"
+  | "split"
   | "mono";
 
 export interface Preset {
@@ -25,18 +27,22 @@ export interface Preset {
 
 export const PRESETS: Preset[] = [
   { id: "auto",   name: "Auto",   hue: 280, description: "Färghjul, kick → blixt" },
-  { id: "party",  name: "Party",  hue: 320, description: "Regnbåge, snabb, kick" },
+  { id: "party",  name: "Party",  hue: 320, description: "Regnbåge + vit puls på kick" },
   { id: "strobe", name: "Strobe", hue: 0,   description: "Vit blink i takt" },
   { id: "comet",  name: "Comet",  hue: 25,  description: "Eldklot glider med lång svans (välj hue)" },
+  { id: "chase",  name: "Chase",  hue: 160, description: "Ljus hoppar mellan lampor på beat" },
+  { id: "split",  name: "Split",  hue: 200, description: "Grupp A = bas, Grupp B = diskant" },
   { id: "mono",   name: "Mono",   hue: 15,  description: "En färg, flimrande (välj hue)" },
 ];
 
 export interface Params {
   brightness: number;   // 0..100
-  smoothness: number;   // 0..100  (0 = snärtigt/snabbt release, 100 = mjukt/långsamt — mappar releaseAlpha)
+  smoothness: number;   // 0..100
   sensitivity: number;  // 0..100
-  monoHue: number;      // 0..360 hue för Mono-läget (15 ≈ eld-orange, 0 = röd, 240 = blå)
-  cometHue: number;     // 0..360 hue för Comet-huvudet (15 ≈ eld-orange)
+  monoHue: number;      // 0..360
+  cometHue: number;     // 0..360 (delas av Chase-huvudet)
+  splitHueA: number;    // 0..360 — Split: grupp A (bas)
+  splitHueB: number;    // 0..360 — Split: grupp B (diskant)
 }
 
 interface DmxState {
@@ -68,7 +74,7 @@ interface Persisted {
 
 const defaults: Persisted = {
   preset: "auto",
-  params: { brightness: 80, smoothness: 50, sensitivity: 60, monoHue: 15, cometHue: 15 },
+  params: { brightness: 80, smoothness: 50, sensitivity: 60, monoHue: 15, cometHue: 15, splitHueA: 0, splitHueB: 200 },
   fixtures: [
     { id: "f1", name: "PAR 1", startCh: 1,  mode: "rgb" },
     { id: "f2", name: "PAR 2", startCh: 4,  mode: "rgb" },

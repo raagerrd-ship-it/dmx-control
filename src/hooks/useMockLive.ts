@@ -49,6 +49,11 @@ export function useMockLive() {
   const slowEnergyMean = useRef(0.2);
   const dropUntil = useRef(0);
 
+  // Chase-position (kick-driven ping-pong, med auto-advance)
+  const chasePos = useRef(0);
+  const chaseDir = useRef(1);
+  const lastChaseAdvance = useRef(0);
+
   // fejkad musikkälla: bas-sinus + slumpade "beats" var 0.35–0.6s + drop var 8–14s
   const nextBeat = useRef(0.5);
   const nextDrop = useRef(10);
@@ -128,6 +133,19 @@ export function useMockLive() {
       const hueBase = huePhase.current;
       const fixtureCount = Math.max(1, fixtures.length);
 
+      // Syntetisk "treble" — moduleras av kick + snabb sinus + brus,
+      // så Split-läget visar rörelse i browsermocken utan riktig FFT.
+      const treble = Math.min(1, 0.15 + Math.abs(Math.sin(t * 7.3)) * 0.35 + kick * 0.4 + Math.random() * 0.1);
+
+      // Chase-avancemang: kick ELLER auto-advance var 320 ms
+      const nowMs = performance.now();
+      if (fixtureCount > 1 && (kick > 0.7 || nowMs - lastChaseAdvance.current > 320)) {
+        lastChaseAdvance.current = nowMs;
+        chasePos.current += chaseDir.current;
+        if (chasePos.current >= fixtureCount - 1) { chasePos.current = fixtureCount - 1; chaseDir.current = -1; }
+        else if (chasePos.current <= 0)           { chasePos.current = 0;                chaseDir.current =  1; }
+      }
+
       fixtures.forEach((f, idx) => {
         let r = 0, g = 0, b = 0, w = 0;
 
@@ -164,6 +182,27 @@ export function useMockLive() {
             const sat = Math.min(1, 0.2 + behind * 1.1);
             const v = Math.max(briFloor, briSlider * bump * (0.55 + audio * 0.5));
             const c = hsvToRgb(cometHue, sat, Math.min(1, v));
+            r = c[0]; g = c[1]; b = c[2];
+            break;
+          }
+          case "chase": {
+            // Ljus hoppar mellan lampor på beat, med kort svans till grannar.
+            const d = Math.abs(idx - chasePos.current);
+            const tail = Math.exp(-d * 1.4);
+            const v = Math.max(briFloor, briSlider * tail * (0.6 + audio * 0.5 + kick * 0.4));
+            const c = hsvToRgb(params.cometHue, 0.9, Math.min(1, v));
+            r = c[0]; g = c[1]; b = c[2];
+            break;
+          }
+          case "split": {
+            // Grupp A (jämna) = bas-driven, grupp B (udda) = diskant-driven.
+            const isA = idx % 2 === 0;
+            const hue = isA ? params.splitHueA : params.splitHueB;
+            const drive = isA
+              ? Math.min(1, audio * 1.4 + kick * 0.8)
+              : Math.min(1, treble * 1.6 + audio * 0.3);
+            const v = Math.max(briFloor, briSlider * (0.15 + drive));
+            const c = hsvToRgb(hue, 1, Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
             break;
           }

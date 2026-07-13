@@ -3,7 +3,7 @@
  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
  */
 
-export type Mode = "auto" | "party" | "comet" | "mono" | "strobe" | "blackout";
+export type Mode = "auto" | "party" | "comet" | "chase" | "split" | "mono" | "strobe" | "blackout";
 
 /**
  * A fixture is placed at `address` and occupies channels in a defined role
@@ -51,6 +51,12 @@ export interface EngineConfig {
   monoHue: number;
   /** Hue 0..360 used by "comet" mode for the fireball head. */
   cometHue: number;
+  /** Hue A (bass side) for "split" mode. */
+  splitHueA: number;
+  /** Hue B (treble side) for "split" mode. */
+  splitHueB: number;
+  /** "chase" sub-pattern: sweep (L→R loop) or ping-pong (bounce). */
+  chaseStyle: "sweep" | "pingpong";
   /** Physical push-button that cycles through modes. Set null to disable. */
   modeButton: { chip: string; line: number } | null;
   /** Transient identify override — not persisted. index = fixture being lit. */
@@ -81,6 +87,9 @@ export const defaultConfig: EngineConfig = {
   master: 1.0,
   monoHue: 15,   // warm orange — feels like fire, but the user can pick anything
   cometHue: 15,  // fireball default; pick e.g. 220 for a blue comet
+  splitHueA: 0,    // red for bass side
+  splitHueB: 200,  // cyan for treble side
+  chaseStyle: "pingpong",
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   dmxMaxHz: 200, // safe max for typical fixtures; helper caps automatically
 };

@@ -9,6 +9,7 @@ import type { EngineConfig } from "./config.js";
 export interface Frame {
   level: number;        // 0..1, auto-gained RMS
   energy: number;       // 0..1, bass-weighted spectral energy
+  treble: number;       // 0..1, high-band spectral energy (hats/cymbals/vocals top)
   flux: number;         // 0..1, bass-band spectral flux
   kick: boolean;        // true on rising edge only
   gain: number;         // current auto-gain factor (debug)
@@ -57,8 +58,10 @@ export class Analyser {
     const half = this.cfg.fft.size / 2;
     const mag = new Float32Array(half);
     let bassEnergy = 0;
+    let trebleEnergy = 0;
     let flux = 0;
-    const bassBins = Math.min(16, half);   // ~0–1.5 kHz @ 48k/512
+    const bassBins = Math.min(16, half);           // ~0–1.5 kHz @ 48k/512
+    const trebleStart = Math.floor(half * 0.5);    // ~top half of spectrum (~12 kHz+)
     for (let i = 0; i < half; i++) {
       const re = spectrum[2 * i];
       const im = spectrum[2 * i + 1];
@@ -68,9 +71,11 @@ export class Analyser {
         const d = mag[i] - this.prevMag[i];
         if (d > 0) flux += d;    // half-wave rectified
       }
+      if (i >= trebleStart) trebleEnergy += mag[i];
     }
     this.prevMag = mag;
     const energy = Math.min(1, (bassEnergy / bassBins) * 0.02);
+    const treble = Math.min(1, (trebleEnergy / (half - trebleStart)) * 0.03);
     const fluxNorm = Math.min(1, flux * 0.005);
 
     // Auto-gain (slow: seconds-to-minute timescales)
@@ -106,7 +111,7 @@ export class Analyser {
       this.lastKick = now;
     }
 
-    return { level, energy, flux: fluxNorm, kick, gain: this.gain };
+    return { level, energy, treble, flux: fluxNorm, kick, gain: this.gain };
   }
 }
 
