@@ -45,10 +45,13 @@ export interface Params {
   splitHueB: number;    // 0..360 — Split: grupp B (diskant)
 }
 
+export type Rotation = Record<PresetId, boolean>;
+
 interface DmxState {
   preset: PresetId;
   params: Params;
   fixtures: Fixture[];
+  rotation: Rotation;
   micEnabled: boolean;
   micError: string | null;
   audioLevel: number;   // 0..1 (smoothed)
@@ -59,6 +62,7 @@ interface DmxState {
   addFixture: () => void;
   updateFixture: (id: string, patch: Partial<Fixture>) => void;
   removeFixture: (id: string) => void;
+  toggleRotation: (id: PresetId) => void;
   setLive: (audio: number, kick: number, frame: number[]) => void;
   setMicEnabled: (b: boolean) => void;
   setMicError: (m: string | null) => void;
