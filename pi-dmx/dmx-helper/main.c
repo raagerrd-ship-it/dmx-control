@@ -47,17 +47,19 @@
 
 #define UART_DEV        "/dev/ttyAMA0"
 #define SOCK_PATH       "/run/dmx.sock"
-#define DMX_CHANNELS    512
-#define FRAME_BYTES     (DMX_CHANNELS + 1)   /* start code + channels */
+#define DMX_MAX_SLOTS   512
+#define DMX_MIN_SLOTS   24        /* spec-recommended minimum */
 #define BREAK_US        100
 #define MAB_US          12
-#define REFRESH_HZ      44           /* DMX-512 spec max (~44.1 Hz for 512 slots) */
-#define REFRESH_NS      (1000000000L / REFRESH_HZ)
+#define MBB_US          50        /* mark-between-breaks (post-frame idle) */
+#define REFRESH_HZ_CAP  200       /* safe upper bound for typical fixtures */
+#define BYTE_US         44        /* 1 start + 8 data + 2 stop @ 250k */
 
 static volatile sig_atomic_t g_running = 1;
 
-/* Shared universe. Two buffers + atomic index for lock-free swap. */
-static uint8_t g_universe[2][DMX_CHANNELS];
+/* Shared universe. Two buffers + atomic slot-count + atomic active index. */
+static uint8_t  g_universe[2][DMX_MAX_SLOTS];
+static _Atomic int g_slots[2] = { DMX_MIN_SLOTS, DMX_MIN_SLOTS };
 static _Atomic int g_active_idx = 0;
 
 /* Trigger from main thread → tx thread when new frame arrives */
@@ -117,31 +119,40 @@ static void *tx_thread(void *arg) {
     int fd = *(int *)arg;
     set_rt_priority(50);
 
-    uint8_t frame[FRAME_BYTES];
+    /* Max buffer size: start code + all 512 slots */
+    uint8_t frame[1 + DMX_MAX_SLOTS];
     frame[0] = 0x00;  /* DMX null start code */
+
+    const long min_period_ns = 1000000000L / REFRESH_HZ_CAP;
 
     struct timespec next;
     clock_gettime(CLOCK_MONOTONIC, &next);
 
     while (g_running) {
-        /* Snapshot current universe */
-        int idx = atomic_load(&g_active_idx);
-        memcpy(frame + 1, g_universe[idx], DMX_CHANNELS);
+        /* Snapshot current universe + slot count */
+        int idx   = atomic_load(&g_active_idx);
+        int slots = atomic_load(&g_slots[idx]);
+        if (slots < DMX_MIN_SLOTS) slots = DMX_MIN_SLOTS;
+        if (slots > DMX_MAX_SLOTS) slots = DMX_MAX_SLOTS;
+        memcpy(frame + 1, g_universe[idx], slots);
 
         /* Break + MAB + data + drain */
         ioctl(fd, TIOCSBRK, 0);
         sleep_ns(BREAK_US * 1000L);
         ioctl(fd, TIOCCBRK, 0);
         sleep_ns(MAB_US * 1000L);
-        if (write(fd, frame, FRAME_BYTES) != FRAME_BYTES) {
+        int frame_bytes = 1 + slots;
+        if (write(fd, frame, frame_bytes) != frame_bytes) {
             perror("write");
         }
         tcdrain(fd);
 
-        /* Wait until either the next refresh deadline or a new-frame trigger,
-         * whichever comes first. This gives us continuous 40 Hz refresh but
-         * also low-latency push when the engine has fresh data. */
-        ts_add_ns(&next, REFRESH_NS);
+        /* Frame period = actual wire time + MBB, but capped to REFRESH_HZ_CAP.
+         * At 24 slots: ~1.2 ms wire → capped to 5 ms (200 Hz).
+         * At 512 slots: ~22.7 ms wire → runs at ~44 Hz naturally. */
+        long wire_ns = (long)(BREAK_US + MAB_US + frame_bytes * BYTE_US + MBB_US) * 1000L;
+        long period_ns = wire_ns > min_period_ns ? wire_ns : min_period_ns;
+        ts_add_ns(&next, period_ns);
 
         pthread_mutex_lock(&g_trigger_mtx);
         while (g_running && !g_trigger_pending) {
@@ -176,20 +187,33 @@ static int sock_open(const char *path) {
     return s;
 }
 
-static void handle_frame(const uint8_t *buf, size_t len) {
-    if (len != DMX_CHANNELS) {
-        fprintf(stderr, "bad frame size: %zu (expected %d)\n", len, DMX_CHANNELS);
+static void handle_frame(const uint8_t *buf, int slots) {
+    if (slots < DMX_MIN_SLOTS || slots > DMX_MAX_SLOTS) {
+        fprintf(stderr, "bad slot count: %d (expected %d..%d)\n",
+                slots, DMX_MIN_SLOTS, DMX_MAX_SLOTS);
         return;
     }
     /* Swap-in via double-buffer: write to the inactive slot, then flip. */
     int inactive = atomic_load(&g_active_idx) ^ 1;
-    memcpy(g_universe[inactive], buf, DMX_CHANNELS);
+    memcpy(g_universe[inactive], buf, slots);
+    atomic_store(&g_slots[inactive], slots);
     atomic_store(&g_active_idx, inactive);
 
     pthread_mutex_lock(&g_trigger_mtx);
     g_trigger_pending = 1;
     pthread_cond_signal(&g_trigger_cv);
     pthread_mutex_unlock(&g_trigger_mtx);
+}
+
+/* Read exactly `n` bytes from `fd`, return 0 on success, -1 on EOF/err. */
+static int read_exact(int fd, uint8_t *buf, size_t n) {
+    size_t got = 0;
+    while (got < n) {
+        ssize_t r = read(fd, buf + got, n - got);
+        if (r <= 0) return -1;
+        got += (size_t)r;
+    }
+    return 0;
 }
 
 /* ── main ─────────────────────────────────────────────────────────────── */
@@ -212,13 +236,15 @@ int main(void) {
         perror("pthread_create"); close(uart); close(sock); return 1;
     }
 
-    fprintf(stderr, "dmx-helper: listening on %s, output on %s @ 250k 8N2, %d Hz refresh\n",
-            SOCK_PATH, UART_DEV, REFRESH_HZ);
+    fprintf(stderr, "dmx-helper: listening on %s, output on %s @ 250k 8N2, "
+                    "variable-length frames, cap %d Hz\n",
+            SOCK_PATH, UART_DEV, REFRESH_HZ_CAP);
 
-    /* Accept one client at a time (the Node engine). If it disconnects,
-     * we loop back and accept a new one. Frames are exactly 512 bytes,
-     * read as a fixed-size stream. */
-    uint8_t buf[DMX_CHANNELS];
+    /* Accept one client at a time (the Node engine). Wire protocol per frame:
+     *   [2 bytes LE: slot count N]  [N bytes: DMX slots 1..N]
+     * where DMX_MIN_SLOTS <= N <= DMX_MAX_SLOTS. */
+    uint8_t hdr[2];
+    uint8_t payload[DMX_MAX_SLOTS];
     while (g_running) {
         int client = accept(sock, NULL, NULL);
         if (client < 0) {
@@ -228,14 +254,14 @@ int main(void) {
         fprintf(stderr, "dmx-helper: engine connected\n");
 
         while (g_running) {
-            size_t got = 0;
-            while (got < DMX_CHANNELS) {
-                ssize_t n = read(client, buf + got, DMX_CHANNELS - got);
-                if (n <= 0) { got = 0; break; }
-                got += (size_t)n;
+            if (read_exact(client, hdr, 2) < 0) break;
+            int slots = hdr[0] | (hdr[1] << 8);
+            if (slots < DMX_MIN_SLOTS || slots > DMX_MAX_SLOTS) {
+                fprintf(stderr, "protocol error: slots=%d, disconnecting\n", slots);
+                break;
             }
-            if (got != DMX_CHANNELS) break;   /* disconnected */
-            handle_frame(buf, DMX_CHANNELS);
+            if (read_exact(client, payload, (size_t)slots) < 0) break;
+            handle_frame(payload, slots);
         }
         close(client);
         fprintf(stderr, "dmx-helper: engine disconnected\n");

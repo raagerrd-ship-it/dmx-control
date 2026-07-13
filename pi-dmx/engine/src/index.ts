@@ -18,7 +18,7 @@ import { DmxSender } from "./dmx.js";
 import { startServer } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
-import type { Mode } from "./config.js";
+import { activeSlots, type Mode } from "./config.js";
 
 const MODE_CYCLE: Mode[] = ["auto", "party", "comet", "mono", "strobe", "blackout"];
 
@@ -26,8 +26,10 @@ const cfg = await loadConfig();
 const analyser = new Analyser(cfg);
 const effects = new EffectEngine(cfg);
 const dmx = new DmxSender();
+dmx.setMaxHz(cfg.dmxMaxHz);
 
 let latestFrame: Frame | null = null;
+let curSlots = activeSlots(cfg.fixtures);
 
 const capture = new AudioCapture({
   device: cfg.audio.device,
@@ -40,7 +42,7 @@ capture.on("chunk", (samples: Float32Array) => {
   const frame = analyser.process(samples);
   latestFrame = frame;
   const universe = effects.render(frame);
-  dmx.send(universe);
+  dmx.send(universe, curSlots);
 });
 
 capture.on("stderr", (s) => console.error("[arecord]", s));
@@ -51,7 +53,11 @@ capture.start();
 const server = await startServer({
   cfg,
   getLatestFrame: () => latestFrame,
-  onConfigChanged: () => scheduleSave(cfg),
+  onConfigChanged: () => {
+    scheduleSave(cfg);
+    curSlots = activeSlots(cfg.fixtures);
+    dmx.setMaxHz(cfg.dmxMaxHz);
+  },
 }, Number(process.env.PORT ?? 80));
 console.log(`audio-dmx-engine listening on ${server.app.server.address()}`);
 

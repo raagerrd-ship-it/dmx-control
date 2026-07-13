@@ -55,6 +55,8 @@ export interface EngineConfig {
   modeButton: { chip: string; line: number } | null;
   /** Transient identify override — not persisted. index = fixture being lit. */
   identify?: { index: number } | null;
+  /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */
+  dmxMaxHz: number;
 }
 
 export const defaultConfig: EngineConfig = {
@@ -80,6 +82,7 @@ export const defaultConfig: EngineConfig = {
   monoHue: 15,   // warm orange — feels like fire, but the user can pick anything
   cometHue: 15,  // fireball default; pick e.g. 220 for a blue comet
   modeButton: { chip: "gpiochip0", line: 17 },   // GPIO17 = physical pin 11
+  dmxMaxHz: 200, // safe max for typical fixtures; helper caps automatically
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
@@ -91,4 +94,22 @@ export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[
 export function fixtureRoles(fx: FixtureConfig): ChannelRole[] {
   if (fx.preset === "custom") return fx.roles ?? [];
   return PRESET_ROLES[fx.preset];
+}
+
+/**
+ * Highest DMX channel used by any fixture, or 0 if there are none.
+ * The C sidecar accepts frames from 24 to 512 slots — the fewer we send,
+ * the faster each frame gets on the wire (fewer bytes @ 44 µs each).
+ */
+export function activeSlots(fixtures: FixtureConfig[]): number {
+  let max = 0;
+  for (const fx of fixtures) {
+    const w = fixtureRoles(fx).length;
+    const top = fx.address + w - 1;
+    if (top > max) max = top;
+  }
+  // Clamp to spec-min 24, spec-max 512
+  if (max < 24) max = 24;
+  if (max > 512) max = 512;
+  return max;
 }

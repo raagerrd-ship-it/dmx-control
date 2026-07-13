@@ -124,6 +124,12 @@
 
 
 
+  <h1>DMX refresh</h1>
+  <div class="card">
+    <div class="row"><label>Max rate</label><span class="val"><span id="dmxHzVal">–</span> Hz</span></div>
+    <input type="range" id="dmxHz" min="30" max="300" step="5" value="200" />
+    <div class="status">Wire cap depends on used channels. Lower this if a fixture flickers.</div>
+  </div>
 
   <h1>Fixtures</h1>
   <div class="card">
@@ -167,6 +173,8 @@ const cometCard = document.getElementById("cometCard");
 const cometHueEl = document.getElementById("cometHue");
 const cometValEl = document.getElementById("cometVal");
 const cometSwatch = document.getElementById("cometSwatch");
+const dmxHzEl = document.getElementById("dmxHz");
+const dmxHzVal = document.getElementById("dmxHzVal");
 const connEl = document.getElementById("conn");
 
 let ws;
@@ -211,6 +219,9 @@ function applyConfig(cfg) {
   cometValEl.textContent = chue;
   cometSwatch.style.background = `hsl(${chue} 100% 50%)`;
   cometCard.style.display = cfg.mode === "comet" ? "" : "none";
+  const hz = Math.round(cfg.dmxMaxHz ?? 200);
+  dmxHzEl.value = hz;
+  dmxHzVal.textContent = hz;
   identifyingIndex = cfg.identify?.index ?? -1;
   if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
   else renderFixtures();
@@ -255,6 +266,12 @@ document.querySelectorAll("[data-comet-hue]").forEach((b) => {
     cometHueEl.dispatchEvent(new Event("input"));
   };
 });
+dmxHzEl.oninput = () => {
+  const v = Number(dmxHzEl.value);
+  dmxHzVal.textContent = v;
+  send({ type: "setDmxMaxHz", value: v });
+};
+
 
 /* ── Fixture editor ─────────────────────────────────────────────────── */
 const PRESETS = ["rgb", "rgbw", "dimmer", "custom"];
