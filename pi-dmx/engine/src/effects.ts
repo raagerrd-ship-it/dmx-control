@@ -140,7 +140,7 @@ function pickColor(
   const dyn = Math.max(0, Math.min(1, cfg.dynamics ?? 0.6));
   const shaped = (floor: number, x: number) => {
     const f = floor * (1 - dyn);
-    return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.5));
+    return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 2.5));
   };
   switch (mode) {
     case "auto": {
