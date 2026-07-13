@@ -14,6 +14,10 @@ export class EffectEngine {
   private universe = new Uint8Array(512);
   private t0 = performance.now();
   private lastKickBoost = 0;
+  /** Chase mode: fixture-index of the currently lit head. Advanced on kick and slow-time. */
+  private chasePos = 0;
+  private chaseDir = 1;
+  private lastChaseAdvance = 0;
 
   constructor(private cfg: EngineConfig) {}
 
