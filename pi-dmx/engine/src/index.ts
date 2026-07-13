@@ -90,6 +90,7 @@ server = await startServer({
   getLatestFrame: () => latestFrame,
   cycleMode,
   smartSync,
+  resetAgc: () => analyser.resetGain(),
   onConfigChanged: () => {
     scheduleSave(cfg);
     curSlots = activeSlots(cfg.fixtures);

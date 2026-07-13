@@ -24,6 +24,13 @@ export class Analyser {
   private fluxHistory: number[] = []; // for median
   private readonly fluxHistLen = 43;  // ~1s @ 375 Hz frame rate
   private gain = 1;
+
+  /** Called when the input routing changes — the old gain is meaningless for
+   *  the new source's signal level, so re-converge from neutral. */
+  resetGain() {
+    this.gain = 1;
+    this.envelope = 0;
+  }
   private envelope: number;
   private lastKick = 0;
   private lastT = performance.now();
