@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
-import { presetById, useDmx } from "@/store/dmx";
+import { presetById, useDmx, type PresetId } from "@/store/dmx";
 import { smoothStep, softnessToAlpha } from "@/lib/audioCurve";
 import { useMic } from "@/hooks/useMic";
+import { activeOverride } from "@/store/smartSync";
 
 /**
  * Mock live-loop: simulerar mic-nivå + kick och genererar DMX-frame
@@ -64,8 +65,24 @@ export function useMockLive() {
       const dt = Math.max(0.001, Math.min(0.1, t - lastT.current));
       lastT.current = t;
       const st = useDmx.getState();
-      const { preset, params, fixtures } = st;
+      const { params, fixtures } = st;
+      let { preset } = st;
       const sens = params.sensitivity / 100;
+
+      // === Smart Sync override: aktiv section byter preset + hue, aktiv flash → drop-blixt ===
+      const nowWall = Date.now();
+      const ovr = activeOverride(nowWall);
+      let smartFlash = ovr.flashUntil > nowWall;
+      let smartPrimaryHue: number | null = null;
+      let smartSecondaryHue: number | null = null;
+      if (ovr.section) {
+        const p = ovr.section.preset;
+        if (p === "auto" || p === "party" || p === "strobe" || p === "comet" || p === "chase" || p === "split" || p === "mono") {
+          preset = p as PresetId;
+        }
+        smartPrimaryHue = ovr.section.primaryHue;
+        smartSecondaryHue = ovr.section.secondaryHue;
+      }
 
       const releaseAlpha = softnessToAlpha(params.smoothness);
       const attackAlpha = 1.0;
@@ -146,6 +163,14 @@ export function useMockLive() {
         else if (chasePos.current <= 0)           { chasePos.current = 0;                chaseDir.current =  1; }
       }
 
+      // Applicera Smart Sync hue-override om aktiv
+      const cometHue    = smartPrimaryHue   ?? params.cometHue;
+      const monoHue     = smartPrimaryHue   ?? params.monoHue;
+      const splitHueA   = smartPrimaryHue   ?? params.splitHueA;
+      const splitHueB   = smartSecondaryHue ?? params.splitHueB;
+      // Smart Sync-flash = tvinga vit blixt (drop-punkt)
+      const flashNow = flashActive || smartFlash;
+
       fixtures.forEach((f, idx) => {
         let r = 0, g = 0, b = 0, w = 0;
 
@@ -163,13 +188,13 @@ export function useMockLive() {
             const v = Math.max(briFloor, briSlider * (0.45 + audio * 0.55) * (0.6 + wave * 0.4));
             const c = hsvToRgb(hue, 1, Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
-            if (kick > 0.7 || flashActive) { r = g = b = 255 * briSlider; }
+            if (kick > 0.7 || flashNow) { r = g = b = 255 * briSlider; }
             break;
           }
           case "comet": {
             // Eldklot glider genom lamporna med lång, utfadande svans.
             // Färg = användarvald hue (t.ex. blå komet, grön, magenta).
-            const cometHue = params.cometHue;
+            // cometHue kommer från yttre scope (kan vara Smart Sync-override)
             const headPos = (hueBase * 0.3 + kick * 0.2) % 1;
             const myPos = idx / fixtureCount;
             // Signerat avstånd bakåt från huvudet (0..1), wrappat
@@ -190,14 +215,14 @@ export function useMockLive() {
             const d = Math.abs(idx - chasePos.current);
             const tail = Math.exp(-d * 1.4);
             const v = Math.max(briFloor, briSlider * tail * (0.6 + audio * 0.5 + kick * 0.4));
-            const c = hsvToRgb(params.cometHue, 0.9, Math.min(1, v));
+            const c = hsvToRgb(cometHue, 0.9, Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
             break;
           }
           case "split": {
             // Grupp A (jämna) = bas-driven, grupp B (udda) = diskant-driven.
             const isA = idx % 2 === 0;
-            const hue = isA ? params.splitHueA : params.splitHueB;
+            const hue = isA ? splitHueA : splitHueB;
             const drive = isA
               ? Math.min(1, audio * 1.4 + kick * 0.8)
               : Math.min(1, treble * 1.6 + audio * 0.3);
@@ -209,7 +234,7 @@ export function useMockLive() {
           case "mono": {
             // En användarvald hue. Vid varma toner (~15°) mer flimmer så det
             // känns som eld; svalare toner får mjuk shimmer.
-            const monoHue = params.monoHue;
+            // monoHue kommer från yttre scope (kan vara Smart Sync-override)
             const isWarm = monoHue < 40 || monoHue > 340;
             const flicker = isWarm
               ? 0.7 + Math.random() * 0.3
@@ -231,7 +256,7 @@ export function useMockLive() {
             const v = Math.max(briFloor, briSlider * (0.5 + audio * 0.6));
             const c = hsvToRgb(hue, Math.max(0.6, sat), Math.min(1, v));
             r = c[0]; g = c[1]; b = c[2];
-            if (kick > 0.85 || flashActive) { r = g = b = 255 * briSlider; }
+            if (kick > 0.85 || flashNow) { r = g = b = 255 * briSlider; }
           }
         }
 
