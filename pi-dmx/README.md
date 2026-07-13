@@ -47,7 +47,7 @@ audio/effect/UI logic.
 | **Whadda WPM432** DMX-512 module | Contains the RS-485 driver + 3-pin XLR female. No extra breakout needed. |
 | 3× jumper wires | Pi ↔ WPM432 (5V / GND / TX) |
 | 120 Ω resistor | DMX line termination across pins 2/3 at the last fixture |
-| Push-button (NO) | Optional: physical mode-cycle button — GPIO17 (pin 11) to GND |
+| Codec Zero SW1 button | Built-in — cycles through modes. No extra wiring. |
 | INMP441 (backup mic) | Not used in this build — line-in only |
 
 ### WPM432 wiring (TX-only, no RDM)
