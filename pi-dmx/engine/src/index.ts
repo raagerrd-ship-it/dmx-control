@@ -61,7 +61,8 @@ const cycleMode = (): Mode => {
   return cfg.mode;
 };
 
-const server = await startServer({
+// eslint-disable-next-line prefer-const
+var server = await startServer({
   cfg,
   getLatestFrame: () => latestFrame,
   cycleMode,
