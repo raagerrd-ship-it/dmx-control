@@ -182,14 +182,14 @@ function pickColor(
       const hueA = (t * 45 + idx * (360 / count) + frame.energy * 40);
       const hueB = (-t * 30 + idx * (360 / count) * 1.5 + frame.treble * 90);
       const mix  = 0.35 + frame.treble * 0.5;
-      const hue  = (((hueA * (1 - mix) + hueB * mix) % 360) + 360) % 360 / 360;
+      const hue  = snapHue(idx, (((hueA * (1 - mix) + hueB * mix) % 360) + 360) % 360 / 360);
       const v = shaped(0.15, band * 0.9 + kickEnv * 0.3);
       return hsvToRgb(hue, 1, v);
     }
     case "party": {
       // Counter-rotating hues + white punch on kick for a real "flash" feel.
       const dir = idx % 2 === 0 ? 1 : -1;
-      const hue = ((t * 90 * dir + idx * 137) % 360 + 360) % 360 / 360;
+      const hue = snapHue(idx, ((t * 90 * dir + idx * 137) % 360 + 360) % 360 / 360);
       const v = shaped(0.2, band * 0.8 + kickEnv * 0.5);
       const sat = Math.max(0, 1 - kickEnv * 0.8);   // punch flashes white on kicks
       return hsvToRgb(hue, sat, v);
@@ -206,7 +206,7 @@ function pickColor(
       else             v = Math.exp(-(-behind) * 2.5);
       v = Math.min(1, v);
       const heat = v;
-      const hue = (((cometHue % 360) + 360) % 360) / 360;
+      const hue = snapHue(idx, (((cometHue % 360) + 360) % 360) / 360);
       const sat = 0.35 + (1 - heat) * 0.65;
       const kickBoost = 1 + kickEnv * 0.35;
       // The tail shape is positional — scale the whole comet with the music so
@@ -219,14 +219,14 @@ function pickColor(
       // glow briefly so the move reads even on 4 fixtures. Hue = cometHue.
       const d = Math.abs(idx - chasePos);
       const tail = Math.exp(-d * 1.4);
-      const hue = (((cometHue % 360) + 360) % 360) / 360;
+      const hue = snapHue(idx, (((cometHue % 360) + 360) % 360) / 360);
       const v = Math.min(1, tail * shaped(0.35, audio * 0.7 + kickEnv * 0.5));
       return hsvToRgb(hue, 0.9, v);
     }
     case "split": {
       // Groups A/B by index parity. A = bass-driven (kick+energy), B = treble.
       const isA = idx % 2 === 0;
-      const hue = (((isA ? splitHueA : splitHueB) % 360) + 360) % 360 / 360;
+      const hue = snapHue(idx, (((isA ? splitHueA : splitHueB) % 360) + 360) % 360 / 360);
       const drive = isA
         ? Math.min(1, frame.energy * norm + kickEnv * 0.8)
         : Math.min(1, frame.treble * norm * 1.2 + audio * 0.3);
@@ -236,7 +236,7 @@ function pickColor(
     case "mono": {
       const isWarm = monoHue < 40 || monoHue > 340;
       const flicker = isWarm ? 0.7 + Math.random() * 0.3 : 0.9 + Math.random() * 0.1;
-      const hue = (((monoHue + (isWarm ? (Math.random() - 0.5) * 12 : 0)) % 360) + 360) % 360 / 360;
+      const hue = snapHue(idx, (((monoHue + (isWarm ? (Math.random() - 0.5) * 12 : 0)) % 360) + 360) % 360 / 360);
       // One color, four lamps — each breathing with its own spectrum band.
       const v = flicker * shaped(0.25, band * 0.8 + kickEnv * 0.25);
       return hsvToRgb(hue, 1, v);
@@ -250,12 +250,26 @@ function pickColor(
   }
 }
 
+// Per-fixture hue-sector hold: raw hues near a 60° boundary would otherwise
+// flip between two pure colors many times a second (reads as color flicker).
+// Only leave the held sector once the raw hue is clearly past the boundary.
+const sectorHold: number[] = [];
+function snapHue(idx: number, h: number): number {
+  const raw = (((h * 6) % 6) + 6) % 6;
+  let cur = sectorHold[idx];
+  if (cur === undefined) cur = sectorHold[idx] = Math.round(raw) % 6;
+  let d = raw - cur;
+  if (d > 3) d -= 6; else if (d < -3) d += 6;
+  if (Math.abs(d) > 0.65) sectorHold[idx] = cur = ((Math.round(raw) % 6) + 6) % 6;
+  return cur / 6;
+}
+
 function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
   // Physical PARs with big discrete R/G/B LEDs can't blend hues — anything
   // between the six pure corner colors lights the LED groups unevenly and
   // looks muddy. Snap hue to 60° steps and saturation to pure color/white;
   // all smoothness lives in brightness (v) instead.
-  h = (Math.round(h * 6) % 6) / 6;
+  // hue arrives sector-snapped via snapHue(); saturation stays pure/white
   s = s >= 0.5 ? 1 : 0;
   const i = Math.floor(h * 6);
   const f = h * 6 - i;
