@@ -45,10 +45,13 @@ export interface Params {
   splitHueB: number;    // 0..360 — Split: grupp B (diskant)
 }
 
+export type Rotation = Record<PresetId, boolean>;
+
 interface DmxState {
   preset: PresetId;
   params: Params;
   fixtures: Fixture[];
+  rotation: Rotation;
   micEnabled: boolean;
   micError: string | null;
   audioLevel: number;   // 0..1 (smoothed)
@@ -59,6 +62,7 @@ interface DmxState {
   addFixture: () => void;
   updateFixture: (id: string, patch: Partial<Fixture>) => void;
   removeFixture: (id: string) => void;
+  toggleRotation: (id: PresetId) => void;
   setLive: (audio: number, kick: number, frame: number[]) => void;
   setMicEnabled: (b: boolean) => void;
   setMicError: (m: string | null) => void;
@@ -70,7 +74,12 @@ interface Persisted {
   preset: PresetId;
   params: Params;
   fixtures: Fixture[];
+  rotation: Rotation;
 }
+
+const defaultRotation: Rotation = {
+  auto: true, party: true, strobe: false, comet: true, chase: true, split: true, mono: false,
+};
 
 const defaults: Persisted = {
   preset: "auto",
@@ -81,6 +90,7 @@ const defaults: Persisted = {
     { id: "f3", name: "PAR 3", startCh: 7,  mode: "rgb" },
     { id: "f4", name: "PAR 4", startCh: 10, mode: "rgb" },
   ],
+  rotation: defaultRotation,
 };
 
 function load(): Persisted {
@@ -92,6 +102,7 @@ function load(): Persisted {
       ...defaults,
       ...parsed,
       params: { ...defaults.params, ...(parsed.params ?? {}) },
+      rotation: { ...defaultRotation, ...(parsed.rotation ?? {}) },
     };
     // Migrera bort borttagna presets (static/blackout → auto)
     if (!PRESETS.some((p) => p.id === merged.preset)) merged.preset = "auto";
@@ -107,53 +118,55 @@ function save(s: Persisted) {
 
 const initial = load();
 
-export const useDmx = create<DmxState>((set, get) => ({
-  preset: initial.preset,
-  params: initial.params,
-  fixtures: initial.fixtures,
-  micEnabled: false,
-  micError: null,
-  audioLevel: 0,
-  kick: 0,
-  frame: new Array(512).fill(0),
+export const useDmx = create<DmxState>((set, get) => {
+  const persist = () => {
+    const { preset, params, fixtures, rotation } = get();
+    save({ preset, params, fixtures, rotation });
+  };
+  return {
+    preset: initial.preset,
+    params: initial.params,
+    fixtures: initial.fixtures,
+    rotation: initial.rotation,
+    micEnabled: false,
+    micError: null,
+    audioLevel: 0,
+    kick: 0,
+    frame: new Array(512).fill(0),
 
-  setPreset: (id) => {
-    set({ preset: id });
-    const { params, fixtures } = get();
-    save({ preset: id, params, fixtures });
-  },
-  patchParams: (p) => {
-    const params = { ...get().params, ...p };
-    set({ params });
-    save({ preset: get().preset, params, fixtures: get().fixtures });
-  },
-  addFixture: () => {
-    const fixtures = [...get().fixtures];
-    const last = fixtures[fixtures.length - 1];
-    const startCh = last ? Math.min(509, last.startCh + channelsFor(last.mode)) : 1;
-    fixtures.push({
-      id: "f" + Date.now().toString(36),
-      name: `Fixture ${fixtures.length + 1}`,
-      startCh,
-      mode: "rgb",
-    });
-    set({ fixtures });
-    save({ preset: get().preset, params: get().params, fixtures });
-  },
-  updateFixture: (id, patch) => {
-    const fixtures = get().fixtures.map((f) => (f.id === id ? { ...f, ...patch } : f));
-    set({ fixtures });
-    save({ preset: get().preset, params: get().params, fixtures });
-  },
-  removeFixture: (id) => {
-    const fixtures = get().fixtures.filter((f) => f.id !== id);
-    set({ fixtures });
-    save({ preset: get().preset, params: get().params, fixtures });
-  },
-  setLive: (audioLevel, kick, frame) => set({ audioLevel, kick, frame }),
-  setMicEnabled: (micEnabled) => set({ micEnabled, micError: micEnabled ? get().micError : null }),
-  setMicError: (micError) => set({ micError }),
-}));
+    setPreset: (id) => { set({ preset: id }); persist(); },
+    patchParams: (p) => { set({ params: { ...get().params, ...p } }); persist(); },
+    addFixture: () => {
+      const fixtures = [...get().fixtures];
+      const last = fixtures[fixtures.length - 1];
+      const startCh = last ? Math.min(509, last.startCh + channelsFor(last.mode)) : 1;
+      fixtures.push({
+        id: "f" + Date.now().toString(36),
+        name: `Fixture ${fixtures.length + 1}`,
+        startCh,
+        mode: "rgb",
+      });
+      set({ fixtures });
+      persist();
+    },
+    updateFixture: (id, patch) => {
+      set({ fixtures: get().fixtures.map((f) => (f.id === id ? { ...f, ...patch } : f)) });
+      persist();
+    },
+    removeFixture: (id) => {
+      set({ fixtures: get().fixtures.filter((f) => f.id !== id) });
+      persist();
+    },
+    toggleRotation: (id) => {
+      const rotation = { ...get().rotation, [id]: !get().rotation[id] };
+      set({ rotation });
+      persist();
+    },
+    setLive: (audioLevel, kick, frame) => set({ audioLevel, kick, frame }),
+    setMicEnabled: (micEnabled) => set({ micEnabled, micError: micEnabled ? get().micError : null }),
+    setMicError: (micError) => set({ micError }),
+  };
+});
 
 export function channelsFor(mode: FixtureMode): number {
   return mode === "rgbw" ? 4 : mode === "dimmer" ? 1 : 3;

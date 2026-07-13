@@ -57,6 +57,8 @@ export interface EngineConfig {
   splitHueB: number;
   /** "chase" sub-pattern: sweep (L→R loop) or ping-pong (bounce). */
   chaseStyle: "sweep" | "pingpong";
+  /** Which modes are included in the physical button / WS cycle. */
+  rotation: Partial<Record<Mode, boolean>>;
   /** Physical push-button that cycles through modes. Set null to disable. */
   modeButton: { chip: string; line: number } | null;
   /** Transient identify override — not persisted. index = fixture being lit. */
@@ -90,6 +92,7 @@ export const defaultConfig: EngineConfig = {
   splitHueA: 0,    // red for bass side
   splitHueB: 200,  // cyan for treble side
   chaseStyle: "pingpong",
+  rotation: { auto: true, party: true, comet: true, chase: true, split: true, mono: false, strobe: false },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   dmxMaxHz: 200, // safe max for typical fixtures; helper caps automatically
 };

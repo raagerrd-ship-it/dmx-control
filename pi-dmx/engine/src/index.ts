@@ -55,8 +55,12 @@ capture.start();
 // so UI and hardware follow the exact same path.
 let server: Server;
 const cycleMode = (): Mode => {
-  const cur = MODE_CYCLE.indexOf(cfg.mode);
-  cfg.mode = MODE_CYCLE[(cur + 1) % MODE_CYCLE.length];
+  // Filter to modes the user has enabled in rotation; fall back to the full
+  // list if they disabled everything so the button never becomes a no-op.
+  const enabled = MODE_CYCLE.filter((m) => cfg.rotation?.[m] !== false);
+  const list = enabled.length > 0 ? enabled : MODE_CYCLE;
+  const cur = list.indexOf(cfg.mode);
+  cfg.mode = list[(cur + 1) % list.length];
   scheduleSave(cfg);
   server.broadcastConfig();
   return cfg.mode;
