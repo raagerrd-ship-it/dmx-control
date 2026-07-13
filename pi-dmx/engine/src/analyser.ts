@@ -130,7 +130,7 @@ export class Analyser {
 
     const dtHop = this.cfg.fft.hop / this.cfg.audio.rate;
     const aAtt = 1 - Math.exp(-dtHop / 0.015);
-    const aRel = 1 - Math.exp(-dtHop / 0.25);
+    const aRel = 1 - Math.exp(-dtHop / 0.4);
     const smooth = (prev: number, x: number) => prev + (x - prev) * (x > prev ? aAtt : aRel);
     this.lvlSmooth = smooth(this.lvlSmooth, level);
     this.engSmooth = smooth(this.engSmooth, energy);
