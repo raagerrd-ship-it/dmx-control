@@ -23,6 +23,7 @@ export class EffectEngine {
   /** Drops mode: per-lamp fire time + hue; advanced on each beat/kick. */
   private dropPos = 0;
   private dropSector = 0;
+  private dropCount = 0;
   private lastDropAdvance = 0;
   private dropFired: number[] = [];
   private dropHue: number[] = [];
@@ -135,7 +136,8 @@ export class EffectEngine {
     if (effMode === "drops" && count > 0 && (frame.kick || beatTick) && now - this.lastDropAdvance > 140) {
       this.lastDropAdvance = now;
       this.dropPos = (this.dropPos + 1) % count;
-      this.dropSector = (this.dropSector + 1 + (this.dropPos % 2)) % 6;  // hoppar ojämnt genom färgcirkeln
+      this.dropCount++;
+      this.dropSector = mixedSector(this.dropCount);
       this.dropFired[this.dropPos] = now;
       this.dropHue[this.dropPos] = this.dropSector / 6;
     }
@@ -247,13 +249,13 @@ function pickColor(
       // A soft brightness wave rolling across the rig at music speed; the whole
       // rig shares one hue that steps onward every few seconds.
       const base = 0.5 + 0.5 * Math.sin(wavePhase - idx * 1.1);
-      const hue = snapHue(101, ((t * 14) % 360) / 360);
+      const hue = mixedSector(Math.floor(t / 4.3)) / 6;
       const v = shaped(0.1, base * (0.3 + audio * 0.8) + kickEnv * 0.25);
       return hsvToRgb(hue, 1, v);
     }
     case "cycle": {
       // Calm: all lamps breathe together, slowly walking the color circle.
-      const hue = snapHue(102, ((t * 7) % 360) / 360);
+      const hue = mixedSector(Math.floor(t / 8.5)) / 6;
       const sway = 0.9 + 0.1 * Math.sin(t * 0.8 + idx * 1.6);
       const v = shaped(0.35, (0.3 + audio * 0.55 + kickEnv * 0.1) * sway);
       return hsvToRgb(hue, 1, v);
@@ -283,6 +285,13 @@ function pickColor(
 // Per-fixture hue-sector hold: raw hues near a 60° boundary would otherwise
 // flip between two pure colors many times a second (reads as color flicker).
 // Only leave the held sector once the raw hue is clearly past the boundary.
+// Low-discrepancy color walk: golden-ratio jumps visit every pure color in a
+// varied, non-sequential order (red→blue→yellow→…) instead of stepping around
+// the circle neighbor by neighbor.
+function mixedSector(n: number): number {
+  return Math.floor(((((n * 0.61803398875) % 1) + 1) % 1) * 6);
+}
+
 const sectorHold: number[] = [];
 function snapHue(idx: number, h: number): number {
   const raw = (((h * 6) % 6) + 6) % 6;
