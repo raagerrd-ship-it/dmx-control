@@ -189,7 +189,26 @@ const cometValEl = document.getElementById("cometVal");
 const cometSwatch = document.getElementById("cometSwatch");
 const dmxHzEl = document.getElementById("dmxHz");
 const dmxHzVal = document.getElementById("dmxHzVal");
+const agcTargetEl  = document.getElementById("agcTarget");
+const agcTargetVal = document.getElementById("agcTargetVal");
+const agcAggEl     = document.getElementById("agcAgg");
+const agcAggVal    = document.getElementById("agcAggVal");
+const agcTauDetail = document.getElementById("agcTauDetail");
 const connEl = document.getElementById("conn");
+
+// Inverse of server's log curve: derive aggressiveness 0..1 from tauDown seconds.
+// tauDown = 60 * (2/60)^a  →  a = log(tauDown/60) / log(2/60)
+function tauDownToAgg(tauDown) {
+  if (!(tauDown > 0)) return 0;
+  const a = Math.log(tauDown / 60) / Math.log(2 / 60);
+  return Math.max(0, Math.min(1, a));
+}
+function aggToTau(a) {
+  return {
+    up:   180 * Math.pow(10 / 180, a),
+    down:  60 * Math.pow(2  / 60,  a),
+  };
+}
 
 let ws;
 function connect() {
