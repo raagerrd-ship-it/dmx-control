@@ -62,7 +62,7 @@ const server = await startServer({
 }, Number(process.env.PORT ?? 80));
 console.log(`audio-dmx-engine listening on ${server.app.server.address()}`);
 
-// Physical mode button — cycles Auto → Chill → Party → Chase → Fire → Strobe → Blackout → Auto…
+// Physical mode button — cycles Auto → Party → Comet → Mono → Strobe → Auto…
 let button: Button | null = null;
 if (cfg.modeButton) {
   button = new Button({ chip: cfg.modeButton.chip, line: cfg.modeButton.line });
