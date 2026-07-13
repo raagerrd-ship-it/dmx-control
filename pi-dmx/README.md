@@ -104,13 +104,22 @@ What it does:
 3. Edits `/boot/firmware/cmdline.txt` — drops the serial console, appends
    `isolcpus=3 nohz_full=3 rcu_nocbs=3` so CPU3 is reserved for `dmx-helper`.
 4. Disables `hciuart`, `bluetooth`, `serial-getty@ttyAMA0`.
-5. Installs `/etc/asound.conf` (default capture = `hw:0,0`) and the
+5. Sets up a permanent **WiFi access point** on `wlan0` via NetworkManager
+   — SSID `pi-dmx`, password `dmx12345`, gateway `192.168.4.1`. Override
+   with `AP_SSID=... AP_PASS=... sudo -E bash install.sh`.
+6. Installs `/etc/asound.conf` (default capture = `hw:0,0`) and the
    `codec-zero-linein` oneshot for AUX-in routing.
-6. Builds + installs `dmx-helper` to `/usr/local/bin/`.
-7. Builds + installs the Node engine to `/opt/audio-dmx-engine/`, config
+7. Builds + installs `dmx-helper` to `/usr/local/bin/`.
+8. Builds + installs the Node engine to `/opt/audio-dmx-engine/`, config
    under `/var/lib/audio-dmx-engine/`.
-8. Enables `cpu-performance`, `codec-zero-linein`, `dmx-helper`,
+9. Enables `cpu-performance`, `codec-zero-linein`, `dmx-helper`,
    `audio-dmx-engine`.
+
+After reboot the Pi broadcasts its own network. Join `pi-dmx` from your
+phone and open **http://192.168.4.1/**. WiFi/BT chip is on SDIO — fully
+independent of the UART, so the AP doesn't touch DMX timing.
+
+
 
 Everything runs as **root** on purpose — this Pi is a single-purpose
 appliance on an isolated network, so we skip capability juggling

@@ -19,13 +19,13 @@ REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 BOOT_DIR="/boot/firmware"
 [[ -d $BOOT_DIR ]] || BOOT_DIR="/boot"
 
-echo "==> [1/8] apt packages"
+echo "==> [1/9] apt packages"
 apt-get update -qq
 apt-get install -y --no-install-recommends \
   build-essential nodejs npm \
   alsa-utils gpiod libcap2-bin
 
-echo "==> [2/8] /boot config — UART, Codec Zero, force_turbo"
+echo "==> [2/9] /boot config — UART, Codec Zero, force_turbo"
 CFG="$BOOT_DIR/config.txt"
 touch "$CFG"
 ensure_line() { grep -qxF "$1" "$CFG" || echo "$1" >> "$CFG"; }
@@ -35,7 +35,7 @@ ensure_line "init_uart_clock=48000000"
 ensure_line "dtoverlay=iqaudio-codec"
 ensure_line "force_turbo=1"
 
-echo "==> [3/8] /boot cmdline — isolate CPU3 for dmx-helper, drop serial console"
+echo "==> [3/9] /boot cmdline — isolate CPU3 for dmx-helper, drop serial console"
 CMD="$BOOT_DIR/cmdline.txt"
 if [[ -f $CMD ]]; then
   sed -i 's/console=serial0,115200 \?//g; s/console=ttyAMA0,115200 \?//g' "$CMD"
@@ -44,8 +44,31 @@ if [[ -f $CMD ]]; then
   fi
 fi
 
-echo "==> [4/8] disable Bluetooth stack + serial-getty"
+echo "==> [4/9] disable Bluetooth stack + serial-getty"
 systemctl disable --now hciuart bluetooth serial-getty@ttyAMA0 2>/dev/null || true
+
+AP_SSID="${AP_SSID:-pi-dmx}"
+AP_PASS="${AP_PASS:-dmx12345}"       # WPA2 requires 8+ chars
+echo "==> [5/9] WiFi AP — SSID=$AP_SSID, gateway=192.168.4.1"
+# Bookworm ships NetworkManager. `ipv4.method shared` = NM runs its own
+# dnsmasq for DHCP/DNS, so no separate hostapd/dnsmasq config needed.
+if command -v nmcli >/dev/null; then
+  AP_CON="pi-dmx-ap"
+  nmcli con delete "$AP_CON" 2>/dev/null || true
+  nmcli con add type wifi ifname wlan0 mode ap con-name "$AP_CON" \
+    ssid "$AP_SSID" autoconnect yes
+  nmcli con modify "$AP_CON" \
+    802-11-wireless.band bg 802-11-wireless.channel 6 \
+    802-11-wireless-security.key-mgmt wpa-psk \
+    802-11-wireless-security.psk "$AP_PASS" \
+    ipv4.method shared ipv4.addresses 192.168.4.1/24 \
+    ipv6.method disabled \
+    connection.autoconnect-priority 100
+  nmcli con up "$AP_CON" || true
+else
+  echo "  ! NetworkManager not found — skipping AP setup." >&2
+  echo "    Install NM or configure hostapd manually." >&2
+fi
 
 echo "==> [5/8] Codec Zero — route AUX line-in to capture"
 install -Dm644 /dev/stdin /etc/alsa/codec-zero-linein.state <<'EOF_ALSA'
@@ -99,4 +122,5 @@ echo
 echo "Done. Reboot once so /boot config + isolcpus take effect:"
 echo "    sudo reboot"
 echo
-echo "After reboot, open http://<pi-ip>/ from your phone."
+echo "After reboot, join WiFi '$AP_SSID' (password: $AP_PASS)"
+echo "and open http://192.168.4.1/ from your phone."
