@@ -103,7 +103,9 @@ export class Analyser {
       if (this.gain < 0.5) this.gain = 0.5;
       else if (this.gain > 20) this.gain = 20;
     }
-    const level = Math.min(1, rms * 4 * this.gain);
+    // rms*gain averages at autoGainTarget once the AGC has converged — the old
+    // *4 factor made steady-state level 4x the target, i.e. pegged at 100%.
+    const level = Math.min(1, rms * this.gain);
 
     // Kick: bassFlux above median × threshold, with cooldown + energy gate.
     this.fluxHistory.push(fluxNorm);

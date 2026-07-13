@@ -67,7 +67,7 @@ export class EffectEngine {
 
         // Normalize against the AGC target so "at target loudness" = full drive —
         // the AGC otherwise parks the level around ~0.5 and v never reaches 1.
-        const audio = Math.min(1, (frame.level / Math.max(0.15, this.cfg.detection.autoGainTarget)) * (0.5 + this.cfg.sensitivity));
+        const audio = Math.min(1, (frame.level / Math.max(0.15, this.cfg.detection.autoGainTarget)) * (0.35 + this.cfg.sensitivity * 0.5));
     const master = this.cfg.master;
     const count = this.cfg.fixtures.length;
 
