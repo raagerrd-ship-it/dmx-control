@@ -163,8 +163,10 @@ function pickColor(
     audio,
     Math.min(1, frame.treble * norm * 1.1),
     Math.min(1, frame.energy * norm * 0.45 + kickEnv),
+    // "low": calm glow when the music is quiet, out of the way when loud.
+    Math.max(0, (0.5 - audio) * 2) * 0.6,
   ];
-  const BAND_IDX = { bass: 0, mid: 1, treble: 2, kick: 3 } as const;
+  const BAND_IDX = { bass: 0, mid: 1, treble: 2, kick: 3, low: 4 } as const;
   const band = fx?.bands?.length
     ? Math.max(...fx.bands.map((b) => bands[BAND_IDX[b]]))
     : bands[idx % bands.length];

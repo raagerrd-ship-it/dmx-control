@@ -475,7 +475,7 @@ function renderFixtures() {
       <div class="fx-field" style="margin-top:8px">
         <label>Musikband (auto/party/mono)</label>
         <div class="fx-roles">
-          ${["bass","mid","treble","kick"].map((b) => `<label class="fx-role" style="cursor:pointer"><input type="checkbox" data-band-i="${i}" data-band="${b}" ${(fx.bands ?? []).includes(b) ? "checked" : ""}> ${{bass:"Bas",mid:"Mellan",treble:"Diskant",kick:"Kick"}[b]}</label>`).join("")}
+          ${["bass","mid","treble","kick","low"].map((b) => `<label class="fx-role" style="cursor:pointer"><input type="checkbox" data-band-i="${i}" data-band="${b}" ${(fx.bands ?? []).includes(b) ? "checked" : ""}> ${{bass:"Bas",mid:"Mellan",treble:"Diskant",kick:"Kick",low:"Lågvolym"}[b]}</label>`).join("")}
         </div>
         <div class="fx-meta">Starkaste ikryssade bandet styr. Inga ikryssade = auto (listordning).</div>
       </div>

@@ -316,7 +316,7 @@ function sanitizeFixtures(input: unknown[]): FixtureConfig[] | null {
       }
     }
     const bandsArr = Array.isArray(r.bands)
-      ? ([...new Set(r.bands.filter((b) => ["bass", "mid", "treble", "kick"].includes(b as string)))] as NonNullable<FixtureConfig["bands"]>)
+      ? ([...new Set(r.bands.filter((b) => ["bass", "mid", "treble", "kick", "low"].includes(b as string)))] as NonNullable<FixtureConfig["bands"]>)
       : undefined;
     const fx: FixtureConfig = { name, address, preset, ...(roles ? { roles } : {}), ...(bandsArr?.length ? { bands: bandsArr } : {}) };
 

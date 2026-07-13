@@ -25,7 +25,7 @@ export interface FixtureConfig {
   roles?: ChannelRole[];
   /** Spectrum bands driving this lamp in auto/party/mono (strongest wins).
    *  Empty/unset = auto by list order. */
-  bands?: ("bass" | "mid" | "treble" | "kick")[];
+  bands?: ("bass" | "mid" | "treble" | "kick" | "low")[];
 }
 
 export interface EngineConfig {
