@@ -53,6 +53,7 @@ capture.start();
 
 // Shared mode cycler — used by both the physical button and the WS "cycleMode" message,
 // so UI and hardware follow the exact same path.
+let server: Server;
 const cycleMode = (): Mode => {
   const cur = MODE_CYCLE.indexOf(cfg.mode);
   cfg.mode = MODE_CYCLE[(cur + 1) % MODE_CYCLE.length];
@@ -61,8 +62,7 @@ const cycleMode = (): Mode => {
   return cfg.mode;
 };
 
-// eslint-disable-next-line prefer-const
-var server = await startServer({
+server = await startServer({
   cfg,
   getLatestFrame: () => latestFrame,
   cycleMode,
