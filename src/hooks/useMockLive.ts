@@ -49,6 +49,11 @@ export function useMockLive() {
   const slowEnergyMean = useRef(0.2);
   const dropUntil = useRef(0);
 
+  // Chase-position (kick-driven ping-pong, med auto-advance)
+  const chasePos = useRef(0);
+  const chaseDir = useRef(1);
+  const lastChaseAdvance = useRef(0);
+
   // fejkad musikkälla: bas-sinus + slumpade "beats" var 0.35–0.6s + drop var 8–14s
   const nextBeat = useRef(0.5);
   const nextDrop = useRef(10);
