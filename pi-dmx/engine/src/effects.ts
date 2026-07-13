@@ -41,7 +41,7 @@ export class EffectEngine {
     // SmartSync drop-flash: everything white for the duration. Sits after
     // identify so locating fixtures still works while synced.
     if (this.cfg.flashUntil && Date.now() < this.cfg.flashUntil) {
-      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master, true);  // hw-strobe burst on drop flashes
+      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master, 220);  // hw-strobe burst on drop flashes
       return this.universe;
     }
 
@@ -70,9 +70,11 @@ export class EffectEngine {
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const hwStrobe = this.cfg.mode === "strobe" && fixtureRoles(fx).includes("strobe");
+      // CH-strobe rate follows the music: quiet = slow flashes, loud = machine gun.
+      const strobeVal = hwStrobe ? Math.round(100 + audio * 155) : 0;
       // Hardware strobe: steady white on the color channels, CH-strobe does the flashing.
       const rgb = hwStrobe ? ([1, 1, 1] as [number, number, number]) : pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos);
-      writeFixture(this.universe, fx, rgb, master, hwStrobe);
+      writeFixture(this.universe, fx, rgb, master, strobeVal);
     }
 
     return this.universe;
@@ -84,7 +86,7 @@ function writeFixture(
   fx: FixtureConfig,
   rgb: [number, number, number],
   master: number,
-  hwStrobe = false,
+  strobeVal = 0,
 ) {
   const roles = fixtureRoles(fx);
   const base = fx.address - 1;   // DMX is 1-indexed
@@ -110,7 +112,7 @@ function writeFixture(
       case "b":      u[ch] = to255((b - (roles.includes("w") ? w : 0)) * colorScale); break;
       case "w":      u[ch] = to255(w * colorScale); break;
       case "dim":    u[ch] = to255(hasColor ? m : dim * m); break;
-      case "strobe": u[ch] = hwStrobe ? 220 : 0; break;  // 8-255 = fixture strobe, faster when higher
+      case "strobe": u[ch] = Math.max(0, Math.min(255, strobeVal)); break;  // 8-255 = fixture strobe, faster when higher
       case "unused": break;
     }
   }
@@ -179,7 +181,10 @@ function pickColor(
       const hue = (((cometHue % 360) + 360) % 360) / 360;
       const sat = 0.35 + (1 - heat) * 0.65;
       const kickBoost = 1 + kickEnv * 0.35;
-      return hsvToRgb(hue, sat, Math.min(1, v * kickBoost));
+      // The tail shape is positional — scale the whole comet with the music so
+      // it breathes instead of burning at constant brightness.
+      const breathe = 0.25 + 0.75 * shaped(0.2, audio * 0.9 + kickEnv * 0.2);
+      return hsvToRgb(hue, sat, Math.min(1, v * kickBoost * breathe));
     }
     case "chase": {
       // Bright head at chasePos with short trailing tail. Neighbouring fixtures
@@ -187,7 +192,7 @@ function pickColor(
       const d = Math.abs(idx - chasePos);
       const tail = Math.exp(-d * 1.4);
       const hue = (((cometHue % 360) + 360) % 360) / 360;
-      const v = Math.min(1, tail * shaped(0.6, audio * 0.5 + kickEnv * 0.4));
+      const v = Math.min(1, tail * shaped(0.35, audio * 0.7 + kickEnv * 0.5));
       return hsvToRgb(hue, 0.9, v);
     }
     case "split": {
@@ -195,8 +200,8 @@ function pickColor(
       const isA = idx % 2 === 0;
       const hue = (((isA ? splitHueA : splitHueB) % 360) + 360) % 360 / 360;
       const drive = isA
-        ? Math.min(1, frame.energy * 1.4 + kickEnv * 0.8)
-        : Math.min(1, frame.treble * 1.6 + audio * 0.3);
+        ? Math.min(1, frame.energy * norm + kickEnv * 0.8)
+        : Math.min(1, frame.treble * norm * 1.2 + audio * 0.3);
       const v = shaped(0.15, drive);
       return hsvToRgb(hue, 1, v);
     }
@@ -204,11 +209,12 @@ function pickColor(
       const isWarm = monoHue < 40 || monoHue > 340;
       const flicker = isWarm ? 0.7 + Math.random() * 0.3 : 0.9 + Math.random() * 0.1;
       const hue = (((monoHue + (isWarm ? (Math.random() - 0.5) * 12 : 0)) % 360) + 360) % 360 / 360;
-      const v = flicker * shaped(0.4, audio * 0.6 + kickEnv * 0.3);
+      // One color, four lamps — each breathing with its own spectrum band.
+      const v = flicker * shaped(0.25, band * 0.8 + kickEnv * 0.25);
       return hsvToRgb(hue, 1, v);
     }
     case "strobe": {
-      const on = Math.floor(t * 12) % 2 === 0;
+      const on = Math.floor(t * (6 + audio * 14)) % 2 === 0;
       return on ? [1, 1, 1] : [0, 0, 0];
     }
     default:
