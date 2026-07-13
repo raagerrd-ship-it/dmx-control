@@ -219,6 +219,9 @@ function applyConfig(cfg) {
   cometValEl.textContent = chue;
   cometSwatch.style.background = `hsl(${chue} 100% 50%)`;
   cometCard.style.display = cfg.mode === "comet" ? "" : "none";
+  const hz = Math.round(cfg.dmxMaxHz ?? 200);
+  dmxHzEl.value = hz;
+  dmxHzVal.textContent = hz;
   identifyingIndex = cfg.identify?.index ?? -1;
   if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
   else renderFixtures();
