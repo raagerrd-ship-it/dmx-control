@@ -1,9 +1,11 @@
 import { useLiveAnalysis } from "@/store/liveAnalysis";
 import { useLiveAnalysisRunner } from "@/hooks/useLiveAnalysis";
+import { useLiveAnalysisRelay } from "@/hooks/useLiveAnalysisRelay";
 import { Waves, Activity, AlertCircle, Loader2 } from "lucide-react";
 
 export function LiveAnalysisPanel() {
   useLiveAnalysisRunner();
+  useLiveAnalysisRelay();
   const s = useLiveAnalysis();
 
   const statusLabel =
