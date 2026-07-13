@@ -102,6 +102,13 @@
     <input type="range" id="sens" min="0" max="100" value="60" />
   </div>
 
+  <h1>Dynamik</h1>
+  <div class="card">
+    <div class="row"><label>Kontrast tyst ↔ högt</label><span class="val"><span id="dynVal">–</span>%</span></div>
+    <input type="range" id="dyn" min="0" max="100" value="60" />
+    <div class="status">Lågt = jämnt ljus hela tiden. Högt = dovt i tysta partier och rejäl smäll i beats/drops.</div>
+  </div>
+
   <h1>Master brightness</h1>
   <div class="card">
     <div class="row"><label>Overall level</label><span class="val" id="masterVal">–</span></div>
@@ -226,6 +233,8 @@ const levelVal = document.getElementById("levelVal");
 const gainVal = document.getElementById("gainVal");
 const sensEl = document.getElementById("sens");
 const sensVal = document.getElementById("sensVal");
+const dynEl = document.getElementById("dyn");
+const dynVal = document.getElementById("dynVal");
 const masterEl = document.getElementById("master");
 const masterVal = document.getElementById("masterVal");
 const monoCard = document.getElementById("monoCard");
@@ -293,6 +302,8 @@ function applyConfig(cfg) {
   renderModes(cfg.mode);
   sensEl.value = Math.round(cfg.sensitivity * 100);
   sensVal.textContent = sensEl.value + "%";
+  dynEl.value = Math.round((cfg.dynamics ?? 0.6) * 100);
+  dynVal.textContent = dynEl.value;
   masterEl.value = Math.round(cfg.master * 100);
   masterVal.textContent = masterEl.value + "%";
   // Mono color card: only meaningful when mode === "mono", but we keep the
@@ -336,6 +347,7 @@ function applyFrame(f) {
   }
 }
 sensEl.oninput = () => { sensVal.textContent = sensEl.value + "%"; send({ type: "setSensitivity", value: sensEl.value / 100 }); };
+dynEl.oninput = () => { dynVal.textContent = dynEl.value; send({ type: "setDynamics", value: dynEl.value / 100 }); };
 masterEl.oninput = () => { masterVal.textContent = masterEl.value + "%"; send({ type: "setMaster", value: masterEl.value / 100 }); };
 monoHueEl.oninput = () => {
   const h = Number(monoHueEl.value);

@@ -220,6 +220,8 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
             sock.send(JSON.stringify({ type: "modeChanged", mode: next }));
           } else if (msg.type === "setSensitivity") {
             deps.cfg.sensitivity = clamp01(msg.value);
+          } else if (msg.type === "setDynamics") {
+            deps.cfg.dynamics = clamp01(msg.value);
           } else if (msg.type === "setMaster") {
             deps.cfg.master = clamp01(msg.value);
           } else if (msg.type === "setMonoHue" && typeof msg.value === "number") {

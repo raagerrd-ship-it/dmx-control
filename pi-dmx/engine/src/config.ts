@@ -46,6 +46,8 @@ export interface EngineConfig {
   fixtures: FixtureConfig[];
   mode: Mode;
   sensitivity: number;    // 0..1 user knob
+  /** 0..1 kontrast: 0 = jämnt ljus, 1 = dovt i tystnad + smäll i beats. */
+  dynamics: number;
   master: number;         // 0..1 master brightness
   /** Hue 0..360 used by "mono" mode. 15 ≈ fire orange, 0 = red, 240 = blue. */
   monoHue: number;
@@ -88,6 +90,7 @@ export const defaultConfig: EngineConfig = {
   ],
   mode: "auto",
   sensitivity: 0.6,
+  dynamics: 0.6,
   master: 1.0,
   monoHue: 15,   // warm orange — feels like fire, but the user can pick anything
   cometHue: 15,  // fireball default; pick e.g. 220 for a blue comet

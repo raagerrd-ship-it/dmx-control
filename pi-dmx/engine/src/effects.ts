@@ -41,7 +41,7 @@ export class EffectEngine {
     // SmartSync drop-flash: everything white for the duration. Sits after
     // identify so locating fixtures still works while synced.
     if (this.cfg.flashUntil && Date.now() < this.cfg.flashUntil) {
-      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master);
+      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master, true);  // hw-strobe burst on drop flashes
       return this.universe;
     }
 
@@ -125,6 +125,13 @@ function pickColor(
   chasePos: number,
 ): [number, number, number] {
   const { mode, monoHue, cometHue, splitHueA, splitHueB } = cfg;
+  // Dynamics: lower floors + gamma on the audio-driven part, so quiet passages
+  // go dim and beats punch. dyn=0 reproduces the old flat curves.
+  const dyn = Math.max(0, Math.min(1, cfg.dynamics ?? 0.6));
+  const shaped = (floor: number, x: number) => {
+    const f = floor * (1 - dyn);
+    return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.5));
+  };
   switch (mode) {
     case "auto": {
       // Two counter-drifting hue layers blended by treble → richer variety
@@ -133,14 +140,14 @@ function pickColor(
       const hueB = (-t * 30 + idx * (360 / count) * 1.5 + frame.treble * 90);
       const mix  = 0.35 + frame.treble * 0.5;
       const hue  = (((hueA * (1 - mix) + hueB * mix) % 360) + 360) % 360 / 360;
-      const v = Math.min(1, 0.3 + audio * 0.8 + kickEnv * 0.5);
+      const v = shaped(0.3, audio * 0.8 + kickEnv * 0.5);
       return hsvToRgb(hue, 1, v);
     }
     case "party": {
       // Counter-rotating hues + white punch on kick for a real "flash" feel.
       const dir = idx % 2 === 0 ? 1 : -1;
       const hue = ((t * 90 * dir + idx * 137) % 360 + 360) % 360 / 360;
-      const v = Math.min(1, 0.5 + audio * 0.5 + kickEnv * 0.5);
+      const v = shaped(0.5, audio * 0.5 + kickEnv * 0.5);
       const sat = Math.max(0, 1 - kickEnv * 0.8);   // punch flashes white on kicks
       return hsvToRgb(hue, sat, v);
     }
@@ -167,7 +174,7 @@ function pickColor(
       const d = Math.abs(idx - chasePos);
       const tail = Math.exp(-d * 1.4);
       const hue = (((cometHue % 360) + 360) % 360) / 360;
-      const v = Math.min(1, tail * (0.6 + audio * 0.5 + kickEnv * 0.4));
+      const v = Math.min(1, tail * shaped(0.6, audio * 0.5 + kickEnv * 0.4));
       return hsvToRgb(hue, 0.9, v);
     }
     case "split": {
@@ -177,14 +184,14 @@ function pickColor(
       const drive = isA
         ? Math.min(1, frame.energy * 1.4 + kickEnv * 0.8)
         : Math.min(1, frame.treble * 1.6 + audio * 0.3);
-      const v = Math.min(1, 0.15 + drive);
+      const v = shaped(0.15, drive);
       return hsvToRgb(hue, 1, v);
     }
     case "mono": {
       const isWarm = monoHue < 40 || monoHue > 340;
       const flicker = isWarm ? 0.7 + Math.random() * 0.3 : 0.9 + Math.random() * 0.1;
       const hue = (((monoHue + (isWarm ? (Math.random() - 0.5) * 12 : 0)) % 360) + 360) % 360 / 360;
-      const v = flicker * Math.min(1, 0.4 + audio * 0.6 + kickEnv * 0.3);
+      const v = flicker * shaped(0.4, audio * 0.6 + kickEnv * 0.3);
       return hsvToRgb(hue, 1, v);
     }
     case "strobe": {
