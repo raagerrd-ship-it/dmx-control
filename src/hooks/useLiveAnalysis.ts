@@ -80,13 +80,19 @@ export function useLiveAnalysisRunner() {
         // ScriptProcessor är deprecated men mest kompatibel över mobiler
         processor = audioCtx.createScriptProcessor(1024, 1, 1);
         processor.onaudioprocess = (ev) => {
-          const input = ev.inputBuffer.getChannelData(0);
+          const raw = ev.inputBuffer.getChannelData(0);
+          const trimDb = useLiveAnalysis.getState().micTrimDb;
+          const gain = Math.pow(10, trimDb / 20);
+          // Kopiera + applicera trim så vi inte muterar WebAudio-buffern
+          const input = new Float32Array(raw.length);
+          for (let i = 0; i < raw.length; i++) input[i] = raw[i] * gain;
           // Skriv in i ringbuffert
           for (let i = 0; i < input.length; i++) {
             ring[ringWrite] = input[i];
             ringWrite = (ringWrite + 1) % RING_SIZE;
           }
           filled = Math.min(RING_SIZE, filled + input.length);
+
 
           // RMS energi
           let sum = 0;

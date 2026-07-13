@@ -18,6 +18,8 @@ interface LiveState {
   sendBeats: boolean;
   sendDrops: boolean;
   sendHues: boolean;
+  /** Mic-trim i dB (-24..+24) — appliceras på inspelade sampel före FFT/BPM. */
+  micTrimDb: number;
 
   setEnabled: (b: boolean) => void;
   setStatus: (s: LiveStatus, err?: string | null) => void;
@@ -27,7 +29,23 @@ interface LiveState {
   setSendBeats: (b: boolean) => void;
   setSendDrops: (b: boolean) => void;
   setSendHues: (b: boolean) => void;
+  setMicTrimDb: (v: number) => void;
 }
+
+const LS_KEY = "live-analysis-cal-v1";
+interface Persisted { micTrimDb: number; sensitivity: number }
+function loadCal(): Persisted {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) return { micTrimDb: 0, sensitivity: 0.6, ...JSON.parse(raw) };
+  } catch { /* noop */ }
+  return { micTrimDb: 0, sensitivity: 0.6 };
+}
+function saveCal(p: Persisted) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(p)); } catch { /* noop */ }
+}
+const initialCal = loadCal();
+
 
 export const useLiveAnalysis = create<LiveState>((set) => ({
   enabled: false,
@@ -39,19 +57,29 @@ export const useLiveAnalysis = create<LiveState>((set) => ({
   energy: 0,
   lastFlashAt: 0,
   nextBeatAt: 0,
-  sensitivity: 0.6,
+  sensitivity: initialCal.sensitivity,
   sendBeats: true,
   sendDrops: true,
   sendHues: true,
+  micTrimDb: initialCal.micTrimDb,
   setEnabled: (enabled) => set({ enabled, status: enabled ? "loading" : "off", errorMsg: null }),
   setStatus: (status, err = null) => set({ status, errorMsg: err }),
   update: (patch) => set(patch),
   markFlash: (atMs) => set({ lastFlashAt: atMs }),
-  setSensitivity: (sensitivity) => set({ sensitivity }),
+  setSensitivity: (sensitivity) => {
+    set({ sensitivity });
+    saveCal({ micTrimDb: useLiveAnalysis.getState().micTrimDb, sensitivity });
+  },
   setSendBeats: (sendBeats) => set({ sendBeats }),
   setSendDrops: (sendDrops) => set({ sendDrops }),
   setSendHues: (sendHues) => set({ sendHues }),
+  setMicTrimDb: (micTrimDb) => {
+    const v = Math.max(-24, Math.min(24, micTrimDb));
+    set({ micTrimDb: v });
+    saveCal({ micTrimDb: v, sensitivity: useLiveAnalysis.getState().sensitivity });
+  },
 }));
+
 
 /** Aktiv drop-blixt (200 ms lookahead-window) från Live Analysis. */
 export function liveActiveFlash(nowMs: number): boolean {
