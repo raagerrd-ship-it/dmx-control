@@ -127,6 +127,16 @@ function pickColor(
   const { mode, monoHue, cometHue, splitHueA, splitHueB } = cfg;
   // Dynamics: lower floors + gamma on the audio-driven part, so quiet passages
   // go dim and beats punch. dyn=0 reproduces the old flat curves.
+  // Per-fixture band drive: each lamp breathes with its own slice of the
+  // spectrum (bass / mids / treble / kick) so pure-colored lamps still feel
+  // alive and independent — full 0..100% swing per color.
+  const bands = [
+    Math.min(1, frame.energy * 1.3),
+    Math.min(1, audio * 1.2),
+    Math.min(1, frame.treble * 1.5),
+    Math.min(1, frame.energy * 0.6 + kickEnv),
+  ];
+  const band = bands[idx % bands.length];
   const dyn = Math.max(0, Math.min(1, cfg.dynamics ?? 0.6));
   const shaped = (floor: number, x: number) => {
     const f = floor * (1 - dyn);
@@ -140,14 +150,14 @@ function pickColor(
       const hueB = (-t * 30 + idx * (360 / count) * 1.5 + frame.treble * 90);
       const mix  = 0.35 + frame.treble * 0.5;
       const hue  = (((hueA * (1 - mix) + hueB * mix) % 360) + 360) % 360 / 360;
-      const v = shaped(0.3, audio * 0.8 + kickEnv * 0.5);
+      const v = shaped(0.15, band * 0.9 + kickEnv * 0.3);
       return hsvToRgb(hue, 1, v);
     }
     case "party": {
       // Counter-rotating hues + white punch on kick for a real "flash" feel.
       const dir = idx % 2 === 0 ? 1 : -1;
       const hue = ((t * 90 * dir + idx * 137) % 360 + 360) % 360 / 360;
-      const v = shaped(0.5, audio * 0.5 + kickEnv * 0.5);
+      const v = shaped(0.2, band * 0.8 + kickEnv * 0.5);
       const sat = Math.max(0, 1 - kickEnv * 0.8);   // punch flashes white on kicks
       return hsvToRgb(hue, sat, v);
     }
