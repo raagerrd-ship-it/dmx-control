@@ -34,6 +34,8 @@ export interface SmartSyncPublicState {
   status: SmartSyncStatus;
   errorMsg: string | null;
   track: { name: string; artists: string; durationMs: number } | null;
+  /** >0 when the beat clock is locked to the song's tempo. */
+  bpm: number;
 }
 
 type TimelineEvent =
@@ -74,7 +76,7 @@ export class SmartSync {
   }
 
   state(): SmartSyncPublicState {
-    return { enabled: this.enabled, status: this.status, errorMsg: this.errorMsg, track: this.track };
+    return { enabled: this.enabled, status: this.status, errorMsg: this.errorMsg, track: this.track, bpm: this.deps.cfg.beat ? this.currentBpm : 0 };
   }
 
   enable() {

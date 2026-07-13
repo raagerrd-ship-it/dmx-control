@@ -667,6 +667,7 @@ function applySmartSync(m) {
   ssToggle.textContent = ssEnabled ? "Stäng av" : "Aktivera";
   ssToggle.classList.toggle("primary", ssEnabled);
   let txt = SS_LABELS[m.status] ?? m.status;
+  if (m.status === "synced") txt = m.bpm > 0 ? `synkad ✓ taktlåst ${Math.round(m.bpm)} BPM` : "synkad (låt-ID utan Spotify-analys — ingen taktlåsning)";
   if (m.status === "error" && m.errorMsg) txt += ": " + m.errorMsg;
   ssStatus.textContent = txt;
   if (m.track) {
