@@ -187,20 +187,33 @@ static int sock_open(const char *path) {
     return s;
 }
 
-static void handle_frame(const uint8_t *buf, size_t len) {
-    if (len != DMX_CHANNELS) {
-        fprintf(stderr, "bad frame size: %zu (expected %d)\n", len, DMX_CHANNELS);
+static void handle_frame(const uint8_t *buf, int slots) {
+    if (slots < DMX_MIN_SLOTS || slots > DMX_MAX_SLOTS) {
+        fprintf(stderr, "bad slot count: %d (expected %d..%d)\n",
+                slots, DMX_MIN_SLOTS, DMX_MAX_SLOTS);
         return;
     }
     /* Swap-in via double-buffer: write to the inactive slot, then flip. */
     int inactive = atomic_load(&g_active_idx) ^ 1;
-    memcpy(g_universe[inactive], buf, DMX_CHANNELS);
+    memcpy(g_universe[inactive], buf, slots);
+    atomic_store(&g_slots[inactive], slots);
     atomic_store(&g_active_idx, inactive);
 
     pthread_mutex_lock(&g_trigger_mtx);
     g_trigger_pending = 1;
     pthread_cond_signal(&g_trigger_cv);
     pthread_mutex_unlock(&g_trigger_mtx);
+}
+
+/* Read exactly `n` bytes from `fd`, return 0 on success, -1 on EOF/err. */
+static int read_exact(int fd, uint8_t *buf, size_t n) {
+    size_t got = 0;
+    while (got < n) {
+        ssize_t r = read(fd, buf + got, n - got);
+        if (r <= 0) return -1;
+        got += (size_t)r;
+    }
+    return 0;
 }
 
 /* ── main ─────────────────────────────────────────────────────────────── */
@@ -223,13 +236,15 @@ int main(void) {
         perror("pthread_create"); close(uart); close(sock); return 1;
     }
 
-    fprintf(stderr, "dmx-helper: listening on %s, output on %s @ 250k 8N2, %d Hz refresh\n",
-            SOCK_PATH, UART_DEV, REFRESH_HZ);
+    fprintf(stderr, "dmx-helper: listening on %s, output on %s @ 250k 8N2, "
+                    "variable-length frames, cap %d Hz\n",
+            SOCK_PATH, UART_DEV, REFRESH_HZ_CAP);
 
-    /* Accept one client at a time (the Node engine). If it disconnects,
-     * we loop back and accept a new one. Frames are exactly 512 bytes,
-     * read as a fixed-size stream. */
-    uint8_t buf[DMX_CHANNELS];
+    /* Accept one client at a time (the Node engine). Wire protocol per frame:
+     *   [2 bytes LE: slot count N]  [N bytes: DMX slots 1..N]
+     * where DMX_MIN_SLOTS <= N <= DMX_MAX_SLOTS. */
+    uint8_t hdr[2];
+    uint8_t payload[DMX_MAX_SLOTS];
     while (g_running) {
         int client = accept(sock, NULL, NULL);
         if (client < 0) {
@@ -239,14 +254,14 @@ int main(void) {
         fprintf(stderr, "dmx-helper: engine connected\n");
 
         while (g_running) {
-            size_t got = 0;
-            while (got < DMX_CHANNELS) {
-                ssize_t n = read(client, buf + got, DMX_CHANNELS - got);
-                if (n <= 0) { got = 0; break; }
-                got += (size_t)n;
+            if (read_exact(client, hdr, 2) < 0) break;
+            int slots = hdr[0] | (hdr[1] << 8);
+            if (slots < DMX_MIN_SLOTS || slots > DMX_MAX_SLOTS) {
+                fprintf(stderr, "protocol error: slots=%d, disconnecting\n", slots);
+                break;
             }
-            if (got != DMX_CHANNELS) break;   /* disconnected */
-            handle_frame(buf, DMX_CHANNELS);
+            if (read_exact(client, payload, (size_t)slots) < 0) break;
+            handle_frame(payload, slots);
         }
         close(client);
         fprintf(stderr, "dmx-helper: engine disconnected\n");
