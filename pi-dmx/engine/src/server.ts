@@ -120,6 +120,15 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
             return;
           } else if (msg.type === "setDmxMaxHz" && typeof msg.value === "number") {
             deps.cfg.dmxMaxHz = Math.max(30, Math.min(500, Math.round(msg.value)));
+          } else if (msg.type === "setAgcTarget" && typeof msg.value === "number") {
+            // Target loudness the AGC aims for (0.2 = subtle, 0.8 = punchy).
+            deps.cfg.detection.autoGainTarget = Math.max(0.1, Math.min(0.9, msg.value));
+          } else if (msg.type === "setAgcAggressiveness" && typeof msg.value === "number") {
+            // Single knob → both tau values on a log curve.
+            // 0 = slow (tauUp 180 s / tauDown 60 s), 1 = fast (10 s / 2 s).
+            const a = Math.max(0, Math.min(1, msg.value));
+            deps.cfg.detection.tauUp   = 180 * Math.pow(10 / 180, a);
+            deps.cfg.detection.tauDown = 60  * Math.pow(2  / 60,  a);
           }
           deps.onConfigChanged?.();
           // Echo back
