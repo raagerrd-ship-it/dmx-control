@@ -57,19 +57,29 @@ export const useLiveAnalysis = create<LiveState>((set) => ({
   energy: 0,
   lastFlashAt: 0,
   nextBeatAt: 0,
-  sensitivity: 0.6,
+  sensitivity: initialCal.sensitivity,
   sendBeats: true,
   sendDrops: true,
   sendHues: true,
+  micTrimDb: initialCal.micTrimDb,
   setEnabled: (enabled) => set({ enabled, status: enabled ? "loading" : "off", errorMsg: null }),
   setStatus: (status, err = null) => set({ status, errorMsg: err }),
   update: (patch) => set(patch),
   markFlash: (atMs) => set({ lastFlashAt: atMs }),
-  setSensitivity: (sensitivity) => set({ sensitivity }),
+  setSensitivity: (sensitivity) => {
+    set({ sensitivity });
+    saveCal({ micTrimDb: useLiveAnalysis.getState().micTrimDb, sensitivity });
+  },
   setSendBeats: (sendBeats) => set({ sendBeats }),
   setSendDrops: (sendDrops) => set({ sendDrops }),
   setSendHues: (sendHues) => set({ sendHues }),
+  setMicTrimDb: (micTrimDb) => {
+    const v = Math.max(-24, Math.min(24, micTrimDb));
+    set({ micTrimDb: v });
+    saveCal({ micTrimDb: v, sensitivity: useLiveAnalysis.getState().sensitivity });
+  },
 }));
+
 
 /** Aktiv drop-blixt (200 ms lookahead-window) från Live Analysis. */
 export function liveActiveFlash(nowMs: number): boolean {
