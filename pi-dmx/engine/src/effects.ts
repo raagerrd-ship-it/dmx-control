@@ -67,8 +67,10 @@ export class EffectEngine {
 
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
-      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos);
-      writeFixture(this.universe, fx, rgb, master);
+      const hwStrobe = this.cfg.mode === "strobe" && fixtureRoles(fx).includes("strobe");
+      // Hardware strobe: steady white on the color channels, CH-strobe does the flashing.
+      const rgb = hwStrobe ? ([1, 1, 1] as [number, number, number]) : pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos);
+      writeFixture(this.universe, fx, rgb, master, hwStrobe);
     }
 
     return this.universe;
@@ -80,6 +82,7 @@ function writeFixture(
   fx: FixtureConfig,
   rgb: [number, number, number],
   master: number,
+  hwStrobe = false,
 ) {
   const roles = fixtureRoles(fx);
   const base = fx.address - 1;   // DMX is 1-indexed
@@ -105,7 +108,7 @@ function writeFixture(
       case "b":      u[ch] = to255((b - (roles.includes("w") ? w : 0)) * colorScale); break;
       case "w":      u[ch] = to255(w * colorScale); break;
       case "dim":    u[ch] = to255(hasColor ? m : dim * m); break;
-      case "strobe": u[ch] = 0; break;  // off unless mode adds it later
+      case "strobe": u[ch] = hwStrobe ? 220 : 0; break;  // 8-255 = fixture strobe, faster when higher
       case "unused": break;
     }
   }
