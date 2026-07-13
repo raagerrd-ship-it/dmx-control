@@ -3,7 +3,7 @@ Description=DMX-512 output sidecar (PL011 → MAX485)
 # Wait for the UART device itself — right after first boot udev can be late,
 # and failing here used to cascade into a dependency-failed engine.
 Wants=dev-ttyAMA0.device
-After=multi-user.target dev-ttyAMA0.device
+After=dev-ttyAMA0.device
 StartLimitIntervalSec=0
 
 [Service]
