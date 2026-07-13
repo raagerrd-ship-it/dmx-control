@@ -21,6 +21,8 @@ export interface ServerDeps {
   cfg: EngineConfig;
   getLatestFrame: () => Frame | null;
   onConfigChanged?: () => void;
+  /** Advance to the next mode in the shared cycle. Returns the new mode. */
+  cycleMode: () => Mode;
 }
 
 export interface Server {
@@ -98,6 +100,9 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
           const msg = JSON.parse(raw.toString());
           if (msg.type === "setMode" && isMode(msg.mode)) {
             deps.cfg.mode = msg.mode;
+          } else if (msg.type === "cycleMode") {
+            const next = deps.cycleMode();
+            conn.socket.send(JSON.stringify({ type: "modeChanged", mode: next }));
           } else if (msg.type === "setSensitivity") {
             deps.cfg.sensitivity = clamp01(msg.value);
           } else if (msg.type === "setMaster") {

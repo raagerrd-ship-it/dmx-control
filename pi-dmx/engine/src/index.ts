@@ -15,7 +15,7 @@ import { AudioCapture } from "./audio.js";
 import { Analyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
 import { DmxSender } from "./dmx.js";
-import { startServer } from "./server.js";
+import { startServer, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 import { activeSlots, type Mode } from "./config.js";
@@ -51,9 +51,21 @@ capture.on("exit", (code) => console.error("[arecord] exited", code));
 
 capture.start();
 
-const server = await startServer({
+// Shared mode cycler — used by both the physical button and the WS "cycleMode" message,
+// so UI and hardware follow the exact same path.
+let server: Server;
+const cycleMode = (): Mode => {
+  const cur = MODE_CYCLE.indexOf(cfg.mode);
+  cfg.mode = MODE_CYCLE[(cur + 1) % MODE_CYCLE.length];
+  scheduleSave(cfg);
+  server.broadcastConfig();
+  return cfg.mode;
+};
+
+server = await startServer({
   cfg,
   getLatestFrame: () => latestFrame,
+  cycleMode,
   onConfigChanged: () => {
     scheduleSave(cfg);
     curSlots = activeSlots(cfg.fixtures);
@@ -75,11 +87,8 @@ let button: Button | null = null;
 if (cfg.modeButton) {
   button = new Button({ chip: cfg.modeButton.chip, line: cfg.modeButton.line });
   button.on("press", () => {
-    const cur = MODE_CYCLE.indexOf(cfg.mode);
-    cfg.mode = MODE_CYCLE[(cur + 1) % MODE_CYCLE.length];
-    console.log(`[button] mode → ${cfg.mode}`);
-    scheduleSave(cfg);
-    server.broadcastConfig();
+    const next = cycleMode();
+    console.log(`[button] mode → ${next}`);
   });
   button.on("longPress", () => {
     // Decide from current tauUp which side we're on and flip.
