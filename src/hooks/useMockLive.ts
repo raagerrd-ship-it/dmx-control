@@ -25,7 +25,7 @@ const ONSET_ENERGY_FLOOR = 0.05;
 const TICK_ENERGY_FLOOR = 0.05;
 const BRIGHTNESS_FLOOR = 0.04;         // ~5/255, håller lampan svagt tänd i tystnad
 const DROP_MULT = 1.5;                 // sustained > mean*1.5 → drop
-const DROP_FLASH_MS = 220;
+const DROP_FLASH_S = 1.5;              // hur länge synthetic drop-boost håller i sig
 const DYNAMIC_DAMPING = 0.8;
 const CENTER_ALPHA = 0.002;            // per tick, glidande centernivå
 
