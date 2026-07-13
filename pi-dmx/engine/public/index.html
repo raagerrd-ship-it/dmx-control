@@ -496,6 +496,13 @@ function renderFixtures() {
     el.addEventListener("input", onFieldChange);
     el.addEventListener("change", onFieldChange);
   });
+  fxEl.querySelectorAll("[data-roles-open]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      const i = Number(e.currentTarget.dataset.rolesOpen);
+      if (fxRolesOpen.has(i)) fxRolesOpen.delete(i); else fxRolesOpen.add(i);
+      renderFixtures();
+    });
+  });
   fxEl.querySelectorAll("[data-band]").forEach((el) => {
     el.addEventListener("change", (e) => {
       const i = Number(e.target.dataset.bandI);
@@ -545,7 +552,12 @@ function renderFixtures() {
   });
 }
 
+let fxRolesOpen = new Set();
 function renderCustomRoles(fx, i) {
+  // Set-once config — collapsed by default so the card stays clean.
+  if (!fxRolesOpen.has(i)) {
+    return `<div class="fx-meta" style="cursor:pointer;text-decoration:underline" data-roles-open="${i}">Kanalroller: ${(fx.roles ?? []).join(" · ")} — ändra</div>`;
+  }
   const roles = fx.roles ?? [];
   return `<div class="fx-roles">
     ${roles.map((r, ri) => `
@@ -557,6 +569,7 @@ function renderCustomRoles(fx, i) {
       </span>
     `).join("")}
     <span class="fx-role" style="cursor:pointer" data-role-add="${i}">+ ch</span>
+    <span class="fx-role" style="cursor:pointer" data-roles-open="${i}">✕ stäng</span>
   </div>`;
 }
 
