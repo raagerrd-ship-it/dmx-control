@@ -197,7 +197,6 @@ export function useMockLive() {
         }
 
         const ch = f.startCh - 1;
-        const chans = channelsFor(f.mode);
         if (f.mode === "dimmer") {
           frame[ch] = Math.round(Math.max(r, g, b));
         } else if (f.mode === "rgb") {
@@ -211,7 +210,6 @@ export function useMockLive() {
           frame[ch + 2] = Math.round(b - w * 0.5);
           frame[ch + 3] = Math.round(w);
         }
-        void chans;
       });
 
       st.setLive(Math.min(1, audio), kick, frame);
