@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { channelsFor, presetById, useDmx } from "@/store/dmx";
+import { presetById, useDmx } from "@/store/dmx";
 import { smoothStep, softnessToAlpha } from "@/lib/audioCurve";
 import { useMic } from "@/hooks/useMic";
 
@@ -25,7 +25,7 @@ const ONSET_ENERGY_FLOOR = 0.05;
 const TICK_ENERGY_FLOOR = 0.05;
 const BRIGHTNESS_FLOOR = 0.04;         // ~5/255, håller lampan svagt tänd i tystnad
 const DROP_MULT = 1.5;                 // sustained > mean*1.5 → drop
-const DROP_FLASH_MS = 220;
+
 const DYNAMIC_DAMPING = 0.8;
 const CENTER_ALPHA = 0.002;            // per tick, glidande centernivå
 
@@ -105,12 +105,7 @@ export function useMockLive() {
 
       // === Drop-detektor: sustained > slow mean * 1.5 → vit blixt ===
       slowEnergyMean.current += (rawEnergy - slowEnergyMean.current) * 0.008;
-      if (rawEnergy > slowEnergyMean.current * DROP_MULT && rawEnergy > 0.4 && t > dropUntil.current + DROP_FLASH_MS / 1000) {
-        // dropUntil används redan för source-boost; separata flash-fönstret:
-      }
-      // Fired-flag-fri variant: härled flash direkt av rawEnergy vs mean.
-      const dropActive = rawEnergy > slowEnergyMean.current * DROP_MULT && rawEnergy > 0.5;
-      const flashActive = dropActive;
+      const flashActive = rawEnergy > slowEnergyMean.current * DROP_MULT && rawEnergy > 0.5;
 
       // === Energy-gate + smoothing på nivå ===
       let audioTarget = rawEnergy;
@@ -202,7 +197,6 @@ export function useMockLive() {
         }
 
         const ch = f.startCh - 1;
-        const chans = channelsFor(f.mode);
         if (f.mode === "dimmer") {
           frame[ch] = Math.round(Math.max(r, g, b));
         } else if (f.mode === "rgb") {
@@ -216,7 +210,6 @@ export function useMockLive() {
           frame[ch + 2] = Math.round(b - w * 0.5);
           frame[ch + 3] = Math.round(w);
         }
-        void chans;
       });
 
       st.setLive(Math.min(1, audio), kick, frame);

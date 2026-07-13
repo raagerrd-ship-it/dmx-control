@@ -13,7 +13,6 @@ export default function DmxController() {
   useMockLive();
   const [tab, setTab] = useState<Tab>("live");
   const preset = useDmx((s) => s.preset);
-  const conn = useDmx((s) => s.conn);
   const monoHue = useDmx((s) => s.params.monoHue);
   const cometHue = useDmx((s) => s.params.cometHue);
   const patch = useDmx((s) => s.patchParams);
@@ -27,15 +26,9 @@ export default function DmxController() {
           <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
             <span
               className="w-1.5 h-1.5 rounded-full"
-              style={{
-                background:
-                  conn === "connected" ? "hsl(140 70% 50%)" :
-                  conn === "connecting" ? "hsl(40 90% 55%)" :
-                  conn === "mock" ? "hsl(var(--accent))" :
-                  "hsl(0 60% 55%)",
-              }}
+              style={{ background: "hsl(var(--accent))" }}
             />
-            {conn === "mock" ? "Mock-läge (ingen Pi)" : conn}
+            Preview (kör inte mot Pi)
           </div>
         </div>
         <div className="text-right">

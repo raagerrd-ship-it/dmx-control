@@ -39,13 +39,10 @@ export interface Params {
   cometHue: number;     // 0..360 hue för Comet-huvudet (15 ≈ eld-orange)
 }
 
-export type ConnState = "mock" | "connecting" | "connected" | "disconnected";
-
 interface DmxState {
   preset: PresetId;
   params: Params;
   fixtures: Fixture[];
-  conn: ConnState;
   micEnabled: boolean;
   micError: string | null;
   audioLevel: number;   // 0..1 (smoothed)
@@ -57,7 +54,6 @@ interface DmxState {
   updateFixture: (id: string, patch: Partial<Fixture>) => void;
   removeFixture: (id: string) => void;
   setLive: (audio: number, kick: number, frame: number[]) => void;
-  setConn: (c: ConnState) => void;
   setMicEnabled: (b: boolean) => void;
   setMicError: (m: string | null) => void;
 }
@@ -109,7 +105,6 @@ export const useDmx = create<DmxState>((set, get) => ({
   preset: initial.preset,
   params: initial.params,
   fixtures: initial.fixtures,
-  conn: "mock",
   micEnabled: false,
   micError: null,
   audioLevel: 0,
@@ -150,7 +145,6 @@ export const useDmx = create<DmxState>((set, get) => ({
     save({ preset: get().preset, params: get().params, fixtures });
   },
   setLive: (audioLevel, kick, frame) => set({ audioLevel, kick, frame }),
-  setConn: (conn) => set({ conn }),
   setMicEnabled: (micEnabled) => set({ micEnabled, micError: micEnabled ? get().micError : null }),
   setMicError: (micError) => set({ micError }),
 }));
