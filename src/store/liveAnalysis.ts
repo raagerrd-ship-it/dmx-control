@@ -18,6 +18,8 @@ interface LiveState {
   sendBeats: boolean;
   sendDrops: boolean;
   sendHues: boolean;
+  /** Mic-trim i dB (-24..+24) — appliceras på inspelade sampel före FFT/BPM. */
+  micTrimDb: number;
 
   setEnabled: (b: boolean) => void;
   setStatus: (s: LiveStatus, err?: string | null) => void;
@@ -27,7 +29,23 @@ interface LiveState {
   setSendBeats: (b: boolean) => void;
   setSendDrops: (b: boolean) => void;
   setSendHues: (b: boolean) => void;
+  setMicTrimDb: (v: number) => void;
 }
+
+const LS_KEY = "live-analysis-cal-v1";
+interface Persisted { micTrimDb: number; sensitivity: number }
+function loadCal(): Persisted {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) return { micTrimDb: 0, sensitivity: 0.6, ...JSON.parse(raw) };
+  } catch { /* noop */ }
+  return { micTrimDb: 0, sensitivity: 0.6 };
+}
+function saveCal(p: Persisted) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(p)); } catch { /* noop */ }
+}
+const initialCal = loadCal();
+
 
 export const useLiveAnalysis = create<LiveState>((set) => ({
   enabled: false,
