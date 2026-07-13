@@ -81,17 +81,23 @@ export class AudioCapture extends EventEmitter {
   }
 
   private toMonoFloat32(buf: Buffer): Float32Array {
-    const out = new Float32Array(this.opts.hopSamples);
+    const n = this.opts.hopSamples;
+    const out = new Float32Array(n);
+    // Zero-copy Int16Array view over the incoming buffer. Pi Zero 2 W is
+    // little-endian, matching S16_LE, so no byteswap needed. ~3-4× faster
+    // than readInt16LE() in a hot loop.
+    const i16 = new Int16Array(
+      buf.buffer,
+      buf.byteOffset,
+      buf.byteLength >> 1,
+    );
     if (this.opts.channels === 1) {
-      for (let i = 0; i < out.length; i++) {
-        out[i] = buf.readInt16LE(i * 2) / 32768;
-      }
+      const INV = 1 / 32768;
+      for (let i = 0; i < n; i++) out[i] = i16[i] * INV;
     } else {
-      // Sum L+R, avg → mono. Preserves audio pannned hard to one side.
-      for (let i = 0; i < out.length; i++) {
-        const l = buf.readInt16LE(i * 4);
-        const r = buf.readInt16LE(i * 4 + 2);
-        out[i] = (l + r) / 65536;
+      const INV = 1 / 65536;
+      for (let i = 0, j = 0; i < n; i++, j += 2) {
+        out[i] = (i16[j] + i16[j + 1]) * INV;
       }
     }
     return out;
