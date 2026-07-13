@@ -133,6 +133,19 @@ export function useMockLive() {
       const hueBase = huePhase.current;
       const fixtureCount = Math.max(1, fixtures.length);
 
+      // Syntetisk "treble" — moduleras av kick + snabb sinus + brus,
+      // så Split-läget visar rörelse i browsermocken utan riktig FFT.
+      const treble = Math.min(1, 0.15 + Math.abs(Math.sin(t * 7.3)) * 0.35 + kick * 0.4 + Math.random() * 0.1);
+
+      // Chase-avancemang: kick ELLER auto-advance var 320 ms
+      const nowMs = performance.now();
+      if (fixtureCount > 1 && (kick > 0.7 || nowMs - lastChaseAdvance.current > 320)) {
+        lastChaseAdvance.current = nowMs;
+        chasePos.current += chaseDir.current;
+        if (chasePos.current >= fixtureCount - 1) { chasePos.current = fixtureCount - 1; chaseDir.current = -1; }
+        else if (chasePos.current <= 0)           { chasePos.current = 0;                chaseDir.current =  1; }
+      }
+
       fixtures.forEach((f, idx) => {
         let r = 0, g = 0, b = 0, w = 0;
 
