@@ -255,6 +255,15 @@ function applyConfig(cfg) {
   const hz = Math.round(cfg.dmxMaxHz ?? 200);
   dmxHzEl.value = hz;
   dmxHzVal.textContent = hz;
+  const tgt = Math.round((cfg.detection?.autoGainTarget ?? 0.5) * 100);
+  agcTargetEl.value = tgt;
+  agcTargetVal.textContent = tgt;
+  const agg = tauDownToAgg(cfg.detection?.tauDown ?? 30);
+  const aggPct = Math.round(agg * 100);
+  agcAggEl.value = aggPct;
+  agcAggVal.textContent = aggPct;
+  const t = aggToTau(agg);
+  agcTauDetail.textContent = `~${t.up.toFixed(0)} s up · ~${t.down.toFixed(0)} s down`;
   identifyingIndex = cfg.identify?.index ?? -1;
   if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
   else renderFixtures();
