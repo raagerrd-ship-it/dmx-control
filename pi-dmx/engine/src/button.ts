@@ -8,7 +8,8 @@
  * Debounced: ignores repeat edges within `debounceMs`.
  */
 
-import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcessByStdio } from "node:child_process";
+import type { Readable } from "node:stream";
 import { EventEmitter } from "node:events";
 
 export interface ButtonOptions {
@@ -25,7 +26,7 @@ export interface ButtonOptions {
  *   "longPress" — held longer than longPressMs (fires on release)
  */
 export class Button extends EventEmitter {
-  private proc: ChildProcessWithoutNullStreams | null = null;
+  private proc: ChildProcessByStdio<null, Readable, Readable> | null = null;
   private stopped = false;
   private lastEdge = 0;
   private lastPressEmit = 0;

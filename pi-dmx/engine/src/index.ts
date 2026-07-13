@@ -18,6 +18,7 @@ import { DmxSender } from "./dmx.js";
 import { startServer, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
+import { SmartSync } from "./smartsync.js";
 import { activeSlots, type Mode } from "./config.js";
 
 // Physical button cycles through the fun modes (skips blackout so the button never kills the show).
@@ -42,6 +43,7 @@ const capture = new AudioCapture({
 capture.on("chunk", (samples: Float32Array) => {
   const frame = analyser.process(samples);
   latestFrame = frame;
+  smartSync.feed(samples);
   const universe = effects.render(frame);
   dmx.send(universe, curSlots);
 });
@@ -50,6 +52,16 @@ capture.on("stderr", (s) => console.error("[arecord]", s));
 capture.on("exit", (code) => console.error("[arecord] exited", code));
 
 capture.start();
+
+// SmartSync: song-identification driven show (needs internet → hotspot mode).
+const smartSync = new SmartSync({
+  cfg,
+  onConfigChanged: () => {
+    scheduleSave(cfg);
+    server?.broadcastConfig();
+  },
+  onState: (st) => server?.broadcastSmartSync(st),
+});
 
 // Shared mode cycler — used by both the physical button and the WS "cycleMode" message,
 // so UI and hardware follow the exact same path.
@@ -70,6 +82,7 @@ server = await startServer({
   cfg,
   getLatestFrame: () => latestFrame,
   cycleMode,
+  smartSync,
   onConfigChanged: () => {
     scheduleSave(cfg);
     curSlots = activeSlots(cfg.fixtures);
@@ -110,6 +123,7 @@ if (cfg.modeButton) {
 }
 
 process.on("SIGTERM", () => {
+  smartSync.disable();
   capture.stop();
   button?.stop();
   dmx.close();

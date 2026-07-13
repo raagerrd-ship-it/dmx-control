@@ -61,6 +61,20 @@
     <div class="modes" id="modes"></div>
   </div>
 
+  <h1>Smart Sync</h1>
+  <div class="card">
+    <div class="row">
+      <label>Låtigenkänning + Spotify-analys</label>
+      <button class="btn" id="ssToggle" style="flex:0 0 auto;padding:8px 14px">Aktivera</button>
+    </div>
+    <div class="row" style="margin-top:6px"><label>Status</label><span class="val" id="ssStatus">av</span></div>
+    <div class="row" id="ssTrackRow" style="display:none"><label>Låt</label><span class="val" id="ssTrack">–</span></div>
+    <div class="status" id="ssHint">
+      Identifierar låten som spelas och styr ljuset efter dess sektioner, drops
+      och stämning. Kräver internet på Pi:n (starta med hotspot igång).
+    </div>
+  </div>
+
   <h1>Level <span class="kick-dot" id="kickDot"></span></h1>
   <div class="card">
     <div class="row"><label>Input</label><span class="val" id="levelVal">–</span></div>
@@ -175,11 +189,36 @@
     <pre id="updLog" class="status" style="white-space:pre-wrap;max-height:180px;overflow:auto;margin-top:10px;display:none;font-family:ui-monospace,Menlo,monospace;font-size:11px"></pre>
   </div>
 
+  <h1>WiFi</h1>
+  <div class="card">
+    <div class="row"><label>Aktivt nät</label><span class="val" id="wifiActive">–</span></div>
+    <div class="row"><label>Sparad hotspot</label><span class="val" id="wifiSaved">–</span></div>
+    <div class="fx-grid" style="margin-top:10px">
+      <div class="fx-field">
+        <label>Hotspot-namn (SSID)</label>
+        <input type="text" id="wifiSsid" autocapitalize="off" autocorrect="off" placeholder="t.ex. Richards iPhone" />
+      </div>
+      <div class="fx-field">
+        <label>Lösenord</label>
+        <input type="password" id="wifiPass" placeholder="hotspottens lösenord" />
+      </div>
+    </div>
+    <div class="fx-actions">
+      <button class="btn primary" id="wifiSave">Spara hotspot</button>
+      <button class="btn" id="wifiConnect" disabled>Anslut nu</button>
+      <button class="btn" id="wifiForget" disabled>Glöm</button>
+    </div>
+    <div class="status" id="wifiHint">
+      Sparad hotspot används automatiskt vid uppstart om den är igång (ger internet
+      för uppdateringar m.m.). Annars startar Pi:n sin egen AP "pi-dmx".
+    </div>
+  </div>
+
   <div class="status" id="conn">Connecting…</div>
 
 
 <script>
-const MODES = ["auto","party","comet","mono","strobe","blackout"];
+const MODES = ["auto","party","comet","chase","split","mono","strobe","blackout"];
 const modesEl = document.getElementById("modes");
 const kickDot = document.getElementById("kickDot");
 const levelBar = document.getElementById("levelBar");
@@ -230,6 +269,7 @@ function connect() {
     const m = JSON.parse(ev.data);
     if (m.type === "config") applyConfig(m.config);
     else if (m.type === "frame") applyFrame(m);
+    else if (m.type === "smartSync") applySmartSync(m);
   };
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
@@ -593,8 +633,103 @@ fxSaveBtn.onclick = () => {
   renderFixtures();
 };
 
+/* ── Smart Sync ─────────────────────────────────────────────────────── */
+const ssToggle = document.getElementById("ssToggle");
+const ssStatus = document.getElementById("ssStatus");
+const ssTrackRow = document.getElementById("ssTrackRow");
+const ssTrack = document.getElementById("ssTrack");
+let ssEnabled = false;
+
+const SS_LABELS = {
+  off: "av",
+  listening: "lyssnar…",
+  identifying: "identifierar låt…",
+  analyzing: "hämtar Spotify-analys…",
+  synced: "synkad ✓",
+  "no-match": "ingen träff — försöker igen",
+  error: "fel",
+};
+
+function applySmartSync(m) {
+  ssEnabled = !!m.enabled;
+  ssToggle.textContent = ssEnabled ? "Stäng av" : "Aktivera";
+  ssToggle.classList.toggle("primary", ssEnabled);
+  let txt = SS_LABELS[m.status] ?? m.status;
+  if (m.status === "error" && m.errorMsg) txt += ": " + m.errorMsg;
+  ssStatus.textContent = txt;
+  if (m.track) {
+    ssTrackRow.style.display = "";
+    ssTrack.textContent = m.track.artists ? `${m.track.name} — ${m.track.artists}` : m.track.name;
+  } else {
+    ssTrackRow.style.display = "none";
+  }
+}
+
+ssToggle.onclick = () => send({ type: "smartSyncEnable", enabled: !ssEnabled });
+
 renderModes("auto");
 connect();
+
+/* ── WiFi / hotspot ─────────────────────────────────────────────────── */
+const wifiActive  = document.getElementById("wifiActive");
+const wifiSaved   = document.getElementById("wifiSaved");
+const wifiSsidEl  = document.getElementById("wifiSsid");
+const wifiPassEl  = document.getElementById("wifiPass");
+const wifiSaveBtn = document.getElementById("wifiSave");
+const wifiConnBtn = document.getElementById("wifiConnect");
+const wifiForgetBtn = document.getElementById("wifiForget");
+const wifiHint    = document.getElementById("wifiHint");
+
+async function refreshWifi() {
+  try {
+    const r = await fetch("/wifi/status").then(r => r.json());
+    wifiActive.textContent = r.apCon ? "Egen AP (pi-dmx)" : (r.active ?? "okänt");
+    wifiSaved.textContent = r.hotspotSsid ?? "ingen";
+    wifiConnBtn.disabled = !r.hotspotSsid || !r.apCon;
+    wifiForgetBtn.disabled = !r.hotspotSsid;
+  } catch {}
+}
+refreshWifi();
+
+wifiSaveBtn.onclick = async () => {
+  const ssid = wifiSsidEl.value.trim();
+  const password = wifiPassEl.value;
+  if (!ssid) { wifiHint.textContent = "Fyll i hotspottens namn (SSID)."; return; }
+  wifiSaveBtn.disabled = true;
+  try {
+    const r = await fetch("/wifi/hotspot", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ssid, password }),
+    }).then(r => r.json());
+    if (r.error) { wifiHint.textContent = "Fel: " + r.error; }
+    else {
+      wifiHint.textContent = `Sparat! Starta Pi:n med hotspoten "${ssid}" igång så ansluter den dit.`;
+      wifiPassEl.value = "";
+      await refreshWifi();
+    }
+  } catch (e) {
+    wifiHint.textContent = "Kunde inte spara: " + e.message;
+  }
+  wifiSaveBtn.disabled = false;
+};
+
+wifiConnBtn.onclick = async () => {
+  if (!confirm(
+    "Byta till hotspotten NU?\n\n" +
+    "AP:n pi-dmx släcks och din anslutning hit bryts. Slå på hotspoten på " +
+    "mobilen FÖRST, och öppna sedan http://pi-dmx.local/ när Pi:n anslutit. " +
+    "Om hotspotten inte hittas startar Pi:n om AP:n igen efter en stund."
+  )) return;
+  try { await fetch("/wifi/hotspot/connect", { method: "POST" }); } catch {}
+  wifiHint.textContent = "Byter nät… anslut mobilen till din hotspot och öppna http://pi-dmx.local/";
+};
+
+wifiForgetBtn.onclick = async () => {
+  if (!confirm("Glömma den sparade hotspotten?")) return;
+  try { await fetch("/wifi/hotspot", { method: "DELETE" }); } catch {}
+  await refreshWifi();
+};
 
 // ---- Self-update ----------------------------------------------------------
 const verSha = document.getElementById("verSha");

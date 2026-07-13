@@ -63,6 +63,8 @@ export interface EngineConfig {
   modeButton: { chip: string; line: number } | null;
   /** Transient identify override — not persisted. index = fixture being lit. */
   identify?: { index: number } | null;
+  /** Transient SmartSync flash override (wall-clock ms) — not persisted. */
+  flashUntil?: number | null;
   /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */
   dmxMaxHz: number;
 }

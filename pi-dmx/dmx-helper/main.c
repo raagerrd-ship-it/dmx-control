@@ -38,7 +38,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
-#include <termios.h>
+/* <termios.h> krockar med <asm/termbits.h> pa nyare headers; tcdrain ersatt med ioctl(TCSBRK,1) */
 #include <time.h>
 #include <unistd.h>
 
@@ -145,7 +145,7 @@ static void *tx_thread(void *arg) {
         if (write(fd, frame, frame_bytes) != frame_bytes) {
             perror("write");
         }
-        tcdrain(fd);
+        ioctl(fd, TCSBRK, 1);  /* == tcdrain(fd) */
 
         /* Frame period = actual wire time + MBB, but capped to REFRESH_HZ_CAP.
          * At 24 slots: ~1.2 ms wire → capped to 5 ms (200 Hz).

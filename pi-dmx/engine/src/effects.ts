@@ -38,6 +38,13 @@ export class EffectEngine {
       return this.universe;
     }
 
+    // SmartSync drop-flash: everything white for the duration. Sits after
+    // identify so locating fixtures still works while synced.
+    if (this.cfg.flashUntil && Date.now() < this.cfg.flashUntil) {
+      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master);
+      return this.universe;
+    }
+
     const audio = frame.level * this.cfg.sensitivity;
     const master = this.cfg.master;
     const count = this.cfg.fixtures.length;

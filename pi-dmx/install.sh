@@ -71,7 +71,7 @@ if command -v nmcli >/dev/null; then
       802-11-wireless-security.key-mgmt "" \
       802-11-wireless-security.psk "" 2>/dev/null || true
   fi
-  nmcli con up "$AP_CON" || true
+  echo "  (AP-profil skapad — aktiveras vid reboot; patchad for fjarrinstall)"
 
 else
   echo "  ! NetworkManager not found — skipping AP setup." >&2

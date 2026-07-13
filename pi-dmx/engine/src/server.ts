@@ -16,6 +16,7 @@ import { readFileSync, existsSync } from "node:fs";
 import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import type { Frame } from "./analyser.js";
+import type { SmartSync, SmartSyncPublicState } from "./smartsync.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -25,12 +26,15 @@ export interface ServerDeps {
   onConfigChanged?: () => void;
   /** Advance to the next mode in the shared cycle. Returns the new mode. */
   cycleMode: () => Mode;
+  smartSync: SmartSync;
 }
 
 export interface Server {
   app: FastifyInstance;
   /** Push current config to all connected clients (e.g. after a physical button press) */
   broadcastConfig: () => void;
+  /** Push SmartSync state to all connected clients. */
+  broadcastSmartSync: (st: SmartSyncPublicState) => void;
 }
 
 export async function startServer(deps: ServerDeps, port = 80): Promise<Server> {
@@ -118,10 +122,76 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
     }
   });
 
+  // ---- WiFi / phone hotspot ------------------------------------------------
+  // The appliance has two network personalities, chosen at boot by
+  // autoconnect-priority: the user's phone hotspot (200, internet for updates
+  // and online features) wins over the own AP "pi-dmx" (100, offline gigs).
+  const HOTSPOT_CON = "phone-hotspot";
+  const nmcli = (...args: string[]) =>
+    execFileSync("nmcli", args, { encoding: "utf8" }).trim();
+  const hotspotSsid = (): string | null => {
+    try {
+      const ssid = nmcli("-g", "802-11-wireless.ssid", "con", "show", HOTSPOT_CON);
+      return ssid || null;
+    } catch { return null; }
+  };
+
+  app.get("/wifi/status", async () => {
+    try {
+      const active = nmcli("-t", "-f", "NAME,DEVICE", "con", "show", "--active")
+        .split("\n").find((l) => l.endsWith(":wlan0"))?.split(":")[0] ?? null;
+      return { active, apCon: active === "pi-dmx-ap", hotspotSsid: hotspotSsid() };
+    } catch (e) {
+      return { error: (e as Error).message };
+    }
+  });
+
+  app.post("/wifi/hotspot", async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const ssid = typeof b.ssid === "string" ? b.ssid.trim() : "";
+    const password = typeof b.password === "string" ? b.password : "";
+    if (ssid.length < 1 || ssid.length > 32)
+      return reply.code(400).send({ error: "SSID måste vara 1–32 tecken" });
+    if (password !== "" && (password.length < 8 || password.length > 63))
+      return reply.code(400).send({ error: "Lösenord måste vara 8–63 tecken (eller tomt för öppet nät)" });
+    try {
+      try { nmcli("con", "delete", HOTSPOT_CON); } catch { /* didn't exist */ }
+      nmcli("con", "add", "type", "wifi", "ifname", "wlan0",
+        "con-name", HOTSPOT_CON, "ssid", ssid, "autoconnect", "yes");
+      nmcli("con", "modify", HOTSPOT_CON, "connection.autoconnect-priority", "200");
+      if (password !== "") {
+        nmcli("con", "modify", HOTSPOT_CON,
+          "802-11-wireless-security.key-mgmt", "wpa-psk",
+          "802-11-wireless-security.psk", password);
+      }
+      return { saved: true, ssid };
+    } catch (e) {
+      return reply.code(500).send({ error: (e as Error).message });
+    }
+  });
+
+  app.post("/wifi/hotspot/connect", async (_req, reply) => {
+    if (!hotspotSsid()) return reply.code(400).send({ error: "Ingen hotspot sparad" });
+    // Detached: switching wlan0 away from the AP kills this HTTP connection,
+    // so fire-and-forget and let the client show its own guidance.
+    spawn("nmcli", ["con", "up", HOTSPOT_CON], { detached: true, stdio: "ignore" }).unref();
+    return { switching: true };
+  });
+
+  app.delete("/wifi/hotspot", async (_req, reply) => {
+    try {
+      nmcli("con", "delete", HOTSPOT_CON);
+      return { deleted: true };
+    } catch (e) {
+      return reply.code(500).send({ error: (e as Error).message });
+    }
+  });
+
   app.register(async (f) => {
     f.get("/ws", { websocket: true }, (conn) => {
       // Send initial state
       conn.socket.send(JSON.stringify({ type: "config", config: deps.cfg }));
+      conn.socket.send(JSON.stringify({ type: "smartSync", ...deps.smartSync.state() }));
 
       // Push frame samples at 20 Hz for the level meter
       const push = setInterval(() => {
@@ -137,7 +207,7 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
         }
       }, 50);
 
-      conn.socket.on("message", (raw) => {
+      conn.socket.on("message", (raw: Buffer) => {
         try {
           const msg = JSON.parse(raw.toString());
           if (msg.type === "setMode" && isMode(msg.mode)) {
@@ -165,6 +235,10 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
           } else if (msg.type === "identifyStop") {
             stopIdentify();
             return;
+          } else if (msg.type === "smartSyncEnable") {
+            if (msg.enabled) deps.smartSync.enable();
+            else deps.smartSync.disable();
+            return; // state pushed via onState
           } else if (msg.type === "setDmxMaxHz" && typeof msg.value === "number") {
             deps.cfg.dmxMaxHz = Math.max(30, Math.min(500, Math.round(msg.value)));
           } else if (msg.type === "setAgcTarget" && typeof msg.value === "number") {
@@ -197,12 +271,18 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
       if (c.readyState === 1) c.send(payload);
     }
   };
-  return { app, broadcastConfig };
+  const broadcastSmartSync = (st: SmartSyncPublicState) => {
+    const payload = JSON.stringify({ type: "smartSync", ...st });
+    for (const c of app.websocketServer.clients) {
+      if (c.readyState === 1) c.send(payload);
+    }
+  };
+  return { app, broadcastConfig, broadcastSmartSync };
 }
 
 function isMode(m: unknown): m is Mode {
   return typeof m === "string" &&
-    ["auto", "party", "comet", "mono", "strobe", "blackout"].includes(m);
+    ["auto", "party", "comet", "chase", "split", "mono", "strobe", "blackout"].includes(m);
 }
 const clamp01 = (x: number) => typeof x === "number" && x >= 0 && x <= 1 ? x : 0;
 

@@ -6,7 +6,8 @@
  * the analyser's hop size. Auto-restarts on subprocess exit.
  */
 
-import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, type ChildProcessByStdio } from "node:child_process";
+import type { Readable } from "node:stream";
 import { EventEmitter } from "node:events";
 
 export interface AudioCaptureOptions {
@@ -17,9 +18,9 @@ export interface AudioCaptureOptions {
 }
 
 export class AudioCapture extends EventEmitter {
-  private proc: ChildProcessWithoutNullStreams | null = null;
+  private proc: ChildProcessByStdio<null, Readable, Readable> | null = null;
   private stopped = false;
-  private leftover = Buffer.alloc(0);
+  private leftover: Buffer = Buffer.alloc(0);
   private readonly bytesPerFrame: number;   // S16LE = 2 bytes/sample × channels
   private readonly chunkBytes: number;
 

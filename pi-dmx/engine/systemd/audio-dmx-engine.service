@@ -2,6 +2,7 @@
 Description=Audio → DMX engine (Node)
 After=network.target dmx-helper.service cpu-performance.service sound.target
 Requires=dmx-helper.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
