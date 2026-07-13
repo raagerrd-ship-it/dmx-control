@@ -111,7 +111,7 @@ export class Analyser {
       this.lastKick = now;
     }
 
-    return { level, energy, flux: fluxNorm, kick, gain: this.gain };
+    return { level, energy, treble, flux: fluxNorm, kick, gain: this.gain };
   }
 }
 
