@@ -51,7 +51,7 @@
 #define FRAME_BYTES     (DMX_CHANNELS + 1)   /* start code + channels */
 #define BREAK_US        100
 #define MAB_US          12
-#define REFRESH_HZ      40
+#define REFRESH_HZ      44           /* DMX-512 spec max (~44.1 Hz for 512 slots) */
 #define REFRESH_NS      (1000000000L / REFRESH_HZ)
 
 static volatile sig_atomic_t g_running = 1;
