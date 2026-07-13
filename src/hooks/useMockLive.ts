@@ -105,12 +105,7 @@ export function useMockLive() {
 
       // === Drop-detektor: sustained > slow mean * 1.5 → vit blixt ===
       slowEnergyMean.current += (rawEnergy - slowEnergyMean.current) * 0.008;
-      if (rawEnergy > slowEnergyMean.current * DROP_MULT && rawEnergy > 0.4 && t > dropUntil.current + DROP_FLASH_MS / 1000) {
-        // dropUntil används redan för source-boost; separata flash-fönstret:
-      }
-      // Fired-flag-fri variant: härled flash direkt av rawEnergy vs mean.
-      const dropActive = rawEnergy > slowEnergyMean.current * DROP_MULT && rawEnergy > 0.5;
-      const flashActive = dropActive;
+      const flashActive = rawEnergy > slowEnergyMean.current * DROP_MULT && rawEnergy > 0.5;
 
       // === Energy-gate + smoothing på nivå ===
       let audioTarget = rawEnergy;
