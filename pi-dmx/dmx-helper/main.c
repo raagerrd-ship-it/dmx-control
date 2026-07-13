@@ -119,31 +119,40 @@ static void *tx_thread(void *arg) {
     int fd = *(int *)arg;
     set_rt_priority(50);
 
-    uint8_t frame[FRAME_BYTES];
+    /* Max buffer size: start code + all 512 slots */
+    uint8_t frame[1 + DMX_MAX_SLOTS];
     frame[0] = 0x00;  /* DMX null start code */
+
+    const long min_period_ns = 1000000000L / REFRESH_HZ_CAP;
 
     struct timespec next;
     clock_gettime(CLOCK_MONOTONIC, &next);
 
     while (g_running) {
-        /* Snapshot current universe */
-        int idx = atomic_load(&g_active_idx);
-        memcpy(frame + 1, g_universe[idx], DMX_CHANNELS);
+        /* Snapshot current universe + slot count */
+        int idx   = atomic_load(&g_active_idx);
+        int slots = atomic_load(&g_slots[idx]);
+        if (slots < DMX_MIN_SLOTS) slots = DMX_MIN_SLOTS;
+        if (slots > DMX_MAX_SLOTS) slots = DMX_MAX_SLOTS;
+        memcpy(frame + 1, g_universe[idx], slots);
 
         /* Break + MAB + data + drain */
         ioctl(fd, TIOCSBRK, 0);
         sleep_ns(BREAK_US * 1000L);
         ioctl(fd, TIOCCBRK, 0);
         sleep_ns(MAB_US * 1000L);
-        if (write(fd, frame, FRAME_BYTES) != FRAME_BYTES) {
+        int frame_bytes = 1 + slots;
+        if (write(fd, frame, frame_bytes) != frame_bytes) {
             perror("write");
         }
         tcdrain(fd);
 
-        /* Wait until either the next refresh deadline or a new-frame trigger,
-         * whichever comes first. This gives us continuous 40 Hz refresh but
-         * also low-latency push when the engine has fresh data. */
-        ts_add_ns(&next, REFRESH_NS);
+        /* Frame period = actual wire time + MBB, but capped to REFRESH_HZ_CAP.
+         * At 24 slots: ~1.2 ms wire → capped to 5 ms (200 Hz).
+         * At 512 slots: ~22.7 ms wire → runs at ~44 Hz naturally. */
+        long wire_ns = (long)(BREAK_US + MAB_US + frame_bytes * BYTE_US + MBB_US) * 1000L;
+        long period_ns = wire_ns > min_period_ns ? wire_ns : min_period_ns;
+        ts_add_ns(&next, period_ns);
 
         pthread_mutex_lock(&g_trigger_mtx);
         while (g_running && !g_trigger_pending) {
