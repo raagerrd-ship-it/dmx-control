@@ -89,16 +89,22 @@ function writeFixture(
   // White = min(r,g,b) so RGBW fixtures keep saturation on the color chans
   const w = Math.min(r, g, b);
   const dim = Math.max(r, g, b);
+  // Fixtures with BOTH a dimmer and color channels multiply them internally.
+  // Sending brightness on both gives a quadratic curve (reads as blinking,
+  // not fading) — master goes on the dim channel, dynamics stay in color.
+  const hasColor = roles.includes("r") || roles.includes("g") || roles.includes("b");
+  const hasDim = roles.includes("dim");
+  const colorScale = hasDim ? 1 : m;
 
   for (let i = 0; i < roles.length; i++) {
     const ch = base + i;
     if (ch < 0 || ch >= 512) continue;
     switch (roles[i]) {
-      case "r":      u[ch] = to255((r - (roles.includes("w") ? w : 0)) * m); break;
-      case "g":      u[ch] = to255((g - (roles.includes("w") ? w : 0)) * m); break;
-      case "b":      u[ch] = to255((b - (roles.includes("w") ? w : 0)) * m); break;
-      case "w":      u[ch] = to255(w * m); break;
-      case "dim":    u[ch] = to255(dim * m); break;
+      case "r":      u[ch] = to255((r - (roles.includes("w") ? w : 0)) * colorScale); break;
+      case "g":      u[ch] = to255((g - (roles.includes("w") ? w : 0)) * colorScale); break;
+      case "b":      u[ch] = to255((b - (roles.includes("w") ? w : 0)) * colorScale); break;
+      case "w":      u[ch] = to255(w * colorScale); break;
+      case "dim":    u[ch] = to255(hasColor ? m : dim * m); break;
       case "strobe": u[ch] = 0; break;  // off unless mode adds it later
       case "unused": break;
     }
