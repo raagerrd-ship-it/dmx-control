@@ -78,10 +78,13 @@ export class EffectEngine {
       return this.universe;
     }
 
-    // SmartSync drop-flash: everything white for the duration. Sits after
-    // identify so locating fixtures still works while synced.
-    if (this.cfg.flashUntil && Date.now() < this.cfg.flashUntil) {
-      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master, 220);  // hw-strobe burst on drop flashes
+    // SmartSync + Live Analysis drop-flash: everything white for the duration.
+    const nowWall = Date.now();
+    const flashActive =
+      (this.cfg.flashUntil && nowWall < this.cfg.flashUntil) ||
+      (this.cfg.liveFlashUntil && nowWall < this.cfg.liveFlashUntil);
+    if (flashActive) {
+      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master, 220);
       return this.universe;
     }
 
