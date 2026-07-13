@@ -62,7 +62,15 @@ const server = await startServer({
 }, Number(process.env.PORT ?? 80));
 console.log(`audio-dmx-engine listening on ${server.app.server.address()}`);
 
-// Physical mode button — cycles Auto → Party → Comet → Mono → Strobe → Auto…
+// Physical mode button — short press cycles modes, long press toggles AGC
+// aggressiveness between "Lugn" (a=0.1) and "Aggressiv" (a=0.8).
+const AGC_CALM = 0.1;
+const AGC_AGGRESSIVE = 0.8;
+const applyAggressiveness = (a: number) => {
+  cfg.detection.tauUp   = 180 * Math.pow(10 / 180, a);
+  cfg.detection.tauDown = 60  * Math.pow(2  / 60,  a);
+};
+
 let button: Button | null = null;
 if (cfg.modeButton) {
   button = new Button({ chip: cfg.modeButton.chip, line: cfg.modeButton.line });
@@ -71,12 +79,21 @@ if (cfg.modeButton) {
     cfg.mode = MODE_CYCLE[(cur + 1) % MODE_CYCLE.length];
     console.log(`[button] mode → ${cfg.mode}`);
     scheduleSave(cfg);
-    server.broadcastConfig();   // mobile UI updates instantly
+    server.broadcastConfig();
+  });
+  button.on("longPress", () => {
+    // Decide from current tauUp which side we're on and flip.
+    const isAggressiveNow = cfg.detection.tauUp < 60;
+    const next = isAggressiveNow ? AGC_CALM : AGC_AGGRESSIVE;
+    applyAggressiveness(next);
+    console.log(`[button] AGC → ${next === AGC_CALM ? "Lugn" : "Aggressiv"} (tauUp=${cfg.detection.tauUp.toFixed(1)}s)`);
+    scheduleSave(cfg);
+    server.broadcastConfig();
   });
   button.on("stderr", (s) => console.error("[gpiomon]", s));
   button.on("exit", (code) => console.error("[gpiomon] exited", code));
   button.start();
-  console.log(`mode-button on ${cfg.modeButton.chip} line ${cfg.modeButton.line}`);
+  console.log(`mode-button on ${cfg.modeButton.chip} line ${cfg.modeButton.line} (short=mode, long=AGC)`);
 }
 
 process.on("SIGTERM", () => {
