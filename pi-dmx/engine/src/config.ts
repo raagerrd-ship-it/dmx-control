@@ -51,6 +51,12 @@ export interface EngineConfig {
   monoHue: number;
   /** Hue 0..360 used by "comet" mode for the fireball head. */
   cometHue: number;
+  /** Hue A (bass side) for "split" mode. */
+  splitHueA: number;
+  /** Hue B (treble side) for "split" mode. */
+  splitHueB: number;
+  /** "chase" sub-pattern: sweep (L→R loop) or ping-pong (bounce). */
+  chaseStyle: "sweep" | "pingpong";
   /** Physical push-button that cycles through modes. Set null to disable. */
   modeButton: { chip: string; line: number } | null;
   /** Transient identify override — not persisted. index = fixture being lit. */
