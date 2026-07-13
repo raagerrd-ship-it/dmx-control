@@ -14,6 +14,8 @@ export type PresetId =
   | "party"
   | "strobe"
   | "comet"
+  | "chase"
+  | "split"
   | "mono";
 
 export interface Preset {
@@ -25,9 +27,11 @@ export interface Preset {
 
 export const PRESETS: Preset[] = [
   { id: "auto",   name: "Auto",   hue: 280, description: "Färghjul, kick → blixt" },
-  { id: "party",  name: "Party",  hue: 320, description: "Regnbåge, snabb, kick" },
+  { id: "party",  name: "Party",  hue: 320, description: "Regnbåge + vit puls på kick" },
   { id: "strobe", name: "Strobe", hue: 0,   description: "Vit blink i takt" },
   { id: "comet",  name: "Comet",  hue: 25,  description: "Eldklot glider med lång svans (välj hue)" },
+  { id: "chase",  name: "Chase",  hue: 160, description: "Ljus hoppar mellan lampor på beat" },
+  { id: "split",  name: "Split",  hue: 200, description: "Grupp A = bas, Grupp B = diskant" },
   { id: "mono",   name: "Mono",   hue: 15,  description: "En färg, flimrande (välj hue)" },
 ];
 
