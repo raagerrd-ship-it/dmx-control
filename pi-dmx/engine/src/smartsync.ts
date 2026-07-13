@@ -67,6 +67,7 @@ export class SmartSync {
   private timers: NodeJS.Timeout[] = [];
   private loopTimer: NodeJS.Timeout | null = null;
   private generation = 0; // bumped on disable to invalidate an in-flight cycle
+  private currentBpm = 0;
 
   constructor(private deps: Deps) {
     this.inputRate = deps.cfg.audio.rate;
@@ -93,6 +94,7 @@ export class SmartSync {
     this.clearTimeline();
     this.track = null;
     this.deps.cfg.flashUntil = null;
+    this.deps.cfg.beat = null;
     this.setStatus("off");
   }
 
@@ -170,6 +172,8 @@ export class SmartSync {
       // Anchor: at wall-clock `identifyStart` the song was at `playOffsetMs`.
       // Every event's atMs is already relative to playOffsetMs, so it fires at
       // identifyStart + atMs.
+      this.currentBpm = Number(an.features?.tempo ?? 0);
+      if (this.currentBpm > 40) this.deps.cfg.beat = { anchorMs: identifyStart, bpm: this.currentBpm };
       this.scheduleTimeline(identifyStart, (an.events ?? []) as TimelineEvent[], an, gen);
       this.setStatus("synced");
 
@@ -190,9 +194,13 @@ export class SmartSync {
     for (const e of events) {
       const fireIn = anchorWallMs + e.atMs - now;
       if (fireIn < -500) continue; // already passed
-      if (e.type === "bar") continue; // downbeat hints unused for now
+      // "bar" downbeats calibrate the beat clock so beat-locked effects stay in phase.
       const t = setTimeout(() => {
         if (gen !== this.generation) return;
+        if (e.type === "bar") {
+          if (this.currentBpm > 40) this.deps.cfg.beat = { anchorMs: Date.now(), bpm: this.currentBpm };
+          return;
+        }
         if (e.type === "section") {
           this.applySection(e.preset, e.primaryHue, e.secondaryHue);
         } else if (e.type === "flash") {

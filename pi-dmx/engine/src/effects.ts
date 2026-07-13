@@ -18,13 +18,33 @@ export class EffectEngine {
   private chasePos = 0;
   private chaseDir = 1;
   private lastChaseAdvance = 0;
+  /** Beat clock: last whole-beat index seen (SmartSync tempo sync). */
+  private lastBeatIdx = -1;
 
   constructor(private cfg: EngineConfig) {}
 
   render(frame: Frame): Uint8Array {
     const t = (performance.now() - this.t0) / 1000;
     if (frame.kick) this.lastKickBoost = performance.now();
-    const kickEnv = Math.max(0, 1 - (performance.now() - this.lastKickBoost) / 250);
+
+    // SmartSync beat clock → predicted kick: pulse in the song's exact tempo,
+    // phase-calibrated by the Spotify downbeat markers. Beats real kick
+    // detection whenever we're synced.
+    let beatEnv = 0;
+    let beatTick = false;
+    const beat = this.cfg.beat;
+    if (beat && beat.bpm > 40) {
+      const beatMs = 60000 / beat.bpm;
+      const since = Date.now() - beat.anchorMs;
+      const phase = ((since % beatMs) + beatMs) % beatMs / beatMs;
+      beatEnv = Math.pow(1 - phase, 3);
+      const beatIdx = Math.floor(since / beatMs);
+      if (beatIdx !== this.lastBeatIdx) { this.lastBeatIdx = beatIdx; beatTick = true; }
+    }
+    const kickEnv = Math.max(
+      Math.max(0, 1 - (performance.now() - this.lastKickBoost) / 250),
+      beatEnv * 0.8,
+    );
 
     this.universe.fill(0);
 
@@ -56,7 +76,9 @@ export class EffectEngine {
     // stays coherent when the user switches into it.
     const now = performance.now();
     const autoAdvanceMs = 320;   // ~185 bpm floor
-    if (count > 0 && (frame.kick || now - this.lastChaseAdvance > autoAdvanceMs)) {
+    // Beat-locked when synced: step ON the beat instead of after the kick.
+    const advance = this.cfg.beat ? beatTick : frame.kick;
+    if (count > 0 && (advance || now - this.lastChaseAdvance > autoAdvanceMs)) {
       this.lastChaseAdvance = now;
       if (this.cfg.chaseStyle === "pingpong" && count > 1) {
         this.chasePos += this.chaseDir;

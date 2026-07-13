@@ -67,6 +67,8 @@ export interface EngineConfig {
   identify?: { index: number } | null;
   /** Transient SmartSync flash override (wall-clock ms) — not persisted. */
   flashUntil?: number | null;
+  /** Transient SmartSync beat clock (BPM + wall-clock anchor) — not persisted. */
+  beat?: { anchorMs: number; bpm: number } | null;
   /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */
   dmxMaxHz: number;
 }
