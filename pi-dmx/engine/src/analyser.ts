@@ -98,7 +98,7 @@ export class Analyser {
     let kick = false;
     if (
       fluxNorm > median * d.kickThreshold &&
-      fluxNorm > 0.045 &&                  // absolute floor from useMockLive
+      fluxNorm > 0.045 &&                  // absolute floor
       energy > 0.05 &&
       now - this.lastKick > d.kickCooldownMs
     ) {
