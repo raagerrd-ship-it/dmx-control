@@ -20,7 +20,8 @@ import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 import { activeSlots, type Mode } from "./config.js";
 
-const MODE_CYCLE: Mode[] = ["auto", "party", "comet", "mono", "strobe", "blackout"];
+// Physical button cycles through the fun modes (skips blackout so the button never kills the show).
+const MODE_CYCLE: Mode[] = ["auto", "party", "comet", "mono", "strobe"];
 
 const cfg = await loadConfig();
 const analyser = new Analyser(cfg);
