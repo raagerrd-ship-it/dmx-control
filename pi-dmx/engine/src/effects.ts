@@ -1,7 +1,6 @@
 /**
  * Effect engine: consume Frames from the analyser, write a 512-byte DMX
- * universe. Ported from useMockLive's color pipelines — cleaned up for
- * headless use.
+ * universe.
  *
  * Each fixture in cfg.fixtures gets rendered based on its index. Fixture
  * channel-layout is honored (RGB / RGBW / dimmer).
