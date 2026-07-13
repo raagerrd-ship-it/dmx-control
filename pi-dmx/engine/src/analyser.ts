@@ -74,8 +74,10 @@ export class Analyser {
       if (i >= trebleStart) trebleEnergy += mag[i];
     }
     this.prevMag = mag;
-    const energy = Math.min(1, (bassEnergy / bassBins) * 0.02);
-    const treble = Math.min(1, (trebleEnergy / (half - trebleStart)) * 0.03);
+    // Gain-compensated like `level` — otherwise the band-driven fixtures and
+    // the kick energy gate die at low volume while the AGC keeps level alive.
+    const energy = Math.min(1, (bassEnergy / bassBins) * 0.02 * this.gain);
+    const treble = Math.min(1, (trebleEnergy / (half - trebleStart)) * 0.03 * this.gain);
     const fluxNorm = Math.min(1, flux * 0.005);
 
     // Auto-gain (slow: seconds-to-minute timescales)
