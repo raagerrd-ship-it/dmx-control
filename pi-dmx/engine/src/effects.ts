@@ -35,6 +35,9 @@ export class EffectEngine {
   private smartDwellUntil = 0;
   private lastSectionAt = 0;
   private intensityEma = 0.4;
+  /** Silence gate: fade the whole rig to black when no music plays. */
+  private lastActiveMs = performance.now();
+  private silenceGate = 1;
   private smartCount = 0;
   private lastRenderMs = performance.now();
 
@@ -85,7 +88,7 @@ export class EffectEngine {
         // Normalize against the AGC target so "at target loudness" = full drive —
         // the AGC otherwise parks the level around ~0.5 and v never reaches 1.
         const audio = Math.min(1, (frame.level / Math.max(0.15, this.cfg.detection.autoGainTarget)) * (0.35 + this.cfg.sensitivity * 0.5));
-    const master = this.cfg.master;
+        const master = this.cfg.master * this.silenceGate;
     const count = this.cfg.fixtures.length;
 
     // Chase state machine — kick advances one step, plus a slow auto-advance
@@ -138,6 +141,13 @@ export class EffectEngine {
     const dtSec = Math.min(0.1, (now - this.lastRenderMs) / 1000);
     this.lastRenderMs = now;
     this.intensityEma += (Math.max(audio, kickEnv * 0.8) - this.intensityEma) * Math.min(1, dtSec / 6);
+
+    // Silence gate: below threshold for 4 s → fade out over 2 s; music back →
+    // fade in fast. Mode floors otherwise keep the lamps glowing in silence.
+    if (frame.level > 0.05 || frame.kick) this.lastActiveMs = now;
+    const gateTarget = now - this.lastActiveMs > 4000 ? 0 : 1;
+    const gateRate = gateTarget > this.silenceGate ? dtSec / 0.3 : dtSec / 2;
+    this.silenceGate += Math.max(-gateRate, Math.min(gateRate, gateTarget - this.silenceGate));
     if (effMode === "wave") this.wavePhase += dtSec * (1.6 + audio * 4);
 
     // Drops: each beat/kick fires the next lamp in a fresh pure color.
