@@ -48,8 +48,8 @@ echo "==> [4/9] disable Bluetooth stack + serial-getty"
 systemctl disable --now hciuart bluetooth serial-getty@ttyAMA0 2>/dev/null || true
 
 AP_SSID="${AP_SSID:-pi-dmx}"
-AP_PASS="${AP_PASS:-dmx12345}"       # WPA2 requires 8+ chars
-echo "==> [5/9] WiFi AP — SSID=$AP_SSID, gateway=192.168.4.1"
+AP_PASS="${AP_PASS:-}"                 # empty = open network (no password)
+echo "==> [5/9] WiFi AP — SSID=$AP_SSID, gateway=192.168.4.1$([ -z "$AP_PASS" ] && echo ' (open)')"
 # Bookworm ships NetworkManager. `ipv4.method shared` = NM runs its own
 # dnsmasq for DHCP/DNS, so no separate hostapd/dnsmasq config needed.
 if command -v nmcli >/dev/null; then
@@ -59,12 +59,20 @@ if command -v nmcli >/dev/null; then
     ssid "$AP_SSID" autoconnect yes
   nmcli con modify "$AP_CON" \
     802-11-wireless.band bg 802-11-wireless.channel 6 \
-    802-11-wireless-security.key-mgmt wpa-psk \
-    802-11-wireless-security.psk "$AP_PASS" \
     ipv4.method shared ipv4.addresses 192.168.4.1/24 \
     ipv6.method disabled \
     connection.autoconnect-priority 100
+  if [ -n "$AP_PASS" ]; then
+    nmcli con modify "$AP_CON" \
+      802-11-wireless-security.key-mgmt wpa-psk \
+      802-11-wireless-security.psk "$AP_PASS"
+  else
+    nmcli con modify "$AP_CON" \
+      802-11-wireless-security.key-mgmt "" \
+      802-11-wireless-security.psk "" 2>/dev/null || true
+  fi
   nmcli con up "$AP_CON" || true
+
 else
   echo "  ! NetworkManager not found — skipping AP setup." >&2
   echo "    Install NM or configure hostapd manually." >&2
