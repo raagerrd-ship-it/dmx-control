@@ -12,10 +12,11 @@ import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
 
 export interface ButtonOptions {
-  chip: string;          // e.g. "gpiochip0"
-  line: number;          // BCM GPIO number (e.g. 17 = pin 11)
-  debounceMs?: number;   // default 40
-  longPressMs?: number;  // default 700
+  chip: string;              // e.g. "gpiochip0"
+  line: number;              // BCM GPIO number (e.g. 17 = pin 11)
+  debounceMs?: number;       // edge-level noise filter, default 40
+  longPressMs?: number;      // hold threshold for long-press, default 700
+  minPressIntervalMs?: number; // rate-limit between emitted "press" events, default 300
 }
 
 /**
