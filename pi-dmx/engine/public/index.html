@@ -313,6 +313,18 @@ dmxHzEl.oninput = () => {
   dmxHzVal.textContent = v;
   send({ type: "setDmxMaxHz", value: v });
 };
+agcTargetEl.oninput = () => {
+  const v = Number(agcTargetEl.value);
+  agcTargetVal.textContent = v;
+  send({ type: "setAgcTarget", value: v / 100 });
+};
+agcAggEl.oninput = () => {
+  const v = Number(agcAggEl.value);
+  agcAggVal.textContent = v;
+  const t = aggToTau(v / 100);
+  agcTauDetail.textContent = `~${t.up.toFixed(0)} s up · ~${t.down.toFixed(0)} s down`;
+  send({ type: "setAgcAggressiveness", value: v / 100 });
+};
 
 
 /* ── Fixture editor ─────────────────────────────────────────────────── */
