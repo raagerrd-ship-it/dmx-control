@@ -95,3 +95,21 @@ export function fixtureRoles(fx: FixtureConfig): ChannelRole[] {
   if (fx.preset === "custom") return fx.roles ?? [];
   return PRESET_ROLES[fx.preset];
 }
+
+/**
+ * Highest DMX channel used by any fixture, or 0 if there are none.
+ * The C sidecar accepts frames from 24 to 512 slots — the fewer we send,
+ * the faster each frame gets on the wire (fewer bytes @ 44 µs each).
+ */
+export function activeSlots(fixtures: FixtureConfig[]): number {
+  let max = 0;
+  for (const fx of fixtures) {
+    const w = fixtureRoles(fx).length;
+    const top = fx.address + w - 1;
+    if (top > max) max = top;
+  }
+  // Clamp to spec-min 24, spec-max 512
+  if (max < 24) max = 24;
+  if (max > 512) max = 512;
+  return max;
+}
