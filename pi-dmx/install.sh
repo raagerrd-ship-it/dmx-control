@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# ============================================================================
+# pi-dmx — one-shot installer for a fresh Raspberry Pi Zero 2 W.
+#
+# Idempotent. Re-run after code changes to rebuild + restart services.
+# Expects to be run from the repo root: `sudo bash pi-dmx/install.sh`.
+#
+# This is a dedicated single-purpose appliance — everything runs as root
+# so nothing gets in the way of ALSA / GPIO / serial / port 80.
+# ============================================================================
+set -euo pipefail
+
+if [[ $EUID -ne 0 ]]; then
+  echo "Run with sudo: sudo bash pi-dmx/install.sh" >&2
+  exit 1
+fi
+
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+BOOT_DIR="/boot/firmware"
+[[ -d $BOOT_DIR ]] || BOOT_DIR="/boot"
+
+echo "==> [1/8] apt packages"
+apt-get update -qq
+apt-get install -y --no-install-recommends \
+  build-essential nodejs npm \
+  alsa-utils gpiod libcap2-bin
+
+echo "==> [2/8] /boot config — UART, Codec Zero, force_turbo"
+CFG="$BOOT_DIR/config.txt"
+touch "$CFG"
+ensure_line() { grep -qxF "$1" "$CFG" || echo "$1" >> "$CFG"; }
+ensure_line "enable_uart=1"
+ensure_line "dtoverlay=disable-bt"
+ensure_line "init_uart_clock=48000000"
+ensure_line "dtoverlay=iqaudio-codec"
+ensure_line "force_turbo=1"
+
+echo "==> [3/8] /boot cmdline — isolate CPU3 for dmx-helper, drop serial console"
+CMD="$BOOT_DIR/cmdline.txt"
+if [[ -f $CMD ]]; then
+  sed -i 's/console=serial0,115200 \?//g; s/console=ttyAMA0,115200 \?//g' "$CMD"
+  if ! grep -q "isolcpus=3" "$CMD"; then
+    sed -i '1 s/$/ isolcpus=3 nohz_full=3 rcu_nocbs=3/' "$CMD"
+  fi
+fi
+
+echo "==> [4/8] disable Bluetooth stack + serial-getty"
+systemctl disable --now hciuart bluetooth serial-getty@ttyAMA0 2>/dev/null || true
+
+echo "==> [5/8] Codec Zero — route AUX line-in to capture"
+install -Dm644 /dev/stdin /etc/alsa/codec-zero-linein.state <<'EOF_ALSA'
+# Placeholder — replace with Pi Foundation's Record_from_3.5mm_Aux-In.state
+# once you have it on the Pi. Until then, run `alsamixer -c 0` and set
+# ADC Mixer Left/Right Sidetone → AIN1/AIN2, Mic Boost → 0, then
+# `sudo alsactl store -f /etc/alsa/codec-zero-linein.state`.
+EOF_ALSA
+install -Dm644 /dev/stdin /etc/systemd/system/codec-zero-linein.service <<'EOF_SVC'
+[Unit]
+Description=Codec Zero — AUX line-in routing
+After=sound.target
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c '[ -s /etc/alsa/codec-zero-linein.state ] && /usr/sbin/alsactl restore -f /etc/alsa/codec-zero-linein.state || true'
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+EOF_SVC
+install -Dm644 /dev/stdin /etc/asound.conf <<'EOF_ASND'
+pcm.!default {
+  type asym
+  capture.pcm "hw:0,0"
+}
+EOF_ASND
+
+echo "==> [6/8] build + install dmx-helper (C sidecar)"
+make -C "$REPO_DIR/dmx-helper" clean
+make -C "$REPO_DIR/dmx-helper"
+make -C "$REPO_DIR/dmx-helper" install
+install -Dm644 "$REPO_DIR/dmx-helper/systemd/dmx-helper.service" \
+  /etc/systemd/system/dmx-helper.service
+
+echo "==> [7/8] build + install audio-dmx-engine (Node)"
+cd "$REPO_DIR/engine"
+npm ci --no-audit --no-fund
+npm run build
+mkdir -p /opt/audio-dmx-engine /var/lib/audio-dmx-engine
+rsync -a --delete dist/ /opt/audio-dmx-engine/dist/
+rsync -a --delete public/ /opt/audio-dmx-engine/public/
+rsync -a --delete node_modules/ /opt/audio-dmx-engine/node_modules/
+install -m644 package.json /opt/audio-dmx-engine/package.json
+install -Dm644 systemd/audio-dmx-engine.service /etc/systemd/system/audio-dmx-engine.service
+install -Dm644 systemd/cpu-performance.service /etc/systemd/system/cpu-performance.service
+
+echo "==> [8/8] enable + start services"
+systemctl daemon-reload
+systemctl enable --now cpu-performance codec-zero-linein dmx-helper audio-dmx-engine
+
+echo
+echo "Done. Reboot once so /boot config + isolcpus take effect:"
+echo "    sudo reboot"
+echo
+echo "After reboot, open http://<pi-ip>/ from your phone."

@@ -1,13 +1,12 @@
 [Unit]
 Description=Audio → DMX engine (Node)
-After=network.target dmx-helper.service cpu-performance.service
+After=network.target dmx-helper.service cpu-performance.service sound.target
 Requires=dmx-helper.service
 
 [Service]
 Type=simple
 WorkingDirectory=/opt/audio-dmx-engine
 # --max-old-space-size caps V8 heap at 200 MB (Pi Zero 2 W has 512 MB total).
-# Prevents runaway GC pauses if a leak ever appears; well above steady-state ~60 MB.
 ExecStart=/usr/bin/node --enable-source-maps --max-old-space-size=200 dist/index.js
 Environment=NODE_ENV=production
 Environment=UV_THREADPOOL_SIZE=2
@@ -21,13 +20,11 @@ Nice=-10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=2
 
-# Needs CAP_NET_BIND_SERVICE to bind :80 as non-root — grant via setcap on node
-AmbientCapabilities=CAP_NET_BIND_SERVICE
-User=pi
-Group=pi
-SupplementaryGroups=audio dialout
+# Runs as root — this is a dedicated single-purpose appliance on an isolated
+# network. Simplifies binding :80, ALSA access, and GPIO/serial permissions.
+User=root
 
-# Keep engine off the isolated realtime core (CPU3 is reserved for dmx-helper).
+# Keep engine off the isolated realtime core (CPU3 reserved for dmx-helper).
 CPUAffinity=0 1 2
 
 [Install]

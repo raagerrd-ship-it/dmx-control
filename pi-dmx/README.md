@@ -82,120 +82,61 @@ Requires `gpiod` (`sudo apt install -y gpiod`). To use a different GPIO
 disable it entirely.
 
 
-## System setup (one-time)
+## Install
 
-### 1. `/boot/firmware/config.txt`
-
-```ini
-# UART for DMX (WPM432)
-enable_uart=1
-dtoverlay=disable-bt
-init_uart_clock=48000000
-
-# Codec Zero HAT — line-in on 3.5mm AUX
-dtoverlay=iqaudio-codec
-
-# Performance
-force_turbo=1
-```
-
-### 2. `/boot/firmware/cmdline.txt`
-
-Remove `console=serial0,115200`. Append:
-
-```
-isolcpus=3 nohz_full=3 rcu_nocbs=3
-```
-
-### 3. Disable serial console + Bluetooth stack
+Flash Raspberry Pi OS Lite (64-bit) to the SD card, boot, connect the Pi to
+Wi-Fi/SSH, then clone this repo and run the one-shot installer:
 
 ```bash
-sudo systemctl disable --now hciuart bluetooth serial-getty@ttyAMA0
+git clone <this-repo> ~/pi-dmx-src
+sudo bash ~/pi-dmx-src/pi-dmx/install.sh
+sudo reboot
 ```
 
-### 4. CPU governor
+The script is idempotent — re-run it after pulling code changes and it will
+rebuild + restart both services.
 
-Installed as a systemd oneshot together with the engine (see step below) — no
-manual command needed. If you want to apply it immediately without a reboot:
+What it does:
+
+1. Installs apt deps (`build-essential nodejs npm alsa-utils gpiod`).
+2. Edits `/boot/firmware/config.txt` — `enable_uart=1`, `disable-bt`,
+   `iqaudio-codec`, `force_turbo=1`.
+3. Edits `/boot/firmware/cmdline.txt` — drops the serial console, appends
+   `isolcpus=3 nohz_full=3 rcu_nocbs=3` so CPU3 is reserved for `dmx-helper`.
+4. Disables `hciuart`, `bluetooth`, `serial-getty@ttyAMA0`.
+5. Installs `/etc/asound.conf` (default capture = `hw:0,0`) and the
+   `codec-zero-linein` oneshot for AUX-in routing.
+6. Builds + installs `dmx-helper` to `/usr/local/bin/`.
+7. Builds + installs the Node engine to `/opt/audio-dmx-engine/`, config
+   under `/var/lib/audio-dmx-engine/`.
+8. Enables `cpu-performance`, `codec-zero-linein`, `dmx-helper`,
+   `audio-dmx-engine`.
+
+Everything runs as **root** on purpose — this Pi is a single-purpose
+appliance on an isolated network, so we skip capability juggling
+(`setcap`, dialout/audio groups, port-80 binding tricks). If you ever want
+to lock it down, change `User=root` in the engine service back to `pi` and
+re-add the caps.
+
+### First-boot ALSA calibration
+
+The Codec Zero powers up with the mic pre-amp enabled. Once, after the
+first reboot, route AUX-in to the ADC and save the state so the
+`codec-zero-linein` service restores it automatically:
 
 ```bash
-echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+alsamixer -c 0                                       # set AIN1/AIN2 as capture source, Mic Boost = 0
+sudo alsactl store -f /etc/alsa/codec-zero-linein.state
+sudo systemctl restart codec-zero-linein audio-dmx-engine
 ```
 
-### 5. udev + permissions
-
-```bash
-# /etc/udev/rules.d/99-dmx-uart.rules
-KERNEL=="ttyAMA0", GROUP="dialout", MODE="0660"
-
-sudo usermod -aG dialout,audio pi
-```
-
-### 6. Codec Zero — route AUX line-in to capture
-
-The Codec Zero powers up with the mic pre-amp active. For line-in from the
-mixer we disable the boost and route AUX-IN → ADC. Save this as
-`/etc/alsa/codec-zero-linein.state` (adapted from the Pi Foundation's
-`Record_from_3.5mm_Aux-In.state`) and load it at boot:
-
-```bash
-# Apply on boot via systemd
-sudo tee /etc/systemd/system/codec-zero-linein.service >/dev/null <<'EOF'
-[Unit]
-Description=Codec Zero — AUX line-in routing
-After=sound.target
-[Service]
-Type=oneshot
-ExecStart=/usr/sbin/alsactl restore -f /etc/alsa/codec-zero-linein.state
-RemainAfterExit=yes
-[Install]
-WantedBy=multi-user.target
-EOF
-sudo systemctl enable --now codec-zero-linein
-```
-
-The Codec Zero registers as card 0 (`snd_rpi_wsp`). Set it as ALSA default:
-
-```bash
-# /etc/asound.conf
-pcm.!default {
-    type asym
-    capture.pcm "hw:0,0"
-}
-```
-
-Verify with `arecord -l` (Codec Zero on card 0) and record a 3 s test:
+Verify capture:
 
 ```bash
 arecord -D hw:0,0 -f S16_LE -r 48000 -c 2 -d 3 /tmp/test.wav && aplay /tmp/test.wav
 ```
 
-## Build & install
 
-```bash
-cd pi-dmx/dmx-helper
-make
-sudo make install                        # → /usr/local/bin/dmx-helper
-sudo setcap cap_sys_nice+ep /usr/local/bin/dmx-helper
-
-sudo cp systemd/dmx-helper.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now dmx-helper
-```
-
-### Engine + CPU governor
-
-```bash
-cd pi-dmx/engine
-npm ci && npm run build
-sudo mkdir -p /opt/audio-dmx-engine
-sudo cp -r dist package.json node_modules public /opt/audio-dmx-engine/
-sudo setcap cap_net_bind_service=+ep $(readlink -f $(which node))
-
-sudo cp systemd/cpu-performance.service systemd/audio-dmx-engine.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now cpu-performance audio-dmx-engine
-```
 
 ## Verify DMX
 
