@@ -24,6 +24,12 @@ export class Analyser {
   private fluxHistory: number[] = []; // for median
   private readonly fluxHistLen = 43;  // ~1s @ 375 Hz frame rate
   private gain = 1;
+  // Attack/release-smoothed outputs — raw per-hop values update ~370x/s and
+  // read as flicker on the lamps. Fast attack keeps hits punchy; the slower
+  // release lets light glide down instead of sputtering.
+  private lvlSmooth = 0;
+  private engSmooth = 0;
+  private trbSmooth = 0;
 
   /** Called when the input routing changes — the old gain is meaningless for
    *  the new source's signal level, so re-converge from neutral. */
@@ -122,7 +128,14 @@ export class Analyser {
       this.lastKick = now;
     }
 
-    return { level, energy, treble, flux: fluxNorm, kick, gain: this.gain };
+    const dtHop = this.cfg.fft.hop / this.cfg.audio.rate;
+    const aAtt = 1 - Math.exp(-dtHop / 0.015);
+    const aRel = 1 - Math.exp(-dtHop / 0.25);
+    const smooth = (prev: number, x: number) => prev + (x - prev) * (x > prev ? aAtt : aRel);
+    this.lvlSmooth = smooth(this.lvlSmooth, level);
+    this.engSmooth = smooth(this.engSmooth, energy);
+    this.trbSmooth = smooth(this.trbSmooth, treble);
+    return { level: this.lvlSmooth, energy: this.engSmooth, treble: this.trbSmooth, flux: fluxNorm, kick, gain: this.gain };
   }
 }
 
