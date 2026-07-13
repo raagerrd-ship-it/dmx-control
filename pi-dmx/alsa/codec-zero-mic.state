@@ -16,7 +16,7 @@ state.Zero {
 	control.2 {
 		iface MIXER
 		name 'Mic 2 Volume'
-		value 5
+		value 0
 		comment {
 			access 'read write'
 			type INTEGER
@@ -318,7 +318,7 @@ state.Zero {
 	control.24 {
 		iface MIXER
 		name 'Mic 2 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -938,7 +938,7 @@ state.Zero {
 	control.74 {
 		iface MIXER
 		name 'Mixin Left Mic 2 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -1211,7 +1211,7 @@ state.IQaudIOCODEC {
 	control.2 {
 		iface MIXER
 		name 'Mic 2 Volume'
-		value 5
+		value 0
 		comment {
 			access 'read write'
 			type INTEGER
@@ -1513,7 +1513,7 @@ state.IQaudIOCODEC {
 	control.24 {
 		iface MIXER
 		name 'Mic 2 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
@@ -2133,7 +2133,7 @@ state.IQaudIOCODEC {
 	control.74 {
 		iface MIXER
 		name 'Mixin Left Mic 2 Switch'
-		value true
+		value false
 		comment {
 			access 'read write'
 			type BOOLEAN
