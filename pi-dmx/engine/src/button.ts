@@ -12,10 +12,11 @@ import { spawn, ChildProcessWithoutNullStreams } from "node:child_process";
 import { EventEmitter } from "node:events";
 
 export interface ButtonOptions {
-  chip: string;          // e.g. "gpiochip0"
-  line: number;          // BCM GPIO number (e.g. 17 = pin 11)
-  debounceMs?: number;   // default 40
-  longPressMs?: number;  // default 700
+  chip: string;              // e.g. "gpiochip0"
+  line: number;              // BCM GPIO number (e.g. 17 = pin 11)
+  debounceMs?: number;       // edge-level noise filter, default 40
+  longPressMs?: number;      // hold threshold for long-press, default 700
+  minPressIntervalMs?: number; // rate-limit between emitted "press" events, default 300
 }
 
 /**
@@ -27,6 +28,7 @@ export class Button extends EventEmitter {
   private proc: ChildProcessWithoutNullStreams | null = null;
   private stopped = false;
   private lastEdge = 0;
+  private lastPressEmit = 0;
   private pressedAt: number | null = null;
 
   constructor(private opts: ButtonOptions) { super(); }
@@ -58,6 +60,8 @@ export class Button extends EventEmitter {
 
     const debounceMs = this.opts.debounceMs ?? 40;
     const longPressMs = this.opts.longPressMs ?? 700;
+    const minPressIntervalMs = this.opts.minPressIntervalMs ?? 300;
+
 
     let buf = "";
     p.stdout.on("data", (b) => {
@@ -77,8 +81,13 @@ export class Button extends EventEmitter {
           if (this.pressedAt == null) continue;
           const held = now - this.pressedAt;
           this.pressedAt = null;
-          if (held >= longPressMs) this.emit("longPress");
-          else this.emit("press");
+          if (held >= longPressMs) {
+            this.emit("longPress");
+          } else if (now - this.lastPressEmit >= minPressIntervalMs) {
+            // Rate-limit short presses so bounce or panic-tapping can't skip modes.
+            this.lastPressEmit = now;
+            this.emit("press");
+          }
         }
       }
     });
