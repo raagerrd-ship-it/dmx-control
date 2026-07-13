@@ -45,7 +45,9 @@ export class EffectEngine {
       return this.universe;
     }
 
-    const audio = frame.level * this.cfg.sensitivity;
+        // Normalize against the AGC target so "at target loudness" = full drive —
+        // the AGC otherwise parks the level around ~0.5 and v never reaches 1.
+        const audio = Math.min(1, (frame.level / Math.max(0.15, this.cfg.detection.autoGainTarget)) * (0.5 + this.cfg.sensitivity));
     const master = this.cfg.master;
     const count = this.cfg.fixtures.length;
 
@@ -130,17 +132,18 @@ function pickColor(
   // Per-fixture band drive: each lamp breathes with its own slice of the
   // spectrum (bass / mids / treble / kick) so pure-colored lamps still feel
   // alive and independent — full 0..100% swing per color.
+  const norm = 1 / Math.max(0.15, cfg.detection?.autoGainTarget ?? 0.5);
   const bands = [
-    Math.min(1, frame.energy * 1.3),
-    Math.min(1, audio * 1.2),
-    Math.min(1, frame.treble * 1.5),
-    Math.min(1, frame.energy * 0.6 + kickEnv),
+    Math.min(1, frame.energy * norm * 0.9),
+    audio,
+    Math.min(1, frame.treble * norm * 1.1),
+    Math.min(1, frame.energy * norm * 0.45 + kickEnv),
   ];
   const band = bands[idx % bands.length];
   const dyn = Math.max(0, Math.min(1, cfg.dynamics ?? 0.6));
   const shaped = (floor: number, x: number) => {
     const f = floor * (1 - dyn);
-    return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 2.5));
+    return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.2));
   };
   switch (mode) {
     case "auto": {
