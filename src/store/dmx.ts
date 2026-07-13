@@ -39,13 +39,10 @@ export interface Params {
   cometHue: number;     // 0..360 hue för Comet-huvudet (15 ≈ eld-orange)
 }
 
-export type ConnState = "mock" | "connecting" | "connected" | "disconnected";
-
 interface DmxState {
   preset: PresetId;
   params: Params;
   fixtures: Fixture[];
-  conn: ConnState;
   micEnabled: boolean;
   micError: string | null;
   audioLevel: number;   // 0..1 (smoothed)
@@ -57,7 +54,6 @@ interface DmxState {
   updateFixture: (id: string, patch: Partial<Fixture>) => void;
   removeFixture: (id: string) => void;
   setLive: (audio: number, kick: number, frame: number[]) => void;
-  setConn: (c: ConnState) => void;
   setMicEnabled: (b: boolean) => void;
   setMicError: (m: string | null) => void;
 }
