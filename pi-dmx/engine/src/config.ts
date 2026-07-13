@@ -97,7 +97,7 @@ export const defaultConfig: EngineConfig = {
     { name: "Par 3", address: 7,  preset: "rgb" },
     { name: "Par 4", address: 10, preset: "rgb" },
   ],
-  mode: "party",
+  mode: "smart",
   audioInput: "aux",
   sensitivity: 0.6,
   dynamics: 0.6,
