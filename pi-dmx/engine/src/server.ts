@@ -118,6 +118,8 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
           } else if (msg.type === "identifyStop") {
             stopIdentify();
             return;
+          } else if (msg.type === "setDmxMaxHz" && typeof msg.value === "number") {
+            deps.cfg.dmxMaxHz = Math.max(30, Math.min(500, Math.round(msg.value)));
           }
           deps.onConfigChanged?.();
           // Echo back
