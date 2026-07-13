@@ -233,6 +233,11 @@ function renderModes(current) {
     b.onclick = () => send({ type: "setMode", mode: m });
     modesEl.appendChild(b);
   }
+  const next = document.createElement("button");
+  next.className = "mode-btn";
+  next.textContent = "Nästa →";
+  next.onclick = () => send({ type: "cycleMode" });
+  modesEl.appendChild(next);
 }
 function applyConfig(cfg) {
   renderModes(cfg.mode);
