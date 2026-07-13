@@ -3,7 +3,7 @@
  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
  */
 
-export type Mode = "pulse" | "party" | "chase" | "spectrum" | "vu" | "mono" | "blackout";
+export type Mode = "drops" | "party" | "chase" | "wave" | "cycle" | "mono" | "blackout";
 
 /**
  * A fixture is placed at `address` and occupies channels in a defined role
@@ -95,7 +95,7 @@ export const defaultConfig: EngineConfig = {
     { name: "Par 3", address: 7,  preset: "rgb" },
     { name: "Par 4", address: 10, preset: "rgb" },
   ],
-  mode: "spectrum",
+  mode: "party",
   audioInput: "aux",
   sensitivity: 0.6,
   dynamics: 0.6,
@@ -105,7 +105,7 @@ export const defaultConfig: EngineConfig = {
   splitHueA: 0,    // red for bass side
   splitHueB: 200,  // cyan for treble side
   chaseStyle: "pingpong",
-  rotation: { pulse: true, party: true, chase: true, spectrum: true, vu: true, mono: false },
+  rotation: { drops: true, party: true, chase: true, wave: true, cycle: false, mono: false },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   dmxMaxHz: 200, // safe max for typical fixtures; helper caps automatically
 };

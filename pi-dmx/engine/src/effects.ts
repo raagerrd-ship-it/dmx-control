@@ -20,6 +20,12 @@ export class EffectEngine {
   private lastChaseAdvance = 0;
   /** Beat clock: last whole-beat index seen (SmartSync tempo sync). */
   private lastBeatIdx = -1;
+  /** Drops mode: per-lamp fire time + hue; advanced on each beat/kick. */
+  private dropPos = 0;
+  private dropSector = 0;
+  private lastDropAdvance = 0;
+  private dropFired: number[] = [];
+  private dropHue: number[] = [];
 
   constructor(private cfg: EngineConfig) {}
 
@@ -89,9 +95,18 @@ export class EffectEngine {
       }
     }
 
+    // Drops: each beat/kick fires the next lamp in a fresh pure color.
+    if (this.cfg.mode === "drops" && count > 0 && (frame.kick || beatTick) && now - this.lastDropAdvance > 140) {
+      this.lastDropAdvance = now;
+      this.dropPos = (this.dropPos + 1) % count;
+      this.dropSector = (this.dropSector + 1 + (this.dropPos % 2)) % 6;  // hoppar ojämnt genom färgcirkeln
+      this.dropFired[this.dropPos] = now;
+      this.dropHue[this.dropPos] = this.dropSector / 6;
+    }
+
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
-      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx);
+      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue);
       writeFixture(this.universe, fx, rgb, master);
     }
 
@@ -146,6 +161,8 @@ function pickColor(
   frame: Frame,
   chasePos: number,
   fx?: FixtureConfig,
+  dropFired: number[] = [],
+  dropHue: number[] = [],
 ): [number, number, number] {
   const { mode, monoHue, cometHue, splitHueA, splitHueB } = cfg;
   // Dynamics: lower floors + gamma on the audio-driven part, so quiet passages
@@ -180,30 +197,28 @@ function pickColor(
       const sat = Math.max(0, 1 - kickEnv * 0.8);   // punch flashes white on kicks
       return hsvToRgb(hue, sat, v);
     }
-    case "pulse": {
-      // Whole rig pumps on the beat (tempo-locked when SmartSync is synced,
-      // kick-driven otherwise). Color steps one pure hue at a time.
-      const hue = snapHue(100, ((t * 25) % 360) / 360);  // shared slot: all lamps same color
-      const v = shaped(0.06, Math.max(kickEnv, audio * 0.35));
+    case "drops": {
+      // Every beat paints the next lamp in a fresh pure color that decays —
+      // overlapping decays turn the rhythm into moving splashes of color.
+      const since = (performance.now() - (dropFired[idx] ?? -1e9)) / 1000;
+      const v = Math.exp(-since / 0.45) * (0.55 + 0.45 * Math.min(1, audio + kickEnv));
+      return hsvToRgb(dropHue[idx] ?? 0, 1, Math.min(1, v));
+    }
+    case "wave": {
+      // A soft brightness wave rolling across the rig at music speed; the whole
+      // rig shares one hue that steps onward every few seconds.
+      const speed = 1.6 + audio * 4;
+      const base = 0.5 + 0.5 * Math.sin(t * speed - idx * 1.1);
+      const hue = snapHue(101, ((t * 14) % 360) / 360);
+      const v = shaped(0.1, base * (0.3 + audio * 0.8) + kickEnv * 0.25);
       return hsvToRgb(hue, 1, v);
     }
-    case "spectrum": {
-      // Band -> fixed color: bass red, mids green, treble blue, kick magenta,
-      // low-glow amber. Calm, readable — the music laid out in space.
-      const bi = fx?.bands?.length ? BAND_IDX[fx.bands[0]] : idx % 4;
-      const SPECTRUM_HUES = [0, 120, 240, 300, 45];
-      const hue = (SPECTRUM_HUES[bi] ?? 0) / 360;
-      const v = shaped(0.1, band * 0.95 + kickEnv * 0.2);
+    case "cycle": {
+      // Calm: all lamps breathe together, slowly walking the color circle.
+      const hue = snapHue(102, ((t * 7) % 360) / 360);
+      const sway = 0.9 + 0.1 * Math.sin(t * 0.8 + idx * 1.6);
+      const v = shaped(0.35, (0.3 + audio * 0.55 + kickEnv * 0.1) * sway);
       return hsvToRgb(hue, 1, v);
-    }
-    case "vu": {
-      // The rig as a VU meter: fixtures light in list order with the level,
-      // green through yellow to a red top.
-      const th = (idx + 0.5) / count;
-      const drive = Math.min(1, Math.max(audio, kickEnv * 0.6) * 1.15);
-      const lit = Math.min(1, Math.max(0, (drive - th + 0.25) / 0.25));
-      const hue = idx === count - 1 ? 0 : idx === count - 2 ? 60 / 360 : 120 / 360;
-      return hsvToRgb(hue, 1, lit * lit);
     }
     case "chase": {
       // Bright head at chasePos with short trailing tail. Neighbouring fixtures
