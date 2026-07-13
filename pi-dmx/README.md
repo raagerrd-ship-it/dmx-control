@@ -115,6 +115,9 @@ sudo systemctl disable --now hciuart bluetooth serial-getty@ttyAMA0
 
 ### 4. CPU governor
 
+Installed as a systemd oneshot together with the engine (see step below) — no
+manual command needed. If you want to apply it immediately without a reboot:
+
 ```bash
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 ```
