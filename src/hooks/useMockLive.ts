@@ -185,6 +185,27 @@ export function useMockLive() {
             r = c[0]; g = c[1]; b = c[2];
             break;
           }
+          case "chase": {
+            // Ljus hoppar mellan lampor på beat, med kort svans till grannar.
+            const d = Math.abs(idx - chasePos.current);
+            const tail = Math.exp(-d * 1.4);
+            const v = Math.max(briFloor, briSlider * tail * (0.6 + audio * 0.5 + kick * 0.4));
+            const c = hsvToRgb(params.cometHue, 0.9, Math.min(1, v));
+            r = c[0]; g = c[1]; b = c[2];
+            break;
+          }
+          case "split": {
+            // Grupp A (jämna) = bas-driven, grupp B (udda) = diskant-driven.
+            const isA = idx % 2 === 0;
+            const hue = isA ? params.splitHueA : params.splitHueB;
+            const drive = isA
+              ? Math.min(1, audio * 1.4 + kick * 0.8)
+              : Math.min(1, treble * 1.6 + audio * 0.3);
+            const v = Math.max(briFloor, briSlider * (0.15 + drive));
+            const c = hsvToRgb(hue, 1, Math.min(1, v));
+            r = c[0]; g = c[1]; b = c[2];
+            break;
+          }
           case "mono": {
             // En användarvald hue. Vid varma toner (~15°) mer flimmer så det
             // känns som eld; svalare toner får mjuk shimmer.
