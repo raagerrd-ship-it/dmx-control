@@ -9,6 +9,7 @@ import type { EngineConfig } from "./config.js";
 export interface Frame {
   level: number;        // 0..1, auto-gained RMS
   energy: number;       // 0..1, bass-weighted spectral energy
+  treble: number;       // 0..1, high-band spectral energy (hats/cymbals/vocals top)
   flux: number;         // 0..1, bass-band spectral flux
   kick: boolean;        // true on rising edge only
   gain: number;         // current auto-gain factor (debug)
