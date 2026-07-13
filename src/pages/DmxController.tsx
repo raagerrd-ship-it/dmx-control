@@ -67,7 +67,15 @@ export default function DmxController() {
           <>
             <PresetGrid />
             {preset === "mono"  && <HueColorCard label="Mono-färg"  hue={monoHue}  onChange={(h) => patch({ monoHue: h })} />}
-            {preset === "comet" && <HueColorCard label="Comet-färg" hue={cometHue} onChange={(h) => patch({ cometHue: h })} />}
+            {(preset === "comet" || preset === "chase") && (
+              <HueColorCard label={preset === "comet" ? "Comet-färg" : "Chase-färg"} hue={cometHue} onChange={(h) => patch({ cometHue: h })} />
+            )}
+            {preset === "split" && (
+              <>
+                <HueColorCard label="Grupp A (bas)"     hue={splitHueA} onChange={(h) => patch({ splitHueA: h })} />
+                <HueColorCard label="Grupp B (diskant)" hue={splitHueB} onChange={(h) => patch({ splitHueB: h })} />
+              </>
+            )}
             <LiveControls />
             <LivePreview />
           </>
