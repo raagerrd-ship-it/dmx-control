@@ -1,9 +1,6 @@
 /**
  * Audio analyser: sliding FFT window, RMS level with slow auto-gain,
  * kick detection via bass-flux median-prominence gate.
- *
- * Ported from the browser useMic + useMockLive kick-detection logic.
- * Same math, no browser APIs.
  */
 
 import FFT from "fft.js";
@@ -101,7 +98,7 @@ export class Analyser {
     let kick = false;
     if (
       fluxNorm > median * d.kickThreshold &&
-      fluxNorm > 0.045 &&                  // absolute floor from useMockLive
+      fluxNorm > 0.045 &&                  // absolute floor
       energy > 0.05 &&
       now - this.lastKick > d.kickCooldownMs
     ) {
