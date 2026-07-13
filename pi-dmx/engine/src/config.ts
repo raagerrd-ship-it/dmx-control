@@ -3,7 +3,7 @@
  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
  */
 
-export type Mode = "drops" | "party" | "chase" | "wave" | "cycle" | "mono" | "blackout";
+export type Mode = "smart" | "drops" | "party" | "chase" | "wave" | "cycle" | "mono" | "blackout";
 
 /**
  * A fixture is placed at `address` and occupies channels in a defined role
@@ -72,6 +72,8 @@ export interface EngineConfig {
   identify?: { index: number } | null;
   /** Transient SmartSync flash override (wall-clock ms) — not persisted. */
   flashUntil?: number | null;
+  /** Transient: current section energy from SmartSync (drives "smart" mode). */
+  sectionEnergy?: { value: number; atMs: number } | null;
   /** Transient SmartSync beat clock (BPM + wall-clock anchor) — not persisted. */
   beat?: { anchorMs: number; bpm: number } | null;
   /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */
@@ -105,7 +107,7 @@ export const defaultConfig: EngineConfig = {
   splitHueA: 0,    // red for bass side
   splitHueB: 200,  // cyan for treble side
   chaseStyle: "pingpong",
-  rotation: { drops: true, party: true, chase: true, wave: true, cycle: false, mono: false },
+  rotation: { smart: true, drops: true, party: true, chase: true, wave: true, cycle: false, mono: false },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   dmxMaxHz: 200, // safe max for typical fixtures; helper caps automatically
 };

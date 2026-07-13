@@ -22,13 +22,13 @@ import { SmartSync } from "./smartsync.js";
 import { activeSlots, type Mode } from "./config.js";
 
 // Physical button cycles through the fun modes (skips blackout so the button never kills the show).
-const MODE_CYCLE: Mode[] = ["drops", "party", "chase", "wave", "cycle", "mono"];
+const MODE_CYCLE: Mode[] = ["smart", "drops", "party", "chase", "wave", "cycle", "mono"];
 
 const cfg = await loadConfig();
 // Migrate legacy mode names from persisted configs.
 const LEGACY_MODES: Record<string, Mode> = { auto: "wave", comet: "wave", split: "party", strobe: "party", pulse: "drops", spectrum: "wave", vu: "cycle" };
 if (LEGACY_MODES[cfg.mode as string]) cfg.mode = LEGACY_MODES[cfg.mode as string];
-if (!["drops","party","chase","wave","cycle","mono","blackout"].includes(cfg.mode)) cfg.mode = "party";
+if (!["smart","drops","party","chase","wave","cycle","mono","blackout"].includes(cfg.mode)) cfg.mode = "party";
 
 // Re-apply the chosen codec input routing (the boot service restores the aux
 // default; this honors a persisted mic choice).

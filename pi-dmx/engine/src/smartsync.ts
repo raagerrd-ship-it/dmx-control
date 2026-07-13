@@ -192,7 +192,8 @@ export class SmartSync {
     // Initial mode + palette from the track-level features, applied immediately.
     this.applySection(String(an.preset ?? "auto"),
       Number(an.hues?.primary ?? this.deps.cfg.monoHue),
-      Number(an.hues?.secondary ?? this.deps.cfg.splitHueB));
+      Number(an.hues?.secondary ?? this.deps.cfg.splitHueB),
+      Number(an.features?.energy ?? 0.5));
 
     const now = Date.now();
     for (const e of events) {
@@ -206,7 +207,7 @@ export class SmartSync {
           return;
         }
         if (e.type === "section") {
-          this.applySection(e.preset, e.primaryHue, e.secondaryHue);
+          this.applySection(e.preset, e.primaryHue, e.secondaryHue, e.energy);
         } else if (e.type === "flash") {
           this.deps.cfg.flashUntil = Date.now() + e.durationMs;
         }
@@ -215,10 +216,15 @@ export class SmartSync {
     }
   }
 
-  private applySection(preset: string, primaryHue: number, secondaryHue: number) {
+  private applySection(preset: string, primaryHue: number, secondaryHue: number, energy?: number) {
     const cfg = this.deps.cfg;
-    const mapped = PRESET_MAP[preset] ?? preset;
-    cfg.mode = (VALID_MODES as string[]).includes(mapped) ? (mapped as Mode) : "party";
+    if (typeof energy === "number") cfg.sectionEnergy = { value: Math.max(0, Math.min(1, energy)), atMs: Date.now() };
+    // In "smart" mode the engine picks the effect itself from the section
+    // energy — only colors and energy flow through.
+    if (cfg.mode !== "smart") {
+      const mapped = PRESET_MAP[preset] ?? preset;
+      cfg.mode = (VALID_MODES as string[]).includes(mapped) ? (mapped as Mode) : "party";
+    }
     cfg.monoHue = primaryHue;
     cfg.cometHue = primaryHue;
     cfg.splitHueA = primaryHue;

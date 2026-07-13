@@ -29,6 +29,11 @@ export class EffectEngine {
   /** Wave mode: integrated phase — speed may vary per frame without the
    *  wave jumping (t*speed would re-scale all elapsed time on every change). */
   private wavePhase = 0;
+  /** "smart" mode: which effect the feel-chooser currently delegates to. */
+  private smartMode: Mode = "wave";
+  private smartDwellUntil = 0;
+  private lastSectionAt = 0;
+  private intensityEma = 0.4;
   private lastRenderMs = performance.now();
 
   constructor(private cfg: EngineConfig) {}
@@ -99,13 +104,35 @@ export class EffectEngine {
       }
     }
 
+    // "smart": pick the effect from the song's feel — SmartSync section energy
+    // when synced (switches on musical section boundaries), otherwise a slow
+    // local energy average with a 12 s dwell so it never zaps around.
+    let effMode: Mode = this.cfg.mode;
+    if (this.cfg.mode === "smart") {
+      const se = this.cfg.sectionEnergy;
+      const fresh = se && now - se.atMs < 40_000;
+      const intensity = fresh ? se!.value : this.intensityEma;
+      const sectionChanged = fresh && se!.atMs !== this.lastSectionAt;
+      if (sectionChanged || now > this.smartDwellUntil) {
+        if (fresh) this.lastSectionAt = se!.atMs;
+        this.smartDwellUntil = now + 12_000;
+        this.smartMode = intensity < 0.25 ? "cycle"
+          : intensity < 0.45 ? "wave"
+          : intensity < 0.62 ? "chase"
+          : intensity < 0.8  ? "drops"
+          : "party";
+      }
+      effMode = this.smartMode;
+    }
+
     // Advance the wave phase by dt so speed changes glide instead of jumping.
     const dtSec = Math.min(0.1, (now - this.lastRenderMs) / 1000);
     this.lastRenderMs = now;
-    if (this.cfg.mode === "wave") this.wavePhase += dtSec * (1.6 + audio * 4);
+    this.intensityEma += (Math.max(audio, kickEnv * 0.8) - this.intensityEma) * Math.min(1, dtSec / 6);
+    if (effMode === "wave") this.wavePhase += dtSec * (1.6 + audio * 4);
 
     // Drops: each beat/kick fires the next lamp in a fresh pure color.
-    if (this.cfg.mode === "drops" && count > 0 && (frame.kick || beatTick) && now - this.lastDropAdvance > 140) {
+    if (effMode === "drops" && count > 0 && (frame.kick || beatTick) && now - this.lastDropAdvance > 140) {
       this.lastDropAdvance = now;
       this.dropPos = (this.dropPos + 1) % count;
       this.dropSector = (this.dropSector + 1 + (this.dropPos % 2)) % 6;  // hoppar ojämnt genom färgcirkeln
@@ -115,7 +142,7 @@ export class EffectEngine {
 
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
-      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase);
+      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, effMode);
       writeFixture(this.universe, fx, rgb, master);
     }
 
@@ -173,8 +200,10 @@ function pickColor(
   dropFired: number[] = [],
   dropHue: number[] = [],
   wavePhase = 0,
+  modeOverride?: Mode,
 ): [number, number, number] {
-  const { mode, monoHue, cometHue, splitHueA, splitHueB } = cfg;
+  const { monoHue, cometHue, splitHueA, splitHueB } = cfg;
+  const mode = modeOverride ?? cfg.mode;
   // Dynamics: lower floors + gamma on the audio-driven part, so quiet passages
   // go dim and beats punch. dyn=0 reproduces the old flat curves.
   // Per-fixture band drive: each lamp breathes with its own slice of the
