@@ -1,0 +1,17 @@
+[Unit]
+Description=Lock all CPU cores to performance governor
+After=multi-user.target
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Pi Zero 2 W defaults to `ondemand`, which introduces ~1-2 ms scheduling
+# jitter as frequencies ramp. `performance` keeps all four A53 cores at
+# max clock — negligible power impact on a wall-powered lighting rig,
+# meaningful latency win for audio→DMX.
+ExecStart=/bin/sh -c 'for c in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_governor; do echo performance > "$c"; done'
+ExecStop=/bin/sh -c 'for c in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_governor; do echo ondemand > "$c"; done'
+
+[Install]
+WantedBy=multi-user.target

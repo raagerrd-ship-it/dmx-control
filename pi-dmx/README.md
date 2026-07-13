@@ -115,6 +115,9 @@ sudo systemctl disable --now hciuart bluetooth serial-getty@ttyAMA0
 
 ### 4. CPU governor
 
+Installed as a systemd oneshot together with the engine (see step below) — no
+manual command needed. If you want to apply it immediately without a reboot:
+
 ```bash
 echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
 ```
@@ -178,6 +181,20 @@ sudo setcap cap_sys_nice+ep /usr/local/bin/dmx-helper
 sudo cp systemd/dmx-helper.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now dmx-helper
+```
+
+### Engine + CPU governor
+
+```bash
+cd pi-dmx/engine
+npm ci && npm run build
+sudo mkdir -p /opt/audio-dmx-engine
+sudo cp -r dist package.json node_modules public /opt/audio-dmx-engine/
+sudo setcap cap_net_bind_service=+ep $(readlink -f $(which node))
+
+sudo cp systemd/cpu-performance.service systemd/audio-dmx-engine.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now cpu-performance audio-dmx-engine
 ```
 
 ## Verify DMX
