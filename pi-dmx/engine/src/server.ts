@@ -220,6 +220,9 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
             sock.send(JSON.stringify({ type: "modeChanged", mode: next }));
           } else if (msg.type === "setSensitivity") {
             deps.cfg.sensitivity = clamp01(msg.value);
+          } else if (msg.type === "setAudioInput" && (msg.value === "aux" || msg.value === "mic")) {
+            deps.cfg.audioInput = msg.value;
+            spawn("alsactl", ["restore", "-f", `/etc/alsa/codec-zero-${msg.value}.state`], { stdio: "ignore" });
           } else if (msg.type === "setDynamics") {
             deps.cfg.dynamics = clamp01(msg.value);
           } else if (msg.type === "setMaster") {

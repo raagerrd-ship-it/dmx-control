@@ -48,6 +48,8 @@ export interface EngineConfig {
   };
   fixtures: FixtureConfig[];
   mode: Mode;
+  /** Which codec input feeds the show: line on the P1 AUX header or the mic path. */
+  audioInput: "aux" | "mic";
   sensitivity: number;    // 0..1 user knob
   /** 0..1 kontrast: 0 = jämnt ljus, 1 = dovt i tystnad + smäll i beats. */
   dynamics: number;
@@ -94,6 +96,7 @@ export const defaultConfig: EngineConfig = {
     { name: "Par 4", address: 10, preset: "rgb" },
   ],
   mode: "auto",
+  audioInput: "aux",
   sensitivity: 0.6,
   dynamics: 0.6,
   master: 1.0,

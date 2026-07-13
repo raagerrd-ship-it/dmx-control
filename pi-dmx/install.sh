@@ -87,6 +87,9 @@ echo "==> [5/8] Codec Zero — route AUX line-in to capture"
 # Working DA7212 register state: AUX IN (P1 header) routed to capture.
 # Without this the codec never drives the I2S clocks (EIO on arecord/aplay).
 install -Dm644 "$REPO_DIR/alsa/codec-zero-auxin.state" /etc/alsa/codec-zero-linein.state
+# Both routings available for the UI input switch (aux = line via P1, mic = 3.5mm/onboard).
+install -Dm644 "$REPO_DIR/alsa/codec-zero-auxin.state" /etc/alsa/codec-zero-aux.state
+install -Dm644 "$REPO_DIR/alsa/codec-zero-mic.state" /etc/alsa/codec-zero-mic.state
 install -Dm644 /dev/stdin /etc/systemd/system/codec-zero-linein.service <<'EOF_SVC'
 [Unit]
 Description=Codec Zero — AUX line-in routing

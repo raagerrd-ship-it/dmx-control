@@ -80,6 +80,10 @@
     <div class="row"><label>Input</label><span class="val" id="levelVal">–</span></div>
     <div class="meter"><div id="levelBar" style="width:0%"></div></div>
     <div class="status">Auto-gain: <span id="gainVal">–</span>×</div>
+    <div class="fx-actions" style="margin-top:10px">
+      <button class="btn" id="inAux">AUX in (P1)</button>
+      <button class="btn" id="inMic">Mic (3.5mm)</button>
+    </div>
   </div>
 
   <h1>Auto-gain</h1>
@@ -233,6 +237,10 @@ const levelVal = document.getElementById("levelVal");
 const gainVal = document.getElementById("gainVal");
 const sensEl = document.getElementById("sens");
 const sensVal = document.getElementById("sensVal");
+const inAux = document.getElementById("inAux");
+const inMic = document.getElementById("inMic");
+inAux.onclick = () => send({ type: "setAudioInput", value: "aux" });
+inMic.onclick = () => send({ type: "setAudioInput", value: "mic" });
 const dynEl = document.getElementById("dyn");
 const dynVal = document.getElementById("dynVal");
 const masterEl = document.getElementById("master");
@@ -302,6 +310,8 @@ function applyConfig(cfg) {
   renderModes(cfg.mode);
   sensEl.value = Math.round(cfg.sensitivity * 100);
   sensVal.textContent = sensEl.value + "%";
+  inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
+  inMic.classList.toggle("primary", cfg.audioInput === "mic");
   dynEl.value = Math.round((cfg.dynamics ?? 0.6) * 100);
   dynVal.textContent = dynEl.value;
   masterEl.value = Math.round(cfg.master * 100);
