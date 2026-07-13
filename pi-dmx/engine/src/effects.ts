@@ -236,4 +236,7 @@ function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
 }
 
 const clamp01 = (x: number) => x < 0 ? 0 : x > 1 ? 1 : x;
-const to255 = (x: number) => Math.round(clamp01(x) * 255);
+// LED PARs are wildly non-linear: DMX 128 looks ~80% bright and the low end
+// cuts off abruptly. Gamma 2.2 makes the fade perceptually linear — half
+// looks half, and most DMX resolution lands in the visible low range.
+const to255 = (x: number) => Math.round(Math.pow(clamp01(x), 2.2) * 255);
