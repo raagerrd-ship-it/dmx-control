@@ -596,6 +596,53 @@ fxSaveBtn.onclick = () => {
 renderModes("auto");
 connect();
 
+// ---- Self-update ----------------------------------------------------------
+const verSha = document.getElementById("verSha");
+const verMsg = document.getElementById("verMsg");
+const btnUpdate = document.getElementById("btnUpdate");
+const updLog = document.getElementById("updLog");
+let updPoll = null;
+
+async function refreshVersion() {
+  try {
+    const r = await fetch("/update/status").then(r => r.json());
+    verSha.textContent = r.sha ? `${r.sha} · ${new Date(r.date).toLocaleString("sv-SE")}` : (r.error ?? "unknown");
+    verMsg.textContent = r.msg ?? "";
+    if (r.log) { updLog.textContent = r.log; }
+  } catch {}
+}
+refreshVersion();
+
+btnUpdate.onclick = async () => {
+  if (!confirm("Uppdatera till senaste versionen? Tjänsten startas om.")) return;
+  btnUpdate.disabled = true;
+  btnUpdate.textContent = "Updating…";
+  updLog.style.display = "block";
+  updLog.textContent = "Startar…";
+  try {
+    await fetch("/update", { method: "POST" });
+  } catch {}
+  // Poll status + version; when SHA changes we're done.
+  const startedSha = verSha.textContent;
+  if (updPoll) clearInterval(updPoll);
+  updPoll = setInterval(async () => {
+    await refreshVersion();
+    if (verSha.textContent && verSha.textContent !== startedSha && !/–|unknown/.test(verSha.textContent)) {
+      clearInterval(updPoll); updPoll = null;
+      btnUpdate.disabled = false;
+      btnUpdate.textContent = "Update to latest";
+    }
+  }, 2000);
+  // Safety timeout
+  setTimeout(() => {
+    if (updPoll) { clearInterval(updPoll); updPoll = null; }
+    btnUpdate.disabled = false;
+    btnUpdate.textContent = "Update to latest";
+  }, 180000);
+};
+
+
+
 </script>
 </body>
 </html>
