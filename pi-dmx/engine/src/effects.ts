@@ -165,7 +165,9 @@ function pickColor(
     Math.min(1, frame.energy * norm * 0.45 + kickEnv),
   ];
   const BAND_IDX = { bass: 0, mid: 1, treble: 2, kick: 3 } as const;
-  const band = bands[fx?.band ? BAND_IDX[fx.band] : idx % bands.length];
+  const band = fx?.bands?.length
+    ? Math.max(...fx.bands.map((b) => bands[BAND_IDX[b]]))
+    : bands[idx % bands.length];
   const dyn = Math.max(0, Math.min(1, cfg.dynamics ?? 0.6));
   const shaped = (floor: number, x: number) => {
     const f = floor * (1 - dyn);

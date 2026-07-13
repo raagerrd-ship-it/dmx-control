@@ -474,9 +474,10 @@ function renderFixtures() {
       </div>
       <div class="fx-field" style="margin-top:8px">
         <label>Musikband (auto/party/mono)</label>
-        <select data-i="${i}" data-k="band">
-          ${["auto","bass","mid","treble","kick"].map((b) => `<option value="${b}" ${(fx.band ?? "auto") === b ? "selected" : ""}>${{auto:"Auto (listordning)",bass:"Bas",mid:"Mellan",treble:"Diskant",kick:"Kick"}[b]}</option>`).join("")}
-        </select>
+        <div class="fx-roles">
+          ${["bass","mid","treble","kick"].map((b) => `<label class="fx-role" style="cursor:pointer"><input type="checkbox" data-band-i="${i}" data-band="${b}" ${(fx.bands ?? []).includes(b) ? "checked" : ""}> ${{bass:"Bas",mid:"Mellan",treble:"Diskant",kick:"Kick"}[b]}</label>`).join("")}
+        </div>
+        <div class="fx-meta">Starkaste ikryssade bandet styr. Inga ikryssade = auto (listordning).</div>
       </div>
       ${fx.preset === "custom" ? renderCustomRoles(fx, i) : ""}
       <div class="fx-meta">Ch ${fx.address}–${fx.address + width - 1} · ${width} channel${width > 1 ? "s" : ""} · ${rolesOf(fx).join(" · ")}</div>
@@ -494,6 +495,15 @@ function renderFixtures() {
   fxEl.querySelectorAll("[data-k]").forEach((el) => {
     el.addEventListener("input", onFieldChange);
     el.addEventListener("change", onFieldChange);
+  });
+  fxEl.querySelectorAll("[data-band]").forEach((el) => {
+    el.addEventListener("change", (e) => {
+      const i = Number(e.target.dataset.bandI);
+      const set = new Set(fxDraft[i].bands ?? []);
+      if (e.target.checked) set.add(e.target.dataset.band); else set.delete(e.target.dataset.band);
+      if (set.size) fxDraft[i].bands = [...set]; else delete fxDraft[i].bands;
+      markDirty();
+    });
   });
   fxEl.querySelectorAll("[data-del]").forEach((el) => {
     el.addEventListener("click", (e) => {
@@ -572,7 +582,6 @@ function onFieldChange(e) {
   const fx = fxDraft[i];
   if (k === "name")    fx.name = e.target.value;
   if (k === "address") fx.address = parseInt(e.target.value, 10) || 0;
-  if (k === "band") { if (e.target.value === "auto") delete fx.band; else fx.band = e.target.value; }
   if (k === "preset") {
     fx.preset = e.target.value;
     if (fx.preset === "custom" && !fx.roles) fx.roles = ["r","g","b"];

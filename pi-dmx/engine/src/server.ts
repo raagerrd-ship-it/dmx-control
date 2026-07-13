@@ -315,8 +315,10 @@ function sanitizeFixtures(input: unknown[]): FixtureConfig[] | null {
         roles.push(role as ChannelRole);
       }
     }
-    const band = ["bass", "mid", "treble", "kick"].includes(r.band as string) ? (r.band as FixtureConfig["band"]) : undefined;
-    const fx: FixtureConfig = { name, address, preset, ...(roles ? { roles } : {}), ...(band ? { band } : {}) };
+    const bandsArr = Array.isArray(r.bands)
+      ? ([...new Set(r.bands.filter((b) => ["bass", "mid", "treble", "kick"].includes(b as string)))] as NonNullable<FixtureConfig["bands"]>)
+      : undefined;
+    const fx: FixtureConfig = { name, address, preset, ...(roles ? { roles } : {}), ...(bandsArr?.length ? { bands: bandsArr } : {}) };
 
     // Check the fixture fits within the universe
     const width = fixtureRoles(fx).length;
