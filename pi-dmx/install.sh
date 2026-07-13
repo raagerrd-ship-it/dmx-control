@@ -37,6 +37,8 @@ ensure_line "init_uart_clock=48000000"
 sed -i '/^dtoverlay=iqaudio-codec$/d' "$CFG"
 ensure_line "dtoverlay=rpi-codeczero"
 ensure_line "force_turbo=1"
+# HDMI audio off — keeps the codec as card 0 (card order is otherwise random)
+sed -i 's/^dtoverlay=vc4-kms-v3d$/dtoverlay=vc4-kms-v3d,noaudio/' "$CFG"
 
 echo "==> [3/9] /boot cmdline — isolate CPU3 for dmx-helper, drop serial console"
 CMD="$BOOT_DIR/cmdline.txt"
@@ -82,12 +84,9 @@ else
 fi
 
 echo "==> [5/8] Codec Zero — route AUX line-in to capture"
-install -Dm644 /dev/stdin /etc/alsa/codec-zero-linein.state <<'EOF_ALSA'
-# Placeholder — replace with Pi Foundation's Record_from_3.5mm_Aux-In.state
-# once you have it on the Pi. Until then, run `alsamixer -c 0` and set
-# ADC Mixer Left/Right Sidetone → AIN1/AIN2, Mic Boost → 0, then
-# `sudo alsactl store -f /etc/alsa/codec-zero-linein.state`.
-EOF_ALSA
+# Working DA7212 register state: AUX IN (P1 header) routed to capture.
+# Without this the codec never drives the I2S clocks (EIO on arecord/aplay).
+install -Dm644 "$REPO_DIR/alsa/codec-zero-auxin.state" /etc/alsa/codec-zero-linein.state
 install -Dm644 /dev/stdin /etc/systemd/system/codec-zero-linein.service <<'EOF_SVC'
 [Unit]
 Description=Codec Zero — AUX line-in routing
