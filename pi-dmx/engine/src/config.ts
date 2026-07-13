@@ -76,6 +76,10 @@ export interface EngineConfig {
   sectionEnergy?: { value: number; atMs: number } | null;
   /** Transient SmartSync beat clock (BPM + wall-clock anchor) — not persisted. */
   beat?: { anchorMs: number; bpm: number } | null;
+  /** Transient Live Analysis (Essentia.js på mobilen) drop-blixt — wall-clock ms. */
+  liveFlashUntil?: number | null;
+  /** Transient Live Analysis färg-hint från tonart (degrees 0..360) — inte persisted. */
+  liveHueHint?: { primary: number; secondary: number; atMs: number } | null;
   /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */
   dmxMaxHz: number;
 }
