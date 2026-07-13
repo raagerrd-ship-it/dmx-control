@@ -125,6 +125,8 @@ install -Dm644 systemd/cpu-performance.service /etc/systemd/system/cpu-performan
 echo "==> [8/8] enable + start services"
 systemctl daemon-reload
 systemctl enable --now cpu-performance codec-zero-linein dmx-helper audio-dmx-engine
+# enable --now does not restart already-running units — force the new build live.
+systemctl restart dmx-helper audio-dmx-engine
 
 echo
 echo "Done. Reboot once so /boot config + isolcpus take effect:"
