@@ -35,6 +35,7 @@ export class EffectEngine {
   private smartDwellUntil = 0;
   private lastSectionAt = 0;
   private intensityEma = 0.4;
+  private smartCount = 0;
   private lastRenderMs = performance.now();
 
   constructor(private cfg: EngineConfig) {}
@@ -116,12 +117,19 @@ export class EffectEngine {
       const sectionChanged = fresh && se!.atMs !== this.lastSectionAt;
       if (sectionChanged || now > this.smartDwellUntil) {
         if (fresh) this.lastSectionAt = se!.atMs;
-        this.smartDwellUntil = now + 12_000;
-        this.smartMode = intensity < 0.25 ? "cycle"
-          : intensity < 0.45 ? "wave"
-          : intensity < 0.62 ? "chase"
-          : intensity < 0.8  ? "drops"
-          : "party";
+        this.smartDwellUntil = now + 20_000;
+        // Rotate within a pool of modes that fit the current feel — mixed
+        // order, never the same mode twice in a row.
+        const POOLS: Mode[][] = [
+          ["cycle", "wave", "mono"],     // lugnt
+          ["wave", "chase", "drops"],    // mellan
+          ["party", "drops", "chase"],   // högt tryck
+        ];
+        const pool = POOLS[intensity < 0.3 ? 0 : intensity < 0.6 ? 1 : 2];
+        this.smartCount++;
+        let next = pool[Math.floor(((this.smartCount * 0.61803398875) % 1) * pool.length)];
+        if (next === this.smartMode) next = pool[(pool.indexOf(next) + 1) % pool.length];
+        this.smartMode = next;
       }
       effMode = this.smartMode;
     }
