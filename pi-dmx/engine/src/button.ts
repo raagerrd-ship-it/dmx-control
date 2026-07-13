@@ -60,6 +60,8 @@ export class Button extends EventEmitter {
 
     const debounceMs = this.opts.debounceMs ?? 40;
     const longPressMs = this.opts.longPressMs ?? 700;
+    const minPressIntervalMs = this.opts.minPressIntervalMs ?? 300;
+
 
     let buf = "";
     p.stdout.on("data", (b) => {
