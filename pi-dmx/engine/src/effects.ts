@@ -135,8 +135,10 @@ export class EffectEngine {
     // Drops: each beat/kick fires the next lamp in a fresh pure color.
     if (effMode === "drops" && count > 0 && (frame.kick || beatTick) && now - this.lastDropAdvance > 140) {
       this.lastDropAdvance = now;
-      this.dropPos = (this.dropPos + 1) % count;
       this.dropCount++;
+      // Golden-ratio walk over the lamps too — mixed order, never the same
+      // lamp twice in a row, all lamps hit evenly.
+      this.dropPos = Math.floor(((this.dropCount * 0.61803398875) % 1) * count);
       this.dropSector = mixedSector(this.dropCount);
       this.dropFired[this.dropPos] = now;
       this.dropHue[this.dropPos] = this.dropSector / 6;
