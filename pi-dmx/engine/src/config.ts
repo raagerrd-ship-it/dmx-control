@@ -82,6 +82,7 @@ export const defaultConfig: EngineConfig = {
   monoHue: 15,   // warm orange — feels like fire, but the user can pick anything
   cometHue: 15,  // fireball default; pick e.g. 220 for a blue comet
   modeButton: { chip: "gpiochip0", line: 17 },   // GPIO17 = physical pin 11
+  dmxMaxHz: 200, // safe max for typical fixtures; helper caps automatically
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
