@@ -74,7 +74,12 @@ interface Persisted {
   preset: PresetId;
   params: Params;
   fixtures: Fixture[];
+  rotation: Rotation;
 }
+
+const defaultRotation: Rotation = {
+  auto: true, party: true, strobe: false, comet: true, chase: true, split: true, mono: false,
+};
 
 const defaults: Persisted = {
   preset: "auto",
@@ -85,6 +90,7 @@ const defaults: Persisted = {
     { id: "f3", name: "PAR 3", startCh: 7,  mode: "rgb" },
     { id: "f4", name: "PAR 4", startCh: 10, mode: "rgb" },
   ],
+  rotation: defaultRotation,
 };
 
 function load(): Persisted {
