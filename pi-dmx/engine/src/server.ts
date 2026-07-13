@@ -189,15 +189,18 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
 
   app.register(async (f) => {
     f.get("/ws", { websocket: true }, (conn) => {
+      // @fastify/websocket v10+ passes the raw WebSocket; older versions pass
+      // a SocketStream with `.socket`. Support both.
+      const sock: any = (conn as any).socket ?? conn;
       // Send initial state
-      conn.socket.send(JSON.stringify({ type: "config", config: deps.cfg }));
-      conn.socket.send(JSON.stringify({ type: "smartSync", ...deps.smartSync.state() }));
+      sock.send(JSON.stringify({ type: "config", config: deps.cfg }));
+      sock.send(JSON.stringify({ type: "smartSync", ...deps.smartSync.state() }));
 
       // Push frame samples at 20 Hz for the level meter
       const push = setInterval(() => {
         const frame = deps.getLatestFrame();
-        if (frame && conn.socket.readyState === 1) {
-          conn.socket.send(JSON.stringify({
+        if (frame && sock.readyState === 1) {
+          sock.send(JSON.stringify({
             type: "frame",
             level: frame.level,
             energy: frame.energy,
@@ -207,14 +210,14 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
         }
       }, 50);
 
-      conn.socket.on("message", (raw: Buffer) => {
+      sock.on("message", (raw: Buffer) => {
         try {
           const msg = JSON.parse(raw.toString());
           if (msg.type === "setMode" && isMode(msg.mode)) {
             deps.cfg.mode = msg.mode;
           } else if (msg.type === "cycleMode") {
             const next = deps.cycleMode();
-            conn.socket.send(JSON.stringify({ type: "modeChanged", mode: next }));
+            sock.send(JSON.stringify({ type: "modeChanged", mode: next }));
           } else if (msg.type === "setSensitivity") {
             deps.cfg.sensitivity = clamp01(msg.value);
           } else if (msg.type === "setMaster") {
@@ -259,7 +262,7 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
         } catch { /* ignore malformed */ }
       });
 
-      conn.socket.on("close", () => clearInterval(push));
+      sock.on("close", () => clearInterval(push));
     });
   });
 
