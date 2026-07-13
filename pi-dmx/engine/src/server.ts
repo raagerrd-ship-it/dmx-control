@@ -21,6 +21,8 @@ export interface ServerDeps {
   cfg: EngineConfig;
   getLatestFrame: () => Frame | null;
   onConfigChanged?: () => void;
+  /** Advance to the next mode in the shared cycle. Returns the new mode. */
+  cycleMode: () => Mode;
 }
 
 export interface Server {
