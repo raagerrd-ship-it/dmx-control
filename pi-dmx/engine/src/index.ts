@@ -15,7 +15,7 @@ import { AudioCapture } from "./audio.js";
 import { Analyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
 import { DmxSender } from "./dmx.js";
-import { startServer } from "./server.js";
+import { startServer, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 import { activeSlots, type Mode } from "./config.js";
