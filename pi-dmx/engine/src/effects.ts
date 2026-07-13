@@ -40,10 +40,27 @@ export class EffectEngine {
 
     const audio = frame.level * this.cfg.sensitivity;
     const master = this.cfg.master;
+    const count = this.cfg.fixtures.length;
 
-    for (let i = 0; i < this.cfg.fixtures.length; i++) {
+    // Chase state machine — kick advances one step, plus a slow auto-advance
+    // so it never stalls in silence. Runs regardless of mode so the head
+    // stays coherent when the user switches into it.
+    const now = performance.now();
+    const autoAdvanceMs = 320;   // ~185 bpm floor
+    if (count > 0 && (frame.kick || now - this.lastChaseAdvance > autoAdvanceMs)) {
+      this.lastChaseAdvance = now;
+      if (this.cfg.chaseStyle === "pingpong" && count > 1) {
+        this.chasePos += this.chaseDir;
+        if (this.chasePos >= count - 1) { this.chasePos = count - 1; this.chaseDir = -1; }
+        else if (this.chasePos <= 0)    { this.chasePos = 0;         this.chaseDir =  1; }
+      } else {
+        this.chasePos = (this.chasePos + 1) % Math.max(1, count);
+      }
+    }
+
+    for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
-      const rgb = pickColor(this.cfg, t, i, this.cfg.fixtures.length, audio, kickEnv, frame);
+      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos);
       writeFixture(this.universe, fx, rgb, master);
     }
 
