@@ -71,6 +71,8 @@ export default function DmxController() {
           <>
             <SmartSyncPanel />
             <LiveAnalysisPanel />
+            <MicCalibration />
+
             <PresetGrid />
             {preset === "mono"  && <HueColorCard label="Mono-färg"  hue={monoHue}  onChange={(h) => patch({ monoHue: h })} />}
             {(preset === "comet" || preset === "chase") && (
