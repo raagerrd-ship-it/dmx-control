@@ -261,6 +261,20 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
             const a = Math.max(0, Math.min(1, msg.value));
             deps.cfg.detection.tauUp   = 180 * Math.pow(10 / 180, a);
             deps.cfg.detection.tauDown = 60  * Math.pow(2  / 60,  a);
+          } else if (msg.type === "liveFlash") {
+            // Live Analysis (Essentia.js på mobilen) → drop-blixt om ~200 ms
+            const dur = typeof msg.durationMs === "number" ? msg.durationMs : 220;
+            const at = typeof msg.atMs === "number" ? msg.atMs : Date.now() + 200;
+            deps.cfg.liveFlashUntil = at + dur;
+            return;
+          } else if (msg.type === "liveHueHint" && typeof msg.primary === "number") {
+            const primary = ((msg.primary % 360) + 360) % 360;
+            const secondary = ((((msg.secondary ?? msg.primary + 30) as number) % 360) + 360) % 360;
+            deps.cfg.liveHueHint = { primary, secondary, atMs: Date.now() };
+            return;
+          } else if (msg.type === "liveBeat" && typeof msg.bpm === "number") {
+            deps.cfg.beat = { anchorMs: typeof msg.atMs === "number" ? msg.atMs : Date.now(), bpm: msg.bpm };
+            return;
           }
           deps.onConfigChanged?.();
           // Echo back

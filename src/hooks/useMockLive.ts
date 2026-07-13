@@ -3,6 +3,7 @@ import { presetById, useDmx, type PresetId } from "@/store/dmx";
 import { smoothStep, softnessToAlpha } from "@/lib/audioCurve";
 import { useMic } from "@/hooks/useMic";
 import { activeOverride } from "@/store/smartSync";
+import { liveActiveFlash } from "@/store/liveAnalysis";
 
 /**
  * Mock live-loop: simulerar mic-nivå + kick och genererar DMX-frame
@@ -72,7 +73,7 @@ export function useMockLive() {
       // === Smart Sync override: aktiv section byter preset + hue, aktiv flash → drop-blixt ===
       const nowWall = Date.now();
       const ovr = activeOverride(nowWall);
-      let smartFlash = ovr.flashUntil > nowWall;
+      let smartFlash = ovr.flashUntil > nowWall || liveActiveFlash(nowWall);
       let smartPrimaryHue: number | null = null;
       let smartSecondaryHue: number | null = null;
       if (ovr.section) {

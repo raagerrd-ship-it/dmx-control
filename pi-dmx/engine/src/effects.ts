@@ -78,10 +78,13 @@ export class EffectEngine {
       return this.universe;
     }
 
-    // SmartSync drop-flash: everything white for the duration. Sits after
-    // identify so locating fixtures still works while synced.
-    if (this.cfg.flashUntil && Date.now() < this.cfg.flashUntil) {
-      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master, 220);  // hw-strobe burst on drop flashes
+    // SmartSync + Live Analysis drop-flash: everything white for the duration.
+    const nowWall = Date.now();
+    const flashActive =
+      (this.cfg.flashUntil && nowWall < this.cfg.flashUntil) ||
+      (this.cfg.liveFlashUntil && nowWall < this.cfg.liveFlashUntil);
+    if (flashActive) {
+      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master, 220);
       return this.universe;
     }
 
@@ -224,7 +227,12 @@ function pickColor(
   wavePhase = 0,
   modeOverride?: Mode,
 ): [number, number, number] {
-  const { monoHue, cometHue, splitHueA, splitHueB } = cfg;
+  const { monoHue: monoHueRaw, cometHue: cometHueRaw, splitHueA, splitHueB } = cfg;
+  // Live Analysis färg-hint från tonart tar över mono/comet i 20 s efter senaste key-uppdatering.
+  const hint = cfg.liveHueHint;
+  const hintFresh = !!hint && (Date.now() - hint.atMs) < 20_000;
+  const monoHue = hintFresh ? hint!.primary : monoHueRaw;
+  const cometHue = hintFresh ? hint!.secondary : cometHueRaw;
   const mode = modeOverride ?? cfg.mode;
   // Dynamics: lower floors + gamma on the audio-driven part, so quiet passages
   // go dim and beats punch. dyn=0 reproduces the old flat curves.
