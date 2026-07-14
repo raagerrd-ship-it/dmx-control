@@ -141,9 +141,9 @@ export class EffectEngine {
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
         // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
-        const LUGN: Mode[] = ["cycle", "breathe", "tide", "mono"];
-        const FART: Mode[] = ["wave", "chase", "drops"];
-        const FULLFART: Mode[] = ["party", "snap", "bounce"];
+        const LUGN: Mode[] = ["cycle", "breathe", "tide", "mono", "aurora", "drift"];
+        const FART: Mode[] = ["wave", "chase", "drops", "sweep", "pulse"];
+        const FULLFART: Mode[] = ["party", "snap", "bounce", "strobe", "rave"];
         const bpm = this.cfg.beat?.bpm ?? 0;
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
         let tier: Mode[];
@@ -194,7 +194,8 @@ export class EffectEngine {
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, effMode);
-      writeFixture(this.universe, fx, rgb, master);
+      const strobeVal = effMode === "strobe" ? 210 : 0;   // hårdvarustrobe i strobe-läget
+      writeFixture(this.universe, fx, rgb, master, strobeVal);
     }
 
     // Output ballistics on color/dim channels (never strobe/mode channels —
@@ -381,6 +382,50 @@ function pickColor(
       const d = Math.abs(idx - pos);
       const hue = mixedSector(Math.floor(beatIdx / (span * 2))) / 6;
       const v = Math.exp(-d * 1.3) * (punchFloor + (1 - punchFloor) * Math.min(1, beatPulse * 0.8 + audio * 0.4));
+      return hsvToRgb(hue, 1, v);
+    }
+    case "aurora": {
+      // Lugn: varje lampa håller sin egen långsamt vandrande färg; mjuk spatial våg.
+      const hue = mixedSector(idx + Math.floor(t / 8)) / 6;
+      const wash = 0.5 + 0.5 * Math.sin(t * 0.5 - idx * 0.8);
+      const v = shaped(0.4, 0.25 + wash * 0.4 + audio * 0.25);
+      return hsvToRgb(hue, 1, v);
+    }
+    case "drift": {
+      // Lugnast/ambient: hela riggen i EN mycket långsamt driftande färg, knappt rörelse.
+      const hue = mixedSector(Math.floor(t / 14)) / 6;
+      const v = shaped(0.45, 0.5 + 0.15 * Math.sin(t * 0.4) + audio * 0.2);
+      return hsvToRgb(hue, 1, v);
+    }
+    case "sweep": {
+      // Fart: ett ljusband glider mjukt (kontinuerligt) över riggen; färg stegar då och då.
+      const headPos = (wavePhase * 0.5) % count;
+      let dd = Math.abs(idx - headPos);
+      if (dd > count / 2) dd = count - dd;   // wrap
+      const hue = mixedSector(Math.floor(t / 5)) / 6;
+      const v = shaped(0.15, Math.exp(-dd * 1.1) * (0.6 + audio * 0.5) + kickEnv * 0.2);
+      return hsvToRgb(hue, 1, v);
+    }
+    case "pulse": {
+      // Fart: hela riggen samma färg, pulsar på beatet; färg stegar var fjärde takt.
+      const hue = mixedSector(Math.floor(beatIdx / 4)) / 6;
+      const v = punchFloor + (1 - punchFloor) * Math.min(1, beatPulse * 0.85 + audio * 0.25);
+      return hsvToRgb(hue, 1, v);
+    }
+    case "strobe": {
+      // Full fart: hårdvarustrobe (CH5 sätts i render); färgen cyklar snabbt, fullt ljus.
+      const hue = mixedSector(beatIdx) / 6;
+      return hsvToRgb(hue, 1, 1);
+    }
+    case "rave": {
+      // Full fart: riggen i två halvor som växlar färg varje taktslag, hög kontrast.
+      const groupA = idx < count / 2;
+      const flip = beatIdx % 2 === 0;
+      const hue = mixedSector(beatIdx + (groupA ? 0 : 3)) / 6;
+      const lit = groupA === flip;
+      const v = lit
+        ? (punchFloor + (1 - punchFloor) * Math.min(1, beatPulse + audio * 0.3))
+        : punchFloor * 0.4;
       return hsvToRgb(hue, 1, v);
     }
     case "chase": {
