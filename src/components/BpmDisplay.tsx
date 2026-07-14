@@ -1,13 +1,13 @@
-import { usePiLive } from "@/hooks/usePiLive";
+import { useDmx } from "@/store/dmx";
 
 /**
- * Realtids-BPM + confidence-mätare. Visas bara när Pi-engine är ansluten
- * (i preview: dolt). Confidence är peak-to-mean av tempo-scoringen —
- * hög = tydlig, stabil puls; låg = otydlig/utsmetad.
+ * Realtids-BPM + confidence-mätare. Läser ur dmx-store — populeras av
+ * useMockLive i preview och av usePiLive (WS → Pi-engine) i produktion.
+ * Confidence = peak-to-mean av tempo-scoringen: hög → stabil puls, låg → otydlig.
  */
 export function BpmDisplay() {
-  const { connected, bpm, bpmConfidence } = usePiLive();
-  if (!connected) return null;
+  const bpm = useDmx((s) => s.bpm);
+  const bpmConfidence = useDmx((s) => s.bpmConfidence);
 
   const pct = Math.round(Math.max(0, Math.min(1, bpmConfidence)) * 100);
   const locked = bpm > 0 && bpmConfidence > 0.55;
