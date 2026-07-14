@@ -32,6 +32,7 @@ export type DropSens = 0 | 0.3 | 0.6 | 0.9;
 export type AudioIn = "aux" | "mic";
 
 export interface PiSettings {
+  power: boolean;         // stort AV/PÅ högst upp
   rotation: Record<string, boolean>;
   energyDrivesMode: boolean;
   beatPulse: boolean;
@@ -44,6 +45,7 @@ export interface PiSettings {
 }
 
 const defaults: PiSettings = {
+  power: true,
   rotation: Object.fromEntries(ALL.map(([m]) => [m, true])),
   energyDrivesMode: true,
   beatPulse: false,
