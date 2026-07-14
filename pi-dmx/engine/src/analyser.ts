@@ -85,32 +85,49 @@ export class Analyser {
     const HZ = Analyser.ENV_HZ;
     const lagMin = Math.floor(HZ * 60 / 185);
     const lagMax = Math.min(N - 1, Math.floor(HZ * 60 / 55));   // ner till 55 BPM
-    let bestLag = 0, bestVal = 0;
+    // 1) Rå autokorrelation, LENGTH-NORMALISERAD: /(N-lag) tar bort biasen mot
+    //    korta lag (annars vinner alltid snabb takt eftersom fler termer bidrar).
+    // 2) COMB-SCORING: score(L) = ac(L) + ½·ac(2L) + ⅓·ac(3L). En äkta beat-
+    //    period resonerar även på dubbla/trippla lag — enskilda toppar gör det inte.
+    //    (Klapuri/Ellis tempogram-approach.)
+    // 3) PERCEPTUELL PRIOR: log-Gaussian runt 120 BPM (σ ≈ 0.4 oktav) minskar
+    //    oktavfel — hjärnan föredrar tempo nära 120 (Parncutt-resonanskurva).
+    const ac = new Float32Array(lagMax + 1);
     for (let lag = lagMin; lag <= lagMax; lag++) {
       let sum = 0;
-      for (let i = 0; i + lag < N; i++) sum += env[i] * env[i + lag];
-      if (sum > bestVal) { bestVal = sum; bestLag = lag; }
+      const M = N - lag;
+      for (let i = 0; i < M; i++) sum += env[i] * env[i + lag];
+      ac[lag] = sum / M;
+    }
+    let bestLag = 0, bestVal = 0;
+    for (let lag = lagMin; lag <= lagMax; lag++) {
+      let score = ac[lag];
+      if (2 * lag <= lagMax) score += 0.5 * ac[2 * lag];
+      if (3 * lag <= lagMax) score += 0.33 * ac[3 * lag];
+      const bpmAt = (HZ * 60) / lag;
+      const oct = Math.log2(bpmAt / 120);
+      const prior = Math.exp(-(oct * oct) / (2 * 0.4 * 0.4));   // 1.0 vid 120, ~0.46 vid 60/240
+      score *= prior;
+      if (score > bestVal) { bestVal = score; bestLag = lag; }
     }
     if (bestLag === 0 || bestVal <= 0) return;
     // OFF-BEAT-TEST → skilj äkta snabb takt (dans) från subdivision (ballad).
-    // 68 och 139 BPM ligger nästan en oktav isär, så autokorrelationens styrka
-    // ensam kan inte välja. Vik istället onset-envelopen på DUBBLA perioden,
-    // hitta bästa fas, och jämför energin PÅ slaget mot MELLAN slagen:
-    //   svaga mellanslag (hi-hats i en ballad) → sanna takten är den långsamma → halvera
-    //   starka mellanslag (varje slag i en danslåt) → snabb takt är äkta → behåll
+    // Vik onset-envelopen på DUBBLA perioden, jämför energi PÅ slaget vs MELLAN.
+    // Svaga mellanslag → sanna takten är halva; starka → behåll snabb takt.
     const P = bestLag * 2;
     if (P <= lagMax) {
       let bestPhase = 0, bestPhaseSum = -1;
       for (let ph = 0; ph < P; ph++) {
-        let s = 0; for (let i = ph; i < N; i += P) s += env[i] + mean;
+        let s = 0; for (let i = ph; i < N; i += P) s += Math.max(0, env[i]);
         if (s > bestPhaseSum) { bestPhaseSum = s; bestPhase = ph; }
       }
       let onE = 0, offE = 0;
       const offPh = (bestPhase + bestLag) % P;
-      for (let i = bestPhase; i < N; i += P) onE += Math.max(0, env[i] + mean);
-      for (let i = offPh; i < N; i += P) offE += Math.max(0, env[i] + mean);
-      if (onE > 0 && offE < onE * 0.45) bestLag = P;   // mellanslag TYDLIGT svaga (äkta ballad) → halvera; annars behåll snabb takt
+      for (let i = bestPhase; i < N; i += P) onE += Math.max(0, env[i]);
+      for (let i = offPh;    i < N; i += P) offE += Math.max(0, env[i]);
+      if (onE > 0 && offE < onE * 0.45) bestLag = P;
     }
+
     // Parabolisk interpolation kring toppen → sub-lag-precision (t.ex. 125 ist. 122).
     let lagF = bestLag;
     if (bestLag > lagMin && bestLag + 1 <= lagMax) {
