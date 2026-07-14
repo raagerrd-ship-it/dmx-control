@@ -82,11 +82,9 @@ export class EffectEngine {
       return this.universe;
     }
 
-    // SmartSync + Live Analysis drop-flash: everything white for the duration.
+    // Drop-flash (lokal strong-kick): everything white for the duration.
     const nowWall = Date.now();
-    const flashActive =
-      (this.cfg.flashUntil && nowWall < this.cfg.flashUntil) ||
-      (this.cfg.liveFlashUntil && nowWall < this.cfg.liveFlashUntil);
+    const flashActive = !!(this.cfg.flashUntil && nowWall < this.cfg.flashUntil);
     if (flashActive) {
       // White pop; optional hardware-strobe punch (fixture stutters on the
       // drop). Punch is opt-in — the clean pop is the default.
@@ -127,15 +125,12 @@ export class EffectEngine {
     // local energy average with a 12 s dwell so it never zaps around.
     let effMode: Mode = this.cfg.mode;
     if (this.cfg.mode === "smart") {
-      const se = this.cfg.sectionEnergy;
-      const fresh = se && now - se.atMs < 40_000;
-      const intensity = fresh ? se!.value : this.intensityEma;
-      const sectionChanged = fresh && se!.atMs !== this.lastSectionAt;
-        const bigJump = fresh && Math.abs(intensity - this.lastSmartIntensity) > 0.12;
-        if (sectionChanged || bigJump || now > this.smartDwellUntil) {
-        if (fresh) this.lastSectionAt = se!.atMs;
+      // Energi styr läget → lokal intensitet väljer pool; annars fast medel.
+      const intensity = this.cfg.energyDrivesMode ? this.intensityEma : 0.5;
+        const bigJump = this.cfg.energyDrivesMode && Math.abs(intensity - this.lastSmartIntensity) > 0.12;
+        if (bigJump || now > this.smartDwellUntil) {
         this.lastSmartIntensity = intensity;
-        this.smartDwellUntil = now + (this.cfg.smartDwellMs ?? 9_000);
+        this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
         // Rotate within a pool of modes that fit the current feel — mixed
         // order, never the same mode twice in a row.
         const POOLS: Mode[][] = [
@@ -261,12 +256,7 @@ function pickColor(
   wavePhase = 0,
   modeOverride?: Mode,
 ): [number, number, number] {
-  const { monoHue: monoHueRaw, cometHue: cometHueRaw, splitHueA, splitHueB } = cfg;
-  // Live Analysis färg-hint från tonart tar över mono/comet i 20 s efter senaste key-uppdatering.
-  const hint = cfg.liveHueHint;
-  const hintFresh = !!hint && (Date.now() - hint.atMs) < 20_000;
-  const monoHue = hintFresh ? hint!.primary : monoHueRaw;
-  const cometHue = hintFresh ? hint!.secondary : cometHueRaw;
+  const { monoHue, cometHue, splitHueA, splitHueB } = cfg;
   const mode = modeOverride ?? cfg.mode;
   // Taktindex/fas från den lokala BPM-klockan — för beat-låsta lägen.
   let beatIdx = 0, beatFrac = 0;

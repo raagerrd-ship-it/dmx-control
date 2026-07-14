@@ -43,7 +43,6 @@ export interface ServerDeps {
   /** Reset the AGC after an input-routing switch. */
   resetAgc: (startGain?: number) => void;
   setGainLock: (locked: boolean) => void;
-  onLiveBeat?: () => void;
 }
 
 export interface Server {
@@ -103,21 +102,6 @@ export async function startServer(
     prefix: "/",
   });
 
-  // Live Analysis-appen (byggd React-app) — serveras same-origin så dess
-  // WS-relay når /ws utan mixed content. Öppnas på http://<pi>/app/
-  await app.register(fastifyStatic, {
-    root: join(__dirname, "..", "webapp"),
-    prefix: "/app/",
-    decorateReply: false,
-  });
-  app.get("/app", (_req, reply) => reply.redirect("/app/"));
-  // SPA-fallback: klient-routade sidor (/app/live) finns inte som filer.
-  app.setNotFoundHandler((req, reply) => {
-    if (req.raw.url && req.raw.url.startsWith("/app/")) {
-      return reply.type("text/html").send(readFileSync(join(__dirname, "..", "webapp", "index.html")));
-    }
-    reply.code(404).send({ error: "not found" });
-  });
 
   // ---- Self-update ---------------------------------------------------------
   // The repo lives at /root/pi-dmx-src (or wherever `git clone` put it).
@@ -297,47 +281,17 @@ export async function startServer(
             const a = Math.max(0, Math.min(1, msg.value));
             deps.cfg.detection.tauUp   = 180 * Math.pow(10 / 180, a);
             deps.cfg.detection.tauDown = 60  * Math.pow(2  / 60,  a);
-          } else if (msg.type === "liveFlash") {
-            // Live Analysis (Essentia.js på mobilen) → drop-blixt om ~200 ms
-            // Föredra relativ tid (inMs) — mobilens och Pi:ns klockor kan skilja
-            // minuter (ingen RTC). Absolut atMs accepteras bara nära Pi-klockan.
-            const dur = typeof msg.durationMs === "number" ? msg.durationMs : 220;
-            const nowMs = Date.now();
-            let at = nowMs + 200;
-            if (typeof msg.inMs === "number") at = nowMs + Math.max(0, Math.min(2000, msg.inMs));
-            else if (typeof msg.atMs === "number" && Math.abs(msg.atMs - nowMs) < 2000) at = msg.atMs;
-            deps.cfg.liveFlashUntil = at + dur;
-            return;
-          } else if (msg.type === "liveHueHint" && typeof msg.primary === "number") {
-            const primary = ((msg.primary % 360) + 360) % 360;
-            const secondary = ((((msg.secondary ?? msg.primary + 30) as number) % 360) + 360) % 360;
-            deps.cfg.liveHueHint = { primary, secondary, atMs: Date.now() };
-            return;
-          } else if (msg.type === "smartDwell") {
-            const m = { slow: 20_000, normal: 9_000, fast: 4_000 } as Record<string, number>;
-            deps.cfg.smartDwellMs = m[msg.mode as string] ?? 9_000;
-            return;
-          } else if (msg.type === "punchOnDrop") {
-            deps.cfg.punchOnDrop = !!msg.enabled;
-            return;
-          } else if (msg.type === "beatPulse") {
-            deps.cfg.beatPulse = !!msg.enabled;
-            return;
-          } else if (msg.type === "liveEnergy" && typeof msg.value === "number") {
-            // Matar smart-lägets pool-väljare. atMs bara vid stora skiften så
-            // små driftvärden inte triggar mode-byten i onödan.
-            const v = Math.max(0, Math.min(1, msg.value));
-            const prev = deps.cfg.sectionEnergy;
-            deps.cfg.sectionEnergy = { value: v, atMs: prev && Math.abs(prev.value - v) < 0.2 ? prev.atMs : Date.now() };
-            return;
-          } else if (msg.type === "liveBeat" && typeof msg.bpm === "number") {
-            const nowB = Date.now();
-            let anchor = nowB;
-            if (typeof msg.inMs === "number") anchor = nowB + Math.max(0, Math.min(5000, msg.inMs));
-            else if (typeof msg.atMs === "number" && Math.abs(msg.atMs - nowB) < 5000) anchor = msg.atMs;
-            deps.cfg.beat = { anchorMs: anchor, bpm: msg.bpm };
-            deps.onLiveBeat?.();
-            return;
+          } else if (msg.type === "setBeatPulse") {
+            deps.cfg.beatPulse = !!msg.value;
+          } else if (msg.type === "setPunchOnDrop") {
+            deps.cfg.punchOnDrop = !!msg.value;
+          } else if (msg.type === "setEnergyDrivesMode") {
+            deps.cfg.energyDrivesMode = !!msg.value;
+          } else if (msg.type === "setDropSensitivity" && typeof msg.value === "number") {
+            deps.cfg.dropSensitivity = Math.max(0, Math.min(1, msg.value));
+          } else if (msg.type === "setSmartDwell") {
+            const m = { slow: 20000, normal: 9000, fast: 4000 } as Record<string, number>;
+            deps.cfg.smartDwellMs = m[msg.mode as string] ?? 9000;
           }
           deps.onConfigChanged?.();
           // Echo back

@@ -53,6 +53,16 @@ export interface EngineConfig {
   sensitivity: number;    // 0..1 user knob
   /** 0..1 kontrast: 0 = jämnt ljus, 1 = dovt i tystnad + smäll i beats. */
   dynamics: number;
+  /** Pulsa hela riggen på taktslag. */
+  beatPulse: boolean;
+  /** Lampans hårdvarustrobe som punch på drop. */
+  punchOnDrop: boolean;
+  /** Energi (lokal) väljer läge i smart-läget. */
+  energyDrivesMode: boolean;
+  /** Drop-blixt på starka slag: 0=av .. 1=känsligast. */
+  dropSensitivity: number;
+  /** Hur ofta smart byter läge (ms). */
+  smartDwellMs: number;
   master: number;         // 0..1 master brightness
   /** Hue 0..360 used by "mono" mode. 15 ≈ fire orange, 0 = red, 240 = blue. */
   monoHue: number;
@@ -72,20 +82,8 @@ export interface EngineConfig {
   identify?: { index: number } | null;
   /** Transient SmartSync flash override (wall-clock ms) — not persisted. */
   flashUntil?: number | null;
-  /** Transient: current section energy from SmartSync (drives "smart" mode). */
-  sectionEnergy?: { value: number; atMs: number } | null;
   /** Transient SmartSync beat clock (BPM + wall-clock anchor) — not persisted. */
   beat?: { anchorMs: number; bpm: number } | null;
-  /** Transient Live Analysis (Essentia.js på mobilen) drop-blixt — wall-clock ms. */
-  liveFlashUntil?: number | null;
-  /** Transient: hur ofta smart byter läge (ms). */
-  smartDwellMs?: number | null;
-  /** Transient: lampans hårdvarustrobe som punch på drop. */
-  punchOnDrop?: boolean | null;
-  /** Transient: pulsa hela riggen på taktslag. */
-  beatPulse?: boolean | null;
-  /** Transient Live Analysis färg-hint från tonart (degrees 0..360) — inte persisted. */
-  liveHueHint?: { primary: number; secondary: number; atMs: number } | null;
   /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */
   dmxMaxHz: number;
 }
@@ -111,6 +109,11 @@ export const defaultConfig: EngineConfig = {
   audioInput: "aux",
   sensitivity: 0.6,
   dynamics: 0.6,
+  beatPulse: false,
+  punchOnDrop: false,
+  energyDrivesMode: true,
+  dropSensitivity: 0.5,
+  smartDwellMs: 9000,
   master: 1.0,
   monoHue: 15,   // warm orange — feels like fire, but the user can pick anything
   cometHue: 15,  // fireball default; pick e.g. 220 for a blue comet

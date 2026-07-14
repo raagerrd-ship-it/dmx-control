@@ -23,6 +23,13 @@
     .seg { display:flex; gap:6px; }
     .seg button { flex:1; padding:11px 8px; background:var(--card); border:1px solid var(--line); border-radius:9px; color:var(--fg); font-size:14px; font-weight:500; cursor:pointer; }
     .seg button.active { background:var(--hot); border-color:var(--hot); color:#fff; }
+    .segmini { display:flex; gap:4px; }
+    .segmini button { padding:6px 10px; font-size:12px; }
+    .tgl { display:flex; align-items:center; justify-content:space-between; padding:8px 0; font-size:14px; }
+    .tgl input { width:42px; height:24px; -webkit-appearance:none; appearance:none; background:var(--line); border-radius:12px; position:relative; cursor:pointer; transition:background .15s; }
+    .tgl input:checked { background:var(--hot); }
+    .tgl input::after { content:''; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:#fff; transition:transform .15s; }
+    .tgl input:checked::after { transform:translateX(18px); }
     .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .row label { color: var(--dim); font-size: 13px; }
     .row .val { font-variant-numeric: tabular-nums; color: var(--fg); font-size: 13px; }
@@ -96,9 +103,12 @@
   </div>
 
   <div id="smartCard" class="card" style="display:none;margin-top:-4px">
-    <div class="row"><label>Smart-läget drivs av mobilens musikanalys</label></div>
-    <button class="btn primary" id="openLive" style="width:100%;margin-top:8px">🎵 Öppna Live-analys</button>
-    <div class="status">Öppnas i säkert läge (https) — godkänn certifikatet en gång.</div>
+    <label class="tgl"><span>Energi styr läget</span><input type="checkbox" id="tEnergy"></label>
+    <label class="tgl"><span>Byter läge</span>
+      <span class="seg segmini" id="segDwell">
+        <button data-dwell="slow">Sällan</button><button data-dwell="normal">Normal</button><button data-dwell="fast">Ofta</button>
+      </span>
+    </label>
   </div>
 
   <h1>Level <span class="kick-dot" id="kickDot"></span></h1>
@@ -109,6 +119,21 @@
     <div class="fx-actions" style="margin-top:10px">
       <button class="btn" id="inAux">AUX (kabel-in)</button>
       <button class="btn" id="inMic">Mic (inbyggd)</button>
+    </div>
+  </div>
+
+  <h1>Effekter</h1>
+  <div class="card">
+    <label class="tgl"><span>Pulsa ljuset på taktslag</span><input type="checkbox" id="tBeatPulse"></label>
+    <label class="tgl"><span>Punch (strobe) på drop</span><input type="checkbox" id="tPunch"></label>
+    <div class="setrow" style="margin-top:12px">
+      <label>Drop-blixt känslighet</label>
+      <div class="seg" id="segDrop">
+        <button data-drop="0">Av</button>
+        <button data-drop="0.3">Låg</button>
+        <button data-drop="0.6">Normal</button>
+        <button data-drop="0.9">Hög</button>
+      </div>
     </div>
   </div>
 
@@ -227,6 +252,11 @@ function aggToTau(a) {
 }
 
 // Segmenterade kontroller: markera knappen närmast configvärdet.
+function segActivateStr(groupId, value, attr) {
+  const g = document.getElementById(groupId);
+  if (!g) return;
+  g.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset[attr] === value));
+}
 function segActivate(groupId, value, attr) {
   const g = document.getElementById(groupId);
   if (!g) return;
@@ -277,6 +307,11 @@ function renderModes(current) {
 function applyConfig(cfg) {
   renderModes(cfg.mode);
   document.getElementById("smartCard").style.display = cfg.mode === "smart" ? "" : "none";
+  tBeatPulse.checked = !!cfg.beatPulse;
+  tPunch.checked = !!cfg.punchOnDrop;
+  tEnergy.checked = cfg.energyDrivesMode !== false;
+  segActivate("segDrop", cfg.dropSensitivity ?? 0.6, "drop");
+  segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
   inMic.classList.toggle("primary", cfg.audioInput === "mic");
   segActivate("segDyn", cfg.dynamics ?? 0.6, "dyn");
@@ -619,7 +654,16 @@ fxSaveBtn.onclick = () => {
 };
 
 
-document.getElementById("openLive").onclick = () => { location.href = `https://${location.hostname}/app/live`; };
+const tBeatPulse = document.getElementById("tBeatPulse");
+const tPunch = document.getElementById("tPunch");
+const tEnergy = document.getElementById("tEnergy");
+tBeatPulse.onchange = () => send({ type: "setBeatPulse", value: tBeatPulse.checked });
+tPunch.onchange = () => send({ type: "setPunchOnDrop", value: tPunch.checked });
+tEnergy.onchange = () => send({ type: "setEnergyDrivesMode", value: tEnergy.checked });
+document.querySelectorAll("#segDrop button").forEach((b) =>
+  b.onclick = () => { send({ type: "setDropSensitivity", value: Number(b.dataset.drop) }); segActivate("segDrop", Number(b.dataset.drop), "drop"); });
+document.querySelectorAll("#segDwell button").forEach((b) =>
+  b.onclick = () => { send({ type: "setSmartDwell", mode: b.dataset.dwell }); segActivateStr("segDwell", b.dataset.dwell, "dwell"); });
 renderModes("auto");
 connect();
 

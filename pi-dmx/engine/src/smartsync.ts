@@ -218,7 +218,6 @@ export class SmartSync {
 
   private applySection(preset: string, primaryHue: number, secondaryHue: number, energy?: number) {
     const cfg = this.deps.cfg;
-    if (typeof energy === "number") cfg.sectionEnergy = { value: Math.max(0, Math.min(1, energy)), atMs: Date.now() };
     // In "smart" mode the engine picks the effect itself from the section
     // energy — only colors and energy flow through.
     if (cfg.mode !== "smart") {
