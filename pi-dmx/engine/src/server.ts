@@ -289,6 +289,8 @@ export async function startServer(
             deps.cfg.energyDrivesMode = !!msg.value;
           } else if (msg.type === "setDropSensitivity" && typeof msg.value === "number") {
             deps.cfg.dropSensitivity = Math.max(0, Math.min(1, msg.value));
+          } else if (msg.type === "setRotation" && typeof msg.mode === "string") {
+            deps.cfg.rotation = { ...deps.cfg.rotation, [msg.mode]: !!msg.value };
           } else if (msg.type === "setSmartDwell") {
             const m = { slow: 20000, normal: 9000, fast: 4000 } as Record<string, number>;
             deps.cfg.smartDwellMs = m[msg.mode as string] ?? 9000;

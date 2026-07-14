@@ -66,50 +66,27 @@
     .btn.primary { background: var(--hot); border-color: var(--hot); color: white; }
     .btn.ok { background: transparent; border-color: var(--ok); color: var(--ok); }
     .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .rotrow { display:flex; align-items:center; justify-content:space-between; padding:9px 2px; font-size:15px; text-transform:capitalize; }
+    .rotrow + .rotrow { border-top:1px solid var(--line); }
   </style>
 </head>
 <body>
-  <h1>Mode</h1>
+  <h1>Show</h1>
   <div class="card">
-    <div class="modes" id="modes"></div>
-    <div id="monoCard" style="display:none;border-top:1px solid var(--line);margin-top:12px;padding-top:10px">
-      <div class="row"><label>Mono-färg</label><span class="val"><span id="monoSwatch" style="display:inline-block;width:18px;height:18px;border-radius:4px;vertical-align:middle;border:1px solid var(--line);margin-right:6px"></span><span id="monoVal">–</span>°</span></div>
-      <input type="range" id="monoHue" min="0" max="359" value="15" style="background:linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);height:10px;border-radius:5px;-webkit-appearance:none;appearance:none" />
-      <div class="fx-actions" style="margin-top:10px">
-        <button class="btn" data-preset-hue="0">Red</button>
-        <button class="btn" data-preset-hue="60">Yellow</button>
-        <button class="btn" data-preset-hue="120">Green</button>
-        <button class="btn" data-preset-hue="200">Cyan</button>
-        <button class="btn" data-preset-hue="240">Blue</button>
-        <button class="btn" data-preset-hue="290">Purple</button>
-        <button class="btn" data-preset-hue="330">Pink</button>
-      </div>
-    </div>
-    <div id="cometCard" style="display:none;border-top:1px solid var(--line);margin-top:12px;padding-top:10px">
-      <div class="row"><label>Chase-färg</label><span class="val"><span id="cometSwatch" style="display:inline-block;width:18px;height:18px;border-radius:4px;vertical-align:middle;border:1px solid var(--line);margin-right:6px"></span><span id="cometVal">–</span>°</span></div>
-      <input type="range" id="cometHue" min="0" max="359" value="15" style="background:linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);height:10px;border-radius:5px;-webkit-appearance:none;appearance:none" />
-      <div class="fx-actions" style="margin-top:10px">
-        <button class="btn" data-comet-hue="0">Red</button>
-        <button class="btn" data-comet-hue="60">Yellow</button>
-        <button class="btn" data-comet-hue="120">Green</button>
-        <button class="btn" data-comet-hue="200">Cyan</button>
-        <button class="btn" data-comet-hue="240">Blue</button>
-        <button class="btn" data-comet-hue="290">Purple</button>
-        <button class="btn" data-comet-hue="330">Pink</button>
-      </div>
-    </div>
-  </div>
-
-  </div>
-
-  <div id="smartCard" class="card" style="display:none;margin-top:-4px">
+    <div class="status" style="margin-bottom:8px">Smart-läge — anpassar ljuset efter musiken och roterar mellan de effekter du kryssat i.</div>
     <label class="tgl"><span>Energi styr läget</span><input type="checkbox" id="tEnergy"></label>
-    <label class="tgl"><span>Byter läge</span>
+    <label class="tgl"><span>Byter effekt</span>
       <span class="seg segmini" id="segDwell">
         <button data-dwell="slow">Sällan</button><button data-dwell="normal">Normal</button><button data-dwell="fast">Ofta</button>
       </span>
     </label>
   </div>
+
+  <h1>Lugna effekter</h1>
+  <div class="card"><div id="calmList" class="rotlist"></div></div>
+
+  <h1>Effekter med fart</h1>
+  <div class="card"><div id="fastList" class="rotlist"></div></div>
 
   <h1>Level <span class="kick-dot" id="kickDot"></span></h1>
   <div class="card">
@@ -217,8 +194,6 @@
 
 
 <script>
-const MODES = ["smart","drops","party","chase","wave","cycle","breathe","tide","snap","bounce","mono","blackout"];
-const modesEl = document.getElementById("modes");
 const kickDot = document.getElementById("kickDot");
 const levelBar = document.getElementById("levelBar");
 const levelVal = document.getElementById("levelVal");
@@ -227,14 +202,6 @@ const inAux = document.getElementById("inAux");
 const inMic = document.getElementById("inMic");
 inAux.onclick = () => send({ type: "setAudioInput", value: "aux" });
 inMic.onclick = () => send({ type: "setAudioInput", value: "mic" });
-const monoCard = document.getElementById("monoCard");
-const monoHueEl = document.getElementById("monoHue");
-const monoValEl = document.getElementById("monoVal");
-const monoSwatch = document.getElementById("monoSwatch");
-const cometCard = document.getElementById("cometCard");
-const cometHueEl = document.getElementById("cometHue");
-const cometValEl = document.getElementById("cometVal");
-const cometSwatch = document.getElementById("cometSwatch");
 const connEl = document.getElementById("conn");
 
 // Inverse of server's log curve: derive aggressiveness 0..1 from tauDown seconds.
@@ -289,24 +256,29 @@ function connect() {
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
 
-function renderModes(current) {
-  modesEl.innerHTML = "";
-  for (const m of MODES) {
-    const b = document.createElement("button");
-    b.className = "mode-btn" + (m === current ? " active" : "");
-    b.textContent = m;
-    b.onclick = () => send({ type: "setMode", mode: m });
-    modesEl.appendChild(b);
+const CALM_MODES = [["cycle","Cykel"],["breathe","Andas"],["tide","Tidvatten"],["mono","Enfärg"],["wave","Våg"]];
+const FAST_MODES = [["party","Party"],["chase","Jakt"],["drops","Drops"],["snap","Snap"],["bounce","Studs"]];
+let curRotation = {};
+function renderRotList(elId, list) {
+  const el = document.getElementById(elId);
+  el.innerHTML = "";
+  for (const [m, label] of list) {
+    const row = document.createElement("label");
+    row.className = "rotrow";
+    const on = curRotation[m] !== false;
+    row.innerHTML = `<span>${label}</span><input type="checkbox" class="tgl" ${on ? "checked" : ""}>`;
+    row.querySelector("input").onchange = (e) => { curRotation[m] = e.target.checked; send({ type: "setRotation", mode: m, value: e.target.checked }); };
+    el.appendChild(row);
   }
-  const next = document.createElement("button");
-  next.className = "mode-btn";
-  next.textContent = "Nästa →";
-  next.onclick = () => send({ type: "cycleMode" });
-  modesEl.appendChild(next);
 }
+function renderCategories() {
+  renderRotList("calmList", CALM_MODES);
+  renderRotList("fastList", FAST_MODES);
+}
+
 function applyConfig(cfg) {
-  renderModes(cfg.mode);
-  document.getElementById("smartCard").style.display = cfg.mode === "smart" ? "" : "none";
+  curRotation = cfg.rotation || {};
+  renderCategories();
   tBeatPulse.checked = !!cfg.beatPulse;
   tPunch.checked = !!cfg.punchOnDrop;
   tEnergy.checked = cfg.energyDrivesMode !== false;
@@ -317,18 +289,6 @@ function applyConfig(cfg) {
   segActivate("segDyn", cfg.dynamics ?? 0.6, "dyn");
   segActivate("segMaster", cfg.master ?? 1, "master");
   segActivate("segSpeed", tauDownToAgg(cfg.detection?.tauDown ?? 30) > 0.5 ? 0.85 : 0.15, "agg");
-  // Mono color card: only meaningful when mode === "mono", but we keep the
-  // slider synced regardless so switching to mono lands on the right color.
-  const hue = Math.round(cfg.monoHue ?? 15);
-  monoHueEl.value = hue;
-  monoValEl.textContent = hue;
-  monoSwatch.style.background = `hsl(${hue} 100% 50%)`;
-  monoCard.style.display = cfg.mode === "mono" ? "" : "none";
-  const chue = Math.round(cfg.cometHue ?? 15);
-  cometHueEl.value = chue;
-  cometValEl.textContent = chue;
-  cometSwatch.style.background = `hsl(${chue} 100% 50%)`;
-  cometCard.style.display = cfg.mode === "chase" ? "" : "none";
   identifyingIndex = cfg.identify?.index ?? -1;
   if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
   else renderFixtures();
@@ -345,32 +305,6 @@ function applyFrame(f) {
     kickTimer = setTimeout(() => kickDot.classList.remove("on"), 120);
   }
 }
-monoHueEl.oninput = () => {
-  const h = Number(monoHueEl.value);
-  monoValEl.textContent = h;
-  monoSwatch.style.background = `hsl(${h} 100% 50%)`;
-  send({ type: "setMonoHue", value: h });
-};
-document.querySelectorAll("[data-preset-hue]").forEach((b) => {
-  b.onclick = () => {
-    const h = Number(b.dataset.presetHue);
-    monoHueEl.value = h;
-    monoHueEl.dispatchEvent(new Event("input"));
-  };
-});
-cometHueEl.oninput = () => {
-  const h = Number(cometHueEl.value);
-  cometValEl.textContent = h;
-  cometSwatch.style.background = `hsl(${h} 100% 50%)`;
-  send({ type: "setCometHue", value: h });
-};
-document.querySelectorAll("[data-comet-hue]").forEach((b) => {
-  b.onclick = () => {
-    const h = Number(b.dataset.cometHue);
-    cometHueEl.value = h;
-    cometHueEl.dispatchEvent(new Event("input"));
-  };
-});
 
 
 /* ── Fixture editor ─────────────────────────────────────────────────── */
@@ -664,8 +598,10 @@ document.querySelectorAll("#segDrop button").forEach((b) =>
   b.onclick = () => { send({ type: "setDropSensitivity", value: Number(b.dataset.drop) }); segActivate("segDrop", Number(b.dataset.drop), "drop"); });
 document.querySelectorAll("#segDwell button").forEach((b) =>
   b.onclick = () => { send({ type: "setSmartDwell", mode: b.dataset.dwell }); segActivateStr("segDwell", b.dataset.dwell, "dwell"); });
-renderModes("auto");
+renderCategories();
 connect();
+// Smart är alltid läget.
+setTimeout(() => send({ type: "setMode", mode: "smart" }), 400);
 
 /* ── WiFi / hotspot ─────────────────────────────────────────────────── */
 const wifiActive  = document.getElementById("wifiActive");

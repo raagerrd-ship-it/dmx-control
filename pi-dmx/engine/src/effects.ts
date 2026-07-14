@@ -136,17 +136,17 @@ export class EffectEngine {
         if (bigJump || now > this.smartDwellUntil) {
         this.lastSmartIntensity = intensity;
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
-        // Rotate within a pool of modes that fit the current feel — mixed
-        // order, never the same mode twice in a row.
-        const POOLS: Mode[][] = [
-          ["cycle", "wave", "mono", "chase"],     // lugnt
-          ["wave", "chase", "drops", "cycle"],    // mellan
-          ["party", "drops", "chase", "wave"],    // högt tryck
-        ];
-        const pool = POOLS[intensity < 0.3 ? 0 : intensity < 0.6 ? 1 : 2];
+        // Two categories; user checkboxes (cfg.rotation) pick which modes are in
+        // play. Low intensity → Lugn, high → Fart. Mixed order, no repeat.
+        const CALM: Mode[] = ["cycle", "breathe", "tide", "mono", "wave"];
+        const FAST: Mode[] = ["party", "chase", "drops", "snap", "bounce"];
+        const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
+        let pool = intensity < 0.45 ? enabled(CALM) : enabled(FAST);
+        if (pool.length === 0) pool = enabled(intensity < 0.45 ? FAST : CALM);      // andra kategorin
+        if (pool.length === 0) pool = ["cycle"];                                    // sista fallback
         this.smartCount++;
         let next = pool[Math.floor(((this.smartCount * 0.61803398875) % 1) * pool.length)];
-        if (next === this.smartMode) next = pool[(pool.indexOf(next) + 1) % pool.length];
+        if (next === this.smartMode && pool.length > 1) next = pool[(pool.indexOf(next) + 1) % pool.length];
         this.smartMode = next;
       }
       effMode = this.smartMode;
