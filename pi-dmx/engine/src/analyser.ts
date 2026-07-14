@@ -14,8 +14,10 @@ export interface Frame {
   kick: boolean;        // true on rising edge only
   gain: number;         // current auto-gain factor (debug)
   bpm: number;          // 0 = ej låst; lokal tempo-estimat via autokorrelation
+  bpmConfidence: number;// 0..1, hur tydlig vinnande takttoppen är (peak-to-mean)
   beatAnchorMs: number; // wall-clock ms för ett taktslag (fas)
 }
+
 
 export class Analyser {
   private fft: FFT;
