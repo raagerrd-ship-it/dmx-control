@@ -226,7 +226,6 @@ export async function startServer(
       const sock: any = (conn as any).socket ?? conn;
       // Send initial state
       sock.send(JSON.stringify({ type: "config", config: deps.cfg }));
-      sock.send(JSON.stringify({ type: "smartSync", ...deps.smartSync.state() }));
 
       // Push frame samples at 20 Hz for the level meter
       const push = setInterval(() => {
