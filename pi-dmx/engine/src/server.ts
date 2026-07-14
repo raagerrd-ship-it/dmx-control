@@ -16,7 +16,7 @@ import { readFileSync, existsSync } from "node:fs";
 import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import type { Frame } from "./analyser.js";
-import type { SmartSync, SmartSyncPublicState } from "./smartsync.js";
+
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -43,7 +43,6 @@ export interface ServerDeps {
   onConfigChanged?: () => void;
   /** Advance to the next mode in the shared cycle. Returns the new mode. */
   cycleMode: () => Mode;
-  smartSync: SmartSync;
   /** Reset the AGC after an input-routing switch. */
   resetAgc: (startGain?: number) => void;
   setGainLock: (locked: boolean) => void;
@@ -53,8 +52,6 @@ export interface Server {
   app: FastifyInstance;
   /** Push current config to all connected clients (e.g. after a physical button press) */
   broadcastConfig: () => void;
-  /** Push SmartSync state to all connected clients. */
-  broadcastSmartSync: (st: SmartSyncPublicState) => void;
 }
 
 export async function startServer(
@@ -229,7 +226,6 @@ export async function startServer(
       const sock: any = (conn as any).socket ?? conn;
       // Send initial state
       sock.send(JSON.stringify({ type: "config", config: deps.cfg }));
-      sock.send(JSON.stringify({ type: "smartSync", ...deps.smartSync.state() }));
 
       // Push frame samples at 20 Hz for the level meter
       const push = setInterval(() => {
@@ -281,10 +277,6 @@ export async function startServer(
           } else if (msg.type === "identifyStop") {
             stopIdentify();
             return;
-          } else if (msg.type === "smartSyncEnable") {
-            if (msg.enabled) deps.smartSync.enable();
-            else deps.smartSync.disable();
-            return; // state pushed via onState
           } else if (msg.type === "setDmxMaxHz" && typeof msg.value === "number") {
             deps.cfg.dmxMaxHz = Math.max(30, Math.min(500, Math.round(msg.value)));
           } else if (msg.type === "setAgcTarget" && typeof msg.value === "number") {
@@ -330,13 +322,7 @@ export async function startServer(
       if (c.readyState === 1) c.send(payload);
     }
   };
-  const broadcastSmartSync = (st: SmartSyncPublicState) => {
-    const payload = JSON.stringify({ type: "smartSync", ...st });
-    for (const c of app.websocketServer.clients) {
-      if (c.readyState === 1) c.send(payload);
-    }
-  };
-  return { app, broadcastConfig, broadcastSmartSync };
+  return { app, broadcastConfig };
 }
 
 function isMode(m: unknown): m is Mode {

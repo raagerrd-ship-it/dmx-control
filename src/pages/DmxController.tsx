@@ -4,9 +4,6 @@ import { LiveControls } from "@/components/LiveControls";
 import { FixtureSetup } from "@/components/FixtureSetup";
 import { LivePreview } from "@/components/LivePreview";
 import { HueColorCard } from "@/components/HueColorCard";
-import { SmartSyncPanel } from "@/components/SmartSyncPanel";
-import { LiveAnalysisPanel } from "@/components/LiveAnalysisPanel";
-import { MicCalibration } from "@/components/MicCalibration";
 
 import { useMockLive } from "@/hooks/useMockLive";
 import { useDmx, presetById } from "@/store/dmx";
@@ -69,10 +66,6 @@ export default function DmxController() {
       <section className="flex-1 px-5 py-4 space-y-4 safe-bottom">
         {tab === "live" ? (
           <>
-            <SmartSyncPanel />
-            <LiveAnalysisPanel />
-            <MicCalibration />
-
             <PresetGrid />
             {preset === "mono"  && <HueColorCard label="Mono-färg"  hue={monoHue}  onChange={(h) => patch({ monoHue: h })} />}
             {(preset === "comet" || preset === "chase") && (

@@ -1,9 +1,7 @@
 import { useEffect, useRef } from "react";
-import { presetById, useDmx, type PresetId } from "@/store/dmx";
+import { presetById, useDmx } from "@/store/dmx";
 import { smoothStep, softnessToAlpha } from "@/lib/audioCurve";
 import { useMic } from "@/hooks/useMic";
-import { activeOverride } from "@/store/smartSync";
-import { liveActiveFlash } from "@/store/liveAnalysis";
 
 /**
  * Mock live-loop: simulerar mic-nivå + kick och genererar DMX-frame
@@ -66,24 +64,9 @@ export function useMockLive() {
       const dt = Math.max(0.001, Math.min(0.1, t - lastT.current));
       lastT.current = t;
       const st = useDmx.getState();
-      const { params, fixtures } = st;
-      let { preset } = st;
+      const { params, fixtures, preset } = st;
       const sens = params.sensitivity / 100;
 
-      // === Smart Sync override: aktiv section byter preset + hue, aktiv flash → drop-blixt ===
-      const nowWall = Date.now();
-      const ovr = activeOverride(nowWall);
-      let smartFlash = ovr.flashUntil > nowWall || liveActiveFlash(nowWall);
-      let smartPrimaryHue: number | null = null;
-      let smartSecondaryHue: number | null = null;
-      if (ovr.section) {
-        const p = ovr.section.preset;
-        if (p === "auto" || p === "party" || p === "strobe" || p === "comet" || p === "chase" || p === "split" || p === "mono") {
-          preset = p as PresetId;
-        }
-        smartPrimaryHue = ovr.section.primaryHue;
-        smartSecondaryHue = ovr.section.secondaryHue;
-      }
 
       const releaseAlpha = softnessToAlpha(params.smoothness);
       const attackAlpha = 1.0;
@@ -164,13 +147,12 @@ export function useMockLive() {
         else if (chasePos.current <= 0)           { chasePos.current = 0;                chaseDir.current =  1; }
       }
 
-      // Applicera Smart Sync hue-override om aktiv
-      const cometHue    = smartPrimaryHue   ?? params.cometHue;
-      const monoHue     = smartPrimaryHue   ?? params.monoHue;
-      const splitHueA   = smartPrimaryHue   ?? params.splitHueA;
-      const splitHueB   = smartSecondaryHue ?? params.splitHueB;
-      // Smart Sync-flash = tvinga vit blixt (drop-punkt)
-      const flashNow = flashActive || smartFlash;
+      const cometHue  = params.cometHue;
+      const monoHue   = params.monoHue;
+      const splitHueA = params.splitHueA;
+      const splitHueB = params.splitHueB;
+      const flashNow  = flashActive;
+
 
       fixtures.forEach((f, idx) => {
         let r = 0, g = 0, b = 0, w = 0;

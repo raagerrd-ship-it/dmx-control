@@ -19,7 +19,7 @@ import { DmxSender } from "./dmx.js";
 import { startServer, applyInputRouting, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
-import { SmartSync } from "./smartsync.js";
+
 import { activeSlots, type Mode } from "./config.js";
 
 // Physical button cycles through the fun modes (skips blackout so the button never kills the show).
@@ -101,7 +101,7 @@ capture.on("chunk", (samples: Float32Array) => {
       cfg.flashUntil = Date.now() + 150;
     }
   }
-  smartSync.feed(samples);
+
 
   // Frikoppla render från analysrate: analysern (FFT/onset/BPM) körs varje chunk
   // (~375 Hz) för tighta drops, men effekterna behöver bara ~60 Hz för lamporna.
@@ -120,15 +120,6 @@ capture.on("exit", (code) => console.error("[arecord] exited", code));
 
 capture.start();
 
-// SmartSync: song-identification driven show (needs internet → hotspot mode).
-const smartSync = new SmartSync({
-  cfg,
-  onConfigChanged: () => {
-    scheduleSave(cfg);
-    server?.broadcastConfig();
-  },
-  onState: (st) => server?.broadcastSmartSync(st),
-});
 
 // Shared mode cycler — used by both the physical button and the WS "cycleMode" message,
 // so UI and hardware follow the exact same path.
@@ -152,7 +143,6 @@ const serverDeps = {
   // Frisk = en ljud-chunk bearbetad senaste 10 s (arecord + event-loop lever).
   getHealthy: () => Date.now() - lastChunkAt < 10000,
   cycleMode,
-  smartSync,
 
   resetAgc: (g?: number) => analyser.resetGain(g),
   setGainLock: (locked: boolean) => analyser.setGainLock(locked, 1),
@@ -164,8 +154,8 @@ const serverDeps = {
 };
 const s80 = await startServer(serverDeps, Number(process.env.PORT ?? 80));
 
-// HTTPS on 443 (self-signed) — the phone microphone (getUserMedia in the
-// Live Analysis app) requires a secure context, and wss must be same-origin.
+// HTTPS on 443 (self-signed) — kept in case future features need a secure
+// context on the phone (getUserMedia etc.). Optional, serves same routes.
 let s443: Server | null = null;
 const TLS_KEY = "/etc/audio-dmx/tls/key.pem";
 const TLS_CERT = "/etc/audio-dmx/tls/cert.pem";
@@ -180,7 +170,6 @@ if (existsSync(TLS_KEY) && existsSync(TLS_CERT)) {
 server = {
   app: s80.app,
   broadcastConfig: () => { s80.broadcastConfig(); s443?.broadcastConfig(); },
-  broadcastSmartSync: (st) => { s80.broadcastSmartSync(st); s443?.broadcastSmartSync(st); },
 };
 console.log(`audio-dmx-engine listening on ${server.app.server.address()}`);
 
@@ -216,7 +205,6 @@ if (cfg.modeButton) {
 }
 
 process.on("SIGTERM", () => {
-  smartSync.disable();
   capture.stop();
   button?.stop();
   dmx.close();
