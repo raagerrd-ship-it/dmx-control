@@ -103,6 +103,9 @@ export async function startServer(
     root: join(__dirname, "..", "public"),
     prefix: "/",
   });
+  // Ägar-/setup-sida: samma app, men fixture-/system-/wifi-sektionerna avslöjas
+  // bara här (klienten kollar /setup i URL:en). Hyresgäster använder "/".
+  app.get("/setup", (_req, reply) => reply.sendFile("index.html"));
 
 
   // ---- Self-update ---------------------------------------------------------

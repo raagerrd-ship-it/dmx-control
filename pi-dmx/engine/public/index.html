@@ -70,6 +70,7 @@
     .rotrow + .rotrow { border-top:1px solid var(--line); }
     .rotrow.playing { background:color-mix(in srgb, var(--hot) 18%, transparent); border-left-color:var(--hot); font-weight:600; }
     .rotrow.playing span::after { content:"● SPELAS"; margin-left:8px; font-size:10px; font-weight:700; letter-spacing:.5px; color:var(--hot); vertical-align:middle; }
+    .owner-banner { background:color-mix(in srgb, var(--hot) 14%, transparent); border:1px solid var(--hot); border-radius:10px; padding:10px 12px; margin:14px 0 4px; font-size:13px; line-height:1.4; }
   </style>
 </head>
 <body>
@@ -146,6 +147,9 @@
     </div>
   </div>
 
+  <div id="ownerOnly" hidden>
+  <div class="owner-banner">🔧 Ägarläge (setup). Den här sidan är dold för hyresgäster — de öppnar adressen utan <b>/setup</b>.</div>
+
   <h1>Fixtures</h1>
   <div class="card">
     <div id="fixtures"></div>
@@ -194,11 +198,18 @@
       för uppdateringar m.m.). Annars startar Pi:n sin egen AP "pi-dmx".
     </div>
   </div>
+  </div><!-- /ownerOnly -->
 
   <div class="status" id="conn">Connecting…</div>
 
 
 <script>
+// Ägarläge: fixture-/system-/wifi-sektionerna visas bara på setup-sidan
+// (adress med /setup eller #setup). Hyresgäster öppnar bara "/" och ser dem
+// aldrig → kan inte råka ändra eller tappa DMX-adresserna.
+const OWNER_MODE = /setup/i.test(location.pathname) || /setup/i.test(location.hash);
+if (OWNER_MODE) { const o = document.getElementById("ownerOnly"); if (o) o.hidden = false; }
+
 const kickDot = document.getElementById("kickDot");
 const levelBar = document.getElementById("levelBar");
 const levelVal = document.getElementById("levelVal");
