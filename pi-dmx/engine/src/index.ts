@@ -43,6 +43,7 @@ dmx.setMaxHz(cfg.dmxMaxHz);
 
 let latestFrame: Frame | null = null;
 let lastDropMs = 0;
+let lastRenderMs = 0;
 let fluxBaseline = 0.1;
 let curSlots = activeSlots(cfg.fixtures);
 
@@ -85,8 +86,17 @@ capture.on("chunk", (samples: Float32Array) => {
     }
   }
   smartSync.feed(samples);
-  const universe = effects.render(frame);
-  dmx.send(universe, curSlots);
+
+  // Frikoppla render från analysrate: analysern (FFT/onset/BPM) körs varje chunk
+  // (~375 Hz) för tighta drops, men effekterna behöver bara ~60 Hz för lamporna.
+  // Att rendera 375x/s var slöseri (rate-limiten kastade 85%) och orsaken till
+  // att Node låg ~2% efter realtid. Nu rendras bara var ~16:e ms.
+  const nowR = performance.now();
+  if (nowR - lastRenderMs >= 16) {
+    lastRenderMs = nowR;
+    const universe = effects.render(latestFrame);
+    dmx.send(universe, curSlots);
+  }
 });
 
 capture.on("stderr", (s) => console.error("[arecord]", s));
