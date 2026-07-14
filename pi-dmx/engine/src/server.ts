@@ -237,8 +237,11 @@ export async function startServer(
             energy: frame.energy,
             kick: frame.kick,
             gain: frame.gain,
+            bpm: frame.bpm,
+            bpmConfidence: frame.bpmConfidence,
             mode: deps.getActiveMode(),
           }));
+
         }
       }, 50);
 
