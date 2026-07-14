@@ -16,7 +16,7 @@ import { readFileSync, existsSync } from "node:fs";
 import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import type { Frame } from "./analyser.js";
-import type { SmartSync, SmartSyncPublicState } from "./smartsync.js";
+
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
