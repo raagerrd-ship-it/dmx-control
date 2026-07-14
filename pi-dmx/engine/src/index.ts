@@ -30,8 +30,7 @@ const cfg = await loadConfig();
 const LEGACY_MODES: Record<string, Mode> = { auto: "wave", comet: "wave", split: "party", strobe: "party", pulse: "drops", spectrum: "wave", vu: "cycle" };
 if (LEGACY_MODES[cfg.mode as string]) cfg.mode = LEGACY_MODES[cfg.mode as string];
 if (!["smart","drops","party","chase","wave","cycle","breathe","tide","snap","bounce","mono","aurora","drift","sweep","pulse","strobe","rave","blackout"].includes(cfg.mode)) cfg.mode = "smart";
-// Analys-hop är inte användarinställbar — tvinga 100 Hz oavsett sparad config.
-cfg.fft.hop = 480;
+cfg.fft.hop = 128;   // analys 375 Hz (beprövad tuning); render/DMX separat 50 Hz
 
 // Re-apply the chosen codec input routing (the boot service restores the aux
 // default; this honors a persisted mic choice).

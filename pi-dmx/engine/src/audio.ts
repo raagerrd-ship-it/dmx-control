@@ -52,7 +52,7 @@ export class AudioCapture extends EventEmitter {
       "-r", String(this.opts.rate),
       "-c", String(this.opts.channels),
       "-t", "raw",
-      "--buffer-size=2048",
+      "--buffer-size=1024",   // ~21 ms — håll capture-latensen låg, låt drift droppa via overrun
       "--period-size=128",
       "-q",
     ];

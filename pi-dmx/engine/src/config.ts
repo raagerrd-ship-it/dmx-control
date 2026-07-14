@@ -90,7 +90,7 @@ export interface EngineConfig {
 
 export const defaultConfig: EngineConfig = {
   audio: { device: "hw:0,0", rate: 48000, channels: 2 },
-  fft: { size: 512, hop: 480 },
+  fft: { size: 512, hop: 128 },
   detection: {
     autoGainTarget: 0.5,
     tauUp: 90,
