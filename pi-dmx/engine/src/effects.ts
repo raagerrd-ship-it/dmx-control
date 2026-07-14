@@ -339,12 +339,13 @@ function pickColor(
   };
   switch (mode) {
     case "party": {
-      // Full fart: FÄRGKAOS-PUMP — varje lampa har sin egen rena färg som
-      // blandas om varje takt, hela riggen slår till på beatet och faller mörk
-      // emellan. Mångfärgat och drivet — motsats till snap (unisont).
+      // Full fart: FÄRGKAOS-PUMP — varje lampa egen ren färg (blandas om varje
+      // takt) och hela riggen THROBBAR hårt: mörk mellan slagen, full på beatet.
+      // Fast lågt golv (12%) så pumpen verkligen syns — det är partyts signatur.
       const hue = mixedSector(beatIdx + idx * 2) / 6;
-      const v = punchFloor + (1 - punchFloor) * Math.min(1, beatPulse * 0.95 + audio * 0.2 + kickEnv * 0.8);
-      return hsvToRgb(hue, 1, v);   // rena färger som pumpar; ingen urtvättande vit-blixt
+      const pump = Math.min(1, beatPulse * 1.0 + kickEnv * 0.7);
+      const v = 0.12 + 0.88 * pump;
+      return hsvToRgb(hue, 1, v);
     }
     case "drops": {
       // Every beat paints the next lamp in a fresh pure color that decays —
@@ -388,11 +389,12 @@ function pickColor(
       return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
     case "snap": {
-      // Full fart: UNISONT FÄRGSLAG — alla lampor samma rena färg, hård kapning
-      // till en NY färg exakt på varje taktslag. Håller ljuset uppe (ingen pump)
-      // så det läser som ett färg-diaspel i takt; snabb fade ger färgsläp i kapet.
+      // Full fart: UNISONT FÄRGSLAG — alla lampor SAMMA färg, KONSTANT ljus (ingen
+      // pump), hård kapning till en NY färg exakt på taktslaget. Läser som en
+      // färg-slideshow i takt; snabb fade ger färgsläp i själva kapet. Motsats
+      // till party (mörk throb) och rave (spatial växling).
       const hue = mixedSector(beatIdx) / 6;
-      const v = Math.min(1, 0.72 + kickEnv * 0.28 + audio * 0.18);
+      const v = Math.min(1, 0.9 + audio * 0.1);
       return hsvToRgb(hue, 1, v);
     }
     case "bounce": {
@@ -445,15 +447,17 @@ function pickColor(
       return hsvToRgb(hue, 1, 1);
     }
     case "rave": {
-      // Full fart: HÅRT SCHACKRUTS-VÄXELSPEL — varannan lampa lyser, grupperna
-      // byter på varje takt i kontrasterande färger, HELT släckt emellan för
-      // maximal kontrast. Läser tydligt även på 3 lampor (0,2 mot 1).
+      // Full fart: TVÅFÄRGS-VÄXELSPEL — riggen delas varannan lampa i två grupper
+      // med KONTRASTFÄRGER (motsatta sidor av hjulet) som PINGPONGAR plats varje
+      // takt, HELT släckt grupp emellan. Färgparet är STABILT i 4 takter så ögat
+      // ser tydligt "A / B / A / B" (på 3 lampor: 0,2 mot 1) — inte färgbyte varje
+      // slag som gör den lik party/snap.
       const even = idx % 2 === 0;
       const flip = beatIdx % 2 === 0;
       const lit = even === flip;
-      const hue = mixedSector(beatIdx + (even ? 0 : 3)) / 6;   // motfärger mellan grupperna
-      const v = lit ? Math.min(1, 0.9 + beatPulse * 0.1 + kickEnv * 0.3) : 0;
-      return hsvToRgb(hue, 1, v);
+      const pairBase = mixedSector(Math.floor(beatIdx / 4));
+      const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;
+      return hsvToRgb(hue, 1, lit ? 1 : 0);
     }
     case "chase": {
       // Snabb LÖPARE: skarpt huvud som hoppar ETT steg per taktslag, kort svans,
