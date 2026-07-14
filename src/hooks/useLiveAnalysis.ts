@@ -18,7 +18,8 @@ import { loadEssentia } from "@/lib/essentia/loader";
 const SAMPLE_RATE_TARGET = 22050;
 const RING_SECONDS = 4;
 const RING_SIZE = SAMPLE_RATE_TARGET * RING_SECONDS;
-const LOOKAHEAD_MS = 200;
+const LOOKAHEAD_MS = 0;   // fyra direkt — onset detekteras redan på slaget,
+                         // extra fördröjning gjorde blixten sen
 
 export function useLiveAnalysisRunner() {
   const enabled = useLiveAnalysis((s) => s.enabled);
