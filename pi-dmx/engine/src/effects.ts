@@ -127,7 +127,7 @@ export class EffectEngine {
     let effMode: Mode = this.cfg.mode;
     if (this.cfg.mode === "smart") {
       // Energi styr läget → lokal intensitet väljer pool; annars fast medel.
-      const intensity = this.cfg.energyDrivesMode ? Math.min(1, this.intensityEma / Math.max(0.08, this.intensityPeak)) : 0.5;
+      const intensity = this.cfg.energyDrivesMode ? Math.min(1, this.intensityEma / Math.max(0.6, this.intensityPeak)) : 0.5;
         // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
         const LUGN: Mode[] = ["cycle", "breathe", "tide", "mono", "aurora", "drift"];
@@ -169,13 +169,14 @@ export class EffectEngine {
     // Advance the wave phase by dt so speed changes glide instead of jumping.
     const dtSec = Math.min(0.1, (now - this.lastRenderMs) / 1000);
     this.lastRenderMs = now;
-    // Intensitet = envelope-följare på energin: SNABB attack (drops registreras
-    // direkt) + långsammare release (lugna partier hinner falla till lugnt).
-    const inst = Math.max(audio, kickEnv * 0.8);
-    const aUp = 1 - Math.exp(-dtSec / 0.4);
-    const aDown = 1 - Math.exp(-dtSec / 3.0);
-    this.intensityEma += (inst - this.intensityEma) * (inst > this.intensityEma ? aUp : aDown);
-    this.intensityPeak = Math.max(this.intensityEma, this.intensityPeak - dtSec / 40 * this.intensityPeak);
+    // Sektionsenergi för nivåval: JÄMN medelnivå av ljudnivån — INTE per-beat
+    // spikar. (Förut ingick kickEnv, som spikar på varje slag och pinnade allt
+    // till Full Fart.) Attack lite snabbare än release så uppbyggnader/drops
+    // ändå syns inom någon sekund, men enskilda slag slätas ut.
+    const aUp = 1 - Math.exp(-dtSec / 1.2);
+    const aDown = 1 - Math.exp(-dtSec / 4.0);
+    this.intensityEma += (audio - this.intensityEma) * (audio > this.intensityEma ? aUp : aDown);
+    this.intensityPeak = Math.max(this.intensityEma, this.intensityPeak - dtSec / 60 * this.intensityPeak);
 
     // Silence gate: below threshold for 4 s → fade out over 2 s; music back →
     // fade in fast. Mode floors otherwise keep the lamps glowing in silence.
