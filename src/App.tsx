@@ -6,6 +6,7 @@ const App = () => (
   <BrowserRouter basename={import.meta.env.BASE_URL}>
     <Routes>
       <Route path="/" element={<DmxController />} />
+      <Route path="/setup" element={<DmxController />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   </BrowserRouter>
