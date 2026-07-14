@@ -54,9 +54,12 @@ export function useMockLive() {
   const chaseDir = useRef(1);
   const lastChaseAdvance = useRef(0);
 
-  // fejkad musikkälla: bas-sinus + slumpade "beats" var 0.35–0.6s + drop var 8–14s
-  const nextBeat = useRef(0.5);
+  // fejkad musikkälla: stabil 128 BPM = 0.469s mellan beats + drop var 8–14s
+  const MOCK_BPM = 128;
+  const BEAT_PERIOD = 60 / MOCK_BPM;
+  const nextBeat = useRef(BEAT_PERIOD);
   const nextDrop = useRef(10);
+
 
   useEffect(() => {
     const tick = () => {
