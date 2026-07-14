@@ -184,7 +184,9 @@ export class EffectEngine {
 
     // Output ballistics on color/dim channels (never strobe/mode channels —
     // a decaying strobe value would sweep through real strobe speeds).
-    const decay = Math.exp(-dtSec / 0.3);
+    // Snappare fade-out i energiska lägen så pumpen syns; lugna behåller mjukheten.
+    const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops";
+    const decay = Math.exp(-dtSec / (fastMode ? 0.12 : 0.3));
     const skip = new Set<number>();
     for (const fx of this.cfg.fixtures) {
       const roles = fixtureRoles(fx);
@@ -295,9 +297,8 @@ function pickColor(
       // (som saturerade nära 100%). Motroterande rena färger, vit punch på kick.
       const dir = idx % 2 === 0 ? 1 : -1;
       const hue = snapHue(idx, ((t * 90 * dir + idx * 137) % 360 + 360) % 360 / 360);
-      const v = shaped(0.08, kickEnv * 0.95 + audio * 0.15);
-      const sat = kickEnv > 0.7 ? 0 : 1;            // vit blixt bara på riktiga transienter
-      return hsvToRgb(hue, sat, v);
+      const v = shaped(0.05, kickEnv * 1.0 + audio * 0.1);
+      return hsvToRgb(hue, 1, v);   // rena färger som pumpar; ingen urtvättande vit-blixt
     }
     case "drops": {
       // Every beat paints the next lamp in a fresh pure color that decays —
