@@ -34,7 +34,7 @@ export class Analyser {
   private envAccumT = 0;
   private bpmCounter = 0;
   private localBpm = 0;
-  private pendingBpm = 0;   // senaste råestimat, för bekräftelse av stora hopp
+  private bpmHist: number[] = [];   // senaste råestimat (~3s) för median-stabilisering
   private silentMs = 0;
   private beatAnchorMs = 0;
   private gain = 1;
@@ -61,9 +61,20 @@ export class Analyser {
     if (locked) { this.gain = fixed; this.envelope = 0; }
   }
 
-  /** Autokorrelation av onset-envelopen -> BPM (75..170), oktavvikt + glidlast. */
+  /**
+   * BPM (55..175) från onset-envelopens autokorrelation.
+   *  1) Toppen i autokorrelationen ger en kandidat-lag.
+   *  2) SUB-HARMONIC-PREFERENS: om dubbla/tredubbla lagget (halva/tredjedels
+   *     tempot) resonerar nästan lika bra är det oftast det ÄKTA beatet — annars
+   *     låser en tryckare/ballad på sin subdivision (dubbeltakt). Väljer grundtempot.
+   *  3) MEDIAN över ~3s → robust mot enstaka oktav-flippar (istället för att
+   *     bestämma per frame, vilket flimrade). Snäpper vid verkligt oktavbyte,
+   *     glider mjukt vid små avvik.
+   *  (Ref: comb/sub-harmonic + fler-frames-röstning, se @audio/beat och
+   *   OBTAIN-realtidsbeat-tracking.)
+   */
   private computeBpm() {
-    if (this.envFilled < Analyser.ENV_LEN * 0.45) return;   // första estimat ~2.2s (var 3.5s)
+    if (this.envFilled < Analyser.ENV_LEN * 0.45) return;   // första estimat ~2.2s
     const N = this.envFilled;
     const env = new Float32Array(N);
     let mean = 0;
@@ -71,8 +82,9 @@ export class Analyser {
     for (let i = 0; i < N; i++) { env[i] = this.envRing[(start + i) % Analyser.ENV_LEN]; mean += env[i]; }
     mean /= N;
     for (let i = 0; i < N; i++) env[i] -= mean;
-    const lagMin = Math.floor(Analyser.ENV_HZ * 60 / 175);
-    const lagMax = Math.floor(Analyser.ENV_HZ * 60 / 63);   // ner till 63 BPM så tryckare/ballad inte dubblas
+    const HZ = Analyser.ENV_HZ;
+    const lagMin = Math.floor(HZ * 60 / 185);
+    const lagMax = Math.min(N - 1, Math.floor(HZ * 60 / 55));   // ner till 55 BPM
     let bestLag = 0, bestVal = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
       let sum = 0;
@@ -80,23 +92,23 @@ export class Analyser {
       if (sum > bestVal) { bestVal = sum; bestLag = lag; }
     }
     if (bestLag === 0 || bestVal <= 0) return;
-    let bpm = (Analyser.ENV_HZ * 60) / bestLag;
-    while (bpm < 63) bpm *= 2;
-    while (bpm >= 170) bpm /= 2;
-    if (this.localBpm === 0) { this.localBpm = Math.round(bpm); this.pendingBpm = bpm; return; }
-    // Oktav-stickiness: välj den oktav-varianten (½×, 1×, 2×) som ligger närmast
-    // nuvarande tempo → dödar 83↔162-hoppen som gjorde att den aldrig satte sig.
-    let best = bpm, bd = Math.abs(bpm - this.localBpm);
-    for (const c of [bpm / 2, bpm * 2]) {
-      if (c >= 70 && c <= 180 && Math.abs(c - this.localBpm) < bd) { bd = Math.abs(c - this.localBpm); best = c; }
+    // Sub-harmonic-preferens → grundtempot framför subdivisionen.
+    for (const mult of [2, 3]) {
+      const L = bestLag * mult;
+      if (L > lagMax) continue;
+      let s = 0; for (let i = 0; i + L < N; i++) s += env[i] * env[i + L];
+      if (s >= bestVal * 0.75) { bestLag = L; break; }
     }
-    const diff = best - this.localBpm;
-    if (Math.abs(diff) <= 12) {
-      this.localBpm = Math.round(this.localBpm + diff * 0.34);          // litet avvik → mjuk glidning (stabilt)
-    } else if (Math.abs(best - this.pendingBpm) <= 8) {
-      this.localBpm = Math.round(best);                                 // stort hopp bekräftat 2 ggr → nytt tempo, snäpp
-    }
-    this.pendingBpm = best;                                             // annars: ignorera engångs-uthopp
+    let bpm = (HZ * 60) / bestLag;
+    while (bpm < 55) bpm *= 2;
+    while (bpm >= 175) bpm /= 2;
+    // Median-stabilisering över ~3s (12 estimat @ 4 Hz).
+    this.bpmHist.push(bpm);
+    if (this.bpmHist.length > 12) this.bpmHist.shift();
+    const sorted = [...this.bpmHist].sort((a, b) => a - b);
+    const med = sorted[sorted.length >> 1];
+    if (this.localBpm === 0 || Math.abs(med - this.localBpm) > 15) this.localBpm = Math.round(med);   // nytt/oktavbyte → snäpp
+    else this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);                    // små avvik → glid
   }
   private envelope: number;
   private lastKick = 0;
@@ -194,7 +206,7 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.envFilled = 0; this.beatAnchorMs = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.bpmHist.length = 0; }
     } else {
       this.silentMs = 0;
     }
