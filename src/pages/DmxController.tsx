@@ -154,38 +154,44 @@ function MoreButton({ open, onToggle }: { open: boolean; onToggle: () => void })
 
 /* ────────── Mer: ljudkälla, live-nivå, effekter, avancerat ────────── */
 
-function MoreSections() {
-  const s = usePi();
+function AudioMeterCard() {
   const audio = useDmx((st) => st.audioLevel);
   const kick = useDmx((st) => st.kick);
   const pct = Math.round(audio * 100);
+  return (
+    <Section title="Ljudnivå">
+      <div className="flex justify-between items-center mb-1.5">
+        <span className="text-[13px] text-muted-foreground flex items-center gap-2">
+          Nivå just nu
+          <span
+            className="w-2 h-2 rounded-full transition-colors inline-block"
+            style={{
+              background: kick > 0.4 ? "hsl(var(--accent))" : "hsl(var(--muted))",
+              boxShadow: kick > 0.4 ? "0 0 12px hsl(var(--accent))" : "none",
+            }}
+          />
+        </span>
+        <span className="text-[13px] tabular-nums">{pct}%</span>
+      </div>
+      <div className="h-2 bg-muted rounded-full overflow-hidden">
+        <div
+          className="h-full transition-[width] duration-[60ms] linear"
+          style={{ width: pct + "%", background: "linear-gradient(90deg, hsl(var(--ok)), hsl(var(--accent)))" }}
+        />
+      </div>
+    </Section>
+  );
+}
+
+function MoreSections() {
+  const s = usePi();
   const playing = usePlayingMode();
   const playingLabel = [...CALM_MODES, ...FAST_MODES, ...FULL_MODES].find(([m]) => m === playing)?.[1] ?? playing;
 
   return (
     <div className="mt-3">
-      {/* Ljudkälla + live-nivå */}
-      <Section title="Ljud">
-        <div className="flex justify-between items-center mb-1.5">
-          <span className="text-[13px] text-muted-foreground flex items-center gap-2">
-            Nivå just nu
-            <span
-              className="w-2 h-2 rounded-full transition-colors inline-block"
-              style={{
-                background: kick > 0.4 ? "hsl(var(--accent))" : "hsl(var(--muted))",
-                boxShadow: kick > 0.4 ? "0 0 12px hsl(var(--accent))" : "none",
-              }}
-            />
-          </span>
-          <span className="text-[13px] tabular-nums">{pct}%</span>
-        </div>
-        <div className="h-2 bg-muted rounded-full overflow-hidden mb-3">
-          <div
-            className="h-full transition-[width] duration-[60ms] linear"
-            style={{ width: pct + "%", background: "linear-gradient(90deg, hsl(var(--ok)), hsl(var(--accent)))" }}
-          />
-        </div>
-        <div className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground mb-1.5">Källa</div>
+      {/* Ljudkälla */}
+      <Section title="Ljudkälla">
         <div className="flex gap-2">
           <button
             onClick={() => setPi({ audioInput: "aux" })}
@@ -205,6 +211,7 @@ function MoreSections() {
           >Mikrofon</button>
         </div>
       </Section>
+
 
       {/* Vilken effekt spelar */}
       <Section title="Spelar nu">
