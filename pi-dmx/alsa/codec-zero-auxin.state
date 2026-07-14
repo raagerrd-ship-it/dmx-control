@@ -10,7 +10,7 @@ state.Zero {
 			range '0 - 7'
 			dbmin -600
 			dbmax 3600
-			dbvalue.0 2400
+			dbvalue.0 -600
 		}
 	}
 	control.2 {
