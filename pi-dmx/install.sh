@@ -122,6 +122,7 @@ npm run build
 mkdir -p /opt/audio-dmx-engine /var/lib/audio-dmx-engine
 rsync -a --delete dist/ /opt/audio-dmx-engine/dist/
 rsync -a --delete public/ /opt/audio-dmx-engine/public/
+[ -d ../webapp ] && rsync -a --delete ../webapp/ /opt/audio-dmx-engine/webapp/
 rsync -a --delete node_modules/ /opt/audio-dmx-engine/node_modules/
 install -m644 package.json /opt/audio-dmx-engine/package.json
 install -Dm644 systemd/audio-dmx-engine.service /etc/systemd/system/audio-dmx-engine.service

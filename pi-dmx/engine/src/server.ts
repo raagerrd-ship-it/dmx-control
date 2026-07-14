@@ -84,6 +84,15 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
     prefix: "/",
   });
 
+  // Live Analysis-appen (byggd React-app) — serveras same-origin så dess
+  // WS-relay når /ws utan mixed content. Öppnas på http://<pi>/app/
+  await app.register(fastifyStatic, {
+    root: join(__dirname, "..", "webapp"),
+    prefix: "/app/",
+    decorateReply: false,
+  });
+  app.get("/app", (_req, reply) => reply.redirect("/app/"));
+
   // ---- Self-update ---------------------------------------------------------
   // The repo lives at /root/pi-dmx-src (or wherever `git clone` put it).
   // Override with PI_DMX_REPO=/path if you cloned elsewhere.
