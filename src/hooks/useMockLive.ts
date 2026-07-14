@@ -85,8 +85,9 @@ export function useMockLive() {
         let beatSpike = 0;
         if (t >= nextBeat.current) {
           beatSpike = 0.7 + Math.random() * 0.3;
-          nextBeat.current = t + 0.35 + Math.random() * 0.25;
+          nextBeat.current += BEAT_PERIOD;
         }
+
         if (t >= nextDrop.current) {
           dropUntil.current = t + 1.5;
           nextDrop.current = t + 8 + Math.random() * 6;
