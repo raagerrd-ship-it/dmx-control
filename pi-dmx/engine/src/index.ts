@@ -120,15 +120,6 @@ capture.on("exit", (code) => console.error("[arecord] exited", code));
 
 capture.start();
 
-// SmartSync: song-identification driven show (needs internet → hotspot mode).
-const smartSync = new SmartSync({
-  cfg,
-  onConfigChanged: () => {
-    scheduleSave(cfg);
-    server?.broadcastConfig();
-  },
-  onState: (st) => server?.broadcastSmartSync(st),
-});
 
 // Shared mode cycler — used by both the physical button and the WS "cycleMode" message,
 // so UI and hardware follow the exact same path.
