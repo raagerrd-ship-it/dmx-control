@@ -32,6 +32,9 @@ export function useLiveAnalysisRunner() {
     let processor: ScriptProcessorNode | null = null;
     let source: MediaStreamAudioSourceNode | null = null;
     let bpmTimer: number | null = null;
+    const bpmHist: number[] = [];   // oktavvikta estimat, senaste ~3 s
+    let lockedBpm = 0;              // stabil takt
+    let beatAnchor = 0;             // fasankare (wall-clock ms)
     let keyTimer: number | null = null;
 
     const set = useLiveAnalysis.setState;
@@ -164,13 +167,39 @@ export function useLiveAnalysisRunner() {
 
             const vec = essentia.arrayToVector(buf);
             const res = essentia.PercivalBpmEstimator(vec);
-            const bpm = Math.round(res.bpm ?? 0);
+            let raw = res.bpm ?? 0;
             vec.delete?.();
-            if (bpm >= 60 && bpm <= 200) {
-              const prev = useLiveAnalysis.getState().bpm;
-              const conf = Math.min(1, useLiveAnalysis.getState().bpmConfidence + 0.15);
-              const nextBeatAt = Date.now() + Math.round(60000 / bpm);
-              set({ bpm, bpmConfidence: conf, nextBeatAt, status: conf > 0.6 ? "locked" : "listening" });
+            if (raw >= 40 && raw <= 250) {
+              // Oktavvik till ett kanoniskt band så 85 och 170 räknas som samma takt.
+              while (raw < 82) raw *= 2;
+              while (raw >= 164) raw /= 2;
+              bpmHist.push(raw);
+              if (bpmHist.length > 12) bpmHist.shift();
+
+              const sorted = [...bpmHist].sort((a, b) => a - b);
+              const median = sorted[Math.floor(sorted.length / 2)];
+              const agree = bpmHist.filter((x) => Math.abs(x - median) <= 3).length / bpmHist.length;
+              const now = Date.now();
+              const st = useLiveAnalysis.getState();
+
+              if (bpmHist.length >= 6 && agree >= 0.5) {
+                // Stabil nog. Uppdatera bara låst takt vid tydlig förändring, och
+                // behåll fasen kontinuerlig (nolla inte varje tick).
+                const rounded = Math.round(median);
+                if (lockedBpm === 0 || Math.abs(rounded - lockedBpm) > 4) {
+                  lockedBpm = rounded;
+                  beatAnchor = now;
+                }
+                const conf = Math.min(1, st.bpmConfidence + 0.12);
+                const beatMs = 60000 / lockedBpm;
+                const nb = Math.floor((now - beatAnchor) / beatMs) + 1;
+                set({ bpm: lockedBpm, bpmConfidence: conf, nextBeatAt: beatAnchor + nb * beatMs,
+                      status: conf > 0.6 ? "locked" : "listening" });
+              } else {
+                // Osäkert — sänk confidence men behåll senaste låsta takt.
+                const conf = Math.max(0, st.bpmConfidence - 0.05);
+                set({ bpmConfidence: conf, status: conf > 0.6 ? "locked" : "listening" });
+              }
             }
           } catch {
             /* ignorera */
@@ -207,6 +236,7 @@ export function useLiveAnalysisRunner() {
       try { source?.disconnect(); } catch { /* noop */ }
       try { audioCtx?.close(); } catch { /* noop */ }
       stream?.getTracks().forEach((t) => t.stop());
+      lockedBpm = 0; beatAnchor = 0; bpmHist.length = 0;
       set({ status: "off", bpm: 0, bpmConfidence: 0, energy: 0, key: "" });
     };
   }, [enabled, sensitivity]);
