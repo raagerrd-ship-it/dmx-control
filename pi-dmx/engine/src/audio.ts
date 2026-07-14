@@ -56,7 +56,9 @@ export class AudioCapture extends EventEmitter {
       "--period-size=128",
       "-q",
     ];
-    const p = spawn("arecord", args, { stdio: ["ignore", "pipe", "pipe"] });
+    // Pin arecord to its own core (1) so audio capture never contends with the
+    // node audio-processing thread (pinned to core 2 via systemd CPUAffinity).
+    const p = spawn("taskset", ["-c", "1", "arecord", ...args], { stdio: ["ignore", "pipe", "pipe"] });
     this.proc = p;
 
     p.stdout.on("data", (buf: Buffer) => this.onData(buf));
