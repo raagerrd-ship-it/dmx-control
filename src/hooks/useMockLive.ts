@@ -147,13 +147,12 @@ export function useMockLive() {
         else if (chasePos.current <= 0)           { chasePos.current = 0;                chaseDir.current =  1; }
       }
 
-      // Applicera Smart Sync hue-override om aktiv
-      const cometHue    = smartPrimaryHue   ?? params.cometHue;
-      const monoHue     = smartPrimaryHue   ?? params.monoHue;
-      const splitHueA   = smartPrimaryHue   ?? params.splitHueA;
-      const splitHueB   = smartSecondaryHue ?? params.splitHueB;
-      // Smart Sync-flash = tvinga vit blixt (drop-punkt)
-      const flashNow = flashActive || smartFlash;
+      const cometHue  = params.cometHue;
+      const monoHue   = params.monoHue;
+      const splitHueA = params.splitHueA;
+      const splitHueB = params.splitHueB;
+      const flashNow  = flashActive;
+
 
       fixtures.forEach((f, idx) => {
         let r = 0, g = 0, b = 0, w = 0;
