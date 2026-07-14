@@ -69,7 +69,11 @@
     .rotrow { display:flex; align-items:center; justify-content:space-between; padding:9px 8px; font-size:15px; text-transform:capitalize; border-left:3px solid transparent; border-radius:6px; transition:background .15s, border-color .15s; }
     .rotrow + .rotrow { border-top:1px solid var(--line); }
     .rotrow.playing { background:color-mix(in srgb, var(--hot) 18%, transparent); border-left-color:var(--hot); font-weight:600; }
-    .rotrow.playing span::after { content:"● SPELAS"; margin-left:8px; font-size:10px; font-weight:700; letter-spacing:.5px; color:var(--hot); vertical-align:middle; }
+    .rotrow.playing .rotname::after { content:"● SPELAS"; margin-left:8px; font-size:10px; font-weight:700; letter-spacing:.5px; color:var(--hot); vertical-align:middle; }
+    .rotinfo { display:flex; flex-direction:column; gap:2px; min-width:0; flex:1 1 auto; }
+    .rotname { font-weight:500; }
+    .rotdesc { font-size:12px; opacity:.6; line-height:1.35; }
+    .rotrow > input.tgl { flex:none; margin-left:14px; }
     .owner-banner { background:color-mix(in srgb, var(--hot) 14%, transparent); border:1px solid var(--hot); border-radius:10px; padding:10px 12px; margin:14px 0 4px; font-size:13px; line-height:1.4; }
   </style>
 </head>
@@ -83,6 +87,7 @@
         <button data-dwell="slow">Sällan</button><button data-dwell="normal">Normal</button><button data-dwell="fast">Ofta</button>
       </span>
     </label>
+    <label class="tgl"><span>Pulsa ljuset på taktslag</span><input type="checkbox" id="tBeatPulse"></label>
   </div>
 
   <h1>Level <span class="kick-dot" id="kickDot"></span></h1>
@@ -107,9 +112,7 @@
 
   <h1>Effekter</h1>
   <div class="card">
-    <label class="tgl"><span>Pulsa ljuset på taktslag</span><input type="checkbox" id="tBeatPulse"></label>
-    <label class="tgl"><span>Punch (strobe) på drop</span><input type="checkbox" id="tPunch"></label>
-    <div class="setrow" style="margin-top:12px">
+    <div class="setrow">
       <label>Drop-blixt känslighet</label>
       <div class="seg" id="segDrop">
         <button data-drop="0">Av</button>
@@ -272,20 +275,39 @@ function connect() {
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
 
-const CALM_MODES = [["cycle","Cykel"],["breathe","Andas"],["tide","Tidvatten"],["mono","Enfärg"],["aurora","Aurora"],["drift","Drift"]];
-const FAST_MODES = [["wave","Våg"],["chase","Jakt"],["drops","Drops"],["sweep","Svep"],["pulse","Puls"]];
-const FULL_MODES = [["party","Party"],["snap","Snap"],["bounce","Studs"],["strobe","Strobe"],["rave","Rave"]];
+const CALM_MODES = [
+  ["cycle","Cykel","Alla lampor andas i takt medan färgen sakta vandrar runt."],
+  ["breathe","Andas","Hela riggen andas som en – djup mjuk våg i en färg."],
+  ["tide","Tidvatten","En långsam våg sköljer fram och tillbaka i par."],
+  ["mono","Eld","Varm brasa som flimrar levande, glider rött → gult."],
+  ["aurora","Aurora","Varje lampa driver i sin egen färg, som norrsken."],
+  ["drift","Drift","Nästan stilla glöd som mycket sakta byter färg."],
+];
+const FAST_MODES = [
+  ["wave","Våg","Flödande färgvåg som rullar över hela riggen."],
+  ["chase","Jakt","En ljuspunkt springer i takt och byter färg."],
+  ["drops","Drops","Varje slag målar nästa lampa i en ny färg."],
+  ["sweep","Svep","En smal spotlight glider över en mörk rigg."],
+  ["pulse","Puls","Hela riggen i en färg som pulsar på beatet."],
+];
+const FULL_MODES = [
+  ["party","Party","Färgkaos som pumpar hårt på varje taktslag."],
+  ["snap","Snap","Alla lampor byter färg blixtsnabbt på varje slag."],
+  ["bounce","Studs","En skarp ljuspunkt studsar fram och tillbaka."],
+  ["strobe","Strobe","Snabb strobe-blixt med skiftande färg."],
+  ["rave","Rave","Varannan lampa blinkar i motfärger – hård växling."],
+];
 let curRotation = {};
 let curPlaying = "";
 function renderRotList(elId, list) {
   const el = document.getElementById(elId);
   el.innerHTML = "";
-  for (const [m, label] of list) {
+  for (const [m, label, desc] of list) {
     const row = document.createElement("label");
     row.className = "rotrow";
     row.dataset.mode = m;
     const on = curRotation[m] !== false;
-    row.innerHTML = `<span>${label}</span><input type="checkbox" class="tgl" ${on ? "checked" : ""}>`;
+    row.innerHTML = `<span class="rotinfo"><span class="rotname">${label}</span><span class="rotdesc">${desc || ""}</span></span><input type="checkbox" class="tgl" ${on ? "checked" : ""}>`;
     row.querySelector("input").onchange = (e) => { curRotation[m] = e.target.checked; send({ type: "setRotation", mode: m, value: e.target.checked }); };
     el.appendChild(row);
   }
@@ -301,7 +323,6 @@ function applyConfig(cfg) {
   curRotation = cfg.rotation || {};
   renderCategories();
   tBeatPulse.checked = !!cfg.beatPulse;
-  tPunch.checked = !!cfg.punchOnDrop;
   tEnergy.checked = cfg.energyDrivesMode !== false;
   segActivate("segDrop", cfg.dropSensitivity ?? 0.6, "drop");
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
@@ -616,10 +637,8 @@ fxSaveBtn.onclick = () => {
 
 
 const tBeatPulse = document.getElementById("tBeatPulse");
-const tPunch = document.getElementById("tPunch");
 const tEnergy = document.getElementById("tEnergy");
 tBeatPulse.onchange = () => send({ type: "setBeatPulse", value: tBeatPulse.checked });
-tPunch.onchange = () => send({ type: "setPunchOnDrop", value: tPunch.checked });
 tEnergy.onchange = () => send({ type: "setEnergyDrivesMode", value: tEnergy.checked });
 document.querySelectorAll("#segDrop button").forEach((b) =>
   b.onclick = () => { send({ type: "setDropSensitivity", value: Number(b.dataset.drop) }); segActivate("segDrop", Number(b.dataset.drop), "drop"); });
