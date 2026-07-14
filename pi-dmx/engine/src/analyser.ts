@@ -125,6 +125,7 @@ export class Analyser {
       if (comb > combMax) combMax = comb;
     }
     let bestLag = 0, bestVal = 0;
+    let scoreSum = 0, scoreCount = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
       let comb = ac[lag];
       if (2 * lag <= lagMax) comb += 0.5 * ac[2 * lag];
@@ -137,10 +138,18 @@ export class Analyser {
       const oct = Math.log2(bpmAt / 120);
       const prior = Math.exp(-(oct * oct) / 2.0);   // σ = 1.0 oktav
       const score = (0.5 * combN + 0.5 * pulseN) * prior;
+      scoreSum += score; scoreCount++;
       if (score > bestVal) { bestVal = score; bestLag = lag; }
     }
 
     if (bestLag === 0 || bestVal <= 0) return;
+    // Peak-to-mean confidence: en tydlig takttopp sticker ut från medelnivån,
+    // en utsmetad "tempolös" låt eller brus har ~platt scoring. clamp(0..1).
+    const meanScore = scoreSum / Math.max(1, scoreCount);
+    const rawConf = meanScore > 0 ? 1 - meanScore / bestVal : 0;
+    // Skala: ~0.35 råvärde är typiskt "helt låst". Mappa 0..0.5 → 0..1.
+    const conf = Math.max(0, Math.min(1, rawConf / 0.5));
+
     // OFF-BEAT-TEST → skilj äkta snabb takt (dans) från subdivision (ballad).
     // Vik onset-envelopen på DUBBLA perioden, jämför energi PÅ slaget vs MELLAN.
     // Svaga mellanslag → sanna takten är halva; starka → behåll snabb takt.
