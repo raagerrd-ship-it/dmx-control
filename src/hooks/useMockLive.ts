@@ -1,9 +1,7 @@
 import { useEffect, useRef } from "react";
-import { presetById, useDmx, type PresetId } from "@/store/dmx";
+import { presetById, useDmx } from "@/store/dmx";
 import { smoothStep, softnessToAlpha } from "@/lib/audioCurve";
 import { useMic } from "@/hooks/useMic";
-import { activeOverride } from "@/store/smartSync";
-import { liveActiveFlash } from "@/store/liveAnalysis";
 
 /**
  * Mock live-loop: simulerar mic-nivå + kick och genererar DMX-frame
