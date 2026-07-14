@@ -30,9 +30,27 @@ const LS_KEY = "pi-mock-v1";
 export type Dwell = "slow" | "normal" | "fast";
 export type DropSens = 0 | 0.3 | 0.6 | 0.9;
 export type AudioIn = "aux" | "mic";
+export type Scene = "chill" | "party" | "wild";
+
+/** Scen-presets — sätter rotation + dwell + dynamik i ett svep. */
+export const SCENES: {
+  id: Scene; label: string; hint: string; icon: string;
+  modes: string[]; dwell: Dwell; dynamics: 0.35 | 0.6 | 0.85; drop: DropSens; pulse: boolean;
+}[] = [
+  { id: "chill", label: "Chill", hint: "Mjukt & lugnt", icon: "◐",
+    modes: CALM_MODES.map(([m]) => m),
+    dwell: "slow", dynamics: 0.35, drop: 0, pulse: false },
+  { id: "party", label: "Fest", hint: "Följer takten", icon: "◈",
+    modes: [...CALM_MODES.slice(3).map(([m]) => m), ...FAST_MODES.map(([m]) => m)],
+    dwell: "normal", dynamics: 0.6, drop: 0.6, pulse: true },
+  { id: "wild",  label: "Galet", hint: "Full fart", icon: "◆",
+    modes: [...FAST_MODES.slice(2).map(([m]) => m), ...FULL_MODES.map(([m]) => m)],
+    dwell: "fast", dynamics: 0.85, drop: 0.9, pulse: true },
+];
 
 export interface PiSettings {
   power: boolean;         // stort AV/PÅ högst upp
+  scene: Scene;           // vald scen (styr rotation-defaults)
   rotation: Record<string, boolean>;
   energyDrivesMode: boolean;
   beatPulse: boolean;
@@ -46,9 +64,10 @@ export interface PiSettings {
 
 const defaults: PiSettings = {
   power: true,
+  scene: "party",
   rotation: Object.fromEntries(ALL.map(([m]) => [m, true])),
   energyDrivesMode: true,
-  beatPulse: false,
+  beatPulse: true,
   dwell: "normal",
   dropSensitivity: 0.6,
   agcAgg: 0.15,
@@ -56,6 +75,13 @@ const defaults: PiSettings = {
   master: 1,
   audioInput: "aux",
 };
+
+/** Applicerar en scen till settings — kalla vid scen-byte. */
+export function applyScene(id: Scene) {
+  const s = SCENES.find((x) => x.id === id)!;
+  const rotation = Object.fromEntries(ALL.map(([m]) => [m, s.modes.includes(m)]));
+  setPi({ scene: id, rotation, dwell: s.dwell, dynamics: s.dynamics, dropSensitivity: s.drop, beatPulse: s.pulse });
+}
 
 function load(): PiSettings {
   try {
