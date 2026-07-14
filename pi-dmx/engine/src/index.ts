@@ -101,7 +101,7 @@ capture.on("chunk", (samples: Float32Array) => {
       cfg.flashUntil = Date.now() + 150;
     }
   }
-  smartSync.feed(samples);
+
 
   // Frikoppla render från analysrate: analysern (FFT/onset/BPM) körs varje chunk
   // (~375 Hz) för tighta drops, men effekterna behöver bara ~60 Hz för lamporna.
