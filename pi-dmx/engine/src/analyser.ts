@@ -106,7 +106,11 @@ export class Analyser {
       if (3 * lag <= lagMax) score += 0.33 * ac[3 * lag];
       const bpmAt = (HZ * 60) / lag;
       const oct = Math.log2(bpmAt / 120);
-      const prior = Math.exp(-(oct * oct) / (2 * 0.4 * 0.4));   // 1.0 vid 120, ~0.46 vid 60/240
+      // σ = 1.0 oktav (Ellis 2007 / librosa default). Snävare σ (t.ex. 0.4) tvingar
+      // allt mot 120 och halverar reggae/dubblar DnB. 1.0 ger 60 BPM ~61% vikt och
+      // 170 BPM ~87% — mjuk preferens, inte tvång.
+      const prior = Math.exp(-(oct * oct) / (2 * 1.0 * 1.0));
+
       score *= prior;
       if (score > bestVal) { bestVal = score; bestLag = lag; }
     }
