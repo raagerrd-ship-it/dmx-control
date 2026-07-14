@@ -62,7 +62,7 @@ export class EffectEngine {
       const beatMs = 60000 / beat.bpm;
       const since = Date.now() - beat.anchorMs;
       const phase = ((since % beatMs) + beatMs) % beatMs / beatMs;
-      beatEnv = Math.pow(1 - phase, 3);
+      beatEnv = Math.pow(1 - phase, 2);
       const beatIdx = Math.floor(since / beatMs);
       if (beatIdx !== this.lastBeatIdx) { this.lastBeatIdx = beatIdx; beatTick = true; }
     }
@@ -192,7 +192,9 @@ export class EffectEngine {
     // a decaying strobe value would sweep through real strobe speeds).
     // Snappare fade-out i energiska lägen så pumpen syns; lugna behåller mjukheten.
     const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops";
-    const decay = Math.exp(-dtSec / (fastMode ? 0.2 : 0.3));
+    const beatMsNow = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
+    const fastTau = Math.max(0.14, Math.min(0.3, beatMsNow * 0.5 / 1000));
+    const decay = Math.exp(-dtSec / (fastMode ? fastTau : 0.3));
     const skip = new Set<number>();
     for (const fx of this.cfg.fixtures) {
       const roles = fixtureRoles(fx);
