@@ -299,7 +299,7 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.bpmHist.length = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.bpmHist.length = 0; }
     } else {
       this.silentMs = 0;
     }
