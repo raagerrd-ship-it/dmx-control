@@ -110,6 +110,13 @@ export async function startServer(
     decorateReply: false,
   });
   app.get("/app", (_req, reply) => reply.redirect("/app/"));
+  // SPA-fallback: klient-routade sidor (/app/live) finns inte som filer.
+  app.setNotFoundHandler((req, reply) => {
+    if (req.raw.url && req.raw.url.startsWith("/app/")) {
+      return reply.type("text/html").send(readFileSync(join(__dirname, "..", "webapp", "index.html")));
+    }
+    reply.code(404).send({ error: "not found" });
+  });
 
   // ---- Self-update ---------------------------------------------------------
   // The repo lives at /root/pi-dmx-src (or wherever `git clone` put it).

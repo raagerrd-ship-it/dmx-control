@@ -95,6 +95,12 @@
 
   </div>
 
+  <div id="smartCard" class="card" style="display:none;margin-top:-4px">
+    <div class="row"><label>Smart-läget drivs av mobilens musikanalys</label></div>
+    <button class="btn primary" id="openLive" style="width:100%;margin-top:8px">🎵 Öppna Live-analys</button>
+    <div class="status">Öppnas i säkert läge (https) — godkänn certifikatet en gång.</div>
+  </div>
+
   <h1>Level <span class="kick-dot" id="kickDot"></span></h1>
   <div class="card">
     <div class="row"><label>Input</label><span class="val" id="levelVal">–</span></div>
@@ -270,6 +276,7 @@ function renderModes(current) {
 }
 function applyConfig(cfg) {
   renderModes(cfg.mode);
+  document.getElementById("smartCard").style.display = cfg.mode === "smart" ? "" : "none";
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
   inMic.classList.toggle("primary", cfg.audioInput === "mic");
   segActivate("segDyn", cfg.dynamics ?? 0.6, "dyn");
@@ -612,6 +619,7 @@ fxSaveBtn.onclick = () => {
 };
 
 
+document.getElementById("openLive").onclick = () => { location.href = `https://${location.hostname}/app/live`; };
 renderModes("auto");
 connect();
 
