@@ -14,8 +14,10 @@ export interface Frame {
   kick: boolean;        // true on rising edge only
   gain: number;         // current auto-gain factor (debug)
   bpm: number;          // 0 = ej låst; lokal tempo-estimat via autokorrelation
+  bpmConfidence: number;// 0..1, hur tydlig vinnande takttoppen är (peak-to-mean)
   beatAnchorMs: number; // wall-clock ms för ett taktslag (fas)
 }
+
 
 export class Analyser {
   private fft: FFT;
@@ -34,6 +36,8 @@ export class Analyser {
   private envAccumT = 0;
   private bpmCounter = 0;
   private localBpm = 0;
+  private localBpmConfidence = 0;
+
   private bpmHist: number[] = [];   // senaste råestimat (~3s) för median-stabilisering
   private silentMs = 0;
   private beatAnchorMs = 0;
@@ -121,6 +125,7 @@ export class Analyser {
       if (comb > combMax) combMax = comb;
     }
     let bestLag = 0, bestVal = 0;
+    let scoreSum = 0, scoreCount = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
       let comb = ac[lag];
       if (2 * lag <= lagMax) comb += 0.5 * ac[2 * lag];
@@ -133,10 +138,18 @@ export class Analyser {
       const oct = Math.log2(bpmAt / 120);
       const prior = Math.exp(-(oct * oct) / 2.0);   // σ = 1.0 oktav
       const score = (0.5 * combN + 0.5 * pulseN) * prior;
+      scoreSum += score; scoreCount++;
       if (score > bestVal) { bestVal = score; bestLag = lag; }
     }
 
     if (bestLag === 0 || bestVal <= 0) return;
+    // Peak-to-mean confidence: en tydlig takttopp sticker ut från medelnivån,
+    // en utsmetad "tempolös" låt eller brus har ~platt scoring. clamp(0..1).
+    const meanScore = scoreSum / Math.max(1, scoreCount);
+    const rawConf = meanScore > 0 ? 1 - meanScore / bestVal : 0;
+    // Skala: ~0.35 råvärde är typiskt "helt låst". Mappa 0..0.5 → 0..1.
+    const conf = Math.max(0, Math.min(1, rawConf / 0.5));
+
     // OFF-BEAT-TEST → skilj äkta snabb takt (dans) från subdivision (ballad).
     // Vik onset-envelopen på DUBBLA perioden, jämför energi PÅ slaget vs MELLAN.
     // Svaga mellanslag → sanna takten är halva; starka → behåll snabb takt.
@@ -185,7 +198,11 @@ export class Analyser {
     const med = sorted[sorted.length >> 1];
     if (this.localBpm === 0 || Math.abs(med - this.localBpm) > 15) this.localBpm = Math.round(med);   // nytt/oktavbyte → snäpp
     else this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);                    // små avvik → glid
+    // Smooth confidence (undvik hoppig UI); attack snabbt, release långsamt.
+    const cA = this.localBpmConfidence;
+    this.localBpmConfidence = cA + (conf - cA) * (conf > cA ? 0.35 : 0.08);
   }
+
   private envelope: number;
   private lastKick = 0;
   private lastT = performance.now();
@@ -282,7 +299,7 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.bpmHist.length = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.bpmHist.length = 0; }
     } else {
       this.silentMs = 0;
     }
@@ -311,7 +328,7 @@ export class Analyser {
     this.lvlSmooth = smooth(this.lvlSmooth, level);
     this.engSmooth = smooth(this.engSmooth, energy);
     this.trbSmooth = smooth(this.trbSmooth, treble);
-    return { level: this.lvlSmooth, energy: this.engSmooth, treble: this.trbSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, beatAnchorMs: this.beatAnchorMs };
+    return { level: this.lvlSmooth, energy: this.engSmooth, treble: this.trbSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, bpmConfidence: this.localBpmConfidence, beatAnchorMs: this.beatAnchorMs };
   }
 }
 
