@@ -137,6 +137,9 @@ export const useDmx = create<DmxState>((set, get) => {
     audioLevel: 0,
     kick: 0,
     frame: new Array(512).fill(0),
+    bpm: 0,
+    bpmConfidence: 0,
+
 
     setPreset: (id) => { set({ preset: id }); persist(); },
     patchParams: (p) => { set({ params: { ...get().params, ...p } }); persist(); },
