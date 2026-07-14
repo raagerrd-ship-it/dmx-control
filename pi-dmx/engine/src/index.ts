@@ -79,11 +79,11 @@ capture.on("chunk", (samples: Float32Array) => {
   // EMA av kick-flux; drop kräver ett tydligt uthopp + minst ~900 ms mellanrum.
   if (frame.kick) {
     fluxBaseline += (frame.flux - fluxBaseline) * 0.05;
-    const mult = 3.2 - cfg.dropSensitivity * 1.6;   // känslig 1.6x .. trög 3.2x
-    const strong = frame.flux > Math.max(0.16, fluxBaseline * mult);
-    if (cfg.dropSensitivity > 0 && strong && Date.now() - lastDropMs > 900) {
+    const mult = 2.4 - cfg.dropSensitivity * 1.5;   // känslig 0.9x .. trög 2.4x
+    const strong = frame.flux > Math.max(0.10, fluxBaseline * mult);
+    if (cfg.dropSensitivity > 0 && strong && Date.now() - lastDropMs > 600) {
       lastDropMs = Date.now();
-      cfg.flashUntil = Date.now() + 130;
+      cfg.flashUntil = Date.now() + 150;
     }
   }
   smartSync.feed(samples);
