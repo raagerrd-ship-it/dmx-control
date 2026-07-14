@@ -42,6 +42,7 @@ export class EffectEngine {
    *  eye sees instant attack and a soft ~0.4 s fall, whatever the modes do. */
   private outSmooth = new Float32Array(512);
   private smartCount = 0;
+  private lastSmartIntensity = 0;
   private lastRenderMs = performance.now();
 
   constructor(private cfg: EngineConfig) {}
@@ -83,9 +84,12 @@ export class EffectEngine {
 
     // SmartSync + Live Analysis drop-flash: everything white for the duration.
     const nowWall = Date.now();
-    const flashActive =
+    const activeMode = this.cfg.mode === "smart" ? this.smartMode : this.cfg.mode;
+    // Ingen vit drop-blixt när läget redan visar slagen (drops/party) — annars dubbelt.
+    const flashOk = activeMode !== "drops" && activeMode !== "party";
+    const flashActive = flashOk && (
       (this.cfg.flashUntil && nowWall < this.cfg.flashUntil) ||
-      (this.cfg.liveFlashUntil && nowWall < this.cfg.liveFlashUntil);
+      (this.cfg.liveFlashUntil && nowWall < this.cfg.liveFlashUntil));
     if (flashActive) {
       for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master, 220);
       return this.universe;
@@ -124,15 +128,17 @@ export class EffectEngine {
       const fresh = se && now - se.atMs < 40_000;
       const intensity = fresh ? se!.value : this.intensityEma;
       const sectionChanged = fresh && se!.atMs !== this.lastSectionAt;
-      if (sectionChanged || now > this.smartDwellUntil) {
+        const bigJump = fresh && Math.abs(intensity - this.lastSmartIntensity) > 0.12;
+        if (sectionChanged || bigJump || now > this.smartDwellUntil) {
         if (fresh) this.lastSectionAt = se!.atMs;
-        this.smartDwellUntil = now + 20_000;
+        this.lastSmartIntensity = intensity;
+        this.smartDwellUntil = now + 9_000;
         // Rotate within a pool of modes that fit the current feel — mixed
         // order, never the same mode twice in a row.
         const POOLS: Mode[][] = [
-          ["cycle", "wave", "mono"],     // lugnt
-          ["wave", "chase", "drops"],    // mellan
-          ["party", "drops", "chase"],   // högt tryck
+          ["cycle", "wave", "mono", "chase"],     // lugnt
+          ["wave", "chase", "drops", "cycle"],    // mellan
+          ["party", "drops", "chase", "wave"],    // högt tryck
         ];
         const pool = POOLS[intensity < 0.3 ? 0 : intensity < 0.6 ? 1 : 2];
         this.smartCount++;
