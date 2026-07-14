@@ -87,11 +87,12 @@ export class Analyser {
     const lagMax = Math.min(N - 1, Math.floor(HZ * 60 / 55));   // ner till 55 BPM
     // 1) Rå autokorrelation, LENGTH-NORMALISERAD: /(N-lag) tar bort biasen mot
     //    korta lag (annars vinner alltid snabb takt eftersom fler termer bidrar).
-    // 2) COMB-SCORING: score(L) = ac(L) + ½·ac(2L) + ⅓·ac(3L). En äkta beat-
-    //    period resonerar även på dubbla/trippla lag — enskilda toppar gör det inte.
-    //    (Klapuri/Ellis tempogram-approach.)
-    // 3) PERCEPTUELL PRIOR: log-Gaussian runt 120 BPM (σ ≈ 0.4 oktav) minskar
-    //    oktavfel — hjärnan föredrar tempo nära 120 (Parncutt-resonanskurva).
+    // 2) COMB-SCORING: ac(L) + ½·ac(2L) + ⅓·ac(3L). En äkta beat-period resonerar
+    //    även på dubbla/trippla lag — enskilda toppar gör det inte. (Klapuri.)
+    // 3) PULSE-TRAIN CROSS-CORRELATION (Percival-Tzanetakis 2014, Essentia):
+    //    korrelera envelopen mot en idealiserad pulsserie vid bästa fas. Fångar
+    //    regelbundenheten även när AC är utsmetad (mjuka onsets, synkoperingar).
+    // 4) PERCEPTUELL PRIOR: log-Gauss runt 120 BPM, σ = 1.0 oktav (Ellis/librosa).
     const ac = new Float32Array(lagMax + 1);
     for (let lag = lagMin; lag <= lagMax; lag++) {
       let sum = 0;
@@ -99,21 +100,42 @@ export class Analyser {
       for (let i = 0; i < M; i++) sum += env[i] * env[i + lag];
       ac[lag] = sum / M;
     }
+    // Halvvågsrektifierad envelope (positiv del) — pulse xcorr använder bara energi PÅ slaget.
+    const envPos = new Float32Array(N);
+    for (let i = 0; i < N; i++) envPos[i] = env[i] > 0 ? env[i] : 0;
+    // Pulse-train xcorr per lag: max över fas av Σ envPos[φ + k·L], normaliserad per antal pulser.
+    const pulse = new Float32Array(lagMax + 1);
+    let pulseMax = 1e-9, combMax = 1e-9;
+    for (let lag = lagMin; lag <= lagMax; lag++) {
+      let best = 0;
+      for (let ph = 0; ph < lag; ph++) {
+        let s = 0, k = 0;
+        for (let i = ph; i < N; i += lag) { s += envPos[i]; k++; }
+        if (k > 0) { const norm = s / k; if (norm > best) best = norm; }
+      }
+      pulse[lag] = best;
+      if (best > pulseMax) pulseMax = best;
+      let comb = ac[lag];
+      if (2 * lag <= lagMax) comb += 0.5 * ac[2 * lag];
+      if (3 * lag <= lagMax) comb += 0.33 * ac[3 * lag];
+      if (comb > combMax) combMax = comb;
+    }
     let bestLag = 0, bestVal = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
-      let score = ac[lag];
-      if (2 * lag <= lagMax) score += 0.5 * ac[2 * lag];
-      if (3 * lag <= lagMax) score += 0.33 * ac[3 * lag];
+      let comb = ac[lag];
+      if (2 * lag <= lagMax) comb += 0.5 * ac[2 * lag];
+      if (3 * lag <= lagMax) comb += 0.33 * ac[3 * lag];
+      // Normalisera båda till [0,1] och rösta jämnt — så de kan väga upp varandra.
+      // AC svarar starkt på självlikhet, pulse xcorr på regelbunden energi-fördelning.
+      const combN = comb / combMax;
+      const pulseN = pulse[lag] / pulseMax;
       const bpmAt = (HZ * 60) / lag;
       const oct = Math.log2(bpmAt / 120);
-      // σ = 1.0 oktav (Ellis 2007 / librosa default). Snävare σ (t.ex. 0.4) tvingar
-      // allt mot 120 och halverar reggae/dubblar DnB. 1.0 ger 60 BPM ~61% vikt och
-      // 170 BPM ~87% — mjuk preferens, inte tvång.
-      const prior = Math.exp(-(oct * oct) / (2 * 1.0 * 1.0));
-
-      score *= prior;
+      const prior = Math.exp(-(oct * oct) / 2.0);   // σ = 1.0 oktav
+      const score = (0.5 * combN + 0.5 * pulseN) * prior;
       if (score > bestVal) { bestVal = score; bestLag = lag; }
     }
+
     if (bestLag === 0 || bestVal <= 0) return;
     // OFF-BEAT-TEST → skilj äkta snabb takt (dans) från subdivision (ballad).
     // Vik onset-envelopen på DUBBLA perioden, jämför energi PÅ slaget vs MELLAN.
