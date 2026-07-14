@@ -54,9 +54,12 @@ export function useMockLive() {
   const chaseDir = useRef(1);
   const lastChaseAdvance = useRef(0);
 
-  // fejkad musikkälla: bas-sinus + slumpade "beats" var 0.35–0.6s + drop var 8–14s
-  const nextBeat = useRef(0.5);
+  // fejkad musikkälla: stabil 128 BPM = 0.469s mellan beats + drop var 8–14s
+  const MOCK_BPM = 128;
+  const BEAT_PERIOD = 60 / MOCK_BPM;
+  const nextBeat = useRef(BEAT_PERIOD);
   const nextDrop = useRef(10);
+
 
   useEffect(() => {
     const tick = () => {
@@ -82,8 +85,9 @@ export function useMockLive() {
         let beatSpike = 0;
         if (t >= nextBeat.current) {
           beatSpike = 0.7 + Math.random() * 0.3;
-          nextBeat.current = t + 0.35 + Math.random() * 0.25;
+          nextBeat.current += BEAT_PERIOD;
         }
+
         if (t >= nextDrop.current) {
           dropUntil.current = t + 1.5;
           nextDrop.current = t + 8 + Math.random() * 6;
@@ -260,6 +264,11 @@ export function useMockLive() {
       });
 
       st.setLive(Math.min(1, audio), kick, frame);
+      // Fake BPM: låst 128 med confidence som rampar upp första ~2s
+      // (matchar Pi-analysern's "search → lock" beteende visuellt).
+      const conf = Math.min(0.85, t / 2.5);
+      st.setBpm(t > 0.8 ? MOCK_BPM : 0, conf);
+
 
       const p = presetById(preset);
       document.documentElement.style.setProperty("--accent-h", String(p.hue));

@@ -57,6 +57,8 @@ interface DmxState {
   audioLevel: number;   // 0..1 (smoothed)
   kick: number;         // 0..1 (decaying)
   frame: number[];      // DMX 1..512, values 0..255
+  bpm: number;          // 0 = ej låst
+  bpmConfidence: number;// 0..1
   setPreset: (id: PresetId) => void;
   patchParams: (p: Partial<Params>) => void;
   addFixture: () => void;
@@ -64,6 +66,8 @@ interface DmxState {
   removeFixture: (id: string) => void;
   toggleRotation: (id: PresetId) => void;
   setLive: (audio: number, kick: number, frame: number[]) => void;
+  setBpm: (bpm: number, confidence: number) => void;
+
   setMicEnabled: (b: boolean) => void;
   setMicError: (m: string | null) => void;
 }
@@ -133,6 +137,9 @@ export const useDmx = create<DmxState>((set, get) => {
     audioLevel: 0,
     kick: 0,
     frame: new Array(512).fill(0),
+    bpm: 0,
+    bpmConfidence: 0,
+
 
     setPreset: (id) => { set({ preset: id }); persist(); },
     patchParams: (p) => { set({ params: { ...get().params, ...p } }); persist(); },
@@ -163,6 +170,8 @@ export const useDmx = create<DmxState>((set, get) => {
       persist();
     },
     setLive: (audioLevel, kick, frame) => set({ audioLevel, kick, frame }),
+    setBpm: (bpm, bpmConfidence) => set({ bpm, bpmConfidence }),
+
     setMicEnabled: (micEnabled) => set({ micEnabled, micError: micEnabled ? get().micError : null }),
     setMicError: (micError) => set({ micError }),
   };

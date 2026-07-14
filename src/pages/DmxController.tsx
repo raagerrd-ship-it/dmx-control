@@ -8,12 +8,16 @@ import { BpmDisplay } from "@/components/BpmDisplay";
 
 
 import { useMockLive } from "@/hooks/useMockLive";
+import { usePiLive } from "@/hooks/usePiLive";
 import { useDmx, presetById } from "@/store/dmx";
+
 
 type Tab = "live" | "fixtures";
 
 export default function DmxController() {
   useMockLive();
+  usePiLive();
+
   const [tab, setTab] = useState<Tab>("live");
   const preset = useDmx((s) => s.preset);
   const monoHue = useDmx((s) => s.params.monoHue);
