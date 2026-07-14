@@ -86,22 +86,10 @@ export class EffectEngine {
       return this.universe;
     }
 
-    // Drop-flash (lokal strong-kick): everything white for the duration.
+    // Drop-bloom: on a drop the current color surges to full brightness (keeps
+    // the mode's look, no jarring primary-override). Optional hardware strobe.
     const nowWall = Date.now();
     const flashActive = !!(this.cfg.flashUntil && nowWall < this.cfg.flashUntil);
-    if (flashActive) {
-      // White pop; optional hardware-strobe punch (fixture stutters on the
-      // drop). Punch is opt-in — the clean pop is the default.
-      // No white LED on these RGB pars — "white" = all diodes = a muddy blob.
-      // Punch each lamp to full in a pure primary (R/G/B across the rig) instead.
-      const punch = this.cfg.punchOnDrop ? 235 : 0;
-      const PRIMARIES: [number, number, number][] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
-      this.cfg.fixtures.forEach((fx, i) =>
-        writeFixture(this.universe, fx, PRIMARIES[i % 3], this.cfg.master, punch));
-      // Feed the ballistics so it decays smoothly out of the flash.
-      for (let ch = 0; ch < 512; ch++) this.outSmooth[ch] = this.universe[ch];
-      return this.universe;
-    }
 
         // Normalize against the AGC target so "at target loudness" = full drive —
         // the AGC otherwise parks the level around ~0.5 and v never reaches 1.
@@ -197,7 +185,12 @@ export class EffectEngine {
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, effMode);
-      const strobeVal = effMode === "strobe" ? 210 : 0;   // hårdvarustrobe i strobe-läget
+      if (flashActive) {
+        // Bloom: skala upp nuvarande färg till full ljusstyrka (behåll färgton).
+        const mxc = Math.max(rgb[0], rgb[1], rgb[2]);
+        if (mxc > 0.02) { rgb[0] /= mxc; rgb[1] /= mxc; rgb[2] /= mxc; }
+      }
+      const strobeVal = (effMode === "strobe" || (flashActive && this.cfg.punchOnDrop)) ? 210 : 0;
       writeFixture(this.universe, fx, rgb, master, strobeVal);
     }
 

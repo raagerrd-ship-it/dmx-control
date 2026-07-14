@@ -109,10 +109,10 @@ export const defaultConfig: EngineConfig = {
   audioInput: "aux",
   sensitivity: 0.6,
   dynamics: 0.6,
-  beatPulse: false,
+  beatPulse: true,
   punchOnDrop: false,
   energyDrivesMode: true,
-  dropSensitivity: 0.5,
+  dropSensitivity: 0.3,
   smartDwellMs: 9000,
   master: 1.0,
   monoHue: 15,   // warm orange — feels like fire, but the user can pick anything
