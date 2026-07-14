@@ -45,6 +45,7 @@ export function useLiveAnalysisRunner() {
     const FLUX_HIST = 20;              // ~400 ms @ 20 ms hop
     const fluxHistory = new Float32Array(FLUX_HIST);
     let fluxIdx = 0;
+    let energyPeak = 0.15;   // långsam energitopp — grindar bort drops i lugna partier
     let prevSpectrum: Float32Array | null = null;
     let lastFlashTs = 0;
     let energyEma = 0;
@@ -123,9 +124,13 @@ export function useLiveAnalysisRunner() {
                 const median = sorted[Math.floor(sorted.length / 2)] || 1e-6;
                 const now = performance.now();
                 const threshold = 3 + (1 - sensitivity) * 4;   // 3..7×
+                // Långsam energitopp (attack snabb, decay ~30 s) — drops bara
+                // när partiet faktiskt har energi, inte på lugn bakgrund.
+                energyPeak = Math.max(energyEma, energyPeak * 0.9995);
+                const loudEnough = energyEma > 0.12 && energyEma > energyPeak * 0.55;
                 if (
                   flux > median * threshold &&
-                  energyEma > 0.05 &&
+                  loudEnough &&
                   now - lastFlashTs > 350
                 ) {
                   lastFlashTs = now;
