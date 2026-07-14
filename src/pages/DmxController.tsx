@@ -157,9 +157,41 @@ function MoreButton({ open, onToggle }: { open: boolean; onToggle: () => void })
 function AudioMeterCard() {
   const audio = useDmx((st) => st.audioLevel);
   const kick = useDmx((st) => st.kick);
+  const bpm = useDmx((st) => st.bpm);
+  const conf = useDmx((st) => st.bpmConfidence);
   const pct = Math.round(audio * 100);
+  const confPct = Math.round(conf * 100);
+  const locked = bpm > 0 && conf >= 0.5;
+  const confLabel = conf < 0.3 ? "Söker" : conf < 0.6 ? "Osäker" : conf < 0.85 ? "Stabil" : "Låst";
   return (
     <Section title="Ljudnivå">
+      {/* BPM + confidence */}
+      <div className="flex items-center justify-between mb-2.5">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[22px] font-semibold tabular-nums leading-none">
+            {bpm > 0 ? Math.round(bpm) : "—"}
+          </span>
+          <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">BPM</span>
+        </div>
+        <div className="flex items-center gap-2 min-w-0 flex-1 ml-4">
+          <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden">
+            <div
+              className="h-full transition-[width] duration-200"
+              style={{
+                width: confPct + "%",
+                background: locked ? "hsl(var(--accent))" : "hsl(var(--muted-foreground))",
+              }}
+            />
+          </div>
+          <span
+            className="text-[11px] tabular-nums w-14 text-right"
+            style={{ color: locked ? "hsl(var(--accent))" : "hsl(var(--muted-foreground))" }}
+          >
+            {confLabel}
+          </span>
+        </div>
+      </div>
+
       <div className="flex justify-between items-center mb-1.5">
         <span className="text-[13px] text-muted-foreground flex items-center gap-2">
           Nivå just nu
@@ -182,6 +214,7 @@ function AudioMeterCard() {
     </Section>
   );
 }
+
 
 function MoreSections() {
   const s = usePi();
