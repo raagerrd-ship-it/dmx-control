@@ -146,10 +146,13 @@ export class EffectEngine {
         const FULLFART: Mode[] = ["party", "snap", "bounce", "strobe", "rave"];
         const bpm = this.cfg.beat?.bpm ?? 0;
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
+        // BPM väljer vilket PAR av kategorier; energin väljer inom paret.
+        //   Låg BPM  → Lugn ↔ Fart
+        //   Hög BPM  → Fart ↔ Full Fart
+        const highTempo = bpm >= 125;
         let tier: Mode[];
-        if (intensity < 0.4) tier = LUGN;
-        else if (intensity < 0.7 || bpm < 140) tier = FART;
-        else tier = FULLFART;
+        if (highTempo) tier = intensity < 0.5 ? FART : FULLFART;
+        else           tier = intensity < 0.5 ? LUGN : FART;
         let pool = enabled(tier);
         if (pool.length === 0) pool = enabled([...FART, ...LUGN, ...FULLFART]);      // valfri aktiv
         if (pool.length === 0) pool = ["cycle"];                                     // sista fallback
