@@ -74,7 +74,7 @@ export class Analyser {
    *   OBTAIN-realtidsbeat-tracking.)
    */
   private computeBpm() {
-    if (this.envFilled < Analyser.ENV_LEN * 0.45) return;   // första estimat ~2.2s
+    if (this.envFilled < 80) return;   // ~0.8s → första grovestimat direkt, förfinas löpande
     const N = this.envFilled;
     const env = new Float32Array(N);
     let mean = 0;
@@ -270,7 +270,11 @@ export class Analyser {
       this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
       this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
       this.envAccum = 0;
-      if (++this.bpmCounter >= Analyser.ENV_HZ / 4) { this.bpmCounter = 0; this.computeBpm(); }   // 4 Hz (var 2 Hz) → snabbare inlåsning
+      // Innan lås: räkna på varje ny envelope-sample (100 Hz) för snabbast första estimat.
+      // Efter lås: 4 Hz räcker gott — sparar CPU och förfinar med median.
+      const stride = this.localBpm === 0 ? 1 : Analyser.ENV_HZ / 4;
+      if (++this.bpmCounter >= stride) { this.bpmCounter = 0; this.computeBpm(); }
+
     }
     if (kick) this.beatAnchorMs = Date.now();
 
