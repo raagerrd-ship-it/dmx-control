@@ -277,10 +277,6 @@ export async function startServer(
           } else if (msg.type === "identifyStop") {
             stopIdentify();
             return;
-          } else if (msg.type === "smartSyncEnable") {
-            if (msg.enabled) deps.smartSync.enable();
-            else deps.smartSync.disable();
-            return; // state pushed via onState
           } else if (msg.type === "setDmxMaxHz" && typeof msg.value === "number") {
             deps.cfg.dmxMaxHz = Math.max(30, Math.min(500, Math.round(msg.value)));
           } else if (msg.type === "setAgcTarget" && typeof msg.value === "number") {
