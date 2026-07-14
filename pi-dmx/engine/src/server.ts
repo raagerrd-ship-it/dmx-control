@@ -52,8 +52,12 @@ export interface Server {
   broadcastSmartSync: (st: SmartSyncPublicState) => void;
 }
 
-export async function startServer(deps: ServerDeps, port = 80): Promise<Server> {
-  const app = Fastify({ logger: false });
+export async function startServer(
+  deps: ServerDeps,
+  port = 80,
+  tls?: { key: Buffer; cert: Buffer },
+): Promise<Server> {
+  const app = Fastify((tls ? { logger: false, https: tls } : { logger: false }) as any) as unknown as FastifyInstance;
 
   // Identify runner: blinks fixtures in order (or one specific fixture) so the
   // user can visually locate them. All state lives on cfg.identify so the

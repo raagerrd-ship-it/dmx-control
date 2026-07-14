@@ -11,6 +11,7 @@
  * saved back (debounced) whenever anything changes it.
  */
 
+import { readFileSync, existsSync } from "node:fs";
 import { AudioCapture } from "./audio.js";
 import { Analyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
@@ -87,7 +88,7 @@ const cycleMode = (): Mode => {
   return cfg.mode;
 };
 
-server = await startServer({
+const serverDeps = {
   cfg,
   getLatestFrame: () => latestFrame,
   cycleMode,
@@ -98,7 +99,27 @@ server = await startServer({
     curSlots = activeSlots(cfg.fixtures);
     dmx.setMaxHz(cfg.dmxMaxHz);
   },
-}, Number(process.env.PORT ?? 80));
+};
+const s80 = await startServer(serverDeps, Number(process.env.PORT ?? 80));
+
+// HTTPS on 443 (self-signed) — the phone microphone (getUserMedia in the
+// Live Analysis app) requires a secure context, and wss must be same-origin.
+let s443: Server | null = null;
+const TLS_KEY = "/etc/audio-dmx/tls/key.pem";
+const TLS_CERT = "/etc/audio-dmx/tls/cert.pem";
+if (existsSync(TLS_KEY) && existsSync(TLS_CERT)) {
+  try {
+    s443 = await startServer(serverDeps, 443, { key: readFileSync(TLS_KEY), cert: readFileSync(TLS_CERT) });
+    console.log("https on :443");
+  } catch (e) {
+    console.error("[https] failed:", (e as Error).message);
+  }
+}
+server = {
+  app: s80.app,
+  broadcastConfig: () => { s80.broadcastConfig(); s443?.broadcastConfig(); },
+  broadcastSmartSync: (st) => { s80.broadcastSmartSync(st); s443?.broadcastSmartSync(st); },
+};
 console.log(`audio-dmx-engine listening on ${server.app.server.address()}`);
 
 // Physical mode button — short press cycles modes, long press toggles AGC

@@ -128,6 +128,12 @@ install -m644 package.json /opt/audio-dmx-engine/package.json
 install -Dm644 systemd/audio-dmx-engine.service /etc/systemd/system/audio-dmx-engine.service
 install -Dm644 systemd/cpu-performance.service /etc/systemd/system/cpu-performance.service
 
+# Self-signed TLS so the phone mic (secure context) + wss work on the LAN/AP.
+if [ ! -f /etc/audio-dmx/tls/cert.pem ]; then
+  mkdir -p /etc/audio-dmx/tls
+  openssl req -x509 -newkey rsa:2048 -keyout /etc/audio-dmx/tls/key.pem     -out /etc/audio-dmx/tls/cert.pem -days 3650 -nodes -subj "/CN=pi-dmx.local" 2>/dev/null
+fi
+
 echo "==> [8/8] enable + start services"
 systemctl daemon-reload
 systemctl enable --now cpu-performance codec-zero-linein dmx-helper audio-dmx-engine
