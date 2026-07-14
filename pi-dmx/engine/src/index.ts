@@ -205,7 +205,6 @@ if (cfg.modeButton) {
 }
 
 process.on("SIGTERM", () => {
-  smartSync.disable();
   capture.stop();
   button?.stop();
   dmx.close();
