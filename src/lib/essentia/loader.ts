@@ -17,7 +17,7 @@ export async function loadEssentia(): Promise<any> {
       const EssentiaWASM = (wasmModule as any).EssentiaWASM ?? (wasmModule as any).default;
       // Emscripten factory tar en Module-config med locateFile
       const module = await (EssentiaWASM as any)({
-        locateFile: (path: string) => `/wasm/${path}`,
+        locateFile: (path: string) => `${import.meta.env.BASE_URL}wasm/${path}`,
       });
       const core = await import("essentia.js/dist/essentia.js-core.es.js");
       const Essentia = (core as any).Essentia ?? (core as any).default;
