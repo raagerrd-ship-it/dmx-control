@@ -127,12 +127,8 @@ export function usePlayingMode(): string {
   const s = usePi();
   const [mode, setMode] = useState<string>(() => firstEnabled(s.rotation));
 
-  // Energi-driven växling
-  const shortEma = useRef(0);
-  const longEma  = useRef(0);
-  const lastSwitchT = useRef(0);
-  const inHigh = useRef(false);
-  const inLow  = useRef(false);
+  // Energi-driven växling — allt state i EN ref för stabil hook-ordning över HMR.
+  const r = useRef({ shortEma: 0, longEma: 0, lastSwitchT: 0, inHigh: false, inLow: false });
 
   useEffect(() => {
     const dwellMs = s.dwell === "fast" ? 4500 : s.dwell === "slow" ? 15000 : 9000;
@@ -151,30 +147,31 @@ export function usePlayingMode(): string {
       }
 
       // Energi-läge
+      const st = r.current;
       const now = performance.now();
       const audio = useDmx.getState().audioLevel;
       // EMA-alphor kalibrerade för 250ms tick (α = 1 - exp(-dt/τ))
-      shortEma.current += (audio - shortEma.current) * 0.22;   // τ ≈ 1 s
-      longEma.current  += (audio - longEma.current)  * 0.031;  // τ ≈ 8 s
-      const ratio = shortEma.current / Math.max(0.04, longEma.current);
+      st.shortEma += (audio - st.shortEma) * 0.22;   // τ ≈ 1 s
+      st.longEma  += (audio - st.longEma)  * 0.031;  // τ ≈ 8 s
+      const ratio = st.shortEma / Math.max(0.04, st.longEma);
 
-      const sinceLast = now - lastSwitchT.current;
+      const sinceLast = now - st.lastSwitchT;
       const cooldownOk = sinceLast > 6000;
 
       // Kant-detektor: gå in i HIGH när ratio > 1.35, ur när < 1.1. Samma för LOW.
-      const risingEdge  = ratio > 1.35 && !inHigh.current;
-      const fallingEdge = ratio < 0.72 && !inLow.current;
-      if (ratio > 1.35) inHigh.current = true;
-      if (ratio < 1.1)  inHigh.current = false;
-      if (ratio < 0.72) inLow.current  = true;
-      if (ratio > 0.9)  inLow.current  = false;
+      const risingEdge  = ratio > 1.35 && !st.inHigh;
+      const fallingEdge = ratio < 0.72 && !st.inLow;
+      if (ratio > 1.35) st.inHigh = true;
+      if (ratio < 1.1)  st.inHigh = false;
+      if (ratio < 0.72) st.inLow  = true;
+      if (ratio > 0.9)  st.inLow  = false;
 
       const timeoutHit = sinceLast > maxDwellMs;
       if (!cooldownOk && !timeoutHit) return;
       if (!risingEdge && !fallingEdge && !timeoutHit) return;
 
       // Välj bucket: HIGH → Full, LOW → Calm, annars → Fast/mellan
-      const long = longEma.current;
+      const long = st.longEma;
       let bucket: [string, string, string][];
       if (risingEdge)      bucket = long > 0.5 ? FULL_MODES : FAST_MODES;
       else if (fallingEdge) bucket = CALM_MODES;
@@ -186,7 +183,7 @@ export function usePlayingMode(): string {
       if (!pool.length) return;
 
       const next = pool[Math.floor(Math.random() * pool.length)];
-      lastSwitchT.current = now;
+      st.lastSwitchT = now;
       setMode(next);
     }, 250);
     return () => clearInterval(id);
