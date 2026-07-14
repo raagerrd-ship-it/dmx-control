@@ -4,6 +4,8 @@ import { LiveControls } from "@/components/LiveControls";
 import { FixtureSetup } from "@/components/FixtureSetup";
 import { LivePreview } from "@/components/LivePreview";
 import { HueColorCard } from "@/components/HueColorCard";
+import { BpmDisplay } from "@/components/BpmDisplay";
+
 
 import { useMockLive } from "@/hooks/useMockLive";
 import { useDmx, presetById } from "@/store/dmx";
