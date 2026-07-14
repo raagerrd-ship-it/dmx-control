@@ -14,6 +14,8 @@ export function useLiveAnalysisRelay() {
   const lastHueSent = useRef(0);
   const lastBeatSent = useRef(0);
   const lastKeyStr = useRef("");
+  const lastEnergySent = useRef(0);
+  const now2 = () => Date.now();
 
   useEffect(() => {
     if (!enabled) return;
@@ -31,6 +33,10 @@ export function useLiveAnalysisRelay() {
         const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
         const ws = new WebSocket(`${proto}//${host}/ws`);
         sockRef.current = ws;
+        ws.onopen = () => {
+          // Live Analysis är hela "smart synk": sätt engine i smart-läge direkt.
+          try { ws.send(JSON.stringify({ type: "setMode", mode: "smart" })); } catch { /* noop */ }
+        };
         ws.onclose = () => {
           sockRef.current = null;
           if (!cancelled) retryTimer = window.setTimeout(connect, 3000);
@@ -46,6 +52,12 @@ export function useLiveAnalysisRelay() {
     const unsub = useLiveAnalysis.subscribe((s) => {
       const ws = sockRef.current;
       if (!ws || ws.readyState !== 1) return;
+
+      // Energinivå till smart-lägets effektväljare (throttlat 2 s)
+      if (now2() - lastEnergySent.current > 2000 && typeof s.energy === "number") {
+        lastEnergySent.current = now2();
+        ws.send(JSON.stringify({ type: "liveEnergy", value: s.energy }));
+      }
 
       // Drop-flash (lookahead → skicka atMs så Pi kan schemalägga)
       if (s.sendDrops && s.lastFlashAt !== lastFlashSent.current && s.lastFlashAt > 0) {

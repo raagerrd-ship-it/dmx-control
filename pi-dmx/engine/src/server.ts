@@ -303,6 +303,13 @@ export async function startServer(
             const secondary = ((((msg.secondary ?? msg.primary + 30) as number) % 360) + 360) % 360;
             deps.cfg.liveHueHint = { primary, secondary, atMs: Date.now() };
             return;
+          } else if (msg.type === "liveEnergy" && typeof msg.value === "number") {
+            // Matar smart-lägets pool-väljare. atMs bara vid stora skiften så
+            // små driftvärden inte triggar mode-byten i onödan.
+            const v = Math.max(0, Math.min(1, msg.value));
+            const prev = deps.cfg.sectionEnergy;
+            deps.cfg.sectionEnergy = { value: v, atMs: prev && Math.abs(prev.value - v) < 0.2 ? prev.atMs : Date.now() };
+            return;
           } else if (msg.type === "liveBeat" && typeof msg.bpm === "number") {
             const nowB = Date.now();
             let anchor = nowB;
