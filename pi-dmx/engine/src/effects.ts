@@ -139,14 +139,20 @@ export class EffectEngine {
         if (bigJump || now > this.smartDwellUntil) {
         this.lastSmartIntensity = intensity;
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
-        // Two categories; user checkboxes (cfg.rotation) pick which modes are in
-        // play. Low intensity → Lugn, high → Fart. Mixed order, no repeat.
-        const CALM: Mode[] = ["cycle", "breathe", "tide", "mono", "wave"];
-        const FAST: Mode[] = ["party", "chase", "drops", "snap", "bounce"];
+        // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
+        // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
+        const LUGN: Mode[] = ["cycle", "breathe", "tide", "mono"];
+        const FART: Mode[] = ["wave", "chase", "drops"];
+        const FULLFART: Mode[] = ["party", "snap", "bounce"];
+        const bpm = this.cfg.beat?.bpm ?? 0;
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
-        let pool = intensity < 0.45 ? enabled(CALM) : enabled(FAST);
-        if (pool.length === 0) pool = enabled(intensity < 0.45 ? FAST : CALM);      // andra kategorin
-        if (pool.length === 0) pool = ["cycle"];                                    // sista fallback
+        let tier: Mode[];
+        if (intensity < 0.4) tier = LUGN;
+        else if (intensity < 0.7 || bpm < 140) tier = FART;
+        else tier = FULLFART;
+        let pool = enabled(tier);
+        if (pool.length === 0) pool = enabled([...FART, ...LUGN, ...FULLFART]);      // valfri aktiv
+        if (pool.length === 0) pool = ["cycle"];                                     // sista fallback
         this.smartCount++;
         let next = pool[Math.floor(((this.smartCount * 0.61803398875) % 1) * pool.length)];
         if (next === this.smartMode && pool.length > 1) next = pool[(pool.indexOf(next) + 1) % pool.length];

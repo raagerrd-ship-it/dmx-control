@@ -88,6 +88,9 @@
   <h1>Effekter med fart</h1>
   <div class="card"><div id="fastList" class="rotlist"></div></div>
 
+  <h1>Effekter med full fart</h1>
+  <div class="card"><div id="fullList" class="rotlist"></div></div>
+
   <h1>Level <span class="kick-dot" id="kickDot"></span></h1>
   <div class="card">
     <div class="row"><label>Input</label><span class="val" id="levelVal">–</span></div>
@@ -256,8 +259,9 @@ function connect() {
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
 
-const CALM_MODES = [["cycle","Cykel"],["breathe","Andas"],["tide","Tidvatten"],["mono","Enfärg"],["wave","Våg"]];
-const FAST_MODES = [["party","Party"],["chase","Jakt"],["drops","Drops"],["snap","Snap"],["bounce","Studs"]];
+const CALM_MODES = [["cycle","Cykel"],["breathe","Andas"],["tide","Tidvatten"],["mono","Enfärg"]];
+const FAST_MODES = [["wave","Våg"],["chase","Jakt"],["drops","Drops"]];
+const FULL_MODES = [["party","Party"],["snap","Snap"],["bounce","Studs"]];
 let curRotation = {};
 function renderRotList(elId, list) {
   const el = document.getElementById(elId);
@@ -274,6 +278,7 @@ function renderRotList(elId, list) {
 function renderCategories() {
   renderRotList("calmList", CALM_MODES);
   renderRotList("fastList", FAST_MODES);
+  renderRotList("fullList", FULL_MODES);
 }
 
 function applyConfig(cfg) {

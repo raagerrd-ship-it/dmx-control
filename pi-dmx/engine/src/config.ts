@@ -120,7 +120,7 @@ export const defaultConfig: EngineConfig = {
   splitHueA: 0,    // red for bass side
   splitHueB: 200,  // cyan for treble side
   chaseStyle: "pingpong",
-  rotation: { cycle: true, breathe: true, tide: true, mono: false, wave: true, party: true, chase: true, drops: true, snap: true, bounce: true },
+  rotation: { cycle: true, breathe: true, tide: true, mono: false, wave: true, chase: true, drops: true, party: true, snap: true, bounce: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   dmxMaxHz: 200, // safe max for typical fixtures; helper caps automatically
 };
