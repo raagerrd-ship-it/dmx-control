@@ -1,102 +1,46 @@
-# Live Analysis (Essentia.js) — separat läge parallellt med SmartSync
 
 ## Mål
 
-Ny panel i mobil-UI:t som lyssnar via telefonens mikrofon, kör Essentia.js lokalt (WASM) och streamar events till Pi:n i realtid. SmartSync-panelen lämnas orörd — båda kan vara på samtidigt.
+Preview i Lovable ska se ut och kännas som Pi:ns riktiga UI (`pi-dmx/engine/public/index.html`). Pi behåller sin vanilla-HTML som sanning; React-appen blir en visuell spegel driven av samma mock som idag.
 
-## Vad Essentia.js ger oss
+## Vad som ändras
 
-1. **BPM-lock** (`RhythmExtractor2013`) → stabil beat-grid, beat-anchor skickas till Pi så beat-drivna effekter (pulse, chase) ligger exakt i fas.
-2. **Drop-lookahead** — 500 ms audio-buffer, spectral flux + energy-rise-detektion. När drop detekteras skickas `flash`-event med `atMs = now + 200ms` så vitpulsen hinner före Pi:ns audio-in.
-3. **Key + mode (dur/moll)** (`KeyExtractor`) → färg-hint: dur = varm palett, moll = kall.
-4. **Danceability + energy** (`Danceability`, `Energy`) → auto-val av preset (låg energy = breathe/mono, hög = split/chase).
-5. **Build-up detection** — glidande fönster på spectral centroid + energy; stigande trend = "build" → förbereder drop-flash.
+**Behålls:** `pi-dmx/engine/public/index.html` (oförändrad), `useMockLive`, `useDmx`-store (data-layer).
 
-## Prioritet i engine när båda är på
+**Skrivs om (src/):**
+- `src/pages/DmxController.tsx` — ny sektionsordning som matchar Pi.
+- `src/index.css` — CSS-variabler + typografi ska matcha Pi (`--bg #0a0a0f`, `--card #15151f`, `--line #252535`, `--hot #ff3a6b`, system-font-stack, uppercase 13px h1 med `letter-spacing:.12em`).
+- Nya komponenter (samma visuella språk som Pi):
+  - `ShowCard` — "Energi styr läget"-toggle, dwell-segment (Sällan/Normal/Ofta), "Pulsa på taktslag".
+  - `LevelCard` — level-meter + kick-dot + gain + AUX/Mic-knappar.
+  - `RotationList` — tre kort: Lugna effekter / Effekter med fart / Effekter med full fart, med raderna, beskrivning, "● SPELAS"-badge.
+  - `EffectsCard` — Drop-blixt segment (Av/Låg/Normal/Hög).
+  - `SettingsCard` — Reaktion/Dynamik/Ljusstyrka segment.
+  - `OwnerBanner` + befintlig `FixtureSetup` visuellt uppdaterad till Pi-stil, `SystemCard`, `WifiCard` (owner-mode via `/setup` i URL:en).
 
-```
-1. Essentia drop-flash        (kort override, ~200 ms vit puls)
-2. SmartSync section/hue      (låt-nivå färg/preset)
-3. Vanlig mode/preset         (default)
-```
+**Tas bort från preview:** `BpmDisplay`, `HueColorCard` (mono/comet/split UI), `PresetGrid` (grid-view), `LiveControls`, tab-navigationen `Live/Fixtures`. Datat i store:t behålls; bara UI-ytor försvinner.
 
-Ingen konflikt: Essentia skickar bara *events* (`beat`, `flash`, `hue-hint`), aldrig mode-lås. SmartSync ändrar `cfg.mode` som vanligt.
+**Mock utökas:** `useMockLive` genererar redan level/kick/mode-cykling — utökas med tre kategorilistor + rotation-toggles + dwell/energy-simulering så alla nya kort har liv.
 
-## Arkitektur
+## Sektioner i ny ordning
 
-```text
-Mobil (browser)
-  Mic (getUserMedia) 
-    → AudioWorklet (128-sample hop @ 48kHz)
-      → RingBuffer (2s lookahead)
-        → Essentia.js WASM
-          → BPM / beat / drop / key / energy
-            → WS /live-analysis → Pi engine
-                                    ↓
-                          cfg.beat (BPM anchor)
-                          cfg.flashUntil (drop)
-                          cfg.liveHueHint (key-based)
-```
+1. Show
+2. Level
+3. Lugna effekter
+4. Effekter med fart
+5. Effekter med full fart
+6. Effekter (drop)
+7. Inställningar
+8. Owner-only (om URL innehåller `/setup`): Fixtures, System, WiFi
 
-## Filer som skapas / ändras
+## Tekniskt
 
-**Nya:**
-- `public/wasm/essentia-wasm.web.wasm` — WASM-binären (kopieras från npm-paketet `essentia.js` vid install)
-- `src/lib/essentia/loader.ts` — laddar WASM + skapar Essentia-instans
-- `src/lib/essentia/analyser.ts` — AudioWorklet-glue + ring buffer + feature-extraction-loop
-- `src/hooks/useLiveAnalysis.ts` — React hook: mic on/off, state (BPM, energy, key, senaste event)
-- `src/store/liveAnalysis.ts` — zustand store (enabled, status, bpm, key, energy, lastFlashMs)
-- `src/components/LiveAnalysisPanel.tsx` — UI-panel (toggle, status, BPM-display, "sensitivity"-slider)
-- `pi-dmx/engine/src/liveAnalysis.ts` — WS-handler på Pi:n, applyar events på cfg
+- Byter Inter/Space Grotesk → samma system-font-stack som Pi (`-apple-system, system-ui`) för pixel-parity. Tailwind-tokens uppdateras via `index.css` — inga `bg-[#...]` i komponenter.
+- Owner-mode: `useLocation().pathname.includes("setup")` eller hash.
+- `LivePreview` behålls som liten debugvy men flyttas till `/setup`.
 
-**Ändras:**
-- `src/pages/DmxController.tsx` — lägger in `<LiveAnalysisPanel />` under `<SmartSyncPanel />`
-- `pi-dmx/engine/src/server.ts` — nytt WS-endpoint `/ws/live-analysis`
-- `pi-dmx/engine/src/config.ts` — lägger till `liveHueHint?: { hue: number; atMs: number }` (valfri; overrides bara ~2s)
-- `pi-dmx/engine/src/effects.ts` — respekterar `liveHueHint` om nyare än 2s
+## Ur scope
 
-## UI-panel (mobilen)
-
-```
-┌─ Live Analysis ─────────────────────┐
-│  [OFF/ON]           status: locked  │
-│  BPM: 128           Key: A minor    │
-│  Energy: ▓▓▓▓▓▓░░░░ 0.62            │
-│  Last drop: 1.2s ago                │
-│                                     │
-│  Sensitivity: ●───────  0.6         │
-│  □ Send beats  □ Send drops         │
-│  □ Send hue hints                   │
-└─────────────────────────────────────┘
-```
-
-Tre separata toggles så användaren kan välja: bara BPM-lock, bara drops, eller allt.
-
-## Steg-för-steg
-
-1. `bun add essentia.js` — kopiera WASM till `public/wasm/`.
-2. AudioWorklet + ring buffer — 2s lookahead, 128-sample hop.
-3. Essentia-loop i main thread: läs senaste 2048 samples var 100 ms, kör BPM/energy/key.
-4. Drop-detektor: spectral flux över 43-frame fönster (≈1s), threshold justerbar via sensitivity-slider. När trigger → `postMessage({type:'flash', atMs: now + 200})`.
-5. WS-klient batchar events, skickar var 50 ms (eller direkt vid flash).
-6. Pi:s `/ws/live-analysis`-handler: `beat` → sätter `cfg.beat = {anchorMs, bpm}`; `flash` → `cfg.flashUntil = event.atMs + 250`; `hue` → `cfg.liveHueHint = {hue, atMs: now}`.
-7. `effects.ts`: om `liveHueHint` yngre än 2s, blenda in dess hue i comet/mono/split.
-
-## Tekniska noter
-
-- **WASM-storlek**: Essentia.js är ~2 MB. Lazy-loadas bara när panelen slås på.
-- **iOS Safari**: kräver `AudioContext` startad från user gesture. Toggle-knappen räcker.
-- **Batteri**: mic + WASM drar ~5 %/h. Auto-stopp efter 15 min inaktivitet (om Pi WS är död).
-- **Latens end-to-end**: mic → analys → WS → Pi engine ≈ 30-50 ms. Drop-lookahead på 200 ms täcker det med marginal.
-- **Ingen internet** krävs — allt lokalt. Fungerar på pi-dmx AP:n även utan mobildata.
-
-## Vad som INTE ändras
-
-- SmartSync-panel, ACRCloud-flöde, Spotify-edge-function: oförändrade.
-- Befintliga presets (drops, party, chase, wave, cycle, mono): oförändrade.
-- Pi engine mode-cykling, rotation-toggle: oförändrade.
-
-## Vad som blir kvar att göra sen (om vi vill)
-
-- Sections (verse/chorus/drop) från Essentia — kräver egen state-machine ovanpå energy-envelope, hoppar över i första iterationen.
-- Multi-band drop-detektion (bass vs full-spectrum) — kan läggas till om drop-detektorn missar sub-drops.
+- Pi:ns HTML rörs inte.
+- Ingen WebSocket-klient i React (den befintliga `usePiLive` behålls; den gör inget i preview eftersom Pi inte finns där).
+- Ingen unifiering av kod mellan Pi och React — det var alternativen 1 och 2 som du valde bort.
