@@ -35,6 +35,7 @@ export class EffectEngine {
   private smartDwellUntil = 0;
   private lastSectionAt = 0;
   private intensityEma = 0.4;
+  private intensityPeak = 0.4;
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -126,7 +127,7 @@ export class EffectEngine {
     let effMode: Mode = this.cfg.mode;
     if (this.cfg.mode === "smart") {
       // Energi styr läget → lokal intensitet väljer pool; annars fast medel.
-      const intensity = this.cfg.energyDrivesMode ? this.intensityEma : 0.5;
+      const intensity = this.cfg.energyDrivesMode ? Math.min(1, this.intensityEma / Math.max(0.08, this.intensityPeak)) : 0.5;
         const bigJump = this.cfg.energyDrivesMode && Math.abs(intensity - this.lastSmartIntensity) > 0.12;
         if (bigJump || now > this.smartDwellUntil) {
         this.lastSmartIntensity = intensity;
@@ -151,6 +152,7 @@ export class EffectEngine {
     const dtSec = Math.min(0.1, (now - this.lastRenderMs) / 1000);
     this.lastRenderMs = now;
     this.intensityEma += (Math.max(audio, kickEnv * 0.8) - this.intensityEma) * Math.min(1, dtSec / 6);
+    this.intensityPeak = Math.max(this.intensityEma, this.intensityPeak - dtSec / 40 * this.intensityPeak);
 
     // Silence gate: below threshold for 4 s → fade out over 2 s; music back →
     // fade in fast. Mode floors otherwise keep the lamps glowing in silence.
@@ -186,7 +188,7 @@ export class EffectEngine {
     // a decaying strobe value would sweep through real strobe speeds).
     // Snappare fade-out i energiska lägen så pumpen syns; lugna behåller mjukheten.
     const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops";
-    const decay = Math.exp(-dtSec / (fastMode ? 0.12 : 0.3));
+    const decay = Math.exp(-dtSec / (fastMode ? 0.2 : 0.3));
     const skip = new Set<number>();
     for (const fx of this.cfg.fixtures) {
       const roles = fixtureRoles(fx);
