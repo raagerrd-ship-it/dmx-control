@@ -220,7 +220,7 @@ export async function startServer(
       // Push frame samples at 20 Hz for the level meter
       const push = setInterval(() => {
         const frame = deps.getLatestFrame();
-        if (frame && sock.readyState === 1) {
+        if (frame && sock.readyState === 1 && (sock.bufferedAmount ?? 0) < 4096) {
           sock.send(JSON.stringify({
             type: "frame",
             level: frame.level,
@@ -298,7 +298,7 @@ export async function startServer(
           deps.onConfigChanged?.();
           // Echo back
           for (const c of app.websocketServer.clients) {
-            if (c.readyState === 1) c.send(JSON.stringify({ type: "config", config: deps.cfg }));
+            if (c.readyState === 1 && ((c as any).bufferedAmount ?? 0) < 8192) c.send(JSON.stringify({ type: "config", config: deps.cfg }));
           }
         } catch { /* ignore malformed */ }
       });
