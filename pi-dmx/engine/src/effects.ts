@@ -180,7 +180,7 @@ export class EffectEngine {
 
     // Output ballistics on color/dim channels (never strobe/mode channels —
     // a decaying strobe value would sweep through real strobe speeds).
-    const decay = Math.exp(-dtSec / 0.4);
+    const decay = Math.exp(-dtSec / 0.3);
     const skip = new Set<number>();
     for (const fx of this.cfg.fixtures) {
       const roles = fixtureRoles(fx);
