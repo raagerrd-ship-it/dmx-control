@@ -147,7 +147,11 @@ export class EffectEngine {
 
     // Silence gate: below threshold for 4 s → fade out over 2 s; music back →
     // fade in fast. Mode floors otherwise keep the lamps glowing in silence.
-    if (frame.level > 0.05 || frame.kick) this.lastActiveMs = now;
+    // Gain-aware threshold: at high AGC gain the amplified noise floor sits
+    // well above 0.05 and read as flicker — real (even weak) music still
+    // lands near the AGC target and passes.
+    const silenceThreshold = 0.05 * Math.max(1, frame.gain / 3);
+    if (frame.level > silenceThreshold || frame.kick) this.lastActiveMs = now;
     const gateTarget = now - this.lastActiveMs > 4000 ? 0 : 1;
     const gateRate = gateTarget > this.silenceGate ? dtSec / 0.3 : dtSec / 2;
     this.silenceGate += Math.max(-gateRate, Math.min(gateRate, gateTarget - this.silenceGate));
