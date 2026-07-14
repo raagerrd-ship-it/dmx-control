@@ -263,8 +263,13 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
             deps.cfg.detection.tauDown = 60  * Math.pow(2  / 60,  a);
           } else if (msg.type === "liveFlash") {
             // Live Analysis (Essentia.js på mobilen) → drop-blixt om ~200 ms
+            // Föredra relativ tid (inMs) — mobilens och Pi:ns klockor kan skilja
+            // minuter (ingen RTC). Absolut atMs accepteras bara nära Pi-klockan.
             const dur = typeof msg.durationMs === "number" ? msg.durationMs : 220;
-            const at = typeof msg.atMs === "number" ? msg.atMs : Date.now() + 200;
+            const nowMs = Date.now();
+            let at = nowMs + 200;
+            if (typeof msg.inMs === "number") at = nowMs + Math.max(0, Math.min(2000, msg.inMs));
+            else if (typeof msg.atMs === "number" && Math.abs(msg.atMs - nowMs) < 2000) at = msg.atMs;
             deps.cfg.liveFlashUntil = at + dur;
             return;
           } else if (msg.type === "liveHueHint" && typeof msg.primary === "number") {
@@ -273,7 +278,11 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
             deps.cfg.liveHueHint = { primary, secondary, atMs: Date.now() };
             return;
           } else if (msg.type === "liveBeat" && typeof msg.bpm === "number") {
-            deps.cfg.beat = { anchorMs: typeof msg.atMs === "number" ? msg.atMs : Date.now(), bpm: msg.bpm };
+            const nowB = Date.now();
+            let anchor = nowB;
+            if (typeof msg.inMs === "number") anchor = nowB + Math.max(0, Math.min(5000, msg.inMs));
+            else if (typeof msg.atMs === "number" && Math.abs(msg.atMs - nowB) < 5000) anchor = msg.atMs;
+            deps.cfg.beat = { anchorMs: anchor, bpm: msg.bpm };
             return;
           }
           deps.onConfigChanged?.();

@@ -30,7 +30,7 @@ export function scheduleSave(cfg: EngineConfig, path = DEFAULT_PATH, delayMs = 5
     try {
       await mkdir(dirname(path), { recursive: true });
       // Strip transient fields (identify/flash overrides) from the persisted copy.
-      const { identify: _omit, flashUntil: _omit2, beat: _omit3, sectionEnergy: _omit4, ...persist } = cfg;
+      const { identify: _omit, flashUntil: _omit2, beat: _omit3, sectionEnergy: _omit4, liveFlashUntil: _omit5, liveHueHint: _omit6, ...persist } = cfg;
       await writeFile(path, JSON.stringify(persist, null, 2), "utf8");
     } catch (e) {
       console.error("[persist] save failed:", e);

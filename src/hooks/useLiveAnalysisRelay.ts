@@ -50,13 +50,13 @@ export function useLiveAnalysisRelay() {
       // Drop-flash (lookahead → skicka atMs så Pi kan schemalägga)
       if (s.sendDrops && s.lastFlashAt !== lastFlashSent.current && s.lastFlashAt > 0) {
         lastFlashSent.current = s.lastFlashAt;
-        ws.send(JSON.stringify({ type: "liveFlash", atMs: s.lastFlashAt, durationMs: 220 }));
+        ws.send(JSON.stringify({ type: "liveFlash", inMs: Math.max(0, s.lastFlashAt - Date.now()), durationMs: 220 }));
       }
 
       // BPM-beat (skicka anchor + BPM en gång per BPM-uppdatering)
       if (s.sendBeats && s.bpm > 0 && s.nextBeatAt !== lastBeatSent.current) {
         lastBeatSent.current = s.nextBeatAt;
-        ws.send(JSON.stringify({ type: "liveBeat", bpm: s.bpm, atMs: s.nextBeatAt }));
+        ws.send(JSON.stringify({ type: "liveBeat", bpm: s.bpm, inMs: Math.max(0, s.nextBeatAt - Date.now()) }));
       }
 
       // Hue-hint (skicka bara när tonarten ändras, throttlat 5 s)
