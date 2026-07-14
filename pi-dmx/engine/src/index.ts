@@ -15,7 +15,7 @@ import { AudioCapture } from "./audio.js";
 import { Analyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
 import { DmxSender } from "./dmx.js";
-import { startServer, type Server } from "./server.js";
+import { startServer, applyInputRouting, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 import { SmartSync } from "./smartsync.js";
@@ -32,10 +32,7 @@ if (!["smart","drops","party","chase","wave","cycle","mono","blackout"].includes
 
 // Re-apply the chosen codec input routing (the boot service restores the aux
 // default; this honors a persisted mic choice).
-if (cfg.audioInput === "mic") {
-  const { spawn: sp } = await import("node:child_process");
-  sp("alsactl", ["restore", "-f", "/etc/alsa/codec-zero-mic.state"], { stdio: "ignore" });
-}
+applyInputRouting(cfg.audioInput === "mic" ? "mic" : "aux");
 const analyser = new Analyser(cfg);
 const effects = new EffectEngine(cfg);
 const dmx = new DmxSender();

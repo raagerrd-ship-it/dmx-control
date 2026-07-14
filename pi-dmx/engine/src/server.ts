@@ -20,6 +20,16 @@ import type { SmartSync, SmartSyncPublicState } from "./smartsync.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// The card-level jack switches (Onboard MIC / MIC Jack / AUX Jack) are NOT
+// captured by alsactl and reset to defaults (room mic ON) on every restore —
+// they must be set explicitly after each state load.
+export function applyInputRouting(input: "aux" | "mic") {
+  const sw = input === "aux"
+    ? "amixer -c 0 -q set 'AUX Jack' on; amixer -c 0 -q set 'Onboard MIC' off; amixer -c 0 -q set 'MIC Jack' off"
+    : "amixer -c 0 -q set 'Onboard MIC' on; amixer -c 0 -q set 'AUX Jack' off; amixer -c 0 -q set 'MIC Jack' off";
+  spawn("sh", ["-c", `alsactl restore 0 -f /etc/alsa/codec-zero-${input}.state 2>/dev/null; ${sw}`], { stdio: "ignore" });
+}
+
 export interface ServerDeps {
   cfg: EngineConfig;
   getLatestFrame: () => Frame | null;
@@ -233,7 +243,7 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
             deps.cfg.sensitivity = clamp01(msg.value);
           } else if (msg.type === "setAudioInput" && (msg.value === "aux" || msg.value === "mic")) {
             deps.cfg.audioInput = msg.value;
-            spawn("alsactl", ["restore", "-f", `/etc/alsa/codec-zero-${msg.value}.state`], { stdio: "ignore" });
+            applyInputRouting(msg.value);
             deps.resetAgc();
           } else if (msg.type === "setDynamics") {
             deps.cfg.dynamics = clamp01(msg.value);
