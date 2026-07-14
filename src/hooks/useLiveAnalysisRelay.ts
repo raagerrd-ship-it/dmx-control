@@ -41,6 +41,7 @@ export function useLiveAnalysisRelay() {
             const st = useLiveAnalysis.getState();
             ws.send(JSON.stringify({ type: "smartDwell", mode: st.dwellMode }));
             ws.send(JSON.stringify({ type: "beatPulse", enabled: st.beatPulse }));
+            ws.send(JSON.stringify({ type: "punchOnDrop", enabled: st.punchOnDrop }));
           } catch { /* noop */ }
         };
         ws.onclose = () => {
@@ -60,11 +61,12 @@ export function useLiveAnalysisRelay() {
       if (!ws || ws.readyState !== 1) return;
 
       // Inställningar (dwell/puls) — skicka vid ändring
-      const sig = `${s.dwellMode}|${s.beatPulse}`;
+      const sig = `${s.dwellMode}|${s.beatPulse}|${s.punchOnDrop}`;
       if (sig !== lastSettings.current) {
         lastSettings.current = sig;
         ws.send(JSON.stringify({ type: "smartDwell", mode: s.dwellMode }));
         ws.send(JSON.stringify({ type: "beatPulse", enabled: s.beatPulse }));
+        ws.send(JSON.stringify({ type: "punchOnDrop", enabled: s.punchOnDrop }));
       }
 
       // Energinivå till smart-lägets effektväljare (throttlat 2 s)

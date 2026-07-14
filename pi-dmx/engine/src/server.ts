@@ -316,6 +316,9 @@ export async function startServer(
             const m = { slow: 20_000, normal: 9_000, fast: 4_000 } as Record<string, number>;
             deps.cfg.smartDwellMs = m[msg.mode as string] ?? 9_000;
             return;
+          } else if (msg.type === "punchOnDrop") {
+            deps.cfg.punchOnDrop = !!msg.enabled;
+            return;
           } else if (msg.type === "beatPulse") {
             deps.cfg.beatPulse = !!msg.enabled;
             return;

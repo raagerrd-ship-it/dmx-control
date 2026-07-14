@@ -22,6 +22,7 @@ interface LiveState {
   dwellMode: "slow" | "normal" | "fast";  // hur ofta smart byter läge
   beatPulse: boolean;           // pulsa hela riggen på taktslag
   energyDrivesMode: boolean;    // energi väljer läge (annars stabilt)
+  punchOnDrop: boolean;         // lampans hårdvarustrobe som punch på drop
   /** Mic-trim i dB (-24..+24) — appliceras på inspelade sampel före FFT/BPM. */
   micTrimDb: number;
 
@@ -38,16 +39,17 @@ interface LiveState {
   setDwellMode: (v: "slow" | "normal" | "fast") => void;
   setBeatPulse: (b: boolean) => void;
   setEnergyDrivesMode: (b: boolean) => void;
+  setPunchOnDrop: (b: boolean) => void;
 }
 
 const LS_KEY = "live-analysis-cal-v1";
-interface Persisted { micTrimDb: number; sensitivity: number; bpmMult: number; dwellMode: "slow"|"normal"|"fast"; beatPulse: boolean; energyDrivesMode: boolean }
+interface Persisted { micTrimDb: number; sensitivity: number; bpmMult: number; dwellMode: "slow"|"normal"|"fast"; beatPulse: boolean; energyDrivesMode: boolean; punchOnDrop: boolean }
 function loadCal(): Persisted {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (raw) return { micTrimDb: 0, sensitivity: 0.6, bpmMult: 1, dwellMode: "normal", beatPulse: false, energyDrivesMode: true, ...JSON.parse(raw) };
+    if (raw) return { micTrimDb: 0, sensitivity: 0.6, bpmMult: 1, dwellMode: "normal", beatPulse: false, energyDrivesMode: true, punchOnDrop: false, ...JSON.parse(raw) };
   } catch { /* noop */ }
-  return { micTrimDb: 0, sensitivity: 0.6, bpmMult: 1, dwellMode: "normal", beatPulse: false, energyDrivesMode: true };
+  return { micTrimDb: 0, sensitivity: 0.6, bpmMult: 1, dwellMode: "normal", beatPulse: false, energyDrivesMode: true, punchOnDrop: false };
 }
 function saveCal(p: Persisted) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(p)); } catch { /* noop */ }
@@ -73,6 +75,7 @@ export const useLiveAnalysis = create<LiveState>((set) => ({
   dwellMode: initialCal.dwellMode,
   beatPulse: initialCal.beatPulse,
   energyDrivesMode: initialCal.energyDrivesMode,
+  punchOnDrop: initialCal.punchOnDrop,
   micTrimDb: initialCal.micTrimDb,
   setEnabled: (enabled) => set({ enabled, status: enabled ? "loading" : "off", errorMsg: null }),
   setStatus: (status, err = null) => set({ status, errorMsg: err }),
@@ -80,19 +83,20 @@ export const useLiveAnalysis = create<LiveState>((set) => ({
   markFlash: (atMs) => set({ lastFlashAt: atMs }),
   setSensitivity: (sensitivity) => {
     set({ sensitivity });
-    const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode });
+    const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode, punchOnDrop: st.punchOnDrop });
   },
   setSendBeats: (sendBeats) => set({ sendBeats }),
   setSendDrops: (sendDrops) => set({ sendDrops }),
   setSendHues: (sendHues) => set({ sendHues }),
-  setBpmMult: (bpmMult) => { set({ bpmMult }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode }); },
-  setDwellMode: (dwellMode) => { set({ dwellMode }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode }); },
-  setBeatPulse: (beatPulse) => { set({ beatPulse }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode }); },
-  setEnergyDrivesMode: (energyDrivesMode) => { set({ energyDrivesMode }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode }); },
+  setBpmMult: (bpmMult) => { set({ bpmMult }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode, punchOnDrop: st.punchOnDrop }); },
+  setDwellMode: (dwellMode) => { set({ dwellMode }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode, punchOnDrop: st.punchOnDrop }); },
+  setBeatPulse: (beatPulse) => { set({ beatPulse }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode, punchOnDrop: st.punchOnDrop }); },
+  setPunchOnDrop: (punchOnDrop) => { set({ punchOnDrop }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode, punchOnDrop }); },
+  setEnergyDrivesMode: (energyDrivesMode) => { set({ energyDrivesMode }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode, punchOnDrop: st.punchOnDrop }); },
   setMicTrimDb: (micTrimDb) => {
     const v = Math.max(-24, Math.min(24, micTrimDb));
     set({ micTrimDb: v });
-    const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: v, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode });
+    const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: v, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode, punchOnDrop: st.punchOnDrop });
   },
 }));
 

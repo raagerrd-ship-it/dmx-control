@@ -88,9 +88,10 @@ export class EffectEngine {
       (this.cfg.flashUntil && nowWall < this.cfg.flashUntil) ||
       (this.cfg.liveFlashUntil && nowWall < this.cfg.liveFlashUntil);
     if (flashActive) {
-      // Clean steady white pop — no hardware strobe (that left lamps caught
-      // dark when the burst ended, reading as a blackout after the drop).
-      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master);
+      // White pop; optional hardware-strobe punch (fixture stutters on the
+      // drop). Punch is opt-in — the clean pop is the default.
+      const punch = this.cfg.punchOnDrop ? 235 : 0;
+      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master, punch);
       // Feed the ballistics so it decays smoothly out of the flash.
       for (let ch = 0; ch < 512; ch++) this.outSmooth[ch] = this.universe[ch];
       return this.universe;

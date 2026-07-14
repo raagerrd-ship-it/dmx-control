@@ -80,6 +80,8 @@ export interface EngineConfig {
   liveFlashUntil?: number | null;
   /** Transient: hur ofta smart byter läge (ms). */
   smartDwellMs?: number | null;
+  /** Transient: lampans hårdvarustrobe som punch på drop. */
+  punchOnDrop?: boolean | null;
   /** Transient: pulsa hela riggen på taktslag. */
   beatPulse?: boolean | null;
   /** Transient Live Analysis färg-hint från tonart (degrees 0..360) — inte persisted. */

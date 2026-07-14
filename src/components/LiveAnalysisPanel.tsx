@@ -84,6 +84,7 @@ export function LiveAnalysisPanel() {
 
           <div className="space-y-2 pt-2 border-t border-border/50">
             <ToggleRow label="Pulsa ljuset på taktslag" checked={s.beatPulse} onChange={s.setBeatPulse} />
+            <ToggleRow label="Lampans punch (strobe) på drop" checked={s.punchOnDrop} onChange={s.setPunchOnDrop} />
             <ToggleRow label="Energi styr läget" checked={s.energyDrivesMode} onChange={s.setEnergyDrivesMode} />
             <ToggleRow label="Skicka beats (taktlås)" checked={s.sendBeats} onChange={s.setSendBeats} />
             <ToggleRow label="Skicka drops" checked={s.sendDrops} onChange={s.setSendDrops} />
