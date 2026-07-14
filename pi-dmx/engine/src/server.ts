@@ -24,9 +24,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // captured by alsactl and reset to defaults (room mic ON) on every restore —
 // they must be set explicitly after each state load.
 export function applyInputRouting(input: "aux" | "mic") {
+  // Hela analoga kedjan sätts explicit — restore tappar även Aux-amp/mixins.
   const sw = input === "aux"
-    ? "amixer -c 0 -q set 'AUX Jack' on; amixer -c 0 -q set 'Onboard MIC' off; amixer -c 0 -q set 'MIC Jack' off"
-    : "amixer -c 0 -q set 'Onboard MIC' on; amixer -c 0 -q set 'AUX Jack' off; amixer -c 0 -q set 'MIC Jack' off";
+    ? "amixer -c 0 -q set 'AUX Jack' on; amixer -c 0 -q set 'Onboard MIC' off; amixer -c 0 -q set 'MIC Jack' off; " +
+      "amixer -c 0 -q set 'Aux' 53 on; amixer -c 0 -q set 'Mixin Left Aux Left' on; amixer -c 0 -q set 'Mixin Right Aux Right' on"
+    : "amixer -c 0 -q set 'Onboard MIC' on; amixer -c 0 -q set 'AUX Jack' off; amixer -c 0 -q set 'MIC Jack' off; " +
+      "amixer -c 0 -q set 'Aux' 0 off; amixer -c 0 -q set 'Mixin Left Aux Left' off; amixer -c 0 -q set 'Mixin Right Aux Right' off";
   spawn("sh", ["-c", `alsactl restore 0 -f /etc/alsa/codec-zero-${input}.state 2>/dev/null; ${sw}`], { stdio: "ignore" });
 }
 
