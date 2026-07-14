@@ -43,6 +43,7 @@ dmx.setMaxHz(cfg.dmxMaxHz);
 
 let latestFrame: Frame | null = null;
 let lastDropMs = 0;
+let fluxBaseline = 0.1;
 let curSlots = activeSlots(cfg.fixtures);
 
 const capture = new AudioCapture({
@@ -59,10 +60,14 @@ capture.on("chunk", (samples: Float32Array) => {
   if (frame.bpm > 0) {
     cfg.beat = { anchorMs: frame.beatAnchorMs || Date.now(), bpm: frame.bpm };
   }
-  // Lokal drop: ovanligt starkt slag → vit blixt. Känslighet 0..1.
-  if (frame.kick && cfg.dropSensitivity > 0) {
-    const thr = 0.28 - cfg.dropSensitivity * 0.2;
-    if (frame.flux > thr && Date.now() - lastDropMs > 250) {
+  // Lokal drop: ett slag som är MYCKET starkare än det normala → sällsynt blixt.
+  // (Inte varje kick — annars överröstar blixten alla lägen.) Baslinje = långsam
+  // EMA av kick-flux; drop kräver ett tydligt uthopp + minst ~900 ms mellanrum.
+  if (frame.kick) {
+    fluxBaseline += (frame.flux - fluxBaseline) * 0.05;
+    const mult = 3.2 - cfg.dropSensitivity * 1.6;   // känslig 1.6x .. trög 3.2x
+    const strong = frame.flux > Math.max(0.16, fluxBaseline * mult);
+    if (cfg.dropSensitivity > 0 && strong && Date.now() - lastDropMs > 900) {
       lastDropMs = Date.now();
       cfg.flashUntil = Date.now() + 130;
     }
