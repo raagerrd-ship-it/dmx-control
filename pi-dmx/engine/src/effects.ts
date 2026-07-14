@@ -89,8 +89,12 @@ export class EffectEngine {
     if (flashActive) {
       // White pop; optional hardware-strobe punch (fixture stutters on the
       // drop). Punch is opt-in — the clean pop is the default.
+      // No white LED on these RGB pars — "white" = all diodes = a muddy blob.
+      // Punch each lamp to full in a pure primary (R/G/B across the rig) instead.
       const punch = this.cfg.punchOnDrop ? 235 : 0;
-      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master, punch);
+      const PRIMARIES: [number, number, number][] = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+      this.cfg.fixtures.forEach((fx, i) =>
+        writeFixture(this.universe, fx, PRIMARIES[i % 3], this.cfg.master, punch));
       // Feed the ballistics so it decays smoothly out of the flash.
       for (let ch = 0; ch < 512; ch++) this.outSmooth[ch] = this.universe[ch];
       return this.universe;
