@@ -154,8 +154,8 @@ const serverDeps = {
 };
 const s80 = await startServer(serverDeps, Number(process.env.PORT ?? 80));
 
-// HTTPS on 443 (self-signed) — the phone microphone (getUserMedia in the
-// Live Analysis app) requires a secure context, and wss must be same-origin.
+// HTTPS on 443 (self-signed) — kept in case future features need a secure
+// context on the phone (getUserMedia etc.). Optional, serves same routes.
 let s443: Server | null = null;
 const TLS_KEY = "/etc/audio-dmx/tls/key.pem";
 const TLS_CERT = "/etc/audio-dmx/tls/cert.pem";
