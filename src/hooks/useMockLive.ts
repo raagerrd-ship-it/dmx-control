@@ -64,24 +64,9 @@ export function useMockLive() {
       const dt = Math.max(0.001, Math.min(0.1, t - lastT.current));
       lastT.current = t;
       const st = useDmx.getState();
-      const { params, fixtures } = st;
-      let { preset } = st;
+      const { params, fixtures, preset } = st;
       const sens = params.sensitivity / 100;
 
-      // === Smart Sync override: aktiv section byter preset + hue, aktiv flash → drop-blixt ===
-      const nowWall = Date.now();
-      const ovr = activeOverride(nowWall);
-      let smartFlash = ovr.flashUntil > nowWall || liveActiveFlash(nowWall);
-      let smartPrimaryHue: number | null = null;
-      let smartSecondaryHue: number | null = null;
-      if (ovr.section) {
-        const p = ovr.section.preset;
-        if (p === "auto" || p === "party" || p === "strobe" || p === "comet" || p === "chase" || p === "split" || p === "mono") {
-          preset = p as PresetId;
-        }
-        smartPrimaryHue = ovr.section.primaryHue;
-        smartSecondaryHue = ovr.section.secondaryHue;
-      }
 
       const releaseAlpha = softnessToAlpha(params.smoothness);
       const attackAlpha = 1.0;
