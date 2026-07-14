@@ -23,11 +23,15 @@ export class AudioCapture extends EventEmitter {
   private leftover: Buffer = Buffer.alloc(0);
   private readonly bytesPerFrame: number;   // S16LE = 2 bytes/sample × channels
   private readonly chunkBytes: number;
+  private readonly chunkMs: number;
+  private wallStart = 0;    // Date.now() vid första chunk
+  private audioMs = 0;      // ms audio vi HAR släppt vidare
 
   constructor(private opts: AudioCaptureOptions) {
     super();
     this.bytesPerFrame = 2 * opts.channels;
     this.chunkBytes = opts.hopSamples * this.bytesPerFrame;
+    this.chunkMs = (opts.hopSamples / opts.rate) * 1000;
   }
 
   start() {
@@ -72,21 +76,21 @@ export class AudioCapture extends EventEmitter {
       ? Buffer.concat([this.leftover, buf])
       : buf;
 
-    // Real-time guard: if a transient stall let audio pile up in the pipe, a
-    // single data event delivers a big backlog. Processing it all would push
-    // the light seconds behind the music. Drop stale audio, keep only the most
-    // recent MAX_BACKLOG chunks so latency can never accumulate.
-    const MAX_BACKLOG = 6;   // ~16 ms
-    let start = 0;
-    const available = Math.floor(combined.length / this.chunkBytes);
-    if (available > MAX_BACKLOG) {
-      start = (available - MAX_BACKLOG) * this.chunkBytes;
-    }
+    if (this.wallStart === 0) this.wallStart = Date.now();
 
-    let offset = start;
+    let offset = 0;
     while (combined.length - offset >= this.chunkBytes) {
       const chunk = combined.subarray(offset, offset + this.chunkBytes);
       offset += this.chunkBytes;
+      this.audioMs += this.chunkMs;
+
+      // Wall-clock pacing: if processing has fallen more than ~120 ms behind
+      // real time (audio piling up faster than we consume it — the slow, steady
+      // accumulation that a burst-cap misses), DROP this stale chunk instead of
+      // rendering it. Keeps the light within ~120 ms of the music indefinitely.
+      const behind = (Date.now() - this.wallStart) - this.audioMs;
+      if (behind > 120) continue;
+
       this.emit("chunk", this.toMonoFloat32(chunk));
     }
     this.leftover = combined.subarray(offset);
