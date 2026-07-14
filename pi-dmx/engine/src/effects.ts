@@ -38,6 +38,9 @@ export class EffectEngine {
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
+  /** Output ballistics: per-channel peak-hold with exponential decay — the
+   *  eye sees instant attack and a soft ~0.4 s fall, whatever the modes do. */
+  private outSmooth = new Float32Array(512);
   private smartCount = 0;
   private lastRenderMs = performance.now();
 
@@ -173,6 +176,24 @@ export class EffectEngine {
       const fx = this.cfg.fixtures[i];
       const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, effMode);
       writeFixture(this.universe, fx, rgb, master);
+    }
+
+    // Output ballistics on color/dim channels (never strobe/mode channels —
+    // a decaying strobe value would sweep through real strobe speeds).
+    const decay = Math.exp(-dtSec / 0.4);
+    const skip = new Set<number>();
+    for (const fx of this.cfg.fixtures) {
+      const roles = fixtureRoles(fx);
+      for (let r = 0; r < roles.length; r++) {
+        if (roles[r] === "strobe") skip.add(fx.address - 1 + r);
+      }
+    }
+    for (let ch = 0; ch < 512; ch++) {
+      if (skip.has(ch)) { this.outSmooth[ch] = this.universe[ch]; continue; }
+      const held = this.outSmooth[ch] * decay;
+      const v = this.universe[ch] >= held ? this.universe[ch] : held;
+      this.outSmooth[ch] = v;
+      this.universe[ch] = Math.round(v);
     }
 
     return this.universe;
