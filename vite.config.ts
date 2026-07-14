@@ -5,6 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // Served from the Pi under /app/ (set here so the shell can't mangle --base).
+  base: mode === "app" ? "/app/" : "/",
   define: {
     __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
   },
