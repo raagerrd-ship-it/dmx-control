@@ -43,7 +43,6 @@ export interface ServerDeps {
   onConfigChanged?: () => void;
   /** Advance to the next mode in the shared cycle. Returns the new mode. */
   cycleMode: () => Mode;
-  smartSync: SmartSync;
   /** Reset the AGC after an input-routing switch. */
   resetAgc: (startGain?: number) => void;
   setGainLock: (locked: boolean) => void;
@@ -53,8 +52,6 @@ export interface Server {
   app: FastifyInstance;
   /** Push current config to all connected clients (e.g. after a physical button press) */
   broadcastConfig: () => void;
-  /** Push SmartSync state to all connected clients. */
-  broadcastSmartSync: (st: SmartSyncPublicState) => void;
 }
 
 export async function startServer(
