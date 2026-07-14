@@ -30,6 +30,8 @@ const cfg = await loadConfig();
 const LEGACY_MODES: Record<string, Mode> = { auto: "wave", comet: "wave", split: "party", strobe: "party", pulse: "drops", spectrum: "wave", vu: "cycle" };
 if (LEGACY_MODES[cfg.mode as string]) cfg.mode = LEGACY_MODES[cfg.mode as string];
 if (!["smart","drops","party","chase","wave","cycle","breathe","tide","snap","bounce","mono","aurora","drift","sweep","pulse","strobe","rave","blackout"].includes(cfg.mode)) cfg.mode = "smart";
+// Analys-hop är inte användarinställbar — tvinga 100 Hz oavsett sparad config.
+cfg.fft.hop = 480;
 
 // Re-apply the chosen codec input routing (the boot service restores the aux
 // default; this honors a persisted mic choice).
@@ -90,9 +92,9 @@ capture.on("chunk", (samples: Float32Array) => {
   // Frikoppla render från analysrate: analysern (FFT/onset/BPM) körs varje chunk
   // (~375 Hz) för tighta drops, men effekterna behöver bara ~60 Hz för lamporna.
   // Att rendera 375x/s var slöseri (rate-limiten kastade 85%) och orsaken till
-  // att Node låg ~2% efter realtid. Nu rendras bara var ~16:e ms.
+  // att Node låg ~2% efter realtid. Render + DMX i lås-steg på 50 Hz.
   const nowR = performance.now();
-  if (nowR - lastRenderMs >= 16) {
+  if (nowR - lastRenderMs >= 20) {
     lastRenderMs = nowR;
     const universe = effects.render(latestFrame);
     dmx.send(universe, curSlots);

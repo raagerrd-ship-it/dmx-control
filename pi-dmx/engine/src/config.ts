@@ -36,7 +36,7 @@ export interface EngineConfig {
   };
   fft: {
     size: 512;            // ~5 ms latency @ 48k, decent bass resolution
-    hop: 128;             // ~2.7 ms hop
+    hop: number;          // sliding-window hop; 480 = 100 Hz analys @ 48k
   };
   detection: {
     autoGainTarget: number;   // 0..1, aim for this level (loud)
@@ -90,7 +90,7 @@ export interface EngineConfig {
 
 export const defaultConfig: EngineConfig = {
   audio: { device: "hw:0,0", rate: 48000, channels: 2 },
-  fft: { size: 512, hop: 128 },
+  fft: { size: 512, hop: 480 },
   detection: {
     autoGainTarget: 0.5,
     tauUp: 90,
@@ -122,7 +122,7 @@ export const defaultConfig: EngineConfig = {
   chaseStyle: "pingpong",
   rotation: { cycle: true, breathe: true, tide: true, mono: false, aurora: true, drift: true, wave: true, chase: true, drops: true, sweep: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
-  dmxMaxHz: 200, // safe max for typical fixtures; helper caps automatically
+  dmxMaxHz: 50, // safe max for typical fixtures; helper caps automatically
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {

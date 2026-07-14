@@ -24,7 +24,7 @@ export class Analyser {
   private writePos = 0;
   private prevMag: Float32Array;     // for flux
   private fluxHistory: number[] = []; // for median
-  private readonly fluxHistLen = 43;  // ~1s @ 375 Hz frame rate
+  private readonly fluxHistLen: number;   // ~115 ms median-fönster (frame-rate-oberoende)
   private static readonly ENV_HZ = 100;
   private static readonly ENV_LEN = 100 * 5;
   private envRing = new Float32Array(Analyser.ENV_LEN);
@@ -94,6 +94,7 @@ export class Analyser {
     this.buffer = new Float32Array(cfg.fft.size);
     this.prevMag = new Float32Array(cfg.fft.size / 2);
     this.envelope = cfg.detection.autoGainTarget;
+    this.fluxHistLen = Math.max(8, Math.round(0.115 * cfg.audio.rate / cfg.fft.hop));
   }
 
   /** Feed a hop-sized chunk of mono samples, get a frame back. */
