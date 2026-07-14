@@ -177,8 +177,8 @@ export class EffectEngine {
     // lands near the AGC target and passes.
     const silenceThreshold = 0.05 * Math.max(1, frame.gain / 3);
     if (frame.level > silenceThreshold || frame.kick) this.lastActiveMs = now;
-    const gateTarget = now - this.lastActiveMs > 4000 ? 0 : 1;
-    const gateRate = gateTarget > this.silenceGate ? dtSec / 0.3 : dtSec / 2;
+    const gateTarget = now - this.lastActiveMs > 800 ? 0 : 1;
+    const gateRate = gateTarget > this.silenceGate ? dtSec / 0.15 : dtSec / 0.5;
     this.silenceGate += Math.max(-gateRate, Math.min(gateRate, gateTarget - this.silenceGate));
     if (effMode === "wave") this.wavePhase += dtSec * (1.6 + audio * 4);
 

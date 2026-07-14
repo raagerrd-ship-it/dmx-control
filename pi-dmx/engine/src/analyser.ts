@@ -34,6 +34,7 @@ export class Analyser {
   private envAccumT = 0;
   private bpmCounter = 0;
   private localBpm = 0;
+  private silentMs = 0;
   private beatAnchorMs = 0;
   private gain = 1;
   // Attack/release-smoothed outputs — raw per-hop values update ~370x/s and
@@ -174,6 +175,14 @@ export class Analyser {
       this.lastKick = now;
     }
 
+    const frameMs0 = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
+    // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
+    if (rms < this.cfg.detection.noiseFloor * 1.5) {
+      this.silentMs += frameMs0;
+      if (this.silentMs > 350) { this.localBpm = 0; this.envFilled = 0; this.beatAnchorMs = 0; }
+    } else {
+      this.silentMs = 0;
+    }
     // --- Onset-envelope → lokal BPM (nedsamplad till 100 Hz) ---
     const frameMs = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
     this.envAccum = Math.max(this.envAccum, fluxNorm);

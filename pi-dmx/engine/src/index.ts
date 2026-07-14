@@ -58,6 +58,7 @@ capture.on("chunk", (samples: Float32Array) => {
   latestFrame = frame;
   // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
   // (om)lås; att sätta det på varje kick fick pulsen att flimra.
+  if (frame.bpm === 0) cfg.beat = null;   // tyst → stoppa beat-effekter direkt
   if (frame.bpm > 0) {
     if (!cfg.beat || Math.abs(cfg.beat.bpm - frame.bpm) > 2) {
       let anchor = frame.beatAnchorMs || Date.now();
