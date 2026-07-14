@@ -205,7 +205,7 @@ export function useLiveAnalysisRunner() {
           } catch {
             /* ignorera */
           }
-        }, 250);
+        }, 450);
 
         // Key/scale var 1500 ms
         keyTimer = window.setInterval(() => {
@@ -222,7 +222,7 @@ export function useLiveAnalysisRunner() {
           } catch {
             /* ignorera */
           }
-        }, 1500);
+        }, 3000);
       } catch (e) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         set({ status: "error", errorMsg: (e as any)?.message ?? String(e) });
