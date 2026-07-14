@@ -1,0 +1,5 @@
+# Files deployed to the Linux Pi must keep LF endings, even when edited on
+# Windows — CRLF in a shell script or systemd unit breaks it on the target.
+*.sh text eol=lf
+*.service text eol=lf
+*.timer text eol=lf
