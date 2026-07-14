@@ -211,7 +211,7 @@ export class EffectEngine {
     // Output ballistics on color/dim channels (never strobe/mode channels —
     // a decaying strobe value would sweep through real strobe speeds).
     // Snappare fade-out i energiska lägen så pumpen syns; lugna behåller mjukheten.
-    const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops";
+    const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops" || effMode === "rave";
     const beatMsNow = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
     const fastTau = Math.max(0.14, Math.min(0.3, beatMsNow * 0.5 / 1000));
     const decay = Math.exp(-dtSec / (fastMode ? fastTau : 0.3));
@@ -334,10 +334,10 @@ function pickColor(
   };
   switch (mode) {
     case "party": {
-      // Beat-pumpad: mörk mellan slagen, full på kick/beat — inte sustained level
-      // (som saturerade nära 100%). Motroterande rena färger, vit punch på kick.
-      const dir = idx % 2 === 0 ? 1 : -1;
-      const hue = snapHue(idx, ((t * 90 * dir + idx * 137) % 360 + 360) % 360 / 360);
+      // Full fart: FÄRGKAOS-PUMP — varje lampa har sin egen rena färg som
+      // blandas om varje takt, hela riggen slår till på beatet och faller mörk
+      // emellan. Mångfärgat och drivet — motsats till snap (unisont).
+      const hue = mixedSector(beatIdx + idx * 2) / 6;
       const v = punchFloor + (1 - punchFloor) * Math.min(1, beatPulse * 0.95 + audio * 0.2 + kickEnv * 0.8);
       return hsvToRgb(hue, 1, v);   // rena färger som pumpar; ingen urtvättande vit-blixt
     }
@@ -380,19 +380,23 @@ function pickColor(
       return hsvToRgb(hue, 1, v);
     }
     case "snap": {
-      // Snabb: varje taktslag hoppar ALLA lampor till en ny ren färg.
+      // Full fart: UNISONT FÄRGSLAG — alla lampor samma rena färg, hård kapning
+      // till en NY färg exakt på varje taktslag. Håller ljuset uppe (ingen pump)
+      // så det läser som ett färg-diaspel i takt; snabb fade ger färgsläp i kapet.
       const hue = mixedSector(beatIdx) / 6;
-      const v = punchFloor + (1 - punchFloor) * Math.min(1, Math.max(beatPulse, kickEnv) * 0.85 + audio * 0.3);
+      const v = Math.min(1, 0.72 + kickEnv * 0.28 + audio * 0.18);
       return hsvToRgb(hue, 1, v);
     }
     case "bounce": {
-      // Snabb: ljuspunkt studsar fram och tillbaka, ett steg per taktslag.
+      // Full fart: en SKARP ljuspunkt studsar fram och tillbaka, ett steg per
+      // takt, kort efterglöd, mörk rigg emellan. Gles och kinetisk; ny ren färg
+      // vid varje studs-steg.
       const span = Math.max(1, count - 1);
       const cyc = beatIdx % (span * 2);
       const pos = cyc <= span ? cyc : span * 2 - cyc;   // triangel-våg
       const d = Math.abs(idx - pos);
-      const hue = mixedSector(Math.floor(beatIdx / (span * 2))) / 6;
-      const v = Math.exp(-d * 1.3) * (punchFloor + (1 - punchFloor) * Math.min(1, beatPulse * 0.8 + audio * 0.4));
+      const hue = mixedSector(beatIdx) / 6;
+      const v = Math.exp(-d * 1.7) * Math.min(1, 0.85 + beatPulse * 0.15 + kickEnv * 0.4);
       return hsvToRgb(hue, 1, v);
     }
     case "aurora": {
@@ -430,14 +434,14 @@ function pickColor(
       return hsvToRgb(hue, 1, 1);
     }
     case "rave": {
-      // Full fart: riggen i två halvor som växlar färg varje taktslag, hög kontrast.
-      const groupA = idx < count / 2;
+      // Full fart: HÅRT SCHACKRUTS-VÄXELSPEL — varannan lampa lyser, grupperna
+      // byter på varje takt i kontrasterande färger, HELT släckt emellan för
+      // maximal kontrast. Läser tydligt även på 3 lampor (0,2 mot 1).
+      const even = idx % 2 === 0;
       const flip = beatIdx % 2 === 0;
-      const hue = mixedSector(beatIdx + (groupA ? 0 : 3)) / 6;
-      const lit = groupA === flip;
-      const v = lit
-        ? (punchFloor + (1 - punchFloor) * Math.min(1, beatPulse + audio * 0.3))
-        : punchFloor * 0.4;
+      const lit = even === flip;
+      const hue = mixedSector(beatIdx + (even ? 0 : 3)) / 6;   // motfärger mellan grupperna
+      const v = lit ? Math.min(1, 0.9 + beatPulse * 0.1 + kickEnv * 0.3) : 0;
       return hsvToRgb(hue, 1, v);
     }
     case "chase": {
