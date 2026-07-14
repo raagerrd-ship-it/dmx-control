@@ -264,6 +264,11 @@ export function useMockLive() {
       });
 
       st.setLive(Math.min(1, audio), kick, frame);
+      // Fake BPM: låst 128 med confidence som rampar upp första ~2s
+      // (matchar Pi-analysern's "search → lock" beteende visuellt).
+      const conf = Math.min(0.85, t / 2.5);
+      st.setBpm(t > 0.8 ? MOCK_BPM : 0, conf);
+
 
       const p = presetById(preset);
       document.documentElement.style.setProperty("--accent-h", String(p.hue));
