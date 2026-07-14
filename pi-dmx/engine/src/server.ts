@@ -322,13 +322,7 @@ export async function startServer(
       if (c.readyState === 1) c.send(payload);
     }
   };
-  const broadcastSmartSync = (st: SmartSyncPublicState) => {
-    const payload = JSON.stringify({ type: "smartSync", ...st });
-    for (const c of app.websocketServer.clients) {
-      if (c.readyState === 1) c.send(payload);
-    }
-  };
-  return { app, broadcastConfig, broadcastSmartSync };
+  return { app, broadcastConfig };
 }
 
 function isMode(m: unknown): m is Mode {
