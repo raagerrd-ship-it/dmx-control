@@ -36,6 +36,8 @@ export class Analyser {
   private envAccumT = 0;
   private bpmCounter = 0;
   private localBpm = 0;
+  private localBpmConfidence = 0;
+
   private bpmHist: number[] = [];   // senaste råestimat (~3s) för median-stabilisering
   private silentMs = 0;
   private beatAnchorMs = 0;
