@@ -291,11 +291,12 @@ function pickColor(
   };
   switch (mode) {
     case "party": {
-      // Counter-rotating hues + white punch on kick for a real "flash" feel.
+      // Beat-pumpad: mörk mellan slagen, full på kick/beat — inte sustained level
+      // (som saturerade nära 100%). Motroterande rena färger, vit punch på kick.
       const dir = idx % 2 === 0 ? 1 : -1;
       const hue = snapHue(idx, ((t * 90 * dir + idx * 137) % 360 + 360) % 360 / 360);
-      const v = shaped(0.2, band * 0.8 + kickEnv * 0.5);
-      const sat = Math.max(0, 1 - kickEnv * 0.8);   // punch flashes white on kicks
+      const v = shaped(0.08, kickEnv * 0.95 + audio * 0.15);
+      const sat = kickEnv > 0.7 ? 0 : 1;            // vit blixt bara på riktiga transienter
       return hsvToRgb(hue, sat, v);
     }
     case "drops": {
