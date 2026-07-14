@@ -72,7 +72,18 @@ export class AudioCapture extends EventEmitter {
       ? Buffer.concat([this.leftover, buf])
       : buf;
 
-    let offset = 0;
+    // Real-time guard: if a transient stall let audio pile up in the pipe, a
+    // single data event delivers a big backlog. Processing it all would push
+    // the light seconds behind the music. Drop stale audio, keep only the most
+    // recent MAX_BACKLOG chunks so latency can never accumulate.
+    const MAX_BACKLOG = 6;   // ~16 ms
+    let start = 0;
+    const available = Math.floor(combined.length / this.chunkBytes);
+    if (available > MAX_BACKLOG) {
+      start = (available - MAX_BACKLOG) * this.chunkBytes;
+    }
+
+    let offset = start;
     while (combined.length - offset >= this.chunkBytes) {
       const chunk = combined.subarray(offset, offset + this.chunkBytes);
       offset += this.chunkBytes;
