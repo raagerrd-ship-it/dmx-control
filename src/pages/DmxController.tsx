@@ -68,7 +68,9 @@ export default function DmxController() {
       <section className="flex-1 px-5 py-4 space-y-4 safe-bottom">
         {tab === "live" ? (
           <>
+            <BpmDisplay />
             <PresetGrid />
+
             {preset === "mono"  && <HueColorCard label="Mono-färg"  hue={monoHue}  onChange={(h) => patch({ monoHue: h })} />}
             {(preset === "comet" || preset === "chase") && (
               <HueColorCard label={preset === "comet" ? "Comet-färg" : "Chase-färg"} hue={cometHue} onChange={(h) => patch({ cometHue: h })} />
