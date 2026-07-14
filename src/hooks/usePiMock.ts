@@ -115,28 +115,90 @@ export function usePi(): PiSettings {
   return state;
 }
 
-/** Cyklar aktiv mode enligt dwell + enabled rotation. Returnerar aktuell mode-nyckel. */
+/**
+ * Aktiv mode.
+ * - Om `energyDrivesMode` = ON: byter på **låtens partier** (vers/refräng/drop/breakdown)
+ *   genom att jämföra kort (~1 s) och lång (~8 s) EMA av audioLevel.
+ *   Nya effekten väljs från rätt energi-bucket (Calm/Fast/Full) — begränsad
+ *   till effekter som är aktiverade i rotation. Cooldown 6 s + max-dwell fallback.
+ * - Om OFF: gamla beteendet — timer via `dwell`.
+ */
 export function usePlayingMode(): string {
   const s = usePi();
   const [mode, setMode] = useState<string>(() => firstEnabled(s.rotation));
+
+  // Energi-driven växling
+  const shortEma = useRef(0);
+  const longEma  = useRef(0);
+  const lastSwitchT = useRef(0);
+  const inHigh = useRef(false);
+  const inLow  = useRef(false);
+
   useEffect(() => {
     const dwellMs = s.dwell === "fast" ? 4500 : s.dwell === "slow" ? 15000 : 9000;
+    const maxDwellMs = dwellMs * 2.5; // säkerhetsnät om inget parti-byte hänt
     const id = setInterval(() => {
       const enabled = ALL.map(([m]) => m).filter((m) => s.rotation[m] !== false);
       if (!enabled.length) return;
-      setMode((cur) => {
-        const idx = enabled.indexOf(cur);
-        return enabled[(idx + 1) % enabled.length];
-      });
-    }, dwellMs);
+
+      // Timer-läge (klassiskt)
+      if (!s.energyDrivesMode) {
+        setMode((cur) => {
+          const idx = enabled.indexOf(cur);
+          return enabled[(idx + 1) % enabled.length];
+        });
+        return;
+      }
+
+      // Energi-läge
+      const now = performance.now();
+      const audio = useDmx.getState().audioLevel;
+      // EMA-alphor kalibrerade för 250ms tick (α = 1 - exp(-dt/τ))
+      shortEma.current += (audio - shortEma.current) * 0.22;   // τ ≈ 1 s
+      longEma.current  += (audio - longEma.current)  * 0.031;  // τ ≈ 8 s
+      const ratio = shortEma.current / Math.max(0.04, longEma.current);
+
+      const sinceLast = now - lastSwitchT.current;
+      const cooldownOk = sinceLast > 6000;
+
+      // Kant-detektor: gå in i HIGH när ratio > 1.35, ur när < 1.1. Samma för LOW.
+      const risingEdge  = ratio > 1.35 && !inHigh.current;
+      const fallingEdge = ratio < 0.72 && !inLow.current;
+      if (ratio > 1.35) inHigh.current = true;
+      if (ratio < 1.1)  inHigh.current = false;
+      if (ratio < 0.72) inLow.current  = true;
+      if (ratio > 0.9)  inLow.current  = false;
+
+      const timeoutHit = sinceLast > maxDwellMs;
+      if (!cooldownOk && !timeoutHit) return;
+      if (!risingEdge && !fallingEdge && !timeoutHit) return;
+
+      // Välj bucket: HIGH → Full, LOW → Calm, annars → Fast/mellan
+      const long = longEma.current;
+      let bucket: [string, string, string][];
+      if (risingEdge)      bucket = long > 0.5 ? FULL_MODES : FAST_MODES;
+      else if (fallingEdge) bucket = CALM_MODES;
+      else                  bucket = long < 0.3 ? CALM_MODES : long > 0.6 ? FULL_MODES : FAST_MODES;
+
+      // Filtrera på aktiverade + undvik samma effekt
+      let pool = bucket.map(([m]) => m).filter((m) => s.rotation[m] !== false && m !== mode);
+      if (!pool.length) pool = enabled.filter((m) => m !== mode);
+      if (!pool.length) return;
+
+      const next = pool[Math.floor(Math.random() * pool.length)];
+      lastSwitchT.current = now;
+      setMode(next);
+    }, 250);
     return () => clearInterval(id);
-  }, [s.dwell, s.rotation]);
+  }, [s.dwell, s.rotation, s.energyDrivesMode, mode]);
+
   // Om aktuell mode blev bortkryssad, hoppa framåt.
   useEffect(() => {
     if (s.rotation[mode] === false) setMode(firstEnabled(s.rotation));
   }, [s.rotation, mode]);
   return mode;
 }
+
 
 function firstEnabled(r: Record<string, boolean>): string {
   const m = ALL.find(([m]) => r[m] !== false);
