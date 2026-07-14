@@ -109,14 +109,35 @@ export class Analyser {
       const offPh = (bestPhase + bestLag) % P;
       for (let i = bestPhase; i < N; i += P) onE += Math.max(0, env[i] + mean);
       for (let i = offPh; i < N; i += P) offE += Math.max(0, env[i] + mean);
-      if (onE > 0 && offE < onE * 0.55) bestLag = P;   // mellanslag svaga → halvera till äkta takt
+      if (onE > 0 && offE < onE * 0.45) bestLag = P;   // mellanslag TYDLIGT svaga (äkta ballad) → halvera; annars behåll snabb takt
     }
-    let bpm = (HZ * 60) / bestLag;
+    // Parabolisk interpolation kring toppen → sub-lag-precision (t.ex. 125 ist. 122).
+    let lagF = bestLag;
+    if (bestLag > lagMin && bestLag + 1 <= lagMax) {
+      const acAt = (L: number) => { let s = 0; for (let i = 0; i + L < N; i++) s += env[i] * env[i + L]; return s; };
+      const yl = acAt(bestLag - 1), y0 = acAt(bestLag), yr = acAt(bestLag + 1);
+      const den = yl - 2 * y0 + yr;
+      if (den < 0) { const d = 0.5 * (yl - yr) / den; if (Math.abs(d) < 1) lagF = bestLag + d; }
+    }
+    let bpm = (HZ * 60) / lagF;
     while (bpm < 55) bpm *= 2;
     while (bpm >= 175) bpm /= 2;
-    // Median-stabilisering över ~3s (12 estimat @ 4 Hz).
+    // OKTAV-STICKINESS: när takten väl är låst, vik nya estimat till oktaven
+    // närmast låset. En låt byter inte oktav mitt i — så en breakdown med svaga
+    // mellanslag (off-beat-testet vill halvera) ska INTE halvera en låst danstakt.
+    // Off-beat-testet avgör bara vid FÖRSTA låsningen; nya låtar låser om via
+    // tyst-resetten (localBpm=0).
+    if (this.localBpm > 0) {
+      let folded = bpm, fd = Math.abs(bpm - this.localBpm);
+      for (const c of [bpm * 2, bpm / 2]) {
+        if (c >= 55 && c < 175 && Math.abs(c - this.localBpm) < fd) { fd = Math.abs(c - this.localBpm); folded = c; }
+      }
+      bpm = folded;
+    }
+    // Median-stabilisering över ~5s (20 estimat @ 4 Hz) → robust mot att
+    // autokorrelationen råkar peka på olika metriska nivåer i olika sektioner.
     this.bpmHist.push(bpm);
-    if (this.bpmHist.length > 12) this.bpmHist.shift();
+    if (this.bpmHist.length > 20) this.bpmHist.shift();
     const sorted = [...this.bpmHist].sort((a, b) => a - b);
     const med = sorted[sorted.length >> 1];
     if (this.localBpm === 0 || Math.abs(med - this.localBpm) > 15) this.localBpm = Math.round(med);   // nytt/oktavbyte → snäpp
