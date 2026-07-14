@@ -133,6 +133,7 @@ const cycleMode = (): Mode => {
 const serverDeps = {
   cfg,
   getLatestFrame: () => latestFrame,
+  getActiveMode: () => effects.getActiveMode(),
   cycleMode,
   smartSync,
 

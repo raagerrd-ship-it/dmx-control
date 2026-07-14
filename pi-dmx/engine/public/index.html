@@ -66,8 +66,10 @@
     .btn.primary { background: var(--hot); border-color: var(--hot); color: white; }
     .btn.ok { background: transparent; border-color: var(--ok); color: var(--ok); }
     .btn:disabled { opacity: .4; cursor: not-allowed; }
-    .rotrow { display:flex; align-items:center; justify-content:space-between; padding:9px 2px; font-size:15px; text-transform:capitalize; }
+    .rotrow { display:flex; align-items:center; justify-content:space-between; padding:9px 8px; font-size:15px; text-transform:capitalize; border-left:3px solid transparent; border-radius:6px; transition:background .15s, border-color .15s; }
     .rotrow + .rotrow { border-top:1px solid var(--line); }
+    .rotrow.playing { background:color-mix(in srgb, var(--hot) 18%, transparent); border-left-color:var(--hot); font-weight:600; }
+    .rotrow.playing span::after { content:"● SPELAS"; margin-left:8px; font-size:10px; font-weight:700; letter-spacing:.5px; color:var(--hot); vertical-align:middle; }
   </style>
 </head>
 <body>
@@ -263,12 +265,14 @@ const CALM_MODES = [["cycle","Cykel"],["breathe","Andas"],["tide","Tidvatten"],[
 const FAST_MODES = [["wave","Våg"],["chase","Jakt"],["drops","Drops"],["sweep","Svep"],["pulse","Puls"]];
 const FULL_MODES = [["party","Party"],["snap","Snap"],["bounce","Studs"],["strobe","Strobe"],["rave","Rave"]];
 let curRotation = {};
+let curPlaying = "";
 function renderRotList(elId, list) {
   const el = document.getElementById(elId);
   el.innerHTML = "";
   for (const [m, label] of list) {
     const row = document.createElement("label");
     row.className = "rotrow";
+    row.dataset.mode = m;
     const on = curRotation[m] !== false;
     row.innerHTML = `<span>${label}</span><input type="checkbox" class="tgl" ${on ? "checked" : ""}>`;
     row.querySelector("input").onchange = (e) => { curRotation[m] = e.target.checked; send({ type: "setRotation", mode: m, value: e.target.checked }); };
@@ -279,6 +283,7 @@ function renderCategories() {
   renderRotList("calmList", CALM_MODES);
   renderRotList("fastList", FAST_MODES);
   renderRotList("fullList", FULL_MODES);
+  curPlaying = "";   // tvinga om-markering av körande rad efter ombygge
 }
 
 function applyConfig(cfg) {
@@ -308,6 +313,12 @@ function applyFrame(f) {
     kickDot.classList.add("on");
     clearTimeout(kickTimer);
     kickTimer = setTimeout(() => kickDot.classList.remove("on"), 120);
+  }
+  if (f.mode && f.mode !== curPlaying) {
+    curPlaying = f.mode;
+    document.querySelectorAll(".rotrow.playing").forEach((r) => r.classList.remove("playing"));
+    const row = document.querySelector('.rotrow[data-mode="' + f.mode + '"]');
+    if (row) row.classList.add("playing");
   }
 }
 

@@ -36,6 +36,8 @@ export function applyInputRouting(input: "aux" | "mic") {
 export interface ServerDeps {
   cfg: EngineConfig;
   getLatestFrame: () => Frame | null;
+  /** Effekten som renderas just nu (smart-läget roterar). */
+  getActiveMode: () => Mode;
   onConfigChanged?: () => void;
   /** Advance to the next mode in the shared cycle. Returns the new mode. */
   cycleMode: () => Mode;
@@ -227,6 +229,7 @@ export async function startServer(
             energy: frame.energy,
             kick: frame.kick,
             gain: frame.gain,
+            mode: deps.getActiveMode(),
           }));
         }
       }, 50);

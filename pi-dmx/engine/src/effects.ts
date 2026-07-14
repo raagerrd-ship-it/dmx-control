@@ -48,6 +48,10 @@ export class EffectEngine {
   private smartCount = 0;
   private lastSmartIntensity = 0;
   private lastSmartTier = "";
+  private activeMode: Mode = "smart";
+
+  /** Den effekt som faktiskt renderas just nu (smart-läget roterar this.smartMode). */
+  getActiveMode(): Mode { return this.activeMode; }
   private lastRenderMs = performance.now();
 
   constructor(private cfg: EngineConfig) {}
@@ -160,6 +164,7 @@ export class EffectEngine {
       }
       effMode = this.smartMode;
     }
+    this.activeMode = effMode;
 
     // Advance the wave phase by dt so speed changes glide instead of jumping.
     const dtSec = Math.min(0.1, (now - this.lastRenderMs) / 1000);
