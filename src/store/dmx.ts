@@ -57,6 +57,8 @@ interface DmxState {
   audioLevel: number;   // 0..1 (smoothed)
   kick: number;         // 0..1 (decaying)
   frame: number[];      // DMX 1..512, values 0..255
+  bpm: number;          // 0 = ej låst
+  bpmConfidence: number;// 0..1
   setPreset: (id: PresetId) => void;
   patchParams: (p: Partial<Params>) => void;
   addFixture: () => void;
@@ -64,6 +66,8 @@ interface DmxState {
   removeFixture: (id: string) => void;
   toggleRotation: (id: PresetId) => void;
   setLive: (audio: number, kick: number, frame: number[]) => void;
+  setBpm: (bpm: number, confidence: number) => void;
+
   setMicEnabled: (b: boolean) => void;
   setMicError: (m: string | null) => void;
 }
