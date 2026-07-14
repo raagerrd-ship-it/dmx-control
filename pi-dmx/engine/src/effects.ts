@@ -123,7 +123,9 @@ export class EffectEngine {
     if (this.cfg.mode === "smart") {
       // Energi styr läget → lokal intensitet väljer pool; annars fast medel.
       const intensity = this.cfg.energyDrivesMode ? Math.min(1, this.intensityEma / Math.max(0.08, this.intensityPeak)) : 0.5;
-        const bigJump = this.cfg.energyDrivesMode && Math.abs(intensity - this.lastSmartIntensity) > 0.12;
+        // Omval vid tydligt hopp; känsligare uppåt (drops) än nedåt.
+        const delta = intensity - this.lastSmartIntensity;
+        const bigJump = this.cfg.energyDrivesMode && (delta > 0.1 || delta < -0.18);
         if (bigJump || now > this.smartDwellUntil) {
         this.lastSmartIntensity = intensity;
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
@@ -134,13 +136,13 @@ export class EffectEngine {
         const FULLFART: Mode[] = ["party", "snap", "bounce", "strobe", "rave"];
         const bpm = this.cfg.beat?.bpm ?? 0;
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
-        // BPM väljer vilket PAR av kategorier; energin väljer inom paret.
-        //   Låg BPM  → Lugn ↔ Fart
-        //   Hög BPM  → Fart ↔ Full Fart
-        const highTempo = bpm >= 125;
-        let tier: Mode[];
-        if (highTempo) tier = intensity < 0.5 ? FART : FULLFART;
-        else           tier = intensity < 0.5 ? LUGN : FART;
+        // Energin styr nivån primärt (alla 3), BPM sänker trösklarna på snabba
+        // låtar så de lutar energiskt — men en lugn passage (låg energi) blir
+        // ändå lugn oavsett tempo.
+        const bpmBias = Math.max(0, Math.min(0.18, (bpm - 110) / 220));
+        const loThr = 0.34 - bpmBias;
+        const hiThr = 0.66 - bpmBias;
+        const tier: Mode[] = intensity < loThr ? LUGN : intensity < hiThr ? FART : FULLFART;
         let pool = enabled(tier);
         if (pool.length === 0) pool = enabled([...FART, ...LUGN, ...FULLFART]);      // valfri aktiv
         if (pool.length === 0) pool = ["cycle"];                                     // sista fallback
@@ -155,7 +157,12 @@ export class EffectEngine {
     // Advance the wave phase by dt so speed changes glide instead of jumping.
     const dtSec = Math.min(0.1, (now - this.lastRenderMs) / 1000);
     this.lastRenderMs = now;
-    this.intensityEma += (Math.max(audio, kickEnv * 0.8) - this.intensityEma) * Math.min(1, dtSec / 6);
+    // Intensitet = envelope-följare på energin: SNABB attack (drops registreras
+    // direkt) + långsammare release (lugna partier hinner falla till lugnt).
+    const inst = Math.max(audio, kickEnv * 0.8);
+    const aUp = 1 - Math.exp(-dtSec / 0.4);
+    const aDown = 1 - Math.exp(-dtSec / 3.0);
+    this.intensityEma += (inst - this.intensityEma) * (inst > this.intensityEma ? aUp : aDown);
     this.intensityPeak = Math.max(this.intensityEma, this.intensityPeak - dtSec / 40 * this.intensityPeak);
 
     // Silence gate: below threshold for 4 s → fade out over 2 s; music back →
