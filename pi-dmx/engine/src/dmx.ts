@@ -49,6 +49,10 @@ export class DmxSender {
    */
   send(universe: Uint8Array, slots: number) {
     if (!this.connected || !this.sock) return;
+    // No queue: if the previous frame hasn't flushed to the sidecar yet, drop
+    // this one. Guarantees the wire always carries the LATEST frame, never a
+    // growing backlog (which read as accumulating light latency).
+    if (this.sock.writableLength > 0) return;
     const now = performance.now();
     if (now - this.lastSent < this.minIntervalMs) return;
     this.lastSent = now;

@@ -42,6 +42,9 @@ export class EffectEngine {
   /** Output ballistics: per-channel peak-hold with exponential decay — the
    *  eye sees instant attack and a soft ~0.4 s fall, whatever the modes do. */
   private outSmooth = new Float32Array(512);
+  private strobeMask = new Uint8Array(512);   // 1 = hoppa ballistik (strobe-kanal)
+  private strobeMaskFor: unknown = null;      // fixtures-referens masken byggdes för
+  private maxCh = 0;                           // högsta använda kanal + 1
   private smartCount = 0;
   private lastSmartIntensity = 0;
   private lastRenderMs = performance.now();
@@ -195,15 +198,23 @@ export class EffectEngine {
     const beatMsNow = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
     const fastTau = Math.max(0.14, Math.min(0.3, beatMsNow * 0.5 / 1000));
     const decay = Math.exp(-dtSec / (fastMode ? fastTau : 0.3));
-    const skip = new Set<number>();
-    for (const fx of this.cfg.fixtures) {
-      const roles = fixtureRoles(fx);
-      for (let r = 0; r < roles.length; r++) {
-        if (roles[r] === "strobe") skip.add(fx.address - 1 + r);
+    // Bygg strobe-masken bara när fixtures ändras (inte varje frame).
+    if (this.strobeMaskFor !== this.cfg.fixtures) {
+      this.strobeMaskFor = this.cfg.fixtures;
+      this.strobeMask.fill(0);
+      let mx = 0;
+      for (const fx of this.cfg.fixtures) {
+        const roles = fixtureRoles(fx);
+        for (let r = 0; r < roles.length; r++) {
+          const ch = fx.address - 1 + r;
+          if (roles[r] === "strobe") this.strobeMask[ch] = 1;
+          if (ch + 1 > mx) mx = ch + 1;
+        }
       }
+      this.maxCh = mx;
     }
-    for (let ch = 0; ch < 512; ch++) {
-      if (skip.has(ch)) { this.outSmooth[ch] = this.universe[ch]; continue; }
+    for (let ch = 0; ch < this.maxCh; ch++) {
+      if (this.strobeMask[ch]) { this.outSmooth[ch] = this.universe[ch]; continue; }
       const held = this.outSmooth[ch] * decay;
       const v = this.universe[ch] >= held ? this.universe[ch] : held;
       this.outSmooth[ch] = v;
