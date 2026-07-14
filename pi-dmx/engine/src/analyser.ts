@@ -74,7 +74,7 @@ export class Analyser {
    *   OBTAIN-realtidsbeat-tracking.)
    */
   private computeBpm() {
-    if (this.envFilled < Analyser.ENV_LEN * 0.45) return;   // första estimat ~2.2s
+    if (this.envFilled < 80) return;   // ~0.8s → första grovestimat direkt, förfinas löpande
     const N = this.envFilled;
     const env = new Float32Array(N);
     let mean = 0;
