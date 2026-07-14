@@ -84,14 +84,15 @@ export class EffectEngine {
 
     // SmartSync + Live Analysis drop-flash: everything white for the duration.
     const nowWall = Date.now();
-    const activeMode = this.cfg.mode === "smart" ? this.smartMode : this.cfg.mode;
-    // Ingen vit drop-blixt när läget redan visar slagen (drops/party) — annars dubbelt.
-    const flashOk = activeMode !== "drops" && activeMode !== "party";
-    const flashActive = flashOk && (
+    const flashActive =
       (this.cfg.flashUntil && nowWall < this.cfg.flashUntil) ||
-      (this.cfg.liveFlashUntil && nowWall < this.cfg.liveFlashUntil));
+      (this.cfg.liveFlashUntil && nowWall < this.cfg.liveFlashUntil);
     if (flashActive) {
-      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master, 220);
+      // Clean steady white pop — no hardware strobe (that left lamps caught
+      // dark when the burst ended, reading as a blackout after the drop).
+      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 1, 1], this.cfg.master);
+      // Feed the ballistics so it decays smoothly out of the flash.
+      for (let ch = 0; ch < 512; ch++) this.outSmooth[ch] = this.universe[ch];
       return this.universe;
     }
 

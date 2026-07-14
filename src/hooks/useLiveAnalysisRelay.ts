@@ -62,7 +62,7 @@ export function useLiveAnalysisRelay() {
       // Drop-flash (lookahead → skicka atMs så Pi kan schemalägga)
       if (s.sendDrops && s.lastFlashAt !== lastFlashSent.current && s.lastFlashAt > 0) {
         lastFlashSent.current = s.lastFlashAt;
-        ws.send(JSON.stringify({ type: "liveFlash", inMs: Math.max(0, s.lastFlashAt - Date.now()), durationMs: 220 }));
+        ws.send(JSON.stringify({ type: "liveFlash", inMs: Math.max(0, s.lastFlashAt - Date.now()), durationMs: 130 }));
       }
 
       // BPM-beat (skicka anchor + BPM en gång per BPM-uppdatering)
