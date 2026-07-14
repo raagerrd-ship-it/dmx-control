@@ -170,7 +170,6 @@ if (existsSync(TLS_KEY) && existsSync(TLS_CERT)) {
 server = {
   app: s80.app,
   broadcastConfig: () => { s80.broadcastConfig(); s443?.broadcastConfig(); },
-  broadcastSmartSync: (st) => { s80.broadcastSmartSync(st); s443?.broadcastSmartSync(st); },
 };
 console.log(`audio-dmx-engine listening on ${server.app.server.address()}`);
 
