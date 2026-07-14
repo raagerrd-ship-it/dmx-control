@@ -36,6 +36,7 @@ if (!["smart","drops","party","chase","wave","cycle","mono","blackout"].includes
 applyInputRouting(cfg.audioInput === "mic" ? "mic" : "aux");
 const analyser = new Analyser(cfg);
 analyser.resetGain(cfg.audioInput === "mic" ? 20 : 1);
+analyser.setGainLock(cfg.audioInput !== "mic", 1);  // aux: fixed 1x
 const effects = new EffectEngine(cfg);
 const dmx = new DmxSender();
 dmx.setMaxHz(cfg.dmxMaxHz);
@@ -94,6 +95,7 @@ const serverDeps = {
   cycleMode,
   smartSync,
   resetAgc: (g?: number) => analyser.resetGain(g),
+  setGainLock: (locked: boolean) => analyser.setGainLock(locked, 1),
   onConfigChanged: () => {
     scheduleSave(cfg);
     curSlots = activeSlots(cfg.fixtures);

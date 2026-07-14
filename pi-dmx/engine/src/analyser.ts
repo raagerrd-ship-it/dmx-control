@@ -33,10 +33,18 @@ export class Analyser {
 
   /** Called when the input routing changes — the old gain is meaningless for
    *  the new source's signal level, so re-converge from neutral. */
+  private gainLocked = false;
+
   resetGain(startGain = 1) {
     // Seed per input: line (aux) arrives hot -> 1x; the room mic is weak -> ~20x.
     this.gain = Math.max(0.5, Math.min(20, startGain));
     this.envelope = 0;
+  }
+
+  /** Lock the AGC (aux: fixed 1x, level tracks the mixer directly) or let it run. */
+  setGainLock(locked: boolean, fixed = 1) {
+    this.gainLocked = locked;
+    if (locked) { this.gain = fixed; this.envelope = 0; }
   }
   private envelope: number;
   private lastKick = 0;
@@ -99,7 +107,7 @@ export class Analyser {
     const dt = Math.min(0.1, (now - this.lastT) / 1000);
     this.lastT = now;
     const d = this.cfg.detection;
-    if (rms > d.noiseFloor) {
+    if (!this.gainLocked && rms > d.noiseFloor) {
       const tau = rms * this.gain > this.envelope ? d.tauDown : d.tauUp;
       const a = 1 - Math.exp(-dt / tau);
       this.envelope += (rms * this.gain - this.envelope) * a;

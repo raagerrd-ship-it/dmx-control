@@ -42,6 +42,7 @@ export interface ServerDeps {
   smartSync: SmartSync;
   /** Reset the AGC after an input-routing switch. */
   resetAgc: (startGain?: number) => void;
+  setGainLock: (locked: boolean) => void;
 }
 
 export interface Server {
@@ -252,6 +253,7 @@ export async function startServer(
             deps.cfg.audioInput = msg.value;
             applyInputRouting(msg.value);
             deps.resetAgc(msg.value === "mic" ? 20 : 1);
+            deps.setGainLock(msg.value !== "mic");
           } else if (msg.type === "setDynamics") {
             deps.cfg.dynamics = clamp01(msg.value);
           } else if (msg.type === "setMaster") {
