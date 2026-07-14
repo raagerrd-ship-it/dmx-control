@@ -43,6 +43,7 @@ export interface ServerDeps {
   /** Reset the AGC after an input-routing switch. */
   resetAgc: (startGain?: number) => void;
   setGainLock: (locked: boolean) => void;
+  onLiveBeat?: () => void;
 }
 
 export interface Server {
@@ -335,6 +336,7 @@ export async function startServer(
             if (typeof msg.inMs === "number") anchor = nowB + Math.max(0, Math.min(5000, msg.inMs));
             else if (typeof msg.atMs === "number" && Math.abs(msg.atMs - nowB) < 5000) anchor = msg.atMs;
             deps.cfg.beat = { anchorMs: anchor, bpm: msg.bpm };
+            deps.onLiveBeat?.();
             return;
           }
           deps.onConfigChanged?.();

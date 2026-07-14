@@ -42,6 +42,7 @@ const dmx = new DmxSender();
 dmx.setMaxHz(cfg.dmxMaxHz);
 
 let latestFrame: Frame | null = null;
+let lastLiveBeatMs = 0;
 let curSlots = activeSlots(cfg.fixtures);
 
 const capture = new AudioCapture({
@@ -54,6 +55,11 @@ const capture = new AudioCapture({
 capture.on("chunk", (samples: Float32Array) => {
   const frame = analyser.process(samples);
   latestFrame = frame;
+  // Lokal BPM → taktklocka. Fasen ankras vid senaste kick. Fylls INTE i om
+  // mobilens Live Analysis nyligen satt en beat (den vinner då, 5 s fönster).
+  if (frame.bpm > 0 && Date.now() - lastLiveBeatMs > 5000) {
+    cfg.beat = { anchorMs: frame.beatAnchorMs || Date.now(), bpm: frame.bpm };
+  }
   smartSync.feed(samples);
   const universe = effects.render(frame);
   dmx.send(universe, curSlots);
@@ -94,6 +100,7 @@ const serverDeps = {
   getLatestFrame: () => latestFrame,
   cycleMode,
   smartSync,
+  onLiveBeat: () => { lastLiveBeatMs = Date.now(); },
   resetAgc: (g?: number) => analyser.resetGain(g),
   setGainLock: (locked: boolean) => analyser.setGainLock(locked, 1),
   onConfigChanged: () => {

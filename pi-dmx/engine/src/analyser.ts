@@ -13,6 +13,8 @@ export interface Frame {
   flux: number;         // 0..1, bass-band spectral flux
   kick: boolean;        // true on rising edge only
   gain: number;         // current auto-gain factor (debug)
+  bpm: number;          // 0 = ej låst; lokal tempo-estimat via autokorrelation
+  beatAnchorMs: number; // wall-clock ms för ett taktslag (fas)
 }
 
 export class Analyser {
@@ -23,6 +25,16 @@ export class Analyser {
   private prevMag: Float32Array;     // for flux
   private fluxHistory: number[] = []; // for median
   private readonly fluxHistLen = 43;  // ~1s @ 375 Hz frame rate
+  private static readonly ENV_HZ = 100;
+  private static readonly ENV_LEN = 100 * 5;
+  private envRing = new Float32Array(Analyser.ENV_LEN);
+  private envPos = 0;
+  private envFilled = 0;
+  private envAccum = 0;
+  private envAccumT = 0;
+  private bpmCounter = 0;
+  private localBpm = 0;
+  private beatAnchorMs = 0;
   private gain = 1;
   // Attack/release-smoothed outputs — raw per-hop values update ~370x/s and
   // read as flicker on the lamps. Fast attack keeps hits punchy; the slower
@@ -45,6 +57,31 @@ export class Analyser {
   setGainLock(locked: boolean, fixed = 1) {
     this.gainLocked = locked;
     if (locked) { this.gain = fixed; this.envelope = 0; }
+  }
+
+  /** Autokorrelation av onset-envelopen -> BPM (75..170), oktavvikt + glidlast. */
+  private computeBpm() {
+    if (this.envFilled < Analyser.ENV_LEN * 0.7) return;
+    const N = this.envFilled;
+    const env = new Float32Array(N);
+    let mean = 0;
+    const start = (this.envPos - N + Analyser.ENV_LEN) % Analyser.ENV_LEN;
+    for (let i = 0; i < N; i++) { env[i] = this.envRing[(start + i) % Analyser.ENV_LEN]; mean += env[i]; }
+    mean /= N;
+    for (let i = 0; i < N; i++) env[i] -= mean;
+    const lagMin = Math.floor(Analyser.ENV_HZ * 60 / 170);
+    const lagMax = Math.floor(Analyser.ENV_HZ * 60 / 75);
+    let bestLag = 0, bestVal = 0;
+    for (let lag = lagMin; lag <= lagMax; lag++) {
+      let sum = 0;
+      for (let i = 0; i + lag < N; i++) sum += env[i] * env[i + lag];
+      if (sum > bestVal) { bestVal = sum; bestLag = lag; }
+    }
+    if (bestLag === 0 || bestVal <= 0) return;
+    let bpm = (Analyser.ENV_HZ * 60) / bestLag;
+    while (bpm < 82) bpm *= 2;
+    while (bpm >= 164) bpm /= 2;
+    if (this.localBpm === 0 || Math.abs(bpm - this.localBpm) > 3) this.localBpm = Math.round(bpm);
   }
   private envelope: number;
   private lastKick = 0;
@@ -137,6 +174,20 @@ export class Analyser {
       this.lastKick = now;
     }
 
+    // --- Onset-envelope → lokal BPM (nedsamplad till 100 Hz) ---
+    const frameMs = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
+    this.envAccum = Math.max(this.envAccum, fluxNorm);
+    this.envAccumT += frameMs;
+    if (this.envAccumT >= 1000 / Analyser.ENV_HZ) {
+      this.envAccumT -= 1000 / Analyser.ENV_HZ;
+      this.envRing[this.envPos] = this.envAccum;
+      this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
+      this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
+      this.envAccum = 0;
+      if (++this.bpmCounter >= Analyser.ENV_HZ / 2) { this.bpmCounter = 0; this.computeBpm(); }
+    }
+    if (kick) this.beatAnchorMs = Date.now();
+
     const dtHop = this.cfg.fft.hop / this.cfg.audio.rate;
     const aAtt = 1 - Math.exp(-dtHop / 0.015);
     const aRel = 1 - Math.exp(-dtHop / 0.4);
@@ -144,7 +195,7 @@ export class Analyser {
     this.lvlSmooth = smooth(this.lvlSmooth, level);
     this.engSmooth = smooth(this.engSmooth, energy);
     this.trbSmooth = smooth(this.trbSmooth, treble);
-    return { level: this.lvlSmooth, energy: this.engSmooth, treble: this.trbSmooth, flux: fluxNorm, kick, gain: this.gain };
+    return { level: this.lvlSmooth, energy: this.engSmooth, treble: this.trbSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, beatAnchorMs: this.beatAnchorMs };
   }
 }
 
