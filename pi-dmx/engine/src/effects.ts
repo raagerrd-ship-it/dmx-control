@@ -358,26 +358,29 @@ function pickColor(
       return hsvToRgb(hue, 1, v);
     }
     case "cycle": {
-      // Calm: all lamps breathe together, slowly walking the color circle.
-      const hue = mixedSector(Math.floor(t / 8.5)) / 6;
-      const sway = 0.9 + 0.1 * Math.sin(t * 0.8 + idx * 1.6);
-      const v = shaped(0.35, (0.3 + audio * 0.55 + kickEnv * 0.1) * sway);
-      return hsvToRgb(hue, 1, v);
+      // Lugn: alla lampor andas TILLSAMMANS medan färgen vandrar runt hjulet —
+      // ett mjukt skimmer med liten fasförskjutning per lampa. Golv 30%.
+      const hue = mixedSector(Math.floor(t / 6)) / 6;
+      const shimmer = 0.5 + 0.5 * Math.sin(t * 0.9 + idx * 1.4);
+      const m = Math.min(1, 0.35 + shimmer * 0.4 + audio * 0.3);
+      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
     case "breathe": {
-      // Lugnast: hela riggen andas i EN långsamt vandrande färg, mjukt golv.
+      // Lugnast: hela riggen andas UNISONT i EN långsamt vandrande färg — djup,
+      // symmetrisk swell (lång mjuk in-/utandning). Golv 30% så den aldrig släcks.
       const hue = mixedSector(Math.floor(t / 11)) / 6;
-      const breath = 0.5 + 0.5 * Math.sin(t * 0.9);
-      const v = shaped(0.4, 0.25 + breath * 0.5 + audio * 0.25);
-      return hsvToRgb(hue, 1, v);
+      const breath = 0.5 + 0.5 * Math.sin(t * 0.7);
+      const m = Math.min(1, breath * 0.85 + audio * 0.2);
+      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
     case "tide": {
-      // Lugn spatial våg: färg sköljer långsamt i par över riggen.
-      const wash = 0.5 + 0.5 * Math.sin(t * 1.1 - idx * 0.9);
+      // Lugn: en långsam våg sköljer i PAR över riggen — en rumslig fade som
+      // vandrar sida till sida. Golv 30%.
+      const wash = 0.5 + 0.5 * Math.sin(t * 0.9 - idx * 1.0);
       const pair = Math.floor(idx / 2);
       const hue = mixedSector(pair + Math.floor(t / 9)) / 6;
-      const v = shaped(0.3, 0.2 + wash * (0.4 + audio * 0.5));
-      return hsvToRgb(hue, 1, v);
+      const m = Math.min(1, 0.3 + wash * 0.55 + audio * 0.25);
+      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
     case "snap": {
       // Full fart: UNISONT FÄRGSLAG — alla lampor samma rena färg, hård kapning
@@ -400,17 +403,20 @@ function pickColor(
       return hsvToRgb(hue, 1, v);
     }
     case "aurora": {
-      // Lugn: varje lampa håller sin egen långsamt vandrande färg; mjuk spatial våg.
-      const hue = mixedSector(idx + Math.floor(t / 8)) / 6;
-      const wash = 0.5 + 0.5 * Math.sin(t * 0.5 - idx * 0.8);
-      const v = shaped(0.4, 0.25 + wash * 0.4 + audio * 0.25);
-      return hsvToRgb(hue, 1, v);
+      // Lugn: varje lampa håller sin EGEN långsamt driftande färg med mjuka,
+      // OBEROENDE korsfades — likt norrsken där färgerna glider var för sig.
+      // Golv 30%.
+      const hue = mixedSector(idx * 2 + Math.floor(t / 7)) / 6;
+      const wash = 0.5 + 0.5 * Math.sin(t * 0.45 - idx * 1.3);
+      const m = Math.min(1, 0.4 + wash * 0.45 + audio * 0.2);
+      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
     case "drift": {
-      // Lugnast/ambient: hela riggen i EN mycket långsamt driftande färg, knappt rörelse.
-      const hue = mixedSector(Math.floor(t / 14)) / 6;
-      const v = shaped(0.45, 0.5 + 0.15 * Math.sin(t * 0.4) + audio * 0.2);
-      return hsvToRgb(hue, 1, v);
+      // Ambient: hela riggen i EN mycket långsamt driftande färg, knappt någon
+      // rörelse — nära stillastående glöd som sakta byter färg. Golv 30%.
+      const hue = mixedSector(Math.floor(t / 16)) / 6;
+      const m = Math.min(1, 0.62 + 0.18 * Math.sin(t * 0.35) + audio * 0.15);
+      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
     case "sweep": {
       // Enfärgad SPOTLIGHT: ETT smalt ljusband glider mjukt över en mörk rigg —
@@ -455,12 +461,16 @@ function pickColor(
       return hsvToRgb(hue, 1, v);
     }
     case "mono": {
-      const isWarm = monoHue < 40 || monoHue > 340;
-      const flicker = isWarm ? 0.7 + Math.random() * 0.3 : 0.9 + Math.random() * 0.1;
-      const hue = snapHue(idx, (((monoHue + (isWarm ? (Math.random() - 0.5) * 12 : 0)) % 360) + 360) % 360 / 360);
-      // One color, four lamps — each breathing with its own spectrum band.
-      const v = flicker * shaped(0.25, band * 0.8 + kickEnv * 0.25);
-      return hsvToRgb(hue, 1, v);
+      // Lugn men LEVANDE: en brasa/glöd. Varje lampa flimrar organiskt (lager av
+      // sinusar i otakt, inte hård random), färgen glider rött→bärnsten→gult när
+      // lågan flammar upp, och den andas som eld. Varm ton (ej snäppt). Golv 30%.
+      const flick = Math.sin(t * 6.7 + idx * 2.3) * 0.5
+                  + Math.sin(t * 10.9 + idx * 4.1) * 0.3
+                  + Math.sin(t * 17.3 + idx * 1.7) * 0.2;   // -1..1 organiskt
+      const ember = 0.5 + 0.5 * flick;                      // 0..1 glöd
+      const hue = 0.015 + 0.11 * ember;                     // rött → gult
+      const m = Math.min(1, 0.4 + ember * 0.45 + kickEnv * 0.3);
+      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
     default:
       return [0, 0, 0];
