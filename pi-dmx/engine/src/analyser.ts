@@ -328,7 +328,7 @@ export class Analyser {
     this.lvlSmooth = smooth(this.lvlSmooth, level);
     this.engSmooth = smooth(this.engSmooth, energy);
     this.trbSmooth = smooth(this.trbSmooth, treble);
-    return { level: this.lvlSmooth, energy: this.engSmooth, treble: this.trbSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, beatAnchorMs: this.beatAnchorMs };
+    return { level: this.lvlSmooth, energy: this.engSmooth, treble: this.trbSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, bpmConfidence: this.localBpmConfidence, beatAnchorMs: this.beatAnchorMs };
   }
 }
 
