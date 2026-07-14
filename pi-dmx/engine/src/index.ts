@@ -43,6 +43,7 @@ const dmx = new DmxSender();
 dmx.setMaxHz(cfg.dmxMaxHz);
 
 let latestFrame: Frame | null = null;
+let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
 let lastDropMs = 0;
 let lastRenderMs = 0;
 let fluxBaseline = 0.1;
@@ -58,6 +59,7 @@ const capture = new AudioCapture({
 capture.on("chunk", (samples: Float32Array) => {
   const frame = analyser.process(samples);
   latestFrame = frame;
+  lastChunkAt = Date.now();
   // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
   // (om)lås; att sätta det på varje kick fick pulsen att flimra.
   if (frame.bpm === 0) cfg.beat = null;   // tyst → stoppa beat-effekter direkt
@@ -147,6 +149,8 @@ const serverDeps = {
   cfg,
   getLatestFrame: () => latestFrame,
   getActiveMode: () => effects.getActiveMode(),
+  // Frisk = en ljud-chunk bearbetad senaste 10 s (arecord + event-loop lever).
+  getHealthy: () => Date.now() - lastChunkAt < 10000,
   cycleMode,
   smartSync,
 

@@ -38,6 +38,8 @@ export interface ServerDeps {
   getLatestFrame: () => Frame | null;
   /** Effekten som renderas just nu (smart-läget roterar). */
   getActiveMode: () => Mode;
+  /** True om ljud-pipelinen bearbetat en frame nyligen (för watchdog /health). */
+  getHealthy: () => boolean;
   onConfigChanged?: () => void;
   /** Advance to the next mode in the shared cycle. Returns the new mode. */
   cycleMode: () => Mode;
@@ -106,6 +108,13 @@ export async function startServer(
   // Ägar-/setup-sida: samma app, men fixture-/system-/wifi-sektionerna avslöjas
   // bara här (klienten kollar /setup i URL:en). Hyresgäster använder "/".
   app.get("/setup", (_req, reply) => reply.sendFile("index.html"));
+
+  // Hälsokoll för watchdog: 200 om ljud-pipelinen lever, annars 503 → watchdogen
+  // startar om motorn (fångar ett HÄNG som Restart=always inte ser).
+  app.get("/health", (_req, reply) => {
+    if (deps.getHealthy()) reply.code(200).send("ok");
+    else reply.code(503).send("stale");
+  });
 
 
   // ---- Self-update ---------------------------------------------------------

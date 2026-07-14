@@ -1,0 +1,7 @@
+[Unit]
+Description=pi-dmx engine health watchdog (restarts engine if hung)
+After=audio-dmx-engine.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/audio-dmx-engine/watchdog.sh
