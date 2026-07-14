@@ -19,7 +19,7 @@ import { DmxSender } from "./dmx.js";
 import { startServer, applyInputRouting, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
-import { SmartSync } from "./smartsync.js";
+
 import { activeSlots, type Mode } from "./config.js";
 
 // Physical button cycles through the fun modes (skips blackout so the button never kills the show).
