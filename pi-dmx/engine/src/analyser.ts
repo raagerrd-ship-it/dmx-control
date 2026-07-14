@@ -34,6 +34,7 @@ export class Analyser {
   private envAccumT = 0;
   private bpmCounter = 0;
   private localBpm = 0;
+  private pendingBpm = 0;   // senaste råestimat, för bekräftelse av stora hopp
   private silentMs = 0;
   private beatAnchorMs = 0;
   private gain = 1;
@@ -62,7 +63,7 @@ export class Analyser {
 
   /** Autokorrelation av onset-envelopen -> BPM (75..170), oktavvikt + glidlast. */
   private computeBpm() {
-    if (this.envFilled < Analyser.ENV_LEN * 0.7) return;
+    if (this.envFilled < Analyser.ENV_LEN * 0.45) return;   // första estimat ~2.2s (var 3.5s)
     const N = this.envFilled;
     const env = new Float32Array(N);
     let mean = 0;
@@ -70,8 +71,8 @@ export class Analyser {
     for (let i = 0; i < N; i++) { env[i] = this.envRing[(start + i) % Analyser.ENV_LEN]; mean += env[i]; }
     mean /= N;
     for (let i = 0; i < N; i++) env[i] -= mean;
-    const lagMin = Math.floor(Analyser.ENV_HZ * 60 / 170);
-    const lagMax = Math.floor(Analyser.ENV_HZ * 60 / 75);
+    const lagMin = Math.floor(Analyser.ENV_HZ * 60 / 175);
+    const lagMax = Math.floor(Analyser.ENV_HZ * 60 / 63);   // ner till 63 BPM så tryckare/ballad inte dubblas
     let bestLag = 0, bestVal = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
       let sum = 0;
@@ -80,9 +81,22 @@ export class Analyser {
     }
     if (bestLag === 0 || bestVal <= 0) return;
     let bpm = (Analyser.ENV_HZ * 60) / bestLag;
-    while (bpm < 82) bpm *= 2;
-    while (bpm >= 164) bpm /= 2;
-    if (this.localBpm === 0 || Math.abs(bpm - this.localBpm) > 3) this.localBpm = Math.round(bpm);
+    while (bpm < 63) bpm *= 2;
+    while (bpm >= 170) bpm /= 2;
+    if (this.localBpm === 0) { this.localBpm = Math.round(bpm); this.pendingBpm = bpm; return; }
+    // Oktav-stickiness: välj den oktav-varianten (½×, 1×, 2×) som ligger närmast
+    // nuvarande tempo → dödar 83↔162-hoppen som gjorde att den aldrig satte sig.
+    let best = bpm, bd = Math.abs(bpm - this.localBpm);
+    for (const c of [bpm / 2, bpm * 2]) {
+      if (c >= 70 && c <= 180 && Math.abs(c - this.localBpm) < bd) { bd = Math.abs(c - this.localBpm); best = c; }
+    }
+    const diff = best - this.localBpm;
+    if (Math.abs(diff) <= 12) {
+      this.localBpm = Math.round(this.localBpm + diff * 0.34);          // litet avvik → mjuk glidning (stabilt)
+    } else if (Math.abs(best - this.pendingBpm) <= 8) {
+      this.localBpm = Math.round(best);                                 // stort hopp bekräftat 2 ggr → nytt tempo, snäpp
+    }
+    this.pendingBpm = best;                                             // annars: ignorera engångs-uthopp
   }
   private envelope: number;
   private lastKick = 0;
@@ -194,7 +208,7 @@ export class Analyser {
       this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
       this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
       this.envAccum = 0;
-      if (++this.bpmCounter >= Analyser.ENV_HZ / 2) { this.bpmCounter = 0; this.computeBpm(); }
+      if (++this.bpmCounter >= Analyser.ENV_HZ / 4) { this.bpmCounter = 0; this.computeBpm(); }   // 4 Hz (var 2 Hz) → snabbare inlåsning
     }
     if (kick) this.beatAnchorMs = Date.now();
 

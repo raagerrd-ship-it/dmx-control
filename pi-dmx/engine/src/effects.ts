@@ -34,8 +34,10 @@ export class EffectEngine {
   private smartMode: Mode = "wave";
   private smartDwellUntil = 0;
   private lastSectionAt = 0;
-  private intensityEma = 0.4;
-  private intensityPeak = 0.4;
+  private intensityEma = 0.5;
+  private intensityPeak = 0.5;
+  private intensityFloor = 0.5;
+  private warmMs = 0;
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -127,7 +129,12 @@ export class EffectEngine {
     let effMode: Mode = this.cfg.mode;
     if (this.cfg.mode === "smart") {
       // Energi styr läget → lokal intensitet väljer pool; annars fast medel.
-      const intensity = this.cfg.energyDrivesMode ? Math.min(1, this.intensityEma / Math.max(0.6, this.intensityPeak)) : 0.5;
+      // Energi RELATIVT låtens eget snitt: en komprimerad signal ligger jämnt
+      // högt, så absolut nivå säger inget. Jämför istället mot en långsam
+      // baslinje (~30s) → mitten (snittet) = Fart, tydligt över snittet (drop/
+      // topp) = Full Fart, tydligt under (breakdown) = Lugn. ±0.15 ger full sving.
+      const baseline = this.intensityFloor;
+      const intensity = this.cfg.energyDrivesMode ? Math.max(0, Math.min(1, 0.5 + (this.intensityEma - baseline) / 0.30)) : 0.5;
         // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
         const LUGN: Mode[] = ["cycle", "breathe", "tide", "mono", "aurora", "drift"];
@@ -135,13 +142,15 @@ export class EffectEngine {
         const FULLFART: Mode[] = ["party", "snap", "bounce", "strobe", "rave"];
         const bpm = this.cfg.beat?.bpm ?? 0;
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
-        // Energin styr nivån primärt (alla 3), BPM sänker trösklarna på snabba
-        // låtar så de lutar energiskt — men en lugn passage (låg energi) blir
-        // ändå lugn oavsett tempo.
-        const bpmBias = Math.max(0, Math.min(0.18, (bpm - 110) / 220));
-        const loThr = 0.34 - bpmBias;
-        const hiThr = 0.66 - bpmBias;
-        const tier: Mode[] = intensity < loThr ? LUGN : intensity < hiThr ? FART : FULLFART;
+        // Fasta trösklar på (relativ) energi. Ingen bpm-sänkning längre — den
+        // pushade mellanenergi till Full Fart och byggde på ett opålitligt
+        // bpm-oktavvärde. Full Fart kräver en TYDLIG topp långt över snittet
+        // (0.78) → reserverad för riktiga drops, inte varje energiskt parti.
+        const loThr = 0.34, hiThr = 0.78;
+        let tier: Mode[] = intensity < loThr ? LUGN : intensity < hiThr ? FART : FULLFART;
+        // Låg-BPM-spärr: en tryckare/ballad ska ALDRIG gå Full Fart, även om dess
+        // relativa energi toppar. (bpm 0 = ej låst → ingen spärr.)
+        if (bpm > 0 && bpm < 95 && tier === FULLFART) tier = FART;
         const tierName = tier === LUGN ? "lugn" : tier === FART ? "fart" : "full";
         // Omval vid: (a) nivåbyte — så en ny effekt slår till DIREKT när vi går
         // in i Fart/Full Fart (inte den gamla kvar tills dwell löper ut),
@@ -169,14 +178,17 @@ export class EffectEngine {
     // Advance the wave phase by dt so speed changes glide instead of jumping.
     const dtSec = Math.min(0.1, (now - this.lastRenderMs) / 1000);
     this.lastRenderMs = now;
-    // Sektionsenergi för nivåval: JÄMN medelnivå av ljudnivån — INTE per-beat
-    // spikar. (Förut ingick kickEnv, som spikar på varje slag och pinnade allt
-    // till Full Fart.) Attack lite snabbare än release så uppbyggnader/drops
-    // ändå syns inom någon sekund, men enskilda slag slätas ut.
-    const aUp = 1 - Math.exp(-dtSec / 1.2);
-    const aDown = 1 - Math.exp(-dtSec / 4.0);
-    this.intensityEma += (audio - this.intensityEma) * (audio > this.intensityEma ? aUp : aDown);
-    this.intensityPeak = Math.max(this.intensityEma, this.intensityPeak - dtSec / 60 * this.intensityPeak);
+    // Sektionsenergi = utjämnad rå nivå (INTE den klippta 'audio', och inga
+    // per-beat spikar). Attack lite snabbare än release så uppbyggnader syns.
+    const aUp = 1 - Math.exp(-dtSec / 1.5);
+    const aDown = 1 - Math.exp(-dtSec / 3.0);
+    this.intensityEma += (frame.level - this.intensityEma) * (frame.level > this.intensityEma ? aUp : aDown);
+    // Baslinje = låtens snitt-energi, referens för nivåvalet ovan. WARMUP: de
+    // första ~8s av spelning konvergerar den snabbt (~3s) så den är klar direkt;
+    // sen låser den till stabil ~25s. Nollställs vid tystnad → snabb omkalibrering
+    // vid låtbyte/paus.
+    const warm = this.warmMs < 8000;
+    this.intensityFloor += (this.intensityEma - this.intensityFloor) * (warm ? dtSec / 3 : dtSec / 25);
 
     // Silence gate: below threshold for 4 s → fade out over 2 s; music back →
     // fade in fast. Mode floors otherwise keep the lamps glowing in silence.
@@ -188,6 +200,8 @@ export class EffectEngine {
     const gateTarget = now - this.lastActiveMs > 250 ? 0 : 1;
     const gateRate = gateTarget > this.silenceGate ? dtSec / 0.1 : dtSec / 0.25;
     this.silenceGate += Math.max(-gateRate, Math.min(gateRate, gateTarget - this.silenceGate));
+    // Warmup-räknare för baslinjen: ackumulera medan aktiv, nollställ vid tystnad.
+    if (this.silenceGate > 0.5) this.warmMs += dtSec * 1000; else this.warmMs = 0;
     if (effMode === "wave" || effMode === "sweep") this.wavePhase += dtSec * (1.6 + audio * 4);
 
     // Drops: each beat/kick fires the next lamp in a fresh pure color.
