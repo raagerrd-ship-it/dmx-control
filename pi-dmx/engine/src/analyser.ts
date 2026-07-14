@@ -92,12 +92,24 @@ export class Analyser {
       if (sum > bestVal) { bestVal = sum; bestLag = lag; }
     }
     if (bestLag === 0 || bestVal <= 0) return;
-    // Sub-harmonic-preferens → grundtempot framför subdivisionen.
-    for (const mult of [2, 3]) {
-      const L = bestLag * mult;
-      if (L > lagMax) continue;
-      let s = 0; for (let i = 0; i + L < N; i++) s += env[i] * env[i + L];
-      if (s >= bestVal * 0.75) { bestLag = L; break; }
+    // OFF-BEAT-TEST → skilj äkta snabb takt (dans) från subdivision (ballad).
+    // 68 och 139 BPM ligger nästan en oktav isär, så autokorrelationens styrka
+    // ensam kan inte välja. Vik istället onset-envelopen på DUBBLA perioden,
+    // hitta bästa fas, och jämför energin PÅ slaget mot MELLAN slagen:
+    //   svaga mellanslag (hi-hats i en ballad) → sanna takten är den långsamma → halvera
+    //   starka mellanslag (varje slag i en danslåt) → snabb takt är äkta → behåll
+    const P = bestLag * 2;
+    if (P <= lagMax) {
+      let bestPhase = 0, bestPhaseSum = -1;
+      for (let ph = 0; ph < P; ph++) {
+        let s = 0; for (let i = ph; i < N; i += P) s += env[i] + mean;
+        if (s > bestPhaseSum) { bestPhaseSum = s; bestPhase = ph; }
+      }
+      let onE = 0, offE = 0;
+      const offPh = (bestPhase + bestLag) % P;
+      for (let i = bestPhase; i < N; i += P) onE += Math.max(0, env[i] + mean);
+      for (let i = offPh; i < N; i += P) offE += Math.max(0, env[i] + mean);
+      if (onE > 0 && offE < onE * 0.55) bestLag = P;   // mellanslag svaga → halvera till äkta takt
     }
     let bpm = (HZ * 60) / bestLag;
     while (bpm < 55) bpm *= 2;
