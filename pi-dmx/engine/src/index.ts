@@ -56,9 +56,20 @@ const capture = new AudioCapture({
 capture.on("chunk", (samples: Float32Array) => {
   const frame = analyser.process(samples);
   latestFrame = frame;
-  // Lokal BPM → taktklocka, fas ankrad vid senaste kick.
+  // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
+  // (om)lås; att sätta det på varje kick fick pulsen att flimra.
   if (frame.bpm > 0) {
-    cfg.beat = { anchorMs: frame.beatAnchorMs || Date.now(), bpm: frame.bpm };
+    if (!cfg.beat || Math.abs(cfg.beat.bpm - frame.bpm) > 2) {
+      let anchor = frame.beatAnchorMs || Date.now();
+      if (cfg.beat) {
+        // Bevara nuvarande fas vid tempoändring så pulsen inte hoppar.
+        const oldMs = 60000 / cfg.beat.bpm, newMs = 60000 / frame.bpm;
+        const phase = (((Date.now() - cfg.beat.anchorMs) % oldMs) + oldMs) % oldMs / oldMs;
+        anchor = Date.now() - phase * newMs;
+      }
+      cfg.beat = { anchorMs: anchor, bpm: frame.bpm };
+    }
+    // annars: behåll ankaret → jämn, kontinuerlig fas
   }
   // Lokal drop: ett slag som är MYCKET starkare än det normala → sällsynt blixt.
   // (Inte varje kick — annars överröstar blixten alla lägen.) Baslinje = långsam
