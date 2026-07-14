@@ -47,6 +47,7 @@ export class EffectEngine {
   private maxCh = 0;                           // högsta använda kanal + 1
   private smartCount = 0;
   private lastSmartIntensity = 0;
+  private lastSmartTier = "";
   private lastRenderMs = performance.now();
 
   constructor(private cfg: EngineConfig) {}
@@ -123,12 +124,6 @@ export class EffectEngine {
     if (this.cfg.mode === "smart") {
       // Energi styr läget → lokal intensitet väljer pool; annars fast medel.
       const intensity = this.cfg.energyDrivesMode ? Math.min(1, this.intensityEma / Math.max(0.08, this.intensityPeak)) : 0.5;
-        // Omval vid tydligt hopp; känsligare uppåt (drops) än nedåt.
-        const delta = intensity - this.lastSmartIntensity;
-        const bigJump = this.cfg.energyDrivesMode && (delta > 0.1 || delta < -0.18);
-        if (bigJump || now > this.smartDwellUntil) {
-        this.lastSmartIntensity = intensity;
-        this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
         // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
         const LUGN: Mode[] = ["cycle", "breathe", "tide", "mono", "aurora", "drift"];
@@ -143,6 +138,18 @@ export class EffectEngine {
         const loThr = 0.34 - bpmBias;
         const hiThr = 0.66 - bpmBias;
         const tier: Mode[] = intensity < loThr ? LUGN : intensity < hiThr ? FART : FULLFART;
+        const tierName = tier === LUGN ? "lugn" : tier === FART ? "fart" : "full";
+        // Omval vid: (a) nivåbyte — så en ny effekt slår till DIREKT när vi går
+        // in i Fart/Full Fart (inte den gamla kvar tills dwell löper ut),
+        // (b) tydligt energihopp, känsligare uppåt (drops) än nedåt,
+        // (c) dwell-timern.
+        const delta = intensity - this.lastSmartIntensity;
+        const bigJump = this.cfg.energyDrivesMode && (delta > 0.1 || delta < -0.18);
+        const tierChanged = this.cfg.energyDrivesMode && tierName !== this.lastSmartTier;
+        if (bigJump || tierChanged || now > this.smartDwellUntil) {
+        this.lastSmartIntensity = intensity;
+        this.lastSmartTier = tierName;
+        this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
         let pool = enabled(tier);
         if (pool.length === 0) pool = enabled([...FART, ...LUGN, ...FULLFART]);      // valfri aktiv
         if (pool.length === 0) pool = ["cycle"];                                     // sista fallback
