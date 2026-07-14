@@ -198,7 +198,11 @@ export class Analyser {
     const med = sorted[sorted.length >> 1];
     if (this.localBpm === 0 || Math.abs(med - this.localBpm) > 15) this.localBpm = Math.round(med);   // nytt/oktavbyte → snäpp
     else this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);                    // små avvik → glid
+    // Smooth confidence (undvik hoppig UI); attack snabbt, release långsamt.
+    const cA = this.localBpmConfidence;
+    this.localBpmConfidence = cA + (conf - cA) * (conf > cA ? 0.35 : 0.08);
   }
+
   private envelope: number;
   private lastKick = 0;
   private lastT = performance.now();
