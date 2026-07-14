@@ -73,6 +73,19 @@ capture.on("chunk", (samples: Float32Array) => {
       cfg.beat = { anchorMs: anchor, bpm: frame.bpm };
     }
     // annars: behåll ankaret → jämn, kontinuerlig fas
+
+    // FAS-LÅS (PLL): knuffa takt-ankaret mot faktiska trumslag så pulsen sitter
+    // i takt även om BPM-SIFFRAN är någon enhet fel. Vid varje kick, mät hur
+    // långt slaget ligger från närmaste förutsagda taktslag och korrigera en
+    // liten del (18%) av felet. Bara när slaget är nära ett taktslag (|fel|<0.25)
+    // → syncoperade off-beat-slag stör inte låset. Liten korrektion = mjuk
+    // inlåsning utan det flimmer en hård nollställning gav.
+    if (frame.kick && cfg.beat) {
+      const beatMs = 60000 / cfg.beat.bpm;
+      const ph = ((((Date.now() - cfg.beat.anchorMs) % beatMs) + beatMs) % beatMs) / beatMs;
+      const err = ph < 0.5 ? ph : ph - 1;   // -0.5..0.5 av ett taktslag
+      if (Math.abs(err) < 0.25) cfg.beat.anchorMs += err * beatMs * 0.18;
+    }
   }
   // Lokal drop: ett slag som är MYCKET starkare än det normala → sällsynt blixt.
   // (Inte varje kick — annars överröstar blixten alla lägen.) Baslinje = långsam
