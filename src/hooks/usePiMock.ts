@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useDmx } from "@/store/dmx";
+
 
 /** Pi-style mode-kategorier. Håll i synk med pi-dmx/engine/public/index.html. */
 export const CALM_MODES: [string, string, string][] = [
