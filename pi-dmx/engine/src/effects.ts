@@ -268,6 +268,14 @@ function pickColor(
   const monoHue = hintFresh ? hint!.primary : monoHueRaw;
   const cometHue = hintFresh ? hint!.secondary : cometHueRaw;
   const mode = modeOverride ?? cfg.mode;
+  // Taktindex/fas från den lokala BPM-klockan — för beat-låsta lägen.
+  let beatIdx = 0, beatFrac = 0;
+  if (cfg.beat && cfg.beat.bpm > 40) {
+    const beatMs = 60000 / cfg.beat.bpm;
+    const since = Date.now() - cfg.beat.anchorMs;
+    beatIdx = Math.floor(since / beatMs);
+    beatFrac = ((since % beatMs) + beatMs) % beatMs / beatMs;
+  }
   // Dynamics: lower floors + gamma on the audio-driven part, so quiet passages
   // go dim and beats punch. dyn=0 reproduces the old flat curves.
   // Per-fixture band drive: each lamp breathes with its own slice of the
@@ -320,6 +328,37 @@ function pickColor(
       const hue = mixedSector(Math.floor(t / 8.5)) / 6;
       const sway = 0.9 + 0.1 * Math.sin(t * 0.8 + idx * 1.6);
       const v = shaped(0.35, (0.3 + audio * 0.55 + kickEnv * 0.1) * sway);
+      return hsvToRgb(hue, 1, v);
+    }
+    case "breathe": {
+      // Lugnast: hela riggen andas i EN långsamt vandrande färg, mjukt golv.
+      const hue = mixedSector(Math.floor(t / 11)) / 6;
+      const breath = 0.5 + 0.5 * Math.sin(t * 0.9);
+      const v = shaped(0.4, 0.25 + breath * 0.5 + audio * 0.25);
+      return hsvToRgb(hue, 1, v);
+    }
+    case "tide": {
+      // Lugn spatial våg: färg sköljer långsamt i par över riggen.
+      const wash = 0.5 + 0.5 * Math.sin(t * 1.1 - idx * 0.9);
+      const pair = Math.floor(idx / 2);
+      const hue = mixedSector(pair + Math.floor(t / 9)) / 6;
+      const v = shaped(0.3, 0.2 + wash * (0.4 + audio * 0.5));
+      return hsvToRgb(hue, 1, v);
+    }
+    case "snap": {
+      // Snabb: varje taktslag hoppar ALLA lampor till en ny ren färg.
+      const hue = mixedSector(beatIdx) / 6;
+      const v = shaped(0.2, Math.max(kickEnv, 1 - beatFrac) * (0.5 + audio * 0.5));
+      return hsvToRgb(hue, 1, v);
+    }
+    case "bounce": {
+      // Snabb: ljuspunkt studsar fram och tillbaka, ett steg per taktslag.
+      const span = Math.max(1, count - 1);
+      const cyc = beatIdx % (span * 2);
+      const pos = cyc <= span ? cyc : span * 2 - cyc;   // triangel-våg
+      const d = Math.abs(idx - pos);
+      const hue = mixedSector(Math.floor(beatIdx / (span * 2))) / 6;
+      const v = shaped(0.12, Math.exp(-d * 1.3) * (0.6 + audio * 0.4 + kickEnv * 0.3));
       return hsvToRgb(hue, 1, v);
     }
     case "chase": {

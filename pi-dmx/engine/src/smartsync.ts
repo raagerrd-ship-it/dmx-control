@@ -51,7 +51,7 @@ interface Deps {
   onState: (s: SmartSyncPublicState) => void;
 }
 
-const VALID_MODES: Mode[] = ["drops", "party", "chase", "wave", "cycle", "mono"];
+const VALID_MODES: Mode[] = ["drops", "party", "chase", "wave", "cycle", "breathe", "tide", "snap", "bounce", "mono"];
 // The Spotify edge function still speaks the old mode names.
 const PRESET_MAP: Record<string, Mode> = { auto: "cycle", comet: "wave", split: "party" };
 
