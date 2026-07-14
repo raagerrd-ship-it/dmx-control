@@ -182,7 +182,7 @@ export class EffectEngine {
     const gateTarget = now - this.lastActiveMs > 250 ? 0 : 1;
     const gateRate = gateTarget > this.silenceGate ? dtSec / 0.1 : dtSec / 0.25;
     this.silenceGate += Math.max(-gateRate, Math.min(gateRate, gateTarget - this.silenceGate));
-    if (effMode === "wave") this.wavePhase += dtSec * (1.6 + audio * 4);
+    if (effMode === "wave" || effMode === "sweep") this.wavePhase += dtSec * (1.6 + audio * 4);
 
     // Drops: each beat/kick fires the next lamp in a fresh pure color.
     if (effMode === "drops" && count > 0 && (frame.kick || beatTick) && now - this.lastDropAdvance > 140) {
@@ -349,11 +349,12 @@ function pickColor(
       return hsvToRgb(dropHue[idx] ?? 0, 1, Math.min(1, v));
     }
     case "wave": {
-      // A soft brightness wave rolling across the rig at music speed; the whole
-      // rig shares one hue that steps onward every few seconds.
-      const base = 0.5 + 0.5 * Math.sin(wavePhase - idx * 1.1);
-      const hue = mixedSector(Math.floor(t / 4.3)) / 6;
-      const v = shaped(0.1, base * (0.3 + audio * 0.8) + kickEnv * 0.25);
+      // Flödande FÄRGVÅG: varje lampa har sin egen rena färg och hela regnbågen
+      // glider över riggen. Full rigg tänd med en mjuk ljusvåg ovanpå — handlar
+      // om FÄRG i rörelse, till skillnad från sweep (en färg) och chase (gles).
+      const base = 0.55 + 0.45 * Math.sin(wavePhase - idx * 1.3);
+      const hue = mixedSector(idx + Math.floor(wavePhase * 0.4)) / 6;
+      const v = shaped(0.12, base * (0.35 + audio * 0.7) + kickEnv * 0.2);
       return hsvToRgb(hue, 1, v);
     }
     case "cycle": {
@@ -408,12 +409,13 @@ function pickColor(
       return hsvToRgb(hue, 1, v);
     }
     case "sweep": {
-      // Fart: ett ljusband glider mjukt (kontinuerligt) över riggen; färg stegar då och då.
+      // Enfärgad SPOTLIGHT: ETT smalt ljusband glider mjukt över en mörk rigg —
+      // hög kontrast, en färg i taget. Motsats till wave (full rigg, många färger).
       const headPos = (wavePhase * 0.5) % count;
       let dd = Math.abs(idx - headPos);
       if (dd > count / 2) dd = count - dd;   // wrap
       const hue = mixedSector(Math.floor(t / 5)) / 6;
-      const v = shaped(0.15, Math.exp(-dd * 1.1) * (0.6 + audio * 0.5) + kickEnv * 0.2);
+      const v = shaped(0.05, Math.exp(-dd * 1.9) * (0.75 + audio * 0.4) + kickEnv * 0.15);
       return hsvToRgb(hue, 1, v);
     }
     case "pulse": {
@@ -439,13 +441,14 @@ function pickColor(
       return hsvToRgb(hue, 1, v);
     }
     case "chase": {
-      // Bright head at chasePos with short trailing tail. Neighbouring fixtures
-      // glow briefly so the move reads even on 4 fixtures. Hue = cometHue.
+      // Snabb LÖPARE: skarpt huvud som hoppar ETT steg per taktslag, kort svans,
+      // och BYTER ren färg medan det springer → rytmiskt och gles, inte en jämn
+      // glidning (sweep) eller full färgvåg (wave).
       const d = Math.abs(idx - chasePos);
-      const tail = Math.exp(-d * 1.4);
-      const hue = snapHue(idx, (((cometHue % 360) + 360) % 360) / 360);
-      const v = Math.min(1, tail * shaped(0.35, audio * 0.7 + kickEnv * 0.5));
-      return hsvToRgb(hue, 0.9, v);
+      const tail = Math.exp(-d * 1.6);
+      const hue = mixedSector(chasePos + Math.floor(t / 4)) / 6;
+      const v = Math.min(1, tail * shaped(0.22, 0.55 + audio * 0.55 + kickEnv * 0.5));
+      return hsvToRgb(hue, 1, v);
     }
     case "mono": {
       const isWarm = monoHue < 40 || monoHue > 340;
