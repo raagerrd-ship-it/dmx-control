@@ -17,6 +17,12 @@
     .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .mode-btn { padding: 14px 8px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); font-size: 14px; font-weight: 500; cursor: pointer; text-transform: capitalize; }
     .mode-btn.active { background: var(--hot); border-color: var(--hot); color: white; }
+    .setrow { margin-bottom: 14px; }
+    .setrow:last-child { margin-bottom: 0; }
+    .setrow > label { display:block; font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px; }
+    .seg { display:flex; gap:6px; }
+    .seg button { flex:1; padding:11px 8px; background:var(--card); border:1px solid var(--line); border-radius:9px; color:var(--fg); font-size:14px; font-weight:500; cursor:pointer; }
+    .seg button.active { background:var(--hot); border-color:var(--hot); color:#fff; }
     .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .row label { color: var(--dim); font-size: 13px; }
     .row .val { font-variant-numeric: tabular-nums; color: var(--fg); font-size: 13px; }
@@ -100,68 +106,45 @@
     </div>
   </div>
 
-  <h1>Auto-gain</h1>
+  <h1>Inställningar</h1>
   <div class="card">
-    <div class="row"><label>Target level</label><span class="val"><span id="agcTargetVal">–</span>%</span></div>
-    <input type="range" id="agcTarget" min="10" max="90" value="50" />
-    <div class="row" style="margin-top:14px"><label>Aggressiveness</label><span class="val"><span id="agcAggVal">–</span>%</span></div>
-    <input type="range" id="agcAgg" min="0" max="100" value="35" />
-    <div class="status">
-      Low = slow drift (follows floor volume, ignores transients).
-      High = fast reaction to loud/quiet passages.
-      <span id="agcTauDetail" style="display:block;margin-top:4px;opacity:.7"></span>
+    <div class="setrow">
+      <label>Reaktion på musiken</label>
+      <div class="seg" id="segSpeed">
+        <button data-agg="0.15">Långsam</button>
+        <button data-agg="0.85">Snabb</button>
+      </div>
     </div>
-  </div>
-
-
-  <h1>Sensitivity</h1>
-  <div class="card">
-    <div class="row"><label>How reactive</label><span class="val" id="sensVal">–</span></div>
-    <input type="range" id="sens" min="0" max="100" value="60" />
-  </div>
-
-  <h1>Dynamik</h1>
-  <div class="card">
-    <div class="row"><label>Kontrast tyst ↔ högt</label><span class="val"><span id="dynVal">–</span>%</span></div>
-    <input type="range" id="dyn" min="0" max="100" value="60" />
-    <div class="status">Lågt = jämnt ljus hela tiden. Högt = dovt i tysta partier och rejäl smäll i beats/drops.</div>
-  </div>
-
-  <h1>Master brightness</h1>
-  <div class="card">
-    <div class="row"><label>Overall level</label><span class="val" id="masterVal">–</span></div>
-    <input type="range" id="master" min="0" max="100" value="100" />
-  </div>
-
-
-
-
-
-  <h1>DMX refresh</h1>
-  <div class="card">
-    <div class="row"><label>Max rate</label><span class="val"><span id="dmxHzVal">–</span> Hz</span></div>
-    <input type="range" id="dmxHz" min="30" max="300" step="5" value="200" />
-    <div class="status">Wire cap depends on used channels. Lower this if a fixture flickers.</div>
+    <div class="setrow">
+      <label>Dynamik (tyst ↔ högt)</label>
+      <div class="seg" id="segDyn">
+        <button data-dyn="0.35">Lugn</button>
+        <button data-dyn="0.6">Normal</button>
+        <button data-dyn="0.85">Maxad</button>
+      </div>
+    </div>
+    <div class="setrow">
+      <label>Ljusstyrka</label>
+      <div class="seg" id="segMaster">
+        <button data-master="0.5">50%</button>
+        <button data-master="0.75">75%</button>
+        <button data-master="1">100%</button>
+      </div>
+    </div>
   </div>
 
   <h1>Fixtures</h1>
   <div class="card">
     <div id="fixtures"></div>
-    <div class="fx-pack">
-      <select id="fxSort" title="How Auto-address orders fixtures">
-        <option value="list">Sort: list order</option>
-        <option value="name">Sort: by name (A→Z)</option>
-        <option value="widest">Sort: widest first</option>
-        <option value="narrowest">Sort: narrowest first</option>
-      </select>
-      <button class="btn" id="fxAutoPack" style="flex:0 0 auto">Auto-address</button>
+    <div class="fx-actions">
+      <button class="btn" id="fxAdd">+ Lägg till lampa</button>
+      <button class="btn" id="fxAutoPack">Auto-adressera</button>
     </div>
     <div class="fx-actions">
-      <button class="btn" id="fxAdd">+ Add fixture</button>
-      <button class="btn ok" id="fxIdentifyAll" title="Blink each fixture in order">Identify all</button>
-      <button class="btn primary" id="fxSave" disabled>Save changes</button>
+      <button class="btn ok" id="fxIdentifyAll" title="Blinkar varje lampa i tur och ordning">Identifiera</button>
+      <button class="btn primary" id="fxSave" disabled>Spara ändringar</button>
     </div>
-    <div class="status" id="fxHint">Tap a fixture to edit. Use Identify to locate lamps in the room.</div>
+    <div class="status" id="fxHint">Tryck på en lampa för att ändra. Identifiera hittar lamporna i rummet.</div>
   </div>
 
   <h1>System</h1>
@@ -209,16 +192,10 @@ const kickDot = document.getElementById("kickDot");
 const levelBar = document.getElementById("levelBar");
 const levelVal = document.getElementById("levelVal");
 const gainVal = document.getElementById("gainVal");
-const sensEl = document.getElementById("sens");
-const sensVal = document.getElementById("sensVal");
 const inAux = document.getElementById("inAux");
 const inMic = document.getElementById("inMic");
 inAux.onclick = () => send({ type: "setAudioInput", value: "aux" });
 inMic.onclick = () => send({ type: "setAudioInput", value: "mic" });
-const dynEl = document.getElementById("dyn");
-const dynVal = document.getElementById("dynVal");
-const masterEl = document.getElementById("master");
-const masterVal = document.getElementById("masterVal");
 const monoCard = document.getElementById("monoCard");
 const monoHueEl = document.getElementById("monoHue");
 const monoValEl = document.getElementById("monoVal");
@@ -227,13 +204,6 @@ const cometCard = document.getElementById("cometCard");
 const cometHueEl = document.getElementById("cometHue");
 const cometValEl = document.getElementById("cometVal");
 const cometSwatch = document.getElementById("cometSwatch");
-const dmxHzEl = document.getElementById("dmxHz");
-const dmxHzVal = document.getElementById("dmxHzVal");
-const agcTargetEl  = document.getElementById("agcTarget");
-const agcTargetVal = document.getElementById("agcTargetVal");
-const agcAggEl     = document.getElementById("agcAgg");
-const agcAggVal    = document.getElementById("agcAggVal");
-const agcTauDetail = document.getElementById("agcTauDetail");
 const connEl = document.getElementById("conn");
 
 // Inverse of server's log curve: derive aggressiveness 0..1 from tauDown seconds.
@@ -249,6 +219,25 @@ function aggToTau(a) {
     down:  60 * Math.pow(2  / 60,  a),
   };
 }
+
+// Segmenterade kontroller: markera knappen närmast configvärdet.
+function segActivate(groupId, value, attr) {
+  const g = document.getElementById(groupId);
+  if (!g) return;
+  let best = null, bd = 1e9;
+  g.querySelectorAll("button").forEach((b) => {
+    const d = Math.abs(Number(b.dataset[attr]) - value);
+    if (d < bd) { bd = d; best = b; }
+    b.classList.remove("active");
+  });
+  if (best) best.classList.add("active");
+}
+document.querySelectorAll("#segSpeed button").forEach((b) =>
+  b.onclick = () => { send({ type: "setAgcAggressiveness", value: Number(b.dataset.agg) }); segActivate("segSpeed", Number(b.dataset.agg), "agg"); });
+document.querySelectorAll("#segDyn button").forEach((b) =>
+  b.onclick = () => { send({ type: "setDynamics", value: Number(b.dataset.dyn) }); segActivate("segDyn", Number(b.dataset.dyn), "dyn"); });
+document.querySelectorAll("#segMaster button").forEach((b) =>
+  b.onclick = () => { send({ type: "setMaster", value: Number(b.dataset.master) }); segActivate("segMaster", Number(b.dataset.master), "master"); });
 
 let ws;
 function connect() {
@@ -281,14 +270,11 @@ function renderModes(current) {
 }
 function applyConfig(cfg) {
   renderModes(cfg.mode);
-  sensEl.value = Math.round(cfg.sensitivity * 100);
-  sensVal.textContent = sensEl.value + "%";
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
   inMic.classList.toggle("primary", cfg.audioInput === "mic");
-  dynEl.value = Math.round((cfg.dynamics ?? 0.6) * 100);
-  dynVal.textContent = dynEl.value;
-  masterEl.value = Math.round(cfg.master * 100);
-  masterVal.textContent = masterEl.value + "%";
+  segActivate("segDyn", cfg.dynamics ?? 0.6, "dyn");
+  segActivate("segMaster", cfg.master ?? 1, "master");
+  segActivate("segSpeed", tauDownToAgg(cfg.detection?.tauDown ?? 30) > 0.5 ? 0.85 : 0.15, "agg");
   // Mono color card: only meaningful when mode === "mono", but we keep the
   // slider synced regardless so switching to mono lands on the right color.
   const hue = Math.round(cfg.monoHue ?? 15);
@@ -301,18 +287,6 @@ function applyConfig(cfg) {
   cometValEl.textContent = chue;
   cometSwatch.style.background = `hsl(${chue} 100% 50%)`;
   cometCard.style.display = cfg.mode === "chase" ? "" : "none";
-  const hz = Math.round(cfg.dmxMaxHz ?? 200);
-  dmxHzEl.value = hz;
-  dmxHzVal.textContent = hz;
-  const tgt = Math.round((cfg.detection?.autoGainTarget ?? 0.5) * 100);
-  agcTargetEl.value = tgt;
-  agcTargetVal.textContent = tgt;
-  const agg = tauDownToAgg(cfg.detection?.tauDown ?? 30);
-  const aggPct = Math.round(agg * 100);
-  agcAggEl.value = aggPct;
-  agcAggVal.textContent = aggPct;
-  const t = aggToTau(agg);
-  agcTauDetail.textContent = `~${t.up.toFixed(0)} s up · ~${t.down.toFixed(0)} s down`;
   identifyingIndex = cfg.identify?.index ?? -1;
   if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
   else renderFixtures();
@@ -329,9 +303,6 @@ function applyFrame(f) {
     kickTimer = setTimeout(() => kickDot.classList.remove("on"), 120);
   }
 }
-sensEl.oninput = () => { sensVal.textContent = sensEl.value + "%"; send({ type: "setSensitivity", value: sensEl.value / 100 }); };
-dynEl.oninput = () => { dynVal.textContent = dynEl.value; send({ type: "setDynamics", value: dynEl.value / 100 }); };
-masterEl.oninput = () => { masterVal.textContent = masterEl.value + "%"; send({ type: "setMaster", value: masterEl.value / 100 }); };
 monoHueEl.oninput = () => {
   const h = Number(monoHueEl.value);
   monoValEl.textContent = h;
@@ -358,23 +329,6 @@ document.querySelectorAll("[data-comet-hue]").forEach((b) => {
     cometHueEl.dispatchEvent(new Event("input"));
   };
 });
-dmxHzEl.oninput = () => {
-  const v = Number(dmxHzEl.value);
-  dmxHzVal.textContent = v;
-  send({ type: "setDmxMaxHz", value: v });
-};
-agcTargetEl.oninput = () => {
-  const v = Number(agcTargetEl.value);
-  agcTargetVal.textContent = v;
-  send({ type: "setAgcTarget", value: v / 100 });
-};
-agcAggEl.oninput = () => {
-  const v = Number(agcAggEl.value);
-  agcAggVal.textContent = v;
-  const t = aggToTau(v / 100);
-  agcTauDetail.textContent = `~${t.up.toFixed(0)} s up · ~${t.down.toFixed(0)} s down`;
-  send({ type: "setAgcAggressiveness", value: v / 100 });
-};
 
 
 /* ── Fixture editor ─────────────────────────────────────────────────── */
@@ -617,7 +571,7 @@ document.getElementById("fxAutoPack").onclick = () => {
   // from address 1. Reordering (not just re-addressing) means the final
   // layout in the UI matches the address order, which is what you'd expect
   // when reading top-to-bottom.
-  const sort = document.getElementById("fxSort").value;
+  const sort = "list";
   const cmp = {
     list:      () => 0,
     name:      (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }),
