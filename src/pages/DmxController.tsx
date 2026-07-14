@@ -26,6 +26,7 @@ export default function DmxController() {
       <PowerHero />
       <SceneTiles />
       <BrightnessCard />
+      <AudioMeterCard />
       <MoreButton open={showMore} onToggle={() => setShowMore((o) => !o)} />
       {showMore && <MoreSections />}
       {ownerMode && <OwnerSections />}
