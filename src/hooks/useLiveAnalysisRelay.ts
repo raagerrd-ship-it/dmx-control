@@ -15,6 +15,7 @@ export function useLiveAnalysisRelay() {
   const lastBeatSent = useRef(0);
   const lastKeyStr = useRef("");
   const lastEnergySent = useRef(0);
+  const lastSettings = useRef("");
   const now2 = () => Date.now();
 
   useEffect(() => {
@@ -35,7 +36,12 @@ export function useLiveAnalysisRelay() {
         sockRef.current = ws;
         ws.onopen = () => {
           // Live Analysis är hela "smart synk": sätt engine i smart-läge direkt.
-          try { ws.send(JSON.stringify({ type: "setMode", mode: "smart" })); } catch { /* noop */ }
+          try {
+            ws.send(JSON.stringify({ type: "setMode", mode: "smart" }));
+            const st = useLiveAnalysis.getState();
+            ws.send(JSON.stringify({ type: "smartDwell", mode: st.dwellMode }));
+            ws.send(JSON.stringify({ type: "beatPulse", enabled: st.beatPulse }));
+          } catch { /* noop */ }
         };
         ws.onclose = () => {
           sockRef.current = null;
@@ -53,8 +59,16 @@ export function useLiveAnalysisRelay() {
       const ws = sockRef.current;
       if (!ws || ws.readyState !== 1) return;
 
+      // Inställningar (dwell/puls) — skicka vid ändring
+      const sig = `${s.dwellMode}|${s.beatPulse}`;
+      if (sig !== lastSettings.current) {
+        lastSettings.current = sig;
+        ws.send(JSON.stringify({ type: "smartDwell", mode: s.dwellMode }));
+        ws.send(JSON.stringify({ type: "beatPulse", enabled: s.beatPulse }));
+      }
+
       // Energinivå till smart-lägets effektväljare (throttlat 2 s)
-      if (now2() - lastEnergySent.current > 2000 && typeof s.energy === "number") {
+      if (s.energyDrivesMode && now2() - lastEnergySent.current > 2000 && typeof s.energy === "number") {
         lastEnergySent.current = now2();
         ws.send(JSON.stringify({ type: "liveEnergy", value: s.energy }));
       }
@@ -68,7 +82,7 @@ export function useLiveAnalysisRelay() {
       // BPM-beat (skicka anchor + BPM en gång per BPM-uppdatering)
       if (s.sendBeats && s.bpm > 0 && s.nextBeatAt !== lastBeatSent.current) {
         lastBeatSent.current = s.nextBeatAt;
-        ws.send(JSON.stringify({ type: "liveBeat", bpm: s.bpm, inMs: Math.max(0, s.nextBeatAt - Date.now()) }));
+        ws.send(JSON.stringify({ type: "liveBeat", bpm: s.bpm * s.bpmMult, inMs: Math.max(0, s.nextBeatAt - Date.now()) }));
       }
 
       // Hue-hint (skicka bara när tonarten ändras, throttlat 5 s)

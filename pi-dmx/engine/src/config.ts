@@ -78,6 +78,10 @@ export interface EngineConfig {
   beat?: { anchorMs: number; bpm: number } | null;
   /** Transient Live Analysis (Essentia.js på mobilen) drop-blixt — wall-clock ms. */
   liveFlashUntil?: number | null;
+  /** Transient: hur ofta smart byter läge (ms). */
+  smartDwellMs?: number | null;
+  /** Transient: pulsa hela riggen på taktslag. */
+  beatPulse?: boolean | null;
   /** Transient Live Analysis färg-hint från tonart (degrees 0..360) — inte persisted. */
   liveHueHint?: { primary: number; secondary: number; atMs: number } | null;
   /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */

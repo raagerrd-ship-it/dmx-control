@@ -312,6 +312,13 @@ export async function startServer(
             const secondary = ((((msg.secondary ?? msg.primary + 30) as number) % 360) + 360) % 360;
             deps.cfg.liveHueHint = { primary, secondary, atMs: Date.now() };
             return;
+          } else if (msg.type === "smartDwell") {
+            const m = { slow: 20_000, normal: 9_000, fast: 4_000 } as Record<string, number>;
+            deps.cfg.smartDwellMs = m[msg.mode as string] ?? 9_000;
+            return;
+          } else if (msg.type === "beatPulse") {
+            deps.cfg.beatPulse = !!msg.enabled;
+            return;
           } else if (msg.type === "liveEnergy" && typeof msg.value === "number") {
             // Matar smart-lägets pool-väljare. atMs bara vid stora skiften så
             // små driftvärden inte triggar mode-byten i onödan.

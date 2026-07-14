@@ -99,7 +99,8 @@ export class EffectEngine {
         // Normalize against the AGC target so "at target loudness" = full drive —
         // the AGC otherwise parks the level around ~0.5 and v never reaches 1.
         const audio = Math.min(1, (frame.level / Math.max(0.15, this.cfg.detection.autoGainTarget)) * (0.35 + this.cfg.sensitivity * 0.5));
-        const master = this.cfg.master * this.silenceGate;
+        const beatMul = this.cfg.beatPulse ? (0.45 + 0.55 * beatEnv) : 1;
+    const master = this.cfg.master * this.silenceGate * beatMul;
     const count = this.cfg.fixtures.length;
 
     // Chase state machine — kick advances one step, plus a slow auto-advance
@@ -133,7 +134,7 @@ export class EffectEngine {
         if (sectionChanged || bigJump || now > this.smartDwellUntil) {
         if (fresh) this.lastSectionAt = se!.atMs;
         this.lastSmartIntensity = intensity;
-        this.smartDwellUntil = now + 9_000;
+        this.smartDwellUntil = now + (this.cfg.smartDwellMs ?? 9_000);
         // Rotate within a pool of modes that fit the current feel — mixed
         // order, never the same mode twice in a row.
         const POOLS: Mode[][] = [

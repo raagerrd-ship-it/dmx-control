@@ -18,6 +18,10 @@ interface LiveState {
   sendBeats: boolean;
   sendDrops: boolean;
   sendHues: boolean;
+  bpmMult: number;              // 0.5 | 1 | 2 — halv/normal/dubbel takt
+  dwellMode: "slow" | "normal" | "fast";  // hur ofta smart byter läge
+  beatPulse: boolean;           // pulsa hela riggen på taktslag
+  energyDrivesMode: boolean;    // energi väljer läge (annars stabilt)
   /** Mic-trim i dB (-24..+24) — appliceras på inspelade sampel före FFT/BPM. */
   micTrimDb: number;
 
@@ -30,16 +34,20 @@ interface LiveState {
   setSendDrops: (b: boolean) => void;
   setSendHues: (b: boolean) => void;
   setMicTrimDb: (v: number) => void;
+  setBpmMult: (v: number) => void;
+  setDwellMode: (v: "slow" | "normal" | "fast") => void;
+  setBeatPulse: (b: boolean) => void;
+  setEnergyDrivesMode: (b: boolean) => void;
 }
 
 const LS_KEY = "live-analysis-cal-v1";
-interface Persisted { micTrimDb: number; sensitivity: number }
+interface Persisted { micTrimDb: number; sensitivity: number; bpmMult: number; dwellMode: "slow"|"normal"|"fast"; beatPulse: boolean; energyDrivesMode: boolean }
 function loadCal(): Persisted {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (raw) return { micTrimDb: 0, sensitivity: 0.6, ...JSON.parse(raw) };
+    if (raw) return { micTrimDb: 0, sensitivity: 0.6, bpmMult: 1, dwellMode: "normal", beatPulse: false, energyDrivesMode: true, ...JSON.parse(raw) };
   } catch { /* noop */ }
-  return { micTrimDb: 0, sensitivity: 0.6 };
+  return { micTrimDb: 0, sensitivity: 0.6, bpmMult: 1, dwellMode: "normal", beatPulse: false, energyDrivesMode: true };
 }
 function saveCal(p: Persisted) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(p)); } catch { /* noop */ }
@@ -61,6 +69,10 @@ export const useLiveAnalysis = create<LiveState>((set) => ({
   sendBeats: true,
   sendDrops: true,
   sendHues: true,
+  bpmMult: initialCal.bpmMult,
+  dwellMode: initialCal.dwellMode,
+  beatPulse: initialCal.beatPulse,
+  energyDrivesMode: initialCal.energyDrivesMode,
   micTrimDb: initialCal.micTrimDb,
   setEnabled: (enabled) => set({ enabled, status: enabled ? "loading" : "off", errorMsg: null }),
   setStatus: (status, err = null) => set({ status, errorMsg: err }),
@@ -68,15 +80,19 @@ export const useLiveAnalysis = create<LiveState>((set) => ({
   markFlash: (atMs) => set({ lastFlashAt: atMs }),
   setSensitivity: (sensitivity) => {
     set({ sensitivity });
-    saveCal({ micTrimDb: useLiveAnalysis.getState().micTrimDb, sensitivity });
+    const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode });
   },
   setSendBeats: (sendBeats) => set({ sendBeats }),
   setSendDrops: (sendDrops) => set({ sendDrops }),
   setSendHues: (sendHues) => set({ sendHues }),
+  setBpmMult: (bpmMult) => { set({ bpmMult }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode }); },
+  setDwellMode: (dwellMode) => { set({ dwellMode }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode }); },
+  setBeatPulse: (beatPulse) => { set({ beatPulse }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode }); },
+  setEnergyDrivesMode: (energyDrivesMode) => { set({ energyDrivesMode }); const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: st.micTrimDb, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode }); },
   setMicTrimDb: (micTrimDb) => {
     const v = Math.max(-24, Math.min(24, micTrimDb));
     set({ micTrimDb: v });
-    saveCal({ micTrimDb: v, sensitivity: useLiveAnalysis.getState().sensitivity });
+    const st = useLiveAnalysis.getState(); saveCal({ micTrimDb: v, sensitivity: st.sensitivity, bpmMult: st.bpmMult, dwellMode: st.dwellMode, beatPulse: st.beatPulse, energyDrivesMode: st.energyDrivesMode });
   },
 }));
 

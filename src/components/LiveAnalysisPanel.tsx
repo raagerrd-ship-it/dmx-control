@@ -75,10 +75,19 @@ export function LiveAnalysisPanel() {
             />
           </div>
 
+          <div className="space-y-3 pt-2 border-t border-border/50">
+            <SegRow label="Takt" value={s.bpmMult} onPick={s.setBpmMult}
+              options={[[0.5, "½×"], [1, "1×"], [2, "2×"]]} />
+            <SegRow label="Byter läge" value={s.dwellMode} onPick={s.setDwellMode}
+              options={[["slow", "Sällan"], ["normal", "Normal"], ["fast", "Ofta"]]} />
+          </div>
+
           <div className="space-y-2 pt-2 border-t border-border/50">
-            <ToggleRow label="Skicka beats" checked={s.sendBeats} onChange={s.setSendBeats} />
-            <ToggleRow label="Skicka drops (lookahead 200 ms)" checked={s.sendDrops} onChange={s.setSendDrops} />
-            <ToggleRow label="Skicka färg-hint från tonart" checked={s.sendHues} onChange={s.setSendHues} />
+            <ToggleRow label="Pulsa ljuset på taktslag" checked={s.beatPulse} onChange={s.setBeatPulse} />
+            <ToggleRow label="Energi styr läget" checked={s.energyDrivesMode} onChange={s.setEnergyDrivesMode} />
+            <ToggleRow label="Skicka beats (taktlås)" checked={s.sendBeats} onChange={s.setSendBeats} />
+            <ToggleRow label="Skicka drops" checked={s.sendDrops} onChange={s.setSendDrops} />
+            <ToggleRow label="Färg från tonart" checked={s.sendHues} onChange={s.setSendHues} />
           </div>
         </>
       )}
@@ -101,5 +110,23 @@ function ToggleRow({ label, checked, onChange }: { label: string; checked: boole
         />
       </button>
     </label>
+  );
+}
+
+function SegRow<T extends string | number>({ label, value, options, onPick }: {
+  label: string; value: T; options: [T, string][]; onPick: (v: T) => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="text-[11px]">{label}</div>
+      <div className="flex gap-1.5">
+        {options.map(([v, txt]) => (
+          <button key={String(v)} type="button" onClick={() => onPick(v)}
+            className={`flex-1 py-2 rounded-lg text-xs font-medium border ${value === v ? "bg-accent border-accent text-accent-foreground" : "bg-muted/40 border-border text-foreground"}`}>
+            {txt}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
