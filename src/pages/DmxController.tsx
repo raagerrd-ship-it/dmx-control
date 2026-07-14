@@ -16,6 +16,8 @@ type Tab = "live" | "fixtures";
 
 export default function DmxController() {
   useMockLive();
+  usePiLive();
+
   const [tab, setTab] = useState<Tab>("live");
   const preset = useDmx((s) => s.preset);
   const monoHue = useDmx((s) => s.params.monoHue);
