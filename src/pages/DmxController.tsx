@@ -8,7 +8,9 @@ import { BpmDisplay } from "@/components/BpmDisplay";
 
 
 import { useMockLive } from "@/hooks/useMockLive";
+import { usePiLive } from "@/hooks/usePiLive";
 import { useDmx, presetById } from "@/store/dmx";
+
 
 type Tab = "live" | "fixtures";
 
