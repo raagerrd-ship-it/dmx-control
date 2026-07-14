@@ -33,8 +33,9 @@ export class Analyser {
 
   /** Called when the input routing changes — the old gain is meaningless for
    *  the new source's signal level, so re-converge from neutral. */
-  resetGain() {
-    this.gain = 1;
+  resetGain(startGain = 1) {
+    // Seed per input: line (aux) arrives hot -> 1x; the room mic is weak -> ~20x.
+    this.gain = Math.max(0.5, Math.min(20, startGain));
     this.envelope = 0;
   }
   private envelope: number;

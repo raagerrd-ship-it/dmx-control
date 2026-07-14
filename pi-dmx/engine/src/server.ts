@@ -41,7 +41,7 @@ export interface ServerDeps {
   cycleMode: () => Mode;
   smartSync: SmartSync;
   /** Reset the AGC after an input-routing switch. */
-  resetAgc: () => void;
+  resetAgc: (startGain?: number) => void;
 }
 
 export interface Server {
@@ -247,7 +247,7 @@ export async function startServer(deps: ServerDeps, port = 80): Promise<Server> 
           } else if (msg.type === "setAudioInput" && (msg.value === "aux" || msg.value === "mic")) {
             deps.cfg.audioInput = msg.value;
             applyInputRouting(msg.value);
-            deps.resetAgc();
+            deps.resetAgc(msg.value === "mic" ? 20 : 1);
           } else if (msg.type === "setDynamics") {
             deps.cfg.dynamics = clamp01(msg.value);
           } else if (msg.type === "setMaster") {
