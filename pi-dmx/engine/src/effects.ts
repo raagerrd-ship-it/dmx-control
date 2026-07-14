@@ -277,6 +277,10 @@ function pickColor(
     beatFrac = ((since % beatMs) + beatMs) % beatMs / beatMs;
   }
   const beatPulse = Math.pow(1 - beatFrac, 2);   // mjuk puls-envelope (0..1) per takt
+  // Tempo-djup: långsamt tempo → djup punch (lågt golv); snabbt → grunt (mot flimmer).
+  const beatMs2 = cfg.beat && cfg.beat.bpm > 40 ? 60000 / cfg.beat.bpm : 500;
+  const tempoDeep = Math.max(0, Math.min(1, (beatMs2 - 340) / 260));   // 0 snabbt .. 1 långsamt
+  const punchFloor = 0.5 - tempoDeep * 0.42;                            // 0.5 (snabbt) .. 0.08 (långsamt)
   // Dynamics: lower floors + gamma on the audio-driven part, so quiet passages
   // go dim and beats punch. dyn=0 reproduces the old flat curves.
   // Per-fixture band drive: each lamp breathes with its own slice of the
@@ -306,7 +310,7 @@ function pickColor(
       // (som saturerade nära 100%). Motroterande rena färger, vit punch på kick.
       const dir = idx % 2 === 0 ? 1 : -1;
       const hue = snapHue(idx, ((t * 90 * dir + idx * 137) % 360 + 360) % 360 / 360);
-      const v = 0.4 + 0.6 * Math.min(1, beatPulse * 0.7 + audio * 0.3 + kickEnv * 0.6);
+      const v = punchFloor + (1 - punchFloor) * Math.min(1, beatPulse * 0.95 + audio * 0.2 + kickEnv * 0.8);
       return hsvToRgb(hue, 1, v);   // rena färger som pumpar; ingen urtvättande vit-blixt
     }
     case "drops": {
@@ -349,7 +353,7 @@ function pickColor(
     case "snap": {
       // Snabb: varje taktslag hoppar ALLA lampor till en ny ren färg.
       const hue = mixedSector(beatIdx) / 6;
-      const v = 0.5 + 0.5 * Math.min(1, Math.max(beatPulse, kickEnv) * 0.6 + audio * 0.4);
+      const v = punchFloor + (1 - punchFloor) * Math.min(1, Math.max(beatPulse, kickEnv) * 0.85 + audio * 0.3);
       return hsvToRgb(hue, 1, v);
     }
     case "bounce": {
@@ -359,7 +363,7 @@ function pickColor(
       const pos = cyc <= span ? cyc : span * 2 - cyc;   // triangel-våg
       const d = Math.abs(idx - pos);
       const hue = mixedSector(Math.floor(beatIdx / (span * 2))) / 6;
-      const v = Math.exp(-d * 1.3) * (0.5 + 0.5 * Math.min(1, beatPulse * 0.5 + audio * 0.5));
+      const v = Math.exp(-d * 1.3) * (punchFloor + (1 - punchFloor) * Math.min(1, beatPulse * 0.8 + audio * 0.4));
       return hsvToRgb(hue, 1, v);
     }
     case "chase": {
