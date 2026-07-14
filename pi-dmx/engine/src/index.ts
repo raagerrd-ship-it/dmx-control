@@ -143,7 +143,6 @@ const serverDeps = {
   // Frisk = en ljud-chunk bearbetad senaste 10 s (arecord + event-loop lever).
   getHealthy: () => Date.now() - lastChunkAt < 10000,
   cycleMode,
-  smartSync,
 
   resetAgc: (g?: number) => analyser.resetGain(g),
   setGainLock: (locked: boolean) => analyser.setGainLock(locked, 1),
