@@ -97,7 +97,17 @@ export class AudioCapture extends EventEmitter {
       // accumulation that a burst-cap misses), DROP this stale chunk instead of
       // rendering it. Keeps the light within ~120 ms of the music indefinitely.
       const behind = (Date.now() - this.wallStart) - this.audioMs;
-      if (behind > 120) continue;
+      // SJÄLVLÄKANDE: en ALSA-overrun (samples TAPPAS när event-loopen stallar en
+      // stund — t.ex. vid ett WiFi-omkopplingsevent) lämnar audioMs permanent
+      // efter väggklockan → 'behind' fastnar högt → annars droppas VARJE chunk för
+      // alltid och lamporna slutar reagera tills watchdogen hinner starta om.
+      // >500 ms ur synk = ett verkligt tapp, inte en normal transient: re-basera
+      // klockan och släpp igenom, så capturen resynkar direkt i stället.
+      if (behind > 500) {
+        this.wallStart = Date.now() - this.audioMs;   // behind ≈ 0 → resynk nu
+      } else if (behind > 120) {
+        continue;   // normalt: droppa EN eftersläpande chunk för att hålla realtid
+      }
 
       this.emit("chunk", this.toMonoFloat32(chunk));
     }
