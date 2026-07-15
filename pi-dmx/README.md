@@ -6,6 +6,33 @@ analyses kicks/drops/energy, and drives DMX-512 out through a **Whadda
 WPM432** module on the PL011 UART. A small web server exposes a mobile UI
 for live control.
 
+No cloud, no DAW, no operator. Plug line-out into it, and the lights play
+the song.
+
+## Highlights
+
+- **Sub-frame realtime on a $15 Pi.** A dedicated C sidecar owns the UART on
+  an *isolated CPU core* (`isolcpus=3`) at `SCHED_FIFO` with `mlockall()`, so
+  DMX break-timing never jitters even while Node does FFTs on the other cores.
+  End-to-end light-follows-music latency: **~40–80 ms** (see budget below).
+- **A show director, not a VU meter.** Local BPM detection (autocorrelation +
+  comb + pulse-train + perceptual prior, phase-locked to real kicks via a PLL),
+  energy tiering relative to the song's own baseline, riser/drop prediction,
+  and a curated-palette phrase engine that changes colour on musical
+  boundaries — so it feels *programmed to the track*, not merely reactive.
+- **VU as a Master VCA.** Overall brightness is a plain, instant linear map of
+  the raw signal level (`0.1 → 0 %`, `0.97 → 100 %`) applied as the *final*
+  gain after every effect and after the output ballistics — no filters, no lag.
+  Effects stay agnostic to it; it just scales them. This is what makes the rig
+  "breathe" with the music.
+- **Modular effect registry.** Each effect is one file exporting an `EffectDef`
+  (render + metadata). A registry derives the mode list, the smart-mode energy
+  pools, validation, and the entire UI from one source of truth — adding an
+  effect is a new file plus one line.
+- **Built for rental.** Crash-safe atomic config writes, an owner-only `/setup`
+  page hidden from renters, a health watchdog that restarts a hung pipeline,
+  and self-healing audio capture that recovers from a jostled connector in ~1 s.
+
 ## Architecture
 
 ```
@@ -72,9 +99,9 @@ HAT, or use a stacking header.
 ### Mode button
 
 The Codec Zero HAT has a built-in push-button (SW1) wired to **GPIO27**.
-Each press cycles: **Auto → Party → Comet → Mono → Strobe → Auto…**
-(Blackout is intentionally skipped so a button press never kills the show —
-you can still select it from the mobile UI.)
+Each press cycles through the effect modes (Smart → drops → party → chase →
+… → twin, in registry order). Blackout is intentionally skipped so a button
+press never kills the show — you can still select it from the mobile UI.
 
 Requires `gpiod` (`sudo apt install -y gpiod`). To use a different GPIO
 (e.g. an external button on GPIO17), edit `modeButton.line` in
@@ -105,8 +132,9 @@ What it does:
    `isolcpus=3 nohz_full=3 rcu_nocbs=3` so CPU3 is reserved for `dmx-helper`.
 4. Disables `hciuart`, `bluetooth`, `serial-getty@ttyAMA0`.
 5. Sets up a permanent **WiFi access point** on `wlan0` via NetworkManager
-   — SSID `pi-dmx`, password `dmx12345`, gateway `192.168.4.1`. Override
-   with `AP_SSID=... AP_PASS=... sudo -E bash install.sh`.
+   — SSID `pi-dmx`, **open by default** (no password), gateway `192.168.4.1`.
+   Set a password with `AP_PASS=... AP_SSID=... sudo -E bash install.sh`
+   (recommended for a rental rig on a shared site).
 6. Installs `/etc/asound.conf` (default capture = `hw:0,0`) and the
    `codec-zero-linein` oneshot for AUX-in routing.
 7. Builds + installs `dmx-helper` to `/usr/local/bin/`.
@@ -174,6 +202,64 @@ python3 -c "import socket,sys; s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM
 
 Well under the ~100 ms perceptual threshold for "light follows music".
 
+## Effect architecture
+
+Every effect lives in its own file under `engine/src/effects/` and exports an
+`EffectDef` — logic **and** metadata in one place:
+
+```ts
+// effects/wave.ts
+export const wave: EffectDef = {
+  key: "wave", label: "Våg", tier: "fart",
+  desc: "Flowing colour wave rolling across the rig.",
+  render: (c) => {
+    const base = 0.55 + 0.45 * Math.sin(c.wavePhase - c.idx * 1.3 * c.phaseSpread);
+    const hue  = c.mixedSector(c.idx + Math.floor(c.wavePhase * 0.4)) / 6;
+    return c.hsv(hue, 1, c.shaped(0.12, base * (0.35 + c.audio * 0.7) + c.frame.treble * 0.35));
+  },
+};
+```
+
+`c` is an `EffectContext` the engine builds once per frame (beat index/phase,
+band energies, riser build-up, a music clock, palette helpers…) and reuses per
+lamp, so there are no allocations in the render loop. `registry.ts` collects
+every `EffectDef` and derives everything else from that one list:
+
+- the physical-button / WS mode cycle (`EFFECT_KEYS`)
+- the smart-mode energy pools (`TIER` — from each effect's `tier` tag)
+- server-side mode validation
+- the mobile UI's effect lists (pushed as metadata, rendered client-side)
+
+**Adding an effect** = create one file, add one line to the registry, add one
+entry to the `Mode` union. No editing five files, no duplicated lists.
+
+The engine (`EffectEngine`) owns all the *cross-cutting* show logic — beat
+clock, drop/riser detection, the VU ceiling, output ballistics, bass punch,
+fog, ambient idle — and applies it uniformly on top of whatever an effect
+returns. Effects only decide colour and per-lamp shape.
+
+## Smart show director
+
+`Smart` mode makes the rig behave like a lighting operator reading the room:
+
+- **BPM** is detected locally (length-normalised autocorrelation + harmonic
+  comb + pulse-train cross-correlation + a log-Gaussian perceptual prior),
+  self-corrects octave errors over ~5 s, and a **PLL** nudges the beat anchor
+  toward each real kick so the pulse stays in phase even if the number is a
+  hair off.
+- **Energy tiering is relative** to the song's own ~25 s baseline (a line
+  feed is compressed and sits high, so absolute level is meaningless): clearly
+  above average → *full fart*, around average → *fart*, below → *lugn*.
+- **Riser/drop prediction** watches the spectral centroid and level climb into
+  a drop, swells brightness through the build, then lands the hit.
+- A **phrase engine** rotates a curated RGB palette every 32 beats on musical
+  boundaries, biased warm/cool by the centroid.
+- **Beat pulse** dips the whole rig between beats *under* the VU ceiling, and a
+  short pre-drop **blackout** makes the impact hit twice as hard.
+
+The physical PARs can't blend hues, so all colour is snapped to the six pure
+R/G/B corners and every bit of smoothness lives in brightness instead.
+
 ## Layout
 
 ```
@@ -183,6 +269,13 @@ pi-dmx/
 │   ├── main.c
 │   ├── Makefile
 │   └── systemd/dmx-helper.service
-├── engine/                    ← Node/TS audio+effect engine
-└── mobile-ui/                 ← Static PWA served by engine
+└── engine/                    ← Node/TS audio + effect engine
+    ├── src/
+    │   ├── analyser.ts         ← FFT, bands, BPM, kick/onset
+    │   ├── effects.ts          ← EffectEngine (director + pipeline)
+    │   ├── effects/            ← one file per effect + registry
+    │   ├── dmx.ts / audio.ts   ← sidecar socket / ALSA capture
+    │   └── server.ts           ← Fastify UI + WebSocket
+    ├── public/                 ← mobile PWA (renter view + /setup)
+    └── systemd/                ← services + health watchdog
 ```
