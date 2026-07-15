@@ -67,6 +67,7 @@ export class EffectEngine {
   private trebleBase = 0.05;     // långsam diskant-baslinje för micro-strobe-transientdetektorn
   private microStrobe = 0;       // micro-strobe envelope (0..1), klingar av på ~2-3 frames
   private lastMicroMs = 0;
+  private vu = 0;                // direkt VU-envelope (snabb attack / ~220ms release) för ljustaket
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -423,19 +424,17 @@ export class EffectEngine {
     this.microStrobe *= 0.38;                                               // klingar av på ~2-3 frames
     if (this.microStrobe < 0.02) this.microStrobe = 0;
     const microMul = this.dropEnv > 0.4 ? 1 : 1 - this.microStrobe * 0.45;  // notch ner till ~0.55 på träffen
-    // DYNAMISKT LJUSTAK (VU): ett löpande max-tak som följer SEKTIONENS relativa
-    // energi (samma signal som smart-tiern: intensityEma mot låtens ~25s-snitt)
-    // → lugna partier lyser dämpat, bara de tyngsta sektionerna når 100%. Takets
-    // DJUP styrs av Dynamik-ratten. Drop/bas-punch/riser/flash BYPASSAR taket så
-    // impakten alltid blir full. Jobbar i alla lägen (signalen finns alltid).
+    // DYNAMISKT LJUSTAK (DIREKT VU): den AKTUELLA nivån styr taket direkt — ingen
+    // långtidsbaslinje, inget medel. VU-ballistik: SNABB attack (ljuset följer
+    // smällen direkt), ~220ms release (ingen flimmer) → ljusstyrka = ljudnivå,
+    // här och nu. Golvets DJUP styrs av Dynamik-ratten. Drop/bas-punch/riser/
+    // flash BYPASSAR taket så impakten alltid blir full.
     let ceilMul = 1;
     if (this.cfg.energyCeiling) {
-      const rel = Math.max(0, Math.min(1, 0.5 + (this.intensityEma - this.intensityFloor) / 0.30));
-      const s = rel <= 0.2 ? 0 : rel >= 0.9 ? 1 : (rel - 0.2) / 0.7;
-      const eased = s * s * (3 - 2 * s);                                    // smoothstep 0.2..0.9 → full vid 90%
+      this.vu += (audio - this.vu) * (audio > this.vu ? 1 : 1 - Math.exp(-dtSec / 0.22));   // snabb upp, mjuk ner
       const dynK = Math.max(0, Math.min(1, this.cfg.dynamics ?? 0.6));
       const floor = 0.6 - dynK * 0.25;                                      // 0.6 (platt) .. 0.35 (dynamiskt) i djup vila
-      const ceil = floor + (1 - floor) * eased;
+      const ceil = floor + (1 - floor) * this.vu;                          // direkt: nivå → tak
       const bypass = Math.max(this.dropEnv, bassPunch, flashActive ? 1 : 0, this.buildUp * 0.6);
       ceilMul = Math.max(ceil, bypass);
     }
