@@ -242,7 +242,7 @@ export class EffectEngine {
         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
         const LUGN: Mode[] = ["cycle", "breathe", "tide", "mono", "aurora", "drift"];
         const FART: Mode[] = ["wave", "chase", "drops", "sweep", "pulse", "eq"];
-        const FULLFART: Mode[] = ["party", "snap", "bounce", "strobe", "rave"];
+        const FULLFART: Mode[] = ["party", "snap", "bounce", "strobe", "rave", "flip"];
         const bpm = this.cfg.beat?.bpm ?? 0;
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
         // Fasta trösklar på (relativ) energi. Ingen bpm-sänkning längre — den
@@ -647,6 +647,19 @@ function pickColor(
       const pairBase = mixedSector(Math.floor(beatIdx / 4));
       const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;
       return hsvToRgb(hue, 1, lit ? 1 : 0);
+    }
+    case "flip": {
+      // CALL-AND-RESPONSE: två grupper (varannan lampa) är BÅDA tända men BYTER
+      // kontrastfärg på varje taktslag → A/B/A/B utan att släckas (mjukare än
+      // rave, som mörklägger ena gruppen). Färgparet byts var 8:e takt. Med
+      // transient-skärpan kapar färgbytet stenhårt.
+      const even = idx % 2 === 0;
+      const onBeatA = beatIdx % 2 === 0;
+      const pairBase = mixedSector(Math.floor(beatIdx / 8));
+      const useA = even === onBeatA;
+      const hue = ((useA ? pairBase : pairBase + 3) % 6) / 6;   // motfärger mellan grupperna
+      const v = 0.6 + 0.4 * Math.min(1, beatPulse * 0.7 + audio * 0.3);   // båda ljusa, lätt puls
+      return hsvToRgb(hue, 1, v);
     }
     case "chase": {
       // Snabb LÖPARE: skarpt huvud som hoppar ETT steg per taktslag, kort svans,
