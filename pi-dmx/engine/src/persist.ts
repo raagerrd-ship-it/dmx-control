@@ -57,7 +57,7 @@ export function scheduleSave(cfg: EngineConfig, path = DEFAULT_PATH, delayMs = 5
     try {
       await mkdir(dirname(path), { recursive: true });
       // Strip transient fields (identify/flash overrides) from the persisted copy.
-      const { identify: _omit, flashUntil: _omit2, beat: _omit3, ...persist } = cfg;
+      const { identify: _omit, flashUntil: _omit2, beat: _omit3, manualBpm: _omit4, ...persist } = cfg;
       const data = JSON.stringify(persist, null, 2);
       // Atomic replace: write temp, keep the prior good file as .bak, then
       // rename over the live file. rename() is atomic on the same filesystem,

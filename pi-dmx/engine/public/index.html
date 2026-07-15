@@ -93,6 +93,14 @@
       </span>
     </label>
     <label class="tgl"><span>Pulsa ljuset på taktslag</span><input type="checkbox" id="tBeatPulse"></label>
+    <div class="setrow" style="margin-top:10px">
+      <label>Takt <span class="val" id="bpmVal">–</span></label>
+      <div class="fx-actions" style="margin:0">
+        <button class="btn" id="tapBtn">🥁 Knacka takt</button>
+        <button class="btn" id="tapAuto">Auto</button>
+      </div>
+    </div>
+    <div class="status" id="tapHint" style="margin-top:4px">Knacka med i takt (4+ slag) för att låsa BPM. Auto = automatisk igen.</div>
   </div>
 
   <h1>Level <span class="kick-dot" id="kickDot"></span></h1>
@@ -352,6 +360,9 @@ function applyConfig(cfg) {
   curMode = cfg.mode || "smart";
   refreshModeView();                 // sätter tEnergy/dwell/intro + renderar listorna
   tBeatPulse.checked = !!cfg.beatPulse;
+  manualBpm = cfg.manualBpm || null;
+  if (tapBtn) tapBtn.classList.toggle("primary", !!manualBpm);
+  showBpm(0);
   segActivate("segDrop", cfg.dropSensitivity ?? 0.6, "drop");
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
@@ -380,6 +391,7 @@ function applyFrame(f) {
     const row = document.querySelector('.rotrow[data-mode="' + f.mode + '"]');
     if (row) row.classList.add("playing");
   }
+  if (!manualBpm && typeof f.bpm === "number") showBpm(f.bpm);   // visa auto-BPM live
 }
 
 
@@ -667,6 +679,37 @@ fxSaveBtn.onclick = () => {
 const tBeatPulse = document.getElementById("tBeatPulse");
 const tEnergy = document.getElementById("tEnergy");
 tBeatPulse.onchange = () => send({ type: "setBeatPulse", value: tBeatPulse.checked });
+
+/* ── Tap-tempo ──────────────────────────────────────────────────────────
+   Knacka takt → låser BPM (överstyr autodetektionen). Fas-låset (PLL) i
+   motorn riktar ändå pulsen mot faktiska trumslag. "Auto" släpper låset. */
+const bpmVal = document.getElementById("bpmVal");
+const tapBtn = document.getElementById("tapBtn");
+const tapAuto = document.getElementById("tapAuto");
+let manualBpm = null;   // låst takt (från config), null = auto
+let taps = [];
+function showBpm(autoBpm) {
+  if (manualBpm) { bpmVal.textContent = manualBpm + " BPM · låst"; bpmVal.style.color = "var(--hot)"; }
+  else { bpmVal.textContent = (autoBpm > 0 ? "~" + Math.round(autoBpm) : "–") + " BPM · auto"; bpmVal.style.color = ""; }
+}
+tapBtn.onclick = () => {
+  const now = Date.now();
+  if (taps.length && now - taps[taps.length - 1] > 2000) taps = [];   // >2s paus → börja om
+  taps.push(now);
+  if (taps.length > 8) taps.shift();
+  if (taps.length >= 3) {
+    let sum = 0; for (let i = 1; i < taps.length; i++) sum += taps[i] - taps[i - 1];
+    let bpm = 60000 / (sum / (taps.length - 1));
+    while (bpm < 70) bpm *= 2; while (bpm >= 190) bpm /= 2;   // vik till 70–190
+    manualBpm = Math.round(bpm);
+    send({ type: "setManualBpm", value: manualBpm });
+    showBpm(0);
+    tapBtn.classList.add("primary");
+  } else {
+    bpmVal.textContent = "knacka… (" + taps.length + ")";
+  }
+};
+tapAuto.onclick = () => { manualBpm = null; taps = []; tapBtn.classList.remove("primary"); send({ type: "setManualBpm", value: 0 }); showBpm(0); };
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.

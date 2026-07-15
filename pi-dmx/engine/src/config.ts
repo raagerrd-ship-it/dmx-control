@@ -84,6 +84,10 @@ export interface EngineConfig {
   flashUntil?: number | null;
   /** Transient SmartSync beat clock (BPM + wall-clock anchor) — not persisted. */
   beat?: { anchorMs: number; bpm: number } | null;
+  /** Tap-tempo override (BPM). When set, overrides the auto-detected tempo for
+   *  the beat clock; the PLL still aligns phase to real kicks. Transient — not
+   *  persisted, so a restart falls back to auto-detection. */
+  manualBpm?: number | null;
   /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */
   dmxMaxHz: number;
 }

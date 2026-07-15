@@ -62,17 +62,20 @@ capture.on("chunk", (samples: Float32Array) => {
   lastChunkAt = Date.now();
   // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
   // (om)lås; att sätta det på varje kick fick pulsen att flimra.
-  if (frame.bpm === 0) cfg.beat = null;   // tyst → stoppa beat-effekter direkt
-  if (frame.bpm > 0) {
-    if (!cfg.beat || Math.abs(cfg.beat.bpm - frame.bpm) > 2) {
+  // Tap-tempo: en manuellt låst takt överstyr auto-detektionen (men PLL:en nedan
+  // riktar ändå fasen mot faktiska trumslag).
+  const effBpm = cfg.manualBpm && cfg.manualBpm > 0 ? cfg.manualBpm : frame.bpm;
+  if (effBpm === 0) cfg.beat = null;   // tyst → stoppa beat-effekter direkt
+  if (effBpm > 0) {
+    if (!cfg.beat || Math.abs(cfg.beat.bpm - effBpm) > 2) {
       let anchor = frame.beatAnchorMs || Date.now();
       if (cfg.beat) {
         // Bevara nuvarande fas vid tempoändring så pulsen inte hoppar.
-        const oldMs = 60000 / cfg.beat.bpm, newMs = 60000 / frame.bpm;
+        const oldMs = 60000 / cfg.beat.bpm, newMs = 60000 / effBpm;
         const phase = (((Date.now() - cfg.beat.anchorMs) % oldMs) + oldMs) % oldMs / oldMs;
         anchor = Date.now() - phase * newMs;
       }
-      cfg.beat = { anchorMs: anchor, bpm: frame.bpm };
+      cfg.beat = { anchorMs: anchor, bpm: effBpm };
     }
     // annars: behåll ankaret → jämn, kontinuerlig fas
 

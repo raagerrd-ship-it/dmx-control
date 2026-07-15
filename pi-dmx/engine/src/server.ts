@@ -304,6 +304,9 @@ export async function startServer(
           } else if (msg.type === "setSmartDwell") {
             const m = { slow: 20000, normal: 9000, fast: 4000 } as Record<string, number>;
             deps.cfg.smartDwellMs = m[msg.mode as string] ?? 9000;
+          } else if (msg.type === "setManualBpm" && typeof msg.value === "number") {
+            // Tap-tempo: value > 0 låser takten, <= 0 släpper (auto igen).
+            deps.cfg.manualBpm = msg.value > 0 ? Math.max(40, Math.min(220, Math.round(msg.value))) : null;
           }
           deps.onConfigChanged?.();
           // Echo back
