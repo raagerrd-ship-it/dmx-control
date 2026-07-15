@@ -240,9 +240,9 @@ export class EffectEngine {
       const intensity = this.cfg.energyDrivesMode ? Math.max(0, Math.min(1, 0.5 + (this.intensityEma - baseline) / 0.30)) : 0.5;
         // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
-        const LUGN: Mode[] = ["cycle", "breathe", "tide", "mono", "aurora", "drift"];
+        const LUGN: Mode[] = ["cycle", "breathe", "tide", "mono", "aurora", "drift", "twin"];
         const FART: Mode[] = ["wave", "chase", "drops", "sweep", "pulse", "eq"];
-        const FULLFART: Mode[] = ["party", "snap", "bounce", "strobe", "rave", "flip"];
+        const FULLFART: Mode[] = ["party", "snap", "bounce", "strobe", "rave", "flip", "gallop"];
         const bpm = this.cfg.beat?.bpm ?? 0;
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
         // Fasta trösklar på (relativ) energi. Ingen bpm-sänkning längre — den
@@ -660,6 +660,32 @@ function pickColor(
       const hue = ((useA ? pairBase : pairBase + 3) % 6) / 6;   // motfärger mellan grupperna
       const v = 0.6 + 0.4 * Math.min(1, beatPulse * 0.7 + audio * 0.3);   // båda ljusa, lätt puls
       return hsvToRgb(hue, 1, v);
+    }
+    case "gallop": {
+      // Full fart: GALLOPP — två grupper (varannan lampa) slår OMLOTT: grupp A
+      // exakt på taktslaget, grupp B på off-beatet (&) → dubbel upplevd rytm,
+      // ett "dun-ka dun-ka" tvärs riggen. Kontrastfärger per grupp, mörk mellan
+      // slagen. Färgparet byts var 4:e takt. (Rave = grupp släcks helt, flip =
+      // båda tända & byter färg; gallop = grupperna delar RYTMEN i off-beat.)
+      const even = idx % 2 === 0;
+      const offFrac = (beatFrac + 0.5) % 1;                  // off-beatets fas
+      const offPulse = Math.pow(1 - offFrac, 2);
+      const groupPulse = even ? beatPulse : offPulse;        // A on-beat, B off-beat
+      const pairBase = mixedSector(Math.floor(beatIdx / 4));
+      const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;   // motfärger
+      const v = 0.1 + 0.9 * Math.min(1, groupPulse * (0.85 + audio * 0.3) + kickEnv * 0.2);
+      return hsvToRgb(hue, 1, v);
+    }
+    case "twin": {
+      // Lugn CALL-AND-RESPONSE: två grupper (varannan lampa) andas i MOTFAS —
+      // när grupp A stiger sjunker grupp B, som ett stilla anrop-och-svar. Grupp A
+      // varm ton, grupp B kall kontrastfärg. Golv 30%. Färgvandring var 8:e takt.
+      const even = idx % 2 === 0;
+      const wash = 0.5 + 0.5 * Math.sin(t * 0.8 + (even ? 0 : Math.PI) - idx * 0.4 * phaseSpread);
+      const pairBase = mixedSector(mclk(8, 10));
+      const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;
+      const m = Math.min(1, wash * 0.7 + band * 0.3);
+      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
     case "chase": {
       // Snabb LÖPARE: skarpt huvud som hoppar ETT steg per taktslag, kort svans,
