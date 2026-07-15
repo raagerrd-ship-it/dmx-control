@@ -502,6 +502,11 @@ function pickColor(
     const f = floor * (1 - dyn);
     return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.2));
   };
+  // MUSIK-KLOCKA: stega färgbyten på TAKTSLAG när vi har en takt (så bytena
+  // landar musikaliskt = "programmerat"), annars på tid (ambient i tystnad).
+  const hasBeat = !!(cfg.beat && cfg.beat.bpm > 40);
+  const mclk = (beatsPerStep: number, secPerStep: number) =>
+    hasBeat ? Math.floor(beatIdx / beatsPerStep) : Math.floor(t / secPerStep);
   switch (mode) {
     case "party": {
       // Full fart: FÄRGKAOS-PUMP — varje lampa egen ren färg (blandas om varje
@@ -533,7 +538,7 @@ function pickColor(
       // Lugn: alla lampor andas TILLSAMMANS medan färgen vandrar runt hjulet —
       // ett mjukt skimmer. Varje lampa reagerar dessutom på SITT frekvensband
       // (bas/mellan/diskant) → ett dämpat spatialt spektrum. Golv 30%.
-      const hue = mixedSector(Math.floor(t / 6)) / 6;
+      const hue = mixedSector(mclk(8, 6)) / 6;                  // ny färg var 8:e takt (eller 6s)
       const shimmer = 0.5 + 0.5 * Math.sin(t * 0.9 + idx * 1.4);
       const m = Math.min(1, 0.35 + shimmer * 0.4 + band * 0.35);
       return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
@@ -551,7 +556,7 @@ function pickColor(
       // vandrar sida till sida. Golv 30%.
       const wash = 0.5 + 0.5 * Math.sin(t * 0.9 - idx * 1.0);
       const pair = Math.floor(idx / 2);
-      const hue = mixedSector(pair + Math.floor(t / 9)) / 6;
+      const hue = mixedSector(pair + mclk(8, 9)) / 6;           // ny färg var 8:e takt (eller 9s)
       const m = Math.min(1, 0.3 + wash * 0.55 + band * 0.3);   // per-lampa frekvensband
       return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
@@ -580,7 +585,7 @@ function pickColor(
       // Lugn: varje lampa håller sin EGEN långsamt driftande färg med mjuka,
       // OBEROENDE korsfades — likt norrsken där färgerna glider var för sig.
       // Golv 30%.
-      const hue = mixedSector(idx * 2 + Math.floor(t / 7)) / 6;
+      const hue = mixedSector(idx * 2 + mclk(8, 7)) / 6;        // ny färg var 8:e takt (eller 7s)
       const wash = 0.5 + 0.5 * Math.sin(t * 0.45 - idx * 1.3);
       const m = Math.min(1, 0.4 + wash * 0.45 + band * 0.25);   // per-lampa frekvensband
       return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
@@ -598,7 +603,7 @@ function pickColor(
       const headPos = (wavePhase * 0.5) % count;
       let dd = Math.abs(idx - headPos);
       if (dd > count / 2) dd = count - dd;   // wrap
-      const hue = mixedSector(Math.floor(t / 5)) / 6;
+      const hue = mixedSector(mclk(4, 5)) / 6;                  // ny färg var 4:e takt (eller 5s)
       const v = shaped(0.05, Math.exp(-dd * 1.9) * (0.75 + audio * 0.4) + kickEnv * 0.15);
       return hsvToRgb(hue, 1, v);
     }
