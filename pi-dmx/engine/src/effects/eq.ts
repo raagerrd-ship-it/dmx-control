@@ -2,10 +2,11 @@ import type { EffectDef } from "./types.js";
 
 // 3-band spektrum-EQ över riggen: varje lampa = ETT band i EN ren färg,
 // ljusstyrkan = bandets NORMALISERADE energi (c.bands: bas/mellan/diskant, redan
-// skalade till 0..1). Bas→Röd, Mellan→Grön, Diskant→Blå. En lätt gamma ger punch
-// och ett golv så en tyst mätare glöder svagt i stället för att slockna helt.
-// (Motorn kör eq med STADIG master — ingen beatPulse-dipp — och utanför VU-taket
-// så den läser som en ren spektrum-mätare, inte en pulsande show-effekt.)
+// skalade till 0..1) — det är effektens KÄRNA. Bas→Röd, Mellan→Grön, Diskant→Blå.
+// En lätt gamma ger punch och ett golv så en tyst mätare glöder svagt i stället
+// för att slockna. (Effekten är helt omedveten om master/beatPulse/VU — de ligger
+// uniformt EFTER, som för alla effekter. Före kläms banden bara för att de var råa
+// och små; med normaliserade band är de ljusstarka nog att överleva kedjan.)
 export const eq: EffectDef = {
   key: "eq", label: "Spektrum", tier: "fart",
   desc: "3-band-EQ: bas→röd lampa, mellan→grön, diskant→blå. Visar ljudets färg.",

@@ -450,13 +450,7 @@ export class EffectEngine {
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
     // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så
     // VU-taket följer nivån direkt utan effekt-ballistikens nedåt-släp.
-    // SPEKTRUM (eq) är en MÄTARE, inte en show-effekt: kör den med STADIG master
-    // (ingen beatPulse-dipp, ingen drop/riser-boost) så banden läses rent; VU-taket
-    // hoppas också över för eq längre ner. Annars kläms banden ihjäl → "fladdrar".
-    const isEq = effMode === "eq";
-    const md = isEq
-      ? this.cfg.master * this.silenceGate
-      : master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8) * microMul;
+    const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8) * microMul;
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
@@ -599,7 +593,7 @@ export class EffectEngine {
     // färg/dim-kanaler; strobe orörda. (Drop/punch/riser/flash ligger redan i
     // ceilMul via bypass → de lyfter taket och kapar inget.) Gatas av silenceGate
     // så den varma ambient-glöden i TYSTNAD inte kapas till svart.
-    if (this.cfg.energyCeiling && !isEq && this.silenceGate > 0.5 && ceilMul < 0.999) {
+    if (this.cfg.energyCeiling && this.silenceGate > 0.5 && ceilMul < 0.999) {
       for (let ch = 0; ch < this.maxCh; ch++) {
         if (!this.strobeMask[ch]) this.universe[ch] = Math.round(this.universe[ch] * ceilMul);
       }
