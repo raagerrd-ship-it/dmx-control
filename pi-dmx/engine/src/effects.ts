@@ -203,7 +203,11 @@ export class EffectEngine {
     else if (frame.level < this.levelCeil * 0.70) this.inZoneState = false;
     const inZone = this.inZoneState;
     const brokeRecently = nowWall - this.breakAtMs < 3500;
-    const dropFired = inZone && !this.wasInZone && brokeRecently;
+    // Kräv ≥2s musik innan en drop får fyra: annars läses låtens INTRO (tystnad →
+    // musik stiger = break → surge) som en falsk drop → 8s max-håll som öppnade
+    // VU-taket hela introt (och fyrade rökmaskinen). warmMs nollställs vid tystnad
+    // → gäller exakt låtstart; en riktig drop mitt i låten har warmMs högt.
+    const dropFired = inZone && !this.wasInZone && brokeRecently && this.warmMs > 2000;
     if (dropFired) this.dropBangUntil = nowWall + 8000;                                          // drop-fönster (max 8s)
     this.wasInZone = inZone;
     // DROP-BLACKOUT (dramaturgisk tystnad): en riser som BRYTS ner i en svacka
@@ -244,7 +248,8 @@ export class EffectEngine {
     this.lvlSlowR += (frame.level - this.lvlSlowR) * (dtNow / 2.5);
     const inRiser = frame.centroid > this.centSlow + 0.06         // diskant kryper upp
                  && frame.level > this.lvlSlowR + 0.04            // nivån stiger
-                 && frame.level > 0.4 && this.dropEnv < 0.2;      // ej redan i drop
+                 && frame.level > 0.4 && this.dropEnv < 0.2       // ej redan i drop
+                 && this.warmMs > 2500;                           // ej låtens intro (nivån stiger ur tystnad)
     const bTarget = inRiser ? 1 : 0;
     const bRate = bTarget > this.buildUp ? dtNow / 3.5 : dtNow / 1.0;   // bygg ~3.5s, klinga ~1s
     this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
