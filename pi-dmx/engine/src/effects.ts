@@ -67,10 +67,7 @@ export class EffectEngine {
   private trebleBase = 0.05;     // långsam diskant-baslinje för micro-strobe-transientdetektorn
   private microStrobe = 0;       // micro-strobe envelope (0..1), klingar av på ~2-3 frames
   private lastMicroMs = 0;
-  private vu = 0;                // direkt VU-envelope (analog ballistik) för ljustaket
-  private vuVel = 0;             // nålens hastighet (fjäder-dämpare på returen)
-  private vuHold = 0;            // redline peak-hold: lysande fotspår efter en topp
-  private vuHoldMs = 0;          // wall-clock då senaste peaken sattes
+  private vu = 0;                // direkt VU-envelope (snabb attack / ~180ms release) för ljustaket
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -434,30 +431,14 @@ export class EffectEngine {
     // flash BYPASSAR taket så impakten alltid blir full.
     let ceilMul = 1;
     if (this.cfg.energyCeiling) {
-      // ANALOG BALLISTIK: nålen kastas UPP snabbt på transienter (~30ms attack),
-      // men faller tillbaka med VIKT — en fjäder-dämpare (lätt underdämpad, ζ≈0.7)
-      // ger den mjuka gungande returen hos en tung vintage-VU (McIntosh/Accuphase),
-      // i stället för en rak exponential som kan kännas flimrig.
-      if (audio > this.vu) {
-        this.vu += (audio - this.vu) * (1 - Math.exp(-dtSec / 0.03));      // snabb attack
-        if (this.vuVel < 0) this.vuVel = 0;                                // ingen kvarvarande nedåtvikt
-      } else {
-        const k = 85, c = 13;                                             // styvhet/dämpning → ~0.6s settle, liten gungning
-        this.vuVel += ((audio - this.vu) * k - this.vuVel * c) * dtSec;   // semi-implicit Euler (stabil)
-        this.vu += this.vuVel * dtSec;
-      }
-      this.vu = Math.max(0, Math.min(1, this.vu));
-      // REDLINE PEAK-HOLD: en hård topp lämnar ett kort lysande "fotspår" — håll
-      // peaken ~90ms, låt den sen tona mot aktuell nivå (~250ms). Taket = max(nål,
-      // hold) → dyker aldrig under live-VU:n; ger glödande svansar efter basslag.
-      // Subtilt (på 4 lampor blir det en global glöd, inte ett rumsligt spår).
-      if (audio >= this.vuHold) { this.vuHold = audio; this.vuHoldMs = nowWall; }
-      else if (nowWall - this.vuHoldMs > 90) this.vuHold += (audio - this.vuHold) * (1 - Math.exp(-dtSec / 0.25));
-      this.vuHold = Math.max(0, Math.min(1, this.vuHold));
-      const vuEff = Math.max(this.vu, this.vuHold);
+      // DIREKT VU: taket följer den AKTUELLA nivån TROGET. Snabb (nära direkt)
+      // attack så ljuset följer smällen, lätt release (~180ms) så det inte
+      // flimrar mellan slagen — men INGEN tröghet/peak-hold som lyfter taket
+      // över den faktiska nivån. Ljusstyrka = ljudnivå, här och nu.
+      this.vu += (audio - this.vu) * (audio > this.vu ? 1 : 1 - Math.exp(-dtSec / 0.18));
       const dynK = Math.max(0, Math.min(1, this.cfg.dynamics ?? 0.6));
       const floor = 0.6 - dynK * 0.25;                                      // 0.6 (platt) .. 0.35 (dynamiskt) i djup vila
-      const ceil = floor + (1 - floor) * vuEff;                            // direkt: nivå → tak
+      const ceil = floor + (1 - floor) * this.vu;                          // direkt: nivå → tak
       const bypass = Math.max(this.dropEnv, bassPunch, flashActive ? 1 : 0, this.buildUp * 0.6);
       ceilMul = Math.max(ceil, bypass);
     }
