@@ -26,6 +26,8 @@ export class Analyser {
   private writePos = 0;
   private prevMag: Float32Array;     // for flux
   private fluxHistory: number[] = []; // for median
+  private kickBaseline = 0;          // adaptiv baslinje för kick-band-flux
+  private kickWasAbove = false;      // stigande-flank-detektion
   private readonly fluxHistLen: number;   // ~115 ms median-fönster (frame-rate-oberoende)
   private static readonly ENV_HZ = 100;
   private static readonly ENV_LEN = 100 * 5;
@@ -38,24 +40,6 @@ export class Analyser {
   private localBpm = 0;
   private localBpmConfidence = 0;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
-  private kickTimes: number[] = [];   // senaste kick-tidsstämplar → stadig kick-takt
-
-  /** Takt implicerad av de FAKTISKA bas-slagen, om de kommer stadigt. 0 = ostadigt/
-   *  för få. Ground truth för oktaven — autokorrelationen missar den ofta. */
-  private steadyKickBpm(): number {
-    const K = this.kickTimes;
-    if (K.length < 4) return 0;
-    const iv: number[] = [];
-    for (let i = 1; i < K.length; i++) iv.push(K[i] - K[i - 1]);
-    const med = [...iv].sort((a, b) => a - b)[iv.length >> 1];
-    if (med <= 0) return 0;
-    const steady = iv.filter((x) => Math.abs(x - med) < med * 0.30).length;
-    if (steady < iv.length * 0.55) return 0;   // ojämna slag → lita inte på det
-    let bpm = 60000 / med;
-    while (bpm < 55) bpm *= 2;
-    while (bpm >= 200) bpm /= 2;
-    return bpm;
-  }
 
   private bpmHist: number[] = [];   // senaste råestimat (~3s) för median-stabilisering
   private silentMs = 0;
@@ -203,16 +187,6 @@ export class Analyser {
     let bpm = (HZ * 60) / lagF;
     while (bpm < 55) bpm *= 2;
     while (bpm >= 175) bpm /= 2;
-    // KICK-ANKARE (fler pulser → högre takt): de faktiska bas-slagen är sanningen
-    // om takten. Om en STADIG kick-takt går tydligt snabbare än autotempot låste
-    // autokorrelationen fel oktav (halv/tredjedels tempo) → använd basens takt.
-    // Bara uppåt + bara vid stadiga slag → säkert (fixar 124→62, 148→96 osv).
-    const kb = this.steadyKickBpm();
-    if (kb > 0 && kb > bpm * 1.35) {
-      bpm = kb;
-      while (bpm < 55) bpm *= 2;
-      while (bpm >= 175) bpm /= 2;
-    }
     // Median över RÅestimaten (utan oktav-tvång) → dämpar brus men låser inte
     // fast oktaven, så en fel initial låsning kan rättas. Långt fönster (~5s) för
     // att inte studsa på brusiga/tvetydiga låtar.
@@ -284,7 +258,9 @@ export class Analyser {
     let bassEnergy = 0;
     let trebleEnergy = 0;
     let flux = 0;
+    let kickFlux = 0;                               // onset ENBART i kick-bandet (sub-bas)
     const bassBins = Math.min(16, half);           // ~0–1.5 kHz @ 48k/512
+    const kickBins = Math.min(3, half);            // bins 0–2 ≈ 0–280 Hz (kick-trumman)
     const trebleStart = Math.floor(half * 0.5);    // ~top half of spectrum (~12 kHz+)
     for (let i = 0; i < half; i++) {
       const re = spectrum[2 * i];
@@ -293,7 +269,7 @@ export class Analyser {
       if (i < bassBins) {
         bassEnergy += mag[i];
         const d = mag[i] - this.prevMag[i];
-        if (d > 0) flux += d;    // half-wave rectified
+        if (d > 0) { flux += d; if (i < kickBins) kickFlux += d; }    // half-wave rectified
       }
       if (i >= trebleStart) trebleEnergy += mag[i];
     }
@@ -324,29 +300,27 @@ export class Analyser {
     // *4 factor made steady-state level 4x the target, i.e. pegged at 100%.
     const level = Math.min(1, rms * this.gain);
 
-    // Kick: bassFlux above median × threshold, with cooldown + energy gate.
-    this.fluxHistory.push(fluxNorm);
-    if (this.fluxHistory.length > this.fluxHistLen) this.fluxHistory.shift();
-    const median = medianOf(this.fluxHistory);
+    // KICK-DETEKTION v2: onset i kick-bandet (sub-bas ~0–280 Hz) mot en ADAPTIV
+    // baslinje (långsam EMA av kick-fluxen). En kick = flux tydligt över
+    // baslinjen; tröskeln skalar med signalen → fyrar pålitligt även på
+    // komprimerat material där en fast tröskel missade nästan alla slag.
+    // Stigande flank + cooldown = exakt ett slag per träff.
+    this.kickBaseline += (kickFlux - this.kickBaseline) * 0.02;
+    const kickThresh = this.kickBaseline * 3.2;    // bara TYDLIGA toppar (kick-trumman), ej varje bas-not
+    const KICK_COOLDOWN = 170;                     // ms → max ~350 BPM, hindrar sub-beat-dubbelfyr
+    const above = kickFlux > kickThresh && energy > 0.06;
     let kick = false;
-    if (
-      fluxNorm > median * d.kickThreshold &&
-      fluxNorm > 0.045 &&                  // absolute floor
-      energy > 0.05 &&
-      now - this.lastKick > d.kickCooldownMs
-    ) {
+    if (above && !this.kickWasAbove && now - this.lastKick > KICK_COOLDOWN) {
       kick = true;
       this.lastKick = now;
-      if (this.kickTimes.length && now - this.kickTimes[this.kickTimes.length - 1] > 2500) this.kickTimes.length = 0;   // paus → börja om
-      this.kickTimes.push(now);
-      if (this.kickTimes.length > 12) this.kickTimes.shift();
     }
+    this.kickWasAbove = above;
 
     const frameMs0 = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.bpmHist.length = 0; this.kickTimes.length = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.bpmHist.length = 0; }
     } else {
       this.silentMs = 0;
     }
