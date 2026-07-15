@@ -440,25 +440,23 @@ export class EffectEngine {
     this.microStrobe *= 0.38;                                               // klingar av på ~2-3 frames
     if (this.microStrobe < 0.02) this.microStrobe = 0;
     const microMul = this.dropEnv > 0.4 ? 1 : 1 - this.microStrobe * 0.45;  // notch ner till ~0.55 på träffen
-    // DYNAMISKT LJUSTAK (DIREKT VU): den AKTUELLA nivån styr taket direkt — ingen
-    // långtidsbaslinje, inget medel. VU-ballistik: SNABB attack (ljuset följer
-    // smällen direkt), ~220ms release (ingen flimmer) → ljusstyrka = ljudnivå,
-    // här och nu. Golvets DJUP styrs av Dynamik-ratten. Drop/bas-punch/riser/
-    // flash BYPASSAR taket så impakten alltid blir full.
+    // DIREKT VU-FILTER: den INGÅENDE ljudnivån styr den UTGÅENDE ljusstyrkan
+    // direkt, som ett SISTA filter efter allt annat (effekter, beatPulse, ...).
+    // Effekterna formar fortfarande sitt eget ljus; VU:n justerar slutresultatet
+    // mot den råa nivån. BARA en drop får skippa filtret (går fram på full).
     let ceilMul = 1;
     if (this.cfg.energyCeiling) {
-      // DIREKT KARTA: rå nivå 0.1 → 0%, 0.97 → 100% (linjärt, klippt). Ingen
-      // baslinje, inget medel, inget golv — ljusstyrka = nivå, konsekvent mellan
-      // låtar (en tyst låt ÄR dimmare). Snabb attack, lätt ~180ms release så det
-      // inte flimrar mellan slagen. HÅRT tak — INGEN bypass, inte ens för drop:
-      // en riktig drop låter >90% → level → VU:n är redan nära max, så den släpps
-      // fram ändå. Slipper allt "taket ligger öppet"-beteende.
-      const vuRaw = Math.max(0, Math.min(1, (frame.level - 0.1) / 0.87));
+      // RÅ nivå RAKT AV som slutgain: insignal X% → utsignal dämpad till X%.
+      // INGEN omskalning/golv — exakt samma värde som input-mätaren visar. Lätt
+      // ballistik (snabb attack / ~180ms release) bara för att slippa flimmer;
+      // stegar aldrig om mappningen (steady 0.40 → tak 0.40).
+      const vuRaw = Math.max(0, Math.min(1, frame.level));
       this.vu += (vuRaw - this.vu) * (vuRaw > this.vu ? 1 : 1 - Math.exp(-dtSec / 0.18));
-      // KLUBB-LÄGE: kvadrera taket → hård kontrast (allt "ludd" mellan slagen
-      // trycks mot mörker, bara topparna exploderar). Uniformt via capMask, så
-      // det blir exakt VU² (ej VU⁴). Av = troget linjärt VU.
-      ceilMul = this.cfg.clubMode ? this.vu * this.vu : this.vu;
+      // KLUBB-LÄGE: kvadrera → hård kontrast (mörkt mellan, explosion på topp).
+      const vuFilter = this.cfg.clubMode ? this.vu * this.vu : this.vu;
+      // BARA DROP skippar VU-filtret: dropEnv (0..1) lyfter taket till full under
+      // det korta drop-fönstret, annars styr den råa VU:n direkt.
+      ceilMul = Math.max(vuFilter, this.dropEnv);
     }
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
     // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så
