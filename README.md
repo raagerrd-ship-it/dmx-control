@@ -1,73 +1,64 @@
-# Welcome to your Lovable project
+# pi-dmx — audio-reactive DMX lighting on a Raspberry Pi Zero 2 W
 
-## Project info
+Turn a $15 Raspberry Pi into a standalone, **audio-reactive DMX-512 lighting
+controller**. Feed it line-in audio and it drives your PAR cans, wash lights,
+and a fog machine live to the music — no laptop, no DAW, no light operator.
+Beat detection, drop/riser prediction, a curated-palette show director, and a
+mobile web UI, all running on the Pi itself.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+> **Hobby project? You're welcome here.** This is free to build and run for any
+> **noncommercial** use — see [Highlights & full docs »](pi-dmx/README.md)
+> (also in [🇸🇪 svenska](pi-dmx/README.sv.md)).
 
-## How can I edit this code?
+**Keywords:** Raspberry Pi · Pi Zero 2 W · DMX-512 · audio reactive · music
+visualization · sound-to-light · LED PAR · stage lighting · real-time · low
+latency · TypeScript · C · SCHED_FIFO · Codec Zero.
 
-There are several ways of editing your application.
+## What makes it special
 
-**Use Lovable**
+- **Sub-frame realtime on a tiny Pi** — a dedicated C sidecar owns the UART on
+  an *isolated CPU core* (`isolcpus=3`, `SCHED_FIFO`, `mlockall()`), so DMX
+  timing never jitters. Light-follows-music latency: **~40–80 ms**.
+- **A show director, not a VU meter** — local BPM detection (phase-locked to
+  real kicks), energy tiering, riser/drop prediction, and a phrase engine that
+  changes colour on musical boundaries. It feels *programmed to the track*.
+- **Modular effects** — each effect is one small file; a registry derives the
+  mode list, smart-mode pools, and the whole UI from one source of truth.
+- **Built for rental** — crash-safe config, an owner-only setup page, a health
+  watchdog, and self-healing audio capture.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+👉 **Full documentation, wiring, and install:** **[pi-dmx/README.md](pi-dmx/README.md)**
 
-Changes made via Lovable will be committed automatically to this repo.
+## Repository layout
 
-**Use your preferred IDE**
+| Path | What it is |
+|---|---|
+| [`pi-dmx/`](pi-dmx/) | The lighting system — C DMX sidecar + Node/TypeScript audio & effect engine + mobile web UI. **Start here.** |
+| `src/` | A companion web app scaffolded with [Lovable](https://lovable.dev) (Vite + React + Tailwind). |
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## License
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+Free for **noncommercial use** (personal, hobby, research, education) under the
+**PolyForm Noncommercial License 1.0.0** — see [LICENSE.md](LICENSE.md).
+Commercial use (renting, reselling, paid products) needs a separate license:
+**raager.rd@gmail.com**.
 
-Follow these steps:
+---
+
+<details>
+<summary>Working on the <code>src/</code> web app (Lovable / Vite)</summary>
+
+This part of the repo is a Vite + TypeScript + React + shadcn-ui + Tailwind app.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
+# Clone, install, run the dev server
 git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
+cd dmx-control
 npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Changes pushed to the repo are reflected in the Lovable project, and vice
+versa. You can also edit files directly on GitHub or in a Codespace.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+</details>
