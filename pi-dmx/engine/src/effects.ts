@@ -39,6 +39,7 @@ export class EffectEngine {
   private intensityFloor = 0.5;
   private warmMs = 0;
   private ambient = 0;   // 0 = spelar, 1 = varm vila (efter ~2.5s tystnad)
+  private bassBaseline = 0.2;   // rullande bas-nivå för bas-punch
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -127,7 +128,13 @@ export class EffectEngine {
         // mot faktiska slag). Kontinuerlig — funkar även när kick-detektorn är
         // gles (komprimerad signal fyrar sällan), till skillnad från ren kick-puls.
         const beatMul = this.cfg.beatPulse ? (0.45 + 0.55 * beatEnv) : 1;
-    const master = this.cfg.master * this.silenceGate * beatMul;
+    // BAS-PUNCH: en hård UTDRAGEN basstöt saknar transient (kicken missar den),
+    // men syns som bas-energi tydligt över sin rullande baslinje. Då: en ljus-
+    // surge som HÅLLER så länge basen ligger på. Baslinjen är långsam (~2s) så en
+    // sustained basnot stannar över den → punchen håller genom hela stöten.
+    this.bassBaseline += (frame.energy - this.bassBaseline) * 0.01;
+    const bassPunch = Math.max(0, Math.min(1, (frame.energy - Math.max(0.12, this.bassBaseline * 1.35)) * 3.5));
+    const master = this.cfg.master * this.silenceGate * beatMul * (1 + bassPunch * 0.75);
     const count = this.cfg.fixtures.length;
 
     // Chase state machine — kick advances one step, plus a slow auto-advance
