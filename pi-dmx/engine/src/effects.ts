@@ -206,7 +206,9 @@ export class EffectEngine {
     // varmt, ljus/diskantig → svalt. Övergången sker mjukt via färg-ballistiken.
     if (this.cfg.mode === "smart") {
       if (frame.bpm === 0) this.phraseBeat = 0;            // tyst/ej låst → nollställ frasen
-      else if (beatTick && ++this.phraseBeat >= this.phraseBeats) {
+      // Räkna bara takter när BPM är PÅLITLIGT (confidence) → palettbytena
+      // hamnar på riktiga fraser, inte på ett hoppigt/osäkert tempo.
+      else if (beatTick && frame.bpmConfidence > 0.35 && ++this.phraseBeat >= this.phraseBeats) {
         this.phraseBeat = 0;
         this.pickPalette(frame.centroid);
       }
@@ -389,7 +391,7 @@ function pickColor(
   const norm = 1 / Math.max(0.15, cfg.detection?.autoGainTarget ?? 0.5);
   const bands = [
     Math.min(1, frame.energy * norm * 0.9),
-    audio,
+    Math.min(1, frame.mid * norm * 1.0),      // RIKTIGA mellanbandet (röst/synth/virvel) — var 'audio'
     Math.min(1, frame.treble * norm * 1.1),
     Math.min(1, frame.energy * norm * 0.45 + kickEnv),
     // "low": calm glow when the music is quiet, out of the way when loud.
@@ -427,15 +429,17 @@ function pickColor(
       // om FÄRG i rörelse, till skillnad från sweep (en färg) och chase (gles).
       const base = 0.55 + 0.45 * Math.sin(wavePhase - idx * 1.3);
       const hue = mixedSector(idx + Math.floor(wavePhase * 0.4)) / 6;
-      const v = shaped(0.12, base * (0.35 + audio * 0.7) + kickEnv * 0.2);
+      // + diskant-glitter: hi-hats/cymbaler ger en snabb ljusflick ovanpå vågen.
+      const v = shaped(0.12, base * (0.35 + audio * 0.7) + kickEnv * 0.2 + frame.treble * 0.35);
       return hsvToRgb(hue, 1, v);
     }
     case "cycle": {
       // Lugn: alla lampor andas TILLSAMMANS medan färgen vandrar runt hjulet —
-      // ett mjukt skimmer med liten fasförskjutning per lampa. Golv 30%.
+      // ett mjukt skimmer. Varje lampa reagerar dessutom på SITT frekvensband
+      // (bas/mellan/diskant) → ett dämpat spatialt spektrum. Golv 30%.
       const hue = mixedSector(Math.floor(t / 6)) / 6;
       const shimmer = 0.5 + 0.5 * Math.sin(t * 0.9 + idx * 1.4);
-      const m = Math.min(1, 0.35 + shimmer * 0.4 + audio * 0.3);
+      const m = Math.min(1, 0.35 + shimmer * 0.4 + band * 0.35);
       return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
     case "breathe": {
@@ -452,7 +456,7 @@ function pickColor(
       const wash = 0.5 + 0.5 * Math.sin(t * 0.9 - idx * 1.0);
       const pair = Math.floor(idx / 2);
       const hue = mixedSector(pair + Math.floor(t / 9)) / 6;
-      const m = Math.min(1, 0.3 + wash * 0.55 + audio * 0.25);
+      const m = Math.min(1, 0.3 + wash * 0.55 + band * 0.3);   // per-lampa frekvensband
       return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
     case "snap": {
@@ -482,7 +486,7 @@ function pickColor(
       // Golv 30%.
       const hue = mixedSector(idx * 2 + Math.floor(t / 7)) / 6;
       const wash = 0.5 + 0.5 * Math.sin(t * 0.45 - idx * 1.3);
-      const m = Math.min(1, 0.4 + wash * 0.45 + audio * 0.2);
+      const m = Math.min(1, 0.4 + wash * 0.45 + band * 0.25);   // per-lampa frekvensband
       return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
     case "drift": {
