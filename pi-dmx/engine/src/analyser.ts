@@ -38,6 +38,24 @@ export class Analyser {
   private localBpm = 0;
   private localBpmConfidence = 0;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
+  private kickTimes: number[] = [];   // senaste kick-tidsstämplar → stadig kick-takt
+
+  /** Takt implicerad av de FAKTISKA bas-slagen, om de kommer stadigt. 0 = ostadigt/
+   *  för få. Ground truth för oktaven — autokorrelationen missar den ofta. */
+  private steadyKickBpm(): number {
+    const K = this.kickTimes;
+    if (K.length < 4) return 0;
+    const iv: number[] = [];
+    for (let i = 1; i < K.length; i++) iv.push(K[i] - K[i - 1]);
+    const med = [...iv].sort((a, b) => a - b)[iv.length >> 1];
+    if (med <= 0) return 0;
+    const steady = iv.filter((x) => Math.abs(x - med) < med * 0.30).length;
+    if (steady < iv.length * 0.55) return 0;   // ojämna slag → lita inte på det
+    let bpm = 60000 / med;
+    while (bpm < 55) bpm *= 2;
+    while (bpm >= 200) bpm /= 2;
+    return bpm;
+  }
 
   private bpmHist: number[] = [];   // senaste råestimat (~3s) för median-stabilisering
   private silentMs = 0;
@@ -185,6 +203,16 @@ export class Analyser {
     let bpm = (HZ * 60) / lagF;
     while (bpm < 55) bpm *= 2;
     while (bpm >= 175) bpm /= 2;
+    // KICK-ANKARE (fler pulser → högre takt): de faktiska bas-slagen är sanningen
+    // om takten. Om en STADIG kick-takt går tydligt snabbare än autotempot låste
+    // autokorrelationen fel oktav (halv/tredjedels tempo) → använd basens takt.
+    // Bara uppåt + bara vid stadiga slag → säkert (fixar 124→62, 148→96 osv).
+    const kb = this.steadyKickBpm();
+    if (kb > 0 && kb > bpm * 1.35) {
+      bpm = kb;
+      while (bpm < 55) bpm *= 2;
+      while (bpm >= 175) bpm /= 2;
+    }
     // Median över RÅestimaten (utan oktav-tvång) → dämpar brus men låser inte
     // fast oktaven, så en fel initial låsning kan rättas. Långt fönster (~5s) för
     // att inte studsa på brusiga/tvetydiga låtar.
@@ -309,13 +337,16 @@ export class Analyser {
     ) {
       kick = true;
       this.lastKick = now;
+      if (this.kickTimes.length && now - this.kickTimes[this.kickTimes.length - 1] > 2500) this.kickTimes.length = 0;   // paus → börja om
+      this.kickTimes.push(now);
+      if (this.kickTimes.length > 12) this.kickTimes.shift();
     }
 
     const frameMs0 = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.bpmHist.length = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.bpmHist.length = 0; this.kickTimes.length = 0; }
     } else {
       this.silentMs = 0;
     }

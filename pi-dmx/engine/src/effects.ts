@@ -101,11 +101,10 @@ export class EffectEngine {
         // Normalize against the AGC target so "at target loudness" = full drive —
         // the AGC otherwise parks the level around ~0.5 and v never reaches 1.
         const audio = Math.min(1, (frame.level / Math.max(0.15, this.cfg.detection.autoGainTarget)) * (0.35 + this.cfg.sensitivity * 0.5));
-        // beatPulse drivs av det FAKTISKA bas-slaget (kick), inte BPM-rutnätet:
-        // pulsar på varje detekterad kick och tonar ut ~340 ms. Alltid i takt med
-        // basen och helt oberoende av om BPM-oktaven är rätt → ingen kalibrering.
-        const kp = Math.max(0, 1 - (performance.now() - this.lastKickBoost) / 340);
-        const beatMul = this.cfg.beatPulse ? (0.45 + 0.55 * kp * kp) : 1;
+        // beatPulse: mjuk, kontinuerlig puls på BPM-rutnätet (PLL:en riktar fasen
+        // mot faktiska slag). Kontinuerlig — funkar även när kick-detektorn är
+        // gles (komprimerad signal fyrar sällan), till skillnad från ren kick-puls.
+        const beatMul = this.cfg.beatPulse ? (0.45 + 0.55 * beatEnv) : 1;
     const master = this.cfg.master * this.silenceGate * beatMul;
     const count = this.cfg.fixtures.length;
 
