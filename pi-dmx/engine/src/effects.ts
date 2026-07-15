@@ -76,6 +76,7 @@ export class EffectEngine {
    *  eye sees instant attack and a soft ~0.4 s fall, whatever the modes do. */
   private outSmooth = new Float32Array(512);
   private strobeMask = new Uint8Array(512);   // 1 = hoppa ballistik (strobe-kanal)
+  private capMask = new Uint8Array(512);      // 1 = VU-taket skalar denna kanal (ljusbärande: färg, annars dim)
   private strobeMaskFor: unknown = null;      // fixtures-referens masken byggdes för
   private maxCh = 0;                           // högsta använda kanal + 1
   private smartCount = 0;
@@ -569,12 +570,19 @@ export class EffectEngine {
     if (this.strobeMaskFor !== this.cfg.fixtures) {
       this.strobeMaskFor = this.cfg.fixtures;
       this.strobeMask.fill(0);
+      this.capMask.fill(0);
       let mx = 0;
       for (const fx of this.cfg.fixtures) {
         const roles = fixtureRoles(fx);
+        // VU-taket skalar de LJUSBÄRANDE kanalerna: färg (r/g/b/w) om fixturen har
+        // det, annars dim-kanalen. På en dim+färg-lampa hålls dim konstant på 255
+        // (all dynamik ligger i färgen), så att skala BÅDA gav v²-dämpning.
+        const hasColor = roles.includes("r") || roles.includes("g") || roles.includes("b") || roles.includes("w");
         for (let r = 0; r < roles.length; r++) {
           const ch = fx.address - 1 + r;
           if (roles[r] === "strobe") this.strobeMask[ch] = 1;
+          if (roles[r] === "r" || roles[r] === "g" || roles[r] === "b" || roles[r] === "w") this.capMask[ch] = 1;
+          else if (roles[r] === "dim" && !hasColor) this.capMask[ch] = 1;
           if (ch + 1 > mx) mx = ch + 1;
         }
       }
@@ -595,7 +603,7 @@ export class EffectEngine {
     // så den varma ambient-glöden i TYSTNAD inte kapas till svart.
     if (this.cfg.energyCeiling && this.silenceGate > 0.5 && ceilMul < 0.999) {
       for (let ch = 0; ch < this.maxCh; ch++) {
-        if (!this.strobeMask[ch]) {
+        if (this.capMask[ch]) {   // bara ljusbärande kanaler → linjär v-dämpning (ej v² på dim+färg)
           this.universe[ch] = Math.round(this.universe[ch] * ceilMul);
           this.outSmooth[ch] *= ceilMul;   // kapa ÄVEN ballistik-bufferten → annars
                                             // håller den kvar en okapad topp som
