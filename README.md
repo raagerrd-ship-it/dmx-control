@@ -34,7 +34,7 @@ latency · TypeScript · C · SCHED_FIFO · Codec Zero.
 | Path | What it is |
 |---|---|
 | [`pi-dmx/`](pi-dmx/) | The lighting system — C DMX sidecar + Node/TypeScript audio & effect engine + mobile web UI. **Start here.** |
-| `src/` | A companion web app scaffolded with [Lovable](https://lovable.dev) (Vite + React + Tailwind). |
+| `src/` | Web app (Vite + React + Tailwind). |
 
 ## License
 
@@ -42,23 +42,3 @@ Free for **noncommercial use** (personal, hobby, research, education) under the
 **PolyForm Noncommercial License 1.0.0** — see [LICENSE.md](LICENSE.md).
 Commercial use (renting, reselling, paid products) needs a separate license:
 **raager.rd@gmail.com**.
-
----
-
-<details>
-<summary>Working on the <code>src/</code> web app (Lovable / Vite)</summary>
-
-This part of the repo is a Vite + TypeScript + React + shadcn-ui + Tailwind app.
-
-```sh
-# Clone, install, run the dev server
-git clone <YOUR_GIT_URL>
-cd dmx-control
-npm i
-npm run dev
-```
-
-Changes pushed to the repo are reflected in the Lovable project, and vice
-versa. You can also edit files directly on GitHub or in a Codespace.
-
-</details>
