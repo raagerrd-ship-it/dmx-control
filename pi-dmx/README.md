@@ -1,5 +1,7 @@
 # pi-dmx — Dedicated audio→DMX controller (Pi Zero 2 W)
 
+*🇬🇧 English · 🇸🇪 [Svenska](README.sv.md)*
+
 Standalone lighting controller. Runs on its own Pi Zero 2 W with nothing else
 installed. Reads line-in audio from a mixer via the **Codec Zero HAT**,
 analyses kicks/drops/energy, and drives DMX-512 out through a **Whadda
