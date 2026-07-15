@@ -46,6 +46,14 @@ export class AudioCapture extends EventEmitter {
   }
 
   private spawnArecord() {
+    // Re-basera wall-clock-pacingen vid varje (om)start. Annars fortsätter
+    // audioMs mot en wallStart från FÖRE avbrottet → 'behind' fastnar över
+    // 120 ms och ALLA chunks droppas efter en capture-lucka (arecord dog /
+    // ljudkortet tappade kontakt). Utan detta återhämtar sig auto-omstarten
+    // aldrig på egen hand — bara en hel process-omstart (watchdog) räddar den.
+    this.wallStart = 0;
+    this.audioMs = 0;
+    this.leftover = Buffer.alloc(0);
     const args = [
       "-D", this.opts.device,
       "-f", "S16_LE",
