@@ -325,8 +325,10 @@ pi-dmx/
 
 ## License & commercial use
 
-© 2026 — all rights reserved. No open-source license is granted. You're
-welcome to read the code and learn from the architecture.
+Free for **noncommercial use** — personal, hobby, tinkering, research,
+education — under the [PolyForm Noncommercial License 1.0.0](../LICENSE.md).
+Read it, run it in your own barn, learn from the architecture.
 
-**Want to use it commercially** — rent it out, resell it, or build a product on
-it? Please get in touch first: **raager.rd@gmail.com**.
+**Commercial use** — renting the rig out, reselling it, or building a paid
+product or service on it — is **not** granted by that license. For a commercial
+license, get in touch first: **raager.rd@gmail.com**.

@@ -321,8 +321,10 @@ pi-dmx/
 
 ## Licens & kommersiell användning
 
-© 2026 — med ensamrätt. Ingen open source-licens ges. Du är välkommen att läsa
-koden och lära av arkitekturen.
+Fri för **icke-kommersiell användning** — privat, hobby, pyssel, forskning,
+utbildning — under [PolyForm Noncommercial License 1.0.0](../LICENSE.md). Läs
+den, kör den i din egen lada, lär av arkitekturen.
 
-**Vill du använda den kommersiellt** — hyra ut den, sälja den vidare eller bygga
-en produkt på den? Hör av dig först: **raager.rd@gmail.com**.
+**Kommersiell användning** — att hyra ut riggen, sälja den vidare eller bygga en
+betald produkt eller tjänst på den — ges **inte** av den licensen. För en
+kommersiell licens, hör av dig först: **raager.rd@gmail.com**.
