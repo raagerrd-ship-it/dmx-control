@@ -111,6 +111,8 @@ export interface EngineConfig {
   colorEcho: boolean;
   /** REGI: micro-strobe — kort mjukvaru-dimmernotch på diskanttransienter (skimmer). */
   microStrobe: boolean;
+  /** REGI: dynamiskt ljustak (VU) — max-styrka följer sektionsenergin; drop bypassar. */
+  energyCeiling: boolean;
 }
 
 export const defaultConfig: EngineConfig = {
@@ -154,6 +156,7 @@ export const defaultConfig: EngineConfig = {
   energyGovernor: false,  // ägar-val: kan förvirra en hyresgäst, av som standard
   colorEcho: false,       // ägar-val: antar lampor i rad; ändrar looket på ytterlamporna
   microStrobe: false,     // ägar-val: strobe-nära, opt-in
+  energyCeiling: false,   // ägar-val: dämpar lugna partier; en hyresgäst kan tro riggen är trasig
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {

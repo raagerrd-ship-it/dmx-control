@@ -423,8 +423,24 @@ export class EffectEngine {
     this.microStrobe *= 0.38;                                               // klingar av på ~2-3 frames
     if (this.microStrobe < 0.02) this.microStrobe = 0;
     const microMul = this.dropEnv > 0.4 ? 1 : 1 - this.microStrobe * 0.45;  // notch ner till ~0.55 på träffen
+    // DYNAMISKT LJUSTAK (VU): ett löpande max-tak som följer SEKTIONENS relativa
+    // energi (samma signal som smart-tiern: intensityEma mot låtens ~25s-snitt)
+    // → lugna partier lyser dämpat, bara de tyngsta sektionerna når 100%. Takets
+    // DJUP styrs av Dynamik-ratten. Drop/bas-punch/riser/flash BYPASSAR taket så
+    // impakten alltid blir full. Jobbar i alla lägen (signalen finns alltid).
+    let ceilMul = 1;
+    if (this.cfg.energyCeiling) {
+      const rel = Math.max(0, Math.min(1, 0.5 + (this.intensityEma - this.intensityFloor) / 0.30));
+      const s = rel <= 0.2 ? 0 : rel >= 0.9 ? 1 : (rel - 0.2) / 0.7;
+      const eased = s * s * (3 - 2 * s);                                    // smoothstep 0.2..0.9 → full vid 90%
+      const dynK = Math.max(0, Math.min(1, this.cfg.dynamics ?? 0.6));
+      const floor = 0.6 - dynK * 0.25;                                      // 0.6 (platt) .. 0.35 (dynamiskt) i djup vila
+      const ceil = floor + (1 - floor) * eased;
+      const bypass = Math.max(this.dropEnv, bassPunch, flashActive ? 1 : 0, this.buildUp * 0.6);
+      ceilMul = Math.max(ceil, bypass);
+    }
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
-    const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8) * microMul;
+    const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8) * microMul * ceilMul;
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
