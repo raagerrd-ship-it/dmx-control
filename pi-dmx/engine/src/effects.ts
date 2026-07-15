@@ -504,7 +504,7 @@ export class EffectEngine {
     const effect = EFFECT_MAP.get(effMode);
     const ctx: EffectContext = {
       cfg: this.cfg, frame, fx: undefined, t, idx: 0, count,
-      audio, kickEnv, band: 0, bands,
+      audio, kickEnv, band: 0,
       beatIdx, beatFrac, beatPulse, hasBeat,
       wavePhase: this.wavePhase, buildUp: this.buildUp, phaseSpread: 1 + this.buildUp * 2.5,
       punchFloor, chasePos: this.chasePos,
