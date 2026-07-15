@@ -446,7 +446,10 @@ export class EffectEngine {
       // fram ändå. Slipper allt "taket ligger öppet"-beteende.
       const vuRaw = Math.max(0, Math.min(1, (frame.level - 0.1) / 0.87));
       this.vu += (vuRaw - this.vu) * (vuRaw > this.vu ? 1 : 1 - Math.exp(-dtSec / 0.18));
-      ceilMul = this.vu;
+      // KLUBB-LÄGE: kvadrera taket → hård kontrast (allt "ludd" mellan slagen
+      // trycks mot mörker, bara topparna exploderar). Uniformt via capMask, så
+      // det blir exakt VU² (ej VU⁴). Av = troget linjärt VU.
+      ceilMul = this.cfg.clubMode ? this.vu * this.vu : this.vu;
     }
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
     // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så

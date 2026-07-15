@@ -327,6 +327,8 @@ export async function startServer(
             deps.cfg.microStrobe = !!msg.value;
           } else if (msg.type === "setEnergyCeiling") {
             deps.cfg.energyCeiling = !!msg.value;
+          } else if (msg.type === "setClubMode") {
+            deps.cfg.clubMode = !!msg.value;
           } else if (msg.type === "fogNow") {
             deps.cfg.fogTrigger = true;   // engångs-puff (motorn nollställer flaggan)
           }

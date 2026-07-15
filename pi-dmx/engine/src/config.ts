@@ -103,6 +103,8 @@ export interface EngineConfig {
   microStrobe: boolean;
   /** REGI: dynamiskt ljustak (VU) — max-styrka följer sektionsenergin; drop bypassar. */
   energyCeiling: boolean;
+  /** REGI: klubb-läge — kvadrerar VU-taket (hård kontrast: mörkt mellan, explosion på topp). */
+  clubMode: boolean;
 }
 
 export const defaultConfig: EngineConfig = {
@@ -142,6 +144,7 @@ export const defaultConfig: EngineConfig = {
   colorEcho: false,       // ägar-val: antar lampor i rad; ändrar looket på ytterlamporna
   microStrobe: false,     // ägar-val: strobe-nära, opt-in
   energyCeiling: true,    // direkt VU = ljusstyrka; standard på (drop/punch bypassar)
+  clubMode: false,        // hård kontrast (VU²); opt-in — rör inte det trogna linjära läget
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
