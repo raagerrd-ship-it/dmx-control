@@ -265,9 +265,12 @@ export class Analyser {
     let flux = 0;
     let kickFlux = 0;                               // onset ENBART i kick-bandet (sub-bas)
     let magSum = 0, magW = 0;                       // för spektralt centroid
-    const bassBins = Math.min(16, half);           // ~0–1.5 kHz @ 48k/512
-    const kickBins = Math.min(3, half);            // bins 0–2 ≈ 0–280 Hz (kick-trumman)
-    const trebleStart = Math.floor(half * 0.5);    // ~top half of spectrum (~12 kHz+)
+    const binHz = this.cfg.audio.rate / this.cfg.fft.size;          // ~93.75 Hz @ 48k/512
+    const bassBins = Math.min(16, half);                            // ~0–1.5 kHz
+    const kickBins = Math.min(3, half);                            // bins 0–2 ≈ 0–280 Hz (kick-trumman)
+    // Diskant = hi-hats/cymbaler ~5–13 kHz (INTE 12 kHz+ där det är tomt).
+    const trebleStart = Math.min(half - 1, Math.round(5000 / binHz));   // ~5 kHz
+    const trebleEnd = Math.min(half, Math.round(13000 / binHz));        // ~13 kHz
     for (let i = 0; i < half; i++) {
       const re = spectrum[2 * i];
       const im = spectrum[2 * i + 1];
@@ -277,9 +280,10 @@ export class Analyser {
         const d = mag[i] - this.prevMag[i];
         if (d > 0) { flux += d; if (i < kickBins) kickFlux += d; }    // half-wave rectified
       } else if (i < trebleStart) {
-        midEnergy += mag[i];                         // mellanband (mellan bas och diskant)
+        midEnergy += mag[i];                         // mellanband (~1.5–5 kHz: röst/synth/virvel)
+      } else if (i < trebleEnd) {
+        trebleEnergy += mag[i];                      // diskant (~5–13 kHz: hi-hats/cymbaler)
       }
-      if (i >= trebleStart) trebleEnergy += mag[i];
       magSum += mag[i]; magW += i * mag[i];          // centroid = viktad medelfrekvens
     }
     this.prevMag = mag;
@@ -287,7 +291,7 @@ export class Analyser {
     // the kick energy gate die at low volume while the AGC keeps level alive.
     const energy = Math.min(1, (bassEnergy / bassBins) * 0.02 * this.gain);
     const mid = Math.min(1, (midEnergy / Math.max(1, trebleStart - bassBins)) * 0.025 * this.gain);
-    const treble = Math.min(1, (trebleEnergy / (half - trebleStart)) * 0.03 * this.gain);
+    const treble = Math.min(1, (trebleEnergy / Math.max(1, trebleEnd - trebleStart)) * 0.04 * this.gain);
     const centroid = magSum > 1e-6 ? Math.min(1, (magW / magSum) / half) : 0;
     const fluxNorm = Math.min(1, flux * 0.005);
 
