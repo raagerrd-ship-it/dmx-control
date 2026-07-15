@@ -39,7 +39,7 @@ export class EffectEngine {
   private intensityFloor = 0.5;
   private warmMs = 0;
   private ambient = 0;   // 0 = spelar, 1 = varm vila (efter ~2.5s tystnad)
-  private bassBaseline = 0.2;   // rullande bas-nivå för bas-punch
+  private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -128,13 +128,17 @@ export class EffectEngine {
         // mot faktiska slag). Kontinuerlig — funkar även när kick-detektorn är
         // gles (komprimerad signal fyrar sällan), till skillnad från ren kick-puls.
         const beatMul = this.cfg.beatPulse ? (0.45 + 0.55 * beatEnv) : 1;
-    // BAS-PUNCH: en hård UTDRAGEN basstöt saknar transient (kicken missar den),
-    // men syns som bas-energi tydligt över sin rullande baslinje. Då: en ljus-
-    // surge som HÅLLER så länge basen ligger på. Baslinjen är långsam (~2s) så en
-    // sustained basnot stannar över den → punchen håller genom hela stöten.
-    this.bassBaseline += (frame.energy - this.bassBaseline) * 0.01;
-    const bassPunch = Math.max(0, Math.min(1, (frame.energy - Math.max(0.12, this.bassBaseline * 1.35)) * 3.5));
+    // BAS-PUNCH: en hård/utdragen basstöt (drop) saknar transient, och på en
+    // komprimerad signal svänger bas-energin lite. Så spåra ett bas-GOLV = den
+    // TYSTA basnivån (sjunker mot tystnad på ~0.4s, stiger mkt långsamt ~5s). En
+    // drop ligger då tydligt ÖVER golvet → punch som HÅLLER tills golvet hinner ikapp.
+    if (frame.energy < this.bassBaseline) this.bassBaseline += (frame.energy - this.bassBaseline) * 0.05;
+    else this.bassBaseline += (frame.energy - this.bassBaseline) * 0.004;
+    const bassPunch = Math.max(0, Math.min(1, (frame.energy - this.bassBaseline - 0.05) * 4));
     const master = this.cfg.master * this.silenceGate * beatMul * (1 + bassPunch * 0.75);
+    // Synlig punch: en hård basstöt (eller drop-flash) BLOOMAR färgen till full
+    // styrka — inte bara ljusare master (som är osynligt när effekten redan lyser).
+    const bloom = flashActive || bassPunch > 0.45;
     const count = this.cfg.fixtures.length;
 
     // Chase state machine — kick advances one step, plus a slow auto-advance
@@ -276,7 +280,7 @@ export class EffectEngine {
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, effMode);
-      if (flashActive) {
+      if (bloom) {
         // Bloom: skala upp nuvarande färg till full ljusstyrka (behåll färgton).
         const mxc = Math.max(rgb[0], rgb[1], rgb[2]);
         if (mxc > 0.02) { rgb[0] /= mxc; rgb[1] /= mxc; rgb[2] /= mxc; }
