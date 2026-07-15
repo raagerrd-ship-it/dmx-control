@@ -441,7 +441,9 @@ export class EffectEngine {
       ceilMul = Math.max(this.vu, bypass);
     }
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
-    const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8) * microMul * ceilMul;
+    // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så
+    // VU-taket följer nivån direkt utan effekt-ballistikens nedåt-släp.
+    const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8) * microMul;
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
@@ -529,6 +531,17 @@ export class EffectEngine {
       const v = this.universe[ch] >= held ? this.universe[ch] : held;
       this.outSmooth[ch] = v;
       this.universe[ch] = Math.round(v);
+    }
+
+    // VU-TAK SIST: applicera taket EFTER ballistiken → ren slutgain som följer
+    // nivån DIREKT (ingen effekt-ballistik som släpar på vägen ner). Kapar bara
+    // färg/dim-kanaler; strobe orörda. (Drop/punch/riser/flash ligger redan i
+    // ceilMul via bypass → de lyfter taket och kapar inget.) Gatas av silenceGate
+    // så den varma ambient-glöden i TYSTNAD inte kapas till svart.
+    if (this.cfg.energyCeiling && this.silenceGate > 0.5 && ceilMul < 0.999) {
+      for (let ch = 0; ch < this.maxCh; ch++) {
+        if (!this.strobeMask[ch]) this.universe[ch] = Math.round(this.universe[ch] * ceilMul);
+      }
     }
 
     // DROP-BLACKOUT: kolsvart NU — förbi ballistikens mjuka fade (stenhård
