@@ -435,10 +435,13 @@ export class EffectEngine {
       // DIREKT KARTA: rå nivå 0.1 → 0%, 0.97 → 100% (linjärt, klippt). Ingen
       // baslinje, inget medel, inget golv — ljusstyrka = nivå, konsekvent mellan
       // låtar (en tyst låt ÄR dimmare). Snabb attack, lätt ~180ms release så det
-      // inte flimrar mellan slagen. Drop/bas-punch/riser/flash bypassar → full impakt.
+      // inte flimrar mellan slagen. Bara ÄKTA drop-händelser bypassar taket (drop-
+      // envelope + drop-flash + riser). INTE bassPunch — den fyrar på varje bas-
+      // stöt i en groove och skulle propsa upp taket hela tiden; en hög bas höjer
+      // dessutom redan level → VU:n, så taket är högt ändå när det verkligen smäller.
       const vuRaw = Math.max(0, Math.min(1, (frame.level - 0.1) / 0.87));
       this.vu += (vuRaw - this.vu) * (vuRaw > this.vu ? 1 : 1 - Math.exp(-dtSec / 0.18));
-      const bypass = Math.max(this.dropEnv, bassPunch, flashActive ? 1 : 0, this.buildUp * 0.6);
+      const bypass = Math.max(this.dropEnv, flashActive ? 1 : 0, this.buildUp * 0.6);
       ceilMul = Math.max(this.vu, bypass);
     }
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
