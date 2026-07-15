@@ -431,20 +431,14 @@ export class EffectEngine {
     // flash BYPASSAR taket så impakten alltid blir full.
     let ceilMul = 1;
     if (this.cfg.energyCeiling) {
-      // DIREKT VU från RÅ nivå. VIKTIGT: använd INTE 'audio' — den är hett driven
-      // (level×~1.3) och ger bara en liten svängning i övre registret, så taket
-      // rörde sig knappt. Expandera i stället det faktiska arbetsområdet
-      // (uppmätt ~0.9×..1.5× AGC-målet på AUX) → hela brightness-spannet. Toppar/
-      // högre låtar når 1.0, tysta partier dyker mot golvet. Momentant (ingen
-      // baslinje/medel); snabb attack, lätt ~180ms release.
-      const tgt = Math.max(0.15, this.cfg.detection.autoGainTarget);
-      const vuRaw = Math.max(0, Math.min(1, (frame.level - tgt * 0.9) / (tgt * 0.6)));
+      // DIREKT KARTA: rå nivå 0.1 → 0%, 0.9 → 100% (linjärt, klippt). Ingen
+      // baslinje, inget medel, inget golv — ljusstyrka = nivå, konsekvent mellan
+      // låtar (en tyst låt ÄR dimmare). Snabb attack, lätt ~180ms release så det
+      // inte flimrar mellan slagen. Drop/bas-punch/riser/flash bypassar → full impakt.
+      const vuRaw = Math.max(0, Math.min(1, (frame.level - 0.1) / 0.8));
       this.vu += (vuRaw - this.vu) * (vuRaw > this.vu ? 1 : 1 - Math.exp(-dtSec / 0.18));
-      const dynK = Math.max(0, Math.min(1, this.cfg.dynamics ?? 0.6));
-      const floor = 0.6 - dynK * 0.25;                                      // 0.6 (platt) .. 0.35 (dynamiskt) i djup vila
-      const ceil = floor + (1 - floor) * this.vu;                          // direkt: nivå → tak
       const bypass = Math.max(this.dropEnv, bassPunch, flashActive ? 1 : 0, this.buildUp * 0.6);
-      ceilMul = Math.max(ceil, bypass);
+      ceilMul = Math.max(this.vu, bypass);
     }
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
     const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8) * microMul * ceilMul;
