@@ -208,7 +208,7 @@ export class EffectEngine {
     // VU-taket hela introt (och fyrade rökmaskinen). warmMs nollställs vid tystnad
     // → gäller exakt låtstart; en riktig drop mitt i låten har warmMs högt.
     const dropFired = inZone && !this.wasInZone && brokeRecently && this.warmMs > 2000;
-    if (dropFired) this.dropBangUntil = nowWall + 8000;                                          // drop-fönster (max 8s)
+    if (dropFired) this.dropBangUntil = nowWall + 2000;                                          // drop-accent (kort — max 2s)
     this.wasInZone = inZone;
     // DROP-BLACKOUT (dramaturgisk tystnad): en riser som BRYTS ner i en svacka
     // strax före dropen → tvinga kolsvart i max 250ms. Svärtan STARTAR på
@@ -440,14 +440,12 @@ export class EffectEngine {
       // DIREKT KARTA: rå nivå 0.1 → 0%, 0.97 → 100% (linjärt, klippt). Ingen
       // baslinje, inget medel, inget golv — ljusstyrka = nivå, konsekvent mellan
       // låtar (en tyst låt ÄR dimmare). Snabb attack, lätt ~180ms release så det
-      // inte flimrar mellan slagen. Bara ÄKTA drop-händelser bypassar taket (drop-
-      // envelope + drop-flash + riser). INTE bassPunch — den fyrar på varje bas-
-      // stöt i en groove och skulle propsa upp taket hela tiden; en hög bas höjer
-      // dessutom redan level → VU:n, så taket är högt ändå när det verkligen smäller.
+      // inte flimrar mellan slagen. HÅRT tak — INGEN bypass, inte ens för drop:
+      // en riktig drop låter >90% → level → VU:n är redan nära max, så den släpps
+      // fram ändå. Slipper allt "taket ligger öppet"-beteende.
       const vuRaw = Math.max(0, Math.min(1, (frame.level - 0.1) / 0.87));
       this.vu += (vuRaw - this.vu) * (vuRaw > this.vu ? 1 : 1 - Math.exp(-dtSec / 0.18));
-      const bypass = Math.max(this.dropEnv, flashActive ? 1 : 0, this.buildUp * 0.6);
-      ceilMul = Math.max(this.vu, bypass);
+      ceilMul = this.vu;
     }
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
     // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så
