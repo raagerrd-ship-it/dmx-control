@@ -66,7 +66,7 @@
     .btn.primary { background: var(--hot); border-color: var(--hot); color: white; }
     .btn.ok { background: transparent; border-color: var(--ok); color: var(--ok); }
     .btn:disabled { opacity: .4; cursor: not-allowed; }
-    .rotrow { display:flex; align-items:center; justify-content:space-between; padding:9px 8px; font-size:15px; text-transform:capitalize; border-left:3px solid transparent; border-radius:6px; transition:background .15s, border-color .15s; }
+    .rotrow { display:flex; align-items:center; justify-content:space-between; padding:9px 8px; font-size:15px; border-left:3px solid transparent; border-radius:6px; transition:background .15s, border-color .15s; }
     .rotrow + .rotrow { border-top:1px solid var(--line); }
     .rotrow.playing { background:color-mix(in srgb, var(--hot) 18%, transparent); border-left-color:var(--hot); font-weight:600; }
     .rotrow.playing .rotname::after { content:"● SPELAS"; margin-left:8px; font-size:10px; font-weight:700; letter-spacing:.5px; color:var(--hot); vertical-align:middle; }
@@ -74,15 +74,20 @@
     .rotname { font-weight:500; }
     .rotdesc { font-size:12px; opacity:.6; line-height:1.35; }
     .rotrow > input.tgl { flex:none; margin-left:14px; }
+    .rotrow.tappable { cursor:pointer; -webkit-tap-highlight-color:transparent; user-select:none; }
+    .rotrow.tappable:active { background:color-mix(in srgb, var(--hot) 8%, transparent); }
+    .rotrow.selected { background:color-mix(in srgb, var(--hot) 16%, transparent); border-left-color:var(--hot); }
+    .rotrow.selected .rotname { font-weight:600; }
+    .rotrow .pick { flex:none; margin-left:14px; font-size:12px; opacity:.55; }
     .owner-banner { background:color-mix(in srgb, var(--hot) 14%, transparent); border:1px solid var(--hot); border-radius:10px; padding:10px 12px; margin:14px 0 4px; font-size:13px; line-height:1.4; }
   </style>
 </head>
 <body>
   <h1>Show</h1>
   <div class="card">
-    <div class="status" style="margin-bottom:8px">Smart-läge — anpassar ljuset efter musiken och roterar mellan de effekter du kryssat i.</div>
-    <label class="tgl"><span>Energi styr läget</span><input type="checkbox" id="tEnergy"></label>
-    <label class="tgl"><span>Byter effekt</span>
+    <div class="status" style="margin-bottom:8px" id="showIntro">Smart-läge — anpassar ljuset efter musiken och roterar mellan de effekter du kryssat i.</div>
+    <label class="tgl"><span>Energi styr läget (av = manuellt)</span><input type="checkbox" id="tEnergy"></label>
+    <label class="tgl" id="dwellRow"><span>Byter effekt</span>
       <span class="seg segmini" id="segDwell">
         <button data-dwell="slow">Sällan</button><button data-dwell="normal">Normal</button><button data-dwell="fast">Ofta</button>
       </span>
@@ -109,19 +114,6 @@
 
   <h1>Effekter med full fart</h1>
   <div class="card"><div id="fullList" class="rotlist"></div></div>
-
-  <h1>Effekter</h1>
-  <div class="card">
-    <div class="setrow">
-      <label>Drop-blixt känslighet</label>
-      <div class="seg" id="segDrop">
-        <button data-drop="0">Av</button>
-        <button data-drop="0.3">Låg</button>
-        <button data-drop="0.6">Normal</button>
-        <button data-drop="0.9">Hög</button>
-      </div>
-    </div>
-  </div>
 
   <h1>Inställningar</h1>
   <div class="card">
@@ -152,6 +144,19 @@
 
   <div id="ownerOnly" hidden>
   <div class="owner-banner">🔧 Ägarläge (setup). Den här sidan är dold för hyresgäster — de öppnar adressen utan <b>/setup</b>.</div>
+
+  <h1>Effekter</h1>
+  <div class="card">
+    <div class="setrow">
+      <label>Drop-blixt känslighet</label>
+      <div class="seg" id="segDrop">
+        <button data-drop="0">Av</button>
+        <button data-drop="0.3">Låg</button>
+        <button data-drop="0.6">Normal</button>
+        <button data-drop="0.9">Hög</button>
+      </div>
+    </div>
+  </div>
 
   <h1>Fixtures</h1>
   <div class="card">
@@ -299,16 +304,28 @@ const FULL_MODES = [
 ];
 let curRotation = {};
 let curPlaying = "";
+let curMode = "smart";   // cfg.mode: "smart" (energi styr) eller en specifik effekt (manuellt)
 function renderRotList(elId, list) {
   const el = document.getElementById(elId);
   el.innerHTML = "";
+  const smart = curMode === "smart";
   for (const [m, label, desc] of list) {
-    const row = document.createElement("label");
-    row.className = "rotrow";
+    const row = document.createElement(smart ? "label" : "div");
+    row.className = "rotrow" + (smart ? "" : " tappable");
     row.dataset.mode = m;
-    const on = curRotation[m] !== false;
-    row.innerHTML = `<span class="rotinfo"><span class="rotname">${label}</span><span class="rotdesc">${desc || ""}</span></span><input type="checkbox" class="tgl" ${on ? "checked" : ""}>`;
-    row.querySelector("input").onchange = (e) => { curRotation[m] = e.target.checked; send({ type: "setRotation", mode: m, value: e.target.checked }); };
+    const info = `<span class="rotinfo"><span class="rotname">${label}</span><span class="rotdesc">${desc || ""}</span></span>`;
+    if (smart) {
+      // Smart: checkbox väljer om effekten är med i rotationen.
+      const on = curRotation[m] !== false;
+      row.innerHTML = info + `<input type="checkbox" class="tgl" ${on ? "checked" : ""}>`;
+      row.querySelector("input").onchange = (e) => { curRotation[m] = e.target.checked; send({ type: "setRotation", mode: m, value: e.target.checked }); };
+    } else {
+      // Manuellt: tryck på raden → kör bara den effekten.
+      const active = curMode === m;
+      if (active) row.classList.add("selected");
+      row.innerHTML = info + (active ? "" : `<span class="pick">Välj</span>`);
+      row.onclick = () => { curMode = m; send({ type: "setMode", mode: m }); renderCategories(); };
+    }
     el.appendChild(row);
   }
 }
@@ -318,12 +335,23 @@ function renderCategories() {
   renderRotList("fullList", FULL_MODES);
   curPlaying = "";   // tvinga om-markering av körande rad efter ombygge
 }
+// Speglar smart/manuellt-läget i UI:t: kryssruta vs kryssknapp, dwell-rad,
+// intro-text — och renderar om listorna i rätt stil.
+function refreshModeView() {
+  const smart = curMode === "smart";
+  tEnergy.checked = smart;
+  document.getElementById("dwellRow").style.display = smart ? "" : "none";
+  document.getElementById("showIntro").textContent = smart
+    ? "Smart-läge — anpassar ljuset efter musiken och roterar mellan de effekter du kryssat i."
+    : "Manuellt läge — tryck på effekten du vill köra just nu.";
+  renderCategories();
+}
 
 function applyConfig(cfg) {
   curRotation = cfg.rotation || {};
-  renderCategories();
+  curMode = cfg.mode || "smart";
+  refreshModeView();                 // sätter tEnergy/dwell/intro + renderar listorna
   tBeatPulse.checked = !!cfg.beatPulse;
-  tEnergy.checked = cfg.energyDrivesMode !== false;
   segActivate("segDrop", cfg.dropSensitivity ?? 0.6, "drop");
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
@@ -639,15 +667,29 @@ fxSaveBtn.onclick = () => {
 const tBeatPulse = document.getElementById("tBeatPulse");
 const tEnergy = document.getElementById("tEnergy");
 tBeatPulse.onchange = () => send({ type: "setBeatPulse", value: tBeatPulse.checked });
-tEnergy.onchange = () => send({ type: "setEnergyDrivesMode", value: tEnergy.checked });
+// Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
+// AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
+// just nu så det inte hoppar, sen väljer du fritt.
+tEnergy.onchange = () => {
+  if (tEnergy.checked) {
+    curMode = "smart";
+    send({ type: "setEnergyDrivesMode", value: true });
+    send({ type: "setMode", mode: "smart" });
+  } else {
+    const pick = (curPlaying && curPlaying !== "smart" && curPlaying !== "blackout") ? curPlaying : "wave";
+    curMode = pick;
+    send({ type: "setMode", mode: pick });
+  }
+  refreshModeView();
+};
 document.querySelectorAll("#segDrop button").forEach((b) =>
   b.onclick = () => { send({ type: "setDropSensitivity", value: Number(b.dataset.drop) }); segActivate("segDrop", Number(b.dataset.drop), "drop"); });
 document.querySelectorAll("#segDwell button").forEach((b) =>
   b.onclick = () => { send({ type: "setSmartDwell", mode: b.dataset.dwell }); segActivateStr("segDwell", b.dataset.dwell, "dwell"); });
 renderCategories();
 connect();
-// Smart är alltid läget.
-setTimeout(() => send({ type: "setMode", mode: "smart" }), 400);
+// Läget (smart eller manuellt vald effekt) kommer från serverns config —
+// tvinga inte smart här, annars skulle manuellt läge tappas vid varje omladdning.
 
 /* ── WiFi / hotspot ─────────────────────────────────────────────────── */
 const wifiActive  = document.getElementById("wifiActive");
