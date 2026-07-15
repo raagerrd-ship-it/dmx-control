@@ -202,6 +202,47 @@ python3 -c "import socket,sys; s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM
 
 Well under the ~100 ms perceptual threshold for "light follows music".
 
+## Fixtures — add or remove lamps
+
+The rig isn't fixed to four PARs. Add, remove, and re-address lamps live from
+the **owner setup page** — open the UI with `/setup` in the URL
+(`http://192.168.4.1/setup`) and use the **Fixtures** card:
+
+| Control | What it does |
+|---|---|
+| **+ Lägg till lampa** | Append a new fixture |
+| **×** on a row | Remove that fixture |
+| Tap a row | Edit its name, **DMX start address**, and type (RGB / RGBW / dimmer / custom channel roles) |
+| **Auto-adressera** | Re-pack every fixture into back-to-back addresses with no gaps |
+| **Identifiera** | Flash each lamp in turn at full white so you can match a row to the physical PAR in the room |
+| **Spara ändringar** | Commit — writes atomically to `config.json` (temp + rename + `.bak`) so a crash mid-save can't corrupt it |
+
+Addresses are validated as you edit (overlaps and out-of-range are flagged and
+block saving). The engine only sends up to the highest channel any fixture
+uses, so fewer lamps also means a shorter DMX frame and a faster refresh.
+
+You can also edit the `fixtures` array in
+`/var/lib/audio-dmx-engine/config.json` directly and restart the service.
+
+### Effects scale to the fixture count automatically
+
+Effects never hard-code "4 lamps." Each one renders per lamp from its index and
+the live count (`c.idx`, `c.count`), so the same effect just spreads across
+however many fixtures you have — 1, 3, 8, whatever:
+
+- **Unison** effects (breathe, drift, pulse, snap, strobe) light every lamp the
+  same, so any count works trivially.
+- **Spatial** effects (wave, chase, sweep, bounce, tide…) use `idx`/`count` to
+  place a moving head, wrap a wave, or wash across the whole line.
+- **Group** effects (rave, flip, gallop, twin) split by parity (`idx % 2`), so
+  two lamps alternate — and with four they read as a clean 2-vs-2 call-and-
+  response.
+- **Spektrum** (eq) maps lamps to bands (`idx % 3` → bass/mid/treble) and cycles
+  the bands across as many lamps as there are.
+
+Add a fifth PAR and the waves get longer, the groups get wider, and the
+spectrum repeats — no code change, no per-count tuning.
+
 ## Effect architecture
 
 Every effect lives in its own file under `engine/src/effects/` and exports an
