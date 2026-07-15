@@ -431,11 +431,15 @@ export class EffectEngine {
     // flash BYPASSAR taket så impakten alltid blir full.
     let ceilMul = 1;
     if (this.cfg.energyCeiling) {
-      // DIREKT VU: taket följer den AKTUELLA nivån TROGET. Snabb (nära direkt)
-      // attack så ljuset följer smällen, lätt release (~180ms) så det inte
-      // flimrar mellan slagen — men INGEN tröghet/peak-hold som lyfter taket
-      // över den faktiska nivån. Ljusstyrka = ljudnivå, här och nu.
-      this.vu += (audio - this.vu) * (audio > this.vu ? 1 : 1 - Math.exp(-dtSec / 0.18));
+      // DIREKT VU från RÅ nivå. VIKTIGT: använd INTE 'audio' — den är hett driven
+      // (level×~1.3) och ger bara en liten svängning i övre registret, så taket
+      // rörde sig knappt. Expandera i stället det faktiska arbetsområdet
+      // (uppmätt ~0.9×..1.5× AGC-målet på AUX) → hela brightness-spannet. Toppar/
+      // högre låtar når 1.0, tysta partier dyker mot golvet. Momentant (ingen
+      // baslinje/medel); snabb attack, lätt ~180ms release.
+      const tgt = Math.max(0.15, this.cfg.detection.autoGainTarget);
+      const vuRaw = Math.max(0, Math.min(1, (frame.level - tgt * 0.9) / (tgt * 0.6)));
+      this.vu += (vuRaw - this.vu) * (vuRaw > this.vu ? 1 : 1 - Math.exp(-dtSec / 0.18));
       const dynK = Math.max(0, Math.min(1, this.cfg.dynamics ?? 0.6));
       const floor = 0.6 - dynK * 0.25;                                      // 0.6 (platt) .. 0.35 (dynamiskt) i djup vila
       const ceil = floor + (1 - floor) * this.vu;                          // direkt: nivå → tak
