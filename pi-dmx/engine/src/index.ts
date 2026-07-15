@@ -21,15 +21,17 @@ import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 
 import { activeSlots, type Mode } from "./config.js";
+import { EFFECT_KEYS, EFFECT_MAP } from "./effects/registry.js";
 
 // Physical button cycles through the fun modes (skips blackout so the button never kills the show).
-const MODE_CYCLE: Mode[] = ["smart", "drops", "party", "chase", "wave", "cycle", "breathe", "tide", "snap", "bounce", "mono", "aurora", "drift", "sweep", "pulse", "strobe", "rave", "eq", "flip", "gallop", "twin"];
+// Härlett ur effekt-registret (samma ordning) → ingen lista att hålla i synk.
+const MODE_CYCLE: Mode[] = ["smart", ...EFFECT_KEYS];
 
 const cfg = await loadConfig();
 // Migrate legacy mode names from persisted configs.
 const LEGACY_MODES: Record<string, Mode> = { auto: "wave", comet: "wave", split: "party", strobe: "party", pulse: "drops", spectrum: "wave", vu: "cycle" };
 if (LEGACY_MODES[cfg.mode as string]) cfg.mode = LEGACY_MODES[cfg.mode as string];
-if (!["smart","drops","party","chase","wave","cycle","breathe","tide","snap","bounce","mono","aurora","drift","sweep","pulse","strobe","rave","eq","flip","gallop","twin","blackout"].includes(cfg.mode)) cfg.mode = "smart";
+if (cfg.mode !== "smart" && cfg.mode !== "blackout" && !EFFECT_MAP.has(cfg.mode)) cfg.mode = "smart";
 cfg.fft.hop = 128;   // analys 375 Hz (beprövad tuning); render/DMX separat 50 Hz
 
 // Re-apply the chosen codec input routing (the boot service restores the aux

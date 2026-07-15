@@ -312,36 +312,21 @@ function connect() {
     const m = JSON.parse(ev.data);
     if (m.type === "config") applyConfig(m.config);
     else if (m.type === "frame") applyFrame(m);
+    else if (m.type === "effects") applyEffects(m.effects);
   };
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
 
-const CALM_MODES = [
-  ["cycle","Cykel","Alla lampor andas i takt medan färgen sakta vandrar runt."],
-  ["breathe","Andas","Hela riggen andas som en – djup mjuk våg i en färg."],
-  ["tide","Tidvatten","En långsam våg sköljer fram och tillbaka i par."],
-  ["mono","Eld","Varm brasa som flimrar levande, glider rött → gult."],
-  ["aurora","Aurora","Varje lampa driver i sin egen färg, som norrsken."],
-  ["drift","Drift","Nästan stilla glöd som mycket sakta byter färg."],
-  ["twin","Tvilling","Två grupper andas i motfas – varmt anrop, kallt svar."],
-];
-const FAST_MODES = [
-  ["wave","Våg","Flödande färgvåg som rullar över hela riggen."],
-  ["chase","Jakt","En ljuspunkt springer i takt och byter färg."],
-  ["drops","Drops","Varje slag målar nästa lampa i en ny färg."],
-  ["sweep","Svep","En smal spotlight glider över en mörk rigg."],
-  ["pulse","Puls","Hela riggen i en färg som pulsar på beatet."],
-  ["eq","Spektrum","3-band-EQ: bas→röd lampa, mellan→grön, diskant→blå. Visar ljudets färg."],
-];
-const FULL_MODES = [
-  ["party","Party","Färgkaos som pumpar hårt på varje taktslag."],
-  ["snap","Snap","Alla lampor byter färg blixtsnabbt på varje slag."],
-  ["bounce","Studs","En skarp ljuspunkt studsar fram och tillbaka."],
-  ["strobe","Strobe","Snabb strobe-blixt med skiftande färg."],
-  ["rave","Rave","Varannan lampa blinkar i motfärger – hård växling."],
-  ["flip","Flip","Två grupper byter kontrastfärg på varje slag – A/B/A/B, båda tända."],
-  ["gallop","Gallopp","Grupperna slår omlott – beat & off-beat, dubbel rytm."],
-];
+// Effekt-listorna kommer från servern (type:"effects", grupperade på tier) →
+// en enda sanningskälla; ingen hårdkodad lista att hålla i synk med motorn.
+let CALM_MODES = [], FAST_MODES = [], FULL_MODES = [];
+function applyEffects(list) {
+  const byTier = (t) => (list || []).filter((e) => e.tier === t).map((e) => [e.key, e.label, e.desc]);
+  CALM_MODES = byTier("lugn");
+  FAST_MODES = byTier("fart");
+  FULL_MODES = byTier("full");
+  renderCategories();
+}
 let curRotation = {};
 let curPlaying = "";
 let curMode = "smart";   // cfg.mode: "smart" (energi styr) eller en specifik effekt (manuellt)

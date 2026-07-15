@@ -16,6 +16,7 @@ import { readFileSync, existsSync } from "node:fs";
 import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import type { Frame } from "./analyser.js";
+import { EFFECT_MAP, EFFECT_META } from "./effects/registry.js";
 
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -224,7 +225,9 @@ export async function startServer(
       // @fastify/websocket v10+ passes the raw WebSocket; older versions pass
       // a SocketStream with `.socket`. Support both.
       const sock: any = (conn as any).socket ?? conn;
-      // Send initial state
+      // Send initial state — effekt-katalogen (en sanningskälla för UI-listorna)
+      // följt av configen.
+      sock.send(JSON.stringify({ type: "effects", effects: EFFECT_META }));
       sock.send(JSON.stringify({ type: "config", config: deps.cfg }));
 
       // Push frame samples at 20 Hz for the level meter
@@ -358,7 +361,7 @@ export async function startServer(
 
 function isMode(m: unknown): m is Mode {
   return typeof m === "string" &&
-    ["smart", "drops", "party", "chase", "wave", "cycle", "breathe", "tide", "snap", "bounce", "mono", "aurora", "drift", "sweep", "pulse", "strobe", "rave", "eq", "flip", "gallop", "twin", "blackout"].includes(m);
+    (m === "smart" || m === "blackout" || EFFECT_MAP.has(m as Mode));
 }
 const clamp01 = (x: number) => typeof x === "number" && x >= 0 && x <= 1 ? x : 0;
 

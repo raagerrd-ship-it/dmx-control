@@ -9,6 +9,10 @@
 import type { EngineConfig, FixtureConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import type { Frame } from "./analyser.js";
+import { EFFECT_MAP, TIER } from "./effects/registry.js";
+import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
+import { hsvToRgb } from "./effects/color.js";
+import type { EffectContext } from "./effects/types.js";
 
 export class EffectEngine {
   private universe = new Uint8Array(512);
@@ -283,9 +287,9 @@ export class EffectEngine {
       const intensity = this.cfg.energyDrivesMode ? Math.max(0, Math.min(1, 0.5 + (this.intensityEma - baseline) / 0.30)) : 0.5;
         // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
-        const LUGN: Mode[] = ["cycle", "breathe", "tide", "mono", "aurora", "drift", "twin"];
-        const FART: Mode[] = ["wave", "chase", "drops", "sweep", "pulse", "eq"];
-        const FULLFART: Mode[] = ["party", "snap", "bounce", "strobe", "rave", "flip", "gallop"];
+        const LUGN = TIER.lugn;
+        const FART = TIER.fart;
+        const FULLFART = TIER.full;
         const bpm = this.cfg.beat?.bpm ?? 0;
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
         // Fasta trösklar på (relativ) energi. Ingen bpm-sänkning längre — den
@@ -353,9 +357,9 @@ export class EffectEngine {
         this.phraseBeat = 0;
         this.pickPalette(frame.centroid);
       }
-      CURRENT_PALETTE = PALETTES[this.paletteIdx].sectors;
+      setPalette(PALETTES[this.paletteIdx].sectors);
     } else {
-      CURRENT_PALETTE = ALL_SECTORS;                       // manuella lägen: obegränsad färg
+      setPalette(ALL_SECTORS);                             // manuella lägen: obegränsad färg
     }
 
     // Advance the wave phase by dt so speed changes glide instead of jumping.
@@ -452,7 +456,8 @@ export class EffectEngine {
     // twin) har redan rumslig struktur → undantagna.
     const ANCHOR_MODES = new Set<Mode>(["party", "snap", "bounce", "strobe", "chase", "wave"]);
     const useAnchor = this.cfg.scenicAnchor && count >= 3 && ANCHOR_MODES.has(effMode);
-    const anchorHue = (CURRENT_PALETTE[CURRENT_PALETTE.length - 1] ?? 0) / 6;   // palettens djupaste ton
+    const anchorPal = currentPalette();
+    const anchorHue = (anchorPal[anchorPal.length - 1] ?? 0) / 6;   // palettens djupaste ton
 
     // STEREO COLOR ECHO: sista lampan renderar de färger FÖRSTA lampan hade ~120ms
     // (6 tick) sedan → färgen "flyger" V→H som ett eko, ger arenabredd på 4 lampor.
@@ -463,12 +468,59 @@ export class EffectEngine {
     const echoOld = echoOn ? this.echoBuf[this.echoPos] : undefined;   // 6 tick gammalt (strax överskrivet)
     let lamp0: [number, number, number] = [0, 0, 0];
 
+    // ── EFFEKT-KONTEXT (framräknat en gång per frame; idx/fx/band muteras per
+    // lampa så samma objekt återanvänds → ingen allokering i loopen) ──────────
+    let beatIdx = 0, beatFrac = 0;
+    if (this.cfg.beat && this.cfg.beat.bpm > 40) {
+      const bMs = 60000 / this.cfg.beat.bpm;
+      const sinceB = Date.now() - this.cfg.beat.anchorMs;
+      beatIdx = Math.floor(sinceB / bMs);
+      beatFrac = ((sinceB % bMs) + bMs) % bMs / bMs;
+    }
+    const beatPulse = Math.pow(1 - beatFrac, 2);   // mjuk puls-envelope (0..1) per takt
+    const beatMs2 = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
+    const tempoDeep = Math.max(0, Math.min(1, (beatMs2 - 340) / 260));   // 0 snabbt .. 1 långsamt
+    const punchFloor = 0.5 - tempoDeep * 0.42;                            // 0.5 (snabbt) .. 0.08 (långsamt)
+    const normB = 1 / Math.max(0.15, this.cfg.detection?.autoGainTarget ?? 0.5);
+    const bands = [
+      Math.min(1, frame.energy * normB * 0.9),
+      Math.min(1, frame.mid * normB * 1.0),      // RIKTIGA mellanbandet (röst/synth/virvel)
+      Math.min(1, frame.treble * normB * 1.1),
+      Math.min(1, frame.energy * normB * 0.45 + kickEnv),
+      Math.max(0, (0.5 - audio) * 2) * 0.6,      // "low": lugn glöd när tyst, ur vägen när högt
+    ];
+    const BAND_IDX = { bass: 0, mid: 1, treble: 2, kick: 3, low: 4 } as const;
+    const dyn = Math.max(0, Math.min(1, this.cfg.dynamics ?? 0.6));
+    const shaped = (floor: number, x: number) => {
+      const f = floor * (1 - dyn);
+      return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.2));
+    };
+    const hasBeat = !!(this.cfg.beat && this.cfg.beat.bpm > 40);
+    const mclk = (beatsPerStep: number, secPerStep: number) =>
+      hasBeat ? Math.floor(beatIdx / beatsPerStep) : Math.floor(t / secPerStep);
+    const effect = EFFECT_MAP.get(effMode);
+    const ctx: EffectContext = {
+      cfg: this.cfg, frame, fx: undefined, t, idx: 0, count,
+      audio, kickEnv, band: 0,
+      beatIdx, beatFrac, beatPulse, hasBeat,
+      wavePhase: this.wavePhase, buildUp: this.buildUp, phaseSpread: 1 + this.buildUp * 2.5,
+      punchFloor, chasePos: this.chasePos,
+      dropFired: this.dropFired, dropHue: this.dropHue, now: performance.now(),
+      mixedSector, mclk, hsv: hsvToRgb, shaped,
+    };
+
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const isAnchor = useAnchor && i > 0 && i < count - 1;   // mittlamporna = ankare
-      const rgb = isAnchor
-        ? hsvToRgb(anchorHue, 1, 0.4 + 0.06 * Math.sin(t * 0.5 + i))   // fast pelare, knappt levande andning
-        : pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, this.buildUp, effMode);
+      let rgb: [number, number, number];
+      if (isAnchor) {
+        rgb = hsvToRgb(anchorHue, 1, 0.4 + 0.06 * Math.sin(t * 0.5 + i));   // fast pelare, knappt levande andning
+      } else {
+        ctx.idx = i;
+        ctx.fx = fx;
+        ctx.band = fx?.bands?.length ? Math.max(...fx.bands.map((b) => bands[BAND_IDX[b]])) : bands[i % bands.length];
+        rgb = effect ? effect.render(ctx) : [0, 0, 0];
+      }
       if (echoOn && i === 0) { lamp0 = [rgb[0], rgb[1], rgb[2]]; }
       else if (echoOn && echoOld && i === count - 1) { rgb[0] = echoOld[0]; rgb[1] = echoOld[1]; rgb[2] = echoOld[2]; }
       if (bloom) {
@@ -597,330 +649,6 @@ function writeFixture(
       case "strobe": u[ch] = Math.max(0, Math.min(255, strobeVal)); break;  // 8-255 = fixture strobe, faster when higher
       case "unused": break;
     }
-  }
-}
-
-function pickColor(
-  cfg: EngineConfig,
-  t: number,
-  idx: number,
-  count: number,
-  audio: number,
-  kickEnv: number,
-  frame: Frame,
-  chasePos: number,
-  fx?: FixtureConfig,
-  dropFired: number[] = [],
-  dropHue: number[] = [],
-  wavePhase = 0,
-  buildUp = 0,
-  modeOverride?: Mode,
-): [number, number, number] {
-  const { monoHue, cometHue, splitHueA, splitHueB } = cfg;
-  const mode = modeOverride ?? cfg.mode;
-  // Taktindex/fas från den lokala BPM-klockan — för beat-låsta lägen.
-  let beatIdx = 0, beatFrac = 0;
-  if (cfg.beat && cfg.beat.bpm > 40) {
-    const beatMs = 60000 / cfg.beat.bpm;
-    const since = Date.now() - cfg.beat.anchorMs;
-    beatIdx = Math.floor(since / beatMs);
-    beatFrac = ((since % beatMs) + beatMs) % beatMs / beatMs;
-  }
-  const beatPulse = Math.pow(1 - beatFrac, 2);   // mjuk puls-envelope (0..1) per takt
-  // Tempo-djup: långsamt tempo → djup punch (lågt golv); snabbt → grunt (mot flimmer).
-  const beatMs2 = cfg.beat && cfg.beat.bpm > 40 ? 60000 / cfg.beat.bpm : 500;
-  const tempoDeep = Math.max(0, Math.min(1, (beatMs2 - 340) / 260));   // 0 snabbt .. 1 långsamt
-  const punchFloor = 0.5 - tempoDeep * 0.42;                            // 0.5 (snabbt) .. 0.08 (långsamt)
-  // Dynamics: lower floors + gamma on the audio-driven part, so quiet passages
-  // go dim and beats punch. dyn=0 reproduces the old flat curves.
-  // Per-fixture band drive: each lamp breathes with its own slice of the
-  // spectrum (bass / mids / treble / kick) so pure-colored lamps still feel
-  // alive and independent — full 0..100% swing per color.
-  const norm = 1 / Math.max(0.15, cfg.detection?.autoGainTarget ?? 0.5);
-  const bands = [
-    Math.min(1, frame.energy * norm * 0.9),
-    Math.min(1, frame.mid * norm * 1.0),      // RIKTIGA mellanbandet (röst/synth/virvel) — var 'audio'
-    Math.min(1, frame.treble * norm * 1.1),
-    Math.min(1, frame.energy * norm * 0.45 + kickEnv),
-    // "low": calm glow when the music is quiet, out of the way when loud.
-    Math.max(0, (0.5 - audio) * 2) * 0.6,
-  ];
-  const BAND_IDX = { bass: 0, mid: 1, treble: 2, kick: 3, low: 4 } as const;
-  const band = fx?.bands?.length
-    ? Math.max(...fx.bands.map((b) => bands[BAND_IDX[b]]))
-    : bands[idx % bands.length];
-  const dyn = Math.max(0, Math.min(1, cfg.dynamics ?? 0.6));
-  const shaped = (floor: number, x: number) => {
-    const f = floor * (1 - dyn);
-    return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.2));
-  };
-  // MUSIK-KLOCKA: stega färgbyten på TAKTSLAG när vi har en takt (så bytena
-  // landar musikaliskt = "programmerat"), annars på tid (ambient i tystnad).
-  const hasBeat = !!(cfg.beat && cfg.beat.bpm > 40);
-  const mclk = (beatsPerStep: number, secPerStep: number) =>
-    hasBeat ? Math.floor(beatIdx / beatsPerStep) : Math.floor(t / secPerStep);
-  // FASFÖRSKJUTEN RISER: under en uppbyggnad dras lampornas fas gradvis isär →
-  // koordinerad våg (buildUp 0) blir kaotiskt svep tvärs riggen (buildUp 1),
-  // "slits isär av energin" precis innan dropen synkar allt.
-  const phaseSpread = 1 + buildUp * 2.5;
-  switch (mode) {
-    case "party": {
-      // Full fart: FÄRGKAOS-PUMP — varje lampa egen ren färg (blandas om varje
-      // takt) och hela riggen THROBBAR hårt: mörk mellan slagen, full på beatet.
-      // Fast lågt golv (12%) så pumpen verkligen syns — det är partyts signatur.
-      const hue = mixedSector(beatIdx + idx * 2) / 6;
-      const pump = Math.min(1, beatPulse * 1.0 + kickEnv * 0.7);
-      const v = 0.12 + 0.88 * pump;
-      return hsvToRgb(hue, 1, v);
-    }
-    case "drops": {
-      // Every beat paints the next lamp in a fresh pure color that decays —
-      // overlapping decays turn the rhythm into moving splashes of color.
-      const since = (performance.now() - (dropFired[idx] ?? -1e9)) / 1000;
-      const v = Math.exp(-since / 0.55) * (0.6 + 0.4 * Math.min(1, audio + kickEnv));
-      return hsvToRgb(dropHue[idx] ?? 0, 1, Math.min(1, v));
-    }
-    case "wave": {
-      // Flödande FÄRGVÅG: varje lampa har sin egen rena färg och hela regnbågen
-      // glider över riggen. Full rigg tänd med en mjuk ljusvåg ovanpå — handlar
-      // om FÄRG i rörelse, till skillnad från sweep (en färg) och chase (gles).
-      const base = 0.55 + 0.45 * Math.sin(wavePhase - idx * 1.3 * phaseSpread);
-      const hue = mixedSector(idx + Math.floor(wavePhase * 0.4)) / 6;
-      // + diskant-glitter: hi-hats/cymbaler ger en snabb ljusflick ovanpå vågen.
-      const v = shaped(0.12, base * (0.35 + audio * 0.7) + kickEnv * 0.2 + frame.treble * 0.35);
-      return hsvToRgb(hue, 1, v);
-    }
-    case "cycle": {
-      // Lugn: alla lampor andas TILLSAMMANS medan färgen vandrar runt hjulet —
-      // ett mjukt skimmer. Varje lampa reagerar dessutom på SITT frekvensband
-      // (bas/mellan/diskant) → ett dämpat spatialt spektrum. Golv 30%.
-      const hue = mixedSector(mclk(8, 6)) / 6;                  // ny färg var 8:e takt (eller 6s)
-      const shimmer = 0.5 + 0.5 * Math.sin(t * 0.9 + idx * 1.4 * phaseSpread);
-      const m = Math.min(1, 0.35 + shimmer * 0.4 + band * 0.35);
-      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
-    }
-    case "breathe": {
-      // Lugnast: hela riggen andas UNISONT i EN långsamt vandrande färg — djup,
-      // symmetrisk swell (lång mjuk in-/utandning). Golv 30% så den aldrig släcks.
-      const hue = mixedSector(Math.floor(t / 11)) / 6;
-      const breath = 0.5 + 0.5 * Math.sin(t * 0.7);
-      const m = Math.min(1, breath * 0.85 + audio * 0.2);
-      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
-    }
-    case "tide": {
-      // Lugn: en långsam våg sköljer i PAR över riggen — en rumslig fade som
-      // vandrar sida till sida. Golv 30%.
-      const wash = 0.5 + 0.5 * Math.sin(t * 0.9 - idx * 1.0 * phaseSpread);
-      const pair = Math.floor(idx / 2);
-      const hue = mixedSector(pair + mclk(8, 9)) / 6;           // ny färg var 8:e takt (eller 9s)
-      const m = Math.min(1, 0.3 + wash * 0.55 + band * 0.3);   // per-lampa frekvensband
-      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
-    }
-    case "snap": {
-      // Full fart: UNISONT FÄRGSLAG — alla lampor SAMMA färg, KONSTANT ljus (ingen
-      // pump), hård kapning till en NY färg exakt på taktslaget. Läser som en
-      // färg-slideshow i takt; snabb fade ger färgsläp i själva kapet. Motsats
-      // till party (mörk throb) och rave (spatial växling).
-      const hue = mixedSector(beatIdx) / 6;
-      const v = Math.min(1, 0.9 + audio * 0.1);
-      return hsvToRgb(hue, 1, v);
-    }
-    case "bounce": {
-      // Full fart: en SKARP ljuspunkt studsar fram och tillbaka, ett steg per
-      // takt, kort efterglöd, mörk rigg emellan. Gles och kinetisk; ny ren färg
-      // vid varje studs-steg.
-      const span = Math.max(1, count - 1);
-      const cyc = beatIdx % (span * 2);
-      const pos = cyc <= span ? cyc : span * 2 - cyc;   // triangel-våg
-      const d = Math.abs(idx - pos);
-      const hue = mixedSector(beatIdx) / 6;
-      const v = Math.exp(-d * 1.7) * Math.min(1, 0.85 + beatPulse * 0.15 + kickEnv * 0.4);
-      return hsvToRgb(hue, 1, v);
-    }
-    case "aurora": {
-      // Lugn: varje lampa håller sin EGEN långsamt driftande färg med mjuka,
-      // OBEROENDE korsfades — likt norrsken där färgerna glider var för sig.
-      // Golv 30%.
-      const hue = mixedSector(idx * 2 + mclk(8, 7)) / 6;        // ny färg var 8:e takt (eller 7s)
-      const wash = 0.5 + 0.5 * Math.sin(t * 0.45 - idx * 1.3 * phaseSpread);
-      const m = Math.min(1, 0.4 + wash * 0.45 + band * 0.25);   // per-lampa frekvensband
-      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
-    }
-    case "drift": {
-      // Ambient: hela riggen i EN mycket långsamt driftande färg, knappt någon
-      // rörelse — nära stillastående glöd som sakta byter färg. Golv 30%.
-      const hue = mixedSector(Math.floor(t / 16)) / 6;
-      const m = Math.min(1, 0.62 + 0.18 * Math.sin(t * 0.35) + audio * 0.15);
-      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
-    }
-    case "sweep": {
-      // Enfärgad SPOTLIGHT: ETT smalt ljusband glider mjukt över en mörk rigg —
-      // hög kontrast, en färg i taget. Motsats till wave (full rigg, många färger).
-      const headPos = (wavePhase * 0.5) % count;
-      let dd = Math.abs(idx - headPos);
-      if (dd > count / 2) dd = count - dd;   // wrap
-      const hue = mixedSector(mclk(4, 5)) / 6;                  // ny färg var 4:e takt (eller 5s)
-      const v = shaped(0.05, Math.exp(-dd * 1.9) * (0.75 + audio * 0.4) + kickEnv * 0.15);
-      return hsvToRgb(hue, 1, v);
-    }
-    case "pulse": {
-      // Fart: hela riggen samma färg, pulsar på beatet; färg stegar var fjärde takt.
-      const hue = mixedSector(Math.floor(beatIdx / 4)) / 6;
-      const v = punchFloor + (1 - punchFloor) * Math.min(1, beatPulse * 0.85 + audio * 0.25);
-      return hsvToRgb(hue, 1, v);
-    }
-    case "strobe": {
-      // Full fart: hårdvarustrobe (CH5 sätts i render); färgen cyklar snabbt, fullt ljus.
-      const hue = mixedSector(beatIdx) / 6;
-      return hsvToRgb(hue, 1, 1);
-    }
-    case "rave": {
-      // Full fart: TVÅFÄRGS-VÄXELSPEL — riggen delas varannan lampa i två grupper
-      // med KONTRASTFÄRGER (motsatta sidor av hjulet) som PINGPONGAR plats varje
-      // takt, HELT släckt grupp emellan. Färgparet är STABILT i 4 takter så ögat
-      // ser tydligt "A / B / A / B" (på 3 lampor: 0,2 mot 1) — inte färgbyte varje
-      // slag som gör den lik party/snap.
-      const even = idx % 2 === 0;
-      const flip = beatIdx % 2 === 0;
-      const lit = even === flip;
-      const pairBase = mixedSector(Math.floor(beatIdx / 4));
-      const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;
-      return hsvToRgb(hue, 1, lit ? 1 : 0);
-    }
-    case "flip": {
-      // CALL-AND-RESPONSE: två grupper (varannan lampa) är BÅDA tända men BYTER
-      // kontrastfärg på varje taktslag → A/B/A/B utan att släckas (mjukare än
-      // rave, som mörklägger ena gruppen). Färgparet byts var 8:e takt. Med
-      // transient-skärpan kapar färgbytet stenhårt.
-      const even = idx % 2 === 0;
-      const onBeatA = beatIdx % 2 === 0;
-      const pairBase = mixedSector(Math.floor(beatIdx / 8));
-      const useA = even === onBeatA;
-      const hue = ((useA ? pairBase : pairBase + 3) % 6) / 6;   // motfärger mellan grupperna
-      const v = 0.6 + 0.4 * Math.min(1, beatPulse * 0.7 + audio * 0.3);   // båda ljusa, lätt puls
-      return hsvToRgb(hue, 1, v);
-    }
-    case "gallop": {
-      // Full fart: GALLOPP — två grupper (varannan lampa) slår OMLOTT: grupp A
-      // exakt på taktslaget, grupp B på off-beatet (&) → dubbel upplevd rytm,
-      // ett "dun-ka dun-ka" tvärs riggen. Kontrastfärger per grupp, mörk mellan
-      // slagen. Färgparet byts var 4:e takt. (Rave = grupp släcks helt, flip =
-      // båda tända & byter färg; gallop = grupperna delar RYTMEN i off-beat.)
-      const even = idx % 2 === 0;
-      const offFrac = (beatFrac + 0.5) % 1;                  // off-beatets fas
-      const offPulse = Math.pow(1 - offFrac, 2);
-      const groupPulse = even ? beatPulse : offPulse;        // A on-beat, B off-beat
-      const pairBase = mixedSector(Math.floor(beatIdx / 4));
-      const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;   // motfärger
-      const v = 0.1 + 0.9 * Math.min(1, groupPulse * (0.85 + audio * 0.3) + kickEnv * 0.2);
-      return hsvToRgb(hue, 1, v);
-    }
-    case "twin": {
-      // Lugn CALL-AND-RESPONSE: två grupper (varannan lampa) andas i MOTFAS —
-      // när grupp A stiger sjunker grupp B, som ett stilla anrop-och-svar. Grupp A
-      // varm ton, grupp B kall kontrastfärg. Golv 30%. Färgvandring var 8:e takt.
-      const even = idx % 2 === 0;
-      const wash = 0.5 + 0.5 * Math.sin(t * 0.8 + (even ? 0 : Math.PI) - idx * 0.4 * phaseSpread);
-      const pairBase = mixedSector(mclk(8, 10));
-      const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;
-      const m = Math.min(1, wash * 0.7 + band * 0.3);
-      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
-    }
-    case "chase": {
-      // Snabb LÖPARE: skarpt huvud som hoppar ETT steg per taktslag, kort svans,
-      // och BYTER ren färg medan det springer → rytmiskt och gles, inte en jämn
-      // glidning (sweep) eller full färgvåg (wave).
-      const d = Math.abs(idx - chasePos);
-      const tail = Math.exp(-d * 1.6);
-      const hue = mixedSector(chasePos + Math.floor(t / 4)) / 6;
-      const v = Math.min(1, tail * shaped(0.22, 0.55 + audio * 0.55 + kickEnv * 0.5));
-      return hsvToRgb(hue, 1, v);
-    }
-    case "mono": {
-      // Lugn men LEVANDE: en brasa/glöd. Varje lampa flimrar organiskt (lager av
-      // sinusar i otakt, inte hård random), färgen glider rött→bärnsten→gult när
-      // lågan flammar upp, och den andas som eld. Varm ton (ej snäppt). Golv 30%.
-      const flick = Math.sin(t * 6.7 + idx * 2.3) * 0.5
-                  + Math.sin(t * 10.9 + idx * 4.1) * 0.3
-                  + Math.sin(t * 17.3 + idx * 1.7) * 0.2;   // -1..1 organiskt
-      const ember = 0.5 + 0.5 * flick;                      // 0..1 glöd
-      const hue = 0.015 + 0.11 * ember;                     // rött → gult
-      const m = Math.min(1, 0.4 + ember * 0.45 + kickEnv * 0.3);
-      return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
-    }
-    case "eq": {
-      // 3-band spektrum-EQ över riggen: varje lampa = ETT band i EN ren färg,
-      // ljusstyrkan = bandets energi. Bas→Röd, Mellan→Grön, Diskant→Blå.
-      // Använder bara EN R/G/B-kanal per lampa → perfekt för rena färger.
-      const bandIdx = count > 1 ? idx % 3 : -1;
-      const r = Math.min(1, frame.energy * 1.7);
-      const g = Math.min(1, frame.mid * 1.9);
-      const b = Math.min(1, frame.treble * 1.9);
-      if (bandIdx === 0) return [Math.max(0.05, r), 0, 0];   // bas → röd
-      if (bandIdx === 1) return [0, Math.max(0.05, g), 0];   // mellan → grön
-      if (bandIdx === 2) return [0, 0, Math.max(0.05, b)];   // diskant → blå
-      return [Math.max(0.05, r), Math.max(0.05, g), Math.max(0.05, b)];   // enda lampa: full mix
-    }
-    default:
-      return [0, 0, 0];
-  }
-}
-
-// Per-fixture hue-sector hold: raw hues near a 60° boundary would otherwise
-// flip between two pure colors many times a second (reads as color flicker).
-// Only leave the held sector once the raw hue is clearly past the boundary.
-// Low-discrepancy color walk: golden-ratio jumps visit every pure color in a
-// varied, non-sequential order (red→blue→yellow→…) instead of stepping around
-// the circle neighbor by neighbor.
-// Färg-sektorer: 0=röd 1=gul 2=grön 3=cyan 4=blå 5=magenta.
-const ALL_SECTORS = [0, 1, 2, 3, 4, 5];
-// Kurerade RGB-vänliga paletter för regi-lagret. temp styr centroid-valet
-// (mörk klang → warm, ljus klang → cool).
-const PALETTES: { name: string; sectors: number[]; temp: "warm" | "cool" | "neutral" }[] = [
-  { name: "Eld",      sectors: [0, 1, 5], temp: "warm" },    // röd / gul / magenta
-  { name: "Guldfest", sectors: [0, 1, 2], temp: "warm" },    // röd / gul / grön
-  { name: "Primär",   sectors: [0, 2, 4], temp: "neutral" }, // röd / grön / blå
-  { name: "Skogsdis", sectors: [1, 2, 3], temp: "cool" },    // gul / grön / cyan
-  { name: "Djupblå",  sectors: [3, 4, 5], temp: "cool" },    // cyan / blå / magenta
-];
-// Regi-lagret sätter denna varje frame; mixedSector begränsar färgvalet till den.
-let CURRENT_PALETTE: number[] = ALL_SECTORS;
-
-function mixedSector(n: number): number {
-  const g = Math.floor(((((n * 0.61803398875) % 1) + 1) % 1) * 6);   // golden-vandring 0–5
-  return CURRENT_PALETTE[g % CURRENT_PALETTE.length];                 // mappa in i aktiv palett
-}
-
-const sectorHold: number[] = [];
-function snapHue(idx: number, h: number): number {
-  const raw = (((h * 6) % 6) + 6) % 6;
-  let cur = sectorHold[idx];
-  if (cur === undefined) cur = sectorHold[idx] = Math.round(raw) % 6;
-  let d = raw - cur;
-  if (d > 3) d -= 6; else if (d < -3) d += 6;
-  if (Math.abs(d) > 0.65) sectorHold[idx] = cur = ((Math.round(raw) % 6) + 6) % 6;
-  return cur / 6;
-}
-
-function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
-  // Physical PARs with big discrete R/G/B LEDs can't blend hues — anything
-  // between the six pure corner colors lights the LED groups unevenly and
-  // looks muddy. Snap hue to 60° steps and saturation to pure color/white;
-  // all smoothness lives in brightness (v) instead.
-  // hue arrives sector-snapped via snapHue(); saturation stays pure/white
-  s = s >= 0.5 ? 1 : 0;
-  const i = Math.floor(h * 6);
-  const f = h * 6 - i;
-  const p = v * (1 - s);
-  const q = v * (1 - f * s);
-  const t = v * (1 - (1 - f) * s);
-  switch (i % 6) {
-    case 0: return [v, t, p];
-    case 1: return [q, v, p];
-    case 2: return [p, v, t];
-    case 3: return [p, q, v];
-    case 4: return [t, p, v];
-    default: return [v, p, q];
   }
 }
 
