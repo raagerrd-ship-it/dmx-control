@@ -33,6 +33,8 @@ export interface EffectContext {
   kickEnv: number;
   /** Lampans frekvensband (bas/mellan/diskant/kick/low) 0..1. */
   band: number;
+  /** Alla normaliserade band [bas, mellan, diskant, kick, low] 0..1 (för eq/spektrum). */
+  bands: number[];
 
   /** Taktindex + fas (0..1) från BPM-klockan; beatPulse = mjuk puls-envelope. */
   beatIdx: number;

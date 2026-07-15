@@ -1,19 +1,24 @@
 import type { EffectDef } from "./types.js";
 
 // 3-band spektrum-EQ över riggen: varje lampa = ETT band i EN ren färg,
-// ljusstyrkan = bandets energi. Bas→Röd, Mellan→Grön, Diskant→Blå. Använder bara
-// EN R/G/B-kanal per lampa → perfekt för rena färger.
+// ljusstyrkan = bandets NORMALISERADE energi (c.bands: bas/mellan/diskant, redan
+// skalade till 0..1). Bas→Röd, Mellan→Grön, Diskant→Blå. En lätt gamma ger punch
+// och ett golv så en tyst mätare glöder svagt i stället för att slockna helt.
+// (Motorn kör eq med STADIG master — ingen beatPulse-dipp — och utanför VU-taket
+// så den läser som en ren spektrum-mätare, inte en pulsande show-effekt.)
 export const eq: EffectDef = {
   key: "eq", label: "Spektrum", tier: "fart",
   desc: "3-band-EQ: bas→röd lampa, mellan→grön, diskant→blå. Visar ljudets färg.",
   render(c) {
+    const FLOOR = 0.1;
+    const bar = (x: number) => Math.max(FLOOR, Math.min(1, Math.pow(x, 0.75)));   // lätt gamma → punchigare
+    const r = bar(c.bands[0]);   // bas
+    const g = bar(c.bands[1]);   // mellan
+    const b = bar(c.bands[2]);   // diskant
     const bandIdx = c.count > 1 ? c.idx % 3 : -1;
-    const r = Math.min(1, c.frame.energy * 1.7);
-    const g = Math.min(1, c.frame.mid * 1.9);
-    const b = Math.min(1, c.frame.treble * 1.9);
-    if (bandIdx === 0) return [Math.max(0.05, r), 0, 0];   // bas → röd
-    if (bandIdx === 1) return [0, Math.max(0.05, g), 0];   // mellan → grön
-    if (bandIdx === 2) return [0, 0, Math.max(0.05, b)];   // diskant → blå
-    return [Math.max(0.05, r), Math.max(0.05, g), Math.max(0.05, b)];   // enda lampa: full mix
+    if (bandIdx === 0) return [r, 0, 0];   // bas → röd
+    if (bandIdx === 1) return [0, g, 0];   // mellan → grön
+    if (bandIdx === 2) return [0, 0, b];   // diskant → blå
+    return [r, g, b];                      // enda lampa: full mix
   },
 };
