@@ -133,7 +133,7 @@ capture.start();
 
 // Shared mode cycler — used by both the physical button and the WS "cycleMode" message,
 // so UI and hardware follow the exact same path.
-let server: Server;
+let server: Server | undefined;
 const cycleMode = (): Mode => {
   // Filter to modes the user has enabled in rotation; fall back to the full
   // list if they disabled everything so the button never becomes a no-op.
@@ -142,7 +142,7 @@ const cycleMode = (): Mode => {
   const cur = list.indexOf(cfg.mode);
   cfg.mode = list[(cur + 1) % list.length];
   scheduleSave(cfg);
-  server.broadcastConfig();
+  server?.broadcastConfig();   // kan anropas innan `server` tilldelats (WS i startfönstret)
   return cfg.mode;
 };
 
@@ -206,7 +206,7 @@ if (cfg.modeButton) {
     applyAggressiveness(next);
     console.log(`[button] AGC → ${next === AGC_CALM ? "Lugn" : "Aggressiv"} (tauUp=${cfg.detection.tauUp.toFixed(1)}s)`);
     scheduleSave(cfg);
-    server.broadcastConfig();
+    server?.broadcastConfig();
   });
   button.on("stderr", (s) => console.error("[gpiomon]", s));
   button.on("exit", (code) => console.error("[gpiomon] exited", code));

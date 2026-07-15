@@ -76,6 +76,14 @@ export class AudioCapture extends EventEmitter {
       this.emit("exit", code);
       if (!this.stopped) setTimeout(() => this.spawnArecord(), 1000);
     });
+    // 'error' fyrar om själva spawn:en failar (arecord saknas på PATH, eller
+    // EAGAIN när fork inte får minne på 512MB-Pi:n). Utan denna lyssnare skulle
+    // ChildProcess kasta ett ohanterat fel → hela motorn kraschar; och 'exit'
+    // fyrar INTE vid spawn-fel, så respawn:en ovan uteblir. Respawna här i stället.
+    p.on("error", (err) => {
+      this.emit("stderr", `spawn: ${(err as Error).message}`);
+      if (!this.stopped) setTimeout(() => this.spawnArecord(), 1000);
+    });
   }
 
   private onData(buf: Buffer) {

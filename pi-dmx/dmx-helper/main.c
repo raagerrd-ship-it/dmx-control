@@ -61,6 +61,10 @@ static volatile sig_atomic_t g_running = 1;
 static uint8_t  g_universe[2][DMX_MAX_SLOTS];
 static _Atomic int g_slots[2] = { DMX_MIN_SLOTS, DMX_MIN_SLOTS };
 static _Atomic int g_active_idx = 0;
+/* Seqlock: skyddar mot en TORN READ när skrivaren hinner flippa TVÅ gånger under
+ * tx-trådens memcpy (då landar den andra skrivningen i just den buffert läsaren
+ * kopierar). Udda = skrivning pågår; läsaren gör om kopian om seq ändrats. */
+static _Atomic unsigned g_seq = 0;
 
 /* Trigger from main thread → tx thread when new frame arrives */
 static pthread_mutex_t g_trigger_mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -107,9 +111,11 @@ static void ts_add_ns(struct timespec *t, long ns) {
 
 static int set_rt_priority(int prio) {
     struct sched_param p = { .sched_priority = prio };
-    if (pthread_setschedparam(pthread_self(), SCHED_FIFO, &p) != 0) {
+    /* pthread-funktioner returnerar felkoden, de sätter INTE errno. */
+    int rc = pthread_setschedparam(pthread_self(), SCHED_FIFO, &p);
+    if (rc != 0) {
         fprintf(stderr, "warn: SCHED_FIFO failed (%s) — running at normal prio\n",
-                strerror(errno));
+                strerror(rc));
         return -1;
     }
     return 0;
@@ -129,12 +135,20 @@ static void *tx_thread(void *arg) {
     clock_gettime(CLOCK_MONOTONIC, &next);
 
     while (g_running) {
-        /* Snapshot current universe + slot count */
-        int idx   = atomic_load(&g_active_idx);
-        int slots = atomic_load(&g_slots[idx]);
-        if (slots < DMX_MIN_SLOTS) slots = DMX_MIN_SLOTS;
-        if (slots > DMX_MAX_SLOTS) slots = DMX_MAX_SLOTS;
-        memcpy(frame + 1, g_universe[idx], slots);
+        /* Snapshot current universe + slot count via seqlock: gör om kopian om
+         * skrivaren rörde bufferten under memcpy (odd seq eller ändrad seq). I
+         * praktiken aldrig fler än ett varv (skrivning ~50 Hz, kopian µs). */
+        int slots;
+        unsigned s1, s2;
+        do {
+            s1 = atomic_load_explicit(&g_seq, memory_order_acquire);
+            int idx = atomic_load(&g_active_idx);
+            slots = atomic_load(&g_slots[idx]);
+            if (slots < DMX_MIN_SLOTS) slots = DMX_MIN_SLOTS;
+            if (slots > DMX_MAX_SLOTS) slots = DMX_MAX_SLOTS;
+            memcpy(frame + 1, g_universe[idx], slots);
+            s2 = atomic_load_explicit(&g_seq, memory_order_acquire);
+        } while ((s1 & 1u) || s1 != s2);
 
         /* Break + MAB + data + drain */
         ioctl(fd, TIOCSBRK, 0);
@@ -142,8 +156,13 @@ static void *tx_thread(void *arg) {
         ioctl(fd, TIOCCBRK, 0);
         sleep_ns(MAB_US * 1000L);
         int frame_bytes = 1 + slots;
-        if (write(fd, frame, frame_bytes) != frame_bytes) {
-            perror("write");
+        /* Loopa write:en — en kort/EINTR-write skulle annars skicka en trunkerad
+         * DMX-ram; skriv tills alla bytes gått ut. */
+        ssize_t off = 0;
+        while (off < frame_bytes) {
+            ssize_t w = write(fd, frame + off, (size_t)(frame_bytes - off));
+            if (w < 0) { if (errno == EINTR) continue; perror("write"); break; }
+            off += w;
         }
         ioctl(fd, TCSBRK, 1);  /* == tcdrain(fd) */
 
@@ -193,11 +212,15 @@ static void handle_frame(const uint8_t *buf, int slots) {
                 slots, DMX_MIN_SLOTS, DMX_MAX_SLOTS);
         return;
     }
-    /* Swap-in via double-buffer: write to the inactive slot, then flip. */
+    /* Swap-in via double-buffer: write to the inactive slot, then flip.
+     * Ramma in med seqlock (udda under skrivning) så en samtidig tx-läsare
+     * gör om sin kopia om vi hann röra bufferten den läste. */
+    atomic_fetch_add_explicit(&g_seq, 1u, memory_order_release);   /* → udda */
     int inactive = atomic_load(&g_active_idx) ^ 1;
     memcpy(g_universe[inactive], buf, slots);
     atomic_store(&g_slots[inactive], slots);
     atomic_store(&g_active_idx, inactive);
+    atomic_fetch_add_explicit(&g_seq, 1u, memory_order_release);   /* → jämn (klar) */
 
     pthread_mutex_lock(&g_trigger_mtx);
     g_trigger_pending = 1;
@@ -219,9 +242,31 @@ static int read_exact(int fd, uint8_t *buf, size_t n) {
 /* ── main ─────────────────────────────────────────────────────────────── */
 
 int main(void) {
-    signal(SIGINT,  on_signal);
-    signal(SIGTERM, on_signal);
-    signal(SIGPIPE, SIG_IGN);
+    /* sigaction UTAN SA_RESTART (glibc:s signal() sätter SA_RESTART → blockande
+     * accept()/read() startar om i stället för att returnera EINTR, så SIGTERM
+     * aldrig når nedstängningen → systemd tvingas till SIGKILL vid varje deploy). */
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_handler = on_signal;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT,  &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+    struct sigaction sp;
+    memset(&sp, 0, sizeof sp);
+    sp.sa_handler = SIG_IGN;
+    sigemptyset(&sp.sa_mask);
+    sigaction(SIGPIPE, &sp, NULL);
+
+    /* Condvar MÅSTE använda CLOCK_MONOTONIC — deadline till cond_timedwait seedas
+     * med clock_gettime(CLOCK_MONOTONIC). Default (CLOCK_REALTIME) gjorde att
+     * deadline alltid låg i det förflutna → timedwait returnerade direkt varje
+     * varv → hela pacingen urkopplad, tx fri-rullade och pinnade CPU-kärnan. */
+    pthread_condattr_t cattr;
+    pthread_condattr_init(&cattr);
+    pthread_condattr_setclock(&cattr, CLOCK_MONOTONIC);
+    pthread_cond_init(&g_trigger_cv, &cattr);
+    pthread_condattr_destroy(&cattr);
 
     mlockall(MCL_CURRENT | MCL_FUTURE);
 

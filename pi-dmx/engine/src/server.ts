@@ -31,7 +31,8 @@ export function applyInputRouting(input: "aux" | "mic") {
       "amixer -c 0 -q set 'Aux' 53 on; amixer -c 0 -q set 'Mixin Left Aux Left' on; amixer -c 0 -q set 'Mixin Right Aux Right' on"
     : "amixer -c 0 -q set 'Onboard MIC' on; amixer -c 0 -q set 'AUX Jack' off; amixer -c 0 -q set 'MIC Jack' off; " +
       "amixer -c 0 -q set 'Aux' 0 off; amixer -c 0 -q set 'Mixin Left Aux Left' off; amixer -c 0 -q set 'Mixin Right Aux Right' off";
-  spawn("sh", ["-c", `alsactl restore 0 -f /etc/alsa/codec-zero-${input}.state 2>/dev/null; ${sw}`], { stdio: "ignore" });
+  spawn("sh", ["-c", `alsactl restore 0 -f /etc/alsa/codec-zero-${input}.state 2>/dev/null; ${sw}`], { stdio: "ignore" })
+    .on("error", (e) => console.error("[audioInput] spawn:", (e as Error).message));   // annars kraschar ett spawn-fel hela root-processen
 }
 
 export interface ServerDeps {
@@ -143,12 +144,14 @@ export async function startServer(
     // Detach via systemd-run so the install.sh restart of audio-dmx-engine
     // doesn't kill the updater mid-run.
     try {
-      spawn("systemd-run", [
+      const up = spawn("systemd-run", [
         "--unit=pi-dmx-update",
         "--collect",
         "--quiet",
         "/bin/bash", `${REPO}/pi-dmx/update.sh`,
-      ], { detached: true, stdio: "ignore" }).unref();
+      ], { detached: true, stdio: "ignore" });
+      up.on("error", (e) => console.error("[update] spawn:", (e as Error).message));   // ej krascha om systemd-run saknas
+      up.unref();
       return reply.send({ started: true });
     } catch (e) {
       return reply.code(500).send({ error: (e as Error).message });
@@ -207,7 +210,8 @@ export async function startServer(
     if (!hotspotSsid()) return reply.code(400).send({ error: "Ingen hotspot sparad" });
     // Detached: switching wlan0 away from the AP kills this HTTP connection,
     // so fire-and-forget and let the client show its own guidance.
-    spawn("nmcli", ["con", "up", HOTSPOT_CON], { detached: true, stdio: "ignore" }).unref();
+    spawn("nmcli", ["con", "up", HOTSPOT_CON], { detached: true, stdio: "ignore" })
+      .on("error", (e) => console.error("[wifi] spawn:", (e as Error).message)).unref();
     return { switching: true };
   });
 

@@ -13,6 +13,8 @@ import { Socket } from "node:net";
 export class DmxSender {
   private sock: Socket | null = null;
   private connected = false;
+  private closed = false;             // close() begärd → sluta återansluta
+  private reconnectScheduled = false; // undvik dubbla reconnect-timers
   private lastSent = 0;
   private minIntervalMs = 5;   // 200 Hz default; overridden by setMaxHz()
 
@@ -25,21 +27,22 @@ export class DmxSender {
     this.minIntervalMs = 1000 / clamped;
   }
 
+  private scheduleReconnect() {
+    // EN reconnect åt gången: en misslyckad anslutning avger BÅDE 'error' och
+    // 'close', och en tappad anslutning 'close' — utan denna vakt schemalade
+    // varje event en ny connect() → socketarna dubblades varje sekund (fd-storm).
+    if (this.closed || this.reconnectScheduled) return;
+    this.reconnectScheduled = true;
+    setTimeout(() => { this.reconnectScheduled = false; this.connect(); }, 1000);
+  }
+
   private connect() {
+    if (this.closed) return;
     const s = new Socket();
     s.connect(this.sockPath);
     s.on("connect", () => { this.connected = true; });
-    s.on("error", (e) => {
-      this.connected = false;
-      if ((e as NodeJS.ErrnoException).code === "ECONNREFUSED"
-          || (e as NodeJS.ErrnoException).code === "ENOENT") {
-        setTimeout(() => this.connect(), 1000);
-      }
-    });
-    s.on("close", () => {
-      this.connected = false;
-      setTimeout(() => this.connect(), 1000);
-    });
+    s.on("error", () => { this.connected = false; });   // 'close' följer och driver den enda reconnecten
+    s.on("close", () => { this.connected = false; this.scheduleReconnect(); });
     this.sock = s;
   }
 
@@ -65,5 +68,5 @@ export class DmxSender {
     this.sock.write(out);
   }
 
-  close() { this.sock?.destroy(); this.sock = null; }
+  close() { this.closed = true; this.sock?.destroy(); this.sock = null; }
 }

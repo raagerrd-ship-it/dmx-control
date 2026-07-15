@@ -28,6 +28,7 @@ export class Analyser {
   private prevMag: Float32Array;     // for flux
   private kickBaseline = 0;          // adaptiv baslinje för kick-band-flux
   private kickWasAbove = false;      // stigande-flank-detektion
+  private kickPrimed = false;        // false på första framen (skräp-flux) → ingen falsk kick
   private static readonly ENV_HZ = 100;
   private static readonly ENV_LEN = 100 * 5;
   private envRing = new Float32Array(Analyser.ENV_LEN);
@@ -321,11 +322,14 @@ export class Analyser {
     const KICK_COOLDOWN = 170;                     // ms → max ~350 BPM, hindrar sub-beat-dubbelfyr
     const above = kickFlux > kickThresh && energy > 0.06;
     let kick = false;
-    if (above && !this.kickWasAbove && now - this.lastKick > KICK_COOLDOWN) {
+    // Första framen: prevMag är noll → flux = hela spektrumet → falsk kick som
+    // annars sätter beat-ankaret / triggar drop-blixt vid start-in-i-musik. Hoppa.
+    if (above && !this.kickWasAbove && now - this.lastKick > KICK_COOLDOWN && this.kickPrimed) {
       kick = true;
       this.lastKick = now;
     }
     this.kickWasAbove = above;
+    this.kickPrimed = true;
 
     const frameMs0 = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.

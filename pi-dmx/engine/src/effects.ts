@@ -386,11 +386,12 @@ export class EffectEngine {
     const warm = this.warmMs < 8000;
     this.intensityFloor += (this.intensityEma - this.intensityFloor) * (warm ? dtSec / 3 : dtSec / 25);
 
-    // Silence gate: below threshold for 4 s → fade out over 2 s; music back →
-    // fade in fast. Mode floors otherwise keep the lamps glowing in silence.
-    // Gain-aware threshold: at high AGC gain the amplified noise floor sits
-    // well above 0.05 and read as flicker — real (even weak) music still
-    // lands near the AGC target and passes.
+    // Silence gate: below threshold for 250 ms → fade the effect out over ~0.25 s
+    // (aggressive so the light sits tight to the audio); music back → fade in fast.
+    // The warm ambient glow (below) takes over so a gap lands on amber, not black.
+    // Gain-aware threshold: at high AGC gain the amplified noise floor sits well
+    // above 0.05 and reads as flicker — real (even weak) music still lands near
+    // the AGC target and passes.
     const silenceThreshold = 0.05 * Math.max(1, frame.gain / 3);
     if (frame.level > silenceThreshold || frame.kick) this.lastActiveMs = now;
     const gateTarget = now - this.lastActiveMs > 250 ? 0 : 1;
@@ -420,7 +421,9 @@ export class EffectEngine {
     // → mjuk, värdig landning (~6s). Ger dansgolvet en snygg avslutning.
     if (this.silenceGate > 0.6) this.hotMs = Math.min(600000, this.hotMs + dtSec * 1000);
     if (this.ambient > 0.8) this.hotMs = Math.max(0, this.hotMs - dtSec * 2000);   // klingar av i djup vila
-    const ambTarget = now - this.lastActiveMs > 2500 ? 1 : 0;
+    // Börja tona in glöden så fort gaten släckt effekten (~0.6s) i stället för att
+    // vänta 2.5s → inget svart fönster mellan "effekt ute" och "glöd inne" vid låtglapp.
+    const ambTarget = now - this.lastActiveMs > 600 ? 1 : 0;
     const landTau = 1.2 + Math.min(1, this.hotMs / 180000) * 5;   // 1.2s .. 6.2s efter lång spelning
     const ambRate = ambTarget > this.ambient ? dtSec / landTau : dtSec / 0.1;   // in: adaptivt, ut: snabbt
     this.ambient += Math.max(-ambRate, Math.min(ambRate, ambTarget - this.ambient));
@@ -589,13 +592,14 @@ export class EffectEngine {
         const hasColor = roles.includes("r") || roles.includes("g") || roles.includes("b") || roles.includes("w");
         for (let r = 0; r < roles.length; r++) {
           const ch = fx.address - 1 + r;
+          if (ch < 0 || ch >= 512) continue;   // hög-adress custom-fixture får inte skriva utanför universet
           if (roles[r] === "strobe") this.strobeMask[ch] = 1;
           if (roles[r] === "r" || roles[r] === "g" || roles[r] === "b" || roles[r] === "w") this.capMask[ch] = 1;
           else if (roles[r] === "dim" && !hasColor) this.capMask[ch] = 1;
           if (ch + 1 > mx) mx = ch + 1;
         }
       }
-      this.maxCh = mx;
+      this.maxCh = Math.min(512, mx);
     }
     for (let ch = 0; ch < this.maxCh; ch++) {
       if (this.strobeMask[ch]) { this.outSmooth[ch] = this.universe[ch]; continue; }

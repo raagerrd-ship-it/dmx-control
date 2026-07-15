@@ -43,8 +43,6 @@ export interface EngineConfig {
     tauUp: number;            // seconds to raise gain (quieter)
     tauDown: number;          // seconds to lower gain (louder)
     noiseFloor: number;       // below this = silence, no gain drift
-    kickThreshold: number;    // relative to median flux
-    kickCooldownMs: number;
   };
   fixtures: FixtureConfig[];
   mode: Mode;
@@ -115,8 +113,6 @@ export const defaultConfig: EngineConfig = {
     tauUp: 90,
     tauDown: 30,
     noiseFloor: 0.003,
-    kickThreshold: 1.6,
-    kickCooldownMs: 90,
   },
   fixtures: [
     { name: "Par 1", address: 1,  preset: "rgb" },

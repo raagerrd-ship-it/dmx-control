@@ -50,24 +50,30 @@ export async function loadConfig(path = DEFAULT_PATH): Promise<EngineConfig> {
 }
 
 let saveTimer: NodeJS.Timeout | null = null;
+let saveSeq = 0;
+let inFlight: Promise<void> = Promise.resolve();
 
 export function scheduleSave(cfg: EngineConfig, path = DEFAULT_PATH, delayMs = 500) {
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
-    try {
-      await mkdir(dirname(path), { recursive: true });
-      // Strip transient fields (identify/flash overrides) from the persisted copy.
-      const { identify: _omit, flashUntil: _omit2, beat: _omit3, manualBpm: _omit4, fogTrigger: _omit5, ...persist } = cfg;
-      const data = JSON.stringify(persist, null, 2);
-      // Atomic replace: write temp, keep the prior good file as .bak, then
-      // rename over the live file. rename() is atomic on the same filesystem,
-      // so a reader (or a power loss) never sees a half-written config.
-      const tmp = `${path}.tmp`;
-      await writeFile(tmp, data, "utf8");
-      await copyFile(path, `${path}.bak`).catch(() => {});   // first save has no prior — ignore
-      await rename(tmp, path);
-    } catch (e) {
-      console.error("[persist] save failed:", e);
-    }
+  saveTimer = setTimeout(() => {
+    // Serialize saves: clearTimeout only cancels a PENDING timer, not a save
+    // callback already awaiting slow flash I/O. Without chaining, a new save
+    // could run concurrently with the in-flight one and both rename over the
+    // live file. The per-save UNIQUE temp name also stops two writers clobbering
+    // the same `.tmp` (the exact corruption the atomic-rename design prevents).
+    inFlight = inFlight.then(async () => {
+      try {
+        await mkdir(dirname(path), { recursive: true });
+        // Strip transient fields (identify/flash overrides) from the persisted copy.
+        const { identify: _omit, flashUntil: _omit2, beat: _omit3, manualBpm: _omit4, fogTrigger: _omit5, ...persist } = cfg;
+        const data = JSON.stringify(persist, null, 2);
+        const tmp = `${path}.${process.pid}.${++saveSeq}.tmp`;
+        await writeFile(tmp, data, "utf8");
+        await copyFile(path, `${path}.bak`).catch(() => {});   // first save has no prior — ignore
+        await rename(tmp, path);
+      } catch (e) {
+        console.error("[persist] save failed:", e);
+      }
+    });
   }, delayMs);
 }

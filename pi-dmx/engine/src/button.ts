@@ -100,5 +100,12 @@ export class Button extends EventEmitter {
       this.emit("exit", code);
       if (!this.stopped) setTimeout(() => this.spawn(), 2000);
     });
+    // 'error' vid spawn-fel (gpiomon saknas om gpiod ej installerat, eller EAGAIN).
+    // Utan denna: ohanterat fel → root-processen kraschar, och 'exit' fyrar inte
+    // så respawn:en uteblir. Respawna här i stället.
+    p.on("error", (err) => {
+      this.emit("stderr", `spawn: ${(err as Error).message}`);
+      if (!this.stopped) setTimeout(() => this.spawn(), 2000);
+    });
   }
 }
