@@ -309,7 +309,7 @@ export async function startServer(
             deps.cfg.manualBpm = msg.value > 0 ? Math.max(40, Math.min(220, Math.round(msg.value))) : null;
           } else if (msg.type === "setFog" && msg.fog && typeof msg.fog === "object") {
             const f = msg.fog as Record<string, unknown>;
-            const cur = deps.cfg.fog ?? { enabled: false, address: 100, onDrop: true, burstMs: 2500, cooldownMs: 25000, level: 255 };
+            const cur = deps.cfg.fog ?? { enabled: false, address: 128, onDrop: true, burstMs: 2500, cooldownMs: 25000, level: 255 };
             deps.cfg.fog = {
               enabled: typeof f.enabled === "boolean" ? f.enabled : cur.enabled,
               address: typeof f.address === "number" ? Math.max(1, Math.min(512, Math.round(f.address))) : cur.address,

@@ -383,7 +383,7 @@ function applyConfig(cfg) {
   if (tapBtn) tapBtn.classList.toggle("primary", !!manualBpm);
   showBpm(0);
   const fog = cfg.fog || {};
-  if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 100; }
+  if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 128; }
   segActivate("segDrop", cfg.dropSensitivity ?? 0.6, "drop");
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
@@ -737,7 +737,7 @@ const fogEnabled = document.getElementById("fogEnabled");
 const fogOnDrop = document.getElementById("fogOnDrop");
 const fogAddr = document.getElementById("fogAddr");
 const fogNowBtn = document.getElementById("fogNow");
-const sendFog = () => send({ type: "setFog", fog: { enabled: fogEnabled.checked, onDrop: fogOnDrop.checked, address: Number(fogAddr.value) || 100 } });
+const sendFog = () => send({ type: "setFog", fog: { enabled: fogEnabled.checked, onDrop: fogOnDrop.checked, address: Number(fogAddr.value) || 128 } });
 fogEnabled.onchange = sendFog;
 fogOnDrop.onchange = sendFog;
 fogAddr.onchange = sendFog;

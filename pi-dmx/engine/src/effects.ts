@@ -48,6 +48,9 @@ export class EffectEngine {
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   private fogUntil = 0;          // rökmaskin: pågående blast till (wall-clock ms)
   private lastFogMs = -1e9;      // senaste blast (för cooldown)
+  private centSlow = 0.3;        // långsam centroid-baslinje för riser-prediktor
+  private lvlSlowR = 0.3;        // långsam nivå-baslinje för riser-prediktor
+  private buildUp = 0;           // 0..1 uppbyggnad (riser) — bygger tension mot dropen
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -177,6 +180,19 @@ export class EffectEngine {
     const dTarget = dropActive ? 1 : 0;
     const dRate = dTarget > this.dropEnv ? dtNow / 0.03 : dtNow / 1.0;
     this.dropEnv += Math.max(-dRate, Math.min(dRate, dTarget - this.dropEnv));
+
+    // RISER / DROP-PREDIKTOR: en uppbyggnad = klangen (centroid) OCH nivån stiger
+    // ihållande mot en drop. Vi har redan en REAKTIV drop-detektor; detta
+    // FÖRUTSPÅR den och bygger tension (ljus-swell) under risern, så dropen landar
+    // med moment. Klingar av om risern rinner ut i sanden. (centroid är 0..1 här.)
+    this.centSlow += (frame.centroid - this.centSlow) * (dtNow / 2.5);
+    this.lvlSlowR += (frame.level - this.lvlSlowR) * (dtNow / 2.5);
+    const inRiser = frame.centroid > this.centSlow + 0.06         // diskant kryper upp
+                 && frame.level > this.lvlSlowR + 0.04            // nivån stiger
+                 && frame.level > 0.4 && this.dropEnv < 0.2;      // ej redan i drop
+    const bTarget = inRiser ? 1 : 0;
+    const bRate = bTarget > this.buildUp ? dtNow / 3.5 : dtNow / 1.0;   // bygg ~3.5s, klinga ~1s
+    this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
 
     const bloom = flashActive || bassPunch > 0.45;
     const count = this.cfg.fixtures.length;
@@ -316,7 +332,8 @@ export class EffectEngine {
     const ambRate = ambTarget > this.ambient ? dtSec / 1.5 : dtSec / 0.1;
     this.ambient += Math.max(-ambRate, Math.min(ambRate, ambTarget - this.ambient));
     const ambLvl = this.ambient * 0.22 * this.cfg.master;   // varm nivå (respekterar master, ej beat/tystnad)
-    const md = master * (1 + this.dropEnv * 0.8);           // ljus-boost under dropen (mjuk via envelope)
+    // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
+    const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8);
 
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];

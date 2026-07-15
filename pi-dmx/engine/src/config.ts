@@ -138,7 +138,7 @@ export const defaultConfig: EngineConfig = {
   rotation: { cycle: true, breathe: true, tide: true, mono: false, aurora: true, drift: true, wave: true, chase: true, drops: true, sweep: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   dmxMaxHz: 50, // safe max for typical fixtures; helper caps automatically
-  fog: { enabled: false, address: 100, onDrop: true, burstMs: 2500, cooldownMs: 25000, level: 255 },
+  fog: { enabled: false, address: 128, onDrop: true, burstMs: 2500, cooldownMs: 25000, level: 255 },
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
