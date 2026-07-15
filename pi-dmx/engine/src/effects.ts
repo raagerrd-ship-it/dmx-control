@@ -13,6 +13,8 @@ import type { Frame } from "./analyser.js";
 export class EffectEngine {
   private universe = new Uint8Array(512);
   private t0 = performance.now();
+  private showTime = 0;      // ackumulerad "show-tid" — accelererar under uppbyggnaden (riser)
+  private lastShowMs = 0;
   private lastKickBoost = 0;
   /** Chase mode: fixture-index of the currently lit head. Advanced on kick and slow-time. */
   private chasePos = 0;
@@ -93,7 +95,15 @@ export class EffectEngine {
   constructor(private cfg: EngineConfig) {}
 
   render(frame: Frame): Uint8Array {
-    const t = (performance.now() - this.t0) / 1000;
+    // Fri-rullande "show-tid": normalt 1× realtid, men accelererar under en
+    // uppbyggnad (buildUp från förra framen) så mönstren snabbar upp mot dropen.
+    // Ackumulerad → kontinuerlig, inga hopp.
+    const _np = performance.now();
+    if (this.lastShowMs === 0) this.lastShowMs = _np;
+    const _dtT = Math.min(0.1, (_np - this.lastShowMs) / 1000);
+    this.lastShowMs = _np;
+    this.showTime += _dtT * (1 + this.buildUp * 1.5);   // upp till 2.5× snabbare vid full uppbyggnad
+    const t = this.showTime;
     if (frame.kick) this.lastKickBoost = performance.now();
 
     // SmartSync beat clock → predicted kick: pulse in the song's exact tempo,
