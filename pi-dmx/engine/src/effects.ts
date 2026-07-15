@@ -62,6 +62,11 @@ export class EffectEngine {
   private governorResting = false;
   private governorRestUntil = 0;
   private lastGovMs = 0;         // energispärrens egen dt-referens
+  private echoBuf: [number, number, number][] = Array.from({ length: 6 }, () => [0, 0, 0]);   // stereo-eko ringbuffert (6 tick ≈ 120ms)
+  private echoPos = 0;
+  private trebleBase = 0.05;     // långsam diskant-baslinje för micro-strobe-transientdetektorn
+  private microStrobe = 0;       // micro-strobe envelope (0..1), klingar av på ~2-3 frames
+  private lastMicroMs = 0;
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -406,8 +411,20 @@ export class EffectEngine {
     const ambRate = ambTarget > this.ambient ? dtSec / landTau : dtSec / 0.1;   // in: adaptivt, ut: snabbt
     this.ambient += Math.max(-ambRate, Math.min(ambRate, ambTarget - this.ambient));
     const ambLvl = this.ambient * 0.22 * this.cfg.master;   // varm nivå (respekterar master, ej beat/tystnad)
+    // MICRO-STROBE (transientskimmer): en skarp diskanttransient (hi-hat/cymbal)
+    // ger en blixtsnabb mjukvaru-dimmernotch (~2-3 frames) → eld sprakar, wave
+    // gnistrar, UTAN hårdvaru-strobe. Bara ljusstyrka; ambient-glöden rörs inte.
+    // Släpps under drops så explosionen hålls ren.
+    this.trebleBase += (frame.treble - this.trebleBase) * 0.05;             // långsam baslinje
+    if (this.cfg.microStrobe && frame.treble > Math.max(0.12, this.trebleBase * 1.55) && nowWall - this.lastMicroMs > 55) {
+      this.lastMicroMs = nowWall;
+      this.microStrobe = 1;
+    }
+    this.microStrobe *= 0.38;                                               // klingar av på ~2-3 frames
+    if (this.microStrobe < 0.02) this.microStrobe = 0;
+    const microMul = this.dropEnv > 0.4 ? 1 : 1 - this.microStrobe * 0.45;  // notch ner till ~0.55 på träffen
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
-    const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8);
+    const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8) * microMul;
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
@@ -418,12 +435,23 @@ export class EffectEngine {
     const useAnchor = this.cfg.scenicAnchor && count >= 3 && ANCHOR_MODES.has(effMode);
     const anchorHue = (CURRENT_PALETTE[CURRENT_PALETTE.length - 1] ?? 0) / 6;   // palettens djupaste ton
 
+    // STEREO COLOR ECHO: sista lampan renderar de färger FÖRSTA lampan hade ~120ms
+    // (6 tick) sedan → färgen "flyger" V→H som ett eko, ger arenabredd på 4 lampor.
+    // Grupp-/spektrum-lägen har egen rumslig logik → undantagna. Ljusstyrkan är
+    // fortfarande live (bara färgen/mönstret ekar).
+    const NO_ECHO = new Set<Mode>(["rave", "flip", "gallop", "twin", "eq"]);
+    const echoOn = this.cfg.colorEcho && count >= 2 && !NO_ECHO.has(effMode);
+    const echoOld = echoOn ? this.echoBuf[this.echoPos] : undefined;   // 6 tick gammalt (strax överskrivet)
+    let lamp0: [number, number, number] = [0, 0, 0];
+
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const isAnchor = useAnchor && i > 0 && i < count - 1;   // mittlamporna = ankare
       const rgb = isAnchor
         ? hsvToRgb(anchorHue, 1, 0.4 + 0.06 * Math.sin(t * 0.5 + i))   // fast pelare, knappt levande andning
         : pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, this.buildUp, effMode);
+      if (echoOn && i === 0) { lamp0 = [rgb[0], rgb[1], rgb[2]]; }
+      else if (echoOn && echoOld && i === count - 1) { rgb[0] = echoOld[0]; rgb[1] = echoOld[1]; rgb[2] = echoOld[2]; }
       if (bloom) {
         // Bloom (bas-punch/flash): skala upp färgen till full ljusstyrka.
         const mxc = Math.max(rgb[0], rgb[1], rgb[2]);
@@ -447,6 +475,9 @@ export class EffectEngine {
       rgb[2] = rgb[2] * md + 0.00 * ambLvl;
       writeFixture(this.universe, fx, rgb, 1, strobeVal);
     }
+    // Skjut in första lampans (pre-master) färg i eko-ringen → sista lampan läser
+    // den om 6 tick. Skrivs EFTER läsningen ovan så fördröjningen blir exakt 6.
+    if (echoOn) { this.echoBuf[this.echoPos] = lamp0; this.echoPos = (this.echoPos + 1) % this.echoBuf.length; }
 
     // Output ballistics on color/dim channels (never strobe/mode channels —
     // a decaying strobe value would sweep through real strobe speeds).

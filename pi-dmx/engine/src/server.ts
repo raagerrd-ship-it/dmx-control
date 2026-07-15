@@ -324,6 +324,10 @@ export async function startServer(
             deps.cfg.scenicAnchor = !!msg.value;
           } else if (msg.type === "setEnergyGovernor") {
             deps.cfg.energyGovernor = !!msg.value;
+          } else if (msg.type === "setColorEcho") {
+            deps.cfg.colorEcho = !!msg.value;
+          } else if (msg.type === "setMicroStrobe") {
+            deps.cfg.microStrobe = !!msg.value;
           } else if (msg.type === "fogNow") {
             deps.cfg.fogTrigger = true;   // engångs-puff (motorn nollställer flaggan)
           }

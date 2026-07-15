@@ -189,6 +189,8 @@
     <label class="tgl"><span>Drop-blackout<br><small style="opacity:.6">Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast.</small></span><input type="checkbox" id="tDropBlackout"></label>
     <label class="tgl"><span>Sceniskt djup<br><small style="opacity:.6">Mittlamporna hålls som fasta uplights i höga lägen. Kräver lampor i rad V→H.</small></span><input type="checkbox" id="tScenicAnchor"></label>
     <label class="tgl"><span>Energispärr<br><small style="opacity:.6">Smart-läget tar en 3-min paus efter ~8 min full fart så dansgolvet får andas.</small></span><input type="checkbox" id="tEnergyGovernor"></label>
+    <label class="tgl"><span>Stereo-eko<br><small style="opacity:.6">Sista lampan speglar första med ~120ms fördröjning — färgen flyger V→H. Kräver lampor i rad.</small></span><input type="checkbox" id="tColorEcho"></label>
+    <label class="tgl"><span>Micro-strobe<br><small style="opacity:.6">Kort mjukvaru-skimmer på diskanttransienter (hi-hats) — eld sprakar, wave gnistrar. Ingen hårdvaru-strobe.</small></span><input type="checkbox" id="tMicroStrobe"></label>
   </div>
 
   <h1>Fixtures</h1>
@@ -397,6 +399,8 @@ function applyConfig(cfg) {
   if (tDropBlackout) tDropBlackout.checked = cfg.dropBlackout !== false;   // default på
   if (tScenicAnchor) tScenicAnchor.checked = !!cfg.scenicAnchor;
   if (tEnergyGovernor) tEnergyGovernor.checked = !!cfg.energyGovernor;
+  if (tColorEcho) tColorEcho.checked = !!cfg.colorEcho;
+  if (tMicroStrobe) tMicroStrobe.checked = !!cfg.microStrobe;
   segActivate("segDrop", cfg.dropSensitivity ?? 0.6, "drop");
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
@@ -763,6 +767,10 @@ const tEnergyGovernor = document.getElementById("tEnergyGovernor");
 tDropBlackout.onchange = () => send({ type: "setDropBlackout", value: tDropBlackout.checked });
 tScenicAnchor.onchange = () => send({ type: "setScenicAnchor", value: tScenicAnchor.checked });
 tEnergyGovernor.onchange = () => send({ type: "setEnergyGovernor", value: tEnergyGovernor.checked });
+const tColorEcho = document.getElementById("tColorEcho");
+const tMicroStrobe = document.getElementById("tMicroStrobe");
+tColorEcho.onchange = () => send({ type: "setColorEcho", value: tColorEcho.checked });
+tMicroStrobe.onchange = () => send({ type: "setMicroStrobe", value: tMicroStrobe.checked });
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.

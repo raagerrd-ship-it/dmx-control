@@ -107,6 +107,10 @@ export interface EngineConfig {
   scenicAnchor: boolean;
   /** REGI: energispärr — smart-läget tvingas till vila efter för lång full fart. */
   energyGovernor: boolean;
+  /** REGI: stereo-eko — sista lampan speglar första med ~120ms fördröjning. */
+  colorEcho: boolean;
+  /** REGI: micro-strobe — kort mjukvaru-dimmernotch på diskanttransienter (skimmer). */
+  microStrobe: boolean;
 }
 
 export const defaultConfig: EngineConfig = {
@@ -148,6 +152,8 @@ export const defaultConfig: EngineConfig = {
   dropBlackout: true,     // dramaturgisk tystnad — låg risk, lyfter varje drop
   scenicAnchor: false,    // ägar-val: antar lampor i rad vänster→höger
   energyGovernor: false,  // ägar-val: kan förvirra en hyresgäst, av som standard
+  colorEcho: false,       // ägar-val: antar lampor i rad; ändrar looket på ytterlamporna
+  microStrobe: false,     // ägar-val: strobe-nära, opt-in
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
