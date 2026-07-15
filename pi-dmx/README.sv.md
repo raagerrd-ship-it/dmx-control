@@ -318,3 +318,11 @@ pi-dmx/
     ├── public/                 ← mobil PWA (hyresgästvy + /setup)
     └── systemd/                ← tjänster + health-watchdog
 ```
+
+## Licens & kommersiell användning
+
+© 2026 — med ensamrätt. Ingen open source-licens ges. Du är välkommen att läsa
+koden och lära av arkitekturen.
+
+**Vill du använda den kommersiellt** — hyra ut den, sälja den vidare eller bygga
+en produkt på den? Hör av dig först: **raager.rd@gmail.com**.

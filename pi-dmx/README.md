@@ -322,3 +322,11 @@ pi-dmx/
     ├── public/                 ← mobile PWA (renter view + /setup)
     └── systemd/                ← services + health watchdog
 ```
+
+## License & commercial use
+
+© 2026 — all rights reserved. No open-source license is granted. You're
+welcome to read the code and learn from the architecture.
+
+**Want to use it commercially** — rent it out, resell it, or build a product on
+it? Please get in touch first: **raager.rd@gmail.com**.
