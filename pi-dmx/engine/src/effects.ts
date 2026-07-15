@@ -53,6 +53,7 @@ export class EffectEngine {
   private centSlow = 0.3;        // långsam centroid-baslinje för riser-prediktor
   private lvlSlowR = 0.3;        // långsam nivå-baslinje för riser-prediktor
   private buildUp = 0;           // 0..1 uppbyggnad (riser) — bygger tension mot dropen
+  private hotMs = 0;             // hur länge musiken pumpat → adaptiv tystnads-landning
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -338,8 +339,14 @@ export class EffectEngine {
     // Varm ambient-vila: efter ~2.5 s HELT tyst tonar lamporna mot en dämpad
     // varm glöd (bärnsten) istället för svart → mysig lounge-känsla när musiken
     // tystnar/byts. Tonar in långsamt (1.5 s), ut snabbt (0.1 s) när musik åter.
+    // ADAPTIV TYSTNADS-LANDNING: spåra hur länge musiken pumpat (hotMs). Kort
+    // spelning → snabb dip till bärnsten (~1.2s); efter en lång stund (flera min)
+    // → mjuk, värdig landning (~6s). Ger dansgolvet en snygg avslutning.
+    if (this.silenceGate > 0.6) this.hotMs = Math.min(600000, this.hotMs + dtSec * 1000);
+    if (this.ambient > 0.8) this.hotMs = Math.max(0, this.hotMs - dtSec * 2000);   // klingar av i djup vila
     const ambTarget = now - this.lastActiveMs > 2500 ? 1 : 0;
-    const ambRate = ambTarget > this.ambient ? dtSec / 1.5 : dtSec / 0.1;
+    const landTau = 1.2 + Math.min(1, this.hotMs / 180000) * 5;   // 1.2s .. 6.2s efter lång spelning
+    const ambRate = ambTarget > this.ambient ? dtSec / landTau : dtSec / 0.1;   // in: adaptivt, ut: snabbt
     this.ambient += Math.max(-ambRate, Math.min(ambRate, ambTarget - this.ambient));
     const ambLvl = this.ambient * 0.22 * this.cfg.master;   // varm nivå (respekterar master, ej beat/tystnad)
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
@@ -347,7 +354,7 @@ export class EffectEngine {
 
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
-      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, effMode);
+      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, this.buildUp, effMode);
       if (bloom) {
         // Bloom (bas-punch/flash): skala upp färgen till full ljusstyrka.
         const mxc = Math.max(rgb[0], rgb[1], rgb[2]);
@@ -378,7 +385,12 @@ export class EffectEngine {
     const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops" || effMode === "rave";
     const beatMsNow = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
     const fastTau = Math.max(0.14, Math.min(0.3, beatMsNow * 0.5 / 1000));
-    const decay = Math.exp(-dtSec / (fastMode ? fastTau : 0.3));
+    // TRANSIENT-SKÄRPA: hög energi/riser → kort decay (knivskarp piska på varje
+    // transient); låg energi → lång decay (mjuk andande wash). Utnyttjar diodernas
+    // snabba respons — skarpt utan hårdvaru-strobe.
+    const sharpen = Math.min(0.65, audio * 0.45 + this.buildUp * 0.5);   // 0 lugnt .. 0.65 energiskt
+    const tau = Math.max(0.08, (fastMode ? fastTau : 0.42) * (1 - sharpen));
+    const decay = Math.exp(-dtSec / tau);
     // Bygg strobe-masken bara när fixtures ändras (inte varje frame).
     if (this.strobeMaskFor !== this.cfg.fixtures) {
       this.strobeMaskFor = this.cfg.fixtures;
@@ -462,6 +474,7 @@ function pickColor(
   dropFired: number[] = [],
   dropHue: number[] = [],
   wavePhase = 0,
+  buildUp = 0,
   modeOverride?: Mode,
 ): [number, number, number] {
   const { monoHue, cometHue, splitHueA, splitHueB } = cfg;
@@ -507,6 +520,10 @@ function pickColor(
   const hasBeat = !!(cfg.beat && cfg.beat.bpm > 40);
   const mclk = (beatsPerStep: number, secPerStep: number) =>
     hasBeat ? Math.floor(beatIdx / beatsPerStep) : Math.floor(t / secPerStep);
+  // FASFÖRSKJUTEN RISER: under en uppbyggnad dras lampornas fas gradvis isär →
+  // koordinerad våg (buildUp 0) blir kaotiskt svep tvärs riggen (buildUp 1),
+  // "slits isär av energin" precis innan dropen synkar allt.
+  const phaseSpread = 1 + buildUp * 2.5;
   switch (mode) {
     case "party": {
       // Full fart: FÄRGKAOS-PUMP — varje lampa egen ren färg (blandas om varje
@@ -528,7 +545,7 @@ function pickColor(
       // Flödande FÄRGVÅG: varje lampa har sin egen rena färg och hela regnbågen
       // glider över riggen. Full rigg tänd med en mjuk ljusvåg ovanpå — handlar
       // om FÄRG i rörelse, till skillnad från sweep (en färg) och chase (gles).
-      const base = 0.55 + 0.45 * Math.sin(wavePhase - idx * 1.3);
+      const base = 0.55 + 0.45 * Math.sin(wavePhase - idx * 1.3 * phaseSpread);
       const hue = mixedSector(idx + Math.floor(wavePhase * 0.4)) / 6;
       // + diskant-glitter: hi-hats/cymbaler ger en snabb ljusflick ovanpå vågen.
       const v = shaped(0.12, base * (0.35 + audio * 0.7) + kickEnv * 0.2 + frame.treble * 0.35);
@@ -539,7 +556,7 @@ function pickColor(
       // ett mjukt skimmer. Varje lampa reagerar dessutom på SITT frekvensband
       // (bas/mellan/diskant) → ett dämpat spatialt spektrum. Golv 30%.
       const hue = mixedSector(mclk(8, 6)) / 6;                  // ny färg var 8:e takt (eller 6s)
-      const shimmer = 0.5 + 0.5 * Math.sin(t * 0.9 + idx * 1.4);
+      const shimmer = 0.5 + 0.5 * Math.sin(t * 0.9 + idx * 1.4 * phaseSpread);
       const m = Math.min(1, 0.35 + shimmer * 0.4 + band * 0.35);
       return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
@@ -554,7 +571,7 @@ function pickColor(
     case "tide": {
       // Lugn: en långsam våg sköljer i PAR över riggen — en rumslig fade som
       // vandrar sida till sida. Golv 30%.
-      const wash = 0.5 + 0.5 * Math.sin(t * 0.9 - idx * 1.0);
+      const wash = 0.5 + 0.5 * Math.sin(t * 0.9 - idx * 1.0 * phaseSpread);
       const pair = Math.floor(idx / 2);
       const hue = mixedSector(pair + mclk(8, 9)) / 6;           // ny färg var 8:e takt (eller 9s)
       const m = Math.min(1, 0.3 + wash * 0.55 + band * 0.3);   // per-lampa frekvensband
@@ -586,7 +603,7 @@ function pickColor(
       // OBEROENDE korsfades — likt norrsken där färgerna glider var för sig.
       // Golv 30%.
       const hue = mixedSector(idx * 2 + mclk(8, 7)) / 6;        // ny färg var 8:e takt (eller 7s)
-      const wash = 0.5 + 0.5 * Math.sin(t * 0.45 - idx * 1.3);
+      const wash = 0.5 + 0.5 * Math.sin(t * 0.45 - idx * 1.3 * phaseSpread);
       const m = Math.min(1, 0.4 + wash * 0.45 + band * 0.25);   // per-lampa frekvensband
       return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
     }
