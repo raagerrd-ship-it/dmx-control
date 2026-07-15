@@ -595,7 +595,13 @@ export class EffectEngine {
     // så den varma ambient-glöden i TYSTNAD inte kapas till svart.
     if (this.cfg.energyCeiling && this.silenceGate > 0.5 && ceilMul < 0.999) {
       for (let ch = 0; ch < this.maxCh; ch++) {
-        if (!this.strobeMask[ch]) this.universe[ch] = Math.round(this.universe[ch] * ceilMul);
+        if (!this.strobeMask[ch]) {
+          this.universe[ch] = Math.round(this.universe[ch] * ceilMul);
+          this.outSmooth[ch] *= ceilMul;   // kapa ÄVEN ballistik-bufferten → annars
+                                            // håller den kvar en okapad topp som
+                                            // blixtrar fram på full styrka när taket
+                                            // släpper vid övergången till tystnad.
+        }
       }
     }
 
