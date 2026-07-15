@@ -40,6 +40,11 @@ export class EffectEngine {
   private warmMs = 0;
   private ambient = 0;   // 0 = spelar, 1 = varm vila (efter ~2.5s tystnad)
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
+  private levelCeil = 0.5;       // långsamt nivå-tak (låtens loud-topp) för drop-detektor
+  private breakAtMs = 0;         // senaste break/lugna stund (nivå-svacka)
+  private wasInZone = false;
+  private inZoneState = false;   // hysteres-tillstånd för topp-zonen
+  private dropBangUntil = 0;     // vit blixt-fas efter en drop-träff
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -138,7 +143,23 @@ export class EffectEngine {
     const master = this.cfg.master * this.silenceGate * beatMul * (1 + bassPunch * 0.75);
     // Synlig punch: en hård basstöt (eller drop-flash) BLOOMAR färgen till full
     // styrka — inte bara ljusare master (som är osynligt när effekten redan lyser).
-    const bloom = flashActive || bassPunch > 0.45;
+    // DROP-DETEKTOR: en "riktig" drop = nivån surgar upp mot låtens tak EFTER en
+    // break (nivå-svacka). Det ger MAX-impact just där, inte på vanlig tung bas.
+    const dtNow = Math.min(0.1, (performance.now() - this.lastRenderMs) / 1000);
+    this.levelCeil = Math.max(frame.level, this.levelCeil - dtNow * 0.015 * this.levelCeil);   // tak, decay ~65s
+    if (frame.level < this.levelCeil * 0.65) this.breakAtMs = nowWall;                          // break/svacka
+    // Topp-zon med HYSTeres: in vid 85% av taket, ut först vid 70% → ingen
+    // flimmer/dubbel-smäll när nivån oscillerar nära tröskeln.
+    if (frame.level > this.levelCeil * 0.85 && frame.level > 0.65) this.inZoneState = true;
+    else if (frame.level < this.levelCeil * 0.70) this.inZoneState = false;
+    const inZone = this.inZoneState;
+    const brokeRecently = nowWall - this.breakAtMs < 3500;
+    if (inZone && !this.wasInZone && brokeRecently) this.dropBangUntil = nowWall + 220;         // DROP-SMÄLL (vit blixt)
+    this.wasInZone = inZone;
+    const dropBang = nowWall < this.dropBangUntil;                                              // blixt-fas
+    const dropHold = inZone && (nowWall - this.dropBangUntil < 8000);                           // MAX under dropen (≤8s efter smäll)
+
+    const bloom = flashActive || bassPunch > 0.45 || dropHold;
     const count = this.cfg.fixtures.length;
 
     // Chase state machine — kick advances one step, plus a slow auto-advance
@@ -276,20 +297,25 @@ export class EffectEngine {
     const ambRate = ambTarget > this.ambient ? dtSec / 1.5 : dtSec / 0.1;
     this.ambient += Math.max(-ambRate, Math.min(ambRate, ambTarget - this.ambient));
     const ambLvl = this.ambient * 0.22 * this.cfg.master;   // varm nivå (respekterar master, ej beat/tystnad)
+    const md = master * (dropHold ? 1.5 : 1);               // extra ljus-boost under dropen
 
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, effMode);
-      if (bloom) {
+      if (dropBang) {
+        // DROP-SMÄLL: bländande VIT MAX-blixt på alla lampor (känns i bröst + ögon).
+        rgb[0] = 1; rgb[1] = 1; rgb[2] = 1;
+      } else if (bloom) {
         // Bloom: skala upp nuvarande färg till full ljusstyrka (behåll färgton).
         const mxc = Math.max(rgb[0], rgb[1], rgb[2]);
         if (mxc > 0.02) { rgb[0] /= mxc; rgb[1] /= mxc; rgb[2] /= mxc; }
       }
-      const strobeVal = (effMode === "strobe" || (flashActive && this.cfg.punchOnDrop)) ? 210 : 0;
+      const strobeVal = (effMode === "strobe" || dropBang || (flashActive && this.cfg.punchOnDrop)) ? 220 : 0;
       // Effekt (master inkl. silenceGate → tonar ut på tystnad) + varm ambient-glöd in.
-      rgb[0] = rgb[0] * master + 1.00 * ambLvl;
-      rgb[1] = rgb[1] * master + 0.30 * ambLvl;
-      rgb[2] = rgb[2] * master + 0.00 * ambLvl;
+      const mm = dropBang ? Math.max(md, this.cfg.master) : md;   // blixten alltid full
+      rgb[0] = rgb[0] * mm + 1.00 * ambLvl;
+      rgb[1] = rgb[1] * mm + 0.30 * ambLvl;
+      rgb[2] = rgb[2] * mm + 0.00 * ambLvl;
       writeFixture(this.universe, fx, rgb, 1, strobeVal);
     }
 
