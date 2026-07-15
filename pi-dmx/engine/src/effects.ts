@@ -44,7 +44,8 @@ export class EffectEngine {
   private breakAtMs = 0;         // senaste break/lugna stund (nivå-svacka)
   private wasInZone = false;
   private inZoneState = false;   // hysteres-tillstånd för topp-zonen
-  private dropBangUntil = 0;     // vit blixt-fas efter en drop-träff
+  private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
+  private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -154,12 +155,17 @@ export class EffectEngine {
     else if (frame.level < this.levelCeil * 0.70) this.inZoneState = false;
     const inZone = this.inZoneState;
     const brokeRecently = nowWall - this.breakAtMs < 3500;
-    if (inZone && !this.wasInZone && brokeRecently) this.dropBangUntil = nowWall + 220;         // DROP-SMÄLL (vit blixt)
+    if (inZone && !this.wasInZone && brokeRecently) this.dropBangUntil = nowWall + 8000;        // drop-fönster (max 8s)
     this.wasInZone = inZone;
-    const dropBang = nowWall < this.dropBangUntil;                                              // blixt-fas
-    const dropHold = inZone && (nowWall - this.dropBangUntil < 8000);                           // MAX under dropen (≤8s efter smäll)
+    const dropActive = inZone && nowWall < this.dropBangUntil;                                  // en riktig drop pågår
+    // DROP-ENVELOPE: FULL ATTACK (~30ms) på träffen, HÅLL allt på max under
+    // dropen, mjuk FADE ner (~1s) när den släpper. Egen effekt — INGEN
+    // hårdvaru-strobe (det gav strobe-känslan), bara ljus + färg på max.
+    const dTarget = dropActive ? 1 : 0;
+    const dRate = dTarget > this.dropEnv ? dtNow / 0.03 : dtNow / 1.0;
+    this.dropEnv += Math.max(-dRate, Math.min(dRate, dTarget - this.dropEnv));
 
-    const bloom = flashActive || bassPunch > 0.45 || dropHold;
+    const bloom = flashActive || bassPunch > 0.45;
     const count = this.cfg.fixtures.length;
 
     // Chase state machine — kick advances one step, plus a slow auto-advance
@@ -297,25 +303,32 @@ export class EffectEngine {
     const ambRate = ambTarget > this.ambient ? dtSec / 1.5 : dtSec / 0.1;
     this.ambient += Math.max(-ambRate, Math.min(ambRate, ambTarget - this.ambient));
     const ambLvl = this.ambient * 0.22 * this.cfg.master;   // varm nivå (respekterar master, ej beat/tystnad)
-    const md = master * (dropHold ? 1.5 : 1);               // extra ljus-boost under dropen
+    const md = master * (1 + this.dropEnv * 0.8);           // ljus-boost under dropen (mjuk via envelope)
 
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, effMode);
-      if (dropBang) {
-        // DROP-SMÄLL: bländande VIT MAX-blixt på alla lampor (känns i bröst + ögon).
-        rgb[0] = 1; rgb[1] = 1; rgb[2] = 1;
-      } else if (bloom) {
-        // Bloom: skala upp nuvarande färg till full ljusstyrka (behåll färgton).
+      if (bloom) {
+        // Bloom (bas-punch/flash): skala upp färgen till full ljusstyrka.
         const mxc = Math.max(rgb[0], rgb[1], rgb[2]);
         if (mxc > 0.02) { rgb[0] /= mxc; rgb[1] /= mxc; rgb[2] /= mxc; }
       }
-      const strobeVal = (effMode === "strobe" || dropBang || (flashActive && this.cfg.punchOnDrop)) ? 220 : 0;
+      if (this.dropEnv > 0.005) {
+        // DROP: blenda effektens färg mot FULL ljusstyrka i takt med envelopet
+        // (full attack → håll → mjuk fade). Behåller färgtonen, ingen strobe.
+        const mxc = Math.max(rgb[0], rgb[1], rgb[2]);
+        if (mxc > 0.02) {
+          const k = this.dropEnv;
+          rgb[0] += (rgb[0] / mxc - rgb[0]) * k;
+          rgb[1] += (rgb[1] / mxc - rgb[1]) * k;
+          rgb[2] += (rgb[2] / mxc - rgb[2]) * k;
+        }
+      }
+      const strobeVal = (effMode === "strobe" || (flashActive && this.cfg.punchOnDrop)) ? 210 : 0;
       // Effekt (master inkl. silenceGate → tonar ut på tystnad) + varm ambient-glöd in.
-      const mm = dropBang ? Math.max(md, this.cfg.master) : md;   // blixten alltid full
-      rgb[0] = rgb[0] * mm + 1.00 * ambLvl;
-      rgb[1] = rgb[1] * mm + 0.30 * ambLvl;
-      rgb[2] = rgb[2] * mm + 0.00 * ambLvl;
+      rgb[0] = rgb[0] * md + 1.00 * ambLvl;
+      rgb[1] = rgb[1] * md + 0.30 * ambLvl;
+      rgb[2] = rgb[2] * md + 0.00 * ambLvl;
       writeFixture(this.universe, fx, rgb, 1, strobeVal);
     }
 
