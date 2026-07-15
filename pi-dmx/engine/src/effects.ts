@@ -16,7 +16,6 @@ import type { EffectContext } from "./effects/types.js";
 
 export class EffectEngine {
   private universe = new Uint8Array(512);
-  private t0 = performance.now();
   private showTime = 0;      // ackumulerad "show-tid" — accelererar under uppbyggnaden (riser)
   private lastShowMs = 0;
   private lastKickBoost = 0;
@@ -41,9 +40,7 @@ export class EffectEngine {
   /** "smart" mode: which effect the feel-chooser currently delegates to. */
   private smartMode: Mode = "wave";
   private smartDwellUntil = 0;
-  private lastSectionAt = 0;
   private intensityEma = 0.5;
-  private intensityPeak = 0.5;
   private intensityFloor = 0.5;
   private warmMs = 0;
   private ambient = 0;   // 0 = spelar, 1 = varm vila (efter ~2.5s tystnad)
@@ -539,7 +536,7 @@ export class EffectEngine {
           rgb[2] += (rgb[2] / mxc - rgb[2]) * k;
         }
       }
-      const strobeVal = (effMode === "strobe" || (flashActive && this.cfg.punchOnDrop)) ? 210 : 0;
+      const strobeVal = effMode === "strobe" ? 210 : 0;
       // Effekt (master inkl. silenceGate → tonar ut på tystnad) + varm ambient-glöd in.
       rgb[0] = rgb[0] * md + 1.00 * ambLvl;
       rgb[1] = rgb[1] * md + 0.30 * ambLvl;

@@ -29,7 +29,8 @@ const MODE_CYCLE: Mode[] = ["smart", ...EFFECT_KEYS];
 
 const cfg = await loadConfig();
 // Migrate legacy mode names from persisted configs.
-const LEGACY_MODES: Record<string, Mode> = { auto: "wave", comet: "wave", split: "party", strobe: "party", pulse: "drops", spectrum: "wave", vu: "cycle" };
+// Migrera BORTTAGNA lägesnamn (strobe/pulse är RIKTIGA nuvarande lägen → ej här).
+const LEGACY_MODES: Record<string, Mode> = { auto: "wave", comet: "wave", split: "party", spectrum: "wave", vu: "cycle" };
 if (LEGACY_MODES[cfg.mode as string]) cfg.mode = LEGACY_MODES[cfg.mode as string];
 if (cfg.mode !== "smart" && cfg.mode !== "blackout" && !EFFECT_MAP.has(cfg.mode)) cfg.mode = "smart";
 cfg.fft.hop = 128;   // analys 375 Hz (beprövad tuning); render/DMX separat 50 Hz

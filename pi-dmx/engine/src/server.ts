@@ -267,10 +267,6 @@ export async function startServer(
             deps.cfg.dynamics = clamp01(msg.value);
           } else if (msg.type === "setMaster") {
             deps.cfg.master = clamp01(msg.value);
-          } else if (msg.type === "setMonoHue" && typeof msg.value === "number") {
-            deps.cfg.monoHue = ((msg.value % 360) + 360) % 360;
-          } else if (msg.type === "setCometHue" && typeof msg.value === "number") {
-            deps.cfg.cometHue = ((msg.value % 360) + 360) % 360;
           } else if (msg.type === "setFixtures" && Array.isArray(msg.fixtures)) {
             const cleaned = sanitizeFixtures(msg.fixtures);
             if (cleaned) { deps.cfg.fixtures = cleaned; stopIdentify(); }
@@ -296,8 +292,6 @@ export async function startServer(
             deps.cfg.detection.tauDown = 60  * Math.pow(2  / 60,  a);
           } else if (msg.type === "setBeatPulse") {
             deps.cfg.beatPulse = !!msg.value;
-          } else if (msg.type === "setPunchOnDrop") {
-            deps.cfg.punchOnDrop = !!msg.value;
           } else if (msg.type === "setEnergyDrivesMode") {
             deps.cfg.energyDrivesMode = !!msg.value;
           } else if (msg.type === "setDropSensitivity" && typeof msg.value === "number") {

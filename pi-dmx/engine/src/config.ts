@@ -55,8 +55,6 @@ export interface EngineConfig {
   dynamics: number;
   /** Pulsa hela riggen på taktslag. */
   beatPulse: boolean;
-  /** Lampans hårdvarustrobe som punch på drop. */
-  punchOnDrop: boolean;
   /** Energi (lokal) väljer läge i smart-läget. */
   energyDrivesMode: boolean;
   /** Drop-blixt på starka slag: 0=av .. 1=känsligast. */
@@ -64,14 +62,6 @@ export interface EngineConfig {
   /** Hur ofta smart byter läge (ms). */
   smartDwellMs: number;
   master: number;         // 0..1 master brightness
-  /** Hue 0..360 used by "mono" mode. 15 ≈ fire orange, 0 = red, 240 = blue. */
-  monoHue: number;
-  /** Hue 0..360 used by "comet" mode for the fireball head. */
-  cometHue: number;
-  /** Hue A (bass side) for "split" mode. */
-  splitHueA: number;
-  /** Hue B (treble side) for "split" mode. */
-  splitHueB: number;
   /** "chase" sub-pattern: sweep (L→R loop) or ping-pong (bounce). */
   chaseStyle: "sweep" | "pingpong";
   /** Which modes are included in the physical button / WS cycle. */
@@ -137,15 +127,10 @@ export const defaultConfig: EngineConfig = {
   sensitivity: 0.6,
   dynamics: 0.6,
   beatPulse: true,
-  punchOnDrop: false,
   energyDrivesMode: true,
   dropSensitivity: 0.3,
   smartDwellMs: 9000,
   master: 1.0,
-  monoHue: 15,   // warm orange — feels like fire, but the user can pick anything
-  cometHue: 15,  // fireball default; pick e.g. 220 for a blue comet
-  splitHueA: 0,    // red for bass side
-  splitHueB: 200,  // cyan for treble side
   chaseStyle: "pingpong",
   rotation: { cycle: true, breathe: true, tide: true, mono: false, aurora: true, drift: true, wave: true, chase: true, drops: true, sweep: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)

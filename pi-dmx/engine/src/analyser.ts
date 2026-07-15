@@ -25,12 +25,9 @@ export class Analyser {
   private fft: FFT;
   private window: Float32Array;
   private buffer: Float32Array;      // sliding FFT window
-  private writePos = 0;
   private prevMag: Float32Array;     // for flux
-  private fluxHistory: number[] = []; // for median
   private kickBaseline = 0;          // adaptiv baslinje för kick-band-flux
   private kickWasAbove = false;      // stigande-flank-detektion
-  private readonly fluxHistLen: number;   // ~115 ms median-fönster (frame-rate-oberoende)
   private static readonly ENV_HZ = 100;
   private static readonly ENV_LEN = 100 * 5;
   private envRing = new Float32Array(Analyser.ENV_LEN);
@@ -235,7 +232,6 @@ export class Analyser {
     this.buffer = new Float32Array(cfg.fft.size);
     this.prevMag = new Float32Array(cfg.fft.size / 2);
     this.envelope = cfg.detection.autoGainTarget;
-    this.fluxHistLen = Math.max(8, Math.round(0.115 * cfg.audio.rate / cfg.fft.hop));
   }
 
   /** Feed a hop-sized chunk of mono samples, get a frame back. */
@@ -374,10 +370,4 @@ function hannWindow(n: number): Float32Array {
   const w = new Float32Array(n);
   for (let i = 0; i < n; i++) w[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1));
   return w;
-}
-
-function medianOf(arr: number[]): number {
-  if (arr.length === 0) return 0;
-  const s = [...arr].sort((a, b) => a - b);
-  return s[s.length >> 1];
 }
