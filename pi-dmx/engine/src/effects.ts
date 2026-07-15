@@ -38,6 +38,7 @@ export class EffectEngine {
   private intensityPeak = 0.5;
   private intensityFloor = 0.5;
   private warmMs = 0;
+  private ambient = 0;   // 0 = spelar, 1 = varm vila (efter ~2.5s tystnad)
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -51,6 +52,27 @@ export class EffectEngine {
   private lastSmartIntensity = 0;
   private lastSmartTier = "";
   private activeMode: Mode = "smart";
+  // Regi-lager: fras-räknare + aktiv palett (byts var N:e takt).
+  private phraseBeat = 0;
+  private phraseBeats = 32;   // taktslag per musikalisk fras → palettbyte
+  private paletteIdx = 2;     // start: Primär
+  private paletteRot = 0;
+
+  /** Välj ny palett vid frasbyte, biasad av klangen (centroid). */
+  private pickPalette(centroid: number) {
+    const wantWarm = centroid < 0.42, wantCool = centroid > 0.60;
+    let cands = PALETTES.map((_, i) => i).filter((i) => {
+      const t = PALETTES[i].temp;
+      if (wantWarm) return t === "warm" || t === "neutral";
+      if (wantCool) return t === "cool" || t === "neutral";
+      return true;
+    });
+    if (cands.length === 0) cands = PALETTES.map((_, i) => i);
+    this.paletteRot++;
+    let next = cands[Math.floor(((this.paletteRot * 0.61803398875) % 1) * cands.length)];
+    if (next === this.paletteIdx && cands.length > 1) next = cands[(cands.indexOf(next) + 1) % cands.length];
+    this.paletteIdx = next;
+  }
 
   /** Den effekt som faktiskt renderas just nu (smart-läget roterar this.smartMode). */
   getActiveMode(): Mode { return this.activeMode; }
@@ -178,6 +200,21 @@ export class EffectEngine {
     }
     this.activeMode = effMode;
 
+    // REGI-LAGER: räkna takter → byt färgpalett var N:e takt (musikalisk fras) i
+    // smart-läget, så showen känns designad och utvecklas över tid istället för
+    // att slumpa färg. Paletten väljs efter klangen (centroid): mörk/bastung →
+    // varmt, ljus/diskantig → svalt. Övergången sker mjukt via färg-ballistiken.
+    if (this.cfg.mode === "smart") {
+      if (frame.bpm === 0) this.phraseBeat = 0;            // tyst/ej låst → nollställ frasen
+      else if (beatTick && ++this.phraseBeat >= this.phraseBeats) {
+        this.phraseBeat = 0;
+        this.pickPalette(frame.centroid);
+      }
+      CURRENT_PALETTE = PALETTES[this.paletteIdx].sectors;
+    } else {
+      CURRENT_PALETTE = ALL_SECTORS;                       // manuella lägen: obegränsad färg
+    }
+
     // Advance the wave phase by dt so speed changes glide instead of jumping.
     const dtSec = Math.min(0.1, (now - this.lastRenderMs) / 1000);
     this.lastRenderMs = now;
@@ -219,6 +256,14 @@ export class EffectEngine {
       this.dropHue[this.dropPos] = this.dropSector / 6;
     }
 
+    // Varm ambient-vila: efter ~2.5 s HELT tyst tonar lamporna mot en dämpad
+    // varm glöd (bärnsten) istället för svart → mysig lounge-känsla när musiken
+    // tystnar/byts. Tonar in långsamt (1.5 s), ut snabbt (0.1 s) när musik åter.
+    const ambTarget = now - this.lastActiveMs > 2500 ? 1 : 0;
+    const ambRate = ambTarget > this.ambient ? dtSec / 1.5 : dtSec / 0.1;
+    this.ambient += Math.max(-ambRate, Math.min(ambRate, ambTarget - this.ambient));
+    const ambLvl = this.ambient * 0.22 * this.cfg.master;   // varm nivå (respekterar master, ej beat/tystnad)
+
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, effMode);
@@ -228,7 +273,11 @@ export class EffectEngine {
         if (mxc > 0.02) { rgb[0] /= mxc; rgb[1] /= mxc; rgb[2] /= mxc; }
       }
       const strobeVal = (effMode === "strobe" || (flashActive && this.cfg.punchOnDrop)) ? 210 : 0;
-      writeFixture(this.universe, fx, rgb, master, strobeVal);
+      // Effekt (master inkl. silenceGate → tonar ut på tystnad) + varm ambient-glöd in.
+      rgb[0] = rgb[0] * master + 1.00 * ambLvl;
+      rgb[1] = rgb[1] * master + 0.30 * ambLvl;
+      rgb[2] = rgb[2] * master + 0.00 * ambLvl;
+      writeFixture(this.universe, fx, rgb, 1, strobeVal);
     }
 
     // Output ballistics on color/dim channels (never strobe/mode channels —
@@ -523,8 +572,23 @@ function pickColor(
 // Low-discrepancy color walk: golden-ratio jumps visit every pure color in a
 // varied, non-sequential order (red→blue→yellow→…) instead of stepping around
 // the circle neighbor by neighbor.
+// Färg-sektorer: 0=röd 1=gul 2=grön 3=cyan 4=blå 5=magenta.
+const ALL_SECTORS = [0, 1, 2, 3, 4, 5];
+// Kurerade RGB-vänliga paletter för regi-lagret. temp styr centroid-valet
+// (mörk klang → warm, ljus klang → cool).
+const PALETTES: { name: string; sectors: number[]; temp: "warm" | "cool" | "neutral" }[] = [
+  { name: "Eld",      sectors: [0, 1, 5], temp: "warm" },    // röd / gul / magenta
+  { name: "Guldfest", sectors: [0, 1, 2], temp: "warm" },    // röd / gul / grön
+  { name: "Primär",   sectors: [0, 2, 4], temp: "neutral" }, // röd / grön / blå
+  { name: "Skogsdis", sectors: [1, 2, 3], temp: "cool" },    // gul / grön / cyan
+  { name: "Djupblå",  sectors: [3, 4, 5], temp: "cool" },    // cyan / blå / magenta
+];
+// Regi-lagret sätter denna varje frame; mixedSector begränsar färgvalet till den.
+let CURRENT_PALETTE: number[] = ALL_SECTORS;
+
 function mixedSector(n: number): number {
-  return Math.floor(((((n * 0.61803398875) % 1) + 1) % 1) * 6);
+  const g = Math.floor(((((n * 0.61803398875) % 1) + 1) % 1) * 6);   // golden-vandring 0–5
+  return CURRENT_PALETTE[g % CURRENT_PALETTE.length];                 // mappa in i aktiv palett
 }
 
 const sectorHold: number[] = [];
