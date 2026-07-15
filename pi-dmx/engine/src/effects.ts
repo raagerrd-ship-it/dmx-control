@@ -187,8 +187,14 @@ export class EffectEngine {
     // komprimerad signal svänger bas-energin lite. Så spåra ett bas-GOLV = den
     // TYSTA basnivån (sjunker mot tystnad på ~0.4s, stiger mkt långsamt ~5s). En
     // drop ligger då tydligt ÖVER golvet → punch som HÅLLER tills golvet hinner ikapp.
+    // LÅTSTART: bas-golvet har spårat TYSTNADEN (~0). Utan detta skulle bassPunch
+    // pinnas på max i ~5s när låten drar igång (golvet kryper ikapp på 0.004) →
+    // bloom + md-boost plattar hela introt till ett ljust svep. Under warmup
+    // (~första 3s aktiv musik) låter vi golvet snabb-komma-ikapp så punchen bara
+    // fyrar på VERKLIGA basstötar över den etablerade nivån, inte på hela introt.
+    const bassRise = this.warmMs < 3000 ? 0.05 : 0.004;
     if (frame.energy < this.bassBaseline) this.bassBaseline += (frame.energy - this.bassBaseline) * 0.05;
-    else this.bassBaseline += (frame.energy - this.bassBaseline) * 0.004;
+    else this.bassBaseline += (frame.energy - this.bassBaseline) * bassRise;
     const bassPunch = Math.max(0, Math.min(1, (frame.energy - this.bassBaseline - 0.05) * 4));
     const master = this.cfg.master * this.silenceGate * beatMul * (1 + bassPunch * 0.75);
     // Synlig punch: en hård basstöt (eller drop-flash) BLOOMAR färgen till full
