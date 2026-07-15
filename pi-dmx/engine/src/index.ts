@@ -47,7 +47,8 @@ let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
 let lastDropMs = 0;
 let lastRenderMs = 0;
 let fluxBaseline = 0.1;
-let curSlots = activeSlots(cfg.fixtures);
+const slotsFor = () => Math.max(activeSlots(cfg.fixtures), cfg.fog?.enabled ? cfg.fog.address : 0);
+let curSlots = slotsFor();
 
 const capture = new AudioCapture({
   device: cfg.audio.device,
@@ -151,7 +152,7 @@ const serverDeps = {
   setGainLock: (locked: boolean) => analyser.setGainLock(locked, 1),
   onConfigChanged: () => {
     scheduleSave(cfg);
-    curSlots = activeSlots(cfg.fixtures);
+    curSlots = slotsFor();
     dmx.setMaxHz(cfg.dmxMaxHz);
   },
 };

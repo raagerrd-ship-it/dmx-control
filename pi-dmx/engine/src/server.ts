@@ -307,6 +307,19 @@ export async function startServer(
           } else if (msg.type === "setManualBpm" && typeof msg.value === "number") {
             // Tap-tempo: value > 0 låser takten, <= 0 släpper (auto igen).
             deps.cfg.manualBpm = msg.value > 0 ? Math.max(40, Math.min(220, Math.round(msg.value))) : null;
+          } else if (msg.type === "setFog" && msg.fog && typeof msg.fog === "object") {
+            const f = msg.fog as Record<string, unknown>;
+            const cur = deps.cfg.fog ?? { enabled: false, address: 100, onDrop: true, burstMs: 2500, cooldownMs: 25000, level: 255 };
+            deps.cfg.fog = {
+              enabled: typeof f.enabled === "boolean" ? f.enabled : cur.enabled,
+              address: typeof f.address === "number" ? Math.max(1, Math.min(512, Math.round(f.address))) : cur.address,
+              onDrop: typeof f.onDrop === "boolean" ? f.onDrop : cur.onDrop,
+              burstMs: typeof f.burstMs === "number" ? Math.max(200, Math.min(8000, Math.round(f.burstMs))) : cur.burstMs,
+              cooldownMs: typeof f.cooldownMs === "number" ? Math.max(0, Math.min(300000, Math.round(f.cooldownMs))) : cur.cooldownMs,
+              level: typeof f.level === "number" ? Math.max(0, Math.min(255, Math.round(f.level))) : cur.level,
+            };
+          } else if (msg.type === "fogNow") {
+            deps.cfg.fogTrigger = true;   // engångs-puff (motorn nollställer flaggan)
           }
           deps.onConfigChanged?.();
           // Echo back

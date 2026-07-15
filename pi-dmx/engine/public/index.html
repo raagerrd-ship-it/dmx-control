@@ -157,6 +157,20 @@
     <div class="status" id="tapHint" style="margin-top:4px">Behövs normalt inte — beatPulse följer basen automatiskt. Reserv om något läge låser fel takt: knacka 4+ slag för att låsa BPM, Auto släpper.</div>
   </div>
 
+  <h1>Rökmaskin</h1>
+  <div class="card">
+    <label class="tgl"><span>Rökmaskin ansluten</span><input type="checkbox" id="fogEnabled"></label>
+    <label class="tgl"><span>Rök på drop</span><input type="checkbox" id="fogOnDrop"></label>
+    <div class="setrow" style="margin-top:8px">
+      <label>DMX-adress</label>
+      <input type="number" id="fogAddr" min="1" max="512" style="width:80px" />
+    </div>
+    <div class="fx-actions" style="margin-top:10px">
+      <button class="btn primary" id="fogNow">💨 Rök nu</button>
+    </div>
+    <div class="status" id="fogHint" style="margin-top:4px">Ställ rökmaskinen på samma DMX-adress. Blast på drop, med skydd (~2,5s puff, ~25s vila) mot överhettning/tom tank.</div>
+  </div>
+
   <h1>Effekter</h1>
   <div class="card">
     <div class="setrow">
@@ -368,6 +382,8 @@ function applyConfig(cfg) {
   manualBpm = cfg.manualBpm || null;
   if (tapBtn) tapBtn.classList.toggle("primary", !!manualBpm);
   showBpm(0);
+  const fog = cfg.fog || {};
+  if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 100; }
   segActivate("segDrop", cfg.dropSensitivity ?? 0.6, "drop");
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
@@ -715,6 +731,17 @@ tapBtn.onclick = () => {
   }
 };
 tapAuto.onclick = () => { manualBpm = null; taps = []; tapBtn.classList.remove("primary"); send({ type: "setManualBpm", value: 0 }); showBpm(0); };
+
+/* ── Rökmaskin ─────────────────────────────────────────────────────────── */
+const fogEnabled = document.getElementById("fogEnabled");
+const fogOnDrop = document.getElementById("fogOnDrop");
+const fogAddr = document.getElementById("fogAddr");
+const fogNowBtn = document.getElementById("fogNow");
+const sendFog = () => send({ type: "setFog", fog: { enabled: fogEnabled.checked, onDrop: fogOnDrop.checked, address: Number(fogAddr.value) || 100 } });
+fogEnabled.onchange = sendFog;
+fogOnDrop.onchange = sendFog;
+fogAddr.onchange = sendFog;
+fogNowBtn.onclick = () => send({ type: "fogNow" });
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.

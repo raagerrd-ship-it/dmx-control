@@ -46,6 +46,8 @@ export class EffectEngine {
   private inZoneState = false;   // hysteres-tillstånd för topp-zonen
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
+  private fogUntil = 0;          // rökmaskin: pågående blast till (wall-clock ms)
+  private lastFogMs = -1e9;      // senaste blast (för cooldown)
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -155,8 +157,19 @@ export class EffectEngine {
     else if (frame.level < this.levelCeil * 0.70) this.inZoneState = false;
     const inZone = this.inZoneState;
     const brokeRecently = nowWall - this.breakAtMs < 3500;
-    if (inZone && !this.wasInZone && brokeRecently) this.dropBangUntil = nowWall + 8000;        // drop-fönster (max 8s)
+    const dropFired = inZone && !this.wasInZone && brokeRecently;
+    if (dropFired) this.dropBangUntil = nowWall + 8000;                                          // drop-fönster (max 8s)
     this.wasInZone = inZone;
+    // RÖKMASKIN: blast på drop (duty-cycle-skyddad) + manuell puff.
+    const fog = this.cfg.fog;
+    if (fog?.enabled) {
+      const wantBurst = (dropFired && fog.onDrop) || this.cfg.fogTrigger;
+      if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;                                      // engångs-flagga
+      if (wantBurst && nowWall - this.lastFogMs > fog.cooldownMs) {
+        this.fogUntil = nowWall + fog.burstMs;
+        this.lastFogMs = nowWall;
+      }
+    }
     const dropActive = inZone && nowWall < this.dropBangUntil;                                  // en riktig drop pågår
     // DROP-ENVELOPE: FULL ATTACK (~30ms) på träffen, HÅLL allt på max under
     // dropen, mjuk FADE ner (~1s) när den släpper. Egen effekt — INGEN
@@ -360,6 +373,12 @@ export class EffectEngine {
       const v = this.universe[ch] >= held ? this.universe[ch] : held;
       this.outSmooth[ch] = v;
       this.universe[ch] = Math.round(v);
+    }
+
+    // Rök-kanal skrivs SIST (efter ballistiken) → instant på/av, ingen fade.
+    if (fog?.enabled) {
+      const fa = fog.address - 1;
+      if (fa >= 0 && fa < 512) this.universe[fa] = nowWall < this.fogUntil ? Math.max(0, Math.min(255, Math.round(fog.level))) : 0;
     }
 
     return this.universe;
