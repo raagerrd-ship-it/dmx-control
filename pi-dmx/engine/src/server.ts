@@ -318,6 +318,12 @@ export async function startServer(
               cooldownMs: typeof f.cooldownMs === "number" ? Math.max(0, Math.min(300000, Math.round(f.cooldownMs))) : cur.cooldownMs,
               level: typeof f.level === "number" ? Math.max(0, Math.min(255, Math.round(f.level))) : cur.level,
             };
+          } else if (msg.type === "setDropBlackout") {
+            deps.cfg.dropBlackout = !!msg.value;
+          } else if (msg.type === "setScenicAnchor") {
+            deps.cfg.scenicAnchor = !!msg.value;
+          } else if (msg.type === "setEnergyGovernor") {
+            deps.cfg.energyGovernor = !!msg.value;
           } else if (msg.type === "fogNow") {
             deps.cfg.fogTrigger = true;   // engångs-puff (motorn nollställer flaggan)
           }

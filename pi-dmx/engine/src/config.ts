@@ -101,6 +101,12 @@ export interface EngineConfig {
   };
   /** Transient one-shot: sätt true för en manuell rök-puff — inte persisterad. */
   fogTrigger?: boolean;
+  /** REGI: dramaturgisk tystnad — kort kolsvart just före drop-explosionen. */
+  dropBlackout: boolean;
+  /** REGI: sceniskt djup — mittlamporna hålls som fasta uplights i höga lägen. */
+  scenicAnchor: boolean;
+  /** REGI: energispärr — smart-läget tvingas till vila efter för lång full fart. */
+  energyGovernor: boolean;
 }
 
 export const defaultConfig: EngineConfig = {
@@ -139,6 +145,9 @@ export const defaultConfig: EngineConfig = {
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   dmxMaxHz: 50, // safe max for typical fixtures; helper caps automatically
   fog: { enabled: false, address: 128, onDrop: true, burstMs: 2500, cooldownMs: 25000, level: 255 },
+  dropBlackout: true,     // dramaturgisk tystnad — låg risk, lyfter varje drop
+  scenicAnchor: false,    // ägar-val: antar lampor i rad vänster→höger
+  energyGovernor: false,  // ägar-val: kan förvirra en hyresgäst, av som standard
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {

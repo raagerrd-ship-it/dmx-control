@@ -56,6 +56,12 @@ export class EffectEngine {
   private lvlSlowR = 0.3;        // långsam nivå-baslinje för riser-prediktor
   private buildUp = 0;           // 0..1 uppbyggnad (riser) — bygger tension mot dropen
   private hotMs = 0;             // hur länge musiken pumpat → adaptiv tystnads-landning
+  private wasBreaking = false;   // flankdetektor för nivå-svacka (drop-blackout)
+  private blackoutUntil = 0;     // dramaturgisk tystnad: kolsvart till (wall-clock ms)
+  private governorMs = 0;        // ackumulerad tid i full fart (energispärr)
+  private governorResting = false;
+  private governorRestUntil = 0;
+  private lastGovMs = 0;         // energispärrens egen dt-referens
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -193,6 +199,18 @@ export class EffectEngine {
     const dropFired = inZone && !this.wasInZone && brokeRecently;
     if (dropFired) this.dropBangUntil = nowWall + 8000;                                          // drop-fönster (max 8s)
     this.wasInZone = inZone;
+    // DROP-BLACKOUT (dramaturgisk tystnad): en riser som BRYTS ner i en svacka
+    // strax före dropen → tvinga kolsvart i max 250ms. Svärtan STARTAR på
+    // svackans flank (bara om vi faktiskt byggt upp: buildUp>0.35) och SLÄPPS i
+    // samma stund dropen fyrar → explosionen landar exakt i takt, aldrig
+    // fördröjd. Rinner risern ut utan drop kommer ljuset bara tillbaka.
+    const nowBreaking = frame.level < this.levelCeil * 0.65;
+    if (this.cfg.dropBlackout && nowBreaking && !this.wasBreaking && this.buildUp > 0.35) {
+      this.blackoutUntil = nowWall + 250;
+    }
+    this.wasBreaking = nowBreaking;
+    if (dropFired) this.blackoutUntil = 0;                                                        // dropen fyrade → släpp svärtan, explodera
+    const blackout = nowWall < this.blackoutUntil;
     // RÖKMASKIN: blast på drop (duty-cycle-skyddad) + manuell puff.
     const fog = this.cfg.fog;
     if (fog?.enabled) {
@@ -273,6 +291,26 @@ export class EffectEngine {
         // Låg-BPM-spärr: en tryckare/ballad ska ALDRIG gå Full Fart, även om dess
         // relativa energi toppar. (bpm 0 = ej låst → ingen spärr.)
         if (bpm > 0 && bpm < 95 && tier === FULLFART) tier = FART;
+        // ENERGISPÄRR (dramaturgiska pauser): en pro-ljusdesigner låter aldrig full
+        // fart pågå i timmar — dansgolvet blir sensoriskt immunt. Fyll en mätare
+        // medan vi ligger i full fart, töm den (halv takt) annars. Efter ~8 min
+        // SAMMANLAGD full fart → tvinga LUGN i 3 min så rummet får "andas ut",
+        // sen släpps full fart igen. Bara i smart-läget → överkör aldrig ett
+        // manuellt valt läge.
+        if (this.cfg.energyGovernor) {
+          const gdt = this.lastGovMs ? Math.min(0.2, (now - this.lastGovMs) / 1000) : 0;
+          this.lastGovMs = now;
+          this.governorMs = Math.max(0, this.governorMs + gdt * 1000 * (tier === FULLFART ? 1 : -0.5));
+          if (!this.governorResting && this.governorMs > 480000) {          // 8 min sammanlagt
+            this.governorResting = true;
+            this.governorRestUntil = now + 180000;                          // 3 min vila
+            this.smartDwellUntil = 0;                                       // byt ner direkt
+          }
+          if (this.governorResting) {
+            if (now < this.governorRestUntil) tier = LUGN;                  // tvingad vila
+            else { this.governorResting = false; this.governorMs = 0; this.smartDwellUntil = 0; }
+          }
+        }
         const tierName = tier === LUGN ? "lugn" : tier === FART ? "fart" : "full";
         // Omval vid: (a) nivåbyte — så en ny effekt slår till DIREKT när vi går
         // in i Fart/Full Fart (inte den gamla kvar tills dwell löper ut),
@@ -371,9 +409,21 @@ export class EffectEngine {
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
     const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8);
 
+    // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
+    // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
+    // kör full gas. Ger arkitektoniskt djup — rörelsen poppar mot en stabil bas.
+    // Antar lampor i rad V→H (ägar-toggle). Grupp-effekterna (rave/flip/gallop/
+    // twin) har redan rumslig struktur → undantagna.
+    const ANCHOR_MODES = new Set<Mode>(["party", "snap", "bounce", "strobe", "chase", "wave"]);
+    const useAnchor = this.cfg.scenicAnchor && count >= 3 && ANCHOR_MODES.has(effMode);
+    const anchorHue = (CURRENT_PALETTE[CURRENT_PALETTE.length - 1] ?? 0) / 6;   // palettens djupaste ton
+
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
-      const rgb = pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, this.buildUp, effMode);
+      const isAnchor = useAnchor && i > 0 && i < count - 1;   // mittlamporna = ankare
+      const rgb = isAnchor
+        ? hsvToRgb(anchorHue, 1, 0.4 + 0.06 * Math.sin(t * 0.5 + i))   // fast pelare, knappt levande andning
+        : pickColor(this.cfg, t, i, count, audio, kickEnv, frame, this.chasePos, fx, this.dropFired, this.dropHue, this.wavePhase, this.buildUp, effMode);
       if (bloom) {
         // Bloom (bas-punch/flash): skala upp färgen till full ljusstyrka.
         const mxc = Math.max(rgb[0], rgb[1], rgb[2]);
@@ -431,6 +481,15 @@ export class EffectEngine {
       const v = this.universe[ch] >= held ? this.universe[ch] : held;
       this.outSmooth[ch] = v;
       this.universe[ch] = Math.round(v);
+    }
+
+    // DROP-BLACKOUT: kolsvart NU — förbi ballistikens mjuka fade (stenhård
+    // klippning). Nolla även den utjämnade bufferten så explosionen efter
+    // svärtan reser sig rent från svart, utan pop från en kvarhållen nivå.
+    if (blackout) {
+      for (let ch = 0; ch < this.maxCh; ch++) {
+        if (!this.strobeMask[ch]) { this.universe[ch] = 0; this.outSmooth[ch] = 0; }
+      }
     }
 
     // Rök-kanal skrivs SIST (efter ballistiken) → instant på/av, ingen fade.
