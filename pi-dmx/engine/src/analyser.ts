@@ -157,14 +157,20 @@ export class Analyser {
     if (P <= lagMax) {
       let bestPhase = 0, bestPhaseSum = -1;
       for (let ph = 0; ph < P; ph++) {
-        let s = 0; for (let i = ph; i < N; i += P) s += Math.max(0, env[i]);
+        let s = 0; for (let i = ph; i < N; i += P) s += envPos[i];
         if (s > bestPhaseSum) { bestPhaseSum = s; bestPhase = ph; }
       }
-      let onE = 0, offE = 0;
+      let onE = 0, offE = 0, offC = 0;
       const offPh = (bestPhase + bestLag) % P;
-      for (let i = bestPhase; i < N; i += P) onE += Math.max(0, env[i]);
-      for (let i = offPh;    i < N; i += P) offE += Math.max(0, env[i]);
-      if (onE > 0 && offE < onE * 0.45) bestLag = P;
+      for (let i = bestPhase; i < N; i += P) onE += envPos[i];
+      for (let i = offPh;    i < N; i += P) { offE += envPos[i]; offC++; }
+      let posMean = 0; for (let i = 0; i < N; i++) posMean += envPos[i]; posMean /= N;
+      const offAvg = offC > 0 ? offE / offC : 0;
+      // Halvera bara om mellanslagen (a) är mycket svagare än slagen OCH (b) inte
+      // har ett EGET onset (ligger nära baslinjen, offAvg < ~1.2× medel). (b)
+      // skiljer en ballad (tomma mellanslag → halvera) från en danslåt med
+      // accent-mönster (svagare men RIKTIGA kick-slag → behåll snabb takt).
+      if (onE > 0 && offE < onE * 0.45 && offAvg < posMean * 1.2) bestLag = P;
     }
 
     // Parabolisk interpolation kring toppen → sub-lag-precision (t.ex. 125 ist. 122).
