@@ -37,6 +37,7 @@ export class Analyser {
   private bpmCounter = 0;
   private localBpm = 0;
   private localBpmConfidence = 0;
+  private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
 
   private bpmHist: number[] = [];   // senaste råestimat (~3s) för median-stabilisering
   private silentMs = 0;
@@ -184,26 +185,35 @@ export class Analyser {
     let bpm = (HZ * 60) / lagF;
     while (bpm < 55) bpm *= 2;
     while (bpm >= 175) bpm /= 2;
-    // OKTAV-STICKINESS: när takten väl är låst, vik nya estimat till oktaven
-    // närmast låset. En låt byter inte oktav mitt i — så en breakdown med svaga
-    // mellanslag (off-beat-testet vill halvera) ska INTE halvera en låst danstakt.
-    // Off-beat-testet avgör bara vid FÖRSTA låsningen; nya låtar låser om via
-    // tyst-resetten (localBpm=0).
-    if (this.localBpm > 0) {
-      let folded = bpm, fd = Math.abs(bpm - this.localBpm);
-      for (const c of [bpm * 2, bpm / 2]) {
-        if (c >= 55 && c < 175 && Math.abs(c - this.localBpm) < fd) { fd = Math.abs(c - this.localBpm); folded = c; }
-      }
-      bpm = folded;
-    }
-    // Median-stabilisering över ~5s (20 estimat @ 4 Hz) → robust mot att
-    // autokorrelationen råkar peka på olika metriska nivåer i olika sektioner.
+    // Median över RÅestimaten (utan oktav-tvång) → dämpar brus men låser inte
+    // fast oktaven, så en fel initial låsning kan rättas. Långt fönster (~5s) för
+    // att inte studsa på brusiga/tvetydiga låtar.
     this.bpmHist.push(bpm);
     if (this.bpmHist.length > 20) this.bpmHist.shift();
     const sorted = [...this.bpmHist].sort((a, b) => a - b);
     const med = sorted[sorted.length >> 1];
-    if (this.localBpm === 0 || Math.abs(med - this.localBpm) > 15) this.localBpm = Math.round(med);   // nytt/oktavbyte → snäpp
-    else this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);                    // små avvik → glid
+    if (this.localBpm === 0) {
+      this.localBpm = Math.round(med);
+      this.octaveVote = 0;
+    } else {
+      // SJÄLVRÄTTANDE OKTAV: håll nuvarande takt för stabilitet, MEN om estimaten
+      // ihållande pekar på en annan oktav (½× eller 2×) → byt efter ~2s bevis, så
+      // en halvtempo-låsning "ökar" till rätt takt istället för att fastna. Ett
+      // enstaka breakdown hinner inte nå tröskeln → ingen flimrig växling.
+      const ratio = med / this.localBpm;
+      if (ratio >= 0.9 && ratio <= 1.11) {
+        this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);   // samma takt → glid
+        this.octaveVote *= 0.5;
+      } else if (ratio > 1.4) {
+        this.octaveVote = Math.max(0, this.octaveVote) + 1;                          // estimaten HÖGRE oktav
+        if (this.octaveVote >= 8) { this.localBpm = Math.round(med); this.octaveVote = 0; }
+      } else if (ratio < 0.7) {
+        this.octaveVote = Math.min(0, this.octaveVote) - 1;                          // estimaten LÄGRE oktav
+        if (this.octaveVote <= -8) { this.localBpm = Math.round(med); this.octaveVote = 0; }
+      } else {
+        this.octaveVote *= 0.7;                                                      // mellanting (3/2) → brus
+      }
+    }
     // Smooth confidence (undvik hoppig UI); attack snabbt, release långsamt.
     const cA = this.localBpmConfidence;
     this.localBpmConfidence = cA + (conf - cA) * (conf > cA ? 0.35 : 0.08);
@@ -305,7 +315,7 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.bpmHist.length = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.bpmHist.length = 0; }
     } else {
       this.silentMs = 0;
     }
