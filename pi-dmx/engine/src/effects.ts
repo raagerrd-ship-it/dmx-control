@@ -16,6 +16,8 @@ export class EffectEngine {
   private showTime = 0;      // ackumulerad "show-tid" — accelererar under uppbyggnaden (riser)
   private lastShowMs = 0;
   private lastKickBoost = 0;
+  private showVel = 0;       // extra show-tids-hastighet från bastransienter (akustisk tröghet)
+  private pendingKick = 0;   // ackumulerade kick-impulser sedan förra rendern (fylls i 375 Hz)
   /** Chase mode: fixture-index of the currently lit head. Advanced on kick and slow-time. */
   private chasePos = 0;
   private chaseDir = 1;
@@ -95,6 +97,13 @@ export class EffectEngine {
 
   constructor(private cfg: EngineConfig) {}
 
+  /** AKUSTISK TRÖGHET: varje bastransient (kick) knuffar show-tiden framåt.
+   *  Anropas i 375 Hz-chunkhanteraren så inga slag missas (render kör bara 50 Hz).
+   *  strength ~0.4..1.0 (skalas av basens styrka). Friktionen i render() bromsar. */
+  registerKick(strength: number): void {
+    this.pendingKick += Math.min(1.5, Math.max(0, strength));
+  }
+
   render(frame: Frame): Uint8Array {
     // Fri-rullande "show-tid": normalt 1× realtid, men accelererar under en
     // uppbyggnad (buildUp från förra framen) så mönstren snabbar upp mot dropen.
@@ -103,7 +112,17 @@ export class EffectEngine {
     if (this.lastShowMs === 0) this.lastShowMs = _np;
     const _dtT = Math.min(0.1, (_np - this.lastShowMs) / 1000);
     this.lastShowMs = _np;
-    this.showTime += _dtT * (1 + this.buildUp * 1.5);   // upp till 2.5× snabbare vid full uppbyggnad
+    // AKUSTISK TRÖGHET (fluid friction): mönstren flyter i en trög vätska. Varje
+    // bastransient ger show-tiden en IMPULS framåt; "vätskefriktionen" bromsar
+    // sedan mjukt tillbaka till normaltempo → vågor/eld/aurora RYCKER till och
+    // accelererar explosivt med bastrumman, för att sedan glida vidare. Skalas av
+    // energin så tysta partier knappt rycker; strukturen (beat-låsta färgbyten)
+    // rörs inte — bara rörelsen får fysikalisk tyngd.
+    const friction = Math.exp(-_dtT / 0.16);            // tröghet τ≈160 ms
+    this.showVel = Math.min(5, this.showVel * friction + this.pendingKick * 2.0);
+    this.pendingKick = 0;
+    // upp till 2.5× snabbare vid full uppbyggnad + kick-ryck ovanpå
+    this.showTime += _dtT * (1 + this.buildUp * 1.5 + this.showVel);
     const t = this.showTime;
     if (frame.kick) this.lastKickBoost = performance.now();
 

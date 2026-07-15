@@ -97,6 +97,9 @@ capture.on("chunk", (samples: Float32Array) => {
   // (Inte varje kick — annars överröstar blixten alla lägen.) Baslinje = långsam
   // EMA av kick-flux; drop kräver ett tydligt uthopp + minst ~900 ms mellanrum.
   if (frame.kick) {
+    // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
+    // inga slag missas) → show-tiden får en knuff, starkare ju tyngre basen är.
+    effects.registerKick(0.4 + Math.min(1, frame.energy * 1.4) * 0.6);
     fluxBaseline += (frame.flux - fluxBaseline) * 0.05;
     const mult = 2.4 - cfg.dropSensitivity * 1.5;   // känslig 0.9x .. trög 2.4x
     const strong = frame.flux > Math.max(0.10, fluxBaseline * mult);
