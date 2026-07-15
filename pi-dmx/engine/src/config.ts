@@ -156,7 +156,7 @@ export const defaultConfig: EngineConfig = {
   energyGovernor: false,  // ägar-val: kan förvirra en hyresgäst, av som standard
   colorEcho: false,       // ägar-val: antar lampor i rad; ändrar looket på ytterlamporna
   microStrobe: false,     // ägar-val: strobe-nära, opt-in
-  energyCeiling: false,   // ägar-val: dämpar lugna partier; en hyresgäst kan tro riggen är trasig
+  energyCeiling: true,    // direkt VU = ljusstyrka; standard på (drop/punch bypassar)
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
