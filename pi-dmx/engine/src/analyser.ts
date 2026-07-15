@@ -8,8 +8,10 @@ import type { EngineConfig } from "./config.js";
 
 export interface Frame {
   level: number;        // 0..1, auto-gained RMS
-  energy: number;       // 0..1, bass-weighted spectral energy
+  energy: number;       // 0..1, bass-band spectral energy (~0–1.5 kHz)
+  mid: number;          // 0..1, mid-band spectral energy (~1.5–12 kHz: röst/synth/virvel)
   treble: number;       // 0..1, high-band spectral energy (hats/cymbals/vocals top)
+  centroid: number;     // 0..1, spektralt tyngdpunkt: mörk/bastung → 0, ljus/diskant → 1
   flux: number;         // 0..1, bass-band spectral flux
   kick: boolean;        // true on rising edge only
   gain: number;         // current auto-gain factor (debug)
@@ -50,7 +52,9 @@ export class Analyser {
   // release lets light glide down instead of sputtering.
   private lvlSmooth = 0;
   private engSmooth = 0;
+  private midSmooth = 0;
   private trbSmooth = 0;
+  private centSmooth = 0.5;
 
   /** Called when the input routing changes — the old gain is meaningless for
    *  the new source's signal level, so re-converge from neutral. */
@@ -256,9 +260,11 @@ export class Analyser {
     const half = this.cfg.fft.size / 2;
     const mag = new Float32Array(half);
     let bassEnergy = 0;
+    let midEnergy = 0;
     let trebleEnergy = 0;
     let flux = 0;
     let kickFlux = 0;                               // onset ENBART i kick-bandet (sub-bas)
+    let magSum = 0, magW = 0;                       // för spektralt centroid
     const bassBins = Math.min(16, half);           // ~0–1.5 kHz @ 48k/512
     const kickBins = Math.min(3, half);            // bins 0–2 ≈ 0–280 Hz (kick-trumman)
     const trebleStart = Math.floor(half * 0.5);    // ~top half of spectrum (~12 kHz+)
@@ -270,14 +276,19 @@ export class Analyser {
         bassEnergy += mag[i];
         const d = mag[i] - this.prevMag[i];
         if (d > 0) { flux += d; if (i < kickBins) kickFlux += d; }    // half-wave rectified
+      } else if (i < trebleStart) {
+        midEnergy += mag[i];                         // mellanband (mellan bas och diskant)
       }
       if (i >= trebleStart) trebleEnergy += mag[i];
+      magSum += mag[i]; magW += i * mag[i];          // centroid = viktad medelfrekvens
     }
     this.prevMag = mag;
     // Gain-compensated like `level` — otherwise the band-driven fixtures and
     // the kick energy gate die at low volume while the AGC keeps level alive.
     const energy = Math.min(1, (bassEnergy / bassBins) * 0.02 * this.gain);
+    const mid = Math.min(1, (midEnergy / Math.max(1, trebleStart - bassBins)) * 0.025 * this.gain);
     const treble = Math.min(1, (trebleEnergy / (half - trebleStart)) * 0.03 * this.gain);
+    const centroid = magSum > 1e-6 ? Math.min(1, (magW / magSum) / half) : 0;
     const fluxNorm = Math.min(1, flux * 0.005);
 
     // Auto-gain (slow: seconds-to-minute timescales)
@@ -348,8 +359,10 @@ export class Analyser {
     const smooth = (prev: number, x: number) => prev + (x - prev) * (x > prev ? aAtt : aRel);
     this.lvlSmooth = smooth(this.lvlSmooth, level);
     this.engSmooth = smooth(this.engSmooth, energy);
+    this.midSmooth = smooth(this.midSmooth, mid);
     this.trbSmooth = smooth(this.trbSmooth, treble);
-    return { level: this.lvlSmooth, energy: this.engSmooth, treble: this.trbSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, bpmConfidence: this.localBpmConfidence, beatAnchorMs: this.beatAnchorMs };
+    this.centSmooth = smooth(this.centSmooth, centroid);
+    return { level: this.lvlSmooth, energy: this.engSmooth, mid: this.midSmooth, treble: this.trbSmooth, centroid: this.centSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, bpmConfidence: this.localBpmConfidence, beatAnchorMs: this.beatAnchorMs };
   }
 }
 

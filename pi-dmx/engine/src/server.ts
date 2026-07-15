@@ -333,7 +333,7 @@ export async function startServer(
 
 function isMode(m: unknown): m is Mode {
   return typeof m === "string" &&
-    ["smart", "drops", "party", "chase", "wave", "cycle", "breathe", "tide", "snap", "bounce", "mono", "aurora", "drift", "sweep", "pulse", "strobe", "rave", "blackout"].includes(m);
+    ["smart", "drops", "party", "chase", "wave", "cycle", "breathe", "tide", "snap", "bounce", "mono", "aurora", "drift", "sweep", "pulse", "strobe", "rave", "eq", "blackout"].includes(m);
 }
 const clamp01 = (x: number) => typeof x === "number" && x >= 0 && x <= 1 ? x : 0;
 

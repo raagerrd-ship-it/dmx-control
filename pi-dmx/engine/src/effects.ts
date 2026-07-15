@@ -141,7 +141,7 @@ export class EffectEngine {
         // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
         const LUGN: Mode[] = ["cycle", "breathe", "tide", "mono", "aurora", "drift"];
-        const FART: Mode[] = ["wave", "chase", "drops", "sweep", "pulse"];
+        const FART: Mode[] = ["wave", "chase", "drops", "sweep", "pulse", "eq"];
         const FULLFART: Mode[] = ["party", "snap", "bounce", "strobe", "rave"];
         const bpm = this.cfg.beat?.bpm ?? 0;
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
@@ -498,6 +498,19 @@ function pickColor(
       const hue = 0.015 + 0.11 * ember;                     // rött → gult
       const m = Math.min(1, 0.4 + ember * 0.45 + kickEnv * 0.3);
       return hsvToRgb(hue, 1, 0.3 + 0.7 * m);
+    }
+    case "eq": {
+      // 3-band spektrum-EQ över riggen: varje lampa = ETT band i EN ren färg,
+      // ljusstyrkan = bandets energi. Bas→Röd, Mellan→Grön, Diskant→Blå.
+      // Använder bara EN R/G/B-kanal per lampa → perfekt för rena färger.
+      const bandIdx = count > 1 ? idx % 3 : -1;
+      const r = Math.min(1, frame.energy * 1.7);
+      const g = Math.min(1, frame.mid * 1.9);
+      const b = Math.min(1, frame.treble * 1.9);
+      if (bandIdx === 0) return [Math.max(0.05, r), 0, 0];   // bas → röd
+      if (bandIdx === 1) return [0, Math.max(0.05, g), 0];   // mellan → grön
+      if (bandIdx === 2) return [0, 0, Math.max(0.05, b)];   // diskant → blå
+      return [Math.max(0.05, r), Math.max(0.05, g), Math.max(0.05, b)];   // enda lampa: full mix
     }
     default:
       return [0, 0, 0];

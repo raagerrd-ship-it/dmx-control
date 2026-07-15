@@ -23,13 +23,13 @@ import { Button } from "./button.js";
 import { activeSlots, type Mode } from "./config.js";
 
 // Physical button cycles through the fun modes (skips blackout so the button never kills the show).
-const MODE_CYCLE: Mode[] = ["smart", "drops", "party", "chase", "wave", "cycle", "breathe", "tide", "snap", "bounce", "mono", "aurora", "drift", "sweep", "pulse", "strobe", "rave"];
+const MODE_CYCLE: Mode[] = ["smart", "drops", "party", "chase", "wave", "cycle", "breathe", "tide", "snap", "bounce", "mono", "aurora", "drift", "sweep", "pulse", "strobe", "rave", "eq"];
 
 const cfg = await loadConfig();
 // Migrate legacy mode names from persisted configs.
 const LEGACY_MODES: Record<string, Mode> = { auto: "wave", comet: "wave", split: "party", strobe: "party", pulse: "drops", spectrum: "wave", vu: "cycle" };
 if (LEGACY_MODES[cfg.mode as string]) cfg.mode = LEGACY_MODES[cfg.mode as string];
-if (!["smart","drops","party","chase","wave","cycle","breathe","tide","snap","bounce","mono","aurora","drift","sweep","pulse","strobe","rave","blackout"].includes(cfg.mode)) cfg.mode = "smart";
+if (!["smart","drops","party","chase","wave","cycle","breathe","tide","snap","bounce","mono","aurora","drift","sweep","pulse","strobe","rave","eq","blackout"].includes(cfg.mode)) cfg.mode = "smart";
 cfg.fft.hop = 128;   // analys 375 Hz (beprövad tuning); render/DMX separat 50 Hz
 
 // Re-apply the chosen codec input routing (the boot service restores the aux
