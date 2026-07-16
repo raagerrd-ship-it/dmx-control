@@ -53,6 +53,9 @@ export interface EngineConfig {
   dynamics: number;
   /** Pulsa hela riggen på taktslag. */
   beatPulse: boolean;
+  /** Hur aggressivt beat-PLL:en knuffar takt-ankaret mot faktiska trumslag
+   *  (0 = av/fri-rullande, ~0.10 mjuk, 0.18 normal, ~0.30 aggressiv). */
+  beatSyncStrength: number;
   /** Energi (lokal) väljer läge i smart-läget. */
   energyDrivesMode: boolean;
   /** Drop-blixt på starka slag: 0=av .. 1=känsligast. */
@@ -127,6 +130,7 @@ export const defaultConfig: EngineConfig = {
   sensitivity: 0.6,
   dynamics: 0.6,
   beatPulse: true,
+  beatSyncStrength: 0.18,   // normal PLL-korrektion mot trumslag
   energyDrivesMode: true,
   dropSensitivity: 0.3,
   smartDwellMs: 9000,

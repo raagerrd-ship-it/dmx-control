@@ -93,7 +93,8 @@ capture.on("chunk", (samples: Float32Array) => {
       const beatMs = 60000 / cfg.beat.bpm;
       const ph = ((((Date.now() - cfg.beat.anchorMs) % beatMs) + beatMs) % beatMs) / beatMs;
       const err = ph < 0.5 ? ph : ph - 1;   // -0.5..0.5 av ett taktslag
-      if (Math.abs(err) < 0.25) cfg.beat.anchorMs += err * beatMs * 0.18;
+      const k = cfg.beatSyncStrength ?? 0.18;   // ägar-ratt: 0 = av/fri-rullande .. ~0.30 aggressiv
+      if (k > 0 && Math.abs(err) < 0.25) cfg.beat.anchorMs += err * beatMs * k;
     }
   }
   // Lokal drop: ett slag som är MYCKET starkare än det normala → sällsynt blixt.

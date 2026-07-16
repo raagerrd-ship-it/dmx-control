@@ -296,6 +296,8 @@ export async function startServer(
             deps.cfg.detection.tauDown = 60  * Math.pow(2  / 60,  a);
           } else if (msg.type === "setBeatPulse") {
             deps.cfg.beatPulse = !!msg.value;
+          } else if (msg.type === "setBeatSyncStrength" && typeof msg.value === "number") {
+            deps.cfg.beatSyncStrength = Math.max(0, Math.min(0.5, msg.value));
           } else if (msg.type === "setEnergyDrivesMode") {
             deps.cfg.energyDrivesMode = !!msg.value;
           } else if (msg.type === "setDropSensitivity" && typeof msg.value === "number") {

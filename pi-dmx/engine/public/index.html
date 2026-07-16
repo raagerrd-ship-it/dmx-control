@@ -155,6 +155,16 @@
       </div>
     </div>
     <div class="status" id="tapHint" style="margin-top:4px">Behövs normalt inte — beatPulse följer basen automatiskt. Reserv om något läge låser fel takt: knacka 4+ slag för att låsa BPM, Auto släpper.</div>
+    <div class="setrow" style="margin-top:10px">
+      <label>Beat-synk</label>
+      <div class="seg" id="segBeatSync">
+        <button data-bs="0">Av</button>
+        <button data-bs="0.10">Mjuk</button>
+        <button data-bs="0.18">Normal</button>
+        <button data-bs="0.30">Aggressiv</button>
+      </div>
+    </div>
+    <div class="status" style="margin-top:4px">Hur hårt pulsen knuffas i fas mot faktiska trumslag. Av = fri-rullande på detekterad BPM. Aggressiv = låser snabbast men kan rycka på taktrik musik.</div>
   </div>
 
   <h1>Rökmaskin</h1>
@@ -393,6 +403,7 @@ function applyConfig(cfg) {
   if (tClubMode) tClubMode.checked = !!cfg.clubMode;
   if (tAmbientGlow) tAmbientGlow.checked = !!cfg.ambientGlow;
   segActivate("segDrop", cfg.dropSensitivity ?? 0.6, "drop");
+  segActivate("segBeatSync", cfg.beatSyncStrength ?? 0.18, "bs");
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
   inMic.classList.toggle("primary", cfg.audioInput === "mic");
@@ -785,6 +796,8 @@ tEnergy.onchange = () => {
 };
 document.querySelectorAll("#segDrop button").forEach((b) =>
   b.onclick = () => { send({ type: "setDropSensitivity", value: Number(b.dataset.drop) }); segActivate("segDrop", Number(b.dataset.drop), "drop"); });
+document.querySelectorAll("#segBeatSync button").forEach((b) =>
+  b.onclick = () => { send({ type: "setBeatSyncStrength", value: Number(b.dataset.bs) }); segActivate("segBeatSync", Number(b.dataset.bs), "bs"); });
 document.querySelectorAll("#segDwell button").forEach((b) =>
   b.onclick = () => { send({ type: "setSmartDwell", mode: b.dataset.dwell }); segActivateStr("segDwell", b.dataset.dwell, "dwell"); });
 renderCategories();
