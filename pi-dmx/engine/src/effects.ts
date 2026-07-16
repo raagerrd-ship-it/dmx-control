@@ -506,13 +506,16 @@ export class EffectEngine {
     const beatMs2 = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
     const tempoDeep = Math.max(0, Math.min(1, (beatMs2 - 340) / 260));   // 0 snabbt .. 1 långsamt
     const punchFloor = 0.5 - tempoDeep * 0.42;                            // 0.5 (snabbt) .. 0.08 (långsamt)
-    const normB = 1 / Math.max(0.15, this.cfg.detection?.autoGainTarget ?? 0.5);
+    // Per-lampa frekvensband (driver aurora/cycle/tide/twin + fixture.bands).
+    // NU ur dubbel-FFT:ns separerade, per-band-AGC-spektrum i stället för det grova
+    // 512-trebandet → renare, mer musikaliskt per-lampa-svar som alltid nyttjar range.
+    const s = frame.spec;
     const bands = [
-      Math.min(1, frame.energy * normB * 0.9),
-      Math.min(1, frame.mid * normB * 1.0),      // RIKTIGA mellanbandet (röst/synth/virvel)
-      Math.min(1, frame.treble * normB * 1.1),
-      Math.min(1, frame.energy * normB * 0.45 + kickEnv),
-      Math.max(0, (0.5 - audio) * 2) * 0.6,      // "low": lugn glöd när tyst, ur vägen när högt
+      Math.max(s.kick, s.bass),                                       // "bass": låg-end (kick+bas)
+      Math.max(s.lowMid, s.mid),                                      // "mid": röst/synth/virvel
+      Math.max(s.treble, s.air),                                      // "treble": hi-hats/cymbaler/luft
+      Math.min(1, Math.max(s.kick, frame.onset.kick) * 0.6 + kickEnv * 0.6),  // "kick": transient
+      Math.max(0, (0.5 - audio) * 2) * 0.6,                           // "low": lugn glöd när tyst, ur vägen när högt
     ];
     const BAND_IDX = { bass: 0, mid: 1, treble: 2, kick: 3, low: 4 } as const;
     // DRUM-KIT onset-envelopes: driv varje röst från dubbel-FFT:ns per-band
@@ -536,7 +539,10 @@ export class EffectEngine {
       hasBeat ? Math.floor(beatIdx / beatsPerStep) : Math.floor(t / secPerStep);
     // GRAVITATIONS-VU: ljudet knuffar nivån UPP; sen faller den med gravitation.
     // En separat peak-prick håller senaste toppen och sjunker långsamt.
-    const gPush = Math.max(audio, frame.level);
+    // Knuffas UPP av låg-enden (kick-anslag + bas), inte av bred-bandsnivån →
+    // varje kick är en fysisk knuff uppåt, sen faller den. Litet audio-golv så
+    // sustained höga partier håller den delvis uppe.
+    const gPush = Math.max(frame.onset.kick, frame.spec.bass * 0.9, audio * 0.5);
     if (gPush > this.gravLevel) { this.gravLevel = gPush; this.gravVel = 0; }   // knuff upp
     else { this.gravVel -= 2.8 * dtSec; this.gravLevel = Math.max(0, this.gravLevel + this.gravVel * dtSec); }
     if (this.gravLevel > this.gravPeak) this.gravPeak = this.gravLevel;

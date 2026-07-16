@@ -12,7 +12,9 @@ export const mono: EffectDef = {
                 + Math.sin(c.t * 17.3 + c.idx * 1.7) * 0.2;   // -1..1 organiskt
     const ember = 0.5 + 0.5 * flick;                          // 0..1 glöd
     const hue = 0.015 + 0.11 * ember;                         // rött → gult
-    const m = Math.min(1, 0.4 + ember * 0.45 + c.kickEnv * 0.3);
+    // Basgången (spec.bass) får lågan att SVALLA + kicken ger en flare → elden
+    // andas med musiken i stället för att bara flimra av sig själv.
+    const m = Math.min(1, 0.4 + ember * 0.4 + c.kickEnv * 0.25 + c.frame.spec.bass * 0.25);
     return c.hsv(hue, 1, 0.3 + 0.7 * m);
   },
 };
