@@ -423,7 +423,13 @@ export class EffectEngine {
     // sen låser den till stabil ~25s. Nollställs vid tystnad → snabb omkalibrering
     // vid låtbyte/paus.
     const warm = this.warmMs < 8000;
-    this.intensityFloor += (this.intensityEma - this.intensityFloor) * (warm ? dtSec / 3 : dtSec / 25);
+    // Baslinjen = robust MEDIAN (P50) av energin, inte EMA-medel: på hett/komprimerat
+    // AUX pinnar level 1.0 i loud sections → ett EMA-medel dras uppåt och "energi över
+    // snitt" (drop/full fart) blir omöjligt. Medianen struntar i pinnarna. Sign-baserad,
+    // steget skalar med baslinjen; snabb konvergens under warmup, sen stabil ~25s. (Lovable.)
+    const floorRate = warm ? dtSec / 3 : dtSec / 25;
+    if (warm) this.intensityFloor += (this.intensityEma - this.intensityFloor) * floorRate;   // seed snabbt
+    else this.intensityFloor += Math.sign(this.intensityEma - this.intensityFloor) * floorRate * (this.intensityFloor + 0.05);
 
     // Silence gate: below threshold for 250 ms → fade the effect out over ~0.25 s
     // (aggressive so the light sits tight to the audio); music back → fade in fast.
