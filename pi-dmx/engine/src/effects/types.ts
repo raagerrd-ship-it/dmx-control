@@ -34,6 +34,11 @@ export interface EffectContext {
   /** Lampans frekvensband (bas/mellan/diskant/kick/low) 0..1. */
   band: number;
 
+  /** Gravitations-VU: nivå som ljudet knuffar upp och som faller med gravitation
+   *  (0..1), + peak-håll som sjunker långsamt. Motorn räknar fysiken. */
+  gravLevel: number;
+  gravPeak: number;
+
   /** Taktindex + fas (0..1) från BPM-klockan; beatPulse = mjuk puls-envelope. */
   beatIdx: number;
   beatFrac: number;

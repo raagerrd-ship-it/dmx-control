@@ -204,6 +204,7 @@
     <label class="tgl"><span>Dynamiskt ljustak (VU)<br><small style="opacity:.6">Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%. Drop bypassar. Djup styrs av Dynamik.</small></span><input type="checkbox" id="tEnergyCeiling"></label>
     <label class="tgl"><span>Klubb-läge (hård kontrast)<br><small style="opacity:.6">Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna. Aggressivt, klistrat på transienterna. Kräver VU-taket på.</small></span><input type="checkbox" id="tClubMode"></label>
     <label class="tgl"><span>Varm vilo-glöd i tystnad<br><small style="opacity:.6">När ingen musik spelar: dim bärnsten-glöd i stället för helt mörkt. Av = lamporna släcks vid ingen input.</small></span><input type="checkbox" id="tAmbientGlow"></label>
+    <label class="tgl"><span>Riser-strobe (build → drop)<br><small style="opacity:.6">Under en uppbyggnad: accelererande strobe + färgen kollapsar mot vitt, sen blackout på dropen. Klassisk EDM-build.</small></span><input type="checkbox" id="tRiserStrobe"></label>
   </div>
 
   <h1>Fixtures</h1>
@@ -402,6 +403,7 @@ function applyConfig(cfg) {
   if (tEnergyCeiling) tEnergyCeiling.checked = !!cfg.energyCeiling;
   if (tClubMode) tClubMode.checked = !!cfg.clubMode;
   if (tAmbientGlow) tAmbientGlow.checked = !!cfg.ambientGlow;
+  if (tRiserStrobe) tRiserStrobe.checked = !!cfg.riserStrobe;
   segActivate("segDrop", cfg.dropSensitivity ?? 0.6, "drop");
   segActivate("segBeatSync", cfg.beatSyncStrength ?? 0.18, "bs");
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
@@ -779,6 +781,8 @@ const tClubMode = document.getElementById("tClubMode");
 tClubMode.onchange = () => send({ type: "setClubMode", value: tClubMode.checked });
 const tAmbientGlow = document.getElementById("tAmbientGlow");
 tAmbientGlow.onchange = () => send({ type: "setAmbientGlow", value: tAmbientGlow.checked });
+const tRiserStrobe = document.getElementById("tRiserStrobe");
+tRiserStrobe.onchange = () => send({ type: "setRiserStrobe", value: tRiserStrobe.checked });
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.

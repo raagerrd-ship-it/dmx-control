@@ -3,7 +3,7 @@
  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
  */
 
-export type Mode = "smart" | "drops" | "party" | "chase" | "wave" | "cycle" | "breathe" | "tide" | "snap" | "bounce" | "mono" | "aurora" | "drift" | "sweep" | "pulse" | "strobe" | "rave" | "eq" | "flip" | "gallop" | "twin" | "ripple" | "blackout";
+export type Mode = "smart" | "drops" | "party" | "chase" | "wave" | "cycle" | "breathe" | "tide" | "snap" | "bounce" | "mono" | "aurora" | "drift" | "sweep" | "pulse" | "strobe" | "rave" | "eq" | "flip" | "gallop" | "twin" | "ripple" | "jump" | "gravity" | "blackout";
 
 /**
  * A fixture is placed at `address` and occupies channels in a defined role
@@ -108,6 +108,9 @@ export interface EngineConfig {
   clubMode: boolean;
   /** REGI: varm vilo-glöd i tystnad — dim bärnsten när ingen musik spelar (annars helt mörkt). */
   ambientGlow: boolean;
+  /** REGI: riser-strobe — under en uppbyggnad accelererar en strobe + färgen
+   *  kollapsar mot vitt, sen blackout på dropen (klassisk EDM-build). */
+  riserStrobe: boolean;
 }
 
 export const defaultConfig: EngineConfig = {
@@ -148,6 +151,7 @@ export const defaultConfig: EngineConfig = {
   energyCeiling: true,    // direkt VU = ljusstyrka; standard på (drop/punch bypassar)
   clubMode: false,        // hård kontrast (VU²); opt-in — rör inte det trogna linjära läget
   ambientGlow: false,     // tystnad = HELT mörkt som standard; slå på för varm vilo-glöd
+  riserStrobe: false,     // ägar-val: accelererande strobe + vit-kollaps under risers
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {

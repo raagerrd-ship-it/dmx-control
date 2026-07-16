@@ -30,11 +30,14 @@ import { flip } from "./flip.js";
 import { gallop } from "./gallop.js";
 import { twin } from "./twin.js";
 import { ripple } from "./ripple.js";
+import { jump } from "./jump.js";
+import { gravity } from "./gravity.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
   drops, party, chase, wave, cycle, breathe, tide, snap, bounce, mono,
   aurora, drift, sweep, pulse, strobe, rave, eq, flip, gallop, twin, ripple,
+  jump, gravity,
 ];
 
 /** Snabb uppslagning nyckel → effekt. */

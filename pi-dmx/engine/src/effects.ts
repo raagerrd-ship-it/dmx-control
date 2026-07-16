@@ -69,6 +69,9 @@ export class EffectEngine {
   private microStrobe = 0;       // micro-strobe envelope (0..1), klingar av på ~2-3 frames
   private lastMicroMs = 0;
   private vu = 0;                // direkt VU-envelope (snabb attack / ~180ms release) för ljustaket
+  private gravLevel = 0;         // gravitations-VU: nivå som faller med gravitation
+  private gravVel = 0;           // dess hastighet
+  private gravPeak = 0;          // peak-håll (sjunker långsamt)
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -477,7 +480,7 @@ export class EffectEngine {
     // (6 tick) sedan → färgen "flyger" V→H som ett eko, ger arenabredd på 4 lampor.
     // Grupp-/spektrum-lägen har egen rumslig logik → undantagna. Ljusstyrkan är
     // fortfarande live (bara färgen/mönstret ekar).
-    const NO_ECHO = new Set<Mode>(["rave", "flip", "gallop", "twin", "ripple", "eq"]);
+    const NO_ECHO = new Set<Mode>(["rave", "flip", "gallop", "twin", "ripple", "gravity", "eq"]);
     const echoOn = this.cfg.colorEcho && count >= 2 && !NO_ECHO.has(effMode);
     const echoOld = echoOn ? this.echoBuf[this.echoPos] : undefined;   // 6 tick gammalt (strax överskrivet)
     let lamp0: [number, number, number] = [0, 0, 0];
@@ -512,16 +515,30 @@ export class EffectEngine {
     const hasBeat = !!(this.cfg.beat && this.cfg.beat.bpm > 40);
     const mclk = (beatsPerStep: number, secPerStep: number) =>
       hasBeat ? Math.floor(beatIdx / beatsPerStep) : Math.floor(t / secPerStep);
+    // GRAVITATIONS-VU: ljudet knuffar nivån UPP; sen faller den med gravitation.
+    // En separat peak-prick håller senaste toppen och sjunker långsamt.
+    const gPush = Math.max(audio, frame.level);
+    if (gPush > this.gravLevel) { this.gravLevel = gPush; this.gravVel = 0; }   // knuff upp
+    else { this.gravVel -= 2.8 * dtSec; this.gravLevel = Math.max(0, this.gravLevel + this.gravVel * dtSec); }
+    if (this.gravLevel > this.gravPeak) this.gravPeak = this.gravLevel;
+    else this.gravPeak = Math.max(0, this.gravPeak - 0.45 * dtSec);   // peak sjunker långsamt
     const effect = EFFECT_MAP.get(effMode);
     const ctx: EffectContext = {
       cfg: this.cfg, frame, fx: undefined, t, idx: 0, count,
-      audio, kickEnv, band: 0,
+      audio, kickEnv, band: 0, gravLevel: this.gravLevel, gravPeak: this.gravPeak,
       beatIdx, beatFrac, beatPulse, hasBeat,
       wavePhase: this.wavePhase, buildUp: this.buildUp, phaseSpread: 1 + this.buildUp * 2.5,
       punchFloor, chasePos: this.chasePos,
       dropFired: this.dropFired, dropHue: this.dropHue, now: performance.now(),
       mixedSector, mclk, hsv: hsvToRgb, shaped,
     };
+
+    // RISER-STROBE (helrigg): under en uppbyggnad accelererar en strobe (3→18 Hz)
+    // och färgen kollapsar mot vitt → klassisk EDM-build. Blackouten på själva
+    // dropen sköts redan separat. Beräknas en gång/frame.
+    const rs = this.cfg.riserStrobe && this.buildUp > 0.25;
+    const rsWhite = rs ? this.buildUp * 0.7 : 0;
+    const rsGate = rs ? (Math.floor(t * (3 + this.buildUp * 15)) % 2 === 0 ? 1 : 0.12) : 1;
 
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
@@ -537,6 +554,11 @@ export class EffectEngine {
       }
       if (echoOn && i === 0) { lamp0 = [rgb[0], rgb[1], rgb[2]]; }
       else if (echoOn && echoOld && i === count - 1) { rgb[0] = echoOld[0]; rgb[1] = echoOld[1]; rgb[2] = echoOld[2]; }
+      if (rs) {   // riser-strobe: vit-kollaps + accelererande gate
+        rgb[0] = (rgb[0] + (1 - rgb[0]) * rsWhite) * rsGate;
+        rgb[1] = (rgb[1] + (1 - rgb[1]) * rsWhite) * rsGate;
+        rgb[2] = (rgb[2] + (1 - rgb[2]) * rsWhite) * rsGate;
+      }
       if (bloom) {
         // Bloom (bas-punch/flash): skala upp färgen till full ljusstyrka.
         const mxc = Math.max(rgb[0], rgb[1], rgb[2]);
