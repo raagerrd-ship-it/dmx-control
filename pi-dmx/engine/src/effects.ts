@@ -458,11 +458,15 @@ export class EffectEngine {
       // INGEN omskalning/golv — exakt samma värde som input-mätaren visar. Lätt
       // ballistik (snabb attack / ~180ms release) bara för att slippa flimmer;
       // stegar aldrig om mappningen (steady 0.40 → tak 0.40).
-      // levelRaw = OSMOOTHAT (rå per-hop) → takets egna ballistik ser signalen
-      // direkt, utan analysatorns 15ms-attack/400ms-release ovanpå. Tightare/mer
-      // i takt. (Effekterna använder fortsatt frame.level, det utjämnade.)
+      // levelRaw = OSMOOTHAT (rå per-hop) → takets egna smooth ser signalen direkt,
+      // utan analysatorns 15ms-attack/400ms-release ovanpå. (Effekterna använder
+      // fortsatt frame.level, det utjämnade.)
+      // ~150ms glidning på BÅDA flankerna: den råa per-hop-nivån fladdrar, och en
+      // instant attack släppte igenom fladdret som ljus-flimmer. En enda kontrollerad
+      // 150ms-lågpass tar bort det utan analysatorns långa okontrollerade svans.
+      // (Drop bypassar ändå via dropEnv nedan.)
       const vuRaw = Math.max(0, Math.min(1, frame.levelRaw));
-      this.vu += (vuRaw - this.vu) * (vuRaw > this.vu ? 1 : 1 - Math.exp(-dtSec / 0.18));
+      this.vu += (vuRaw - this.vu) * (1 - Math.exp(-dtSec / 0.15));
       // KLUBB-LÄGE: kvadrera → hård kontrast (mörkt mellan, explosion på topp).
       const vuFilter = this.cfg.clubMode ? this.vu * this.vu : this.vu;
       // BARA DROP skippar VU-filtret: dropEnv (0..1) lyfter taket till full under
