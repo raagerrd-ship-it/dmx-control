@@ -724,7 +724,11 @@ export class EffectEngine {
         if (ch >= 0 && ch < 512 && this.capMask[ch] && this.universe[ch] > L) L = this.universe[ch];
       }
       if (L <= 0) continue;
-      const gain = L <= cal.off ? 0 : (cal.on + (255 - cal.on) * (L - cal.off) / Math.max(1, 255 - cal.off)) / L;
+      // Mappa HELA det tända området [1..255] → [on..255] så showens lägsta nivå
+      // lyfts till LED:ns tändpunkt (on) och skalar jämnt mot full — INTE [off..255],
+      // som (pga gamma) kapade bort showens nedre ~25%. off = separat dödzon: ligger
+      // luminansen ≤ off tvingas lampan helt släckt (t.ex. tystnad → svart).
+      const gain = L <= cal.off ? 0 : (cal.on + (255 - cal.on) * L / 255) / L;
       if (gain === 1) continue;
       for (let i = 0; i < roles.length; i++) {
         const ch = cbase + i;
