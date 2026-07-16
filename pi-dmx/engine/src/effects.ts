@@ -72,6 +72,12 @@ export class EffectEngine {
   private gravLevel = 0;         // gravitations-VU: nivå som faller med gravitation
   private gravVel = 0;           // dess hastighet
   private gravPeak = 0;          // peak-håll (sjunker långsamt)
+  // DRUM-KIT: per-band onset-envelopes (snabb attack / snabb decay) → trum-punch.
+  private prevMidBand = 0;       // mellan-band förra framen (för onset-derivata)
+  private prevTrebleBand = 0;    // diskant-band förra framen
+  private hatHit = 0;            // hi-hat-envelope (diskant-onset, ~60ms)
+  private snareHit = 0;          // snare-envelope (mellan-onset, ~110ms)
+  private kickHit = 0;          // kick-envelope (frame.kick, ~150ms)
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -483,7 +489,7 @@ export class EffectEngine {
     // (6 tick) sedan → färgen "flyger" V→H som ett eko, ger arenabredd på 4 lampor.
     // Grupp-/spektrum-lägen har egen rumslig logik → undantagna. Ljusstyrkan är
     // fortfarande live (bara färgen/mönstret ekar).
-    const NO_ECHO = new Set<Mode>(["rave", "flip", "gallop", "twin", "ripple", "gravity", "eq"]);
+    const NO_ECHO = new Set<Mode>(["rave", "flip", "gallop", "twin", "ripple", "gravity", "eq", "drumkit"]);
     const echoOn = this.cfg.colorEcho && count >= 2 && !NO_ECHO.has(effMode);
     const echoOld = echoOn ? this.echoBuf[this.echoPos] : undefined;   // 6 tick gammalt (strax överskrivet)
     let lamp0: [number, number, number] = [0, 0, 0];
@@ -510,6 +516,18 @@ export class EffectEngine {
       Math.max(0, (0.5 - audio) * 2) * 0.6,      // "low": lugn glöd när tyst, ur vägen när högt
     ];
     const BAND_IDX = { bass: 0, mid: 1, treble: 2, kick: 3, low: 4 } as const;
+    // DRUM-KIT onset-envelopes: derivatan (bara stigande) av mellan/diskant =
+    // anslaget på snare/hi-hat; frame.kick = kick-transienten. Snabb attack
+    // (sätt till onset-styrkan), snabb exponentiell decay → varje "trumma"
+    // punchar och slocknar i stället för att lysa jämnt som en EQ-mätare.
+    const midOn = Math.max(0, bands[1] - this.prevMidBand);
+    const trbOn = Math.max(0, bands[2] - this.prevTrebleBand);
+    this.prevMidBand = bands[1];
+    this.prevTrebleBand = bands[2];
+    this.hatHit = Math.max(this.hatHit * Math.exp(-dtSec / 0.06), trbOn > 0.06 ? Math.min(1, trbOn * 5) : 0);
+    this.snareHit = Math.max(this.snareHit * Math.exp(-dtSec / 0.11), midOn > 0.05 ? Math.min(1, midOn * 5) : 0);
+    if (frame.kick) this.kickHit = 1; else this.kickHit *= Math.exp(-dtSec / 0.15);
+    const drum = { kick: this.kickHit, snare: this.snareHit, hat: this.hatHit, bass: bands[0] };
     const dyn = Math.max(0, Math.min(1, this.cfg.dynamics ?? 0.6));
     const shaped = (floor: number, x: number) => {
       const f = floor * (1 - dyn);
@@ -528,7 +546,7 @@ export class EffectEngine {
     const effect = EFFECT_MAP.get(effMode);
     const ctx: EffectContext = {
       cfg: this.cfg, frame, fx: undefined, t, idx: 0, count,
-      audio, kickEnv, band: 0, gravLevel: this.gravLevel, gravPeak: this.gravPeak,
+      audio, kickEnv, band: 0, gravLevel: this.gravLevel, gravPeak: this.gravPeak, drum,
       beatIdx, beatFrac, beatPulse, hasBeat,
       wavePhase: this.wavePhase, buildUp: this.buildUp, phaseSpread: 1 + this.buildUp * 2.5,
       punchFloor, chasePos: this.chasePos,
@@ -592,7 +610,7 @@ export class EffectEngine {
     // Output ballistics on color/dim channels (never strobe/mode channels —
     // a decaying strobe value would sweep through real strobe speeds).
     // Snappare fade-out i energiska lägen så pumpen syns; lugna behåller mjukheten.
-    const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops" || effMode === "rave";
+    const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops" || effMode === "rave" || effMode === "drumkit";
     const beatMsNow = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
     const fastTau = Math.max(0.14, Math.min(0.3, beatMsNow * 0.5 / 1000));
     // TRANSIENT-SKÄRPA: hög energi/riser → kort decay (knivskarp piska på varje

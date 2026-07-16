@@ -3,7 +3,7 @@
  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
  */
 
-export type Mode = "smart" | "drops" | "party" | "chase" | "wave" | "cycle" | "breathe" | "tide" | "snap" | "bounce" | "mono" | "aurora" | "drift" | "sweep" | "pulse" | "strobe" | "rave" | "eq" | "flip" | "gallop" | "twin" | "ripple" | "jump" | "gravity" | "blackout";
+export type Mode = "smart" | "drops" | "party" | "chase" | "wave" | "cycle" | "breathe" | "tide" | "snap" | "bounce" | "mono" | "aurora" | "drift" | "sweep" | "pulse" | "strobe" | "rave" | "eq" | "flip" | "gallop" | "twin" | "ripple" | "jump" | "gravity" | "drumkit" | "blackout";
 
 /**
  * A fixture is placed at `address` and occupies channels in a defined role

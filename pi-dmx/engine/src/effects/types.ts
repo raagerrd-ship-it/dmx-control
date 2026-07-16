@@ -39,6 +39,11 @@ export interface EffectContext {
   gravLevel: number;
   gravPeak: number;
 
+  /** Trum-kit onset-envelopes (0..1) per röst: snabb attack på anslaget, snabb
+   *  decay → varje "trumma" punchar och slocknar. kick=sub-transient, snare=mellan-
+   *  onset, hat=diskant-onset, bass=sustained lågfrekvens. Motorn räknar dem. */
+  drum: { kick: number; snare: number; hat: number; bass: number };
+
   /** Taktindex + fas (0..1) från BPM-klockan; beatPulse = mjuk puls-envelope. */
   beatIdx: number;
   beatFrac: number;
