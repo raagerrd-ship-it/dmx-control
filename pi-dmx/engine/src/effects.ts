@@ -458,15 +458,13 @@ export class EffectEngine {
       // INGEN omskalning/golv — exakt samma värde som input-mätaren visar. Lätt
       // ballistik (snabb attack / ~180ms release) bara för att slippa flimmer;
       // stegar aldrig om mappningen (steady 0.40 → tak 0.40).
-      // levelRaw = OSMOOTHAT (rå per-hop) → takets egna smooth ser signalen direkt,
-      // utan analysatorns 15ms-attack/400ms-release ovanpå. (Effekterna använder
-      // fortsatt frame.level, det utjämnade.)
-      // ~150ms glidning på BÅDA flankerna: den råa per-hop-nivån fladdrar, och en
-      // instant attack släppte igenom fladdret som ljus-flimmer. En enda kontrollerad
-      // 150ms-lågpass tar bort det utan analysatorns långa okontrollerade svans.
-      // (Drop bypassar ändå via dropEnv nedan.)
-      const vuRaw = Math.max(0, Math.min(1, frame.levelRaw));
-      this.vu += (vuRaw - this.vu) * (1 - Math.exp(-dtSec / 0.15));
+      // frame.levelVU = ~130ms smoothat PÅ HOP-TAKT (375Hz) i analysatorn → ser alla
+      // hops, mycket lägre jitter än att smootha rå-nivån efter 50Hz-decimering (som
+      // aliasade per-hop-rippel till synligt flimmer). Ingen omskalning/golv: insignal
+      // X% → utsignal X%, bara mjukt. En lätt 60ms-glidning här utjämnar sista resten
+      // utan att återinföra någon lång svans. (Drop bypassar via dropEnv nedan.)
+      const vuRaw = Math.max(0, Math.min(1, frame.levelVU));
+      this.vu += (vuRaw - this.vu) * (1 - Math.exp(-dtSec / 0.06));
       // KLUBB-LÄGE: kvadrera → hård kontrast (mörkt mellan, explosion på topp).
       const vuFilter = this.cfg.clubMode ? this.vu * this.vu : this.vu;
       // BARA DROP skippar VU-filtret: dropEnv (0..1) lyfter taket till full under
@@ -650,10 +648,15 @@ export class EffectEngine {
       }
       this.maxCh = Math.min(512, mx);
     }
+    // MJUK ATTACK (~25ms) i st.f. instant: en 1-frames-spik i effekt/master når bara
+    // ~halvvägs och klingar sen → dödar flimmer (>~20Hz) men behåller beat-pumpen
+    // (<10Hz) och den snabba decayn. Nedgång = oförändrad decay (peak-hold).
+    const aAtt = 1 - Math.exp(-dtSec / 0.025);
     for (let ch = 0; ch < this.maxCh; ch++) {
       if (this.strobeMask[ch]) { this.outSmooth[ch] = this.universe[ch]; continue; }
       const held = this.outSmooth[ch] * decay;
-      const v = this.universe[ch] >= held ? this.universe[ch] : held;
+      const target = this.universe[ch];
+      const v = target >= held ? held + (target - held) * aAtt : held;
       this.outSmooth[ch] = v;
       this.universe[ch] = Math.round(v);
     }

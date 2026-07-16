@@ -21,7 +21,9 @@ export interface Spectrum {
 
 export interface Frame {
   level: number;        // 0..1, auto-gained RMS (15ms attack / 400ms release smoothed)
-  levelRaw: number;     // 0..1, samma auto-gain men OSMOOTHAT (rå per-hop) — för VU-taket
+  levelRaw: number;     // 0..1, samma auto-gain men OSMOOTHAT (rå per-hop)
+  levelVU: number;      // 0..1, ~130ms symmetriskt smoothat PÅ HOP-TAKT (375Hz) — för VU-taket
+                        //  (ser alla hops → mycket mindre brus än att smootha rå på 50Hz)
   energy: number;       // 0..1, bass-band spectral energy (~0–1.5 kHz)
   mid: number;          // 0..1, mid-band spectral energy (~1.5–12 kHz: röst/synth/virvel)
   treble: number;       // 0..1, high-band spectral energy (hats/cymbals/vocals top)
@@ -90,6 +92,7 @@ export class Analyser {
   // read as flicker on the lamps. Fast attack keeps hits punchy; the slower
   // release lets light glide down instead of sputtering.
   private lvlSmooth = 0;
+  private lvlVU = 0;      // ~130ms hop-takt-smooth av levelRaw → VU-taket (låg jitter)
   private engSmooth = 0;
   private midSmooth = 0;
   private trbSmooth = 0;
@@ -435,6 +438,9 @@ export class Analyser {
     const aRel = 1 - Math.exp(-dtHop / 0.4);
     const smooth = (prev: number, x: number) => prev + (x - prev) * (x > prev ? aAtt : aRel);
     this.lvlSmooth = smooth(this.lvlSmooth, level);
+    // VU-nivå: symmetrisk ~130ms lågpass PÅ HOP-TAKT (integrerar alla 375 hops/s
+    // → långt mindre brus än att smootha rå-nivån efter 50Hz-decimering).
+    this.lvlVU += (level - this.lvlVU) * (1 - Math.exp(-dtHop / 0.13));
     this.engSmooth = smooth(this.engSmooth, energy);
     this.midSmooth = smooth(this.midSmooth, mid);
     this.trbSmooth = smooth(this.trbSmooth, treble);
@@ -479,7 +485,7 @@ export class Analyser {
     const spec: Spectrum = { sub: L[0], kick: L[1], bass: L[2], lowMid: L[3], mid: L[4], highMid: L[5], treble: L[6], air: L[7] };
     const onset: Spectrum = { sub: O[0], kick: O[1], bass: O[2], lowMid: O[3], mid: O[4], highMid: O[5], treble: O[6], air: O[7] };
 
-    return { level: this.lvlSmooth, levelRaw: level, energy: this.engSmooth, mid: this.midSmooth, treble: this.trbSmooth, centroid: this.centSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, bpmConfidence: this.localBpmConfidence, beatAnchorMs: this.beatAnchorMs, spec, onset };
+    return { level: this.lvlSmooth, levelRaw: level, levelVU: this.lvlVU, energy: this.engSmooth, mid: this.midSmooth, treble: this.trbSmooth, centroid: this.centSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, bpmConfidence: this.localBpmConfidence, beatAnchorMs: this.beatAnchorMs, spec, onset };
   }
 }
 
