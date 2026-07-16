@@ -15,7 +15,11 @@ export const wave: EffectDef = {
     const ripple = c.frame.spec.treble * Math.sin(c.t * 22 + c.idx * 3);
     const base = 0.55 + 0.45 * Math.sin(c.wavePhase - c.idx * 1.3 * c.phaseSpread + ripple * 0.8);
     const hue = c.mixedSector(c.idx + Math.floor(c.wavePhase * 0.4)) / 6;
-    const v = c.shaped(0.12, base * (0.35 + c.audio * 0.7) + c.kickEnv * 0.2 + c.frame.onset.treble * 0.4);
+    // Vågen BÄR på basen (spec.bass), inte på bredbandsbrus → den tystnar inte av
+    // diskant/sång. onset.treble-glitter ligger ovanpå + en snabbare luft-shimmer
+    // (onset.air) bara på udda lampor → shimmer-topp utan att flödet tappas.
+    const shimmer = c.idx % 2 === 1 ? c.frame.onset.air * 0.25 : 0;
+    const v = c.shaped(0.12, base * (0.35 + c.frame.spec.bass * 0.7) + c.kickEnv * 0.2 + c.frame.onset.treble * 0.4 + shimmer);
     return c.hsv(hue, 1, v);
   },
 };

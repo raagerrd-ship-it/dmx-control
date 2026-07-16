@@ -11,16 +11,18 @@ export const eq: EffectDef = {
   key: "eq", label: "Spektrum", tier: "fart",
   desc: "Spatial spektrumanalysator: låg-bas→röd … diskant→blå, ljus = bandets nivå.",
   render(c) {
-    const s = c.frame.spec;
+    const s = c.frame.spec, o = c.frame.onset;
     const bri = (v: number) => 0.04 + 0.96 * Math.pow(Math.min(1, v), 1.6);   // gamma-kontrast, golv 4%
     // Rainbow-kolumner: band + representativ färg, låg (varm) → hög (kall).
+    // LÅG halva på NIVÅ (spec) → sustained bas som "andas". HÖG halva på ANSLAG
+    // (onset) → perkussion "tickar" skarpt i st.f. att sång/pads smetar kolumnerna.
     const COLS: [number, number][] = [
-      [Math.max(s.sub, s.bass), 0.00],   // låg-bas  → röd
-      [s.lowMid,                0.08],   // låg-mel  → orange
-      [s.mid,                   0.28],   // mel      → gulgrön
-      [s.highMid,               0.40],   // hög-mel  → grön
-      [s.treble,                0.52],   // diskant  → cyan
-      [s.air,                   0.62],   // luft     → blå
+      [Math.max(s.sub, s.bass), 0.00],   // låg-bas  → röd    (nivå)
+      [s.lowMid,                0.08],   // låg-mel  → orange (nivå)
+      [s.mid,                   0.28],   // mel      → gulgrön(nivå)
+      [o.highMid,               0.40],   // hög-mel  → grön   (anslag)
+      [o.treble,                0.52],   // diskant  → cyan   (anslag)
+      [o.air,                   0.62],   // luft     → blå    (anslag)
     ];
     if (c.count <= 1) {
       // Enda lampa: klassisk full mix (låg=röd, mel=grön, hög=blå).

@@ -542,7 +542,7 @@ export class EffectEngine {
     // Knuffas UPP av låg-enden (kick-anslag + bas), inte av bred-bandsnivån →
     // varje kick är en fysisk knuff uppåt, sen faller den. Litet audio-golv så
     // sustained höga partier håller den delvis uppe.
-    const gPush = Math.max(frame.onset.kick, frame.spec.bass * 0.9, audio * 0.5);
+    const gPush = Math.max(frame.onset.kick, frame.spec.sub, frame.spec.bass * 0.9, audio * 0.4);
     if (gPush > this.gravLevel) { this.gravLevel = gPush; this.gravVel = 0; }   // knuff upp
     else { this.gravVel -= 2.8 * dtSec; this.gravLevel = Math.max(0, this.gravLevel + this.gravVel * dtSec); }
     if (this.gravLevel > this.gravPeak) this.gravPeak = this.gravLevel;
@@ -614,7 +614,7 @@ export class EffectEngine {
     // Output ballistics on color/dim channels (never strobe/mode channels —
     // a decaying strobe value would sweep through real strobe speeds).
     // Snappare fade-out i energiska lägen så pumpen syns; lugna behåller mjukheten.
-    const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops" || effMode === "rave" || effMode === "drumkit";
+    const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops" || effMode === "rave" || effMode === "drumkit" || effMode === "duel";
     const beatMsNow = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
     const fastTau = Math.max(0.14, Math.min(0.3, beatMsNow * 0.5 / 1000));
     // TRANSIENT-SKÄRPA: hög energi/riser → kort decay (knivskarp piska på varje
