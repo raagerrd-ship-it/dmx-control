@@ -62,6 +62,23 @@
     .fx-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
     .fx-pack { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
     .fx-pack select { flex: 1; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--fg); font-size: 13px; }
+    /* Kalibrerings-block (lekmannavänligt) */
+    .fx-cal { margin-top: 10px; padding: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+    .fx-cal-head { display: flex; justify-content: space-between; align-items: baseline; }
+    .fx-cal-title { font-size: 14px; font-weight: 600; color: var(--fg); }
+    .fx-cal-badge { font-size: 12px; color: var(--ok); font-variant-numeric: tabular-nums; }
+    .fx-cal-badge.unset { color: var(--dim); }
+    .fx-cal-hint { font-size: 12px; color: var(--dim); line-height: 1.45; margin: 6px 0 10px; }
+    .fx-cal input[type=range] { width: 100%; accent-color: var(--ok); height: 26px; }
+    .fx-cal-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
+    .fx-cal-live { font-size: 13px; color: var(--fg); font-variant-numeric: tabular-nums; }
+    .fx-cal-btn { padding: 10px 16px; background: var(--ok); color: #06110c; border: 0; border-radius: 9px; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .fx-cal-btn:active { opacity: .75; }
+    .fx-adv { margin-top: 10px; }
+    .fx-adv > summary { font-size: 12px; color: var(--dim); cursor: pointer; padding: 6px 0; list-style: none; text-transform: uppercase; letter-spacing: .06em; }
+    .fx-adv > summary::-webkit-details-marker { display: none; }
+    .fx-adv > summary::before { content: "▸  "; }
+    .fx-adv[open] > summary::before { content: "▾  "; }
     .btn { flex: 1; padding: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; color: var(--fg); font-size: 14px; font-weight: 500; cursor: pointer; }
     .btn.primary { background: var(--hot); border-color: var(--hot); color: white; }
     .btn.ok { background: transparent; border-color: var(--ok); color: var(--ok); }
@@ -207,7 +224,7 @@
     <label class="tgl"><span>Riser-strobe (build → drop)<br><small style="opacity:.6">Under en uppbyggnad: accelererande strobe + färgen kollapsar mot vitt, sen blackout på dropen. Klassisk EDM-build.</small></span><input type="checkbox" id="tRiserStrobe"></label>
   </div>
 
-  <h1>Fixtures</h1>
+  <h1>Lampor</h1>
   <div class="card">
     <div id="fixtures"></div>
     <div class="fx-actions">
@@ -215,10 +232,10 @@
       <button class="btn" id="fxAutoPack">Auto-adressera</button>
     </div>
     <div class="fx-actions">
-      <button class="btn ok" id="fxIdentifyAll" title="Blinkar varje lampa i tur och ordning">Identifiera</button>
+      <button class="btn ok" id="fxIdentifyAll" title="Blinkar varje lampa i tur och ordning så du ser vilken som är vilken">Blinka alla</button>
       <button class="btn primary" id="fxSave" disabled>Spara ändringar</button>
     </div>
-    <div class="status" id="fxHint">Tryck på en lampa för att ändra. Identifiera hittar lamporna i rummet.</div>
+    <div class="status" id="fxHint">Kalibrera varje lampas lägsta ljus med reglaget. "Blinka alla" hjälper dig hitta vilken lampa som är vilken.</div>
   </div>
 
   <h1>System</h1>
@@ -499,52 +516,49 @@ function renderFixtures() {
     div.className = "fx" + (fxDirty ? " dirty" : "")
                   + (errByIdx.has(i) ? " err" : "")
                   + (i === identifyingIndex ? " identifying" : "");
+    const litFrom = fx.cal?.on ?? 0;
     div.innerHTML = `
       <div class="fx-head">
         <input class="name" type="text" value="${escapeHtml(fx.name)}" data-i="${i}" data-k="name" />
-        <button class="id" data-id="${i}" title="Blink this fixture">Identify</button>
-        <button class="del" data-del="${i}" aria-label="Remove">×</button>
+        <button class="id" data-id="${i}" title="Blinka lampan så du hittar den">Hitta</button>
+        <button class="del" data-del="${i}" aria-label="Ta bort">×</button>
       </div>
-      <div class="fx-grid">
-        <div class="fx-field">
-          <label>DMX address</label>
-          <input type="number" min="1" max="512" value="${fx.address}" data-i="${i}" data-k="address" inputmode="numeric" />
+      <div class="fx-cal">
+        <div class="fx-cal-head">
+          <span class="fx-cal-title">Lägsta ljus</span>
+          <span class="fx-cal-badge ${litFrom > 0 ? "" : "unset"}" data-cal-badge="${i}">${litFrom > 0 ? `satt: ${litFrom}` : "ej satt"}</span>
         </div>
-        <div class="fx-field">
-          <label>Type</label>
-          <select data-i="${i}" data-k="preset">
-            ${PRESETS.map((p) => `<option value="${p}" ${p === fx.preset ? "selected" : ""}>${p.toUpperCase()}</option>`).join("")}
-          </select>
+        <div class="fx-cal-hint">Dra reglaget tills lampan <b>precis tänder</b> och tryck spara. Då dimrar showen jämnt ner till just den punkten i stället för att slockna för tidigt.</div>
+        <input type="range" min="0" max="64" value="0" step="1" data-caltest-i="${i}" />
+        <div class="fx-cal-row">
+          <span class="fx-cal-live" data-caltest-val="${i}">reglaget: av</span>
+          <button type="button" class="fx-cal-btn" data-cal-set="on" data-cal-set-i="${i}">Spara som lägsta</button>
         </div>
       </div>
-      <div class="fx-field" style="margin-top:8px">
-        <label>Musikband (auto/party/mono)</label>
-        <div class="fx-roles">
-          ${["bass","mid","treble","kick","low"].map((b) => `<label class="fx-role" style="cursor:pointer"><input type="checkbox" data-band-i="${i}" data-band="${b}" ${(fx.bands ?? []).includes(b) ? "checked" : ""}> ${{bass:"Bas",mid:"Mellan",treble:"Diskant",kick:"Kick",low:"Lågvolym"}[b]}</label>`).join("")}
-        </div>
-        <div class="fx-meta">Starkaste ikryssade bandet styr. Inga ikryssade = auto (listordning).</div>
-      </div>
-      <div class="fx-field" style="margin-top:8px">
-        <label>Ljus-kalibrering — sätt bara tändtröskeln</label>
-        <div class="fx-field" style="margin-top:4px">
-          <label style="opacity:.6;font-size:.85em">Testa: dra upp tills lampan PRECIS tänder (<span data-caltest-val="${i}">av</span>)</label>
-          <input type="range" min="0" max="64" value="0" step="1" data-caltest-i="${i}" style="width:100%" />
-          <button type="button" data-cal-set="on" data-cal-set-i="${i}" style="padding:8px;font-size:.85em;width:100%;margin-top:4px">↑ Sätt som tändtröskel (lampans lägsta)</button>
-        </div>
-        <div class="fx-grid" style="margin-top:6px">
+      <details class="fx-adv">
+        <summary>Avancerat · adress, typ, frekvensband</summary>
+        <div class="fx-grid" style="margin-top:8px">
           <div class="fx-field">
-            <label style="opacity:.6;font-size:.85em">Tändtröskel (lägsta)</label>
-            <input type="number" min="0" max="255" value="${fx.cal?.on ?? 0}" data-cal-i="${i}" data-cal-k="on" inputmode="numeric" />
+            <label>DMX-adress</label>
+            <input type="number" min="1" max="512" value="${fx.address}" data-i="${i}" data-k="address" inputmode="numeric" />
           </div>
           <div class="fx-field">
-            <label style="opacity:.6;font-size:.85em">Svartpunkt (valfri, lämna 0)</label>
-            <input type="number" min="0" max="254" value="${fx.cal?.off ?? 0}" data-cal-i="${i}" data-cal-k="off" inputmode="numeric" />
+            <label>Typ</label>
+            <select data-i="${i}" data-k="preset">
+              ${PRESETS.map((p) => `<option value="${p}" ${p === fx.preset ? "selected" : ""}>${p.toUpperCase()}</option>`).join("")}
+            </select>
           </div>
         </div>
-        <div class="fx-meta">Tändtröskeln ÄR lampans dimmaste läge — showen skalar mjukt från full ner till den, sen släcks. Svartpunkten behövs normalt inte (auto strax under). Reglaget till 0 = tillbaka till showen.</div>
-      </div>
-      ${fx.preset === "custom" ? renderCustomRoles(fx, i) : ""}
-      <div class="fx-meta">Ch ${fx.address}–${fx.address + width - 1} · ${width} channel${width > 1 ? "s" : ""} · ${rolesOf(fx).join(" · ")}</div>
+        <div class="fx-field" style="margin-top:10px">
+          <label>Frekvensband (valfritt)</label>
+          <div class="fx-roles">
+            ${["bass","mid","treble","kick","low"].map((b) => `<label class="fx-role" style="cursor:pointer"><input type="checkbox" data-band-i="${i}" data-band="${b}" ${(fx.bands ?? []).includes(b) ? "checked" : ""}> ${{bass:"Bas",mid:"Mellan",treble:"Diskant",kick:"Kick",low:"Lågvolym"}[b]}</label>`).join("")}
+          </div>
+          <div class="fx-meta">Vilket ljud lampan helst reagerar på. Inga ikryssade = automatiskt.</div>
+        </div>
+        ${fx.preset === "custom" ? renderCustomRoles(fx, i) : ""}
+        <div class="fx-meta">Kanal ${fx.address}–${fx.address + width - 1} · ${width} st · ${rolesOf(fx).join(" · ")}</div>
+      </details>
       ${errByIdx.has(i) ? `<div class="fx-err">${errByIdx.get(i).join(" · ")}</div>` : ""}
     `;
     fxEl.appendChild(div);
@@ -576,46 +590,28 @@ function renderFixtures() {
       markDirty();
     });
   });
-  fxEl.querySelectorAll("[data-cal-k]").forEach((el) => {
-    el.addEventListener("input", (e) => {
-      const i = Number(e.target.dataset.calI);
-      const k = e.target.dataset.calK;
-      const v = Math.max(0, Math.min(255, parseInt(e.target.value, 10) || 0));
-      const cal = fxDraft[i].cal ?? { off: 0, on: 0 };
-      cal[k] = v;
-      if (cal.off <= 0 && cal.on <= 0) delete fxDraft[i].cal; else fxDraft[i].cal = cal;
-      markDirty();
-    });
-  });
   // Kalibrerings-slider: tvinga lampan till ett rått DMX-värde (live) så man ser
-  // exakt tänd/släck-punkt. Reglaget till 0 = av (tillbaka till showen).
+  // exakt när den tänder. Reglaget till 0 = av (tillbaka till showen).
   fxEl.querySelectorAll("[data-caltest-i]").forEach((el) => {
     el.addEventListener("input", (e) => {
       const i = Number(e.target.dataset.caltestI);
       const v = parseInt(e.target.value, 10) || 0;
-      calTestActive = v > 0;   // pausa omritning medan man drar (annars nollas slidern)
+      calTestActive = v > 0;   // pausa omritning medan man drar (annars nollas reglaget)
       const valEl = fxEl.querySelector(`[data-caltest-val="${i}"]`);
-      if (valEl) valEl.textContent = v === 0 ? "av" : `DMX ${v} · ${Math.round(v / 255 * 100)}%`;
+      if (valEl) valEl.textContent = v === 0 ? "reglaget: av" : `reglaget: DMX ${v} · ${Math.round(v / 255 * 100)}%`;
       send({ type: "setCalTest", index: v > 0 ? i : -1, value: v });
     });
   });
+  // Spara lägsta: fångar reglagets nuvarande värde som lampans tändtröskel.
   fxEl.querySelectorAll("[data-cal-set]").forEach((el) => {
     el.addEventListener("click", (e) => {
       const i = Number(e.target.dataset.calSetI);
-      const which = e.target.dataset.calSet;   // "off" | "on"
       const slider = fxEl.querySelector(`[data-caltest-i="${i}"]`);
       const v = slider ? (parseInt(slider.value, 10) || 0) : 0;
-      const cal = fxDraft[i].cal ?? { off: 0, on: 0 };
-      cal[which] = v;
-      if (cal.off <= 0 && cal.on <= 0) delete fxDraft[i].cal; else fxDraft[i].cal = cal;
-      const numEl = fxEl.querySelector(`[data-cal-i="${i}"][data-cal-k="${which}"]`);
-      if (numEl) numEl.value = v;
-      if (slider) slider.value = 0;
-      const valEl = fxEl.querySelector(`[data-caltest-val="${i}"]`);
-      if (valEl) valEl.textContent = "av";
+      if (v > 0) fxDraft[i].cal = { off: 0, on: v }; else delete fxDraft[i].cal;
       calTestActive = false;
       send({ type: "setCalTest", index: -1, value: 0 });   // klar → tillbaka till showen
-      markDirty();
+      markDirty();   // ritar om → badgen visar nya värdet, reglaget nollas
     });
   });
   fxEl.querySelectorAll("[data-del]").forEach((el) => {
