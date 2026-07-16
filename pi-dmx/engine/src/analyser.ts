@@ -45,6 +45,13 @@ export class Analyser {
   private bpmHist: number[] = [];   // senaste råestimat (~3s) för median-stabilisering
   private silentMs = 0;
   private beatAnchorMs = 0;
+  // #2 sub-hop fas: kick-flankens flux-topp ligger sällan exakt på en hop. Vi
+  // sparar de två föregående kick-flux-värdena och gör parabolisk interpolation
+  // hoppet EFTER en kick → förfinar beatAnchorMs med ±0.5 hop (~1.3ms). Ren
+  // fas-korrektion; själva kick-blixten fyrar oförändrat direkt.
+  private kfPrev = 0;
+  private kfPrev2 = 0;
+  private pendingKickMs = 0;   // >0 = kick väntar på fas-förfining nästa hop
   private gain = 1;
   // Attack/release-smoothed outputs — raw per-hop values update ~370x/s and
   // read as flicker on the lamps. Fast attack keeps hits punchy; the slower
@@ -84,7 +91,9 @@ export class Analyser {
    *   OBTAIN-realtidsbeat-tracking.)
    */
   private computeBpm() {
-    if (this.envFilled < 80) return;   // ~0.8s → första grovestimat direkt, förfinas löpande
+    if (this.envFilled < 50) return;   // ~0.5s → snabbt första grovestimat (täcker ≥~122 BPM;
+                                       //  långsammare spår låser på overton tills fönstret växer),
+                                       //  förfinas löpande. Halverar time-to-first-lock.
     const N = this.envFilled;
     const env = new Float32Array(N);
     let mean = 0;
@@ -336,7 +345,7 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.bpmHist.length = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHist.length = 0; }
     } else {
       this.silentMs = 0;
     }
@@ -356,7 +365,22 @@ export class Analyser {
       if (++this.bpmCounter >= stride) { this.bpmCounter = 0; this.computeBpm(); }
 
     }
-    if (kick) this.beatAnchorMs = Date.now();
+    // #2 Förfina förra kickens fas: nu har vi y(-1)=kfPrev2, y(0)=kfPrev, y(+1)=kickFlux
+    // runt kick-hopet. Parabelns topp ger sub-hop-offset δ ∈ [-0.5,0.5] hop.
+    if (this.pendingKickMs > 0) {
+      const ym1 = this.kfPrev2, y0 = this.kfPrev, yp1 = kickFlux;
+      const denom = ym1 - 2 * y0 + yp1;
+      if (denom < 0) {                                   // konkav → äkta topp
+        let delta = 0.5 * (ym1 - yp1) / denom;
+        if (delta > 0.5) delta = 0.5; else if (delta < -0.5) delta = -0.5;
+        const hopMs = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
+        this.beatAnchorMs = this.pendingKickMs + delta * hopMs;
+      }
+      this.pendingKickMs = 0;
+    }
+    if (kick) { this.beatAnchorMs = Date.now(); this.pendingKickMs = this.beatAnchorMs; }
+    this.kfPrev2 = this.kfPrev;
+    this.kfPrev = kickFlux;
 
     const dtHop = this.cfg.fft.hop / this.cfg.audio.rate;
     const aAtt = 1 - Math.exp(-dtHop / 0.015);
