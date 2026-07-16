@@ -534,7 +534,15 @@ function renderFixtures() {
             <input type="number" min="0" max="255" value="${fx.cal?.on ?? 0}" data-cal-i="${i}" data-cal-k="on" inputmode="numeric" />
           </div>
         </div>
-        <div class="fx-meta">0/0 = av. Höj svartpunkten tills läckglöd släcks; höj tändtröskeln tills svagaste dim precis tänder.</div>
+        <div class="fx-field" style="margin-top:6px">
+          <label style="opacity:.6;font-size:.85em">Testa ljusstyrka — dra tills den precis tänder/slocknar (<span data-caltest-val="${i}">av</span>)</label>
+          <input type="range" min="0" max="64" value="0" step="1" data-caltest-i="${i}" style="width:100%" />
+          <div class="fx-grid" style="margin-top:4px">
+            <button type="button" data-cal-set="off" data-cal-set-i="${i}" style="padding:8px;font-size:.85em">↑ Sätt som svartpunkt</button>
+            <button type="button" data-cal-set="on" data-cal-set-i="${i}" style="padding:8px;font-size:.85em">↑ Sätt som tändtröskel</button>
+          </div>
+        </div>
+        <div class="fx-meta">Dra ner tills lampan precis slocknar → "Sätt som svartpunkt". Dra upp tills den precis tänder → "Sätt som tändtröskel". Reglaget till 0 = tillbaka till showen.</div>
       </div>
       ${fx.preset === "custom" ? renderCustomRoles(fx, i) : ""}
       <div class="fx-meta">Ch ${fx.address}–${fx.address + width - 1} · ${width} channel${width > 1 ? "s" : ""} · ${rolesOf(fx).join(" · ")}</div>
@@ -577,6 +585,35 @@ function renderFixtures() {
       const cal = fxDraft[i].cal ?? { off: 0, on: 0 };
       cal[k] = v;
       if (cal.off <= 0 && cal.on <= 0) delete fxDraft[i].cal; else fxDraft[i].cal = cal;
+      markDirty();
+    });
+  });
+  // Kalibrerings-slider: tvinga lampan till ett rått DMX-värde (live) så man ser
+  // exakt tänd/släck-punkt. Reglaget till 0 = av (tillbaka till showen).
+  fxEl.querySelectorAll("[data-caltest-i]").forEach((el) => {
+    el.addEventListener("input", (e) => {
+      const i = Number(e.target.dataset.caltestI);
+      const v = parseInt(e.target.value, 10) || 0;
+      const valEl = fxEl.querySelector(`[data-caltest-val="${i}"]`);
+      if (valEl) valEl.textContent = v === 0 ? "av" : `DMX ${v} · ${Math.round(v / 255 * 100)}%`;
+      send({ type: "setCalTest", index: v > 0 ? i : -1, value: v });
+    });
+  });
+  fxEl.querySelectorAll("[data-cal-set]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      const i = Number(e.target.dataset.calSetI);
+      const which = e.target.dataset.calSet;   // "off" | "on"
+      const slider = fxEl.querySelector(`[data-caltest-i="${i}"]`);
+      const v = slider ? (parseInt(slider.value, 10) || 0) : 0;
+      const cal = fxDraft[i].cal ?? { off: 0, on: 0 };
+      cal[which] = v;
+      if (cal.off <= 0 && cal.on <= 0) delete fxDraft[i].cal; else fxDraft[i].cal = cal;
+      const numEl = fxEl.querySelector(`[data-cal-i="${i}"][data-cal-k="${which}"]`);
+      if (numEl) numEl.value = v;
+      if (slider) slider.value = 0;
+      const valEl = fxEl.querySelector(`[data-caltest-val="${i}"]`);
+      if (valEl) valEl.textContent = "av";
+      send({ type: "setCalTest", index: -1, value: 0 });   // klar → tillbaka till showen
       markDirty();
     });
   });
@@ -736,6 +773,7 @@ document.getElementById("fxIdentifyAll").onclick = () => {
 
 fxSaveBtn.onclick = () => {
   if (validateAll().length > 0) return;
+  send({ type: "setCalTest", index: -1, value: 0 });   // avsluta ev. kalibrerings-test
   send({ type: "setFixtures", fixtures: fxDraft });
   fxDirty = false;
   fxSaveBtn.disabled = true;

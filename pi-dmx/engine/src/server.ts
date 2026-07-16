@@ -283,6 +283,15 @@ export async function startServer(
           } else if (msg.type === "identifyStop") {
             stopIdentify();
             return;
+          } else if (msg.type === "setCalTest") {
+            // Kalibrerings-slider: tvinga en lampa till ett rått DMX-värde. index<0 = av.
+            const idx = Math.floor(Number(msg.index));
+            if (Number.isFinite(idx) && idx >= 0 && idx < deps.cfg.fixtures.length) {
+              stopIdentify();
+              deps.cfg.calTest = { index: idx, value: Math.max(0, Math.min(255, Math.floor(Number(msg.value)) || 0)) };
+            } else {
+              deps.cfg.calTest = null;
+            }
           } else if (msg.type === "setDmxMaxHz" && typeof msg.value === "number") {
             deps.cfg.dmxMaxHz = Math.max(30, Math.min(500, Math.round(msg.value)));
           } else if (msg.type === "setAgcTarget" && typeof msg.value === "number") {

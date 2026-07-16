@@ -76,6 +76,10 @@ export interface EngineConfig {
   modeButton: { chip: string; line: number } | null;
   /** Transient identify override — not persisted. index = fixture being lit. */
   identify?: { index: number } | null;
+  /** Transient kalibrerings-test — not persisted. Tvingar fixture[index] till ett
+   *  rått DMX-värde (0..255) på ljuskanalerna, bypassar show/VU/cal → hitta exakt
+   *  tänd/släck-punkt. index<0 = av. */
+  calTest?: { index: number; value: number } | null;
   /** Transient SmartSync flash override (wall-clock ms) — not persisted. */
   flashUntil?: number | null;
   /** Transient SmartSync beat clock (BPM + wall-clock anchor) — not persisted. */

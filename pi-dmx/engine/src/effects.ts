@@ -179,6 +179,25 @@ export class EffectEngine {
       return this.universe;
     }
 
+    // Kalibrerings-test: tvinga MÅL-lampan till ett RÅTT DMX-värde på ljuskanalerna
+    // (bypassar show, VU och cal-remap) så exakt tänd/släck-punkt kan hittas för
+    // hand. Övriga lampor släckta. Transient — sätts från /setup-slidern.
+    const ct = this.cfg.calTest;
+    if (ct && ct.index >= 0 && ct.index < this.cfg.fixtures.length) {
+      const cf = this.cfg.fixtures[ct.index];
+      const roles = fixtureRoles(cf);
+      const cbase = cf.address - 1;
+      const val = Math.max(0, Math.min(255, Math.round(ct.value)));
+      for (let i = 0; i < roles.length; i++) {
+        const role = roles[i];
+        if (role === "r" || role === "g" || role === "b" || role === "w" || role === "dim") {
+          const ch = cbase + i;
+          if (ch >= 0 && ch < 512) this.universe[ch] = val;
+        }
+      }
+      return this.universe;
+    }
+
     // Drop-bloom: on a drop the current color surges to full brightness (keeps
     // the mode's look, no jarring primary-override). Optional hardware strobe.
     const nowWall = Date.now();
