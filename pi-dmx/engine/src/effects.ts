@@ -706,36 +706,29 @@ export class EffectEngine {
       }
     }
 
-    // PER-LAMPA KALIBRERING (sist av allt): svartpunkt + tändtröskel, LUMINANS-
-    // baserat per lampa (inte per kanal). Lampans ljusstyrka = starkaste ljus-
-    // kanalen (capMask = färg för färg-lampor, annars dim). BARA om HELA lampan
-    // ligger ≤ svartpunkt släcks den (effekten vill ha den mörk) → en låg bifärg
-    // i en ljus blandning kapas inte. Annars remappas luminansen (off,255] →
-    // [on,255] och HELA lampan skalas med samma faktor → hue bevaras, minsta
-    // tända lampa når LED:ns tändpunkt. off=0 → mörk stannar mörk, tänd lyfts.
+    // PER-LAMPA KALIBRERING — allra sista steget, precis före output. Ren omskalning
+    // till vad lampan på den adressen fysiskt klarar. Skiter i alla andra inställningar:
+    //   0            → släckt
+    //   över 0       → skalas in i [on..255] (LED:ns tändpunkt → full)
+    // Per lampa (luminans = starkaste kanalen) så färgen bevaras. Motorn har redan
+    // bestämt av/på — 0 betyder av, resten är aktiv ljusstyrka.
     for (const cf of this.cfg.fixtures) {
       const cal = cf.cal;
-      if (!cal || (cal.off <= 0 && cal.on <= 0)) continue;
+      if (!cal || !cal.on) continue;
       const roles = fixtureRoles(cf);
       const cbase = cf.address - 1;
-      // Källa = outSmooth (FLOAT, gamma-kodat, efter ballistik+VU). Byte-universet
-      // är redan avrundat → djupdim (1% = 0.01) krossad till 0. Floaten bevarar den.
-      let L = 0;   // luminans = max av lampans ljuskanaler (float 0..255)
+      // Luminans = starkaste ljuskanalen (byte 0..255) — motorns färdiga värde.
+      let L = 0;
       for (let i = 0; i < roles.length; i++) {
         const ch = cbase + i;
-        if (ch >= 0 && ch < 512 && this.capMask[ch] && this.outSmooth[ch] > L) L = this.outSmooth[ch];
+        if (ch >= 0 && ch < 512 && this.capMask[ch] && this.universe[ch] > L) L = this.universe[ch];
       }
-      if (L <= 0) continue;
-      // Effektens ljusstyrka (L/255 = gamma-kodad, 0..1) mappas → [on..255]: ALLT
-      // som är tänt, ända ner mot 1%, lyfts till LED:ns tändpunkt (on) och skalar
-      // jämnt mot full. off = dödzon: luminans ≤ off (minst ~0.5 byte, = gammal
-      // avrundning-till-svart) → lampan helt släckt (fade snäpper rent till 0).
-      const dead = Math.max(cal.off, 0.5);
-      const gain = L <= dead ? 0 : (cal.on + (255 - cal.on) * L / 255) / L;
+      if (L <= 0) continue;                                    // 0 = släckt → lämna svart
+      const gain = (cal.on + (255 - cal.on) * L / 255) / L;    // skala L → [on..255], hela lampan med
       for (let i = 0; i < roles.length; i++) {
         const ch = cbase + i;
         if (ch >= 0 && ch < 512 && this.capMask[ch]) {
-          this.universe[ch] = gain === 0 ? 0 : Math.min(255, Math.round(this.outSmooth[ch] * gain));
+          this.universe[ch] = Math.min(255, Math.round(this.universe[ch] * gain));
         }
       }
     }
