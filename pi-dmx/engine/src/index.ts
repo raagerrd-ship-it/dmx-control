@@ -33,7 +33,8 @@ const cfg = await loadConfig();
 const LEGACY_MODES: Record<string, Mode> = { auto: "wave", comet: "wave", spectrum: "eq", vu: "gravity" };
 if (LEGACY_MODES[cfg.mode as string]) cfg.mode = LEGACY_MODES[cfg.mode as string];
 if (cfg.mode !== "smart" && cfg.mode !== "blackout" && !EFFECT_MAP.has(cfg.mode)) cfg.mode = "smart";
-cfg.fft.hop = 128;   // analys 375 Hz (beprövad tuning); render/DMX separat 50 Hz
+cfg.fft.hop = 128;   // analys 375 Hz (beprövad tuning); render/DMX separat 100 Hz
+if (!cfg.dmxMaxHz || cfg.dmxMaxHz <= 50) cfg.dmxMaxHz = 100;   // migrera gamla 50-taket → tightare synk
 
 // Re-apply the chosen codec input routing (the boot service restores the aux
 // default; this honors a persisted mic choice).
@@ -121,11 +122,11 @@ capture.on("chunk", (samples: Float32Array) => {
 
 
   // Frikoppla render från analysrate: analysern (FFT/onset/BPM) körs varje chunk
-  // (~375 Hz) för tighta drops, men effekterna behöver bara ~60 Hz för lamporna.
-  // Att rendera 375x/s var slöseri (rate-limiten kastade 85%) och orsaken till
-  // att Node låg ~2% efter realtid. Render + DMX i lås-steg på 50 Hz.
+  // (~375 Hz) för tighta drops, men effekterna renderas i 100 Hz (var 10:e ms) →
+  // halverad utgångslatens mot 50 Hz = tightare bas/drop-synk. Fortfarande långt
+  // under 375 Hz så Node håller realtid. DMX-taket höjt till 100 Hz i takt.
   const nowR = performance.now();
-  if (nowR - lastRenderMs >= 20) {
+  if (nowR - lastRenderMs >= 10) {
     lastRenderMs = nowR;
     const universe = effects.render(latestFrame);
     dmx.send(universe, curSlots);

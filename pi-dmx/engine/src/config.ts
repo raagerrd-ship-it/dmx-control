@@ -150,7 +150,7 @@ export const defaultConfig: EngineConfig = {
   chaseStyle: "pingpong",
   rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
-  dmxMaxHz: 50, // safe max for typical fixtures; helper caps automatically
+  dmxMaxHz: 100, // 100 Hz för tightare bas/drop-synk; helper cappar till wire-limit
   fog: { enabled: false, address: 128, onDrop: true, burstMs: 2500, cooldownMs: 25000, level: 255 },
   dropBlackout: true,     // dramaturgisk tystnad — låg risk, lyfter varje drop
   scenicAnchor: false,    // ägar-val: antar lampor i rad vänster→höger

@@ -223,7 +223,12 @@ export class EffectEngine {
     const bassRise = this.warmMs < 3000 ? 0.05 : 0.004;
     if (frame.energy < this.bassBaseline) this.bassBaseline += (frame.energy - this.bassBaseline) * 0.05;
     else this.bassBaseline += (frame.energy - this.bassBaseline) * bassRise;
-    const bassPunch = Math.max(0, Math.min(1, (frame.energy - this.bassBaseline - 0.05) * 4));
+    // "Goa slaget": den utjämnade bas-svallen (över baslinjen) OCH — för LÅG LATENS —
+    // det SNABBA kick-anslaget från 512-detektionen (fyrar direkt vid lastKickBoost,
+    // ~15ms tidigare än det utjämnade bandet + onset.kick från dubbel-FFT:n som extra
+    // säkring). Max av dem → punchen sitter på slaget.
+    const kickHitFast = Math.max(0, 1 - (performance.now() - this.lastKickBoost) / 180);
+    const bassPunch = Math.max(0, Math.min(1, Math.max((frame.energy - this.bassBaseline - 0.05) * 4, kickHitFast * 0.9, frame.onset.kick * 0.85)));
     // Uniform bas-punch borttagen ur master — effekterna äger sitt slag via ctx.punch.
     const master = this.cfg.master * this.silenceGate * beatMul;
     // Synlig punch: en hård basstöt (eller drop-flash) BLOOMAR färgen till full
