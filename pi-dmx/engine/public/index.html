@@ -525,26 +525,23 @@ function renderFixtures() {
         <div class="fx-meta">Starkaste ikryssade bandet styr. Inga ikryssade = auto (listordning).</div>
       </div>
       <div class="fx-field" style="margin-top:8px">
-        <label>Ljus-kalibrering (DMX 0–255)</label>
-        <div class="fx-grid">
+        <label>Ljus-kalibrering — sätt bara tändtröskeln</label>
+        <div class="fx-field" style="margin-top:4px">
+          <label style="opacity:.6;font-size:.85em">Testa: dra upp tills lampan PRECIS tänder (<span data-caltest-val="${i}">av</span>)</label>
+          <input type="range" min="0" max="64" value="0" step="1" data-caltest-i="${i}" style="width:100%" />
+          <button type="button" data-cal-set="on" data-cal-set-i="${i}" style="padding:8px;font-size:.85em;width:100%;margin-top:4px">↑ Sätt som tändtröskel (lampans lägsta)</button>
+        </div>
+        <div class="fx-grid" style="margin-top:6px">
           <div class="fx-field">
-            <label style="opacity:.6;font-size:.85em">Svartpunkt</label>
-            <input type="number" min="0" max="254" value="${fx.cal?.off ?? 0}" data-cal-i="${i}" data-cal-k="off" inputmode="numeric" />
-          </div>
-          <div class="fx-field">
-            <label style="opacity:.6;font-size:.85em">Tändtröskel</label>
+            <label style="opacity:.6;font-size:.85em">Tändtröskel (lägsta)</label>
             <input type="number" min="0" max="255" value="${fx.cal?.on ?? 0}" data-cal-i="${i}" data-cal-k="on" inputmode="numeric" />
           </div>
-        </div>
-        <div class="fx-field" style="margin-top:6px">
-          <label style="opacity:.6;font-size:.85em">Testa ljusstyrka — dra tills den precis tänder/slocknar (<span data-caltest-val="${i}">av</span>)</label>
-          <input type="range" min="0" max="64" value="0" step="1" data-caltest-i="${i}" style="width:100%" />
-          <div class="fx-grid" style="margin-top:4px">
-            <button type="button" data-cal-set="off" data-cal-set-i="${i}" style="padding:8px;font-size:.85em">↑ Sätt som svartpunkt</button>
-            <button type="button" data-cal-set="on" data-cal-set-i="${i}" style="padding:8px;font-size:.85em">↑ Sätt som tändtröskel</button>
+          <div class="fx-field">
+            <label style="opacity:.6;font-size:.85em">Svartpunkt (valfri, lämna 0)</label>
+            <input type="number" min="0" max="254" value="${fx.cal?.off ?? 0}" data-cal-i="${i}" data-cal-k="off" inputmode="numeric" />
           </div>
         </div>
-        <div class="fx-meta">Dra ner tills lampan precis slocknar → "Sätt som svartpunkt". Dra upp tills den precis tänder → "Sätt som tändtröskel". Reglaget till 0 = tillbaka till showen.</div>
+        <div class="fx-meta">Tändtröskeln ÄR lampans dimmaste läge — showen skalar mjukt från full ner till den, sen släcks. Svartpunkten behövs normalt inte (auto strax under). Reglaget till 0 = tillbaka till showen.</div>
       </div>
       ${fx.preset === "custom" ? renderCustomRoles(fx, i) : ""}
       <div class="fx-meta">Ch ${fx.address}–${fx.address + width - 1} · ${width} channel${width > 1 ? "s" : ""} · ${rolesOf(fx).join(" · ")}</div>
