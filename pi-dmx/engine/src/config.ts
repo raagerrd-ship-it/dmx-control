@@ -3,7 +3,7 @@
  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
  */
 
-export type Mode = "smart" | "drops" | "party" | "chase" | "wave" | "cycle" | "breathe" | "tide" | "snap" | "bounce" | "mono" | "aurora" | "drift" | "sweep" | "pulse" | "strobe" | "rave" | "eq" | "flip" | "gallop" | "twin" | "ripple" | "jump" | "gravity" | "drumkit" | "split" | "cascade" | "subbreath" | "duel" | "airglow" | "prisma" | "seismisk" | "interlace" | "blackout";
+export type Mode = "smart" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "strobe" | "rave" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "subbreath" | "duel" | "airglow" | "blackout";
 
 /**
  * A fixture is placed at `address` and occupies channels in a defined role
@@ -148,7 +148,7 @@ export const defaultConfig: EngineConfig = {
   smartDwellMs: 9000,
   master: 1.0,
   chaseStyle: "pingpong",
-  rotation: { cycle: true, breathe: true, tide: true, mono: false, aurora: true, drift: true, wave: true, chase: true, drops: true, sweep: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },
+  rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   dmxMaxHz: 50, // safe max for typical fixtures; helper caps automatically
   fog: { enabled: false, address: 128, onDrop: true, burstMs: 2500, cooldownMs: 25000, level: 255 },

@@ -371,7 +371,7 @@ export class EffectEngine {
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
         let pool = enabled(tier);
         if (pool.length === 0) pool = enabled([...FART, ...LUGN, ...FULLFART]);      // valfri aktiv
-        if (pool.length === 0) pool = ["cycle"];                                     // sista fallback
+        if (pool.length === 0) pool = ["breathe"];                                   // sista fallback
         this.smartCount++;
         let next = pool[Math.floor(((this.smartCount * 0.61803398875) % 1) * pool.length)];
         if (next === this.smartMode && pool.length > 1) next = pool[(pool.indexOf(next) + 1) % pool.length];
@@ -426,7 +426,7 @@ export class EffectEngine {
     this.silenceGate += Math.max(-gateRate, Math.min(gateRate, gateTarget - this.silenceGate));
     // Warmup-räknare för baslinjen: ackumulera medan aktiv, nollställ vid tystnad.
     if (this.silenceGate > 0.5) this.warmMs += dtSec * 1000; else this.warmMs = 0;
-    if (effMode === "wave" || effMode === "sweep") this.wavePhase += dtSec * (1.6 + audio * 4);
+    if (effMode === "wave") this.wavePhase += dtSec * (1.6 + audio * 4);
 
     // Drops: each beat/kick fires the next lamp in a fresh pure color.
     if (effMode === "drops" && count > 0 && (frame.kick || beatTick) && now - this.lastDropAdvance > 140) {
@@ -509,7 +509,7 @@ export class EffectEngine {
     // (6 tick) sedan → färgen "flyger" V→H som ett eko, ger arenabredd på 4 lampor.
     // Grupp-/spektrum-lägen har egen rumslig logik → undantagna. Ljusstyrkan är
     // fortfarande live (bara färgen/mönstret ekar).
-    const NO_ECHO = new Set<Mode>(["rave", "flip", "gallop", "twin", "ripple", "gravity", "eq", "drumkit", "split", "cascade", "seismisk", "interlace"]);
+    const NO_ECHO = new Set<Mode>(["rave", "gallop", "twin", "ripple", "gravity", "eq", "drumkit", "split"]);
     const echoOn = this.cfg.colorEcho && count >= 2 && !NO_ECHO.has(effMode);
     const echoOld = echoOn ? this.echoBuf[this.echoPos] : undefined;   // 6 tick gammalt (strax överskrivet)
     let lamp0: [number, number, number] = [0, 0, 0];
@@ -635,7 +635,7 @@ export class EffectEngine {
     // Output ballistics on color/dim channels (never strobe/mode channels —
     // a decaying strobe value would sweep through real strobe speeds).
     // Snappare fade-out i energiska lägen så pumpen syns; lugna behåller mjukheten.
-    const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops" || effMode === "rave" || effMode === "drumkit" || effMode === "duel" || effMode === "interlace";
+    const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops" || effMode === "rave" || effMode === "drumkit" || effMode === "duel";
     const beatMsNow = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
     const fastTau = Math.max(0.14, Math.min(0.3, beatMsNow * 0.5 / 1000));
     // TRANSIENT-SKÄRPA: hög energi/riser → kort decay (knivskarp piska på varje

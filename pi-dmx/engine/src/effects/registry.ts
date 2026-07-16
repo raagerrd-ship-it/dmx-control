@@ -13,41 +13,30 @@ import { drops } from "./drops.js";
 import { party } from "./party.js";
 import { chase } from "./chase.js";
 import { wave } from "./wave.js";
-import { cycle } from "./cycle.js";
 import { breathe } from "./breathe.js";
-import { tide } from "./tide.js";
 import { snap } from "./snap.js";
 import { bounce } from "./bounce.js";
 import { mono } from "./mono.js";
 import { aurora } from "./aurora.js";
-import { drift } from "./drift.js";
-import { sweep } from "./sweep.js";
 import { pulse } from "./pulse.js";
 import { strobe } from "./strobe.js";
 import { rave } from "./rave.js";
 import { eq } from "./eq.js";
-import { flip } from "./flip.js";
 import { gallop } from "./gallop.js";
 import { twin } from "./twin.js";
 import { ripple } from "./ripple.js";
-import { jump } from "./jump.js";
 import { gravity } from "./gravity.js";
 import { drumkit } from "./drumkit.js";
 import { split } from "./split.js";
-import { cascade } from "./cascade.js";
 import { subbreath } from "./subbreath.js";
 import { duel } from "./duel.js";
 import { airglow } from "./airglow.js";
-import { prisma } from "./prisma.js";
-import { seismisk } from "./seismisk.js";
-import { interlace } from "./interlace.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
-  drops, party, chase, wave, cycle, breathe, tide, snap, bounce, mono,
-  aurora, drift, sweep, pulse, strobe, rave, eq, flip, gallop, twin, ripple,
-  jump, gravity, drumkit, split, cascade, subbreath, duel, airglow,
-  prisma, seismisk, interlace,
+  drops, party, chase, wave, breathe, snap, bounce, mono, aurora, pulse,
+  strobe, rave, eq, gallop, twin, ripple, gravity, drumkit, split, subbreath,
+  duel, airglow,
 ];
 
 /** Snabb uppslagning nyckel → effekt. */
