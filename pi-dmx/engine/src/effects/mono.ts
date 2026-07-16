@@ -11,10 +11,14 @@ export const mono: EffectDef = {
                 + Math.sin(c.t * 10.9 + c.idx * 4.1) * 0.3
                 + Math.sin(c.t * 17.3 + c.idx * 1.7) * 0.2;   // -1..1 organiskt
     const ember = 0.5 + 0.5 * flick;                          // 0..1 glöd
-    const hue = 0.015 + 0.11 * ember;                         // rött → gult
-    // Basgången (spec.bass) får lågan att SVALLA + kicken ger en flare → elden
-    // andas med musiken i stället för att bara flimra av sig själv.
-    const m = Math.min(1, 0.4 + ember * 0.4 + c.kickEnv * 0.25 + c.frame.spec.bass * 0.25);
-    return c.hsv(hue, 1, 0.3 + 0.7 * m);
+    // Basgången (spec.bass) får lågan att SVALLA, kicken ger en flare, och
+    // mellan/hög-mel-ANSLAG (virvel/gitarr) sprakar som kort vit gnista ovanpå →
+    // elden andas OCH sprakar med musiken. Ljusare musik (centroid) drar gnistan
+    // mot gult (magisk eld) i stället för bara djupt rött.
+    const crackle = Math.max(c.frame.onset.mid, c.frame.onset.highMid);
+    const hue = 0.015 + 0.11 * ember + c.frame.centroid * 0.04;   // rött → gult, ljusare = varmare
+    const m = Math.min(1, 0.4 + ember * 0.4 + c.kickEnv * 0.2 + c.frame.spec.bass * 0.22 + crackle * 0.5);
+    const sat = 1 - crackle * 0.5;                              // anslag → kort vit gnista
+    return c.hsv(hue, sat, 0.3 + 0.7 * m);
   },
 };

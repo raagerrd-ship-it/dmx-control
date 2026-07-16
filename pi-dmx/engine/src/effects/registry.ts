@@ -33,12 +33,15 @@ import { ripple } from "./ripple.js";
 import { jump } from "./jump.js";
 import { gravity } from "./gravity.js";
 import { drumkit } from "./drumkit.js";
+import { split } from "./split.js";
+import { cascade } from "./cascade.js";
+import { subbreath } from "./subbreath.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
   drops, party, chase, wave, cycle, breathe, tide, snap, bounce, mono,
   aurora, drift, sweep, pulse, strobe, rave, eq, flip, gallop, twin, ripple,
-  jump, gravity, drumkit,
+  jump, gravity, drumkit, split, cascade, subbreath,
 ];
 
 /** Snabb uppslagning nyckel → effekt. */
