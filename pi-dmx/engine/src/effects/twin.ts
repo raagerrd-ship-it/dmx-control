@@ -11,7 +11,7 @@ export const twin: EffectDef = {
     const wash = 0.5 + 0.5 * Math.sin(c.t * 0.8 + (even ? 0 : Math.PI) - c.idx * 0.4 * c.phaseSpread);
     const pairBase = c.mixedSector(c.mclk(8, 10));
     const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;
-    const m = Math.min(1, wash * 0.7 + c.band * 0.3);
+    const m = Math.min(1, wash * 0.7 + c.band * 0.3 + c.punch * 0.2);   // + dunk-svall
     return c.hsv(hue, 1, 0.3 + 0.7 * m);
   },
 };

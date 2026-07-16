@@ -17,7 +17,7 @@ export const mono: EffectDef = {
     // mot gult (magisk eld) i stället för bara djupt rött.
     const crackle = Math.max(c.frame.onset.mid, c.frame.onset.highMid);
     const hue = 0.015 + 0.11 * ember + c.frame.centroid * 0.04;   // rött → gult, ljusare = varmare
-    const m = Math.min(1, 0.4 + ember * 0.4 + c.kickEnv * 0.2 + Math.max(c.frame.spec.sub, c.frame.spec.bass) * 0.22 + crackle * 0.5);
+    const m = Math.min(1, 0.4 + ember * 0.4 + c.kickEnv * 0.2 + Math.max(c.frame.spec.sub, c.frame.spec.bass) * 0.22 + crackle * 0.5 + c.punch * 0.25);   // dunk = eld-flare
     const sat = 1 - crackle * 0.5;                              // anslag → kort vit gnista
     return c.hsv(hue, sat, 0.3 + 0.7 * m);
   },

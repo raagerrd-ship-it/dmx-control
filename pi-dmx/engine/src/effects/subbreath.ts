@@ -10,7 +10,7 @@ export const subbreath: EffectDef = {
   key: "subbreath", label: "Sub-andning", tier: "lugn",
   desc: "Djup sub-bas-andning med krispigt luft-skimmer i kanterna.",
   render(c) {
-    const base = 0.3 + 0.7 * c.shaped(0.1, c.frame.spec.sub);   // andas med sub, golv 30%
+    const base = Math.min(1, 0.3 + 0.7 * c.shaped(0.1, c.frame.spec.sub) + c.punch * 0.2);   // sub-andning + dunk-svall
     const hue = c.mixedSector(0) / 6;                            // palettens djupa basfärg
     const air = c.frame.spec.air;
     const isOuter = c.count < 3 ? c.idx % 2 === 0 : (c.idx === 0 || c.idx === c.count - 1);

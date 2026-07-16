@@ -9,7 +9,7 @@ export const aurora: EffectDef = {
   render(c) {
     const hue = c.mixedSector(c.idx * 2 + c.mclk(8, 7) + Math.round(c.frame.centroid * 3)) / 6;   // + centroid → palett-läge
     const wash = 0.5 + 0.5 * Math.sin(c.t * 0.45 - c.idx * 1.3 * c.phaseSpread);
-    const m = Math.min(1, 0.4 + wash * 0.45 + c.band * 0.25);   // per-lampa frekvensband
+    const m = Math.min(1, 0.4 + wash * 0.45 + c.band * 0.25 + c.punch * 0.2);   // per-lampa band + dunk-svall
     return c.hsv(hue, 1, 0.3 + 0.7 * m);
   },
 };

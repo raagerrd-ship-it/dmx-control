@@ -83,6 +83,7 @@ export class EffectEngine {
   /** Output ballistics: per-channel peak-hold with exponential decay — the
    *  eye sees instant attack and a soft ~0.4 s fall, whatever the modes do. */
   private outSmooth = new Float32Array(512);
+  private calSmooth = new Float32Array(512);   // kalibrerings-utgång: håll ljuset & mjuk fade NER mot släck
   private strobeMask = new Uint8Array(512);   // 1 = hoppa ballistik (strobe-kanal)
   private capMask = new Uint8Array(512);      // 1 = VU-taket skalar denna kanal (ljusbärande: färg, annars dim)
   private strobeMaskFor: unknown = null;      // fixtures-referens masken byggdes för
@@ -703,7 +704,7 @@ export class EffectEngine {
     // svärtan reser sig rent från svart, utan pop från en kvarhållen nivå.
     if (blackout) {
       for (let ch = 0; ch < this.maxCh; ch++) {
-        if (!this.strobeMask[ch]) { this.universe[ch] = 0; this.outSmooth[ch] = 0; }
+        if (!this.strobeMask[ch]) { this.universe[ch] = 0; this.outSmooth[ch] = 0; this.calSmooth[ch] = 0; }
       }
     }
 
@@ -713,6 +714,7 @@ export class EffectEngine {
     //   över 0       → skalas in i [on..255] (LED:ns tändpunkt → full)
     // Per lampa (luminans = starkaste kanalen) så färgen bevaras. Motorn har redan
     // bestämt av/på — 0 betyder av, resten är aktiv ljusstyrka.
+    const calRel = 1 - Math.exp(-dtSec / 0.13);   // ~130ms mjuk fade NER mot släck
     for (const cf of this.cfg.fixtures) {
       const cal = cf.cal;
       if (!cal || !cal.on) continue;
@@ -724,12 +726,26 @@ export class EffectEngine {
         const ch = cbase + i;
         if (ch >= 0 && ch < 512 && this.capMask[ch] && this.universe[ch] > L) L = this.universe[ch];
       }
-      if (L <= 0) continue;                                    // 0 = släckt → lämna svart
-      const gain = (cal.on + (255 - cal.on) * L / 255) / L;    // skala L → [on..255], hela lampan med
-      for (let i = 0; i < roles.length; i++) {
-        const ch = cbase + i;
-        if (ch >= 0 && ch < 512 && this.capMask[ch]) {
-          this.universe[ch] = Math.min(255, Math.round(this.universe[ch] * gain));
+      if (L > 0) {
+        // TÄNT: skala luminansen L → [on..255], hela lampan med samma faktor. Följs
+        // DIREKT → punch, dynamik och färgbyten är oförändrat skarpa.
+        const gain = (cal.on + (255 - cal.on) * L / 255) / L;
+        for (let i = 0; i < roles.length; i++) {
+          const ch = cbase + i;
+          if (ch < 0 || ch >= 512 || !this.capMask[ch]) continue;
+          const v = Math.min(255, this.universe[ch] * gain);
+          this.calSmooth[ch] = v;
+          this.universe[ch] = Math.round(v);
+        }
+      } else {
+        // HELA LAMPAN mot släck: håll senaste färgen och tona mjukt NER till 0 (~130ms)
+        // → ingen hård blink från tändtröskeln till svart, ljuset hålls "över släck".
+        for (let i = 0; i < roles.length; i++) {
+          const ch = cbase + i;
+          if (ch < 0 || ch >= 512 || !this.capMask[ch]) continue;
+          const v = this.calSmooth[ch] * (1 - calRel);
+          this.calSmooth[ch] = v;
+          this.universe[ch] = v < 0.5 ? 0 : Math.round(v);
         }
       }
     }
