@@ -477,7 +477,7 @@ export class EffectEngine {
     // (6 tick) sedan → färgen "flyger" V→H som ett eko, ger arenabredd på 4 lampor.
     // Grupp-/spektrum-lägen har egen rumslig logik → undantagna. Ljusstyrkan är
     // fortfarande live (bara färgen/mönstret ekar).
-    const NO_ECHO = new Set<Mode>(["rave", "flip", "gallop", "twin", "eq"]);
+    const NO_ECHO = new Set<Mode>(["rave", "flip", "gallop", "twin", "ripple", "eq"]);
     const echoOn = this.cfg.colorEcho && count >= 2 && !NO_ECHO.has(effMode);
     const echoOld = echoOn ? this.echoBuf[this.echoPos] : undefined;   // 6 tick gammalt (strax överskrivet)
     let lamp0: [number, number, number] = [0, 0, 0];
