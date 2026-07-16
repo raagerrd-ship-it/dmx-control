@@ -6,6 +6,19 @@
 import FFT from "fft.js";
 import type { EngineConfig } from "./config.js";
 
+/** Rikt log-spektrum (8 band) från den parallella 2048-FFT:n. Varje band är
+ *  per-band AGC-normaliserat (0..1) så alla band nyttjar full range oavsett mix. */
+export interface Spectrum {
+  sub: number;      // ~20–60 Hz   — sub/808-rumble
+  kick: number;     // ~60–120 Hz  — kick-grundton/kropp (nu SKILD från basen)
+  bass: number;     // ~120–250 Hz — basgång/basnoter
+  lowMid: number;   // ~250–500 Hz — låg kropp, toms, låg röst
+  mid: number;      // ~0.5–2 kHz  — röst, snare-kropp, synth
+  highMid: number;  // ~2–5 kHz    — närvaro, snare-crack, konsonanter
+  treble: number;   // ~5–10 kHz   — hi-hats, cymbaler
+  air: number;      // ~10–16 kHz  — luft/glitter
+}
+
 export interface Frame {
   level: number;        // 0..1, auto-gained RMS (15ms attack / 400ms release smoothed)
   levelRaw: number;     // 0..1, samma auto-gain men OSMOOTHAT (rå per-hop) — för VU-taket
@@ -19,6 +32,9 @@ export interface Frame {
   bpm: number;          // 0 = ej låst; lokal tempo-estimat via autokorrelation
   bpmConfidence: number;// 0..1, hur tydlig vinnande takttoppen är (peak-to-mean)
   beatAnchorMs: number; // wall-clock ms för ett taktslag (fas)
+  /** Rikt spektrum + per-band onset (anslag) från dubbel-FFT:n (hög-upplöst). */
+  spec: Spectrum;       // per-band NIVÅ (AGC 0..1)
+  onset: Spectrum;      // per-band ONSET/anslag (halvvågs-flux mot adaptiv baslinje, 0..1)
 }
 
 
@@ -27,6 +43,23 @@ export class Analyser {
   private window: Float32Array;
   private buffer: Float32Array;      // sliding FFT window
   private prevMag: Float32Array;     // for flux
+  // --- DUBBEL-FFT: en parallell 2048-FFT enbart för effekternas ljudbild.
+  //     512:an ovan sköter RMS/kick/BPM/onset ORÖRT (all tightad timing intakt);
+  //     denna ger 23 Hz/bin (4× uppl. i botten) → kick och bas kan äntligen skiljas. ---
+  private fftBig!: FFT;
+  private windowBig!: Float32Array;
+  private windowedBig!: Float32Array;   // scratch (återanvänds, ingen alloc/frame)
+  private bufferBig!: Float32Array;     // egen glidande buffert (matas samma hops)
+  private prevMagBig!: Float32Array;    // för per-band flux
+  private magBig!: Float32Array;        // scratch magnitud
+  private specBig!: number[];           // scratch complex (fft.js createComplexArray)
+  private static readonly BAND_HZ = [20, 60, 120, 250, 500, 2000, 5000, 10000, 16000];
+  private bandLo: number[] = [];        // bin-start per band (förberäknat)
+  private bandHi: number[] = [];        // bin-slut per band
+  private bandPeak = new Float32Array(8);  // per-band AGC-peak (själv-skalande nivå)
+  private onsetBase = new Float32Array(8); // per-band adaptiv flux-baslinje (onsets)
+  private bandLvl = new Float32Array(8);   // scratch: per-band nivå denna frame
+  private bandOn = new Float32Array(8);    // scratch: per-band onset denna frame
   private kickBaseline = 0;          // adaptiv baslinje för kick-band-flux
   private kickWasAbove = false;      // stigande-flank-detektion
   private kickPrimed = false;        // false på första framen (skräp-flux) → ingen falsk kick
@@ -243,6 +276,21 @@ export class Analyser {
     this.buffer = new Float32Array(cfg.fft.size);
     this.prevMag = new Float32Array(cfg.fft.size / 2);
     this.envelope = cfg.detection.autoGainTarget;
+    // Dubbel-FFT: 2048 för hög låg-uppl. Egen buffert, matas samma hop-chunks.
+    const BIG = 2048;
+    this.fftBig = new FFT(BIG);
+    this.windowBig = hannWindow(BIG);
+    this.windowedBig = new Float32Array(BIG);
+    this.bufferBig = new Float32Array(BIG);
+    this.prevMagBig = new Float32Array(BIG / 2);
+    this.magBig = new Float32Array(BIG / 2);
+    this.specBig = this.fftBig.createComplexArray();
+    const binHzBig = cfg.audio.rate / BIG;
+    for (let b = 0; b < 8; b++) {
+      this.bandLo[b] = Math.max(1, Math.round(Analyser.BAND_HZ[b] / binHzBig));
+      this.bandHi[b] = Math.min(BIG / 2, Math.round(Analyser.BAND_HZ[b + 1] / binHzBig));
+      this.bandPeak[b] = 1e-4;   // seed → själv-kalibrerar inom ~1s
+    }
   }
 
   /** Feed a hop-sized chunk of mono samples, get a frame back. */
@@ -391,7 +439,47 @@ export class Analyser {
     this.midSmooth = smooth(this.midSmooth, mid);
     this.trbSmooth = smooth(this.trbSmooth, treble);
     this.centSmooth = smooth(this.centSmooth, centroid);
-    return { level: this.lvlSmooth, levelRaw: level, energy: this.engSmooth, mid: this.midSmooth, treble: this.trbSmooth, centroid: this.centSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, bpmConfidence: this.localBpmConfidence, beatAnchorMs: this.beatAnchorMs };
+
+    // --- DUBBEL-FFT: hög-upplöst log-spektrum för effekterna ---
+    // Egen glidande 2048-buffert, matas samma hop. Ger 23 Hz/bin i botten så
+    // sub/kick/bas separeras. Per-band AGC-nivå + per-band adaptiv onset.
+    this.bufferBig.copyWithin(0, hop);   // skjut vänster med en hop
+    this.bufferBig.set(samples, this.bufferBig.length - hop);
+    for (let i = 0; i < this.bufferBig.length; i++) this.windowedBig[i] = this.bufferBig[i] * this.windowBig[i];
+    this.fftBig.realTransform(this.specBig, this.windowedBig);
+    const halfBig = this.bufferBig.length / 2;
+    for (let i = 0; i < halfBig; i++) {
+      const re = this.specBig[2 * i], im = this.specBig[2 * i + 1];
+      this.magBig[i] = Math.sqrt(re * re + im * im);
+    }
+    const gated = rms > this.cfg.detection.noiseFloor * 1.5;
+    for (let b = 0; b < 8; b++) {
+      const lo = this.bandLo[b], hi = this.bandHi[b];
+      const nb = Math.max(1, hi - lo);
+      let sum = 0, fl = 0;
+      for (let i = lo; i < hi; i++) {
+        sum += this.magBig[i];
+        const d = this.magBig[i] - this.prevMagBig[i];
+        if (d > 0) fl += d;
+      }
+      const avg = sum / nb;
+      // Per-band AGC: skala mot egen långsamt sjunkande peak → varje band nyttjar
+      // full range oavsett mix (bas dominerar annars alltid rå-magnituden).
+      if (gated && avg > this.bandPeak[b]) this.bandPeak[b] = avg;
+      else this.bandPeak[b] *= 0.9993;   // ~halveras på ~1.5s → följer men pumpar ej
+      this.bandLvl[b] = gated ? Math.min(1, avg / (this.bandPeak[b] + 1e-6)) : 0;
+      // Per-band onset: halvvågs-flux mot adaptiv baslinje (som kick-detektorn) →
+      // rena anslag oberoende av bandets absoluta energi.
+      const fluxN = fl / nb;
+      this.onsetBase[b] += (fluxN - this.onsetBase[b]) * 0.02;
+      this.bandOn[b] = gated ? Math.max(0, Math.min(1, (fluxN - this.onsetBase[b] * 1.3) * 6)) : 0;
+    }
+    { const t = this.prevMagBig; this.prevMagBig = this.magBig; this.magBig = t; }
+    const L = this.bandLvl, O = this.bandOn;
+    const spec: Spectrum = { sub: L[0], kick: L[1], bass: L[2], lowMid: L[3], mid: L[4], highMid: L[5], treble: L[6], air: L[7] };
+    const onset: Spectrum = { sub: O[0], kick: O[1], bass: O[2], lowMid: O[3], mid: O[4], highMid: O[5], treble: O[6], air: O[7] };
+
+    return { level: this.lvlSmooth, levelRaw: level, energy: this.engSmooth, mid: this.midSmooth, treble: this.trbSmooth, centroid: this.centSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, bpmConfidence: this.localBpmConfidence, beatAnchorMs: this.beatAnchorMs, spec, onset };
   }
 }
 
