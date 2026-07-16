@@ -361,6 +361,9 @@ export class Analyser {
     const dt = Math.min(0.1, (now - this.lastT) / 1000);
     this.lastT = now;
     const d = this.cfg.detection;
+    // AGC körs BARA för mic (aux låser gain på 1× — line-level är hett & stabilt).
+    // Beprövad envelope→autoGainTarget. (Percentil-AGC:n vore bättre men rör bara
+    // denna oanvända mic-väg → behåller det testade.)
     if (!this.gainLocked && rms > d.noiseFloor) {
       const tau = rms * this.gain > this.envelope ? d.tauDown : d.tauUp;
       const a = 1 - Math.exp(-dt / tau);
@@ -372,8 +375,6 @@ export class Analyser {
       if (this.gain < 0.5) this.gain = 0.5;
       else if (this.gain > 20) this.gain = 20;
     }
-    // rms*gain averages at autoGainTarget once the AGC has converged — the old
-    // *4 factor made steady-state level 4x the target, i.e. pegged at 100%.
     const level = Math.min(1, rms * this.gain);
 
     // KICK-DETEKTION v2: onset i kick-bandet (sub-bas ~0–280 Hz) mot en ADAPTIV
