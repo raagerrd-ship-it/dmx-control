@@ -38,12 +38,16 @@ import { cascade } from "./cascade.js";
 import { subbreath } from "./subbreath.js";
 import { duel } from "./duel.js";
 import { airglow } from "./airglow.js";
+import { prisma } from "./prisma.js";
+import { seismisk } from "./seismisk.js";
+import { interlace } from "./interlace.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
   drops, party, chase, wave, cycle, breathe, tide, snap, bounce, mono,
   aurora, drift, sweep, pulse, strobe, rave, eq, flip, gallop, twin, ripple,
   jump, gravity, drumkit, split, cascade, subbreath, duel, airglow,
+  prisma, seismisk, interlace,
 ];
 
 /** Snabb uppslagning nyckel → effekt. */
