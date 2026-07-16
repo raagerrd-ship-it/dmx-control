@@ -473,8 +473,12 @@ export class Analyser {
       const avg = sum / nb;
       // Per-band AGC: skala mot egen långsamt sjunkande peak → varje band nyttjar
       // full range oavsett mix (bas dominerar annars alltid rå-magnituden).
-      if (gated && avg > this.bandPeak[b]) this.bandPeak[b] = avg;
-      else this.bandPeak[b] *= 0.9993;   // ~halveras på ~1.5s → följer men pumpar ej
+      // GOLV (~0.15·lvlSmooth): peaken nollställs INTE i tystnad → när ett tidigare
+      // tyst band (t.ex. diskant i ett intro) smäller till blir det en balanserad
+      // respons, inte en överstyrd ljus-chock/pump. (Gemini.)
+      const minPeak = this.lvlSmooth * 0.15;
+      if (gated && avg > this.bandPeak[b]) this.bandPeak[b] = Math.max(avg, minPeak);
+      else this.bandPeak[b] = Math.max(this.bandPeak[b] * 0.9993, minPeak);
       // Nivån smoothas ~90ms PÅ HOP-TAKT → nivå-drivna/lugna effekter (som läser
       // spec via ctx.band) flimrar inte av det råa per-hop-AGC-bruset. onset lämnas
       // skarp (nedan) så transient-drivna effekter behåller sin punch.

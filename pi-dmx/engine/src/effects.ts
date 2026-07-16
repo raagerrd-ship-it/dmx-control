@@ -228,7 +228,12 @@ export class EffectEngine {
     // ~15ms tidigare än det utjämnade bandet + onset.kick från dubbel-FFT:n som extra
     // säkring). Max av dem → punchen sitter på slaget.
     const kickHitFast = Math.max(0, 1 - (performance.now() - this.lastKickBoost) / 180);
-    const bassPunch = Math.max(0, Math.min(1, Math.max((frame.energy - this.bassBaseline - 0.05) * 4, kickHitFast * 0.9, frame.onset.kick * 0.85)));
+    // DUNK-RATIO (Gemini): anslag/energi i låg-enden — hög = knivskarp kick, låg =
+    // smetig ihållande basnot. Grinda den UTJÄMNADE bas-svallen mjukt av den så bara
+    // riktiga transienter driver punch (de snabba kick-delarna fyrar ändå).
+    const dunkRatio = (frame.onset.kick + frame.onset.sub) / (frame.spec.kick + frame.spec.sub + 0.01);
+    const sustained = Math.max(0, (frame.energy - this.bassBaseline - 0.05) * 4) * Math.min(1, dunkRatio / 0.4);
+    const bassPunch = Math.max(0, Math.min(1, Math.max(sustained, kickHitFast * 0.9, frame.onset.kick * 0.85)));
     // Uniform bas-punch borttagen ur master — effekterna äger sitt slag via ctx.punch.
     const master = this.cfg.master * this.silenceGate * beatMul;
     // Synlig punch: en hård basstöt (eller drop-flash) BLOOMAR färgen till full
