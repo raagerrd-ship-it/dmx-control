@@ -427,7 +427,7 @@ export class EffectEngine {
     const landTau = 1.2 + Math.min(1, this.hotMs / 180000) * 5;   // 1.2s .. 6.2s efter lång spelning
     const ambRate = ambTarget > this.ambient ? dtSec / landTau : dtSec / 0.1;   // in: adaptivt, ut: snabbt
     this.ambient += Math.max(-ambRate, Math.min(ambRate, ambTarget - this.ambient));
-    const ambLvl = this.ambient * 0.22 * this.cfg.master;   // varm nivå (respekterar master, ej beat/tystnad)
+    const ambLvl = this.cfg.ambientGlow ? this.ambient * 0.22 * this.cfg.master : 0;   // vilo-glöd (opt-in); annars helt mörkt i tystnad
     // MICRO-STROBE (transientskimmer): en skarp diskanttransient (hi-hat/cymbal)
     // ger en blixtsnabb mjukvaru-dimmernotch (~2-3 frames) → eld sprakar, wave
     // gnistrar, UTAN hårdvaru-strobe. Bara ljusstyrka; ambient-glöden rörs inte.

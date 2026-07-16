@@ -193,6 +193,7 @@
     <label class="tgl"><span>Micro-strobe<br><small style="opacity:.6">Kort mjukvaru-skimmer på diskanttransienter (hi-hats) — eld sprakar, wave gnistrar. Ingen hårdvaru-strobe.</small></span><input type="checkbox" id="tMicroStrobe"></label>
     <label class="tgl"><span>Dynamiskt ljustak (VU)<br><small style="opacity:.6">Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%. Drop bypassar. Djup styrs av Dynamik.</small></span><input type="checkbox" id="tEnergyCeiling"></label>
     <label class="tgl"><span>Klubb-läge (hård kontrast)<br><small style="opacity:.6">Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna. Aggressivt, klistrat på transienterna. Kräver VU-taket på.</small></span><input type="checkbox" id="tClubMode"></label>
+    <label class="tgl"><span>Varm vilo-glöd i tystnad<br><small style="opacity:.6">När ingen musik spelar: dim bärnsten-glöd i stället för helt mörkt. Av = lamporna släcks vid ingen input.</small></span><input type="checkbox" id="tAmbientGlow"></label>
   </div>
 
   <h1>Fixtures</h1>
@@ -390,6 +391,7 @@ function applyConfig(cfg) {
   if (tMicroStrobe) tMicroStrobe.checked = !!cfg.microStrobe;
   if (tEnergyCeiling) tEnergyCeiling.checked = !!cfg.energyCeiling;
   if (tClubMode) tClubMode.checked = !!cfg.clubMode;
+  if (tAmbientGlow) tAmbientGlow.checked = !!cfg.ambientGlow;
   segActivate("segDrop", cfg.dropSensitivity ?? 0.6, "drop");
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
@@ -764,6 +766,8 @@ const tEnergyCeiling = document.getElementById("tEnergyCeiling");
 tEnergyCeiling.onchange = () => send({ type: "setEnergyCeiling", value: tEnergyCeiling.checked });
 const tClubMode = document.getElementById("tClubMode");
 tClubMode.onchange = () => send({ type: "setClubMode", value: tClubMode.checked });
+const tAmbientGlow = document.getElementById("tAmbientGlow");
+tAmbientGlow.onchange = () => send({ type: "setAmbientGlow", value: tAmbientGlow.checked });
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.

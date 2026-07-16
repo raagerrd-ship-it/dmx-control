@@ -103,6 +103,8 @@ export interface EngineConfig {
   energyCeiling: boolean;
   /** REGI: klubb-läge — kvadrerar VU-taket (hård kontrast: mörkt mellan, explosion på topp). */
   clubMode: boolean;
+  /** REGI: varm vilo-glöd i tystnad — dim bärnsten när ingen musik spelar (annars helt mörkt). */
+  ambientGlow: boolean;
 }
 
 export const defaultConfig: EngineConfig = {
@@ -141,6 +143,7 @@ export const defaultConfig: EngineConfig = {
   microStrobe: false,     // ägar-val: strobe-nära, opt-in
   energyCeiling: true,    // direkt VU = ljusstyrka; standard på (drop/punch bypassar)
   clubMode: false,        // hård kontrast (VU²); opt-in — rör inte det trogna linjära läget
+  ambientGlow: false,     // tystnad = HELT mörkt som standard; slå på för varm vilo-glöd
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {

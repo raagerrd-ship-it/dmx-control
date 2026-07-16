@@ -1,6 +1,12 @@
 [Unit]
 Description=Audio → DMX engine (Node)
-After=network.target dmx-helper.service cpu-performance.service sound.target
+# Starta PARALLELLT med beroendena i stället för seriellt efter dem: att vänta in
+# network/sound/dmx-helper la ~8s node-uppstart OVANPÅ kort-init:en. Motorn hakar
+# på när de blir redo — dmx.ts återansluter till /run/dmx.sock och audio.ts
+# respawnar arecord tills ljudkortet finns. Enda After: cpu-performance (så node
+# kall-startar på full klock). Requires drar in dmx-helper, utan att blockera.
+# (Inget network.target — showen behöver inget nätverk; :80 binder ändå.)
+After=cpu-performance.service
 Requires=dmx-helper.service
 StartLimitIntervalSec=0
 
@@ -8,7 +14,9 @@ StartLimitIntervalSec=0
 Type=simple
 WorkingDirectory=/opt/audio-dmx-engine
 # --max-old-space-size caps V8 heap at 200 MB (Pi Zero 2 W has 512 MB total).
-ExecStart=/usr/bin/node --enable-source-maps --max-old-space-size=200 dist/index.js
+# No --enable-source-maps: it parses every module's map at startup (slower cold
+# boot on the SD card) and this is production — stack traces map to dist anyway.
+ExecStart=/usr/bin/node --max-old-space-size=200 dist/index.js
 Environment=NODE_ENV=production
 Environment=UV_THREADPOOL_SIZE=2
 Environment=PORT=80
