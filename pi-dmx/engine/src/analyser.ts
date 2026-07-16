@@ -60,7 +60,8 @@ export class Analyser {
   private bandHi: number[] = [];        // bin-slut per band
   private bandPeak = new Float32Array(8);  // per-band AGC-peak (själv-skalande nivå)
   private onsetBase = new Float32Array(8); // per-band adaptiv flux-baslinje (onsets)
-  private bandLvl = new Float32Array(8);   // scratch: per-band nivå denna frame
+  private bandLvl = new Float32Array(8);   // scratch: per-band nivå denna frame (~90ms smoothad)
+  private bandLvlSm = new Float32Array(8); // per-band nivå-smooth (håll mellan frames)
   private bandOn = new Float32Array(8);    // scratch: per-band onset denna frame
   private kickBaseline = 0;          // adaptiv baslinje för kick-band-flux
   private kickWasAbove = false;      // stigande-flank-detektion
@@ -438,9 +439,10 @@ export class Analyser {
     const aRel = 1 - Math.exp(-dtHop / 0.4);
     const smooth = (prev: number, x: number) => prev + (x - prev) * (x > prev ? aAtt : aRel);
     this.lvlSmooth = smooth(this.lvlSmooth, level);
-    // VU-nivå: symmetrisk ~130ms lågpass PÅ HOP-TAKT (integrerar alla 375 hops/s
-    // → långt mindre brus än att smootha rå-nivån efter 50Hz-decimering).
-    this.lvlVU += (level - this.lvlVU) * (1 - Math.exp(-dtHop / 0.13));
+    // VU-nivå: symmetrisk ~200ms lågpass PÅ HOP-TAKT (integrerar alla 375 hops/s
+    // → långt mindre brus än att smootha rå-nivån efter 50Hz-decimering). ≤200 BPM
+    // = ett slag var ≥300ms, så 200ms suddar aldrig ut en äkta beat — bara brus.
+    this.lvlVU += (level - this.lvlVU) * (1 - Math.exp(-dtHop / 0.20));
     this.engSmooth = smooth(this.engSmooth, energy);
     this.midSmooth = smooth(this.midSmooth, mid);
     this.trbSmooth = smooth(this.trbSmooth, treble);
@@ -473,7 +475,12 @@ export class Analyser {
       // full range oavsett mix (bas dominerar annars alltid rå-magnituden).
       if (gated && avg > this.bandPeak[b]) this.bandPeak[b] = avg;
       else this.bandPeak[b] *= 0.9993;   // ~halveras på ~1.5s → följer men pumpar ej
-      this.bandLvl[b] = gated ? Math.min(1, avg / (this.bandPeak[b] + 1e-6)) : 0;
+      // Nivån smoothas ~90ms PÅ HOP-TAKT → nivå-drivna/lugna effekter (som läser
+      // spec via ctx.band) flimrar inte av det råa per-hop-AGC-bruset. onset lämnas
+      // skarp (nedan) så transient-drivna effekter behåller sin punch.
+      const lvlRawB = gated ? Math.min(1, avg / (this.bandPeak[b] + 1e-6)) : 0;
+      this.bandLvlSm[b] += (lvlRawB - this.bandLvlSm[b]) * (1 - Math.exp(-(this.cfg.fft.hop / this.cfg.audio.rate) / 0.09));
+      this.bandLvl[b] = this.bandLvlSm[b];
       // Per-band onset: halvvågs-flux mot adaptiv baslinje (som kick-detektorn) →
       // rena anslag oberoende av bandets absoluta energi.
       const fluxN = fl / nb;

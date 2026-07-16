@@ -464,7 +464,7 @@ export class EffectEngine {
       // X% → utsignal X%, bara mjukt. En lätt 60ms-glidning här utjämnar sista resten
       // utan att återinföra någon lång svans. (Drop bypassar via dropEnv nedan.)
       const vuRaw = Math.max(0, Math.min(1, frame.levelVU));
-      this.vu += (vuRaw - this.vu) * (1 - Math.exp(-dtSec / 0.06));
+      this.vu += (vuRaw - this.vu) * (1 - Math.exp(-dtSec / 0.09));
       // KLUBB-LÄGE: kvadrera → hård kontrast (mörkt mellan, explosion på topp).
       const vuFilter = this.cfg.clubMode ? this.vu * this.vu : this.vu;
       // BARA DROP skippar VU-filtret: dropEnv (0..1) lyfter taket till full under
