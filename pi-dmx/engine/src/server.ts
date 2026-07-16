@@ -398,7 +398,15 @@ function sanitizeFixtures(input: unknown[]): FixtureConfig[] | null {
     const bandsArr = Array.isArray(r.bands)
       ? ([...new Set(r.bands.filter((b) => ["bass", "mid", "treble", "kick", "low"].includes(b as string)))] as NonNullable<FixtureConfig["bands"]>)
       : undefined;
-    const fx: FixtureConfig = { name, address, preset, ...(roles ? { roles } : {}), ...(bandsArr?.length ? { bands: bandsArr } : {}) };
+    // Per-lampa ljus-kalibrering: off/on klippta till 0..255. Släpps om båda 0.
+    let cal: FixtureConfig["cal"];
+    if (r.cal && typeof r.cal === "object") {
+      const cr = r.cal as Record<string, unknown>;
+      const clampByte = (x: unknown) => Math.max(0, Math.min(255, Math.floor(Number(x)) || 0));
+      const off = clampByte(cr.off), on = clampByte(cr.on);
+      if (off > 0 || on > 0) cal = { off, on };
+    }
+    const fx: FixtureConfig = { name, address, preset, ...(roles ? { roles } : {}), ...(bandsArr?.length ? { bands: bandsArr } : {}), ...(cal ? { cal } : {}) };
 
     // Check the fixture fits within the universe
     const width = fixtureRoles(fx).length;

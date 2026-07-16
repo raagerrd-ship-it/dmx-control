@@ -26,6 +26,11 @@ export interface FixtureConfig {
   /** Spectrum bands driving this lamp in auto/party/mono (strongest wins).
    *  Empty/unset = auto by list order. */
   bands?: ("bass" | "mid" | "treble" | "kick" | "low")[];
+  /** Per-lampa ljus-kalibrering (DMX 0..255) på de ljusbärande kanalerna.
+   *  off = SVARTPUNKT: utvärde ≤ off → helt släckt (dödar läckglöd).
+   *  on  = TÄNDTRÖSKEL: minsta tända värde lyfts till on (LED:ns faktiska
+   *        tändpunkt) → dim-toningar syns jämnt. Utelämnad = ingen kalibrering. */
+  cal?: { off: number; on: number };
 }
 
 export interface EngineConfig {

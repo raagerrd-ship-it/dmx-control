@@ -687,6 +687,26 @@ export class EffectEngine {
       }
     }
 
+    // PER-LAMPA KALIBRERING (sist av allt): svartpunkt + tändtröskel på de
+    // ljusbärande kanalerna. utvärde ≤ off → 0 (dödar läckglöd/jämnar "släckt");
+    // annars remappas (off,255] → [on,255] så minsta tända värde når LED:ns
+    // faktiska tändpunkt (jämn dimning). off=0 → 0 stannar svart, positivt lyfts.
+    for (const cf of this.cfg.fixtures) {
+      const cal = cf.cal;
+      if (!cal || (cal.off <= 0 && cal.on <= 0)) continue;
+      const roles = fixtureRoles(cf);
+      const cbase = cf.address - 1;
+      const span = Math.max(1, 255 - cal.off);
+      for (let i = 0; i < roles.length; i++) {
+        const role = roles[i];
+        if (role !== "r" && role !== "g" && role !== "b" && role !== "w" && role !== "dim") continue;
+        const ch = cbase + i;
+        if (ch < 0 || ch >= 512) continue;
+        const byte = this.universe[ch];
+        this.universe[ch] = byte <= cal.off ? 0 : Math.round(cal.on + (255 - cal.on) * (byte - cal.off) / span);
+      }
+    }
+
     // Rök-kanal skrivs SIST (efter ballistiken) → instant på/av, ingen fade.
     if (fog?.enabled) {
       const fa = fog.address - 1;

@@ -522,6 +522,20 @@ function renderFixtures() {
         </div>
         <div class="fx-meta">Starkaste ikryssade bandet styr. Inga ikryssade = auto (listordning).</div>
       </div>
+      <div class="fx-field" style="margin-top:8px">
+        <label>Ljus-kalibrering (DMX 0–255)</label>
+        <div class="fx-grid">
+          <div class="fx-field">
+            <label style="opacity:.6;font-size:.85em">Svartpunkt</label>
+            <input type="number" min="0" max="254" value="${fx.cal?.off ?? 0}" data-cal-i="${i}" data-cal-k="off" inputmode="numeric" />
+          </div>
+          <div class="fx-field">
+            <label style="opacity:.6;font-size:.85em">Tändtröskel</label>
+            <input type="number" min="0" max="255" value="${fx.cal?.on ?? 0}" data-cal-i="${i}" data-cal-k="on" inputmode="numeric" />
+          </div>
+        </div>
+        <div class="fx-meta">0/0 = av. Höj svartpunkten tills läckglöd släcks; höj tändtröskeln tills svagaste dim precis tänder.</div>
+      </div>
       ${fx.preset === "custom" ? renderCustomRoles(fx, i) : ""}
       <div class="fx-meta">Ch ${fx.address}–${fx.address + width - 1} · ${width} channel${width > 1 ? "s" : ""} · ${rolesOf(fx).join(" · ")}</div>
       ${errByIdx.has(i) ? `<div class="fx-err">${errByIdx.get(i).join(" · ")}</div>` : ""}
@@ -552,6 +566,17 @@ function renderFixtures() {
       const set = new Set(fxDraft[i].bands ?? []);
       if (e.target.checked) set.add(e.target.dataset.band); else set.delete(e.target.dataset.band);
       if (set.size) fxDraft[i].bands = [...set]; else delete fxDraft[i].bands;
+      markDirty();
+    });
+  });
+  fxEl.querySelectorAll("[data-cal-k]").forEach((el) => {
+    el.addEventListener("input", (e) => {
+      const i = Number(e.target.dataset.calI);
+      const k = e.target.dataset.calK;
+      const v = Math.max(0, Math.min(255, parseInt(e.target.value, 10) || 0));
+      const cal = fxDraft[i].cal ?? { off: 0, on: 0 };
+      cal[k] = v;
+      if (cal.off <= 0 && cal.on <= 0) delete fxDraft[i].cal; else fxDraft[i].cal = cal;
       markDirty();
     });
   });
