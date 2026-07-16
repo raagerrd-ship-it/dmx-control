@@ -706,23 +706,31 @@ export class EffectEngine {
       }
     }
 
-    // PER-LAMPA KALIBRERING (sist av allt): svartpunkt + tändtröskel på de
-    // ljusbärande kanalerna. utvärde ≤ off → 0 (dödar läckglöd/jämnar "släckt");
-    // annars remappas (off,255] → [on,255] så minsta tända värde når LED:ns
-    // faktiska tändpunkt (jämn dimning). off=0 → 0 stannar svart, positivt lyfts.
+    // PER-LAMPA KALIBRERING (sist av allt): svartpunkt + tändtröskel, LUMINANS-
+    // baserat per lampa (inte per kanal). Lampans ljusstyrka = starkaste ljus-
+    // kanalen (capMask = färg för färg-lampor, annars dim). BARA om HELA lampan
+    // ligger ≤ svartpunkt släcks den (effekten vill ha den mörk) → en låg bifärg
+    // i en ljus blandning kapas inte. Annars remappas luminansen (off,255] →
+    // [on,255] och HELA lampan skalas med samma faktor → hue bevaras, minsta
+    // tända lampa når LED:ns tändpunkt. off=0 → mörk stannar mörk, tänd lyfts.
     for (const cf of this.cfg.fixtures) {
       const cal = cf.cal;
       if (!cal || (cal.off <= 0 && cal.on <= 0)) continue;
       const roles = fixtureRoles(cf);
       const cbase = cf.address - 1;
-      const span = Math.max(1, 255 - cal.off);
+      let L = 0;   // luminans = max av lampans ljuskanaler
       for (let i = 0; i < roles.length; i++) {
-        const role = roles[i];
-        if (role !== "r" && role !== "g" && role !== "b" && role !== "w" && role !== "dim") continue;
         const ch = cbase + i;
-        if (ch < 0 || ch >= 512) continue;
-        const byte = this.universe[ch];
-        this.universe[ch] = byte <= cal.off ? 0 : Math.round(cal.on + (255 - cal.on) * (byte - cal.off) / span);
+        if (ch >= 0 && ch < 512 && this.capMask[ch] && this.universe[ch] > L) L = this.universe[ch];
+      }
+      if (L <= 0) continue;
+      const gain = L <= cal.off ? 0 : (cal.on + (255 - cal.on) * (L - cal.off) / Math.max(1, 255 - cal.off)) / L;
+      if (gain === 1) continue;
+      for (let i = 0; i < roles.length; i++) {
+        const ch = cbase + i;
+        if (ch >= 0 && ch < 512 && this.capMask[ch]) {
+          this.universe[ch] = gain === 0 ? 0 : Math.min(255, Math.round(this.universe[ch] * gain));
+        }
       }
     }
 
