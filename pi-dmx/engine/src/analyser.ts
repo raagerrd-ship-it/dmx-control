@@ -7,7 +7,8 @@ import FFT from "fft.js";
 import type { EngineConfig } from "./config.js";
 
 export interface Frame {
-  level: number;        // 0..1, auto-gained RMS
+  level: number;        // 0..1, auto-gained RMS (15ms attack / 400ms release smoothed)
+  levelRaw: number;     // 0..1, samma auto-gain men OSMOOTHAT (rå per-hop) — för VU-taket
   energy: number;       // 0..1, bass-band spectral energy (~0–1.5 kHz)
   mid: number;          // 0..1, mid-band spectral energy (~1.5–12 kHz: röst/synth/virvel)
   treble: number;       // 0..1, high-band spectral energy (hats/cymbals/vocals top)
@@ -366,7 +367,7 @@ export class Analyser {
     this.midSmooth = smooth(this.midSmooth, mid);
     this.trbSmooth = smooth(this.trbSmooth, treble);
     this.centSmooth = smooth(this.centSmooth, centroid);
-    return { level: this.lvlSmooth, energy: this.engSmooth, mid: this.midSmooth, treble: this.trbSmooth, centroid: this.centSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, bpmConfidence: this.localBpmConfidence, beatAnchorMs: this.beatAnchorMs };
+    return { level: this.lvlSmooth, levelRaw: level, energy: this.engSmooth, mid: this.midSmooth, treble: this.trbSmooth, centroid: this.centSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, bpmConfidence: this.localBpmConfidence, beatAnchorMs: this.beatAnchorMs };
   }
 }
 

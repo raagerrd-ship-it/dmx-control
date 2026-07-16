@@ -453,7 +453,10 @@ export class EffectEngine {
       // INGEN omskalning/golv — exakt samma värde som input-mätaren visar. Lätt
       // ballistik (snabb attack / ~180ms release) bara för att slippa flimmer;
       // stegar aldrig om mappningen (steady 0.40 → tak 0.40).
-      const vuRaw = Math.max(0, Math.min(1, frame.level));
+      // levelRaw = OSMOOTHAT (rå per-hop) → takets egna ballistik ser signalen
+      // direkt, utan analysatorns 15ms-attack/400ms-release ovanpå. Tightare/mer
+      // i takt. (Effekterna använder fortsatt frame.level, det utjämnade.)
+      const vuRaw = Math.max(0, Math.min(1, frame.levelRaw));
       this.vu += (vuRaw - this.vu) * (vuRaw > this.vu ? 1 : 1 - Math.exp(-dtSec / 0.18));
       // KLUBB-LÄGE: kvadrera → hård kontrast (mörkt mellan, explosion på topp).
       const vuFilter = this.cfg.clubMode ? this.vu * this.vu : this.vu;
