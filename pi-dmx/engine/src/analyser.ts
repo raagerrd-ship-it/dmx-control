@@ -63,7 +63,9 @@ export class Analyser {
   private bandLvl = new Float32Array(8);   // scratch: per-band nivå denna frame (~90ms smoothad)
   private bandLvlSm = new Float32Array(8); // per-band nivå-smooth (håll mellan frames)
   private bandOn = new Float32Array(8);    // scratch: per-band onset denna frame
-  private kickBaseline = 0;          // adaptiv baslinje för kick-band-flux
+  private kickMed = 0.1;             // robust glidande MEDIAN av kick-fluxen (sign-baserad)
+  private kickMad = 0.05;            // robust MAD (median absolut avvikelse) → tröskel-spridning
+  private kickSeed = 0;              // warmup-räknare: snabb EMA-seed av skalan innan sign-baserad tar över
   private kickWasAbove = false;      // stigande-flank-detektion
   private kickPrimed = false;        // false på första framen (skräp-flux) → ingen falsk kick
   private static readonly ENV_HZ = 100;
@@ -379,8 +381,23 @@ export class Analyser {
     // baslinjen; tröskeln skalar med signalen → fyrar pålitligt även på
     // komprimerat material där en fast tröskel missade nästan alla slag.
     // Stigande flank + cooldown = exakt ett slag per träff.
-    this.kickBaseline += (kickFlux - this.kickBaseline) * 0.02;
-    const kickThresh = this.kickBaseline * 3.2;    // bara TYDLIGA toppar (kick-trumman), ej varje bas-not
+    // ROBUST kick-tröskel (Lovable/Gemini): sign-baserad glidande MEDIAN + MAD i
+    // st.f. EMA-medel × fast faktor. En kick är en OUTLIER → flyttar medianen bara
+    // ett litet steg, så tröskeln self-inflatear INTE (EMA-medlet drogs upp av
+    // kickarna själva → missade efterföljande). Steget skalar med signalen. Tröskel
+    // = median + 4.5·MAD → robust z-score, okänslig för outliers.
+    // Warmup ~1s: snabb EMA för att hitta signalens SKALA direkt (annars klättrar
+    // median från init i 20s med falska kickar). Sen sign-baserad = robust steady-state.
+    if (this.kickSeed < 400) {
+      this.kickSeed++;
+      this.kickMed += (kickFlux - this.kickMed) * 0.05;
+      this.kickMad += (Math.abs(kickFlux - this.kickMed) - this.kickMad) * 0.05;
+    } else {
+      const kStep = 0.002;
+      this.kickMed += Math.sign(kickFlux - this.kickMed) * kStep * (this.kickMed + 0.01);
+      this.kickMad += Math.sign(Math.abs(kickFlux - this.kickMed) - this.kickMad) * kStep * (this.kickMad + 0.01);
+    }
+    const kickThresh = this.kickMed + 4.5 * this.kickMad;
     const KICK_COOLDOWN = 170;                     // ms → max ~350 BPM, hindrar sub-beat-dubbelfyr
     const above = kickFlux > kickThresh && energy > 0.06;
     let kick = false;
