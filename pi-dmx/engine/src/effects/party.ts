@@ -8,8 +8,8 @@ export const party: EffectDef = {
   desc: "Färgkaos som pumpar hårt på varje taktslag.",
   render(c) {
     const hue = c.mixedSector(c.beatIdx + c.idx * 2) / 6;
-    const pump = Math.min(1, c.beatPulse * 1.0 + c.kickEnv * 0.9);   // mer kick → tightare till basen
+    const pump = Math.min(1, c.beatPulse * 1.0 + c.kickEnv * 0.9 + c.punch * 0.7);   // riktig dunk slår igenom
     const v = 0.05 + 0.95 * pump;                                     // djupare throb (mörkare mellan slagen)
-    return c.hsv(hue, 1, v);
+    return c.hsv(hue, 1 - c.punch * 0.4, v);                          // dunk → gnista mot vitt
   },
 };

@@ -19,7 +19,7 @@ export const wave: EffectDef = {
     // diskant/sång. onset.treble-glitter ligger ovanpå + en snabbare luft-shimmer
     // (onset.air) bara på udda lampor → shimmer-topp utan att flödet tappas.
     const shimmer = c.idx % 2 === 1 ? c.frame.onset.air * 0.25 : 0;
-    const v = c.shaped(0.12, base * (0.35 + c.frame.spec.bass * 0.7) + c.kickEnv * 0.2 + c.frame.onset.treble * 0.4 + shimmer);
-    return c.hsv(hue, 1, v);
+    const v = c.shaped(0.12, base * (0.35 + c.frame.spec.bass * 0.7) + c.kickEnv * 0.2 + c.frame.onset.treble * 0.4 + shimmer) + c.punch * 0.3;
+    return c.hsv(hue, 1 - c.punch * 0.25, Math.min(1, v));   // riktig dunk lyfter hela vågen kort
   },
 };

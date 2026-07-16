@@ -14,6 +14,9 @@ export const rave: EffectDef = {
     const lit = even === flip;
     const pairBase = c.mixedSector(Math.floor(c.beatIdx / 4));
     const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;
-    return c.hsv(hue, 1, lit ? 1 : 0);
+    // GOA SLAG: på en riktig dunk tänds ÄVEN den släckta gruppen kort → hela riggen
+    // slår till på basen, sen tillbaka till hård A/B. Tända gruppen gnistrar mot vitt.
+    const v = lit ? 1 : c.punch * 0.6;
+    return c.hsv(hue, lit ? 1 - c.punch * 0.5 : 1, v);
   },
 };

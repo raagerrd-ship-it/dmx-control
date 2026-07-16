@@ -31,6 +31,12 @@ export interface EffectContext {
   audio: number;
   /** Kick-/beat-envelope (0..1). */
   kickEnv: number;
+  /** BAS-PUNCH: "goa slaget" — spikar 0..1 på en riktig dunk (bas klart över sin
+   *  baslinje), noll annars. Effekten avgör själv hur hårt den ska slå. */
+  punch: number;
+  /** DROP-envelope (0..1): full under drop-fönstret, mjuk fade ut. Effekten kan
+   *  förstärka på drop; motorn lyfter INTE längre uniformt. */
+  dropEnv: number;
   /** Lampans frekvensband (bas/mellan/diskant/kick/low) 0..1. */
   band: number;
 

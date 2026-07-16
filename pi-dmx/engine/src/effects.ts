@@ -223,7 +223,8 @@ export class EffectEngine {
     if (frame.energy < this.bassBaseline) this.bassBaseline += (frame.energy - this.bassBaseline) * 0.05;
     else this.bassBaseline += (frame.energy - this.bassBaseline) * bassRise;
     const bassPunch = Math.max(0, Math.min(1, (frame.energy - this.bassBaseline - 0.05) * 4));
-    const master = this.cfg.master * this.silenceGate * beatMul * (1 + bassPunch * 0.75);
+    // Uniform bas-punch borttagen ur master — effekterna äger sitt slag via ctx.punch.
+    const master = this.cfg.master * this.silenceGate * beatMul;
     // Synlig punch: en hård basstöt (eller drop-flash) BLOOMAR färgen till full
     // styrka — inte bara ljusare master (som är osynligt när effekten redan lyser).
     // DROP-DETEKTOR: en "riktig" drop = nivån surgar upp mot låtens tak EFTER en
@@ -288,7 +289,7 @@ export class EffectEngine {
     const bRate = bTarget > this.buildUp ? dtNow / 3.5 : dtNow / 1.0;   // bygg ~3.5s, klinga ~1s
     this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
 
-    const bloom = flashActive || bassPunch > 0.45;
+    const bloom = flashActive;   // bas-punch bloomar INTE längre uniformt — effekten äger sitt slag (ctx.punch)
     const count = this.cfg.fixtures.length;
 
     // Chase state machine — kick advances one step, plus a slow auto-advance
@@ -571,7 +572,7 @@ export class EffectEngine {
     const effect = EFFECT_MAP.get(effMode);
     const ctx: EffectContext = {
       cfg: this.cfg, frame, fx: undefined, t, idx: 0, count,
-      audio, kickEnv, band: 0, gravLevel: this.gravLevel, gravPeak: this.gravPeak, drum,
+      audio, kickEnv, punch: bassPunch, dropEnv: this.dropEnv, band: 0, gravLevel: this.gravLevel, gravPeak: this.gravPeak, drum,
       beatIdx, beatFrac, beatPulse, hasBeat,
       wavePhase: this.wavePhase, buildUp: this.buildUp, phaseSpread: 1 + this.buildUp * 2.5,
       punchFloor, chasePos: this.chasePos,

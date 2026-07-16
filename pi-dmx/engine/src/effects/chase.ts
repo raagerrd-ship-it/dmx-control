@@ -11,7 +11,7 @@ export const chase: EffectDef = {
     const d = Math.abs(c.idx - c.chasePos);
     const tail = Math.exp(-d * 1.6);
     const hue = c.mixedSector(c.chasePos + Math.floor(c.t / 4)) / 6;
-    const v = Math.min(1, tail * c.shaped(0.22, 0.55 + c.audio * 0.55 + c.kickEnv * 0.5 + c.frame.onset.treble * 0.35));
-    return c.hsv(hue, 1, v);
+    const v = Math.min(1, tail * c.shaped(0.22, 0.55 + c.audio * 0.55 + c.kickEnv * 0.5 + c.frame.onset.treble * 0.35) + c.punch * 0.3);
+    return c.hsv(hue, 1 - c.punch * 0.25, v);   // riktig dunk → hela svansen blixtrar
   },
 };

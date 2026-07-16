@@ -9,7 +9,7 @@ export const snap: EffectDef = {
   desc: "Alla lampor byter färg blixtsnabbt på varje slag.",
   render(c) {
     const hue = c.mixedSector(c.beatIdx) / 6;
-    const v = Math.min(1, 0.9 + c.audio * 0.1);
-    return c.hsv(hue, 1, v);
+    const v = Math.min(1, 0.9 + c.audio * 0.1 + c.punch * 0.1);
+    return c.hsv(hue, 1 - c.punch * 0.5, v);   // riktig dunk → vit-slag
   },
 };
