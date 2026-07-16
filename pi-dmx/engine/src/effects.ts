@@ -718,22 +718,24 @@ export class EffectEngine {
       if (!cal || (cal.off <= 0 && cal.on <= 0)) continue;
       const roles = fixtureRoles(cf);
       const cbase = cf.address - 1;
-      let L = 0;   // luminans = max av lampans ljuskanaler
+      // Källa = outSmooth (FLOAT, gamma-kodat, efter ballistik+VU). Byte-universet
+      // är redan avrundat → djupdim (1% = 0.01) krossad till 0. Floaten bevarar den.
+      let L = 0;   // luminans = max av lampans ljuskanaler (float 0..255)
       for (let i = 0; i < roles.length; i++) {
         const ch = cbase + i;
-        if (ch >= 0 && ch < 512 && this.capMask[ch] && this.universe[ch] > L) L = this.universe[ch];
+        if (ch >= 0 && ch < 512 && this.capMask[ch] && this.outSmooth[ch] > L) L = this.outSmooth[ch];
       }
       if (L <= 0) continue;
-      // Mappa HELA det tända området [1..255] → [on..255] så showens lägsta nivå
-      // lyfts till LED:ns tändpunkt (on) och skalar jämnt mot full — INTE [off..255],
-      // som (pga gamma) kapade bort showens nedre ~25%. off = separat dödzon: ligger
-      // luminansen ≤ off tvingas lampan helt släckt (t.ex. tystnad → svart).
-      const gain = L <= cal.off ? 0 : (cal.on + (255 - cal.on) * L / 255) / L;
-      if (gain === 1) continue;
+      // Effektens ljusstyrka (L/255 = gamma-kodad, 0..1) mappas → [on..255]: ALLT
+      // som är tänt, ända ner mot 1%, lyfts till LED:ns tändpunkt (on) och skalar
+      // jämnt mot full. off = dödzon: luminans ≤ off (minst ~0.5 byte, = gammal
+      // avrundning-till-svart) → lampan helt släckt (fade snäpper rent till 0).
+      const dead = Math.max(cal.off, 0.5);
+      const gain = L <= dead ? 0 : (cal.on + (255 - cal.on) * L / 255) / L;
       for (let i = 0; i < roles.length; i++) {
         const ch = cbase + i;
         if (ch >= 0 && ch < 512 && this.capMask[ch]) {
-          this.universe[ch] = gain === 0 ? 0 : Math.min(255, Math.round(this.universe[ch] * gain));
+          this.universe[ch] = gain === 0 ? 0 : Math.min(255, Math.round(this.outSmooth[ch] * gain));
         }
       }
     }
