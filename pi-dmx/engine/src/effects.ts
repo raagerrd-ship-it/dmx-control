@@ -87,7 +87,8 @@ export class EffectEngine {
   /** Output ballistics: per-channel peak-hold with exponential decay — the
    *  eye sees instant attack and a soft ~0.4 s fall, whatever the modes do. */
   private outSmooth = new Float32Array(512);
-  private calSmooth = new Float32Array(512);   // kalibrerings-utgång: håll ljuset & mjuk fade NER mot släck
+  private calHoldVal = new Float32Array(512);   // släpp-håll: senaste TÄNDA kalibrerade värdet
+  private calHoldUntil = new Float32Array(512);  // släpp-håll: deadline (performance.now ms) att hålla till
   private strobeMask = new Uint8Array(512);   // 1 = hoppa ballistik (strobe-kanal)
   private capMask = new Uint8Array(512);      // 1 = VU-taket skalar denna kanal (ljusbärande: färg, annars dim)
   private strobeMaskFor: unknown = null;      // fixtures-referens masken byggdes för
@@ -738,53 +739,47 @@ export class EffectEngine {
     // svärtan reser sig rent från svart, utan pop från en kvarhållen nivå.
     if (blackout) {
       for (let ch = 0; ch < this.maxCh; ch++) {
-        if (!this.strobeMask[ch]) { this.universe[ch] = 0; this.outSmooth[ch] = 0; this.calSmooth[ch] = 0; }
+        if (!this.strobeMask[ch]) { this.universe[ch] = 0; this.outSmooth[ch] = 0; }
       }
     }
 
-    // PER-LAMPA KALIBRERING — allra sista steget, precis före output. Ren omskalning
-    // till vad lampan på den adressen fysiskt klarar. Skiter i alla andra inställningar:
-    //   0            → släckt
-    //   över 0       → skalas in i [on..255] (LED:ns tändpunkt → full)
-    // Per lampa (luminans = starkaste kanalen) så färgen bevaras. Motorn har redan
-    // bestämt av/på — 0 betyder av, resten är aktiv ljusstyrka.
-    const calRel = 1 - Math.exp(-dtSec / 0.13);   // ~130ms mjuk fade NER mot släck
+    // PER-KANAL KALIBRERING — allra sista steget, precis före output. EN ren linjär
+    // omskalning per kanal, inget annat. Motorn (inkl. VU-taket ovan) har redan
+    // bestämt av/på och ljusstyrka; här översätts bara 0..255 till vad dioden fysiskt
+    // klarar på just den adressen:
+    //   0        → 0 (släckt)
+    //   1..255   → onCh..255 (LED:ns tändpunkt → full), linjärt
+    // Ingen kanal kan hamna i dödzonen (0<v<onCh) och ballistiken sköter redan all
+    // mjuk uttoning ner till tändpunkten — så inget fade-håll/extra tröskel behövs.
+    const calNow = performance.now();
     for (const cf of this.cfg.fixtures) {
       const cal = cf.cal;
       if (!cal || !(cal.on || cal.onR || cal.onG || cal.onB || cal.onW)) continue;   // någon tröskel satt
       const on = cal.on || 0;
       const roles = fixtureRoles(cf);
       const cbase = cf.address - 1;
-      // PER-KANAL TRÖSKEL: varje R/G/B(/W/dim) är ANTINGEN 0 (av) ELLER ≥ on (över
-      // LED:ns tändpunkt). En dim BIFÄRG (0<ch<on) hamnar annars i dödzonen där just
-      // den dioden flimrar vid sin egen tändpunkt → färg-fladder. Här lyfts varje
-      // TÄND kanal till [on..255], släckt → 0 → ingen kanal i dödzonen.
-      // Fade-håll (luminans): bara när HELA lampan går mot svart hålls senaste
-      // färgen & tonas mjukt ner (~130ms). Är någon kanal tänd → sätts DIREKT
-      // (skarpa färgbyten, punch och dynamik oförändrat).
-      let anyLit = false;
-      for (let i = 0; i < roles.length; i++) {
-        const ch = cbase + i;
-        if (ch >= 0 && ch < 512 && this.capMask[ch] && this.universe[ch] > 0) { anyLit = true; break; }
-      }
       for (let i = 0; i < roles.length; i++) {
         const ch = cbase + i;
         if (ch < 0 || ch >= 512 || !this.capMask[ch]) continue;
-        const role = roles[i];
-        // Per-FÄRG-tröskel: R/G/B tänder vid olika DMX → kanalens egen om satt.
-        const onCh = (role === "r" ? cal.onR : role === "g" ? cal.onG : role === "b" ? cal.onB : role === "w" ? cal.onW : undefined) ?? on;
-        let v;
-        if (anyLit) {
-          const raw = this.universe[ch];
-          v = raw <= 0 ? 0 : onCh + (255 - onCh) * raw / 255;   // 0 eller [onCh..255]
+        const raw = this.universe[ch];
+        let out;
+        if (raw > 0) {
+          const role = roles[i];
+          // Per-FÄRG-tröskel: R/G/B tänder vid olika DMX → kanalens egen om satt.
+          const onCh = (role === "r" ? cal.onR : role === "g" ? cal.onG : role === "b" ? cal.onB : role === "w" ? cal.onW : undefined) ?? on;
+          out = Math.min(255, Math.round(onCh + (255 - onCh) * raw / 255));
+          this.calHoldVal[ch] = out;               // minns senaste tända
+          this.calHoldUntil[ch] = calNow + 120;    // håll ~120ms efter sista tända
+        } else if (calNow < this.calHoldUntil[ch]) {
+          // SLÄPP-HÅLL: raw dippade till 0 men vi är inom hålltiden → håll senaste
+          // TÄNDA (≥onCh) → mikro-0-dippar i tysta partier bryggas till stadig dim-
+          // glöd i st.f. att bruset strobar dioden 0↔onCh. Äkta tystnad (>120ms 0)
+          // faller igenom → 0, rent släckt.
+          out = this.calHoldVal[ch];
         } else {
-          v = this.calSmooth[ch] * (1 - calRel);            // hela lampan mot svart → mjuk fade
+          out = 0;
         }
-        this.calSmooth[ch] = v;
-        // Per-kanal tröskel på UTGÅNGEN: aldrig i dödzonen (0<v<onCh). Gäller ÄVEN
-        // fade-out → den släcker RENT från tändpunkten, dröjer inte i dödzonen där
-        // dioden flimrar. Under fade: håll ≥onCh tills värdet passerar under → 0.
-        this.universe[ch] = v < Math.max(0.5, onCh) ? 0 : Math.min(255, Math.round(v));
+        this.universe[ch] = out;
       }
     }
 
