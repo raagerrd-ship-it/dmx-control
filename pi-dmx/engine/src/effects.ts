@@ -370,8 +370,10 @@ export class EffectEngine {
         // DROP byter dock DIREKT — vi matchar mot exakt samma `dropHit` som driver
         // effekternas drop-accent (edge-triggad, en frame per drop → self-rate-limitad),
         // så ljus-bytet och drop-smällen är samma händelse. Övriga byten: 2.5s.
+        // Drop-byte bara när energin får driva (energyDrivesMode) → en LUGN stämning
+        // (chill: energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
         const wantSwitch = bigJump || tierChanged || now > this.smartDwellUntil;
-        if (dropHit || (wantSwitch && now - this.lastSmartSwitchMs > 2500)) {
+        if ((dropHit && this.cfg.energyDrivesMode) || (wantSwitch && now - this.lastSmartSwitchMs > 2500)) {
         this.lastSmartSwitchMs = now;
         this.lastSmartIntensity = intensity;
         this.lastSmartTier = tierName;
