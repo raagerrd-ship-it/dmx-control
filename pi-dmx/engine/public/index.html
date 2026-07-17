@@ -100,70 +100,97 @@
     .rotrow.selected .rotname { font-weight:600; }
     .rotrow .pick { flex:none; margin-left:14px; font-size:12px; opacity:.55; }
     .owner-banner { background:color-mix(in srgb, var(--hot) 14%, transparent); border:1px solid var(--hot); border-radius:10px; padding:10px 12px; margin:14px 0 4px; font-size:13px; line-height:1.4; }
+    /* Hyresgäst-vy: power + stämningar + mer-inställningar (matchar Mock-UI) */
+    .power-card { display:flex; align-items:center; gap:14px; padding:16px; border:1px solid var(--hot); border-radius:16px; background:color-mix(in srgb, var(--hot) 12%, var(--card)); cursor:pointer; margin:4px 0 4px; user-select:none; }
+    .power-card.off { border-color:var(--line); background:var(--card); }
+    .power-icon { width:52px; height:52px; border-radius:50%; background:var(--hot); display:flex; align-items:center; justify-content:center; font-size:24px; color:#fff; flex:none; transition:background .15s; }
+    .power-card.off .power-icon { background:var(--line); color:var(--dim); }
+    .power-text small { display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin-bottom:2px; }
+    .power-text b { font-size:19px; font-weight:600; }
+    .mood-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .mood-btn { padding:16px 6px 13px; background:var(--card); border:1px solid var(--line); border-radius:14px; text-align:center; cursor:pointer; transition:border-color .12s, background .12s; user-select:none; }
+    .mood-btn.active { border-color:var(--hot); background:color-mix(in srgb, var(--hot) 15%, var(--card)); }
+    .mood-btn:active { transform:scale(.97); }
+    .mood-btn .mi { font-size:24px; line-height:1; }
+    .mood-btn .mt { font-size:15px; font-weight:600; margin-top:8px; }
+    .mood-btn .ms { font-size:11px; color:var(--dim); margin-top:3px; }
+    details.more { margin-top:8px; }
+    details.more > summary { list-style:none; cursor:pointer; padding:14px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+    details.more > summary::-webkit-details-marker { display:none; }
+    details.more[open] > summary { color:var(--fg); margin-bottom:4px; }
+    details.more > summary::after { content:" ⌄"; }
+    details.more[open] > summary::after { content:" ⌃"; }
   </style>
 </head>
 <body>
-  <h1>Show</h1>
-  <div class="card">
-    <div class="status" style="margin-bottom:8px" id="showIntro">Smart-läge — anpassar ljuset efter musiken och roterar mellan de effekter du kryssat i.</div>
-    <label class="tgl"><span>Energi styr läget (av = manuellt)</span><input type="checkbox" id="tEnergy"></label>
-    <label class="tgl" id="dwellRow"><span>Byter effekt</span>
-      <span class="seg segmini" id="segDwell">
-        <button data-dwell="slow">Sällan</button><button data-dwell="normal">Normal</button><button data-dwell="fast">Ofta</button>
-      </span>
-    </label>
-    <label class="tgl"><span>Pulsa ljuset på taktslag</span><input type="checkbox" id="tBeatPulse"></label>
+  <div class="power-card" id="powerCard">
+    <div class="power-icon">⏻</div>
+    <div class="power-text"><small id="powerSmall">Ljuset är på</small><b id="powerBig">Tryck för att släcka</b></div>
   </div>
 
-  <h1>Level <span class="kick-dot" id="kickDot"></span></h1>
+  <h1>Stämning</h1>
+  <div class="mood-grid">
+    <div class="mood-btn" data-mood="chill"><div class="mi">🌙</div><div class="mt">Chill</div><div class="ms">Mjukt &amp; lugnt</div></div>
+    <div class="mood-btn" data-mood="fest"><div class="mi">🎉</div><div class="mt">Fest</div><div class="ms">Följer takten</div></div>
+    <div class="mood-btn" data-mood="galet"><div class="mi">🔥</div><div class="mt">Galet</div><div class="ms">Full fart</div></div>
+  </div>
+
+  <h1>Ljudkälla</h1>
   <div class="card">
-    <div class="row"><label>Input</label><span class="val" id="levelVal">–</span></div>
-    <div class="meter"><div id="levelBar" style="width:0%"></div></div>
-    <div class="status">Auto-gain: <span id="gainVal">–</span>×</div>
-    <div class="row" style="margin-top:8px"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
+    <div class="fx-actions" style="margin-top:0">
+      <button class="btn" id="inAux">AUX (kabel)</button>
+      <button class="btn" id="inMic">Mikrofon</button>
+    </div>
+  </div>
+
+  <h1>Ljudnivå <span class="kick-dot" id="kickDot"></span></h1>
+  <div class="card">
+    <div class="row"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
     <div class="row"><label>Beat-synk <span class="kick-dot" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
     <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
-    <div class="fx-actions" style="margin-top:10px">
-      <button class="btn" id="inAux">AUX (kabel-in)</button>
-      <button class="btn" id="inMic">Mic (inbyggd)</button>
-    </div>
+    <div class="row" style="margin-top:10px"><label>Nivå just nu</label><span class="val" id="levelVal">–</span></div>
+    <div class="meter"><div id="levelBar" style="width:0%"></div></div>
+    <div class="status">Auto-gain: <span id="gainVal">–</span>×</div>
   </div>
 
-  <h1>Lugna effekter</h1>
-  <div class="card"><div id="calmList" class="rotlist"></div></div>
+  <details class="more">
+    <summary>Mer inställningar</summary>
 
-  <h1>Effekter med fart</h1>
-  <div class="card"><div id="fastList" class="rotlist"></div></div>
+    <h1>Show</h1>
+    <div class="card">
+      <div class="status" style="margin-bottom:8px" id="showIntro">Smart-läge — anpassar ljuset efter musiken och roterar mellan de effekter du kryssat i.</div>
+      <label class="tgl"><span>Energi styr läget (av = manuellt)</span><input type="checkbox" id="tEnergy"></label>
+      <label class="tgl" id="dwellRow"><span>Byter effekt</span>
+        <span class="seg segmini" id="segDwell">
+          <button data-dwell="slow">Sällan</button><button data-dwell="normal">Normal</button><button data-dwell="fast">Ofta</button>
+        </span>
+      </label>
+      <label class="tgl"><span>Pulsa ljuset på taktslag</span><input type="checkbox" id="tBeatPulse"></label>
+    </div>
 
-  <h1>Effekter med full fart</h1>
-  <div class="card"><div id="fullList" class="rotlist"></div></div>
-
-  <h1>Inställningar</h1>
-  <div class="card">
-    <div class="setrow">
-      <label>Reaktion på musiken</label>
-      <div class="seg" id="segSpeed">
-        <button data-agg="0.15">Långsam</button>
-        <button data-agg="0.85">Snabb</button>
+    <h1>Finjustering</h1>
+    <div class="card">
+      <div class="setrow">
+        <label>Reaktion på musiken</label>
+        <div class="seg" id="segSpeed"><button data-agg="0.15">Långsam</button><button data-agg="0.85">Snabb</button></div>
+      </div>
+      <div class="setrow">
+        <label>Dynamik (tyst ↔ högt)</label>
+        <div class="seg" id="segDyn"><button data-dyn="0.35">Lugn</button><button data-dyn="0.6">Normal</button><button data-dyn="0.85">Maxad</button></div>
+      </div>
+      <div class="setrow">
+        <label>Ljusstyrka</label>
+        <div class="seg" id="segMaster"><button data-master="0.5">50%</button><button data-master="0.75">75%</button><button data-master="1">100%</button></div>
       </div>
     </div>
-    <div class="setrow">
-      <label>Dynamik (tyst ↔ högt)</label>
-      <div class="seg" id="segDyn">
-        <button data-dyn="0.35">Lugn</button>
-        <button data-dyn="0.6">Normal</button>
-        <button data-dyn="0.85">Maxad</button>
-      </div>
-    </div>
-    <div class="setrow">
-      <label>Ljusstyrka</label>
-      <div class="seg" id="segMaster">
-        <button data-master="0.5">50%</button>
-        <button data-master="0.75">75%</button>
-        <button data-master="1">100%</button>
-      </div>
-    </div>
-  </div>
+
+    <h1>Lugna effekter</h1>
+    <div class="card"><div id="calmList" class="rotlist"></div></div>
+    <h1>Effekter med fart</h1>
+    <div class="card"><div id="fastList" class="rotlist"></div></div>
+    <h1>Effekter med full fart</h1>
+    <div class="card"><div id="fullList" class="rotlist"></div></div>
+  </details>
 
   <div id="ownerOnly" hidden>
   <div class="owner-banner">🔧 Ägarläge (setup). Den här sidan är dold för hyresgäster — de öppnar adressen utan <b>/setup</b>.</div>
@@ -275,6 +302,22 @@ const inAux = document.getElementById("inAux");
 const inMic = document.getElementById("inMic");
 inAux.onclick = () => send({ type: "setAudioInput", value: "aux" });
 inMic.onclick = () => send({ type: "setAudioInput", value: "mic" });
+
+// STÄMNINGAR: ETT val → motorn sätter hela känslan (setMood). Markering styrs av
+// config.activeMood i applyConfig. En knapp släcker inte, den tänder alltid (mood
+// sätter mode=smart → häver ev. blackout).
+let lastMood = "fest";
+document.querySelectorAll(".mood-btn").forEach((b) =>
+  b.onclick = () => { lastMood = b.dataset.mood; send({ type: "setMood", value: b.dataset.mood }); });
+
+// POWER: släck hela riggen (blackout) / tänd tillbaka till senaste stämning.
+const powerCard = document.getElementById("powerCard");
+const powerSmall = document.getElementById("powerSmall");
+const powerBig = document.getElementById("powerBig");
+powerCard.onclick = () => {
+  if (curMode === "blackout") send({ type: "setMood", value: lastMood });   // tänd → senaste stämning
+  else send({ type: "setMode", mode: "blackout" });                          // släck
+};
 const connEl = document.getElementById("conn");
 
 // Inverse of server's log curve: derive aggressiveness 0..1 from tauDown seconds.
@@ -389,6 +432,13 @@ function applyConfig(cfg) {
   curRotation = cfg.rotation || {};
   curMode = cfg.mode || "smart";
   refreshModeView();                 // sätter tEnergy/dwell/intro + renderar listorna
+  // Stämnings-markering + power-läge (matchar Mock-UI).
+  document.querySelectorAll(".mood-btn").forEach((b) => b.classList.toggle("active", b.dataset.mood === cfg.activeMood));
+  if (cfg.activeMood) lastMood = cfg.activeMood;
+  const off = cfg.mode === "blackout";
+  powerCard.classList.toggle("off", off);
+  powerSmall.textContent = off ? "Ljuset är av" : "Ljuset är på";
+  powerBig.textContent = off ? "Tryck för att tända" : "Tryck för att släcka";
   tBeatPulse.checked = !!cfg.beatPulse;
   const fog = cfg.fog || {};
   if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 128; }
