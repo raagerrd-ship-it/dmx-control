@@ -580,7 +580,8 @@ export class EffectEngine {
     // (snap/rave/party/ripple/…) fortsätter dansa på trummorna även när BPM-låset
     // tappas, i st.f. att frysa på beatIdx=0. Alla effekter använder beatIdx
     // MODULÄRT (färg/grupp/position) → ren drop-in.
-    if (beatTick || (!hasBeat && frame.kick)) this.beatCounter++;
+    const beatHit = beatTick || (!hasBeat && frame.kick);   // DISKRET flank: takten gick just fram (grid-slag, annars verklig kick)
+    if (beatHit) this.beatCounter++;
     const beatIdx = this.beatCounter;
     // beatPulse: grid-puls när låst, annars den VERKLIGA kick-envelopen → pulsar
     // ALLTID på musiken. (Utan detta gav beatFrac=0 → beatPulse=1 konstant = ingen
@@ -633,7 +634,7 @@ export class EffectEngine {
     const ctx: EffectContext = {
       cfg: this.cfg, frame, fx: undefined, t, idx: 0, count,
       audio, kickEnv, punch: bassPunch, dropEnv: this.dropEnv, band: 0, gravLevel: this.gravLevel, gravPeak: this.gravPeak, drum,
-      beatIdx, beatFrac, beatPulse, hasBeat,
+      beatIdx, beatFrac, beatPulse, beatHit, hasBeat,
       wavePhase: this.wavePhase, buildUp: this.buildUp, phaseSpread: 1 + this.buildUp * 2.5,
       punchFloor, chasePos: this.chasePos,
       dropFired: this.dropFired, dropHue: this.dropHue, now: performance.now(),

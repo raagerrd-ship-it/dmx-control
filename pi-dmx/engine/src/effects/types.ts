@@ -54,6 +54,11 @@ export interface EffectContext {
   beatIdx: number;
   beatFrac: number;
   beatPulse: number;
+  /** DISKRET flank: true exakt den frame takten går fram (grid-slag när BPM är
+   *  låst, annars den verkliga kicken). En frame lång → bra för hårda kap/gnistor
+   *  och färgbyte, INTE för mjuka accenter (ballistiken dämpar en 1-frames-spik →
+   *  använd beatPulse/kickEnv för det). Fungerar även utan BPM-lås. */
+  beatHit: boolean;
   hasBeat: boolean;
 
   /** Integrerad vågfas (wave/sweep). */
