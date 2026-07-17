@@ -79,11 +79,6 @@ export class EffectEngine {
   private gravLevel = 0;         // gravitations-VU: nivå som faller med gravitation
   private gravVel = 0;           // dess hastighet
   private gravPeak = 0;          // peak-håll (sjunker långsamt)
-  // DRUM-KIT: per-band onset-envelopes (snabb attack / snabb decay) → trum-punch.
-  // Drivs av dubbel-FFT:ns adaptiva per-band-onsets (frame.onset.*).
-  private hatHit = 0;            // hi-hat-envelope (diskant-anslag, ~60ms)
-  private snareHit = 0;          // snare-envelope (highMid-anslag, ~110ms)
-  private kickHit = 0;           // kick-envelope (frame.kick + onset.kick, ~150ms)
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
@@ -602,17 +597,10 @@ export class EffectEngine {
       Math.max(0, (0.5 - audio) * 2) * 0.6,                           // "low": lugn glöd när tyst, ur vägen när högt
     ];
     const BAND_IDX = { bass: 0, mid: 1, treble: 2, kick: 3, low: 4 } as const;
-    // DRUM-KIT onset-envelopes: driv varje röst från dubbel-FFT:ns per-band
-    // ADAPTIVA onsets (redan väl-separerade i botten) → snabb attack, snabb
-    // decay så varje "trumma" punchar och slocknar i stället för att lysa jämnt.
-    // kick = frame.kick (tightad, diskret) + onset.kick för mellanslag; snare =
-    // highMid-anslag (snare-crack 2–5kHz); hat = treble-anslag (5–10kHz); bas =
-    // spec.bass (120–250Hz, NU skild från kicken). O(hat) och kick separerade.
-    this.hatHit = Math.max(this.hatHit * Math.exp(-dtSec / 0.06), frame.onset.treble);
-    this.snareHit = Math.max(this.snareHit * Math.exp(-dtSec / 0.11), frame.onset.highMid);
-    if (frame.kick) this.kickHit = 1;
-    else this.kickHit = Math.max(this.kickHit * Math.exp(-dtSec / 0.15), frame.onset.kick);
-    const drum = { kick: this.kickHit, snare: this.snareHit, hat: this.hatHit, bass: frame.spec.bass };
+    // DRUM-KIT onset-envelopes: nu FÄRDIGBERÄKNADE i analysern PÅ HOP-TAKT (375Hz)
+    // → varje anslag fångas, aldrig missat mellan två render-frames. Effekten är en
+    // ren konsument. (Flyttat hit; tau 60/110/150ms bevarade i analyser.ts.)
+    const drum = frame.drum;
     const dyn = Math.max(0, Math.min(1, this.cfg.dynamics ?? 0.6));
     const shaped = (floor: number, x: number) => {
       const f = floor * (1 - dyn);

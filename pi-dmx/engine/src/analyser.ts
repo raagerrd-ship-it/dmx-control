@@ -37,6 +37,10 @@ export interface Frame {
   /** Rikt spektrum + per-band onset (anslag) från dubbel-FFT:n (hög-upplöst). */
   spec: Spectrum;       // per-band NIVÅ (AGC 0..1)
   onset: Spectrum;      // per-band ONSET/anslag (halvvågs-flux mot adaptiv baslinje, 0..1)
+  /** TRUM-KIT-envelopes (0..1): peak-hold + decay PÅ HOP-TAKT (375Hz) → fångar
+   *  varje anslag, aldrig missat mellan två render-frames. kick=diskret kick +
+   *  onset.kick, snare=highMid-onset, hat=treble-onset, bass=spec.bass (nivå). */
+  drum: { kick: number; snare: number; hat: number; bass: number };
 }
 
 
@@ -52,7 +56,14 @@ export class Analyser {
   private mag512!: Float32Array;        // magnitud denna hop (swap:as med prevMag)
   private outSpec: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
   private outOnset: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
+  private outDrum = { kick: 0, snare: 0, hat: 0, bass: 0 };   // trum-envelopes (återanvänt)
   private outFrame!: Frame;             // ETT återanvänt Frame (muteras/hop; säkert — main-tråden läser synkront)
+  // TRUM-KIT peak-hold-envelopes (håll mellan hops). Flyttade FRÅN effects.ts render
+  // (100Hz) hit (375Hz) → fångar varje onset-topp. tau bevarade: hat 60ms / snare
+  // 110ms / kick 150ms. (Block 3 av arkitektur-refaktoreringen.)
+  private hatHit = 0;
+  private snareHit = 0;
+  private kickHit = 0;
   // --- DUBBEL-FFT: en parallell 2048-FFT enbart för effekternas ljudbild.
   //     512:an ovan sköter RMS/kick/BPM/onset ORÖRT (all tightad timing intakt);
   //     denna ger 23 Hz/bin (4× uppl. i botten) → kick och bas kan äntligen skiljas. ---
@@ -317,7 +328,7 @@ export class Analyser {
     this.outFrame = {
       level: 0, levelRaw: 0, levelVU: 0, energy: 0, mid: 0, treble: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, beatAnchorMs: 0,
-      spec: this.outSpec, onset: this.outOnset,
+      spec: this.outSpec, onset: this.outOnset, drum: this.outDrum,
     };
   }
 
@@ -533,10 +544,20 @@ export class Analyser {
       this.bandOn[b] = gated ? Math.max(0, Math.min(1, (fluxN - this.onsetBase[b] * 1.3) * 6)) : 0;
     }
     { const t = this.prevMagBig; this.prevMagBig = this.magBig; this.magBig = t; }
+    // TRUM-KIT peak-hold-envelopes PÅ HOP-TAKT (var 2.7ms) → fångar varje anslag,
+    // aldrig missat mellan två render-frames (100Hz). tau bevarade från effects.ts:
+    // hat 60ms (treble-onset O[6]) / snare 110ms (highMid-onset O[5]) / kick 150ms
+    // (diskret kick + kick-onset O[1]). bass = spec.bass-NIVÅ (L[2], ingen envelope).
+    this.hatHit = Math.max(this.hatHit * Math.exp(-dtHop / 0.06), this.bandOn[6]);
+    this.snareHit = Math.max(this.snareHit * Math.exp(-dtHop / 0.11), this.bandOn[5]);
+    if (kick) this.kickHit = 1;
+    else this.kickHit = Math.max(this.kickHit * Math.exp(-dtHop / 0.15), this.bandOn[1]);
     const L = this.bandLvl, O = this.bandOn;
     const spec = this.outSpec, onset = this.outOnset;
     spec.sub = L[0]; spec.kick = L[1]; spec.bass = L[2]; spec.lowMid = L[3]; spec.mid = L[4]; spec.highMid = L[5]; spec.treble = L[6]; spec.air = L[7];
     onset.sub = O[0]; onset.kick = O[1]; onset.bass = O[2]; onset.lowMid = O[3]; onset.mid = O[4]; onset.highMid = O[5]; onset.treble = O[6]; onset.air = O[7];
+    const dr = this.outDrum;
+    dr.kick = this.kickHit; dr.snare = this.snareHit; dr.hat = this.hatHit; dr.bass = L[2];
 
     // Mutera det återanvända Frame:t (spec/onset pekar redan på outSpec/outOnset).
     const f = this.outFrame;
