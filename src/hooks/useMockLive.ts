@@ -76,6 +76,7 @@ export function useMockLive() {
 
       // === Ljudkälla: riktig mic (om aktiv) eller syntetisk fejksignal ===
       let rawEnergy: number;
+      let beatNow = false;
       if (mic.current.active) {
         // Blanda RMS (dynamik) + basviktad spektral-energi (kick-känsla).
         const m = mic.current.level * 0.6 + mic.current.energy * 0.8;
@@ -83,14 +84,11 @@ export function useMockLive() {
       } else {
         const base = 0.25 + 0.15 * Math.sin(t * 1.4);
         let beatSpike = 0;
-        let beatNow = false;
         if (t >= nextBeat.current) {
           beatSpike = 0.7 + Math.random() * 0.3;
           nextBeat.current += BEAT_PERIOD;
           beatNow = true;
         }
-        // Pulsa `beat`-flaggan en frame när taktslaget går fram (rensas nedan).
-        if (beatNow) st.setBeat(true);
 
         if (t >= nextDrop.current) {
           dropUntil.current = t + 1.5;
@@ -100,6 +98,8 @@ export function useMockLive() {
         const noise = Math.random() * 0.05;
         rawEnergy = Math.min(1, Math.max(0, (base + beatSpike * 0.6 + dropBoost + noise) * (0.5 + sens)));
       }
+      // Ren en-frame-puls (matchar engine's `frame.beat`).
+      st.setBeat(beatNow);
 
       // === Spectral flux → onset ===
       const flux = Math.max(0, rawEnergy - prevEnergy.current);
