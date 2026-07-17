@@ -24,6 +24,7 @@ const FEEL: Record<MoodId, {
   dropBlackout: boolean; // kort kolsvart just före drop-explosionen
   clubMode: boolean;     // kvadrera VU-taket → extra hård kontrast
   ambientGlow: boolean;  // varm vilo-glöd i tystnad (annars helt mörkt)
+  energyDrivesMode: boolean; // låt energin driva effekt-BYTEN (av = byter bara på dwell-timern → lugnt)
   smartDwellMs: number;  // hur ofta smart byter effekt (lägre = piggare)
   master: number;        // ljus-tak (0..1): hela riggens max-styrka
   calmDecay: number;     // output-decay (s) för lugna/fart-effekter: högre = trögare,
@@ -34,9 +35,9 @@ const FEEL: Record<MoodId, {
   riserStrobe: boolean;   // accelererande strobe + vit-kollaps under uppbyggnad → drama
   dropHeadroom: boolean;  // normal ≤90%, drops → 100% (drops poppar hårdare)
 }> = {
-  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  smartDwellMs: 40000, master: 0.30, calmDecay: 1.20, energyCeiling: true, riserStrobe: false, dropHeadroom: false },
-  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, smartDwellMs: 9000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: false, dropHeadroom: false },
-  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, smartDwellMs: 6000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: true,  dropHeadroom: true  },
+  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  energyDrivesMode: false, smartDwellMs: 40000, master: 0.30, calmDecay: 1.20, energyCeiling: true, riserStrobe: false, dropHeadroom: false },
+  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 9000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: false, dropHeadroom: false },
+  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 6000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: true,  dropHeadroom: true  },
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -50,7 +51,7 @@ export function isMood(v: unknown): v is MoodId {
 export function applyMood(cfg: EngineConfig, mood: MoodId): void {
   const f = FEEL[mood];
   cfg.mode = "smart";              // stämningarna följer alltid musiken
-  cfg.energyDrivesMode = true;
+  cfg.energyDrivesMode = f.energyDrivesMode;   // chill: av → byter effekt bara på dwell
   cfg.dynamics = f.dynamics;
   cfg.sensitivity = f.sensitivity;
   cfg.beatPulse = f.beatPulse;
