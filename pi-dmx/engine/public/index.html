@@ -69,6 +69,9 @@
     .fx-cal-badge { font-size: 12px; color: var(--ok); font-variant-numeric: tabular-nums; }
     .fx-cal-badge.unset { color: var(--dim); }
     .fx-cal-hint { font-size: 12px; color: var(--dim); line-height: 1.45; margin: 6px 0 10px; }
+    .fx-cal-chips { display: flex; gap: 6px; margin: 8px 0 6px; }
+    .fx-cal-chip { flex: 1; padding: 7px 0; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--dim); font-size: 13px; font-weight: 600; cursor: pointer; }
+    .fx-cal-chip.on { background: var(--ok); color: #06110c; border-color: var(--ok); }
     .fx-cal input[type=range] { width: 100%; accent-color: var(--ok); height: 26px; }
     .fx-cal-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; }
     .fx-cal-live { font-size: 13px; color: var(--fg); font-variant-numeric: tabular-nums; }
@@ -469,6 +472,7 @@ const fxHint = document.getElementById("fxHint");
 let fxDraft = [];
 let fxDirty = false;
 let calTestActive = false;   // true medan kalibrerings-slidern dras → hoppa över omritning
+const calSel = {};           // per lampa: vald kalibrerings-färg ("all"/"r"/"g"/"b")
 let identifyingIndex = -1;    // -1 = no identify in progress
 const deepClone = (x) => JSON.parse(JSON.stringify(x));
 const rolesOf = (fx) => fx.preset === "custom" ? (fx.roles ?? []) : PRESET_ROLES[fx.preset];
@@ -516,7 +520,10 @@ function renderFixtures() {
     div.className = "fx" + (fxDirty ? " dirty" : "")
                   + (errByIdx.has(i) ? " err" : "")
                   + (i === identifyingIndex ? " identifying" : "");
-    const litFrom = fx.cal?.on ?? 0;
+    const _c = fx.cal;
+    const calBadge = (_c && (_c.on || _c.onR || _c.onG || _c.onB))
+      ? [_c.on ? `alla ${_c.on}` : "", _c.onR ? `R${_c.onR}` : "", _c.onG ? `G${_c.onG}` : "", _c.onB ? `B${_c.onB}` : ""].filter(Boolean).join(" · ")
+      : "ej satt";
     div.innerHTML = `
       <div class="fx-head">
         <input class="name" type="text" value="${escapeHtml(fx.name)}" data-i="${i}" data-k="name" />
@@ -526,13 +533,16 @@ function renderFixtures() {
       <div class="fx-cal">
         <div class="fx-cal-head">
           <span class="fx-cal-title">Lägsta ljus</span>
-          <span class="fx-cal-badge ${litFrom > 0 ? "" : "unset"}" data-cal-badge="${i}">${litFrom > 0 ? `satt: ${litFrom}` : "ej satt"}</span>
+          <span class="fx-cal-badge ${calBadge === "ej satt" ? "unset" : ""}" data-cal-badge="${i}">${calBadge}</span>
         </div>
-        <div class="fx-cal-hint">Dra reglaget tills lampan <b>precis tänder</b> och tryck spara. Då dimrar showen jämnt ner till just den punkten i stället för att slockna för tidigt.</div>
+        <div class="fx-cal-hint">Välj färg, dra tills <b>just den</b> precis tänder, tryck spara. <b>Alla</b> = gemensam tröskel · R/G/B = per färg (dioderna tänder vid olika DMX).</div>
+        <div class="fx-cal-chips">
+          ${["all","r","g","b"].map((c) => `<button type="button" class="fx-cal-chip${(calSel[i] || "all") === c ? " on" : ""}" data-cal-ch="${c}" data-cal-ch-i="${i}">${({all:"Alla",r:"R",g:"G",b:"B"})[c]}</button>`).join("")}
+        </div>
         <input type="range" min="0" max="64" value="0" step="1" data-caltest-i="${i}" />
         <div class="fx-cal-row">
           <span class="fx-cal-live" data-caltest-val="${i}">reglaget: av</span>
-          <button type="button" class="fx-cal-btn" data-cal-set="on" data-cal-set-i="${i}">Spara som lägsta</button>
+          <button type="button" class="fx-cal-btn" data-cal-set="on" data-cal-set-i="${i}">Spara</button>
         </div>
       </div>
       <details class="fx-adv">
@@ -599,16 +609,32 @@ function renderFixtures() {
       calTestActive = v > 0;   // pausa omritning medan man drar (annars nollas reglaget)
       const valEl = fxEl.querySelector(`[data-caltest-val="${i}"]`);
       if (valEl) valEl.textContent = v === 0 ? "reglaget: av" : `reglaget: DMX ${v} · ${Math.round(v / 255 * 100)}%`;
-      send({ type: "setCalTest", index: v > 0 ? i : -1, value: v });
+      send({ type: "setCalTest", index: v > 0 ? i : -1, value: v, channel: calSel[i] || "all" });
     });
   });
-  // Spara lägsta: fångar reglagets nuvarande värde som lampans tändtröskel.
+  // Färgval: byt vilken färg testet driver (live) så man kalibrerar en diod i taget.
+  fxEl.querySelectorAll("[data-cal-ch]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      const i = Number(e.target.dataset.calChI);
+      const ch = e.target.dataset.calCh;
+      calSel[i] = ch;
+      fxEl.querySelectorAll(`[data-cal-ch-i="${i}"]`).forEach((b) => b.classList.toggle("on", b.dataset.calCh === ch));
+      const slider = fxEl.querySelector(`[data-caltest-i="${i}"]`);
+      const v = slider ? (parseInt(slider.value, 10) || 0) : 0;
+      calTestActive = v > 0;
+      send({ type: "setCalTest", index: v > 0 ? i : -1, value: v, channel: ch });   // byt färg live
+    });
+  });
+  // Spara: fångar reglagets värde som tröskel för VALD färg (Alla → gemensam on).
   fxEl.querySelectorAll("[data-cal-set]").forEach((el) => {
     el.addEventListener("click", (e) => {
       const i = Number(e.target.dataset.calSetI);
+      const ch = calSel[i] || "all";
       const slider = fxEl.querySelector(`[data-caltest-i="${i}"]`);
       const v = slider ? (parseInt(slider.value, 10) || 0) : 0;
-      if (v > 0) fxDraft[i].cal = { off: 0, on: v }; else delete fxDraft[i].cal;
+      const cal = fxDraft[i].cal ?? { off: 0, on: 0 };
+      if (ch === "all") cal.on = v; else cal["on" + ch.toUpperCase()] = v;   // onR/onG/onB
+      if (!cal.on && !cal.onR && !cal.onG && !cal.onB && !cal.onW) delete fxDraft[i].cal; else fxDraft[i].cal = cal;
       calTestActive = false;
       send({ type: "setCalTest", index: -1, value: 0 });   // klar → tillbaka till showen
       markDirty();   // ritar om → badgen visar nya värdet, reglaget nollas

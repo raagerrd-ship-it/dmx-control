@@ -288,7 +288,8 @@ export async function startServer(
             const idx = Math.floor(Number(msg.index));
             if (Number.isFinite(idx) && idx >= 0 && idx < deps.cfg.fixtures.length) {
               stopIdentify();
-              deps.cfg.calTest = { index: idx, value: Math.max(0, Math.min(255, Math.floor(Number(msg.value)) || 0)) };
+              const chSel = (["all", "r", "g", "b", "w"].includes(msg.channel as string) ? msg.channel : "all") as "all" | "r" | "g" | "b" | "w";
+              deps.cfg.calTest = { index: idx, value: Math.max(0, Math.min(255, Math.floor(Number(msg.value)) || 0)), channel: chSel };
             } else {
               deps.cfg.calTest = null;
             }
@@ -413,7 +414,10 @@ function sanitizeFixtures(input: unknown[]): FixtureConfig[] | null {
       const cr = r.cal as Record<string, unknown>;
       const clampByte = (x: unknown) => Math.max(0, Math.min(255, Math.floor(Number(x)) || 0));
       const off = clampByte(cr.off), on = clampByte(cr.on);
-      if (off > 0 || on > 0) cal = { off, on };
+      // Per-färg-trösklar (valfria): bara med om satta (>0).
+      const perCol: Record<string, number> = {};
+      for (const k of ["onR", "onG", "onB", "onW"] as const) { const v = clampByte(cr[k]); if (v > 0) perCol[k] = v; }
+      if (off > 0 || on > 0 || Object.keys(perCol).length) cal = { off, on, ...perCol };
     }
     const fx: FixtureConfig = { name, address, preset, ...(roles ? { roles } : {}), ...(bandsArr?.length ? { bands: bandsArr } : {}), ...(cal ? { cal } : {}) };
 

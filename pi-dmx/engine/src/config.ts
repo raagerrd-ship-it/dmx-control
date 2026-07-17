@@ -27,10 +27,11 @@ export interface FixtureConfig {
    *  Empty/unset = auto by list order. */
   bands?: ("bass" | "mid" | "treble" | "kick" | "low")[];
   /** Per-lampa ljus-kalibrering (DMX 0..255) på de ljusbärande kanalerna.
-   *  off = SVARTPUNKT: utvärde ≤ off → helt släckt (dödar läckglöd).
-   *  on  = TÄNDTRÖSKEL: minsta tända värde lyfts till on (LED:ns faktiska
-   *        tändpunkt) → dim-toningar syns jämnt. Utelämnad = ingen kalibrering. */
-  cal?: { off: number; on: number };
+   *  on  = TÄNDTRÖSKEL: minsta tända värde lyfts till on (LED:ns tändpunkt) →
+   *        dim-toningar syns jämnt, ingen kanal i dödzonen. off (svartpunkt) legacy.
+   *  onR/onG/onB/onW = valfria PER-FÄRG-trösklar (R/G/B tänder vid olika DMX). En
+   *        kanal använder sin egen tröskel om satt, annars gemensamma `on`. */
+  cal?: { off: number; on: number; onR?: number; onG?: number; onB?: number; onW?: number };
 }
 
 export interface EngineConfig {
@@ -78,8 +79,9 @@ export interface EngineConfig {
   identify?: { index: number } | null;
   /** Transient kalibrerings-test — not persisted. Tvingar fixture[index] till ett
    *  rått DMX-värde (0..255) på ljuskanalerna, bypassar show/VU/cal → hitta exakt
-   *  tänd/släck-punkt. index<0 = av. */
-  calTest?: { index: number; value: number } | null;
+   *  tänd/släck-punkt. index<0 = av. channel = vilken färg testet driver ("all"
+   *  = alla lika, annars bara r/g/b/w → kalibrera per färg). */
+  calTest?: { index: number; value: number; channel?: "all" | "r" | "g" | "b" | "w" } | null;
   /** Transient SmartSync flash override (wall-clock ms) — not persisted. */
   flashUntil?: number | null;
   /** Transient SmartSync beat clock (BPM + wall-clock anchor) — not persisted. */

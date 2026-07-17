@@ -193,12 +193,14 @@ export class EffectEngine {
       const roles = fixtureRoles(cf);
       const cbase = cf.address - 1;
       const val = Math.max(0, Math.min(255, Math.round(ct.value)));
+      const chSel = ct.channel ?? "all";   // vilken färg testet driver (kalibrera per färg)
       for (let i = 0; i < roles.length; i++) {
         const role = roles[i];
-        if (role === "r" || role === "g" || role === "b" || role === "w" || role === "dim") {
-          const ch = cbase + i;
-          if (ch >= 0 && ch < 512) this.universe[ch] = val;
-        }
+        if (role !== "r" && role !== "g" && role !== "b" && role !== "w" && role !== "dim") continue;
+        const ch = cbase + i;
+        if (ch < 0 || ch >= 512) continue;
+        // Driv bara vald färg (all = alla lika). dim = enfärgs-dimmer → alltid.
+        this.universe[ch] = (chSel === "all" || role === chSel || role === "dim") ? val : 0;
       }
       return this.universe;
     }
@@ -749,8 +751,8 @@ export class EffectEngine {
     const calRel = 1 - Math.exp(-dtSec / 0.13);   // ~130ms mjuk fade NER mot släck
     for (const cf of this.cfg.fixtures) {
       const cal = cf.cal;
-      if (!cal || !cal.on) continue;
-      const on = cal.on;
+      if (!cal || !(cal.on || cal.onR || cal.onG || cal.onB || cal.onW)) continue;   // någon tröskel satt
+      const on = cal.on || 0;
       const roles = fixtureRoles(cf);
       const cbase = cf.address - 1;
       // PER-KANAL TRÖSKEL: varje R/G/B(/W/dim) är ANTINGEN 0 (av) ELLER ≥ on (över
@@ -771,7 +773,11 @@ export class EffectEngine {
         let v;
         if (anyLit) {
           const raw = this.universe[ch];
-          v = raw <= 0 ? 0 : on + (255 - on) * raw / 255;   // 0 eller [on..255], per kanal
+          const role = roles[i];
+          // Per-FÄRG-tröskel: R/G/B tänder vid olika DMX → använd kanalens egen om
+          // satt, annars gemensamma on. Så blått lyfts högre än rött om det behövs.
+          const onCh = (role === "r" ? cal.onR : role === "g" ? cal.onG : role === "b" ? cal.onB : role === "w" ? cal.onW : undefined) ?? on;
+          v = raw <= 0 ? 0 : onCh + (255 - onCh) * raw / 255;   // 0 eller [onCh..255]
         } else {
           v = this.calSmooth[ch] * (1 - calRel);            // hela lampan mot svart → mjuk fade
         }
