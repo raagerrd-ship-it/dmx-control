@@ -88,6 +88,9 @@ export interface EngineConfig {
   calTest?: { index: number; value: number; channel?: "all" | "r" | "g" | "b" | "w" } | null;
   /** Transient beat clock (BPM + wall-clock anchor) — not persisted. */
   beat?: { anchorMs: number; bpm: number } | null;
+  /** Transient PLL-fasfel (-0.25..0.25 av en takt), utjämnat — för UI:ts beat-synk-
+   *  indikator (ser hur mycket fasen justeras). Ej persisterad. */
+  beatErr?: number;
   /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */
   dmxMaxHz: number;
   /** Rökmaskin (1 DMX-kanal). Blast på drop, med duty-cycle-skydd. */

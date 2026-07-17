@@ -66,7 +66,7 @@ capture.on("chunk", (samples: Float32Array) => {
   // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
   // (om)lås; att sätta det på varje kick fick pulsen att flimra.
   const effBpm = frame.bpm;
-  if (effBpm === 0) cfg.beat = null;   // tyst → stoppa beat-effekter direkt
+  if (effBpm === 0) { cfg.beat = null; cfg.beatErr = 0; }   // tyst → stoppa beat-effekter direkt
   if (effBpm > 0) {
     if (!cfg.beat || Math.abs(cfg.beat.bpm - effBpm) > 2) {
       let anchor = frame.beatAnchorMs || Date.now();
@@ -97,7 +97,11 @@ capture.on("chunk", (samples: Float32Array) => {
       const conf = frame.bpmConfidence ?? 0;
       let k = k0 * (0.3 + 1.4 * conf);          // conf 0→×0.3, 0.5→×1.0, 1→×1.7
       if (k > 0.4) k = 0.4; else if (k < 0.03) k = 0.03;
-      if (k0 > 0 && Math.abs(err) < 0.25) cfg.beat.anchorMs += err * beatMs * k;
+      const onBeat = Math.abs(err) < 0.25;      // off-beat/synkoperade slag räknas ej
+      // Live fasfel för UI: hur långt slaget låg från gridet (-0.25..0.25 av en takt),
+      // lätt utjämnat. Nära 0 = tight låst; ihållande avvikelse = PLL:en drar in fasen.
+      if (onBeat) cfg.beatErr = (cfg.beatErr ?? 0) * 0.6 + err * 0.4;
+      if (k0 > 0 && onBeat) cfg.beat.anchorMs += err * beatMs * k;
     }
   }
   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så

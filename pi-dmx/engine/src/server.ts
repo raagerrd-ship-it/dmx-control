@@ -283,6 +283,7 @@ export async function startServer(
             bpm: frame.bpm,
             bpmConfidence: frame.bpmConfidence,
             beat,
+            beatErr: deps.cfg.beatErr ?? 0,
             mode: deps.getActiveMode(),
           }));
 

@@ -431,8 +431,18 @@ function applyFrame(f) {
   // Live beat-diagnostik under LEVEL
   const locked = typeof f.bpm === "number" && f.bpm > 0;
   bpmVal.textContent = locked ? Math.round(f.bpm) + " BPM" : "–";
-  beatSyncVal.textContent = locked ? "Låst" : "Söker";
-  beatSyncVal.style.color = locked ? "var(--ok)" : "var(--dim)";
+  // Beat-synk = PLL:ens fasfel i ms: hur långt slagen ligger från gridet just nu.
+  // 0 = tight låst (grön); växer när den justerar (gul); långt av (röd). Rör sig
+  // mot 0 medan den drar in fasen → man SER att den jobbar.
+  if (locked) {
+    const errMs = Math.round((f.beatErr || 0) * (60000 / f.bpm));
+    const a = Math.abs(errMs);
+    beatSyncVal.textContent = (errMs > 0 ? "+" : errMs < 0 ? "−" : "±") + a + " ms";
+    beatSyncVal.style.color = a <= 12 ? "var(--ok)" : a <= 40 ? "var(--warn)" : "var(--hot)";
+  } else {
+    beatSyncVal.textContent = "söker…";
+    beatSyncVal.style.color = "var(--dim)";
+  }
   confVal.textContent = typeof f.bpmConfidence === "number" ? Math.round(f.bpmConfidence * 100) + "%" : "–";
   if (f.beat) {   // beat-lås-prick: pulsa på varje takt
     beatDot.classList.add("on");
