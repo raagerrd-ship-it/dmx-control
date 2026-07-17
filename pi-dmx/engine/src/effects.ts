@@ -96,6 +96,7 @@ export class EffectEngine {
   private smartCount = 0;
   private lastSmartIntensity = 0;
   private lastSmartTier = "";
+  private lastSmartSwitchMs = 0;   // tidsstämpel för senaste effektbyte → minsta-intervall
   private activeMode: Mode = "smart";
   // Regi-lager: fras-räknare + aktiv palett (byts var N:e takt).
   private phraseBeat = 0;
@@ -396,7 +397,15 @@ export class EffectEngine {
         const delta = intensity - this.lastSmartIntensity;
         const bigJump = this.cfg.energyDrivesMode && (delta > 0.1 || delta < -0.18);
         const tierChanged = this.cfg.energyDrivesMode && tierName !== this.lastSmartTier;
-        if (bigJump || tierChanged || now > this.smartDwellUntil) {
+        // MINSTA-INTERVALL mellan byten → dödar snabb-bytandet (bigJump/tierChanged
+        // kan annars fyra flera ggr/s under en ramp eller vid en tier-gräns). En äkta
+        // DROP (in i Full Fart från lägre tier) byter dock nästan direkt — bara ett
+        // kort 0.8s-tak som skydd mot flimmer precis på gränsen. Övriga byten: 2.5s.
+        const enteringFull = tier === FULLFART && this.lastSmartTier !== "full";
+        const minInterval = enteringFull ? 800 : 2500;
+        const wantSwitch = bigJump || tierChanged || now > this.smartDwellUntil;
+        if (wantSwitch && now - this.lastSmartSwitchMs > minInterval) {
+        this.lastSmartSwitchMs = now;
         this.lastSmartIntensity = intensity;
         this.lastSmartTier = tierName;
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
