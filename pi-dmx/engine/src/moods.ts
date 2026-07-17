@@ -29,10 +29,14 @@ const FEEL: Record<MoodId, {
   calmDecay: number;     // output-decay (s) för lugna/fart-effekter: högre = trögare,
                          //   ljuset tonar långsamt = "långsam reaktion". (fart-lägen
                          //   har egen kort decay; detta rör calm/fart.)
+  // ── Regi (pro) — anpassas per stämning (scenicAnchor lämnas till ägaren; layout-beroende) ──
+  energyCeiling: boolean; // dynamiskt VU-ljustak (styrka följer sektionsenergin)
+  riserStrobe: boolean;   // accelererande strobe + vit-kollaps under uppbyggnad → drama
+  dropHeadroom: boolean;  // normal ≤90%, drops → 100% (drops poppar hårdare)
 }> = {
-  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  smartDwellMs: 20000, master: 0.55, calmDecay: 0.80 },
-  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, smartDwellMs: 9000,  master: 1.00, calmDecay: 0.42 },
-  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, smartDwellMs: 6000,  master: 1.00, calmDecay: 0.42 },
+  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  smartDwellMs: 20000, master: 0.55, calmDecay: 0.80, energyCeiling: true, riserStrobe: false, dropHeadroom: false },
+  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, smartDwellMs: 9000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: false, dropHeadroom: false },
+  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, smartDwellMs: 6000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: true,  dropHeadroom: true  },
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -56,6 +60,9 @@ export function applyMood(cfg: EngineConfig, mood: MoodId): void {
   cfg.smartDwellMs = f.smartDwellMs;
   cfg.master = f.master;           // ljus-tak
   cfg.calmDecay = f.calmDecay;      // reaktions-tröghet (output-decay)
+  cfg.energyCeiling = f.energyCeiling;   // Regi (pro): VU-ljustak
+  cfg.riserStrobe = f.riserStrobe;       // Regi (pro): uppbyggnads-strobe
+  cfg.dropHeadroom = f.dropHeadroom;     // Regi (pro): drop-pop
   // Rotation: bara stämningens pool aktiv (allt annat AV → smart väljer bara ur poolen).
   const pool = new Set<Mode>(POOL[mood]);
   const rot: Partial<Record<Mode, boolean>> = {};
