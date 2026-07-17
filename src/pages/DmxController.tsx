@@ -164,19 +164,29 @@ function AudioMeterCard() {
   const kick = useDmx((st) => st.kick);
   const bpm = useDmx((st) => st.bpm);
   const conf = useDmx((st) => st.bpmConfidence);
+  const beat = useDmx((st) => st.beat);
   const pct = Math.round(audio * 100);
   const confPct = Math.round(conf * 100);
   const locked = bpm > 0 && conf >= 0.5;
   const confLabel = conf < 0.3 ? "Söker" : conf < 0.6 ? "Osäker" : conf < 0.85 ? "Stabil" : "Låst";
   return (
     <Section title="Ljudnivå">
-      {/* BPM + confidence */}
+      {/* BPM + beat-lås-prick + confidence */}
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-baseline gap-1.5">
           <span className="text-[22px] font-semibold tabular-nums leading-none">
             {bpm > 0 ? Math.round(bpm) : "—"}
           </span>
           <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">BPM</span>
+          <span
+            className="w-2 h-2 rounded-full inline-block ml-1 transition-all duration-100"
+            style={{
+              background: beat && locked ? "hsl(var(--accent))" : "hsl(var(--muted))",
+              boxShadow: beat && locked ? "0 0 10px hsl(var(--accent))" : "none",
+              transform: beat && locked ? "scale(1.4)" : "scale(1)",
+            }}
+            aria-label={beat ? "taktslag" : ""}
+          />
         </div>
         <div className="flex items-center gap-2 min-w-0 flex-1 ml-4">
           <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden">
@@ -196,6 +206,7 @@ function AudioMeterCard() {
           </span>
         </div>
       </div>
+
 
       <div className="flex justify-between items-center mb-1.5">
         <span className="text-[13px] text-muted-foreground flex items-center gap-2">
@@ -249,6 +260,8 @@ function MoreSections() {
                   const next = enabled[(idx + 1) % enabled.length];
                   // simulera hopp genom att stänga av+på nuvarande så cycle-hooken re-syncar
                   if (next) setRotation(next, true);
+                  // Manuellt val → nolla aktiv stämning (matchar engine: setMode nollar activeMood).
+                  setPi({ scene: null });
                 }}
                 className="py-2.5 px-4 rounded-[10px] border border-border bg-card text-[13px] font-semibold"
               >
