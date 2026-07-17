@@ -45,6 +45,14 @@ export class Analyser {
   private window: Float32Array;
   private buffer: Float32Array;      // sliding FFT window
   private prevMag: Float32Array;     // for flux
+  // --- Pre-allokerade scratchpads för 512-FFT + utdata (GC-skydd: process()
+  //     allokerade ~7KB/hop → ~2.6 MB/s skräp @375Hz. Nu 0 alloc/hop). ---
+  private windowed512!: Float32Array;   // fönstrad tidssignal (scratch)
+  private spectrum512!: number[];       // fft.js komplex-spektrum (scratch)
+  private mag512!: Float32Array;        // magnitud denna hop (swap:as med prevMag)
+  private outSpec: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
+  private outOnset: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
+  private outFrame!: Frame;             // ETT återanvänt Frame (muteras/hop; säkert — main-tråden läser synkront)
   // --- DUBBEL-FFT: en parallell 2048-FFT enbart för effekternas ljudbild.
   //     512:an ovan sköter RMS/kick/BPM/onset ORÖRT (all tightad timing intakt);
   //     denna ger 23 Hz/bin (4× uppl. i botten) → kick och bas kan äntligen skiljas. ---
@@ -81,6 +89,11 @@ export class Analyser {
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
 
   private bpmHist: number[] = [];   // senaste råestimat (~3s) för median-stabilisering
+  // Pre-allokerade scratchpads för computeBpm (GC-skydd; annars 4× Float32Array/anrop).
+  private envScratch = new Float32Array(Analyser.ENV_LEN);
+  private envPosScratch = new Float32Array(Analyser.ENV_LEN);
+  private acScratch = new Float32Array(Analyser.ENV_LEN);
+  private pulseScratch = new Float32Array(Analyser.ENV_LEN);
   private silentMs = 0;
   private beatAnchorMs = 0;
   // #2 sub-hop fas: kick-flankens flux-topp ligger sällan exakt på en hop. Vi
@@ -134,7 +147,7 @@ export class Analyser {
                                        //  långsammare spår låser på overton tills fönstret växer),
                                        //  förfinas löpande. Halverar time-to-first-lock.
     const N = this.envFilled;
-    const env = new Float32Array(N);
+    const env = this.envScratch;   // pre-allokerad (index 0..N-1)
     let mean = 0;
     const start = (this.envPos - N + Analyser.ENV_LEN) % Analyser.ENV_LEN;
     for (let i = 0; i < N; i++) { env[i] = this.envRing[(start + i) % Analyser.ENV_LEN]; mean += env[i]; }
@@ -151,7 +164,7 @@ export class Analyser {
     //    korrelera envelopen mot en idealiserad pulsserie vid bästa fas. Fångar
     //    regelbundenheten även när AC är utsmetad (mjuka onsets, synkoperingar).
     // 4) PERCEPTUELL PRIOR: log-Gauss runt 120 BPM, σ = 1.0 oktav (Ellis/librosa).
-    const ac = new Float32Array(lagMax + 1);
+    const ac = this.acScratch;   // pre-allokerad (index lagMin..lagMax skrivs/läses)
     for (let lag = lagMin; lag <= lagMax; lag++) {
       let sum = 0;
       const M = N - lag;
@@ -159,10 +172,10 @@ export class Analyser {
       ac[lag] = sum / M;
     }
     // Halvvågsrektifierad envelope (positiv del) — pulse xcorr använder bara energi PÅ slaget.
-    const envPos = new Float32Array(N);
+    const envPos = this.envPosScratch;   // pre-allokerad (index 0..N-1)
     for (let i = 0; i < N; i++) envPos[i] = env[i] > 0 ? env[i] : 0;
     // Pulse-train xcorr per lag: max över fas av Σ envPos[φ + k·L], normaliserad per antal pulser.
-    const pulse = new Float32Array(lagMax + 1);
+    const pulse = this.pulseScratch;   // pre-allokerad (index lagMin..lagMax)
     let pulseMax = 1e-9, combMax = 1e-9;
     for (let lag = lagMin; lag <= lagMax; lag++) {
       let best = 0;
@@ -281,6 +294,9 @@ export class Analyser {
     this.window = hannWindow(cfg.fft.size);
     this.buffer = new Float32Array(cfg.fft.size);
     this.prevMag = new Float32Array(cfg.fft.size / 2);
+    this.windowed512 = new Float32Array(cfg.fft.size);
+    this.spectrum512 = this.fft.createComplexArray();
+    this.mag512 = new Float32Array(cfg.fft.size / 2);
     this.envelope = cfg.detection.autoGainTarget;
     // Dubbel-FFT: 2048 för hög låg-uppl. Egen buffert, matas samma hop-chunks.
     const BIG = 2048;
@@ -297,6 +313,12 @@ export class Analyser {
       this.bandHi[b] = Math.min(BIG / 2, Math.round(Analyser.BAND_HZ[b + 1] / binHzBig));
       this.bandPeak[b] = 1e-4;   // seed → själv-kalibrerar inom ~1s
     }
+    // Ett återanvänt Frame (spec/onset pekar på de pre-allokerade objekten).
+    this.outFrame = {
+      level: 0, levelRaw: 0, levelVU: 0, energy: 0, mid: 0, treble: 0, centroid: 0, flux: 0,
+      kick: false, gain: 1, bpm: 0, bpmConfidence: 0, beatAnchorMs: 0,
+      spec: this.outSpec, onset: this.outOnset,
+    };
   }
 
   /** Feed a hop-sized chunk of mono samples, get a frame back. */
@@ -306,10 +328,10 @@ export class Analyser {
     this.buffer.copyWithin(0, hop);
     this.buffer.set(samples, this.buffer.length - hop);
 
-    // Windowed FFT
-    const windowed = new Float32Array(this.cfg.fft.size);
+    // Windowed FFT (pre-allokerade scratchpads → ingen alloc/hop)
+    const windowed = this.windowed512;
     for (let i = 0; i < windowed.length; i++) windowed[i] = this.buffer[i] * this.window[i];
-    const spectrum = this.fft.createComplexArray();
+    const spectrum = this.spectrum512;
     this.fft.realTransform(spectrum, windowed);
 
     // RMS on raw (un-windowed) buffer — cheaper and more stable for auto-gain
@@ -317,9 +339,9 @@ export class Analyser {
     for (let i = 0; i < this.buffer.length; i++) sumSq += this.buffer[i] * this.buffer[i];
     const rms = Math.sqrt(sumSq / this.buffer.length);
 
-    // Magnitude spectrum + bass band
+    // Magnitude spectrum + bass band (mag återanvänds; swap:as med prevMag nedan)
     const half = this.cfg.fft.size / 2;
-    const mag = new Float32Array(half);
+    const mag = this.mag512;
     let bassEnergy = 0;
     let midEnergy = 0;
     let trebleEnergy = 0;
@@ -347,7 +369,8 @@ export class Analyser {
       }
       magSum += mag[i]; magW += i * mag[i];          // centroid = viktad medelfrekvens
     }
-    this.prevMag = mag;
+    // Swap: denna hops magnitud blir nästa hops prevMag (zero-copy, ingen alloc).
+    { const t = this.prevMag; this.prevMag = this.mag512; this.mag512 = t; }
     // Gain-compensated like `level` — otherwise the band-driven fixtures and
     // the kick energy gate die at low volume while the AGC keeps level alive.
     const energy = Math.min(1, (bassEnergy / bassBins) * 0.02 * this.gain);
@@ -511,10 +534,17 @@ export class Analyser {
     }
     { const t = this.prevMagBig; this.prevMagBig = this.magBig; this.magBig = t; }
     const L = this.bandLvl, O = this.bandOn;
-    const spec: Spectrum = { sub: L[0], kick: L[1], bass: L[2], lowMid: L[3], mid: L[4], highMid: L[5], treble: L[6], air: L[7] };
-    const onset: Spectrum = { sub: O[0], kick: O[1], bass: O[2], lowMid: O[3], mid: O[4], highMid: O[5], treble: O[6], air: O[7] };
+    const spec = this.outSpec, onset = this.outOnset;
+    spec.sub = L[0]; spec.kick = L[1]; spec.bass = L[2]; spec.lowMid = L[3]; spec.mid = L[4]; spec.highMid = L[5]; spec.treble = L[6]; spec.air = L[7];
+    onset.sub = O[0]; onset.kick = O[1]; onset.bass = O[2]; onset.lowMid = O[3]; onset.mid = O[4]; onset.highMid = O[5]; onset.treble = O[6]; onset.air = O[7];
 
-    return { level: this.lvlSmooth, levelRaw: level, levelVU: this.lvlVU, energy: this.engSmooth, mid: this.midSmooth, treble: this.trbSmooth, centroid: this.centSmooth, flux: fluxNorm, kick, gain: this.gain, bpm: this.localBpm, bpmConfidence: this.localBpmConfidence, beatAnchorMs: this.beatAnchorMs, spec, onset };
+    // Mutera det återanvända Frame:t (spec/onset pekar redan på outSpec/outOnset).
+    const f = this.outFrame;
+    f.level = this.lvlSmooth; f.levelRaw = level; f.levelVU = this.lvlVU;
+    f.energy = this.engSmooth; f.mid = this.midSmooth; f.treble = this.trbSmooth;
+    f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
+    f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.beatAnchorMs = this.beatAnchorMs;
+    return f;
   }
 }
 
