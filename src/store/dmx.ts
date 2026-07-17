@@ -59,6 +59,7 @@ interface DmxState {
   frame: number[];      // DMX 1..512, values 0..255
   bpm: number;          // 0 = ej låst
   bpmConfidence: number;// 0..1
+  beat: boolean;        // true exakt den frame ett taktslag går fram
   setPreset: (id: PresetId) => void;
   patchParams: (p: Partial<Params>) => void;
   addFixture: () => void;
@@ -67,6 +68,7 @@ interface DmxState {
   toggleRotation: (id: PresetId) => void;
   setLive: (audio: number, kick: number, frame: number[]) => void;
   setBpm: (bpm: number, confidence: number) => void;
+  setBeat: (beat: boolean) => void;
 
   setMicEnabled: (b: boolean) => void;
   setMicError: (m: string | null) => void;
@@ -139,6 +141,7 @@ export const useDmx = create<DmxState>((set, get) => {
     frame: new Array(512).fill(0),
     bpm: 0,
     bpmConfidence: 0,
+    beat: false,
 
 
     setPreset: (id) => { set({ preset: id }); persist(); },
@@ -171,6 +174,7 @@ export const useDmx = create<DmxState>((set, get) => {
     },
     setLive: (audioLevel, kick, frame) => set({ audioLevel, kick, frame }),
     setBpm: (bpm, bpmConfidence) => set({ bpm, bpmConfidence }),
+    setBeat: (beat) => set({ beat }),
 
     setMicEnabled: (micEnabled) => set({ micEnabled, micError: micEnabled ? get().micError : null }),
     setMicError: (micError) => set({ micError }),

@@ -30,17 +30,16 @@ const ALL = [...CALM_MODES, ...FAST_MODES, ...FULL_MODES];
 const LS_KEY = "pi-mock-v1";
 
 export type Dwell = "slow" | "normal" | "fast";
-export type DropSens = 0 | 0.3 | 0.6 | 0.9;
 export type AudioIn = "aux" | "mic";
 export type Scene = "chill" | "party" | "wild";
 
-/** Scen-presets — sätter ALLA relevanta ljud/ljus-parametrar i ett svep. */
+/** Scen-presets — sätter ALLA relevanta ljud/ljus-parametrar i ett svep.
+ *  Motorn äger stämningarna (setMood); här speglar vi känslan i mock-UI. */
 export const SCENES: {
   id: Scene; label: string; hint: string; icon: string;
   modes: string[];
   dwell: Dwell;
   dynamics: 0.35 | 0.6 | 0.85;
-  drop: DropSens;
   pulse: boolean;
   energyDrivesMode: boolean;
   agcAgg: 0.15 | 0.85;
@@ -48,26 +47,25 @@ export const SCENES: {
 }[] = [
   { id: "chill", label: "Chill", hint: "Mjukt & lugnt", icon: "◐",
     modes: CALM_MODES.map(([m]) => m),
-    dwell: "slow", dynamics: 0.35, drop: 0, pulse: false,
+    dwell: "slow", dynamics: 0.35, pulse: false,
     energyDrivesMode: false, agcAgg: 0.15, master: 0.75 },
   { id: "party", label: "Fest", hint: "Följer takten", icon: "◈",
     modes: [...CALM_MODES.slice(3).map(([m]) => m), ...FAST_MODES.map(([m]) => m)],
-    dwell: "normal", dynamics: 0.6, drop: 0.6, pulse: true,
+    dwell: "normal", dynamics: 0.6, pulse: true,
     energyDrivesMode: true, agcAgg: 0.15, master: 1 },
   { id: "wild",  label: "Galet", hint: "Full fart", icon: "◆",
     modes: [...FAST_MODES.slice(2).map(([m]) => m), ...FULL_MODES.map(([m]) => m)],
-    dwell: "fast", dynamics: 0.85, drop: 0.9, pulse: true,
+    dwell: "fast", dynamics: 0.85, pulse: true,
     energyDrivesMode: true, agcAgg: 0.85, master: 1 },
 ];
 
 export interface PiSettings {
   power: boolean;         // stort AV/PÅ högst upp
-  scene: Scene;           // vald scen (styr rotation-defaults)
+  scene: Scene | null;    // vald stämning; null = manuell effekt (matchar engine's activeMood)
   rotation: Record<string, boolean>;
   energyDrivesMode: boolean;
   beatPulse: boolean;
   dwell: Dwell;
-  dropSensitivity: DropSens;
   agcAgg: 0.15 | 0.85;
   dynamics: 0.35 | 0.6 | 0.85;
   master: 0.5 | 0.75 | 1;
@@ -81,7 +79,6 @@ const defaults: PiSettings = {
   energyDrivesMode: true,
   beatPulse: true,
   dwell: "normal",
-  dropSensitivity: 0.6,
   agcAgg: 0.15,
   dynamics: 0.6,
   master: 1,
@@ -97,7 +94,6 @@ export function applyScene(id: Scene) {
     rotation,
     dwell: s.dwell,
     dynamics: s.dynamics,
-    dropSensitivity: s.drop,
     beatPulse: s.pulse,
     energyDrivesMode: s.energyDrivesMode,
     agcAgg: s.agcAgg,
