@@ -101,7 +101,19 @@ capture.on("chunk", (samples: Float32Array) => {
       // Live fasfel för UI: hur långt slaget låg från gridet (-0.25..0.25 av en takt),
       // lätt utjämnat. Nära 0 = tight låst; ihållande avvikelse = PLL:en drar in fasen.
       if (onBeat) cfg.beatErr = (cfg.beatErr ?? 0) * 0.6 + err * 0.4;
-      if (k0 > 0 && onBeat) cfg.beat.anchorMs += err * beatMs * k;
+      if (k0 > 0 && onBeat) {
+        cfg.beat.anchorMs += err * beatMs * k;   // FAS-term: dra ankaret mot slaget
+        // FREKVENS-term (PI-integral): en fas-bara-PLL har ett permanent steady-state-
+        // lag när tempo-SIFFRAN ligger snäppet fel (detekterad ≠ sant tempo). Fin-
+        // justera bpm i fasfelets riktning så laget kan nollas. Långsamt + conf-gated
+        // (rör ej takten på osäker signal); bundet inom ±1.5 av detekterad bpm så
+        // om-ankringen (>2) aldrig triggas → ingen hunting mot analysatorns bpm.
+        if (conf > 0.4) {
+          cfg.beat.bpm += err * 0.15 * conf;   // långsammare än fas-loopen (~0.3) → stabilt, ingen hunting
+          const lo = effBpm - 1.5, hi = effBpm + 1.5;
+          if (cfg.beat.bpm < lo) cfg.beat.bpm = lo; else if (cfg.beat.bpm > hi) cfg.beat.bpm = hi;
+        }
+      }
     }
   }
   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
