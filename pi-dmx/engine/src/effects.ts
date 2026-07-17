@@ -399,12 +399,11 @@ export class EffectEngine {
         const tierChanged = this.cfg.energyDrivesMode && tierName !== this.lastSmartTier;
         // MINSTA-INTERVALL mellan byten → dödar snabb-bytandet (bigJump/tierChanged
         // kan annars fyra flera ggr/s under en ramp eller vid en tier-gräns). En äkta
-        // DROP (in i Full Fart från lägre tier) byter dock nästan direkt — bara ett
-        // kort 0.8s-tak som skydd mot flimmer precis på gränsen. Övriga byten: 2.5s.
-        const enteringFull = tier === FULLFART && this.lastSmartTier !== "full";
-        const minInterval = enteringFull ? 800 : 2500;
+        // DROP byter dock DIREKT — vi matchar mot exakt samma `dropFired` som driver
+        // effekternas drop-accent (edge-triggad, en frame per drop → self-rate-limitad),
+        // så ljus-bytet och drop-smällen är samma händelse. Övriga byten: 2.5s.
         const wantSwitch = bigJump || tierChanged || now > this.smartDwellUntil;
-        if (wantSwitch && now - this.lastSmartSwitchMs > minInterval) {
+        if (dropFired || (wantSwitch && now - this.lastSmartSwitchMs > 2500)) {
         this.lastSmartSwitchMs = now;
         this.lastSmartIntensity = intensity;
         this.lastSmartTier = tierName;
