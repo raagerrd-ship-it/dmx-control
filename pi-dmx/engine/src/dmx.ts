@@ -17,6 +17,12 @@ export class DmxSender {
   private reconnectScheduled = false; // undvik dubbla reconnect-timers
   private lastSent = 0;
   private minIntervalMs = 5;   // 200 Hz default; overridden by setMaxHz()
+  // Pre-allokerad wire-buffert (max: 512 kanaler + 2 bytes header). Återanvänds
+  // per frame → ingen Buffer-wrapper-alloc/frame. SÄKER ENBART pga drop-guarden i
+  // send(): `writableLength > 0 → return` garanterar att en pågående write() har
+  // släppt bufferten (kärnan har kopierat ut den) innan vi skriver över den nästa
+  // frame. INFÖR ALDRIG en send-kö utan att först ge varje kö-post en egen buffert.
+  private outBuf = Buffer.alloc(514);
 
   constructor(private sockPath = "/run/dmx.sock") {
     this.connect();
@@ -61,11 +67,10 @@ export class DmxSender {
     this.lastSent = now;
 
     const n = Math.max(24, Math.min(512, slots | 0));
-    const out = Buffer.allocUnsafe(2 + n);
-    out[0] = n & 0xff;
-    out[1] = (n >> 8) & 0xff;
-    out.set(universe.subarray(0, n), 2);
-    this.sock.write(out);
+    this.outBuf[0] = n & 0xff;
+    this.outBuf[1] = (n >> 8) & 0xff;
+    this.outBuf.set(universe.subarray(0, n), 2);
+    this.sock.write(this.outBuf.subarray(0, 2 + n));   // view, ingen kopia — säker pga guarden ovan
   }
 
   close() { this.closed = true; this.sock?.destroy(); this.sock = null; }
