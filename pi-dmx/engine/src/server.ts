@@ -258,18 +258,21 @@ export async function startServer(
       sock.send(JSON.stringify({ type: "config", config: deps.cfg }));
 
       // Push frame samples at 20 Hz for the level meter + beat diagnostics.
-      // Beat-lås-prick: servern kör på Pi:n (samma klocka som frame.beatAnchorMs)
-      // → räkna takt-index och flagga `beat:true` den push där det gick fram.
-      // Klock-oberoende av klienten (ingen Pi/telefon-tidsskillnad).
+      // Beat-lås-prick: räkna takt-index ur den STABILA PLL-taktklockan (cfg.beat,
+      // samma som effekternas beatPulse) och flagga `beat:true` den push där indexet
+      // går fram. Servern kör på Pi:n → samma klocka som anchorMs (klient-oberoende).
+      // OBS: använd cfg.beat.anchorMs (stabilt, PLL-fasat), INTE frame.beatAnchorMs
+      // som hoppar till varje ny kick och nollar indexet → sporadiska blink.
       let lastBeatIdx = -1;
       const push = setInterval(() => {
         const frame = deps.getLatestFrame();
         if (frame && sock.readyState === 1 && (sock.bufferedAmount ?? 0) < 4096) {
           let beat = false;
-          if (frame.bpm > 40 && frame.beatAnchorMs > 0) {
-            const beatMs = 60000 / frame.bpm;
-            const idx = Math.floor((Date.now() - frame.beatAnchorMs) / beatMs);
-            if (idx !== lastBeatIdx) { if (lastBeatIdx >= 0 && idx > lastBeatIdx) beat = true; lastBeatIdx = idx; }
+          const bc = deps.cfg.beat;
+          if (bc && bc.bpm > 40) {
+            const idx = Math.floor((Date.now() - bc.anchorMs) / (60000 / bc.bpm));
+            if (lastBeatIdx >= 0 && idx > lastBeatIdx) beat = true;
+            lastBeatIdx = idx;
           } else { lastBeatIdx = -1; }
           sock.send(JSON.stringify({
             type: "frame",
