@@ -229,7 +229,10 @@ export class EffectEngine {
     const sustained = Math.max(0, (frame.energy - this.bassBaseline - 0.05) * 4) * Math.min(1, dunkRatio / 0.4);
     const bassPunch = Math.max(0, Math.min(1, Math.max(sustained, kickHitFast * 0.9, frame.onset.kick * 0.85)));
     // Uniform bas-punch borttagen ur master — effekterna äger sitt slag via ctx.punch.
-    const master = this.cfg.master * this.silenceGate * beatMul;
+    // Effekt-drive (silence-gate + beat-puls). Ljus-taket (cfg.master) läggs SIST
+    // i cal-remappen istället — som ett äkta output-tak [onCh..tak], inte en
+    // innehålls-skalning som gamma/kalibrering annars komprimerar bort.
+    const drive = this.silenceGate * beatMul;
     // Synlig punch: en hård basstöt (eller drop-flash) BLOOMAR färgen till full
     // styrka — inte bara ljusare master (som är osynligt när effekten redan lyser).
     // DROP-DETEKTOR: en "riktig" drop = nivån surgar upp mot låtens tak EFTER en
@@ -464,7 +467,7 @@ export class EffectEngine {
     const landTau = 1.2 + Math.min(1, this.hotMs / 180000) * 5;   // 1.2s .. 6.2s efter lång spelning
     const ambRate = ambTarget > this.ambient ? dtSec / landTau : dtSec / 0.1;   // in: adaptivt, ut: snabbt
     this.ambient += Math.max(-ambRate, Math.min(ambRate, ambTarget - this.ambient));
-    const ambLvl = this.cfg.ambientGlow ? this.ambient * 0.22 * this.cfg.master : 0;   // vilo-glöd (opt-in); annars helt mörkt i tystnad
+    const ambLvl = this.cfg.ambientGlow ? this.ambient * 0.22 : 0;   // vilo-glöd (opt-in); ljus-tak läggs i cal-remappen
     // DIREKT VU-FILTER: den INGÅENDE ljudnivån styr den UTGÅENDE ljusstyrkan
     // direkt, som ett SISTA filter efter allt annat (effekter, beatPulse, ...).
     // Effekterna formar fortfarande sitt eget ljus; VU:n justerar slutresultatet
@@ -495,7 +498,7 @@ export class EffectEngine {
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
     // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så
     // VU-taket följer nivån direkt utan effekt-ballistikens nedåt-släp.
-    const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8);
+    const md = drive * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8);
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
@@ -693,19 +696,20 @@ export class EffectEngine {
       }
     }
 
-    // PER-KANAL KALIBRERING — allra sista steget, precis före output. EN ren linjär
-    // omskalning per kanal, inget annat. Motorn (inkl. VU-taket ovan) har redan
-    // bestämt av/på och ljusstyrka; här översätts bara 0..255 till vad dioden fysiskt
-    // klarar på just den adressen:
+    // LJUS-TAK + PER-KANAL KALIBRERING — sista mappningen före output. Mappar
     //   0        → 0 (släckt)
-    //   1..255   → onCh..255 (LED:ns tändpunkt → full), linjärt
-    // Ingen kanal kan hamna i dödzonen (0<v<onCh) och ballistiken sköter redan all
-    // mjuk uttoning ner till tändpunkten — så inget fade-håll/extra tröskel behövs.
+    //   1..255   → onCh .. TAK, linjärt
+    // där TAK = round(255·master) (ljus-taket) och onCh = lampans kalibrerade
+    // tändpunkt (0 om okalibrerad). Så master är ett ÄKTA output-tak (55% → max
+    // 140), inte en innehålls-skalning som gamma/kalibrering annars komprimerar
+    // bort. Vid master=1 → TAK=255 → identiskt med ren kalibrering (+ okalibrerade
+    // kanaler blir identitet). Ingen kanal i dödzonen; släpp-håll (~120ms) bryggar
+    // mikro-0-dippar i botten så dioden inte strobar.
     const calNow = performance.now();
+    const topBase = Math.round(255 * (this.cfg.master ?? 1));   // ljus-tak i byte
     for (const cf of this.cfg.fixtures) {
       const cal = cf.cal;
-      if (!cal || !(cal.on || cal.onR || cal.onG || cal.onB || cal.onW)) continue;   // någon tröskel satt
-      const on = cal.on || 0;
+      const on = cal ? (cal.on || 0) : 0;
       const roles = fixtureRoles(cf);
       const cbase = cf.address - 1;
       for (let i = 0; i < roles.length; i++) {
@@ -716,8 +720,9 @@ export class EffectEngine {
         if (raw > 0) {
           const role = roles[i];
           // Per-FÄRG-tröskel: R/G/B tänder vid olika DMX → kanalens egen om satt.
-          const onCh = (role === "r" ? cal.onR : role === "g" ? cal.onG : role === "b" ? cal.onB : role === "w" ? cal.onW : undefined) ?? on;
-          out = Math.min(255, Math.round(onCh + (255 - onCh) * raw / 255));
+          const onCh = cal ? ((role === "r" ? cal.onR : role === "g" ? cal.onG : role === "b" ? cal.onB : role === "w" ? cal.onW : undefined) ?? on) : 0;
+          const top = Math.max(onCh + 1, topBase);   // taket aldrig under tändpunkten
+          out = Math.min(255, Math.round(onCh + (top - onCh) * raw / 255));
           this.calHoldVal[ch] = out;               // minns senaste tända
           this.calHoldUntil[ch] = calNow + 120;    // håll ~120ms efter sista tända
         } else if (calNow < this.calHoldUntil[ch]) {
@@ -749,7 +754,6 @@ export class EffectEngine {
       const fa = fog.address - 1;
       if (fa >= 0 && fa < 512) this.universe[fa] = nowWall < this.fogUntil ? Math.max(0, Math.min(255, Math.round(fog.level))) : 0;
     }
-
     return this.universe;
   }
 }
