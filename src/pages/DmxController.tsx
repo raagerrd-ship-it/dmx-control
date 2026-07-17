@@ -313,18 +313,18 @@ function AdvancedRotation() {
     <>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full mt-2 mb-3 py-3 rounded-[10px] border border-border bg-card text-[13px] uppercase tracking-[0.12em] text-muted-foreground font-semibold flex items-center justify-center gap-2"
+        className="w-full py-3 text-[13px] uppercase tracking-[0.12em] text-muted-foreground font-semibold flex items-center justify-center gap-2"
         aria-expanded={open}
       >
         <span>Anpassa effekter</span>
         <span className={`transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
       </button>
       {open && (
-        <>
+        <div className="space-y-3 pt-1">
           <RotationCard title="Lugna effekter"         modes={CALM_MODES} />
           <RotationCard title="Effekter med fart"      modes={FAST_MODES} />
           <RotationCard title="Effekter med full fart" modes={FULL_MODES} />
-        </>
+        </div>
       )}
     </>
   );
@@ -337,15 +337,15 @@ function AdvancedTechnical() {
     <>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full mb-3 py-3 rounded-[10px] border border-border bg-card text-[13px] uppercase tracking-[0.12em] text-muted-foreground font-semibold flex items-center justify-center gap-2"
+        className="w-full py-3 text-[13px] uppercase tracking-[0.12em] text-muted-foreground font-semibold flex items-center justify-center gap-2"
         aria-expanded={open}
       >
         <span>Avancerat</span>
         <span className={`transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
       </button>
       {open && (
-        <div className="bg-card border border-border rounded-[14px] p-3.5 mb-3">
-          <div className="mb-4">
+        <div className="space-y-4 pt-1">
+          <div>
             <div className="text-[11px] text-muted-foreground uppercase tracking-[0.08em] mb-1.5">Reaktion på musiken</div>
             <Seg
               value={s.agcAgg}
@@ -356,7 +356,7 @@ function AdvancedTechnical() {
               ]}
             />
           </div>
-          <div className="mb-4">
+          <div>
             <div className="text-[11px] text-muted-foreground uppercase tracking-[0.08em] mb-1.5">Dynamik (tyst ↔ högt)</div>
             <Seg
               value={s.dynamics}
@@ -368,7 +368,7 @@ function AdvancedTechnical() {
               ]}
             />
           </div>
-          <div className="mb-4">
+          <div>
             <div className="text-[11px] text-muted-foreground uppercase tracking-[0.08em] mb-1.5">Drop-blixt känslighet</div>
             <Seg<DropSens>
               value={s.dropSensitivity}
