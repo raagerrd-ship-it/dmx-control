@@ -56,6 +56,10 @@ export class EffectEngine {
   private centSlow = 0.3;        // långsam centroid-baslinje för riser-prediktor
   private lvlSlowR = 0.3;        // långsam nivå-baslinje för riser-prediktor
   private buildUp = 0;           // 0..1 uppbyggnad (riser) — bygger tension mot dropen
+  // NOVELTY-UPPBYGGNADS-DETEKTOR: spektral novelty leder dropen (mätt validerat).
+  private specSlow = new Float32Array(8);
+  private novSlow = 0;           // ihållande spektral novelty (~1.5s)
+  private novBaseline = 0.2;     // ~8s baslinje → riser = novelty STIGER över den
   private hotMs = 0;             // hur länge musiken pumpat → adaptiv tystnads-landning
   private wasBreaking = false;   // flankdetektor för nivå-svacka (drop-blackout)
   private blackoutUntil = 0;     // dramaturgisk tystnad: kolsvart till (wall-clock ms)
@@ -290,12 +294,24 @@ export class EffectEngine {
     // ihållande mot en drop. Vi har redan en REAKTIV drop-detektor; detta
     // FÖRUTSPÅR den och bygger tension (ljus-swell) under risern, så dropen landar
     // med moment. Klingar av om risern rinner ut i sanden. (centroid är 0..1 här.)
+    // NOVELTY = validerad uppbyggnads-signal (mätt: ramsar 0.25→0.78 in i en drop).
+    // Summa av band-nivåernas POSITIVA avvikelse från en ~2s baslinje; ihållande
+    // ~1.5s. Relativt en ~8s baslinje → RISER = novelty STIGER över den (filter-
+    // sweep/snare-roll), skilt från bara-busy (ihållande → baslinjen kommer ikapp).
+    {
+      const sp = frame.spec; const sb = [sp.sub, sp.kick, sp.bass, sp.lowMid, sp.mid, sp.highMid, sp.treble, sp.air];
+      let nov = 0; const sr = 1 - Math.exp(-dtNow / 2.0);
+      for (let b = 0; b < 8; b++) { this.specSlow[b] += (sb[b] - this.specSlow[b]) * sr; nov += Math.max(0, sb[b] - this.specSlow[b]); }
+      this.novSlow += (nov - this.novSlow) * (1 - Math.exp(-dtNow / 1.5));
+      this.novBaseline += (this.novSlow - this.novBaseline) * (dtNow / 8);
+    }
+    const novRiser = this.novSlow > this.novBaseline + 0.15 && this.novSlow > 0.45;
     this.centSlow += (frame.centroid - this.centSlow) * (dtNow / 2.5);
     this.lvlSlowR += (frame.level - this.lvlSlowR) * (dtNow / 2.5);
-    const inRiser = frame.centroid > this.centSlow + 0.06         // diskant kryper upp
-                 && frame.level > this.lvlSlowR + 0.04            // nivån stiger
-                 && frame.level > 0.4 && this.dropEnv < 0.2       // ej redan i drop
-                 && this.warmMs > 2500;                           // ej låtens intro (nivån stiger ur tystnad)
+    const inRiser = this.warmMs > 2500 && frame.level > 0.3 && this.dropEnv < 0.2 && (
+        novRiser                                                                                       // NY: novelty ramsar upp
+        || (frame.centroid > this.centSlow + 0.06 && frame.level > this.lvlSlowR + 0.04 && frame.level > 0.4)  // gammal: diskant + nivå stiger
+      );
     const bTarget = inRiser ? 1 : 0;
     const bRate = bTarget > this.buildUp ? dtNow / 3.5 : dtNow / 1.0;   // bygg ~3.5s, klinga ~1s
     this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
