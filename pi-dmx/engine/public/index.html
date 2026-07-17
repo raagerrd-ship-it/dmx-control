@@ -308,15 +308,33 @@ inMic.onclick = () => send({ type: "setAudioInput", value: "mic" });
 // sätter mode=smart → häver ev. blackout).
 let lastMood = "fest";
 document.querySelectorAll(".mood-btn").forEach((b) =>
-  b.onclick = () => { lastMood = b.dataset.mood; send({ type: "setMood", value: b.dataset.mood }); });
+  b.onclick = () => {
+    lastMood = b.dataset.mood;
+    // Optimistisk markering: lys upp DIREKT vid tryck (motorn bekräftar via config).
+    document.querySelectorAll(".mood-btn").forEach((x) => x.classList.toggle("active", x === b));
+    setPower(false);   // en stämning tänder alltid (häver blackout) → visa på-läge direkt
+    send({ type: "setMood", value: b.dataset.mood });
+  });
 
 // POWER: släck hela riggen (blackout) / tänd tillbaka till senaste stämning.
 const powerCard = document.getElementById("powerCard");
 const powerSmall = document.getElementById("powerSmall");
 const powerBig = document.getElementById("powerBig");
+function setPower(off) {
+  powerCard.classList.toggle("off", off);
+  powerSmall.textContent = off ? "Ljuset är av" : "Ljuset är på";
+  powerBig.textContent = off ? "Tryck för att tända" : "Tryck för att släcka";
+}
 powerCard.onclick = () => {
-  if (curMode === "blackout") send({ type: "setMood", value: lastMood });   // tänd → senaste stämning
-  else send({ type: "setMode", mode: "blackout" });                          // släck
+  if (curMode === "blackout") {                       // TÄND → senaste stämning
+    curMode = "smart"; setPower(false);
+    document.querySelectorAll(".mood-btn").forEach((x) => x.classList.toggle("active", x.dataset.mood === lastMood));
+    send({ type: "setMood", value: lastMood });
+  } else {                                            // SLÄCK
+    curMode = "blackout"; setPower(true);
+    document.querySelectorAll(".mood-btn").forEach((x) => x.classList.remove("active"));
+    send({ type: "setMode", mode: "blackout" });
+  }
 };
 const connEl = document.getElementById("conn");
 
@@ -435,10 +453,7 @@ function applyConfig(cfg) {
   // Stämnings-markering + power-läge (matchar Mock-UI).
   document.querySelectorAll(".mood-btn").forEach((b) => b.classList.toggle("active", b.dataset.mood === cfg.activeMood));
   if (cfg.activeMood) lastMood = cfg.activeMood;
-  const off = cfg.mode === "blackout";
-  powerCard.classList.toggle("off", off);
-  powerSmall.textContent = off ? "Ljuset är av" : "Ljuset är på";
-  powerBig.textContent = off ? "Tryck för att tända" : "Tryck för att släcka";
+  setPower(cfg.mode === "blackout");
   tBeatPulse.checked = !!cfg.beatPulse;
   const fog = cfg.fog || {};
   if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 128; }
