@@ -522,9 +522,17 @@ export class EffectEngine {
       const vuRaw = Math.max(0, Math.min(1, frame.levelVU));
       this.vu += (vuRaw - this.vu) * (1 - Math.exp(-dtSec / 0.09));
       // KLUBB-LÄGE: kvadrera → hård kontrast (mörkt mellan, explosion på topp).
-      const vuFilter = this.cfg.clubMode ? this.vu * this.vu : this.vu;
-      // BARA DROP skippar VU-filtret: dropEnv (0..1) lyfter taket till full under
-      // det korta drop-fönstret, annars styr den råa VU:n direkt.
+      const vuBase = this.cfg.clubMode ? this.vu * this.vu : this.vu;
+      // VU-GOLV: mappa om VU-spannet så det ALDRIG drar ner under VU_FLOOR. 0% VU →
+      // VU_FLOOR, 100% VU → 100%, linjärt. Håller riggen närvarande i tysta partier
+      // (i st.f. att krossas mot tändpunkten där bruset strobar) utan att döda
+      // dynamiken. OBS: golvet gäller MULTIPLIKATORN → en effekt som skickar 0
+      // (avsiktlig blackout) blir fortfarande 0; äkta TYSTNAD tonas bort av
+      // silenceGate i master (effekt→0), inte här. Klubb-läget floras också.
+      const VU_FLOOR = 0.20;
+      const vuFilter = VU_FLOOR + (1 - VU_FLOOR) * vuBase;
+      // BARA DROP skippar VU-golvet: dropEnv (0..1) lyfter taket till full under
+      // det korta drop-fönstret, annars styr den golvade VU:n direkt.
       ceilMul = Math.max(vuFilter, this.dropEnv);
     }
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
