@@ -227,64 +227,82 @@ function MoreSections() {
   const playingLabel = [...CALM_MODES, ...FAST_MODES, ...FULL_MODES].find(([m]) => m === playing)?.[1] ?? playing;
 
   return (
-    <div className="mt-3">
-      {/* Ljusstyrka */}
-      <Section title="Ljusstyrka">
-        <div className="flex items-center justify-between mb-2.5">
-          <span className="text-[13px] text-muted-foreground tabular-nums">{Math.round(s.master * 100)}%</span>
-        </div>
-        <Seg
-          value={s.master}
-          onChange={(v) => setPi({ master: v })}
-          options={[
-            { v: 0.5  as const, label: "50%" },
-            { v: 0.75 as const, label: "75%" },
-            { v: 1    as const, label: "100%" },
-          ]}
-        />
-      </Section>
-
-
-      {/* Vilken effekt spelar */}
-      <Section title="Spelar nu">
-        <div className="flex items-center justify-between">
-          <div className="min-w-0">
-            <div className="text-[17px] font-semibold truncate">{playingLabel}</div>
-            <div className="text-[12px] text-muted-foreground">Byts automatiskt beroende på scen</div>
+    <div className="mt-3 space-y-4">
+      {/* ────────── EFFEKT-SEKTION ────────── */}
+      <div>
+        <h2 className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-semibold mb-2 px-1">Effekter</h2>
+        <div className="bg-card border border-border rounded-[14px] p-4 divide-y divide-border">
+          {/* Vilken effekt spelar */}
+          <div className="pb-4">
+            <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-1.5">Spelar nu</div>
+            <div className="flex items-center justify-between">
+              <div className="min-w-0">
+                <div className="text-[17px] font-semibold truncate">{playingLabel}</div>
+                <div className="text-[12px] text-muted-foreground">Byts automatiskt beroende på scen</div>
+              </div>
+              <button
+                onClick={() => {
+                  // hoppa till nästa aktiverade
+                  const all = [...CALM_MODES, ...FAST_MODES, ...FULL_MODES].map(([m]) => m);
+                  const enabled = all.filter((m) => s.rotation[m] !== false);
+                  const idx = enabled.indexOf(playing);
+                  const next = enabled[(idx + 1) % enabled.length];
+                  // simulera hopp genom att stänga av+på nuvarande så cycle-hooken re-syncar
+                  if (next) setRotation(next, true);
+                }}
+                className="py-2.5 px-4 rounded-[10px] border border-border bg-card text-[13px] font-semibold"
+              >
+                Nästa
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => {
-              // hoppa till nästa aktiverade
-              const all = [...CALM_MODES, ...FAST_MODES, ...FULL_MODES].map(([m]) => m);
-              const enabled = all.filter((m) => s.rotation[m] !== false);
-              const idx = enabled.indexOf(playing);
-              const next = enabled[(idx + 1) % enabled.length];
-              // simulera hopp genom att stänga av+på nuvarande så cycle-hooken re-syncar
-              if (next) setRotation(next, true);
-            }}
-            className="py-2.5 px-4 rounded-[10px] border border-border bg-card text-[13px] font-semibold"
-          >
-            Nästa
-          </button>
+
+          {/* Byter-effekt-hastighet */}
+          <div className="py-4">
+            <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-1.5">Byter effekt</div>
+            <Seg<Dwell>
+              value={s.dwell}
+              onChange={(v) => setPi({ dwell: v })}
+              options={[
+                { v: "slow", label: "Sällan" },
+                { v: "normal", label: "Normal" },
+                { v: "fast", label: "Ofta" },
+              ]}
+            />
+          </div>
+
+          {/* Rotation-listor */}
+          <div className="pt-2">
+            <AdvancedRotation />
+          </div>
         </div>
-      </Section>
+      </div>
 
-      {/* Byter-effekt-hastighet */}
-      <Section title="Byter effekt">
-        <Seg<Dwell>
-          value={s.dwell}
-          onChange={(v) => setPi({ dwell: v })}
-          options={[
-            { v: "slow", label: "Sällan" },
-            { v: "normal", label: "Normal" },
-            { v: "fast", label: "Ofta" },
-          ]}
-        />
-      </Section>
+      {/* ────────── LJUD/LJUS-INSTÄLLNINGAR ────────── */}
+      <div>
+        <h2 className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-semibold mb-2 px-1">Ljud/ljus-inställningar</h2>
+        <div className="bg-card border border-border rounded-[14px] p-4">
+          {/* Ljusstyrka */}
+          <div className="mb-4">
+            <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground mb-1.5">Ljusstyrka</div>
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-[13px] text-muted-foreground tabular-nums">{Math.round(s.master * 100)}%</span>
+            </div>
+            <Seg
+              value={s.master}
+              onChange={(v) => setPi({ master: v })}
+              options={[
+                { v: 0.5  as const, label: "50%" },
+                { v: 0.75 as const, label: "75%" },
+                { v: 1    as const, label: "100%" },
+              ]}
+            />
+          </div>
 
-      {/* Avancerat: rotation-listor + tekniska reglage */}
-      <AdvancedRotation />
-      <AdvancedTechnical />
+          {/* Avancerat: tekniska reglage */}
+          <AdvancedTechnical />
+        </div>
+      </div>
     </div>
   );
 }
