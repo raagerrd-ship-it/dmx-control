@@ -84,8 +84,8 @@ export class EffectEngine {
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
-  /** Output ballistics: per-channel peak-hold with exponential decay — the
-   *  eye sees instant attack and a soft ~0.4 s fall, whatever the modes do. */
+  /** Output ballistics: per-channel soft ~25ms attack + exponential decay — the
+   *  eye sees a fast rise and a soft fall (~0.1–0.4 s), whatever the modes do. */
   private outSmooth = new Float32Array(512);
   private calHoldVal = new Float32Array(512);   // släpp-håll: senaste TÄNDA kalibrerade värdet
   private calHoldUntil = new Float32Array(512);  // släpp-håll: deadline (performance.now ms) att hålla till
@@ -127,7 +127,7 @@ export class EffectEngine {
   constructor(private cfg: EngineConfig) {}
 
   /** AKUSTISK TRÖGHET: varje bastransient (kick) knuffar show-tiden framåt.
-   *  Anropas i 375 Hz-chunkhanteraren så inga slag missas (render kör bara 50 Hz).
+   *  Anropas i 375 Hz-chunkhanteraren så inga slag missas (render kör 100 Hz).
    *  strength ~0.4..1.0 (skalas av basens styrka). Friktionen i render() bromsar. */
   registerKick(strength: number): void {
     this.pendingKick += Math.min(1.5, Math.max(0, strength));
@@ -155,9 +155,9 @@ export class EffectEngine {
     const t = this.showTime;
     if (frame.kick) this.lastKickBoost = performance.now();
 
-    // SmartSync beat clock → predicted kick: pulse in the song's exact tempo,
-    // phase-calibrated by the Spotify downbeat markers. Beats real kick
-    // detection whenever we're synced.
+    // BPM-taktklocka → förutsagt slag: pulsa i låtens exakta tempo, fas-låst av
+    // beat-PLL:en (index.ts riktar ankaret mot faktiska kicks). Bättre än ren
+    // kick-detektion på en komprimerad signal som fyrar glest.
     let beatEnv = 0;
     let beatTick = false;
     const beat = this.cfg.beat;
@@ -261,8 +261,8 @@ export class EffectEngine {
     // musik stiger = break → surge) som en falsk drop → 8s max-håll som öppnade
     // VU-taket hela introt (och fyrade rökmaskinen). warmMs nollställs vid tystnad
     // → gäller exakt låtstart; en riktig drop mitt i låten har warmMs högt.
-    const dropFired = inZone && !this.wasInZone && brokeRecently && this.warmMs > 2000;
-    if (dropFired) this.dropBangUntil = nowWall + 2000;                                          // drop-accent (kort — max 2s)
+    const dropHit = inZone && !this.wasInZone && brokeRecently && this.warmMs > 2000;   // äkta drop-detektor (boolean); ≠ this.dropFired (drops-lägets per-lampa tändtider)
+    if (dropHit) this.dropBangUntil = nowWall + 2000;                                          // drop-accent (kort — max 2s)
     this.wasInZone = inZone;
     // DROP-BLACKOUT (dramaturgisk tystnad): en riser som BRYTS ner i en svacka
     // strax före dropen → tvinga kolsvart i max 250ms. Svärtan STARTAR på
@@ -274,12 +274,12 @@ export class EffectEngine {
       this.blackoutUntil = nowWall + 250;
     }
     this.wasBreaking = nowBreaking;
-    if (dropFired) this.blackoutUntil = 0;                                                        // dropen fyrade → släpp svärtan, explodera
+    if (dropHit) this.blackoutUntil = 0;                                                        // dropen fyrade → släpp svärtan, explodera
     const blackout = nowWall < this.blackoutUntil;
     // RÖKMASKIN: blast på drop (duty-cycle-skyddad) + manuell puff.
     const fog = this.cfg.fog;
     if (fog?.enabled) {
-      const wantBurst = (dropFired && fog.onDrop) || this.cfg.fogTrigger;
+      const wantBurst = (dropHit && fog.onDrop) || this.cfg.fogTrigger;
       if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;                                      // engångs-flagga
       if (wantBurst && nowWall - this.lastFogMs > fog.cooldownMs) {
         this.fogUntil = nowWall + fog.burstMs;
@@ -341,9 +341,9 @@ export class EffectEngine {
       }
     }
 
-    // "smart": pick the effect from the song's feel — SmartSync section energy
-    // when synced (switches on musical section boundaries), otherwise a slow
-    // local energy average with a 12 s dwell so it never zaps around.
+    // "smart": välj effekt ur låtens känsla — relativ sektionsenergi (mot en
+    // långsam baslinje) väljer tier; byter på drop (dropHit) eller efter minst
+    // 2.5s, annars ~9s dwell så den aldrig zappar runt.
     let effMode: Mode = this.cfg.mode;
     if (this.cfg.mode === "smart") {
       // Energi styr läget → lokal intensitet väljer pool; annars fast medel.
@@ -399,11 +399,11 @@ export class EffectEngine {
         const tierChanged = this.cfg.energyDrivesMode && tierName !== this.lastSmartTier;
         // MINSTA-INTERVALL mellan byten → dödar snabb-bytandet (bigJump/tierChanged
         // kan annars fyra flera ggr/s under en ramp eller vid en tier-gräns). En äkta
-        // DROP byter dock DIREKT — vi matchar mot exakt samma `dropFired` som driver
+        // DROP byter dock DIREKT — vi matchar mot exakt samma `dropHit` som driver
         // effekternas drop-accent (edge-triggad, en frame per drop → self-rate-limitad),
         // så ljus-bytet och drop-smällen är samma händelse. Övriga byten: 2.5s.
         const wantSwitch = bigJump || tierChanged || now > this.smartDwellUntil;
-        if (dropFired || (wantSwitch && now - this.lastSmartSwitchMs > 2500)) {
+        if (dropHit || (wantSwitch && now - this.lastSmartSwitchMs > 2500)) {
         this.lastSmartSwitchMs = now;
         this.lastSmartIntensity = intensity;
         this.lastSmartTier = tierName;
@@ -509,7 +509,7 @@ export class EffectEngine {
       this.lastMicroMs = nowWall;
       this.microStrobe = 1;
     }
-    this.microStrobe *= 0.38;                                               // klingar av på ~2-3 frames
+    this.microStrobe *= Math.exp(-dtSec / 0.021);                          // klingar av ~21ms (frame-rate-oberoende)
     if (this.microStrobe < 0.02) this.microStrobe = 0;
     const microMul = this.dropEnv > 0.4 ? 1 : 1 - this.microStrobe * 0.45;  // notch ner till ~0.55 på träffen
     // DIREKT VU-FILTER: den INGÅENDE ljudnivån styr den UTGÅENDE ljusstyrkan
@@ -518,15 +518,11 @@ export class EffectEngine {
     // mot den råa nivån. BARA en drop får skippa filtret (går fram på full).
     let ceilMul = 1;
     if (this.cfg.energyCeiling) {
-      // RÅ nivå RAKT AV som slutgain: insignal X% → utsignal dämpad till X%.
-      // INGEN omskalning/golv — exakt samma värde som input-mätaren visar. Lätt
-      // ballistik (snabb attack / ~180ms release) bara för att slippa flimmer;
-      // stegar aldrig om mappningen (steady 0.40 → tak 0.40).
-      // frame.levelVU = ~130ms smoothat PÅ HOP-TAKT (375Hz) i analysatorn → ser alla
-      // hops, mycket lägre jitter än att smootha rå-nivån efter 50Hz-decimering (som
-      // aliasade per-hop-rippel till synligt flimmer). Ingen omskalning/golv: insignal
-      // X% → utsignal X%, bara mjukt. En lätt 60ms-glidning här utjämnar sista resten
-      // utan att återinföra någon lång svans. (Drop bypassar via dropEnv nedan.)
+      // RÅ nivå som slutgain: insignal X% → utsignal ~X% (nu golvad, se nedan).
+      // frame.levelVU = ~200ms smoothat PÅ HOP-TAKT (375Hz) i analysatorn → ser alla
+      // hops, mycket lägre jitter än att smootha rå-nivån efter render-decimering (som
+      // aliasade per-hop-rippel till synligt flimmer). En lätt ~90ms-glidning här
+      // utjämnar sista resten utan lång svans. (Drop bypassar via dropEnv nedan.)
       const vuRaw = Math.max(0, Math.min(1, frame.levelVU));
       this.vu += (vuRaw - this.vu) * (1 - Math.exp(-dtSec / 0.09));
       // KLUBB-LÄGE: kvadrera → hård kontrast (mörkt mellan, explosion på topp).
@@ -580,7 +576,7 @@ export class EffectEngine {
     const beatMs2 = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
     const tempoDeep = Math.max(0, Math.min(1, (beatMs2 - 340) / 260));   // 0 snabbt .. 1 långsamt
     const punchFloor = 0.5 - tempoDeep * 0.42;                            // 0.5 (snabbt) .. 0.08 (långsamt)
-    // Per-lampa frekvensband (driver aurora/cycle/tide/twin + fixture.bands).
+    // Per-lampa frekvensband (driver aurora/twin + fixture.bands).
     // NU ur dubbel-FFT:ns separerade, per-band-AGC-spektrum i stället för det grova
     // 512-trebandet → renare, mer musikaliskt per-lampa-svar som alltid nyttjar range.
     const s = frame.spec;
