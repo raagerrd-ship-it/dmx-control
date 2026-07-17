@@ -5,6 +5,9 @@
 
 export type Mode = "smart" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "strobe" | "rave" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "subbreath" | "duel" | "airglow" | "blackout";
 
+/** Hyresgäst-stämning: ETT val ställer in hela riggens känsla (se moods.ts). */
+export type MoodId = "chill" | "fest" | "galet";
+
 /**
  * A fixture is placed at `address` and occupies channels in a defined role
  * order. Preset "rgb"/"rgbw"/"dimmer" expand to standard layouts; "custom"
@@ -52,6 +55,9 @@ export interface EngineConfig {
   };
   fixtures: FixtureConfig[];
   mode: Mode;
+  /** Senast valda hyresgäst-stämning (chill/fest/galet) — för att UI:t ska kunna
+   *  markera rätt knapp. Sätts av setMood; en manuell effekt-ändring gör den inaktuell. */
+  activeMood?: MoodId;
   /** Which codec input feeds the show: line on the P1 AUX header or the mic path. */
   audioInput: "aux" | "mic";
   sensitivity: number;    // 0..1 user knob
