@@ -49,6 +49,8 @@ dmx.setMaxHz(cfg.dmxMaxHz);
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
 let lastRenderMs = 0;
+let clockDetBpm = 0;   // analysatorns bpm som taktklockan LÅSTES på (om-ankrings-referens,
+                       // skild från cfg.beat.bpm som frekvens-termen finjusterar)
 const slotsFor = () => Math.max(activeSlots(cfg.fixtures), cfg.fog?.enabled ? cfg.fog.address : 0);
 let curSlots = slotsFor();
 
@@ -66,9 +68,12 @@ capture.on("chunk", (samples: Float32Array) => {
   // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
   // (om)lås; att sätta det på varje kick fick pulsen att flimra.
   const effBpm = frame.bpm;
-  if (effBpm === 0) { cfg.beat = null; cfg.beatErr = 0; }   // tyst → stoppa beat-effekter direkt
+  if (effBpm === 0) { cfg.beat = null; cfg.beatErr = 0; clockDetBpm = 0; }   // tyst → stoppa beat-effekter direkt
   if (effBpm > 0) {
-    if (!cfg.beat || Math.abs(cfg.beat.bpm - effBpm) > 2) {
+    // Om-ankra bara när ANALYSATORNS bpm ändras (nytt tempo/låt), INTE när vår egen
+    // frekvens-finjustering flyttat cfg.beat.bpm — annars nollar korrektionen sig själv.
+    if (!cfg.beat || Math.abs(effBpm - clockDetBpm) > 2) {
+      clockDetBpm = effBpm;
       let anchor = frame.beatAnchorMs || Date.now();
       if (cfg.beat) {
         // Bevara nuvarande fas vid tempoändring så pulsen inte hoppar.
@@ -98,19 +103,20 @@ capture.on("chunk", (samples: Float32Array) => {
       let k = k0 * (0.3 + 1.4 * conf);          // conf 0→×0.3, 0.5→×1.0, 1→×1.7
       if (k > 0.4) k = 0.4; else if (k < 0.03) k = 0.03;
       const onBeat = Math.abs(err) < 0.25;      // off-beat/synkoperade slag räknas ej
-      // Live fasfel för UI: hur långt slaget låg från gridet (-0.25..0.25 av en takt),
-      // lätt utjämnat. Nära 0 = tight låst; ihållande avvikelse = PLL:en drar in fasen.
-      if (onBeat) cfg.beatErr = (cfg.beatErr ?? 0) * 0.6 + err * 0.4;
+      // Live fasfel för UI: hur långt slaget låg från gridet, KRAFTIGT utjämnat
+      // (~2s) → visar det IHÅLLANDE laget, inte per-slag-jittret. Nära 0 = tight låst.
+      if (onBeat) cfg.beatErr = (cfg.beatErr ?? 0) * 0.85 + err * 0.15;
       if (k0 > 0 && onBeat) {
         cfg.beat.anchorMs += err * beatMs * k;   // FAS-term: dra ankaret mot slaget
         // FREKVENS-term (PI-integral): en fas-bara-PLL har ett permanent steady-state-
-        // lag när tempo-SIFFRAN ligger snäppet fel (detekterad ≠ sant tempo). Fin-
-        // justera bpm i fasfelets riktning så laget kan nollas. Långsamt + conf-gated
-        // (rör ej takten på osäker signal); bundet inom ±1.5 av detekterad bpm så
-        // om-ankringen (>2) aldrig triggas → ingen hunting mot analysatorns bpm.
+        // lag när tempo-SIFFRAN ligger snäppet fel (detekterad ≠ sant tempo) → fasen
+        // driftar och rycks tillbaka (sågtand). Fin-justera bpm i fasfelets riktning
+        // så laget nollas. conf-gated; bundet inom ±4 av LÅS-referensen (clockDetBpm)
+        // så ett par bpm tempofel kan tas ut helt, utan att trigga om-ankring (>2 mot
+        // referensen, inte mot vår justerade bpm).
         if (conf > 0.4) {
-          cfg.beat.bpm += err * 0.15 * conf;   // långsammare än fas-loopen (~0.3) → stabilt, ingen hunting
-          const lo = effBpm - 1.5, hi = effBpm + 1.5;
+          cfg.beat.bpm += err * 0.35 * conf;
+          const lo = clockDetBpm - 4, hi = clockDetBpm + 4;
           if (cfg.beat.bpm < lo) cfg.beat.bpm = lo; else if (cfg.beat.bpm > hi) cfg.beat.bpm = hi;
         }
       }
