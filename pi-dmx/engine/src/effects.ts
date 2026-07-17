@@ -66,15 +66,6 @@ export class EffectEngine {
   private hotMs = 0;             // hur länge musiken pumpat → adaptiv tystnads-landning
   private wasBreaking = false;   // flankdetektor för nivå-svacka (drop-blackout)
   private blackoutUntil = 0;     // dramaturgisk tystnad: kolsvart till (wall-clock ms)
-  private governorMs = 0;        // ackumulerad tid i full fart (energispärr)
-  private governorResting = false;
-  private governorRestUntil = 0;
-  private lastGovMs = 0;         // energispärrens egen dt-referens
-  private echoBuf: [number, number, number][] = Array.from({ length: 6 }, () => [0, 0, 0]);   // stereo-eko ringbuffert (6 tick ≈ 120ms)
-  private echoPos = 0;
-  private trebleBase = 0.05;     // långsam diskant-baslinje för micro-strobe-transientdetektorn
-  private microStrobe = 0;       // micro-strobe envelope (0..1), klingar av på ~2-3 frames
-  private lastMicroMs = 0;
   private vu = 0;                // direkt VU-envelope (snabb attack / ~180ms release) för ljustaket
   private gravLevel = 0;         // gravitations-VU: nivå som faller med gravitation
   private gravVel = 0;           // dess hastighet
@@ -205,10 +196,7 @@ export class EffectEngine {
       return this.universe;
     }
 
-    // Drop-bloom: on a drop the current color surges to full brightness (keeps
-    // the mode's look, no jarring primary-override). Optional hardware strobe.
     const nowWall = Date.now();
-    const flashActive = !!(this.cfg.flashUntil && nowWall < this.cfg.flashUntil);
 
         // Normalize against the AGC target so "at target loudness" = full drive —
         // the AGC otherwise parks the level around ~0.5 and v never reaches 1.
@@ -223,7 +211,7 @@ export class EffectEngine {
     // drop ligger då tydligt ÖVER golvet → punch som HÅLLER tills golvet hinner ikapp.
     // LÅTSTART: bas-golvet har spårat TYSTNADEN (~0). Utan detta skulle bassPunch
     // pinnas på max i ~5s när låten drar igång (golvet kryper ikapp på 0.004) →
-    // bloom + md-boost plattar hela introt till ett ljust svep. Under warmup
+    // md-boost plattar hela introt till ett ljust svep. Under warmup
     // (~första 3s aktiv musik) låter vi golvet snabb-komma-ikapp så punchen bara
     // fyrar på VERKLIGA basstötar över den etablerade nivån, inte på hela introt.
     const bassRise = this.warmMs < 3000 ? 0.05 : 0.004;
@@ -318,7 +306,6 @@ export class EffectEngine {
     const bRate = bTarget > this.buildUp ? dtNow / 3.5 : dtNow / 1.0;   // bygg ~3.5s, klinga ~1s
     this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
 
-    const bloom = flashActive;   // bas-punch bloomar INTE längre uniformt — effekten äger sitt slag (ctx.punch)
     const count = this.cfg.fixtures.length;
 
     // Chase state machine — kick advances one step, plus a slow auto-advance
@@ -367,26 +354,6 @@ export class EffectEngine {
         // Låg-BPM-spärr: en tryckare/ballad ska ALDRIG gå Full Fart, även om dess
         // relativa energi toppar. (bpm 0 = ej låst → ingen spärr.)
         if (bpm > 0 && bpm < 95 && tier === FULLFART) tier = FART;
-        // ENERGISPÄRR (dramaturgiska pauser): en pro-ljusdesigner låter aldrig full
-        // fart pågå i timmar — dansgolvet blir sensoriskt immunt. Fyll en mätare
-        // medan vi ligger i full fart, töm den (halv takt) annars. Efter ~8 min
-        // SAMMANLAGD full fart → tvinga LUGN i 3 min så rummet får "andas ut",
-        // sen släpps full fart igen. Bara i smart-läget → överkör aldrig ett
-        // manuellt valt läge.
-        if (this.cfg.energyGovernor) {
-          const gdt = this.lastGovMs ? Math.min(0.2, (now - this.lastGovMs) / 1000) : 0;
-          this.lastGovMs = now;
-          this.governorMs = Math.max(0, this.governorMs + gdt * 1000 * (tier === FULLFART ? 1 : -0.5));
-          if (!this.governorResting && this.governorMs > 480000) {          // 8 min sammanlagt
-            this.governorResting = true;
-            this.governorRestUntil = now + 180000;                          // 3 min vila
-            this.smartDwellUntil = 0;                                       // byt ner direkt
-          }
-          if (this.governorResting) {
-            if (now < this.governorRestUntil) tier = LUGN;                  // tvingad vila
-            else { this.governorResting = false; this.governorMs = 0; this.smartDwellUntil = 0; }
-          }
-        }
         const tierName = tier === LUGN ? "lugn" : tier === FART ? "fart" : "full";
         // Omval vid: (a) nivåbyte — så en ny effekt slår till DIREKT när vi går
         // in i Fart/Full Fart (inte den gamla kvar tills dwell löper ut),
@@ -498,18 +465,6 @@ export class EffectEngine {
     const ambRate = ambTarget > this.ambient ? dtSec / landTau : dtSec / 0.1;   // in: adaptivt, ut: snabbt
     this.ambient += Math.max(-ambRate, Math.min(ambRate, ambTarget - this.ambient));
     const ambLvl = this.cfg.ambientGlow ? this.ambient * 0.22 * this.cfg.master : 0;   // vilo-glöd (opt-in); annars helt mörkt i tystnad
-    // MICRO-STROBE (transientskimmer): en skarp diskanttransient (hi-hat/cymbal)
-    // ger en blixtsnabb mjukvaru-dimmernotch (~2-3 frames) → eld sprakar, wave
-    // gnistrar, UTAN hårdvaru-strobe. Bara ljusstyrka; ambient-glöden rörs inte.
-    // Släpps under drops så explosionen hålls ren.
-    this.trebleBase += (frame.treble - this.trebleBase) * 0.05;             // långsam baslinje
-    if (this.cfg.microStrobe && frame.treble > Math.max(0.12, this.trebleBase * 1.55) && nowWall - this.lastMicroMs > 55) {
-      this.lastMicroMs = nowWall;
-      this.microStrobe = 1;
-    }
-    this.microStrobe *= Math.exp(-dtSec / 0.021);                          // klingar av ~21ms (frame-rate-oberoende)
-    if (this.microStrobe < 0.02) this.microStrobe = 0;
-    const microMul = this.dropEnv > 0.4 ? 1 : 1 - this.microStrobe * 0.45;  // notch ner till ~0.55 på träffen
     // DIREKT VU-FILTER: den INGÅENDE ljudnivån styr den UTGÅENDE ljusstyrkan
     // direkt, som ett SISTA filter efter allt annat (effekter, beatPulse, ...).
     // Effekterna formar fortfarande sitt eget ljus; VU:n justerar slutresultatet
@@ -540,7 +495,7 @@ export class EffectEngine {
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
     // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så
     // VU-taket följer nivån direkt utan effekt-ballistikens nedåt-släp.
-    const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8) * microMul;
+    const md = master * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8);
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
@@ -552,14 +507,6 @@ export class EffectEngine {
     const anchorPal = currentPalette();
     const anchorHue = (anchorPal[anchorPal.length - 1] ?? 0) / 6;   // palettens djupaste ton
 
-    // STEREO COLOR ECHO: sista lampan renderar de färger FÖRSTA lampan hade ~120ms
-    // (6 tick) sedan → färgen "flyger" V→H som ett eko, ger arenabredd på 4 lampor.
-    // Grupp-/spektrum-lägen har egen rumslig logik → undantagna. Ljusstyrkan är
-    // fortfarande live (bara färgen/mönstret ekar).
-    const NO_ECHO = new Set<Mode>(["rave", "gallop", "twin", "ripple", "gravity", "eq", "drumkit", "split"]);
-    const echoOn = this.cfg.colorEcho && count >= 2 && !NO_ECHO.has(effMode);
-    const echoOld = echoOn ? this.echoBuf[this.echoPos] : undefined;   // 6 tick gammalt (strax överskrivet)
-    let lamp0: [number, number, number] = [0, 0, 0];
 
     // ── EFFEKT-KONTEXT (framräknat en gång per frame; idx/fx/band muteras per
     // lampa så samma objekt återanvänds → ingen allokering i loopen) ──────────
@@ -648,17 +595,10 @@ export class EffectEngine {
         ctx.band = fx?.bands?.length ? Math.max(...fx.bands.map((b) => bands[BAND_IDX[b]])) : bands[i % bands.length];
         rgb = effect ? effect.render(ctx) : [0, 0, 0];
       }
-      if (echoOn && i === 0) { lamp0 = [rgb[0], rgb[1], rgb[2]]; }
-      else if (echoOn && echoOld && i === count - 1) { rgb[0] = echoOld[0]; rgb[1] = echoOld[1]; rgb[2] = echoOld[2]; }
       if (rs) {   // riser-strobe: vit-kollaps + accelererande gate
         rgb[0] = (rgb[0] + (1 - rgb[0]) * rsWhite) * rsGate;
         rgb[1] = (rgb[1] + (1 - rgb[1]) * rsWhite) * rsGate;
         rgb[2] = (rgb[2] + (1 - rgb[2]) * rsWhite) * rsGate;
-      }
-      if (bloom) {
-        // Bloom (bas-punch/flash): skala upp färgen till full ljusstyrka.
-        const mxc = Math.max(rgb[0], rgb[1], rgb[2]);
-        if (mxc > 0.02) { rgb[0] /= mxc; rgb[1] /= mxc; rgb[2] /= mxc; }
       }
       if (this.dropEnv > 0.005) {
         // DROP: blenda effektens färg mot FULL ljusstyrka i takt med envelopet
@@ -678,9 +618,6 @@ export class EffectEngine {
       rgb[2] = rgb[2] * md + 0.00 * ambLvl;
       writeFixture(this.universe, fx, rgb, 1, strobeVal);
     }
-    // Skjut in första lampans (pre-master) färg i eko-ringen → sista lampan läser
-    // den om 6 tick. Skrivs EFTER läsningen ovan så fördröjningen blir exakt 6.
-    if (echoOn) { this.echoBuf[this.echoPos] = lamp0; this.echoPos = (this.echoPos + 1) % this.echoBuf.length; }
 
     // Output ballistics on color/dim channels (never strobe/mode channels —
     // a decaying strobe value would sweep through real strobe speeds).

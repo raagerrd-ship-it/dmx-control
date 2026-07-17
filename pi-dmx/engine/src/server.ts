@@ -256,10 +256,20 @@ export async function startServer(
       sock.send(JSON.stringify({ type: "effects", effects: EFFECT_META }));
       sock.send(JSON.stringify({ type: "config", config: deps.cfg }));
 
-      // Push frame samples at 20 Hz for the level meter
+      // Push frame samples at 20 Hz for the level meter + beat diagnostics.
+      // Beat-lås-prick: servern kör på Pi:n (samma klocka som frame.beatAnchorMs)
+      // → räkna takt-index och flagga `beat:true` den push där det gick fram.
+      // Klock-oberoende av klienten (ingen Pi/telefon-tidsskillnad).
+      let lastBeatIdx = -1;
       const push = setInterval(() => {
         const frame = deps.getLatestFrame();
         if (frame && sock.readyState === 1 && (sock.bufferedAmount ?? 0) < 4096) {
+          let beat = false;
+          if (frame.bpm > 40 && frame.beatAnchorMs > 0) {
+            const beatMs = 60000 / frame.bpm;
+            const idx = Math.floor((Date.now() - frame.beatAnchorMs) / beatMs);
+            if (idx !== lastBeatIdx) { if (lastBeatIdx >= 0 && idx > lastBeatIdx) beat = true; lastBeatIdx = idx; }
+          } else { lastBeatIdx = -1; }
           sock.send(JSON.stringify({
             type: "frame",
             level: frame.level,
@@ -268,6 +278,7 @@ export async function startServer(
             gain: frame.gain,
             bpm: frame.bpm,
             bpmConfidence: frame.bpmConfidence,
+            beat,
             mode: deps.getActiveMode(),
           }));
 
@@ -332,16 +343,11 @@ export async function startServer(
             deps.cfg.beatSyncStrength = Math.max(0, Math.min(0.5, msg.value));
           } else if (msg.type === "setEnergyDrivesMode") {
             deps.cfg.energyDrivesMode = !!msg.value;
-          } else if (msg.type === "setDropSensitivity" && typeof msg.value === "number") {
-            deps.cfg.dropSensitivity = Math.max(0, Math.min(1, msg.value));
           } else if (msg.type === "setRotation" && typeof msg.mode === "string") {
             deps.cfg.rotation = { ...deps.cfg.rotation, [msg.mode]: !!msg.value };
           } else if (msg.type === "setSmartDwell") {
             const m = { slow: 20000, normal: 9000, fast: 4000 } as Record<string, number>;
             deps.cfg.smartDwellMs = m[msg.mode as string] ?? 9000;
-          } else if (msg.type === "setManualBpm" && typeof msg.value === "number") {
-            // Tap-tempo: value > 0 låser takten, <= 0 släpper (auto igen).
-            deps.cfg.manualBpm = msg.value > 0 ? Math.max(40, Math.min(220, Math.round(msg.value))) : null;
           } else if (msg.type === "setFog" && msg.fog && typeof msg.fog === "object") {
             const f = msg.fog as Record<string, unknown>;
             const cur = deps.cfg.fog ?? { enabled: false, address: 128, onDrop: true, burstMs: 2500, cooldownMs: 25000, level: 255 };
@@ -357,12 +363,6 @@ export async function startServer(
             deps.cfg.dropBlackout = !!msg.value;
           } else if (msg.type === "setScenicAnchor") {
             deps.cfg.scenicAnchor = !!msg.value;
-          } else if (msg.type === "setEnergyGovernor") {
-            deps.cfg.energyGovernor = !!msg.value;
-          } else if (msg.type === "setColorEcho") {
-            deps.cfg.colorEcho = !!msg.value;
-          } else if (msg.type === "setMicroStrobe") {
-            deps.cfg.microStrobe = !!msg.value;
           } else if (msg.type === "setEnergyCeiling") {
             deps.cfg.energyCeiling = !!msg.value;
           } else if (msg.type === "setClubMode") {

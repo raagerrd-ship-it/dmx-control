@@ -48,9 +48,7 @@ dmx.setMaxHz(cfg.dmxMaxHz);
 
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
-let lastDropMs = 0;
 let lastRenderMs = 0;
-let fluxBaseline = 0.1;
 const slotsFor = () => Math.max(activeSlots(cfg.fixtures), cfg.fog?.enabled ? cfg.fog.address : 0);
 let curSlots = slotsFor();
 
@@ -67,9 +65,7 @@ capture.on("chunk", (samples: Float32Array) => {
   lastChunkAt = Date.now();
   // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
   // (om)lås; att sätta det på varje kick fick pulsen att flimra.
-  // Tap-tempo: en manuellt låst takt överstyr auto-detektionen (men PLL:en nedan
-  // riktar ändå fasen mot faktiska trumslag).
-  const effBpm = cfg.manualBpm && cfg.manualBpm > 0 ? cfg.manualBpm : frame.bpm;
+  const effBpm = frame.bpm;
   if (effBpm === 0) cfg.beat = null;   // tyst → stoppa beat-effekter direkt
   if (effBpm > 0) {
     if (!cfg.beat || Math.abs(cfg.beat.bpm - effBpm) > 2) {
@@ -104,21 +100,9 @@ capture.on("chunk", (samples: Float32Array) => {
       if (k0 > 0 && Math.abs(err) < 0.25) cfg.beat.anchorMs += err * beatMs * k;
     }
   }
-  // Lokal drop: ett slag som är MYCKET starkare än det normala → sällsynt blixt.
-  // (Inte varje kick — annars överröstar blixten alla lägen.) Baslinje = långsam
-  // EMA av kick-flux; drop kräver ett tydligt uthopp + minst ~900 ms mellanrum.
-  if (frame.kick) {
-    // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
-    // inga slag missas) → show-tiden får en knuff, starkare ju tyngre basen är.
-    effects.registerKick(0.4 + Math.min(1, frame.energy * 1.4) * 0.6);
-    fluxBaseline += (frame.flux - fluxBaseline) * 0.05;
-    const mult = 2.4 - cfg.dropSensitivity * 1.5;   // känslig 0.9x .. trög 2.4x
-    const strong = frame.flux > Math.max(0.10, fluxBaseline * mult);
-    if (cfg.dropSensitivity > 0 && strong && Date.now() - lastDropMs > 600) {
-      lastDropMs = Date.now();
-      cfg.flashUntil = Date.now() + 150;
-    }
-  }
+  // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
+  // inga slag missas) → show-tiden får en knuff, starkare ju tyngre basen är.
+  if (frame.kick) effects.registerKick(0.4 + Math.min(1, frame.energy * 1.4) * 0.6);
 
 
   // Frikoppla render från analysrate: analysern (FFT/onset/BPM) körs varje chunk

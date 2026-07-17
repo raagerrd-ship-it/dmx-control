@@ -120,6 +120,9 @@
     <div class="row"><label>Input</label><span class="val" id="levelVal">–</span></div>
     <div class="meter"><div id="levelBar" style="width:0%"></div></div>
     <div class="status">Auto-gain: <span id="gainVal">–</span>×</div>
+    <div class="row" style="margin-top:8px"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
+    <div class="row"><label>Beat-synk <span class="kick-dot" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
+    <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
     <div class="fx-actions" style="margin-top:10px">
       <button class="btn" id="inAux">AUX (kabel-in)</button>
       <button class="btn" id="inMic">Mic (inbyggd)</button>
@@ -165,17 +168,9 @@
   <div id="ownerOnly" hidden>
   <div class="owner-banner">🔧 Ägarläge (setup). Den här sidan är dold för hyresgäster — de öppnar adressen utan <b>/setup</b>.</div>
 
-  <h1>Takt (reserv)</h1>
+  <h1>Beat-synk</h1>
   <div class="card">
     <div class="setrow">
-      <label>Takt <span class="val" id="bpmVal">–</span></label>
-      <div class="fx-actions" style="margin:0">
-        <button class="btn" id="tapBtn">🥁 Knacka takt</button>
-        <button class="btn" id="tapAuto">Auto</button>
-      </div>
-    </div>
-    <div class="status" id="tapHint" style="margin-top:4px">Behövs normalt inte — beatPulse följer basen automatiskt. Reserv om något läge låser fel takt: knacka 4+ slag för att låsa BPM, Auto släpper.</div>
-    <div class="setrow" style="margin-top:10px">
       <label>Beat-synk</label>
       <div class="seg" id="segBeatSync">
         <button data-bs="0">Av</button>
@@ -201,26 +196,10 @@
     <div class="status" id="fogHint" style="margin-top:4px">Ställ rökmaskinen på samma DMX-adress. Blast på drop, med skydd (~2,5s puff, ~25s vila) mot överhettning/tom tank.</div>
   </div>
 
-  <h1>Effekter</h1>
-  <div class="card">
-    <div class="setrow">
-      <label>Drop-blixt känslighet</label>
-      <div class="seg" id="segDrop">
-        <button data-drop="0">Av</button>
-        <button data-drop="0.3">Låg</button>
-        <button data-drop="0.6">Normal</button>
-        <button data-drop="0.9">Hög</button>
-      </div>
-    </div>
-  </div>
-
   <h1>Regi (pro)</h1>
   <div class="card">
     <label class="tgl"><span>Drop-blackout<br><small style="opacity:.6">Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast.</small></span><input type="checkbox" id="tDropBlackout"></label>
     <label class="tgl"><span>Sceniskt djup<br><small style="opacity:.6">Mittlamporna hålls som fasta uplights i höga lägen. Kräver lampor i rad V→H.</small></span><input type="checkbox" id="tScenicAnchor"></label>
-    <label class="tgl"><span>Energispärr<br><small style="opacity:.6">Smart-läget tar en 3-min paus efter ~8 min full fart så dansgolvet får andas.</small></span><input type="checkbox" id="tEnergyGovernor"></label>
-    <label class="tgl"><span>Stereo-eko<br><small style="opacity:.6">Sista lampan speglar första med ~120ms fördröjning — färgen flyger V→H. Kräver lampor i rad.</small></span><input type="checkbox" id="tColorEcho"></label>
-    <label class="tgl"><span>Micro-strobe<br><small style="opacity:.6">Kort mjukvaru-skimmer på diskanttransienter (hi-hats) — eld sprakar, wave gnistrar. Ingen hårdvaru-strobe.</small></span><input type="checkbox" id="tMicroStrobe"></label>
     <label class="tgl"><span>Dynamiskt ljustak (VU)<br><small style="opacity:.6">Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%. Drop bypassar. Djup styrs av Dynamik.</small></span><input type="checkbox" id="tEnergyCeiling"></label>
     <label class="tgl"><span>Klubb-läge (hård kontrast)<br><small style="opacity:.6">Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna. Aggressivt, klistrat på transienterna. Kräver VU-taket på.</small></span><input type="checkbox" id="tClubMode"></label>
     <label class="tgl"><span>Varm vilo-glöd i tystnad<br><small style="opacity:.6">När ingen musik spelar: dim bärnsten-glöd i stället för helt mörkt. Av = lamporna släcks vid ingen input.</small></span><input type="checkbox" id="tAmbientGlow"></label>
@@ -411,22 +390,15 @@ function applyConfig(cfg) {
   curMode = cfg.mode || "smart";
   refreshModeView();                 // sätter tEnergy/dwell/intro + renderar listorna
   tBeatPulse.checked = !!cfg.beatPulse;
-  manualBpm = cfg.manualBpm || null;
-  if (tapBtn) tapBtn.classList.toggle("primary", !!manualBpm);
-  showBpm(0);
   const fog = cfg.fog || {};
   if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 128; }
   if (tDropBlackout) tDropBlackout.checked = cfg.dropBlackout !== false;   // default på
   if (tScenicAnchor) tScenicAnchor.checked = !!cfg.scenicAnchor;
-  if (tEnergyGovernor) tEnergyGovernor.checked = !!cfg.energyGovernor;
-  if (tColorEcho) tColorEcho.checked = !!cfg.colorEcho;
-  if (tMicroStrobe) tMicroStrobe.checked = !!cfg.microStrobe;
   if (tEnergyCeiling) tEnergyCeiling.checked = !!cfg.energyCeiling;
   if (tClubMode) tClubMode.checked = !!cfg.clubMode;
   if (tAmbientGlow) tAmbientGlow.checked = !!cfg.ambientGlow;
   if (tRiserStrobe) tRiserStrobe.checked = !!cfg.riserStrobe;
   if (tDropHeadroom) tDropHeadroom.checked = !!cfg.dropHeadroom;
-  segActivate("segDrop", cfg.dropSensitivity ?? 0.6, "drop");
   segActivate("segBeatSync", cfg.beatSyncStrength ?? 0.18, "bs");
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
@@ -456,7 +428,17 @@ function applyFrame(f) {
     const row = document.querySelector('.rotrow[data-mode="' + f.mode + '"]');
     if (row) row.classList.add("playing");
   }
-  if (!manualBpm && typeof f.bpm === "number") showBpm(f.bpm);   // visa auto-BPM live
+  // Live beat-diagnostik under LEVEL
+  const locked = typeof f.bpm === "number" && f.bpm > 0;
+  bpmVal.textContent = locked ? Math.round(f.bpm) + " BPM" : "–";
+  beatSyncVal.textContent = locked ? "Låst" : "Söker";
+  beatSyncVal.style.color = locked ? "var(--ok)" : "var(--dim)";
+  confVal.textContent = typeof f.bpmConfidence === "number" ? Math.round(f.bpmConfidence * 100) + "%" : "–";
+  if (f.beat) {   // beat-lås-prick: pulsa på varje takt
+    beatDot.classList.add("on");
+    clearTimeout(beatTimer);
+    beatTimer = setTimeout(() => beatDot.classList.remove("on"), 100);
+  }
 }
 
 
@@ -811,36 +793,12 @@ const tBeatPulse = document.getElementById("tBeatPulse");
 const tEnergy = document.getElementById("tEnergy");
 tBeatPulse.onchange = () => send({ type: "setBeatPulse", value: tBeatPulse.checked });
 
-/* ── Tap-tempo ──────────────────────────────────────────────────────────
-   Knacka takt → låser BPM (överstyr autodetektionen). Fas-låset (PLL) i
-   motorn riktar ändå pulsen mot faktiska trumslag. "Auto" släpper låset. */
+// Live beat-diagnostik under LEVEL (uppdateras i applyFrame).
 const bpmVal = document.getElementById("bpmVal");
-const tapBtn = document.getElementById("tapBtn");
-const tapAuto = document.getElementById("tapAuto");
-let manualBpm = null;   // låst takt (från config), null = auto
-let taps = [];
-function showBpm(autoBpm) {
-  if (manualBpm) { bpmVal.textContent = manualBpm + " BPM · låst"; bpmVal.style.color = "var(--hot)"; }
-  else { bpmVal.textContent = (autoBpm > 0 ? "~" + Math.round(autoBpm) : "–") + " BPM · auto"; bpmVal.style.color = ""; }
-}
-tapBtn.onclick = () => {
-  const now = Date.now();
-  if (taps.length && now - taps[taps.length - 1] > 2000) taps = [];   // >2s paus → börja om
-  taps.push(now);
-  if (taps.length > 8) taps.shift();
-  if (taps.length >= 3) {
-    let sum = 0; for (let i = 1; i < taps.length; i++) sum += taps[i] - taps[i - 1];
-    let bpm = 60000 / (sum / (taps.length - 1));
-    while (bpm < 70) bpm *= 2; while (bpm >= 190) bpm /= 2;   // vik till 70–190
-    manualBpm = Math.round(bpm);
-    send({ type: "setManualBpm", value: manualBpm });
-    showBpm(0);
-    tapBtn.classList.add("primary");
-  } else {
-    bpmVal.textContent = "knacka… (" + taps.length + ")";
-  }
-};
-tapAuto.onclick = () => { manualBpm = null; taps = []; tapBtn.classList.remove("primary"); send({ type: "setManualBpm", value: 0 }); showBpm(0); };
+const beatSyncVal = document.getElementById("beatSyncVal");
+const confVal = document.getElementById("confVal");
+const beatDot = document.getElementById("beatDot");
+let beatTimer;
 
 /* ── Rökmaskin ─────────────────────────────────────────────────────────── */
 const fogEnabled = document.getElementById("fogEnabled");
@@ -856,14 +814,8 @@ fogNowBtn.onclick = () => send({ type: "fogNow" });
 /* ── Regi (pro) ────────────────────────────────────────────────────────── */
 const tDropBlackout = document.getElementById("tDropBlackout");
 const tScenicAnchor = document.getElementById("tScenicAnchor");
-const tEnergyGovernor = document.getElementById("tEnergyGovernor");
 tDropBlackout.onchange = () => send({ type: "setDropBlackout", value: tDropBlackout.checked });
 tScenicAnchor.onchange = () => send({ type: "setScenicAnchor", value: tScenicAnchor.checked });
-tEnergyGovernor.onchange = () => send({ type: "setEnergyGovernor", value: tEnergyGovernor.checked });
-const tColorEcho = document.getElementById("tColorEcho");
-const tMicroStrobe = document.getElementById("tMicroStrobe");
-tColorEcho.onchange = () => send({ type: "setColorEcho", value: tColorEcho.checked });
-tMicroStrobe.onchange = () => send({ type: "setMicroStrobe", value: tMicroStrobe.checked });
 const tEnergyCeiling = document.getElementById("tEnergyCeiling");
 tEnergyCeiling.onchange = () => send({ type: "setEnergyCeiling", value: tEnergyCeiling.checked });
 const tClubMode = document.getElementById("tClubMode");
@@ -889,8 +841,6 @@ tEnergy.onchange = () => {
   }
   refreshModeView();
 };
-document.querySelectorAll("#segDrop button").forEach((b) =>
-  b.onclick = () => { send({ type: "setDropSensitivity", value: Number(b.dataset.drop) }); segActivate("segDrop", Number(b.dataset.drop), "drop"); });
 document.querySelectorAll("#segBeatSync button").forEach((b) =>
   b.onclick = () => { send({ type: "setBeatSyncStrength", value: Number(b.dataset.bs) }); segActivate("segBeatSync", Number(b.dataset.bs), "bs"); });
 document.querySelectorAll("#segDwell button").forEach((b) =>

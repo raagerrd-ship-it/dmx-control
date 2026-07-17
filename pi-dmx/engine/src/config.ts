@@ -64,8 +64,6 @@ export interface EngineConfig {
   beatSyncStrength: number;
   /** Energi (lokal) väljer läge i smart-läget. */
   energyDrivesMode: boolean;
-  /** Drop-blixt på starka slag: 0=av .. 1=känsligast. */
-  dropSensitivity: number;
   /** Hur ofta smart byter läge (ms). */
   smartDwellMs: number;
   master: number;         // 0..1 master brightness
@@ -82,14 +80,8 @@ export interface EngineConfig {
    *  tänd/släck-punkt. index<0 = av. channel = vilken färg testet driver ("all"
    *  = alla lika, annars bara r/g/b/w → kalibrera per färg). */
   calTest?: { index: number; value: number; channel?: "all" | "r" | "g" | "b" | "w" } | null;
-  /** Transient SmartSync flash override (wall-clock ms) — not persisted. */
-  flashUntil?: number | null;
-  /** Transient SmartSync beat clock (BPM + wall-clock anchor) — not persisted. */
+  /** Transient beat clock (BPM + wall-clock anchor) — not persisted. */
   beat?: { anchorMs: number; bpm: number } | null;
-  /** Tap-tempo override (BPM). When set, overrides the auto-detected tempo for
-   *  the beat clock; the PLL still aligns phase to real kicks. Transient — not
-   *  persisted, so a restart falls back to auto-detection. */
-  manualBpm?: number | null;
   /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */
   dmxMaxHz: number;
   /** Rökmaskin (1 DMX-kanal). Blast på drop, med duty-cycle-skydd. */
@@ -107,12 +99,6 @@ export interface EngineConfig {
   dropBlackout: boolean;
   /** REGI: sceniskt djup — mittlamporna hålls som fasta uplights i höga lägen. */
   scenicAnchor: boolean;
-  /** REGI: energispärr — smart-läget tvingas till vila efter för lång full fart. */
-  energyGovernor: boolean;
-  /** REGI: stereo-eko — sista lampan speglar första med ~120ms fördröjning. */
-  colorEcho: boolean;
-  /** REGI: micro-strobe — kort mjukvaru-dimmernotch på diskanttransienter (skimmer). */
-  microStrobe: boolean;
   /** REGI: dynamiskt ljustak (VU) — max-styrka följer sektionsenergin; drop bypassar. */
   energyCeiling: boolean;
   /** REGI: klubb-läge — kvadrerar VU-taket (hård kontrast: mörkt mellan, explosion på topp). */
@@ -149,7 +135,6 @@ export const defaultConfig: EngineConfig = {
   beatPulse: true,
   beatSyncStrength: 0.18,   // normal PLL-korrektion mot trumslag
   energyDrivesMode: true,
-  dropSensitivity: 0.3,
   smartDwellMs: 9000,
   master: 1.0,
   chaseStyle: "pingpong",
@@ -159,9 +144,6 @@ export const defaultConfig: EngineConfig = {
   fog: { enabled: false, address: 128, onDrop: true, burstMs: 2500, cooldownMs: 25000, level: 255 },
   dropBlackout: true,     // dramaturgisk tystnad — låg risk, lyfter varje drop
   scenicAnchor: false,    // ägar-val: antar lampor i rad vänster→höger
-  energyGovernor: false,  // ägar-val: kan förvirra en hyresgäst, av som standard
-  colorEcho: false,       // ägar-val: antar lampor i rad; ändrar looket på ytterlamporna
-  microStrobe: false,     // ägar-val: strobe-nära, opt-in
   energyCeiling: true,    // direkt VU = ljusstyrka; standard på (drop/punch bypassar)
   clubMode: false,        // hård kontrast (VU²); opt-in — rör inte det trogna linjära läget
   ambientGlow: false,     // tystnad = HELT mörkt som standard; slå på för varm vilo-glöd
