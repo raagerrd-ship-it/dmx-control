@@ -4,7 +4,7 @@ import { useDmx } from "@/store/dmx";
 import {
   CALM_MODES, FAST_MODES, FULL_MODES, SCENES,
   usePi, usePlayingMode, setPi, setRotation, applyScene,
-  type Dwell, type DropSens, type Scene,
+  type Dwell,
 } from "@/hooks/usePiMock";
 import { useLocation } from "react-router-dom";
 
@@ -365,19 +365,6 @@ function AdvancedTechnical() {
                 { v: 0.35 as const, label: "Lugn" },
                 { v: 0.6  as const, label: "Normal" },
                 { v: 0.85 as const, label: "Maxad" },
-              ]}
-            />
-          </div>
-          <div>
-            <div className="text-[11px] text-muted-foreground uppercase tracking-[0.08em] mb-1.5">Drop-blixt känslighet</div>
-            <Seg<DropSens>
-              value={s.dropSensitivity}
-              onChange={(v) => setPi({ dropSensitivity: v })}
-              options={[
-                { v: 0,   label: "Av" },
-                { v: 0.3, label: "Låg" },
-                { v: 0.6, label: "Normal" },
-                { v: 0.9, label: "Hög" },
               ]}
             />
           </div>
