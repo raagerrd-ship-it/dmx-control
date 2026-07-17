@@ -25,10 +25,14 @@ const FEEL: Record<MoodId, {
   clubMode: boolean;     // kvadrera VU-taket → extra hård kontrast
   ambientGlow: boolean;  // varm vilo-glöd i tystnad (annars helt mörkt)
   smartDwellMs: number;  // hur ofta smart byter effekt (lägre = piggare)
+  master: number;        // ljus-tak (0..1): hela riggens max-styrka
+  calmDecay: number;     // output-decay (s) för lugna/fart-effekter: högre = trögare,
+                         //   ljuset tonar långsamt = "långsam reaktion". (fart-lägen
+                         //   har egen kort decay; detta rör calm/fart.)
 }> = {
-  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  smartDwellMs: 20000 },
-  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, smartDwellMs: 9000  },
-  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, smartDwellMs: 6000  },
+  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  smartDwellMs: 20000, master: 0.55, calmDecay: 0.80 },
+  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, smartDwellMs: 9000,  master: 1.00, calmDecay: 0.42 },
+  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, smartDwellMs: 6000,  master: 1.00, calmDecay: 0.42 },
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -37,8 +41,8 @@ export function isMood(v: unknown): v is MoodId {
 }
 
 /** Applicera en stämning på configen. Anroparen (server-handlern) sköter
- *  broadcast + persist efteråt. Rör INTE master (ljusstyrka är egen ratt) eller
- *  audioInput (hyresgästen väljer AUX/mic separat). */
+ *  broadcast + persist efteråt. Rör INTE audioInput (hyresgästen väljer AUX/mic
+ *  separat). master (ljus-tak) sätts nu per stämning; kan justeras manuellt efteråt. */
 export function applyMood(cfg: EngineConfig, mood: MoodId): void {
   const f = FEEL[mood];
   cfg.mode = "smart";              // stämningarna följer alltid musiken
@@ -50,6 +54,8 @@ export function applyMood(cfg: EngineConfig, mood: MoodId): void {
   cfg.clubMode = f.clubMode;
   cfg.ambientGlow = f.ambientGlow;
   cfg.smartDwellMs = f.smartDwellMs;
+  cfg.master = f.master;           // ljus-tak
+  cfg.calmDecay = f.calmDecay;      // reaktions-tröghet (output-decay)
   // Rotation: bara stämningens pool aktiv (allt annat AV → smart väljer bara ur poolen).
   const pool = new Set<Mode>(POOL[mood]);
   const rot: Partial<Record<Mode, boolean>> = {};

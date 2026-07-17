@@ -629,7 +629,7 @@ export class EffectEngine {
     // transient); låg energi → lång decay (mjuk andande wash). Utnyttjar diodernas
     // snabba respons — skarpt utan hårdvaru-strobe.
     const sharpen = Math.min(0.65, audio * 0.45 + this.buildUp * 0.5);   // 0 lugnt .. 0.65 energiskt
-    const tau = Math.max(0.08, (fastMode ? fastTau : 0.42) * (1 - sharpen));
+    const tau = Math.max(0.08, (fastMode ? fastTau : (this.cfg.calmDecay ?? 0.42)) * (1 - sharpen));
     const decay = Math.exp(-dtSec / tau);
     // Bygg strobe-masken bara när fixtures ändras (inte varje frame).
     if (this.strobeMaskFor !== this.cfg.fixtures) {

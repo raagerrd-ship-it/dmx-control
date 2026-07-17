@@ -63,6 +63,9 @@ export interface EngineConfig {
   sensitivity: number;    // 0..1 user knob
   /** 0..1 kontrast: 0 = jämnt ljus, 1 = dovt i tystnad + smäll i beats. */
   dynamics: number;
+  /** Output-ballistikens decay (s) för lugna/fart-effekter — högre = ljuset tonar
+   *  långsammare = "långsam reaktion". Sätts per stämning (moods.ts); default 0.42. */
+  calmDecay: number;
   /** Pulsa hela riggen på taktslag. */
   beatPulse: boolean;
   /** Hur aggressivt beat-PLL:en knuffar takt-ankaret mot faktiska trumslag
@@ -141,6 +144,7 @@ export const defaultConfig: EngineConfig = {
   audioInput: "aux",
   sensitivity: 0.6,
   dynamics: 0.6,
+  calmDecay: 0.42,
   beatPulse: true,
   beatSyncStrength: 0.18,   // normal PLL-korrektion mot trumslag
   energyDrivesMode: true,
