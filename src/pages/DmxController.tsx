@@ -12,7 +12,7 @@ import { useLocation } from "react-router-dom";
  * HYRESGÄST-UI (mock). Prioritet i den ordningen:
  *  1) Är ljuset PÅ? (stor switch)
  *  2) Vilken stämning? (Chill / Fest / Galet — 3 stora tiles, ett tap sätter allt)
- *  3) Ljusstyrka
+ *  3) Ljudkälla
  * Allt annat gömt bakom "Mer inställningar". Pi-HTML:en är fortfarande orörd.
  */
 export default function DmxController() {
@@ -157,7 +157,7 @@ function MoreButton({ open, onToggle }: { open: boolean; onToggle: () => void })
   );
 }
 
-/* ────────── Mer: ljudkälla, live-nivå, effekter, avancerat ────────── */
+/* ────────── Mer: ljusstyrka, live-nivå, effekter, avancerat ────────── */
 
 function AudioMeterCard() {
   const audio = useDmx((st) => st.audioLevel);
