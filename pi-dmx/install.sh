@@ -76,7 +76,14 @@ if command -v nmcli >/dev/null; then
       802-11-wireless-security.key-mgmt "" \
       802-11-wireless-security.psk "" 2>/dev/null || true
   fi
-  echo "  (AP-profil skapad — aktiveras vid reboot; patchad for fjarrinstall)"
+  # CAPTIVE PORTAL: NM:s shared-dnsmasq laser /etc/NetworkManager/dnsmasq-shared.d/*.conf.
+  # Peka ALLA domaner till gatewayen -> nar en telefon ansluter till AP:n landar OS:ens
+  # internet-koll pa kontroll-sidan automatiskt (motorn 302:ar probe-URLerna till "/").
+  # Galler bara AP/shared-interfacet; Pi:ns egen wifi-klient ar oberord.
+  install -d /etc/NetworkManager/dnsmasq-shared.d
+  printf '# Captive portal: alla domaner -> gateway sa OS-internet-kollen landar pa /.\naddress=/#/192.168.4.1\n' \
+    > /etc/NetworkManager/dnsmasq-shared.d/captive.conf
+  echo "  (AP-profil + captive-portal skapad — aktiveras vid reboot; patchad for fjarrinstall)"
 
 else
   echo "  ! NetworkManager not found — skipping AP setup." >&2

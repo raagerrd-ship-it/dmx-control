@@ -108,6 +108,28 @@ export async function startServer(
   // bara här (klienten kollar /setup i URL:en). Hyresgäster använder "/".
   app.get("/setup", (_req, reply) => reply.sendFile("index.html"));
 
+  // CAPTIVE PORTAL: när en telefon/laptop ansluter till Pi-AP:n gör OS:et en
+  // "internet-koll" mot en känd URL. DNS på AP:n (dnsmasq-shared.d) pekar ALLA
+  // domäner till 192.168.4.1 → koll-requesten landar här. Vi svarar med en 302 →
+  // OS:et ser "ingen internet, inloggning krävs" och poppar upp kontroll-sidan
+  // automatiskt. Redirect till "/" (hyresgäst-vyn), INTE /setup (ägar-sektioner).
+  const CAPTIVE_PORTAL = "http://192.168.4.1/";
+  const captiveRedirect = (_req: any, reply: any) => reply.code(302).header("location", CAPTIVE_PORTAL).send();
+  // OS-specifika probe-URLer (explicita → vinner över statiska filens wildcard).
+  for (const p of [
+    "/generate_204", "/gen_204",                 // Android / Chrome OS
+    "/hotspot-detect.html",                        // Apple iOS/macOS (CNA)
+    "/library/test/success.html",                  // Apple (äldre)
+    "/connecttest.txt", "/ncsi.txt", "/redirect",  // Windows NCSI
+    "/canonical.html",                             // Firefox
+  ]) app.get(p, captiveRedirect);
+  // Fallback: alla övriga okända GET (andra probe-varianter, godtyckliga domäner
+  // OS:et testar) → samma redirect. Icke-GET behåller normal 404.
+  app.setNotFoundHandler((req, reply) => {
+    if (req.method === "GET") return captiveRedirect(req, reply);
+    return reply.code(404).send();
+  });
+
   // Hälsokoll för watchdog: 200 om ljud-pipelinen lever, annars 503 → watchdogen
   // startar om motorn (fångar ett HÄNG som Restart=always inte ser).
   app.get("/health", (_req, reply) => {
