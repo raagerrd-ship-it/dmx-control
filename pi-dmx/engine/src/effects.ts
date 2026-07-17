@@ -25,8 +25,11 @@ export class EffectEngine {
   private chasePos = 0;
   private chaseDir = 1;
   private lastChaseAdvance = 0;
-  /** Beat clock: last whole-beat index seen (SmartSync tempo sync). */
+  /** Beat clock: last whole-beat index seen (för beatTick-flanken). */
   private lastBeatIdx = -1;
+  /** Takt-räknare som effekterna ser (beatIdx): stegar på grid-slaget när BPM är
+   *  låst, annars på verkliga kicks → grid-effekter fryser aldrig utan BPM-lås. */
+  private beatCounter = 0;
   /** Drops mode: per-lamp fire time + hue; advanced on each beat/kick. */
   private dropPos = 0;
   private dropSector = 0;
@@ -565,14 +568,24 @@ export class EffectEngine {
 
     // ── EFFEKT-KONTEXT (framräknat en gång per frame; idx/fx/band muteras per
     // lampa så samma objekt återanvänds → ingen allokering i loopen) ──────────
-    let beatIdx = 0, beatFrac = 0;
-    if (this.cfg.beat && this.cfg.beat.bpm > 40) {
-      const bMs = 60000 / this.cfg.beat.bpm;
-      const sinceB = Date.now() - this.cfg.beat.anchorMs;
-      beatIdx = Math.floor(sinceB / bMs);
+    const hasBeat = !!(this.cfg.beat && this.cfg.beat.bpm > 40);
+    let beatFrac = 0;
+    if (hasBeat) {
+      const bMs = 60000 / this.cfg.beat!.bpm;
+      const sinceB = Date.now() - this.cfg.beat!.anchorMs;
       beatFrac = ((sinceB % bMs) + bMs) % bMs / bMs;
     }
-    const beatPulse = Math.pow(1 - beatFrac, 2);   // mjuk puls-envelope (0..1) per takt
+    // TAKT-RÄKNARE med graceful degradation: stegar på GRID-slaget (beatTick) när
+    // BPM är låst, annars på VERKLIGA kicks (frame.kick). Så grid-effekterna
+    // (snap/rave/party/ripple/…) fortsätter dansa på trummorna även när BPM-låset
+    // tappas, i st.f. att frysa på beatIdx=0. Alla effekter använder beatIdx
+    // MODULÄRT (färg/grupp/position) → ren drop-in.
+    if (beatTick || (!hasBeat && frame.kick)) this.beatCounter++;
+    const beatIdx = this.beatCounter;
+    // beatPulse: grid-puls när låst, annars den VERKLIGA kick-envelopen → pulsar
+    // ALLTID på musiken. (Utan detta gav beatFrac=0 → beatPulse=1 konstant = ingen
+    // puls när BPM ej låst → party/pulse/bounce lyste bara jämnt högt.)
+    const beatPulse = hasBeat ? Math.pow(1 - beatFrac, 2) : kickEnv;
     const beatMs2 = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
     const tempoDeep = Math.max(0, Math.min(1, (beatMs2 - 340) / 260));   // 0 snabbt .. 1 långsamt
     const punchFloor = 0.5 - tempoDeep * 0.42;                            // 0.5 (snabbt) .. 0.08 (långsamt)
@@ -604,7 +617,6 @@ export class EffectEngine {
       const f = floor * (1 - dyn);
       return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.2));
     };
-    const hasBeat = !!(this.cfg.beat && this.cfg.beat.bpm > 40);
     const mclk = (beatsPerStep: number, secPerStep: number) =>
       hasBeat ? Math.floor(beatIdx / beatsPerStep) : Math.floor(t / secPerStep);
     // GRAVITATIONS-VU: ljudet knuffar nivån UPP; sen faller den med gravitation.
