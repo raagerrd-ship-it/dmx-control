@@ -750,35 +750,33 @@ export class EffectEngine {
     for (const cf of this.cfg.fixtures) {
       const cal = cf.cal;
       if (!cal || !cal.on) continue;
+      const on = cal.on;
       const roles = fixtureRoles(cf);
       const cbase = cf.address - 1;
-      // Luminans = starkaste ljuskanalen (byte 0..255) — motorns färdiga värde.
-      let L = 0;
+      // PER-KANAL TRÖSKEL: varje R/G/B(/W/dim) är ANTINGEN 0 (av) ELLER ≥ on (över
+      // LED:ns tändpunkt). En dim BIFÄRG (0<ch<on) hamnar annars i dödzonen där just
+      // den dioden flimrar vid sin egen tändpunkt → färg-fladder. Här lyfts varje
+      // TÄND kanal till [on..255], släckt → 0 → ingen kanal i dödzonen.
+      // Fade-håll (luminans): bara när HELA lampan går mot svart hålls senaste
+      // färgen & tonas mjukt ner (~130ms). Är någon kanal tänd → sätts DIREKT
+      // (skarpa färgbyten, punch och dynamik oförändrat).
+      let anyLit = false;
       for (let i = 0; i < roles.length; i++) {
         const ch = cbase + i;
-        if (ch >= 0 && ch < 512 && this.capMask[ch] && this.universe[ch] > L) L = this.universe[ch];
+        if (ch >= 0 && ch < 512 && this.capMask[ch] && this.universe[ch] > 0) { anyLit = true; break; }
       }
-      if (L > 0) {
-        // TÄNT: skala luminansen L → [on..255], hela lampan med samma faktor. Följs
-        // DIREKT → punch, dynamik och färgbyten är oförändrat skarpa.
-        const gain = (cal.on + (255 - cal.on) * L / 255) / L;
-        for (let i = 0; i < roles.length; i++) {
-          const ch = cbase + i;
-          if (ch < 0 || ch >= 512 || !this.capMask[ch]) continue;
-          const v = Math.min(255, this.universe[ch] * gain);
-          this.calSmooth[ch] = v;
-          this.universe[ch] = Math.round(v);
+      for (let i = 0; i < roles.length; i++) {
+        const ch = cbase + i;
+        if (ch < 0 || ch >= 512 || !this.capMask[ch]) continue;
+        let v;
+        if (anyLit) {
+          const raw = this.universe[ch];
+          v = raw <= 0 ? 0 : on + (255 - on) * raw / 255;   // 0 eller [on..255], per kanal
+        } else {
+          v = this.calSmooth[ch] * (1 - calRel);            // hela lampan mot svart → mjuk fade
         }
-      } else {
-        // HELA LAMPAN mot släck: håll senaste färgen och tona mjukt NER till 0 (~130ms)
-        // → ingen hård blink från tändtröskeln till svart, ljuset hålls "över släck".
-        for (let i = 0; i < roles.length; i++) {
-          const ch = cbase + i;
-          if (ch < 0 || ch >= 512 || !this.capMask[ch]) continue;
-          const v = this.calSmooth[ch] * (1 - calRel);
-          this.calSmooth[ch] = v;
-          this.universe[ch] = v < 0.5 ? 0 : Math.round(v);
-        }
+        this.calSmooth[ch] = v;
+        this.universe[ch] = v < 0.5 ? 0 : Math.round(v);
       }
     }
 
