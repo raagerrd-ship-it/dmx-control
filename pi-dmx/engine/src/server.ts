@@ -349,6 +349,8 @@ export async function startServer(
             deps.cfg.ambientGlow = !!msg.value;
           } else if (msg.type === "setRiserStrobe") {
             deps.cfg.riserStrobe = !!msg.value;
+          } else if (msg.type === "setDropHeadroom") {
+            deps.cfg.dropHeadroom = !!msg.value;
           } else if (msg.type === "fogNow") {
             deps.cfg.fogTrigger = true;   // engångs-puff (motorn nollställer flaggan)
           }

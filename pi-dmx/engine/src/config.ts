@@ -122,6 +122,9 @@ export interface EngineConfig {
   /** REGI: riser-strobe — under en uppbyggnad accelererar en strobe + färgen
    *  kollapsar mot vitt, sen blackout på dropen (klassisk EDM-build). */
   riserStrobe: boolean;
+  /** REGI: drop-headroom — kapa normal ljusstyrka till ~95%, men låt DROPS gå
+   *  ända till 100% → drops poppar, och konstant full blast dämpas. */
+  dropHeadroom: boolean;
 }
 
 export const defaultConfig: EngineConfig = {
@@ -163,6 +166,7 @@ export const defaultConfig: EngineConfig = {
   clubMode: false,        // hård kontrast (VU²); opt-in — rör inte det trogna linjära läget
   ambientGlow: false,     // tystnad = HELT mörkt som standard; slå på för varm vilo-glöd
   riserStrobe: false,     // ägar-val: accelererande strobe + vit-kollaps under risers
+  dropHeadroom: false,    // ägar-val: normal ≤95%, drops → 100% (huvudrum för pop)
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {

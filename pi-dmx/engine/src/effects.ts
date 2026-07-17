@@ -786,6 +786,17 @@ export class EffectEngine {
       }
     }
 
+    // DROP-HEADROOM: kapa normal ljusstyrka till 95%, men släpp DROPS till 100%.
+    // Ren TAK-klämning (bara det som ligger över kapet dras ner → dim-värden orörda,
+    // ingen kanal skjuts under sin tröskel). dropEnv lyfter kapet till 100% under
+    // dropen → den poppar tydligt mot en normalt lite lugnare rigg. Sist av allt.
+    if (this.cfg.dropHeadroom) {
+      const capByte = Math.round(255 * Math.min(1, 0.95 + 0.05 * this.dropEnv));
+      for (let ch = 0; ch < this.maxCh; ch++) {
+        if (this.capMask[ch] && this.universe[ch] > capByte) this.universe[ch] = capByte;
+      }
+    }
+
     // Rök-kanal skrivs SIST (efter ballistiken) → instant på/av, ingen fade.
     if (fog?.enabled) {
       const fa = fog.address - 1;

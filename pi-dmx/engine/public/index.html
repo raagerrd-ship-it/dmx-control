@@ -225,6 +225,7 @@
     <label class="tgl"><span>Klubb-läge (hård kontrast)<br><small style="opacity:.6">Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna. Aggressivt, klistrat på transienterna. Kräver VU-taket på.</small></span><input type="checkbox" id="tClubMode"></label>
     <label class="tgl"><span>Varm vilo-glöd i tystnad<br><small style="opacity:.6">När ingen musik spelar: dim bärnsten-glöd i stället för helt mörkt. Av = lamporna släcks vid ingen input.</small></span><input type="checkbox" id="tAmbientGlow"></label>
     <label class="tgl"><span>Riser-strobe (build → drop)<br><small style="opacity:.6">Under en uppbyggnad: accelererande strobe + färgen kollapsar mot vitt, sen blackout på dropen. Klassisk EDM-build.</small></span><input type="checkbox" id="tRiserStrobe"></label>
+    <label class="tgl"><span>Drop-headroom (max 95%, drops 100%)<br><small style="opacity:.6">Kapar normal ljusstyrka till 95% men släpper drops ända till full — de poppar tydligare och riggen slutar blasta på max hela tiden.</small></span><input type="checkbox" id="tDropHeadroom"></label>
   </div>
 
   <h1>Lampor</h1>
@@ -424,6 +425,7 @@ function applyConfig(cfg) {
   if (tClubMode) tClubMode.checked = !!cfg.clubMode;
   if (tAmbientGlow) tAmbientGlow.checked = !!cfg.ambientGlow;
   if (tRiserStrobe) tRiserStrobe.checked = !!cfg.riserStrobe;
+  if (tDropHeadroom) tDropHeadroom.checked = !!cfg.dropHeadroom;
   segActivate("segDrop", cfg.dropSensitivity ?? 0.6, "drop");
   segActivate("segBeatSync", cfg.beatSyncStrength ?? 0.18, "bs");
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
@@ -870,6 +872,8 @@ const tAmbientGlow = document.getElementById("tAmbientGlow");
 tAmbientGlow.onchange = () => send({ type: "setAmbientGlow", value: tAmbientGlow.checked });
 const tRiserStrobe = document.getElementById("tRiserStrobe");
 tRiserStrobe.onchange = () => send({ type: "setRiserStrobe", value: tRiserStrobe.checked });
+const tDropHeadroom = document.getElementById("tDropHeadroom");
+tDropHeadroom.onchange = () => send({ type: "setDropHeadroom", value: tDropHeadroom.checked });
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.
