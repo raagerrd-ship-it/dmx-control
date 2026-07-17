@@ -12,7 +12,7 @@ import { useLocation } from "react-router-dom";
  * HYRESGÄST-UI (mock). Prioritet i den ordningen:
  *  1) Är ljuset PÅ? (stor switch)
  *  2) Vilken stämning? (Chill / Fest / Galet — 3 stora tiles, ett tap sätter allt)
- *  3) Ljusstyrka
+ *  3) Ljudkälla
  * Allt annat gömt bakom "Mer inställningar". Pi-HTML:en är fortfarande orörd.
  */
 export default function DmxController() {
@@ -25,7 +25,7 @@ export default function DmxController() {
     <main className="mx-auto max-w-md px-4 pt-4 pb-8 safe-bottom">
       <PowerHero />
       <SceneTiles />
-      <BrightnessCard />
+      <AudioSourceCard />
       <AudioMeterCard />
       <MoreButton open={showMore} onToggle={() => setShowMore((o) => !o)} />
       {showMore && <MoreSections />}
@@ -114,26 +114,31 @@ function SceneTiles() {
   );
 }
 
-/* ────────── 3. Ljusstyrka ────────── */
+/* ────────── 3. Ljudkälla (synligt i huvudvy) ────────── */
 
-function BrightnessCard() {
+function AudioSourceCard() {
   const s = usePi();
   return (
-    <div className="bg-card border border-border rounded-[14px] p-4 mb-4">
-      <div className="flex items-center justify-between mb-2.5">
-        <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Ljusstyrka</span>
-        <span className="text-[13px] text-muted-foreground tabular-nums">{Math.round(s.master * 100)}%</span>
+    <Section title="Ljudkälla">
+      <div className="flex gap-2">
+        <button
+          onClick={() => setPi({ audioInput: "aux" })}
+          className={`flex-1 py-3.5 rounded-[10px] border font-semibold text-[15px] ${
+            s.audioInput === "aux"
+              ? "bg-primary border-primary text-primary-foreground"
+              : "bg-card border-border"
+          }`}
+        >AUX (kabel)</button>
+        <button
+          onClick={() => setPi({ audioInput: "mic" })}
+          className={`flex-1 py-3.5 rounded-[10px] border font-semibold text-[15px] ${
+            s.audioInput === "mic"
+              ? "bg-primary border-primary text-primary-foreground"
+              : "bg-card border-border"
+          }`}
+        >Mikrofon</button>
       </div>
-      <Seg
-        value={s.master}
-        onChange={(v) => setPi({ master: v })}
-        options={[
-          { v: 0.5  as const, label: "50%" },
-          { v: 0.75 as const, label: "75%" },
-          { v: 1    as const, label: "100%" },
-        ]}
-      />
-    </div>
+    </Section>
   );
 }
 
@@ -152,7 +157,7 @@ function MoreButton({ open, onToggle }: { open: boolean; onToggle: () => void })
   );
 }
 
-/* ────────── Mer: ljudkälla, live-nivå, effekter, avancerat ────────── */
+/* ────────── Mer: ljusstyrka, live-nivå, effekter, avancerat ────────── */
 
 function AudioMeterCard() {
   const audio = useDmx((st) => st.audioLevel);
@@ -223,26 +228,20 @@ function MoreSections() {
 
   return (
     <div className="mt-3">
-      {/* Ljudkälla */}
-      <Section title="Ljudkälla">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setPi({ audioInput: "aux" })}
-            className={`flex-1 py-3.5 rounded-[10px] border font-semibold text-[15px] ${
-              s.audioInput === "aux"
-                ? "bg-primary border-primary text-primary-foreground"
-                : "bg-card border-border"
-            }`}
-          >AUX (kabel)</button>
-          <button
-            onClick={() => setPi({ audioInput: "mic" })}
-            className={`flex-1 py-3.5 rounded-[10px] border font-semibold text-[15px] ${
-              s.audioInput === "mic"
-                ? "bg-primary border-primary text-primary-foreground"
-                : "bg-card border-border"
-            }`}
-          >Mikrofon</button>
+      {/* Ljusstyrka */}
+      <Section title="Ljusstyrka">
+        <div className="flex items-center justify-between mb-2.5">
+          <span className="text-[13px] text-muted-foreground tabular-nums">{Math.round(s.master * 100)}%</span>
         </div>
+        <Seg
+          value={s.master}
+          onChange={(v) => setPi({ master: v })}
+          options={[
+            { v: 0.5  as const, label: "50%" },
+            { v: 0.75 as const, label: "75%" },
+            { v: 1    as const, label: "100%" },
+          ]}
+        />
       </Section>
 
 
