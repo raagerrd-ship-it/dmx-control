@@ -98,6 +98,7 @@ export class Analyser {
   private localBpm = 0;
   private localBpmConfidence = 0;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
+  private bpmStable = 0;    // antal stabila (finjusterings-)estimat i rad → committa oktaven
 
   private bpmHist: number[] = [];   // senaste råestimat (~3s) för median-stabilisering
   // Pre-allokerade scratchpads för computeBpm (GC-skydd; annars 4× Float32Array/anrop).
@@ -272,23 +273,30 @@ export class Analyser {
     if (this.localBpm === 0) {
       this.localBpm = Math.round(med);
       this.octaveVote = 0;
+      this.bpmStable = 0;
     } else {
       // SJÄLVRÄTTANDE OKTAV: håll nuvarande takt för stabilitet, MEN om estimaten
       // ihållande pekar på en annan oktav (½× eller 2×) → byt efter ~2s bevis, så
       // en halvtempo-låsning "ökar" till rätt takt istället för att fastna. Ett
       // enstaka breakdown hinner inte nå tröskeln → ingen flimrig växling.
+      // COMMIT: efter ~15s STABIL lås (60 finjusterings-estimat @4Hz) LÅSES oktaven —
+      // bara finjustering tillåts, aldrig ½×/2× mitt i en låt (en låt byter inte
+      // oktav; halvering nollade takt-gridet & bröt beat-synken). Ett wrong initial-
+      // lås hinner rättas under första 15s. Nollställs vid tystnad/låtbyte (localBpm=0).
+      const committed = this.bpmStable >= 60;
       const ratio = med / this.localBpm;
       if (ratio >= 0.9 && ratio <= 1.11) {
         this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);   // samma takt → glid
         this.octaveVote *= 0.5;
-      } else if (ratio > 1.4) {
+        if (this.bpmStable < 100000) this.bpmStable++;                              // stabil tid ackumuleras
+      } else if (!committed && ratio > 1.4) {
         this.octaveVote = Math.max(0, this.octaveVote) + 1;                          // estimaten HÖGRE oktav
-        if (this.octaveVote >= 8) { this.localBpm = Math.round(med); this.octaveVote = 0; }
-      } else if (ratio < 0.7) {
+        if (this.octaveVote >= 8) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
+      } else if (!committed && ratio < 0.7) {
         this.octaveVote = Math.min(0, this.octaveVote) - 1;                          // estimaten LÄGRE oktav
-        if (this.octaveVote <= -8) { this.localBpm = Math.round(med); this.octaveVote = 0; }
+        if (this.octaveVote <= -8) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
       } else {
-        this.octaveVote *= 0.7;                                                      // mellanting (3/2) → brus
+        this.octaveVote *= 0.7;                                                      // mellanting (3/2) / committad off-oktav → brus
       }
     }
     // Smooth confidence (undvik hoppig UI); attack snabbt, release långsamt.
@@ -449,7 +457,7 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHist.length = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHist.length = 0; }
     } else {
       this.silentMs = 0;
     }
