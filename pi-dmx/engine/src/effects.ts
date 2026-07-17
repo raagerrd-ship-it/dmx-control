@@ -770,19 +770,21 @@ export class EffectEngine {
       for (let i = 0; i < roles.length; i++) {
         const ch = cbase + i;
         if (ch < 0 || ch >= 512 || !this.capMask[ch]) continue;
+        const role = roles[i];
+        // Per-FÄRG-tröskel: R/G/B tänder vid olika DMX → kanalens egen om satt.
+        const onCh = (role === "r" ? cal.onR : role === "g" ? cal.onG : role === "b" ? cal.onB : role === "w" ? cal.onW : undefined) ?? on;
         let v;
         if (anyLit) {
           const raw = this.universe[ch];
-          const role = roles[i];
-          // Per-FÄRG-tröskel: R/G/B tänder vid olika DMX → använd kanalens egen om
-          // satt, annars gemensamma on. Så blått lyfts högre än rött om det behövs.
-          const onCh = (role === "r" ? cal.onR : role === "g" ? cal.onG : role === "b" ? cal.onB : role === "w" ? cal.onW : undefined) ?? on;
           v = raw <= 0 ? 0 : onCh + (255 - onCh) * raw / 255;   // 0 eller [onCh..255]
         } else {
           v = this.calSmooth[ch] * (1 - calRel);            // hela lampan mot svart → mjuk fade
         }
         this.calSmooth[ch] = v;
-        this.universe[ch] = v < 0.5 ? 0 : Math.round(v);
+        // Per-kanal tröskel på UTGÅNGEN: aldrig i dödzonen (0<v<onCh). Gäller ÄVEN
+        // fade-out → den släcker RENT från tändpunkten, dröjer inte i dödzonen där
+        // dioden flimrar. Under fade: håll ≥onCh tills värdet passerar under → 0.
+        this.universe[ch] = v < Math.max(0.5, onCh) ? 0 : Math.min(255, Math.round(v));
       }
     }
 
