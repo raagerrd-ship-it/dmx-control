@@ -51,6 +51,7 @@ export class EffectEngine {
   private wavePhase = 0;
   /** "smart" mode: which effect the feel-chooser currently delegates to. */
   private smartMode: Mode = "wave";
+  private tierEma = 0.5;   // ihallande intensitet for tier-val (se render)
   private smartDwellUntil = 0;
   private warmMs = 0;
   private ambient = 0;   // 0 = spelar, 1 = varm vila (efter ~2.5s tystnad)
@@ -333,7 +334,19 @@ export class EffectEngine {
       // topp) = Full Fart, tydligt under (breakdown) = Lugn. ±0.15 ger full sving.
       // Sektionsenergin KOMMER FRÅN ANALYSATORN (frame.intensity). Orkestratorn
       // analyserar inte själv — den regisserar bara: väljer tier och effekt.
-      const intensity = this.cfg.energyDrivesMode ? frame.intensity : 0.5;
+      // IHALLANDE energi, inte ogonblicksvarde. Tiern lases av i BYTESOGONBLICKET
+      // och effekten spelar sedan hela sin dwell (15s+), sa en enda sekunds topp
+      // rackte for att lasa in en fullfart-effekt i ett helt mellanparti.
+      //   MATT: FULL-effekter spelade 39% av tiden trots att intensiteten lag
+      //   over FULL-troskeln (0.78) bara ~7%.
+      // En 5s-EMA aker inte med pa spikar men foljer en verklig sektionsandring
+      // inom nagra sekunder. Uppat gar den LANGSAMT (maste fortjanas) och nedat
+      // snabbt (musiken slapper -> showen ska folja med direkt) - samma
+      // dramaturgi som breakdown-regeln.
+      const iNow = this.cfg.energyDrivesMode ? frame.intensity : 0.5;
+      const iTau = iNow > this.tierEma ? 5.0 : 2.0;
+      this.tierEma += (iNow - this.tierEma) * Math.min(1, _dtT / iTau);
+      const intensity = this.cfg.energyDrivesMode ? this.tierEma : 0.5;
         // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
         const LUGN = TIER.lugn;
