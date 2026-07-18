@@ -98,6 +98,9 @@ export class Analyser {
   private bandLo: number[] = [];        // bin-start per band (förberäknat)
   private bandHi: number[] = [];        // bin-slut per band
   private bandPeak = new Float32Array(8);  // per-band AGC-peak (själv-skalande nivå)
+  private onsetMed = new Float32Array(8);  // robust glidande median av per-band-fluxen
+  private onsetMad = new Float32Array(8);  // robust MAD -> troskelspridning per band
+  private static readonly ONSET_K = 3.0;   // troskel = median + K*MAD
   private onsetBase = new Float32Array(8); // per-band adaptiv flux-baslinje (onsets)
   private bandLvl = new Float32Array(8);   // scratch: per-band nivå denna frame (~90ms smoothad)
   private bandLvlSm = new Float32Array(8); // per-band nivå-smooth (håll mellan frames)
@@ -646,8 +649,22 @@ export class Analyser {
       // Per-band onset: halvvågs-flux mot adaptiv baslinje (som kick-detektorn) →
       // rena anslag oberoende av bandets absoluta energi.
       const fluxN = fl / nb;
-      this.onsetBase[b] += (fluxN - this.onsetBase[b]) * (0.02 * Analyser.BIG_EVERY);
-      this.bandOn[b] = gated ? Math.max(0, Math.min(1, (fluxN - this.onsetBase[b] * 1.3) * 6)) : 0;
+      // ROBUST PROMINENS-GRIND (samma som kick-detektorn anvander, banden fick den
+      // aldrig). Den gamla grinden var "1.3x en EMA-baslinje x6", vilket slapper
+      // igenom varje transient i bandet i stallet for verkliga trumslag.
+      //   MATT vid BPM 134: kick 1116 slag/min (borde ~134, 8x for manga),
+      //   virvel 429/min (borde ~67, 6x). Darfor kandes trum-envelopen alltid pa
+      //   och gav ingen musikalisk accent - den var inte matttad, den overtriggade.
+      // Sign-baserad median + MAD ar okanslig for outliers (ett slag ar en outlier
+      // och far darfor INTE dra upp sin egen troskel, till skillnad fran en EMA).
+      // Steget skalas med BIG_EVERY sa tidskonstanten blir samma som kickens trots
+      // att banden uppdateras var tredje hop.
+      const oStep = 0.002 * Analyser.BIG_EVERY;
+      this.onsetMed[b] += Math.sign(fluxN - this.onsetMed[b]) * oStep * (this.onsetMed[b] + 0.01);
+      this.onsetMad[b] += Math.sign(Math.abs(fluxN - this.onsetMed[b]) - this.onsetMad[b]) * oStep * (this.onsetMad[b] + 0.01);
+      const oThr = this.onsetMed[b] + Analyser.ONSET_K * this.onsetMad[b];
+      // Skala mot MAD i stallet for en fast faktor -> sjalvskalande per band.
+      this.bandOn[b] = gated ? Math.max(0, Math.min(1, (fluxN - oThr) / Math.max(1e-6, this.onsetMad[b] * 3))) : 0;
     }
     { const t = this.prevMagBig; this.prevMagBig = this.magBig; this.magBig = t; }
     }   // slut på decimerad stor-FFT
@@ -657,8 +674,13 @@ export class Analyser {
     // (diskret kick + kick-onset O[1]). bass = spec.bass-NIVÅ (L[2], ingen envelope).
     this.hatHit = Math.max(this.hatHit * Math.exp(-dtHop / 0.06), this.bandOn[6]);
     this.snareHit = Math.max(this.snareHit * Math.exp(-dtHop / 0.11), this.bandOn[5]);
+    // Drivs ENBART av den riktiga kick-detektorn (median + 4.5*MAD). Tidigare
+    // fylldes den ocksa pa av bandOn[1], men det bandet (60-120 Hz) domineras av
+    // sustained bas: MATT 816-1377 anslag/min dar ~110 fanns, dvs 8x for manga.
+    // Den svammade over den korrekta detektorn sa envelopen aldrig slocknade och
+    // kicken forlorade sin accent.
     if (kick) this.kickHit = 1;
-    else this.kickHit = Math.max(this.kickHit * Math.exp(-dtHop / 0.15), this.bandOn[1]);
+    else this.kickHit = this.kickHit * Math.exp(-dtHop / 0.15);
     // ── DROP-DETEKTION (flyttad hit: att AVGÖRA om det är en drop är analys) ──
     // En "riktig" drop = nivån surgar upp mot låtens tak EFTER en break (svacka).
     // Topp-zonen har hysteres (in vid 85% av taket, ut först vid 70%) så nivån inte
