@@ -261,7 +261,15 @@ export class EffectEngine {
     const dtNow = Math.min(0.1, (performance.now() - this.lastRenderMs) / 1000);
     const dropHit = frame.dropCount !== this.lastDropCount;
     this.lastDropCount = frame.dropCount;
-    if (dropHit) this.dropBangUntil = nowWall + 2000;                                          // drop-accent (kort — max 2s)
+    // DROPEN AR EN SMALL, INTE EN PLATA. Hallet var 2s och uttoningen 1s, alltsa
+    // ~3s full blast per drop — och eftersom dropEnv KRINGGAR VU-taket (se
+    // ceilMul nedan) ar det de enda ogonblick riggen gar till max.
+    //   MATT: VU-taket sjalvt nadde aldrig over 0.85 (0% av tiden), men
+    //   dropEnv lag over 0.5 i 14% av tiden i ett aktivt parti. Var sjunde
+    //   sekund i max, vilket lasare som "for mycket drops".
+    // 800ms hall + 1s utton ger fortfarande en tydlig gest men halverar tiden i
+    // max. Sjalva anslaget (30ms attack) ar orort, sa smallen kanns lika hard.
+    if (dropHit) this.dropBangUntil = nowWall + 800;
     // DROP-BLACKOUT (dramaturgisk tystnad): en riser som BRYTS ner i en svacka
     // strax före dropen → tvinga kolsvart i max 250ms. Svärtan STARTAR på
     // svackans flank (bara om vi faktiskt byggt upp: buildUp>0.35) och SLÄPPS i
