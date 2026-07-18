@@ -283,6 +283,9 @@ export async function startServer(
             bpm: frame.bpm,
             bpmConfidence: frame.bpmConfidence,
             intensity: frame.intensity,   // sektionsenergi (diagnostik)
+            dropCount: frame.dropCount,   // monoton drop-räknare (diagnostik)
+            buildUp: frame.buildUp,       // uppbyggnad 0..1 (diagnostik)
+            inZone: frame.inZone,
             beat,
             beatErr: deps.cfg.beatErr ?? 0,
             mode: deps.getActiveMode(),

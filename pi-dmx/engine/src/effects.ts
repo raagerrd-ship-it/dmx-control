@@ -46,21 +46,12 @@ export class EffectEngine {
   private warmMs = 0;
   private ambient = 0;   // 0 = spelar, 1 = varm vila (efter ~2.5s tystnad)
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
-  private levelCeil = 0.5;       // långsamt nivå-tak (låtens loud-topp) för drop-detektor
-  private breakAtMs = 0;         // senaste break/lugna stund (nivå-svacka)
-  private wasInZone = false;
-  private inZoneState = false;   // hysteres-tillstånd för topp-zonen
+  private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   private fogUntil = 0;          // rökmaskin: pågående blast till (wall-clock ms)
   private lastFogMs = -1e9;      // senaste blast (för cooldown)
-  private centSlow = 0.3;        // långsam centroid-baslinje för riser-prediktor
-  private lvlSlowR = 0.3;        // långsam nivå-baslinje för riser-prediktor
-  private buildUp = 0;           // 0..1 uppbyggnad (riser) — bygger tension mot dropen
   // NOVELTY-UPPBYGGNADS-DETEKTOR: spektral novelty leder dropen (mätt validerat).
-  private specSlow = new Float32Array(8);
-  private novSlow = 0;           // ihållande spektral novelty (~1.5s)
-  private novBaseline = 0.2;     // ~8s baslinje → riser = novelty STIGER över den
   private hotMs = 0;             // hur länge musiken pumpat → adaptiv tystnads-landning
   private wasBreaking = false;   // flankdetektor för nivå-svacka (drop-blackout)
   private blackoutUntil = 0;     // dramaturgisk tystnad: kolsvart till (wall-clock ms)
@@ -137,7 +128,7 @@ export class EffectEngine {
     this.showVel = Math.min(5, this.showVel * friction + this.pendingKick * 2.0);
     this.pendingKick = 0;
     // upp till 2.5× snabbare vid full uppbyggnad + kick-ryck ovanpå
-    this.showTime += _dtT * (1 + this.buildUp * 1.5 + this.showVel);
+    this.showTime += _dtT * (1 + frame.buildUp * 1.5 + this.showVel);
     const t = this.showTime;
     if (frame.kick) this.lastKickBoost = performance.now();
 
@@ -232,31 +223,21 @@ export class EffectEngine {
     const drive = this.silenceGate * beatMul;
     // Synlig punch: en hård basstöt (eller drop-flash) BLOOMAR färgen till full
     // styrka — inte bara ljusare master (som är osynligt när effekten redan lyser).
-    // DROP-DETEKTOR: en "riktig" drop = nivån surgar upp mot låtens tak EFTER en
-    // break (nivå-svacka). Det ger MAX-impact just där, inte på vanlig tung bas.
+    // DROP: analysatorn AVGÖR om det är en drop (frame.dropCount är MONOTON). Vi
+    // jämför mot vårt senast hanterade värde → flanken kan ALDRIG missas trots att
+    // rendern går långsammare än analysen (en enframs-boolean hade aliaserats bort).
+    // Här ligger bara show-REAKTIONEN: accent-fönster, blackout, rök, envelope.
     const dtNow = Math.min(0.1, (performance.now() - this.lastRenderMs) / 1000);
-    this.levelCeil = Math.max(frame.level, this.levelCeil - dtNow * 0.015 * this.levelCeil);   // tak, decay ~65s
-    if (frame.level < this.levelCeil * 0.65) this.breakAtMs = nowWall;                          // break/svacka
-    // Topp-zon med HYSTeres: in vid 85% av taket, ut först vid 70% → ingen
-    // flimmer/dubbel-smäll när nivån oscillerar nära tröskeln.
-    if (frame.level > this.levelCeil * 0.85 && frame.level > 0.65) this.inZoneState = true;
-    else if (frame.level < this.levelCeil * 0.70) this.inZoneState = false;
-    const inZone = this.inZoneState;
-    const brokeRecently = nowWall - this.breakAtMs < 3500;
-    // Kräv ≥2s musik innan en drop får fyra: annars läses låtens INTRO (tystnad →
-    // musik stiger = break → surge) som en falsk drop → 8s max-håll som öppnade
-    // VU-taket hela introt (och fyrade rökmaskinen). warmMs nollställs vid tystnad
-    // → gäller exakt låtstart; en riktig drop mitt i låten har warmMs högt.
-    const dropHit = inZone && !this.wasInZone && brokeRecently && this.warmMs > 2000;   // äkta drop-detektor (boolean); ≠ this.dropFired (drops-lägets per-lampa tändtider)
+    const dropHit = frame.dropCount !== this.lastDropCount;
+    this.lastDropCount = frame.dropCount;
     if (dropHit) this.dropBangUntil = nowWall + 2000;                                          // drop-accent (kort — max 2s)
-    this.wasInZone = inZone;
     // DROP-BLACKOUT (dramaturgisk tystnad): en riser som BRYTS ner i en svacka
     // strax före dropen → tvinga kolsvart i max 250ms. Svärtan STARTAR på
     // svackans flank (bara om vi faktiskt byggt upp: buildUp>0.35) och SLÄPPS i
     // samma stund dropen fyrar → explosionen landar exakt i takt, aldrig
     // fördröjd. Rinner risern ut utan drop kommer ljuset bara tillbaka.
-    const nowBreaking = frame.level < this.levelCeil * 0.65;
-    if (this.cfg.dropBlackout && nowBreaking && !this.wasBreaking && this.buildUp > 0.35) {
+    const nowBreaking = frame.breaking;
+    if (this.cfg.dropBlackout && nowBreaking && !this.wasBreaking && frame.buildUp > 0.35) {
       this.blackoutUntil = nowWall + 250;
     }
     this.wasBreaking = nowBreaking;
@@ -272,7 +253,7 @@ export class EffectEngine {
         this.lastFogMs = nowWall;
       }
     }
-    const dropActive = inZone && nowWall < this.dropBangUntil;                                  // en riktig drop pågår
+    const dropActive = frame.inZone && nowWall < this.dropBangUntil;                                  // en riktig drop pågår
     // DROP-ENVELOPE: FULL ATTACK (~30ms) på träffen, HÅLL allt på max under
     // dropen, mjuk FADE ner (~1s) när den släpper. Egen effekt — INGEN
     // hårdvaru-strobe (det gav strobe-känslan), bara ljus + färg på max.
@@ -280,31 +261,8 @@ export class EffectEngine {
     const dRate = dTarget > this.dropEnv ? dtNow / 0.03 : dtNow / 1.0;
     this.dropEnv += Math.max(-dRate, Math.min(dRate, dTarget - this.dropEnv));
 
-    // RISER / DROP-PREDIKTOR: en uppbyggnad = klangen (centroid) OCH nivån stiger
-    // ihållande mot en drop. Vi har redan en REAKTIV drop-detektor; detta
-    // FÖRUTSPÅR den och bygger tension (ljus-swell) under risern, så dropen landar
-    // med moment. Klingar av om risern rinner ut i sanden. (centroid är 0..1 här.)
-    // NOVELTY = validerad uppbyggnads-signal (mätt: ramsar 0.25→0.78 in i en drop).
-    // Summa av band-nivåernas POSITIVA avvikelse från en ~2s baslinje; ihållande
-    // ~1.5s. Relativt en ~8s baslinje → RISER = novelty STIGER över den (filter-
-    // sweep/snare-roll), skilt från bara-busy (ihållande → baslinjen kommer ikapp).
-    {
-      const sp = frame.spec; const sb = [sp.sub, sp.kick, sp.bass, sp.lowMid, sp.mid, sp.highMid, sp.treble, sp.air];
-      let nov = 0; const sr = 1 - Math.exp(-dtNow / 2.0);
-      for (let b = 0; b < 8; b++) { this.specSlow[b] += (sb[b] - this.specSlow[b]) * sr; nov += Math.max(0, sb[b] - this.specSlow[b]); }
-      this.novSlow += (nov - this.novSlow) * (1 - Math.exp(-dtNow / 1.5));
-      this.novBaseline += (this.novSlow - this.novBaseline) * (dtNow / 8);
-    }
-    const novRiser = this.novSlow > this.novBaseline + 0.15 && this.novSlow > 0.45;
-    this.centSlow += (frame.centroid - this.centSlow) * (dtNow / 2.5);
-    this.lvlSlowR += (frame.level - this.lvlSlowR) * (dtNow / 2.5);
-    const inRiser = this.warmMs > 2500 && frame.level > 0.3 && this.dropEnv < 0.2 && (
-        novRiser                                                                                       // NY: novelty ramsar upp
-        || (frame.centroid > this.centSlow + 0.06 && frame.level > this.lvlSlowR + 0.04 && frame.level > 0.4)  // gammal: diskant + nivå stiger
-      );
-    const bTarget = inRiser ? 1 : 0;
-    const bRate = bTarget > this.buildUp ? dtNow / 3.5 : dtNow / 1.0;   // bygg ~3.5s, klinga ~1s
-    this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
+    // UPPBYGGNAD: analysatorn räknar riser/novelty och ger oss frame.buildUp (0..1).
+    // Reaktionerna (riser-strobe, md-swell, phaseSpread, show-tid) ligger kvar här.
 
     const count = this.cfg.fixtures.length;
 
@@ -380,7 +338,7 @@ export class EffectEngine {
         const tierChanged = this.cfg.energyDrivesMode && tierName !== this.lastSmartTier;
         const held = now - this.lastSmartSwitchMs;
         const MIN_HOLD = 8000;    // en effekt lever ALLTID minst 8s
-        const DROP_HOLD = 5000;   // en drop får bryta lite tidigare — men inte varje drop
+        const DROP_HOLD = 8000;   // drop byter inte oftare än nagot annat (detektorn fyrar tatt pa pulsande musik)
         // Drop-byte bara när energin får driva → en LUGN stämning (chill,
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
         const dropSwitch = dropHit && this.cfg.energyDrivesMode && held > DROP_HOLD;
@@ -493,7 +451,7 @@ export class EffectEngine {
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
     // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så
     // VU-taket följer nivån direkt utan effekt-ballistikens nedåt-släp.
-    const md = drive * (1 + this.buildUp * 0.35 + this.dropEnv * 0.8);
+    const md = drive * (1 + frame.buildUp * 0.35 + this.dropEnv * 0.8);
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
@@ -568,7 +526,7 @@ export class EffectEngine {
       cfg: this.cfg, frame, fx: undefined, t, idx: 0, count,
       audio, kickEnv, punch: bassPunch, dropEnv: this.dropEnv, band: 0, gravLevel: this.gravLevel, gravPeak: this.gravPeak, drum,
       beatIdx, beatFrac, beatPulse, beatHit, hasBeat,
-      wavePhase: this.wavePhase, buildUp: this.buildUp, phaseSpread: 1 + this.buildUp * 2.5,
+      wavePhase: this.wavePhase, buildUp: frame.buildUp, phaseSpread: 1 + frame.buildUp * 2.5,
       punchFloor, chasePos: this.chasePos,
       dropFired: this.dropFired, dropHue: this.dropHue, now: performance.now(),
       mixedSector, mclk, hsv: hsvToRgb, shaped,
@@ -577,9 +535,9 @@ export class EffectEngine {
     // RISER-STROBE (helrigg): under en uppbyggnad accelererar en strobe (3→18 Hz)
     // och färgen kollapsar mot vitt → klassisk EDM-build. Blackouten på själva
     // dropen sköts redan separat. Beräknas en gång/frame.
-    const rs = this.cfg.riserStrobe && this.buildUp > 0.25;
-    const rsWhite = rs ? this.buildUp * 0.7 : 0;
-    const rsGate = rs ? (Math.floor(t * (3 + this.buildUp * 15)) % 2 === 0 ? 1 : 0.12) : 1;
+    const rs = this.cfg.riserStrobe && frame.buildUp > 0.25;
+    const rsWhite = rs ? frame.buildUp * 0.7 : 0;
+    const rsGate = rs ? (Math.floor(t * (3 + frame.buildUp * 15)) % 2 === 0 ? 1 : 0.12) : 1;
 
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
@@ -626,7 +584,7 @@ export class EffectEngine {
     // TRANSIENT-SKÄRPA: hög energi/riser → kort decay (knivskarp piska på varje
     // transient); låg energi → lång decay (mjuk andande wash). Utnyttjar diodernas
     // snabba respons — skarpt utan hårdvaru-strobe.
-    const sharpen = Math.min(0.65, audio * 0.45 + this.buildUp * 0.5);   // 0 lugnt .. 0.65 energiskt
+    const sharpen = Math.min(0.65, audio * 0.45 + frame.buildUp * 0.5);   // 0 lugnt .. 0.65 energiskt
     const tau = Math.max(0.08, (fastMode ? fastTau : (this.cfg.calmDecay ?? 0.42)) * (1 - sharpen));
     const decay = Math.exp(-dtSec / tau);
     // Bygg strobe-masken bara när fixtures ändras (inte varje frame).

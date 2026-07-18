@@ -35,6 +35,16 @@ export interface Frame {
   bpmConfidence: number;// 0..1, hur tydlig vinnande takttoppen är (peak-to-mean)
   intensity: number;    // 0..1 SEKTIONSENERGI relativt låtens eget snitt (0.5 = snittet,
                         //  <0.34 breakdown, >0.78 drop/topp) — driver show-orkestreringen
+  /** DROP-DETEKTION. dropCount är MONOTON: den ökar en gång per upptäckt drop, så
+   *  en konsument på lägre takt (render 100Hz) kan jämföra mot sitt eget senaste
+   *  värde och ALDRIG missa en flank (till skillnad från en enframs-boolean). */
+  dropCount: number;    // monoton räknare — +1 per drop
+  inZone: boolean;      // nivån är i låtens topp-zon (ihållande tillstånd, hysteres)
+  breaking: boolean;    // nivån är i en svacka/break (ihållande tillstånd)
+  /** UPPBYGGNAD (riser): 0..1 tension som ramsar upp mot en drop. Mjuk signal →
+   *  sampling-säker. Show-REAKTIONERNA (strobe, swell) ligger i effekt-motorn. */
+  buildUp: number;
+  inRiser: boolean;
   beatAnchorMs: number; // wall-clock ms för ett taktslag (fas)
   /** Rikt spektrum + per-band onset (anslag) från dubbel-FFT:n (hög-upplöst). */
   spec: Spectrum;       // per-band NIVÅ (AGC 0..1)
@@ -125,6 +135,20 @@ export class Analyser {
   private intensityEma = 0.5;    // sektionsenergi: utjämnad nivå
   private intensityFloor = 0.5;  // dess robusta P50-baslinje (låtens snitt)
   private activeMs = 0;          // hur länge musik spelat (warmup för baslinjen)
+  // DROP-DETEKTION (flyttad från effects: analys hör hemma här; show-reaktionen stannar där)
+  private levelCeil = 0.5;       // långsamt nivå-tak (låtens loud-topp)
+  private breakAtMs = 0;         // senaste svacka
+  private inZoneState = false;   // hysteres för topp-zonen
+  private wasInZone = false;
+  private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
+  private lastDropMs = -1e9;
+  // RISER/UPPBYGGNAD (flyttad från effects)
+  private specSlow = new Float32Array(8);
+  private novSlow = 0;           // ihållande spektral novelty (~1.5s)
+  private novBaseline = 0.2;     // ~8s baslinje → riser = novelty STIGER över den
+  private centSlow = 0.3;
+  private lvlSlowR = 0.3;
+  private buildUp = 0;           // 0..1 uppbyggnads-envelope
   private lvlVU = 0;      // ~130ms hop-takt-smooth av levelRaw → VU-taket (låg jitter)
   private engSmooth = 0;
   private midSmooth = 0;
@@ -340,7 +364,8 @@ export class Analyser {
     // Ett återanvänt Frame (spec/onset pekar på de pre-allokerade objekten).
     this.outFrame = {
       level: 0, levelRaw: 0, levelVU: 0, energy: 0, mid: 0, treble: 0, centroid: 0, flux: 0,
-      kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5, beatAnchorMs: 0,
+      kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
+      dropCount: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, beatAnchorMs: 0,
       spec: this.outSpec, onset: this.outOnset, drum: this.outDrum,
     };
   }
@@ -584,6 +609,45 @@ export class Analyser {
     this.snareHit = Math.max(this.snareHit * Math.exp(-dtHop / 0.11), this.bandOn[5]);
     if (kick) this.kickHit = 1;
     else this.kickHit = Math.max(this.kickHit * Math.exp(-dtHop / 0.15), this.bandOn[1]);
+    // ── DROP-DETEKTION (flyttad hit: att AVGÖRA om det är en drop är analys) ──
+    // En "riktig" drop = nivån surgar upp mot låtens tak EFTER en break (svacka).
+    // Topp-zonen har hysteres (in vid 85% av taket, ut först vid 70%) så nivån inte
+    // flimrar kring tröskeln. Kräver ≥2s musik så låtens INTRO (tystnad→musik) inte
+    // läses som en drop. Resultatet exponeras som en MONOTON räknare → en konsument
+    // på lägre takt kan aldrig missa flanken.
+    const nowWallA = Date.now();
+    this.levelCeil = Math.max(this.lvlSmooth, this.levelCeil - dtHop * 0.015 * this.levelCeil);   // tak, decay ~65s
+    const breaking = this.lvlSmooth < this.levelCeil * 0.65;
+    if (breaking) this.breakAtMs = nowWallA;
+    if (this.lvlSmooth > this.levelCeil * 0.85 && this.lvlSmooth > 0.65) this.inZoneState = true;
+    else if (this.lvlSmooth < this.levelCeil * 0.70) this.inZoneState = false;
+    const inZone = this.inZoneState;
+    if (inZone && !this.wasInZone && nowWallA - this.breakAtMs < 3500 && this.activeMs > 2000) {
+      this.dropCount++; this.lastDropMs = nowWallA;
+    }
+    this.wasInZone = inZone;
+
+    // ── UPPBYGGNAD / RISER (flyttad hit) ──
+    // Spektral NOVELTY = summan av bandens POSITIVA avvikelse från en ~2s baslinje,
+    // ihållande ~1.5s. Mätt validerad: ramsar 0.25→0.78 in i en drop. Relativt en
+    // ~8s baslinje → RISER = novelty STIGER över den (filter-sweep/snare-roll),
+    // skilt från bara-busy (ihållande → baslinjen kommer ikapp). Gammal väg
+    // (klang+nivå stiger) ligger kvar som OR. Inte direkt efter en drop.
+    let nov = 0; const sr = 1 - Math.exp(-dtHop / 2.0);
+    for (let b = 0; b < 8; b++) { this.specSlow[b] += (this.bandLvl[b] - this.specSlow[b]) * sr; nov += Math.max(0, this.bandLvl[b] - this.specSlow[b]); }
+    this.novSlow += (nov - this.novSlow) * (1 - Math.exp(-dtHop / 1.5));
+    this.novBaseline += (this.novSlow - this.novBaseline) * (dtHop / 8);
+    const novRiser = this.novSlow > this.novBaseline + 0.15 && this.novSlow > 0.45;
+    this.centSlow += (this.centSmooth - this.centSlow) * (dtHop / 2.5);
+    this.lvlSlowR += (this.lvlSmooth - this.lvlSlowR) * (dtHop / 2.5);
+    const inRiser = this.activeMs > 2500 && this.lvlSmooth > 0.3 && nowWallA - this.lastDropMs > 1500 && (
+        novRiser
+        || (this.centSmooth > this.centSlow + 0.06 && this.lvlSmooth > this.lvlSlowR + 0.04 && this.lvlSmooth > 0.4)
+      );
+    const bTarget = inRiser ? 1 : 0;
+    const bRate = bTarget > this.buildUp ? dtHop / 3.5 : dtHop / 1.0;   // bygg ~3.5s, klinga ~1s
+    this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
+
     const L = this.bandLvl, O = this.bandOn;
     const spec = this.outSpec, onset = this.outOnset;
     spec.sub = L[0]; spec.kick = L[1]; spec.bass = L[2]; spec.lowMid = L[3]; spec.mid = L[4]; spec.highMid = L[5]; spec.treble = L[6]; spec.air = L[7];
@@ -597,6 +661,7 @@ export class Analyser {
     f.energy = this.engSmooth; f.mid = this.midSmooth; f.treble = this.trbSmooth;
     f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
     f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.intensity = intensity; f.beatAnchorMs = this.beatAnchorMs;
+    f.dropCount = this.dropCount; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
     return f;
   }
 }
