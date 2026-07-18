@@ -155,6 +155,8 @@ export class Analyser {
   // DROP-DETEKTION (flyttad från effects: analys hör hemma här; show-reaktionen stannar där)
   private levelCeil = 0.5;       // långsamt nivå-tak (låtens loud-topp)
   private breakAtMs = 0;         // senaste svacka
+  private lastRiserMs = 0;       // senaste uppbyggnad — en drop maste foljas pa en riser
+  private breakHoldMs = 0;       // hur lange svackan hallit i sig (mikro-dippar raknas inte)
   private inZoneState = false;   // hysteres för topp-zonen
   private wasInZone = false;
   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
@@ -716,8 +718,22 @@ export class Analyser {
     // på lägre takt kan aldrig missa flanken.
     const nowWallA = Date.now();
     this.levelCeil = Math.max(this.lvlSmooth, this.levelCeil - dtHop * 0.015 * this.levelCeil);   // tak, decay ~65s
+    // SVACKAN MASTE VARA IHALLANDE. Forut satte VILKEN dipp som helst breakAtMs,
+    // aven en som varade nagra tiondelar - en trumfill eller en kort lucka racker.
+    // I en lat som ligger konstant hogt betyder det att varje sadan mikro-dipp
+    // foljd av ateringang i topp-zonen raknades som en drop.
+    //   MATT pa en lat anvandaren rapporterade som "falsk-droppar hela tiden":
+    //   4.0 drops/min, inZone 90% av tiden, nivan aldrig lag (p10=0.57), och
+    //   intensiteten vid varje drop 0.65-0.83 - alltsa passerade energigrinden
+    //   utan problem. Det var inte energin som var fel utan svack-definitionen.
+    // Ett verkligt breakdown varar sekunder, inte tiondelar. 400ms ihallande.
     const breaking = this.lvlSmooth < this.levelCeil * 0.65;
-    if (breaking) this.breakAtMs = nowWallA;
+    if (breaking) {
+      this.breakHoldMs += dtHop * 1000;
+      if (this.breakHoldMs > 400) this.breakAtMs = nowWallA;
+    } else {
+      this.breakHoldMs = 0;
+    }
     if (this.lvlSmooth > this.levelCeil * 0.85 && this.lvlSmooth > 0.65) this.inZoneState = true;
     else if (this.lvlSmooth < this.levelCeil * 0.70) this.inZoneState = false;
     const inZone = this.inZoneState;
@@ -737,8 +753,20 @@ export class Analyser {
     // 8-40 takter. En drop ar en sektionsgrans; tva sadana kan inte ligga en
     // halv sekund isar. 2s ar valdigt lagt satt mot narmaste akta intervall
     // (8 takter = ~13s vid 150 BPM), sa den kan inte kapa nagot verkligt.
-    const dropSpacingOk = nowWallA - this.lastDropMs > 2000;
-    if (dropEnergyOk && dropSpacingOk && inZone && !this.wasInZone && nowWallA - this.breakAtMs < 3500 && this.activeMs > 2000) {
+    // SPARRAS I TAKTER, INTE SEKUNDER. Musik raknas inte i millisekunder: 2s var
+    // drygt EN takt vid 150 BPM. Uppmatta AKTA drop-intervall lag pa 8-40 takter,
+    // dar 8 var det kortaste. En drop kan alltsa omojligt folja pa en annan inom
+    // 8 takter (32 taktslag). Gransen skalar nu med tempot: ~13s vid 150 BPM,
+    // ~21s vid 90 BPM.
+    const minGapMs = this.localBpm > 40 ? (32 * 60000 / this.localBpm) : 13000;
+    const dropSpacingOk = nowWallA - this.lastDropMs > minGapMs;
+    // EN DROP AR KULMEN PA EN UPPBYGGNAD, inte bara "nivan gick upp". Utan detta
+    // var detektorn ren nivalogik: varje ateringang i topp-zonen raknades, sa en
+    // lat som ligger konstant hogt (uppmatt inZone 90% av tiden) falsk-droppade
+    // om och om. En riser MASTE ha funnits strax innan - det ar skillnaden mellan
+    // ett strukturellt ogonblick och en nivavariation.
+    const dropAfterRiser = nowWallA - this.lastRiserMs < 4000;
+    if (dropEnergyOk && dropSpacingOk && dropAfterRiser && inZone && !this.wasInZone && nowWallA - this.breakAtMs < 3500 && this.activeMs > 2000) {
       this.dropCount++; this.lastDropMs = nowWallA;
     }
     this.wasInZone = inZone;
@@ -760,6 +788,10 @@ export class Analyser {
         novRiser
         || (this.centSmooth > this.centSlow + 0.06 && this.lvlSmooth > this.lvlSlowR + 0.04 && this.lvlSmooth > 0.4)
       );
+    // Stampla uppbyggnaden — drop-villkoret ovan kraver att en riser fanns strax
+    // innan. inRiser raknas fram EFTER drop-kontrollen, sa stampeln lases forst
+    // nasta hop (2.7ms senare); helt utan betydelse mot 4000ms-fonstret.
+    if (inRiser) this.lastRiserMs = nowWallA;
     const bTarget = inRiser ? 1 : 0;
     const bRate = bTarget > this.buildUp ? dtHop / 3.5 : dtHop / 1.0;   // bygg ~3.5s, klinga ~1s
     this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
