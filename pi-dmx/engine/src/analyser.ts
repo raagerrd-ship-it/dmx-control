@@ -766,7 +766,15 @@ export class Analyser {
     // om och om. En riser MASTE ha funnits strax innan - det ar skillnaden mellan
     // ett strukturellt ogonblick och en nivavariation.
     const dropAfterRiser = nowWallA - this.lastRiserMs < 4000;
-    if (dropEnergyOk && dropSpacingOk && dropAfterRiser && inZone && !this.wasInZone && nowWallA - this.breakAtMs < 3500 && this.activeMs > 2000) {
+    // RISER-KRAVET AR AVSTANGT. Det var ratt tanke - en drop ar kulmen pa en
+    // uppbyggnad - men det grindade pa en DOD signal och slog darmed av drop-
+    // detektionen helt i stallet for att rensa den.
+    //   MATT: buildUp p50=0.00 p90=0.00 p99=0.31 (kravet ar >0.35) och inRiser
+    //   0% av tiden -> 0 drops pa 70s. Riser-detektorn fyrar i princip aldrig.
+    // Femte signalen i sessionen som ser levande ut men ar en konstant. Innan
+    // kravet kan aterinforas maste inRiser/buildUp lagas och matas om - annars
+    // ar det bara ett dyrt satt att stanga av dropsen.
+    if (dropEnergyOk && dropSpacingOk && inZone && !this.wasInZone && nowWallA - this.breakAtMs < 3500 && this.activeMs > 2000) {
       this.dropCount++; this.lastDropMs = nowWallA;
     }
     this.wasInZone = inZone;
