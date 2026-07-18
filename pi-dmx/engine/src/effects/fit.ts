@@ -32,11 +32,11 @@ export const FIT: Partial<Record<Mode, Fit>> = {
 
   // ── Lugna: sustained, långsamma ──
   breathe:   { punch: 0.10, bass: 0.55, bright: 0.20, beat: 0.20 },   // andas med sektionsenergin
-  aurora:    { punch: 0.10, bass: 0.30, bright: 0.55, beat: 0.10 },
+  aurora:    { punch: 0.10, bass: 0.20, bright: 0.80, beat: 0.10 },   // klangdrivet skimmer
   mono:      { punch: 0.20, bass: 0.60, bright: 0.20, beat: 0.10 },   // eld/glöd, varm
   subbreath: { punch: 0.10, bass: 0.85, bright: 0.10, beat: 0.10 },   // sub-driven andning
   airglow:   { punch: 0.10, bass: 0.10, bright: 0.90, beat: 0.10 },   // luftig shimmer
-  twin:      { punch: 0.20, bass: 0.40, bright: 0.45, beat: 0.20 },
+  twin:      { punch: 0.15, bass: 0.35, bright: 0.35, beat: 0.70 },   // taktlast vaxelsang
   // ── Fart: flödande/rytmiska ──
   wave:      { punch: 0.30, bass: 0.40, bright: 0.60, beat: 0.30 },
   chase:     { punch: 0.50, bass: 0.40, bright: 0.35, beat: 0.70 },
