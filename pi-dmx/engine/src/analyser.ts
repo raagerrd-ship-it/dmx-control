@@ -33,6 +33,8 @@ export interface Frame {
   gain: number;         // current auto-gain factor (debug)
   bpm: number;          // 0 = ej låst; lokal tempo-estimat via autokorrelation
   bpmConfidence: number;// 0..1, hur tydlig vinnande takttoppen är (peak-to-mean)
+  intensity: number;    // 0..1 SEKTIONSENERGI relativt låtens eget snitt (0.5 = snittet,
+                        //  <0.34 breakdown, >0.78 drop/topp) — driver show-orkestreringen
   beatAnchorMs: number; // wall-clock ms för ett taktslag (fas)
   /** Rikt spektrum + per-band onset (anslag) från dubbel-FFT:n (hög-upplöst). */
   spec: Spectrum;       // per-band NIVÅ (AGC 0..1)
@@ -120,6 +122,9 @@ export class Analyser {
   // read as flicker on the lamps. Fast attack keeps hits punchy; the slower
   // release lets light glide down instead of sputtering.
   private lvlSmooth = 0;
+  private intensityEma = 0.5;    // sektionsenergi: utjämnad nivå
+  private intensityFloor = 0.5;  // dess robusta P50-baslinje (låtens snitt)
+  private activeMs = 0;          // hur länge musik spelat (warmup för baslinjen)
   private lvlVU = 0;      // ~130ms hop-takt-smooth av levelRaw → VU-taket (låg jitter)
   private engSmooth = 0;
   private midSmooth = 0;
@@ -335,7 +340,7 @@ export class Analyser {
     // Ett återanvänt Frame (spec/onset pekar på de pre-allokerade objekten).
     this.outFrame = {
       level: 0, levelRaw: 0, levelVU: 0, energy: 0, mid: 0, treble: 0, centroid: 0, flux: 0,
-      kick: false, gain: 1, bpm: 0, bpmConfidence: 0, beatAnchorMs: 0,
+      kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5, beatAnchorMs: 0,
       spec: this.outSpec, onset: this.outOnset, drum: this.outDrum,
     };
   }
@@ -508,6 +513,25 @@ export class Analyser {
     this.trbSmooth = smooth(this.trbSmooth, treble);
     this.centSmooth = smooth(this.centSmooth, centroid);
 
+    // SEKTIONSENERGI (0..1) — hur energiskt partiet är RELATIVT låtens eget snitt.
+    // Ren analys av nivån över tid → hör hemma här, inte i show-orkestreringen.
+    // En komprimerad signal ligger jämnt högt, så absolut nivå säger inget; jämför
+    // mot en robust baslinje (P50-median, ej EMA-medel som pinnas upp av loud
+    // sections). Mitten = snittet, tydligt över = drop/topp, under = breakdown.
+    // Attack något snabbare än release så uppbyggnader syns. WARMUP: baslinjen
+    // konvergerar snabbt (~3s) de första 8s aktiv musik, sen stabil ~25s.
+    // Nollställs vid tystnad → snabb omkalibrering vid låtbyte.
+    if (rms >= this.cfg.detection.noiseFloor * 1.5) this.activeMs += dtHop * 1000;
+    else this.activeMs = 0;
+    const iUp = 1 - Math.exp(-dtHop / 1.5);
+    const iDown = 1 - Math.exp(-dtHop / 3.0);
+    this.intensityEma += (this.lvlSmooth - this.intensityEma) * (this.lvlSmooth > this.intensityEma ? iUp : iDown);
+    const iWarm = this.activeMs < 8000;
+    const floorRate = iWarm ? dtHop / 3 : dtHop / 25;
+    if (iWarm) this.intensityFloor += (this.intensityEma - this.intensityFloor) * floorRate;   // seed snabbt
+    else this.intensityFloor += Math.sign(this.intensityEma - this.intensityFloor) * floorRate * (this.intensityFloor + 0.05);
+    const intensity = Math.max(0, Math.min(1, 0.5 + (this.intensityEma - this.intensityFloor) / 0.30));
+
     // --- DUBBEL-FFT: hög-upplöst log-spektrum för effekterna ---
     // Egen glidande 2048-buffert, matas samma hop. Ger 23 Hz/bin i botten så
     // sub/kick/bas separeras. Per-band AGC-nivå + per-band adaptiv onset.
@@ -572,7 +596,7 @@ export class Analyser {
     f.level = this.lvlSmooth; f.levelRaw = level; f.levelVU = this.lvlVU;
     f.energy = this.engSmooth; f.mid = this.midSmooth; f.treble = this.trbSmooth;
     f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
-    f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.beatAnchorMs = this.beatAnchorMs;
+    f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.intensity = intensity; f.beatAnchorMs = this.beatAnchorMs;
     return f;
   }
 }

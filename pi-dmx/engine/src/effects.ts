@@ -43,8 +43,6 @@ export class EffectEngine {
   /** "smart" mode: which effect the feel-chooser currently delegates to. */
   private smartMode: Mode = "wave";
   private smartDwellUntil = 0;
-  private intensityEma = 0.5;
-  private intensityFloor = 0.5;
   private warmMs = 0;
   private ambient = 0;   // 0 = spelar, 1 = varm vila (efter ~2.5s tystnad)
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
@@ -338,8 +336,9 @@ export class EffectEngine {
       // högt, så absolut nivå säger inget. Jämför istället mot en långsam
       // baslinje (~30s) → mitten (snittet) = Fart, tydligt över snittet (drop/
       // topp) = Full Fart, tydligt under (breakdown) = Lugn. ±0.15 ger full sving.
-      const baseline = this.intensityFloor;
-      const intensity = this.cfg.energyDrivesMode ? Math.max(0, Math.min(1, 0.5 + (this.intensityEma - baseline) / 0.30)) : 0.5;
+      // Sektionsenergin KOMMER FRÅN ANALYSATORN (frame.intensity). Orkestratorn
+      // analyserar inte själv — den regisserar bara: väljer tier och effekt.
+      const intensity = this.cfg.energyDrivesMode ? frame.intensity : 0.5;
         // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
         const LUGN = TIER.lugn;
@@ -422,24 +421,6 @@ export class EffectEngine {
     // Advance the wave phase by dt so speed changes glide instead of jumping.
     const dtSec = Math.min(0.1, (now - this.lastRenderMs) / 1000);
     this.lastRenderMs = now;
-    // Sektionsenergi = utjämnad rå nivå (INTE den klippta 'audio', och inga
-    // per-beat spikar). Attack lite snabbare än release så uppbyggnader syns.
-    const aUp = 1 - Math.exp(-dtSec / 1.5);
-    const aDown = 1 - Math.exp(-dtSec / 3.0);
-    this.intensityEma += (frame.level - this.intensityEma) * (frame.level > this.intensityEma ? aUp : aDown);
-    // Baslinje = låtens snitt-energi, referens för nivåvalet ovan. WARMUP: de
-    // första ~8s av spelning konvergerar den snabbt (~3s) så den är klar direkt;
-    // sen låser den till stabil ~25s. Nollställs vid tystnad → snabb omkalibrering
-    // vid låtbyte/paus.
-    const warm = this.warmMs < 8000;
-    // Baslinjen = robust MEDIAN (P50) av energin, inte EMA-medel: på hett/komprimerat
-    // AUX pinnar level 1.0 i loud sections → ett EMA-medel dras uppåt och "energi över
-    // snitt" (drop/full fart) blir omöjligt. Medianen struntar i pinnarna. Sign-baserad,
-    // steget skalar med baslinjen; snabb konvergens under warmup, sen stabil ~25s. (Lovable.)
-    const floorRate = warm ? dtSec / 3 : dtSec / 25;
-    if (warm) this.intensityFloor += (this.intensityEma - this.intensityFloor) * floorRate;   // seed snabbt
-    else this.intensityFloor += Math.sign(this.intensityEma - this.intensityFloor) * floorRate * (this.intensityFloor + 0.05);
-
     // Silence gate: below threshold for 250 ms → fade the effect out over ~0.25 s
     // (aggressive so the light sits tight to the audio); music back → fade in fast.
     // The warm ambient glow (below) takes over so a gap lands on amber, not black.

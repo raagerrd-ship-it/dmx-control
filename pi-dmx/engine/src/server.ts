@@ -282,6 +282,7 @@ export async function startServer(
             gain: frame.gain,
             bpm: frame.bpm,
             bpmConfidence: frame.bpmConfidence,
+            intensity: frame.intensity,   // sektionsenergi (diagnostik)
             beat,
             beatErr: deps.cfg.beatErr ?? 0,
             mode: deps.getActiveMode(),
