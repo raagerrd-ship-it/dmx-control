@@ -286,6 +286,7 @@ export async function startServer(
             dropCount: frame.dropCount,   // monoton drop-räknare (diagnostik)
             buildUp: frame.buildUp,       // uppbyggnad 0..1 (diagnostik)
             inZone: frame.inZone,
+            profile: frame.profile,       // karaktarsprofil (diagnostik)
             beat,
             beatErr: deps.cfg.beatErr ?? 0,
             mode: deps.getActiveMode(),

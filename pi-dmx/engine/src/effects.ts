@@ -10,6 +10,7 @@ import type { EngineConfig, FixtureConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER } from "./effects/registry.js";
+import { fitScore } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
 import { hsvToRgb } from "./effects/color.js";
 import type { EffectContext } from "./effects/types.js";
@@ -351,9 +352,18 @@ export class EffectEngine {
         if (pool.length === 0) pool = enabled([...FART, ...LUGN, ...FULLFART]);      // valfri aktiv
         if (pool.length === 0) pool = ["breathe"];                                   // sista fallback
         this.smartCount++;
-        let next = pool[Math.floor(((this.smartCount * 0.61803398875) % 1) * pool.length)];
-        if (next === this.smartMode && pool.length > 1) next = pool[(pool.indexOf(next) + 1) % pool.length];
-        this.smartMode = next;
+        // DIRIGENTEN VÄLJER: poängsätt poolen mot musikens KARAKTÄR (frame.profile)
+        // istället för att slumpa. Tydliga basslag → drumkit/gravity/duel; luftig
+        // brygga → airglow/wave; tight fyra-på-golvet → snap/rave/gallop.
+        // Vi tar inte alltid #1 utan varierar bland de tre bäst passande (gyllene
+        // snittet) → matchar musiken men blir aldrig förutsägbar. Nuvarande effekt
+        // utesluts så det alltid blir ett verkligt byte.
+        const ranked = pool
+          .map((m) => ({ m, s: fitScore(m, frame.profile) }))
+          .sort((a, b) => b.s - a.s);
+        const cands = ranked.filter((x) => x.m !== this.smartMode);
+        const top = (cands.length ? cands : ranked).slice(0, 3);
+        this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
       }
       effMode = this.smartMode;
     }

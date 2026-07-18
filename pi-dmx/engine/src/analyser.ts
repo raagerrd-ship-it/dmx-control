@@ -45,6 +45,13 @@ export interface Frame {
    *  sampling-säker. Show-REAKTIONERNA (strobe, swell) ligger i effekt-motorn. */
   buildUp: number;
   inRiser: boolean;
+  /** KARAKTÄRSPROFIL (~8s glidande) — vad SLAGS musik är detta? Dirigenten väljer
+   *  effekt efter passform mot den här, inte bara efter energinivå.
+   *    punch  = transienttäthet (fyra-på-golvet/trummigt ↔ svävande)
+   *    bass   = låg-endens tyngd (sub+kick+bas mot resten)
+   *    bright = klang uppåt (hi-hats/luft mot resten)
+   *    beat   = hur tydlig takten är (BPM-konfidens) */
+  profile: { punch: number; bass: number; bright: number; beat: number };
   beatAnchorMs: number; // wall-clock ms för ett taktslag (fas)
   /** Rikt spektrum + per-band onset (anslag) från dubbel-FFT:n (hög-upplöst). */
   spec: Spectrum;       // per-band NIVÅ (AGC 0..1)
@@ -69,6 +76,7 @@ export class Analyser {
   private outSpec: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
   private outOnset: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
   private outDrum = { kick: 0, snare: 0, hat: 0, bass: 0 };   // trum-envelopes (återanvänt)
+  private outProfile = { punch: 0.4, bass: 0.5, bright: 0.3, beat: 0.5 };   // karaktärsprofil (återanvänt)
   private outFrame!: Frame;             // ETT återanvänt Frame (muteras/hop; säkert — main-tråden läser synkront)
   // TRUM-KIT peak-hold-envelopes (håll mellan hops). Flyttade FRÅN effects.ts render
   // (100Hz) hit (375Hz) → fångar varje onset-topp. tau bevarade: hat 60ms / snare
@@ -149,6 +157,11 @@ export class Analyser {
   private centSlow = 0.3;
   private lvlSlowR = 0.3;
   private buildUp = 0;           // 0..1 uppbyggnads-envelope
+  // KARAKTÄRSPROFIL (långsam, ~8s)
+  private profPunch = 0.4;
+  private profBass = 0.5;
+  private profBright = 0.3;
+  private profBeat = 0.5;
   private lvlVU = 0;      // ~130ms hop-takt-smooth av levelRaw → VU-taket (låg jitter)
   private engSmooth = 0;
   private midSmooth = 0;
@@ -365,7 +378,7 @@ export class Analyser {
     this.outFrame = {
       level: 0, levelRaw: 0, levelVU: 0, energy: 0, mid: 0, treble: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
-      dropCount: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, beatAnchorMs: 0,
+      dropCount: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
       spec: this.outSpec, onset: this.outOnset, drum: this.outDrum,
     };
   }
@@ -647,6 +660,28 @@ export class Analyser {
     const bTarget = inRiser ? 1 : 0;
     const bRate = bTarget > this.buildUp ? dtHop / 3.5 : dtHop / 1.0;   // bygg ~3.5s, klinga ~1s
     this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
+
+    // ── KARAKTÄRSPROFIL (~8s) — musikens KARAKTÄR, inte dess energinivå ──
+    // Banden är redan per-band AGC:ade (0..1 var), så vi jobbar med RELATIONER:
+    // hur stor del av ljudbilden som är låg-end resp. luft, och hur transientrikt
+    // det är. Långsam (8s) → stabil nog att styra effektval utan att fladdra.
+    let bSum = 1e-6; for (let b = 0; b < 8; b++) bSum += this.bandLvl[b];
+    const bassW = (this.bandLvl[0] + this.bandLvl[1] + this.bandLvl[2]) / bSum;   // sub+kick+bas
+    const brightW = (this.bandLvl[6] + this.bandLvl[7]) / bSum;                    // diskant+luft
+    const punchNow = Math.min(1, (this.bandOn[1] + this.bandOn[5] + this.bandOn[6]) * 0.8);  // kick+snare+hat-anslag
+    const pr = 1 - Math.exp(-dtHop / 8.0);
+    this.profPunch += (punchNow - this.profPunch) * pr;
+    this.profBass += (bassW - this.profBass) * pr;
+    this.profBright += (brightW - this.profBright) * pr;
+    this.profBeat += (this.localBpmConfidence - this.profBeat) * pr;
+    // Skala råvärdena till användbara 0..1-spann (typiska musikvärden → full range).
+    const cl = (x: number) => x < 0 ? 0 : x > 1 ? 1 : x;
+    // Skalningen är KALIBRERAD mot uppmätta råvärden på riktig musik (annars
+    // mättar punch på 1.00 och bright ligger konstant högt → ingen diskriminering).
+    this.outProfile.punch = cl((this.profPunch - 0.05) / 0.40);
+    this.outProfile.bass = cl((this.profBass - 0.28) / 0.30);
+    this.outProfile.bright = cl((this.profBright - 0.14) / 0.19);
+    this.outProfile.beat = cl(this.profBeat);
 
     const L = this.bandLvl, O = this.bandOn;
     const spec = this.outSpec, onset = this.outOnset;
