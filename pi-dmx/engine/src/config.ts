@@ -148,7 +148,7 @@ export const defaultConfig: EngineConfig = {
   beatPulse: true,
   beatSyncStrength: 0.18,   // normal PLL-korrektion mot trumslag
   energyDrivesMode: true,
-  smartDwellMs: 9000,
+  smartDwellMs: 15000,
   master: 1.0,
   chaseStyle: "pingpong",
   rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },

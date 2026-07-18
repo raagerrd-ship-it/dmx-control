@@ -355,8 +355,8 @@ export async function startServer(
           } else if (msg.type === "setRotation" && typeof msg.mode === "string") {
             deps.cfg.rotation = { ...deps.cfg.rotation, [msg.mode]: !!msg.value };
           } else if (msg.type === "setSmartDwell") {
-            const m = { slow: 20000, normal: 9000, fast: 4000 } as Record<string, number>;
-            deps.cfg.smartDwellMs = m[msg.mode as string] ?? 9000;
+            const m = { slow: 30000, normal: 15000, fast: 8000 } as Record<string, number>;
+            deps.cfg.smartDwellMs = m[msg.mode as string] ?? 15000;
           } else if (msg.type === "setFog" && msg.fog && typeof msg.fog === "object") {
             const f = msg.fog as Record<string, unknown>;
             const cur = deps.cfg.fog ?? { enabled: false, address: 128, onDrop: true, burstMs: 2500, cooldownMs: 25000, level: 255 };

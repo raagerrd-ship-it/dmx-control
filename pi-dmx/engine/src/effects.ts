@@ -83,7 +83,6 @@ export class EffectEngine {
   private strobeMaskFor: unknown = null;      // fixtures-referens masken byggdes för
   private maxCh = 0;                           // högsta använda kanal + 1
   private smartCount = 0;
-  private lastSmartIntensity = 0;
   private lastSmartTier = "";
   private lastSmartSwitchMs = 0;   // tidsstämpel för senaste effektbyte → minsta-intervall
   private activeMode: Mode = "smart";
@@ -330,8 +329,8 @@ export class EffectEngine {
     }
 
     // "smart": välj effekt ur låtens känsla — relativ sektionsenergi (mot en
-    // långsam baslinje) väljer tier; byter på drop (dropHit) eller efter minst
-    // 2.5s, annars ~9s dwell så den aldrig zappar runt.
+    // långsam baslinje) väljer tier. Byter bara på tier-byte, drop eller dwell —
+    // alltid med minsta hålltid så en effekt hinner läsas (se orkestreringen nedan).
     let effMode: Mode = this.cfg.mode;
     if (this.cfg.mode === "smart") {
       // Energi styr läget → lokal intensitet väljer pool; annars fast medel.
@@ -353,29 +352,42 @@ export class EffectEngine {
         // bpm-oktavvärde. Full Fart kräver en TYDLIG topp långt över snittet
         // (0.78) → reserverad för riktiga drops, inte varje energiskt parti.
         const loThr = 0.34, hiThr = 0.78;
-        let tier: Mode[] = intensity < loThr ? LUGN : intensity < hiThr ? FART : FULLFART;
+        // TIER-HYSTERES: utan den flaxar tiern så fort intensiteten pendlar kring en
+        // gräns → tierChanged blir sann om och om → effektbyte varje minsta-hålltid
+        // (mätt: byte var 8.0s spikrakt). Kräv att man går TYDLIGT förbi gränsen för
+        // att LÄMNA nuvarande tier (in vid gränsen, ut först HYST därbortom).
+        const HYST = 0.08;
+        let lo = loThr, hi = hiThr;
+        if (this.lastSmartTier === "lugn") lo = loThr + HYST;                       // svårare att lämna lugn
+        else if (this.lastSmartTier === "fart") { lo = loThr - HYST; hi = hiThr + HYST; }  // brett fart-band
+        else if (this.lastSmartTier === "full") hi = hiThr - HYST;                  // svårare att lämna full
+        let tier: Mode[] = intensity < lo ? LUGN : intensity < hi ? FART : FULLFART;
         // Låg-BPM-spärr: en tryckare/ballad ska ALDRIG gå Full Fart, även om dess
         // relativa energi toppar. (bpm 0 = ej låst → ingen spärr.)
         if (bpm > 0 && bpm < 95 && tier === FULLFART) tier = FART;
         const tierName = tier === LUGN ? "lugn" : tier === FART ? "fart" : "full";
-        // Omval vid: (a) nivåbyte — så en ny effekt slår till DIREKT när vi går
-        // in i Fart/Full Fart (inte den gamla kvar tills dwell löper ut),
-        // (b) tydligt energihopp, känsligare uppåt (drops) än nedåt,
-        // (c) dwell-timern.
-        const delta = intensity - this.lastSmartIntensity;
-        const bigJump = this.cfg.energyDrivesMode && (delta > 0.1 || delta < -0.18);
+        // EFFEKT-ORKESTRERING. En effekt ska hinna LÄSAS av publiken innan nästa
+        // kommer — därför byter vi bara på MENINGSFULLA händelser, och alltid med
+        // en minsta hålltid:
+        //   (a) TIER-BYTE — musiken byter karaktär (breakdown ↔ fart ↔ full fart)
+        //   (b) DROP — det dramatiska ögonblicket (rate-limitat, se nedan)
+        //   (c) DWELL-timern — showens grundpuls (per stämning)
+        // Borttaget: det gamla "bigJump" (|Δintensitet|>0.1). Det var en SJÄLV-
+        // ÅTERLADDANDE spärrhake — deltat mättes mot intensiteten VID SENASTE BYTET,
+        // som nollställdes vid varje byte, så under en energi-ramp klättrade det
+        // förbi tröskeln igen direkt efter varje byte → byte var 2.5:e sekund genom
+        // hela uppbyggnaden. Tier-byte + drop täcker de verkligt musikaliska
+        // ögonblicken; energi-variation INOM en tier ska effekten själv svara på.
         const tierChanged = this.cfg.energyDrivesMode && tierName !== this.lastSmartTier;
-        // MINSTA-INTERVALL mellan byten → dödar snabb-bytandet (bigJump/tierChanged
-        // kan annars fyra flera ggr/s under en ramp eller vid en tier-gräns). En äkta
-        // DROP byter dock DIREKT — vi matchar mot exakt samma `dropHit` som driver
-        // effekternas drop-accent (edge-triggad, en frame per drop → self-rate-limitad),
-        // så ljus-bytet och drop-smällen är samma händelse. Övriga byten: 2.5s.
-        // Drop-byte bara när energin får driva (energyDrivesMode) → en LUGN stämning
-        // (chill: energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
-        const wantSwitch = bigJump || tierChanged || now > this.smartDwellUntil;
-        if ((dropHit && this.cfg.energyDrivesMode) || (wantSwitch && now - this.lastSmartSwitchMs > 2500)) {
+        const held = now - this.lastSmartSwitchMs;
+        const MIN_HOLD = 8000;    // en effekt lever ALLTID minst 8s
+        const DROP_HOLD = 5000;   // en drop får bryta lite tidigare — men inte varje drop
+        // Drop-byte bara när energin får driva → en LUGN stämning (chill,
+        // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
+        const dropSwitch = dropHit && this.cfg.energyDrivesMode && held > DROP_HOLD;
+        const wantSwitch = tierChanged || now > this.smartDwellUntil;
+        if (dropSwitch || (wantSwitch && held > MIN_HOLD)) {
         this.lastSmartSwitchMs = now;
-        this.lastSmartIntensity = intensity;
         this.lastSmartTier = tierName;
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
         let pool = enabled(tier);
