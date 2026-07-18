@@ -380,11 +380,23 @@ export class EffectEngine {
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
         const dropSwitch = dropHit && this.cfg.energyDrivesMode && held > DROP_HOLD;
         const wantSwitch = tierChanged || now > this.smartDwellUntil;
-        if (dropSwitch || (wantSwitch && held > MIN_HOLD)) {
+        // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
+        // det, inte bara på energinivån. Två regler, båda dramaturgiska:
+        //
+        // 1) Byt ALDRIG mitt i en uppbyggnad. Publiken laddar mot dropen, och ett
+        //    effektbyte där släpper spänningen precis när den ska byggas. Håll
+        //    kvar genom hela risern — då landar bytet i stället PÅ dropen, vilket
+        //    är det enda ögonblick där ett byte förstärker musiken.
+        const inBuild = frame.inRiser || frame.buildUp > 0.35;
+        // 2) I ett breakdown: gå till den lugna poolen oavsett vad energitiern
+        //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
+        //    så utan detta fortsätter riggen köra fullfart genom en svacka.
+        const wantCalm = frame.breaking && this.cfg.energyDrivesMode;
+        if (!inBuild && (dropSwitch || (wantSwitch && held > MIN_HOLD))) {
         this.lastSmartSwitchMs = now;
         this.lastSmartTier = tierName;
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
-        let pool = enabled(tier);
+        let pool = enabled(wantCalm ? LUGN : tier);
         if (pool.length === 0) pool = enabled([...FART, ...LUGN, ...FULLFART]);      // valfri aktiv
         if (pool.length === 0) pool = ["breathe"];                                   // sista fallback
         this.smartCount++;

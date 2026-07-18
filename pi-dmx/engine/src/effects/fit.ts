@@ -31,7 +31,7 @@ export const FIT: Partial<Record<Mode, Fit>> = {
   hjarta:    { punch: 0.35, bass: 0.70, bright: 0.15, beat: 0.90 },   // taktlåst puls, klarar lugnt
 
   // ── Lugna: sustained, långsamma ──
-  breathe:   { punch: 0.10, bass: 0.40, bright: 0.30, beat: 0.20 },
+  breathe:   { punch: 0.10, bass: 0.55, bright: 0.20, beat: 0.20 },   // andas med sektionsenergin
   aurora:    { punch: 0.10, bass: 0.30, bright: 0.55, beat: 0.10 },
   mono:      { punch: 0.20, bass: 0.60, bright: 0.20, beat: 0.10 },   // eld/glöd, varm
   subbreath: { punch: 0.10, bass: 0.85, bright: 0.10, beat: 0.10 },   // sub-driven andning
