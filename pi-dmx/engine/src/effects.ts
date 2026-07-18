@@ -19,6 +19,12 @@ export class EffectEngine {
   private universe = new Uint8Array(512);
   /** Utjamnad tilltro till takten (0..1) — styr beatPulse-djupet. */
   private beatTrust = 0;
+  /** EDGE-SÄKER KICK. frame.kick är en enframs-boolean på analysatorns 375 Hz
+   *  medan render kör 100 Hz → en direkt läsning missar ~73 % av kickarna.
+   *  Räknaren matas i registerKick (375 Hz) och konsumeras som en flank i
+   *  render — samma monotona mönster som frame.dropCount. */
+  private kickCount = 0;
+  private lastKickSeen = 0;
   private showTime = 0;      // ackumulerad "show-tid" — accelererar under uppbyggnaden (riser)
   private lastShowMs = 0;
   private lastKickBoost = 0;
@@ -111,12 +117,16 @@ export class EffectEngine {
    *  strength ~0.4..1.0 (skalas av basens styrka). Friktionen i render() bromsar. */
   registerKick(strength: number): void {
     this.pendingKick += Math.min(1.5, Math.max(0, strength));
+    this.kickCount++;
   }
 
   render(frame: Frame): Uint8Array {
     // Fri-rullande "show-tid": normalt 1× realtid, men accelererar under en
     // uppbyggnad (buildUp från förra framen) så mönstren snabbar upp mot dropen.
     // Ackumulerad → kontinuerlig, inga hopp.
+    // Konsumera kick-flanken EN gång per render (se kickCount ovan).
+    const kickHit = this.kickCount !== this.lastKickSeen;
+    this.lastKickSeen = this.kickCount;
     const _np = performance.now();
     if (this.lastShowMs === 0) this.lastShowMs = _np;
     const _dtT = Math.min(0.1, (_np - this.lastShowMs) / 1000);
@@ -133,7 +143,7 @@ export class EffectEngine {
     // upp till 2.5× snabbare vid full uppbyggnad + kick-ryck ovanpå
     this.showTime += _dtT * (1 + frame.buildUp * 1.5 + this.showVel);
     const t = this.showTime;
-    if (frame.kick) this.lastKickBoost = performance.now();
+    if (kickHit) this.lastKickBoost = performance.now();
 
     // BPM-taktklocka → förutsagt slag: pulsa i låtens exakta tempo, fas-låst av
     // beat-PLL:en (index.ts riktar ankaret mot faktiska kicks). Bättre än ren
@@ -147,7 +157,14 @@ export class EffectEngine {
       const phase = ((since % beatMs) + beatMs) % beatMs / beatMs;
       beatEnv = Math.pow(1 - phase, 2);
       const beatIdx = Math.floor(since / beatMs);
-      if (beatIdx !== this.lastBeatIdx) { this.lastBeatIdx = beatIdx; beatTick = true; }
+      // BARA FRAMÅT. Villkoret var `!==`, som fyrade på VARJE förändring — även
+      // bakåt. PLL:en justerar anchorMs och bpm kontinuerligt i båda riktningar,
+      // så nära en taktgräns dittrade index 132 → 131 → 132 och gav TRE slag där
+      // ett fanns. MÄTT: 150 beatTick/min vid BPM 132 (+14 %). Eftersom beatTick
+      // driver beatHit, som driver varje grid-effekt, gick hela riggen ur takt.
+      // Backar ankaret följer vi med i tysthet men utan att räkna ett slag.
+      if (beatIdx > this.lastBeatIdx) { this.lastBeatIdx = beatIdx; beatTick = true; }
+      else if (beatIdx < this.lastBeatIdx) this.lastBeatIdx = beatIdx;
     }
     const kickEnv = Math.max(
       Math.max(0, 1 - (performance.now() - this.lastKickBoost) / 250),
@@ -283,9 +300,16 @@ export class EffectEngine {
     // so it never stalls in silence. Runs regardless of mode so the head
     // stays coherent when the user switches into it.
     const now = performance.now();
-    const autoAdvanceMs = 320;   // ~185 bpm floor
-    // Beat-locked when synced: step ON the beat instead of after the kick.
-    const advance = this.cfg.beat ? beatTick : frame.kick;
+    // TAKTLÅST NÄR TAKTEN HÖRS. Villkoret var cfg.beat, som är sant så fort en
+    // takt NÅGONSIN låsts — inte att den stämmer nu. Och auto-framryckningen låg
+    // på 320 ms OAVSETT: vid 134 BPM ligger slaget på 448 ms, så auto-steget hann
+    // alltid först. Hela vårt BPM-intervall (80–160 = 750–375 ms/slag) ligger över
+    // 320 ms → chase free-rullade på ~187 BPM och stegade ~2× per takt, aldrig i
+    // takt. Nu: när takten är trovärdig stegar vi PÅ slaget och auto-steget är
+    // bara ett skyddsnät långsammare än det långsammaste slaget (750 ms @80 BPM).
+    const beatOk = this.beatTrust > 0.5;
+    const autoAdvanceMs = beatOk ? 1200 : 320;
+    const advance = beatOk ? beatTick : kickHit;
     if (count > 0 && (advance || now - this.lastChaseAdvance > autoAdvanceMs)) {
       this.lastChaseAdvance = now;
       if (this.cfg.chaseStyle === "pingpong" && count > 1) {
@@ -408,7 +432,7 @@ export class EffectEngine {
     // above 0.05 and reads as flicker — real (even weak) music still lands near
     // the AGC target and passes.
     const silenceThreshold = 0.05 * Math.max(1, frame.gain / 3);
-    if (frame.level > silenceThreshold || frame.kick) this.lastActiveMs = now;
+    if (frame.level > silenceThreshold || kickHit) this.lastActiveMs = now;
     const gateTarget = now - this.lastActiveMs > 250 ? 0 : 1;
     const gateRate = gateTarget > this.silenceGate ? dtSec / 0.1 : dtSec / 0.25;
     this.silenceGate += Math.max(-gateRate, Math.min(gateRate, gateTarget - this.silenceGate));
@@ -417,7 +441,11 @@ export class EffectEngine {
     if (effMode === "wave") this.wavePhase += dtSec * (1.6 + audio * 4);
 
     // Drops: each beat/kick fires the next lamp in a fresh pure color.
-    if (effMode === "drops" && count > 0 && (frame.kick || beatTick) && now - this.lastDropAdvance > 140) {
+    // Samma sak för drops: läste frame.kick i render (100 Hz) → aliasat, OCH
+    // fyrade på både kick och grid-slag → upp till 2 tändningar per takt.
+    // En tändning per slag när takten hörs, annars på den edge-säkra kicken.
+    const dropAdvance = this.beatTrust > 0.5 ? beatTick : kickHit;
+    if (effMode === "drops" && count > 0 && dropAdvance && now - this.lastDropAdvance > 140) {
       this.lastDropAdvance = now;
       this.dropCount++;
       // Golden-ratio walk over the lamps too — mixed order, never the same
@@ -500,7 +528,7 @@ export class EffectEngine {
     // (snap/rave/party/ripple/…) fortsätter dansa på trummorna även när BPM-låset
     // tappas, i st.f. att frysa på beatIdx=0. Alla effekter använder beatIdx
     // MODULÄRT (färg/grupp/position) → ren drop-in.
-    const beatHit = beatTick || (!hasBeat && frame.kick);   // DISKRET flank: takten gick just fram (grid-slag, annars verklig kick)
+    const beatHit = beatTick || (!hasBeat && kickHit);   // DISKRET flank: takten gick just fram (grid-slag, annars verklig kick)
     if (beatHit) this.beatCounter++;
     const beatIdx = this.beatCounter;
     // beatPulse: grid-puls när låst, annars den VERKLIGA kick-envelopen → pulsar
