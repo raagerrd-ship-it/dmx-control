@@ -11,9 +11,9 @@ import { EFFECT_KEYS } from "./effects/registry.js";
 /** Vilka effekter smart-läget får välja bland per stämning (rotation-poolen).
  *  Bara dessa är "på"; alla andra sätts AV så smart bara plockar ur poolen. */
 const POOL: Record<MoodId, Mode[]> = {
-  chill: ["breathe", "aurora", "mono", "subbreath", "airglow", "twin"],
-  fest:  ["breathe", "aurora", "twin", "wave", "chase", "pulse", "drops", "party", "snap", "bounce", "gallop", "ripple"],
-  galet: ["party", "snap", "bounce", "rave", "gallop", "ripple", "drops", "drumkit", "duel", "split", "pulse", "strobe"],
+  chill: ["breathe", "aurora", "mono", "subbreath", "airglow", "twin", "tide", "drift", "pendel", "viska"],
+  fest:  ["breathe", "aurora", "twin", "wave", "chase", "pulse", "drops", "party", "snap", "bounce", "gallop", "ripple", "tide", "pendel", "backbeat", "eko", "hjarta", "stege"],
+  galet: ["party", "snap", "bounce", "rave", "gallop", "ripple", "drops", "drumkit", "duel", "split", "pulse", "strobe", "backbeat", "tick", "stege", "eko"],
 };
 
 /** "Känslo-rattarna" per stämning. LÄTT ATT JUSTERA. */

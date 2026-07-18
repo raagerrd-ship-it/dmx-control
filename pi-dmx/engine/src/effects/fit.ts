@@ -18,6 +18,18 @@ import type { Mode } from "../config.js";
 export interface Fit { punch: number; bass: number; bright: number; beat: number }
 
 export const FIT: Partial<Record<Mode, Fit>> = {
+  // ── Nya lugna ──
+  tide:      { punch: 0.15, bass: 0.65, bright: 0.20, beat: 0.10 },   // tung vattenlinje, sustained
+  drift:     { punch: 0.05, bass: 0.30, bright: 0.50, beat: 0.05 },   // ren klangfärg, rör sig inte på slag
+  pendel:    { punch: 0.15, bass: 0.30, bright: 0.30, beat: 0.55 },   // lugn MEN taktlåst
+  viska:     { punch: 0.70, bass: 0.35, bright: 0.60, beat: 0.30 },   // lever på perkussion trots låg energi
+  // ── Nya fart ──
+  backbeat:  { punch: 0.90, bass: 0.75, bright: 0.45, beat: 0.85 },   // kräver tydlig kick+virvel
+  tick:      { punch: 0.75, bass: 0.20, bright: 0.95, beat: 0.60 },   // hi-hat-driven, toppregister
+  stege:     { punch: 0.80, bass: 0.55, bright: 0.75, beat: 0.35 },   // anslag i hela spektrat
+  eko:       { punch: 0.55, bass: 0.45, bright: 0.40, beat: 0.95 },   // meningslös utan takt
+  hjarta:    { punch: 0.35, bass: 0.70, bright: 0.15, beat: 0.90 },   // taktlåst puls, klarar lugnt
+
   // ── Lugna: sustained, långsamma ──
   breathe:   { punch: 0.10, bass: 0.40, bright: 0.30, beat: 0.20 },
   aurora:    { punch: 0.10, bass: 0.30, bright: 0.55, beat: 0.10 },

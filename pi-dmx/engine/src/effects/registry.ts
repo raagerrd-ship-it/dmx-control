@@ -31,12 +31,23 @@ import { split } from "./split.js";
 import { subbreath } from "./subbreath.js";
 import { duel } from "./duel.js";
 import { airglow } from "./airglow.js";
+import { tide } from "./tide.js";
+import { drift } from "./drift.js";
+import { pendel } from "./pendel.js";
+import { viska } from "./viska.js";
+import { backbeat } from "./backbeat.js";
+import { tick } from "./tick.js";
+import { stege } from "./stege.js";
+import { eko } from "./eko.js";
+import { hjarta } from "./hjarta.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
   drops, party, chase, wave, breathe, snap, bounce, mono, aurora, pulse,
   strobe, rave, eq, gallop, twin, ripple, gravity, drumkit, split, subbreath,
   duel, airglow,
+  // Nya (2026-07): fyller lugn- och fart-poolerna till 10+ vardera.
+  tide, drift, pendel, viska, backbeat, tick, stege, eko, hjarta,
 ];
 
 /** Snabb uppslagning nyckel → effekt. */

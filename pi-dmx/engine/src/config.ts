@@ -3,7 +3,7 @@
  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
  */
 
-export type Mode = "smart" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "strobe" | "rave" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "subbreath" | "duel" | "airglow" | "blackout";
+export type Mode = "smart" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "strobe" | "rave" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "subbreath" | "duel" | "airglow" | "tide" | "drift" | "pendel" | "viska" | "backbeat" | "tick" | "stege" | "eko" | "hjarta" | "blackout";
 
 /** Hyresgäst-stämning: ETT val ställer in hela riggens känsla (se moods.ts). */
 export type MoodId = "chill" | "fest" | "galet";
