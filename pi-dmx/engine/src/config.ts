@@ -154,7 +154,13 @@ export const defaultConfig: EngineConfig = {
   rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   dmxMaxHz: 100, // 100 Hz för tightare bas/drop-synk; helper cappar till wire-limit
-  fog: { enabled: false, address: 128, onDrop: true, burstMs: 2500, cooldownMs: 25000, level: 255 },
+  // Rok-defaults satta for Ibiza LSM1500PRO + Cameo XTRA HEAVY: maskinen ger
+  // 250 m3/min och vatskan ar den tataste sorten (extremt lang svavtid, gjord
+  // for UTOMHUS). I ett slutet rum fyller en 2.5s-puff for mycket och den langa
+  // svavtiden gor att man inte kan angra sig. Maskinen orkar dessutom bara
+  // 40-50s i strack innan varmeblocket maste hamta igen, sa 1s/60s ar ~1.6%
+  // arbetscykel - den hinner alltid vara varm. Oka vid behov, inte tvartom.
+  fog: { enabled: false, address: 13, onDrop: true, burstMs: 1000, cooldownMs: 60000, level: 255 },
   dropBlackout: true,     // dramaturgisk tystnad — låg risk, lyfter varje drop
   scenicAnchor: false,    // ägar-val: antar lampor i rad vänster→höger
   energyCeiling: true,    // direkt VU = ljusstyrka; standard på (drop/punch bypassar)
