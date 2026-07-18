@@ -119,6 +119,8 @@ export class Analyser {
   private bpmCounter = 0;
   private localBpm = 0;
   private localBpmConfidence = 0;
+  private static readonly BPM_MIN = 80;    // festintervall; MAX maste vara exakt 2x MIN
+  private static readonly BPM_MAX = 160;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
   private bpmStable = 0;    // antal stabila (finjusterings-)estimat i rad → committa oktaven
   private newSongVote = 0;  // ihållande oenighet trots låst oktav → låtbyte utan tystnadslucka
@@ -188,7 +190,7 @@ export class Analyser {
   }
 
   /**
-   * BPM (55..175) från onset-envelopens autokorrelation.
+   * BPM (80..160) från onset-envelopens autokorrelation.
    *  1) Toppen i autokorrelationen ger en kandidat-lag.
    *  2) SUB-HARMONIC-PREFERENS: om dubbla/tredubbla lagget (halva/tredjedels
    *     tempot) resonerar nästan lika bra är det oftast det ÄKTA beatet — annars
@@ -212,7 +214,7 @@ export class Analyser {
     for (let i = 0; i < N; i++) env[i] -= mean;
     const HZ = Analyser.ENV_HZ;
     const lagMin = Math.floor(HZ * 60 / 185);
-    const lagMax = Math.min(N - 1, Math.floor(HZ * 60 / 55));   // ner till 55 BPM
+    const lagMax = Math.min(N - 1, Math.floor(HZ * 60 / 55));   // sokfonstret ar bredare an vikningen med flit
     // 1) Rå autokorrelation, LENGTH-NORMALISERAD: /(N-lag) tar bort biasen mot
     //    korta lag (annars vinner alltid snabb takt eftersom fler termer bidrar).
     // 2) COMB-SCORING: ac(L) + ½·ac(2L) + ⅓·ac(3L). En äkta beat-period resonerar
@@ -306,8 +308,12 @@ export class Analyser {
       if (den < 0) { const d = 0.5 * (yl - yr) / den; if (Math.abs(d) < 1) lagF = bestLag + d; }
     }
     let bpm = (HZ * 60) / lagF;
-    while (bpm < 55) bpm *= 2;
-    while (bpm >= 175) bpm /= 2;
+    // BPM-FILTER: vik in i 80..160 — festmusik ligger dar, och allt utanfor ar
+    // en oktav-artefakt (en 76-BPM-last ar i praktiken 152, en 170 ar 85).
+    // Intervallet MASTE spanna exakt en oktav (max = 2x min): med t.ex. 80..150
+    // blir 155 -> 77.5 -> 155 -> 77.5 i all evighet och motorn hanger.
+    while (bpm < Analyser.BPM_MIN) bpm *= 2;
+    while (bpm >= Analyser.BPM_MAX) bpm /= 2;
     // Median över RÅestimaten (utan oktav-tvång) → dämpar brus men låser inte
     // fast oktaven, så en fel initial låsning kan rättas. Långt fönster (~5s) för
     // att inte studsa på brusiga/tvetydiga låtar.

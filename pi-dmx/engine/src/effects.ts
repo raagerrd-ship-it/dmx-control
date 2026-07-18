@@ -17,6 +17,8 @@ import type { EffectContext } from "./effects/types.js";
 
 export class EffectEngine {
   private universe = new Uint8Array(512);
+  /** Utjamnad tilltro till takten (0..1) — styr beatPulse-djupet. */
+  private beatTrust = 0;
   private showTime = 0;      // ackumulerad "show-tid" — accelererar under uppbyggnaden (riser)
   private lastShowMs = 0;
   private lastKickBoost = 0;
@@ -193,7 +195,17 @@ export class EffectEngine {
         // beatPulse: mjuk, kontinuerlig puls på BPM-rutnätet (PLL:en riktar fasen
         // mot faktiska slag). Kontinuerlig — funkar även när kick-detektorn är
         // gles (komprimerad signal fyrar sällan), till skillnad från ren kick-puls.
-        const beatMul = this.cfg.beatPulse ? (0.45 + 0.55 * beatEnv) : 1;
+        //
+        // PULSA BARA NÄR TAKTEN FAKTISKT HÖRS. cfg.beat finns alltid så fort en
+        // takt någonsin låstes, så den dög inte som villkor — vid oklar musik
+        // pulsade riggen vidare på ett gissat rutnät och blinket hamnade bredvid
+        // musiken. Nu styr bpmConfidence pulsens DJUP: full puls över 0.60, helt
+        // slät under 0.35, mjuk ramp emellan. Djupet smoothas (~0.6s) så att en
+        // vacklande konfidens inte hackar pulsen av och på.
+        const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - 0.35) / 0.25));
+        this.beatTrust += (trustRaw - this.beatTrust) * 0.03;
+        const depth = 0.55 * this.beatTrust;
+        const beatMul = this.cfg.beatPulse ? (1 - depth) + depth * beatEnv : 1;
     // BAS-PUNCH: en hård/utdragen basstöt (drop) saknar transient, och på en
     // komprimerad signal svänger bas-energin lite. Så spåra ett bas-GOLV = den
     // TYSTA basnivån (sjunker mot tystnad på ~0.4s, stiger mkt långsamt ~5s). En
