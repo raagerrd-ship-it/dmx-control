@@ -121,6 +121,7 @@ export class Analyser {
   private localBpmConfidence = 0;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
   private bpmStable = 0;    // antal stabila (finjusterings-)estimat i rad → committa oktaven
+  private newSongVote = 0;  // ihållande oenighet trots låst oktav → låtbyte utan tystnadslucka
 
   private bpmHist: number[] = [];   // senaste råestimat (~3s) för median-stabilisering
   // Pre-allokerade scratchpads för computeBpm (GC-skydd; annars 4× Float32Array/anrop).
@@ -332,6 +333,7 @@ export class Analyser {
       if (ratio >= 0.9 && ratio <= 1.11) {
         this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);   // samma takt → glid
         this.octaveVote *= 0.5;
+        this.newSongVote *= 0.5;                                                    // ense igen → glöm oenigheten
         if (this.bpmStable < 100000) this.bpmStable++;                              // stabil tid ackumuleras
       } else if (!committed && ratio > 1.4) {
         this.octaveVote = Math.max(0, this.octaveVote) + 1;                          // estimaten HÖGRE oktav
@@ -341,6 +343,21 @@ export class Analyser {
         if (this.octaveVote <= -8) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
       } else {
         this.octaveVote *= 0.7;                                                      // mellanting (3/2) / committad off-oktav → brus
+        // LÅTBYTE UTAN TYSTNADSLUCKA: låset ovan nollställs annars BARA av 350 ms
+        // tystnad — men crossfade/DJ-set/gapless spelning har ingen. Då satt
+        // localBpm fast på första låtens tempo resten av kvällen och hela
+        // takt-gridet var fel. Skillnaden mot ett breakdown är inte hur MYCKET
+        // estimaten är oense utan hur LÄNGE: ett breakdown är oense några sekunder,
+        // en ny låt för alltid. ~6s ihållande oenighet (24 estimat @4Hz, mot en
+        // median som redan är 5s) = ny låt → släpp låset och lås om. Skulle ett
+        // långt halvtempo-parti råka trigga rättar den sig själv på 6s igen —
+        // oändligt mycket bättre än att sitta fel hela kvällen.
+        if (committed && ++this.newSongVote >= 24) {
+          this.localBpm = Math.round(med);
+          this.newSongVote = 0;
+          this.octaveVote = 0;
+          this.bpmStable = 0;   // nytt lås får byggas om från början
+        }
       }
     }
     // Smooth confidence (undvik hoppig UI); attack snabbt, release långsamt.
@@ -502,7 +519,7 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHist.length = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHist.length = 0; }
     } else {
       this.silentMs = 0;
     }
