@@ -721,7 +721,17 @@ export class Analyser {
     if (this.lvlSmooth > this.levelCeil * 0.85 && this.lvlSmooth > 0.65) this.inZoneState = true;
     else if (this.lvlSmooth < this.levelCeil * 0.70) this.inZoneState = false;
     const inZone = this.inZoneState;
-    if (inZone && !this.wasInZone && nowWallA - this.breakAtMs < 3500 && this.activeMs > 2000) {
+    // EN DROP MASTE LANDA I HOG ENERGI. Villkoren ovan tittar bara pa LOKALA
+    // nivasprang (svacka -> topp-zon) och vet inget om var i laten vi ar, sa varje
+    // liten variation i ett tyst parti raknades som en drop.
+    //   MATT: 4.7 drops/minut, varav 71% vid intensitet under 0.45. Uppmatta
+    //   drop-intensiteter: 0.39 0.32 0.81 0.34 0.40 0.37 0.51 - bara EN av sju
+    //   lag i genuint hog energi.
+    // En drop ar per definition ett sprang IN i hog energi, inte bara ett sprang.
+    // intensity ar nu en levande signal (se 4392f61) och raknas fram i samma
+    // funktion, sa gransen kostar ingenting.
+    const dropEnergyOk = intensity > 0.60;
+    if (dropEnergyOk && inZone && !this.wasInZone && nowWallA - this.breakAtMs < 3500 && this.activeMs > 2000) {
       this.dropCount++; this.lastDropMs = nowWallA;
     }
     this.wasInZone = inZone;
