@@ -23,15 +23,14 @@ export class AudioCapture extends EventEmitter {
   private leftover: Buffer = Buffer.alloc(0);
   private readonly bytesPerFrame: number;   // S16LE = 2 bytes/sample × channels
   private readonly chunkBytes: number;
-  private readonly chunkMs: number;
-  private wallStart = 0;    // Date.now() vid första chunk
-  private audioMs = 0;      // ms audio vi HAR släppt vidare
+  /** Kasta en chunk när så mycket FÄRSKARE ljud redan står på kö bakom den.
+   *  Normaldrift mäter 0.0 ms kö, så detta fyrar bara vid en verklig stall. */
+  private static readonly STALE_MS = 50;
 
   constructor(private opts: AudioCaptureOptions) {
     super();
     this.bytesPerFrame = 2 * opts.channels;
     this.chunkBytes = opts.hopSamples * this.bytesPerFrame;
-    this.chunkMs = (opts.hopSamples / opts.rate) * 1000;
   }
 
   start() {
@@ -46,13 +45,6 @@ export class AudioCapture extends EventEmitter {
   }
 
   private spawnArecord() {
-    // Re-basera wall-clock-pacingen vid varje (om)start. Annars fortsätter
-    // audioMs mot en wallStart från FÖRE avbrottet → 'behind' fastnar över
-    // 120 ms och ALLA chunks droppas efter en capture-lucka (arecord dog /
-    // ljudkortet tappade kontakt). Utan detta återhämtar sig auto-omstarten
-    // aldrig på egen hand — bara en hel process-omstart (watchdog) räddar den.
-    this.wallStart = 0;
-    this.audioMs = 0;
     this.leftover = Buffer.alloc(0);
     const args = [
       "-D", this.opts.device,
@@ -97,30 +89,28 @@ export class AudioCapture extends EventEmitter {
       ? Buffer.concat([this.leftover, buf])
       : buf;
 
-    if (this.wallStart === 0) this.wallStart = Date.now();
-
     let offset = 0;
     while (combined.length - offset >= this.chunkBytes) {
       const chunk = combined.subarray(offset, offset + this.chunkBytes);
       offset += this.chunkBytes;
-      this.audioMs += this.chunkMs;
 
-      // Wall-clock pacing: if processing has fallen more than ~120 ms behind
-      // real time (audio piling up faster than we consume it — the slow, steady
-      // accumulation that a burst-cap misses), DROP this stale chunk instead of
-      // rendering it. Keeps the light within ~120 ms of the music indefinitely.
-      const behind = (Date.now() - this.wallStart) - this.audioMs;
-      // SJÄLVLÄKANDE: en ALSA-overrun (samples TAPPAS när event-loopen stallar en
-      // stund — t.ex. vid ett WiFi-omkopplingsevent) lämnar audioMs permanent
-      // efter väggklockan → 'behind' fastnar högt → annars droppas VARJE chunk för
-      // alltid och lamporna slutar reagera tills watchdogen hinner starta om.
-      // >500 ms ur synk = ett verkligt tapp, inte en normal transient: re-basera
-      // klockan och släpp igenom, så capturen resynkar direkt i stället.
-      if (behind > 500) {
-        this.wallStart = Date.now() - this.audioMs;   // behind ≈ 0 → resynk nu
-      } else if (behind > 120) {
-        continue;   // normalt: droppa EN eftersläpande chunk för att hålla realtid
-      }
+      // Släng gammalt ljud när event-loopen har stallat: allt som redan står på
+      // kö bakom den här chunken är FÄRSKARE, så att analysera den vore att visa
+      // gårdagens musik. Kön = resten av det här batchet + det ALSA hunnit fylla
+      // i strömmen. MÄTT i normaldrift: 0.0 ms snitt OCH 0.0 ms max — vakten är
+      // rent skydd mot stall, den fyrar aldrig när allt är friskt.
+      //
+      // Detta ersätter en väggklocks-drift (`behind`) som mätte fel storhet: den
+      // räknade väggtid minus ljud som KOMMIT UR pipen, vilket bara kan glida vid
+      // en ALSA-overrun — alltså samples som aldrig fanns, inte kö. Den drift
+      // kunde bara växa (varje overrun lade på ~40 ms) och kunde aldrig repareras
+      // av att droppa, eftersom man omöjligt konsumerar snabbare än arecord matar.
+      // Vid >120 ms droppades därför VARJE chunk för alltid och riggen frös. Kön
+      // nedan är momentan och kan aldrig fastna, så inget resynk-lappverk behövs.
+      const queued = (combined.length - offset)
+        + (this.proc?.stdout.readableLength ?? 0);
+      const staleMs = (queued / this.bytesPerFrame / this.opts.rate) * 1000;
+      if (staleMs > AudioCapture.STALE_MS) continue;
 
       this.emit("chunk", this.toMonoFloat32(chunk));
     }
