@@ -731,7 +731,14 @@ export class Analyser {
     // intensity ar nu en levande signal (se 4392f61) och raknas fram i samma
     // funktion, sa gransen kostar ingenting.
     const dropEnergyOk = intensity > 0.60;
-    if (dropEnergyOk && inZone && !this.wasInZone && nowWallA - this.breakAtMs < 3500 && this.activeMs > 2000) {
+    // REFRAKTARPERIOD. Det fanns ingen alls: en drop kunde folja pa en annan
+    // inom brakdelen av en sekund. MATT i drop-intervall-loggen: tva av tio
+    // intervall lag pa 0.2 och 0.5 TAKTER, dvs dubbelfyrningar - resten lag pa
+    // 8-40 takter. En drop ar en sektionsgrans; tva sadana kan inte ligga en
+    // halv sekund isar. 2s ar valdigt lagt satt mot narmaste akta intervall
+    // (8 takter = ~13s vid 150 BPM), sa den kan inte kapa nagot verkligt.
+    const dropSpacingOk = nowWallA - this.lastDropMs > 2000;
+    if (dropEnergyOk && dropSpacingOk && inZone && !this.wasInZone && nowWallA - this.breakAtMs < 3500 && this.activeMs > 2000) {
       this.dropCount++; this.lastDropMs = nowWallA;
     }
     this.wasInZone = inZone;
