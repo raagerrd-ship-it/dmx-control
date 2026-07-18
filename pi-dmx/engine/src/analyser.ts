@@ -277,8 +277,17 @@ export class Analyser {
     // en utsmetad "tempolös" låt eller brus har ~platt scoring. clamp(0..1).
     const meanScore = scoreSum / Math.max(1, scoreCount);
     const rawConf = meanScore > 0 ? 1 - meanScore / bestVal : 0;
-    // Skala: ~0.35 råvärde är typiskt "helt låst". Mappa 0..0.5 → 0..1.
-    const conf = Math.max(0, Math.min(1, rawConf / 0.5));
+    // Skala MÄTT, inte gissad. Kommentaren här sa förut att ~0.35 råvärde är
+    // "helt låst" och mappade 0..0.5 → 0..1. Verkligheten:
+    //   rawConf p05=0.33  p50=0.65  p95=0.72  — och 82-90 % låg ÖVER 0.5.
+    // Alltså mättades nio fall av tio till exakt 1.00 och hela det informativa
+    // området (0.5-0.75) kastades bort. Konfidensen såg levande ut men var en
+    // konstant, och allt som hängde på den stod stilla: beatPulse skulle tona ut
+    // när takten är oklar men gjorde det aldrig, och samma värde styr numera
+    // chase-låsningen och drops.
+    // Golvet 0.35 är inte noll för att även taktlös musik ger en viss topp i
+    // autokorrelationen; det är där diskrimineringen faktiskt börjar.
+    const conf = Math.max(0, Math.min(1, (rawConf - 0.35) / 0.40));
 
     // OFF-BEAT-TEST → skilj äkta snabb takt (dans) från subdivision (ballad).
     // Vik onset-envelopen på DUBBLA perioden, jämför energi PÅ slaget vs MELLAN.
