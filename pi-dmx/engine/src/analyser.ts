@@ -348,11 +348,13 @@ export class Analyser {
         // localBpm fast på första låtens tempo resten av kvällen och hela
         // takt-gridet var fel. Skillnaden mot ett breakdown är inte hur MYCKET
         // estimaten är oense utan hur LÄNGE: ett breakdown är oense några sekunder,
-        // en ny låt för alltid. ~6s ihållande oenighet (24 estimat @4Hz, mot en
-        // median som redan är 5s) = ny låt → släpp låset och lås om. Skulle ett
-        // långt halvtempo-parti råka trigga rättar den sig själv på 6s igen —
-        // oändligt mycket bättre än att sitta fel hela kvällen.
-        if (committed && ++this.newSongVote >= 24) {
+        // en ny låt för alltid. ~25s ihållande oenighet (100 estimat @4Hz) = ny låt
+        // → släpp låset och lås om.
+        // MÄTT: 6s var för kort — på riktig musik halverades BPM 145→73→144 mitt
+        // i en låt när ett breakdown hann nå tröskeln. En låt är 3–5 min, så 25s
+        // ryms lätt inom ett låtbyte men ingen sektion håller i sig så länge.
+        // Värsta fall efter ett låtbyte: 25s fel takt. Mot hela kvällen fel.
+        if (committed && ++this.newSongVote >= 100) {
           this.localBpm = Math.round(med);
           this.newSongVote = 0;
           this.octaveVote = 0;
