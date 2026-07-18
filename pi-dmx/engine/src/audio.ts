@@ -65,6 +65,11 @@ export class AudioCapture extends EventEmitter {
       "-q",
     ];
     const p = spawn("arecord", args, { stdio: ["ignore", "pipe", "pipe"] });
+    // Pinna ljudinfångningen till kärna 0 — den ÄRVER annars motorns affinitet
+    // (CPUAffinity=1 2) och slåss då om kärna med analys/render. Egen kärna =
+    // ALSA-bufferten töms i tid även när motorn har en burst. Fire-and-forget:
+    // saknas taskset fortsätter arecord ändå, bara utan pinning.
+    if (p.pid) spawn("taskset", ["-pc", "0", String(p.pid)], { stdio: "ignore" }).on("error", () => {});
     this.proc = p;
 
     p.stdout.on("data", (buf: Buffer) => this.onData(buf));

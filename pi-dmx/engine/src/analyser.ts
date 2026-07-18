@@ -102,6 +102,8 @@ export class Analyser {
   private bandLvl = new Float32Array(8);   // scratch: per-band nivå denna frame (~90ms smoothad)
   private bandLvlSm = new Float32Array(8); // per-band nivå-smooth (håll mellan frames)
   private bandOn = new Float32Array(8);    // scratch: per-band onset denna frame
+  private bigCounter = 0;                  // decimering av 2048-FFT:n (se BIG_EVERY)
+  private static readonly BIG_EVERY = 3;   // kor stor-FFT var N:e hop → analysen ryms i realtid
   private kickMed = 0.1;             // robust glidande MEDIAN av kick-fluxen (sign-baserad)
   private kickMad = 0.05;            // robust MAD (median absolut avvikelse) → tröskel-spridning
   private kickSeed = 0;              // warmup-räknare: snabb EMA-seed av skalan innan sign-baserad tar över
@@ -573,8 +575,17 @@ export class Analyser {
     // --- DUBBEL-FFT: hög-upplöst log-spektrum för effekterna ---
     // Egen glidande 2048-buffert, matas samma hop. Ger 23 Hz/bin i botten så
     // sub/kick/bas separeras. Per-band AGC-nivå + per-band adaptiv onset.
+    // Bufferten matas VARJE hop (glidande fönster måste vara obrutet)...
     this.bufferBig.copyWithin(0, hop);   // skjut vänster med en hop
     this.bufferBig.set(samples, this.bufferBig.length - hop);
+    // ...men själva FFT:n + band-analysen körs bara var BIG_EVERY:e hop. 2048-FFT:n
+    // är analysatorns dyraste steg och spec-NIVÅERNA smoothas ändå ~90ms — de behöver
+    // inte 375Hz. MÄTT: analysen tog 3.8ms/hop mot 2.67ms budget → ljud droppades och
+    // ljuset låg 40–140ms efter. Decimeringen får den att rymmas i realtid.
+    // Tidssteget skalas (bigDt) så smoothing-tidskonstanterna blir oförändrade.
+    if (++this.bigCounter >= Analyser.BIG_EVERY) {
+    this.bigCounter = 0;
+    const bigDt = dtHop * Analyser.BIG_EVERY;
     for (let i = 0; i < this.bufferBig.length; i++) this.windowedBig[i] = this.bufferBig[i] * this.windowBig[i];
     this.fftBig.realTransform(this.specBig, this.windowedBig);
     const halfBig = this.bufferBig.length / 2;
@@ -605,15 +616,16 @@ export class Analyser {
       // spec via ctx.band) flimrar inte av det råa per-hop-AGC-bruset. onset lämnas
       // skarp (nedan) så transient-drivna effekter behåller sin punch.
       const lvlRawB = gated ? Math.min(1, avg / (this.bandPeak[b] + 1e-6)) : 0;
-      this.bandLvlSm[b] += (lvlRawB - this.bandLvlSm[b]) * (1 - Math.exp(-(this.cfg.fft.hop / this.cfg.audio.rate) / 0.09));
+      this.bandLvlSm[b] += (lvlRawB - this.bandLvlSm[b]) * (1 - Math.exp(-bigDt / 0.09));
       this.bandLvl[b] = this.bandLvlSm[b];
       // Per-band onset: halvvågs-flux mot adaptiv baslinje (som kick-detektorn) →
       // rena anslag oberoende av bandets absoluta energi.
       const fluxN = fl / nb;
-      this.onsetBase[b] += (fluxN - this.onsetBase[b]) * 0.02;
+      this.onsetBase[b] += (fluxN - this.onsetBase[b]) * (0.02 * Analyser.BIG_EVERY);
       this.bandOn[b] = gated ? Math.max(0, Math.min(1, (fluxN - this.onsetBase[b] * 1.3) * 6)) : 0;
     }
     { const t = this.prevMagBig; this.prevMagBig = this.magBig; this.magBig = t; }
+    }   // slut på decimerad stor-FFT
     // TRUM-KIT peak-hold-envelopes PÅ HOP-TAKT (var 2.7ms) → fångar varje anslag,
     // aldrig missat mellan två render-frames (100Hz). tau bevarade från effects.ts:
     // hat 60ms (treble-onset O[6]) / snare 110ms (highMid-onset O[5]) / kick 150ms
