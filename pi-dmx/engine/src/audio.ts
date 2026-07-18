@@ -23,9 +23,11 @@ export class AudioCapture extends EventEmitter {
   private leftover: Buffer = Buffer.alloc(0);
   private readonly bytesPerFrame: number;   // S16LE = 2 bytes/sample × channels
   private readonly chunkBytes: number;
-  /** Kasta en chunk när så mycket FÄRSKARE ljud redan står på kö bakom den.
-   *  Normaldrift mäter 0.0 ms kö, så detta fyrar bara vid en verklig stall. */
-  private static readonly STALE_MS = 50;
+  /** Katastrofgräns: bara när ETT batch bär mer ljud än så är det så gammalt att
+   *  en lucka är bättre än att spela det. MÄTT: normala batchar når 32 ms, värsta
+   *  vid uppstart 163 ms, och enstaka event-loop-stalls ger 341 ms → 1500 ms ger
+   *  4× marginal till det värsta uppmätta. Ren försäkring, fyrar aldrig i drift. */
+  private static readonly STALE_MS = 1500;
 
   constructor(private opts: AudioCaptureOptions) {
     super();
@@ -94,23 +96,23 @@ export class AudioCapture extends EventEmitter {
       const chunk = combined.subarray(offset, offset + this.chunkBytes);
       offset += this.chunkBytes;
 
-      // Släng gammalt ljud när event-loopen har stallat: allt som redan står på
-      // kö bakom den här chunken är FÄRSKARE, så att analysera den vore att visa
-      // gårdagens musik. Kön = resten av det här batchet + det ALSA hunnit fylla
-      // i strömmen. MÄTT i normaldrift: 0.0 ms snitt OCH 0.0 ms max — vakten är
-      // rent skydd mot stall, den fyrar aldrig när allt är friskt.
+      // Ett STORT batch betyder inte att vi ligger efter — det betyder att node
+      // buntade ihop läsningar och gav oss ikapp-ljudet på en gång. MÄTT: normala
+      // batchar bär upp till 32 ms, uppstart 163 ms. Ljudet är redan i handen och
+      // vi kör på ~47 % av realtidsbudgeten, så att bearbeta HELA batchet är både
+      // rätt och snabbast — vi hinner ikapp av oss själva. Att slänga det är att
+      // slänga riktig musik: en tidigare version av den här vakten sköt på 50 ms
+      // och kastade då 28 % av ljudet i varje burst, vilket syntes som fladder i
+      // låga partier (kalibreringsmappningen förstorar varje lucka).
       //
-      // Detta ersätter en väggklocks-drift (`behind`) som mätte fel storhet: den
-      // räknade väggtid minus ljud som KOMMIT UR pipen, vilket bara kan glida vid
-      // en ALSA-overrun — alltså samples som aldrig fanns, inte kö. Den drift
-      // kunde bara växa (varje overrun lade på ~40 ms) och kunde aldrig repareras
-      // av att droppa, eftersom man omöjligt konsumerar snabbare än arecord matar.
-      // Vid >120 ms droppades därför VARJE chunk för alltid och riggen frös. Kön
-      // nedan är momentan och kan aldrig fastna, så inget resynk-lappverk behövs.
-      const queued = (combined.length - offset)
-        + (this.proc?.stdout.readableLength ?? 0);
-      const staleMs = (queued / this.bytesPerFrame / this.opts.rate) * 1000;
-      if (staleMs > AudioCapture.STALE_MS) continue;
+      // Två tidigare mått som ledde fel, så de inte provas igen:
+      //   • `behind` (väggtid − ljud ur pipen) mätte ALSA-overruns, inte kö. Den
+      //     kunde bara växa och drop kunde inte reparera den → vid >120 ms
+      //     droppades varje chunk för alltid och riggen frös.
+      //   • `stdout.readableLength` är alltid 0: backloggen ligger i OS-pipen,
+      //     osynlig härifrån. Den mätte ingenting.
+      const staleMs = ((combined.length - offset) / this.bytesPerFrame / this.opts.rate) * 1000;
+      if (staleMs > AudioCapture.STALE_MS) continue;   // katastrofal stall → lucka slår gammalt ljud
 
       this.emit("chunk", this.toMonoFloat32(chunk));
     }
