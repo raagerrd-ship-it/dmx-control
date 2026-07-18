@@ -150,6 +150,7 @@ export class Analyser {
   private lvlSmooth = 0;
   private intensityEma = 0.5;    // sektionsenergi: utjämnad nivå
   private intensityFloor = 0.5;  // dess robusta P50-baslinje (låtens snitt)
+  private intensitySpread = 0.05;  // uppmatt dynamik (MAD) → sjalvkalibrerande skala
   private activeMs = 0;          // hur länge musik spelat (warmup för baslinjen)
   // DROP-DETEKTION (flyttad från effects: analys hör hemma här; show-reaktionen stannar där)
   private levelCeil = 0.5;       // långsamt nivå-tak (låtens loud-topp)
@@ -595,10 +596,27 @@ export class Analyser {
     const iDown = 1 - Math.exp(-dtHop / 3.0);
     this.intensityEma += (this.lvlSmooth - this.intensityEma) * (this.lvlSmooth > this.intensityEma ? iUp : iDown);
     const iWarm = this.activeMs < 8000;
-    const floorRate = iWarm ? dtHop / 3 : dtHop / 25;
+    // REFERENSEN MASTE VARA MYCKET LANGSAMMARE AN DET DEN MATER. Golvet gick
+    // forut pa 25s (~0.022/s), men musikens sektioner andrar sig over tiotals
+    // sekunder OCH auto-gainen plattar ut nivaskillnaderna — sa golvet hann
+    // ikapp EMA:n och gapet oppnade sig aldrig.
+    //   MATT: intensity p10=0.50 p50=0.50 p90=0.51 p99=0.63.
+    // Tiern kraver <0.34 for lugn och >0.78 for full, sa BADA ytterlagena var
+    // oatkomliga: full-tiern (11 effekter) spelades 1 gang av 13 pa en kvart.
+    // 150s referens = flera latar, alltsa ett aftonsnitt i stallet for ett
+    // glidande just-nu-varde.
+    const floorRate = iWarm ? dtHop / 3 : dtHop / 150;
     if (iWarm) this.intensityFloor += (this.intensityEma - this.intensityFloor) * floorRate;   // seed snabbt
     else this.intensityFloor += Math.sign(this.intensityEma - this.intensityFloor) * floorRate * (this.intensityFloor + 0.05);
-    const intensity = Math.max(0, Math.min(1, 0.5 + (this.intensityEma - this.intensityFloor) / 0.30));
+    // SJALVKALIBRERANDE SKALA: den fasta namnaren 0.30 var en GISSNING om hur
+    // stor dynamiken ar. Mat den i stallet — ett glidande medelavvikelse-matt
+    // (MAD) over avvikelsen fran golvet. Da nyttjar intensity hela 0..1 oavsett
+    // om baren spelar dynamisk rock eller platt komprimerad house. +-2 MAD
+    // spanner hela skalan; minsta 0.015 hindrar att tyst brus blir blaser upp.
+    const dev = this.intensityEma - this.intensityFloor;
+    this.intensitySpread += (Math.abs(dev) - this.intensitySpread) * (iWarm ? dtHop / 3 : dtHop / 60);
+    const scale = Math.max(0.015, this.intensitySpread) * 4;
+    const intensity = Math.max(0, Math.min(1, 0.5 + dev / scale));
 
     // --- DUBBEL-FFT: hög-upplöst log-spektrum för effekterna ---
     // Egen glidande 2048-buffert, matas samma hop. Ger 23 Hz/bin i botten så
