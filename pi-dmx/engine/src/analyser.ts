@@ -746,6 +746,17 @@ export class Analyser {
     // En drop ar per definition ett sprang IN i hog energi, inte bara ett sprang.
     // intensity ar nu en levande signal (se 4392f61) och raknas fram i samma
     // funktion, sa gransen kostar ingenting.
+    // TVA VAGAR IN I EN DROP, inte en. Villkoret krävde tidigare att nivan FALLIT
+    // (breakAtMs inom 3.5s) fore zonintradet - alltsa breakdown -> drop. Men en
+    // modern EDM-uppbyggnad STIGER rakt in i dropen utan att forst falla, och da
+    // blockerades den.
+    //   MATT vid atta zonintraden: ett hade energi 1.00 OCH aktiv riser - ett
+    //   solklart drop - men blockerades for att senaste svackan lag 8.0s bort.
+    // Nu racker antingen en svacka (klassisk breakdown) ELLER en riser (modern
+    // uppbyggnad) strax innan. Riser-signalen ar bekraftat levande: den fyrar
+    // 9.8% av tiden och buildUp nar 0.61.
+    const hadBreak = nowWallA - this.breakAtMs < 3500;
+    const hadRiser = nowWallA - this.lastRiserMs < 4000;
     const dropEnergyOk = intensity > 0.60;
     // REFRAKTARPERIOD. Det fanns ingen alls: en drop kunde folja pa en annan
     // inom brakdelen av en sekund. MATT i drop-intervall-loggen: tva av tio
@@ -774,7 +785,7 @@ export class Analyser {
     // Femte signalen i sessionen som ser levande ut men ar en konstant. Innan
     // kravet kan aterinforas maste inRiser/buildUp lagas och matas om - annars
     // ar det bara ett dyrt satt att stanga av dropsen.
-    if (dropEnergyOk && dropSpacingOk && inZone && !this.wasInZone && nowWallA - this.breakAtMs < 3500 && this.activeMs > 2000) {
+    if (dropEnergyOk && dropSpacingOk && inZone && !this.wasInZone && (hadBreak || hadRiser) && this.activeMs > 2000) {
       this.dropCount++; this.lastDropMs = nowWallA;
     }
     this.wasInZone = inZone;
