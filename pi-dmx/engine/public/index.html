@@ -221,6 +221,10 @@
       <button class="btn primary" id="fogNow">💨 Rök nu</button>
     </div>
     <div class="status" id="fogState" style="margin-top:8px">—</div>
+    <!-- Termisk hälsa: fylls medan den rökar, sjunker av sig själv i vila.
+         Samma .meter-gradient som LEVEL → grön i botten, röd först när den
+         närmar sig taket, vilket är precis avläsningen man vill ha. -->
+    <div class="meter" id="fogHeatMeter" style="margin-top:6px"><div id="fogHeatBar" style="width:0%"></div></div>
     <div class="status" id="fogService" style="margin-top:4px">—</div>
     <div class="fx-actions" style="margin-top:8px">
       <button class="btn" id="fogServiceReset">Nollställ efter underhåll</button>
@@ -531,9 +535,12 @@ function applyFogStatus(s) {
   if (!s) {
     fogState.textContent = "Ej ansluten.";
     fogService.textContent = "—";
+    fogHeatMeter.style.display = "none";
     return;
   }
+  fogHeatMeter.style.display = "";
   const heatPct = Math.round(s.heat * 100);
+  fogHeatBar.style.width = heatPct + "%";
   if (s.state === "heating") {
     const left = Math.ceil(s.warmLeftMs / 1000);
     fogState.textContent = "🔥 Värmer — klar om " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0");
@@ -917,6 +924,8 @@ const fogNowBtn = document.getElementById("fogNow");
 const fogState = document.getElementById("fogState");
 const fogService = document.getElementById("fogService");
 const fogServiceReset = document.getElementById("fogServiceReset");
+const fogHeatMeter = document.getElementById("fogHeatMeter");
+const fogHeatBar = document.getElementById("fogHeatBar");
 const sendFog = () => send({ type: "setFog", fog: { enabled: fogEnabled.checked, onDrop: fogOnDrop.checked, address: Number(fogAddr.value) || 128 } });
 fogEnabled.onchange = sendFog;
 fogOnDrop.onchange = sendFog;
