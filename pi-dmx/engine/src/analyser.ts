@@ -391,6 +391,22 @@ export class Analyser {
   private envelope: number;
   private lastKick = 0;
   private lastT = performance.now();
+  /** VIRTUELL KLOCKA. Analysatorns dtHop är sampelbaserad, men fyra beslut läser
+   *  väggklockan — drop-spärren ("8 takter sedan förra"), svackans ålder, riserns
+   *  ålder. Spelar man upp en inspelning snabbare än realtid hinner åtta takter
+   *  gå på några millisekunder och hela strukturlogiken kollapsar.
+   *
+   *  Med en injicerbar klocka blir analysatorn DETERMINISTISK: samma ljud in ger
+   *  samma bildrutor ut, oavsett hur fort man matar den. Det är förutsättningen
+   *  för en regressionsbänk — och för att kunna välja tröskelvärden mot tjugo
+   *  låtar i stället för mot en. Live är beteendet oförändrat (null = riktig tid). */
+  private virtualMs: number | null = null;
+  /** Driv analysatorn på en virtuell klocka (offline-uppspelning). Anropas med
+   *  ackumulerad ljudtid i ms före varje process(). null = tillbaka till realtid. */
+  setVirtualClock(ms: number | null) { this.virtualMs = ms; }
+  private perfNow(): number { return this.virtualMs ?? performance.now(); }
+  private wallNow(): number { return this.virtualMs === null ? Date.now() : this.virtualEpoch + this.virtualMs; }
+  private virtualEpoch = 1700000000000;
 
   constructor(private cfg: EngineConfig) {
     this.fft = new FFT(cfg.fft.size);
@@ -484,7 +500,7 @@ export class Analyser {
     const fluxNorm = Math.min(1, flux * 0.005);
 
     // Auto-gain (slow: seconds-to-minute timescales)
-    const now = performance.now();
+    const now = this.perfNow();
     const dt = Math.min(0.1, (now - this.lastT) / 1000);
     this.lastT = now;
     const d = this.cfg.detection;
@@ -595,7 +611,7 @@ export class Analyser {
       }
       this.pendingKickMs = 0;
     }
-    if (kick) { this.beatAnchorMs = Date.now(); this.pendingKickMs = this.beatAnchorMs; }
+    if (kick) { this.beatAnchorMs = this.wallNow(); this.pendingKickMs = this.beatAnchorMs; }
     this.kfPrev2 = this.kfPrev;
     this.kfPrev = kickFlux;
 
@@ -736,7 +752,7 @@ export class Analyser {
     // flimrar kring tröskeln. Kräver ≥2s musik så låtens INTRO (tystnad→musik) inte
     // läses som en drop. Resultatet exponeras som en MONOTON räknare → en konsument
     // på lägre takt kan aldrig missa flanken.
-    const nowWallA = Date.now();
+    const nowWallA = this.wallNow();
     this.levelCeil = Math.max(this.lvlSmooth, this.levelCeil - dtHop * 0.015 * this.levelCeil);   // tak, decay ~65s
     // SVACKAN MASTE VARA IHALLANDE. Forut satte VILKEN dipp som helst breakAtMs,
     // aven en som varade nagra tiondelar - en trumfill eller en kort lucka racker.
