@@ -527,7 +527,27 @@ export class Analyser {
     }
     const kickThresh = this.kickMed + 4.5 * this.kickMad;
     const KICK_COOLDOWN = 170;                     // ms → max ~350 BPM, hindrar sub-beat-dubbelfyr
-    const above = kickFlux > kickThresh && energy > 0.06;
+    let above = kickFlux > kickThresh && energy > 0.06;
+    // ── TAKT-GRID-GRIND ──────────────────────────────────────────────────────
+    // Morfologiska filter kan INTE skilja en synth-stot fran en bastrumma - matt
+    // och forkastat tre ganger: SuperFlux (191->222 falska), relativ flux
+    // (190->193) och stigtid (p50 = 2 hops, ingen svans att filtrera). De falska
+    // kickarna ar ocksa skarpa transienter, bara inte fran trumman.
+    // Kvar ar KRONOLOGIN: hor transienten hemma pa taktgridet?
+    //
+    // VIKTIGT: referensen ar cfg.beat.anchorMs (PLL:ens stabila fas), INTE
+    // this.beatAnchorMs - den senare sätts av varje detekterad kick och vore
+    // cirkulär: en falsk kick skulle flytta gridet den doms mot.
+    const grid = this.cfg.beat;
+    if (above && grid && grid.bpm > 40 && this.localBpmConfidence > 0.5) {
+      const beatMs = 60000 / grid.bpm;
+      const gridMs = beatMs / 2;                    // attondelar: four-on-the-floor + upptakter
+      let offset = ((now - grid.anchorMs) % gridMs + gridMs) % gridMs;
+      const distToGrid = Math.min(offset, gridMs - offset);
+      const tolerance = Math.max(30, beatMs * 0.15);   // ~+-40 ms vid 150 BPM
+      if (distToGrid > tolerance) above = false;    // skarp transient, men felplacerad
+    }
+    // ─────────────────────────────────────────────────────────────────────────
     let kick = false;
     // Första framen: prevMag är noll → flux = hela spektrumet → falsk kick som
     // annars sätter beat-ankaret / triggar drop-blixt vid start-in-i-musik. Hoppa.
