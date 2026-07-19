@@ -269,7 +269,10 @@ export class EffectEngine {
     //   sekund i max, vilket lasare som "for mycket drops".
     // 800ms hall + 1s utton ger fortfarande en tydlig gest men halverar tiden i
     // max. Sjalva anslaget (30ms attack) ar orort, sa smallen kanns lika hard.
-    if (dropHit) this.dropBangUntil = nowWall + 800;
+    // 2000ms kandes som for mycket max-ljus, 800ms som for kort - 1300ms ar
+    // mitten. Har ar anvandarens oga ratt matinstrument: hur lange en drop ska
+    // halla ar en upplevelseparameter, inte en troskel att mata fram.
+    if (dropHit) this.dropBangUntil = nowWall + 1300;
     // DROP-BLACKOUT (dramaturgisk tystnad): en riser som BRYTS ner i en svacka
     // strax före dropen → tvinga kolsvart i max 250ms. Svärtan STARTAR på
     // svackans flank (bara om vi faktiskt byggt upp: buildUp>0.35) och SLÄPPS i
