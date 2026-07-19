@@ -646,11 +646,22 @@ export class EffectEngine {
         // DROP: blenda effektens färg mot FULL ljusstyrka i takt med envelopet
         // (full attack → håll → mjuk fade). Behåller färgtonen, ingen strobe.
         const mxc = Math.max(rgb[0], rgb[1], rgb[2]);
+        const k = this.dropEnv;
         if (mxc > 0.02) {
-          const k = this.dropEnv;
+          // Tand lampa: normalisera till FULL intensitet, behall fargtonen.
           rgb[0] += (rgb[0] / mxc - rgb[0]) * k;
           rgb[1] += (rgb[1] / mxc - rgb[1]) * k;
           rgb[2] += (rgb[2] / mxc - rgb[2]) * k;
+        } else {
+          // SLACKT lampa ska OCKSA med i dropen. Forut hoppades den over helt av
+          // mxc-sparren, sa korde chase med ett tant huvud gick tre av fyra kannor
+          // miste om hela dropen - riggen "tande inte allt". En drop ar ett
+          // AVBROTT, inte en forstarkning av det monster som rakar paga: hela
+          // riggen ska smalla till. Mork lampa lyfts mot vitt, tand behaller sin
+          // farg pa full styrka -> stor blixt med kvarvarande fargspel.
+          rgb[0] += (1 - rgb[0]) * k;
+          rgb[1] += (1 - rgb[1]) * k;
+          rgb[2] += (1 - rgb[2]) * k;
         }
       }
       const strobeVal = effMode === "strobe" ? 210 : 0;
