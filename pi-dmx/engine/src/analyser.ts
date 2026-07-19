@@ -757,7 +757,17 @@ export class Analyser {
     // 9.8% av tiden och buildUp nar 0.61.
     const hadBreak = nowWallA - this.breakAtMs < 3500;
     const hadRiser = nowWallA - this.lastRiserMs < 4000;
-    const dropEnergyOk = intensity > 0.60;
+    // Troskeln ar MATT fram, inte gissad. Skuggmatning over 14 zonintraden gav
+    // antal drops per troskel (givet att ovriga grindar passerar):
+    //   0.60 -> 1 drop | 0.45 -> 2 | 0.35 -> 2 | 0.10 -> 2 | 0.05 -> 4 | 0.00 -> 11
+    // En PLATA mellan 0.10 och 0.60: exakt varde spelar ingen roll dar. 0.45 ligger
+    // mitt i den med marginal at bada hall, och slapper igenom ett akta drop
+    // (intensitet 0.47 med aktiv riser) som 0.60 blockerade.
+    // Golvet ar viktigt: sju av fjorton zonintraden lag pa intensitet 0.00 och
+    // passerade alla ANDRA grindar - utan energikravet blir det 11 drops i st.f. 2.
+    // Den tidigare 0.60 var cirkulart satt (kalibrerad mot drops som redan
+    // passerat samma grind), darav ommatningen.
+    const dropEnergyOk = intensity > 0.45;
     // REFRAKTARPERIOD. Det fanns ingen alls: en drop kunde folja pa en annan
     // inom brakdelen av en sekund. MATT i drop-intervall-loggen: tva av tio
     // intervall lag pa 0.2 och 0.5 TAKTER, dvs dubbelfyrningar - resten lag pa
