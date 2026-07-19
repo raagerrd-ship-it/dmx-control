@@ -102,8 +102,24 @@ export interface EngineConfig {
     address: number;       // DMX-adress 1..512
     onDrop: boolean;       // auto-blast på drop
     burstMs: number;       // max längd per blast
-    cooldownMs: number;    // min tid mellan blast (skydd mot överhettning/tomt)
+    cooldownMs: number;    // min tid mellan blast (MUSIKALISK gles­het — inte skyddet)
     level: number;         // DMX-värde (0..255) när den rökar
+    /** Uppvärmningstid från kall maskin (ms). LSM1500PRO ≈ 10 min. Motorn kan
+     *  inte MÄTA värmen — den räknar från att maskinen slogs på, och visar en
+     *  nedräkning. Utan den trycker en gäst på "rök nu", inget händer, och de
+     *  tror att maskinen är trasig. Blockerar INTE puffar: efter en motor-
+     *  omstart kan maskinen redan vara varm, och då vore 10 min väntan en lögn. */
+    warmupMs?: number;
+    /** Wall-clock då maskinen slogs PÅ — uppvärmningen räknas härifrån.
+     *  PERSISTERAD med flit: annars startar nedräkningen om vid varje motor-
+     *  omstart och påstår "10 min kvar" om en maskin som stått varm i en timme. */
+    warmStartMs?: number;
+    /** Ackumulerad röktid sedan senaste service (ms) — vätskeåtgång + värmearbete. */
+    sprayMs?: number;
+    /** Antal puffar sedan senaste service. */
+    bursts?: number;
+    /** Wall-clock då räknarna nollställdes (för "X sedan senaste underhåll"). */
+    serviceAtMs?: number;
   };
   /** Transient one-shot: sätt true för en manuell rök-puff — inte persisterad. */
   fogTrigger?: boolean;
@@ -160,7 +176,7 @@ export const defaultConfig: EngineConfig = {
   // svavtiden gor att man inte kan angra sig. Maskinen orkar dessutom bara
   // 40-50s i strack innan varmeblocket maste hamta igen, sa 1s/60s ar ~1.6%
   // arbetscykel - den hinner alltid vara varm. Oka vid behov, inte tvartom.
-  fog: { enabled: false, address: 13, onDrop: true, burstMs: 1000, cooldownMs: 60000, level: 255 },
+  fog: { enabled: false, address: 13, onDrop: true, burstMs: 1000, cooldownMs: 60000, level: 255, warmupMs: 600000, sprayMs: 0, bursts: 0 },
   dropBlackout: true,     // dramaturgisk tystnad — låg risk, lyfter varje drop
   scenicAnchor: false,    // ägar-val: antar lampor i rad vänster→höger
   energyCeiling: true,    // direkt VU = ljusstyrka; standard på (drop/punch bypassar)

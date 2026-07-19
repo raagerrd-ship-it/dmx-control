@@ -220,7 +220,12 @@
     <div class="fx-actions" style="margin-top:10px">
       <button class="btn primary" id="fogNow">💨 Rök nu</button>
     </div>
-    <div class="status" id="fogHint" style="margin-top:4px">Ställ rökmaskinen på samma DMX-adress. Blast på drop, med skydd (~2,5s puff, ~25s vila) mot överhettning/tom tank.</div>
+    <div class="status" id="fogState" style="margin-top:8px">—</div>
+    <div class="status" id="fogService" style="margin-top:4px">—</div>
+    <div class="fx-actions" style="margin-top:8px">
+      <button class="btn" id="fogServiceReset">Nollställ efter underhåll</button>
+    </div>
+    <div class="status" id="fogHint" style="margin-top:4px">Ställ rökmaskinen på samma DMX-adress. Maskinen behöver ~10 min uppvärmning från kall. Värmekontot ersätter fast vila: en lång puff kostar mer än en kort.</div>
   </div>
 
   <h1>Regi (pro)</h1>
@@ -514,6 +519,35 @@ function applyFrame(f) {
     clearTimeout(beatTimer);
     beatTimer = setTimeout(() => beatDot.classList.remove("on"), 100);
   }
+  applyFogStatus(f.fog);
+}
+
+/* ── Rökmaskinens tillstånd ─────────────────────────────────────────────
+   Uppvärmningen är det som gör att en gäst inte tror maskinen är trasig:
+   nedräkningen SÄGER att inget kommer ännu. Värmekontot visar hur nära
+   den termiska budgeten vi ligger — sjunker av sig själv i vila. */
+function applyFogStatus(s) {
+  if (!fogState) return;
+  if (!s) {
+    fogState.textContent = "Ej ansluten.";
+    fogService.textContent = "—";
+    return;
+  }
+  const heatPct = Math.round(s.heat * 100);
+  if (s.state === "heating") {
+    const left = Math.ceil(s.warmLeftMs / 1000);
+    fogState.textContent = "🔥 Värmer — klar om " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0");
+    fogState.style.color = "var(--warn)";
+  } else if (s.state === "spraying") {
+    fogState.textContent = "💨 Rökar nu · värme " + heatPct + "%";
+    fogState.style.color = "var(--hot)";
+  } else {
+    fogState.textContent = "✓ Redo · värme " + heatPct + "%";
+    fogState.style.color = heatPct > 80 ? "var(--warn)" : "var(--ok)";
+  }
+  const min = Math.floor(s.sprayMs / 60000), sec = Math.floor((s.sprayMs % 60000) / 1000);
+  fogService.textContent = "Sedan underhåll: " + s.bursts + " puffar, " +
+    (min > 0 ? min + " min " + sec + " s" : sec + " s") + " rök";
 }
 
 
@@ -880,11 +914,18 @@ const fogEnabled = document.getElementById("fogEnabled");
 const fogOnDrop = document.getElementById("fogOnDrop");
 const fogAddr = document.getElementById("fogAddr");
 const fogNowBtn = document.getElementById("fogNow");
+const fogState = document.getElementById("fogState");
+const fogService = document.getElementById("fogService");
+const fogServiceReset = document.getElementById("fogServiceReset");
 const sendFog = () => send({ type: "setFog", fog: { enabled: fogEnabled.checked, onDrop: fogOnDrop.checked, address: Number(fogAddr.value) || 128 } });
 fogEnabled.onchange = sendFog;
 fogOnDrop.onchange = sendFog;
 fogAddr.onchange = sendFog;
 fogNowBtn.onclick = () => send({ type: "fogNow" });
+// Nollställning raderar driftstatistik → bekräfta, den går inte att ångra.
+fogServiceReset.onclick = () => {
+  if (confirm("Nollställ rökmaskinens räknare? Gör detta efter påfylld tank / rengöring.")) send({ type: "fogService" });
+};
 
 /* ── Regi (pro) ────────────────────────────────────────────────────────── */
 const tDropBlackout = document.getElementById("tDropBlackout");

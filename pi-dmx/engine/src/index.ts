@@ -166,6 +166,8 @@ const serverDeps = {
   getActiveMode: () => effects.getActiveMode(),
   // Frisk = en ljud-chunk bearbetad senaste 10 s (arecord + event-loop lever).
   getHealthy: () => Date.now() - lastChunkAt < 10000,
+  getFogStatus: () => effects.getFogStatus(),
+  resetFogService: () => effects.resetFogService(),
   cycleMode,
 
   resetAgc: (g?: number) => analyser.resetGain(g),
@@ -227,6 +229,16 @@ if (cfg.modeButton) {
   button.start();
   console.log(`mode-button on ${cfg.modeButton.chip} line ${cfg.modeButton.line} (short=mode, long=AGC)`);
 }
+
+// Rökens drifträknare tickar i RENDERLOOPEN, inte via config-meddelanden — utan
+// det här skulle de bara nå flashen av en slump (nästa gång någon råkar röra en
+// inställning). Spara var 5:e minut, och bara när något faktiskt rökt sedan
+// sist: en tomgångsskrivning per 5 min hela kvällen sliter på SD-kortet i onödan.
+let savedSprayMs = cfg.fog?.sprayMs ?? 0;
+setInterval(() => {
+  const s = cfg.fog?.sprayMs ?? 0;
+  if (s !== savedSprayMs) { savedSprayMs = s; scheduleSave(cfg); }
+}, 300000);
 
 process.on("SIGTERM", () => {
   capture.stop();

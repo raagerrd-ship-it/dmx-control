@@ -15,6 +15,16 @@ import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "
 import { hsvToRgb } from "./effects/color.js";
 import type { EffectContext } from "./effects/types.js";
 
+/** Rökmaskinens tillstånd, för UI:t. */
+export interface FogStatus {
+  /** heating = uppvärmningsklockan går, ready = redo, spraying = puff pågår. */
+  state: "heating" | "ready" | "spraying";
+  warmLeftMs: number;   // kvar av uppvärmningen (0 när klar)
+  heat: number;         // termisk budget som är förbrukad, 0..1
+  sprayMs: number;      // ackumulerad röktid sedan service
+  bursts: number;       // antal puffar sedan service
+}
+
 export class EffectEngine {
   private universe = new Uint8Array(512);
   /** Utjamnad tilltro till takten (0..1) — styr beatPulse-djupet. */
@@ -61,6 +71,17 @@ export class EffectEngine {
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   private fogUntil = 0;          // rökmaskin: pågående blast till (wall-clock ms)
   private lastFogMs = -1e9;      // senaste blast (för cooldown)
+  // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
+  // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
+  // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
+  // ett värmekonto i millisekunder: det fylls medan den rökar och rinner av i
+  // vila. Då kostar en lång puff mer än en kort, precis som i fysiken.
+  private static readonly FOG_HEAT_MAX = 45000;    // datablad: 40–50 s i sträck
+  private static readonly FOG_RECOVER = 0.15;      // vila dränerar 15% av realtid
+                                                   // → 1 s rök ≈ 6,7 s återhämtning
+  private fogHeat = 0;           // värmekonto (ms), 0..FOG_HEAT_MAX
+  private fogWasEnabled = false; // flank: enabled false→true startar uppvärmningsklockan
+                                 // (själva starttiden bor i cfg.fog.warmStartMs → överlever omstart)
   // NOVELTY-UPPBYGGNADS-DETEKTOR: spektral novelty leder dropen (mätt validerat).
   private hotMs = 0;             // hur länge musiken pumpat → adaptiv tystnads-landning
   private wasBreaking = false;   // flankdetektor för nivå-svacka (drop-blackout)
@@ -109,6 +130,30 @@ export class EffectEngine {
 
   /** Den effekt som faktiskt renderas just nu (smart-läget roterar this.smartMode). */
   getActiveMode(): Mode { return this.activeMode; }
+
+  /** Rökmaskinens tillstånd för UI:t. null = inte ansluten. */
+  getFogStatus(): FogStatus | null {
+    const fog = this.cfg.fog;
+    if (!fog?.enabled) return null;
+    const now = Date.now();
+    const warmLeftMs = fog.warmStartMs ? Math.max(0, (fog.warmupMs ?? 600000) - (now - fog.warmStartMs)) : 0;
+    return {
+      state: now < this.fogUntil ? "spraying" : warmLeftMs > 0 ? "heating" : "ready",
+      warmLeftMs,
+      heat: Math.min(1, this.fogHeat / EffectEngine.FOG_HEAT_MAX),
+      sprayMs: fog.sprayMs ?? 0,
+      bursts: fog.bursts ?? 0,
+    };
+  }
+
+  /** Nollställ drifträknarna efter underhåll (påfylld tank / rengöring). */
+  resetFogService() {
+    const fog = this.cfg.fog;
+    if (!fog) return;
+    fog.sprayMs = 0;
+    fog.bursts = 0;
+    fog.serviceAtMs = Date.now();
+  }
   private lastRenderMs = performance.now();
 
   constructor(private cfg: EngineConfig) {}
@@ -285,15 +330,38 @@ export class EffectEngine {
     this.wasBreaking = nowBreaking;
     if (dropHit) this.blackoutUntil = 0;                                                        // dropen fyrade → släpp svärtan, explodera
     const blackout = nowWall < this.blackoutUntil;
-    // RÖKMASKIN: blast på drop (duty-cycle-skyddad) + manuell puff.
+    // RÖKMASKIN: blast på drop + manuell puff, skyddad av en TERMISK BUDGET.
     const fog = this.cfg.fog;
     if (fog?.enabled) {
+      // Flank: maskinen slogs precis på → starta uppvärmningsklockan.
+      // Sätts bara om den saknas → en omstart ärver den riktiga påslagstiden.
+      if (!this.fogWasEnabled) { this.fogWasEnabled = true; if (!fog.warmStartMs) fog.warmStartMs = nowWall; }
+      const spraying = nowWall < this.fogUntil;
+      const dtMs = _dtT * 1000;
+      if (spraying) {
+        this.fogHeat += dtMs;
+        fog.sprayMs = (fog.sprayMs ?? 0) + dtMs;   // drifträknare (vätska + värmearbete)
+      } else {
+        this.fogHeat = Math.max(0, this.fogHeat - dtMs * EffectEngine.FOG_RECOVER);
+      }
+      // NÖDSTOPP mitt i en puff: en lång manuell blast får inte köra
+      // värmeblocket i botten bara för att den redan hunnit starta.
+      if (spraying && this.fogHeat >= EffectEngine.FOG_HEAT_MAX) this.fogUntil = 0;
       const wantBurst = (dropHit && fog.onDrop) || this.cfg.fogTrigger;
       if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;                                      // engångs-flagga
-      if (wantBurst && nowWall - this.lastFogMs > fog.cooldownMs) {
+      const gapOk = nowWall - this.lastFogMs > fog.cooldownMs;              // musikalisk glesehet
+      const heatOk = this.fogHeat + fog.burstMs <= EffectEngine.FOG_HEAT_MAX;  // hårdvaruskydd
+      if (wantBurst && !spraying && gapOk && heatOk) {
         this.fogUntil = nowWall + fog.burstMs;
         this.lastFogMs = nowWall;
+        fog.bursts = (fog.bursts ?? 0) + 1;
       }
+    } else if (this.fogWasEnabled) {
+      // Avstängd → glöm uppvärmningen (nästa påslag är en ny kall start) och
+      // släpp en pågående puff, annars fastnar rök-kanalen tänd.
+      this.fogWasEnabled = false;
+      if (this.cfg.fog) this.cfg.fog.warmStartMs = 0;
+      this.fogUntil = 0;
     }
     const dropActive = frame.inZone && nowWall < this.dropBangUntil;                                  // en riktig drop pågår
     // DROP-ENVELOPE: FULL ATTACK (~30ms) på träffen, HÅLL allt på max under

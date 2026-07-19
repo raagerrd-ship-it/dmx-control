@@ -16,6 +16,7 @@ import { readFileSync, existsSync } from "node:fs";
 import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { applyMood, isMood } from "./moods.js";
+import type { FogStatus } from "./effects.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, EFFECT_META } from "./effects/registry.js";
 
@@ -43,6 +44,10 @@ export interface ServerDeps {
   getActiveMode: () => Mode;
   /** True om ljud-pipelinen bearbetat en frame nyligen (för watchdog /health). */
   getHealthy: () => boolean;
+  /** Rökmaskinens tillstånd (uppvärmning/värmekonto/drifträknare). null = ej ansluten. */
+  getFogStatus: () => FogStatus | null;
+  /** Nollställ rökmaskinens drifträknare efter underhåll. */
+  resetFogService: () => void;
   onConfigChanged?: () => void;
   /** Advance to the next mode in the shared cycle. Returns the new mode. */
   cycleMode: () => Mode;
@@ -295,6 +300,7 @@ export async function startServer(
             beat,
             beatErr: deps.cfg.beatErr ?? 0,
             mode: deps.getActiveMode(),
+            fog: deps.getFogStatus(),     // null när maskinen inte är ansluten
           }));
 
         }
@@ -377,6 +383,10 @@ export async function startServer(
               burstMs: typeof f.burstMs === "number" ? Math.max(200, Math.min(8000, Math.round(f.burstMs))) : cur.burstMs,
               cooldownMs: typeof f.cooldownMs === "number" ? Math.max(0, Math.min(300000, Math.round(f.cooldownMs))) : cur.cooldownMs,
               level: typeof f.level === "number" ? Math.max(0, Math.min(255, Math.round(f.level))) : cur.level,
+              // Uppvärmning: 0 = "hoppa över nedräkningen" (maskinen redan varm), tak 30 min.
+              warmupMs: typeof f.warmupMs === "number" ? Math.max(0, Math.min(1800000, Math.round(f.warmupMs))) : cur.warmupMs,
+              // Drifträknarna ägs av motorn — aldrig satta av klienten.
+              sprayMs: cur.sprayMs, bursts: cur.bursts, serviceAtMs: cur.serviceAtMs, warmStartMs: cur.warmStartMs,
             };
           } else if (msg.type === "setDropBlackout") {
             deps.cfg.dropBlackout = !!msg.value;
@@ -394,6 +404,8 @@ export async function startServer(
             deps.cfg.dropHeadroom = !!msg.value;
           } else if (msg.type === "fogNow") {
             deps.cfg.fogTrigger = true;   // engångs-puff (motorn nollställer flaggan)
+          } else if (msg.type === "fogService") {
+            deps.resetFogService();       // tank påfylld / rengjord → nollställ räknarna
           }
           deps.onConfigChanged?.();
           // Echo back
