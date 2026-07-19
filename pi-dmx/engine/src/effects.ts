@@ -23,6 +23,8 @@ export interface FogStatus {
   heat: number;         // termisk budget som är förbrukad, 0..1
   sprayMs: number;      // ackumulerad röktid sedan service
   bursts: number;       // antal puffar sedan service
+  /** Namnet på en armatur vars kanaler rök-adressen krockar med, annars null. */
+  conflict: string | null;
 }
 
 export class EffectEngine {
@@ -137,7 +139,18 @@ export class EffectEngine {
     if (!fog?.enabled) return null;
     const now = Date.now();
     const warmLeftMs = fog.warmStartMs ? Math.max(0, (fog.warmupMs ?? 600000) - (now - fog.warmStartMs)) : 0;
+    // ADRESSKROCK. Rök-kanalen skrivs SIST i universumet (efter ballistiken, för
+    // att få instant på/av) → den VINNER över en armatur som delar adressen, och
+    // lampan slocknar utan förklaring. Vi flyttar den INTE automatiskt: ett tyst
+    // adressbyte är värre än problemet, för då stämmer inte DIP-switcharna längre.
+    // Vi säger till och låter ägaren välja.
+    let conflict: string | null = null;
+    for (const fx of this.cfg.fixtures) {
+      const top = fx.address + fixtureRoles(fx).length - 1;
+      if (fog.address >= fx.address && fog.address <= top) { conflict = fx.name; break; }
+    }
     return {
+      conflict,
       state: now < this.fogUntil ? "spraying" : warmLeftMs > 0 ? "heating" : "ready",
       warmLeftMs,
       heat: Math.min(1, this.fogHeat / EffectEngine.FOG_HEAT_MAX),

@@ -220,6 +220,7 @@
     <div class="fx-actions" style="margin-top:10px">
       <button class="btn primary" id="fogNow">💨 Rök nu</button>
     </div>
+    <div class="status" id="fogConflict" style="margin-top:8px;display:none"></div>
     <div class="status" id="fogState" style="margin-top:8px">—</div>
     <!-- Termisk hälsa: fylls medan den rökar, sjunker av sig själv i vila.
          Samma .meter-gradient som LEVEL → grön i botten, röd först när den
@@ -536,9 +537,21 @@ function applyFogStatus(s) {
     fogState.textContent = "Ej ansluten.";
     fogService.textContent = "—";
     fogHeatMeter.style.display = "none";
+    fogConflict.style.display = "none";
     return;
   }
   fogHeatMeter.style.display = "";
+  // Adresskrock: röken skrivs sist och VINNER → armaturen slocknar tyst. Säg
+  // vilken lampa som drabbas och vilken adress som är ledig, annars sitter
+  // ägaren och letar efter ett hårdvarufel som inte finns.
+  if (s.conflict) {
+    fogConflict.textContent = "⚠ Rök-adress " + (fogAddr.value || "?") + " krockar med \"" + s.conflict +
+      "\" — den lampan slocknar. Röken skrivs sist och vinner. Adress " + nextFreeAddress(1, fxDraft) + " är ledig.";
+    fogConflict.style.color = "var(--hot)";
+    fogConflict.style.display = "";
+  } else {
+    fogConflict.style.display = "none";
+  }
   const heatPct = Math.round(s.heat * 100);
   fogHeatBar.style.width = heatPct + "%";
   if (s.state === "heating") {
@@ -926,6 +939,7 @@ const fogService = document.getElementById("fogService");
 const fogServiceReset = document.getElementById("fogServiceReset");
 const fogHeatMeter = document.getElementById("fogHeatMeter");
 const fogHeatBar = document.getElementById("fogHeatBar");
+const fogConflict = document.getElementById("fogConflict");
 const sendFog = () => send({ type: "setFog", fog: { enabled: fogEnabled.checked, onDrop: fogOnDrop.checked, address: Number(fogAddr.value) || 128 } });
 fogEnabled.onchange = sendFog;
 fogOnDrop.onchange = sendFog;
