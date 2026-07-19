@@ -643,25 +643,19 @@ export class EffectEngine {
         rgb[2] = (rgb[2] + (1 - rgb[2]) * rsWhite) * rsGate;
       }
       if (this.dropEnv > 0.005) {
-        // DROP: blenda effektens färg mot FULL ljusstyrka i takt med envelopet
-        // (full attack → håll → mjuk fade). Behåller färgtonen, ingen strobe.
-        const mxc = Math.max(rgb[0], rgb[1], rgb[2]);
+        // DESIGNAD DROP-LOOK. Forut var detta en BLANDNING, inte ett uttryck:
+        // tand lampa behöll sin egen farg pa full styrka, mork lampa lyftes mot
+        // VITT — resultatet blev vitt bredvid fargat, vilket skar sig. (Innan
+        // dess hoppades morka lampor over helt, sa chase med ett tant huvud lat
+        // tre av fyra kannor missa hela dropen.)
+        // Nu gar HELA riggen till samma palettfarg pa full styrka, med en vit
+        // karna i toppen som klingar av till ren farg — klassisk drop: vit blixt
+        // som landar i farg. Ett enat uttryck i stallet for lampa-for-lampa-mix.
+        const dc = hsvToRgb(mixedSector(this.dropSector + i) / 6, 1, 1);
+        const vitKarna = Math.max(0, (this.dropEnv - 0.6) / 0.4);   // bara vid toppen
         const k = this.dropEnv;
-        if (mxc > 0.02) {
-          // Tand lampa: normalisera till FULL intensitet, behall fargtonen.
-          rgb[0] += (rgb[0] / mxc - rgb[0]) * k;
-          rgb[1] += (rgb[1] / mxc - rgb[1]) * k;
-          rgb[2] += (rgb[2] / mxc - rgb[2]) * k;
-        } else {
-          // SLACKT lampa ska OCKSA med i dropen. Forut hoppades den over helt av
-          // mxc-sparren, sa korde chase med ett tant huvud gick tre av fyra kannor
-          // miste om hela dropen - riggen "tande inte allt". En drop ar ett
-          // AVBROTT, inte en forstarkning av det monster som rakar paga: hela
-          // riggen ska smalla till. Mork lampa lyfts mot vitt, tand behaller sin
-          // farg pa full styrka -> stor blixt med kvarvarande fargspel.
-          rgb[0] += (1 - rgb[0]) * k;
-          rgb[1] += (1 - rgb[1]) * k;
-          rgb[2] += (1 - rgb[2]) * k;
+        for (let c = 0; c < 3; c++) {
+          rgb[c] += ((dc[c] + (1 - dc[c]) * vitKarna) - rgb[c]) * k;
         }
       }
       const strobeVal = effMode === "strobe" ? 210 : 0;
