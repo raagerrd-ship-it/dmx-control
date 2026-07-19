@@ -95,6 +95,16 @@ export class EffectEngine {
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
   private silenceGate = 1;
+  /** LEVER MEN HÖR INGENTING. Utan den här signalen ser "aux-kabeln sitter inte
+   *  i" exakt likadant ut som "strömmen är av" och "säkringen gick": svart. Den
+   *  som slår på lådan 22:00 står ensam bakom disken utan laptop — riggen är den
+   *  enda skärm som finns, och den måste kunna säga tre olika saker.
+   *  Ej opt-in: ett grundbeteende, inte en inställning man kan råka slå av. */
+  private static readonly DEAF_AFTER_MS = 90000;   // låtglapp = sekunder, DJ-paus =
+                                                   // någon minut. 90 s utan EN enda
+                                                   // transient betyder att vi inte
+                                                   // hör källan, inte att det är tyst.
+  private deafFade = 0;          // 0..1 inblandning av väntande-andningen
   /** Output ballistics: per-channel soft ~25ms attack + exponential decay — the
    *  eye sees a fast rise and a soft fall (~0.1–0.4 s), whatever the modes do. */
   private outSmooth = new Float32Array(512);
@@ -588,6 +598,17 @@ export class EffectEngine {
     const ambRate = ambTarget > this.ambient ? dtSec / landTau : dtSec / 0.1;   // in: adaptivt, ut: snabbt
     this.ambient += Math.max(-ambRate, Math.min(ambRate, ambTarget - this.ambient));
     const ambLvl = this.cfg.ambientGlow ? this.ambient * 0.22 : 0;   // vilo-glöd (opt-in); ljus-tak läggs i cal-remappen
+    // VÄNTELÄGE: efter 90 s utan ljud tonar en långsam, tydligt AVSIKTLIG andning
+    // in (5 s period). Den är medvetet trög och svag — den ska läsas som "den
+    // lever och väntar", inte som en show. In långsamt (3 s) så den inte poppar
+    // upp mitt i en paus; ut snabbt (0.4 s) så första takten tar över direkt.
+    const deafTarget = now - this.lastActiveMs > EffectEngine.DEAF_AFTER_MS ? 1 : 0;
+    this.deafFade += Math.max(-dtSec / 0.4, Math.min(dtSec / 3, deafTarget - this.deafFade));
+    const breathe = 0.5 - 0.5 * Math.cos((now / 5000) * Math.PI * 2);
+    const deafLvl = this.deafFade * (0.06 + 0.14 * breathe);
+    // Samma bärnstens-kanal som vilo-glöden; den starkare av de två vinner så
+    // lägena inte adderas till något ljusare än någon av dem var tänkt att vara.
+    const restLvl = Math.max(ambLvl, deafLvl);
     // DIREKT VU-FILTER: den INGÅENDE ljudnivån styr den UTGÅENDE ljusstyrkan
     // direkt, som ett SISTA filter efter allt annat (effekter, beatPulse, ...).
     // Effekterna formar fortfarande sitt eget ljus; VU:n justerar slutresultatet
@@ -741,9 +762,9 @@ export class EffectEngine {
       }
       const strobeVal = effMode === "strobe" ? 210 : 0;
       // Effekt (master inkl. silenceGate → tonar ut på tystnad) + varm ambient-glöd in.
-      rgb[0] = rgb[0] * md + 1.00 * ambLvl;
-      rgb[1] = rgb[1] * md + 0.30 * ambLvl;
-      rgb[2] = rgb[2] * md + 0.00 * ambLvl;
+      rgb[0] = rgb[0] * md + 1.00 * restLvl;
+      rgb[1] = rgb[1] * md + 0.30 * restLvl;
+      rgb[2] = rgb[2] * md + 0.00 * restLvl;
       writeFixture(this.universe, fx, rgb, 1, strobeVal);
     }
 

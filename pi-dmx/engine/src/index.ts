@@ -36,6 +36,24 @@ if (cfg.mode !== "smart" && cfg.mode !== "blackout" && !EFFECT_MAP.has(cfg.mode)
 cfg.fft.hop = 128;   // analys 375 Hz (beprövad tuning); render/DMX separat 100 Hz
 if (!cfg.dmxMaxHz || cfg.dmxMaxHz <= 50) cfg.dmxMaxHz = 100;   // migrera gamla 50-taket → tightare synk
 
+// RÖKENS UPPVÄRMNINGSKLOCKA FÅR INTE ÖVERLEVA EN STRÖMCYKEL.
+// cfg.fog.warmStartMs persisteras med flit så en MOTOR-omstart (deploy, krasch,
+// systemd-restart) inte påstår "10 min kvar" om en maskin som stått varm. Men i
+// en bar slås hela lådan av över natten: då bootar den, warmStartMs är från
+// igår, och UI:t säger "✓ Redo" om en rökmaskin som stått kall i arton timmar —
+// exakt det problem nedräkningen fanns till för att lösa.
+// Exakt test i stället för tumregel: räkna fram NÄR Pi:n bootade och kasta
+// tiden bara om den sattes FÖRE det. En motoromstart 3 min efter boot bevaras
+// alltså korrekt, vilket en enkel "uptime < N"-gräns hade slarvat bort.
+try {
+  const upSec = Number(readFileSync("/proc/uptime", "utf8").split(" ")[0]);
+  const bootMs = Date.now() - upSec * 1000;
+  if (cfg.fog?.warmStartMs && cfg.fog.warmStartMs < bootMs) {
+    cfg.fog.warmStartMs = 0;   // kallstart → nedräkningen börjar om vid första render
+    console.log("[fog] kallstart — uppvärmningen räknas om");
+  }
+} catch { /* /proc saknas (ej Linux) → behåll det persisterade värdet */ }
+
 // Re-apply the chosen codec input routing (the boot service restores the aux
 // default; this honors a persisted mic choice).
 applyInputRouting(cfg.audioInput === "mic" ? "mic" : "aux");
