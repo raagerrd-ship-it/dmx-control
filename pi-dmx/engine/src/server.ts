@@ -285,6 +285,11 @@ export async function startServer(
             intensity: frame.intensity,   // sektionsenergi (diagnostik)
             dropCount: frame.dropCount,   // monoton drop-räknare (diagnostik)
             buildUp: frame.buildUp,       // uppbyggnad 0..1 (diagnostik)
+            inRiser: frame.inRiser,       // riser PÅGÅR — utan detta fältet läser en
+                                          // extern mätning undefined, vilket i en
+                                          // percentiltabell ser exakt ut som en nolla.
+                                          // Det ledde till slutsatsen "signalen är död"
+                                          // och en revert av en korrekt fix (820e7b6).
             inZone: frame.inZone,
             profile: frame.profile,       // karaktarsprofil (diagnostik)
             beat,
