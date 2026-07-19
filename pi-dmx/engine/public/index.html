@@ -240,7 +240,8 @@
     <label class="tgl"><span>Dynamiskt ljustak (VU)<br><small style="opacity:.6">Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%. Drop bypassar. Djup styrs av Dynamik.</small></span><input type="checkbox" id="tEnergyCeiling"></label>
     <label class="tgl"><span>Klubb-läge (hård kontrast)<br><small style="opacity:.6">Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna. Aggressivt, klistrat på transienterna. Kräver VU-taket på.</small></span><input type="checkbox" id="tClubMode"></label>
     <label class="tgl"><span>Varm vilo-glöd i tystnad<br><small style="opacity:.6">När ingen musik spelar: dim bärnsten-glöd i stället för helt mörkt. Av = lamporna släcks vid ingen input.</small></span><input type="checkbox" id="tAmbientGlow"></label>
-    <label class="tgl"><span>Riser-strobe (build → drop)<br><small style="opacity:.6">Under en uppbyggnad: accelererande strobe + färgen kollapsar mot vitt, sen blackout på dropen. Klassisk EDM-build.</small></span><input type="checkbox" id="tRiserStrobe"></label>
+    <label class="tgl"><span>Riser-strobe (build → drop)<br><small style="opacity:.6">Under en uppbyggnad: accelererande strobe + färgen kollapsar mot vitt, sen blackout på dropen. Klassisk EDM-build. Blixttakten är begränsad till 1,5/s.</small></span><input type="checkbox" id="tRiserStrobe"></label>
+    <label class="tgl"><span>Släpp strobe-taket (scenläge)<br><small style="opacity:.6">⚠ Höjer blixttakten från 1,5 till 9 per sekund. Blinkande ljus kan utlösa epileptiska anfall — risken är störst när hela riggen blinkar synkront i vitt. Gränsen för allmänt säkert innehåll är 3 blixtar/s. Slå bara på detta om lokalen skyltar om strobe vid entrén.</small></span><input type="checkbox" id="tStrobeUnlimited"></label>
     <label class="tgl"><span>Drop-headroom (max 90%, drops 100%)<br><small style="opacity:.6">Kapar normal ljusstyrka till 90% men släpper drops ända till full — de poppar tydligare och riggen slutar blasta på max hela tiden.</small></span><input type="checkbox" id="tDropHeadroom"></label>
   </div>
 
@@ -473,6 +474,7 @@ function applyConfig(cfg) {
   if (tClubMode) tClubMode.checked = !!cfg.clubMode;
   if (tAmbientGlow) tAmbientGlow.checked = !!cfg.ambientGlow;
   if (tRiserStrobe) tRiserStrobe.checked = !!cfg.riserStrobe;
+  if (tStrobeUnlimited) tStrobeUnlimited.checked = !!cfg.strobeUnlimited;
   if (tDropHeadroom) tDropHeadroom.checked = !!cfg.dropHeadroom;
   segActivate("segBeatSync", cfg.beatSyncStrength ?? 0.18, "bs");
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
@@ -963,6 +965,17 @@ const tAmbientGlow = document.getElementById("tAmbientGlow");
 tAmbientGlow.onchange = () => send({ type: "setAmbientGlow", value: tAmbientGlow.checked });
 const tRiserStrobe = document.getElementById("tRiserStrobe");
 tRiserStrobe.onchange = () => send({ type: "setRiserStrobe", value: tRiserStrobe.checked });
+const tStrobeUnlimited = document.getElementById("tStrobeUnlimited");
+// Att HÖJA taket kräver ett aktivt ja; att sänka det gör det aldrig.
+tStrobeUnlimited.onchange = () => {
+  const varning = "Höjer blixttakten till 9 per sekund.\n\n" +
+    "Blinkande ljus kan utlösa epileptiska anfall. Gränsen för allmänt säkert innehåll är 3 blixtar/s.\n\n" +
+    "Slå bara på detta om lokalen skyltar om strobe vid entrén. Fortsätta?";
+  if (tStrobeUnlimited.checked && !confirm(varning)) {
+    tStrobeUnlimited.checked = false; return;
+  }
+  send({ type: "setStrobeUnlimited", value: tStrobeUnlimited.checked });
+};
 const tDropHeadroom = document.getElementById("tDropHeadroom");
 tDropHeadroom.onchange = () => send({ type: "setDropHeadroom", value: tDropHeadroom.checked });
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).

@@ -400,6 +400,8 @@ export async function startServer(
             deps.cfg.ambientGlow = !!msg.value;
           } else if (msg.type === "setRiserStrobe") {
             deps.cfg.riserStrobe = !!msg.value;
+          } else if (msg.type === "setStrobeUnlimited") {
+            deps.cfg.strobeUnlimited = !!msg.value;
           } else if (msg.type === "setDropHeadroom") {
             deps.cfg.dropHeadroom = !!msg.value;
           } else if (msg.type === "fogNow") {

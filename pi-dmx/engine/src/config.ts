@@ -134,8 +134,22 @@ export interface EngineConfig {
   /** REGI: varm vilo-glöd i tystnad — dim bärnsten när ingen musik spelar (annars helt mörkt). */
   ambientGlow: boolean;
   /** REGI: riser-strobe — under en uppbyggnad accelererar en strobe + färgen
-   *  kollapsar mot vitt, sen blackout på dropen (klassisk EDM-build). */
+   *  kollapsar mot vitt, sen blackout på dropen (klassisk EDM-build).
+   *  Frekvensen är takad — se `strobeUnlimited`. */
   riserStrobe: boolean;
+  /** ÄGARENS MEDVETNA VAL att släppa strobe-taket från 3 Hz till 18 Hz.
+   *
+   *  FOTOSENSITIV EPILEPSI. Blinkande ljus kan utlösa anfall. Risken är störst
+   *  mellan ~15 och 25 Hz, och värst när HELA synfältet blinkar synkront i vitt
+   *  — exakt vad en helriggs-strobe gör. Etablerad gräns för allmänt säkert
+   *  innehåll (WCAG 2.3.1, och rundradions riktlinjer) är HÖGST 3 blixtar per
+   *  sekund. Därför är 3 Hz standard här.
+   *
+   *  Scenstrobar går snabbare än så och är lagliga — men då är det ett aktivt
+   *  beslut av den som driver lokalen, med skyltning vid entrén. Den här flaggan
+   *  finns för att det beslutet ska vara MEDVETET och synligt, aldrig något
+   *  motorn gör i tysthet. Standard av. */
+  strobeUnlimited?: boolean;
   /** REGI: drop-headroom — kapa normal ljusstyrka till ~95%, men låt DROPS gå
    *  ända till 100% → drops poppar, och konstant full blast dämpas. */
   dropHeadroom: boolean;
@@ -183,6 +197,7 @@ export const defaultConfig: EngineConfig = {
   clubMode: false,        // hård kontrast (VU²); opt-in — rör inte det trogna linjära läget
   ambientGlow: false,     // tystnad = HELT mörkt som standard; slå på för varm vilo-glöd
   riserStrobe: false,     // ägar-val: accelererande strobe + vit-kollaps under risers
+  strobeUnlimited: false, // säkert tak (3 Hz) som standard — se kommentaren i typen
   dropHeadroom: false,    // ägar-val: normal ≤95%, drops → 100% (huvudrum för pop)
 };
 

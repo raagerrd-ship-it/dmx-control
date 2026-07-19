@@ -100,6 +100,12 @@ export class EffectEngine {
    *  som slår på lådan 22:00 står ensam bakom disken utan laptop — riggen är den
    *  enda skärm som finns, och den måste kunna säga tre olika saker.
    *  Ej opt-in: ett grundbeteende, inte en inställning man kan råka slå av. */
+  /** Strobe-tak i Hz. SAFE = gränsen för allmänt säkert innehåll (WCAG 2.3.1
+   *  och rundradions riktlinjer: högst 3 blixtar/s). MAX = ägarens medvetna
+   *  scenläge. Notera att `Math.floor(t*hz) % 2` ger hz/2 hela blixtcykler per
+   *  sekund — talen är alltså tagna med marginal, inte i underkant. */
+  private static readonly STROBE_SAFE_HZ = 3;
+  private static readonly STROBE_MAX_HZ = 18;
   private static readonly DEAF_AFTER_MS = 90000;   // låtglapp = sekunder, DJ-paus =
                                                    // någon minut. 90 s utan EN enda
                                                    // transient betyder att vi inte
@@ -723,9 +729,17 @@ export class EffectEngine {
     // RISER-STROBE (helrigg): under en uppbyggnad accelererar en strobe (3→18 Hz)
     // och färgen kollapsar mot vitt → klassisk EDM-build. Blackouten på själva
     // dropen sköts redan separat. Beräknas en gång/frame.
+    // FREKVENSEN ÄR TAKAD. Blinkande ljus kan utlösa epileptiska anfall; risken
+    // är störst mellan ~15 och 25 Hz och värst när HELA synfältet blinkar
+    // synkront i vitt — vilket är precis vad det här gör. Den gamla rampen gick
+    // till 18 Hz, rakt in i det värsta bandet. Taket är nu 3 Hz (WCAG 2.3.1 och
+    // rundradions gräns för allmänt säkert innehåll). Ägaren kan höja det, men
+    // bara genom ett uttryckligt val — aldrig som en bieffekt av något annat.
     const rs = this.cfg.riserStrobe && frame.buildUp > 0.25;
+    const maxHz = this.cfg.strobeUnlimited ? EffectEngine.STROBE_MAX_HZ : EffectEngine.STROBE_SAFE_HZ;
+    const hz = Math.min(maxHz, 1.5 + frame.buildUp * (maxHz - 1.5));
     const rsWhite = rs ? frame.buildUp * 0.7 : 0;
-    const rsGate = rs ? (Math.floor(t * (3 + frame.buildUp * 15)) % 2 === 0 ? 1 : 0.12) : 1;
+    const rsGate = rs ? (Math.floor(t * hz) % 2 === 0 ? 1 : 0.12) : 1;
 
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
