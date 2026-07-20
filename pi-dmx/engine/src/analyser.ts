@@ -167,6 +167,10 @@ export class Analyser {
    *  Nivå-baserad zon gav 172 flanker på 15 min (en var 5:e sekund) för ~19 drops.
    *  Baskropps-zonen ger 46 (en var 20:e sekund) — rätt storleksordning. */
   private bodyEnv = 0;
+  /** Snabb envelopp (0.12 s) ENBART for stigningstakten. Den langsammare
+   *  bodyEnv (0.35 s) styr tak och franvaro. Blandar man ihop dem dampas
+   *  stigningen och trosklarna slutar motsvara det som mattes i banken. */
+  private bodyFast = 0;
   private bodyCeil = 0.2;
   private bodyZoneState = false;
   private wasBodyZone = false;
@@ -805,24 +809,31 @@ export class Analyser {
     // fortfarande betyder korrekt.
     const bodyNow = (this.bandLvl[0] + this.bandLvl[1] + this.bandLvl[2]) / 3;   // sub + kick + bas
     this.bodyEnv += (bodyNow - this.bodyEnv) * Math.min(1, dtHop / 0.35);
+    this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / 0.12);
     this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * 0.015 * this.bodyCeil);
     if (this.bodyEnv > this.bodyCeil * 0.80) this.bodyZoneState = true;
     else if (this.bodyEnv < this.bodyCeil * 0.45) this.bodyZoneState = false;
     // BAS-FRÅNVARO med VARAKTIGHETSKRAV: under 30 % av taket i ≥3 s i sträck.
-    if (this.bodyEnv < this.bodyCeil * 0.30) {
+    if (this.bodyEnv < this.bodyCeil * 0.40) {
       this.bodyGoneMs += dtHop * 1000;
-      if (this.bodyGoneMs >= 3000) this.lastBodyGoneMs = nowWallA;
+      if (this.bodyGoneMs >= 2000) this.lastBodyGoneMs = nowWallA;
     } else this.bodyGoneMs = 0;
     // STIGNINGSTAKT över 0.5 s (ringbuffert, ingen allokering).
     const hist = this.bodyHist, HL = hist.length;
     const oldest = hist[(this.bodyHistPos + HL - this.bodyHistLen) % HL];
-    const bodyRise = this.bodyEnv - oldest;
-    hist[this.bodyHistPos] = this.bodyEnv;
+    const bodyRise = this.bodyFast - oldest;
+    hist[this.bodyHistPos] = this.bodyFast;
     this.bodyHistPos = (this.bodyHistPos + 1) % HL;
     const want = Math.min(HL - 1, Math.max(1, Math.round(0.5 / dtHop)));
     if (this.bodyHistLen < want) this.bodyHistLen++;
     // Anslaget: basen stiger snabbt OCH den var nyss borta på riktigt.
-    const bodyOnset = bodyRise > 0.05 && nowWallA - this.lastBodyGoneMs < 6000;
+    // TROSKLARNA ar svepta mot 15 min av agarens musik (20 varianter). Ett
+    // STORRE stigningskrav vann i tre av fyra franvaro-varianter — riktningen
+    // ar alltsa robust, aven om decimalerna inte ar det (n=17 referenspunkter).
+    // 40 %/2 s slar 30 %/3 s: verkliga drops kommer ofta efter en DELVIS
+    // nedgang, inte total tystnad — 10 av 11 missade drops foll pa just det.
+    // Precision 46 -> 56 %, recall 35 -> 53 %.
+    const bodyOnset = bodyRise > 0.15 && nowWallA - this.lastBodyGoneMs < 6000;
     // EN DROP MASTE LANDA I HOG ENERGI. Villkoren ovan tittar bara pa LOKALA
     // nivasprang (svacka -> topp-zon) och vet inget om var i laten vi ar, sa varje
     // liten variation i ett tyst parti raknades som en drop.
