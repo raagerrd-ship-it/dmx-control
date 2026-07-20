@@ -454,6 +454,15 @@ export class EffectEngine {
       const iNow = this.cfg.energyDrivesMode ? frame.intensity : 0.5;
       const iTau = iNow > this.tierEma ? 5.0 : 2.0;
       this.tierEma += (iNow - this.tierEma) * Math.min(1, _dtT / iTau);
+      // EN DROP AR BEVISET pa att energin kommit — vanta inte pa medelvardet.
+      // `intensity` mater den fras som just TAGIT SLUT, alltsa breakdownen. Utan
+      // det har snappet tror dirigenten att musiken ar LUGN i exakt det ogonblick
+      // kvallens storsta ogonblick slar till, och valjer en lugn effekt.
+      // UPPMATT pa agarens material: vid drops lag tierEma pa 0.09-0.47 i sju av
+      // sjutton fall (dvs "lugn"), och tiern hann ikapp forst efter 3.5 s median
+      // — plus MIN_HOLD 8 s innan effekten fick bytas. Showen kom alltsa ikapp
+      // ett tiotal sekunder EFTER dropen.
+      if (dropHit && this.tierEma < 0.75) this.tierEma = 0.75;
       const intensity = this.cfg.energyDrivesMode ? this.tierEma : 0.5;
         // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.

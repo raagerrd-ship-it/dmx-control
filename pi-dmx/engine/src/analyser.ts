@@ -158,6 +158,32 @@ export class Analyser {
   private lastRiserMs = 0;       // senaste uppbyggnad — en drop maste foljas pa en riser
   private breakHoldMs = 0;       // hur lange svackan hallit i sig (mikro-dippar raknas inte)
   private inZoneState = false;   // hysteres för topp-zonen
+  /** BASKROPPEN — (sub+kick+bas)/3, utjämnad. Det är HÄR en drop syns.
+   *  MÄTT över 15 min av ägarens egen musik: `level` ligger i sin övre tredjedel
+   *  67 % av tiden (dynamik p90/p10 = 2.1) — den kan omöjligt peka ut ett särskilt
+   *  ögonblick. Baskroppen ligger högt bara 9 % av tiden (dynamik 5.6). Sång och
+   *  synth håller uppe nivån hela låten; det som FÖRSVINNER i en breakdown och
+   *  SLÅR TILLBAKA i dropen är basen.
+   *  Nivå-baserad zon gav 172 flanker på 15 min (en var 5:e sekund) för ~19 drops.
+   *  Baskropps-zonen ger 46 (en var 20:e sekund) — rätt storleksordning. */
+  private bodyEnv = 0;
+  private bodyCeil = 0.2;
+  private bodyZoneState = false;
+  private wasBodyZone = false;
+  /** ANSLAGSDETEKTION. En tröskel som ska NÅS korsas först när basen redan
+   *  kommit — uppmätt 2.5 s efter anslaget. STIGNINGSTAKTEN fyrar när den
+   *  börjar: uppmätt 0.1 s. Ringbuffert med 0.5 s historik (förallokerad). */
+  private bodyHist = new Float32Array(200);
+  private bodyHistPos = 0;
+  private bodyHistLen = 1;
+  /** Ihållande bas-FRÅNVARO. Det som gör en drop till en drop är att basen
+   *  varit BORTA. Utan varaktighetskrav räcker en trumfill, och då är villkoret
+   *  uppfyllt nästan jämt — då blir 8-takters-spärren det enda som begränsar
+   *  takten och detektorn förvandlas till en METRONOM. Uppmätt live: den fyrade
+   *  var 15:e sekund (= spärren) och användarens riktiga drops låg 9-15 s FEL,
+   *  blockerade av den föregående falska avfyrningen. */
+  private bodyGoneMs = 0;
+  private lastBodyGoneMs = -1e9;
   private wasInZone = false;
   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
   private lastDropMs = -1e9;
@@ -773,6 +799,30 @@ export class Analyser {
     if (this.lvlSmooth > this.levelCeil * 0.85 && this.lvlSmooth > 0.65) this.inZoneState = true;
     else if (this.lvlSmooth < this.levelCeil * 0.70) this.inZoneState = false;
     const inZone = this.inZoneState;
+    // BASKROPPS-ZON — drop-detektionens egen zon. Samma form som ovan (adaptivt
+    // tak + hysteres) men på den signal där drops faktiskt syns. `inZone` lämnas
+    // orörd: effektlagret använder den som "musiken ligger högt", vilket den
+    // fortfarande betyder korrekt.
+    const bodyNow = (this.bandLvl[0] + this.bandLvl[1] + this.bandLvl[2]) / 3;   // sub + kick + bas
+    this.bodyEnv += (bodyNow - this.bodyEnv) * Math.min(1, dtHop / 0.35);
+    this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * 0.015 * this.bodyCeil);
+    if (this.bodyEnv > this.bodyCeil * 0.80) this.bodyZoneState = true;
+    else if (this.bodyEnv < this.bodyCeil * 0.45) this.bodyZoneState = false;
+    // BAS-FRÅNVARO med VARAKTIGHETSKRAV: under 30 % av taket i ≥3 s i sträck.
+    if (this.bodyEnv < this.bodyCeil * 0.30) {
+      this.bodyGoneMs += dtHop * 1000;
+      if (this.bodyGoneMs >= 3000) this.lastBodyGoneMs = nowWallA;
+    } else this.bodyGoneMs = 0;
+    // STIGNINGSTAKT över 0.5 s (ringbuffert, ingen allokering).
+    const hist = this.bodyHist, HL = hist.length;
+    const oldest = hist[(this.bodyHistPos + HL - this.bodyHistLen) % HL];
+    const bodyRise = this.bodyEnv - oldest;
+    hist[this.bodyHistPos] = this.bodyEnv;
+    this.bodyHistPos = (this.bodyHistPos + 1) % HL;
+    const want = Math.min(HL - 1, Math.max(1, Math.round(0.5 / dtHop)));
+    if (this.bodyHistLen < want) this.bodyHistLen++;
+    // Anslaget: basen stiger snabbt OCH den var nyss borta på riktigt.
+    const bodyOnset = bodyRise > 0.05 && nowWallA - this.lastBodyGoneMs < 6000;
     // EN DROP MASTE LANDA I HOG ENERGI. Villkoren ovan tittar bara pa LOKALA
     // nivasprang (svacka -> topp-zon) och vet inget om var i laten vi ar, sa varje
     // liten variation i ett tyst parti raknades som en drop.
@@ -831,10 +881,15 @@ export class Analyser {
     // Femte signalen i sessionen som ser levande ut men ar en konstant. Innan
     // kravet kan aterinforas maste inRiser/buildUp lagas och matas om - annars
     // ar det bara ett dyrt satt att stanga av dropsen.
-    if (dropEnergyOk && dropSpacingOk && inZone && !this.wasInZone && (hadBreak || hadRiser) && this.activeMs > 2000) {
+    // FLANKEN TAS PÅ BASKROPPEN, inte på nivån. Nivå-zonen var sann 80 % av tiden
+    // i ägarens musik → dess flanker låg godtyckligt, och 8-takters-spärren blev
+    // i praktiken den som VALDE när en drop fyrade (första flanken efter att
+    // fönstret löpt ut). Uppmätt resultat: 3 träffar av 19, 16 falsklarm.
+    if (dropSpacingOk && bodyOnset && this.activeMs > 2000) {
       this.dropCount++; this.lastDropMs = nowWallA;
     }
     this.wasInZone = inZone;
+    this.wasBodyZone = this.bodyZoneState;
 
     // ── UPPBYGGNAD / RISER (flyttad hit) ──
     // Spektral NOVELTY = summan av bandens POSITIVA avvikelse från en ~2s baslinje,
