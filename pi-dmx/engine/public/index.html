@@ -149,25 +149,26 @@
     </div>
     <input type="range" id="moodSlider" min="1" max="10" step="1" value="5" aria-label="Stämning från Chill till Galet" />
     <div class="mood-slider-legend"><span>Chill</span><span>Fest</span><span>Galet</span></div>
+    <div class="mood-desc" id="moodDesc">Pulsar på taktslag, byter effekt ibland</div>
   </div>
 
-  <h1>Ljudkälla</h1>
+  <h1>Ljud <span class="kick-dot" id="kickDot"></span></h1>
   <div class="card">
     <div class="fx-actions" style="margin-top:0">
       <button class="btn" id="inAux">AUX (kabel)</button>
       <button class="btn" id="inMic">Mikrofon</button>
     </div>
+    <div class="row" style="margin-top:14px"><label>Nivå just nu</label><span class="val" id="levelVal">–</span></div>
+    <div class="meter"><div id="levelBar" style="width:0%"></div></div>
+    <details class="tech-details">
+      <summary>Teknisk info</summary>
+      <div class="row" style="margin-top:10px"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
+      <div class="row"><label>Beat-synk <span class="kick-dot" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
+      <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
+      <div class="status">Auto-gain: <span id="gainVal">–</span>×</div>
+    </details>
   </div>
 
-  <h1>Ljudnivå <span class="kick-dot" id="kickDot"></span></h1>
-  <div class="card">
-    <div class="row"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
-    <div class="row"><label>Beat-synk <span class="kick-dot" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
-    <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
-    <div class="row" style="margin-top:10px"><label>Nivå just nu</label><span class="val" id="levelVal">–</span></div>
-    <div class="meter"><div id="levelBar" style="width:0%"></div></div>
-    <div class="status">Auto-gain: <span id="gainVal">–</span>×</div>
-  </div>
 
   <details class="more">
     <summary>Effekt-val · välj vilka som roterar</summary>
