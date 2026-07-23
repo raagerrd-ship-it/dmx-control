@@ -316,6 +316,7 @@ function AdvancedMirror() {
             <AdvFlag on={f.energyCeiling}    label="Dynamiskt ljustak" />
             <AdvFlag on={f.riserStrobe}      label="Riser-strobe" />
             <AdvFlag on={f.dropHeadroom}     label="Drop-headroom" />
+            <AdvFlag on={false}              label="Rökmaskin aktiv" />
           </div>
         </Card>
       </div>

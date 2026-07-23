@@ -204,6 +204,7 @@
         <div class="advflag" id="fCeil"><span class="dot"></span>Dynamiskt ljustak</div>
         <div class="advflag" id="fRiser"><span class="dot"></span>Riser-strobe</div>
         <div class="advflag" id="fHead"><span class="dot"></span>Drop-headroom</div>
+        <div class="advflag" id="fFog"><span class="dot"></span>Rökmaskin aktiv</div>
       </div>
     </div>
   </details>
@@ -558,6 +559,7 @@ function updateAdvMirror(cfg) {
   flag("fCeil",   cfg.energyCeiling);
   flag("fRiser",  cfg.riserStrobe);
   flag("fHead",   cfg.dropHeadroom);
+  flag("fFog",    cfg.fog && cfg.fog.enabled);
 }
 let kickTimer;
 function applyFrame(f) {
