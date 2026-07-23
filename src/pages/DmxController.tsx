@@ -325,6 +325,75 @@ function MoreSections() {
           <AdvancedTechnical />
         </div>
       </div>
+
+      {/* ────────── LED-RING (runt fysiska vredet) ────────── */}
+      <div>
+        <h2 className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground font-semibold mb-2 px-1">LED-ring runt vredet</h2>
+        <div className="bg-card border border-border rounded-[14px] p-4">
+          <RingSettings />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RingSettings() {
+  const s = usePi();
+  const r = s.ring;
+  const set = (patch: Partial<PiSettings["ring"]>) =>
+    setPi({ ring: { ...r, ...patch } });
+  return (
+    <div className="space-y-4">
+      <div>
+        <div className="flex items-baseline justify-between mb-1.5">
+          <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Max-ljusstyrka</div>
+          <div className="text-[13px] tabular-nums text-muted-foreground">{Math.round(r.maxBright * 100)}%</div>
+        </div>
+        <input
+          type="range" min={5} max={100} step={5}
+          value={Math.round(r.maxBright * 100)}
+          onChange={(e) => set({ maxBright: Number(e.target.value) / 100 })}
+          className="w-full h-2 accent-[hsl(var(--primary))] cursor-pointer"
+          aria-label="Max-ljusstyrka på LED-ringen"
+        />
+        <div className="text-[11px] text-muted-foreground/80 mt-1 leading-snug">
+          Tak för hur starkt ringen får lysa. Håll under ~50 % om ringen delar 5 V med Codec Zero.
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-baseline justify-between mb-1.5">
+          <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Pulse-boost på beat</div>
+          <div className="text-[13px] tabular-nums text-muted-foreground">+{Math.round(r.pulseBoost * 100)}%</div>
+        </div>
+        <input
+          type="range" min={0} max={50} step={2}
+          value={Math.round(r.pulseBoost * 100)}
+          onChange={(e) => set({ pulseBoost: Number(e.target.value) / 100 })}
+          className="w-full h-2 accent-[hsl(var(--primary))] cursor-pointer"
+          aria-label="Ringens pulse-boost på taktslag"
+        />
+        <div className="text-[11px] text-muted-foreground/80 mt-1 leading-snug">
+          Extra blink när takten träffar. 0 % = stilla ring.
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-baseline justify-between mb-1.5">
+          <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">Blackout-fade</div>
+          <div className="text-[13px] tabular-nums text-muted-foreground">{r.blackoutFadeMs} ms</div>
+        </div>
+        <input
+          type="range" min={0} max={2000} step={50}
+          value={r.blackoutFadeMs}
+          onChange={(e) => set({ blackoutFadeMs: Number(e.target.value) })}
+          className="w-full h-2 accent-[hsl(var(--primary))] cursor-pointer"
+          aria-label="Hur mjukt ringen slocknar vid blackout"
+        />
+        <div className="text-[11px] text-muted-foreground/80 mt-1 leading-snug">
+          Hur mjukt ringen slocknar när ljuset släcks. 0 = instant.
+        </div>
+      </div>
     </div>
   );
 }
