@@ -72,6 +72,9 @@ export interface PiSettings {
   dynamics: number;
   master: number;
   audioInput: AudioIn;
+  /** LED-ring runt vredet: max-ljusstyrka, pulse-boost och blackout-fade. Speglar
+   *  cfg.intensityRing på Pi:n; skickas som setRing-meddelande över WS. */
+  ring: { maxBright: number; pulseBoost: number; blackoutFadeMs: number };
 }
 
 const defaults: PiSettings = {
@@ -86,6 +89,7 @@ const defaults: PiSettings = {
   dynamics: 0.6,
   master: 1,
   audioInput: "aux",
+  ring: { maxBright: 0.40, pulseBoost: 0.18, blackoutFadeMs: 400 },
 };
 
 /** Härled bucket från intensity 0..1: 0..0.33 chill, 0.34..0.66 party, 0.67..1 wild. */
@@ -141,7 +145,11 @@ function load(): PiSettings {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return defaults;
     const p = JSON.parse(raw) as Partial<PiSettings>;
-    return { ...defaults, ...p, rotation: { ...defaults.rotation, ...(p.rotation ?? {}) } };
+    return {
+      ...defaults, ...p,
+      rotation: { ...defaults.rotation, ...(p.rotation ?? {}) },
+      ring: { ...defaults.ring, ...(p.ring ?? {}) },
+    };
   } catch { return defaults; }
 }
 
