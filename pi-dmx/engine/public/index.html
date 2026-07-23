@@ -139,6 +139,26 @@
     .advflag .dot { width:9px; height:9px; border-radius:50%; background:var(--line); flex:none; transition:background .15s, box-shadow .15s; }
     .advflag.on { color:var(--fg); }
     .advflag.on .dot { background:var(--ok); box-shadow:0 0 8px color-mix(in srgb, var(--ok) 60%, transparent); }
+    /* Drift-hälsa: sticky banner högst upp när något inte är som det ska.
+       Röd = allvarligt (WS/DMX nere), gul = varning (BLE tappat, mic tyst länge). */
+    .health-banner { position:sticky; top:0; z-index:50; margin:8px -16px 8px; padding:10px 16px; font-size:13px; line-height:1.35; display:none; }
+    .health-banner.show { display:block; }
+    .health-banner.err  { background:color-mix(in srgb, var(--hot) 22%, var(--bg));  border-top:2px solid var(--hot);  border-bottom:1px solid var(--hot);  color:#fff; }
+    .health-banner.warn { background:color-mix(in srgb, var(--warn) 22%, var(--bg)); border-top:2px solid var(--warn); border-bottom:1px solid var(--warn); color:#fff; }
+    .health-banner b { font-weight:600; }
+    /* Välkomst-overlay: visas första gången någon öppnar hyresgäst-vyn.
+       localStorage-flagga håller den kvar borta efter första bekräftelsen. */
+    .welcome-ov { position:fixed; inset:0; z-index:100; background:rgba(10,10,15,.92); backdrop-filter: blur(8px); display:none; align-items:center; justify-content:center; padding:24px; }
+    .welcome-ov.show { display:flex; }
+    .welcome-card { max-width:420px; width:100%; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px; }
+    .welcome-card h2 { margin:0 0 6px; font-size:22px; font-weight:700; }
+    .welcome-card p  { margin:0 0 14px; color:var(--dim); font-size:14px; line-height:1.5; }
+    .welcome-steps { display:flex; flex-direction:column; gap:12px; margin:16px 0 20px; }
+    .welcome-step { display:flex; gap:12px; align-items:flex-start; }
+    .welcome-step .n { flex:none; width:26px; height:26px; border-radius:50%; background:var(--hot); color:#fff; font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center; }
+    .welcome-step .t b { display:block; font-size:14px; margin-bottom:2px; }
+    .welcome-step .t span { font-size:13px; color:var(--dim); line-height:1.4; }
+    .welcome-btn { width:100%; padding:14px; background:var(--hot); border:0; border-radius:12px; color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
   </style>
 </head>
 <body>
