@@ -116,6 +116,12 @@
     .mood-slider-val .num { color:var(--dim); }
     .mood-slider-card input[type=range] { width:100%; height:24px; accent-color:var(--hot); cursor:pointer; }
     .mood-slider-legend { display:flex; justify-content:space-between; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-top:4px; padding:0 2px; }
+    .mood-desc { margin-top:10px; padding-top:10px; border-top:1px solid var(--line); font-size:13px; color:var(--fg); line-height:1.35; }
+    details.tech-details { margin-top:12px; }
+    details.tech-details > summary { list-style:none; cursor:pointer; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; padding:6px 0; }
+    details.tech-details > summary::-webkit-details-marker { display:none; }
+    details.tech-details > summary::after { content:" ⌄"; }
+    details.tech-details[open] > summary::after { content:" ⌃"; }
     details.more { margin-top:8px; }
     details.more > summary { list-style:none; cursor:pointer; padding:14px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
     details.more > summary::-webkit-details-marker { display:none; }
@@ -149,25 +155,26 @@
     </div>
     <input type="range" id="moodSlider" min="1" max="10" step="1" value="5" aria-label="Stämning från Chill till Galet" />
     <div class="mood-slider-legend"><span>Chill</span><span>Fest</span><span>Galet</span></div>
+    <div class="mood-desc" id="moodDesc">Pulsar på taktslag, byter effekt ibland</div>
   </div>
 
-  <h1>Ljudkälla</h1>
+  <h1>Ljud <span class="kick-dot" id="kickDot"></span></h1>
   <div class="card">
     <div class="fx-actions" style="margin-top:0">
       <button class="btn" id="inAux">AUX (kabel)</button>
       <button class="btn" id="inMic">Mikrofon</button>
     </div>
+    <div class="row" style="margin-top:14px"><label>Nivå just nu</label><span class="val" id="levelVal">–</span></div>
+    <div class="meter"><div id="levelBar" style="width:0%"></div></div>
+    <details class="tech-details">
+      <summary>Teknisk info</summary>
+      <div class="row" style="margin-top:10px"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
+      <div class="row"><label>Beat-synk <span class="kick-dot" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
+      <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
+      <div class="status">Auto-gain: <span id="gainVal">–</span>×</div>
+    </details>
   </div>
 
-  <h1>Ljudnivå <span class="kick-dot" id="kickDot"></span></h1>
-  <div class="card">
-    <div class="row"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
-    <div class="row"><label>Beat-synk <span class="kick-dot" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
-    <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
-    <div class="row" style="margin-top:10px"><label>Nivå just nu</label><span class="val" id="levelVal">–</span></div>
-    <div class="meter"><div id="levelBar" style="width:0%"></div></div>
-    <div class="status">Auto-gain: <span id="gainVal">–</span>×</div>
-  </div>
 
   <details class="more">
     <summary>Effekt-val · välj vilka som roterar</summary>
@@ -331,12 +338,21 @@ const moodSlider = document.getElementById("moodSlider");
 const moodSliderCard = document.getElementById("moodSliderCard");
 const moodLbl = document.getElementById("moodLbl");
 const moodNum = document.getElementById("moodNum");
-function moodLabelFor(v) { return v <= 3 ? "Chill" : v <= 7 ? "Fest" : "Galet"; }
+const moodDesc = document.getElementById("moodDesc");
+function moodInfoFor(v) {
+  if (v <= 2) return { name: "Chill",  desc: "Mjukt och långsamt, följer inte taktslag" };
+  if (v <= 4) return { name: "Chill+", desc: "Följer musiken lugnt" };
+  if (v <= 6) return { name: "Fest",   desc: "Pulsar på taktslag, byter effekt ibland" };
+  if (v <= 8) return { name: "Fest+",  desc: "Klubb-läge, byter effekt oftare" };
+  return               { name: "Galet", desc: "Full fart, drop-blackout, riser-strobe" };
+}
 function updateMoodUi(v01, active) {
   const v = Math.max(1, Math.min(10, Math.round(v01 * 9) + 1));
   moodSlider.value = String(v);
-  moodLbl.textContent = moodLabelFor(v);
+  const info = moodInfoFor(v);
+  moodLbl.textContent = info.name;
   moodNum.textContent = ` · ${v}/10`;
+  if (moodDesc) moodDesc.textContent = info.desc;
   moodSliderCard.classList.toggle("active", !!active);
 }
 moodSlider.addEventListener("input", () => {

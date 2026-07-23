@@ -1,46 +1,42 @@
-
 ## Mål
 
-Preview i Lovable ska se ut och kännas som Pi:ns riktiga UI (`pi-dmx/engine/public/index.html`). Pi behåller sin vanilla-HTML som sanning; React-appen blir en visuell spegel driven av samma mock som idag.
+Rensa default-vyn för hyresgäster så bara det som spelar roll för dem syns. Tekniska värden (BPM, konfidens, auto-gain) flyttas till ägarläge. Ägarläge är oförändrat i funktion.
 
-## Vad som ändras
+## Ändringar
 
-**Behålls:** `pi-dmx/engine/public/index.html` (oförändrad), `useMockLive`, `useDmx`-store (data-layer).
+**1. Slå ihop "Ljudkälla" in i "Ljudnivå"**
 
-**Skrivs om (src/):**
-- `src/pages/DmxController.tsx` — ny sektionsordning som matchar Pi.
-- `src/index.css` — CSS-variabler + typografi ska matcha Pi (`--bg #0a0a0f`, `--card #15151f`, `--line #252535`, `--hot #ff3a6b`, system-font-stack, uppercase 13px h1 med `letter-spacing:.12em`).
-- Nya komponenter (samma visuella språk som Pi):
-  - `ShowCard` — "Energi styr läget"-toggle, dwell-segment (Sällan/Normal/Ofta), "Pulsa på taktslag".
-  - `LevelCard` — level-meter + kick-dot + gain + AUX/Mic-knappar.
-  - `RotationList` — tre kort: Lugna effekter / Effekter med fart / Effekter med full fart, med raderna, beskrivning, "● SPELAS"-badge.
-  - `EffectsCard` — Drop-blixt segment (Av/Låg/Normal/Hög).
-  - `SettingsCard` — Reaktion/Dynamik/Ljusstyrka segment.
-  - `OwnerBanner` + befintlig `FixtureSetup` visuellt uppdaterad till Pi-stil, `SystemCard`, `WifiCard` (owner-mode via `/setup` i URL:en).
+Ta bort separat h1 + kort för AUX/Mic. Lägg AUX/Mic-knapparna som första rad inuti Ljudnivå-kortet, ovanför nivå-metern. H1 döps om till "Ljud".
 
-**Tas bort från preview:** `BpmDisplay`, `HueColorCard` (mono/comet/split UI), `PresetGrid` (grid-view), `LiveControls`, tab-navigationen `Live/Fixtures`. Datat i store:t behålls; bara UI-ytor försvinner.
+**2. Förenkla Ljudnivå för hyresgäst**
 
-**Mock utökas:** `useMockLive` genererar redan level/kick/mode-cykling — utökas med tre kategorilistor + rotation-toggles + dwell/energy-simulering så alla nya kort har liv.
+Behåll, kanske snygga till, så det är tydligt bara
 
-## Sektioner i ny ordning
+**3. Tydligare stämnings-etikett**
 
-1. Show
-2. Level
-3. Lugna effekter
-4. Effekter med fart
-5. Effekter med full fart
-6. Effekter (drop)
-7. Inställningar
-8. Owner-only (om URL innehåller `/setup`): Fixtures, System, WiFi
+Under slidern: ersätt "Fest · 5/10" med en kortare beskrivning av vad läget faktiskt gör vid det värdet. Mappning (baseras på `deriveFeel`-bucket + intensity):
 
-## Tekniskt
+- 1–2 · **Chill** — "Mjukt, långsamt, följer inte taktslag"
+- 3–4 · **Chill+** — "Följer musiken lugnt"
+- 5–6 · **Fest** — "Pulsar på taktslag, byter effekt ibland"
+- 7–8 · **Fest+** — "Klubb-läge, byter oftare"
+- 9–10 · **Galet** — "Full fart, drop-blackout, riser-strobe"
 
-- Byter Inter/Space Grotesk → samma system-font-stack som Pi (`-apple-system, system-ui`) för pixel-parity. Tailwind-tokens uppdateras via `index.css` — inga `bg-[#...]` i komponenter.
-- Owner-mode: `useLocation().pathname.includes("setup")` eller hash.
-- `LivePreview` behålls som liten debugvy men flyttas till `/setup`.
+Siffran `x/10` blir liten tabular-nums till höger istället för dominant.
+
+## Filer
+
+**Pi (källa till sanning):**
+
+- `pi-dmx/engine/public/index.html` — flytta AUX/Mic-knappar in i Ljudnivå-kortet, ta bort separat Ljudkälla-block, wrappa BPM/beat/konfidens/auto-gain-raderna i `#ownerOnly`-container (eller flytta dem in i ägar-sektionen som nytt "Diagnostik"-kort), uppdatera stämnings-etikett-JSX + JS-mapping.
+
+**Mock (spegel):**
+
+- `src/pages/DmxController.tsx` — samma tre ändringar i `AudioSourceCard` (tas bort), `AudioMeterCard` (skalas ner till nivå + kick), `OwnerSections` (får Diagnostik-kort), `MoodSlider` (ny etikett-mapping).
 
 ## Ur scope
 
-- Pi:ns HTML rörs inte.
-- Ingen WebSocket-klient i React (den befintliga `usePiLive` behålls; den gör inget i preview eftersom Pi inte finns där).
-- Ingen unifiering av kod mellan Pi och React — det var alternativen 1 och 2 som du valde bort.
+- Slidern behålls 1–10 (fysiska vredet mappar hit); Power-kortet rörs inte.
+- "Avancerat · spegel av stämningen" ligger kvar för alla (du valde inte att gömma det).
+- Effekt-val oförändrat.
+- Ingen ändring av engine, BPM-detektor eller mock-data.
