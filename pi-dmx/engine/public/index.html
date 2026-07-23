@@ -493,7 +493,7 @@ function applyConfig(cfg) {
   lastIntensity = x;
   updateMoodUi(x, cfg.mode !== "blackout");
   setPower(cfg.mode === "blackout");
-  tBeatPulse.checked = !!cfg.beatPulse;
+  if (tBeatPulse) tBeatPulse.checked = !!cfg.beatPulse;
   const fog = cfg.fog || {};
   if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 128; }
   if (tDropBlackout) tDropBlackout.checked = cfg.dropBlackout !== false;   // default på
@@ -985,7 +985,8 @@ fxSaveBtn.onclick = () => {
 
 const tBeatPulse = document.getElementById("tBeatPulse");
 const tEnergy = document.getElementById("tEnergy");
-tBeatPulse.onchange = () => send({ type: "setBeatPulse", value: tBeatPulse.checked });
+if (tBeatPulse) tBeatPulse.onchange = () => send({ type: "setBeatPulse", value: tBeatPulse.checked });
+
 
 // Live beat-diagnostik under LEVEL (uppdateras i applyFrame).
 const bpmVal = document.getElementById("bpmVal");
