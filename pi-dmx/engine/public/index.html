@@ -1297,16 +1297,24 @@ function renderBleScan(devices) {
     return;
   }
   bleScanList.innerHTML = fresh.map((d) => `
-    <div class="row" style="align-items:center;gap:10px;opacity:${d.chip === "bledom" ? "1" : ".55"}">
+    <div class="row" style="align-items:center;gap:8px;opacity:${d.chip === "bledom" ? "1" : ".55"}">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600">${escapeHtml(d.name || d.mac)}</div>
         <div style="opacity:.6;font-size:11px">${escapeHtml(d.mac)} · ${d.chip} · ${d.rssi} dBm</div>
       </div>
+      <button class="btn" data-ble-identify="${escapeHtml(d.mac)}" title="Blinka så du ser vilken lampa detta är">Blinka</button>
       <button class="btn primary" data-ble-pair="${escapeHtml(d.mac)}" data-ble-name="${escapeHtml(d.name || d.mac)}" data-ble-chip="${d.chip}">
         ${d.chip === "bledom" ? "Para" : "Testa"}
       </button>
     </div>
   `).join("");
+  bleScanList.querySelectorAll("[data-ble-identify]").forEach((btn) => {
+    btn.onclick = () => {
+      send({ type: "bleIdentify", mac: btn.dataset.bleIdentify });
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = "Blinkar…";
+      setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 6000);
+    };
+  });
   bleScanList.querySelectorAll("[data-ble-pair]").forEach((btn) => {
     btn.onclick = () => {
       send({ type: "blePair", mac: btn.dataset.blePair, name: btn.dataset.bleName, chip: btn.dataset.bleChip });
