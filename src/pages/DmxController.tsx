@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useMockLive } from "@/hooks/useMockLive";
 import { useDmx } from "@/store/dmx";
 import {
-  CALM_MODES, FAST_MODES, FULL_MODES, SCENES,
-  usePi, usePlayingMode, setPi, setRotation, applyScene,
+  CALM_MODES, FAST_MODES, FULL_MODES,
+  usePi, usePlayingMode, setPi, setRotation, applyIntensity,
   type Dwell,
 } from "@/hooks/usePiMock";
 import { useLocation } from "react-router-dom";
