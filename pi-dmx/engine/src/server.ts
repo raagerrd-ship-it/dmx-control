@@ -300,6 +300,8 @@ export async function startServer(
             beat,
             beatErr: deps.cfg.beatErr ?? 0,
             mode: deps.getActiveMode(),
+            activeMood: deps.cfg.activeMood,
+            activeIntensity: deps.cfg.activeIntensity,   // vred/slider-position (0..1)
             fog: deps.getFogStatus(),     // null när maskinen inte är ansluten
           }));
 
