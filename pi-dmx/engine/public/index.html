@@ -541,6 +541,40 @@ function applyConfig(cfg) {
   else if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
   else renderFixtures();
 }
+
+/** Uppdatera "Avancerat · spegel av stämningen" — skrivskyddade sliders + dots. */
+function updateAdvMirror(cfg) {
+  const setBar = (id, pct, label) => {
+    const b = document.getElementById(id); const v = document.getElementById(id + "V");
+    if (b) b.style.width = Math.max(0, Math.min(100, pct)) + "%";
+    if (v) v.textContent = label;
+  };
+  const dyn = cfg.dynamics ?? 0.6;
+  const sens = cfg.sensitivity ?? 0.6;
+  const mst = cfg.master ?? 1;
+  const dec = cfg.calmDecay ?? 0.42;               // 0.30..1.20 s enligt moods.ts
+  const dwellMs = cfg.smartDwellMs ?? 9000;        // 10 000..40 000 typiskt
+  setBar("advDyn",    dyn * 100,             Math.round(dyn * 100) + "%");
+  setBar("advSens",   sens * 100,            Math.round(sens * 100) + "%");
+  setBar("advMaster", mst * 100,             Math.round(mst * 100) + "%");
+  // Tröghet: mappa 0.30 s → 0%, 1.20 s → 100%
+  setBar("advDecay",  ((dec - 0.30) / 0.90) * 100, dec.toFixed(2) + "s");
+  // Byter effekt: kort dwell → hög "aktivitet". Mappa 5 000 → 100%, 40 000 → 0%
+  setBar("advDwell",  ((40000 - dwellMs) / 35000) * 100,
+    dwellMs >= 20000 ? "Sällan" : dwellMs >= 10000 ? "Normal" : "Ofta");
+  const flag = (id, on) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle("on", !!on);
+  };
+  flag("fEnergy", cfg.energyDrivesMode);
+  flag("fBeat",   cfg.beatPulse);
+  flag("fDropBl", cfg.dropBlackout);
+  flag("fClub",   cfg.clubMode);
+  flag("fAmb",    cfg.ambientGlow);
+  flag("fCeil",   cfg.energyCeiling);
+  flag("fRiser",  cfg.riserStrobe);
+  flag("fHead",   cfg.dropHeadroom);
+}
 let kickTimer;
 function applyFrame(f) {
   const pct = Math.round(f.level * 100);
