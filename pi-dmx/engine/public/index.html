@@ -622,6 +622,7 @@ function applyFrame(f) {
   levelBar.style.width = pct + "%";
   levelVal.textContent = pct + "%";
   gainVal.textContent = f.gain.toFixed(1);
+  lastBleActive = f.bleActive ?? 0;
   if (f.kick) {
     kickDot.classList.add("on");
     clearTimeout(kickTimer);
