@@ -1045,7 +1045,7 @@ tDropHeadroom.onchange = () => send({ type: "setDropHeadroom", value: tDropHeadr
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.
-tEnergy.onchange = () => {
+if (tEnergy) tEnergy.onchange = () => {
   if (tEnergy.checked) {
     curMode = "smart";
     send({ type: "setEnergyDrivesMode", value: true });
@@ -1057,6 +1057,7 @@ tEnergy.onchange = () => {
   }
   refreshModeView();
 };
+
 document.querySelectorAll("#segBeatSync button").forEach((b) =>
   b.onclick = () => { send({ type: "setBeatSyncStrength", value: Number(b.dataset.bs) }); segActivate("segBeatSync", Number(b.dataset.bs), "bs"); });
 document.querySelectorAll("#segDwell button").forEach((b) =>
