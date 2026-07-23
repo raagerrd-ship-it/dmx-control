@@ -1266,9 +1266,17 @@ function renderBlePaired(devices) {
         <div style="font-weight:600">${escapeHtml(d.name || d.mac)}</div>
         <div style="opacity:.6;font-size:11px">${escapeHtml(d.mac)} · ${d.chip}</div>
       </div>
+      <button class="btn" data-ble-identify="${escapeHtml(d.mac)}" title="Blinka lampan så du ser vilken det är">Blinka</button>
       <button class="btn" data-ble-unpair="${escapeHtml(d.mac)}">Ta bort</button>
     </div>
   `).join("");
+  blePairedList.querySelectorAll("[data-ble-identify]").forEach((btn) => {
+    btn.onclick = () => {
+      send({ type: "bleIdentify", mac: btn.dataset.bleIdentify });
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = "Blinkar…";
+      setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 6000);
+    };
+  });
   blePairedList.querySelectorAll("[data-ble-unpair]").forEach((btn) => {
     btn.onclick = () => {
       if (!confirm("Ta bort slingan?")) return;
