@@ -223,11 +223,13 @@ async function handle(sock: net.Socket, msg: any) {
     // Engine boot handshake — restore persisted list.
     for (const d of msg.devices) {
       const mac = normalizeMac(d.mac);
-      if (!mac || known.has(mac)) continue;
+      if (!mac) continue;
+      const existing = known.get(mac);
+      if (existing) { existing.transient = false; continue; }
       known.set(mac, {
         mac, name: d.name || mac, chip: d.chip === "bledom" ? "bledom" : "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
-        target: [0, 0, 0], connecting: false,
+        target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: false,
       });
     }
     broadcastPaired();
@@ -246,16 +248,38 @@ async function handle(sock: net.Socket, msg: any) {
   }
   if (msg.type === "pair" && typeof msg.mac === "string") {
     const mac = normalizeMac(msg.mac);
+    const existing = known.get(mac);
+    if (existing) {
+      // Kan ha lagts till transient via "identify" — markera nu som permanent.
+      existing.transient = false;
+    } else {
+      const s = seen.get(mac);
+      known.set(mac, {
+        mac, name: s?.name || mac, chip: s?.chip || "unknown",
+        peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
+        target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: false,
+      });
+    }
+    const strip = known.get(mac)!;
+    await connect(strip);
+    return;
+  }
+  if (msg.type === "identify" && typeof msg.mac === "string") {
+    // "Blinka lampan" — hjälp användaren identifiera vilken fysisk slinga
+    // en post i listan motsvarar. Skapar transient-post om ej redan parad.
+    const mac = normalizeMac(msg.mac);
+    const durationMs = Math.max(1000, Math.min(15000, msg.durationMs ?? 6000));
     if (!known.has(mac)) {
       const s = seen.get(mac);
       known.set(mac, {
         mac, name: s?.name || mac, chip: s?.chip || "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
-        target: [0, 0, 0], connecting: false,
+        target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: true,
       });
     }
     const strip = known.get(mac)!;
-    await connect(strip);
+    strip.identifyUntil = Date.now() + durationMs;
+    connect(strip).catch(() => {});
     return;
   }
   if (msg.type === "unpair" && typeof msg.mac === "string") {
