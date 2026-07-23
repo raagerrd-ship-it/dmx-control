@@ -76,7 +76,12 @@ function PowerHero() {
 function MoodSlider() {
   const s = usePi();
   const v = Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
-  const label = v <= 3 ? "Chill" : v <= 7 ? "Fest" : "Galet";
+  const info =
+    v <= 2 ? { name: "Chill",  desc: "Mjukt och långsamt, följer inte taktslag" } :
+    v <= 4 ? { name: "Chill+", desc: "Följer musiken lugnt" } :
+    v <= 6 ? { name: "Fest",   desc: "Pulsar på taktslag, byter effekt ibland" } :
+    v <= 8 ? { name: "Fest+",  desc: "Klubb-läge, byter effekt oftare" } :
+             { name: "Galet",  desc: "Full fart, drop-blackout, riser-strobe" };
   const dim = !s.power;
   return (
     <div
@@ -87,7 +92,7 @@ function MoodSlider() {
       <div className="flex items-baseline justify-between mb-2">
         <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Chill → Galet</span>
         <span className="text-[13px] font-semibold tabular-nums">
-          <span className="text-primary">{label}</span>
+          <span className="text-primary">{info.name}</span>
           <span className="text-muted-foreground"> · {v}/10</span>
         </span>
       </div>
@@ -108,6 +113,9 @@ function MoodSlider() {
         <span>Chill</span>
         <span>Fest</span>
         <span>Galet</span>
+      </div>
+      <div className="mt-2.5 pt-2.5 border-t border-border text-[13px] leading-snug">
+        {info.desc}
       </div>
     </div>
   );
