@@ -97,6 +97,11 @@ export interface EffectDef {
   desc: string;
   /** Smart-lägets energitier. */
   tier: EffectTier;
+  /** Specialroller (hazer/uv/blinder/strobe/laser/co2) som effekten aktivt driver
+   *  när den körs. Motorn skriver till fixture-kanaler med matchande roll; UI:t
+   *  gråar ut effekter vars drives inte har någon kopplad fixture. Tom/utelämnad
+   *  = effekten drar bara PAR/RGB-lamporna. */
+  drives?: ChannelRole[];
   /** Rendera EN lampa → [r,g,b] i 0..1. */
   render: (c: EffectContext) => [number, number, number];
 }
