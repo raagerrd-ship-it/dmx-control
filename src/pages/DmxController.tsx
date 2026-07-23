@@ -119,23 +119,7 @@ function MoodSlider() {
   );
 }
 
-/* ────────── Ljudkälla ────────── */
-
-function AudioSourceCard() {
-  const s = usePi();
-  return (
-    <Card>
-      <div className="flex gap-2">
-        <SourceBtn active={s.audioInput === "aux"} onClick={() => setPi({ audioInput: "aux" })}>
-          AUX (kabel)
-        </SourceBtn>
-        <SourceBtn active={s.audioInput === "mic"} onClick={() => setPi({ audioInput: "mic" })}>
-          Mikrofon
-        </SourceBtn>
-      </div>
-    </Card>
-  );
-}
+/* ────────── Ljud (källa + nivå + teknisk info) ────────── */
 
 function SourceBtn({
   active, onClick, children,
@@ -154,9 +138,8 @@ function SourceBtn({
   );
 }
 
-/* ────────── Ljudnivå (matchar Pi:s rader) ────────── */
-
 function AudioMeterCard() {
+  const s = usePi();
   const audio = useDmx((st) => st.audioLevel);
   const kick = useDmx((st) => st.kick);
   const bpm = useDmx((st) => st.bpm);
@@ -165,22 +148,23 @@ function AudioMeterCard() {
   const pct = Math.round(audio * 100);
   const confPct = Math.round(conf * 100);
   const locked = bpm > 0;
-  const beatErrMs = 0; // preview: PLL-fasfel finns bara på Pi
   const beatErrLabel = locked ? "±0 ms" : "söker…";
   const beatErrColor = locked ? "hsl(var(--ok))" : "hsl(var(--muted-foreground))";
   return (
     <>
       <SectionTitle>
-        Ljudnivå <KickDot on={kick > 0.4} />
+        Ljud <KickDot on={kick > 0.4} />
       </SectionTitle>
       <Card>
-        <MeterRow label="BPM" value={locked ? `${Math.round(bpm)} BPM` : "–"} />
-        <MeterRow
-          label={<>Beat-synk <KickDot on={beat && locked} /></>}
-          value={<span style={{ color: beatErrColor }}>{beatErrLabel}</span>}
-        />
-        <MeterRow label="Konfidens" value={locked ? `${confPct}%` : "–"} />
-        <MeterRow label="Nivå just nu" value={`${pct}%`} className="mt-2.5" />
+        <div className="flex gap-2">
+          <SourceBtn active={s.audioInput === "aux"} onClick={() => setPi({ audioInput: "aux" })}>
+            AUX (kabel)
+          </SourceBtn>
+          <SourceBtn active={s.audioInput === "mic"} onClick={() => setPi({ audioInput: "mic" })}>
+            Mikrofon
+          </SourceBtn>
+        </div>
+        <MeterRow label="Nivå just nu" value={`${pct}%`} className="mt-3.5" />
         <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-2">
           <div
             className="h-full transition-[width] duration-[60ms] linear"
@@ -190,13 +174,29 @@ function AudioMeterCard() {
             }}
           />
         </div>
-        <div className="text-[12px] text-muted-foreground mt-2">
-          Auto-gain: <span className="tabular-nums text-foreground">1.0</span>×
-        </div>
+        <details className="mt-3 group/tech">
+          <summary className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground font-semibold cursor-pointer list-none [&::-webkit-details-marker]:hidden py-1.5 group-open/tech:text-foreground">
+            <span>Teknisk info</span>
+            <span className="ml-1 group-open/tech:hidden"> ⌄</span>
+            <span className="ml-1 hidden group-open/tech:inline"> ⌃</span>
+          </summary>
+          <div className="mt-2">
+            <MeterRow label="BPM" value={locked ? `${Math.round(bpm)} BPM` : "–"} />
+            <MeterRow
+              label={<>Beat-synk <KickDot on={beat && locked} /></>}
+              value={<span style={{ color: beatErrColor }}>{beatErrLabel}</span>}
+            />
+            <MeterRow label="Konfidens" value={locked ? `${confPct}%` : "–"} />
+            <div className="text-[12px] text-muted-foreground mt-2">
+              Auto-gain: <span className="tabular-nums text-foreground">1.0</span>×
+            </div>
+          </div>
+        </details>
       </Card>
     </>
   );
 }
+
 
 function MeterRow({
   label, value, className,
