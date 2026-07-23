@@ -53,3 +53,64 @@ Idag saknas synligt beteende för:
 Punkt **1 + 2 + 4** är mjukvara och ger störst uthyrningsvärde per timme. Säg till om jag ska sätta igång med alla tre eller plocka en åt gången — jag börjar hellre med #2 (drift-robusthet) eftersom det är det som annars skulle förstöra en kväll för en hyresgäst.
 
 Punkt 3 levererar jag som ett separat dokument (ingen kod). Punkt 5 tar vi efter att 1–4 är på plats.
+
+---
+
+# Framtida plan — Marknads-gap & produktdifferentiering
+
+## Kortslutning
+
+Ingen befintlig produkt kombinerar **riktig DMX + BLE-slingor + noll-konfig hyrbox + audio-reaktivitet med drop/riser/BPM** i samma enhet. Vi har ett unikt fönster, men 2–3 riktade tillägg avgör om det blir "nördprojekt" eller "hyrbar produkt".
+
+## Konkurrensöversikt
+
+| Produkt | Styrka | Begränsning |
+|---|---|---|
+| **LedFx + WLED + ESP32** | Gratis, populär, bra LED-effekter | Endast adresserbar LED (ingen DMX), kräver PC/router, ingen hyr-UX |
+| **QLC+ / Lights-Pi / DMX Smart Link Hub ($366)** | Riktig DMX | "Lightboard-tänk": man programmerar själv. Ingen audio-reaktivitet ur lådan, ingen BLE, ingen mobil-abstraktion |
+| **Kommersiella hyrpaket (Scenkonsult, Fest-service, Hygglo)** | Fysiskt komplett | Styrs manuellt eller via lampornas inbyggda mikrofoner — varje lampa chasear isolerat, ingen samordning. 600–1600 kr/dag |
+| **pyopendmx / hobbyrepon** | Audio→DMX experiment | Ingen hårdvara, inget mobil-UI, ingen BLE-hybrid |
+
+## Vad vi redan äger (unikt)
+
+1. **Hybrid DMX + BLE i samma show-director** — LedFx kan bara nätverks-LED, QLC+ kan bara DMX.
+2. **Musikförståelse på Pi Zero 2 W** — onset+drop+BPM+key utan moln, på 512 MB RAM.
+3. **Hyrgäst-UX** — PowerHero, tre scener, en slider, hälso-banner, välkomst-overlay, rollback, fabriks-reset.
+4. **Zero-touch onboarding** — captive portal/AP öppnar UI utan IP/QR/app.
+5. **Ägare/hyrgäst-separation** — `/setup` döljer fixture-mapping, BLE-parning och kalibrering.
+6. **Rental-robusthet** — DMX-liveness, BLE-connected-count, mic-tyst-varning, power-state-persist, watchdog.
+
+## Rekommenderade nästa steg (sorterade efter marknadseffekt)
+
+### A. Faktura-vänlig hyrescykel (störst kommersiell hävstång, minst kod)
+- **Post-eventrapport**: drifttid, uppskattad energiförbrukning, BLE-drops, ev. crash-log. HTML/PDF att maila.
+- **Time-lock**: box slutar reagera efter hyrperiodens slut; visar "Hyrperiod slut — ring uthyraren".
+- **QR + hyrarnamn**: QR på lådan, välkomst-overlay säger "Välkommen [namn] 👋".
+
+### B. Zoner — "en stämning per rum"
+Fixtures får zon-tag (dansgolv, bar, toalett). Stämningsslidern styr per zon, hyrgästen får tre reglage istället för ett. Ingen hobby-stack gör detta smidigt.
+
+### C. Fjärrsupport-läge
+Ägaren aktiverar "Support-mode" i `/setup` → boxen öppnar reverse-tunnel i 60 min. Uthyraren fixar riggen på distans.
+
+### D. Show-recept export/import
+Ägaren exporterar Chill/Fest/Galet + fixture-mapping + kalibrering som `.showrecipe`. Sprid till alla sina boxar. Saknas för skalbarhet över 3–4 lådor.
+
+### E. Bluetooth A2DP-sink på Pi
+Pi tar emot musik från hyrarens telefon via Bluetooth → analyserar → skickar vidare via AUX-out. Tar bort största hyrare-frågan: "jag har ingen kabel".
+
+### F. Preset-marknadsplats (långsikt)
+Katalog i UI:t (Bröllop, Barnkalas, 80-tal, Techno) baserat på `.showrecipe`.
+
+## Vad vi INTE ska bygga
+
+- Full DMX-programmering per kanal (finns i QLC+, krossar hyr-UX).
+- Cloud-analys / AI i molnet (bryter noll-konfig-löftet).
+- Egen mobilapp (PWA + captive portal är starkare säljargument än App Store).
+
+## Rekommenderad ordning
+
+1. **A** — låser in värdet av allt vi byggt i #1/#2/#4, tydligast "designad för uthyrare".
+2. **E** — tar bort sista hyrare-frågan kring ljudkälla.
+3. **D** — när vi vet vad ägarna faktiskt vill kopiera mellan boxar.
+4. **B / C / F** — efter första riktiga hyror.
