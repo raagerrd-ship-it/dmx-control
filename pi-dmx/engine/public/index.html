@@ -1309,10 +1309,12 @@ function renderBlePaired(devices) {
   // applicerar per frame, så justeringen syns direkt på slingan.
   const readCalFor = (mac) => {
     const dev = blePairedDevices.find((x) => x.mac === mac);
-    const base = (dev && dev.cal) || { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1 };
+    const base = (dev && dev.cal) || { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1, gamma: 1 };
     const cal = { ...base };
     blePairedList.querySelectorAll(`[data-ble-cal="${mac}"]`).forEach((el) => {
-      cal[el.dataset.calKey] = Number(el.value) / 100;
+      const key = el.dataset.calKey;
+      // Gamma-slidern går 30..300 → 0.30..3.00; övriga går 0..100 → 0..1.
+      cal[key] = key === "gamma" ? Number(el.value) / 100 : Number(el.value) / 100;
     });
     return cal;
   };
@@ -1320,15 +1322,16 @@ function renderBlePaired(devices) {
   blePairedList.querySelectorAll("[data-ble-cal]").forEach((slider) => {
     slider.oninput = () => {
       const mac = slider.dataset.bleCal;
-      const out = blePairedList.querySelector(`[data-cal-out="${mac}-${slider.dataset.calKey}"]`);
-      if (out) out.textContent = `${slider.value}%`;
+      const key = slider.dataset.calKey;
+      const out = blePairedList.querySelector(`[data-cal-out="${mac}-${key}"]`);
+      if (out) out.textContent = key === "gamma" ? (Number(slider.value) / 100).toFixed(2) : `${slider.value}%`;
       if (calDebounce) clearTimeout(calDebounce);
       calDebounce = setTimeout(() => { send({ type: "bleCal", mac, cal: readCalFor(mac) }); }, 40);
     };
   });
   blePairedList.querySelectorAll("[data-ble-cal-reset]").forEach((btn) => {
     btn.onclick = () => {
-      send({ type: "bleCal", mac: btn.dataset.bleCalReset, cal: { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1 } });
+      send({ type: "bleCal", mac: btn.dataset.bleCalReset, cal: { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1, gamma: 1 } });
     };
   });
 }
