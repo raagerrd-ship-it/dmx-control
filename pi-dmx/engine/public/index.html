@@ -131,10 +131,13 @@
   </div>
 
   <h1>Stämning</h1>
-  <div class="mood-grid">
-    <div class="mood-btn" data-mood="chill"><div class="mi">🌙</div><div class="mt">Chill</div><div class="ms">Mjukt &amp; lugnt</div></div>
-    <div class="mood-btn" data-mood="fest"><div class="mi">🎉</div><div class="mt">Fest</div><div class="ms">Följer takten</div></div>
-    <div class="mood-btn" data-mood="galet"><div class="mi">🔥</div><div class="mt">Galet</div><div class="ms">Full fart</div></div>
+  <div class="mood-slider-card" id="moodSliderCard">
+    <div class="mood-slider-head">
+      <span class="mood-slider-label">Chill → Galet</span>
+      <span class="mood-slider-val"><span class="lbl" id="moodLbl">Fest</span><span class="num" id="moodNum"> · 5/10</span></span>
+    </div>
+    <input type="range" id="moodSlider" min="1" max="10" step="1" value="5" aria-label="Stämning från Chill till Galet" />
+    <div class="mood-slider-legend"><span>Chill</span><span>Fest</span><span>Galet</span></div>
   </div>
 
   <h1>Ljudkälla</h1>
