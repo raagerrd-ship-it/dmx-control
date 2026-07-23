@@ -141,15 +141,24 @@ async function writeStrip(strip: Strip, r: number, g: number, b: number) {
   if (!strip.char || strip.chip !== "bledom") return;
   const now = Date.now();
   if (now - strip.lastWriteMs < MIN_WRITE_INTERVAL_MS) return;
+  // Applicera per-slinga kalibrering: vitbalans (rGain/gGain/bGain) och
+  // global max (maxBrightness) trimmar olika BLEDOM-kloner att matcha.
+  // BLEDOM's RGB-mode ignorerar brightness-byten — ljusstyrkan MÅSTE ligga
+  // i R/G/B-amplituden (se bledom-rgb-saturation memory).
+  const c = strip.cal;
+  const m = c.maxBrightness;
+  const cr = byte(r * c.rGain * m);
+  const cg = byte(g * c.gGain * m);
+  const cb = byte(b * c.bGain * m);
   // Skip writes that would just re-send the last frame (except keep-alive).
   const [pr, pg, pb] = strip.lastFrame;
-  const changed = pr !== r || pg !== g || pb !== b;
+  const changed = pr !== cr || pg !== cg || pb !== cb;
   if (!changed && now - strip.lastWriteMs < KEEPALIVE_MS) return;
-  const pkt = Buffer.from([0x7e, 0x00, 0x05, 0x03, r, g, b, 0x00, 0xef]);
+  const pkt = Buffer.from([0x7e, 0x00, 0x05, 0x03, cr, cg, cb, 0x00, 0xef]);
   try {
     await strip.char.writeAsync(pkt, true);   // withoutResponse: half airtime
     strip.lastWriteMs = now;
-    strip.lastFrame = [r, g, b];
+    strip.lastFrame = [cr, cg, cb];
   } catch (e) {
     // Write failed → char likely stale after a silent drop. Force reconnect.
     strip.char = null;
