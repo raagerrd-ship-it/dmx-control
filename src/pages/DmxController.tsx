@@ -373,8 +373,8 @@ function AdvancedTechnical() {
               value={s.agcAgg}
               onChange={(v) => setPi({ agcAgg: v })}
               options={[
-                { v: 0.15 as const, label: "Långsam" },
-                { v: 0.85 as const, label: "Snabb" },
+                { v: 0.15, label: "Långsam" },
+                { v: 0.85, label: "Snabb" },
               ]}
             />
           </div>
