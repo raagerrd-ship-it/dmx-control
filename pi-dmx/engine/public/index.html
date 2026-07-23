@@ -1262,8 +1262,9 @@ function renderBlePaired(devices) {
   const connected = devices.filter((d) => d.connected).length;
   bleStatus.textContent = `${connected}/${devices.length} slinga${devices.length === 1 ? "" : "or"} uppkopplade.`;
   blePairedList.innerHTML = devices.map((d) => {
-    const cal = d.cal || { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1 };
+    const cal = d.cal || { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1, gamma: 1 };
     const pct = (x) => Math.round((x ?? 1) * 100);
+    const gammaVal = (typeof cal.gamma === "number" ? cal.gamma : 1);
     return `
     <div class="row" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px">
       <div style="display:flex;align-items:center;gap:10px">
@@ -1276,15 +1277,16 @@ function renderBlePaired(devices) {
         <button class="btn" data-ble-unpair="${escapeHtml(d.mac)}">Ta bort</button>
       </div>
       <details style="margin-top:2px">
-        <summary style="cursor:pointer;font-size:12px;opacity:.75">Kalibrering (vitbalans &amp; max-ljus)</summary>
+        <summary style="cursor:pointer;font-size:12px;opacity:.75">Kalibrering (vitbalans, max-ljus &amp; gamma)</summary>
         <div style="display:grid;grid-template-columns:80px 1fr 44px;gap:6px 10px;align-items:center;margin-top:8px;font-size:12px">
           <label>Röd</label>       <input type="range" min="0" max="100" value="${pct(cal.rGain)}"        data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="rGain">        <span data-cal-out="${escapeHtml(d.mac)}-rGain">${pct(cal.rGain)}%</span>
           <label>Grön</label>      <input type="range" min="0" max="100" value="${pct(cal.gGain)}"        data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="gGain">        <span data-cal-out="${escapeHtml(d.mac)}-gGain">${pct(cal.gGain)}%</span>
           <label>Blå</label>       <input type="range" min="0" max="100" value="${pct(cal.bGain)}"        data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="bGain">        <span data-cal-out="${escapeHtml(d.mac)}-bGain">${pct(cal.bGain)}%</span>
           <label>Max ljus</label>  <input type="range" min="0" max="100" value="${pct(cal.maxBrightness)}" data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="maxBrightness"> <span data-cal-out="${escapeHtml(d.mac)}-maxBrightness">${pct(cal.maxBrightness)}%</span>
+          <label>Gamma</label>     <input type="range" min="30" max="300" value="${Math.round(gammaVal * 100)}" data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="gamma"> <span data-cal-out="${escapeHtml(d.mac)}-gamma">${gammaVal.toFixed(2)}</span>
         </div>
         <div style="margin-top:6px;font-size:11px;opacity:.6">
-          Trimma per slinga så olika BLEDOM-kloner ser likadana ut. T.ex. sänk röd om en slinga går för varmt, eller sänk max om en är starkare än de andra.
+          Trimma per slinga så olika BLEDOM-kloner ser likadana ut. Gamma 1.00 = linjär; höj (t.ex. 1.5) om en slinga tänder för aggressivt i låga värden, sänk (t.ex. 0.7) om den är seg innan den tänder.
         </div>
         <button class="btn" data-ble-cal-reset="${escapeHtml(d.mac)}" style="margin-top:6px">Nollställ</button>
       </details>
