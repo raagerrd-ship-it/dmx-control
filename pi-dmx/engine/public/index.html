@@ -172,33 +172,9 @@
   <details class="more">
     <summary>Mer inställningar</summary>
 
-    <h1>Show</h1>
-    <div class="card">
-      <div class="status" style="margin-bottom:8px" id="showIntro">Smart-läge — anpassar ljuset efter musiken och roterar mellan de effekter du kryssat i.</div>
-      <label class="tgl"><span>Energi styr läget (av = manuellt)</span><input type="checkbox" id="tEnergy"></label>
-      <label class="tgl" id="dwellRow"><span>Byter effekt</span>
-        <span class="seg segmini" id="segDwell">
-          <button data-dwell="slow">Sällan</button><button data-dwell="normal">Normal</button><button data-dwell="fast">Ofta</button>
-        </span>
-      </label>
-      <label class="tgl"><span>Pulsa ljuset på taktslag</span><input type="checkbox" id="tBeatPulse"></label>
-    </div>
+    <!-- Show + Finjustering borttagna — allt här styrs av stämnings-slidern.
+         Se "Avancerat · spegel av stämningen" för live-värden. -->
 
-    <h1>Finjustering</h1>
-    <div class="card">
-      <div class="setrow">
-        <label>Reaktion på musiken</label>
-        <div class="seg" id="segSpeed"><button data-agg="0.15">Långsam</button><button data-agg="0.85">Snabb</button></div>
-      </div>
-      <div class="setrow">
-        <label>Dynamik (tyst ↔ högt)</label>
-        <div class="seg" id="segDyn"><button data-dyn="0.35">Lugn</button><button data-dyn="0.6">Normal</button><button data-dyn="0.85">Maxad</button></div>
-      </div>
-      <div class="setrow">
-        <label>Ljusstyrka</label>
-        <div class="seg" id="segMaster"><button data-master="0.5">50%</button><button data-master="0.75">75%</button><button data-master="1">100%</button></div>
-      </div>
-    </div>
 
     <details class="more" style="margin-top:14px">
       <summary>Effekt-val · välj vilka som roterar</summary>
@@ -501,14 +477,11 @@ function renderCategories() {
 // Speglar smart/manuellt-läget i UI:t: kryssruta vs kryssknapp, dwell-rad,
 // intro-text — och renderar om listorna i rätt stil.
 function refreshModeView() {
-  const smart = curMode === "smart";
-  tEnergy.checked = smart;
-  document.getElementById("dwellRow").style.display = smart ? "" : "none";
-  document.getElementById("showIntro").textContent = smart
-    ? "Smart-läge — anpassar ljuset efter musiken och roterar mellan de effekter du kryssat i."
-    : "Manuellt läge — tryck på effekten du vill köra just nu.";
+  // Show-kontrollerna är borttagna; stämnings-slidern driver läget.
+  // Vi renderar bara listorna om utseendet (smart vs manuellt) ändrats.
   renderCategories();
 }
+
 
 function applyConfig(cfg) {
   curRotation = cfg.rotation || {};
@@ -520,7 +493,7 @@ function applyConfig(cfg) {
   lastIntensity = x;
   updateMoodUi(x, cfg.mode !== "blackout");
   setPower(cfg.mode === "blackout");
-  tBeatPulse.checked = !!cfg.beatPulse;
+  if (tBeatPulse) tBeatPulse.checked = !!cfg.beatPulse;
   const fog = cfg.fog || {};
   if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 128; }
   if (tDropBlackout) tDropBlackout.checked = cfg.dropBlackout !== false;   // default på
@@ -1012,7 +985,8 @@ fxSaveBtn.onclick = () => {
 
 const tBeatPulse = document.getElementById("tBeatPulse");
 const tEnergy = document.getElementById("tEnergy");
-tBeatPulse.onchange = () => send({ type: "setBeatPulse", value: tBeatPulse.checked });
+if (tBeatPulse) tBeatPulse.onchange = () => send({ type: "setBeatPulse", value: tBeatPulse.checked });
+
 
 // Live beat-diagnostik under LEVEL (uppdateras i applyFrame).
 const bpmVal = document.getElementById("bpmVal");
@@ -1071,7 +1045,7 @@ tDropHeadroom.onchange = () => send({ type: "setDropHeadroom", value: tDropHeadr
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.
-tEnergy.onchange = () => {
+if (tEnergy) tEnergy.onchange = () => {
   if (tEnergy.checked) {
     curMode = "smart";
     send({ type: "setEnergyDrivesMode", value: true });
@@ -1083,6 +1057,7 @@ tEnergy.onchange = () => {
   }
   refreshModeView();
 };
+
 document.querySelectorAll("#segBeatSync button").forEach((b) =>
   b.onclick = () => { send({ type: "setBeatSyncStrength", value: Number(b.dataset.bs) }); segActivate("segBeatSync", Number(b.dataset.bs), "bs"); });
 document.querySelectorAll("#segDwell button").forEach((b) =>
