@@ -1,66 +1,55 @@
-## Scope
+# Revision — vad som saknas innan boxen är uthyrningsklar
 
-Lägg till stöd för BLEDOM-styrda ljusslingor som körs **parallellt** med DMX-riggen. Slingorna speglar riggens medelfärg + ljusstyrka per frame — samma beat, samma stämning, en förlängning av showen. Ingen egen effektmotor för BLE.
+Fem områden där jag ser konkreta luckor. Jag föreslår att vi tar dem i denna ordning — de tre första är "får inte fela hos hyresgäst", de två sista är polish.
 
-Om en användare köper en BLE-lampa som inte är BLEDOM (t.ex. Triones, Zengge, LEDnetWF) syns den ändå i scan-listan men skrivningar tystnar. Vi loggar chip-typ vid pairing så jag kan lägga till fler protokoll senare utan att bygga om.
+## 1. Första-gången-flödet för hyresgäst
 
-## Arkitektur — sidecar-mönster (samma som dmx-helper)
+Idag: hyresgäst ansluter till `pi-dmx` WiFi, öppnar en URL, ser stämningsslidern. Men:
+- Ingen captive portal → hyresgästen måste veta att skriva `192.168.4.1` eller `pi-dmx.local`.
+- Ingen "Välkommen"-skärm som förklarar vad knappen gör, var man startar musiken, vad "Galet" innebär.
+- Ingen indikator på om ljudet faktiskt kommer in (mic-nivå syns i AudioMeterCard, men inget varnar vid tystnad i 30 s).
 
-```text
-┌──────────────────┐  Unix socket   ┌──────────────────┐
-│ audio-dmx-engine │ ─────────────► │   ble-writer     │
-│ (kärna 1-2)      │   {r,g,b,br}   │  (kärna 3 låst)  │
-│                  │   ~60 Hz       │                  │
-│ ALSA · FFT ·     │                │  noble + BLEDOM  │
-│ effekter · DMX   │                │  keep-alive 1 Hz │
-└──────────────────┘                │  canWriteNow()   │
-                                    └───────┬──────────┘
-                                            │ GATT writes
-                                            ▼
-                                     BLEDOM-slingor
-```
+**Åtgärd:** captive portal-redirect i hostapd/dnsmasq → första besöket får en 1-skärms "Så funkar boxen" (3 punkter + "Kom igång"-knapp). Tyst-mic-varning efter 30 s när Power är på.
 
-**Varför sidecar och inte worker_thread?** `noble` äger hci0 exklusivt — kraschar den (vanligt vid dålig signal) ska den kunna respawna utan att ta med ALSA-loopen. Sidecar isolerar det. Samma design som `dmx-helper`.
+## 2. Vad händer när något dör mitt i kvällen
 
-## Ändringar
+Idag saknas synligt beteende för:
+- **USB-DMX urdragen** → engine loggar fel, hyresgästen ser inget. Ska visa röd banner "DMX-kabel urkopplad".
+- **BLE-strip tappar anslutning** → sidecarn återansluter tyst, men om det tar 30 s ser hyresgästen svarta slingor utan förklaring.
+- **Strömbrott** → boxen startar om, men Power-knappen står i "av" tills någon trycker på den. Bör återgå till senaste läge.
+- **Engine-krasch** → systemd startar om, men WebSocket-klienten (mobilen) visar bara "frusen" UI tills man laddar om.
 
-**Nytt: `pi-dmx/ble-writer/`**
-- `src/index.ts` — noble-scan, GATT-anslut, BLEDOM 9-byte-paket (`7e 00 05 03 RR GG BB 00 ef`), 1 Hz keep-alive, `canWriteNow()` pre-gate (16 ms mellan writes per enhet — samma som Lotus).
-- `package.json` — noble som enda deps.
-- Lyssnar på `/run/pi-dmx/ble.sock`. Protokoll: `{type:"paired"}` → nuvarande lista, `{type:"color", r, g, b, brightness}` → skriv nu, `{type:"scan"}` → returnera hittade enheter, `{type:"pair", mac}` / `{type:"unpair", mac}`.
+**Åtgärd:** hälso-banner högst upp i UI som lyser gult/rött vid DMX-tapp, BLE-tapp >10 s, eller WS-reconnect. Persist Power-state till disk och återställ vid boot.
 
-**Engine (`pi-dmx/engine/`)**
-- `src/config.ts` — nytt fält `bleDevices: { mac: string; name: string; chip: "bledom" | "unknown" }[]` (default `[]`).
-- `src/effects.ts` — efter DMX-skrivningen per frame, räkna ut riggens medelfärg (viktat med brightness) och skicka till sidecarn. Inget nytt tungt jobb — färgerna finns redan.
-- `src/server.ts` — WS-relay: `{type:"bleScan"}`, `{type:"blePair", mac}`, `{type:"bleUnpair", mac}` → prata med sidecarn.
+## 3. Fysisk box — det som inte finns i koden
 
-**UI**
-- `pi-dmx/engine/public/index.html` (`/setup`-läget): ny sektion **"BLE-slingor"** med scan-knapp, hittade enheter (namn + MAC + chip-typ, gråa ut icke-BLEDOM med "stöds inte än"), parade enheter med ta-bort-knapp.
-- `src/pages/DmxController.tsx` — spegling av samma sektion i mock. Visar bara statisk placeholder (ingen faktisk BLE i browser).
-- **Avancerat**-flagga i båda: **"BLE-slingor aktiva"** (grön när ≥1 parad enhet svarar).
+- **Etiketter:** ingen dokumenterad märkning på USB-DMX-porten, XLR-utgången, ljud-in, LED-ringens ratt. Hyresgäst kommer koppla fel.
+- **QR-klistermärke** på boxen: "Anslut till WiFi `pi-dmx` → öppna kameran" (löser #1 utan captive portal om vi vill).
+- **Säkringar / överströmsskydd** på 5V-linjen om vi driver LED-ring + HAT från samma matning.
+- **Kylning:** Pi Zero 2 W under last (audio + BLE + DMX + LED-ring) blir varm i sluten box. Behöver minst passiv kylfläns, gärna liten fläkt.
+- **LED-ring-diffusor:** naken WS2812 är obehagligt skarp, behöver mattat skydd.
 
-**Installation (`pi-dmx/install.sh`)**
-- Installera `bluez` + sätt CAP_NET_ADMIN/CAP_NET_RAW på node-binären för ble-writer.
-- Ny systemd-service `pi-dmx-ble.service`:
-  ```ini
-  [Service]
-  CPUAffinity=3
-  Nice=-5
-  User=root
-  ExecStart=/usr/bin/node /opt/pi-dmx/ble-writer/dist/index.js
-  Restart=always
-  ```
-- Uppdatera `audio-dmx-engine.service` med `CPUAffinity=1 2` (håll bort från 0 och 3).
+**Åtgärd:** ingen kod — men jag levererar en "box-checklista" (märkningsschema + rekommenderad BOM för kylning/diffusor/säkring) som du kan följa fysiskt.
 
-## Vad som medvetet INTE ingår
+## 4. Uppdatering & återställning utan SSH
 
-- Inga andra BLE-chip än BLEDOM i första version — skanning visar dem, men skrivning tystnar. Lägg till Triones/Zengge när du har hårdvara att testa mot.
-- Ingen per-slinga-färgroll (alla slingor får riggens medelfärg). Kan utökas senare med `role: "ble-mirror" | "ble-warm" | "ble-accent"` om det behövs.
-- Ingen effekt-registret-integration (`drives: ["ble"]`) — slingorna reagerar på ALLA effekter automatiskt via medelfärgen.
+- "Uppdatera systemet"-knappen finns, men om en release bricka:r boxen finns inget sätt för dig (eller hyresgäst) att rulla tillbaka utan att koppla in tangentbord.
+- Ingen "fabriksåterställning" som nollställer parade BLE-slingor + fixtures om hyresgäst pillat sönder något.
 
-## Verifiering
+**Åtgärd:** update.sh sparar föregående `dist/` som `dist.prev/` och en "Rulla tillbaka"-knapp under `/setup`. "Fabriksåterställning"-knapp under `/setup` med bekräftelse (raderar `config.json` + BLE-lista).
 
-1. `npx tsgo --noEmit` i både engine och ble-writer → inga fel.
-2. Efter deploy: `systemctl status pi-dmx-ble` → running, `taskset -pc $(pgrep -f ble-writer)` → `3`.
-3. `htop`: ALSA-underruns försvinner (dvs. sync-driften du sett förvärras inte).
-4. Para en BLEDOM-slinga i `/setup`, dra mood-slidern → slingan skiftar färg synligt i takt med DMX-lamporna.
+## 5. Ljudkedja-polish som märks
+
+- **Auto-gain för mic:** idag manuell kalibrering. Vid uthyrning kommer ljudmiljön variera — auto-normalisera RMS över 10 s.
+- **"Ingen musik"-läge:** när det är tyst >5 s → ambient glöd eller mjuk fade i stället för att effekterna fortsätter köra på brus.
+- **Line-in vs mic-val från hyresgäst-UI** (inte bara `/setup`) om boxen har båda ingångar.
+
+**Åtgärd:** RMS-baserad auto-gain i `alsaMic.ts`, tystnads-detektor i `analyser.ts` som triggar ambient-fallback oavsett stämning.
+
+---
+
+## Vad jag föreslår att vi bygger nu
+
+Punkt **1 + 2 + 4** är mjukvara och ger störst uthyrningsvärde per timme. Säg till om jag ska sätta igång med alla tre eller plocka en åt gången — jag börjar hellre med #2 (drift-robusthet) eftersom det är det som annars skulle förstöra en kväll för en hyresgäst.
+
+Punkt 3 levererar jag som ett separat dokument (ingen kod). Punkt 5 tar vi efter att 1–4 är på plats.
