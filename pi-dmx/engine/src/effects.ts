@@ -939,12 +939,17 @@ export class EffectEngine {
   }
 }
 
+interface SpecialtyValues {
+  hazer: number; uv: number; blinder: number; strobe: number; laser: number; co2: number;
+}
+
 function writeFixture(
   u: Uint8Array,
   fx: FixtureConfig,
   rgb: [number, number, number],
   master: number,
   strobeVal = 0,
+  specialty?: SpecialtyValues,
 ) {
   const roles = fixtureRoles(fx);
   const base = fx.address - 1;   // DMX is 1-indexed
@@ -954,9 +959,6 @@ function writeFixture(
   // White = min(r,g,b) so RGBW fixtures keep saturation on the color chans
   const w = Math.min(r, g, b);
   const dim = Math.max(r, g, b);
-  // Fixtures with BOTH a dimmer and color channels multiply them internally.
-  // Sending brightness on both gives a quadratic curve (reads as blinking,
-  // not fading) — master goes on the dim channel, dynamics stay in color.
   const hasColor = roles.includes("r") || roles.includes("g") || roles.includes("b");
   const hasDim = roles.includes("dim");
   const colorScale = hasDim ? 1 : m;
@@ -970,7 +972,12 @@ function writeFixture(
       case "b":      u[ch] = to255((b - (roles.includes("w") ? w : 0)) * colorScale); break;
       case "w":      u[ch] = to255(w * colorScale); break;
       case "dim":    u[ch] = to255(hasColor ? m : dim * m); break;
-      case "strobe": u[ch] = Math.max(0, Math.min(255, strobeVal)); break;  // 8-255 = fixture strobe, faster when higher
+      case "strobe": u[ch] = Math.max(0, Math.min(255, Math.max(strobeVal, specialty?.strobe ?? 0))); break;
+      case "hazer":   u[ch] = specialty?.hazer   ?? 0; break;
+      case "uv":      u[ch] = specialty?.uv      ?? 0; break;
+      case "blinder": u[ch] = specialty?.blinder ?? 0; break;
+      case "laser":   u[ch] = specialty?.laser   ?? 0; break;
+      case "co2":     u[ch] = specialty?.co2     ?? 0; break;
       case "unused": break;
     }
   }
