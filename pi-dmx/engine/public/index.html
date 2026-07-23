@@ -600,7 +600,11 @@ function updateAdvMirror(cfg) {
   flag("fCeil",   cfg.energyCeiling);
   flag("fRiser",  cfg.riserStrobe);
   flag("fHead",   cfg.dropHeadroom);
-  flag("fFog",    cfg.fog && cfg.fog.enabled);
+  // Fog: DMX-drivet — kräver att användaren aktiverat den OCH satt en giltig
+  // DMX-adress. Utan adress finns ingen hårdvara att skicka till, så flaggan
+  // ska inte lysa även om enabled är på.
+  const fogAddr = Number(cfg.fog?.address ?? 0);
+  flag("fFog",    !!(cfg.fog && cfg.fog.enabled && fogAddr > 0));
   curFixtures = Array.isArray(cfg.fixtures) ? cfg.fixtures : [];
   // "aktiv" = nuvarande läge driver rollen OCH minst en fixture har den rollen.
   // Ren "kopplad utan att spelas" släcker flaggan — den ska ge en LEVANDE bild
@@ -614,9 +618,13 @@ function updateAdvMirror(cfg) {
   flag("fBlinder",  isActive("blinder"));
   flag("fLaser",    isActive("laser"));
   flag("fCo2",      isActive("co2"));
-  flag("fBle",      (cfg.bleDevices?.length ?? 0) > 0 && lastBleActive > 0);
+  // BLE: kräver minst en FAKTISKT uppkopplad slinga (sidecarn rapporterar
+  // .connected per device). Bara "parad" räcker inte — då är slingan avstängd
+  // eller utom räckvidd och flaggan skulle ljuga.
+  flag("fBle",      bleConnectedCount > 0);
   renderCategories();   // fixtures kan ha ändrats → uppdatera "kräver: X"-taggar
 }
+let bleConnectedCount = 0;
 let lastBleActive = 0;
 let kickTimer;
 function applyFrame(f) {
@@ -1253,14 +1261,18 @@ function macKey(d) { return (d.mac || "").toLowerCase(); }
 
 function renderBlePaired(devices) {
   blePairedDevices = devices;
+  bleConnectedCount = devices.filter((d) => d.connected).length;
+  // Spegla i "BLE-slingor aktiva"-flaggan omedelbart när status ändras
+  // (annars uppdateras den först när nästa cfg-broadcast kommer).
+  const bleFlag = document.getElementById("fBle");
+  if (bleFlag) bleFlag.classList.toggle("on", bleConnectedCount > 0);
   if (!blePairedList) return;
   if (!devices.length) {
     blePairedList.innerHTML = `<div class="status" style="opacity:.7">Inga slingor parade ännu. Tryck "Sök" nedan.</div>`;
     bleStatus.textContent = "Sidecar ansluten. Inga parade slingor.";
     return;
   }
-  const connected = devices.filter((d) => d.connected).length;
-  bleStatus.textContent = `${connected}/${devices.length} slinga${devices.length === 1 ? "" : "or"} uppkopplade.`;
+  bleStatus.textContent = `${bleConnectedCount}/${devices.length} slinga${devices.length === 1 ? "" : "or"} uppkopplade.`;
   blePairedList.innerHTML = devices.map((d) => {
     const cal = d.cal || { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1, gamma: 1 };
     const pct = (x) => Math.round((x ?? 1) * 100);
