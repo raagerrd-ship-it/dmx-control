@@ -581,13 +581,20 @@ function updateAdvMirror(cfg) {
   flag("fRiser",  cfg.riserStrobe);
   flag("fHead",   cfg.dropHeadroom);
   flag("fFog",    cfg.fog && cfg.fog.enabled);
-  const hasRole = (r) => Array.isArray(cfg.fixtures) && cfg.fixtures.some(fx => Array.isArray(fx.roles) && fx.roles.includes(r));
-  flag("fStrobeCh", hasRole("strobe"));
-  flag("fHazer",    hasRole("hazer"));
-  flag("fUv",       hasRole("uv"));
-  flag("fBlinder",  hasRole("blinder"));
-  flag("fLaser",    hasRole("laser"));
-  flag("fCo2",      hasRole("co2"));
+  curFixtures = Array.isArray(cfg.fixtures) ? cfg.fixtures : [];
+  // "aktiv" = nuvarande läge driver rollen OCH minst en fixture har den rollen.
+  // Ren "kopplad utan att spelas" släcker flaggan — den ska ge en LEVANDE bild
+  // av vad rök/hazer/blinder/UV/laser/CO₂ faktiskt gör just nu, inte bara vad
+  // som är kabeldraget.
+  const drivesNow = MODE_DRIVES[cfg.mode] || [];
+  const isActive = (r) => drivesNow.includes(r) && curFixtures.some(fx => Array.isArray(fx.roles) && fx.roles.includes(r));
+  flag("fStrobeCh", isActive("strobe"));
+  flag("fHazer",    isActive("hazer"));
+  flag("fUv",       isActive("uv"));
+  flag("fBlinder",  isActive("blinder"));
+  flag("fLaser",    isActive("laser"));
+  flag("fCo2",      isActive("co2"));
+  renderCategories();   // fixtures kan ha ändrats → uppdatera "kräver: X"-taggar
 }
 let kickTimer;
 function applyFrame(f) {
