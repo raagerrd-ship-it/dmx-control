@@ -384,9 +384,9 @@ function AdvancedTechnical() {
               value={s.dynamics}
               onChange={(v) => setPi({ dynamics: v })}
               options={[
-                { v: 0.35 as const, label: "Lugn" },
-                { v: 0.6  as const, label: "Normal" },
-                { v: 0.85 as const, label: "Maxad" },
+                { v: 0.35, label: "Lugn" },
+                { v: 0.6,  label: "Normal" },
+                { v: 0.85, label: "Maxad" },
               ]}
             />
           </div>
