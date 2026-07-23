@@ -460,6 +460,24 @@ export async function startServer(
             // en post motsvarar. Ingen cfg-mutation; sidecarn hanterar timeout.
             deps.ble?.identify(msg.mac);
             return;
+          } else if (msg.type === "bleCal" && typeof msg.mac === "string" && msg.cal) {
+            // Vitbalans + max-ljus per slinga. Persistera i cfg så värdena
+            // överlever reboot; skicka till sidecarn för direkt effekt.
+            const clamp01 = (x: any) => {
+              const n = typeof x === "number" && Number.isFinite(x) ? x : 1;
+              return n < 0 ? 0 : n > 1 ? 1 : n;
+            };
+            const cal = {
+              rGain: clamp01(msg.cal.rGain),
+              gGain: clamp01(msg.cal.gGain),
+              bGain: clamp01(msg.cal.bGain),
+              maxBrightness: clamp01(msg.cal.maxBrightness),
+            };
+            const mac = msg.mac.toLowerCase();
+            const list = deps.cfg.bleDevices ?? (deps.cfg.bleDevices = []);
+            const entry = list.find((d) => d.mac.toLowerCase() === mac);
+            if (entry) entry.cal = cal;
+            deps.ble?.setCal(mac, cal);
           }
           deps.onConfigChanged?.();
           // Echo back
