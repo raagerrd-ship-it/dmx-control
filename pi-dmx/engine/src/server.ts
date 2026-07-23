@@ -314,6 +314,9 @@ export async function startServer(
           if (msg.type === "setMood" && isMood(msg.value)) {
             // Hyresgäst-stämning: motorn sätter HELA känslan (mode/dynamik/rotation/…).
             applyMood(deps.cfg, msg.value);
+          } else if (msg.type === "setIntensity" && typeof msg.value === "number") {
+            // Kontinuerligt vred/slider 0..1 — samma kontrakt för KY-040 och UI.
+            applyIntensity(deps.cfg, msg.value);
           } else if (msg.type === "setMode" && isMode(msg.mode)) {
             deps.cfg.mode = msg.mode;
             deps.cfg.activeMood = undefined;   // manuell effekt → ingen stämning aktiv längre
