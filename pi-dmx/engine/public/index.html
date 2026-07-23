@@ -1261,17 +1261,35 @@ function renderBlePaired(devices) {
   }
   const connected = devices.filter((d) => d.connected).length;
   bleStatus.textContent = `${connected}/${devices.length} slinga${devices.length === 1 ? "" : "or"} uppkopplade.`;
-  blePairedList.innerHTML = devices.map((d) => `
-    <div class="row" style="align-items:center;gap:10px">
-      <span class="dot${d.connected ? " on" : ""}"></span>
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600">${escapeHtml(d.name || d.mac)}</div>
-        <div style="opacity:.6;font-size:11px">${escapeHtml(d.mac)} · ${d.chip}</div>
+  blePairedList.innerHTML = devices.map((d) => {
+    const cal = d.cal || { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1 };
+    const pct = (x) => Math.round((x ?? 1) * 100);
+    return `
+    <div class="row" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="dot${d.connected ? " on" : ""}"></span>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600">${escapeHtml(d.name || d.mac)}</div>
+          <div style="opacity:.6;font-size:11px">${escapeHtml(d.mac)} · ${d.chip}</div>
+        </div>
+        <button class="btn" data-ble-identify="${escapeHtml(d.mac)}" title="Blinka lampan så du ser vilken det är">Blinka</button>
+        <button class="btn" data-ble-unpair="${escapeHtml(d.mac)}">Ta bort</button>
       </div>
-      <button class="btn" data-ble-identify="${escapeHtml(d.mac)}" title="Blinka lampan så du ser vilken det är">Blinka</button>
-      <button class="btn" data-ble-unpair="${escapeHtml(d.mac)}">Ta bort</button>
+      <details style="margin-top:2px">
+        <summary style="cursor:pointer;font-size:12px;opacity:.75">Kalibrering (vitbalans &amp; max-ljus)</summary>
+        <div style="display:grid;grid-template-columns:80px 1fr 44px;gap:6px 10px;align-items:center;margin-top:8px;font-size:12px">
+          <label>Röd</label>       <input type="range" min="0" max="100" value="${pct(cal.rGain)}"        data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="rGain">        <span data-cal-out="${escapeHtml(d.mac)}-rGain">${pct(cal.rGain)}%</span>
+          <label>Grön</label>      <input type="range" min="0" max="100" value="${pct(cal.gGain)}"        data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="gGain">        <span data-cal-out="${escapeHtml(d.mac)}-gGain">${pct(cal.gGain)}%</span>
+          <label>Blå</label>       <input type="range" min="0" max="100" value="${pct(cal.bGain)}"        data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="bGain">        <span data-cal-out="${escapeHtml(d.mac)}-bGain">${pct(cal.bGain)}%</span>
+          <label>Max ljus</label>  <input type="range" min="0" max="100" value="${pct(cal.maxBrightness)}" data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="maxBrightness"> <span data-cal-out="${escapeHtml(d.mac)}-maxBrightness">${pct(cal.maxBrightness)}%</span>
+        </div>
+        <div style="margin-top:6px;font-size:11px;opacity:.6">
+          Trimma per slinga så olika BLEDOM-kloner ser likadana ut. T.ex. sänk röd om en slinga går för varmt, eller sänk max om en är starkare än de andra.
+        </div>
+        <button class="btn" data-ble-cal-reset="${escapeHtml(d.mac)}" style="margin-top:6px">Nollställ</button>
+      </details>
     </div>
-  `).join("");
+  `;}).join("");
   blePairedList.querySelectorAll("[data-ble-identify]").forEach((btn) => {
     btn.onclick = () => {
       send({ type: "bleIdentify", mac: btn.dataset.bleIdentify });
@@ -1283,6 +1301,32 @@ function renderBlePaired(devices) {
     btn.onclick = () => {
       if (!confirm("Ta bort slingan?")) return;
       send({ type: "bleUnpair", mac: btn.dataset.bleUnpair });
+    };
+  });
+  // Kalibrerings-sliders: skicka bleCal live medan användaren drar. Sidecarn
+  // applicerar per frame, så justeringen syns direkt på slingan.
+  const readCalFor = (mac) => {
+    const dev = blePairedDevices.find((x) => x.mac === mac);
+    const base = (dev && dev.cal) || { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1 };
+    const cal = { ...base };
+    blePairedList.querySelectorAll(`[data-ble-cal="${mac}"]`).forEach((el) => {
+      cal[el.dataset.calKey] = Number(el.value) / 100;
+    });
+    return cal;
+  };
+  let calDebounce = null;
+  blePairedList.querySelectorAll("[data-ble-cal]").forEach((slider) => {
+    slider.oninput = () => {
+      const mac = slider.dataset.bleCal;
+      const out = blePairedList.querySelector(`[data-cal-out="${mac}-${slider.dataset.calKey}"]`);
+      if (out) out.textContent = `${slider.value}%`;
+      if (calDebounce) clearTimeout(calDebounce);
+      calDebounce = setTimeout(() => { send({ type: "bleCal", mac, cal: readCalFor(mac) }); }, 40);
+    };
+  });
+  blePairedList.querySelectorAll("[data-ble-cal-reset]").forEach((btn) => {
+    btn.onclick = () => {
+      send({ type: "bleCal", mac: btn.dataset.bleCalReset, cal: { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1 } });
     };
   });
 }

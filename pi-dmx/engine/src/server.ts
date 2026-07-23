@@ -57,12 +57,14 @@ export interface ServerDeps {
   /** BLE sidecar bridge. Optional — null when hardware / sidecar isn't available. */
   ble?: {
     activeCount: () => number;
-    paired: () => { mac: string; name: string; chip: "bledom" | "unknown"; connected: boolean }[];
+    paired: () => { mac: string; name: string; chip: "bledom" | "unknown"; connected: boolean; cal?: { rGain: number; gGain: number; bGain: number; maxBrightness: number } }[];
     scan: () => void;
     pair: (mac: string) => void;
     unpair: (mac: string) => void;
     /** Blinka en specifik slinga i identifieringsfärg så användaren kan bekräfta vilken fysisk enhet det är. */
     identify: (mac: string) => void;
+    /** Live-uppdatera vitbalans + max-ljus per slinga. */
+    setCal: (mac: string, cal: { rGain: number; gGain: number; bGain: number; maxBrightness: number }) => void;
     /** Register a listener called whenever a scan finishes. */
     onScan: (fn: (devices: { mac: string; name: string; chip: "bledom" | "unknown"; rssi: number }[]) => void) => void;
     /** Register a listener called whenever the paired list changes. */
@@ -458,6 +460,24 @@ export async function startServer(
             // en post motsvarar. Ingen cfg-mutation; sidecarn hanterar timeout.
             deps.ble?.identify(msg.mac);
             return;
+          } else if (msg.type === "bleCal" && typeof msg.mac === "string" && msg.cal) {
+            // Vitbalans + max-ljus per slinga. Persistera i cfg så värdena
+            // överlever reboot; skicka till sidecarn för direkt effekt.
+            const clamp01 = (x: any) => {
+              const n = typeof x === "number" && Number.isFinite(x) ? x : 1;
+              return n < 0 ? 0 : n > 1 ? 1 : n;
+            };
+            const cal = {
+              rGain: clamp01(msg.cal.rGain),
+              gGain: clamp01(msg.cal.gGain),
+              bGain: clamp01(msg.cal.bGain),
+              maxBrightness: clamp01(msg.cal.maxBrightness),
+            };
+            const mac = msg.mac.toLowerCase();
+            const list = deps.cfg.bleDevices ?? (deps.cfg.bleDevices = []);
+            const entry = list.find((d) => d.mac.toLowerCase() === mac);
+            if (entry) entry.cal = cal;
+            deps.ble?.setCal(mac, cal);
           }
           deps.onConfigChanged?.();
           // Echo back

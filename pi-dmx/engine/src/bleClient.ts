@@ -16,11 +16,18 @@ import net from "node:net";
 const SOCK = "/run/pi-dmx/ble.sock";
 const MIN_SEND_MS = 16;     // ~60 Hz cap on the wire
 
+export interface BleCal {
+  rGain: number;         // 0..1 vitbalans per kanal
+  gGain: number;
+  bGain: number;
+  maxBrightness: number; // 0..1 global tak per slinga
+}
 export interface BlePairedDevice {
   mac: string;
   name: string;
   chip: "bledom" | "unknown";
   connected: boolean;
+  cal?: BleCal;          // sidecarn skickar med aktuell kalibrering
 }
 export interface BleScanDevice {
   mac: string;
@@ -103,4 +110,7 @@ export class BleClient {
   unpair(mac: string) { this.send({ type: "unpair", mac }); }
   /** Blinka en specifik slinga i identifieringsfärg (magenta-puls). */
   identify(mac: string, durationMs = 6000) { this.send({ type: "identify", mac, durationMs }); }
+  /** Live-uppdatera per-slinga vitbalans + max-ljus. Ändringen tar effekt vid
+   *  nästa render-tick i sidecarn — ingen nedkoppling. */
+  setCal(mac: string, cal: BleCal) { this.send({ type: "cal", mac, cal }); }
 }

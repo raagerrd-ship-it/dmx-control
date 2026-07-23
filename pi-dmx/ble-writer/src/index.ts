@@ -49,6 +49,14 @@ const KEEPALIVE_MS = 1000;
 
 type Chip = "bledom" | "unknown";
 
+interface StripCal {
+  rGain: number;         // 0..1 per-channel vitbalans
+  gGain: number;
+  bGain: number;
+  maxBrightness: number; // 0..1 global tak för slingan
+}
+const DEFAULT_CAL: StripCal = { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1 };
+
 interface Strip {
   mac: string;
   name: string;
@@ -61,6 +69,7 @@ interface Strip {
   connecting: boolean;
   identifyUntil: number;                    // 0 = normal; >now = blinka i identifieringsfärg
   transient: boolean;                        // true = added by identify, drop after blink om ej parad
+  cal: StripCal;                             // per-slinga vitbalans + max-ljus
 }
 
 const known = new Map<string, Strip>();     // paired, persisted list
@@ -132,15 +141,24 @@ async function writeStrip(strip: Strip, r: number, g: number, b: number) {
   if (!strip.char || strip.chip !== "bledom") return;
   const now = Date.now();
   if (now - strip.lastWriteMs < MIN_WRITE_INTERVAL_MS) return;
+  // Applicera per-slinga kalibrering: vitbalans (rGain/gGain/bGain) och
+  // global max (maxBrightness) trimmar olika BLEDOM-kloner att matcha.
+  // BLEDOM's RGB-mode ignorerar brightness-byten — ljusstyrkan MÅSTE ligga
+  // i R/G/B-amplituden (se bledom-rgb-saturation memory).
+  const c = strip.cal;
+  const m = c.maxBrightness;
+  const cr = byte(r * c.rGain * m);
+  const cg = byte(g * c.gGain * m);
+  const cb = byte(b * c.bGain * m);
   // Skip writes that would just re-send the last frame (except keep-alive).
   const [pr, pg, pb] = strip.lastFrame;
-  const changed = pr !== r || pg !== g || pb !== b;
+  const changed = pr !== cr || pg !== cg || pb !== cb;
   if (!changed && now - strip.lastWriteMs < KEEPALIVE_MS) return;
-  const pkt = Buffer.from([0x7e, 0x00, 0x05, 0x03, r, g, b, 0x00, 0xef]);
+  const pkt = Buffer.from([0x7e, 0x00, 0x05, 0x03, cr, cg, cb, 0x00, 0xef]);
   try {
     await strip.char.writeAsync(pkt, true);   // withoutResponse: half airtime
     strip.lastWriteMs = now;
-    strip.lastFrame = [r, g, b];
+    strip.lastFrame = [cr, cg, cb];
   } catch (e) {
     // Write failed → char likely stale after a silent drop. Force reconnect.
     strip.char = null;
@@ -192,8 +210,21 @@ function broadcast(obj: unknown) {
 }
 function pairedSnapshot() {
   return [...known.values()].map((s) => ({
-    mac: s.mac, name: s.name, chip: s.chip, connected: !!s.char,
+    mac: s.mac, name: s.name, chip: s.chip, connected: !!s.char, cal: { ...s.cal },
   }));
+}
+
+function normalizeCal(raw: any): StripCal {
+  const clamp = (x: any, def: number) => {
+    const n = typeof x === "number" && Number.isFinite(x) ? x : def;
+    return n < 0 ? 0 : n > 1 ? 1 : n;
+  };
+  return {
+    rGain: clamp(raw?.rGain, 1),
+    gGain: clamp(raw?.gGain, 1),
+    bGain: clamp(raw?.bGain, 1),
+    maxBrightness: clamp(raw?.maxBrightness, 1),
+  };
 }
 function broadcastPaired() { broadcast({ type: "paired", devices: pairedSnapshot() }); }
 function broadcastActive() {
@@ -220,16 +251,25 @@ async function handle(sock: net.Socket, msg: any) {
   }
   if (msg.type === "paired") { send(sock, { type: "paired", devices: pairedSnapshot() }); return; }
   if (msg.type === "setKnown" && Array.isArray(msg.devices)) {
-    // Engine boot handshake — restore persisted list.
+    // Engine boot handshake — restore persisted list, inklusive cal.
+    // Kör även för uppdateringar: cal på befintlig post skrivs över så
+    // slider-ändringar tar effekt utan att koppla ner slingan.
     for (const d of msg.devices) {
       const mac = normalizeMac(d.mac);
       if (!mac) continue;
       const existing = known.get(mac);
-      if (existing) { existing.transient = false; continue; }
+      if (existing) {
+        existing.transient = false;
+        if (d.cal) existing.cal = normalizeCal(d.cal);
+        // Force write next tick so ny cal syns direkt.
+        existing.lastFrame = [-1, -1, -1];
+        continue;
+      }
       known.set(mac, {
         mac, name: d.name || mac, chip: d.chip === "bledom" ? "bledom" : "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
         target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: false,
+        cal: normalizeCal(d.cal),
       });
     }
     broadcastPaired();
@@ -258,10 +298,21 @@ async function handle(sock: net.Socket, msg: any) {
         mac, name: s?.name || mac, chip: s?.chip || "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
         target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: false,
+        cal: { ...DEFAULT_CAL },
       });
     }
     const strip = known.get(mac)!;
     await connect(strip);
+    return;
+  }
+  if (msg.type === "cal" && typeof msg.mac === "string") {
+    // Live-uppdatering av vitbalans / max-ljus per slinga.
+    const mac = normalizeMac(msg.mac);
+    const strip = known.get(mac);
+    if (!strip) return;
+    strip.cal = normalizeCal(msg.cal);
+    strip.lastFrame = [-1, -1, -1];   // forcera fresh write med nya värden
+    broadcastPaired();
     return;
   }
   if (msg.type === "identify" && typeof msg.mac === "string") {
@@ -275,6 +326,7 @@ async function handle(sock: net.Socket, msg: any) {
         mac, name: s?.name || mac, chip: s?.chip || "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
         target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: true,
+        cal: { ...DEFAULT_CAL },
       });
     }
     const strip = known.get(mac)!;
