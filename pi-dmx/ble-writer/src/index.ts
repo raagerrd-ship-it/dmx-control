@@ -251,16 +251,25 @@ async function handle(sock: net.Socket, msg: any) {
   }
   if (msg.type === "paired") { send(sock, { type: "paired", devices: pairedSnapshot() }); return; }
   if (msg.type === "setKnown" && Array.isArray(msg.devices)) {
-    // Engine boot handshake — restore persisted list.
+    // Engine boot handshake — restore persisted list, inklusive cal.
+    // Kör även för uppdateringar: cal på befintlig post skrivs över så
+    // slider-ändringar tar effekt utan att koppla ner slingan.
     for (const d of msg.devices) {
       const mac = normalizeMac(d.mac);
       if (!mac) continue;
       const existing = known.get(mac);
-      if (existing) { existing.transient = false; continue; }
+      if (existing) {
+        existing.transient = false;
+        if (d.cal) existing.cal = normalizeCal(d.cal);
+        // Force write next tick so ny cal syns direkt.
+        existing.lastFrame = [-1, -1, -1];
+        continue;
+      }
       known.set(mac, {
         mac, name: d.name || mac, chip: d.chip === "bledom" ? "bledom" : "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
         target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: false,
+        cal: normalizeCal(d.cal),
       });
     }
     broadcastPaired();
@@ -289,10 +298,21 @@ async function handle(sock: net.Socket, msg: any) {
         mac, name: s?.name || mac, chip: s?.chip || "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
         target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: false,
+        cal: { ...DEFAULT_CAL },
       });
     }
     const strip = known.get(mac)!;
     await connect(strip);
+    return;
+  }
+  if (msg.type === "cal" && typeof msg.mac === "string") {
+    // Live-uppdatering av vitbalans / max-ljus per slinga.
+    const mac = normalizeMac(msg.mac);
+    const strip = known.get(mac);
+    if (!strip) return;
+    strip.cal = normalizeCal(msg.cal);
+    strip.lastFrame = [-1, -1, -1];   // forcera fresh write med nya värden
+    broadcastPaired();
     return;
   }
   if (msg.type === "identify" && typeof msg.mac === "string") {
@@ -306,6 +326,7 @@ async function handle(sock: net.Socket, msg: any) {
         mac, name: s?.name || mac, chip: s?.chip || "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
         target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: true,
+        cal: { ...DEFAULT_CAL },
       });
     }
     const strip = known.get(mac)!;
