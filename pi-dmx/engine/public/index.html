@@ -172,33 +172,9 @@
   <details class="more">
     <summary>Mer inställningar</summary>
 
-    <h1>Show</h1>
-    <div class="card">
-      <div class="status" style="margin-bottom:8px" id="showIntro">Smart-läge — anpassar ljuset efter musiken och roterar mellan de effekter du kryssat i.</div>
-      <label class="tgl"><span>Energi styr läget (av = manuellt)</span><input type="checkbox" id="tEnergy"></label>
-      <label class="tgl" id="dwellRow"><span>Byter effekt</span>
-        <span class="seg segmini" id="segDwell">
-          <button data-dwell="slow">Sällan</button><button data-dwell="normal">Normal</button><button data-dwell="fast">Ofta</button>
-        </span>
-      </label>
-      <label class="tgl"><span>Pulsa ljuset på taktslag</span><input type="checkbox" id="tBeatPulse"></label>
-    </div>
+    <!-- Show + Finjustering borttagna — allt här styrs av stämnings-slidern.
+         Se "Avancerat · spegel av stämningen" för live-värden. -->
 
-    <h1>Finjustering</h1>
-    <div class="card">
-      <div class="setrow">
-        <label>Reaktion på musiken</label>
-        <div class="seg" id="segSpeed"><button data-agg="0.15">Långsam</button><button data-agg="0.85">Snabb</button></div>
-      </div>
-      <div class="setrow">
-        <label>Dynamik (tyst ↔ högt)</label>
-        <div class="seg" id="segDyn"><button data-dyn="0.35">Lugn</button><button data-dyn="0.6">Normal</button><button data-dyn="0.85">Maxad</button></div>
-      </div>
-      <div class="setrow">
-        <label>Ljusstyrka</label>
-        <div class="seg" id="segMaster"><button data-master="0.5">50%</button><button data-master="0.75">75%</button><button data-master="1">100%</button></div>
-      </div>
-    </div>
 
     <details class="more" style="margin-top:14px">
       <summary>Effekt-val · välj vilka som roterar</summary>
