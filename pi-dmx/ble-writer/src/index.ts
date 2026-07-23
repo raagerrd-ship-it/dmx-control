@@ -54,8 +54,12 @@ interface StripCal {
   gGain: number;
   bGain: number;
   maxBrightness: number; // 0..1 global tak för slingan
+  /** Perceptuell ljuskurva: 1.0 = linjär, >1 = mjukare botten (mörka värden mörkare),
+   *  <1 = brantare botten. BLEDOM-kloner varierar i hur snabbt de tänder → gamma
+   *  jämnar ut svag-till-mellan-intensitet mellan olika slingor. Clampas 0.3..3.0. */
+  gamma: number;
 }
-const DEFAULT_CAL: StripCal = { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1 };
+const DEFAULT_CAL: StripCal = { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1, gamma: 1 };
 
 interface Strip {
   mac: string;
@@ -147,9 +151,13 @@ async function writeStrip(strip: Strip, r: number, g: number, b: number) {
   // i R/G/B-amplituden (se bledom-rgb-saturation memory).
   const c = strip.cal;
   const m = c.maxBrightness;
-  const cr = byte(r * c.rGain * m);
-  const cg = byte(g * c.gGain * m);
-  const cb = byte(b * c.bGain * m);
+  // Gamma appliceras på den normaliserade amplituden (0..1) innan byte-clip.
+  // gamma>1 → botten mörknar (bra när en klon "hoppar igång" för snabbt);
+  // gamma<1 → botten ljusnar (klon som är seg i låga värden).
+  const g1 = c.gamma;
+  const cr = byte(255 * Math.pow(Math.max(0, r * c.rGain * m) / 255, g1));
+  const cg = byte(255 * Math.pow(Math.max(0, g * c.gGain * m) / 255, g1));
+  const cb = byte(255 * Math.pow(Math.max(0, b * c.bGain * m) / 255, g1));
   // Skip writes that would just re-send the last frame (except keep-alive).
   const [pr, pg, pb] = strip.lastFrame;
   const changed = pr !== cr || pg !== cg || pb !== cb;
@@ -215,15 +223,20 @@ function pairedSnapshot() {
 }
 
 function normalizeCal(raw: any): StripCal {
-  const clamp = (x: any, def: number) => {
+  const clamp01 = (x: any, def: number) => {
     const n = typeof x === "number" && Number.isFinite(x) ? x : def;
     return n < 0 ? 0 : n > 1 ? 1 : n;
   };
+  const clampGamma = (x: any) => {
+    const n = typeof x === "number" && Number.isFinite(x) ? x : 1;
+    return n < 0.3 ? 0.3 : n > 3.0 ? 3.0 : n;
+  };
   return {
-    rGain: clamp(raw?.rGain, 1),
-    gGain: clamp(raw?.gGain, 1),
-    bGain: clamp(raw?.bGain, 1),
-    maxBrightness: clamp(raw?.maxBrightness, 1),
+    rGain: clamp01(raw?.rGain, 1),
+    gGain: clamp01(raw?.gGain, 1),
+    bGain: clamp01(raw?.bGain, 1),
+    maxBrightness: clamp01(raw?.maxBrightness, 1),
+    gamma: clampGamma(raw?.gamma),
   };
 }
 function broadcastPaired() { broadcast({ type: "paired", devices: pairedSnapshot() }); }

@@ -21,6 +21,7 @@ export interface BleCal {
   gGain: number;
   bGain: number;
   maxBrightness: number; // 0..1 global tak per slinga
+  gamma: number;         // 0.3..3.0 ljuskurva; 1.0 = linjär
 }
 export interface BlePairedDevice {
   mac: string;
