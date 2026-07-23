@@ -6,7 +6,7 @@ import {
   usePi, usePlayingMode, setPi, setRotation, applyIntensity,
   type Dwell, type PiSettings,
 } from "@/hooks/usePiMock";
-import { usePiConfig, usePiConnected } from "@/hooks/usePiEngine";
+import { usePiConfig, usePiConnected, deriveEngineConfig } from "@/hooks/usePiEngine";
 import { useLocation } from "react-router-dom";
 
 /**
@@ -424,8 +424,13 @@ function AdvancedRotation() {
 
 function AdvancedTechnical() {
   const [open, setOpen] = useState(false);
-  const cfg = usePiConfig();
+  const live = usePiConfig();
   const connected = usePiConnected();
+  const mock = usePi();
+  // Preview (Lovable) har ingen Pi — då härleds värdena från mock-intensiteten
+  // med exakt samma FEEL-kurvor som moods.ts. Så preview speglar riktiga motorn.
+  const cfg = live ?? deriveEngineConfig(mock.intensity);
+  const isMirror = !live;
 
   // Skalor matchar moods.ts (FEEL): chill → galet ändpunkter per fält.
   const pct = (v: number | undefined, lo: number, hi: number) =>
@@ -448,9 +453,10 @@ function AdvancedTechnical() {
       {open && (
         <div className="space-y-4 pt-1">
           <div className="text-[11px] text-muted-foreground/80 leading-snug -mt-1">
-            Live-värden direkt från motorn. Alla sätts automatiskt av stämningen
-            (slider eller det fysiska vredet).
-            {!connected && (
+            {isMirror
+              ? "Preview speglar motorns FEEL-kurvor för vald stämning. Anslut till Pi:n för live-värden."
+              : "Live-värden direkt från motorn."} Alla sätts automatiskt av stämningen (slider eller det fysiska vredet).
+            {!connected && !isMirror && (
               <span className="text-accent"> · Ansluter till motorn…</span>
             )}
           </div>

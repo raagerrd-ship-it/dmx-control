@@ -91,3 +91,48 @@ export function usePiConfig(): EnginePublicConfig | null {
 export function usePiConnected(): boolean {
   return useSyncExternalStore(subscribe, () => connected, () => false);
 }
+
+/**
+ * Speglar `moods.ts` applyIntensity() exakt. Används i preview (Lovable)
+ * där ingen Pi finns att prata WS med — så Avancerat-vyn visar samma
+ * kurvor som motorn skulle sätta för given stämning.
+ */
+const FEEL = {
+  chill: { dynamics: 0.30, sensitivity: 0.50, master: 0.30, calmDecay: 1.20, smartDwellMs: 40000,
+           beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,
+           energyDrivesMode: false, energyCeiling: true, riserStrobe: false, dropHeadroom: false },
+  fest:  { dynamics: 0.60, sensitivity: 0.60, master: 1.00, calmDecay: 0.42, smartDwellMs: 15000,
+           beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false,
+           energyDrivesMode: true,  energyCeiling: true, riserStrobe: false, dropHeadroom: false },
+  galet: { dynamics: 0.85, sensitivity: 0.70, master: 1.00, calmDecay: 0.42, smartDwellMs: 10000,
+           beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false,
+           energyDrivesMode: true,  energyCeiling: true, riserStrobe: true,  dropHeadroom: true  },
+} as const;
+
+export function deriveEngineConfig(xRaw: number): EnginePublicConfig {
+  const x = Math.max(0, Math.min(1, xRaw));
+  const [aId, bId, t] = x <= 0.5
+    ? (["chill", "fest",  x / 0.5]        as const)
+    : (["fest",  "galet", (x - 0.5) / 0.5] as const);
+  const a = FEEL[aId], b = FEEL[bId];
+  const lerp = (u: number, v: number) => u + (v - u) * t;
+  const bucket = x < 1 / 3 ? "chill" : x < 2 / 3 ? "fest" : "galet";
+  const bf = FEEL[bucket];
+  return {
+    dynamics:       lerp(a.dynamics, b.dynamics),
+    sensitivity:    lerp(a.sensitivity, b.sensitivity),
+    master:         lerp(a.master, b.master),
+    calmDecay:      lerp(a.calmDecay, b.calmDecay),
+    smartDwellMs:   Math.round(lerp(a.smartDwellMs, b.smartDwellMs)),
+    beatPulse:        bf.beatPulse,
+    dropBlackout:     bf.dropBlackout,
+    clubMode:         bf.clubMode,
+    ambientGlow:      bf.ambientGlow,
+    energyDrivesMode: bf.energyDrivesMode,
+    energyCeiling:    bf.energyCeiling,
+    riserStrobe:      bf.riserStrobe,
+    dropHeadroom:     bf.dropHeadroom,
+    activeMood: bucket,
+    activeIntensity: x,
+  };
+}
