@@ -44,6 +44,8 @@ export interface ServerDeps {
   getActiveMode: () => Mode;
   /** True om ljud-pipelinen bearbetat en frame nyligen (för watchdog /health). */
   getHealthy: () => boolean;
+  /** True om DMX-sockeln mot helpern är öppen. UI:t visar röd banner annars. */
+  getDmxConnected: () => boolean;
   /** Rökmaskinens tillstånd (uppvärmning/värmekonto/drifträknare). null = ej ansluten. */
   getFogStatus: () => FogStatus | null;
   /** Nollställ rökmaskinens drifträknare efter underhåll. */
