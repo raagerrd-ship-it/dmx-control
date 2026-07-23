@@ -453,6 +453,11 @@ export async function startServer(
             if (deps.cfg.bleDevices) {
               deps.cfg.bleDevices = deps.cfg.bleDevices.filter((d) => d.mac.toLowerCase() !== msg.mac.toLowerCase());
             }
+          } else if (msg.type === "bleIdentify" && typeof msg.mac === "string") {
+            // "Blinka lampan" — hjälper användaren identifiera vilken fysisk slinga
+            // en post motsvarar. Ingen cfg-mutation; sidecarn hanterar timeout.
+            deps.ble?.identify(msg.mac);
+            return;
           }
           deps.onConfigChanged?.();
           // Echo back
