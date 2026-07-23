@@ -63,6 +63,10 @@ export interface EngineConfig {
   activeIntensity?: number;
   /** Fysiskt vred (KY-040) för stämnings-intensitet. Null = inget vred anslutet. */
   intensityKnob?: { chip: string; clk: number; dt: number; sw?: number } | null;
+  /** WS2812B LED-ring runt vredet (Electrokit 12-LED, 40 mm). Kopplas på SPI0 MOSI
+   *  (GPIO10, pin 19) — GPIO18 kan inte användas eftersom Codec Zero äger I²S där.
+   *  Null = ingen ring monterad. */
+  intensityRing?: { bus: number; device: number } | null;
   /** Which codec input feeds the show: line on the P1 AUX header or the mic path. */
   audioInput: "aux" | "mic";
   sensitivity: number;    // 0..1 user knob
@@ -188,6 +192,7 @@ export const defaultConfig: EngineConfig = {
   chaseStyle: "pingpong",
   rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
+  intensityRing: { bus: 0, device: 0 },          // WS2812 12-LED på SPI0 MOSI (GPIO10, pin 19)
   dmxMaxHz: 100, // 100 Hz för tightare bas/drop-synk; helper cappar till wire-limit
   // Rok-defaults satta for Ibiza LSM1500PRO + Cameo XTRA HEAVY: maskinen ger
   // 250 m3/min och vatskan ar den tataste sorten (extremt lang svavtid, gjord
