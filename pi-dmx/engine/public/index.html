@@ -1288,7 +1288,11 @@ function renderBlePaired(devices) {
         <div style="margin-top:6px;font-size:11px;opacity:.6">
           Trimma per slinga så olika BLEDOM-kloner ser likadana ut. Gamma 1.00 = linjär; höj (t.ex. 1.5) om en slinga tänder för aggressivt i låga värden, sänk (t.ex. 0.7) om den är seg innan den tänder.
         </div>
-        <button class="btn" data-ble-cal-reset="${escapeHtml(d.mac)}" style="margin-top:6px">Nollställ</button>
+        <div class="fx-actions" style="margin-top:6px">
+          <button class="btn" data-ble-cal-reset="${escapeHtml(d.mac)}">Nollställ</button>
+          <button class="btn" data-ble-cal-copy="${escapeHtml(d.mac)}">Kopiera till…</button>
+        </div>
+        <div data-ble-cal-copy-panel="${escapeHtml(d.mac)}" hidden style="margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:12px"></div>
       </details>
     </div>
   `;}).join("");
