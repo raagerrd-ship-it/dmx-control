@@ -422,8 +422,18 @@ function AdvancedRotation() {
 }
 
 function AdvancedTechnical() {
-  const s = usePi();
   const [open, setOpen] = useState(false);
+  const cfg = usePiConfig();
+  const connected = usePiConnected();
+
+  // Skalor matchar moods.ts (FEEL): chill → galet ändpunkter per fält.
+  const pct = (v: number | undefined, lo: number, hi: number) =>
+    v === undefined ? null : Math.round(((v - lo) / (hi - lo)) * 100);
+  const bool = (v: boolean | undefined) => (v === undefined ? null : v ? 100 : 0);
+  // smartDwellMs: låg = ofta byte, hög = sällan → invertera för "Byter effekt".
+  const dwellPct = (ms: number | undefined) =>
+    ms === undefined ? null : Math.round(((40000 - Math.max(10000, Math.min(40000, ms))) / 30000) * 100);
+
   return (
     <>
       <button
@@ -437,38 +447,27 @@ function AdvancedTechnical() {
       {open && (
         <div className="space-y-4 pt-1">
           <div className="text-[11px] text-muted-foreground/80 leading-snug -mt-1">
-            Alla värden nedan sätts automatiskt av stämnings-slidern. Här ser du var de landar just nu.
+            Live-värden direkt från motorn. Alla sätts automatiskt av stämningen
+            (slider eller det fysiska vredet).
+            {!connected && (
+              <span className="text-accent"> · Ansluter till motorn…</span>
+            )}
           </div>
-          <ReadonlyMeter
-            label="Ljusstyrka"
-            pct={Math.round(s.master * 100)}
-            leftLabel="50%" rightLabel="100%"
-          />
-          <ReadonlyMeter
-            label="Reaktion på musiken"
-            pct={Math.round(((s.agcAgg - 0.15) / (0.85 - 0.15)) * 100)}
-            leftLabel="Långsam" rightLabel="Snabb"
-          />
-          <ReadonlyMeter
-            label="Dynamik (tyst ↔ högt)"
-            pct={Math.round(((s.dynamics - 0.35) / (0.85 - 0.35)) * 100)}
-            leftLabel="Lugn" rightLabel="Maxad"
-          />
-          <ReadonlyMeter
-            label="Byter effekt"
-            pct={s.dwell === "slow" ? 0 : s.dwell === "normal" ? 50 : 100}
-            leftLabel="Sällan" rightLabel="Ofta"
-          />
-          <ReadonlyMeter
-            label="Pulsa ljuset på taktslag"
-            pct={s.beatPulse ? 100 : 0}
-            leftLabel="Av" rightLabel="På"
-          />
-          <ReadonlyMeter
-            label="Energi styr läget"
-            pct={s.energyDrivesMode ? 100 : 0}
-            leftLabel="Av" rightLabel="På"
-          />
+          {/* Kontinuerliga rattar (lerpas av applyIntensity) */}
+          <ReadonlyMeter label="Ljusstyrka"           pct={pct(cfg?.master,      0.30, 1.00)} leftLabel="30%"   rightLabel="100%" />
+          <ReadonlyMeter label="Reaktion på musiken"  pct={pct(cfg?.sensitivity, 0.50, 0.70)} leftLabel="Långsam" rightLabel="Snabb" />
+          <ReadonlyMeter label="Dynamik (tyst ↔ högt)" pct={pct(cfg?.dynamics,   0.30, 0.85)} leftLabel="Lugn"  rightLabel="Maxad" />
+          <ReadonlyMeter label="Reaktions-tröghet"    pct={pct(cfg?.calmDecay,   1.20, 0.42)} leftLabel="Trögt" rightLabel="Snärtigt" />
+          <ReadonlyMeter label="Byter effekt"         pct={dwellPct(cfg?.smartDwellMs)}       leftLabel="Sällan" rightLabel="Ofta" />
+          {/* Bucket-flaggor (snäpper vid chill/fest/galet) */}
+          <ReadonlyMeter label="Pulsa ljuset på taktslag" pct={bool(cfg?.beatPulse)}        leftLabel="Av" rightLabel="På" />
+          <ReadonlyMeter label="Energi styr läget"        pct={bool(cfg?.energyDrivesMode)} leftLabel="Av" rightLabel="På" />
+          <ReadonlyMeter label="Blackout före drop"       pct={bool(cfg?.dropBlackout)}     leftLabel="Av" rightLabel="På" />
+          <ReadonlyMeter label="Klubb-kontrast"           pct={bool(cfg?.clubMode)}         leftLabel="Av" rightLabel="På" />
+          <ReadonlyMeter label="Vilo-glöd i tystnad"      pct={bool(cfg?.ambientGlow)}      leftLabel="Av" rightLabel="På" />
+          <ReadonlyMeter label="Dynamiskt ljustak"        pct={bool(cfg?.energyCeiling)}    leftLabel="Av" rightLabel="På" />
+          <ReadonlyMeter label="Riser-strobe (uppbyggnad)" pct={bool(cfg?.riserStrobe)}     leftLabel="Av" rightLabel="På" />
+          <ReadonlyMeter label="Drop-headroom (drops = 100%)" pct={bool(cfg?.dropHeadroom)} leftLabel="Av" rightLabel="På" />
         </div>
       )}
     </>
