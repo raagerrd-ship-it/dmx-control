@@ -16,11 +16,18 @@ import net from "node:net";
 const SOCK = "/run/pi-dmx/ble.sock";
 const MIN_SEND_MS = 16;     // ~60 Hz cap on the wire
 
+export interface BleCal {
+  rGain: number;         // 0..1 vitbalans per kanal
+  gGain: number;
+  bGain: number;
+  maxBrightness: number; // 0..1 global tak per slinga
+}
 export interface BlePairedDevice {
   mac: string;
   name: string;
   chip: "bledom" | "unknown";
   connected: boolean;
+  cal?: BleCal;          // sidecarn skickar med aktuell kalibrering
 }
 export interface BleScanDevice {
   mac: string;
