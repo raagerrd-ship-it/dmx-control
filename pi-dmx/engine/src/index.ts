@@ -21,9 +21,10 @@ import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 import { IntensityKnob } from "./intensityKnob.js";
 import { KnobRing } from "./knobRing.js";
+import { BleClient, type BleScanDevice } from "./bleClient.js";
 import { applyIntensity } from "./moods.js";
 
-import { activeSlots, type Mode } from "./config.js";
+import { activeSlots, fixtureRoles, type Mode } from "./config.js";
 import { EFFECT_KEYS, EFFECT_MAP } from "./effects/registry.js";
 
 // Physical button cycles through the fun modes (skips blackout so the button never kills the show).
@@ -174,6 +175,28 @@ capture.on("chunk", (samples: Float32Array) => {
     lastRenderMs = nowR;
     const universe = effects.render(latestFrame);
     dmx.send(universe, curSlots);
+    // BLE-slingorna får riggens dominanta färg: medelvärde av alla R/G/B/W-kanaler
+    // (W adderas i alla tre → varmvit blir vit på BLEDOM som saknar W). Master
+    // skickas som separat brightness så sidecarn kan gamma-korrigera. Billigt
+    // (max ~40 iterationer @ 100 Hz) och håller BLE i takt med DMX utan att
+    // effekterna behöver veta om att slingorna finns.
+    if (bleClient && cfg.bleDevices && cfg.bleDevices.length > 0) {
+      let rs = 0, gs = 0, bs = 0, n = 0;
+      for (const fx of cfg.fixtures) {
+        const roles = fixtureRoles(fx);
+        let r = 0, g = 0, b = 0, w = 0, hasRgb = false;
+        for (let i = 0; i < roles.length; i++) {
+          const v = universe[fx.address - 1 + i] ?? 0;
+          if (roles[i] === "r") { r = v; hasRgb = true; }
+          else if (roles[i] === "g") { g = v; hasRgb = true; }
+          else if (roles[i] === "b") { b = v; hasRgb = true; }
+          else if (roles[i] === "w") { w = v; }
+          else if (roles[i] === "dim") { r = g = b = v; hasRgb = true; }
+        }
+        if (hasRgb) { rs += Math.min(255, r + w); gs += Math.min(255, g + w); bs += Math.min(255, b + w); n++; }
+      }
+      if (n > 0) bleClient.setColor(rs / n / 255, gs / n / 255, bs / n / 255, cfg.master);
+    }
   }
 });
 
