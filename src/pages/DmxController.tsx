@@ -25,10 +25,8 @@ export default function DmxController() {
       <SectionTitle>Stämning</SectionTitle>
       <MoodSlider />
 
-      <SectionTitle>Ljudkälla</SectionTitle>
-      <AudioSourceCard />
-
       <AudioMeterCard />
+
 
       <MoreDetails />
 
