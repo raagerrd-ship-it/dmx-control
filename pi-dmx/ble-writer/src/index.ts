@@ -154,8 +154,28 @@ async function writeStrip(strip: Strip, r: number, g: number, b: number) {
 // is written at most once per MIN_WRITE_INTERVAL_MS. Node's async writes are
 // enqueued in parallel — no strip blocks another.
 setInterval(() => {
-  const [r, g, b] = target;
+  const [gr, gg, gb] = target;
+  const now = Date.now();
   for (const strip of known.values()) {
+    // Identify: en distinkt magenta-puls så användaren enkelt ser vilken
+    // fysisk slinga en post i listan motsvarar. Pulsar ~1.5 Hz.
+    let r = gr, g = gg, b = gb;
+    if (strip.identifyUntil > now) {
+      const phase = 0.5 - 0.5 * Math.cos((now / 1000) * Math.PI * 3); // 0..1 @ ~1.5 Hz
+      const v = Math.round(60 + phase * 195);
+      r = v; g = 0; b = v;                              // magenta-puls
+    } else if (strip.identifyUntil !== 0) {
+      // Identify just klar
+      strip.identifyUntil = 0;
+      if (strip.transient) {
+        // Aldrig parad → koppla ner och glöm
+        if (strip.peripheral) { try { strip.peripheral.disconnectAsync(); } catch { /* */ } }
+        known.delete(strip.mac);
+        broadcastPaired();
+        broadcastActive();
+        continue;
+      }
+    }
     if (strip.char) writeStrip(strip, r, g, b).catch(() => {});
     else connect(strip).catch(() => {});   // idempotent, guarded by .connecting
   }
