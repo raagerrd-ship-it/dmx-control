@@ -2,28 +2,45 @@ import { useEffect, useRef, useState } from "react";
 import { useDmx } from "@/store/dmx";
 
 
-/** Pi-style mode-kategorier. Håll i synk med pi-dmx/engine/public/index.html. */
+/** Pi-style mode-kategorier — spegling av effekt-registret på Pi:n
+ *  (pi-dmx/engine/src/effects/registry.ts). EN sanningskälla; håll listorna
+ *  identiska med `EFFECT_META` (key/label/desc + tier) från registret. */
 export const CALM_MODES: [string, string, string][] = [
-  ["cycle",   "Cykel",   "Alla lampor andas i takt medan färgen sakta vandrar runt."],
-  ["breathe", "Andas",   "Hela riggen andas som en – djup mjuk våg i en färg."],
-  ["tide",    "Tidvatten","En långsam våg sköljer fram och tillbaka i par."],
-  ["mono",    "Eld",     "Varm brasa som flimrar levande, glider rött → gult."],
-  ["aurora",  "Aurora",  "Varje lampa driver i sin egen färg, som norrsken."],
-  ["drift",   "Drift",   "Nästan stilla glöd som mycket sakta byter färg."],
+  ["breathe",   "Andas",       "Hela riggen andas som en – djup mjuk våg i en färg."],
+  ["mono",      "Eld",         "Varm brasa som flimrar levande, glider rött → gult."],
+  ["aurora",    "Aurora",      "Varje lampa driver i sin egen färg, som norrsken."],
+  ["twin",      "Tvilling",    "Två grupper andas i motfas – varmt anrop, kallt svar."],
+  ["subbreath", "Sub-andning", "Djup sub-bas-andning med krispigt luft-skimmer i kanterna."],
+  ["airglow",   "Luft-glöd",   "Nästan mörkt; varje cymbal/shaker/väsljud tänder en gnista i kanten."],
+  ["tide",      "Tidvatten",   "En vattenlinje som stiger genom riggen med musikens tyngd; skum på toppen."],
+  ["drift",     "Drift",       "Ljuset vandrar genom riggen efter musikens klangfärg — mörkt åt ena hållet, ljust åt andra."],
+  ["pendel",    "Pendel",      "En mjuk ljustopp svänger taktlåst över riggen, ett svep per fras."],
+  ["viska",     "Viska",       "Nästan mörkt — bara diskreta gnistor från virvel och hi-hat, dov puls på kicken."],
 ];
 export const FAST_MODES: [string, string, string][] = [
-  ["wave",   "Våg",    "Flödande färgvåg som rullar över hela riggen."],
-  ["chase",  "Jakt",   "En ljuspunkt springer i takt och byter färg."],
-  ["drops",  "Drops",  "Varje slag målar nästa lampa i en ny färg."],
-  ["sweep",  "Svep",   "En smal spotlight glider över en mörk rigg."],
-  ["pulse",  "Puls",   "Hela riggen i en färg som pulsar på beatet."],
+  ["drops",  "Drops",     "Varje slag målar nästa lampa i en ny färg."],
+  ["chase",  "Jakt",      "En ljuspunkt springer i takt och byter färg."],
+  ["wave",   "Våg",       "Flödande färgvåg som rullar över hela riggen."],
+  ["pulse",  "Puls",      "Hela riggen i en färg som pulsar på beatet."],
+  ["eq",     "Spektrum",  "Spatial spektrumanalysator: låg-bas→röd … diskant→blå, ljus = bandets nivå."],
+  ["tick",   "Tick",      "Hi-hatsen flyttar ljuset steg för steg; kicken slår ner hela raden."],
+  ["stege",  "Stege",     "Riggen är en frekvensstege — anslag i varje band tänder sin pinne, fills rullar uppåt."],
+  ["eko",    "Eko",       "Taktslaget ekar genom riggen med taktlåst fördröjning, svagare för varje studs."],
+  ["hjarta", "Hjärtslag", "Dubbelpuls i takten — ett kraftigt slag och ett svagare efterslag, som ett hjärta."],
 ];
 export const FULL_MODES: [string, string, string][] = [
-  ["party",  "Party",  "Färgkaos som pumpar hårt på varje taktslag."],
-  ["snap",   "Snap",   "Alla lampor byter färg blixtsnabbt på varje slag."],
-  ["bounce", "Studs",  "En skarp ljuspunkt studsar fram och tillbaka."],
-  ["strobe", "Strobe", "Snabb strobe-blixt med skiftande färg."],
-  ["rave",   "Rave",   "Varannan lampa blinkar i motfärger – hård växling."],
+  ["party",    "Party",       "Färgkaos som pumpar hårt på varje taktslag."],
+  ["snap",     "Snap",        "Alla lampor byter färg blixtsnabbt på varje slag."],
+  ["bounce",   "Studs",       "En skarp ljuspunkt studsar fram och tillbaka."],
+  ["strobe",   "Strobe",      "Snabb strobe-blixt med skiftande färg."],
+  ["rave",     "Rave",        "Varannan lampa blinkar i motfärger – hård växling."],
+  ["gallop",   "Gallopp",     "Grupperna slår omlott – beat & off-beat, dubbel rytm."],
+  ["ripple",   "Krusning",    "Puls från mitten och ut – inre lampor ena takten, yttre nästa."],
+  ["gravity",  "Gravitation", "Ljudet lyfter en nivå som faller med tyngd; en peak-prick hänger kvar."],
+  ["drumkit",  "Trumkit",     "Varje lampa = en trumröst (kick/snare/hi-hat/bas) som punchar på sitt eget anslag."],
+  ["split",    "Klyvning",    "Inre lampor tung bas-matta, yttre lampor gnistrande diskant-anslag."],
+  ["duel",     "Duell",       "Kick vs hi-hat slåss om riggens färg – röd dunk eller isblå tick."],
+  ["backbeat", "Backbeat",    "Dov puls på bastrumman, vit blixt på virveln — den klassiska 2-och-4-känslan."],
 ];
 const ALL = [...CALM_MODES, ...FAST_MODES, ...FULL_MODES];
 
