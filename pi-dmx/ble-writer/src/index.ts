@@ -49,6 +49,14 @@ const KEEPALIVE_MS = 1000;
 
 type Chip = "bledom" | "unknown";
 
+interface StripCal {
+  rGain: number;         // 0..1 per-channel vitbalans
+  gGain: number;
+  bGain: number;
+  maxBrightness: number; // 0..1 global tak för slingan
+}
+const DEFAULT_CAL: StripCal = { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1 };
+
 interface Strip {
   mac: string;
   name: string;
@@ -61,6 +69,7 @@ interface Strip {
   connecting: boolean;
   identifyUntil: number;                    // 0 = normal; >now = blinka i identifieringsfärg
   transient: boolean;                        // true = added by identify, drop after blink om ej parad
+  cal: StripCal;                             // per-slinga vitbalans + max-ljus
 }
 
 const known = new Map<string, Strip>();     // paired, persisted list
