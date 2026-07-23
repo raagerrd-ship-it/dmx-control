@@ -110,4 +110,7 @@ export class BleClient {
   unpair(mac: string) { this.send({ type: "unpair", mac }); }
   /** Blinka en specifik slinga i identifieringsfärg (magenta-puls). */
   identify(mac: string, durationMs = 6000) { this.send({ type: "identify", mac, durationMs }); }
+  /** Live-uppdatera per-slinga vitbalans + max-ljus. Ändringen tar effekt vid
+   *  nästa render-tick i sidecarn — ingen nedkoppling. */
+  setCal(mac: string, cal: BleCal) { this.send({ type: "cal", mac, cal }); }
 }
