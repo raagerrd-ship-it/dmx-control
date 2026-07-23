@@ -322,6 +322,11 @@ export async function startServer(
             activeIntensity: deps.cfg.activeIntensity,   // vred/slider-position (0..1)
             fog: deps.getFogStatus(),     // null när maskinen inte är ansluten
             bleActive: deps.ble?.activeCount() ?? 0,   // antal parade BLE-slingor som är uppkopplade
+            // Drift-hälsa: UI:t visar en banner om DMX-helpern är nere eller
+            // om parade BLE-slingor tappat kontakt. Billigt att skicka varje
+            // frame — samma push-rate som resten (20 Hz).
+            dmxOk: deps.getDmxConnected(),
+            blePairedCount: deps.ble?.paired().length ?? 0,
           }));
 
         }
