@@ -57,12 +57,14 @@ export interface ServerDeps {
   /** BLE sidecar bridge. Optional — null when hardware / sidecar isn't available. */
   ble?: {
     activeCount: () => number;
-    paired: () => { mac: string; name: string; chip: "bledom" | "unknown"; connected: boolean }[];
+    paired: () => { mac: string; name: string; chip: "bledom" | "unknown"; connected: boolean; cal?: { rGain: number; gGain: number; bGain: number; maxBrightness: number } }[];
     scan: () => void;
     pair: (mac: string) => void;
     unpair: (mac: string) => void;
     /** Blinka en specifik slinga i identifieringsfärg så användaren kan bekräfta vilken fysisk enhet det är. */
     identify: (mac: string) => void;
+    /** Live-uppdatera vitbalans + max-ljus per slinga. */
+    setCal: (mac: string, cal: { rGain: number; gGain: number; bGain: number; maxBrightness: number }) => void;
     /** Register a listener called whenever a scan finishes. */
     onScan: (fn: (devices: { mac: string; name: string; chip: "bledom" | "unknown"; rssi: number }[]) => void) => void;
     /** Register a listener called whenever the paired list changes. */
