@@ -1297,6 +1297,89 @@ btnUpdate.onclick = async () => {
   }, 180000);
 };
 
+// ---- Rollback + fabriks-reset --------------------------------------------
+// Rollback: går tillbaka till förra SHA (sparad av update.sh). Bara meningsfullt
+// om en tidigare /update har körts sen boxen kom från fabriken.
+const btnRollback = document.getElementById("btnRollback");
+if (btnRollback) btnRollback.onclick = async () => {
+  if (!confirm("Rulla tillbaka till föregående version? Tjänsten startas om.")) return;
+  btnRollback.disabled = true;
+  btnRollback.textContent = "Rullar tillbaka…";
+  updLog.style.display = "block";
+  updLog.textContent = "Startar rollback…";
+  try { await fetch("/update/rollback", { method: "POST" }); } catch {}
+  // Samma poll-mönster som update: version ändras → klar
+  const startedSha = verSha.textContent;
+  const p = setInterval(async () => {
+    await refreshVersion();
+    if (verSha.textContent && verSha.textContent !== startedSha && !/–|unknown/.test(verSha.textContent)) {
+      clearInterval(p); btnRollback.disabled = false; btnRollback.textContent = "Rollback";
+    }
+  }, 2000);
+  setTimeout(() => { clearInterval(p); btnRollback.disabled = false; btnRollback.textContent = "Rollback"; }, 180000);
+};
+
+// Fabriks-reset: nolla config (fixtures FÖRSVINNER). Konfigen sparas som
+// .factory-<ts>-backup så ägaren kan återställa manuellt om det var fel knapp.
+const btnFactory = document.getElementById("btnFactory");
+if (btnFactory) btnFactory.onclick = async () => {
+  if (!confirm("Fabriks-reset raderar ALLA fixtures och kalibreringar.\n\nEn backup sparas på disk men måste återställas manuellt via SSH.\n\nFortsätt?")) return;
+  if (!confirm("Är du helt säker? Detta går inte ångra från appen.")) return;
+  btnFactory.disabled = true;
+  btnFactory.textContent = "Nollställer…";
+  try { await fetch("/factory-reset", { method: "POST" }); } catch {}
+  // Motorn kör systemctl restart → WS tappar. onclose triggar reconnect
+  // och när den kommer upp igen är configen defaults. Ingen extra polling.
+};
+
+// ---- Välkomst-overlay ----------------------------------------------------
+// Bara på hyresgäst-vyn (/), aldrig i owner-läget — där stör den bara.
+const welcomeOv = document.getElementById("welcomeOv");
+const welcomeBtn = document.getElementById("welcomeBtn");
+if (welcomeOv && welcomeBtn && !OWNER_MODE) {
+  try {
+    if (!localStorage.getItem("pi-dmx-welcome-seen-v1")) welcomeOv.classList.add("show");
+  } catch { /* Safari private mode: skit i det, visa aldrig */ }
+  welcomeBtn.onclick = () => {
+    welcomeOv.classList.remove("show");
+    try { localStorage.setItem("pi-dmx-welcome-seen-v1", String(Date.now())); } catch {}
+  };
+}
+
+// ---- Drift-hälsa banner --------------------------------------------------
+// Trippel-sanning: WS-anslutning, DMX-sockeln mot helpern, samt "parade
+// BLE-slingor som TAPPAT kontakt". Mic-tyst-varning är HÖGKONTEXT (spelar
+// användaren musik just nu?) → använd bara som gul varning efter 30s tystnad
+// medan power är på och vi faktiskt gör en show.
+let wsOk = false, dmxOk = true, blePairedCount = 0, bleConnectedCount = 0;
+let lastAudibleMs = Date.now();
+const healthBanner = document.getElementById("healthBanner");
+function renderHealth() {
+  if (!healthBanner) return;
+  const msgs = [];
+  let sev = "";   // "err" | "warn"
+  if (!wsOk) { msgs.push("<b>Inte ansluten</b> — kontrollera att telefonen är på pi-dmx-nätet."); sev = "err"; }
+  else if (!dmxOk) { msgs.push("<b>DMX-utgången är nere</b> — kontrollera USB-DMX-kabeln till lamporna."); sev = "err"; }
+  // BLE-varning: bara om ägaren HAR parat slingor men NÅGON tappat kontakt.
+  if (blePairedCount > 0 && bleConnectedCount < blePairedCount) {
+    const off = blePairedCount - bleConnectedCount;
+    msgs.push(`<b>${off} av ${blePairedCount} BLE-slinga${blePairedCount === 1 ? "" : "or"} tappade kontakt</b> — sätt på strömmen eller flytta närmare.`);
+    if (sev !== "err") sev = "warn";
+  }
+  // Mic-tyst: bara relevant om ljuset är på (curMode !== blackout) och det gått
+  // >30s sen vi hörde nåt. Låg prio → adderas bara om inget värre är fel.
+  if (curMode !== "blackout" && Date.now() - lastAudibleMs > 30000 && sev === "") {
+    msgs.push("<b>Ingen ljud-signal på 30s</b> — spela musik eller kolla mikrofonen/AUX-kabeln.");
+    sev = "warn";
+  }
+  healthBanner.className = "health-banner" + (msgs.length ? " show " + sev : "");
+  healthBanner.innerHTML = msgs.join("<br>");
+}
+// Kör en gång direkt så bannern renderas medan WS ansluter.
+renderHealth();
+
+
+
 
 /* ── BLE-slingor (owner-only) ──────────────────────────────────────────── */
 const bleStatus       = document.getElementById("bleStatus");
