@@ -436,29 +436,21 @@ function AdvancedTechnical() {
       </button>
       {open && (
         <div className="space-y-4 pt-1">
-          <div>
-            <div className="text-[11px] text-muted-foreground uppercase tracking-[0.08em] mb-1.5">Reaktion på musiken</div>
-            <Seg
-              value={s.agcAgg}
-              onChange={(v) => setPi({ agcAgg: v })}
-              options={[
-                { v: 0.15, label: "Långsam" },
-                { v: 0.85, label: "Snabb" },
-              ]}
-            />
+          <div className="text-[11px] text-muted-foreground/80 leading-snug -mt-1">
+            Stämnings-slidern sätter Reaktion och Dynamik automatiskt. Här ser du var de landar just nu.
           </div>
-          <div>
-            <div className="text-[11px] text-muted-foreground uppercase tracking-[0.08em] mb-1.5">Dynamik (tyst ↔ högt)</div>
-            <Seg
-              value={s.dynamics}
-              onChange={(v) => setPi({ dynamics: v })}
-              options={[
-                { v: 0.35, label: "Lugn" },
-                { v: 0.6,  label: "Normal" },
-                { v: 0.85, label: "Maxad" },
-              ]}
-            />
-          </div>
+          <ReadonlyMeter
+            label="Reaktion på musiken"
+            value={s.agcAgg}
+            min={0.15} max={0.85}
+            leftLabel="Långsam" rightLabel="Snabb"
+          />
+          <ReadonlyMeter
+            label="Dynamik (tyst ↔ högt)"
+            value={s.dynamics}
+            min={0.35} max={0.85}
+            leftLabel="Lugn" rightLabel="Maxad"
+          />
           <label className="flex items-center justify-between py-1 text-[15px] cursor-pointer">
             <span>Pulsa ljuset på taktslag</span>
             <SwitchBtn checked={s.beatPulse} onChange={(v) => setPi({ beatPulse: v })} />
@@ -472,6 +464,35 @@ function AdvancedTechnical() {
     </>
   );
 }
+
+function ReadonlyMeter({
+  label, value, min, max, leftLabel, rightLabel,
+}: {
+  label: string; value: number; min: number; max: number;
+  leftLabel: string; rightLabel: string;
+}) {
+  const pct = Math.round(((value - min) / (max - min)) * 100);
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-1.5">
+        <div className="text-[11px] text-muted-foreground uppercase tracking-[0.08em]">{label}</div>
+        <div className="text-[11px] tabular-nums text-muted-foreground/70">auto</div>
+      </div>
+      <input
+        type="range" min={0} max={100} step={1}
+        value={Math.max(0, Math.min(100, pct))}
+        readOnly disabled
+        className="w-full h-2 accent-[hsl(var(--primary))] opacity-70 cursor-not-allowed"
+        aria-label={`${label} (styrs av stämning)`}
+      />
+      <div className="flex justify-between text-[11px] uppercase tracking-[0.1em] text-muted-foreground/70 mt-1 px-0.5">
+        <span>{leftLabel}</span>
+        <span>{rightLabel}</span>
+      </div>
+    </div>
+  );
+}
+
 
 /* ────────── Delar ────────── */
 
