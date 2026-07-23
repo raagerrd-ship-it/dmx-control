@@ -375,13 +375,22 @@ function RotationList({ modes }: { modes: [string, string, string][] }) {
         {modes.map(([m, label, desc], i) => {
           const on = s.rotation[m] !== false;
           const isPlaying = playing === m && s.power;
+          // Mock:en har inga specialroll-fixtures konfigurerade (bara PAR i
+          // demo-state) → alla effekter vars `drives` kräver hazer/uv/etc. gråas
+          // ut med "kräver: X"-tagg. Exakt samma logik som på Pi:n; skillnaden
+          // är bara att Pi:ns cfg.fixtures verkligen kan innehålla de rollerna.
+          const missing = MODE_DRIVES[m] || [];
+          const dim = missing.length > 0;
           return (
             <label
               key={m}
               className={`flex items-center justify-between py-2.5 px-2 rounded-md border-l-[3px] transition-colors cursor-pointer ${
                 isPlaying ? "border-l-primary" : "border-l-transparent"
               } ${i > 0 ? "border-t border-t-border" : ""}`}
-              style={isPlaying ? { background: "color-mix(in srgb, hsl(var(--accent)) 18%, transparent)" } : undefined}
+              style={{
+                ...(isPlaying ? { background: "color-mix(in srgb, hsl(var(--accent)) 18%, transparent)" } : {}),
+                ...(dim ? { opacity: 0.45 } : {}),
+              }}
             >
               <span className="flex-1 min-w-0 flex flex-col gap-0.5">
                 <span className={`text-[15px] ${isPlaying ? "font-semibold" : "font-medium"}`}>
@@ -392,7 +401,10 @@ function RotationList({ modes }: { modes: [string, string, string][] }) {
                     </span>
                   )}
                 </span>
-                <span className="text-xs text-muted-foreground/70 leading-snug">{desc}</span>
+                <span className="text-xs text-muted-foreground/70 leading-snug">
+                  {desc}
+                  {dim && <span className="opacity-70"> · kräver: {missing.join(", ")}</span>}
+                </span>
               </span>
               <SwitchBtn checked={on} onChange={(v) => setRotation(m, v)} />
             </label>
