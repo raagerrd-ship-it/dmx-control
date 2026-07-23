@@ -61,6 +61,8 @@ export interface ServerDeps {
     scan: () => void;
     pair: (mac: string) => void;
     unpair: (mac: string) => void;
+    /** Blinka en specifik slinga i identifieringsfärg så användaren kan bekräfta vilken fysisk enhet det är. */
+    identify: (mac: string) => void;
     /** Register a listener called whenever a scan finishes. */
     onScan: (fn: (devices: { mac: string; name: string; chip: "bledom" | "unknown"; rssi: number }[]) => void) => void;
     /** Register a listener called whenever the paired list changes. */
