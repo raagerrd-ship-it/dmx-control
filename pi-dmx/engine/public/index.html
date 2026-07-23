@@ -205,12 +205,12 @@
         <div class="advflag" id="fRiser"><span class="dot"></span>Riser-strobe</div>
         <div class="advflag" id="fHead"><span class="dot"></span>Drop-headroom</div>
         <div class="advflag" id="fFog"><span class="dot"></span>Rökmaskin aktiv</div>
-        <div class="advflag" id="fStrobeCh"><span class="dot"></span>DMX-strobe kopplad</div>
-        <div class="advflag" id="fHazer"><span class="dot"></span>Hazer kopplad</div>
-        <div class="advflag" id="fUv"><span class="dot"></span>UV-bar kopplad</div>
-        <div class="advflag" id="fBlinder"><span class="dot"></span>Blinder kopplad</div>
-        <div class="advflag" id="fLaser"><span class="dot"></span>Laser kopplad</div>
-        <div class="advflag" id="fCo2"><span class="dot"></span>CO₂-jet kopplad</div>
+        <div class="advflag" id="fStrobeCh"><span class="dot"></span>DMX-strobe aktiv</div>
+        <div class="advflag" id="fHazer"><span class="dot"></span>Hazer aktiv</div>
+        <div class="advflag" id="fUv"><span class="dot"></span>UV aktiv</div>
+        <div class="advflag" id="fBlinder"><span class="dot"></span>Blinder aktiv</div>
+        <div class="advflag" id="fLaser"><span class="dot"></span>Laser aktiv</div>
+        <div class="advflag" id="fCo2"><span class="dot"></span>CO₂ aktiv</div>
       </div>
     </div>
   </details>
@@ -449,11 +449,22 @@ function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
 // Effekt-listorna kommer från servern (type:"effects", grupperade på tier) →
 // en enda sanningskälla; ingen hårdkodad lista att hålla i synk med motorn.
 let CALM_MODES = [], FAST_MODES = [], FULL_MODES = [];
+// Vilka SPECIALROLLER (hazer/uv/blinder/strobe/laser/co2) varje effekt aktivt
+// driver — kommer från EFFECT_META på servern. Används för att gråa ut rader
+// i "Effekt-val" när kravd roll saknar kopplad fixture, och för att lysa
+// "aktiv"-flaggorna i Avancerat när nuvarande läge driver rollen.
+let MODE_DRIVES = {};
+let curFixtures = [];
+function hasRoleGlobal(r) {
+  return curFixtures.some(fx => Array.isArray(fx.roles) && fx.roles.includes(r));
+}
 function applyEffects(list) {
   const byTier = (t) => (list || []).filter((e) => e.tier === t).map((e) => [e.key, e.label, e.desc]);
   CALM_MODES = byTier("lugn");
   FAST_MODES = byTier("fart");
   FULL_MODES = byTier("full");
+  MODE_DRIVES = {};
+  for (const e of list || []) MODE_DRIVES[e.key] = e.drives || [];
   renderCategories();
 }
 let curRotation = {};
@@ -467,14 +478,18 @@ function renderRotList(elId, list) {
     const row = document.createElement(smart ? "label" : "div");
     row.className = "rotrow" + (smart ? "" : " tappable");
     row.dataset.mode = m;
-    const info = `<span class="rotinfo"><span class="rotname">${label}</span><span class="rotdesc">${desc || ""}</span></span>`;
+    // Kräver-tagg: effektens drives-roller som INTE har en kopplad fixture →
+    // raden gråas ut och användaren ser vad som saknas (option "visa men gråa ut").
+    const drives = MODE_DRIVES[m] || [];
+    const missing = drives.filter(r => !hasRoleGlobal(r));
+    if (missing.length) { row.style.opacity = "0.45"; }
+    const req = missing.length ? ` · <span style="opacity:.7">kräver: ${missing.join(", ")}</span>` : "";
+    const info = `<span class="rotinfo"><span class="rotname">${label}</span><span class="rotdesc">${(desc || "") + req}</span></span>`;
     if (smart) {
-      // Smart: checkbox väljer om effekten är med i rotationen.
       const on = curRotation[m] !== false;
       row.innerHTML = info + `<input type="checkbox" class="tgl" ${on ? "checked" : ""}>`;
       row.querySelector("input").onchange = (e) => { curRotation[m] = e.target.checked; send({ type: "setRotation", mode: m, value: e.target.checked }); };
     } else {
-      // Manuellt: tryck på raden → kör bara den effekten.
       const active = curMode === m;
       if (active) row.classList.add("selected");
       row.innerHTML = info + (active ? "" : `<span class="pick">Välj</span>`);
@@ -566,13 +581,20 @@ function updateAdvMirror(cfg) {
   flag("fRiser",  cfg.riserStrobe);
   flag("fHead",   cfg.dropHeadroom);
   flag("fFog",    cfg.fog && cfg.fog.enabled);
-  const hasRole = (r) => Array.isArray(cfg.fixtures) && cfg.fixtures.some(fx => Array.isArray(fx.roles) && fx.roles.includes(r));
-  flag("fStrobeCh", hasRole("strobe"));
-  flag("fHazer",    hasRole("hazer"));
-  flag("fUv",       hasRole("uv"));
-  flag("fBlinder",  hasRole("blinder"));
-  flag("fLaser",    hasRole("laser"));
-  flag("fCo2",      hasRole("co2"));
+  curFixtures = Array.isArray(cfg.fixtures) ? cfg.fixtures : [];
+  // "aktiv" = nuvarande läge driver rollen OCH minst en fixture har den rollen.
+  // Ren "kopplad utan att spelas" släcker flaggan — den ska ge en LEVANDE bild
+  // av vad rök/hazer/blinder/UV/laser/CO₂ faktiskt gör just nu, inte bara vad
+  // som är kabeldraget.
+  const drivesNow = MODE_DRIVES[cfg.mode] || [];
+  const isActive = (r) => drivesNow.includes(r) && curFixtures.some(fx => Array.isArray(fx.roles) && fx.roles.includes(r));
+  flag("fStrobeCh", isActive("strobe"));
+  flag("fHazer",    isActive("hazer"));
+  flag("fUv",       isActive("uv"));
+  flag("fBlinder",  isActive("blinder"));
+  flag("fLaser",    isActive("laser"));
+  flag("fCo2",      isActive("co2"));
+  renderCategories();   // fixtures kan ha ändrats → uppdatera "kräver: X"-taggar
 }
 let kickTimer;
 function applyFrame(f) {

@@ -6,7 +6,7 @@
  * och UI:t härleds alla ur det här registret — ingen duplicering i fem filer.
  */
 
-import type { Mode } from "../config.js";
+import type { ChannelRole, Mode } from "../config.js";
 import type { EffectDef, EffectTier } from "./types.js";
 
 import { drops } from "./drops.js";
@@ -50,6 +50,39 @@ export const EFFECTS: EffectDef[] = [
   tide, drift, pendel, viska, backbeat, tick, stege, eko, hjarta,
 ];
 
+/** Specialrolls-mappning: vilka fixture-roller (hazer/uv/blinder/strobe/laser/co2)
+ *  varje effekt aktivt driver. Effekten fungerar utan dessa; matchning styr bara
+ *  vilka SPECIALFIXTURES motorn ska tända, och UI:t gråar ut effekter vars enda
+ *  drives saknar kopplad fixture. Håll listan här (metadata) – inte i varje
+ *  effekt-fil – så vi har EN översikt att justera från. */
+const SPECIALTY_DRIVES: Partial<Record<Mode, ChannelRole[]>> = {
+  drops:    ["blinder", "strobe", "laser", "co2", "hazer"],
+  party:    ["blinder", "laser", "co2", "hazer"],
+  strobe:   ["strobe", "laser"],
+  rave:     ["strobe", "laser", "blinder", "hazer", "co2"],
+  snap:     ["blinder"],
+  bounce:   ["laser"],
+  backbeat: ["blinder"],
+  hjarta:   ["blinder"],
+  gallop:   ["laser"],
+  chase:    ["laser"],
+  aurora:   ["hazer", "uv"],
+  subbreath:["hazer"],
+  wave:     ["hazer"],
+  tide:     ["hazer", "uv"],
+  drift:    ["hazer", "uv"],
+  airglow:  ["uv"],
+  viska:    ["uv"],
+  pulse:    ["hazer"],
+};
+
+// Injicera drives i effekt-def:erna en gång vid modul-init (så EFFECT_META och
+// alla konsumenter ser samma sanning).
+for (const e of EFFECTS) {
+  const d = SPECIALTY_DRIVES[e.key];
+  if (d && d.length) e.drives = d;
+}
+
 /** Snabb uppslagning nyckel → effekt. */
 export const EFFECT_MAP: Map<Mode, EffectDef> = new Map(EFFECTS.map((e) => [e.key, e]));
 
@@ -64,4 +97,4 @@ export const TIER: Record<EffectTier, Mode[]> = {
 };
 
 /** Metadata för UI:t (skickas till klienten → en sanningskälla för listorna). */
-export const EFFECT_META = EFFECTS.map(({ key, label, desc, tier }) => ({ key, label, desc, tier }));
+export const EFFECT_META = EFFECTS.map(({ key, label, desc, tier, drives }) => ({ key, label, desc, tier, drives: drives ?? [] }));

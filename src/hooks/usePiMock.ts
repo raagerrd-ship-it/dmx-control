@@ -42,6 +42,29 @@ export const FULL_MODES: [string, string, string][] = [
   ["duel",     "Duell",       "Kick vs hi-hat slåss om riggens färg – röd dunk eller isblå tick."],
   ["backbeat", "Backbeat",    "Dov puls på bastrumman, vit blixt på virveln — den klassiska 2-och-4-känslan."],
 ];
+/** Vilka specialroller varje effekt driver — måste matcha SPECIALTY_DRIVES i
+ *  pi-dmx/engine/src/effects/registry.ts. Används av mocken för att gråa ut
+ *  rader i "Effekt-val" när effekten kräver en roll som ingen fixture har. */
+export const MODE_DRIVES: Record<string, string[]> = {
+  drops:    ["blinder", "strobe", "laser", "co2", "hazer"],
+  party:    ["blinder", "laser", "co2", "hazer"],
+  strobe:   ["strobe", "laser"],
+  rave:     ["strobe", "laser", "blinder", "hazer", "co2"],
+  snap:     ["blinder"],
+  bounce:   ["laser"],
+  backbeat: ["blinder"],
+  hjarta:   ["blinder"],
+  gallop:   ["laser"],
+  chase:    ["laser"],
+  aurora:   ["hazer", "uv"],
+  subbreath:["hazer"],
+  wave:     ["hazer"],
+  tide:     ["hazer", "uv"],
+  drift:    ["hazer", "uv"],
+  airglow:  ["uv"],
+  viska:    ["uv"],
+  pulse:    ["hazer"],
+};
 const ALL = [...CALM_MODES, ...FAST_MODES, ...FULL_MODES];
 
 const LS_KEY = "pi-mock-v1";

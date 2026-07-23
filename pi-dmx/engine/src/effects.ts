@@ -750,6 +750,24 @@ export class EffectEngine {
     const rsWhite = rs ? frame.buildUp * 0.7 : 0;
     const rsGate = rs ? (Math.floor(t * hz) % 2 === 0 ? 1 : 0.12) : 1;
 
+    // SPECIALKANALER (hazer/uv/blinder/strobe/laser/co2). Effektens `drives`-tagg
+    // avgör om motorn tänder dem denna frame. Värdena hämtas från samma signaler
+    // som färg-renderingen: audio-nivå, kick, drop, riser-strobe. Roller utan
+    // matchande drive-tagg = 0 (svart) → knivskarp av/på, ingen läckage mellan
+    // effekter. Kanalerna maskas ur ballistiken längre ner (samma spår som
+    // strobe) så pulser inte tonas ut och sätter fixtures i mellanhastigheter.
+    const drivesSet = effect?.drives ? new Set<string>(effect.drives) : null;
+    const has = (r: string) => !!drivesSet && drivesSet.has(r);
+    const clamp255 = (x: number) => x < 0 ? 0 : x > 255 ? 255 : Math.round(x);
+    const specialty = {
+      hazer:   has("hazer")   ? clamp255(140 + audio * 60) : 0,
+      uv:      has("uv")      ? clamp255(180 * md) : 0,
+      blinder: has("blinder") ? clamp255(Math.max(kickEnv * 255, this.dropEnv > 0.6 ? 255 : 0)) : 0,
+      strobe:  has("strobe")  ? (effMode === "strobe" ? 210 : (rs ? 220 : 0)) : 0,
+      laser:   has("laser")   ? clamp255(180 + audio * 75) : 0,
+      co2:     has("co2") && this.dropEnv > 0.85 ? 255 : 0,
+    };
+
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const isAnchor = useAnchor && i > 0 && i < count - 1;   // mittlamporna = ankare
@@ -768,14 +786,6 @@ export class EffectEngine {
         rgb[2] = (rgb[2] + (1 - rgb[2]) * rsWhite) * rsGate;
       }
       if (this.dropEnv > 0.005) {
-        // DESIGNAD DROP-LOOK. Forut var detta en BLANDNING, inte ett uttryck:
-        // tand lampa behöll sin egen farg pa full styrka, mork lampa lyftes mot
-        // VITT — resultatet blev vitt bredvid fargat, vilket skar sig. (Innan
-        // dess hoppades morka lampor over helt, sa chase med ett tant huvud lat
-        // tre av fyra kannor missa hela dropen.)
-        // Nu gar HELA riggen till samma palettfarg pa full styrka, med en vit
-        // karna i toppen som klingar av till ren farg — klassisk drop: vit blixt
-        // som landar i farg. Ett enat uttryck i stallet for lampa-for-lampa-mix.
         const dc = hsvToRgb(mixedSector(this.dropSector + i) / 6, 1, 1);
         const vitKarna = Math.max(0, (this.dropEnv - 0.6) / 0.4);   // bara vid toppen
         const k = this.dropEnv;
@@ -788,7 +798,7 @@ export class EffectEngine {
       rgb[0] = rgb[0] * md + 1.00 * restLvl;
       rgb[1] = rgb[1] * md + 0.30 * restLvl;
       rgb[2] = rgb[2] * md + 0.00 * restLvl;
-      writeFixture(this.universe, fx, rgb, 1, strobeVal);
+      writeFixture(this.universe, fx, rgb, 1, strobeVal, specialty);
     }
 
     // Output ballistics on color/dim channels (never strobe/mode channels —
@@ -811,16 +821,18 @@ export class EffectEngine {
       let mx = 0;
       for (const fx of this.cfg.fixtures) {
         const roles = fixtureRoles(fx);
-        // VU-taket skalar de LJUSBÄRANDE kanalerna: färg (r/g/b/w) om fixturen har
-        // det, annars dim-kanalen. På en dim+färg-lampa hålls dim konstant på 255
-        // (all dynamik ligger i färgen), så att skala BÅDA gav v²-dämpning.
         const hasColor = roles.includes("r") || roles.includes("g") || roles.includes("b") || roles.includes("w");
         for (let r = 0; r < roles.length; r++) {
           const ch = fx.address - 1 + r;
           if (ch < 0 || ch >= 512) continue;   // hög-adress custom-fixture får inte skriva utanför universet
-          if (roles[r] === "strobe") this.strobeMask[ch] = 1;
-          if (roles[r] === "r" || roles[r] === "g" || roles[r] === "b" || roles[r] === "w") this.capMask[ch] = 1;
-          else if (roles[r] === "dim" && !hasColor) this.capMask[ch] = 1;
+          const role = roles[r];
+          // Specialroller (strobe, hazer, uv, blinder, laser, co2) skrivs direkt
+          // av motorn per frame – de får INTE glidas ut av ballistiken, då tonar
+          // en 255 nedåt genom mellan­hastigheter (strobe skulle fara mellan
+          // takter, blinder klänga kvar en halv sekund, hazer flimra).
+          if (role === "strobe" || role === "hazer" || role === "uv" || role === "blinder" || role === "laser" || role === "co2") this.strobeMask[ch] = 1;
+          if (role === "r" || role === "g" || role === "b" || role === "w") this.capMask[ch] = 1;
+          else if (role === "dim" && !hasColor) this.capMask[ch] = 1;
           if (ch + 1 > mx) mx = ch + 1;
         }
       }
@@ -927,12 +939,17 @@ export class EffectEngine {
   }
 }
 
+interface SpecialtyValues {
+  hazer: number; uv: number; blinder: number; strobe: number; laser: number; co2: number;
+}
+
 function writeFixture(
   u: Uint8Array,
   fx: FixtureConfig,
   rgb: [number, number, number],
   master: number,
   strobeVal = 0,
+  specialty?: SpecialtyValues,
 ) {
   const roles = fixtureRoles(fx);
   const base = fx.address - 1;   // DMX is 1-indexed
@@ -942,9 +959,6 @@ function writeFixture(
   // White = min(r,g,b) so RGBW fixtures keep saturation on the color chans
   const w = Math.min(r, g, b);
   const dim = Math.max(r, g, b);
-  // Fixtures with BOTH a dimmer and color channels multiply them internally.
-  // Sending brightness on both gives a quadratic curve (reads as blinking,
-  // not fading) — master goes on the dim channel, dynamics stay in color.
   const hasColor = roles.includes("r") || roles.includes("g") || roles.includes("b");
   const hasDim = roles.includes("dim");
   const colorScale = hasDim ? 1 : m;
@@ -958,7 +972,12 @@ function writeFixture(
       case "b":      u[ch] = to255((b - (roles.includes("w") ? w : 0)) * colorScale); break;
       case "w":      u[ch] = to255(w * colorScale); break;
       case "dim":    u[ch] = to255(hasColor ? m : dim * m); break;
-      case "strobe": u[ch] = Math.max(0, Math.min(255, strobeVal)); break;  // 8-255 = fixture strobe, faster when higher
+      case "strobe": u[ch] = Math.max(0, Math.min(255, Math.max(strobeVal, specialty?.strobe ?? 0))); break;
+      case "hazer":   u[ch] = specialty?.hazer   ?? 0; break;
+      case "uv":      u[ch] = specialty?.uv      ?? 0; break;
+      case "blinder": u[ch] = specialty?.blinder ?? 0; break;
+      case "laser":   u[ch] = specialty?.laser   ?? 0; break;
+      case "co2":     u[ch] = specialty?.co2     ?? 0; break;
       case "unused": break;
     }
   }
