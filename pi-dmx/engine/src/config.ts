@@ -75,7 +75,10 @@ export interface EngineConfig {
    *  om Bluetooth själv. Persisteras så att slingorna återansluter automatiskt
    *  vid boot; ägaren parar dem en gång via /setup. `chip: "unknown"` = enhet
    *  hittad men vet ej protokoll (spara ändå så listan inte tappas). */
-  bleDevices?: { mac: string; name: string; chip: "bledom" | "unknown" }[];
+  /** cal = vitbalans- och max-ljus-kalibrering per slinga (0..1 per kanal + max).
+   *  Standard 1,1,1,1 = ingen justering. Sidecarn applicerar dessa på RGB innan
+   *  packet-write, så olika BLEDOM-kloner kan trimmas att se likadana ut. */
+  bleDevices?: { mac: string; name: string; chip: "bledom" | "unknown"; cal?: { rGain: number; gGain: number; bGain: number; maxBrightness: number } }[];
   /** Which codec input feeds the show: line on the P1 AUX header or the mic path. */
   audioInput: "aux" | "mic";
   sensitivity: number;    // 0..1 user knob
