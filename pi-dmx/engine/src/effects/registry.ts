@@ -6,7 +6,7 @@
  * och UI:t härleds alla ur det här registret — ingen duplicering i fem filer.
  */
 
-import type { Mode } from "../config.js";
+import type { ChannelRole, Mode } from "../config.js";
 import type { EffectDef, EffectTier } from "./types.js";
 
 import { drops } from "./drops.js";
