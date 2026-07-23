@@ -19,6 +19,8 @@ import { DmxSender } from "./dmx.js";
 import { startServer, applyInputRouting, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
+import { IntensityKnob } from "./intensityKnob.js";
+import { applyIntensity } from "./moods.js";
 
 import { activeSlots, type Mode } from "./config.js";
 import { EFFECT_KEYS, EFFECT_MAP } from "./effects/registry.js";
