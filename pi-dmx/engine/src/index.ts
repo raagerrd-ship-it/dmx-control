@@ -204,6 +204,11 @@ const serverDeps = {
     scheduleSave(cfg);
     curSlots = slotsFor();
     dmx.setMaxHz(cfg.dmxMaxHz);
+    if (ring && cfg.intensityRing) ring.setOptions({
+      maxBright: cfg.intensityRing.maxBright,
+      pulseBoost: cfg.intensityRing.pulseBoost,
+      blackoutFadeMs: cfg.intensityRing.blackoutFadeMs,
+    });
   },
 };
 const s80 = await startServer(serverDeps, Number(process.env.PORT ?? 80));
