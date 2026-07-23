@@ -210,8 +210,21 @@ function broadcast(obj: unknown) {
 }
 function pairedSnapshot() {
   return [...known.values()].map((s) => ({
-    mac: s.mac, name: s.name, chip: s.chip, connected: !!s.char,
+    mac: s.mac, name: s.name, chip: s.chip, connected: !!s.char, cal: { ...s.cal },
   }));
+}
+
+function normalizeCal(raw: any): StripCal {
+  const clamp = (x: any, def: number) => {
+    const n = typeof x === "number" && Number.isFinite(x) ? x : def;
+    return n < 0 ? 0 : n > 1 ? 1 : n;
+  };
+  return {
+    rGain: clamp(raw?.rGain, 1),
+    gGain: clamp(raw?.gGain, 1),
+    bGain: clamp(raw?.bGain, 1),
+    maxBrightness: clamp(raw?.maxBrightness, 1),
+  };
 }
 function broadcastPaired() { broadcast({ type: "paired", devices: pairedSnapshot() }); }
 function broadcastActive() {
