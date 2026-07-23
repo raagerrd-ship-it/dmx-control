@@ -38,6 +38,16 @@ if (LEGACY_MODES[cfg.mode as string]) cfg.mode = LEGACY_MODES[cfg.mode as string
 if (cfg.mode !== "smart" && cfg.mode !== "blackout" && !EFFECT_MAP.has(cfg.mode)) cfg.mode = "smart";
 cfg.fft.hop = 128;   // analys 375 Hz (beprövad tuning); render/DMX separat 100 Hz
 if (!cfg.dmxMaxHz || cfg.dmxMaxHz <= 50) cfg.dmxMaxHz = 100;   // migrera gamla 50-taket → tightare synk
+// Migrera äldre intensityRing utan de nya fälten (maxBright/pulseBoost/blackoutFadeMs).
+if (cfg.intensityRing) {
+  const r = cfg.intensityRing as Partial<NonNullable<typeof cfg.intensityRing>>;
+  cfg.intensityRing = {
+    bus: r.bus ?? 0, device: r.device ?? 0,
+    maxBright: r.maxBright ?? 0.40,
+    pulseBoost: r.pulseBoost ?? 0.18,
+    blackoutFadeMs: r.blackoutFadeMs ?? 400,
+  };
+}
 
 // RÖKENS UPPVÄRMNINGSKLOCKA FÅR INTE ÖVERLEVA EN STRÖMCYKEL.
 // cfg.fog.warmStartMs persisteras med flit så en MOTOR-omstart (deploy, krasch,
