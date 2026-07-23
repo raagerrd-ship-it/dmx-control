@@ -61,19 +61,22 @@ export const SCENES: {
 
 export interface PiSettings {
   power: boolean;         // stort AV/PÅ högst upp
-  scene: Scene | null;    // vald stämning; null = manuell effekt (matchar engine's activeMood)
+  /** Stämnings-vred 0..1 (Chill → Galet). Mappas 1..10 i UI. */
+  intensity: number;
+  scene: Scene | null;    // härledd bucket (chill/party/wild) från intensity — för visning/legacy
   rotation: Record<string, boolean>;
   energyDrivesMode: boolean;
   beatPulse: boolean;
   dwell: Dwell;
-  agcAgg: 0.15 | 0.85;
-  dynamics: 0.35 | 0.6 | 0.85;
-  master: 0.5 | 0.75 | 1;
+  agcAgg: number;
+  dynamics: number;
+  master: number;
   audioInput: AudioIn;
 }
 
 const defaults: PiSettings = {
   power: true,
+  intensity: 0.5,
   scene: "party",
   rotation: Object.fromEntries(ALL.map(([m]) => [m, true])),
   energyDrivesMode: true,
@@ -85,20 +88,52 @@ const defaults: PiSettings = {
   audioInput: "aux",
 };
 
-/** Applicerar en scen till settings — kalla vid scen-byte. Sätter allt som "hör till stämningen". */
-export function applyScene(id: Scene) {
-  const s = SCENES.find((x) => x.id === id)!;
-  const rotation = Object.fromEntries(ALL.map(([m]) => [m, s.modes.includes(m)]));
+/** Härled bucket från intensity 0..1: 0..0.33 chill, 0.34..0.66 party, 0.67..1 wild. */
+function bucketFromIntensity(x: number): Scene {
+  return x < 0.34 ? "chill" : x < 0.67 ? "party" : "wild";
+}
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/**
+ * Kontinuerlig stämning: interpolerar dynamics/master/agc mjukt mellan
+ * chill (0) → fest (0.5) → galet (1). Rotation-pool, dwell, puls och
+ * energiläge snäpper vid bucket-gränserna för att matcha motorns FEEL/POOL.
+ */
+export function applyIntensity(x: number) {
+  const clamped = Math.max(0, Math.min(1, x));
+  const c = SCENES[0], p = SCENES[1], w = SCENES[2];
+  let dynamics: number, master: number, agc: number;
+  if (clamped <= 0.5) {
+    const t = clamped / 0.5;
+    dynamics = lerp(c.dynamics, p.dynamics, t);
+    master   = lerp(c.master,   p.master,   t);
+    agc      = lerp(c.agcAgg,   p.agcAgg,   t);
+  } else {
+    const t = (clamped - 0.5) / 0.5;
+    dynamics = lerp(p.dynamics, w.dynamics, t);
+    master   = lerp(p.master,   w.master,   t);
+    agc      = lerp(p.agcAgg,   w.agcAgg,   t);
+  }
+  const bucket = bucketFromIntensity(clamped);
+  const sc = SCENES.find((s) => s.id === bucket)!;
+  const rotation = Object.fromEntries(ALL.map(([m]) => [m, sc.modes.includes(m)]));
   setPi({
-    scene: id,
+    intensity: clamped,
+    scene: bucket,
     rotation,
-    dwell: s.dwell,
-    dynamics: s.dynamics,
-    beatPulse: s.pulse,
-    energyDrivesMode: s.energyDrivesMode,
-    agcAgg: s.agcAgg,
-    master: s.master,
+    dwell: sc.dwell,
+    dynamics,
+    beatPulse: sc.pulse,
+    energyDrivesMode: sc.energyDrivesMode,
+    agcAgg: agc,
+    master,
   });
+}
+
+/** Legacy: byt till en av de tre bucket-ankarna. */
+export function applyScene(id: Scene) {
+  applyIntensity(id === "chill" ? 0 : id === "party" ? 0.5 : 1);
 }
 
 function load(): PiSettings {
