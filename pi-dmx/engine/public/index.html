@@ -319,18 +319,30 @@ const inMic = document.getElementById("inMic");
 inAux.onclick = () => send({ type: "setAudioInput", value: "aux" });
 inMic.onclick = () => send({ type: "setAudioInput", value: "mic" });
 
-// STÄMNINGAR: ETT val → motorn sätter hela känslan (setMood). Markering styrs av
-// config.activeMood i applyConfig. En knapp släcker inte, den tänder alltid (mood
-// sätter mode=smart → häver ev. blackout).
-let lastMood = "fest";
-document.querySelectorAll(".mood-btn").forEach((b) =>
-  b.onclick = () => {
-    lastMood = b.dataset.mood;
-    // Optimistisk markering: lys upp DIREKT vid tryck (motorn bekräftar via config).
-    document.querySelectorAll(".mood-btn").forEach((x) => x.classList.toggle("active", x === b));
-    setPower(false);   // en stämning tänder alltid (häver blackout) → visa på-läge direkt
-    send({ type: "setMood", value: b.dataset.mood });
-  });
+// STÄMNING: 1..10-slider speglar det fysiska KY-040-vredet. Skickar setIntensity
+// (0..1) → motorn (samma kod-väg som vredet). lastIntensity håller senaste värdet
+// så power-toggle kan tända tillbaka till det vi hade.
+let lastIntensity = 0.5;
+const moodSlider = document.getElementById("moodSlider");
+const moodSliderCard = document.getElementById("moodSliderCard");
+const moodLbl = document.getElementById("moodLbl");
+const moodNum = document.getElementById("moodNum");
+function moodLabelFor(v) { return v <= 3 ? "Chill" : v <= 7 ? "Fest" : "Galet"; }
+function updateMoodUi(v01, active) {
+  const v = Math.max(1, Math.min(10, Math.round(v01 * 9) + 1));
+  moodSlider.value = String(v);
+  moodLbl.textContent = moodLabelFor(v);
+  moodNum.textContent = ` · ${v}/10`;
+  moodSliderCard.classList.toggle("active", !!active);
+}
+moodSlider.addEventListener("input", () => {
+  const v = Math.max(1, Math.min(10, parseInt(moodSlider.value, 10) || 5));
+  const x = (v - 1) / 9;
+  lastIntensity = x;
+  updateMoodUi(x, true);
+  setPower(false);   // slidern tänder alltid (häver blackout)
+  send({ type: "setIntensity", value: x });
+});
 
 // POWER: släck hela riggen (blackout) / tänd tillbaka till senaste stämning.
 const powerCard = document.getElementById("powerCard");
