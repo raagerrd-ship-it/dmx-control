@@ -122,6 +122,17 @@
     details.more[open] > summary { color:var(--fg); margin-bottom:4px; }
     details.more > summary::after { content:" ⌄"; }
     details.more[open] > summary::after { content:" ⌃"; }
+    /* Spegel-sliders: skrivskyddad vy av vad Stämningen just nu har satt */
+    .advhint { font-size:12px; color:var(--dim); line-height:1.4; margin-bottom:10px; }
+    .advrow { display:grid; grid-template-columns: 130px 1fr 44px; gap:10px; align-items:center; margin-bottom:9px; }
+    .advrow > label { font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+    .advrow > .val { text-align:right; font-size:12px; color:var(--fg); font-variant-numeric:tabular-nums; }
+    .advrow .meter { margin-top:0; height:6px; opacity:.85; }
+    .advflags { display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; margin-top:12px; padding-top:10px; border-top:1px solid var(--line); }
+    .advflag { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--dim); }
+    .advflag .dot { width:9px; height:9px; border-radius:50%; background:var(--line); flex:none; transition:background .15s, box-shadow .15s; }
+    .advflag.on { color:var(--fg); }
+    .advflag.on .dot { background:var(--ok); box-shadow:0 0 8px color-mix(in srgb, var(--ok) 60%, transparent); }
   </style>
 </head>
 <body>
