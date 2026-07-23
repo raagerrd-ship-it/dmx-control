@@ -317,12 +317,12 @@ function AdvancedMirror() {
             <AdvFlag on={f.riserStrobe}      label="Riser-strobe" />
             <AdvFlag on={f.dropHeadroom}     label="Drop-headroom" />
             <AdvFlag on={false}              label="Rökmaskin aktiv" />
-            <AdvFlag on={false}              label="DMX-strobe kopplad" />
-            <AdvFlag on={false}              label="Hazer kopplad" />
-            <AdvFlag on={false}              label="UV-bar kopplad" />
-            <AdvFlag on={false}              label="Blinder kopplad" />
-            <AdvFlag on={false}              label="Laser kopplad" />
-            <AdvFlag on={false}              label="CO₂-jet kopplad" />
+            <AdvFlag on={false}              label="DMX-strobe aktiv" />
+            <AdvFlag on={false}              label="Hazer aktiv" />
+            <AdvFlag on={false}              label="UV aktiv" />
+            <AdvFlag on={false}              label="Blinder aktiv" />
+            <AdvFlag on={false}              label="Laser aktiv" />
+            <AdvFlag on={false}              label="CO₂ aktiv" />
           </div>
         </Card>
       </div>
