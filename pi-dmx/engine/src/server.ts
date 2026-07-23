@@ -466,12 +466,18 @@ export async function startServer(
 
   await app.listen({ port, host: "0.0.0.0" });
 
-  const broadcastConfig = () => {
-    const payload = JSON.stringify({ type: "config", config: deps.cfg });
+  const broadcast = (payload: unknown) => {
+    const s = JSON.stringify(payload);
     for (const c of app.websocketServer.clients) {
-      if (c.readyState === 1) c.send(payload);
+      if (c.readyState === 1) c.send(s);
     }
   };
+  const broadcastConfig = () => broadcast({ type: "config", config: deps.cfg });
+  // Sidecar events → fan out to every connected browser. Same server instance
+  // registers per port (80 + 443) so both listeners see the same events; the
+  // sidecar only fires ONE event per action, so this doubles up harmlessly.
+  deps.ble?.onScan((devices) => broadcast({ type: "bleScanResults", devices }));
+  deps.ble?.onPaired(() => broadcast({ type: "blePaired", devices: deps.ble!.paired() }));
   return { app, broadcastConfig };
 }
 
