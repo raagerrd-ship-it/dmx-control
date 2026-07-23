@@ -292,8 +292,10 @@
     </div>
     <div id="bleScanList" style="margin-top:8px"></div>
     <div class="status" style="margin-top:8px;opacity:.7">
-      BLEDOM-klonade RGB-LED-band paras här. Sidecarn kör på egen CPU-kärna så
-      Bluetooth-scanningen aldrig stör ljud- eller DMX-timingen. Riggens
+      BLEDOM-klonade RGB-LED-band paras här. Tryck <b>Blinka</b> på en post för
+      att pulsa lampan i magenta i några sekunder — då ser du direkt vilken
+      fysisk slinga det är innan du parar den. Sidecarn kör på egen CPU-kärna
+      så Bluetooth-scanningen aldrig stör ljud- eller DMX-timingen. Riggens
       genomsnittsfärg speglas till slingorna live (~60 Hz).
     </div>
   </div>
@@ -1266,9 +1268,17 @@ function renderBlePaired(devices) {
         <div style="font-weight:600">${escapeHtml(d.name || d.mac)}</div>
         <div style="opacity:.6;font-size:11px">${escapeHtml(d.mac)} · ${d.chip}</div>
       </div>
+      <button class="btn" data-ble-identify="${escapeHtml(d.mac)}" title="Blinka lampan så du ser vilken det är">Blinka</button>
       <button class="btn" data-ble-unpair="${escapeHtml(d.mac)}">Ta bort</button>
     </div>
   `).join("");
+  blePairedList.querySelectorAll("[data-ble-identify]").forEach((btn) => {
+    btn.onclick = () => {
+      send({ type: "bleIdentify", mac: btn.dataset.bleIdentify });
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = "Blinkar…";
+      setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 6000);
+    };
+  });
   blePairedList.querySelectorAll("[data-ble-unpair]").forEach((btn) => {
     btn.onclick = () => {
       if (!confirm("Ta bort slingan?")) return;
@@ -1289,16 +1299,24 @@ function renderBleScan(devices) {
     return;
   }
   bleScanList.innerHTML = fresh.map((d) => `
-    <div class="row" style="align-items:center;gap:10px;opacity:${d.chip === "bledom" ? "1" : ".55"}">
+    <div class="row" style="align-items:center;gap:8px;opacity:${d.chip === "bledom" ? "1" : ".55"}">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600">${escapeHtml(d.name || d.mac)}</div>
         <div style="opacity:.6;font-size:11px">${escapeHtml(d.mac)} · ${d.chip} · ${d.rssi} dBm</div>
       </div>
+      <button class="btn" data-ble-identify="${escapeHtml(d.mac)}" title="Blinka så du ser vilken lampa detta är">Blinka</button>
       <button class="btn primary" data-ble-pair="${escapeHtml(d.mac)}" data-ble-name="${escapeHtml(d.name || d.mac)}" data-ble-chip="${d.chip}">
         ${d.chip === "bledom" ? "Para" : "Testa"}
       </button>
     </div>
   `).join("");
+  bleScanList.querySelectorAll("[data-ble-identify]").forEach((btn) => {
+    btn.onclick = () => {
+      send({ type: "bleIdentify", mac: btn.dataset.bleIdentify });
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = "Blinkar…";
+      setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 6000);
+    };
+  });
   bleScanList.querySelectorAll("[data-ble-pair]").forEach((btn) => {
     btn.onclick = () => {
       send({ type: "blePair", mac: btn.dataset.blePair, name: btn.dataset.bleName, chip: btn.dataset.bleChip });

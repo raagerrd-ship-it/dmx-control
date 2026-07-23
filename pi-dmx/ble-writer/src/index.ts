@@ -59,6 +59,8 @@ interface Strip {
   lastFrame: [number, number, number];      // last (r,g,b) actually sent
   target:    [number, number, number];      // next (r,g,b) requested
   connecting: boolean;
+  identifyUntil: number;                    // 0 = normal; >now = blinka i identifieringsfärg
+  transient: boolean;                        // true = added by identify, drop after blink om ej parad
 }
 
 const known = new Map<string, Strip>();     // paired, persisted list
@@ -152,8 +154,28 @@ async function writeStrip(strip: Strip, r: number, g: number, b: number) {
 // is written at most once per MIN_WRITE_INTERVAL_MS. Node's async writes are
 // enqueued in parallel — no strip blocks another.
 setInterval(() => {
-  const [r, g, b] = target;
+  const [gr, gg, gb] = target;
+  const now = Date.now();
   for (const strip of known.values()) {
+    // Identify: en distinkt magenta-puls så användaren enkelt ser vilken
+    // fysisk slinga en post i listan motsvarar. Pulsar ~1.5 Hz.
+    let r = gr, g = gg, b = gb;
+    if (strip.identifyUntil > now) {
+      const phase = 0.5 - 0.5 * Math.cos((now / 1000) * Math.PI * 3); // 0..1 @ ~1.5 Hz
+      const v = Math.round(60 + phase * 195);
+      r = v; g = 0; b = v;                              // magenta-puls
+    } else if (strip.identifyUntil !== 0) {
+      // Identify just klar
+      strip.identifyUntil = 0;
+      if (strip.transient) {
+        // Aldrig parad → koppla ner och glöm
+        if (strip.peripheral) { try { strip.peripheral.disconnectAsync(); } catch { /* */ } }
+        known.delete(strip.mac);
+        broadcastPaired();
+        broadcastActive();
+        continue;
+      }
+    }
     if (strip.char) writeStrip(strip, r, g, b).catch(() => {});
     else connect(strip).catch(() => {});   // idempotent, guarded by .connecting
   }
@@ -201,11 +223,13 @@ async function handle(sock: net.Socket, msg: any) {
     // Engine boot handshake — restore persisted list.
     for (const d of msg.devices) {
       const mac = normalizeMac(d.mac);
-      if (!mac || known.has(mac)) continue;
+      if (!mac) continue;
+      const existing = known.get(mac);
+      if (existing) { existing.transient = false; continue; }
       known.set(mac, {
         mac, name: d.name || mac, chip: d.chip === "bledom" ? "bledom" : "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
-        target: [0, 0, 0], connecting: false,
+        target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: false,
       });
     }
     broadcastPaired();
@@ -224,16 +248,38 @@ async function handle(sock: net.Socket, msg: any) {
   }
   if (msg.type === "pair" && typeof msg.mac === "string") {
     const mac = normalizeMac(msg.mac);
+    const existing = known.get(mac);
+    if (existing) {
+      // Kan ha lagts till transient via "identify" — markera nu som permanent.
+      existing.transient = false;
+    } else {
+      const s = seen.get(mac);
+      known.set(mac, {
+        mac, name: s?.name || mac, chip: s?.chip || "unknown",
+        peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
+        target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: false,
+      });
+    }
+    const strip = known.get(mac)!;
+    await connect(strip);
+    return;
+  }
+  if (msg.type === "identify" && typeof msg.mac === "string") {
+    // "Blinka lampan" — hjälp användaren identifiera vilken fysisk slinga
+    // en post i listan motsvarar. Skapar transient-post om ej redan parad.
+    const mac = normalizeMac(msg.mac);
+    const durationMs = Math.max(1000, Math.min(15000, msg.durationMs ?? 6000));
     if (!known.has(mac)) {
       const s = seen.get(mac);
       known.set(mac, {
         mac, name: s?.name || mac, chip: s?.chip || "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
-        target: [0, 0, 0], connecting: false,
+        target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: true,
       });
     }
     const strip = known.get(mac)!;
-    await connect(strip);
+    strip.identifyUntil = Date.now() + durationMs;
+    connect(strip).catch(() => {});
     return;
   }
   if (msg.type === "unpair" && typeof msg.mac === "string") {

@@ -101,4 +101,6 @@ export class BleClient {
   scan() { this.send({ type: "scan" }); }
   pair(mac: string) { this.send({ type: "pair", mac }); }
   unpair(mac: string) { this.send({ type: "unpair", mac }); }
+  /** Blinka en specifik slinga i identifieringsfärg (magenta-puls). */
+  identify(mac: string, durationMs = 6000) { this.send({ type: "identify", mac, durationMs }); }
 }

@@ -61,6 +61,8 @@ export interface ServerDeps {
     scan: () => void;
     pair: (mac: string) => void;
     unpair: (mac: string) => void;
+    /** Blinka en specifik slinga i identifieringsfärg så användaren kan bekräfta vilken fysisk enhet det är. */
+    identify: (mac: string) => void;
     /** Register a listener called whenever a scan finishes. */
     onScan: (fn: (devices: { mac: string; name: string; chip: "bledom" | "unknown"; rssi: number }[]) => void) => void;
     /** Register a listener called whenever the paired list changes. */
@@ -451,6 +453,11 @@ export async function startServer(
             if (deps.cfg.bleDevices) {
               deps.cfg.bleDevices = deps.cfg.bleDevices.filter((d) => d.mac.toLowerCase() !== msg.mac.toLowerCase());
             }
+          } else if (msg.type === "bleIdentify" && typeof msg.mac === "string") {
+            // "Blinka lampan" — hjälper användaren identifiera vilken fysisk slinga
+            // en post motsvarar. Ingen cfg-mutation; sidecarn hanterar timeout.
+            deps.ble?.identify(msg.mac);
+            return;
           }
           deps.onConfigChanged?.();
           // Echo back
