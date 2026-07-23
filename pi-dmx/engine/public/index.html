@@ -535,6 +535,7 @@ function applyConfig(cfg) {
   segActivate("segDyn", cfg.dynamics ?? 0.6, "dyn");
   segActivate("segMaster", cfg.master ?? 1, "master");
   segActivate("segSpeed", tauDownToAgg(cfg.detection?.tauDown ?? 30) > 0.5 ? 0.85 : 0.15, "agg");
+  updateAdvMirror(cfg);
   identifyingIndex = cfg.identify?.index ?? -1;
   if (calTestActive) { /* kalibrering pågår → rör inte fixture-DOM:en (nollar annars slidern) */ }
   else if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
