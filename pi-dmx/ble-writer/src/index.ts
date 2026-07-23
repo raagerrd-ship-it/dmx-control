@@ -59,6 +59,8 @@ interface Strip {
   lastFrame: [number, number, number];      // last (r,g,b) actually sent
   target:    [number, number, number];      // next (r,g,b) requested
   connecting: boolean;
+  identifyUntil: number;                    // 0 = normal; >now = blinka i identifieringsfärg
+  transient: boolean;                        // true = added by identify, drop after blink om ej parad
 }
 
 const known = new Map<string, Strip>();     // paired, persisted list
