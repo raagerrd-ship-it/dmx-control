@@ -228,8 +228,9 @@ function MoreDetails() {
         <span className="ml-1 hidden group-open:inline"> ⌃</span>
       </summary>
 
-      <ShowCard />
-      <FinjusteringCard />
+      {/* Show + Finjustering borttagna — allt styrs av stämnings-slidern.
+          Se "Avancerat · spegel av stämningen" nedan för live-värden. */}
+
 
       <details className="mt-3 group/eff">
         <summary className="py-3 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/eff:text-foreground">
@@ -357,91 +358,8 @@ function AdvFlag({ on, label }: { on: boolean; label: string }) {
   );
 }
 
-/* ────────── Show ────────── */
+/* ────────── Show + Finjustering borttagna (styrs av stämnings-slidern) ────────── */
 
-function ShowCard() {
-  const s = usePi();
-  const smart = true; // preview har ingen manuell effekt-lås just nu
-  return (
-    <>
-      <SectionTitle>Show</SectionTitle>
-      <Card>
-        <div className="text-[12px] text-muted-foreground mb-2 leading-snug">
-          {smart
-            ? "Smart-läge — anpassar ljuset efter musiken och roterar mellan de effekter du kryssat i."
-            : "Manuellt läge — tryck på effekten du vill köra just nu."}
-        </div>
-        <TglRow
-          label="Energi styr läget (av = manuellt)"
-          checked={s.energyDrivesMode}
-          onChange={(v) => setPi({ energyDrivesMode: v })}
-        />
-        <div className="flex items-center justify-between py-2">
-          <span className="text-[14px]">Byter effekt</span>
-          <SegMini
-            value={s.dwell}
-            options={[
-              { v: "slow", label: "Sällan" },
-              { v: "normal", label: "Normal" },
-              { v: "fast", label: "Ofta" },
-            ]}
-            onChange={(v) => setPi({ dwell: v })}
-          />
-        </div>
-        <TglRow
-          label="Pulsa ljuset på taktslag"
-          checked={s.beatPulse}
-          onChange={(v) => setPi({ beatPulse: v })}
-        />
-      </Card>
-    </>
-  );
-}
-
-/* ────────── Finjustering (Reaktion / Dynamik / Ljusstyrka) ────────── */
-
-function FinjusteringCard() {
-  const s = usePi();
-  return (
-    <>
-      <SectionTitle>Finjustering</SectionTitle>
-      <Card>
-        <SetRow label="Reaktion på musiken">
-          <Seg
-            value={s.agcAgg}
-            options={[
-              { v: 0.15, label: "Långsam" },
-              { v: 0.85, label: "Snabb" },
-            ]}
-            onChange={(v) => setPi({ agcAgg: v })}
-          />
-        </SetRow>
-        <SetRow label="Dynamik (tyst ↔ högt)">
-          <Seg
-            value={s.dynamics}
-            options={[
-              { v: 0.35, label: "Lugn" },
-              { v: 0.6,  label: "Normal" },
-              { v: 0.85, label: "Maxad" },
-            ]}
-            onChange={(v) => setPi({ dynamics: v })}
-          />
-        </SetRow>
-        <SetRow label="Ljusstyrka" last>
-          <Seg
-            value={s.master}
-            options={[
-              { v: 0.5,  label: "50%" },
-              { v: 0.75, label: "75%" },
-              { v: 1,    label: "100%" },
-            ]}
-            onChange={(v) => setPi({ master: v })}
-          />
-        </SetRow>
-      </Card>
-    </>
-  );
-}
 
 /* ────────── Rotation-lista (matchar Pi:s .rotrow) ────────── */
 
