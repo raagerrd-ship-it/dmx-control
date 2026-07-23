@@ -2,8 +2,7 @@ import { useMockLive } from "@/hooks/useMockLive";
 import { useDmx } from "@/store/dmx";
 import {
   CALM_MODES, FAST_MODES, FULL_MODES,
-  usePi, usePlayingMode, setPi, setRotation, applyScene, SCENES,
-  type Scene,
+  usePi, usePlayingMode, setPi, setRotation, applyIntensity,
 } from "@/hooks/usePiMock";
 import { useLocation } from "react-router-dom";
 
@@ -24,7 +23,7 @@ export default function DmxController() {
       <PowerHero />
 
       <SectionTitle>Stämning</SectionTitle>
-      <MoodGrid />
+      <MoodSlider />
 
       <SectionTitle>Ljudkälla</SectionTitle>
       <AudioSourceCard />
@@ -72,39 +71,44 @@ function PowerHero() {
   );
 }
 
-/* ────────── Stämning: 3 tiles (matchar Pi:s .mood-grid) ────────── */
+/* ────────── Stämning: 1..10-slider (speglar KY-040-vredet på Pi) ────────── */
 
-const MOODS: { id: Scene; icon: string; label: string; hint: string }[] = [
-  { id: "chill", icon: "🌙", label: "Chill", hint: "Mjukt & lugnt" },
-  { id: "party", icon: "🎉", label: "Fest",  hint: "Följer takten" },
-  { id: "wild",  icon: "🔥", label: "Galet", hint: "Full fart" },
-];
-
-function MoodGrid() {
+function MoodSlider() {
   const s = usePi();
+  const v = Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
+  const label = v <= 3 ? "Chill" : v <= 7 ? "Fest" : "Galet";
+  const dim = !s.power;
   return (
-    <div className="grid grid-cols-3 gap-2 mb-3">
-      {MOODS.map((m) => {
-        const active = s.scene === m.id && s.power;
-        return (
-          <button
-            key={m.id}
-            onClick={() => {
-              if (!s.power) setPi({ power: true });
-              applyScene(m.id);
-            }}
-            className={`py-4 pb-3 px-1.5 rounded-2xl border text-center transition-colors ${
-              active
-                ? "border-primary bg-[color-mix(in_srgb,hsl(var(--accent))_15%,hsl(var(--card)))]"
-                : "border-border bg-card"
-            }`}
-          >
-            <div className="text-2xl leading-none">{m.icon}</div>
-            <div className="text-[15px] font-semibold mt-2">{m.label}</div>
-            <div className="text-[11px] text-muted-foreground mt-0.5">{m.hint}</div>
-          </button>
-        );
-      })}
+    <div
+      className={`bg-card border rounded-[14px] px-3.5 pt-3.5 pb-3 mb-3 transition-colors ${
+        dim ? "border-border opacity-70" : "border-[color-mix(in_srgb,hsl(var(--accent))_55%,hsl(var(--border)))]"
+      }`}
+    >
+      <div className="flex items-baseline justify-between mb-2">
+        <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Chill → Galet</span>
+        <span className="text-[13px] font-semibold tabular-nums">
+          <span className="text-primary">{label}</span>
+          <span className="text-muted-foreground"> · {v}/10</span>
+        </span>
+      </div>
+      <input
+        type="range"
+        min={1}
+        max={10}
+        step={1}
+        value={v}
+        onChange={(e) => {
+          if (!s.power) setPi({ power: true });
+          applyIntensity((Number(e.target.value) - 1) / 9);
+        }}
+        className="w-full h-6 accent-[hsl(var(--primary))] cursor-pointer"
+        aria-label="Stämning från Chill till Galet"
+      />
+      <div className="flex justify-between text-[11px] uppercase tracking-[0.1em] text-muted-foreground mt-1 px-0.5">
+        <span>Chill</span>
+        <span>Fest</span>
+        <span>Galet</span>
+      </div>
     </div>
   );
 }
@@ -509,7 +513,3 @@ function SegMini<T extends string | number>({
     </div>
   );
 }
-
-// Håll `SCENES` importerad så tree-shaking inte tar den — vi kan behöva
-// referera fler mood-fält (t.ex. `agcAgg`) om Pi-HTML:en byggs ut.
-void SCENES;

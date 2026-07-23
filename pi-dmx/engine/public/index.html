@@ -107,13 +107,15 @@
     .power-card.off .power-icon { background:var(--line); color:var(--dim); }
     .power-text small { display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin-bottom:2px; }
     .power-text b { font-size:19px; font-weight:600; }
-    .mood-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-    .mood-btn { padding:16px 6px 13px; background:var(--card); border:1px solid var(--line); border-radius:14px; text-align:center; cursor:pointer; transition:border-color .12s, background .12s; user-select:none; }
-    .mood-btn.active { border-color:var(--hot); background:color-mix(in srgb, var(--hot) 15%, var(--card)); }
-    .mood-btn:active { transform:scale(.97); }
-    .mood-btn .mi { font-size:24px; line-height:1; }
-    .mood-btn .mt { font-size:15px; font-weight:600; margin-top:8px; }
-    .mood-btn .ms { font-size:11px; color:var(--dim); margin-top:3px; }
+    .mood-slider-card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 14px 12px; }
+    .mood-slider-card.active { border-color:color-mix(in srgb, var(--hot) 55%, var(--line)); }
+    .mood-slider-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; }
+    .mood-slider-label { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); }
+    .mood-slider-val { font-size:13px; font-variant-numeric:tabular-nums; font-weight:600; }
+    .mood-slider-val .lbl { color:var(--hot); }
+    .mood-slider-val .num { color:var(--dim); }
+    .mood-slider-card input[type=range] { width:100%; height:24px; accent-color:var(--hot); cursor:pointer; }
+    .mood-slider-legend { display:flex; justify-content:space-between; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-top:4px; padding:0 2px; }
     details.more { margin-top:8px; }
     details.more > summary { list-style:none; cursor:pointer; padding:14px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
     details.more > summary::-webkit-details-marker { display:none; }
@@ -129,10 +131,13 @@
   </div>
 
   <h1>Stämning</h1>
-  <div class="mood-grid">
-    <div class="mood-btn" data-mood="chill"><div class="mi">🌙</div><div class="mt">Chill</div><div class="ms">Mjukt &amp; lugnt</div></div>
-    <div class="mood-btn" data-mood="fest"><div class="mi">🎉</div><div class="mt">Fest</div><div class="ms">Följer takten</div></div>
-    <div class="mood-btn" data-mood="galet"><div class="mi">🔥</div><div class="mt">Galet</div><div class="ms">Full fart</div></div>
+  <div class="mood-slider-card" id="moodSliderCard">
+    <div class="mood-slider-head">
+      <span class="mood-slider-label">Chill → Galet</span>
+      <span class="mood-slider-val"><span class="lbl" id="moodLbl">Fest</span><span class="num" id="moodNum"> · 5/10</span></span>
+    </div>
+    <input type="range" id="moodSlider" min="1" max="10" step="1" value="5" aria-label="Stämning från Chill till Galet" />
+    <div class="mood-slider-legend"><span>Chill</span><span>Fest</span><span>Galet</span></div>
   </div>
 
   <h1>Ljudkälla</h1>
@@ -314,18 +319,30 @@ const inMic = document.getElementById("inMic");
 inAux.onclick = () => send({ type: "setAudioInput", value: "aux" });
 inMic.onclick = () => send({ type: "setAudioInput", value: "mic" });
 
-// STÄMNINGAR: ETT val → motorn sätter hela känslan (setMood). Markering styrs av
-// config.activeMood i applyConfig. En knapp släcker inte, den tänder alltid (mood
-// sätter mode=smart → häver ev. blackout).
-let lastMood = "fest";
-document.querySelectorAll(".mood-btn").forEach((b) =>
-  b.onclick = () => {
-    lastMood = b.dataset.mood;
-    // Optimistisk markering: lys upp DIREKT vid tryck (motorn bekräftar via config).
-    document.querySelectorAll(".mood-btn").forEach((x) => x.classList.toggle("active", x === b));
-    setPower(false);   // en stämning tänder alltid (häver blackout) → visa på-läge direkt
-    send({ type: "setMood", value: b.dataset.mood });
-  });
+// STÄMNING: 1..10-slider speglar det fysiska KY-040-vredet. Skickar setIntensity
+// (0..1) → motorn (samma kod-väg som vredet). lastIntensity håller senaste värdet
+// så power-toggle kan tända tillbaka till det vi hade.
+let lastIntensity = 0.5;
+const moodSlider = document.getElementById("moodSlider");
+const moodSliderCard = document.getElementById("moodSliderCard");
+const moodLbl = document.getElementById("moodLbl");
+const moodNum = document.getElementById("moodNum");
+function moodLabelFor(v) { return v <= 3 ? "Chill" : v <= 7 ? "Fest" : "Galet"; }
+function updateMoodUi(v01, active) {
+  const v = Math.max(1, Math.min(10, Math.round(v01 * 9) + 1));
+  moodSlider.value = String(v);
+  moodLbl.textContent = moodLabelFor(v);
+  moodNum.textContent = ` · ${v}/10`;
+  moodSliderCard.classList.toggle("active", !!active);
+}
+moodSlider.addEventListener("input", () => {
+  const v = Math.max(1, Math.min(10, parseInt(moodSlider.value, 10) || 5));
+  const x = (v - 1) / 9;
+  lastIntensity = x;
+  updateMoodUi(x, true);
+  setPower(false);   // slidern tänder alltid (häver blackout)
+  send({ type: "setIntensity", value: x });
+});
 
 // POWER: släck hela riggen (blackout) / tänd tillbaka till senaste stämning.
 const powerCard = document.getElementById("powerCard");
@@ -337,13 +354,13 @@ function setPower(off) {
   powerBig.textContent = off ? "Tryck för att tända" : "Tryck för att släcka";
 }
 powerCard.onclick = () => {
-  if (curMode === "blackout") {                       // TÄND → senaste stämning
+  if (curMode === "blackout") {                       // TÄND → senaste intensity
     curMode = "smart"; setPower(false);
-    document.querySelectorAll(".mood-btn").forEach((x) => x.classList.toggle("active", x.dataset.mood === lastMood));
-    send({ type: "setMood", value: lastMood });
+    updateMoodUi(lastIntensity, true);
+    send({ type: "setIntensity", value: lastIntensity });
   } else {                                            // SLÄCK
     curMode = "blackout"; setPower(true);
-    document.querySelectorAll(".mood-btn").forEach((x) => x.classList.remove("active"));
+    updateMoodUi(lastIntensity, false);
     send({ type: "setMode", mode: "blackout" });
   }
 };
@@ -461,9 +478,11 @@ function applyConfig(cfg) {
   curRotation = cfg.rotation || {};
   curMode = cfg.mode || "smart";
   refreshModeView();                 // sätter tEnergy/dwell/intro + renderar listorna
-  // Stämnings-markering + power-läge (matchar Mock-UI).
-  document.querySelectorAll(".mood-btn").forEach((b) => b.classList.toggle("active", b.dataset.mood === cfg.activeMood));
-  if (cfg.activeMood) lastMood = cfg.activeMood;
+  // Stämnings-slidern speglar motorns activeIntensity (KY-040-vredet eller
+  // andra klienter kan ha ändrat den). Kortet dimmas när ljuset är av.
+  const x = typeof cfg.activeIntensity === "number" ? cfg.activeIntensity : 0.5;
+  lastIntensity = x;
+  updateMoodUi(x, cfg.mode !== "blackout");
   setPower(cfg.mode === "blackout");
   tBeatPulse.checked = !!cfg.beatPulse;
   const fog = cfg.fog || {};
