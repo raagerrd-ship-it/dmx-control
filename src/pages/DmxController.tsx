@@ -314,9 +314,9 @@ function MoreSections() {
               value={s.master}
               onChange={(v) => setPi({ master: v })}
               options={[
-                { v: 0.5  as const, label: "50%" },
-                { v: 0.75 as const, label: "75%" },
-                { v: 1    as const, label: "100%" },
+                { v: 0.5,  label: "50%" },
+                { v: 0.75, label: "75%" },
+                { v: 1,    label: "100%" },
               ]}
             />
           </div>
