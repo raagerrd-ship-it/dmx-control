@@ -513,7 +513,3 @@ function SegMini<T extends string | number>({
     </div>
   );
 }
-
-// Håll `SCENES` importerad så tree-shaking inte tar den — vi kan behöva
-// referera fler mood-fält (t.ex. `agcAgg`) om Pi-HTML:en byggs ut.
-void SCENES;
