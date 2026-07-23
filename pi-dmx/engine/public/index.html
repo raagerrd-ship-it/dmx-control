@@ -494,8 +494,8 @@ let ws;
 function connect() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${proto}://${location.host}/ws`);
-  ws.onopen  = () => connEl.textContent = "Connected";
-  ws.onclose = () => { connEl.textContent = "Disconnected — retrying…"; setTimeout(connect, 1500); };
+  ws.onopen  = () => { connEl.textContent = "Connected"; wsOk = true; renderHealth(); };
+  ws.onclose = () => { connEl.textContent = "Disconnected — retrying…"; wsOk = false; renderHealth(); setTimeout(connect, 1500); };
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
     if (m.type === "config") applyConfig(m.config);
