@@ -85,30 +85,39 @@ function PowerIcon({ on }: { on: boolean }) {
 
 function SceneTiles() {
   const s = usePi();
+  const val = Math.round(s.intensity * 9) + 1; // 1..10
+  const label = val <= 3 ? "Chill" : val <= 7 ? "Fest" : "Galet";
+  const dim = !s.power;
   return (
     <div className="mb-4">
-      <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground mb-2 px-1">Stämning</div>
-      <div className="grid grid-cols-3 gap-2">
-        {SCENES.map((sc) => {
-          const active = s.scene === sc.id;
-          const dim = !s.power;
-          return (
-            <button
-              key={sc.id}
-              onClick={() => { if (!s.power) setPi({ power: true }); applyScene(sc.id); }}
-              className={`rounded-[14px] py-4 px-2 border-2 transition-all flex flex-col items-center gap-1.5 ${
-                active
-                  ? "border-primary bg-[color-mix(in_srgb,hsl(var(--accent))_16%,transparent)]"
-                  : "border-border bg-card"
-              } ${dim ? "opacity-60" : ""}`}
-              aria-pressed={active}
-            >
-              <span className={`text-2xl leading-none ${active ? "text-primary" : "text-muted-foreground"}`}>{sc.icon}</span>
-              <span className="text-[15px] font-semibold">{sc.label}</span>
-              <span className="text-[11px] text-muted-foreground leading-tight">{sc.hint}</span>
-            </button>
-          );
-        })}
+      <div className="flex items-baseline justify-between mb-2 px-1">
+        <span className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Stämning</span>
+        <span className="text-[13px] font-semibold tabular-nums">
+          <span className="text-primary">{label}</span>
+          <span className="text-muted-foreground"> · {val}/10</span>
+        </span>
+      </div>
+      <div className={`bg-card border-2 rounded-[14px] px-4 pt-4 pb-3 transition-colors ${
+        dim ? "border-border opacity-60" : "border-primary/40"
+      }`}>
+        <input
+          type="range"
+          min={1}
+          max={10}
+          step={1}
+          value={val}
+          onChange={(e) => {
+            if (!s.power) setPi({ power: true });
+            applyIntensity((Number(e.target.value) - 1) / 9);
+          }}
+          className="w-full h-2 accent-[hsl(var(--primary))] cursor-pointer"
+          aria-label="Stämning från Chill till Galet"
+        />
+        <div className="flex justify-between text-[11px] uppercase tracking-[0.12em] text-muted-foreground mt-2 px-0.5">
+          <span>Chill</span>
+          <span>Fest</span>
+          <span>Galet</span>
+        </div>
       </div>
     </div>
   );
