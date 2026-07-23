@@ -437,28 +437,38 @@ function AdvancedTechnical() {
       {open && (
         <div className="space-y-4 pt-1">
           <div className="text-[11px] text-muted-foreground/80 leading-snug -mt-1">
-            Stämnings-slidern sätter Reaktion och Dynamik automatiskt. Här ser du var de landar just nu.
+            Alla värden nedan sätts automatiskt av stämnings-slidern. Här ser du var de landar just nu.
           </div>
           <ReadonlyMeter
+            label="Ljusstyrka"
+            pct={Math.round(s.master * 100)}
+            leftLabel="50%" rightLabel="100%"
+          />
+          <ReadonlyMeter
             label="Reaktion på musiken"
-            value={s.agcAgg}
-            min={0.15} max={0.85}
+            pct={Math.round(((s.agcAgg - 0.15) / (0.85 - 0.15)) * 100)}
             leftLabel="Långsam" rightLabel="Snabb"
           />
           <ReadonlyMeter
             label="Dynamik (tyst ↔ högt)"
-            value={s.dynamics}
-            min={0.35} max={0.85}
+            pct={Math.round(((s.dynamics - 0.35) / (0.85 - 0.35)) * 100)}
             leftLabel="Lugn" rightLabel="Maxad"
           />
-          <label className="flex items-center justify-between py-1 text-[15px] cursor-pointer">
-            <span>Pulsa ljuset på taktslag</span>
-            <SwitchBtn checked={s.beatPulse} onChange={(v) => setPi({ beatPulse: v })} />
-          </label>
-          <label className="flex items-center justify-between py-1 text-[15px] cursor-pointer">
-            <span>Energi styr läget</span>
-            <SwitchBtn checked={s.energyDrivesMode} onChange={(v) => setPi({ energyDrivesMode: v })} />
-          </label>
+          <ReadonlyMeter
+            label="Byter effekt"
+            pct={s.dwell === "slow" ? 0 : s.dwell === "normal" ? 50 : 100}
+            leftLabel="Sällan" rightLabel="Ofta"
+          />
+          <ReadonlyMeter
+            label="Pulsa ljuset på taktslag"
+            pct={s.beatPulse ? 100 : 0}
+            leftLabel="Av" rightLabel="På"
+          />
+          <ReadonlyMeter
+            label="Energi styr läget"
+            pct={s.energyDrivesMode ? 100 : 0}
+            leftLabel="Av" rightLabel="På"
+          />
         </div>
       )}
     </>
@@ -466,12 +476,11 @@ function AdvancedTechnical() {
 }
 
 function ReadonlyMeter({
-  label, value, min, max, leftLabel, rightLabel,
+  label, pct, leftLabel, rightLabel,
 }: {
-  label: string; value: number; min: number; max: number;
-  leftLabel: string; rightLabel: string;
+  label: string; pct: number; leftLabel: string; rightLabel: string;
 }) {
-  const pct = Math.round(((value - min) / (max - min)) * 100);
+  const clamped = Math.max(0, Math.min(100, pct));
   return (
     <div>
       <div className="flex items-baseline justify-between mb-1.5">
@@ -480,7 +489,7 @@ function ReadonlyMeter({
       </div>
       <input
         type="range" min={0} max={100} step={1}
-        value={Math.max(0, Math.min(100, pct))}
+        value={clamped}
         readOnly disabled
         className="w-full h-2 accent-[hsl(var(--primary))] opacity-70 cursor-not-allowed"
         aria-label={`${label} (styrs av stämning)`}
@@ -492,6 +501,7 @@ function ReadonlyMeter({
     </div>
   );
 }
+
 
 
 /* ────────── Delar ────────── */
