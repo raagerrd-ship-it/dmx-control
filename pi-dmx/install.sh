@@ -23,7 +23,8 @@ echo "==> [1/9] apt packages"
 apt-get update -qq
 apt-get install -y --no-install-recommends \
   build-essential nodejs npm \
-  alsa-utils gpiod libcap2-bin
+  alsa-utils gpiod libcap2-bin \
+  bluetooth bluez libbluetooth-dev
 
 echo "==> [2/9] /boot config — UART, Codec Zero, force_turbo"
 CFG="$BOOT_DIR/config.txt"
@@ -52,8 +53,11 @@ if [[ -f $CMD ]]; then
   fi
 fi
 
-echo "==> [4/9] disable Bluetooth stack + serial-getty"
-systemctl disable --now hciuart bluetooth serial-getty@ttyAMA0 2>/dev/null || true
+echo "==> [4/9] disable serial-getty (håll bluetoothd igång — BLE-sidecarn använder hci0)"
+# BT-stacken behövs för BLE-slingorna. hciuart var för PL011/BT-modem-kombon på
+# äldre Pi, irrelevant på Zero 2 W (BT sitter på SDIO).
+systemctl disable --now hciuart serial-getty@ttyAMA0 2>/dev/null || true
+systemctl enable --now bluetooth 2>/dev/null || true
 
 AP_SSID="${AP_SSID:-pi-dmx}"
 AP_PASS="${AP_PASS:-}"                 # empty = open network (no password)
@@ -144,11 +148,27 @@ if [ ! -f /etc/audio-dmx/tls/cert.pem ]; then
   openssl req -x509 -newkey rsa:2048 -keyout /etc/audio-dmx/tls/key.pem     -out /etc/audio-dmx/tls/cert.pem -days 3650 -nodes -subj "/CN=pi-dmx.local" 2>/dev/null
 fi
 
+echo "==> [7b/8] build + install pi-dmx-ble (BLE sidecar)"
+if [ -d "$REPO_DIR/ble-writer" ]; then
+  cd "$REPO_DIR/ble-writer"
+  npm ci --no-audit --no-fund
+  npm run build
+  mkdir -p /opt/pi-dmx-ble
+  rsync -a --delete dist/ /opt/pi-dmx-ble/dist/
+  rsync -a --delete node_modules/ /opt/pi-dmx-ble/node_modules/
+  install -m644 package.json /opt/pi-dmx-ble/package.json
+  install -Dm644 systemd/pi-dmx-ble.service /etc/systemd/system/pi-dmx-ble.service
+  mkdir -p /run/pi-dmx
+  cd "$REPO_DIR/engine"
+fi
+
 echo "==> [8/8] enable + start services"
 systemctl daemon-reload
 systemctl enable --now cpu-performance codec-zero-linein dmx-helper audio-dmx-engine
+[ -f /etc/systemd/system/pi-dmx-ble.service ] && systemctl enable --now pi-dmx-ble
 # enable --now does not restart already-running units — force the new build live.
 systemctl restart dmx-helper audio-dmx-engine
+[ -f /etc/systemd/system/pi-dmx-ble.service ] && systemctl restart pi-dmx-ble
 
 echo
 echo "Done. Reboot once so /boot config + isolcpus take effect:"
@@ -156,3 +176,4 @@ echo "    sudo reboot"
 echo
 echo "After reboot, join WiFi '$AP_SSID' (password: $AP_PASS)"
 echo "and open http://192.168.4.1/ from your phone."
+echo "BLE-slingor paras under /setup → BLE-slingor (endast synligt i ägarläge)."
