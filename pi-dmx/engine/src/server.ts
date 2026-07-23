@@ -409,6 +409,15 @@ export async function startServer(
             deps.cfg.strobeUnlimited = !!msg.value;
           } else if (msg.type === "setDropHeadroom") {
             deps.cfg.dropHeadroom = !!msg.value;
+          } else if (msg.type === "setRing" && msg.ring && typeof msg.ring === "object" && deps.cfg.intensityRing) {
+            const r = msg.ring as Record<string, unknown>;
+            const cur = deps.cfg.intensityRing;
+            deps.cfg.intensityRing = {
+              bus: cur.bus, device: cur.device,
+              maxBright:      typeof r.maxBright === "number"      ? Math.max(0.05, Math.min(1,    r.maxBright))      : cur.maxBright,
+              pulseBoost:     typeof r.pulseBoost === "number"     ? Math.max(0,    Math.min(0.5,  r.pulseBoost))     : cur.pulseBoost,
+              blackoutFadeMs: typeof r.blackoutFadeMs === "number" ? Math.max(0,    Math.min(3000, Math.round(r.blackoutFadeMs))) : cur.blackoutFadeMs,
+            };
           } else if (msg.type === "fogNow") {
             deps.cfg.fogTrigger = true;   // engångs-puff (motorn nollställer flaggan)
           } else if (msg.type === "fogService") {
