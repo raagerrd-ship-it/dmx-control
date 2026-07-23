@@ -162,6 +162,23 @@
   </style>
 </head>
 <body>
+  <div class="health-banner" id="healthBanner" role="status" aria-live="polite"></div>
+
+  <!-- Välkomst-overlay: förklarar knapparna första gången någon ansluter.
+       Dismissas till localStorage så återkommande hyresgäster slipper den. -->
+  <div class="welcome-ov" id="welcomeOv" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+    <div class="welcome-card">
+      <h2 id="welcomeTitle">Välkommen 👋</h2>
+      <p>Så här styr du lamporna från din telefon:</p>
+      <div class="welcome-steps">
+        <div class="welcome-step"><div class="n">1</div><div class="t"><b>Tryck ⏻ för att tända</b><span>Stora knappen längst upp tänder och släcker hela riggen.</span></div></div>
+        <div class="welcome-step"><div class="n">2</div><div class="t"><b>Dra Stämning</b><span>Chill = lugnt. Fest = takt. Galet = full fart. Slidern gör allt annat själv.</span></div></div>
+        <div class="welcome-step"><div class="n">3</div><div class="t"><b>Spela musik</b><span>Ljuset följer musiken. Ingen musik = ingen rörelse.</span></div></div>
+      </div>
+      <button class="welcome-btn" id="welcomeBtn">Kör igång</button>
+    </div>
+  </div>
+
   <div class="power-card" id="powerCard">
     <div class="power-icon">⏻</div>
     <div class="power-text"><small id="powerSmall">Ljuset är på</small><b id="powerBig">Tryck för att släcka</b></div>
