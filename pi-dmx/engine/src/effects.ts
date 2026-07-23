@@ -750,6 +750,24 @@ export class EffectEngine {
     const rsWhite = rs ? frame.buildUp * 0.7 : 0;
     const rsGate = rs ? (Math.floor(t * hz) % 2 === 0 ? 1 : 0.12) : 1;
 
+    // SPECIALKANALER (hazer/uv/blinder/strobe/laser/co2). Effektens `drives`-tagg
+    // avgör om motorn tänder dem denna frame. Värdena hämtas från samma signaler
+    // som färg-renderingen: audio-nivå, kick, drop, riser-strobe. Roller utan
+    // matchande drive-tagg = 0 (svart) → knivskarp av/på, ingen läckage mellan
+    // effekter. Kanalerna maskas ur ballistiken längre ner (samma spår som
+    // strobe) så pulser inte tonas ut och sätter fixtures i mellanhastigheter.
+    const drivesSet = effect?.drives ? new Set<string>(effect.drives) : null;
+    const has = (r: string) => !!drivesSet && drivesSet.has(r);
+    const clamp255 = (x: number) => x < 0 ? 0 : x > 255 ? 255 : Math.round(x);
+    const specialty = {
+      hazer:   has("hazer")   ? clamp255(140 + audio * 60) : 0,
+      uv:      has("uv")      ? clamp255(180 * md) : 0,
+      blinder: has("blinder") ? clamp255(Math.max(kickEnv * 255, this.dropEnv > 0.6 ? 255 : 0)) : 0,
+      strobe:  has("strobe")  ? (effMode === "strobe" ? 210 : (rs ? 220 : 0)) : 0,
+      laser:   has("laser")   ? clamp255(180 + audio * 75) : 0,
+      co2:     has("co2") && this.dropEnv > 0.85 ? 255 : 0,
+    };
+
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const isAnchor = useAnchor && i > 0 && i < count - 1;   // mittlamporna = ankare
@@ -768,14 +786,6 @@ export class EffectEngine {
         rgb[2] = (rgb[2] + (1 - rgb[2]) * rsWhite) * rsGate;
       }
       if (this.dropEnv > 0.005) {
-        // DESIGNAD DROP-LOOK. Forut var detta en BLANDNING, inte ett uttryck:
-        // tand lampa behöll sin egen farg pa full styrka, mork lampa lyftes mot
-        // VITT — resultatet blev vitt bredvid fargat, vilket skar sig. (Innan
-        // dess hoppades morka lampor over helt, sa chase med ett tant huvud lat
-        // tre av fyra kannor missa hela dropen.)
-        // Nu gar HELA riggen till samma palettfarg pa full styrka, med en vit
-        // karna i toppen som klingar av till ren farg — klassisk drop: vit blixt
-        // som landar i farg. Ett enat uttryck i stallet for lampa-for-lampa-mix.
         const dc = hsvToRgb(mixedSector(this.dropSector + i) / 6, 1, 1);
         const vitKarna = Math.max(0, (this.dropEnv - 0.6) / 0.4);   // bara vid toppen
         const k = this.dropEnv;
@@ -788,7 +798,7 @@ export class EffectEngine {
       rgb[0] = rgb[0] * md + 1.00 * restLvl;
       rgb[1] = rgb[1] * md + 0.30 * restLvl;
       rgb[2] = rgb[2] * md + 0.00 * restLvl;
-      writeFixture(this.universe, fx, rgb, 1, strobeVal);
+      writeFixture(this.universe, fx, rgb, 1, strobeVal, specialty);
     }
 
     // Output ballistics on color/dim channels (never strobe/mode channels —
