@@ -221,6 +221,20 @@ const cycleMode = (): Mode => {
   return cfg.mode;
 };
 
+// BLE-sidecarn (BLEDOM-slingor) — instansieras här så motorn kan mata färger
+// varje render-frame. Om sidecarn är nere, socketen saknas, eller ingen slinga
+// är parad så är alla setColor/scan-anrop tysta no-ops → resten av showen bryr
+// sig inte.
+const bleClient = new BleClient();
+const bleScanSubs: ((d: BleScanDevice[]) => void)[] = [];
+const blePairedSubs: (() => void)[] = [];
+bleClient.setListeners({
+  onScan:   (devices) => { for (const fn of bleScanSubs)  fn(devices); },
+  onPaired: () =>        { for (const fn of blePairedSubs) fn(); },
+});
+bleClient.setKnownDevices(cfg.bleDevices ?? []);
+bleClient.start();
+
 const serverDeps = {
   cfg,
   getLatestFrame: () => latestFrame,
@@ -242,6 +256,17 @@ const serverDeps = {
       pulseBoost: cfg.intensityRing.pulseBoost,
       blackoutFadeMs: cfg.intensityRing.blackoutFadeMs,
     });
+    // Håll sidecarns persisterade lista i synk (paired/unpaired från vilket UI som helst).
+    bleClient.setKnownDevices(cfg.bleDevices ?? []);
+  },
+  ble: {
+    activeCount: () => bleClient.activeCount,
+    paired: () => bleClient.pairedCache,
+    scan:   () => bleClient.scan(),
+    pair:   (mac: string) => bleClient.pair(mac),
+    unpair: (mac: string) => bleClient.unpair(mac),
+    onScan:   (fn: (d: BleScanDevice[]) => void) => { bleScanSubs.push(fn); },
+    onPaired: (fn: () => void) => { blePairedSubs.push(fn); },
   },
 };
 const s80 = await startServer(serverDeps, Number(process.env.PORT ?? 80));
