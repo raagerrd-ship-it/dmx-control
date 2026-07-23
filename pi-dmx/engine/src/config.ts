@@ -14,7 +14,7 @@ export type MoodId = "chill" | "fest" | "galet";
  * takes an explicit `roles` array (e.g. ["dim","r","g","b","strobe"]) so
  * odd fixtures can be mapped without code changes.
  */
-export type ChannelRole = "r" | "g" | "b" | "w" | "dim" | "strobe" | "unused";
+export type ChannelRole = "r" | "g" | "b" | "w" | "dim" | "strobe" | "hazer" | "uv" | "blinder" | "laser" | "co2" | "unused";
 export type FixturePreset = "rgb" | "rgbw" | "dimmer" | "custom";
 
 export interface FixtureConfig {

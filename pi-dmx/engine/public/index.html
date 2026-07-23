@@ -206,6 +206,11 @@
         <div class="advflag" id="fHead"><span class="dot"></span>Drop-headroom</div>
         <div class="advflag" id="fFog"><span class="dot"></span>Rökmaskin aktiv</div>
         <div class="advflag" id="fStrobeCh"><span class="dot"></span>DMX-strobe kopplad</div>
+        <div class="advflag" id="fHazer"><span class="dot"></span>Hazer kopplad</div>
+        <div class="advflag" id="fUv"><span class="dot"></span>UV-bar kopplad</div>
+        <div class="advflag" id="fBlinder"><span class="dot"></span>Blinder kopplad</div>
+        <div class="advflag" id="fLaser"><span class="dot"></span>Laser kopplad</div>
+        <div class="advflag" id="fCo2"><span class="dot"></span>CO₂-jet kopplad</div>
       </div>
     </div>
   </details>
@@ -561,7 +566,13 @@ function updateAdvMirror(cfg) {
   flag("fRiser",  cfg.riserStrobe);
   flag("fHead",   cfg.dropHeadroom);
   flag("fFog",    cfg.fog && cfg.fog.enabled);
-  flag("fStrobeCh", Array.isArray(cfg.fixtures) && cfg.fixtures.some(fx => Array.isArray(fx.roles) && fx.roles.includes("strobe")));
+  const hasRole = (r) => Array.isArray(cfg.fixtures) && cfg.fixtures.some(fx => Array.isArray(fx.roles) && fx.roles.includes(r));
+  flag("fStrobeCh", hasRole("strobe"));
+  flag("fHazer",    hasRole("hazer"));
+  flag("fUv",       hasRole("uv"));
+  flag("fBlinder",  hasRole("blinder"));
+  flag("fLaser",    hasRole("laser"));
+  flag("fCo2",      hasRole("co2"));
 }
 let kickTimer;
 function applyFrame(f) {
