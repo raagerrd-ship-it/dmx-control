@@ -266,6 +266,7 @@ const serverDeps = {
     pair:   (mac: string) => bleClient.pair(mac),
     unpair: (mac: string) => bleClient.unpair(mac),
     identify: (mac: string) => bleClient.identify(mac),
+    setCal: (mac, cal) => bleClient.setCal(mac, cal),
     onScan:   (fn: (d: BleScanDevice[]) => void) => { bleScanSubs.push(fn); },
     onPaired: (fn: () => void) => { blePairedSubs.push(fn); },
   },
