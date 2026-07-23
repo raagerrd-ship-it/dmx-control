@@ -43,7 +43,9 @@ function encodeByte(v: number, out: Uint8Array, offset: number) {
 const CHILL: [number, number, number] = [10, 120, 200];    // sval cyan/blå
 const FEST:  [number, number, number] = [255, 140, 20];    // varm orange
 const GALET: [number, number, number] = [255, 25, 25];     // röd
-const MAX_BRIGHT = 0.40;    // 40% ceiling — se doc-kommentar
+const DEFAULT_MAX_BRIGHT = 0.40;
+const DEFAULT_PULSE_BOOST = 0.18;
+const DEFAULT_BLACKOUT_FADE_MS = 400;
 
 function lerpColor(x: number): [number, number, number] {
   // 0..0.5 → chill→fest, 0.5..1 → fest→galet
@@ -60,6 +62,12 @@ export interface KnobRingOptions {
   bus?: number;     // default 0 (SPI0)
   device?: number;  // default 0 (CE0 — vi använder ändå bara MOSI)
   fps?: number;     // default 30
+  /** 0.05..1.0 — tak på ringens ljusstyrka (default 0.40, 5V-drift). */
+  maxBright?: number;
+  /** 0..0.5 — extra ljusstyrka på beat-frame (default 0.18). */
+  pulseBoost?: number;
+  /** 0..3000 ms — mjuk fade vid blackout (default 400, 0 = snap). */
+  blackoutFadeMs?: number;
 }
 
 export interface RingState {
@@ -74,10 +82,26 @@ export class KnobRing {
   private txBuf: Uint8Array;
   private state: RingState = { intensity: 0.5, blackout: false, beat: false };
   private beatPulse = 0;   // 0..1, avklingar
+  private blackoutFade = 1; // 1 = full, 0 = släckt (ebbar mot 0 vid blackout, snappar till 1 annars)
+  private maxBright: number;
+  private pulseBoost: number;
+  private blackoutFadeMs: number;
+  private tickMs: number;
 
   constructor(private opts: KnobRingOptions = {}) {
     // Layout: [reset låg] [N_LEDS * 3 färgbytes * 3 SPI-bytes] [reset låg]
     this.txBuf = new Uint8Array(RESET_BYTES + N_LEDS * 3 * 3 + RESET_BYTES);
+    this.maxBright = clamp(opts.maxBright ?? DEFAULT_MAX_BRIGHT, 0.05, 1);
+    this.pulseBoost = clamp(opts.pulseBoost ?? DEFAULT_PULSE_BOOST, 0, 0.5);
+    this.blackoutFadeMs = clamp(opts.blackoutFadeMs ?? DEFAULT_BLACKOUT_FADE_MS, 0, 3000);
+    this.tickMs = Math.round(1000 / (opts.fps ?? 30));
+  }
+
+  /** Live-justering från UI/config-broadcast. */
+  setOptions(o: Partial<Pick<KnobRingOptions, "maxBright" | "pulseBoost" | "blackoutFadeMs">>) {
+    if (o.maxBright !== undefined)      this.maxBright = clamp(o.maxBright, 0.05, 1);
+    if (o.pulseBoost !== undefined)     this.pulseBoost = clamp(o.pulseBoost, 0, 0.5);
+    if (o.blackoutFadeMs !== undefined) this.blackoutFadeMs = clamp(o.blackoutFadeMs, 0, 3000);
   }
 
   start() {
@@ -89,8 +113,7 @@ export class KnobRing {
         if (e) console.error("[ring] spi setOptions:", e.message);
       });
     });
-    const interval = Math.round(1000 / (this.opts.fps ?? 30));
-    this.timer = setInterval(() => this.tick(), interval);
+    this.timer = setInterval(() => this.tick(), this.tickMs);
   }
 
   /** Anropas från motor-loopen: mata in senaste tillstånd. `beat` = true bara
@@ -107,21 +130,37 @@ export class KnobRing {
     this.beatPulse *= 0.80;
     if (this.beatPulse < 0.01) this.beatPulse = 0;
 
-    const { intensity, blackout } = this.state;
-    const [r, g, b] = blackout ? [0, 0, 0] : lerpColor(intensity);
-    const litFloat = blackout ? 0 : intensity * N_LEDS;
+    // Blackout-fade: 1 → 0 under `blackoutFadeMs`. tau = fadeMs/3 → ~95 % släckt vid utsatt tid.
+    if (this.state.blackout) {
+      if (this.blackoutFadeMs <= 1) this.blackoutFade = 0;
+      else {
+        const tau = this.blackoutFadeMs / 3;
+        const alpha = 1 - Math.exp(-this.tickMs / tau);
+        this.blackoutFade += (0 - this.blackoutFade) * alpha;
+        if (this.blackoutFade < 0.005) this.blackoutFade = 0;
+      }
+    } else {
+      this.blackoutFade = 1;   // instant fade-in när ljuset kommer tillbaka
+    }
+
+    const { intensity } = this.state;
+    const [r, g, b] = lerpColor(intensity);
+    const litFloat = intensity * N_LEDS;
     const litFull = Math.floor(litFloat);
     const partial = litFloat - litFull;
 
-    // Global brightness: intensity ↗ → ökar (0.35 vid chill, 1.0 vid galet) × MAX_BRIGHT,
-    // plus beat-puff +18%.
-    const bright = MAX_BRIGHT * (0.35 + 0.65 * intensity) * (1 + 0.18 * this.beatPulse);
+    // Global brightness: intensity ↗ → ökar (0.35 vid chill, 1.0 vid galet) × maxBright,
+    // × blackout-fade × (1 + pulseBoost * beatPulse).
+    const bright =
+      this.maxBright *
+      (0.35 + 0.65 * intensity) *
+      this.blackoutFade *
+      (1 + this.pulseBoost * this.beatPulse);
 
     let off = RESET_BYTES;
     for (let i = 0; i < N_LEDS; i++) {
       let scale: number;
-      if (blackout) scale = 0;
-      else if (i < litFull) scale = 1;
+      if (i < litFull) scale = 1;
       else if (i === litFull) scale = partial;
       else scale = 0;
       const k = scale * bright;
@@ -145,7 +184,10 @@ export class KnobRing {
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
     // Släck ringen mjukt vid avslut
     this.state.blackout = true;
+    this.blackoutFade = 0;
     this.tick();
     setTimeout(() => this.spi?.close(() => {}), 50);
   }
 }
+
+function clamp(v: number, lo: number, hi: number) { return v < lo ? lo : v > hi ? hi : v; }

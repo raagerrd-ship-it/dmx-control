@@ -311,9 +311,13 @@ if (cfg.intensityKnob) {
 // själva boxen: hyresgäster ser direkt vilket steg de valt utan att titta i UI:t.
 let ring: KnobRing | null = null;
 if (cfg.intensityRing) {
-  ring = new KnobRing({ bus: cfg.intensityRing.bus, device: cfg.intensityRing.device });
+  const r = cfg.intensityRing;
+  ring = new KnobRing({
+    bus: r.bus, device: r.device,
+    maxBright: r.maxBright, pulseBoost: r.pulseBoost, blackoutFadeMs: r.blackoutFadeMs,
+  });
   ring.start();
-  console.log(`intensity-ring on SPI${cfg.intensityRing.bus}.${cfg.intensityRing.device} (12 × WS2812B)`);
+  console.log(`intensity-ring on SPI${r.bus}.${r.device} (12 × WS2812B, max ${Math.round(r.maxBright * 100)}%)`);
 }
 
 // Rökens drifträknare tickar i RENDERLOOPEN, inte via config-meddelanden — utan
