@@ -204,6 +204,38 @@ export async function startServer(
     }
   });
 
+  // Rollback: kör rollback.sh som checkar ut `.prev-sha` sparad av senaste
+  // update.sh och kör om install. Samma detachning som /update — annars killar
+  // engine-restarten scriptet halvvägs.
+  app.post("/update/rollback", async (_req, reply) => {
+    try {
+      const up = spawn("systemd-run", [
+        "--unit=pi-dmx-rollback", "--collect", "--quiet",
+        "/bin/bash", `${REPO}/pi-dmx/rollback.sh`,
+      ], { detached: true, stdio: "ignore" });
+      up.on("error", (e) => console.error("[rollback] spawn:", (e as Error).message));
+      up.unref();
+      return reply.send({ started: true });
+    } catch (e) {
+      return reply.code(500).send({ error: (e as Error).message });
+    }
+  });
+
+  // Fabriks-reset: flytta undan configen (BEHÅLL den som .factory-<ts> för
+  // återhämtning om ägaren ångrar sig), tvinga en systemd-restart så motorn
+  // laddar defaults. Fixtures FÖRSVINNER — det är hela poängen med reset.
+  app.post("/factory-reset", async (_req, reply) => {
+    try {
+      const CFG = process.env.CONFIG_PATH ?? "/var/lib/audio-dmx-engine/config.json";
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      spawn("sh", ["-c", `mv -f ${CFG} ${CFG}.factory-${ts} 2>/dev/null; mv -f ${CFG}.bak ${CFG}.bak.factory-${ts} 2>/dev/null; systemctl restart audio-dmx-engine`], { detached: true, stdio: "ignore" })
+        .on("error", (e) => console.error("[factory-reset] spawn:", (e as Error).message)).unref();
+      return reply.send({ started: true });
+    } catch (e) {
+      return reply.code(500).send({ error: (e as Error).message });
+    }
+  });
+
   // ---- WiFi / phone hotspot ------------------------------------------------
   // The appliance has two network personalities, chosen at boot by
   // autoconnect-priority: the user's phone hotspot (200, internet for updates
