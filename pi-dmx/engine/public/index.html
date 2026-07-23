@@ -477,14 +477,11 @@ function renderCategories() {
 // Speglar smart/manuellt-läget i UI:t: kryssruta vs kryssknapp, dwell-rad,
 // intro-text — och renderar om listorna i rätt stil.
 function refreshModeView() {
-  const smart = curMode === "smart";
-  tEnergy.checked = smart;
-  document.getElementById("dwellRow").style.display = smart ? "" : "none";
-  document.getElementById("showIntro").textContent = smart
-    ? "Smart-läge — anpassar ljuset efter musiken och roterar mellan de effekter du kryssat i."
-    : "Manuellt läge — tryck på effekten du vill köra just nu.";
+  // Show-kontrollerna är borttagna; stämnings-slidern driver läget.
+  // Vi renderar bara listorna om utseendet (smart vs manuellt) ändrats.
   renderCategories();
 }
+
 
 function applyConfig(cfg) {
   curRotation = cfg.rotation || {};
