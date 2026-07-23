@@ -6,6 +6,7 @@ import {
   usePi, usePlayingMode, setPi, setRotation, applyIntensity,
   type Dwell, type PiSettings,
 } from "@/hooks/usePiMock";
+import { usePiConfig, usePiConnected } from "@/hooks/usePiEngine";
 import { useLocation } from "react-router-dom";
 
 /**
