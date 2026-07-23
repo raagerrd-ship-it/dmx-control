@@ -821,16 +821,18 @@ export class EffectEngine {
       let mx = 0;
       for (const fx of this.cfg.fixtures) {
         const roles = fixtureRoles(fx);
-        // VU-taket skalar de LJUSBÄRANDE kanalerna: färg (r/g/b/w) om fixturen har
-        // det, annars dim-kanalen. På en dim+färg-lampa hålls dim konstant på 255
-        // (all dynamik ligger i färgen), så att skala BÅDA gav v²-dämpning.
         const hasColor = roles.includes("r") || roles.includes("g") || roles.includes("b") || roles.includes("w");
         for (let r = 0; r < roles.length; r++) {
           const ch = fx.address - 1 + r;
           if (ch < 0 || ch >= 512) continue;   // hög-adress custom-fixture får inte skriva utanför universet
-          if (roles[r] === "strobe") this.strobeMask[ch] = 1;
-          if (roles[r] === "r" || roles[r] === "g" || roles[r] === "b" || roles[r] === "w") this.capMask[ch] = 1;
-          else if (roles[r] === "dim" && !hasColor) this.capMask[ch] = 1;
+          const role = roles[r];
+          // Specialroller (strobe, hazer, uv, blinder, laser, co2) skrivs direkt
+          // av motorn per frame – de får INTE glidas ut av ballistiken, då tonar
+          // en 255 nedåt genom mellan­hastigheter (strobe skulle fara mellan
+          // takter, blinder klänga kvar en halv sekund, hazer flimra).
+          if (role === "strobe" || role === "hazer" || role === "uv" || role === "blinder" || role === "laser" || role === "co2") this.strobeMask[ch] = 1;
+          if (role === "r" || role === "g" || role === "b" || role === "w") this.capMask[ch] = 1;
+          else if (role === "dim" && !hasColor) this.capMask[ch] = 1;
           if (ch + 1 > mx) mx = ch + 1;
         }
       }
