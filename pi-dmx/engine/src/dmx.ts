@@ -33,6 +33,10 @@ export class DmxSender {
     this.minIntervalMs = 1000 / clamped;
   }
 
+  /** True när sockeln mot dmx-helper är öppen. UI:t visar en varningsbanner
+   *  om helpern är nere så hyresgästen ser problemet innan showen. */
+  isConnected() { return this.connected; }
+
   private scheduleReconnect() {
     // EN reconnect åt gången: en misslyckad anslutning avger BÅDE 'error' och
     // 'close', och en tappad anslutning 'close' — utan denna vakt schemalade

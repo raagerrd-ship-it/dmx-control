@@ -44,6 +44,8 @@ export interface ServerDeps {
   getActiveMode: () => Mode;
   /** True om ljud-pipelinen bearbetat en frame nyligen (för watchdog /health). */
   getHealthy: () => boolean;
+  /** True om DMX-sockeln mot helpern är öppen. UI:t visar röd banner annars. */
+  getDmxConnected: () => boolean;
   /** Rökmaskinens tillstånd (uppvärmning/värmekonto/drifträknare). null = ej ansluten. */
   getFogStatus: () => FogStatus | null;
   /** Nollställ rökmaskinens drifträknare efter underhåll. */
@@ -202,6 +204,38 @@ export async function startServer(
     }
   });
 
+  // Rollback: kör rollback.sh som checkar ut `.prev-sha` sparad av senaste
+  // update.sh och kör om install. Samma detachning som /update — annars killar
+  // engine-restarten scriptet halvvägs.
+  app.post("/update/rollback", async (_req, reply) => {
+    try {
+      const up = spawn("systemd-run", [
+        "--unit=pi-dmx-rollback", "--collect", "--quiet",
+        "/bin/bash", `${REPO}/pi-dmx/rollback.sh`,
+      ], { detached: true, stdio: "ignore" });
+      up.on("error", (e) => console.error("[rollback] spawn:", (e as Error).message));
+      up.unref();
+      return reply.send({ started: true });
+    } catch (e) {
+      return reply.code(500).send({ error: (e as Error).message });
+    }
+  });
+
+  // Fabriks-reset: flytta undan configen (BEHÅLL den som .factory-<ts> för
+  // återhämtning om ägaren ångrar sig), tvinga en systemd-restart så motorn
+  // laddar defaults. Fixtures FÖRSVINNER — det är hela poängen med reset.
+  app.post("/factory-reset", async (_req, reply) => {
+    try {
+      const CFG = process.env.CONFIG_PATH ?? "/var/lib/audio-dmx-engine/config.json";
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      spawn("sh", ["-c", `mv -f ${CFG} ${CFG}.factory-${ts} 2>/dev/null; mv -f ${CFG}.bak ${CFG}.bak.factory-${ts} 2>/dev/null; systemctl restart audio-dmx-engine`], { detached: true, stdio: "ignore" })
+        .on("error", (e) => console.error("[factory-reset] spawn:", (e as Error).message)).unref();
+      return reply.send({ started: true });
+    } catch (e) {
+      return reply.code(500).send({ error: (e as Error).message });
+    }
+  });
+
   // ---- WiFi / phone hotspot ------------------------------------------------
   // The appliance has two network personalities, chosen at boot by
   // autoconnect-priority: the user's phone hotspot (200, internet for updates
@@ -320,6 +354,11 @@ export async function startServer(
             activeIntensity: deps.cfg.activeIntensity,   // vred/slider-position (0..1)
             fog: deps.getFogStatus(),     // null när maskinen inte är ansluten
             bleActive: deps.ble?.activeCount() ?? 0,   // antal parade BLE-slingor som är uppkopplade
+            // Drift-hälsa: UI:t visar en banner om DMX-helpern är nere eller
+            // om parade BLE-slingor tappat kontakt. Billigt att skicka varje
+            // frame — samma push-rate som resten (20 Hz).
+            dmxOk: deps.getDmxConnected(),
+            blePairedCount: deps.ble?.paired().length ?? 0,
           }));
 
         }
