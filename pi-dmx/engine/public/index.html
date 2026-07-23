@@ -354,13 +354,13 @@ function setPower(off) {
   powerBig.textContent = off ? "Tryck för att tända" : "Tryck för att släcka";
 }
 powerCard.onclick = () => {
-  if (curMode === "blackout") {                       // TÄND → senaste stämning
+  if (curMode === "blackout") {                       // TÄND → senaste intensity
     curMode = "smart"; setPower(false);
-    document.querySelectorAll(".mood-btn").forEach((x) => x.classList.toggle("active", x.dataset.mood === lastMood));
-    send({ type: "setMood", value: lastMood });
+    updateMoodUi(lastIntensity, true);
+    send({ type: "setIntensity", value: lastIntensity });
   } else {                                            // SLÄCK
     curMode = "blackout"; setPower(true);
-    document.querySelectorAll(".mood-btn").forEach((x) => x.classList.remove("active"));
+    updateMoodUi(lastIntensity, false);
     send({ type: "setMode", mode: "blackout" });
   }
 };
