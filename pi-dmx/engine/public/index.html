@@ -170,43 +170,35 @@
   </div>
 
   <details class="more">
-    <summary>Mer inställningar</summary>
+    <summary>Effekt-val · välj vilka som roterar</summary>
+    <h1 style="margin-top:14px">Lugna effekter</h1>
+    <div class="card"><div id="calmList" class="rotlist"></div></div>
+    <h1>Effekter med fart</h1>
+    <div class="card"><div id="fastList" class="rotlist"></div></div>
+    <h1>Effekter med full fart</h1>
+    <div class="card"><div id="fullList" class="rotlist"></div></div>
+  </details>
 
-    <!-- Show + Finjustering borttagna — allt här styrs av stämnings-slidern.
-         Se "Avancerat · spegel av stämningen" för live-värden. -->
-
-
-    <details class="more" style="margin-top:14px">
-      <summary>Effekt-val · välj vilka som roterar</summary>
-      <h1 style="margin-top:14px">Lugna effekter</h1>
-      <div class="card"><div id="calmList" class="rotlist"></div></div>
-      <h1>Effekter med fart</h1>
-      <div class="card"><div id="fastList" class="rotlist"></div></div>
-      <h1>Effekter med full fart</h1>
-      <div class="card"><div id="fullList" class="rotlist"></div></div>
-    </details>
-
-    <details class="more" style="margin-top:14px">
-      <summary>Avancerat · spegel av stämningen</summary>
-      <div class="card">
-        <div class="advhint">Skrivskyddad vy. Stämnings-slidern (och det fysiska vredet) sätter allt nedan — dessa värden speglar motorn i realtid.</div>
-        <div class="advrow"><label>Dynamik</label><div class="meter"><div id="advDyn" style="width:0%"></div></div><span class="val" id="advDynV">–</span></div>
-        <div class="advrow"><label>Reaktion</label><div class="meter"><div id="advSens" style="width:0%"></div></div><span class="val" id="advSensV">–</span></div>
-        <div class="advrow"><label>Ljustak</label><div class="meter"><div id="advMaster" style="width:0%"></div></div><span class="val" id="advMasterV">–</span></div>
-        <div class="advrow"><label>Tröghet</label><div class="meter"><div id="advDecay" style="width:0%"></div></div><span class="val" id="advDecayV">–</span></div>
-        <div class="advrow"><label>Byter effekt</label><div class="meter"><div id="advDwell" style="width:0%"></div></div><span class="val" id="advDwellV">–</span></div>
-        <div class="advflags">
-          <div class="advflag" id="fEnergy"><span class="dot"></span>Energi styr läget</div>
-          <div class="advflag" id="fBeat"><span class="dot"></span>Pulsa på taktslag</div>
-          <div class="advflag" id="fDropBl"><span class="dot"></span>Drop-blackout</div>
-          <div class="advflag" id="fClub"><span class="dot"></span>Klubb-läge</div>
-          <div class="advflag" id="fAmb"><span class="dot"></span>Vilo-glöd</div>
-          <div class="advflag" id="fCeil"><span class="dot"></span>Dynamiskt ljustak</div>
-          <div class="advflag" id="fRiser"><span class="dot"></span>Riser-strobe</div>
-          <div class="advflag" id="fHead"><span class="dot"></span>Drop-headroom</div>
-        </div>
+  <details class="more" style="margin-top:14px">
+    <summary>Avancerat · spegel av stämningen</summary>
+    <div class="card">
+      <div class="advhint">Skrivskyddad vy. Stämnings-slidern (och det fysiska vredet) sätter allt nedan — dessa värden speglar motorn i realtid.</div>
+      <div class="advrow"><label>Dynamik</label><div class="meter"><div id="advDyn" style="width:0%"></div></div><span class="val" id="advDynV">–</span></div>
+      <div class="advrow"><label>Reaktion</label><div class="meter"><div id="advSens" style="width:0%"></div></div><span class="val" id="advSensV">–</span></div>
+      <div class="advrow"><label>Ljustak</label><div class="meter"><div id="advMaster" style="width:0%"></div></div><span class="val" id="advMasterV">–</span></div>
+      <div class="advrow"><label>Tröghet</label><div class="meter"><div id="advDecay" style="width:0%"></div></div><span class="val" id="advDecayV">–</span></div>
+      <div class="advrow"><label>Byter effekt</label><div class="meter"><div id="advDwell" style="width:0%"></div></div><span class="val" id="advDwellV">–</span></div>
+      <div class="advflags">
+        <div class="advflag" id="fEnergy"><span class="dot"></span>Energi styr läget</div>
+        <div class="advflag" id="fBeat"><span class="dot"></span>Pulsa på taktslag</div>
+        <div class="advflag" id="fDropBl"><span class="dot"></span>Drop-blackout</div>
+        <div class="advflag" id="fClub"><span class="dot"></span>Klubb-läge</div>
+        <div class="advflag" id="fAmb"><span class="dot"></span>Vilo-glöd</div>
+        <div class="advflag" id="fCeil"><span class="dot"></span>Dynamiskt ljustak</div>
+        <div class="advflag" id="fRiser"><span class="dot"></span>Riser-strobe</div>
+        <div class="advflag" id="fHead"><span class="dot"></span>Drop-headroom</div>
       </div>
-    </details>
+    </div>
   </details>
 
   <div id="ownerOnly" hidden>

@@ -221,18 +221,8 @@ function KickDot({ on }: { on: boolean }) {
 
 function MoreDetails() {
   return (
-    <details className="mt-2 group">
-      <summary className="py-3.5 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open:text-foreground">
-        <span>Mer inställningar</span>
-        <span className="ml-1 group-open:hidden"> ⌄</span>
-        <span className="ml-1 hidden group-open:inline"> ⌃</span>
-      </summary>
-
-      {/* Show + Finjustering borttagna — allt styrs av stämnings-slidern.
-          Se "Avancerat · spegel av stämningen" nedan för live-värden. */}
-
-
-      <details className="mt-3 group/eff">
+    <>
+      <details className="mt-2 group/eff">
         <summary className="py-3 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/eff:text-foreground">
           <span>Effekt-val · välj vilka som roterar</span>
           <span className="ml-1 group-open/eff:hidden"> ⌄</span>
@@ -247,7 +237,7 @@ function MoreDetails() {
       </details>
 
       <AdvancedMirror />
-    </details>
+    </>
   );
 }
 
