@@ -23,7 +23,7 @@ export default function DmxController() {
       <PowerHero />
 
       <SectionTitle>Stämning</SectionTitle>
-      <MoodGrid />
+      <MoodSlider />
 
       <SectionTitle>Ljudkälla</SectionTitle>
       <AudioSourceCard />
