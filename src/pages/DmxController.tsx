@@ -478,14 +478,15 @@ function AdvancedTechnical() {
 function ReadonlyMeter({
   label, pct, leftLabel, rightLabel,
 }: {
-  label: string; pct: number; leftLabel: string; rightLabel: string;
+  label: string; pct: number | null; leftLabel: string; rightLabel: string;
 }) {
-  const clamped = Math.max(0, Math.min(100, pct));
+  const missing = pct === null || pct === undefined || Number.isNaN(pct);
+  const clamped = missing ? 0 : Math.max(0, Math.min(100, pct as number));
   return (
-    <div>
+    <div className={missing ? "opacity-50" : undefined}>
       <div className="flex items-baseline justify-between mb-1.5">
         <div className="text-[11px] text-muted-foreground uppercase tracking-[0.08em]">{label}</div>
-        <div className="text-[11px] tabular-nums text-muted-foreground/70">auto</div>
+        <div className="text-[11px] tabular-nums text-muted-foreground/70">{missing ? "—" : "auto"}</div>
       </div>
       <input
         type="range" min={0} max={100} step={1}
