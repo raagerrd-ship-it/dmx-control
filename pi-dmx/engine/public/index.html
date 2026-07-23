@@ -1338,6 +1338,42 @@ function renderBlePaired(devices) {
       send({ type: "bleCal", mac: btn.dataset.bleCalReset, cal: { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1, gamma: 1 } });
     };
   });
+  // "Kopiera till…" — kopiera aktuella cal-värden (inkl. gamma) till valda slingor.
+  blePairedList.querySelectorAll("[data-ble-cal-copy]").forEach((btn) => {
+    btn.onclick = () => {
+      const srcMac = btn.dataset.bleCalCopy;
+      const panel  = blePairedList.querySelector(`[data-ble-cal-copy-panel="${srcMac}"]`);
+      if (!panel) return;
+      if (!panel.hidden) { panel.hidden = true; panel.innerHTML = ""; return; }
+      const targets = blePairedDevices.filter((x) => x.mac !== srcMac);
+      if (!targets.length) { panel.hidden = false; panel.innerHTML = `<div style="opacity:.7">Inga andra slingor att kopiera till.</div>`; return; }
+      panel.hidden = false;
+      panel.innerHTML = `
+        <div style="margin-bottom:6px;opacity:.75">Kopiera vitbalans, max-ljus &amp; gamma till:</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${targets.map((t) => `<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-copy-tgt="${escapeHtml(t.mac)}" checked> ${escapeHtml(t.name || t.mac)}</label>`).join("")}
+        </div>
+        <div class="fx-actions" style="margin-top:8px">
+          <button class="btn" data-copy-all>Alla / Ingen</button>
+          <button class="btn primary" data-copy-go>Kopiera</button>
+          <button class="btn" data-copy-cancel>Avbryt</button>
+        </div>`;
+      panel.querySelector("[data-copy-all]").onclick = () => {
+        const boxes = panel.querySelectorAll("[data-copy-tgt]");
+        const anyOff = Array.from(boxes).some((b) => !b.checked);
+        boxes.forEach((b) => { b.checked = anyOff; });
+      };
+      panel.querySelector("[data-copy-cancel]").onclick = () => { panel.hidden = true; panel.innerHTML = ""; };
+      panel.querySelector("[data-copy-go]").onclick = () => {
+        const srcCal = readCalFor(srcMac);
+        const macs = Array.from(panel.querySelectorAll("[data-copy-tgt]:checked")).map((b) => b.dataset.copyTgt);
+        if (!macs.length) { panel.hidden = true; panel.innerHTML = ""; return; }
+        macs.forEach((mac) => send({ type: "bleCal", mac, cal: srcCal }));
+        panel.innerHTML = `<div style="color:var(--ok)">Kopierade till ${macs.length} slinga${macs.length === 1 ? "" : "or"}.</div>`;
+        setTimeout(() => { panel.hidden = true; panel.innerHTML = ""; }, 1400);
+      };
+    };
+  });
 }
 
 function renderBleScan(devices) {
