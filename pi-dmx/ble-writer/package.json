@@ -1,0 +1,19 @@
+{
+  "name": "pi-dmx-ble-writer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BLE sidecar for pi-dmx. Owns hci0, drives BLEDOM LED strips, isolated from the audio/DMX loop via a Unix socket. Runs pinned to CPU 0 so noble scan spikes never touch ALSA (cores 1-2) or dmx-helper (core 3).",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@abandonware/noble": "^1.9.2-25"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "typescript": "^5.4.5"
+  }
+}

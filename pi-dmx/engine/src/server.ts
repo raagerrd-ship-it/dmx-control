@@ -54,6 +54,18 @@ export interface ServerDeps {
   /** Reset the AGC after an input-routing switch. */
   resetAgc: (startGain?: number) => void;
   setGainLock: (locked: boolean) => void;
+  /** BLE sidecar bridge. Optional — null when hardware / sidecar isn't available. */
+  ble?: {
+    activeCount: () => number;
+    paired: () => { mac: string; name: string; chip: "bledom" | "unknown"; connected: boolean }[];
+    scan: () => void;
+    pair: (mac: string) => void;
+    unpair: (mac: string) => void;
+    /** Register a listener called whenever a scan finishes. */
+    onScan: (fn: (devices: { mac: string; name: string; chip: "bledom" | "unknown"; rssi: number }[]) => void) => void;
+    /** Register a listener called whenever the paired list changes. */
+    onPaired: (fn: () => void) => void;
+  };
 }
 
 export interface Server {
@@ -303,6 +315,7 @@ export async function startServer(
             activeMood: deps.cfg.activeMood,
             activeIntensity: deps.cfg.activeIntensity,   // vred/slider-position (0..1)
             fog: deps.getFogStatus(),     // null när maskinen inte är ansluten
+            bleActive: deps.ble?.activeCount() ?? 0,   // antal parade BLE-slingor som är uppkopplade
           }));
 
         }
@@ -422,6 +435,22 @@ export async function startServer(
             deps.cfg.fogTrigger = true;   // engångs-puff (motorn nollställer flaggan)
           } else if (msg.type === "fogService") {
             deps.resetFogService();       // tank påfylld / rengjord → nollställ räknarna
+          } else if (msg.type === "bleScan") {
+            // Åtta-sekunders scan i sidecarn; resultatet kommer via bleScanResults nedan.
+            deps.ble?.scan();
+            return;
+          } else if (msg.type === "blePair" && typeof msg.mac === "string") {
+            deps.ble?.pair(msg.mac);
+            // Kom ihåg i cfg så en respawn av sidecarn (eller reboot) återansluter av sig själv.
+            const list = deps.cfg.bleDevices ?? (deps.cfg.bleDevices = []);
+            if (!list.some((d) => d.mac.toLowerCase() === msg.mac.toLowerCase())) {
+              list.push({ mac: msg.mac.toLowerCase(), name: typeof msg.name === "string" ? msg.name : msg.mac, chip: msg.chip === "bledom" ? "bledom" : "unknown" });
+            }
+          } else if (msg.type === "bleUnpair" && typeof msg.mac === "string") {
+            deps.ble?.unpair(msg.mac);
+            if (deps.cfg.bleDevices) {
+              deps.cfg.bleDevices = deps.cfg.bleDevices.filter((d) => d.mac.toLowerCase() !== msg.mac.toLowerCase());
+            }
           }
           deps.onConfigChanged?.();
           // Echo back
@@ -453,7 +482,7 @@ function isMode(m: unknown): m is Mode {
 const clamp01 = (x: number) => typeof x === "number" && x >= 0 && x <= 1 ? x : 0;
 
 const VALID_PRESETS: FixturePreset[] = ["rgb", "rgbw", "dimmer", "custom"];
-const VALID_ROLES: ChannelRole[] = ["r", "g", "b", "w", "dim", "strobe", "unused"];
+const VALID_ROLES: ChannelRole[] = ["r", "g", "b", "w", "dim", "strobe", "hazer", "uv", "blinder", "laser", "co2", "unused"];
 
 /** Validate + normalize a fixtures[] patch. Returns null if any entry is bogus. */
 function sanitizeFixtures(input: unknown[]): FixtureConfig[] | null {

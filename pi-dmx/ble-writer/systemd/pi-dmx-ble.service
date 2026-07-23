@@ -1,0 +1,30 @@
+[Unit]
+Description=pi-dmx BLE sidecar (BLEDOM strips)
+# Bluetooth stack needs to be up but this must NOT block the DMX pipeline:
+# a missing/broken adapter should still leave the show running.
+After=bluetooth.service cpu-performance.service
+Wants=bluetooth.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/pi-dmx-ble
+ExecStartPre=/bin/mkdir -p /run/pi-dmx
+ExecStart=/usr/bin/node --max-old-space-size=80 dist/index.js
+Restart=always
+RestartSec=3
+
+# CPU 0 is free — dmx-helper owns 3 (isolcpus=3), engine owns 1-2. Landing
+# BLE here keeps noble scan spikes off the ALSA cores, which is the whole
+# reason we're paying for a separate process.
+CPUAffinity=0
+Nice=-2
+
+# Root because noble needs raw HCI. In a properly locked-down deployment
+# you would set CAP_NET_ADMIN + CAP_NET_RAW on the node binary and drop
+# to a bluetooth user — we run root for the same appliance rationale as
+# audio-dmx-engine (isolated network, single tenant).
+User=root
+
+[Install]
+WantedBy=multi-user.target
