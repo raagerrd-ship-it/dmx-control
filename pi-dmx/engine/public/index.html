@@ -566,7 +566,13 @@ function updateAdvMirror(cfg) {
   flag("fRiser",  cfg.riserStrobe);
   flag("fHead",   cfg.dropHeadroom);
   flag("fFog",    cfg.fog && cfg.fog.enabled);
-  flag("fStrobeCh", Array.isArray(cfg.fixtures) && cfg.fixtures.some(fx => Array.isArray(fx.roles) && fx.roles.includes("strobe")));
+  const hasRole = (r) => Array.isArray(cfg.fixtures) && cfg.fixtures.some(fx => Array.isArray(fx.roles) && fx.roles.includes(r));
+  flag("fStrobeCh", hasRole("strobe"));
+  flag("fHazer",    hasRole("hazer"));
+  flag("fUv",       hasRole("uv"));
+  flag("fBlinder",  hasRole("blinder"));
+  flag("fLaser",    hasRole("laser"));
+  flag("fCo2",      hasRole("co2"));
 }
 let kickTimer;
 function applyFrame(f) {
