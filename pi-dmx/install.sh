@@ -32,6 +32,9 @@ ensure_line() { grep -qxF "$1" "$CFG" || echo "$1" >> "$CFG"; }
 ensure_line "enable_uart=1"
 ensure_line "dtoverlay=disable-bt"
 ensure_line "init_uart_clock=48000000"
+# SPI0 på GPIO10 (MOSI, pin 19) driver WS2812-ringen runt vredet. GPIO18 (den
+# klassiska PWM-metoden) är upptagen av Codec Zero I²S, så SPI är enda vägen.
+ensure_line "dtparam=spi=on"
 # rpi-codeczero (not iqaudio-codec) — the generic IQaudIO overlay gives
 # "I2S SYNC error" / EIO on capture with the Codec Zero on newer kernels.
 sed -i '/^dtoverlay=iqaudio-codec$/d' "$CFG"

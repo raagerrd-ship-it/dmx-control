@@ -20,6 +20,7 @@ import { startServer, applyInputRouting, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 import { IntensityKnob } from "./intensityKnob.js";
+import { KnobRing } from "./knobRing.js";
 import { applyIntensity } from "./moods.js";
 
 import { activeSlots, type Mode } from "./config.js";
@@ -145,6 +146,13 @@ capture.on("chunk", (samples: Float32Array) => {
   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
   // inga slag missas) → show-tiden får en knuff, starkare ju tyngre basen är.
   if (frame.kick) effects.registerKick(0.4 + Math.min(1, frame.energy * 1.4) * 0.6);
+  // WS2812-ringen: mata intensity + kick-puls varje frame (billig update; ringen
+  // renderar själv i egen takt @ 30 Hz och avklingar puffen mjukt).
+  ring?.update({
+    intensity: cfg.activeIntensity ?? 0.5,
+    blackout: cfg.mode === "blackout",
+    beat: frame.kick,
+  });
 
 
   // Frikoppla render från analysrate: analysern (FFT/onset/BPM) körs varje chunk
@@ -299,6 +307,15 @@ if (cfg.intensityKnob) {
   }
 }
 
+// WS2812B LED-ring (Electrokit 12-LED) — visuell återkoppling för vredet på
+// själva boxen: hyresgäster ser direkt vilket steg de valt utan att titta i UI:t.
+let ring: KnobRing | null = null;
+if (cfg.intensityRing) {
+  ring = new KnobRing({ bus: cfg.intensityRing.bus, device: cfg.intensityRing.device });
+  ring.start();
+  console.log(`intensity-ring on SPI${cfg.intensityRing.bus}.${cfg.intensityRing.device} (12 × WS2812B)`);
+}
+
 // Rökens drifträknare tickar i RENDERLOOPEN, inte via config-meddelanden — utan
 // det här skulle de bara nå flashen av en slump (nästa gång någon råkar röra en
 // inställning). Spara var 5:e minut, och bara när något faktiskt rökt sedan
@@ -314,6 +331,7 @@ process.on("SIGTERM", () => {
   button?.stop();
   knob?.stop();
   knobSw?.stop();
+  ring?.stop();
   dmx.close();
   process.exit(0);
 });
