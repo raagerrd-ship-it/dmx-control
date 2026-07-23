@@ -674,6 +674,13 @@ function applyFrame(f) {
   levelVal.textContent = pct + "%";
   gainVal.textContent = f.gain.toFixed(1);
   lastBleActive = f.bleActive ?? 0;
+  // Drift-hälsa: uppdatera flaggorna som banner-logiken läser.
+  dmxOk = f.dmxOk !== false;                           // undef = gammal engine → anta OK
+  blePairedCount = f.blePairedCount ?? 0;
+  bleConnectedCount = lastBleActive;
+  const now = Date.now();
+  if (f.level > 0.02) lastAudibleMs = now;             // "hörs något?" – ~2% level = klart över brus
+  renderHealth();
   if (f.kick) {
     kickDot.classList.add("on");
     clearTimeout(kickTimer);
