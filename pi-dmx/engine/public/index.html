@@ -478,9 +478,11 @@ function applyConfig(cfg) {
   curRotation = cfg.rotation || {};
   curMode = cfg.mode || "smart";
   refreshModeView();                 // sätter tEnergy/dwell/intro + renderar listorna
-  // Stämnings-markering + power-läge (matchar Mock-UI).
-  document.querySelectorAll(".mood-btn").forEach((b) => b.classList.toggle("active", b.dataset.mood === cfg.activeMood));
-  if (cfg.activeMood) lastMood = cfg.activeMood;
+  // Stämnings-slidern speglar motorns activeIntensity (KY-040-vredet eller
+  // andra klienter kan ha ändrat den). Kortet dimmas när ljuset är av.
+  const x = typeof cfg.activeIntensity === "number" ? cfg.activeIntensity : 0.5;
+  lastIntensity = x;
+  updateMoodUi(x, cfg.mode !== "blackout");
   setPower(cfg.mode === "blackout");
   tBeatPulse.checked = !!cfg.beatPulse;
   const fog = cfg.fog || {};
