@@ -339,11 +339,23 @@ const moodSliderCard = document.getElementById("moodSliderCard");
 const moodLbl = document.getElementById("moodLbl");
 const moodNum = document.getElementById("moodNum");
 function moodLabelFor(v) { return v <= 3 ? "Chill" : v <= 7 ? "Fest" : "Galet"; }
+const moodLbl = document.getElementById("moodLbl");
+const moodNum = document.getElementById("moodNum");
+const moodDesc = document.getElementById("moodDesc");
+function moodInfoFor(v) {
+  if (v <= 2) return { name: "Chill",  desc: "Mjukt och långsamt, följer inte taktslag" };
+  if (v <= 4) return { name: "Chill+", desc: "Följer musiken lugnt" };
+  if (v <= 6) return { name: "Fest",   desc: "Pulsar på taktslag, byter effekt ibland" };
+  if (v <= 8) return { name: "Fest+",  desc: "Klubb-läge, byter effekt oftare" };
+  return               { name: "Galet", desc: "Full fart, drop-blackout, riser-strobe" };
+}
 function updateMoodUi(v01, active) {
   const v = Math.max(1, Math.min(10, Math.round(v01 * 9) + 1));
   moodSlider.value = String(v);
-  moodLbl.textContent = moodLabelFor(v);
+  const info = moodInfoFor(v);
+  moodLbl.textContent = info.name;
   moodNum.textContent = ` · ${v}/10`;
+  if (moodDesc) moodDesc.textContent = info.desc;
   moodSliderCard.classList.toggle("active", !!active);
 }
 moodSlider.addEventListener("input", () => {
