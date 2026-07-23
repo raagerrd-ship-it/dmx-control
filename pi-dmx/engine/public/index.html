@@ -205,6 +205,7 @@
         <div class="advflag" id="fRiser"><span class="dot"></span>Riser-strobe</div>
         <div class="advflag" id="fHead"><span class="dot"></span>Drop-headroom</div>
         <div class="advflag" id="fFog"><span class="dot"></span>Rökmaskin aktiv</div>
+        <div class="advflag" id="fStrobeCh"><span class="dot"></span>DMX-strobe kopplad</div>
       </div>
     </div>
   </details>
@@ -560,6 +561,7 @@ function updateAdvMirror(cfg) {
   flag("fRiser",  cfg.riserStrobe);
   flag("fHead",   cfg.dropHeadroom);
   flag("fFog",    cfg.fog && cfg.fog.enabled);
+  flag("fStrobeCh", Array.isArray(cfg.fixtures) && cfg.fixtures.some(fx => Array.isArray(fx.roles) && fx.roles.includes("strobe")));
 }
 let kickTimer;
 function applyFrame(f) {
