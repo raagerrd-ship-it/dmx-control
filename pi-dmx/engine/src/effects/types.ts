@@ -8,7 +8,7 @@
  * lampa och de färdiga signalerna.
  */
 
-import type { EngineConfig, FixtureConfig, Mode } from "../config.js";
+import type { ChannelRole, EngineConfig, FixtureConfig, Mode } from "../config.js";
 import type { Frame } from "../analyser.js";
 
 /** Smart-lägets energitier som effekten hör hemma i. */
