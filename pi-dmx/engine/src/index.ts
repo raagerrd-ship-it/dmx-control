@@ -241,6 +241,7 @@ const serverDeps = {
   getActiveMode: () => effects.getActiveMode(),
   // Frisk = en ljud-chunk bearbetad senaste 10 s (arecord + event-loop lever).
   getHealthy: () => Date.now() - lastChunkAt < 10000,
+  getDmxConnected: () => dmx.isConnected(),
   getFogStatus: () => effects.getFogStatus(),
   resetFogService: () => effects.resetFogService(),
   cycleMode,
