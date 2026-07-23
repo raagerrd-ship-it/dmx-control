@@ -312,6 +312,8 @@ setInterval(() => {
 process.on("SIGTERM", () => {
   capture.stop();
   button?.stop();
+  knob?.stop();
+  knobSw?.stop();
   dmx.close();
   process.exit(0);
 });
