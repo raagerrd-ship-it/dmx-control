@@ -15,7 +15,7 @@ import { spawn, execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
 import { fixtureRoles } from "./config.js";
-import { applyMood, isMood } from "./moods.js";
+import { applyMood, applyIntensity, isMood } from "./moods.js";
 import type { FogStatus } from "./effects.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, EFFECT_META } from "./effects/registry.js";
@@ -300,6 +300,8 @@ export async function startServer(
             beat,
             beatErr: deps.cfg.beatErr ?? 0,
             mode: deps.getActiveMode(),
+            activeMood: deps.cfg.activeMood,
+            activeIntensity: deps.cfg.activeIntensity,   // vred/slider-position (0..1)
             fog: deps.getFogStatus(),     // null när maskinen inte är ansluten
           }));
 
@@ -312,6 +314,9 @@ export async function startServer(
           if (msg.type === "setMood" && isMood(msg.value)) {
             // Hyresgäst-stämning: motorn sätter HELA känslan (mode/dynamik/rotation/…).
             applyMood(deps.cfg, msg.value);
+          } else if (msg.type === "setIntensity" && typeof msg.value === "number") {
+            // Kontinuerligt vred/slider 0..1 — samma kontrakt för KY-040 och UI.
+            applyIntensity(deps.cfg, msg.value);
           } else if (msg.type === "setMode" && isMode(msg.mode)) {
             deps.cfg.mode = msg.mode;
             deps.cfg.activeMood = undefined;   // manuell effekt → ingen stämning aktiv längre

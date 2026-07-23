@@ -70,4 +70,45 @@ export function applyMood(cfg: EngineConfig, mood: MoodId): void {
   for (const k of EFFECT_KEYS) rot[k] = pool.has(k);
   cfg.rotation = rot;
   cfg.activeMood = mood;
+  cfg.activeIntensity = mood === "chill" ? 0 : mood === "fest" ? 0.5 : 1;
+}
+
+/** Kontinuerlig stämning från ETT vred (KY-040) eller UI-slider: 0..1
+ *  (Chill → Galet). Kontinuerliga rattar (dynamics/sensitivity/master/calm­
+ *  Decay/smartDwellMs) lerpas mjukt mellan tre ankare; poolen och boolean-
+ *  flaggorna snäpper vid 1/3 och 2/3 så motorns rotation-set byts stegvis. */
+export function applyIntensity(cfg: EngineConfig, xRaw: number): void {
+  const x = Math.max(0, Math.min(1, xRaw));
+  // Två segment: chill (0) → fest (0.5) → galet (1).
+  const [aId, bId, t] = x <= 0.5
+    ? (["chill", "fest",  x / 0.5]        as const)
+    : (["fest",  "galet", (x - 0.5) / 0.5] as const);
+  const a = FEEL[aId], b = FEEL[bId];
+  const lerp = (u: number, v: number) => u + (v - u) * t;
+
+  cfg.mode = "smart";
+  cfg.dynamics       = lerp(a.dynamics, b.dynamics);
+  cfg.sensitivity    = lerp(a.sensitivity, b.sensitivity);
+  cfg.master         = lerp(a.master, b.master);
+  cfg.calmDecay      = lerp(a.calmDecay, b.calmDecay);
+  cfg.smartDwellMs   = Math.round(lerp(a.smartDwellMs, b.smartDwellMs));
+
+  // Bucket-snäpp på ~1/3 och ~2/3 (matchar POOL/FEEL-anchoreringen ovan).
+  const bucket: MoodId = x < 1 / 3 ? "chill" : x < 2 / 3 ? "fest" : "galet";
+  const bf = FEEL[bucket];
+  cfg.energyDrivesMode = bf.energyDrivesMode;
+  cfg.beatPulse        = bf.beatPulse;
+  cfg.dropBlackout     = bf.dropBlackout;
+  cfg.clubMode         = bf.clubMode;
+  cfg.ambientGlow      = bf.ambientGlow;
+  cfg.energyCeiling    = bf.energyCeiling;
+  cfg.riserStrobe      = bf.riserStrobe;
+  cfg.dropHeadroom     = bf.dropHeadroom;
+  const pool = new Set<Mode>(POOL[bucket]);
+  const rot: Partial<Record<Mode, boolean>> = {};
+  for (const k of EFFECT_KEYS) rot[k] = pool.has(k);
+  cfg.rotation = rot;
+
+  cfg.activeMood     = bucket;   // för legacy-UI som markerar chill/fest/galet
+  cfg.activeIntensity = x;
 }

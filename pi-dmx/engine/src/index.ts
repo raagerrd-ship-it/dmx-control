@@ -19,6 +19,8 @@ import { DmxSender } from "./dmx.js";
 import { startServer, applyInputRouting, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
+import { IntensityKnob } from "./intensityKnob.js";
+import { applyIntensity } from "./moods.js";
 
 import { activeSlots, type Mode } from "./config.js";
 import { EFFECT_KEYS, EFFECT_MAP } from "./effects/registry.js";
@@ -248,6 +250,55 @@ if (cfg.modeButton) {
   console.log(`mode-button on ${cfg.modeButton.chip} line ${cfg.modeButton.line} (short=mode, long=AGC)`);
 }
 
+// KY-040 stämnings-vred → applyIntensity → samma kod-väg som WS "setIntensity".
+// UI-slidern och vredet är alltså exakt samma "input" — vem som än rör den
+// senast vinner, och båda syns hos alla klienter via `activeIntensity` i frame.
+let knob: IntensityKnob | null = null;
+let knobSw: Button | null = null;
+if (cfg.intensityKnob) {
+  const k = cfg.intensityKnob;
+  knob = new IntensityKnob({
+    chip: k.chip, clk: k.clk, dt: k.dt,
+    initial: cfg.activeIntensity ?? 0.5,
+  });
+  knob.on("change", (v: number) => {
+    applyIntensity(cfg, v);
+    scheduleSave(cfg);
+    server?.broadcastConfig();
+  });
+  knob.on("stderr", (s: string) => console.error("[knob]", s));
+  knob.start();
+  console.log(`intensity-knob on ${k.chip} CLK=${k.clk} DT=${k.dt}${k.sw != null ? ` SW=${k.sw}` : ""}`);
+
+  // Push-knapp på vredet: kort tryck = hoppa till närmaste bucket-mitt
+  // (0/0.5/1); långt tryck = blackout-toggle.
+  if (k.sw != null) {
+    knobSw = new Button({ chip: k.chip, line: k.sw });
+    knobSw.on("press", () => {
+      const x = cfg.activeIntensity ?? 0.5;
+      const next = x < 1 / 3 ? 0.5 : x < 2 / 3 ? 1 : 0;
+      applyIntensity(cfg, next);
+      knob?.set(next);
+      scheduleSave(cfg);
+      server?.broadcastConfig();
+      console.log(`[knob-sw] intensity → ${next.toFixed(2)}`);
+    });
+    knobSw.on("longPress", () => {
+      cfg.mode = cfg.mode === "blackout" ? "smart" : "blackout";
+      scheduleSave(cfg);
+      server?.broadcastConfig();
+    });
+    knobSw.start();
+  }
+
+  // WS "setIntensity" från UI: håll vredets interna värde synkat så nästa
+  // detent-vridning fortsätter från rätt position (och inte hoppar tillbaka).
+  const origBroadcast = server?.broadcastConfig;
+  if (origBroadcast && server) {
+    server.broadcastConfig = () => { knob?.set(cfg.activeIntensity ?? knob.get()); origBroadcast.call(server); };
+  }
+}
+
 // Rökens drifträknare tickar i RENDERLOOPEN, inte via config-meddelanden — utan
 // det här skulle de bara nå flashen av en slump (nästa gång någon råkar röra en
 // inställning). Spara var 5:e minut, och bara när något faktiskt rökt sedan
@@ -261,6 +312,8 @@ setInterval(() => {
 process.on("SIGTERM", () => {
   capture.stop();
   button?.stop();
+  knob?.stop();
+  knobSw?.stop();
   dmx.close();
   process.exit(0);
 });

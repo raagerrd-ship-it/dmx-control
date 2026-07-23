@@ -58,6 +58,11 @@ export interface EngineConfig {
   /** Senast valda hyresgäst-stämning (chill/fest/galet) — för att UI:t ska kunna
    *  markera rätt knapp. Sätts av setMood; en manuell effekt-ändring gör den inaktuell. */
   activeMood?: MoodId;
+  /** Kontinuerlig stämning 0..1 (Chill → Galet) från fysiskt vred (KY-040) eller
+   *  slider i UI. Speglar samma bucket som activeMood men med lerp mellan ankarna. */
+  activeIntensity?: number;
+  /** Fysiskt vred (KY-040) för stämnings-intensitet. Null = inget vred anslutet. */
+  intensityKnob?: { chip: string; clk: number; dt: number; sw?: number } | null;
   /** Which codec input feeds the show: line on the P1 AUX header or the mic path. */
   audioInput: "aux" | "mic";
   sensitivity: number;    // 0..1 user knob
