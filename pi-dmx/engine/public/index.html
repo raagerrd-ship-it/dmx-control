@@ -458,6 +458,8 @@ function connect() {
     if (m.type === "config") applyConfig(m.config);
     else if (m.type === "frame") applyFrame(m);
     else if (m.type === "effects") applyEffects(m.effects);
+    else if (m.type === "bleScanResults") renderBleScan(m.devices || []);
+    else if (m.type === "blePaired") renderBlePaired(m.devices || []);
   };
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
@@ -610,8 +612,10 @@ function updateAdvMirror(cfg) {
   flag("fBlinder",  isActive("blinder"));
   flag("fLaser",    isActive("laser"));
   flag("fCo2",      isActive("co2"));
+  flag("fBle",      (cfg.bleDevices?.length ?? 0) > 0 && lastBleActive > 0);
   renderCategories();   // fixtures kan ha ändrats → uppdatera "kräver: X"-taggar
 }
+let lastBleActive = 0;
 let kickTimer;
 function applyFrame(f) {
   const pct = Math.round(f.level * 100);
