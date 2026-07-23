@@ -231,12 +231,19 @@ function MoreDetails() {
       <ShowCard />
       <FinjusteringCard />
 
-      <SectionTitle>Lugna effekter</SectionTitle>
-      <RotationList modes={CALM_MODES} />
-      <SectionTitle>Effekter med fart</SectionTitle>
-      <RotationList modes={FAST_MODES} />
-      <SectionTitle>Effekter med full fart</SectionTitle>
-      <RotationList modes={FULL_MODES} />
+      <details className="mt-3 group/eff">
+        <summary className="py-3 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/eff:text-foreground">
+          <span>Effekt-val · välj vilka som roterar</span>
+          <span className="ml-1 group-open/eff:hidden"> ⌄</span>
+          <span className="ml-1 hidden group-open/eff:inline"> ⌃</span>
+        </summary>
+        <SectionTitle>Lugna effekter</SectionTitle>
+        <RotationList modes={CALM_MODES} />
+        <SectionTitle>Effekter med fart</SectionTitle>
+        <RotationList modes={FAST_MODES} />
+        <SectionTitle>Effekter med full fart</SectionTitle>
+        <RotationList modes={FULL_MODES} />
+      </details>
 
       <AdvancedMirror />
     </details>
