@@ -237,7 +237,116 @@ function MoreDetails() {
       <RotationList modes={FAST_MODES} />
       <SectionTitle>Effekter med full fart</SectionTitle>
       <RotationList modes={FULL_MODES} />
+
+      <AdvancedMirror />
     </details>
+  );
+}
+
+/* ────────── Avancerat · spegel av stämningen (skrivskyddad) ────────── */
+
+/** Härled hela FEEL-uppsättningen från intensity 0..1 — speglar
+ *  pi-dmx/engine/src/moods.ts (5 kontinuerliga lerp + 8 bucket-snap). */
+function deriveFeel(x: number) {
+  const clamped = Math.max(0, Math.min(1, x));
+  const A = { dynamics: 0.30, sensitivity: 0.50, master: 0.30, calmDecay: 1.20, smartDwellMs: 40000,
+    energyDrivesMode: false, beatPulse: false, dropBlackout: false, clubMode: false,
+    ambientGlow: true,  energyCeiling: true, riserStrobe: false, dropHeadroom: false };
+  const B = { dynamics: 0.60, sensitivity: 0.60, master: 1.00, calmDecay: 0.42, smartDwellMs: 15000,
+    energyDrivesMode: true,  beatPulse: true,  dropBlackout: true,  clubMode: false,
+    ambientGlow: false, energyCeiling: true, riserStrobe: false, dropHeadroom: false };
+  const C = { dynamics: 0.85, sensitivity: 0.70, master: 1.00, calmDecay: 0.42, smartDwellMs: 10000,
+    energyDrivesMode: true,  beatPulse: true,  dropBlackout: true,  clubMode: true,
+    ambientGlow: false, energyCeiling: true, riserStrobe: true,  dropHeadroom: true  };
+  const [a, b, t] = clamped <= 0.5
+    ? [A, B, clamped / 0.5] as const
+    : [B, C, (clamped - 0.5) / 0.5] as const;
+  const lerp = (u: number, v: number) => u + (v - u) * t;
+  const bucket = clamped < 1 / 3 ? A : clamped < 2 / 3 ? B : C;
+  return {
+    dynamics: lerp(a.dynamics, b.dynamics),
+    sensitivity: lerp(a.sensitivity, b.sensitivity),
+    master: lerp(a.master, b.master),
+    calmDecay: lerp(a.calmDecay, b.calmDecay),
+    smartDwellMs: Math.round(lerp(a.smartDwellMs, b.smartDwellMs)),
+    energyDrivesMode: bucket.energyDrivesMode,
+    beatPulse: bucket.beatPulse,
+    dropBlackout: bucket.dropBlackout,
+    clubMode: bucket.clubMode,
+    ambientGlow: bucket.ambientGlow,
+    energyCeiling: bucket.energyCeiling,
+    riserStrobe: bucket.riserStrobe,
+    dropHeadroom: bucket.dropHeadroom,
+  };
+}
+
+function AdvancedMirror() {
+  const s = usePi();
+  const f = deriveFeel(s.intensity);
+  const decayPct = ((f.calmDecay - 0.30) / 0.90) * 100;
+  const dwellPct = ((40000 - f.smartDwellMs) / 35000) * 100;
+  const dwellLbl = f.smartDwellMs >= 20000 ? "Sällan" : f.smartDwellMs >= 10000 ? "Normal" : "Ofta";
+  return (
+    <details className="mt-3.5 group">
+      <summary className="py-3.5 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open:text-foreground">
+        <span>Avancerat · spegel av stämningen</span>
+        <span className="ml-1 group-open:hidden"> ⌄</span>
+        <span className="ml-1 hidden group-open:inline"> ⌃</span>
+      </summary>
+      <div className="mt-1">
+        <Card>
+          <div className="text-[12px] text-muted-foreground leading-snug mb-2.5">
+            Skrivskyddad vy. Stämnings-slidern (och det fysiska vredet) sätter allt nedan — dessa värden speglar motorn i realtid.
+          </div>
+          <AdvBar label="Dynamik"       pct={f.dynamics * 100}    value={Math.round(f.dynamics * 100) + "%"} />
+          <AdvBar label="Reaktion"      pct={f.sensitivity * 100} value={Math.round(f.sensitivity * 100) + "%"} />
+          <AdvBar label="Ljustak"       pct={f.master * 100}      value={Math.round(f.master * 100) + "%"} />
+          <AdvBar label="Tröghet"       pct={decayPct}            value={f.calmDecay.toFixed(2) + "s"} />
+          <AdvBar label="Byter effekt"  pct={dwellPct}            value={dwellLbl} />
+          <div className="mt-3 pt-2.5 border-t border-border grid grid-cols-2 gap-x-3 gap-y-1.5">
+            <AdvFlag on={f.energyDrivesMode} label="Energi styr läget" />
+            <AdvFlag on={f.beatPulse}        label="Pulsa på taktslag" />
+            <AdvFlag on={f.dropBlackout}     label="Drop-blackout" />
+            <AdvFlag on={f.clubMode}         label="Klubb-läge" />
+            <AdvFlag on={f.ambientGlow}      label="Vilo-glöd" />
+            <AdvFlag on={f.energyCeiling}    label="Dynamiskt ljustak" />
+            <AdvFlag on={f.riserStrobe}      label="Riser-strobe" />
+            <AdvFlag on={f.dropHeadroom}     label="Drop-headroom" />
+          </div>
+        </Card>
+      </div>
+    </details>
+  );
+}
+
+function AdvBar({ label, pct, value }: { label: string; pct: number; value: string }) {
+  const w = Math.max(0, Math.min(100, pct));
+  return (
+    <div className="grid grid-cols-[110px_1fr_44px] gap-2.5 items-center mb-2">
+      <span className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground">{label}</span>
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden opacity-90">
+        <div
+          className="h-full transition-[width] duration-200"
+          style={{ width: w + "%", background: "linear-gradient(90deg, hsl(var(--ok)), hsl(var(--accent)))" }}
+        />
+      </div>
+      <span className="text-right text-[12px] tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+function AdvFlag({ on, label }: { on: boolean; label: string }) {
+  return (
+    <div className={`flex items-center gap-2 text-[13px] ${on ? "text-foreground" : "text-muted-foreground"}`}>
+      <span
+        className="w-2.5 h-2.5 rounded-full flex-none transition-colors"
+        style={{
+          background: on ? "hsl(var(--ok))" : "hsl(var(--muted))",
+          boxShadow: on ? "0 0 8px color-mix(in srgb, hsl(var(--ok)) 60%, transparent)" : "none",
+        }}
+      />
+      <span>{label}</span>
+    </div>
   );
 }
 
