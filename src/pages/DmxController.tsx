@@ -323,6 +323,7 @@ function AdvancedMirror() {
             <AdvFlag on={false}              label="Blinder aktiv" />
             <AdvFlag on={false}              label="Laser aktiv" />
             <AdvFlag on={false}              label="CO₂ aktiv" />
+            <AdvFlag on={false}              label="BLE-slingor aktiva" />
           </div>
         </Card>
       </div>

@@ -211,6 +211,7 @@
         <div class="advflag" id="fBlinder"><span class="dot"></span>Blinder aktiv</div>
         <div class="advflag" id="fLaser"><span class="dot"></span>Laser aktiv</div>
         <div class="advflag" id="fCo2"><span class="dot"></span>CO₂ aktiv</div>
+        <div class="advflag" id="fBle"><span class="dot"></span>BLE-slingor aktiva</div>
       </div>
     </div>
   </details>
@@ -280,6 +281,21 @@
       <button class="btn primary" id="fxSave" disabled>Spara ändringar</button>
     </div>
     <div class="status" id="fxHint">Kalibrera varje lampas lägsta ljus med reglaget. "Blinka alla" hjälper dig hitta vilken lampa som är vilken.</div>
+  </div>
+
+  <h1>BLE-slingor</h1>
+  <div class="card">
+    <div class="status" id="bleStatus">Söker sidecar…</div>
+    <div id="blePairedList" style="margin-top:10px"></div>
+    <div class="fx-actions" style="margin-top:10px">
+      <button class="btn primary" id="bleScanBtn">Sök nya slingor (8 s)</button>
+    </div>
+    <div id="bleScanList" style="margin-top:8px"></div>
+    <div class="status" style="margin-top:8px;opacity:.7">
+      BLEDOM-klonade RGB-LED-band paras här. Sidecarn kör på egen CPU-kärna så
+      Bluetooth-scanningen aldrig stör ljud- eller DMX-timingen. Riggens
+      genomsnittsfärg speglas till slingorna live (~60 Hz).
+    </div>
   </div>
 
   <h1>System</h1>
@@ -442,6 +458,8 @@ function connect() {
     if (m.type === "config") applyConfig(m.config);
     else if (m.type === "frame") applyFrame(m);
     else if (m.type === "effects") applyEffects(m.effects);
+    else if (m.type === "bleScanResults") renderBleScan(m.devices || []);
+    else if (m.type === "blePaired") renderBlePaired(m.devices || []);
   };
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
@@ -594,14 +612,17 @@ function updateAdvMirror(cfg) {
   flag("fBlinder",  isActive("blinder"));
   flag("fLaser",    isActive("laser"));
   flag("fCo2",      isActive("co2"));
+  flag("fBle",      (cfg.bleDevices?.length ?? 0) > 0 && lastBleActive > 0);
   renderCategories();   // fixtures kan ha ändrats → uppdatera "kräver: X"-taggar
 }
+let lastBleActive = 0;
 let kickTimer;
 function applyFrame(f) {
   const pct = Math.round(f.level * 100);
   levelBar.style.width = pct + "%";
   levelVal.textContent = pct + "%";
   gainVal.textContent = f.gain.toFixed(1);
+  lastBleActive = f.bleActive ?? 0;
   if (f.kick) {
     kickDot.classList.add("on");
     clearTimeout(kickTimer);
@@ -1218,6 +1239,90 @@ btnUpdate.onclick = async () => {
   }, 180000);
 };
 
+
+/* ── BLE-slingor (owner-only) ──────────────────────────────────────────── */
+const bleStatus       = document.getElementById("bleStatus");
+const bleScanBtn      = document.getElementById("bleScanBtn");
+const bleScanList     = document.getElementById("bleScanList");
+const blePairedList   = document.getElementById("blePairedList");
+let blePairedDevices  = [];
+
+function macKey(d) { return (d.mac || "").toLowerCase(); }
+
+function renderBlePaired(devices) {
+  blePairedDevices = devices;
+  if (!blePairedList) return;
+  if (!devices.length) {
+    blePairedList.innerHTML = `<div class="status" style="opacity:.7">Inga slingor parade ännu. Tryck "Sök" nedan.</div>`;
+    bleStatus.textContent = "Sidecar ansluten. Inga parade slingor.";
+    return;
+  }
+  const connected = devices.filter((d) => d.connected).length;
+  bleStatus.textContent = `${connected}/${devices.length} slinga${devices.length === 1 ? "" : "or"} uppkopplade.`;
+  blePairedList.innerHTML = devices.map((d) => `
+    <div class="row" style="align-items:center;gap:10px">
+      <span class="dot${d.connected ? " on" : ""}"></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600">${escapeHtml(d.name || d.mac)}</div>
+        <div style="opacity:.6;font-size:11px">${escapeHtml(d.mac)} · ${d.chip}</div>
+      </div>
+      <button class="btn" data-ble-unpair="${escapeHtml(d.mac)}">Ta bort</button>
+    </div>
+  `).join("");
+  blePairedList.querySelectorAll("[data-ble-unpair]").forEach((btn) => {
+    btn.onclick = () => {
+      if (!confirm("Ta bort slingan?")) return;
+      send({ type: "bleUnpair", mac: btn.dataset.bleUnpair });
+    };
+  });
+}
+
+function renderBleScan(devices) {
+  bleScanBtn.disabled = false;
+  bleScanBtn.textContent = "Sök nya slingor (8 s)";
+  const paired = new Set(blePairedDevices.map(macKey));
+  // Visa BLEDOM-träffar först, sen okända (dimmade). Filtera bort redan parade.
+  const fresh = devices.filter((d) => !paired.has(macKey(d)))
+    .sort((a, b) => (a.chip === "bledom" ? -1 : 1) - (b.chip === "bledom" ? -1 : 1) || b.rssi - a.rssi);
+  if (!fresh.length) {
+    bleScanList.innerHTML = `<div class="status" style="opacity:.7">Inga nya slingor hittade. Se till att strömmen är på och att den inte redan är ansluten till en annan app.</div>`;
+    return;
+  }
+  bleScanList.innerHTML = fresh.map((d) => `
+    <div class="row" style="align-items:center;gap:10px;opacity:${d.chip === "bledom" ? "1" : ".55"}">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600">${escapeHtml(d.name || d.mac)}</div>
+        <div style="opacity:.6;font-size:11px">${escapeHtml(d.mac)} · ${d.chip} · ${d.rssi} dBm</div>
+      </div>
+      <button class="btn primary" data-ble-pair="${escapeHtml(d.mac)}" data-ble-name="${escapeHtml(d.name || d.mac)}" data-ble-chip="${d.chip}">
+        ${d.chip === "bledom" ? "Para" : "Testa"}
+      </button>
+    </div>
+  `).join("");
+  bleScanList.querySelectorAll("[data-ble-pair]").forEach((btn) => {
+    btn.onclick = () => {
+      send({ type: "blePair", mac: btn.dataset.blePair, name: btn.dataset.bleName, chip: btn.dataset.bleChip });
+      btn.disabled = true; btn.textContent = "Parar…";
+    };
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+if (bleScanBtn) {
+  bleScanBtn.onclick = () => {
+    bleScanBtn.disabled = true;
+    bleScanBtn.textContent = "Söker…";
+    bleScanList.innerHTML = `<div class="status" style="opacity:.7">Söker i 8 sekunder…</div>`;
+    send({ type: "bleScan" });
+    // Fail-safe: knapp ska aldrig fastna om sidecarn inte svarar.
+    setTimeout(() => { if (bleScanBtn.disabled) { bleScanBtn.disabled = false; bleScanBtn.textContent = "Sök nya slingor (8 s)"; } }, 12000);
+  };
+  // Ta emot initialläget så snart WS är uppe (server broadcastar blePaired vid ändring).
+  setTimeout(() => renderBlePaired([]), 200);
+}
 
 
 </script>
