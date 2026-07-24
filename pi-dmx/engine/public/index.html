@@ -122,44 +122,42 @@
     .power-card.off .power-icon { background:var(--line); color:var(--dim); }
     .power-text small { display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin-bottom:2px; }
     .power-text b { font-size:19px; font-weight:600; }
-   /* Hero-kort: glaspanel som samlar stämning + ljud (Depth-panel-riktning) */
-   .hero-card { position:relative; margin: 4px 0 14px; padding: 20px 18px 18px; border-radius: 24px;
-     background: color-mix(in srgb, var(--fg) 3%, transparent);
-     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 8%, transparent), 0 30px 60px -30px rgba(0,0,0,.6);
-     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); overflow:hidden; }
-   .hero-card::before { content:""; position:absolute; top:-96px; left:-96px; width:192px; height:192px; border-radius:50%;
-     background: color-mix(in srgb, var(--hot) 22%, transparent); filter: blur(80px); pointer-events:none; }
-   .hero-head { position:relative; display:flex; align-items:flex-end; justify-content:space-between; padding:0 2px; margin-bottom:14px; }
-   .hero-head .hero-lbl { font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:color-mix(in srgb, var(--fg) 45%, transparent); font-weight:600; }
-   .hero-head .hero-num { font-size:12px; font-weight:700; color:var(--hot); font-variant-numeric:tabular-nums; text-shadow: 0 0 8px color-mix(in srgb, var(--hot) 55%, transparent); }
-   .hero-head .hero-num.off { color:var(--dim); text-shadow:none; }
-   .hero-card .mood-slider { margin: 0; }
-   .hero-card .audio-section { margin: 18px 0 0; }
-   /* Stämnings-slider (huvudkontroll). Speglar .mood-range i src/index.css. */
-   .mood-slider { margin: 8px 0 18px; }
-   .mood-slider-head { display:flex; align-items:baseline; justify-content:space-between; padding:0 2px; margin-bottom:12px; }
-   .mood-slider-label { font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); font-weight:600; }
-   .mood-slider-pill { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:4px 10px; border-radius:999px; font-variant-numeric:tabular-nums; background:color-mix(in srgb, var(--hot) 12%, transparent); color:var(--hot); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hot) 25%, transparent); transition: background .15s, color .15s, box-shadow .15s; }
-   .mood-slider-pill.off { background:color-mix(in srgb, var(--dim) 15%, transparent); color:var(--dim); box-shadow: inset 0 0 0 1px var(--line); }
-   .mood-slider-pill .num { opacity:.5; }
-   .mood-track-wrap { position:relative; }
-   .mood-ticks { position:absolute; inset:0 14px; display:flex; justify-content:space-between; align-items:center; pointer-events:none; }
-   .mood-ticks span { width:2px; height:4px; border-radius:1px; background:color-mix(in srgb, var(--fg) 12%, transparent); }
-   input[type=range].mood-range { -webkit-appearance:none; appearance:none; width:100%; height:40px; background:transparent; cursor:pointer; --mood-fill:60%; --mood-accent: var(--hot); position:relative; }
-  input[type=range].mood-range::-webkit-slider-runnable-track { height:10px; border-radius:999px; background: linear-gradient(90deg, color-mix(in srgb, var(--hot) 0%, transparent) 0%, var(--mood-accent) var(--mood-fill), color-mix(in srgb, var(--fg) 8%, transparent) var(--mood-fill) 100%); }
-  input[type=range].mood-range::-moz-range-track { height:10px; border-radius:999px; background: linear-gradient(90deg, color-mix(in srgb, var(--hot) 0%, transparent) 0%, var(--mood-accent) var(--mood-fill), color-mix(in srgb, var(--fg) 8%, transparent) var(--mood-fill) 100%); }
+    /* Hero-kort: en enda professionell glaspanel som samlar alla huvudkontroller */
+    .hero-card { position:relative; margin: 4px 0 14px; padding: 20px 18px 18px; border-radius: 28px;
+      background: color-mix(in srgb, var(--fg) 2%, transparent);
+      border: 1px solid color-mix(in srgb, var(--fg) 6%, transparent);
+      box-shadow: 0 30px 60px -30px rgba(0,0,0,.5);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); overflow:hidden; }
+    .hero-card::before { content:""; position:absolute; top:-80px; left:-60px; width:160px; height:160px; border-radius:50%;
+      background: color-mix(in srgb, var(--hot) 16%, transparent); filter: blur(70px); pointer-events:none; }
+    .hero-head { position:relative; display:flex; align-items:flex-end; justify-content:space-between; padding:0 2px; margin-bottom:14px; }
+    .hero-head .hero-lbl { font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:color-mix(in srgb, var(--fg) 45%, transparent); font-weight:600; }
+    .hero-head .hero-name { font-size:12px; font-weight:600; color:var(--hot); }
+    .hero-head .hero-name.off { color:var(--dim); }
+    .hero-card .mood-slider { margin: 0; }
+    .hero-card .audio-section { margin: 20px 0 0; }
+    /* Stämnings-slider (huvudkontroll). Speglar .mood-range i src/index.css. */
+    .mood-slider { margin: 8px 0 18px; }
+    .mood-slider-head { display:flex; align-items:baseline; justify-content:space-between; padding:0 2px; margin-bottom:12px; }
+    .mood-slider-label { font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+    .mood-track-wrap { position:relative; }
+    .mood-ticks { position:absolute; inset:0 14px; display:flex; justify-content:space-between; align-items:center; pointer-events:none; }
+    .mood-ticks span { width:2px; height:4px; border-radius:1px; background:color-mix(in srgb, var(--fg) 12%, transparent); }
+    input[type=range].mood-range { -webkit-appearance:none; appearance:none; width:100%; height:40px; background:transparent; cursor:pointer; --mood-fill:60%; --mood-accent: var(--hot); position:relative; }
+   input[type=range].mood-range::-webkit-slider-runnable-track { height:10px; border-radius:999px; background: linear-gradient(90deg, color-mix(in srgb, var(--hot) 0%, transparent) 0%, var(--mood-accent) var(--mood-fill), color-mix(in srgb, var(--fg) 8%, transparent) var(--mood-fill) 100%); }
+   input[type=range].mood-range::-moz-range-track { height:10px; border-radius:999px; background: linear-gradient(90deg, color-mix(in srgb, var(--hot) 0%, transparent) 0%, var(--mood-accent) var(--mood-fill), color-mix(in srgb, var(--fg) 8%, transparent) var(--mood-fill) 100%); }
 
-   input[type=range].mood-range::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:30px; height:30px; margin-top:-10px; background:var(--fg); border:5px solid var(--bg); border-radius:999px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hot) 35%, transparent), 0 0 22px 2px color-mix(in srgb, var(--hot) 55%, transparent); transition: transform .12s ease, box-shadow .18s ease; }
-   input[type=range].mood-range::-moz-range-thumb { width:30px; height:30px; background:var(--fg); border:5px solid var(--bg); border-radius:999px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hot) 35%, transparent), 0 0 22px 2px color-mix(in srgb, var(--hot) 55%, transparent); }
-   input[type=range].mood-range:active::-webkit-slider-thumb { transform: scale(1.08); }
-   input[type=range].mood-range:active::-moz-range-thumb { transform: scale(1.08); }
-   input[type=range].mood-range:focus { outline:none; }
-   input[type=range].mood-range.is-off { --mood-accent: color-mix(in srgb, var(--dim) 55%, transparent); }
-   input[type=range].mood-range.is-off::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--line); }
-   input[type=range].mood-range.is-off::-moz-range-thumb { box-shadow: 0 0 0 1px var(--line); }
-   .mood-slider-legend { display:flex; justify-content:space-between; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); margin-top:4px; padding:0 2px; }
-   .mood-slider-legend span.on { color:var(--hot); }
-   .mood-desc { margin-top:12px; padding:0 2px; font-size:13px; color:var(--dim); line-height:1.35; font-style:italic; }
+    input[type=range].mood-range::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:30px; height:30px; margin-top:-10px; background:var(--fg); border:5px solid var(--bg); border-radius:999px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hot) 35%, transparent), 0 0 22px 2px color-mix(in srgb, var(--hot) 55%, transparent); transition: transform .12s ease, box-shadow .18s ease; }
+    input[type=range].mood-range::-moz-range-thumb { width:30px; height:30px; background:var(--fg); border:5px solid var(--bg); border-radius:999px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hot) 35%, transparent), 0 0 22px 2px color-mix(in srgb, var(--hot) 55%, transparent); }
+    input[type=range].mood-range:active::-webkit-slider-thumb { transform: scale(1.08); }
+    input[type=range].mood-range:active::-moz-range-thumb { transform: scale(1.08); }
+    input[type=range].mood-range:focus { outline:none; }
+    input[type=range].mood-range.is-off { --mood-accent: color-mix(in srgb, var(--dim) 55%, transparent); }
+    input[type=range].mood-range.is-off::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--line); }
+    input[type=range].mood-range.is-off::-moz-range-thumb { box-shadow: 0 0 0 1px var(--line); }
+    .mood-slider-legend { display:flex; justify-content:space-between; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); margin-top:4px; padding:0 2px; }
+    .mood-slider-legend span.on { color:var(--hot); }
+    .mood-desc { margin-top:12px; padding:0 2px; font-size:13px; color:var(--dim); line-height:1.35; font-style:italic; }
     details.tech-details { margin-top:12px; }
     details.tech-details > summary { list-style:none; cursor:pointer; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
     details.tech-details > summary::-webkit-details-marker { display:none; }
