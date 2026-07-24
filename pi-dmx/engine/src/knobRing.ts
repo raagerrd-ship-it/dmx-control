@@ -157,6 +157,11 @@ export class KnobRing {
       this.blackoutFade *
       (1 + this.pulseBoost * this.beatPulse);
 
+    // Standby-glöd: när vredet är 0 (blackout) och fade-out är klar lyser alla
+    // 12 LEDs svagt rött så användaren ser att riggen har ström men är "släckt".
+    const standby = this.state.blackout && this.blackoutFade < 0.02;
+    const standbyR = standby ? Math.round(255 * this.maxBright * 0.06) : 0;
+
     let off = RESET_BYTES;
     for (let i = 0; i < N_LEDS; i++) {
       let scale: number;
@@ -165,9 +170,15 @@ export class KnobRing {
       else scale = 0;
       const k = scale * bright;
       // WS2812 wire order är GRB
-      encodeByte(Math.round(g * k), this.txBuf, off);     off += 3;
-      encodeByte(Math.round(r * k), this.txBuf, off);     off += 3;
-      encodeByte(Math.round(b * k), this.txBuf, off);     off += 3;
+      if (standby) {
+        encodeByte(0,         this.txBuf, off); off += 3;
+        encodeByte(standbyR,  this.txBuf, off); off += 3;
+        encodeByte(0,         this.txBuf, off); off += 3;
+      } else {
+        encodeByte(Math.round(g * k), this.txBuf, off); off += 3;
+        encodeByte(Math.round(r * k), this.txBuf, off); off += 3;
+        encodeByte(Math.round(b * k), this.txBuf, off); off += 3;
+      }
     }
 
     const msg: SPI.SpiMessage = [{
