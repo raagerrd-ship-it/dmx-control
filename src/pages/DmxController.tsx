@@ -173,11 +173,6 @@ function InputLevel() {
         </div>
       </div>
 
-      <div className="flex justify-between mt-1.5 px-1 font-mono">
-        <span className="text-[9px] tracking-widest text-muted-foreground/40">TYST</span>
-        <span className="text-[9px] tracking-widest text-muted-foreground/40">-12 dB</span>
-        <span className={`text-[9px] tracking-widest ${hot ? "text-primary" : "text-muted-foreground/40"}`}>KLIPP</span>
-      </div>
     </div>
   );
 }
