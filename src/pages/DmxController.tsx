@@ -72,8 +72,18 @@ function MoodSlider() {
   const off = !s.power;
   const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
   const fillPct = (v / 10) * 100;
+  const info = moodInfoFor(v);
   return (
     <div>
+      <div className="flex items-baseline justify-between px-1 mb-3">
+        <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground/80">
+          Stämning
+        </span>
+        <span className={`text-[11px] font-semibold ${off ? "text-muted-foreground/50" : "text-primary"}`}>
+          {info.name}
+        </span>
+      </div>
+
       <div className="relative h-12 flex items-center">
         <div aria-hidden className="absolute inset-0 bg-primary/[0.04] blur-xl pointer-events-none" />
         <div className="mood-ticks" aria-hidden>
@@ -101,9 +111,9 @@ function MoodSlider() {
       </div>
 
       <div className="flex justify-between mt-2 px-1 font-mono">
-        <span className={`text-[9px] font-bold tracking-widest ${off ? "text-primary/80" : "text-muted-foreground/40"}`}>LVL 00</span>
+        <span className={`text-[9px] font-bold tracking-widest ${off ? "text-primary/80" : "text-muted-foreground/40"}`}>AV</span>
         <span className={v >= 5 && v <= 7 ? "text-[9px] font-bold tracking-widest text-primary" : "text-[9px] font-bold tracking-widest text-muted-foreground/40"}>FEST</span>
-        <span className={`text-[9px] font-bold tracking-widest ${v >= 9 ? "text-primary" : "text-muted-foreground/40"}`}>LVL 10</span>
+        <span className={`text-[9px] font-bold tracking-widest ${v >= 9 ? "text-primary" : "text-muted-foreground/40"}`}>GALET</span>
       </div>
     </div>
   );
