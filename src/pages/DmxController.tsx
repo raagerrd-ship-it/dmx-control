@@ -128,9 +128,9 @@ function InputLevel() {
   const hot = pct > 85;
   const silent = pct < 4;
 
-  const peakRef = React.useRef(0);
-  const [peak, setPeak] = React.useState(0);
-  React.useEffect(() => {
+  const peakRef = useRef(0);
+  const [peak, setPeak] = useState(0);
+  useEffect(() => {
     if (pct >= peakRef.current) {
       peakRef.current = pct;
       setPeak(pct);
