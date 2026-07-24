@@ -98,22 +98,6 @@ function MoodSlider() {
 
 /* ────────── Ljud (källa + nivå + teknisk info) ────────── */
 
-function SourceBtn({
-  active, onClick, children,
-}: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 py-3 rounded-[10px] border font-medium text-[14px] ${
-        active
-          ? "bg-primary border-primary text-primary-foreground"
-          : "bg-card border-border text-foreground"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
 
 function AudioMeterCard() {
   const s = usePi();
@@ -125,80 +109,125 @@ function AudioMeterCard() {
   const pct = Math.round(audio * 100);
   const confPct = Math.round(conf * 100);
   const locked = bpm > 0;
-  const beatErrLabel = locked ? "±0 ms" : "söker…";
-  const beatErrColor = locked ? "hsl(var(--ok))" : "hsl(var(--muted-foreground))";
+  const kickOn = kick > 0.4;
+  const hot = audio > 0.85;
+  const source = s.audioInput;
+
   return (
-    <>
-      <SectionTitle>
-        Ljud <KickDot on={kick > 0.4} />
-      </SectionTitle>
-      <Card>
-        <div className="flex gap-2">
-          <SourceBtn active={s.audioInput === "aux"} onClick={() => setPi({ audioInput: "aux" })}>
-            AUX (kabel)
-          </SourceBtn>
-          <SourceBtn active={s.audioInput === "mic"} onClick={() => setPi({ audioInput: "mic" })}>
-            Mikrofon
-          </SourceBtn>
-        </div>
-        <MeterRow label="Nivå just nu" value={`${pct}%`} className="mt-3.5" />
-        <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-2">
-          <div
-            className="h-full transition-[width] duration-[60ms] linear"
-            style={{
-              width: pct + "%",
-              background: "linear-gradient(90deg, hsl(var(--ok)), hsl(var(--accent)))",
-            }}
+    <section className="mb-4">
+      {/* Segmenterad källa-väljare */}
+      <div
+        role="tablist"
+        aria-label="Ljudkälla"
+        className="relative grid grid-cols-2 rounded-full bg-muted/40 p-1 ring-1 ring-border/60"
+      >
+        <span
+          aria-hidden
+          className="absolute inset-y-1 w-[calc(50%-4px)] rounded-full bg-primary shadow-[0_0_20px_hsl(var(--primary)/0.45)] transition-transform duration-300 ease-out"
+          style={{ transform: `translateX(${source === "aux" ? "0%" : "calc(100% + 8px)"})` }}
+        />
+        {[
+          { id: "aux", label: "AUX (kabel)" },
+          { id: "mic", label: "Mikrofon" },
+        ].map((o) => (
+          <button
+            key={o.id}
+            role="tab"
+            aria-selected={source === o.id}
+            onClick={() => setPi({ audioInput: o.id as "aux" | "mic" })}
+            className={`relative z-10 py-2.5 rounded-full text-[13px] font-medium transition-colors ${
+              source === o.id ? "text-primary-foreground" : "text-muted-foreground"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Nivåmätare */}
+      <div className="mt-4 flex items-baseline justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Nivå
+          </span>
+          <span
+            className={`inline-block h-1.5 w-1.5 rounded-full transition-all ${
+              kickOn ? "bg-primary shadow-[0_0_10px_hsl(var(--primary))] scale-125" : "bg-muted"
+            }`}
+            aria-label={kickOn ? "Kick" : "Ingen kick"}
           />
         </div>
-        <details className="mt-3 group/tech">
-          <summary className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground font-semibold cursor-pointer list-none [&::-webkit-details-marker]:hidden py-1.5 group-open/tech:text-foreground">
-            <span>Teknisk info</span>
-            <span className="ml-1 group-open/tech:hidden"> ⌄</span>
-            <span className="ml-1 hidden group-open/tech:inline"> ⌃</span>
-          </summary>
-          <div className="mt-2">
-            <MeterRow label="BPM" value={locked ? `${Math.round(bpm)} BPM` : "–"} />
-            <MeterRow
-              label={<>Beat-synk <KickDot on={beat && locked} /></>}
-              value={<span style={{ color: beatErrColor }}>{beatErrLabel}</span>}
-            />
-            <MeterRow label="Konfidens" value={locked ? `${confPct}%` : "–"} />
-            <div className="text-[12px] text-muted-foreground mt-2">
-              Auto-gain: <span className="tabular-nums text-foreground">1.0</span>×
-            </div>
-          </div>
-        </details>
-      </Card>
-    </>
+        <span
+          className={`text-[13px] tabular-nums font-semibold transition-colors ${
+            hot ? "text-primary" : "text-foreground"
+          }`}
+        >
+          {pct}%
+        </span>
+      </div>
+      <div className="relative mt-2 h-2 rounded-full bg-muted/50 overflow-hidden ring-1 ring-border/40">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-[60ms] linear"
+          style={{
+            width: pct + "%",
+            background: "linear-gradient(90deg, hsl(var(--ok)), hsl(var(--accent)), hsl(var(--primary)))",
+            boxShadow: hot ? "0 0 14px hsl(var(--primary) / 0.55)" : "none",
+          }}
+        />
+        {/* diskreta ticks */}
+        <div className="pointer-events-none absolute inset-0 flex justify-between px-1">
+          {Array.from({ length: 11 }).map((_, i) => (
+            <span key={i} className="w-px bg-background/40" />
+          ))}
+        </div>
+      </div>
+
+      {/* Teknisk info */}
+      <details className="mt-3 group/tech">
+        <summary className="flex items-center gap-1.5 py-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/tech:text-foreground">
+          <span>Teknisk info</span>
+          <span className="transition-transform group-open/tech:rotate-180">⌄</span>
+        </summary>
+        <div className="mt-2 divide-y divide-border/40 rounded-xl bg-muted/25 ring-1 ring-border/40 px-3">
+          <TechRow label="BPM" value={locked ? `${Math.round(bpm)}` : "–"} accent={locked} />
+          <TechRow
+            label="Beat-synk"
+            value={locked ? "±0 ms" : "söker…"}
+            accent={locked && beat}
+            dot={locked && beat}
+          />
+          <TechRow label="Konfidens" value={locked ? `${confPct}%` : "–"} />
+          <TechRow label="Auto-gain" value="1.0×" />
+        </div>
+      </details>
+    </section>
   );
 }
 
-
-function MeterRow({
-  label, value, className,
+function TechRow({
+  label, value, accent, dot,
 }: {
-  label: React.ReactNode; value: React.ReactNode; className?: string;
+  label: string; value: React.ReactNode; accent?: boolean; dot?: boolean;
 }) {
   return (
-    <div className={`flex justify-between items-center mb-1.5 ${className ?? ""}`}>
-      <span className="text-[13px] text-muted-foreground flex items-center gap-1.5">{label}</span>
-      <span className="text-[13px] tabular-nums">{value}</span>
+    <div className="flex items-center justify-between py-2">
+      <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+        {label}
+        {dot && (
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))]" />
+        )}
+      </span>
+      <span
+        className={`text-[13px] tabular-nums font-medium ${
+          accent ? "text-primary" : "text-foreground"
+        }`}
+      >
+        {value}
+      </span>
     </div>
   );
 }
 
-function KickDot({ on }: { on: boolean }) {
-  return (
-    <span
-      className="inline-block w-2 h-2 rounded-full align-middle transition-colors"
-      style={{
-        background: on ? "hsl(var(--accent))" : "hsl(var(--muted))",
-        boxShadow: on ? "0 0 12px hsl(var(--accent))" : "none",
-      }}
-    />
-  );
-}
 
 /* ────────── Mer inställningar (details) — Show + Finjustering + rotation ────────── */
 

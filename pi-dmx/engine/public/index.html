@@ -153,6 +153,33 @@
     details.tech-details > summary::-webkit-details-marker { display:none; }
     details.tech-details > summary::after { content:" ⌄"; }
     details.tech-details[open] > summary::after { content:" ⌃"; }
+
+    /* Ljud-sektion (proffsig, kort-lös) */
+    .audio-section { margin: 4px 0 14px; }
+    .src-seg { position:relative; display:grid; grid-template-columns:1fr 1fr; gap:0; padding:4px; border-radius:999px; background:color-mix(in srgb, var(--fg) 6%, transparent); box-shadow:inset 0 0 0 1px var(--line); }
+    .src-seg .src-thumb { position:absolute; top:4px; bottom:4px; width:calc(50% - 4px); border-radius:999px; background:var(--hot); box-shadow:0 0 20px color-mix(in srgb, var(--hot) 45%, transparent); transition:transform .3s cubic-bezier(.4,.0,.2,1); }
+    .src-seg[data-src="mic"] .src-thumb { transform:translateX(calc(100% + 8px)); }
+    .src-seg button { position:relative; z-index:1; background:transparent; border:0; padding:10px 8px; border-radius:999px; color:var(--dim); font-size:13px; font-weight:500; cursor:pointer; transition:color .2s; }
+    .src-seg button.active { color:#fff; }
+    .audio-head { display:flex; align-items:baseline; justify-content:space-between; margin-top:14px; }
+    .audio-head-l { display:flex; align-items:center; gap:8px; }
+    .audio-lbl { font-size:11px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
+    .audio-kd { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--line); transition:all .1s; }
+    .audio-kd.on { background:var(--hot); box-shadow:0 0 10px var(--hot); transform:scale(1.25); }
+    .audio-pct { font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; color:var(--fg); transition:color .2s; }
+    .audio-pct.hot { color:var(--hot); }
+    .audio-bar { position:relative; margin-top:8px; height:8px; border-radius:999px; background:color-mix(in srgb, var(--fg) 4%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); overflow:hidden; }
+    .audio-bar > .fill { position:absolute; inset:0 auto 0 0; border-radius:999px; background: linear-gradient(90deg, var(--ok), #7fd7c0 40%, var(--hot)); transition: width 60ms linear, box-shadow .2s; }
+    .audio-bar.hot > .fill { box-shadow:0 0 14px color-mix(in srgb, var(--hot) 55%, transparent); }
+    .audio-bar > .ticks { position:absolute; inset:0; display:flex; justify-content:space-between; padding:0 4px; pointer-events:none; }
+    .audio-bar > .ticks span { width:1px; background:color-mix(in srgb, var(--bg) 60%, transparent); }
+    .tech-list { margin-top:8px; padding:0 12px; background:color-mix(in srgb, var(--fg) 3%, transparent); border-radius:12px; box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
+    .tech-list .row { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-top:1px solid color-mix(in srgb, var(--line) 60%, transparent); margin:0; }
+    .tech-list .row:first-child { border-top:0; }
+    .tech-list label { font-size:12px; color:var(--dim); display:inline-flex; align-items:center; gap:6px; }
+    .tech-list .val { font-size:13px; font-variant-numeric:tabular-nums; font-weight:500; color:var(--fg); }
+    .tech-list .val.on { color:var(--hot); }
+
     details.more { margin-top:8px; }
     details.more > summary { list-style:none; cursor:pointer; padding:14px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
     details.more > summary::-webkit-details-marker { display:none; }
@@ -267,22 +294,34 @@
     <div class="mood-desc" id="moodDesc">Pulsar på taktslag, byter effekt ibland</div>
   </section>
 
-  <h1>Ljud <span class="kick-dot" id="kickDot"></span></h1>
-  <div class="card">
-    <div class="fx-actions" style="margin-top:0">
-      <button class="btn" id="inAux">AUX (kabel)</button>
-      <button class="btn" id="inMic">Mikrofon</button>
+  <section class="audio-section">
+    <div class="src-seg" id="srcSeg" data-src="aux" role="tablist" aria-label="Ljudkälla">
+      <span class="src-thumb" aria-hidden="true"></span>
+      <button id="inAux" class="active" role="tab" aria-selected="true">AUX (kabel)</button>
+      <button id="inMic" role="tab" aria-selected="false">Mikrofon</button>
     </div>
-    <div class="row" style="margin-top:14px"><label>Nivå just nu</label><span class="val" id="levelVal">–</span></div>
-    <div class="meter"><div id="levelBar" style="width:0%"></div></div>
+    <div class="audio-head">
+      <div class="audio-head-l">
+        <span class="audio-lbl">Nivå</span>
+        <span class="audio-kd" id="kickDot" aria-hidden="true"></span>
+      </div>
+      <span class="audio-pct" id="levelVal">0%</span>
+    </div>
+    <div class="audio-bar" id="levelBarWrap">
+      <div class="fill" id="levelBar" style="width:0%"></div>
+      <div class="ticks" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    </div>
     <details class="tech-details">
       <summary>Teknisk info</summary>
-      <div class="row" style="margin-top:10px"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
-      <div class="row"><label>Beat-synk <span class="kick-dot" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
-      <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
-      <div class="status">Auto-gain: <span id="gainVal">–</span>×</div>
+      <div class="tech-list">
+        <div class="row"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
+        <div class="row"><label>Beat-synk <span class="audio-kd" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
+        <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
+        <div class="row"><label>Auto-gain</label><span class="val"><span id="gainVal">–</span>×</span></div>
+      </div>
     </details>
-  </div>
+  </section>
+
 
 
   <details class="more">
@@ -765,8 +804,14 @@ function applyConfig(cfg) {
     if (bsBadge) bsBadge.textContent = bsOv ? "Manuell" : "Följer stämning";
   }
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
-  inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
-  inMic.classList.toggle("primary", cfg.audioInput === "mic");
+  const curSrc = (cfg.audioInput ?? "aux") === "mic" ? "mic" : "aux";
+  const srcSeg = document.getElementById("srcSeg");
+  if (srcSeg) srcSeg.dataset.src = curSrc;
+  inAux.classList.toggle("active", curSrc === "aux");
+  inAux.setAttribute("aria-selected", curSrc === "aux" ? "true" : "false");
+  inMic.classList.toggle("active", curSrc === "mic");
+  inMic.setAttribute("aria-selected", curSrc === "mic" ? "true" : "false");
+
   segActivate("segDyn", cfg.dynamics ?? 0.6, "dyn");
   segActivate("segMaster", cfg.master ?? 1, "master");
   segActivate("segSpeed", tauDownToAgg(cfg.detection?.tauDown ?? 30) > 0.5 ? 0.85 : 0.15, "agg");
@@ -886,6 +931,11 @@ function applyFrame(f) {
   const pct = Math.round(f.level * 100);
   levelBar.style.width = pct + "%";
   levelVal.textContent = pct + "%";
+  const hot = f.level > 0.85;
+  levelVal.classList.toggle("hot", hot);
+  const barWrap = document.getElementById("levelBarWrap");
+  if (barWrap) barWrap.classList.toggle("hot", hot);
+
   gainVal.textContent = f.gain.toFixed(1);
   lastBleActive = f.bleActive ?? 0;
   // Drift-hälsa: uppdatera flaggorna som banner-logiken läser.
