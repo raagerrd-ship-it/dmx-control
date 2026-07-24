@@ -47,9 +47,25 @@ function MoodSlider() {
   const off = !s.power;
   const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
   const fillPct = (v / 10) * 100;
+  const info = moodInfoFor(v);
   return (
     <section className="mb-6 mt-2">
-
+      <div className="flex items-baseline justify-between px-0.5 mb-3">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+          Stämning
+        </span>
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12px] font-semibold tabular-nums transition-colors ${
+            off
+              ? "bg-muted/20 text-muted-foreground ring-1 ring-border/60"
+              : "bg-primary/10 text-primary ring-1 ring-primary/30 shadow-[0_0_10px_hsl(var(--primary)/0.15)]"
+          }`}
+        >
+          <span className="uppercase tracking-wider">{info.name}</span>
+          <span className="opacity-50">·</span>
+          <span>{v}/10</span>
+        </span>
+      </div>
 
       <div className="relative">
         <div className="mood-ticks" aria-hidden>
@@ -76,10 +92,10 @@ function MoodSlider() {
         />
       </div>
 
-      <div className="flex justify-between text-[10px] uppercase tracking-[0.18em] text-muted-foreground mt-1 px-0.5">
-        <span className={off ? "" : "opacity-70"}>Av</span>
-        <span className={v >= 5 && v <= 7 ? "text-primary" : "opacity-70"}>Fest</span>
-        <span className={v >= 9 ? "text-primary" : "opacity-70"}>Galet</span>
+      <div className="flex justify-between text-[10px] uppercase tracking-[0.2em] mt-2 px-0.5">
+        <span className={off ? "text-primary" : "text-muted-foreground/70"}>Av</span>
+        <span className={v >= 5 && v <= 7 ? "text-primary" : "text-muted-foreground/70"}>Fest</span>
+        <span className={v >= 9 ? "text-primary" : "text-muted-foreground/70"}>Galet</span>
       </div>
     </section>
   );
