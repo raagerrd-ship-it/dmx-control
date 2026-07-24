@@ -198,7 +198,9 @@ function AudioMeterCard() {
             dot={locked && beat}
           />
           <TechRow label="Konfidens" value={locked ? `${confPct}%` : "–"} />
+          <TechRow label="Kick" value={kickOn ? "puls" : "–"} accent={kickOn} dot={kickOn} />
           <TechRow label="Auto-gain" value="1.0×" />
+
         </div>
       </details>
 
