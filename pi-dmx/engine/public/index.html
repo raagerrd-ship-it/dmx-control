@@ -1647,7 +1647,7 @@ if (wizDismiss) wizDismiss.onclick = () => {
 // vi wrappar bara nästa applyCfg-tick genom att kalla maybeShowWizard från
 // samma ställe applyCfg redan gör sin renderRotation etc.
 window.__maybeShowWizard = maybeShowWizard;
-maybeShowWizard();
+maybeShowWizard(null);
 
 // ---- Walk-test: guidad kanal-identifiering ------------------------------
 // DMX är enkelriktat → vi kan inte fråga lampan. Vi tänder EN kanal i taget
