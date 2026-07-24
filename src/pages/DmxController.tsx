@@ -258,10 +258,11 @@ function MoreDetails() {
   return (
     <>
       <details className="mt-2 group/eff">
-        <summary className="py-3 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/eff:text-foreground">
-          <span>Effekt-val · välj vilka som roterar</span>
-          <span className="ml-1 group-open/eff:hidden"> ⌄</span>
-          <span className="ml-1 hidden group-open/eff:inline"> ⌃</span>
+        <summary className="flex items-center justify-between px-5 py-3 rounded-full border border-border/70 bg-card/60 text-[12px] uppercase tracking-[0.18em] text-muted-foreground font-semibold cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/eff:text-foreground group-open/eff:border-border transition-colors">
+          <span>Effekt-val · rotation</span>
+          <svg className="h-3.5 w-3.5 text-muted-foreground/70 transition-transform duration-200 group-open/eff:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
         </summary>
         <SectionTitle>Lugna effekter</SectionTitle>
         <RotationList modes={CALM_MODES} />
