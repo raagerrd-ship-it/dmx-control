@@ -148,12 +148,12 @@
    .mood-slider-legend { display:flex; justify-content:space-between; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); margin-top:4px; padding:0 2px; }
    .mood-slider-legend span.on { color:var(--hot); }
    .mood-desc { margin-top:12px; padding:0 2px; font-size:13px; color:var(--dim); line-height:1.35; font-style:italic; }
-    details.tech-details { margin-top:12px; }
-    details.tech-details > summary { list-style:none; cursor:pointer; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
-    details.tech-details > summary::-webkit-details-marker { display:none; }
-    details.tech-details[open] > summary { color:var(--fg); margin-bottom:4px; }
-    details.tech-details > summary::after { content:" ⌄"; }
-    details.tech-details[open] > summary::after { content:" ⌃"; }
+   details.tech-details { margin-top:12px; }
+   details.tech-details > summary { list-style:none; cursor:pointer; padding:12px 20px; background:color-mix(in srgb, var(--card) 60%, transparent); border:1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius:999px; display:flex; align-items:center; justify-content:space-between; font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); font-weight:600; transition: color .15s, border-color .15s; }
+   details.tech-details > summary::-webkit-details-marker { display:none; }
+   details.tech-details[open] > summary { color:var(--fg); border-color:var(--line); margin-bottom:6px; }
+   details.tech-details > summary::after { content:""; width:14px; height:14px; background: no-repeat center / 14px url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237a7a90' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>"); transition: transform .2s; }
+   details.tech-details[open] > summary::after { transform: rotate(180deg); }
 
     /* Ljud-sektion (proffsig, kort-lös) */
     .audio-section { margin: 4px 0 14px; }
