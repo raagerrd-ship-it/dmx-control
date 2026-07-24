@@ -994,8 +994,6 @@ function applyFrame(f) {
   bpmVal.classList.toggle("on", locked);
   confVal.textContent = locked ? confPct + "%" : "–";
   confVal.classList.toggle("on", locked && confPct >= 70);
-  modeVal.textContent = moodV > 0 ? modeInfo.name : "Av";
-  modeVal.classList.toggle("on", moodV > 0);
   if (moodDesc) moodDesc.textContent = moodV > 0 ? modeInfo.desc : "Ljuset är släckt — dra åt höger för att tända";
 
   if (locked && f.beat) {   // beat-lås-prick: pulsa på varje takt
