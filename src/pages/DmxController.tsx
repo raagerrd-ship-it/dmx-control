@@ -230,19 +230,25 @@ function TechGrid() {
   const moodV = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
   const locked = bpm > 0;
   const confPct = Math.round(conf * 100);
+  const info = moodInfoFor(moodV);
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <TechTile label="BPM" value={locked ? String(Math.round(bpm)) : "—"} accent={locked} dot={locked && beat} />
-      <TechTile label="Konfidens" value={locked ? `${confPct}%` : "—"} accent={locked && confPct >= 70} />
-      <TechTile label="Läge" value={off ? "Av" : moodInfoFor(moodV).name} accent={!off} />
+    <div className="relative overflow-hidden rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06] px-4 py-3.5">
+      <div className="flex items-stretch divide-x divide-foreground/[0.06]">
+        <TechCell label="BPM" value={locked ? String(Math.round(bpm)) : "—"} accent={locked} dot={locked && beat} />
+        <TechCell label="Konfidens" value={locked ? `${confPct}%` : "—"} accent={locked && confPct >= 70} />
+        <TechCell label="Läge" value={off ? "Av" : info.name} accent={!off} />
+      </div>
+      <div className="mt-3 pt-3 border-t border-foreground/[0.06] text-[11px] leading-snug text-muted-foreground/80">
+        {off ? "Ljuset är släckt — dra åt höger för att tända" : info.desc}
+      </div>
     </div>
   );
 }
 
-function TechTile({ label, value, accent, dot }: { label: string; value: string; accent?: boolean; dot?: boolean }) {
+function TechCell({ label, value, accent, dot }: { label: string; value: string; accent?: boolean; dot?: boolean }) {
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06] p-3 flex flex-col justify-between">
-      <div className="flex items-center gap-1.5 mb-2">
+    <div className="flex-1 px-3 first:pl-0 last:pr-0 flex flex-col gap-1.5">
+      <div className="flex items-center gap-1.5">
         <span className="text-[8px] font-bold text-muted-foreground/70 uppercase tracking-[0.22em]">{label}</span>
         {dot && <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))] animate-pulse" />}
       </div>
@@ -252,6 +258,7 @@ function TechTile({ label, value, accent, dot }: { label: string; value: string;
     </div>
   );
 }
+
 
 
 /* ────────── Mer inställningar (details) — Show + Finjustering + rotation ────────── */
