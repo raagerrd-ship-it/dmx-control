@@ -872,6 +872,7 @@ function applyConfig(cfg) {
   else if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
   else renderFixtures();
   syncRingUi(cfg.intensityRing);
+  if (sfFx) sfFx.textContent = String(Array.isArray(cfg.fixtures) ? cfg.fixtures.length : 0);
 }
 
 /* LED-ring (WS2812 på vredet) — visas bara om hårdvaran är konfigurerad. */
