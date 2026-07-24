@@ -426,6 +426,7 @@ function RotationList({ modes }: { modes: [string, string, string][] }) {
  * Håll i synk med Pi:ns HTML när något ändras där.                        */
 function OwnerSections() {
   const [beatSync, setBeatSync] = useState(0.18);
+  const [beatSyncOverride, setBeatSyncOverride] = useState(false);
   const [fogEnabled, setFogEnabled] = useState(false);
   const [fogOnDrop, setFogOnDrop] = useState(true);
   const [fogAddr, setFogAddr] = useState(200);
@@ -451,9 +452,11 @@ function OwnerSections() {
 
       <SectionTitle>Beat-synk</SectionTitle>
       <Card>
-        <SetRow label={<>Beat-synk <em className="not-italic ml-1.5 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider rounded-full border align-middle"
-              style={{ color: "#e5b8ff", background: "rgba(180,120,255,.14)", borderColor: "rgba(180,120,255,.35)" }}>Följer stämning</em></>} last>
-          <div style={{ pointerEvents: "none", opacity: 0.75 }}>
+        <SetRow label={<>Beat-synk {!beatSyncOverride && <em className="not-italic ml-1.5 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider rounded-full border align-middle"
+              style={{ color: "#e5b8ff", background: "rgba(180,120,255,.14)", borderColor: "rgba(180,120,255,.35)" }}>Följer stämning</em>}
+              {beatSyncOverride && <em className="not-italic ml-1.5 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider rounded-full border align-middle"
+              style={{ color: "#ffd39a", background: "rgba(255,180,80,.14)", borderColor: "rgba(255,180,80,.35)" }}>Manuell</em>}</>} last>
+          <div style={{ pointerEvents: beatSyncOverride ? "auto" : "none", opacity: beatSyncOverride ? 1 : 0.75 }}>
             <Seg<number>
               value={beatSync}
               onChange={setBeatSync}
@@ -466,8 +469,9 @@ function OwnerSections() {
             />
           </div>
         </SetRow>
+        <TglRow label="Åsidosätt stämning (manuell PLL-styrka)" checked={beatSyncOverride} onChange={setBeatSyncOverride} />
         <div className="text-[12px] text-muted-foreground leading-snug mt-2">
-          Hur hårt pulsen knuffas i fas mot faktiska trumslag. Chill=Mjuk, Fest=Normal, Galet=Aggressiv — sätts av stämnings-vredet.
+          Hur hårt pulsen knuffas i fas mot faktiska trumslag. Chill=Mjuk, Fest=Normal, Galet=Aggressiv — sätts av stämnings-vredet om override är av.
         </div>
       </Card>
 

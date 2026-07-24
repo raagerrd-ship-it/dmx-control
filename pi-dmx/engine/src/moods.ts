@@ -106,7 +106,7 @@ export function applyIntensity(cfg: EngineConfig, xRaw: number): void {
   cfg.energyCeiling    = bf.energyCeiling;
   cfg.riserStrobe      = bf.riserStrobe;
   cfg.dropHeadroom     = bf.dropHeadroom;
-  cfg.beatSyncStrength = bf.beatSyncStrength;
+  if (!cfg.beatSyncOverride) cfg.beatSyncStrength = bf.beatSyncStrength;
   const pool = new Set<Mode>(POOL[bucket]);
   const rot: Partial<Record<Mode, boolean>> = {};
   for (const k of EFFECT_KEYS) rot[k] = pool.has(k);
