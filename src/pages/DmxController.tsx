@@ -652,7 +652,10 @@ function OwnerSections() {
         </button>
       </Card>
 
+      <TypskyltCard />
+
       <SectionTitle>WiFi</SectionTitle>
+
       <Card>
         <div className="flex justify-between text-[13px] mb-1.5">
           <span className="text-muted-foreground">Aktivt nät</span>
