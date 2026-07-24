@@ -206,18 +206,8 @@ function InputLevel() {
 function SourcePill() {
   const s = usePi();
   const source = s.audioInput;
-  const isMic = source === "mic";
   return (
-    <div
-      role="tablist"
-      aria-label="Ljudkälla"
-      className="relative grid grid-cols-2 rounded-full bg-foreground/[0.03] p-1 ring-1 ring-foreground/10"
-    >
-      <span
-        aria-hidden
-        className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-primary/[0.08] ring-1 ring-primary/30 transition-transform duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
-        style={{ transform: isMic ? "translateX(calc(100% + 8px))" : "translateX(0)" }}
-      />
+    <div className="grid grid-cols-2 gap-3">
       {[
         { id: "aux", label: "AUX" },
         { id: "mic", label: "Mikrofon" },
@@ -226,20 +216,24 @@ function SourcePill() {
         return (
           <button
             key={o.id}
-            role="tab"
-            aria-selected={active}
             onClick={() => setPi({ audioInput: o.id as "aux" | "mic" })}
-            className={`relative z-10 flex items-center justify-center gap-2 rounded-full py-2.5 text-[11px] font-medium transition-colors ${
-              active ? "text-foreground" : "text-muted-foreground/55"
+            className={`flex items-center justify-between px-4 py-3 rounded-2xl border transition-colors ${
+              active
+                ? "bg-primary/10 border-primary/50 text-primary"
+                : "bg-foreground/[0.03] border-foreground/[0.08] text-muted-foreground/70"
             }`}
           >
-            <span
-              aria-hidden
-              className={`inline-block h-1.5 w-1.5 rounded-full transition-colors ${
-                active ? "bg-primary shadow-[0_0_6px_hsl(var(--primary))]" : "bg-muted-foreground/35"
+            <span className="text-[13px] font-semibold">{o.label}</span>
+            <div
+              className={`w-8 h-4 rounded-full relative transition-colors ${
+                active ? "bg-primary" : "bg-muted"
               }`}
-            />
-            {o.label}
+            >
+              <span
+                className="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform"
+                style={{ transform: active ? "translateX(16px)" : "none" }}
+              />
+            </div>
           </button>
         );
       })}
