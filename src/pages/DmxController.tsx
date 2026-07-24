@@ -452,7 +452,7 @@ function OwnerSections() {
       <SectionTitle>Beat-synk</SectionTitle>
       <Card>
         <SetRow label="Beat-synk" last>
-          <Seg
+          <Seg<number>
             value={beatSync}
             onChange={setBeatSync}
             options={[
