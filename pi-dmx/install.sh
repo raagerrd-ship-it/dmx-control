@@ -141,6 +141,12 @@ rsync -a --delete node_modules/ /opt/audio-dmx-engine/node_modules/
 install -m644 package.json /opt/audio-dmx-engine/package.json
 install -Dm644 systemd/audio-dmx-engine.service /etc/systemd/system/audio-dmx-engine.service
 install -Dm644 systemd/cpu-performance.service /etc/systemd/system/cpu-performance.service
+# Health watchdog — restart engine if /health hangs for 2 checks in a row.
+# Timer fires every 30s (see .timer). Never fights systemd Restart=always;
+# only intervenes when the process is active but stuck (audio/DMX pipeline).
+install -Dm755 systemd/watchdog.sh /opt/audio-dmx-engine/watchdog.sh
+install -Dm644 systemd/pi-dmx-watchdog.service /etc/systemd/system/pi-dmx-watchdog.service
+install -Dm644 systemd/pi-dmx-watchdog.timer /etc/systemd/system/pi-dmx-watchdog.timer
 
 # Self-signed TLS so the phone mic (secure context) + wss work on the LAN/AP.
 if [ ! -f /etc/audio-dmx/tls/cert.pem ]; then
@@ -164,7 +170,7 @@ fi
 
 echo "==> [8/8] enable + start services"
 systemctl daemon-reload
-systemctl enable --now cpu-performance codec-zero-linein dmx-helper audio-dmx-engine
+systemctl enable --now cpu-performance codec-zero-linein dmx-helper audio-dmx-engine pi-dmx-watchdog.timer
 [ -f /etc/systemd/system/pi-dmx-ble.service ] && systemctl enable --now pi-dmx-ble
 # enable --now does not restart already-running units — force the new build live.
 systemctl restart dmx-helper audio-dmx-engine
