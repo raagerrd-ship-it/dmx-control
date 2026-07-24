@@ -42,43 +42,23 @@ export default function DmxController() {
    så den känns som den enda saken hyresgästen behöver röra. */
 
 function HeroCard() {
-  const s = usePi();
-  const off = !s.power;
-  const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
   return (
-    <section className="relative mt-3 mb-5 rounded-[32px] overflow-hidden ring-1 ring-foreground/10 bg-black shadow-[0_40px_80px_-40px_rgba(0,0,0,0.85)]">
-      {/* Neon corner glows */}
-      <div aria-hidden className="pointer-events-none absolute -top-32 -left-32 w-64 h-64 rounded-full bg-primary/15 blur-[90px]" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-32 -right-32 w-56 h-56 rounded-full bg-primary/10 blur-[80px]" />
+    <section className="relative mt-3 mb-5 px-2">
+      {/* Neon ambient glows behind everything, no card frame */}
+      <div aria-hidden className="pointer-events-none absolute -top-24 -left-16 w-64 h-64 rounded-full bg-primary/10 blur-[90px]" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-16 w-56 h-56 rounded-full bg-primary/[0.07] blur-[80px]" />
 
-      <div className="relative p-7">
-        {/* ── STÄMNING · big glowing number ── */}
-        <div className="flex items-baseline justify-between px-1 mb-4">
-          <span className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground/70 font-bold">
-            Stämning
-          </span>
-          <span
-            className={`text-[40px] leading-none font-light tabular-nums tracking-tight ${
-              off ? "text-muted-foreground/50" : "text-primary drop-shadow-[0_0_12px_hsl(var(--primary)/0.55)]"
-            }`}
-          >
-            {String(v).padStart(2, "0")}
-          </span>
-        </div>
-
+      <div className="relative">
         <MoodSlider />
 
-        {/* ── Signal Output ── */}
-        <div className="mt-8">
-          <AudioMeterCard />
+        <div className="mt-9">
+          <InputLevel />
         </div>
 
-        {/* ── Source pill selector ── */}
-        <div className="mt-7">
+        <div className="mt-6">
           <SourcePill />
         </div>
 
-        {/* ── Tech grid ── */}
         <div className="mt-7">
           <TechGrid />
         </div>
