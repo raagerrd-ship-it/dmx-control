@@ -189,6 +189,9 @@ function AudioMeterCard() {
           <span className="ml-1 hidden group-open/tech:inline"> ⌃</span>
         </summary>
         <div className="mt-2 divide-y divide-border/40 rounded-xl bg-muted/25 ring-1 ring-border/40 px-3">
+          <p className="py-2 text-[13px] leading-snug text-muted-foreground italic">
+            {moodInfoFor(moodV).desc}
+          </p>
           <TechRow label="BPM" value={locked ? `${Math.round(bpm)}` : "–"} accent={locked} />
           <TechRow
             label="Beat-synk"
