@@ -628,9 +628,7 @@ inMic.onclick = () => send({ type: "setAudioInput", value: "mic" });
 let lastIntensity = 0.5;
 const moodSlider = document.getElementById("moodSlider");
 const moodSliderCard = document.getElementById("moodSliderCard");
-const moodPill = document.getElementById("moodPill");
-const moodLbl = document.getElementById("moodLbl");
-const moodNum = document.getElementById("moodNum");
+const moodName = document.getElementById("moodName");
 const moodDesc = document.getElementById("moodDesc");
 const legFest = document.getElementById("legFest");
 const legGalet = document.getElementById("legGalet");
@@ -647,15 +645,11 @@ function updateMoodUi(v01, active, forceZero) {
   const v = forceZero ? 0 : Math.max(1, Math.min(10, Math.round(v01 * 9) + 1));
   moodSlider.value = String(v);
   const info = moodInfoFor(v);
-  if (typeof moodLbl !== "undefined" && moodLbl) moodLbl.textContent = info.name;
-  if (typeof moodNum !== "undefined" && moodNum) { moodNum.textContent = String(v).padStart(2, "0"); moodNum.classList.toggle("off", v === 0); }
-
-
+  if (moodName) { moodName.textContent = info.name; moodName.classList.toggle("off", v === 0); }
   if (moodDesc) moodDesc.textContent = info.desc;
   const off = !active || v === 0;
   moodSlider.style.setProperty("--mood-fill", (v / 10 * 100) + "%");
   moodSlider.classList.toggle("is-off", off);
-  if (moodPill) moodPill.classList.toggle("off", off);
   if (legFest)  legFest.classList.toggle("on",  !off && v >= 5 && v <= 7);
   if (legGalet) legGalet.classList.toggle("on", !off && v >= 9);
 }
