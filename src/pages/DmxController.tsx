@@ -26,9 +26,8 @@ export default function DmxController() {
         <BrandLogo className="h-32 w-auto opacity-95 sm:h-36 md:h-40 lg:h-44 landscape:h-28" />
       </header>
 
-      <MoodSlider />
+      <HeroCard />
 
-      <AudioMeterCard />
 
 
       <MoreDetails />
@@ -42,13 +41,34 @@ export default function DmxController() {
    Renderas som appens huvudkontroll — ingen kort-ruta runt, ligger direkt på sidan
    så den känns som den enda saken hyresgästen behöver röra. */
 
+function HeroCard() {
+  const s = usePi();
+  const off = !s.power;
+  const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
+  return (
+    <section className="relative mt-2 mb-4 rounded-3xl p-5 overflow-hidden ring-1 ring-foreground/10 bg-foreground/[0.03] backdrop-blur-xl shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
+      <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 w-48 h-48 rounded-full bg-primary/25 blur-[80px]" />
+      <div className="relative flex items-end justify-between px-0.5 mb-3.5">
+        <span className="text-[10px] uppercase tracking-[0.22em] text-foreground/45 font-semibold">Stämning</span>
+        <span
+          className={`text-[12px] font-bold tabular-nums ${off ? "text-muted-foreground" : "text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.55)]"}`}
+        >
+          {String(v).padStart(2, "0")}
+        </span>
+      </div>
+      <MoodSlider />
+      <AudioMeterCard />
+    </section>
+  );
+}
+
 function MoodSlider() {
   const s = usePi();
   const off = !s.power;
   const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
   const fillPct = (v / 10) * 100;
   return (
-    <section className="mb-6 mt-2">
+    <section className="mb-4">
 
 
       <div className="relative">
@@ -113,7 +133,8 @@ function AudioMeterCard() {
   const moodV = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
 
   return (
-    <section className="mb-4">
+    <section>
+
       {/* Nivåmätare */}
       <div className="flex items-baseline justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
