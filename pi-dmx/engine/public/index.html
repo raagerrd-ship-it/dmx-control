@@ -1468,6 +1468,97 @@ if (btnFactory) btnFactory.onclick = async () => {
   // och när den kommer upp igen är configen defaults. Ingen extra polling.
 };
 
+// ---- Walk-test: guidad kanal-identifiering ------------------------------
+// DMX är enkelriktat → vi kan inte fråga lampan. Vi tänder EN kanal i taget
+// (rå DMX-value 255, allt annat 0) och användaren rapporterar vad de ser.
+// Efter 3–8 svar gissar vi rgb / rgbw / rgb7 / dimmer / custom.
+const walkOv     = document.getElementById("walkOv");
+const walkChEl   = document.getElementById("walkCh");
+const walkAddrEl = document.getElementById("walkAddr");
+const walkLogEl  = document.getElementById("walkLog");
+const walkOptsEl = document.getElementById("walkOpts");
+const walkResEl  = document.getElementById("walkResult");
+const walkCancel = document.getElementById("walkCancel");
+const walkApply  = document.getElementById("walkApply");
+let walkState = null;   // { index, channel, answers: string[], suggested: string|null }
+
+const WALK_MAX_CH = 8;   // 8 kanaler räcker för allt vanligt (RGB→RGBAWU+Dim+Strobe+2 macro)
+const WALK_ANS_LABEL = { r:"Rött", g:"Grönt", b:"Blått", w:"Vitt", dim:"Ljusare", strobe:"Blink", auto:"Auto-program", nothing:"Inget" };
+
+function openWalkTest(index) {
+  const fx = curFixtures[index];
+  if (!fx) return;
+  walkState = { index, channel: 0, answers: [], suggested: null };
+  walkResEl.style.display = "none";
+  walkApply.style.display = "none";
+  walkOptsEl.style.display = "";
+  walkLogEl.textContent = `Adress ${fx.address}. Tryck på det du ser för varje kanal — eller "Inget" om lampan är släckt.`;
+  walkOv.classList.add("show");
+  walkSendCh(0);
+}
+function walkSendCh(ch) {
+  if (!walkState) return;
+  walkState.channel = ch;
+  const fx = curFixtures[walkState.index];
+  walkChEl.textContent = String(ch + 1);
+  walkAddrEl.textContent = fx ? `DMX-adress ${fx.address + ch}` : "";
+  send({ type: "setWalkTest", index: walkState.index, channel: ch });
+}
+function walkStop() {
+  send({ type: "setWalkTest", index: -1, channel: 0 });
+  walkState = null;
+  walkOv.classList.remove("show");
+}
+function walkGuess(answers) {
+  // Bara "riktiga" svar räknas — nothing/auto/strobe påverkar preset-valet
+  // men R/G/B/W/Dim avgör bredden.
+  const colors = answers.slice(0, 4);   // första 4 kanaler = färgnyttolast normalt
+  const hasR = answers.includes("r"), hasG = answers.includes("g"), hasB = answers.includes("b"), hasW = answers.includes("w");
+  const hasDim = answers.includes("dim"), hasStr = answers.includes("strobe"), hasAuto = answers.includes("auto");
+  if (hasR && hasG && hasB && (hasDim || hasStr || hasAuto)) return { preset: "rgb7", why: "R/G/B + dim/strobe/auto → 7-kanals-läge" };
+  if (hasR && hasG && hasB && hasW) return { preset: "rgbw", why: "Alla fyra grundfärger identifierade" };
+  if (hasR && hasG && hasB) return { preset: "rgb", why: "Endast R/G/B — inget som antyder fler kanaler" };
+  if (hasDim && !hasR && !hasG && !hasB) return { preset: "dimmer", why: "Bara ljusstyrka reagerar" };
+  return { preset: null, why: "Osäkert — testa igen eller välj preset manuellt i Avancerat." };
+}
+function walkFinish() {
+  const g = walkGuess(walkState.answers);
+  walkState.suggested = g.preset;
+  walkOptsEl.style.display = "none";
+  walkResEl.style.display = "";
+  const fx = curFixtures[walkState.index];
+  const width = g.preset === "rgb7" ? 7 : g.preset === "rgbw" ? 4 : g.preset === "rgb" ? 3 : g.preset === "dimmer" ? 1 : 0;
+  walkResEl.innerHTML = `<b>${g.preset ? `Förslag: ${g.preset.toUpperCase()} (${width} kanaler)` : "Inget säkert förslag"}</b>${g.why}`;
+  walkApply.style.display = g.preset ? "" : "none";
+  // Slå av output — låt lampan vila medan användaren läser
+  send({ type: "setWalkTest", index: -1, channel: 0 });
+}
+if (walkOv) {
+  walkOptsEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-walk-ans]");
+    if (!btn || !walkState) return;
+    const ans = btn.dataset.walkAns;
+    if (ans === "done") { walkFinish(); return; }
+    walkState.answers.push(ans);
+    walkLogEl.textContent = walkState.answers.map((a, i) => `Kanal ${i + 1}: ${WALK_ANS_LABEL[a] || a}`).join(" · ");
+    const next = walkState.channel + 1;
+    if (next >= WALK_MAX_CH) { walkFinish(); return; }
+    walkSendCh(next);
+  });
+  walkCancel.onclick = walkStop;
+  walkApply.onclick = () => {
+    if (!walkState || !walkState.suggested) return walkStop();
+    const i = walkState.index;
+    if (!fxDraft[i]) return walkStop();
+    fxDraft[i].preset = walkState.suggested;
+    if (walkState.suggested !== "custom") delete fxDraft[i].roles;
+    markDirty();
+    fxHint.textContent = `Preset satt till ${walkState.suggested.toUpperCase()} — glöm inte att spara.`;
+    walkStop();
+  };
+}
+
+
 // ---- Välkomst-overlay ----------------------------------------------------
 // Bara på hyresgäst-vyn (/), aldrig i owner-läget — där stör den bara.
 const welcomeOv = document.getElementById("welcomeOv");
