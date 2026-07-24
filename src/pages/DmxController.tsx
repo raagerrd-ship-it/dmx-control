@@ -325,11 +325,11 @@ function AdvancedMirror() {
   const dwellPct = ((40000 - f.smartDwellMs) / 35000) * 100;
   const dwellLbl = f.smartDwellMs >= 20000 ? "Sällan" : f.smartDwellMs >= 10000 ? "Normal" : "Ofta";
   return (
-    <details className="mt-3.5 group">
-      <summary className="py-3.5 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open:text-foreground">
-        <span>Avancerat · spegel av stämningen</span>
-        <span className="ml-1 group-open:hidden"> ⌄</span>
-        <span className="ml-1 hidden group-open:inline"> ⌃</span>
+    <details className="mt-3 group">
+      <summary className="py-4 rounded-full border border-foreground/10 bg-foreground/[0.03] text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-foreground/[0.06] group-open:text-foreground/90 transition-colors">
+        <span>Avancerat</span>
+        <span className="ml-1.5 opacity-70 group-open:hidden">⌄</span>
+        <span className="ml-1.5 opacity-70 hidden group-open:inline">⌃</span>
       </summary>
       <div className="mt-1">
         <Card>
