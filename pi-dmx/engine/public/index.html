@@ -951,6 +951,7 @@ function renderFixtures() {
     div.innerHTML = `
       <div class="fx-head">
         <input class="name" type="text" value="${escapeHtml(fx.name)}" data-i="${i}" data-k="name" />
+        <button class="id" data-walk-open="${i}" title="Stega kanal-för-kanal och gissa preset">Identifiera</button>
         <button class="id" data-id="${i}" title="Blinka lampan så du hittar den">Hitta</button>
         <button class="del" data-del="${i}" aria-label="Ta bort">×</button>
       </div>
