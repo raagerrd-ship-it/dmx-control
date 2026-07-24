@@ -1367,11 +1367,18 @@ if (tEnergy) tEnergy.onchange = () => {
 };
 
 document.querySelectorAll("#segBeatSync button").forEach((b) =>
-  b.onclick = () => { send({ type: "setBeatSyncStrength", value: Number(b.dataset.bs) }); segActivate("segBeatSync", Number(b.dataset.bs), "bs"); });
-{
-  const ov = document.getElementById("beatSyncOverride");
-  if (ov) ov.onchange = () => send({ type: "setBeatSyncOverride", value: ov.checked });
-}
+  b.onclick = () => {
+    const v = b.dataset.bs;
+    if (v === "auto") {
+      send({ type: "setBeatSyncOverride", value: false });
+    } else {
+      send({ type: "setBeatSyncOverride", value: true });
+      send({ type: "setBeatSyncStrength", value: Number(v) });
+    }
+    document.querySelectorAll("#segBeatSync button").forEach((x) => x.classList.toggle("primary", x === b));
+    const bsBadge = document.getElementById("beatSyncBadge");
+    if (bsBadge) bsBadge.textContent = v === "auto" ? "Följer stämning" : "Manuell";
+  });
 document.querySelectorAll("#segDwell button").forEach((b) =>
   b.onclick = () => { send({ type: "setSmartDwell", mode: b.dataset.dwell }); segActivateStr("segDwell", b.dataset.dwell, "dwell"); });
 renderCategories();
