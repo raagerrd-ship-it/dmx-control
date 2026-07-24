@@ -183,6 +183,10 @@ export interface EngineConfig {
   /** REGI: drop-headroom — kapa normal ljusstyrka till ~95%, men låt DROPS gå
    *  ända till 100% → drops poppar, och konstant full blast dämpas. */
   dropHeadroom: boolean;
+  /** Master-toggle för Regi (pro): när false rör stämnings-vredet INTE de sex
+   *  Regi-flaggorna (dropBlackout, energyCeiling, clubMode, ambientGlow,
+   *  riserStrobe, dropHeadroom). Ägaren äger då dem själv. Default false. */
+  regiPro?: boolean;
 }
 
 export const defaultConfig: EngineConfig = {
