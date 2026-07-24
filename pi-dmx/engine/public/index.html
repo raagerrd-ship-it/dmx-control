@@ -988,8 +988,8 @@ function applyFrame(f) {
   bpmVal.classList.toggle("on", locked);
   confVal.textContent = locked ? confPct + "%" : "–";
   confVal.classList.toggle("on", locked && confPct >= 70);
-  modeVal.textContent = powerOn ? modeName : "Av";
-  modeVal.classList.toggle("on", powerOn);
+  modeVal.textContent = moodV > 0 ? modeName : "Av";
+  modeVal.classList.toggle("on", moodV > 0);
   if (locked && f.beat) {   // beat-lås-prick: pulsa på varje takt
     bpmDot.style.display = "inline-block";
     clearTimeout(beatTimer);
