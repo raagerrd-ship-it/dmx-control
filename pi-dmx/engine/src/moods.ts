@@ -34,10 +34,11 @@ const FEEL: Record<MoodId, {
   energyCeiling: boolean; // dynamiskt VU-ljustak (styrka följer sektionsenergin)
   riserStrobe: boolean;   // accelererande strobe + vit-kollaps under uppbyggnad → drama
   dropHeadroom: boolean;  // normal ≤90%, drops → 100% (drops poppar hårdare)
+  beatSyncStrength: number; // hur hårt PLL-fasen knuffas mot trumslag (0/0.10/0.18/0.30)
 }> = {
-  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  energyDrivesMode: false, smartDwellMs: 40000, master: 0.30, calmDecay: 1.20, energyCeiling: true, riserStrobe: false, dropHeadroom: false },
-  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 15000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: false, dropHeadroom: false },
-  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 10000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: true,  dropHeadroom: true  },
+  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  energyDrivesMode: false, smartDwellMs: 40000, master: 0.30, calmDecay: 1.20, energyCeiling: true, riserStrobe: false, dropHeadroom: false, beatSyncStrength: 0.10 },
+  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 15000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: false, dropHeadroom: false, beatSyncStrength: 0.18 },
+  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 10000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: true,  dropHeadroom: true,  beatSyncStrength: 0.30 },
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
