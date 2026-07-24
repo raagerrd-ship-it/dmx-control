@@ -580,8 +580,9 @@ function updateMoodUi(v01, active, forceZero) {
   const v = forceZero ? 0 : Math.max(1, Math.min(10, Math.round(v01 * 9) + 1));
   moodSlider.value = String(v);
   const info = moodInfoFor(v);
-  moodLbl.textContent = info.name;
-  moodNum.textContent = `· ${v}/10`;
+  if (typeof moodLbl !== "undefined" && moodLbl) moodLbl.textContent = info.name;
+  if (typeof moodNum !== "undefined" && moodNum) moodNum.textContent = `· ${v}/10`;
+
   if (moodDesc) moodDesc.textContent = info.desc;
   const off = !active || v === 0;
   moodSlider.style.setProperty("--mood-fill", (v / 10 * 100) + "%");
