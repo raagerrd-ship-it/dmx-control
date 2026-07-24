@@ -45,19 +45,48 @@ function HeroCard() {
   const s = usePi();
   const off = !s.power;
   const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
+  const mood = moodInfoFor(v);
   return (
-    <section className="relative mt-2 mb-4 rounded-3xl p-5 overflow-hidden ring-1 ring-foreground/10 bg-foreground/[0.03] backdrop-blur-xl shadow-[0_30px_60px_-30px_rgba(0,0,0,0.6)]">
-      <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 w-48 h-48 rounded-full bg-primary/25 blur-[80px]" />
-      <div className="relative flex items-end justify-between px-0.5 mb-3.5">
-        <span className="text-[10px] uppercase tracking-[0.22em] text-foreground/45 font-semibold">Stämning</span>
+    <section className="relative mt-2 mb-4 rounded-[28px] overflow-hidden ring-1 ring-foreground/10 bg-gradient-to-b from-foreground/[0.05] to-foreground/[0.02] backdrop-blur-xl shadow-[0_40px_80px_-40px_rgba(0,0,0,0.75),inset_0_1px_0_hsl(var(--foreground)/0.06)]">
+      {/* Pink corner glow */}
+      <div aria-hidden className="pointer-events-none absolute -top-32 -left-24 w-64 h-64 rounded-full bg-primary/25 blur-[90px]" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-32 -right-24 w-56 h-56 rounded-full bg-primary/10 blur-[80px]" />
+
+      {/* ── Header row: label · mode chip · big number ── */}
+      <div className="relative px-5 pt-5 pb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-[0.24em] text-foreground/45 font-semibold">Stämning</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.14em] font-semibold border transition-colors ${
+              off
+                ? "text-muted-foreground/70 border-border/60 bg-muted/20"
+                : "text-primary border-primary/40 bg-primary/10 shadow-[0_0_10px_hsl(var(--primary)/0.3)]"
+            }`}
+          >
+            {mood.name}
+          </span>
+        </div>
         <span
-          className={`text-[12px] font-bold tabular-nums ${off ? "text-muted-foreground" : "text-primary drop-shadow-[0_0_8px_hsl(var(--primary)/0.55)]"}`}
+          className={`text-[26px] leading-none font-bold tabular-nums tracking-tight ${
+            off ? "text-muted-foreground/60" : "text-primary drop-shadow-[0_0_12px_hsl(var(--primary)/0.55)]"
+          }`}
         >
           {String(v).padStart(2, "0")}
         </span>
       </div>
-      <MoodSlider />
-      <AudioMeterCard />
+
+      {/* ── Mood slider (primary control) ── */}
+      <div className="relative px-5 pb-5">
+        <MoodSlider />
+      </div>
+
+      {/* ── Inset sub-panel: Nivå + källa ── */}
+      <div className="relative mx-3 mb-3 rounded-2xl bg-black/25 ring-1 ring-inset ring-foreground/[0.06] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)] p-4">
+        <AudioMeterCard />
+      </div>
+
+      {/* ── Inset sub-panel: Teknisk info ── */}
+      <TechPanel />
     </section>
   );
 }
@@ -68,9 +97,7 @@ function MoodSlider() {
   const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
   const fillPct = (v / 10) * 100;
   return (
-    <section className="mb-4">
-
-
+    <div>
       <div className="relative">
         <div className="mood-ticks" aria-hidden>
           {Array.from({ length: 11 }).map((_, i) => <span key={i} />)}
@@ -96,16 +123,16 @@ function MoodSlider() {
         />
       </div>
 
-      <div className="flex justify-between text-[10px] uppercase tracking-[0.18em] text-muted-foreground mt-1 px-0.5">
-        <span className={off ? "" : "opacity-70"}>Av</span>
-        <span className={v >= 5 && v <= 7 ? "text-primary" : "opacity-70"}>Fest</span>
-        <span className={v >= 9 ? "text-primary" : "opacity-70"}>Galet</span>
+      <div className="flex justify-between text-[10px] uppercase tracking-[0.18em] mt-2 px-0.5">
+        <span className={off ? "text-primary" : "text-muted-foreground/60"}>Av</span>
+        <span className={v >= 5 && v <= 7 ? "text-primary" : "text-muted-foreground/60"}>Fest</span>
+        <span className={v >= 9 ? "text-primary" : "text-muted-foreground/60"}>Galet</span>
       </div>
-    </section>
+    </div>
   );
 }
 
-/* ────────── Ljud (källa + nivå + teknisk info) ────────── */
+/* ────────── Ljud (källa + nivå) ────────── */
 
 function moodInfoFor(v: number) {
   if (v <= 0) return { name: "Av",     desc: "Ljuset är släckt — dra åt höger för att tända" };
@@ -119,62 +146,50 @@ function moodInfoFor(v: number) {
 function AudioMeterCard() {
   const s = usePi();
   const audio = useDmx((st) => st.audioLevel);
-  const kick = useDmx((st) => st.kick);
-  const bpm = useDmx((st) => st.bpm);
-  const conf = useDmx((st) => st.bpmConfidence);
-  const beat = useDmx((st) => st.beat);
   const pct = Math.round(audio * 100);
-  const confPct = Math.round(conf * 100);
-  const locked = bpm > 0;
-  const kickOn = kick > 0.4;
   const hot = audio > 0.85;
   const source = s.audioInput;
-  const off = !s.power;
-  const moodV = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
 
   return (
-    <section>
-
+    <div>
       {/* Nivåmätare */}
       <div className="flex items-baseline justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-foreground/45">
           Nivå
         </span>
         <span
           className={`text-[13px] tabular-nums font-semibold transition-colors ${
-            hot ? "text-primary" : "text-foreground"
+            hot ? "text-primary" : "text-foreground/85"
           }`}
         >
           {pct}%
         </span>
       </div>
 
-      <div className="relative mt-2 h-2 rounded-full overflow-hidden ring-1 ring-border/40">
+      <div className="relative mt-2 h-1.5 rounded-full overflow-hidden bg-black/40 ring-1 ring-inset ring-foreground/[0.05]">
         <div
           className="absolute inset-0 rounded-full transition-[background] duration-[60ms] linear"
           style={{
-            background: `linear-gradient(90deg, hsl(var(--primary) / 0) 0%, hsl(var(--primary)) ${pct}%, hsl(var(--muted) / 0.5) ${pct}% 100%)`,
+            background: `linear-gradient(90deg, hsl(var(--primary) / 0.15) 0%, hsl(var(--primary)) ${pct}%, transparent ${pct}% 100%)`,
             boxShadow: hot ? "0 0 14px hsl(var(--primary) / 0.55)" : "none",
           }}
         />
-        {/* diskreta 0–10 tick-markörer */}
         <div className="pointer-events-none absolute inset-x-1 inset-y-0 flex items-center justify-between">
           {Array.from({ length: 11 }).map((_, i) => (
-            <span key={i} className="w-0.5 h-1 rounded-sm bg-foreground/15" />
+            <span key={i} className="w-px h-1 rounded-sm bg-foreground/15" />
           ))}
         </div>
-
       </div>
 
       {/* Segmenterad källa-väljare */}
       <div
         role="tablist"
         aria-label="Ljudkälla"
-        className="relative mt-4 grid grid-cols-2 rounded-full bg-muted/20 p-1 ring-1 ring-border/40"
+        className="relative mt-4 grid grid-cols-2 rounded-full bg-black/40 p-1 ring-1 ring-inset ring-foreground/[0.05]"
       >
         <span
           aria-hidden
-          className="absolute inset-y-1 w-[calc(50%-4px)] rounded-full bg-primary/10 ring-1 ring-primary/40 shadow-[0_0_12px_hsl(var(--primary)/0.15)] transition-transform duration-300 ease-out"
+          className="absolute inset-y-1 w-[calc(50%-4px)] rounded-full bg-primary/15 ring-1 ring-primary/40 shadow-[0_0_14px_hsl(var(--primary)/0.25)] transition-transform duration-300 ease-out"
           style={{ transform: `translateX(${source === "aux" ? "0%" : "calc(100% + 8px)"})` }}
         />
         {[
@@ -186,7 +201,7 @@ function AudioMeterCard() {
             role="tab"
             aria-selected={source === o.id}
             onClick={() => setPi({ audioInput: o.id as "aux" | "mic" })}
-            className={`relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-full text-[13px] font-medium transition-colors ${
+            className={`relative z-10 flex items-center justify-center gap-2 py-2 rounded-full text-[13px] font-medium transition-colors ${
               source === o.id ? "text-foreground" : "text-muted-foreground/70"
             }`}
           >
@@ -200,34 +215,45 @@ function AudioMeterCard() {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
 
+function TechPanel() {
+  const s = usePi();
+  const bpm = useDmx((st) => st.bpm);
+  const conf = useDmx((st) => st.bpmConfidence);
+  const beat = useDmx((st) => st.beat);
+  const kick = useDmx((st) => st.kick);
+  const off = !s.power;
+  const moodV = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
+  const confPct = Math.round(conf * 100);
+  const locked = bpm > 0;
+  const kickOn = kick > 0.4;
 
-      {/* Teknisk info */}
-      <details className="mt-3 group/tech">
-        <summary className="py-3 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/tech:text-foreground">
-          <span>Teknisk info</span>
-          <span className="ml-1 group-open/tech:hidden"> ⌄</span>
-          <span className="ml-1 hidden group-open/tech:inline"> ⌃</span>
-        </summary>
-        <div className="mt-2 divide-y divide-border/40 rounded-xl bg-muted/25 ring-1 ring-border/40 px-3">
-          <p className="py-2 text-[13px] leading-snug text-muted-foreground italic">
-            {moodInfoFor(moodV).desc}
-          </p>
-          <TechRow label="BPM" value={locked ? `${Math.round(bpm)}` : "–"} accent={locked} />
-          <TechRow
-            label="Beat-synk"
-            value={locked ? "±0 ms" : "söker…"}
-            accent={locked && beat}
-            dot={locked && beat}
-          />
-          <TechRow label="Konfidens" value={locked ? `${confPct}%` : "–"} />
-          <TechRow label="Kick" value={kickOn ? "puls" : "–"} accent={kickOn} dot={kickOn} />
-          <TechRow label="Auto-gain" value="1.0×" />
-
-        </div>
-      </details>
-
-    </section>
+  return (
+    <details className="group/tech mx-3 mb-3">
+      <summary className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-black/25 ring-1 ring-inset ring-foreground/[0.05] text-[10px] uppercase tracking-[0.22em] text-foreground/50 font-semibold cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/tech:text-foreground/80 transition-colors">
+        <span>Teknisk info</span>
+        <span className="group-open/tech:hidden text-foreground/40">⌄</span>
+        <span className="hidden group-open/tech:inline text-foreground/40">⌃</span>
+      </summary>
+      <div className="mt-2 rounded-xl bg-black/30 ring-1 ring-inset ring-foreground/[0.05] shadow-[inset_0_2px_6px_rgba(0,0,0,0.3)] px-4 divide-y divide-foreground/[0.06]">
+        <p className="py-3 text-[12.5px] leading-snug text-muted-foreground italic">
+          {moodInfoFor(moodV).desc}
+        </p>
+        <TechRow label="BPM" value={locked ? `${Math.round(bpm)}` : "–"} accent={locked} />
+        <TechRow
+          label="Beat-synk"
+          value={locked ? "±0 ms" : "söker…"}
+          accent={locked && beat}
+          dot={locked && beat}
+        />
+        <TechRow label="Konfidens" value={locked ? `${confPct}%` : "–"} />
+        <TechRow label="Kick" value={kickOn ? "puls" : "–"} accent={kickOn} dot={kickOn} />
+        <TechRow label="Auto-gain" value="1.0×" />
+      </div>
+    </details>
   );
 }
 
