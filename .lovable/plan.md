@@ -1,116 +1,26 @@
-# Revision — vad som saknas innan boxen är uthyrningsklar
+## Problem
 
-Fem områden där jag ser konkreta luckor. Jag föreslår att vi tar dem i denna ordning — de tre första är "får inte fela hos hyresgäst", de två sista är polish.
+Motorn och servern har fullt stöd för att styra WS2812-ringens tre parametrar (`maxBright`, `pulseBoost`, `blackoutFadeMs`) via WS-meddelandet `setRing`, men UI-kontrollerna för dem finns inte i `pi-dmx/engine/public/index.html`. Det gör att inställningarna bara kan ändras genom att handredigera `config.json` — vilket motsäger tidigare beslut att alla ägarinställningar ska ligga under `/setup`.
 
-## 1. Första-gången-flödet för hyresgäst
+## Åtgärd
 
-Idag: hyresgäst ansluter till `pi-dmx` WiFi, öppnar en URL, ser stämningsslidern. Men:
-- Ingen captive portal → hyresgästen måste veta att skriva `192.168.4.1` eller `pi-dmx.local`.
-- Ingen "Välkommen"-skärm som förklarar vad knappen gör, var man startar musiken, vad "Galet" innebär.
-- Ingen indikator på om ljudet faktiskt kommer in (mic-nivå syns i AudioMeterCard, men inget varnar vid tystnad i 30 s).
+Lägg till ett "LED-ring"-kort i `#ownerOnly`-sektionen i `pi-dmx/engine/public/index.html`, ovanför eller under System-kortet, med tre sliders:
 
-**Åtgärd:** captive portal-redirect i hostapd/dnsmasq → första besöket får en 1-skärms "Så funkar boxen" (3 punkter + "Kom igång"-knapp). Tyst-mic-varning efter 30 s när Power är på.
+- **Max ljusstyrka** — 5–100 % (skickar `maxBright` 0.05–1.0)
+- **Pulse-boost** — 0–50 % (skickar `pulseBoost` 0–0.5)
+- **Blackout-fade** — 0–3000 ms (skickar `blackoutFadeMs`)
 
-## 2. Vad händer när något dör mitt i kvällen
+Kortet visas bara om `cfg.intensityRing` finns i senast mottagna config (annars är hårdvaran inte konfigurerad → dölj för att inte förvirra). Värden läses från `cfg.intensityRing` i `onConfig`-callbacken; skrivningar skickas som `{ type: "setRing", ring: { ... } }` med debounce ~150 ms medan användaren drar. Live-värde visas som `%`/`ms` bredvid slidern (samma pattern som kalibreringssliders).
 
-Idag saknas synligt beteende för:
-- **USB-DMX urdragen** → engine loggar fel, hyresgästen ser inget. Ska visa röd banner "DMX-kabel urkopplad".
-- **BLE-strip tappar anslutning** → sidecarn återansluter tyst, men om det tar 30 s ser hyresgästen svarta slingor utan förklaring.
-- **Strömbrott** → boxen startar om, men Power-knappen står i "av" tills någon trycker på den. Bör återgå till senaste läge.
-- **Engine-krasch** → systemd startar om, men WebSocket-klienten (mobilen) visar bara "frusen" UI tills man laddar om.
+Ingen ändring i motor/server/`config.ts` — hela kedjan finns redan.
 
-**Åtgärd:** hälso-banner högst upp i UI som lyser gult/rött vid DMX-tapp, BLE-tapp >10 s, eller WS-reconnect. Persist Power-state till disk och återställ vid boot.
+## Teknisk detalj
 
-## 3. Fysisk box — det som inte finns i koden
+- Ny DOM-block placeras kring rad 340 i `pi-dmx/engine/public/index.html` (inuti `#ownerOnly`, före System-kortet).
+- JS-block läggs in i den befintliga config-mottagaren där andra ägarkontroller synkas.
+- Använder samma `send({ type, ... })`-helper som resten av UI:t.
+- Ringen renderar redan om vid `onConfigChanged` → ingen extra broadcast behövs; inställningen syns direkt fysiskt.
 
-- **Etiketter:** ingen dokumenterad märkning på USB-DMX-porten, XLR-utgången, ljud-in, LED-ringens ratt. Hyresgäst kommer koppla fel.
-- **QR-klistermärke** på boxen: "Anslut till WiFi `pi-dmx` → öppna kameran" (löser #1 utan captive portal om vi vill).
-- **Säkringar / överströmsskydd** på 5V-linjen om vi driver LED-ring + HAT från samma matning.
-- **Kylning:** Pi Zero 2 W under last (audio + BLE + DMX + LED-ring) blir varm i sluten box. Behöver minst passiv kylfläns, gärna liten fläkt.
-- **LED-ring-diffusor:** naken WS2812 är obehagligt skarp, behöver mattat skydd.
+## Utanför scope
 
-**Åtgärd:** ingen kod — men jag levererar en "box-checklista" (märkningsschema + rekommenderad BOM för kylning/diffusor/säkring) som du kan följa fysiskt.
-
-## 4. Uppdatering & återställning utan SSH
-
-- "Uppdatera systemet"-knappen finns, men om en release bricka:r boxen finns inget sätt för dig (eller hyresgäst) att rulla tillbaka utan att koppla in tangentbord.
-- Ingen "fabriksåterställning" som nollställer parade BLE-slingor + fixtures om hyresgäst pillat sönder något.
-
-**Åtgärd:** update.sh sparar föregående `dist/` som `dist.prev/` och en "Rulla tillbaka"-knapp under `/setup`. "Fabriksåterställning"-knapp under `/setup` med bekräftelse (raderar `config.json` + BLE-lista).
-
-## 5. Ljudkedja-polish som märks
-
-- **Auto-gain för mic:** idag manuell kalibrering. Vid uthyrning kommer ljudmiljön variera — auto-normalisera RMS över 10 s.
-- **"Ingen musik"-läge:** när det är tyst >5 s → ambient glöd eller mjuk fade i stället för att effekterna fortsätter köra på brus.
-- **Line-in vs mic-val från hyresgäst-UI** (inte bara `/setup`) om boxen har båda ingångar.
-
-**Åtgärd:** RMS-baserad auto-gain i `alsaMic.ts`, tystnads-detektor i `analyser.ts` som triggar ambient-fallback oavsett stämning.
-
----
-
-## Vad jag föreslår att vi bygger nu
-
-Punkt **1 + 2 + 4** är mjukvara och ger störst uthyrningsvärde per timme. Säg till om jag ska sätta igång med alla tre eller plocka en åt gången — jag börjar hellre med #2 (drift-robusthet) eftersom det är det som annars skulle förstöra en kväll för en hyresgäst.
-
-Punkt 3 levererar jag som ett separat dokument (ingen kod). Punkt 5 tar vi efter att 1–4 är på plats.
-
----
-
-# Framtida plan — Marknads-gap & produktdifferentiering
-
-## Kortslutning
-
-Ingen befintlig produkt kombinerar **riktig DMX + BLE-slingor + noll-konfig hyrbox + audio-reaktivitet med drop/riser/BPM** i samma enhet. Vi har ett unikt fönster, men 2–3 riktade tillägg avgör om det blir "nördprojekt" eller "hyrbar produkt".
-
-## Konkurrensöversikt
-
-| Produkt | Styrka | Begränsning |
-|---|---|---|
-| **LedFx + WLED + ESP32** | Gratis, populär, bra LED-effekter | Endast adresserbar LED (ingen DMX), kräver PC/router, ingen hyr-UX |
-| **QLC+ / Lights-Pi / DMX Smart Link Hub ($366)** | Riktig DMX | "Lightboard-tänk": man programmerar själv. Ingen audio-reaktivitet ur lådan, ingen BLE, ingen mobil-abstraktion |
-| **Kommersiella hyrpaket (Scenkonsult, Fest-service, Hygglo)** | Fysiskt komplett | Styrs manuellt eller via lampornas inbyggda mikrofoner — varje lampa chasear isolerat, ingen samordning. 600–1600 kr/dag |
-| **pyopendmx / hobbyrepon** | Audio→DMX experiment | Ingen hårdvara, inget mobil-UI, ingen BLE-hybrid |
-
-## Vad vi redan äger (unikt)
-
-1. **Hybrid DMX + BLE i samma show-director** — LedFx kan bara nätverks-LED, QLC+ kan bara DMX.
-2. **Musikförståelse på Pi Zero 2 W** — onset+drop+BPM+key utan moln, på 512 MB RAM.
-3. **Hyrgäst-UX** — PowerHero, tre scener, en slider, hälso-banner, välkomst-overlay, rollback, fabriks-reset.
-4. **Zero-touch onboarding** — captive portal/AP öppnar UI utan IP/QR/app.
-5. **Ägare/hyrgäst-separation** — `/setup` döljer fixture-mapping, BLE-parning och kalibrering.
-6. **Rental-robusthet** — DMX-liveness, BLE-connected-count, mic-tyst-varning, power-state-persist, watchdog.
-
-## Rekommenderade nästa steg (sorterade efter marknadseffekt)
-
-### A. Faktura-vänlig hyrescykel (störst kommersiell hävstång, minst kod)
-- **Post-eventrapport**: drifttid, uppskattad energiförbrukning, BLE-drops, ev. crash-log. HTML/PDF att maila.
-- **Time-lock**: box slutar reagera efter hyrperiodens slut; visar "Hyrperiod slut — ring uthyraren".
-- **QR + hyrarnamn**: QR på lådan, välkomst-overlay säger "Välkommen [namn] 👋".
-
-### B. Zoner — "en stämning per rum"
-Fixtures får zon-tag (dansgolv, bar, toalett). Stämningsslidern styr per zon, hyrgästen får tre reglage istället för ett. Ingen hobby-stack gör detta smidigt.
-
-### C. Fjärrsupport-läge
-Ägaren aktiverar "Support-mode" i `/setup` → boxen öppnar reverse-tunnel i 60 min. Uthyraren fixar riggen på distans.
-
-### D. Show-recept export/import
-Ägaren exporterar Chill/Fest/Galet + fixture-mapping + kalibrering som `.showrecipe`. Sprid till alla sina boxar. Saknas för skalbarhet över 3–4 lådor.
-
-### E. Bluetooth A2DP-sink på Pi
-Pi tar emot musik från hyrarens telefon via Bluetooth → analyserar → skickar vidare via AUX-out. Tar bort största hyrare-frågan: "jag har ingen kabel".
-
-### F. Preset-marknadsplats (långsikt)
-Katalog i UI:t (Bröllop, Barnkalas, 80-tal, Techno) baserat på `.showrecipe`.
-
-## Vad vi INTE ska bygga
-
-- Full DMX-programmering per kanal (finns i QLC+, krossar hyr-UX).
-- Cloud-analys / AI i molnet (bryter noll-konfig-löftet).
-- Egen mobilapp (PWA + captive portal är starkare säljargument än App Store).
-
-## Rekommenderad ordning
-
-1. **A** — låser in värdet av allt vi byggt i #1/#2/#4, tydligast "designad för uthyrare".
-2. **E** — tar bort sista hyrare-frågan kring ljudkälla.
-3. **D** — när vi vet vad ägarna faktiskt vill kopiera mellan boxar.
-4. **B / C / F** — efter första riktiga hyror.
+- Mock-UI:t (`src/pages/DmxController.tsx`) — ringinställningar är hårdvaruspecifika för lådan och hör inte hemma i hyresgäst-mocken. Kan speglas separat om du vill senare.
