@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
 import { useMockLive } from "@/hooks/useMockLive";
 import { useDmx } from "@/store/dmx";
