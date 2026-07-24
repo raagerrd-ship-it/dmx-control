@@ -168,6 +168,23 @@
     .welcome-step .t b { display:block; font-size:14px; margin-bottom:2px; }
     .welcome-step .t span { font-size:13px; color:var(--dim); line-height:1.4; }
     .welcome-btn { width:100%; padding:14px; background:var(--hot); border:0; border-radius:12px; color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+    /* Walk-test overlay: guidar användaren genom kanal-för-kanal-test av en fixture. */
+    .walk-ov { position:fixed; inset:0; z-index:110; background:rgba(10,10,15,.92); backdrop-filter: blur(8px); display:none; align-items:center; justify-content:center; padding:20px; }
+    .walk-ov.show { display:flex; }
+    .walk-card { max-width:440px; width:100%; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; }
+    .walk-card h2 { margin:0 0 4px; font-size:20px; font-weight:700; }
+    .walk-card .sub { margin:0 0 14px; color:var(--dim); font-size:13px; line-height:1.5; }
+    .walk-step { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:var(--bg); border:1px solid var(--line); border-radius:10px; margin-bottom:14px; font-size:14px; }
+    .walk-step b { font-size:18px; }
+    .walk-opts { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:12px; }
+    .walk-opts button { padding:12px 6px; background:var(--bg); border:1px solid var(--line); border-radius:10px; color:var(--fg); font-size:13px; font-weight:600; cursor:pointer; }
+    .walk-opts button:hover { border-color:var(--hot); }
+    .walk-log { font-size:12px; color:var(--dim); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:12px; min-height:24px; line-height:1.5; }
+    .walk-result { background:color-mix(in srgb, var(--hot) 15%, var(--bg)); border:1px solid var(--hot); border-radius:10px; padding:12px; margin-bottom:12px; font-size:13px; line-height:1.5; }
+    .walk-result b { display:block; font-size:15px; margin-bottom:4px; color:var(--fg); }
+    .walk-actions { display:flex; gap:8px; }
+    .walk-actions button { flex:1; padding:12px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--fg); font-size:14px; font-weight:600; cursor:pointer; }
+    .walk-actions button.primary { background:var(--hot); border-color:var(--hot); color:#fff; }
   </style>
 </head>
 <body>
