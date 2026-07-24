@@ -25,7 +25,6 @@ export default function DmxController() {
       <header className="flex justify-center pt-4 pb-3">
         <BrandLogo className="h-28 w-auto opacity-95 sm:h-32 md:h-36 lg:h-40 landscape:h-24" />
       </header>
-      <PowerHero />
 
       <SectionTitle>Stämning</SectionTitle>
       <MoodSlider />
@@ -40,60 +39,27 @@ export default function DmxController() {
   );
 }
 
-/* ────────── Power (hero) ────────── */
-
-function PowerHero() {
-  const s = usePi();
-  const on = s.power;
-  return (
-    <button
-      onClick={() => setPi({ power: !on })}
-      className={`w-full flex items-center gap-3.5 p-4 rounded-2xl border transition-colors ${
-        on
-          ? "border-primary bg-[color-mix(in_srgb,hsl(var(--accent))_12%,hsl(var(--card)))]"
-          : "border-border bg-card"
-      }`}
-      aria-pressed={on}
-    >
-      <div
-        className={`w-[52px] h-[52px] rounded-full flex-none flex items-center justify-center text-2xl ${
-          on ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-        }`}
-      >
-        ⏻
-      </div>
-      <div className="min-w-0 text-left">
-        <div className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-          {on ? "Ljuset är på" : "Ljuset är av"}
-        </div>
-        <div className="text-[19px] font-semibold leading-tight mt-0.5">
-          {on ? "Tryck för att släcka" : "Tryck för att tända"}
-        </div>
-      </div>
-    </button>
-  );
-}
-
-/* ────────── Stämning: 1..10-slider (speglar KY-040-vredet på Pi) ────────── */
+/* ────────── Stämning: 0..10-slider (speglar KY-040-vredet på Pi; 0 = av) ────────── */
 
 function MoodSlider() {
   const s = usePi();
-  const v = Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
+  const off = !s.power;
+  const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
   const info =
-    v <= 2 ? { name: "Chill",  desc: "Mjukt och långsamt, följer inte taktslag" } :
-    v <= 4 ? { name: "Chill+", desc: "Följer musiken lugnt" } :
-    v <= 6 ? { name: "Fest",   desc: "Pulsar på taktslag, byter effekt ibland" } :
-    v <= 8 ? { name: "Fest+",  desc: "Klubb-läge, byter effekt oftare" } :
-             { name: "Galet",  desc: "Full fart, drop-blackout, riser-strobe" };
-  const dim = !s.power;
+    v === 0 ? { name: "Av",     desc: "Ljuset är släckt — dra åt höger för att tända" } :
+    v <= 2  ? { name: "Chill",  desc: "Mjukt och långsamt, följer inte taktslag" } :
+    v <= 4  ? { name: "Chill+", desc: "Följer musiken lugnt" } :
+    v <= 6  ? { name: "Fest",   desc: "Pulsar på taktslag, byter effekt ibland" } :
+    v <= 8  ? { name: "Fest+",  desc: "Klubb-läge, byter effekt oftare" } :
+              { name: "Galet",  desc: "Full fart, drop-blackout, riser-strobe" };
   return (
     <div
       className={`bg-card border rounded-[14px] px-3.5 pt-3.5 pb-3 mb-3 transition-colors ${
-        dim ? "border-border opacity-70" : "border-[color-mix(in_srgb,hsl(var(--accent))_55%,hsl(var(--border)))]"
+        off ? "border-border opacity-70" : "border-[color-mix(in_srgb,hsl(var(--accent))_55%,hsl(var(--border)))]"
       }`}
     >
       <div className="flex items-baseline justify-between mb-2">
-        <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Chill → Galet</span>
+        <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Av → Galet</span>
         <span className="text-[13px] font-semibold tabular-nums">
           <span className="text-primary">{info.name}</span>
           <span className="text-muted-foreground"> · {v}/10</span>
@@ -101,19 +67,24 @@ function MoodSlider() {
       </div>
       <input
         type="range"
-        min={1}
+        min={0}
         max={10}
         step={1}
         value={v}
         onChange={(e) => {
-          if (!s.power) setPi({ power: true });
-          applyIntensity((Number(e.target.value) - 1) / 9);
+          const nv = Number(e.target.value);
+          if (nv === 0) {
+            setPi({ power: false });
+          } else {
+            if (!s.power) setPi({ power: true });
+            applyIntensity((nv - 1) / 9);
+          }
         }}
         className="w-full h-6 accent-[hsl(var(--primary))] cursor-pointer"
-        aria-label="Stämning från Chill till Galet"
+        aria-label="Stämning från Av till Galet"
       />
       <div className="flex justify-between text-[11px] uppercase tracking-[0.1em] text-muted-foreground mt-1 px-0.5">
-        <span>Chill</span>
+        <span>Av</span>
         <span>Fest</span>
         <span>Galet</span>
       </div>

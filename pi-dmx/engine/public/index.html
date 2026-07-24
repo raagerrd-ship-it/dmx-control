@@ -241,19 +241,14 @@
     </div>
   </div>
 
-  <div class="power-card" id="powerCard">
-    <div class="power-icon">⏻</div>
-    <div class="power-text"><small id="powerSmall">Ljuset är på</small><b id="powerBig">Tryck för att släcka</b></div>
-  </div>
-
   <h1>Stämning</h1>
   <div class="mood-slider-card" id="moodSliderCard">
     <div class="mood-slider-head">
-      <span class="mood-slider-label">Chill → Galet</span>
+      <span class="mood-slider-label">Av → Galet</span>
       <span class="mood-slider-val"><span class="lbl" id="moodLbl">Fest</span><span class="num" id="moodNum"> · 5/10</span></span>
     </div>
-    <input type="range" id="moodSlider" min="1" max="10" step="1" value="5" aria-label="Stämning från Chill till Galet" />
-    <div class="mood-slider-legend"><span>Chill</span><span>Fest</span><span>Galet</span></div>
+    <input type="range" id="moodSlider" min="0" max="10" step="1" value="5" aria-label="Stämning från Av till Galet" />
+    <div class="mood-slider-legend"><span>Av</span><span>Fest</span><span>Galet</span></div>
     <div class="mood-desc" id="moodDesc">Pulsar på taktslag, byter effekt ibland</div>
   </div>
 
@@ -545,9 +540,9 @@ const inMic = document.getElementById("inMic");
 inAux.onclick = () => send({ type: "setAudioInput", value: "aux" });
 inMic.onclick = () => send({ type: "setAudioInput", value: "mic" });
 
-// STÄMNING: 1..10-slider speglar det fysiska KY-040-vredet. Skickar setIntensity
-// (0..1) → motorn (samma kod-väg som vredet). lastIntensity håller senaste värdet
-// så power-toggle kan tända tillbaka till det vi hade.
+// STÄMNING: 0..10-slider speglar det fysiska KY-040-vredet. 0 = släckt (blackout),
+// 1..10 = aktiv stämning. Skickar setIntensity (0..1) → motorn. lastIntensity håller
+// senaste aktiva värdet så vi kan tända tillbaka från extern blackout.
 let lastIntensity = 0.5;
 const moodSlider = document.getElementById("moodSlider");
 const moodSliderCard = document.getElementById("moodSliderCard");
@@ -555,50 +550,37 @@ const moodLbl = document.getElementById("moodLbl");
 const moodNum = document.getElementById("moodNum");
 const moodDesc = document.getElementById("moodDesc");
 function moodInfoFor(v) {
+  if (v <= 0) return { name: "Av",     desc: "Ljuset är släckt — dra åt höger för att tända" };
   if (v <= 2) return { name: "Chill",  desc: "Mjukt och långsamt, följer inte taktslag" };
   if (v <= 4) return { name: "Chill+", desc: "Följer musiken lugnt" };
   if (v <= 6) return { name: "Fest",   desc: "Pulsar på taktslag, byter effekt ibland" };
   if (v <= 8) return { name: "Fest+",  desc: "Klubb-läge, byter effekt oftare" };
   return               { name: "Galet", desc: "Full fart, drop-blackout, riser-strobe" };
 }
-function updateMoodUi(v01, active) {
-  const v = Math.max(1, Math.min(10, Math.round(v01 * 9) + 1));
+// Visning: v=0 → 0/10 (av). v≥1 → mappar på (v-1)/9 → 0..1.
+function updateMoodUi(v01, active, forceZero) {
+  const v = forceZero ? 0 : Math.max(1, Math.min(10, Math.round(v01 * 9) + 1));
   moodSlider.value = String(v);
   const info = moodInfoFor(v);
   moodLbl.textContent = info.name;
   moodNum.textContent = ` · ${v}/10`;
   if (moodDesc) moodDesc.textContent = info.desc;
-  moodSliderCard.classList.toggle("active", !!active);
+  moodSliderCard.classList.toggle("active", !!active && v > 0);
 }
 moodSlider.addEventListener("input", () => {
-  const v = Math.max(1, Math.min(10, parseInt(moodSlider.value, 10) || 5));
+  const v = Math.max(0, Math.min(10, parseInt(moodSlider.value, 10) || 0));
+  if (v === 0) {
+    curMode = "blackout";
+    updateMoodUi(lastIntensity, false, true);
+    send({ type: "setMode", mode: "blackout" });
+    return;
+  }
   const x = (v - 1) / 9;
   lastIntensity = x;
-  updateMoodUi(x, true);
-  setPower(false);   // slidern tänder alltid (häver blackout)
+  curMode = "smart";
+  updateMoodUi(x, true, false);
   send({ type: "setIntensity", value: x });
 });
-
-// POWER: släck hela riggen (blackout) / tänd tillbaka till senaste stämning.
-const powerCard = document.getElementById("powerCard");
-const powerSmall = document.getElementById("powerSmall");
-const powerBig = document.getElementById("powerBig");
-function setPower(off) {
-  powerCard.classList.toggle("off", off);
-  powerSmall.textContent = off ? "Ljuset är av" : "Ljuset är på";
-  powerBig.textContent = off ? "Tryck för att tända" : "Tryck för att släcka";
-}
-powerCard.onclick = () => {
-  if (curMode === "blackout") {                       // TÄND → senaste intensity
-    curMode = "smart"; setPower(false);
-    updateMoodUi(lastIntensity, true);
-    send({ type: "setIntensity", value: lastIntensity });
-  } else {                                            // SLÄCK
-    curMode = "blackout"; setPower(true);
-    updateMoodUi(lastIntensity, false);
-    send({ type: "setMode", mode: "blackout" });
-  }
-};
 const connEl = document.getElementById("conn");
 
 // Inverse of server's log curve: derive aggressiveness 0..1 from tauDown seconds.
@@ -732,8 +714,7 @@ function applyConfig(cfg) {
   // andra klienter kan ha ändrat den). Kortet dimmas när ljuset är av.
   const x = typeof cfg.activeIntensity === "number" ? cfg.activeIntensity : 0.5;
   lastIntensity = x;
-  updateMoodUi(x, cfg.mode !== "blackout");
-  setPower(cfg.mode === "blackout");
+  updateMoodUi(x, cfg.mode !== "blackout", cfg.mode === "blackout");
   if (tBeatPulse) tBeatPulse.checked = !!cfg.beatPulse;
   const fog = cfg.fog || {};
   if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 128; }
