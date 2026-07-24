@@ -686,6 +686,220 @@ function OwnerSections() {
   );
 }
 
+// ---- Typskylt (CE-nameplate + EU-DoC generator) --------------------------
+// Speglar Pi:ns /setup-kort. State sparas i localStorage under samma nyckel
+// som Pi-UI:t använder, så samma värden syns på båda ställen.
+const TS_FIELDS = [
+  { k: "Mfg", label: "Företagsnamn / tillverkare", ph: "t.ex. Firma AB" },
+  { k: "Org", label: "Org.nr (valfritt)", ph: "556123-4567" },
+  { k: "Addr1", label: "Postadress", ph: "Gatan 1" },
+  { k: "Addr2", label: "Postnr & ort", ph: "123 45 Ort" },
+  { k: "Country", label: "Land", ph: "Sverige", def: "Sverige" },
+  { k: "Contact", label: "Kontakt (e-post/URL)", ph: "support@…" },
+  { k: "Model", label: "Modell", ph: "PDMX-1", def: "PDMX-1" },
+  { k: "SN", label: "Serienummer", ph: "2026-0001" },
+  { k: "MfgDate", label: "Tillverkningsdatum (ISO-vecka)", ph: "2026-W03" },
+  { k: "Ip", label: "IP-klass", ph: "IP20", def: "IP20" },
+] as const;
+
+type TsVals = Record<string, string>;
+
+function buildNameplate(v: TsVals): string {
+  const line = "──────────────────────────────────────────────────────";
+  const pad = (s: string, n: number) => (s + " ".repeat(n)).slice(0, n);
+  return [
+    "  pi-dmx Controller           Model: " + (v.Model || "PDMX-1"),
+    "  " + line,
+    "  SN: " + pad(v.SN || "—", 22) + " Mfg: " + (v.MfgDate || "—"),
+    "",
+    "  Input:  5 V ⎓  3 A max  (USB-C)",
+    "  Power:  15 W max",
+    "  IP:     " + (v.Ip || "IP20") + "  (indoor use only)",
+    "",
+    "  Radio:  Wi-Fi 2.4 GHz  ≤100 mW EIRP",
+    "          BT 4.2 LE      ≤10 mW EIRP",
+    "",
+    "  Manufacturer:",
+    "    " + (v.Mfg || "[företagsnamn]") + (v.Org ? "  (" + v.Org + ")" : ""),
+    "    " + (v.Addr1 || "[gatuadress]"),
+    "    " + (v.Addr2 || "[postnr ort]") + ", " + (v.Country || "Sverige"),
+    "    " + (v.Contact || "[e-post/URL]"),
+    "",
+    "  Made in " + (v.Country || "Sweden"),
+    "",
+    "      ( C E )        ( WEEE — överkryssad soptunna )",
+    "",
+    "  ⚠ Stroboskop — se manual. Endast inomhus.",
+    "  ⚠ Strobe — see manual. Indoor use only.",
+  ].join("\n");
+}
+
+function buildDocHtml(v: TsVals): string {
+  const esc = (s: string) => (s || "").replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" } as Record<string,string>)[c]);
+  const today = new Date().toISOString().slice(0, 10);
+  const mfg = esc(v.Mfg || "[Företagsnamn]");
+  const addr = [v.Addr1, v.Addr2, v.Country].filter(Boolean).map(esc).join(", ") || "[Adress]";
+  const model = esc(v.Model || "PDMX-1");
+  const sn = esc(v.SN || "[Serienummer / batch]");
+  const contact = esc(v.Contact || "[E-post/URL]");
+  return `<!doctype html><html lang="sv"><head><meta charset="utf-8"><title>EU DoC — ${model}</title>
+<style>
+  @page { size:A4; margin:22mm 20mm; }
+  body { font-family: Georgia, "Times New Roman", serif; color:#111; font-size:11pt; line-height:1.55; }
+  h1 { font-size:16pt; margin:0 0 4px; }
+  h2 { font-size:11pt; margin:22px 0 6px; text-transform:uppercase; letter-spacing:.08em; border-bottom:1px solid #333; padding-bottom:2px; }
+  .sub { color:#555; font-size:10pt; margin-bottom:18px; }
+  table { width:100%; border-collapse:collapse; margin:6px 0; }
+  td { padding:4px 6px; vertical-align:top; border-bottom:1px solid #eee; }
+  td.k { width:38%; color:#555; }
+  ul { margin:4px 0 4px 20px; padding:0; } li { margin:2px 0; }
+  .sig { margin-top:36px; display:flex; gap:40px; }
+  .sig div { flex:1; } .sig .line { border-top:1px solid #111; margin-top:48px; padding-top:4px; font-size:9pt; color:#555; }
+  .foot { margin-top:24px; font-size:9pt; color:#666; }
+  .warn { font-size:9pt; color:#555; font-style:italic; }
+  .noprint { position:fixed; top:8px; right:8px; }
+  .noprint button { font:inherit; padding:8px 14px; cursor:pointer; }
+  @media print { .noprint { display:none; } }
+</style></head><body>
+<div class="noprint"><button onclick="window.print()">Skriv ut / Spara som PDF</button></div>
+<h1>EU Declaration of Conformity</h1>
+<div class="sub">EU-försäkran om överensstämmelse · Utfärdad ${today}</div>
+<h2>1. Product / Produkt</h2>
+<table>
+  <tr><td class="k">Product name</td><td>pi-dmx Controller — audio-reactive DMX lighting controller</td></tr>
+  <tr><td class="k">Model / Type</td><td>${model}</td></tr>
+  <tr><td class="k">Serial number / Batch</td><td>${sn}</td></tr>
+</table>
+<h2>2. Manufacturer / Tillverkare</h2>
+<table>
+  <tr><td class="k">Name</td><td>${mfg}${v.Org ? " (Org.nr " + esc(v.Org) + ")" : ""}</td></tr>
+  <tr><td class="k">Address</td><td>${addr}</td></tr>
+  <tr><td class="k">Contact</td><td>${contact}</td></tr>
+</table>
+<h2>3. Object of the declaration</h2>
+<p>This declaration of conformity is issued under the sole responsibility of the manufacturer.
+Föremålet för försäkran ovan överensstämmer med relevant harmoniserad unionslagstiftning:</p>
+<ul>
+  <li><b>Radio Equipment Directive (RED)</b> — 2014/53/EU</li>
+  <li><b>RoHS</b> — 2011/65/EU (as amended by (EU) 2015/863)</li>
+  <li><b>WEEE</b> — 2012/19/EU</li>
+  <li><b>General Product Safety Regulation</b> — (EU) 2023/988</li>
+</ul>
+<h2>4. Harmonised standards applied</h2>
+<ul>
+  <li>EN 301 489-1 / EN 301 489-17 — EMC for radio equipment (Wi-Fi/BT)</li>
+  <li>EN 300 328 — Wideband transmission systems, 2.4 GHz band</li>
+  <li>EN IEC 62368-1 — Audio/video, ICT equipment — Safety</li>
+  <li>EN IEC 63000 — Technical documentation for RoHS</li>
+  <li>EN 62479 — Assessment of low-power electronic equipment (RF exposure)</li>
+</ul>
+<p class="warn">Justera listan efter faktiskt genomförd provning.</p>
+<h2>5. Radio characteristics</h2>
+<table>
+  <tr><td class="k">Frequency band</td><td>2400–2483.5 MHz</td></tr>
+  <tr><td class="k">Wi-Fi max EIRP</td><td>≤ 100 mW (20 dBm)</td></tr>
+  <tr><td class="k">Bluetooth LE max EIRP</td><td>≤ 10 mW (10 dBm)</td></tr>
+  <tr><td class="k">Radio module</td><td>Integrated in Raspberry Pi Zero 2 W (CYW43438)</td></tr>
+</table>
+<h2>6. Additional information</h2>
+<table>
+  <tr><td class="k">Input</td><td>5 V DC, 3 A max, USB-C</td></tr>
+  <tr><td class="k">Power consumption</td><td>15 W max</td></tr>
+  <tr><td class="k">Ingress protection</td><td>${esc(v.Ip || "IP20")} — indoor use only</td></tr>
+  <tr><td class="k">Manufacturing date / batch</td><td>${esc(v.MfgDate || "—")}</td></tr>
+</table>
+<h2>7. Signature / Undertecknat för och på uppdrag av tillverkaren</h2>
+<div class="sig">
+  <div><div class="line">Ort och datum</div></div>
+  <div><div class="line">Namn, befattning</div></div>
+  <div><div class="line">Underskrift</div></div>
+</div>
+<div class="foot">Dokumentet arkiveras hos tillverkaren i minst 10 år efter att sista enheten släppts på marknaden. Kopia medföljer varje enhet vid leverans.</div>
+</body></html>`;
+}
+
+function TypskyltCard() {
+  const [v, setV] = useState<TsVals>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("pi-dmx-typskylt-v1") || "{}");
+      const out: TsVals = {};
+      for (const f of TS_FIELDS) out[f.k] = saved[f.k] ?? (f as any).def ?? "";
+      return out;
+    } catch {
+      const out: TsVals = {};
+      for (const f of TS_FIELDS) out[f.k] = (f as any).def ?? "";
+      return out;
+    }
+  });
+  const setField = (k: string, val: string) => {
+    setV((s) => {
+      const n = { ...s, [k]: val };
+      try { localStorage.setItem("pi-dmx-typskylt-v1", JSON.stringify(n)); } catch {}
+      return n;
+    });
+  };
+  const preview = buildNameplate(v);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(preview); }
+    catch { alert("Kunde inte kopiera — markera texten manuellt."); }
+  };
+  const openDoc = () => {
+    const w = window.open("", "_blank");
+    if (!w) { alert("Popup blockerad — tillåt popups för att generera DoC."); return; }
+    w.document.write(buildDocHtml(v));
+    w.document.close();
+    w.focus();
+  };
+  const printLabel = () => {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write("<pre style='font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:20px'>" + preview.replace(/</g, "&lt;") + "</pre>");
+    w.document.close(); w.focus(); w.print();
+  };
+  return (
+    <>
+      <SectionTitle>Typskylt</SectionTitle>
+      <Card>
+        <div className="text-[12px] text-muted-foreground mb-3 leading-snug">
+          Obligatorisk märkning på varje enhet som säljs/hyrs ut i EU. Fyll i fälten — förhandsvisningen uppdateras och kan skickas till etiketttrycket eller exporteras som EU-DoC (PDF).
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {TS_FIELDS.map((f) => (
+            <label key={f.k} className="flex flex-col gap-1">
+              <span className="text-[11px] text-muted-foreground">{f.label}</span>
+              <input
+                value={v[f.k] || ""}
+                onChange={(e) => setField(f.k, e.target.value)}
+                placeholder={f.ph}
+                className="bg-muted border border-border rounded-md px-2.5 py-2 text-[13px]"
+              />
+            </label>
+          ))}
+        </div>
+        <pre className="mt-3 p-3 rounded-md border border-border bg-black/40 text-[11px] leading-relaxed overflow-auto whitespace-pre font-mono text-neutral-200">
+{preview}
+        </pre>
+        <div className="flex gap-2 mt-3 flex-wrap">
+          <button onClick={copy} className="flex-1 py-2.5 rounded-[9px] border border-border bg-card text-[14px]">Kopiera etikett</button>
+          <button onClick={printLabel} className="flex-1 py-2.5 rounded-[9px] border border-border bg-card text-[14px]">Skriv ut</button>
+          <button onClick={openDoc} className="basis-full py-2.5 rounded-[9px] bg-primary text-primary-foreground font-medium text-[14px]">EU-DoC (PDF)</button>
+        </div>
+        <details className="mt-3">
+          <summary className="cursor-pointer text-[11px] uppercase tracking-wider text-muted-foreground py-1">Måste också medfölja enheten (inte på skylten)</summary>
+          <ul className="mt-2 ml-4 list-disc text-[12px] text-muted-foreground leading-relaxed">
+            <li>EU-DoC — signerad, listar RED 2014/53/EU + RoHS 2011/65/EU</li>
+            <li>Bruksanvisning på svenska — säkerhet, epilepsi- &amp; rökmaskin-varning</li>
+            <li>WEEE-registrering hos El-Kretsen innan första försäljning</li>
+            <li>Serienummerregister — arkiveras i 10 år</li>
+          </ul>
+        </details>
+      </Card>
+    </>
+  );
+}
+
+
+
 function RegiTgl({
   label, sub, checked, onChange, last, moodLocked,
 }: { label: string; sub: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean; moodLocked?: boolean }) {
