@@ -292,8 +292,8 @@ function MoreDetails() {
   return (
     <>
       <details className="mt-4 group/eff">
-        <summary className="py-4 rounded-full border border-primary/50 bg-primary/[0.04] text-primary text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden shadow-[0_0_14px_hsl(var(--primary)/0.12)] hover:bg-primary/[0.08] transition-colors">
-          <span>Effekt-val</span>
+        <summary className="w-full py-4 rounded-2xl bg-primary text-primary-foreground text-[11px] font-black uppercase tracking-[0.22em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden shadow-[0_0_20px_hsl(var(--primary)/0.25)] hover:bg-primary/90 active:scale-[0.99] transition-all">
+          <span>Välj effekt</span>
           <span className="ml-1.5 opacity-70 group-open/eff:hidden">⌄</span>
           <span className="ml-1.5 opacity-70 hidden group-open/eff:inline">⌃</span>
         </summary>
