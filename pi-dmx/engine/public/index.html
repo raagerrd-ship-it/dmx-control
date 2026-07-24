@@ -351,14 +351,16 @@
 
   <h1>Regi (pro)</h1>
   <div class="card">
-    <label class="tgl"><span>Drop-blackout<br><small style="opacity:.6">Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast.</small></span><input type="checkbox" id="tDropBlackout"></label>
+    <div class="status" style="margin:-2px 0 10px;opacity:.7">Ägar-val nedan gäller alltid. De 6 nedersta styrs av stämnings-vredet (Chill/Fest/Galet) och visas här bara för insyn.</div>
     <label class="tgl"><span>Sceniskt djup<br><small style="opacity:.6">Mittlamporna hålls som fasta uplights i höga lägen. Kräver lampor i rad V→H.</small></span><input type="checkbox" id="tScenicAnchor"></label>
-    <label class="tgl"><span>Dynamiskt ljustak (VU)<br><small style="opacity:.6">Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%. Drop bypassar. Djup styrs av Dynamik.</small></span><input type="checkbox" id="tEnergyCeiling"></label>
-    <label class="tgl"><span>Klubb-läge (hård kontrast)<br><small style="opacity:.6">Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna. Aggressivt, klistrat på transienterna. Kräver VU-taket på.</small></span><input type="checkbox" id="tClubMode"></label>
-    <label class="tgl"><span>Varm vilo-glöd i tystnad<br><small style="opacity:.6">När ingen musik spelar: dim bärnsten-glöd i stället för helt mörkt. Av = lamporna släcks vid ingen input.</small></span><input type="checkbox" id="tAmbientGlow"></label>
-    <label class="tgl"><span>Riser-strobe (build → drop)<br><small style="opacity:.6">Under en uppbyggnad: accelererande strobe + färgen kollapsar mot vitt, sen blackout på dropen. Klassisk EDM-build. Blixttakten är begränsad till 1,5/s.</small></span><input type="checkbox" id="tRiserStrobe"></label>
     <label class="tgl"><span>Släpp strobe-taket (scenläge)<br><small style="opacity:.6">⚠ Höjer blixttakten från 1,5 till 9 per sekund. Blinkande ljus kan utlösa epileptiska anfall — risken är störst när hela riggen blinkar synkront i vitt. Gränsen för allmänt säkert innehåll är 3 blixtar/s. Slå bara på detta om lokalen skyltar om strobe vid entrén.</small></span><input type="checkbox" id="tStrobeUnlimited"></label>
-    <label class="tgl"><span>Drop-headroom (max 90%, drops 100%)<br><small style="opacity:.6">Kapar normal ljusstyrka till 90% men släpper drops ända till full — de poppar tydligare och riggen slutar blasta på max hela tiden.</small></span><input type="checkbox" id="tDropHeadroom"></label>
+    <div style="border-top:1px solid rgba(255,255,255,.08);margin:10px 0 6px"></div>
+    <label class="tgl mood-locked"><span>Drop-blackout <em class="mood-badge">Följer stämning</em><br><small style="opacity:.6">Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast.</small></span><input type="checkbox" id="tDropBlackout" disabled></label>
+    <label class="tgl mood-locked"><span>Dynamiskt ljustak (VU) <em class="mood-badge">Följer stämning</em><br><small style="opacity:.6">Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%.</small></span><input type="checkbox" id="tEnergyCeiling" disabled></label>
+    <label class="tgl mood-locked"><span>Klubb-läge (hård kontrast) <em class="mood-badge">Följer stämning</em><br><small style="opacity:.6">Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna.</small></span><input type="checkbox" id="tClubMode" disabled></label>
+    <label class="tgl mood-locked"><span>Varm vilo-glöd i tystnad <em class="mood-badge">Följer stämning</em><br><small style="opacity:.6">Dim bärnsten-glöd när ingen musik spelar, istället för helt mörkt.</small></span><input type="checkbox" id="tAmbientGlow" disabled></label>
+    <label class="tgl mood-locked"><span>Riser-strobe (build → drop) <em class="mood-badge">Följer stämning</em><br><small style="opacity:.6">Accelererande strobe under uppbyggnad, blackout på dropen. Begränsad till 1,5/s.</small></span><input type="checkbox" id="tRiserStrobe" disabled></label>
+    <label class="tgl mood-locked"><span>Drop-headroom (max 90%, drops 100%) <em class="mood-badge">Följer stämning</em><br><small style="opacity:.6">Normalläget kapas till 90% så drops poppar tydligare.</small></span><input type="checkbox" id="tDropHeadroom" disabled></label>
   </div>
 
   <h1>Lampor</h1>
