@@ -627,6 +627,7 @@ export async function startServer(
   });
 
   await app.listen({ port, host: "0.0.0.0" });
+  logHealth("info", "server", `HTTP redo på port ${port} (v${PKG_VERSION})`);
 
   const broadcast = (payload: unknown) => {
     const s = JSON.stringify(payload);
@@ -638,8 +639,16 @@ export async function startServer(
   // Sidecar events → fan out to every connected browser. Same server instance
   // registers per port (80 + 443) so both listeners see the same events; the
   // sidecar only fires ONE event per action, so this doubles up harmlessly.
-  deps.ble?.onScan((devices) => broadcast({ type: "bleScanResults", devices }));
-  deps.ble?.onPaired(() => broadcast({ type: "blePaired", devices: deps.ble!.paired() }));
+  deps.ble?.onScan((devices) => {
+    logHealth("info", "ble", `scan hittade ${devices.length} enhet(er)`);
+    broadcast({ type: "bleScanResults", devices });
+  });
+  deps.ble?.onPaired(() => {
+    const list = deps.ble!.paired();
+    const online = list.filter((d) => d.connected).length;
+    logHealth("info", "ble", `parad lista uppdaterad: ${online}/${list.length} uppkopplade`);
+    broadcast({ type: "blePaired", devices: list });
+  });
   return { app, broadcastConfig };
 }
 
