@@ -294,22 +294,34 @@
     <div class="mood-desc" id="moodDesc">Pulsar på taktslag, byter effekt ibland</div>
   </section>
 
-  <h1>Ljud <span class="kick-dot" id="kickDot"></span></h1>
-  <div class="card">
-    <div class="fx-actions" style="margin-top:0">
-      <button class="btn" id="inAux">AUX (kabel)</button>
-      <button class="btn" id="inMic">Mikrofon</button>
+  <section class="audio-section">
+    <div class="src-seg" id="srcSeg" data-src="aux" role="tablist" aria-label="Ljudkälla">
+      <span class="src-thumb" aria-hidden="true"></span>
+      <button id="inAux" class="active" role="tab" aria-selected="true">AUX (kabel)</button>
+      <button id="inMic" role="tab" aria-selected="false">Mikrofon</button>
     </div>
-    <div class="row" style="margin-top:14px"><label>Nivå just nu</label><span class="val" id="levelVal">–</span></div>
-    <div class="meter"><div id="levelBar" style="width:0%"></div></div>
+    <div class="audio-head">
+      <div class="audio-head-l">
+        <span class="audio-lbl">Nivå</span>
+        <span class="audio-kd" id="kickDot" aria-hidden="true"></span>
+      </div>
+      <span class="audio-pct" id="levelVal">0%</span>
+    </div>
+    <div class="audio-bar" id="levelBarWrap">
+      <div class="fill" id="levelBar" style="width:0%"></div>
+      <div class="ticks" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    </div>
     <details class="tech-details">
       <summary>Teknisk info</summary>
-      <div class="row" style="margin-top:10px"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
-      <div class="row"><label>Beat-synk <span class="kick-dot" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
-      <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
-      <div class="status">Auto-gain: <span id="gainVal">–</span>×</div>
+      <div class="tech-list">
+        <div class="row"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
+        <div class="row"><label>Beat-synk <span class="audio-kd" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
+        <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
+        <div class="row"><label>Auto-gain</label><span class="val"><span id="gainVal">–</span>×</span></div>
+      </div>
     </details>
-  </div>
+  </section>
+
 
 
   <details class="more">
