@@ -72,17 +72,22 @@
   height: 10px;
   border-radius: 999px;
   background:
-    linear-gradient(90deg, var(--mood-accent) 0 var(--mood-fill),
-                          hsl(var(--muted) / 0.5) var(--mood-fill) 100%);
+    linear-gradient(90deg,
+      hsl(var(--primary) / 0) 0%,
+      var(--mood-accent) var(--mood-fill),
+      hsl(var(--muted) / 0.5) var(--mood-fill) 100%);
   box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.04);
 }
 .mood-range::-moz-range-track {
   height: 10px;
   border-radius: 999px;
   background:
-    linear-gradient(90deg, var(--mood-accent) 0 var(--mood-fill),
-                          hsl(var(--muted) / 0.5) var(--mood-fill) 100%);
+    linear-gradient(90deg,
+      hsl(var(--primary) / 0) 0%,
+      var(--mood-accent) var(--mood-fill),
+      hsl(var(--muted) / 0.5) var(--mood-fill) 100%);
 }
+
 .mood-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
