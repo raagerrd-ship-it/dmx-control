@@ -1273,7 +1273,11 @@ const fogHeatMeter = document.getElementById("fogHeatMeter");
 const fogHeatBar = document.getElementById("fogHeatBar");
 const fogConflict = document.getElementById("fogConflict");
 const sendFog = () => send({ type: "setFog", fog: { enabled: fogEnabled.checked, onDrop: fogOnDrop.checked, address: Number(fogAddr.value) || 128 } });
-fogEnabled.onchange = sendFog;
+fogEnabled.onchange = () => {
+  const s = document.getElementById("fogSettings");
+  if (s) s.style.display = fogEnabled.checked ? "" : "none";
+  sendFog();
+};
 fogOnDrop.onchange = sendFog;
 fogAddr.onchange = sendFog;
 fogNowBtn.onclick = () => send({ type: "fogNow" });
