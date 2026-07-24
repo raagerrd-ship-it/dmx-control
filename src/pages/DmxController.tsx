@@ -26,9 +26,8 @@ export default function DmxController() {
         <BrandLogo className="h-32 w-auto opacity-95 sm:h-36 md:h-40 lg:h-44 landscape:h-28" />
       </header>
 
-      <MoodSlider />
+      <HeroCard />
 
-      <AudioMeterCard />
 
 
       <MoreDetails />
