@@ -252,12 +252,14 @@ function TechGrid() {
   const locked = bpm > 0;
   const confPct = Math.round(conf * 100);
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-3 gap-3">
       <TechTile label="BPM" value={locked ? String(Math.round(bpm)) : "—"} accent={locked} dot={locked && beat} />
       <TechTile label="Konfidens" value={locked ? `${confPct}%` : "—"} />
       <TechTile label="Kick" value={kick > 0.4 ? "PULS" : "—"} accent={kick > 0.4} dot={kick > 0.4} />
       <TechTile label="Auto-gain" value="1.0×" />
-      <div className="col-span-2 p-3.5 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06]">
+      <TechTile label="Sync" value={locked ? "Aktiv" : "Väntar"} accent={locked} dot={locked && beat} />
+      <TechTile label="Temp" value="42°C" />
+      <div className="col-span-3 p-3.5 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06]">
         <div className="text-[8px] font-bold text-muted-foreground/70 uppercase mb-1 tracking-[0.22em]">Läge</div>
         <div className="text-[13px] font-medium text-foreground/85 leading-snug">
           {moodInfoFor(moodV).desc}
@@ -269,13 +271,15 @@ function TechGrid() {
 
 function TechTile({ label, value, accent, dot }: { label: string; value: string; accent?: boolean; dot?: boolean }) {
   return (
-    <div className="p-3.5 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06]">
-      <div className="flex items-center gap-1.5 mb-1">
-        <span className="text-[8px] font-bold text-muted-foreground/70 uppercase tracking-[0.22em]">{label}</span>
-        {dot && <span className="inline-block w-1 h-1 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]" />}
+    <div className="aspect-square p-3 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06] flex flex-col items-center justify-center text-center gap-2">
+      <div className="w-8 h-8 rounded-xl bg-foreground/[0.05] flex items-center justify-center text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">
+        {label.slice(0, 3)}
       </div>
-      <div className={`text-[15px] font-mono font-semibold tabular-nums ${accent ? "text-primary" : "text-foreground/85"}`}>
-        {value}
+      <div className="flex items-center gap-1">
+        <div className={`text-[13px] font-mono font-semibold tabular-nums ${accent ? "text-primary" : "text-foreground/85"}`}>
+          {value}
+        </div>
+        {dot && <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]" />}
       </div>
     </div>
   );
