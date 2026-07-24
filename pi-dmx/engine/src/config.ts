@@ -211,7 +211,6 @@ export const defaultConfig: EngineConfig = {
   beatPulse: true,
   beatSyncStrength: 0.18,   // normal PLL-korrektion mot trumslag
   beatSyncOverride: false,  // stämnings-vredet styr som default
-  moodOverride: false,      // stämnings-vredet styr Regi (pro)-flaggorna som default
   energyDrivesMode: true,
   smartDwellMs: 15000,
   master: 1.0,
