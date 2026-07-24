@@ -510,18 +510,24 @@ function OwnerSections() {
 
       <SectionTitle>Regi (pro)</SectionTitle>
       <Card>
-        <div className="text-[12px] text-muted-foreground leading-snug mb-2">
-          Alla val nedan är ägar-val. Stämnings-vredet sätter dem som preset — du kan justera fritt efteråt.
-        </div>
+        <RegiTgl
+          label="Regi (pro) aktiv"
+          sub="När av: stämnings-vredet rör inte flaggorna nedan — du äger dem själv. När på: Chill/Fest/Galet sätter dem som preset, du kan justera fritt efteråt."
+          checked={regiPro}
+          onChange={setRegiPro}
+        />
+        <div className="border-t border-border my-2" />
         <RegiTgl label="Sceniskt djup" sub="Mittlamporna hålls som fasta uplights i höga lägen. Kräver lampor i rad V→H." checked={regi.scenicAnchor} onChange={rg("scenicAnchor")} />
         <RegiTgl label="Släpp strobe-taket (scenläge)" sub="⚠ Höjer blixttakten till 9/s. Slå bara på om lokalen skyltar om strobe vid entrén." checked={regi.strobeUnlimited} onChange={rg("strobeUnlimited")} />
-        <div className="border-t border-border my-2" />
-        <RegiTgl label="Drop-blackout" sub="Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast." checked={regi.dropBlackout} onChange={rg("dropBlackout")} />
-        <RegiTgl label="Dynamiskt ljustak (VU)" sub="Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%." checked={regi.energyCeiling} onChange={rg("energyCeiling")} />
-        <RegiTgl label="Klubb-läge (hård kontrast)" sub="Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna. Kräver VU-taket på." checked={regi.clubMode} onChange={rg("clubMode")} />
-        <RegiTgl label="Varm vilo-glöd i tystnad" sub="Dim bärnsten-glöd när ingen musik spelar, istället för helt mörkt." checked={regi.ambientGlow} onChange={rg("ambientGlow")} />
-        <RegiTgl label="Riser-strobe (build → drop)" sub="Accelererande strobe under uppbyggnad, blackout på dropen. Begränsad till 1,5/s." checked={regi.riserStrobe} onChange={rg("riserStrobe")} />
-        <RegiTgl label="Drop-headroom (max 90%, drops 100%)" sub="Normalläget kapas till 90% så drops poppar tydligare." checked={regi.dropHeadroom} onChange={rg("dropHeadroom")} last />
+        <div className={regiPro ? "" : "opacity-45 pointer-events-none"}>
+          <div className="border-t border-border my-2" />
+          <RegiTgl label="Drop-blackout" sub="Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast." checked={regi.dropBlackout} onChange={rg("dropBlackout")} />
+          <RegiTgl label="Dynamiskt ljustak (VU)" sub="Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%." checked={regi.energyCeiling} onChange={rg("energyCeiling")} />
+          <RegiTgl label="Klubb-läge (hård kontrast)" sub="Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna. Kräver VU-taket på." checked={regi.clubMode} onChange={rg("clubMode")} />
+          <RegiTgl label="Varm vilo-glöd i tystnad" sub="Dim bärnsten-glöd när ingen musik spelar, istället för helt mörkt." checked={regi.ambientGlow} onChange={rg("ambientGlow")} />
+          <RegiTgl label="Riser-strobe (build → drop)" sub="Accelererande strobe under uppbyggnad, blackout på dropen. Begränsad till 1,5/s." checked={regi.riserStrobe} onChange={rg("riserStrobe")} />
+          <RegiTgl label="Drop-headroom (max 90%, drops 100%)" sub="Normalläget kapas till 90% så drops poppar tydligare." checked={regi.dropHeadroom} onChange={rg("dropHeadroom")} last />
+        </div>
       </Card>
 
       <SectionTitle>Lampor</SectionTitle>
