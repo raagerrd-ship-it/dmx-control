@@ -497,14 +497,18 @@ function OwnerSections() {
 
       <SectionTitle>Regi (pro)</SectionTitle>
       <Card>
-        <RegiTgl label="Drop-blackout" sub="Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast." checked={regi.dropBlackout} onChange={rg("dropBlackout")} />
+        <div className="text-[12px] text-muted-foreground leading-snug mb-2">
+          Ägar-val nedan gäller alltid. De 6 nedersta styrs av stämnings-vredet (Chill/Fest/Galet) och visas här bara för insyn.
+        </div>
         <RegiTgl label="Sceniskt djup" sub="Mittlamporna hålls som fasta uplights i höga lägen. Kräver lampor i rad V→H." checked={regi.scenicAnchor} onChange={rg("scenicAnchor")} />
-        <RegiTgl label="Dynamiskt ljustak (VU)" sub="Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%." checked={regi.energyCeiling} onChange={rg("energyCeiling")} />
-        <RegiTgl label="Klubb-läge (hård kontrast)" sub="Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna. Kräver VU-taket på." checked={regi.clubMode} onChange={rg("clubMode")} />
-        <RegiTgl label="Varm vilo-glöd i tystnad" sub="Dim bärnsten-glöd när ingen musik spelar, istället för helt mörkt." checked={regi.ambientGlow} onChange={rg("ambientGlow")} />
-        <RegiTgl label="Riser-strobe (build → drop)" sub="Accelererande strobe under uppbyggnad, blackout på dropen. Begränsad till 1,5/s." checked={regi.riserStrobe} onChange={rg("riserStrobe")} />
-        <RegiTgl label="Släpp strobe-taket (scenläge)" sub="⚠ Höjer blixttakten till 9/s. Slå bara på om lokalen skyltar om strobe vid entrén." checked={regi.strobeUnlimited} onChange={rg("strobeUnlimited")} />
-        <RegiTgl label="Drop-headroom (max 90%, drops 100%)" sub="Normalläget kapas till 90% så drops poppar tydligare." checked={regi.dropHeadroom} onChange={rg("dropHeadroom")} last />
+        <RegiTgl label="Släpp strobe-taket (scenläge)" sub="⚠ Höjer blixttakten till 9/s. Slå bara på om lokalen skyltar om strobe vid entrén." checked={regi.strobeUnlimited} onChange={rg("strobeUnlimited")} last />
+        <div className="border-t border-border my-2" />
+        <RegiTgl label="Drop-blackout" sub="Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast." checked={regi.dropBlackout} onChange={rg("dropBlackout")} moodLocked />
+        <RegiTgl label="Dynamiskt ljustak (VU)" sub="Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%." checked={regi.energyCeiling} onChange={rg("energyCeiling")} moodLocked />
+        <RegiTgl label="Klubb-läge (hård kontrast)" sub="Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna. Kräver VU-taket på." checked={regi.clubMode} onChange={rg("clubMode")} moodLocked />
+        <RegiTgl label="Varm vilo-glöd i tystnad" sub="Dim bärnsten-glöd när ingen musik spelar, istället för helt mörkt." checked={regi.ambientGlow} onChange={rg("ambientGlow")} moodLocked />
+        <RegiTgl label="Riser-strobe (build → drop)" sub="Accelererande strobe under uppbyggnad, blackout på dropen. Begränsad till 1,5/s." checked={regi.riserStrobe} onChange={rg("riserStrobe")} moodLocked />
+        <RegiTgl label="Drop-headroom (max 90%, drops 100%)" sub="Normalläget kapas till 90% så drops poppar tydligare." checked={regi.dropHeadroom} onChange={rg("dropHeadroom")} moodLocked last />
       </Card>
 
       <SectionTitle>Lampor</SectionTitle>
@@ -660,15 +664,23 @@ function OwnerSections() {
 }
 
 function RegiTgl({
-  label, sub, checked, onChange, last,
-}: { label: string; sub: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean }) {
+  label, sub, checked, onChange, last, moodLocked,
+}: { label: string; sub: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean; moodLocked?: boolean }) {
   return (
-    <label className={`flex items-start justify-between gap-3 py-2.5 cursor-pointer ${last ? "" : "border-b border-border"}`}>
+    <label className={`flex items-start justify-between gap-3 py-2.5 ${moodLocked ? "cursor-default opacity-85" : "cursor-pointer"} ${last ? "" : "border-b border-border"}`}>
       <span className="flex-1 min-w-0">
-        <span className="text-[14px] block">{label}</span>
+        <span className="text-[14px] block">
+          {label}
+          {moodLocked && (
+            <em className="not-italic ml-1.5 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider rounded-full border align-middle"
+                style={{ color: "#e5b8ff", background: "rgba(180,120,255,.14)", borderColor: "rgba(180,120,255,.35)" }}>
+              Följer stämning
+            </em>
+          )}
+        </span>
         <span className="text-[11px] text-muted-foreground leading-snug block mt-0.5">{sub}</span>
       </span>
-      <SwitchBtn checked={checked} onChange={onChange} />
+      <SwitchBtn checked={checked} onChange={moodLocked ? () => {} : onChange} />
     </label>
   );
 }

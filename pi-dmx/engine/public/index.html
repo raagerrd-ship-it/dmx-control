@@ -30,6 +30,9 @@
     .tgl input:checked { background:var(--hot); }
     .tgl input::after { content:''; position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:#fff; transition:transform .15s; }
     .tgl input:checked::after { transform:translateX(18px); }
+    .tgl input:disabled { opacity:.45; cursor:not-allowed; }
+    .mood-locked > span { opacity:.85; }
+    .mood-badge { display:inline-block; margin-left:6px; padding:1px 7px; font-size:10px; font-style:normal; font-weight:600; letter-spacing:.3px; text-transform:uppercase; color:#e5b8ff; background:rgba(180,120,255,.14); border:1px solid rgba(180,120,255,.35); border-radius:999px; vertical-align:middle; }
     .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
     .row label { color: var(--dim); font-size: 13px; }
     .row .val { font-variant-numeric: tabular-nums; color: var(--fg); font-size: 13px; }
@@ -351,14 +354,16 @@
 
   <h1>Regi (pro)</h1>
   <div class="card">
-    <label class="tgl"><span>Drop-blackout<br><small style="opacity:.6">Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast.</small></span><input type="checkbox" id="tDropBlackout"></label>
+    <div class="status" style="margin:-2px 0 10px;opacity:.7">Ägar-val nedan gäller alltid. De 6 nedersta styrs av stämnings-vredet (Chill/Fest/Galet) och visas här bara för insyn.</div>
     <label class="tgl"><span>Sceniskt djup<br><small style="opacity:.6">Mittlamporna hålls som fasta uplights i höga lägen. Kräver lampor i rad V→H.</small></span><input type="checkbox" id="tScenicAnchor"></label>
-    <label class="tgl"><span>Dynamiskt ljustak (VU)<br><small style="opacity:.6">Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%. Drop bypassar. Djup styrs av Dynamik.</small></span><input type="checkbox" id="tEnergyCeiling"></label>
-    <label class="tgl"><span>Klubb-läge (hård kontrast)<br><small style="opacity:.6">Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna. Aggressivt, klistrat på transienterna. Kräver VU-taket på.</small></span><input type="checkbox" id="tClubMode"></label>
-    <label class="tgl"><span>Varm vilo-glöd i tystnad<br><small style="opacity:.6">När ingen musik spelar: dim bärnsten-glöd i stället för helt mörkt. Av = lamporna släcks vid ingen input.</small></span><input type="checkbox" id="tAmbientGlow"></label>
-    <label class="tgl"><span>Riser-strobe (build → drop)<br><small style="opacity:.6">Under en uppbyggnad: accelererande strobe + färgen kollapsar mot vitt, sen blackout på dropen. Klassisk EDM-build. Blixttakten är begränsad till 1,5/s.</small></span><input type="checkbox" id="tRiserStrobe"></label>
     <label class="tgl"><span>Släpp strobe-taket (scenläge)<br><small style="opacity:.6">⚠ Höjer blixttakten från 1,5 till 9 per sekund. Blinkande ljus kan utlösa epileptiska anfall — risken är störst när hela riggen blinkar synkront i vitt. Gränsen för allmänt säkert innehåll är 3 blixtar/s. Slå bara på detta om lokalen skyltar om strobe vid entrén.</small></span><input type="checkbox" id="tStrobeUnlimited"></label>
-    <label class="tgl"><span>Drop-headroom (max 90%, drops 100%)<br><small style="opacity:.6">Kapar normal ljusstyrka till 90% men släpper drops ända till full — de poppar tydligare och riggen slutar blasta på max hela tiden.</small></span><input type="checkbox" id="tDropHeadroom"></label>
+    <div style="border-top:1px solid rgba(255,255,255,.08);margin:10px 0 6px"></div>
+    <label class="tgl mood-locked"><span>Drop-blackout <em class="mood-badge">Följer stämning</em><br><small style="opacity:.6">Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast.</small></span><input type="checkbox" id="tDropBlackout" disabled></label>
+    <label class="tgl mood-locked"><span>Dynamiskt ljustak (VU) <em class="mood-badge">Följer stämning</em><br><small style="opacity:.6">Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%.</small></span><input type="checkbox" id="tEnergyCeiling" disabled></label>
+    <label class="tgl mood-locked"><span>Klubb-läge (hård kontrast) <em class="mood-badge">Följer stämning</em><br><small style="opacity:.6">Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna.</small></span><input type="checkbox" id="tClubMode" disabled></label>
+    <label class="tgl mood-locked"><span>Varm vilo-glöd i tystnad <em class="mood-badge">Följer stämning</em><br><small style="opacity:.6">Dim bärnsten-glöd när ingen musik spelar, istället för helt mörkt.</small></span><input type="checkbox" id="tAmbientGlow" disabled></label>
+    <label class="tgl mood-locked"><span>Riser-strobe (build → drop) <em class="mood-badge">Följer stämning</em><br><small style="opacity:.6">Accelererande strobe under uppbyggnad, blackout på dropen. Begränsad till 1,5/s.</small></span><input type="checkbox" id="tRiserStrobe" disabled></label>
+    <label class="tgl mood-locked"><span>Drop-headroom (max 90%, drops 100%) <em class="mood-badge">Följer stämning</em><br><small style="opacity:.6">Normalläget kapas till 90% så drops poppar tydligare.</small></span><input type="checkbox" id="tDropHeadroom" disabled></label>
   </div>
 
   <h1>Lampor</h1>
@@ -1276,19 +1281,18 @@ fogServiceReset.onclick = () => {
   if (confirm("Nollställ rökmaskinens räknare? Gör detta efter påfylld tank / rengöring.")) send({ type: "fogService" });
 };
 
-/* ── Regi (pro) ────────────────────────────────────────────────────────── */
+/* ── Regi (pro) ──────────────────────────────────────────────────────────
+ * Bara scenicAnchor + strobeUnlimited är ägar-val. Resten (dropBlackout,
+ * energyCeiling, clubMode, ambientGlow, riserStrobe, dropHeadroom) sätts av
+ * stämnings-vredet i moods.ts och visas här som disabled för insyn — därför
+ * inga onchange-handlers på dem. */
 const tDropBlackout = document.getElementById("tDropBlackout");
 const tScenicAnchor = document.getElementById("tScenicAnchor");
-tDropBlackout.onchange = () => send({ type: "setDropBlackout", value: tDropBlackout.checked });
 tScenicAnchor.onchange = () => send({ type: "setScenicAnchor", value: tScenicAnchor.checked });
 const tEnergyCeiling = document.getElementById("tEnergyCeiling");
-tEnergyCeiling.onchange = () => send({ type: "setEnergyCeiling", value: tEnergyCeiling.checked });
 const tClubMode = document.getElementById("tClubMode");
-tClubMode.onchange = () => send({ type: "setClubMode", value: tClubMode.checked });
 const tAmbientGlow = document.getElementById("tAmbientGlow");
-tAmbientGlow.onchange = () => send({ type: "setAmbientGlow", value: tAmbientGlow.checked });
 const tRiserStrobe = document.getElementById("tRiserStrobe");
-tRiserStrobe.onchange = () => send({ type: "setRiserStrobe", value: tRiserStrobe.checked });
 const tStrobeUnlimited = document.getElementById("tStrobeUnlimited");
 // Att HÖJA taket kräver ett aktivt ja; att sänka det gör det aldrig.
 tStrobeUnlimited.onchange = () => {
@@ -1301,7 +1305,6 @@ tStrobeUnlimited.onchange = () => {
   send({ type: "setStrobeUnlimited", value: tStrobeUnlimited.checked });
 };
 const tDropHeadroom = document.getElementById("tDropHeadroom");
-tDropHeadroom.onchange = () => send({ type: "setDropHeadroom", value: tDropHeadroom.checked });
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.
