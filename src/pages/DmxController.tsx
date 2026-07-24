@@ -109,6 +109,8 @@ function AudioMeterCard() {
   const kickOn = kick > 0.4;
   const hot = audio > 0.85;
   const source = s.audioInput;
+  const off = !s.power;
+  const moodV = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
 
   return (
     <section className="mb-4">
