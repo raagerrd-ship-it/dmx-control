@@ -168,7 +168,7 @@
     /* Ljud-sektion (proffsig, kort-lös) */
     .audio-section { margin: 4px 0 14px; }
     .src-seg { position:relative; display:grid; grid-template-columns:1fr 1fr; gap:0; padding:4px; border-radius:999px; background:color-mix(in srgb, var(--fg) 3%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
-    .src-seg .src-thumb { position:absolute; top:4px; bottom:4px; width:calc(50% - 4px); border-radius:999px; background:color-mix(in srgb, var(--hot) 6%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--hot) 30%, transparent); transition:transform .3s cubic-bezier(.4,.0,.2,1); }
+    .src-seg .src-thumb { position:absolute; top:4px; bottom:4px; width:calc(50% - 4px); border-radius:999px; background:color-mix(in srgb, var(--fg) 4%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--fg) 10%, transparent); transition:transform .3s cubic-bezier(.4,.0,.2,1); }
     .src-seg[data-src="mic"] .src-thumb { transform:translateX(calc(100% + 8px)); }
     .src-seg button { position:relative; z-index:1; display:flex; align-items:center; justify-content:center; gap:8px; background:transparent; border:0; padding:10px 8px; border-radius:999px; color:color-mix(in srgb, var(--dim) 65%, transparent); font-size:13px; font-weight:500; cursor:pointer; transition:color .2s; }
     .src-seg button::before { content:""; width:5px; height:5px; border-radius:999px; background:color-mix(in srgb, var(--dim) 35%, transparent); transition:background .2s, box-shadow .2s; }
