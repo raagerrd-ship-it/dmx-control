@@ -68,7 +68,7 @@ function MoodSlider() {
   const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
   const fillPct = (v / 10) * 100;
   return (
-    <section className="mb-6 mt-2">
+    <section className="mb-4">
 
 
       <div className="relative">
