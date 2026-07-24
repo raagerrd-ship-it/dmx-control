@@ -230,6 +230,11 @@ export const defaultConfig: EngineConfig = {
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
   rgb:    ["r", "g", "b"],
+  // 7-ch standard-layout: R,G,B,DIM(master),STROBE,MACRO,MACRO-SPEED.
+  // DIM styrs via role "dim" (writeFixture skriver master*255 när R/G/B finns);
+  // STROBE via role "strobe"; sista två som "unused" → 0 varje frame (fill(0)
+  // före writeFixture) så inbyggda auto-program aldrig triggas.
+  rgb7:   ["r", "g", "b", "dim", "strobe", "unused", "unused"],
   rgbw:   ["r", "g", "b", "w"],
   dimmer: ["dim"],
 };
