@@ -906,6 +906,13 @@ function renderFixtures() {
         <button class="id" data-id="${i}" title="Blinka lampan så du hittar den">Hitta</button>
         <button class="del" data-del="${i}" aria-label="Ta bort">×</button>
       </div>
+      <div class="fx-chan-row" aria-label="DMX-kanaler">
+        ${rolesOf(fx).map((role, k) => {
+          const cls = ({ r:"r", g:"g", b:"b", w:"w", a:"a", uv:"uv", dim:"d", strobe:"a", unused:"" })[role] || "";
+          const lbl = ({ r:"R", g:"G", b:"B", w:"W", a:"A", uv:"UV", dim:"DIM", strobe:"STR", unused:"—" })[role] || role.toUpperCase();
+          return `<span class="fx-chan ${cls}">${fx.address + k}·${lbl}</span>`;
+        }).join("")}
+      </div>
       <div class="fx-cal">
         <div class="fx-cal-head">
           <span class="fx-cal-title">Lägsta ljus</span>
