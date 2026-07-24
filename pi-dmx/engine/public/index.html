@@ -970,7 +970,7 @@ function applyFrame(f) {
     const peak = Math.round((peakHold / 100) * segs.length);
     segs.forEach((s, i) => {
       s.classList.toggle("on", i < active);
-      s.classList.toggle("peak", i === peak && i >= active);
+      s.classList.toggle("peak", i === peak && pct >= 4);
     });
   }
 
