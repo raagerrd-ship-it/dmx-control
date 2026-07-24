@@ -451,21 +451,23 @@ function OwnerSections() {
 
       <SectionTitle>Beat-synk</SectionTitle>
       <Card>
-        <SetRow label="Beat-synk" last>
-          <Seg<number>
-            value={beatSync}
-            onChange={setBeatSync}
-            options={[
-              { v: 0,    label: "Av" },
-              { v: 0.10, label: "Mjuk" },
-              { v: 0.18, label: "Normal" },
-              { v: 0.30, label: "Aggressiv" },
-            ]}
-          />
+        <SetRow label={<>Beat-synk <em className="not-italic ml-1.5 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider rounded-full border align-middle"
+              style={{ color: "#e5b8ff", background: "rgba(180,120,255,.14)", borderColor: "rgba(180,120,255,.35)" }}>Följer stämning</em></>} last>
+          <div style={{ pointerEvents: "none", opacity: 0.75 }}>
+            <Seg<number>
+              value={beatSync}
+              onChange={setBeatSync}
+              options={[
+                { v: 0,    label: "Av" },
+                { v: 0.10, label: "Mjuk" },
+                { v: 0.18, label: "Normal" },
+                { v: 0.30, label: "Aggressiv" },
+              ]}
+            />
+          </div>
         </SetRow>
         <div className="text-[12px] text-muted-foreground leading-snug mt-2">
-          Hur hårt pulsen knuffas i fas mot faktiska trumslag. Av = fri-rullande
-          på detekterad BPM. Aggressiv låser snabbast men kan rycka på taktrik musik.
+          Hur hårt pulsen knuffas i fas mot faktiska trumslag. Chill=Mjuk, Fest=Normal, Galet=Aggressiv — sätts av stämnings-vredet.
         </div>
       </Card>
 
