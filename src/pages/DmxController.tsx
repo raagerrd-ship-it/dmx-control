@@ -191,9 +191,10 @@ function AudioMeterCard() {
 
       {/* Teknisk info */}
       <details className="mt-3 group/tech">
-        <summary className="flex items-center gap-1.5 py-1.5 text-[11px] uppercase tracking-[0.18em] text-muted-foreground font-semibold cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/tech:text-foreground">
+        <summary className="py-3 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/tech:text-foreground">
           <span>Teknisk info</span>
-          <span className="transition-transform group-open/tech:rotate-180">⌄</span>
+          <span className="ml-1 group-open/tech:hidden"> ⌄</span>
+          <span className="ml-1 hidden group-open/tech:inline"> ⌃</span>
         </summary>
         <div className="mt-2 divide-y divide-border/40 rounded-xl bg-muted/25 ring-1 ring-border/40 px-3">
           <TechRow label="BPM" value={locked ? `${Math.round(bpm)}` : "–"} accent={locked} />
@@ -207,6 +208,7 @@ function AudioMeterCard() {
           <TechRow label="Auto-gain" value="1.0×" />
         </div>
       </details>
+
     </section>
   );
 }
