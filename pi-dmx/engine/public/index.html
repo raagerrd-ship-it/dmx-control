@@ -38,10 +38,8 @@
     .row .val { font-variant-numeric: tabular-nums; color: var(--fg); font-size: 13px; }
     input[type=range] { width: 100%; accent-color: var(--hot); }
     .meter { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 8px; }
-    .meter > div { height: 100%; background: linear-gradient(90deg, var(--ok), var(--hot)); transition: width 60ms linear; }
-    .kick-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background: var(--line); margin-left: 6px; vertical-align: middle; transition: background 40ms; }
-    .kick-dot.on { background: var(--hot); box-shadow: 0 0 12px var(--hot); }
-    .status { font-size: 12px; color: var(--dim); margin-top: 8px; }
+.meter > div { height: 100%; background: linear-gradient(90deg, var(--ok), var(--hot)); transition: width 60ms linear; }
+.status { font-size: 12px; color: var(--dim); margin-top: 8px; }
     .brand-logo { height: clamp(128px, 18vw, 184px); width: auto; opacity: .95; display:block; }
     @media (orientation: landscape) { .brand-logo { height: clamp(88px, 15vh, 132px); } }
 
@@ -340,9 +338,6 @@
         <div class="row"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
         <div class="row"><label>Beat-synk <span class="audio-kd" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
         <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
-        <div class="row"><label>Kick <span class="audio-kd" id="kickDot"></span></label><span class="val" id="kickVal">–</span></div>
-        <div class="row"><label>Auto-gain</label><span class="val"><span id="gainVal">–</span>×</span></div>
-
       </div>
     </details>
   </section>
@@ -611,10 +606,8 @@
 const OWNER_MODE = /setup/i.test(location.pathname) || /setup/i.test(location.hash);
 if (OWNER_MODE) { const o = document.getElementById("ownerOnly"); if (o) o.hidden = false; }
 
-const kickDot = document.getElementById("kickDot");
 const levelBar = document.getElementById("levelBar");
 const levelVal = document.getElementById("levelVal");
-const gainVal = document.getElementById("gainVal");
 const inAux = document.getElementById("inAux");
 const inMic = document.getElementById("inMic");
 inAux.onclick = () => send({ type: "setAudioInput", value: "aux" });
@@ -952,7 +945,6 @@ function updateAdvMirror(cfg) {
 }
 let bleConnectedCount = 0;
 let lastBleActive = 0;
-let kickTimer;
 function applyFrame(f) {
   const pct = Math.round(f.level * 100);
   levelBar.style.width = pct + "%";
@@ -962,7 +954,6 @@ function applyFrame(f) {
   const barWrap = document.getElementById("levelBarWrap");
   if (barWrap) barWrap.classList.toggle("hot", hot);
 
-  gainVal.textContent = f.gain.toFixed(1);
   lastBleActive = f.bleActive ?? 0;
   // Drift-hälsa: uppdatera flaggorna som banner-logiken läser.
   dmxOk = f.dmxOk !== false;                           // undef = gammal engine → anta OK
@@ -971,16 +962,6 @@ function applyFrame(f) {
   const now = Date.now();
   if (f.level > 0.02) lastAudibleMs = now;             // "hörs något?" – ~2% level = klart över brus
   renderHealth();
-  if (f.kick) {
-    kickDot.classList.add("on");
-    const kv = document.getElementById("kickVal");
-    if (kv) { kv.textContent = "puls"; kv.classList.add("hot"); }
-    clearTimeout(kickTimer);
-    kickTimer = setTimeout(() => {
-      kickDot.classList.remove("on");
-      if (kv) { kv.textContent = "–"; kv.classList.remove("hot"); }
-    }, 160);
-  }
 
   if (f.mode && f.mode !== curPlaying) {
     curPlaying = f.mode;

@@ -226,7 +226,6 @@ function TechGrid() {
   const bpm = useDmx((st) => st.bpm);
   const conf = useDmx((st) => st.bpmConfidence);
   const beat = useDmx((st) => st.beat);
-  const kick = useDmx((st) => st.kick);
   const off = !s.power;
   const moodV = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
   const locked = bpm > 0;
@@ -235,8 +234,6 @@ function TechGrid() {
     <div className="grid grid-cols-2 gap-3">
       <TechTile label="BPM" value={locked ? String(Math.round(bpm)) : "—"} accent={locked} dot={locked && beat} />
       <TechTile label="Konfidens" value={locked ? `${confPct}%` : "—"} />
-      <TechTile label="Kick" value={kick > 0.4 ? "PULS" : "—"} accent={kick > 0.4} dot={kick > 0.4} />
-      <TechTile label="Auto-gain" value="1.0×" />
       <div className="col-span-2 p-3.5 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06]">
         <div className="text-[8px] font-bold text-muted-foreground/70 uppercase mb-1 tracking-[0.22em]">Läge</div>
         <div className="text-[13px] font-medium text-foreground/85 leading-snug">
