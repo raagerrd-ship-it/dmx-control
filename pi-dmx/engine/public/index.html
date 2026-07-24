@@ -205,6 +205,35 @@
     </div>
   </div>
 
+  <!-- Walk-test overlay: stega kanal-för-kanal, användaren svarar löpande. -->
+  <div class="walk-ov" id="walkOv" role="dialog" aria-modal="true" aria-labelledby="walkTitle">
+    <div class="walk-card">
+      <h2 id="walkTitle">Identifiera kanal-layout</h2>
+      <p class="sub" id="walkSub">DMX är enkelriktat — lampan svarar inte tillbaka. Titta på lampan och tryck på det du ser.</p>
+      <div class="walk-step">
+        <span>Testar kanal <b id="walkCh">1</b> av upp till 8</span>
+        <span id="walkAddr" style="color:var(--dim);font-size:12px"></span>
+      </div>
+      <div class="walk-log" id="walkLog">Ingen svar registrerade ännu.</div>
+      <div class="walk-opts" id="walkOpts">
+        <button data-walk-ans="r">🔴 Rött</button>
+        <button data-walk-ans="g">🟢 Grönt</button>
+        <button data-walk-ans="b">🔵 Blått</button>
+        <button data-walk-ans="w">⚪ Vitt</button>
+        <button data-walk-ans="dim">☀️ Ljusare</button>
+        <button data-walk-ans="strobe">⚡ Blink</button>
+        <button data-walk-ans="auto">🎨 Auto-program</button>
+        <button data-walk-ans="nothing">— Inget</button>
+        <button data-walk-ans="done" style="grid-column:span 1;border-color:var(--hot);color:var(--hot)">✓ Klar</button>
+      </div>
+      <div class="walk-result" id="walkResult" style="display:none"></div>
+      <div class="walk-actions">
+        <button id="walkCancel">Avbryt</button>
+        <button id="walkApply" class="primary" style="display:none">Använd förslag</button>
+      </div>
+    </div>
+  </div>
+
   <div class="power-card" id="powerCard">
     <div class="power-icon">⏻</div>
     <div class="power-text"><small id="powerSmall">Ljuset är på</small><b id="powerBig">Tryck för att släcka</b></div>
