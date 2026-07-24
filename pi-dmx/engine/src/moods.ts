@@ -58,15 +58,13 @@ export function applyMood(cfg: EngineConfig, mood: MoodId): void {
   cfg.smartDwellMs = f.smartDwellMs;
   cfg.master = f.master;           // ljus-tak
   cfg.calmDecay = f.calmDecay;      // reaktions-tröghet (output-decay)
-  if (!cfg.moodOverride) {
-    cfg.beatPulse = f.beatPulse;
-    cfg.dropBlackout = f.dropBlackout;
-    cfg.clubMode = f.clubMode;
-    cfg.ambientGlow = f.ambientGlow;
-    cfg.energyCeiling = f.energyCeiling;   // Regi (pro): VU-ljustak
-    cfg.riserStrobe = f.riserStrobe;       // Regi (pro): uppbyggnads-strobe
-    cfg.dropHeadroom = f.dropHeadroom;     // Regi (pro): drop-pop
-  }
+  cfg.beatPulse = f.beatPulse;
+  cfg.dropBlackout = f.dropBlackout;
+  cfg.clubMode = f.clubMode;
+  cfg.ambientGlow = f.ambientGlow;
+  cfg.energyCeiling = f.energyCeiling;   // Regi (pro): VU-ljustak
+  cfg.riserStrobe = f.riserStrobe;       // Regi (pro): uppbyggnads-strobe
+  cfg.dropHeadroom = f.dropHeadroom;     // Regi (pro): drop-pop
   if (!cfg.beatSyncOverride) cfg.beatSyncStrength = f.beatSyncStrength; // PLL-styrka mot trumslag
   // Rotation: bara stämningens pool aktiv (allt annat AV → smart väljer bara ur poolen).
   const pool = new Set<Mode>(POOL[mood]);
