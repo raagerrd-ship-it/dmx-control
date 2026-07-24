@@ -511,13 +511,23 @@ function OwnerSections() {
       <Card>
         <div className="space-y-2">
           {([
-            { name: "PAR 1", type: "RGBW" as const, addr: 1 },
-            { name: "PAR 2", type: "RGBW" as const, addr: 8 },
-            { name: "PAR 3", type: "RGBW" as const, addr: 15 },
-            { name: "PAR 4", type: "RGBW" as const, addr: 22 },
+            { name: "PAR 1", type: "RGB7" as const, addr: 1 },
+            { name: "PAR 2", type: "RGB7" as const, addr: 8 },
+            { name: "PAR 3", type: "RGB7" as const, addr: 15 },
+            { name: "PAR 4", type: "RGB7" as const, addr: 22 },
           ]).map((f) => {
             const roles: { label: string; cls: string }[] =
-              f.type === "RGBW"
+              f.type === "RGB7"
+                ? [
+                    { label: "R", cls: "bg-red-500/20 text-red-300 border-red-500/30" },
+                    { label: "G", cls: "bg-green-500/20 text-green-300 border-green-500/30" },
+                    { label: "B", cls: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
+                    { label: "DIM", cls: "bg-muted text-foreground/80 border-border" },
+                    { label: "STR", cls: "bg-yellow-500/20 text-yellow-200 border-yellow-500/30" },
+                    { label: "MAC", cls: "bg-muted/40 text-muted-foreground border-border" },
+                    { label: "SPD", cls: "bg-muted/40 text-muted-foreground border-border" },
+                  ]
+                : f.type === "RGBW"
                 ? [
                     { label: "R", cls: "bg-red-500/20 text-red-300 border-red-500/30" },
                     { label: "G", cls: "bg-green-500/20 text-green-300 border-green-500/30" },

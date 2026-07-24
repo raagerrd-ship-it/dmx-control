@@ -15,7 +15,7 @@ export type MoodId = "chill" | "fest" | "galet";
  * odd fixtures can be mapped without code changes.
  */
 export type ChannelRole = "r" | "g" | "b" | "w" | "dim" | "strobe" | "hazer" | "uv" | "blinder" | "laser" | "co2" | "unused";
-export type FixturePreset = "rgb" | "rgbw" | "dimmer" | "custom";
+export type FixturePreset = "rgb" | "rgb7" | "rgbw" | "dimmer" | "custom";
 
 export interface FixtureConfig {
   /** Human name shown in the mobile UI */
@@ -187,10 +187,13 @@ export const defaultConfig: EngineConfig = {
     noiseFloor: 0.003,
   },
   fixtures: [
-    { name: "Par 1", address: 1,  preset: "rgb" },
-    { name: "Par 2", address: 4,  preset: "rgb" },
-    { name: "Par 3", address: 7,  preset: "rgb" },
-    { name: "Par 4", address: 10, preset: "rgb" },
+    // 7-kanals RGB-parkanor: R,G,B,DIM,STROBE,MACRO,MACRO-SPEED.
+    // rgb7-presetet skickar DIM=255 (master), STROBE=0/live, MACRO+SPEED=0
+    // så lampornas inbyggda auto-program hålls av och vår motor äger showen.
+    { name: "Par 1", address: 1,  preset: "rgb7" },
+    { name: "Par 2", address: 8,  preset: "rgb7" },
+    { name: "Par 3", address: 15, preset: "rgb7" },
+    { name: "Par 4", address: 22, preset: "rgb7" },
   ],
   mode: "smart",
   audioInput: "aux",
@@ -227,6 +230,11 @@ export const defaultConfig: EngineConfig = {
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
   rgb:    ["r", "g", "b"],
+  // 7-ch standard-layout: R,G,B,DIM(master),STROBE,MACRO,MACRO-SPEED.
+  // DIM styrs via role "dim" (writeFixture skriver master*255 när R/G/B finns);
+  // STROBE via role "strobe"; sista två som "unused" → 0 varje frame (fill(0)
+  // före writeFixture) så inbyggda auto-program aldrig triggas.
+  rgb7:   ["r", "g", "b", "dim", "strobe", "unused", "unused"],
   rgbw:   ["r", "g", "b", "w"],
   dimmer: ["dim"],
 };

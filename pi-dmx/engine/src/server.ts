@@ -558,7 +558,7 @@ function isMode(m: unknown): m is Mode {
 }
 const clamp01 = (x: number) => typeof x === "number" && x >= 0 && x <= 1 ? x : 0;
 
-const VALID_PRESETS: FixturePreset[] = ["rgb", "rgbw", "dimmer", "custom"];
+const VALID_PRESETS: FixturePreset[] = ["rgb", "rgb7", "rgbw", "dimmer", "custom"];
 const VALID_ROLES: ChannelRole[] = ["r", "g", "b", "w", "dim", "strobe", "hazer", "uv", "blinder", "laser", "co2", "unused"];
 
 /** Validate + normalize a fixtures[] patch. Returns null if any entry is bogus. */
