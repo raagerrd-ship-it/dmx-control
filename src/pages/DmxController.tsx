@@ -453,26 +453,28 @@ function OwnerSections() {
 
       <SectionTitle>Beat-synk</SectionTitle>
       <Card>
-        <SetRow label={<>Beat-synk {!beatSyncOverride && <em className="not-italic ml-1.5 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider rounded-full border align-middle"
-              style={{ color: "#e5b8ff", background: "rgba(180,120,255,.14)", borderColor: "rgba(180,120,255,.35)" }}>Följer stämning</em>}
-              {beatSyncOverride && <em className="not-italic ml-1.5 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider rounded-full border align-middle"
-              style={{ color: "#ffd39a", background: "rgba(255,180,80,.14)", borderColor: "rgba(255,180,80,.35)" }}>Manuell</em>}</>} last>
-          <div style={{ pointerEvents: beatSyncOverride ? "auto" : "none", opacity: beatSyncOverride ? 1 : 0.75 }}>
-            <Seg<number>
-              value={beatSync}
-              onChange={setBeatSync}
-              options={[
-                { v: 0,    label: "Av" },
-                { v: 0.10, label: "Mjuk" },
-                { v: 0.18, label: "Normal" },
-                { v: 0.30, label: "Aggressiv" },
-              ]}
-            />
-          </div>
+        <SetRow label={<>Beat-synk {!beatSyncOverride
+            ? <em className="not-italic ml-1.5 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider rounded-full border align-middle"
+                style={{ color: "#e5b8ff", background: "rgba(180,120,255,.14)", borderColor: "rgba(180,120,255,.35)" }}>Följer stämning</em>
+            : <em className="not-italic ml-1.5 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider rounded-full border align-middle"
+                style={{ color: "#ffd39a", background: "rgba(255,180,80,.14)", borderColor: "rgba(255,180,80,.35)" }}>Manuell</em>}</>} last>
+          <Seg<string>
+            value={!beatSyncOverride ? "auto" : String(beatSync)}
+            onChange={(v) => {
+              if (v === "auto") { setBeatSyncOverride(false); }
+              else { setBeatSyncOverride(true); setBeatSync(Number(v)); }
+            }}
+            options={[
+              { v: "auto", label: "Auto" },
+              { v: "0",    label: "Av" },
+              { v: "0.1",  label: "Lugnt" },
+              { v: "0.18", label: "Normal" },
+              { v: "0.3",  label: "Aggressiv" },
+            ]}
+          />
         </SetRow>
-        <TglRow label="Åsidosätt stämning (manuell PLL-styrka)" checked={beatSyncOverride} onChange={setBeatSyncOverride} />
         <div className="text-[12px] text-muted-foreground leading-snug mt-2">
-          Hur hårt pulsen knuffas i fas mot faktiska trumslag. Chill=Mjuk, Fest=Normal, Galet=Aggressiv — sätts av stämnings-vredet om override är av.
+          Hur hårt pulsen knuffas i fas mot faktiska trumslag. <b>Auto</b> följer stämningen (Chill=Lugnt, Fest=Normal, Galet=Aggressiv). Välj en styrka manuellt för att åsidosätta.
         </div>
       </Card>
 
