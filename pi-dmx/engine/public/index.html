@@ -1298,10 +1298,8 @@ fogServiceReset.onclick = () => {
 };
 
 /* ── Regi (pro) ──────────────────────────────────────────────────────────
- * scenicAnchor + strobeUnlimited är alltid ägar-val. De 6 mood-flaggorna
- * (dropBlackout, energyCeiling, clubMode, ambientGlow, riserStrobe,
- * dropHeadroom) styrs av stämnings-vredet — men om "moodOverride" slås på
- * så låses de upp och ägaren kan sätta dem manuellt. */
+ * Alla flaggor är ägar-val. Stämnings-vredet sätter dem som preset när det
+ * ändras; ägaren kan justera fritt efteråt. */
 const tDropBlackout = document.getElementById("tDropBlackout");
 tDropBlackout.onchange = () => send({ type: "setDropBlackout", value: tDropBlackout.checked });
 const tScenicAnchor = document.getElementById("tScenicAnchor");
@@ -1327,10 +1325,6 @@ tStrobeUnlimited.onchange = () => {
 };
 const tDropHeadroom = document.getElementById("tDropHeadroom");
 tDropHeadroom.onchange = () => send({ type: "setDropHeadroom", value: tDropHeadroom.checked });
-{
-  const mOv = document.getElementById("moodOverride");
-  if (mOv) mOv.onchange = () => send({ type: "setMoodOverride", value: mOv.checked });
-}
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.
