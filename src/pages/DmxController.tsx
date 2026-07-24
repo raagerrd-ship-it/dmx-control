@@ -472,27 +472,31 @@ function OwnerSections() {
       <SectionTitle>Rökmaskin</SectionTitle>
       <Card>
         <TglRow label="Rökmaskin ansluten" checked={fogEnabled} onChange={setFogEnabled} />
-        <TglRow label="Rök på drop" checked={fogOnDrop} onChange={setFogOnDrop} />
-        <div className="flex items-center justify-between mt-2">
-          <span className="text-[13px] text-muted-foreground">DMX-adress</span>
-          <input
-            type="number" min={1} max={512} value={fogAddr}
-            onChange={(e) => setFogAddr(Number(e.target.value) || 1)}
-            className="w-20 bg-muted border border-border rounded-md px-2 py-1 text-[13px] tabular-nums text-right"
-          />
-        </div>
-        <div className="mt-3">
-          <button className="w-full py-2.5 rounded-[9px] bg-primary text-primary-foreground font-medium text-[14px]">
-            💨 Rök nu
-          </button>
-        </div>
-        <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-3">
-          <div className="h-full w-[15%]" style={{ background: "linear-gradient(90deg, hsl(var(--ok)), hsl(var(--warn, 40 100% 55%)))" }} />
-        </div>
-        <div className="text-[12px] text-muted-foreground mt-2 leading-snug">
-          Ställ rökmaskinen på samma DMX-adress. Värmekontot ersätter fast vila:
-          en lång puff kostar mer än en kort.
-        </div>
+        {fogEnabled && (
+          <>
+            <TglRow label="Rök på drop" checked={fogOnDrop} onChange={setFogOnDrop} />
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-[13px] text-muted-foreground">DMX-adress</span>
+              <input
+                type="number" min={1} max={512} value={fogAddr}
+                onChange={(e) => setFogAddr(Number(e.target.value) || 1)}
+                className="w-20 bg-muted border border-border rounded-md px-2 py-1 text-[13px] tabular-nums text-right"
+              />
+            </div>
+            <div className="mt-3">
+              <button className="w-full py-2.5 rounded-[9px] bg-primary text-primary-foreground font-medium text-[14px]">
+                💨 Rök nu
+              </button>
+            </div>
+            <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-3">
+              <div className="h-full w-[15%]" style={{ background: "linear-gradient(90deg, hsl(var(--ok)), hsl(var(--warn, 40 100% 55%)))" }} />
+            </div>
+            <div className="text-[12px] text-muted-foreground mt-2 leading-snug">
+              Ställ rökmaskinen på samma DMX-adress. Värmekontot ersätter fast vila:
+              en lång puff kostar mer än en kort.
+            </div>
+          </>
+        )}
       </Card>
 
       <SectionTitle>Regi (pro)</SectionTitle>
