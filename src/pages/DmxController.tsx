@@ -47,25 +47,9 @@ function MoodSlider() {
   const off = !s.power;
   const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
   const fillPct = (v / 10) * 100;
-  const info = moodInfoFor(v);
   return (
     <section className="mb-6 mt-2">
-      <div className="flex items-baseline justify-between px-0.5 mb-3">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-          Stämning
-        </span>
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12px] font-semibold tabular-nums transition-colors ${
-            off
-              ? "bg-muted/20 text-muted-foreground ring-1 ring-border/60"
-              : "bg-primary/10 text-primary ring-1 ring-primary/30 shadow-[0_0_10px_hsl(var(--primary)/0.15)]"
-          }`}
-        >
-          <span className="uppercase tracking-wider">{info.name}</span>
-          <span className="opacity-50">·</span>
-          <span>{v}/10</span>
-        </span>
-      </div>
+
 
       <div className="relative">
         <div className="mood-ticks" aria-hidden>
@@ -92,10 +76,10 @@ function MoodSlider() {
         />
       </div>
 
-      <div className="flex justify-between text-[10px] uppercase tracking-[0.2em] mt-2 px-0.5">
-        <span className={off ? "text-primary" : "text-muted-foreground/70"}>Av</span>
-        <span className={v >= 5 && v <= 7 ? "text-primary" : "text-muted-foreground/70"}>Fest</span>
-        <span className={v >= 9 ? "text-primary" : "text-muted-foreground/70"}>Galet</span>
+      <div className="flex justify-between text-[10px] uppercase tracking-[0.18em] text-muted-foreground mt-1 px-0.5">
+        <span className={off ? "" : "opacity-70"}>Av</span>
+        <span className={v >= 5 && v <= 7 ? "text-primary" : "opacity-70"}>Fest</span>
+        <span className={v >= 9 ? "text-primary" : "opacity-70"}>Galet</span>
       </div>
     </section>
   );
@@ -199,14 +183,13 @@ function AudioMeterCard() {
 
       {/* Teknisk info */}
       <details className="mt-3 group/tech">
-        <summary className="flex items-center justify-between px-5 py-3 rounded-full border border-border/70 bg-card/60 text-[12px] uppercase tracking-[0.18em] text-muted-foreground font-semibold cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/tech:text-foreground group-open/tech:border-border transition-colors">
+        <summary className="py-3 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/tech:text-foreground">
           <span>Teknisk info</span>
-          <svg className="h-3.5 w-3.5 text-muted-foreground/70 transition-transform duration-200 group-open/tech:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M6 9l6 6 6-6" />
-          </svg>
+          <span className="ml-1 group-open/tech:hidden"> ⌄</span>
+          <span className="ml-1 hidden group-open/tech:inline"> ⌃</span>
         </summary>
-        <div className="mt-2 divide-y divide-border/40 rounded-2xl bg-muted/20 ring-1 ring-border/40 px-4">
-          <p className="py-2.5 text-[13px] leading-snug text-muted-foreground italic">
+        <div className="mt-2 divide-y divide-border/40 rounded-xl bg-muted/25 ring-1 ring-border/40 px-3">
+          <p className="py-2 text-[13px] leading-snug text-muted-foreground italic">
             {moodInfoFor(moodV).desc}
           </p>
           <TechRow label="BPM" value={locked ? `${Math.round(bpm)}` : "–"} accent={locked} />
@@ -258,11 +241,10 @@ function MoreDetails() {
   return (
     <>
       <details className="mt-2 group/eff">
-        <summary className="flex items-center justify-between px-5 py-3 rounded-full border border-border/70 bg-card/60 text-[12px] uppercase tracking-[0.18em] text-muted-foreground font-semibold cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/eff:text-foreground group-open/eff:border-border transition-colors">
-          <span>Effekt-val · rotation</span>
-          <svg className="h-3.5 w-3.5 text-muted-foreground/70 transition-transform duration-200 group-open/eff:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M6 9l6 6 6-6" />
-          </svg>
+        <summary className="py-3 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/eff:text-foreground">
+          <span>Effekt-val · välj vilka som roterar</span>
+          <span className="ml-1 group-open/eff:hidden"> ⌄</span>
+          <span className="ml-1 hidden group-open/eff:inline"> ⌃</span>
         </summary>
         <SectionTitle>Lugna effekter</SectionTitle>
         <RotationList modes={CALM_MODES} />
@@ -321,12 +303,11 @@ function AdvancedMirror() {
   const dwellPct = ((40000 - f.smartDwellMs) / 35000) * 100;
   const dwellLbl = f.smartDwellMs >= 20000 ? "Sällan" : f.smartDwellMs >= 10000 ? "Normal" : "Ofta";
   return (
-    <details className="mt-2.5 group">
-      <summary className="flex items-center justify-between px-5 py-3 rounded-full border border-border/70 bg-card/60 text-[12px] uppercase tracking-[0.18em] text-muted-foreground font-semibold cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open:text-foreground group-open:border-border transition-colors">
-        <span>Avancerat · spegel</span>
-        <svg className="h-3.5 w-3.5 text-muted-foreground/70 transition-transform duration-200 group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M6 9l6 6 6-6" />
-        </svg>
+    <details className="mt-3.5 group">
+      <summary className="py-3.5 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open:text-foreground">
+        <span>Avancerat · spegel av stämningen</span>
+        <span className="ml-1 group-open:hidden"> ⌄</span>
+        <span className="ml-1 hidden group-open:inline"> ⌃</span>
       </summary>
       <div className="mt-1">
         <Card>
