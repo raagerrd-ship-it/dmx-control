@@ -185,14 +185,20 @@ function InputLevel() {
 function SourcePill() {
   const s = usePi();
   const source = s.audioInput;
+  const isMic = source === "mic";
   return (
     <div
       role="tablist"
       aria-label="Ljudkälla"
-      className="relative grid grid-cols-2 gap-1 rounded-full bg-foreground/[0.04] p-1.5 ring-1 ring-foreground/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]"
+      className="relative grid grid-cols-2 rounded-full bg-foreground/[0.03] p-1 ring-1 ring-foreground/10"
     >
+      <span
+        aria-hidden
+        className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-primary/[0.08] ring-1 ring-primary/30 transition-transform duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+        style={{ transform: isMic ? "translateX(calc(100% + 8px))" : "translateX(0)" }}
+      />
       {[
-        { id: "aux", label: "AUX (kabel)" },
+        { id: "aux", label: "AUX" },
         { id: "mic", label: "Mikrofon" },
       ].map((o) => {
         const active = source === o.id;
@@ -202,12 +208,16 @@ function SourcePill() {
             role="tab"
             aria-selected={active}
             onClick={() => setPi({ audioInput: o.id as "aux" | "mic" })}
-            className={`relative py-3 rounded-full text-[10px] font-black uppercase tracking-[0.22em] transition-all ${
-              active
-                ? "bg-primary text-primary-foreground shadow-[0_0_18px_hsl(var(--primary)/0.5)]"
-                : "text-muted-foreground/60"
+            className={`relative z-10 flex items-center justify-center gap-2 rounded-full py-2.5 text-[11px] font-medium transition-colors ${
+              active ? "text-foreground" : "text-muted-foreground/55"
             }`}
           >
+            <span
+              aria-hidden
+              className={`inline-block h-1.5 w-1.5 rounded-full transition-colors ${
+                active ? "bg-primary shadow-[0_0_6px_hsl(var(--primary))]" : "bg-muted-foreground/35"
+              }`}
+            />
             {o.label}
           </button>
         );
