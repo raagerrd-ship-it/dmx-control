@@ -102,9 +102,10 @@ function MoodSlider() {
 
       <div className="flex justify-between mt-2 px-1 font-mono">
         <span className={`text-[9px] font-bold tracking-widest ${off ? "text-primary/80" : "text-muted-foreground/40"}`}>LVL 00</span>
-        <span className={v >= 5 && v <= 7 ? "text-[9px] font-bold tracking-widest text-primary" : "text-[9px] font-bold tracking-widest text-muted-foreground/40"}>FEST</span>
+        <span className={`text-[9px] font-bold tracking-widest uppercase ${!off ? "text-primary" : "text-muted-foreground/40"}`}>{moodInfoFor(v).name}</span>
         <span className={`text-[9px] font-bold tracking-widest ${v >= 9 ? "text-primary" : "text-muted-foreground/40"}`}>LVL 10</span>
       </div>
+
     </div>
   );
 }
