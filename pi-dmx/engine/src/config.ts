@@ -187,10 +187,13 @@ export const defaultConfig: EngineConfig = {
     noiseFloor: 0.003,
   },
   fixtures: [
-    { name: "Par 1", address: 1,  preset: "rgb" },
-    { name: "Par 2", address: 4,  preset: "rgb" },
-    { name: "Par 3", address: 7,  preset: "rgb" },
-    { name: "Par 4", address: 10, preset: "rgb" },
+    // 7-kanals RGB-parkanor: R,G,B,DIM,STROBE,MACRO,MACRO-SPEED.
+    // rgb7-presetet skickar DIM=255 (master), STROBE=0/live, MACRO+SPEED=0
+    // så lampornas inbyggda auto-program hålls av och vår motor äger showen.
+    { name: "Par 1", address: 1,  preset: "rgb7" },
+    { name: "Par 2", address: 8,  preset: "rgb7" },
+    { name: "Par 3", address: 15, preset: "rgb7" },
+    { name: "Par 4", address: 22, preset: "rgb7" },
   ],
   mode: "smart",
   audioInput: "aux",
