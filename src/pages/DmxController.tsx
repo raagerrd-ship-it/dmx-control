@@ -153,17 +153,9 @@ function AudioMeterCard() {
 
       {/* Nivåmätare */}
       <div className="mt-4 flex items-baseline justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Nivå
-          </span>
-          <span
-            className={`inline-block h-1.5 w-1.5 rounded-full transition-all ${
-              kickOn ? "bg-primary shadow-[0_0_10px_hsl(var(--primary))] scale-125" : "bg-muted"
-            }`}
-            aria-label={kickOn ? "Kick" : "Ingen kick"}
-          />
-        </div>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Nivå
+        </span>
         <span
           className={`text-[13px] tabular-nums font-semibold transition-colors ${
             hot ? "text-primary" : "text-foreground"
@@ -172,6 +164,7 @@ function AudioMeterCard() {
           {pct}%
         </span>
       </div>
+
       <div className="relative mt-2 h-2 rounded-full bg-muted/50 overflow-hidden ring-1 ring-border/40">
         <div
           className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-[60ms] linear"
@@ -205,7 +198,9 @@ function AudioMeterCard() {
             dot={locked && beat}
           />
           <TechRow label="Konfidens" value={locked ? `${confPct}%` : "–"} />
+          <TechRow label="Kick" value={kickOn ? "puls" : "–"} accent={kickOn} dot={kickOn} />
           <TechRow label="Auto-gain" value="1.0×" />
+
         </div>
       </details>
 

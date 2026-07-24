@@ -306,7 +306,6 @@
     <div class="audio-head">
       <div class="audio-head-l">
         <span class="audio-lbl">Nivå</span>
-        <span class="audio-kd" id="kickDot" aria-hidden="true"></span>
       </div>
       <span class="audio-pct" id="levelVal">0%</span>
     </div>
@@ -320,7 +319,9 @@
         <div class="row"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
         <div class="row"><label>Beat-synk <span class="audio-kd" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
         <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
+        <div class="row"><label>Kick <span class="audio-kd" id="kickDot"></span></label><span class="val" id="kickVal">–</span></div>
         <div class="row"><label>Auto-gain</label><span class="val"><span id="gainVal">–</span>×</span></div>
+
       </div>
     </details>
   </section>
@@ -950,9 +951,15 @@ function applyFrame(f) {
   renderHealth();
   if (f.kick) {
     kickDot.classList.add("on");
+    const kv = document.getElementById("kickVal");
+    if (kv) { kv.textContent = "puls"; kv.classList.add("hot"); }
     clearTimeout(kickTimer);
-    kickTimer = setTimeout(() => kickDot.classList.remove("on"), 120);
+    kickTimer = setTimeout(() => {
+      kickDot.classList.remove("on");
+      if (kv) { kv.textContent = "–"; kv.classList.remove("hot"); }
+    }, 160);
   }
+
   if (f.mode && f.mode !== curPlaying) {
     curPlaying = f.mode;
     document.querySelectorAll(".rotrow.playing").forEach((r) => r.classList.remove("playing"));
