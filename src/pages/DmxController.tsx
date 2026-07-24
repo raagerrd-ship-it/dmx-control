@@ -165,15 +165,15 @@ function AudioMeterCard() {
         </span>
       </div>
 
-      <div className="relative mt-2 h-2 rounded-full bg-muted/50 overflow-hidden ring-1 ring-border/40">
+      <div className="relative mt-2 h-2 rounded-full overflow-hidden ring-1 ring-border/40">
         <div
-          className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-[60ms] linear"
+          className="absolute inset-0 rounded-full transition-[background] duration-[60ms] linear"
           style={{
-            width: pct + "%",
-            background: "linear-gradient(90deg, hsl(var(--ok)), hsl(var(--accent)), hsl(var(--primary)))",
+            background: `linear-gradient(90deg, hsl(var(--primary) / 0) 0%, hsl(var(--primary)) ${pct}%, hsl(var(--muted) / 0.5) ${pct}% 100%)`,
             boxShadow: hot ? "0 0 14px hsl(var(--primary) / 0.55)" : "none",
           }}
         />
+
         {/* diskreta ticks */}
         <div className="pointer-events-none absolute inset-0 flex justify-between px-1">
           {Array.from({ length: 11 }).map((_, i) => (
