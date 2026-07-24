@@ -188,17 +188,17 @@
     .audio-bar.hot > span.on { box-shadow:0 0 8px color-mix(in srgb, var(--hot) 55%, transparent); }
 
     .tech-list { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-top:12px; }
-    .tech-list .row { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-top:1px solid color-mix(in srgb, var(--line) 60%, transparent); margin:0; }
-    .tech-list .row:first-child { border-top:0; }
-    .tech-list label { font-size:12px; color:var(--dim); display:inline-flex; align-items:center; gap:6px; }
-    .tech-list .val { font-size:13px; font-variant-numeric:tabular-nums; font-weight:500; color:var(--fg); }
+    .tech-list .row { display:flex; flex-direction:column; align-items:center; justify-content:center; aspect-ratio:1/1; padding:8px; border:1px solid color-mix(in srgb, var(--line) 60%, transparent); border-radius:16px; background:color-mix(in srgb, var(--fg) 3%, transparent); text-align:center; }
+    .tech-list .row .icon { width:32px; height:32px; border-radius:10px; background:color-mix(in srgb, var(--fg) 6%, transparent); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:var(--dim); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+    .tech-list label { font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
+    .tech-list .val { font-size:13px; font-variant-numeric:tabular-nums; font-weight:600; color:var(--fg); }
     .tech-list .val.on { color:var(--hot); }
-    .tech-list .mood-desc { margin:0; padding:10px 0; border-bottom:1px solid color-mix(in srgb, var(--line) 60%, transparent); font-style:italic; }
+    .tech-list .mood-desc { grid-column:1 / -1; padding:12px; border:1px solid color-mix(in srgb, var(--line) 60%, transparent); border-radius:16px; background:color-mix(in srgb, var(--fg) 3%, transparent); font-size:13px; color:var(--dim); line-height:1.35; font-style:italic; }
 
-    details.more { margin-top:8px; }
-    details.more > summary { list-style:none; cursor:pointer; padding:14px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+    details.more { margin-top:12px; }
+    details.more > summary { list-style:none; cursor:pointer; padding:16px; background:var(--hot); border:0; border-radius:16px; text-align:center; font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:#fff; font-weight:700; box-shadow:0 0 20px color-mix(in srgb, var(--hot) 25%, transparent); transition:opacity .15s, transform .1s; }
     details.more > summary::-webkit-details-marker { display:none; }
-    details.more[open] > summary { color:var(--fg); margin-bottom:4px; }
+    details.more > summary:active { transform:scale(.99); opacity:.92; }
     details.more > summary::after { content:" ⌄"; }
     details.more[open] > summary::after { content:" ⌃"; }
     /* Spegel-sliders: skrivskyddad vy av vad Stämningen just nu har satt */
