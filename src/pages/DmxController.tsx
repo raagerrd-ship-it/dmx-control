@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BrandLogo } from "@/components/BrandLogo";
 import { useMockLive } from "@/hooks/useMockLive";
 import { useDmx } from "@/store/dmx";
 import {
@@ -21,6 +22,9 @@ export default function DmxController() {
 
   return (
     <main className="mx-auto max-w-md px-4 pt-1 pb-8 safe-bottom">
+      <header className="flex justify-center pt-3 pb-2">
+        <BrandLogo className="h-9 w-auto opacity-90" />
+      </header>
       <PowerHero />
 
       <SectionTitle>Stämning</SectionTitle>
