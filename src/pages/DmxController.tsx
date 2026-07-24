@@ -46,13 +46,6 @@ function MoodSlider() {
   const s = usePi();
   const off = !s.power;
   const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
-  const info =
-    v === 0 ? { name: "Av",     desc: "Ljuset är släckt — dra åt höger för att tända" } :
-    v <= 2  ? { name: "Chill",  desc: "Mjukt och långsamt, följer inte taktslag" } :
-    v <= 4  ? { name: "Chill+", desc: "Följer musiken lugnt" } :
-    v <= 6  ? { name: "Fest",   desc: "Pulsar på taktslag, byter effekt ibland" } :
-    v <= 8  ? { name: "Fest+",  desc: "Klubb-läge, byter effekt oftare" } :
-              { name: "Galet",  desc: "Full fart, drop-blackout, riser-strobe" };
   const fillPct = (v / 10) * 100;
   return (
     <section className="mb-6 mt-2">
@@ -88,10 +81,6 @@ function MoodSlider() {
         <span className={v >= 5 && v <= 7 ? "text-primary" : "opacity-70"}>Fest</span>
         <span className={v >= 9 ? "text-primary" : "opacity-70"}>Galet</span>
       </div>
-
-      <p className="mt-3 text-[13px] leading-snug text-muted-foreground italic">
-        {info.desc}
-      </p>
     </section>
   );
 }
