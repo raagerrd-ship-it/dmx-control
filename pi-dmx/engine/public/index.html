@@ -194,6 +194,12 @@
     .tech-list .val { font-size:13px; font-variant-numeric:tabular-nums; font-weight:500; color:var(--fg); }
     .tech-list .val.on { color:var(--hot); }
     .tech-list .mood-desc { margin:0; padding:10px 0; border-bottom:1px solid color-mix(in srgb, var(--line) 60%, transparent); font-style:italic; }
+    .tech-strip { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:8px; }
+    .tech-tile { position:relative; overflow:hidden; padding:12px 10px; border-radius:14px; background:color-mix(in srgb, var(--fg) 3%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); display:flex; flex-direction:column; justify-content:space-between; }
+    .tech-tile .lbl { font-size:9px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); display:inline-flex; align-items:center; gap:6px; }
+    .tech-tile .val { font-size:16px; font-variant-numeric:tabular-nums; font-weight:600; color:var(--fg); line-height:1; }
+    .tech-tile .val.on { color:var(--hot); }
+    .tech-tile .dot { width:6px; height:6px; border-radius:50%; background:var(--hot); box-shadow:0 0 8px var(--hot); }
 
     details.more { margin-top:8px; }
     details.more > summary { list-style:none; cursor:pointer; padding:14px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
@@ -333,11 +339,19 @@
 
     <details class="tech-details">
       <summary>Teknisk info</summary>
-      <div class="tech-list">
-        <div class="mood-desc" id="moodDesc">Pulsar på taktslag, byter effekt ibland</div>
-        <div class="row"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
-        <div class="row"><label>Beat-synk <span class="audio-kd" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
-        <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
+      <div class="tech-strip">
+        <div class="tech-tile">
+          <div class="lbl">BPM <span class="dot" id="bpmDot" style="display:none"></span></div>
+          <div class="val" id="bpmVal">–</div>
+        </div>
+        <div class="tech-tile">
+          <div class="lbl">Konfidens</div>
+          <div class="val" id="confVal">–</div>
+        </div>
+        <div class="tech-tile">
+          <div class="lbl">Läge</div>
+          <div class="val" id="modeVal">–</div>
+        </div>
       </div>
     </details>
   </section>
@@ -622,7 +636,6 @@ const moodSliderCard = document.getElementById("moodSliderCard");
 const moodPill = document.getElementById("moodPill");
 const moodLbl = document.getElementById("moodLbl");
 const moodNum = document.getElementById("moodNum");
-const moodDesc = document.getElementById("moodDesc");
 const legFest = document.getElementById("legFest");
 const legGalet = document.getElementById("legGalet");
 function moodInfoFor(v) {
@@ -640,9 +653,6 @@ function updateMoodUi(v01, active, forceZero) {
   const info = moodInfoFor(v);
   if (typeof moodLbl !== "undefined" && moodLbl) moodLbl.textContent = info.name;
   if (typeof moodNum !== "undefined" && moodNum) { moodNum.textContent = String(v).padStart(2, "0"); moodNum.classList.toggle("off", v === 0); }
-
-
-  if (moodDesc) moodDesc.textContent = info.desc;
   const off = !active || v === 0;
   moodSlider.style.setProperty("--mood-fill", (v / 10 * 100) + "%");
   moodSlider.classList.toggle("is-off", off);
@@ -971,24 +981,19 @@ function applyFrame(f) {
   }
   // Live beat-diagnostik under LEVEL
   const locked = typeof f.bpm === "number" && f.bpm > 0;
-  bpmVal.textContent = locked ? Math.round(f.bpm) + " BPM" : "–";
-  // Beat-synk = PLL:ens fasfel i ms: hur långt slagen ligger från gridet just nu.
-  // 0 = tight låst (grön); växer när den justerar (gul); långt av (röd). Rör sig
-  // mot 0 medan den drar in fasen → man SER att den jobbar.
-  if (locked) {
-    const errMs = Math.round((f.beatErr || 0) * (60000 / f.bpm));
-    const a = Math.abs(errMs);
-    beatSyncVal.textContent = (errMs > 0 ? "+" : errMs < 0 ? "−" : "±") + a + " ms";
-    beatSyncVal.style.color = a <= 12 ? "var(--ok)" : a <= 40 ? "var(--warn)" : "var(--hot)";
-  } else {
-    beatSyncVal.textContent = "söker…";
-    beatSyncVal.style.color = "var(--dim)";
-  }
-  confVal.textContent = typeof f.bpmConfidence === "number" ? Math.round(f.bpmConfidence * 100) + "%" : "–";
-  if (f.beat) {   // beat-lås-prick: pulsa på varje takt
-    beatDot.classList.add("on");
+  const confPct = typeof f.bpmConfidence === "number" ? Math.round(f.bpmConfidence * 100) : 0;
+  const moodV = parseInt(moodSlider.value, 10) || 0;
+  const modeName = moodInfoFor(moodV).name;
+  bpmVal.textContent = locked ? String(Math.round(f.bpm)) : "–";
+  bpmVal.classList.toggle("on", locked);
+  confVal.textContent = locked ? confPct + "%" : "–";
+  confVal.classList.toggle("on", locked && confPct >= 70);
+  modeVal.textContent = moodV > 0 ? modeName : "Av";
+  modeVal.classList.toggle("on", moodV > 0);
+  if (locked && f.beat) {   // beat-lås-prick: pulsa på varje takt
+    bpmDot.style.display = "inline-block";
     clearTimeout(beatTimer);
-    beatTimer = setTimeout(() => beatDot.classList.remove("on"), 100);
+    beatTimer = setTimeout(() => bpmDot.style.display = "none", 100);
   }
   applyFogStatus(f.fog);
 }
@@ -1407,9 +1412,9 @@ if (tBeatPulse) tBeatPulse.onchange = () => send({ type: "setBeatPulse", value: 
 
 // Live beat-diagnostik under LEVEL (uppdateras i applyFrame).
 const bpmVal = document.getElementById("bpmVal");
-const beatSyncVal = document.getElementById("beatSyncVal");
+const bpmDot = document.getElementById("bpmDot");
 const confVal = document.getElementById("confVal");
-const beatDot = document.getElementById("beatDot");
+const modeVal = document.getElementById("modeVal");
 let beatTimer;
 
 /* ── Rökmaskin ─────────────────────────────────────────────────────────── */
