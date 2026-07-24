@@ -98,22 +98,6 @@ function MoodSlider() {
 
 /* ────────── Ljud (källa + nivå + teknisk info) ────────── */
 
-function SourceBtn({
-  active, onClick, children,
-}: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 py-3 rounded-[10px] border font-medium text-[14px] ${
-        active
-          ? "bg-primary border-primary text-primary-foreground"
-          : "bg-card border-border text-foreground"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
 
 function AudioMeterCard() {
   const s = usePi();
