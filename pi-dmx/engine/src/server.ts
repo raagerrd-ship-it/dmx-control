@@ -12,13 +12,23 @@ import fastifyWebsocket from "@fastify/websocket";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { spawn, execFileSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, copyFileSync } from "node:fs";
 import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
-import { fixtureRoles } from "./config.js";
+import { fixtureRoles, defaultConfig } from "./config.js";
 import { applyMood, applyIntensity, isMood } from "./moods.js";
 import type { FogStatus } from "./effects.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, EFFECT_META } from "./effects/registry.js";
+import { logHealth, getHealthLog } from "./healthLog.js";
+
+// Version hämtas från package.json vid startup — ingen build-tid-magi, bara en
+// synkron read en gång per process.
+let PKG_VERSION = "dev";
+try {
+  const pkgPath = join(__dirname_shim(), "..", "package.json");
+  PKG_VERSION = JSON.parse(readFileSync(pkgPath, "utf8")).version || "dev";
+} catch { /* dev-läge utan package.json bredvid dist/ */ }
+function __dirname_shim() { return dirname(fileURLToPath(import.meta.url)); }
 
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
