@@ -183,6 +183,10 @@ export interface EngineConfig {
   /** REGI: drop-headroom — kapa normal ljusstyrka till ~95%, men låt DROPS gå
    *  ända till 100% → drops poppar, och konstant full blast dämpas. */
   dropHeadroom: boolean;
+  /** Master-toggle för Regi (pro): när false rör stämnings-vredet INTE de sex
+   *  Regi-flaggorna (dropBlackout, energyCeiling, clubMode, ambientGlow,
+   *  riserStrobe, dropHeadroom). Ägaren äger då dem själv. Default false. */
+  regiPro?: boolean;
 }
 
 export const defaultConfig: EngineConfig = {
@@ -235,6 +239,7 @@ export const defaultConfig: EngineConfig = {
   riserStrobe: false,     // ägar-val: accelererande strobe + vit-kollaps under risers
   strobeUnlimited: false, // säkert tak (3 Hz) som standard — se kommentaren i typen
   dropHeadroom: false,    // ägar-val: normal ≤95%, drops → 100% (huvudrum för pop)
+  regiPro: false,         // master-toggle: när AV rör stämnings-vredet inte Regi-flaggorna
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
