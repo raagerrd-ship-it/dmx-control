@@ -115,11 +115,41 @@ function AudioMeterCard() {
 
   return (
     <section className="mb-4">
+      {/* Nivåmätare */}
+      <div className="flex items-baseline justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Nivå
+        </span>
+        <span
+          className={`text-[13px] tabular-nums font-semibold transition-colors ${
+            hot ? "text-primary" : "text-foreground"
+          }`}
+        >
+          {pct}%
+        </span>
+      </div>
+
+      <div className="relative mt-2 h-2 rounded-full overflow-hidden ring-1 ring-border/40">
+        <div
+          className="absolute inset-0 rounded-full transition-[background] duration-[60ms] linear"
+          style={{
+            background: `linear-gradient(90deg, hsl(var(--primary) / 0) 0%, hsl(var(--primary)) ${pct}%, hsl(var(--muted) / 0.5) ${pct}% 100%)`,
+            boxShadow: hot ? "0 0 14px hsl(var(--primary) / 0.55)" : "none",
+          }}
+        />
+        {/* diskreta ticks */}
+        <div className="pointer-events-none absolute inset-0 flex justify-between px-1">
+          {Array.from({ length: 11 }).map((_, i) => (
+            <span key={i} className="w-px bg-background/40" />
+          ))}
+        </div>
+      </div>
+
       {/* Segmenterad källa-väljare */}
       <div
         role="tablist"
         aria-label="Ljudkälla"
-        className="relative grid grid-cols-2 rounded-full bg-muted/20 p-1 ring-1 ring-border/40"
+        className="relative mt-4 grid grid-cols-2 rounded-full bg-muted/20 p-1 ring-1 ring-border/40"
       >
         <span
           aria-hidden
@@ -150,37 +180,6 @@ function AudioMeterCard() {
         ))}
       </div>
 
-
-      {/* Nivåmätare */}
-      <div className="mt-4 flex items-baseline justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Nivå
-        </span>
-        <span
-          className={`text-[13px] tabular-nums font-semibold transition-colors ${
-            hot ? "text-primary" : "text-foreground"
-          }`}
-        >
-          {pct}%
-        </span>
-      </div>
-
-      <div className="relative mt-2 h-2 rounded-full overflow-hidden ring-1 ring-border/40">
-        <div
-          className="absolute inset-0 rounded-full transition-[background] duration-[60ms] linear"
-          style={{
-            background: `linear-gradient(90deg, hsl(var(--primary) / 0) 0%, hsl(var(--primary)) ${pct}%, hsl(var(--muted) / 0.5) ${pct}% 100%)`,
-            boxShadow: hot ? "0 0 14px hsl(var(--primary) / 0.55)" : "none",
-          }}
-        />
-
-        {/* diskreta ticks */}
-        <div className="pointer-events-none absolute inset-0 flex justify-between px-1">
-          {Array.from({ length: 11 }).map((_, i) => (
-            <span key={i} className="w-px bg-background/40" />
-          ))}
-        </div>
-      </div>
 
       {/* Teknisk info */}
       <details className="mt-3 group/tech">
