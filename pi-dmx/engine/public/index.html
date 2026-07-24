@@ -931,6 +931,11 @@ function applyFrame(f) {
   const pct = Math.round(f.level * 100);
   levelBar.style.width = pct + "%";
   levelVal.textContent = pct + "%";
+  const hot = f.level > 0.85;
+  levelVal.classList.toggle("hot", hot);
+  const barWrap = document.getElementById("levelBarWrap");
+  if (barWrap) barWrap.classList.toggle("hot", hot);
+
   gainVal.textContent = f.gain.toFixed(1);
   lastBleActive = f.bleActive ?? 0;
   // Drift-hälsa: uppdatera flaggorna som banner-logiken läser.
