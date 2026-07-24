@@ -1623,6 +1623,31 @@ if (btnHealthDownload) btnHealthDownload.onclick = async () => {
 // Ladda in en första omgång direkt när owner-vyn öppnas.
 if (OWNER_MODE) refreshHealthLog();
 
+// ---- Första-start-wizard (owner only) -----------------------------------
+// Visas överst i /setup tills ägaren antingen har lagt till minst en fixture
+// ELLER tryckt "Jag är klar". LocalStorage-flaggan gör att den inte poppar
+// upp igen efter en fabriks-reset om ägaren avfärdat den (medvetet val:
+// fabriks-reset nollar config men inte browser-preferences).
+const setupWizard = document.getElementById("setupWizard");
+const wizDismiss = document.getElementById("wizDismiss");
+function maybeShowWizard() {
+  if (!setupWizard || !OWNER_MODE) return;
+  let dismissed = false;
+  try { dismissed = !!localStorage.getItem("pi-dmx-wizard-done-v1"); } catch {}
+  const hasFixtures = Array.isArray(cfg?.fixtures) && cfg.fixtures.length > 0;
+  setupWizard.hidden = dismissed || hasFixtures;
+}
+if (wizDismiss) wizDismiss.onclick = () => {
+  try { localStorage.setItem("pi-dmx-wizard-done-v1", String(Date.now())); } catch {}
+  if (setupWizard) setupWizard.hidden = true;
+};
+// applyCfg körs varje gång servern broadcastar → wizard göms automatiskt
+// när första fixturen sparas. Hook:a in via en MutationObserver-fri väg:
+// vi wrappar bara nästa applyCfg-tick genom att kalla maybeShowWizard från
+// samma ställe applyCfg redan gör sin renderRotation etc.
+window.__maybeShowWizard = maybeShowWizard;
+maybeShowWizard();
+
 // ---- Walk-test: guidad kanal-identifiering ------------------------------
 // DMX är enkelriktat → vi kan inte fråga lampan. Vi tänder EN kanal i taget
 // (rå DMX-value 255, allt annat 0) och användaren rapporterar vad de ser.
