@@ -171,6 +171,66 @@ export async function startServer(
     else reply.code(503).send("stale");
   });
 
+  // ---- Version + systemlogg ------------------------------------------------
+  // Uthyrning: när något går fel behöver support kunna se "vilken firmware" och
+  // "vad hände de senaste minuterna" utan SSH. Version läses en gång vid start
+  // (PKG_VERSION), logg är en ring­buffert i minnet (se healthLog.ts).
+  app.get("/api/version", async () => ({ version: PKG_VERSION }));
+  app.get("/api/health-log", async () => ({
+    version: PKG_VERSION,
+    now: Date.now(),
+    events: getHealthLog(),
+  }));
+
+  // ---- Config export / import ---------------------------------------------
+  // Ägaren kan ladda ner config.json som backup och ladda upp igen — så en
+  // brickad enhet kan återskapas på 30 s utan att paras om alla lampor/BLE.
+  const CFG_PATH = process.env.CONFIG_PATH ?? "/var/lib/audio-dmx-engine/config.json";
+  app.get("/api/config/export", async (_req, reply) => {
+    // Strippa transienta fält (samma som persist.ts) så exporten är ren.
+    const { identify: _1, beat: _2, beatErr: _3, fogTrigger: _4, walkTest: _5, calTest: _6, ...persist } = deps.cfg as any;
+    const body = JSON.stringify({ version: PKG_VERSION, exportedAt: new Date().toISOString(), config: persist }, null, 2);
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    return reply
+      .header("content-type", "application/json")
+      .header("content-disposition", `attachment; filename="pi-dmx-config-${stamp}.json"`)
+      .send(body);
+  });
+
+  app.post("/api/config/import", async (req, reply) => {
+    // Accepterar antingen { config: {...} } (från vår export) eller ett rått
+    // config-objekt (för händigt manuellt bruk). Skriver till samma sökväg
+    // som persist.ts men går förbi debouncern → syns direkt efter restart.
+    const body = req.body as any;
+    const incoming = body && typeof body === "object"
+      ? (body.config && typeof body.config === "object" ? body.config : body)
+      : null;
+    if (!incoming || typeof incoming !== "object") {
+      return reply.code(400).send({ error: "invalid JSON body" });
+    }
+    // Grov sanity check: måste ha en fixtures-array (matchar persist.ts).
+    if (!Array.isArray(incoming.fixtures)) {
+      return reply.code(400).send({ error: "config saknar fixtures[]" });
+    }
+    try {
+      // Behåll nuvarande som .import-<ts>-backup ifall användaren ångrar sig.
+      try {
+        const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        copyFileSync(CFG_PATH, `${CFG_PATH}.import-${ts}.bak`);
+      } catch { /* first import, no prior */ }
+      writeFileSync(CFG_PATH, JSON.stringify(incoming, null, 2), "utf8");
+      logHealth("info", "config", "importerad — startar om motorn");
+      // Motorn läser config i startup → begär restart. Detached så vi hinner svara.
+      spawn("systemd-run", ["--unit=pi-dmx-restart", "--collect", "--quiet",
+        "systemctl", "restart", "audio-dmx-engine"], { detached: true, stdio: "ignore" })
+        .on("error", (e) => console.error("[import] restart spawn:", (e as Error).message)).unref();
+      return reply.send({ imported: true, restarting: true });
+    } catch (e) {
+      logHealth("err", "config", `import misslyckades: ${(e as Error).message}`);
+      return reply.code(500).send({ error: (e as Error).message });
+    }
+  });
+
 
   // ---- Self-update ---------------------------------------------------------
   // The repo lives at /root/pi-dmx-src (or wherever `git clone` put it).
