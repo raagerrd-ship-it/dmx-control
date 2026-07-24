@@ -664,15 +664,23 @@ function OwnerSections() {
 }
 
 function RegiTgl({
-  label, sub, checked, onChange, last,
-}: { label: string; sub: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean }) {
+  label, sub, checked, onChange, last, moodLocked,
+}: { label: string; sub: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean; moodLocked?: boolean }) {
   return (
-    <label className={`flex items-start justify-between gap-3 py-2.5 cursor-pointer ${last ? "" : "border-b border-border"}`}>
+    <label className={`flex items-start justify-between gap-3 py-2.5 ${moodLocked ? "cursor-default opacity-85" : "cursor-pointer"} ${last ? "" : "border-b border-border"}`}>
       <span className="flex-1 min-w-0">
-        <span className="text-[14px] block">{label}</span>
+        <span className="text-[14px] block">
+          {label}
+          {moodLocked && (
+            <em className="not-italic ml-1.5 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider rounded-full border align-middle"
+                style={{ color: "#e5b8ff", background: "rgba(180,120,255,.14)", borderColor: "rgba(180,120,255,.35)" }}>
+              Följer stämning
+            </em>
+          )}
+        </span>
         <span className="text-[11px] text-muted-foreground leading-snug block mt-0.5">{sub}</span>
       </span>
-      <SwitchBtn checked={checked} onChange={onChange} />
+      <SwitchBtn checked={checked} onChange={moodLocked ? () => {} : onChange} />
     </label>
   );
 }
