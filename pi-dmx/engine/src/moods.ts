@@ -65,7 +65,7 @@ export function applyMood(cfg: EngineConfig, mood: MoodId): void {
   cfg.energyCeiling = f.energyCeiling;   // Regi (pro): VU-ljustak
   cfg.riserStrobe = f.riserStrobe;       // Regi (pro): uppbyggnads-strobe
   cfg.dropHeadroom = f.dropHeadroom;     // Regi (pro): drop-pop
-  cfg.beatSyncStrength = f.beatSyncStrength; // PLL-styrka mot trumslag
+  if (!cfg.beatSyncOverride) cfg.beatSyncStrength = f.beatSyncStrength; // PLL-styrka mot trumslag
   // Rotation: bara stämningens pool aktiv (allt annat AV → smart väljer bara ur poolen).
   const pool = new Set<Mode>(POOL[mood]);
   const rot: Partial<Record<Mode, boolean>> = {};
@@ -106,7 +106,7 @@ export function applyIntensity(cfg: EngineConfig, xRaw: number): void {
   cfg.energyCeiling    = bf.energyCeiling;
   cfg.riserStrobe      = bf.riserStrobe;
   cfg.dropHeadroom     = bf.dropHeadroom;
-  cfg.beatSyncStrength = bf.beatSyncStrength;
+  if (!cfg.beatSyncOverride) cfg.beatSyncStrength = bf.beatSyncStrength;
   const pool = new Set<Mode>(POOL[bucket]);
   const rot: Partial<Record<Mode, boolean>> = {};
   for (const k of EFFECT_KEYS) rot[k] = pool.has(k);
