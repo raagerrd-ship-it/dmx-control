@@ -481,7 +481,9 @@
     <div class="fx-actions" style="margin-top:8px">
       <button class="btn" id="tsCopy">Kopiera etikett</button>
       <button class="btn" id="tsPrint">Skriv ut</button>
+      <button class="btn primary" id="tsDoc">EU-DoC (PDF)</button>
     </div>
+
     <details style="margin-top:10px">
       <summary style="cursor:pointer;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:4px 0">Måste också medfölja enheten (inte på skylten)</summary>
       <ul style="margin:8px 0 0 18px;padding:0;font-size:12px;color:var(--dim);line-height:1.6">
@@ -1728,7 +1730,111 @@ function tsRender() {
     w.document.write("<pre style='font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:20px'>" + tsPreview.textContent.replace(/</g,"&lt;") + "</pre>");
     w.document.close(); w.focus(); w.print();
   };
+  const dc = document.getElementById("tsDoc");
+  if (dc) dc.onclick = () => {
+    const v = tsGet();
+    const esc = (s) => (s || "").replace(/[&<>]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[c]);
+    const today = new Date().toISOString().slice(0,10);
+    const mfg = esc(v.Mfg || "[Företagsnamn]");
+    const addr = [v.Addr1, v.Addr2, v.Country].filter(Boolean).map(esc).join(", ") || "[Adress]";
+    const model = esc(v.Model || "PDMX-1");
+    const sn = esc(v.SN || "[Serienummer / batch]");
+    const contact = esc(v.Contact || "[E-post/URL]");
+    const html = `<!doctype html><html lang="sv"><head><meta charset="utf-8">
+<title>EU Declaration of Conformity — ${model}</title>
+<style>
+  @page { size: A4; margin: 22mm 20mm; }
+  body { font-family: Georgia, "Times New Roman", serif; color:#111; font-size:11pt; line-height:1.55; }
+  h1 { font-size:16pt; margin:0 0 4px; letter-spacing:.02em; }
+  h2 { font-size:11pt; margin:22px 0 6px; text-transform:uppercase; letter-spacing:.08em; border-bottom:1px solid #333; padding-bottom:2px; }
+  .sub { color:#555; font-size:10pt; margin-bottom:18px; }
+  table { width:100%; border-collapse:collapse; margin:6px 0; }
+  td { padding:4px 6px; vertical-align:top; border-bottom:1px solid #eee; }
+  td.k { width:38%; color:#555; }
+  ul { margin:4px 0 4px 20px; padding:0; }
+  li { margin:2px 0; }
+  .sig { margin-top:36px; display:flex; gap:40px; }
+  .sig div { flex:1; }
+  .sig .line { border-top:1px solid #111; margin-top:48px; padding-top:4px; font-size:9pt; color:#555; }
+  .foot { margin-top:24px; font-size:9pt; color:#666; }
+  .warn { font-size:9pt; color:#555; font-style:italic; }
+  @media print { .noprint { display:none; } }
+  .noprint { position:fixed; top:8px; right:8px; }
+  .noprint button { font:inherit; padding:8px 14px; cursor:pointer; }
+</style></head><body>
+<div class="noprint"><button onclick="window.print()">Skriv ut / Spara som PDF</button></div>
+
+<h1>EU Declaration of Conformity</h1>
+<div class="sub">EU-försäkran om överensstämmelse · Utfärdad ${today}</div>
+
+<h2>1. Product / Produkt</h2>
+<table>
+  <tr><td class="k">Product name</td><td>pi-dmx Controller — audio-reactive DMX lighting controller</td></tr>
+  <tr><td class="k">Model / Type</td><td>${model}</td></tr>
+  <tr><td class="k">Serial number / Batch</td><td>${sn}</td></tr>
+</table>
+
+<h2>2. Manufacturer / Tillverkare</h2>
+<table>
+  <tr><td class="k">Name</td><td>${mfg}${v.Org ? " (Org.nr " + esc(v.Org) + ")" : ""}</td></tr>
+  <tr><td class="k">Address</td><td>${addr}</td></tr>
+  <tr><td class="k">Contact</td><td>${contact}</td></tr>
+</table>
+
+<h2>3. Object of the declaration</h2>
+<p>This declaration of conformity is issued under the sole responsibility of the manufacturer.
+Föremålet för försäkran ovan överensstämmer med relevant harmoniserad unionslagstiftning:</p>
+<ul>
+  <li><b>Radio Equipment Directive (RED)</b> — 2014/53/EU</li>
+  <li><b>RoHS</b> — 2011/65/EU (as amended by (EU) 2015/863)</li>
+  <li><b>WEEE</b> — 2012/19/EU</li>
+  <li><b>General Product Safety Regulation</b> — (EU) 2023/988</li>
+</ul>
+
+<h2>4. Harmonised standards applied</h2>
+<ul>
+  <li>EN 301 489-1 / EN 301 489-17 — EMC for radio equipment (Wi-Fi/BT)</li>
+  <li>EN 300 328 — Wideband transmission systems, 2.4 GHz band</li>
+  <li>EN IEC 62368-1 — Audio/video, information and communication technology equipment — Safety</li>
+  <li>EN IEC 63000 — Technical documentation for restriction of hazardous substances</li>
+  <li>EN 62479 — Assessment of low-power electronic equipment (RF exposure)</li>
+</ul>
+<p class="warn">Justera listan efter faktiskt genomförd provning. Ta bort standarder som inte tillämpats.</p>
+
+<h2>5. Radio characteristics</h2>
+<table>
+  <tr><td class="k">Frequency band</td><td>2400–2483.5 MHz</td></tr>
+  <tr><td class="k">Wi-Fi max EIRP</td><td>≤ 100 mW (20 dBm)</td></tr>
+  <tr><td class="k">Bluetooth LE max EIRP</td><td>≤ 10 mW (10 dBm)</td></tr>
+  <tr><td class="k">Radio module</td><td>Integrated in Raspberry Pi Zero 2 W (CYW43438)</td></tr>
+</table>
+
+<h2>6. Additional information</h2>
+<table>
+  <tr><td class="k">Input</td><td>5 V DC, 3 A max, USB-C</td></tr>
+  <tr><td class="k">Power consumption</td><td>15 W max</td></tr>
+  <tr><td class="k">Ingress protection</td><td>${esc(v.Ip || "IP20")} — indoor use only</td></tr>
+  <tr><td class="k">Manufacturing date / batch</td><td>${esc(v.MfgDate || "—")}</td></tr>
+</table>
+
+<h2>7. Signature / Undertecknat för och på uppdrag av tillverkaren</h2>
+<div class="sig">
+  <div><div class="line">Ort och datum / Place and date</div></div>
+  <div><div class="line">Namn, befattning / Name, position</div></div>
+  <div><div class="line">Underskrift / Signature</div></div>
+</div>
+
+<div class="foot">
+  Dokumentet ska arkiveras hos tillverkaren i minst 10 år efter att den sista enheten släppts på marknaden.
+  Kopia medföljer varje enhet vid leverans.
+</div>
+</body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { alert("Popup blockerad — tillåt popups för att generera DoC."); return; }
+    w.document.write(html); w.document.close(); w.focus();
+  };
 })();
+
 
 
 
