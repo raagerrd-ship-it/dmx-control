@@ -45,48 +45,44 @@ function HeroCard() {
   const s = usePi();
   const off = !s.power;
   const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
-  const mood = moodInfoFor(v);
   return (
-    <section className="relative mt-2 mb-4 rounded-[28px] overflow-hidden ring-1 ring-foreground/10 bg-gradient-to-b from-foreground/[0.05] to-foreground/[0.02] backdrop-blur-xl shadow-[0_40px_80px_-40px_rgba(0,0,0,0.75),inset_0_1px_0_hsl(var(--foreground)/0.06)]">
-      {/* Pink corner glow */}
-      <div aria-hidden className="pointer-events-none absolute -top-32 -left-24 w-64 h-64 rounded-full bg-primary/25 blur-[90px]" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-32 -right-24 w-56 h-56 rounded-full bg-primary/10 blur-[80px]" />
+    <section className="relative mt-3 mb-5 rounded-[32px] overflow-hidden ring-1 ring-foreground/10 bg-black shadow-[0_40px_80px_-40px_rgba(0,0,0,0.85)]">
+      {/* Neon corner glows */}
+      <div aria-hidden className="pointer-events-none absolute -top-32 -left-32 w-64 h-64 rounded-full bg-primary/15 blur-[90px]" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-32 -right-32 w-56 h-56 rounded-full bg-primary/10 blur-[80px]" />
 
-      {/* ── Header row: label · mode chip · big number ── */}
-      <div className="relative px-5 pt-5 pb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-[0.24em] text-foreground/45 font-semibold">Stämning</span>
+      <div className="relative p-7">
+        {/* ── STÄMNING · big glowing number ── */}
+        <div className="flex items-baseline justify-between px-1 mb-4">
+          <span className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground/70 font-bold">
+            Stämning
+          </span>
           <span
-            className={`px-2 py-0.5 rounded-full text-[10px] uppercase tracking-[0.14em] font-semibold border transition-colors ${
-              off
-                ? "text-muted-foreground/70 border-border/60 bg-muted/20"
-                : "text-primary border-primary/40 bg-primary/10 shadow-[0_0_10px_hsl(var(--primary)/0.3)]"
+            className={`text-[40px] leading-none font-light tabular-nums tracking-tight ${
+              off ? "text-muted-foreground/50" : "text-primary drop-shadow-[0_0_12px_hsl(var(--primary)/0.55)]"
             }`}
           >
-            {mood.name}
+            {String(v).padStart(2, "0")}
           </span>
         </div>
-        <span
-          className={`text-[26px] leading-none font-bold tabular-nums tracking-tight ${
-            off ? "text-muted-foreground/60" : "text-primary drop-shadow-[0_0_12px_hsl(var(--primary)/0.55)]"
-          }`}
-        >
-          {String(v).padStart(2, "0")}
-        </span>
-      </div>
 
-      {/* ── Mood slider (primary control) ── */}
-      <div className="relative px-5 pb-5">
         <MoodSlider />
-      </div>
 
-      {/* ── Inset sub-panel: Nivå + källa ── */}
-      <div className="relative mx-3 mb-3 rounded-2xl bg-black/25 ring-1 ring-inset ring-foreground/[0.06] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)] p-4">
-        <AudioMeterCard />
-      </div>
+        {/* ── Signal Output ── */}
+        <div className="mt-8">
+          <AudioMeterCard />
+        </div>
 
-      {/* ── Inset sub-panel: Teknisk info ── */}
-      <TechPanel />
+        {/* ── Source pill selector ── */}
+        <div className="mt-7">
+          <SourcePill />
+        </div>
+
+        {/* ── Tech grid ── */}
+        <div className="mt-7">
+          <TechGrid />
+        </div>
+      </div>
     </section>
   );
 }
@@ -98,7 +94,8 @@ function MoodSlider() {
   const fillPct = (v / 10) * 100;
   return (
     <div>
-      <div className="relative">
+      <div className="relative h-12 flex items-center">
+        <div aria-hidden className="absolute inset-0 bg-primary/[0.04] blur-xl pointer-events-none" />
         <div className="mood-ticks" aria-hidden>
           {Array.from({ length: 11 }).map((_, i) => <span key={i} />)}
         </div>
@@ -123,10 +120,10 @@ function MoodSlider() {
         />
       </div>
 
-      <div className="flex justify-between text-[10px] uppercase tracking-[0.18em] mt-2 px-0.5">
-        <span className={off ? "text-primary" : "text-muted-foreground/60"}>Av</span>
-        <span className={v >= 5 && v <= 7 ? "text-primary" : "text-muted-foreground/60"}>Fest</span>
-        <span className={v >= 9 ? "text-primary" : "text-muted-foreground/60"}>Galet</span>
+      <div className="flex justify-between mt-2 px-1 font-mono">
+        <span className={`text-[9px] font-bold tracking-widest ${off ? "text-primary/80" : "text-muted-foreground/40"}`}>LVL 00</span>
+        <span className={v >= 5 && v <= 7 ? "text-[9px] font-bold tracking-widest text-primary" : "text-[9px] font-bold tracking-widest text-muted-foreground/40"}>FEST</span>
+        <span className={`text-[9px] font-bold tracking-widest ${v >= 9 ? "text-primary" : "text-muted-foreground/40"}`}>LVL 10</span>
       </div>
     </div>
   );
@@ -144,82 +141,82 @@ function moodInfoFor(v: number) {
 }
 
 function AudioMeterCard() {
-  const s = usePi();
   const audio = useDmx((st) => st.audioLevel);
-  const pct = Math.round(audio * 100);
   const hot = audio > 0.85;
-  const source = s.audioInput;
-
+  // 7 discrete bars, level distributed with slight center bias
+  const bars = [0.35, 0.55, 0.75, 1.0, 0.85, 0.55, 0.3].map((peak) =>
+    Math.max(0.12, Math.min(1, audio * peak * 1.1))
+  );
   return (
-    <div>
-      {/* Nivåmätare */}
-      <div className="flex items-baseline justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-foreground/45">
-          Nivå
-        </span>
-        <span
-          className={`text-[13px] tabular-nums font-semibold transition-colors ${
-            hot ? "text-primary" : "text-foreground/85"
-          }`}
-        >
-          {pct}%
-        </span>
-      </div>
-
-      <div className="relative mt-2 h-1.5 rounded-full overflow-hidden bg-black/40 ring-1 ring-inset ring-foreground/[0.05]">
-        <div
-          className="absolute inset-0 rounded-full transition-[background] duration-[60ms] linear"
-          style={{
-            background: `linear-gradient(90deg, hsl(var(--primary) / 0.15) 0%, hsl(var(--primary)) ${pct}%, transparent ${pct}% 100%)`,
-            boxShadow: hot ? "0 0 14px hsl(var(--primary) / 0.55)" : "none",
-          }}
-        />
-        <div className="pointer-events-none absolute inset-x-1 inset-y-0 flex items-center justify-between">
-          {Array.from({ length: 11 }).map((_, i) => (
-            <span key={i} className="w-px h-1 rounded-sm bg-foreground/15" />
-          ))}
+    <section className="rounded-2xl bg-foreground/[0.03] backdrop-blur-md ring-1 ring-foreground/[0.06] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.05)] p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground/80">
+          Signal Output
+        </h3>
+        <div className="flex gap-1">
+          <span className="w-1 h-1 rounded-full bg-primary/30" />
+          <span className="w-1 h-1 rounded-full bg-primary/60" />
+          <span className={`w-1 h-1 rounded-full bg-primary ${hot ? "shadow-[0_0_6px_hsl(var(--primary))]" : ""}`} />
         </div>
       </div>
+      <div className="flex items-end gap-1.5 h-9">
+        {bars.map((h, i) => {
+          const strong = h > 0.7;
+          const mid = h > 0.4;
+          return (
+            <span
+              key={i}
+              className={`flex-1 rounded-sm transition-all duration-150 ${
+                strong
+                  ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.6)]"
+                  : mid
+                    ? "bg-primary/60"
+                    : "bg-muted/40"
+              }`}
+              style={{ height: `${Math.round(h * 100)}%` }}
+            />
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
-      {/* Segmenterad källa-väljare */}
-      <div
-        role="tablist"
-        aria-label="Ljudkälla"
-        className="relative mt-4 grid grid-cols-2 rounded-full bg-black/40 p-1 ring-1 ring-inset ring-foreground/[0.05]"
-      >
-        <span
-          aria-hidden
-          className="absolute inset-y-1 w-[calc(50%-4px)] rounded-full bg-primary/15 ring-1 ring-primary/40 shadow-[0_0_14px_hsl(var(--primary)/0.25)] transition-transform duration-300 ease-out"
-          style={{ transform: `translateX(${source === "aux" ? "0%" : "calc(100% + 8px)"})` }}
-        />
-        {[
-          { id: "aux", label: "AUX (kabel)" },
-          { id: "mic", label: "Mikrofon" },
-        ].map((o) => (
+function SourcePill() {
+  const s = usePi();
+  const source = s.audioInput;
+  return (
+    <div
+      role="tablist"
+      aria-label="Ljudkälla"
+      className="relative grid grid-cols-2 gap-1 rounded-full bg-foreground/[0.04] p-1.5 ring-1 ring-foreground/10 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]"
+    >
+      {[
+        { id: "aux", label: "AUX (kabel)" },
+        { id: "mic", label: "Mikrofon" },
+      ].map((o) => {
+        const active = source === o.id;
+        return (
           <button
             key={o.id}
             role="tab"
-            aria-selected={source === o.id}
+            aria-selected={active}
             onClick={() => setPi({ audioInput: o.id as "aux" | "mic" })}
-            className={`relative z-10 flex items-center justify-center gap-2 py-2 rounded-full text-[13px] font-medium transition-colors ${
-              source === o.id ? "text-foreground" : "text-muted-foreground/70"
+            className={`relative py-3 rounded-full text-[10px] font-black uppercase tracking-[0.22em] transition-all ${
+              active
+                ? "bg-primary text-primary-foreground shadow-[0_0_18px_hsl(var(--primary)/0.5)]"
+                : "text-muted-foreground/60"
             }`}
           >
-            <span
-              aria-hidden
-              className={`h-1.5 w-1.5 rounded-full transition-colors ${
-                source === o.id ? "bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.8)]" : "bg-muted-foreground/30"
-              }`}
-            />
             {o.label}
           </button>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
 
-function TechPanel() {
+function TechGrid() {
   const s = usePi();
   const bpm = useDmx((st) => st.bpm);
   const conf = useDmx((st) => st.bpmConfidence);
@@ -227,56 +224,34 @@ function TechPanel() {
   const kick = useDmx((st) => st.kick);
   const off = !s.power;
   const moodV = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
-  const confPct = Math.round(conf * 100);
   const locked = bpm > 0;
-  const kickOn = kick > 0.4;
-
+  const confPct = Math.round(conf * 100);
   return (
-    <details className="group/tech mx-3 mb-3">
-      <summary className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-black/25 ring-1 ring-inset ring-foreground/[0.05] text-[10px] uppercase tracking-[0.22em] text-foreground/50 font-semibold cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/tech:text-foreground/80 transition-colors">
-        <span>Teknisk info</span>
-        <span className="group-open/tech:hidden text-foreground/40">⌄</span>
-        <span className="hidden group-open/tech:inline text-foreground/40">⌃</span>
-      </summary>
-      <div className="mt-2 rounded-xl bg-black/30 ring-1 ring-inset ring-foreground/[0.05] shadow-[inset_0_2px_6px_rgba(0,0,0,0.3)] px-4 divide-y divide-foreground/[0.06]">
-        <p className="py-3 text-[12.5px] leading-snug text-muted-foreground italic">
+    <div className="grid grid-cols-2 gap-3">
+      <TechTile label="BPM" value={locked ? String(Math.round(bpm)) : "—"} accent={locked} dot={locked && beat} />
+      <TechTile label="Konfidens" value={locked ? `${confPct}%` : "—"} />
+      <TechTile label="Kick" value={kick > 0.4 ? "PULS" : "—"} accent={kick > 0.4} dot={kick > 0.4} />
+      <TechTile label="Auto-gain" value="1.0×" />
+      <div className="col-span-2 p-3.5 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06]">
+        <div className="text-[8px] font-bold text-muted-foreground/70 uppercase mb-1 tracking-[0.22em]">Läge</div>
+        <div className="text-[13px] font-medium text-foreground/85 leading-snug">
           {moodInfoFor(moodV).desc}
-        </p>
-        <TechRow label="BPM" value={locked ? `${Math.round(bpm)}` : "–"} accent={locked} />
-        <TechRow
-          label="Beat-synk"
-          value={locked ? "±0 ms" : "söker…"}
-          accent={locked && beat}
-          dot={locked && beat}
-        />
-        <TechRow label="Konfidens" value={locked ? `${confPct}%` : "–"} />
-        <TechRow label="Kick" value={kickOn ? "puls" : "–"} accent={kickOn} dot={kickOn} />
-        <TechRow label="Auto-gain" value="1.0×" />
+        </div>
       </div>
-    </details>
+    </div>
   );
 }
 
-function TechRow({
-  label, value, accent, dot,
-}: {
-  label: string; value: React.ReactNode; accent?: boolean; dot?: boolean;
-}) {
+function TechTile({ label, value, accent, dot }: { label: string; value: string; accent?: boolean; dot?: boolean }) {
   return (
-    <div className="flex items-center justify-between py-2">
-      <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-        {label}
-        {dot && (
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))]" />
-        )}
-      </span>
-      <span
-        className={`text-[13px] tabular-nums font-medium ${
-          accent ? "text-primary" : "text-foreground"
-        }`}
-      >
+    <div className="p-3.5 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06]">
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className="text-[8px] font-bold text-muted-foreground/70 uppercase tracking-[0.22em]">{label}</span>
+        {dot && <span className="inline-block w-1 h-1 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]" />}
+      </div>
+      <div className={`text-[15px] font-mono font-semibold tabular-nums ${accent ? "text-primary" : "text-foreground/85"}`}>
         {value}
-      </span>
+      </div>
     </div>
   );
 }
@@ -287,11 +262,11 @@ function TechRow({
 function MoreDetails() {
   return (
     <>
-      <details className="mt-2 group/eff">
-        <summary className="py-3 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/eff:text-foreground">
-          <span>Effekt-val · välj vilka som roterar</span>
-          <span className="ml-1 group-open/eff:hidden"> ⌄</span>
-          <span className="ml-1 hidden group-open/eff:inline"> ⌃</span>
+      <details className="mt-4 group/eff">
+        <summary className="py-4 rounded-full border border-primary/50 bg-primary/[0.04] text-primary text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden shadow-[0_0_14px_hsl(var(--primary)/0.12)] hover:bg-primary/[0.08] transition-colors">
+          <span>Effekt-val</span>
+          <span className="ml-1.5 opacity-70 group-open/eff:hidden">⌄</span>
+          <span className="ml-1.5 opacity-70 hidden group-open/eff:inline">⌃</span>
         </summary>
         <SectionTitle>Lugna effekter</SectionTitle>
         <RotationList modes={CALM_MODES} />
@@ -350,11 +325,11 @@ function AdvancedMirror() {
   const dwellPct = ((40000 - f.smartDwellMs) / 35000) * 100;
   const dwellLbl = f.smartDwellMs >= 20000 ? "Sällan" : f.smartDwellMs >= 10000 ? "Normal" : "Ofta";
   return (
-    <details className="mt-3.5 group">
-      <summary className="py-3.5 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open:text-foreground">
-        <span>Avancerat · spegel av stämningen</span>
-        <span className="ml-1 group-open:hidden"> ⌄</span>
-        <span className="ml-1 hidden group-open:inline"> ⌃</span>
+    <details className="mt-3 group">
+      <summary className="py-4 rounded-full border border-foreground/10 bg-foreground/[0.03] text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-foreground/[0.06] group-open:text-foreground/90 transition-colors">
+        <span>Avancerat</span>
+        <span className="ml-1.5 opacity-70 group-open:hidden">⌄</span>
+        <span className="ml-1.5 opacity-70 hidden group-open:inline">⌃</span>
       </summary>
       <div className="mt-1">
         <Card>
