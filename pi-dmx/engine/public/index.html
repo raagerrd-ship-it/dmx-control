@@ -315,18 +315,19 @@
   <div class="owner-banner">🔧 Ägarläge (setup). Den här sidan är dold för hyresgäster — de öppnar adressen utan <b>/setup</b>.</div>
 
   <h1>Beat-synk</h1>
-  <div class="card">
+  <div class="card mood-locked">
     <div class="setrow">
-      <label>Beat-synk</label>
-      <div class="seg" id="segBeatSync">
+      <label>Beat-synk <em class="mood-badge">Följer stämning</em></label>
+      <div class="seg" id="segBeatSync" style="pointer-events:none;opacity:.75">
         <button data-bs="0">Av</button>
         <button data-bs="0.10">Mjuk</button>
         <button data-bs="0.18">Normal</button>
         <button data-bs="0.30">Aggressiv</button>
       </div>
     </div>
-    <div class="status" style="margin-top:4px">Hur hårt pulsen knuffas i fas mot faktiska trumslag. Av = fri-rullande på detekterad BPM. Aggressiv = låser snabbast men kan rycka på taktrik musik.</div>
+    <div class="status" style="margin-top:4px">Hur hårt pulsen knuffas i fas mot faktiska trumslag. Chill=Mjuk, Fest=Normal, Galet=Aggressiv — sätts av stämnings-vredet.</div>
   </div>
+
 
   <h1>Rökmaskin</h1>
   <div class="card">
