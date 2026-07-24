@@ -992,13 +992,15 @@ function applyFrame(f) {
   const locked = typeof f.bpm === "number" && f.bpm > 0;
   const confPct = typeof f.bpmConfidence === "number" ? Math.round(f.bpmConfidence * 100) : 0;
   const moodV = parseInt(moodSlider.value, 10) || 0;
-  const modeName = moodInfoFor(moodV).name;
+  const modeInfo = moodInfoFor(moodV);
   bpmVal.textContent = locked ? String(Math.round(f.bpm)) : "–";
   bpmVal.classList.toggle("on", locked);
   confVal.textContent = locked ? confPct + "%" : "–";
   confVal.classList.toggle("on", locked && confPct >= 70);
-  modeVal.textContent = moodV > 0 ? modeName : "Av";
+  modeVal.textContent = moodV > 0 ? modeInfo.name : "Av";
   modeVal.classList.toggle("on", moodV > 0);
+  if (moodDesc) moodDesc.textContent = moodV > 0 ? modeInfo.desc : "Ljuset är släckt — dra åt höger för att tända";
+
   if (locked && f.beat) {   // beat-lås-prick: pulsa på varje takt
     bpmDot.style.display = "inline-block";
     clearTimeout(beatTimer);
