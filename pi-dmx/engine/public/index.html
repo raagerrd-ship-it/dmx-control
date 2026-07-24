@@ -319,14 +319,14 @@
     <div class="setrow">
       <label>Beat-synk <em class="mood-badge" id="beatSyncBadge">Följer stämning</em></label>
       <div class="seg" id="segBeatSync">
+        <button data-bs="auto">Auto</button>
         <button data-bs="0">Av</button>
-        <button data-bs="0.10">Mjuk</button>
+        <button data-bs="0.10">Lugnt</button>
         <button data-bs="0.18">Normal</button>
         <button data-bs="0.30">Aggressiv</button>
       </div>
     </div>
-    <label class="tgl" style="margin-top:8px"><span>Åsidosätt stämning (manuell PLL-styrka)<br><small style="opacity:.6">När på: stämnings-vredet rör inte beat-synken — du väljer styrkan här.</small></span><input type="checkbox" id="beatSyncOverride"></label>
-    <div class="status" style="margin-top:4px">Hur hårt pulsen knuffas i fas mot faktiska trumslag. Chill=Mjuk, Fest=Normal, Galet=Aggressiv — sätts av stämnings-vredet om override är av.</div>
+    <div class="status" style="margin-top:8px">Hur hårt pulsen knuffas i fas mot faktiska trumslag. <b>Auto</b> följer stämningen (Chill=Lugnt, Fest=Normal, Galet=Aggressiv). Välj en styrka manuellt för att åsidosätta.</div>
   </div>
 
 
@@ -696,16 +696,16 @@ function applyConfig(cfg) {
       if (b) b.textContent = mOv ? "Manuell" : "Följer stämning";
     }
   }
-  segActivate("segBeatSync", cfg.beatSyncStrength ?? 0.18, "bs");
-  const bsOv = !!cfg.beatSyncOverride;
-  const bsCard = document.getElementById("beatSyncCard");
-  const bsSeg = document.getElementById("segBeatSync");
-  const bsBadge = document.getElementById("beatSyncBadge");
-  const bsOvChk = document.getElementById("beatSyncOverride");
-  if (bsOvChk) bsOvChk.checked = bsOv;
-  if (bsCard) bsCard.classList.toggle("mood-locked", !bsOv);
-  if (bsSeg) { bsSeg.style.pointerEvents = bsOv ? "" : "none"; bsSeg.style.opacity = bsOv ? "" : ".75"; }
-  if (bsBadge) bsBadge.textContent = bsOv ? "Manuell" : "Följer stämning";
+  {
+    const bsOv = !!cfg.beatSyncOverride;
+    const bsBadge = document.getElementById("beatSyncBadge");
+    const seg = document.getElementById("segBeatSync");
+    if (seg) {
+      const active = bsOv ? String(cfg.beatSyncStrength ?? 0.18) : "auto";
+      seg.querySelectorAll("button").forEach((b) => b.classList.toggle("primary", b.dataset.bs === active));
+    }
+    if (bsBadge) bsBadge.textContent = bsOv ? "Manuell" : "Följer stämning";
+  }
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
   inMic.classList.toggle("primary", cfg.audioInput === "mic");
@@ -1367,11 +1367,18 @@ if (tEnergy) tEnergy.onchange = () => {
 };
 
 document.querySelectorAll("#segBeatSync button").forEach((b) =>
-  b.onclick = () => { send({ type: "setBeatSyncStrength", value: Number(b.dataset.bs) }); segActivate("segBeatSync", Number(b.dataset.bs), "bs"); });
-{
-  const ov = document.getElementById("beatSyncOverride");
-  if (ov) ov.onchange = () => send({ type: "setBeatSyncOverride", value: ov.checked });
-}
+  b.onclick = () => {
+    const v = b.dataset.bs;
+    if (v === "auto") {
+      send({ type: "setBeatSyncOverride", value: false });
+    } else {
+      send({ type: "setBeatSyncOverride", value: true });
+      send({ type: "setBeatSyncStrength", value: Number(v) });
+    }
+    document.querySelectorAll("#segBeatSync button").forEach((x) => x.classList.toggle("primary", x === b));
+    const bsBadge = document.getElementById("beatSyncBadge");
+    if (bsBadge) bsBadge.textContent = v === "auto" ? "Följer stämning" : "Manuell";
+  });
 document.querySelectorAll("#segDwell button").forEach((b) =>
   b.onclick = () => { send({ type: "setSmartDwell", mode: b.dataset.dwell }); segActivateStr("segDwell", b.dataset.dwell, "dwell"); });
 renderCategories();
