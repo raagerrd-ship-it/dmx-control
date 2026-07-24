@@ -1658,6 +1658,80 @@ if (btnHealthDownload) btnHealthDownload.onclick = async () => {
 // Ladda in en första omgång direkt när owner-vyn öppnas.
 if (OWNER_MODE) refreshHealthLog();
 
+// ---- Typskylt ------------------------------------------------------------
+// CE-krav: varje enhet i EU måste ha en typskylt med tillverkare, modell, SN,
+// spänning, radio-EIRP, CE + WEEE-symbol. Ägaren fyller i sina fält och får
+// ut en färdig etikett-text att skicka till trycket.
+const TS_FIELDS = ["Mfg","Org","Addr1","Addr2","Country","Contact","Model","SN","MfgDate","Ip"];
+const TS_DEFAULTS = { Country: "Sverige", Model: "PDMX-1", Ip: "IP20" };
+const tsPreview = document.getElementById("tsPreview");
+function tsGet() {
+  const v = {};
+  for (const k of TS_FIELDS) {
+    const el = document.getElementById("ts" + k);
+    v[k] = el ? el.value.trim() : "";
+  }
+  return v;
+}
+function tsRender() {
+  if (!tsPreview) return;
+  const v = tsGet();
+  const pad = (s, n) => (s + " ".repeat(n)).slice(0, n);
+  const line = "──────────────────────────────────────────────────────";
+  const L = [
+    "  pi-dmx Controller           Model: " + (v.Model || "PDMX-1"),
+    "  " + line,
+    "  SN: " + pad(v.SN || "—", 22) + " Mfg: " + (v.MfgDate || "—"),
+    "",
+    "  Input:  5 V ⎓  3 A max  (USB-C)",
+    "  Power:  15 W max",
+    "  IP:     " + (v.Ip || "IP20") + "  (indoor use only)",
+    "",
+    "  Radio:  Wi-Fi 2.4 GHz  ≤100 mW EIRP",
+    "          BT 4.2 LE      ≤10 mW EIRP",
+    "",
+    "  Manufacturer:",
+    "    " + (v.Mfg || "[företagsnamn]") + (v.Org ? "  (" + v.Org + ")" : ""),
+    "    " + (v.Addr1 || "[gatuadress]"),
+    "    " + (v.Addr2 || "[postnr ort]") + ", " + (v.Country || "Sverige"),
+    "    " + (v.Contact || "[e-post/URL]"),
+    "",
+    "  Made in " + (v.Country || "Sweden"),
+    "",
+    "      ( C E )        ( WEEE — överkryssad soptunna )",
+    "",
+    "  ⚠ Stroboskop — se manual. Endast inomhus.",
+    "  ⚠ Strobe — see manual. Indoor use only.",
+  ];
+  tsPreview.textContent = L.join("\n");
+  try { localStorage.setItem("pi-dmx-typskylt-v1", JSON.stringify(v)); } catch {}
+}
+(function tsInit(){
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem("pi-dmx-typskylt-v1") || "{}"); } catch {}
+  for (const k of TS_FIELDS) {
+    const el = document.getElementById("ts" + k);
+    if (!el) continue;
+    el.value = saved[k] ?? TS_DEFAULTS[k] ?? "";
+    el.addEventListener("input", tsRender);
+  }
+  tsRender();
+  const cp = document.getElementById("tsCopy");
+  if (cp) cp.onclick = async () => {
+    try { await navigator.clipboard.writeText(tsPreview.textContent); cp.textContent = "Kopierat ✓"; setTimeout(()=>cp.textContent="Kopiera etikett", 1500); }
+    catch { alert("Kunde inte kopiera — markera texten manuellt."); }
+  };
+  const pr = document.getElementById("tsPrint");
+  if (pr) pr.onclick = () => {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write("<pre style='font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:20px'>" + tsPreview.textContent.replace(/</g,"&lt;") + "</pre>");
+    w.document.close(); w.focus(); w.print();
+  };
+})();
+
+
+
 // ---- Första-start-wizard (owner only) -----------------------------------
 // Visas överst i /setup tills ägaren antingen har lagt till minst en fixture
 // ELLER tryckt "Jag är klar". LocalStorage-flaggan gör att den inte poppar
