@@ -58,15 +58,13 @@ export function applyMood(cfg: EngineConfig, mood: MoodId): void {
   cfg.smartDwellMs = f.smartDwellMs;
   cfg.master = f.master;           // ljus-tak
   cfg.calmDecay = f.calmDecay;      // reaktions-tröghet (output-decay)
-  if (!cfg.moodOverride) {
-    cfg.beatPulse = f.beatPulse;
-    cfg.dropBlackout = f.dropBlackout;
-    cfg.clubMode = f.clubMode;
-    cfg.ambientGlow = f.ambientGlow;
-    cfg.energyCeiling = f.energyCeiling;   // Regi (pro): VU-ljustak
-    cfg.riserStrobe = f.riserStrobe;       // Regi (pro): uppbyggnads-strobe
-    cfg.dropHeadroom = f.dropHeadroom;     // Regi (pro): drop-pop
-  }
+  cfg.beatPulse = f.beatPulse;
+  cfg.dropBlackout = f.dropBlackout;
+  cfg.clubMode = f.clubMode;
+  cfg.ambientGlow = f.ambientGlow;
+  cfg.energyCeiling = f.energyCeiling;   // Regi (pro): VU-ljustak
+  cfg.riserStrobe = f.riserStrobe;       // Regi (pro): uppbyggnads-strobe
+  cfg.dropHeadroom = f.dropHeadroom;     // Regi (pro): drop-pop
   if (!cfg.beatSyncOverride) cfg.beatSyncStrength = f.beatSyncStrength; // PLL-styrka mot trumslag
   // Rotation: bara stämningens pool aktiv (allt annat AV → smart väljer bara ur poolen).
   const pool = new Set<Mode>(POOL[mood]);
@@ -101,15 +99,13 @@ export function applyIntensity(cfg: EngineConfig, xRaw: number): void {
   const bucket: MoodId = x < 1 / 3 ? "chill" : x < 2 / 3 ? "fest" : "galet";
   const bf = FEEL[bucket];
   cfg.energyDrivesMode = bf.energyDrivesMode;
-  if (!cfg.moodOverride) {
-    cfg.beatPulse        = bf.beatPulse;
-    cfg.dropBlackout     = bf.dropBlackout;
-    cfg.clubMode         = bf.clubMode;
-    cfg.ambientGlow      = bf.ambientGlow;
-    cfg.energyCeiling    = bf.energyCeiling;
-    cfg.riserStrobe      = bf.riserStrobe;
-    cfg.dropHeadroom     = bf.dropHeadroom;
-  }
+  cfg.beatPulse        = bf.beatPulse;
+  cfg.dropBlackout     = bf.dropBlackout;
+  cfg.clubMode         = bf.clubMode;
+  cfg.ambientGlow      = bf.ambientGlow;
+  cfg.energyCeiling    = bf.energyCeiling;
+  cfg.riserStrobe      = bf.riserStrobe;
+  cfg.dropHeadroom     = bf.dropHeadroom;
   if (!cfg.beatSyncOverride) cfg.beatSyncStrength = bf.beatSyncStrength;
   const pool = new Set<Mode>(POOL[bucket]);
   const rot: Partial<Record<Mode, boolean>> = {};
