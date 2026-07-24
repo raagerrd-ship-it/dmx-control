@@ -83,6 +83,7 @@ export class KnobRing {
   private state: RingState = { intensity: 0.5, blackout: false, beat: false };
   private beatPulse = 0;   // 0..1, avklingar
   private blackoutFade = 1; // 1 = full, 0 = släckt (ebbar mot 0 vid blackout, snappar till 1 annars)
+  private standbyGlow = 0;  // 0..1 — svag röd standby-glöd, ebbar mjukt in/ut runt blackout
   private maxBright: number;
   private pulseBoost: number;
   private blackoutFadeMs: number;
