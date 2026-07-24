@@ -129,7 +129,7 @@ jobs:
       # Release-noten innehåller en maskinläsbar `BLE_BUILD_TAG: <tag>`-rad
       # som update-services.sh på Pi:n parsar för att verifiera att rätt
       # kod faktiskt deployades.
-      - uses: softprops/action-gh-release@v2.3.2
+      - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
@@ -141,7 +141,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: softprops/action-gh-release@v2.3.2
+      - uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Latest (${{ steps.version.outputs.tag }})
