@@ -686,6 +686,7 @@ function refreshModeView() {
 function applyConfig(cfg) {
   curRotation = cfg.rotation || {};
   curMode = cfg.mode || "smart";
+  if (typeof window.__maybeShowWizard === "function") window.__maybeShowWizard(cfg);
   refreshModeView();                 // sätter tEnergy/dwell/intro + renderar listorna
   // Stämnings-slidern speglar motorns activeIntensity (KY-040-vredet eller
   // andra klienter kan ha ändrat den). Kortet dimmas när ljuset är av.
