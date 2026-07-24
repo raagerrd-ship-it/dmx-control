@@ -137,12 +137,13 @@ function AudioMeterCard() {
             boxShadow: hot ? "0 0 14px hsl(var(--primary) / 0.55)" : "none",
           }}
         />
-        {/* diskreta ticks */}
-        <div className="pointer-events-none absolute inset-0 flex justify-between px-1">
+        {/* diskreta 0–10 tick-markörer */}
+        <div className="pointer-events-none absolute inset-x-1 inset-y-0 flex items-center justify-between">
           {Array.from({ length: 11 }).map((_, i) => (
-            <span key={i} className="w-px bg-background/40" />
+            <span key={i} className="w-0.5 h-1 rounded-sm bg-foreground/15" />
           ))}
         </div>
+
       </div>
 
       {/* Segmenterad källa-väljare */}
