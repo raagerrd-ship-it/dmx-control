@@ -835,9 +835,11 @@ function applyFogStatus(s) {
 
 
 /* ── Fixture editor ─────────────────────────────────────────────────── */
-const PRESETS = ["rgb", "rgbw", "dimmer", "custom"];
+const PRESETS = ["rgb", "rgb7", "rgbw", "dimmer", "custom"];
 const PRESET_ROLES = {
   rgb:    ["r","g","b"],
+  // 7-ch: R,G,B,DIM,STROBE,MACRO,MACRO-SPEED. Motorn låser DIM=255, MACRO+SPEED=0.
+  rgb7:   ["r","g","b","dim","strobe","unused","unused"],
   rgbw:   ["r","g","b","w"],
   dimmer: ["dim"],
 };
