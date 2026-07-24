@@ -427,7 +427,7 @@ function RotationList({ modes }: { modes: [string, string, string][] }) {
 function OwnerSections() {
   const [beatSync, setBeatSync] = useState(0.18);
   const [beatSyncOverride, setBeatSyncOverride] = useState(false);
-  const [moodOverride, setMoodOverride] = useState(false);
+  
   const [fogEnabled, setFogEnabled] = useState(false);
   const [fogOnDrop, setFogOnDrop] = useState(true);
   const [fogAddr, setFogAddr] = useState(200);
