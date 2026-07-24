@@ -125,7 +125,7 @@ function moodInfoFor(v: number) {
 function InputLevel() {
   const audio = useDmx((st) => st.audioLevel);
   const pct = Math.max(0, Math.min(100, Math.round(audio * 100)));
-  const hot = pct > 85;
+  const hot = pct >= 99;
   const silent = pct < 4;
 
   const peakRef = useRef(0);
