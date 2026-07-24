@@ -181,28 +181,6 @@ function InputLevel() {
     </div>
   );
 }
-      <div className="flex items-end gap-1.5 h-9">
-        {bars.map((h, i) => {
-          const strong = h > 0.7;
-          const mid = h > 0.4;
-          return (
-            <span
-              key={i}
-              className={`flex-1 rounded-sm transition-all duration-150 ${
-                strong
-                  ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.6)]"
-                  : mid
-                    ? "bg-primary/60"
-                    : "bg-muted/40"
-              }`}
-              style={{ height: `${Math.round(h * 100)}%` }}
-            />
-          );
-        })}
-      </div>
-    </section>
-  );
-}
 
 function SourcePill() {
   const s = usePi();
