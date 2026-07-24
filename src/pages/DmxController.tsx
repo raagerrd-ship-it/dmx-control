@@ -33,7 +33,17 @@ export default function DmxController() {
       <MoreDetails />
 
       {ownerMode && <OwnerSections />}
+
+      <StatusFooter />
     </main>
+  );
+}
+
+function StatusFooter() {
+  return (
+    <div className="mt-6 text-center text-[10px] tracking-[0.24em] uppercase text-muted-foreground/40 font-mono">
+      Ansluten · v1.4.0 · 4 lampor
+    </div>
   );
 }
 
