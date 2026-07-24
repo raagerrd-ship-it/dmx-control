@@ -46,13 +46,6 @@ function MoodSlider() {
   const s = usePi();
   const off = !s.power;
   const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
-  const info =
-    v === 0 ? { name: "Av",     desc: "Ljuset är släckt — dra åt höger för att tända" } :
-    v <= 2  ? { name: "Chill",  desc: "Mjukt och långsamt, följer inte taktslag" } :
-    v <= 4  ? { name: "Chill+", desc: "Följer musiken lugnt" } :
-    v <= 6  ? { name: "Fest",   desc: "Pulsar på taktslag, byter effekt ibland" } :
-    v <= 8  ? { name: "Fest+",  desc: "Klubb-läge, byter effekt oftare" } :
-              { name: "Galet",  desc: "Full fart, drop-blackout, riser-strobe" };
   const fillPct = (v / 10) * 100;
   return (
     <section className="mb-6 mt-2">
@@ -88,16 +81,20 @@ function MoodSlider() {
         <span className={v >= 5 && v <= 7 ? "text-primary" : "opacity-70"}>Fest</span>
         <span className={v >= 9 ? "text-primary" : "opacity-70"}>Galet</span>
       </div>
-
-      <p className="mt-3 text-[13px] leading-snug text-muted-foreground italic">
-        {info.desc}
-      </p>
     </section>
   );
 }
 
 /* ────────── Ljud (källa + nivå + teknisk info) ────────── */
 
+function moodInfoFor(v: number) {
+  if (v <= 0) return { name: "Av",     desc: "Ljuset är släckt — dra åt höger för att tända" };
+  if (v <= 2) return { name: "Chill",  desc: "Mjukt och långsamt, följer inte taktslag" };
+  if (v <= 4) return { name: "Chill+", desc: "Följer musiken lugnt" };
+  if (v <= 6) return { name: "Fest",   desc: "Pulsar på taktslag, byter effekt ibland" };
+  if (v <= 8) return { name: "Fest+",  desc: "Klubb-läge, byter effekt oftare" };
+  return               { name: "Galet",  desc: "Full fart, drop-blackout, riser-strobe" };
+}
 
 function AudioMeterCard() {
   const s = usePi();
@@ -112,6 +109,8 @@ function AudioMeterCard() {
   const kickOn = kick > 0.4;
   const hot = audio > 0.85;
   const source = s.audioInput;
+  const off = !s.power;
+  const moodV = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
 
   return (
     <section className="mb-4">
@@ -190,6 +189,9 @@ function AudioMeterCard() {
           <span className="ml-1 hidden group-open/tech:inline"> ⌃</span>
         </summary>
         <div className="mt-2 divide-y divide-border/40 rounded-xl bg-muted/25 ring-1 ring-border/40 px-3">
+          <p className="py-2 text-[13px] leading-snug text-muted-foreground italic">
+            {moodInfoFor(moodV).desc}
+          </p>
           <TechRow label="BPM" value={locked ? `${Math.round(bpm)}` : "–"} accent={locked} />
           <TechRow
             label="Beat-synk"

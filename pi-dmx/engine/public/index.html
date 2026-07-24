@@ -183,6 +183,7 @@
     .tech-list label { font-size:12px; color:var(--dim); display:inline-flex; align-items:center; gap:6px; }
     .tech-list .val { font-size:13px; font-variant-numeric:tabular-nums; font-weight:500; color:var(--fg); }
     .tech-list .val.on { color:var(--hot); }
+    .tech-list .mood-desc { margin:0; padding:10px 0; border-bottom:1px solid color-mix(in srgb, var(--line) 60%, transparent); font-style:italic; }
 
     details.more { margin-top:8px; }
     details.more > summary { list-style:none; cursor:pointer; padding:14px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
@@ -295,7 +296,6 @@
       <input type="range" id="moodSlider" class="mood-range" min="0" max="10" step="1" value="5" aria-label="Stämning från Av till Galet" />
     </div>
     <div class="mood-slider-legend"><span id="legAv">Av</span><span id="legFest">Fest</span><span id="legGalet">Galet</span></div>
-    <div class="mood-desc" id="moodDesc">Pulsar på taktslag, byter effekt ibland</div>
   </section>
 
   <section class="audio-section">
@@ -318,6 +318,7 @@
     <details class="tech-details">
       <summary>Teknisk info</summary>
       <div class="tech-list">
+        <div class="mood-desc" id="moodDesc">Pulsar på taktslag, byter effekt ibland</div>
         <div class="row"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
         <div class="row"><label>Beat-synk <span class="audio-kd" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
         <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
