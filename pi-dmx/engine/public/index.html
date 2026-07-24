@@ -665,6 +665,8 @@ function applyConfig(cfg) {
   if (tBeatPulse) tBeatPulse.checked = !!cfg.beatPulse;
   const fog = cfg.fog || {};
   if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 128; }
+  const fogSettings = document.getElementById("fogSettings");
+  if (fogSettings) fogSettings.style.display = fog.enabled ? "" : "none";
   if (tDropBlackout) tDropBlackout.checked = cfg.dropBlackout !== false;   // default på
   if (tScenicAnchor) tScenicAnchor.checked = !!cfg.scenicAnchor;
   if (tEnergyCeiling) tEnergyCeiling.checked = !!cfg.energyCeiling;
