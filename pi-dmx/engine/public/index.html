@@ -804,8 +804,14 @@ function applyConfig(cfg) {
     if (bsBadge) bsBadge.textContent = bsOv ? "Manuell" : "Följer stämning";
   }
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
-  inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
-  inMic.classList.toggle("primary", cfg.audioInput === "mic");
+  const curSrc = (cfg.audioInput ?? "aux") === "mic" ? "mic" : "aux";
+  const srcSeg = document.getElementById("srcSeg");
+  if (srcSeg) srcSeg.dataset.src = curSrc;
+  inAux.classList.toggle("active", curSrc === "aux");
+  inAux.setAttribute("aria-selected", curSrc === "aux" ? "true" : "false");
+  inMic.classList.toggle("active", curSrc === "mic");
+  inMic.setAttribute("aria-selected", curSrc === "mic" ? "true" : "false");
+
   segActivate("segDyn", cfg.dynamics ?? 0.6, "dyn");
   segActivate("segMaster", cfg.master ?? 1, "master");
   segActivate("segSpeed", tauDownToAgg(cfg.detection?.tauDown ?? 30) > 0.5 ? 0.85 : 0.15, "agg");
