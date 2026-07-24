@@ -99,15 +99,13 @@ export function applyIntensity(cfg: EngineConfig, xRaw: number): void {
   const bucket: MoodId = x < 1 / 3 ? "chill" : x < 2 / 3 ? "fest" : "galet";
   const bf = FEEL[bucket];
   cfg.energyDrivesMode = bf.energyDrivesMode;
-  if (!cfg.moodOverride) {
-    cfg.beatPulse        = bf.beatPulse;
-    cfg.dropBlackout     = bf.dropBlackout;
-    cfg.clubMode         = bf.clubMode;
-    cfg.ambientGlow      = bf.ambientGlow;
-    cfg.energyCeiling    = bf.energyCeiling;
-    cfg.riserStrobe      = bf.riserStrobe;
-    cfg.dropHeadroom     = bf.dropHeadroom;
-  }
+  cfg.beatPulse        = bf.beatPulse;
+  cfg.dropBlackout     = bf.dropBlackout;
+  cfg.clubMode         = bf.clubMode;
+  cfg.ambientGlow      = bf.ambientGlow;
+  cfg.energyCeiling    = bf.energyCeiling;
+  cfg.riserStrobe      = bf.riserStrobe;
+  cfg.dropHeadroom     = bf.dropHeadroom;
   if (!cfg.beatSyncOverride) cfg.beatSyncStrength = bf.beatSyncStrength;
   const pool = new Set<Mode>(POOL[bucket]);
   const rot: Partial<Record<Mode, boolean>> = {};
