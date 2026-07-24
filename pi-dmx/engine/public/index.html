@@ -949,14 +949,31 @@ function updateAdvMirror(cfg) {
 let bleConnectedCount = 0;
 let lastBleActive = 0;
 let kickTimer;
+let peakHold = 0;
+let clipUntil = 0;
 function applyFrame(f) {
   const pct = Math.round(f.level * 100);
-  levelBar.style.width = pct + "%";
   levelVal.textContent = pct + "%";
-  const hot = f.level > 0.85;
+  const now = performance.now();
+  // Peak-hold med långsam decay
+  if (pct >= peakHold) peakHold = pct;
+  else peakHold = Math.max(pct, peakHold - 1.2);
+  // KLIPP-latch: ≥99 % hålls i 600 ms för stabilt ljus
+  if (pct >= 99) clipUntil = now + 600;
+  const hot = now < clipUntil;
   levelVal.classList.toggle("hot", hot);
   const barWrap = document.getElementById("levelBarWrap");
   if (barWrap) barWrap.classList.toggle("hot", hot);
+  // Segmenterad mätare: 12 block
+  if (barWrap) {
+    const segs = barWrap.querySelectorAll("span");
+    const active = Math.round((pct / 100) * segs.length);
+    const peak = Math.round((peakHold / 100) * segs.length);
+    segs.forEach((s, i) => {
+      s.classList.toggle("on", i < active);
+      s.classList.toggle("peak", i === peak && pct < 4);
+    });
+  }
 
   gainVal.textContent = f.gain.toFixed(1);
   lastBleActive = f.bleActive ?? 0;
