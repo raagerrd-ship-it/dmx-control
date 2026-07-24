@@ -696,16 +696,16 @@ function applyConfig(cfg) {
       if (b) b.textContent = mOv ? "Manuell" : "Följer stämning";
     }
   }
-  segActivate("segBeatSync", cfg.beatSyncStrength ?? 0.18, "bs");
-  const bsOv = !!cfg.beatSyncOverride;
-  const bsCard = document.getElementById("beatSyncCard");
-  const bsSeg = document.getElementById("segBeatSync");
-  const bsBadge = document.getElementById("beatSyncBadge");
-  const bsOvChk = document.getElementById("beatSyncOverride");
-  if (bsOvChk) bsOvChk.checked = bsOv;
-  if (bsCard) bsCard.classList.toggle("mood-locked", !bsOv);
-  if (bsSeg) { bsSeg.style.pointerEvents = bsOv ? "" : "none"; bsSeg.style.opacity = bsOv ? "" : ".75"; }
-  if (bsBadge) bsBadge.textContent = bsOv ? "Manuell" : "Följer stämning";
+  {
+    const bsOv = !!cfg.beatSyncOverride;
+    const bsBadge = document.getElementById("beatSyncBadge");
+    const seg = document.getElementById("segBeatSync");
+    if (seg) {
+      const active = bsOv ? String(cfg.beatSyncStrength ?? 0.18) : "auto";
+      seg.querySelectorAll("button").forEach((b) => b.classList.toggle("primary", b.dataset.bs === active));
+    }
+    if (bsBadge) bsBadge.textContent = bsOv ? "Manuell" : "Följer stämning";
+  }
   segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
   inAux.classList.toggle("primary", (cfg.audioInput ?? "aux") === "aux");
   inMic.classList.toggle("primary", cfg.audioInput === "mic");
