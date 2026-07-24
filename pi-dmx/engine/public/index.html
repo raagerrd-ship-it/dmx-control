@@ -1317,17 +1317,22 @@ fogServiceReset.onclick = () => {
 };
 
 /* ── Regi (pro) ──────────────────────────────────────────────────────────
- * Bara scenicAnchor + strobeUnlimited är ägar-val. Resten (dropBlackout,
- * energyCeiling, clubMode, ambientGlow, riserStrobe, dropHeadroom) sätts av
- * stämnings-vredet i moods.ts och visas här som disabled för insyn — därför
- * inga onchange-handlers på dem. */
+ * scenicAnchor + strobeUnlimited är alltid ägar-val. De 6 mood-flaggorna
+ * (dropBlackout, energyCeiling, clubMode, ambientGlow, riserStrobe,
+ * dropHeadroom) styrs av stämnings-vredet — men om "moodOverride" slås på
+ * så låses de upp och ägaren kan sätta dem manuellt. */
 const tDropBlackout = document.getElementById("tDropBlackout");
+tDropBlackout.onchange = () => send({ type: "setDropBlackout", value: tDropBlackout.checked });
 const tScenicAnchor = document.getElementById("tScenicAnchor");
 tScenicAnchor.onchange = () => send({ type: "setScenicAnchor", value: tScenicAnchor.checked });
 const tEnergyCeiling = document.getElementById("tEnergyCeiling");
+tEnergyCeiling.onchange = () => send({ type: "setEnergyCeiling", value: tEnergyCeiling.checked });
 const tClubMode = document.getElementById("tClubMode");
+tClubMode.onchange = () => send({ type: "setClubMode", value: tClubMode.checked });
 const tAmbientGlow = document.getElementById("tAmbientGlow");
+tAmbientGlow.onchange = () => send({ type: "setAmbientGlow", value: tAmbientGlow.checked });
 const tRiserStrobe = document.getElementById("tRiserStrobe");
+tRiserStrobe.onchange = () => send({ type: "setRiserStrobe", value: tRiserStrobe.checked });
 const tStrobeUnlimited = document.getElementById("tStrobeUnlimited");
 // Att HÖJA taket kräver ett aktivt ja; att sänka det gör det aldrig.
 tStrobeUnlimited.onchange = () => {
@@ -1340,6 +1345,11 @@ tStrobeUnlimited.onchange = () => {
   send({ type: "setStrobeUnlimited", value: tStrobeUnlimited.checked });
 };
 const tDropHeadroom = document.getElementById("tDropHeadroom");
+tDropHeadroom.onchange = () => send({ type: "setDropHeadroom", value: tDropHeadroom.checked });
+{
+  const mOv = document.getElementById("moodOverride");
+  if (mOv) mOv.onchange = () => send({ type: "setMoodOverride", value: mOv.checked });
+}
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.
