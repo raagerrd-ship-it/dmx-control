@@ -170,7 +170,7 @@ fi
 
 echo "==> [8/8] enable + start services"
 systemctl daemon-reload
-systemctl enable --now cpu-performance codec-zero-linein dmx-helper audio-dmx-engine
+systemctl enable --now cpu-performance codec-zero-linein dmx-helper audio-dmx-engine pi-dmx-watchdog.timer
 [ -f /etc/systemd/system/pi-dmx-ble.service ] && systemctl enable --now pi-dmx-ble
 # enable --now does not restart already-running units — force the new build live.
 systemctl restart dmx-helper audio-dmx-engine
