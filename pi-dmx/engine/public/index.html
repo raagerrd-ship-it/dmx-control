@@ -314,6 +314,18 @@
   <div id="ownerOnly" hidden>
   <div class="owner-banner">🔧 Ägarläge (setup). Den här sidan är dold för hyresgäster — de öppnar adressen utan <b>/setup</b>.</div>
 
+  <div id="setupWizard" class="card" hidden style="border:1px solid var(--warn);background:linear-gradient(180deg,rgba(255,180,60,.08),rgba(255,180,60,.02))">
+    <h1 style="margin:0 0 6px;font-size:18px">👋 Kom igång — första start</h1>
+    <div class="status" style="margin:0 0 10px">Så här får du boxen att lira på 3 minuter:</div>
+    <ol style="margin:0 0 10px 20px;line-height:1.7;font-size:13px">
+      <li><b>Lägg till lampor</b> under <em>Lampor</em>: sätt DMX-adress + preset (RGB / RGBW / RGB7). Osäker på kanaler? Tryck <em>Walk-test</em>.</li>
+      <li><b>Para BLE-slingor</b> (om du har några) under <em>BLE-slingor</em> → Sök → Blinka → Para.</li>
+      <li><b>Testa</b>: gå tillbaka till hyresgäst-vyn (adressen utan <b>/setup</b>), tryck Power, dra Stämning. Musik i mikrofonen → lamporna rör sig.</li>
+      <li><b>Exportera config</b> under <em>System</em> när allt funkar — då har du en backup ifall något strular.</li>
+    </ol>
+    <button class="btn primary" id="wizDismiss">Jag är klar — dölj denna guide</button>
+  </div>
+
   <h1>Beat-synk</h1>
   <div class="card" id="beatSyncCard">
     <div class="setrow">
@@ -422,16 +434,30 @@
 
   <h1>System</h1>
   <div class="card">
-    <div class="row"><label>Version</label><span class="val" id="verSha">–</span></div>
+    <div class="row"><label>Motor-version</label><span class="val" id="engVer">–</span></div>
+    <div class="row"><label>Git-SHA</label><span class="val" id="verSha">–</span></div>
     <div class="status" id="verMsg" style="margin-top:2px"></div>
     <div class="fx-actions" style="margin-top:10px">
-      <button class="btn primary" id="btnUpdate">Update to latest</button>
-      <button class="btn" id="btnRollback">Rollback</button>
+      <button class="btn primary" id="btnUpdate">Uppdatera till senaste</button>
+      <button class="btn" id="btnRollback">Rulla tillbaka</button>
+    </div>
+    <div class="fx-actions" style="margin-top:8px">
+      <button class="btn" id="btnCfgExport">Exportera config</button>
+      <button class="btn" id="btnCfgImport">Importera config</button>
+      <input type="file" id="cfgImportFile" accept="application/json,.json" style="display:none">
     </div>
     <div class="fx-actions" style="margin-top:8px">
       <button class="btn" id="btnFactory" style="border-color:var(--warn);color:var(--warn)">Fabriks-reset (raderar fixtures)</button>
     </div>
     <pre id="updLog" class="status" style="white-space:pre-wrap;max-height:180px;overflow:auto;margin-top:10px;display:none;font-family:ui-monospace,Menlo,monospace;font-size:11px"></pre>
+    <details style="margin-top:10px">
+      <summary style="cursor:pointer;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:4px 0">Systemlogg (senaste händelser)</summary>
+      <div class="fx-actions" style="margin:8px 0">
+        <button class="btn" id="btnHealthRefresh">Uppdatera</button>
+        <button class="btn" id="btnHealthDownload">Ladda ner som JSON</button>
+      </div>
+      <div id="healthLogList" class="status" style="max-height:280px;overflow:auto;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.5">Laddar…</div>
+    </details>
   </div>
 
   <h1>WiFi</h1>
@@ -660,6 +686,7 @@ function refreshModeView() {
 function applyConfig(cfg) {
   curRotation = cfg.rotation || {};
   curMode = cfg.mode || "smart";
+  if (typeof window.__maybeShowWizard === "function") window.__maybeShowWizard(cfg);
   refreshModeView();                 // sätter tEnergy/dwell/intro + renderar listorna
   // Stämnings-slidern speglar motorns activeIntensity (KY-040-vredet eller
   // andra klienter kan ha ändrat den). Kortet dimmas när ljuset är av.
@@ -1437,24 +1464,29 @@ wifiForgetBtn.onclick = async () => {
 // ---- Self-update ----------------------------------------------------------
 const verSha = document.getElementById("verSha");
 const verMsg = document.getElementById("verMsg");
+const engVer = document.getElementById("engVer");
 const btnUpdate = document.getElementById("btnUpdate");
 const updLog = document.getElementById("updLog");
 let updPoll = null;
 
 async function refreshVersion() {
   try {
-    const r = await fetch("/update/status").then(r => r.json());
-    verSha.textContent = r.sha ? `${r.sha} · ${new Date(r.date).toLocaleString("sv-SE")}` : (r.error ?? "unknown");
-    verMsg.textContent = r.msg ?? "";
-    if (r.log) { updLog.textContent = r.log; }
+    const [status, ver] = await Promise.all([
+      fetch("/update/status").then(r => r.json()).catch(() => ({})),
+      fetch("/api/version").then(r => r.json()).catch(() => ({})),
+    ]);
+    if (engVer) engVer.textContent = ver.version ? `v${ver.version}` : "–";
+    verSha.textContent = status.sha ? `${status.sha} · ${new Date(status.date).toLocaleString("sv-SE")}` : (status.error ?? "unknown");
+    verMsg.textContent = status.msg ?? "";
+    if (status.log) { updLog.textContent = status.log; }
   } catch {}
 }
 refreshVersion();
 
 btnUpdate.onclick = async () => {
-  if (!confirm("Uppdatera till senaste versionen? Tjänsten startas om.")) return;
+  if (!confirm("Uppdatera till senaste versionen? Tjänsten startas om. Om nya versionen kraschar rullar vi automatiskt tillbaka efter 60 s.")) return;
   btnUpdate.disabled = true;
-  btnUpdate.textContent = "Updating…";
+  btnUpdate.textContent = "Uppdaterar…";
   updLog.style.display = "block";
   updLog.textContent = "Startar…";
   try {
@@ -1468,15 +1500,15 @@ btnUpdate.onclick = async () => {
     if (verSha.textContent && verSha.textContent !== startedSha && !/–|unknown/.test(verSha.textContent)) {
       clearInterval(updPoll); updPoll = null;
       btnUpdate.disabled = false;
-      btnUpdate.textContent = "Update to latest";
+      btnUpdate.textContent = "Uppdatera till senaste";
     }
   }, 2000);
-  // Safety timeout
+  // Safety timeout — 4 min räcker för install + 60 s stabilitetsfönstret.
   setTimeout(() => {
     if (updPoll) { clearInterval(updPoll); updPoll = null; }
     btnUpdate.disabled = false;
-    btnUpdate.textContent = "Update to latest";
-  }, 180000);
+    btnUpdate.textContent = "Uppdatera till senaste";
+  }, 240000);
 };
 
 // ---- Rollback + fabriks-reset --------------------------------------------
@@ -1495,10 +1527,10 @@ if (btnRollback) btnRollback.onclick = async () => {
   const p = setInterval(async () => {
     await refreshVersion();
     if (verSha.textContent && verSha.textContent !== startedSha && !/–|unknown/.test(verSha.textContent)) {
-      clearInterval(p); btnRollback.disabled = false; btnRollback.textContent = "Rollback";
+      clearInterval(p); btnRollback.disabled = false; btnRollback.textContent = "Rulla tillbaka";
     }
   }, 2000);
-  setTimeout(() => { clearInterval(p); btnRollback.disabled = false; btnRollback.textContent = "Rollback"; }, 180000);
+  setTimeout(() => { clearInterval(p); btnRollback.disabled = false; btnRollback.textContent = "Rulla tillbaka"; }, 180000);
 };
 
 // Fabriks-reset: nolla config (fixtures FÖRSVINNER). Konfigen sparas som
@@ -1513,6 +1545,109 @@ if (btnFactory) btnFactory.onclick = async () => {
   // Motorn kör systemctl restart → WS tappar. onclose triggar reconnect
   // och när den kommer upp igen är configen defaults. Ingen extra polling.
 };
+
+// ---- Config export / import ---------------------------------------------
+// Snabb "backup + restore" utan SSH — kritiskt för uthyrning: om en enhet
+// börjar bete sig konstigt kan ägaren skicka en känd bra config från en
+// annan box och vara igång på 30 s.
+const btnCfgExport = document.getElementById("btnCfgExport");
+if (btnCfgExport) btnCfgExport.onclick = () => {
+  // Låt browsern hantera nedladdningen via ankaret — enklare än fetch+blob
+  // och Content-Disposition:ns filnamn behålls.
+  window.location.href = "/api/config/export";
+};
+const btnCfgImport = document.getElementById("btnCfgImport");
+const cfgImportFile = document.getElementById("cfgImportFile");
+if (btnCfgImport && cfgImportFile) {
+  btnCfgImport.onclick = () => cfgImportFile.click();
+  cfgImportFile.onchange = async () => {
+    const file = cfgImportFile.files && cfgImportFile.files[0];
+    if (!file) return;
+    if (!confirm(`Importera "${file.name}"? Nuvarande config sparas som backup men ersätts och motorn startas om.`)) {
+      cfgImportFile.value = "";
+      return;
+    }
+    try {
+      const text = await file.text();
+      // Låt servern validera — vi vill inte duplicera schema-check här.
+      const r = await fetch("/api/config/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: text,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      alert("Config importerad. Motorn startar om — sidan laddas om automatiskt.");
+    } catch (e) {
+      alert("Import misslyckades: " + (e && e.message ? e.message : e));
+    }
+    cfgImportFile.value = "";
+  };
+}
+
+// ---- Systemlogg ----------------------------------------------------------
+// Uthyrning-support: ägaren kan öppna /setup och läsa senaste händelserna,
+// eller ladda ner som JSON och skicka till support. Ingen SSH krävs.
+const healthLogList = document.getElementById("healthLogList");
+const btnHealthRefresh = document.getElementById("btnHealthRefresh");
+const btnHealthDownload = document.getElementById("btnHealthDownload");
+const SEV_COLOR = { info: "var(--dim)", warn: "var(--warn)", err: "var(--hot)" };
+async function refreshHealthLog() {
+  if (!healthLogList) return;
+  healthLogList.textContent = "Hämtar…";
+  try {
+    const r = await fetch("/api/health-log").then(r => r.json());
+    const evs = (r.events || []).slice().reverse();
+    if (!evs.length) { healthLogList.textContent = "(inga händelser)"; return; }
+    healthLogList.innerHTML = evs.map((e) => {
+      const t = new Date(e.t).toLocaleTimeString("sv-SE");
+      const col = SEV_COLOR[e.sev] || "var(--fg)";
+      return `<div><span style="color:${col}">[${t} ${e.sev.toUpperCase()} ${escapeHtml(e.tag)}]</span> ${escapeHtml(e.msg)}</div>`;
+    }).join("");
+  } catch (e) {
+    healthLogList.textContent = "Kunde inte läsa logg: " + e;
+  }
+}
+if (btnHealthRefresh) btnHealthRefresh.onclick = refreshHealthLog;
+if (btnHealthDownload) btnHealthDownload.onclick = async () => {
+  try {
+    const r = await fetch("/api/health-log").then(r => r.json());
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const blob = new Blob([JSON.stringify(r, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `pi-dmx-log-${stamp}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) { alert("Kunde inte ladda ner: " + e); }
+};
+// Ladda in en första omgång direkt när owner-vyn öppnas.
+if (OWNER_MODE) refreshHealthLog();
+
+// ---- Första-start-wizard (owner only) -----------------------------------
+// Visas överst i /setup tills ägaren antingen har lagt till minst en fixture
+// ELLER tryckt "Jag är klar". LocalStorage-flaggan gör att den inte poppar
+// upp igen efter en fabriks-reset om ägaren avfärdat den (medvetet val:
+// fabriks-reset nollar config men inte browser-preferences).
+const setupWizard = document.getElementById("setupWizard");
+const wizDismiss = document.getElementById("wizDismiss");
+function maybeShowWizard(cfg) {
+  if (!setupWizard || !OWNER_MODE) return;
+  let dismissed = false;
+  try { dismissed = !!localStorage.getItem("pi-dmx-wizard-done-v1"); } catch {}
+  const hasFixtures = cfg && Array.isArray(cfg.fixtures) && cfg.fixtures.length > 0;
+  setupWizard.hidden = dismissed || hasFixtures;
+}
+if (wizDismiss) wizDismiss.onclick = () => {
+  try { localStorage.setItem("pi-dmx-wizard-done-v1", String(Date.now())); } catch {}
+  if (setupWizard) setupWizard.hidden = true;
+};
+// applyCfg körs varje gång servern broadcastar → wizard göms automatiskt
+// när första fixturen sparas. Hook:a in via en MutationObserver-fri väg:
+// vi wrappar bara nästa applyCfg-tick genom att kalla maybeShowWizard från
+// samma ställe applyCfg redan gör sin renderRotation etc.
+window.__maybeShowWizard = maybeShowWizard;
+maybeShowWizard(null);
 
 // ---- Walk-test: guidad kanal-identifiering ------------------------------
 // DMX är enkelriktat → vi kan inte fråga lampan. Vi tänder EN kanal i taget
