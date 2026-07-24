@@ -510,27 +510,55 @@ function OwnerSections() {
       <SectionTitle>Lampor</SectionTitle>
       <Card>
         <div className="space-y-2">
-          {[
-            { name: "PAR 1", type: "RGBW", addr: 1 },
-            { name: "PAR 2", type: "RGBW", addr: 8 },
-            { name: "PAR 3", type: "RGBW", addr: 15 },
-            { name: "PAR 4", type: "RGBW", addr: 22 },
-          ].map((f) => (
-            <div key={f.name} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-              <div>
-                <div className="text-[14px] font-medium">{f.name}</div>
-                <div className="text-[11px] text-muted-foreground">{f.type} · DMX {f.addr}</div>
+          {([
+            { name: "PAR 1", type: "RGBW" as const, addr: 1 },
+            { name: "PAR 2", type: "RGBW" as const, addr: 8 },
+            { name: "PAR 3", type: "RGBW" as const, addr: 15 },
+            { name: "PAR 4", type: "RGBW" as const, addr: 22 },
+          ]).map((f) => {
+            const roles: { label: string; cls: string }[] =
+              f.type === "RGBW"
+                ? [
+                    { label: "R", cls: "bg-red-500/20 text-red-300 border-red-500/30" },
+                    { label: "G", cls: "bg-green-500/20 text-green-300 border-green-500/30" },
+                    { label: "B", cls: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
+                    { label: "W", cls: "bg-amber-100/15 text-amber-100 border-amber-100/30" },
+                  ]
+                : f.type === "RGB"
+                ? [
+                    { label: "R", cls: "bg-red-500/20 text-red-300 border-red-500/30" },
+                    { label: "G", cls: "bg-green-500/20 text-green-300 border-green-500/30" },
+                    { label: "B", cls: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
+                  ]
+                : [{ label: "DIM", cls: "bg-muted text-foreground/80 border-border" }];
+            const last = f.addr + roles.length - 1;
+            return (
+              <div key={f.name} className="flex items-start justify-between py-2 border-b border-border last:border-0 gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="text-[14px] font-medium">{f.name}</div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground">{f.type}</span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-0.5">DMX {f.addr}{roles.length > 1 ? `–${last}` : ""} · {roles.length} kanal{roles.length > 1 ? "er" : ""}</div>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {roles.map((r, i) => (
+                      <span key={i} className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${r.cls}`}>
+                        {f.addr + i}·{r.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <button className="px-2.5 py-1.5 rounded-[8px] border border-border bg-card text-[12px] shrink-0">Blinka</button>
               </div>
-              <button className="px-2.5 py-1.5 rounded-[8px] border border-border bg-card text-[12px]">Blinka</button>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div className="flex gap-2 mt-3">
           <button className="flex-1 py-2 rounded-[9px] border border-border bg-card text-[13px]">+ Lägg till</button>
           <button className="flex-1 py-2 rounded-[9px] border border-border bg-card text-[13px]">Auto-adressera</button>
         </div>
         <div className="text-[12px] text-muted-foreground mt-2 leading-snug">
-          Mock — riktig fixture-editor finns på Pi:ns <code>/setup</code>.
+          Auto-detektering av lamp-typ finns inte — DMX är enkelriktat. Välj läge (RGB/RGBW/Dimmer) manuellt; Auto-adressera räknar ut startadresser åt dig. Riktig editor: Pi:ns <code>/setup</code>.
         </div>
       </Card>
 

@@ -68,6 +68,15 @@
     .fx-cal-title { font-size: 14px; font-weight: 600; color: var(--fg); }
     .fx-cal-badge { font-size: 12px; color: var(--ok); font-variant-numeric: tabular-nums; }
     .fx-cal-badge.unset { color: var(--dim); }
+    .fx-chan-row { display: flex; flex-wrap: wrap; gap: 4px; margin: -2px 0 8px; }
+    .fx-chan { font: 600 10px/1 ui-monospace, Menlo, monospace; padding: 3px 6px; border-radius: 5px; border: 1px solid var(--line); color: var(--dim); letter-spacing: .02em; }
+    .fx-chan.r { color: #ff8a8a; border-color: #ff8a8a55; background: #ff4d4d18; }
+    .fx-chan.g { color: #7ee59a; border-color: #7ee59a55; background: #43d97018; }
+    .fx-chan.b { color: #8ab6ff; border-color: #8ab6ff55; background: #4d7dff1c; }
+    .fx-chan.w { color: #f5e9c8; border-color: #f5e9c855; background: #ffe9a81a; }
+    .fx-chan.a { color: #ffcf88; border-color: #ffcf8855; background: #ffb04a1c; }
+    .fx-chan.uv { color: #d3a6ff; border-color: #d3a6ff55; background: #a86bff1e; }
+    .fx-chan.d { color: #e6e6e6; border-color: #ffffff33; background: #ffffff10; }
     .fx-cal-hint { font-size: 12px; color: var(--dim); line-height: 1.45; margin: 6px 0 10px; }
     .fx-cal-chips { display: flex; gap: 6px; margin: 8px 0 6px; }
     .fx-cal-chip { flex: 1; padding: 7px 0; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; color: var(--dim); font-size: 13px; font-weight: 600; cursor: pointer; }
@@ -896,6 +905,13 @@ function renderFixtures() {
         <input class="name" type="text" value="${escapeHtml(fx.name)}" data-i="${i}" data-k="name" />
         <button class="id" data-id="${i}" title="Blinka lampan så du hittar den">Hitta</button>
         <button class="del" data-del="${i}" aria-label="Ta bort">×</button>
+      </div>
+      <div class="fx-chan-row" aria-label="DMX-kanaler">
+        ${rolesOf(fx).map((role, k) => {
+          const cls = ({ r:"r", g:"g", b:"b", w:"w", a:"a", uv:"uv", dim:"d", strobe:"a", unused:"" })[role] || "";
+          const lbl = ({ r:"R", g:"G", b:"B", w:"W", a:"A", uv:"UV", dim:"DIM", strobe:"STR", unused:"—" })[role] || role.toUpperCase();
+          return `<span class="fx-chan ${cls}">${fx.address + k}·${lbl}</span>`;
+        }).join("")}
       </div>
       <div class="fx-cal">
         <div class="fx-cal-head">
