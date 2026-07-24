@@ -83,6 +83,7 @@ export class KnobRing {
   private state: RingState = { intensity: 0.5, blackout: false, beat: false };
   private beatPulse = 0;   // 0..1, avklingar
   private blackoutFade = 1; // 1 = full, 0 = släckt (ebbar mot 0 vid blackout, snappar till 1 annars)
+  private standbyGlow = 0;  // 0..1 — svag röd standby-glöd, ebbar mjukt in/ut runt blackout
   private maxBright: number;
   private pulseBoost: number;
   private blackoutFadeMs: number;
@@ -130,18 +131,24 @@ export class KnobRing {
     this.beatPulse *= 0.80;
     if (this.beatPulse < 0.01) this.beatPulse = 0;
 
-    // Blackout-fade: 1 → 0 under `blackoutFadeMs`. tau = fadeMs/3 → ~95 % släckt vid utsatt tid.
-    if (this.state.blackout) {
-      if (this.blackoutFadeMs <= 1) this.blackoutFade = 0;
-      else {
-        const tau = this.blackoutFadeMs / 3;
-        const alpha = 1 - Math.exp(-this.tickMs / tau);
-        this.blackoutFade += (0 - this.blackoutFade) * alpha;
-        if (this.blackoutFade < 0.005) this.blackoutFade = 0;
-      }
-    } else {
-      this.blackoutFade = 1;   // instant fade-in när ljuset kommer tillbaka
-    }
+    // Blackout-fade: ebbar mjukt både IN (mot 0) och UT (mot 1) med samma tau, så
+    // vridningen från 0 känns like en dimmer som tänds — inte som en snap.
+    // tau = fadeMs/3 → ~95 % framme vid utsatt tid.
+    const fadeMs = Math.max(this.blackoutFadeMs, 1);
+    const fadeTau = fadeMs / 3;
+    const fadeAlpha = 1 - Math.exp(-this.tickMs / fadeTau);
+    const fadeTarget = this.state.blackout ? 0 : 1;
+    this.blackoutFade += (fadeTarget - this.blackoutFade) * fadeAlpha;
+    if (Math.abs(this.blackoutFade - fadeTarget) < 0.005) this.blackoutFade = fadeTarget;
+
+    // Standby-glöd: ligger något efter blackout-fadet så den svaga röda inte
+    // "krockar" med den utfadande showfärgen — den tonar in när ringen är släckt
+    // och tonar ut igen precis när användaren börjar vrida upp.
+    const glowTau = fadeMs / 2;
+    const glowAlpha = 1 - Math.exp(-this.tickMs / glowTau);
+    const glowTarget = this.state.blackout ? 1 : 0;
+    this.standbyGlow += (glowTarget - this.standbyGlow) * glowAlpha;
+    if (Math.abs(this.standbyGlow - glowTarget) < 0.005) this.standbyGlow = glowTarget;
 
     const { intensity } = this.state;
     const [r, g, b] = lerpColor(intensity);
@@ -157,10 +164,9 @@ export class KnobRing {
       this.blackoutFade *
       (1 + this.pulseBoost * this.beatPulse);
 
-    // Standby-glöd: när vredet är 0 (blackout) och fade-out är klar lyser alla
-    // 12 LEDs svagt rött så användaren ser att riggen har ström men är "släckt".
-    const standby = this.state.blackout && this.blackoutFade < 0.02;
-    const standbyR = standby ? Math.round(255 * this.maxBright * 0.06) : 0;
+    // Standby-röd som crossfadeas ovanpå den utfadande showen. 6 % av maxBright
+    // = tydligt synlig i mörker men lyser inte upp rummet.
+    const standbyR = 255 * this.maxBright * 0.06 * this.standbyGlow;
 
     let off = RESET_BYTES;
     for (let i = 0; i < N_LEDS; i++) {
@@ -169,16 +175,14 @@ export class KnobRing {
       else if (i === litFull) scale = partial;
       else scale = 0;
       const k = scale * bright;
-      // WS2812 wire order är GRB
-      if (standby) {
-        encodeByte(0,         this.txBuf, off); off += 3;
-        encodeByte(standbyR,  this.txBuf, off); off += 3;
-        encodeByte(0,         this.txBuf, off); off += 3;
-      } else {
-        encodeByte(Math.round(g * k), this.txBuf, off); off += 3;
-        encodeByte(Math.round(r * k), this.txBuf, off); off += 3;
-        encodeByte(Math.round(b * k), this.txBuf, off); off += 3;
-      }
+      // WS2812 wire order är GRB. Standby-röd adderas på ALLA 12 LEDs oavsett
+      // scale, så ringen "andas in" i standby och tänds mjukt tillbaka.
+      const rOut = Math.min(255, Math.round(r * k + standbyR));
+      const gOut = Math.min(255, Math.round(g * k));
+      const bOut = Math.min(255, Math.round(b * k));
+      encodeByte(gOut, this.txBuf, off); off += 3;
+      encodeByte(rOut, this.txBuf, off); off += 3;
+      encodeByte(bOut, this.txBuf, off); off += 3;
     }
 
     const msg: SPI.SpiMessage = [{
