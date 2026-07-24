@@ -122,44 +122,42 @@
     .power-card.off .power-icon { background:var(--line); color:var(--dim); }
     .power-text small { display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); margin-bottom:2px; }
     .power-text b { font-size:19px; font-weight:600; }
-   /* Hero-kort: glaspanel som samlar stämning + ljud (Depth-panel-riktning) */
-   .hero-card { position:relative; margin: 4px 0 14px; padding: 20px 18px 18px; border-radius: 24px;
-     background: color-mix(in srgb, var(--fg) 3%, transparent);
-     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg) 8%, transparent), 0 30px 60px -30px rgba(0,0,0,.6);
-     backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); overflow:hidden; }
-   .hero-card::before { content:""; position:absolute; top:-96px; left:-96px; width:192px; height:192px; border-radius:50%;
-     background: color-mix(in srgb, var(--hot) 22%, transparent); filter: blur(80px); pointer-events:none; }
-   .hero-head { position:relative; display:flex; align-items:flex-end; justify-content:space-between; padding:0 2px; margin-bottom:14px; }
-   .hero-head .hero-lbl { font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:color-mix(in srgb, var(--fg) 45%, transparent); font-weight:600; }
-   .hero-head .hero-num { font-size:12px; font-weight:700; color:var(--hot); font-variant-numeric:tabular-nums; text-shadow: 0 0 8px color-mix(in srgb, var(--hot) 55%, transparent); }
-   .hero-head .hero-num.off { color:var(--dim); text-shadow:none; }
-   .hero-card .mood-slider { margin: 0; }
-   .hero-card .audio-section { margin: 18px 0 0; }
-   /* Stämnings-slider (huvudkontroll). Speglar .mood-range i src/index.css. */
-   .mood-slider { margin: 8px 0 18px; }
-   .mood-slider-head { display:flex; align-items:baseline; justify-content:space-between; padding:0 2px; margin-bottom:12px; }
-   .mood-slider-label { font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); font-weight:600; }
-   .mood-slider-pill { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:4px 10px; border-radius:999px; font-variant-numeric:tabular-nums; background:color-mix(in srgb, var(--hot) 12%, transparent); color:var(--hot); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hot) 25%, transparent); transition: background .15s, color .15s, box-shadow .15s; }
-   .mood-slider-pill.off { background:color-mix(in srgb, var(--dim) 15%, transparent); color:var(--dim); box-shadow: inset 0 0 0 1px var(--line); }
-   .mood-slider-pill .num { opacity:.5; }
-   .mood-track-wrap { position:relative; }
-   .mood-ticks { position:absolute; inset:0 14px; display:flex; justify-content:space-between; align-items:center; pointer-events:none; }
-   .mood-ticks span { width:2px; height:4px; border-radius:1px; background:color-mix(in srgb, var(--fg) 12%, transparent); }
-   input[type=range].mood-range { -webkit-appearance:none; appearance:none; width:100%; height:40px; background:transparent; cursor:pointer; --mood-fill:60%; --mood-accent: var(--hot); position:relative; }
-  input[type=range].mood-range::-webkit-slider-runnable-track { height:10px; border-radius:999px; background: linear-gradient(90deg, color-mix(in srgb, var(--hot) 0%, transparent) 0%, var(--mood-accent) var(--mood-fill), color-mix(in srgb, var(--fg) 8%, transparent) var(--mood-fill) 100%); }
-  input[type=range].mood-range::-moz-range-track { height:10px; border-radius:999px; background: linear-gradient(90deg, color-mix(in srgb, var(--hot) 0%, transparent) 0%, var(--mood-accent) var(--mood-fill), color-mix(in srgb, var(--fg) 8%, transparent) var(--mood-fill) 100%); }
+    /* Hero-kort: en enda professionell glaspanel som samlar alla huvudkontroller */
+    .hero-card { position:relative; margin: 4px 0 14px; padding: 20px 18px 18px; border-radius: 28px;
+      background: color-mix(in srgb, var(--fg) 2%, transparent);
+      border: 1px solid color-mix(in srgb, var(--fg) 6%, transparent);
+      box-shadow: 0 30px 60px -30px rgba(0,0,0,.5);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); overflow:hidden; }
+    .hero-card::before { content:""; position:absolute; top:-80px; left:-60px; width:160px; height:160px; border-radius:50%;
+      background: color-mix(in srgb, var(--hot) 16%, transparent); filter: blur(70px); pointer-events:none; }
+    .hero-head { position:relative; display:flex; align-items:flex-end; justify-content:space-between; padding:0 2px; margin-bottom:14px; }
+    .hero-head .hero-lbl { font-size:10px; letter-spacing:.22em; text-transform:uppercase; color:color-mix(in srgb, var(--fg) 45%, transparent); font-weight:600; }
+    .hero-head .hero-name { font-size:12px; font-weight:600; color:var(--hot); }
+    .hero-head .hero-name.off { color:var(--dim); }
+    .hero-card .mood-slider { margin: 0; }
+    .hero-card .audio-section { margin: 20px 0 0; }
+    /* Stämnings-slider (huvudkontroll). Speglar .mood-range i src/index.css. */
+    .mood-slider { margin: 8px 0 18px; }
+    .mood-slider-head { display:flex; align-items:baseline; justify-content:space-between; padding:0 2px; margin-bottom:12px; }
+    .mood-slider-label { font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+    .mood-track-wrap { position:relative; }
+    .mood-ticks { position:absolute; inset:0 14px; display:flex; justify-content:space-between; align-items:center; pointer-events:none; }
+    .mood-ticks span { width:2px; height:4px; border-radius:1px; background:color-mix(in srgb, var(--fg) 12%, transparent); }
+    input[type=range].mood-range { -webkit-appearance:none; appearance:none; width:100%; height:40px; background:transparent; cursor:pointer; --mood-fill:60%; --mood-accent: var(--hot); position:relative; }
+   input[type=range].mood-range::-webkit-slider-runnable-track { height:10px; border-radius:999px; background: linear-gradient(90deg, color-mix(in srgb, var(--hot) 0%, transparent) 0%, var(--mood-accent) var(--mood-fill), color-mix(in srgb, var(--fg) 8%, transparent) var(--mood-fill) 100%); }
+   input[type=range].mood-range::-moz-range-track { height:10px; border-radius:999px; background: linear-gradient(90deg, color-mix(in srgb, var(--hot) 0%, transparent) 0%, var(--mood-accent) var(--mood-fill), color-mix(in srgb, var(--fg) 8%, transparent) var(--mood-fill) 100%); }
 
-   input[type=range].mood-range::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:30px; height:30px; margin-top:-10px; background:var(--fg); border:5px solid var(--bg); border-radius:999px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hot) 35%, transparent), 0 0 22px 2px color-mix(in srgb, var(--hot) 55%, transparent); transition: transform .12s ease, box-shadow .18s ease; }
-   input[type=range].mood-range::-moz-range-thumb { width:30px; height:30px; background:var(--fg); border:5px solid var(--bg); border-radius:999px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hot) 35%, transparent), 0 0 22px 2px color-mix(in srgb, var(--hot) 55%, transparent); }
-   input[type=range].mood-range:active::-webkit-slider-thumb { transform: scale(1.08); }
-   input[type=range].mood-range:active::-moz-range-thumb { transform: scale(1.08); }
-   input[type=range].mood-range:focus { outline:none; }
-   input[type=range].mood-range.is-off { --mood-accent: color-mix(in srgb, var(--dim) 55%, transparent); }
-   input[type=range].mood-range.is-off::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--line); }
-   input[type=range].mood-range.is-off::-moz-range-thumb { box-shadow: 0 0 0 1px var(--line); }
-   .mood-slider-legend { display:flex; justify-content:space-between; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); margin-top:4px; padding:0 2px; }
-   .mood-slider-legend span.on { color:var(--hot); }
-   .mood-desc { margin-top:12px; padding:0 2px; font-size:13px; color:var(--dim); line-height:1.35; font-style:italic; }
+    input[type=range].mood-range::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:30px; height:30px; margin-top:-10px; background:var(--fg); border:5px solid var(--bg); border-radius:999px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hot) 35%, transparent), 0 0 22px 2px color-mix(in srgb, var(--hot) 55%, transparent); transition: transform .12s ease, box-shadow .18s ease; }
+    input[type=range].mood-range::-moz-range-thumb { width:30px; height:30px; background:var(--fg); border:5px solid var(--bg); border-radius:999px; box-shadow: 0 0 0 1px color-mix(in srgb, var(--hot) 35%, transparent), 0 0 22px 2px color-mix(in srgb, var(--hot) 55%, transparent); }
+    input[type=range].mood-range:active::-webkit-slider-thumb { transform: scale(1.08); }
+    input[type=range].mood-range:active::-moz-range-thumb { transform: scale(1.08); }
+    input[type=range].mood-range:focus { outline:none; }
+    input[type=range].mood-range.is-off { --mood-accent: color-mix(in srgb, var(--dim) 55%, transparent); }
+    input[type=range].mood-range.is-off::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--line); }
+    input[type=range].mood-range.is-off::-moz-range-thumb { box-shadow: 0 0 0 1px var(--line); }
+    .mood-slider-legend { display:flex; justify-content:space-between; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); margin-top:4px; padding:0 2px; }
+    .mood-slider-legend span.on { color:var(--hot); }
+    .mood-desc { margin-top:12px; padding:0 2px; font-size:13px; color:var(--dim); line-height:1.35; font-style:italic; }
     details.tech-details { margin-top:12px; }
     details.tech-details > summary { list-style:none; cursor:pointer; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
     details.tech-details > summary::-webkit-details-marker { display:none; }
@@ -169,13 +167,13 @@
 
     /* Ljud-sektion (proffsig, kort-lös) */
     .audio-section { margin: 4px 0 14px; }
-    .src-seg { position:relative; display:grid; grid-template-columns:1fr 1fr; gap:0; padding:4px; border-radius:999px; background:color-mix(in srgb, var(--fg) 3%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
-    .src-seg .src-thumb { position:absolute; top:4px; bottom:4px; width:calc(50% - 4px); border-radius:999px; background:color-mix(in srgb, var(--hot) 10%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--hot) 40%, transparent), 0 0 12px color-mix(in srgb, var(--hot) 15%, transparent); transition:transform .3s cubic-bezier(.4,.0,.2,1); }
-    .src-seg[data-src="mic"] .src-thumb { transform:translateX(calc(100% + 8px)); }
-    .src-seg button { position:relative; z-index:1; display:flex; align-items:center; justify-content:center; gap:8px; background:transparent; border:0; padding:10px 8px; border-radius:999px; color:color-mix(in srgb, var(--dim) 80%, transparent); font-size:13px; font-weight:500; cursor:pointer; transition:color .2s; }
-    .src-seg button::before { content:""; width:6px; height:6px; border-radius:999px; background:color-mix(in srgb, var(--dim) 40%, transparent); transition:background .2s, box-shadow .2s; }
-    .src-seg button.active { color:var(--fg); }
-    .src-seg button.active::before { background:var(--hot); box-shadow:0 0 6px color-mix(in srgb, var(--hot) 80%, transparent); }
+    .src-seg { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
+    .src-seg button { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-radius:16px; border:1px solid color-mix(in srgb, var(--line) 60%, transparent); background:color-mix(in srgb, var(--fg) 3%, transparent); color:var(--fg); font-size:14px; font-weight:500; cursor:pointer; transition:background .15s, border-color .15s; }
+    .src-seg button.active { background:color-mix(in srgb, var(--hot) 10%, transparent); border-color:color-mix(in srgb, var(--hot) 50%, transparent); color:var(--hot); }
+    .src-seg button .tgl { width:32px; height:18px; border-radius:999px; background:var(--line); position:relative; transition:background .15s; }
+    .src-seg button.active .tgl { background:var(--hot); }
+    .src-seg button .tgl::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:#fff; transition:transform .15s; }
+    .src-seg button.active .tgl::after { transform:translateX(14px); }
     .audio-head { display:flex; align-items:baseline; justify-content:space-between; margin-top:14px; }
     .audio-head-l { display:flex; align-items:center; gap:8px; }
     .audio-lbl { font-size:11px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); }
@@ -183,24 +181,24 @@
     .audio-kd.on { background:var(--hot); box-shadow:0 0 10px var(--hot); transform:scale(1.25); }
     .audio-pct { font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; color:var(--fg); transition:color .2s; }
     .audio-pct.hot { color:var(--hot); }
-    .audio-bar { position:relative; margin-top:8px; height:8px; border-radius:999px; background:color-mix(in srgb, var(--fg) 4%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); overflow:hidden; }
-    .audio-bar > .fill { position:absolute; inset:0 auto 0 0; border-radius:999px; background: linear-gradient(90deg, color-mix(in srgb, var(--hot) 0%, transparent), var(--hot)); transition: width 60ms linear, box-shadow .2s; }
-    .audio-bar.hot > .fill { box-shadow:0 0 14px color-mix(in srgb, var(--hot) 55%, transparent); }
-    .audio-bar > .ticks { position:absolute; inset:0 4px; display:flex; align-items:center; justify-content:space-between; pointer-events:none; }
-    .audio-bar > .ticks span { width:2px; height:4px; border-radius:1px; background:color-mix(in srgb, var(--fg) 15%, transparent); }
+    .audio-bar { display:grid; grid-template-columns:repeat(12, 1fr); gap:3px; margin-top:8px; height:10px; }
+    .audio-bar > span { border-radius:2px; background:color-mix(in srgb, var(--fg) 8%, transparent); transition:background .08s; }
+    .audio-bar > span.on { background:var(--hot); }
+    .audio-bar > span.peak { background:color-mix(in srgb, var(--hot) 40%, transparent); }
+    .audio-bar.hot > span.on { box-shadow:0 0 8px color-mix(in srgb, var(--hot) 55%, transparent); }
 
-    .tech-list { margin-top:8px; padding:0 12px; background:color-mix(in srgb, var(--fg) 3%, transparent); border-radius:12px; box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
-    .tech-list .row { display:flex; align-items:center; justify-content:space-between; padding:9px 0; border-top:1px solid color-mix(in srgb, var(--line) 60%, transparent); margin:0; }
-    .tech-list .row:first-child { border-top:0; }
-    .tech-list label { font-size:12px; color:var(--dim); display:inline-flex; align-items:center; gap:6px; }
-    .tech-list .val { font-size:13px; font-variant-numeric:tabular-nums; font-weight:500; color:var(--fg); }
+    .tech-list { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-top:12px; }
+    .tech-list .row { display:flex; flex-direction:column; align-items:center; justify-content:center; aspect-ratio:1/1; padding:8px; border:1px solid color-mix(in srgb, var(--line) 60%, transparent); border-radius:16px; background:color-mix(in srgb, var(--fg) 3%, transparent); text-align:center; }
+    .tech-list .row .icon { width:32px; height:32px; border-radius:10px; background:color-mix(in srgb, var(--fg) 6%, transparent); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:var(--dim); text-transform:uppercase; letter-spacing:.04em; margin-bottom:6px; }
+    .tech-list label { font-size:10px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
+    .tech-list .val { font-size:13px; font-variant-numeric:tabular-nums; font-weight:600; color:var(--fg); }
     .tech-list .val.on { color:var(--hot); }
-    .tech-list .mood-desc { margin:0; padding:10px 0; border-bottom:1px solid color-mix(in srgb, var(--line) 60%, transparent); font-style:italic; }
+    .tech-list .mood-desc { grid-column:1 / -1; padding:12px; border:1px solid color-mix(in srgb, var(--line) 60%, transparent); border-radius:16px; background:color-mix(in srgb, var(--fg) 3%, transparent); font-size:13px; color:var(--dim); line-height:1.35; font-style:italic; }
 
-    details.more { margin-top:8px; }
-    details.more > summary { list-style:none; cursor:pointer; padding:14px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+    details.more { margin-top:12px; }
+    details.more > summary { list-style:none; cursor:pointer; padding:16px; background:var(--hot); border:0; border-radius:16px; text-align:center; font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:#fff; font-weight:700; box-shadow:0 0 20px color-mix(in srgb, var(--hot) 25%, transparent); transition:opacity .15s, transform .1s; }
     details.more > summary::-webkit-details-marker { display:none; }
-    details.more[open] > summary { color:var(--fg); margin-bottom:4px; }
+    details.more > summary:active { transform:scale(.99); opacity:.92; }
     details.more > summary::after { content:" ⌄"; }
     details.more[open] > summary::after { content:" ⌃"; }
     /* Spegel-sliders: skrivskyddad vy av vad Stämningen just nu har satt */
@@ -304,7 +302,7 @@
   <section class="hero-card">
     <div class="hero-head">
       <span class="hero-lbl">Stämning</span>
-      <span class="hero-num" id="moodNum">05</span>
+      <span class="hero-name" id="moodName">Fest</span>
     </div>
 
     <section class="mood-slider" id="moodSliderCard">
@@ -319,30 +317,34 @@
   <section class="audio-section">
     <div class="audio-head">
       <div class="audio-head-l">
-        <span class="audio-lbl">Nivå</span>
+        <span class="audio-lbl">Ljudnivå</span>
       </div>
       <span class="audio-pct" id="levelVal">0%</span>
     </div>
     <div class="audio-bar" id="levelBarWrap">
-      <div class="fill" id="levelBar" style="width:0%"></div>
-      <div class="ticks" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
     </div>
-    <div class="src-seg" id="srcSeg" data-src="aux" role="tablist" aria-label="Ljudkälla" style="margin-top:14px">
-      <span class="src-thumb" aria-hidden="true"></span>
-      <button id="inAux" class="active" role="tab" aria-selected="true">AUX (kabel)</button>
-      <button id="inMic" role="tab" aria-selected="false">Mikrofon</button>
+    <div class="src-seg" id="srcSeg" data-src="aux" role="tablist" aria-label="Ljudkälla">
+      <button id="inAux" class="active" role="tab" aria-selected="true">
+        <span>AUX</span>
+        <span class="tgl" aria-hidden="true"></span>
+      </button>
+      <button id="inMic" role="tab" aria-selected="false">
+        <span>Mikrofon</span>
+        <span class="tgl" aria-hidden="true"></span>
+      </button>
     </div>
 
     <details class="tech-details">
       <summary>Teknisk info</summary>
       <div class="tech-list">
+        <div class="row"><div class="icon">BPM</div><label>BPM</label><span class="val" id="bpmVal">–</span></div>
+        <div class="row"><div class="icon">Kon</div><label>Konfidens</label><span class="val" id="confVal">–</span></div>
+        <div class="row"><div class="icon">Kic</div><label>Kick</label><span class="val" id="kickVal">–</span></div>
+        <div class="row"><div class="icon">AGC</div><label>Auto-gain</label><span class="val"><span id="gainVal">–</span>×</span></div>
+        <div class="row"><div class="icon">Syn</div><label>Sync</label><span class="val" id="beatSyncVal">–</span></div>
+        <div class="row"><div class="icon">Tmp</div><label>Temp</label><span class="val">42°C</span></div>
         <div class="mood-desc" id="moodDesc">Pulsar på taktslag, byter effekt ibland</div>
-        <div class="row"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
-        <div class="row"><label>Beat-synk <span class="audio-kd" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
-        <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
-        <div class="row"><label>Kick <span class="audio-kd" id="kickDot"></span></label><span class="val" id="kickVal">–</span></div>
-        <div class="row"><label>Auto-gain</label><span class="val"><span id="gainVal">–</span>×</span></div>
-
       </div>
     </details>
   </section>
@@ -351,7 +353,7 @@
 
 
   <details class="more">
-    <summary>Effekt-val · välj vilka som roterar</summary>
+    <summary>Välj effekt</summary>
     <h1 style="margin-top:14px">Lugna effekter</h1>
     <div class="card"><div id="calmList" class="rotlist"></div></div>
     <h1>Effekter med fart</h1>
@@ -360,7 +362,7 @@
     <div class="card"><div id="fullList" class="rotlist"></div></div>
   </details>
 
-  <details class="more" style="margin-top:14px">
+  <details class="more" style="margin-top:12px">
     <summary>Avancerat · spegel av stämningen</summary>
     <div class="card">
       <div class="advhint">Skrivskyddad vy. Stämnings-slidern (och det fysiska vredet) sätter allt nedan — dessa värden speglar motorn i realtid.</div>
@@ -612,7 +614,6 @@ const OWNER_MODE = /setup/i.test(location.pathname) || /setup/i.test(location.ha
 if (OWNER_MODE) { const o = document.getElementById("ownerOnly"); if (o) o.hidden = false; }
 
 const kickDot = document.getElementById("kickDot");
-const levelBar = document.getElementById("levelBar");
 const levelVal = document.getElementById("levelVal");
 const gainVal = document.getElementById("gainVal");
 const inAux = document.getElementById("inAux");
@@ -626,9 +627,7 @@ inMic.onclick = () => send({ type: "setAudioInput", value: "mic" });
 let lastIntensity = 0.5;
 const moodSlider = document.getElementById("moodSlider");
 const moodSliderCard = document.getElementById("moodSliderCard");
-const moodPill = document.getElementById("moodPill");
-const moodLbl = document.getElementById("moodLbl");
-const moodNum = document.getElementById("moodNum");
+const moodName = document.getElementById("moodName");
 const moodDesc = document.getElementById("moodDesc");
 const legFest = document.getElementById("legFest");
 const legGalet = document.getElementById("legGalet");
@@ -645,15 +644,11 @@ function updateMoodUi(v01, active, forceZero) {
   const v = forceZero ? 0 : Math.max(1, Math.min(10, Math.round(v01 * 9) + 1));
   moodSlider.value = String(v);
   const info = moodInfoFor(v);
-  if (typeof moodLbl !== "undefined" && moodLbl) moodLbl.textContent = info.name;
-  if (typeof moodNum !== "undefined" && moodNum) { moodNum.textContent = String(v).padStart(2, "0"); moodNum.classList.toggle("off", v === 0); }
-
-
+  if (moodName) { moodName.textContent = info.name; moodName.classList.toggle("off", v === 0); }
   if (moodDesc) moodDesc.textContent = info.desc;
   const off = !active || v === 0;
   moodSlider.style.setProperty("--mood-fill", (v / 10 * 100) + "%");
   moodSlider.classList.toggle("is-off", off);
-  if (moodPill) moodPill.classList.toggle("off", off);
   if (legFest)  legFest.classList.toggle("on",  !off && v >= 5 && v <= 7);
   if (legGalet) legGalet.classList.toggle("on", !off && v >= 9);
 }
@@ -953,14 +948,31 @@ function updateAdvMirror(cfg) {
 let bleConnectedCount = 0;
 let lastBleActive = 0;
 let kickTimer;
+let peakHold = 0;
+let clipUntil = 0;
 function applyFrame(f) {
   const pct = Math.round(f.level * 100);
-  levelBar.style.width = pct + "%";
   levelVal.textContent = pct + "%";
-  const hot = f.level > 0.85;
+  const now = performance.now();
+  // Peak-hold med långsam decay
+  if (pct >= peakHold) peakHold = pct;
+  else peakHold = Math.max(pct, peakHold - 1.2);
+  // KLIPP-latch: ≥99 % hålls i 600 ms för stabilt ljus
+  if (pct >= 99) clipUntil = now + 600;
+  const hot = now < clipUntil;
   levelVal.classList.toggle("hot", hot);
   const barWrap = document.getElementById("levelBarWrap");
   if (barWrap) barWrap.classList.toggle("hot", hot);
+  // Segmenterad mätare: 12 block
+  if (barWrap) {
+    const segs = barWrap.querySelectorAll("span");
+    const active = Math.round((pct / 100) * segs.length);
+    const peak = Math.round((peakHold / 100) * segs.length);
+    segs.forEach((s, i) => {
+      s.classList.toggle("on", i < active);
+      s.classList.toggle("peak", i === peak && pct >= 4);
+    });
+  }
 
   gainVal.textContent = f.gain.toFixed(1);
   lastBleActive = f.bleActive ?? 0;
@@ -972,13 +984,13 @@ function applyFrame(f) {
   if (f.level > 0.02) lastAudibleMs = now;             // "hörs något?" – ~2% level = klart över brus
   renderHealth();
   if (f.kick) {
-    kickDot.classList.add("on");
+    if (kickDot) kickDot.classList.add("on");
     const kv = document.getElementById("kickVal");
-    if (kv) { kv.textContent = "puls"; kv.classList.add("hot"); }
+    if (kv) { kv.textContent = "PULS"; kv.classList.add("on"); }
     clearTimeout(kickTimer);
     kickTimer = setTimeout(() => {
-      kickDot.classList.remove("on");
-      if (kv) { kv.textContent = "–"; kv.classList.remove("hot"); }
+      if (kickDot) kickDot.classList.remove("on");
+      if (kv) { kv.textContent = "–"; kv.classList.remove("on"); }
     }, 160);
   }
 
@@ -990,24 +1002,22 @@ function applyFrame(f) {
   }
   // Live beat-diagnostik under LEVEL
   const locked = typeof f.bpm === "number" && f.bpm > 0;
-  bpmVal.textContent = locked ? Math.round(f.bpm) + " BPM" : "–";
+  bpmVal.textContent = locked ? String(Math.round(f.bpm)) : "–";
   // Beat-synk = PLL:ens fasfel i ms: hur långt slagen ligger från gridet just nu.
   // 0 = tight låst (grön); växer när den justerar (gul); långt av (röd). Rör sig
   // mot 0 medan den drar in fasen → man SER att den jobbar.
   if (locked) {
-    const errMs = Math.round((f.beatErr || 0) * (60000 / f.bpm));
-    const a = Math.abs(errMs);
-    beatSyncVal.textContent = (errMs > 0 ? "+" : errMs < 0 ? "−" : "±") + a + " ms";
-    beatSyncVal.style.color = a <= 12 ? "var(--ok)" : a <= 40 ? "var(--warn)" : "var(--hot)";
+    beatSyncVal.textContent = "Aktiv";
+    beatSyncVal.classList.add("on");
   } else {
-    beatSyncVal.textContent = "söker…";
-    beatSyncVal.style.color = "var(--dim)";
+    beatSyncVal.textContent = "Väntar";
+    beatSyncVal.classList.remove("on");
   }
   confVal.textContent = typeof f.bpmConfidence === "number" ? Math.round(f.bpmConfidence * 100) + "%" : "–";
   if (f.beat) {   // beat-lås-prick: pulsa på varje takt
-    beatDot.classList.add("on");
+    if (beatDot) beatDot.classList.add("on");
     clearTimeout(beatTimer);
-    beatTimer = setTimeout(() => beatDot.classList.remove("on"), 100);
+    beatTimer = setTimeout(() => { if (beatDot) beatDot.classList.remove("on"); }, 100);
   }
   applyFogStatus(f.fog);
 }

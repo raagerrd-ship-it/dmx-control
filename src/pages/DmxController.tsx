@@ -43,23 +43,23 @@ export default function DmxController() {
 
 function HeroCard() {
   return (
-    <section className="relative mt-3 mb-5 px-2">
-      {/* Neon ambient glows behind everything, no card frame */}
-      <div aria-hidden className="pointer-events-none absolute -top-24 -left-16 w-64 h-64 rounded-full bg-primary/10 blur-[90px]" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-16 w-56 h-56 rounded-full bg-primary/[0.07] blur-[80px]" />
+    <section className="relative mt-2 mb-5">
+      {/* Soft ambient glow behind the console card */}
+      <div aria-hidden className="pointer-events-none absolute -top-20 -left-12 w-56 h-56 rounded-full bg-primary/[0.08] blur-[80px]" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-16 -right-12 w-48 h-48 rounded-full bg-primary/[0.05] blur-[70px]" />
 
-      <div className="relative">
+      <div className="relative rounded-[28px] border border-foreground/[0.06] bg-foreground/[0.02] p-5 shadow-2xl shadow-black/40 backdrop-blur-sm">
         <MoodSlider />
 
-        <div className="mt-9">
+        <div className="mt-8">
           <InputLevel />
         </div>
 
-        <div className="mt-6">
+        <div className="mt-5">
           <SourcePill />
         </div>
 
-        <div className="mt-7">
+        <div className="mt-6">
           <TechGrid />
         </div>
       </div>
@@ -72,8 +72,18 @@ function MoodSlider() {
   const off = !s.power;
   const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
   const fillPct = (v / 10) * 100;
+  const info = moodInfoFor(v);
   return (
     <div>
+      <div className="flex items-baseline justify-between px-1 mb-3">
+        <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-muted-foreground/80">
+          Stämning
+        </span>
+        <span className={`text-[11px] font-semibold ${off ? "text-muted-foreground/50" : "text-primary"}`}>
+          {info.name}
+        </span>
+      </div>
+
       <div className="relative h-12 flex items-center">
         <div aria-hidden className="absolute inset-0 bg-primary/[0.04] blur-xl pointer-events-none" />
         <div className="mood-ticks" aria-hidden>
@@ -101,9 +111,9 @@ function MoodSlider() {
       </div>
 
       <div className="flex justify-between mt-2 px-1 font-mono">
-        <span className={`text-[9px] font-bold tracking-widest ${off ? "text-primary/80" : "text-muted-foreground/40"}`}>LVL 00</span>
+        <span className={`text-[9px] font-bold tracking-widest ${off ? "text-primary/80" : "text-muted-foreground/40"}`}>AV</span>
         <span className={v >= 5 && v <= 7 ? "text-[9px] font-bold tracking-widest text-primary" : "text-[9px] font-bold tracking-widest text-muted-foreground/40"}>FEST</span>
-        <span className={`text-[9px] font-bold tracking-widest ${v >= 9 ? "text-primary" : "text-muted-foreground/40"}`}>LVL 10</span>
+        <span className={`text-[9px] font-bold tracking-widest ${v >= 9 ? "text-primary" : "text-muted-foreground/40"}`}>GALET</span>
       </div>
     </div>
   );
@@ -120,8 +130,8 @@ function moodInfoFor(v: number) {
   return               { name: "Galet",  desc: "Full fart, drop-blackout, riser-strobe" };
 }
 
-/* Horisontell input-mätare: visar verklig ljudnivå (0–100 %) med peak-hold.
-   Samma visuella språk som stämningsslidern så det känns som en logisk mätare. */
+/* Segmenterad input-mätare: 12 block som tänds efter ljudnivå.
+   Mer professionell och stabil än en mjuk bar — tydligare avläsning på scen. */
 function InputLevel() {
   const audio = useDmx((st) => st.audioLevel);
   const pct = Math.max(0, Math.min(100, Math.round(audio * 100)));
@@ -136,7 +146,7 @@ function InputLevel() {
       peakRef.current = pct;
       setPeak(pct);
     } else {
-      peakRef.current = Math.max(pct, peakRef.current - 1.5);
+      peakRef.current = Math.max(pct, peakRef.current - 1.2);
       setPeak(peakRef.current);
     }
     // KLIPP-latch: kräver ≥99 % och hålls i 600 ms för att undvika flimmer
@@ -146,6 +156,10 @@ function InputLevel() {
     setClip((prev) => (prev !== active ? active : prev));
   }, [pct]);
   const hot = clip;
+
+  const SEGMENTS = 12;
+  const activeSegs = Math.round((pct / 100) * SEGMENTS);
+  const peakSeg = Math.round((peak / 100) * SEGMENTS);
 
   return (
     <div>
@@ -158,26 +172,26 @@ function InputLevel() {
         </span>
       </div>
 
-      <div className="relative h-3 rounded-full bg-foreground/[0.05] ring-1 ring-foreground/[0.06] overflow-hidden">
-        {/* fyllnad */}
-        <div
-          className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-100 ${
-            hot ? "bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.7)]" : "bg-primary/70"
-          }`}
-          style={{ width: `${pct}%` }}
-        />
-        {/* peak-hold linje */}
-        <div
-          aria-hidden
-          className="absolute inset-y-0 w-[2px] bg-primary/90 shadow-[0_0_6px_hsl(var(--primary))] transition-[left] duration-150"
-          style={{ left: `calc(${peak}% - 1px)`, opacity: silent ? 0 : 1 }}
-        />
-        {/* skala */}
-        <div aria-hidden className="absolute inset-0 flex justify-between px-[6px] pointer-events-none">
-          {Array.from({ length: 11 }).map((_, i) => (
-            <span key={i} className="w-px h-full bg-foreground/[0.06]" />
-          ))}
-        </div>
+      <div className="grid grid-cols-12 gap-[3px] h-3">
+        {Array.from({ length: SEGMENTS }).map((_, i) => {
+          const isActive = i < activeSegs;
+          const isPeak = i === peakSeg && !silent;
+          const isHot = hot && isActive;
+          return (
+            <div
+              key={i}
+              className={`rounded-sm transition-colors duration-100 ${
+                isHot
+                  ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.6)]"
+                  : isActive
+                  ? "bg-primary/80"
+                  : isPeak
+                  ? "bg-primary/40"
+                  : "bg-foreground/[0.06]"
+              }`}
+            />
+          );
+        })}
       </div>
 
       <div className="flex justify-between mt-1.5 px-1 font-mono">
@@ -192,18 +206,8 @@ function InputLevel() {
 function SourcePill() {
   const s = usePi();
   const source = s.audioInput;
-  const isMic = source === "mic";
   return (
-    <div
-      role="tablist"
-      aria-label="Ljudkälla"
-      className="relative grid grid-cols-2 rounded-full bg-foreground/[0.03] p-1 ring-1 ring-foreground/10"
-    >
-      <span
-        aria-hidden
-        className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-primary/[0.08] ring-1 ring-primary/30 transition-transform duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
-        style={{ transform: isMic ? "translateX(calc(100% + 8px))" : "translateX(0)" }}
-      />
+    <div className="grid grid-cols-2 gap-3">
       {[
         { id: "aux", label: "AUX" },
         { id: "mic", label: "Mikrofon" },
@@ -212,20 +216,24 @@ function SourcePill() {
         return (
           <button
             key={o.id}
-            role="tab"
-            aria-selected={active}
             onClick={() => setPi({ audioInput: o.id as "aux" | "mic" })}
-            className={`relative z-10 flex items-center justify-center gap-2 rounded-full py-2.5 text-[11px] font-medium transition-colors ${
-              active ? "text-foreground" : "text-muted-foreground/55"
+            className={`flex items-center justify-between px-4 py-3 rounded-2xl border transition-colors ${
+              active
+                ? "bg-primary/10 border-primary/50 text-primary"
+                : "bg-foreground/[0.03] border-foreground/[0.08] text-muted-foreground/70"
             }`}
           >
-            <span
-              aria-hidden
-              className={`inline-block h-1.5 w-1.5 rounded-full transition-colors ${
-                active ? "bg-primary shadow-[0_0_6px_hsl(var(--primary))]" : "bg-muted-foreground/35"
+            <span className="text-[13px] font-semibold">{o.label}</span>
+            <div
+              className={`w-8 h-4 rounded-full relative transition-colors ${
+                active ? "bg-primary" : "bg-muted"
               }`}
-            />
-            {o.label}
+            >
+              <span
+                className="absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform"
+                style={{ transform: active ? "translateX(16px)" : "none" }}
+              />
+            </div>
           </button>
         );
       })}
@@ -244,12 +252,14 @@ function TechGrid() {
   const locked = bpm > 0;
   const confPct = Math.round(conf * 100);
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-3 gap-3">
       <TechTile label="BPM" value={locked ? String(Math.round(bpm)) : "—"} accent={locked} dot={locked && beat} />
       <TechTile label="Konfidens" value={locked ? `${confPct}%` : "—"} />
       <TechTile label="Kick" value={kick > 0.4 ? "PULS" : "—"} accent={kick > 0.4} dot={kick > 0.4} />
       <TechTile label="Auto-gain" value="1.0×" />
-      <div className="col-span-2 p-3.5 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06]">
+      <TechTile label="Sync" value={locked ? "Aktiv" : "Väntar"} accent={locked} dot={locked && beat} />
+      <TechTile label="Temp" value="42°C" />
+      <div className="col-span-3 p-3.5 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06]">
         <div className="text-[8px] font-bold text-muted-foreground/70 uppercase mb-1 tracking-[0.22em]">Läge</div>
         <div className="text-[13px] font-medium text-foreground/85 leading-snug">
           {moodInfoFor(moodV).desc}
@@ -261,13 +271,15 @@ function TechGrid() {
 
 function TechTile({ label, value, accent, dot }: { label: string; value: string; accent?: boolean; dot?: boolean }) {
   return (
-    <div className="p-3.5 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06]">
-      <div className="flex items-center gap-1.5 mb-1">
-        <span className="text-[8px] font-bold text-muted-foreground/70 uppercase tracking-[0.22em]">{label}</span>
-        {dot && <span className="inline-block w-1 h-1 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]" />}
+    <div className="aspect-square p-3 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06] flex flex-col items-center justify-center text-center gap-2">
+      <div className="w-8 h-8 rounded-xl bg-foreground/[0.05] flex items-center justify-center text-[10px] font-bold text-muted-foreground/60 uppercase tracking-wider">
+        {label.slice(0, 3)}
       </div>
-      <div className={`text-[15px] font-mono font-semibold tabular-nums ${accent ? "text-primary" : "text-foreground/85"}`}>
-        {value}
+      <div className="flex items-center gap-1">
+        <div className={`text-[13px] font-mono font-semibold tabular-nums ${accent ? "text-primary" : "text-foreground/85"}`}>
+          {value}
+        </div>
+        {dot && <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]" />}
       </div>
     </div>
   );
@@ -280,8 +292,8 @@ function MoreDetails() {
   return (
     <>
       <details className="mt-4 group/eff">
-        <summary className="py-4 rounded-full border border-primary/50 bg-primary/[0.04] text-primary text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden shadow-[0_0_14px_hsl(var(--primary)/0.12)] hover:bg-primary/[0.08] transition-colors">
-          <span>Effekt-val</span>
+        <summary className="w-full py-4 rounded-2xl bg-primary text-primary-foreground text-[11px] font-black uppercase tracking-[0.22em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden shadow-[0_0_20px_hsl(var(--primary)/0.25)] hover:bg-primary/90 active:scale-[0.99] transition-all">
+          <span>Välj effekt</span>
           <span className="ml-1.5 opacity-70 group-open/eff:hidden">⌄</span>
           <span className="ml-1.5 opacity-70 hidden group-open/eff:inline">⌃</span>
         </summary>
