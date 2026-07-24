@@ -337,6 +337,25 @@
     </div>
   </div>
 
+  <h1 id="ringHdr" hidden>LED-ring (vred)</h1>
+  <div class="card" id="ringCard" hidden>
+    <div class="row"><label>Max ljusstyrka</label>
+      <input type="range" min="5" max="100" step="1" id="ringMax" style="flex:1;margin:0 10px">
+      <span class="val" id="ringMaxV">–</span>
+    </div>
+    <div class="row"><label>Pulse-boost</label>
+      <input type="range" min="0" max="50" step="1" id="ringPulse" style="flex:1;margin:0 10px">
+      <span class="val" id="ringPulseV">–</span>
+    </div>
+    <div class="row"><label>Blackout-fade</label>
+      <input type="range" min="0" max="3000" step="50" id="ringFade" style="flex:1;margin:0 10px">
+      <span class="val" id="ringFadeV">–</span>
+    </div>
+    <div class="status" style="margin-top:6px">
+      Max = takljus för hela ringen. Pulse-boost = extra puff på taktslag. Blackout-fade = hur mjukt ringen tonar ut vid släckt läge.
+    </div>
+  </div>
+
   <h1>System</h1>
   <div class="card">
     <div class="row"><label>Version</label><span class="val" id="verSha">–</span></div>
@@ -607,7 +626,53 @@ function applyConfig(cfg) {
   if (calTestActive) { /* kalibrering pågår → rör inte fixture-DOM:en (nollar annars slidern) */ }
   else if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
   else renderFixtures();
+  syncRingUi(cfg.intensityRing);
 }
+
+/* LED-ring (WS2812 på vredet) — visas bara om hårdvaran är konfigurerad. */
+let ringDirty = false;
+function syncRingUi(r) {
+  const hdr = document.getElementById("ringHdr");
+  const card = document.getElementById("ringCard");
+  if (!r) { if (hdr) hdr.hidden = true; if (card) card.hidden = true; return; }
+  if (hdr) hdr.hidden = false; if (card) card.hidden = false;
+  if (ringDirty) return;   // användaren drar → rör inte reglagen
+  const setV = (id, v, suf) => { const el = document.getElementById(id); if (el) el.textContent = v + suf; };
+  const setR = (id, v) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = String(v); };
+  setR("ringMax",   Math.round((r.maxBright ?? 0.4) * 100));
+  setR("ringPulse", Math.round((r.pulseBoost ?? 0.18) * 100));
+  setR("ringFade",  Math.round(r.blackoutFadeMs ?? 400));
+  setV("ringMaxV",   Math.round((r.maxBright ?? 0.4) * 100), "%");
+  setV("ringPulseV", Math.round((r.pulseBoost ?? 0.18) * 100), "%");
+  setV("ringFadeV",  Math.round(r.blackoutFadeMs ?? 400), " ms");
+}
+
+(function wireRing() {
+  let t = null;
+  const push = () => {
+    const ring = {
+      maxBright:      Number(document.getElementById("ringMax").value)   / 100,
+      pulseBoost:     Number(document.getElementById("ringPulse").value) / 100,
+      blackoutFadeMs: Number(document.getElementById("ringFade").value),
+    };
+    send({ type: "setRing", ring });
+  };
+  const bind = (id, outId, suf, fmt) => {
+    const el = document.getElementById(id);
+    const out = document.getElementById(outId);
+    if (!el) return;
+    el.addEventListener("input", () => {
+      ringDirty = true;
+      out.textContent = fmt(el.value) + suf;
+      if (t) clearTimeout(t);
+      t = setTimeout(() => { push(); ringDirty = false; }, 150);
+    });
+  };
+  bind("ringMax",   "ringMaxV",   "%",  (v) => Math.round(Number(v)));
+  bind("ringPulse", "ringPulseV", "%",  (v) => Math.round(Number(v)));
+  bind("ringFade",  "ringFadeV",  " ms",(v) => Math.round(Number(v)));
+})();
+
 
 /** Uppdatera "Avancerat · spegel av stämningen" — skrivskyddade sliders + dots. */
 function updateAdvMirror(cfg) {
