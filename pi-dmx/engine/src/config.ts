@@ -93,6 +93,9 @@ export interface EngineConfig {
   /** Hur aggressivt beat-PLL:en knuffar takt-ankaret mot faktiska trumslag
    *  (0 = av/fri-rullande, ~0.10 mjuk, 0.18 normal, ~0.30 aggressiv). */
   beatSyncStrength: number;
+  /** Ägar-override: när true rör stämnings-vredet INTE beatSyncStrength,
+   *  och segmentet i /setup blir redigerbart igen. */
+  beatSyncOverride?: boolean;
   /** Energi (lokal) väljer läge i smart-läget. */
   energyDrivesMode: boolean;
   /** Hur ofta smart byter läge (ms). */
