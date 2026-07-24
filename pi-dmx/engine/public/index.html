@@ -1002,7 +1002,7 @@ function applyFrame(f) {
   }
   // Live beat-diagnostik under LEVEL
   const locked = typeof f.bpm === "number" && f.bpm > 0;
-  bpmVal.textContent = locked ? Math.round(f.bpm) + " BPM" : "–";
+  bpmVal.textContent = locked ? String(Math.round(f.bpm)) : "–";
   // Beat-synk = PLL:ens fasfel i ms: hur långt slagen ligger från gridet just nu.
   // 0 = tight låst (grön); växer när den justerar (gul); långt av (röd). Rör sig
   // mot 0 medan den drar in fasen → man SER att den jobbar.
