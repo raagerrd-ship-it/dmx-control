@@ -460,6 +460,40 @@
     </details>
   </div>
 
+  <h1>Typskylt</h1>
+  <div class="card">
+    <div class="status" style="margin-bottom:8px">
+      Obligatorisk märkning på varje enhet som säljs/hyrs ut i EU. Fyll i fälten nedan — förhandsvisningen uppdateras och kan skickas till etiketttrycket.
+    </div>
+    <div class="fx-grid">
+      <div class="fx-field"><label>Företagsnamn / tillverkare</label><input type="text" id="tsMfg" placeholder="t.ex. Firma AB" /></div>
+      <div class="fx-field"><label>Org.nr (valfritt)</label><input type="text" id="tsOrg" placeholder="556123-4567" /></div>
+      <div class="fx-field"><label>Postadress</label><input type="text" id="tsAddr1" placeholder="Gatan 1" /></div>
+      <div class="fx-field"><label>Postnr &amp; ort</label><input type="text" id="tsAddr2" placeholder="123 45 Ort" /></div>
+      <div class="fx-field"><label>Land</label><input type="text" id="tsCountry" placeholder="Sverige" /></div>
+      <div class="fx-field"><label>Kontakt (e-post/URL)</label><input type="text" id="tsContact" placeholder="support@…" /></div>
+      <div class="fx-field"><label>Modell</label><input type="text" id="tsModel" placeholder="PDMX-1" /></div>
+      <div class="fx-field"><label>Serienummer</label><input type="text" id="tsSN" placeholder="2026-0001" /></div>
+      <div class="fx-field"><label>Tillverkningsdatum (ISO-vecka)</label><input type="text" id="tsMfgDate" placeholder="2026-W03" /></div>
+      <div class="fx-field"><label>IP-klass</label><input type="text" id="tsIp" placeholder="IP20" /></div>
+    </div>
+    <pre id="tsPreview" class="status" style="white-space:pre;overflow:auto;margin-top:12px;padding:12px;background:#0a0a0a;border:1px solid var(--line);border-radius:8px;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.5;color:#ddd"></pre>
+    <div class="fx-actions" style="margin-top:8px">
+      <button class="btn" id="tsCopy">Kopiera etikett</button>
+      <button class="btn" id="tsPrint">Skriv ut</button>
+    </div>
+    <details style="margin-top:10px">
+      <summary style="cursor:pointer;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:4px 0">Måste också medfölja enheten (inte på skylten)</summary>
+      <ul style="margin:8px 0 0 18px;padding:0;font-size:12px;color:var(--dim);line-height:1.6">
+        <li>EU-försäkran om överensstämmelse (DoC) — signerad, listar RED 2014/53/EU + RoHS 2011/65/EU</li>
+        <li>Bruksanvisning på svenska — säkerhet, uppkoppling, epilepsi- &amp; rökmaskin-varning</li>
+        <li>WEEE-registrering hos El-Kretsen innan första försäljning</li>
+        <li>Serienummerregister — vem hyrde/köpte vilken SN, arkiveras i 10 år</li>
+      </ul>
+    </details>
+  </div>
+
+
   <h1>WiFi</h1>
   <div class="card">
     <div class="row"><label>Aktivt nät</label><span class="val" id="wifiActive">–</span></div>
@@ -1623,6 +1657,80 @@ if (btnHealthDownload) btnHealthDownload.onclick = async () => {
 };
 // Ladda in en första omgång direkt när owner-vyn öppnas.
 if (OWNER_MODE) refreshHealthLog();
+
+// ---- Typskylt ------------------------------------------------------------
+// CE-krav: varje enhet i EU måste ha en typskylt med tillverkare, modell, SN,
+// spänning, radio-EIRP, CE + WEEE-symbol. Ägaren fyller i sina fält och får
+// ut en färdig etikett-text att skicka till trycket.
+const TS_FIELDS = ["Mfg","Org","Addr1","Addr2","Country","Contact","Model","SN","MfgDate","Ip"];
+const TS_DEFAULTS = { Country: "Sverige", Model: "PDMX-1", Ip: "IP20" };
+const tsPreview = document.getElementById("tsPreview");
+function tsGet() {
+  const v = {};
+  for (const k of TS_FIELDS) {
+    const el = document.getElementById("ts" + k);
+    v[k] = el ? el.value.trim() : "";
+  }
+  return v;
+}
+function tsRender() {
+  if (!tsPreview) return;
+  const v = tsGet();
+  const pad = (s, n) => (s + " ".repeat(n)).slice(0, n);
+  const line = "──────────────────────────────────────────────────────";
+  const L = [
+    "  pi-dmx Controller           Model: " + (v.Model || "PDMX-1"),
+    "  " + line,
+    "  SN: " + pad(v.SN || "—", 22) + " Mfg: " + (v.MfgDate || "—"),
+    "",
+    "  Input:  5 V ⎓  3 A max  (USB-C)",
+    "  Power:  15 W max",
+    "  IP:     " + (v.Ip || "IP20") + "  (indoor use only)",
+    "",
+    "  Radio:  Wi-Fi 2.4 GHz  ≤100 mW EIRP",
+    "          BT 4.2 LE      ≤10 mW EIRP",
+    "",
+    "  Manufacturer:",
+    "    " + (v.Mfg || "[företagsnamn]") + (v.Org ? "  (" + v.Org + ")" : ""),
+    "    " + (v.Addr1 || "[gatuadress]"),
+    "    " + (v.Addr2 || "[postnr ort]") + ", " + (v.Country || "Sverige"),
+    "    " + (v.Contact || "[e-post/URL]"),
+    "",
+    "  Made in " + (v.Country || "Sweden"),
+    "",
+    "      ( C E )        ( WEEE — överkryssad soptunna )",
+    "",
+    "  ⚠ Stroboskop — se manual. Endast inomhus.",
+    "  ⚠ Strobe — see manual. Indoor use only.",
+  ];
+  tsPreview.textContent = L.join("\n");
+  try { localStorage.setItem("pi-dmx-typskylt-v1", JSON.stringify(v)); } catch {}
+}
+(function tsInit(){
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem("pi-dmx-typskylt-v1") || "{}"); } catch {}
+  for (const k of TS_FIELDS) {
+    const el = document.getElementById("ts" + k);
+    if (!el) continue;
+    el.value = saved[k] ?? TS_DEFAULTS[k] ?? "";
+    el.addEventListener("input", tsRender);
+  }
+  tsRender();
+  const cp = document.getElementById("tsCopy");
+  if (cp) cp.onclick = async () => {
+    try { await navigator.clipboard.writeText(tsPreview.textContent); cp.textContent = "Kopierat ✓"; setTimeout(()=>cp.textContent="Kopiera etikett", 1500); }
+    catch { alert("Kunde inte kopiera — markera texten manuellt."); }
+  };
+  const pr = document.getElementById("tsPrint");
+  if (pr) pr.onclick = () => {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write("<pre style='font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:20px'>" + tsPreview.textContent.replace(/</g,"&lt;") + "</pre>");
+    w.document.close(); w.focus(); w.print();
+  };
+})();
+
+
 
 // ---- Första-start-wizard (owner only) -----------------------------------
 // Visas överst i /setup tills ägaren antingen har lagt till minst en fixture
