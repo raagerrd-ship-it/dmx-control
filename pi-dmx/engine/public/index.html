@@ -337,6 +337,25 @@
     </div>
   </div>
 
+  <h1 id="ringHdr" hidden>LED-ring (vred)</h1>
+  <div class="card" id="ringCard" hidden>
+    <div class="row"><label>Max ljusstyrka</label>
+      <input type="range" min="5" max="100" step="1" id="ringMax" style="flex:1;margin:0 10px">
+      <span class="val" id="ringMaxV">–</span>
+    </div>
+    <div class="row"><label>Pulse-boost</label>
+      <input type="range" min="0" max="50" step="1" id="ringPulse" style="flex:1;margin:0 10px">
+      <span class="val" id="ringPulseV">–</span>
+    </div>
+    <div class="row"><label>Blackout-fade</label>
+      <input type="range" min="0" max="3000" step="50" id="ringFade" style="flex:1;margin:0 10px">
+      <span class="val" id="ringFadeV">–</span>
+    </div>
+    <div class="status" style="margin-top:6px">
+      Max = takljus för hela ringen. Pulse-boost = extra puff på taktslag. Blackout-fade = hur mjukt ringen tonar ut vid släckt läge.
+    </div>
+  </div>
+
   <h1>System</h1>
   <div class="card">
     <div class="row"><label>Version</label><span class="val" id="verSha">–</span></div>
