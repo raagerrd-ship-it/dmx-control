@@ -440,6 +440,8 @@ export async function startServer(
             deps.cfg.beatSyncStrength = Math.max(0, Math.min(0.5, msg.value));
           } else if (msg.type === "setBeatSyncOverride") {
             deps.cfg.beatSyncOverride = !!msg.value;
+          } else if (msg.type === "setMoodOverride") {
+            deps.cfg.moodOverride = !!msg.value;
           } else if (msg.type === "setEnergyDrivesMode") {
             deps.cfg.energyDrivesMode = !!msg.value;
           } else if (msg.type === "setRotation" && typeof msg.mode === "string") {

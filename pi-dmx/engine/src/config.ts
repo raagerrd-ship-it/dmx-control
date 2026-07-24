@@ -96,6 +96,10 @@ export interface EngineConfig {
   /** Ägar-override: när true rör stämnings-vredet INTE beatSyncStrength,
    *  och segmentet i /setup blir redigerbart igen. */
   beatSyncOverride?: boolean;
+  /** Ägar-override för hela Regi (pro): när true rör stämnings-vredet INTE
+   *  de 6 mood-styrda flaggorna (dropBlackout, energyCeiling, clubMode,
+   *  ambientGlow, riserStrobe, dropHeadroom) — de blir redigerbara i /setup. */
+  moodOverride?: boolean;
   /** Energi (lokal) väljer läge i smart-läget. */
   energyDrivesMode: boolean;
   /** Hur ofta smart byter läge (ms). */
@@ -211,6 +215,7 @@ export const defaultConfig: EngineConfig = {
   beatPulse: true,
   beatSyncStrength: 0.18,   // normal PLL-korrektion mot trumslag
   beatSyncOverride: false,  // stämnings-vredet styr som default
+  moodOverride: false,      // stämnings-vredet styr Regi (pro)-flaggorna som default
   energyDrivesMode: true,
   smartDwellMs: 15000,
   master: 1.0,
