@@ -199,13 +199,14 @@ function AudioMeterCard() {
 
       {/* Teknisk info */}
       <details className="mt-3 group/tech">
-        <summary className="py-3 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/tech:text-foreground">
+        <summary className="flex items-center justify-between px-5 py-3 rounded-full border border-border/70 bg-card/60 text-[12px] uppercase tracking-[0.18em] text-muted-foreground font-semibold cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/tech:text-foreground group-open/tech:border-border transition-colors">
           <span>Teknisk info</span>
-          <span className="ml-1 group-open/tech:hidden"> ⌄</span>
-          <span className="ml-1 hidden group-open/tech:inline"> ⌃</span>
+          <svg className="h-3.5 w-3.5 text-muted-foreground/70 transition-transform duration-200 group-open/tech:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
         </summary>
-        <div className="mt-2 divide-y divide-border/40 rounded-xl bg-muted/25 ring-1 ring-border/40 px-3">
-          <p className="py-2 text-[13px] leading-snug text-muted-foreground italic">
+        <div className="mt-2 divide-y divide-border/40 rounded-2xl bg-muted/20 ring-1 ring-border/40 px-4">
+          <p className="py-2.5 text-[13px] leading-snug text-muted-foreground italic">
             {moodInfoFor(moodV).desc}
           </p>
           <TechRow label="BPM" value={locked ? `${Math.round(bpm)}` : "–"} accent={locked} />
