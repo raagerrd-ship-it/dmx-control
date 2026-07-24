@@ -125,11 +125,12 @@ function moodInfoFor(v: number) {
 function InputLevel() {
   const audio = useDmx((st) => st.audioLevel);
   const pct = Math.max(0, Math.min(100, Math.round(audio * 100)));
-  const hot = pct >= 99;
   const silent = pct < 4;
 
   const peakRef = useRef(0);
   const [peak, setPeak] = useState(0);
+  const clipUntilRef = useRef(0);
+  const [clip, setClip] = useState(false);
   useEffect(() => {
     if (pct >= peakRef.current) {
       peakRef.current = pct;
@@ -138,7 +139,13 @@ function InputLevel() {
       peakRef.current = Math.max(pct, peakRef.current - 1.5);
       setPeak(peakRef.current);
     }
+    // KLIPP-latch: kräver ≥99 % och hålls i 600 ms för att undvika flimmer
+    const now = performance.now();
+    if (pct >= 99) clipUntilRef.current = now + 600;
+    const active = now < clipUntilRef.current;
+    setClip((prev) => (prev !== active ? active : prev));
   }, [pct]);
+  const hot = clip;
 
   return (
     <div>
