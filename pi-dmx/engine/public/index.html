@@ -726,12 +726,22 @@ document.querySelectorAll("#segDyn button").forEach((b) =>
 document.querySelectorAll("#segMaster button").forEach((b) =>
   b.onclick = () => { send({ type: "setMaster", value: Number(b.dataset.master) }); segActivate("segMaster", Number(b.dataset.master), "master"); });
 
+const statusFooter = document.getElementById("statusFooter");
+const sfVer = document.getElementById("sfVer");
+const sfFx  = document.getElementById("sfFx");
+function setFooterOnline(ok) {
+  if (!statusFooter) return;
+  statusFooter.firstChild.nodeValue = ok ? "Ansluten · " : "Frånkopplad · ";
+  statusFooter.classList.toggle("offline", !ok);
+}
+fetch("/api/version").then(r => r.json()).then(v => { if (sfVer) sfVer.textContent = v.version ? "v" + v.version : "–"; }).catch(() => {});
+
 let ws;
 function connect() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${proto}://${location.host}/ws`);
-  ws.onopen  = () => { connEl.textContent = "Connected"; wsOk = true; renderHealth(); };
-  ws.onclose = () => { connEl.textContent = "Disconnected — retrying…"; wsOk = false; renderHealth(); setTimeout(connect, 1500); };
+  ws.onopen  = () => { connEl.textContent = "Connected"; wsOk = true; renderHealth(); setFooterOnline(true); };
+  ws.onclose = () => { connEl.textContent = "Disconnected — retrying…"; wsOk = false; renderHealth(); setFooterOnline(false); setTimeout(connect, 1500); };
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
     if (m.type === "config") applyConfig(m.config);
