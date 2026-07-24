@@ -168,7 +168,7 @@
     /* Ljud-sektion (proffsig, kort-lös) */
     .audio-section { margin: 4px 0 14px; }
     .src-seg { position:relative; display:grid; grid-template-columns:1fr 1fr; gap:0; padding:4px; border-radius:999px; background:color-mix(in srgb, var(--fg) 3%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
-    .src-seg .src-thumb { position:absolute; top:4px; bottom:4px; width:calc(50% - 4px); border-radius:999px; background:color-mix(in srgb, var(--hot) 6%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--hot) 30%, transparent); transition:transform .3s cubic-bezier(.4,.0,.2,1); }
+    .src-seg .src-thumb { position:absolute; top:4px; bottom:4px; width:calc(50% - 4px); border-radius:999px; background:color-mix(in srgb, var(--fg) 4%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--fg) 10%, transparent); transition:transform .3s cubic-bezier(.4,.0,.2,1); }
     .src-seg[data-src="mic"] .src-thumb { transform:translateX(calc(100% + 8px)); }
     .src-seg button { position:relative; z-index:1; display:flex; align-items:center; justify-content:center; gap:8px; background:transparent; border:0; padding:10px 8px; border-radius:999px; color:color-mix(in srgb, var(--dim) 65%, transparent); font-size:13px; font-weight:500; cursor:pointer; transition:color .2s; }
     .src-seg button::before { content:""; width:5px; height:5px; border-radius:999px; background:color-mix(in srgb, var(--dim) 35%, transparent); transition:background .2s, box-shadow .2s; }
@@ -212,6 +212,8 @@
     details.more[open] > summary { color:var(--fg); margin-bottom:4px; }
     details.more > summary::after { content:" ⌄"; }
     details.more[open] > summary::after { content:" ⌃"; }
+    .status-footer { margin-top:24px; text-align:center; font-size:10px; letter-spacing:.24em; text-transform:uppercase; color:color-mix(in srgb, var(--dim) 55%, transparent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .status-footer.offline { color:color-mix(in srgb, var(--warn) 80%, transparent); }
     /* Spegel-sliders: skrivskyddad vy av vad Stämningen just nu har satt */
     .advhint { font-size:12px; color:var(--dim); line-height:1.4; margin-bottom:10px; }
     .advrow { display:grid; grid-template-columns: 130px 1fr 44px; gap:10px; align-items:center; margin-bottom:9px; }
@@ -322,7 +324,7 @@
       <div class="mood-ticks" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
       <input type="range" id="moodSlider" class="mood-range" min="0" max="10" step="1" value="5" aria-label="Stämning från Av till Galet" />
     </div>
-    <div class="mood-slider-legend"><span id="legAv">Av</span><span id="legFest">Fest</span><span id="legGalet">Galet</span></div>
+    <div class="mood-slider-legend"><span id="legAv">AV</span><span id="legFest">Fest</span><span id="legGalet">MAX</span></div>
   </section>
 
   <section class="audio-section">
@@ -353,10 +355,6 @@
           <div class="tech-cell">
             <div class="lbl">Konfidens</div>
             <div class="val" id="confVal">–</div>
-          </div>
-          <div class="tech-cell">
-            <div class="lbl">Läge</div>
-            <div class="val" id="modeVal">–</div>
           </div>
         </div>
         <div class="mood-desc" id="moodDesc">Ljuset är släckt — dra åt höger för att tända</div>
@@ -407,6 +405,10 @@
       </div>
     </div>
   </details>
+
+  <div id="statusFooter" class="status-footer">Ansluten · <span id="sfVer">–</span> · <span id="sfFx">–</span> lampor</div>
+
+
 
   <div id="ownerOnly" hidden>
   <div class="owner-banner">🔧 Ägarläge (setup). Den här sidan är dold för hyresgäster — de öppnar adressen utan <b>/setup</b>.</div>
@@ -724,12 +726,22 @@ document.querySelectorAll("#segDyn button").forEach((b) =>
 document.querySelectorAll("#segMaster button").forEach((b) =>
   b.onclick = () => { send({ type: "setMaster", value: Number(b.dataset.master) }); segActivate("segMaster", Number(b.dataset.master), "master"); });
 
+const statusFooter = document.getElementById("statusFooter");
+const sfVer = document.getElementById("sfVer");
+const sfFx  = document.getElementById("sfFx");
+function setFooterOnline(ok) {
+  if (!statusFooter) return;
+  statusFooter.firstChild.nodeValue = ok ? "Ansluten · " : "Frånkopplad · ";
+  statusFooter.classList.toggle("offline", !ok);
+}
+fetch("/api/version").then(r => r.json()).then(v => { if (sfVer) sfVer.textContent = v.version ? "v" + v.version : "–"; }).catch(() => {});
+
 let ws;
 function connect() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   ws = new WebSocket(`${proto}://${location.host}/ws`);
-  ws.onopen  = () => { connEl.textContent = "Connected"; wsOk = true; renderHealth(); };
-  ws.onclose = () => { connEl.textContent = "Disconnected — retrying…"; wsOk = false; renderHealth(); setTimeout(connect, 1500); };
+  ws.onopen  = () => { connEl.textContent = "Connected"; wsOk = true; renderHealth(); setFooterOnline(true); };
+  ws.onclose = () => { connEl.textContent = "Disconnected — retrying…"; wsOk = false; renderHealth(); setFooterOnline(false); setTimeout(connect, 1500); };
   ws.onmessage = (ev) => {
     const m = JSON.parse(ev.data);
     if (m.type === "config") applyConfig(m.config);
@@ -860,6 +872,7 @@ function applyConfig(cfg) {
   else if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
   else renderFixtures();
   syncRingUi(cfg.intensityRing);
+  if (sfFx) sfFx.textContent = String(Array.isArray(cfg.fixtures) ? cfg.fixtures.length : 0);
 }
 
 /* LED-ring (WS2812 på vredet) — visas bara om hårdvaran är konfigurerad. */
@@ -998,8 +1011,6 @@ function applyFrame(f) {
   bpmVal.classList.toggle("on", locked);
   confVal.textContent = locked ? confPct + "%" : "–";
   confVal.classList.toggle("on", locked && confPct >= 70);
-  modeVal.textContent = moodV > 0 ? modeInfo.name : "Av";
-  modeVal.classList.toggle("on", moodV > 0);
   if (moodDesc) moodDesc.textContent = moodV > 0 ? modeInfo.desc : "Ljuset är släckt — dra åt höger för att tända";
 
   if (locked && f.beat) {   // beat-lås-prick: pulsa på varje takt
@@ -1426,7 +1437,6 @@ if (tBeatPulse) tBeatPulse.onchange = () => send({ type: "setBeatPulse", value: 
 const bpmVal = document.getElementById("bpmVal");
 const bpmDot = document.getElementById("bpmDot");
 const confVal = document.getElementById("confVal");
-const modeVal = document.getElementById("modeVal");
 const moodDesc = document.getElementById("moodDesc");
 
 let beatTimer;

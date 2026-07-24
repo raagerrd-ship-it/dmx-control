@@ -33,7 +33,17 @@ export default function DmxController() {
       <MoreDetails />
 
       {ownerMode && <OwnerSections />}
+
+      <StatusFooter />
     </main>
+  );
+}
+
+function StatusFooter() {
+  return (
+    <div className="mt-6 text-center text-[10px] tracking-[0.24em] uppercase text-muted-foreground/40 font-mono">
+      Ansluten · v1.4.0 · 4 lampor
+    </div>
   );
 }
 
@@ -101,9 +111,9 @@ function MoodSlider() {
       </div>
 
       <div className="flex justify-between mt-2 px-1 font-mono">
-        <span className={`text-[9px] font-bold tracking-widest ${off ? "text-primary/80" : "text-muted-foreground/40"}`}>LVL 00</span>
+        <span className={`text-[9px] font-bold tracking-widest ${off ? "text-primary/80" : "text-muted-foreground/40"}`}>AV</span>
         <span className={`text-[9px] font-bold tracking-widest uppercase ${!off ? "text-primary" : "text-muted-foreground/40"}`}>{moodInfoFor(v).name}</span>
-        <span className={`text-[9px] font-bold tracking-widest ${v >= 9 ? "text-primary" : "text-muted-foreground/40"}`}>LVL 10</span>
+        <span className={`text-[9px] font-bold tracking-widest ${v >= 9 ? "text-primary" : "text-muted-foreground/40"}`}>MAX</span>
       </div>
 
     </div>
@@ -191,7 +201,7 @@ function SourcePill() {
       {/* sliding thumb */}
       <div
         aria-hidden
-        className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-primary/[0.08] ring-1 ring-primary/25 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+        className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-foreground/[0.05] ring-1 ring-foreground/10 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
         style={{ transform: isMic ? "translateX(calc(100% + 8px))" : "translateX(0)" }}
       />
       {[
@@ -237,7 +247,6 @@ function TechGrid() {
       <div className="flex items-stretch divide-x divide-foreground/[0.06]">
         <TechCell label="BPM" value={locked ? String(Math.round(bpm)) : "—"} accent={locked} dot={locked && beat} />
         <TechCell label="Konfidens" value={locked ? `${confPct}%` : "—"} accent={locked && confPct >= 70} />
-        <TechCell label="Läge" value={off ? "Av" : info.name} accent={!off} />
       </div>
       <div className="mt-3 pt-3 border-t border-foreground/[0.06] text-[11px] leading-snug text-muted-foreground/80">
         {off ? "Ljuset är släckt — dra åt höger för att tända" : info.desc}
