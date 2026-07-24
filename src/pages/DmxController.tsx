@@ -191,7 +191,7 @@ function SourcePill() {
       {/* sliding thumb */}
       <div
         aria-hidden
-        className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-primary/[0.08] ring-1 ring-primary/25 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+        className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-foreground/[0.05] ring-1 ring-foreground/10 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
         style={{ transform: isMic ? "translateX(calc(100% + 8px))" : "translateX(0)" }}
       />
       {[
