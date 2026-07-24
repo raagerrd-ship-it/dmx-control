@@ -714,8 +714,7 @@ function applyConfig(cfg) {
   // andra klienter kan ha ändrat den). Kortet dimmas när ljuset är av.
   const x = typeof cfg.activeIntensity === "number" ? cfg.activeIntensity : 0.5;
   lastIntensity = x;
-  updateMoodUi(x, cfg.mode !== "blackout");
-  setPower(cfg.mode === "blackout");
+  updateMoodUi(x, cfg.mode !== "blackout", cfg.mode === "blackout");
   if (tBeatPulse) tBeatPulse.checked = !!cfg.beatPulse;
   const fog = cfg.fog || {};
   if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 128; }
