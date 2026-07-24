@@ -268,8 +268,10 @@ export async function startServer(
       ], { detached: true, stdio: "ignore" });
       up.on("error", (e) => console.error("[update] spawn:", (e as Error).message));   // ej krascha om systemd-run saknas
       up.unref();
+      logHealth("info", "update", "OTA-uppdatering startad");
       return reply.send({ started: true });
     } catch (e) {
+      logHealth("err", "update", `start misslyckades: ${(e as Error).message}`);
       return reply.code(500).send({ error: (e as Error).message });
     }
   });
@@ -285,8 +287,10 @@ export async function startServer(
       ], { detached: true, stdio: "ignore" });
       up.on("error", (e) => console.error("[rollback] spawn:", (e as Error).message));
       up.unref();
+      logHealth("warn", "update", "rollback startad");
       return reply.send({ started: true });
     } catch (e) {
+      logHealth("err", "update", `rollback misslyckades: ${(e as Error).message}`);
       return reply.code(500).send({ error: (e as Error).message });
     }
   });
@@ -300,8 +304,10 @@ export async function startServer(
       const ts = new Date().toISOString().replace(/[:.]/g, "-");
       spawn("sh", ["-c", `mv -f ${CFG} ${CFG}.factory-${ts} 2>/dev/null; mv -f ${CFG}.bak ${CFG}.bak.factory-${ts} 2>/dev/null; systemctl restart audio-dmx-engine`], { detached: true, stdio: "ignore" })
         .on("error", (e) => console.error("[factory-reset] spawn:", (e as Error).message)).unref();
+      logHealth("warn", "config", "fabriks-reset — motorn startas om");
       return reply.send({ started: true });
     } catch (e) {
+      logHealth("err", "config", `fabriks-reset misslyckades: ${(e as Error).message}`);
       return reply.code(500).send({ error: (e as Error).message });
     }
   });
