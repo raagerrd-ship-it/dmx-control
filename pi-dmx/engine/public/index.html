@@ -38,10 +38,8 @@
     .row .val { font-variant-numeric: tabular-nums; color: var(--fg); font-size: 13px; }
     input[type=range] { width: 100%; accent-color: var(--hot); }
     .meter { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 8px; }
-    .meter > div { height: 100%; background: linear-gradient(90deg, var(--ok), var(--hot)); transition: width 60ms linear; }
-    .kick-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background: var(--line); margin-left: 6px; vertical-align: middle; transition: background 40ms; }
-    .kick-dot.on { background: var(--hot); box-shadow: 0 0 12px var(--hot); }
-    .status { font-size: 12px; color: var(--dim); margin-top: 8px; }
+.meter > div { height: 100%; background: linear-gradient(90deg, var(--ok), var(--hot)); transition: width 60ms linear; }
+.status { font-size: 12px; color: var(--dim); margin-top: 8px; }
     .brand-logo { height: clamp(128px, 18vw, 184px); width: auto; opacity: .95; display:block; }
     @media (orientation: landscape) { .brand-logo { height: clamp(88px, 15vh, 132px); } }
 
