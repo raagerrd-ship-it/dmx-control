@@ -22,8 +22,8 @@ export default function DmxController() {
 
   return (
     <main className="mx-auto max-w-md px-4 pt-1 pb-8 safe-bottom">
-      <header className="flex justify-center pt-3 pb-2">
-        <BrandLogo className="h-16 w-auto opacity-90" />
+      <header className="flex justify-center pt-4 pb-3">
+        <BrandLogo className="h-24 w-auto opacity-95" />
       </header>
       <PowerHero />
 
