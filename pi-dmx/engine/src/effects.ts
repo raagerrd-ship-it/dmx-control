@@ -248,13 +248,7 @@ export class EffectEngine {
 
     this.universe.fill(0);
 
-    if (this.cfg.mode === "blackout") {
-      // Standby-glöd: alla lampor lyser svagt rött så användaren ser att riggen
-      // är på men "släckt" (vred = 0). Master hålls lågt så det inte lyser upp
-      // rummet — bara en indikator att strömmen är kvar.
-      for (const fx of this.cfg.fixtures) writeFixture(this.universe, fx, [1, 0, 0], 0.04);
-      return this.universe;
-    }
+    if (this.cfg.mode === "blackout") return this.universe;
 
     // Identify override: light only the target fixture(s) at full white so the
     // user can visually locate each fixture in the room. Bypasses audio/mode.
