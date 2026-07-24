@@ -55,25 +55,8 @@ function MoodSlider() {
               { name: "Galet",  desc: "Full fart, drop-blackout, riser-strobe" };
   const fillPct = (v / 10) * 100;
   return (
-    <section className="mb-6 mt-2" aria-labelledby="mood-heading">
-      <div className="flex items-baseline justify-between px-0.5 mb-3">
-        <h2
-          id="mood-heading"
-          className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground"
-        >
-          Stämning
-        </h2>
-        <div
-          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold tabular-nums transition-colors ${
-            off
-              ? "bg-muted/40 text-muted-foreground"
-              : "bg-primary/10 text-primary ring-1 ring-primary/25"
-          }`}
-        >
-          <span>{info.name}</span>
-          <span className="opacity-50">· {v}/10</span>
-        </div>
-      </div>
+    <section className="mb-6 mt-2">
+
 
       <div className="relative">
         <div className="mood-ticks" aria-hidden>
