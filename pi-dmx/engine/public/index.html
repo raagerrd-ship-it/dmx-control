@@ -355,9 +355,11 @@
 
   <h1>Regi (pro)</h1>
   <div class="card">
-    <div class="status" style="margin:-2px 0 10px;opacity:.7">Alla val nedan är ägar-val. Stämnings-vredet (Chill/Fest/Galet) sätter dem som preset — du kan justera fritt efteråt.</div>
+    <label class="tgl"><span>Regi (pro) aktiv<br><small style="opacity:.6">När av: stämnings-vredet rör inte flaggorna nedan — du äger dem själv. När på: Chill/Fest/Galet sätter dem som preset, du kan justera fritt efteråt.</small></span><input type="checkbox" id="tRegiPro"></label>
+    <div style="border-top:1px solid rgba(255,255,255,.08);margin:10px 0 6px"></div>
     <label class="tgl"><span>Sceniskt djup<br><small style="opacity:.6">Mittlamporna hålls som fasta uplights i höga lägen. Kräver lampor i rad V→H.</small></span><input type="checkbox" id="tScenicAnchor"></label>
     <label class="tgl"><span>Släpp strobe-taket (scenläge)<br><small style="opacity:.6">⚠ Höjer blixttakten från 1,5 till 9 per sekund. Blinkande ljus kan utlösa epileptiska anfall — risken är störst när hela riggen blinkar synkront i vitt. Gränsen för allmänt säkert innehåll är 3 blixtar/s. Slå bara på detta om lokalen skyltar om strobe vid entrén.</small></span><input type="checkbox" id="tStrobeUnlimited"></label>
+    <div id="regiProGroup">
     <div style="border-top:1px solid rgba(255,255,255,.08);margin:10px 0 6px"></div>
     <label class="tgl"><span>Drop-blackout<br><small style="opacity:.6">Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast.</small></span><input type="checkbox" id="tDropBlackout"></label>
     <label class="tgl"><span>Dynamiskt ljustak (VU)<br><small style="opacity:.6">Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%.</small></span><input type="checkbox" id="tEnergyCeiling"></label>
@@ -365,6 +367,7 @@
     <label class="tgl"><span>Varm vilo-glöd i tystnad<br><small style="opacity:.6">Dim bärnsten-glöd när ingen musik spelar, istället för helt mörkt.</small></span><input type="checkbox" id="tAmbientGlow"></label>
     <label class="tgl"><span>Riser-strobe (build → drop)<br><small style="opacity:.6">Accelererande strobe under uppbyggnad, blackout på dropen. Begränsad till 1,5/s.</small></span><input type="checkbox" id="tRiserStrobe"></label>
     <label class="tgl"><span>Drop-headroom (max 90%, drops 100%)<br><small style="opacity:.6">Normalläget kapas till 90% så drops poppar tydligare.</small></span><input type="checkbox" id="tDropHeadroom"></label>
+    </div>
   </div>
 
   <h1>Lampor</h1>
