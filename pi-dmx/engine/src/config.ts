@@ -210,6 +210,7 @@ export const defaultConfig: EngineConfig = {
   calmDecay: 0.42,
   beatPulse: true,
   beatSyncStrength: 0.18,   // normal PLL-korrektion mot trumslag
+  beatSyncOverride: false,  // stämnings-vredet styr som default
   energyDrivesMode: true,
   smartDwellMs: 15000,
   master: 1.0,
