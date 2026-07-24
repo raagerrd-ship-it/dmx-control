@@ -1086,6 +1086,12 @@ function renderFixtures() {
       send({ type: "identifyOne", index: Number(e.target.dataset.id) });
     });
   });
+  fxEl.querySelectorAll("[data-walk-open]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      if (fxDirty) { fxHint.textContent = "Spara ändringar innan du kör identifiering"; return; }
+      openWalkTest(Number(e.currentTarget.dataset.walkOpen));
+    });
+  });
   fxEl.querySelectorAll("[data-role-i]").forEach((el) => {
     el.addEventListener("change", (e) => {
       const i = Number(e.target.dataset.fxI);
