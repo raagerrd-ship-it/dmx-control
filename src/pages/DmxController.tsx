@@ -119,11 +119,11 @@ function AudioMeterCard() {
       <div
         role="tablist"
         aria-label="Ljudkälla"
-        className="relative grid grid-cols-2 rounded-full bg-muted/40 p-1 ring-1 ring-border/60"
+        className="relative grid grid-cols-2 rounded-full bg-muted/20 p-1 ring-1 ring-border/40"
       >
         <span
           aria-hidden
-          className="absolute inset-y-1 w-[calc(50%-4px)] rounded-full bg-primary shadow-[0_0_20px_hsl(var(--primary)/0.45)] transition-transform duration-300 ease-out"
+          className="absolute inset-y-1 w-[calc(50%-4px)] rounded-full bg-primary/10 ring-1 ring-primary/40 shadow-[0_0_12px_hsl(var(--primary)/0.15)] transition-transform duration-300 ease-out"
           style={{ transform: `translateX(${source === "aux" ? "0%" : "calc(100% + 8px)"})` }}
         />
         {[
@@ -135,14 +135,21 @@ function AudioMeterCard() {
             role="tab"
             aria-selected={source === o.id}
             onClick={() => setPi({ audioInput: o.id as "aux" | "mic" })}
-            className={`relative z-10 py-2.5 rounded-full text-[13px] font-medium transition-colors ${
-              source === o.id ? "text-primary-foreground" : "text-muted-foreground"
+            className={`relative z-10 flex items-center justify-center gap-2 py-2.5 rounded-full text-[13px] font-medium transition-colors ${
+              source === o.id ? "text-foreground" : "text-muted-foreground/70"
             }`}
           >
+            <span
+              aria-hidden
+              className={`h-1.5 w-1.5 rounded-full transition-colors ${
+                source === o.id ? "bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.8)]" : "bg-muted-foreground/30"
+              }`}
+            />
             {o.label}
           </button>
         ))}
       </div>
+
 
       {/* Nivåmätare */}
       <div className="mt-4 flex items-baseline justify-between">
