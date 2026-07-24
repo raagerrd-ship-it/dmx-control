@@ -26,7 +26,6 @@ export default function DmxController() {
         <BrandLogo className="h-32 w-auto opacity-95 sm:h-36 md:h-40 lg:h-44 landscape:h-28" />
       </header>
 
-      <SectionTitle>Stämning</SectionTitle>
       <MoodSlider />
 
       <AudioMeterCard />
@@ -39,7 +38,9 @@ export default function DmxController() {
   );
 }
 
-/* ────────── Stämning: 0..10-slider (speglar KY-040-vredet på Pi; 0 = av) ────────── */
+/* ────────── Stämning: 0..10-slider (speglar KY-040-vredet på Pi; 0 = av) ──────────
+   Renderas som appens huvudkontroll — ingen kort-ruta runt, ligger direkt på sidan
+   så den känns som den enda saken hyresgästen behöver röra. */
 
 function MoodSlider() {
   const s = usePi();
@@ -52,46 +53,63 @@ function MoodSlider() {
     v <= 6  ? { name: "Fest",   desc: "Pulsar på taktslag, byter effekt ibland" } :
     v <= 8  ? { name: "Fest+",  desc: "Klubb-läge, byter effekt oftare" } :
               { name: "Galet",  desc: "Full fart, drop-blackout, riser-strobe" };
+  const fillPct = (v / 10) * 100;
   return (
-    <div
-      className={`bg-card border rounded-[14px] px-3.5 pt-3.5 pb-3 mb-3 transition-colors ${
-        off ? "border-border opacity-70" : "border-[color-mix(in_srgb,hsl(var(--accent))_55%,hsl(var(--border)))]"
-      }`}
-    >
-      <div className="flex items-baseline justify-between mb-2">
-        <span className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground">Av → Galet</span>
-        <span className="text-[13px] font-semibold tabular-nums">
-          <span className="text-primary">{info.name}</span>
-          <span className="text-muted-foreground"> · {v}/10</span>
-        </span>
+    <section className="mb-6 mt-2" aria-labelledby="mood-heading">
+      <div className="flex items-baseline justify-between px-0.5 mb-3">
+        <h2
+          id="mood-heading"
+          className="text-[11px] font-semibold uppercase tracking-[0.22em] text-muted-foreground"
+        >
+          Stämning
+        </h2>
+        <div
+          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold tabular-nums transition-colors ${
+            off
+              ? "bg-muted/40 text-muted-foreground"
+              : "bg-primary/10 text-primary ring-1 ring-primary/25"
+          }`}
+        >
+          <span>{info.name}</span>
+          <span className="opacity-50">· {v}/10</span>
+        </div>
       </div>
-      <input
-        type="range"
-        min={0}
-        max={10}
-        step={1}
-        value={v}
-        onChange={(e) => {
-          const nv = Number(e.target.value);
-          if (nv === 0) {
-            setPi({ power: false });
-          } else {
-            if (!s.power) setPi({ power: true });
-            applyIntensity((nv - 1) / 9);
-          }
-        }}
-        className="w-full h-6 accent-[hsl(var(--primary))] cursor-pointer"
-        aria-label="Stämning från Av till Galet"
-      />
-      <div className="flex justify-between text-[11px] uppercase tracking-[0.1em] text-muted-foreground mt-1 px-0.5">
-        <span>Av</span>
-        <span>Fest</span>
-        <span>Galet</span>
+
+      <div className="relative">
+        <div className="mood-ticks" aria-hidden>
+          {Array.from({ length: 11 }).map((_, i) => <span key={i} />)}
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={10}
+          step={1}
+          value={v}
+          onChange={(e) => {
+            const nv = Number(e.target.value);
+            if (nv === 0) {
+              setPi({ power: false });
+            } else {
+              if (!s.power) setPi({ power: true });
+              applyIntensity((nv - 1) / 9);
+            }
+          }}
+          style={{ ["--mood-fill" as string]: `${fillPct}%` }}
+          className={`mood-range relative ${off ? "is-off" : ""}`}
+          aria-label="Stämning från Av till Galet"
+        />
       </div>
-      <div className="mt-2.5 pt-2.5 border-t border-border text-[13px] leading-snug">
+
+      <div className="flex justify-between text-[10px] uppercase tracking-[0.18em] text-muted-foreground mt-1 px-0.5">
+        <span className={off ? "" : "opacity-70"}>Av</span>
+        <span className={v >= 5 && v <= 7 ? "text-primary" : "opacity-70"}>Fest</span>
+        <span className={v >= 9 ? "text-primary" : "opacity-70"}>Galet</span>
+      </div>
+
+      <p className="mt-3 text-[13px] leading-snug text-muted-foreground italic">
         {info.desc}
-      </div>
-    </div>
+      </p>
+    </section>
   );
 }
 
