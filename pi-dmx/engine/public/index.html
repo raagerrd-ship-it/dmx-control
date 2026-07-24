@@ -1303,6 +1303,14 @@ fogServiceReset.onclick = () => {
 /* ── Regi (pro) ──────────────────────────────────────────────────────────
  * Alla flaggor är ägar-val. Stämnings-vredet sätter dem som preset när det
  * ändras; ägaren kan justera fritt efteråt. */
+const tRegiPro = document.getElementById("tRegiPro");
+const regiProGroup = document.getElementById("regiProGroup");
+function applyRegiProUi(on){
+  if (!regiProGroup) return;
+  regiProGroup.style.opacity = on ? "1" : "0.45";
+  regiProGroup.querySelectorAll("input").forEach(i => i.disabled = !on);
+}
+tRegiPro.onchange = () => { send({ type: "setRegiPro", value: tRegiPro.checked }); applyRegiProUi(tRegiPro.checked); };
 const tDropBlackout = document.getElementById("tDropBlackout");
 tDropBlackout.onchange = () => send({ type: "setDropBlackout", value: tDropBlackout.checked });
 const tScenicAnchor = document.getElementById("tScenicAnchor");
