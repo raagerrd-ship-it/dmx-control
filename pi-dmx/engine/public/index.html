@@ -339,11 +339,19 @@
 
     <details class="tech-details">
       <summary>Teknisk info</summary>
-      <div class="tech-list">
-        <div class="mood-desc" id="moodDesc">Pulsar på taktslag, byter effekt ibland</div>
-        <div class="row"><label>BPM</label><span class="val" id="bpmVal">–</span></div>
-        <div class="row"><label>Beat-synk <span class="audio-kd" id="beatDot"></span></label><span class="val" id="beatSyncVal">–</span></div>
-        <div class="row"><label>Konfidens</label><span class="val" id="confVal">–</span></div>
+      <div class="tech-strip">
+        <div class="tech-tile">
+          <div class="lbl">BPM <span class="dot" id="bpmDot" style="display:none"></span></div>
+          <div class="val" id="bpmVal">–</div>
+        </div>
+        <div class="tech-tile">
+          <div class="lbl">Konfidens</div>
+          <div class="val" id="confVal">–</div>
+        </div>
+        <div class="tech-tile">
+          <div class="lbl">Läge</div>
+          <div class="val" id="modeVal">–</div>
+        </div>
       </div>
     </details>
   </section>
