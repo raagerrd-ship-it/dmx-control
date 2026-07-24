@@ -120,25 +120,67 @@ function moodInfoFor(v: number) {
   return               { name: "Galet",  desc: "Full fart, drop-blackout, riser-strobe" };
 }
 
-function AudioMeterCard() {
+/* Horisontell input-mätare: visar verklig ljudnivå (0–100 %) med peak-hold.
+   Samma visuella språk som stämningsslidern så det känns som en logisk mätare. */
+function InputLevel() {
   const audio = useDmx((st) => st.audioLevel);
-  const hot = audio > 0.85;
-  // 7 discrete bars, level distributed with slight center bias
-  const bars = [0.35, 0.55, 0.75, 1.0, 0.85, 0.55, 0.3].map((peak) =>
-    Math.max(0.12, Math.min(1, audio * peak * 1.1))
-  );
+  const pct = Math.max(0, Math.min(100, Math.round(audio * 100)));
+  const hot = pct > 85;
+  const silent = pct < 4;
+
+  const peakRef = React.useRef(0);
+  const [peak, setPeak] = React.useState(0);
+  React.useEffect(() => {
+    if (pct >= peakRef.current) {
+      peakRef.current = pct;
+      setPeak(pct);
+    } else {
+      peakRef.current = Math.max(pct, peakRef.current - 1.5);
+      setPeak(peakRef.current);
+    }
+  }, [pct]);
+
   return (
-    <section className="rounded-2xl bg-foreground/[0.03] backdrop-blur-md ring-1 ring-foreground/[0.06] shadow-[inset_0_1px_0_hsl(var(--foreground)/0.05)] p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-[10px] font-bold uppercase tracking-[0.24em] text-muted-foreground/80">
-          Signal Output
-        </h3>
-        <div className="flex gap-1">
-          <span className="w-1 h-1 rounded-full bg-primary/30" />
-          <span className="w-1 h-1 rounded-full bg-primary/60" />
-          <span className={`w-1 h-1 rounded-full bg-primary ${hot ? "shadow-[0_0_6px_hsl(var(--primary))]" : ""}`} />
+    <div>
+      <div className="flex items-baseline justify-between px-1 mb-2">
+        <span className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground/70 font-bold">
+          Ljudnivå
+        </span>
+        <span className={`text-[11px] font-mono tabular-nums ${hot ? "text-primary" : silent ? "text-muted-foreground/40" : "text-muted-foreground/80"}`}>
+          {String(pct).padStart(2, "0")}%
+        </span>
+      </div>
+
+      <div className="relative h-3 rounded-full bg-foreground/[0.05] ring-1 ring-foreground/[0.06] overflow-hidden">
+        {/* fyllnad */}
+        <div
+          className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-100 ${
+            hot ? "bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.7)]" : "bg-primary/70"
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+        {/* peak-hold linje */}
+        <div
+          aria-hidden
+          className="absolute inset-y-0 w-[2px] bg-primary/90 shadow-[0_0_6px_hsl(var(--primary))] transition-[left] duration-150"
+          style={{ left: `calc(${peak}% - 1px)`, opacity: silent ? 0 : 1 }}
+        />
+        {/* skala */}
+        <div aria-hidden className="absolute inset-0 flex justify-between px-[6px] pointer-events-none">
+          {Array.from({ length: 11 }).map((_, i) => (
+            <span key={i} className="w-px h-full bg-foreground/[0.06]" />
+          ))}
         </div>
       </div>
+
+      <div className="flex justify-between mt-1.5 px-1 font-mono">
+        <span className="text-[9px] tracking-widest text-muted-foreground/40">TYST</span>
+        <span className="text-[9px] tracking-widest text-muted-foreground/40">-12 dB</span>
+        <span className={`text-[9px] tracking-widest ${hot ? "text-primary" : "text-muted-foreground/40"}`}>KLIPP</span>
+      </div>
+    </div>
+  );
+}
       <div className="flex items-end gap-1.5 h-9">
         {bars.map((h, i) => {
           const strong = h > 0.7;
