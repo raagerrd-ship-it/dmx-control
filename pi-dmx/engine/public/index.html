@@ -646,7 +646,7 @@ function updateMoodUi(v01, active, forceZero) {
   moodSlider.value = String(v);
   const info = moodInfoFor(v);
   if (typeof moodLbl !== "undefined" && moodLbl) moodLbl.textContent = info.name;
-  if (typeof moodNum !== "undefined" && moodNum) moodNum.textContent = `· ${v}/10`;
+  if (typeof moodNum !== "undefined" && moodNum) { moodNum.textContent = String(v).padStart(2, "0"); moodNum.classList.toggle("off", v === 0); }
 
 
   if (moodDesc) moodDesc.textContent = info.desc;
