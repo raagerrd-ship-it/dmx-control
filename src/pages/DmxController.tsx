@@ -418,7 +418,23 @@ function RotationList({ modes }: { modes: [string, string, string][] }) {
 
 /* ────────── Owner-only ────────── */
 
+/* Owner-only mock. Speglar pi-dmx/engine/public/index.html #ownerOnly-blocket
+ * (Beat-synk, Rökmaskin, Regi pro, Lampor, BLE-slingor, LED-ring, System, WiFi)
+ * så previewn ser likadan ut som /setup på Pi:n. Alla värden är lokal state —
+ * inget skickas någonstans, det är bara en visuell mirror.
+ * Håll i synk med Pi:ns HTML när något ändras där.                        */
 function OwnerSections() {
+  const [beatSync, setBeatSync] = useState(0.18);
+  const [fogEnabled, setFogEnabled] = useState(false);
+  const [fogOnDrop, setFogOnDrop] = useState(true);
+  const [fogAddr, setFogAddr] = useState(200);
+  const [regi, setRegi] = useState({
+    dropBlackout: true, scenicAnchor: false, energyCeiling: true,
+    clubMode: false, ambientGlow: true, riserStrobe: false,
+    strobeUnlimited: false, dropHeadroom: false,
+  });
+  const rg = (k: keyof typeof regi) => (v: boolean) => setRegi((s) => ({ ...s, [k]: v }));
+  const [ring, setRing] = useState({ maxBright: 60, pulseBoost: 20, blackoutFadeMs: 800 });
   return (
     <>
       <div
@@ -431,21 +447,209 @@ function OwnerSections() {
         🔧 Ägarläge (setup). Den här sidan är dold för hyresgäster — de öppnar
         adressen utan <b>/setup</b>.
       </div>
-      <SectionTitle>Lampor</SectionTitle>
+
+      <SectionTitle>Beat-synk</SectionTitle>
       <Card>
-        <div className="text-xs text-muted-foreground">
-          Fixture-editorn finns bara på Pi:n. Öppna <code>/setup</code> på
-          <code> pi-dmx.local</code> för att redigera.
+        <SetRow label="Beat-synk" last>
+          <Seg
+            value={beatSync}
+            onChange={setBeatSync}
+            options={[
+              { v: 0,    label: "Av" },
+              { v: 0.10, label: "Mjuk" },
+              { v: 0.18, label: "Normal" },
+              { v: 0.30, label: "Aggressiv" },
+            ]}
+          />
+        </SetRow>
+        <div className="text-[12px] text-muted-foreground leading-snug mt-2">
+          Hur hårt pulsen knuffas i fas mot faktiska trumslag. Av = fri-rullande
+          på detekterad BPM. Aggressiv låser snabbast men kan rycka på taktrik musik.
         </div>
       </Card>
+
+      <SectionTitle>Rökmaskin</SectionTitle>
+      <Card>
+        <TglRow label="Rökmaskin ansluten" checked={fogEnabled} onChange={setFogEnabled} />
+        <TglRow label="Rök på drop" checked={fogOnDrop} onChange={setFogOnDrop} />
+        <div className="flex items-center justify-between mt-2">
+          <span className="text-[13px] text-muted-foreground">DMX-adress</span>
+          <input
+            type="number" min={1} max={512} value={fogAddr}
+            onChange={(e) => setFogAddr(Number(e.target.value) || 1)}
+            className="w-20 bg-muted border border-border rounded-md px-2 py-1 text-[13px] tabular-nums text-right"
+          />
+        </div>
+        <div className="mt-3">
+          <button className="w-full py-2.5 rounded-[9px] bg-primary text-primary-foreground font-medium text-[14px]">
+            💨 Rök nu
+          </button>
+        </div>
+        <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-3">
+          <div className="h-full w-[15%]" style={{ background: "linear-gradient(90deg, hsl(var(--ok)), hsl(var(--warn, 40 100% 55%)))" }} />
+        </div>
+        <div className="text-[12px] text-muted-foreground mt-2 leading-snug">
+          Ställ rökmaskinen på samma DMX-adress. Värmekontot ersätter fast vila:
+          en lång puff kostar mer än en kort.
+        </div>
+      </Card>
+
+      <SectionTitle>Regi (pro)</SectionTitle>
+      <Card>
+        <RegiTgl label="Drop-blackout" sub="Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast." checked={regi.dropBlackout} onChange={rg("dropBlackout")} />
+        <RegiTgl label="Sceniskt djup" sub="Mittlamporna hålls som fasta uplights i höga lägen. Kräver lampor i rad V→H." checked={regi.scenicAnchor} onChange={rg("scenicAnchor")} />
+        <RegiTgl label="Dynamiskt ljustak (VU)" sub="Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%." checked={regi.energyCeiling} onChange={rg("energyCeiling")} />
+        <RegiTgl label="Klubb-läge (hård kontrast)" sub="Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna. Kräver VU-taket på." checked={regi.clubMode} onChange={rg("clubMode")} />
+        <RegiTgl label="Varm vilo-glöd i tystnad" sub="Dim bärnsten-glöd när ingen musik spelar, istället för helt mörkt." checked={regi.ambientGlow} onChange={rg("ambientGlow")} />
+        <RegiTgl label="Riser-strobe (build → drop)" sub="Accelererande strobe under uppbyggnad, blackout på dropen. Begränsad till 1,5/s." checked={regi.riserStrobe} onChange={rg("riserStrobe")} />
+        <RegiTgl label="Släpp strobe-taket (scenläge)" sub="⚠ Höjer blixttakten till 9/s. Slå bara på om lokalen skyltar om strobe vid entrén." checked={regi.strobeUnlimited} onChange={rg("strobeUnlimited")} />
+        <RegiTgl label="Drop-headroom (max 90%, drops 100%)" sub="Normalläget kapas till 90% så drops poppar tydligare." checked={regi.dropHeadroom} onChange={rg("dropHeadroom")} last />
+      </Card>
+
+      <SectionTitle>Lampor</SectionTitle>
+      <Card>
+        <div className="space-y-2">
+          {[
+            { name: "PAR 1", type: "RGBW", addr: 1 },
+            { name: "PAR 2", type: "RGBW", addr: 8 },
+            { name: "PAR 3", type: "RGBW", addr: 15 },
+            { name: "PAR 4", type: "RGBW", addr: 22 },
+          ].map((f) => (
+            <div key={f.name} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+              <div>
+                <div className="text-[14px] font-medium">{f.name}</div>
+                <div className="text-[11px] text-muted-foreground">{f.type} · DMX {f.addr}</div>
+              </div>
+              <button className="px-2.5 py-1.5 rounded-[8px] border border-border bg-card text-[12px]">Blinka</button>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2 mt-3">
+          <button className="flex-1 py-2 rounded-[9px] border border-border bg-card text-[13px]">+ Lägg till</button>
+          <button className="flex-1 py-2 rounded-[9px] border border-border bg-card text-[13px]">Auto-adressera</button>
+        </div>
+        <div className="text-[12px] text-muted-foreground mt-2 leading-snug">
+          Mock — riktig fixture-editor finns på Pi:ns <code>/setup</code>.
+        </div>
+      </Card>
+
+      <SectionTitle>BLE-slingor</SectionTitle>
+      <Card>
+        <div className="text-[13px] text-muted-foreground">Söker sidecar… <span className="opacity-60">(mock)</span></div>
+        <div className="mt-3 py-2 border-t border-border">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-[14px] font-medium">Slinga · A4:C1:38:XX:XX</div>
+              <div className="text-[11px] text-muted-foreground">Parad · ansluten</div>
+            </div>
+            <button className="px-2.5 py-1.5 rounded-[8px] border border-border bg-card text-[12px]">Blinka</button>
+          </div>
+        </div>
+        <button className="w-full mt-3 py-2.5 rounded-[9px] bg-primary text-primary-foreground font-medium text-[14px]">
+          Sök nya slingor (8 s)
+        </button>
+        <div className="text-[12px] text-muted-foreground mt-2 leading-snug">
+          BLEDOM-klonade RGB-band paras här. Tryck <b>Blinka</b> för att pulsa
+          lampan i magenta så du ser vilken fysisk slinga det är innan parning.
+        </div>
+      </Card>
+
+      <SectionTitle>LED-ring (vred)</SectionTitle>
+      <Card>
+        <RangeRow label="Max ljusstyrka" min={5} max={100} step={1} value={ring.maxBright} unit=""
+          onChange={(v) => setRing((s) => ({ ...s, maxBright: v }))} />
+        <RangeRow label="Pulse-boost" min={0} max={50} step={1} value={ring.pulseBoost} unit=""
+          onChange={(v) => setRing((s) => ({ ...s, pulseBoost: v }))} />
+        <RangeRow label="Blackout-fade" min={0} max={3000} step={50} value={ring.blackoutFadeMs} unit=" ms"
+          onChange={(v) => setRing((s) => ({ ...s, blackoutFadeMs: v }))} last />
+        <div className="text-[12px] text-muted-foreground mt-1 leading-snug">
+          Max = takljus. Pulse-boost = extra puff på taktslag. Fade = hur mjukt ringen tonar ut vid släckt läge.
+        </div>
+      </Card>
+
       <SectionTitle>System</SectionTitle>
       <Card>
-        <div className="flex justify-between text-[13px]">
+        <div className="flex justify-between text-[13px] mb-1">
           <span className="text-muted-foreground">Version</span>
           <span className="tabular-nums">preview</span>
         </div>
+        <div className="flex gap-2 mt-3">
+          <button className="flex-1 py-2.5 rounded-[9px] bg-primary text-primary-foreground font-medium text-[14px]">
+            Update to latest
+          </button>
+          <button className="flex-1 py-2.5 rounded-[9px] border border-border bg-card text-[14px]">
+            Rollback
+          </button>
+        </div>
+        <button
+          className="w-full mt-2 py-2.5 rounded-[9px] border text-[14px]"
+          style={{ borderColor: "hsl(var(--warn, 40 100% 55%))", color: "hsl(var(--warn, 40 100% 55%))" }}
+        >
+          Fabriks-reset (raderar fixtures)
+        </button>
+      </Card>
+
+      <SectionTitle>WiFi</SectionTitle>
+      <Card>
+        <div className="flex justify-between text-[13px] mb-1.5">
+          <span className="text-muted-foreground">Aktivt nät</span>
+          <span className="tabular-nums">pi-dmx (AP)</span>
+        </div>
+        <div className="flex justify-between text-[13px] mb-3">
+          <span className="text-muted-foreground">Sparad hotspot</span>
+          <span className="tabular-nums opacity-60">—</span>
+        </div>
+        <SetRow label="Hotspot-namn (SSID)">
+          <input placeholder="t.ex. Richards iPhone"
+            className="w-full bg-muted border border-border rounded-md px-2.5 py-2 text-[14px]" />
+        </SetRow>
+        <SetRow label="Lösenord" last>
+          <input type="password" placeholder="hotspottens lösenord"
+            className="w-full bg-muted border border-border rounded-md px-2.5 py-2 text-[14px]" />
+        </SetRow>
+        <div className="flex gap-2 mt-3">
+          <button className="flex-1 py-2.5 rounded-[9px] bg-primary text-primary-foreground font-medium text-[14px]">Spara</button>
+          <button className="flex-1 py-2.5 rounded-[9px] border border-border bg-card text-[14px]" disabled>Anslut</button>
+          <button className="flex-1 py-2.5 rounded-[9px] border border-border bg-card text-[14px]" disabled>Glöm</button>
+        </div>
+        <div className="text-[12px] text-muted-foreground mt-2 leading-snug">
+          Sparad hotspot används automatiskt vid uppstart. Annars startar Pi:n sin egen AP "pi-dmx".
+        </div>
       </Card>
     </>
+  );
+}
+
+function RegiTgl({
+  label, sub, checked, onChange, last,
+}: { label: string; sub: string; checked: boolean; onChange: (v: boolean) => void; last?: boolean }) {
+  return (
+    <label className={`flex items-start justify-between gap-3 py-2.5 cursor-pointer ${last ? "" : "border-b border-border"}`}>
+      <span className="flex-1 min-w-0">
+        <span className="text-[14px] block">{label}</span>
+        <span className="text-[11px] text-muted-foreground leading-snug block mt-0.5">{sub}</span>
+      </span>
+      <SwitchBtn checked={checked} onChange={onChange} />
+    </label>
+  );
+}
+
+function RangeRow({
+  label, min, max, step, value, unit, onChange, last,
+}: {
+  label: string; min: number; max: number; step: number;
+  value: number; unit: string; onChange: (v: number) => void; last?: boolean;
+}) {
+  return (
+    <div className={`flex items-center gap-3 ${last ? "" : "mb-2.5"}`}>
+      <span className="text-[13px] text-muted-foreground w-[110px] flex-none">{label}</span>
+      <input
+        type="range" min={min} max={max} step={step} value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="flex-1 accent-[hsl(var(--primary))]"
+      />
+      <span className="text-[13px] tabular-nums w-14 text-right">{value}{unit}</span>
+    </div>
   );
 }
 
