@@ -680,6 +680,7 @@ function applyConfig(cfg) {
   if (tRiserStrobe) tRiserStrobe.checked = !!cfg.riserStrobe;
   if (tStrobeUnlimited) tStrobeUnlimited.checked = !!cfg.strobeUnlimited;
   if (tDropHeadroom) tDropHeadroom.checked = !!cfg.dropHeadroom;
+  if (tRegiPro) { tRegiPro.checked = !!cfg.regiPro; applyRegiProUi(!!cfg.regiPro); }
   {
     const bsOv = !!cfg.beatSyncOverride;
     const bsBadge = document.getElementById("beatSyncBadge");
