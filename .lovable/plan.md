@@ -1,26 +1,93 @@
-## Problem
 
-Motorn och servern har fullt stöd för att styra WS2812-ringens tre parametrar (`maxBright`, `pulseBoost`, `blackoutFadeMs`) via WS-meddelandet `setRing`, men UI-kontrollerna för dem finns inte i `pi-dmx/engine/public/index.html`. Det gör att inställningarna bara kan ändras genom att handredigera `config.json` — vilket motsäger tidigare beslut att alla ägarinställningar ska ligga under `/setup`.
+# Vägen till säljbar OCH uthyrningsbar produkt
 
-## Åtgärd
+Mjukvaran och arkitekturen är nära produktnivå. Det som kvarstår är juridik, hårdvarumekanik, drift-hårdning och skalning. Med "båda" (uthyrning + försäljning) prioriteras fjärrdiagnostik OCH certifiering/chassi parallellt.
 
-Lägg till ett "LED-ring"-kort i `#ownerOnly`-sektionen i `pi-dmx/engine/public/index.html`, ovanför eller under System-kortet, med tre sliders:
+---
 
-- **Max ljusstyrka** — 5–100 % (skickar `maxBright` 0.05–1.0)
-- **Pulse-boost** — 0–50 % (skickar `pulseBoost` 0–0.5)
-- **Blackout-fade** — 0–3000 ms (skickar `blackoutFadeMs`)
+## Fas 1 — Blockers (inget säljs utan dessa)
 
-Kortet visas bara om `cfg.intensityRing` finns i senast mottagna config (annars är hårdvaran inte konfigurerad → dölj för att inte förvirra). Värden läses från `cfg.intensityRing` i `onConfig`-callbacken; skrivningar skickas som `{ type: "setRing", ring: { ... } }` med debounce ~150 ms medan användaren drar. Live-värde visas som `%`/`ms` bredvid slidern (samma pattern som kalibreringssliders).
+**1. Licens**
+Nuvarande `LICENSE.md` (PolyForm Noncommercial) tillåter varken uthyrning eller försäljning. Byt till en dual-license eller ren kommersiell licens innan första enhet lämnar huset.
 
-Ingen ändring i motor/server/`config.ts` — hela kedjan finns redan.
+**2. CE-märkning (EU)**
+Färdig box som säljs/hyrs ut inom EU behöver CE (EMC + LVD). Åtgärder: dokumentera BOM, intern riskbedömning, ev. labbtest av EMC. Tydlig strobe-/epilepsi-varning på chassit och i UI.
 
-## Teknisk detalj
+**3. Chassi + kablage**
+Idag: Pi + HAT + hopptrådar. Behövs: hölje, dragavlastning, XLR-panelkontakt, strömkontakt, knapp/vred-genomföring, ventilation, serieetikett.
 
-- Ny DOM-block placeras kring rad 340 i `pi-dmx/engine/public/index.html` (inuti `#ownerOnly`, före System-kortet).
-- JS-block läggs in i den befintliga config-mottagaren där andra ägarkontroller synkas.
-- Använder samma `send({ type, ... })`-helper som resten av UI:t.
-- Ringen renderar redan om vid `onConfigChanged` → ingen extra broadcast behövs; inställningen syns direkt fysiskt.
+---
 
-## Utanför scope
+## Fas 2 — Mjukvaruhårdning (samma kod för uthyrning + försäljning)
 
-- Mock-UI:t (`src/pages/DmxController.tsx`) — ringinställningar är hårdvaruspecifika för lådan och hör inte hemma i hyresgäst-mocken. Kan speglas separat om du vill senare.
+**4. Versionerade OTA-uppdateringar med auto-rollback**
+- Versionsnummer i motor + UI, visas i /setup.
+- GitHub Actions bygger `dist.tar.gz` + checksumma per release.
+- `update.sh` verifierar checksumma, teststartar, auto-rollback om motorn kraschar inom 60 s.
+
+**5. Watchdog + självläkning**
+- Övervaka att DMX-frames tickar och ljud-chunks kommer in.
+- Auto-restart av `audio-dmx-engine` vid låsning.
+- Verifiera att `codec-zero-linein` återställer routing efter strömavbrott.
+
+**6. Systemlogg + hälsohistorik i /setup**
+- Ringbuffert med senaste händelser (DMX nere, ljud tyst, BLE tappad, krascher).
+- Kort "Systemlogg"-kort i /setup + JSON-export via WS för support.
+
+**7. Config export/import**
+- Ladda ner/upp config i /setup, så en förstörd enhet återskapas på 30 s.
+
+**8. Factory reset**
+- Rensar config, behåller firmware. Åtkomlig via /setup och via lång knapptryckning på fysiska knappen.
+
+---
+
+## Fas 3 — Upplevelse
+
+**9. Första-start-wizard**
+Guide som frågar antal lampor → auto-adressera → walk-test → klar. En hyresgäst eller köpare ska aldrig behöva se rå DMX-adressering.
+
+**10. i18n (sv/en)**
+Extrahera alla etiketter till ett översättningsobjekt. Börja med svenska + engelska.
+
+**11. Säkerhetsinfo synlig**
+Strobe-/epilepsi-varning vid första användning av strobe/galet, permanent länk i /setup, och skyltning-mall att sätta vid entrén.
+
+---
+
+## Fas 4 — Skalning (tillverkning + flotta)
+
+**12. Enhetsidentifiering**
+Unikt serienummer, unikt AP-lösenord/SSID, unika självsignerade cert per enhet. Genereras vid första boot till `/etc/audio-dmx/device.json`.
+
+**13. Färdig SD-avbild**
+Raspberry Pi OS-avbild med allt förinstallerat. Tillverkning = flasha kort + koppla ihop chassi.
+
+**14. Servicepåminnelser**
+Rök-räknare finns redan; utöka till "service efter X spray-minuter / Y puffar" och visa i /setup.
+
+**15. Fjärrsupport (uthyrning)**
+Frivillig opt-in tunnel (t.ex. Tailscale) för att support ska kunna nå boxen ute hos hyresgäst utan att öppna portar. Av som standard.
+
+---
+
+## Rekommenderad ordning
+
+1. **Licens** (dag 1 — annars är allt annat teoretiskt).
+2. **Fas 2 (mjukvaruhårdning)** — parallellt med chassi-arbetet. Ger direkt värde för första uthyrningarna.
+3. **Chassi + CE-förberedelse** — långsammast, starta tidigt.
+4. **Fas 3 (upplevelse)** — innan första betalande hyresgäst.
+5. **Fas 4 (skalning)** — när enhet #2 börjar närma sig.
+
+---
+
+## Konkret första sprint (om du vill sätta igång i kod)
+
+Fem punkter som ger störst effekt utan att röra hårdvara:
+- Versionsnummer + systemlogg-kort i /setup.
+- Config export/import.
+- Watchdog + auto-rollback i `update.sh`.
+- Första-start-wizard.
+- Engelsk översättning.
+
+Säg till om jag ska bryta ner sprinten till en implementeringsplan, eller om du vill börja med något specifikt (t.ex. bara systemloggen + export/import först).
