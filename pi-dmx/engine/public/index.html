@@ -1017,9 +1017,9 @@ function applyFrame(f) {
   }
   confVal.textContent = typeof f.bpmConfidence === "number" ? Math.round(f.bpmConfidence * 100) + "%" : "–";
   if (f.beat) {   // beat-lås-prick: pulsa på varje takt
-    beatDot.classList.add("on");
+    if (beatDot) beatDot.classList.add("on");
     clearTimeout(beatTimer);
-    beatTimer = setTimeout(() => beatDot.classList.remove("on"), 100);
+    beatTimer = setTimeout(() => { if (beatDot) beatDot.classList.remove("on"); }, 100);
   }
   applyFogStatus(f.fog);
 }
