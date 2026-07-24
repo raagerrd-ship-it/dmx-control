@@ -1451,24 +1451,29 @@ wifiForgetBtn.onclick = async () => {
 // ---- Self-update ----------------------------------------------------------
 const verSha = document.getElementById("verSha");
 const verMsg = document.getElementById("verMsg");
+const engVer = document.getElementById("engVer");
 const btnUpdate = document.getElementById("btnUpdate");
 const updLog = document.getElementById("updLog");
 let updPoll = null;
 
 async function refreshVersion() {
   try {
-    const r = await fetch("/update/status").then(r => r.json());
-    verSha.textContent = r.sha ? `${r.sha} · ${new Date(r.date).toLocaleString("sv-SE")}` : (r.error ?? "unknown");
-    verMsg.textContent = r.msg ?? "";
-    if (r.log) { updLog.textContent = r.log; }
+    const [status, ver] = await Promise.all([
+      fetch("/update/status").then(r => r.json()).catch(() => ({})),
+      fetch("/api/version").then(r => r.json()).catch(() => ({})),
+    ]);
+    if (engVer) engVer.textContent = ver.version ? `v${ver.version}` : "–";
+    verSha.textContent = status.sha ? `${status.sha} · ${new Date(status.date).toLocaleString("sv-SE")}` : (status.error ?? "unknown");
+    verMsg.textContent = status.msg ?? "";
+    if (status.log) { updLog.textContent = status.log; }
   } catch {}
 }
 refreshVersion();
 
 btnUpdate.onclick = async () => {
-  if (!confirm("Uppdatera till senaste versionen? Tjänsten startas om.")) return;
+  if (!confirm("Uppdatera till senaste versionen? Tjänsten startas om. Om nya versionen kraschar rullar vi automatiskt tillbaka efter 60 s.")) return;
   btnUpdate.disabled = true;
-  btnUpdate.textContent = "Updating…";
+  btnUpdate.textContent = "Uppdaterar…";
   updLog.style.display = "block";
   updLog.textContent = "Startar…";
   try {
@@ -1482,15 +1487,15 @@ btnUpdate.onclick = async () => {
     if (verSha.textContent && verSha.textContent !== startedSha && !/–|unknown/.test(verSha.textContent)) {
       clearInterval(updPoll); updPoll = null;
       btnUpdate.disabled = false;
-      btnUpdate.textContent = "Update to latest";
+      btnUpdate.textContent = "Uppdatera till senaste";
     }
   }, 2000);
-  // Safety timeout
+  // Safety timeout — 4 min räcker för install + 60 s stabilitetsfönstret.
   setTimeout(() => {
     if (updPoll) { clearInterval(updPoll); updPoll = null; }
     btnUpdate.disabled = false;
-    btnUpdate.textContent = "Update to latest";
-  }, 180000);
+    btnUpdate.textContent = "Uppdatera till senaste";
+  }, 240000);
 };
 
 // ---- Rollback + fabriks-reset --------------------------------------------
@@ -1509,10 +1514,10 @@ if (btnRollback) btnRollback.onclick = async () => {
   const p = setInterval(async () => {
     await refreshVersion();
     if (verSha.textContent && verSha.textContent !== startedSha && !/–|unknown/.test(verSha.textContent)) {
-      clearInterval(p); btnRollback.disabled = false; btnRollback.textContent = "Rollback";
+      clearInterval(p); btnRollback.disabled = false; btnRollback.textContent = "Rulla tillbaka";
     }
   }, 2000);
-  setTimeout(() => { clearInterval(p); btnRollback.disabled = false; btnRollback.textContent = "Rollback"; }, 180000);
+  setTimeout(() => { clearInterval(p); btnRollback.disabled = false; btnRollback.textContent = "Rulla tillbaka"; }, 180000);
 };
 
 // Fabriks-reset: nolla config (fixtures FÖRSVINNER). Konfigen sparas som
@@ -1527,6 +1532,84 @@ if (btnFactory) btnFactory.onclick = async () => {
   // Motorn kör systemctl restart → WS tappar. onclose triggar reconnect
   // och när den kommer upp igen är configen defaults. Ingen extra polling.
 };
+
+// ---- Config export / import ---------------------------------------------
+// Snabb "backup + restore" utan SSH — kritiskt för uthyrning: om en enhet
+// börjar bete sig konstigt kan ägaren skicka en känd bra config från en
+// annan box och vara igång på 30 s.
+const btnCfgExport = document.getElementById("btnCfgExport");
+if (btnCfgExport) btnCfgExport.onclick = () => {
+  // Låt browsern hantera nedladdningen via ankaret — enklare än fetch+blob
+  // och Content-Disposition:ns filnamn behålls.
+  window.location.href = "/api/config/export";
+};
+const btnCfgImport = document.getElementById("btnCfgImport");
+const cfgImportFile = document.getElementById("cfgImportFile");
+if (btnCfgImport && cfgImportFile) {
+  btnCfgImport.onclick = () => cfgImportFile.click();
+  cfgImportFile.onchange = async () => {
+    const file = cfgImportFile.files && cfgImportFile.files[0];
+    if (!file) return;
+    if (!confirm(`Importera "${file.name}"? Nuvarande config sparas som backup men ersätts och motorn startas om.`)) {
+      cfgImportFile.value = "";
+      return;
+    }
+    try {
+      const text = await file.text();
+      // Låt servern validera — vi vill inte duplicera schema-check här.
+      const r = await fetch("/api/config/import", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: text,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+      alert("Config importerad. Motorn startar om — sidan laddas om automatiskt.");
+    } catch (e) {
+      alert("Import misslyckades: " + (e && e.message ? e.message : e));
+    }
+    cfgImportFile.value = "";
+  };
+}
+
+// ---- Systemlogg ----------------------------------------------------------
+// Uthyrning-support: ägaren kan öppna /setup och läsa senaste händelserna,
+// eller ladda ner som JSON och skicka till support. Ingen SSH krävs.
+const healthLogList = document.getElementById("healthLogList");
+const btnHealthRefresh = document.getElementById("btnHealthRefresh");
+const btnHealthDownload = document.getElementById("btnHealthDownload");
+const SEV_COLOR = { info: "var(--dim)", warn: "var(--warn)", err: "var(--hot)" };
+async function refreshHealthLog() {
+  if (!healthLogList) return;
+  healthLogList.textContent = "Hämtar…";
+  try {
+    const r = await fetch("/api/health-log").then(r => r.json());
+    const evs = (r.events || []).slice().reverse();
+    if (!evs.length) { healthLogList.textContent = "(inga händelser)"; return; }
+    healthLogList.innerHTML = evs.map((e) => {
+      const t = new Date(e.t).toLocaleTimeString("sv-SE");
+      const col = SEV_COLOR[e.sev] || "var(--fg)";
+      return `<div><span style="color:${col}">[${t} ${e.sev.toUpperCase()} ${escapeHtml(e.tag)}]</span> ${escapeHtml(e.msg)}</div>`;
+    }).join("");
+  } catch (e) {
+    healthLogList.textContent = "Kunde inte läsa logg: " + e;
+  }
+}
+if (btnHealthRefresh) btnHealthRefresh.onclick = refreshHealthLog;
+if (btnHealthDownload) btnHealthDownload.onclick = async () => {
+  try {
+    const r = await fetch("/api/health-log").then(r => r.json());
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const blob = new Blob([JSON.stringify(r, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `pi-dmx-log-${stamp}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (e) { alert("Kunde inte ladda ner: " + e); }
+};
+// Ladda in en första omgång direkt när owner-vyn öppnas.
+if (OWNER_MODE) refreshHealthLog();
 
 // ---- Walk-test: guidad kanal-identifiering ------------------------------
 // DMX är enkelriktat → vi kan inte fråga lampan. Vi tänder EN kanal i taget
