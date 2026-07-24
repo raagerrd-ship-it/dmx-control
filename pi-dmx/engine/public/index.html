@@ -1631,11 +1631,11 @@ if (OWNER_MODE) refreshHealthLog();
 // fabriks-reset nollar config men inte browser-preferences).
 const setupWizard = document.getElementById("setupWizard");
 const wizDismiss = document.getElementById("wizDismiss");
-function maybeShowWizard() {
+function maybeShowWizard(cfg) {
   if (!setupWizard || !OWNER_MODE) return;
   let dismissed = false;
   try { dismissed = !!localStorage.getItem("pi-dmx-wizard-done-v1"); } catch {}
-  const hasFixtures = Array.isArray(cfg?.fixtures) && cfg.fixtures.length > 0;
+  const hasFixtures = cfg && Array.isArray(cfg.fixtures) && cfg.fixtures.length > 0;
   setupWizard.hidden = dismissed || hasFixtures;
 }
 if (wizDismiss) wizDismiss.onclick = () => {
