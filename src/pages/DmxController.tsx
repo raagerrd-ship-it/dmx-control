@@ -231,27 +231,22 @@ function TechGrid() {
   const locked = bpm > 0;
   const confPct = Math.round(conf * 100);
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-3 gap-2">
       <TechTile label="BPM" value={locked ? String(Math.round(bpm)) : "—"} accent={locked} dot={locked && beat} />
-      <TechTile label="Konfidens" value={locked ? `${confPct}%` : "—"} />
-      <div className="col-span-2 p-3.5 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06]">
-        <div className="text-[8px] font-bold text-muted-foreground/70 uppercase mb-1 tracking-[0.22em]">Läge</div>
-        <div className="text-[13px] font-medium text-foreground/85 leading-snug">
-          {moodInfoFor(moodV).desc}
-        </div>
-      </div>
+      <TechTile label="Konfidens" value={locked ? `${confPct}%` : "—"} accent={locked && confPct >= 70} />
+      <TechTile label="Läge" value={off ? "Av" : moodInfoFor(moodV).name} accent={!off} />
     </div>
   );
 }
 
 function TechTile({ label, value, accent, dot }: { label: string; value: string; accent?: boolean; dot?: boolean }) {
   return (
-    <div className="p-3.5 rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06]">
-      <div className="flex items-center gap-1.5 mb-1">
+    <div className="relative overflow-hidden rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06] p-3 flex flex-col justify-between">
+      <div className="flex items-center gap-1.5 mb-2">
         <span className="text-[8px] font-bold text-muted-foreground/70 uppercase tracking-[0.22em]">{label}</span>
-        {dot && <span className="inline-block w-1 h-1 rounded-full bg-primary shadow-[0_0_6px_hsl(var(--primary))]" />}
+        {dot && <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))] animate-pulse" />}
       </div>
-      <div className={`text-[15px] font-mono font-semibold tabular-nums ${accent ? "text-primary" : "text-foreground/85"}`}>
+      <div className={`text-[16px] font-mono font-semibold tabular-nums leading-none ${accent ? "text-primary" : "text-foreground/85"}`}>
         {value}
       </div>
     </div>
