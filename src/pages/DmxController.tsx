@@ -727,7 +727,7 @@ function Card({ children }: { children: React.ReactNode }) {
 
 function SetRow({
   label, children, last,
-}: { label: string; children: React.ReactNode; last?: boolean }) {
+}: { label: React.ReactNode; children: React.ReactNode; last?: boolean }) {
   return (
     <div className={last ? "" : "mb-3.5"}>
       <div className="text-[12px] uppercase tracking-[0.08em] text-muted-foreground mb-1.5">
