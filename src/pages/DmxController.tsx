@@ -237,7 +237,6 @@ function TechGrid() {
       <div className="flex items-stretch divide-x divide-foreground/[0.06]">
         <TechCell label="BPM" value={locked ? String(Math.round(bpm)) : "—"} accent={locked} dot={locked && beat} />
         <TechCell label="Konfidens" value={locked ? `${confPct}%` : "—"} accent={locked && confPct >= 70} />
-        <TechCell label="Läge" value={off ? "Av" : info.name} accent={!off} />
       </div>
       <div className="mt-3 pt-3 border-t border-foreground/[0.06] text-[11px] leading-snug text-muted-foreground/80">
         {off ? "Ljuset är släckt — dra åt höger för att tända" : info.desc}
