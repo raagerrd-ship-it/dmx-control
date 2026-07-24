@@ -25,7 +25,6 @@ export default function DmxController() {
       <header className="flex justify-center pt-4 pb-3">
         <BrandLogo className="h-28 w-auto opacity-95 sm:h-32 md:h-36 lg:h-40 landscape:h-24" />
       </header>
-      <PowerHero />
 
       <SectionTitle>Stämning</SectionTitle>
       <MoodSlider />
