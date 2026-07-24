@@ -133,7 +133,8 @@ function AudioMeterCard() {
   const moodV = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
 
   return (
-    <section className="mb-4">
+    <section>
+
       {/* Nivåmätare */}
       <div className="flex items-baseline justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
