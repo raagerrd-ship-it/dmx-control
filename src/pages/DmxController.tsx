@@ -436,6 +436,7 @@ function OwnerSections() {
     clubMode: false, ambientGlow: true, riserStrobe: false,
     strobeUnlimited: false, dropHeadroom: false,
   });
+  const [regiPro, setRegiPro] = useState(false);
   const rg = (k: keyof typeof regi) => (v: boolean) => setRegi((s) => ({ ...s, [k]: v }));
   const [ring, setRing] = useState({ maxBright: 60, pulseBoost: 20, blackoutFadeMs: 800 });
   return (
