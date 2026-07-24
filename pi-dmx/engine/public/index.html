@@ -678,22 +678,6 @@ function applyConfig(cfg) {
   if (tStrobeUnlimited) tStrobeUnlimited.checked = !!cfg.strobeUnlimited;
   if (tDropHeadroom) tDropHeadroom.checked = !!cfg.dropHeadroom;
   {
-    const mOv = !!cfg.moodOverride;
-    const mOvChk = document.getElementById("moodOverride");
-    if (mOvChk) mOvChk.checked = mOv;
-    const rows = [
-      ["tDropBlackout","bDropBlackout"],["tEnergyCeiling","bEnergyCeiling"],
-      ["tClubMode","bClubMode"],["tAmbientGlow","bAmbientGlow"],
-      ["tRiserStrobe","bRiserStrobe"],["tDropHeadroom","bDropHeadroom"],
-    ];
-    for (const [tId, bId] of rows) {
-      const t = document.getElementById(tId);
-      const b = document.getElementById(bId);
-      if (t) { t.disabled = !mOv; t.parentElement && t.parentElement.classList.toggle("mood-locked", !mOv); }
-      if (b) b.textContent = mOv ? "Manuell" : "Följer stämning";
-    }
-  }
-  {
     const bsOv = !!cfg.beatSyncOverride;
     const bsBadge = document.getElementById("beatSyncBadge");
     const seg = document.getElementById("segBeatSync");
