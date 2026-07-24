@@ -87,6 +87,14 @@ function MoodSlider() {
 
 /* ────────── Ljud (källa + nivå + teknisk info) ────────── */
 
+function moodInfoFor(v: number) {
+  if (v <= 0) return { name: "Av",     desc: "Ljuset är släckt — dra åt höger för att tända" };
+  if (v <= 2) return { name: "Chill",  desc: "Mjukt och långsamt, följer inte taktslag" };
+  if (v <= 4) return { name: "Chill+", desc: "Följer musiken lugnt" };
+  if (v <= 6) return { name: "Fest",   desc: "Pulsar på taktslag, byter effekt ibland" };
+  if (v <= 8) return { name: "Fest+",  desc: "Klubb-läge, byter effekt oftare" };
+  return               { name: "Galet",  desc: "Full fart, drop-blackout, riser-strobe" };
+}
 
 function AudioMeterCard() {
   const s = usePi();
