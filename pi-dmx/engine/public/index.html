@@ -314,6 +314,18 @@
   <div id="ownerOnly" hidden>
   <div class="owner-banner">🔧 Ägarläge (setup). Den här sidan är dold för hyresgäster — de öppnar adressen utan <b>/setup</b>.</div>
 
+  <div id="setupWizard" class="card" hidden style="border:1px solid var(--warn);background:linear-gradient(180deg,rgba(255,180,60,.08),rgba(255,180,60,.02))">
+    <h1 style="margin:0 0 6px;font-size:18px">👋 Kom igång — första start</h1>
+    <div class="status" style="margin:0 0 10px">Så här får du boxen att lira på 3 minuter:</div>
+    <ol style="margin:0 0 10px 20px;line-height:1.7;font-size:13px">
+      <li><b>Lägg till lampor</b> under <em>Lampor</em>: sätt DMX-adress + preset (RGB / RGBW / RGB7). Osäker på kanaler? Tryck <em>Walk-test</em>.</li>
+      <li><b>Para BLE-slingor</b> (om du har några) under <em>BLE-slingor</em> → Sök → Blinka → Para.</li>
+      <li><b>Testa</b>: gå tillbaka till hyresgäst-vyn (adressen utan <b>/setup</b>), tryck Power, dra Stämning. Musik i mikrofonen → lamporna rör sig.</li>
+      <li><b>Exportera config</b> under <em>System</em> när allt funkar — då har du en backup ifall något strular.</li>
+    </ol>
+    <button class="btn primary" id="wizDismiss">Jag är klar — dölj denna guide</button>
+  </div>
+
   <h1>Beat-synk</h1>
   <div class="card" id="beatSyncCard">
     <div class="setrow">
