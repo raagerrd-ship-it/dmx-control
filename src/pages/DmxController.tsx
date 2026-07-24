@@ -130,8 +130,8 @@ function moodInfoFor(v: number) {
   return               { name: "Galet",  desc: "Full fart, drop-blackout, riser-strobe" };
 }
 
-/* Horisontell input-mätare: visar verklig ljudnivå (0–100 %) med peak-hold.
-   Samma visuella språk som stämningsslidern så det känns som en logisk mätare. */
+/* Segmenterad input-mätare: 12 block som tänds efter ljudnivå.
+   Mer professionell och stabil än en mjuk bar — tydligare avläsning på scen. */
 function InputLevel() {
   const audio = useDmx((st) => st.audioLevel);
   const pct = Math.max(0, Math.min(100, Math.round(audio * 100)));
@@ -146,7 +146,7 @@ function InputLevel() {
       peakRef.current = pct;
       setPeak(pct);
     } else {
-      peakRef.current = Math.max(pct, peakRef.current - 1.5);
+      peakRef.current = Math.max(pct, peakRef.current - 1.2);
       setPeak(peakRef.current);
     }
     // KLIPP-latch: kräver ≥99 % och hålls i 600 ms för att undvika flimmer
@@ -156,6 +156,10 @@ function InputLevel() {
     setClip((prev) => (prev !== active ? active : prev));
   }, [pct]);
   const hot = clip;
+
+  const SEGMENTS = 12;
+  const activeSegs = Math.round((pct / 100) * SEGMENTS);
+  const peakSeg = Math.round((peak / 100) * SEGMENTS);
 
   return (
     <div>
@@ -168,26 +172,26 @@ function InputLevel() {
         </span>
       </div>
 
-      <div className="relative h-3 rounded-full bg-foreground/[0.05] ring-1 ring-foreground/[0.06] overflow-hidden">
-        {/* fyllnad */}
-        <div
-          className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-100 ${
-            hot ? "bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.7)]" : "bg-primary/70"
-          }`}
-          style={{ width: `${pct}%` }}
-        />
-        {/* peak-hold linje */}
-        <div
-          aria-hidden
-          className="absolute inset-y-0 w-[2px] bg-primary/90 shadow-[0_0_6px_hsl(var(--primary))] transition-[left] duration-150"
-          style={{ left: `calc(${peak}% - 1px)`, opacity: silent ? 0 : 1 }}
-        />
-        {/* skala */}
-        <div aria-hidden className="absolute inset-0 flex justify-between px-[6px] pointer-events-none">
-          {Array.from({ length: 11 }).map((_, i) => (
-            <span key={i} className="w-px h-full bg-foreground/[0.06]" />
-          ))}
-        </div>
+      <div className="grid grid-cols-12 gap-[3px] h-3">
+        {Array.from({ length: SEGMENTS }).map((_, i) => {
+          const isActive = i < activeSegs;
+          const isPeak = i === peakSeg && !silent;
+          const isHot = hot && isActive;
+          return (
+            <div
+              key={i}
+              className={`rounded-sm transition-colors duration-100 ${
+                isHot
+                  ? "bg-primary shadow-[0_0_10px_hsl(var(--primary)/0.6)]"
+                  : isActive
+                  ? "bg-primary/80"
+                  : isPeak
+                  ? "bg-primary/40"
+                  : "bg-foreground/[0.06]"
+              }`}
+            />
+          );
+        })}
       </div>
 
       <div className="flex justify-between mt-1.5 px-1 font-mono">
