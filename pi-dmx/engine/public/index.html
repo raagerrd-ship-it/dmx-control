@@ -42,8 +42,8 @@
     .kick-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background: var(--line); margin-left: 6px; vertical-align: middle; transition: background 40ms; }
     .kick-dot.on { background: var(--hot); box-shadow: 0 0 12px var(--hot); }
     .status { font-size: 12px; color: var(--dim); margin-top: 8px; }
-    .brand-logo { height: clamp(112px, 16vw, 168px); width: auto; opacity: .95; }
-    @media (orientation: landscape) { .brand-logo { height: clamp(80px, 14vh, 120px); } }
+    .brand-logo { height: clamp(128px, 18vw, 184px); width: auto; opacity: .95; display:block; }
+    @media (orientation: landscape) { .brand-logo { height: clamp(88px, 15vh, 132px); } }
 
 
     /* Fixture editor */
@@ -194,7 +194,7 @@
   </style>
 </head>
 <body>
-  <header style="display:flex;justify-content:center;padding:22px 0 10px"><img src="/logo.png" alt="Dahlsjö Pulse" class="brand-logo" draggable="false"></header>
+  <header style="display:flex;justify-content:center;padding:4px 0 2px"><img src="/logo.png" alt="Dahlsjö Pulse" class="brand-logo" draggable="false"></header>
   <div class="health-banner" id="healthBanner" role="status" aria-live="polite"></div>
 
   <!-- Välkomst-overlay: förklarar knapparna första gången någon ansluter.
