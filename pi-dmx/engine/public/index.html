@@ -168,6 +168,23 @@
     .welcome-step .t b { display:block; font-size:14px; margin-bottom:2px; }
     .welcome-step .t span { font-size:13px; color:var(--dim); line-height:1.4; }
     .welcome-btn { width:100%; padding:14px; background:var(--hot); border:0; border-radius:12px; color:#fff; font-size:15px; font-weight:600; cursor:pointer; }
+    /* Walk-test overlay: guidar användaren genom kanal-för-kanal-test av en fixture. */
+    .walk-ov { position:fixed; inset:0; z-index:110; background:rgba(10,10,15,.92); backdrop-filter: blur(8px); display:none; align-items:center; justify-content:center; padding:20px; }
+    .walk-ov.show { display:flex; }
+    .walk-card { max-width:440px; width:100%; background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; }
+    .walk-card h2 { margin:0 0 4px; font-size:20px; font-weight:700; }
+    .walk-card .sub { margin:0 0 14px; color:var(--dim); font-size:13px; line-height:1.5; }
+    .walk-step { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; background:var(--bg); border:1px solid var(--line); border-radius:10px; margin-bottom:14px; font-size:14px; }
+    .walk-step b { font-size:18px; }
+    .walk-opts { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-bottom:12px; }
+    .walk-opts button { padding:12px 6px; background:var(--bg); border:1px solid var(--line); border-radius:10px; color:var(--fg); font-size:13px; font-weight:600; cursor:pointer; }
+    .walk-opts button:hover { border-color:var(--hot); }
+    .walk-log { font-size:12px; color:var(--dim); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:12px; min-height:24px; line-height:1.5; }
+    .walk-result { background:color-mix(in srgb, var(--hot) 15%, var(--bg)); border:1px solid var(--hot); border-radius:10px; padding:12px; margin-bottom:12px; font-size:13px; line-height:1.5; }
+    .walk-result b { display:block; font-size:15px; margin-bottom:4px; color:var(--fg); }
+    .walk-actions { display:flex; gap:8px; }
+    .walk-actions button { flex:1; padding:12px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--fg); font-size:14px; font-weight:600; cursor:pointer; }
+    .walk-actions button.primary { background:var(--hot); border-color:var(--hot); color:#fff; }
   </style>
 </head>
 <body>
@@ -185,6 +202,35 @@
         <div class="welcome-step"><div class="n">3</div><div class="t"><b>Spela musik</b><span>Ljuset följer musiken. Ingen musik = ingen rörelse.</span></div></div>
       </div>
       <button class="welcome-btn" id="welcomeBtn">Kör igång</button>
+    </div>
+  </div>
+
+  <!-- Walk-test overlay: stega kanal-för-kanal, användaren svarar löpande. -->
+  <div class="walk-ov" id="walkOv" role="dialog" aria-modal="true" aria-labelledby="walkTitle">
+    <div class="walk-card">
+      <h2 id="walkTitle">Identifiera kanal-layout</h2>
+      <p class="sub" id="walkSub">DMX är enkelriktat — lampan svarar inte tillbaka. Titta på lampan och tryck på det du ser.</p>
+      <div class="walk-step">
+        <span>Testar kanal <b id="walkCh">1</b> av upp till 8</span>
+        <span id="walkAddr" style="color:var(--dim);font-size:12px"></span>
+      </div>
+      <div class="walk-log" id="walkLog">Ingen svar registrerade ännu.</div>
+      <div class="walk-opts" id="walkOpts">
+        <button data-walk-ans="r">🔴 Rött</button>
+        <button data-walk-ans="g">🟢 Grönt</button>
+        <button data-walk-ans="b">🔵 Blått</button>
+        <button data-walk-ans="w">⚪ Vitt</button>
+        <button data-walk-ans="dim">☀️ Ljusare</button>
+        <button data-walk-ans="strobe">⚡ Blink</button>
+        <button data-walk-ans="auto">🎨 Auto-program</button>
+        <button data-walk-ans="nothing">— Inget</button>
+        <button data-walk-ans="done" style="grid-column:span 1;border-color:var(--hot);color:var(--hot)">✓ Klar</button>
+      </div>
+      <div class="walk-result" id="walkResult" style="display:none"></div>
+      <div class="walk-actions">
+        <button id="walkCancel">Avbryt</button>
+        <button id="walkApply" class="primary" style="display:none">Använd förslag</button>
+      </div>
     </div>
   </div>
 
@@ -905,6 +951,7 @@ function renderFixtures() {
     div.innerHTML = `
       <div class="fx-head">
         <input class="name" type="text" value="${escapeHtml(fx.name)}" data-i="${i}" data-k="name" />
+        <button class="id" data-walk-open="${i}" title="Stega kanal-för-kanal och gissa preset">Identifiera</button>
         <button class="id" data-id="${i}" title="Blinka lampan så du hittar den">Hitta</button>
         <button class="del" data-del="${i}" aria-label="Ta bort">×</button>
       </div>
@@ -1037,6 +1084,12 @@ function renderFixtures() {
       // not fxDraft. Warn if there are unsaved edits.
       if (fxDirty) { fxHint.textContent = "Save changes before identifying"; return; }
       send({ type: "identifyOne", index: Number(e.target.dataset.id) });
+    });
+  });
+  fxEl.querySelectorAll("[data-walk-open]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      if (fxDirty) { fxHint.textContent = "Spara ändringar innan du kör identifiering"; return; }
+      openWalkTest(Number(e.currentTarget.dataset.walkOpen));
     });
   });
   fxEl.querySelectorAll("[data-role-i]").forEach((el) => {
@@ -1414,6 +1467,97 @@ if (btnFactory) btnFactory.onclick = async () => {
   // Motorn kör systemctl restart → WS tappar. onclose triggar reconnect
   // och när den kommer upp igen är configen defaults. Ingen extra polling.
 };
+
+// ---- Walk-test: guidad kanal-identifiering ------------------------------
+// DMX är enkelriktat → vi kan inte fråga lampan. Vi tänder EN kanal i taget
+// (rå DMX-value 255, allt annat 0) och användaren rapporterar vad de ser.
+// Efter 3–8 svar gissar vi rgb / rgbw / rgb7 / dimmer / custom.
+const walkOv     = document.getElementById("walkOv");
+const walkChEl   = document.getElementById("walkCh");
+const walkAddrEl = document.getElementById("walkAddr");
+const walkLogEl  = document.getElementById("walkLog");
+const walkOptsEl = document.getElementById("walkOpts");
+const walkResEl  = document.getElementById("walkResult");
+const walkCancel = document.getElementById("walkCancel");
+const walkApply  = document.getElementById("walkApply");
+let walkState = null;   // { index, channel, answers: string[], suggested: string|null }
+
+const WALK_MAX_CH = 8;   // 8 kanaler räcker för allt vanligt (RGB→RGBAWU+Dim+Strobe+2 macro)
+const WALK_ANS_LABEL = { r:"Rött", g:"Grönt", b:"Blått", w:"Vitt", dim:"Ljusare", strobe:"Blink", auto:"Auto-program", nothing:"Inget" };
+
+function openWalkTest(index) {
+  const fx = curFixtures[index];
+  if (!fx) return;
+  walkState = { index, channel: 0, answers: [], suggested: null };
+  walkResEl.style.display = "none";
+  walkApply.style.display = "none";
+  walkOptsEl.style.display = "";
+  walkLogEl.textContent = `Adress ${fx.address}. Tryck på det du ser för varje kanal — eller "Inget" om lampan är släckt.`;
+  walkOv.classList.add("show");
+  walkSendCh(0);
+}
+function walkSendCh(ch) {
+  if (!walkState) return;
+  walkState.channel = ch;
+  const fx = curFixtures[walkState.index];
+  walkChEl.textContent = String(ch + 1);
+  walkAddrEl.textContent = fx ? `DMX-adress ${fx.address + ch}` : "";
+  send({ type: "setWalkTest", index: walkState.index, channel: ch });
+}
+function walkStop() {
+  send({ type: "setWalkTest", index: -1, channel: 0 });
+  walkState = null;
+  walkOv.classList.remove("show");
+}
+function walkGuess(answers) {
+  // Bara "riktiga" svar räknas — nothing/auto/strobe påverkar preset-valet
+  // men R/G/B/W/Dim avgör bredden.
+  const colors = answers.slice(0, 4);   // första 4 kanaler = färgnyttolast normalt
+  const hasR = answers.includes("r"), hasG = answers.includes("g"), hasB = answers.includes("b"), hasW = answers.includes("w");
+  const hasDim = answers.includes("dim"), hasStr = answers.includes("strobe"), hasAuto = answers.includes("auto");
+  if (hasR && hasG && hasB && (hasDim || hasStr || hasAuto)) return { preset: "rgb7", why: "R/G/B + dim/strobe/auto → 7-kanals-läge" };
+  if (hasR && hasG && hasB && hasW) return { preset: "rgbw", why: "Alla fyra grundfärger identifierade" };
+  if (hasR && hasG && hasB) return { preset: "rgb", why: "Endast R/G/B — inget som antyder fler kanaler" };
+  if (hasDim && !hasR && !hasG && !hasB) return { preset: "dimmer", why: "Bara ljusstyrka reagerar" };
+  return { preset: null, why: "Osäkert — testa igen eller välj preset manuellt i Avancerat." };
+}
+function walkFinish() {
+  const g = walkGuess(walkState.answers);
+  walkState.suggested = g.preset;
+  walkOptsEl.style.display = "none";
+  walkResEl.style.display = "";
+  const fx = curFixtures[walkState.index];
+  const width = g.preset === "rgb7" ? 7 : g.preset === "rgbw" ? 4 : g.preset === "rgb" ? 3 : g.preset === "dimmer" ? 1 : 0;
+  walkResEl.innerHTML = `<b>${g.preset ? `Förslag: ${g.preset.toUpperCase()} (${width} kanaler)` : "Inget säkert förslag"}</b>${g.why}`;
+  walkApply.style.display = g.preset ? "" : "none";
+  // Slå av output — låt lampan vila medan användaren läser
+  send({ type: "setWalkTest", index: -1, channel: 0 });
+}
+if (walkOv) {
+  walkOptsEl.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-walk-ans]");
+    if (!btn || !walkState) return;
+    const ans = btn.dataset.walkAns;
+    if (ans === "done") { walkFinish(); return; }
+    walkState.answers.push(ans);
+    walkLogEl.textContent = walkState.answers.map((a, i) => `Kanal ${i + 1}: ${WALK_ANS_LABEL[a] || a}`).join(" · ");
+    const next = walkState.channel + 1;
+    if (next >= WALK_MAX_CH) { walkFinish(); return; }
+    walkSendCh(next);
+  });
+  walkCancel.onclick = walkStop;
+  walkApply.onclick = () => {
+    if (!walkState || !walkState.suggested) return walkStop();
+    const i = walkState.index;
+    if (!fxDraft[i]) return walkStop();
+    fxDraft[i].preset = walkState.suggested;
+    if (walkState.suggested !== "custom") delete fxDraft[i].roles;
+    markDirty();
+    fxHint.textContent = `Preset satt till ${walkState.suggested.toUpperCase()} — glöm inte att spara.`;
+    walkStop();
+  };
+}
+
 
 // ---- Välkomst-overlay ----------------------------------------------------
 // Bara på hyresgäst-vyn (/), aldrig i owner-läget — där stör den bara.

@@ -64,8 +64,8 @@ export function scheduleSave(cfg: EngineConfig, path = DEFAULT_PATH, delayMs = 5
     inFlight = inFlight.then(async () => {
       try {
         await mkdir(dirname(path), { recursive: true });
-        // Strip transient fields (identify/beat/fog-trigger) from the persisted copy.
-        const { identify: _omit, beat: _omit3, beatErr: _omit6, fogTrigger: _omit5, ...persist } = cfg;
+        // Strip transient fields (identify/beat/fog-trigger/walk-test) from the persisted copy.
+        const { identify: _omit, beat: _omit3, beatErr: _omit6, fogTrigger: _omit5, walkTest: _omit7, calTest: _omit8, ...persist } = cfg;
         const data = JSON.stringify(persist, null, 2);
         const tmp = `${path}.${process.pid}.${++saveSeq}.tmp`;
         await writeFile(tmp, data, "utf8");

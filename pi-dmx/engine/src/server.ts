@@ -412,6 +412,17 @@ export async function startServer(
             } else {
               deps.cfg.calTest = null;
             }
+          } else if (msg.type === "setWalkTest") {
+            // Walk-test: tänd en rå DMX-kanal på mål-fixturen. index<0 = av.
+            const idx = Math.floor(Number(msg.index));
+            const ch = Math.floor(Number(msg.channel));
+            if (Number.isFinite(idx) && idx >= 0 && idx < deps.cfg.fixtures.length && Number.isFinite(ch) && ch >= 0 && ch < 32) {
+              stopIdentify();
+              deps.cfg.calTest = null;
+              deps.cfg.walkTest = { index: idx, channel: ch };
+            } else {
+              deps.cfg.walkTest = null;
+            }
           } else if (msg.type === "setDmxMaxHz" && typeof msg.value === "number") {
             deps.cfg.dmxMaxHz = Math.max(30, Math.min(500, Math.round(msg.value)));
           } else if (msg.type === "setAgcTarget" && typeof msg.value === "number") {

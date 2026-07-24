@@ -111,6 +111,11 @@ export interface EngineConfig {
    *  tänd/släck-punkt. index<0 = av. channel = vilken färg testet driver ("all"
    *  = alla lika, annars bara r/g/b/w → kalibrera per färg). */
   calTest?: { index: number; value: number; channel?: "all" | "r" | "g" | "b" | "w" } | null;
+  /** Transient walk-test — inte persisterad. Tänder EN rå DMX-kanal (255) på
+   *  fixture[index]+channel-offset så användaren kan avgöra vad varje kanal gör
+   *  (R/G/B/W/Dim/Strobe/Auto/inget). Används av /setup för att gissa preset
+   *  (rgb/rgbw/rgb7) — DMX är enkelriktat, användaren är sensorn. */
+  walkTest?: { index: number; channel: number } | null;
   /** Transient beat clock (BPM + wall-clock anchor) — not persisted. */
   beat?: { anchorMs: number; bpm: number } | null;
   /** Transient PLL-fasfel (-0.25..0.25 av en takt), utjämnat — för UI:ts beat-synk-

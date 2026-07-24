@@ -279,6 +279,16 @@ export class EffectEngine {
       return this.universe;
     }
 
+    // Walk-test: tänd EN rå DMX-kanal på mål-fixturen till 255 (allt annat 0)
+    // så användaren kan avgöra vad kanalen gör och gissa 3/4/7-kanals-preset.
+    const wt = this.cfg.walkTest;
+    if (wt && wt.index >= 0 && wt.index < this.cfg.fixtures.length && wt.channel >= 0) {
+      const wf = this.cfg.fixtures[wt.index];
+      const ch = (wf.address - 1) + wt.channel;
+      if (ch >= 0 && ch < 512) this.universe[ch] = 255;
+      return this.universe;
+    }
+
     const nowWall = Date.now();
 
         // Normalize against the AGC target so "at target loudness" = full drive —
