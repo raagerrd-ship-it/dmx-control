@@ -43,23 +43,23 @@ export default function DmxController() {
 
 function HeroCard() {
   return (
-    <section className="relative mt-3 mb-5 px-2">
-      {/* Neon ambient glows behind everything, no card frame */}
-      <div aria-hidden className="pointer-events-none absolute -top-24 -left-16 w-64 h-64 rounded-full bg-primary/10 blur-[90px]" />
-      <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-16 w-56 h-56 rounded-full bg-primary/[0.07] blur-[80px]" />
+    <section className="relative mt-2 mb-5">
+      {/* Soft ambient glow behind the console card */}
+      <div aria-hidden className="pointer-events-none absolute -top-20 -left-12 w-56 h-56 rounded-full bg-primary/[0.08] blur-[80px]" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-16 -right-12 w-48 h-48 rounded-full bg-primary/[0.05] blur-[70px]" />
 
-      <div className="relative">
+      <div className="relative rounded-[28px] border border-foreground/[0.06] bg-foreground/[0.02] p-5 shadow-2xl shadow-black/40 backdrop-blur-sm">
         <MoodSlider />
 
-        <div className="mt-9">
+        <div className="mt-8">
           <InputLevel />
         </div>
 
-        <div className="mt-6">
+        <div className="mt-5">
           <SourcePill />
         </div>
 
-        <div className="mt-7">
+        <div className="mt-6">
           <TechGrid />
         </div>
       </div>
