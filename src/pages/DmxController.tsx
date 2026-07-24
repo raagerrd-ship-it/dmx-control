@@ -262,11 +262,11 @@ function TechTile({ label, value, accent, dot }: { label: string; value: string;
 function MoreDetails() {
   return (
     <>
-      <details className="mt-2 group/eff">
-        <summary className="py-3 rounded-[12px] border border-border bg-card text-[12px] uppercase tracking-[0.1em] text-muted-foreground font-semibold text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden group-open/eff:text-foreground">
-          <span>Effekt-val · välj vilka som roterar</span>
-          <span className="ml-1 group-open/eff:hidden"> ⌄</span>
-          <span className="ml-1 hidden group-open/eff:inline"> ⌃</span>
+      <details className="mt-4 group/eff">
+        <summary className="py-4 rounded-full border border-primary/50 bg-primary/[0.04] text-primary text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden shadow-[0_0_14px_hsl(var(--primary)/0.12)] hover:bg-primary/[0.08] transition-colors">
+          <span>Effekt-val</span>
+          <span className="ml-1.5 opacity-70 group-open/eff:hidden">⌄</span>
+          <span className="ml-1.5 opacity-70 hidden group-open/eff:inline">⌃</span>
         </summary>
         <SectionTitle>Lugna effekter</SectionTitle>
         <RotationList modes={CALM_MODES} />
