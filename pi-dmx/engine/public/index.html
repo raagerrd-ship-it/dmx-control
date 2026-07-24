@@ -563,9 +563,12 @@ inMic.onclick = () => send({ type: "setAudioInput", value: "mic" });
 let lastIntensity = 0.5;
 const moodSlider = document.getElementById("moodSlider");
 const moodSliderCard = document.getElementById("moodSliderCard");
+const moodPill = document.getElementById("moodPill");
 const moodLbl = document.getElementById("moodLbl");
 const moodNum = document.getElementById("moodNum");
 const moodDesc = document.getElementById("moodDesc");
+const legFest = document.getElementById("legFest");
+const legGalet = document.getElementById("legGalet");
 function moodInfoFor(v) {
   if (v <= 0) return { name: "Av",     desc: "Ljuset är släckt — dra åt höger för att tända" };
   if (v <= 2) return { name: "Chill",  desc: "Mjukt och långsamt, följer inte taktslag" };
@@ -580,9 +583,14 @@ function updateMoodUi(v01, active, forceZero) {
   moodSlider.value = String(v);
   const info = moodInfoFor(v);
   moodLbl.textContent = info.name;
-  moodNum.textContent = ` · ${v}/10`;
+  moodNum.textContent = `· ${v}/10`;
   if (moodDesc) moodDesc.textContent = info.desc;
-  moodSliderCard.classList.toggle("active", !!active && v > 0);
+  const off = !active || v === 0;
+  moodSlider.style.setProperty("--mood-fill", (v / 10 * 100) + "%");
+  moodSlider.classList.toggle("is-off", off);
+  if (moodPill) moodPill.classList.toggle("off", off);
+  if (legFest)  legFest.classList.toggle("on",  !off && v >= 5 && v <= 7);
+  if (legGalet) legGalet.classList.toggle("on", !off && v >= 9);
 }
 moodSlider.addEventListener("input", () => {
   const v = Math.max(0, Math.min(10, parseInt(moodSlider.value, 10) || 0));
