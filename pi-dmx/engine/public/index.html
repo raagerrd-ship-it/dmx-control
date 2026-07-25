@@ -166,7 +166,8 @@
     details.tech-details[open] > summary::after { content:" ⌃"; }
 
     /* Ljud-sektion (proffsig, kort-lös) */
-    .audio-section { margin: 4px 0 14px; }
+     .audio-section { margin: 8px 0 14px; padding: 14px 14px 12px; border-radius: 16px; background: color-mix(in srgb, var(--fg) 3%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
+     .audio-section > .audio-head:first-child { margin-top: 0; }
     .src-seg { position:relative; display:grid; grid-template-columns:1fr 1fr; gap:0; padding:4px; border-radius:999px; background:color-mix(in srgb, var(--fg) 3%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
     .src-seg .src-thumb { position:absolute; top:4px; bottom:4px; width:calc(50% - 4px); border-radius:999px; background:color-mix(in srgb, var(--fg) 4%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--fg) 10%, transparent); transition:transform .3s cubic-bezier(.4,.0,.2,1); }
     .src-seg[data-src="mic"] .src-thumb { transform:translateX(calc(100% + 8px)); }
