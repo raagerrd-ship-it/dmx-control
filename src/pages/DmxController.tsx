@@ -203,8 +203,8 @@ function SourcePill() {
       {/* sliding thumb */}
       <div
         aria-hidden
-        className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-foreground/[0.05] ring-1 ring-foreground/10 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
-        style={{ transform: isMic ? "translateX(calc(100% + 8px))" : "translateX(0)" }}
+        className="absolute inset-y-1 left-1 w-[calc(50%-4px)] rounded-full bg-foreground/[0.05] ring-1 ring-foreground/10 transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+        style={{ transform: isMic ? "translateX(100%)" : "translateX(0)" }}
       />
       {[
         { id: "aux", label: "AUX (kabel)" },
