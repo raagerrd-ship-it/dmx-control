@@ -285,20 +285,23 @@ function TechCell({ label, value, accent, dot, listening }: { label: string; val
 function MoreDetails() {
   return (
     <>
-      <details className="mt-4 group/eff">
-        <summary className="py-4 rounded-full border border-foreground/10 bg-foreground/[0.03] text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-foreground/[0.06] group-open/eff:text-foreground/90 transition-colors">
+      <details className="mt-4 group/eff rounded-3xl group-open/eff:bg-foreground/[0.02] group-open/eff:ring-1 group-open/eff:ring-foreground/10 [&[open]]:bg-foreground/[0.02] [&[open]]:ring-1 [&[open]]:ring-foreground/10 transition-colors">
+        <summary className="py-4 rounded-full border border-foreground/10 bg-foreground/[0.03] text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-foreground/[0.06] group-open/eff:text-foreground/90 group-open/eff:rounded-b-none group-open/eff:border-b-0 group-open/eff:bg-foreground/[0.05] transition-colors">
           <span>Effekt-val</span>
           <span className="ml-2 inline-block px-2 py-[2px] rounded-full bg-primary/[0.14] text-primary text-[9px] font-bold tracking-[0.12em] align-[1px]">AUTO</span>
           <span className="ml-1.5 opacity-70 group-open/eff:hidden">⌄</span>
           <span className="ml-1.5 opacity-70 hidden group-open/eff:inline">⌃</span>
         </summary>
-        <SectionTitle>Lugna effekter</SectionTitle>
-        <RotationList modes={CALM_MODES} />
-        <SectionTitle>Effekter med fart</SectionTitle>
-        <RotationList modes={FAST_MODES} />
-        <SectionTitle>Effekter med full fart</SectionTitle>
-        <RotationList modes={FULL_MODES} />
+        <div className="px-4 pb-4 pt-1">
+          <SectionTitle>Lugna effekter</SectionTitle>
+          <RotationList modes={CALM_MODES} />
+          <SectionTitle>Effekter med fart</SectionTitle>
+          <RotationList modes={FAST_MODES} />
+          <SectionTitle>Effekter med full fart</SectionTitle>
+          <RotationList modes={FULL_MODES} />
+        </div>
       </details>
+
 
       <AdvancedMirror />
     </>
