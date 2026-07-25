@@ -213,7 +213,7 @@
     details.more[open] > summary { color:var(--fg); margin-bottom:4px; }
     details.more > summary::after { content:" ⌄"; }
     details.more[open] > summary::after { content:" ⌃"; }
-    .status-footer { margin-top:24px; text-align:center; font-size:10px; letter-spacing:.24em; text-transform:uppercase; color:color-mix(in srgb, var(--dim) 55%, transparent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .status-footer { position:fixed; left:0; right:0; bottom:0; z-index:40; padding: 10px 16px calc(env(safe-area-inset-bottom) + 10px); text-align:center; font-size:10px; letter-spacing:.24em; text-transform:uppercase; color:color-mix(in srgb, var(--dim) 55%, transparent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
     .status-footer.offline { color:color-mix(in srgb, var(--warn) 80%, transparent); }
     /* Spegel-sliders: skrivskyddad vy av vad Stämningen just nu har satt */
     .advhint { font-size:12px; color:var(--dim); line-height:1.4; margin-bottom:10px; }
