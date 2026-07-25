@@ -354,7 +354,8 @@ function AdvancedMirror() {
   const dwellLbl = f.smartDwellMs >= 20000 ? "Sällan" : f.smartDwellMs >= 10000 ? "Normal" : "Ofta";
   return (
     <details className="mt-3 group rounded-3xl [&[open]]:bg-foreground/[0.02] [&[open]]:ring-1 [&[open]]:ring-foreground/10 transition-colors">
-      <summary className="py-4 rounded-full border border-foreground/10 bg-foreground/[0.03] text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-foreground/[0.06] group-open:text-foreground/90 group-open:rounded-b-none group-open:border-b-0 group-open:bg-foreground/[0.05] transition-colors">
+      <summary className="py-4 rounded-full border border-foreground/10 bg-foreground/[0.03] text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-foreground/[0.06] group-open:text-foreground/90 group-open:rounded-none group-open:rounded-t-3xl group-open:border-0 group-open:border-b group-open:border-foreground/10 group-open:bg-transparent transition-colors">
+
         <span>Avancerat</span>
         <span className="ml-1.5 opacity-70 group-open:hidden">⌄</span>
         <span className="ml-1.5 opacity-70 hidden group-open:inline">⌃</span>
