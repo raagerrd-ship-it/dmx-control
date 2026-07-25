@@ -61,7 +61,7 @@ function HeroCard() {
       <div className="relative">
         <MoodSlider />
 
-        <div className="mt-8 rounded-2xl bg-foreground/[0.03] ring-1 ring-inset ring-border/60 px-4 pt-4 pb-3">
+        <div className="mt-6 rounded-2xl bg-foreground/[0.03] ring-1 ring-inset ring-border/60 p-4">
           <InputLevel />
 
           <div className="mt-5">
