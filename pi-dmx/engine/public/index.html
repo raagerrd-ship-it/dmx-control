@@ -195,16 +195,25 @@
     .tech-list .val { font-size:13px; font-variant-numeric:tabular-nums; font-weight:500; color:var(--fg); }
     .tech-list .val.on { color:var(--hot); }
     .tech-list .mood-desc { margin:0; padding:10px 0; border-bottom:1px solid color-mix(in srgb, var(--line) 60%, transparent); font-style:italic; }
-    .tech-strip { margin-top:8px; padding:12px 14px; border-radius:14px; background:color-mix(in srgb, var(--fg) 3%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
+    .tech-strip { margin-top:8px; padding:16px 14px 14px; border-radius:14px; background:color-mix(in srgb, var(--fg) 3%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--line) 60%, transparent); }
     .tech-cells { display:flex; align-items:stretch; }
-    .tech-cell { flex:1; padding:0 12px; display:flex; flex-direction:column; gap:6px; border-left:1px solid color-mix(in srgb, var(--line) 55%, transparent); }
+    .tech-cell { flex:1; padding:2px 12px; display:flex; flex-direction:column; gap:8px; border-left:1px solid color-mix(in srgb, var(--line) 55%, transparent); }
     .tech-cell:first-child { padding-left:0; border-left:0; }
     .tech-cell:last-child { padding-right:0; }
-    .tech-cell .lbl { font-size:9px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); display:inline-flex; align-items:center; gap:6px; }
-    .tech-cell .val { font-size:16px; font-variant-numeric:tabular-nums; font-weight:600; color:var(--fg); line-height:1; }
+    .tech-cell .lbl { font-size:9px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); display:inline-flex; align-items:center; gap:6px; }
+    .tech-cell .val { font-size:30px; font-variant-numeric:tabular-nums; font-weight:600; color:var(--fg); line-height:1; letter-spacing:-.02em; }
     .tech-cell .val.on { color:var(--hot); }
+    .tech-cell .val.listening { font-size:14px; font-weight:500; color:var(--dim); letter-spacing:.04em; font-style:italic; display:inline-flex; align-items:center; gap:8px; }
+    .tech-cell .val.listening .pulse-dot { width:7px; height:7px; border-radius:50%; background:color-mix(in srgb, var(--hot) 70%, transparent); animation: listenPulse 1.1s ease-in-out infinite; }
+    @keyframes listenPulse { 0%,100% { transform:scale(.7); opacity:.4 } 50% { transform:scale(1.15); opacity:1 } }
     .tech-cell .dot { width:6px; height:6px; border-radius:50%; background:var(--hot); box-shadow:0 0 8px var(--hot); }
-    .tech-strip .mood-desc { margin-top:12px; padding-top:12px; border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent); font-size:11px; line-height:1.4; color:var(--dim); }
+    .tech-strip .mood-desc { margin-top:14px; padding-top:12px; border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent); font-size:11px; line-height:1.4; color:var(--dim); }
+    /* Ljudmätare: 5 breda segment istället för 11 små tick-linjer */
+    .audio-bar > .segs { position:absolute; inset:0; display:flex; pointer-events:none; }
+    .audio-bar > .segs > div { flex:1; border-right:1px solid color-mix(in srgb, var(--bg) 60%, transparent); }
+    .audio-bar > .segs > div:last-child { border-right:0; }
+    /* Aktiv effekt-badge i Effekt-val-summary */
+    details.more > summary .fx-active { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:999px; background:color-mix(in srgb, var(--hot) 14%, transparent); color:var(--hot); font-size:10px; font-weight:700; letter-spacing:.12em; vertical-align:1px; }
 
 
     details.more { margin-top:8px; }
@@ -337,7 +346,7 @@
     </div>
     <div class="audio-bar" id="levelBarWrap">
       <div class="fill" id="levelBar" style="width:0%"></div>
-      <div class="ticks" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <div class="segs" aria-hidden="true"><div></div><div></div><div></div><div></div><div></div></div>
     </div>
     <div class="src-seg" id="srcSeg" data-src="aux" role="tablist" aria-label="Ljudkälla" style="margin-top:14px">
       <span class="src-thumb" aria-hidden="true"></span>
@@ -368,7 +377,7 @@
 
 
   <details class="more">
-    <summary>Effekt-val · välj vilka som roterar</summary>
+    <summary>Effekt-val · välj vilka som roterar <span class="fx-active" id="fxActiveBadge" style="display:none"></span></summary>
     <h1 style="margin-top:14px">Lugna effekter</h1>
     <div class="card"><div id="calmList" class="rotlist"></div></div>
     <h1>Effekter med fart</h1>
@@ -1008,11 +1017,33 @@ function applyFrame(f) {
   const confPct = typeof f.bpmConfidence === "number" ? Math.round(f.bpmConfidence * 100) : 0;
   const moodV = parseInt(moodSlider.value, 10) || 0;
   const modeInfo = moodInfoFor(moodV);
-  bpmVal.textContent = locked ? String(Math.round(f.bpm)) : "–";
-  bpmVal.classList.toggle("on", locked);
+  if (locked) {
+    bpmVal.textContent = String(Math.round(f.bpm));
+    bpmVal.classList.add("on");
+    bpmVal.classList.remove("listening");
+  } else {
+    bpmVal.innerHTML = '<span class="pulse-dot"></span>Lyssnar…';
+    bpmVal.classList.remove("on");
+    bpmVal.classList.add("listening");
+  }
   confVal.textContent = locked ? confPct + "%" : "–";
   confVal.classList.toggle("on", locked && confPct >= 70);
   if (moodDesc) moodDesc.textContent = moodV > 0 ? modeInfo.desc : "Ljuset är släckt — dra åt höger för att tända";
+
+  // Aktiv effekt-badge i Effekt-val-summary
+  const fxBadge = document.getElementById("fxActiveBadge");
+  if (fxBadge) {
+    const playing = f.mode || curPlaying;
+    let label = "";
+    if (curMode === "smart") label = "AUTO";
+    else if (playing) {
+      const all = [].concat(CALM_MODES, FAST_MODES, FULL_MODES);
+      const hit = all.find((t) => t[0] === playing);
+      label = hit ? hit[1].toUpperCase() : playing.toUpperCase();
+    }
+    if (label) { fxBadge.textContent = label; fxBadge.style.display = ""; }
+    else fxBadge.style.display = "none";
+  }
 
   if (locked && f.beat) {   // beat-lås-prick: pulsa på varje takt
     bpmDot.style.display = "inline-block";
