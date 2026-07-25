@@ -424,54 +424,67 @@ function AdvFlag({ on, label }: { on: boolean; label: string }) {
 /* ────────── Show + Finjustering borttagna (styrs av stämnings-slidern) ────────── */
 
 
-/* ────────── Rotation-lista (matchar Pi:s .rotrow) ────────── */
+/* ────────── Effekt-lista (3 stilar i ett kort med avdelare) ────────── */
 
-function RotationList({ modes }: { modes: [string, string, string][] }) {
+function EffectList() {
   const s = usePi();
   const playing = usePlayingMode();
+  const categories = [
+    { title: "Lugna effekter", modes: CALM_MODES },
+    { title: "Effekter med fart", modes: FAST_MODES },
+    { title: "Effekter med full fart", modes: FULL_MODES },
+  ];
   return (
-    <Card>
-      <div>
-        {modes.map(([m, label, desc], i) => {
-          const on = s.rotation[m] !== false;
-          const isPlaying = playing === m && s.power;
-          // Mock:en har inga specialroll-fixtures konfigurerade (bara PAR i
-          // demo-state) → alla effekter vars `drives` kräver hazer/uv/etc. gråas
-          // ut med "kräver: X"-tagg. Exakt samma logik som på Pi:n; skillnaden
-          // är bara att Pi:ns cfg.fixtures verkligen kan innehålla de rollerna.
-          const missing = MODE_DRIVES[m] || [];
-          const dim = missing.length > 0;
-          return (
-            <label
-              key={m}
-              className={`flex items-center justify-between py-2.5 px-2 rounded-md border-l-[3px] transition-colors cursor-pointer ${
-                isPlaying ? "border-l-primary" : "border-l-transparent"
-              } ${i > 0 ? "border-t border-t-border" : ""}`}
-              style={{
-                ...(isPlaying ? { background: "color-mix(in srgb, hsl(var(--accent)) 18%, transparent)" } : {}),
-                ...(dim ? { opacity: 0.45 } : {}),
-              }}
-            >
-              <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-                <span className={`text-[15px] ${isPlaying ? "font-semibold" : "font-medium"}`}>
-                  {label}
-                  {isPlaying && (
-                    <span className="ml-2 text-[10px] font-bold tracking-wider align-middle" style={{ color: "hsl(var(--accent))" }}>
-                      ● SPELAS
+    <div>
+      {categories.map(({ title, modes }, catIdx) => (
+        <div key={title}>
+          <div
+            className={`text-[10px] uppercase tracking-[0.12em] text-muted-foreground font-semibold mb-2 ${
+              catIdx === 0 ? "mt-0" : "mt-3"
+            }`}
+          >
+            {title}
+          </div>
+          <div>
+            {modes.map(([m, label, desc], i) => {
+              const on = s.rotation[m] !== false;
+              const isPlaying = playing === m && s.power;
+              const missing = MODE_DRIVES[m] || [];
+              const dim = missing.length > 0;
+              return (
+                <label
+                  key={m}
+                  className={`flex items-center justify-between py-2.5 px-2 rounded-md border-l-[3px] transition-colors cursor-pointer ${
+                    isPlaying ? "border-l-primary" : "border-l-transparent"
+                  } ${i > 0 ? "border-t border-t-border" : ""}`}
+                  style={{
+                    ...(isPlaying ? { background: "color-mix(in srgb, hsl(var(--accent)) 18%, transparent)" } : {}),
+                    ...(dim ? { opacity: 0.45 } : {}),
+                  }}
+                >
+                  <span className="flex-1 min-w-0 flex flex-col gap-0.5">
+                    <span className={`text-[15px] ${isPlaying ? "font-semibold" : "font-medium"}`}>
+                      {label}
+                      {isPlaying && (
+                        <span className="ml-2 text-[10px] font-bold tracking-wider align-middle" style={{ color: "hsl(var(--accent))" }}>
+                          ● SPELAS
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-                <span className="text-xs text-muted-foreground/70 leading-snug">
-                  {desc}
-                  {dim && <span className="opacity-70"> · kräver: {missing.join(", ")}</span>}
-                </span>
-              </span>
-              <SwitchBtn checked={on} onChange={(v) => setRotation(m, v)} />
-            </label>
-          );
-        })}
-      </div>
-    </Card>
+                    <span className="text-xs text-muted-foreground/70 leading-snug">
+                      {desc}
+                      {dim && <span className="opacity-70"> · kräver: {missing.join(", ")}</span>}
+                    </span>
+                  </span>
+                  <SwitchBtn checked={on} onChange={(v) => setRotation(m, v)} />
+                </label>
+              );
+            })}
+          </div>
+          {catIdx < categories.length - 1 && <div className="my-2 border-t border-border" />}
+        </div>
+      ))}
+    </div>
   );
 }
 
