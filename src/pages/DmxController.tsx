@@ -285,15 +285,14 @@ function TechCell({ label, value, accent, dot, listening }: { label: string; val
 function MoreDetails() {
   return (
     <>
-      <details className="mt-4 group/eff rounded-3xl [&[open]]:bg-foreground/[0.02] [&[open]]:ring-1 [&[open]]:ring-foreground/10 overflow-hidden transition-colors">
-        <summary className="py-4 rounded-full border border-foreground/10 bg-foreground/[0.03] text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-foreground/[0.06] group-open/eff:text-foreground/90 group-open/eff:rounded-none group-open/eff:rounded-t-3xl group-open/eff:border-0 group-open/eff:border-b group-open/eff:border-foreground/10 group-open/eff:bg-transparent transition-colors">
-
+      <details className="mt-4 group/eff rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
+        <summary className="px-4 py-4 text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] hover:text-foreground/90 group-open/eff:text-foreground/90 group-open/eff:border-b group-open/eff:border-foreground/10 transition-colors">
           <span>Effekt-val</span>
           <span className="ml-2 inline-block px-2 py-[2px] rounded-full bg-primary/[0.14] text-primary text-[9px] font-bold tracking-[0.12em] align-[1px]">AUTO</span>
           <span className="ml-1.5 opacity-70 group-open/eff:hidden">⌄</span>
           <span className="ml-1.5 opacity-70 hidden group-open/eff:inline">⌃</span>
         </summary>
-        <div className="px-4 pb-4 pt-1">
+        <div className="px-4 pb-4 pt-3">
           <EffectList />
         </div>
       </details>
@@ -348,9 +347,8 @@ function AdvancedMirror() {
   const dwellPct = ((40000 - f.smartDwellMs) / 35000) * 100;
   const dwellLbl = f.smartDwellMs >= 20000 ? "Sällan" : f.smartDwellMs >= 10000 ? "Normal" : "Ofta";
   return (
-    <details className="mt-3 group rounded-3xl [&[open]]:bg-foreground/[0.02] [&[open]]:ring-1 [&[open]]:ring-foreground/10 overflow-hidden transition-colors">
-      <summary className="py-4 rounded-full border border-foreground/10 bg-foreground/[0.03] text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-foreground/[0.06] group-open:text-foreground/90 group-open:rounded-none group-open:rounded-t-3xl group-open:border-0 group-open:border-b group-open:border-foreground/10 group-open:bg-transparent transition-colors">
-
+    <details className="mt-3 group rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
+      <summary className="px-4 py-4 text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] hover:text-foreground/90 group-open:text-foreground/90 group-open:border-b group-open:border-foreground/10 transition-colors">
         <span>Avancerat</span>
         <span className="ml-1.5 opacity-70 group-open:hidden">⌄</span>
         <span className="ml-1.5 opacity-70 hidden group-open:inline">⌃</span>
