@@ -176,10 +176,10 @@ function InputLevel() {
           className="absolute inset-y-0 w-[2px] bg-primary/90 shadow-[0_0_6px_hsl(var(--primary))] transition-[left] duration-150"
           style={{ left: `calc(${peak}% - 1px)`, opacity: silent ? 0 : 1 }}
         />
-        {/* skala */}
-        <div aria-hidden className="absolute inset-0 flex justify-between px-[6px] pointer-events-none">
-          {Array.from({ length: 11 }).map((_, i) => (
-            <span key={i} className="w-px h-full bg-foreground/[0.06]" />
+        {/* skala — 5 breda segment */}
+        <div aria-hidden className="absolute inset-0 flex pointer-events-none">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className={`flex-1 ${i < 4 ? "border-r border-background/50" : ""}`} />
           ))}
         </div>
       </div>
