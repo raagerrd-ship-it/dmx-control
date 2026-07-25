@@ -162,7 +162,7 @@ function InputLevel() {
         </span>
       </div>
 
-      <div className="relative h-3 rounded-full bg-foreground/[0.05] ring-1 ring-foreground/[0.06] overflow-hidden">
+      <div className="relative h-2.5 rounded-full bg-foreground/[0.08] overflow-hidden">
         {/* fyllnad */}
         <div
           className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-100 ${
@@ -176,10 +176,10 @@ function InputLevel() {
           className="absolute inset-y-0 w-[2px] bg-primary/90 shadow-[0_0_6px_hsl(var(--primary))] transition-[left] duration-150"
           style={{ left: `calc(${peak}% - 1px)`, opacity: silent ? 0 : 1 }}
         />
-        {/* skala — 5 breda segment */}
-        <div aria-hidden className="absolute inset-0 flex pointer-events-none">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className={`flex-1 ${i < 4 ? "border-r border-background/50" : ""}`} />
+        {/* skala — 11 tunna ticks (matchar stämningsslidern) */}
+        <div aria-hidden className="absolute inset-y-0 left-[14px] right-[14px] flex justify-between items-center pointer-events-none">
+          {Array.from({ length: 11 }).map((_, i) => (
+            <span key={i} className="w-[2px] h-1 rounded-[1px] bg-foreground/[0.12]" />
           ))}
         </div>
       </div>
