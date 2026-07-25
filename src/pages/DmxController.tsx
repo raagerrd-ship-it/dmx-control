@@ -53,7 +53,7 @@ function StatusFooter() {
 
 function HeroCard() {
   return (
-    <section className="relative mt-3 mb-5 px-2">
+    <section className="relative mt-5 mb-5 px-2">
       {/* Neon ambient glows behind everything, no card frame */}
       <div aria-hidden className="pointer-events-none absolute -top-24 -left-16 w-64 h-64 rounded-full bg-primary/10 blur-[90px]" />
       <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-16 w-56 h-56 rounded-full bg-primary/[0.07] blur-[80px]" />
