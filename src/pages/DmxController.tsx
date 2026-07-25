@@ -68,7 +68,7 @@ function HeroCard() {
             <SourcePill />
           </div>
 
-          <div className="mt-6">
+          <div className="mt-5">
             <TechGrid />
           </div>
         </div>
@@ -245,7 +245,7 @@ function TechGrid() {
   const confPct = Math.round(conf * 100);
   const info = moodInfoFor(moodV);
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06] px-4 py-4">
+    <div className="relative pt-4 border-t border-foreground/[0.06]">
       <div className="flex items-stretch divide-x divide-foreground/[0.06]">
         <TechCell label="BPM" value={locked ? String(Math.round(bpm)) : "listening"} accent={locked} dot={locked && beat} listening={!locked} />
         <TechCell label="Konfidens" value={locked ? `${confPct}%` : "—"} accent={locked && confPct >= 70} />
