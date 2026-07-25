@@ -286,6 +286,7 @@ function MoreDetails() {
       <details className="mt-4 group/eff">
         <summary className="py-4 rounded-full border border-foreground/10 bg-foreground/[0.03] text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-foreground/[0.06] group-open/eff:text-foreground/90 transition-colors">
           <span>Effekt-val</span>
+          <span className="ml-2 inline-block px-2 py-[2px] rounded-full bg-primary/[0.14] text-primary text-[9px] font-bold tracking-[0.12em] align-[1px]">AUTO</span>
           <span className="ml-1.5 opacity-70 group-open/eff:hidden">⌄</span>
           <span className="ml-1.5 opacity-70 hidden group-open/eff:inline">⌃</span>
         </summary>
