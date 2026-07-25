@@ -347,14 +347,14 @@ function AdvancedMirror() {
   const dwellPct = ((40000 - f.smartDwellMs) / 35000) * 100;
   const dwellLbl = f.smartDwellMs >= 20000 ? "Sällan" : f.smartDwellMs >= 10000 ? "Normal" : "Ofta";
   return (
-    <details className="mt-3 group rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
+    <details className="mt-5 group rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
       <summary className="px-4 py-4 text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] hover:text-foreground/90 group-open:text-foreground/90 group-open:border-b group-open:border-foreground/10 transition-colors">
         <span>Avancerat</span>
         <span className="ml-1.5 opacity-70 group-open:hidden">⌄</span>
         <span className="ml-1.5 opacity-70 hidden group-open:inline">⌃</span>
       </summary>
-      <div className="px-4 pb-4 pt-3">
-        <div className="text-[12px] text-muted-foreground leading-snug mb-2.5">
+      <div className="p-4">
+        <div className="text-[12px] text-muted-foreground leading-snug mb-3">
           Skrivskyddad vy. Stämnings-slidern (och det fysiska vredet) sätter allt nedan — dessa värden speglar motorn i realtid.
         </div>
         <AdvBar label="Dynamik"       pct={f.dynamics * 100}    value={Math.round(f.dynamics * 100) + "%"} />
@@ -362,7 +362,7 @@ function AdvancedMirror() {
         <AdvBar label="Ljustak"       pct={f.master * 100}      value={Math.round(f.master * 100) + "%"} />
         <AdvBar label="Tröghet"       pct={decayPct}            value={f.calmDecay.toFixed(2) + "s"} />
         <AdvBar label="Byter effekt"  pct={dwellPct}            value={dwellLbl} />
-        <div className="mt-3 pt-2.5 border-t border-border grid grid-cols-2 gap-x-3 gap-y-1.5">
+        <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 gap-x-3 gap-y-1.5">
           <AdvFlag on={f.energyDrivesMode} label="Energi styr läget" />
           <AdvFlag on={f.beatPulse}        label="Pulsa på taktslag" />
           <AdvFlag on={f.dropBlackout}     label="Drop-blackout" />
