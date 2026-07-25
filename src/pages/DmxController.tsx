@@ -53,7 +53,7 @@ function StatusFooter() {
 
 function HeroCard() {
   return (
-    <section className="relative mt-3 mb-5 px-2">
+    <section className="relative mt-5 mb-5 px-2">
       {/* Neon ambient glows behind everything, no card frame */}
       <div aria-hidden className="pointer-events-none absolute -top-24 -left-16 w-64 h-64 rounded-full bg-primary/10 blur-[90px]" />
       <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-16 w-56 h-56 rounded-full bg-primary/[0.07] blur-[80px]" />
@@ -61,7 +61,7 @@ function HeroCard() {
       <div className="relative">
         <MoodSlider />
 
-        <div className="mt-8 rounded-2xl bg-foreground/[0.03] ring-1 ring-inset ring-border/60 px-4 pt-4 pb-3">
+        <div className="mt-6 rounded-2xl bg-foreground/[0.03] ring-1 ring-inset ring-border/60 p-4">
           <InputLevel />
 
           <div className="mt-5">
@@ -250,7 +250,7 @@ function TechGrid() {
         <TechCell label="BPM" value={locked ? String(Math.round(bpm)) : "listening"} accent={locked} dot={locked && beat} listening={!locked} />
         <TechCell label="Konfidens" value={locked ? `${confPct}%` : "—"} accent={locked && confPct >= 70} />
       </div>
-      <div className="mt-3.5 pt-3 border-t border-foreground/[0.06] text-[11px] leading-snug text-muted-foreground/80">
+      <div className="mt-4 pt-4 border-t border-foreground/[0.06] text-[11px] leading-snug text-muted-foreground/80">
         {off ? "Ljuset är släckt — dra åt höger för att tända" : info.desc}
       </div>
     </div>
@@ -285,14 +285,14 @@ function TechCell({ label, value, accent, dot, listening }: { label: string; val
 function MoreDetails() {
   return (
     <>
-      <details className="mt-4 group/eff rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
+      <details className="mt-5 group/eff rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
         <summary className="px-4 py-4 text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] hover:text-foreground/90 group-open/eff:text-foreground/90 group-open/eff:border-b group-open/eff:border-foreground/10 transition-colors">
           <span>Effekt-val</span>
           <span className="ml-2 inline-block px-2 py-[2px] rounded-full bg-primary/[0.14] text-primary text-[9px] font-bold tracking-[0.12em] align-[1px]">AUTO</span>
           <span className="ml-1.5 opacity-70 group-open/eff:hidden">⌄</span>
           <span className="ml-1.5 opacity-70 hidden group-open/eff:inline">⌃</span>
         </summary>
-        <div className="px-4 pb-4 pt-3">
+        <div className="p-4">
           <EffectList />
         </div>
       </details>
@@ -347,14 +347,14 @@ function AdvancedMirror() {
   const dwellPct = ((40000 - f.smartDwellMs) / 35000) * 100;
   const dwellLbl = f.smartDwellMs >= 20000 ? "Sällan" : f.smartDwellMs >= 10000 ? "Normal" : "Ofta";
   return (
-    <details className="mt-3 group rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
+    <details className="mt-5 group rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
       <summary className="px-4 py-4 text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] hover:text-foreground/90 group-open:text-foreground/90 group-open:border-b group-open:border-foreground/10 transition-colors">
         <span>Avancerat</span>
         <span className="ml-1.5 opacity-70 group-open:hidden">⌄</span>
         <span className="ml-1.5 opacity-70 hidden group-open:inline">⌃</span>
       </summary>
-      <div className="px-4 pb-4 pt-3">
-        <div className="text-[12px] text-muted-foreground leading-snug mb-2.5">
+      <div className="p-4">
+        <div className="text-[12px] text-muted-foreground leading-snug mb-3">
           Skrivskyddad vy. Stämnings-slidern (och det fysiska vredet) sätter allt nedan — dessa värden speglar motorn i realtid.
         </div>
         <AdvBar label="Dynamik"       pct={f.dynamics * 100}    value={Math.round(f.dynamics * 100) + "%"} />
@@ -362,7 +362,7 @@ function AdvancedMirror() {
         <AdvBar label="Ljustak"       pct={f.master * 100}      value={Math.round(f.master * 100) + "%"} />
         <AdvBar label="Tröghet"       pct={decayPct}            value={f.calmDecay.toFixed(2) + "s"} />
         <AdvBar label="Byter effekt"  pct={dwellPct}            value={dwellLbl} />
-        <div className="mt-3 pt-2.5 border-t border-border grid grid-cols-2 gap-x-3 gap-y-1.5">
+        <div className="mt-4 pt-4 border-t border-border grid grid-cols-2 gap-x-3 gap-y-1.5">
           <AdvFlag on={f.energyDrivesMode} label="Energi styr läget" />
           <AdvFlag on={f.beatPulse}        label="Pulsa på taktslag" />
           <AdvFlag on={f.dropBlackout}     label="Drop-blackout" />
