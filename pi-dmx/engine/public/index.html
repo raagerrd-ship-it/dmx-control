@@ -215,16 +215,16 @@
     /* Aktiv effekt-badge i Effekt-val-summary */
     details.more > summary .fx-active { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:999px; background:color-mix(in srgb, var(--hot) 14%, transparent); color:var(--hot); font-size:10px; font-weight:700; letter-spacing:.12em; vertical-align:1px; }
     /* Effekt-val: ett kort med avdelare mellan de tre stilarna */
-    .fx-card { padding-top:12px; padding-bottom:10px; }
+    .fx-card { padding:14px; }
     .fx-cat { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); font-weight:600; margin:14px 0 8px; }
     .fx-cat:first-of-type { margin-top:0; }
     .cat-divider { height:1px; background:var(--line); margin:10px 0; }
 
 
-    details.more { margin-top:8px; }
-    details.more > summary { list-style:none; cursor:pointer; padding:14px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+    details.more { margin-top:8px; border:1px solid var(--line); border-radius:12px; background:var(--card); overflow:hidden; }
+    details.more > summary { list-style:none; cursor:pointer; padding:14px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
     details.more > summary::-webkit-details-marker { display:none; }
-    details.more[open] > summary { color:var(--fg); margin-bottom:4px; }
+    details.more[open] > summary { color:var(--fg); border-bottom:1px solid var(--line); }
     details.more > summary::after { content:" ⌄"; }
     details.more[open] > summary::after { content:" ⌃"; }
     .status-footer { position:fixed; left:0; right:0; bottom:0; z-index:40; padding: 10px 16px calc(env(safe-area-inset-bottom) + 10px); text-align:center; font-size:10px; letter-spacing:.24em; text-transform:uppercase; color:color-mix(in srgb, var(--dim) 55%, transparent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
@@ -383,7 +383,7 @@
 
   <details class="more">
     <summary>Effekt-val · välj vilka som roterar <span class="fx-active" id="fxActiveBadge" style="display:none"></span></summary>
-    <div class="card fx-card">
+    <div class="fx-card">
       <div class="fx-cat">Lugna effekter</div>
       <div id="calmList" class="rotlist"></div>
       <div class="cat-divider"></div>
@@ -397,29 +397,31 @@
 
   <details class="more" style="margin-top:14px">
     <summary>Avancerat · spegel av stämningen</summary>
-    <div class="advhint">Skrivskyddad vy. Stämnings-slidern (och det fysiska vredet) sätter allt nedan — dessa värden speglar motorn i realtid.</div>
-    <div class="advrow"><label>Dynamik</label><div class="meter"><div id="advDyn" style="width:0%"></div></div><span class="val" id="advDynV">–</span></div>
-    <div class="advrow"><label>Reaktion</label><div class="meter"><div id="advSens" style="width:0%"></div></div><span class="val" id="advSensV">–</span></div>
-    <div class="advrow"><label>Ljustak</label><div class="meter"><div id="advMaster" style="width:0%"></div></div><span class="val" id="advMasterV">–</span></div>
-    <div class="advrow"><label>Tröghet</label><div class="meter"><div id="advDecay" style="width:0%"></div></div><span class="val" id="advDecayV">–</span></div>
-    <div class="advrow"><label>Byter effekt</label><div class="meter"><div id="advDwell" style="width:0%"></div></div><span class="val" id="advDwellV">–</span></div>
-    <div class="advflags">
-      <div class="advflag" id="fEnergy"><span class="dot"></span>Energi styr läget</div>
-      <div class="advflag" id="fBeat"><span class="dot"></span>Pulsa på taktslag</div>
-      <div class="advflag" id="fDropBl"><span class="dot"></span>Drop-blackout</div>
-      <div class="advflag" id="fClub"><span class="dot"></span>Klubb-läge</div>
-      <div class="advflag" id="fAmb"><span class="dot"></span>Vilo-glöd</div>
-      <div class="advflag" id="fCeil"><span class="dot"></span>Dynamiskt ljustak</div>
-      <div class="advflag" id="fRiser"><span class="dot"></span>Riser-strobe</div>
-      <div class="advflag" id="fHead"><span class="dot"></span>Drop-headroom</div>
-      <div class="advflag" id="fFog"><span class="dot"></span>Rökmaskin aktiv</div>
-      <div class="advflag" id="fStrobeCh"><span class="dot"></span>DMX-strobe aktiv</div>
-      <div class="advflag" id="fHazer"><span class="dot"></span>Hazer aktiv</div>
-      <div class="advflag" id="fUv"><span class="dot"></span>UV aktiv</div>
-      <div class="advflag" id="fBlinder"><span class="dot"></span>Blinder aktiv</div>
-      <div class="advflag" id="fLaser"><span class="dot"></span>Laser aktiv</div>
-      <div class="advflag" id="fCo2"><span class="dot"></span>CO₂ aktiv</div>
-      <div class="advflag" id="fBle"><span class="dot"></span>BLE-slingor aktiva</div>
+    <div style="padding:0 14px 14px">
+      <div class="advhint">Skrivskyddad vy. Stämnings-slidern (och det fysiska vredet) sätter allt nedan — dessa värden speglar motorn i realtid.</div>
+      <div class="advrow"><label>Dynamik</label><div class="meter"><div id="advDyn" style="width:0%"></div></div><span class="val" id="advDynV">–</span></div>
+      <div class="advrow"><label>Reaktion</label><div class="meter"><div id="advSens" style="width:0%"></div></div><span class="val" id="advSensV">–</span></div>
+      <div class="advrow"><label>Ljustak</label><div class="meter"><div id="advMaster" style="width:0%"></div></div><span class="val" id="advMasterV">–</span></div>
+      <div class="advrow"><label>Tröghet</label><div class="meter"><div id="advDecay" style="width:0%"></div></div><span class="val" id="advDecayV">–</span></div>
+      <div class="advrow"><label>Byter effekt</label><div class="meter"><div id="advDwell" style="width:0%"></div></div><span class="val" id="advDwellV">–</span></div>
+      <div class="advflags">
+        <div class="advflag" id="fEnergy"><span class="dot"></span>Energi styr läget</div>
+        <div class="advflag" id="fBeat"><span class="dot"></span>Pulsa på taktslag</div>
+        <div class="advflag" id="fDropBl"><span class="dot"></span>Drop-blackout</div>
+        <div class="advflag" id="fClub"><span class="dot"></span>Klubb-läge</div>
+        <div class="advflag" id="fAmb"><span class="dot"></span>Vilo-glöd</div>
+        <div class="advflag" id="fCeil"><span class="dot"></span>Dynamiskt ljustak</div>
+        <div class="advflag" id="fRiser"><span class="dot"></span>Riser-strobe</div>
+        <div class="advflag" id="fHead"><span class="dot"></span>Drop-headroom</div>
+        <div class="advflag" id="fFog"><span class="dot"></span>Rökmaskin aktiv</div>
+        <div class="advflag" id="fStrobeCh"><span class="dot"></span>DMX-strobe aktiv</div>
+        <div class="advflag" id="fHazer"><span class="dot"></span>Hazer aktiv</div>
+        <div class="advflag" id="fUv"><span class="dot"></span>UV aktiv</div>
+        <div class="advflag" id="fBlinder"><span class="dot"></span>Blinder aktiv</div>
+        <div class="advflag" id="fLaser"><span class="dot"></span>Laser aktiv</div>
+        <div class="advflag" id="fCo2"><span class="dot"></span>CO₂ aktiv</div>
+        <div class="advflag" id="fBle"><span class="dot"></span>BLE-slingor aktiva</div>
+      </div>
     </div>
   </details>
 
