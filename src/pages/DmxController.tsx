@@ -294,12 +294,9 @@ function MoreDetails() {
           <span className="ml-1.5 opacity-70 hidden group-open/eff:inline">⌃</span>
         </summary>
         <div className="px-4 pb-4 pt-1">
-          <SectionTitle>Lugna effekter</SectionTitle>
-          <RotationList modes={CALM_MODES} />
-          <SectionTitle>Effekter med fart</SectionTitle>
-          <RotationList modes={FAST_MODES} />
-          <SectionTitle>Effekter med full fart</SectionTitle>
-          <RotationList modes={FULL_MODES} />
+          <Card>
+            <EffectList />
+          </Card>
         </div>
       </details>
 
