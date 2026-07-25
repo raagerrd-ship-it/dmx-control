@@ -162,14 +162,16 @@ function InputLevel() {
         </span>
       </div>
 
-      <div className="relative h-2.5 rounded-full bg-foreground/[0.08] overflow-hidden">
-        {/* fyllnad */}
+      <div className="relative h-2.5 rounded-full bg-muted/50 overflow-hidden" style={{ boxShadow: "inset 0 1px 0 hsl(0 0% 100% / 0.04)" }}>
+        {/* fyllnad — samma fade som stämningsslidern */}
         <div
-          className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-100 ${
-            hot ? "bg-primary shadow-[0_0_12px_hsl(var(--primary)/0.7)]" : "bg-primary/70"
-          }`}
-          style={{ width: `${pct}%` }}
+          className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-100 ${hot ? "shadow-[0_0_12px_hsl(var(--primary)/0.7)]" : ""}`}
+          style={{
+            width: `${pct}%`,
+            background: `linear-gradient(90deg, hsl(var(--primary) / 0) 0%, hsl(var(--primary) / ${hot ? 1 : 0.85}) 100%)`,
+          }}
         />
+
         {/* peak-hold linje */}
         <div
           aria-hidden
