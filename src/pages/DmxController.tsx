@@ -21,7 +21,7 @@ export default function DmxController() {
   const ownerMode = /setup/i.test(location.pathname) || /setup/i.test(location.hash);
 
   return (
-    <main className="mx-auto max-w-md px-4 pt-1 pb-16 safe-bottom">
+    <main className="mx-auto max-w-md px-4 pt-1 pb-16 safe-bottom overflow-x-clip">
       <header className="flex justify-center -mt-1 -mb-1">
         <BrandLogo className="h-24 w-auto opacity-95 sm:h-28 md:h-32 lg:h-32 landscape:h-20" />
       </header>
