@@ -243,28 +243,35 @@ function TechGrid() {
   const confPct = Math.round(conf * 100);
   const info = moodInfoFor(moodV);
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06] px-4 py-3.5">
+    <div className="relative overflow-hidden rounded-2xl bg-foreground/[0.03] ring-1 ring-foreground/[0.06] px-4 py-4">
       <div className="flex items-stretch divide-x divide-foreground/[0.06]">
-        <TechCell label="BPM" value={locked ? String(Math.round(bpm)) : "—"} accent={locked} dot={locked && beat} />
+        <TechCell label="BPM" value={locked ? String(Math.round(bpm)) : "listening"} accent={locked} dot={locked && beat} listening={!locked} />
         <TechCell label="Konfidens" value={locked ? `${confPct}%` : "—"} accent={locked && confPct >= 70} />
       </div>
-      <div className="mt-3 pt-3 border-t border-foreground/[0.06] text-[11px] leading-snug text-muted-foreground/80">
+      <div className="mt-3.5 pt-3 border-t border-foreground/[0.06] text-[11px] leading-snug text-muted-foreground/80">
         {off ? "Ljuset är släckt — dra åt höger för att tända" : info.desc}
       </div>
     </div>
   );
 }
 
-function TechCell({ label, value, accent, dot }: { label: string; value: string; accent?: boolean; dot?: boolean }) {
+function TechCell({ label, value, accent, dot, listening }: { label: string; value: string; accent?: boolean; dot?: boolean; listening?: boolean }) {
   return (
-    <div className="flex-1 px-3 first:pl-0 last:pr-0 flex flex-col gap-1.5">
+    <div className="flex-1 px-3 first:pl-0 last:pr-0 flex flex-col gap-2">
       <div className="flex items-center gap-1.5">
-        <span className="text-[8px] font-bold text-muted-foreground/70 uppercase tracking-[0.22em]">{label}</span>
+        <span className="text-[9px] font-bold text-muted-foreground/70 uppercase tracking-[0.22em]">{label}</span>
         {dot && <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))] animate-pulse" />}
       </div>
-      <div className={`text-[16px] font-mono font-semibold tabular-nums leading-none ${accent ? "text-primary" : "text-foreground/85"}`}>
-        {value}
-      </div>
+      {listening ? (
+        <div className="flex items-center gap-2 text-[13px] italic text-muted-foreground/70 leading-none">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/70 animate-pulse" />
+          Lyssnar…
+        </div>
+      ) : (
+        <div className={`text-[28px] font-mono font-semibold tabular-nums leading-none tracking-tight ${accent ? "text-primary" : "text-foreground/85"}`}>
+          {value}
+        </div>
+      )}
     </div>
   );
 }
