@@ -1017,11 +1017,33 @@ function applyFrame(f) {
   const confPct = typeof f.bpmConfidence === "number" ? Math.round(f.bpmConfidence * 100) : 0;
   const moodV = parseInt(moodSlider.value, 10) || 0;
   const modeInfo = moodInfoFor(moodV);
-  bpmVal.textContent = locked ? String(Math.round(f.bpm)) : "–";
-  bpmVal.classList.toggle("on", locked);
+  if (locked) {
+    bpmVal.textContent = String(Math.round(f.bpm));
+    bpmVal.classList.add("on");
+    bpmVal.classList.remove("listening");
+  } else {
+    bpmVal.innerHTML = '<span class="pulse-dot"></span>Lyssnar…';
+    bpmVal.classList.remove("on");
+    bpmVal.classList.add("listening");
+  }
   confVal.textContent = locked ? confPct + "%" : "–";
   confVal.classList.toggle("on", locked && confPct >= 70);
   if (moodDesc) moodDesc.textContent = moodV > 0 ? modeInfo.desc : "Ljuset är släckt — dra åt höger för att tända";
+
+  // Aktiv effekt-badge i Effekt-val-summary
+  const fxBadge = document.getElementById("fxActiveBadge");
+  if (fxBadge) {
+    const playing = f.mode || curPlaying;
+    let label = "";
+    if (curMode === "smart") label = "AUTO";
+    else if (playing) {
+      const all = [].concat(CALM_MODES, FAST_MODES, FULL_MODES);
+      const hit = all.find((t) => t[0] === playing);
+      label = hit ? hit[1].toUpperCase() : playing.toUpperCase();
+    }
+    if (label) { fxBadge.textContent = label; fxBadge.style.display = ""; }
+    else fxBadge.style.display = "none";
+  }
 
   if (locked && f.beat) {   // beat-lås-prick: pulsa på varje takt
     bpmDot.style.display = "inline-block";
