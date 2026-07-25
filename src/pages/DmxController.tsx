@@ -21,9 +21,9 @@ export default function DmxController() {
   const ownerMode = /setup/i.test(location.pathname) || /setup/i.test(location.hash);
 
   return (
-    <main className="mx-auto max-w-md px-4 pt-1 pb-8 safe-bottom">
-      <header className="flex justify-center -mt-1 -mb-2">
-        <BrandLogo className="h-32 w-auto opacity-95 sm:h-36 md:h-40 lg:h-44 landscape:h-28" />
+    <main className="mx-auto max-w-md px-4 pt-1 pb-16 safe-bottom">
+      <header className="flex justify-center -mt-1 -mb-1">
+        <BrandLogo className="h-24 w-auto opacity-95 sm:h-28 md:h-32 lg:h-32 landscape:h-20" />
       </header>
 
       <HeroCard />
@@ -41,7 +41,7 @@ export default function DmxController() {
 
 function StatusFooter() {
   return (
-    <div className="mt-6 text-center text-[10px] tracking-[0.24em] uppercase text-muted-foreground/40 font-mono">
+    <div className="fixed inset-x-0 bottom-0 z-40 px-4 pt-2.5 pb-[calc(env(safe-area-inset-bottom)+10px)] text-center text-[10px] tracking-[0.24em] uppercase text-muted-foreground/40 font-mono bg-background/80 backdrop-blur-md border-t border-border/60">
       Ansluten · v1.4.0 · 4 lampor
     </div>
   );
@@ -61,16 +61,16 @@ function HeroCard() {
       <div className="relative">
         <MoodSlider />
 
-        <div className="mt-9">
+        <div className="mt-8 rounded-2xl bg-foreground/[0.03] ring-1 ring-inset ring-border/60 px-4 pt-4 pb-3">
           <InputLevel />
-        </div>
 
-        <div className="mt-6">
-          <SourcePill />
-        </div>
+          <div className="mt-5">
+            <SourcePill />
+          </div>
 
-        <div className="mt-7">
-          <TechGrid />
+          <div className="mt-6">
+            <TechGrid />
+          </div>
         </div>
       </div>
     </section>
