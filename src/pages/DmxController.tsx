@@ -360,35 +360,33 @@ function AdvancedMirror() {
         <span className="ml-1.5 opacity-70 group-open:hidden">⌄</span>
         <span className="ml-1.5 opacity-70 hidden group-open:inline">⌃</span>
       </summary>
-      <div className="px-4 pb-4 pt-1">
-        <Card>
-          <div className="text-[12px] text-muted-foreground leading-snug mb-2.5">
-            Skrivskyddad vy. Stämnings-slidern (och det fysiska vredet) sätter allt nedan — dessa värden speglar motorn i realtid.
-          </div>
-          <AdvBar label="Dynamik"       pct={f.dynamics * 100}    value={Math.round(f.dynamics * 100) + "%"} />
-          <AdvBar label="Reaktion"      pct={f.sensitivity * 100} value={Math.round(f.sensitivity * 100) + "%"} />
-          <AdvBar label="Ljustak"       pct={f.master * 100}      value={Math.round(f.master * 100) + "%"} />
-          <AdvBar label="Tröghet"       pct={decayPct}            value={f.calmDecay.toFixed(2) + "s"} />
-          <AdvBar label="Byter effekt"  pct={dwellPct}            value={dwellLbl} />
-          <div className="mt-3 pt-2.5 border-t border-border grid grid-cols-2 gap-x-3 gap-y-1.5">
-            <AdvFlag on={f.energyDrivesMode} label="Energi styr läget" />
-            <AdvFlag on={f.beatPulse}        label="Pulsa på taktslag" />
-            <AdvFlag on={f.dropBlackout}     label="Drop-blackout" />
-            <AdvFlag on={f.clubMode}         label="Klubb-läge" />
-            <AdvFlag on={f.ambientGlow}      label="Vilo-glöd" />
-            <AdvFlag on={f.energyCeiling}    label="Dynamiskt ljustak" />
-            <AdvFlag on={f.riserStrobe}      label="Riser-strobe" />
-            <AdvFlag on={f.dropHeadroom}     label="Drop-headroom" />
-            <AdvFlag on={false}              label="Rökmaskin aktiv" />
-            <AdvFlag on={false}              label="DMX-strobe aktiv" />
-            <AdvFlag on={false}              label="Hazer aktiv" />
-            <AdvFlag on={false}              label="UV aktiv" />
-            <AdvFlag on={false}              label="Blinder aktiv" />
-            <AdvFlag on={false}              label="Laser aktiv" />
-            <AdvFlag on={false}              label="CO₂ aktiv" />
-            <AdvFlag on={false}              label="BLE-slingor aktiva" />
-          </div>
-        </Card>
+      <div className="px-4 pb-4 pt-3">
+        <div className="text-[12px] text-muted-foreground leading-snug mb-2.5">
+          Skrivskyddad vy. Stämnings-slidern (och det fysiska vredet) sätter allt nedan — dessa värden speglar motorn i realtid.
+        </div>
+        <AdvBar label="Dynamik"       pct={f.dynamics * 100}    value={Math.round(f.dynamics * 100) + "%"} />
+        <AdvBar label="Reaktion"      pct={f.sensitivity * 100} value={Math.round(f.sensitivity * 100) + "%"} />
+        <AdvBar label="Ljustak"       pct={f.master * 100}      value={Math.round(f.master * 100) + "%"} />
+        <AdvBar label="Tröghet"       pct={decayPct}            value={f.calmDecay.toFixed(2) + "s"} />
+        <AdvBar label="Byter effekt"  pct={dwellPct}            value={dwellLbl} />
+        <div className="mt-3 pt-2.5 border-t border-border grid grid-cols-2 gap-x-3 gap-y-1.5">
+          <AdvFlag on={f.energyDrivesMode} label="Energi styr läget" />
+          <AdvFlag on={f.beatPulse}        label="Pulsa på taktslag" />
+          <AdvFlag on={f.dropBlackout}     label="Drop-blackout" />
+          <AdvFlag on={f.clubMode}         label="Klubb-läge" />
+          <AdvFlag on={f.ambientGlow}      label="Vilo-glöd" />
+          <AdvFlag on={f.energyCeiling}    label="Dynamiskt ljustak" />
+          <AdvFlag on={f.riserStrobe}      label="Riser-strobe" />
+          <AdvFlag on={f.dropHeadroom}     label="Drop-headroom" />
+          <AdvFlag on={false}              label="Rökmaskin aktiv" />
+          <AdvFlag on={false}              label="DMX-strobe aktiv" />
+          <AdvFlag on={false}              label="Hazer aktiv" />
+          <AdvFlag on={false}              label="UV aktiv" />
+          <AdvFlag on={false}              label="Blinder aktiv" />
+          <AdvFlag on={false}              label="Laser aktiv" />
+          <AdvFlag on={false}              label="CO₂ aktiv" />
+          <AdvFlag on={false}              label="BLE-slingor aktiva" />
+        </div>
       </div>
     </details>
 
