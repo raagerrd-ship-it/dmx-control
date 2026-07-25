@@ -285,14 +285,14 @@ function TechCell({ label, value, accent, dot, listening }: { label: string; val
 function MoreDetails() {
   return (
     <>
-      <details className="mt-4 group/eff rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
+      <details className="mt-5 group/eff rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
         <summary className="px-4 py-4 text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] hover:text-foreground/90 group-open/eff:text-foreground/90 group-open/eff:border-b group-open/eff:border-foreground/10 transition-colors">
           <span>Effekt-val</span>
           <span className="ml-2 inline-block px-2 py-[2px] rounded-full bg-primary/[0.14] text-primary text-[9px] font-bold tracking-[0.12em] align-[1px]">AUTO</span>
           <span className="ml-1.5 opacity-70 group-open/eff:hidden">⌄</span>
           <span className="ml-1.5 opacity-70 hidden group-open/eff:inline">⌃</span>
         </summary>
-        <div className="px-4 pb-4 pt-3">
+        <div className="p-4">
           <EffectList />
         </div>
       </details>
