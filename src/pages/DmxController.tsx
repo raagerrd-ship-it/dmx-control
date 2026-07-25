@@ -68,7 +68,7 @@ function HeroCard() {
             <SourcePill />
           </div>
 
-          <div className="mt-6">
+          <div className="mt-5">
             <TechGrid />
           </div>
         </div>
