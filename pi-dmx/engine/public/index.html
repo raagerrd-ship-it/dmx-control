@@ -280,7 +280,10 @@
   </style>
 </head>
 <body>
-  <header style="display:flex;justify-content:center;padding:2px 0 0"><img src="/logo.png" alt="Dahlsjö Pulse" class="brand-logo" draggable="false"></header>
+  <header style="display:flex;flex-direction:column;align-items:center;padding:2px 0 0;gap:2px">
+    <img src="/logo.png" alt="Dahlsjö Pulse" class="brand-logo" draggable="false">
+    <span style="font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:color-mix(in srgb, var(--dim) 60%, transparent);font-weight:500">Ljus som lyssnar</span>
+  </header>
   <div class="health-banner" id="healthBanner" role="status" aria-live="polite"></div>
 
   <!-- Välkomst-overlay: förklarar knapparna första gången någon ansluter.
