@@ -1045,17 +1045,21 @@ function applyFrame(f) {
   const confPct = typeof f.bpmConfidence === "number" ? Math.round(f.bpmConfidence * 100) : 0;
   const moodV = parseInt(moodSlider.value, 10) || 0;
   const modeInfo = moodInfoFor(moodV);
+  const bpmPulseDot = document.getElementById("bpmPulseDot");
   if (locked) {
     bpmVal.textContent = String(Math.round(f.bpm));
     bpmVal.classList.add("on");
-    bpmVal.classList.remove("listening");
+    bpmVal.classList.remove("muted");
+    if (bpmPulseDot) bpmPulseDot.style.display = "none";
   } else {
-    bpmVal.innerHTML = '<span class="pulse-dot"></span>Lyssnar…';
+    bpmVal.textContent = "— —";
     bpmVal.classList.remove("on");
-    bpmVal.classList.add("listening");
+    bpmVal.classList.add("muted");
+    if (bpmPulseDot) bpmPulseDot.style.display = "inline-block";
   }
-  confVal.textContent = locked ? confPct + "%" : "–";
+  confVal.textContent = locked ? confPct + "%" : "— —";
   confVal.classList.toggle("on", locked && confPct >= 70);
+  confVal.classList.toggle("muted", !locked);
   if (moodDesc) moodDesc.textContent = moodV > 0 ? modeInfo.desc : "Ljuset är släckt — dra åt höger för att tända";
 
   // Aktiv effekt-badge i Effekt-val-summary
