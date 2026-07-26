@@ -22,8 +22,11 @@ export default function DmxController() {
 
   return (
     <main className="mx-auto max-w-md px-4 pt-1 pb-16 safe-bottom overflow-x-clip">
-      <header className="flex justify-center -mt-1 -mb-1">
+      <header className="flex flex-col items-center -mt-1 -mb-1">
         <BrandLogo className="h-24 w-auto opacity-95 sm:h-28 md:h-32 lg:h-32 landscape:h-20" />
+        <span className="mt-1 text-[10px] tracking-[0.3em] uppercase text-muted-foreground/60 font-medium">
+          Ljus som lyssnar
+        </span>
       </header>
 
       <HeroCard />
