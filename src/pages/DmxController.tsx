@@ -386,6 +386,28 @@ function AdvancedMirror() {
           <AdvFlag on={false}              label="CO₂ aktiv" />
           <AdvFlag on={false}              label="BLE-slingor aktiva" />
         </div>
+        <div className="mt-4 pt-4 border-t border-border">
+          <div className="flex items-baseline justify-between mb-2">
+            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-[0.22em]">Lampor</span>
+            <span className="text-[10px] text-muted-foreground/50 uppercase tracking-[0.16em]">DMX-adress</span>
+          </div>
+          <div className="divide-y divide-foreground/[0.05]">
+            {[
+              { name: "Par 1", type: "RGB 7-kanal", addr: 1 },
+              { name: "Par 2", type: "RGB 7-kanal", addr: 8 },
+              { name: "Par 3", type: "RGB 7-kanal", addr: 15 },
+              { name: "Par 4", type: "RGB 7-kanal", addr: 22 },
+            ].map((fx) => (
+              <div key={fx.name} className="flex items-center justify-between py-2 text-[13px]">
+                <div className="flex flex-col">
+                  <span className="text-foreground/85">{fx.name}</span>
+                  <span className="text-[10px] text-muted-foreground/60 uppercase tracking-[0.14em]">{fx.type}</span>
+                </div>
+                <span className="font-mono tabular-nums text-foreground/70 text-[13px]">{fx.addr}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </details>
 
