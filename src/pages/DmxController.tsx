@@ -22,8 +22,11 @@ export default function DmxController() {
 
   return (
     <main className="mx-auto max-w-md px-4 pt-1 pb-16 safe-bottom overflow-x-clip">
-      <header className="flex justify-center -mt-1 -mb-1">
+      <header className="flex flex-col items-center -mt-1 -mb-1">
         <BrandLogo className="h-24 w-auto opacity-95 sm:h-28 md:h-32 lg:h-32 landscape:h-20" />
+        <span className="mt-1 text-[10px] tracking-[0.3em] uppercase text-muted-foreground/60 font-medium">
+          Ljus som lyssnar
+        </span>
       </header>
 
       <HeroCard />
@@ -112,7 +115,7 @@ function MoodSlider() {
 
       <div className="flex justify-between mt-2 px-1 font-mono">
         <span className={`text-[9px] font-bold tracking-widest ${off ? "text-primary/80" : "text-muted-foreground/40"}`}>AV</span>
-        <span className={`text-[9px] font-bold tracking-widest uppercase ${!off ? "text-primary" : "text-muted-foreground/40"}`}>{moodInfoFor(v).name}</span>
+        <span className={`text-[9px] font-bold tracking-widest uppercase ${off ? "text-muted-foreground/40" : "text-foreground/85"}`}>{moodInfoFor(v).name}</span>
         <span className={`text-[9px] font-bold tracking-widest ${v >= 9 ? "text-primary" : "text-muted-foreground/40"}`}>MAX</span>
       </div>
 
@@ -247,8 +250,8 @@ function TechGrid() {
   return (
     <div className="relative pt-4 border-t border-foreground/[0.06]">
       <div className="flex items-stretch divide-x divide-foreground/[0.06]">
-        <TechCell label="BPM" value={locked ? String(Math.round(bpm)) : "listening"} accent={locked} dot={locked && beat} listening={!locked} />
-        <TechCell label="Konfidens" value={locked ? `${confPct}%` : "—"} accent={locked && confPct >= 70} />
+        <TechCell label="BPM"        value={locked ? String(Math.round(bpm)) : "— —"} accent={locked} dot={locked ? beat : true} pulseDot={!locked} muted={!locked} />
+        <TechCell label="Konfidens"  value={locked ? `${confPct}%` : "— —"}          accent={locked && confPct >= 70} muted={!locked} />
       </div>
       <div className="mt-4 pt-4 border-t border-foreground/[0.06] text-[11px] leading-snug text-muted-foreground/80">
         {off ? "Ljuset är släckt — dra åt höger för att tända" : info.desc}
@@ -257,23 +260,26 @@ function TechGrid() {
   );
 }
 
-function TechCell({ label, value, accent, dot, listening }: { label: string; value: string; accent?: boolean; dot?: boolean; listening?: boolean }) {
+function TechCell({ label, value, accent, dot, pulseDot, muted }: { label: string; value: string; accent?: boolean; dot?: boolean; pulseDot?: boolean; muted?: boolean }) {
   return (
     <div className="flex-1 px-3 first:pl-0 last:pr-0 flex flex-col gap-2">
       <div className="flex items-center gap-1.5">
         <span className="text-[9px] font-bold text-muted-foreground/70 uppercase tracking-[0.22em]">{label}</span>
-        {dot && <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_hsl(var(--primary))] animate-pulse" />}
+        {dot && (
+          <span
+            className={`inline-block w-1.5 h-1.5 rounded-full bg-primary ${
+              pulseDot ? "shadow-[0_0_6px_hsl(var(--primary)/0.7)] animate-pulse" : "shadow-[0_0_8px_hsl(var(--primary))]"
+            }`}
+          />
+        )}
       </div>
-      {listening ? (
-        <div className="flex items-center gap-2 text-[13px] italic text-muted-foreground/70 leading-none">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary/70 animate-pulse" />
-          Lyssnar…
-        </div>
-      ) : (
-        <div className={`text-[28px] font-mono font-semibold tabular-nums leading-none tracking-tight ${accent ? "text-primary" : "text-foreground/85"}`}>
-          {value}
-        </div>
-      )}
+      <div
+        className={`text-[28px] font-mono font-semibold tabular-nums leading-none tracking-tight ${
+          accent ? "text-primary" : muted ? "text-foreground/40" : "text-foreground/85"
+        }`}
+      >
+        {value}
+      </div>
     </div>
   );
 }
@@ -288,7 +294,7 @@ function MoreDetails() {
       <details className="mt-5 group/eff rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
         <summary className="px-4 py-4 text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] hover:text-foreground/90 group-open/eff:text-foreground/90 group-open/eff:border-b group-open/eff:border-foreground/10 transition-colors">
           <span>Effekt-val</span>
-          <span className="ml-2 inline-block px-2 py-[2px] rounded-full bg-primary/[0.14] text-primary text-[9px] font-bold tracking-[0.12em] align-[1px]">AUTO</span>
+          <span className="ml-2 inline-block px-2 py-[2px] rounded-full bg-foreground/[0.04] ring-1 ring-foreground/10 text-foreground/60 text-[9px] font-bold tracking-[0.12em] align-[1px]">AUTO</span>
           <span className="ml-1.5 opacity-70 group-open/eff:hidden">⌄</span>
           <span className="ml-1.5 opacity-70 hidden group-open/eff:inline">⌃</span>
         </summary>
@@ -379,6 +385,28 @@ function AdvancedMirror() {
           <AdvFlag on={false}              label="Laser aktiv" />
           <AdvFlag on={false}              label="CO₂ aktiv" />
           <AdvFlag on={false}              label="BLE-slingor aktiva" />
+        </div>
+        <div className="mt-4 pt-4 border-t border-border">
+          <div className="flex items-baseline justify-between mb-2">
+            <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-[0.22em]">Lampor</span>
+            <span className="text-[10px] text-muted-foreground/50 uppercase tracking-[0.16em]">DMX-adress</span>
+          </div>
+          <div className="divide-y divide-foreground/[0.05]">
+            {[
+              { name: "Par 1", type: "RGB 7-kanal", addr: 1 },
+              { name: "Par 2", type: "RGB 7-kanal", addr: 8 },
+              { name: "Par 3", type: "RGB 7-kanal", addr: 15 },
+              { name: "Par 4", type: "RGB 7-kanal", addr: 22 },
+            ].map((fx) => (
+              <div key={fx.name} className="flex items-center justify-between py-2 text-[13px]">
+                <div className="flex flex-col">
+                  <span className="text-foreground/85">{fx.name}</span>
+                  <span className="text-[10px] text-muted-foreground/60 uppercase tracking-[0.14em]">{fx.type}</span>
+                </div>
+                <span className="font-mono tabular-nums text-foreground/70 text-[13px]">{fx.addr}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </details>

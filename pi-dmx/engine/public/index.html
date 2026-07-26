@@ -156,7 +156,7 @@
    input[type=range].mood-range.is-off::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--line); }
    input[type=range].mood-range.is-off::-moz-range-thumb { box-shadow: 0 0 0 1px var(--line); }
    .mood-slider-legend { display:flex; justify-content:space-between; font-size:10px; letter-spacing:.18em; text-transform:uppercase; color:var(--dim); margin-top:4px; padding:0 2px; }
-   .mood-slider-legend span.on { color:var(--hot); }
+   .mood-slider-legend span.on { color:color-mix(in srgb, var(--fg) 85%, transparent); }
    .mood-desc { margin-top:12px; padding:0 2px; font-size:13px; color:var(--dim); line-height:1.35; font-style:italic; }
     details.tech-details { margin-top:12px; }
     details.tech-details > summary { list-style:none; cursor:pointer; padding:12px; background:var(--card); border:1px solid var(--line); border-radius:12px; text-align:center; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); font-weight:600; }
@@ -203,8 +203,8 @@
     .tech-cell .lbl { font-size:9px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); display:inline-flex; align-items:center; gap:6px; }
     .tech-cell .val { font-size:30px; font-variant-numeric:tabular-nums; font-weight:600; color:var(--fg); line-height:1; letter-spacing:-.02em; }
     .tech-cell .val.on { color:var(--hot); }
-    .tech-cell .val.listening { font-size:14px; font-weight:500; color:var(--dim); letter-spacing:.04em; font-style:italic; display:inline-flex; align-items:center; gap:8px; }
-    .tech-cell .val.listening .pulse-dot { width:7px; height:7px; border-radius:50%; background:color-mix(in srgb, var(--hot) 70%, transparent); animation: listenPulse 1.1s ease-in-out infinite; }
+    .tech-cell .val.muted { color:color-mix(in srgb, var(--fg) 40%, transparent); }
+    .tech-cell .lbl .pulse-dot { width:6px; height:6px; border-radius:50%; background:color-mix(in srgb, var(--hot) 70%, transparent); animation: listenPulse 1.1s ease-in-out infinite; }
     @keyframes listenPulse { 0%,100% { transform:scale(.7); opacity:.4 } 50% { transform:scale(1.15); opacity:1 } }
     .tech-cell .dot { width:6px; height:6px; border-radius:50%; background:var(--hot); box-shadow:0 0 8px var(--hot); }
     .tech-strip .mood-desc { margin-top:14px; padding-top:12px; border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent); font-size:11px; line-height:1.4; color:var(--dim); }
@@ -213,7 +213,7 @@
     .audio-bar > .segs > div { flex:1; border-right:1px solid color-mix(in srgb, var(--bg) 60%, transparent); }
     .audio-bar > .segs > div:last-child { border-right:0; }
     /* Aktiv effekt-badge i Effekt-val-summary */
-    details.more > summary .fx-active { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:999px; background:color-mix(in srgb, var(--hot) 14%, transparent); color:var(--hot); font-size:10px; font-weight:700; letter-spacing:.12em; vertical-align:1px; }
+    details.more > summary .fx-active { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:999px; background:color-mix(in srgb, var(--fg) 4%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--fg) 10%, transparent); color:color-mix(in srgb, var(--fg) 60%, transparent); font-size:10px; font-weight:700; letter-spacing:.12em; vertical-align:1px; }
     /* Effekt-val: ett kort med avdelare mellan de tre stilarna */
     .fx-card { padding:14px; }
     .fx-cat { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim); font-weight:600; margin:14px 0 8px; }
@@ -240,6 +240,16 @@
     .advflag .dot { width:9px; height:9px; border-radius:50%; background:var(--line); flex:none; transition:background .15s, box-shadow .15s; }
     .advflag.on { color:var(--fg); }
     .advflag.on .dot { background:var(--ok); box-shadow:0 0 8px color-mix(in srgb, var(--ok) 60%, transparent); }
+    .advfx-list { margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+    .advfx-list .advfx-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
+    .advfx-list .advfx-head > span:first-child { font-size:10px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; color:color-mix(in srgb, var(--dim) 80%, transparent); }
+    .advfx-list .advfx-head > span:last-child { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:color-mix(in srgb, var(--dim) 50%, transparent); }
+    .advfx-list .advfx-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent); }
+    .advfx-list .advfx-row:first-child { border-top:0; }
+    .advfx-list .advfx-row .n { display:flex; flex-direction:column; }
+    .advfx-list .advfx-row .n b { font-size:13px; font-weight:500; color:color-mix(in srgb, var(--fg) 85%, transparent); }
+    .advfx-list .advfx-row .n span { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:color-mix(in srgb, var(--dim) 60%, transparent); }
+    .advfx-list .advfx-row .a { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric:tabular-nums; font-size:13px; color:color-mix(in srgb, var(--fg) 70%, transparent); }
     /* Drift-hälsa: sticky banner högst upp när något inte är som det ska.
        Röd = allvarligt (WS/DMX nere), gul = varning (BLE tappat, mic tyst länge). */
     .health-banner { position:sticky; top:0; z-index:50; margin:8px -16px 8px; padding:10px 16px; font-size:13px; line-height:1.35; display:none; }
@@ -280,7 +290,10 @@
   </style>
 </head>
 <body>
-  <header style="display:flex;justify-content:center;padding:2px 0 0"><img src="/logo.png" alt="Dahlsjö Pulse" class="brand-logo" draggable="false"></header>
+  <header style="display:flex;flex-direction:column;align-items:center;padding:2px 0 0;gap:2px">
+    <img src="/logo.png" alt="Dahlsjö Pulse" class="brand-logo" draggable="false">
+    <span style="font-size:10px;letter-spacing:.3em;text-transform:uppercase;color:color-mix(in srgb, var(--dim) 60%, transparent);font-weight:500">Ljus som lyssnar</span>
+  </header>
   <div class="health-banner" id="healthBanner" role="status" aria-live="polite"></div>
 
   <!-- Välkomst-overlay: förklarar knapparna första gången någon ansluter.
@@ -364,12 +377,12 @@
       <div class="tech-strip">
         <div class="tech-cells">
           <div class="tech-cell">
-            <div class="lbl">BPM <span class="dot" id="bpmDot" style="display:none"></span></div>
-            <div class="val" id="bpmVal">–</div>
+            <div class="lbl">BPM <span class="dot" id="bpmDot" style="display:none"></span><span class="pulse-dot" id="bpmPulseDot"></span></div>
+            <div class="val muted" id="bpmVal">— —</div>
           </div>
           <div class="tech-cell">
             <div class="lbl">Konfidens</div>
-            <div class="val" id="confVal">–</div>
+            <div class="val muted" id="confVal">— —</div>
           </div>
         </div>
         <div class="mood-desc" id="moodDesc">Ljuset är släckt — dra åt höger för att tända</div>
@@ -421,6 +434,12 @@
         <div class="advflag" id="fLaser"><span class="dot"></span>Laser aktiv</div>
         <div class="advflag" id="fCo2"><span class="dot"></span>CO₂ aktiv</div>
         <div class="advflag" id="fBle"><span class="dot"></span>BLE-slingor aktiva</div>
+      </div>
+      <div class="advfx-list" id="advFxList">
+        <div class="advfx-head">
+          <span>Lampor</span><span>DMX-adress</span>
+        </div>
+        <div class="advfx-rows" id="advFxRows"></div>
       </div>
     </div>
   </details>
@@ -993,6 +1012,28 @@ function updateAdvMirror(cfg) {
   // .connected per device). Bara "parad" räcker inte — då är slingan avstängd
   // eller utom räckvidd och flaggan skulle ljuga.
   flag("fBle",      bleConnectedCount > 0);
+  // Lampor-lista: adress + typ (RGB / RGBW / RGB7 …) från cfg.fixtures.
+  const fxRows = document.getElementById("advFxRows");
+  const fxWrap = document.getElementById("advFxList");
+  if (fxRows && fxWrap) {
+    if (!curFixtures.length) {
+      fxWrap.style.display = "none";
+    } else {
+      fxWrap.style.display = "";
+      const presetLbl = (p) => {
+        const s = String(p || "").toLowerCase();
+        if (s === "rgb7") return "RGB 7-kanal";
+        if (s === "rgbw") return "RGBW";
+        if (s === "rgb")  return "RGB 3-kanal";
+        return s ? s.toUpperCase() : "Fixture";
+      };
+      fxRows.innerHTML = curFixtures.map((fx) => (
+        '<div class="advfx-row"><div class="n"><b>' +
+        (fx.name || "Lampa") + '</b><span>' + presetLbl(fx.preset) +
+        '</span></div><span class="a">' + (fx.address ?? "–") + '</span></div>'
+      )).join("");
+    }
+  }
   renderCategories();   // fixtures kan ha ändrats → uppdatera "kräver: X"-taggar
 }
 let bleConnectedCount = 0;
@@ -1026,17 +1067,21 @@ function applyFrame(f) {
   const confPct = typeof f.bpmConfidence === "number" ? Math.round(f.bpmConfidence * 100) : 0;
   const moodV = parseInt(moodSlider.value, 10) || 0;
   const modeInfo = moodInfoFor(moodV);
+  const bpmPulseDot = document.getElementById("bpmPulseDot");
   if (locked) {
     bpmVal.textContent = String(Math.round(f.bpm));
     bpmVal.classList.add("on");
-    bpmVal.classList.remove("listening");
+    bpmVal.classList.remove("muted");
+    if (bpmPulseDot) bpmPulseDot.style.display = "none";
   } else {
-    bpmVal.innerHTML = '<span class="pulse-dot"></span>Lyssnar…';
+    bpmVal.textContent = "— —";
     bpmVal.classList.remove("on");
-    bpmVal.classList.add("listening");
+    bpmVal.classList.add("muted");
+    if (bpmPulseDot) bpmPulseDot.style.display = "inline-block";
   }
-  confVal.textContent = locked ? confPct + "%" : "–";
+  confVal.textContent = locked ? confPct + "%" : "— —";
   confVal.classList.toggle("on", locked && confPct >= 70);
+  confVal.classList.toggle("muted", !locked);
   if (moodDesc) moodDesc.textContent = moodV > 0 ? modeInfo.desc : "Ljuset är släckt — dra åt höger för att tända";
 
   // Aktiv effekt-badge i Effekt-val-summary
