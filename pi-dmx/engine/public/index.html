@@ -1012,6 +1012,28 @@ function updateAdvMirror(cfg) {
   // .connected per device). Bara "parad" räcker inte — då är slingan avstängd
   // eller utom räckvidd och flaggan skulle ljuga.
   flag("fBle",      bleConnectedCount > 0);
+  // Lampor-lista: adress + typ (RGB / RGBW / RGB7 …) från cfg.fixtures.
+  const fxRows = document.getElementById("advFxRows");
+  const fxWrap = document.getElementById("advFxList");
+  if (fxRows && fxWrap) {
+    if (!curFixtures.length) {
+      fxWrap.style.display = "none";
+    } else {
+      fxWrap.style.display = "";
+      const presetLbl = (p) => {
+        const s = String(p || "").toLowerCase();
+        if (s === "rgb7") return "RGB 7-kanal";
+        if (s === "rgbw") return "RGBW";
+        if (s === "rgb")  return "RGB 3-kanal";
+        return s ? s.toUpperCase() : "Fixture";
+      };
+      fxRows.innerHTML = curFixtures.map((fx) => (
+        '<div class="advfx-row"><div class="n"><b>' +
+        (fx.name || "Lampa") + '</b><span>' + presetLbl(fx.preset) +
+        '</span></div><span class="a">' + (fx.address ?? "–") + '</span></div>'
+      )).join("");
+    }
+  }
   renderCategories();   // fixtures kan ha ändrats → uppdatera "kräver: X"-taggar
 }
 let bleConnectedCount = 0;
