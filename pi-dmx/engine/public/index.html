@@ -240,6 +240,16 @@
     .advflag .dot { width:9px; height:9px; border-radius:50%; background:var(--line); flex:none; transition:background .15s, box-shadow .15s; }
     .advflag.on { color:var(--fg); }
     .advflag.on .dot { background:var(--ok); box-shadow:0 0 8px color-mix(in srgb, var(--ok) 60%, transparent); }
+    .advfx-list { margin-top:14px; padding-top:12px; border-top:1px solid var(--line); }
+    .advfx-list .advfx-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
+    .advfx-list .advfx-head > span:first-child { font-size:10px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; color:color-mix(in srgb, var(--dim) 80%, transparent); }
+    .advfx-list .advfx-head > span:last-child { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:color-mix(in srgb, var(--dim) 50%, transparent); }
+    .advfx-list .advfx-row { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent); }
+    .advfx-list .advfx-row:first-child { border-top:0; }
+    .advfx-list .advfx-row .n { display:flex; flex-direction:column; }
+    .advfx-list .advfx-row .n b { font-size:13px; font-weight:500; color:color-mix(in srgb, var(--fg) 85%, transparent); }
+    .advfx-list .advfx-row .n span { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:color-mix(in srgb, var(--dim) 60%, transparent); }
+    .advfx-list .advfx-row .a { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric:tabular-nums; font-size:13px; color:color-mix(in srgb, var(--fg) 70%, transparent); }
     /* Drift-hälsa: sticky banner högst upp när något inte är som det ska.
        Röd = allvarligt (WS/DMX nere), gul = varning (BLE tappat, mic tyst länge). */
     .health-banner { position:sticky; top:0; z-index:50; margin:8px -16px 8px; padding:10px 16px; font-size:13px; line-height:1.35; display:none; }
