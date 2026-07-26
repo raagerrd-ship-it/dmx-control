@@ -203,8 +203,8 @@
     .tech-cell .lbl { font-size:9px; font-weight:700; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); display:inline-flex; align-items:center; gap:6px; }
     .tech-cell .val { font-size:30px; font-variant-numeric:tabular-nums; font-weight:600; color:var(--fg); line-height:1; letter-spacing:-.02em; }
     .tech-cell .val.on { color:var(--hot); }
-    .tech-cell .val.listening { font-size:14px; font-weight:500; color:var(--dim); letter-spacing:.04em; font-style:italic; display:inline-flex; align-items:center; gap:8px; }
-    .tech-cell .val.listening .pulse-dot { width:7px; height:7px; border-radius:50%; background:color-mix(in srgb, var(--hot) 70%, transparent); animation: listenPulse 1.1s ease-in-out infinite; }
+    .tech-cell .val.muted { color:color-mix(in srgb, var(--fg) 40%, transparent); }
+    .tech-cell .lbl .pulse-dot { width:6px; height:6px; border-radius:50%; background:color-mix(in srgb, var(--hot) 70%, transparent); animation: listenPulse 1.1s ease-in-out infinite; }
     @keyframes listenPulse { 0%,100% { transform:scale(.7); opacity:.4 } 50% { transform:scale(1.15); opacity:1 } }
     .tech-cell .dot { width:6px; height:6px; border-radius:50%; background:var(--hot); box-shadow:0 0 8px var(--hot); }
     .tech-strip .mood-desc { margin-top:14px; padding-top:12px; border-top:1px solid color-mix(in srgb, var(--line) 55%, transparent); font-size:11px; line-height:1.4; color:var(--dim); }
