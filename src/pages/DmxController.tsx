@@ -62,7 +62,6 @@ function HeroCard() {
       <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-16 w-56 h-56 rounded-full bg-primary/[0.07] blur-[80px]" />
 
       <div className="relative">
-        <MoodHead />
         <MoodSlider />
 
         <div className="mt-6 rounded-2xl bg-foreground/[0.03] ring-1 ring-inset ring-border/60 p-4">
@@ -72,35 +71,16 @@ function HeroCard() {
             <SourcePill />
           </div>
 
-          <details className="mt-5 group/tech rounded-[14px] border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
-            <summary className="px-4 py-3 text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] hover:text-foreground/90 group-open/tech:text-foreground/90 transition-colors">
-              <span>Teknisk info</span>
-              <span className="ml-1.5 opacity-70 group-open/tech:hidden">⌄</span>
-              <span className="ml-1.5 opacity-70 hidden group-open/tech:inline">⌃</span>
-            </summary>
-            <div className="px-4 pb-4">
-              <TechGrid />
-            </div>
-          </details>
+          <div className="mt-5 pt-4 border-t border-foreground/10">
+            <TechGrid />
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-function MoodHead() {
-  const s = usePi();
-  const off = !s.power;
-  const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
-  return (
-    <div className="flex items-baseline justify-between px-1 mb-1">
-      <span className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground/70 font-bold">Stämning</span>
-      <span className={`text-[11px] font-mono tabular-nums font-bold ${off ? "text-muted-foreground/40" : "text-primary"}`}>
-        {String(v).padStart(2, "0")}
-      </span>
-    </div>
-  );
-}
+
 
 function MoodSlider() {
 
