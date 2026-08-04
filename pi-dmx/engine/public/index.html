@@ -2161,7 +2161,10 @@ if (welcomeOv && welcomeBtn && !OWNER_MODE) {
 // BLE-slingor som TAPPAT kontakt". Mic-tyst-varning är HÖGKONTEXT (spelar
 // användaren musik just nu?) → använd bara som gul varning efter 30s tystnad
 // medan power är på och vi faktiskt gör en show.
-let wsOk = false, dmxOk = true, blePairedCount = 0, bleConnectedCount = 0;
+let wsOk = false, dmxOk = true, blePairedCount = 0;
+// bleConnectedCount deklareras redan högre upp (~rad 1039) — dubbel let här gav
+// SyntaxError som stoppade HELA skriptet → connect() kördes aldrig, allt fastnade
+// på "Connecting...". Delas nu mellan ring-flaggan och BLE-statusen (bad merge).
 let lastAudibleMs = Date.now();
 const healthBanner = document.getElementById("healthBanner");
 function renderHealth() {
