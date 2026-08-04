@@ -296,7 +296,7 @@ function MoreDetails() {
     <>
       <details className="mt-5 group/eff rounded-2xl border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
         <summary className="px-4 py-4 text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] hover:text-foreground/90 group-open/eff:text-foreground/90 group-open/eff:border-b group-open/eff:border-foreground/10 transition-colors">
-          <span>Effekt-val · välj vilka som roterar</span>
+          <span>Effekt-val</span>
           <span className="ml-2 inline-block px-2 py-[2px] rounded-full bg-foreground/[0.04] ring-1 ring-foreground/10 text-foreground/60 text-[9px] font-bold tracking-[0.12em] align-[1px]">AUTO</span>
           <span className="ml-1.5 opacity-70 group-open/eff:hidden">⌄</span>
           <span className="ml-1.5 opacity-70 hidden group-open/eff:inline">⌃</span>
