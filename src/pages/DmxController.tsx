@@ -161,7 +161,7 @@ function InputLevel() {
     <div>
       <div className="flex items-baseline justify-between px-1 mb-2">
         <span className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground/70 font-bold">
-          Nivå
+          Ljudnivå
         </span>
         <span className={`text-[11px] font-mono tabular-nums ${hot ? "text-primary" : silent ? "text-muted-foreground/40" : "text-muted-foreground/80"}`}>
           {String(pct).padStart(2, "0")}%
