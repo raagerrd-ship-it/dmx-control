@@ -21,7 +21,7 @@ import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 import { IntensityKnob } from "./intensityKnob.js";
 import { KnobRing } from "./knobRing.js";
-import { BleClient, type BleScanDevice } from "./bleClient.js";
+import { BleClient, type BleScanDevice, type BleCal } from "./bleClient.js";
 import { applyIntensity } from "./moods.js";
 
 import { activeSlots, fixtureRoles, type Mode } from "./config.js";
@@ -267,7 +267,7 @@ const serverDeps = {
     pair:   (mac: string) => bleClient.pair(mac),
     unpair: (mac: string) => bleClient.unpair(mac),
     identify: (mac: string) => bleClient.identify(mac),
-    setCal: (mac, cal) => bleClient.setCal(mac, cal),
+    setCal: (mac: string, cal: BleCal) => bleClient.setCal(mac, cal),
     onScan:   (fn: (d: BleScanDevice[]) => void) => { bleScanSubs.push(fn); },
     onPaired: (fn: () => void) => { blePairedSubs.push(fn); },
   },
