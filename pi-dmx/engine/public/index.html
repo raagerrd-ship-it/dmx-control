@@ -11,7 +11,10 @@
     :root { --bg:#0a0a0f; --card:#15151f; --line:#252535; --fg:#e8e8f0; --dim:#7a7a90; --hot:#ff3a6b; --ok:#40e0a0; --warn:#ffb020; }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin:0; padding:0; background:var(--bg); color:var(--fg); font: 15px -apple-system, system-ui, sans-serif; overscroll-behavior: none; }
-    body { padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 56px); }
+    /* Smalare sida: maxbredd + centrerad (mockens max-w-md = 28rem). Utan detta
+       sprawlar innehållet över hela skärmen på dator. width via max-width → full
+       bredd på telefon, kapad på dator. */
+    body { max-width: 28rem; margin: 0 auto; padding: env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 56px); }
     h1 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: 20px 0 10px; font-weight: 600; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
     .modes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -650,7 +653,9 @@
   </div>
   </div><!-- /ownerOnly -->
 
-  <div class="status" id="conn">Connecting…</div>
+  <!-- Dold: anslutningsstatus finns redan i sidfoten. Elementet behålls så
+       ws.onopen/onclose (skriver hit oskyddat) inte kraschar. -->
+  <div class="status" id="conn" style="display:none">Connecting…</div>
 
 
 <script>
