@@ -108,9 +108,9 @@ export class KnobRing {
   start() {
     const bus = this.opts.bus ?? 0;
     const dev = this.opts.device ?? 0;
-    this.spi = SPI.open(bus, dev, (err: Error | null) => {
+    this.spi = SPI.open(bus, dev, (err?: Error | null) => {
       if (err) { console.error("[ring] spi open failed:", err.message); this.spi = null; return; }
-      this.spi!.setOptions({ mode: SPI.MODE0, maxSpeedHz: SPI_SPEED_HZ, bitsPerWord: 8 }, (e: Error | null) => {
+      this.spi!.setOptions({ mode: 0, maxSpeedHz: SPI_SPEED_HZ, bitsPerWord: 8 }, (e?: Error | null) => {
         if (e) console.error("[ring] spi setOptions:", e.message);
       });
     });
@@ -190,7 +190,7 @@ export class KnobRing {
       sendBuffer: Buffer.from(this.txBuf.buffer, this.txBuf.byteOffset, this.txBuf.byteLength),
       speedHz: SPI_SPEED_HZ,
     }];
-    this.spi.transfer(msg, (err: Error | null) => {
+    this.spi.transfer(msg, (err?: Error | null) => {
       if (err) console.error("[ring] spi tx:", err.message);
     });
   }
