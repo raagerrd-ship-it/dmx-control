@@ -62,6 +62,7 @@ function HeroCard() {
       <div aria-hidden className="pointer-events-none absolute -bottom-24 -right-16 w-56 h-56 rounded-full bg-primary/[0.07] blur-[80px]" />
 
       <div className="relative">
+        <MoodHead />
         <MoodSlider />
 
         <div className="mt-6 rounded-2xl bg-foreground/[0.03] ring-1 ring-inset ring-border/60 p-4">
@@ -71,9 +72,16 @@ function HeroCard() {
             <SourcePill />
           </div>
 
-          <div className="mt-5">
-            <TechGrid />
-          </div>
+          <details className="mt-5 group/tech rounded-[14px] border border-foreground/10 bg-foreground/[0.02] overflow-hidden">
+            <summary className="px-4 py-3 text-center cursor-pointer list-none [&::-webkit-details-marker]:hidden text-muted-foreground/80 text-[10px] font-black uppercase tracking-[0.24em] hover:text-foreground/90 group-open/tech:text-foreground/90 transition-colors">
+              <span>Teknisk info</span>
+              <span className="ml-1.5 opacity-70 group-open/tech:hidden">⌄</span>
+              <span className="ml-1.5 opacity-70 hidden group-open/tech:inline">⌃</span>
+            </summary>
+            <div className="px-4 pb-4">
+              <TechGrid />
+            </div>
+          </details>
         </div>
       </div>
     </section>
