@@ -340,11 +340,6 @@
   </div>
 
   <section class="hero-card">
-    <div class="hero-head">
-      <span class="hero-lbl">Stämning</span>
-      <span class="hero-num" id="moodNum">05</span>
-    </div>
-
     <section class="mood-slider" id="moodSliderCard">
 
     <div class="mood-track-wrap">
@@ -357,7 +352,7 @@
   <section class="audio-section">
     <div class="audio-head">
       <div class="audio-head-l">
-        <span class="audio-lbl">Nivå</span>
+        <span class="audio-lbl">Ljudnivå</span>
       </div>
       <span class="audio-pct" id="levelVal">0%</span>
     </div>
@@ -371,30 +366,27 @@
       <button id="inMic" role="tab" aria-selected="false">Mikrofon</button>
     </div>
 
-    <details class="tech-details">
-      <summary>Teknisk info</summary>
-      <div class="tech-strip">
-        <div class="tech-cells">
-          <div class="tech-cell">
-            <div class="lbl">BPM <span class="dot" id="bpmDot" style="display:none"></span><span class="pulse-dot" id="bpmPulseDot"></span></div>
-            <div class="val muted" id="bpmVal">— —</div>
-          </div>
-          <div class="tech-cell">
-            <div class="lbl">Konfidens</div>
-            <div class="val muted" id="confVal">— —</div>
-          </div>
+    <div class="tech-strip">
+      <div class="tech-cells">
+        <div class="tech-cell">
+          <div class="lbl">BPM <span class="dot" id="bpmDot" style="display:none"></span><span class="pulse-dot" id="bpmPulseDot"></span></div>
+          <div class="val muted" id="bpmVal">— —</div>
         </div>
-        <div class="mood-desc" id="moodDesc">Ljuset är släckt — dra åt höger för att tända</div>
+        <div class="tech-cell">
+          <div class="lbl">Konfidens</div>
+          <div class="val muted" id="confVal">— —</div>
+        </div>
       </div>
+      <div class="mood-desc" id="moodDesc">Ljuset är släckt — dra åt höger för att tända</div>
+    </div>
+  </section>
+  </section>
 
-    </details>
-  </section>
-  </section>
 
 
 
   <details class="more">
-    <summary>Effekt-val · välj vilka som roterar <span class="fx-active" id="fxActiveBadge" style="display:none"></span></summary>
+    <summary>Effekt-val <span class="fx-active" id="fxActiveBadge" style="display:none"></span></summary>
     <div class="fx-card">
       <div class="fx-cat">Lugna effekter</div>
       <div id="calmList" class="rotlist"></div>
@@ -408,7 +400,7 @@
   </details>
 
   <details class="more" style="margin-top:14px">
-    <summary>Avancerat · spegel av stämningen</summary>
+    <summary>Avancerat</summary>
     <div style="padding:14px">
       <div class="advhint">Skrivskyddad vy. Stämnings-slidern (och det fysiska vredet) sätter allt nedan — dessa värden speglar motorn i realtid.</div>
       <div class="advrow"><label>Dynamik</label><div class="meter"><div id="advDyn" style="width:0%"></div></div><span class="val" id="advDynV">–</span></div>
