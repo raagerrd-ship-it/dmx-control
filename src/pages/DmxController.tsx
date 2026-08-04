@@ -88,7 +88,22 @@ function HeroCard() {
   );
 }
 
+function MoodHead() {
+  const s = usePi();
+  const off = !s.power;
+  const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
+  return (
+    <div className="flex items-baseline justify-between px-1 mb-1">
+      <span className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground/70 font-bold">Stämning</span>
+      <span className={`text-[11px] font-mono tabular-nums font-bold ${off ? "text-muted-foreground/40" : "text-primary"}`}>
+        {String(v).padStart(2, "0")}
+      </span>
+    </div>
+  );
+}
+
 function MoodSlider() {
+
   const s = usePi();
   const off = !s.power;
   const v = off ? 0 : Math.max(1, Math.min(10, Math.round(s.intensity * 9) + 1));
