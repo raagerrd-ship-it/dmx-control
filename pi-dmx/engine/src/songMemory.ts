@@ -128,8 +128,8 @@ export class SongMemory {
   private novAvg = 0;             // låtens normala fönster-till-fönster-variation
   private novHits = 0;            // fönster i rad över tröskeln
   private levAvg = 0;             // långsamt nivåsnitt (dippdetektering)
-  private dipAt = 0;
-  private lastEvidence: string[] = [];              // väggklocka för senaste nivådippen
+  private dipAt = 0;              // väggklocka för senaste nivådippen
+  private lastEvidence: string[] = [];   // senast aktiva gränssignaler (diagnostik)
   private loudSince = 0;          // volymgrind: sedan när nivån är tydlig musik
   private recogSplit = -1;        // ≥0: igenkänningen pekar på gräns, matchens position i ms
 
