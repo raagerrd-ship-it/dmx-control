@@ -256,9 +256,11 @@ function TechGrid() {
         <TechCell label="BPM"        value={locked ? String(Math.round(bpm)) : "— —"} accent={locked} dot={locked ? beat : true} pulseDot={!locked} muted={!locked} />
         <TechCell label="Konfidens"  value={locked ? `${confPct}%` : "— —"}          accent={locked && confPct >= 70} muted={!locked} />
       </div>
+      <SongMemoryRow />
       <div className="mt-4 pt-4 border-t border-foreground/[0.06] text-[11px] leading-snug text-muted-foreground/80">
-        {off ? "Ljuset är släckt — dra åt höger för att tända" : info.desc}
+        {off ? "Ljuset är släckt — dra åt höger för att tände" : info.desc}
       </div>
+
     </div>
   );
 }
