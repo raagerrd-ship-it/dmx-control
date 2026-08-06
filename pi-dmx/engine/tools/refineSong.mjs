@@ -63,12 +63,14 @@ for (let i = PRE; i < fr.length - POST; i++) {
   if (after < before * 2.2 + 0.03) continue;     // lyftet måste vara stort
   const rise = sm[Math.min(sm.length - 1, i + RISE)] - sm[i - RISE];
   if (rise < after * 0.35) continue;             // ...och skarpt
-  // Flanken: gå bakåt till breaket och sedan fram till första korsningen uppåt
-  // → dropens exakta anslag, inte där realtid hann reagera.
-  const floor = before + (after - before) * 0.35;
-  let k = i;
-  while (k > i - F(2.0) && k > 0 && sm[k] > floor) k--;
-  while (k < i && sm[k] < floor) k++;
+  // Flanken: den brantaste stigningen i ett smalt fönster runt kandidaten.
+  // (Att gå bakåt till breakets nivå landade i en dal MELLAN kickarna, upp till
+  // en sekund för tidigt — dropen måste ligga på anslaget.)
+  let k = i, bestRise = -Infinity;
+  for (let j = Math.max(RISE, i - F(0.4)); j < Math.min(sm.length - RISE, i + F(0.2)); j++) {
+    const r = sm[j + RISE] - sm[j - RISE];
+    if (r > bestRise) { bestRise = r; k = j; }
+  }
   drops.push({ t: Math.round(fr[k].t * 1000), s: Math.min(1, 0.45 + after * 0.5) });
   lastDrop = i;
 }
