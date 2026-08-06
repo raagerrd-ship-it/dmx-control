@@ -310,6 +310,8 @@ export class SongMemory {
     if (now - this.lastLoud > SILENCE_END_MS) { this.commit(); return; }
 
     const tLive = now - this.playStart;
+    if (this.boundary(now, tLive, o)) return;
+
     // Tidslinje-inspelning (alltid — även för en känd låt, så minnet förbättras).
     const songT = this.matchId ? tLive + this.matchOffset : tLive;
     if (learn) {
