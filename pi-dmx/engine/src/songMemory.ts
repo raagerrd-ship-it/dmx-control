@@ -277,7 +277,7 @@ export class SongMemory {
     const bar = Math.max(NOV_TH, this.novAvg * NOV_FACTOR);
     if (this.novAvg > 0 && d > bar) {
       this.novHits++;
-      if (this.novHits >= NOV_HITS) this.novelty = d;
+      if (this.novHits >= NOV_HITS) this.novAt = this.clock();
     } else this.novHits = 0;
     this.novAvg = this.novAvg > 0 ? this.novAvg * 0.9 + d * 0.1 : d;
     for (let b = 0; b < prof.length; b++) this.novRef[b] = this.novRef[b] * 0.75 + prof[b] * 0.25;
