@@ -50,7 +50,15 @@ export class SongMemory {
   constructor(private readonly clock: () => number = Date.now) {}
 
   private songs = new Map<number, Song>();
-  private index = new Map<number, number[]>();   // hash → [songId, tMs, songId, tMs, ...]
+  /** INVERS-INDEX, kompakt. Ett Map<hash, number[]> kostade ~450 MB RAM för 500
+   *  låtar (en liten JS-array per hash) — otänkbart på en Pi Zero 2W med 512 MB.
+   *  Nu: två sorterade typade arrayer (~7 MB) + binärsökning.
+   *  idxVal = slot(20 bit) << 12 | ruta(12 bit), där slot pekar i slotIds och
+   *  ruta är låt-tid / FRAME_MS. */
+  private idxHash = new Uint32Array(0);
+  private idxVal = new Uint32Array(0);
+  private slotIds: number[] = [];
+
   private nextId = 1;
   private dirty = false;
 
