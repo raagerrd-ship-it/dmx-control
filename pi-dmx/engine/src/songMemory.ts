@@ -110,9 +110,13 @@ export class SongMemory {
   private novN = 0;
   private novStart = 0;
   private novRef: Float32Array | null = null;
-  private novelty = 0;            // senaste klangavståndet (konsumeras i tick)
+  private novAt = 0;              // väggklocka för senaste klangskiftet
   private novAvg = 0;             // låtens normala fönster-till-fönster-variation
   private novHits = 0;            // fönster i rad över tröskeln
+  private levAvg = 0;             // långsamt nivåsnitt (dippdetektering)
+  private dipAt = 0;              // väggklocka för senaste nivådippen
+  private loudSince = 0;          // volymgrind: sedan när nivån är tydlig musik
+
 
 
   // Matchning
