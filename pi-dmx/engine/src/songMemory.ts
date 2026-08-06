@@ -31,8 +31,9 @@ const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som b�
 
 // LÅTGRÄNS UTAN TYSTNAD. Spotify/Apple Music spelar gaplöst eller crossfadar —
 // 3 s tystnad inträffar aldrig, och utan de här signalerna blir hela kvällen
-// "en låt". Ingen enskild signal räcker (en drop byter också klang, en BPM-mätning
-// kan hoppa), så vi väger SAMLAD EVIDENS: temposkifte + klangskifte + nivådipp.
+// "en låt". Mätt på riktig Spotify-ström via AUX fyrar nivådipp under 55 % av
+// snittet ungefär en gång per tre minuter och får därför ensam sätta en gräns.
+// Övriga signaler vägs fortfarande som SAMLAD EVIDENS: temposkifte + klangskifte.
 // Två vakter gör det robust: minsta låtlängd (en drop/breakdown sker alltid inom
 // den) och ett maxtak (aldrig 22 minuters gröt igen). Missas en gräns tappar vi
 // bara inlärningen för spåret och realtidsdetektorn kör som förut — ren uppsida.
@@ -41,9 +42,8 @@ const MAX_SEG_MS = 600000;     // 10 min utan gräns → tvinga fram en
 // MÄTT PÅ HÅRDVARA: tempoföljaren vacklar systematiskt INOM samma låt
 // (126→91, 129→92, 129→93, 129→92 på 28 s — kvot 1.39–1.40 varje gång, en
 // tolkningsmiss som ingen kvotlista fångar). Ett tempohopp får därför ALDRIG
-// fyra en gräns ensamt: BPM är en STÖDsignal, en av två. Den bärande gränsen är
-// nivådipp + klangskifte, så klangskiftet är gjort känsligare för att kompensera.
-const EVIDENCE_NEEDED = 2;       // alltid minst två signaler
+// fyra en gräns ensamt: BPM är en STÖDsignal, en av två.
+const EVIDENCE_NEEDED = 2;       // gäller övriga signaler; nivådipp räcker ensam
 const BPM_JUMP = 0.07;           // >7 % tempoändring = en (av två) signaler
 const BPM_HOLD_MS = 4000;        // ...som håller i 4 s (inte en halvtaktsmiss)
 const DIP_RATIO = 0.55;          // nivå under 55 % av snittet (min/snitt mätt 0.505)
@@ -415,8 +415,8 @@ export class SongMemory {
     }
   }
 
-  /** LÅTGRÄNS I EN GAPLÖS STRÖM. Väger samlad evidens (tempo + klang + nivådipp),
-   *  grindad av min/max-längd. Returnerar true om vi delade. */
+  /** LÅTGRÄNS I EN GAPLÖS STRÖM. Nivådipp räcker ensam; övriga signaler kräver
+   *  samlad evidens. Allt grindas av min/max-längd. Returnerar true om vi delade. */
   private boundary(now: number, tLive: number, o: { bpm: number; bpmConfidence: number; level: number }): boolean {
     // Nivådipp: även en crossfade har oftast ett ögonblick där nivån faller.
     this.levAvg = this.levAvg > 0 ? this.levAvg * 0.995 + o.level * 0.005 : o.level;
@@ -445,7 +445,8 @@ export class SongMemory {
     this.lastEvidence = ev;
 
     let why = "";
-    if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
+    if (ev.includes("nivådipp")) why = "nivådipp";
+    else if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
     else if (tLive > MAX_SEG_MS) why = "maxlängd";   // aldrig en 22-minuters gröt igen
     if (!why) return false;
 
