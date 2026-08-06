@@ -154,14 +154,30 @@ capture.on("chunk", (samples: Float32Array) => {
     if (songs.takeDrop() > 0) outDrop++;          // pre-fired ur minnet
     const ri = songs.replayIntensity();
     if (ri !== null) frame.intensity = frame.intensity * 0.3 + ri * 0.7;
+    // DRAMATURGI UR MINNET: taket, riser-rampen och strukturen är förberäknade
+    // offline — realtid kan bara gissa hur lång en uppbyggnad är, minnet VET.
+    const cues = songs.replayCues();
+    effects.memCeiling = cues.ceiling;
+    effects.memHasGrid = cues.hasGrid;
+    if (cues.section) effects.memSectionAt = performance.now();
+    if (cues.phrase) effects.memPhraseAt = performance.now();
+    if (cues.build !== null) {
+      // Proportionell mot RESTEN av risern → 100 % exakt på dropen, i stället för
+      // realtidens gissning som toppar för tidigt eller för sent.
+      frame.buildUp = Math.max(frame.buildUp, cues.build);
+      frame.inRiser = true;
+    }
     if (!memoryBeatLocked) {
       const lb = songs.lockedBeat();
       if (lb && lb.bpm > 40) { cfg.beat = { anchorMs: lb.anchorMs, bpm: lb.bpm }; clockDetBpm = lb.bpm; memoryBeatLocked = true; }
     }
   } else {
     memoryBeatLocked = false;
+    effects.memCeiling = null;
+    effects.memHasGrid = false;
     if (liveDrop) outDrop++;                      // realtidsdetektorn som förut
   }
+
   frame.dropCount = outDrop;
   // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
   // (om)lås; att sätta det på varje kick fick pulsen att flimra.
