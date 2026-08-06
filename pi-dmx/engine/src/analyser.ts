@@ -716,7 +716,11 @@ export class Analyser {
       const re = this.specBig[2 * i], im = this.specBig[2 * i + 1];
       this.magBig[i] = Math.sqrt(re * re + im * im);
     }
+    // LÅTMINNET får samma magnitud (ingen extra FFT). Anropas före swap:en nedan,
+    // så bufferten faktiskt innehåller DENNA frames spektrum.
+    this.specSink?.(this.magBig, this.cfg.audio.rate / this.bufferBig.length);
     const gated = rms > this.cfg.detection.noiseFloor * 1.5;
+
     for (let b = 0; b < 8; b++) {
       const lo = this.bandLo[b], hi = this.bandHi[b];
       const nb = Math.max(1, hi - lo);
