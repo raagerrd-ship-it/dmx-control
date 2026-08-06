@@ -45,6 +45,9 @@ export interface SongMemoryState {
 }
 
 export class SongMemory {
+  /** Klockan är injicerbar enbart för test (simulerad tid → snabb replay-verifiering). */
+  constructor(private readonly clock: () => number = Date.now) {}
+
   private songs = new Map<number, Song>();
   private index = new Map<number, number[]>();   // hash → [songId, tMs, songId, tMs, ...]
   private nextId = 1;
@@ -137,7 +140,7 @@ export class SongMemory {
   /** Matas varje gång analysatorn har en ny 2048-magnitud (låt-tid ur klockan). */
   pushSpectrum(mag: Float32Array, binHz: number): void {
     if (!this.playStart) return;
-    const tLive = Date.now() - this.playStart;
+    const tLive = this.clock() - this.playStart;
     this.lm.length = 0;
     this.fp.push(mag, binHz, tLive, this.lm);
     for (const l of this.lm) {
@@ -172,7 +175,7 @@ export class SongMemory {
    * plockar fram nästa replay-drop.
    */
   tick(o: { level: number; dropped: boolean; bpm: number; bpmConfidence: number; intensity: number; beatAnchorMs: number }): void {
-    const now = Date.now();
+    const now = this.clock();
     if (o.level > 0.02) this.lastLoud = now;
     if (!this.playStart) {
       if (o.level > 0.05) { this.playStart = now; this.lastLoud = now; this.fp.reset(); }
@@ -237,7 +240,7 @@ export class SongMemory {
   replayIntensity(): number | null {
     const s = this.matchId ? this.songs.get(this.matchId) : undefined;
     if (!s || s.meta.intensity.length === 0) return null;
-    const sec = Math.floor((Date.now() - this.playStart + this.matchOffset) / 1000);
+    const sec = Math.floor((this.clock() - this.playStart + this.matchOffset) / 1000);
     if (sec < 0 || sec >= s.meta.intensity.length) return null;
     return s.meta.intensity[sec] / 255;
   }
@@ -249,7 +252,7 @@ export class SongMemory {
       known: !!s,
       plays: s?.meta.plays ?? 0,
       confidence: Math.max(0, Math.min(1, this.matchVotes / (VOTES_NEEDED * 3))),
-      positionMs: this.playStart ? Date.now() - this.playStart + (s ? this.matchOffset : 0) : 0,
+      positionMs: this.playStart ? this.clock() - this.playStart + (s ? this.matchOffset : 0) : 0,
       learning: !!this.playStart && !s,
     };
   }
@@ -285,7 +288,7 @@ export class SongMemory {
     if (this.songs.size >= MAX_SONGS) this.evict();
     const id = this.nextId++;
     const meta: SongMeta = {
-      id, createdMs: Date.now(), lastMs: Date.now(), plays: 1, durationMs: dur,
+      id, createdMs: this.clock(), lastMs: this.clock(), plays: 1, durationMs: dur,
       bpm, beatPhaseMs: this.bpmAnchor,
       drops: this.learnDrops, intensity: this.learnIntensity,
     };
@@ -303,7 +306,7 @@ export class SongMemory {
    *  falsklarm rensas bort. Fingeravtrycket behålls som det är. */
   private mergeInto(s: Song, dur: number, bpm: number): void {
     const m = s.meta;
-    m.plays++; m.lastMs = Date.now();
+    m.plays++; m.lastMs = this.clock();
     if (dur > m.durationMs) m.durationMs = dur;
     if (bpm > 0) m.bpm = m.bpm ? m.bpm * 0.7 + bpm * 0.3 : bpm;
     for (const d of this.learnDrops) {
