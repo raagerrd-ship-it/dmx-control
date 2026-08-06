@@ -24,7 +24,15 @@ const HIST = 10;          // ringbuffert av tidigare toppar (≈1.7 s bakåt)
 const DT_MIN = 2;         // parbildning: 2–8 rutor bort (0.34–1.4 s)
 const DT_MAX = 8;
 
-export interface Landmark { hash: number; t: number; }
+/** Täta lagringen de första 30 s: fler mål att träffa i startfönstret. */
+const DENSE_STORE_MS = 30_000;
+
+/** `store` = ska sparas i minnet. ASYMMETRI: vi genererar alla par (upp till 7
+ *  per ruta) för MATCHNING, men sparar bara det första — lagrade hashar blir en
+ *  delmängd av de matchade, så minnet är oförändrat medan röstunderlaget blir
+ *  ~7×. Under de första 30 s sparas alla par. */
+export interface Landmark { hash: number; t: number; store: boolean; }
+
 
 export class Fingerprinter {
   private acc: Float32Array | null = null;   // max-hold mellan fingerprint-rutor
