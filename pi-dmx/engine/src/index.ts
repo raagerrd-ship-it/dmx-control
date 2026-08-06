@@ -11,7 +11,7 @@
  * saved back (debounced) whenever anything changes it.
  */
 
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, renameSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { LearnRecorder } from "./learnRecorder.js";
 import { RefineQueue } from "./refineQueue.js";
@@ -311,7 +311,7 @@ const serverDeps = {
   getDmxConnected: () => dmx.isConnected(),
   getFogStatus: () => effects.getFogStatus(),
   resetFogService: () => effects.resetFogService(),
-  songMemory: { state: () => ({ ...songs.state(), refining: refiner.busy }), forget: () => songs.forget() },
+  songMemory: { state: () => ({ ...songs.state(), refining: refiner.busy, refiningId: refiner.songId }), forget: () => songs.forget() },
   cycleMode,
 
   resetAgc: (g?: number) => analyser.resetGain(g),
