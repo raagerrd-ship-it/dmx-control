@@ -334,9 +334,16 @@ export class SongMemory {
     if (learn !== this.learnMode) { this.learnMode = learn; this.dropLearning(); }
     if (o.level > 0.02) this.lastLoud = now;
     if (!this.playStart) {
-      if (o.level > 0.05) { this.playStart = now; this.lastLoud = now; this.fp.reset(); }
+      // Volymgrind: starta bara på tydlig musik som hållit en sekund, aldrig på brusgolvet.
+      if (o.level >= START_LEVEL) {
+        if (!this.loudSince) this.loudSince = now;
+        else if (now - this.loudSince >= START_HOLD_MS) {
+          this.playStart = now - START_HOLD_MS; this.lastLoud = now; this.loudSince = 0; this.fp.reset();
+        }
+      } else this.loudSince = 0;
       return;
     }
+
     if (now - this.lastLoud > SILENCE_END_MS) { this.commit(); return; }
 
     const tLive = now - this.playStart;
