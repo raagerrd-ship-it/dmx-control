@@ -426,22 +426,13 @@ export class SongMemory {
 
     if (o.bpmConfidence > 0.5 && o.bpm > 40 && !this.segBpm) { this.segBpm = o.bpm; this.segBpmConf = o.bpmConfidence; }
     let bpmShift = "";
-    let bpmStrong = false;
     if (o.bpmConfidence > 0.5 && o.bpm > 40 && this.segBpm) {
       const dev = Math.abs(o.bpm - this.segBpm) / this.segBpm;
       if (dev > BPM_JUMP) {
         if (!this.bpmOffSince) this.bpmOffSince = now;
-        const held = now - this.bpmOffSince;
-        // Stabilitet: det nya tempot måste ligga stilla, annars är det följaren som skakar.
-        if (!this.candBpm || Math.abs(o.bpm - this.candBpm) / this.candBpm > BPM_STABLE_TOL) { this.candBpm = o.bpm; this.candSince = now; }
-        const stable = now - this.candSince >= BPM_STABLE_MS;
-        const ratio = o.bpm / this.segBpm;
-        const badRatio = BPM_RATIO_BAD.some((r) => Math.abs(ratio - r) / r < BPM_RATIO_BAD_TOL);
-        if (held > BPM_HOLD_MS) bpmShift = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
-        if (dev > BPM_JUMP_STRONG && held > BPM_HOLD_STRONG_MS && stable && !badRatio
-            && o.bpmConfidence > BPM_CONF_STRONG && this.segBpmConf > BPM_CONF_STRONG) bpmStrong = true;
+        if (now - this.bpmOffSince > BPM_HOLD_MS) bpmShift = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
       } else {
-        this.bpmOffSince = 0; this.candBpm = 0; this.candSince = 0;
+        this.bpmOffSince = 0;
         this.segBpm = this.segBpm * 0.95 + o.bpm * 0.05;
         this.segBpmConf = Math.max(this.segBpmConf, o.bpmConfidence);
       }
@@ -453,12 +444,10 @@ export class SongMemory {
     if (bpmShift) ev.push(bpmShift);
     if (this.novAt && now - this.novAt < NOV_WIN_KEEP_MS) ev.push("klangskifte");
     if (this.dipAt && now - this.dipAt < DIP_WIN_MS) ev.push("nivådipp");
-    this.lastEvidence = bpmStrong ? [...ev, "starkt tempohopp"] : ev;
+    this.lastEvidence = ev;
 
     let why = "";
-    // Starkt, ihållande tempohopp räcker ensamt — inom en låt ändras inte tempot så.
-    if (bpmStrong) why = `${bpmShift} (starkt)`;
-    else if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
+    if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
     else if (tLive > MAX_SEG_MS) why = "maxlängd";   // aldrig en 22-minuters gröt igen
     if (!why) return false;
 
