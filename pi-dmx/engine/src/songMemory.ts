@@ -415,7 +415,9 @@ export class SongMemory {
       confidence: Math.max(0, Math.min(1, this.matchVotes / (VOTES_NEEDED * 3))),
       positionMs: this.playStart ? this.clock() - this.playStart + (s ? this.matchOffset : 0) : 0,
       learning: !!this.playStart && !s && this.learnMode,
+      learningId: !!this.playStart && !s && this.learnMode ? this.nextId : 0,
     };
+
   }
 
   /** Avstängning: skriv in pågående låt och spara innan processen dör. */
