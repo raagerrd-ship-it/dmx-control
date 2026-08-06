@@ -56,6 +56,8 @@ export interface SongMemoryState {
   confidence: number;   // 0..1
   positionMs: number;   // var i låten vi är
   learning: boolean;    // spelar just nu in en ny låt
+  learningId: number;   // id som inlärningen kommer att skrivas till (0 = ingen)
+
 }
 
 export class SongMemory {
