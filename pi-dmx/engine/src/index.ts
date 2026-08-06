@@ -87,6 +87,21 @@ await songs.load();
 // sorl med 20× gain → smutsigt fingeravtryck).
 analyser.setSpectrumSink((mag, binHz) => songs.pushSpectrum(mag, binHz, cfg.audioInput !== "mic"));
 
+// ── OFFLINE-TVÄTT ──────────────────────────────────────────────────────────
+// Medan en NY låt lärs in på aux strömmas råljudet till en temp-WAV. När låten
+// tystnat spawnas refinern (egen process, nice 19) som räknar om drops/BPM/
+// energi framåtblickande och skriver en sidecar som ersätter tidslinjen.
+const DATA_DIR = dirname(process.env.SONGS_PATH ?? "/var/lib/audio-dmx-engine/songs.bin");
+const recorder = new LearnRecorder(join(DATA_DIR, "learn.wav"), cfg.audio.rate);
+const refiner = new RefineQueue(DATA_DIR, (t) => songs.applyRefined(t.songId, t));
+refiner.cleanStale();
+songs.onDropLearning = () => recorder.abort();
+songs.onCommit = (songId) => {
+  const wav = recorder.finish();
+  if (wav && songId) refiner.start(wav, songId);
+};
+
+
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
 let lastRenderMs = 0;
