@@ -24,10 +24,10 @@ const MAGIC = 0x444d5331;      // "DMS1"
 const MAX_SONGS = 500;
 const PRE_FIRE_MS = 120;       // trigga dropen strax före → lamporna hinner
 const SILENCE_END_MS = 3000;   // tystnad så länge = låten är slut
-const MIN_LEARN_MS = 45000;    // kortare än så: inte värt att minnas
 const OFFSET_BUCKET = 250;     // ms per offset-fack
 const VOTES_NEEDED = 10;
 const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som bästa ANNAN låt
+const LEARN_QUARANTINE_MS = 30000; // nyss känd låt = breakdown/tillfälligt tapp, inte ny låt
 
 // LÅTGRÄNS UTAN TYSTNAD. Spotify/Apple Music spelar gaplöst eller crossfadar —
 // 3 s tystnad inträffar aldrig, och utan de här signalerna blir hela kvällen
@@ -141,6 +141,8 @@ export class SongMemory {
   private lastEvidence: string[] = [];   // senast aktiva gränssignaler (diagnostik)
   private loudSince = 0;          // volymgrind: sedan när nivån är tydlig musik
   private recogSplit = -1;        // ≥0: igenkänningen pekar på gräns, matchens position i ms
+  private lastMatchedAt = 0;       // håll inlärning i karantän efter senast etablerade match
+  private quarantinedSegment = false;
 
 
 
@@ -263,7 +265,7 @@ export class SongMemory {
     this.lm.length = 0;
     this.fp.push(mag, binHz, tLive, this.lm);
     for (const l of this.lm) {
-      if (learn && l.store) { this.learnHash.push(l.hash); this.learnTime.push(l.t); }
+      if (learn && !this.quarantinedSegment && l.store) { this.learnHash.push(l.hash); this.learnTime.push(l.t); }
       this.vote(l);
     }
 
@@ -330,9 +332,13 @@ export class SongMemory {
       const key = id * 100000 + Math.round(off / OFFSET_BUCKET);
       const v = (this.votes.get(key) ?? 0) + 1;
       this.votes.set(key, v);
-      if (v >= VOTES_NEEDED && id !== this.matchId && v >= this.bestOther(id) * MARGIN) {
+      const establishes = !this.matchId && v >= VOTES_NEEDED && v >= this.bestOther(id) * MARGIN;
+      const replaces = !!this.matchId && id !== this.matchId && v >= VOTES_NEEDED && v > this.bestFor(this.matchId);
+      if (id !== this.matchId && (establishes || replaces)) {
         const wasMatch = this.matchId;
         this.matchId = id;
+        this.lastMatchedAt = this.clock();
+        this.quarantinedSegment = false;
         this.matchOffset = Math.round(off / OFFSET_BUCKET) * OFFSET_BUCKET;
         this.replayIdx = 0;
         const s = this.songs.get(id);
@@ -355,6 +361,12 @@ export class SongMemory {
     return best;
   }
 
+  private bestFor(id: number): number {
+    let best = 0;
+    for (const [k, v] of this.votes) if (Math.floor(k / 100000) === id && v > best) best = v;
+    return best;
+  }
+
   /**
    * Matas varje hop. Sköter låtgränser (start/slut), tidslinje-inspelning och
    * plockar fram nästa replay-drop.
@@ -372,12 +384,26 @@ export class SongMemory {
         if (!this.loudSince) this.loudSince = now;
         else if (now - this.loudSince >= START_HOLD_MS) {
           this.playStart = now - START_HOLD_MS; this.lastLoud = now; this.loudSince = 0; this.fp.reset();
+          this.quarantinedSegment = learn && now - this.lastMatchedAt < LEARN_QUARANTINE_MS;
         }
       } else this.loudSince = 0;
       return;
     }
 
     if (now - this.lastLoud > SILENCE_END_MS) { this.commit(); return; }
+
+    // En etablerad match hålls genom breakdowns och andra spektralt svaga partier.
+    // Bara tystnad/commit eller en annan låt med fler röster får ersätta den.
+    if (this.matchId) {
+      this.lastMatchedAt = now;
+      this.quarantinedSegment = false;
+    } else if (this.quarantinedSegment) {
+      if (now - this.lastMatchedAt < LEARN_QUARANTINE_MS) return;
+      // Ingen känd låt återfanns under karantänen. Börja en ren inlärning NU så
+      // WAV, fingeravtryck och tidslinje får samma nollpunkt.
+      this.restartLearningAt(now);
+      return;
+    }
 
     // Igenkänning-som-gräns: säkrare än all heuristik → egen väg, före evidensen.
     if (this.recogSplit >= 0) { this.splitOnRecognition(now, this.recogSplit); return; }
@@ -407,7 +433,6 @@ export class SongMemory {
       for (const [k, v] of this.votes) { const nv = v * 0.6; if (nv < 1) this.votes.delete(k); else this.votes.set(k, nv); }
       if (this.matchId) {
         this.matchVotes *= 0.6;
-        if (this.matchVotes < VOTES_NEEDED * 0.5) { this.matchId = 0; this.matchVotes = 0; }   // tappad match → realtidsläge
       }
     }
 
@@ -492,7 +517,7 @@ export class SongMemory {
   /** Lär just nu in en NY låt (aux, ej igenkänd) → temp-inspelningen ska rulla.
    *  Egen getter i stället för state() på ljudvägen: state() allokerar ett
    *  objekt, och den här frågan ställs 375 gånger i sekunden. */
-  get learningNew(): boolean { return !!this.playStart && !this.matchId && this.learnMode; }
+  get learningNew(): boolean { return !!this.playStart && !this.matchId && this.learnMode && !this.quarantinedSegment; }
 
   /** Igenkänd låt → true medan replayen äger showen. */
   get recognized(): boolean { return this.matchId !== 0; }
@@ -559,10 +584,10 @@ export class SongMemory {
       songs: this.songs.size,
       known: !!s,
       plays: s?.meta.plays ?? 0,
-      confidence: Math.max(0, Math.min(1, this.matchVotes / (VOTES_NEEDED * 3))),
+      confidence: s ? 1 : Math.max(0, Math.min(1, this.matchVotes / (VOTES_NEEDED * 3))),
       positionMs: this.playStart ? this.clock() - this.playStart + (s ? this.matchOffset : 0) : 0,
-      learning: !!this.playStart && !s && this.learnMode,
-      learningId: !!this.playStart && !s && this.learnMode ? this.nextId : 0,
+      learning: !!this.playStart && !s && this.learnMode && !this.quarantinedSegment,
+      learningId: !!this.playStart && !s && this.learnMode && !this.quarantinedSegment ? this.nextId : 0,
       lastEvidence: this.lastEvidence.slice(),
     };
 
@@ -587,6 +612,18 @@ export class SongMemory {
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
     this.onDropLearning?.();
+  }
+
+  private restartLearningAt(now: number): void {
+    this.dropLearning();
+    this.playStart = now;
+    this.lastLoud = now;
+    this.quarantinedSegment = false;
+    this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0;
+    this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
+    this.levAvg = 0; this.dipAt = 0; this.recogSplit = -1;
+    this.votes.clear(); this.matchVotes = 0; this.replayIdx = 0; this.pendingDrop = 0;
+    this.fp.reset();
   }
 
   /** Anropas när en låt är slut: id på låten som lärdes in/uppdaterades, eller
@@ -623,7 +660,7 @@ export class SongMemory {
     const dur = this.lastLoud - this.playStart;
     const matched = this.matchId ? this.songs.get(this.matchId) : undefined;
     let committed: number | null = null;
-    if (this.learnMode && dur >= MIN_LEARN_MS && this.learnHash.length > 60) {
+    if (this.learnMode && !this.quarantinedSegment && dur >= MIN_SEG_MS && this.learnHash.length > 60) {
       const bpm = median(this.bpmSamples);
       if (matched) { this.mergeInto(matched, dur, bpm); committed = matched.meta.id; }
       else committed = this.addSong(dur, bpm);
@@ -635,7 +672,7 @@ export class SongMemory {
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
-    this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogSplit = -1;
+    this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogSplit = -1; this.quarantinedSegment = false;
 
 
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.replayIdx = 0; this.pendingDrop = 0;
