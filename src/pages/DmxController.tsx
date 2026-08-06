@@ -268,19 +268,23 @@ function TechGrid() {
   );
 }
 
-/** Låtminnets tre lägen. I mocken är siffrorna statiska — Pi:n fyller dem live. */
+/** Låtminnets lägen. I mocken är siffrorna statiska — Pi:n fyller dem live. */
 function songMemoryState() {
-  return { songs: 0, known: false, plays: 0, learning: false };
+  return { songs: 0, known: false, plays: 0, learning: false, learningId: 0, refining: false, refiningId: 0 };
 }
 
-/** Diskret indikator vid ljudnivån: spelar in / kör på inspelning / inget. */
+/** Diskret indikator vid ljudnivån: spelar in / tvättar / kör på inspelning. */
 function SongMemoryBadge() {
-  const { known, learning, plays } = songMemoryState();
-  if (!known && !learning) return <span className="text-[10px] text-muted-foreground/30">—</span>;
+  const { known, learning, plays, learningId, refining, refiningId } = songMemoryState();
+  const parts: string[] = [];
+  if (refining) parts.push(`◌ Tvättar #${refiningId}`);
+  if (learning) parts.push(`● Spelar in #${learningId}`);
+  if (known) parts.push(`Kör på inspelning · ${plays}×`);
+  if (parts.length === 0) return <span className="text-[10px] text-muted-foreground/30">—</span>;
   return (
     <span className={`flex items-center gap-1.5 text-[10px] font-medium tracking-wide ${known ? "text-primary" : "text-foreground/60"}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${known ? "bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.8)]" : "bg-destructive animate-pulse"}`} />
-      {known ? `Kör på inspelning · ${plays}×` : "Spelar in låt"}
+      {parts.join(" · ")}
     </span>
   );
 }
@@ -288,8 +292,12 @@ function SongMemoryBadge() {
 /** Låtminne: visar om motorn känner igen låten som spelas, och låter ägaren
  *  nollställa minnet. */
 function SongMemoryRow() {
-  const { songs, known, learning, plays } = songMemoryState();
-  const status = known ? `KÖR PÅ INSPELNING · ${plays} SPELNINGAR` : learning ? "SPELAR IN LÅT" : "REALTID";
+  const { songs, known, learning, plays, learningId, refining, refiningId } = songMemoryState();
+  const status = [
+    refining ? `TVÄTTAR #${refiningId}` : "",
+    known ? `KÖR PÅ INSPELNING · ${plays} SPELNINGAR` : learning ? `SPELAR IN #${learningId}` : "REALTID",
+  ].filter(Boolean).join(" · ");
+
   return (
     <div className="mt-4 pt-4 border-t border-foreground/[0.06] flex items-center justify-between gap-3">
       <div className="flex flex-col gap-1">
