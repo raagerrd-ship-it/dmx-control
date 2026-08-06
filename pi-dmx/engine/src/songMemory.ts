@@ -349,6 +349,32 @@ export class SongMemory {
     }
   }
 
+  /** LÅTGRÄNS I EN GAPLÖS STRÖM. Committar och startar nästa sekvens direkt när
+   *  tempot bytt ihållande eller klangen hoppat. Returnerar true om vi delade. */
+  private boundary(now: number, tLive: number, o: { bpm: number; bpmConfidence: number }): boolean {
+    const nov = this.novelty;
+    this.novelty = 0;
+    if (o.bpmConfidence > 0.5 && o.bpm > 40 && !this.segBpm) this.segBpm = o.bpm;
+    if (tLive < MIN_SEG_MS) return false;
+
+    let why = "";
+    if (o.bpmConfidence > 0.5 && o.bpm > 40 && this.segBpm) {
+      if (Math.abs(o.bpm - this.segBpm) / this.segBpm > BPM_JUMP) {
+        if (!this.bpmOffSince) this.bpmOffSince = now;
+        else if (now - this.bpmOffSince > BPM_HOLD_MS) why = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
+      } else { this.bpmOffSince = 0; this.segBpm = this.segBpm * 0.95 + o.bpm * 0.05; }
+    }
+    if (!why && nov > NOV_TH) why = `klangskifte ${nov.toFixed(2)}`;
+    if (!why) return false;
+
+    console.log(`[song] låtgräns efter ${(tLive / 1000).toFixed(0)}s (${why})`);
+    this.commit();
+    // Starta nästa sekvens direkt — strömmen tystnar aldrig.
+    this.playStart = now;
+    this.lastLoud = now;
+    return true;
+  }
+
   /** Drop ur minnet som ska fyras av denna renderframe (0 = ingen). */
   takeDrop(): number {
     const d = this.pendingDrop;
