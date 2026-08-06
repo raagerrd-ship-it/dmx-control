@@ -29,6 +29,19 @@ const OFFSET_BUCKET = 250;     // ms per offset-fack
 const VOTES_NEEDED = 10;
 const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som bästa ANNAN låt
 
+// LÅTGRÄNS UTAN TYSTNAD. Spotify/Apple Music spelar gaplöst eller crossfadar —
+// 3 s tystnad inträffar aldrig, och utan de här signalerna blir hela kvällen
+// "en låt". Två saker går att fånga: ett ihållande temposkifte och ett tydligt
+// klangskifte (spektral novelty). Missas en gräns tappar vi bara inlärningen
+// för det spåret och realtidsdetektorn kör som förut — ren uppsida.
+const MIN_SEG_MS = 40000;      // dela aldrig en sekvens kortare än så
+const BPM_JUMP = 0.07;         // >7 % tempoändring
+const BPM_HOLD_MS = 4000;      // ...som håller i 4 s (inte en halvtaktsmiss)
+const NOV_WIN_MS = 1500;       // klangprofil per 1.5 s
+const NOV_TH = 0.55;           // L1-avstånd (0..2) mellan profil och referens
+const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
+
+
 interface Drop { t: number; s: number; c: number; }
 interface SongMeta {
   id: number; createdMs: number; lastMs: number; plays: number; durationMs: number;
