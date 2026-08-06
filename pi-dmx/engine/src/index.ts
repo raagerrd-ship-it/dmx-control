@@ -78,13 +78,23 @@ const effects = new EffectEngine(cfg);
 const dmx = new DmxSender();
 dmx.setMaxHz(cfg.dmxMaxHz);
 
+// LÅTMINNE: fingeravtryck + tidslinje per låt. Fylls ur analysatorns stora FFT
+// (ingen extra transform) och äger dropsen när en låt känns igen.
+const songs = new SongMemory();
+await songs.load();
+analyser.setSpectrumSink((mag, binHz) => songs.pushSpectrum(mag, binHz));
+
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
 let lastRenderMs = 0;
 let clockDetBpm = 0;   // analysatorns bpm som taktklockan LÅSTES på (om-ankrings-referens,
                        // skild från cfg.beat.bpm som frekvens-termen finjusterar)
+let lastLiveDrop = 0;        // senast sedda drop-räknare FRÅN analysatorn
+let outDrop = 0;             // drop-räknaren effekterna ser (live eller replay)
+let memoryBeatLocked = false;// taktklockan är låst ur låtminnet
 const slotsFor = () => Math.max(activeSlots(cfg.fixtures), cfg.fog?.enabled ? cfg.fog.address : 0);
 let curSlots = slotsFor();
+
 
 const capture = new AudioCapture({
   device: cfg.audio.device,
