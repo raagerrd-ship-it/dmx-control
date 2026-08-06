@@ -97,11 +97,35 @@ capture.on("chunk", (samples: Float32Array) => {
   const frame = analyser.process(samples);
   latestFrame = frame;
   lastChunkAt = Date.now();
+  // ── LÅTMINNE ──────────────────────────────────────────────────────────────
+  // Analysatorns egen drop-flank läses FÖRE vi eventuellt skriver om räknaren
+  // (replayen äger dropsen när låten är känd).
+  const liveDrop = frame.dropCount !== lastLiveDrop;
+  lastLiveDrop = frame.dropCount;
+  songs.tick({
+    level: frame.level, dropped: liveDrop, bpm: frame.bpm,
+    bpmConfidence: frame.bpmConfidence, intensity: frame.intensity,
+    beatAnchorMs: frame.beatAnchorMs,
+  });
+  if (songs.recognized) {
+    if (songs.takeDrop() > 0) outDrop++;          // pre-fired ur minnet
+    const ri = songs.replayIntensity();
+    if (ri !== null) frame.intensity = frame.intensity * 0.3 + ri * 0.7;
+    if (!memoryBeatLocked) {
+      const lb = songs.lockedBeat();
+      if (lb && lb.bpm > 40) { cfg.beat = { anchorMs: lb.anchorMs, bpm: lb.bpm }; clockDetBpm = lb.bpm; memoryBeatLocked = true; }
+    }
+  } else {
+    memoryBeatLocked = false;
+    if (liveDrop) outDrop++;                      // realtidsdetektorn som förut
+  }
+  frame.dropCount = outDrop;
   // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
   // (om)lås; att sätta det på varje kick fick pulsen att flimra.
   const effBpm = frame.bpm;
-  if (effBpm === 0) { cfg.beat = null; cfg.beatErr = 0; clockDetBpm = 0; }   // tyst → stoppa beat-effekter direkt
+  if (effBpm === 0) { cfg.beat = null; cfg.beatErr = 0; clockDetBpm = 0; memoryBeatLocked = false; }   // tyst → stoppa beat-effekter direkt
   if (effBpm > 0) {
+
     // Om-ankra bara när ANALYSATORNS bpm ändras (nytt tempo/låt), INTE när vår egen
     // frekvens-finjustering flyttat cfg.beat.bpm — annars nollar korrektionen sig själv.
     if (!cfg.beat || Math.abs(effBpm - clockDetBpm) > 2) {
