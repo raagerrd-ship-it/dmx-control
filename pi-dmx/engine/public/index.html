@@ -359,6 +359,7 @@
     <div class="audio-head">
       <div class="audio-head-l">
         <span class="audio-lbl">Ljudnivå</span>
+        <span id="songBadge" style="margin-left:8px;font-size:10px;letter-spacing:.02em;color:rgba(255,255,255,.35)">—</span>
       </div>
       <span class="audio-pct" id="levelVal">0%</span>
     </div>
@@ -670,6 +671,7 @@ if (OWNER_MODE) { const o = document.getElementById("ownerOnly"); if (o) o.hidde
 
 const levelBar = document.getElementById("levelBar");
 const levelVal = document.getElementById("levelVal");
+const songBadge = document.getElementById("songBadge");   // låtminne: lär in / kör på inspelning
 const inAux = document.getElementById("inAux");
 const inMic = document.getElementById("inMic");
 inAux.onclick = () => send({ type: "setAudioInput", value: "aux" });
@@ -1048,6 +1050,14 @@ function applyFrame(f) {
   levelVal.textContent = pct + "%";
   const hot = f.level > 0.85;
   levelVal.classList.toggle("hot", hot);
+  // Låtminne-badge: ● lär in (aux) · ▶ kör på inspelning · — inget. f.song är
+  // null tills låtminnes-motorn är deployad → badgen står kvar på "—".
+  if (songBadge) {
+    const sg = f.song;
+    if (sg && sg.learning) { songBadge.textContent = "● Spelar in låt"; songBadge.style.color = "#ff4d4d"; }
+    else if (sg && sg.known) { songBadge.textContent = "▶ Kör på inspelning · " + sg.plays + "×"; songBadge.style.color = "var(--pink,#ff3ea5)"; }
+    else { songBadge.textContent = "—"; songBadge.style.color = "rgba(255,255,255,.35)"; }
+  }
   const barWrap = document.getElementById("levelBarWrap");
   if (barWrap) barWrap.classList.toggle("hot", hot);
 
