@@ -46,6 +46,14 @@ const mean = (a, from, to) => {
   return s / (hi - lo);
 };
 
+/** Percentil ur en osorterad lista (kopierar → rör inte indata). */
+const quantile = (a, q) => {
+  const s = Array.from(a).sort((x, y) => x - y);
+  if (!s.length) return 0;
+  return s[Math.max(0, Math.min(s.length - 1, Math.round(q * (s.length - 1))))];
+};
+
+
 // ── DROPS, ICKE-KAUSALT ───────────────────────────────────────────────────
 // Kandidat: kroppen har varit BORTA (break/riser) och kommer tillbaka — och
 // framtidsfönstret visar att lyftet HÅLLER. Tidpunkten sätts på flanken, inte
