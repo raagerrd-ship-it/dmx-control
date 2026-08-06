@@ -60,7 +60,13 @@ export interface ServerDeps {
   getFogStatus: () => FogStatus | null;
   /** Nollställ rökmaskinens drifträknare efter underhåll. */
   resetFogService: () => void;
+  /** Låtminnets tillstånd (igenkänning/inlärning) + glöm-knapp. */
+  songMemory?: {
+    state: () => { songs: number; known: boolean; plays: number; confidence: number; positionMs: number; learning: boolean };
+    forget: () => void;
+  };
   onConfigChanged?: () => void;
+
   /** Advance to the next mode in the shared cycle. Returns the new mode. */
   cycleMode: () => Mode;
   /** Reset the AGC after an input-routing switch. */
