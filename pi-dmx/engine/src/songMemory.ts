@@ -91,6 +91,16 @@ export class SongMemory {
   private bpmAnchor = 0;
   private learnMode = true;       // false = mikrofon: känn igen, men lär inget
 
+  // Låtgräns utan tystnad
+  private segBpm = 0;             // tempot den pågående sekvensen etablerat
+  private bpmOffSince = 0;        // väggklocka då tempot började avvika
+  private novAcc = new Float32Array(NOV_BANDS.length - 1);
+  private novN = 0;
+  private novStart = 0;
+  private novRef: Float32Array | null = null;
+  private novelty = 0;            // senaste klangavståndet (konsumeras i tick)
+
+
   // Matchning
   private votes = new Map<number, number>();   // songId*100000 + bucket → röster
   private lastDecay = 0;
