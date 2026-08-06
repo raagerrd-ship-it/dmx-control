@@ -557,17 +557,26 @@ export class SongMemory {
   onDropLearning?: () => void;
 
   /** Ersätt tidslinjen med de offline-tvättade värdena. Fingeravtrycket
-   *  (hashar + tider) och spelräknaren rörs INTE — de är för matchning. */
-  applyRefined(songId: number, t: { drops: { t: number; s: number }[]; bpm: number; beatPhaseMs: number; intensity: number[] }): void {
+   *  (hashar + tider) och spelräknaren rörs INTE 
+   *  — de är för matchning.
+   *  v1-sidecars saknar dramaturgi-fälten; då lämnas de orörda. */
+  applyRefined(songId: number, t: {
+    drops: { t: number; s: number }[]; bpm: number; beatPhaseMs: number; intensity: number[];
+    risers?: Riser[]; sections?: number[]; phrase?: { p16: number } | null;
+  }): void {
     const s = this.songs.get(songId);
     if (!s) return;
     s.meta.drops = t.drops.map((d) => ({ t: d.t, s: d.s, c: Math.max(2, s.meta.plays) }));   // tvättade drops är bekräftade
     if (t.bpm > 40) { s.meta.bpm = t.bpm; s.meta.beatPhaseMs = t.beatPhaseMs; }
     if (t.intensity.length) s.meta.intensity = t.intensity;
+    if (t.risers) s.meta.risers = t.risers;
+    if (t.sections) s.meta.sections = t.sections;
+    if (t.phrase?.p16) s.meta.phraseMs = t.phrase.p16;
     this.dirty = true;
     void this.save();
-    console.log(`[song] låt #${songId} tvättad: ${t.drops.length} drops, ${t.bpm} BPM`);
+    console.log(`[song] låt #${songId} tvättad: ${t.drops.length} drops, ${t.risers?.length ?? 0} risers, ${t.sections?.length ?? 0} sektioner, ${t.bpm} BPM`);
   }
+
 
   /** Låten är slut: skriv in i minnet (ny låt) eller förbättra den kända. */
   private commit(): void {
