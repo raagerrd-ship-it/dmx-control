@@ -48,8 +48,10 @@ export class RefineQueue {
   start(wav: string, songId: number): void {
     if (this.proc) { rm(wav); return; }        // en åt gången
     this.tries = 0;
+    this.id = songId;
     this.run(wav, songId);
   }
+
 
   private run(wav: string, songId: number): void {
     const out = join(this.dir, `${songId}.refined.json`);
