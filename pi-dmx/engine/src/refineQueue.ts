@@ -15,7 +15,12 @@ export interface RefinedTimeline {
   v: number; songId: number;
   drops: { t: number; s: number }[];
   bpm: number; beatPhaseMs: number; intensity: number[];
+  /** v2: dramaturgi. Saknas i v1-filer → motorn kör som förut. */
+  risers?: { start: number; end: number; drop: number }[];
+  sections?: number[];
+  phrase?: { barMs: number; p8: number; p16: number; p32: number } | null;
 }
+
 
 const SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), "../tools/refineSong.mjs");
 const MAX_TRIES = 2;
