@@ -163,8 +163,11 @@ function InputLevel() {
         <span className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground/70 font-bold">
           Ljudnivå
         </span>
-        <span className={`text-[11px] font-mono tabular-nums ${hot ? "text-primary" : silent ? "text-muted-foreground/40" : "text-muted-foreground/80"}`}>
-          {String(pct).padStart(2, "0")}%
+        <span className="flex items-baseline gap-3">
+          <SongMemoryBadge />
+          <span className={`text-[11px] font-mono tabular-nums ${hot ? "text-primary" : silent ? "text-muted-foreground/40" : "text-muted-foreground/80"}`}>
+            {String(pct).padStart(2, "0")}%
+          </span>
         </span>
       </div>
 
