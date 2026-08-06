@@ -227,4 +227,4 @@ writeFileSync(out, JSON.stringify({
 }));
 
 const cpu = process.cpuUsage();
-console.log(`[refine] låt #${songId}: ${dur.toFixed(0)}s ljud, ${drops.length} drops, ${bpm.toFixed(1)} BPM — vägg ${((Date.now() - t0) / 1000).toFixed(1)}s, CPU ${((cpu.user + cpu.system) / 1e6).toFixed(1)}s`);
+console.log(`[refine] låt #${songId}: ${dur.toFixed(0)}s ljud, ${drops.length} drops, ${risers.length} risers, ${sections.length} sektioner, ${bpm.toFixed(1)} BPM — vägg ${((Date.now() - t0) / 1000).toFixed(1)}s, CPU ${((cpu.user + cpu.system) / 1e6).toFixed(1)}s`);
