@@ -888,7 +888,7 @@ export class EffectEngine {
     // färg/dim-kanaler; strobe orörda. (Drop/punch/riser/flash ligger redan i
     // ceilMul via bypass → de lyfter taket och kapar inget.) Gatas av silenceGate
     // så den varma ambient-glöden i TYSTNAD inte kapas till svart.
-    if (this.cfg.energyCeiling && this.silenceGate > 0.5 && ceilMul < 0.999) {
+    if ((this.cfg.energyCeiling || this.memCeiling !== null) && this.silenceGate > 0.5 && ceilMul < 0.999) {
       for (let ch = 0; ch < this.maxCh; ch++) {
         if (this.capMask[ch]) {   // bara ljusbärande kanaler → linjär v-dämpning (ej v² på dim+färg)
           this.universe[ch] = Math.round(this.universe[ch] * ceilMul);
