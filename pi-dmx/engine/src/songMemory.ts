@@ -431,7 +431,7 @@ export class SongMemory {
     this.levAvg = this.levAvg > 0 ? this.levAvg * 0.995 + o.level * 0.005 : o.level;
     if (this.levAvg > 0.05 && o.level < this.levAvg * DIP_RATIO) this.dipAt = now;
 
-    if (o.bpmConfidence > 0.5 && o.bpm > 40 && !this.segBpm) this.segBpm = o.bpm;
+    if (o.bpmConfidence > 0.5 && o.bpm > 40 && !this.segBpm) { this.segBpm = o.bpm; this.segBpmConf = o.bpmConfidence; }
     let bpmShift = "";
     let bpmStrong = false;
     if (o.bpmConfidence > 0.5 && o.bpm > 40 && this.segBpm) {
@@ -439,10 +439,21 @@ export class SongMemory {
       if (dev > BPM_JUMP) {
         if (!this.bpmOffSince) this.bpmOffSince = now;
         const held = now - this.bpmOffSince;
+        // Stabilitet: det nya tempot måste ligga stilla, annars är det följaren som skakar.
+        if (!this.candBpm || Math.abs(o.bpm - this.candBpm) / this.candBpm > BPM_STABLE_TOL) { this.candBpm = o.bpm; this.candSince = now; }
+        const stable = now - this.candSince >= BPM_STABLE_MS;
+        const ratio = o.bpm / this.segBpm;
+        const badRatio = BPM_RATIO_BAD.some((r) => Math.abs(ratio - r) / r < BPM_RATIO_BAD_TOL);
         if (held > BPM_HOLD_MS) bpmShift = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
-        if (dev > BPM_JUMP_STRONG && held > BPM_HOLD_STRONG_MS) bpmStrong = true;
-      } else { this.bpmOffSince = 0; this.segBpm = this.segBpm * 0.95 + o.bpm * 0.05; }
+        if (dev > BPM_JUMP_STRONG && held > BPM_HOLD_STRONG_MS && stable && !badRatio
+            && o.bpmConfidence > BPM_CONF_STRONG && this.segBpmConf > BPM_CONF_STRONG) bpmStrong = true;
+      } else {
+        this.bpmOffSince = 0; this.candBpm = 0; this.candSince = 0;
+        this.segBpm = this.segBpm * 0.95 + o.bpm * 0.05;
+        this.segBpmConf = Math.max(this.segBpmConf, o.bpmConfidence);
+      }
     }
+
     if (tLive < MIN_SEG_MS) return false;   // en drop/breakdown ligger alltid inom minsta längd
 
     const ev: string[] = [];
