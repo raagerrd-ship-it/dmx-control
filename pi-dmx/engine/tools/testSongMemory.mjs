@@ -55,6 +55,7 @@ const fired = await play(mem, A, clock, 120000, dropsA, true);
 const st = mem.state();
 console.log("andra spelningen: drops ur minnet @", fired.map((x) => (x / 1000).toFixed(1) + "s").join(", "));
 
+await new Promise((r) => setTimeout(r, 300));   // låt sparningen landa
 const mem2 = new SongMemory(() => clock.t);
 await mem2.load();
 console.log("laddat från disk:", mem2.state().songs, "låtar");

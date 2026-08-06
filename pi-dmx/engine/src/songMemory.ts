@@ -257,6 +257,12 @@ export class SongMemory {
     };
   }
 
+  /** Avstängning: skriv in pågående låt och spara innan processen dör. */
+  async flush(): Promise<void> {
+    if (this.playStart) this.commit();
+    await this.save();
+  }
+
   /** Glöm allt (UI-knapp). */
   forget(): void {
     this.songs.clear(); this.index.clear(); this.votes.clear();

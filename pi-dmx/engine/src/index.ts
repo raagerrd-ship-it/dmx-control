@@ -433,6 +433,7 @@ setInterval(() => {
 }, 300000);
 
 process.on("SIGTERM", () => {
+  void songs.flush();
   capture.stop();
   button?.stop();
   knob?.stop();
