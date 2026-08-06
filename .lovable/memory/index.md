@@ -53,3 +53,4 @@ BLEDOM HCI-stuck recovery is process.exit via systemd. Never add same-process re
 - [BLE library rationale](mem://pi/ble/library-choice-rationale) — Noble chosen over D-Bus for HCI config
 - [Hybrid discovery](mem://pi/ble/hybrid-discovery-strategy) — hcitool for lescan, noble for GATT
 - [Sonos-driven lifecycle](mem://pi/runtime/sonos-driven-lifecycle) — ignite() + state-machine, ersätter /tmp-flagga som restart-driver
+- [Tvättad show v2](mem://pi/lighting/refined-show-v2) — sidecar v2: normaliserad intensitet, risers, sektioner, frasgrid, graderad dropstyrka
