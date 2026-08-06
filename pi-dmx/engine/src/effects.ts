@@ -647,7 +647,14 @@ export class EffectEngine {
     // Effekterna formar fortfarande sitt eget ljus; VU:n justerar slutresultatet
     // mot den råa nivån. BARA en drop får skippa filtret (går fram på full).
     let ceilMul = 1;
-    if (this.cfg.energyCeiling) {
+    if (this.memCeiling !== null) {
+      // MINNESTAK: låten är igenkänd och tvättad → vi VET kurvan i förväg. Den är
+      // normaliserad (p5..p95) och sekundmjuk, så full dynamik utan en enda
+      // fladder-risk. Live-VU:n (som fladdrade vid höga nivåer) står åt sidan.
+      const MEM_FLOOR = 0.20;
+      ceilMul = Math.max(MEM_FLOOR + (1 - MEM_FLOOR) * this.memCeiling, this.dropEnv);
+    } else if (this.cfg.energyCeiling) {
+
       // RÅ nivå som slutgain: insignal X% → utsignal ~X% (nu golvad, se nedan).
       // frame.levelVU = ~200ms smoothat PÅ HOP-TAKT (375Hz) i analysatorn → ser alla
       // hops, mycket lägre jitter än att smootha rå-nivån efter render-decimering (som
