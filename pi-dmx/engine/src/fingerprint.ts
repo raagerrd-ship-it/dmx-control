@@ -91,7 +91,10 @@ export class Fingerprinter {
       // matbar vinst: konfidens 0.35 med 7 par mot 0.38 med 1 par. Kostnad utan
       // nytta -> tillbaka till fa par. Tat LAGRING forsta 30 s ar kvar (dense),
       // den ar billig och ger fler mal att traffa i startfonstret.
-      const maxPairs = dense ? 3 : 1;
+      // MATT: 7 par -> 98 % CPU (fladder), 1 par -> 48 % CPU men igenkanningen
+      // tappade (agaren spelade en lard lat som spelades in som ny). 3 par ar
+      // mellanlaget: ~3x fler roster an 1, och CPU-marginalen finns (48 %).
+      const maxPairs = dense ? 5 : 3;
       let made = 0;
       for (let d = DT_MIN; d <= DT_MAX && made < maxPairs; d++) {
         const prev = this.ring[(this.ringPos - d + HIST * 2) % HIST];
