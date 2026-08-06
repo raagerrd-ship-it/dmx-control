@@ -29,6 +29,9 @@ export class RefineQueue {
 
   get busy(): boolean { return this.proc !== null; }
 
+  /** Avstängning: döda en pågående tvätt. Temp-WAV:en städas vid nästa start. */
+  stop(): void { this.proc?.kill("SIGTERM"); this.proc = null; }
+
   /** Städa kvarglömda filer efter strömavbrott mitt i en låt. */
   cleanStale(): void {
     for (const f of safeReaddir(this.dir)) {

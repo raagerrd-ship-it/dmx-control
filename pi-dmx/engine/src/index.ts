@@ -460,6 +460,7 @@ setInterval(() => {
 
 process.on("SIGTERM", () => {
   recorder.abort();
+  refiner.stop();
   void songs.flush();
   capture.stop();
   button?.stop();
