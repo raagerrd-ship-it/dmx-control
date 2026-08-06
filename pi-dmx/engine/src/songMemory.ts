@@ -38,7 +38,9 @@ const MIN_SEG_MS = 40000;      // dela aldrig en sekvens kortare än så
 const BPM_JUMP = 0.07;         // >7 % tempoändring
 const BPM_HOLD_MS = 4000;      // ...som håller i 4 s (inte en halvtaktsmiss)
 const NOV_WIN_MS = 1500;       // klangprofil per 1.5 s
-const NOV_TH = 0.55;           // L1-avstånd (0..2) mellan profil och referens
+const NOV_TH = 0.30;           // L1-avstånd (0..2): absolut golv
+const NOV_FACTOR = 3.0;        // ...och minst så många gånger låtens egen variation
+const NOV_HITS = 2;            // två fönster i rad (3 s) → inte en enstaka spik
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
 
 
@@ -99,6 +101,8 @@ export class SongMemory {
   private novStart = 0;
   private novRef: Float32Array | null = null;
   private novelty = 0;            // senaste klangavståndet (konsumeras i tick)
+  private novAvg = 0;             // låtens normala fönster-till-fönster-variation
+  private novHits = 0;            // fönster i rad över tröskeln
 
 
   // Matchning
@@ -489,7 +493,7 @@ export class SongMemory {
     this.playStart = 0;
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
-    this.segBpm = 0; this.bpmOffSince = 0; this.novelty = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0;
+    this.segBpm = 0; this.bpmOffSince = 0; this.novelty = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
 
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.fp.reset();
