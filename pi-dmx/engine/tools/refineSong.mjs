@@ -60,12 +60,12 @@ for (let i = PRE; i < fr.length - POST; i++) {
   const before = mean(sm, i - PRE, i - PRE_GAP);
   const after = mean(sm, i + POST_LEAD, i + POST);
   if (after < 0.12) continue;                    // tyst parti → ingen drop
-  if (after < before * 2.2 + 0.03) continue;     // lyftet måste vara stort
+  if (after < before * 2.6 + 0.04) continue;     // lyftet måste vara stort
   const rise = sm[Math.min(sm.length - 1, i + RISE)] - sm[i - RISE];
   if (rise < after * 0.35) continue;             // ...och skarpt
   // Lyftet måste ha börjat HÄR, inte någon gång i framtidsfönstret: annars
   // fyrar detektorn upp till en sekund före anslaget.
-  if (mean(sm, i + F(0.05), i + F(0.3)) < after * 0.5) continue;
+  if (mean(sm, i + F(0.05), i + F(0.3)) < after * 0.75) continue;
   // Flanken: den brantaste stigningen i ett smalt fönster runt kandidaten.
   // (Att gå bakåt till breakets nivå landade i en dal MELLAN kickarna, upp till
   // en sekund för tidigt — dropen måste ligga på anslaget.)
