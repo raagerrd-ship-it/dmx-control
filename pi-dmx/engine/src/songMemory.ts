@@ -74,6 +74,7 @@ export class SongMemory {
   private learnIntensity: number[] = [];
   private bpmSamples: number[] = [];
   private bpmAnchor = 0;
+  private learnMode = true;       // false = mikrofon: känn igen, men lär inget
 
   // Matchning
   private votes = new Map<number, number>();   // songId*100000 + bucket → röster
@@ -183,14 +184,17 @@ export class SongMemory {
     }
   }
 
-  /** Matas varje gång analysatorn har en ny 2048-magnitud (låt-tid ur klockan). */
-  pushSpectrum(mag: Float32Array, binHz: number): void {
+  /** Matas varje gång analysatorn har en ny 2048-magnitud (låt-tid ur klockan).
+   *  `learn` = false (mikrofon) → vi känner igen men lär oss inget: mikens 20×
+   *  gain drar in sorl och rumsljud, och ett smutsigt fingeravtryck är värre än
+   *  inget. */
+  pushSpectrum(mag: Float32Array, binHz: number, learn = true): void {
     if (!this.playStart) return;
     const tLive = this.clock() - this.playStart;
     this.lm.length = 0;
     this.fp.push(mag, binHz, tLive, this.lm);
     for (const l of this.lm) {
-      this.learnHash.push(l.hash); this.learnTime.push(l.t);
+      if (learn) { this.learnHash.push(l.hash); this.learnTime.push(l.t); }
       this.vote(l);
     }
   }
@@ -236,8 +240,12 @@ export class SongMemory {
    * Matas varje hop. Sköter låtgränser (start/slut), tidslinje-inspelning och
    * plockar fram nästa replay-drop.
    */
-  tick(o: { level: number; dropped: boolean; bpm: number; bpmConfidence: number; intensity: number; beatAnchorMs: number }): void {
+  tick(o: { level: number; dropped: boolean; bpm: number; bpmConfidence: number; intensity: number; beatAnchorMs: number; learn?: boolean }): void {
     const now = this.clock();
+    const learn = o.learn !== false;
+    // Byte av ingång mitt i en inlärning → kasta det halva materialet, annars
+    // hamnar ett halvt mik-fingeravtryck i minnet.
+    if (learn !== this.learnMode) { this.learnMode = learn; this.dropLearning(); }
     if (o.level > 0.02) this.lastLoud = now;
     if (!this.playStart) {
       if (o.level > 0.05) { this.playStart = now; this.lastLoud = now; this.fp.reset(); }
@@ -248,15 +256,17 @@ export class SongMemory {
     const tLive = now - this.playStart;
     // Tidslinje-inspelning (alltid — även för en känd låt, så minnet förbättras).
     const songT = this.matchId ? tLive + this.matchOffset : tLive;
-    if (o.dropped) this.learnDrops.push({ t: songT, s: Math.min(1, 0.5 + o.intensity * 0.5), c: 1 });
-    const sec = Math.floor(songT / 1000);
-    if (sec >= 0 && this.learnIntensity.length <= sec) {
-      while (this.learnIntensity.length < sec) this.learnIntensity.push(128);
-      this.learnIntensity.push(Math.round(Math.max(0, Math.min(1, o.intensity)) * 255));
-    }
-    if (o.bpm > 0 && o.bpmConfidence > 0.4) {
-      if (this.bpmSamples.length < 4000) this.bpmSamples.push(o.bpm);
-      if (!this.bpmAnchor && o.beatAnchorMs) this.bpmAnchor = ((o.beatAnchorMs - this.playStart) % 60000 + 60000) % 60000;
+    if (learn) {
+      if (o.dropped) this.learnDrops.push({ t: songT, s: Math.min(1, 0.5 + o.intensity * 0.5), c: 1 });
+      const sec = Math.floor(songT / 1000);
+      if (sec >= 0 && this.learnIntensity.length <= sec) {
+        while (this.learnIntensity.length < sec) this.learnIntensity.push(128);
+        this.learnIntensity.push(Math.round(Math.max(0, Math.min(1, o.intensity)) * 255));
+      }
+      if (o.bpm > 0 && o.bpmConfidence > 0.4) {
+        if (this.bpmSamples.length < 4000) this.bpmSamples.push(o.bpm);
+        if (!this.bpmAnchor && o.beatAnchorMs) this.bpmAnchor = ((o.beatAnchorMs - this.playStart) % 60000 + 60000) % 60000;
+      }
     }
 
     // Röstförfall: gamla röster ska inte hålla en match vid liv i en ny låt.
@@ -315,7 +325,7 @@ export class SongMemory {
       plays: s?.meta.plays ?? 0,
       confidence: Math.max(0, Math.min(1, this.matchVotes / (VOTES_NEEDED * 3))),
       positionMs: this.playStart ? this.clock() - this.playStart + (s ? this.matchOffset : 0) : 0,
-      learning: !!this.playStart && !s,
+      learning: !!this.playStart && !s && this.learnMode,
     };
   }
 
@@ -333,11 +343,17 @@ export class SongMemory {
     void this.save();
   }
 
+  /** Kasta pågående inlärning (ingången bytte mitt i låten). */
+  private dropLearning(): void {
+    this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
+    this.bpmSamples = []; this.bpmAnchor = 0;
+  }
+
   /** Låten är slut: skriv in i minnet (ny låt) eller förbättra den kända. */
   private commit(): void {
     const dur = this.lastLoud - this.playStart;
     const matched = this.matchId ? this.songs.get(this.matchId) : undefined;
-    if (dur >= MIN_LEARN_MS && this.learnHash.length > 60) {
+    if (this.learnMode && dur >= MIN_LEARN_MS && this.learnHash.length > 60) {
       const bpm = median(this.bpmSamples);
       if (matched) this.mergeInto(matched, dur, bpm);
       else this.addSong(dur, bpm);
@@ -346,8 +362,7 @@ export class SongMemory {
     }
     // Nollställ för nästa låt.
     this.playStart = 0;
-    this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
-    this.bpmSamples = []; this.bpmAnchor = 0;
+    this.dropLearning();
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.fp.reset();
   }

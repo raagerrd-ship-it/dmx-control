@@ -163,8 +163,11 @@ function InputLevel() {
         <span className="text-[10px] uppercase tracking-[0.28em] text-muted-foreground/70 font-bold">
           Ljudnivå
         </span>
-        <span className={`text-[11px] font-mono tabular-nums ${hot ? "text-primary" : silent ? "text-muted-foreground/40" : "text-muted-foreground/80"}`}>
-          {String(pct).padStart(2, "0")}%
+        <span className="flex items-baseline gap-3">
+          <SongMemoryBadge />
+          <span className={`text-[11px] font-mono tabular-nums ${hot ? "text-primary" : silent ? "text-muted-foreground/40" : "text-muted-foreground/80"}`}>
+            {String(pct).padStart(2, "0")}%
+          </span>
         </span>
       </div>
 
@@ -265,11 +268,28 @@ function TechGrid() {
   );
 }
 
+/** Låtminnets tre lägen. I mocken är siffrorna statiska — Pi:n fyller dem live. */
+function songMemoryState() {
+  return { songs: 0, known: false, plays: 0, learning: false };
+}
+
+/** Diskret indikator vid ljudnivån: spelar in / kör på inspelning / inget. */
+function SongMemoryBadge() {
+  const { known, learning, plays } = songMemoryState();
+  if (!known && !learning) return <span className="text-[10px] text-muted-foreground/30">—</span>;
+  return (
+    <span className={`flex items-center gap-1.5 text-[10px] font-medium tracking-wide ${known ? "text-primary" : "text-foreground/60"}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${known ? "bg-primary shadow-[0_0_6px_hsl(var(--primary)/0.8)]" : "bg-destructive animate-pulse"}`} />
+      {known ? `Kör på inspelning · ${plays}×` : "Spelar in låt"}
+    </span>
+  );
+}
+
 /** Låtminne: visar om motorn känner igen låten som spelas, och låter ägaren
- *  nollställa minnet. I mocken är siffrorna statiska — Pi:n fyller dem live. */
+ *  nollställa minnet. */
 function SongMemoryRow() {
-  const songs = 0, known = false, learning = false;
-  const status = known ? "KÄND LÅT" : learning ? "LÄR IN…" : "LYSSNAR";
+  const { songs, known, learning, plays } = songMemoryState();
+  const status = known ? `KÖR PÅ INSPELNING · ${plays} SPELNINGAR` : learning ? "SPELAR IN LÅT" : "REALTID";
   return (
     <div className="mt-4 pt-4 border-t border-foreground/[0.06] flex items-center justify-between gap-3">
       <div className="flex flex-col gap-1">
