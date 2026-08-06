@@ -440,6 +440,22 @@ export class SongMemory {
     return true;
   }
 
+  /** Gräns satt av igenkännaren: skriv in det gångna segmentet och starta nästa
+   *  med matchen behållen, tidsställd på låtens faktiska position. */
+  private splitOnRecognition(now: number, pos: number): void {
+    const id = this.matchId;
+    console.log(`[song] låtgräns efter ${((now - this.playStart) / 1000).toFixed(0)}s (igenkänd låt #${id} vid ${(pos / 1000).toFixed(1)}s)`);
+    this.commit();   // nollställer bl.a. matchId och recogSplit
+    this.playStart = now - pos;
+    this.lastLoud = now;
+    this.matchId = id;
+    this.matchOffset = 0;
+    this.matchVotes = VOTES_NEEDED;
+    this.replayIdx = 0;
+  }
+
+
+
 
   /** Drop ur minnet som ska fyras av denna renderframe (0 = ingen). */
   takeDrop(): number {
