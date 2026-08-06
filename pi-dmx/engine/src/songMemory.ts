@@ -120,8 +120,6 @@ export class SongMemory {
   // Låtgräns utan tystnad
   private segBpm = 0;             // tempot den pågående sekvensen etablerat
   private segBpmConf = 0;         // konfidensen tempot etablerades med
-  private candBpm = 0;            // tempot efter hoppet (stabilitetskontroll)
-  private candSince = 0;          // väggklocka då kandidattempot blev stabilt
   private bpmOffSince = 0;        // väggklocka då tempot började avvika
   private novAcc = new Float32Array(NOV_BANDS.length - 1);
   private novN = 0;
