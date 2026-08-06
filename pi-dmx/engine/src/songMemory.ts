@@ -29,6 +29,21 @@ const OFFSET_BUCKET = 250;     // ms per offset-fack
 const VOTES_NEEDED = 10;
 const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som bästa ANNAN låt
 
+// LÅTGRÄNS UTAN TYSTNAD. Spotify/Apple Music spelar gaplöst eller crossfadar —
+// 3 s tystnad inträffar aldrig, och utan de här signalerna blir hela kvällen
+// "en låt". Två saker går att fånga: ett ihållande temposkifte och ett tydligt
+// klangskifte (spektral novelty). Missas en gräns tappar vi bara inlärningen
+// för det spåret och realtidsdetektorn kör som förut — ren uppsida.
+const MIN_SEG_MS = 40000;      // dela aldrig en sekvens kortare än så
+const BPM_JUMP = 0.07;         // >7 % tempoändring
+const BPM_HOLD_MS = 4000;      // ...som håller i 4 s (inte en halvtaktsmiss)
+const NOV_WIN_MS = 1500;       // klangprofil per 1.5 s
+const NOV_TH = 0.30;           // L1-avstånd (0..2): absolut golv
+const NOV_FACTOR = 3.0;        // ...och minst så många gånger låtens egen variation
+const NOV_HITS = 2;            // två fönster i rad (3 s) → inte en enstaka spik
+const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
+
+
 interface Drop { t: number; s: number; c: number; }
 interface SongMeta {
   id: number; createdMs: number; lastMs: number; plays: number; durationMs: number;
@@ -43,6 +58,8 @@ export interface SongMemoryState {
   confidence: number;   // 0..1
   positionMs: number;   // var i låten vi är
   learning: boolean;    // spelar just nu in en ny låt
+  learningId: number;   // id som inlärningen kommer att skrivas till (0 = ingen)
+
 }
 
 export class SongMemory {
@@ -75,6 +92,18 @@ export class SongMemory {
   private bpmSamples: number[] = [];
   private bpmAnchor = 0;
   private learnMode = true;       // false = mikrofon: känn igen, men lär inget
+
+  // Låtgräns utan tystnad
+  private segBpm = 0;             // tempot den pågående sekvensen etablerat
+  private bpmOffSince = 0;        // väggklocka då tempot började avvika
+  private novAcc = new Float32Array(NOV_BANDS.length - 1);
+  private novN = 0;
+  private novStart = 0;
+  private novRef: Float32Array | null = null;
+  private novelty = 0;            // senaste klangavståndet (konsumeras i tick)
+  private novAvg = 0;             // låtens normala fönster-till-fönster-variation
+  private novHits = 0;            // fönster i rad över tröskeln
+
 
   // Matchning
   private votes = new Map<number, number>();   // songId*100000 + bucket → röster
@@ -197,7 +226,50 @@ export class SongMemory {
       if (learn) { this.learnHash.push(l.hash); this.learnTime.push(l.t); }
       this.vote(l);
     }
+    this.pushNovelty(mag, binHz);
   }
+
+  /** KLANGSKIFTE. Energin samlas i oktavband, normaliseras (form, inte volym)
+   *  och jämförs var 1.5 s med ett långsamt referensspektrum.
+   *
+   *  Tröskeln är ADAPTIV: hur mycket profilen normalt rör sig skiljer sig
+   *  enormt mellan en jämn housemix och sparsam akustisk musik, så ett fast
+   *  tal ger antingen falska gränser eller inga alls. Vi kräver att avståndet
+   *  är flera gånger större än låtens EGEN normala variation — och att det
+   *  håller två fönster i rad (3 s), vilket ett nytt spår gör men en
+   *  refrängövergång inte. */
+  private pushNovelty(mag: Float32Array, binHz: number): void {
+    const now = this.clock();
+    if (!this.novStart) this.novStart = now;
+    for (let b = 0; b < this.novAcc.length; b++) {
+      const lo = Math.max(1, Math.round(NOV_BANDS[b] / binHz));
+      const hi = Math.min(mag.length - 1, Math.round(NOV_BANDS[b + 1] / binHz));
+      let s = 0;
+      for (let i = lo; i <= hi; i++) s += mag[i];
+      this.novAcc[b] += hi >= lo ? s / (hi - lo + 1) : 0;
+    }
+    this.novN++;
+    if (now - this.novStart < NOV_WIN_MS) return;
+    this.novStart = now;
+    let sum = 0;
+    for (let b = 0; b < this.novAcc.length; b++) sum += this.novAcc[b];
+    const prof = new Float32Array(this.novAcc.length);
+    if (sum > 0) for (let b = 0; b < prof.length; b++) prof[b] = this.novAcc[b] / sum;
+    this.novAcc.fill(0); this.novN = 0;
+    if (sum <= 0) return;
+    if (!this.novRef) { this.novRef = prof; return; }
+    let d = 0;
+    for (let b = 0; b < prof.length; b++) d += Math.abs(prof[b] - this.novRef[b]);
+    const bar = Math.max(NOV_TH, this.novAvg * NOV_FACTOR);
+    if (this.novAvg > 0 && d > bar) {
+      this.novHits++;
+      if (this.novHits >= NOV_HITS) this.novelty = d;
+    } else this.novHits = 0;
+    this.novAvg = this.novAvg > 0 ? this.novAvg * 0.9 + d * 0.1 : d;
+    for (let b = 0; b < prof.length; b++) this.novRef[b] = this.novRef[b] * 0.75 + prof[b] * 0.25;
+  }
+
+
 
   private vote(l: Landmark): void {
     const start = this.find(l.hash);
@@ -254,6 +326,8 @@ export class SongMemory {
     if (now - this.lastLoud > SILENCE_END_MS) { this.commit(); return; }
 
     const tLive = now - this.playStart;
+    if (this.boundary(now, tLive, o)) return;
+
     // Tidslinje-inspelning (alltid — även för en känd låt, så minnet förbättras).
     const songT = this.matchId ? tLive + this.matchOffset : tLive;
     if (learn) {
@@ -289,6 +363,32 @@ export class SongMemory {
         this.replayIdx++;
       }
     }
+  }
+
+  /** LÅTGRÄNS I EN GAPLÖS STRÖM. Committar och startar nästa sekvens direkt när
+   *  tempot bytt ihållande eller klangen hoppat. Returnerar true om vi delade. */
+  private boundary(now: number, tLive: number, o: { bpm: number; bpmConfidence: number }): boolean {
+    const nov = this.novelty;
+    this.novelty = 0;
+    if (o.bpmConfidence > 0.5 && o.bpm > 40 && !this.segBpm) this.segBpm = o.bpm;
+    if (tLive < MIN_SEG_MS) return false;
+
+    let why = "";
+    if (o.bpmConfidence > 0.5 && o.bpm > 40 && this.segBpm) {
+      if (Math.abs(o.bpm - this.segBpm) / this.segBpm > BPM_JUMP) {
+        if (!this.bpmOffSince) this.bpmOffSince = now;
+        else if (now - this.bpmOffSince > BPM_HOLD_MS) why = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
+      } else { this.bpmOffSince = 0; this.segBpm = this.segBpm * 0.95 + o.bpm * 0.05; }
+    }
+    if (!why && nov > NOV_TH) why = `klangskifte ${nov.toFixed(2)}`;
+    if (!why) return false;
+
+    console.log(`[song] låtgräns efter ${(tLive / 1000).toFixed(0)}s (${why})`);
+    this.commit();
+    // Starta nästa sekvens direkt — strömmen tystnar aldrig.
+    this.playStart = now;
+    this.lastLoud = now;
+    return true;
   }
 
   /** Drop ur minnet som ska fyras av denna renderframe (0 = ingen). */
@@ -331,7 +431,9 @@ export class SongMemory {
       confidence: Math.max(0, Math.min(1, this.matchVotes / (VOTES_NEEDED * 3))),
       positionMs: this.playStart ? this.clock() - this.playStart + (s ? this.matchOffset : 0) : 0,
       learning: !!this.playStart && !s && this.learnMode,
+      learningId: !!this.playStart && !s && this.learnMode ? this.nextId : 0,
     };
+
   }
 
   /** Avstängning: skriv in pågående låt och spara innan processen dör. */
@@ -391,6 +493,8 @@ export class SongMemory {
     this.playStart = 0;
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
+    this.segBpm = 0; this.bpmOffSince = 0; this.novelty = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
+
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.fp.reset();
     this.onCommit?.(committed);
