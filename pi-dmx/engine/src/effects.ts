@@ -549,7 +549,7 @@ export class EffectEngine {
         //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
         //    så utan detta fortsätter riggen köra fullfart genom en svacka.
         const wantCalm = frame.breaking && this.cfg.energyDrivesMode;
-        if (!inBuild && (dropSwitch || (wantSwitch && held > MIN_HOLD))) {
+        if (!inBuild && (dropSwitch || (wantSwitch && held > MIN_HOLD && gridOk))) {
         this.lastSmartSwitchMs = now;
         this.lastSmartTier = tierName;
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
