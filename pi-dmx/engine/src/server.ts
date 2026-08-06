@@ -443,6 +443,8 @@ export async function startServer(
             // frame — samma push-rate som resten (20 Hz).
             dmxOk: deps.getDmxConnected(),
             blePairedCount: deps.ble?.paired().length ?? 0,
+            song: deps.songMemory?.state() ?? null,   // låtminne: känd låt / lär in
+
           }));
 
         }
