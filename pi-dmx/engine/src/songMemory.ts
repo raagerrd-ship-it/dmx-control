@@ -386,22 +386,31 @@ export class SongMemory {
     }
   }
 
-  /** LÅTGRÄNS I EN GAPLÖS STRÖM. Committar och startar nästa sekvens direkt när
-   *  tempot bytt ihållande eller klangen hoppat. Returnerar true om vi delade. */
-  private boundary(now: number, tLive: number, o: { bpm: number; bpmConfidence: number }): boolean {
-    const nov = this.novelty;
-    this.novelty = 0;
-    if (o.bpmConfidence > 0.5 && o.bpm > 40 && !this.segBpm) this.segBpm = o.bpm;
-    if (tLive < MIN_SEG_MS) return false;
+  /** LÅTGRÄNS I EN GAPLÖS STRÖM. Väger samlad evidens (tempo + klang + nivådipp),
+   *  grindad av min/max-längd. Returnerar true om vi delade. */
+  private boundary(now: number, tLive: number, o: { bpm: number; bpmConfidence: number; level: number }): boolean {
+    // Nivådipp: även en crossfade har oftast ett ögonblick där nivån faller.
+    this.levAvg = this.levAvg > 0 ? this.levAvg * 0.995 + o.level * 0.005 : o.level;
+    if (this.levAvg > 0.05 && o.level < this.levAvg * DIP_RATIO) this.dipAt = now;
 
-    let why = "";
+    if (o.bpmConfidence > 0.5 && o.bpm > 40 && !this.segBpm) this.segBpm = o.bpm;
+    let bpmShift = "";
     if (o.bpmConfidence > 0.5 && o.bpm > 40 && this.segBpm) {
       if (Math.abs(o.bpm - this.segBpm) / this.segBpm > BPM_JUMP) {
         if (!this.bpmOffSince) this.bpmOffSince = now;
-        else if (now - this.bpmOffSince > BPM_HOLD_MS) why = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
+        else if (now - this.bpmOffSince > BPM_HOLD_MS) bpmShift = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
       } else { this.bpmOffSince = 0; this.segBpm = this.segBpm * 0.95 + o.bpm * 0.05; }
     }
-    if (!why && nov > NOV_TH) why = `klangskifte ${nov.toFixed(2)}`;
+    if (tLive < MIN_SEG_MS) return false;   // en drop/breakdown ligger alltid inom minsta längd
+
+    const ev: string[] = [];
+    if (bpmShift) ev.push(bpmShift);
+    if (this.novAt && now - this.novAt < NOV_WIN_KEEP_MS) ev.push("klangskifte");
+    if (this.dipAt && now - this.dipAt < DIP_WIN_MS) ev.push("nivådipp");
+
+    let why = "";
+    if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
+    else if (tLive > MAX_SEG_MS) why = "maxlängd";   // aldrig en 22-minuters gröt igen
     if (!why) return false;
 
     console.log(`[song] låtgräns efter ${(tLive / 1000).toFixed(0)}s (${why})`);
@@ -411,6 +420,7 @@ export class SongMemory {
     this.lastLoud = now;
     return true;
   }
+
 
   /** Drop ur minnet som ska fyras av denna renderframe (0 = ingen). */
   takeDrop(): number {
