@@ -38,10 +38,16 @@ const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som b�
 // bara inlärningen för spåret och realtidsdetektorn kör som förut — ren uppsida.
 const MIN_SEG_MS = 75000;      // dela aldrig en sekvens kortare än så
 const MAX_SEG_MS = 600000;     // 10 min utan gräns → tvinga fram en
-const EVIDENCE_NEEDED = 2;     // hur många signaler som måste peka på gräns
-const BPM_JUMP = 0.07;         // >7 % tempoändring
-const BPM_HOLD_MS = 4000;      // ...som håller i 4 s (inte en halvtaktsmiss)
-const DIP_RATIO = 0.35;        // nivå under 35 % av snittet = dipp/crossfade
+// MÄTT PÅ HÅRDVARA (791 prover, Spotify via aux): nivån låg 0.38–0.91 med snitt
+// 0.76 — inget enda prov under 35 % av snittet. Nivådippen är alltså i praktiken
+// en död signal, och "räkna två signaler" gjorde klangskiftet obligatoriskt.
+// Därför VIKTAD evidens: ett starkt tempohopp räcker ensamt.
+const EVIDENCE_NEEDED = 2;       // svag evidens: minst två signaler
+const BPM_JUMP = 0.07;           // >7 % tempoändring = svag signal
+const BPM_JUMP_STRONG = 0.12;    // >12 % som håller länge = ny låt, ensam nog
+const BPM_HOLD_MS = 4000;        // ...som håller i 4 s (inte en halvtaktsmiss)
+const BPM_HOLD_STRONG_MS = 6000; // starkt hopp måste hålla ännu längre
+const DIP_RATIO = 0.55;          // nivå under 55 % av snittet (min/snitt mätt 0.505)
 const DIP_WIN_MS = 6000;       // dipp räknas som evidens så länge efteråt
 const START_LEVEL = 0.15;      // volymgrind: starta bara på tydlig musik
 const START_HOLD_MS = 1000;    // ...som hållit i en sekund
@@ -76,6 +82,7 @@ export interface SongMemoryState {
   positionMs: number;   // var i låten vi är
   learning: boolean;    // spelar just nu in en ny låt
   learningId: number;   // id som inlärningen kommer att skrivas till (0 = ingen)
+  lastEvidence: string[];   // gränssignaler som var aktiva vid senaste kontrollen (diagnostik)
 
 }
 
@@ -121,7 +128,8 @@ export class SongMemory {
   private novAvg = 0;             // låtens normala fönster-till-fönster-variation
   private novHits = 0;            // fönster i rad över tröskeln
   private levAvg = 0;             // långsamt nivåsnitt (dippdetektering)
-  private dipAt = 0;              // väggklocka för senaste nivådippen
+  private dipAt = 0;
+  private lastEvidence: string[] = [];              // väggklocka för senaste nivådippen
   private loudSince = 0;          // volymgrind: sedan när nivån är tydlig musik
   private recogSplit = -1;        // ≥0: igenkänningen pekar på gräns, matchens position i ms
 
@@ -414,10 +422,14 @@ export class SongMemory {
 
     if (o.bpmConfidence > 0.5 && o.bpm > 40 && !this.segBpm) this.segBpm = o.bpm;
     let bpmShift = "";
+    let bpmStrong = false;
     if (o.bpmConfidence > 0.5 && o.bpm > 40 && this.segBpm) {
-      if (Math.abs(o.bpm - this.segBpm) / this.segBpm > BPM_JUMP) {
+      const dev = Math.abs(o.bpm - this.segBpm) / this.segBpm;
+      if (dev > BPM_JUMP) {
         if (!this.bpmOffSince) this.bpmOffSince = now;
-        else if (now - this.bpmOffSince > BPM_HOLD_MS) bpmShift = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
+        const held = now - this.bpmOffSince;
+        if (held > BPM_HOLD_MS) bpmShift = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
+        if (dev > BPM_JUMP_STRONG && held > BPM_HOLD_STRONG_MS) bpmStrong = true;
       } else { this.bpmOffSince = 0; this.segBpm = this.segBpm * 0.95 + o.bpm * 0.05; }
     }
     if (tLive < MIN_SEG_MS) return false;   // en drop/breakdown ligger alltid inom minsta längd
@@ -426,9 +438,12 @@ export class SongMemory {
     if (bpmShift) ev.push(bpmShift);
     if (this.novAt && now - this.novAt < NOV_WIN_KEEP_MS) ev.push("klangskifte");
     if (this.dipAt && now - this.dipAt < DIP_WIN_MS) ev.push("nivådipp");
+    this.lastEvidence = bpmStrong ? [...ev, "starkt tempohopp"] : ev;
 
     let why = "";
-    if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
+    // Starkt, ihållande tempohopp räcker ensamt — inom en låt ändras inte tempot så.
+    if (bpmStrong) why = `${bpmShift} (starkt)`;
+    else if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
     else if (tLive > MAX_SEG_MS) why = "maxlängd";   // aldrig en 22-minuters gröt igen
     if (!why) return false;
 
@@ -498,6 +513,7 @@ export class SongMemory {
       positionMs: this.playStart ? this.clock() - this.playStart + (s ? this.matchOffset : 0) : 0,
       learning: !!this.playStart && !s && this.learnMode,
       learningId: !!this.playStart && !s && this.learnMode ? this.nextId : 0,
+      lastEvidence: this.lastEvidence.slice(),
     };
 
   }
