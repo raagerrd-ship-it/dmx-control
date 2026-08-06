@@ -51,6 +51,13 @@ const NOV_FACTOR = 3.0;        // ...och minst så många gånger låtens egen v
 const NOV_HITS = 2;            // två fönster i rad (3 s) → inte en enstaka spik
 const NOV_WIN_KEEP_MS = 6000;  // klangskifte räknas som evidens så länge efteråt
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
+// IGENKÄNNING SOM GRÄNS. Känner igenkännaren en ANNAN känd låt mitt i ett segment,
+// och matchen pekar på låtens BÖRJAN, är det en nära-säker låtgräns — gratis, allt
+// är redan uträknat. Övertrumfar evidens-regeln och minsta längd: exakta gränser
+// för kända låtar, dvs varje repris skärper minnet.
+const RECOG_SPLIT_MIN_MS = 20000;   // segmentet måste ha rullat så länge
+const RECOG_POS_MS = 20000;         // ...och matchen ligga inom låtens första 20 s
+
 
 
 
