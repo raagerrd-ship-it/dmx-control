@@ -477,6 +477,8 @@ export class SongMemory {
     this.playStart = 0;
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
+    this.segBpm = 0; this.bpmOffSince = 0; this.novelty = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0;
+
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.fp.reset();
     this.onCommit?.(committed);
