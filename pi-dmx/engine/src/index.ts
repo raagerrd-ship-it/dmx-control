@@ -97,9 +97,11 @@ const refiner = new RefineQueue(DATA_DIR, (t) => songs.applyRefined(t.songId, t)
 refiner.cleanStale();
 songs.onDropLearning = () => recorder.abort();
 songs.onCommit = (songId) => {
+  if (!songId) { recorder.abort(); return; }   // inget lärdes in → kasta ljudet
   const wav = recorder.finish();
-  if (wav && songId) refiner.start(wav, songId);
+  if (wav) refiner.start(wav, songId);
 };
+
 
 
 let latestFrame: Frame | null = null;
