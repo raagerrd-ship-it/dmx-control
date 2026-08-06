@@ -63,10 +63,12 @@ for (let i = PRE; i < fr.length - POST; i++) {
   if (after < before * 2.2 + 0.03) continue;     // lyftet måste vara stort
   const rise = sm[Math.min(sm.length - 1, i + RISE)] - sm[i - RISE];
   if (rise < after * 0.35) continue;             // ...och skarpt
-  // Flanken: gå bakåt till där kroppen lämnade före-nivån → dropens exakta start.
+  // Flanken: gå bakåt till breaket och sedan fram till första korsningen uppåt
+  // → dropens exakta anslag, inte där realtid hann reagera.
+  const floor = before + (after - before) * 0.35;
   let k = i;
-  const floor = before + (after - before) * 0.25;
-  while (k > i - F(0.5) && k > 0 && sm[k] > floor) k--;
+  while (k > i - F(2.0) && k > 0 && sm[k] > floor) k--;
+  while (k < i && sm[k] < floor) k++;
   drops.push({ t: Math.round(fr[k].t * 1000), s: Math.min(1, 0.45 + after * 0.5) });
   lastDrop = i;
 }
@@ -79,14 +81,27 @@ const on = [];
 for (let i = step; i < fr.length; i += step) on.push(Math.max(0, sm[i] - sm[i - step]));
 const onMean = on.reduce((a, b) => a + b, 0) / (on.length || 1);
 for (let i = 0; i < on.length; i++) on[i] -= onMean;
-let bestLag = 0, bestScore = 0;
-for (let lag = Math.round(HZ * 60 / 200); lag <= Math.round(HZ * 60 / 60); lag++) {
+const LAG_MIN = Math.round(HZ * 60 / 200), LAG_MAX = Math.round(HZ * 60 / 60);
+const ac = new Float64Array(LAG_MAX * 4 + 2);
+for (let lag = LAG_MIN; lag < ac.length; lag++) {
   let s = 0;
   for (let i = lag; i < on.length; i++) s += on[i] * on[i - lag];
-  s /= on.length - lag;
+  ac[lag] = s / Math.max(1, on.length - lag);   // längd-normaliserat
+}
+// Kamscore: en riktig taktperiod har toppar även på 2×, 3× och 4× lagen. Utan
+// det vinner ofta en granne till rätt lag och tempot hamnar några BPM fel.
+let bestLag = 0, bestScore = -Infinity;
+for (let lag = LAG_MIN; lag <= LAG_MAX; lag++) {
+  const s = ac[lag] + 0.5 * (ac[2 * lag] ?? 0) + 0.25 * (ac[3 * lag] ?? 0) + 0.125 * (ac[4 * lag] ?? 0);
   if (s > bestScore) { bestScore = s; bestLag = lag; }
 }
-let bpm = bestLag ? 60 * HZ / bestLag : 0;
+// Subsampel-topp (parabel) → BPM med decimal i stället för kvantiserad till lag.
+let lagF = bestLag;
+if (bestLag > LAG_MIN && bestLag < LAG_MAX) {
+  const a = ac[bestLag - 1], b = ac[bestLag], c = ac[bestLag + 1], den = a - 2 * b + c;
+  if (den !== 0) lagF = bestLag + Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den));
+}
+let bpm = lagF ? 60 * HZ / lagF : 0;
 // Oktavval: håll tempot i 80–160, där dansmusik faktiskt bor.
 while (bpm > 0 && bpm < 80) bpm *= 2;
 while (bpm > 165) bpm /= 2;
