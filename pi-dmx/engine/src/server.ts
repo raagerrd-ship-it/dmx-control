@@ -465,6 +465,10 @@ export async function startServer(
           } else if (msg.type === "cycleMode") {
             const next = deps.cycleMode();
             sock.send(JSON.stringify({ type: "modeChanged", mode: next }));
+          } else if (msg.type === "forgetSongs") {
+            deps.songMemory?.forget();
+            return;
+
           } else if (msg.type === "setSensitivity") {
             deps.cfg.sensitivity = clamp01(msg.value);
           } else if (msg.type === "setAudioInput" && (msg.value === "aux" || msg.value === "mic")) {
