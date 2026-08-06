@@ -49,8 +49,11 @@ export class RefineQueue {
   private run(wav: string, songId: number): void {
     const out = join(this.dir, `${songId}.refined.json`);
     this.tries++;
-    // `nice` finns på varje Debian; saknas den kör vi ändå (fire and forget).
-    const p = spawn("nice", ["-n", "19", process.execPath, SCRIPT, wav, String(songId), out], { stdio: ["ignore", "pipe", "pipe"] });
+    // taskset -c 0: barnprocessen ÄRVER annars motorns CPUAffinity=1 2 och skulle
+    // konkurrera med FFT/analysen. Kärna 0 delas med arecord (nästan bara DMA) och
+    // BLE-sidecarn (idle mellan skrivningar); kärna 3 är DMX:ens och rörs aldrig.
+    // `taskset`/`nice` finns på varje Debian; saknas de kör vi ändå (fire and forget).
+    const p = spawn("taskset", ["-c", "0", "nice", "-n", "19", process.execPath, SCRIPT, wav, String(songId), out], { stdio: ["ignore", "pipe", "pipe"] });
     this.proc = p;
     p.stdout.on("data", (b: Buffer) => { const s = b.toString().trim(); if (s) console.log(s); });
     p.stderr.on("data", (b: Buffer) => { const s = b.toString().trim(); if (s) console.error(`[refine] ${s}`); });

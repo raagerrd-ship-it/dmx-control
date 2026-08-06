@@ -136,8 +136,6 @@ npm run build
 mkdir -p /opt/audio-dmx-engine /var/lib/audio-dmx-engine
 rsync -a --delete dist/ /opt/audio-dmx-engine/dist/
 rsync -a --delete public/ /opt/audio-dmx-engine/public/
-# tools/ måste med: refineSong.mjs är offline-tvätten som motorn spawnar.
-rsync -a --delete tools/ /opt/audio-dmx-engine/tools/
 [ -d ../webapp ] && rsync -a --delete ../webapp/ /opt/audio-dmx-engine/webapp/
 rsync -a --delete node_modules/ /opt/audio-dmx-engine/node_modules/
 install -m644 package.json /opt/audio-dmx-engine/package.json
