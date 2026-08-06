@@ -12,6 +12,9 @@
  */
 
 import { readFileSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { LearnRecorder } from "./learnRecorder.js";
+import { RefineQueue } from "./refineQueue.js";
 import { AudioCapture } from "./audio.js";
 import { Analyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
