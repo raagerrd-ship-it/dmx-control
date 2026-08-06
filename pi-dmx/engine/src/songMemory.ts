@@ -222,7 +222,38 @@ export class SongMemory {
       if (learn) { this.learnHash.push(l.hash); this.learnTime.push(l.t); }
       this.vote(l);
     }
+    this.pushNovelty(mag, binHz);
   }
+
+  /** KLANGSKIFTE. Energin samlas i oktavband, normaliseras (form, inte volym)
+   *  och jämförs var 1.5 s med ett långsamt referensspektrum. Ett nytt spår
+   *  byter instrumentering → profilen hoppar; en vers→refräng gör det inte. */
+  private pushNovelty(mag: Float32Array, binHz: number): void {
+    const now = this.clock();
+    if (!this.novStart) this.novStart = now;
+    for (let b = 0; b < this.novAcc.length; b++) {
+      const lo = Math.max(1, Math.round(NOV_BANDS[b] / binHz));
+      const hi = Math.min(mag.length - 1, Math.round(NOV_BANDS[b + 1] / binHz));
+      let s = 0;
+      for (let i = lo; i <= hi; i++) s += mag[i];
+      this.novAcc[b] += hi >= lo ? s / (hi - lo + 1) : 0;
+    }
+    this.novN++;
+    if (now - this.novStart < NOV_WIN_MS) return;
+    this.novStart = now;
+    let sum = 0;
+    for (let b = 0; b < this.novAcc.length; b++) sum += this.novAcc[b];
+    const prof = new Float32Array(this.novAcc.length);
+    if (sum > 0) for (let b = 0; b < prof.length; b++) prof[b] = this.novAcc[b] / sum;
+    this.novAcc.fill(0); this.novN = 0;
+    if (sum <= 0) return;
+    if (!this.novRef) { this.novRef = prof; return; }
+    let d = 0;
+    for (let b = 0; b < prof.length; b++) d += Math.abs(prof[b] - this.novRef[b]);
+    this.novelty = Math.max(this.novelty, d);
+    for (let b = 0; b < prof.length; b++) this.novRef[b] = this.novRef[b] * 0.75 + prof[b] * 0.25;
+  }
+
 
   private vote(l: Landmark): void {
     const start = this.find(l.hash);
