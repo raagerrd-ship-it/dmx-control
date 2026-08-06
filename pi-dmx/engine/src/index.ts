@@ -102,8 +102,14 @@ songs.onDropLearning = () => recorder.abort();
 songs.onCommit = (songId) => {
   if (!songId) { recorder.abort(); return; }   // inget lärdes in → kasta ljudet
   const wav = recorder.finish();
-  if (wav) refiner.start(wav, songId);
+  if (!wav) return;
+  // Gaplös ström: nästa låt börjar spelas in i learn.wav i samma sekund som
+  // tvätten läser den. Döp om till <songId>.wav först → ingen kapplöpning.
+  const own = join(DATA_DIR, `${songId}.wav`);
+  try { renameSync(wav, own); } catch (e) { console.error("[refine] kunde inte döpa om temp-WAV:", (e as Error).message); return; }
+  refiner.start(own, songId);
 };
+
 
 
 
