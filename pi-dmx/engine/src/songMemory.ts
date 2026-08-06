@@ -69,11 +69,18 @@ const RECOG_POS_MS = 20000;         // ...och matchen ligga inom låtens första
 
 
 interface Drop { t: number; s: number; c: number; }
+/** v2-dramaturgi ur offline-tvätten. Alla fält är VALFRIA: en låt som lärdes in
+ *  före v2 (eller aldrig tvättats) saknar dem och körs exakt som förut. */
+interface Riser { start: number; end: number; drop: number; }
 interface SongMeta {
   id: number; createdMs: number; lastMs: number; plays: number; durationMs: number;
   bpm: number; beatPhaseMs: number; drops: Drop[]; intensity: number[];   // 1 värde/s, 0–255
+  risers?: Riser[];        // uppbyggnader med känt mål
+  sections?: number[];     // tidpunkter (ms) där låtens karaktär skiftar
+  phraseMs?: number;       // längden på en 16-taktersfras (frasgrid, fas = beatPhaseMs)
 }
 interface Song { meta: SongMeta; hashes: Uint32Array; times: Uint32Array; }
+
 
 export interface SongMemoryState {
   songs: number;        // antal lärda låtar
