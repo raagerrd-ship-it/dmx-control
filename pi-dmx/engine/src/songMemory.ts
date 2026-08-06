@@ -36,18 +36,25 @@ const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som b�
 // Två vakter gör det robust: minsta låtlängd (en drop/breakdown sker alltid inom
 // den) och ett maxtak (aldrig 22 minuters gröt igen). Missas en gräns tappar vi
 // bara inlärningen för spåret och realtidsdetektorn kör som förut — ren uppsida.
-const MIN_SEG_MS = 75000;      // dela aldrig en sekvens kortare än så
+const MIN_SEG_MS = 110000;     // MÄTT: 75 s triggade direkt (två segment exakt 75 s) → höjt
 const MAX_SEG_MS = 600000;     // 10 min utan gräns → tvinga fram en
 // MÄTT PÅ HÅRDVARA (791 prover, Spotify via aux): nivån låg 0.38–0.91 med snitt
 // 0.76 — inget enda prov under 35 % av snittet. Nivådippen är alltså i praktiken
 // en död signal, och "räkna två signaler" gjorde klangskiftet obligatoriskt.
-// Därför VIKTAD evidens: ett starkt tempohopp räcker ensamt.
+// Därför VIKTAD evidens: ett starkt tempohopp räcker ensamt — men bara om det
+// nya tempot är STABILT och kvoten inte luktar oktav-/taktmiss (146→90 = 1.62).
 const EVIDENCE_NEEDED = 2;       // svag evidens: minst två signaler
 const BPM_JUMP = 0.07;           // >7 % tempoändring = svag signal
 const BPM_JUMP_STRONG = 0.12;    // >12 % som håller länge = ny låt, ensam nog
 const BPM_HOLD_MS = 4000;        // ...som håller i 4 s (inte en halvtaktsmiss)
 const BPM_HOLD_STRONG_MS = 6000; // starkt hopp måste hålla ännu längre
+const BPM_STABLE_MS = 10000;     // ...och det NYA tempot ska ligga stilla ±3 % så länge
+const BPM_STABLE_TOL = 0.03;
+const BPM_CONF_STRONG = 0.6;     // hög konfidens krävs både före och efter hoppet
+const BPM_RATIO_BAD = [2, 0.5, 1.5, 2 / 3];   // oktav-/trippel-/halvtaktstolkning
+const BPM_RATIO_BAD_TOL = 0.06;
 const DIP_RATIO = 0.55;          // nivå under 55 % av snittet (min/snitt mätt 0.505)
+
 const DIP_WIN_MS = 6000;       // dipp räknas som evidens så länge efteråt
 const START_LEVEL = 0.15;      // volymgrind: starta bara på tydlig musik
 const START_HOLD_MS = 1000;    // ...som hållit i en sekund
