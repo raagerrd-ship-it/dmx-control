@@ -256,9 +256,34 @@ function TechGrid() {
         <TechCell label="BPM"        value={locked ? String(Math.round(bpm)) : "— —"} accent={locked} dot={locked ? beat : true} pulseDot={!locked} muted={!locked} />
         <TechCell label="Konfidens"  value={locked ? `${confPct}%` : "— —"}          accent={locked && confPct >= 70} muted={!locked} />
       </div>
+      <SongMemoryRow />
       <div className="mt-4 pt-4 border-t border-foreground/[0.06] text-[11px] leading-snug text-muted-foreground/80">
         {off ? "Ljuset är släckt — dra åt höger för att tända" : info.desc}
       </div>
+
+    </div>
+  );
+}
+
+/** Låtminne: visar om motorn känner igen låten som spelas, och låter ägaren
+ *  nollställa minnet. I mocken är siffrorna statiska — Pi:n fyller dem live. */
+function SongMemoryRow() {
+  const songs = 0, known = false, learning = false;
+  const status = known ? "KÄND LÅT" : learning ? "LÄR IN…" : "LYSSNAR";
+  return (
+    <div className="mt-4 pt-4 border-t border-foreground/[0.06] flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-1">
+        <span className="text-[9px] font-bold text-muted-foreground/70 uppercase tracking-[0.22em]">Låtminne</span>
+        <span className={`text-[12px] font-semibold tracking-wide ${known ? "text-primary" : "text-foreground/60"}`}>
+          {status} · {songs} lärda
+        </span>
+      </div>
+      <button
+        type="button"
+        className="px-3 py-2 rounded-xl bg-foreground/[0.04] ring-1 ring-foreground/10 text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground/80 hover:text-foreground/90 transition-colors"
+      >
+        Glöm alla
+      </button>
     </div>
   );
 }

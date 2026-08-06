@@ -107,6 +107,10 @@ export class Analyser {
   private bandOn = new Float32Array(8);    // scratch: per-band onset denna frame
   private bigCounter = 0;                  // decimering av 2048-FFT:n (se BIG_EVERY)
   private static readonly BIG_EVERY = 3;   // kor stor-FFT var N:e hop → analysen ryms i realtid
+  /** Valfri avlyssnare på den stora magnituden (låtminnets fingeravtryck). */
+  private specSink: ((mag: Float32Array, binHz: number) => void) | null = null;
+  setSpectrumSink(fn: ((mag: Float32Array, binHz: number) => void) | null): void { this.specSink = fn; }
+
   private kickMed = 0.1;             // robust glidande MEDIAN av kick-fluxen (sign-baserad)
   private kickMad = 0.05;            // robust MAD (median absolut avvikelse) → tröskel-spridning
   private kickSeed = 0;              // warmup-räknare: snabb EMA-seed av skalan innan sign-baserad tar över
@@ -716,7 +720,11 @@ export class Analyser {
       const re = this.specBig[2 * i], im = this.specBig[2 * i + 1];
       this.magBig[i] = Math.sqrt(re * re + im * im);
     }
+    // LÅTMINNET får samma magnitud (ingen extra FFT). Anropas före swap:en nedan,
+    // så bufferten faktiskt innehåller DENNA frames spektrum.
+    this.specSink?.(this.magBig, this.cfg.audio.rate / this.bufferBig.length);
     const gated = rms > this.cfg.detection.noiseFloor * 1.5;
+
     for (let b = 0; b < 8; b++) {
       const lo = this.bandLo[b], hi = this.bandHi[b];
       const nb = Math.max(1, hi - lo);

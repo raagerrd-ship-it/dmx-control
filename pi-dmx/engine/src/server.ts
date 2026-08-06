@@ -60,7 +60,13 @@ export interface ServerDeps {
   getFogStatus: () => FogStatus | null;
   /** Nollställ rökmaskinens drifträknare efter underhåll. */
   resetFogService: () => void;
+  /** Låtminnets tillstånd (igenkänning/inlärning) + glöm-knapp. */
+  songMemory?: {
+    state: () => { songs: number; known: boolean; plays: number; confidence: number; positionMs: number; learning: boolean };
+    forget: () => void;
+  };
   onConfigChanged?: () => void;
+
   /** Advance to the next mode in the shared cycle. Returns the new mode. */
   cycleMode: () => Mode;
   /** Reset the AGC after an input-routing switch. */
@@ -437,6 +443,8 @@ export async function startServer(
             // frame — samma push-rate som resten (20 Hz).
             dmxOk: deps.getDmxConnected(),
             blePairedCount: deps.ble?.paired().length ?? 0,
+            song: deps.songMemory?.state() ?? null,   // låtminne: känd låt / lär in
+
           }));
 
         }
@@ -457,6 +465,10 @@ export async function startServer(
           } else if (msg.type === "cycleMode") {
             const next = deps.cycleMode();
             sock.send(JSON.stringify({ type: "modeChanged", mode: next }));
+          } else if (msg.type === "forgetSongs") {
+            deps.songMemory?.forget();
+            return;
+
           } else if (msg.type === "setSensitivity") {
             deps.cfg.sensitivity = clamp01(msg.value);
           } else if (msg.type === "setAudioInput" && (msg.value === "aux" || msg.value === "mic")) {
