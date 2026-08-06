@@ -118,7 +118,7 @@ capture.on("chunk", (samples: Float32Array) => {
   songs.tick({
     level: frame.level, dropped: liveDrop, bpm: frame.bpm,
     bpmConfidence: frame.bpmConfidence, intensity: frame.intensity,
-    beatAnchorMs: frame.beatAnchorMs,
+    beatAnchorMs: frame.beatAnchorMs, learn: cfg.audioInput !== "mic",
   });
   if (songs.recognized) {
     if (songs.takeDrop() > 0) outDrop++;          // pre-fired ur minnet
