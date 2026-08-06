@@ -74,9 +74,11 @@ for (let i = PRE; i < fr.length - POST; i++) {
     const r = sm[j + RISE] - sm[j - RISE];
     if (r > bestRise) { bestRise = r; k = j; }
   }
-  drops.push({ t: Math.round(fr[k].t * 1000), s: Math.min(1, 0.45 + after * 0.5) });
+  // Styrkan graderas EFTERÅT (relativt kvällens övriga drops) — se nedan.
+  drops.push({ i: k, t: Math.round(fr[k].t * 1000), lift: after / (before + 0.05), s: 0.5 });
   lastDrop = i;
 }
+
 
 // ── BPM över HELA låten ───────────────────────────────────────────────────
 // Autokorrelation på onset-kurvan i 100 Hz, längd-normaliserad (annars vinner
