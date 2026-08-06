@@ -89,6 +89,14 @@ export class EffectEngine {
   private wasBreaking = false;   // flankdetektor för nivå-svacka (drop-blackout)
   private blackoutUntil = 0;     // dramaturgisk tystnad: kolsvart till (wall-clock ms)
   private vu = 0;                // direkt VU-envelope (snabb attack / ~180ms release) för ljustaket
+  // ── DRAMATURGI UR LÅTMINNET (sätts av index.ts, bara för IGENKÄNDA låtar) ──
+  // En FÖRBERÄKNAD kurva kan inte fladdra som live-VU:n gjorde: ett värde per
+  // sekund, mjukt interpolerat. Okänd låt → allt är null/0 och showen kör som förut.
+  memCeiling: number | null = null;   // normaliserat ljustak 0..1 ur minnet
+  memSectionAt = 0;                   // performance.now() för senaste sektionsgräns
+  memPhraseAt = 0;                    // ...och senaste frasgräns
+  memHasGrid = false;                 // låten har sektioner/frasgrid att vänta in
+
   private gravLevel = 0;         // gravitations-VU: nivå som faller med gravitation
   private gravVel = 0;           // dess hastighet
   private gravPeak = 0;          // peak-håll (sjunker långsamt)
@@ -519,7 +527,16 @@ export class EffectEngine {
         // Drop-byte bara när energin får driva → en LUGN stämning (chill,
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
         const dropSwitch = dropHit && this.cfg.energyDrivesMode && held > DROP_HOLD;
-        const wantSwitch = tierChanged || now > this.smartDwellUntil;
+        // MINNETS STRUKTUR: en tvättad låt vet var karaktären skiftar och var
+        // fraserna börjar. Ett byte DÄR känns komponerat; samma byte 1,5 takt fel
+        // känns slumpmässigt. Sektionsgräns = byt gärna nu; frasgräns = ok att byta.
+        // Har låten grid väntar dwell-timern in nästa gräns (men max 20 s extra, så
+        // showen aldrig fastnar om gridet skulle vara fel).
+        const memSection = now - this.memSectionAt < 300;
+        const memPhrase = now - this.memPhraseAt < 250;
+        const gridOk = !this.memHasGrid || memSection || memPhrase || now > this.smartDwellUntil + 20000;
+        const wantSwitch = tierChanged || memSection || now > this.smartDwellUntil;
+
         // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
         // det, inte bara på energinivån. Två regler, båda dramaturgiska:
         //
@@ -532,7 +549,7 @@ export class EffectEngine {
         //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
         //    så utan detta fortsätter riggen köra fullfart genom en svacka.
         const wantCalm = frame.breaking && this.cfg.energyDrivesMode;
-        if (!inBuild && (dropSwitch || (wantSwitch && held > MIN_HOLD))) {
+        if (!inBuild && (dropSwitch || (wantSwitch && held > MIN_HOLD && gridOk))) {
         this.lastSmartSwitchMs = now;
         this.lastSmartTier = tierName;
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
@@ -639,7 +656,14 @@ export class EffectEngine {
     // Effekterna formar fortfarande sitt eget ljus; VU:n justerar slutresultatet
     // mot den råa nivån. BARA en drop får skippa filtret (går fram på full).
     let ceilMul = 1;
-    if (this.cfg.energyCeiling) {
+    if (this.memCeiling !== null) {
+      // MINNESTAK: låten är igenkänd och tvättad → vi VET kurvan i förväg. Den är
+      // normaliserad (p5..p95) och sekundmjuk, så full dynamik utan en enda
+      // fladder-risk. Live-VU:n (som fladdrade vid höga nivåer) står åt sidan.
+      const MEM_FLOOR = 0.20;
+      ceilMul = Math.max(MEM_FLOOR + (1 - MEM_FLOOR) * this.memCeiling, this.dropEnv);
+    } else if (this.cfg.energyCeiling) {
+
       // RÅ nivå som slutgain: insignal X% → utsignal ~X% (nu golvad, se nedan).
       // frame.levelVU = ~200ms smoothat PÅ HOP-TAKT (375Hz) i analysatorn → ser alla
       // hops, mycket lägre jitter än att smootha rå-nivån efter render-decimering (som
@@ -873,7 +897,7 @@ export class EffectEngine {
     // färg/dim-kanaler; strobe orörda. (Drop/punch/riser/flash ligger redan i
     // ceilMul via bypass → de lyfter taket och kapar inget.) Gatas av silenceGate
     // så den varma ambient-glöden i TYSTNAD inte kapas till svart.
-    if (this.cfg.energyCeiling && this.silenceGate > 0.5 && ceilMul < 0.999) {
+    if ((this.cfg.energyCeiling || this.memCeiling !== null) && this.silenceGate > 0.5 && ceilMul < 0.999) {
       for (let ch = 0; ch < this.maxCh; ch++) {
         if (this.capMask[ch]) {   // bara ljusbärande kanaler → linjär v-dämpning (ej v² på dim+färg)
           this.universe[ch] = Math.round(this.universe[ch] * ceilMul);

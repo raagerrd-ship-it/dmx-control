@@ -15,7 +15,12 @@ export interface RefinedTimeline {
   v: number; songId: number;
   drops: { t: number; s: number }[];
   bpm: number; beatPhaseMs: number; intensity: number[];
+  /** v2: dramaturgi. Saknas i v1-filer → motorn kör som förut. */
+  risers?: { start: number; end: number; drop: number }[];
+  sections?: number[];
+  phrase?: { barMs: number; p8: number; p16: number; p32: number } | null;
 }
+
 
 const SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), "../tools/refineSong.mjs");
 const MAX_TRIES = 2;
@@ -80,7 +85,7 @@ export class RefineQueue {
     if (!existsSync(path)) return false;
     try {
       const t = JSON.parse(readFileSync(path, "utf8")) as RefinedTimeline;
-      if (t.v !== 1 || !Array.isArray(t.drops)) return false;
+      if ((t.v !== 1 && t.v !== 2) || !Array.isArray(t.drops)) return false;   // v1 fungerar fortsatt
       this.apply(t);
       return true;
     } catch (e) {

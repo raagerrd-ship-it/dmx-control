@@ -69,11 +69,18 @@ const RECOG_POS_MS = 20000;         // ...och matchen ligga inom låtens första
 
 
 interface Drop { t: number; s: number; c: number; }
+/** v2-dramaturgi ur offline-tvätten. Alla fält är VALFRIA: en låt som lärdes in
+ *  före v2 (eller aldrig tvättats) saknar dem och körs exakt som förut. */
+interface Riser { start: number; end: number; drop: number; }
 interface SongMeta {
   id: number; createdMs: number; lastMs: number; plays: number; durationMs: number;
   bpm: number; beatPhaseMs: number; drops: Drop[]; intensity: number[];   // 1 värde/s, 0–255
+  risers?: Riser[];        // uppbyggnader med känt mål
+  sections?: number[];     // tidpunkter (ms) där låtens karaktär skiftar
+  phraseMs?: number;       // längden på en 16-taktersfras (frasgrid, fas = beatPhaseMs)
 }
 interface Song { meta: SongMeta; hashes: Uint32Array; times: Uint32Array; }
+
 
 export interface SongMemoryState {
   songs: number;        // antal lärda låtar
@@ -497,14 +504,54 @@ export class SongMemory {
     return { bpm: s.meta.bpm, anchorMs: this.playStart + s.meta.beatPhaseMs };
   }
 
-  /** Energikurvan ur minnet (0..1) på nuvarande position, eller null. */
+  /** Energikurvan ur minnet (0..1) på nuvarande position, eller null.
+   *  LINJÄRT INTERPOLERAD mellan sekundvärdena: en förberäknad, mjuk kurva kan
+   *  aldrig fladdra som live-VU:n gjorde. */
   replayIntensity(): number | null {
     const s = this.matchId ? this.songs.get(this.matchId) : undefined;
     if (!s || s.meta.intensity.length === 0) return null;
-    const sec = Math.floor((this.clock() - this.playStart + this.matchOffset) / 1000);
-    if (sec < 0 || sec >= s.meta.intensity.length) return null;
-    return s.meta.intensity[sec] / 255;
+    const x = (this.clock() - this.playStart + this.matchOffset) / 1000;
+    const i = Math.floor(x);
+    if (i < 0 || i >= s.meta.intensity.length) return null;
+    const a = s.meta.intensity[i] / 255;
+    const b = (s.meta.intensity[i + 1] ?? s.meta.intensity[i]) / 255;
+    return a + (b - a) * (x - i);
   }
+
+  /** DRAMATURGI UR MINNET (bara igenkända, tvättade låtar). Mutera-och-återanvänd:
+   *  frågan ställs på ljudvägen 375 gånger i sekunden → ingen allokering.
+   *   build   = riser-ramp 0..1 som når 1.0 exakt på dropen (null = ingen riser)
+   *   ceiling = normaliserad energikurva som ljustak (null = kör som idag)
+   *   section = true den hop en sektionsgräns passeras
+   *   phrase  = true den hop en 16-taktersfras börjar
+   *   hasGrid = låten har sektioner/frasgrid → dirigenten får vänta in dem */
+  private cues = { build: null as number | null, ceiling: null as number | null, section: false, phrase: false, hasGrid: false };
+  private cuePrevT = -1;
+  replayCues(): { build: number | null; ceiling: number | null; section: boolean; phrase: boolean; hasGrid: boolean } {
+    const c = this.cues;
+    c.build = null; c.ceiling = null; c.section = false; c.phrase = false; c.hasGrid = false;
+    const s = this.matchId ? this.songs.get(this.matchId) : undefined;
+    if (!s) { this.cuePrevT = -1; return c; }
+    const t = this.clock() - this.playStart + this.matchOffset;
+    const prev = this.cuePrevT < 0 || t < this.cuePrevT ? t : this.cuePrevT;
+    this.cuePrevT = t;
+    c.ceiling = this.replayIntensity();
+    const m = s.meta;
+    if (m.risers) for (const r of m.risers) {
+      if (t >= r.start && t < r.end && r.end > r.start) { c.build = (t - r.start) / (r.end - r.start); break; }
+    }
+    if (m.sections?.length) {
+      c.hasGrid = true;
+      for (const st of m.sections) if (st > prev && st <= t) { c.section = true; break; }
+    }
+    if (m.phraseMs && m.phraseMs > 1000) {
+      c.hasGrid = true;
+      const ph = m.beatPhaseMs;
+      c.phrase = Math.floor((prev - ph) / m.phraseMs) !== Math.floor((t - ph) / m.phraseMs);
+    }
+    return c;
+  }
+
 
   state(): SongMemoryState {
     const s = this.matchId ? this.songs.get(this.matchId) : undefined;
@@ -550,17 +597,26 @@ export class SongMemory {
   onDropLearning?: () => void;
 
   /** Ersätt tidslinjen med de offline-tvättade värdena. Fingeravtrycket
-   *  (hashar + tider) och spelräknaren rörs INTE — de är för matchning. */
-  applyRefined(songId: number, t: { drops: { t: number; s: number }[]; bpm: number; beatPhaseMs: number; intensity: number[] }): void {
+   *  (hashar + tider) och spelräknaren rörs INTE 
+   *  — de är för matchning.
+   *  v1-sidecars saknar dramaturgi-fälten; då lämnas de orörda. */
+  applyRefined(songId: number, t: {
+    drops: { t: number; s: number }[]; bpm: number; beatPhaseMs: number; intensity: number[];
+    risers?: Riser[]; sections?: number[]; phrase?: { p16: number } | null;
+  }): void {
     const s = this.songs.get(songId);
     if (!s) return;
     s.meta.drops = t.drops.map((d) => ({ t: d.t, s: d.s, c: Math.max(2, s.meta.plays) }));   // tvättade drops är bekräftade
     if (t.bpm > 40) { s.meta.bpm = t.bpm; s.meta.beatPhaseMs = t.beatPhaseMs; }
     if (t.intensity.length) s.meta.intensity = t.intensity;
+    if (t.risers) s.meta.risers = t.risers;
+    if (t.sections) s.meta.sections = t.sections;
+    if (t.phrase?.p16) s.meta.phraseMs = t.phrase.p16;
     this.dirty = true;
     void this.save();
-    console.log(`[song] låt #${songId} tvättad: ${t.drops.length} drops, ${t.bpm} BPM`);
+    console.log(`[song] låt #${songId} tvättad: ${t.drops.length} drops, ${t.risers?.length ?? 0} risers, ${t.sections?.length ?? 0} sektioner, ${t.bpm} BPM`);
   }
+
 
   /** Låten är slut: skriv in i minnet (ny låt) eller förbättra den kända. */
   private commit(): void {
