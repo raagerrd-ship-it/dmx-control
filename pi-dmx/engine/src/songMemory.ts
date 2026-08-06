@@ -113,24 +113,26 @@ export class SongMemory {
   private rebuildIndex(): void {
     let total = 0;
     for (const s of this.songs.values()) total += s.hashes.length;
-    const hash = new Uint32Array(total), val = new Uint32Array(total);
+    // Sortera som 64-bitars (hash<<32 | val) i EN typad array: en vanlig
+    // JS-array med index hade boxat ~850k tal och kostat hundratals MB.
+    const pack = new BigUint64Array(total);
     this.slotIds = [];
     let p = 0;
     for (const s of this.songs.values()) {
       const slot = this.slotIds.push(s.meta.id) - 1;
       for (let k = 0; k < s.hashes.length; k++) {
-        hash[p] = s.hashes[k];
-        val[p] = (slot << 12) | Math.min(4095, Math.round(s.times[k] / FRAME_MS));
-        p++;
+        const val = (slot << 12) | Math.min(4095, Math.round(s.times[k] / FRAME_MS));
+        pack[p++] = (BigInt(s.hashes[k]) << 32n) | BigInt(val);
       }
     }
-    // Sortera på hash (indirekt, så val följer med).
-    const order = new Uint32Array(total);
-    for (let i = 0; i < total; i++) order[i] = i;
-    const ord = Array.from(order).sort((a, b) => hash[a] - hash[b]);
-    this.idxHash = new Uint32Array(total);
-    this.idxVal = new Uint32Array(total);
-    for (let i = 0; i < total; i++) { this.idxHash[i] = hash[ord[i]]; this.idxVal[i] = val[ord[i]]; }
+    pack.sort();
+    const hash = new Uint32Array(total), value = new Uint32Array(total);
+    for (let i = 0; i < total; i++) {
+      hash[i] = Number(pack[i] >> 32n);
+      value[i] = Number(pack[i] & 0xffffffffn);
+    }
+    this.idxHash = hash;
+    this.idxVal = value;
   }
 
   /** Första positionen i idxHash med `h` (eller -1). */
