@@ -31,8 +31,9 @@ const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som b�
 
 // LÅTGRÄNS UTAN TYSTNAD. Spotify/Apple Music spelar gaplöst eller crossfadar —
 // 3 s tystnad inträffar aldrig, och utan de här signalerna blir hela kvällen
-// "en låt". Ingen enskild signal räcker (en drop byter också klang, en BPM-mätning
-// kan hoppa), så vi väger SAMLAD EVIDENS: temposkifte + klangskifte + nivådipp.
+// "en låt". Mätt på riktig Spotify-ström via AUX fyrar nivådipp under 55 % av
+// snittet ungefär en gång per tre minuter och får därför ensam sätta en gräns.
+// Övriga signaler vägs fortfarande som SAMLAD EVIDENS: temposkifte + klangskifte.
 // Två vakter gör det robust: minsta låtlängd (en drop/breakdown sker alltid inom
 // den) och ett maxtak (aldrig 22 minuters gröt igen). Missas en gräns tappar vi
 // bara inlärningen för spåret och realtidsdetektorn kör som förut — ren uppsida.
@@ -415,8 +416,8 @@ export class SongMemory {
     }
   }
 
-  /** LÅTGRÄNS I EN GAPLÖS STRÖM. Väger samlad evidens (tempo + klang + nivådipp),
-   *  grindad av min/max-längd. Returnerar true om vi delade. */
+  /** LÅTGRÄNS I EN GAPLÖS STRÖM. Nivådipp räcker ensam; övriga signaler kräver
+   *  samlad evidens. Allt grindas av min/max-längd. Returnerar true om vi delade. */
   private boundary(now: number, tLive: number, o: { bpm: number; bpmConfidence: number; level: number }): boolean {
     // Nivådipp: även en crossfade har oftast ett ögonblick där nivån faller.
     this.levAvg = this.levAvg > 0 ? this.levAvg * 0.995 + o.level * 0.005 : o.level;
