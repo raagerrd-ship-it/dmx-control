@@ -89,6 +89,14 @@ export class EffectEngine {
   private wasBreaking = false;   // flankdetektor för nivå-svacka (drop-blackout)
   private blackoutUntil = 0;     // dramaturgisk tystnad: kolsvart till (wall-clock ms)
   private vu = 0;                // direkt VU-envelope (snabb attack / ~180ms release) för ljustaket
+  // ── DRAMATURGI UR LÅTMINNET (sätts av index.ts, bara för IGENKÄNDA låtar) ──
+  // En FÖRBERÄKNAD kurva kan inte fladdra som live-VU:n gjorde: ett värde per
+  // sekund, mjukt interpolerat. Okänd låt → allt är null/0 och showen kör som förut.
+  memCeiling: number | null = null;   // normaliserat ljustak 0..1 ur minnet
+  memSectionAt = 0;                   // performance.now() för senaste sektionsgräns
+  memPhraseAt = 0;                    // ...och senaste frasgräns
+  memHasGrid = false;                 // låten har sektioner/frasgrid att vänta in
+
   private gravLevel = 0;         // gravitations-VU: nivå som faller med gravitation
   private gravVel = 0;           // dess hastighet
   private gravPeak = 0;          // peak-håll (sjunker långsamt)
