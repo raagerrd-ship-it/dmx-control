@@ -487,6 +487,7 @@ export class SongMemory {
     // Starta nästa sekvens direkt — strömmen tystnar aldrig.
     this.playStart = now;
     this.lastLoud = now;
+    this.quarantinedSegment = this.learnMode && now - this.lastMatchedAt < LEARN_QUARANTINE_MS;
     return true;
   }
 
