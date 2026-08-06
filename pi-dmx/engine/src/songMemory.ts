@@ -111,7 +111,16 @@ export class SongMemory {
     }
   }
 
-  private async save(): Promise<void> {
+  private saving: Promise<void> = Promise.resolve();
+
+  /** Skrivningar serialiseras — två parallella skrivningar delade temp-filnamn
+   *  och den ena renamade bort den andras fil (ENOENT). */
+  private save(): Promise<void> {
+    this.saving = this.saving.then(() => this.saveNow());
+    return this.saving;
+  }
+
+  private async saveNow(): Promise<void> {
     if (!this.dirty) return;
     this.dirty = false;
     const parts: Buffer[] = [];
