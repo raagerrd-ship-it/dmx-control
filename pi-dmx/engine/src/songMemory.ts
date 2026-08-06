@@ -504,14 +504,54 @@ export class SongMemory {
     return { bpm: s.meta.bpm, anchorMs: this.playStart + s.meta.beatPhaseMs };
   }
 
-  /** Energikurvan ur minnet (0..1) på nuvarande position, eller null. */
+  /** Energikurvan ur minnet (0..1) på nuvarande position, eller null.
+   *  LINJÄRT INTERPOLERAD mellan sekundvärdena: en förberäknad, mjuk kurva kan
+   *  aldrig fladdra som live-VU:n gjorde. */
   replayIntensity(): number | null {
     const s = this.matchId ? this.songs.get(this.matchId) : undefined;
     if (!s || s.meta.intensity.length === 0) return null;
-    const sec = Math.floor((this.clock() - this.playStart + this.matchOffset) / 1000);
-    if (sec < 0 || sec >= s.meta.intensity.length) return null;
-    return s.meta.intensity[sec] / 255;
+    const x = (this.clock() - this.playStart + this.matchOffset) / 1000;
+    const i = Math.floor(x);
+    if (i < 0 || i >= s.meta.intensity.length) return null;
+    const a = s.meta.intensity[i] / 255;
+    const b = (s.meta.intensity[i + 1] ?? s.meta.intensity[i]) / 255;
+    return a + (b - a) * (x - i);
   }
+
+  /** DRAMATURGI UR MINNET (bara igenkända, tvättade låtar). Mutera-och-återanvänd:
+   *  frågan ställs på ljudvägen 375 gånger i sekunden → ingen allokering.
+   *   build   = riser-ramp 0..1 som når 1.0 exakt på dropen (null = ingen riser)
+   *   ceiling = normaliserad energikurva som ljustak (null = kör som idag)
+   *   section = true den hop en sektionsgräns passeras
+   *   phrase  = true den hop en 16-taktersfras börjar
+   *   hasGrid = låten har sektioner/frasgrid → dirigenten får vänta in dem */
+  private cues = { build: null as number | null, ceiling: null as number | null, section: false, phrase: false, hasGrid: false };
+  private cuePrevT = -1;
+  replayCues(): { build: number | null; ceiling: number | null; section: boolean; phrase: boolean; hasGrid: boolean } {
+    const c = this.cues;
+    c.build = null; c.ceiling = null; c.section = false; c.phrase = false; c.hasGrid = false;
+    const s = this.matchId ? this.songs.get(this.matchId) : undefined;
+    if (!s) { this.cuePrevT = -1; return c; }
+    const t = this.clock() - this.playStart + this.matchOffset;
+    const prev = this.cuePrevT < 0 || t < this.cuePrevT ? t : this.cuePrevT;
+    this.cuePrevT = t;
+    c.ceiling = this.replayIntensity();
+    const m = s.meta;
+    if (m.risers) for (const r of m.risers) {
+      if (t >= r.start && t < r.end && r.end > r.start) { c.build = (t - r.start) / (r.end - r.start); break; }
+    }
+    if (m.sections?.length) {
+      c.hasGrid = true;
+      for (const st of m.sections) if (st > prev && st <= t) { c.section = true; break; }
+    }
+    if (m.phraseMs && m.phraseMs > 1000) {
+      c.hasGrid = true;
+      const ph = m.beatPhaseMs;
+      c.phrase = Math.floor((prev - ph) / m.phraseMs) !== Math.floor((t - ph) / m.phraseMs);
+    }
+    return c;
+  }
+
 
   state(): SongMemoryState {
     const s = this.matchId ? this.songs.get(this.matchId) : undefined;
