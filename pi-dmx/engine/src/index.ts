@@ -23,6 +23,7 @@ import { IntensityKnob } from "./intensityKnob.js";
 import { KnobRing } from "./knobRing.js";
 import { BleClient, type BleScanDevice, type BleCal } from "./bleClient.js";
 import { applyIntensity } from "./moods.js";
+import { SongMemory } from "./songMemory.js";
 
 import { activeSlots, fixtureRoles, type Mode } from "./config.js";
 import { EFFECT_KEYS, EFFECT_MAP } from "./effects/registry.js";
@@ -278,6 +279,7 @@ const serverDeps = {
   getDmxConnected: () => dmx.isConnected(),
   getFogStatus: () => effects.getFogStatus(),
   resetFogService: () => effects.resetFogService(),
+  songMemory: { state: () => songs.state(), forget: () => songs.forget() },
   cycleMode,
 
   resetAgc: (g?: number) => analyser.resetGain(g),
