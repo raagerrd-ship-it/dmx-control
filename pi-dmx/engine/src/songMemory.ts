@@ -104,20 +104,46 @@ export class SongMemory {
       console.log(`[song] ${this.songs.size} lärda låtar i minnet`);
     } catch (e) {
       console.error("[song] kunde inte läsa låtminnet:", (e as Error).message);
-      this.songs.clear(); this.index.clear();
+      this.songs.clear(); this.idxHash = new Uint32Array(0); this.idxVal = new Uint32Array(0); this.slotIds = [];
     }
   }
 
+  /** Bygg om det sorterade indexet. Körs vid start och när en låt lagts till /
+   *  rensats bort — aldrig på ljudvägen. */
   private rebuildIndex(): void {
-    this.index.clear();
+    let total = 0;
+    for (const s of this.songs.values()) total += s.hashes.length;
+    const hash = new Uint32Array(total), val = new Uint32Array(total);
+    this.slotIds = [];
+    let p = 0;
     for (const s of this.songs.values()) {
+      const slot = this.slotIds.push(s.meta.id) - 1;
       for (let k = 0; k < s.hashes.length; k++) {
-        let arr = this.index.get(s.hashes[k]);
-        if (!arr) { arr = []; this.index.set(s.hashes[k], arr); }
-        arr.push(s.meta.id, s.times[k]);
+        hash[p] = s.hashes[k];
+        val[p] = (slot << 12) | Math.min(4095, Math.round(s.times[k] / FRAME_MS));
+        p++;
       }
     }
+    // Sortera på hash (indirekt, så val följer med).
+    const order = new Uint32Array(total);
+    for (let i = 0; i < total; i++) order[i] = i;
+    const ord = Array.from(order).sort((a, b) => hash[a] - hash[b]);
+    this.idxHash = new Uint32Array(total);
+    this.idxVal = new Uint32Array(total);
+    for (let i = 0; i < total; i++) { this.idxHash[i] = hash[ord[i]]; this.idxVal[i] = val[ord[i]]; }
   }
+
+  /** Första positionen i idxHash med `h` (eller -1). */
+  private find(h: number): number {
+    let lo = 0, hi = this.idxHash.length - 1, res = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (this.idxHash[mid] < h) lo = mid + 1;
+      else { if (this.idxHash[mid] === h) res = mid; hi = mid - 1; }
+    }
+    return res;
+  }
+
 
   private saving: Promise<void> = Promise.resolve();
 
