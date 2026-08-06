@@ -343,11 +343,17 @@ export class SongMemory {
     void this.save();
   }
 
+  /** Kasta pågående inlärning (ingången bytte mitt i låten). */
+  private dropLearning(): void {
+    this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
+    this.bpmSamples = []; this.bpmAnchor = 0;
+  }
+
   /** Låten är slut: skriv in i minnet (ny låt) eller förbättra den kända. */
   private commit(): void {
     const dur = this.lastLoud - this.playStart;
     const matched = this.matchId ? this.songs.get(this.matchId) : undefined;
-    if (dur >= MIN_LEARN_MS && this.learnHash.length > 60) {
+    if (this.learnMode && dur >= MIN_LEARN_MS && this.learnHash.length > 60) {
       const bpm = median(this.bpmSamples);
       if (matched) this.mergeInto(matched, dur, bpm);
       else this.addSong(dur, bpm);
@@ -356,8 +362,7 @@ export class SongMemory {
     }
     // Nollställ för nästa låt.
     this.playStart = 0;
-    this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
-    this.bpmSamples = []; this.bpmAnchor = 0;
+    this.dropLearning();
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.fp.reset();
   }
