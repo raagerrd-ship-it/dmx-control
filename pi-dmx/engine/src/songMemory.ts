@@ -183,14 +183,17 @@ export class SongMemory {
     }
   }
 
-  /** Matas varje gång analysatorn har en ny 2048-magnitud (låt-tid ur klockan). */
-  pushSpectrum(mag: Float32Array, binHz: number): void {
+  /** Matas varje gång analysatorn har en ny 2048-magnitud (låt-tid ur klockan).
+   *  `learn` = false (mikrofon) → vi känner igen men lär oss inget: mikens 20×
+   *  gain drar in sorl och rumsljud, och ett smutsigt fingeravtryck är värre än
+   *  inget. */
+  pushSpectrum(mag: Float32Array, binHz: number, learn = true): void {
     if (!this.playStart) return;
     const tLive = this.clock() - this.playStart;
     this.lm.length = 0;
     this.fp.push(mag, binHz, tLive, this.lm);
     for (const l of this.lm) {
-      this.learnHash.push(l.hash); this.learnTime.push(l.t);
+      if (learn) { this.learnHash.push(l.hash); this.learnTime.push(l.t); }
       this.vote(l);
     }
   }
