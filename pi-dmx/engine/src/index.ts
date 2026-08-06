@@ -83,7 +83,9 @@ dmx.setMaxHz(cfg.dmxMaxHz);
 // (ingen extra transform) och äger dropsen när en låt känns igen.
 const songs = new SongMemory();
 await songs.load();
-analyser.setSpectrumSink((mag, binHz) => songs.pushSpectrum(mag, binHz));
+// Igenkänning körs på båda ingångarna; INLÄRNING bara på aux (miken drar in
+// sorl med 20× gain → smutsigt fingeravtryck).
+analyser.setSpectrumSink((mag, binHz) => songs.pushSpectrum(mag, binHz, cfg.audioInput !== "mic"));
 
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
