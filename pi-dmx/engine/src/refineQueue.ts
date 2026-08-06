@@ -23,11 +23,15 @@ const MAX_TRIES = 2;
 export class RefineQueue {
   private proc: ChildProcess | null = null;
   private tries = 0;
+  private id = 0;
 
   /** @param dir datakatalogen (samma som songs.bin) */
   constructor(private readonly dir: string, private readonly apply: (t: RefinedTimeline) => void) {}
 
   get busy(): boolean { return this.proc !== null; }
+
+  /** Låten som tvättas just nu (0 = ingen) — UI visar "Tvättar #1". */
+  get songId(): number { return this.proc ? this.id : 0; }
 
   /** Avstängning: döda en pågående tvätt. Temp-WAV:en städas vid nästa start. */
   stop(): void { this.proc?.kill("SIGTERM"); this.proc = null; }
@@ -35,9 +39,10 @@ export class RefineQueue {
   /** Städa kvarglömda filer efter strömavbrott mitt i en låt. */
   cleanStale(): void {
     for (const f of safeReaddir(this.dir)) {
-      if (f.endsWith(".refined.json") || f === "learn.wav") rm(join(this.dir, f));
+      if (f.endsWith(".refined.json") || f.endsWith(".wav")) rm(join(this.dir, f));
     }
   }
+
 
   /** Låten är committad och WAV:en stängd → tvätta nu (tystnad = ingen last). */
   start(wav: string, songId: number): void {
