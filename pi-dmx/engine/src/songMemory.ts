@@ -361,8 +361,12 @@ export class SongMemory {
 
     if (now - this.lastLoud > SILENCE_END_MS) { this.commit(); return; }
 
+    // Igenkänning-som-gräns: säkrare än all heuristik → egen väg, före evidensen.
+    if (this.recogSplit >= 0) { this.splitOnRecognition(now, this.recogSplit); return; }
+
     const tLive = now - this.playStart;
     if (this.boundary(now, tLive, o)) return;
+
 
     // Tidslinje-inspelning (alltid — även för en känd låt, så minnet förbättras).
     const songT = this.matchId ? tLive + this.matchOffset : tLive;
