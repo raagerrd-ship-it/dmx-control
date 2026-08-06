@@ -434,7 +434,7 @@
       </div>
       <div class="advfx-list" id="advFxList">
         <div class="advfx-head">
-          <span>Lampor</span><span>DMX-adress</span>
+          <span>Enheter</span><span>DMX-adress</span>
         </div>
         <div class="advfx-rows" id="advFxRows"></div>
       </div>
@@ -1030,7 +1030,12 @@ function updateAdvMirror(cfg) {
         '<div class="advfx-row"><div class="n"><b>' +
         (fx.name || "Lampa") + '</b><span>' + presetLbl(fx.preset) +
         '</span></div><span class="a">' + (fx.address ?? "–") + '</span></div>'
-      )).join("");
+      )).join("")
+      // Rökmaskinen visas som en rad i samma lista så användaren SER dess kanal
+      // (läsbar; själva adressen sätts på /setup). Bara när den är ansluten.
+      + ((cfg.fog && cfg.fog.enabled && cfg.fog.address)
+          ? '<div class="advfx-row"><div class="n"><b>Rökmaskin</b><span>1-kanal · rök</span></div><span class="a">' + cfg.fog.address + '</span></div>'
+          : "");
     }
   }
   renderCategories();   // fixtures kan ha ändrats → uppdatera "kräver: X"-taggar
