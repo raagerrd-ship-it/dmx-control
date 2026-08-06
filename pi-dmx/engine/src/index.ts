@@ -140,6 +140,10 @@ capture.on("chunk", (samples: Float32Array) => {
     bpmConfidence: frame.bpmConfidence, intensity: frame.intensity,
     beatAnchorMs: frame.beatAnchorMs, learn: cfg.audioInput !== "mic",
   });
+  // Temp-inspelning: bara medan en NY låt lärs in på aux (state().learning),
+  // aldrig på mik och aldrig för en redan känd låt.
+  if (songs.state().learning) { if (!recorder.active) recorder.start(); recorder.write(samples); }
+
   if (songs.recognized) {
     if (songs.takeDrop() > 0) outDrop++;          // pre-fired ur minnet
     const ri = songs.replayIntensity();
