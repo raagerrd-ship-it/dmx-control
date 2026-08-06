@@ -26,7 +26,8 @@ const PRE_FIRE_MS = 120;       // trigga dropen strax före → lamporna hinner
 const SILENCE_END_MS = 3000;   // tystnad så länge = låten är slut
 const MIN_LEARN_MS = 45000;    // kortare än så: inte värt att minnas
 const OFFSET_BUCKET = 250;     // ms per offset-fack
-const VOTES_NEEDED = 8;
+const VOTES_NEEDED = 10;
+const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som bästa ANNAN låt
 
 interface Drop { t: number; s: number; c: number; }
 interface SongMeta {
@@ -159,7 +160,7 @@ export class SongMemory {
       const key = id * 100000 + Math.round(off / OFFSET_BUCKET);
       const v = (this.votes.get(key) ?? 0) + 1;
       this.votes.set(key, v);
-      if (v >= VOTES_NEEDED && id !== this.matchId) {
+      if (v >= VOTES_NEEDED && id !== this.matchId && v >= this.bestOther(id) * MARGIN) {
         this.matchId = id;
         this.matchOffset = Math.round(off / OFFSET_BUCKET) * OFFSET_BUCKET;
         this.replayIdx = 0;
@@ -168,6 +169,14 @@ export class SongMemory {
       }
       if (id === this.matchId) this.matchVotes = Math.max(this.matchVotes, v);
     }
+  }
+
+  /** Bästa röstfack som tillhör en ANNAN låt än `id` — marginalkravet.
+   *  Utan det räcker slumpmässiga hash-krockar för att peka ut fel låt. */
+  private bestOther(id: number): number {
+    let best = 1;
+    for (const [k, v] of this.votes) if (Math.floor(k / 100000) !== id && v > best) best = v;
+    return best;
   }
 
   /**
