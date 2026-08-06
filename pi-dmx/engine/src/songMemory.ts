@@ -31,17 +31,27 @@ const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som b�
 
 // LÅTGRÄNS UTAN TYSTNAD. Spotify/Apple Music spelar gaplöst eller crossfadar —
 // 3 s tystnad inträffar aldrig, och utan de här signalerna blir hela kvällen
-// "en låt". Två saker går att fånga: ett ihållande temposkifte och ett tydligt
-// klangskifte (spektral novelty). Missas en gräns tappar vi bara inlärningen
-// för det spåret och realtidsdetektorn kör som förut — ren uppsida.
-const MIN_SEG_MS = 40000;      // dela aldrig en sekvens kortare än så
+// "en låt". Ingen enskild signal räcker (en drop byter också klang, en BPM-mätning
+// kan hoppa), så vi väger SAMLAD EVIDENS: temposkifte + klangskifte + nivådipp.
+// Två vakter gör det robust: minsta låtlängd (en drop/breakdown sker alltid inom
+// den) och ett maxtak (aldrig 22 minuters gröt igen). Missas en gräns tappar vi
+// bara inlärningen för spåret och realtidsdetektorn kör som förut — ren uppsida.
+const MIN_SEG_MS = 75000;      // dela aldrig en sekvens kortare än så
+const MAX_SEG_MS = 600000;     // 10 min utan gräns → tvinga fram en
+const EVIDENCE_NEEDED = 2;     // hur många signaler som måste peka på gräns
 const BPM_JUMP = 0.07;         // >7 % tempoändring
 const BPM_HOLD_MS = 4000;      // ...som håller i 4 s (inte en halvtaktsmiss)
+const DIP_RATIO = 0.35;        // nivå under 35 % av snittet = dipp/crossfade
+const DIP_WIN_MS = 6000;       // dipp räknas som evidens så länge efteråt
+const START_LEVEL = 0.15;      // volymgrind: starta bara på tydlig musik
+const START_HOLD_MS = 1000;    // ...som hållit i en sekund
 const NOV_WIN_MS = 1500;       // klangprofil per 1.5 s
 const NOV_TH = 0.30;           // L1-avstånd (0..2): absolut golv
 const NOV_FACTOR = 3.0;        // ...och minst så många gånger låtens egen variation
 const NOV_HITS = 2;            // två fönster i rad (3 s) → inte en enstaka spik
+const NOV_WIN_KEEP_MS = 6000;  // klangskifte räknas som evidens så länge efteråt
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
+
 
 
 interface Drop { t: number; s: number; c: number; }
