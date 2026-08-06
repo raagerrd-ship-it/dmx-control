@@ -85,7 +85,7 @@ export class RefineQueue {
     if (!existsSync(path)) return false;
     try {
       const t = JSON.parse(readFileSync(path, "utf8")) as RefinedTimeline;
-      if (t.v !== 1 || !Array.isArray(t.drops)) return false;
+      if ((t.v !== 1 && t.v !== 2) || !Array.isArray(t.drops)) return false;   // v1 fungerar fortsatt
       this.apply(t);
       return true;
     } catch (e) {
