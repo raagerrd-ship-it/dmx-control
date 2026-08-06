@@ -142,7 +142,7 @@ capture.on("chunk", (samples: Float32Array) => {
   });
   // Temp-inspelning: bara medan en NY låt lärs in på aux (state().learning),
   // aldrig på mik och aldrig för en redan känd låt.
-  if (songs.state().learning) { if (!recorder.active) recorder.start(); recorder.write(samples); }
+  if (songs.learningNew) { if (!recorder.active) recorder.start(); recorder.write(samples); }
 
   if (songs.recognized) {
     if (songs.takeDrop() > 0) outDrop++;          // pre-fired ur minnet
@@ -305,7 +305,7 @@ const serverDeps = {
   getDmxConnected: () => dmx.isConnected(),
   getFogStatus: () => effects.getFogStatus(),
   resetFogService: () => effects.resetFogService(),
-  songMemory: { state: () => songs.state(), forget: () => songs.forget() },
+  songMemory: { state: () => ({ ...songs.state(), refining: refiner.busy }), forget: () => songs.forget() },
   cycleMode,
 
   resetAgc: (g?: number) => analyser.resetGain(g),
@@ -459,6 +459,7 @@ setInterval(() => {
 }, 300000);
 
 process.on("SIGTERM", () => {
+  recorder.abort();
   void songs.flush();
   capture.stop();
   button?.stop();

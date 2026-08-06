@@ -298,6 +298,11 @@ export class SongMemory {
     return d;
   }
 
+  /** Lär just nu in en NY låt (aux, ej igenkänd) → temp-inspelningen ska rulla.
+   *  Egen getter i stället för state() på ljudvägen: state() allokerar ett
+   *  objekt, och den här frågan ställs 375 gånger i sekunden. */
+  get learningNew(): boolean { return !!this.playStart && !this.matchId && this.learnMode; }
+
   /** Igenkänd låt → true medan replayen äger showen. */
   get recognized(): boolean { return this.matchId !== 0; }
 
