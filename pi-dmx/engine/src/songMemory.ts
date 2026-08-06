@@ -325,7 +325,7 @@ export class SongMemory {
       plays: s?.meta.plays ?? 0,
       confidence: Math.max(0, Math.min(1, this.matchVotes / (VOTES_NEEDED * 3))),
       positionMs: this.playStart ? this.clock() - this.playStart + (s ? this.matchOffset : 0) : 0,
-      learning: !!this.playStart && !s,
+      learning: !!this.playStart && !s && this.learnMode,
     };
   }
 
