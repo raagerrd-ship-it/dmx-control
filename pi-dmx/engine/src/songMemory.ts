@@ -17,7 +17,7 @@
 
 import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
-import { Fingerprinter, type Landmark } from "./fingerprint.js";
+import { Fingerprinter, FRAME_MS, type Landmark } from "./fingerprint.js";
 
 const PATH = process.env.SONGS_PATH ?? "/var/lib/audio-dmx-engine/songs.bin";
 const MAGIC = 0x444d5331;      // "DMS1"
@@ -194,14 +194,18 @@ export class SongMemory {
   }
 
   private vote(l: Landmark): void {
-    const hits = this.index.get(l.hash);
-    if (!hits) return;
+    const start = this.find(l.hash);
+    if (start < 0) return;
+    let end = start;
+    while (end < this.idxHash.length && this.idxHash[end] === l.hash) end++;
     // ÖVERPOPULÄR HASH → ingen information. Ett par som återkommer i hundratals
     // lägen (en loop, en drone, en stadig hi-hat) pekar inte ut någon låt utan
     // sprider bara röster; att räkna den ger falska träffar.
-    if (hits.length > 120) return;
-    for (let i = 0; i < hits.length; i += 2) {
-      const id = hits[i], tSong = hits[i + 1];
+    if (end - start > 60) return;
+    for (let i = start; i < end; i++) {
+      const v0 = this.idxVal[i];
+      const id = this.slotIds[v0 >>> 12];
+      const tSong = (v0 & 0xfff) * FRAME_MS;
       const off = tSong - l.t;
       if (off < -2000) continue;   // låten kan inte vara "före" sin egen början
       const key = id * 100000 + Math.round(off / OFFSET_BUCKET);
@@ -321,7 +325,7 @@ export class SongMemory {
 
   /** Glöm allt (UI-knapp). */
   forget(): void {
-    this.songs.clear(); this.index.clear(); this.votes.clear();
+    this.songs.clear(); this.votes.clear(); this.rebuildIndex();
     this.matchId = 0; this.matchVotes = 0; this.nextId = 1;
     this.dirty = true;
     void this.save();
@@ -356,11 +360,7 @@ export class SongMemory {
     };
     const hashes = new Uint32Array(this.learnHash), times = new Uint32Array(this.learnTime);
     this.songs.set(id, { meta, hashes, times });
-    for (let k = 0; k < hashes.length; k++) {
-      let arr = this.index.get(hashes[k]);
-      if (!arr) { arr = []; this.index.set(hashes[k], arr); }
-      arr.push(id, times[k]);
-    }
+    this.rebuildIndex();
     console.log(`[song] lärde in ny låt #${id} (${(dur / 1000).toFixed(0)}s, ${hashes.length} hashar, ${meta.drops.length} drops)`);
   }
 
