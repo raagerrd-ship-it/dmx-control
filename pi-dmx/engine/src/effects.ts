@@ -527,7 +527,16 @@ export class EffectEngine {
         // Drop-byte bara när energin får driva → en LUGN stämning (chill,
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
         const dropSwitch = dropHit && this.cfg.energyDrivesMode && held > DROP_HOLD;
-        const wantSwitch = tierChanged || now > this.smartDwellUntil;
+        // MINNETS STRUKTUR: en tvättad låt vet var karaktären skiftar och var
+        // fraserna börjar. Ett byte DÄR känns komponerat; samma byte 1,5 takt fel
+        // känns slumpmässigt. Sektionsgräns = byt gärna nu; frasgräns = ok att byta.
+        // Har låten grid väntar dwell-timern in nästa gräns (men max 20 s extra, så
+        // showen aldrig fastnar om gridet skulle vara fel).
+        const memSection = now - this.memSectionAt < 300;
+        const memPhrase = now - this.memPhraseAt < 250;
+        const gridOk = !this.memHasGrid || memSection || memPhrase || now > this.smartDwellUntil + 20000;
+        const wantSwitch = tierChanged || memSection || now > this.smartDwellUntil;
+
         // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
         // det, inte bara på energinivån. Två regler, båda dramaturgiska:
         //
