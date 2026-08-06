@@ -74,6 +74,7 @@ export class SongMemory {
   private learnIntensity: number[] = [];
   private bpmSamples: number[] = [];
   private bpmAnchor = 0;
+  private learnMode = true;       // false = mikrofon: känn igen, men lär inget
 
   // Matchning
   private votes = new Map<number, number>();   // songId*100000 + bucket → röster
