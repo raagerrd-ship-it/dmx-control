@@ -1,61 +1,55 @@
-Fem små UI-polish + två Avancerat-tillägg. Alla ändringar mirrors i mock (`src/pages/DmxController.tsx`) och Pi-UI (`pi-dmx/engine/public/index.html`).
+# Låtminne — igenkänning utan att veta låtens namn
 
-## 1. Enhetligt BPM/Konfidens-tomläge
+Motorn lär sig automatiskt varje låt som spelas via ett akustiskt fingeravtryck. Nästa gång samma inspelning spelas känns den igen inom några sekunder, och showen körs från minnet istället för att gissa i realtid: drops triggas exakt (till och med några hundra millisekunder *före*), BPM/taktankare låser direkt, och effekt/stämningskurvan blir samma som förra gången.
 
-Idag: "Lyssnar…" i kursiv rosa i BPM, tunt streck i Konfidens → asymmetriskt.
+Ingen internetuppkoppling, ingen ACRCloud, ingen låttitel — bara "är det här samma ljud som spår #218?".
 
-Nytt: Båda kolumner visar `— —` i samma stora typvikt (`text-3xl fg/40`) tills BPM låser. Liten pulserande rosa prick bredvid "BPM"-etiketten signalerar lyssning. När BPM låser: siffror fadar in, pricken slocknar.
+## Så fungerar det för användaren
 
-## 2. Dämpa AUTO-badgen
+1. Låt spelas första gången → motorn kör som idag (realtidsdetektor) och spelar tyst in ett fingeravtryck plus en tidslinje.
+2. Samma låt igen → efter ~3-5 sekunder står det "Känd låt" i UI:t, och lamporna följer den inlärda showen.
+3. Andra remix/liveversion räknas som ny låt (annat ljud = annat fingeravtryck) — den lärs in separat.
+4. Minnet rymmer ~500 låtar; äldst och minst spelade rensas bort när det blir fullt.
 
-Glas-variant likt Avancerat-chevron: bg `fg/4`, border `fg/12`, text `fg/60`. Behåller "AUTO"-texten men blir lugn indikator istället för rosa accent.
+## Teknik
 
-## 3. Neutralisera slider-legenden
+### Fingeravtryck (nytt: `pi-dmx/engine/src/fingerprint.ts`)
+- Återanvänder analysatorns befintliga FFT-magnitud (1024 samples, hop 128) — ingen extra FFT, ingen extra CPU-kostnad för transformen.
+- Per ~85 ms-ruta: plocka spektraltoppar i 6 log-spridda band, para toppar inom ett måltidsfönster (0.2–2.0 s) → 32-bitars hash `(f1, f2, Δt)` + tidsstämpel.
+- Målsatt täthet ~4 hashar/s → ~1 200 hashar per 5-minuterslåt.
 
-`CHILL / FEST / GALET` i `fg` (vit) `font-medium` istället för rosa. Thumb-halon blir ensam rosa fokuspunkt i regionen. AV/MAX oförändrade.
+### Matchning
+- Invers hash-index i minnet: `hash → [(songId, offsetMs)]`.
+- Röstning på `offset = tid_i_låt − nu`: när en offset-bucket får tillräckligt många röster (och tydlig marginal mot näst bästa) räknas låten som igenkänd — och vi vet samtidigt **var i låten** vi är. Det är den positionen hela replayen bygger på.
+- Fortlöpande omröstning i bakgrunden → hoppar man i låten eller byter spår följer matchningen med, och tappad match faller tillbaka till realtidsläget.
 
-## 4. Header-förankring
+### Lagring (nytt: `pi-dmx/engine/src/songMemory.ts`)
+- En binär fil under motorns datakatalog (`/var/lib/audio-dmx-engine/songs.bin`) + ett litet index. Uppskattning: ~500 låtar × 1 200 hashar × 8 byte ≈ 5 MB — ryms lätt, och hash-indexet byggs i RAM vid start (~600 k poster, några MB).
+- Ligger utanför `config.json` så inlärningen inte sliter på SD-kortet vid varje inställningsändring; skrivs när en låt är färdiginspelad.
+- Överlever uppdateringar (samma regel som övrig persistens); täcks av befintlig export/import som valfri bilaga.
 
-Diskret tagline under DMS-logotypen: `text-[10px] tracking-[0.3em] uppercase text-muted-foreground/60`, texten `LJUS SOM LYSSNAR`. Ingen linje — bara typografiskt ankare.
+### Tidslinje per låt
+Sparas som en gles lista med händelser i låttid:
+- `drop` (ms) med styrka — vid replay pre-fire ~120 ms före för att kompensera lampornas svarstid.
+- `bpm` + taktfas → beat-klockan ankras direkt vid igenkänning istället för att låsa in sig under 10-20 s.
+- `intensity`/effekt-spår i grov upplösning (~1 s) → samma dramaturgi som förra gången.
+- Tidslinjen förbättras varje gång låten spelas (drops som bekräftas av båda körningarna vinner; enstaka falska rensas bort).
 
-## 5. Rökmaskin-toggle (i Avancerat)
+### Motorintegration
+- `analyser.ts`: exponera spektralramen till fingerprint-modulen (ingen ändrad detektionslogik).
+- `effects.ts` / `index.ts`: när en låt är igenkänd får replay-spåret prioritet över realtidsdrops; realtidsdetektorn körs vidare parallellt som fallback och som inlärning.
+- Nytt `songMemory`-block i WS-state: `{ known: bool, plays: n, confidence, positionMs }`.
+- CPU-budget på Pi Zero 2W: toppdetektion + hashning i steget som redan körs, matchningsröstningen körs var ~250 ms på ett litet fönster. Mål < 3 % extra CPU; mätning ingår i arbetet och tätheten sänks om det inte håller.
 
-Ny rad inuti Avancerat, renderas endast om minst en fixture har rollen `hazer` eller `co2`:
+## UI
 
-```
-🌫  Dimma          [  ●○  ]
-    Rökmaskin & CO₂
-```
+- `src/pages/DmxController.tsx` (mocken, som jag äger): rad i Teknisk info — "Låtminne: Känd låt (3:e gången)" / "Lär in…" / "—", plus antal lärda låtar och en knapp för att glömma minnet.
+- Samma ändring levereras som diff/beskrivning för `pi-dmx/engine/public/index.html`, som din Pi-agent äger.
 
-Samma glas-thumb-toggle som AUX/Mikrofon. Default PÅ. State: `hazeEnabled` i `usePiMock` + `cfg.hazeEnabled` på Pi. Gate i output-mixern så alla effekter respekterar den utan egna ändringar.
+## Ordning
 
-## 6. Fixture-adresser i Avancerat
-
-Ny read-only lista längst ner i Avancerat, så en användare som råkat justera DIP-switcharna kan verifiera adressering utan att gå in i /setup. Kompakt tabell-look:
-
-```
-LAMPOR
-─────────────────────────
-Lampa 1   RGB          DMX 1
-Lampa 2   RGB          DMX 5
-Lampa 3   Hazer        DMX 9
-Lampa 4   Blinder      DMX 12
-```
-
-- Rubrik `LAMPOR` i samma stil som andra Avancerat-etiketter
-- Rader: namn (fg), typ (dim), adress (fg mono, höger)
-- Tunn `border-t` mellan rader, ingen egen kort-bakgrund
-- Data: `fixtures` från `usePi()` (mock) / `cfg.fixtures` (Pi)
-- Länk sist: `Justera i inställningar →` som öppnar /setup (bara på Pi:n, döljs i mocken)
-
-## Teknisk detalj
-
-Filer:
-- `src/pages/DmxController.tsx` — punkt 1–6 UI
-- `src/hooks/usePiMock.ts` — `hazeEnabled` fält + setter, mock-fixtures-lista med adresser
-- `pi-dmx/engine/public/index.html` — punkt 1–6 speglade
-- `pi-dmx/engine/src/config.ts` — `hazeEnabled` fält
-- `pi-dmx/engine/src/effects.ts` — output-gate på hazer/co2 när `hazeEnabled=false`
-- `pi-dmx/engine/src/server.ts` — persist + WS-message `setHaze`
-
-Ingen ändring i effekter, palette, rotation, BLE eller fixture-modellen. Punkt 6 är rent en läs-vy över befintlig `fixtures`-data.
+1. `fingerprint.ts` + enhetstest mot en inspelad fil via `tools/replay.mjs` → verifiera: samma fil matchar sig själv, två olika låtar matchar inte.
+2. `songMemory.ts` (lagring + index + rensning) → verifiera: 500 låtar laddas vid start under 1 s.
+3. Tidslinje-inspelning och replay i motorn → verifiera: andra genomspelningen triggar drops på samma sekunder som första.
+4. CPU-mätning på Pi → verifiera: inga ALSA-överskridningar, analystiden kvar under budget.
+5. UI-rad i mocken + diff för Pi-filen.
