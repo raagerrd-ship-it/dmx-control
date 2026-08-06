@@ -153,6 +153,10 @@ export class SongMemory {
   private vote(l: Landmark): void {
     const hits = this.index.get(l.hash);
     if (!hits) return;
+    // ÖVERPOPULÄR HASH → ingen information. Ett par som återkommer i hundratals
+    // lägen (en loop, en drone, en stadig hi-hat) pekar inte ut någon låt utan
+    // sprider bara röster; att räkna den ger falska träffar.
+    if (hits.length > 120) return;
     for (let i = 0; i < hits.length; i += 2) {
       const id = hits[i], tSong = hits[i + 1];
       const off = tSong - l.t;

@@ -13,10 +13,11 @@ function mkSong(seed) {
   let s = seed;
   const rnd = () => ((s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
   // Stabil "låt": 40 toner som byts var 2:a sekund → reproducerbart spektrum.
-  const notes = Array.from({ length: 60 }, () => Array.from({ length: 4 }, () => 3 + Math.floor(rnd() * 200)));
+  // Toner byts var 200 ms över hela spektrumet → varierat, låt-likt förlopp.
+  const notes = Array.from({ length: 600 }, () => Array.from({ length: 4 }, () => 3 + Math.floor(rnd() * 210)));
   return (tMs, mag) => {
     mag.fill(0.001);
-    const set = notes[Math.floor(tMs / 2000) % notes.length];
+    const set = notes[Math.floor(tMs / 200) % notes.length];
     for (const b of set) mag[b] = 1 + 0.05 * Math.sin(tMs / 130 + b);
   };
 }
