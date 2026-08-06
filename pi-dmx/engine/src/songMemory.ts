@@ -311,12 +311,18 @@ export class SongMemory {
       const v = (this.votes.get(key) ?? 0) + 1;
       this.votes.set(key, v);
       if (v >= VOTES_NEEDED && id !== this.matchId && v >= this.bestOther(id) * MARGIN) {
+        const wasMatch = this.matchId;
         this.matchId = id;
         this.matchOffset = Math.round(off / OFFSET_BUCKET) * OFFSET_BUCKET;
         this.replayIdx = 0;
         const s = this.songs.get(id);
-        console.log(`[song] känd låt #${id} (${s?.meta.plays ?? 0} tidigare spelningar), position ${((l.t + this.matchOffset) / 1000).toFixed(1)}s`);
+        const pos = l.t + this.matchOffset;
+        console.log(`[song] känd låt #${id} (${s?.meta.plays ?? 0} tidigare spelningar), position ${(pos / 1000).toFixed(1)}s`);
+        // Ny känd låt som just börjat mitt i ett rullande segment → låtgräns.
+        // (En match nära låtens början direkt efter segmentstart är samma låt, ej gräns.)
+        if (this.playStart && this.clock() - this.playStart > RECOG_SPLIT_MIN_MS && pos < RECOG_POS_MS && wasMatch !== id) this.recogSplit = pos;
       }
+
       if (id === this.matchId) this.matchVotes = Math.max(this.matchVotes, v);
     }
   }
