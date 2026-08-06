@@ -609,6 +609,9 @@ export class SongMemory {
 
   private addSong(dur: number, bpm: number): number {
     if (this.songs.size >= MAX_SONGS) this.evict();
+    // BUGG (mätt): samma id loggades två gånger — nextId kunde hamna efter en
+    // redan använd id (t.ex. efter omladdning). Härled alltid ur befintliga låtar.
+    for (const s of this.songs.values()) if (s.meta.id >= this.nextId) this.nextId = s.meta.id + 1;
     const id = this.nextId++;
     const meta: SongMeta = {
       id, createdMs: this.clock(), lastMs: this.clock(), plays: 1, durationMs: dur,
