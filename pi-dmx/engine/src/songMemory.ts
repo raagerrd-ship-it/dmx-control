@@ -239,8 +239,12 @@ export class SongMemory {
    * Matas varje hop. Sköter låtgränser (start/slut), tidslinje-inspelning och
    * plockar fram nästa replay-drop.
    */
-  tick(o: { level: number; dropped: boolean; bpm: number; bpmConfidence: number; intensity: number; beatAnchorMs: number }): void {
+  tick(o: { level: number; dropped: boolean; bpm: number; bpmConfidence: number; intensity: number; beatAnchorMs: number; learn?: boolean }): void {
     const now = this.clock();
+    const learn = o.learn !== false;
+    // Byte av ingång mitt i en inlärning → kasta det halva materialet, annars
+    // hamnar ett halvt mik-fingeravtryck i minnet.
+    if (learn !== this.learnMode) { this.learnMode = learn; this.dropLearning(); }
     if (o.level > 0.02) this.lastLoud = now;
     if (!this.playStart) {
       if (o.level > 0.05) { this.playStart = now; this.lastLoud = now; this.fp.reset(); }
@@ -251,15 +255,17 @@ export class SongMemory {
     const tLive = now - this.playStart;
     // Tidslinje-inspelning (alltid — även för en känd låt, så minnet förbättras).
     const songT = this.matchId ? tLive + this.matchOffset : tLive;
-    if (o.dropped) this.learnDrops.push({ t: songT, s: Math.min(1, 0.5 + o.intensity * 0.5), c: 1 });
-    const sec = Math.floor(songT / 1000);
-    if (sec >= 0 && this.learnIntensity.length <= sec) {
-      while (this.learnIntensity.length < sec) this.learnIntensity.push(128);
-      this.learnIntensity.push(Math.round(Math.max(0, Math.min(1, o.intensity)) * 255));
-    }
-    if (o.bpm > 0 && o.bpmConfidence > 0.4) {
-      if (this.bpmSamples.length < 4000) this.bpmSamples.push(o.bpm);
-      if (!this.bpmAnchor && o.beatAnchorMs) this.bpmAnchor = ((o.beatAnchorMs - this.playStart) % 60000 + 60000) % 60000;
+    if (learn) {
+      if (o.dropped) this.learnDrops.push({ t: songT, s: Math.min(1, 0.5 + o.intensity * 0.5), c: 1 });
+      const sec = Math.floor(songT / 1000);
+      if (sec >= 0 && this.learnIntensity.length <= sec) {
+        while (this.learnIntensity.length < sec) this.learnIntensity.push(128);
+        this.learnIntensity.push(Math.round(Math.max(0, Math.min(1, o.intensity)) * 255));
+      }
+      if (o.bpm > 0 && o.bpmConfidence > 0.4) {
+        if (this.bpmSamples.length < 4000) this.bpmSamples.push(o.bpm);
+        if (!this.bpmAnchor && o.beatAnchorMs) this.bpmAnchor = ((o.beatAnchorMs - this.playStart) % 60000 + 60000) % 60000;
+      }
     }
 
     // Röstförfall: gamla röster ska inte hålla en match vid liv i en ny låt.
