@@ -61,7 +61,7 @@ const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
 // och matchen pekar på låtens BÖRJAN, är det en nära-säker låtgräns — gratis, allt
 // är redan uträknat. Övertrumfar evidens-regeln och minsta längd: exakta gränser
 // för kända låtar, dvs varje repris skärper minnet.
-const RECOG_SPLIT_MIN_MS = 20000;   // segmentet måste ha rullat så länge
+const RECOG_SPLIT_MIN_MS = MIN_SEG_MS;   // aldrig committa under minsta låtlängd — annars ger en smutsig blob en kaskad
 const RECOG_POS_MS = 20000;         // ...och matchen ligga inom låtens första 20 s
 
 
@@ -332,7 +332,7 @@ export class SongMemory {
         console.log(`[song] känd låt #${id} (${s?.meta.plays ?? 0} tidigare spelningar), position ${(pos / 1000).toFixed(1)}s`);
         // Ny känd låt som just börjat mitt i ett rullande segment → låtgräns.
         // (En match nära låtens början direkt efter segmentstart är samma låt, ej gräns.)
-        if (this.playStart && this.clock() - this.playStart > RECOG_SPLIT_MIN_MS && pos < RECOG_POS_MS && wasMatch !== id) this.recogSplit = pos;
+        if (this.playStart && this.clock() - this.playStart >= RECOG_SPLIT_MIN_MS && pos < RECOG_POS_MS && wasMatch !== id) this.recogSplit = pos;
       }
 
       if (id === this.matchId) this.matchVotes = Math.max(this.matchVotes, v);
@@ -577,7 +577,7 @@ export class SongMemory {
     this.playStart = 0;
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
-    this.segBpm = 0; this.segBpmConf = 0; this.candBpm = 0; this.candSince = 0; this.bpmOffSince = 0; this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
+    this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
     this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogSplit = -1;
 
 
