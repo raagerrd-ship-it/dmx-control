@@ -254,9 +254,10 @@ export class SongMemory {
     this.lm.length = 0;
     this.fp.push(mag, binHz, tLive, this.lm);
     for (const l of this.lm) {
-      if (learn) { this.learnHash.push(l.hash); this.learnTime.push(l.t); }
+      if (learn && l.store) { this.learnHash.push(l.hash); this.learnTime.push(l.t); }
       this.vote(l);
     }
+
     this.pushNovelty(mag, binHz);
   }
 
