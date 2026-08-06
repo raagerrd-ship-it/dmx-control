@@ -38,10 +38,16 @@ const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som b�
 // bara inlärningen för spåret och realtidsdetektorn kör som förut — ren uppsida.
 const MIN_SEG_MS = 75000;      // dela aldrig en sekvens kortare än så
 const MAX_SEG_MS = 600000;     // 10 min utan gräns → tvinga fram en
-const EVIDENCE_NEEDED = 2;     // hur många signaler som måste peka på gräns
-const BPM_JUMP = 0.07;         // >7 % tempoändring
-const BPM_HOLD_MS = 4000;      // ...som håller i 4 s (inte en halvtaktsmiss)
-const DIP_RATIO = 0.35;        // nivå under 35 % av snittet = dipp/crossfade
+// MÄTT PÅ HÅRDVARA (791 prover, Spotify via aux): nivån låg 0.38–0.91 med snitt
+// 0.76 — inget enda prov under 35 % av snittet. Nivådippen är alltså i praktiken
+// en död signal, och "räkna två signaler" gjorde klangskiftet obligatoriskt.
+// Därför VIKTAD evidens: ett starkt tempohopp räcker ensamt.
+const EVIDENCE_NEEDED = 2;       // svag evidens: minst två signaler
+const BPM_JUMP = 0.07;           // >7 % tempoändring = svag signal
+const BPM_JUMP_STRONG = 0.12;    // >12 % som håller länge = ny låt, ensam nog
+const BPM_HOLD_MS = 4000;        // ...som håller i 4 s (inte en halvtaktsmiss)
+const BPM_HOLD_STRONG_MS = 6000; // starkt hopp måste hålla ännu längre
+const DIP_RATIO = 0.55;          // nivå under 55 % av snittet (min/snitt mätt 0.505)
 const DIP_WIN_MS = 6000;       // dipp räknas som evidens så länge efteråt
 const START_LEVEL = 0.15;      // volymgrind: starta bara på tydlig musik
 const START_HOLD_MS = 1000;    // ...som hållit i en sekund
@@ -51,6 +57,13 @@ const NOV_FACTOR = 3.0;        // ...och minst så många gånger låtens egen v
 const NOV_HITS = 2;            // två fönster i rad (3 s) → inte en enstaka spik
 const NOV_WIN_KEEP_MS = 6000;  // klangskifte räknas som evidens så länge efteråt
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
+// IGENKÄNNING SOM GRÄNS. Känner igenkännaren en ANNAN känd låt mitt i ett segment,
+// och matchen pekar på låtens BÖRJAN, är det en nära-säker låtgräns — gratis, allt
+// är redan uträknat. Övertrumfar evidens-regeln och minsta längd: exakta gränser
+// för kända låtar, dvs varje repris skärper minnet.
+const RECOG_SPLIT_MIN_MS = 20000;   // segmentet måste ha rullat så länge
+const RECOG_POS_MS = 20000;         // ...och matchen ligga inom låtens första 20 s
+
 
 
 
@@ -69,6 +82,7 @@ export interface SongMemoryState {
   positionMs: number;   // var i låten vi är
   learning: boolean;    // spelar just nu in en ny låt
   learningId: number;   // id som inlärningen kommer att skrivas till (0 = ingen)
+  lastEvidence: string[];   // gränssignaler som var aktiva vid senaste kontrollen (diagnostik)
 
 }
 
@@ -115,7 +129,10 @@ export class SongMemory {
   private novHits = 0;            // fönster i rad över tröskeln
   private levAvg = 0;             // långsamt nivåsnitt (dippdetektering)
   private dipAt = 0;              // väggklocka för senaste nivådippen
+  private lastEvidence: string[] = [];   // senast aktiva gränssignaler (diagnostik)
   private loudSince = 0;          // volymgrind: sedan när nivån är tydlig musik
+  private recogSplit = -1;        // ≥0: igenkänningen pekar på gräns, matchens position i ms
+
 
 
 
@@ -304,12 +321,18 @@ export class SongMemory {
       const v = (this.votes.get(key) ?? 0) + 1;
       this.votes.set(key, v);
       if (v >= VOTES_NEEDED && id !== this.matchId && v >= this.bestOther(id) * MARGIN) {
+        const wasMatch = this.matchId;
         this.matchId = id;
         this.matchOffset = Math.round(off / OFFSET_BUCKET) * OFFSET_BUCKET;
         this.replayIdx = 0;
         const s = this.songs.get(id);
-        console.log(`[song] känd låt #${id} (${s?.meta.plays ?? 0} tidigare spelningar), position ${((l.t + this.matchOffset) / 1000).toFixed(1)}s`);
+        const pos = l.t + this.matchOffset;
+        console.log(`[song] känd låt #${id} (${s?.meta.plays ?? 0} tidigare spelningar), position ${(pos / 1000).toFixed(1)}s`);
+        // Ny känd låt som just börjat mitt i ett rullande segment → låtgräns.
+        // (En match nära låtens början direkt efter segmentstart är samma låt, ej gräns.)
+        if (this.playStart && this.clock() - this.playStart > RECOG_SPLIT_MIN_MS && pos < RECOG_POS_MS && wasMatch !== id) this.recogSplit = pos;
       }
+
       if (id === this.matchId) this.matchVotes = Math.max(this.matchVotes, v);
     }
   }
@@ -346,8 +369,12 @@ export class SongMemory {
 
     if (now - this.lastLoud > SILENCE_END_MS) { this.commit(); return; }
 
+    // Igenkänning-som-gräns: säkrare än all heuristik → egen väg, före evidensen.
+    if (this.recogSplit >= 0) { this.splitOnRecognition(now, this.recogSplit); return; }
+
     const tLive = now - this.playStart;
     if (this.boundary(now, tLive, o)) return;
+
 
     // Tidslinje-inspelning (alltid — även för en känd låt, så minnet förbättras).
     const songT = this.matchId ? tLive + this.matchOffset : tLive;
@@ -395,10 +422,14 @@ export class SongMemory {
 
     if (o.bpmConfidence > 0.5 && o.bpm > 40 && !this.segBpm) this.segBpm = o.bpm;
     let bpmShift = "";
+    let bpmStrong = false;
     if (o.bpmConfidence > 0.5 && o.bpm > 40 && this.segBpm) {
-      if (Math.abs(o.bpm - this.segBpm) / this.segBpm > BPM_JUMP) {
+      const dev = Math.abs(o.bpm - this.segBpm) / this.segBpm;
+      if (dev > BPM_JUMP) {
         if (!this.bpmOffSince) this.bpmOffSince = now;
-        else if (now - this.bpmOffSince > BPM_HOLD_MS) bpmShift = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
+        const held = now - this.bpmOffSince;
+        if (held > BPM_HOLD_MS) bpmShift = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
+        if (dev > BPM_JUMP_STRONG && held > BPM_HOLD_STRONG_MS) bpmStrong = true;
       } else { this.bpmOffSince = 0; this.segBpm = this.segBpm * 0.95 + o.bpm * 0.05; }
     }
     if (tLive < MIN_SEG_MS) return false;   // en drop/breakdown ligger alltid inom minsta längd
@@ -407,9 +438,12 @@ export class SongMemory {
     if (bpmShift) ev.push(bpmShift);
     if (this.novAt && now - this.novAt < NOV_WIN_KEEP_MS) ev.push("klangskifte");
     if (this.dipAt && now - this.dipAt < DIP_WIN_MS) ev.push("nivådipp");
+    this.lastEvidence = bpmStrong ? [...ev, "starkt tempohopp"] : ev;
 
     let why = "";
-    if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
+    // Starkt, ihållande tempohopp räcker ensamt — inom en låt ändras inte tempot så.
+    if (bpmStrong) why = `${bpmShift} (starkt)`;
+    else if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
     else if (tLive > MAX_SEG_MS) why = "maxlängd";   // aldrig en 22-minuters gröt igen
     if (!why) return false;
 
@@ -420,6 +454,22 @@ export class SongMemory {
     this.lastLoud = now;
     return true;
   }
+
+  /** Gräns satt av igenkännaren: skriv in det gångna segmentet och starta nästa
+   *  med matchen behållen, tidsställd på låtens faktiska position. */
+  private splitOnRecognition(now: number, pos: number): void {
+    const id = this.matchId;
+    console.log(`[song] låtgräns efter ${((now - this.playStart) / 1000).toFixed(0)}s (igenkänd låt #${id} vid ${(pos / 1000).toFixed(1)}s)`);
+    this.commit();   // nollställer bl.a. matchId och recogSplit
+    this.playStart = now - pos;
+    this.lastLoud = now;
+    this.matchId = id;
+    this.matchOffset = 0;
+    this.matchVotes = VOTES_NEEDED;
+    this.replayIdx = 0;
+  }
+
+
 
 
   /** Drop ur minnet som ska fyras av denna renderframe (0 = ingen). */
@@ -463,6 +513,7 @@ export class SongMemory {
       positionMs: this.playStart ? this.clock() - this.playStart + (s ? this.matchOffset : 0) : 0,
       learning: !!this.playStart && !s && this.learnMode,
       learningId: !!this.playStart && !s && this.learnMode ? this.nextId : 0,
+      lastEvidence: this.lastEvidence.slice(),
     };
 
   }
@@ -525,7 +576,7 @@ export class SongMemory {
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
     this.segBpm = 0; this.bpmOffSince = 0; this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
-    this.levAvg = 0; this.dipAt = 0; this.loudSince = 0;
+    this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogSplit = -1;
 
 
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.replayIdx = 0; this.pendingDrop = 0;

@@ -1054,7 +1054,8 @@ function applyFrame(f) {
   // null tills låtminnes-motorn är deployad → badgen står kvar på "—".
   if (songBadge) {
     const sg = f.song;
-    if (sg && sg.learning) { songBadge.textContent = "● Spelar in låt"; songBadge.style.color = "#ff4d4d"; }
+    if (sg && sg.learning) { songBadge.textContent = "● Spelar in låt" + (sg.learningId ? " #" + sg.learningId : ""); songBadge.style.color = "#ff4d4d"; }
+    else if (sg && sg.refining) { songBadge.textContent = "◌ Tvättar inspelning" + (sg.refiningId ? " #" + sg.refiningId : "") + "…"; songBadge.style.color = "rgba(255,255,255,.55)"; }
     else if (sg && sg.known) { songBadge.textContent = "▶ Kör på inspelning · " + sg.plays + "×"; songBadge.style.color = "var(--pink,#ff3ea5)"; }
     else { songBadge.textContent = "—"; songBadge.style.color = "rgba(255,255,255,.35)"; }
   }
