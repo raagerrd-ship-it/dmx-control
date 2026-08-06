@@ -392,7 +392,7 @@ export class SongMemory {
   }
 
 
-  private addSong(dur: number, bpm: number): void {
+  private addSong(dur: number, bpm: number): number {
     if (this.songs.size >= MAX_SONGS) this.evict();
     const id = this.nextId++;
     const meta: SongMeta = {
@@ -404,6 +404,7 @@ export class SongMemory {
     this.songs.set(id, { meta, hashes, times });
     this.rebuildIndex();
     console.log(`[song] lärde in ny låt #${id} (${(dur / 1000).toFixed(0)}s, ${hashes.length} hashar, ${meta.drops.length} drops)`);
+    return id;
   }
 
   /** Andra (eller femte) gången samma låt: bekräftade drops vinner, engångs-
