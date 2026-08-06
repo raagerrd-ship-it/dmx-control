@@ -298,6 +298,11 @@ export class SongMemory {
     return d;
   }
 
+  /** Lär just nu in en NY låt (aux, ej igenkänd) → temp-inspelningen ska rulla.
+   *  Egen getter i stället för state() på ljudvägen: state() allokerar ett
+   *  objekt, och den här frågan ställs 375 gånger i sekunden. */
+  get learningNew(): boolean { return !!this.playStart && !this.matchId && this.learnMode; }
+
   /** Igenkänd låt → true medan replayen äger showen. */
   get recognized(): boolean { return this.matchId !== 0; }
 
@@ -347,27 +352,52 @@ export class SongMemory {
   private dropLearning(): void {
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
+    this.onDropLearning?.();
+  }
+
+  /** Anropas när en låt är slut: id på låten som lärdes in/uppdaterades, eller
+   *  null när inget lärdes (för kort, mikrofon, ingångsbyte). Motorn använder
+   *  det för att trigga offline-tvätten. */
+  onCommit?: (songId: number | null) => void;
+  /** Anropas när pågående inlärning kastas → temp-inspelningen ska avbrytas. */
+  onDropLearning?: () => void;
+
+  /** Ersätt tidslinjen med de offline-tvättade värdena. Fingeravtrycket
+   *  (hashar + tider) och spelräknaren rörs INTE — de är för matchning. */
+  applyRefined(songId: number, t: { drops: { t: number; s: number }[]; bpm: number; beatPhaseMs: number; intensity: number[] }): void {
+    const s = this.songs.get(songId);
+    if (!s) return;
+    s.meta.drops = t.drops.map((d) => ({ t: d.t, s: d.s, c: Math.max(2, s.meta.plays) }));   // tvättade drops är bekräftade
+    if (t.bpm > 40) { s.meta.bpm = t.bpm; s.meta.beatPhaseMs = t.beatPhaseMs; }
+    if (t.intensity.length) s.meta.intensity = t.intensity;
+    this.dirty = true;
+    void this.save();
+    console.log(`[song] låt #${songId} tvättad: ${t.drops.length} drops, ${t.bpm} BPM`);
   }
 
   /** Låten är slut: skriv in i minnet (ny låt) eller förbättra den kända. */
   private commit(): void {
     const dur = this.lastLoud - this.playStart;
     const matched = this.matchId ? this.songs.get(this.matchId) : undefined;
+    let committed: number | null = null;
     if (this.learnMode && dur >= MIN_LEARN_MS && this.learnHash.length > 60) {
       const bpm = median(this.bpmSamples);
-      if (matched) this.mergeInto(matched, dur, bpm);
-      else this.addSong(dur, bpm);
+      if (matched) { this.mergeInto(matched, dur, bpm); committed = matched.meta.id; }
+      else committed = this.addSong(dur, bpm);
       this.dirty = true;
       void this.save();
     }
     // Nollställ för nästa låt.
     this.playStart = 0;
-    this.dropLearning();
+    this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
+    this.bpmSamples = []; this.bpmAnchor = 0;
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.fp.reset();
+    this.onCommit?.(committed);
   }
 
-  private addSong(dur: number, bpm: number): void {
+
+  private addSong(dur: number, bpm: number): number {
     if (this.songs.size >= MAX_SONGS) this.evict();
     const id = this.nextId++;
     const meta: SongMeta = {
@@ -379,6 +409,7 @@ export class SongMemory {
     this.songs.set(id, { meta, hashes, times });
     this.rebuildIndex();
     console.log(`[song] lärde in ny låt #${id} (${(dur / 1000).toFixed(0)}s, ${hashes.length} hashar, ${meta.drops.length} drops)`);
+    return id;
   }
 
   /** Andra (eller femte) gången samma låt: bekräftade drops vinner, engångs-

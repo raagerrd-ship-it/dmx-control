@@ -62,7 +62,7 @@ export interface ServerDeps {
   resetFogService: () => void;
   /** Låtminnets tillstånd (igenkänning/inlärning) + glöm-knapp. */
   songMemory?: {
-    state: () => { songs: number; known: boolean; plays: number; confidence: number; positionMs: number; learning: boolean };
+    state: () => { songs: number; known: boolean; plays: number; confidence: number; positionMs: number; learning: boolean; refining: boolean };
     forget: () => void;
   };
   onConfigChanged?: () => void;

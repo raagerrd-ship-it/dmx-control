@@ -12,6 +12,9 @@
  */
 
 import { readFileSync, existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { LearnRecorder } from "./learnRecorder.js";
+import { RefineQueue } from "./refineQueue.js";
 import { AudioCapture } from "./audio.js";
 import { Analyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
@@ -87,6 +90,23 @@ await songs.load();
 // sorl med 20× gain → smutsigt fingeravtryck).
 analyser.setSpectrumSink((mag, binHz) => songs.pushSpectrum(mag, binHz, cfg.audioInput !== "mic"));
 
+// ── OFFLINE-TVÄTT ──────────────────────────────────────────────────────────
+// Medan en NY låt lärs in på aux strömmas råljudet till en temp-WAV. När låten
+// tystnat spawnas refinern (egen process, nice 19) som räknar om drops/BPM/
+// energi framåtblickande och skriver en sidecar som ersätter tidslinjen.
+const DATA_DIR = dirname(process.env.SONGS_PATH ?? "/var/lib/audio-dmx-engine/songs.bin");
+const recorder = new LearnRecorder(join(DATA_DIR, "learn.wav"), cfg.audio.rate);
+const refiner = new RefineQueue(DATA_DIR, (t) => songs.applyRefined(t.songId, t));
+refiner.cleanStale();
+songs.onDropLearning = () => recorder.abort();
+songs.onCommit = (songId) => {
+  if (!songId) { recorder.abort(); return; }   // inget lärdes in → kasta ljudet
+  const wav = recorder.finish();
+  if (wav) refiner.start(wav, songId);
+};
+
+
+
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
 let lastRenderMs = 0;
@@ -120,6 +140,10 @@ capture.on("chunk", (samples: Float32Array) => {
     bpmConfidence: frame.bpmConfidence, intensity: frame.intensity,
     beatAnchorMs: frame.beatAnchorMs, learn: cfg.audioInput !== "mic",
   });
+  // Temp-inspelning: bara medan en NY låt lärs in på aux (state().learning),
+  // aldrig på mik och aldrig för en redan känd låt.
+  if (songs.learningNew) { if (!recorder.active) recorder.start(); recorder.write(samples); }
+
   if (songs.recognized) {
     if (songs.takeDrop() > 0) outDrop++;          // pre-fired ur minnet
     const ri = songs.replayIntensity();
@@ -281,7 +305,7 @@ const serverDeps = {
   getDmxConnected: () => dmx.isConnected(),
   getFogStatus: () => effects.getFogStatus(),
   resetFogService: () => effects.resetFogService(),
-  songMemory: { state: () => songs.state(), forget: () => songs.forget() },
+  songMemory: { state: () => ({ ...songs.state(), refining: refiner.busy }), forget: () => songs.forget() },
   cycleMode,
 
   resetAgc: (g?: number) => analyser.resetGain(g),
@@ -435,6 +459,8 @@ setInterval(() => {
 }, 300000);
 
 process.on("SIGTERM", () => {
+  recorder.abort();
+  refiner.stop();
   void songs.flush();
   capture.stop();
   button?.stop();
