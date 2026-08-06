@@ -15,6 +15,6 @@ export const pendel: EffectDef = {
     const d = Math.abs(c.idx - pos);
     const glow = Math.exp(-d * 1.5);
     const hue = c.mixedSector(Math.floor(step / 16)) / 6;
-    return c.hsv(hue, 1, Math.min(1, 0.08 + glow * (0.55 + c.audio * 0.45) + c.punch * 0.2));
+    return c.hsv(hue, 1, Math.min(1, 0.20 + glow * (0.55 + c.audio * 0.45) + c.punch * 0.2));
   },
 };

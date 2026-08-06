@@ -10,7 +10,7 @@ export const airglow: EffectDef = {
   key: "airglow", label: "Luft-glöd", tier: "lugn",
   desc: "Nästan mörkt; varje cymbal/shaker/väsljud tänder en gnista i kanten.",
   render(c) {
-    const base = 0.07 + 0.06 * Math.sin(c.t * 0.3 + c.idx * 1.7);   // svag vilo-glöd (krispare)
+    const base = 0.20 + 0.06 * (0.5 + 0.5 * Math.sin(c.t * 0.3 + c.idx * 1.7));   // svag vilo-glöd (krispare)
     const spark = c.shaped(0, Math.max(c.frame.onset.air, c.frame.onset.treble)) * 0.95;  // rena anslag (shaker/hi-hat)
     const hue = 0.40 + c.frame.spec.air * 0.10;                    // grön → cyan när air sustained
     return c.hsv(hue, 1, Math.min(1, base + spark + c.punch * 0.25));   // riktig dunk lyfter glöden kort

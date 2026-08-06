@@ -31,14 +31,23 @@ const FEEL: Record<MoodId, {
                          //   ljuset tonar långsamt = "långsam reaktion". (fart-lägen
                          //   har egen kort decay; detta rör calm/fart.)
   // ── Regi (pro) — anpassas per stämning (scenicAnchor lämnas till ägaren; layout-beroende) ──
-  energyCeiling: boolean; // dynamiskt VU-ljustak (styrka följer sektionsenergin)
+  /** Dynamiskt VU-ljustak. AV i alla stamningar sedan 2026-08-07: det var
+   *  ENDA signalen som applicerades EFTER ballistiken (outjamnad, med flit) och
+   *  gav synligt FLADDER vid max ljusstyrka, dar VU:n ror sig 0.8-1.0.
+   *  Isolerat med tre test: clubMode av = ingen skillnad; en lampa pa ratt
+   *  DMX 255 stod HELT stabil (hardvaran frisk); energyCeiling av = fladdret
+   *  BORTA. Agarens dom med den av: "betydligt battre och jamnare".
+   *  Effekterna reagerar anda pa musiken via c.audio/c.punch — VU-taket var ett
+   *  EXTRA globalt lager, inte sjalva musikreaktiviteten.
+   *  Kan fortfarande slas pa manuellt i Regi (pro). */
+  energyCeiling: boolean;
   riserStrobe: boolean;   // accelererande strobe + vit-kollaps under uppbyggnad → drama
   dropHeadroom: boolean;  // normal ≤90%, drops → 100% (drops poppar hårdare)
   beatSyncStrength: number; // hur hårt PLL-fasen knuffas mot trumslag (0/0.10/0.18/0.30)
 }> = {
-  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  energyDrivesMode: false, smartDwellMs: 40000, master: 0.30, calmDecay: 1.20, energyCeiling: true, riserStrobe: false, dropHeadroom: false, beatSyncStrength: 0.10 },
-  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 15000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: false, dropHeadroom: false, beatSyncStrength: 0.18 },
-  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 10000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: true,  dropHeadroom: true,  beatSyncStrength: 0.30 },
+  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  energyDrivesMode: false, smartDwellMs: 40000, master: 0.30, calmDecay: 1.20, energyCeiling: false, riserStrobe: false, dropHeadroom: false, beatSyncStrength: 0.10 },
+  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 15000,  master: 1.00, calmDecay: 0.42, energyCeiling: false, riserStrobe: false, dropHeadroom: false, beatSyncStrength: 0.18 },
+  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 10000,  master: 1.00, calmDecay: 0.42, energyCeiling: false, riserStrobe: true,  dropHeadroom: true,  beatSyncStrength: 0.30 },
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 

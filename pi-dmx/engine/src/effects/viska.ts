@@ -13,6 +13,6 @@ export const viska: EffectDef = {
     const spark = role === 0 ? d.kick * 0.55 : role === 1 ? d.snare * 0.75 : d.hat * 0.6;
     const hue = role === 0 ? 0.02 : role === 1 ? 0.10 : 0.55;   // röd / varmvit / iskall
     const sat = role === 1 ? 0.25 : 0.9;
-    return c.hsv(hue, sat, Math.min(1, 0.03 + spark));
+    return c.hsv(hue, sat, Math.min(1, 0.20 + spark));
   },
 };

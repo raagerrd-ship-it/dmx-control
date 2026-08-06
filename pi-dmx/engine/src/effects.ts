@@ -646,7 +646,14 @@ export class EffectEngine {
       // aliasade per-hop-rippel till synligt flimmer). En lätt ~90ms-glidning här
       // utjämnar sista resten utan lång svans. (Drop bypassar via dropEnv nedan.)
       const vuRaw = Math.max(0, Math.min(1, frame.levelVU));
-      this.vu += (vuRaw - this.vu) * (1 - Math.exp(-dtSec / 0.09));
+      // ASYMMETRISK VU: snabb UPP (transienter/drops syns), langsam NER (inget
+      // fladder). MATT: med symmetriska 90 ms fladdrade riggen synligt vid MAX
+      // ljusstyrka — dar VU:n ror sig 0.8-1.0 och taket appliceras EFTER
+      // ballistiken, alltsa helt outjamnat. Av/pa-test av energyCeiling
+      // isolerade det: flimret forsvann helt med taket av, och en lampa pa
+      // ratt DMX 255 stod samtidigt HELT stabil (= hardvaran ar frisk).
+      const vuTau = vuRaw > this.vu ? 0.12 : 0.60;   // 0.35 gav kvarvarande fladder -> mjukare fall
+      this.vu += (vuRaw - this.vu) * (1 - Math.exp(-dtSec / vuTau));
       // KLUBB-LÄGE: kvadrera → hård kontrast (mörkt mellan, explosion på topp).
       const vuBase = this.cfg.clubMode ? this.vu * this.vu : this.vu;
       // VU-GOLV: mappa om VU-spannet så det ALDRIG drar ner under VU_FLOOR. 0% VU →

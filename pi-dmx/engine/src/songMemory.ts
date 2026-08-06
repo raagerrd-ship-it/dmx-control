@@ -36,24 +36,24 @@ const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som b�
 // Två vakter gör det robust: minsta låtlängd (en drop/breakdown sker alltid inom
 // den) och ett maxtak (aldrig 22 minuters gröt igen). Missas en gräns tappar vi
 // bara inlärningen för spåret och realtidsdetektorn kör som förut — ren uppsida.
-const MIN_SEG_MS = 75000;      // dela aldrig en sekvens kortare än så
+const MIN_SEG_MS = 110000;     // MÄTT: 75 s triggade direkt (två segment exakt 75 s) → höjt
 const MAX_SEG_MS = 600000;     // 10 min utan gräns → tvinga fram en
-// MÄTT PÅ HÅRDVARA (791 prover, Spotify via aux): nivån låg 0.38–0.91 med snitt
-// 0.76 — inget enda prov under 35 % av snittet. Nivådippen är alltså i praktiken
-// en död signal, och "räkna två signaler" gjorde klangskiftet obligatoriskt.
-// Därför VIKTAD evidens: ett starkt tempohopp räcker ensamt.
-const EVIDENCE_NEEDED = 2;       // svag evidens: minst två signaler
-const BPM_JUMP = 0.07;           // >7 % tempoändring = svag signal
-const BPM_JUMP_STRONG = 0.12;    // >12 % som håller länge = ny låt, ensam nog
+// MÄTT PÅ HÅRDVARA: tempoföljaren vacklar systematiskt INOM samma låt
+// (126→91, 129→92, 129→93, 129→92 på 28 s — kvot 1.39–1.40 varje gång, en
+// tolkningsmiss som ingen kvotlista fångar). Ett tempohopp får därför ALDRIG
+// fyra en gräns ensamt: BPM är en STÖDsignal, en av två. Den bärande gränsen är
+// nivådipp + klangskifte, så klangskiftet är gjort känsligare för att kompensera.
+const EVIDENCE_NEEDED = 2;       // alltid minst två signaler
+const BPM_JUMP = 0.07;           // >7 % tempoändring = en (av två) signaler
 const BPM_HOLD_MS = 4000;        // ...som håller i 4 s (inte en halvtaktsmiss)
-const BPM_HOLD_STRONG_MS = 6000; // starkt hopp måste hålla ännu längre
 const DIP_RATIO = 0.55;          // nivå under 55 % av snittet (min/snitt mätt 0.505)
+
 const DIP_WIN_MS = 6000;       // dipp räknas som evidens så länge efteråt
 const START_LEVEL = 0.15;      // volymgrind: starta bara på tydlig musik
 const START_HOLD_MS = 1000;    // ...som hållit i en sekund
 const NOV_WIN_MS = 1500;       // klangprofil per 1.5 s
 const NOV_TH = 0.30;           // L1-avstånd (0..2): absolut golv
-const NOV_FACTOR = 3.0;        // ...och minst så många gånger låtens egen variation
+const NOV_FACTOR = 2.2;        // ...och minst så många gånger låtens egen variation (sänkt: bär gränsen nu)
 const NOV_HITS = 2;            // två fönster i rad (3 s) → inte en enstaka spik
 const NOV_WIN_KEEP_MS = 6000;  // klangskifte räknas som evidens så länge efteråt
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
@@ -61,7 +61,7 @@ const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
 // och matchen pekar på låtens BÖRJAN, är det en nära-säker låtgräns — gratis, allt
 // är redan uträknat. Övertrumfar evidens-regeln och minsta längd: exakta gränser
 // för kända låtar, dvs varje repris skärper minnet.
-const RECOG_SPLIT_MIN_MS = 20000;   // segmentet måste ha rullat så länge
+const RECOG_SPLIT_MIN_MS = MIN_SEG_MS;   // aldrig committa under minsta låtlängd — annars ger en smutsig blob en kaskad
 const RECOG_POS_MS = 20000;         // ...och matchen ligga inom låtens första 20 s
 
 
@@ -119,6 +119,7 @@ export class SongMemory {
 
   // Låtgräns utan tystnad
   private segBpm = 0;             // tempot den pågående sekvensen etablerat
+  private segBpmConf = 0;         // konfidensen tempot etablerades med
   private bpmOffSince = 0;        // väggklocka då tempot började avvika
   private novAcc = new Float32Array(NOV_BANDS.length - 1);
   private novN = 0;
@@ -254,9 +255,10 @@ export class SongMemory {
     this.lm.length = 0;
     this.fp.push(mag, binHz, tLive, this.lm);
     for (const l of this.lm) {
-      if (learn) { this.learnHash.push(l.hash); this.learnTime.push(l.t); }
+      if (learn && l.store) { this.learnHash.push(l.hash); this.learnTime.push(l.t); }
       this.vote(l);
     }
+
     this.pushNovelty(mag, binHz);
   }
 
@@ -330,7 +332,7 @@ export class SongMemory {
         console.log(`[song] känd låt #${id} (${s?.meta.plays ?? 0} tidigare spelningar), position ${(pos / 1000).toFixed(1)}s`);
         // Ny känd låt som just börjat mitt i ett rullande segment → låtgräns.
         // (En match nära låtens början direkt efter segmentstart är samma låt, ej gräns.)
-        if (this.playStart && this.clock() - this.playStart > RECOG_SPLIT_MIN_MS && pos < RECOG_POS_MS && wasMatch !== id) this.recogSplit = pos;
+        if (this.playStart && this.clock() - this.playStart >= RECOG_SPLIT_MIN_MS && pos < RECOG_POS_MS && wasMatch !== id) this.recogSplit = pos;
       }
 
       if (id === this.matchId) this.matchVotes = Math.max(this.matchVotes, v);
@@ -420,30 +422,30 @@ export class SongMemory {
     this.levAvg = this.levAvg > 0 ? this.levAvg * 0.995 + o.level * 0.005 : o.level;
     if (this.levAvg > 0.05 && o.level < this.levAvg * DIP_RATIO) this.dipAt = now;
 
-    if (o.bpmConfidence > 0.5 && o.bpm > 40 && !this.segBpm) this.segBpm = o.bpm;
+    if (o.bpmConfidence > 0.5 && o.bpm > 40 && !this.segBpm) { this.segBpm = o.bpm; this.segBpmConf = o.bpmConfidence; }
     let bpmShift = "";
-    let bpmStrong = false;
     if (o.bpmConfidence > 0.5 && o.bpm > 40 && this.segBpm) {
       const dev = Math.abs(o.bpm - this.segBpm) / this.segBpm;
       if (dev > BPM_JUMP) {
         if (!this.bpmOffSince) this.bpmOffSince = now;
-        const held = now - this.bpmOffSince;
-        if (held > BPM_HOLD_MS) bpmShift = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
-        if (dev > BPM_JUMP_STRONG && held > BPM_HOLD_STRONG_MS) bpmStrong = true;
-      } else { this.bpmOffSince = 0; this.segBpm = this.segBpm * 0.95 + o.bpm * 0.05; }
+        if (now - this.bpmOffSince > BPM_HOLD_MS) bpmShift = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
+      } else {
+        this.bpmOffSince = 0;
+        this.segBpm = this.segBpm * 0.95 + o.bpm * 0.05;
+        this.segBpmConf = Math.max(this.segBpmConf, o.bpmConfidence);
+      }
     }
+
     if (tLive < MIN_SEG_MS) return false;   // en drop/breakdown ligger alltid inom minsta längd
 
     const ev: string[] = [];
     if (bpmShift) ev.push(bpmShift);
     if (this.novAt && now - this.novAt < NOV_WIN_KEEP_MS) ev.push("klangskifte");
     if (this.dipAt && now - this.dipAt < DIP_WIN_MS) ev.push("nivådipp");
-    this.lastEvidence = bpmStrong ? [...ev, "starkt tempohopp"] : ev;
+    this.lastEvidence = ev;
 
     let why = "";
-    // Starkt, ihållande tempohopp räcker ensamt — inom en låt ändras inte tempot så.
-    if (bpmStrong) why = `${bpmShift} (starkt)`;
-    else if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
+    if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
     else if (tLive > MAX_SEG_MS) why = "maxlängd";   // aldrig en 22-minuters gröt igen
     if (!why) return false;
 
@@ -575,7 +577,7 @@ export class SongMemory {
     this.playStart = 0;
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
-    this.segBpm = 0; this.bpmOffSince = 0; this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
+    this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
     this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogSplit = -1;
 
 
@@ -587,6 +589,9 @@ export class SongMemory {
 
   private addSong(dur: number, bpm: number): number {
     if (this.songs.size >= MAX_SONGS) this.evict();
+    // BUGG (mätt): samma id loggades två gånger — nextId kunde hamna efter en
+    // redan använd id (t.ex. efter omladdning). Härled alltid ur befintliga låtar.
+    for (const s of this.songs.values()) if (s.meta.id >= this.nextId) this.nextId = s.meta.id + 1;
     const id = this.nextId++;
     const meta: SongMeta = {
       id, createdMs: this.clock(), lastMs: this.clock(), plays: 1, durationMs: dur,
