@@ -226,8 +226,14 @@ export class SongMemory {
   }
 
   /** KLANGSKIFTE. Energin samlas i oktavband, normaliseras (form, inte volym)
-   *  och jämförs var 1.5 s med ett långsamt referensspektrum. Ett nytt spår
-   *  byter instrumentering → profilen hoppar; en vers→refräng gör det inte. */
+   *  och jämförs var 1.5 s med ett långsamt referensspektrum.
+   *
+   *  Tröskeln är ADAPTIV: hur mycket profilen normalt rör sig skiljer sig
+   *  enormt mellan en jämn housemix och sparsam akustisk musik, så ett fast
+   *  tal ger antingen falska gränser eller inga alls. Vi kräver att avståndet
+   *  är flera gånger större än låtens EGEN normala variation — och att det
+   *  håller två fönster i rad (3 s), vilket ett nytt spår gör men en
+   *  refrängövergång inte. */
   private pushNovelty(mag: Float32Array, binHz: number): void {
     const now = this.clock();
     if (!this.novStart) this.novStart = now;
@@ -250,9 +256,15 @@ export class SongMemory {
     if (!this.novRef) { this.novRef = prof; return; }
     let d = 0;
     for (let b = 0; b < prof.length; b++) d += Math.abs(prof[b] - this.novRef[b]);
-    this.novelty = Math.max(this.novelty, d);
+    const bar = Math.max(NOV_TH, this.novAvg * NOV_FACTOR);
+    if (this.novAvg > 0 && d > bar) {
+      this.novHits++;
+      if (this.novHits >= NOV_HITS) this.novelty = d;
+    } else this.novHits = 0;
+    this.novAvg = this.novAvg > 0 ? this.novAvg * 0.9 + d * 0.1 : d;
     for (let b = 0; b < prof.length; b++) this.novRef[b] = this.novRef[b] * 0.75 + prof[b] * 0.25;
   }
+
 
 
   private vote(l: Landmark): void {
