@@ -76,7 +76,10 @@ for (let i = PRE; i < fr.length - POST; i++) {
 // ── BPM över HELA låten ───────────────────────────────────────────────────
 // Autokorrelation på onset-kurvan i 100 Hz, längd-normaliserad (annars vinner
 // alltid den kortaste lagen).
-const HZ = 100, step = Math.max(1, Math.round(1 / (HZ * dt)));
+// Steget måste vara ett helt antal hopar → den FAKTISKA kurvfrekvensen räknas
+// ur steget. (Att anta 100 Hz gav 6,7 % fel tempo: 128 BPM lästes som 136,5.)
+const step = Math.max(1, Math.round(1 / (100 * dt)));
+const HZ = 1 / (step * dt);
 const on = [];
 for (let i = step; i < fr.length; i += step) on.push(Math.max(0, sm[i] - sm[i - step]));
 const onMean = on.reduce((a, b) => a + b, 0) / (on.length || 1);
