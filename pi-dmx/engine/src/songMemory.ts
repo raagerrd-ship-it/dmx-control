@@ -844,9 +844,28 @@ export class SongMemory {
     // Starta nästa sekvens direkt — strömmen tystnar aldrig.
     this.playStart = bAt;
     this.lastLoud = now;
+    this.heurBoundaryAt = now;   // en bekräftad match får revidera nollpunkten
     this.quarantinedSegment = this.learnMode && now - this.lastMatchedAt < LEARN_QUARANTINE_MS;
     return true;
   }
+
+  /** IGENKÄNNINGEN HAR FÖRETRÄDE. Klangskiftet satte redan gränsen, men på
+   *  ungefärlig tid. En bekräftad match vet exakt var låten började → flytta
+   *  nollpunkten dit och märk gränsen som igenkänd. Ingen ny gräns, ingen ny
+   *  commit — bara tidslinjen rättad, så replayen ligger i fas. */
+  private reviseBoundary(now: number, pos: number): void {
+    const id = this.matchId;
+    const delta = (now - this.playStart) - pos;
+    console.log(`[song] gräns reviderad av igenkänning: låt #${id} vid ${(pos / 1000).toFixed(1)}s (flytt ${(delta / 1000).toFixed(1)}s)`);
+    this.lastBoundary = `igenkänd låt #${id}`;
+    this.heurBoundaryAt = 0;
+    this.playStart = now - pos;
+    this.lastLoud = now;
+    this.dropLearning();   // de sekunderna hörde till fel låt
+    this.replayIdx = this.nextDropIndex(this.songs.get(id), pos);
+    this.cuePrevT = -1;
+  }
+
 
   /** Gräns satt av igenkännaren: skriv in det gångna segmentet och starta nästa
    *  med matchen behållen, tidsställd på låtens faktiska position.
