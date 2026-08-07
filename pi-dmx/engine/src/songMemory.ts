@@ -777,10 +777,12 @@ export class SongMemory {
     }
   }
 
-  /** LÅTGRÄNS I EN GAPLÖS STRÖM. Nivådipp räcker ensam; övriga signaler kräver
-   *  samlad evidens. Allt grindas av min/max-längd. Returnerar true om vi delade. */
+  /** LÅTGRÄNS I EN GAPLÖS STRÖM. KLANGSKIFTET bär gränsen ensamt (mätt mot facit);
+   *  nivådipp och temposkifte sänker bara tröskeln när de finns. Allt grindas av
+   *  min/max-längd. Returnerar true om vi delade. */
   private boundary(now: number, tLive: number, o: { bpm: number; bpmConfidence: number; level: number }): boolean {
-    // Nivådipp: även en crossfade har oftast ett ögonblick där nivån faller.
+    // Nivådipp: extrasignal. Vid Spotify-crossfade faller nivån knappt alls
+    // (mätt: kvot 0.98 och 0.91 vid facitgränserna), så den får aldrig krävas.
     this.levAvg = this.levAvg > 0 ? this.levAvg * 0.995 + o.level * 0.005 : o.level;
     if (this.levAvg > 0.05 && o.level < this.levAvg * DIP_RATIO) this.dipAt = now;
 
@@ -798,24 +800,30 @@ export class SongMemory {
       }
     }
 
-    if (tLive < MIN_SEG_MS) return false;   // en drop/breakdown ligger alltid inom minsta längd
+    // Gränsen backdateras NOV_BACK_MS (novelty reagerar när nya materialet fyllt
+    // fönstret), så minsta längd mäts på det backdaterade segmentet.
+    if (tLive < MIN_SEG_MS + NOV_BACK_MS) return false;
 
+    const novFresh = this.novAt > 0 && now - this.novAt < NOV_WIN_KEEP_MS;
     const ev: string[] = [];
+    if (novFresh) ev.push(`klangskifte ${this.novPeak.toFixed(2)}`);
     if (bpmShift) ev.push(bpmShift);
-    if (this.novAt && now - this.novAt < NOV_WIN_KEEP_MS) ev.push("klangskifte");
     if (this.dipAt && now - this.dipAt < DIP_WIN_MS) ev.push("nivådipp");
     this.lastEvidence = ev;
 
     let why = "";
-    if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
-    else if (tLive > MAX_SEG_MS) why = "maxlängd";   // aldrig en 22-minuters gröt igen
+    let back = NOV_BACK_MS;
+    if (novFresh && (this.novPeak >= NOV_STRONG || ev.length >= 2)) why = ev.join(" + ");
+    else if (tLive > MAX_SEG_MS) { why = "maxlängd"; back = 0; }   // aldrig en 22-minuters gröt igen
     if (!why) return false;
 
-    console.log(`[song] låtgräns efter ${(tLive / 1000).toFixed(0)}s (${why})`);
+    const bAt = now - back;
+    console.log(`[song] låtgräns efter ${((bAt - this.playStart) / 1000).toFixed(0)}s (${why})`);
     this.lastBoundary = why;
+    this.lastLoud = bAt;   // segmentets längd räknas till den backdaterade gränsen
     this.commit();
     // Starta nästa sekvens direkt — strömmen tystnar aldrig.
-    this.playStart = now;
+    this.playStart = bAt;
     this.lastLoud = now;
     this.quarantinedSegment = this.learnMode && now - this.lastMatchedAt < LEARN_QUARANTINE_MS;
     return true;
