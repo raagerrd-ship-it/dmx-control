@@ -1,37 +1,31 @@
-# Chroma-novelty som andra, oberoende gränssignal
+# Nästa steg: strunta i chroma, stabilisera igenkänningen
 
-Målet: låtgränser ska kunna fyra på **två olika sorters bevis** (klangfärg + tonart) i stället för två varianter av samma spektralmått. Först då kan minsta låtlängd sänkas utan att kaskaden av falska gränser återkommer.
+Mätningen är entydig: chroma-avståndet vid verkliga crossfade-gränser överlappar helt med falska kandidater (0,0000 vid en riktig gräns). Chroma byggs inte in — den skulle kosta CPU på Zero 2 W utan beslutsvärde.
 
-Claudes mätning delas: kaskadtabellen (110 s → 2 gränser/2 låtar, 60 s → 4/0, 30 s → 7/0) visar att spärren i dag bär hela beslutet. Vi rör därför **inte** spärren i detta steg.
+Slutsatsen är att heuristik på crossfade är en återvändsgränd. Den signal som faktiskt mätts som exakt är igenkänningen (0,2 s fel mot klangskiftets 9–10 s). Därför lägger vi kraften där.
 
 ## Vad som byggs
 
-1. **Chroma-profil ur befintlig FFT**
-   Samma 2048-magnitud som redan matas in mappas till 12 halvtoner (bin → MIDI-not → not mod 12), energinormaliserad per fönster. Ingen ny FFT, ingen ny CPU-tråd — bara en extra loop i samma 1,5-sekundersfönster som klangprofilen.
+### 1. Känd låt slut = gränsbevis
+Idag släpps matchen när positionen passerar `durationMs` (rad 746) utan att någon gräns sätts. Det är det starkaste kända gränsbeviset vi har och det kastas bort. En bekräftad match vars lagrade tidslinje tar slut ska committa segmentet och starta en ny tidslinje på samma tick.
 
-2. **Chroma-novelty mot samma ringbuffert-horisont**
-   Cosinus-avstånd mellan nuvarande chroma-profil och profilen 8 s bakåt, med **rotationsinvariant** jämförelse avstängd (vi vill just se tonartsbyte). Nytt fält `chromaAt` / `chromaPeak` vid sidan av `novAt` / `novPeak`, nollställs i samma `resetNovelty()`.
+### 2. Sluta flimra mellan låt-ID
+Loggen visar att motorn växlar mellan låt #1 och #2 under ~15 s, båda med konfidens 1,00.
+- Byte av aktiv låt kräver både röstmarginal och att utmanaren lett en viss tid — inte bara flest röster på ett enskilt tick.
+- En bekräftad match behåller sitt lås genom svaga passager så länge positionen fortsätter vara tidslinjeenlig (glidande position, inte hoppande).
 
-3. **Evidensregeln blir tvåsorts**
-   - Klangskifte ≥ `NOV_STRONG` fyrar fortfarande ensamt (mätt 2/2, 0 falska — får inte försämras).
-   - Nytt: klangskifte ≥ `NOV_WEAK` **plus** chroma-novelty över sin tröskel = gräns. Det är två oberoende bevis.
-   - Nivådipp och tempo förblir svaga extrasignaler.
+### 3. Konfidens som säger något
+`confidence` mättas idag på 1 så snart matchen är bekräftad (rad 1067). Den skalas istället efter röstmarginal och färskhet, så att flimmer syns i mätningarna och kan användas som villkor.
 
-4. **Kalibrering mot facit, inte gissning**
-   Chroma-tröskeln sätts från mätning på facit3 (kända gränser 165 s / 317 s): vi loggar chroma-avståndets percentil vid de verkliga gränserna och vid alla falska klangskiftesträffar, och väljer tröskeln i platån där båda gränserna fångas med noll falska.
+### 4. Relativ klangskiftesröskel — bara som reserv
+`NOV_STRONG` är absolut (0,68). Den kompletteras med en relativ jämförelse mot segmentets typiska rörelse, med kvar absolut golv. `MIN_SEG_MS` (110 s) sänks INTE i detta steg — mätningen visade att spärren fortfarande bär beslutet för okända låtar.
 
-## Verifiering (grön innan deploy)
+## Så verifieras det
+Tvåvarvstest mot facit3 i `tools/testSongMemory.mjs`:
+- Varv 1 (okänd musik): oförändrat 2/2 gränser, noll falska.
+- Varv 2 (inlärt): gränser via igenkänning med < 1 s fel, och noll ID-växlingar utanför verkliga byten.
 
-- `tools/testSongMemory.mjs` varv 1 måste stå kvar på 2/2 gränser, 0 falska.
-- Ny mätutskrift: chroma-percentil vid facitgräns vs vid varje icke-gräns-topp.
-- Först när tvåsorts-regeln ger 2/2 med 0 falska **och** klarar en sänkning av `MIN_SEG_MS` till 60 s utan kaskad, föreslås spärrsänkningen som ett separat steg.
-
-## Vad som INTE görs nu
-
-- `MIN_SEG_MS` sänks inte i detta steg.
-- Igenkänningen förblir den exakta gränsen (0,2 s fel mot noveltyns 9 s); chroma förbättrar bara reservplanen.
-- Glappandet/flimret mellan låt-id är ett separat problem och ligger kvar orört.
+Deploy sker först när båda varven är gröna.
 
 ## Tekniskt
-
-Berörd fil: `pi-dmx/engine/src/songMemory.ts` (+ `dist` för offlinetestet) och `tools/testSongMemory.mjs` för mätutskriften. Ingen ändring i `index.ts` — chroma matas ur `pushSpectrum` som redan finns. Inget rör Pi-ägda `engine/public/index.html`.
+Allt sker i `pi-dmx/engine/src/songMemory.ts` plus mätning i `pi-dmx/engine/tools/testSongMemory.mjs`. Ingen ny CPU-tung DSP tillkommer. `index.html` på Pi:n berörs inte.
