@@ -99,6 +99,11 @@ export class EffectEngine {
   memPhraseAt = 0;                    // ...och senaste frasgräns
   memHasGrid = false;                 // låten har sektioner/frasgrid att vänta in
 
+  /** Misstänkt låtbyte → låt auto-rangen kalibrera om snabbt mot nya nivåer. */
+  softenRange(): void { this.range.soften(); }
+
+
+
   private gravLevel = 0;         // gravitations-VU: nivå som faller med gravitation
   private gravVel = 0;           // dess hastighet
   private gravPeak = 0;          // peak-håll (sjunker långsamt)
