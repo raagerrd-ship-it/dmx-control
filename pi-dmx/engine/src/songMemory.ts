@@ -182,7 +182,10 @@ export class SongMemory {
   /** Räknare som tickar vid varje satt låtgräns → motorn kan kalibrera om dynamiken. */
   boundaryCount = 0;
   private loudSince = 0;          // volymgrind: sedan när nivån är tydlig musik
-  private recogSplit = -1;        // ≥0: igenkänningen pekar på gräns, matchens position i ms
+  /** Kandidat till igenkänning-gräns. Överriden får INTE dela ett segment på
+   *  första röstmajoriteten — en falsk match dör inom MATCH_FRESH_MS, så gränsen
+   *  väntar in en BEKRÄFTAD match (stabil ≥ MATCH_STABLE_MS med färska träffar). */
+  private recogPending: { id: number; at: number } | null = null;
   private lastMatchedAt = 0;       // håll inlärning i karantän efter senast etablerade match
   private quarantinedSegment = false;
 
