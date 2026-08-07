@@ -943,7 +943,7 @@ export class SongMemory {
   forget(): void {
     this.songs.clear(); this.votes.clear(); this.rebuildIndex();
     this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0; this.nextId = 1;
-    this.lastFreshMatchHit = 0; this.blockedMatchId = 0;
+    this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear();
     this.dirty = true;
     void this.save();
   }
@@ -962,9 +962,9 @@ export class SongMemory {
     this.quarantinedSegment = false;
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0;
     this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
-    this.levAvg = 0; this.dipAt = 0; this.recogSplit = -1;
+    this.levAvg = 0; this.dipAt = 0; this.recogPending = null;
     this.votes.clear(); this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.lastFreshMatchHit = 0; this.blockedMatchId = 0;
+    this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear();
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
@@ -1052,11 +1052,11 @@ export class SongMemory {
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
-    this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogSplit = -1; this.quarantinedSegment = false;
+    this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogPending = null; this.quarantinedSegment = false;
 
 
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.lastFreshMatchHit = 0; this.blockedMatchId = 0;
+    this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear();
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
