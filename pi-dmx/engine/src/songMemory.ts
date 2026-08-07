@@ -52,6 +52,14 @@ const RELOCK_GLIDE_MAX = 400;      // ms/s: snabbaste gliden (drift nära snap)
 
 
 const LEARN_QUARANTINE_MS = 30000; // nyss känd låt = breakdown/tillfälligt tapp, inte ny låt
+// SKYDDSNÄT MOT ORENT SEGMENT. Missas en låtgräns svälver segmentet början av
+// NÄSTA låt (mätt: 272 s i stället för 201 s). Spelas den låten sedan matchar
+// den mot det orena segmentet och motorn kör FEL låts tidslinje — aktivt fel
+// show, sämre än realtid. En match vars position gått förbi den lagrade låtens
+// slut har definitionsmässigt inget mer att spela upp: släpp den då.
+const MATCH_END_GRACE_MS = 2000;
+const TRIM_MIN_HALF_MS = 60000;    // en trimmad halva under 60 s är inte en låt
+
 
 // LÅTGRÄNS UTAN TYSTNAD. Spotify/Apple Music spelar gaplöst eller crossfadar —
 // 3 s tystnad inträffar aldrig, och utan de här signalerna blir hela kvällen
