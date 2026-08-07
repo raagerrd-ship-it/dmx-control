@@ -196,6 +196,8 @@ export class SongMemory {
   private lastRelockAt = 0;       // senaste periodiska låsverifieringen
   private relocks = 0;            // antal gånger synken tvingats tillbaka (diagnostik)
   private driftMs = 0;            // senast mätta drift mot oberoende estimat
+  private relockTarget: number | null = null;  // pågående glid mot verifierat offset
+  private glideAt = 0;            // klocka för glidens senaste steg
 
   /** Rullande råoffset per träff (id + off). Ger etableringen en median UNDER
    *  fack-upplösningen → låtstarten låses direkt, inte ±125 ms fel. */
@@ -406,7 +408,7 @@ export class SongMemory {
         this.syncOffsets = [];
         this.lastSyncAt = 0;
         this.syncFast = true;
-        this.lastRelockAt = 0; this.driftMs = 0;
+        this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0;
         this.matchVotes = winner.votes;
         this.matchMargin = winner.votes / Math.max(1, other);
         this.replayIdx = 0;
@@ -590,6 +592,7 @@ export class SongMemory {
     // Byte av ingång mitt i en inlärning → kasta det halva materialet, annars
     // hamnar ett halvt mik-fingeravtryck i minnet.
     if (learn !== this.learnMode) { this.learnMode = learn; this.dropLearning(); }
+    this.glideLock(now);
     if (o.level > 0.02) this.lastLoud = now;
     if (!this.playStart) {
       // Volymgrind: starta bara på tydlig musik som hållit en sekund, aldrig på brusgolvet.
@@ -873,7 +876,7 @@ export class SongMemory {
     this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
     this.levAvg = 0; this.dipAt = 0; this.recogSplit = -1;
     this.votes.clear(); this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.replayIdx = 0; this.pendingDrop = 0;
+    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
   }
@@ -929,7 +932,7 @@ export class SongMemory {
 
 
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.replayIdx = 0; this.pendingDrop = 0;
+    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
     this.onCommit?.(committed);
