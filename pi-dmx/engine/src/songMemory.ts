@@ -187,10 +187,12 @@ export class SongMemory {
   private novAcc = new Float32Array(NOV_BANDS.length - 1);
   private novN = 0;
   private novStart = 0;
-  private novRef: Float32Array | null = null;
+  /** Ringbuffert med klangprofiler → jämförelse mot NOV_LAG_MS bakåt. */
+  private novHist: Float32Array[] = [];
+  private novIdx = 0;             // nästa slot i ringen
+  private novFilled = 0;          // antal skrivna profiler
   private novAt = 0;              // väggklocka för senaste klangskiftet
-  private novAvg = 0;             // låtens normala fönster-till-fönster-variation
-  private novHits = 0;            // fönster i rad över tröskeln
+  private novPeak = 0;            // L1-avståndet vid det skiftet
   private levAvg = 0;             // långsamt nivåsnitt (dippdetektering)
   private dipAt = 0;              // väggklocka för senaste nivådippen
   private lastEvidence: string[] = [];   // senast aktiva gränssignaler (diagnostik)
