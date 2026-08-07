@@ -474,6 +474,7 @@ export class SongMemory {
     this.syncOffsets.push(off);
     if (this.syncOffsets.length > 31) this.syncOffsets.shift();
     const now = this.clock();
+    this.verifyLock(now, winner.bucket);
     const needSamples = this.syncFast ? SYNC_SAMPLES_FAST : SYNC_SAMPLES;
     if (this.syncOffsets.length < needSamples || (!this.syncFast && now - this.lastSyncAt < SYNC_INTERVAL_MS)) return;
     const wasFast = this.syncFast;
@@ -493,6 +494,35 @@ export class SongMemory {
       this.matchOffset += Math.max(-SYNC_NUDGE_MS, Math.min(SYNC_NUDGE_MS, error));
     }
   }
+
+  /** PERIODISK RE-LOCK. Var RELOCK_INTERVAL_MS jämförs det aktiva offsetet med
+   *  medianen av de senaste råträffarna (oberoende estimat). Driver låset iväg
+   *  mer än RELOCK_ERROR_MS snappas det tillbaka direkt i stället för att nudgas
+   *  hem under tiotals sekunder. */
+  private verifyLock(now: number, bucket: number): void {
+    if (!this.lastRelockAt) { this.lastRelockAt = now; return; }
+    if (now - this.lastRelockAt < RELOCK_INTERVAL_MS) return;
+    this.lastRelockAt = now;
+    const c: number[] = [];
+    for (let i = 0; i < this.recentId.length; i++) {
+      if (this.recentId[i] !== this.matchId) continue;
+      if (Math.abs(Math.round(this.recentOff[i] / OFFSET_BUCKET) - bucket) > 1) continue;
+      c.push(this.recentOff[i]);
+    }
+    if (c.length < RELOCK_MIN_HITS) return;
+    const est = median(c);
+    this.driftMs = est - this.matchOffset;
+    if (Math.abs(this.driftMs) < RELOCK_ERROR_MS) return;
+    this.matchOffset = est;
+    this.rawOffset = est;
+    this.syncOffsets = [];
+    this.syncBucket = bucket;
+    this.replayIdx = this.nextDropIndex(this.songs.get(this.matchId), now - this.playStart + this.matchOffset);
+    this.cuePrevT = -1;
+    this.relocks++;
+    console.log(`[song] re-lock: drift ${(this.driftMs / 1000).toFixed(2)}s korrigerad`);
+  }
+
 
   private nextDropIndex(song: Song | undefined, positionMs: number): number {
     if (!song) return 0;
