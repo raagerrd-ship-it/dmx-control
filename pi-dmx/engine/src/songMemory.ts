@@ -504,7 +504,8 @@ export class SongMemory {
       this.replayIdx = this.nextDropIndex(this.songs.get(this.matchId), now - this.playStart + this.matchOffset);
       this.cuePrevT = -1;
       if (!wasFast) console.log(`[song] synk hoppade ${(error / 1000).toFixed(2)}s till ny position`);
-    } else {
+    } else if (this.relockTarget === null) {
+      // Under en pågående glid äger re-locken offseten — annars drar de mot varandra.
       this.matchOffset += Math.max(-SYNC_NUDGE_MS, Math.min(SYNC_NUDGE_MS, error));
     }
   }
