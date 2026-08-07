@@ -6,19 +6,21 @@ Efter det får igenkänningen (som mätts till 0,2 s fel) bära all realtidsdete
 
 ## Så fungerar det
 
-Ett nytt läge "Inlärning" i mobil-UI:t med tre knappar:
+Ja — två knappar räcker, för mobilen som spelar musiken vet redan när spåret byts. Den behöver bara skicka det till Pi:n automatiskt.
 
 ```text
-[ Starta inlärning ]        -> segmentet börjar HÄR (exakt tidsstämpel)
-[ Nästa låt ]               -> committa segmentet + starta nästa i samma tick
-[ Avsluta inlärning ]       -> committa sista segmentet, tillbaka till normalläge
+[ Starta inlärning ]        -> inlärningsläge på, första segmentet börjar
+   ...mobilen rapporterar varje spårbyte automatiskt (gräns sätts exakt där)
+[ Stoppa inlärning ]        -> committa sista segmentet, tillbaka till normalläge
 ```
+
+Mobil-UI:t lyssnar på webbläsarens mediasession (`navigator.mediaSession` / `<audio>`-element vid uppspelning från sidan) och skickar en gräns när spårets identitet eller position nollställs. Spelar du från Spotify eller en annan app i stället, finns knappen `Nästa låt` kvar som manuell reserv — men den behövs bara då.
 
 Medan läget är aktivt:
 - All heuristisk gränsdetektering är avstängd (inga klangskiften, ingen nivådipp, ingen 110-sekundersspärr).
-- Ingen igenkänningsdriven gräns — bara dina knapptryck.
+- Ingen igenkänningsdriven gräns — bara mobilens spårbyten.
 - `MIN_SEG_MS` gäller inte; ett 40-sekunders spår kan läras in.
-- UI:t visar löpande segmentlängd och "sparat: N låtar" så du ser att trycket gick fram.
+- UI:t visar löpande segmentlängd och "sparat: N låtar" så du ser att gränserna går fram.
 
 Efter avslutad inlärning körs tvätten (`refineSong.mjs`) på varje segment som vanligt — men nu på material med korrekta start- och slutpunkter, vilket också gör `trimAt`-logiken onödig för dessa låtar.
 
