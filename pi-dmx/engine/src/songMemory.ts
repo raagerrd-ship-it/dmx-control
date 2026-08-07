@@ -38,11 +38,18 @@ const SEEK_ERROR_MS = 1500;    // större stabilt hopp = seek/ny uppspelningspos
 // AUTOMATISK RE-LOCK. Nudgen rättar bara 25 ms/750 ms (≈33 ms/s) — ett medelstort
 // fel (t.ex. crossfade, DSP-buffertbyte, klockdrift) under seek-tröskeln tar då
 // tiotals sekunder att äta upp, och under tiden sitter droparna fel. Därför
-// verifieras låset periodiskt mot ett OBEROENDE offset-estimat (medianen av de
-// senaste råträffarna) och snappas direkt om driften är för stor.
-const RELOCK_INTERVAL_MS = 8000;
-const RELOCK_ERROR_MS = 250;   // ett fack: mindre än så hörs/syns inte
-const RELOCK_MIN_HITS = 6;     // estimatet måste vila på flera träffar
+// verifieras låset ofta mot ett OBEROENDE offset-estimat (medianen av de senaste
+// råträffarna). Korrigeringen är GLIDANDE och proportionell mot driften: ju större
+// drift, desto snabbare glid — så synken är hemma på ett par sekunder utan att
+// showklockan hoppar (ett hopp syns som ryck i ljusprofilen). Bara en riktig seek
+// (drift över RELOCK_SNAP_MS) snappar, för då ÄR positionen en annan.
+const RELOCK_INTERVAL_MS = 1500;   // täta kontroller → driften hinner aldrig växa
+const RELOCK_ERROR_MS = 120;       // under det här hörs/syns ingen skillnad
+const RELOCK_MIN_HITS = 6;         // estimatet måste vila på flera träffar
+const RELOCK_SNAP_MS = 900;        // så stort fel är en seek, inte drift → snappa
+const RELOCK_GLIDE_MIN = 60;       // ms/s: mjukaste gliden (liten drift)
+const RELOCK_GLIDE_MAX = 400;      // ms/s: snabbaste gliden (drift nära snap)
+
 
 const LEARN_QUARANTINE_MS = 30000; // nyss känd låt = breakdown/tillfälligt tapp, inte ny låt
 
