@@ -808,6 +808,18 @@ export class SongMemory {
   private releaseMatch(id: number, why: string): void {
     console.log(`[song] släppte match #${id}: ${why}`);
     this.blockedMatchId = id;
+    this.recogPending = null;
+    // UPPREPAD FALSKMATCH VID ~SAMMA POSITION: låt-id:t räcker inte som spärr
+    // (det nollas vid nästa commit) — det är hash-klustret runt just den
+    // positionen som är för generiskt. Blockera zonen resten av segmentet.
+    const pos = (this.playStart ? this.clock() - this.playStart : 0) + this.matchOffset;
+    const prev = this.releasedAt.get(id);
+    if (prev !== undefined && Math.abs(prev - pos) < FALSE_ZONE_MS) {
+      this.blockedZones.push({ id, from: pos - FALSE_ZONE_MS, to: pos + FALSE_ZONE_MS });
+      console.log(`[song] blockerar låt #${id} runt ${(pos / 1000).toFixed(1)}s (upprepad falskmatch)`);
+    }
+    this.releasedAt.set(id, pos);
+
     // Materialet efter ett släppt lås är inte en verifierad ny låt. Karantänen
     // hindrar att svansen omedelbart sparas som en dubblett/förgiftat segment.
     this.lastMatchedAt = this.clock();
