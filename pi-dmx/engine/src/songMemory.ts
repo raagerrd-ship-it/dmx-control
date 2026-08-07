@@ -174,6 +174,11 @@ export class SongMemory {
   private syncBucket = 0;
   private syncOffsets: number[] = [];
   private lastSyncAt = 0;
+  private syncFast = true;        // första korrigeringen efter ett lås ska komma direkt
+  /** Rullande råoffset per träff (id + off). Ger etableringen en median UNDER
+   *  fack-upplösningen → låtstarten låses direkt, inte ±125 ms fel. */
+  private recentId: number[] = [];
+  private recentOff: number[] = [];
   private lastBoundary = "";
   private replayIdx = 0;
   private pendingDrop = 0;        // styrka på en drop som ska fyras av
