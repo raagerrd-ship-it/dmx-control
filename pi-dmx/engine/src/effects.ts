@@ -664,12 +664,17 @@ export class EffectEngine {
       ceilMul = Math.max(MEM_FLOOR + (1 - MEM_FLOOR) * this.memCeiling, this.dropEnv);
     } else if (this.cfg.energyCeiling) {
 
-      // RÅ nivå som slutgain: insignal X% → utsignal ~X% (nu golvad, se nedan).
+      // LÖPANDE NORMALISERING: samma kurva som minnestaket, räknad kausalt. Rå VU
+      // är en ABSOLUT skala → platt i tysta låtar, mättad i höga. Auto-rangen
+      // mappar nivån mot låtens EGNA p5..p95 så dynamiken blir full oavsett hur
+      // hårt mastrad låten är, utan att veta vilken låt det är.
       // frame.levelVU = ~200ms smoothat PÅ HOP-TAKT (375Hz) i analysatorn → ser alla
       // hops, mycket lägre jitter än att smootha rå-nivån efter render-decimering (som
       // aliasade per-hop-rippel till synligt flimmer). En lätt ~90ms-glidning här
       // utjämnar sista resten utan lång svans. (Drop bypassar via dropEnv nedan.)
-      const vuRaw = Math.max(0, Math.min(1, frame.levelVU));
+      const lvl = Math.max(0, Math.min(1, frame.levelVU));
+      this.range.push(lvl, dtSec);
+      const vuRaw = this.range.norm(lvl);
       // ASYMMETRISK VU: snabb UPP (transienter/drops syns), langsam NER (inget
       // fladder). MATT: med symmetriska 90 ms fladdrade riggen synligt vid MAX
       // ljusstyrka — dar VU:n ror sig 0.8-1.0 och taket appliceras EFTER
@@ -679,6 +684,7 @@ export class EffectEngine {
       const vuTau = vuRaw > this.vu ? 0.12 : 0.60;   // 0.35 gav kvarvarande fladder -> mjukare fall
       this.vu += (vuRaw - this.vu) * (1 - Math.exp(-dtSec / vuTau));
       // KLUBB-LÄGE: kvadrera → hård kontrast (mörkt mellan, explosion på topp).
+      // Kvadreringen biter nu på den NORMALISERADE kurvan → meningsfull i alla låtar.
       const vuBase = this.cfg.clubMode ? this.vu * this.vu : this.vu;
       // VU-GOLV: mappa om VU-spannet så det ALDRIG drar ner under VU_FLOOR. 0% VU →
       // VU_FLOOR, 100% VU → 100%, linjärt. Håller riggen närvarande i tysta partier
