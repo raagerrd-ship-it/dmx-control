@@ -80,7 +80,9 @@ console.log("andra spelningen: drops ur minnet @", fired.map((x) => (x / 1000).t
 const midStart = 21037;
 await playFrom(mem, A, clock, midStart, 12000);
 const mid = mem.state();
-const expectedMid = midStart + 12000;
+// Inlärningens nollpunkt öppnas efter den 1 s långa musikgrinden; WAV,
+// fingerprint och showdata delar därför sourceT - 1000 ms.
+const expectedMid = midStart + 12000 - 1000;
 const midError = Math.abs(mid.positionMs - expectedMid);
 console.log("start mitt i låten: positionsfel", midError.toFixed(0), "ms");
 
@@ -90,7 +92,7 @@ const beforeSeek = mem.state().positionMs;
 const seekTo = 70083;
 await playFrom(mem, A, clock, seekTo, 12000);
 const afterSeek = mem.state();
-const seekError = Math.abs(afterSeek.positionMs - (seekTo + 12000));
+const seekError = Math.abs(afterSeek.positionMs - (seekTo + 12000 - 1000));
 console.log("seek: position", beforeSeek.toFixed(0), "→", afterSeek.positionMs.toFixed(0), "ms, fel", seekError.toFixed(0), "ms");
 
 await new Promise((r) => setTimeout(r, 300));   // låt sparningen landa
@@ -100,10 +102,22 @@ console.log("laddat från disk:", mem2.state().songs, "låtar");
 const firedB = await play(mem2, B, clock, 120000, [], true);
 console.log("annan låt matchade:", mem2.state().known, "(ska vara false), drops ur minnet:", firedB.length);
 
+await new Promise((r) => setTimeout(r, 300));
+const mem3 = new SongMemory(() => clock.t);
+await mem3.load();
+// Gaplöst A→B utan tystnad. Den negativa offseten för B måste tillåtas så dess
+// igenkänning kan sätta gränsen och nollpunkten nära början av låt #2.
+await playFrom(mem3, A, clock, 0, 115000);
+await playFrom(mem3, B, clock, 0, 15000);
+const gapless = mem3.state();
+console.log("gaplöst byte: låt #", gapless.songId, "position", gapless.positionMs.toFixed(0), "ms, gräns", gapless.lastBoundary);
+
 const ok = fired.length >= 2
   && fired.every((f) => dropsA.some((d) => Math.abs(d - f) < 800))
   && mid.known && midError < 350
   && afterSeek.known && seekError < 350
+  && gapless.songId === 2 && gapless.positionMs > 10000 && gapless.positionMs < 16000
+  && gapless.lastBoundary === "igenkänd låt #2"
   && mem2.state().known === false;
 console.log(ok ? "OK" : "MISSLYCKADES");
 process.exit(ok ? 0 : 1);

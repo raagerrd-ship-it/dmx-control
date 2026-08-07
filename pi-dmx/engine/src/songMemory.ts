@@ -348,7 +348,9 @@ export class SongMemory {
       const id = this.slotIds[v0 >>> 12];
       const tSong = (v0 & 0xfff) * FRAME_MS;
       const off = tSong - l.t;
-      if (off < -2000) continue;   // låten kan inte vara "före" sin egen början
+      // Negativ offset är förväntad när en ny känd låt börjar mitt i ett
+      // gaplöst segment: dess låttid är nära noll medan l.t fortfarande avser
+      // föregående segments långa live-tidslinje.
       const bucket = Math.round(off / OFFSET_BUCKET);
       const key = this.voteKey(id, bucket);
       const v = (this.votes.get(key) ?? 0) + 1;
