@@ -399,6 +399,7 @@ export class SongMemory {
       const id = this.slotIds[v0 >>> 12];
       if (id === this.blockedMatchId) continue;
       const tSong = (v0 & 0xfff) * FRAME_MS;
+      if (this.inBlockedZone(id, tSong)) continue;
       const off = tSong - l.t;
       // Negativ offset är förväntad när en ny känd låt börjar mitt i ett
       // gaplöst segment: dess låttid är nära noll medan l.t fortfarande avser
