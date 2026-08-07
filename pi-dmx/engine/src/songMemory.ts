@@ -50,6 +50,8 @@ const RELOCK_SNAP_MS = 900;        // så stort fel är en seek, inte drift → 
 const RELOCK_GLIDE_MIN = 60;       // ms/s: mjukaste gliden (liten drift)
 const RELOCK_GLIDE_MAX = 400;      // ms/s: snabbaste gliden (drift nära snap)
 const MATCH_FRESH_MS = 6000;        // en aktiv match måste få nya, positionsenliga träffar
+const MATCH_STABLE_MS = 5000;       // ...och ha hållit så länge innan den får dela ett segment
+const FALSE_ZONE_MS = 15000;        // låttidszon runt en falskmatchad position som blockeras
 
 
 const LEARN_QUARANTINE_MS = 30000; // nyss känd låt = breakdown/tillfälligt tapp, inte ny låt
