@@ -500,8 +500,11 @@ export class SongMemory {
     // och just då behövs re-locken mest.
     this.verifyLock(now);
     const bucket = Math.round(off / OFFSET_BUCKET);
+    // Efter seek/re-lock kan det historiska vinnarfacket ligga kvar en stund.
+    // En råträff nära den AKTUELLA korrigerade offseten är ändå färsk evidens;
+    // avlägsna hash-krockar får däremot inte hålla matchen vid liv.
+    if (Math.abs(off - this.matchOffset) <= OFFSET_BUCKET * 2) this.lastFreshMatchHit = now;
     if (Math.abs(bucket - winner.bucket) > 1) return;
-    this.lastFreshMatchHit = now;
     if (Math.abs(this.syncBucket - winner.bucket) > 1) { this.syncBucket = winner.bucket; this.syncOffsets = []; }
     this.syncOffsets.push(off);
     if (this.syncOffsets.length > 31) this.syncOffsets.shift();
