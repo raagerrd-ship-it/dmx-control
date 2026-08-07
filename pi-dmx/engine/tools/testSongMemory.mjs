@@ -122,6 +122,17 @@ await playFrom(mem4, B, clock, 0, 15000);
 const shortPrev = mem4.state();
 console.log("kort segment → snabb låsning: låt #", shortPrev.songId, "position", shortPrev.positionMs.toFixed(0), "ms, låtar", shortPrev.songs);
 
+await new Promise((r) => setTimeout(r, 300));
+const mem5 = new SongMemory(() => clock.t);
+await mem5.load();
+// DRIFT UNDER SEEK-TRÖSKELN (600 ms, t.ex. crossfade/buffertbyte). Nudgen ensam
+// skulle ta ~20 s; den periodiska re-locken ska snappa tillbaka.
+await playFrom(mem5, A, clock, 0, 20000);
+const drifted = await playFrom(mem5, A, clock, 20000 + 600, 20000);
+const dr = mem5.state();
+const driftError = Math.abs(dr.positionMs - (20600 + 20000 - 1000));
+console.log("drift 600ms: re-locks", dr.relocks, "kvarvarande fel", driftError.toFixed(0), "ms");
+
 const ok = fired.length >= 2
   && fired.every((f) => dropsA.some((d) => Math.abs(d - f) < 800))
   && mid.known && midError < 350
