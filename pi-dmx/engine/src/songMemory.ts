@@ -461,7 +461,9 @@ export class SongMemory {
     this.syncOffsets.push(off);
     if (this.syncOffsets.length > 31) this.syncOffsets.shift();
     const now = this.clock();
-    if (this.syncOffsets.length < SYNC_SAMPLES || now - this.lastSyncAt < SYNC_INTERVAL_MS) return;
+    const needSamples = this.syncFast ? SYNC_SAMPLES_FAST : SYNC_SAMPLES;
+    if (this.syncOffsets.length < needSamples || (!this.syncFast && now - this.lastSyncAt < SYNC_INTERVAL_MS)) return;
+    this.syncFast = false;
     this.lastSyncAt = now;
     const raw = median(this.syncOffsets);
     this.rawOffset = raw;
