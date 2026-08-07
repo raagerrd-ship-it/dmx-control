@@ -1,31 +1,37 @@
-# Nästa steg: strunta i chroma, stabilisera igenkänningen
+# Manuell inlärning från mobilen (exakta gränser)
 
-Mätningen är entydig: chroma-avståndet vid verkliga crossfade-gränser överlappar helt med falska kandidater (0,0000 vid en riktig gräns). Chroma byggs inte in — den skulle kosta CPU på Zero 2 W utan beslutsvärde.
+Din idé löser problemet där det faktiskt går att lösa. Heuristiken kan inte hitta ett crossfade-byte — men *du* vet exakt när låten börjar och slutar. Om mobilen får sätta gränsen blir facit exakt, och biblioteket byggs på rena segment i stället för smutsiga blobbar.
 
-Slutsatsen är att heuristik på crossfade är en återvändsgränd. Den signal som faktiskt mätts som exakt är igenkänningen (0,2 s fel mot klangskiftets 9–10 s). Därför lägger vi kraften där.
+Efter det får igenkänningen (som mätts till 0,2 s fel) bära all realtidsdetektering, och klangskiftesheuristiken blir bara en reservplan för okänd musik.
 
-## Vad som byggs
+## Så fungerar det
 
-### 1. Känd låt slut = gränsbevis
-Idag släpps matchen när positionen passerar `durationMs` (rad 746) utan att någon gräns sätts. Det är det starkaste kända gränsbeviset vi har och det kastas bort. En bekräftad match vars lagrade tidslinje tar slut ska committa segmentet och starta en ny tidslinje på samma tick.
+Ett nytt läge "Inlärning" i mobil-UI:t med tre knappar:
 
-### 2. Sluta flimra mellan låt-ID
-Loggen visar att motorn växlar mellan låt #1 och #2 under ~15 s, båda med konfidens 1,00.
-- Byte av aktiv låt kräver både röstmarginal och att utmanaren lett en viss tid — inte bara flest röster på ett enskilt tick.
-- En bekräftad match behåller sitt lås genom svaga passager så länge positionen fortsätter vara tidslinjeenlig (glidande position, inte hoppande).
+```text
+[ Starta inlärning ]        -> segmentet börjar HÄR (exakt tidsstämpel)
+[ Nästa låt ]               -> committa segmentet + starta nästa i samma tick
+[ Avsluta inlärning ]       -> committa sista segmentet, tillbaka till normalläge
+```
 
-### 3. Konfidens som säger något
-`confidence` mättas idag på 1 så snart matchen är bekräftad (rad 1067). Den skalas istället efter röstmarginal och färskhet, så att flimmer syns i mätningarna och kan användas som villkor.
+Medan läget är aktivt:
+- All heuristisk gränsdetektering är avstängd (inga klangskiften, ingen nivådipp, ingen 110-sekundersspärr).
+- Ingen igenkänningsdriven gräns — bara dina knapptryck.
+- `MIN_SEG_MS` gäller inte; ett 40-sekunders spår kan läras in.
+- UI:t visar löpande segmentlängd och "sparat: N låtar" så du ser att trycket gick fram.
 
-### 4. Relativ klangskiftesröskel — bara som reserv
-`NOV_STRONG` är absolut (0,68). Den kompletteras med en relativ jämförelse mot segmentets typiska rörelse, med kvar absolut golv. `MIN_SEG_MS` (110 s) sänks INTE i detta steg — mätningen visade att spärren fortfarande bär beslutet för okända låtar.
+Efter avslutad inlärning körs tvätten (`refineSong.mjs`) på varje segment som vanligt — men nu på material med korrekta start- och slutpunkter, vilket också gör `trimAt`-logiken onödig för dessa låtar.
 
-## Så verifieras det
-Tvåvarvstest mot facit3 i `tools/testSongMemory.mjs`:
-- Varv 1 (okänd musik): oförändrat 2/2 gränser, noll falska.
-- Varv 2 (inlärt): gränser via igenkänning med < 1 s fel, och noll ID-växlingar utanför verkliga byten.
+## Latens och exakthet
 
-Deploy sker först när båda varven är gröna.
+Knapptrycket går över WiFi-AP:n till Pi:n på några millisekunder, men det är inte hela sanningen: din reaktionstid är den stora felkällan. Därför sätts gränsen med en liten justerbar offset (standard −300 ms) så att lite av föregående låt hellre hamnar i slutet av det gamla segmentet än i början av det nya. Fingeravtrycket är robust mot det; en avhuggen intro är värre.
 
 ## Tekniskt
-Allt sker i `pi-dmx/engine/src/songMemory.ts` plus mätning i `pi-dmx/engine/tools/testSongMemory.mjs`. Ingen ny CPU-tung DSP tillkommer. `index.html` på Pi:n berörs inte.
+
+- `pi-dmx/engine/src/songMemory.ts`: nya publika `beginManual()`, `boundaryManual()`, `endManual()` som committar segmentet på angiven tidsstämpel och startar ny tidslinje atomärt (samma väg som dagens bekräftade gräns, men utan bevisvillkor). En `manualMode`-flagga kortsluter heuristik och spärrar.
+- `pi-dmx/engine/src/server.ts`: `POST /api/learn/start`, `/api/learn/next`, `/api/learn/stop`, samt `learn`-status i WebSocket-strömmen.
+- `pi-dmx/engine/src/index.ts`: `LearnRecorder` styrs av manuellt läge när det är aktivt.
+- UI: `index.html` på Pi:n ägs av dig — jag levererar den delen som en färdig diff att klistra in, inte som en direktändring.
+- Verifiering: nytt test i `tools/testSongMemory.mjs` som spelar facit3-WAV:en och skickar manuella gränser vid 165 s och 317 s → biblioteket ska innehålla exakt 3 låtar med gränsfel 0 ms, och varv 2 ska känna igen alla tre.
+
+Heuristiken tas inte bort — den behövs fortfarande när gäster spelar okänd musik.
