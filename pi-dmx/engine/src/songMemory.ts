@@ -30,6 +30,15 @@ const OFFSET_KEY_BIAS = 10000; // negativa offset-fack måste fortfarande avkoda
 const VOTES_NEEDED = 10;
 const VOTES_NEEDED_START = 6;  // matchen pekar på låtens BÖRJAN → egen korroborerande signal, lås snabbare
 const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som bästa ANNAN låt
+// BIBLIOTEKSKÄNSLIGT BEVISKRAV. Med få lagrade låtar finns ingen konkurrent att
+// slå, så MARGIN är nästan gratis och hela beviset vilar på röstantalet — och 10
+// landmärkespar kan en generisk loop leverera. Därför: (a) fler röster krävs när
+// biblioteket är litet, (b) rösterna måste ligga i ett SAMMANHÄNGANDE offset-
+// kluster som spänner minst ett par sekunder ljud (en loop ger röster i en
+// klump, en riktig match ger dem utspridda över tiden).
+const SMALL_LIB = 10;          // under så många låtar räknas biblioteket som litet
+const VOTES_SMALL_LIB = 6;     // extra röster som krävs då
+const SPAN_MIN_MS = 2500;      // vinnarklustret måste spänna så mycket livetid
 const SYNC_SAMPLES = 9;        // robust median innan tidspositionen korrigeras
 const SYNC_SAMPLES_FAST = 5;   // ...men FÖRSTA korrigeringen efter ett lås ska komma direkt
 const SYNC_INTERVAL_MS = 750;
@@ -231,6 +240,7 @@ export class SongMemory {
    *  fack-upplösningen → låtstarten låses direkt, inte ±125 ms fel. */
   private recentId: number[] = [];
   private recentOff: number[] = [];
+  private recentT: number[] = [];
   private lastBoundary = "";
   private replayIdx = 0;
   private pendingDrop = 0;        // styrka på en drop som ska fyras av
@@ -416,17 +426,19 @@ export class SongMemory {
       const key = this.voteKey(id, bucket);
       const v = (this.votes.get(key) ?? 0) + 1;
       this.votes.set(key, v);
-      this.recentId.push(id); this.recentOff.push(off);
-      if (this.recentId.length > 256) { this.recentId.shift(); this.recentOff.shift(); }
+      this.recentId.push(id); this.recentOff.push(off); this.recentT.push(l.t);
+      if (this.recentId.length > 256) { this.recentId.shift(); this.recentOff.shift(); this.recentT.shift(); }
       const winner = this.bestFor(id);
       const other = this.bestCompetitor(id, winner.bucket);
       // START-LÅS: pekar vinnaren på låtens första sekunder är själva
       // startjusteringen en extra signal — då räcker färre röster, och en ny låt
       // i en gaplös ström låses innan första refrängen.
       const atStart = l.t + winner.bucket * OFFSET_BUCKET < RECOG_POS_MS;
-      const need = atStart ? VOTES_NEEDED_START : VOTES_NEEDED;
-      const establishes = !this.matchId && winner.votes >= need && winner.votes >= other * MARGIN;
-      const replaces = !!this.matchId && id !== this.matchId && winner.votes >= need && winner.votes > this.bestFor(this.matchId).votes;
+      const need = (atStart ? VOTES_NEEDED_START : VOTES_NEEDED)
+        + (this.songs.size < SMALL_LIB ? VOTES_SMALL_LIB : 0);
+      const spread = this.clusterSpan(id, winner.bucket) >= SPAN_MIN_MS;
+      const establishes = !this.matchId && spread && winner.votes >= need && winner.votes >= other * MARGIN;
+      const replaces = !!this.matchId && id !== this.matchId && spread && winner.votes >= need && winner.votes > this.bestFor(this.matchId).votes;
       if (id !== this.matchId && (establishes || replaces)) {
         const wasMatch = this.matchId;
         this.matchId = id;
@@ -457,6 +469,19 @@ export class SongMemory {
 
       if (id === this.matchId) this.trackSync(off, winner, other);
     }
+  }
+
+  /** Livetidsspann för träffarna i vinnarfacket (± ett fack). En generisk loop
+   *  ger många röster i en tät klump; en riktig match ger dem utspridda. */
+  private clusterSpan(id: number, bucket: number): number {
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < this.recentId.length; i++) {
+      if (this.recentId[i] !== id) continue;
+      if (Math.abs(Math.round(this.recentOff[i] / OFFSET_BUCKET) - bucket) > 1) continue;
+      if (this.recentT[i] < lo) lo = this.recentT[i];
+      if (this.recentT[i] > hi) hi = this.recentT[i];
+    }
+    return hi > lo ? hi - lo : 0;
   }
 
   /** Median av de råoffset som ligger i vinnarfacket (± ett fack). Facket är
@@ -579,7 +604,7 @@ export class SongMemory {
       this.relockTarget = null;
       this.syncOffsets = [];
       this.syncBucket = Math.round(est / OFFSET_BUCKET);
-      this.recentId = []; this.recentOff = [];
+      this.recentId = []; this.recentOff = []; this.recentT = [];
       this.replayIdx = this.nextDropIndex(this.songs.get(this.matchId), now - this.playStart + this.matchOffset);
       this.cuePrevT = -1;
       this.relocks++;
@@ -799,7 +824,7 @@ export class SongMemory {
       this.boundaryCount++;
       this.dropLearning();
       this.votes.clear();
-      this.recentId = []; this.recentOff = [];
+      this.recentId = []; this.recentOff = []; this.recentT = [];
       this.fp.reset();
     }
     this.playStart = now - pos;
@@ -865,7 +890,7 @@ export class SongMemory {
     this.lastFreshMatchHit = 0;
     this.matchOffset = 0; this.rawOffset = 0;
     this.votes.clear();
-    this.recentId = []; this.recentOff = [];
+    this.recentId = []; this.recentOff = []; this.recentT = [];
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true;
     this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0;
     this.replayIdx = 0; this.cuePrevT = -1;
@@ -1003,7 +1028,7 @@ export class SongMemory {
     this.votes.clear(); this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
     this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear(); this.bannedIds.clear(); this.falseHits.clear(); this.matchSince = 0; this.matchConfirmed = false;
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
-    this.recentId = []; this.recentOff = [];
+    this.recentId = []; this.recentOff = []; this.recentT = [];
     this.fp.reset();
   }
 
@@ -1106,7 +1131,7 @@ export class SongMemory {
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
     this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear(); this.bannedIds.clear(); this.falseHits.clear(); this.matchSince = 0; this.matchConfirmed = false;
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
-    this.recentId = []; this.recentOff = [];
+    this.recentId = []; this.recentOff = []; this.recentT = [];
     this.fp.reset();
     this.onCommit?.(committed, !matched);
   }
