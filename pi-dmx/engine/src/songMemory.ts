@@ -101,7 +101,13 @@ const NOV_WIN_MS = 1500;       // klangprofil per 1.5 s
 const NOV_LAG_MS = 8000;       // jämför mot profilen så långt bakåt (facitmätningens fönster)
 const NOV_STRONG = 0.68;        // MÄTT: platå 0.60–0.75 gav 2/2 träff, 0 falska → mitten
 const NOV_WEAK = 0.55;          // ...räcker om nivådipp eller temposkifte också fyrar
-const NOV_BACK_MS = NOV_LAG_MS / 2;  // novelty reagerar när nya materialet fyllt fönstret (mätt 10–11 s för tidigt)
+// BACKDATERING: MÄTT MOT FACIT ligger gränsen redan 9–12 s FÖR TIDIGT (156 mot
+// 165, 305 mot 317) — crossfaden lägger nästa låts material före den nominella
+// gränsen, så noveltyn fyrar före, inte efter. Backdatering drar den ännu tidigare
+// och gör felet större: satt till 0. (En framåtskjutning är omöjlig i realtid —
+// gränsen kan inte sättas i framtiden.)
+const NOV_BACK_MS = 0;
+
 const NOV_WIN_KEEP_MS = 6000;  // klangskifte räknas som evidens så länge efteråt
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
 // IGENKÄNNING SOM GRÄNS. Känner igenkännaren en ANNAN känd låt mitt i ett segment,
