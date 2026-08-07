@@ -168,6 +168,7 @@ const ok = fired.length >= 2
   && shortPrev.songId === 2 && shortPrev.positionMs > 10000 && shortPrev.positionMs < 16000
   && shortPrev.songs === 2
   && dr.known && driftError < 250 && (drifted.maxJump ?? 0) < 60
-  && mem2.state().known === false;
+  && mem2.state().known === false
+  && afterTrim === beforeTrim && afterDrop === beforeTrim - 1;
 console.log(ok ? "OK" : "MISSLYCKADES");
 process.exit(ok ? 0 : 1);
