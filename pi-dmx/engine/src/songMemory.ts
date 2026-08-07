@@ -362,8 +362,8 @@ export class SongMemory {
         this.matchId = id;
         this.lastMatchedAt = this.clock();
         this.quarantinedSegment = false;
-        this.matchOffset = off;   // rå landmark-tid är finare än det 250 ms-fack som bara används för konsensus
-        this.rawOffset = off;
+        this.matchOffset = winner.bucket * OFFSET_BUCKET;
+        this.rawOffset = this.matchOffset;
         this.syncBucket = winner.bucket;
         this.syncOffsets = [];
         this.matchVotes = winner.votes;
