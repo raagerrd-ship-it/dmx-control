@@ -4,8 +4,17 @@
  *   1. Lär in låt A → sparas.
  *   2. Spela A igen → ska kännas igen och drops komma från minnet.
  *   3. Spela låt B (annat ljud) → får INTE matcha A.
+ *
+ * ISOLERAT MINNE: testet skriver alltid till en TOM temp-fil. Utan detta ärver
+ * körningen ett riktigt låtminne (/var/lib/audio-dmx-engine/songs.bin) och blir
+ * icke-deterministisk — extra lärda låtar ändrar röster och offset-marginaler.
  */
-import { SongMemory } from "../dist/songMemory.js";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+process.env.SONGS_PATH = join(mkdtempSync(join(tmpdir(), "songmem-")), "songs.bin");
+const { SongMemory } = await import("../dist/songMemory.js");
+
 
 const BINS = 1024, BIN_HZ = 48000 / 2048, STEP = 8;   // ms per stor-FFT-ram
 
