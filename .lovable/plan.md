@@ -1,39 +1,37 @@
-# Låtgränser: relativ tröskel, känt slut som bevis, och stopp för matchflimret
+# Chroma-novelty som andra, oberoende gränssignal
 
-Claudes mätning visar tre saker. De två första ändringarna finns **inte** i den här kodbasen ännu (verifierat: `NOV_STRONG` är fortfarande en absolut tröskel, och känd låts slut släpper bara matchen utan att sätta gräns). Det tredje — att matchen tappas och flimrar — är ett separat spårningsproblem.
+Målet: låtgränser ska kunna fyra på **två olika sorters bevis** (klangfärg + tonart) i stället för två varianter av samma spektralmått. Först då kan minsta låtlängd sänkas utan att kaskaden av falska gränser återkommer.
 
-## 1. Relativ klangskiftesröskel
+Claudes mätning delas: kaskadtabellen (110 s → 2 gränser/2 låtar, 60 s → 4/0, 30 s → 7/0) visar att spärren i dag bär hela beslutet. Vi rör därför **inte** spärren i detta steg.
 
-Idag krävs `novPeak >= 0.68` absolut, annars är enda utvägen `MAX_SEG_MS`. En mjuk crossfade i ett jämnt parti kan ligga strax under och då bär 110-sekunderstimern hela beslutet.
+## Vad som byggs
 
-- Behåll det absoluta golvet som lägsta krav (skydd mot brus).
-- Lägg till att ett skifte som är tydligt större än segmentets egen typiska klangrörelse (löpande median/percentil av `novelty`) räknas som stark gräns även när det absoluta värdet är lägre.
-- Nivådipp och tempo är kvar som extrasignaler — aldrig krav.
-- Godkänt: facit-inspelningen ger fortsatt 2/2 gränser och noll falska på varv 1.
+1. **Chroma-profil ur befintlig FFT**
+   Samma 2048-magnitud som redan matas in mappas till 12 halvtoner (bin → MIDI-not → not mod 12), energinormaliserad per fönster. Ingen ny FFT, ingen ny CPU-tråd — bara en extra loop i samma 1,5-sekundersfönster som klangprofilen.
 
-## 2. Känd låts slut sätter gräns
+2. **Chroma-novelty mot samma ringbuffert-horisont**
+   Cosinus-avstånd mellan nuvarande chroma-profil och profilen 8 s bakåt, med **rotationsinvariant** jämförelse avstängd (vi vill just se tonartsbyte). Nytt fält `chromaAt` / `chromaPeak` vid sidan av `novAt` / `novPeak`, nollställs i samma `resetNovelty()`.
 
-När en bekräftad match passerar sin lagrade längd vet motorn att låten är slut — det är idag bara ett släpp.
+3. **Evidensregeln blir tvåsorts**
+   - Klangskifte ≥ `NOV_STRONG` fyrar fortfarande ensamt (mätt 2/2, 0 falska — får inte försämras).
+   - Nytt: klangskifte ≥ `NOV_WEAK` **plus** chroma-novelty över sin tröskel = gräns. Det är två oberoende bevis.
+   - Nivådipp och tempo förblir svaga extrasignaler.
 
-- Vid släpp av en **bekräftad** match på grund av "tidslinjen tog slut": behandla tidpunkten som låtgräns med orsak "känd låt slut", commit och atomisk omstart av nollpunkten (samma väg som igenkänningsgränsen).
-- Gäller inte falska matchningar eller släpp på grund av uteblivna färska träffar.
+4. **Kalibrering mot facit, inte gissning**
+   Chroma-tröskeln sätts från mätning på facit3 (kända gränser 165 s / 317 s): vi loggar chroma-avståndets percentil vid de verkliga gränserna och vid alla falska klangskiftesträffar, och väljer tröskeln i platån där båda gränserna fångas med noll falska.
 
-## 3. Matchflimret (nytt arbete)
+## Verifiering (grön innan deploy)
 
-Mätningen visar korrekta positioner men tre tapp och ~15 s växling mellan låt #1 och #2, båda med konfidens 1,00. Två orsaker att åtgärda:
+- `tools/testSongMemory.mjs` varv 1 måste stå kvar på 2/2 gränser, 0 falska.
+- Ny mätutskrift: chroma-percentil vid facitgräns vs vid varje icke-gräns-topp.
+- Först när tvåsorts-regeln ger 2/2 med 0 falska **och** klarar en sänkning av `MIN_SEG_MS` till 60 s utan kaskad, föreslås spärrsänkningen som ett separat steg.
 
-- **Byte är för billigt.** Ett byte kräver idag bara fler röster än den aktiva matchen. Kräv i stället att utmanaren håller sin övervikt över en kort tid och med marginal, och att den aktiva matchen samtidigt saknar färska positionsenliga träffar. Ett byte till samma id som just släpptes ska respektera karantänen.
-- **Tapp genom svaga partier.** `MATCH_FRESH_MS` mäter bara senaste träff. Låt en bekräftad match överleva ett glapp med en förlängd nådetid så länge positionen fortsätter vara konsistent, och rapportera "håller position utan träffar" i state i stället för att falla till realtid direkt.
-- **Konfidensen är inte informativ** — den mättar på 1,00 i båda riktningarna. Skala den mot röstmarginal och färskhet så loggen kan skilja stark från svag match.
+## Vad som INTE görs nu
 
-## Verifiering
-
-- Utöka `tools/testSongMemory.mjs` med ett tvåvarvsfall: samma material två gånger genom samma minne. Varv 2 ska sätta gränsen via igenkänning (< 1 s fel) och **inte** växla låt-id mer än en gång per verklig gräns.
-- Nytt mätvärde i testet: antal matchtapp och antal id-växlingar per körning — båda ska vara 0 utanför verkliga gränser.
-- Varv 1 (okänd musik) måste förbli 2/2 gränser, noll falska.
-- Kör hela regressionen grön innan något deployas.
+- `MIN_SEG_MS` sänks inte i detta steg.
+- Igenkänningen förblir den exakta gränsen (0,2 s fel mot noveltyns 9 s); chroma förbättrar bara reservplanen.
+- Glappandet/flimret mellan låt-id är ett separat problem och ligger kvar orört.
 
 ## Tekniskt
 
-- All logik i `pi-dmx/engine/src/songMemory.ts` (`boundary`, `releaseMatch`, `vote`, `tick`, `state`).
-- Inga ändringar i fingerprintformat, lagrade låtar eller den användarägda Pi-UI-filen.
+Berörd fil: `pi-dmx/engine/src/songMemory.ts` (+ `dist` för offlinetestet) och `tools/testSongMemory.mjs` för mätutskriften. Ingen ändring i `index.ts` — chroma matas ur `pushSpectrum` som redan finns. Inget rör Pi-ägda `engine/public/index.html`.
