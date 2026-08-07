@@ -925,20 +925,55 @@ export class SongMemory {
    *  v1-sidecars saknar dramaturgi-fälten; då lämnas de orörda. */
   applyRefined(songId: number, t: {
     drops: { t: number; s: number }[]; bpm: number; beatPhaseMs: number; intensity: number[];
-    risers?: Riser[]; sections?: number[]; phrase?: { p16: number } | null;
+    risers?: Riser[]; sections?: number[]; phrase?: { p16: number } | null; trimAt?: number;
   }): void {
     const s = this.songs.get(songId);
     if (!s) return;
+    // OREN INSPELNING: tvätten såg en låtgräns INNE i segmentet (permanent tempo-
+    // OCH klangskifte). Behåll bara första halvan — annars matchar nästa låt mot
+    // det här fingeravtrycket och får fel tidslinje.
+    if (t.trimAt && t.trimAt > 0) { this.trimSong(s, t.trimAt); if (!this.songs.has(songId)) return; }
     s.meta.drops = t.drops.map((d) => ({ t: d.t, s: d.s, c: Math.max(2, s.meta.plays) }));   // tvättade drops är bekräftade
     if (t.bpm > 40) { s.meta.bpm = t.bpm; s.meta.beatPhaseMs = t.beatPhaseMs; }
     if (t.intensity.length) s.meta.intensity = t.intensity;
     if (t.risers) s.meta.risers = t.risers;
     if (t.sections) s.meta.sections = t.sections;
     if (t.phrase?.p16) s.meta.phraseMs = t.phrase.p16;
+    if (t.trimAt && t.trimAt > 0) {
+      // Tvättens tidslinje täcker hela det orena segmentet → klipp den också.
+      s.meta.drops = s.meta.drops.filter((d) => d.t <= t.trimAt!);
+      s.meta.intensity = s.meta.intensity.slice(0, Math.ceil(t.trimAt / 1000));
+      if (s.meta.risers) s.meta.risers = s.meta.risers.filter((r) => r.end <= t.trimAt!);
+      if (s.meta.sections) s.meta.sections = s.meta.sections.filter((x) => x <= t.trimAt!);
+    }
     this.dirty = true;
     void this.save();
     console.log(`[song] låt #${songId} tvättad: ${t.drops.length} drops, ${t.risers?.length ?? 0} risers, ${t.sections?.length ?? 0} sektioner, ${t.bpm} BPM`);
   }
+
+  /** Klipp bort allt efter en intern låtgräns: hashar, tider och längd. Är första
+   *  halvan för kort finns ingen låt att behålla — kasta hela posten. */
+  private trimSong(s: Song, trimAt: number): void {
+    const was = s.meta.durationMs;
+    if (trimAt < TRIM_MIN_HALF_MS) {
+      this.songs.delete(s.meta.id);
+      this.rebuildIndex();
+      this.dirty = true;
+      console.log(`[song] låt #${s.meta.id} kastad: intern gräns redan vid ${(trimAt / 1000).toFixed(0)}s`);
+      return;
+    }
+    let n = 0;
+    for (let k = 0; k < s.times.length; k++) if (s.times[k] <= trimAt) n++;
+    const hashes = new Uint32Array(n), times = new Uint32Array(n);
+    let p = 0;
+    for (let k = 0; k < s.times.length; k++) if (s.times[k] <= trimAt) { hashes[p] = s.hashes[k]; times[p] = s.times[k]; p++; }
+    s.hashes = hashes; s.times = times;
+    s.meta.durationMs = trimAt;
+    this.rebuildIndex();
+    this.dirty = true;
+    console.log(`[song] låt #${s.meta.id} trimmad: ${(was / 1000).toFixed(0)}s → ${(trimAt / 1000).toFixed(0)}s (intern gräns), ${n} hashar kvar`);
+  }
+
 
 
   /** Låten är slut: skriv in i minnet (ny låt) eller förbättra den kända. */
