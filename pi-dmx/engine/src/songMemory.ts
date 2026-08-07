@@ -28,8 +28,10 @@ const OFFSET_BUCKET = 250;     // ms per offset-fack
 const OFFSET_KEY_STRIDE = 100000;
 const OFFSET_KEY_BIAS = 10000; // negativa offset-fack måste fortfarande avkodas till rätt låt-id
 const VOTES_NEEDED = 10;
+const VOTES_NEEDED_START = 6;  // matchen pekar på låtens BÖRJAN → egen korroborerande signal, lås snabbare
 const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som bästa ANNAN låt
 const SYNC_SAMPLES = 9;        // robust median innan tidspositionen korrigeras
+const SYNC_SAMPLES_FAST = 5;   // ...men FÖRSTA korrigeringen efter ett lås ska komma direkt
 const SYNC_INTERVAL_MS = 750;
 const SYNC_NUDGE_MS = 25;      // korrekt lås får aldrig börja vandra
 const SEEK_ERROR_MS = 1500;    // större stabilt hopp = seek/ny uppspelningsposition
