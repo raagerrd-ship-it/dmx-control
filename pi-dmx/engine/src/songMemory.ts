@@ -462,6 +462,11 @@ export class SongMemory {
   }
 
 
+  private inBlockedZone(id: number, tSong: number): boolean {
+    for (const z of this.blockedZones) if (z.id === id && tSong >= z.from && tSong <= z.to) return true;
+    return false;
+  }
+
   private voteKey(id: number, bucket: number): number {
     return id * OFFSET_KEY_STRIDE + bucket + OFFSET_KEY_BIAS;
   }
