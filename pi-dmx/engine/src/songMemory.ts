@@ -385,8 +385,8 @@ export class SongMemory {
     this.novStart = now;
     let sum = 0;
     for (let b = 0; b < this.novAcc.length; b++) sum += this.novAcc[b];
-    this.novAcc.fill(0); this.novN = 0;
-    if (sum <= 0) return;
+    this.novN = 0;
+    if (sum <= 0) { this.novAcc.fill(0); return; }
     const lag = Math.max(1, Math.round(NOV_LAG_MS / NOV_WIN_MS));
     const size = lag + 1;
     if (this.novHist.length !== size) {
@@ -395,7 +395,8 @@ export class SongMemory {
       this.novIdx = 0; this.novFilled = 0;
     }
     const prof = this.novHist[this.novIdx];
-    for (let b = 0; b < prof.length; b++) prof[b] = this.novAcc[b] / sum;   // novAcc redan nollad? nej — se nedan
+    for (let b = 0; b < prof.length; b++) prof[b] = this.novAcc[b] / sum;
+    this.novAcc.fill(0);
     this.novIdx = (this.novIdx + 1) % size;
     this.novFilled++;
     if (this.novFilled > lag) {
