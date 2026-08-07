@@ -114,6 +114,12 @@ console.log("laddat från disk:", mem2.state().songs, "låtar");
 const firedB = await play(mem2, B, clock, 120000, [], true);
 console.log("annan låt matchade:", mem2.state().known, "(ska vara false), drops ur minnet:", firedB.length);
 
+// En etablerad match får aldrig leva förbi lagrad duration. Samma id blockeras
+// efter släppet så kvarvarande gamla röster inte omedelbart låser tillbaka.
+await playFrom(mem2, A, clock, 112000, 12000);
+const pastEnd = mem2.state();
+console.log("förbi lagrat slut: känd", pastEnd.known, "position", pastEnd.positionMs.toFixed(0), "ms");
+
 await new Promise((r) => setTimeout(r, 300));
 const mem3 = new SongMemory(() => clock.t);
 await mem3.load();
@@ -169,6 +175,7 @@ const ok = fired.length >= 2
   && shortPrev.songs === 2
   && dr.known && driftError < 250 && (drifted.maxJump ?? 0) < 60
   && mem2.state().known === false
+  && pastEnd.known === false
   && afterTrim === beforeTrim && afterDrop === beforeTrim - 1;
 console.log(ok ? "OK" : "MISSLYCKADES");
 process.exit(ok ? 0 : 1);

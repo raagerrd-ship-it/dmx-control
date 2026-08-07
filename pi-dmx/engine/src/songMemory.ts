@@ -49,6 +49,7 @@ const RELOCK_MIN_HITS = 6;         // estimatet måste vila på flera träffar
 const RELOCK_SNAP_MS = 900;        // så stort fel är en seek, inte drift → snappa
 const RELOCK_GLIDE_MIN = 60;       // ms/s: mjukaste gliden (liten drift)
 const RELOCK_GLIDE_MAX = 400;      // ms/s: snabbaste gliden (drift nära snap)
+const MATCH_FRESH_MS = 6000;        // en aktiv match måste få nya, positionsenliga träffar
 
 
 const LEARN_QUARANTINE_MS = 30000; // nyss känd låt = breakdown/tillfälligt tapp, inte ny låt
@@ -57,11 +58,6 @@ const LEARN_QUARANTINE_MS = 30000; // nyss känd låt = breakdown/tillfälligt t
 // den mot det orena segmentet och motorn kör FEL låts tidslinje — aktivt fel
 // show, sämre än realtid. En match vars position gått förbi den lagrade låtens
 // slut har definitionsmässigt inget mer att spela upp: släpp den då.
-// Marginalen är RELATIV: samma låt spelas sällan exakt lika länge (fade-out,
-// crossfade, olika master) — bara ett fel som är stort i förhållande till låten
-// är ett tecken på fel tidslinje.
-const MATCH_END_GRACE_MS = 5000;
-const MATCH_END_GRACE_FRAC = 0.08;
 const TRIM_MIN_HALF_MS = 60000;    // en trimmad halva under 60 s är inte en låt
 
 
@@ -200,6 +196,8 @@ export class SongMemory {
   private matchOffset = 0;
   private matchVotes = 0;
   private matchMargin = 0;
+  private lastFreshMatchHit = 0;
+  private blockedMatchId = 0;
   private rawOffset = 0;
   private syncBucket = 0;
   private syncOffsets: number[] = [];
@@ -389,6 +387,7 @@ export class SongMemory {
     for (let i = start; i < end; i++) {
       const v0 = this.idxVal[i];
       const id = this.slotIds[v0 >>> 12];
+      if (id === this.blockedMatchId) continue;
       const tSong = (v0 & 0xfff) * FRAME_MS;
       const off = tSong - l.t;
       // Negativ offset är förväntad när en ny känd låt börjar mitt i ett
@@ -401,7 +400,7 @@ export class SongMemory {
       this.recentId.push(id); this.recentOff.push(off);
       if (this.recentId.length > 256) { this.recentId.shift(); this.recentOff.shift(); }
       const winner = this.bestFor(id);
-      const other = this.bestOther(id);
+      const other = this.bestCompetitor(id, winner.bucket);
       // START-LÅS: pekar vinnaren på låtens första sekunder är själva
       // startjusteringen en extra signal — då räcker färre röster, och en ny låt
       // i en gaplös ström låses innan första refrängen.
@@ -423,6 +422,7 @@ export class SongMemory {
         this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0;
         this.matchVotes = winner.votes;
         this.matchMargin = winner.votes / Math.max(1, other);
+        this.lastFreshMatchHit = this.clock();
         this.replayIdx = 0;
         const s = this.songs.get(id);
         const pos = l.t + this.matchOffset;
@@ -462,16 +462,19 @@ export class SongMemory {
     return key - this.voteId(key) * OFFSET_KEY_STRIDE - OFFSET_KEY_BIAS;
   }
 
-  /** Bästa röstfack som tillhör en ANNAN låt än `id` — marginalkravet.
-   *  Utan det räcker slumpmässiga hash-krockar för att peka ut fel låt. */
-  private bestOther(id: number): number {
+  /** Starkaste konkurrerande förklaring: annan låt ELLER ett avlägset offsetfack
+   *  i samma låt. Det senare är avgörande för repetitiv musik; MARGIN mot bara
+   *  andra låtar kunde annars ge en falsk match maximal konfidens. */
+  private bestCompetitor(id: number, winnerBucket: number): number {
     let best = 1;
-    const seen = new Set<number>();
-    for (const [k] of this.votes) {
+    for (const [k, v] of this.votes) {
       const otherId = this.voteId(k);
-      if (otherId === id || seen.has(otherId)) continue;
-      seen.add(otherId);
-      best = Math.max(best, this.bestFor(otherId).votes);
+      const bucket = this.voteBucket(k);
+      if (otherId === id && Math.abs(bucket - winnerBucket) <= 2) continue;
+      const clustered = v
+        + (this.votes.get(this.voteKey(otherId, bucket - 1)) ?? 0)
+        + (this.votes.get(this.voteKey(otherId, bucket + 1)) ?? 0);
+      best = Math.max(best, clustered);
     }
     return best;
   }
@@ -498,6 +501,7 @@ export class SongMemory {
     this.verifyLock(now);
     const bucket = Math.round(off / OFFSET_BUCKET);
     if (Math.abs(bucket - winner.bucket) > 1) return;
+    this.lastFreshMatchHit = now;
     if (Math.abs(this.syncBucket - winner.bucket) > 1) { this.syncBucket = winner.bucket; this.syncOffsets = []; }
     this.syncOffsets.push(off);
     if (this.syncOffsets.length > 31) this.syncOffsets.shift();
@@ -640,13 +644,14 @@ export class SongMemory {
     if (this.recogSplit >= 0) { this.splitOnRecognition(now, this.recogSplit); return; }
 
     const tLive = now - this.playStart;
-    // Tidslinjen har tagit slut → matchen kan inte vara rätt låt (eller minnet är
-    // orent). Släpp den och låt realtiden ta över i stället för att styra showen
-    // med en tidslinje som passerat låtens slut.
+    // Tidslinjen har tagit slut, eller nya positionsenliga fingeravtryck har
+    // upphört → släpp omedelbart. Blockera samma id resten av segmentet så gamla
+    // röster inte kan låsa tillbaka mot samma felaktiga tidslinje.
     if (this.matchId) {
       const m = this.songs.get(this.matchId);
-      const grace = Math.max(MATCH_END_GRACE_MS, m ? m.meta.durationMs * MATCH_END_GRACE_FRAC : 0);
-      if (m && tLive + this.matchOffset > m.meta.durationMs + grace) this.releaseMatch(m.meta.id);
+      const position = tLive + this.matchOffset;
+      if (m && position > m.meta.durationMs) this.releaseMatch(m.meta.id, "tidslinjen tog slut");
+      else if (this.lastFreshMatchHit && now - this.lastFreshMatchHit > MATCH_FRESH_MS) this.releaseMatch(this.matchId, "inga färska träffar");
     }
     if (this.boundary(now, tLive, o)) return;
 
@@ -757,6 +762,8 @@ export class SongMemory {
     this.matchOffset = 0;
     this.rawOffset = 0;
     this.matchVotes = VOTES_NEEDED;
+    this.lastFreshMatchHit = now;
+    this.blockedMatchId = 0;
     this.lastMatchedAt = now;
     this.syncBucket = 0;
     this.syncOffsets = [];
@@ -772,9 +779,11 @@ export class SongMemory {
 
   /** Släpp en etablerad match utan att röra inlärningen. Rösterna nollas så
    *  samma låt inte låser om sig på nästa hop. */
-  private releaseMatch(id: number): void {
-    console.log(`[song] släppte match #${id}: tidslinjen tog slut (position förbi låtens slut)`);
+  private releaseMatch(id: number, why: string): void {
+    console.log(`[song] släppte match #${id}: ${why}`);
+    this.blockedMatchId = id;
     this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0;
+    this.lastFreshMatchHit = 0;
     this.matchOffset = 0; this.rawOffset = 0;
     this.votes.clear();
     this.recentId = []; this.recentOff = [];
@@ -892,6 +901,7 @@ export class SongMemory {
   forget(): void {
     this.songs.clear(); this.votes.clear(); this.rebuildIndex();
     this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0; this.nextId = 1;
+    this.lastFreshMatchHit = 0; this.blockedMatchId = 0;
     this.dirty = true;
     void this.save();
   }
@@ -912,6 +922,7 @@ export class SongMemory {
     this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
     this.levAvg = 0; this.dipAt = 0; this.recogSplit = -1;
     this.votes.clear(); this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
+    this.lastFreshMatchHit = 0; this.blockedMatchId = 0;
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
@@ -1003,6 +1014,7 @@ export class SongMemory {
 
 
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
+    this.lastFreshMatchHit = 0; this.blockedMatchId = 0;
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
