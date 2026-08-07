@@ -99,8 +99,12 @@ const recorder = new LearnRecorder(join(DATA_DIR, "learn.wav"), cfg.audio.rate);
 const refiner = new RefineQueue(DATA_DIR, (t) => songs.applyRefined(t.songId, t));
 refiner.cleanStale();
 songs.onDropLearning = () => recorder.abort();
-songs.onCommit = (songId) => {
+songs.onCommit = (songId, fresh) => {
   if (!songId) { recorder.abort(); return; }   // inget lärdes in → kasta ljudet
+  // Segmentet matchade en KÄND låt → inspelningen är bara den del som spelades,
+  // alltså per definition partiell. Den lagrade tvätten byggde på hela låten och
+  // ska aldrig ersättas av en sämre. Ingen tvätt, inget ljud kvar.
+  if (!fresh) { recorder.abort(); return; }
   const wav = recorder.finish();
   if (!wav) return;
   // Gaplös ström: nästa låt börjar spelas in i learn.wav i samma sekund som
@@ -119,6 +123,7 @@ let lastRenderMs = 0;
 let clockDetBpm = 0;   // analysatorns bpm som taktklockan LÅSTES på (om-ankrings-referens,
                        // skild från cfg.beat.bpm som frekvens-termen finjusterar)
 let lastLiveDrop = 0;        // senast sedda drop-räknare FRÅN analysatorn
+let lastBoundary = 0;        // senast sedda låtgräns-räknare (dynamikens omkalibrering)
 let outDrop = 0;             // drop-räknaren effekterna ser (live eller replay)
 let memoryBeatLocked = false;// taktklockan är låst ur låtminnet
 const slotsFor = () => Math.max(activeSlots(cfg.fixtures), cfg.fog?.enabled ? cfg.fog.address : 0);
@@ -149,6 +154,10 @@ capture.on("chunk", (samples: Float32Array) => {
   // Temp-inspelning: bara medan en NY låt lärs in på aux (state().learning),
   // aldrig på mik och aldrig för en redan känd låt.
   if (songs.learningNew) { if (!recorder.active) recorder.start(); recorder.write(samples); }
+  // LÅTGRÄNS → mjuk omkalibrering av den löpande dynamiken (auto-rangen får
+  // krypa in på nya låtens nivåer inom sekunder i stället för en minut).
+  if (songs.boundaryCount !== lastBoundary) { lastBoundary = songs.boundaryCount; effects.softenRange(); }
+
 
   if (songs.recognized) {
     if (songs.takeDrop() > 0) outDrop++;          // pre-fired ur minnet

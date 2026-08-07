@@ -4,8 +4,17 @@
  *   1. Lär in låt A → sparas.
  *   2. Spela A igen → ska kännas igen och drops komma från minnet.
  *   3. Spela låt B (annat ljud) → får INTE matcha A.
+ *
+ * ISOLERAT MINNE: testet skriver alltid till en TOM temp-fil. Utan detta ärver
+ * körningen ett riktigt låtminne (/var/lib/audio-dmx-engine/songs.bin) och blir
+ * icke-deterministisk — extra lärda låtar ändrar röster och offset-marginaler.
  */
-import { SongMemory } from "../dist/songMemory.js";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+process.env.SONGS_PATH = join(mkdtempSync(join(tmpdir(), "songmem-")), "songs.bin");
+const { SongMemory } = await import("../dist/songMemory.js");
+
 
 const BINS = 1024, BIN_HZ = 48000 / 2048, STEP = 8;   // ms per stor-FFT-ram
 
@@ -42,6 +51,28 @@ async function play(mem, song, clock, durMs, drops, learnDrops) {
   return fired;
 }
 
+/** Spela en källa vars position kan skilja sig från väggklockan. Det simulerar
+ *  både sen inkoppling och seek utan att ändra SongMemorys injicerade klocka. */
+async function playFrom(mem, song, clock, sourceStartMs, durMs, drops = []) {
+  const mag = new Float32Array(BINS);
+  const fired = [];
+  const start = clock.t;
+  let nextDrop = 0, prevPos = 0;
+  for (let elapsed = 0; elapsed < durMs; elapsed += STEP) {
+    clock.t = start + elapsed;
+    const sourceT = sourceStartMs + elapsed;
+    song(sourceT, mag);
+    mem.pushSpectrum(mag, BIN_HZ, false);
+    mem.tick({ level: 0.5, dropped: false, bpm: 128, bpmConfidence: 0.8, intensity: 0.6, beatAnchorMs: clock.t, learn: false });
+    if (mem.takeDrop() > 0) fired.push(sourceT);
+    const pos = mem.state().positionMs;
+    if (prevPos > 0) fired.maxJump = Math.max(fired.maxJump ?? 0, Math.abs(pos - prevPos - STEP));
+    prevPos = pos;
+    while (nextDrop < drops.length && drops[nextDrop] < sourceT - 1000) nextDrop++;
+  }
+  return fired;
+}
+
 const clock = { t: 1_700_000_000_000 };
 const mem = new SongMemory(() => clock.t);
 await mem.load();
@@ -56,6 +87,26 @@ const fired = await play(mem, A, clock, 120000, dropsA, true);
 const st = mem.state();
 console.log("andra spelningen: drops ur minnet @", fired.map((x) => (x / 1000).toFixed(1) + "s").join(", "));
 
+// Start mitt i låten: identifieringens position ska konvergera till källans
+// riktiga tid och inte stanna på ett grovt 250 ms-fack.
+const midStart = 21037;
+await playFrom(mem, A, clock, midStart, 12000);
+const mid = mem.state();
+// Inlärningens nollpunkt öppnas efter den 1 s långa musikgrinden; WAV,
+// fingerprint och showdata delar därför sourceT - 1000 ms.
+const expectedMid = midStart + 12000 - 1000;
+const midError = Math.abs(mid.positionMs - expectedMid);
+console.log("start mitt i låten: positionsfel", midError.toFixed(0), "ms");
+
+// Seek framåt under en etablerad match. Fortsatta fingerprint-träffar ska flytta
+// showklockan och nästa drop-index, inte hålla kvar den första offseten.
+const beforeSeek = mem.state().positionMs;
+const seekTo = 70083;
+const seekFired = await playFrom(mem, A, clock, seekTo, 28000);
+const afterSeek = mem.state();
+const seekError = Math.abs(afterSeek.positionMs - (seekTo + 28000 - 1000));
+console.log("seek: position", beforeSeek.toFixed(0), "→", afterSeek.positionMs.toFixed(0), "ms, fel", seekError.toFixed(0), "ms");
+
 await new Promise((r) => setTimeout(r, 300));   // låt sparningen landa
 const mem2 = new SongMemory(() => clock.t);
 await mem2.load();
@@ -63,8 +114,68 @@ console.log("laddat från disk:", mem2.state().songs, "låtar");
 const firedB = await play(mem2, B, clock, 120000, [], true);
 console.log("annan låt matchade:", mem2.state().known, "(ska vara false), drops ur minnet:", firedB.length);
 
+// En etablerad match får aldrig leva förbi lagrad duration. Samma id blockeras
+// efter släppet så kvarvarande gamla röster inte omedelbart låser tillbaka.
+await playFrom(mem2, A, clock, 112000, 12000);
+const pastEnd = mem2.state();
+console.log("förbi lagrat slut: känd", pastEnd.known, "position", pastEnd.positionMs.toFixed(0), "ms");
+
+await new Promise((r) => setTimeout(r, 300));
+const mem3 = new SongMemory(() => clock.t);
+await mem3.load();
+// Gaplöst A→B utan tystnad. Den negativa offseten för B måste tillåtas så dess
+// igenkänning kan sätta gränsen och nollpunkten nära början av låt #2.
+await playFrom(mem3, A, clock, 0, 115000);
+await playFrom(mem3, B, clock, 0, 15000);
+const gapless = mem3.state();
+console.log("gaplöst byte: låt #", gapless.songId, "position", gapless.positionMs.toFixed(0), "ms, gräns", gapless.lastBoundary);
+
+await new Promise((r) => setTimeout(r, 300));
+const mem4 = new SongMemory(() => clock.t);
+await mem4.load();
+// KORT föregående segment (under minsta låtlängd): inget får committas, men
+// tidslinjen ska ändå ställas om direkt så showen är i synk med låt #2.
+await playFrom(mem4, A, clock, 0, 40000);
+await playFrom(mem4, B, clock, 0, 15000);
+const shortPrev = mem4.state();
+console.log("kort segment → snabb låsning: låt #", shortPrev.songId, "position", shortPrev.positionMs.toFixed(0), "ms, låtar", shortPrev.songs);
+
+await new Promise((r) => setTimeout(r, 300));
+const mem5 = new SongMemory(() => clock.t);
+await mem5.load();
+// DRIFT UNDER SEEK-TRÖSKELN (600 ms, t.ex. crossfade/buffertbyte). Nudgen ensam
+// skulle ta ~20 s; den periodiska re-locken ska snappa tillbaka.
+await playFrom(mem5, A, clock, 0, 20000);
+const drifted = await playFrom(mem5, A, clock, 20000 + 600, 20000);
+const dr = mem5.state();
+const driftError = Math.abs(dr.positionMs - (20600 + 20000 - 1000));
+console.log("drift 600ms: re-locks", dr.relocks, "kvarvarande fel", driftError.toFixed(0), "ms, största klockhopp", (drifted.maxJump ?? 0).toFixed(0), "ms");
+
+// TRIMNING UR TVÄTTEN: ett orent segment (innehåller nästa låts början) ska
+// klippas på trimAt, och en trimAt under minsta halva ska kasta hela låten.
+await new Promise((r) => setTimeout(r, 300));
+const mem6 = new SongMemory(() => clock.t);
+await mem6.load();
+const beforeTrim = mem6.state().songs;
+mem6.applyRefined(1, { drops: [{ t: 5000, s: 1 }, { t: 90000, s: 1 }], bpm: 128, beatPhaseMs: 0, intensity: [], trimAt: 70000 });
+const afterTrim = mem6.state().songs;
+mem6.applyRefined(2, { drops: [], bpm: 128, beatPhaseMs: 0, intensity: [], trimAt: 30000 });
+const afterDrop = mem6.state().songs;
+console.log("trim:", beforeTrim, "låtar →", afterTrim, "(trimmad) →", afterDrop, "(kastad)");
+
 const ok = fired.length >= 2
+
   && fired.every((f) => dropsA.some((d) => Math.abs(d - f) < 800))
-  && mem2.state().known === false;
+  && mid.known && midError < 350
+  && afterSeek.known && seekError < 350
+  && seekFired.length === 1 && Math.abs(seekFired[0] - 95000) < 500
+  && gapless.songId === 2 && gapless.positionMs > 10000 && gapless.positionMs < 16000
+  && gapless.lastBoundary === "igenkänd låt #2"
+  && shortPrev.songId === 2 && shortPrev.positionMs > 10000 && shortPrev.positionMs < 16000
+  && shortPrev.songs === 2
+  && dr.known && driftError < 250 && (drifted.maxJump ?? 0) < 60
+  && mem2.state().known === false
+  && pastEnd.known === false
+  && afterTrim === beforeTrim && afterDrop === beforeTrim - 1;
 console.log(ok ? "OK" : "MISSLYCKADES");
 process.exit(ok ? 0 : 1);

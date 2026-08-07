@@ -220,11 +220,71 @@ const phrase = bpm > 0
   ? { barMs: Math.round(4 * 60000 / bpm), p8: Math.round(32 * 60000 / bpm), p16: Math.round(64 * 60000 / bpm), p32: Math.round(128 * 60000 / bpm) }
   : null;
 
+// ── INTERN LÅTGRÄNS (orent segment) ───────────────────────────────────────
+// Missar realtidsdetektorn en gräns sväljer segmentet början av NÄSTA låt. Det
+// är trivialt att se offline: tempot OCH klangen skiftar mitt i och går INTE
+// tillbaka — till skillnad från en breakdown, som återvänder. Motorn trimmar
+// låten på trimAt, annars matchar nästa låt mot fel tidslinje.
+const bpmIn = (t0, t1) => {
+  const i0 = Math.max(0, Math.round(t0 * HZ)), i1 = Math.min(on.length, Math.round(t1 * HZ));
+  if (i1 - i0 < HZ * 20) return 0;
+  const seg = on.slice(i0, i1);
+  const m = seg.reduce((a, b) => a + b, 0) / seg.length;
+  for (let i = 0; i < seg.length; i++) seg[i] -= m;
+  const a2 = new Float64Array(LAG_MAX * 4 + 2);
+  for (let lag = LAG_MIN; lag < a2.length; lag++) {
+    let s = 0;
+    for (let i = lag; i < seg.length; i++) s += seg[i] * seg[i - lag];
+    a2[lag] = s / Math.max(1, seg.length - lag);
+  }
+  let bl = 0, bs = -Infinity;
+  for (let lag = LAG_MIN; lag <= LAG_MAX; lag++) {
+    const s = a2[lag] + 0.5 * (a2[2 * lag] ?? 0) + 0.25 * (a2[3 * lag] ?? 0) + 0.125 * (a2[4 * lag] ?? 0);
+    if (s > bs) { bs = s; bl = lag; }
+  }
+  let v = bl ? 60 * HZ / bl : 0;
+  while (v > 0 && v < 80) v *= 2;
+  while (v > 165) v /= 2;
+  return v;
+};
+const profileOver = (t0, t1) => {
+  const p = [0, 0, 0, 0, 0];
+  let n = 0;
+  for (let i = Math.max(0, F(t0)); i < Math.min(fr.length, F(t1)); i++) {
+    p[0] += fr[i].sub; p[1] += fr[i].kickB; p[2] += fr[i].bass; p[3] += fr[i].mid; p[4] += fr[i].treble; n++;
+  }
+  if (!n) return null;
+  const sum = p.reduce((a, b) => a + b, 0) || 1;
+  return p.map((x) => x / sum);
+};
+const l1 = (a, b) => a.reduce((s, x, i) => s + Math.abs(x - b[i]), 0);
+let trimAt = 0;
+{
+  const HALF = 60;              // båda halvorna måste vara en låt värd namnet
+  let bestD = 0;
+  for (const ms of sections) {
+    const t = ms / 1000;
+    if (t < HALF || dur - t < HALF) continue;
+    const A = profileOver(t - 30, t), B = profileOver(t, t + 30), C = profileOver(t + 30, t + 60);
+    if (!A || !B || !C) continue;
+    const d = l1(A, B);
+    if (d < 0.25) continue;         // klangskiftet måste vara tydligt
+    if (l1(A, C) < d * 0.7) continue;   // ...och INTE gå tillbaka inom 30 s (då var det en breakdown)
+    const a = bpmIn(t - HALF, t), b = bpmIn(t, t + HALF);
+    if (!(a > 0 && b > 0) || Math.abs(a - b) / a < 0.06) continue;   // tempot måste skifta också
+    if (d > bestD) { bestD = d; trimAt = Math.round(ms); }
+  }
+}
+
 writeFileSync(out, JSON.stringify({
   v: 2, songId: Number(songId),
   drops: drops.map((d) => ({ t: d.t, s: d.s })),
   bpm: Math.round(bpm * 10) / 10, beatPhaseMs, intensity, risers, sections, phrase,
+  durMs: Math.round(dur * 1000),
+  ...(trimAt ? { trimAt } : {}),
 }));
+if (trimAt) console.log(`[refine] INTERN LÅTGRÄNS vid ${(trimAt / 1000).toFixed(0)}s — låten trimmas`);
+
 
 const cpu = process.cpuUsage();
 console.log(`[refine] låt #${songId}: ${dur.toFixed(0)}s ljud, ${drops.length} drops, ${risers.length} risers, ${sections.length} sektioner, ${bpm.toFixed(1)} BPM — vägg ${((Date.now() - t0) / 1000).toFixed(1)}s, CPU ${((cpu.user + cpu.system) / 1e6).toFixed(1)}s`);
