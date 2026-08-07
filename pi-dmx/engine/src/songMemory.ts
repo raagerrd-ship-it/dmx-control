@@ -438,10 +438,11 @@ export class SongMemory {
         const s = this.songs.get(id);
         const pos = l.t + this.matchOffset;
         console.log(`[song] känd låt #${id} (${s?.meta.plays ?? 0} tidigare spelningar), position ${(pos / 1000).toFixed(1)}s`);
-        // Ny känd låt som just börjat mitt i ett rullande segment → låtgräns.
-        // (En match nära segmentets egen start är samma låt, ej gräns.)
+        // Ny känd låt som just börjat mitt i ett rullande segment → KANDIDAT till
+        // låtgräns. Beslutet tas först när matchen bekräftats (se tick).
         const tLive = this.playStart ? this.clock() - this.playStart : 0;
-        if (this.playStart && pos < RECOG_POS_MS && wasMatch !== id && tLive - pos > RECOG_POS_MS) this.recogSplit = pos;
+        if (this.playStart && pos < RECOG_POS_MS && wasMatch !== id && tLive - pos > RECOG_POS_MS) this.recogPending = { id, at: this.clock() };
+        else this.recogPending = null;
       }
 
       if (id === this.matchId) this.trackSync(off, winner, other);
