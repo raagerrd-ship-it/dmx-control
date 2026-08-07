@@ -479,8 +479,14 @@ export class SongMemory {
         // Ny känd låt som just börjat mitt i ett rullande segment → KANDIDAT till
         // låtgräns. Beslutet tas först när matchen bekräftats (se tick).
         const tLive = this.playStart ? this.clock() - this.playStart : 0;
-        if (this.playStart && pos < RECOG_POS_MS && wasMatch !== id && tLive - pos > RECOG_POS_MS) this.recogPending = { id, at: this.clock() };
+        const now = this.clock();
+        if (this.playStart && pos < RECOG_POS_MS && wasMatch !== id && tLive - pos > RECOG_POS_MS) this.recogPending = { id, at: now };
+        // Klangskiftet hann före: gränsen är redan satt, men ungefärlig. Matchen
+        // vet exakt var låten började → revidera nollpunkten i stället.
+        else if (this.playStart && pos < RECOG_POS_MS && this.heurBoundaryAt && now - this.heurBoundaryAt < RECOG_REVISE_MS
+                 && Math.abs(tLive - pos) > 1000) this.recogPending = { id, at: now, revise: true };
         else this.recogPending = null;
+
       }
 
       if (id === this.matchId) this.trackSync(off, winner, other);
