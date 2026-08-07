@@ -6,15 +6,17 @@ Efter det får igenkänningen (som mätts till 0,2 s fel) bära all realtidsdete
 
 ## Så fungerar det
 
-Ja — två knappar räcker, för mobilen som spelar musiken vet redan när spåret byts. Den behöver bara skicka det till Pi:n automatiskt.
+Ja — två knappar räcker, men bara om musiken spelas upp i webbläsaren på samma sida som UI:t. Då vet mobilen själv när spåret byts.
 
 ```text
 [ Starta inlärning ]        -> inlärningsläge på, första segmentet börjar
-   ...mobilen rapporterar varje spårbyte automatiskt (gräns sätts exakt där)
+   ...automatiskt spårbyte när musiken spelas i webbläsaren
 [ Stoppa inlärning ]        -> committa sista segmentet, tillbaka till normalläge
 ```
 
-Mobil-UI:t lyssnar på webbläsarens mediasession (`navigator.mediaSession` / `<audio>`-element vid uppspelning från sidan) och skickar en gräns när spårets identitet eller position nollställs. Spelar du från Spotify eller en annan app i stället, finns knappen `Nästa låt` kvar som manuell reserv — men den behövs bara då.
+Automatisk detektering fungerar när musiken spelas från sidans eget `<audio>`-element eller en inbäddad spelare som exponerar `navigator.mediaSession` — då fyrar sidan en gräns när `trackchange`- eller `positionstate`-händelsen visar nytt spår.
+
+Spelar du istället från Spotify, Apple Music eller en annan app på telefonen kan webbsidan inte läsa den uppspelningen (OS:et blockerar det av integritetsskäl). Då visas i stället en knapp `Nästa låt` som du trycker på vid varje spårbyte. Knapptrycket skickar samma exakta gränssignal till Pi:n.
 
 Medan läget är aktivt:
 - All heuristisk gränsdetektering är avstängd (inga klangskiften, ingen nivådipp, ingen 110-sekundersspärr).
