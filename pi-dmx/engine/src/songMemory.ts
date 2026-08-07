@@ -201,8 +201,13 @@ export class SongMemory {
   private loudSince = 0;          // volymgrind: sedan när nivån är tydlig musik
   /** Kandidat till igenkänning-gräns. Överriden får INTE dela ett segment på
    *  första röstmajoriteten — en falsk match dör inom MATCH_FRESH_MS, så gränsen
-   *  väntar in en BEKRÄFTAD match (stabil ≥ MATCH_STABLE_MS med färska träffar). */
-  private recogPending: { id: number; at: number } | null = null;
+   *  väntar in en BEKRÄFTAD match (stabil ≥ MATCH_STABLE_MS med färska träffar).
+   *  revise = klangskiftet hann före: gränsen finns redan, men på ungefärlig tid
+   *  → matchens exakta position ska ersätta noveltyns (ingen ny gräns). */
+  private recogPending: { id: number; at: number; revise?: boolean } | null = null;
+  /** Väggklocka för senaste gräns satt av klangskifte/heuristik (revideringsfönster). */
+  private heurBoundaryAt = 0;
+
   private lastMatchedAt = 0;       // håll inlärning i karantän efter senast etablerade match
   private quarantinedSegment = false;
 
