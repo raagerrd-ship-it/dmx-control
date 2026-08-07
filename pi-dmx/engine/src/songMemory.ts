@@ -463,16 +463,19 @@ export class SongMemory {
     const now = this.clock();
     const needSamples = this.syncFast ? SYNC_SAMPLES_FAST : SYNC_SAMPLES;
     if (this.syncOffsets.length < needSamples || (!this.syncFast && now - this.lastSyncAt < SYNC_INTERVAL_MS)) return;
+    const wasFast = this.syncFast;
     this.syncFast = false;
     this.lastSyncAt = now;
     const raw = median(this.syncOffsets);
     this.rawOffset = raw;
     const error = raw - this.matchOffset;
-    if (Math.abs(error) >= SEEK_ERROR_MS) {
+    // Första korrigeringen efter ett lås SNAPPAR (låset ska sitta direkt);
+    // därefter nudgas bara, så ett korrekt lås aldrig vandrar.
+    if (wasFast || Math.abs(error) >= SEEK_ERROR_MS) {
       this.matchOffset = raw;
       this.replayIdx = this.nextDropIndex(this.songs.get(this.matchId), now - this.playStart + this.matchOffset);
       this.cuePrevT = -1;
-      console.log(`[song] synk hoppade ${(error / 1000).toFixed(2)}s till ny position`);
+      if (!wasFast) console.log(`[song] synk hoppade ${(error / 1000).toFixed(2)}s till ny position`);
     } else {
       this.matchOffset += Math.max(-SYNC_NUDGE_MS, Math.min(SYNC_NUDGE_MS, error));
     }
