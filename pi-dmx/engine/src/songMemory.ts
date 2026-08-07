@@ -38,11 +38,18 @@ const SEEK_ERROR_MS = 1500;    // större stabilt hopp = seek/ny uppspelningspos
 // AUTOMATISK RE-LOCK. Nudgen rättar bara 25 ms/750 ms (≈33 ms/s) — ett medelstort
 // fel (t.ex. crossfade, DSP-buffertbyte, klockdrift) under seek-tröskeln tar då
 // tiotals sekunder att äta upp, och under tiden sitter droparna fel. Därför
-// verifieras låset periodiskt mot ett OBEROENDE offset-estimat (medianen av de
-// senaste råträffarna) och snappas direkt om driften är för stor.
-const RELOCK_INTERVAL_MS = 8000;
-const RELOCK_ERROR_MS = 250;   // ett fack: mindre än så hörs/syns inte
-const RELOCK_MIN_HITS = 6;     // estimatet måste vila på flera träffar
+// verifieras låset ofta mot ett OBEROENDE offset-estimat (medianen av de senaste
+// råträffarna). Korrigeringen är GLIDANDE och proportionell mot driften: ju större
+// drift, desto snabbare glid — så synken är hemma på ett par sekunder utan att
+// showklockan hoppar (ett hopp syns som ryck i ljusprofilen). Bara en riktig seek
+// (drift över RELOCK_SNAP_MS) snappar, för då ÄR positionen en annan.
+const RELOCK_INTERVAL_MS = 1500;   // täta kontroller → driften hinner aldrig växa
+const RELOCK_ERROR_MS = 120;       // under det här hörs/syns ingen skillnad
+const RELOCK_MIN_HITS = 6;         // estimatet måste vila på flera träffar
+const RELOCK_SNAP_MS = 900;        // så stort fel är en seek, inte drift → snappa
+const RELOCK_GLIDE_MIN = 60;       // ms/s: mjukaste gliden (liten drift)
+const RELOCK_GLIDE_MAX = 400;      // ms/s: snabbaste gliden (drift nära snap)
+
 
 const LEARN_QUARANTINE_MS = 30000; // nyss känd låt = breakdown/tillfälligt tapp, inte ny låt
 
@@ -189,6 +196,8 @@ export class SongMemory {
   private lastRelockAt = 0;       // senaste periodiska låsverifieringen
   private relocks = 0;            // antal gånger synken tvingats tillbaka (diagnostik)
   private driftMs = 0;            // senast mätta drift mot oberoende estimat
+  private relockTarget: number | null = null;  // pågående glid mot verifierat offset
+  private glideAt = 0;            // klocka för glidens senaste steg
 
   /** Rullande råoffset per träff (id + off). Ger etableringen en median UNDER
    *  fack-upplösningen → låtstarten låses direkt, inte ±125 ms fel. */
@@ -399,7 +408,7 @@ export class SongMemory {
         this.syncOffsets = [];
         this.lastSyncAt = 0;
         this.syncFast = true;
-        this.lastRelockAt = 0; this.driftMs = 0;
+        this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0;
         this.matchVotes = winner.votes;
         this.matchMargin = winner.votes / Math.max(1, other);
         this.replayIdx = 0;
@@ -495,16 +504,16 @@ export class SongMemory {
       this.replayIdx = this.nextDropIndex(this.songs.get(this.matchId), now - this.playStart + this.matchOffset);
       this.cuePrevT = -1;
       if (!wasFast) console.log(`[song] synk hoppade ${(error / 1000).toFixed(2)}s till ny position`);
-    } else {
+    } else if (this.relockTarget === null) {
+      // Under en pågående glid äger re-locken offseten — annars drar de mot varandra.
       this.matchOffset += Math.max(-SYNC_NUDGE_MS, Math.min(SYNC_NUDGE_MS, error));
     }
   }
 
   /** PERIODISK RE-LOCK. Var RELOCK_INTERVAL_MS jämförs det aktiva offsetet med
    *  medianen av de senaste råträffarna för matchen (oberoende estimat, utan
-   *  beroende av vinnarfacket som hänger efter vid drift). Är driften större än
-   *  RELOCK_ERROR_MS snappas låset tillbaka direkt i stället för att nudgas hem
-   *  under tiotals sekunder — annars sitter droparna fel hela tiden. */
+   *  beroende av vinnarfacket som hänger efter vid drift). Driften glidar hem med
+   *  en hastighet som växer med felet; bara ett seek-stort fel snappar. */
   private verifyLock(now: number): void {
     if (!this.lastRelockAt) { this.lastRelockAt = now; return; }
     if (now - this.lastRelockAt < RELOCK_INTERVAL_MS) return;
@@ -515,18 +524,51 @@ export class SongMemory {
     }
     if (c.length < RELOCK_MIN_HITS) return;
     const est = median(c);
-    this.driftMs = est - this.matchOffset;
-    if (Math.abs(this.driftMs) < RELOCK_ERROR_MS) return;
-    this.matchOffset = est;
+    this.driftMs = est - (this.relockTarget ?? this.matchOffset);
+    if (Math.abs(this.driftMs) < RELOCK_ERROR_MS) { this.relockTarget = null; return; }
+    if (Math.abs(est - this.matchOffset) >= RELOCK_SNAP_MS) {
+      // Riktig seek: positionen ÄR en annan, glid skulle bara ge fel ljus länge.
+      this.matchOffset = est;
+      this.rawOffset = est;
+      this.relockTarget = null;
+      this.syncOffsets = [];
+      this.syncBucket = Math.round(est / OFFSET_BUCKET);
+      this.recentId = []; this.recentOff = [];
+      this.replayIdx = this.nextDropIndex(this.songs.get(this.matchId), now - this.playStart + this.matchOffset);
+      this.cuePrevT = -1;
+      this.relocks++;
+      console.log(`[song] re-lock: hoppade ${(this.driftMs / 1000).toFixed(2)}s`);
+      return;
+    }
+    if (this.relockTarget === null) this.relocks++;
+    this.relockTarget = est;
     this.rawOffset = est;
-    this.syncOffsets = [];
-    this.syncBucket = Math.round(est / OFFSET_BUCKET);
-    this.recentId = []; this.recentOff = [];
-    this.replayIdx = this.nextDropIndex(this.songs.get(this.matchId), now - this.playStart + this.matchOffset);
-    this.cuePrevT = -1;
-    this.relocks++;
-    console.log(`[song] re-lock: drift ${(this.driftMs / 1000).toFixed(2)}s korrigerad`);
+    this.glideAt = this.glideAt || now;
   }
+
+  /** Glidande korrigering, körs varje tick. Hastigheten skalar med kvarvarande
+   *  fel → stor drift är hemma på ~2 s, små fel kryper hem osynligt. */
+  private glideLock(now: number): void {
+    if (this.relockTarget === null || !this.matchId) { this.glideAt = now; return; }
+    const dt = Math.max(0, Math.min(500, now - this.glideAt));
+    this.glideAt = now;
+    const err = this.relockTarget - this.matchOffset;
+    const span = Math.max(1, RELOCK_SNAP_MS - RELOCK_ERROR_MS);
+    const k = Math.max(0, Math.min(1, (Math.abs(err) - RELOCK_ERROR_MS) / span));
+    const rate = RELOCK_GLIDE_MIN + (RELOCK_GLIDE_MAX - RELOCK_GLIDE_MIN) * k;   // ms/s
+    const step = Math.min(Math.abs(err), rate * dt / 1000);
+    this.matchOffset += Math.sign(err) * step;
+    if (Math.abs(this.relockTarget - this.matchOffset) < 5) {
+      this.matchOffset = this.relockTarget;
+      this.relockTarget = null;
+      this.syncOffsets = [];
+      this.syncBucket = Math.round(this.matchOffset / OFFSET_BUCKET);
+      console.log(`[song] re-lock: synk hemma (drift ${(this.driftMs / 1000).toFixed(2)}s)`);
+    }
+    // Drop-indexet följer den glidande klockan, annars fyras en drop två gånger.
+    this.replayIdx = this.nextDropIndex(this.songs.get(this.matchId), now - this.playStart + this.matchOffset);
+  }
+
 
 
 
@@ -551,6 +593,7 @@ export class SongMemory {
     // Byte av ingång mitt i en inlärning → kasta det halva materialet, annars
     // hamnar ett halvt mik-fingeravtryck i minnet.
     if (learn !== this.learnMode) { this.learnMode = learn; this.dropLearning(); }
+    this.glideLock(now);
     if (o.level > 0.02) this.lastLoud = now;
     if (!this.playStart) {
       // Volymgrind: starta bara på tydlig musik som hållit en sekund, aldrig på brusgolvet.
@@ -834,7 +877,7 @@ export class SongMemory {
     this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
     this.levAvg = 0; this.dipAt = 0; this.recogSplit = -1;
     this.votes.clear(); this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.replayIdx = 0; this.pendingDrop = 0;
+    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
   }
@@ -890,7 +933,7 @@ export class SongMemory {
 
 
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.replayIdx = 0; this.pendingDrop = 0;
+    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
     this.onCommit?.(committed);

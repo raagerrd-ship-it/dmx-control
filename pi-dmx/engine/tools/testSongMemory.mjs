@@ -48,7 +48,7 @@ async function playFrom(mem, song, clock, sourceStartMs, durMs, drops = []) {
   const mag = new Float32Array(BINS);
   const fired = [];
   const start = clock.t;
-  let nextDrop = 0;
+  let nextDrop = 0, prevPos = 0;
   for (let elapsed = 0; elapsed < durMs; elapsed += STEP) {
     clock.t = start + elapsed;
     const sourceT = sourceStartMs + elapsed;
@@ -56,6 +56,9 @@ async function playFrom(mem, song, clock, sourceStartMs, durMs, drops = []) {
     mem.pushSpectrum(mag, BIN_HZ, false);
     mem.tick({ level: 0.5, dropped: false, bpm: 128, bpmConfidence: 0.8, intensity: 0.6, beatAnchorMs: clock.t, learn: false });
     if (mem.takeDrop() > 0) fired.push(sourceT);
+    const pos = mem.state().positionMs;
+    if (prevPos > 0) fired.maxJump = Math.max(fired.maxJump ?? 0, Math.abs(pos - prevPos - STEP));
+    prevPos = pos;
     while (nextDrop < drops.length && drops[nextDrop] < sourceT - 1000) nextDrop++;
   }
   return fired;
@@ -131,7 +134,7 @@ await playFrom(mem5, A, clock, 0, 20000);
 const drifted = await playFrom(mem5, A, clock, 20000 + 600, 20000);
 const dr = mem5.state();
 const driftError = Math.abs(dr.positionMs - (20600 + 20000 - 1000));
-console.log("drift 600ms: re-locks", dr.relocks, "kvarvarande fel", driftError.toFixed(0), "ms");
+console.log("drift 600ms: re-locks", dr.relocks, "kvarvarande fel", driftError.toFixed(0), "ms, största klockhopp", (drifted.maxJump ?? 0).toFixed(0), "ms");
 
 const ok = fired.length >= 2
   && fired.every((f) => dropsA.some((d) => Math.abs(d - f) < 800))
@@ -142,7 +145,7 @@ const ok = fired.length >= 2
   && gapless.lastBoundary === "igenkänd låt #2"
   && shortPrev.songId === 2 && shortPrev.positionMs > 10000 && shortPrev.positionMs < 16000
   && shortPrev.songs === 2
-  && dr.known && driftError < 350
+  && dr.known && driftError < 250 && (drifted.maxJump ?? 0) < 60
   && mem2.state().known === false;
 console.log(ok ? "OK" : "MISSLYCKADES");
 process.exit(ok ? 0 : 1);
