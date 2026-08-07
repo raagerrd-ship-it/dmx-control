@@ -732,10 +732,12 @@ export class SongMemory {
       if (this.matchId !== p.id || !fresh) this.recogPending = null;
       else if (now - p.at >= MATCH_STABLE_MS && this.matchVotes >= VOTES_NEEDED && this.matchMargin >= MARGIN) {
         this.recogPending = null;
-        this.splitOnRecognition(now, tLive + this.matchOffset);
+        if (p.revise) this.reviseBoundary(now, tLive + this.matchOffset);
+        else this.splitOnRecognition(now, tLive + this.matchOffset);
         return;
       }
     }
+
 
     if (this.boundary(now, tLive, o)) return;
 
