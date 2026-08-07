@@ -142,6 +142,7 @@ const ok = fired.length >= 2
   && gapless.lastBoundary === "igenkänd låt #2"
   && shortPrev.songId === 2 && shortPrev.positionMs > 10000 && shortPrev.positionMs < 16000
   && shortPrev.songs === 2
+  && dr.known && driftError < 350
   && mem2.state().known === false;
 console.log(ok ? "OK" : "MISSLYCKADES");
 process.exit(ok ? 0 : 1);
