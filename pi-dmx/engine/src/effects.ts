@@ -14,6 +14,7 @@ import { fitScore } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
 import { hsvToRgb } from "./effects/color.js";
 import type { EffectContext } from "./effects/types.js";
+import { LiveRange } from "./liveRange.js";
 
 /** Rökmaskinens tillstånd, för UI:t. */
 export interface FogStatus {
