@@ -42,6 +42,25 @@ async function play(mem, song, clock, durMs, drops, learnDrops) {
   return fired;
 }
 
+/** Spela en källa vars position kan skilja sig från väggklockan. Det simulerar
+ *  både sen inkoppling och seek utan att ändra SongMemorys injicerade klocka. */
+async function playFrom(mem, song, clock, sourceStartMs, durMs, drops = []) {
+  const mag = new Float32Array(BINS);
+  const fired = [];
+  const start = clock.t;
+  let nextDrop = 0;
+  for (let elapsed = 0; elapsed < durMs; elapsed += STEP) {
+    clock.t = start + elapsed;
+    const sourceT = sourceStartMs + elapsed;
+    song(sourceT, mag);
+    mem.pushSpectrum(mag, BIN_HZ, false);
+    mem.tick({ level: 0.5, dropped: false, bpm: 128, bpmConfidence: 0.8, intensity: 0.6, beatAnchorMs: clock.t, learn: false });
+    if (mem.takeDrop() > 0) fired.push(sourceT);
+    while (nextDrop < drops.length && drops[nextDrop] < sourceT - 1000) nextDrop++;
+  }
+  return fired;
+}
+
 const clock = { t: 1_700_000_000_000 };
 const mem = new SongMemory(() => clock.t);
 await mem.load();
@@ -56,6 +75,24 @@ const fired = await play(mem, A, clock, 120000, dropsA, true);
 const st = mem.state();
 console.log("andra spelningen: drops ur minnet @", fired.map((x) => (x / 1000).toFixed(1) + "s").join(", "));
 
+// Start mitt i låten: identifieringens position ska konvergera till källans
+// riktiga tid och inte stanna på ett grovt 250 ms-fack.
+const midStart = 21037;
+await playFrom(mem, A, clock, midStart, 12000);
+const mid = mem.state();
+const expectedMid = midStart + 12000;
+const midError = Math.abs(mid.positionMs - expectedMid);
+console.log("start mitt i låten: positionsfel", midError.toFixed(0), "ms");
+
+// Seek framåt under en etablerad match. Fortsatta fingerprint-träffar ska flytta
+// showklockan och nästa drop-index, inte hålla kvar den första offseten.
+const beforeSeek = mem.state().positionMs;
+const seekTo = 70083;
+await playFrom(mem, A, clock, seekTo, 12000);
+const afterSeek = mem.state();
+const seekError = Math.abs(afterSeek.positionMs - (seekTo + 12000));
+console.log("seek: position", beforeSeek.toFixed(0), "→", afterSeek.positionMs.toFixed(0), "ms, fel", seekError.toFixed(0), "ms");
+
 await new Promise((r) => setTimeout(r, 300));   // låt sparningen landa
 const mem2 = new SongMemory(() => clock.t);
 await mem2.load();
@@ -65,6 +102,8 @@ console.log("annan låt matchade:", mem2.state().known, "(ska vara false), drops
 
 const ok = fired.length >= 2
   && fired.every((f) => dropsA.some((d) => Math.abs(d - f) < 800))
+  && mid.known && midError < 350
+  && afterSeek.known && seekError < 350
   && mem2.state().known === false;
 console.log(ok ? "OK" : "MISSLYCKADES");
 process.exit(ok ? 0 : 1);
