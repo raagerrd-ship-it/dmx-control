@@ -89,6 +89,7 @@ export class EffectEngine {
   private wasBreaking = false;   // flankdetektor för nivå-svacka (drop-blackout)
   private blackoutUntil = 0;     // dramaturgisk tystnad: kolsvart till (wall-clock ms)
   private vu = 0;                // direkt VU-envelope (snabb attack / ~180ms release) för ljustaket
+  private range = new LiveRange();   // rullande p5..p95 av nivån → normaliserad dynamik live
   // ── DRAMATURGI UR LÅTMINNET (sätts av index.ts, bara för IGENKÄNDA låtar) ──
   // En FÖRBERÄKNAD kurva kan inte fladdra som live-VU:n gjorde: ett värde per
   // sekund, mjukt interpolerat. Okänd låt → allt är null/0 och showen kör som förut.
