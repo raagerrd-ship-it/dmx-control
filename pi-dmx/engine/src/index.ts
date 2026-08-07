@@ -119,6 +119,7 @@ let lastRenderMs = 0;
 let clockDetBpm = 0;   // analysatorns bpm som taktklockan LÅSTES på (om-ankrings-referens,
                        // skild från cfg.beat.bpm som frekvens-termen finjusterar)
 let lastLiveDrop = 0;        // senast sedda drop-räknare FRÅN analysatorn
+let lastBoundary = 0;        // senast sedda låtgräns-räknare (dynamikens omkalibrering)
 let outDrop = 0;             // drop-räknaren effekterna ser (live eller replay)
 let memoryBeatLocked = false;// taktklockan är låst ur låtminnet
 const slotsFor = () => Math.max(activeSlots(cfg.fixtures), cfg.fog?.enabled ? cfg.fog.address : 0);
@@ -149,6 +150,10 @@ capture.on("chunk", (samples: Float32Array) => {
   // Temp-inspelning: bara medan en NY låt lärs in på aux (state().learning),
   // aldrig på mik och aldrig för en redan känd låt.
   if (songs.learningNew) { if (!recorder.active) recorder.start(); recorder.write(samples); }
+  // LÅTGRÄNS → mjuk omkalibrering av den löpande dynamiken (auto-rangen får
+  // krypa in på nya låtens nivåer inom sekunder i stället för en minut).
+  if (songs.boundaryCount !== lastBoundary) { lastBoundary = songs.boundaryCount; effects.softenRange(); }
+
 
   if (songs.recognized) {
     if (songs.takeDrop() > 0) outDrop++;          // pre-fired ur minnet
