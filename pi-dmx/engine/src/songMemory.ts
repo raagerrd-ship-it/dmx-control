@@ -765,6 +765,20 @@ export class SongMemory {
     this.dipAt = 0;
   }
 
+  /** Släpp en etablerad match utan att röra inlärningen. Rösterna nollas så
+   *  samma låt inte låser om sig på nästa hop. */
+  private releaseMatch(id: number): void {
+    console.log(`[song] släppte match #${id}: tidslinjen tog slut (position förbi låtens slut)`);
+    this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0;
+    this.matchOffset = 0; this.rawOffset = 0;
+    this.votes.clear();
+    this.recentId = []; this.recentOff = [];
+    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true;
+    this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0;
+    this.replayIdx = 0; this.cuePrevT = -1;
+  }
+
+
 
 
 
