@@ -875,7 +875,20 @@ export class SongMemory {
     this.syncOffsets = [];
     this.lastSyncAt = 0;
     this.syncFast = true;
+    // Alla offset-röster och landmarks ovan mättes mot den GAMLA playStart.
+    // Om de ligger kvar kan verifyLock snappa tillbaka till den gamla negativa
+    // offseten efter revideringen (plattformsmätt: cirka -4,8 s).
+    this.votes.clear();
+    this.recentId = []; this.recentOff = []; this.recentT = [];
+    this.fp.reset();
+    this.matchVotes = VOTES_NEEDED;
+    this.matchSince = now;
+    this.matchConfirmed = true;
+    this.lastFreshMatchHit = now;
+    this.lastRelockAt = 0;
+    this.driftMs = 0;
     this.relockTarget = null;
+    this.glideAt = 0;
     this.dropLearning();   // de sekunderna hörde till fel låt
     this.replayIdx = this.nextDropIndex(this.songs.get(id), pos);
     this.cuePrevT = -1;
