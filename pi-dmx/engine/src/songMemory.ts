@@ -861,10 +861,20 @@ export class SongMemory {
     this.heurBoundaryAt = 0;
     this.playStart = now - pos;
     this.lastLoud = now;
+    // NOLLPUNKTEN ÄR NU EXAKT → offseten måste nollas, annars läggs den på en
+    // andra gång (positionen blev tidigare pos + matchOffset, dvs ~backdateringen fel).
+    this.matchOffset = 0;
+    this.rawOffset = 0;
+    this.syncBucket = 0;
+    this.syncOffsets = [];
+    this.lastSyncAt = 0;
+    this.syncFast = true;
+    this.relockTarget = null;
     this.dropLearning();   // de sekunderna hörde till fel låt
     this.replayIdx = this.nextDropIndex(this.songs.get(id), pos);
     this.cuePrevT = -1;
   }
+
 
 
   /** Gräns satt av igenkännaren: skriv in det gångna segmentet och starta nästa
