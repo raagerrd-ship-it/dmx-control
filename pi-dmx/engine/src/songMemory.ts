@@ -54,6 +54,7 @@ const MATCH_STABLE_MS = 5000;       // ...och ha hållit så länge innan den f�
 const FALSE_ZONE_MS = 15000;        // låttidszon runt en falskmatchad position som blockeras
 
 
+const FALSE_HITS_MAX = 3;          // fler falskmatchningar än så i ett segment → låten tystas helt
 const LEARN_QUARANTINE_MS = 30000; // nyss känd låt = breakdown/tillfälligt tapp, inte ny låt
 // SKYDDSNÄT MOT ORENT SEGMENT. Missas en låtgräns svälver segmentet början av
 // NÄSTA låt (mätt: 272 s i stället för 201 s). Spelas den låten sedan matchar
@@ -208,6 +209,12 @@ export class SongMemory {
    *  igen. En låt som falskmatchas upprepat vid ~samma position har en för
    *  generisk sekvens där; att blockera bara låt-id:t räcker inte. */
   private blockedZones: { id: number; from: number; to: number }[] = [];
+  /** Låt-id som falskmatchat för många gånger i detta segment → rösta inte på den alls. */
+  private bannedIds = new Set<number>();
+  private falseHits = new Map<number, number>();
+  /** När nuvarande match låstes, och om den nått BEKRÄFTAD status (stabil + färska träffar). */
+  private matchSince = 0;
+  private matchConfirmed = false;
   private releasedAt = new Map<number, number>();   // id → senaste släppta position
   private rawOffset = 0;
   private syncBucket = 0;
@@ -398,7 +405,7 @@ export class SongMemory {
     for (let i = start; i < end; i++) {
       const v0 = this.idxVal[i];
       const id = this.slotIds[v0 >>> 12];
-      if (id === this.blockedMatchId) continue;
+      if (id === this.blockedMatchId || this.bannedIds.has(id)) continue;
       const tSong = (v0 & 0xfff) * FRAME_MS;
       if (this.inBlockedZone(id, tSong)) continue;
       const off = tSong - l.t;
@@ -435,6 +442,8 @@ export class SongMemory {
         this.matchVotes = winner.votes;
         this.matchMargin = winner.votes / Math.max(1, other);
         this.lastFreshMatchHit = this.clock();
+        this.matchSince = this.clock();
+        this.matchConfirmed = false;
         this.replayIdx = 0;
         const s = this.songs.get(id);
         const pos = l.t + this.matchOffset;
@@ -665,6 +674,13 @@ export class SongMemory {
     // Tidslinjen har tagit slut, eller nya positionsenliga fingeravtryck har
     // upphört → släpp omedelbart. Blockera samma id resten av segmentet så gamla
     // röster inte kan låsa tillbaka mot samma felaktiga tidslinje.
+    // BEKRÄFTAD MATCH: samma krav som för att få dela ett segment. Bara en
+    // bekräftad match får sätta inlärningskarantän när den släpps — annars
+    // stoppade varje falsklarm ALL inlärning (mätt: 4 låtar spelade, 1 inlärd).
+    if (this.matchId && !this.matchConfirmed && now - this.matchSince >= MATCH_STABLE_MS
+        && this.lastFreshMatchHit > 0 && now - this.lastFreshMatchHit < MATCH_FRESH_MS / 2
+        && this.matchVotes >= VOTES_NEEDED && this.matchMargin >= MARGIN) this.matchConfirmed = true;
+
     if (this.matchId) {
       const m = this.songs.get(this.matchId);
       const position = tLive + this.matchOffset;
@@ -794,6 +810,8 @@ export class SongMemory {
     this.matchOffset = 0;
     this.rawOffset = 0;
     this.matchVotes = VOTES_NEEDED;
+    this.matchSince = now;
+    this.matchConfirmed = true;
     this.lastFreshMatchHit = now;
     this.blockedMatchId = 0;
     this.lastMatchedAt = now;
@@ -826,10 +844,23 @@ export class SongMemory {
     }
     this.releasedAt.set(id, pos);
 
-    // Materialet efter ett släppt lås är inte en verifierad ny låt. Karantänen
-    // hindrar att svansen omedelbart sparas som en dubblett/förgiftat segment.
-    this.lastMatchedAt = this.clock();
-    this.quarantinedSegment = this.learnMode;
+    // TAK: samma lagrade låt som falskmatchar om och om igen i ett segment är
+    // bara generisk — sluta rösta på den helt resten av segmentet (bredare än
+    // hash-zon-spärren, som bara täcker en position).
+    if (!this.matchConfirmed) {
+      const n = (this.falseHits.get(id) ?? 0) + 1;
+      this.falseHits.set(id, n);
+      if (n > FALSE_HITS_MAX) { this.bannedIds.add(id); console.log(`[song] slutar rösta på låt #${id} resten av segmentet (${n} falskmatchningar)`); }
+    }
+
+    // Karantän BARA efter en bekräftad match: då är svansen troligen samma låt
+    // och får inte sparas som dubblett. En match som släpps som FALSK avbryter
+    // sin egen karantän — materialet var en ny låt hela tiden, och de hashar som
+    // samlats under matchen ligger redan kvar i learnHash.
+    if (this.matchConfirmed) { this.lastMatchedAt = this.clock(); this.quarantinedSegment = this.learnMode; }
+    else this.quarantinedSegment = false;
+    this.matchConfirmed = false;
+    this.matchSince = 0;
     this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0;
     this.lastFreshMatchHit = 0;
     this.matchOffset = 0; this.rawOffset = 0;
@@ -949,7 +980,7 @@ export class SongMemory {
   forget(): void {
     this.songs.clear(); this.votes.clear(); this.rebuildIndex();
     this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0; this.nextId = 1;
-    this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear();
+    this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear(); this.bannedIds.clear(); this.falseHits.clear(); this.matchSince = 0; this.matchConfirmed = false;
     this.dirty = true;
     void this.save();
   }
@@ -970,7 +1001,7 @@ export class SongMemory {
     this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
     this.levAvg = 0; this.dipAt = 0; this.recogPending = null;
     this.votes.clear(); this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear();
+    this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear(); this.bannedIds.clear(); this.falseHits.clear(); this.matchSince = 0; this.matchConfirmed = false;
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
@@ -1073,7 +1104,7 @@ export class SongMemory {
 
 
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear();
+    this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear(); this.bannedIds.clear(); this.falseHits.clear(); this.matchSince = 0; this.matchConfirmed = false;
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
