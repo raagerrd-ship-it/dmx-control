@@ -139,6 +139,8 @@ export class SongMemory {
   private levAvg = 0;             // långsamt nivåsnitt (dippdetektering)
   private dipAt = 0;              // väggklocka för senaste nivådippen
   private lastEvidence: string[] = [];   // senast aktiva gränssignaler (diagnostik)
+  /** Räknare som tickar vid varje satt låtgräns → motorn kan kalibrera om dynamiken. */
+  boundaryCount = 0;
   private loudSince = 0;          // volymgrind: sedan när nivån är tydlig musik
   private recogSplit = -1;        // ≥0: igenkänningen pekar på gräns, matchens position i ms
   private lastMatchedAt = 0;       // håll inlärning i karantän efter senast etablerade match
