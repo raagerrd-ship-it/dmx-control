@@ -660,6 +660,7 @@ export class SongMemory {
 
   /** Låten är slut: skriv in i minnet (ny låt) eller förbättra den kända. */
   private commit(): void {
+    this.boundaryCount++;   // gräns passerad → motorns auto-range får kalibrera om
     const dur = this.lastLoud - this.playStart;
     const matched = this.matchId ? this.songs.get(this.matchId) : undefined;
     let committed: number | null = null;
