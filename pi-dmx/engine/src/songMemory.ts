@@ -57,7 +57,11 @@ const LEARN_QUARANTINE_MS = 30000; // nyss känd låt = breakdown/tillfälligt t
 // den mot det orena segmentet och motorn kör FEL låts tidslinje — aktivt fel
 // show, sämre än realtid. En match vars position gått förbi den lagrade låtens
 // slut har definitionsmässigt inget mer att spela upp: släpp den då.
-const MATCH_END_GRACE_MS = 2000;
+// Marginalen är RELATIV: samma låt spelas sällan exakt lika länge (fade-out,
+// crossfade, olika master) — bara ett fel som är stort i förhållande till låten
+// är ett tecken på fel tidslinje.
+const MATCH_END_GRACE_MS = 5000;
+const MATCH_END_GRACE_FRAC = 0.08;
 const TRIM_MIN_HALF_MS = 60000;    // en trimmad halva under 60 s är inte en låt
 
 
@@ -641,7 +645,8 @@ export class SongMemory {
     // med en tidslinje som passerat låtens slut.
     if (this.matchId) {
       const m = this.songs.get(this.matchId);
-      if (m && tLive + this.matchOffset > m.meta.durationMs + MATCH_END_GRACE_MS) this.releaseMatch(m.meta.id);
+      const grace = Math.max(MATCH_END_GRACE_MS, m ? m.meta.durationMs * MATCH_END_GRACE_FRAC : 0);
+      if (m && tLive + this.matchOffset > m.meta.durationMs + grace) this.releaseMatch(m.meta.id);
     }
     if (this.boundary(now, tLive, o)) return;
 
