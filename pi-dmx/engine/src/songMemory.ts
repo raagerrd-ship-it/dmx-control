@@ -782,6 +782,10 @@ export class SongMemory {
   private releaseMatch(id: number, why: string): void {
     console.log(`[song] släppte match #${id}: ${why}`);
     this.blockedMatchId = id;
+    // Materialet efter ett släppt lås är inte en verifierad ny låt. Karantänen
+    // hindrar att svansen omedelbart sparas som en dubblett/förgiftat segment.
+    this.lastMatchedAt = this.clock();
+    this.quarantinedSegment = this.learnMode;
     this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0;
     this.lastFreshMatchHit = 0;
     this.matchOffset = 0; this.rawOffset = 0;
