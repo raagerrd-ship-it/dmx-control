@@ -886,7 +886,7 @@ export class SongMemory {
     }
     this.playStart = now - pos;
     this.lastLoud = now;
-    this.recogPending = null;
+    this.recogPending = null; this.heurBoundaryAt = 0;
     this.quarantinedSegment = false;
     this.matchId = id;
     this.matchOffset = 0;
