@@ -112,6 +112,16 @@ await playFrom(mem3, B, clock, 0, 15000);
 const gapless = mem3.state();
 console.log("gaplöst byte: låt #", gapless.songId, "position", gapless.positionMs.toFixed(0), "ms, gräns", gapless.lastBoundary);
 
+await new Promise((r) => setTimeout(r, 300));
+const mem4 = new SongMemory(() => clock.t);
+await mem4.load();
+// KORT föregående segment (under minsta låtlängd): inget får committas, men
+// tidslinjen ska ändå ställas om direkt så showen är i synk med låt #2.
+await playFrom(mem4, A, clock, 0, 40000);
+await playFrom(mem4, B, clock, 0, 15000);
+const shortPrev = mem4.state();
+console.log("kort segment → snabb låsning: låt #", shortPrev.songId, "position", shortPrev.positionMs.toFixed(0), "ms, låtar", shortPrev.songs);
+
 const ok = fired.length >= 2
   && fired.every((f) => dropsA.some((d) => Math.abs(d - f) < 800))
   && mid.known && midError < 350
@@ -119,6 +129,8 @@ const ok = fired.length >= 2
   && seekFired.length === 1 && Math.abs(seekFired[0] - 95000) < 500
   && gapless.songId === 2 && gapless.positionMs > 10000 && gapless.positionMs < 16000
   && gapless.lastBoundary === "igenkänd låt #2"
+  && shortPrev.songId === 2 && shortPrev.positionMs > 10000 && shortPrev.positionMs < 16000
+  && shortPrev.songs === 2
   && mem2.state().known === false;
 console.log(ok ? "OK" : "MISSLYCKADES");
 process.exit(ok ? 0 : 1);
