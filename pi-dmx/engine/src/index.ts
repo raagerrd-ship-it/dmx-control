@@ -99,8 +99,12 @@ const recorder = new LearnRecorder(join(DATA_DIR, "learn.wav"), cfg.audio.rate);
 const refiner = new RefineQueue(DATA_DIR, (t) => songs.applyRefined(t.songId, t));
 refiner.cleanStale();
 songs.onDropLearning = () => recorder.abort();
-songs.onCommit = (songId) => {
+songs.onCommit = (songId, fresh) => {
   if (!songId) { recorder.abort(); return; }   // inget lärdes in → kasta ljudet
+  // Segmentet matchade en KÄND låt → inspelningen är bara den del som spelades,
+  // alltså per definition partiell. Den lagrade tvätten byggde på hela låten och
+  // ska aldrig ersättas av en sämre. Ingen tvätt, inget ljud kvar.
+  if (!fresh) { recorder.abort(); return; }
   const wav = recorder.finish();
   if (!wav) return;
   // Gaplös ström: nästa låt börjar spelas in i learn.wav i samma sekund som
