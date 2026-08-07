@@ -413,6 +413,10 @@ export class SongMemory {
   }
 
 
+  private voteKey(id: number, bucket: number): number {
+    return id * OFFSET_KEY_STRIDE + bucket + OFFSET_KEY_BIAS;
+  }
+
   private voteId(key: number): number {
     return Math.floor(key / OFFSET_KEY_STRIDE);
   }
