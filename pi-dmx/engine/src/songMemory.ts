@@ -655,9 +655,6 @@ export class SongMemory {
       return;
     }
 
-    // Igenkänning-som-gräns: säkrare än all heuristik → egen väg, före evidensen.
-    if (this.recogSplit >= 0) { this.splitOnRecognition(now, this.recogSplit); return; }
-
     const tLive = now - this.playStart;
     // Tidslinjen har tagit slut, eller nya positionsenliga fingeravtryck har
     // upphört → släpp omedelbart. Blockera samma id resten av segmentet så gamla
@@ -668,6 +665,20 @@ export class SongMemory {
       if (m && position > m.meta.durationMs) this.releaseMatch(m.meta.id, "tidslinjen tog slut");
       else if (this.lastFreshMatchHit && now - this.lastFreshMatchHit > MATCH_FRESH_MS) this.releaseMatch(this.matchId, "inga färska träffar");
     }
+
+    // Igenkänning-som-gräns: bara en BEKRÄFTAD match får dela segmentet — stabil
+    // en stund, med löpande färska träffar och full röstmajoritet med marginal.
+    if (this.recogPending) {
+      const p = this.recogPending;
+      const fresh = this.lastFreshMatchHit > 0 && now - this.lastFreshMatchHit < MATCH_FRESH_MS / 2;
+      if (this.matchId !== p.id || !fresh) this.recogPending = null;
+      else if (now - p.at >= MATCH_STABLE_MS && this.matchVotes >= VOTES_NEEDED && this.matchMargin >= MARGIN) {
+        this.recogPending = null;
+        this.splitOnRecognition(now, tLive + this.matchOffset);
+        return;
+      }
+    }
+
     if (this.boundary(now, tLive, o)) return;
 
 
