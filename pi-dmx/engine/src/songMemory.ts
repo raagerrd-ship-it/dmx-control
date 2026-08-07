@@ -114,6 +114,8 @@ export interface SongMemoryState {
   rawOffsetMs: number;
   correctedOffsetMs: number;
   lastBoundary: string;
+  driftMs: number;
+  relocks: number;
 
 }
 
@@ -397,6 +399,7 @@ export class SongMemory {
         this.syncOffsets = [];
         this.lastSyncAt = 0;
         this.syncFast = true;
+        this.lastRelockAt = 0; this.driftMs = 0;
         this.matchVotes = winner.votes;
         this.matchMargin = winner.votes / Math.max(1, other);
         this.replayIdx = 0;
@@ -792,6 +795,8 @@ export class SongMemory {
       rawOffsetMs: this.rawOffset,
       correctedOffsetMs: this.matchOffset,
       lastBoundary: this.lastBoundary,
+      driftMs: this.driftMs,
+      relocks: this.relocks,
     };
 
   }
@@ -826,7 +831,7 @@ export class SongMemory {
     this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
     this.levAvg = 0; this.dipAt = 0; this.recogSplit = -1;
     this.votes.clear(); this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.replayIdx = 0; this.pendingDrop = 0;
+    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
   }
@@ -882,7 +887,7 @@ export class SongMemory {
 
 
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.replayIdx = 0; this.pendingDrop = 0;
+    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
     this.onCommit?.(committed);
