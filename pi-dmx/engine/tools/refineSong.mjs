@@ -280,6 +280,7 @@ writeFileSync(out, JSON.stringify({
   v: 2, songId: Number(songId),
   drops: drops.map((d) => ({ t: d.t, s: d.s })),
   bpm: Math.round(bpm * 10) / 10, beatPhaseMs, intensity, risers, sections, phrase,
+  durMs: Math.round(dur * 1000),
   ...(trimAt ? { trimAt } : {}),
 }));
 if (trimAt) console.log(`[refine] INTERN LÅTGRÄNS vid ${(trimAt / 1000).toFixed(0)}s — låten trimmas`);

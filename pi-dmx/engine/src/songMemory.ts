@@ -112,6 +112,7 @@ interface SongMeta {
   risers?: Riser[];        // uppbyggnader med känt mål
   sections?: number[];     // tidpunkter (ms) där låtens karaktär skiftar
   phraseMs?: number;       // längden på en 16-taktersfras (frasgrid, fas = beatPhaseMs)
+  refinedFromMs?: number;  // hur mycket LJUD tvätten byggde på — en kortare tvätt får aldrig ersätta en längre
 }
 interface Song { meta: SongMeta; hashes: Uint32Array; times: Uint32Array; }
 
@@ -978,7 +979,7 @@ export class SongMemory {
   /** Anropas när en låt är slut: id på låten som lärdes in/uppdaterades, eller
    *  null när inget lärdes (för kort, mikrofon, ingångsbyte). Motorn använder
    *  det för att trigga offline-tvätten. */
-  onCommit?: (songId: number | null) => void;
+  onCommit?: (songId: number | null, fresh: boolean) => void;
   /** Anropas när pågående inlärning kastas → temp-inspelningen ska avbrytas. */
   onDropLearning?: () => void;
 
@@ -989,9 +990,19 @@ export class SongMemory {
   applyRefined(songId: number, t: {
     drops: { t: number; s: number }[]; bpm: number; beatPhaseMs: number; intensity: number[];
     risers?: Riser[]; sections?: number[]; phrase?: { p16: number } | null; trimAt?: number;
+    /** hur många ms ljud tvätten byggde på */ durMs?: number;
   }): void {
     const s = this.songs.get(songId);
     if (!s) return;
+    // EN SÄMRE TVÄTT FÅR INTE SKRIVA ÖVER EN BÄTTRE (mätt: 106 s-segment ersatte
+    // en 234 s-tvätt med 0 drops). Bygger den nya tvätten på mindre ljud än den
+    // befintliga är den per definition partiell → kasta den.
+    const from = t.durMs ?? 0;
+    const had = s.meta.refinedFromMs ?? 0;
+    if (had && from < had) {
+      console.log(`[song] låt #${songId}: tvätt förkastad (${(from / 1000).toFixed(0)}s ljud < befintliga ${(had / 1000).toFixed(0)}s)`);
+      return;
+    }
     // OREN INSPELNING: tvätten såg en låtgräns INNE i segmentet (permanent tempo-
     // OCH klangskifte). Behåll bara första halvan — annars matchar nästa låt mot
     // det här fingeravtrycket och får fel tidslinje.
@@ -1002,6 +1013,7 @@ export class SongMemory {
     if (t.risers) s.meta.risers = t.risers;
     if (t.sections) s.meta.sections = t.sections;
     if (t.phrase?.p16) s.meta.phraseMs = t.phrase.p16;
+    if (from) s.meta.refinedFromMs = from;
     if (t.trimAt && t.trimAt > 0) {
       // Tvättens tidslinje täcker hela det orena segmentet → klipp den också.
       s.meta.drops = s.meta.drops.filter((d) => d.t <= t.trimAt!);
@@ -1065,7 +1077,7 @@ export class SongMemory {
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
-    this.onCommit?.(committed);
+    this.onCommit?.(committed, !matched);
   }
 
 
