@@ -10,6 +10,7 @@ Lifecycle drivs av Sonos playbackState (ignite() vid boot). Manuell UI-disconnec
 BLEDOM HCI-stuck recovery is process.exit via systemd. Never add same-process retry.
 
 ## Memories
+- [Bekräftad match före gräns](mem://pi/lighting/bekraftad-match-innan-grans) — recogPending: 5 s stabil + fulla röster innan låtgräns; blockedZones mot upprepad falskmatch
 - [Orent segment trimmas](mem://pi/lighting/oren-inspelning-trim) — tvätten hittar intern låtgräns → trimAt; match vars tidslinje tagit slut släpps
 - [Portable BLE driver](mem://pi/ble/portable-driver-layering) — pi/src/ble-driver/ fristående (noll outside-imports); ble/ är app-glue shims + subsystem-state; motor via createLampDriver
 - [Attack/release smoothing](mem://pi/lighting/attack-release-smoothing) — log-release vs mjuk-attack (lowSoftFloor), golv som dynamisk lyft, inverterat flicker-deadband, soft-watchdog

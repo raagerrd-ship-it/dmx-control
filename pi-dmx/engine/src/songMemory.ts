@@ -50,6 +50,8 @@ const RELOCK_SNAP_MS = 900;        // så stort fel är en seek, inte drift → 
 const RELOCK_GLIDE_MIN = 60;       // ms/s: mjukaste gliden (liten drift)
 const RELOCK_GLIDE_MAX = 400;      // ms/s: snabbaste gliden (drift nära snap)
 const MATCH_FRESH_MS = 6000;        // en aktiv match måste få nya, positionsenliga träffar
+const MATCH_STABLE_MS = 5000;       // ...och ha hållit så länge innan den får dela ett segment
+const FALSE_ZONE_MS = 15000;        // låttidszon runt en falskmatchad position som blockeras
 
 
 const LEARN_QUARANTINE_MS = 30000; // nyss känd låt = breakdown/tillfälligt tapp, inte ny låt
@@ -182,7 +184,10 @@ export class SongMemory {
   /** Räknare som tickar vid varje satt låtgräns → motorn kan kalibrera om dynamiken. */
   boundaryCount = 0;
   private loudSince = 0;          // volymgrind: sedan när nivån är tydlig musik
-  private recogSplit = -1;        // ≥0: igenkänningen pekar på gräns, matchens position i ms
+  /** Kandidat till igenkänning-gräns. Överriden får INTE dela ett segment på
+   *  första röstmajoriteten — en falsk match dör inom MATCH_FRESH_MS, så gränsen
+   *  väntar in en BEKRÄFTAD match (stabil ≥ MATCH_STABLE_MS med färska träffar). */
+  private recogPending: { id: number; at: number } | null = null;
   private lastMatchedAt = 0;       // håll inlärning i karantän efter senast etablerade match
   private quarantinedSegment = false;
 
@@ -198,6 +203,11 @@ export class SongMemory {
   private matchMargin = 0;
   private lastFreshMatchHit = 0;
   private blockedMatchId = 0;
+  /** Hash-kluster (låttidszoner) som falskmatchat i DETTA segment → räknas inte
+   *  igen. En låt som falskmatchas upprepat vid ~samma position har en för
+   *  generisk sekvens där; att blockera bara låt-id:t räcker inte. */
+  private blockedZones: { id: number; from: number; to: number }[] = [];
+  private releasedAt = new Map<number, number>();   // id → senaste släppta position
   private rawOffset = 0;
   private syncBucket = 0;
   private syncOffsets: number[] = [];
@@ -389,6 +399,7 @@ export class SongMemory {
       const id = this.slotIds[v0 >>> 12];
       if (id === this.blockedMatchId) continue;
       const tSong = (v0 & 0xfff) * FRAME_MS;
+      if (this.inBlockedZone(id, tSong)) continue;
       const off = tSong - l.t;
       // Negativ offset är förväntad när en ny känd låt börjar mitt i ett
       // gaplöst segment: dess låttid är nära noll medan l.t fortfarande avser
@@ -427,10 +438,11 @@ export class SongMemory {
         const s = this.songs.get(id);
         const pos = l.t + this.matchOffset;
         console.log(`[song] känd låt #${id} (${s?.meta.plays ?? 0} tidigare spelningar), position ${(pos / 1000).toFixed(1)}s`);
-        // Ny känd låt som just börjat mitt i ett rullande segment → låtgräns.
-        // (En match nära segmentets egen start är samma låt, ej gräns.)
+        // Ny känd låt som just börjat mitt i ett rullande segment → KANDIDAT till
+        // låtgräns. Beslutet tas först när matchen bekräftats (se tick).
         const tLive = this.playStart ? this.clock() - this.playStart : 0;
-        if (this.playStart && pos < RECOG_POS_MS && wasMatch !== id && tLive - pos > RECOG_POS_MS) this.recogSplit = pos;
+        if (this.playStart && pos < RECOG_POS_MS && wasMatch !== id && tLive - pos > RECOG_POS_MS) this.recogPending = { id, at: this.clock() };
+        else this.recogPending = null;
       }
 
       if (id === this.matchId) this.trackSync(off, winner, other);
@@ -449,6 +461,11 @@ export class SongMemory {
     return c.length >= 3 ? median(c) : bucket * OFFSET_BUCKET;
   }
 
+
+  private inBlockedZone(id: number, tSong: number): boolean {
+    for (const z of this.blockedZones) if (z.id === id && tSong >= z.from && tSong <= z.to) return true;
+    return false;
+  }
 
   private voteKey(id: number, bucket: number): number {
     return id * OFFSET_KEY_STRIDE + bucket + OFFSET_KEY_BIAS;
@@ -643,9 +660,6 @@ export class SongMemory {
       return;
     }
 
-    // Igenkänning-som-gräns: säkrare än all heuristik → egen väg, före evidensen.
-    if (this.recogSplit >= 0) { this.splitOnRecognition(now, this.recogSplit); return; }
-
     const tLive = now - this.playStart;
     // Tidslinjen har tagit slut, eller nya positionsenliga fingeravtryck har
     // upphört → släpp omedelbart. Blockera samma id resten av segmentet så gamla
@@ -656,6 +670,20 @@ export class SongMemory {
       if (m && position > m.meta.durationMs) this.releaseMatch(m.meta.id, "tidslinjen tog slut");
       else if (this.lastFreshMatchHit && now - this.lastFreshMatchHit > MATCH_FRESH_MS) this.releaseMatch(this.matchId, "inga färska träffar");
     }
+
+    // Igenkänning-som-gräns: bara en BEKRÄFTAD match får dela segmentet — stabil
+    // en stund, med löpande färska träffar och full röstmajoritet med marginal.
+    if (this.recogPending) {
+      const p = this.recogPending;
+      const fresh = this.lastFreshMatchHit > 0 && now - this.lastFreshMatchHit < MATCH_FRESH_MS / 2;
+      if (this.matchId !== p.id || !fresh) this.recogPending = null;
+      else if (now - p.at >= MATCH_STABLE_MS && this.matchVotes >= VOTES_NEEDED && this.matchMargin >= MARGIN) {
+        this.recogPending = null;
+        this.splitOnRecognition(now, tLive + this.matchOffset);
+        return;
+      }
+    }
+
     if (this.boundary(now, tLive, o)) return;
 
 
@@ -759,7 +787,7 @@ export class SongMemory {
     }
     this.playStart = now - pos;
     this.lastLoud = now;
-    this.recogSplit = -1;
+    this.recogPending = null;
     this.quarantinedSegment = false;
     this.matchId = id;
     this.matchOffset = 0;
@@ -785,6 +813,18 @@ export class SongMemory {
   private releaseMatch(id: number, why: string): void {
     console.log(`[song] släppte match #${id}: ${why}`);
     this.blockedMatchId = id;
+    this.recogPending = null;
+    // UPPREPAD FALSKMATCH VID ~SAMMA POSITION: låt-id:t räcker inte som spärr
+    // (det nollas vid nästa commit) — det är hash-klustret runt just den
+    // positionen som är för generiskt. Blockera zonen resten av segmentet.
+    const pos = (this.playStart ? this.clock() - this.playStart : 0) + this.matchOffset;
+    const prev = this.releasedAt.get(id);
+    if (prev !== undefined && Math.abs(prev - pos) < FALSE_ZONE_MS) {
+      this.blockedZones.push({ id, from: pos - FALSE_ZONE_MS, to: pos + FALSE_ZONE_MS });
+      console.log(`[song] blockerar låt #${id} runt ${(pos / 1000).toFixed(1)}s (upprepad falskmatch)`);
+    }
+    this.releasedAt.set(id, pos);
+
     // Materialet efter ett släppt lås är inte en verifierad ny låt. Karantänen
     // hindrar att svansen omedelbart sparas som en dubblett/förgiftat segment.
     this.lastMatchedAt = this.clock();
@@ -908,7 +948,7 @@ export class SongMemory {
   forget(): void {
     this.songs.clear(); this.votes.clear(); this.rebuildIndex();
     this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0; this.nextId = 1;
-    this.lastFreshMatchHit = 0; this.blockedMatchId = 0;
+    this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear();
     this.dirty = true;
     void this.save();
   }
@@ -927,9 +967,9 @@ export class SongMemory {
     this.quarantinedSegment = false;
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0;
     this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
-    this.levAvg = 0; this.dipAt = 0; this.recogSplit = -1;
+    this.levAvg = 0; this.dipAt = 0; this.recogPending = null;
     this.votes.clear(); this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.lastFreshMatchHit = 0; this.blockedMatchId = 0;
+    this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear();
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
@@ -1017,11 +1057,11 @@ export class SongMemory {
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
-    this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogSplit = -1; this.quarantinedSegment = false;
+    this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogPending = null; this.quarantinedSegment = false;
 
 
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.lastFreshMatchHit = 0; this.blockedMatchId = 0;
+    this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear();
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = [];
     this.fp.reset();
