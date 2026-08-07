@@ -126,6 +126,10 @@ export interface EngineConfig {
   beatErr?: number;
   /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */
   dmxMaxHz: number;
+  /** Latminnets INLARNING. false = kann igen och kor pa inspelning som vanligt,
+   *  men lar ALDRIG in nya latar. Igenkanning paverkas inte. Anvands nar man vill
+   *  frysa minnet (t.ex. medan segmenteringen trimmas) utan att byta ljudkalla. */
+  songLearn?: boolean;
   /** Rökmaskin (1 DMX-kanal). Blast på drop, med duty-cycle-skydd. */
   fog?: {
     enabled: boolean;      // maskinen inkopplad/aktiv

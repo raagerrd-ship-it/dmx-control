@@ -46,6 +46,14 @@ const mean = (a, from, to) => {
   return s / (hi - lo);
 };
 
+/** Percentil ur en osorterad lista (kopierar → rör inte indata). */
+const quantile = (a, q) => {
+  const s = Array.from(a).sort((x, y) => x - y);
+  if (!s.length) return 0;
+  return s[Math.max(0, Math.min(s.length - 1, Math.round(q * (s.length - 1))))];
+};
+
+
 // ── DROPS, ICKE-KAUSALT ───────────────────────────────────────────────────
 // Kandidat: kroppen har varit BORTA (break/riser) och kommer tillbaka — och
 // framtidsfönstret visar att lyftet HÅLLER. Tidpunkten sätts på flanken, inte
@@ -74,9 +82,11 @@ for (let i = PRE; i < fr.length - POST; i++) {
     const r = sm[j + RISE] - sm[j - RISE];
     if (r > bestRise) { bestRise = r; k = j; }
   }
-  drops.push({ t: Math.round(fr[k].t * 1000), s: Math.min(1, 0.45 + after * 0.5) });
+  // Styrkan graderas EFTERÅT (relativt kvällens övriga drops) — se nedan.
+  drops.push({ i: k, t: Math.round(fr[k].t * 1000), lift: after / (before + 0.05), s: 0.5 });
   lastDrop = i;
 }
+
 
 // ── BPM över HELA låten ───────────────────────────────────────────────────
 // Autokorrelation på onset-kurvan i 100 Hz, längd-normaliserad (annars vinner
@@ -125,8 +135,12 @@ if (bpm > 0) {
   beatPhaseMs = Math.round((bi / HZ) * 1000);
 }
 
-// ── Energikurva, 1 värde/sekund ───────────────────────────────────────────
-const secs = Math.ceil(dur);
+// ── Energikurva, 1 värde/sekund — NORMALISERAD ────────────────────────────
+// Realtidens intensity är relativ till ett löpande medel och vet aldrig vad
+// låtens faktiska botten och topp är. Offline gör vi det: sträck kurvan mellan
+// p5 och p95 (percentiler, så en enstaka spik inte plattar ut resten) → hela
+// registret används. Glättningen läggs EFTER sträckningen.
+const secs = Math.max(1, Math.ceil(dur));
 const intensity = new Array(secs).fill(0);
 {
   const cnt = new Array(secs).fill(0);
@@ -134,12 +148,83 @@ const intensity = new Array(secs).fill(0);
     const s = Math.floor(f.t);
     if (s >= 0 && s < secs) { intensity[s] += f.intensity; cnt[s]++; }
   }
-  for (let s = 0; s < secs; s++) intensity[s] = cnt[s] ? intensity[s] / cnt[s] : (intensity[s - 1] ?? 0.5) / 255;
-  // Lätt utjämning så dramaturgin inte hackar sekund för sekund.
+  for (let s = 0; s < secs; s++) intensity[s] = cnt[s] ? intensity[s] / cnt[s] : (intensity[s - 1] ?? 0.5);
+  const p5 = quantile(intensity, 0.05), p95 = quantile(intensity, 0.95);
+  if (p95 - p5 > 0.02) for (let s = 0; s < secs; s++) intensity[s] = (intensity[s] - p5) / (p95 - p5);
   for (let s = 1; s < secs; s++) intensity[s] = intensity[s] * 0.7 + intensity[s - 1] * 0.3;
   for (let s = 0; s < secs; s++) intensity[s] = Math.round(Math.max(0, Math.min(1, intensity[s])) * 255);
 }
 
-writeFileSync(out, JSON.stringify({ v: 1, songId: Number(songId), drops, bpm: Math.round(bpm * 10) / 10, beatPhaseMs, intensity }));
+// ── DROP-STYRKA: relativt kvällens övriga drops ────────────────────────────
+// Största dropen ska SE störst ut. Lyftets storlek rangordnas mellan p10 och
+// p90 av låtens egna lyft → 0.35..1.0.
+if (drops.length) {
+  const lifts = drops.map((d) => d.lift);
+  const lo = quantile(lifts, 0.10), hi = quantile(lifts, 0.90);
+  for (const d of drops) {
+    const n = hi > lo ? (d.lift - lo) / (hi - lo) : 0.5;
+    d.s = Math.round(Math.max(0.35, Math.min(1, 0.35 + 0.65 * n)) * 100) / 100;
+  }
+}
+
+// ── RISER-SEGMENT MED KÄNT MÅL ────────────────────────────────────────────
+// Realtid vet att en uppbyggnad pågår men inte hur LÅNG den är. Här vet vi
+// både start och den drop den leder till → motorn kan bygga proportionellt och
+// nå 100 % exakt på dropen. Starten = kroppens lägsta punkt inom 30 s före.
+const risers = [];
+{
+  const BACK = F(30), MIN = F(2);
+  drops.forEach((d, di) => {
+    let lo = d.i, loV = sm[d.i];
+    for (let j = d.i; j > Math.max(0, d.i - BACK); j--) if (sm[j] < loV) { loV = sm[j]; lo = j; }
+    if (d.i - lo >= MIN) risers.push({ start: Math.round(fr[lo].t * 1000), end: d.t, drop: di });
+  });
+}
+
+// ── SEKTIONSGRÄNSER ──────────────────────────────────────────────────────
+// Dirigenten byter idag effekt på en timer, alltså godtyckligt mitt i en fras.
+// Här hittar vi var låtens KARAKTÄR skiftar: L1-avstånd mellan normaliserade
+// klangprofiler per 1.5 s, toppar över snitt + 2σ, minst 8 s isär.
+const sections = [];
+{
+  const W = F(1.5);
+  const prof = [];
+  for (let i = 0; i + W <= fr.length; i += W) {
+    const p = [0, 0, 0, 0, 0];
+    for (let j = i; j < i + W; j++) { p[0] += fr[j].sub; p[1] += fr[j].kickB; p[2] += fr[j].bass; p[3] += fr[j].mid; p[4] += fr[j].treble; }
+    const sum = p.reduce((a, b) => a + b, 0) || 1;
+    prof.push({ t: fr[i].t, p: p.map((x) => x / sum) });
+  }
+  const nov = [];
+  for (let i = 1; i < prof.length; i++) {
+    let d = 0;
+    for (let b = 0; b < 5; b++) d += Math.abs(prof[i].p[b] - prof[i - 1].p[b]);
+    nov.push(d);
+  }
+  if (nov.length > 4) {
+    const m = nov.reduce((a, b) => a + b, 0) / nov.length;
+    const sd = Math.sqrt(nov.reduce((a, b) => a + (b - m) * (b - m), 0) / nov.length);
+    const th = m + 2 * sd;
+    let last = -Infinity;
+    for (let i = 0; i < nov.length; i++) {
+      const t = prof[i + 1].t * 1000;
+      if (nov[i] > th && t - last > 8000) { sections.push(Math.round(t)); last = t; }
+    }
+  }
+}
+
+// ── FRASGRID ─────────────────────────────────────────────────────────────
+// Accenter och effektbyten som landar på en frasgräns känns musikaliska; samma
+// accent 1,5 takt fel känns slumpmässig. Fasen är beatPhaseMs.
+const phrase = bpm > 0
+  ? { barMs: Math.round(4 * 60000 / bpm), p8: Math.round(32 * 60000 / bpm), p16: Math.round(64 * 60000 / bpm), p32: Math.round(128 * 60000 / bpm) }
+  : null;
+
+writeFileSync(out, JSON.stringify({
+  v: 2, songId: Number(songId),
+  drops: drops.map((d) => ({ t: d.t, s: d.s })),
+  bpm: Math.round(bpm * 10) / 10, beatPhaseMs, intensity, risers, sections, phrase,
+}));
+
 const cpu = process.cpuUsage();
-console.log(`[refine] låt #${songId}: ${dur.toFixed(0)}s ljud, ${drops.length} drops, ${bpm.toFixed(1)} BPM — vägg ${((Date.now() - t0) / 1000).toFixed(1)}s, CPU ${((cpu.user + cpu.system) / 1e6).toFixed(1)}s`);
+console.log(`[refine] låt #${songId}: ${dur.toFixed(0)}s ljud, ${drops.length} drops, ${risers.length} risers, ${sections.length} sektioner, ${bpm.toFixed(1)} BPM — vägg ${((Date.now() - t0) / 1000).toFixed(1)}s, CPU ${((cpu.user + cpu.system) / 1e6).toFixed(1)}s`);
