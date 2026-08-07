@@ -636,7 +636,15 @@ export class SongMemory {
     if (this.recogSplit >= 0) { this.splitOnRecognition(now, this.recogSplit); return; }
 
     const tLive = now - this.playStart;
+    // Tidslinjen har tagit slut → matchen kan inte vara rätt låt (eller minnet är
+    // orent). Släpp den och låt realtiden ta över i stället för att styra showen
+    // med en tidslinje som passerat låtens slut.
+    if (this.matchId) {
+      const m = this.songs.get(this.matchId);
+      if (m && tLive + this.matchOffset > m.meta.durationMs + MATCH_END_GRACE_MS) this.releaseMatch(m.meta.id);
+    }
     if (this.boundary(now, tLive, o)) return;
+
 
 
     // Tidslinje-inspelning (alltid — även för en känd låt, så minnet förbättras).
