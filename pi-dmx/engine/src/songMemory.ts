@@ -201,6 +201,11 @@ export class SongMemory {
   private matchMargin = 0;
   private lastFreshMatchHit = 0;
   private blockedMatchId = 0;
+  /** Hash-kluster (låttidszoner) som falskmatchat i DETTA segment → räknas inte
+   *  igen. En låt som falskmatchas upprepat vid ~samma position har en för
+   *  generisk sekvens där; att blockera bara låt-id:t räcker inte. */
+  private blockedZones: { id: number; from: number; to: number }[] = [];
+  private releasedAt = new Map<number, number>();   // id → senaste släppta position
   private rawOffset = 0;
   private syncBucket = 0;
   private syncOffsets: number[] = [];
