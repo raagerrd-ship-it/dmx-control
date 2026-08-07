@@ -90,9 +90,9 @@ console.log("start mitt i låten: positionsfel", midError.toFixed(0), "ms");
 // showklockan och nästa drop-index, inte hålla kvar den första offseten.
 const beforeSeek = mem.state().positionMs;
 const seekTo = 70083;
-await playFrom(mem, A, clock, seekTo, 12000);
+const seekFired = await playFrom(mem, A, clock, seekTo, 28000);
 const afterSeek = mem.state();
-const seekError = Math.abs(afterSeek.positionMs - (seekTo + 12000 - 1000));
+const seekError = Math.abs(afterSeek.positionMs - (seekTo + 28000 - 1000));
 console.log("seek: position", beforeSeek.toFixed(0), "→", afterSeek.positionMs.toFixed(0), "ms, fel", seekError.toFixed(0), "ms");
 
 await new Promise((r) => setTimeout(r, 300));   // låt sparningen landa
@@ -116,6 +116,7 @@ const ok = fired.length >= 2
   && fired.every((f) => dropsA.some((d) => Math.abs(d - f) < 800))
   && mid.known && midError < 350
   && afterSeek.known && seekError < 350
+  && seekFired.length === 1 && Math.abs(seekFired[0] - 95000) < 500
   && gapless.songId === 2 && gapless.positionMs > 10000 && gapless.positionMs < 16000
   && gapless.lastBoundary === "igenkänd låt #2"
   && mem2.state().known === false;
