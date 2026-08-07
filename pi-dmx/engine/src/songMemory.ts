@@ -184,6 +184,10 @@ export class SongMemory {
   private syncOffsets: number[] = [];
   private lastSyncAt = 0;
   private syncFast = true;        // första korrigeringen efter ett lås ska komma direkt
+  private lastRelockAt = 0;       // senaste periodiska låsverifieringen
+  private relocks = 0;            // antal gånger synken tvingats tillbaka (diagnostik)
+  private driftMs = 0;            // senast mätta drift mot oberoende estimat
+
   /** Rullande råoffset per träff (id + off). Ger etableringen en median UNDER
    *  fack-upplösningen → låtstarten låses direkt, inte ±125 ms fel. */
   private recentId: number[] = [];
