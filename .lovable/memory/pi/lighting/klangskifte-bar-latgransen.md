@@ -12,4 +12,4 @@ MÄTT MOT FACIT (Pi:ns egen learn.wav, 3 gaplösa Spotify-låtar, gränser 165 s
 IMPLEMENTATION (songMemory.ts):
 - `pushNovelty` jämför nu mot ringbuffertens profil NOV_LAG_MS (8 s) bakåt, ABSOLUT tröskel. Den adaptiva tröskeln (novAvg × faktor) togs bort: den höjde ribban just i partier där gaplösa övergångar sker.
 - `NOV_STRONG = 0.68` räcker ENSAMT. `NOV_WEAK = 0.55` räcker om nivådipp eller temposkifte också fyrar — extrasignaler, aldrig nödvändiga. EVIDENCE_NEEDED är borta.
-- Gränsen backdateras `NOV_BACK_MS = 4000` (halva noveltyfönstret) eftersom detektionen konsekvent låg 10–11 s för tidigt... nej: novelty reagerar när nytt material fyllt fönstret, dvs gränsen loggas SENARE än den verkliga i klocktid men simuleringens tidsstämpel låg 10–11 s tidigt; backdateringen flyttar segmentgränsen närmare facit. MIN_SEG mäts därför på `tLive - NOV_BACK_MS`.
+- Gränsen backdateras `NOV_BACK_MS = 4000` (halva noveltyfönstret) för att kompensera att detektionen reagerar först när nytt material fyllt fönstret. MIN_SEG mäts därför på `tLive - NOV_BACK_MS`.
