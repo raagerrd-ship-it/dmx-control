@@ -110,6 +110,12 @@ const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
 // för kända låtar, dvs varje repris skärper minnet.
 const RECOG_SPLIT_MIN_MS = MIN_SEG_MS;   // aldrig committa under minsta låtlängd — annars ger en smutsig blob en kaskad
 const RECOG_POS_MS = 20000;         // ...och matchen ligga inom låtens första 20 s
+// FÖRETRÄDE: igenkänningen är den SÄKRASTE gränsen (den vet vilken låt som börjat),
+// klangskiftet är en heuristik som dessutom ligger ~10 s för tidigt. Fyrar noveltyn
+// först får en bekräftad match inom det här fönstret REVIDERA nollpunkten till
+// låtens exakta position — ingen ny gräns sätts, bara tidslinjen rättas.
+const RECOG_REVISE_MS = 20000;
+
 
 
 
@@ -201,8 +207,13 @@ export class SongMemory {
   private loudSince = 0;          // volymgrind: sedan när nivån är tydlig musik
   /** Kandidat till igenkänning-gräns. Överriden får INTE dela ett segment på
    *  första röstmajoriteten — en falsk match dör inom MATCH_FRESH_MS, så gränsen
-   *  väntar in en BEKRÄFTAD match (stabil ≥ MATCH_STABLE_MS med färska träffar). */
-  private recogPending: { id: number; at: number } | null = null;
+   *  väntar in en BEKRÄFTAD match (stabil ≥ MATCH_STABLE_MS med färska träffar).
+   *  revise = klangskiftet hann före: gränsen finns redan, men på ungefärlig tid
+   *  → matchens exakta position ska ersätta noveltyns (ingen ny gräns). */
+  private recogPending: { id: number; at: number; revise?: boolean } | null = null;
+  /** Väggklocka för senaste gräns satt av klangskifte/heuristik (revideringsfönster). */
+  private heurBoundaryAt = 0;
+
   private lastMatchedAt = 0;       // håll inlärning i karantän efter senast etablerade match
   private quarantinedSegment = false;
 
@@ -474,8 +485,14 @@ export class SongMemory {
         // Ny känd låt som just börjat mitt i ett rullande segment → KANDIDAT till
         // låtgräns. Beslutet tas först när matchen bekräftats (se tick).
         const tLive = this.playStart ? this.clock() - this.playStart : 0;
-        if (this.playStart && pos < RECOG_POS_MS && wasMatch !== id && tLive - pos > RECOG_POS_MS) this.recogPending = { id, at: this.clock() };
+        const now = this.clock();
+        if (this.playStart && pos < RECOG_POS_MS && wasMatch !== id && tLive - pos > RECOG_POS_MS) this.recogPending = { id, at: now };
+        // Klangskiftet hann före: gränsen är redan satt, men ungefärlig. Matchen
+        // vet exakt var låten började → revidera nollpunkten i stället.
+        else if (this.playStart && pos < RECOG_POS_MS && this.heurBoundaryAt && now - this.heurBoundaryAt < RECOG_REVISE_MS
+                 && Math.abs(tLive - pos) > 1000) this.recogPending = { id, at: now, revise: true };
         else this.recogPending = null;
+
       }
 
       if (id === this.matchId) this.trackSync(off, winner, other);
@@ -732,10 +749,12 @@ export class SongMemory {
       if (this.matchId !== p.id || !fresh) this.recogPending = null;
       else if (now - p.at >= MATCH_STABLE_MS && this.matchVotes >= VOTES_NEEDED && this.matchMargin >= MARGIN) {
         this.recogPending = null;
-        this.splitOnRecognition(now, tLive + this.matchOffset);
+        if (p.revise) this.reviseBoundary(now, tLive + this.matchOffset);
+        else this.splitOnRecognition(now, tLive + this.matchOffset);
         return;
       }
     }
+
 
     if (this.boundary(now, tLive, o)) return;
 
@@ -825,9 +844,28 @@ export class SongMemory {
     // Starta nästa sekvens direkt — strömmen tystnar aldrig.
     this.playStart = bAt;
     this.lastLoud = now;
+    this.heurBoundaryAt = now;   // en bekräftad match får revidera nollpunkten
     this.quarantinedSegment = this.learnMode && now - this.lastMatchedAt < LEARN_QUARANTINE_MS;
     return true;
   }
+
+  /** IGENKÄNNINGEN HAR FÖRETRÄDE. Klangskiftet satte redan gränsen, men på
+   *  ungefärlig tid. En bekräftad match vet exakt var låten började → flytta
+   *  nollpunkten dit och märk gränsen som igenkänd. Ingen ny gräns, ingen ny
+   *  commit — bara tidslinjen rättad, så replayen ligger i fas. */
+  private reviseBoundary(now: number, pos: number): void {
+    const id = this.matchId;
+    const delta = (now - this.playStart) - pos;
+    console.log(`[song] gräns reviderad av igenkänning: låt #${id} vid ${(pos / 1000).toFixed(1)}s (flytt ${(delta / 1000).toFixed(1)}s)`);
+    this.lastBoundary = `igenkänd låt #${id}`;
+    this.heurBoundaryAt = 0;
+    this.playStart = now - pos;
+    this.lastLoud = now;
+    this.dropLearning();   // de sekunderna hörde till fel låt
+    this.replayIdx = this.nextDropIndex(this.songs.get(id), pos);
+    this.cuePrevT = -1;
+  }
+
 
   /** Gräns satt av igenkännaren: skriv in det gångna segmentet och starta nästa
    *  med matchen behållen, tidsställd på låtens faktiska position.
@@ -848,7 +886,7 @@ export class SongMemory {
     }
     this.playStart = now - pos;
     this.lastLoud = now;
-    this.recogPending = null;
+    this.recogPending = null; this.heurBoundaryAt = 0;
     this.quarantinedSegment = false;
     this.matchId = id;
     this.matchOffset = 0;
@@ -1144,7 +1182,7 @@ export class SongMemory {
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.resetNovelty();
-    this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogPending = null; this.quarantinedSegment = false;
+    this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogPending = null; this.heurBoundaryAt = 0; this.quarantinedSegment = false;
 
 
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
