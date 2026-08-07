@@ -1,57 +1,33 @@
-# Offline-tvätt av inlärda låtar (refiner)
+# Löpande dynamik — samma kurva som tvätten, utan igenkänning
 
-Realtidsanalysen är kausal — den kan inte se framåt, så drops släpar och BPM/energi blir grova. Planen: spela in råljudet till en temp-WAV medan en ny låt lärs in (bara aux), och när låten tystnat köra en **separat process** som analyserar filen framåtblickande och ersätter låtens tidslinje med tvättade värden. Fingeravtrycket rörs aldrig.
+## Idén
 
-Allt lokalt. Inget ljud lämnar lådan, ingen internetuppkoppling.
+Det som gör den tvättade showen snygg är inte att motorn *vet vilken låt* det är — det är att ljustaket är **normaliserat** (p5–p95 av just den låtens nivåer) och **sekundmjukt**. Live-vägen (`energyCeiling`) använder i stället rå VU: absolut nivå, inget spann, därför platt i tysta låtar och mättat i höga.
 
-## Så fungerar det
+Den normaliseringen kan köras löpande. Den behöver bara nivåhistorik — inte fingeravtryck, inte låtgräns, inte tvätt.
 
-1. Ny låt spelas på aux → motorn skriver samtidigt råljudet till `/var/lib/audio-dmx-engine/learn.wav` (strömmande, en låt i taget).
-2. Låten tystnar → låten committas som idag, och refinern spawnas i tystnaden.
-3. Refinern kör ~50× realtid (en 4-minuterslåt ≈ 5 s) och skriver en liten sidecar-JSON.
-4. Motorn plockar upp JSON:en, ersätter låtens drops/BPM/energi, sparar `songs.bin`, raderar WAV + JSON.
-5. Nästa gång låten spelas är dropsen redan rätt-centrerade — och `mergeInto` fortsätter förbättra över repriser precis som nu.
+## Vad som byggs
 
-Kör låten på mik: ingen inspelning, ingen tvätt. Igenkänning fungerar som förut.
+1. **Rullande auto-range på nivån**
+   Ett litet histogram över `frame.levelVU` (~64 hinkar) med exponentiellt avtagande vikt, fönster ~60–90 s. Ur det läses p5 och p95 löpande. Nivån mappas `(vu - p5) / (p95 - p95)` → 0..1 = exakt samma normaliserade kurva som tvätten producerar, fast räknad framåt i tid.
 
-## Teknik
+2. **Samma efterbehandling som minnestaket**
+   Golv (samma 0.20), asymmetrisk mjukning (snabb upp, långsam ner), drop får fortsatt full bypass via `dropEnv`. Klubb-läget kvadrerar den normaliserade kurvan i stället för den råa → hårdare kontrast blir meningsfull i alla låtar.
 
-### A. Temp-WAV (`src/learnRecorder.ts`, nytt)
-- `createWriteStream` + WAV-header som patchas med rätt längd vid stängning. 48 kHz **mono** int16 → ~5,8 MB/min, ~17 MB för en 3-minuterslåt.
-- Matas från `capture.on("chunk")` med samma Float32-mono som analysatorn får (`f * 32768`), så refinern ser exakt samma signal som realtid såg — inga kanal-/skalningsskillnader.
-- Backpressure respekteras (`write()` returnerar false → hoppa över chunk och räkna det i loggen; hellre lucka än att bygga kö i RAM).
-- Startar bara när: `audioInput === "aux"`, låten lärs in (ny låt, ej igenkänd), och det finns ≥100 MB ledigt på disken (`statfs`). Hård tak-gräns 10 min ljud → sen stängs skrivningen.
-- Loggar filstorlek vid stängning.
+3. **Snabb omkalibrering vid misstänkt låtbyte**
+   Låtminnet har redan gränsevidensen (klangskifte + nivådipp). När den signalerar gräns halveras histogrammets vikt en gång → spannet kryper in på nya låtens nivåer på några sekunder i stället för en minut. Ingen ny detektion behövs, ingen risk: en falsk gräns kostar bara en snabbare omkalibrering.
 
-### B. Refinern (`tools/refineSong.mjs`, nytt)
-- Fristående process, körs som `nice -n 19 node tools/refineSong.mjs <wav> <songId> <outJson>`. **Aldrig** på huvudtråden — inget `await` i renderloopen.
-- Återanvänder `replay(path)` ur `tools/replay.mjs` (riktiga `Analyser` + `setVirtualClock`), ingen ny analysator.
-- Ur de deterministiska ramarna räknas:
-  - **Drops, icke-kausalt**: baskropp = `sub+kick+bass`. Kandidat = skarpt lyft efter en period med borta bas; bekräftas mot ett **framtidsfönster** (~1,5 s) — lyftet måste hålla. Tidpunkten sätts på anslagets flank, inte där realtid hann reagera.
-  - **BPM över hela låten**: autokorrelation på hela onset-kurvan + oktavval, plus `beatPhaseMs` ur bästa fasläge → ett stabilt tempo i stället för ett glidande medel.
-  - **Energikurva**: 1 värde/sekund, lätt utjämnad.
-- Skriver `<songId>.refined.json`: `{ v, songId, drops:[{t,s}], bpm, beatPhaseMs, intensity:[…] }`. Rör **inte** `songs.bin` (två skrivare på samma fil = korrupt minne).
-- Skriver egen CPU-tid + ljudlängd till stdout (`process.cpuUsage()`), som motorn loggar.
+4. **Minnestaket vinner fortfarande**
+   Är låten igenkänd och tvättad används den förberäknade kurvan som idag (den är framåtblickande, live kan bara vara kausal). Den löpande normaliseringen är default-vägen för allt annat — okända låtar, mik-ingång, första spelningen.
 
-### C. Trigger och applicering
-- `src/refineQueue.ts` (nytt): `spawn` när en låt committats med en färdig WAV, en åt gången, med en enkel retry-räknare (max 2 försök). Vid fel eller överskriden gräns: radera WAV + JSON — aldrig hoarda ljud.
-- `songMemory.ts` får två små tillägg (index och hashformat orörda):
-  - `commit()` returnerar id:t på låten som lärdes in/uppdaterades.
-  - `applyRefined(songId, data)` ersätter `drops`/`bpm`/`beatPhaseMs`/`intensity`, markerar dirty och sparar. Hashar och `plays` behålls.
-- Motorn kollar var 5:e sekund efter sidecar-filer, applicerar, och städar båda filerna.
-- WS-state får `refining: boolean` så UI:t kan visa "tvättar…".
+## Vad som inte byggs
 
-### D. Städning och säkerhet
-- Vid uppstart: radera kvarglömda `*.refined.json` och `learn.wav` (strömavbrott mitt i en låt).
-- Vid SIGTERM: stäng WAV-strömmen, döda ev. refiner-process, `songs.flush()` som nu.
-- Refinern är en läsare av WAV + skrivare av JSON; motorn är enda skrivaren av `songs.bin`.
+Ingen ny UI, ingen ny inställning: `energyCeiling` (Regi-flaggan) fortsätter vara samma strömbrytare, men bakom den sitter normaliserad dynamik i stället för rå VU. Riser/sektioner rörs inte — analysatorns `buildUp` sköter dem live redan.
 
-## UI
-`src/pages/DmxController.tsx` (mocken): låtminnes-raden får ett tredje läge — "Tvättar inspelning…". Samma ändring levereras som diff för `pi-dmx/engine/public/index.html`, som din Pi-agent äger.
+## Tekniskt
 
-## Ordning
-1. `learnRecorder.ts` + inkoppling i `index.ts` → verifiera: WAV skapas bara på aux, storleken matchar låtlängden, filen är spelbar och `replay.mjs` kan läsa den.
-2. `refineSong.mjs` → verifiera: kör på en inspelad WAV, drops ligger tidigare/centrerat jämfört med realtidens, BPM stabilt, JSON korrekt.
-3. `refineQueue.ts` + `applyRefined` → verifiera: efter tystnad tvättas låten, `songs.bin` uppdateras, temp-filerna är borta.
-4. Mätning på Pi:n: temp-storlek, refinerns CPU-tid, inga ALSA-överskridningar under tvätten (den körs i tystnad med `nice 19`).
-5. UI-läge i mocken + diff för Pi-filen.
+- Ny liten modul `pi-dmx/engine/src/liveRange.ts`: avtagande histogram + `p(q)`-läsning, ingen allokering per frame (fast Float32Array).
+- `effects.ts`: `else if (this.cfg.energyCeiling)`-grenen matar `liveRange` och använder normaliserad nivå i stället för `vuRaw`; golv/ballistik/`dropEnv` oförändrade.
+- `index.ts`: vid gränsevidens från `songMemory` → `effects.liveRangeReset()` (mjuk, viktshalvering).
+- `songMemory.ts`: exponera att en gräns just inträffade (befintlig commit/evidens-väg, inget nytt detektionsarbete).
+- Verifieras med en offline-simulering: mata en tvättad `<songId>.wav`-kurva genom `liveRange` och jämföra mot tvättens p5/p95-normalisering — kausalt släp ska vara sekunder, inte tiondelar av en låt. `tsc` ska vara 0.
