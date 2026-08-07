@@ -149,6 +149,10 @@ capture.on("chunk", (samples: Float32Array) => {
   // Temp-inspelning: bara medan en NY låt lärs in på aux (state().learning),
   // aldrig på mik och aldrig för en redan känd låt.
   if (songs.learningNew) { if (!recorder.active) recorder.start(); recorder.write(samples); }
+  // LÅTGRÄNS → mjuk omkalibrering av den löpande dynamiken (auto-rangen får
+  // krypa in på nya låtens nivåer inom sekunder i stället för en minut).
+  if (songs.boundaryCount !== lastBoundary) { lastBoundary = songs.boundaryCount; effects.softenRange(); }
+
 
   if (songs.recognized) {
     if (songs.takeDrop() > 0) outDrop++;          // pre-fired ur minnet
