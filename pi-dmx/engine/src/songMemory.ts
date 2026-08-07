@@ -83,23 +83,25 @@ const TRIM_MIN_HALF_MS = 60000;    // en trimmad halva under 60 s är inte en l�
 // bara inlärningen för spåret och realtidsdetektorn kör som förut — ren uppsida.
 const MIN_SEG_MS = 110000;     // MÄTT: 75 s triggade direkt (två segment exakt 75 s) → höjt
 const MAX_SEG_MS = 600000;     // 10 min utan gräns → tvinga fram en
-// MÄTT PÅ HÅRDVARA: tempoföljaren vacklar systematiskt INOM samma låt
-// (126→91, 129→92, 129→93, 129→92 på 28 s — kvot 1.39–1.40 varje gång, en
-// tolkningsmiss som ingen kvotlista fångar). Ett tempohopp får därför ALDRIG
-// fyra en gräns ensamt: BPM är en STÖDsignal, en av två. Den bärande gränsen är
-// nivådipp + klangskifte, så klangskiftet är gjort känsligare för att kompensera.
-const EVIDENCE_NEEDED = 2;       // alltid minst två signaler
-const BPM_JUMP = 0.07;           // >7 % tempoändring = en (av två) signaler
+// MÄTT OFFLINE MOT FACIT (3 gaplösa Spotify-låtar, kända gränser 165 s / 317 s):
+//  - Nivådippen är DÖD vid crossfade: dipp-kvot 0.979 och 0.906 vid gränserna,
+//    mot DIP_RATIO 0.55. Inte ens 0.85 hade fångat gräns 1.
+//  - Tempot var IDENTISKT 125 BPM på båda sidor om gräns 2.
+//  - Klangskiftet såg BÅDA (percentil 88 och 92).
+// Därför bär KLANGSKIFTET gränsen ENSAMT; nivådipp och tempo är extrasignaler
+// som gör detektionen känsligare när de finns, men aldrig nödvändiga.
+const BPM_JUMP = 0.07;           // >7 % tempoändring = extrasignal
 const BPM_HOLD_MS = 4000;        // ...som håller i 4 s (inte en halvtaktsmiss)
-const DIP_RATIO = 0.55;          // nivå under 55 % av snittet (min/snitt mätt 0.505)
+const DIP_RATIO = 0.55;          // nivå under 55 % av snittet (extrasignal)
 
 const DIP_WIN_MS = 6000;       // dipp räknas som evidens så länge efteråt
 const START_LEVEL = 0.15;      // volymgrind: starta bara på tydlig musik
 const START_HOLD_MS = 1000;    // ...som hållit i en sekund
 const NOV_WIN_MS = 1500;       // klangprofil per 1.5 s
-const NOV_TH = 0.30;           // L1-avstånd (0..2): absolut golv
-const NOV_FACTOR = 2.2;        // ...och minst så många gånger låtens egen variation (sänkt: bär gränsen nu)
-const NOV_HITS = 2;            // två fönster i rad (3 s) → inte en enstaka spik
+const NOV_LAG_MS = 8000;       // jämför mot profilen så långt bakåt (facitmätningens fönster)
+const NOV_STRONG = 0.68;        // MÄTT: platå 0.60–0.75 gav 2/2 träff, 0 falska → mitten
+const NOV_WEAK = 0.55;          // ...räcker om nivådipp eller temposkifte också fyrar
+const NOV_BACK_MS = NOV_LAG_MS / 2;  // novelty reagerar när nya materialet fyllt fönstret (mätt 10–11 s för tidigt)
 const NOV_WIN_KEEP_MS = 6000;  // klangskifte räknas som evidens så länge efteråt
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
 // IGENKÄNNING SOM GRÄNS. Känner igenkännaren en ANNAN känd låt mitt i ett segment,
