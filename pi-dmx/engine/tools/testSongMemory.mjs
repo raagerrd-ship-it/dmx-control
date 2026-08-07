@@ -145,7 +145,20 @@ const dr = mem5.state();
 const driftError = Math.abs(dr.positionMs - (20600 + 20000 - 1000));
 console.log("drift 600ms: re-locks", dr.relocks, "kvarvarande fel", driftError.toFixed(0), "ms, största klockhopp", (drifted.maxJump ?? 0).toFixed(0), "ms");
 
+// TRIMNING UR TVÄTTEN: ett orent segment (innehåller nästa låts början) ska
+// klippas på trimAt, och en trimAt under minsta halva ska kasta hela låten.
+await new Promise((r) => setTimeout(r, 300));
+const mem6 = new SongMemory(() => clock.t);
+await mem6.load();
+const beforeTrim = mem6.state().songs;
+mem6.applyRefined(1, { drops: [{ t: 5000, s: 1 }, { t: 90000, s: 1 }], bpm: 128, beatPhaseMs: 0, intensity: [], trimAt: 70000 });
+const afterTrim = mem6.state().songs;
+mem6.applyRefined(2, { drops: [], bpm: 128, beatPhaseMs: 0, intensity: [], trimAt: 30000 });
+const afterDrop = mem6.state().songs;
+console.log("trim:", beforeTrim, "låtar →", afterTrim, "(trimmad) →", afterDrop, "(kastad)");
+
 const ok = fired.length >= 2
+
   && fired.every((f) => dropsA.some((d) => Math.abs(d - f) < 800))
   && mid.known && midError < 350
   && afterSeek.known && seekError < 350
