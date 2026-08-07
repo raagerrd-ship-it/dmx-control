@@ -867,7 +867,7 @@ export class SongMemory {
     this.replayIdx = this.nextDropIndex(this.songs.get(id), pos);
     // Segmentets gränsdetektorer hör nu en ny låt.
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0;
-    this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
+    this.resetNovelty();
     this.dipAt = 0;
   }
 
@@ -1042,7 +1042,7 @@ export class SongMemory {
     this.lastLoud = now;
     this.quarantinedSegment = false;
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0;
-    this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
+    this.resetNovelty();
     this.levAvg = 0; this.dipAt = 0; this.recogPending = null;
     this.votes.clear(); this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
     this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear(); this.bannedIds.clear(); this.falseHits.clear(); this.matchSince = 0; this.matchConfirmed = false;
@@ -1143,7 +1143,7 @@ export class SongMemory {
     this.playStart = 0;
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
-    this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
+    this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.resetNovelty();
     this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogPending = null; this.quarantinedSegment = false;
 
 
