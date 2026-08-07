@@ -1,42 +1,32 @@
-# Manuell inlärning från mobilen (exakta gränser)
+# Manuell inlärning på Pi:n (exakta gränser)
 
-Din idé löser problemet där det faktiskt går att lösa. Heuristiken kan inte hitta ett crossfade-byte — men *du* vet exakt när låten börjar och slutar. Om mobilen får sätta gränsen blir facit exakt, och biblioteket byggs på rena segment i stället för smutsiga blobbar.
+Du har rätt. För Spotify/Apple Music blir mobil-app-idén inte smartare än en knapp på Pi:n — båda kräver att du som lyssnare trycker vid varje spårbyte. Det enda undantaget är om musiken spelas i webbläsaren på samma sida, men då är det fortfarande en knapp/touch i gränssnittet, bara på en annan skärm.
 
-Efter det får igenkänningen (som mätts till 0,2 s fel) bära all realtidsdetektering, och klangskiftesheuristiken blir bara en reservplan för okänd musik.
+Därför förenklar vi: lägg knapparna direkt på Pi:s UI. Det är färre rörliga delar, samma exakthet, och det kräver ingen ny app eller kommunikationskanal.
 
 ## Så fungerar det
 
-Ja — två knappar räcker, men bara om musiken spelas upp i webbläsaren på samma sida som UI:t. Då vet mobilen själv när spåret byts.
+Ett nytt läge "Inlärning" i Pi-UI:t med två knappar:
 
 ```text
-[ Starta inlärning ]        -> inlärningsläge på, första segmentet börjar
-   ...automatiskt spårbyte när musiken spelas i webbläsaren
+[ Starta inlärning ]        -> inlärningsläge på, första segmentet börjar HÄR
+[ Nästa låt ]               -> committa segmentet + starta nästa i samma tick
 [ Stoppa inlärning ]        -> committa sista segmentet, tillbaka till normalläge
 ```
 
-Automatisk detektering fungerar när musiken spelas från sidans eget `<audio>`-element eller en inbäddad spelare som exponerar `navigator.mediaSession` — då fyrar sidan en gräns när `trackchange`- eller `positionstate`-händelsen visar nytt spår.
-
-Spelar du istället från Spotify, Apple Music eller en annan app på telefonen kan webbsidan inte läsa den uppspelningen. Varken iOS eller Android tillåter att en webbsida eller app avlyssnar en annan apps ljud eller playback-state — det är låst av integritetsskäl. Det finns inget sätt att få reda på att Spotify byter låt utan att Spotify själva berättar det via ett API.
-
-Det enda officiella sättet är Spotify Web API, men det kräver:
-- Internetuppkoppling.
-- Att du loggar in och godkänner appen i Spotify.
-- Att uppspelningen sker via Spotify Connect eller ett konto som API:et kan se — inte lokalt på telefonen med hörlurar.
-- Dessutom har API:et fördröjning och tillåter inte kommersiell användning utan avtal.
-
-Därför är den praktiska lösningen för Spotify/Apple Music en manuell knapp `Nästa låt` i UI:t. Knapptrycket skickar samma exakta gränssignal till Pi:n. Det är fortfarande mycket bättre än heuristiken, eftersom du som lyssnare hör bytet och trycker inom en halv sekund.
+När du trycker `Nästa låt` skickas en exakt tidsstämpel till motorn. Du som lyssnare hör bytet och trycker inom en halv sekund — vilket fortfarande är betydligt bättre än dagens heuristik (9–10 s fel).
 
 Medan läget är aktivt:
 - All heuristisk gränsdetektering är avstängd (inga klangskiften, ingen nivådipp, ingen 110-sekundersspärr).
-- Ingen igenkänningsdriven gräns — bara mobilens spårbyten eller knapptryck.
+- Ingen igenkänningsdriven gräns — bara knapptrycken.
 - `MIN_SEG_MS` gäller inte; ett 40-sekunders spår kan läras in.
-- UI:t visar löpande segmentlängd och "sparat: N låtar" så du ser att gränserna går fram.
+- UI:t visar löpande segmentlängd och "sparat: N låtar" så du ser att trycket gick fram.
 
 Efter avslutad inlärning körs tvätten (`refineSong.mjs`) på varje segment som vanligt — men nu på material med korrekta start- och slutpunkter, vilket också gör `trimAt`-logiken onödig för dessa låtar.
 
 ## Latens och exakthet
 
-Knapptrycket går över WiFi-AP:n till Pi:n på några millisekunder, men det är inte hela sanningen: din reaktionstid är den stora felkällan. Därför sätts gränsen med en liten justerbar offset (standard −300 ms) så att lite av föregående låt hellre hamnar i slutet av det gamla segmentet än i början av det nya. Fingeravtrycket är robust mot det; en avhuggen intro är värre.
+Knapptrycket går lokalt inuti Pi:n (ingen nätverksresa), men din reaktionstid är den stora felkällan. Därför sätts gränsen med en liten justerbar offset (standard −300 ms) så att lite av föregående låt hellre hamnar i slutet av det gamla segmentet än i början av det nya. Fingeravtrycket är robust mot det; en avhuggen intro är värre.
 
 ## Tekniskt
 
