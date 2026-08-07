@@ -35,6 +35,15 @@ const SYNC_SAMPLES_FAST = 5;   // ...men FÖRSTA korrigeringen efter ett lås sk
 const SYNC_INTERVAL_MS = 750;
 const SYNC_NUDGE_MS = 25;      // korrekt lås får aldrig börja vandra
 const SEEK_ERROR_MS = 1500;    // större stabilt hopp = seek/ny uppspelningsposition
+// AUTOMATISK RE-LOCK. Nudgen rättar bara 25 ms/750 ms (≈33 ms/s) — ett medelstort
+// fel (t.ex. crossfade, DSP-buffertbyte, klockdrift) under seek-tröskeln tar då
+// tiotals sekunder att äta upp, och under tiden sitter droparna fel. Därför
+// verifieras låset periodiskt mot ett OBEROENDE offset-estimat (medianen av de
+// senaste råträffarna) och snappas direkt om driften är för stor.
+const RELOCK_INTERVAL_MS = 8000;
+const RELOCK_ERROR_MS = 250;   // ett fack: mindre än så hörs/syns inte
+const RELOCK_MIN_HITS = 6;     // estimatet måste vila på flera träffar
+
 const LEARN_QUARANTINE_MS = 30000; // nyss känd låt = breakdown/tillfälligt tapp, inte ny låt
 
 // LÅTGRÄNS UTAN TYSTNAD. Spotify/Apple Music spelar gaplöst eller crossfadar —
