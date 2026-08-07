@@ -620,19 +620,42 @@ export class SongMemory {
   }
 
   /** Gräns satt av igenkännaren: skriv in det gångna segmentet och starta nästa
-   *  med matchen behållen, tidsställd på låtens faktiska position. */
+   *  med matchen behållen, tidsställd på låtens faktiska position.
+   *  Är segmentet kortare än minsta låtlängd committas inget (det vore en smutsig
+   *  blob) — men tidslinjen ställs om ändå, så showen är i synk direkt. */
   private splitOnRecognition(now: number, pos: number): void {
     const id = this.matchId;
-    console.log(`[song] låtgräns efter ${((now - this.playStart) / 1000).toFixed(0)}s (igenkänd låt #${id} vid ${(pos / 1000).toFixed(1)}s)`);
+    const tLive = now - this.playStart;
+    console.log(`[song] låtgräns efter ${(tLive / 1000).toFixed(0)}s (igenkänd låt #${id} vid ${(pos / 1000).toFixed(1)}s)`);
     this.lastBoundary = `igenkänd låt #${id}`;
-    this.commit();   // nollställer bl.a. matchId och recogSplit
+    if (tLive >= RECOG_SPLIT_MIN_MS) this.commit();   // nollställer bl.a. matchId och recogSplit
+    else {
+      this.boundaryCount++;
+      this.dropLearning();
+      this.votes.clear();
+      this.fp.reset();
+    }
     this.playStart = now - pos;
     this.lastLoud = now;
+    this.recogSplit = -1;
+    this.quarantinedSegment = false;
     this.matchId = id;
     this.matchOffset = 0;
+    this.rawOffset = 0;
     this.matchVotes = VOTES_NEEDED;
-    this.replayIdx = 0;
+    this.lastMatchedAt = now;
+    this.syncBucket = 0;
+    this.syncOffsets = [];
+    this.lastSyncAt = 0;
+    this.syncFast = true;
+    this.cuePrevT = -1;
+    this.replayIdx = this.nextDropIndex(this.songs.get(id), pos);
+    // Segmentets gränsdetektorer hör nu en ny låt.
+    this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0;
+    this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
+    this.dipAt = 0;
   }
+
 
 
 
