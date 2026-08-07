@@ -362,19 +362,28 @@ export class SongMemory {
       const key = this.voteKey(id, bucket);
       const v = (this.votes.get(key) ?? 0) + 1;
       this.votes.set(key, v);
+      this.recentId.push(id); this.recentOff.push(off);
+      if (this.recentId.length > 256) { this.recentId.shift(); this.recentOff.shift(); }
       const winner = this.bestFor(id);
       const other = this.bestOther(id);
-      const establishes = !this.matchId && winner.votes >= VOTES_NEEDED && winner.votes >= other * MARGIN;
-      const replaces = !!this.matchId && id !== this.matchId && winner.votes >= VOTES_NEEDED && winner.votes > this.bestFor(this.matchId).votes;
+      // START-LÅS: pekar vinnaren på låtens första sekunder är själva
+      // startjusteringen en extra signal — då räcker färre röster, och en ny låt
+      // i en gaplös ström låses innan första refrängen.
+      const atStart = l.t + winner.bucket * OFFSET_BUCKET < RECOG_POS_MS;
+      const need = atStart ? VOTES_NEEDED_START : VOTES_NEEDED;
+      const establishes = !this.matchId && winner.votes >= need && winner.votes >= other * MARGIN;
+      const replaces = !!this.matchId && id !== this.matchId && winner.votes >= need && winner.votes > this.bestFor(this.matchId).votes;
       if (id !== this.matchId && (establishes || replaces)) {
         const wasMatch = this.matchId;
         this.matchId = id;
         this.lastMatchedAt = this.clock();
         this.quarantinedSegment = false;
-        this.matchOffset = winner.bucket * OFFSET_BUCKET;
+        this.matchOffset = this.clusterOffset(id, winner.bucket);
         this.rawOffset = this.matchOffset;
         this.syncBucket = winner.bucket;
         this.syncOffsets = [];
+        this.lastSyncAt = 0;
+        this.syncFast = true;
         this.matchVotes = winner.votes;
         this.matchMargin = winner.votes / Math.max(1, other);
         this.replayIdx = 0;
@@ -382,17 +391,27 @@ export class SongMemory {
         const pos = l.t + this.matchOffset;
         console.log(`[song] känd låt #${id} (${s?.meta.plays ?? 0} tidigare spelningar), position ${(pos / 1000).toFixed(1)}s`);
         // Ny känd låt som just börjat mitt i ett rullande segment → låtgräns.
-        // (En match nära låtens början direkt efter segmentstart är samma låt, ej gräns.)
-        if (this.playStart && this.clock() - this.playStart >= RECOG_SPLIT_MIN_MS && pos < RECOG_POS_MS && wasMatch !== id) this.recogSplit = pos;
+        // (En match nära segmentets egen start är samma låt, ej gräns.)
+        const tLive = this.playStart ? this.clock() - this.playStart : 0;
+        if (this.playStart && pos < RECOG_POS_MS && wasMatch !== id && tLive - pos > RECOG_POS_MS) this.recogSplit = pos;
       }
 
       if (id === this.matchId) this.trackSync(off, winner, other);
     }
   }
 
-  private voteKey(id: number, bucket: number): number {
-    return id * OFFSET_KEY_STRIDE + bucket + OFFSET_KEY_BIAS;
+  /** Median av de råoffset som ligger i vinnarfacket (± ett fack). Facket är
+   *  250 ms grovt; medianen ger millisekunder. */
+  private clusterOffset(id: number, bucket: number): number {
+    const c: number[] = [];
+    for (let i = 0; i < this.recentId.length; i++) {
+      if (this.recentId[i] !== id) continue;
+      if (Math.abs(Math.round(this.recentOff[i] / OFFSET_BUCKET) - bucket) > 1) continue;
+      c.push(this.recentOff[i]);
+    }
+    return c.length >= 3 ? median(c) : bucket * OFFSET_BUCKET;
   }
+
 
   private voteId(key: number): number {
     return Math.floor(key / OFFSET_KEY_STRIDE);
