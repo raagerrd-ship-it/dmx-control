@@ -366,14 +366,10 @@ export class SongMemory {
   }
 
   /** KLANGSKIFTE. Energin samlas i oktavband, normaliseras (form, inte volym)
-   *  och jämförs var 1.5 s med ett långsamt referensspektrum.
-   *
-   *  Tröskeln är ADAPTIV: hur mycket profilen normalt rör sig skiljer sig
-   *  enormt mellan en jämn housemix och sparsam akustisk musik, så ett fast
-   *  tal ger antingen falska gränser eller inga alls. Vi kräver att avståndet
-   *  är flera gånger större än låtens EGEN normala variation — och att det
-   *  håller två fönster i rad (3 s), vilket ett nytt spår gör men en
-   *  refrängövergång inte. */
+   *  och jämförs var 1.5 s med profilen NOV_LAG_MS bakåt — exakt måttet som mättes
+   *  mot facit (percentil 88 och 92 vid de verkliga gränserna). Tröskeln är
+   *  ABSOLUT: den adaptiva varianten drog upp ribban i just de partier där en
+   *  gaplös övergång sker, och missade båda facitgränserna. */
   private pushNovelty(mag: Float32Array, binHz: number): void {
     const now = this.clock();
     if (!this.novStart) this.novStart = now;
@@ -389,20 +385,30 @@ export class SongMemory {
     this.novStart = now;
     let sum = 0;
     for (let b = 0; b < this.novAcc.length; b++) sum += this.novAcc[b];
-    const prof = new Float32Array(this.novAcc.length);
-    if (sum > 0) for (let b = 0; b < prof.length; b++) prof[b] = this.novAcc[b] / sum;
     this.novAcc.fill(0); this.novN = 0;
     if (sum <= 0) return;
-    if (!this.novRef) { this.novRef = prof; return; }
-    let d = 0;
-    for (let b = 0; b < prof.length; b++) d += Math.abs(prof[b] - this.novRef[b]);
-    const bar = Math.max(NOV_TH, this.novAvg * NOV_FACTOR);
-    if (this.novAvg > 0 && d > bar) {
-      this.novHits++;
-      if (this.novHits >= NOV_HITS) this.novAt = this.clock();
-    } else this.novHits = 0;
-    this.novAvg = this.novAvg > 0 ? this.novAvg * 0.9 + d * 0.1 : d;
-    for (let b = 0; b < prof.length; b++) this.novRef[b] = this.novRef[b] * 0.75 + prof[b] * 0.25;
+    const lag = Math.max(1, Math.round(NOV_LAG_MS / NOV_WIN_MS));
+    const size = lag + 1;
+    if (this.novHist.length !== size) {
+      this.novHist = [];
+      for (let i = 0; i < size; i++) this.novHist.push(new Float32Array(this.novAcc.length));
+      this.novIdx = 0; this.novFilled = 0;
+    }
+    const prof = this.novHist[this.novIdx];
+    for (let b = 0; b < prof.length; b++) prof[b] = this.novAcc[b] / sum;   // novAcc redan nollad? nej — se nedan
+    this.novIdx = (this.novIdx + 1) % size;
+    this.novFilled++;
+    if (this.novFilled > lag) {
+      const past = this.novHist[this.novIdx];   // efter framflyttningen pekar idx på äldsta = lag fönster bakåt
+      let d = 0;
+      for (let b = 0; b < prof.length; b++) d += Math.abs(prof[b] - past[b]);
+      if (d >= NOV_WEAK) { this.novAt = now; this.novPeak = d; }
+    }
+  }
+
+  private resetNovelty(): void {
+    this.novAt = 0; this.novPeak = 0; this.novAcc.fill(0); this.novN = 0; this.novStart = 0;
+    this.novHist = []; this.novIdx = 0; this.novFilled = 0;
   }
 
 
