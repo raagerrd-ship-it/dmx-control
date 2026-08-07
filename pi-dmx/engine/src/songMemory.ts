@@ -83,23 +83,25 @@ const TRIM_MIN_HALF_MS = 60000;    // en trimmad halva under 60 s är inte en l�
 // bara inlärningen för spåret och realtidsdetektorn kör som förut — ren uppsida.
 const MIN_SEG_MS = 110000;     // MÄTT: 75 s triggade direkt (två segment exakt 75 s) → höjt
 const MAX_SEG_MS = 600000;     // 10 min utan gräns → tvinga fram en
-// MÄTT PÅ HÅRDVARA: tempoföljaren vacklar systematiskt INOM samma låt
-// (126→91, 129→92, 129→93, 129→92 på 28 s — kvot 1.39–1.40 varje gång, en
-// tolkningsmiss som ingen kvotlista fångar). Ett tempohopp får därför ALDRIG
-// fyra en gräns ensamt: BPM är en STÖDsignal, en av två. Den bärande gränsen är
-// nivådipp + klangskifte, så klangskiftet är gjort känsligare för att kompensera.
-const EVIDENCE_NEEDED = 2;       // alltid minst två signaler
-const BPM_JUMP = 0.07;           // >7 % tempoändring = en (av två) signaler
+// MÄTT OFFLINE MOT FACIT (3 gaplösa Spotify-låtar, kända gränser 165 s / 317 s):
+//  - Nivådippen är DÖD vid crossfade: dipp-kvot 0.979 och 0.906 vid gränserna,
+//    mot DIP_RATIO 0.55. Inte ens 0.85 hade fångat gräns 1.
+//  - Tempot var IDENTISKT 125 BPM på båda sidor om gräns 2.
+//  - Klangskiftet såg BÅDA (percentil 88 och 92).
+// Därför bär KLANGSKIFTET gränsen ENSAMT; nivådipp och tempo är extrasignaler
+// som gör detektionen känsligare när de finns, men aldrig nödvändiga.
+const BPM_JUMP = 0.07;           // >7 % tempoändring = extrasignal
 const BPM_HOLD_MS = 4000;        // ...som håller i 4 s (inte en halvtaktsmiss)
-const DIP_RATIO = 0.55;          // nivå under 55 % av snittet (min/snitt mätt 0.505)
+const DIP_RATIO = 0.55;          // nivå under 55 % av snittet (extrasignal)
 
 const DIP_WIN_MS = 6000;       // dipp räknas som evidens så länge efteråt
 const START_LEVEL = 0.15;      // volymgrind: starta bara på tydlig musik
 const START_HOLD_MS = 1000;    // ...som hållit i en sekund
 const NOV_WIN_MS = 1500;       // klangprofil per 1.5 s
-const NOV_TH = 0.30;           // L1-avstånd (0..2): absolut golv
-const NOV_FACTOR = 2.2;        // ...och minst så många gånger låtens egen variation (sänkt: bär gränsen nu)
-const NOV_HITS = 2;            // två fönster i rad (3 s) → inte en enstaka spik
+const NOV_LAG_MS = 8000;       // jämför mot profilen så långt bakåt (facitmätningens fönster)
+const NOV_STRONG = 0.68;        // MÄTT: platå 0.60–0.75 gav 2/2 träff, 0 falska → mitten
+const NOV_WEAK = 0.55;          // ...räcker om nivådipp eller temposkifte också fyrar
+const NOV_BACK_MS = NOV_LAG_MS / 2;  // novelty reagerar när nya materialet fyllt fönstret (mätt 10–11 s för tidigt)
 const NOV_WIN_KEEP_MS = 6000;  // klangskifte räknas som evidens så länge efteråt
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
 // IGENKÄNNING SOM GRÄNS. Känner igenkännaren en ANNAN känd låt mitt i ett segment,
@@ -185,10 +187,12 @@ export class SongMemory {
   private novAcc = new Float32Array(NOV_BANDS.length - 1);
   private novN = 0;
   private novStart = 0;
-  private novRef: Float32Array | null = null;
+  /** Ringbuffert med klangprofiler → jämförelse mot NOV_LAG_MS bakåt. */
+  private novHist: Float32Array[] = [];
+  private novIdx = 0;             // nästa slot i ringen
+  private novFilled = 0;          // antal skrivna profiler
   private novAt = 0;              // väggklocka för senaste klangskiftet
-  private novAvg = 0;             // låtens normala fönster-till-fönster-variation
-  private novHits = 0;            // fönster i rad över tröskeln
+  private novPeak = 0;            // L1-avståndet vid det skiftet
   private levAvg = 0;             // långsamt nivåsnitt (dippdetektering)
   private dipAt = 0;              // väggklocka för senaste nivådippen
   private lastEvidence: string[] = [];   // senast aktiva gränssignaler (diagnostik)
@@ -362,14 +366,10 @@ export class SongMemory {
   }
 
   /** KLANGSKIFTE. Energin samlas i oktavband, normaliseras (form, inte volym)
-   *  och jämförs var 1.5 s med ett långsamt referensspektrum.
-   *
-   *  Tröskeln är ADAPTIV: hur mycket profilen normalt rör sig skiljer sig
-   *  enormt mellan en jämn housemix och sparsam akustisk musik, så ett fast
-   *  tal ger antingen falska gränser eller inga alls. Vi kräver att avståndet
-   *  är flera gånger större än låtens EGEN normala variation — och att det
-   *  håller två fönster i rad (3 s), vilket ett nytt spår gör men en
-   *  refrängövergång inte. */
+   *  och jämförs var 1.5 s med profilen NOV_LAG_MS bakåt — exakt måttet som mättes
+   *  mot facit (percentil 88 och 92 vid de verkliga gränserna). Tröskeln är
+   *  ABSOLUT: den adaptiva varianten drog upp ribban i just de partier där en
+   *  gaplös övergång sker, och missade båda facitgränserna. */
   private pushNovelty(mag: Float32Array, binHz: number): void {
     const now = this.clock();
     if (!this.novStart) this.novStart = now;
@@ -385,20 +385,31 @@ export class SongMemory {
     this.novStart = now;
     let sum = 0;
     for (let b = 0; b < this.novAcc.length; b++) sum += this.novAcc[b];
-    const prof = new Float32Array(this.novAcc.length);
-    if (sum > 0) for (let b = 0; b < prof.length; b++) prof[b] = this.novAcc[b] / sum;
-    this.novAcc.fill(0); this.novN = 0;
-    if (sum <= 0) return;
-    if (!this.novRef) { this.novRef = prof; return; }
-    let d = 0;
-    for (let b = 0; b < prof.length; b++) d += Math.abs(prof[b] - this.novRef[b]);
-    const bar = Math.max(NOV_TH, this.novAvg * NOV_FACTOR);
-    if (this.novAvg > 0 && d > bar) {
-      this.novHits++;
-      if (this.novHits >= NOV_HITS) this.novAt = this.clock();
-    } else this.novHits = 0;
-    this.novAvg = this.novAvg > 0 ? this.novAvg * 0.9 + d * 0.1 : d;
-    for (let b = 0; b < prof.length; b++) this.novRef[b] = this.novRef[b] * 0.75 + prof[b] * 0.25;
+    this.novN = 0;
+    if (sum <= 0) { this.novAcc.fill(0); return; }
+    const lag = Math.max(1, Math.round(NOV_LAG_MS / NOV_WIN_MS));
+    const size = lag + 1;
+    if (this.novHist.length !== size) {
+      this.novHist = [];
+      for (let i = 0; i < size; i++) this.novHist.push(new Float32Array(this.novAcc.length));
+      this.novIdx = 0; this.novFilled = 0;
+    }
+    const prof = this.novHist[this.novIdx];
+    for (let b = 0; b < prof.length; b++) prof[b] = this.novAcc[b] / sum;
+    this.novAcc.fill(0);
+    this.novIdx = (this.novIdx + 1) % size;
+    this.novFilled++;
+    if (this.novFilled > lag) {
+      const past = this.novHist[this.novIdx];   // efter framflyttningen pekar idx på äldsta = lag fönster bakåt
+      let d = 0;
+      for (let b = 0; b < prof.length; b++) d += Math.abs(prof[b] - past[b]);
+      if (d >= NOV_WEAK) { this.novAt = now; this.novPeak = d; }
+    }
+  }
+
+  private resetNovelty(): void {
+    this.novAt = 0; this.novPeak = 0; this.novAcc.fill(0); this.novN = 0; this.novStart = 0;
+    this.novHist = []; this.novIdx = 0; this.novFilled = 0;
   }
 
 
@@ -766,10 +777,12 @@ export class SongMemory {
     }
   }
 
-  /** LÅTGRÄNS I EN GAPLÖS STRÖM. Nivådipp räcker ensam; övriga signaler kräver
-   *  samlad evidens. Allt grindas av min/max-längd. Returnerar true om vi delade. */
+  /** LÅTGRÄNS I EN GAPLÖS STRÖM. KLANGSKIFTET bär gränsen ensamt (mätt mot facit);
+   *  nivådipp och temposkifte sänker bara tröskeln när de finns. Allt grindas av
+   *  min/max-längd. Returnerar true om vi delade. */
   private boundary(now: number, tLive: number, o: { bpm: number; bpmConfidence: number; level: number }): boolean {
-    // Nivådipp: även en crossfade har oftast ett ögonblick där nivån faller.
+    // Nivådipp: extrasignal. Vid Spotify-crossfade faller nivån knappt alls
+    // (mätt: kvot 0.98 och 0.91 vid facitgränserna), så den får aldrig krävas.
     this.levAvg = this.levAvg > 0 ? this.levAvg * 0.995 + o.level * 0.005 : o.level;
     if (this.levAvg > 0.05 && o.level < this.levAvg * DIP_RATIO) this.dipAt = now;
 
@@ -787,24 +800,30 @@ export class SongMemory {
       }
     }
 
-    if (tLive < MIN_SEG_MS) return false;   // en drop/breakdown ligger alltid inom minsta längd
+    // Gränsen backdateras NOV_BACK_MS (novelty reagerar när nya materialet fyllt
+    // fönstret), så minsta längd mäts på det backdaterade segmentet.
+    if (tLive < MIN_SEG_MS + NOV_BACK_MS) return false;
 
+    const novFresh = this.novAt > 0 && now - this.novAt < NOV_WIN_KEEP_MS;
     const ev: string[] = [];
+    if (novFresh) ev.push(`klangskifte ${this.novPeak.toFixed(2)}`);
     if (bpmShift) ev.push(bpmShift);
-    if (this.novAt && now - this.novAt < NOV_WIN_KEEP_MS) ev.push("klangskifte");
     if (this.dipAt && now - this.dipAt < DIP_WIN_MS) ev.push("nivådipp");
     this.lastEvidence = ev;
 
     let why = "";
-    if (ev.length >= EVIDENCE_NEEDED) why = ev.join(" + ");
-    else if (tLive > MAX_SEG_MS) why = "maxlängd";   // aldrig en 22-minuters gröt igen
+    let back = NOV_BACK_MS;
+    if (novFresh && (this.novPeak >= NOV_STRONG || ev.length >= 2)) why = ev.join(" + ");
+    else if (tLive > MAX_SEG_MS) { why = "maxlängd"; back = 0; }   // aldrig en 22-minuters gröt igen
     if (!why) return false;
 
-    console.log(`[song] låtgräns efter ${(tLive / 1000).toFixed(0)}s (${why})`);
+    const bAt = now - back;
+    console.log(`[song] låtgräns efter ${((bAt - this.playStart) / 1000).toFixed(0)}s (${why})`);
     this.lastBoundary = why;
+    this.lastLoud = bAt;   // segmentets längd räknas till den backdaterade gränsen
     this.commit();
     // Starta nästa sekvens direkt — strömmen tystnar aldrig.
-    this.playStart = now;
+    this.playStart = bAt;
     this.lastLoud = now;
     this.quarantinedSegment = this.learnMode && now - this.lastMatchedAt < LEARN_QUARANTINE_MS;
     return true;
@@ -848,7 +867,7 @@ export class SongMemory {
     this.replayIdx = this.nextDropIndex(this.songs.get(id), pos);
     // Segmentets gränsdetektorer hör nu en ny låt.
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0;
-    this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
+    this.resetNovelty();
     this.dipAt = 0;
   }
 
@@ -1023,7 +1042,7 @@ export class SongMemory {
     this.lastLoud = now;
     this.quarantinedSegment = false;
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0;
-    this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
+    this.resetNovelty();
     this.levAvg = 0; this.dipAt = 0; this.recogPending = null;
     this.votes.clear(); this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
     this.lastFreshMatchHit = 0; this.blockedMatchId = 0; this.blockedZones = []; this.releasedAt.clear(); this.bannedIds.clear(); this.falseHits.clear(); this.matchSince = 0; this.matchConfirmed = false;
@@ -1124,7 +1143,7 @@ export class SongMemory {
     this.playStart = 0;
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
-    this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
+    this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.resetNovelty();
     this.levAvg = 0; this.dipAt = 0; this.loudSince = 0; this.recogPending = null; this.quarantinedSegment = false;
 
 
