@@ -52,6 +52,18 @@ const RELOCK_GLIDE_MAX = 400;      // ms/s: snabbaste gliden (drift nära snap)
 
 
 const LEARN_QUARANTINE_MS = 30000; // nyss känd låt = breakdown/tillfälligt tapp, inte ny låt
+// SKYDDSNÄT MOT ORENT SEGMENT. Missas en låtgräns svälver segmentet början av
+// NÄSTA låt (mätt: 272 s i stället för 201 s). Spelas den låten sedan matchar
+// den mot det orena segmentet och motorn kör FEL låts tidslinje — aktivt fel
+// show, sämre än realtid. En match vars position gått förbi den lagrade låtens
+// slut har definitionsmässigt inget mer att spela upp: släpp den då.
+// Marginalen är RELATIV: samma låt spelas sällan exakt lika länge (fade-out,
+// crossfade, olika master) — bara ett fel som är stort i förhållande till låten
+// är ett tecken på fel tidslinje.
+const MATCH_END_GRACE_MS = 5000;
+const MATCH_END_GRACE_FRAC = 0.08;
+const TRIM_MIN_HALF_MS = 60000;    // en trimmad halva under 60 s är inte en låt
+
 
 // LÅTGRÄNS UTAN TYSTNAD. Spotify/Apple Music spelar gaplöst eller crossfadar —
 // 3 s tystnad inträffar aldrig, och utan de här signalerna blir hela kvällen
@@ -628,7 +640,16 @@ export class SongMemory {
     if (this.recogSplit >= 0) { this.splitOnRecognition(now, this.recogSplit); return; }
 
     const tLive = now - this.playStart;
+    // Tidslinjen har tagit slut → matchen kan inte vara rätt låt (eller minnet är
+    // orent). Släpp den och låt realtiden ta över i stället för att styra showen
+    // med en tidslinje som passerat låtens slut.
+    if (this.matchId) {
+      const m = this.songs.get(this.matchId);
+      const grace = Math.max(MATCH_END_GRACE_MS, m ? m.meta.durationMs * MATCH_END_GRACE_FRAC : 0);
+      if (m && tLive + this.matchOffset > m.meta.durationMs + grace) this.releaseMatch(m.meta.id);
+    }
     if (this.boundary(now, tLive, o)) return;
+
 
 
     // Tidslinje-inspelning (alltid — även för en känd låt, så minnet förbättras).
@@ -748,6 +769,20 @@ export class SongMemory {
     this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
     this.dipAt = 0;
   }
+
+  /** Släpp en etablerad match utan att röra inlärningen. Rösterna nollas så
+   *  samma låt inte låser om sig på nästa hop. */
+  private releaseMatch(id: number): void {
+    console.log(`[song] släppte match #${id}: tidslinjen tog slut (position förbi låtens slut)`);
+    this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0;
+    this.matchOffset = 0; this.rawOffset = 0;
+    this.votes.clear();
+    this.recentId = []; this.recentOff = [];
+    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true;
+    this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0;
+    this.replayIdx = 0; this.cuePrevT = -1;
+  }
+
 
 
 
@@ -895,20 +930,55 @@ export class SongMemory {
    *  v1-sidecars saknar dramaturgi-fälten; då lämnas de orörda. */
   applyRefined(songId: number, t: {
     drops: { t: number; s: number }[]; bpm: number; beatPhaseMs: number; intensity: number[];
-    risers?: Riser[]; sections?: number[]; phrase?: { p16: number } | null;
+    risers?: Riser[]; sections?: number[]; phrase?: { p16: number } | null; trimAt?: number;
   }): void {
     const s = this.songs.get(songId);
     if (!s) return;
+    // OREN INSPELNING: tvätten såg en låtgräns INNE i segmentet (permanent tempo-
+    // OCH klangskifte). Behåll bara första halvan — annars matchar nästa låt mot
+    // det här fingeravtrycket och får fel tidslinje.
+    if (t.trimAt && t.trimAt > 0) { this.trimSong(s, t.trimAt); if (!this.songs.has(songId)) return; }
     s.meta.drops = t.drops.map((d) => ({ t: d.t, s: d.s, c: Math.max(2, s.meta.plays) }));   // tvättade drops är bekräftade
     if (t.bpm > 40) { s.meta.bpm = t.bpm; s.meta.beatPhaseMs = t.beatPhaseMs; }
     if (t.intensity.length) s.meta.intensity = t.intensity;
     if (t.risers) s.meta.risers = t.risers;
     if (t.sections) s.meta.sections = t.sections;
     if (t.phrase?.p16) s.meta.phraseMs = t.phrase.p16;
+    if (t.trimAt && t.trimAt > 0) {
+      // Tvättens tidslinje täcker hela det orena segmentet → klipp den också.
+      s.meta.drops = s.meta.drops.filter((d) => d.t <= t.trimAt!);
+      s.meta.intensity = s.meta.intensity.slice(0, Math.ceil(t.trimAt / 1000));
+      if (s.meta.risers) s.meta.risers = s.meta.risers.filter((r) => r.end <= t.trimAt!);
+      if (s.meta.sections) s.meta.sections = s.meta.sections.filter((x) => x <= t.trimAt!);
+    }
     this.dirty = true;
     void this.save();
     console.log(`[song] låt #${songId} tvättad: ${t.drops.length} drops, ${t.risers?.length ?? 0} risers, ${t.sections?.length ?? 0} sektioner, ${t.bpm} BPM`);
   }
+
+  /** Klipp bort allt efter en intern låtgräns: hashar, tider och längd. Är första
+   *  halvan för kort finns ingen låt att behålla — kasta hela posten. */
+  private trimSong(s: Song, trimAt: number): void {
+    const was = s.meta.durationMs;
+    if (trimAt < TRIM_MIN_HALF_MS) {
+      this.songs.delete(s.meta.id);
+      this.rebuildIndex();
+      this.dirty = true;
+      console.log(`[song] låt #${s.meta.id} kastad: intern gräns redan vid ${(trimAt / 1000).toFixed(0)}s`);
+      return;
+    }
+    let n = 0;
+    for (let k = 0; k < s.times.length; k++) if (s.times[k] <= trimAt) n++;
+    const hashes = new Uint32Array(n), times = new Uint32Array(n);
+    let p = 0;
+    for (let k = 0; k < s.times.length; k++) if (s.times[k] <= trimAt) { hashes[p] = s.hashes[k]; times[p] = s.times[k]; p++; }
+    s.hashes = hashes; s.times = times;
+    s.meta.durationMs = trimAt;
+    this.rebuildIndex();
+    this.dirty = true;
+    console.log(`[song] låt #${s.meta.id} trimmad: ${(was / 1000).toFixed(0)}s → ${(trimAt / 1000).toFixed(0)}s (intern gräns), ${n} hashar kvar`);
+  }
+
 
 
   /** Låten är slut: skriv in i minnet (ny låt) eller förbättra den kända. */

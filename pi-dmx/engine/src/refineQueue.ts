@@ -19,6 +19,9 @@ export interface RefinedTimeline {
   risers?: { start: number; end: number; drop: number }[];
   sections?: number[];
   phrase?: { barMs: number; p8: number; p16: number; p32: number } | null;
+  /** v2: tvätten hittade en låtgräns INNE i segmentet → motorn trimmar låten. */
+  trimAt?: number;
+
 }
 
 
