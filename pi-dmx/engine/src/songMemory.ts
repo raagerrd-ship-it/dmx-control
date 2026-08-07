@@ -28,8 +28,10 @@ const OFFSET_BUCKET = 250;     // ms per offset-fack
 const OFFSET_KEY_STRIDE = 100000;
 const OFFSET_KEY_BIAS = 10000; // negativa offset-fack måste fortfarande avkodas till rätt låt-id
 const VOTES_NEEDED = 10;
+const VOTES_NEEDED_START = 6;  // matchen pekar på låtens BÖRJAN → egen korroborerande signal, lås snabbare
 const MARGIN = 2;        // vinnaren måste ha dubbelt så många röster som bästa ANNAN låt
 const SYNC_SAMPLES = 9;        // robust median innan tidspositionen korrigeras
+const SYNC_SAMPLES_FAST = 5;   // ...men FÖRSTA korrigeringen efter ett lås ska komma direkt
 const SYNC_INTERVAL_MS = 750;
 const SYNC_NUDGE_MS = 25;      // korrekt lås får aldrig börja vandra
 const SEEK_ERROR_MS = 1500;    // större stabilt hopp = seek/ny uppspelningsposition
@@ -172,6 +174,11 @@ export class SongMemory {
   private syncBucket = 0;
   private syncOffsets: number[] = [];
   private lastSyncAt = 0;
+  private syncFast = true;        // första korrigeringen efter ett lås ska komma direkt
+  /** Rullande råoffset per träff (id + off). Ger etableringen en median UNDER
+   *  fack-upplösningen → låtstarten låses direkt, inte ±125 ms fel. */
+  private recentId: number[] = [];
+  private recentOff: number[] = [];
   private lastBoundary = "";
   private replayIdx = 0;
   private pendingDrop = 0;        // styrka på en drop som ska fyras av
@@ -355,19 +362,28 @@ export class SongMemory {
       const key = this.voteKey(id, bucket);
       const v = (this.votes.get(key) ?? 0) + 1;
       this.votes.set(key, v);
+      this.recentId.push(id); this.recentOff.push(off);
+      if (this.recentId.length > 256) { this.recentId.shift(); this.recentOff.shift(); }
       const winner = this.bestFor(id);
       const other = this.bestOther(id);
-      const establishes = !this.matchId && winner.votes >= VOTES_NEEDED && winner.votes >= other * MARGIN;
-      const replaces = !!this.matchId && id !== this.matchId && winner.votes >= VOTES_NEEDED && winner.votes > this.bestFor(this.matchId).votes;
+      // START-LÅS: pekar vinnaren på låtens första sekunder är själva
+      // startjusteringen en extra signal — då räcker färre röster, och en ny låt
+      // i en gaplös ström låses innan första refrängen.
+      const atStart = l.t + winner.bucket * OFFSET_BUCKET < RECOG_POS_MS;
+      const need = atStart ? VOTES_NEEDED_START : VOTES_NEEDED;
+      const establishes = !this.matchId && winner.votes >= need && winner.votes >= other * MARGIN;
+      const replaces = !!this.matchId && id !== this.matchId && winner.votes >= need && winner.votes > this.bestFor(this.matchId).votes;
       if (id !== this.matchId && (establishes || replaces)) {
         const wasMatch = this.matchId;
         this.matchId = id;
         this.lastMatchedAt = this.clock();
         this.quarantinedSegment = false;
-        this.matchOffset = winner.bucket * OFFSET_BUCKET;
+        this.matchOffset = this.clusterOffset(id, winner.bucket);
         this.rawOffset = this.matchOffset;
         this.syncBucket = winner.bucket;
         this.syncOffsets = [];
+        this.lastSyncAt = 0;
+        this.syncFast = true;
         this.matchVotes = winner.votes;
         this.matchMargin = winner.votes / Math.max(1, other);
         this.replayIdx = 0;
@@ -375,13 +391,27 @@ export class SongMemory {
         const pos = l.t + this.matchOffset;
         console.log(`[song] känd låt #${id} (${s?.meta.plays ?? 0} tidigare spelningar), position ${(pos / 1000).toFixed(1)}s`);
         // Ny känd låt som just börjat mitt i ett rullande segment → låtgräns.
-        // (En match nära låtens början direkt efter segmentstart är samma låt, ej gräns.)
-        if (this.playStart && this.clock() - this.playStart >= RECOG_SPLIT_MIN_MS && pos < RECOG_POS_MS && wasMatch !== id) this.recogSplit = pos;
+        // (En match nära segmentets egen start är samma låt, ej gräns.)
+        const tLive = this.playStart ? this.clock() - this.playStart : 0;
+        if (this.playStart && pos < RECOG_POS_MS && wasMatch !== id && tLive - pos > RECOG_POS_MS) this.recogSplit = pos;
       }
 
       if (id === this.matchId) this.trackSync(off, winner, other);
     }
   }
+
+  /** Median av de råoffset som ligger i vinnarfacket (± ett fack). Facket är
+   *  250 ms grovt; medianen ger millisekunder. */
+  private clusterOffset(id: number, bucket: number): number {
+    const c: number[] = [];
+    for (let i = 0; i < this.recentId.length; i++) {
+      if (this.recentId[i] !== id) continue;
+      if (Math.abs(Math.round(this.recentOff[i] / OFFSET_BUCKET) - bucket) > 1) continue;
+      c.push(this.recentOff[i]);
+    }
+    return c.length >= 3 ? median(c) : bucket * OFFSET_BUCKET;
+  }
+
 
   private voteKey(id: number, bucket: number): number {
     return id * OFFSET_KEY_STRIDE + bucket + OFFSET_KEY_BIAS;
@@ -431,16 +461,21 @@ export class SongMemory {
     this.syncOffsets.push(off);
     if (this.syncOffsets.length > 31) this.syncOffsets.shift();
     const now = this.clock();
-    if (this.syncOffsets.length < SYNC_SAMPLES || now - this.lastSyncAt < SYNC_INTERVAL_MS) return;
+    const needSamples = this.syncFast ? SYNC_SAMPLES_FAST : SYNC_SAMPLES;
+    if (this.syncOffsets.length < needSamples || (!this.syncFast && now - this.lastSyncAt < SYNC_INTERVAL_MS)) return;
+    const wasFast = this.syncFast;
+    this.syncFast = false;
     this.lastSyncAt = now;
     const raw = median(this.syncOffsets);
     this.rawOffset = raw;
     const error = raw - this.matchOffset;
-    if (Math.abs(error) >= SEEK_ERROR_MS) {
+    // Första korrigeringen efter ett lås SNAPPAR (låset ska sitta direkt);
+    // därefter nudgas bara, så ett korrekt lås aldrig vandrar.
+    if (wasFast || Math.abs(error) >= SEEK_ERROR_MS) {
       this.matchOffset = raw;
       this.replayIdx = this.nextDropIndex(this.songs.get(this.matchId), now - this.playStart + this.matchOffset);
       this.cuePrevT = -1;
-      console.log(`[song] synk hoppade ${(error / 1000).toFixed(2)}s till ny position`);
+      if (!wasFast) console.log(`[song] synk hoppade ${(error / 1000).toFixed(2)}s till ny position`);
     } else {
       this.matchOffset += Math.max(-SYNC_NUDGE_MS, Math.min(SYNC_NUDGE_MS, error));
     }
@@ -585,19 +620,43 @@ export class SongMemory {
   }
 
   /** Gräns satt av igenkännaren: skriv in det gångna segmentet och starta nästa
-   *  med matchen behållen, tidsställd på låtens faktiska position. */
+   *  med matchen behållen, tidsställd på låtens faktiska position.
+   *  Är segmentet kortare än minsta låtlängd committas inget (det vore en smutsig
+   *  blob) — men tidslinjen ställs om ändå, så showen är i synk direkt. */
   private splitOnRecognition(now: number, pos: number): void {
     const id = this.matchId;
-    console.log(`[song] låtgräns efter ${((now - this.playStart) / 1000).toFixed(0)}s (igenkänd låt #${id} vid ${(pos / 1000).toFixed(1)}s)`);
+    const tLive = now - this.playStart;
+    console.log(`[song] låtgräns efter ${(tLive / 1000).toFixed(0)}s (igenkänd låt #${id} vid ${(pos / 1000).toFixed(1)}s)`);
     this.lastBoundary = `igenkänd låt #${id}`;
-    this.commit();   // nollställer bl.a. matchId och recogSplit
+    if (tLive >= RECOG_SPLIT_MIN_MS) this.commit();   // nollställer bl.a. matchId och recogSplit
+    else {
+      this.boundaryCount++;
+      this.dropLearning();
+      this.votes.clear();
+      this.recentId = []; this.recentOff = [];
+      this.fp.reset();
+    }
     this.playStart = now - pos;
     this.lastLoud = now;
+    this.recogSplit = -1;
+    this.quarantinedSegment = false;
     this.matchId = id;
     this.matchOffset = 0;
+    this.rawOffset = 0;
     this.matchVotes = VOTES_NEEDED;
-    this.replayIdx = 0;
+    this.lastMatchedAt = now;
+    this.syncBucket = 0;
+    this.syncOffsets = [];
+    this.lastSyncAt = 0;
+    this.syncFast = true;
+    this.cuePrevT = -1;
+    this.replayIdx = this.nextDropIndex(this.songs.get(id), pos);
+    // Segmentets gränsdetektorer hör nu en ny låt.
+    this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0;
+    this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
+    this.dipAt = 0;
   }
+
 
 
 
@@ -724,7 +783,8 @@ export class SongMemory {
     this.novAt = 0; this.novRef = null; this.novAcc.fill(0); this.novN = 0; this.novStart = 0; this.novAvg = 0; this.novHits = 0;
     this.levAvg = 0; this.dipAt = 0; this.recogSplit = -1;
     this.votes.clear(); this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
+    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.replayIdx = 0; this.pendingDrop = 0;
+    this.recentId = []; this.recentOff = [];
     this.fp.reset();
   }
 
@@ -779,7 +839,8 @@ export class SongMemory {
 
 
     this.votes.clear(); this.matchId = 0; this.matchVotes = 0; this.matchMargin = 0; this.rawOffset = 0; this.matchOffset = 0;
-    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
+    this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.replayIdx = 0; this.pendingDrop = 0;
+    this.recentId = []; this.recentOff = [];
     this.fp.reset();
     this.onCommit?.(committed);
   }
