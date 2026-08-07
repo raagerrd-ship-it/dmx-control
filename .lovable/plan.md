@@ -16,11 +16,19 @@ Ja — två knappar räcker, men bara om musiken spelas upp i webbläsaren på s
 
 Automatisk detektering fungerar när musiken spelas från sidans eget `<audio>`-element eller en inbäddad spelare som exponerar `navigator.mediaSession` — då fyrar sidan en gräns när `trackchange`- eller `positionstate`-händelsen visar nytt spår.
 
-Spelar du istället från Spotify, Apple Music eller en annan app på telefonen kan webbsidan inte läsa den uppspelningen (OS:et blockerar det av integritetsskäl). Då visas i stället en knapp `Nästa låt` som du trycker på vid varje spårbyte. Knapptrycket skickar samma exakta gränssignal till Pi:n.
+Spelar du istället från Spotify, Apple Music eller en annan app på telefonen kan webbsidan inte läsa den uppspelningen. Varken iOS eller Android tillåter att en webbsida eller app avlyssnar en annan apps ljud eller playback-state — det är låst av integritetsskäl. Det finns inget sätt att få reda på att Spotify byter låt utan att Spotify själva berättar det via ett API.
+
+Det enda officiella sättet är Spotify Web API, men det kräver:
+- Internetuppkoppling.
+- Att du loggar in och godkänner appen i Spotify.
+- Att uppspelningen sker via Spotify Connect eller ett konto som API:et kan se — inte lokalt på telefonen med hörlurar.
+- Dessutom har API:et fördröjning och tillåter inte kommersiell användning utan avtal.
+
+Därför är den praktiska lösningen för Spotify/Apple Music en manuell knapp `Nästa låt` i UI:t. Knapptrycket skickar samma exakta gränssignal till Pi:n. Det är fortfarande mycket bättre än heuristiken, eftersom du som lyssnare hör bytet och trycker inom en halv sekund.
 
 Medan läget är aktivt:
 - All heuristisk gränsdetektering är avstängd (inga klangskiften, ingen nivådipp, ingen 110-sekundersspärr).
-- Ingen igenkänningsdriven gräns — bara mobilens spårbyten.
+- Ingen igenkänningsdriven gräns — bara mobilens spårbyten eller knapptryck.
 - `MIN_SEG_MS` gäller inte; ett 40-sekunders spår kan läras in.
 - UI:t visar löpande segmentlängd och "sparat: N låtar" så du ser att gränserna går fram.
 
