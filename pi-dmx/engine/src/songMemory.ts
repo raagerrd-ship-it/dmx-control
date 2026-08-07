@@ -110,6 +110,12 @@ const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
 // för kända låtar, dvs varje repris skärper minnet.
 const RECOG_SPLIT_MIN_MS = MIN_SEG_MS;   // aldrig committa under minsta låtlängd — annars ger en smutsig blob en kaskad
 const RECOG_POS_MS = 20000;         // ...och matchen ligga inom låtens första 20 s
+// FÖRETRÄDE: igenkänningen är den SÄKRASTE gränsen (den vet vilken låt som börjat),
+// klangskiftet är en heuristik som dessutom ligger ~10 s för tidigt. Fyrar noveltyn
+// först får en bekräftad match inom det här fönstret REVIDERA nollpunkten till
+// låtens exakta position — ingen ny gräns sätts, bara tidslinjen rättas.
+const RECOG_REVISE_MS = 20000;
+
 
 
 
