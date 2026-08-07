@@ -471,13 +471,15 @@ export class SongMemory {
   private trackSync(off: number, winner: { votes: number; bucket: number }, other: number): void {
     this.matchVotes = winner.votes;
     this.matchMargin = winner.votes / Math.max(1, other);
+    const now = this.clock();
+    // Före fack-grinden: en drift gör att nya träffar hamnar UTANFÖR vinnarfacket,
+    // och just då behövs re-locken mest.
+    this.verifyLock(now);
     const bucket = Math.round(off / OFFSET_BUCKET);
     if (Math.abs(bucket - winner.bucket) > 1) return;
     if (Math.abs(this.syncBucket - winner.bucket) > 1) { this.syncBucket = winner.bucket; this.syncOffsets = []; }
     this.syncOffsets.push(off);
     if (this.syncOffsets.length > 31) this.syncOffsets.shift();
-    const now = this.clock();
-    this.verifyLock(now, winner.bucket);
     const needSamples = this.syncFast ? SYNC_SAMPLES_FAST : SYNC_SAMPLES;
     if (this.syncOffsets.length < needSamples || (!this.syncFast && now - this.lastSyncAt < SYNC_INTERVAL_MS)) return;
     const wasFast = this.syncFast;
@@ -499,18 +501,17 @@ export class SongMemory {
   }
 
   /** PERIODISK RE-LOCK. Var RELOCK_INTERVAL_MS jämförs det aktiva offsetet med
-   *  medianen av de senaste råträffarna (oberoende estimat). Driver låset iväg
-   *  mer än RELOCK_ERROR_MS snappas det tillbaka direkt i stället för att nudgas
-   *  hem under tiotals sekunder. */
-  private verifyLock(now: number, bucket: number): void {
+   *  medianen av de senaste råträffarna för matchen (oberoende estimat, utan
+   *  beroende av vinnarfacket som hänger efter vid drift). Är driften större än
+   *  RELOCK_ERROR_MS snappas låset tillbaka direkt i stället för att nudgas hem
+   *  under tiotals sekunder — annars sitter droparna fel hela tiden. */
+  private verifyLock(now: number): void {
     if (!this.lastRelockAt) { this.lastRelockAt = now; return; }
     if (now - this.lastRelockAt < RELOCK_INTERVAL_MS) return;
     this.lastRelockAt = now;
     const c: number[] = [];
-    for (let i = 0; i < this.recentId.length; i++) {
-      if (this.recentId[i] !== this.matchId) continue;
-      if (Math.abs(Math.round(this.recentOff[i] / OFFSET_BUCKET) - bucket) > 1) continue;
-      c.push(this.recentOff[i]);
+    for (let i = this.recentId.length - 1; i >= 0 && c.length < 48; i--) {
+      if (this.recentId[i] === this.matchId) c.push(this.recentOff[i]);
     }
     if (c.length < RELOCK_MIN_HITS) return;
     const est = median(c);
@@ -519,12 +520,14 @@ export class SongMemory {
     this.matchOffset = est;
     this.rawOffset = est;
     this.syncOffsets = [];
-    this.syncBucket = bucket;
+    this.syncBucket = Math.round(est / OFFSET_BUCKET);
+    this.recentId = []; this.recentOff = [];
     this.replayIdx = this.nextDropIndex(this.songs.get(this.matchId), now - this.playStart + this.matchOffset);
     this.cuePrevT = -1;
     this.relocks++;
     console.log(`[song] re-lock: drift ${(this.driftMs / 1000).toFixed(2)}s korrigerad`);
   }
+
 
 
   private nextDropIndex(song: Song | undefined, positionMs: number): number {
