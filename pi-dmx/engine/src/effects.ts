@@ -435,14 +435,10 @@ export class EffectEngine {
         // alltså avstängt halva tiden och nästan avstängt resten. Låten hade en fullt
         // hörbar takt; konfidensen är låg för att tempot är svårMÄTT, inte för att
         // takten saknas. Ny ramp: noll under 0.18, full över 0.55.
-        // MINNETS TAKT HAR FULL TILLIT — ocksa har.
-        // index.ts satter `cfg.beat.confidence = 1` nar takten kommer ur minnet,
-        // med motiveringen att den ar tvattad pa HELA laten. Men pulsens DJUP
-        // laste fortfarande realtidens tempogissning, sa hjartslaget tunnades ut
-        // sa fort live-analysen blev osaker — pa en lat vi har mätt fardigt.
-        // Det ar tvartemot poangen med att ha laten i minnet.
-        const conf = Math.max(frame.bpmConfidence, this.cfg.beat?.confidence ?? 0);
-        const trustRaw = Math.max(0, Math.min(1, (conf - 0.18) / 0.37));
+        // `frame.bpmConfidence` ar redan 1 nar takten kommer ur latminnet —
+        // index.ts satter den vid kallan, sa alla konsumenter ser samma sanning
+        // och ingen behover vaga in realtidens osakerhet pa en tvattad lat.
+        const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - 0.18) / 0.37));
         this.beatTrust += (trustRaw - this.beatTrust) * 0.03;
         // PULSEN SKA FÖLJA MUSIKENS ENERGI, INTE BARA TAKTENS TYDLIGHET.
         // MÄTT 2026-08-07: i ett LUGNT parti pulsade riggen 70→100 % på varje taktslag

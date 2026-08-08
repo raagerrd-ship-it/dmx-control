@@ -289,6 +289,13 @@ capture.on("chunk", (samples: Float32Array) => {
       const lb = songs.lockedBeat();
       if (lb && lb.bpm > 40) { cfg.beat = { anchorMs: lb.anchorMs, bpm: lb.bpm, confidence: 1 }; clockDetBpm = lb.bpm; memoryBeatLocked = true; }   // ur minnet: tvättad på HELA låten → full tillit
     }
+    // EN INSPELNING ÖVERTRUMFAR REALTIDENS GISSNING — VID KÄLLAN.
+    // Tempot är tvättat på hela låten och verifierat mot strukturmodellen. Att
+    // låta varje konsument väga in realtidens osäkerhet vore att låtsas att vi
+    // vet mindre än vi gör: hjärtslagets djup tunnades ut, `beatOk` föll, och
+    // drop-vägen bytte från takt till kick — allt på en låt vi mätt färdigt.
+    // Sätts här i stället för på fem ställen nedströms.
+    if (memoryBeatLocked) frame.bpmConfidence = 1;
   } else {
     memoryBeatLocked = false;
     effects.memCeiling = null;
