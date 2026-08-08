@@ -90,12 +90,32 @@ export class RefineQueue {
    *  for ett segment, sa skyddet var inte tillrackligt. Nu kaas de i stallet. */
   private waiting: { wav: string; songId: number }[] = [];
 
+  /**
+   * PAUSAD UNDER INSPELNING. Tvatten ar ~70 s CPU per lat och delar karna 0 med
+   * arecord. Under en session ar INSPELNINGEN det som maste lyckas — en tappad
+   * ljudchunk gar inte att ta igen, medan en tvatt kan vanta hur lange som helst.
+   * Darfor kaas allt medan agaren spelar in, och betas av nar Stoppa trycks.
+   *   Ingen matning visar an att tvatten faktiskt stor arecord (noll tvattar pa
+   *   fjorton dagar), sa detta ar forsiktighet, inte en lagning. Men det kostar
+   *   ingenting: arbetet blir gjort anda, bara nagra minuter senare.
+   */
+  private paused = false;
+  setPaused(p: boolean): void {
+    const was = this.paused;
+    this.paused = p;
+    if (was && !p) {
+      if (this.waiting.length) console.log(`[refine] sessionen slut — betar av ${this.waiting.length} låt(ar)`);
+      if (!this.proc) this.next();
+    }
+  }
+
   /** Låten är committad och WAV:en stängd → tvätta nu (tystnad = ingen last). */
   start(wav: string, songId: number): void {
-    if (this.proc) {
+    if (this.proc || this.paused) {
       // Taket ar generost men inte oandligt: varje vantande lat ligger som WAV
       // pa kortet, och kortet ar inte gratis.
-      if (this.waiting.length >= 8) { console.log(`[refine] kön full — hoppar över låt #${songId}`); rm(wav); return; }
+      // Taket racker for en lang session: 30 latar a ~23 MB = ~690 MB, mot 3,8 GB fritt.
+      if (this.waiting.length >= 30) { console.log(`[refine] kön full — hoppar över låt #${songId}`); rm(wav); return; }
       this.waiting.push({ wav, songId });
       console.log(`[refine] låt #${songId} köad (${this.waiting.length} väntar)`);
       return;
@@ -107,6 +127,7 @@ export class RefineQueue {
 
   /** Ta nasta ur kon nar en tvatt ar klar. */
   private next(): void {
+    if (this.paused) return;          // sessionen pagar — vanta
     const n = this.waiting.shift();
     if (!n) return;
     this.tries = 0;

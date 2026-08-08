@@ -503,9 +503,12 @@ const serverDeps = {
   songMemory: {
       state: () => ({ ...songs.state(), refining: refiner.busy, refiningId: refiner.songId }),
       forget: () => songs.forget(),
-      manualStart: () => songs.manualStart(),
+      // INSPELNINGEN HAR FORETRADE. Tvatten (~70 s CPU per lat, karna 0 delad med
+      // arecord) pausas under hela sessionen och betas av nar Stoppa trycks. En
+      // tappad ljudchunk gar inte att ta igen; en tvatt kan vanta.
+      manualStart: () => { refiner.setPaused(true); songs.manualStart(); },
       manualNext: () => songs.manualNext(),
-      manualStop: () => songs.manualStop(),
+      manualStop: () => { songs.manualStop(); refiner.setPaused(false); },
       list: () => songs.list(),
       setNote: (id: number, note: string) => songs.setNote(id, note),
       forgetSong: (id: number) => songs.forgetSong(id),
