@@ -1368,8 +1368,37 @@ export class SongMemory {
    *  lat som spelas — id:t ar nyckeln, och tidslinjen ligger redan i den har
    *  klassen. Saknas strukturen kor allt precis som forut. */
   private structures = new Map<number, { parts: { t: number; label: string }[] }>();
-  setStructure(songId: number, st: { parts: { t: number; label: string }[] } | undefined): void {
+  setStructure(songId: number, st: { parts: { t: number; label: string }[]; bpm?: number } | undefined): void {
     if (st && st.parts?.length) this.structures.set(songId, st); else this.structures.delete(songId);
+
+    // TEMPO-KORSNING MOT MODELLEN.
+    // Tvatten raknar tempo med autokorrelation, och den halverar ibland: en
+    // fyra-pa-golvet-lat kan lika garna beskrivas som halva tempot med dubbelt
+    // sa langa slag, och autokorrelationen har ingen anledning att foredra det
+    // ena. Strukturmodellen har hort HELA laten med en tranad tempodetektor.
+    //   MATT 2026-08-08 pa agarens fyra latar:
+    //     #1 tvatt 128.4 / modell 128     #3 tvatt  85.9 / modell 171   <-- halva
+    //     #2 tvatt 126.0 / modell 125     #4 tvatt 137.8 / modell 140
+    //   En av fyra. `lockedBeat()` matar det lagrade tempot till taktklockan med
+    //   FULL tillit, sa pa just den laten pulsade hjartslaget i halvfart.
+    // Bara OKTAVFEL rattas (faktor ~2 eller ~0.5). Sma skillnader lamnas — dar
+    // ar tvatten mer exakt, den mater pa just den har inspelningen.
+    // ANKARET ROrs INTE: vid en oktavdubbling ar det lagrade slaget fortfarande
+    // ett verkligt slag, det tillkommer bara slag mellan dem. Fasen star kvar.
+    const song = this.songs.get(songId);
+    const mb = song?.meta.bpm ?? 0;
+    const sb = st?.bpm ?? 0;
+    if (song && mb > 40 && sb > 40) {
+      const r = sb / mb;
+      const half = r > 1.8 && r < 2.2;      // lagrat var HALVA det sanna
+      const dbl = r > 0.45 && r < 0.56;     // lagrat var DUBBLA det sanna
+      if (half || dbl) {
+        console.log(`[song] låt #${songId}: tempo ${mb.toFixed(1)} → ${sb.toFixed(1)} BPM (oktavfel, modellen gäller)`);
+        song.meta.bpm = sb;
+        this.dirty = true;
+        void this.save();
+      }
+    }
   }
   private ceilNow = 0;            // utjämnat ljustak (följer bågen, inte taktslagen)
   private ceilAt = 0;             // väggklocka för utjämningen
