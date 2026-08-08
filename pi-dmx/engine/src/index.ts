@@ -117,7 +117,12 @@ const structure = new StructureQueue(
 // bortkastad efter varje omstart.
 for (const [id, st] of Object.entries(structure.all())) songs.setStructure(Number(id), st);
 // Tvatten lamnar over ljudet i stallet for att radera det.
-refiner.onRefined = (wav, songId) => structure.enqueue(wav, songId);
+refiner.onRefined = (wav, songId) => {
+  // Skicka med latens KANDA langd (efter tvattens trimning) sa strukturanalysen
+  // beskriver exakt det ljud minnets tidslinje ar byggd pa.
+  const meta = songs.list().find((r) => r.id === songId);
+  structure.enqueue(wav, songId, meta?.durationMs);
+};
 songs.onDropLearning = () => recorder.abort();
 songs.onCommit = (songId, fresh) => {
   if (!songId) { recorder.abort(); return; }   // inget lärdes in → kasta ljudet

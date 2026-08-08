@@ -136,8 +136,23 @@ export class StructureQueue {
     return out.sort((a, b) => a - b);
   }
 
-  /** Refinern anropar detta i stället för att radera WAV:en. */
-  enqueue(wav: string, songId: number): void {
+  /**
+   * Refinern anropar detta i stället för att radera WAV:en.
+   *
+   * @param durationMs latens langd ENLIGT MINNET, efter tvattens trimning.
+   *
+   * TIDSBASEN MASTE VARA GEMENSAM. Tvatten skriver ett `trimAt` som kortar
+   * minnets tidslinje (den hittade en latgrans inne i segmentet, eller tystnad i
+   * slutet), men WAV:en pa disk ar OTRIMMAD. Skickas den rakt upp beskriver
+   * strukturen ett langre ljud an tidslinjen, och sektionstiderna pekar fel ju
+   * langre in i laten man kommer. Darfor klipps ljudet till minnets langd HAR,
+   * innan det lamnar Pi:n — samma ljud, samma nollpunkt.
+   *   Att lata modellen hitta gransen sjalv racker inte: MATT 2026-08-08 satte
+   *   den en sektionsgrans vid 212 s dar facit sager 208 s. Fyra sekunder fel,
+   *   och den sager "ny sektion", inte "ny lat". Bra nog for att bekrafta en
+   *   grans, for grovt for att klippa efter.
+   */
+  enqueue(wav: string, songId: number, durationMs?: number): void {
     if (this.store[String(songId)]) { rm(wav); return; }        // redan analyserad
     const pend = this.pendingIds();
     if (pend.length >= MAX_PENDING) {
@@ -149,7 +164,7 @@ export class StructureQueue {
       // Nedsamplas till 16 kHz mono: strukturanalys behöver inte mer, och det tar
       // uppladdningen från ~23 MB till ~7,7 MB. Ingen ffmpeg finns på Pi:n.
       const small = join(this.dir, `${songId}.pending.wav`);
-      downsampleWav(wav, small, TARGET_RATE);
+      downsampleWav(wav, small, TARGET_RATE, durationMs);
       rm(wav);
       console.log(`[struktur] låt #${songId} köad för analys (${pend.length + 1} i kö)`);
     } catch (e) {
@@ -296,7 +311,7 @@ function rm(p: string): void { try { unlinkSync(p); } catch { /* fanns inte */ }
  * Enkelt lågpass, men fullt tillräckligt: strukturanalysen tittar på sektioner
  * på tiotals sekunder, inte på diskantdetaljer.
  */
-export function downsampleWav(src: string, dst: string, targetRate: number): void {
+export function downsampleWav(src: string, dst: string, targetRate: number, maxMs?: number): void {
   const b = readFileSync(src);
   let p = 12, ch = 1, rate = 0, dOff = 0, dLen = 0;
   while (p + 8 <= b.length) {
@@ -307,7 +322,9 @@ export function downsampleWav(src: string, dst: string, targetRate: number): voi
   }
   if (!rate || !dLen) throw new Error("trasig WAV");
   const i16 = new Int16Array(b.buffer, b.byteOffset + dOff, dLen >> 1);
-  const frames = Math.floor(i16.length / ch);
+  let frames = Math.floor(i16.length / ch);
+  // Klipp till minnets langd sa uppladdningen och tidslinjen delar nollpunkt OCH slut.
+  if (maxMs && maxMs > 1000) frames = Math.min(frames, Math.floor((maxMs / 1000) * rate));
   const step = Math.max(1, Math.round(rate / targetRate));
   const outRate = Math.round(rate / step);
   const outN = Math.floor(frames / step);
