@@ -435,7 +435,14 @@ export class EffectEngine {
         // alltså avstängt halva tiden och nästan avstängt resten. Låten hade en fullt
         // hörbar takt; konfidensen är låg för att tempot är svårMÄTT, inte för att
         // takten saknas. Ny ramp: noll under 0.18, full över 0.55.
-        const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - 0.18) / 0.37));
+        // MINNETS TAKT HAR FULL TILLIT — ocksa har.
+        // index.ts satter `cfg.beat.confidence = 1` nar takten kommer ur minnet,
+        // med motiveringen att den ar tvattad pa HELA laten. Men pulsens DJUP
+        // laste fortfarande realtidens tempogissning, sa hjartslaget tunnades ut
+        // sa fort live-analysen blev osaker — pa en lat vi har mätt fardigt.
+        // Det ar tvartemot poangen med att ha laten i minnet.
+        const conf = Math.max(frame.bpmConfidence, this.cfg.beat?.confidence ?? 0);
+        const trustRaw = Math.max(0, Math.min(1, (conf - 0.18) / 0.37));
         this.beatTrust += (trustRaw - this.beatTrust) * 0.03;
         // PULSEN SKA FÖLJA MUSIKENS ENERGI, INTE BARA TAKTENS TYDLIGHET.
         // MÄTT 2026-08-07: i ett LUGNT parti pulsade riggen 70→100 % på varje taktslag
@@ -1106,7 +1113,8 @@ export class EffectEngine {
         ? (this.lowLogAt = Date.now(), console.log(
             `[lagniva] niva ${frame.level.toFixed(3)} vu ${this.vu.toFixed(2)} tak ${ceilMul.toFixed(2)}` +
             ` puls ${this.beatMulNow.toFixed(2)} drive ${this.silenceGate.toFixed(2)} md ${md.toFixed(2)}` +
-            ` intensitet ${frame.intensity.toFixed(2)} effekt ${this.smartMode}`), {})
+            ` intensitet ${frame.intensity.toFixed(2)} konf ${frame.bpmConfidence.toFixed(2)}` +
+            ` tillit ${this.beatTrust.toFixed(2)} effekt ${this.smartMode}`), {})
         : {}),
       pulseActive: !!this.cfg.beatPulse && this.silenceGate > 0.5,
       blackout: blackout || this.inputOff,
