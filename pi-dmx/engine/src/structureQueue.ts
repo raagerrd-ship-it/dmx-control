@@ -53,6 +53,15 @@ const RETRY_BASE_MS = 60000;         // backoff efter misslyckande
 const RETRY_MAX_MS = 3600000;
 const TARGET_RATE = 16000;           // nedsampling före uppladdning
 const MODEL = "sakemin/all-in-one-music-structure-analyzer";
+/**
+ * VERSIONS-ID KRAVS. Community-modeller kan INTE koras via
+ * /v1/models/{agare}/{namn}/predictions — den formen ar bara for officiella
+ * modeller och svarar 404 (uppmatt 2026-08-08). Publika modeller startas i
+ * stallet via /v1/predictions med ett explicit version-hash.
+ * Uppdateras modellen maste hashen bytas har; da svarar API:et 404 igen och
+ * felet syns i UI:ets statusrad.
+ */
+const VERSION = "001b4137be6ac67bdc28cb5cffacf128b874f530258d033de23121e785cb7290";
 
 export class StructureQueue {
   private store: Record<string, SongStructure> = {};
@@ -213,10 +222,12 @@ async function uploadFile(path: string, token: string): Promise<string> {
 }
 
 async function predict(fileUrl: string, token: string): Promise<any> {
-  const res = await fetch(`https://api.replicate.com/v1/models/${MODEL}/predictions`, {
+  const res = await fetch("https://api.replicate.com/v1/predictions", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ input: { music_input: fileUrl } }),
+    // visualize/sonify AV med flit: de producerar bilder och ljudfiler vi inte
+    // anvander, och varje extra utdata kostar tid och bandbredd.
+    body: JSON.stringify({ version: VERSION, input: { music_input: fileUrl, visualize: false, sonify: false } }),
   });
   if (!res.ok) throw new Error(`start ${res.status}: ${(await res.text()).slice(0, 200)}`);
   let pred: any = await res.json();
@@ -232,7 +243,16 @@ async function predict(fileUrl: string, token: string): Promise<any> {
     pred = await p.json();
   }
   if (pred.status !== "succeeded") throw new Error(`körning ${pred.status}: ${String(pred.error).slice(0, 200)}`);
-  return pred.output;
+  // UTDATA AR EN ARRAY AV FIL-URL:er, inte ett JSON-objekt (schemat sager
+  // {type: array, items: {type: string, format: uri}} — uppmatt 2026-08-08).
+  // Analysen ligger alltsa i en fil som maste hamtas separat.
+  const urls: string[] = (Array.isArray(pred.output) ? pred.output : [pred.output]).filter((x: any) => typeof x === "string");
+  const jsonUrl = urls.find((u) => u.toLowerCase().endsWith(".json")) ?? urls[0];
+  if (!jsonUrl) throw new Error("körningen gav inga filer");
+  const f = await fetch(jsonUrl);
+  if (!f.ok) throw new Error(`hämtning av resultatet ${f.status}`);
+  const txt = await f.text();
+  try { return JSON.parse(txt); } catch { throw new Error(`resultatet var inte JSON: ${txt.slice(0, 120)}`); }
 }
 
 /**
