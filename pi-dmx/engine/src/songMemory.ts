@@ -790,7 +790,15 @@ export class SongMemory {
     const error = raw - this.matchOffset;
     // Första korrigeringen efter ett lås SNAPPAR (låset ska sitta direkt);
     // därefter nudgas bara, så ett korrekt lås aldrig vandrar.
-    if (wasFast || Math.abs(error) >= SEEK_ERROR_MS) {
+    //   MEN VILLKORET SNAPPADE FÖR ALLTID. `Math.abs(error) >= SEEK_ERROR_MS`
+    //   tog ingen hänsyn till att synken redan låst, sa den hoppade om och om.
+    //   MATT 2026-08-08: "SYNK LÅST för låt #2 vid 6.4s (fel 0 ms)" och EN sekund
+    //   senare "synk hoppade 3.72s till ny position" — ett perfekt las kastades
+    //   bort direkt. Det ar den vagen agarens "ljuset ligger ett par sekunder
+    //   fore ljudet" kom ifran; sjalva tidslinjen var matt korrekt (minnesdrops
+    //   lag pa exakt -0,12 s = PRE_FIRE_MS hela laten igenom).
+    //   verifyLock fick samma sparr tidigare — den har vagen missades da.
+    if (wasFast || (!this.syncLocked && Math.abs(error) >= SEEK_ERROR_MS)) {
       this.matchOffset = raw;
       this.replayIdx = this.nextDropIndex(this.songs.get(this.matchId), now - this.playStart + this.matchOffset);
       this.cuePrevT = -1;

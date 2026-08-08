@@ -164,6 +164,7 @@ export class EffectEngine {
   private inputLowSince = 0;     // väggklocka: sedan när nivån legat under gränsen
   private inputOff = false;      // ingången bedöms avstängd → riggen mörk
   private silenceGate = 1;
+  private lowLogAt = 0;
   /** LEVER MEN HÖR INGENTING. Utan den här signalen ser "aux-kabeln sitter inte
    *  i" exakt likadant ut som "strömmen är av" och "säkringen gick": svart. Den
    *  som slår på lådan 22:00 står ensam bakom disken utan laptop — riggen är den
@@ -642,7 +643,16 @@ export class EffectEngine {
         const memSection = now - this.memSectionAt < 300;
         const memPhrase = now - this.memPhraseAt < 250;
         const gridOk = !this.memHasGrid || memSection || memPhrase || now > this.smartDwellUntil + 20000;
-        const wantSwitch = tierChanged || memSection || now > this.smartDwellUntil;
+        // MED STRUKTUR AR SEKTIONEN ENHETEN. Dwell-timern och tier-bytet ar till
+        // for OKANDA latar, dar showen inte har nagot battre att ga pa. Har vi en
+        // analyserad struktur ska looken sitta HELA sektionen ut — annars byter
+        // den mitt i refrangen, vilket ar precis vad man vill undvika.
+        //   MATT 2026-08-08 i en och samma refrang: "ny look chase (tier fart)"
+        //   foljt 11 s senare av "ny look ripple (tier full)" — tre looker i en
+        //   refrang, driven av att tiern flaxade mellan fart och full.
+        const wantSwitch = this.memPart
+          ? memSection
+          : (tierChanged || memSection || now > this.smartDwellUntil);
 
         // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
         // det, inte bara på energinivån. Två regler, båda dramaturgiska:
@@ -691,8 +701,14 @@ export class EffectEngine {
         // i poolen (energin har flyttat sig) väljs en ny, och den blir sektionens
         // nya look. `wantCalm` går före: ett breakdown ska vara lugnt även om
         // etiketten säger refräng.
+        // ATERSEENDET VAGER TYNGRE AN TIERN. Forr kravdes att den ihagkomna
+        // looken lag i NUVARANDE tier-pool — men tiern ror sig med energin, sa
+        // samma refrang hamnade i "fart" ena gangen och "full" nasta, och looken
+        // kastades bort. MATT: "chorus: aterser stege" tva ganger, sedan tre nya
+        // looker i rad sa fort tiern gick till full. Kravet ar nu bara att
+        // effekten alls ar pasagen av agaren.
         const remembered = !wantCalm && part ? this.partLook.get(part) : undefined;
-        if (remembered && pool.includes(remembered)) {
+        if (remembered && this.cfg.rotation?.[remembered] !== false) {
           this.smartMode = remembered;
           console.log(`[dirigent] ${part}: återser "${remembered}"`);
         } else {
@@ -1035,6 +1051,15 @@ export class EffectEngine {
       ceilMul,
       pulseMul: Math.max(this.beatMulNow, this.dropEnv),
       ceilingActive: (this.cfg.energyCeiling || this.memCeiling !== null) && this.silenceGate > 0.5,
+      // MATNING (grindar inget): nar nivan ar LAG, vad ar det som anda haller
+      // ljuset uppe? Varje steg i kedjan loggas sa orsaken kan pekas ut i stallet
+      // for gissas. Strypt till var 1,5 s.
+      ...(frame.level < 0.35 && Date.now() - this.lowLogAt > 1500
+        ? (this.lowLogAt = Date.now(), console.log(
+            `[lagniva] niva ${frame.level.toFixed(3)} vu ${this.vu.toFixed(2)} tak ${ceilMul.toFixed(2)}` +
+            ` puls ${this.beatMulNow.toFixed(2)} drive ${this.silenceGate.toFixed(2)} md ${md.toFixed(2)}` +
+            ` intensitet ${frame.intensity.toFixed(2)} effekt ${this.smartMode}`), {})
+        : {}),
       pulseActive: !!this.cfg.beatPulse && this.silenceGate > 0.5,
       blackout: blackout || this.inputOff,
       master: this.cfg.master ?? 1,
