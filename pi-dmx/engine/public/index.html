@@ -913,20 +913,33 @@ function structCell(x) {
   return '<span style="opacity:.35">—</span>';
 }
 
+// Faltena ar TOMMA MED FLIT: hemligheter ekas aldrig tillbaka och rutan toms
+// efter sandning, sa en nyckel inte blir liggande lasbar i en oppen flik. Men en
+// tom ruta ser ut som en osparad ruta — darav den tydliga markeringen har.
+function markSaved(el, saved, name) {
+  if (!el) return;
+  el.placeholder = saved ? "✓ " + name + " sparad — skriv ny för att byta" : name;
+  el.style.borderColor = saved ? "rgba(255,62,165,.55)" : "rgba(255,255,255,.12)";
+}
+
 function renderStructStatus(st) {
   const el = document.getElementById("structHint");
   if (!el || !st) return;
-  const tok = document.getElementById("structToken");
-  if (tok && st.hasToken && !tok.placeholder.startsWith("Nyckel")) tok.placeholder = "Nyckel sparad — skriv ny för att byta";
-  var t = st.hasToken ? "" : "Ingen nyckel — kön står still. ";
+  markSaved(document.getElementById("structToken"), st.hasToken, "Replicate-nyckel");
+  var t = st.hasToken
+    ? "✓ Klar att analysera. "
+    : "⚠ Ingen nyckel — kön står still. ";
   t += (st.analysed || 0) + " analyserade, " + (st.pending || 0) + " i kö";
   if (st.busy) t += " · analyserar just nu";
   if (st.error) t += " · senaste fel: " + st.error;
   el.textContent = t;
+
+  markSaved(document.getElementById("acrKey"), st.hasAcr, "Access Key");
+  markSaved(document.getElementById("acrSecret"), st.hasAcr, "Secret Key");
   const a = document.getElementById("acrHint");
   if (a) a.textContent = st.hasAcr
-    ? "Uppgifter sparade — nya låtar namnges automatiskt."
-    : "Inga uppgifter — låtar får namnges för hand.";
+    ? "✓ Klar — nya låtar namnges automatiskt."
+    : "⚠ Inga uppgifter — låtar får namnges för hand.";
 }
 
 function renderSongList(rows) {
