@@ -139,6 +139,17 @@ export class EffectEngine {
    *  ingen analys. Sätts av index.ts. ANVANDS INTE AN av effektvalet — den ska
    *  in dar medvetet och matbart, inte som en sidoeffekt av att faltet dok upp. */
   memPart: string | null = null;
+  /** Vilken låt strukturen kommer från — look-minnet nollas när den byts. */
+  memSongId = 0;
+  /**
+   * LOOK PER SEKTIONSTYP. Riktiga ljustekniker upprepar medvetet: refrängen ska
+   * kännas som ett ÅTERSEENDE, inte som en ny slump varje gång. Utan det här
+   * väljer dirigenten om från passform-tabellen vid varje sektionsgräns, och
+   * refräng fem ser ut som ingenting av refräng ett.
+   * Bara för den här låten — nollas vid låtbyte.
+   */
+  private partLook = new Map<string, Mode>();
+  private partLookSong = 0;
 
   /** Misstänkt låtbyte → låt auto-rangen kalibrera om snabbt mot nya nivåer. */
   softenRange(): void { this.range.soften(); }
@@ -645,11 +656,26 @@ export class EffectEngine {
         //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
         //    så utan detta fortsätter riggen köra fullfart genom en svacka.
         const wantCalm = frame.breaking && this.cfg.energyDrivesMode;
+        // 3) SEKTIONENS NAMN VET MER AN ENERGIN. Energitiern läser vad som HÄNT
+        //    (en trög EMA över intensiteten); etiketten säger vad låten GÖR just
+        //    nu, hämtat ur en analys av hela låten. Där de säger emot varandra
+        //    väger namnet tyngre — men bara som golv och tak, aldrig som ersättare:
+        //    en lugn refräng ska fortfarande vara lugnare än en intensiv.
+        //      chorus  → aldrig den lugna poolen (refrängen är låtens tyngdpunkt)
+        //      verse   → aldrig full fart (kontrast kräver att något är mindre)
+        //      intro/outro/end → lugnt, oavsett vad energin råkar säga
+        const part = this.memPart;
+        let tierS = tier;
+        if (part === "chorus" || part === "drop") { if (tierS === LUGN) tierS = FART; }
+        else if (part === "verse") { if (tierS === FULLFART) tierS = FART; }
+        else if (part === "intro" || part === "outro" || part === "end") tierS = LUGN;
+        // Ny låt → glöm förra låtens looker.
+        if (this.memSongId !== this.partLookSong) { this.partLook.clear(); this.partLookSong = this.memSongId; }
         if (!inBuild && (dropSwitch || (wantSwitch && held > MIN_HOLD && gridOk))) {
         this.lastSmartSwitchMs = now;
         this.lastSmartTier = tierName;
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
-        let pool = enabled(wantCalm ? LUGN : tier);
+        let pool = enabled(wantCalm ? LUGN : tierS);
         if (pool.length === 0) pool = enabled([...FART, ...LUGN, ...FULLFART]);      // valfri aktiv
         if (pool.length === 0) pool = ["breathe"];                                   // sista fallback
         this.smartCount++;
@@ -659,12 +685,28 @@ export class EffectEngine {
         // Vi tar inte alltid #1 utan varierar bland de tre bäst passande (gyllene
         // snittet) → matchar musiken men blir aldrig förutsägbar. Nuvarande effekt
         // utesluts så det alltid blir ett verkligt byte.
-        const ranked = pool
-          .map((m) => ({ m, s: fitScore(m, frame.profile) }))
-          .sort((a, b) => b.s - a.s);
-        const cands = ranked.filter((x) => x.m !== this.smartMode);
-        const top = (cands.length ? cands : ranked).slice(0, 3);
-        this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
+        // ÅTERSEENDE FÖRE NYHET. Har den här sektionstypen redan haft en look i
+        // den här låten, ta tillbaka den — det är hela poängen med att veta att
+        // det ÄR en refräng och inte bara "en ny sektion". Passar den inte längre
+        // i poolen (energin har flyttat sig) väljs en ny, och den blir sektionens
+        // nya look. `wantCalm` går före: ett breakdown ska vara lugnt även om
+        // etiketten säger refräng.
+        const remembered = !wantCalm && part ? this.partLook.get(part) : undefined;
+        if (remembered && pool.includes(remembered)) {
+          this.smartMode = remembered;
+          console.log(`[dirigent] ${part}: återser "${remembered}"`);
+        } else {
+          const ranked = pool
+            .map((m) => ({ m, s: fitScore(m, frame.profile) }))
+            .sort((a, b) => b.s - a.s);
+          const cands = ranked.filter((x) => x.m !== this.smartMode);
+          const top = (cands.length ? cands : ranked).slice(0, 3);
+          this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
+          if (part && !wantCalm) {
+            this.partLook.set(part, this.smartMode);
+            console.log(`[dirigent] ${part}: ny look "${this.smartMode}" (tier ${tierS === LUGN ? "lugn" : tierS === FART ? "fart" : "full"})`);
+          }
+        }
       }
       effMode = this.smartMode;
     }

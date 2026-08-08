@@ -1339,7 +1339,7 @@ export class SongMemory {
    *   section = true den hop en sektionsgräns passeras
    *   phrase  = true den hop en 16-taktersfras börjar
    *   hasGrid = låten har sektioner/frasgrid → dirigenten får vänta in dem */
-  private cues = { build: null as number | null, ceiling: null as number | null, section: false, phrase: false, hasGrid: false, hasRisers: false, part: null as string | null };
+  private cues = { build: null as number | null, ceiling: null as number | null, section: false, phrase: false, hasGrid: false, hasRisers: false, part: null as string | null, songId: 0 };
   /** ANALYSERAD STRUKTUR per lat-id (intro/verse/chorus/bridge/outro + nedslag).
    *  Kommer fran strukturkon, som skickar ljudet pa analys EN gang och sparar
    *  svaret for alltid. Den bor HAR for att igenkanningen ar det som vet VILKEN
@@ -1352,9 +1352,9 @@ export class SongMemory {
   private ceilNow = 0;            // utjämnat ljustak (följer bågen, inte taktslagen)
   private ceilAt = 0;             // väggklocka för utjämningen
   private cuePrevT = -1;
-  replayCues(): { build: number | null; ceiling: number | null; section: boolean; phrase: boolean; hasGrid: boolean; hasRisers: boolean; part: string | null } {
+  replayCues(): { build: number | null; ceiling: number | null; section: boolean; phrase: boolean; hasGrid: boolean; hasRisers: boolean; part: string | null; songId: number } {
     const c = this.cues;
-    c.build = null; c.ceiling = null; c.section = false; c.phrase = false; c.hasGrid = false; c.hasRisers = false; c.part = null;
+    c.build = null; c.ceiling = null; c.section = false; c.phrase = false; c.hasGrid = false; c.hasRisers = false; c.part = null; c.songId = 0;
     const s = this.matchId ? this.songs.get(this.matchId) : undefined;
     if (!s) { this.cuePrevT = -1; return c; }
     const t = this.clock() - this.playStart + this.matchOffset + REPLAY_LEAD_MS;
@@ -1374,6 +1374,7 @@ export class SongMemory {
     // tidpunkter dar KARAKTAREN skiftade; `parts` ar namngivna sektioner ur en
     // tranad modell. Bada far satta `section` (dirigenten byter look dar), men
     // bara den senare kan saga VAD som borjar.
+    c.songId = m.id;
     const struct = this.structures.get(m.id);
     if (struct) {
       c.hasGrid = true;

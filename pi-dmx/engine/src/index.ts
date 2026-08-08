@@ -262,6 +262,7 @@ capture.on("chunk", (samples: Float32Array) => {
     effects.memHasGrid = cues.hasGrid;
     if (cues.section) effects.memSectionAt = performance.now();
     effects.memPart = cues.part;
+    effects.memSongId = cues.songId;
     if (cues.phrase) effects.memPhraseAt = performance.now();
     if (cues.build !== null) {
       // Proportionell mot RESTEN av risern → 100 % exakt på dropen, i stället för
@@ -283,6 +284,7 @@ capture.on("chunk", (samples: Float32Array) => {
     effects.memCeiling = null;
     effects.memHasGrid = false;
     effects.memPart = null;
+    effects.memSongId = 0;
     if (liveDrop) outDrop++;                      // realtidsdetektorn som förut
   }
 
