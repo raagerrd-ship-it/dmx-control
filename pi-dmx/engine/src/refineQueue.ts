@@ -47,7 +47,13 @@ export class RefineQueue {
   get songId(): number { return this.proc ? this.id : 0; }
 
   /** Avstängning: döda en pågående tvätt. Temp-WAV:en städas vid nästa start. */
-  stop(): void { this.proc?.kill("SIGTERM"); this.proc = null; }
+  stop(): void {
+    this.proc?.kill("SIGTERM");
+    this.proc = null;
+    // Vantande ljud lamnas KVAR pa disk: cleanStale() aterupptar dem vid nasta
+    // start. Att radera dem hade tappat latar vid en deploy mitt i en session.
+    this.waiting = [];
+  }
 
   /** ÅTERUPPTA EN AVBRUTEN TVÄTT.
    *  En tvätt tar ~70 s på en Zero 2 W. Avbryts motorn under tiden (deploy, strömavbrott,
@@ -56,29 +62,56 @@ export class RefineQueue {
    *  därmed stod kvar med 0 drops. En <songId>.wav utan färdig .refined.json är en
    *  oavslutad tvätt, inte skräp: kör den igen. Övriga rester städas som förut. */
   cleanStale(): void {
-    let resume: { wav: string; id: number } | null = null;
+    // ALLA avbrutna tvattar aterupptas, inte bara den forsta. Forr beholls en och
+    // resten RADERADES — harmlost nar bara en tvatt kunde finnas, men med en ko
+    // (se `waiting`) kan flera latar ligga och vanta nar motorn startas om mitt i
+    // en inspelningssession. Da hade en deploy tyst atit upp allt utom en lat.
+    const resume: { wav: string; id: number }[] = [];
     for (const f of safeReaddir(this.dir)) {
       if (f.endsWith(".refined.json")) { rm(join(this.dir, f)); continue; }
       if (f.endsWith(".pending.wav")) continue;   // vantar pa strukturanalys — inte skrap
       if (!f.endsWith(".wav")) continue;
       const id = Number(f.slice(0, -4));
       // learn.wav (pågående inspelning) har inget numeriskt namn → städas som förr.
-      if (Number.isInteger(id) && id > 0 && !resume) { resume = { wav: join(this.dir, f), id }; continue; }
+      if (Number.isInteger(id) && id > 0) { resume.push({ wav: join(this.dir, f), id }); continue; }
       rm(join(this.dir, f));
     }
-    if (resume) {
-      console.log(`[refine] återupptar avbruten tvätt av låt #${resume.id}`);
-      this.start(resume.wav, resume.id);
-    }
+    resume.sort((a, b) => a.id - b.id);
+    if (resume.length) console.log(`[refine] återupptar ${resume.length} avbruten tvätt${resume.length > 1 ? "ar" : ""}: ${resume.map((r) => "#" + r.id).join(", ")}`);
+    for (const r of resume) this.start(r.wav, r.id);
   }
 
 
+  /** VANTANDE TVATTAR. Forr kastades ljudet direkt om en tvatt redan pagick
+   *  ("en at gangen"), vilket i en LOPANDE inspelningssession — dar agaren bara
+   *  trycker "Nasta lat" mellan latarna — tyst offrade bade tvatten OCH
+   *  strukturanalysen for varje lat som committades medan foregaende tvattades.
+   *  En lang lat kan ta over 110 s att tvatta, och 110 s ar just minimilangden
+   *  for ett segment, sa skyddet var inte tillrackligt. Nu kaas de i stallet. */
+  private waiting: { wav: string; songId: number }[] = [];
+
   /** Låten är committad och WAV:en stängd → tvätta nu (tystnad = ingen last). */
   start(wav: string, songId: number): void {
-    if (this.proc) { rm(wav); return; }        // en åt gången
+    if (this.proc) {
+      // Taket ar generost men inte oandligt: varje vantande lat ligger som WAV
+      // pa kortet, och kortet ar inte gratis.
+      if (this.waiting.length >= 8) { console.log(`[refine] kön full — hoppar över låt #${songId}`); rm(wav); return; }
+      this.waiting.push({ wav, songId });
+      console.log(`[refine] låt #${songId} köad (${this.waiting.length} väntar)`);
+      return;
+    }
     this.tries = 0;
     this.id = songId;
     this.run(wav, songId);
+  }
+
+  /** Ta nasta ur kon nar en tvatt ar klar. */
+  private next(): void {
+    const n = this.waiting.shift();
+    if (!n) return;
+    this.tries = 0;
+    this.id = n.songId;
+    this.run(n.wav, n.songId);
   }
 
 
@@ -93,7 +126,7 @@ export class RefineQueue {
     this.proc = p;
     p.stdout.on("data", (b: Buffer) => { const s = b.toString().trim(); if (s) console.log(s); });
     p.stderr.on("data", (b: Buffer) => { const s = b.toString().trim(); if (s) console.error(`[refine] ${s}`); });
-    p.on("error", (e) => { console.error("[refine] kunde inte starta:", e.message); this.proc = null; rm(wav); rm(out); });
+    p.on("error", (e) => { console.error("[refine] kunde inte starta:", e.message); this.proc = null; rm(wav); rm(out); this.next(); });
     p.on("exit", (code) => {
       this.proc = null;
       // DIAGNOSTIK: KEEP_WAV=1 sparar ljudet i stället för att radera det, så en post
@@ -104,14 +137,21 @@ export class RefineQueue {
         // pa en hostad modell och ska ha originalet. Kon tar over agarskapet och
         // raderar WAV:en nar analysen ar SPARAD, sa ett avbrott aldrig tappar en
         // lat. Utan kopplad ko beter sig allt som forut.
-        if (this.onRefined) { this.onRefined(wav, this.id); return; }
+        if (this.onRefined) { this.onRefined(wav, this.id); this.next(); return; }
         if (!process.env.KEEP_WAV) rm(wav); else console.log(`[refine] KEEP_WAV: sparade ${wav}`);
+        this.next();
         return;
       }
       rm(out);
       if (this.tries < MAX_TRIES) { console.log(`[refine] försök ${this.tries} misslyckades (kod ${code}) — provar igen`); this.run(wav, songId); return; }
       console.error(`[refine] gav upp låt #${songId} (kod ${code})`);
-      rm(wav);   // hoarda aldrig ljud
+      // TVATTEN OCH STRUKTURANALYSEN AR OBEROENDE. Forr raderades ljudet nar
+      // tvatten gav upp, vilket tog med sig strukturanalysen i fallet — trots att
+      // den inte har nagot med tvatten att gora. Lamna over ljudet anda; kon
+      // raderar det nar ANALYSEN ar sparad. Misslyckas aven den kastas det dar.
+      if (this.onRefined) { this.onRefined(wav, songId); this.next(); return; }
+      rm(wav);   // ingen ko kopplad → hoarda aldrig ljud
+      this.next();
     });
   }
 
