@@ -690,6 +690,24 @@
         <button class="btn" id="structSave">Spara</button>
       </div>
       <div class="status" id="structHint" style="margin-top:6px">—</div>
+
+      <div style="margin-top:14px">
+        <b>Automatisk namngivning</b>
+        <div class="status" style="margin-top:6px">
+          Ett tolv sekunders utdrag ur mitten av låten skickas till ACRCloud, som
+          känner igen den mot en katalog av riktiga inspelningar. Träffar den säkert
+          fylls namnet i åt dig — annars lämnas fältet tomt att skriva i själv.
+          Ett namn du redan skrivit skrivs aldrig över.
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+          <input id="acrKey" type="text" placeholder="Access Key"
+            style="flex:1;min-width:150px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;padding:6px 8px;font:inherit" />
+          <input id="acrSecret" type="password" placeholder="Secret Key"
+            style="flex:1;min-width:150px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;padding:6px 8px;font:inherit" />
+          <button class="btn" id="acrSave">Spara</button>
+        </div>
+        <div class="status" id="acrHint" style="margin-top:6px">—</div>
+      </div>
     </div>
     <div id="songListWrap" style="margin-top:14px;overflow-x:auto">
       <table id="songList" style="width:100%;border-collapse:collapse;font-size:14px">
@@ -868,6 +886,16 @@ if (structSave) structSave.onclick = () => {
   const h = document.getElementById("structHint");
   if (h) h.textContent = "Sparar nyckel…";
 };
+
+const acrSave = document.getElementById("acrSave");
+if (acrSave) acrSave.onclick = () => {
+  const k = document.getElementById("acrKey"), s = document.getElementById("acrSecret");
+  if (!k || !s) return;
+  send({ type: "setAcrCreds", key: k.value, secret: s.value, host: "identify-eu-west-1.acrcloud.com" });
+  k.value = ""; s.value = "";
+  const h = document.getElementById("acrHint");
+  if (h) h.textContent = "Sparar uppgifter…";
+};
 function fmtDur(ms) {
   const t = Math.round(ms / 1000);
   return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0");
@@ -895,6 +923,10 @@ function renderStructStatus(st) {
   if (st.busy) t += " · analyserar just nu";
   if (st.error) t += " · senaste fel: " + st.error;
   el.textContent = t;
+  const a = document.getElementById("acrHint");
+  if (a) a.textContent = st.hasAcr
+    ? "Uppgifter sparade — nya låtar namnges automatiskt."
+    : "Inga uppgifter — låtar får namnges för hand.";
 }
 
 function renderSongList(rows) {

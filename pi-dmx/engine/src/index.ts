@@ -16,6 +16,7 @@ import { dirname, join } from "node:path";
 import { LearnRecorder } from "./learnRecorder.js";
 import { RefineQueue } from "./refineQueue.js";
 import { StructureQueue } from "./structureQueue.js";
+import { sampleForIdentify, identify, formatNote } from "./identify.js";
 import { AudioCapture } from "./audio.js";
 import { Analyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
@@ -130,11 +131,38 @@ songs.onCommit = (songId, fresh) => {
   // tvätten läser den. Döp om till <songId>.wav först → ingen kapplöpning.
   const own = join(DATA_DIR, `${songId}.wav`);
   try { renameSync(wav, own); } catch (e) { console.error("[refine] kunde inte döpa om temp-WAV:", (e as Error).message); return; }
+  // NAMNGE LATEN — innan tvatten hinner radera ljudet. Lasningen ar read-only och
+  // stor inte refinern. Fire-and-forget: showen far ALDRIG vanta pa ett natverk.
+  void nameSong(own, songId);
   refiner.start(own, songId);
 };
 
 
 
+
+/**
+ * AUTOMATISK NAMNGIVNING via ACRCloud. Fyller bara `note` — samma falt agaren
+ * skriver i for hand — och bara nar traffen ar sakert nog. Hittar den inget
+ * lamnas faltet TOMT: en sjalvsaker fel titel ar samre an ingen alls.
+ * Skriver aldrig over ett namn som redan finns.
+ */
+async function nameSong(wavPath: string, songId: number): Promise<void> {
+  const host = cfg.acrHost, key = cfg.acrKey, secret = cfg.acrSecret;
+  if (!host || !key || !secret) return;
+  const existing = songs.list().find((r) => r.id === songId);
+  if (existing?.note) return;                       // agaren har redan dopt den
+  try {
+    const sample = sampleForIdentify(wavPath);
+    if (!sample) { console.log(`[namn] låt #${songId}: för kort för igenkänning`); return; }
+    const hit = await identify(sample, { host, key, secret });
+    if (!hit) { console.log(`[namn] låt #${songId}: ingen säker träff — lämnas namnlös`); return; }
+    const note = formatNote(hit);
+    songs.setNote(songId, note);
+    console.log(`[namn] låt #${songId} = "${note}" (score ${hit.score})`);
+  } catch (e) {
+    console.error(`[namn] låt #${songId} misslyckades:`, (e as Error).message);
+  }
+}
 
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk

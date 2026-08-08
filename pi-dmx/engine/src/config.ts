@@ -143,6 +143,11 @@ export interface EngineConfig {
    *  ett krav. Nyckeln bor pa Pi:n och lamnar aldrig den; skulle webblasaren
    *  anropa tjansten direkt hade den exponerats i en sida over HTTP pa LAN:et. */
   replicateToken?: string;
+  /** ACRCloud for automatisk namngivning. Alla tre kravs; saknas nagon hoppas
+   *  steget over helt och latarna far namnges for hand som forut. */
+  acrHost?: string;
+  acrKey?: string;
+  acrSecret?: string;
   /** Rökmaskin (1 DMX-kanal). Blast på drop, med duty-cycle-skydd. */
   fog?: {
     enabled: boolean;      // maskinen inkopplad/aktiv

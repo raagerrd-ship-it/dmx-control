@@ -212,7 +212,8 @@ export async function startServer(
     // replicateToken strippas OCKSA: exporten ar en fil agaren delar och sparar,
     // och en API-nyckel i klartext dar ar en lackande hemlighet som overlever
     // langt efter att den glomts bort. Den bor bara i configen pa Pi:n.
-    const { identify: _1, beat: _2, beatErr: _3, fogTrigger: _4, walkTest: _5, calTest: _6, replicateToken: _7, ...persist } = deps.cfg as any;
+    const { identify: _1, beat: _2, beatErr: _3, fogTrigger: _4, walkTest: _5, calTest: _6, replicateToken: _7,
+            acrKey: _8, acrSecret: _9, ...persist } = deps.cfg as any;
     const body = JSON.stringify({ version: PKG_VERSION, exportedAt: new Date().toISOString(), config: persist }, null, 2);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     return reply
@@ -499,6 +500,14 @@ export async function startServer(
             sock.send(JSON.stringify({ type: "structureStatus", hasToken: !!v, ...(deps.structureStatus?.() ?? {}) }));
           } else if (msg.type === "structureStatus") {
             sock.send(JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, ...(deps.structureStatus?.() ?? {}) }));
+          } else if (msg.type === "setAcrCreds" && typeof msg.key === "string" && typeof msg.secret === "string") {
+            // Hemligheterna ekas ALDRIG tillbaka — bara om de ar satta eller ej.
+            const k = msg.key.trim(), s2 = msg.secret.trim();
+            deps.cfg.acrKey = k || undefined;
+            deps.cfg.acrSecret = s2 || undefined;
+            if (typeof msg.host === "string" && msg.host.trim()) deps.cfg.acrHost = msg.host.trim();
+            console.log(`[namn] ACRCloud-uppgifter ${k && s2 ? "satta" : "borttagna"}`);
+            sock.send(JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, hasAcr: !!(deps.cfg.acrKey && deps.cfg.acrSecret), ...(deps.structureStatus?.() ?? {}) }));
           } else if (msg.type === "probeDmx") {
             deps.probeDmx?.(Array.isArray(msg.channels) ? msg.channels.map(Number) : [1, 2, 3, 4, 5, 6, 7], Number(msg.frames) || 400);
           } else if (msg.type === "listSongs") {
@@ -508,7 +517,7 @@ export async function startServer(
             sock.send(JSON.stringify({
               type: "songList",
               songs: withStruct,
-              structure: { hasToken: !!deps.cfg.replicateToken, ...(deps.structureStatus?.() ?? {}) },
+              structure: { hasToken: !!deps.cfg.replicateToken, hasAcr: !!(deps.cfg.acrKey && deps.cfg.acrSecret), ...(deps.structureStatus?.() ?? {}) },
             }));
           } else if (msg.type === "songManualStart") {
             // Inlärning ska bara vara på när ägaren faktiskt spelar in. Automatisk
