@@ -15,6 +15,7 @@ import { readFileSync, existsSync, renameSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { LearnRecorder } from "./learnRecorder.js";
 import { RefineQueue } from "./refineQueue.js";
+import { StructureQueue } from "./structureQueue.js";
 import { AudioCapture } from "./audio.js";
 import { Analyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
@@ -99,6 +100,23 @@ const recorder = new LearnRecorder(join(DATA_DIR, "learn.wav"), cfg.audio.rate);
 let lastLearningNew = false;
 const refiner = new RefineQueue(DATA_DIR, (t) => songs.applyRefined(t.songId, t));
 refiner.cleanStale();
+
+// STRUKTURKON: skickar varje inlard lat pa analys EN gang och sparar svaret for
+// alltid i structure.json. Analysen ger FUNKTIONSETIKETTER (intro/verse/chorus/
+// bridge/outro) som Pi:n omojligt kan rakna fram sjalv — modellen vill ha ett par
+// GB RAM och maskinen har 416 MB totalt.
+// Kopplingen till IGENKANNINGEN ar hela poangen: strukturen lagras pa songId, och
+// nar fingeravtrycken sager vilken lat som spelas hittar minnet ratt tidslinje.
+const structure = new StructureQueue(
+  DATA_DIR,
+  () => cfg.replicateToken,
+  (songId, st) => songs.setStructure(songId, st),
+);
+// Allt som redan analyserats matas in vid uppstart — annars vore analysen
+// bortkastad efter varje omstart.
+for (const [id, st] of Object.entries(structure.all())) songs.setStructure(Number(id), st);
+// Tvatten lamnar over ljudet i stallet for att radera det.
+refiner.onRefined = (wav, songId) => structure.enqueue(wav, songId);
 songs.onDropLearning = () => recorder.abort();
 songs.onCommit = (songId, fresh) => {
   if (!songId) { recorder.abort(); return; }   // inget lärdes in → kasta ljudet
@@ -198,6 +216,7 @@ capture.on("chunk", (samples: Float32Array) => {
     effects.memCeiling = cfg.memCeilingOff === false ? cues.ceiling : null;
     effects.memHasGrid = cues.hasGrid;
     if (cues.section) effects.memSectionAt = performance.now();
+    effects.memPart = cues.part;
     if (cues.phrase) effects.memPhraseAt = performance.now();
     if (cues.build !== null) {
       // Proportionell mot RESTEN av risern → 100 % exakt på dropen, i stället för
@@ -218,6 +237,7 @@ capture.on("chunk", (samples: Float32Array) => {
     memoryBeatLocked = false;
     effects.memCeiling = null;
     effects.memHasGrid = false;
+    effects.memPart = null;
     if (liveDrop) outDrop++;                      // realtidsdetektorn som förut
   }
 
@@ -458,6 +478,7 @@ const serverDeps = {
       forgetSong: (id: number) => songs.forgetSong(id),
       dumpCurve: (id: number) => songs.dumpCurve(id),
     },
+    structureStatus: () => structure.status(),
     probeDmx: (channels: number[], frames: number) => {
       dmxProbe.chs = channels; dmxProbe.rows = []; dmxProbe.t0 = performance.now(); dmxProbe.left = frames;
     },
@@ -612,6 +633,12 @@ setInterval(() => {
   const s = cfg.fog?.sprayMs ?? 0;
   if (s !== savedSprayMs) { savedSprayMs = s; scheduleSave(cfg); }
 }, 300000);
+
+// STRUKTURKÖN betar av sig själv i bakgrunden: en låt i taget, bara när det
+// finns en nyckel OCH något i kön. Uppladdning och pollning är ren I/O — ingen
+// CPU som kan störa showen. 20 s är rikligt; kön har ingen brådska och en låt
+// analyseras en enda gång i sitt liv.
+setInterval(() => structure.tick(), 20000);
 
 process.on("SIGTERM", () => {
   recorder.abort();

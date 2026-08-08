@@ -138,6 +138,11 @@ export interface EngineConfig {
   songLearn?: boolean;
   /** Diagnostik: stäng av minnets ljustak (memCeiling) utan att röra resten. */
   memCeilingOff?: boolean;
+  /** API-nyckel for den hostade strukturanalysen (Replicate). Utan den ligger
+   *  kon still och showen kor precis som forut — analysen ar ett PALAGG, aldrig
+   *  ett krav. Nyckeln bor pa Pi:n och lamnar aldrig den; skulle webblasaren
+   *  anropa tjansten direkt hade den exponerats i en sida over HTTP pa LAN:et. */
+  replicateToken?: string;
   /** Rökmaskin (1 DMX-kanal). Blast på drop, med duty-cycle-skydd. */
   fog?: {
     enabled: boolean;      // maskinen inkopplad/aktiv

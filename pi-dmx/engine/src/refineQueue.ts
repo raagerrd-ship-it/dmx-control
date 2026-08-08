@@ -36,6 +36,9 @@ export class RefineQueue {
   private id = 0;
 
   /** @param dir datakatalogen (samma som songs.bin) */
+  /** Satts av index.ts: strukturkon tar over ljudet i stallet for att det raderas. */
+  onRefined: ((wav: string, songId: number) => void) | null = null;
+
   constructor(private readonly dir: string, private readonly apply: (t: RefinedTimeline) => void) {}
 
   get busy(): boolean { return this.proc !== null; }
@@ -56,6 +59,7 @@ export class RefineQueue {
     let resume: { wav: string; id: number } | null = null;
     for (const f of safeReaddir(this.dir)) {
       if (f.endsWith(".refined.json")) { rm(join(this.dir, f)); continue; }
+      if (f.endsWith(".pending.wav")) continue;   // vantar pa strukturanalys — inte skrap
       if (!f.endsWith(".wav")) continue;
       const id = Number(f.slice(0, -4));
       // learn.wav (pågående inspelning) har inget numeriskt namn → städas som förr.
@@ -94,7 +98,16 @@ export class RefineQueue {
       this.proc = null;
       // DIAGNOSTIK: KEEP_WAV=1 sparar ljudet i stället för att radera det, så en post
       // kan jämföras mot det ljud den FAKTISKT byggdes på. Normalt av — ljud hoardas aldrig.
-      if (code === 0 && this.load(out)) { if (!process.env.KEEP_WAV) rm(wav); else console.log(`[refine] KEEP_WAV: sparade ${wav}`); rm(out); return; }
+      if (code === 0 && this.load(out)) {
+        rm(out);
+        // TVATTEN AR KLAR — men ljudet behovs an en gang: strukturanalysen kor
+        // pa en hostad modell och ska ha originalet. Kon tar over agarskapet och
+        // raderar WAV:en nar analysen ar SPARAD, sa ett avbrott aldrig tappar en
+        // lat. Utan kopplad ko beter sig allt som forut.
+        if (this.onRefined) { this.onRefined(wav, this.id); return; }
+        if (!process.env.KEEP_WAV) rm(wav); else console.log(`[refine] KEEP_WAV: sparade ${wav}`);
+        return;
+      }
       rm(out);
       if (this.tries < MAX_TRIES) { console.log(`[refine] försök ${this.tries} misslyckades (kod ${code}) — provar igen`); this.run(wav, songId); return; }
       console.error(`[refine] gav upp låt #${songId} (kod ${code})`);

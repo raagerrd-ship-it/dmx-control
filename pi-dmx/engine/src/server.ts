@@ -74,6 +74,8 @@ export interface ServerDeps {
     dumpCurve: (id: number) => void;
   };
   probeDmx?: (channels: number[], frames: number) => void;
+  /** Strukturkons lage for UI:t: hur manga vantar, hur manga ar klara. */
+  structureStatus?: () => { pending: number; analysed: number; busy: boolean; error: string };
   onConfigChanged?: () => void;
 
   /** Advance to the next mode in the shared cycle. Returns the new mode. */
@@ -205,7 +207,10 @@ export async function startServer(
   const CFG_PATH = process.env.CONFIG_PATH ?? "/var/lib/audio-dmx-engine/config.json";
   app.get("/api/config/export", async (_req, reply) => {
     // Strippa transienta fält (samma som persist.ts) så exporten är ren.
-    const { identify: _1, beat: _2, beatErr: _3, fogTrigger: _4, walkTest: _5, calTest: _6, ...persist } = deps.cfg as any;
+    // replicateToken strippas OCKSA: exporten ar en fil agaren delar och sparar,
+    // och en API-nyckel i klartext dar ar en lackande hemlighet som overlever
+    // langt efter att den glomts bort. Den bor bara i configen pa Pi:n.
+    const { identify: _1, beat: _2, beatErr: _3, fogTrigger: _4, walkTest: _5, calTest: _6, replicateToken: _7, ...persist } = deps.cfg as any;
     const body = JSON.stringify({ version: PKG_VERSION, exportedAt: new Date().toISOString(), config: persist }, null, 2);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     return reply
@@ -484,6 +489,14 @@ export async function startServer(
             sock.send(JSON.stringify({ type: "songList", songs: deps.songMemory?.list() ?? [] }));
           } else if (msg.type === "songCurve" && typeof msg.id === "number") {
             deps.songMemory?.dumpCurve(msg.id);
+          } else if (msg.type === "setReplicateToken" && typeof msg.value === "string") {
+            // Tom strang = sla av analysen. Nyckeln ekas ALDRIG tillbaka.
+            const v = msg.value.trim();
+            deps.cfg.replicateToken = v || undefined;
+            console.log(`[struktur] API-nyckel ${v ? "satt" : "borttagen"}`);
+            sock.send(JSON.stringify({ type: "structureStatus", hasToken: !!v, ...(deps.structureStatus?.() ?? {}) }));
+          } else if (msg.type === "structureStatus") {
+            sock.send(JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, ...(deps.structureStatus?.() ?? {}) }));
           } else if (msg.type === "probeDmx") {
             deps.probeDmx?.(Array.isArray(msg.channels) ? msg.channels.map(Number) : [1, 2, 3, 4, 5, 6, 7], Number(msg.frames) || 400);
           } else if (msg.type === "listSongs") {

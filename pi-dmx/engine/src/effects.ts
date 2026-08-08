@@ -126,6 +126,11 @@ export class EffectEngine {
   memSectionAt = 0;                   // performance.now() för senaste sektionsgräns
   memPhraseAt = 0;                    // ...och senaste frasgräns
   memHasGrid = false;                 // låten har sektioner/frasgrid att vänta in
+  /** VILKEN sorts sektion som spelas just nu ur den analyserade strukturen:
+   *  "intro" | "verse" | "chorus" | "bridge" | "outro" … null = okänd låt eller
+   *  ingen analys. Sätts av index.ts. ANVANDS INTE AN av effektvalet — den ska
+   *  in dar medvetet och matbart, inte som en sidoeffekt av att faltet dok upp. */
+  memPart: string | null = null;
 
   /** Misstänkt låtbyte → låt auto-rangen kalibrera om snabbt mot nya nivåer. */
   softenRange(): void { this.range.soften(); }
