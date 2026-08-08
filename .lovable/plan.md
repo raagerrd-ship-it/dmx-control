@@ -1,39 +1,74 @@
-# Manuell inlärning på Pi:n (exakta gränser)
+# Justerbart tidsförsprång per effekt
 
-Du har rätt. För Spotify/Apple Music blir mobil-app-idén inte smartare än en knapp på Pi:n — båda kräver att du som lyssnare trycker vid varje spårbyte. Det enda undantaget är om musiken spelas i webbläsaren på samma sida, men då är det fortfarande en knapp/touch i gränssnittet, bara på en annan skärm.
+## Mål
+Låta ägaren trimma när varje effekt slår till i förhållande till takten. Globalt `showLeadMs` räcker inte när t.ex. hjärtslaget ska toppa PÅ slaget samtidigt som en strobe kan behöva vara något tidigare/senare än en grid-effekt.
 
-Därför förenklar vi: lägg knapparna direkt på Pi:s UI. Det är färre rörliga delar, samma exakthet, och det kräver ingen ny app eller kommunikationskanal.
+## Nuvarande läge (verifierat)
+- `beatClock.ts` har redan `beatPhase(beat, now, leadMs)` och `nextBeatIn(beat, now, leadMs)` — försprånget är inbyggt i matematiken.
+- `EffectEngine` i `effects.ts` räknar ut EN uppsättning `beatFrac`, `beatIdx`, `beatPulse`, `beatHit` per frame och delar med alla effekter via `EffectContext`.
+- Det finns redan ett globalt fält `cfg.showLeadMs` (0–300 ms) och WS-meddelandet `setShowLead`, men det har inget reglage i vare sig React-mocken eller Pi-UI:t.
+- React-mocken (`src/pages/DmxController.tsx`) har ett ägarblock (`OwnerSections`) som speglar Pi:ns `/setup`-vy.
+- Pi-UI:t (`pi-dmx/engine/public/index.html`) ägs av användaren; Lovable redigerar det inte utan levererar ändringar som diff/beskrivning.
 
-## Så fungerar det
+## Förändringar
 
-Ett nytt läge "Inlärning" i Pi-UI:t med två knappar:
+### 1. Motor: per-effekt försprång i config
+Lägg till i `EngineConfig`:
 
-```text
-[ Starta inlärning ]        -> inlärningsläge på, första segmentet börjar HÄR
-[ Nästa låt ]               -> committa segmentet + starta nästa i samma tick
-[ Stoppa inlärning ]        -> committa sista segmentet, tillbaka till normalläge
+```typescript
+effectLeads?: Partial<Record<Mode, number>>; // extra ms per effekt, utöver showLeadMs
 ```
 
-När du trycker `Nästa låt` skickas en exakt tidsstämpel till motorn. Du som lyssnare hör bytet och trycker inom en halv sekund — vilket fortfarande är betydligt bättre än dagens heuristik (9–10 s fel).
+- Default tomt objekt `{}`.
+- Giltigt intervall för varje effekt: `-100 .. +200 ms`.
+- Effektivt försprång = `showLeadMs + (effectLeads[effMode] ?? 0)`.
 
-Medan läget är aktivt:
-- All heuristisk gränsdetektering är avstängd (inga klangskiften, ingen nivådipp, ingen 110-sekundersspärr).
-- Ingen igenkänningsdriven gräns — bara knapptrycken.
-- `MIN_SEG_MS` gäller inte; ett 40-sekunders spår kan läras in.
-- UI:t visar löpande segmentlängd och "sparat: N låtar" så du ser att trycket gick fram.
+### 2. Motor: räkna ut beat-värden per effekt
+I `EffectEngine.render()`:
+- Behåll globala `beatTick` (BPM-låst grid) och `kickHit` (verklig kick) — de är sanningen om musiken.
+- För det aktuella `effMode` beräkna:
+  - `effBeatFrac = beatPhase(beat, now, totalLead)`
+  - `effBeatIdx` från en per-effekt takt-räknare som stegar på `beatTick || kickHit`
+  - `effBeatPulse = hasBeat ? Math.pow(1 - effBeatFrac, 2) : kickEnv`
+  - `effBeatHit = (effBeatIdx > lastEffBeatIdx[effMode]) || (!hasBeat && kickHit)`
+- Skriv dessa värden in i `EffectContext` innan `effect.render(ctx)` anropas.
+- Alla andra signaler (`kickEnv`, `dropEnv`, `audio`, …) förblir oförändrade.
 
-Efter avslutad inlärning körs tvätten (`refineSong.mjs`) på varje segment som vanligt — men nu på material med korrekta start- och slutpunkter, vilket också gör `trimAt`-logiken onödig för dessa låtar.
+### 3. Motor: WS-kommando
+Lägg till hanterare i `server.ts`:
 
-## Latens och exakthet
+```typescript
+} else if (msg.type === "setEffectLead" && typeof msg.mode === "string" && typeof msg.value === "number") {
+  if (isMode(msg.mode)) {
+    deps.cfg.effectLeads = { ...deps.cfg.effectLeads, [msg.mode]: Math.max(-100, Math.min(200, Math.round(msg.value))) };
+  }
+}
+```
 
-Knapptrycket går lokalt inuti Pi:n (ingen nätverksresa), men din reaktionstid är den stora felkällan. Därför sätts gränsen med en liten justerbar offset (standard −300 ms) så att lite av föregående låt hellre hamnar i slutet av det gamla segmentet än i början av det nya. Fingeravtrycket är robust mot det; en avhuggen intro är värre.
+### 4. React-mock: nytt ägarkort "Effekttiming"
+I `src/pages/DmxController.tsx` / `OwnerSections`:
+- Lägg till ett kort efter "Beat-synk".
+- Global slider för `showLeadMs` (0–300 ms) med etikett "Globalt försprång".
+- Lista över alla effekter från `EFFECT_META` (eller hårdkodad kopia i mocken) med individuella sliders för `-100 .. +200 ms`.
+- Varje rad visar effektnamn, aktuellt ms-värde och en slider.
+- Allt är lokal state i mocken — inget skickas någonstans, precis som övriga ägardelar.
 
-## Tekniskt
+### 5. Pi-UI: diff/beskrivning
+Eftersom `pi-dmx/engine/public/index.html` ägs av användaren levereras ändringarna som:
+- HTML: nytt kort "Effekttiming" inuti `<div id="ownerOnly">`, placerat efter "Beat-synk".
+- CSS: återanvända befintliga slider/rad-stilar.
+- JS: WS-anslutningen får en ny funktion `sendEffectLead(mode, ms)` och config-broadcast läser in `cfg.effectLeads` för att sätta sliderarnas positioner.
 
-- `pi-dmx/engine/src/songMemory.ts`: nya publika `beginManual()`, `boundaryManual()`, `endManual()` som committar segmentet på angiven tidsstämpel och startar ny tidslinje atomärt (samma väg som dagens bekräftade gräns, men utan bevisvillkor). En `manualMode`-flagga kortsluter heuristik och spärrar.
-- `pi-dmx/engine/src/server.ts`: `POST /api/learn/start`, `/api/learn/next`, `/api/learn/stop`, samt `learn`-status i WebSocket-strömmen.
-- `pi-dmx/engine/src/index.ts`: `LearnRecorder` styrs av manuellt läge när det är aktivt.
-- UI: `index.html` på Pi:n ägs av dig — jag levererar den delen som en färdig diff att klistra in, inte som en direktändring.
-- Verifiering: nytt test i `tools/testSongMemory.mjs` som spelar facit3-WAV:en och skickar manuella gränser vid 165 s och 317 s → biblioteket ska innehålla exakt 3 låtar med gränsfel 0 ms, och varv 2 ska känna igen alla tre.
+### 6. Persistens
+`effectLeads` sparas automatiskt via befintlig `scheduleSave` eftersom det är ett nytt fält på `cfg`. Inga transienta fält behöver strippas.
 
-Heuristiken tas inte bort — den behövs fortfarande när gäster spelar okänd musik.
+## Vad vi INTE gör
+- Vi ändrar inte `beatClock.ts` — den har redan rätt API.
+- Vi ändrar inte enskilda effektfiler — de konsumerar fortfarande `c.beatFrac` etc.
+- Vi lägger inte till fler timing-källor (t.ex. chroma) — detta är en ren justerbarhets-funktion.
+
+## Verifiering
+1. Byggmotorns typer (`bun run build` i `pi-dmx/engine`) går igenom.
+2. React-mocken bygger (`bun run build`).
+3. Manuell koll: ändra ett effekt-försprång i mock-UI:t och se att värdet visas korrekt.
+4. Diff-texten för Pi-UI:t granskas av användaren innan den appliceras på `index.html`.
