@@ -550,8 +550,22 @@ export class SongMemory {
   private vote(l: Landmark): void {
     // MANUELL INSPELNING: ingen matchning alls. Se WHOLE_MIN_VOTES ovan.
     if (this.manualMode) return;
-    // Ingen match inom fönstret → sluta leta, kör realtid resten av låten.
-    if (!this.matchId && l.t > RECOG_WINDOW_MS) return;
+    // LIVE-SIDANS FÖNSTER ÄR BORTTAGET. Här stod tidigare "ingen match inom
+    // fönstret → sluta leta", vilket band igenkänningen till att gränsdetektorn
+    // hittade låtbytet. Gör den inte det fortsätter segmentet, fönstret rinner
+    // ut, och NÄSTA låt får aldrig ett försök — hur exakt ägaren än startar den.
+    //   MÄTT 2026-08-09: ett segment löpte 3 min 45 s utan en enda gräns. En låt
+    //   som spelades från början mitt i det segmentet kändes aldrig igen, trots
+    //   att den låg komplett i minnet med namn och struktur.
+    //   Segmentlängderna samma natt: 149, 126, 110, 167, 225 s mot låtar på
+    //   180-210 s. Gränserna hamnar alltså mitt i låtar, inte mellan dem.
+    // SKYDDET LIGGER KVAR, och det är den andra halvan (se tSong nedan): en träff
+    // får bara peka på en LAGRAD låts första sekunder. Spelar vi 90 s in i något
+    // kan ljudet omöjligt likna en inspelnings inledning, så en falsk sen synk
+    // kan inte uppstå — det var alltid den halvan som bar säkerheten.
+    // KOSTNAD: röstningen körs nu hela låten. Mätt på ägarens material ~9
+    // landmarks/s, och varje röst är en binärsökning plus högst 60 steg. Några
+    // hundra operationer i sekunden — försumbart även på en Zero 2 W.
     const start = this.find(l.hash);
     if (start < 0) return;
     let end = start;
