@@ -55,6 +55,11 @@ const BEAT_PREDIP_FRAC = 0.12;
 const BEAT_PREDIP_MIN_MS = 25;
 const BEAT_PREDIP_MAX_MS = 60;
 const BEAT_PREDIP_DEPTH = 0.35;
+/** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
+ *  öppning, kort nog att vara framme innan första refrängen. */
+const START_FADE_MS = 5000;
+/** Drops ignoreras helt så länge — täcker påslaget och de första takterna. */
+const START_DROP_MUTE_MS = 3000;
 /** HELA SHOWENS FÖRSPRÅNG mot musiken — hjärtslag, grid-byten, takträknare.
  *  Analysatorns eget ankare (`cfg.beat.anchorMs`) är och förblir sanningen om var
  *  slaget ligger i LJUDET; den dömer kickar och drops mot det och får aldrig
@@ -151,6 +156,20 @@ export class EffectEngine {
   /** Sektionens UPPMATTA energi (0..1), -1 = okand. Ur minnets energikurva, som
    *  tvatten raknat pa hela laten — alltsa kant redan nar sektionen BORJAR. */
   memPartEnergy = -1;
+  /**
+   * LÅTSTART: tona in, och tig om drops.
+   * En låt börjar aldrig i fullt ljus — introt är låtens tystaste parti och
+   * publiken ska mötas av något som växer, inte av en vägg. Och en "drop" i de
+   * första sekunderna är nästan alltid att LJUDET slogs på, inte att musiken
+   * gjorde något: nivån går från noll till full på ett ögonblick, vilket är
+   * exakt vad en drop-detektor letar efter.
+   * Sätts av index.ts när en känd låt låser tidigt i tidslinjen, och av
+   * tystnadsgrindens flank här nedan när ljudet kommer tillbaka (okända låtar).
+   */
+  private songStartAt = 0;
+  private gatePrev = 1;
+  /** Låten började — tona in ljuset och ignorera drops en stund. */
+  noteSongStart(): void { this.songStartAt = performance.now(); }
   private partLook = new Map<string, Mode>();
   private partLookSong = 0;
 
@@ -507,7 +526,8 @@ export class EffectEngine {
     // 2000ms kandes som for mycket max-ljus, 800ms som for kort - 1300ms ar
     // mitten. Har ar anvandarens oga ratt matinstrument: hur lange en drop ska
     // halla ar en upplevelseparameter, inte en troskel att mata fram.
-    if (dropHit) this.dropBangUntil = nowWall + 1300;
+    const sinceStart = this.songStartAt ? performance.now() - this.songStartAt : 1e9;
+    if (dropHit && sinceStart > START_DROP_MUTE_MS) this.dropBangUntil = nowWall + 1300;
     // DROP-BLACKOUT (dramaturgisk tystnad): en riser som BRYTS ner i en svacka
     // strax före dropen → tvinga kolsvart i max 250ms. Svärtan STARTAR på
     // svackans flank (bara om vi faktiskt byggt upp: buildUp>0.35) och SLÄPPS i
@@ -782,6 +802,11 @@ export class EffectEngine {
     const gateTarget = now - this.lastActiveMs > 250 ? 0 : 1;
     const gateRate = gateTarget > this.silenceGate ? dtSec / 0.1 : dtSec / 0.25;
     this.silenceGate += Math.max(-gateRate, Math.min(gateRate, gateTarget - this.silenceGate));
+    // FLANK: ljudet var borta och kom tillbaka → behandla det som en låtstart.
+    // Täcker okända låtar och att någon startar musiken; för kända låtar sätter
+    // index.ts samma sak när minnet låser tidigt i tidslinjen.
+    if (this.gatePrev < 0.2 && this.silenceGate > 0.8) this.songStartAt = performance.now();
+    this.gatePrev = this.silenceGate;
     // Warmup-räknare för baslinjen: ackumulera medan aktiv, nollställ vid tystnad.
     if (this.silenceGate > 0.5) this.warmMs += dtSec * 1000; else this.warmMs = 0;
     if (effMode === "wave") this.wavePhase += dtSec * (1.6 + audio * 4);
@@ -882,6 +907,14 @@ export class EffectEngine {
       ceilMul = Math.max(vuFilter, this.dropEnv);
     }
     // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
+    // INTONING VID LÅTSTART. Klämmer taket, inte effekten: allt som lyser tonar
+    // upp tillsammans i stället för att enskilda kanaler beter sig olika. Kvadraten
+    // gör starten mjuk och slutet snabbt — en linjär ramp känns som en dimmer som
+    // dras, en kvadratisk som att musiken kommer igång.
+    if (sinceStart < START_FADE_MS) {
+      const w = sinceStart / START_FADE_MS;
+      ceilMul = Math.min(ceilMul, w * w);
+    }
     // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så
     // VU-taket följer nivån direkt utan effekt-ballistikens nedåt-släp.
     const md = drive * (1 + frame.buildUp * 0.35 + this.dropEnv * 0.8);

@@ -126,7 +126,7 @@ export class KnobRing {
   }
 
   private tick() {
-    if (!this.spi) return;
+    if (!this.spi || this.closed) return;
     // Beat-avklingning: exp(-dt/tau), tau ≈ 150 ms, tick ≈ 33 ms
     this.beatPulse *= 0.80;
     if (this.beatPulse < 0.01) this.beatPulse = 0;
@@ -190,10 +190,21 @@ export class KnobRing {
       sendBuffer: Buffer.from(this.txBuf.buffer, this.txBuf.byteOffset, this.txBuf.byteLength),
       speedHz: SPI_SPEED_HZ,
     }];
-    this.spi.transfer(msg, (err?: Error | null) => {
-      if (err) console.error("[ring] spi tx:", err.message);
-    });
+    // KASTAS SYNKRONT NAR ENHETEN AR STANGD. `transfer` slanger EPERM direkt i
+    // stallet for att lamna felet till callbacken, sa felhanteringen nedan aldrig
+    // nas. Vid varje omstart tickade en kvarvarande timer mot en stangd SPI och
+    // gav "Error: EPERM, device closed" i loggen — ofarligt men brusigt, och brus
+    // gor att ett VERKLIGT fel drunknar nar man raknar rader i journalen.
+    try {
+      this.spi.transfer(msg, (err?: Error | null) => {
+        if (err && !this.closed) console.error("[ring] spi tx:", err.message);
+      });
+    } catch {
+      this.closed = true;          // enheten ar borta — sluta forsoka
+    }
   }
+
+  private closed = false;
 
   stop() {
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
@@ -201,7 +212,7 @@ export class KnobRing {
     this.state.blackout = true;
     this.blackoutFade = 0;
     this.tick();
-    setTimeout(() => this.spi?.close(() => {}), 50);
+    setTimeout(() => { this.closed = true; this.spi?.close(() => {}); }, 50);
   }
 }
 

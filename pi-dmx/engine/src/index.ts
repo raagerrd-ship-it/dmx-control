@@ -181,6 +181,7 @@ async function nameSong(wavPath: string, songId: number): Promise<void> {
   }
 }
 
+let lastCueSongId = 0;
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
 let lastRenderMs = 0;
@@ -264,6 +265,14 @@ capture.on("chunk", (samples: Float32Array) => {
     effects.memPart = cues.part;
     effects.memSongId = cues.songId;
     effects.memPartEnergy = cues.partEnergy;
+    // LÅTSTART UR MINNET: känns låten igen och vi står tidigt i tidslinjen har en
+    // ny låt just börjat. Flanken tas på songId, så den fyrar en gång per låt och
+    // inte varje ruta. Tystnadsgrindens flank i effects täcker okända låtar.
+    if (cues.songId && cues.songId !== lastCueSongId) {
+      lastCueSongId = cues.songId;
+      const st = songs.state();
+      if (st.positionMs < 12000) effects.noteSongStart();
+    }
     if (cues.phrase) effects.memPhraseAt = performance.now();
     if (cues.build !== null) {
       // Proportionell mot RESTEN av risern → 100 % exakt på dropen, i stället för
