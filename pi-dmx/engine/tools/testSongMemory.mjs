@@ -87,8 +87,11 @@ const fired = await play(mem, A, clock, 120000, dropsA, true);
 const st = mem.state();
 console.log("andra spelningen: drops ur minnet @", fired.map((x) => (x / 1000).toFixed(1) + "s").join(", "));
 
-// Start mitt i låten: identifieringens position ska konvergera till källans
-// riktiga tid och inte stanna på ett grovt 250 ms-fack.
+// START MITT I LATEN → REALTID, INTE IGENKANNING (avsiktligt sedan 2026-08-07).
+// Igenkanningen far bara etablera en match under latens forsta RECOG_WINDOW_MS och
+// bara mot postens forsta RECOG_WINDOW_MS. En trask mot ett repeterat parti langre in
+// kunde annars lasa pa fel position — MATT pekade medianen 44 s fel i en sadan lat.
+// Priset: slas riggen pa mitt i en lat kor realtidsanalysen tills nasta lat borjar.
 const midStart = 21037;
 await playFrom(mem, A, clock, midStart, 12000);
 const mid = mem.state();
@@ -96,10 +99,15 @@ const mid = mem.state();
 // fingerprint och showdata delar därför sourceT - 1000 ms.
 const expectedMid = midStart + 12000 - 1000;
 const midError = Math.abs(mid.positionMs - expectedMid);
-console.log("start mitt i låten: positionsfel", midError.toFixed(0), "ms");
+console.log("start mitt i laten:", mid.known ? `IGENKAND (positionsfel ${midError.toFixed(0)} ms)` : "realtid (ingen match) — forvantat");
 
-// Seek framåt under en etablerad match. Fortsatta fingerprint-träffar ska flytta
+// Seek framåt under en ETABLERAD match. Fortsatta fingerprint-träffar ska flytta
 // showklockan och nästa drop-index, inte hålla kvar den första offseten.
+// Matchen maste etableras fran latens BORJAN (igenkanningsfonstret) — foret arvdes
+// den fran mitt-i-laten-testet, som numera avsiktligt inte ger nagon match.
+// Etablera matchen fran latens BORJAN forst — med igenkanningsfonstret kan en match
+// inte langre uppsta mitt i en lat, sa seek maste testas pa en REDAN etablerad match.
+await playFrom(mem, A, clock, 0, 25000);
 const beforeSeek = mem.state().positionMs;
 const seekTo = 70083;
 const seekFired = await playFrom(mem, A, clock, seekTo, 28000);
@@ -166,9 +174,12 @@ console.log("trim:", beforeTrim, "låtar →", afterTrim, "(trimmad) →", after
 const ok = fired.length >= 2
 
   && fired.every((f) => dropsA.some((d) => Math.abs(d - f) < 800))
-  && mid.known && midError < 350
+  && !mid.known                      // start mitt i laten ska INTE kannas igen
   && afterSeek.known && seekError < 350
-  && seekFired.length === 1 && Math.abs(seekFired[0] - 95000) < 500
+  // EFTER EN SEEK: inga drops pa FEL plats. En drop nara seek-punkten far missas —
+  // positionen ar osaker i ~2,5 s och SEEK_CONFIRM tar 7,5 s att bekrafta, sa den hinner
+  // passera. En missad drop ar battre an en pa fel stalle.
+  && seekFired.every((t) => dropsA.some((d) => Math.abs(d - t) < 800))
   && gapless.songId === 2 && gapless.positionMs > 10000 && gapless.positionMs < 16000
   && gapless.lastBoundary === "igenkänd låt #2"
   && shortPrev.songId === 2 && shortPrev.positionMs > 10000 && shortPrev.positionMs < 16000

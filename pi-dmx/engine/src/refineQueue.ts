@@ -46,10 +46,25 @@ export class RefineQueue {
   /** Avstängning: döda en pågående tvätt. Temp-WAV:en städas vid nästa start. */
   stop(): void { this.proc?.kill("SIGTERM"); this.proc = null; }
 
-  /** Städa kvarglömda filer efter strömavbrott mitt i en låt. */
+  /** ÅTERUPPTA EN AVBRUTEN TVÄTT.
+   *  En tvätt tar ~70 s på en Zero 2 W. Avbryts motorn under tiden (deploy, strömavbrott,
+   *  krasch) kastades ljudet förr och låten blev liggande otvättad för alltid — utan att
+   *  någonting sa till. MÄTT 2026-08-07: fyra deployer i rad slog ut tvätten av en låt som
+   *  därmed stod kvar med 0 drops. En <songId>.wav utan färdig .refined.json är en
+   *  oavslutad tvätt, inte skräp: kör den igen. Övriga rester städas som förut. */
   cleanStale(): void {
+    let resume: { wav: string; id: number } | null = null;
     for (const f of safeReaddir(this.dir)) {
-      if (f.endsWith(".refined.json") || f.endsWith(".wav")) rm(join(this.dir, f));
+      if (f.endsWith(".refined.json")) { rm(join(this.dir, f)); continue; }
+      if (!f.endsWith(".wav")) continue;
+      const id = Number(f.slice(0, -4));
+      // learn.wav (pågående inspelning) har inget numeriskt namn → städas som förr.
+      if (Number.isInteger(id) && id > 0 && !resume) { resume = { wav: join(this.dir, f), id }; continue; }
+      rm(join(this.dir, f));
+    }
+    if (resume) {
+      console.log(`[refine] återupptar avbruten tvätt av låt #${resume.id}`);
+      this.start(resume.wav, resume.id);
     }
   }
 
@@ -77,7 +92,9 @@ export class RefineQueue {
     p.on("error", (e) => { console.error("[refine] kunde inte starta:", e.message); this.proc = null; rm(wav); rm(out); });
     p.on("exit", (code) => {
       this.proc = null;
-      if (code === 0 && this.load(out)) { rm(wav); rm(out); return; }
+      // DIAGNOSTIK: KEEP_WAV=1 sparar ljudet i stället för att radera det, så en post
+      // kan jämföras mot det ljud den FAKTISKT byggdes på. Normalt av — ljud hoardas aldrig.
+      if (code === 0 && this.load(out)) { if (!process.env.KEEP_WAV) rm(wav); else console.log(`[refine] KEEP_WAV: sparade ${wav}`); rm(out); return; }
       rm(out);
       if (this.tries < MAX_TRIES) { console.log(`[refine] försök ${this.tries} misslyckades (kod ${code}) — provar igen`); this.run(wav, songId); return; }
       console.error(`[refine] gav upp låt #${songId} (kod ${code})`);

@@ -8,6 +8,9 @@
 
 import type { EngineConfig, FixtureConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
+import { FixtureOutput, type SpecialtyValues } from "./output.js";
+import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked } from "./beatClock.js";
+import { PostProcess } from "./postprocess.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER } from "./effects/registry.js";
 import { fitScore } from "./effects/fit.js";
@@ -28,10 +31,41 @@ export interface FogStatus {
   conflict: string | null;
 }
 
+// HJÄRTSLAGETS FORM, SKALAD MED TEMPOT.
+// En fast utklingning ger olika känsla i olika tempon: 130 ms är ett tätt dunk vid
+// 159 BPM men en gles blink vid 90. Skalas båda mot taktperioden upptar pulsen samma
+// ANDEL av takten oavsett tempo (~45 %), och resten är vila — då känns det som att
+// ljuset följer musiken i stället för att gå i sin egen takt.
+// Attacken har ett golv och ett tak: under ~30 ms läses den som ett steg (blixt),
+// över ~70 ms tappar den anslaget.
+/** Under den här nivån räknas ingången som avstängd, inte som ett tyst parti. */
+const INPUT_OFF_LEVEL = 0.02;
+/** ...men först när den legat där så länge — ett break i låten ska inte släcka showen. */
+const INPUT_OFF_MS = 2000;
+
+const BEAT_ATTACK_FRAC = 0.12;
+const BEAT_ATTACK_MIN_MS = 30;
+const BEAT_ATTACK_MAX_MS = 70;
+const BEAT_DECAY_FRAC = 0.32;
+/** HELA SHOWENS FÖRSPRÅNG mot musiken — hjärtslag, grid-byten, takträknare.
+ *  Analysatorns eget ankare (`cfg.beat.anchorMs`) är och förblir sanningen om var
+ *  slaget ligger i LJUDET; den dömer kickar och drops mot det och får aldrig
+ *  förskjutas. Men LJUSET är trögare än ljudet, så allt på showsidan läser klockan
+ *  som om den låg `SHOW_LEAD_MS` fram. Då kommer inte bara pulsen tidigare utan
+ *  också effektbyten och takträknaren — hela riggen känns tightare, inte bara dunken.
+ *  0 = allt exakt på slaget. 50 = hela showen 50 ms före.
+ *  Hjärtslaget lägger dessutom till sin egen attacktid, så dess TOPP landar rätt. */
+const SHOW_LEAD_DEFAULT = 50;
+
 export class EffectEngine {
   private universe = new Uint8Array(512);
   /** Utjamnad tilltro till takten (0..1) — styr beatPulse-djupet. */
+  /** Showens försprång i ms — läses ur config varje frame så ratten biter live. */
+  private get showLead(): number { return this.cfg.showLeadMs ?? SHOW_LEAD_DEFAULT; }
   private beatTrust = 0;
+  beatMulNow = 1;                     // hjärtslagets multiplikator — appliceras SIST (publik: diagnostik)
+  private prevCeil = 0;               // förra rutans ljustak → hur snabbt det vandrar
+  private ceilRateAvg = 0;            // utjämnad takrörelse (enheter/s)
   /** EDGE-SÄKER KICK. frame.kick är en enframs-boolean på analysatorns 375 Hz
    *  medan render kör 100 Hz → en direkt läsning missar ~73 % av kickarna.
    *  Räknaren matas i registerKick (375 Hz) och konsumeras som en flank i
@@ -72,18 +106,12 @@ export class EffectEngine {
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
-  private fogUntil = 0;          // rökmaskin: pågående blast till (wall-clock ms)
-  private lastFogMs = -1e9;      // senaste blast (för cooldown)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
   // ett värmekonto i millisekunder: det fylls medan den rökar och rinner av i
   // vila. Då kostar en lång puff mer än en kort, precis som i fysiken.
-  private static readonly FOG_HEAT_MAX = 45000;    // datablad: 40–50 s i sträck
-  private static readonly FOG_RECOVER = 0.15;      // vila dränerar 15% av realtid
                                                    // → 1 s rök ≈ 6,7 s återhämtning
-  private fogHeat = 0;           // värmekonto (ms), 0..FOG_HEAT_MAX
-  private fogWasEnabled = false; // flank: enabled false→true startar uppvärmningsklockan
                                  // (själva starttiden bor i cfg.fog.warmStartMs → överlever omstart)
   // NOVELTY-UPPBYGGNADS-DETEKTOR: spektral novelty leder dropen (mätt validerat).
   private hotMs = 0;             // hur länge musiken pumpat → adaptiv tystnads-landning
@@ -109,6 +137,8 @@ export class EffectEngine {
   private gravPeak = 0;          // peak-håll (sjunker långsamt)
   /** Silence gate: fade the whole rig to black when no music plays. */
   private lastActiveMs = performance.now();
+  private inputLowSince = 0;     // väggklocka: sedan när nivån legat under gränsen
+  private inputOff = false;      // ingången bedöms avstängd → riggen mörk
   private silenceGate = 1;
   /** LEVER MEN HÖR INGENTING. Utan den här signalen ser "aux-kabeln sitter inte
    *  i" exakt likadant ut som "strömmen är av" och "säkringen gick": svart. Den
@@ -128,12 +158,10 @@ export class EffectEngine {
   private deafFade = 0;          // 0..1 inblandning av väntande-andningen
   /** Output ballistics: per-channel soft ~25ms attack + exponential decay — the
    *  eye sees a fast rise and a soft fall (~0.1–0.4 s), whatever the modes do. */
-  private outSmooth = new Float32Array(512);
-  private calHoldVal = new Float32Array(512);   // släpp-håll: senaste TÄNDA kalibrerade värdet
-  private calHoldUntil = new Float32Array(512);  // släpp-håll: deadline (performance.now ms) att hålla till
-  private strobeMask = new Uint8Array(512);   // 1 = hoppa ballistik (strobe-kanal)
-  private capMask = new Uint8Array(512);      // 1 = VU-taket skalar denna kanal (ljusbärande: färg, annars dim)
-  private strobeMaskFor: unknown = null;      // fixtures-referens masken byggdes för
+  /** Output-tjänsten äger ALL kunskap om hur lampor tar emot ljus. */
+  private out = new FixtureOutput();
+  /** Efterbehandlingen äger slutkedjan: ballistik → tak → hjärtslag → kalibrering. */
+  private post = new PostProcess();
   private maxCh = 0;                           // högsta använda kanal + 1
   private smartCount = 0;
   private lastSmartTier = "";
@@ -182,9 +210,9 @@ export class EffectEngine {
     }
     return {
       conflict,
-      state: now < this.fogUntil ? "spraying" : warmLeftMs > 0 ? "heating" : "ready",
+      state: this.out.fogState(now).spraying ? "spraying" : warmLeftMs > 0 ? "heating" : "ready",
       warmLeftMs,
-      heat: Math.min(1, this.fogHeat / EffectEngine.FOG_HEAT_MAX),
+      heat: this.out.fogState(now).heat,
       sprayMs: fog.sprayMs ?? 0,
       bursts: fog.bursts ?? 0,
     };
@@ -241,12 +269,27 @@ export class EffectEngine {
     let beatEnv = 0;
     let beatTick = false;
     const beat = this.cfg.beat;
-    if (beat && beat.bpm > 40) {
-      const beatMs = 60000 / beat.bpm;
-      const since = Date.now() - beat.anchorMs;
-      const phase = ((since % beatMs) + beatMs) % beatMs / beatMs;
-      beatEnv = Math.pow(1 - phase, 2);
-      const beatIdx = Math.floor(since / beatMs);
+    if (beatLocked(beat)) {
+      const beatMs = beatPeriod(beat);
+      const now2 = Date.now();
+      // HJÄRTSLAG: ATTACK → FADEOUT → VILA.
+      // Förr: Math.pow(1 - phase, 2) — ljuset hoppade till fullt på NOLL ms vid varje
+      // slag och sjönk sedan hela takten igenom. Ett steg utan attack läses som blixt,
+      // och utan vila mellan slagen blir riggen aldrig stilla: MÄTT 2026-08-07 upplevdes
+      // det som stroboskop i låtens lugna partier. Nu en kort men verklig attack, en
+      // exponentiell utklingning och tystnad tills nästa slag — samma puls, annan form.
+      const atk = Math.max(BEAT_ATTACK_MIN_MS, Math.min(BEAT_ATTACK_MAX_MS, beatMs * BEAT_ATTACK_FRAC));
+      // ATTACKEN BÖRJAR FÖRE SLAGET SÅ TOPPEN LANDAR PÅ DET.
+      // MÄTT 2026-08-08 på DMX-utgången: ljuset kulminerade vid fas 0,10 av takten,
+      // alltså ~48 ms EFTER slaget — attacken startade på slaget och behövde sin
+      // uppgångstid. Genom att flytta fram fasen med exakt attackens längd börjar
+      // uppgången `atk` ms före slaget och toppen sammanfaller med det. Samma tanke
+      // som REPLAY_LEAD_MS för minnet: ljus är trögare än ljud.
+      // Försprånget = attackens längd: klockan ger fasen som om vi låg `atk` ms fram.
+      const tSince = beatPhase(beat, now2, atk + this.showLead) * beatMs;
+      const dec = beatMs * BEAT_DECAY_FRAC;
+      beatEnv = tSince < atk ? tSince / atk : Math.exp(-(tSince - atk) / dec);
+      const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
       // BARA FRAMÅT. Villkoret var `!==`, som fyrade på VARJE förändring — även
       // bakåt. PLL:en justerar anchorMs och bpm kontinuerligt i båda riktningar,
       // så nära en taktgräns dittrade index 132 → 131 → 132 och gav TRE slag där
@@ -256,6 +299,10 @@ export class EffectEngine {
       if (beatIdx > this.lastBeatIdx) { this.lastBeatIdx = beatIdx; beatTick = true; }
       else if (beatIdx < this.lastBeatIdx) this.lastBeatIdx = beatIdx;
     }
+    // INGEN TICK-VÄG FÖR HJÄRTSLAGET — med flit. Utan pålitlig takt tiger det hellre
+    // än pulsar på lösa kicks: en puls som sitter fel är värre än ingen puls. (Grid-
+    // EFFEKTERNA faller däremot tillbaka på verkliga kicks, se beatHit längre ner —
+    // de byter bild, de slår inte takt.)
     const kickEnv = Math.max(
       Math.max(0, 1 - (performance.now() - this.lastKickBoost) / 250),
       beatEnv * 0.8,
@@ -269,7 +316,7 @@ export class EffectEngine {
     // user can visually locate each fixture in the room. Bypasses audio/mode.
     const id = this.cfg.identify;
     if (id && id.index >= 0 && id.index < this.cfg.fixtures.length) {
-      writeFixture(this.universe, this.cfg.fixtures[id.index], [1, 1, 1], 1);
+      this.out.writeFixture(this.universe, this.cfg.fixtures[id.index], [1, 1, 1], 1);
       return this.universe;
     }
 
@@ -319,10 +366,47 @@ export class EffectEngine {
         // musiken. Nu styr bpmConfidence pulsens DJUP: full puls över 0.60, helt
         // slät under 0.35, mjuk ramp emellan. Djupet smoothas (~0.6s) så att en
         // vacklande konfidens inte hackar pulsen av och på.
-        const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - 0.35) / 0.25));
+        // GRINDEN VAR FÖR HÖG. Djupet nollades under bpmConfidence 0.35, och MÄTT
+        // 2026-08-07 låg en låts konfidens med MEDIAN exakt 0.35 — hjärtslaget var
+        // alltså avstängt halva tiden och nästan avstängt resten. Låten hade en fullt
+        // hörbar takt; konfidensen är låg för att tempot är svårMÄTT, inte för att
+        // takten saknas. Ny ramp: noll under 0.18, full över 0.55.
+        const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - 0.18) / 0.37));
         this.beatTrust += (trustRaw - this.beatTrust) * 0.03;
-        const depth = 0.55 * this.beatTrust;
-        const beatMul = this.cfg.beatPulse ? (1 - depth) + depth * beatEnv : 1;
+        // PULSEN SKA FÖLJA MUSIKENS ENERGI, INTE BARA TAKTENS TYDLIGHET.
+        // MÄTT 2026-08-07: i ett LUGNT parti pulsade riggen 70→100 % på varje taktslag
+        // (två gånger i sekunden vid 117 BPM), vilket lästes som stroboskop. Djupet
+        // styrdes enbart av bpmConfidence — takten är ju lika tydlig i ett stilla parti
+        // som i ett kraftigt. Nu skalas det med energin: mild puls när låten andas,
+        // full puls när den går för fullt. frame.intensity kommer ur minnets kurva när
+        // en inspelning är synkad, annars ur realtidsanalysen.
+        const energy = Math.max(0, Math.min(1, frame.intensity));
+        // TAKET OCH PULSEN FÅR INTE VANDRA SAMTIDIGT.
+        // MÄTT 2026-08-07: i låtens första 30 s rör sig minnets ljustak 42→57→47→60 % i
+        // sekundtakt medan taktpulsen går 2,65 ggr/s ovanpå. Var för sig är båda lugna —
+        // tillsammans blir pulsen oregelbunden, och oregelbunden puls läses som strobe.
+        // Efter 30 s ligger taket still och samma puls upplevs som en jämn rytm, vilket
+        // är precis vad användaren rapporterade. Lösningen dämpar INTE taket (dynamiken
+        // är poängen) utan tonar ner pulsen medan taket rör sig.
+        // BARA när ett minnestak finns. I realtid föll den förr tillbaka på energin, som
+        // fladdrar 10 Hz — då bottnade calm på 0,25 och hjärtslaget försvann helt ur
+        // realtidsläget. Dämpningen ska skydda mot att TAKET vandrar, inte mot att
+        // musiken lever.
+        let calm = 1;
+        if (this.memCeiling !== null) {
+          const ceilRate = Math.abs(this.memCeiling - this.prevCeil) * 100;   // enheter/s (render 100 Hz)
+          this.prevCeil = this.memCeiling;
+          this.ceilRateAvg += (ceilRate - this.ceilRateAvg) * 0.02;           // ~0,5 s
+          calm = Math.max(0.5, 1 - this.ceilRateAvg * 4);
+        } else { this.ceilRateAvg = 0; }
+        // 0.55 → 0.70: ett kraftigare hjärtslag DOMINERAR över småfladder i nivån i
+        // stället för att konkurrera med det — användarens förslag, och det ger dessutom
+        // mer av den känsla pulsen finns till för.
+        // 0.80 → 0.92, och energigolvet 0.35 → 0.50: djupare slag överallt, och märkbart
+        // mer även i lugna partier. Pulsen ligger sist i kedjan och passerar inget
+        // filter, så hela djupet når fram — det som mäts är det som syns.
+        const depth = 0.92 * this.beatTrust * (0.50 + 0.50 * energy) * calm;
+        this.beatMulNow = this.cfg.beatPulse ? (1 - depth) + depth * beatEnv : 1;
     // BAS-PUNCH: en hård/utdragen basstöt (drop) saknar transient, och på en
     // komprimerad signal svänger bas-energin lite. Så spåra ett bas-GOLV = den
     // TYSTA basnivån (sjunker mot tystnad på ~0.4s, stiger mkt långsamt ~5s). En
@@ -350,7 +434,10 @@ export class EffectEngine {
     // Effekt-drive (silence-gate + beat-puls). Ljus-taket (cfg.master) läggs SIST
     // i cal-remappen istället — som ett äkta output-tak [onCh..tak], inte en
     // innehålls-skalning som gamma/kalibrering annars komprimerar bort.
-    const drive = this.silenceGate * beatMul;
+    // HJÄRTSLAGET LIGGER NUMERA SIST, efter ballistiken — se nedan. Låg det här
+    // smetades det ut av utgångens decay (0,42 s), som är mycket långsammare än
+    // pulsens egen (121 ms): ljuset hölls kvar mellan slagen och slaget kändes knappt.
+    const drive = this.silenceGate;
     // Synlig punch: en hård basstöt (eller drop-flash) BLOOMAR färgen till full
     // styrka — inte bara ljusare master (som är osynligt när effekten redan lyser).
     // DROP: analysatorn AVGÖR om det är en drop (frame.dropCount är MONOTON). Vi
@@ -384,39 +471,7 @@ export class EffectEngine {
     this.wasBreaking = nowBreaking;
     if (dropHit) this.blackoutUntil = 0;                                                        // dropen fyrade → släpp svärtan, explodera
     const blackout = nowWall < this.blackoutUntil;
-    // RÖKMASKIN: blast på drop + manuell puff, skyddad av en TERMISK BUDGET.
-    const fog = this.cfg.fog;
-    if (fog?.enabled) {
-      // Flank: maskinen slogs precis på → starta uppvärmningsklockan.
-      // Sätts bara om den saknas → en omstart ärver den riktiga påslagstiden.
-      if (!this.fogWasEnabled) { this.fogWasEnabled = true; if (!fog.warmStartMs) fog.warmStartMs = nowWall; }
-      const spraying = nowWall < this.fogUntil;
-      const dtMs = _dtT * 1000;
-      if (spraying) {
-        this.fogHeat += dtMs;
-        fog.sprayMs = (fog.sprayMs ?? 0) + dtMs;   // drifträknare (vätska + värmearbete)
-      } else {
-        this.fogHeat = Math.max(0, this.fogHeat - dtMs * EffectEngine.FOG_RECOVER);
-      }
-      // NÖDSTOPP mitt i en puff: en lång manuell blast får inte köra
-      // värmeblocket i botten bara för att den redan hunnit starta.
-      if (spraying && this.fogHeat >= EffectEngine.FOG_HEAT_MAX) this.fogUntil = 0;
-      const wantBurst = (dropHit && fog.onDrop) || this.cfg.fogTrigger;
-      if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;                                      // engångs-flagga
-      const gapOk = nowWall - this.lastFogMs > fog.cooldownMs;              // musikalisk glesehet
-      const heatOk = this.fogHeat + fog.burstMs <= EffectEngine.FOG_HEAT_MAX;  // hårdvaruskydd
-      if (wantBurst && !spraying && gapOk && heatOk) {
-        this.fogUntil = nowWall + fog.burstMs;
-        this.lastFogMs = nowWall;
-        fog.bursts = (fog.bursts ?? 0) + 1;
-      }
-    } else if (this.fogWasEnabled) {
-      // Avstängd → glöm uppvärmningen (nästa påslag är en ny kall start) och
-      // släpp en pågående puff, annars fastnar rök-kanalen tänd.
-      this.fogWasEnabled = false;
-      if (this.cfg.fog) this.cfg.fog.warmStartMs = 0;
-      this.fogUntil = 0;
-    }
+    const fog = this.cfg.fog;   // rök beslutas EFTER effekterna (de får önska) — se nedan
     const dropActive = frame.inZone && nowWall < this.dropBangUntil;                                  // en riktig drop pågår
     // DROP-ENVELOPE: FULL ATTACK (~30ms) på träffen, HÅLL allt på max under
     // dropen, mjuk FADE ner (~1s) när den släpper. Egen effekt — INGEN
@@ -607,6 +662,14 @@ export class EffectEngine {
     // Gain-aware threshold: at high AGC gain the amplified noise floor sits well
     // above 0.05 and reads as flicker — real (even weak) music still lands near
     // the AGC target and passes.
+    // INGÅNGEN AVSTÄNGD: ligger nivån stabilt under INPUT_OFF_LEVEL är det inte ett
+    // tyst parti i musiken utan att källan är av (eller kabeln ur). Då ska riggen vara
+    // MÖRK — inte vila på den varma glöden. Kravet på uthållighet gör att ett verkligt
+    // break i låten (som dippar men kommer tillbaka) aldrig råkar släcka showen.
+    if (frame.level >= INPUT_OFF_LEVEL) this.inputLowSince = 0;
+    else if (!this.inputLowSince) this.inputLowSince = now;
+    this.inputOff = !!this.inputLowSince && now - this.inputLowSince > INPUT_OFF_MS;
+
     const silenceThreshold = 0.05 * Math.max(1, frame.gain / 3);
     if (frame.level > silenceThreshold || kickHit) this.lastActiveMs = now;
     const gateTarget = now - this.lastActiveMs > 250 ? 0 : 1;
@@ -688,7 +751,13 @@ export class EffectEngine {
       // ballistiken, alltsa helt outjamnat. Av/pa-test av energyCeiling
       // isolerade det: flimret forsvann helt med taket av, och en lampa pa
       // ratt DMX 255 stod samtidigt HELT stabil (= hardvaran ar frisk).
-      const vuTau = vuRaw > this.vu ? 0.12 : 0.60;   // 0.35 gav kvarvarande fladder -> mjukare fall
+      // MJUKARE TAK ("soothing"): 0.12/0.60 → 0.25/0.85. Den snabba attacken lät taket
+      // hoppa upp på varje transient; med en längre uppgång andas det med låten i
+      // stället för att rycka. Hjärtslaget står för det snabba — taket för nivån.
+      // Ytterligare mjukat: 0.25/0.85 → 0.45/1.20. Taket ska följa låtens NIVÅ, inte
+      // dess anslag — allt snabbt kommer från hjärtslaget. Priset är att en verklig
+      // nivåändring (vers → refräng) tar en halv sekund extra att slå igenom.
+      const vuTau = vuRaw > this.vu ? 0.45 : 1.20;
       this.vu += (vuRaw - this.vu) * (1 - Math.exp(-dtSec / vuTau));
       // KLUBB-LÄGE: kvadrera → hård kontrast (mörkt mellan, explosion på topp).
       // Kvadreringen biter nu på den NORMALISERADE kurvan → meningsfull i alla låtar.
@@ -723,13 +792,8 @@ export class EffectEngine {
 
     // ── EFFEKT-KONTEXT (framräknat en gång per frame; idx/fx/band muteras per
     // lampa så samma objekt återanvänds → ingen allokering i loopen) ──────────
-    const hasBeat = !!(this.cfg.beat && this.cfg.beat.bpm > 40);
-    let beatFrac = 0;
-    if (hasBeat) {
-      const bMs = 60000 / this.cfg.beat!.bpm;
-      const sinceB = Date.now() - this.cfg.beat!.anchorMs;
-      beatFrac = ((sinceB % bMs) + bMs) % bMs / bMs;
-    }
+    const hasBeat = beatLocked(this.cfg.beat);
+    const beatFrac = beatPhase(this.cfg.beat, Date.now(), this.showLead);
     // TAKT-RÄKNARE med graceful degradation: stegar på GRID-slaget (beatTick) när
     // BPM är låst, annars på VERKLIGA kicks (frame.kick). Så grid-effekterna
     // (snap/rave/party/ripple/…) fortsätter dansa på trummorna även när BPM-låset
@@ -742,7 +806,7 @@ export class EffectEngine {
     // ALLTID på musiken. (Utan detta gav beatFrac=0 → beatPulse=1 konstant = ingen
     // puls när BPM ej låst → party/pulse/bounce lyste bara jämnt högt.)
     const beatPulse = hasBeat ? Math.pow(1 - beatFrac, 2) : kickEnv;
-    const beatMs2 = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
+    const beatMs2 = beatPeriod(this.cfg.beat);
     const tempoDeep = Math.max(0, Math.min(1, (beatMs2 - 340) / 260));   // 0 snabbt .. 1 långsamt
     const punchFloor = 0.5 - tempoDeep * 0.42;                            // 0.5 (snabbt) .. 0.08 (långsamt)
     // Per-lampa frekvensband (driver aurora/twin + fixture.bands).
@@ -778,9 +842,11 @@ export class EffectEngine {
     else { this.gravVel -= 2.8 * dtSec; this.gravLevel = Math.max(0, this.gravLevel + this.gravVel * dtSec); }
     if (this.gravLevel > this.gravPeak) this.gravPeak = this.gravLevel;
     else this.gravPeak = Math.max(0, this.gravPeak - 0.45 * dtSec);   // peak sjunker långsamt
+    // Effekternas önskemål om specialenheter, samlade över lamporna.
+    let wantStrobe = 0, wantBlinder = 0, wantUv = 0, wantLaser = 0, wantHazer = 0, wantCo2 = 0, wantFogFx = false;
     const effect = EFFECT_MAP.get(effMode);
     const ctx: EffectContext = {
-      cfg: this.cfg, frame, fx: undefined, t, idx: 0, count,
+      cfg: this.cfg, frame, fx: undefined, t, idx: 0, count, want: {},
       audio, kickEnv, punch: bassPunch, dropEnv: this.dropEnv, band: 0, gravLevel: this.gravLevel, gravPeak: this.gravPeak, drum,
       beatIdx, beatFrac, beatPulse, beatHit, hasBeat,
       wavePhase: this.wavePhase, buildUp: frame.buildUp, phaseSpread: 1 + frame.buildUp * 2.5,
@@ -814,12 +880,12 @@ export class EffectEngine {
     const has = (r: string) => !!drivesSet && drivesSet.has(r);
     const clamp255 = (x: number) => x < 0 ? 0 : x > 255 ? 255 : Math.round(x);
     const specialty = {
-      hazer:   has("hazer")   ? clamp255(140 + audio * 60) : 0,
-      uv:      has("uv")      ? clamp255(180 * md) : 0,
-      blinder: has("blinder") ? clamp255(Math.max(kickEnv * 255, this.dropEnv > 0.6 ? 255 : 0)) : 0,
-      strobe:  has("strobe")  ? (effMode === "strobe" ? 210 : (rs ? 220 : 0)) : 0,
-      laser:   has("laser")   ? clamp255(180 + audio * 75) : 0,
-      co2:     has("co2") && this.dropEnv > 0.85 ? 255 : 0,
+      hazer:   has("hazer")   ? clamp255(Math.max(140 + audio * 60, wantHazer * 255)) : 0,
+      uv:      has("uv")      ? clamp255(Math.max(180 * md, wantUv * 255)) : 0,
+      blinder: has("blinder") ? clamp255(Math.max(kickEnv * 255, this.dropEnv > 0.6 ? 255 : 0, wantBlinder * 255)) : 0,
+      strobe:  has("strobe")  ? clamp255(Math.max(effMode === "strobe" ? 210 : (rs ? 220 : 0), wantStrobe * 255)) : 0,
+      laser:   has("laser")   ? clamp255(Math.max(180 + audio * 75, wantLaser * 255)) : 0,
+      co2:     has("co2")     ? clamp255(Math.max(this.dropEnv > 0.85 ? 255 : 0, wantCo2 * 255)) : 0,
     };
 
     for (let i = 0; i < count; i++) {
@@ -831,8 +897,22 @@ export class EffectEngine {
       } else {
         ctx.idx = i;
         ctx.fx = fx;
+        ctx.want.strobe = undefined; ctx.want.blinder = undefined;
+        ctx.want.uv = undefined; ctx.want.laser = undefined; ctx.want.fog = undefined;
+        ctx.want.hazer = undefined; ctx.want.co2 = undefined;
         ctx.band = fx?.bands?.length ? Math.max(...fx.bands.map((b) => bands[BAND_IDX[b]])) : bands[i % bands.length];
         rgb = effect ? effect.render(ctx) : [0, 0, 0];
+        // EFFEKTENS ÖNSKEMÅL. Den vet sin egen dramaturgi bäst; motorn avgör om det
+        // blir av (fixturen måste ha rollen, och rök går genom hårdvaruskyddet).
+        // Högsta önskemål bland lamporna vinner — en effekt som vill stroba på EN
+        // lampa menar rimligen hela riggens strobe.
+        if (ctx.want.strobe !== undefined) wantStrobe = Math.max(wantStrobe, ctx.want.strobe);
+        if (ctx.want.blinder !== undefined) wantBlinder = Math.max(wantBlinder, ctx.want.blinder);
+        if (ctx.want.uv !== undefined) wantUv = Math.max(wantUv, ctx.want.uv);
+        if (ctx.want.laser !== undefined) wantLaser = Math.max(wantLaser, ctx.want.laser);
+        if (ctx.want.hazer !== undefined) wantHazer = Math.max(wantHazer, ctx.want.hazer);
+        if (ctx.want.co2 !== undefined) wantCo2 = Math.max(wantCo2, ctx.want.co2);
+        if (ctx.want.fog) wantFogFx = true;
       }
       if (rs) {   // riser-strobe: vit-kollaps + accelererande gate
         rgb[0] = (rgb[0] + (1 - rgb[0]) * rsWhite) * rsGate;
@@ -852,14 +932,14 @@ export class EffectEngine {
       rgb[0] = rgb[0] * md + 1.00 * restLvl;
       rgb[1] = rgb[1] * md + 0.30 * restLvl;
       rgb[2] = rgb[2] * md + 0.00 * restLvl;
-      writeFixture(this.universe, fx, rgb, 1, strobeVal, specialty);
+      this.out.writeFixture(this.universe, fx, rgb, 1, strobeVal, specialty);
     }
 
     // Output ballistics on color/dim channels (never strobe/mode channels —
     // a decaying strobe value would sweep through real strobe speeds).
     // Snappare fade-out i energiska lägen så pumpen syns; lugna behåller mjukheten.
     const fastMode = effMode === "party" || effMode === "snap" || effMode === "bounce" || effMode === "drops" || effMode === "rave" || effMode === "drumkit" || effMode === "duel";
-    const beatMsNow = this.cfg.beat && this.cfg.beat.bpm > 40 ? 60000 / this.cfg.beat.bpm : 500;
+    const beatMsNow = beatPeriod(this.cfg.beat);
     const fastTau = Math.max(0.14, Math.min(0.3, beatMsNow * 0.5 / 1000));
     // TRANSIENT-SKÄRPA: hög energi/riser → kort decay (knivskarp piska på varje
     // transient); låg energi → lång decay (mjuk andande wash). Utnyttjar diodernas
@@ -868,177 +948,36 @@ export class EffectEngine {
     const tau = Math.max(0.08, (fastMode ? fastTau : (this.cfg.calmDecay ?? 0.42)) * (1 - sharpen));
     const decay = Math.exp(-dtSec / tau);
     // Bygg strobe-masken bara när fixtures ändras (inte varje frame).
-    if (this.strobeMaskFor !== this.cfg.fixtures) {
-      this.strobeMaskFor = this.cfg.fixtures;
-      this.strobeMask.fill(0);
-      this.capMask.fill(0);
-      let mx = 0;
-      for (const fx of this.cfg.fixtures) {
-        const roles = fixtureRoles(fx);
-        const hasColor = roles.includes("r") || roles.includes("g") || roles.includes("b") || roles.includes("w");
-        for (let r = 0; r < roles.length; r++) {
-          const ch = fx.address - 1 + r;
-          if (ch < 0 || ch >= 512) continue;   // hög-adress custom-fixture får inte skriva utanför universet
-          const role = roles[r];
-          // Specialroller (strobe, hazer, uv, blinder, laser, co2) skrivs direkt
-          // av motorn per frame – de får INTE glidas ut av ballistiken, då tonar
-          // en 255 nedåt genom mellan­hastigheter (strobe skulle fara mellan
-          // takter, blinder klänga kvar en halv sekund, hazer flimra).
-          if (role === "strobe" || role === "hazer" || role === "uv" || role === "blinder" || role === "laser" || role === "co2") this.strobeMask[ch] = 1;
-          if (role === "r" || role === "g" || role === "b" || role === "w") this.capMask[ch] = 1;
-          else if (role === "dim" && !hasColor) this.capMask[ch] = 1;
-          if (ch + 1 > mx) mx = ch + 1;
-        }
-      }
-      this.maxCh = Math.min(512, mx);
-    }
-    // MJUK ATTACK (~25ms) i st.f. instant: en 1-frames-spik i effekt/master når bara
-    // ~halvvägs och klingar sen → dödar flimmer (>~20Hz) men behåller beat-pumpen
-    // (<10Hz) och den snabba decayn. Nedgång = oförändrad decay (peak-hold).
-    const aAtt = 1 - Math.exp(-dtSec / 0.025);
-    for (let ch = 0; ch < this.maxCh; ch++) {
-      if (this.strobeMask[ch]) { this.outSmooth[ch] = this.universe[ch]; continue; }
-      const held = this.outSmooth[ch] * decay;
-      const target = this.universe[ch];
-      const v = target >= held ? held + (target - held) * aAtt : held;
-      this.outSmooth[ch] = v;
-      this.universe[ch] = Math.round(v);
-    }
+    this.out.build(this.cfg.fixtures);
+    this.maxCh = this.out.maxCh;
+    // EFTERBEHANDLING: ballistik → ljustak → hjärtslag → blackout → kalibrering →
+    // headroom. Ordningen och motiven bor i postprocess.ts; här räknas bara VAD som
+    // ska gälla den här rutan. Drop-undantagen bakas in innan de skickas vidare.
+    this.post.apply(this.universe, this.out, {
+      dtSec,
+      decay,
+      ceilMul,
+      pulseMul: Math.max(this.beatMulNow, this.dropEnv),
+      ceilingActive: (this.cfg.energyCeiling || this.memCeiling !== null) && this.silenceGate > 0.5,
+      pulseActive: !!this.cfg.beatPulse && this.silenceGate > 0.5,
+      blackout: blackout || this.inputOff,
+      master: this.cfg.master ?? 1,
+      fixtures: this.cfg.fixtures,
+      headroomCap: this.cfg.dropHeadroom ? Math.round(255 * Math.min(1, 0.90 + 0.10 * this.dropEnv)) : -1,
+      nowMs: performance.now(),
+    });
 
-    // VU-TAK SIST: applicera taket EFTER ballistiken → ren slutgain som följer
-    // nivån DIREKT (ingen effekt-ballistik som släpar på vägen ner). Kapar bara
-    // färg/dim-kanaler; strobe orörda. (Drop/punch/riser/flash ligger redan i
-    // ceilMul via bypass → de lyfter taket och kapar inget.) Gatas av silenceGate
-    // så den varma ambient-glöden i TYSTNAD inte kapas till svart.
-    if ((this.cfg.energyCeiling || this.memCeiling !== null) && this.silenceGate > 0.5 && ceilMul < 0.999) {
-      for (let ch = 0; ch < this.maxCh; ch++) {
-        if (this.capMask[ch]) {   // bara ljusbärande kanaler → linjär v-dämpning (ej v² på dim+färg)
-          this.universe[ch] = Math.round(this.universe[ch] * ceilMul);
-          this.outSmooth[ch] *= ceilMul;   // kapa ÄVEN ballistik-bufferten → annars
-                                            // håller den kvar en okapad topp som
-                                            // blixtrar fram på full styrka när taket
-                                            // släpper vid övergången till tystnad.
-        }
-      }
-    }
-
-    // DROP-BLACKOUT: kolsvart NU — förbi ballistikens mjuka fade (stenhård
-    // klippning). Nolla även den utjämnade bufferten så explosionen efter
-    // svärtan reser sig rent från svart, utan pop från en kvarhållen nivå.
-    if (blackout) {
-      for (let ch = 0; ch < this.maxCh; ch++) {
-        if (!this.strobeMask[ch]) { this.universe[ch] = 0; this.outSmooth[ch] = 0; }
-      }
-    }
-
-    // LJUS-TAK + PER-KANAL KALIBRERING — sista mappningen före output. Mappar
-    //   0        → 0 (släckt)
-    //   1..255   → onCh .. TAK, linjärt
-    // där TAK = round(255·master) (ljus-taket) och onCh = lampans kalibrerade
-    // tändpunkt (0 om okalibrerad). Så master är ett ÄKTA output-tak (55% → max
-    // 140), inte en innehålls-skalning som gamma/kalibrering annars komprimerar
-    // bort. Vid master=1 → TAK=255 → identiskt med ren kalibrering (+ okalibrerade
-    // kanaler blir identitet). Ingen kanal i dödzonen; släpp-håll (~120ms) bryggar
-    // mikro-0-dippar i botten så dioden inte strobar.
-    const calNow = performance.now();
-    const topBase = Math.round(255 * (this.cfg.master ?? 1));   // ljus-tak i byte
-    for (const cf of this.cfg.fixtures) {
-      const cal = cf.cal;
-      const on = cal ? (cal.on || 0) : 0;
-      const roles = fixtureRoles(cf);
-      const cbase = cf.address - 1;
-      for (let i = 0; i < roles.length; i++) {
-        const ch = cbase + i;
-        if (ch < 0 || ch >= 512 || !this.capMask[ch]) continue;
-        const raw = this.universe[ch];
-        let out;
-        if (raw > 0) {
-          const role = roles[i];
-          // Per-FÄRG-tröskel: R/G/B tänder vid olika DMX → kanalens egen om satt.
-          const onCh = cal ? ((role === "r" ? cal.onR : role === "g" ? cal.onG : role === "b" ? cal.onB : role === "w" ? cal.onW : undefined) ?? on) : 0;
-          const top = Math.max(onCh + 1, topBase);   // taket aldrig under tändpunkten
-          out = Math.min(255, Math.round(onCh + (top - onCh) * raw / 255));
-          this.calHoldVal[ch] = out;               // minns senaste tända
-          this.calHoldUntil[ch] = calNow + 120;    // håll ~120ms efter sista tända
-        } else if (calNow < this.calHoldUntil[ch]) {
-          // SLÄPP-HÅLL: raw dippade till 0 men vi är inom hålltiden → håll senaste
-          // TÄNDA (≥onCh) → mikro-0-dippar i tysta partier bryggas till stadig dim-
-          // glöd i st.f. att bruset strobar dioden 0↔onCh. Äkta tystnad (>120ms 0)
-          // faller igenom → 0, rent släckt.
-          out = this.calHoldVal[ch];
-        } else {
-          out = 0;
-        }
-        this.universe[ch] = out;
-      }
-    }
-
-    // DROP-HEADROOM: kapa normal ljusstyrka till 90%, men släpp DROPS till 100%.
-    // Ren TAK-klämning (bara det som ligger över kapet dras ner → dim-värden orörda,
-    // ingen kanal skjuts under sin tröskel). dropEnv lyfter kapet till 100% under
-    // dropen → den poppar tydligt mot en normalt lite lugnare rigg. Sist av allt.
-    if (this.cfg.dropHeadroom) {
-      const capByte = Math.round(255 * Math.min(1, 0.90 + 0.10 * this.dropEnv));
-      for (let ch = 0; ch < this.maxCh; ch++) {
-        if (this.capMask[ch] && this.universe[ch] > capByte) this.universe[ch] = capByte;
-      }
-    }
-
-    // Rök-kanal skrivs SIST (efter ballistiken) → instant på/av, ingen fade.
-    if (fog?.enabled) {
-      const fa = fog.address - 1;
-      if (fa >= 0 && fa < 512) this.universe[fa] = nowWall < this.fogUntil ? Math.max(0, Math.min(255, Math.round(fog.level))) : 0;
+    // Rök: motorn avgör OM den ska spruta, output-tjänsten var signalen hamnar.
+    // RÖK: motorn samlar önskemålen — drop, manuell knapp, eller en effekt som bett om
+    // det — och output-tjänsten avgör om maskinen KAN (värmebudget, cooldown, nödstopp).
+    if (fog) {
+      const wantBurst = (dropHit && fog.onDrop) || this.cfg.fogTrigger || wantFogFx;
+      if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;   // engångs-flagga
+      const spraying = this.out.fogTick(nowWall, _dtT * 1000, wantBurst, fog);
+      if (fog.enabled) this.out.writeFog(this.universe, fog.address, spraying ? fog.level : 0);
     }
     return this.universe;
   }
 }
 
-interface SpecialtyValues {
-  hazer: number; uv: number; blinder: number; strobe: number; laser: number; co2: number;
-}
 
-function writeFixture(
-  u: Uint8Array,
-  fx: FixtureConfig,
-  rgb: [number, number, number],
-  master: number,
-  strobeVal = 0,
-  specialty?: SpecialtyValues,
-) {
-  const roles = fixtureRoles(fx);
-  const base = fx.address - 1;   // DMX is 1-indexed
-  const m = clamp01(master);
-
-  const [r, g, b] = rgb;
-  // White = min(r,g,b) so RGBW fixtures keep saturation on the color chans
-  const w = Math.min(r, g, b);
-  const dim = Math.max(r, g, b);
-  const hasColor = roles.includes("r") || roles.includes("g") || roles.includes("b");
-  const hasDim = roles.includes("dim");
-  const colorScale = hasDim ? 1 : m;
-
-  for (let i = 0; i < roles.length; i++) {
-    const ch = base + i;
-    if (ch < 0 || ch >= 512) continue;
-    switch (roles[i]) {
-      case "r":      u[ch] = to255((r - (roles.includes("w") ? w : 0)) * colorScale); break;
-      case "g":      u[ch] = to255((g - (roles.includes("w") ? w : 0)) * colorScale); break;
-      case "b":      u[ch] = to255((b - (roles.includes("w") ? w : 0)) * colorScale); break;
-      case "w":      u[ch] = to255(w * colorScale); break;
-      case "dim":    u[ch] = to255(hasColor ? m : dim * m); break;
-      case "strobe": u[ch] = Math.max(0, Math.min(255, Math.max(strobeVal, specialty?.strobe ?? 0))); break;
-      case "hazer":   u[ch] = specialty?.hazer   ?? 0; break;
-      case "uv":      u[ch] = specialty?.uv      ?? 0; break;
-      case "blinder": u[ch] = specialty?.blinder ?? 0; break;
-      case "laser":   u[ch] = specialty?.laser   ?? 0; break;
-      case "co2":     u[ch] = specialty?.co2     ?? 0; break;
-      case "unused": break;
-    }
-  }
-}
-
-const clamp01 = (x: number) => x < 0 ? 0 : x > 1 ? 1 : x;
-// LED PARs are wildly non-linear: DMX 128 looks ~80% bright and the low end
-// cuts off abruptly. Gamma 2.2 makes the fade perceptually linear — half
-// looks half, and most DMX resolution lands in the visible low range.
-const to255 = (x: number) => Math.round(Math.pow(clamp01(x), 2.2) * 255);

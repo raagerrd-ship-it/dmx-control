@@ -96,6 +96,7 @@ analyser.setSpectrumSink((mag, binHz) => songs.pushSpectrum(mag, binHz, cfg.audi
 // energi framåtblickande och skriver en sidecar som ersätter tidslinjen.
 const DATA_DIR = dirname(process.env.SONGS_PATH ?? "/var/lib/audio-dmx-engine/songs.bin");
 const recorder = new LearnRecorder(join(DATA_DIR, "learn.wav"), cfg.audio.rate);
+let lastLearningNew = false;
 const refiner = new RefineQueue(DATA_DIR, (t) => songs.applyRefined(t.songId, t));
 refiner.cleanStale();
 songs.onDropLearning = () => recorder.abort();
@@ -104,7 +105,7 @@ songs.onCommit = (songId, fresh) => {
   // Segmentet matchade en KÄND låt → inspelningen är bara den del som spelades,
   // alltså per definition partiell. Den lagrade tvätten byggde på hela låten och
   // ska aldrig ersättas av en sämre. Ingen tvätt, inget ljud kvar.
-  if (!fresh) { recorder.abort(); return; }
+  if (!fresh) { console.log(`[diag] commit: ingen tvätt (fresh=false), songId=${songId}`); recorder.abort(); return; }
   const wav = recorder.finish();
   if (!wav) return;
   // Gaplös ström: nästa låt börjar spelas in i learn.wav i samma sekund som
@@ -120,6 +121,7 @@ songs.onCommit = (songId, fresh) => {
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
 let lastRenderMs = 0;
+const dmxProbe = { left: 0, chs: [] as number[], rows: [] as string[], t0: 0 };
 let clockDetBpm = 0;   // analysatorns bpm som taktklockan LÅSTES på (om-ankrings-referens,
                        // skild från cfg.beat.bpm som frekvens-termen finjusterar)
 let lastLiveDrop = 0;        // senast sedda drop-räknare FRÅN analysatorn
@@ -153,32 +155,60 @@ capture.on("chunk", (samples: Float32Array) => {
   });
   // Temp-inspelning: bara medan en NY låt lärs in på aux (state().learning),
   // aldrig på mik och aldrig för en redan känd låt.
-  if (songs.learningNew) { if (!recorder.active) recorder.start(); recorder.write(samples); }
+  // DIAGNOSTIK: learningNew kräver !matchId. En kortvarig falsk match under
+  // inspelningen pausar ljudskrivningen medan fingerprintingen fortsätter → WAV:en
+  // blir KORTARE än tidslinjen och tvättens drops/energikurva hamnar för tidigt.
+  const lnNow = songs.learningNew;
+  if (lnNow !== lastLearningNew) {
+    lastLearningNew = lnNow;
+    if (recorder.active) console.log(`[diag] ljudskrivning ${lnNow ? "ÅTER" : "PAUSAD"} vid segmenttid ${(songs.state().positionMs / 1000).toFixed(2)}s — ${songs.learnWhy}`);
+  }
+  if (lnNow) { if (!recorder.active) recorder.start(); recorder.write(samples); }
   // LÅTGRÄNS → mjuk omkalibrering av den löpande dynamiken (auto-rangen får
   // krypa in på nya låtens nivåer inom sekunder i stället för en minut).
   if (songs.boundaryCount !== lastBoundary) { lastBoundary = songs.boundaryCount; effects.softenRange(); }
 
 
   if (songs.recognized) {
-    if (songs.takeDrop() > 0) outDrop++;          // pre-fired ur minnet
+    // DIAGNOSTIK: realtidsdetektorn kopplas bort när låten är känd, så ett fel i
+    // postens drop-tid korrigeras aldrig. Logga BÅDA med position, så felet kan mätas.
+    if (liveDrop) console.log(`[diag] realtidsdrop vid position ${(songs.state().positionMs / 1000).toFixed(2)}s`);
+    if (songs.takeDrop() > 0) {
+      console.log(`[diag] MINNESDROP: position ${(songs.state().positionMs / 1000).toFixed(2)}s (lagrad drop-tid ${(songs.lastFiredDropMs / 1000).toFixed(2)}s)`);
+      outDrop++;          // pre-fired ur minnet
+    }
     const ri = songs.replayIntensity();
-    if (ri !== null) frame.intensity = frame.intensity * 0.3 + ri * 0.7;
+    // 100 % UR MINNET NÄR SYNKEN ÄR LÅST.
+    // Förr blandades 30 % live-intensitet in i dramaturgin. Ligger den signalen
+    // brusigt eller en aning ur fas syns det som fladder — och hela poängen med en
+    // verifierad tidslinje är att den inte behöver gissa. `recognized` kräver numera
+    // bevisad synk, så det finns inget skäl att väga in realtidens gissning längre.
+    if (ri !== null) frame.intensity = ri;
     // DRAMATURGI UR MINNET: taket, riser-rampen och strukturen är förberäknade
     // offline — realtid kan bara gissa hur lång en uppbyggnad är, minnet VET.
     const cues = songs.replayCues();
-    effects.memCeiling = cues.ceiling;
+    // MINNETS LJUSTAK ÄR AVSTÄNGT SOM STANDARD. Taket tas ur insignalen (energyCeiling):
+    // det är alltid i fas med musiken, fungerar likadant i realtid och uppspelning, och
+    // kan inte hamna snett av en tidsbas. Minnet bidrar i stället med det bara minnet
+    // vet: drops, uppbyggnader, tempo och när effekter ska bytas.
+    effects.memCeiling = cfg.memCeilingOff === false ? cues.ceiling : null;
     effects.memHasGrid = cues.hasGrid;
     if (cues.section) effects.memSectionAt = performance.now();
     if (cues.phrase) effects.memPhraseAt = performance.now();
     if (cues.build !== null) {
       // Proportionell mot RESTEN av risern → 100 % exakt på dropen, i stället för
       // realtidens gissning som toppar för tidigt eller för sent.
-      frame.buildUp = Math.max(frame.buildUp, cues.build);
+      frame.buildUp = cues.build;
       frame.inRiser = true;
+    } else if (cues.hasRisers) {
+      // Minnet VET var uppbyggnaderna ligger — och här är ingen. Då ska realtidens
+      // gissning inte få starta en, för då byggs spänning där låten inte har någon.
+      frame.buildUp = 0;
+      frame.inRiser = false;
     }
     if (!memoryBeatLocked) {
       const lb = songs.lockedBeat();
-      if (lb && lb.bpm > 40) { cfg.beat = { anchorMs: lb.anchorMs, bpm: lb.bpm }; clockDetBpm = lb.bpm; memoryBeatLocked = true; }
+      if (lb && lb.bpm > 40) { cfg.beat = { anchorMs: lb.anchorMs, bpm: lb.bpm, confidence: 1 }; clockDetBpm = lb.bpm; memoryBeatLocked = true; }   // ur minnet: tvättad på HELA låten → full tillit
     }
   } else {
     memoryBeatLocked = false;
@@ -188,6 +218,7 @@ capture.on("chunk", (samples: Float32Array) => {
   }
 
   frame.dropCount = outDrop;
+  (frame as unknown as Record<string, number>).beatMul = effects.beatMulNow;
   // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
   // (om)lås; att sätta det på varje kick fick pulsen att flimra.
   const effBpm = frame.bpm;
@@ -196,7 +227,13 @@ capture.on("chunk", (samples: Float32Array) => {
 
     // Om-ankra bara när ANALYSATORNS bpm ändras (nytt tempo/låt), INTE när vår egen
     // frekvens-finjustering flyttat cfg.beat.bpm — annars nollar korrektionen sig själv.
-    if (!cfg.beat || Math.abs(effBpm - clockDetBpm) > 2) {
+    //
+    // OCH ALDRIG NÄR TEMPOT ÄR LÅST UR MINNET. En igenkänd, synkad låt har ett tempo
+    // som tvätten räknat fram på HELA låten; realtidsdetektorn gissar på några sekunder
+    // och hoppade MÄTT 2026-08-07 mellan 117, 81 och 143 BPM mitt i samma låt. Varje
+    // hopp ankrade om taktklockan, fasen kastade sig och pulsen lästes som stroboskop.
+    // PLL:en nedan får fortfarande finjustera FASEN mot faktiska trumslag.
+    if (!memoryBeatLocked && (!cfg.beat || Math.abs(effBpm - clockDetBpm) > 2)) {
       clockDetBpm = effBpm;
       let anchor = frame.beatAnchorMs || Date.now();
       if (cfg.beat) {
@@ -205,7 +242,7 @@ capture.on("chunk", (samples: Float32Array) => {
         const phase = (((Date.now() - cfg.beat.anchorMs) % oldMs) + oldMs) % oldMs / oldMs;
         anchor = Date.now() - phase * newMs;
       }
-      cfg.beat = { anchorMs: anchor, bpm: effBpm };
+      cfg.beat = { anchorMs: anchor, bpm: effBpm, confidence: frame.bpmConfidence };
     }
     // annars: behåll ankaret → jämn, kontinuerlig fas
 
@@ -266,6 +303,19 @@ capture.on("chunk", (samples: Float32Array) => {
   if (nowR - lastRenderMs >= 10) {
     lastRenderMs = nowR;
     const universe = effects.render(latestFrame);
+    // DIAGNOSTIK: sampla den FAKTISKA DMX-utgången (efter puls, tak och kalibrering)
+    // så pulsen kan verifieras på det som lamporna får — inte på en mellansignal.
+    if (dmxProbe.left > 0) {
+      dmxProbe.left--;
+      // Taktfasen räknas ur samma klocka som effekterna använder → 0 = precis på slaget.
+      let bf = -1;
+      if (cfg.beat && cfg.beat.bpm > 40) {
+        const bMs = 60000 / cfg.beat.bpm;
+        bf = ((((Date.now() - cfg.beat.anchorMs) % bMs) + bMs) % bMs) / bMs;
+      }
+      dmxProbe.rows.push(`${Math.round(performance.now() - dmxProbe.t0)},${bf.toFixed(3)},${dmxProbe.chs.map((c) => universe[c]).join(",")}`);
+      if (dmxProbe.left === 0) console.log("[dmxprobe] ms,beatFrac," + dmxProbe.chs.join(",") + "|" + dmxProbe.rows.join("|"));
+    }
     dmx.send(universe, curSlots);
     // BLE-slingorna får riggens dominanta färg: medelvärde av alla R/G/B/W-kanaler
     // (W adderas i alla tre → varmvit blir vit på BLEDOM som saknar W). Master
@@ -336,7 +386,20 @@ const serverDeps = {
   getDmxConnected: () => dmx.isConnected(),
   getFogStatus: () => effects.getFogStatus(),
   resetFogService: () => effects.resetFogService(),
-  songMemory: { state: () => ({ ...songs.state(), refining: refiner.busy, refiningId: refiner.songId }), forget: () => songs.forget() },
+  songMemory: {
+      state: () => ({ ...songs.state(), refining: refiner.busy, refiningId: refiner.songId }),
+      forget: () => songs.forget(),
+      manualStart: () => songs.manualStart(),
+      manualNext: () => songs.manualNext(),
+      manualStop: () => songs.manualStop(),
+      list: () => songs.list(),
+      setNote: (id: number, note: string) => songs.setNote(id, note),
+      forgetSong: (id: number) => songs.forgetSong(id),
+      dumpCurve: (id: number) => songs.dumpCurve(id),
+    },
+    probeDmx: (channels: number[], frames: number) => {
+      dmxProbe.chs = channels; dmxProbe.rows = []; dmxProbe.t0 = performance.now(); dmxProbe.left = frames;
+    },
   cycleMode,
 
   resetAgc: (g?: number) => analyser.resetGain(g),

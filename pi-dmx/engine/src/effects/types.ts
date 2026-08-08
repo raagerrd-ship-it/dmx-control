@@ -16,7 +16,24 @@ export type EffectTier = "lugn" | "fart" | "full";
 
 /** Allt en effekt behöver för att rendera EN lampa. Byggs av motorn per frame;
  *  idx/fx/band muteras per lampa (samma objekt återanvänds → ingen allokering). */
+/** En effekts ÖNSKEMÅL om specialenheter. Effekten uttrycker vad den vill; motorn
+ *  avgör om det blir av — en fixtur måste ha rollen, och rök går alltid genom
+ *  värmebudget och cooldown. Sätts valfritt i render(); nollställs varje ruta.
+ *  Allt utom `fog` är 0..1 och skalas av motorn till DMX. */
+export interface EffectWants {
+  strobe?: number;
+  blinder?: number;
+  uv?: number;
+  laser?: number;
+  hazer?: number;
+  co2?: number;
+  /** true = "nu vore ett bra läge för en puff". Motorn kan neka (värme/cooldown). */
+  fog?: boolean;
+}
+
 export interface EffectContext {
+  /** Skriv här för att be om specialenheter — se EffectWants. */
+  want: EffectWants;
   cfg: EngineConfig;
   frame: Frame;
   fx?: FixtureConfig;

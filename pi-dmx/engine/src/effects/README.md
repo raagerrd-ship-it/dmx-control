@@ -7,11 +7,51 @@ render(c: EffectContext): [number, number, number]   // → [r, g, b], each 0..1
 ```
 
 The engine calls it once per lamp, per frame (~50 Hz), and does *everything else*
-around it — master brightness, beat pulse, the VU ceiling, ballistics, drop
-bloom, fog, the ambient idle glow, gamma, and the DMX wire. **Your effect only
-decides the colour and per-lamp shape of one lamp.** Don't apply master volume,
-don't cap brightness to the audio level, don't gamma-correct — that's all done
-downstream (see *What the engine does after you* below).
+around it — master brightness, the heartbeat pulse, the VU ceiling, ballistics,
+drop bloom, the ambient idle glow, gamma, and the DMX wire. **Your effect decides
+the colour and per-lamp shape of one lamp**, and may *ask* for special fixtures
+(see below). Don't apply master volume, don't cap brightness to the audio level,
+don't gamma-correct — that's all done downstream (see *What the engine does after
+you* below).
+
+## Asking for special fixtures
+
+Colour comes back as your return value. Everything else — strobe, blinder, UV,
+laser, hazer, CO₂ and fog — is requested through `c.want`:
+
+```ts
+render(c) {
+  if (c.dropEnv > 0.8) c.want.strobe = 1;        // 0..1, scaled to DMX by the engine
+  if (c.beatIdx % 32 === 0) c.want.fog = true;   // boolean: "now would be a good moment"
+  c.want.uv = c.buildUp;                          // ramp UV with the build-up
+  return c.hsv(hue, 1, v);                        // r, g, b as always
+}
+```
+
+`c.want` is `{ strobe?, blinder?, uv?, laser?, hazer?, co2? }` in **0..1**, plus
+`fog?: boolean`. It is cleared before every lamp, so set it fresh each frame.
+
+**You are expressing a wish, not writing a channel.** Two rules always hold:
+
+* **Your effect must declare the role, and the rig must have the fixture.** The
+  `drives` tag lives in the `SPECIALTY_DRIVES` table in `registry.ts` — *not* in
+  your effect file. If your effect sets `c.want.strobe` but isn't listed there
+  for `"strobe"`, the request is **silently ignored**. Add the role to that table
+  when you add a `want`, or nothing will happen. Asking for a laser on a rig
+  without one also does nothing — you can never write to a channel that isn't
+  there. (`c.want.fog` is the exception: the fogger is one machine on its own
+  address, not a per-fixture role, so it needs no `drives` tag.)
+* **Fog goes through hardware protection.** The output service owns a thermal
+  budget (~45 s of spraying per the datasheet), a cooldown between bursts, and an
+  emergency stop mid-burst. `c.want.fog = true` may therefore be declined, and
+  that is correct behaviour — never try to work around it.
+
+The strongest wish across all lamps wins: if your effect asks for strobe on one
+lamp, it means the rig's strobe. Requests are combined with the engine's own
+value via `Math.max`, so you can only ever *add* intensity, never dim what the
+director already decided.
+
+Effects that set nothing behave exactly as before — `want` is entirely optional.
 
 Each effect lives in its own file and exports an `EffectDef`:
 
@@ -92,6 +132,20 @@ Built once per frame and reused; `idx` / `fx` / `band` change per lamp.
 
 ---
 
+### Special fixtures (write, don't read)
+| Field | Range | Meaning |
+|---|---|---|
+| `c.want.strobe` | 0..1 | Ask for strobe. Combined with the engine's own via `Math.max`. |
+| `c.want.blinder` | 0..1 | Ask for blinder. |
+| `c.want.uv` | 0..1 | Ask for UV. |
+| `c.want.laser` | 0..1 | Ask for laser. |
+| `c.want.hazer` | 0..1 | Ask for haze. |
+| `c.want.co2` | 0..1 | Ask for CO₂. |
+| `c.want.fog` | bool | "Now would be a good moment for a burst." May be declined by the thermal budget. |
+
+Cleared before every lamp — set it fresh each frame. Ignored unless the rig
+actually has that fixture. See *Asking for special fixtures* at the top.
+
 ## Output — what you return
 
 `[r, g, b]`, each **0..1**. Almost always build it with `c.hsv(hue, 1, v)`:
@@ -111,20 +165,26 @@ a pure-red bass lamp) when you want one physical LED group per lamp.
 
 ## What the engine does *after* you (so you don't)
 
-In order, on top of your `[r,g,b]`:
+In order, on top of your `[r,g,b]`. **The order is measured, not arbitrary** — it
+was rebuilt on 2026-08-07 after the heartbeat turned out never to reach the lamps.
 
 1. **Bloom / drop blend** — on a bass punch or drop the colour is pushed to full.
-2. **`× md`** — master · silence-gate · **beatPulse dip** · bass-punch · riser/drop
-   boost · micro-strobe. (So `beatPulse` is *also* applied globally — you can add
-   your own on top for a stronger per-effect pulse, or rely on the global one.)
+2. **`× md`** — master · silence-gate · bass-punch · riser/drop boost · micro-strobe.
+   (The heartbeat is *not* here any more; see step 6.)
 3. **Ambient idle glow** added when the music stops (owner toggle).
-4. **Output ballistics** — a peak-hold with tempo/energy-adaptive decay
-   (transient-sharpen) smooths the DMX output.
-5. **VU ceiling** — the final gain: output brightness = **raw input level**
-   (only a drop bypasses it). *This is why you must NOT scale brightness to the
-   audio level yourself — it's done here, last.*
-6. **Gamma 2.2 → 0–255** per DMX channel; `dim` channel handling for fixtures
-   with a separate dimmer.
+4. **Colour → channels** (`output.ts`): RGBW split, `dim` handling, **gamma 2.2 → 0–255**.
+5. **Output ballistics** — soft attack (90 ms) + peak-hold decay. This cleans up the
+   *effects'* own jitter. It runs before the ceiling and the pulse so it can never
+   smear either of them.
+6. **VU ceiling** — the final brightness, taken from the **input level normalised
+   against a rolling p5–p95 window** (not the raw level: a compressed track has a
+   narrow span, so the gain is capped at 2×). A drop bypasses it. *This is why you
+   must NOT scale brightness to the audio level yourself.*
+7. **Heartbeat** — attack/decay per beat, scaled with tempo, applied **last of all**
+   and outside the ballistics. A drop bypasses it too. Put it before the ballistics
+   and its 121 ms decay gets smeared by the output's 0.42 s — measured: the DMX
+   output then showed no periodicity at the beat at all.
+8. **Calibration** — per-channel on-threshold and the master output cap.
 
 **Rules of thumb**
 - One lamp at a time; key everything off `c.idx` / `c.count` so you scale to any

@@ -54,7 +54,15 @@ export const EFFECTS: EffectDef[] = [
  *  varje effekt aktivt driver. Effekten fungerar utan dessa; matchning styr bara
  *  vilka SPECIALFIXTURES motorn ska tända, och UI:t gråar ut effekter vars enda
  *  drives saknar kopplad fixture. Håll listan här (metadata) – inte i varje
- *  effekt-fil – så vi har EN översikt att justera från. */
+ *  effekt-fil – så vi har EN översikt att justera från.
+ *
+ *  DEN HÄR TABELLEN ÄR OCKSÅ NYCKELN TILL `c.want`. En effekt som sätter
+ *  `c.want.strobe` men INTE står med här för "strobe" får sitt önskemål TYST
+ *  ignorerat — motorn kollar `drives` innan den vidarebefordrar. Lägger du till
+ *  ett `want` i en effekt: lägg till rollen här också, annars händer ingenting.
+ *  (Undantag: `c.want.fog`. Rökmaskinen är EN enhet på egen adress, inte en roll
+ *  per fixtur, så den kräver ingen drives-tagg — bara att maskinen är påslagen
+ *  och att hårdvaruskyddet i output.ts släpper fram puffen.) */
 const SPECIALTY_DRIVES: Partial<Record<Mode, ChannelRole[]>> = {
   drops:    ["blinder", "strobe", "laser", "co2", "hazer"],
   party:    ["blinder", "laser", "co2", "hazer"],

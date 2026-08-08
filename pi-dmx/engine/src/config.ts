@@ -120,16 +120,24 @@ export interface EngineConfig {
    *  (rgb/rgbw/rgb7) — DMX är enkelriktat, användaren är sensorn. */
   walkTest?: { index: number; channel: number } | null;
   /** Transient beat clock (BPM + wall-clock anchor) — not persisted. */
-  beat?: { anchorMs: number; bpm: number } | null;
+  /** Taktklockan. Fasen (anchorMs) knuffas löpande av PLL:en mot faktiska trumslag;
+   *  confidence avgör om takten alls får användas — se beatClock.ts. */
+  beat?: { anchorMs: number; bpm: number; confidence?: number } | null;
   /** Transient PLL-fasfel (-0.25..0.25 av en takt), utjämnat — för UI:ts beat-synk-
    *  indikator (ser hur mycket fasen justeras). Ej persisterad. */
   beatErr?: number;
   /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */
+  /** HELA SHOWENS FÖRSPRÅNG mot musiken (ms) — en ratt för all fördröjning i kedjan:
+   *  DMX-överföring, lampornas svarstid, ljudkortets buffert. Analysatorns eget ankare
+   *  rörs aldrig; det är sanningen om var slaget ligger i ljudet. Se effects.ts. */
+  showLeadMs?: number;
   dmxMaxHz: number;
   /** Latminnets INLARNING. false = kann igen och kor pa inspelning som vanligt,
    *  men lar ALDRIG in nya latar. Igenkanning paverkas inte. Anvands nar man vill
    *  frysa minnet (t.ex. medan segmenteringen trimmas) utan att byta ljudkalla. */
   songLearn?: boolean;
+  /** Diagnostik: stäng av minnets ljustak (memCeiling) utan att röra resten. */
+  memCeilingOff?: boolean;
   /** Rökmaskin (1 DMX-kanal). Blast på drop, med duty-cycle-skydd. */
   fog?: {
     enabled: boolean;      // maskinen inkopplad/aktiv
@@ -227,6 +235,7 @@ export const defaultConfig: EngineConfig = {
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   intensityRing: { bus: 0, device: 0, maxBright: 0.40, pulseBoost: 0.18, blackoutFadeMs: 400 },  // WS2812 12-LED på SPI0 MOSI (GPIO10, pin 19)
   bleDevices: [],   // paras via /setup — sidecarn respawnar utan att tappa listan
+  showLeadMs: 50,
   dmxMaxHz: 100, // 100 Hz för tightare bas/drop-synk; helper cappar till wire-limit
   // Rok-defaults satta for Ibiza LSM1500PRO + Cameo XTRA HEAVY: maskinen ger
   // 250 m3/min och vatskan ar den tataste sorten (extremt lang svavtid, gjord
