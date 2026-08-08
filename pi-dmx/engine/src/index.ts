@@ -16,7 +16,7 @@ import { dirname, join } from "node:path";
 import { LearnRecorder } from "./learnRecorder.js";
 import { RefineQueue } from "./refineQueue.js";
 import { StructureQueue } from "./structureQueue.js";
-import { sampleForIdentify, identify, formatNote } from "./identify.js";
+import { sampleForIdentify, identify, formatNote, wavDuration, SAMPLE_SPOTS } from "./identify.js";
 import { AudioCapture } from "./audio.js";
 import { Analyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
@@ -157,13 +157,25 @@ async function nameSong(wavPath: string, songId: number): Promise<void> {
   const existing = songs.list().find((r) => r.id === songId);
   if (existing?.note) return;                       // agaren har redan dopt den
   try {
-    const sample = sampleForIdentify(wavPath);
-    if (!sample) { console.log(`[namn] låt #${songId}: för kort för igenkänning`); return; }
-    const hit = await identify(sample, { host, key, secret });
-    if (!hit) { console.log(`[namn] låt #${songId}: ingen säker träff — lämnas namnlös`); return; }
-    const note = formatNote(hit);
-    songs.setNote(songId, note);
-    console.log(`[namn] låt #${songId} = "${note}" (score ${hit.score})`);
+    const durS = wavDuration(wavPath);
+    if (durS < 40) { console.log(`[namn] låt #${songId}: för kort för igenkänning (${durS.toFixed(0)} s)`); return; }
+    // FLERA STALLEN. Ett enda utdrag racker inte: MATT 2026-08-08 gav mitten av
+    // en lat score 46 pa FEL lat, medan 30 s in och 2/3 in bada gav 100 pa ratt.
+    for (let i = 0; i < SAMPLE_SPOTS.length; i++) {
+      const at = SAMPLE_SPOTS[i](durS);
+      if (at < 0 || at + 12 > durS) continue;
+      const sample = sampleForIdentify(wavPath, at);
+      if (!sample) continue;
+      const hit = await identify(sample, { host, key, secret });
+      if (hit) {
+        const note = formatNote(hit);
+        songs.setNote(songId, note);
+        console.log(`[namn] låt #${songId} = "${note}" (score ${hit.score}, utdrag vid ${at.toFixed(0)} s)`);
+        return;
+      }
+      console.log(`[namn] låt #${songId}: osäker vid ${at.toFixed(0)} s — provar nästa`);
+    }
+    console.log(`[namn] låt #${songId}: ingen säker träff på ${SAMPLE_SPOTS.length} försök — lämnas namnlös`);
   } catch (e) {
     console.error(`[namn] låt #${songId} misslyckades:`, (e as Error).message);
   }

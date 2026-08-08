@@ -83,6 +83,15 @@ export class StructureQueue {
   private load(): void {
     try {
       if (existsSync(this.file)) this.store = JSON.parse(readFileSync(this.file, "utf8"));
+      // Slå ihop grannar med samma etikett aven i REDAN sparade analyser, sa de
+      // som lagrades innan hopslagningen fanns inte behover kostas om.
+      let cleaned = 0;
+      for (const s of Object.values(this.store)) {
+        const before = s.parts.length;
+        s.parts = s.parts.filter((p, i) => i === 0 || s.parts[i - 1].label !== p.label);
+        if (s.parts.length !== before) cleaned++;
+      }
+      if (cleaned) { this.save(); console.log(`[struktur] slog ihop sektioner i ${cleaned} tidigare analys(er)`); }
       const n = Object.keys(this.store).length;
       if (n) console.log(`[struktur] ${n} analyserade låtar i minnet`);
     } catch (e) {
@@ -290,6 +299,19 @@ export function parseAllInOne(out: any): { bpm?: number; downbeats?: number[]; p
     parts.push({ t: Math.round(start * 1000), label });
   }
   parts.sort((a, b) => a.t - b.t);
+  // SLA IHOP GRANNAR MED SAMMA ETIKETT. Modellen delar langa sektioner vid
+  // frasgranser, sa svaret innehaller sekvenser som "INT INT", "CHO CHO",
+  // "VER VER". MATT 2026-08-08 pa agarens egna latar: 11 sektioner blev 9 och
+  // 13 blev 8 efter hopslagning — och det ar de hopslagna som motsvarar vad
+  // laten FAKTISKT bestar av. For dirigenten ar skillnaden viktig: den ska byta
+  // look nar refrangen borjar, inte mitt i den.
+  const merged: SongPart[] = [];
+  for (const p of parts) {
+    if (merged.length && merged[merged.length - 1].label === p.label) continue;
+    merged.push(p);
+  }
+  parts.length = 0;
+  parts.push(...merged);
   const dbRaw = root?.downbeats ?? root?.downbeat ?? [];
   const downbeats = (Array.isArray(dbRaw) ? dbRaw : []).map((x: any) => Math.round(num(x)! * 1000)).filter((x) => Number.isFinite(x));
   const bpm = num(root?.bpm ?? root?.tempo) ?? undefined;

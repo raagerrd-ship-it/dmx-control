@@ -21,10 +21,17 @@
 import { readFileSync } from "node:fs";
 import { createHmac } from "node:crypto";
 
-/** Under detta litar vi inte på träffen — fältet lämnas tomt. */
-const MIN_SCORE = 70;
-/** Toppen måste dessutom vara tydligt bättre än tvåan. */
-const MIN_MARGIN = 20;
+/**
+ * ENDA REGELN: score 100. Inget annat sparas.
+ *
+ * MATT 2026-08-08 over sex utdrag ur fyra riktiga inspelningar. Varje RATT svar
+ * lag pa exakt 100; varje FEL svar lag pa 46, 43, 40, 34, 31 eller 22. Gapet ar
+ * sa stort att ingen marginalregel behovs — och en marginalregel var dessutom
+ * direkt skadlig: ACRCloud svarade en gang med TRE traffar pa 100 ("Supa Dupa",
+ * "(Extended Mix)", "(Original Mix)" — samma lat i tre utgavor), vilket en
+ * krav-pa-avstand-till-tvaan hade avvisat som tvetydigt.
+ */
+const REQUIRED_SCORE = 100;
 /** ACRCloud behöver inte mer: 8 kHz mono räcker gott och tar utdraget från
  *  1,4 MB till under 200 kB. */
 const SAMPLE_RATE = 8000;
@@ -34,11 +41,40 @@ export interface IdentifyCreds { host: string; key: string; secret: string; }
 export interface IdentifyHit { title: string; artist: string; album?: string; score: number; }
 
 /**
- * Klipp ut ett utdrag MITT i låten och samla till 8 kHz mono.
- * Mitten med flit: introt kan vara tyst, uttoning likaså, och en igenkänning
- * som får tystnad svarar inget alls.
+ * ETT UTDRAG RACKER INTE. MATT 2026-08-08 pa en riktig inspelning (181 s):
+ *   mitten (85 s)  -> score  46 pa FEL lat  (korrekt avvisad, men inget namn)
+ *   30 s in        -> score 100, ratt lat
+ *   2/3 in (120 s) -> score 100, ratt lat
+ * Laten fanns alltsa i katalogen hela tiden — mitten rakade bara vara ett parti
+ * som fingeravtrycker daligt. Darfor provas flera stallen tills ett svar ar
+ * sakert. Ordningen ar den uppmatta: 30 s in forst, sedan 2/3, sedan mitten.
  */
-export function sampleForIdentify(wavPath: string): Buffer | null {
+export const SAMPLE_SPOTS = [
+  (durS: number) => 30,
+  (durS: number) => durS * 0.66,
+  (durS: number) => (durS - SAMPLE_SEC) / 2,
+];
+
+/** Langden pa ljudet i sekunder, eller 0 om filen inte gar att lasa. */
+export function wavDuration(wavPath: string): number {
+  try {
+    const b = readFileSync(wavPath);
+    let p = 12, ch = 1, rate = 0, dLen = 0;
+    while (p + 8 <= b.length) {
+      const id = b.toString("ascii", p, p + 4), sz = b.readUInt32LE(p + 4);
+      if (id === "fmt ") { ch = b.readUInt16LE(p + 10); rate = b.readUInt32LE(p + 12); }
+      else if (id === "data") { dLen = Math.min(sz, b.length - (p + 8)); break; }
+      p += 8 + sz + (sz & 1);
+    }
+    return rate ? dLen / 2 / ch / rate : 0;
+  } catch { return 0; }
+}
+
+/**
+ * Klipp ut ett utdrag ur låten och samla till 8 kHz mono.
+ * @param atS var utdraget borjar (sekunder). Utanfor filen → null.
+ */
+export function sampleForIdentify(wavPath: string, atS?: number): Buffer | null {
   const b = readFileSync(wavPath);
   let p = 12, ch = 1, rate = 0, dOff = 0, dLen = 0;
   while (p + 8 <= b.length) {
@@ -52,7 +88,9 @@ export function sampleForIdentify(wavPath: string): Buffer | null {
   const frames = Math.floor(i16.length / ch);
   const need = SAMPLE_SEC * rate;
   if (frames < need) return null;
-  const start = Math.floor((frames - need) / 2);
+  const start = atS === undefined
+    ? Math.floor((frames - need) / 2)
+    : Math.max(0, Math.min(frames - need, Math.floor(atS * rate)));
 
   const step = Math.max(1, Math.round(rate / SAMPLE_RATE));
   const outRate = Math.round(rate / step);
@@ -118,11 +156,8 @@ export async function identify(sample: Buffer, creds: IdentifyCreds): Promise<Id
 
   const music: any[] = j?.metadata?.music ?? [];
   if (!music.length) return null;
-  const sorted = [...music].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-  const top = sorted[0];
-  const second = sorted[1]?.score ?? 0;
-  if ((top.score ?? 0) < MIN_SCORE) return null;
-  if ((top.score ?? 0) - second < MIN_MARGIN) return null;
+  const top = [...music].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+  if ((top.score ?? 0) < REQUIRED_SCORE) return null;
 
   return {
     title: String(top.title ?? "").trim(),
