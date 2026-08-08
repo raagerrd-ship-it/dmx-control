@@ -1,74 +1,42 @@
-# Justerbart tidsförsprång per effekt
+# Bedömning av motorn + två optimeringar
 
-## Mål
-Låta ägaren trimma när varje effekt slår till i förhållande till takten. Globalt `showLeadMs` räcker inte när t.ex. hjärtslaget ska toppa PÅ slaget samtidigt som en strobe kan behöva vara något tidigare/senare än en grid-effekt.
+## Bedömning
 
-## Nuvarande läge (verifierat)
-- `beatClock.ts` har redan `beatPhase(beat, now, leadMs)` och `nextBeatIn(beat, now, leadMs)` — försprånget är inbyggt i matematiken.
-- `EffectEngine` i `effects.ts` räknar ut EN uppsättning `beatFrac`, `beatIdx`, `beatPulse`, `beatHit` per frame och delar med alla effekter via `EffectContext`.
-- Det finns redan ett globalt fält `cfg.showLeadMs` (0–300 ms) och WS-meddelandet `setShowLead`, men det har inget reglage i vare sig React-mocken eller Pi-UI:t.
-- React-mocken (`src/pages/DmxController.tsx`) har ett ägarblock (`OwnerSections`) som speglar Pi:ns `/setup`-vy.
-- Pi-UI:t (`pi-dmx/engine/public/index.html`) ägs av användaren; Lovable redigerar det inte utan levererar ändringar som diff/beskrivning.
+Motorn är i mycket gott skick. Det som var rörigt är nu uppdelat med tydligt ägarskap: `beatClock` äger takten, `postprocess` äger slutkedjan i mätt ordning, `output` äger lampkunskapen, `effects` äger bara VAD som ska lysa. Besluten är dokumenterade med mätdatum och med "prova inte det här igen"-noteringar, vilket är ovanligt bra och gör att vi slutar gå i cirklar.
 
-## Förändringar
+Latenskedjan är redan nära golvet för en Zero 2 W:
 
-### 1. Motor: per-effekt försprång i config
-Lägg till i `EngineConfig`:
-
-```typescript
-effectLeads?: Partial<Record<Mode, number>>; // extra ms per effekt, utöver showLeadMs
+```text
+arecord 1024/128 (~21 ms) → analys 375 Hz → render 100 Hz → DMX ≤200 Hz → sidecar
 ```
 
-- Default tomt objekt `{}`.
-- Giltigt intervall för varje effekt: `-100 .. +200 ms`.
-- Effektivt försprång = `showLeadMs + (effectLeads[effMode] ?? 0)`.
+Skickliga detaljer som redan är gjorda: förallokerad wire-buffert med drop-guard i stället för sändkö (utgången bär alltid SENASTE ramen), zero-copy Int16-vy i ljudvägen, arecord pinnad till kärna 0, och försprång (lead) delat i konsumentens attacktid + global `showLeadMs`.
 
-### 2. Motor: räkna ut beat-värden per effekt
-I `EffectEngine.render()`:
-- Behåll globala `beatTick` (BPM-låst grid) och `kickHit` (verklig kick) — de är sanningen om musiken.
-- För det aktuella `effMode` beräkna:
-  - `effBeatFrac = beatPhase(beat, now, totalLead)`
-  - `effBeatIdx` från en per-effekt takt-räknare som stegar på `beatTick || kickHit`
-  - `effBeatPulse = hasBeat ? Math.pow(1 - effBeatFrac, 2) : kickEnv`
-  - `effBeatHit = (effBeatIdx > lastEffBeatIdx[effMode]) || (!hasBeat && kickHit)`
-- Skriv dessa värden in i `EffectContext` innan `effect.render(ctx)` anropas.
-- Alla andra signaler (`kickEnv`, `dropEnv`, `audio`, …) förblir oförändrade.
+Jag hittar två saker kvar som är värda att göra. Resten av det jag tittade på är antingen redan optimalt eller skulle kosta mer i risk än det ger.
 
-### 3. Motor: WS-kommando
-Lägg till hanterare i `server.ts`:
+## 1. Riggen fryser om ljudinfångningen dör (viktigast)
 
-```typescript
-} else if (msg.type === "setEffectLead" && typeof msg.mode === "string" && typeof msg.value === "number") {
-  if (isMode(msg.mode)) {
-    deps.cfg.effectLeads = { ...deps.cfg.effectLeads, [msg.mode]: Math.max(-100, Math.min(200, Math.round(msg.value))) };
-  }
-}
-```
+Renderingen sker inuti chunk-hanteraren: ingen ljud-chunk ⇒ ingen `effects.render()` och ingen `dmx.send()`. Om `arecord` dör respawnas det efter 1 s, och under den tiden står lamporna kvar på exakt den färg och styrka de hade i sista ramen — mitt i en drop kan det vara full vit. Tystnadsgrinden och blackout-logiken kan inte heller köra, eftersom de bor i render.
 
-### 4. React-mock: nytt ägarkort "Effekttiming"
-I `src/pages/DmxController.tsx` / `OwnerSections`:
-- Lägg till ett kort efter "Beat-synk".
-- Global slider för `showLeadMs` (0–300 ms) med etikett "Globalt försprång".
-- Lista över alla effekter från `EFFECT_META` (eller hårdkodad kopia i mocken) med individuella sliders för `-100 .. +200 ms`.
-- Varje rad visar effektnamn, aktuellt ms-värde och en slider.
-- Allt är lokal state i mocken — inget skickas någonstans, precis som övriga ägardelar.
+Åtgärd: en fristående klocka som renderar när ljudet tystnat i utgången — inte som andra renderingsväg, utan samma `render()` med senaste framen, så vi inte får två sanningar.
 
-### 5. Pi-UI: diff/beskrivning
-Eftersom `pi-dmx/engine/public/index.html` ägs av användaren levereras ändringarna som:
-- HTML: nytt kort "Effekttiming" inuti `<div id="ownerOnly">`, placerat efter "Beat-synk".
-- CSS: återanvända befintliga slider/rad-stilar.
-- JS: WS-anslutningen får en ny funktion `sendEffectLead(mode, ms)` och config-broadcast läser in `cfg.effectLeads` för att sätta sliderarnas positioner.
+- 50 Hz-timer som bara gör något om det gått > 40 ms sedan senaste render.
+- Framens nivå/energi behandlas som fallande när chunkar saknas, så riggen tonar mjukt mot tystnadsläget i stället för att stå kvar.
+- Ingen extra kostnad i normal drift: timern hittar alltid en färsk render och avslutar direkt.
 
-### 6. Persistens
-`effectLeads` sparas automatiskt via befintlig `scheduleSave` eftersom det är ett nytt fält på `cfg`. Inga transienta fält behöver strippas.
+## 2. Allokering per ljud-chunk
 
-## Vad vi INTE gör
-- Vi ändrar inte `beatClock.ts` — den har redan rätt API.
-- Vi ändrar inte enskilda effektfiler — de konsumerar fortfarande `c.beatFrac` etc.
-- Vi lägger inte till fler timing-källor (t.ex. chroma) — detta är en ren justerbarhets-funktion.
+`toMonoFloat32` skapar en ny `Float32Array` per chunk, ~375 gånger i sekunden. Det är liten men konstant sopmängd på en maskin där en GC-paus syns som fladder.
+
+Åtgärd: återanvänd en förallokerad buffert i `AudioCapture` — men bara efter att vi kontrollerat att ingen konsument sparar arrayen mellan chunkar (analysatorn kopierar in i sitt FFT-fönster, `recorder.write` skriver vidare direkt). Om någon av dem visar sig hålla referensen kvar hoppar vi över den här punkten helt; den är inte värd en tystnadsbugg.
+
+## Sådant jag medvetet lämnar
+
+- Justerbart försprång per effekt — avvisat tidigare, tas inte upp igen.
+- Höjd render- eller DMX-frekvens: 100 Hz render mot 200 Hz DMX-tak är redan under sidecarns gräns, och mer ger ingen synlig vinst men mindre CPU-marginal.
+- Ljudbuffertens storlek: 21 ms är nära det som ALSA klarar utan overruns på en Zero 2 W.
 
 ## Verifiering
-1. Byggmotorns typer (`bun run build` i `pi-dmx/engine`) går igenom.
-2. React-mocken bygger (`bun run build`).
-3. Manuell koll: ändra ett effekt-försprång i mock-UI:t och se att värdet visas korrekt.
-4. Diff-texten för Pi-UI:t granskas av användaren innan den appliceras på `index.html`.
+
+1. Fallback-tick → stoppa `arecord` medan showen kör och kontrollera att riggen tonar ner i stället för att frysa.
+2. Buffertåteranvändning → jämför nivå-/BPM-loggen före och efter; identisk kurva krävs, annars backas ändringen.
