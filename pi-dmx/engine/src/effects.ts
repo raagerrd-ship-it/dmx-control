@@ -47,6 +47,14 @@ const BEAT_ATTACK_FRAC = 0.12;
 const BEAT_ATTACK_MIN_MS = 30;
 const BEAT_ATTACK_MAX_MS = 70;
 const BEAT_DECAY_FRAC = 0.32;
+/** PRE-DIP: en kort nedgang strax FORE anslaget, sa slaget far nagot att sticka
+ *  upp ur. Uttryckt i TID (andel av takten, klamd) och inte i ramar — den ska
+ *  folja tempot, inte renderns takt. Djupet ar avsiktligt modest: dippen ska
+ *  kannas som andning, inte som ett andra blink. */
+const BEAT_PREDIP_FRAC = 0.12;
+const BEAT_PREDIP_MIN_MS = 25;
+const BEAT_PREDIP_MAX_MS = 60;
+const BEAT_PREDIP_DEPTH = 0.35;
 /** HELA SHOWENS FÖRSPRÅNG mot musiken — hjärtslag, grid-byten, takträknare.
  *  Analysatorns eget ankare (`cfg.beat.anchorMs`) är och förblir sanningen om var
  *  slaget ligger i LJUDET; den dömer kickar och drops mot det och får aldrig
@@ -294,6 +302,23 @@ export class EffectEngine {
       const tSince = beatPhase(beat, now2, atk + this.showLead) * beatMs;
       const dec = beatMs * BEAT_DECAY_FRAC;
       beatEnv = tSince < atk ? tSince / atk : Math.exp(-(tSince - atk) / dec);
+      // PRE-DIP: en inandning strax FÖRE anslaget.
+      // Ögat läser kontrast, inte absolut nivå. Att sänka ljuset en aning precis
+      // innan slaget gör att samma topp känns hårdare — utan att toppen höjs, och
+      // därmed utan att riggen blir ljusare eller tröttare att titta på.
+      // Idén är hämtad från Song Studio-poleringen i det andra projektet
+      // (PREDIP_FRAMES/PREDIP_DEPTH); här uttryckt i tid i stället för ramar, så
+      // den följer tempot i stället för renderns takt.
+      // Dippen ligger i slutet av takten — alltså precis före nästa attack, som ju
+      // startar `atk` ms innan slaget. Envelopen får gå NEGATIV: den är ett
+      // 0..1-mått som skalas mot pulsdjupet, så negativa värden betyder mörkare
+      // än pulsens eget golv. Slutmultiplikatorn klamras separat.
+      const dipMs = Math.max(BEAT_PREDIP_MIN_MS, Math.min(BEAT_PREDIP_MAX_MS, beatMs * BEAT_PREDIP_FRAC));
+      const dipStart = beatMs - dipMs;
+      if (tSince > dipStart) {
+        const w = (tSince - dipStart) / dipMs;         // 0 → 1 fram mot anslaget
+        beatEnv -= BEAT_PREDIP_DEPTH * w * w;          // kvadratisk: mjuk in, tydlig ut
+      }
       const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
       // BARA FRAMÅT. Villkoret var `!==`, som fyrade på VARJE förändring — även
       // bakåt. PLL:en justerar anchorMs och bpm kontinuerligt i båda riktningar,
@@ -411,7 +436,11 @@ export class EffectEngine {
         // mer även i lugna partier. Pulsen ligger sist i kedjan och passerar inget
         // filter, så hela djupet når fram — det som mäts är det som syns.
         const depth = 0.92 * this.beatTrust * (0.50 + 0.50 * energy) * calm;
-        this.beatMulNow = this.cfg.beatPulse ? (1 - depth) + depth * beatEnv : 1;
+        // KLAMRAS NEDAT: pre-dippen far envelopen ga negativ med flit, men
+        // multiplikatorn far aldrig slacka riggen helt — da lases dippen som ett
+        // blink i stallet for som andning. 0.06 lamnar lamporna tanda.
+        const bm = this.cfg.beatPulse ? (1 - depth) + depth * beatEnv : 1;
+        this.beatMulNow = bm < 0.06 ? 0.06 : bm > 1 ? 1 : bm;
     // BAS-PUNCH: en hård/utdragen basstöt (drop) saknar transient, och på en
     // komprimerad signal svänger bas-energin lite. Så spåra ett bas-GOLV = den
     // TYSTA basnivån (sjunker mot tystnad på ~0.4s, stiger mkt långsamt ~5s). En

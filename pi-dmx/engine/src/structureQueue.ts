@@ -99,6 +99,18 @@ export class StructureQueue {
   /** Allt som redan analyserats — motorn matar in det i minnet vid uppstart. */
   all(): Record<string, SongStructure> { return this.store; }
 
+  /** Lage per lat for UI:t: vantar den, analyseras den just nu, eller ar den klar? */
+  info(songId: number): { parts: number; kinds: string[]; pending: boolean; active: boolean } {
+    const s = this.store[String(songId)];
+    const pending = existsSync(join(this.dir, `${songId}.pending.wav`));
+    return {
+      parts: s?.parts.length ?? 0,
+      kinds: s ? [...new Set(s.parts.map((p) => p.label))] : [],
+      pending,
+      active: pending && this.busy && this.pendingIds()[0] === songId,
+    };
+  }
+
   status(): { pending: number; analysed: number; busy: boolean; error: string } {
     return { pending: this.pendingIds().length, analysed: Object.keys(this.store).length, busy: this.busy, error: this.lastError };
   }

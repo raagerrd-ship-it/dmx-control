@@ -76,6 +76,8 @@ export interface ServerDeps {
   probeDmx?: (channels: number[], frames: number) => void;
   /** Strukturkons lage for UI:t: hur manga vantar, hur manga ar klara. */
   structureStatus?: () => { pending: number; analysed: number; busy: boolean; error: string };
+  /** Per lat: hur langt strukturanalysen kommit — visas i latlistan. */
+  structureInfo?: (songId: number) => { parts: number; kinds: string[]; pending: boolean; active: boolean };
   onConfigChanged?: () => void;
 
   /** Advance to the next mode in the shared cycle. Returns the new mode. */
@@ -501,7 +503,13 @@ export async function startServer(
             deps.probeDmx?.(Array.isArray(msg.channels) ? msg.channels.map(Number) : [1, 2, 3, 4, 5, 6, 7], Number(msg.frames) || 400);
           } else if (msg.type === "listSongs") {
             const l = deps.songMemory?.list() ?? [];
-            sock.send(JSON.stringify({ type: "songList", songs: l }));
+            // Berika med strukturlaget sa listan visar bade tvatten OCH analysen.
+            const withStruct = l.map((r: any) => ({ ...r, struct: deps.structureInfo?.(r.id) }));
+            sock.send(JSON.stringify({
+              type: "songList",
+              songs: withStruct,
+              structure: { hasToken: !!deps.cfg.replicateToken, ...(deps.structureStatus?.() ?? {}) },
+            }));
           } else if (msg.type === "songManualStart") {
             // Inlärning ska bara vara på när ägaren faktiskt spelar in. Automatisk
             // inlärning utanför manuellt läge producerade bara blandposter.

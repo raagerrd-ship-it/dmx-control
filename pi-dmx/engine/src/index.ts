@@ -479,6 +479,7 @@ const serverDeps = {
       dumpCurve: (id: number) => songs.dumpCurve(id),
     },
     structureStatus: () => structure.status(),
+    structureInfo: (songId: number) => structure.info(songId),
     probeDmx: (channels: number[], frames: number) => {
       dmxProbe.chs = channels; dmxProbe.rows = []; dmxProbe.t0 = performance.now(); dmxProbe.left = frames;
     },

@@ -673,6 +673,24 @@
       <button class="btn" id="learnStop" disabled>Stoppa</button>
     </div>
     <div class="status" id="learnHint">Inte igång.</div>
+
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.10)">
+      <b>Strukturanalys</b>
+      <div class="status" style="margin-top:6px">
+        Varje inspelad låt skickas EN gång på analys som märker ut intro, vers, refräng,
+        bridge och outro — det Pi:n inte kan räkna fram själv. Svaret sparas för alltid
+        och ljudet raderas då. Utan nyckel ligger kön still och showen kör precis som förut.
+        <br><br>
+        Analysen kräver internet. På fest när Pi:n är egen accesspunkt väntar kön helt enkelt
+        tills den kommer hem igen.
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+        <input id="structToken" type="password" placeholder="Replicate API-nyckel (r8_…)"
+          style="flex:1;min-width:180px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;padding:6px 8px;font:inherit" />
+        <button class="btn" id="structSave">Spara</button>
+      </div>
+      <div class="status" id="structHint" style="margin-top:6px">—</div>
+    </div>
     <div id="songListWrap" style="margin-top:14px;overflow-x:auto">
       <table id="songList" style="width:100%;border-collapse:collapse;font-size:14px">
         <thead><tr style="text-align:left;opacity:.6;white-space:nowrap">
@@ -683,6 +701,7 @@
           <th style="padding:4px 6px" title="antal drops">Drops</th>
           <th style="padding:4px 6px" title="antal spelningar">Spelad</th>
           <th style="padding:4px 6px;white-space:nowrap">Status</th>
+          <th style="padding:4px 6px;white-space:nowrap" title="strukturanalys: intro/vers/refräng/bridge">Struktur</th>
           <th style="padding:4px 6px"></th>
         </tr></thead>
         <tbody id="songListBody"></tbody>
@@ -822,7 +841,8 @@ function connect() {
     else if (m.type === "effects") applyEffects(m.effects);
     else if (m.type === "bleScanResults") renderBleScan(m.devices || []);
     else if (m.type === "blePaired") renderBlePaired(m.devices || []);
-    else if (m.type === "songList") renderSongList(m.songs || []);
+    else if (m.type === "songList") { renderSongList(m.songs || []); renderStructStatus(m.structure); }
+    else if (m.type === "structureStatus") renderStructStatus(m);
   };
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
@@ -836,10 +856,47 @@ const learnHint  = document.getElementById("learnHint");
 if (learnStart) learnStart.onclick = () => send({ type: "songManualStart" });
 if (learnNext)  learnNext.onclick  = () => send({ type: "songManualNext" });
 if (learnStop)  learnStop.onclick  = () => send({ type: "songManualStop" });
+
+// API-nyckeln skickas EN gang och ekas aldrig tillbaka. Faltet toms direkt efter
+// sandning sa nyckeln inte blir liggande synlig i en flik pa en delad dator.
+const structSave = document.getElementById("structSave");
+if (structSave) structSave.onclick = () => {
+  const el = document.getElementById("structToken");
+  if (!el) return;
+  send({ type: "setReplicateToken", value: el.value });
+  el.value = "";
+  const h = document.getElementById("structHint");
+  if (h) h.textContent = "Sparar nyckel…";
+};
 function fmtDur(ms) {
   const t = Math.round(ms / 1000);
   return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0");
 }
+// Strukturanalysens lage per lat. Fyra tillstand, och de sager olika saker:
+// klar (hur manga sektioner), analyseras nu, vantar i kon, eller ingenting alls.
+function structCell(x) {
+  if (!x) return '<span style="opacity:.35">—</span>';
+  if (x.parts > 0) {
+    const kinds = (x.kinds || []).join(", ");
+    return '<span style="color:var(--pink,#ff3ea5)" title="' + kinds + '">✓ ' + x.parts + ' delar</span>';
+  }
+  if (x.active) return '<span style="color:#ffd166">◌ Analyseras…</span>';
+  if (x.pending) return '<span style="opacity:.55">○ I kö</span>';
+  return '<span style="opacity:.35">—</span>';
+}
+
+function renderStructStatus(st) {
+  const el = document.getElementById("structHint");
+  if (!el || !st) return;
+  const tok = document.getElementById("structToken");
+  if (tok && st.hasToken && !tok.placeholder.startsWith("Nyckel")) tok.placeholder = "Nyckel sparad — skriv ny för att byta";
+  var t = st.hasToken ? "" : "Ingen nyckel — kön står still. ";
+  t += (st.analysed || 0) + " analyserade, " + (st.pending || 0) + " i kö";
+  if (st.busy) t += " · analyserar just nu";
+  if (st.error) t += " · senaste fel: " + st.error;
+  el.textContent = t;
+}
+
 function renderSongList(rows) {
   if (rows) lastRows = rows; else rows = lastRows;
   const body = document.getElementById("songListBody");
@@ -848,7 +905,7 @@ function renderSongList(rows) {
   if (document.activeElement && document.activeElement.classList
       && document.activeElement.classList.contains("songNote")) return;
   if (!rows || !rows.length) {
-    body.innerHTML = '<tr><td colspan="6" style="padding:8px 0;opacity:.5">Inga inspelningar än.</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" style="padding:8px 0;opacity:.5">Inga inspelningar än.</td></tr>';
     return;
   }
   body.innerHTML = rows.map(function (r) {
@@ -869,6 +926,7 @@ function renderSongList(rows) {
       + '<td style="padding:6px 6px">' + r.drops + '</td>'
       + '<td style="padding:6px 6px;white-space:nowrap">' + r.plays + '×</td>'
       + '<td style="padding:6px 6px;white-space:nowrap">' + st + '</td>'
+      + '<td style="padding:6px 6px;white-space:nowrap">' + structCell(r.struct) + '</td>'
       + '<td style="padding:6px 0 6px 6px"><button class="btn songDel" data-id="' + r.id
       + '" title="glöm den här inspelningen" style="padding:2px 8px;font-size:13px;opacity:.7">✕</button></td></tr>';
   }).join("");
