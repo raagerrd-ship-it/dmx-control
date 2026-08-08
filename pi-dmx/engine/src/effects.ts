@@ -148,6 +148,9 @@ export class EffectEngine {
    * refräng fem ser ut som ingenting av refräng ett.
    * Bara för den här låten — nollas vid låtbyte.
    */
+  /** Sektionens UPPMATTA energi (0..1), -1 = okand. Ur minnets energikurva, som
+   *  tvatten raknat pa hela laten — alltsa kant redan nar sektionen BORJAR. */
+  memPartEnergy = -1;
   private partLook = new Map<string, Mode>();
   private partLookSong = 0;
 
@@ -577,7 +580,17 @@ export class EffectEngine {
       // inom nagra sekunder. Uppat gar den LANGSAMT (maste fortjanas) och nedat
       // snabbt (musiken slapper -> showen ska folja med direkt) - samma
       // dramaturgi som breakdown-regeln.
-      const iNow = this.cfg.energyDrivesMode ? frame.intensity : 0.5;
+      // SEKTIONENS EGEN ENERGI SLAR REALTIDENS MEDELVARDE.
+      // `tierEma` ar en 5 s-EMA over intensiteten — den kan per definition bara
+      // beratta vad som REDAN hant, och en sektion ar oftast igang i flera
+      // sekunder innan medelvardet hunnit ikapp. Minnet vet i stallet vad hela
+      // sektionen vager redan nar den BORJAR, for tvatten har matt den fardigt
+      // pa hela laten. Det ar precis den skillnaden som gor att showen kan MOTA
+      // en refrang i stallet for att komma efter den.
+      // Realtidsvagen ar orord for okanda latar och som fallback.
+      const iNow = this.cfg.energyDrivesMode
+        ? (this.memPartEnergy >= 0 ? this.memPartEnergy : frame.intensity)
+        : 0.5;
       const iTau = iNow > this.tierEma ? 5.0 : 2.0;
       this.tierEma += (iNow - this.tierEma) * Math.min(1, _dtT / iTau);
       // EN DROP AR BEVISET pa att energin kommit — vanta inte pa medelvardet.
@@ -666,19 +679,21 @@ export class EffectEngine {
         //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
         //    så utan detta fortsätter riggen köra fullfart genom en svacka.
         const wantCalm = frame.breaking && this.cfg.energyDrivesMode;
-        // 3) SEKTIONENS NAMN VET MER AN ENERGIN. Energitiern läser vad som HÄNT
-        //    (en trög EMA över intensiteten); etiketten säger vad låten GÖR just
-        //    nu, hämtat ur en analys av hela låten. Där de säger emot varandra
-        //    väger namnet tyngre — men bara som golv och tak, aldrig som ersättare:
-        //    en lugn refräng ska fortfarande vara lugnare än en intensiv.
-        //      chorus  → aldrig den lugna poolen (refrängen är låtens tyngdpunkt)
-        //      verse   → aldrig full fart (kontrast kräver att något är mindre)
-        //      intro/outro/end → lugnt, oavsett vad energin råkar säga
+        // 3) ETIKETTEN STYR INTE NIVÅN — SEKTIONENS UPPMÄTTA ENERGI GÖR DET.
+        //    Här stod tidigare musikaliska schabloner: refräng aldrig lugn, vers
+        //    aldrig full fart, intro/outro alltid lugnt. De byggde på att energin
+        //    kom från en trög EMA som inte gick att lita på.
+        //      MÄTT 2026-08-08, sektionsenergi ur ägarens egna låtar:
+        //        #1  intro 0.26 · chorus 0.31 · verse 0.76 · chorus 0.83
+        //            · inst 0.91 · chorus 0.45 · inst 0.93 · chorus 0.63 · end 0.07
+        //        #3  chorus 0.51 · inst 0.81 · verse 0.96 · chorus 0.66 · end 0.28
+        //      Refrängerna varierar mellan 0.31 och 0.83 i SAMMA låt, och i #3 är
+        //      VERSEN låtens starkaste parti (0.96). Schablonerna hade tvingat upp
+        //      en stillsam refräng och hållit tillbaka en väldig vers — fel åt båda
+        //      hållen. Etiketten far darfor styra IDENTITET (samma look aterkommer)
+        //      och NAR bytet sker (sektionsgransen), men inte hur starkt det lyser.
         const part = this.memPart;
-        let tierS = tier;
-        if (part === "chorus" || part === "drop") { if (tierS === LUGN) tierS = FART; }
-        else if (part === "verse") { if (tierS === FULLFART) tierS = FART; }
-        else if (part === "intro" || part === "outro" || part === "end") tierS = LUGN;
+        const tierS = tier;
         // Ny låt → glöm förra låtens looker.
         if (this.memSongId !== this.partLookSong) { this.partLook.clear(); this.partLookSong = this.memSongId; }
         if (!inBuild && (dropSwitch || (wantSwitch && held > MIN_HOLD && gridOk))) {

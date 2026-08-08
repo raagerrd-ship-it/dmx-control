@@ -1361,14 +1361,14 @@ export class SongMemory {
    *   section = true den hop en sektionsgräns passeras
    *   phrase  = true den hop en 16-taktersfras börjar
    *   hasGrid = låten har sektioner/frasgrid → dirigenten får vänta in dem */
-  private cues = { build: null as number | null, ceiling: null as number | null, section: false, phrase: false, hasGrid: false, hasRisers: false, part: null as string | null, songId: 0 };
+  private cues = { build: null as number | null, ceiling: null as number | null, section: false, phrase: false, hasGrid: false, hasRisers: false, part: null as string | null, songId: 0, partEnergy: -1 };
   /** ANALYSERAD STRUKTUR per lat-id (intro/verse/chorus/bridge/outro + nedslag).
    *  Kommer fran strukturkon, som skickar ljudet pa analys EN gang och sparar
    *  svaret for alltid. Den bor HAR for att igenkanningen ar det som vet VILKEN
    *  lat som spelas — id:t ar nyckeln, och tidslinjen ligger redan i den har
    *  klassen. Saknas strukturen kor allt precis som forut. */
-  private structures = new Map<number, { parts: { t: number; label: string }[] }>();
-  setStructure(songId: number, st: { parts: { t: number; label: string }[]; bpm?: number } | undefined): void {
+  private structures = new Map<number, { parts: { t: number; label: string; energy?: number }[] }>();
+  setStructure(songId: number, st: { parts: { t: number; label: string; energy?: number }[]; bpm?: number } | undefined): void {
     if (st && st.parts?.length) this.structures.set(songId, st); else this.structures.delete(songId);
 
     // TEMPO-KORSNING MOT MODELLEN.
@@ -1386,6 +1386,26 @@ export class SongMemory {
     // ANKARET ROrs INTE: vid en oktavdubbling ar det lagrade slaget fortfarande
     // ett verkligt slag, det tillkommer bara slag mellan dem. Fasen star kvar.
     const song = this.songs.get(songId);
+
+    // SEKTIONENS EGEN ENERGI, uträknad EN gång.
+    // `meta.intensity` är låtens energikurva med ett värde per sekund (0–255),
+    // framräknad av tvätten som sett HELA låten. Medelvärdet över en sektions
+    // spann säger vad den sektionen faktiskt väger — och det vet vi i samma
+    // ögonblick den börjar, till skillnad från realtidens 5 s-EMA som per
+    // definition släpar. Det är hela poängen med att ha låten i minnet.
+    const iv = song?.meta.intensity;
+    if (st?.parts?.length && iv && iv.length) {
+      for (let i = 0; i < st.parts.length; i++) {
+        const a = Math.max(0, Math.floor(st.parts[i].t / 1000));
+        const bEnd = i + 1 < st.parts.length ? Math.floor(st.parts[i + 1].t / 1000) : iv.length;
+        let sum = 0, n = 0;
+        for (let k = a; k < Math.min(bEnd, iv.length); k++) { sum += iv[k]; n++; }
+        if (n) st.parts[i].energy = sum / n / 255;
+      }
+      const dump = st.parts.map((p) => `${p.label} ${(p.energy ?? 0).toFixed(2)}`).join(" · ");
+      console.log(`[song] låt #${songId} sektionsenergi: ${dump}`);
+    }
+
     const mb = song?.meta.bpm ?? 0;
     const sb = st?.bpm ?? 0;
     if (song && mb > 40 && sb > 40) {
@@ -1403,9 +1423,9 @@ export class SongMemory {
   private ceilNow = 0;            // utjämnat ljustak (följer bågen, inte taktslagen)
   private ceilAt = 0;             // väggklocka för utjämningen
   private cuePrevT = -1;
-  replayCues(): { build: number | null; ceiling: number | null; section: boolean; phrase: boolean; hasGrid: boolean; hasRisers: boolean; part: string | null; songId: number } {
+  replayCues(): { build: number | null; ceiling: number | null; section: boolean; phrase: boolean; hasGrid: boolean; hasRisers: boolean; part: string | null; songId: number; partEnergy: number } {
     const c = this.cues;
-    c.build = null; c.ceiling = null; c.section = false; c.phrase = false; c.hasGrid = false; c.hasRisers = false; c.part = null; c.songId = 0;
+    c.build = null; c.ceiling = null; c.section = false; c.phrase = false; c.hasGrid = false; c.hasRisers = false; c.part = null; c.songId = 0; c.partEnergy = -1;
     const s = this.matchId ? this.songs.get(this.matchId) : undefined;
     if (!s) { this.cuePrevT = -1; return c; }
     const t = this.clock() - this.playStart + this.matchOffset + REPLAY_LEAD_MS;
@@ -1430,11 +1450,13 @@ export class SongMemory {
     if (struct) {
       c.hasGrid = true;
       let cur: string | null = null;
+      let curE = -1;
       for (const p of struct.parts) {
-        if (p.t <= t) cur = p.label;
+        if (p.t <= t) { cur = p.label; curE = p.energy ?? -1; }
         if (p.t > prev && p.t <= t) c.section = true;
       }
       c.part = cur;
+      c.partEnergy = curE;
     }
     if (m.phraseMs && m.phraseMs > 1000) {
       c.hasGrid = true;
