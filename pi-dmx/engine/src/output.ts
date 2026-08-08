@@ -94,9 +94,28 @@ export class FixtureOutput {
    * Skala ljusstyrkan på alla fixturer. Anroparen behöver inte veta något om lampor.
    * @param mul 0..1 multiplikator
    */
+  /**
+   * SKALA LJUSET — men SLÄCK ALDRIG något som lyser.
+   *
+   * VU-taket och hjärtslaget skalar ner. Rundas ett tänt värde till 0 faller det
+   * genom kalibreringens golv: `calibrate()` lyfter bara `raw > 0` till lampans
+   * tändpunkt, och 0 tolkas som "ska vara släckt". En lampa som bara var svagt
+   * tänd i ett lugnt parti slocknade alltså helt — och att slockna är något helt
+   * annat än att vara svag.
+   * Därför golvas resultatet på 1: kalibreringen tar sedan upp det till lampans
+   * kalibrerade minimum, vilket är precis så mörkt en tänd lampa får bli.
+   *
+   * MÖRKLÄGGNING GÅR FORTFARANDE FRAM. Blackout (drop-svärta, avstängd ingång)
+   * skriver nollor DIREKT i efterbehandlingens steg 4, efter den här skalningen,
+   * och rör inte den här vägen. Det är skillnaden mellan "dämpat" och "släckt".
+   */
   scale(universe: Uint8Array, mul: number): void {
     for (let ch = 0; ch < this.maxCh; ch++) {
-      if (this.light[ch]) universe[ch] = Math.round(universe[ch] * mul);
+      if (!this.light[ch]) continue;
+      const v = universe[ch];
+      if (v === 0) continue;                       // redan släckt — lämna det så
+      const out = Math.round(v * mul);
+      universe[ch] = out < 1 ? 1 : out;            // tänt förblir tänt
     }
   }
 
