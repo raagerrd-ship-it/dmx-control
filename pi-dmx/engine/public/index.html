@@ -675,29 +675,34 @@
     <div class="status" id="learnHint">Inte igång.</div>
 
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.10)">
-      <b>Strukturanalys</b>
-      <div class="status" style="margin-top:6px">
-        Varje inspelad låt skickas EN gång på analys som märker ut intro, vers, refräng,
-        bridge och outro — det Pi:n inte kan räkna fram själv. Svaret sparas för alltid
-        och ljudet raderas då. Utan nyckel ligger kön still och showen kör precis som förut.
-        <br><br>
-        Analysen kräver internet. På fest när Pi:n är egen accesspunkt väntar kön helt enkelt
-        tills den kommer hem igen.
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <b>Analys och namngivning</b>
+        <button class="btn" id="keysEditBtn" style="display:none">Ändra</button>
       </div>
-      <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
-        <input id="structToken" type="password" placeholder="Replicate API-nyckel (r8_…)"
-          style="flex:1;min-width:180px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;padding:6px 8px;font:inherit" />
-        <button class="btn" id="structSave">Spara</button>
-      </div>
-      <div class="status" id="structHint" style="margin-top:6px">—</div>
 
-      <div style="margin-top:14px">
-        <b>Automatisk namngivning</b>
+      <!-- SAMMANFATTNING: allt ar satt, faltena tar bara plats. En engangsgrej. -->
+      <div class="status" id="keysSummary" style="display:none;margin-top:6px">—</div>
+
+      <!-- INSTALLNINGAR: visas nar nagot saknas, eller nar man tryckt Andra. -->
+      <div id="keysEdit">
         <div class="status" style="margin-top:6px">
-          Ett tolv sekunders utdrag ur mitten av låten skickas till ACRCloud, som
-          känner igen den mot en katalog av riktiga inspelningar. Träffar den säkert
-          fylls namnet i åt dig — annars lämnas fältet tomt att skriva i själv.
-          Ett namn du redan skrivit skrivs aldrig över.
+          <b>Strukturanalys.</b> Varje inspelad låt skickas EN gång på analys som märker ut
+          intro, vers, refräng, bridge och outro — det Pi:n inte kan räkna fram själv. Svaret
+          sparas för alltid och ljudet raderas då. Kräver internet; på fest när Pi:n är egen
+          accesspunkt väntar kön tills den kommer hem.
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+          <input id="structToken" type="password" placeholder="Replicate API-nyckel (r8_…)"
+            style="flex:1;min-width:180px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;padding:6px 8px;font:inherit" />
+          <button class="btn" id="structSave">Spara</button>
+        </div>
+        <div class="status" id="structHint" style="margin-top:6px">—</div>
+
+        <div class="status" style="margin-top:12px">
+          <b>Automatisk namngivning.</b> Ett tolv sekunders utdrag ur mitten av låten skickas
+          till ACRCloud, som känner igen den mot en katalog av riktiga inspelningar. Träffar
+          den säkert fylls namnet i åt dig — annars lämnas fältet tomt. Ett namn du redan
+          skrivit skrivs aldrig över.
         </div>
         <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
           <input id="acrKey" type="text" placeholder="Access Key"
@@ -708,6 +713,7 @@
         </div>
         <div class="status" id="acrHint" style="margin-top:6px">—</div>
       </div>
+    </div>
     </div>
     <div id="songListWrap" style="margin-top:14px;overflow-x:auto">
       <table id="songList" style="width:100%;border-collapse:collapse;font-size:14px">
@@ -887,6 +893,13 @@ if (structSave) structSave.onclick = () => {
   if (h) h.textContent = "Sparar nyckel…";
 };
 
+const keysEditBtn = document.getElementById("keysEditBtn");
+if (keysEditBtn) keysEditBtn.onclick = () => {
+  keysForceOpen = !keysForceOpen;
+  keysEditBtn.textContent = keysForceOpen ? "Dölj" : "Ändra";
+  send({ type: "structureStatus" });
+};
+
 const acrSave = document.getElementById("acrSave");
 if (acrSave) acrSave.onclick = () => {
   const k = document.getElementById("acrKey"), s = document.getElementById("acrSecret");
@@ -916,6 +929,7 @@ function structCell(x) {
 // Faltena ar TOMMA MED FLIT: hemligheter ekas aldrig tillbaka och rutan toms
 // efter sandning, sa en nyckel inte blir liggande lasbar i en oppen flik. Men en
 // tom ruta ser ut som en osparad ruta — darav den tydliga markeringen har.
+let keysForceOpen = false;
 function markSaved(el, saved, name) {
   if (!el) return;
   el.placeholder = saved ? "✓ " + name + " sparad — skriv ny för att byta" : name;
@@ -940,6 +954,26 @@ function renderStructStatus(st) {
   if (a) a.textContent = st.hasAcr
     ? "✓ Klar — nya låtar namnges automatiskt."
     : "⚠ Inga uppgifter — låtar får namnges för hand.";
+
+  // FALLS IHOP NAR ALLT AR SATT. Nycklar fylls i EN gang; darefter ar tva tomma
+  // losenordsrutor bara forvirrande — de ser osparade ut aven nar de inte ar det,
+  // och de kan inte fyllas i for att visa vad som star dar (en hemlighet som ekas
+  // tillbaka blir liggande lasbar i en oppen flik).
+  const done = !!(st.hasToken && st.hasAcr);
+  const sum = document.getElementById("keysSummary");
+  const edit = document.getElementById("keysEdit");
+  const btn = document.getElementById("keysEditBtn");
+  if (!sum || !edit || !btn) return;
+  if (done && !keysForceOpen) {
+    var line = "✓ Strukturanalys och namngivning påslagna · "
+      + (st.analysed || 0) + " analyserade, " + (st.pending || 0) + " i kö";
+    if (st.busy) line += " · analyserar just nu";
+    if (st.error) line += " · senaste fel: " + st.error;
+    sum.textContent = line;
+    sum.style.display = ""; edit.style.display = "none"; btn.style.display = "";
+  } else {
+    sum.style.display = "none"; edit.style.display = ""; btn.style.display = done ? "" : "none";
+  }
 }
 
 function renderSongList(rows) {
