@@ -58,8 +58,17 @@ export class LiveRange {
     if (this.total < this.minWeight) return level;
     const lo = this.p(0.05), hi = this.p(0.95);
     const span = hi - lo;
-    if (span < 0.08) return level;
-    const x = (level - lo) / span;
+    // TAK PÅ FÖRSTÄRKNINGEN. Ett hårt av/på vid 0.08 lämnade ett fönster där en jämn
+    // låt fick tiofaldig förstärkning: p5..p95 ligger tätt, och då blir varje liten
+    // nivåvariation full ljusrörelse. MÄTT 2026-08-07: fladder i partier med konstant
+    // energi. Golvet under spannet begränsar förstärkningen till ~4× och tonar in
+    // mjukt i stället för att slå om.
+    // 0.50 ⇒ högst 2× förstärkning. MÄTT 2026-08-07: vid 4× var ljuset perfekt i
+    // DYNAMISKA låtar men fladdrade så fort låten blev jämn — då ligger p5..p95 tätt
+    // och varje liten nivåvariation blev full ljusrörelse. Hjärtslaget står för
+    // dynamiken; taket ska bara följa låtens nivå utan att blåsa upp brus till ljus.
+    const span2 = Math.max(span, 0.50);
+    const x = (level - lo) / span2;
     return x < 0 ? 0 : x > 1 ? 1 : x;
   }
 

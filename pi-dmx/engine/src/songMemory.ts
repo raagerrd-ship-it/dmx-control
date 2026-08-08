@@ -56,6 +56,50 @@ const RELOCK_INTERVAL_MS = 1500;   // täta kontroller → driften hinner aldrig
 const RELOCK_ERROR_MS = 120;       // under det här hörs/syns ingen skillnad
 const RELOCK_MIN_HITS = 6;         // estimatet måste vila på flera träffar
 const RELOCK_SNAP_MS = 900;        // så stort fel är en seek, inte drift → snappa
+// LÅST NÄR LÅTEN HITTATS.
+// MÄTT 2026-08-07: 25 re-locks på 145 s, med hopp i par som tog ut varandra
+// (−58,78 → +55,82 → −85,29 → +85,64 → −188,28). Fingerprintingen hittar samma ljud
+// på TVÅ ställen i låten (refräng 1 och refräng 2) och medianen kan tillfälligt peka
+// på fel kluster — då snappade positionen dit på EN enda mätning.
+// En riktig seek är sällsynt; en falsk median är vanlig i repeterad musik. Därför
+// måste ett stort hopp bekräftas av flera kontroller i rad innan det får gälla.
+const SEEK_CONFIRM = 5;            // 5 × RELOCK_INTERVAL_MS ≈ 7,5 s av samma svar
+// TRE STEG: IDENTIFIERA → SYNKA → LÅS.
+// Att veta VILKEN låt det är säger ingenting om VAR i den vi är. Inspelningen började
+// inte exakt på låtens första sample, och första offsetgissningen kan vara sekunder fel.
+// Förr tog minnet över showen i samma ögonblick som låt-id:t låste — då kördes drops och
+// energikurvan mot en overifierad tidslinje. Nu måste synken bevisa sig först: tills dess
+// kör realtidsanalysen (som alltid fungerar), sedan låses tidslinjen och minnet tar över.
+const SYNC_LOCK_HITS = 3;          // kontroller i rad med fel under RELOCK_ERROR_MS
+// IGENKÄNNINGSFÖNSTER: leta bara i låtens början.
+// Har ingen match hittats på 20 s är låten antingen okänd eller så började den mitt i —
+// då är realtidsanalysen rätt svar, och den fungerar alltid. En SEN låsning bygger dessutom
+// på färre träffar och är just när medianen pekar fel: MÄTT 2026-08-07 pekade den 44 s fel
+// periodvis i en låt med återkommande partier. Fönstret räknas från segmentets start och
+// nollställs alltså vid varje låtgräns. En redan etablerad match berörs inte — den får
+// re-locka hela låten ut.
+const RECOG_WINDOW_MS = 20000;
+// ENGÅNGSKOLL EFTER INSPELNING (i stället för matchning UNDER den).
+// Under manuell inspelning röstar motorn inte alls: ägaren har sagt att en låt spelas
+// in, och varje gissning under tiden har visat sig hitta nya sätt att störa — pausad
+// ljudskrivning, karantän, kastad tvätt, "tidslinjen tog slut" mitt i. I stället matchas
+// HELA inspelningens fingeravtryck mot hela biblioteket i ett svep när den är klar.
+// Det är starkare bevis: hela låten som underlag i stället för några sekunders buffert.
+// MÄTT 2026-08-07: en ÄKTA ominspelning ger 416 träffar / 16× live och 783 / 783× offline.
+// Med 40/3 slog en FALSK match igenom på 50 träffar / 3,6× och skrev över en annan låt.
+// Marginalen mellan äkta och falskt är enorm — trösklarna kostar alltså ingenting.
+const WHOLE_MIN_VOTES = 150;       // så många positionsenliga träffar krävs
+const WHOLE_MIN_RATIO = 5;         // ...och så många gånger fler än näst bästa låt
+// En ominspelning av samma låt startar inom någon sekund från den lagrade nollpunkten.
+// Den falska matchen låg 22,5 s bort — den pekade på ett repeterat parti längre in.
+const WHOLE_MAX_OFFSET_MS = 8000;
+// LJUSET LIGGER FÖRE LJUDET — MED FLIT.
+// Lampor är trögare än högtalare: DMX-uppdatering, ballistikens 25 ms attack och
+// armaturens egen svarstid gör att ett ljus som styrs exakt på ljudet ALLTID landar
+// en aning sent. Drops har redan 120 ms försprång (PRE_FIRE_MS) av samma skäl; den
+// kontinuerliga ljusstyrningen hade inget. Leaden rör BARA uppspelningen — igenkänningen
+// jämför inkommande ljud mot lagrade hashar och påverkas inte, så ingen omatch kan uppstå.
+const REPLAY_LEAD_MS = 50;
 const RELOCK_GLIDE_MIN = 60;       // ms/s: mjukaste gliden (liten drift)
 const RELOCK_GLIDE_MAX = 400;      // ms/s: snabbaste gliden (drift nära snap)
 const MATCH_FRESH_MS = 6000;        // en aktiv match måste få nya, positionsenliga träffar
@@ -108,7 +152,36 @@ const NOV_WEAK = 0.55;          // ...räcker om nivådipp eller temposkifte ock
 // gränsen kan inte sättas i framtiden.)
 const NOV_BACK_MS = 0;
 
-const NOV_WIN_KEEP_MS = 6000;  // klangskifte räknas som evidens så länge efteråt
+const NOV_WIN_KEEP_MS = 6000;
+// RELATIV KLANGSKIFTESTRÖSKEL.
+// MÄTT 2026-08-07 (5 låtbyten live): tre av sex segment blev exakt 110-111 s, alltså
+// MIN_SEG_MS på sekunden, med identiska hashantal. Klangskiftet låg redan över absoluta
+// 0.68 hela tiden — gränsen sattes av minimiklockan, inte av musiken. Och styrkan
+// separerar inte: en ÄKTA gräns mätte 0.62 medan en FALSK mätte 0.94.
+// Vad som är ett kraftigt skifte beror på låten → jämför mot låtens EGEN fördelning,
+// samma princip som energitieringens relativa baslinje.
+// KÄND LÅT SLUT = GRÄNSBEVIS.
+// När en BEKRÄFTAD match passerar sin inlärda längd vet vi var låten slutade —
+// belagt av hundratals positionsenliga hash-träffar, inte av en spektrumgissning.
+// Räknas som ett bevis (inte ensam gräns): är posten kortare än låten (t.ex. efter
+// en tidigare timerdelning) skulle den annars permanenta sitt eget fel.
+const MATCH_END_WIN_MS = 8000;
+// MATCHBYTE MÅSTE KOSTA NÅGOT.
+// MÄTT 2026-08-07 (facit3, varv 2): matchen växlade #1↔#2 fyra gånger på fyra
+// sekunder mitt inne i en låt, båda med konfidens 1.00. Byte krävde bara EN röst
+// mer än den aktiva matchen. Nu krävs tre saker samtidigt: klar övervikt, att
+// överviktet HÅLLIT en stund, och att den aktiva matchen tystnat.
+const SWITCH_MARGIN = 1.6;      // utmanaren måste ha så många gånger fler röster
+const SWITCH_HOLD_MS = 1500;    // ...och hålla övervikten så länge
+// NÅDETID FÖR BEKRÄFTAD MATCH.
+// MÄTT: samma körning tappade matchen tre gånger i spektralt svaga partier trots
+// att positionen var korrekt hela vägen. En bekräftad match får överleva längre
+// glapp — "tidslinjen tog slut" fångar ändå det verkliga slutet.
+const MATCH_FRESH_CONFIRMED_MS = 15000;
+const NOV_Q = 0.97;            // skiftet måste ligga i toppen av de senaste minuterna
+const NOV_TAU_S = 45;          // glömska på fördelningen (~90 s effektivt fönster)
+const NOV_DIST_MIN_S = 20;     // innan så mycket data samlats gäller bara absoluta kravet
+const NOV_DIST_BUCKETS = 48;   // d är ett L1-avstånd i 0..2  // klangskifte räknas som evidens så länge efteråt
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
 // IGENKÄNNING SOM GRÄNS. Känner igenkännaren en ANNAN känd låt mitt i ett segment,
 // och matchen pekar på låtens BÖRJAN, är det en nära-säker låtgräns — gratis, allt
@@ -137,6 +210,7 @@ interface SongMeta {
   sections?: number[];     // tidpunkter (ms) där låtens karaktär skiftar
   phraseMs?: number;       // längden på en 16-taktersfras (frasgrid, fas = beatPhaseMs)
   refinedFromMs?: number;  // hur mycket LJUD tvätten byggde på — en kortare tvätt får aldrig ersätta en längre
+  note?: string;           // ägarens egen etikett (t.ex. låtnamn) — bara för igenkänning i UI:t
 }
 interface Song { meta: SongMeta; hashes: Uint32Array; times: Uint32Array; }
 
@@ -155,6 +229,9 @@ export interface SongMemoryState {
   matchMargin: number;
   rawOffsetMs: number;
   correctedOffsetMs: number;
+  note: string;        // ägarens etikett på den låt som spelas
+  synced: boolean;     // tidslinjen verifierad → showen körs från minnet
+  manual: boolean;
   lastBoundary: string;
   driftMs: number;
   relocks: number;
@@ -205,6 +282,13 @@ export class SongMemory {
   private novFilled = 0;          // antal skrivna profiler
   private novAt = 0;              // väggklocka för senaste klangskiftet
   private novPeak = 0;            // L1-avståndet vid det skiftet
+  private novDist = new Float32Array(NOV_DIST_BUCKETS);  // fördelning över ALLA d
+  private novDistTotal = 0;
+  private matchEndedAt = 0;       // väggklocka när en bekräftad tidslinje tog slut
+  private manualMode = false;     // användaren sätter gränserna, inte detektorn
+  private segBestMatch = 0;       // bästa bekräftade match UNDER segmentet
+  private challengerId = 0;       // id som just nu utmanar den aktiva matchen
+  private challengerSince = 0;    // sedan när utmanaren hållit sin övervikt
   private levAvg = 0;             // långsamt nivåsnitt (dippdetektering)
   private dipAt = 0;              // väggklocka för senaste nivådippen
   private lastEvidence: string[] = [];   // senast aktiva gränssignaler (diagnostik)
@@ -255,6 +339,12 @@ export class SongMemory {
   private relocks = 0;            // antal gånger synken tvingats tillbaka (diagnostik)
   private driftMs = 0;            // senast mätta drift mot oberoende estimat
   private relockTarget: number | null = null;  // pågående glid mot verifierat offset
+  private syncGood = 0;           // kontroller i rad som visat liten drift
+  private syncLocked = false;     // tidslinjen är verifierad → minnet får äga showen
+  private offBad = 0;             // 0..1 andel träffar som pekar långt bort → positionen osäker
+  private lastPosBlockLog = 0;    // strypning av [diag] REPLAY TYST
+  private seekTarget = 0;         // kandidat till stort positionshopp
+  private seekCount = 0;          // hur många kontroller i rad som pekat dit
   private glideAt = 0;            // klocka för glidens senaste steg
 
   /** Rullande råoffset per träff (id + off). Ger etableringen en median UNDER
@@ -265,6 +355,7 @@ export class SongMemory {
   private lastBoundary = "";
   private replayIdx = 0;
   private pendingDrop = 0;        // styrka på en drop som ska fyras av
+  lastFiredDropMs = 0;            // diagnostik: den lagrade tiden för senast fyrade drop
 
   async load(): Promise<void> {
     let buf: Buffer;
@@ -420,18 +511,47 @@ export class SongMemory {
       const past = this.novHist[this.novIdx];   // efter framflyttningen pekar idx på äldsta = lag fönster bakåt
       let d = 0;
       for (let b = 0; b < prof.length; b++) d += Math.abs(prof[b] - past[b]);
+      // Fördelningen matas med VARJE d — även de små. Det är dem som avgör
+      // vad "ovanligt" betyder i just den här låten.
+      const dt = NOV_WIN_MS / 1000;
+      const decay = Math.exp(-dt / NOV_TAU_S);
+      for (let i = 0; i < NOV_DIST_BUCKETS; i++) this.novDist[i] *= decay;
+      this.novDistTotal *= decay;
+      let bk = Math.floor((d / 2) * NOV_DIST_BUCKETS);
+      if (bk < 0) bk = 0; if (bk >= NOV_DIST_BUCKETS) bk = NOV_DIST_BUCKETS - 1;
+      this.novDist[bk] += dt;
+      this.novDistTotal += dt;
       if (d >= NOV_WEAK) { this.novAt = now; this.novPeak = d; }
     }
   }
 
+  /** Tröskeln som låten själv sätter: NOV_Q-percentilen av de senaste minuternas
+   *  klangskiften. Returnerar 0 innan tillräckligt med data samlats — då gäller
+   *  bara det absoluta kravet, precis som förr. */
+  private novRelThreshold(): number {
+    if (this.novDistTotal < NOV_DIST_MIN_S) return 0;
+    const target = this.novDistTotal * NOV_Q;
+    let acc = 0;
+    for (let i = 0; i < NOV_DIST_BUCKETS; i++) {
+      acc += this.novDist[i];
+      if (acc >= target) return ((i + 0.5) / NOV_DIST_BUCKETS) * 2;
+    }
+    return 2;
+  }
+
   private resetNovelty(): void {
     this.novAt = 0; this.novPeak = 0; this.novAcc.fill(0); this.novN = 0; this.novStart = 0;
+    this.novDist.fill(0); this.novDistTotal = 0;
     this.novHist = []; this.novIdx = 0; this.novFilled = 0;
   }
 
 
 
   private vote(l: Landmark): void {
+    // MANUELL INSPELNING: ingen matchning alls. Se WHOLE_MIN_VOTES ovan.
+    if (this.manualMode) return;
+    // Ingen match inom fönstret → sluta leta, kör realtid resten av låten.
+    if (!this.matchId && l.t > RECOG_WINDOW_MS) return;
     const start = this.find(l.hash);
     if (start < 0) return;
     let end = start;
@@ -445,6 +565,12 @@ export class SongMemory {
       const id = this.slotIds[v0 >>> 12];
       if (id === this.blockedMatchId || this.bannedIds.has(id)) continue;
       const tSong = (v0 & 0xfff) * FRAME_MS;
+      // BÅDA ÄNDARNA I FÖNSTRET: när vi LETAR efter en match får träffen bara peka på
+      // låtens FÖRSTA sekunder. En träff mot ett repeterat parti 90 s in i posten kan
+      // annars etablera en match på fel position — och det är precis den sorten som fick
+      // medianen att peka 44 s fel. En redan etablerad match tar alla träffar, hela låten
+      // ut, så re-lock och positionsspårning påverkas inte.
+      if (!this.matchId && tSong > RECOG_WINDOW_MS) continue;
       if (this.inBlockedZone(id, tSong)) continue;
       const off = tSong - l.t;
       // Negativ offset är förväntad när en ny känd låt börjar mitt i ett
@@ -466,9 +592,22 @@ export class SongMemory {
         + (this.songs.size < SMALL_LIB ? VOTES_SMALL_LIB : 0);
       const spread = this.clusterSpan(id, winner.bucket) >= SPAN_MIN_MS;
       const establishes = !this.matchId && spread && winner.votes >= need && winner.votes >= other * MARGIN;
-      const replaces = !!this.matchId && id !== this.matchId && spread && winner.votes >= need && winner.votes > this.bestFor(this.matchId).votes;
+      // Utmanaren måste slå den aktiva matchen med marginal, inte med en röst.
+      const nowV = this.clock();
+      const curVotes = this.matchId ? this.bestFor(this.matchId).votes : 0;
+      const outvotes = winner.votes >= need && winner.votes >= curVotes * SWITCH_MARGIN;
+      if (this.matchId && id !== this.matchId) {
+        if (outvotes) { if (this.challengerId !== id) { this.challengerId = id; this.challengerSince = nowV; } }
+        else if (this.challengerId === id) { this.challengerId = 0; this.challengerSince = 0; }
+      }
+      const held = this.challengerId === id && nowV - this.challengerSince >= SWITCH_HOLD_MS;
+      // Den aktiva matchen måste ha tystnat. Får den fortfarande positionsenliga
+      // träffar är den vid liv, hur många röster utmanaren än samlat.
+      const curStale = !this.lastFreshMatchHit || nowV - this.lastFreshMatchHit > MATCH_FRESH_MS / 2;
+      const replaces = !!this.matchId && id !== this.matchId && spread && outvotes && held && curStale;
       if (id !== this.matchId && (establishes || replaces)) {
         const wasMatch = this.matchId;
+        this.challengerId = 0; this.challengerSince = 0;
         this.matchId = id;
         this.lastMatchedAt = this.clock();
         this.quarantinedSegment = false;
@@ -478,7 +617,8 @@ export class SongMemory {
         this.syncOffsets = [];
         this.lastSyncAt = 0;
         this.syncFast = true;
-        this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0;
+        this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.seekCount = 0; this.seekTarget = 0;
+        this.syncGood = 0; this.syncLocked = false; this.offBad = 0;
         this.matchVotes = winner.votes;
         this.matchMargin = winner.votes / Math.max(1, other);
         this.lastFreshMatchHit = this.clock();
@@ -536,6 +676,46 @@ export class SongMemory {
     return false;
   }
 
+  /** Matcha HELA den färdiga inspelningen mot biblioteket i ett svep.
+   *  Returnerar bästa låt om den vinner med marginal, annars null (= ny låt). */
+  private matchWhole(): { id: number; votes: number; ratio: number; offsetMs: number } | null {
+    if (this.idxHash.length === 0 || this.learnHash.length < 200) return null;
+    const tally = new Map<number, number>();
+    for (let k = 0; k < this.learnHash.length; k++) {
+      const h = this.learnHash[k], t = this.learnTime[k];
+      const start = this.find(h);
+      if (start < 0) continue;
+      let end = start;
+      while (end < this.idxHash.length && this.idxHash[end] === h) end++;
+      if (end - start > 60) continue;   // överpopulär hash → ingen information
+      for (let i = start; i < end; i++) {
+        const v0 = this.idxVal[i];
+        const id = this.slotIds[v0 >>> 12];
+        const tSong = (v0 & 0xfff) * FRAME_MS;
+        const key = this.voteKey(id, Math.round((tSong - t) / OFFSET_BUCKET));
+        tally.set(key, (tally.get(key) ?? 0) + 1);
+      }
+    }
+    if (!tally.size) return null;
+    // Bästa fack per låt (klustrat med grannfacken, som i realtidsröstningen).
+    const bestPerSong = new Map<number, number>();
+    const bestBucket = new Map<number, number>();
+    for (const [key, v] of tally) {
+      const id = this.voteId(key), b = this.voteBucket(key);
+      const c = v + (tally.get(this.voteKey(id, b - 1)) ?? 0) + (tally.get(this.voteKey(id, b + 1)) ?? 0);
+      if (c > (bestPerSong.get(id) ?? 0)) { bestPerSong.set(id, c); bestBucket.set(id, b); }
+    }
+    let bestId = 0, best = 0, second = 0;
+    for (const [id, v] of bestPerSong) {
+      if (v > best) { second = best; best = v; bestId = id; }
+      else if (v > second) second = v;
+    }
+    if (!bestId) return null;
+    // Offseten är hur mycket den NYA inspelningen ligger förskjuten mot den lagrade:
+    // lagrad tid = inspelningstid + offset.
+    return { id: bestId, votes: best, ratio: best / Math.max(1, second), offsetMs: (bestBucket.get(bestId) ?? 0) * OFFSET_BUCKET };
+  }
+
   private voteKey(id: number, bucket: number): number {
     return id * OFFSET_KEY_STRIDE + bucket + OFFSET_KEY_BIAS;
   }
@@ -589,7 +769,13 @@ export class SongMemory {
     // Efter seek/re-lock kan det historiska vinnarfacket ligga kvar en stund.
     // En råträff nära den AKTUELLA korrigerade offseten är ändå färsk evidens;
     // avlägsna hash-krockar får däremot inte hålla matchen vid liv.
-    if (Math.abs(off - this.matchOffset) <= OFFSET_BUCKET * 2) this.lastFreshMatchHit = now;
+    if (Math.abs(off - this.matchOffset) <= OFFSET_BUCKET * 2) { this.lastFreshMatchHit = now; this.offBad *= 0.94; }
+    // ANDELEN avvikande träffar, inte förekomsten av dem.
+    // Förr räckte EN träff > RELOCK_SNAP_MS bort för att tysta replayen i 2,5 s. MÄTT
+    // 2026-08-07: i en låt med återkommande partier kommer sådana träffar hela tiden,
+    // så blockeringen släppte aldrig och INGA inspelade drops gick igenom. Vid en
+    // VERKLIG seek pekar däremot ALLA träffar fel samtidigt — då stiger andelen snabbt.
+    else if (Math.abs(off - this.matchOffset) > RELOCK_SNAP_MS) this.offBad += (1 - this.offBad) * 0.06;
     if (Math.abs(bucket - winner.bucket) > 1) return;
     if (Math.abs(this.syncBucket - winner.bucket) > 1) { this.syncBucket = winner.bucket; this.syncOffsets = []; }
     this.syncOffsets.push(off);
@@ -630,9 +816,48 @@ export class SongMemory {
     if (c.length < RELOCK_MIN_HITS) return;
     const est = median(c);
     this.driftMs = est - (this.relockTarget ?? this.matchOffset);
-    if (Math.abs(this.driftMs) < RELOCK_ERROR_MS) { this.relockTarget = null; return; }
+    if (Math.abs(this.driftMs) < RELOCK_ERROR_MS) {
+      this.relockTarget = null;
+      if (!this.syncLocked && ++this.syncGood >= SYNC_LOCK_HITS) {
+        this.syncLocked = true;
+        // Hoppa förbi de drops som redan passerat under synkfasen — de har spelats
+        // av realtidsanalysen och ska inte fyras i efterhand.
+        const posNow = this.clock() - this.playStart + this.matchOffset;
+        this.replayIdx = this.nextDropIndex(this.songs.get(this.matchId), posNow);
+        this.pendingDrop = 0;
+        console.log(`[song] SYNK LÅST för låt #${this.matchId} vid ${(posNow / 1000).toFixed(1)}s (fel ${this.driftMs.toFixed(0)} ms) — minnet tar över`);
+      }
+      return;
+    }
+    // RÄKNA NER, NOLLA INTE.
+    // MÄTT 2026-08-07: driften växlade mellan −52 ms och −47 000 ms i samma låt —
+    // medianen pekar tillfälligt på ett REPETERAT parti. Att nolla räknaren vid varje
+    // sådant utslag gjorde att tre godkända kontroller i rad nästan aldrig uppnåddes,
+    // och synken tog onödigt lång tid att låsa. Ett enstaka utslag ska kosta ett steg,
+    // inte allt. (Positionen står ändå still — SEEK_CONFIRM blockerar själva hoppet.)
+    if (this.syncGood > 0) this.syncGood--;
     if (Math.abs(est - this.matchOffset) >= RELOCK_SNAP_MS) {
-      // Riktig seek: positionen ÄR en annan, glid skulle bara ge fel ljus länge.
+      // LÅST SYNK HOPPAR INTE. Låset sätts i början av låten; därefter ÄGER klockan
+      // positionen och fingeravtrycken får bara justera den i småsteg (gliden nedan).
+      // MÄTT 2026-08-08: efter ett korrekt lås (första minnesdropen 23,94 s mot lagrad
+      // 24,06 s — alltså rätt position) rapporterades "drift" på 21,4 s och 25,4 s, och
+      // fem sådana i rad flyttade positionen −48 s. Estimaten kom från REPETERADE
+      // PARTIER i samma låt: refrängen matchar sig själv, och medianen pekar då på en
+      // annan förekomst. SEEK_CONFIRM hjälper inte — i en låt med refräng återkommer
+      // samma falska svar hur många gånger som helst.
+      // Är vi genuint fel (användaren spolade) slutar de NÄRA träffarna komma, och
+      // matchningen släpps av staleness-vägen. Att tappa minnet är billigare än att
+      // spela det från fel plats.
+      if (this.syncLocked) { this.seekCount = 0; return; }
+      // Ett stort fel är nästan alltid ett repeterat parti, inte en seek. Kräv att
+      // FLERA kontroller i rad pekar på samma nya position innan positionen flyttas.
+      if (this.seekCount > 0 && Math.abs(est - this.seekTarget) < RELOCK_SNAP_MS) {
+        this.seekCount++;
+        this.seekTarget = this.seekTarget * 0.6 + est * 0.4;
+      } else { this.seekTarget = est; this.seekCount = 1; }
+      if (this.seekCount < SEEK_CONFIRM) return;   // låst tills bevisen är entydiga
+      this.seekCount = 0;
+      // Bekräftad seek: positionen ÄR en annan, glid skulle bara ge fel ljus länge.
       this.matchOffset = est;
       this.rawOffset = est;
       this.relockTarget = null;
@@ -645,6 +870,7 @@ export class SongMemory {
       console.log(`[song] re-lock: hoppade ${(this.driftMs / 1000).toFixed(2)}s`);
       return;
     }
+    this.seekCount = 0;   // felet är litet igen → ingen seek på gång
     if (this.relockTarget === null) this.relocks++;
     this.relockTarget = est;
     this.rawOffset = est;
@@ -708,13 +934,13 @@ export class SongMemory {
           // Fingerprint och temp-WAV börjar först när grinden öppnar. Samma
           // nollpunkt här gör att den tvättade tidslinjen inte hamnar 1 s snett.
           this.playStart = now; this.lastLoud = now; this.loudSince = 0; this.fp.reset();
-          this.quarantinedSegment = learn && now - this.lastMatchedAt < LEARN_QUARANTINE_MS;
+          this.quarantinedSegment = learn && now - this.lastMatchedAt < LEARN_QUARANTINE_MS && !this.manualMode;
         }
       } else this.loudSince = 0;
       return;
     }
 
-    if (now - this.lastLoud > SILENCE_END_MS) { this.commit(); return; }
+    if (!this.manualMode && now - this.lastLoud > SILENCE_END_MS) { this.commit(); return; }
 
     // En etablerad match hålls genom breakdowns och andra spektralt svaga partier.
     // Bara tystnad/commit eller en annan låt med fler röster får ersätta den.
@@ -738,13 +964,25 @@ export class SongMemory {
     // stoppade varje falsklarm ALL inlärning (mätt: 4 låtar spelade, 1 inlärd).
     if (this.matchId && !this.matchConfirmed && now - this.matchSince >= MATCH_STABLE_MS
         && this.lastFreshMatchHit > 0 && now - this.lastFreshMatchHit < MATCH_FRESH_MS / 2
-        && this.matchVotes >= VOTES_NEEDED && this.matchMargin >= MARGIN) this.matchConfirmed = true;
+        && this.matchVotes >= VOTES_NEEDED && this.matchMargin >= MARGIN) {
+      this.matchConfirmed = true;
+      // SPARA VILKEN låt det var. Släpps matchen senare ("tidslinjen tog slut" när
+      // den lagrade posten är kortare än låten) skulle commit annars se en ny låt
+      // och skapa en DUBBLETT av något vi redan kan.
+      this.segBestMatch = this.matchId;
+    }
 
     if (this.matchId) {
       const m = this.songs.get(this.matchId);
       const position = tLive + this.matchOffset;
-      if (m && position > m.meta.durationMs) this.releaseMatch(m.meta.id, "tidslinjen tog slut");
-      else if (this.lastFreshMatchHit && now - this.lastFreshMatchHit > MATCH_FRESH_MS) this.releaseMatch(this.matchId, "inga färska träffar");
+      if (m && position > m.meta.durationMs) {
+        if (this.matchConfirmed) this.matchEndedAt = now;
+        this.releaseMatch(m.meta.id, "tidslinjen tog slut");
+      }
+      else {
+        const freshWin = this.matchConfirmed ? MATCH_FRESH_CONFIRMED_MS : MATCH_FRESH_MS;
+        if (this.lastFreshMatchHit && now - this.lastFreshMatchHit > freshWin) this.releaseMatch(this.matchId, "inga färska träffar");
+      }
     }
 
     // Igenkänning-som-gräns: bara en BEKRÄFTAD match får dela segmentet — stabil
@@ -767,6 +1005,10 @@ export class SongMemory {
 
 
     // Tidslinje-inspelning (alltid — även för en känd låt, så minnet förbättras).
+    // DROPS HAR SIN EGEN FÖRSPRÅNG — och ska INTE ha REPLAY_LEAD_MS ovanpå.
+    // PRE_FIRE_MS (120 ms) är avvägt så att ljuset hinner RESA SIG och rummet är fullt
+    // PRECIS när dropen träffar. Läggs leaden på blir det 170 ms och toppen kommer före
+    // ljudet i stället för med det. Ljustaket och effektbytena ligger kvar på 50 ms.
     const songT = this.matchId ? tLive + this.matchOffset : tLive;
     if (learn) {
       if (o.dropped) this.learnDrops.push({ t: songT, s: Math.min(1, 0.5 + o.intensity * 0.5), c: 1 });
@@ -791,12 +1033,31 @@ export class SongMemory {
     }
 
     // REPLAY: nästa drop ur tidslinjen, PRE_FIRE_MS före.
-    const s = this.matchId ? this.songs.get(this.matchId) : undefined;
+    // BARA när synken är låst. Förr sattes pendingDrop så fort ett låt-id fanns, men
+    // takeDrop() anropas bara när `recognized` (= id OCH låst synk) — så drops som
+    // passerade under synkfasen KÖADES och släpptes alla i samma ögonblick som låset
+    // gick i. MÄTT 2026-08-07: synk låst 12,8 s → drop 12,79 s (lagrad 12,09 s, +0,7 s);
+    // synk låst 19,4 s → samma drop vid 19,38 s (+7,3 s). Ju senare låset, desto större fel.
+    // ...och inte medan en positionsändring väntar på bekräftelse. Under de sekunder
+    // SEEK_CONFIRM håller emot vet vi inte var vi är: MÄTT 2026-08-07 avlossades en drop
+    // från den GAMLA positionen mitt under en seek. En drop på fel plats är värre än en
+    // missad — showen ska hellre tiga tills positionen är avgjord.
+    // Tig bara när MAJORITETEN av träffarna pekar bort — då är vi någon annanstans.
+    const posSure = this.seekCount === 0 && this.offBad < 0.5;
+    // MÄTNING (tystar inget som inte redan var tyst): replayen kräver ju LÅST synk, så
+    // den här grinden kan bara slå till EFTER låset. Frågan är om den gör det i onödan
+    // — 2026-08-08 låg positionen mätt rätt (+0,12 s) men inga fler minnesdrops kom.
+    if (!posSure && this.matchId && this.syncLocked && now - this.lastPosBlockLog > 3000) {
+      this.lastPosBlockLog = now;
+      console.log(`[diag] REPLAY TYST trots lås: offBad ${this.offBad.toFixed(2)} (gräns 0.50), seek ${this.seekCount}`);
+    }
+    const s = this.matchId && this.syncLocked && posSure ? this.songs.get(this.matchId) : undefined;
     if (s) {
       const drops = s.meta.drops;
       while (this.replayIdx < drops.length && drops[this.replayIdx].t + PRE_FIRE_MS < songT) this.replayIdx++;
       if (this.replayIdx < drops.length && drops[this.replayIdx].t - PRE_FIRE_MS <= songT) {
         this.pendingDrop = drops[this.replayIdx].s;
+        this.lastFiredDropMs = drops[this.replayIdx].t;
         this.replayIdx++;
       }
     }
@@ -827,6 +1088,14 @@ export class SongMemory {
 
     // Gränsen backdateras NOV_BACK_MS (novelty reagerar när nya materialet fyllt
     // fönstret), så minsta längd mäts på det backdaterade segmentet.
+    if (this.manualMode) return false;   // knapparna äger gränserna
+    // LÅST LÅT KÖRS UT.
+    // MÄTT 2026-08-07: mitt i en igenkänd låt fyrade "låtgräns efter 111s (klangskifte
+    // 0.82 + tempo 110→155 BPM)". Varje sådan gräns gör en commit som nollställer match,
+    // position OCH synk — sedan låser den om på nytt och showen spårar ur. När vi VET
+    // vilken låt det är och tidslinjen är verifierad behövs ingen gissning: låten slutar
+    // när tidslinjen tar slut ("tidslinjen tog slut") eller när ljudet tystnar.
+    if (this.syncLocked && this.matchId) return false;
     if (tLive < MIN_SEG_MS + NOV_BACK_MS) return false;
 
     const novFresh = this.novAt > 0 && now - this.novAt < NOV_WIN_KEEP_MS;
@@ -834,11 +1103,16 @@ export class SongMemory {
     if (novFresh) ev.push(`klangskifte ${this.novPeak.toFixed(2)}`);
     if (bpmShift) ev.push(bpmShift);
     if (this.dipAt && now - this.dipAt < DIP_WIN_MS) ev.push("nivådipp");
+    if (this.matchEndedAt && now - this.matchEndedAt < MATCH_END_WIN_MS) ev.push("känd låt slut");
     this.lastEvidence = ev;
 
     let why = "";
     let back = NOV_BACK_MS;
-    if (novFresh && (this.novPeak >= NOV_STRONG || ev.length >= 2)) why = ev.join(" + ");
+    // Ensam räcker klangskiftet bara om det är starkt BÅDE absolut och relativt
+    // låtens egen fördelning. Två oberoende bevis räcker som förr.
+    const novRel = this.novRelThreshold();
+    const novSolo = this.novPeak >= NOV_STRONG && this.novPeak >= novRel;
+    if (novFresh && (novSolo || ev.length >= 2)) why = ev.join(" + ");
     else if (tLive > MAX_SEG_MS) { why = "maxlängd"; back = 0; }   // aldrig en 22-minuters gröt igen
     if (!why) return false;
 
@@ -851,7 +1125,8 @@ export class SongMemory {
     this.playStart = bAt;
     this.lastLoud = now;
     this.heurBoundaryAt = now;   // en bekräftad match får revidera nollpunkten
-    this.quarantinedSegment = this.learnMode && now - this.lastMatchedAt < LEARN_QUARANTINE_MS;
+    this.matchEndedAt = 0;
+    this.quarantinedSegment = this.learnMode && now - this.lastMatchedAt < LEARN_QUARANTINE_MS && !this.manualMode;
     return true;
   }
 
@@ -901,6 +1176,7 @@ export class SongMemory {
    *  Är segmentet kortare än minsta låtlängd committas inget (det vore en smutsig
    *  blob) — men tidslinjen ställs om ändå, så showen är i synk direkt. */
   private splitOnRecognition(now: number, pos: number): void {
+    if (this.manualMode) return;
     const id = this.matchId;
     const tLive = now - this.playStart;
     console.log(`[song] låtgräns efter ${(tLive / 1000).toFixed(0)}s (igenkänd låt #${id} vid ${(pos / 1000).toFixed(1)}s)`);
@@ -968,7 +1244,16 @@ export class SongMemory {
     // och får inte sparas som dubblett. En match som släpps som FALSK avbryter
     // sin egen karantän — materialet var en ny låt hela tiden, och de hashar som
     // samlats under matchen ligger redan kvar i learnHash.
-    if (this.matchConfirmed) { this.lastMatchedAt = this.clock(); this.quarantinedSegment = this.learnMode; }
+    // MANUELLT LÄGE: ägaren har tryckt Starta inlärning — då ska ingen automatik
+    // sätta segmentet i karantän. MÄTT 2026-08-07: en ominspelning av låt #5 samlade
+    // 1367 hashar och 135 s ljud, men när uppspelningens tidslinje tog slut vid 132 s
+    // ("släppte match: tidslinjen tog slut") sattes karantän — och HELA inspelningen
+    // kastades. Felet drabbade bara ominspelning av redan kända låtar, alltså precis
+    // det man gör för att rätta en dålig post.
+    // Synken gällde den SLÄPPTA låten. Utan detta ärvde nästa match ett låst syncLocked
+    // och började spela drops innan positionen var verifierad.
+    this.syncLocked = false; this.syncGood = 0;
+    if (this.matchConfirmed) { this.lastMatchedAt = this.clock(); this.quarantinedSegment = this.learnMode && !this.manualMode; }
     else this.quarantinedSegment = false;
     this.matchConfirmed = false;
     this.matchSince = 0;
@@ -997,10 +1282,22 @@ export class SongMemory {
   /** Lär just nu in en NY låt (aux, ej igenkänd) → temp-inspelningen ska rulla.
    *  Egen getter i stället för state() på ljudvägen: state() allokerar ett
    *  objekt, och den här frågan ställs 375 gånger i sekunden. */
-  get learningNew(): boolean { return !!this.playStart && !this.matchId && this.learnMode && !this.quarantinedSegment; }
+  /** Ska ljudet skrivas till temp-WAV just nu?
+   *  I MANUELLT läge har ägaren redan sagt att en låt spelas in — då får motorns
+   *  egna gissningar inte avbryta skrivningen. MÄTT 2026-08-07: låt #1 fick en WAV
+   *  som var 1,1 s KORTARE än tidslinjen (189,9 mot 191 s) eftersom en kortvarig
+   *  match satte matchId mitt i inspelningen. Allt tvätten sedan räknade fram —
+   *  drops OCH energikurvan — hamnade för tidigt, vilket syntes både som drops före
+   *  anslaget och som att VU-fladdret kom tillbaka när kurvan låg ur fas. */
+  get learningNew(): boolean { return !!this.playStart && (this.manualMode || !this.matchId) && this.learnMode && !this.quarantinedSegment; }
+
+  /** Diagnostik: VARFÖR skriver vi (inte) ljud just nu? */
+  get learnWhy(): string {
+    return `playStart=${this.playStart ? "ja" : "NEJ"} manual=${this.manualMode} matchId=${this.matchId} learnMode=${this.learnMode} karantän=${this.quarantinedSegment} hashar=${this.learnHash.length}`;
+  }
 
   /** Igenkänd låt → true medan replayen äger showen. */
-  get recognized(): boolean { return this.matchId !== 0; }
+  get recognized(): boolean { return this.matchId !== 0 && this.syncLocked; }
 
   /** Tempo + taktfas ur minnet (väggklocka-ankare) — låser beat-klockan direkt. */
   lockedBeat(): { bpm: number; anchorMs: number } | null {
@@ -1014,13 +1311,25 @@ export class SongMemory {
    *  aldrig fladdra som live-VU:n gjorde. */
   replayIntensity(): number | null {
     const s = this.matchId ? this.songs.get(this.matchId) : undefined;
-    if (!s || s.meta.intensity.length === 0) return null;
-    const x = (this.clock() - this.playStart + this.matchOffset) / 1000;
+    if (!s || s.meta.intensity.length === 0) { this.ceilAt = 0; return null; }
+    const x = (this.clock() - this.playStart + this.matchOffset + REPLAY_LEAD_MS) / 1000;
     const i = Math.floor(x);
     if (i < 0 || i >= s.meta.intensity.length) return null;
     const a = s.meta.intensity[i] / 255;
     const b = (s.meta.intensity[i + 1] ?? s.meta.intensity[i]) / 255;
-    return a + (b - a) * (x - i);
+    const target = a + (b - a) * (x - i);
+    // TAKET SKA FÖLJA LÅTENS BÅGE, INTE VARJE TAKTSLAG.
+    // MÄTT 2026-08-07: kurvan vandrar 42→57→47→60 % i SEKUNDTAKT i låtens lugna inledning
+    // — det är taktnivå, inte dramaturgi. I realtid finns inget tak alls (energyCeiling är
+    // av) och showen är då jämn; taket är alltså hela skillnaden mot det användaren
+    // jämför med. En tidskonstant på 1 s HALVERAR sekundvariationen (32→18 enheter) men
+    // låter tystnaden nå botten ändå (7–17 av 255) och rör inte de långsamma dragen.
+    const now = this.clock();
+    if (!this.ceilAt) { this.ceilAt = now; this.ceilNow = target; return target; }
+    const dt = Math.max(0, Math.min(0.25, (now - this.ceilAt) / 1000));
+    this.ceilAt = now;
+    this.ceilNow += (target - this.ceilNow) * (1 - Math.exp(-dt / 1.0));
+    return this.ceilNow;
   }
 
   /** DRAMATURGI UR MINNET (bara igenkända, tvättade låtar). Mutera-och-återanvänd:
@@ -1030,18 +1339,21 @@ export class SongMemory {
    *   section = true den hop en sektionsgräns passeras
    *   phrase  = true den hop en 16-taktersfras börjar
    *   hasGrid = låten har sektioner/frasgrid → dirigenten får vänta in dem */
-  private cues = { build: null as number | null, ceiling: null as number | null, section: false, phrase: false, hasGrid: false };
+  private cues = { build: null as number | null, ceiling: null as number | null, section: false, phrase: false, hasGrid: false, hasRisers: false };
+  private ceilNow = 0;            // utjämnat ljustak (följer bågen, inte taktslagen)
+  private ceilAt = 0;             // väggklocka för utjämningen
   private cuePrevT = -1;
-  replayCues(): { build: number | null; ceiling: number | null; section: boolean; phrase: boolean; hasGrid: boolean } {
+  replayCues(): { build: number | null; ceiling: number | null; section: boolean; phrase: boolean; hasGrid: boolean; hasRisers: boolean } {
     const c = this.cues;
-    c.build = null; c.ceiling = null; c.section = false; c.phrase = false; c.hasGrid = false;
+    c.build = null; c.ceiling = null; c.section = false; c.phrase = false; c.hasGrid = false; c.hasRisers = false;
     const s = this.matchId ? this.songs.get(this.matchId) : undefined;
     if (!s) { this.cuePrevT = -1; return c; }
-    const t = this.clock() - this.playStart + this.matchOffset;
+    const t = this.clock() - this.playStart + this.matchOffset + REPLAY_LEAD_MS;
     const prev = this.cuePrevT < 0 || t < this.cuePrevT ? t : this.cuePrevT;
     this.cuePrevT = t;
     c.ceiling = this.replayIntensity();
     const m = s.meta;
+    c.hasRisers = !!m.risers && m.risers.length > 0;
     if (m.risers) for (const r of m.risers) {
       if (t >= r.start && t < r.end && r.end > r.start) { c.build = (t - r.start) / (r.end - r.start); break; }
     }
@@ -1058,13 +1370,25 @@ export class SongMemory {
   }
 
 
+  /** 0..1 för en aktiv match: halva vikten röstmarginal, halva färskhet. */
+  private matchConfidence(): number {
+    const age = this.lastFreshMatchHit ? this.clock() - this.lastFreshMatchHit : Infinity;
+    const win = this.matchConfirmed ? MATCH_FRESH_CONFIRMED_MS : MATCH_FRESH_MS;
+    const freshF = age < MATCH_FRESH_MS / 2 ? 1 : age < win ? 0.55 : 0.25;
+    const marginF = Math.max(0, Math.min(1, this.matchMargin / (MARGIN * 2)));
+    return Math.max(0.15, Math.min(1, 0.5 * marginF + 0.5 * freshF));
+  }
+
   state(): SongMemoryState {
     const s = this.matchId ? this.songs.get(this.matchId) : undefined;
     return {
       songs: this.songs.size,
       known: !!s,
       plays: s?.meta.plays ?? 0,
-      confidence: s ? 1 : Math.max(0, Math.min(1, this.matchVotes / (VOTES_NEEDED * 3))),
+      // Konfidensen mättade förr på 1.00 så fort en match fanns — den kunde inte
+      // skilja en stark match från en som höll på att tappas. Nu vägs röstmarginal
+      // mot hur färska träffarna är.
+      confidence: s ? this.matchConfidence() : Math.max(0, Math.min(1, this.matchVotes / (VOTES_NEEDED * 3))),
       positionMs: this.playStart ? this.clock() - this.playStart + (s ? this.matchOffset : 0) : 0,
       learning: !!this.playStart && !s && this.learnMode && !this.quarantinedSegment,
       learningId: !!this.playStart && !s && this.learnMode && !this.quarantinedSegment ? this.nextId : 0,
@@ -1074,6 +1398,9 @@ export class SongMemory {
       matchMargin: this.matchMargin,
       rawOffsetMs: this.rawOffset,
       correctedOffsetMs: this.matchOffset,
+      note: s?.meta.note ?? "",
+      synced: this.syncLocked,
+      manual: this.manualMode,
       lastBoundary: this.lastBoundary,
       driftMs: this.driftMs,
       relocks: this.relocks,
@@ -1194,12 +1521,46 @@ export class SongMemory {
 
 
   /** Låten är slut: skriv in i minnet (ny låt) eller förbättra den kända. */
-  private commit(): void {
+  private commit(force = false, discard = false): void {
     this.boundaryCount++;   // gräns passerad → motorns auto-range får kalibrera om
     const dur = this.lastLoud - this.playStart;
-    const matched = this.matchId ? this.songs.get(this.matchId) : undefined;
+    const wasManual = this.manualMode;
+    const mId = this.matchId || this.segBestMatch;
+    let matched = mId ? this.songs.get(mId) : undefined;
+    // MANUELL INSPELNING: ingen matchning skedde under tiden → gör den nu, på allt.
+    if (wasManual && !discard && this.learnHash.length > 60) {
+      const w = this.matchWhole();
+      if (w && w.votes >= WHOLE_MIN_VOTES && w.ratio >= WHOLE_MIN_RATIO && Math.abs(w.offsetMs) <= WHOLE_MAX_OFFSET_MS) {
+        matched = this.songs.get(w.id);
+        // TIDSBASEN MÅSTE RÄTTAS FÖRE SAMMANSLAGNING.
+        // Två inspelningar av samma låt börjar aldrig på exakt samma sample. Slår man
+        // ihop drops rakt av vandrar de: MÄTT 2026-08-07 flyttades låt #5:s drops 0,7 s
+        // bakåt vid andra ominspelningen (12,09→11,4). Hasharna behålls från den FÖRSTA
+        // inspelningen, så det är dess tidsbas som gäller — och engångskollen vet exakt
+        // hur mycket den nya ligger fel.
+        if (w.offsetMs !== 0) {
+          for (const d of this.learnDrops) d.t += w.offsetMs;
+          const shiftS = Math.round(w.offsetMs / 1000);
+          if (shiftS > 0) this.learnIntensity = new Array(shiftS).fill(this.learnIntensity[0] ?? 0).concat(this.learnIntensity);
+          else if (shiftS < 0) this.learnIntensity = this.learnIntensity.slice(-shiftS);
+        }
+        console.log(`[song] engångskoll: samma låt som #${w.id} (${w.votes} träffar, ${w.ratio.toFixed(1)}× näst bästa, tidsbas ${w.offsetMs >= 0 ? "+" : ""}${w.offsetMs} ms) → slås ihop`);
+      } else if (w) {
+        const varfor = Math.abs(w.offsetMs) > WHOLE_MAX_OFFSET_MS
+          ? `tidsbas ${(w.offsetMs / 1000).toFixed(1)} s bort — pekar på ett annat ställe i låten`
+          : `under tröskel ${WHOLE_MIN_VOTES}/${WHOLE_MIN_RATIO}`;
+        console.log(`[song] engångskoll: NY låt (bästa var #${w.id} med ${w.votes} träffar, ${w.ratio.toFixed(1)}× — ${varfor})`);
+      } else {
+        console.log("[song] engångskoll: NY låt (inget i biblioteket liknar)");
+      }
+    }
     let committed: number | null = null;
-    if (this.learnMode && !this.quarantinedSegment && dur >= MIN_SEG_MS && this.learnHash.length > 60) {
+    // En MANUELL gräns är auktoritativ: användaren vet var låten slutade.
+    // Minsta längd finns för att skydda mot detektorns gissningar, inte mot en tumme.
+    const longEnough = force || dur >= MIN_SEG_MS;
+    if (wasManual && !discard && !(this.learnMode && !this.quarantinedSegment && longEnough && this.learnHash.length > 60))
+      console.log(`[diag] commit SPARADE INTE: ${this.learnWhy} dur=${(dur/1000).toFixed(0)}s`);
+    if (!discard && this.learnMode && !this.quarantinedSegment && longEnough && this.learnHash.length > 60) {
       const bpm = median(this.bpmSamples);
       if (matched) { this.mergeInto(matched, dur, bpm); committed = matched.meta.id; }
       else committed = this.addSong(dur, bpm);
@@ -1208,6 +1569,8 @@ export class SongMemory {
     }
     // Nollställ för nästa låt.
     this.playStart = 0;
+    this.segBestMatch = 0;
+    this.syncGood = 0; this.syncLocked = false;
     this.learnHash = []; this.learnTime = []; this.learnDrops = []; this.learnIntensity = [];
     this.bpmSamples = []; this.bpmAnchor = 0;
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.resetNovelty();
@@ -1219,9 +1582,103 @@ export class SongMemory {
     this.syncOffsets = []; this.syncBucket = 0; this.lastSyncAt = 0; this.syncFast = true; this.lastRelockAt = 0; this.driftMs = 0; this.relockTarget = null; this.glideAt = 0; this.replayIdx = 0; this.pendingDrop = 0;
     this.recentId = []; this.recentOff = []; this.recentT = [];
     this.fp.reset();
-    this.onCommit?.(committed, !matched);
+    // En MANUELL inspelning är komplett, inte partiell → den ska tvättas även när
+    // den matchade en känd låt. applyRefined skyddar ändå mot att en kortare tvätt
+    // ersätter en längre (refinedFromMs).
+    this.onCommit?.(committed, !matched || wasManual);
   }
 
+
+  /** MANUELL INLÄRNING.
+   *  MÄTT 2026-08-07: den automatiska gränsdetektorn träffar 0 av 2 verkliga
+   *  låtgränser på facit3 (fel −52 och −56 s) och producerar poster som innehåller
+   *  slutet av en låt ihop med början av nästa. En knapptryckning ligger inom ett par
+   *  sekunder, och det kostar ~20 av 1500 hashar — uppspelningens synk sätts ändå av
+   *  fingerprintingen mot ljudet självt, inte av var segmentet råkade börja.
+   *  Medan manuellt läge är på sätter INGET automatiskt gränser. */
+  manualStart(): void {
+    this.manualMode = true;
+    this.commit(false, true);   // kasta det som råkade ligga i bufferten
+    console.log("[song] manuell inlärning: START");
+  }
+
+  /** Spara låten som just spelades och börja direkt på nästa.
+   *  Ett segment under minsta låtlängd är nästan säkert ett feltryck — det kastas
+   *  hellre än sparas, för en halv låt i minnet ger fel show nästa gång. */
+  manualNext(): void {
+    if (!this.manualMode) return;
+    const dur = this.lastLoud - this.playStart;
+    if (dur < MIN_SEG_MS) {
+      console.log(`[song] manuell gräns: segment bara ${(dur / 1000).toFixed(0)}s → KASTAT (feltryck?)`);
+      this.commit(false, true);
+      return;
+    }
+    console.log(`[song] manuell gräns: NÄSTA LÅT efter ${(dur / 1000).toFixed(0)}s`);
+    this.commit(false, false);
+  }
+
+  /** Sluta. Det pågående segmentet är per definition ofullständigt → kastas. */
+  manualStop(): void {
+    if (!this.manualMode) return;
+    this.manualMode = false;
+    this.commit(false, true);
+    console.log(`[song] manuell inlärning: STOPP (pågående segment kastat), ${this.songs.size} låtar i minnet`);
+  }
+
+  isManual(): boolean { return this.manualMode; }
+
+  /** Diagnostik: skriv ut energikurvan (ljustaket) sekund för sekund. */
+  dumpCurve(id: number): void {
+    const s = this.songs.get(id);
+    if (!s) { console.log(`[diag] låt #${id} finns inte`); return; }
+    const v = s.meta.intensity;
+    console.log(`[diag] låt #${id} energikurva, ${v.length} värden (0-255):`);
+    for (let i = 0; i < Math.min(v.length, 40); i += 10)
+      console.log(`[diag]   ${i}-${Math.min(i + 9, v.length - 1)}s: ${v.slice(i, i + 10).join(" ")}`);
+  }
+
+  /** Glöm EN låt. Fanns bara forget() som rensade allt — den trubbigheten gjorde
+   *  att en frisk post fick strykas ihop med en trasig. */
+  forgetSong(id: number): void {
+    const s = this.songs.get(id);
+    if (!s) return;
+    const name = s.meta.note ? ` (${s.meta.note})` : "";
+    this.songs.delete(id);
+    if (this.matchId === id) { this.matchId = 0; this.matchConfirmed = false; this.matchVotes = 0; }
+    if (this.segBestMatch === id) this.segBestMatch = 0;
+    this.rebuildIndex();
+    this.dirty = true;
+    void this.save();
+    console.log(`[song] glömde låt #${id}${name} — ${this.songs.size} kvar`);
+  }
+
+  /** Ägarens etikett på en låt. Påverkar inget i showen — den finns för att man
+   *  ska kunna SE om rätt inspelning känns igen. */
+  setNote(id: number, note: string): void {
+    const s = this.songs.get(id);
+    if (!s) return;
+    const clean = String(note ?? "").slice(0, 80).trim();
+    if (clean) s.meta.note = clean; else delete s.meta.note;
+    this.dirty = true;
+    void this.save();
+    console.log(`[song] låt #${id} fick namn: ${clean || "(rensat)"}`);
+  }
+
+  /** Låtlistan för UI:t. "Processad" = tvätten har byggt om posten (refinedFromMs). */
+  list(): { id: number; durationMs: number; plays: number; drops: number; bpm: number; refined: boolean; note: string; dropTimes: number[] }[] {
+    const out: { id: number; durationMs: number; plays: number; drops: number; bpm: number; refined: boolean; note: string; dropTimes: number[] }[] = [];
+    for (const s of this.songs.values()) {
+      out.push({
+        id: s.meta.id, durationMs: s.meta.durationMs, plays: s.meta.plays,
+        drops: s.meta.drops.length, bpm: Math.round(s.meta.bpm),
+        refined: (s.meta.refinedFromMs ?? 0) > 0,
+        note: s.meta.note ?? "",
+        dropTimes: s.meta.drops.map((d) => d.t),
+      });
+    }
+    out.sort((a, b) => a.id - b.id);
+    return out;
+  }
 
   private addSong(dur: number, bpm: number): number {
     if (this.songs.size >= MAX_SONGS) this.evict();

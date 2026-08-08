@@ -64,7 +64,16 @@ export interface ServerDeps {
   songMemory?: {
     state: () => { songs: number; known: boolean; plays: number; confidence: number; positionMs: number; learning: boolean; refining: boolean };
     forget: () => void;
+    /** Manuell inlärning: användaren markerar låtgränserna själv. */
+    manualStart: () => void;
+    manualNext: () => void;
+    manualStop: () => void;
+    list: () => { id: number; durationMs: number; plays: number; drops: number; bpm: number; refined: boolean; note: string; dropTimes: number[] }[];
+    setNote: (id: number, note: string) => void;
+    forgetSong: (id: number) => void;
+    dumpCurve: (id: number) => void;
   };
+  probeDmx?: (channels: number[], frames: number) => void;
   onConfigChanged?: () => void;
 
   /** Advance to the next mode in the shared cycle. Returns the new mode. */
@@ -423,6 +432,7 @@ export async function startServer(
             bpmConfidence: frame.bpmConfidence,
             intensity: frame.intensity,   // sektionsenergi (diagnostik)
             dropCount: frame.dropCount,   // monoton drop-räknare (diagnostik)
+            beatMul: (frame as unknown as Record<string, number>).beatMul,   // hjärtslagets faktiska djup (diagnostik)
             buildUp: frame.buildUp,       // uppbyggnad 0..1 (diagnostik)
             inRiser: frame.inRiser,       // riser PÅGÅR — utan detta fältet läser en
                                           // extern mätning undefined, vilket i en
@@ -465,6 +475,30 @@ export async function startServer(
           } else if (msg.type === "cycleMode") {
             const next = deps.cycleMode();
             sock.send(JSON.stringify({ type: "modeChanged", mode: next }));
+          } else if (msg.type === "setSongNote" && typeof msg.id === "number") {
+            deps.songMemory?.setNote(msg.id, typeof msg.note === "string" ? msg.note : "");
+            const l2 = deps.songMemory?.list() ?? [];
+            sock.send(JSON.stringify({ type: "songList", songs: l2 }));
+          } else if (msg.type === "forgetSong" && typeof msg.id === "number") {
+            deps.songMemory?.forgetSong(msg.id);
+            sock.send(JSON.stringify({ type: "songList", songs: deps.songMemory?.list() ?? [] }));
+          } else if (msg.type === "songCurve" && typeof msg.id === "number") {
+            deps.songMemory?.dumpCurve(msg.id);
+          } else if (msg.type === "probeDmx") {
+            deps.probeDmx?.(Array.isArray(msg.channels) ? msg.channels.map(Number) : [1, 2, 3, 4, 5, 6, 7], Number(msg.frames) || 400);
+          } else if (msg.type === "listSongs") {
+            const l = deps.songMemory?.list() ?? [];
+            sock.send(JSON.stringify({ type: "songList", songs: l }));
+          } else if (msg.type === "songManualStart") {
+            // Inlärning ska bara vara på när ägaren faktiskt spelar in. Automatisk
+            // inlärning utanför manuellt läge producerade bara blandposter.
+            deps.cfg.songLearn = true;
+            deps.songMemory?.manualStart();
+          } else if (msg.type === "songManualNext") {
+            deps.songMemory?.manualNext();
+          } else if (msg.type === "songManualStop") {
+            deps.songMemory?.manualStop();
+            deps.cfg.songLearn = false;
           } else if (msg.type === "forgetSongs") {
             deps.songMemory?.forget();
             return;
@@ -564,6 +598,10 @@ export async function startServer(
             deps.cfg.ambientGlow = !!msg.value;
           } else if (msg.type === "setRiserStrobe") {
             deps.cfg.riserStrobe = !!msg.value;
+          } else if (msg.type === "setMemCeiling") {
+            deps.cfg.memCeilingOff = !msg.value;   // value=true → taket PÅ
+          } else if (msg.type === "setShowLead" && typeof msg.value === "number") {
+            deps.cfg.showLeadMs = Math.max(0, Math.min(300, Math.round(msg.value)));
           } else if (msg.type === "setSongLearn") {
             deps.cfg.songLearn = !!msg.value;   // frys/tina latminnets inlarning
           } else if (msg.type === "setStrobeUnlimited") {

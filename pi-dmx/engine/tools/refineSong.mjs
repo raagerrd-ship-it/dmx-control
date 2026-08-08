@@ -83,6 +83,7 @@ for (let i = PRE; i < fr.length - POST; i++) {
     if (r > bestRise) { bestRise = r; k = j; }
   }
   // Styrkan graderas EFTERÅT (relativt kvällens övriga drops) — se nedan.
+  if (process.env.FLANK_LOG) console.log(`[flank] kandidat ${fr[i].t.toFixed(2)}s -> flank ${fr[k].t.toFixed(2)}s (flytt ${(fr[k].t - fr[i].t).toFixed(2)}s)`);
   drops.push({ i: k, t: Math.round(fr[k].t * 1000), lift: after / (before + 0.05), s: 0.5 });
   lastDrop = i;
 }
@@ -146,11 +147,35 @@ const intensity = new Array(secs).fill(0);
   const cnt = new Array(secs).fill(0);
   for (const f of fr) {
     const s = Math.floor(f.t);
-    if (s >= 0 && s < secs) { intensity[s] += f.intensity; cnt[s]++; }
+    // ABSOLUT energi, inte f.intensity — den är REDAN relativ till ett löpande
+    // medel. Att sträcka den mot p5..p95 blev en andra normalisering ovanpå den
+    // första: MÄTT 2026-08-07 fick låt #5:s lugna intro full skala (10→255→19→255
+    // på tjugo sekunder) trots att partiet var genomgående stilla. Med absolut
+    // energi speglar kurvan vad som FAKTISKT är starkt och svagt i låten.
+    // KURVAN BYGGS PÅ NIVÅN, INTE PÅ "intensity".
+    // MÄTT 2026-08-07 mot en RÅINSPELNING av låten (corpus/formanga.wav): låten är
+    // HELT tyst 11–15 s (rå RMS 1 % av max). `level` följde det exakt (1–2 %), men
+    // `intensity` visade 13–21 % — den är relativ till ett löpande medel, så när
+    // musiken tystnar sjunker referensen och tystnaden läses som energi igen. Den
+    // tvättade kurvan sköt därför upp till 172 av 255 MITT I tystnaden, vilket syntes
+    // som att lamporna blinkade i ett lugnt parti.
+    // (Rå bandenergi testades också och blev dubbelt så hoppig — level är rätt val.)
+    if (s >= 0 && s < secs) { intensity[s] += f.level; cnt[s]++; }
   }
   for (let s = 0; s < secs; s++) intensity[s] = cnt[s] ? intensity[s] / cnt[s] : (intensity[s - 1] ?? 0.5);
+  // FULL KONTRAST — det är LAMPOR vi styr, inte ljud.
+  // p5..p95-sträckning ger hela registret även i hårt komprimerad musik (mätt: låten
+  // rörde sig bara mellan 56 % och 98 % av sin maxnivå). Att komprimera kurvan för att
+  // dämpa upplevt fladder testades och förkastades — dynamiken är själva poängen, och
+  // fladdret visade sig komma från att 30 % LIVE-intensitet blandades in i dramaturgin
+  // medan den låg några ms fel. Sedan blandningen togs bort (100 % minne) är det borta.
+  const STRETCH = 1.0;
   const p5 = quantile(intensity, 0.05), p95 = quantile(intensity, 0.95);
-  if (p95 - p5 > 0.02) for (let s = 0; s < secs; s++) intensity[s] = (intensity[s] - p5) / (p95 - p5);
+  const mx = Math.max(...intensity) || 1;
+  if (p95 - p5 > 0.02) for (let s = 0; s < secs; s++) {
+    const stretched = Math.max(0, Math.min(1, (intensity[s] - p5) / (p95 - p5)));
+    intensity[s] = STRETCH * stretched + (1 - STRETCH) * (intensity[s] / mx);
+  }
   for (let s = 1; s < secs; s++) intensity[s] = intensity[s] * 0.7 + intensity[s - 1] * 0.3;
   for (let s = 0; s < secs; s++) intensity[s] = Math.round(Math.max(0, Math.min(1, intensity[s])) * 255);
 }
@@ -276,12 +301,54 @@ let trimAt = 0;
   }
 }
 
+// ── ÖVERHÄNG I SLUTET ─────────────────────────────────────────────────────
+// Manuell inlärning: trycker man "Nästa låt" ett par sekunder sent följer början
+// av NÄSTA låt med i posten. Den interna gränsen ovan kan aldrig fånga det — den
+// kräver 60 s på båda sidor. MÄTT 2026-08-07: vid ett låtbyte faller nivån till
+// ~0.005 i drygt två sekunder. Den signaturen letar vi efter i slutet.
+// Hittas ingen tystnad trimmas INGENTING: ett blint klipp skulle straffa varje
+// gång användaren tryckte i tid, och några extra hashar är billigare än så.
+let tailTrim = 0;
+{
+  const LOOK_S = 12;            // så långt in i slutet vi söker
+  const MIN_GAP_S = 0.6;        // kortare fall är ett anslag, inte ett låtslut
+  const lvl = new Float32Array(fr.length);
+  for (let i = 0; i < fr.length; i++) lvl[i] = fr[i].sub + fr[i].kickB + fr[i].bass + fr[i].mid + fr[i].treble;
+  // Referens = medianen över hela låten, så tröskeln följer materialet.
+  const sorted = Array.from(lvl).sort((a, b) => a - b);
+  const med = sorted[sorted.length >> 1] || 0;
+  const quiet = med * 0.12;     // klart under låtens normalnivå
+  const from = Math.max(0, F(dur - LOOK_S));
+  let runStart = -1, best = -1, bestLen = 0;
+  for (let i = from; i < fr.length; i++) {
+    if (lvl[i] <= quiet) { if (runStart < 0) runStart = i; }
+    else {
+      if (runStart >= 0) {
+        const len = (i - runStart) * dt;
+        if (len >= MIN_GAP_S && len > bestLen) { bestLen = len; best = runStart; }
+      }
+      runStart = -1;
+    }
+  }
+  // Tystnad som pågår när inspelningen tar slut räknas också.
+  if (runStart >= 0) {
+    const len = (fr.length - runStart) * dt;
+    if (len >= MIN_GAP_S && len > bestLen) { bestLen = len; best = runStart; }
+  }
+  if (best > 0) {
+    tailTrim = Math.round(fr[best].t * 1000);
+    console.log(`[refine] SLUT hittat vid ${(tailTrim / 1000).toFixed(1)}s (tystnad ${bestLen.toFixed(1)}s) — ${(dur - tailTrim / 1000).toFixed(1)}s överhäng klipps`);
+  }
+}
+// Den interna gränsen (två hela låtar) har företräde — den är ett större fel.
+const cut = trimAt || tailTrim;
+
 writeFileSync(out, JSON.stringify({
   v: 2, songId: Number(songId),
   drops: drops.map((d) => ({ t: d.t, s: d.s })),
   bpm: Math.round(bpm * 10) / 10, beatPhaseMs, intensity, risers, sections, phrase,
   durMs: Math.round(dur * 1000),
-  ...(trimAt ? { trimAt } : {}),
+  ...(cut ? { trimAt: cut } : {}),
 }));
 if (trimAt) console.log(`[refine] INTERN LÅTGRÄNS vid ${(trimAt / 1000).toFixed(0)}s — låten trimmas`);
 

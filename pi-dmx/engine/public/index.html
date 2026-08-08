@@ -655,6 +655,40 @@
       för uppdateringar m.m.). Annars startar Pi:n sin egen AP "pi-dmx".
     </div>
   </div>
+
+  <div class="card">
+    <h2>Låtinlärning</h2>
+    <div class="status">
+      Motorn gissar själv var låtar börjar och slutar, men gissar ofta fel. Markerar du
+      gränserna själv blir inspelningarna rena — och nästa gång låten spelas hittar
+      igenkänningen rätt läge i ljudet på egen hand.
+      <br><br>
+      <b>Starta</b> när låten börjar · <b>Nästa låt</b> precis vid bytet · <b>Stoppa</b> när du är klar.
+      Ett par sekunder hit eller dit spelar ingen roll. Segment under 110 sekunder kastas
+      som feltryck, och spelar du in en låt som redan finns förbättras den i stället för att dubbleras.
+    </div>
+    <div class="fx-actions">
+      <button class="btn primary" id="learnStart">Starta inlärning</button>
+      <button class="btn" id="learnNext" disabled>Nästa låt</button>
+      <button class="btn" id="learnStop" disabled>Stoppa</button>
+    </div>
+    <div class="status" id="learnHint">Inte igång.</div>
+    <div id="songListWrap" style="margin-top:14px;overflow-x:auto">
+      <table id="songList" style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead><tr style="text-align:left;opacity:.6;white-space:nowrap">
+          <th style="padding:4px 6px 4px 0">#</th>
+          <th style="padding:4px 6px;width:99%">Namn</th>
+          <th style="padding:4px 6px">Längd</th>
+          <th style="padding:4px 6px">BPM</th>
+          <th style="padding:4px 6px" title="antal drops">Drops</th>
+          <th style="padding:4px 6px" title="antal spelningar">Spelad</th>
+          <th style="padding:4px 6px;white-space:nowrap">Status</th>
+          <th style="padding:4px 6px"></th>
+        </tr></thead>
+        <tbody id="songListBody"></tbody>
+      </table>
+    </div>
+  </div>
   </div><!-- /ownerOnly -->
 
   <!-- Dold: anslutningsstatus finns redan i sidfoten. Elementet behålls så
@@ -788,9 +822,99 @@ function connect() {
     else if (m.type === "effects") applyEffects(m.effects);
     else if (m.type === "bleScanResults") renderBleScan(m.devices || []);
     else if (m.type === "blePaired") renderBlePaired(m.devices || []);
+    else if (m.type === "songList") renderSongList(m.songs || []);
   };
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+// MANUELL LÅTINLÄRNING (bara /setup). Knapparna äger gränserna medan läget är på —
+// den automatiska detektorn är tystad i motorn så länge.
+const learnStart = document.getElementById("learnStart");
+const learnNext  = document.getElementById("learnNext");
+const learnStop  = document.getElementById("learnStop");
+const learnHint  = document.getElementById("learnHint");
+if (learnStart) learnStart.onclick = () => send({ type: "songManualStart" });
+if (learnNext)  learnNext.onclick  = () => send({ type: "songManualNext" });
+if (learnStop)  learnStop.onclick  = () => send({ type: "songManualStop" });
+function fmtDur(ms) {
+  const t = Math.round(ms / 1000);
+  return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0");
+}
+function renderSongList(rows) {
+  if (rows) lastRows = rows; else rows = lastRows;
+  const body = document.getElementById("songListBody");
+  if (!body) return;
+  // Rör inte tabellen om markören står i ett namnfält — annars försvinner det man skriver.
+  if (document.activeElement && document.activeElement.classList
+      && document.activeElement.classList.contains("songNote")) return;
+  if (!rows || !rows.length) {
+    body.innerHTML = '<tr><td colspan="6" style="padding:8px 0;opacity:.5">Inga inspelningar än.</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map(function (r) {
+    const nm = String(r.note || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    // Tvätten körs först efter inspelningen; otvättad post kör på råmätningen.
+    // Tvätten kör som egen process efter inspelningen — visa den medan den pågår.
+    const st = (refiningNow && refiningNow === r.id)
+      ? '<span style="color:#ffd166">◌ Tvättas…</span>'
+      : r.refined
+        ? '<span style="color:var(--pink,#ff3ea5)">✓ Processad</span>'
+        : '<span style="opacity:.55">○ Otvättad</span>';
+    return '<tr style="border-top:1px solid rgba(255,255,255,.08)">'
+      + '<td style="padding:6px 8px 6px 0">#' + r.id + '</td>'
+      + '<td style="padding:6px 8px"><input class="songNote" data-id="' + r.id + '" value="' + nm
+      + '" placeholder="låtnamn…" style="width:100%;min-width:96px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;padding:4px 6px;font:inherit" /></td>'
+      + '<td style="padding:6px 6px;white-space:nowrap">' + fmtDur(r.durationMs) + '</td>'
+      + '<td style="padding:6px 6px">' + (r.bpm || "—") + '</td>'
+      + '<td style="padding:6px 6px">' + r.drops + '</td>'
+      + '<td style="padding:6px 6px;white-space:nowrap">' + r.plays + '×</td>'
+      + '<td style="padding:6px 6px;white-space:nowrap">' + st + '</td>'
+      + '<td style="padding:6px 0 6px 6px"><button class="btn songDel" data-id="' + r.id
+      + '" title="glöm den här inspelningen" style="padding:2px 8px;font-size:13px;opacity:.7">✕</button></td></tr>';
+  }).join("");
+  // Spara vid Enter eller när fältet tappar fokus. Servern svarar med hela listan,
+  // så vi skriver inte över ett fält användaren just skriver i.
+  body.querySelectorAll("button.songDel").forEach(function (el) {
+    el.onclick = function () {
+      const id = Number(el.getAttribute("data-id"));
+      const row = el.closest("tr");
+      const nm = row ? (row.querySelector("input.songNote") || {}).value : "";
+      if (confirm("Glöm inspelningen" + (nm ? ' "' + nm + '"' : " #" + id) + "?")) send({ type: "forgetSong", id: id });
+    };
+  });
+  body.querySelectorAll("input.songNote").forEach(function (el) {
+    el.onkeydown = function (e) { if (e.key === "Enter") el.blur(); };
+    el.onblur = function () {
+      const id = Number(el.getAttribute("data-id"));
+      send({ type: "setSongNote", id: id, note: el.value });
+    };
+  });
+}
+let lastSongCount = -1, lastRefreshAt = 0;
+let refiningNow = 0, lastRows = null, lastRefining = -1;
+function renderLearn(sg) {
+  if (!learnHint) return;
+  const on = !!(sg && sg.manual);
+  if (learnStart) learnStart.disabled = on;
+  if (learnNext)  learnNext.disabled  = !on;
+  if (learnStop)  learnStop.disabled  = !on;
+  // Tvätten startar direkt efter en inspelning — statusraden ska följa med.
+  const rf = (sg && sg.refining) ? (sg.refiningId || 0) : 0;
+  if (rf !== lastRefining) { lastRefining = rf; refiningNow = rf; renderSongList(null); }
+  const n = sg ? sg.songs : 0;
+  const nowT = Date.now();
+  if (n !== lastSongCount || nowT - lastRefreshAt > 10000) {
+    lastSongCount = n; lastRefreshAt = nowT;
+    send({ type: "listSongs" });
+  }
+  if (!on) { learnHint.textContent = "Inte igång. " + n + " låtar i minnet."; return; }
+  const secs = Math.round((sg.positionMs || 0) / 1000);
+  const kort = secs < 110;
+  learnHint.textContent = "● Spelar in — " + secs + " s"
+    + (kort ? " (för kort ännu, kastas om du trycker Nästa nu)" : " (tillräckligt långt)")
+    + " · " + n + " låtar i minnet.";
+}
+
 
 // Effekt-listorna kommer från servern (type:"effects", grupperade på tier) →
 // en enda sanningskälla; ingen hårdkodad lista att hålla i synk med motorn.
@@ -1054,11 +1178,19 @@ function applyFrame(f) {
   // null tills låtminnes-motorn är deployad → badgen står kvar på "—".
   if (songBadge) {
     const sg = f.song;
-    if (sg && sg.learning) { songBadge.textContent = "● Spelar in låt" + (sg.learningId ? " #" + sg.learningId : ""); songBadge.style.color = "#ff4d4d"; }
-    else if (sg && sg.refining) { songBadge.textContent = "◌ Tvättar inspelning" + (sg.refiningId ? " #" + sg.refiningId : "") + "…"; songBadge.style.color = "rgba(255,255,255,.55)"; }
-    else if (sg && sg.known) { songBadge.textContent = "▶ Kör på inspelning · " + sg.plays + "×"; songBadge.style.color = "var(--pink,#ff3ea5)"; }
+    // De första sekunderna VET motorn inte om låten är känd — fingerprintingen
+    // behöver träffar först (mätt: låser typiskt efter ~3 s). Att säga "spelar in
+    // låt #6" då är missvisande; den lyssnar fortfarande.
+    if (sg && sg.learning && sg.songs > 0 && (sg.positionMs || 0) < 8000) {
+      songBadge.textContent = "◌ Lyssnar…"; songBadge.style.color = "rgba(255,255,255,.55)";
+    }
+    else if (sg && sg.learning) { songBadge.textContent = "● Spelar in låt" + (sg.learningId ? " #" + sg.learningId : ""); songBadge.style.color = "#ff4d4d"; }
+    // Låten är identifierad men tidslinjen ännu inte verifierad → realtid kör showen.
+    else if (sg && sg.known && !sg.synced) { songBadge.textContent = "◌ Synkar " + (sg.note || "inspelning") + "…"; songBadge.style.color = "#ffd166"; }
+    else if (sg && sg.known) { songBadge.textContent = "▶ " + (sg.note ? sg.note : "Kör på inspelning") + " · " + sg.plays + "×"; songBadge.style.color = "var(--pink,#ff3ea5)"; }
     else { songBadge.textContent = "—"; songBadge.style.color = "rgba(255,255,255,.35)"; }
   }
+  renderLearn(f.song);
   const barWrap = document.getElementById("levelBarWrap");
   if (barWrap) barWrap.classList.toggle("hot", hot);
 
