@@ -121,6 +121,10 @@ songs.onCommit = (songId, fresh) => {
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
 let lastRenderMs = 0;
+/** Kopia av senast SÄNDA ramen. Fallback-ticken tonar ned den vid ljudavbrott —
+ *  den gissar aldrig fram en ny bild, för den har ingen giltig indata att gissa ur. */
+let lastUniverse: Uint8Array | null = null;
+let fadeUniverse = new Uint8Array(0);
 const dmxProbe = { left: 0, chs: [] as number[], rows: [] as string[], t0: 0 };
 let clockDetBpm = 0;   // analysatorns bpm som taktklockan LÅSTES på (om-ankrings-referens,
                        // skild från cfg.beat.bpm som frekvens-termen finjusterar)
@@ -299,24 +303,49 @@ capture.on("chunk", (samples: Float32Array) => {
   // (~375 Hz) för tighta drops, men effekterna renderas i 100 Hz (var 10:e ms) →
   // halverad utgångslatens mot 50 Hz = tightare bas/drop-synk. Fortfarande långt
   // under 375 Hz så Node håller realtid. DMX-taket höjt till 100 Hz i takt.
-  const nowR = performance.now();
-  if (nowR - lastRenderMs >= 10) {
-    lastRenderMs = nowR;
+  if (performance.now() - lastRenderMs >= 10) renderAndSend();
+});
+
+/**
+ * DIAGNOSTIK: sampla den FAKTISKA DMX-utgången (efter puls, tak och kalibrering)
+ * så pulsen kan verifieras på det som lamporna får — inte på en mellansignal.
+ *
+ * Anropas från BÅDA sändvägarna. Låg den bara i renderAndSend blev fallback-vägen
+ * osynlig för proben — och då går felläget inte att mäta med det verktyg som ska
+ * bevisa det. (Precis det hände 2026-08-08: uttoningen gav noll rader.)
+ */
+function probeSample(universe: Uint8Array): void {
+  if (dmxProbe.left <= 0) return;
+  dmxProbe.left--;
+  // Taktfasen räknas ur samma klocka som effekterna använder → 0 = precis på slaget.
+  let bf = -1;
+  if (cfg.beat && cfg.beat.bpm > 40) {
+    const bMs = 60000 / cfg.beat.bpm;
+    bf = ((((Date.now() - cfg.beat.anchorMs) % bMs) + bMs) % bMs) / bMs;
+  }
+  dmxProbe.rows.push(`${Math.round(performance.now() - dmxProbe.t0)},${bf.toFixed(3)},${dmxProbe.chs.map((c) => universe[c]).join(",")}`);
+  if (dmxProbe.left === 0) console.log("[dmxprobe] ms,beatFrac," + dmxProbe.chs.join(",") + "|" + dmxProbe.rows.join("|"));
+}
+
+/**
+ * RENDER + SÄND — den ENDA vägen ut till lamporna.
+ *
+ * Bröts ut ur chunk-hanteraren så att fallback-ticken (se nedan) kan köra EXAKT
+ * samma väg. Två renderingsvägar hade blivit två sanningar om vad som ska lysa,
+ * och de skulle glida isär vid första ändringen.
+ */
+function renderAndSend(): void {
+    if (!latestFrame) return;   // inget ljud har någonsin kommit — inget att rendera
+    lastRenderMs = performance.now();
     const universe = effects.render(latestFrame);
-    // DIAGNOSTIK: sampla den FAKTISKA DMX-utgången (efter puls, tak och kalibrering)
-    // så pulsen kan verifieras på det som lamporna får — inte på en mellansignal.
-    if (dmxProbe.left > 0) {
-      dmxProbe.left--;
-      // Taktfasen räknas ur samma klocka som effekterna använder → 0 = precis på slaget.
-      let bf = -1;
-      if (cfg.beat && cfg.beat.bpm > 40) {
-        const bMs = 60000 / cfg.beat.bpm;
-        bf = ((((Date.now() - cfg.beat.anchorMs) % bMs) + bMs) % bMs) / bMs;
-      }
-      dmxProbe.rows.push(`${Math.round(performance.now() - dmxProbe.t0)},${bf.toFixed(3)},${dmxProbe.chs.map((c) => universe[c]).join(",")}`);
-      if (dmxProbe.left === 0) console.log("[dmxprobe] ms,beatFrac," + dmxProbe.chs.join(",") + "|" + dmxProbe.rows.join("|"));
-    }
+    probeSample(universe);
     dmx.send(universe, curSlots);
+    // Spara ramen så fallback-ticken har något att tona ned om ljudet dör.
+    if (!lastUniverse || lastUniverse.length !== universe.length) {
+      lastUniverse = new Uint8Array(universe.length);
+      fadeUniverse = new Uint8Array(universe.length);
+    }
+    lastUniverse.set(universe);
     // BLE-slingorna får riggens dominanta färg: medelvärde av alla R/G/B/W-kanaler
     // (W adderas i alla tre → varmvit blir vit på BLEDOM som saknar W). Master
     // skickas som separat brightness så sidecarn kan gamma-korrigera. Billigt
@@ -339,8 +368,40 @@ capture.on("chunk", (samples: Float32Array) => {
       }
       if (n > 0) bleClient.setColor(rs / n / 255, gs / n / 255, bs / n / 255, cfg.master);
     }
-  }
-});
+}
+
+// FALLBACK-TICK — riggen får inte FRYSA om ljudet tystnar i utgången.
+// Renderingen drivs av ljud-chunkar: ingen chunk ⇒ ingen render() ⇒ ingen
+// dmx.send(), och lamporna står kvar på sista ramen. Mitt i en drop kan det vara
+// full vit, och den står kvar tills någon startar om tjänsten. Tystnadsgrinden
+// kan inte rädda det, för den bor INUTI render.
+//   MÄTT 2026-08-08: noll "[arecord] exited" på sju dagar (mot 46 overruns, som
+//   är något annat — tappat ljud, inte död process). Det här är alltså försäkring
+//   mot ett sällsynt men elakt fel, inte en lagning av något som händer i drift.
+// Ramen TONAS NED i stället för att frysa, så den BEFINTLIGA input-off-vägen
+// (nivå under 0,02 i 2 s → allt släckt) mörklägger riggen av sig själv. Inget
+// nytt beteende, ingen andra sanning om när det ska vara mörkt.
+const FALLBACK_AFTER_MS = 40;   // 4 missade 100 Hz-rutor → ljudet driver inte längre
+const FALLBACK_FADE_MS = 400;   // uttoning till svart när ljudet är borta
+setInterval(() => {
+  // Normal drift: renderingen är alltid färsk (100 Hz) → vi avslutar direkt.
+  if (performance.now() - lastRenderMs < FALLBACK_AFTER_MS) return;
+  if (!lastUniverse) return;    // inget har någonsin lyst — inget att tona ned
+  // FÖRSTA FÖRSÖKET MATADE MOTORN MED PÅHITTADE, AVTAGANDE RAMAR. Det gick åt
+  // FEL HÅLL: `ceilingActive`/`pulseActive` i effects.ts kräver `silenceGate > 0.5`,
+  // så när den påhittade nivån sjönk slutade LJUSTAKET appliceras — och taket är
+  // det som håller riggen på DMX 20–60. MÄTT 2026-08-08 med arecord dödad mitt i
+  // showen: utgången rampade 27 → 145 → 225 och låg kvar på 225 tills ljudet kom
+  // tillbaka. Alltså full vit i stället för mörker, precis det vi ville undvika.
+  // Nu rör vi inte effektmotorn alls under avbrottet. Den har ingen giltig indata
+  // och ska inte tvingas gissa. Vi tonar bara ned DET SOM REDAN LÖSTE och håller
+  // svart tills ljudet är tillbaka — ett entydigt felläge utan nya beteenden.
+  const k = Math.max(0, 1 - (Date.now() - lastChunkAt) / FALLBACK_FADE_MS);
+  for (let i = 0; i < lastUniverse.length; i++) fadeUniverse[i] = Math.round(lastUniverse[i] * k);
+  probeSample(fadeUniverse);
+  dmx.send(fadeUniverse, curSlots);
+  lastRenderMs = performance.now();
+}, 20);
 
 capture.on("stderr", (s) => console.error("[arecord]", s));
 capture.on("exit", (code) => console.error("[arecord] exited", code));
