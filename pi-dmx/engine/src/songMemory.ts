@@ -1043,7 +1043,21 @@ export class SongMemory {
     // från den GAMLA positionen mitt under en seek. En drop på fel plats är värre än en
     // missad — showen ska hellre tiga tills positionen är avgjord.
     // Tig bara när MAJORITETEN av träffarna pekar bort — då är vi någon annanstans.
-    const posSure = this.seekCount === 0 && this.offBad < 0.5;
+    // LAST SYNK LITAR PA KLOCKAN.
+    // `offBad` raknar hur stor andel av fingeravtrycksträffarna som pekar langt
+    // fran nuvarande position. Tanken var att fanga "vi ar nagon annanstans" —
+    // men i en REPETITIV lat pekar traffarna isar av ren musikalisk anledning:
+    // varje refrang matchar alla andra refranger.
+    //   MATT 2026-08-08 pa "Witch Doctor" (struktur INT CHO VER CHO INS CHO INS
+    //   CHO END — FEM refranger): offBad lag pa 0.57-0.84 hela laten igenom och
+    //   tystade varenda inspelad drop, samtidigt som re-locken rapporterade
+    //   "synk hemma". Ju mer repetitiv laten, desto sakrare tystnad — tvartemot
+    //   vad man vill.
+    // Efter last synk KAN vi inte langre flytta oss (verifyLock hoppar aldrig),
+    // sa misstron har ingen atgard kvar att skydda mot. Ar vi genuint fel slutar
+    // de NARA traffarna komma och matchningen slapps av staleness-vagen — det ar
+    // det riktiga skyddet, och det ar kvar.
+    const posSure = this.syncLocked ? this.seekCount === 0 : (this.seekCount === 0 && this.offBad < 0.5);
     // MÄTNING (tystar inget som inte redan var tyst): replayen kräver ju LÅST synk, så
     // den här grinden kan bara slå till EFTER låset. Frågan är om den gör det i onödan
     // — 2026-08-08 låg positionen mätt rätt (+0,12 s) men inga fler minnesdrops kom.
