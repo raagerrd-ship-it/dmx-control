@@ -124,6 +124,14 @@ refiner.onRefined = (wav, songId) => {
   structure.enqueue(wav, songId, meta?.durationMs);
 };
 songs.onDropLearning = () => recorder.abort();
+// TAKET SLOG TILL (segment > 20 min = glomt stopp). songMemory har redan kastat
+// segmentet; har slas inlarningen av pa riktigt, precis som knappen "Stoppa"
+// gor, sa den inte bara borjar om pa nasta ruta.
+songs.onLearnTimeout = () => {
+  cfg.songLearn = false;
+  recorder.abort();
+  scheduleSave(cfg);
+};
 songs.onCommit = (songId, fresh) => {
   if (!songId) { recorder.abort(); return; }   // inget lärdes in → kasta ljudet
   // Segmentet matchade en KÄND låt → inspelningen är bara den del som spelades,

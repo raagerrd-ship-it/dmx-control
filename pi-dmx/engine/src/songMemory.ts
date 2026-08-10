@@ -63,6 +63,16 @@ const RELOCK_SNAP_MS = 900;        // så stort fel är en seek, inte drift → 
 // på fel kluster — då snappade positionen dit på EN enda mätning.
 // En riktig seek är sällsynt; en falsk median är vanlig i repeterad musik. Därför
 // måste ett stort hopp bekräftas av flera kontroller i rad innan det får gälla.
+/**
+ * TAK PA ETT MANUELLT SEGMENT. En lat ar aldrig tjugo minuter — har ett segment
+ * vuxit sa lange har agaren glomt att trycka "Nasta lat" eller "Stoppa", och det
+ * som spelats in ar en grot av flera latar. En sadan post ar inte bara vardelos
+ * utan skadlig: den lars in som EN lat, matchar allt och inget, och tar plats.
+ * Ljudet vager dessutom ~92 kB/s, sa en glomd inspelning over natten skulle
+ * fylla kortet och stoppa alla riktiga inspelningar.
+ * Da ar det battre att sluta: kasta segmentet och sla av inlarningen.
+ */
+const MANUAL_MAX_SEGMENT_MS = 20 * 60 * 1000;
 const SEEK_CONFIRM = 5;            // 5 × RELOCK_INTERVAL_MS ≈ 7,5 s av samma svar
 // TRE STEG: IDENTIFIERA → SYNKA → LÅS.
 // Att veta VILKEN låt det är säger ingenting om VAR i den vi är. Inspelningen började
@@ -947,6 +957,15 @@ export class SongMemory {
     // hamnar ett halvt mik-fingeravtryck i minnet.
     if (learn !== this.learnMode) { this.learnMode = learn; this.dropLearning(); }
     this.glideLock(now);
+    // GLOMT STOPP → kasta och sla av. Kollas fore allt annat sa ett skenande
+    // segment inte hinner gora nagot mer.
+    if (this.manualMode && this.playStart && now - this.playStart > MANUAL_MAX_SEGMENT_MS) {
+      const min = Math.round((now - this.playStart) / 60000);
+      console.log(`[song] inlärningen har gått ${min} min utan låtbyte — glömt stopp? Kastar segmentet och slår av.`);
+      this.manualStop();          // kastar pagaende segment (commit(false, true))
+      this.onLearnTimeout?.();    // motorn slar av cfg.songLearn och avbryter recordern
+      return;
+    }
     if (o.level > 0.02) this.lastLoud = now;
     if (!this.playStart) {
       // Volymgrind: starta bara på tydlig musik som hållit en sekund, aldrig på brusgolvet.
@@ -1562,6 +1581,8 @@ export class SongMemory {
   onCommit?: (songId: number | null, fresh: boolean) => void;
   /** Anropas när pågående inlärning kastas → temp-inspelningen ska avbrytas. */
   onDropLearning?: () => void;
+  /** Taket slog till — motorn ska sla av inlarningen (cfg.songLearn) ocksa. */
+  onLearnTimeout?: () => void;
 
   /** Ersätt tidslinjen med de offline-tvättade värdena. Fingeravtrycket
    *  (hashar + tider) och spelräknaren rörs INTE 
