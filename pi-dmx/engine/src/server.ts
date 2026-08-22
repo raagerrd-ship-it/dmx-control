@@ -782,10 +782,9 @@ export async function startServer(
             deps.ble?.setCal(mac, cal);
           }
           deps.onConfigChanged?.();
-          // Echo back
-          for (const c of app.websocketServer.clients) {
-            if (c.readyState === 1 && ((c as any).bufferedAmount ?? 0) < 8192) c.send(JSON.stringify({ type: "config", config: deps.cfg }));
-          }
+          // Echo back — koalescerat: en långsam klient får bara den senaste configen.
+          const cfgMsg = JSON.stringify({ type: "config", config: deps.cfg });
+          for (const c of app.websocketServer.clients) sendState(c, "config", cfgMsg);
         } catch { /* ignore malformed */ }
       });
 
