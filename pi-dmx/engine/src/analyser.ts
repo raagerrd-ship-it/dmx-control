@@ -296,6 +296,7 @@ export class Analyser {
     for (let i = 0; i < N; i++) envPos[i] = env[i] > 0 ? env[i] : 0;
     // Pulse-train xcorr per lag: max över fas av Σ envPos[φ + k·L], normaliserad per antal pulser.
     const pulse = this.pulseScratch;   // pre-allokerad (index lagMin..lagMax)
+    const combArr = this.combScratch;  // comb-summan beräknas EN gång per lag
     let pulseMax = 1e-9, combMax = 1e-9;
     for (let lag = lagMin; lag <= lagMax; lag++) {
       let best = 0;
@@ -309,25 +310,22 @@ export class Analyser {
       let comb = ac[lag];
       if (2 * lag <= lagMax) comb += 0.5 * ac[2 * lag];
       if (3 * lag <= lagMax) comb += 0.33 * ac[3 * lag];
+      combArr[lag] = comb;
       if (comb > combMax) combMax = comb;
     }
     let bestLag = 0, bestVal = 0;
     let scoreSum = 0, scoreCount = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
-      let comb = ac[lag];
-      if (2 * lag <= lagMax) comb += 0.5 * ac[2 * lag];
-      if (3 * lag <= lagMax) comb += 0.33 * ac[3 * lag];
       // Normalisera båda till [0,1] och rösta jämnt — så de kan väga upp varandra.
       // AC svarar starkt på självlikhet, pulse xcorr på regelbunden energi-fördelning.
-      const combN = comb / combMax;
+      const combN = combArr[lag] / combMax;
       const pulseN = pulse[lag] / pulseMax;
-      const bpmAt = (HZ * 60) / lag;
-      const oct = Math.log2(bpmAt / 120);
-      const prior = Math.exp(-(oct * oct) / 2.0);   // σ = 1.0 oktav
+      const prior = this.priorLut[lag];   // log-Gauss, σ = 1.0 oktav (förberäknad)
       const score = (0.5 * combN + 0.5 * pulseN) * prior;
       scoreSum += score; scoreCount++;
       if (score > bestVal) { bestVal = score; bestLag = lag; }
     }
+
 
     if (bestLag === 0 || bestVal <= 0) return;
     // Peak-to-mean confidence: en tydlig takttopp sticker ut från medelnivån,
