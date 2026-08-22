@@ -453,6 +453,8 @@ export async function startServer(
   // OBS: använd cfg.beat.anchorMs (stabilt, PLL-fasat), INTE frame.beatAnchorMs
   // som hoppar till varje ny kick och nollar indexet → sporadiska blink.
   let lastBeatIdx = -1;
+  let frameDrops = 0;         // analyspaket släppta pga full sendbuffert (diagnostik)
+  let lastDropLogMs = 0;
   let pkLevel = 0, pkEnergy = 0, pkKick = false, pkBeat = false, subTick = 0;
   let frameTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -553,14 +555,14 @@ export async function startServer(
             deps.cfg.activeMood = undefined;   // manuell effekt → ingen stämning aktiv längre
           } else if (msg.type === "cycleMode") {
             const next = deps.cycleMode();
-            sock.send(JSON.stringify({ type: "modeChanged", mode: next }));
+            sendState(sock, "modeChanged", JSON.stringify({ type: "modeChanged", mode: next }));
           } else if (msg.type === "setSongNote" && typeof msg.id === "number") {
             deps.songMemory?.setNote(msg.id, typeof msg.note === "string" ? msg.note : "");
             const l2 = deps.songMemory?.list() ?? [];
-            sock.send(JSON.stringify({ type: "songList", songs: l2 }));
+            sendState(sock, "songList", JSON.stringify({ type: "songList", songs: l2 }));
           } else if (msg.type === "forgetSong" && typeof msg.id === "number") {
             deps.songMemory?.forgetSong(msg.id);
-            sock.send(JSON.stringify({ type: "songList", songs: deps.songMemory?.list() ?? [] }));
+            sendState(sock, "songList", JSON.stringify({ type: "songList", songs: deps.songMemory?.list() ?? [] }));
           } else if (msg.type === "songCurve" && typeof msg.id === "number") {
             deps.songMemory?.dumpCurve(msg.id);
           } else if (msg.type === "setReplicateToken" && typeof msg.value === "string") {
@@ -568,9 +570,9 @@ export async function startServer(
             const v = msg.value.trim();
             deps.cfg.replicateToken = v || undefined;
             console.log(`[struktur] API-nyckel ${v ? "satt" : "borttagen"}`);
-            sock.send(JSON.stringify({ type: "structureStatus", hasToken: !!v, ...(deps.structureStatus?.() ?? {}) }));
+            sendState(sock, "structureStatus", JSON.stringify({ type: "structureStatus", hasToken: !!v, ...(deps.structureStatus?.() ?? {}) }));
           } else if (msg.type === "structureStatus") {
-            sock.send(JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, ...(deps.structureStatus?.() ?? {}) }));
+            sendState(sock, "structureStatus", JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, ...(deps.structureStatus?.() ?? {}) }));
           } else if (msg.type === "setAcrCreds" && typeof msg.key === "string" && typeof msg.secret === "string") {
             // Hemligheterna ekas ALDRIG tillbaka — bara om de ar satta eller ej.
             const k = msg.key.trim(), s2 = msg.secret.trim();
@@ -578,7 +580,7 @@ export async function startServer(
             deps.cfg.acrSecret = s2 || undefined;
             if (typeof msg.host === "string" && msg.host.trim()) deps.cfg.acrHost = msg.host.trim();
             console.log(`[namn] ACRCloud-uppgifter ${k && s2 ? "satta" : "borttagna"}`);
-            sock.send(JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, hasAcr: !!(deps.cfg.acrKey && deps.cfg.acrSecret), ...(deps.structureStatus?.() ?? {}) }));
+            sendState(sock, "structureStatus", JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, hasAcr: !!(deps.cfg.acrKey && deps.cfg.acrSecret), ...(deps.structureStatus?.() ?? {}) }));
           } else if (msg.type === "probeDmx") {
             deps.probeDmx?.(Array.isArray(msg.channels) ? msg.channels.map(Number) : [1, 2, 3, 4, 5, 6, 7], Number(msg.frames) || 400);
           } else if (msg.type === "listSongs") {
