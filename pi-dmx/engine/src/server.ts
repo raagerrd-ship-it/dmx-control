@@ -403,6 +403,86 @@ export async function startServer(
     }
   });
 
+  // ---- Frame-push: EN delad fläkt för alla klienter -------------------------
+  // Tidigare hade varje socket sin EGEN 50 ms-timer och sin egen
+  // JSON.stringify → N× serialisering och N osynkade pushar. Nu byggs
+  // payloaden en gång per tick och samma sträng skickas till alla.
+  //
+  // TOPPHÅLLNING + BATCH: vi POLLAR frames på 40 Hz men SKICKAR på 20 Hz, och
+  // tar MAX av level/energy/kick och OR av beat mellan två pushar. Analysatorn
+  // kan variera i takt (375 Hz normalt, men BPM-strid/tystnad glesar ut) utan
+  // att mätaren hackar — UI:t får alltid toppen i intervallet istället för ett
+  // slumpmässigt ögonblicksvärde som råkade ligga i en dal.
+  //
+  // Beat-lås-prick: räkna takt-index ur den STABILA PLL-taktklockan (cfg.beat,
+  // samma som effekternas beatPulse) och flagga `beat:true` den push där indexet
+  // går fram. Servern kör på Pi:n → samma klocka som anchorMs (klient-oberoende).
+  // OBS: använd cfg.beat.anchorMs (stabilt, PLL-fasat), INTE frame.beatAnchorMs
+  // som hoppar till varje ny kick och nollar indexet → sporadiska blink.
+  let lastBeatIdx = -1;
+  let pkLevel = 0, pkEnergy = 0, pkKick = false, pkBeat = false, subTick = 0;
+  let frameTimer: ReturnType<typeof setInterval> | null = null;
+
+  const frameTick = () => {
+    const frame = deps.getLatestFrame();
+    if (!frame) return;
+    // 1) Ackumulera topparna (körs 40 Hz).
+    if (frame.level > pkLevel) pkLevel = frame.level;
+    if (frame.energy > pkEnergy) pkEnergy = frame.energy;
+    if (frame.kick) pkKick = true;
+    const bc = deps.cfg.beat;
+    if (bc && bc.bpm > 40) {
+      const idx = Math.floor((Date.now() - bc.anchorMs) / (60000 / bc.bpm));
+      if (lastBeatIdx >= 0 && idx > lastBeatIdx) pkBeat = true;
+      lastBeatIdx = idx;
+    } else { lastBeatIdx = -1; }
+    // 2) Skicka varannan tick (20 Hz) — en sträng för alla klienter.
+    if (++subTick < 2) return;
+    subTick = 0;
+    const clients = app.websocketServer.clients;
+    if (clients.size === 0) {
+      if (frameTimer) { clearInterval(frameTimer); frameTimer = null; }
+      return;
+    }
+    const s = JSON.stringify({
+      type: "frame",
+      level: pkLevel,
+      energy: pkEnergy,
+      kick: pkKick,
+      gain: frame.gain,
+      bpm: frame.bpm,
+      bpmConfidence: frame.bpmConfidence,
+      intensity: frame.intensity,   // sektionsenergi (diagnostik)
+      dropCount: frame.dropCount,   // monoton drop-räknare (diagnostik)
+      beatMul: (frame as unknown as Record<string, number>).beatMul,   // hjärtslagets faktiska djup (diagnostik)
+      buildUp: frame.buildUp,       // uppbyggnad 0..1 (diagnostik)
+      inRiser: frame.inRiser,       // riser PÅGÅR — utan detta fältet läser en
+                                    // extern mätning undefined, vilket i en
+                                    // percentiltabell ser exakt ut som en nolla.
+                                    // Det ledde till slutsatsen "signalen är död"
+                                    // och en revert av en korrekt fix (820e7b6).
+      inZone: frame.inZone,
+      profile: frame.profile,       // karaktarsprofil (diagnostik)
+      beat: pkBeat,
+      beatErr: deps.cfg.beatErr ?? 0,
+      mode: deps.getActiveMode(),
+      activeMood: deps.cfg.activeMood,
+      activeIntensity: deps.cfg.activeIntensity,   // vred/slider-position (0..1)
+      fog: deps.getFogStatus(),     // null när maskinen inte är ansluten
+      bleActive: deps.ble?.activeCount() ?? 0,   // antal parade BLE-slingor som är uppkopplade
+      // Drift-hälsa: UI:t visar en banner om DMX-helpern är nere eller
+      // om parade BLE-slingor tappat kontakt. Billigt att skicka varje
+      // frame — samma push-rate som resten (20 Hz).
+      dmxOk: deps.getDmxConnected(),
+      blePairedCount: deps.ble?.paired().length ?? 0,
+      song: deps.songMemory?.state() ?? null,   // låtminne: känd låt / lär in
+    });
+    pkLevel = 0; pkEnergy = 0; pkKick = false; pkBeat = false;
+    for (const c of clients) {
+      if (c.readyState === 1 && ((c as any).bufferedAmount ?? 0) < 4096) c.send(s);
+    }
+  };
+
   app.register(async (f) => {
     f.get("/ws", { websocket: true }, (conn) => {
       // @fastify/websocket v10+ passes the raw WebSocket; older versions pass
@@ -413,60 +493,10 @@ export async function startServer(
       sock.send(JSON.stringify({ type: "effects", effects: EFFECT_META }));
       sock.send(JSON.stringify({ type: "config", config: deps.cfg }));
 
-      // Push frame samples at 20 Hz for the level meter + beat diagnostics.
-      // Beat-lås-prick: räkna takt-index ur den STABILA PLL-taktklockan (cfg.beat,
-      // samma som effekternas beatPulse) och flagga `beat:true` den push där indexet
-      // går fram. Servern kör på Pi:n → samma klocka som anchorMs (klient-oberoende).
-      // OBS: använd cfg.beat.anchorMs (stabilt, PLL-fasat), INTE frame.beatAnchorMs
-      // som hoppar till varje ny kick och nollar indexet → sporadiska blink.
-      let lastBeatIdx = -1;
-      const push = setInterval(() => {
-        const frame = deps.getLatestFrame();
-        if (frame && sock.readyState === 1 && (sock.bufferedAmount ?? 0) < 4096) {
-          let beat = false;
-          const bc = deps.cfg.beat;
-          if (bc && bc.bpm > 40) {
-            const idx = Math.floor((Date.now() - bc.anchorMs) / (60000 / bc.bpm));
-            if (lastBeatIdx >= 0 && idx > lastBeatIdx) beat = true;
-            lastBeatIdx = idx;
-          } else { lastBeatIdx = -1; }
-          sock.send(JSON.stringify({
-            type: "frame",
-            level: frame.level,
-            energy: frame.energy,
-            kick: frame.kick,
-            gain: frame.gain,
-            bpm: frame.bpm,
-            bpmConfidence: frame.bpmConfidence,
-            intensity: frame.intensity,   // sektionsenergi (diagnostik)
-            dropCount: frame.dropCount,   // monoton drop-räknare (diagnostik)
-            beatMul: (frame as unknown as Record<string, number>).beatMul,   // hjärtslagets faktiska djup (diagnostik)
-            buildUp: frame.buildUp,       // uppbyggnad 0..1 (diagnostik)
-            inRiser: frame.inRiser,       // riser PÅGÅR — utan detta fältet läser en
-                                          // extern mätning undefined, vilket i en
-                                          // percentiltabell ser exakt ut som en nolla.
-                                          // Det ledde till slutsatsen "signalen är död"
-                                          // och en revert av en korrekt fix (820e7b6).
-            inZone: frame.inZone,
-            profile: frame.profile,       // karaktarsprofil (diagnostik)
-            beat,
-            beatErr: deps.cfg.beatErr ?? 0,
-            mode: deps.getActiveMode(),
-            activeMood: deps.cfg.activeMood,
-            activeIntensity: deps.cfg.activeIntensity,   // vred/slider-position (0..1)
-            fog: deps.getFogStatus(),     // null när maskinen inte är ansluten
-            bleActive: deps.ble?.activeCount() ?? 0,   // antal parade BLE-slingor som är uppkopplade
-            // Drift-hälsa: UI:t visar en banner om DMX-helpern är nere eller
-            // om parade BLE-slingor tappat kontakt. Billigt att skicka varje
-            // frame — samma push-rate som resten (20 Hz).
-            dmxOk: deps.getDmxConnected(),
-            blePairedCount: deps.ble?.paired().length ?? 0,
-            song: deps.songMemory?.state() ?? null,   // låtminne: känd låt / lär in
+      // Starta den delade fläkten vid första klienten (den stoppar sig själv
+      // när sista klienten försvinner).
+      if (!frameTimer) { subTick = 0; frameTimer = setInterval(frameTick, 25); }
 
-          }));
-
-        }
-      }, 50);
 
       sock.on("message", (raw: Buffer) => {
         try {
@@ -706,7 +736,7 @@ export async function startServer(
         } catch { /* ignore malformed */ }
       });
 
-      sock.on("close", () => clearInterval(push));
+      // Den delade frame-fläkten stoppar sig själv när sista klienten stängt.
     });
   });
 
