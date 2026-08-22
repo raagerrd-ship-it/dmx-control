@@ -432,10 +432,17 @@ export class Analyser {
     // Median över RÅestimaten (utan oktav-tvång) → dämpar brus men låser inte
     // fast oktaven, så en fel initial låsning kan rättas. Långt fönster (~5s) för
     // att inte studsa på brusiga/tvetydiga låtar.
+    // TIDSVIKTAD RÖSTNING: före lås körs computeBpm() 100 Hz, så de 20 "rösterna"
+    // var samma 0.2 s data tjugo gånger — ingen medianvinst, bara fördröjning.
+    // Max en röst per 250 ms ⇒ fönstret täcker verkligen ~5 s.
     const HN = Analyser.BPM_HIST;
-    this.bpmHist[this.bpmHistPos] = bpm;
-    this.bpmHistPos = (this.bpmHistPos + 1) % HN;
-    if (this.bpmHistLen < HN) this.bpmHistLen++;
+    const voteNow = this.perfNow();
+    if (this.bpmHistLen === 0 || voteNow - this.lastVoteMs >= 250) {
+      this.lastVoteMs = voteNow;
+      this.bpmHist[this.bpmHistPos] = bpm;
+      this.bpmHistPos = (this.bpmHistPos + 1) % HN;
+      if (this.bpmHistLen < HN) this.bpmHistLen++;
+    }
     const n = this.bpmHistLen;
     const scratch = this.bpmSortScratch;
     for (let i = 0; i < n; i++) scratch[i] = this.bpmHist[(this.bpmHistPos - n + i + HN) % HN];
