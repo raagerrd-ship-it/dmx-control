@@ -587,7 +587,7 @@ export async function startServer(
             const l = deps.songMemory?.list() ?? [];
             // Berika med strukturlaget sa listan visar bade tvatten OCH analysen.
             const withStruct = l.map((r: any) => ({ ...r, struct: deps.structureInfo?.(r.id) }));
-            sock.send(JSON.stringify({
+            sendState(sock, "songList", JSON.stringify({
               type: "songList",
               songs: withStruct,
               structure: { hasToken: !!deps.cfg.replicateToken, hasAcr: !!(deps.cfg.acrKey && deps.cfg.acrSecret), ...(deps.structureStatus?.() ?? {}) },
