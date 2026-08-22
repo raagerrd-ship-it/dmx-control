@@ -793,13 +793,25 @@ export class SongMemory {
     // Efter seek/re-lock kan det historiska vinnarfacket ligga kvar en stund.
     // En råträff nära den AKTUELLA korrigerade offseten är ändå färsk evidens;
     // avlägsna hash-krockar får däremot inte hålla matchen vid liv.
-    if (Math.abs(off - this.matchOffset) <= OFFSET_BUCKET * 2) { this.lastFreshMatchHit = now; this.offBad *= 0.94; }
+    if (Math.abs(off - this.matchOffset) <= OFFSET_BUCKET * 2) { this.lastFreshMatchHit = now; this.offBad *= 0.94; this.farRun = 0; }
     // ANDELEN avvikande träffar, inte förekomsten av dem.
     // Förr räckte EN träff > RELOCK_SNAP_MS bort för att tysta replayen i 2,5 s. MÄTT
     // 2026-08-07: i en låt med återkommande partier kommer sådana träffar hela tiden,
     // så blockeringen släppte aldrig och INGA inspelade drops gick igenom. Vid en
     // VERKLIG seek pekar däremot ALLA träffar fel samtidigt — då stiger andelen snabbt.
-    else if (Math.abs(off - this.matchOffset) > RELOCK_SNAP_MS) this.offBad += (1 - this.offBad) * 0.06;
+    else if (Math.abs(off - this.matchOffset) > RELOCK_SNAP_MS) {
+      this.offBad += (1 - this.offBad) * 0.06;
+      // SAMSTÄMMIG FAR-SERIE = SPOLNING, NU. Den periodiska kontrollen kräver
+      // RELOCK_MIN_HITS nya träffar och hinner först efter ~5 s — MÄTT avfyrades en
+      // inspelad drop 4,9 s efter en spolning, ~35 s fel. Skillnaden mot repeterade
+      // partier är att refrängträffar VÄXLAR med närträffar (som nollar serien),
+      // medan en spolning ger bara fel — och alla åt SAMMA håll.
+      if (this.farRun > 0 && Math.abs(off - this.farTarget) < RELOCK_SNAP_MS) this.farRun++;
+      else { this.farTarget = off; this.farRun = 1; }
+      // Positionen står still (verifyLock hoppar aldrig på låst synk); det här
+      // tystar bara replayen via posSure tills seek-bevisen är entydiga.
+      if (this.farRun >= 8 && this.syncLocked && this.seekCount === 0) this.seekCount = 1;
+    }
     if (Math.abs(bucket - winner.bucket) > 1) return;
     if (Math.abs(this.syncBucket - winner.bucket) > 1) {
       // VINNARFACKET BYTTE → POSITIONEN ÄR OKLAR NU, inte om 5 s. Den periodiska
