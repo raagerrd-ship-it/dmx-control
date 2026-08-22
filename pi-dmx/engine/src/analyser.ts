@@ -148,6 +148,17 @@ export class Analyser {
   private envPosScratch = new Float32Array(Analyser.ENV_LEN);
   private acScratch = new Float32Array(Analyser.ENV_LEN);
   private pulseScratch = new Float32Array(Analyser.ENV_LEN);
+  private combScratch = new Float64Array(Analyser.ENV_LEN);
+  /** Perceptuell prior (log-Gauss runt 120 BPM) per lag — lagg→BPM ar fast, sa
+   *  de ~78 Math.exp()-anropen per computeBpm-anrop kan bakas en gang. */
+  private priorLut = (() => {
+    const t = new Float64Array(Analyser.ENV_LEN);
+    for (let lag = 1; lag < Analyser.ENV_LEN; lag++) {
+      const oct = Math.log2(((Analyser.ENV_HZ * 60) / lag) / 120);
+      t[lag] = Math.exp(-(oct * oct) / 2.0);
+    }
+    return t;
+  })();
   private silentMs = 0;
   private beatAnchorMs = 0;
   // #2 sub-hop fas: kick-flankens flux-topp ligger sällan exakt på en hop. Vi
@@ -285,6 +296,7 @@ export class Analyser {
     for (let i = 0; i < N; i++) envPos[i] = env[i] > 0 ? env[i] : 0;
     // Pulse-train xcorr per lag: max över fas av Σ envPos[φ + k·L], normaliserad per antal pulser.
     const pulse = this.pulseScratch;   // pre-allokerad (index lagMin..lagMax)
+    const combArr = this.combScratch;  // comb-summan beräknas EN gång per lag
     let pulseMax = 1e-9, combMax = 1e-9;
     for (let lag = lagMin; lag <= lagMax; lag++) {
       let best = 0;
@@ -298,25 +310,22 @@ export class Analyser {
       let comb = ac[lag];
       if (2 * lag <= lagMax) comb += 0.5 * ac[2 * lag];
       if (3 * lag <= lagMax) comb += 0.33 * ac[3 * lag];
+      combArr[lag] = comb;
       if (comb > combMax) combMax = comb;
     }
     let bestLag = 0, bestVal = 0;
     let scoreSum = 0, scoreCount = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
-      let comb = ac[lag];
-      if (2 * lag <= lagMax) comb += 0.5 * ac[2 * lag];
-      if (3 * lag <= lagMax) comb += 0.33 * ac[3 * lag];
       // Normalisera båda till [0,1] och rösta jämnt — så de kan väga upp varandra.
       // AC svarar starkt på självlikhet, pulse xcorr på regelbunden energi-fördelning.
-      const combN = comb / combMax;
+      const combN = combArr[lag] / combMax;
       const pulseN = pulse[lag] / pulseMax;
-      const bpmAt = (HZ * 60) / lag;
-      const oct = Math.log2(bpmAt / 120);
-      const prior = Math.exp(-(oct * oct) / 2.0);   // σ = 1.0 oktav
+      const prior = this.priorLut[lag];   // log-Gauss, σ = 1.0 oktav (förberäknad)
       const score = (0.5 * combN + 0.5 * pulseN) * prior;
       scoreSum += score; scoreCount++;
       if (score > bestVal) { bestVal = score; bestLag = lag; }
     }
+
 
     if (bestLag === 0 || bestVal <= 0) return;
     // Peak-to-mean confidence: en tydlig takttopp sticker ut från medelnivån,
@@ -663,7 +672,13 @@ export class Analyser {
       this.envAccum = 0;
       // Innan lås: räkna på varje ny envelope-sample (100 Hz) för snabbast första estimat.
       // Efter lås: 4 Hz räcker gott — sparar CPU och förfinar med median.
-      const stride = this.localBpm === 0 ? 1 : Analyser.ENV_HZ / 4;
+      // TAK PÅ OLÅST TAKT: kostnaden växer med fönstret (uppmätt 28 µs @ N=100,
+      // 110 µs @ N=500 på x86 ⇒ ~10× på Zero 2W). Med 100 Hz och fullt fönster
+      // blir det en CPU-spik som aldrig ger något: när fönstret redan är >1.5 s
+      // och ingen lås skett är låten taktlös/otydlig, och 20 Hz räcker mer än väl.
+      // De första ~1.5 s körs fortfarande i full takt — time-to-first-lock är orörd.
+      const stride = this.localBpm !== 0 ? Analyser.ENV_HZ / 4
+        : this.envFilled < 150 ? 1 : 5;
       if (++this.bpmCounter >= stride) { this.bpmCounter = 0; this.computeBpm(); }
 
     }
