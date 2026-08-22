@@ -452,7 +452,13 @@ export async function startServer(
   // går fram. Servern kör på Pi:n → samma klocka som anchorMs (klient-oberoende).
   // OBS: använd cfg.beat.anchorMs (stabilt, PLL-fasat), INTE frame.beatAnchorMs
   // som hoppar till varje ny kick och nollar indexet → sporadiska blink.
+  // Mätarvärdena skickas 20 Hz till mobilen. Ett rått 0.42837192612 kostar 13
+  // tecken i varje paket och UI:t visar tre decimaler i bästa fall — tre
+  // decimaler räcker och halverar paketet, vilket är färre bytes över WiFi och
+  // därmed längre till HIGH_WATER-gränsen på en svag länk.
+  const r3 = (v: number | undefined) => (typeof v === "number" ? Math.round(v * 1000) / 1000 : v);
   let lastBeatIdx = -1;
+
   let frameDrops = 0;         // analyspaket släppta pga full sendbuffert (diagnostik)
   let lastDropLogMs = 0;
   let pkLevel = 0, pkEnergy = 0, pkKick = false, pkBeat = false, subTick = 0;
