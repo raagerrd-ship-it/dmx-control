@@ -145,13 +145,46 @@ export async function startServer(
     broadcast();
     identifyTimer = setTimeout(() => stopIdentify(), holdMs);
   };
+  // ---- Backpressure ---------------------------------------------------------
+  // En långsam klient (svag WiFi-länk, mobil i bakgrunden) får annars sin
+  // send-kö att växa obegränsat: paketen levereras till slut, men då är de
+  // sekunder gamla och UI:t "spelar upp" gammal analys i slow motion.
+  //
+  // Regler:
+  //  • Analyspaket (`frame`) är FÄRSKVARA — köas aldrig. Är kön full släpps
+  //    paketet helt; nästa tick (50 ms) har färskare data ändå.
+  //  • State-paket (config, songList, …) måste komma fram, men bara det
+  //    SENASTE av varje typ är intressant. De läggs i en per-klient map
+  //    nycklad på `type`, så ett nyare paket skriver över ett äldre oskickat.
+  //    Kön flushas när sockets buffert har dränerats.
+  const HIGH_WATER = 4096;   // bytes i sockets sendbuffert = "klienten hänger inte med"
+  const pendingOf = (c: any): Map<string, string> => (c.__pending ??= new Map<string, string>());
+
+  /** Skicka ett state-paket med koalescering per typ (senaste vinner). */
+  const sendState = (c: any, type: string, s: string) => {
+    if (c.readyState !== 1) return;
+    if ((c.bufferedAmount ?? 0) > HIGH_WATER) { pendingOf(c).set(type, s); return; }
+    const p = pendingOf(c);
+    if (p.size) p.delete(type);   // vi skickar det färska nu
+    c.send(s);
+  };
+
+  /** Töm koalescerade state-paket för en klient som hunnit ikapp. */
+  const flushState = (c: any) => {
+    const p = c.__pending as Map<string, string> | undefined;
+    if (!p || p.size === 0) return;
+    if ((c.bufferedAmount ?? 0) > HIGH_WATER) return;
+    for (const s of p.values()) c.send(s);
+    p.clear();
+  };
+
   /** Fan out till alla anslutna klienter. Utan argument = aktuell config. */
   const broadcast = (payload?: unknown) => {
-    const s = JSON.stringify(payload ?? { type: "config", config: deps.cfg });
-    for (const c of app.websocketServer.clients) {
-      if (c.readyState === 1) c.send(s);
-    }
+    const p: any = payload ?? { type: "config", config: deps.cfg };
+    const s = JSON.stringify(p);
+    for (const c of app.websocketServer.clients) sendState(c, p.type ?? "config", s);
   };
+
 
 
   await app.register(fastifyWebsocket);
