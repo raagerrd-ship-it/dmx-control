@@ -801,7 +801,15 @@ export class SongMemory {
     // VERKLIG seek pekar däremot ALLA träffar fel samtidigt — då stiger andelen snabbt.
     else if (Math.abs(off - this.matchOffset) > RELOCK_SNAP_MS) this.offBad += (1 - this.offBad) * 0.06;
     if (Math.abs(bucket - winner.bucket) > 1) return;
-    if (Math.abs(this.syncBucket - winner.bucket) > 1) { this.syncBucket = winner.bucket; this.syncOffsets = []; }
+    if (Math.abs(this.syncBucket - winner.bucket) > 1) {
+      // VINNARFACKET BYTTE → POSITIONEN ÄR OKLAR NU, inte om 5 s. Den periodiska
+      // kontrollen behöver RELOCK_MIN_HITS nya träffar och hinner först efter
+      // ~5 s — MÄTT avfyrades en inspelad drop 4,9 s efter en spolning, ~35 s
+      // fel. Fackbytet är samma bevis men omedelbart, så replayen tystas direkt
+      // (posSure) medan positionen står still tills seek-bevisen är entydiga.
+      if (this.syncLocked && this.seekCount === 0) this.seekCount = 1;
+      this.syncBucket = winner.bucket; this.syncOffsets = [];
+    }
     this.syncOffsets.push(off);
     if (this.syncOffsets.length > 31) this.syncOffsets.shift();
     const needSamples = this.syncFast ? SYNC_SAMPLES_FAST : SYNC_SAMPLES;
