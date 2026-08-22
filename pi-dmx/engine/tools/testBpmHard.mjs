@@ -42,3 +42,16 @@ const kick = (tt, beat, decay = 25) => Math.exp(-((tt % beat) / beat) * beat * d
 // 5. BRUSIGT rum (mic): kick dränkt i brus
 { const b = 60/136;
   sim("brusigt rum 136", 30, tt => 0.35*kick(tt,b) + 0.22*noise() + 0.15*Math.sin(2*Math.PI*220*tt), () => 136); }
+
+// 6. BREAKDOWN: basen försvinner 12–20 s (bara pad), sedan tillbaka. Takten ska HÅLLA.
+{ const b = 60/142;
+  sim("breakdown 142", 40, tt => { const on = tt < 12 || tt > 20;
+    return (on ? 0.6*kick(tt,b) + 0.25*Math.exp(-((tt%(b/2))/(b/2))*b*80)*noise() : 0)
+      + 0.3*Math.sin(2*Math.PI*280*tt)*(0.7+0.3*Math.sin(tt*2)) + 0.02*noise(); }, () => 142); }
+// 7. SHUFFLE/triolkänsla 116 — mellanslag med egen accent
+{ const b = 60/116;
+  sim("shuffle 116", 30, tt => { const p = (tt % b)/b;
+    return 0.6*Math.exp(-p*b*24)*Math.sin(2*Math.PI*58*tt)
+      + 0.3*Math.exp(-(((tt+b*0.66)%b)/b)*b*60)*noise() + 0.02*noise(); }, () => 116); }
+// 8. NÄRA OKTAVGRÄNS 158
+{ const b = 60/158; sim("158 (nära gräns)", 30, tt => 0.6*kick(tt,b)+0.2*noise()*Math.exp(-((tt%(b/2))/(b/2))*b*80)+0.02*noise(), () => 158); }
