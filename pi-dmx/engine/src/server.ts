@@ -523,7 +523,17 @@ export async function startServer(
       flushState(cc);
       cc.send(s);
     }
+    // Logga släpp högst en gång per 10 s — annars döljer en svag länk allt annat.
+    if (frameDrops > 0) {
+      const now = Date.now();
+      if (now - lastDropLogMs > 10000) {
+        lastDropLogMs = now;
+        logHealth("info", "server", `${frameDrops} analyspaket släppta (långsam klient)`);
+        frameDrops = 0;
+      }
+    }
   };
+
 
 
   app.register(async (f) => {
