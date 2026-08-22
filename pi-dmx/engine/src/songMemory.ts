@@ -353,6 +353,8 @@ export class SongMemory {
   private syncLocked = false;     // tidslinjen är verifierad → minnet får äga showen
   private offBad = 0;             // 0..1 andel träffar som pekar långt bort → positionen osäker
   private lastPosBlockLog = 0;    // strypning av [diag] REPLAY TYST
+  private farRun = 0;            // samstämmiga träffar långt från nuvarande position
+  private farTarget = 0;
   private seekTarget = 0;         // kandidat till stort positionshopp
   private seekCount = 0;          // hur många kontroller i rad som pekat dit
   private glideAt = 0;            // klocka för glidens senaste steg
