@@ -149,6 +149,15 @@ export class Analyser {
   private acScratch = new Float32Array(Analyser.ENV_LEN);
   private pulseScratch = new Float32Array(Analyser.ENV_LEN);
   private combScratch = new Float64Array(Analyser.ENV_LEN);
+  private prefScratch = new Float64Array(Analyser.ENV_LEN + 1);   // prefix-summa → lokalt medel (whitening)
+  /** BASBANDETS onset-envelope (kick-flux), samma raster och position som envRing. */
+  private envBassRing = new Float32Array(Analyser.ENV_LEN);
+  private envBassAccum = 0;
+  private scoreFull = new Float64Array(Analyser.ENV_LEN);
+  private scoreBass = new Float64Array(Analyser.ENV_LEN);
+  /** Ackumulerat tempogram (EMA av hela lag-kurvan mellan anrop). */
+  private tempoGram = new Float64Array(Analyser.ENV_LEN);
+  private lastVoteMs = 0;   // tidsviktad median-röstning (max 4 röster/s)
   /** Perceptuell prior (log-Gauss runt 120 BPM) per lag — lagg→BPM ar fast, sa
    *  de ~78 Math.exp()-anropen per computeBpm-anrop kan bakas en gang. */
   private priorLut = (() => {
