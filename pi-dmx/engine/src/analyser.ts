@@ -710,20 +710,25 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; }
     } else {
       this.silentMs = 0;
     }
     // --- Onset-envelope → lokal BPM (nedsamplad till 100 Hz) ---
     const frameMs = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
     this.envAccum = Math.max(this.envAccum, fluxNorm);
+    // Basbandets egen envelope (kick-flux) — samma raster, oberoende signal.
+    const bassFluxNorm = Math.min(1, kickFlux * 0.02);
+    if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
     this.envAccumT += frameMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) {
       this.envAccumT -= 1000 / Analyser.ENV_HZ;
       this.envRing[this.envPos] = this.envAccum;
+      this.envBassRing[this.envPos] = this.envBassAccum;
       this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
       this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
       this.envAccum = 0;
+      this.envBassAccum = 0;
       // Innan lås: räkna på varje ny envelope-sample (100 Hz) för snabbast första estimat.
       // Efter lås: 4 Hz räcker gott — sparar CPU och förfinar med median.
       // TAK PÅ OLÅST TAKT: kostnaden växer med fönstret (uppmätt 28 µs @ N=100,
