@@ -466,6 +466,23 @@ export class Analyser {
       this.bandHi[b] = Math.min(BIG / 2, Math.round(Analyser.BAND_HZ[b + 1] / binHzBig));
       this.bandPeak[b] = 1e-4;   // seed → själv-kalibrerar inom ~1s
     }
+    // FÖRBERÄKNADE EMA-ALFOR. dtHop och alla tidskonstanter är fasta, så de 11
+    // Math.exp()-anropen per hop (~4000/s vid 375 Hz) hörde inte hemma i tick-vägen.
+    const dtHop = cfg.fft.hop / cfg.audio.rate;
+    const bigDt = dtHop * Analyser.BIG_EVERY;
+    this.dtHop = dtHop;
+    this.aAtt = 1 - Math.exp(-dtHop / 0.015);
+    this.aRel = 1 - Math.exp(-dtHop / 0.4);
+    this.aVU = 1 - Math.exp(-dtHop / 0.20);
+    this.aIUp = 1 - Math.exp(-dtHop / 1.5);
+    this.aIDown = 1 - Math.exp(-dtHop / 3.0);
+    this.aBandLvl = 1 - Math.exp(-bigDt / 0.09);
+    this.dHat = Math.exp(-dtHop / 0.06);
+    this.dSnare = Math.exp(-dtHop / 0.11);
+    this.dKick = Math.exp(-dtHop / 0.15);
+    this.aSpecSlow = 1 - Math.exp(-dtHop / 2.0);
+    this.aNovSlow = 1 - Math.exp(-dtHop / 1.5);
+    this.aProf = 1 - Math.exp(-dtHop / 8.0);
     // Ett återanvänt Frame (spec/onset pekar på de pre-allokerade objekten).
     this.outFrame = {
       level: 0, levelRaw: 0, levelVU: 0, energy: 0, mid: 0, treble: 0, centroid: 0, flux: 0,
