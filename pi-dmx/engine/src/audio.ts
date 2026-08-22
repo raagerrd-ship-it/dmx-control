@@ -28,11 +28,14 @@ export class AudioCapture extends EventEmitter {
    *  vid uppstart 163 ms, och enstaka event-loop-stalls ger 341 ms → 1500 ms ger
    *  4× marginal till det värsta uppmätta. Ren försäkring, fyrar aldrig i drift. */
   private static readonly STALE_MS = 1500;
+  /** Se toMonoFloat32: återanvänd mono-buffert, giltig bara under 'chunk'-handlern. */
+  private readonly mono: Float32Array;
 
   constructor(private opts: AudioCaptureOptions) {
     super();
     this.bytesPerFrame = 2 * opts.channels;
     this.chunkBytes = opts.hopSamples * this.bytesPerFrame;
+    this.mono = new Float32Array(opts.hopSamples);
   }
 
   start() {
@@ -119,9 +122,20 @@ export class AudioCapture extends EventEmitter {
     this.leftover = combined.subarray(offset);
   }
 
+  /**
+   * ÅTERANVÄND BUFFERT — chunkarna kommer ~375 gånger i sekunden, och en ny
+   * Float32Array per chunk är konstant sopmängd på en maskin där en GC-paus
+   * syns som fladder i ljuset.
+   *
+   * KONTRAKT: den utsända arrayen gäller BARA under 'chunk'-handlern. Båda
+   * konsumenterna kopierar synkront innan de släpper den (analyser.process →
+   * `buffer.set(samples)`, recorder.write → egen Int16-buffert), och onData
+   * emittar en chunk i taget så nästa skrivning sker efter att den förra är
+   * konsumerad. EN KONSUMENT SOM SPARAR ARRAYEN MELLAN CHUNKAR MÅSTE KOPIERA.
+   */
   private toMonoFloat32(buf: Buffer): Float32Array {
     const n = this.opts.hopSamples;
-    const out = new Float32Array(n);
+    const out = this.mono;
     // Zero-copy Int16Array view over the incoming buffer. Pi Zero 2 W is
     // little-endian, matching S16_LE, so no byteswap needed. ~3-4× faster
     // than readInt16LE() in a hot loop.
