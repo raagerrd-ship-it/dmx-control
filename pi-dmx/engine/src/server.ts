@@ -736,7 +736,7 @@ export async function startServer(
         } catch { /* ignore malformed */ }
       });
 
-      sock.on("close", () => clearInterval(push));
+      // Den delade frame-fläkten stoppar sig själv när sista klienten stängt.
     });
   });
 
