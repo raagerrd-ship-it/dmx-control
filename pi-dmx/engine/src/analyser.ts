@@ -149,6 +149,15 @@ export class Analyser {
   private acScratch = new Float32Array(Analyser.ENV_LEN);
   private pulseScratch = new Float32Array(Analyser.ENV_LEN);
   private combScratch = new Float64Array(Analyser.ENV_LEN);
+  private prefScratch = new Float64Array(Analyser.ENV_LEN + 1);   // prefix-summa → lokalt medel (whitening)
+  /** BASBANDETS onset-envelope (kick-flux), samma raster och position som envRing. */
+  private envBassRing = new Float32Array(Analyser.ENV_LEN);
+  private envBassAccum = 0;
+  private scoreFull = new Float64Array(Analyser.ENV_LEN);
+  private scoreBass = new Float64Array(Analyser.ENV_LEN);
+  /** Ackumulerat tempogram (EMA av hela lag-kurvan mellan anrop). */
+  private tempoGram = new Float64Array(Analyser.ENV_LEN);
+  private lastVoteMs = 0;   // tidsviktad median-röstning (max 4 röster/s)
   /** Perceptuell prior (log-Gauss runt 120 BPM) per lag — lagg→BPM ar fast, sa
    *  de ~78 Math.exp()-anropen per computeBpm-anrop kan bakas en gang. */
   private priorLut = (() => {
@@ -262,29 +271,34 @@ export class Analyser {
    *  (Ref: comb/sub-harmonic + fler-frames-röstning, se @audio/beat och
    *   OBTAIN-realtidsbeat-tracking.)
    */
-  private computeBpm() {
-    if (this.envFilled < 50) return;   // ~0.5s → snabbt första grovestimat (täcker ≥~122 BPM;
-                                       //  långsammare spår låser på overton tills fönstret växer),
-                                       //  förfinas löpande. Halverar time-to-first-lock.
-    const N = this.envFilled;
-    const env = this.envScratch;   // pre-allokerad (index 0..N-1)
-    let mean = 0;
-    const start = (this.envPos - N + Analyser.ENV_LEN) % Analyser.ENV_LEN;
-    for (let i = 0; i < N; i++) { env[i] = this.envRing[(start + i) % Analyser.ENV_LEN]; mean += env[i]; }
-    mean /= N;
-    for (let i = 0; i < N; i++) env[i] -= mean;
-    const HZ = Analyser.ENV_HZ;
-    const lagMin = Math.floor(HZ * 60 / 185);
-    const lagMax = Math.min(N - 1, Math.floor(HZ * 60 / 55));   // sokfonstret ar bredare an vikningen med flit
+  /** Autokorrelation + comb + pulse-xcorr + prior för EN onset-envelope.
+   *  Fyller `out[lagMin..lagMax]` med normaliserad score och returnerar bandets
+   *  medelenergi (0 = tyst band → anroparen kan vikta ner det). Scratcharna håller
+   *  efteråt den SENAST scorade envelopen — off-beat-testet och den paraboliska
+   *  interpolationen läser dem, så helbandet måste scoras sist. */
+  private scoreEnv(ring: Float32Array, N: number, out: Float64Array, lagMin: number, lagMax: number): number {
+    const L = Analyser.ENV_LEN;
+    const env = this.envScratch;
+    const pre = this.prefScratch;
+    const start = (this.envPos - N + L) % L;
+    let energy = 0;
+    pre[0] = 0;
+    for (let i = 0; i < N; i++) {
+      const v = ring[(start + i) % L];
+      env[i] = v; energy += v; pre[i + 1] = pre[i] + v;
+    }
+    // WHITENING: subtrahera ett LOKALT medel (1 s glidande) i stället för det
+    // globala. En långsam nivådrift inom fönstret (uppbyggnad, breakdown, AGC som
+    // andas) läcker annars rakt in i autokorrelationen och lyfter de långa laggen.
+    const half = Analyser.ENV_HZ >> 1;
+    for (let i = 0; i < N; i++) {
+      const lo = i - half > 0 ? i - half : 0;
+      const hi = i + half + 1 < N ? i + half + 1 : N;
+      env[i] -= (pre[hi] - pre[lo]) / (hi - lo);
+    }
     // 1) Rå autokorrelation, LENGTH-NORMALISERAD: /(N-lag) tar bort biasen mot
     //    korta lag (annars vinner alltid snabb takt eftersom fler termer bidrar).
-    // 2) COMB-SCORING: ac(L) + ½·ac(2L) + ⅓·ac(3L). En äkta beat-period resonerar
-    //    även på dubbla/trippla lag — enskilda toppar gör det inte. (Klapuri.)
-    // 3) PULSE-TRAIN CROSS-CORRELATION (Percival-Tzanetakis 2014, Essentia):
-    //    korrelera envelopen mot en idealiserad pulsserie vid bästa fas. Fångar
-    //    regelbundenheten även när AC är utsmetad (mjuka onsets, synkoperingar).
-    // 4) PERCEPTUELL PRIOR: log-Gauss runt 120 BPM, σ = 1.0 oktav (Ellis/librosa).
-    const ac = this.acScratch;   // pre-allokerad (index lagMin..lagMax skrivs/läses)
+    const ac = this.acScratch;
     for (let lag = lagMin; lag <= lagMax; lag++) {
       let sum = 0;
       const M = N - lag;
@@ -292,11 +306,15 @@ export class Analyser {
       ac[lag] = sum / M;
     }
     // Halvvågsrektifierad envelope (positiv del) — pulse xcorr använder bara energi PÅ slaget.
-    const envPos = this.envPosScratch;   // pre-allokerad (index 0..N-1)
+    const envPos = this.envPosScratch;
     for (let i = 0; i < N; i++) envPos[i] = env[i] > 0 ? env[i] : 0;
-    // Pulse-train xcorr per lag: max över fas av Σ envPos[φ + k·L], normaliserad per antal pulser.
-    const pulse = this.pulseScratch;   // pre-allokerad (index lagMin..lagMax)
-    const combArr = this.combScratch;  // comb-summan beräknas EN gång per lag
+    // 2) COMB-SCORING: ac(L) + ½·ac(2L) + ⅓·ac(3L). En äkta beat-period resonerar
+    //    även på dubbla/trippla lag — enskilda toppar gör det inte. (Klapuri.)
+    // 3) PULSE-TRAIN CROSS-CORRELATION (Percival-Tzanetakis 2014, Essentia):
+    //    korrelera envelopen mot en idealiserad pulsserie vid bästa fas. Fångar
+    //    regelbundenheten även när AC är utsmetad (mjuka onsets, synkoperingar).
+    const pulse = this.pulseScratch;
+    const combArr = this.combScratch;
     let pulseMax = 1e-9, combMax = 1e-9;
     for (let lag = lagMin; lag <= lagMax; lag++) {
       let best = 0;
@@ -313,19 +331,48 @@ export class Analyser {
       combArr[lag] = comb;
       if (comb > combMax) combMax = comb;
     }
-    let bestLag = 0, bestVal = 0;
-    let scoreSum = 0, scoreCount = 0;
+    // Normalisera båda till [0,1] och rösta jämnt — så de kan väga upp varandra.
+    // AC svarar starkt på självlikhet, pulse xcorr på regelbunden energi-fördelning.
+    // 4) PERCEPTUELL PRIOR: log-Gauss runt 120 BPM, σ = 1.0 oktav (Ellis/librosa).
     for (let lag = lagMin; lag <= lagMax; lag++) {
-      // Normalisera båda till [0,1] och rösta jämnt — så de kan väga upp varandra.
-      // AC svarar starkt på självlikhet, pulse xcorr på regelbunden energi-fördelning.
-      const combN = combArr[lag] / combMax;
-      const pulseN = pulse[lag] / pulseMax;
-      const prior = this.priorLut[lag];   // log-Gauss, σ = 1.0 oktav (förberäknad)
-      const score = (0.5 * combN + 0.5 * pulseN) * prior;
-      scoreSum += score; scoreCount++;
-      if (score > bestVal) { bestVal = score; bestLag = lag; }
+      out[lag] = (0.5 * (combArr[lag] / combMax) + 0.5 * (pulse[lag] / pulseMax)) * this.priorLut[lag];
     }
+    return energy / N;
+  }
 
+  private computeBpm() {
+    if (this.envFilled < 50) return;   // ~0.5s → snabbt första grovestimat (täcker ≥~122 BPM;
+                                       //  långsammare spår låser på overton tills fönstret växer),
+                                       //  förfinas löpande. Halverar time-to-first-lock.
+    const N = this.envFilled;
+    const HZ = Analyser.ENV_HZ;
+    const lagMin = Math.floor(HZ * 60 / 185);
+    const lagMax = Math.min(N - 1, Math.floor(HZ * 60 / 55));   // sokfonstret ar bredare an vikningen med flit
+    // FLERBANDS-ONSET: helbandsfluxen smetas ut av sång och synth — slaget bor i
+    // basen. Två OBEROENDE score-kurvor som röstar ihop rättar just de fall där
+    // off-beat-testet annars tvekar mellan ballad och danslåt. Helbandet scoras
+    // SIST eftersom scratcharna (env/envPos) används nedan.
+    const eBass = this.scoreEnv(this.envBassRing, N, this.scoreBass, lagMin, lagMax);
+    const eFull = this.scoreEnv(this.envRing, N, this.scoreFull, lagMin, lagMax);
+    if (eFull <= 0 && eBass <= 0) return;
+    const wBass = eBass > eFull * 0.15 ? 0.55 : 0;   // tomt basband → helbandet ensamt
+    const wFull = 1 - wBass;
+    // TEMPOGRAM-ACKUMULERING: förr kastades hela score-kurvan varje anrop och bara
+    // toppen sparades, varpå medianen fick städa upp efteråt (~5 s till lås). Nu
+    // EMA:as HELA lag-kurvan mellan anrop, så bevis ackumuleras där det hör hemma:
+    // låset kommer på 1–2 s och oktav-flippar dör innan de hinner synas.
+    const a = this.localBpm === 0 ? 0.30 : 0.15;
+    const tg = this.tempoGram;
+    let bestLag = 0, bestVal = 0, scoreSum = 0, scoreCount = 0;
+    for (let lag = lagMin; lag <= lagMax; lag++) {
+      const s = wFull * this.scoreFull[lag] + wBass * this.scoreBass[lag];
+      const v = tg[lag] + (s - tg[lag]) * a;
+      tg[lag] = v;
+      scoreSum += v; scoreCount++;
+      if (v > bestVal) { bestVal = v; bestLag = lag; }
+    }
+    const env = this.envScratch;     // helbandets whitenade envelope (scoreEnv körde sist)
+    const envPos = this.envPosScratch;
 
     if (bestLag === 0 || bestVal <= 0) return;
     // Peak-to-mean confidence: en tydlig takttopp sticker ut från medelnivån,
@@ -385,10 +432,17 @@ export class Analyser {
     // Median över RÅestimaten (utan oktav-tvång) → dämpar brus men låser inte
     // fast oktaven, så en fel initial låsning kan rättas. Långt fönster (~5s) för
     // att inte studsa på brusiga/tvetydiga låtar.
+    // TIDSVIKTAD RÖSTNING: före lås körs computeBpm() 100 Hz, så de 20 "rösterna"
+    // var samma 0.2 s data tjugo gånger — ingen medianvinst, bara fördröjning.
+    // Max en röst per 250 ms ⇒ fönstret täcker verkligen ~5 s.
     const HN = Analyser.BPM_HIST;
-    this.bpmHist[this.bpmHistPos] = bpm;
-    this.bpmHistPos = (this.bpmHistPos + 1) % HN;
-    if (this.bpmHistLen < HN) this.bpmHistLen++;
+    const voteNow = this.perfNow();
+    if (this.bpmHistLen === 0 || voteNow - this.lastVoteMs >= 250) {
+      this.lastVoteMs = voteNow;
+      this.bpmHist[this.bpmHistPos] = bpm;
+      this.bpmHistPos = (this.bpmHistPos + 1) % HN;
+      if (this.bpmHistLen < HN) this.bpmHistLen++;
+    }
     const n = this.bpmHistLen;
     const scratch = this.bpmSortScratch;
     for (let i = 0; i < n; i++) scratch[i] = this.bpmHist[(this.bpmHistPos - n + i + HN) % HN];
@@ -437,7 +491,15 @@ export class Analyser {
         // i en låt när ett breakdown hann nå tröskeln. En låt är 3–5 min, så 25s
         // ryms lätt inom ett låtbyte men ingen sektion håller i sig så länge.
         // Värsta fall efter ett låtbyte: 25s fel takt. Mot hela kvällen fel.
-        if (committed && ++this.newSongVote >= 100) {
+        // DOMINANS-GRIND (möjlig först med det ackumulerade tempogrammet): 25 s var
+        // en ren tidsspärr eftersom vi förr bara hade toppen att gå på. Nu kan vi
+        // fråga HUR MYCKET bättre den nya toppen är än den låsta laggen. Ett
+        // breakdown gör den låsta laggen svagare men ger ingen dominant rival —
+        // en ny låt gör det. Dominant rival ⇒ lås om på ~6 s i st.f. 25.
+        const lockLag = Math.round((HZ * 60) / this.localBpm);
+        const rival = lockLag >= lagMin && lockLag <= lagMax
+          ? bestVal / Math.max(1e-9, tg[lockLag]) : 1;
+        if (committed && ++this.newSongVote >= (rival > 1.6 ? 24 : 100)) {
           this.localBpm = Math.round(med);
           this.newSongVote = 0;
           this.octaveVote = 0;
@@ -656,20 +718,25 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; }
     } else {
       this.silentMs = 0;
     }
     // --- Onset-envelope → lokal BPM (nedsamplad till 100 Hz) ---
     const frameMs = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
     this.envAccum = Math.max(this.envAccum, fluxNorm);
+    // Basbandets egen envelope (kick-flux) — samma raster, oberoende signal.
+    const bassFluxNorm = Math.min(1, kickFlux * 0.02);
+    if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
     this.envAccumT += frameMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) {
       this.envAccumT -= 1000 / Analyser.ENV_HZ;
       this.envRing[this.envPos] = this.envAccum;
+      this.envBassRing[this.envPos] = this.envBassAccum;
       this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
       this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
       this.envAccum = 0;
+      this.envBassAccum = 0;
       // Innan lås: räkna på varje ny envelope-sample (100 Hz) för snabbast första estimat.
       // Efter lås: 4 Hz räcker gott — sparar CPU och förfinar med median.
       // TAK PÅ OLÅST TAKT: kostnaden växer med fönstret (uppmätt 28 µs @ N=100,
