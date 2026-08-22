@@ -64,7 +64,7 @@ async function playFrom(mem, song, clock, sourceStartMs, durMs, drops = []) {
     song(sourceT, mag);
     mem.pushSpectrum(mag, BIN_HZ, false);
     mem.tick({ level: 0.5, dropped: false, bpm: 128, bpmConfidence: 0.8, intensity: 0.6, beatAnchorMs: clock.t, learn: false });
-    if (mem.takeDrop() > 0) { fired.push(sourceT); const q=mem.state(); console.log('[t] DROP elapsed',elapsed,'sourceT',sourceT,'pos',q.positionMs.toFixed(0),'seek',q.seekCount??'?','synced',q.synced); }
+    if (mem.takeDrop() > 0) { fired.push(sourceT); console.log('[t] DROP elapsed',elapsed,'sourceT',sourceT,'pos',mem.state().positionMs.toFixed(0)); }
     const pos = mem.state().positionMs;
     if (prevPos > 0) fired.maxJump = Math.max(fired.maxJump ?? 0, Math.abs(pos - prevPos - STEP));
     prevPos = pos;
