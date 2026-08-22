@@ -512,9 +512,17 @@ export async function startServer(
     });
     pkLevel = 0; pkEnergy = 0; pkKick = false; pkBeat = false;
     for (const c of clients) {
-      if (c.readyState === 1 && ((c as any).bufferedAmount ?? 0) < 4096) c.send(s);
+      const cc = c as any;
+      if (cc.readyState !== 1) continue;
+      // Klienten hänger inte med → SLÄPP analyspaketet (färskvara, aldrig kö).
+      if ((cc.bufferedAmount ?? 0) > HIGH_WATER) { frameDrops++; continue; }
+      // Har den precis dränerat kön? Skicka eftersläpande state FÖRST, så UI:t
+      // aldrig ritar en frame mot en gammal config.
+      flushState(cc);
+      cc.send(s);
     }
   };
+
 
   app.register(async (f) => {
     f.get("/ws", { websocket: true }, (conn) => {
