@@ -377,10 +377,19 @@ export class Analyser {
     // Median över RÅestimaten (utan oktav-tvång) → dämpar brus men låser inte
     // fast oktaven, så en fel initial låsning kan rättas. Långt fönster (~5s) för
     // att inte studsa på brusiga/tvetydiga låtar.
-    this.bpmHist.push(bpm);
-    if (this.bpmHist.length > 20) this.bpmHist.shift();
-    const sorted = [...this.bpmHist].sort((a, b) => a - b);
-    const med = sorted[sorted.length >> 1];
+    const HN = Analyser.BPM_HIST;
+    this.bpmHist[this.bpmHistPos] = bpm;
+    this.bpmHistPos = (this.bpmHistPos + 1) % HN;
+    if (this.bpmHistLen < HN) this.bpmHistLen++;
+    const n = this.bpmHistLen;
+    const scratch = this.bpmSortScratch;
+    for (let i = 0; i < n; i++) scratch[i] = this.bpmHist[(this.bpmHistPos - n + i + HN) % HN];
+    for (let i = 1; i < n; i++) {           // insertion sort (n ≤ 20, redan nästan sorterad)
+      const v = scratch[i]; let j = i - 1;
+      while (j >= 0 && scratch[j] > v) { scratch[j + 1] = scratch[j]; j--; }
+      scratch[j + 1] = v;
+    }
+    const med = scratch[n >> 1];
     if (this.localBpm === 0) {
       this.localBpm = Math.round(med);
       this.octaveVote = 0;
