@@ -491,7 +491,15 @@ export class Analyser {
         // i en låt när ett breakdown hann nå tröskeln. En låt är 3–5 min, så 25s
         // ryms lätt inom ett låtbyte men ingen sektion håller i sig så länge.
         // Värsta fall efter ett låtbyte: 25s fel takt. Mot hela kvällen fel.
-        if (committed && ++this.newSongVote >= 100) {
+        // DOMINANS-GRIND (möjlig först med det ackumulerade tempogrammet): 25 s var
+        // en ren tidsspärr eftersom vi förr bara hade toppen att gå på. Nu kan vi
+        // fråga HUR MYCKET bättre den nya toppen är än den låsta laggen. Ett
+        // breakdown gör den låsta laggen svagare men ger ingen dominant rival —
+        // en ny låt gör det. Dominant rival ⇒ lås om på ~6 s i st.f. 25.
+        const lockLag = Math.round((HZ * 60) / this.localBpm);
+        const rival = lockLag >= lagMin && lockLag <= lagMax
+          ? bestVal / Math.max(1e-9, tg[lockLag]) : 1;
+        if (committed && ++this.newSongVote >= (rival > 1.6 ? 24 : 100)) {
           this.localBpm = Math.round(med);
           this.newSongVote = 0;
           this.octaveVote = 0;
