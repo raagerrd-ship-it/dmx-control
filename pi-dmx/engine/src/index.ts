@@ -479,7 +479,7 @@ function renderAndSend(): void {
  * chunk senaste 40 ms lämnas ramen orörd så fallback-ticken nedan tar över och
  * tonar ned — motorn ska aldrig rendera vidare på en gammal frame.
  */
-const RENDER_MS = 10;
+const RENDER_MS = 5;   // 200 Hz — halverar rastrets bidrag till latens (5 ms → 2,5 ms i snitt)
 let nextRenderAt = performance.now() + RENDER_MS;
 function renderTick(): void {
   const now = performance.now();
