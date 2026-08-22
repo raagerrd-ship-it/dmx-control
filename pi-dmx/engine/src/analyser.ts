@@ -132,7 +132,18 @@ export class Analyser {
   private bpmStable = 0;    // antal stabila (finjusterings-)estimat i rad → committa oktaven
   private newSongVote = 0;  // ihållande oenighet trots låst oktav → låtbyte utan tystnadslucka
 
-  private bpmHist: number[] = [];   // senaste råestimat (~3s) för median-stabilisering
+  // Ringbuffert för senaste råestimat (~5s) → median-stabilisering utan allokering.
+  private static readonly BPM_HIST = 20;
+  private bpmHist = new Float64Array(Analyser.BPM_HIST);
+  private bpmHistLen = 0;
+  private bpmHistPos = 0;
+  private bpmSortScratch = new Float64Array(Analyser.BPM_HIST);
+  // Förberäknade EMA-alfor / decay-faktorer (fasta dtHop + fasta tidskonstanter).
+  private dtHop = 0;
+  private aAtt = 0; private aRel = 0; private aVU = 0;
+  private aIUp = 0; private aIDown = 0; private aBandLvl = 0;
+  private dHat = 0; private dSnare = 0; private dKick = 0;
+  private aSpecSlow = 0; private aNovSlow = 0; private aProf = 0;
   // Pre-allokerade scratchpads för computeBpm (GC-skydd; annars 4× Float32Array/anrop).
   private envScratch = new Float32Array(Analyser.ENV_LEN);
   private envPosScratch = new Float32Array(Analyser.ENV_LEN);
