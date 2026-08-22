@@ -145,13 +145,46 @@ export async function startServer(
     broadcast();
     identifyTimer = setTimeout(() => stopIdentify(), holdMs);
   };
+  // ---- Backpressure ---------------------------------------------------------
+  // En långsam klient (svag WiFi-länk, mobil i bakgrunden) får annars sin
+  // send-kö att växa obegränsat: paketen levereras till slut, men då är de
+  // sekunder gamla och UI:t "spelar upp" gammal analys i slow motion.
+  //
+  // Regler:
+  //  • Analyspaket (`frame`) är FÄRSKVARA — köas aldrig. Är kön full släpps
+  //    paketet helt; nästa tick (50 ms) har färskare data ändå.
+  //  • State-paket (config, songList, …) måste komma fram, men bara det
+  //    SENASTE av varje typ är intressant. De läggs i en per-klient map
+  //    nycklad på `type`, så ett nyare paket skriver över ett äldre oskickat.
+  //    Kön flushas när sockets buffert har dränerats.
+  const HIGH_WATER = 4096;   // bytes i sockets sendbuffert = "klienten hänger inte med"
+  const pendingOf = (c: any): Map<string, string> => (c.__pending ??= new Map<string, string>());
+
+  /** Skicka ett state-paket med koalescering per typ (senaste vinner). */
+  const sendState = (c: any, type: string, s: string) => {
+    if (c.readyState !== 1) return;
+    if ((c.bufferedAmount ?? 0) > HIGH_WATER) { pendingOf(c).set(type, s); return; }
+    const p = pendingOf(c);
+    if (p.size) p.delete(type);   // vi skickar det färska nu
+    c.send(s);
+  };
+
+  /** Töm koalescerade state-paket för en klient som hunnit ikapp. */
+  const flushState = (c: any) => {
+    const p = c.__pending as Map<string, string> | undefined;
+    if (!p || p.size === 0) return;
+    if ((c.bufferedAmount ?? 0) > HIGH_WATER) return;
+    for (const s of p.values()) c.send(s);
+    p.clear();
+  };
+
   /** Fan out till alla anslutna klienter. Utan argument = aktuell config. */
   const broadcast = (payload?: unknown) => {
-    const s = JSON.stringify(payload ?? { type: "config", config: deps.cfg });
-    for (const c of app.websocketServer.clients) {
-      if (c.readyState === 1) c.send(s);
-    }
+    const p: any = payload ?? { type: "config", config: deps.cfg };
+    const s = JSON.stringify(p);
+    for (const c of app.websocketServer.clients) sendState(c, p.type ?? "config", s);
   };
+
 
 
   await app.register(fastifyWebsocket);
@@ -420,6 +453,8 @@ export async function startServer(
   // OBS: använd cfg.beat.anchorMs (stabilt, PLL-fasat), INTE frame.beatAnchorMs
   // som hoppar till varje ny kick och nollar indexet → sporadiska blink.
   let lastBeatIdx = -1;
+  let frameDrops = 0;         // analyspaket släppta pga full sendbuffert (diagnostik)
+  let lastDropLogMs = 0;
   let pkLevel = 0, pkEnergy = 0, pkKick = false, pkBeat = false, subTick = 0;
   let frameTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -479,9 +514,27 @@ export async function startServer(
     });
     pkLevel = 0; pkEnergy = 0; pkKick = false; pkBeat = false;
     for (const c of clients) {
-      if (c.readyState === 1 && ((c as any).bufferedAmount ?? 0) < 4096) c.send(s);
+      const cc = c as any;
+      if (cc.readyState !== 1) continue;
+      // Klienten hänger inte med → SLÄPP analyspaketet (färskvara, aldrig kö).
+      if ((cc.bufferedAmount ?? 0) > HIGH_WATER) { frameDrops++; continue; }
+      // Har den precis dränerat kön? Skicka eftersläpande state FÖRST, så UI:t
+      // aldrig ritar en frame mot en gammal config.
+      flushState(cc);
+      cc.send(s);
+    }
+    // Logga släpp högst en gång per 10 s — annars döljer en svag länk allt annat.
+    if (frameDrops > 0) {
+      const now = Date.now();
+      if (now - lastDropLogMs > 10000) {
+        lastDropLogMs = now;
+        logHealth("info", "server", `${frameDrops} analyspaket släppta (långsam klient)`);
+        frameDrops = 0;
+      }
     }
   };
+
+
 
   app.register(async (f) => {
     f.get("/ws", { websocket: true }, (conn) => {
@@ -512,14 +565,14 @@ export async function startServer(
             deps.cfg.activeMood = undefined;   // manuell effekt → ingen stämning aktiv längre
           } else if (msg.type === "cycleMode") {
             const next = deps.cycleMode();
-            sock.send(JSON.stringify({ type: "modeChanged", mode: next }));
+            sendState(sock, "modeChanged", JSON.stringify({ type: "modeChanged", mode: next }));
           } else if (msg.type === "setSongNote" && typeof msg.id === "number") {
             deps.songMemory?.setNote(msg.id, typeof msg.note === "string" ? msg.note : "");
             const l2 = deps.songMemory?.list() ?? [];
-            sock.send(JSON.stringify({ type: "songList", songs: l2 }));
+            sendState(sock, "songList", JSON.stringify({ type: "songList", songs: l2 }));
           } else if (msg.type === "forgetSong" && typeof msg.id === "number") {
             deps.songMemory?.forgetSong(msg.id);
-            sock.send(JSON.stringify({ type: "songList", songs: deps.songMemory?.list() ?? [] }));
+            sendState(sock, "songList", JSON.stringify({ type: "songList", songs: deps.songMemory?.list() ?? [] }));
           } else if (msg.type === "songCurve" && typeof msg.id === "number") {
             deps.songMemory?.dumpCurve(msg.id);
           } else if (msg.type === "setReplicateToken" && typeof msg.value === "string") {
@@ -527,9 +580,9 @@ export async function startServer(
             const v = msg.value.trim();
             deps.cfg.replicateToken = v || undefined;
             console.log(`[struktur] API-nyckel ${v ? "satt" : "borttagen"}`);
-            sock.send(JSON.stringify({ type: "structureStatus", hasToken: !!v, ...(deps.structureStatus?.() ?? {}) }));
+            sendState(sock, "structureStatus", JSON.stringify({ type: "structureStatus", hasToken: !!v, ...(deps.structureStatus?.() ?? {}) }));
           } else if (msg.type === "structureStatus") {
-            sock.send(JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, ...(deps.structureStatus?.() ?? {}) }));
+            sendState(sock, "structureStatus", JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, ...(deps.structureStatus?.() ?? {}) }));
           } else if (msg.type === "setAcrCreds" && typeof msg.key === "string" && typeof msg.secret === "string") {
             // Hemligheterna ekas ALDRIG tillbaka — bara om de ar satta eller ej.
             const k = msg.key.trim(), s2 = msg.secret.trim();
@@ -537,14 +590,14 @@ export async function startServer(
             deps.cfg.acrSecret = s2 || undefined;
             if (typeof msg.host === "string" && msg.host.trim()) deps.cfg.acrHost = msg.host.trim();
             console.log(`[namn] ACRCloud-uppgifter ${k && s2 ? "satta" : "borttagna"}`);
-            sock.send(JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, hasAcr: !!(deps.cfg.acrKey && deps.cfg.acrSecret), ...(deps.structureStatus?.() ?? {}) }));
+            sendState(sock, "structureStatus", JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, hasAcr: !!(deps.cfg.acrKey && deps.cfg.acrSecret), ...(deps.structureStatus?.() ?? {}) }));
           } else if (msg.type === "probeDmx") {
             deps.probeDmx?.(Array.isArray(msg.channels) ? msg.channels.map(Number) : [1, 2, 3, 4, 5, 6, 7], Number(msg.frames) || 400);
           } else if (msg.type === "listSongs") {
             const l = deps.songMemory?.list() ?? [];
             // Berika med strukturlaget sa listan visar bade tvatten OCH analysen.
             const withStruct = l.map((r: any) => ({ ...r, struct: deps.structureInfo?.(r.id) }));
-            sock.send(JSON.stringify({
+            sendState(sock, "songList", JSON.stringify({
               type: "songList",
               songs: withStruct,
               structure: { hasToken: !!deps.cfg.replicateToken, hasAcr: !!(deps.cfg.acrKey && deps.cfg.acrSecret), ...(deps.structureStatus?.() ?? {}) },
@@ -729,10 +782,9 @@ export async function startServer(
             deps.ble?.setCal(mac, cal);
           }
           deps.onConfigChanged?.();
-          // Echo back
-          for (const c of app.websocketServer.clients) {
-            if (c.readyState === 1 && ((c as any).bufferedAmount ?? 0) < 8192) c.send(JSON.stringify({ type: "config", config: deps.cfg }));
-          }
+          // Echo back — koalescerat: en långsam klient får bara den senaste configen.
+          const cfgMsg = JSON.stringify({ type: "config", config: deps.cfg });
+          for (const c of app.websocketServer.clients) sendState(c, "config", cfgMsg);
         } catch { /* ignore malformed */ }
       });
 
