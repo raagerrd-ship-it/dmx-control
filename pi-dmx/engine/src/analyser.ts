@@ -672,7 +672,13 @@ export class Analyser {
       this.envAccum = 0;
       // Innan lås: räkna på varje ny envelope-sample (100 Hz) för snabbast första estimat.
       // Efter lås: 4 Hz räcker gott — sparar CPU och förfinar med median.
-      const stride = this.localBpm === 0 ? 1 : Analyser.ENV_HZ / 4;
+      // TAK PÅ OLÅST TAKT: kostnaden växer med fönstret (uppmätt 28 µs @ N=100,
+      // 110 µs @ N=500 på x86 ⇒ ~10× på Zero 2W). Med 100 Hz och fullt fönster
+      // blir det en CPU-spik som aldrig ger något: när fönstret redan är >1.5 s
+      // och ingen lås skett är låten taktlös/otydlig, och 20 Hz räcker mer än väl.
+      // De första ~1.5 s körs fortfarande i full takt — time-to-first-lock är orörd.
+      const stride = this.localBpm !== 0 ? Analyser.ENV_HZ / 4
+        : this.envFilled < 150 ? 1 : 5;
       if (++this.bpmCounter >= stride) { this.bpmCounter = 0; this.computeBpm(); }
 
     }
