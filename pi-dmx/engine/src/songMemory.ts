@@ -880,7 +880,19 @@ export class SongMemory {
       // Är vi genuint fel (användaren spolade) slutar de NÄRA träffarna komma, och
       // matchningen släpps av staleness-vägen. Att tappa minnet är billigare än att
       // spela det från fel plats.
-      if (this.syncLocked) { this.seekCount = 0; return; }
+      // MEN: TYSTNA MEDAN DET ÄR OKLART. Att nolla seekCount här gjorde att
+      // posSure (se replay-grinden) stannade på true, så drops fortsatte fyras
+      // från den GAMLA positionen efter en riktig spolning — MÄTT: en drop 4,9 s
+      // efter seek, ~35 s fel. Positionen ska stå still (raden nedan), men
+      // bevisen ska räknas så replayen håller tyst tills matchningen antingen
+      // stabiliserats igen eller släppts av staleness-vägen.
+      if (this.syncLocked) {
+        if (this.seekCount > 0 && Math.abs(est - this.seekTarget) < RELOCK_SNAP_MS) {
+          this.seekCount++;
+          this.seekTarget = this.seekTarget * 0.6 + est * 0.4;
+        } else { this.seekTarget = est; this.seekCount = 1; }
+        return;
+      }
       // Ett stort fel är nästan alltid ett repeterat parti, inte en seek. Kräv att
       // FLERA kontroller i rad pekar på samma nya position innan positionen flyttas.
       if (this.seekCount > 0 && Math.abs(est - this.seekTarget) < RELOCK_SNAP_MS) {
