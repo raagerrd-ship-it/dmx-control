@@ -391,13 +391,11 @@ capture.on("chunk", (samples: Float32Array) => {
     beat: frame.kick,
   });
 
-
-  // Frikoppla render från analysrate: analysern (FFT/onset/BPM) körs varje chunk
-  // (~375 Hz) för tighta drops, men effekterna renderas i 100 Hz (var 10:e ms) →
-  // halverad utgångslatens mot 50 Hz = tightare bas/drop-synk. Fortfarande långt
-  // under 375 Hz så Node håller realtid. DMX-taket höjt till 100 Hz i takt.
-  if (performance.now() - lastRenderMs >= 10) renderAndSend();
+  // Renderingen ligger INTE här längre — se renderTick nedan. Analysen (FFT/onset/
+  // BPM) körs varje chunk (~375 Hz) för tighta drops; effekterna renderas på ett
+  // EGET fast raster så renderintervallet inte längre varierar med analyslasten.
 });
+
 
 /**
  * DIAGNOSTIK: sampla den FAKTISKA DMX-utgången (efter puls, tak och kalibrering)
