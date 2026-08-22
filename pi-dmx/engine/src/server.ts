@@ -420,7 +420,7 @@ export async function startServer(
   // OBS: använd cfg.beat.anchorMs (stabilt, PLL-fasat), INTE frame.beatAnchorMs
   // som hoppar till varje ny kick och nollar indexet → sporadiska blink.
   let lastBeatIdx = -1;
-  let pkLevel = 0, pkEnergy = 0, pkKick = 0, pkBeat = false, subTick = 0;
+  let pkLevel = 0, pkEnergy = 0, pkKick = false, pkBeat = false, subTick = 0;
   let frameTimer: ReturnType<typeof setInterval> | null = null;
 
   const frameTick = () => {
@@ -429,7 +429,7 @@ export async function startServer(
     // 1) Ackumulera topparna (körs 40 Hz).
     if (frame.level > pkLevel) pkLevel = frame.level;
     if (frame.energy > pkEnergy) pkEnergy = frame.energy;
-    if (frame.kick > pkKick) pkKick = frame.kick;
+    if (frame.kick) pkKick = true;
     const bc = deps.cfg.beat;
     if (bc && bc.bpm > 40) {
       const idx = Math.floor((Date.now() - bc.anchorMs) / (60000 / bc.bpm));
@@ -477,7 +477,7 @@ export async function startServer(
       blePairedCount: deps.ble?.paired().length ?? 0,
       song: deps.songMemory?.state() ?? null,   // låtminne: känd låt / lär in
     });
-    pkLevel = 0; pkEnergy = 0; pkKick = 0; pkBeat = false;
+    pkLevel = 0; pkEnergy = 0; pkKick = false; pkBeat = false;
     for (const c of clients) {
       if (c.readyState === 1 && ((c as any).bufferedAmount ?? 0) < 4096) c.send(s);
     }
