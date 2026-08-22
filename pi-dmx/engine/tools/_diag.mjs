@@ -113,6 +113,7 @@ const seekTo = 70083;
 const seekFired = await playFrom(mem, A, clock, seekTo, 28000);
 const afterSeek = mem.state();
 const seekError = Math.abs(afterSeek.positionMs - (seekTo + 28000 - 1000));
+console.log("seekFired:", seekFired, "known", afterSeek.known, "pos", afterSeek.positionMs);
 console.log("seek: position", beforeSeek.toFixed(0), "→", afterSeek.positionMs.toFixed(0), "ms, fel", seekError.toFixed(0), "ms");
 
 await new Promise((r) => setTimeout(r, 300));   // låt sparningen landa
