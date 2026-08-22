@@ -112,7 +112,7 @@ const beforeSeek = mem.state().positionMs;
 const seekTo = 70083;
 const seekFired = await playFrom(mem, A, clock, seekTo, 28000);
 const afterSeek = mem.state();
-console.log("seek: position", beforeSeek.toFixed(0), "→", afterSeek.positionMs.toFixed(0), "ms, fel", seekError.toFixed(0), "ms");
+console.log("seek: matchning", afterSeek.known ? "kvar" : "släppt (förväntat)", "— drops på fel plats:", seekFired.filter((t) => !dropsA.some((d) => Math.abs(d - t) < 800)).length);
 
 await new Promise((r) => setTimeout(r, 300));   // låt sparningen landa
 const mem2 = new SongMemory(() => clock.t);
