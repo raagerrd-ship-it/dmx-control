@@ -479,30 +479,33 @@ export async function startServer(
       if (frameTimer) { clearInterval(frameTimer); frameTimer = null; }
       return;
     }
+    const p = frame.profile;
     const s = JSON.stringify({
       type: "frame",
-      level: pkLevel,
-      energy: pkEnergy,
+      level: r3(pkLevel),
+      energy: r3(pkEnergy),
       kick: pkKick,
-      gain: frame.gain,
+      gain: r3(frame.gain),
       bpm: frame.bpm,
-      bpmConfidence: frame.bpmConfidence,
-      intensity: frame.intensity,   // sektionsenergi (diagnostik)
+      bpmConfidence: r3(frame.bpmConfidence),
+      intensity: r3(frame.intensity),   // sektionsenergi (diagnostik)
       dropCount: frame.dropCount,   // monoton drop-räknare (diagnostik)
-      beatMul: (frame as unknown as Record<string, number>).beatMul,   // hjärtslagets faktiska djup (diagnostik)
-      buildUp: frame.buildUp,       // uppbyggnad 0..1 (diagnostik)
+      beatMul: r3((frame as unknown as Record<string, number>).beatMul),   // hjärtslagets faktiska djup (diagnostik)
+      buildUp: r3(frame.buildUp),    // uppbyggnad 0..1 (diagnostik)
       inRiser: frame.inRiser,       // riser PÅGÅR — utan detta fältet läser en
                                     // extern mätning undefined, vilket i en
                                     // percentiltabell ser exakt ut som en nolla.
                                     // Det ledde till slutsatsen "signalen är död"
                                     // och en revert av en korrekt fix (820e7b6).
       inZone: frame.inZone,
-      profile: frame.profile,       // karaktarsprofil (diagnostik)
+      // karaktarsprofil (diagnostik) — rundad som resten
+      profile: p ? { punch: r3(p.punch), bass: r3(p.bass), bright: r3(p.bright), beat: r3(p.beat) } : p,
       beat: pkBeat,
       beatErr: deps.cfg.beatErr ?? 0,
       mode: deps.getActiveMode(),
       activeMood: deps.cfg.activeMood,
-      activeIntensity: deps.cfg.activeIntensity,   // vred/slider-position (0..1)
+      activeIntensity: r3(deps.cfg.activeIntensity),   // vred/slider-position (0..1)
+
       fog: deps.getFogStatus(),     // null när maskinen inte är ansluten
       bleActive: deps.ble?.activeCount() ?? 0,   // antal parade BLE-slingor som är uppkopplade
       // Drift-hälsa: UI:t visar en banner om DMX-helpern är nere eller
