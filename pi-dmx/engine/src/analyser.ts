@@ -139,7 +139,6 @@ export class Analyser {
   private bpmHistPos = 0;
   private bpmSortScratch = new Float64Array(Analyser.BPM_HIST);
   // Förberäknade EMA-alfor / decay-faktorer (fasta dtHop + fasta tidskonstanter).
-  private dtHop = 0;
   private aAtt = 0; private aRel = 0; private aVU = 0;
   private aIUp = 0; private aIDown = 0; private aBandLvl = 0;
   private dHat = 0; private dSnare = 0; private dKick = 0;
@@ -490,7 +489,6 @@ export class Analyser {
     // Math.exp()-anropen per hop (~4000/s vid 375 Hz) hörde inte hemma i tick-vägen.
     const dtHop = cfg.fft.hop / cfg.audio.rate;
     const bigDt = dtHop * Analyser.BIG_EVERY;
-    this.dtHop = dtHop;
     this.aAtt = 1 - Math.exp(-dtHop / 0.015);
     this.aRel = 1 - Math.exp(-dtHop / 0.4);
     this.aVU = 1 - Math.exp(-dtHop / 0.20);
