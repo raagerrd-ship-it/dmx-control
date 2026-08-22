@@ -391,13 +391,11 @@ capture.on("chunk", (samples: Float32Array) => {
     beat: frame.kick,
   });
 
-
-  // Frikoppla render från analysrate: analysern (FFT/onset/BPM) körs varje chunk
-  // (~375 Hz) för tighta drops, men effekterna renderas i 100 Hz (var 10:e ms) →
-  // halverad utgångslatens mot 50 Hz = tightare bas/drop-synk. Fortfarande långt
-  // under 375 Hz så Node håller realtid. DMX-taket höjt till 100 Hz i takt.
-  if (performance.now() - lastRenderMs >= 10) renderAndSend();
+  // Renderingen ligger INTE här längre — se renderTick nedan. Analysen (FFT/onset/
+  // BPM) körs varje chunk (~375 Hz) för tighta drops; effekterna renderas på ett
+  // EGET fast raster så renderintervallet inte längre varierar med analyslasten.
 });
+
 
 /**
  * DIAGNOSTIK: sampla den FAKTISKA DMX-utgången (efter puls, tak och kalibrering)
@@ -462,6 +460,34 @@ function renderAndSend(): void {
       if (n > 0) bleClient.setColor(rs / n / 255, gs / n / 255, bs / n / 255, cfg.master);
     }
 }
+
+/**
+ * RENDER-RASTER — 100 Hz på EGEN tidsaxel, inte piggyback på ljud-chunkarna.
+ *
+ * Förr renderades det inne i chunk-hanteraren med villkoret "≥10 ms sedan sist".
+ * Chunkarna kommer ~375 Hz (2,7 ms), så det faktiska intervallet blev 10,7–13,4 ms
+ * och varierade med analyslasten: en BPM-beräkning eller en tung chunk sköt render
+ * framåt, och fasen mot taktklockan gled. Här sätts deadline i förväg och
+ * kompenseras, så rutan ligger på 10 ms oavsett vad analysen gjorde.
+ *
+ * LJUDBEROENDET ÄR KVAR: rastret renderar bara när det finns FÄRSKT ljud. Utan
+ * chunk senaste 40 ms lämnas ramen orörd så fallback-ticken nedan tar över och
+ * tonar ned — motorn ska aldrig rendera vidare på en gammal frame.
+ */
+const RENDER_MS = 10;
+let nextRenderAt = performance.now() + RENDER_MS;
+function renderTick(): void {
+  const now = performance.now();
+  nextRenderAt += RENDER_MS;
+  // Låg vi efter (GC, tung chunk)? Hoppa fram i stället för att köra igen en
+  // skur av inhämtningsrutor — lamporna vinner inget på att få gammal ljus.
+  if (nextRenderAt < now) nextRenderAt = now + RENDER_MS;
+  if (Date.now() - lastChunkAt <= FALLBACK_AFTER_MS) renderAndSend();
+  setTimeout(renderTick, Math.max(0, nextRenderAt - performance.now()));
+}
+setTimeout(renderTick, RENDER_MS);
+
+
 
 // FALLBACK-TICK — riggen får inte FRYSA om ljudet tystnar i utgången.
 // Renderingen drivs av ljud-chunkar: ingen chunk ⇒ ingen render() ⇒ ingen
