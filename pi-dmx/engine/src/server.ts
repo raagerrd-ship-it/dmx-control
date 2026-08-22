@@ -408,7 +408,7 @@ export async function startServer(
   // JSON.stringify → N× serialisering och N osynkade pushar. Nu byggs
   // payloaden en gång per tick och samma sträng skickas till alla.
   //
-  // TOPPHÅLLNING + BATCH: vi POLLAR frames på 50 Hz men SKICKAR på 20 Hz, och
+  // TOPPHÅLLNING + BATCH: vi POLLAR frames på 40 Hz men SKICKAR på 20 Hz, och
   // tar MAX av level/energy/kick och OR av beat mellan två pushar. Analysatorn
   // kan variera i takt (375 Hz normalt, men BPM-strid/tystnad glesar ut) utan
   // att mätaren hackar — UI:t får alltid toppen i intervallet istället för ett
@@ -426,7 +426,7 @@ export async function startServer(
   const frameTick = () => {
     const frame = deps.getLatestFrame();
     if (!frame) return;
-    // 1) Ackumulera topparna (körs 50 Hz).
+    // 1) Ackumulera topparna (körs 40 Hz).
     if (frame.level > pkLevel) pkLevel = frame.level;
     if (frame.energy > pkEnergy) pkEnergy = frame.energy;
     if (frame.kick > pkKick) pkKick = frame.kick;
