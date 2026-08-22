@@ -148,6 +148,17 @@ export class Analyser {
   private envPosScratch = new Float32Array(Analyser.ENV_LEN);
   private acScratch = new Float32Array(Analyser.ENV_LEN);
   private pulseScratch = new Float32Array(Analyser.ENV_LEN);
+  private combScratch = new Float64Array(Analyser.ENV_LEN);
+  /** Perceptuell prior (log-Gauss runt 120 BPM) per lag — lagg→BPM ar fast, sa
+   *  de ~78 Math.exp()-anropen per computeBpm-anrop kan bakas en gang. */
+  private priorLut = (() => {
+    const t = new Float64Array(Analyser.ENV_LEN);
+    for (let lag = 1; lag < Analyser.ENV_LEN; lag++) {
+      const oct = Math.log2(((Analyser.ENV_HZ * 60) / lag) / 120);
+      t[lag] = Math.exp(-(oct * oct) / 2.0);
+    }
+    return t;
+  })();
   private silentMs = 0;
   private beatAnchorMs = 0;
   // #2 sub-hop fas: kick-flankens flux-topp ligger sällan exakt på en hop. Vi
