@@ -353,6 +353,8 @@ export class SongMemory {
   private syncLocked = false;     // tidslinjen är verifierad → minnet får äga showen
   private offBad = 0;             // 0..1 andel träffar som pekar långt bort → positionen osäker
   private lastPosBlockLog = 0;    // strypning av [diag] REPLAY TYST
+  private farRun = 0;            // samstämmiga träffar långt från nuvarande position
+  private farTarget = 0;
   private seekTarget = 0;         // kandidat till stort positionshopp
   private seekCount = 0;          // hur många kontroller i rad som pekat dit
   private glideAt = 0;            // klocka för glidens senaste steg
@@ -793,15 +795,35 @@ export class SongMemory {
     // Efter seek/re-lock kan det historiska vinnarfacket ligga kvar en stund.
     // En råträff nära den AKTUELLA korrigerade offseten är ändå färsk evidens;
     // avlägsna hash-krockar får däremot inte hålla matchen vid liv.
-    if (Math.abs(off - this.matchOffset) <= OFFSET_BUCKET * 2) { this.lastFreshMatchHit = now; this.offBad *= 0.94; }
+    if (Math.abs(off - this.matchOffset) <= OFFSET_BUCKET * 2) { this.lastFreshMatchHit = now; this.offBad *= 0.94; this.farRun = 0; }
     // ANDELEN avvikande träffar, inte förekomsten av dem.
     // Förr räckte EN träff > RELOCK_SNAP_MS bort för att tysta replayen i 2,5 s. MÄTT
     // 2026-08-07: i en låt med återkommande partier kommer sådana träffar hela tiden,
     // så blockeringen släppte aldrig och INGA inspelade drops gick igenom. Vid en
     // VERKLIG seek pekar däremot ALLA träffar fel samtidigt — då stiger andelen snabbt.
-    else if (Math.abs(off - this.matchOffset) > RELOCK_SNAP_MS) this.offBad += (1 - this.offBad) * 0.06;
+    else if (Math.abs(off - this.matchOffset) > RELOCK_SNAP_MS) {
+      this.offBad += (1 - this.offBad) * 0.06;
+      // SAMSTÄMMIG FAR-SERIE = SPOLNING, NU. Den periodiska kontrollen kräver
+      // RELOCK_MIN_HITS nya träffar och hinner först efter ~5 s — MÄTT avfyrades en
+      // inspelad drop 4,9 s efter en spolning, ~35 s fel. Skillnaden mot repeterade
+      // partier är att refrängträffar VÄXLAR med närträffar (som nollar serien),
+      // medan en spolning ger bara fel — och alla åt SAMMA håll.
+      if (this.farRun > 0 && Math.abs(off - this.farTarget) < RELOCK_SNAP_MS) this.farRun++;
+      else { this.farTarget = off; this.farRun = 1; }
+      // Positionen står still (verifyLock hoppar aldrig på låst synk); det här
+      // tystar bara replayen via posSure tills seek-bevisen är entydiga.
+      if (this.farRun >= 8 && this.syncLocked && this.seekCount === 0) this.seekCount = 1;
+    }
     if (Math.abs(bucket - winner.bucket) > 1) return;
-    if (Math.abs(this.syncBucket - winner.bucket) > 1) { this.syncBucket = winner.bucket; this.syncOffsets = []; }
+    if (Math.abs(this.syncBucket - winner.bucket) > 1) {
+      // VINNARFACKET BYTTE → POSITIONEN ÄR OKLAR NU, inte om 5 s. Den periodiska
+      // kontrollen behöver RELOCK_MIN_HITS nya träffar och hinner först efter
+      // ~5 s — MÄTT avfyrades en inspelad drop 4,9 s efter en spolning, ~35 s
+      // fel. Fackbytet är samma bevis men omedelbart, så replayen tystas direkt
+      // (posSure) medan positionen står still tills seek-bevisen är entydiga.
+      if (this.syncLocked && this.seekCount === 0) this.seekCount = 1;
+      this.syncBucket = winner.bucket; this.syncOffsets = [];
+    }
     this.syncOffsets.push(off);
     if (this.syncOffsets.length > 31) this.syncOffsets.shift();
     const needSamples = this.syncFast ? SYNC_SAMPLES_FAST : SYNC_SAMPLES;
@@ -880,7 +902,19 @@ export class SongMemory {
       // Är vi genuint fel (användaren spolade) slutar de NÄRA träffarna komma, och
       // matchningen släpps av staleness-vägen. Att tappa minnet är billigare än att
       // spela det från fel plats.
-      if (this.syncLocked) { this.seekCount = 0; return; }
+      // MEN: TYSTNA MEDAN DET ÄR OKLART. Att nolla seekCount här gjorde att
+      // posSure (se replay-grinden) stannade på true, så drops fortsatte fyras
+      // från den GAMLA positionen efter en riktig spolning — MÄTT: en drop 4,9 s
+      // efter seek, ~35 s fel. Positionen ska stå still (raden nedan), men
+      // bevisen ska räknas så replayen håller tyst tills matchningen antingen
+      // stabiliserats igen eller släppts av staleness-vägen.
+      if (this.syncLocked) {
+        if (this.seekCount > 0 && Math.abs(est - this.seekTarget) < RELOCK_SNAP_MS) {
+          this.seekCount++;
+          this.seekTarget = this.seekTarget * 0.6 + est * 0.4;
+        } else { this.seekTarget = est; this.seekCount = 1; }
+        return;
+      }
       // Ett stort fel är nästan alltid ett repeterat parti, inte en seek. Kräv att
       // FLERA kontroller i rad pekar på samma nya position innan positionen flyttas.
       if (this.seekCount > 0 && Math.abs(est - this.seekTarget) < RELOCK_SNAP_MS) {

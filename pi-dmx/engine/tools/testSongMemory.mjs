@@ -112,8 +112,7 @@ const beforeSeek = mem.state().positionMs;
 const seekTo = 70083;
 const seekFired = await playFrom(mem, A, clock, seekTo, 28000);
 const afterSeek = mem.state();
-const seekError = Math.abs(afterSeek.positionMs - (seekTo + 28000 - 1000));
-console.log("seek: position", beforeSeek.toFixed(0), "→", afterSeek.positionMs.toFixed(0), "ms, fel", seekError.toFixed(0), "ms");
+console.log("seek: matchning", afterSeek.known ? "kvar" : "släppt (förväntat)", "— drops på fel plats:", seekFired.filter((t) => !dropsA.some((d) => Math.abs(d - t) < 800)).length);
 
 await new Promise((r) => setTimeout(r, 300));   // låt sparningen landa
 const mem2 = new SongMemory(() => clock.t);
@@ -175,7 +174,10 @@ const ok = fired.length >= 2
 
   && fired.every((f) => dropsA.some((d) => Math.abs(d - f) < 800))
   && !mid.known                      // start mitt i laten ska INTE kannas igen
-  && afterSeek.known && seekError < 350
+  // SEEK PA EN LAST SYNK: positionen flyttas medvetet INTE (2026-08-08) — en stor
+  // avvikelse ar nastan alltid ett repeterat parti, inte en spolning. Nara traffar
+  // uteblir da och matchningen slapps av staleness-vagen → realtid resten av laten.
+  && afterSeek.known === false
   // EFTER EN SEEK: inga drops pa FEL plats. En drop nara seek-punkten far missas —
   // positionen ar osaker i ~2,5 s och SEEK_CONFIRM tar 7,5 s att bekrafta, sa den hinner
   // passera. En missad drop ar battre an en pa fel stalle.
