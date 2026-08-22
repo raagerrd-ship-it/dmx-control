@@ -383,6 +383,11 @@ capture.on("chunk", (samples: Float32Array) => {
   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
   // inga slag missas) → show-tiden får en knuff, starkare ju tyngre basen är.
   if (frame.kick) effects.registerKick(0.4 + Math.min(1, frame.energy * 1.4) * 0.6);
+  // KICK-BYPASS: vänta inte på nästa rasterruta för en bastransient — den är
+  // exakt det ögonblick ögat jämför mot örat. Rendera direkt och flytta fram
+  // rasterdeadlinen så vi inte får två rutor på 1 ms.
+  if (frame.kick) { renderAndSend(); nextRenderAt = performance.now() + RENDER_MS; }
+
   // WS2812-ringen: mata intensity + kick-puls varje frame (billig update; ringen
   // renderar själv i egen takt @ 30 Hz och avklingar puffen mjukt).
   ring?.update({
@@ -474,7 +479,7 @@ function renderAndSend(): void {
  * chunk senaste 40 ms lämnas ramen orörd så fallback-ticken nedan tar över och
  * tonar ned — motorn ska aldrig rendera vidare på en gammal frame.
  */
-const RENDER_MS = 10;
+const RENDER_MS = 5;   // 200 Hz — halverar rastrets bidrag till latens (5 ms → 2,5 ms i snitt)
 let nextRenderAt = performance.now() + RENDER_MS;
 function renderTick(): void {
   const now = performance.now();
