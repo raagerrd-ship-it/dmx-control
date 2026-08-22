@@ -28,11 +28,14 @@ export class AudioCapture extends EventEmitter {
    *  vid uppstart 163 ms, och enstaka event-loop-stalls ger 341 ms → 1500 ms ger
    *  4× marginal till det värsta uppmätta. Ren försäkring, fyrar aldrig i drift. */
   private static readonly STALE_MS = 1500;
+  /** Se toMonoFloat32: återanvänd mono-buffert, giltig bara under 'chunk'-handlern. */
+  private readonly mono: Float32Array;
 
   constructor(private opts: AudioCaptureOptions) {
     super();
     this.bytesPerFrame = 2 * opts.channels;
     this.chunkBytes = opts.hopSamples * this.bytesPerFrame;
+    this.mono = new Float32Array(opts.hopSamples);
   }
 
   start() {
@@ -130,8 +133,6 @@ export class AudioCapture extends EventEmitter {
    * emittar en chunk i taget så nästa skrivning sker efter att den förra är
    * konsumerad. EN KONSUMENT SOM SPARAR ARRAYEN MELLAN CHUNKAR MÅSTE KOPIERA.
    */
-  private readonly mono: Float32Array = new Float32Array(this.opts.hopSamples);
-
   private toMonoFloat32(buf: Buffer): Float32Array {
     const n = this.opts.hopSamples;
     const out = this.mono;
