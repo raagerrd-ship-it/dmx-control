@@ -461,6 +461,34 @@ function renderAndSend(): void {
     }
 }
 
+/**
+ * RENDER-RASTER — 100 Hz på EGEN tidsaxel, inte piggyback på ljud-chunkarna.
+ *
+ * Förr renderades det inne i chunk-hanteraren med villkoret "≥10 ms sedan sist".
+ * Chunkarna kommer ~375 Hz (2,7 ms), så det faktiska intervallet blev 10,7–13,4 ms
+ * och varierade med analyslasten: en BPM-beräkning eller en tung chunk sköt render
+ * framåt, och fasen mot taktklockan gled. Här sätts deadline i förväg och
+ * kompenseras, så rutan ligger på 10 ms oavsett vad analysen gjorde.
+ *
+ * LJUDBEROENDET ÄR KVAR: rastret renderar bara när det finns FÄRSKT ljud. Utan
+ * chunk senaste 40 ms lämnas ramen orörd så fallback-ticken nedan tar över och
+ * tonar ned — motorn ska aldrig rendera vidare på en gammal frame.
+ */
+const RENDER_MS = 10;
+let nextRenderAt = performance.now() + RENDER_MS;
+function renderTick(): void {
+  const now = performance.now();
+  nextRenderAt += RENDER_MS;
+  // Låg vi efter (GC, tung chunk)? Hoppa fram i stället för att köra igen en
+  // skur av inhämtningsrutor — lamporna vinner inget på att få gammal ljus.
+  if (nextRenderAt < now) nextRenderAt = now + RENDER_MS;
+  if (Date.now() - lastChunkAt <= FALLBACK_AFTER_MS) renderAndSend();
+  setTimeout(renderTick, Math.max(0, nextRenderAt - performance.now()));
+}
+setTimeout(renderTick, RENDER_MS);
+
+
+
 // FALLBACK-TICK — riggen får inte FRYSA om ljudet tystnar i utgången.
 // Renderingen drivs av ljud-chunkar: ingen chunk ⇒ ingen render() ⇒ ingen
 // dmx.send(), och lamporna står kvar på sista ramen. Mitt i en drop kan det vara
