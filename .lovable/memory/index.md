@@ -10,6 +10,7 @@ Lifecycle drivs av Sonos playbackState (ignite() vid boot). Manuell UI-disconnec
 BLEDOM HCI-stuck recovery is process.exit via systemd. Never add same-process retry.
 
 ## Memories
+- [Beat-lås timing](mem://pi/audio/beat-lock-timing) — kickAtMs till PLL, taktfas/ettan, tidsbaserad konfidens, omlåsning vid låtgräns
 - [Klangskifte bär låtgränsen](mem://pi/lighting/klangskifte-bar-latgransen) — facitmätt: nivådipp/tempo döda vid Spotify-crossfade; novelty mot 8 s bakåt, tröskel 0.68, backdaterad 4 s
 - [Karantän bara efter bekräftad match](mem://pi/lighting/karantan-bara-efter-bekraftad-match) — falsk match avbryter sin egen inlärningskarantän; bannedIds efter >3 falskmatchningar
 - [Bekräftad match före gräns](mem://pi/lighting/bekraftad-match-innan-grans) — recogPending: 5 s stabil + fulla röster innan låtgräns; blockedZones mot upprepad falskmatch
