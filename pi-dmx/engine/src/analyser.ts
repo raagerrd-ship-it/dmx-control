@@ -215,7 +215,7 @@ export class Analyser {
   private lvlSmooth = 0;
   private intensityEma = 0.5;    // sektionsenergi: utjämnad nivå
   private intensityFloor = 0.5;  // dess robusta P50-baslinje (låtens snitt)
-  private intensitySpread = 0.05;  // uppmatt dynamik (MAD) → sjalvkalibrerande skala
+  private intensitySpread = 0.05;  // glidande medelabsolutavvikelse (EJ median-MAD) → sjalvkalibrerande skala
   private activeMs = 0;          // hur länge musik spelat (warmup för baslinjen)
   // DROP-DETEKTION (flyttad från effects: analys hör hemma här; show-reaktionen stannar där)
   private levelCeil = 0.5;       // långsamt nivå-tak (låtens loud-topp)
