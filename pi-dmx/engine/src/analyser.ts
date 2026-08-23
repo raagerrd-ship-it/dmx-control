@@ -704,19 +704,19 @@ export class Analyser {
       for (let i = 0; i < this.buffer.length; i++) { const v = this.buffer[i]; ss += v * v; sl += v; }
     }
     this.sumSq = ss; this.sumLin = sl;
-    // DC-BORTTAGNING. Ett litet DC-offset (vanligt på USB/I²S-ingångar) lägger sig
-    // helt i bin 0 och pinnar både bassEnergy och kickFlux-baslinjen. Bin 0 kan INTE
-    // bara uteslutas som i den stora FFT:n: här är binbredden 93.75 Hz, så bin 0 är
-    // 0–94 Hz och innehåller själva bastrumman (MÄTT: utan bin 0 dog låsningen helt
-    // i "brusigt rum 136"). I stället dras fönstrets medelvärde bort — riktig
-    // DC-borttagning, gratis i loopen som redan finns.
+    // DC: RMS räknas som STANDARDAVVIKELSE (ss/N - mean²) så ett DC-offset inte
+    // pinnar AGC:n. Spektrumet lämnas däremot orört — VARKEN bin 0 uteslutet, VILKET
+    // PROVATS OCH FÖRKASTATS: binbredden är 93.75 Hz, så bin 0 är 0–94 Hz och bär
+    // själva bastrumman (utan den dog låsningen helt i "brusigt rum 136"), OCH
+    // medelvärdesborttagning i fönstret, som vid 512 sampel (10.7 ms) är ett högpass
+    // kring 100 Hz och dämpade 58 Hz-kicken så 92/100 BPM låste på 113.
     const mean = sl / this.buffer.length;
     const varr = ss / this.buffer.length - mean * mean;
     const rms = Math.sqrt(varr > 0 ? varr : 0);
 
     // Windowed FFT (pre-allokerade scratchpads → ingen alloc/hop)
     const windowed = this.windowed512;
-    for (let i = 0; i < windowed.length; i++) windowed[i] = (this.buffer[i] - mean) * this.window[i];
+    for (let i = 0; i < windowed.length; i++) windowed[i] = this.buffer[i] * this.window[i];
     const spectrum = this.spectrum512;
     this.fft.realTransform(spectrum, windowed);
 
