@@ -917,14 +917,16 @@ export class Analyser {
     const dtHop = this.dtHop;
     const aAtt = this.aAtt;
     const aRel = this.aRel;
-    const smooth = (prev: number, x: number) => prev + (x - prev) * (x > prev ? aAtt : aRel);
-    this.lvlSmooth = smooth(this.lvlSmooth, level);
+    // Modulnivå-funktion, inte closure: två closures per hop (~750/s) allokerades
+    // rakt emot filens 0-alloc-ambition.
+    this.lvlSmooth = ema(this.lvlSmooth, level, aAtt, aRel);
     // VU-nivå: symmetrisk ~200ms lågpass PÅ HOP-TAKT (integrerar alla 375 hops/s
     // → långt mindre brus än att smootha rå-nivån efter 50Hz-decimering). ≤200 BPM
     // = ett slag var ≥300ms, så 200ms suddar aldrig ut en äkta beat — bara brus.
     this.lvlVU += (level - this.lvlVU) * this.aVU;
-    this.engSmooth = smooth(this.engSmooth, energy);
-    this.centSmooth = smooth(this.centSmooth, centroid);
+    this.engSmooth = ema(this.engSmooth, energy, aAtt, aRel);
+    this.centSmooth = ema(this.centSmooth, centroid, aAtt, aRel);
+
 
     // SEKTIONSENERGI (0..1) — hur energiskt partiet är RELATIVT låtens eget snitt.
     // Ren analys av nivån över tid → hör hemma här, inte i show-orkestreringen.
