@@ -570,9 +570,9 @@ export class Analyser {
     // på läge — och den grindar kick-gridet (>0.5), PLL-frekvenstermen (>0.4) och
     // hjärtslagets djup. Tidskonstanterna (25 ms upp, 120 ms ner) är valda så att
     // beteendet i OLÅST läge är exakt som förut.
-    const cNow = this.perfNow();
-    const dt = this.lastConfMs > 0 ? Math.min(0.5, (cNow - this.lastConfMs) / 1000) : 0.01;
-    this.lastConfMs = cNow;
+    const dt = this.lastConfMs > 0 ? Math.min(0.5, (voteNow - this.lastConfMs) / 1000) : 0.01;
+    this.lastConfMs = voteNow;
+
     const cA = this.localBpmConfidence;
     const aC = 1 - Math.exp(-dt / (conf > cA ? 0.025 : 0.120));
     this.localBpmConfidence = cA + (conf - cA) * aC;
