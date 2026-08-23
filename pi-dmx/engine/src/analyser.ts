@@ -839,8 +839,8 @@ export class Analyser {
       if (denom < 0) {                                   // konkav → äkta topp
         let delta = 0.5 * (ym1 - yp1) / denom;
         if (delta > 0.5) delta = 0.5; else if (delta < -0.5) delta = -0.5;
-        const hopMs = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
         this.beatAnchorMs = this.pendingKickMs + delta * hopMs;
+
       }
       this.pendingKickMs = 0;
       // Slaget är färdigmätt → lämna över dess EXAKTA tid till PLL:en.
