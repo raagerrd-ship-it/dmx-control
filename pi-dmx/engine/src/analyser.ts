@@ -611,7 +611,6 @@ export class Analyser {
   private lastT = performance.now();
   /** Löpande kvadratsumma över `buffer` (glidande RMS) + räknare för full omräkning. */
   private sumSq = 0;
-  private sumLin = 0;
   private rmsRecalc = 0;
 
   /** VIRTUELL KLOCKA. Analysatorns dtHop är sampelbaserad, men fyra beslut läser
@@ -694,23 +693,23 @@ export class Analyser {
     // taget, så det räcker att dra av utgående hop och lägga till den inkommande
     // (128 ops i stället för 512 kvadrater, 375 gånger i sekunden). Full omräkning
     // ~1×/s mot flyttalsdrift.
-    let ss = this.sumSq, sl = this.sumLin;
-    for (let i = 0; i < hop; i++) { const v = this.buffer[i]; ss -= v * v; sl -= v; }
+    let ss = this.sumSq;
+    for (let i = 0; i < hop; i++) { const v = this.buffer[i]; ss -= v * v; }
     this.buffer.copyWithin(0, hop);
     this.buffer.set(samples, this.buffer.length - hop);
-    for (let i = 0; i < hop; i++) { const v = samples[i]; ss += v * v; sl += v; }
+    for (let i = 0; i < hop; i++) { const v = samples[i]; ss += v * v; }
     if (++this.rmsRecalc >= 400 || ss < 0) {
-      this.rmsRecalc = 0; ss = 0; sl = 0;
-      for (let i = 0; i < this.buffer.length; i++) { const v = this.buffer[i]; ss += v * v; sl += v; }
+      this.rmsRecalc = 0; ss = 0;
+      for (let i = 0; i < this.buffer.length; i++) { const v = this.buffer[i]; ss += v * v; }
     }
-    this.sumSq = ss; this.sumLin = sl;
-    // DC: RMS räknas som STANDARDAVVIKELSE (ss/N - mean²) så ett DC-offset inte
-    // pinnar AGC:n. Spektrumet lämnas däremot orört — VARKEN bin 0 uteslutet, VILKET
-    // PROVATS OCH FÖRKASTATS: binbredden är 93.75 Hz, så bin 0 är 0–94 Hz och bär
-    // själva bastrumman (utan den dog låsningen helt i "brusigt rum 136"), OCH
-    // medelvärdesborttagning i fönstret, som vid 512 sampel (10.7 ms) är ett högpass
-    // kring 100 Hz och dämpade 58 Hz-kicken så 92/100 BPM låste på 113.
-    const mean = sl / this.buffer.length;
+    this.sumSq = ss;
+    // DC-HANTERING: PROVAT OCH FÖRKASTAT (2026-08-23), båda vägarna kostade lås:
+    //  • utesluta bin 0 ur bass/kick-banden — binbredden är 93.75 Hz, så bin 0 är
+    //    0–94 Hz och BÄR bastrumman ("brusigt rum 136" gick 100 % → 0 %);
+    //  • dra bort fönstrets medelvärde före FFT:n — vid 512 sampel (10.7 ms) är det
+    //    ett högpass kring 100 Hz som dämpade 58 Hz-kicken (92/100 BPM låste på 113);
+    //  • RMS som standardavvikelse (ss/N − mean²) — sänkte nivån just under
+    //    energi-grinden i brusiga rum (100 % → 0 %).
     const rms = Math.sqrt(ss / this.buffer.length);
 
     // Windowed FFT (pre-allokerade scratchpads → ingen alloc/hop)
