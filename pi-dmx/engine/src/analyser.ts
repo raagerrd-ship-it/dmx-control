@@ -148,6 +148,7 @@ export class Analyser {
   private static readonly BPM_MIN = 80;    // festintervall; MAX maste vara exakt 2x MIN
   private static readonly BPM_MAX = 160;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
+  private nearVote = 0;     // bevis för GRANN-fel (t.ex. 122 låst mot 136): bara före commit
   private bpmStable = 0;    // antal stabila (finjusterings-)estimat i rad → committa oktaven
   private challengerBpm = 0;   // tempot rösterna faktiskt pekar på (måste hålla ihop)
   private lockPeak = 0;        // tempogram-toppens styrka när takten är frisk (referens)
@@ -525,9 +526,18 @@ export class Analyser {
       } else if (!committed && ratio < 0.7) {
         this.octaveVote = Math.min(0, this.octaveVote) - 1;                          // estimaten LÄGRE oktav
         if (this.octaveVote <= -8) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
+      } else if (!committed) {
+        // GRANNRÄTTNING: ett tidigt lås från 0.5 s fönster kan hamna 10-20 % fel
+        // (MÄTT: brusigt rum 136 låste 122 på en av åtta brus-seeder och satt kvar
+        // hela låten — glid-bandet slutar vid 1.11 och oktav-grenen börjar vid 1.4,
+        // så felet låg i ett dödområde). Räknas bara före commit och kräver ~2 s
+        // sammanhållet bevis; committad lås rörs inte.
+        this.nearVote++;
+        if (this.nearVote >= 8) { this.localBpm = Math.round(med); this.nearVote = 0; this.octaveVote = 0; this.bpmStable = 0; }
       } else {
-        this.octaveVote *= 0.7;                                                      // mellanting (3/2) / committad off-oktav → brus
+        this.octaveVote *= 0.7;                                                      // committad off-oktav → brus
       }
+      if (ratio >= 0.9 && ratio <= 1.11) this.nearVote = 0;
 
       // ── LÅTBYTE UTAN TYSTNADSLUCKA ────────────────────────────────────────────
       // Låset ovan nollställs annars BARA av 350 ms tystnad — men crossfade, DJ-set
@@ -612,7 +622,7 @@ export class Analyser {
   resetTempo(): void {
     this.localBpm = 0; this.localBpmConfidence = 0;
     this.bpmHistLen = 0; this.bpmHistPos = 0;
-    this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.challengerBpm = 0; this.lastSongVoteMs = 0; this.lockPeak = 0;
+    this.octaveVote = 0; this.nearVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.challengerBpm = 0; this.lastSongVoteMs = 0; this.lockPeak = 0;
     this.tempoGram.fill(0);
     this.barAcc.fill(0); this.barCount = 0;
   }
@@ -879,7 +889,7 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += hopMs;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.challengerBpm = 0; this.lastSongVoteMs = 0; this.lockPeak = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); this.barCount = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.nearVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.challengerBpm = 0; this.lastSongVoteMs = 0; this.lockPeak = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); this.barCount = 0; }
     } else {
       this.silentMs = 0;
     }
