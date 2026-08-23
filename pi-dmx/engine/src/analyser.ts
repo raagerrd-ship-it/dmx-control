@@ -53,6 +53,14 @@ export interface Frame {
    *    beat   = hur tydlig takten är (BPM-konfidens) */
   profile: { punch: number; bass: number; bright: number; beat: number };
   beatAnchorMs: number; // wall-clock ms för ett taktslag (fas)
+  /** >0 = ett trumslag är FÄRDIGMÄTT denna ruta: väggklocka för slagets flux-topp
+   *  med sub-hop-precision (±1.3 ms). Kommer en hop EFTER frame.kick (parabeln
+   *  behöver hoppet efter toppen) och är den enda tidsstämpel PLL:en får mäta
+   *  fasfel mot — Date.now() vid rutans behandling bär ALSA-leveransens jitter. */
+  kickAtMs: number;
+  /** TAKTFAS: hur många slag ankaret ska flyttas FRAMÅT för att landa på ettan
+   *  (0..3), eller -1 när fasen ännu är osäker. Motorn äger ankaret och applicerar. */
+  barShift: number;
   /** Rikt spektrum + per-band onset (anslag) från dubbel-FFT:n (hög-upplöst). */
   spec: Spectrum;       // per-band NIVÅ (AGC 0..1)
   onset: Spectrum;      // per-band ONSET/anslag (halvvågs-flux mot adaptiv baslinje, 0..1)
