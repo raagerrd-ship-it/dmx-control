@@ -607,6 +607,10 @@ export class Analyser {
   private envelope: number;
   private lastKick = 0;
   private lastT = performance.now();
+  /** Löpande kvadratsumma över `buffer` (glidande RMS) + räknare för full omräkning. */
+  private sumSq = 0;
+  private rmsRecalc = 0;
+
   /** VIRTUELL KLOCKA. Analysatorns dtHop är sampelbaserad, men fyra beslut läser
    *  väggklockan — drop-spärren ("8 takter sedan förra"), svackans ålder, riserns
    *  ålder. Spelar man upp en inspelning snabbare än realtid hinner åtta takter
