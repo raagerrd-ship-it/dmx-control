@@ -520,6 +520,7 @@ export class Analyser {
       //      ackumulerade tempogrammet? Ett breakdown gör låset svagare men ger ingen
       //      dominant rival — en ny låt gör det.
       // Rösterna räknas i TID, inte i anrop: stride växlar 100→20 Hz med låset.
+      (this as any).dbg = { bpm, med, conf, bestVal };
       const committedNow = this.bpmStable >= 60;
       const rawOff = Math.abs(bpm / this.localBpm - 1) > 0.11;
       const sameChallenger = this.challengerBpm > 0 && Math.abs(bpm / this.challengerBpm - 1) <= 0.04;
