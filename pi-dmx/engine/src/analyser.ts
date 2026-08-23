@@ -622,7 +622,10 @@ export class Analyser {
 
   private envelope: number;
   private lastKick = 0;
-  private lastT = performance.now();
+  // 0 = "ej satt". Får INTE seedas med performance.now(): vid virtuell klocka
+  // (perfNow → virtualMs, startar nära 0) blir första dt negativ → exp(+stort)
+  // → NaN i envelope/gain, och NaN passerar båda clamparna nedan.
+  private lastT = 0;
   /** Löpande kvadratsumma över `buffer` (glidande RMS) + räknare för full omräkning. */
   private sumSq = 0;
   private rmsRecalc = 0;
