@@ -697,8 +697,6 @@ export class Analyser {
     const bassBins = Math.min(16, half);                            // ~0–1.5 kHz
     const kickBins = Math.min(3, half);                            // bins 0–2 ≈ 0–280 Hz (kick-trumman)
     // Diskant = hi-hats/cymbaler ~5–13 kHz (INTE 12 kHz+ där det är tomt).
-    const trebleStart = Math.min(half - 1, Math.round(5000 / binHz));   // ~5 kHz
-    const trebleEnd = Math.min(half, Math.round(13000 / binHz));        // ~13 kHz
     for (let i = 0; i < half; i++) {
       const re = spectrum[2 * i];
       const im = spectrum[2 * i + 1];
@@ -707,13 +705,10 @@ export class Analyser {
         bassEnergy += mag[i];
         const d = mag[i] - this.prevMag[i];
         if (d > 0) { flux += d; if (i < kickBins) kickFlux += d; }    // half-wave rectified
-      } else if (i < trebleStart) {
-        midEnergy += mag[i];                         // mellanband (~1.5–5 kHz: röst/synth/virvel)
-      } else if (i < trebleEnd) {
-        trebleEnergy += mag[i];                      // diskant (~5–13 kHz: hi-hats/cymbaler)
       }
       magSum += mag[i]; magW += i * mag[i];          // centroid = viktad medelfrekvens
     }
+
     // Swap: denna hops magnitud blir nästa hops prevMag (zero-copy, ingen alloc).
     { const t = this.prevMag; this.prevMag = this.mag512; this.mag512 = t; }
     // Gain-compensated like `level` — otherwise the band-driven fixtures and
