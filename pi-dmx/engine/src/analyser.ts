@@ -104,6 +104,11 @@ export class Analyser {
   private prevMagBig!: Float32Array;    // för per-band flux
   private magBig!: Float32Array;        // scratch magnitud
   private magBigMax = 0;                // högsta bin någon läser (band 8-taket)
+  /** Cachade vyer (0..magBigMax) till specSink — subarray() per stor-FFT vore 125
+   *  alloc/s. Vyerna växlas tillsammans med buffertarna, annars pekar de fel
+   *  varannan frame. */
+  private magBigView!: Float32Array;
+  private prevMagBigView!: Float32Array;
 
   private specBig!: number[];           // scratch complex (fft.js createComplexArray)
   private static readonly BAND_HZ = [20, 60, 120, 250, 500, 2000, 5000, 10000, 16000];
@@ -119,6 +124,8 @@ export class Analyser {
   private bandOn = new Float32Array(8);    // scratch: per-band onset denna frame
   private bigCounter = 0;                  // decimering av 2048-FFT:n (se BIG_EVERY)
   private static readonly BIG_EVERY = 3;   // kor stor-FFT var N:e hop → analysen ryms i realtid
+  /** bandPeak-decay per stor-FFT (τ ≈ 3.8 s oavsett BIG_EVERY). */
+  private static readonly PEAK_DECAY = Math.pow(0.9993, Analyser.BIG_EVERY);
   /** Valfri avlyssnare på den stora magnituden (låtminnets fingeravtryck). */
   private specSink: ((mag: Float32Array, binHz: number) => void) | null = null;
   setSpectrumSink(fn: ((mag: Float32Array, binHz: number) => void) | null): void { this.specSink = fn; }
@@ -208,7 +215,7 @@ export class Analyser {
   private lvlSmooth = 0;
   private intensityEma = 0.5;    // sektionsenergi: utjämnad nivå
   private intensityFloor = 0.5;  // dess robusta P50-baslinje (låtens snitt)
-  private intensitySpread = 0.05;  // uppmatt dynamik (MAD) → sjalvkalibrerande skala
+  private intensitySpread = 0.05;  // glidande medelabsolutavvikelse (EJ median-MAD) → sjalvkalibrerande skala
   private activeMs = 0;          // hur länge musik spelat (warmup för baslinjen)
   // DROP-DETEKTION (flyttad från effects: analys hör hemma här; show-reaktionen stannar där)
   private levelCeil = 0.5;       // långsamt nivå-tak (låtens loud-topp)
@@ -268,13 +275,16 @@ export class Analyser {
   resetGain(startGain = 1) {
     // Seed per input: line (aux) arrives hot -> 1x; the room mic is weak -> ~20x.
     this.gain = Math.max(0.5, Math.min(20, startGain));
-    this.envelope = 0;
+    // NEUTRALT ÄR autoGainTarget, INTE 0: AGC:n räknar desired = target/max(1e-4, env),
+    // så env = 0 ger ett enormt tal som slår gainen i 20x-taket innan envelopen
+    // konvergerat — en hörbar ljuspump vid varje ingångsbyte.
+    this.envelope = this.cfg.detection.autoGainTarget;
   }
 
   /** Lock the AGC (aux: fixed 1x, level tracks the mixer directly) or let it run. */
   setGainLock(locked: boolean, fixed = 1) {
     this.gainLocked = locked;
-    if (locked) { this.gain = fixed; this.envelope = 0; }
+    if (locked) { this.gain = fixed; this.envelope = this.cfg.detection.autoGainTarget; }
   }
 
   /**
@@ -659,6 +669,8 @@ export class Analyser {
       this.bandPeak[b] = 1e-4;   // seed → själv-kalibrerar inom ~1s
     }
     this.magBigMax = Math.min(BIG / 2, this.bandHi[7] + 1);
+    this.magBigView = this.magBig.subarray(0, this.magBigMax);
+    this.prevMagBigView = this.prevMagBig.subarray(0, this.magBigMax);
 
     // FÖRBERÄKNADE EMA-ALFOR. dtHop och alla tidskonstanter är fasta, så de 11
     // Math.exp()-anropen per hop (~4000/s vid 375 Hz) hörde inte hemma i tick-vägen.
@@ -1020,9 +1032,9 @@ export class Analyser {
     }
 
     // LÅTMINNET får samma magnitud (ingen extra FFT). Anropas före swap:en nedan,
-    // så bufferten faktiskt innehåller DENNA frames spektrum. Skickas som subarray
-    // upp till magBigMax — svansen räknas inte, så ingen läsare kan tyst få nollor.
-    this.specSink?.(this.magBig.subarray(0, this.magBigMax), this.cfg.audio.rate / this.bufferBig.length);
+    // så bufferten faktiskt innehåller DENNA frames spektrum. Skickas som cachad vy
+    // (0..magBigMax) — svansen räknas inte, så ingen läsare kan tyst få nollor.
+    this.specSink?.(this.magBigView, this.cfg.audio.rate / this.bufferBig.length);
     const gated = rms > this.cfg.detection.noiseFloor * 1.5;
 
     for (let b = 0; b < 8; b++) {
@@ -1041,8 +1053,11 @@ export class Analyser {
       // tyst band (t.ex. diskant i ett intro) smäller till blir det en balanserad
       // respons, inte en överstyrd ljus-chock/pump. (Gemini.)
       const minPeak = this.lvlSmooth * 0.15;
+      // DECAYEN SKALAS MED BIG_EVERY: blocket körs 125/s, inte 375/s. Rå 0.9993 gav
+      // τ ≈ 11 s i stället för kalibrerade ~3.8 s (ett hett band höll sin peak in i
+      // nästa parti → konstlat låg diskant efter en drop). PEAK_DECAY = 0.9993^BIG_EVERY.
       if (gated && avg > this.bandPeak[b]) this.bandPeak[b] = Math.max(avg, minPeak);
-      else this.bandPeak[b] = Math.max(this.bandPeak[b] * 0.9993, minPeak);
+      else this.bandPeak[b] = Math.max(this.bandPeak[b] * Analyser.PEAK_DECAY, minPeak);
       // Nivån smoothas ~90ms PÅ HOP-TAKT → nivå-drivna/lugna effekter (som läser
       // spec via ctx.band) flimrar inte av det råa per-hop-AGC-bruset. onset lämnas
       // skarp (nedan) så transient-drivna effekter behåller sin punch.
@@ -1069,7 +1084,8 @@ export class Analyser {
       // Skala mot MAD i stallet for en fast faktor -> sjalvskalande per band.
       this.bandOn[b] = gated ? Math.max(0, Math.min(1, (fluxN - oThr) / Math.max(1e-6, this.onsetMad[b] * 3))) : 0;
     }
-    { const t = this.prevMagBig; this.prevMagBig = this.magBig; this.magBig = t; }
+    { const t = this.prevMagBig; this.prevMagBig = this.magBig; this.magBig = t;
+      const v = this.prevMagBigView; this.prevMagBigView = this.magBigView; this.magBigView = v; }
     }   // slut på decimerad stor-FFT
     // TRUM-KIT peak-hold-envelopes PÅ HOP-TAKT (var 2.7ms) → fångar varje anslag,
     // aldrig missat mellan två render-frames (100Hz). tau bevarade från effects.ts:
