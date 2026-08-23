@@ -793,16 +793,18 @@ export class Analyser {
     this.kickWasAbove = above;
     this.kickPrimed = true;
 
-    const frameMs0 = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
+    // Hoppets längd i ms — en enda förberäknad konstant (räknades förut fram tre
+    // gånger per hop under tre olika namn: frameMs0, frameMs, hopMs).
+    const hopMs = this.hopMs;
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
-      this.silentMs += frameMs0;
+      this.silentMs += hopMs;
       if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.challengerBpm = 0; this.lastSongVoteMs = 0; this.lockPeak = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); this.barCount = 0; }
     } else {
       this.silentMs = 0;
     }
     // --- Onset-envelope → lokal BPM (nedsamplad till 100 Hz) ---
-    const frameMs = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
+
     this.envAccum = Math.max(this.envAccum, fluxNorm);
     // Basbandets egen envelope (kick-flux) — samma raster, oberoende signal.
     const bassFluxNorm = Math.min(1, kickFlux * 0.02);
