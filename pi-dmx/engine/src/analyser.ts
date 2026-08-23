@@ -1000,8 +1000,9 @@ export class Analyser {
     }
 
     // LÅTMINNET får samma magnitud (ingen extra FFT). Anropas före swap:en nedan,
-    // så bufferten faktiskt innehåller DENNA frames spektrum.
-    this.specSink?.(this.magBig, this.cfg.audio.rate / this.bufferBig.length);
+    // så bufferten faktiskt innehåller DENNA frames spektrum. Skickas som subarray
+    // upp till magBigMax — svansen räknas inte, så ingen läsare kan tyst få nollor.
+    this.specSink?.(this.magBig.subarray(0, this.magBigMax), this.cfg.audio.rate / this.bufferBig.length);
     const gated = rms > this.cfg.detection.noiseFloor * 1.5;
 
     for (let b = 0; b < 8; b++) {
