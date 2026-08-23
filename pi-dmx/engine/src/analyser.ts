@@ -25,8 +25,10 @@ export interface Frame {
   levelVU: number;      // 0..1, ~130ms symmetriskt smoothat PÅ HOP-TAKT (375Hz) — för VU-taket
                         //  (ser alla hops → mycket mindre brus än att smootha rå på 50Hz)
   energy: number;       // 0..1, bass-band spectral energy (~0–1.5 kHz)
-  mid: number;          // 0..1, mid-band spectral energy (~1.5–12 kHz: röst/synth/virvel)
-  treble: number;       // 0..1, high-band spectral energy (hats/cymbals/vocals top)
+                        // mid/treble på 512-FFT:n är BORTA: ingen effekt läste dem — effektlagret
+                        // använder spec.mid/spec.treble ur 2048-FFT:ns oktavband, som är bättre
+                        // upplösta. Två EMA + två bandsummor per hop gick åt till ingenting.
+
   centroid: number;     // 0..1, spektralt tyngdpunkt: mörk/bastung → 0, ljus/diskant → 1
   flux: number;         // 0..1, bass-band spectral flux
   kick: boolean;        // true on rising edge only
