@@ -804,12 +804,16 @@ export class Analyser {
       this.pendingKickMs = 0;
       // Slaget är färdigmätt → lämna över dess EXAKTA tid till PLL:en.
       kickAtMs = this.beatAnchorMs;
-      // TAKTFAS: bokför slagets tyngd på sin plats i fyrtakten.
+      // TAKTFAS: bokför slagets tyngd på sin plats i fyrtakten. Vikten är slagets
+      // EGEN styrka (flux mot sin tröskel, kvadrerad så skillnaden mellan ettans
+      // tunga och mellanslagens lätta trumma verkligen separerar). Bandenergin gick
+      // inte att använda: den är utjämnad över ~100 ms och gav alla fyra platser
+      // samma vikt ⇒ ingen marginal, ingen taktfas (MÄTT 2026-08-23).
       const g = this.cfg.beat;
       if (g && g.bpm > 40 && this.localBpmConfidence > 0.5) {
         const bMs = 60000 / g.bpm;
         const slot = ((Math.round((kickAtMs - g.anchorMs) / bMs) % 4) + 4) % 4;
-        this.barAcc[slot] += 0.5 + Math.min(1, this.engSmooth * 1.4) * 0.5;
+        this.barAcc[slot] += this.pendingKickW * this.pendingKickW;
         for (let i = 0; i < 4; i++) this.barAcc[i] *= 0.997;   // ~4 takters glömska
       }
     }
