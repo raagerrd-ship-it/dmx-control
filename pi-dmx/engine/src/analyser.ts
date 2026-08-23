@@ -436,7 +436,7 @@ export class Analyser {
     // parabelns vertex mäts på samma skala som toppvalet gjordes på.
     let lagF = bestLag;
     if (bestLag > lagMin && bestLag + 1 <= lagMax) {
-      const yl = ac[bestLag - 1], y0 = ac[bestLag], yr = ac[bestLag + 1];
+      const yl = this.acScratch[bestLag - 1], y0 = this.acScratch[bestLag], yr = this.acScratch[bestLag + 1];
       const den = yl - 2 * y0 + yr;
       if (den < 0) { const d = 0.5 * (yl - yr) / den; if (Math.abs(d) < 1) lagF = bestLag + d; }
     }
