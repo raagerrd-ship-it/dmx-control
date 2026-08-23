@@ -1188,13 +1188,13 @@ export class Analyser {
     this.profBright += (brightW - this.profBright) * pr;
     this.profBeat += (this.localBpmConfidence - this.profBeat) * pr;
     // Skala råvärdena till användbara 0..1-spann (typiska musikvärden → full range).
-    const cl = (x: number) => x < 0 ? 0 : x > 1 ? 1 : x;
     // Skalningen är KALIBRERAD mot uppmätta råvärden på riktig musik (annars
     // mättar punch på 1.00 och bright ligger konstant högt → ingen diskriminering).
-    this.outProfile.punch = cl((this.profPunch - 0.05) / 0.40);
-    this.outProfile.bass = cl((this.profBass - 0.28) / 0.30);
-    this.outProfile.bright = cl((this.profBright - 0.14) / 0.19);
-    this.outProfile.beat = cl(this.profBeat);
+    this.outProfile.punch = cl01((this.profPunch - 0.05) / 0.40);
+    this.outProfile.bass = cl01((this.profBass - 0.28) / 0.30);
+    this.outProfile.bright = cl01((this.profBright - 0.14) / 0.19);
+    this.outProfile.beat = cl01(this.profBeat);
+
 
     const L = this.bandLvl, O = this.bandOn;
     const spec = this.outSpec, onset = this.outOnset;
