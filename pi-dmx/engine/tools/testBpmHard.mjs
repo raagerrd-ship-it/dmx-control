@@ -5,6 +5,7 @@ const { defaultConfig } = await import("../dist/config.js");
 const RATE = 48000, HOP = 128;
 
 function sim(name, durS, gen, truth) {
+  resetNoise();
   const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig)));
   an.setGainLock(true, 1);
   const buf = new Float32Array(HOP);
@@ -24,7 +25,16 @@ function sim(name, durS, gen, truth) {
   console.log(name.padEnd(26), "lås", (lockMs || NaN).toFixed(0).padStart(6), "ms   rätt",
     (100 * ok / tot).toFixed(0).padStart(3) + "%   cpu", (cpu / hops * 1000).toFixed(0) + " µs/hop");
 }
-const noise = () => Math.random() * 2 - 1;
+// Seedat brus (mulberry32) → bänken är bit-identisk mellan körningar.
+let rngState = 0x9e3779b9;
+const noise = () => {
+  rngState = (rngState + 0x6d2b79f5) | 0;
+  let x = rngState;
+  x = Math.imul(x ^ (x >>> 15), 1 | x);
+  x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+  return (((x ^ (x >>> 14)) >>> 0) / 4294967296) * 2 - 1;
+};
+const resetNoise = () => { rngState = 0x9e3779b9; };
 const kick = (tt, beat, decay = 25) => Math.exp(-((tt % beat) / beat) * beat * decay) * Math.sin(2 * Math.PI * 58 * tt);
 
 // 1. NIVÅDRIFT: långsam fade in/out över fönstret (testar whitening)

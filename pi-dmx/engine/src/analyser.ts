@@ -622,7 +622,10 @@ export class Analyser {
 
   private envelope: number;
   private lastKick = 0;
-  private lastT = performance.now();
+  // 0 = "ej satt". Får INTE seedas med performance.now(): vid virtuell klocka
+  // (perfNow → virtualMs, startar nära 0) blir första dt negativ → exp(+stort)
+  // → NaN i envelope/gain, och NaN passerar båda clamparna nedan.
+  private lastT = 0;
   /** Löpande kvadratsumma över `buffer` (glidande RMS) + räknare för full omräkning. */
   private sumSq = 0;
   private rmsRecalc = 0;
@@ -791,7 +794,7 @@ export class Analyser {
 
     // Auto-gain (slow: seconds-to-minute timescales)
     const now = this.perfNow();
-    const dt = Math.min(0.1, (now - this.lastT) / 1000);
+    const dt = this.lastT === 0 ? 0 : Math.max(0, Math.min(0.1, (now - this.lastT) / 1000));
     this.lastT = now;
     const d = this.cfg.detection;
     // AGC körs BARA för mic (aux låser gain på 1× — line-level är hett & stabilt).
