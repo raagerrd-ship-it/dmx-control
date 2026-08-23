@@ -166,6 +166,11 @@ export class Analyser {
   /** Ackumulerat tempogram (EMA av hela lag-kurvan mellan anrop). */
   private tempoGram = new Float64Array(Analyser.ENV_LEN);
   private lastVoteMs = 0;   // tidsviktad median-röstning (max 4 röster/s)
+  private lastConfMs = 0;   // tidsbaserad alpha för bpmConfidence (stride-oberoende)
+  /** TAKTFAS: vikt per taktslags-plats (idx mod 4) mot cfg.beat-gridet. Ettan bär
+   *  tyngsta slaget i så gott som all dansmusik — den plats som samlar mest
+   *  kick-tyngd ÄR ettan. Glöms långsamt så ett låtbyte kan flytta fasen. */
+  private barAcc = new Float64Array(4);
   /** Perceptuell prior (log-Gauss runt 120 BPM) per lag — lagg→BPM ar fast, sa
    *  de ~78 Math.exp()-anropen per computeBpm-anrop kan bakas en gang. */
   private priorLut = (() => {
