@@ -445,6 +445,10 @@ export class Analyser {
     // att interpolera på samma yta toppen valdes ur, men tempogrammets prior-vikt är
     // en lutning över lag och drog vertexen mot 120 BPM (128→127, 150→149, taktfas
     // 128→129). Råkurvan är symmetrisk kring toppen och landar exakt.
+    // ÄVEN PROVAT (2026-08-23): (wFull·scoreFull + wBass·scoreBass) / priorLut, dvs
+    // bandviktad yta med priorn dividerad bort. Samma bias kvar (128→127.0,
+    // 140→139.0, 150→149.0) — comb/pulse-normaliseringen i scoreEnv är inte heller
+    // symmetrisk kring toppen. acScratch ger 128.0/140.0/150.0 exakt. Behålls.
     let lagF = bestLag;
     if (bestLag - 1 >= lagMin && bestLag + 1 <= lagMax) {
       const yl = this.acScratch[bestLag - 1], y0 = this.acScratch[bestLag], yr = this.acScratch[bestLag + 1];
