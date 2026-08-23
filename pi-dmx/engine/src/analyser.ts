@@ -667,6 +667,8 @@ export class Analyser {
       this.bandPeak[b] = 1e-4;   // seed → själv-kalibrerar inom ~1s
     }
     this.magBigMax = Math.min(BIG / 2, this.bandHi[7] + 1);
+    this.magBigView = this.magBig.subarray(0, this.magBigMax);
+    this.prevMagBigView = this.prevMagBig.subarray(0, this.magBigMax);
 
     // FÖRBERÄKNADE EMA-ALFOR. dtHop och alla tidskonstanter är fasta, så de 11
     // Math.exp()-anropen per hop (~4000/s vid 375 Hz) hörde inte hemma i tick-vägen.
