@@ -183,11 +183,11 @@ for (const [name] of Object.entries(TRACKS)) {
   const all = rs.flatMap(x => x.buildUps);
   console.log("  " + name.padEnd(14),
     "inRiser", med(rs.map(x => x.riserPct)).toFixed(1).padStart(5) + "%",
-    " buildUp p50", pct(all, 0.5).toFixed(2), "p90", pct(all, 0.9).toFixed(2), "p99", pct(all, 0.99).toFixed(2), "max", Math.max(...all).toFixed(2));
+    " buildUp p50", pct(all, 0.5).toFixed(2), "p90", pct(all, 0.9).toFixed(2), "p99", pct(all, 0.99).toFixed(2), "max", all.reduce((a,x)=>x>a?x:a,0).toFixed(2));
 }
 const allB = runs.flatMap(x => x.r.buildUps);
 console.log("  TOTALT        ", "inRiser", med(runs.map(x => x.r.riserPct)).toFixed(1).padStart(5) + "%",
-  " buildUp p50", pct(allB, 0.5).toFixed(2), "p90", pct(allB, 0.9).toFixed(2), "p99", pct(allB, 0.99).toFixed(2), "max", Math.max(...allB).toFixed(2), "\n");
+  " buildUp p50", pct(allB, 0.5).toFixed(2), "p90", pct(allB, 0.9).toFixed(2), "p99", pct(allB, 0.99).toFixed(2), "max", allB.reduce((a,x)=>x>a?x:a,0).toFixed(2), "\n");
 
 // UPPGIFT 2 — grind-kombinationer
 console.log("GRIND-KOMBINATIONER (r=riser>0.35, e=intensity>0.45, w=svack/riser-fönster):");
