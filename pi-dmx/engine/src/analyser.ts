@@ -431,13 +431,16 @@ export class Analyser {
     }
 
     // Parabolisk interpolation kring toppen → sub-lag-precision (t.ex. 125 ist. 122).
+    // Tar värdena UR ac[] i stället för att räkna om tre autokorrelationer per anrop
+    // (tre O(N)-loopar, ~1200 mult). ac[] är dessutom LENGTH-NORMALISERAD, så
+    // parabelns vertex mäts på samma skala som toppvalet gjordes på.
     let lagF = bestLag;
     if (bestLag > lagMin && bestLag + 1 <= lagMax) {
-      const acAt = (L: number) => { let s = 0; for (let i = 0; i + L < N; i++) s += env[i] * env[i + L]; return s; };
-      const yl = acAt(bestLag - 1), y0 = acAt(bestLag), yr = acAt(bestLag + 1);
+      const yl = ac[bestLag - 1], y0 = ac[bestLag], yr = ac[bestLag + 1];
       const den = yl - 2 * y0 + yr;
       if (den < 0) { const d = 0.5 * (yl - yr) / den; if (Math.abs(d) < 1) lagF = bestLag + d; }
     }
+
     let bpm = (HZ * 60) / lagF;
     // BPM-FILTER: vik in i 80..160 — festmusik ligger dar, och allt utanfor ar
     // en oktav-artefakt (en 76-BPM-last ar i praktiken 152, en 170 ar 85).
