@@ -224,8 +224,6 @@ export class Analyser {
    *  stigningen och trosklarna slutar motsvara det som mattes i banken. */
   private bodyFast = 0;
   private bodyCeil = 0.2;
-  private bodyZoneState = false;
-  private wasBodyZone = false;
   /** ANSLAGSDETEKTION. En tröskel som ska NÅS korsas först när basen redan
    *  kommit — uppmätt 2.5 s efter anslaget. STIGNINGSTAKTEN fyrar när den
    *  börjar: uppmätt 0.1 s. Ringbuffert med 0.5 s historik (förallokerad). */
