@@ -1106,20 +1106,13 @@ export class Analyser {
     // ~21s vid 90 BPM.
     const minGapMs = this.localBpm > 40 ? (32 * 60000 / this.localBpm) : 13000;
     const dropSpacingOk = nowWallA - this.lastDropMs > minGapMs;
-    // EN DROP AR KULMEN PA EN UPPBYGGNAD, inte bara "nivan gick upp". Utan detta
-    // var detektorn ren nivalogik: varje ateringang i topp-zonen raknades, sa en
-    // lat som ligger konstant hogt (uppmatt inZone 90% av tiden) falsk-droppade
-    // om och om. En riser MASTE ha funnits strax innan - det ar skillnaden mellan
-    // ett strukturellt ogonblick och en nivavariation.
-    const dropAfterRiser = nowWallA - this.lastRiserMs < 4000;
-    // RISER-KRAVET AR AVSTANGT. Det var ratt tanke - en drop ar kulmen pa en
+    // RISER-KRAVET AR AVSTANGT. Tanken var ratt - en drop ar kulmen pa en
     // uppbyggnad - men det grindade pa en DOD signal och slog darmed av drop-
     // detektionen helt i stallet for att rensa den.
     //   MATT: buildUp p50=0.00 p90=0.00 p99=0.31 (kravet ar >0.35) och inRiser
     //   0% av tiden -> 0 drops pa 70s. Riser-detektorn fyrar i princip aldrig.
-    // Femte signalen i sessionen som ser levande ut men ar en konstant. Innan
-    // kravet kan aterinforas maste inRiser/buildUp lagas och matas om - annars
-    // ar det bara ett dyrt satt att stanga av dropsen.
+    // Innan kravet kan aterinforas maste inRiser/buildUp lagas och matas om.
+
     // FLANKEN TAS PÅ BASKROPPEN, inte på nivån. Nivå-zonen var sann 80 % av tiden
     // i ägarens musik → dess flanker låg godtyckligt, och 8-takters-spärren blev
     // i praktiken den som VALDE när en drop fyrade (första flanken efter att
