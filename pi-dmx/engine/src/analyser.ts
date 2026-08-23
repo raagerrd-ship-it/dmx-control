@@ -378,14 +378,7 @@ export class Analyser {
     // toppen sparades, varpå medianen fick städa upp efteråt (~5 s till lås). Nu
     // EMA:as HELA lag-kurvan mellan anrop, så bevis ackumuleras där det hör hemma:
     // låset kommer på 1–2 s och oktav-flippar dör innan de hinner synas.
-    // ADAPTIV MINNESLÄNGD: 0.15 ger ~5 s minne i tempogrammet, vilket är precis vad
-    // ett breakdown behöver för att inte tappa takten — men efter en crossfade satt
-    // den GAMLA laggen kvar och höll nere dominanskvoten, så omlåsningen dröjde 6 s
-    // (MÄTT 2026-08-23). Så snart estimaten börjar peka bort från låset (bevis för
-    // en sammanhållen utmanare finns) kortas minnet till samma 0.30 som vid kallstart: gammalt bevis vädras
-    // ut, det nya tempot får dominera direkt. Ense igen ⇒ tillbaka till 0.15.
-    const relocking = this.challengerBpm > 0 && this.newSongVote > 500;
-    const a = this.localBpm === 0 || relocking ? 0.30 : 0.15;
+    const a = this.localBpm === 0 ? 0.30 : 0.15;
     const tg = this.tempoGram;
     let bestLag = 0, bestVal = 0, scoreSum = 0, scoreCount = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
