@@ -1039,10 +1039,9 @@ export class Analyser {
     if (this.lvlSmooth > this.levelCeil * 0.85 && this.lvlSmooth > 0.65) this.inZoneState = true;
     else if (this.lvlSmooth < this.levelCeil * 0.70) this.inZoneState = false;
     const inZone = this.inZoneState;
-    // BASKROPPS-ZON — drop-detektionens egen zon. Samma form som ovan (adaptivt
-    // tak + hysteres) men på den signal där drops faktiskt syns. `inZone` lämnas
-    // orörd: effektlagret använder den som "musiken ligger högt", vilket den
-    // fortfarande betyder korrekt.
+    // BASKROPPEN — drop-detektionens egen signal (tak + frånvaro + stigningstakt).
+    // `inZone` lämnas orörd: effektlagret använder den som "musiken ligger högt".
+
     const bodyNow = (this.bandLvl[0] + this.bandLvl[1] + this.bandLvl[2]) / 3;   // sub + kick + bas
     this.bodyEnv += (bodyNow - this.bodyEnv) * Math.min(1, dtHop / 0.35);
     this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / 0.12);
