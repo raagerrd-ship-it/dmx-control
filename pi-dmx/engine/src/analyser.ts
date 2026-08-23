@@ -654,6 +654,8 @@ export class Analyser {
       this.bandHi[b] = Math.min(BIG / 2, Math.round(Analyser.BAND_HZ[b + 1] / binHzBig));
       this.bandPeak[b] = 1e-4;   // seed → själv-kalibrerar inom ~1s
     }
+    this.magBigMax = Math.min(BIG / 2, this.bandHi[7] + 1);
+
     // FÖRBERÄKNADE EMA-ALFOR. dtHop och alla tidskonstanter är fasta, så de 11
     // Math.exp()-anropen per hop (~4000/s vid 375 Hz) hörde inte hemma i tick-vägen.
     const dtHop = cfg.fft.hop / cfg.audio.rate;
