@@ -139,6 +139,7 @@ export class Analyser {
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
   private bpmStable = 0;    // antal stabila (finjusterings-)estimat i rad → committa oktaven
   private challengerBpm = 0;   // tempot rösterna faktiskt pekar på (måste hålla ihop)
+  private lockPeak = 0;        // tempogram-toppens styrka när takten är frisk (referens)
   private lastSongVoteMs = 0;  // väggklocka för förra låtbytesrösten (bevis mäts i TID)
   private newSongVote = 0;  // ihållande oenighet trots låst oktav → låtbyte utan tystnadslucka
 
@@ -487,6 +488,9 @@ export class Analyser {
       if (ratio >= 0.9 && ratio <= 1.11) {
         this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);   // samma takt → glid
         this.octaveVote *= 0.5;
+        // Referens för hur STARK takten är när allt är gott — låtbytesgrinden nedan
+        // jämför mot den (ett breakdown har svag takt, en ny låt en full).
+        this.lockPeak = this.lockPeak > 0 ? this.lockPeak + (bestVal - this.lockPeak) * 0.05 : bestVal;
         if (this.bpmStable < 100000) this.bpmStable++;                              // stabil tid ackumuleras
       } else if (!committed && ratio > 1.4) {
         this.octaveVote = Math.max(0, this.octaveVote) + 1;                          // estimaten HÖGRE oktav
@@ -520,11 +524,17 @@ export class Analyser {
       //      ackumulerade tempogrammet? Ett breakdown gör låset svagare men ger ingen
       //      dominant rival — en ny låt gör det.
       // Rösterna räknas i TID, inte i anrop: stride växlar 100→20 Hz med låset.
-      (this as any).dbg = { bpm, med, conf, bestVal };
       const committedNow = this.bpmStable >= 60;
       const rawOff = Math.abs(bpm / this.localBpm - 1) > 0.11;
       const sameChallenger = this.challengerBpm > 0 && Math.abs(bpm / this.challengerBpm - 1) <= 0.04;
-      if (!committedNow || !rawOff) {
+      // 4. FRISK TAKT. Ett breakdown ser ut som ett låtbyte i allt utom kvaliteten:
+      //    MÄTT 2026-08-23 (breakdown 142) låg conf 0.58–0.70 och tempogram-toppen på
+      //    ~0.5 mot 0.9 i den friska delen, och råestimatet vandrade till ~107 medan
+      //    basen kom tillbaka — tillräckligt för att fälla låset (BPM 142→111).
+      //    En riktig ny låt har full topp och conf ~1.0. Så: bara ett TYDLIGT tempo
+      //    får rösta bort ett fungerande lås.
+      const healthy = conf >= 0.8 && (this.lockPeak <= 0 || bestVal >= this.lockPeak * 0.65);
+      if (!committedNow || !rawOff || !healthy) {
         this.newSongVote *= 0.7;
         if (this.newSongVote < 0.5) { this.newSongVote = 0; this.challengerBpm = 0; }
       } else if (!sameChallenger) {
@@ -551,6 +561,7 @@ export class Analyser {
           this.newSongVote = 0;
           this.octaveVote = 0;
           this.bpmStable = 0;   // nytt lås får byggas om från början
+          this.lockPeak = 0;
         }
       }
     }
@@ -574,7 +585,7 @@ export class Analyser {
   resetTempo(): void {
     this.localBpm = 0; this.localBpmConfidence = 0;
     this.bpmHistLen = 0; this.bpmHistPos = 0;
-    this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.challengerBpm = 0; this.lastSongVoteMs = 0;
+    this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.challengerBpm = 0; this.lastSongVoteMs = 0; this.lockPeak = 0;
     this.tempoGram.fill(0);
     this.barAcc.fill(0); this.barCount = 0;
   }
@@ -789,7 +800,7 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.challengerBpm = 0; this.lastSongVoteMs = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); this.barCount = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.challengerBpm = 0; this.lastSongVoteMs = 0; this.lockPeak = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); this.barCount = 0; }
     } else {
       this.silentMs = 0;
     }
