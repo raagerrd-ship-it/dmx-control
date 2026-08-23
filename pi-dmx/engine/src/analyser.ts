@@ -1213,12 +1213,18 @@ export class Analyser {
     // ~21s vid 90 BPM.
     const minGapMs = this.localBpm > 40 ? (32 * 60000 / this.localBpm) : 13000;
     const dropSpacingOk = nowWallA - this.lastDropMs > minGapMs;
-    // RISER-KRAVET AR AVSTANGT. Tanken var ratt - en drop ar kulmen pa en
-    // uppbyggnad - men det grindade pa en DOD signal och slog darmed av drop-
-    // detektionen helt i stallet for att rensa den.
-    //   MATT: buildUp p50=0.00 p90=0.00 p99=0.31 (kravet ar >0.35) och inRiser
-    //   0% av tiden -> 0 drops pa 70s. Riser-detektorn fyrar i princip aldrig.
-    // Innan kravet kan aterinforas maste inRiser/buildUp lagas och matas om.
+    // RISER-KRAVET AR AVSTANGT — men INTE for att signalen ar dod. Den gamla
+    // motiveringen ("inRiser 0% av tiden, buildUp p99=0.31") mattes mot en
+    // aldre riser-detektor och ar RADERAD som falsk.
+    //   OMMATT mot novelty-baserad novRiser (tools/testDrops.mjs, 8 seeder):
+    //   inRiser 8.8% av tiden, buildUp p50=0.00 p90=0.00 p99=0.42 max=0.85.
+    //   p50/p90=0 ar forvantat — en riser SKA vara sallsynt. I ett brusigt rum
+    //   fyrar den nastan aldrig (0.6%, max 0.04), sa ett hart riser-krav skulle
+    //   sla av drop-detektionen just dar mikrofonen sitter.
+    // Kravet ar fortfarande avstangt tills det matts om mot bodyOnset pa akta
+    // material (se nedan) — men grunden ar nu grindens kalibrering, inte en dod
+    // signal.
+
 
     // FLANKEN TAS PÅ BASKROPPEN, inte på nivån. Nivå-zonen var sann 80 % av tiden
     // i ägarens musik → dess flanker låg godtyckligt, och 8-takters-spärren blev
