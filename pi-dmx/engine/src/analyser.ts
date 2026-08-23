@@ -208,9 +208,8 @@ export class Analyser {
   private activeMs = 0;          // hur länge musik spelat (warmup för baslinjen)
   // DROP-DETEKTION (flyttad från effects: analys hör hemma här; show-reaktionen stannar där)
   private levelCeil = 0.5;       // långsamt nivå-tak (låtens loud-topp)
-  private breakAtMs = 0;         // senaste svacka
-  private lastRiserMs = 0;       // senaste uppbyggnad — en drop maste foljas pa en riser
-  private breakHoldMs = 0;       // hur lange svackan hallit i sig (mikro-dippar raknas inte)
+  private lastRiserMs = 0;       // senaste uppbyggnad (reserverad: riser-kravet är avstängt)
+
   private inZoneState = false;   // hysteres för topp-zonen
   /** BASKROPPEN — (sub+kick+bas)/3, utjämnad. Det är HÄR en drop syns.
    *  MÄTT över 15 min av ägarens egen musik: `level` ligger i sin övre tredjedel
