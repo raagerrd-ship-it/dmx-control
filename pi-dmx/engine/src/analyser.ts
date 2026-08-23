@@ -881,7 +881,7 @@ export class Analyser {
     this.kfPrev2 = this.kfPrev;
     this.kfPrev = kickFlux;
 
-    const dtHop = this.cfg.fft.hop / this.cfg.audio.rate;
+    const dtHop = this.dtHop;
     const aAtt = this.aAtt;
     const aRel = this.aRel;
     const smooth = (prev: number, x: number) => prev + (x - prev) * (x > prev ? aAtt : aRel);
