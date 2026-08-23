@@ -809,7 +809,7 @@ export class Analyser {
     // Basbandets egen envelope (kick-flux) — samma raster, oberoende signal.
     const bassFluxNorm = Math.min(1, kickFlux * 0.02);
     if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
-    this.envAccumT += frameMs;
+    this.envAccumT += hopMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) {
       this.envAccumT -= 1000 / Analyser.ENV_HZ;
       this.envRing[this.envPos] = this.envAccum;
