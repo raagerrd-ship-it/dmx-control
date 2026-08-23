@@ -1047,8 +1047,7 @@ export class Analyser {
     this.bodyEnv += (bodyNow - this.bodyEnv) * Math.min(1, dtHop / 0.35);
     this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / 0.12);
     this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * 0.015 * this.bodyCeil);
-    if (this.bodyEnv > this.bodyCeil * 0.80) this.bodyZoneState = true;
-    else if (this.bodyEnv < this.bodyCeil * 0.45) this.bodyZoneState = false;
+
     // BAS-FRÅNVARO med VARAKTIGHETSKRAV: under 30 % av taket i ≥3 s i sträck.
     if (this.bodyEnv < this.bodyCeil * 0.40) {
       this.bodyGoneMs += dtHop * 1000;
