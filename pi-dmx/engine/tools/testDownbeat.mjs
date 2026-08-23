@@ -28,7 +28,7 @@ for (let hop = 0; hop < hops; hop++) {
   const f = an.process(buf);
   // Minimal motor-koppling: ankare vid lås + fas-PLL + taktfas (som index.ts).
   if (f.bpm > 0) {
-    if (!cfg.beat) cfg.beat = { anchorMs: f.beatAnchorMs, bpm: f.bpm, confidence: f.bpmConfidence };
+    if (!cfg.beat) cfg.beat = { anchorMs: f.beatAnchorMs + 60000 / f.bpm, bpm: f.bpm, confidence: f.bpmConfidence };  // medvetet EN takt fel
     if (f.kickAtMs > 0) {
       const bMs = 60000 / cfg.beat.bpm;
       const ph = ((((f.kickAtMs - cfg.beat.anchorMs) % bMs) + bMs) % bMs) / bMs;
@@ -48,5 +48,5 @@ for (let beat = Math.ceil(70 / B); beat * B < 90; beat++) {
   tot++; if (((idx % 4) + 4) % 4 === 0) ok++;
 }
 console.log(`bpm ${cfg.beat?.bpm.toFixed(1)}  taktfas-justeringar ${shifts}  ettan rätt ${ok}/${tot}`);
-if (tot === 0 || ok !== tot) { console.log("MISSLYCKADES"); process.exit(1); }
+if (tot === 0 || shifts === 0 || ok !== tot) { console.log("MISSLYCKADES"); process.exit(1); }
 console.log("OK");
