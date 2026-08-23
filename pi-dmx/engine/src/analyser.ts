@@ -637,7 +637,10 @@ export class Analyser {
     // FÖRBERÄKNADE EMA-ALFOR. dtHop och alla tidskonstanter är fasta, så de 11
     // Math.exp()-anropen per hop (~4000/s vid 375 Hz) hörde inte hemma i tick-vägen.
     const dtHop = cfg.fft.hop / cfg.audio.rate;
+    this.dtHop = dtHop;
+    this.hopMs = dtHop * 1000;
     const bigDt = dtHop * Analyser.BIG_EVERY;
+
     this.aAtt = 1 - Math.exp(-dtHop / 0.015);
     this.aRel = 1 - Math.exp(-dtHop / 0.4);
     this.aVU = 1 - Math.exp(-dtHop / 0.20);
