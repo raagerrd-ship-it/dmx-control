@@ -150,6 +150,8 @@ export class Analyser {
   private bpmHistPos = 0;
   private bpmSortScratch = new Float64Array(Analyser.BPM_HIST);
   // Förberäknade EMA-alfor / decay-faktorer (fasta dtHop + fasta tidskonstanter).
+  private dtHop = 0; private hopMs = 0;
+
   private aAtt = 0; private aRel = 0; private aVU = 0;
   private aIUp = 0; private aIDown = 0; private aBandLvl = 0;
   private dHat = 0; private dSnare = 0; private dKick = 0;
@@ -206,9 +208,8 @@ export class Analyser {
   private activeMs = 0;          // hur länge musik spelat (warmup för baslinjen)
   // DROP-DETEKTION (flyttad från effects: analys hör hemma här; show-reaktionen stannar där)
   private levelCeil = 0.5;       // långsamt nivå-tak (låtens loud-topp)
-  private breakAtMs = 0;         // senaste svacka
-  private lastRiserMs = 0;       // senaste uppbyggnad — en drop maste foljas pa en riser
-  private breakHoldMs = 0;       // hur lange svackan hallit i sig (mikro-dippar raknas inte)
+  private lastRiserMs = 0;       // senaste uppbyggnad (reserverad: riser-kravet är avstängt)
+
   private inZoneState = false;   // hysteres för topp-zonen
   /** BASKROPPEN — (sub+kick+bas)/3, utjämnad. Det är HÄR en drop syns.
    *  MÄTT över 15 min av ägarens egen musik: `level` ligger i sin övre tredjedel
@@ -224,8 +225,6 @@ export class Analyser {
    *  stigningen och trosklarna slutar motsvara det som mattes i banken. */
   private bodyFast = 0;
   private bodyCeil = 0.2;
-  private bodyZoneState = false;
-  private wasBodyZone = false;
   /** ANSLAGSDETEKTION. En tröskel som ska NÅS korsas först när basen redan
    *  kommit — uppmätt 2.5 s efter anslaget. STIGNINGSTAKTEN fyrar när den
    *  börjar: uppmätt 0.1 s. Ringbuffert med 0.5 s historik (förallokerad). */
@@ -240,7 +239,6 @@ export class Analyser {
    *  blockerade av den föregående falska avfyrningen. */
   private bodyGoneMs = 0;
   private lastBodyGoneMs = -1e9;
-  private wasInZone = false;
   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
   private lastDropMs = -1e9;
   // RISER/UPPBYGGNAD (flyttad från effects)
@@ -571,9 +569,9 @@ export class Analyser {
     // på läge — och den grindar kick-gridet (>0.5), PLL-frekvenstermen (>0.4) och
     // hjärtslagets djup. Tidskonstanterna (25 ms upp, 120 ms ner) är valda så att
     // beteendet i OLÅST läge är exakt som förut.
-    const cNow = this.perfNow();
-    const dt = this.lastConfMs > 0 ? Math.min(0.5, (cNow - this.lastConfMs) / 1000) : 0.01;
-    this.lastConfMs = cNow;
+    const dt = this.lastConfMs > 0 ? Math.min(0.5, (voteNow - this.lastConfMs) / 1000) : 0.01;
+    this.lastConfMs = voteNow;
+
     const cA = this.localBpmConfidence;
     const aC = 1 - Math.exp(-dt / (conf > cA ? 0.025 : 0.120));
     this.localBpmConfidence = cA + (conf - cA) * aC;
@@ -640,7 +638,10 @@ export class Analyser {
     // FÖRBERÄKNADE EMA-ALFOR. dtHop och alla tidskonstanter är fasta, så de 11
     // Math.exp()-anropen per hop (~4000/s vid 375 Hz) hörde inte hemma i tick-vägen.
     const dtHop = cfg.fft.hop / cfg.audio.rate;
+    this.dtHop = dtHop;
+    this.hopMs = dtHop * 1000;
     const bigDt = dtHop * Analyser.BIG_EVERY;
+
     this.aAtt = 1 - Math.exp(-dtHop / 0.015);
     this.aRel = 1 - Math.exp(-dtHop / 0.4);
     this.aVU = 1 - Math.exp(-dtHop / 0.20);
@@ -796,21 +797,23 @@ export class Analyser {
     this.kickWasAbove = above;
     this.kickPrimed = true;
 
-    const frameMs0 = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
+    // Hoppets längd i ms — en enda förberäknad konstant (räknades förut fram tre
+    // gånger per hop under tre olika namn: frameMs0, frameMs, hopMs).
+    const hopMs = this.hopMs;
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
-      this.silentMs += frameMs0;
+      this.silentMs += hopMs;
       if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.challengerBpm = 0; this.lastSongVoteMs = 0; this.lockPeak = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); this.barCount = 0; }
     } else {
       this.silentMs = 0;
     }
     // --- Onset-envelope → lokal BPM (nedsamplad till 100 Hz) ---
-    const frameMs = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
+
     this.envAccum = Math.max(this.envAccum, fluxNorm);
     // Basbandets egen envelope (kick-flux) — samma raster, oberoende signal.
     const bassFluxNorm = Math.min(1, kickFlux * 0.02);
     if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
-    this.envAccumT += frameMs;
+    this.envAccumT += hopMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) {
       this.envAccumT -= 1000 / Analyser.ENV_HZ;
       this.envRing[this.envPos] = this.envAccum;
@@ -840,8 +843,8 @@ export class Analyser {
       if (denom < 0) {                                   // konkav → äkta topp
         let delta = 0.5 * (ym1 - yp1) / denom;
         if (delta > 0.5) delta = 0.5; else if (delta < -0.5) delta = -0.5;
-        const hopMs = (this.cfg.fft.hop / this.cfg.audio.rate) * 1000;
         this.beatAnchorMs = this.pendingKickMs + delta * hopMs;
+
       }
       this.pendingKickMs = 0;
       // Slaget är färdigmätt → lämna över dess EXAKTA tid till PLL:en.
@@ -877,7 +880,7 @@ export class Analyser {
     this.kfPrev2 = this.kfPrev;
     this.kfPrev = kickFlux;
 
-    const dtHop = this.cfg.fft.hop / this.cfg.audio.rate;
+    const dtHop = this.dtHop;
     const aAtt = this.aAtt;
     const aRel = this.aRel;
     const smooth = (prev: number, x: number) => prev + (x - prev) * (x > prev ? aAtt : aRel);
@@ -1020,35 +1023,22 @@ export class Analyser {
     // på lägre takt kan aldrig missa flanken.
     const nowWallA = this.wallNow();
     this.levelCeil = Math.max(this.lvlSmooth, this.levelCeil - dtHop * 0.015 * this.levelCeil);   // tak, decay ~65s
-    // SVACKAN MASTE VARA IHALLANDE. Forut satte VILKEN dipp som helst breakAtMs,
-    // aven en som varade nagra tiondelar - en trumfill eller en kort lucka racker.
-    // I en lat som ligger konstant hogt betyder det att varje sadan mikro-dipp
-    // foljd av ateringang i topp-zonen raknades som en drop.
-    //   MATT pa en lat anvandaren rapporterade som "falsk-droppar hela tiden":
-    //   4.0 drops/min, inZone 90% av tiden, nivan aldrig lag (p10=0.57), och
-    //   intensiteten vid varje drop 0.65-0.83 - alltsa passerade energigrinden
-    //   utan problem. Det var inte energin som var fel utan svack-definitionen.
-    // Ett verkligt breakdown varar sekunder, inte tiondelar. 400ms ihallande.
+    // `breaking` = nivån ligger i en svacka. Exponeras till effektlagret (lugnt läge).
+    // Den GAMLA svack-stämpeln (breakAtMs, 400 ms ihållande) grindade drop-villkoret
+    // innan flanken flyttades till baskroppen; den är borttagen med sitt villkor.
     const breaking = this.lvlSmooth < this.levelCeil * 0.65;
-    if (breaking) {
-      this.breakHoldMs += dtHop * 1000;
-      if (this.breakHoldMs > 400) this.breakAtMs = nowWallA;
-    } else {
-      this.breakHoldMs = 0;
-    }
+
     if (this.lvlSmooth > this.levelCeil * 0.85 && this.lvlSmooth > 0.65) this.inZoneState = true;
     else if (this.lvlSmooth < this.levelCeil * 0.70) this.inZoneState = false;
     const inZone = this.inZoneState;
-    // BASKROPPS-ZON — drop-detektionens egen zon. Samma form som ovan (adaptivt
-    // tak + hysteres) men på den signal där drops faktiskt syns. `inZone` lämnas
-    // orörd: effektlagret använder den som "musiken ligger högt", vilket den
-    // fortfarande betyder korrekt.
+    // BASKROPPEN — drop-detektionens egen signal (tak + frånvaro + stigningstakt).
+    // `inZone` lämnas orörd: effektlagret använder den som "musiken ligger högt".
+
     const bodyNow = (this.bandLvl[0] + this.bandLvl[1] + this.bandLvl[2]) / 3;   // sub + kick + bas
     this.bodyEnv += (bodyNow - this.bodyEnv) * Math.min(1, dtHop / 0.35);
     this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / 0.12);
     this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * 0.015 * this.bodyCeil);
-    if (this.bodyEnv > this.bodyCeil * 0.80) this.bodyZoneState = true;
-    else if (this.bodyEnv < this.bodyCeil * 0.45) this.bodyZoneState = false;
+
     // BAS-FRÅNVARO med VARAKTIGHETSKRAV: under 30 % av taket i ≥3 s i sträck.
     if (this.bodyEnv < this.bodyCeil * 0.40) {
       this.bodyGoneMs += dtHop * 1000;
@@ -1088,19 +1078,11 @@ export class Analyser {
     // Nu racker antingen en svacka (klassisk breakdown) ELLER en riser (modern
     // uppbyggnad) strax innan. Riser-signalen ar bekraftat levande: den fyrar
     // 9.8% av tiden och buildUp nar 0.61.
-    const hadBreak = nowWallA - this.breakAtMs < 3500;
-    const hadRiser = nowWallA - this.lastRiserMs < 4000;
-    // Troskeln ar MATT fram, inte gissad. Skuggmatning over 14 zonintraden gav
-    // antal drops per troskel (givet att ovriga grindar passerar):
-    //   0.60 -> 1 drop | 0.45 -> 2 | 0.35 -> 2 | 0.10 -> 2 | 0.05 -> 4 | 0.00 -> 11
-    // En PLATA mellan 0.10 och 0.60: exakt varde spelar ingen roll dar. 0.45 ligger
-    // mitt i den med marginal at bada hall, och slapper igenom ett akta drop
-    // (intensitet 0.47 med aktiv riser) som 0.60 blockerade.
-    // Golvet ar viktigt: sju av fjorton zonintraden lag pa intensitet 0.00 och
-    // passerade alla ANDRA grindar - utan energikravet blir det 11 drops i st.f. 2.
-    // Den tidigare 0.60 var cirkulart satt (kalibrerad mot drops som redan
-    // passerat samma grind), darav ommatningen.
-    const dropEnergyOk = intensity > 0.45;
+    // ENERGIGOLVET (intensity > 0.45) och svacka/riser-fönstren är BORTA som villkor
+    // sedan flanken flyttades till baskroppen: de mättes fram mot den gamla
+    // nivå-zon-detektorn och grindade signaler som inte längre bär beslutet.
+    // Innan något av dem återinförs måste det mätas om mot bodyOnset.
+
     // REFRAKTARPERIOD. Det fanns ingen alls: en drop kunde folja pa en annan
     // inom brakdelen av en sekund. MATT i drop-intervall-loggen: tva av tio
     // intervall lag pa 0.2 och 0.5 TAKTER, dvs dubbelfyrningar - resten lag pa
@@ -1114,45 +1096,21 @@ export class Analyser {
     // ~21s vid 90 BPM.
     const minGapMs = this.localBpm > 40 ? (32 * 60000 / this.localBpm) : 13000;
     const dropSpacingOk = nowWallA - this.lastDropMs > minGapMs;
-    // EN DROP AR KULMEN PA EN UPPBYGGNAD, inte bara "nivan gick upp". Utan detta
-    // var detektorn ren nivalogik: varje ateringang i topp-zonen raknades, sa en
-    // lat som ligger konstant hogt (uppmatt inZone 90% av tiden) falsk-droppade
-    // om och om. En riser MASTE ha funnits strax innan - det ar skillnaden mellan
-    // ett strukturellt ogonblick och en nivavariation.
-    const dropAfterRiser = nowWallA - this.lastRiserMs < 4000;
-    // RISER-KRAVET AR AVSTANGT. Det var ratt tanke - en drop ar kulmen pa en
+    // RISER-KRAVET AR AVSTANGT. Tanken var ratt - en drop ar kulmen pa en
     // uppbyggnad - men det grindade pa en DOD signal och slog darmed av drop-
     // detektionen helt i stallet for att rensa den.
     //   MATT: buildUp p50=0.00 p90=0.00 p99=0.31 (kravet ar >0.35) och inRiser
     //   0% av tiden -> 0 drops pa 70s. Riser-detektorn fyrar i princip aldrig.
-    // Femte signalen i sessionen som ser levande ut men ar en konstant. Innan
-    // kravet kan aterinforas maste inRiser/buildUp lagas och matas om - annars
-    // ar det bara ett dyrt satt att stanga av dropsen.
+    // Innan kravet kan aterinforas maste inRiser/buildUp lagas och matas om.
+
     // FLANKEN TAS PÅ BASKROPPEN, inte på nivån. Nivå-zonen var sann 80 % av tiden
     // i ägarens musik → dess flanker låg godtyckligt, och 8-takters-spärren blev
     // i praktiken den som VALDE när en drop fyrade (första flanken efter att
     // fönstret löpt ut). Uppmätt resultat: 3 träffar av 19, 16 falsklarm.
     if (dropSpacingOk && bodyOnset && this.activeMs > 2000) {
-      // MÄTNING (loggar bara, grindar inte): hör dropen hemma på taktgridet?
-      // En drop är ett musikaliskt beslut och landar nästan alltid PÅ en takt.
-      // Kick-detektionen har redan den kronologi-kontrollen; drops har den inte.
-      // Innan den införs som villkor mäts hur långt FRÅN gridet de faktiskt ligger.
-      const g = this.cfg.beat;
-      if (g && g.bpm > 40) {
-        const bMs = 60000 / g.bpm;
-        const off = ((nowWallA - g.anchorMs) % bMs + bMs) % bMs;
-        const dist = Math.min(off, bMs - off);
-        // intensitet loggas med: energigolvet (dropEnergyOk, > 0.45) mattes fram mot den
-        // GAMLA niva-zon-detektorn och foljde aldrig med nar flanken flyttades till
-        // baskroppen. Innan det ateranvands vill vi se vilka drops det skulle kapa.
-        console.log(`[dropgrid] ${dist.toFixed(0)} ms fran takten (takt ${bMs.toFixed(0)} ms, ${(100 * dist / (bMs / 2)).toFixed(0)} %% av halva takten, konf ${this.localBpmConfidence.toFixed(2)}, intensitet ${intensity.toFixed(2)}, svacka ${hadBreak ? "ja" : "nej"}, riser ${hadRiser ? "ja" : "nej"})`);
-      } else {
-        console.log("[dropgrid] ingen takt last");
-      }
       this.dropCount++; this.lastDropMs = nowWallA;
     }
-    this.wasInZone = inZone;
-    this.wasBodyZone = this.bodyZoneState;
+
 
     // ── UPPBYGGNAD / RISER (flyttad hit) ──
     // Spektral NOVELTY = summan av bandens POSITIVA avvikelse från en ~2s baslinje,
