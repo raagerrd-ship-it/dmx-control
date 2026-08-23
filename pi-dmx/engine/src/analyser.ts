@@ -171,6 +171,7 @@ export class Analyser {
    *  tyngsta slaget i så gott som all dansmusik — den plats som samlar mest
    *  kick-tyngd ÄR ettan. Glöms långsamt så ett låtbyte kan flytta fasen. */
   private barAcc = new Float64Array(4);
+  private barCount = 0;        // antal bokförda slag (bevisunderlag för taktfasen)
   /** Perceptuell prior (log-Gauss runt 120 BPM) per lag — lagg→BPM ar fast, sa
    *  de ~78 Math.exp()-anropen per computeBpm-anrop kan bakas en gang. */
   private priorLut = (() => {
@@ -546,11 +547,11 @@ export class Analyser {
     this.bpmHistLen = 0; this.bpmHistPos = 0;
     this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0;
     this.tempoGram.fill(0);
-    this.barAcc.fill(0);
+    this.barAcc.fill(0); this.barCount = 0;
   }
 
   /** Taktfasen är applicerad av motorn (ankaret flyttat) → börja om räkningen. */
-  resetBar(): void { this.barAcc.fill(0); }
+  resetBar(): void { this.barAcc.fill(0); this.barCount = 0; }
 
   private envelope: number;
   private lastKick = 0;
@@ -759,7 +760,7 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); this.barCount = 0; }
     } else {
       this.silentMs = 0;
     }
@@ -815,13 +816,14 @@ export class Analyser {
         const bMs = 60000 / g.bpm;
         const slot = ((Math.round((kickAtMs - g.anchorMs) / bMs) % 4) + 4) % 4;
         this.barAcc[slot] += this.pendingKickW * this.pendingKickW;
+        if (this.barCount < 1000) this.barCount++;
         for (let i = 0; i < 4; i++) this.barAcc[i] *= 0.997;   // ~4 takters glömska
       }
     }
     if (kick) {
       this.beatAnchorMs = this.wallNow();
       this.pendingKickMs = this.beatAnchorMs;
-      this.pendingKickW = Math.min(3, kickFlux / Math.max(1e-9, kickThresh));
+      this.pendingKickW = kickFlux;   // absolut anslagsstyrka (kvot mot tröskeln mättade)
     }
     // Vinnande plats = ettan, men bara med TYDLIG marginal (35 %) och nog med bevis
     // (~16 slag). Annars -1: bättre ingen taktfas än en som sitter en åtta bort.
@@ -830,7 +832,7 @@ export class Analyser {
       let bi = 0, best = this.barAcc[0], second = -1;
       for (let i = 1; i < 4; i++) if (this.barAcc[i] > best) { second = best; best = this.barAcc[i]; bi = i; }
       for (let i = 0; i < 4; i++) if (i !== bi && this.barAcc[i] > second) second = this.barAcc[i];
-      if (best > 8 && best > second * 1.35) barShift = bi;
+      if (this.barCount >= 16 && best > second * 1.35) barShift = bi;
     }
     this.kfPrev2 = this.kfPrev;
     this.kfPrev = kickFlux;
