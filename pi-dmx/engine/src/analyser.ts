@@ -1133,26 +1133,9 @@ export class Analyser {
     // i praktiken den som VALDE när en drop fyrade (första flanken efter att
     // fönstret löpt ut). Uppmätt resultat: 3 träffar av 19, 16 falsklarm.
     if (dropSpacingOk && bodyOnset && this.activeMs > 2000) {
-      // MÄTNING (loggar bara, grindar inte): hör dropen hemma på taktgridet?
-      // En drop är ett musikaliskt beslut och landar nästan alltid PÅ en takt.
-      // Kick-detektionen har redan den kronologi-kontrollen; drops har den inte.
-      // Innan den införs som villkor mäts hur långt FRÅN gridet de faktiskt ligger.
-      const g = this.cfg.beat;
-      if (g && g.bpm > 40) {
-        const bMs = 60000 / g.bpm;
-        const off = ((nowWallA - g.anchorMs) % bMs + bMs) % bMs;
-        const dist = Math.min(off, bMs - off);
-        // intensitet loggas med: energigolvet (dropEnergyOk, > 0.45) mattes fram mot den
-        // GAMLA niva-zon-detektorn och foljde aldrig med nar flanken flyttades till
-        // baskroppen. Innan det ateranvands vill vi se vilka drops det skulle kapa.
-        console.log(`[dropgrid] ${dist.toFixed(0)} ms fran takten (takt ${bMs.toFixed(0)} ms, ${(100 * dist / (bMs / 2)).toFixed(0)} %% av halva takten, konf ${this.localBpmConfidence.toFixed(2)}, intensitet ${intensity.toFixed(2)}, svacka ${hadBreak ? "ja" : "nej"}, riser ${hadRiser ? "ja" : "nej"})`);
-      } else {
-        console.log("[dropgrid] ingen takt last");
-      }
       this.dropCount++; this.lastDropMs = nowWallA;
     }
-    this.wasInZone = inZone;
-    this.wasBodyZone = this.bodyZoneState;
+
 
     // ── UPPBYGGNAD / RISER (flyttad hit) ──
     // Spektral NOVELTY = summan av bandens POSITIVA avvikelse från en ~2s baslinje,
