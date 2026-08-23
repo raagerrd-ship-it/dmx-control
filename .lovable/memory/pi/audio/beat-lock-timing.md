@@ -13,3 +13,10 @@ type: feature
 **Omlåsning:** `analyser.resetTempo()` anropas när `songs.boundaryCount` tickar (bekräftad låtgräns) → medianfönster + tempogram nollas, första estimatet låser direkt. Utan minnesstöd styr dominansgrinden: rival >2.5× ⇒ 8 röster (~2 s), >1.6× ⇒ 24, annars 100.
 
 **Testbänk:** `tools/testDownbeat.mjs` (medvetet en takt fel start ⇒ ska rättas), `testBpmHard.mjs`, `testSongMemory.mjs`, `testSeekLocked.mjs`.
+
+## Coast vid svag konfidens (2026-08-23)
+`cfg.beat.confidence` uppdateras nu VARJE ruta i index.ts (tidigare bara vid låsning).
+Hysteres: stark takt ≥0.35 nollar coast; under MIN_BEAT_CONFIDENCE (0.20) hålls gridet
+fri-rullande i 4 s (fasen bevaras → effekter glider inte). Håller svagheten i sig
+släpps gridet och `analyser.resetTempo()` körs → nytt lås på ~0,5 s. Minneslåst tempo
+(memoryBeatLocked) undantas alltid.
