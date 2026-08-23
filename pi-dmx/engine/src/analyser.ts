@@ -1084,7 +1084,8 @@ export class Analyser {
       // Skala mot MAD i stallet for en fast faktor -> sjalvskalande per band.
       this.bandOn[b] = gated ? Math.max(0, Math.min(1, (fluxN - oThr) / Math.max(1e-6, this.onsetMad[b] * 3))) : 0;
     }
-    { const t = this.prevMagBig; this.prevMagBig = this.magBig; this.magBig = t; }
+    { const t = this.prevMagBig; this.prevMagBig = this.magBig; this.magBig = t;
+      const v = this.prevMagBigView; this.prevMagBigView = this.magBigView; this.magBigView = v; }
     }   // slut på decimerad stor-FFT
     // TRUM-KIT peak-hold-envelopes PÅ HOP-TAKT (var 2.7ms) → fångar varje anslag,
     // aldrig missat mellan två render-frames (100Hz). tau bevarade från effects.ts:
