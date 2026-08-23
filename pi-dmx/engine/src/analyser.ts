@@ -499,7 +499,10 @@ export class Analyser {
         const lockLag = Math.round((HZ * 60) / this.localBpm);
         const rival = lockLag >= lagMin && lockLag <= lagMax
           ? bestVal / Math.max(1e-9, tg[lockLag]) : 1;
-        if (committed && ++this.newSongVote >= (rival > 1.6 ? 24 : 100)) {
+        // TVÅ DOMINANSSTEG: en ÖVERLÄGSEN rival (>2.5×) är inte ett breakdown — då är
+        // den låsta laggen i praktiken borta ur tempogrammet. Lås om på ~2 s.
+        const need = rival > 2.5 ? 8 : rival > 1.6 ? 24 : 100;
+        if (committed && ++this.newSongVote >= need) {
           this.localBpm = Math.round(med);
           this.newSongVote = 0;
           this.octaveVote = 0;
@@ -508,9 +511,32 @@ export class Analyser {
       }
     }
     // Smooth confidence (undvik hoppig UI); attack snabbt, release långsamt.
+    // TIDSBASERAD alpha: computeBpm() körs 100 Hz olåst men 20 Hz låst (adaptiv
+    // stride). Med fasta 0.35/0.08 rörde konfidensen sig 5× olika snabbt beroende
+    // på läge — och den grindar kick-gridet (>0.5), PLL-frekvenstermen (>0.4) och
+    // hjärtslagets djup. Tidskonstanterna (25 ms upp, 120 ms ner) är valda så att
+    // beteendet i OLÅST läge är exakt som förut.
+    const cNow = this.perfNow();
+    const dt = this.lastConfMs > 0 ? Math.min(0.5, (cNow - this.lastConfMs) / 1000) : 0.01;
+    this.lastConfMs = cNow;
     const cA = this.localBpmConfidence;
-    this.localBpmConfidence = cA + (conf - cA) * (conf > cA ? 0.35 : 0.08);
+    const aC = 1 - Math.exp(-dt / (conf > cA ? 0.025 : 0.120));
+    this.localBpmConfidence = cA + (conf - cA) * aC;
   }
+
+  /** Nollställ tempoläget — anropas när låtminnet BEKRÄFTAT en låtgräns. Då vet vi
+   *  att historiken tillhör förra låten; att medianrösta vidare på den kostade 6 s
+   *  omlåsning. Nästa estimat får låsa direkt (localBpm === 0 ⇒ första röst låser). */
+  resetTempo(): void {
+    this.localBpm = 0; this.localBpmConfidence = 0;
+    this.bpmHistLen = 0; this.bpmHistPos = 0;
+    this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0;
+    this.tempoGram.fill(0);
+    this.barAcc.fill(0);
+  }
+
+  /** Taktfasen är applicerad av motorn (ankaret flyttat) → börja om räkningen. */
+  resetBar(): void { this.barAcc.fill(0); }
 
   private envelope: number;
   private lastKick = 0;
