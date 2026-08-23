@@ -34,13 +34,16 @@ const med = (a) => { const b = a.slice().sort((x, y) => x - y); const n = b.leng
 function sim(name, durS, gen, truth) {
   const r = [];
   for (let s = 0; s < SEEDS; s++) r.push(run(gen, truth, durS, 0x9e3779b9 + s * 0x85ebca6b));
-  const locks = r.map(x => x.lockMs), accs = r.map(x => x.acc);
-  const mL = med(locks), mA = med(accs);
+  const accs = r.map(x => x.acc);
+  const fails = r.filter(x => !isFinite(x.lockMs)).length;
+  const locks = r.filter(x => isFinite(x.lockMs)).map(x => x.lockMs);
+  const mL = locks.length ? med(locks) : NaN, mA = med(accs);
   const floor = locks.filter(x => x <= FLOOR_MS).length;
   console.log(name.padEnd(26),
     "lås med", mL.toFixed(0).padStart(6), "ms",
     "[" + Math.min(...locks).toFixed(0) + "–" + Math.max(...locks).toFixed(0) + "]",
     floor ? ("golv " + floor + "/" + SEEDS).padEnd(11) : "".padEnd(11),
+    fails ? ("MISS " + fails + "/" + SEEDS).padEnd(11) : "".padEnd(11),
     "rätt med", mA.toFixed(0).padStart(3) + "%",
     "[" + Math.min(...accs).toFixed(0) + "–" + Math.max(...accs).toFixed(0) + "]",
     "cpu", med(r.map(x => x.cpu)).toFixed(0) + " µs/hop");
