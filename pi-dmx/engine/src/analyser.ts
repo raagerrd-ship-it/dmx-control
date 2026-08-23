@@ -1164,6 +1164,7 @@ export class Analyser {
     f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
     f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.intensity = intensity; f.beatAnchorMs = this.beatAnchorMs;
     f.dropCount = this.dropCount; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
+    f.kickAtMs = kickAtMs; f.barShift = barShift;
     return f;
   }
 }
