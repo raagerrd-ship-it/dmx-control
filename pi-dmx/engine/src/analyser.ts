@@ -855,6 +855,16 @@ export class Analyser {
         this.barAcc[slot] += this.pendingKickW * this.pendingKickW;
         if (this.barCount < 1000) this.barCount++;
         for (let i = 0; i < 4; i++) this.barAcc[i] *= 0.997;   // ~4 takters glömska
+        // VINNANDE PLATS räknas ut HÄR, inte varje hop: barAcc ändras bara när ett
+        // slag bokförs, så mellanliggande hops gav exakt samma svar. Vinsten är
+        // dessutom att förslaget kommer högst en gång per slag i stället för i varje
+        // ruta fram till att motorn hunnit flytta ankaret.
+        // Kravet: TYDLIG marginal (35 %) och nog med bevis (~16 slag). Annars -1 —
+        // bättre ingen taktfas än en som sitter en åtta bort.
+        let bi = 0, best = this.barAcc[0], second = -1;
+        for (let i = 1; i < 4; i++) if (this.barAcc[i] > best) { second = best; best = this.barAcc[i]; bi = i; }
+        for (let i = 0; i < 4; i++) if (i !== bi && this.barAcc[i] > second) second = this.barAcc[i];
+        if (this.barCount >= 16 && best > second * 1.35) barShift = bi;
       }
     }
     if (kick) {
@@ -862,15 +872,7 @@ export class Analyser {
       this.pendingKickMs = this.beatAnchorMs;
       this.pendingKickW = kickFlux;   // absolut anslagsstyrka (kvot mot tröskeln mättade)
     }
-    // Vinnande plats = ettan, men bara med TYDLIG marginal (35 %) och nog med bevis
-    // (~16 slag). Annars -1: bättre ingen taktfas än en som sitter en åtta bort.
-    let barShift = -1;
-    {
-      let bi = 0, best = this.barAcc[0], second = -1;
-      for (let i = 1; i < 4; i++) if (this.barAcc[i] > best) { second = best; best = this.barAcc[i]; bi = i; }
-      for (let i = 0; i < 4; i++) if (i !== bi && this.barAcc[i] > second) second = this.barAcc[i];
-      if (this.barCount >= 16 && best > second * 1.35) barShift = bi;
-    }
+
     this.kfPrev2 = this.kfPrev;
     this.kfPrev = kickFlux;
 
