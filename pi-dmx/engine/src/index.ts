@@ -403,6 +403,27 @@ capture.on("chunk", (samples: Float32Array) => {
       cfg.beat.anchorMs += frame.barShift * (60000 / cfg.beat.bpm);
       analyser.resetBar();
     }
+    // LEVANDE KONFIDENS + COAST. Tidigare skrevs confidence bara vid (om)låsning →
+    // grinden nedströms stod och tittade på ett gammalt värde. Nu uppdateras den varje
+    // ruta, men med hysteres: faller takt-tydligheten (eller taktfasen aldrig blir
+    // säker) håller vi gridet fri-rullande i GRID_COAST_MS — fasen är kvar, så inget
+    // glider när takten kommer tillbaka. Håller svagheten i sig är det en riktig
+    // låt-/tempoändring: släpp gridet OCH nolla tempohistoriken så nästa lås tas på
+    // ~0,5 s i stället för att medianen släpar med gammalt tempo.
+    if (cfg.beat) {
+      const liveConf = memoryBeatLocked ? 1 : (frame.bpmConfidence ?? 0);
+      const nowMs = Date.now();
+      if (liveConf >= GRID_ON_CONF) { gridWeakSince = 0; gridCoasting = false; }
+      else if (liveConf < MIN_BEAT_CONFIDENCE) {
+        if (gridWeakSince === 0) { gridWeakSince = nowMs; gridCoasting = true; }
+        else if (nowMs - gridWeakSince >= GRID_COAST_MS) {
+          gridCoasting = false;
+          gridWeakSince = nowMs;                 // fönstret startar om → ingen spam
+          if (!memoryBeatLocked) { analyser.resetTempo(); clockDetBpm = 0; }
+        }
+      }
+      cfg.beat.confidence = gridCoasting ? Math.max(liveConf, MIN_BEAT_CONFIDENCE) : liveConf;
+    }
   }
   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
   // inga slag missas) → show-tiden får en knuff, starkare ju tyngre basen är.
