@@ -138,6 +138,7 @@ export class Analyser {
   private static readonly BPM_MAX = 160;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
   private bpmStable = 0;    // antal stabila (finjusterings-)estimat i rad → committa oktaven
+  private challengerBpm = 0; // tempot rösterna faktiskt pekar på (måste hålla ihop)
   private newSongVote = 0;  // ihållande oenighet trots låst oktav → låtbyte utan tystnadslucka
 
   // Ringbuffert för senaste råestimat (~5s) → median-stabilisering utan allokering.
@@ -376,7 +377,13 @@ export class Analyser {
     // toppen sparades, varpå medianen fick städa upp efteråt (~5 s till lås). Nu
     // EMA:as HELA lag-kurvan mellan anrop, så bevis ackumuleras där det hör hemma:
     // låset kommer på 1–2 s och oktav-flippar dör innan de hinner synas.
-    const a = this.localBpm === 0 ? 0.30 : 0.15;
+    // ADAPTIV MINNESLÄNGD: 0.15 ger ~5 s minne i tempogrammet, vilket är precis vad
+    // ett breakdown behöver för att inte tappa takten — men efter en crossfade satt
+    // den GAMLA laggen kvar och höll nere dominanskvoten, så omlåsningen dröjde 6 s
+    // (MÄTT 2026-08-23). Så snart estimaten börjar peka bort från låset (newSongVote
+    // stiger) kortas minnet till samma 0.30 som vid kallstart: gammalt bevis vädras
+    // ut, det nya tempot får dominera direkt. Ense igen ⇒ tillbaka till 0.15.
+    const a = this.localBpm === 0 || this.newSongVote > 2 ? 0.30 : 0.15;
     const tg = this.tempoGram;
     let bestLag = 0, bestVal = 0, scoreSum = 0, scoreCount = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
@@ -486,6 +493,7 @@ export class Analyser {
         this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);   // samma takt → glid
         this.octaveVote *= 0.5;
         this.newSongVote *= 0.5;                                                    // ense igen → glöm oenigheten
+        if (this.newSongVote < 1) this.challengerBpm = 0;                           // ...och glöm utmanaren
         if (this.bpmStable < 100000) this.bpmStable++;                              // stabil tid ackumuleras
       } else if (!committed && ratio > 1.4) {
         this.octaveVote = Math.max(0, this.octaveVote) + 1;                          // estimaten HÖGRE oktav
@@ -517,8 +525,23 @@ export class Analyser {
         // TVÅ DOMINANSSTEG: en ÖVERLÄGSEN rival (>2.5×) är inte ett breakdown — då är
         // den låsta laggen i praktiken borta ur tempogrammet. Lås om på ~2 s.
         const need = rival > 2.5 ? 8 : rival > 1.6 ? 24 : 100;
+        // UTMANAREN MÅSTE VARA SAMMA HELA VÄGEN. Rösterna räknades förr oavsett VAD
+        // estimaten pekade på, så brus som bara var oense (olika tempo varje ruta)
+        // kunde ackumulera fram ett låtbyte — och omlåsningen tog sedan medianen,
+        // som fortfarande var halvfull av förra låtens tempo. Nu spåras en utmanare:
+        // varje estimat inom 4 % glider in i den, allt annat nollställer beviset.
+        if (this.challengerBpm === 0 || Math.abs(bpm / this.challengerBpm - 1) > 0.04) {
+          this.challengerBpm = bpm;
+          this.newSongVote = 0;
+        } else {
+          this.challengerBpm += (bpm - this.challengerBpm) * 0.2;
+        }
         if (committed && ++this.newSongVote >= need) {
-          this.localBpm = Math.round(med);
+          // Lås på UTMANAREN, inte medianen, och kasta historiken: ett blandat
+          // medianfönster (halva förra låten) kostade flera sekunder till rätt takt.
+          this.localBpm = Math.round(this.challengerBpm);
+          this.bpmHistLen = 0; this.bpmHistPos = 0; this.lastVoteMs = 0;
+          this.challengerBpm = 0;
           this.newSongVote = 0;
           this.octaveVote = 0;
           this.bpmStable = 0;   // nytt lås får byggas om från början
@@ -545,7 +568,7 @@ export class Analyser {
   resetTempo(): void {
     this.localBpm = 0; this.localBpmConfidence = 0;
     this.bpmHistLen = 0; this.bpmHistPos = 0;
-    this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0;
+    this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.challengerBpm = 0;
     this.tempoGram.fill(0);
     this.barAcc.fill(0); this.barCount = 0;
   }
@@ -760,7 +783,7 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); this.barCount = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.challengerBpm = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); this.barCount = 0; }
     } else {
       this.silentMs = 0;
     }
