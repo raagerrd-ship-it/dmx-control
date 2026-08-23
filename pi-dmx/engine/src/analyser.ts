@@ -445,6 +445,10 @@ export class Analyser {
     // att interpolera på samma yta toppen valdes ur, men tempogrammets prior-vikt är
     // en lutning över lag och drog vertexen mot 120 BPM (128→127, 150→149, taktfas
     // 128→129). Råkurvan är symmetrisk kring toppen och landar exakt.
+    // ÄVEN PROVAT (2026-08-23): (wFull·scoreFull + wBass·scoreBass) / priorLut, dvs
+    // bandviktad yta med priorn dividerad bort. Samma bias kvar (128→127.0,
+    // 140→139.0, 150→149.0) — comb/pulse-normaliseringen i scoreEnv är inte heller
+    // symmetrisk kring toppen. acScratch ger 128.0/140.0/150.0 exakt. Behålls.
     let lagF = bestLag;
     if (bestLag - 1 >= lagMin && bestLag + 1 <= lagMax) {
       const yl = this.acScratch[bestLag - 1], y0 = this.acScratch[bestLag], yr = this.acScratch[bestLag + 1];
@@ -697,7 +701,9 @@ export class Analyser {
     for (let i = 0; i < hop; i++) { const v = this.buffer[i]; ss -= v * v; }
     this.buffer.copyWithin(0, hop);
     this.buffer.set(samples, this.buffer.length - hop);
-    for (let i = 0; i < hop; i++) { const v = samples[i]; ss += v * v; }
+    // Läs den INKOMMANDE hopen ur this.buffer (efter set), inte ur `samples`: annars
+    // adderas float64-tal och subtraheras float32-tal → systematisk drift, inte brus.
+    for (let i = this.buffer.length - hop; i < this.buffer.length; i++) { const v = this.buffer[i]; ss += v * v; }
     if (++this.rmsRecalc >= 400 || ss < 0) {
       this.rmsRecalc = 0; ss = 0;
       for (let i = 0; i < this.buffer.length; i++) { const v = this.buffer[i]; ss += v * v; }
@@ -751,7 +757,14 @@ export class Analyser {
     // Gain-compensated like `level` — otherwise the band-driven fixtures and
     // the kick energy gate die at low volume while the AGC keeps level alive.
     const energy = Math.min(1, (bassEnergy / bassBins) * 0.02 * this.gain);
-    const centroid = powSum > 1e-12 ? Math.min(1, (powW / powSum) / half) : 0;
+    // CENTROID-KALIBRERING (mätt 2026-08-23, 60 s syntetisk låt 128 BPM):
+    //   magnitudviktad (gamla) p10/p50/p90 = 0.194 / 0.254 / 0.343
+    //   effektviktad rå                    = 0.025 / 0.044 / 0.115  ← halva spannet, allt lägre
+    // Effektvikten kvadrerar ungefär tyngdpunkten, så sqrt(1.47·c) återställer
+    // värdemängden: 0.192 / 0.254 / 0.411. Kostar 1 sqrt/hop i stället för 240 —
+    // och `centSmooth > centSlow + 0.06` samt effektlagrets färgtemperatur läser
+    // samma skala som förut.
+    const centroid = powSum > 1e-12 ? Math.min(1, Math.sqrt(1.47 * (powW / powSum) / half)) : 0;
     const fluxNorm = Math.min(1, flux * 0.005);
 
 
@@ -998,8 +1011,9 @@ export class Analyser {
     }
 
     // LÅTMINNET får samma magnitud (ingen extra FFT). Anropas före swap:en nedan,
-    // så bufferten faktiskt innehåller DENNA frames spektrum.
-    this.specSink?.(this.magBig, this.cfg.audio.rate / this.bufferBig.length);
+    // så bufferten faktiskt innehåller DENNA frames spektrum. Skickas som subarray
+    // upp till magBigMax — svansen räknas inte, så ingen läsare kan tyst få nollor.
+    this.specSink?.(this.magBig.subarray(0, this.magBigMax), this.cfg.audio.rate / this.bufferBig.length);
     const gated = rms > this.cfg.detection.noiseFloor * 1.5;
 
     for (let b = 0; b < 8; b++) {
