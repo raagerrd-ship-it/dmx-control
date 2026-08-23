@@ -257,8 +257,6 @@ export class Analyser {
   private profBeat = 0.5;
   private lvlVU = 0;      // ~130ms hop-takt-smooth av levelRaw → VU-taket (låg jitter)
   private engSmooth = 0;
-  private midSmooth = 0;
-  private trbSmooth = 0;
   private centSmooth = 0.5;
 
   /** Called when the input routing changes — the old gain is meaningless for
