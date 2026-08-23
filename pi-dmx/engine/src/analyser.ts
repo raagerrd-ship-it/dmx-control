@@ -104,6 +104,11 @@ export class Analyser {
   private prevMagBig!: Float32Array;    // för per-band flux
   private magBig!: Float32Array;        // scratch magnitud
   private magBigMax = 0;                // högsta bin någon läser (band 8-taket)
+  /** Cachade vyer (0..magBigMax) till specSink — subarray() per stor-FFT vore 125
+   *  alloc/s. Vyerna växlas tillsammans med buffertarna, annars pekar de fel
+   *  varannan frame. */
+  private magBigView!: Float32Array;
+  private prevMagBigView!: Float32Array;
 
   private specBig!: number[];           // scratch complex (fft.js createComplexArray)
   private static readonly BAND_HZ = [20, 60, 120, 250, 500, 2000, 5000, 10000, 16000];
