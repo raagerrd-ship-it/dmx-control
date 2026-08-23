@@ -492,8 +492,6 @@ export class Analyser {
       if (ratio >= 0.9 && ratio <= 1.11) {
         this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);   // samma takt → glid
         this.octaveVote *= 0.5;
-        this.newSongVote *= 0.5;                                                    // ense igen → glöm oenigheten
-        if (this.newSongVote < 1) this.challengerBpm = 0;                           // ...och glöm utmanaren
         if (this.bpmStable < 100000) this.bpmStable++;                              // stabil tid ackumuleras
       } else if (!committed && ratio > 1.4) {
         this.octaveVote = Math.max(0, this.octaveVote) + 1;                          // estimaten HÖGRE oktav
@@ -503,42 +501,54 @@ export class Analyser {
         if (this.octaveVote <= -8) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
       } else {
         this.octaveVote *= 0.7;                                                      // mellanting (3/2) / committad off-oktav → brus
-        // LÅTBYTE UTAN TYSTNADSLUCKA: låset ovan nollställs annars BARA av 350 ms
-        // tystnad — men crossfade/DJ-set/gapless spelning har ingen. Då satt
-        // localBpm fast på första låtens tempo resten av kvällen och hela
-        // takt-gridet var fel. Skillnaden mot ett breakdown är inte hur MYCKET
-        // estimaten är oense utan hur LÄNGE: ett breakdown är oense några sekunder,
-        // en ny låt för alltid. ~25s ihållande oenighet (100 estimat @4Hz) = ny låt
-        // → släpp låset och lås om.
-        // MÄTT: 6s var för kort — på riktig musik halverades BPM 145→73→144 mitt
-        // i en låt när ett breakdown hann nå tröskeln. En låt är 3–5 min, så 25s
-        // ryms lätt inom ett låtbyte men ingen sektion håller i sig så länge.
-        // Värsta fall efter ett låtbyte: 25s fel takt. Mot hela kvällen fel.
-        // DOMINANS-GRIND (möjlig först med det ackumulerade tempogrammet): 25 s var
-        // en ren tidsspärr eftersom vi förr bara hade toppen att gå på. Nu kan vi
-        // fråga HUR MYCKET bättre den nya toppen är än den låsta laggen. Ett
-        // breakdown gör den låsta laggen svagare men ger ingen dominant rival —
-        // en ny låt gör det. Dominant rival ⇒ lås om på ~6 s i st.f. 25.
+      }
+
+      // ── LÅTBYTE UTAN TYSTNADSLUCKA ────────────────────────────────────────────
+      // Låset ovan nollställs annars BARA av 350 ms tystnad — men crossfade, DJ-set
+      // och gapless spelning har ingen. Då satt localBpm fast på första låtens tempo
+      // resten av kvällen och hela takt-gridet var fel.
+      //
+      // Beslutet ligger UTANFÖR median-grenarna och mäts på RÅestimatet. MÄTT
+      // 2026-08-23 på crossfade 128→146: tempogrammet pekade om inom ~0,4 s, men
+      // 5 s-medianen låg kvar innanför ±11 % i sex sekunder — alltså tog "samma
+      // takt"-grenen hand om rutan och rösträkningen startade inte ens förrän 26,9 s.
+      // Omlåsning skedde 28,4 s (8,4 s efter bytet). Med rå bedömning startar
+      // beviset direkt vid bytet; medianen får fortsätta sköta glid och oktav.
+      //
+      // TRE VILLKOR måste hålla SAMTIDIGT, annars vädras beviset ut (×0.7):
+      //   1. RÅ OENIGHET   estimatet ligger >11 % från låset (samma band som glidet).
+      //   2. SAMMA UTMANARE varje estimat inom 4 % glider in i challengerBpm; allt
+      //      annat nollställer. Brus är oense men pekar ingenstans — det ska inte
+      //      kunna ackumulera fram ett låtbyte (MÄTT: brusigt rum tappade takten helt
+      //      när räkningen inte krävde en sammanhållen utmanare).
+      //   3. DOMINANS       hur mycket bättre är utmanarens lag än den låstas i det
+      //      ackumulerade tempogrammet? Ett breakdown gör låset svagare men ger ingen
+      //      dominant rival — en ny låt gör det.
+      // Rösterna räknas i TID, inte i anrop: stride växlar 100→20 Hz med låset.
+      const committedNow = this.bpmStable >= 60;
+      const rawOff = Math.abs(bpm / this.localBpm - 1) > 0.11;
+      const sameChallenger = this.challengerBpm > 0 && Math.abs(bpm / this.challengerBpm - 1) <= 0.04;
+      if (!committedNow || !rawOff) {
+        this.newSongVote *= 0.7;
+        if (this.newSongVote < 0.5) { this.newSongVote = 0; this.challengerBpm = 0; }
+      } else if (!sameChallenger) {
+        this.challengerBpm = bpm;                 // ny riktning → beviset börjar om
+        this.newSongVote = 0;
+        this.lastSongVoteMs = voteNow;
+      } else {
+        this.challengerBpm += (bpm - this.challengerBpm) * 0.2;
         const lockLag = Math.round((HZ * 60) / this.localBpm);
         const rival = lockLag >= lagMin && lockLag <= lagMax
           ? bestVal / Math.max(1e-9, tg[lockLag]) : 1;
-        // TVÅ DOMINANSSTEG: en ÖVERLÄGSEN rival (>2.5×) är inte ett breakdown — då är
-        // den låsta laggen i praktiken borta ur tempogrammet. Lås om på ~2 s.
-        const need = rival > 2.5 ? 8 : rival > 1.6 ? 24 : 100;
-        // UTMANAREN MÅSTE VARA SAMMA HELA VÄGEN. Rösterna räknades förr oavsett VAD
-        // estimaten pekade på, så brus som bara var oense (olika tempo varje ruta)
-        // kunde ackumulera fram ett låtbyte — och omlåsningen tog sedan medianen,
-        // som fortfarande var halvfull av förra låtens tempo. Nu spåras en utmanare:
-        // varje estimat inom 4 % glider in i den, allt annat nollställer beviset.
-        if (this.challengerBpm === 0 || Math.abs(bpm / this.challengerBpm - 1) > 0.04) {
-          this.challengerBpm = bpm;
-          this.newSongVote = 0;
-        } else {
-          this.challengerBpm += (bpm - this.challengerBpm) * 0.2;
-        }
-        if (committed && ++this.newSongVote >= need) {
-          // Lås på UTMANAREN, inte medianen, och kasta historiken: ett blandat
-          // medianfönster (halva förra låten) kostade flera sekunder till rätt takt.
+        // Dominant rival ⇒ 1,5 s bevis. Svag ⇒ 25 s, som förr: MÄTT tidigare att 6 s
+        // halverade BPM 145→73→144 mitt i en låt när ett breakdown nådde tröskeln.
+        const needMs = rival > 2.5 ? 1500 : rival > 1.6 ? 4000 : 25000;
+        const dtVote = this.lastSongVoteMs > 0 ? Math.min(200, voteNow - this.lastSongVoteMs) : 0;
+        this.lastSongVoteMs = voteNow;
+        this.newSongVote += dtVote;
+        if (this.newSongVote >= needMs) {
+          // Lås på UTMANAREN, inte medianen, och kasta historiken: ett medianfönster
+          // halvfullt av förra låtens tempo kostade flera sekunder till rätt takt.
           this.localBpm = Math.round(this.challengerBpm);
           this.bpmHistLen = 0; this.bpmHistPos = 0; this.lastVoteMs = 0;
           this.challengerBpm = 0;
