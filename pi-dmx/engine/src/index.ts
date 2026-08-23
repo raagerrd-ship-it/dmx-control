@@ -28,6 +28,7 @@ import { IntensityKnob } from "./intensityKnob.js";
 import { KnobRing } from "./knobRing.js";
 import { BleClient, type BleScanDevice, type BleCal } from "./bleClient.js";
 import { applyIntensity } from "./moods.js";
+import { MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { SongMemory } from "./songMemory.js";
 
 import { activeSlots, fixtureRoles, type Mode } from "./config.js";
