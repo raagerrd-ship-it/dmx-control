@@ -794,7 +794,7 @@ export class Analyser {
 
     // Auto-gain (slow: seconds-to-minute timescales)
     const now = this.perfNow();
-    const dt = Math.min(0.1, (now - this.lastT) / 1000);
+    const dt = this.lastT === 0 ? 0 : Math.max(0, Math.min(0.1, (now - this.lastT) / 1000));
     this.lastT = now;
     const d = this.cfg.detection;
     // AGC körs BARA för mic (aux låser gain på 1× — line-level är hett & stabilt).
