@@ -697,7 +697,9 @@ export class Analyser {
     for (let i = 0; i < hop; i++) { const v = this.buffer[i]; ss -= v * v; }
     this.buffer.copyWithin(0, hop);
     this.buffer.set(samples, this.buffer.length - hop);
-    for (let i = 0; i < hop; i++) { const v = samples[i]; ss += v * v; }
+    // Läs den INKOMMANDE hopen ur this.buffer (efter set), inte ur `samples`: annars
+    // adderas float64-tal och subtraheras float32-tal → systematisk drift, inte brus.
+    for (let i = this.buffer.length - hop; i < this.buffer.length; i++) { const v = this.buffer[i]; ss += v * v; }
     if (++this.rmsRecalc >= 400 || ss < 0) {
       this.rmsRecalc = 0; ss = 0;
       for (let i = 0; i < this.buffer.length; i++) { const v = this.buffer[i]; ss += v * v; }
