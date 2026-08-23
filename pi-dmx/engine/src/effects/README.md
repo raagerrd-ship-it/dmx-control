@@ -67,7 +67,7 @@ export const wave: EffectDef = {
   render: (c) => {
     const base = 0.55 + 0.45 * Math.sin(c.wavePhase - c.idx * 1.3 * c.phaseSpread);
     const hue  = c.mixedSector(c.idx + Math.floor(c.wavePhase * 0.4)) / 6;
-    return c.hsv(hue, 1, c.shaped(0.12, base * (0.35 + c.audio * 0.7) + c.frame.treble * 0.35));
+    return c.hsv(hue, 1, c.shaped(0.12, base * (0.35 + c.audio * 0.7) + c.spec.treble * 0.35));
   },
 };
 ```
@@ -97,8 +97,8 @@ Built once per frame and reused; `idx` / `fx` / `band` change per lamp.
 | `c.frame.level` | 0..1 | **Raw** input level (what the input meter shows). |
 | `c.audio` | 0..1 | Level normalised/clipped against the AGC target (hot-driven; saturates near loud). Use for "brightness follows loudness". |
 | `c.frame.energy` | 0..1 | Bass band energy |
-| `c.frame.mid` | 0..1 | Mid band (vocals/synth/snare) |
-| `c.frame.treble` | 0..1 | Treble band (hi-hats/cymbals) |
+| `c.spec.mid` | 0..1 | Mid band (vocals/synth/snare) — from the 2048 octave bands |
+| `c.spec.treble` | 0..1 | Treble band (hi-hats/cymbals) — from the 2048 octave bands |
 | `c.frame.centroid` | 0..1 | Spectral centroid: 0 = dark/bassy, 1 = bright/airy |
 | `c.frame.flux` | ≥0 | Spectral flux (onset strength) |
 | `c.kickEnv` | 0..1 | Kick / beat envelope (decays after each kick; falls back to the BPM grid) |
