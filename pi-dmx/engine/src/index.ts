@@ -28,6 +28,7 @@ import { IntensityKnob } from "./intensityKnob.js";
 import { KnobRing } from "./knobRing.js";
 import { BleClient, type BleScanDevice, type BleCal } from "./bleClient.js";
 import { applyIntensity } from "./moods.js";
+import { MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { SongMemory } from "./songMemory.js";
 
 import { activeSlots, fixtureRoles, type Mode } from "./config.js";
@@ -204,6 +205,13 @@ let lastLiveDrop = 0;        // senast sedda drop-räknare FRÅN analysatorn
 let lastBoundary = 0;        // senast sedda låtgräns-räknare (dynamikens omkalibrering)
 let outDrop = 0;             // drop-räknaren effekterna ser (live eller replay)
 let memoryBeatLocked = false;// taktklockan är låst ur låtminnet
+// COAST: konfidensen dippar i breakdowns/brus men TEMPOT är oftast fortfarande rätt.
+// Släpper vi gridet direkt hoppar effekterna till kick-drift och glider tillbaka när
+// takten kommer igen. Vi håller därför gridet fri-rullande en stund innan vi ger upp.
+const GRID_ON_CONF = 0.35;   // tydlig takt igen → coast avbryts
+const GRID_COAST_MS = 4000;  // så länge håller vi gridet på svag konfidens
+let gridWeakSince = 0;       // ms-tidpunkt då konfidensen föll under grinden (0 = stark)
+let gridCoasting = false;
 const slotsFor = () => Math.max(activeSlots(cfg.fixtures), cfg.fog?.enabled ? cfg.fog.address : 0);
 let curSlots = slotsFor();
 
@@ -394,6 +402,27 @@ capture.on("chunk", (samples: Float32Array) => {
     if (frame.barShift > 0 && cfg.beat && !memoryBeatLocked) {
       cfg.beat.anchorMs += frame.barShift * (60000 / cfg.beat.bpm);
       analyser.resetBar();
+    }
+    // LEVANDE KONFIDENS + COAST. Tidigare skrevs confidence bara vid (om)låsning →
+    // grinden nedströms stod och tittade på ett gammalt värde. Nu uppdateras den varje
+    // ruta, men med hysteres: faller takt-tydligheten (eller taktfasen aldrig blir
+    // säker) håller vi gridet fri-rullande i GRID_COAST_MS — fasen är kvar, så inget
+    // glider när takten kommer tillbaka. Håller svagheten i sig är det en riktig
+    // låt-/tempoändring: släpp gridet OCH nolla tempohistoriken så nästa lås tas på
+    // ~0,5 s i stället för att medianen släpar med gammalt tempo.
+    if (cfg.beat) {
+      const liveConf = memoryBeatLocked ? 1 : (frame.bpmConfidence ?? 0);
+      const nowMs = Date.now();
+      if (liveConf >= GRID_ON_CONF) { gridWeakSince = 0; gridCoasting = false; }
+      else if (liveConf < MIN_BEAT_CONFIDENCE) {
+        if (gridWeakSince === 0) { gridWeakSince = nowMs; gridCoasting = true; }
+        else if (nowMs - gridWeakSince >= GRID_COAST_MS) {
+          gridCoasting = false;
+          gridWeakSince = nowMs;                 // fönstret startar om → ingen spam
+          if (!memoryBeatLocked) { analyser.resetTempo(); clockDetBpm = 0; }
+        }
+      }
+      cfg.beat.confidence = gridCoasting ? Math.max(liveConf, MIN_BEAT_CONFIDENCE) : liveConf;
     }
   }
   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
