@@ -791,6 +791,7 @@ export class Analyser {
     }
     // #2 Förfina förra kickens fas: nu har vi y(-1)=kfPrev2, y(0)=kfPrev, y(+1)=kickFlux
     // runt kick-hopet. Parabelns topp ger sub-hop-offset δ ∈ [-0.5,0.5] hop.
+    let kickAtMs = 0;
     if (this.pendingKickMs > 0) {
       const ym1 = this.kfPrev2, y0 = this.kfPrev, yp1 = kickFlux;
       const denom = ym1 - 2 * y0 + yp1;
@@ -801,8 +802,27 @@ export class Analyser {
         this.beatAnchorMs = this.pendingKickMs + delta * hopMs;
       }
       this.pendingKickMs = 0;
+      // Slaget är färdigmätt → lämna över dess EXAKTA tid till PLL:en.
+      kickAtMs = this.beatAnchorMs;
+      // TAKTFAS: bokför slagets tyngd på sin plats i fyrtakten.
+      const g = this.cfg.beat;
+      if (g && g.bpm > 40 && this.localBpmConfidence > 0.5) {
+        const bMs = 60000 / g.bpm;
+        const slot = ((Math.round((kickAtMs - g.anchorMs) / bMs) % 4) + 4) % 4;
+        this.barAcc[slot] += 0.5 + Math.min(1, this.engSmooth * 1.4) * 0.5;
+        for (let i = 0; i < 4; i++) this.barAcc[i] *= 0.997;   // ~4 takters glömska
+      }
     }
     if (kick) { this.beatAnchorMs = this.wallNow(); this.pendingKickMs = this.beatAnchorMs; }
+    // Vinnande plats = ettan, men bara med TYDLIG marginal (35 %) och nog med bevis
+    // (~16 slag). Annars -1: bättre ingen taktfas än en som sitter en åtta bort.
+    let barShift = -1;
+    {
+      let bi = 0, best = this.barAcc[0], second = -1;
+      for (let i = 1; i < 4; i++) if (this.barAcc[i] > best) { second = best; best = this.barAcc[i]; bi = i; }
+      for (let i = 0; i < 4; i++) if (i !== bi && this.barAcc[i] > second) second = this.barAcc[i];
+      if (best > 8 && best > second * 1.35) barShift = bi;
+    }
     this.kfPrev2 = this.kfPrev;
     this.kfPrev = kickFlux;
 
