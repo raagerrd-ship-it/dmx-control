@@ -441,13 +441,13 @@ export class Analyser {
     }
 
     // Parabolisk interpolation kring toppen → sub-lag-precision (t.ex. 125 ist. 122).
-    // MÅSTE läsa SAMMA yta som toppen valdes ur: tempoGram (comb + pulse + prior,
-    // EMA-ackumulerad). Förut lästes acScratch = helbandets råa autokorrelation, en
-    // helt annan kurva — och efter off-beat-dubblingen (bestLag = P) ännu mer, vilket
-    // gav en systematisk BPM-avvikelse i just de fallen.
+    // Läser acScratch (råa autokorrelationen), INTE tempoGram: PROVAT (2026-08-23)
+    // att interpolera på samma yta toppen valdes ur, men tempogrammets prior-vikt är
+    // en lutning över lag och drog vertexen mot 120 BPM (128→127, 150→149, taktfas
+    // 128→129). Råkurvan är symmetrisk kring toppen och landar exakt.
     let lagF = bestLag;
     if (bestLag - 1 >= lagMin && bestLag + 1 <= lagMax) {
-      const yl = tg[bestLag - 1], y0 = tg[bestLag], yr = tg[bestLag + 1];
+      const yl = this.acScratch[bestLag - 1], y0 = this.acScratch[bestLag], yr = this.acScratch[bestLag + 1];
       const den = yl - 2 * y0 + yr;
       if (den < 0) { const d = 0.5 * (yl - yr) / den; if (Math.abs(d) < 1) lagF = bestLag + d; }
     }
