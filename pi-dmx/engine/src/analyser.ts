@@ -1171,7 +1171,7 @@ export class Analyser {
     // Mutera det återanvända Frame:t (spec/onset pekar redan på outSpec/outOnset).
     const f = this.outFrame;
     f.level = this.lvlSmooth; f.levelRaw = level; f.levelVU = this.lvlVU;
-    f.energy = this.engSmooth; f.mid = this.midSmooth; f.treble = this.trbSmooth;
+    f.energy = this.engSmooth;
     f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
     f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.intensity = intensity; f.beatAnchorMs = this.beatAnchorMs;
     f.dropCount = this.dropCount; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
