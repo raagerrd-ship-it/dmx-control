@@ -719,8 +719,6 @@ export class Analyser {
     // Gain-compensated like `level` — otherwise the band-driven fixtures and
     // the kick energy gate die at low volume while the AGC keeps level alive.
     const energy = Math.min(1, (bassEnergy / bassBins) * 0.02 * this.gain);
-    const mid = Math.min(1, (midEnergy / Math.max(1, trebleStart - bassBins)) * 0.025 * this.gain);
-    const treble = Math.min(1, (trebleEnergy / Math.max(1, trebleEnd - trebleStart)) * 0.04 * this.gain);
     const centroid = magSum > 1e-6 ? Math.min(1, (magW / magSum) / half) : 0;
     const fluxNorm = Math.min(1, flux * 0.005);
 
