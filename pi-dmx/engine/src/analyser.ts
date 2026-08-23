@@ -801,11 +801,17 @@ export class Analyser {
     // VIKTIGT: referensen ar cfg.beat.anchorMs (PLL:ens stabila fas), INTE
     // this.beatAnchorMs - den senare sätts av varje detekterad kick och vore
     // cirkulär: en falsk kick skulle flytta gridet den doms mot.
+    //
+    // TIDSBAS: anchorMs är VÄGGKLOCKA (PLL:en mäter mot frame.kickAtMs = wallNow()).
+    // Här användes `now` = perfNow() (ms sedan processtart) — 1,7·10¹² ms fel, vilket
+    // efter `% gridMs` blev en konstant men helt godtycklig fasförskjutning: grinden
+    // släppte igenom transienter i fel fas och kastade äkta kickar.
     const grid = this.cfg.beat;
     if (above && grid && grid.bpm > 40 && this.localBpmConfidence > 0.5) {
       const beatMs = 60000 / grid.bpm;
       const gridMs = beatMs / 2;                    // attondelar: four-on-the-floor + upptakter
-      let offset = ((now - grid.anchorMs) % gridMs + gridMs) % gridMs;
+      const offset = ((this.wallNow() - grid.anchorMs) % gridMs + gridMs) % gridMs;
+
       const distToGrid = Math.min(offset, gridMs - offset);
       const tolerance = Math.max(30, beatMs * 0.15);   // ~+-40 ms vid 150 BPM
       if (distToGrid > tolerance) above = false;    // skarp transient, men felplacerad
