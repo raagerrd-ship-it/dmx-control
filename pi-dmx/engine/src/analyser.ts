@@ -447,7 +447,7 @@ export class Analyser {
     // gav en systematisk BPM-avvikelse i just de fallen.
     let lagF = bestLag;
     if (bestLag - 1 >= lagMin && bestLag + 1 <= lagMax) {
-      const yl = tg[bestLag - 1], y0 = tg[bestLag], yr = tg[bestLag + 1];
+      const yl = this.acScratch[bestLag - 1], y0 = this.acScratch[bestLag], yr = this.acScratch[bestLag + 1];
       const den = yl - 2 * y0 + yr;
       if (den < 0) { const d = 0.5 * (yl - yr) / den; if (Math.abs(d) < 1) lagF = bestLag + d; }
     }
