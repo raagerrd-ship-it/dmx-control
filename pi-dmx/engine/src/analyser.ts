@@ -616,6 +616,7 @@ export class Analyser {
       level: 0, levelRaw: 0, levelVU: 0, energy: 0, mid: 0, treble: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
       dropCount: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
+      kickAtMs: 0, barShift: -1,
       spec: this.outSpec, onset: this.outOnset, drum: this.outDrum,
     };
   }
