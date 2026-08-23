@@ -11,6 +11,7 @@ BLEDOM HCI-stuck recovery is process.exit via systemd. Never add same-process re
 
 ## Memories
 - [Crossfade-omlåsning](mem://pi/audio/crossfade-relock) — låtbyte utan tystnad: råestimat + sammanhållen utmanare + dominans + frisk takt, bevis i ms
+- [DC & interpolation förkastat](mem://pi/audio/dc-och-interpolation-forkastat) — bin 0 kvar, ingen mean-borttagning, RMS utan varians, parabol på acScratch
 - [Beat-lås timing](mem://pi/audio/beat-lock-timing) — kickAtMs till PLL, taktfas/ettan, tidsbaserad konfidens, omlåsning vid låtgräns
 - [Klangskifte bär låtgränsen](mem://pi/lighting/klangskifte-bar-latgransen) — facitmätt: nivådipp/tempo döda vid Spotify-crossfade; novelty mot 8 s bakåt, tröskel 0.68, backdaterad 4 s
 - [Karantän bara efter bekräftad match](mem://pi/lighting/karantan-bara-efter-bekraftad-match) — falsk match avbryter sin egen inlärningskarantän; bannedIds efter >3 falskmatchningar
