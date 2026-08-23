@@ -579,7 +579,7 @@ export class Analyser {
       }
     }
     // Smooth confidence (undvik hoppig UI); attack snabbt, release långsamt.
-    // TIDSBASERAD alpha: computeBpm() körs 100 Hz olåst men 20 Hz låst (adaptiv
+    // TIDSBASERAD alpha: computeBpm() körs 100 Hz olåst men 4 Hz låst (adaptiv
     // stride). Med fasta 0.35/0.08 rörde konfidensen sig 5× olika snabbt beroende
     // på läge — och den grindar kick-gridet (>0.5), PLL-frekvenstermen (>0.4) och
     // hjärtslagets djup. Tidskonstanterna (25 ms upp, 120 ms ner) är valda så att
@@ -1080,7 +1080,7 @@ export class Analyser {
     this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / 0.12);
     this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * 0.015 * this.bodyCeil);
 
-    // BAS-FRÅNVARO med VARAKTIGHETSKRAV: under 30 % av taket i ≥3 s i sträck.
+    // BAS-FRÅNVARO med VARAKTIGHETSKRAV: under 40 % av taket i ≥2 s i sträck.
     if (this.bodyEnv < this.bodyCeil * 0.40) {
       this.bodyGoneMs += dtHop * 1000;
       if (this.bodyGoneMs >= 2000) this.lastBodyGoneMs = nowWallA;
@@ -1218,6 +1218,14 @@ export class Analyser {
     return f;
   }
 }
+
+/** Asymmetrisk EMA (snabb attack, långsam release) — modulnivå så tick-vägen
+ *  inte allokerar en closure per hop. */
+function ema(prev: number, x: number, aUp: number, aDown: number): number {
+  return prev + (x - prev) * (x > prev ? aUp : aDown);
+}
+
+function cl01(x: number): number { return x < 0 ? 0 : x > 1 ? 1 : x; }
 
 function hannWindow(n: number): Float32Array {
   const w = new Float32Array(n);
