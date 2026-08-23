@@ -242,7 +242,10 @@ capture.on("chunk", (samples: Float32Array) => {
   if (lnNow) { if (!recorder.active) recorder.start(); recorder.write(samples); }
   // LÅTGRÄNS → mjuk omkalibrering av den löpande dynamiken (auto-rangen får
   // krypa in på nya låtens nivåer inom sekunder i stället för en minut).
-  if (songs.boundaryCount !== lastBoundary) { lastBoundary = songs.boundaryCount; effects.softenRange(); }
+  // Samma sak för TEMPOT: medianfönstret (~5 s) och tempogrammet tillhör förra
+  // låten. Att rösta vidare på dem kostade upp till 6 s omlåsning fastän minnet
+  // just SLAGIT FAST att en ny låt börjat. Nollställt lås tar första estimatet direkt.
+  if (songs.boundaryCount !== lastBoundary) { lastBoundary = songs.boundaryCount; effects.softenRange(); analyser.resetTempo(); }
 
 
   if (songs.recognized) {
