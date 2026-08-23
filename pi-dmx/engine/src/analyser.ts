@@ -25,8 +25,10 @@ export interface Frame {
   levelVU: number;      // 0..1, ~130ms symmetriskt smoothat PÅ HOP-TAKT (375Hz) — för VU-taket
                         //  (ser alla hops → mycket mindre brus än att smootha rå på 50Hz)
   energy: number;       // 0..1, bass-band spectral energy (~0–1.5 kHz)
-  mid: number;          // 0..1, mid-band spectral energy (~1.5–12 kHz: röst/synth/virvel)
-  treble: number;       // 0..1, high-band spectral energy (hats/cymbals/vocals top)
+                        // mid/treble på 512-FFT:n är BORTA: ingen effekt läste dem — effektlagret
+                        // använder spec.mid/spec.treble ur 2048-FFT:ns oktavband, som är bättre
+                        // upplösta. Två EMA + två bandsummor per hop gick åt till ingenting.
+
   centroid: number;     // 0..1, spektralt tyngdpunkt: mörk/bastung → 0, ljus/diskant → 1
   flux: number;         // 0..1, bass-band spectral flux
   kick: boolean;        // true on rising edge only
@@ -255,8 +257,6 @@ export class Analyser {
   private profBeat = 0.5;
   private lvlVU = 0;      // ~130ms hop-takt-smooth av levelRaw → VU-taket (låg jitter)
   private engSmooth = 0;
-  private midSmooth = 0;
-  private trbSmooth = 0;
   private centSmooth = 0.5;
 
   /** Called when the input routing changes — the old gain is meaningless for
@@ -431,13 +431,16 @@ export class Analyser {
     }
 
     // Parabolisk interpolation kring toppen → sub-lag-precision (t.ex. 125 ist. 122).
+    // Tar värdena UR ac[] i stället för att räkna om tre autokorrelationer per anrop
+    // (tre O(N)-loopar, ~1200 mult). ac[] är dessutom LENGTH-NORMALISERAD, så
+    // parabelns vertex mäts på samma skala som toppvalet gjordes på.
     let lagF = bestLag;
     if (bestLag > lagMin && bestLag + 1 <= lagMax) {
-      const acAt = (L: number) => { let s = 0; for (let i = 0; i + L < N; i++) s += env[i] * env[i + L]; return s; };
-      const yl = acAt(bestLag - 1), y0 = acAt(bestLag), yr = acAt(bestLag + 1);
+      const yl = this.acScratch[bestLag - 1], y0 = this.acScratch[bestLag], yr = this.acScratch[bestLag + 1];
       const den = yl - 2 * y0 + yr;
       if (den < 0) { const d = 0.5 * (yl - yr) / den; if (Math.abs(d) < 1) lagF = bestLag + d; }
     }
+
     let bpm = (HZ * 60) / lagF;
     // BPM-FILTER: vik in i 80..160 — festmusik ligger dar, och allt utanfor ar
     // en oktav-artefakt (en 76-BPM-last ar i praktiken 152, en 170 ar 85).
@@ -656,7 +659,7 @@ export class Analyser {
     this.aProf = 1 - Math.exp(-dtHop / 8.0);
     // Ett återanvänt Frame (spec/onset pekar på de pre-allokerade objekten).
     this.outFrame = {
-      level: 0, levelRaw: 0, levelVU: 0, energy: 0, mid: 0, treble: 0, centroid: 0, flux: 0,
+      level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
       dropCount: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
       kickAtMs: 0, barShift: -1,
@@ -686,17 +689,13 @@ export class Analyser {
     const half = this.cfg.fft.size / 2;
     const mag = this.mag512;
     let bassEnergy = 0;
-    let midEnergy = 0;
-    let trebleEnergy = 0;
     let flux = 0;
     let kickFlux = 0;                               // onset ENBART i kick-bandet (sub-bas)
     let magSum = 0, magW = 0;                       // för spektralt centroid
     const binHz = this.cfg.audio.rate / this.cfg.fft.size;          // ~93.75 Hz @ 48k/512
     const bassBins = Math.min(16, half);                            // ~0–1.5 kHz
     const kickBins = Math.min(3, half);                            // bins 0–2 ≈ 0–280 Hz (kick-trumman)
-    // Diskant = hi-hats/cymbaler ~5–13 kHz (INTE 12 kHz+ där det är tomt).
-    const trebleStart = Math.min(half - 1, Math.round(5000 / binHz));   // ~5 kHz
-    const trebleEnd = Math.min(half, Math.round(13000 / binHz));        // ~13 kHz
+
     for (let i = 0; i < half; i++) {
       const re = spectrum[2 * i];
       const im = spectrum[2 * i + 1];
@@ -705,20 +704,15 @@ export class Analyser {
         bassEnergy += mag[i];
         const d = mag[i] - this.prevMag[i];
         if (d > 0) { flux += d; if (i < kickBins) kickFlux += d; }    // half-wave rectified
-      } else if (i < trebleStart) {
-        midEnergy += mag[i];                         // mellanband (~1.5–5 kHz: röst/synth/virvel)
-      } else if (i < trebleEnd) {
-        trebleEnergy += mag[i];                      // diskant (~5–13 kHz: hi-hats/cymbaler)
       }
       magSum += mag[i]; magW += i * mag[i];          // centroid = viktad medelfrekvens
     }
+
     // Swap: denna hops magnitud blir nästa hops prevMag (zero-copy, ingen alloc).
     { const t = this.prevMag; this.prevMag = this.mag512; this.mag512 = t; }
     // Gain-compensated like `level` — otherwise the band-driven fixtures and
     // the kick energy gate die at low volume while the AGC keeps level alive.
     const energy = Math.min(1, (bassEnergy / bassBins) * 0.02 * this.gain);
-    const mid = Math.min(1, (midEnergy / Math.max(1, trebleStart - bassBins)) * 0.025 * this.gain);
-    const treble = Math.min(1, (trebleEnergy / Math.max(1, trebleEnd - trebleStart)) * 0.04 * this.gain);
     const centroid = magSum > 1e-6 ? Math.min(1, (magW / magSum) / half) : 0;
     const fluxNorm = Math.min(1, flux * 0.005);
 
@@ -837,6 +831,8 @@ export class Analyser {
     // #2 Förfina förra kickens fas: nu har vi y(-1)=kfPrev2, y(0)=kfPrev, y(+1)=kickFlux
     // runt kick-hopet. Parabelns topp ger sub-hop-offset δ ∈ [-0.5,0.5] hop.
     let kickAtMs = 0;
+    let barShift = -1;
+
     if (this.pendingKickMs > 0) {
       const ym1 = this.kfPrev2, y0 = this.kfPrev, yp1 = kickFlux;
       const denom = ym1 - 2 * y0 + yp1;
@@ -861,6 +857,16 @@ export class Analyser {
         this.barAcc[slot] += this.pendingKickW * this.pendingKickW;
         if (this.barCount < 1000) this.barCount++;
         for (let i = 0; i < 4; i++) this.barAcc[i] *= 0.997;   // ~4 takters glömska
+        // VINNANDE PLATS räknas ut HÄR, inte varje hop: barAcc ändras bara när ett
+        // slag bokförs, så mellanliggande hops gav exakt samma svar. Vinsten är
+        // dessutom att förslaget kommer högst en gång per slag i stället för i varje
+        // ruta fram till att motorn hunnit flytta ankaret.
+        // Kravet: TYDLIG marginal (35 %) och nog med bevis (~16 slag). Annars -1 —
+        // bättre ingen taktfas än en som sitter en åtta bort.
+        let bi = 0, best = this.barAcc[0], second = -1;
+        for (let i = 1; i < 4; i++) if (this.barAcc[i] > best) { second = best; best = this.barAcc[i]; bi = i; }
+        for (let i = 0; i < 4; i++) if (i !== bi && this.barAcc[i] > second) second = this.barAcc[i];
+        if (this.barCount >= 16 && best > second * 1.35) barShift = bi;
       }
     }
     if (kick) {
@@ -868,15 +874,7 @@ export class Analyser {
       this.pendingKickMs = this.beatAnchorMs;
       this.pendingKickW = kickFlux;   // absolut anslagsstyrka (kvot mot tröskeln mättade)
     }
-    // Vinnande plats = ettan, men bara med TYDLIG marginal (35 %) och nog med bevis
-    // (~16 slag). Annars -1: bättre ingen taktfas än en som sitter en åtta bort.
-    let barShift = -1;
-    {
-      let bi = 0, best = this.barAcc[0], second = -1;
-      for (let i = 1; i < 4; i++) if (this.barAcc[i] > best) { second = best; best = this.barAcc[i]; bi = i; }
-      for (let i = 0; i < 4; i++) if (i !== bi && this.barAcc[i] > second) second = this.barAcc[i];
-      if (this.barCount >= 16 && best > second * 1.35) barShift = bi;
-    }
+
     this.kfPrev2 = this.kfPrev;
     this.kfPrev = kickFlux;
 
@@ -890,8 +888,6 @@ export class Analyser {
     // = ett slag var ≥300ms, så 200ms suddar aldrig ut en äkta beat — bara brus.
     this.lvlVU += (level - this.lvlVU) * this.aVU;
     this.engSmooth = smooth(this.engSmooth, energy);
-    this.midSmooth = smooth(this.midSmooth, mid);
-    this.trbSmooth = smooth(this.trbSmooth, treble);
     this.centSmooth = smooth(this.centSmooth, centroid);
 
     // SEKTIONSENERGI (0..1) — hur energiskt partiet är RELATIVT låtens eget snitt.
@@ -1169,7 +1165,7 @@ export class Analyser {
     // Mutera det återanvända Frame:t (spec/onset pekar redan på outSpec/outOnset).
     const f = this.outFrame;
     f.level = this.lvlSmooth; f.levelRaw = level; f.levelVU = this.lvlVU;
-    f.energy = this.engSmooth; f.mid = this.midSmooth; f.treble = this.trbSmooth;
+    f.energy = this.engSmooth;
     f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
     f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.intensity = intensity; f.beatAnchorMs = this.beatAnchorMs;
     f.dropCount = this.dropCount; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
