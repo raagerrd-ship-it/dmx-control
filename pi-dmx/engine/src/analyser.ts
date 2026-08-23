@@ -681,8 +681,21 @@ export class Analyser {
   process(samples: Float32Array): Frame {
     // Slide buffer left by hop, append new samples at end.
     const hop = samples.length;
+    // RMS på rå (o-fönstrad) buffert — LÖPANDE SUMMA. Bufferten glider en hop i
+    // taget, så det räcker att dra av utgående hop och lägga till den inkommande
+    // (128 ops i stället för 512 kvadrater, 375 gånger i sekunden). Full omräkning
+    // ~1×/s mot flyttalsdrift.
+    let ss = this.sumSq;
+    for (let i = 0; i < hop; i++) { const v = this.buffer[i]; ss -= v * v; }
     this.buffer.copyWithin(0, hop);
     this.buffer.set(samples, this.buffer.length - hop);
+    for (let i = 0; i < hop; i++) { const v = samples[i]; ss += v * v; }
+    if (++this.rmsRecalc >= 400 || ss < 0) {
+      this.rmsRecalc = 0; ss = 0;
+      for (let i = 0; i < this.buffer.length; i++) { const v = this.buffer[i]; ss += v * v; }
+    }
+    this.sumSq = ss;
+    const rms = Math.sqrt(ss / this.buffer.length);
 
     // Windowed FFT (pre-allokerade scratchpads → ingen alloc/hop)
     const windowed = this.windowed512;
@@ -690,32 +703,34 @@ export class Analyser {
     const spectrum = this.spectrum512;
     this.fft.realTransform(spectrum, windowed);
 
-    // RMS on raw (un-windowed) buffer — cheaper and more stable for auto-gain
-    let sumSq = 0;
-    for (let i = 0; i < this.buffer.length; i++) sumSq += this.buffer[i] * this.buffer[i];
-    const rms = Math.sqrt(sumSq / this.buffer.length);
-
     // Magnitude spectrum + bass band (mag återanvänds; swap:as med prevMag nedan)
     const half = this.cfg.fft.size / 2;
     const mag = this.mag512;
     let bassEnergy = 0;
     let flux = 0;
     let kickFlux = 0;                               // onset ENBART i kick-bandet (sub-bas)
-    let magSum = 0, magW = 0;                       // för spektralt centroid
-    const binHz = this.cfg.audio.rate / this.cfg.fft.size;          // ~93.75 Hz @ 48k/512
+    let powSum = 0, powW = 0;                       // för spektralt centroid (EFFEKT-viktat)
     const bassBins = Math.min(16, half);                            // ~0–1.5 kHz
-    const kickBins = Math.min(3, half);                            // bins 0–2 ≈ 0–280 Hz (kick-trumman)
+    const kickBins = Math.min(3, half);                            // bins 1–2 ≈ 90–280 Hz (kick-trumman)
 
-    for (let i = 0; i < half; i++) {
+    // BIN 0 = DC och är UTESLUTEN. Ett litet DC-offset (vanligt på USB/I²S-ingångar)
+    // hamnar helt i bin 0 och pinnade både bassEnergy och kickFlux-baslinjen. Den
+    // stora FFT:n har redan Math.max(1, …) i bandLo av samma skäl.
+    // MAGNITUD (sqrt) räknas bara i basbanden — det är de enda bin som läses. Övriga
+    // 240 sqrt/hop (~90 000/s) fanns bara för centroiden, som nu viktar på EFFEKT
+    // (re²+im²) i stället: samma spektrala tyngdpunkt, ingen rot.
+    for (let i = 1; i < half; i++) {
       const re = spectrum[2 * i];
       const im = spectrum[2 * i + 1];
-      mag[i] = Math.sqrt(re * re + im * im);
+      const p = re * re + im * im;
       if (i < bassBins) {
-        bassEnergy += mag[i];
-        const d = mag[i] - this.prevMag[i];
-        if (d > 0) { flux += d; if (i < kickBins) kickFlux += d; }    // half-wave rectified
+        const m = Math.sqrt(p);
+        mag[i] = m;
+        bassEnergy += m;
+        const dd = m - this.prevMag[i];
+        if (dd > 0) { flux += dd; if (i < kickBins) kickFlux += dd; }   // half-wave rectified
       }
-      magSum += mag[i]; magW += i * mag[i];          // centroid = viktad medelfrekvens
+      powSum += p; powW += i * p;
     }
 
     // Swap: denna hops magnitud blir nästa hops prevMag (zero-copy, ingen alloc).
@@ -723,8 +738,9 @@ export class Analyser {
     // Gain-compensated like `level` — otherwise the band-driven fixtures and
     // the kick energy gate die at low volume while the AGC keeps level alive.
     const energy = Math.min(1, (bassEnergy / bassBins) * 0.02 * this.gain);
-    const centroid = magSum > 1e-6 ? Math.min(1, (magW / magSum) / half) : 0;
+    const centroid = powSum > 1e-12 ? Math.min(1, (powW / powSum) / half) : 0;
     const fluxNorm = Math.min(1, flux * 0.005);
+
 
     // Auto-gain (slow: seconds-to-minute timescales)
     const now = this.perfNow();
