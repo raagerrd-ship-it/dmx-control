@@ -150,6 +150,8 @@ export class Analyser {
   private bpmHistPos = 0;
   private bpmSortScratch = new Float64Array(Analyser.BPM_HIST);
   // Förberäknade EMA-alfor / decay-faktorer (fasta dtHop + fasta tidskonstanter).
+  private dtHop = 0; private hopMs = 0;
+
   private aAtt = 0; private aRel = 0; private aVU = 0;
   private aIUp = 0; private aIDown = 0; private aBandLvl = 0;
   private dHat = 0; private dSnare = 0; private dKick = 0;
