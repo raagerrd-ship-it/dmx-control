@@ -447,8 +447,7 @@ export class Analyser {
     // 128→129). Råkurvan är symmetrisk kring toppen och landar exakt.
     let lagF = bestLag;
     if (bestLag - 1 >= lagMin && bestLag + 1 <= lagMax) {
-      const surf = (lag: number) => (wFull * this.scoreFull[lag] + wBass * this.scoreBass[lag]) / this.priorLut[lag];
-      const yl = surf(bestLag - 1), y0 = surf(bestLag), yr = surf(bestLag + 1);
+      const yl = this.acScratch[bestLag - 1], y0 = this.acScratch[bestLag], yr = this.acScratch[bestLag + 1];
       const den = yl - 2 * y0 + yr;
       if (den < 0) { const d = 0.5 * (yl - yr) / den; if (Math.abs(d) < 1) lagF = bestLag + d; }
     }
