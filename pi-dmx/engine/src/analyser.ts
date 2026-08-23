@@ -711,8 +711,7 @@ export class Analyser {
     // medelvärdesborttagning i fönstret, som vid 512 sampel (10.7 ms) är ett högpass
     // kring 100 Hz och dämpade 58 Hz-kicken så 92/100 BPM låste på 113.
     const mean = sl / this.buffer.length;
-    const varr = ss / this.buffer.length - mean * mean;
-    const rms = Math.sqrt(varr > 0 ? varr : 0);
+    const rms = Math.sqrt(ss / this.buffer.length);
 
     // Windowed FFT (pre-allokerade scratchpads → ingen alloc/hop)
     const windowed = this.windowed512;
