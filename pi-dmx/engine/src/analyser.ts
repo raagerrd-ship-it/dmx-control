@@ -753,7 +753,14 @@ export class Analyser {
     // Gain-compensated like `level` — otherwise the band-driven fixtures and
     // the kick energy gate die at low volume while the AGC keeps level alive.
     const energy = Math.min(1, (bassEnergy / bassBins) * 0.02 * this.gain);
-    const centroid = powSum > 1e-12 ? Math.min(1, (powW / powSum) / half) : 0;
+    // CENTROID-KALIBRERING (mätt 2026-08-23, 60 s syntetisk låt 128 BPM):
+    //   magnitudviktad (gamla) p10/p50/p90 = 0.194 / 0.254 / 0.343
+    //   effektviktad rå                    = 0.025 / 0.044 / 0.115  ← halva spannet, allt lägre
+    // Effektvikten kvadrerar ungefär tyngdpunkten, så sqrt(1.47·c) återställer
+    // värdemängden: 0.192 / 0.254 / 0.411. Kostar 1 sqrt/hop i stället för 240 —
+    // och `centSmooth > centSlow + 0.06` samt effektlagrets färgtemperatur läser
+    // samma skala som förut.
+    const centroid = powSum > 1e-12 ? Math.min(1, Math.sqrt(1.47 * (powW / powSum) / half)) : 0;
     const fluxNorm = Math.min(1, flux * 0.005);
 
 
