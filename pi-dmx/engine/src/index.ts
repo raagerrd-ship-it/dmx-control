@@ -387,6 +387,14 @@ capture.on("chunk", (samples: Float32Array) => {
         }
       }
     }
+    // TAKTFAS (ettan): analysatorn har mätt vilken av fyrtaktens platser som bär
+    // tyngsta slaget. Flytta ankaret HELA taktslag så takträknaren (beatIdx) börjar
+    // på ettan — effekter som byter var fjärde takt landar då på musikens storsväng
+    // i stället för på ett godtyckligt slag. Fasen inom takten rörs INTE.
+    if (frame.barShift > 0 && cfg.beat && !memoryBeatLocked) {
+      cfg.beat.anchorMs += frame.barShift * (60000 / cfg.beat.bpm);
+      analyser.resetBar();
+    }
   }
   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
   // inga slag missas) → show-tiden får en knuff, starkare ju tyngre basen är.
