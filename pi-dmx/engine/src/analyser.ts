@@ -980,11 +980,14 @@ export class Analyser {
     const bigDt = dtHop * Analyser.BIG_EVERY;
     for (let i = 0; i < this.bufferBig.length; i++) this.windowedBig[i] = this.bufferBig[i] * this.windowBig[i];
     this.fftBig.realTransform(this.specBig, this.windowedBig);
-    const halfBig = this.bufferBig.length / 2;
-    for (let i = 0; i < halfBig; i++) {
+    // Bara upp till högsta bin som någon läser (band 8 slutar vid 16 kHz ≈ bin 683,
+    // låtminnet slutar vid 5 kHz ≈ bin 218). Resterande ~340 sqrt per stor-FFT hade
+    // ingen läsare.
+    for (let i = 0; i < this.magBigMax; i++) {
       const re = this.specBig[2 * i], im = this.specBig[2 * i + 1];
       this.magBig[i] = Math.sqrt(re * re + im * im);
     }
+
     // LÅTMINNET får samma magnitud (ingen extra FFT). Anropas före swap:en nedan,
     // så bufferten faktiskt innehåller DENNA frames spektrum.
     this.specSink?.(this.magBig, this.cfg.audio.rate / this.bufferBig.length);
