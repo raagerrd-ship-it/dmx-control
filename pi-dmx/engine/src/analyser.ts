@@ -439,15 +439,17 @@ export class Analyser {
     }
 
     // Parabolisk interpolation kring toppen → sub-lag-precision (t.ex. 125 ist. 122).
-    // Tar värdena UR ac[] i stället för att räkna om tre autokorrelationer per anrop
-    // (tre O(N)-loopar, ~1200 mult). ac[] är dessutom LENGTH-NORMALISERAD, så
-    // parabelns vertex mäts på samma skala som toppvalet gjordes på.
+    // MÅSTE läsa SAMMA yta som toppen valdes ur: tempoGram (comb + pulse + prior,
+    // EMA-ackumulerad). Förut lästes acScratch = helbandets råa autokorrelation, en
+    // helt annan kurva — och efter off-beat-dubblingen (bestLag = P) ännu mer, vilket
+    // gav en systematisk BPM-avvikelse i just de fallen.
     let lagF = bestLag;
-    if (bestLag > lagMin && bestLag + 1 <= lagMax) {
-      const yl = this.acScratch[bestLag - 1], y0 = this.acScratch[bestLag], yr = this.acScratch[bestLag + 1];
+    if (bestLag - 1 >= lagMin && bestLag + 1 <= lagMax) {
+      const yl = tg[bestLag - 1], y0 = tg[bestLag], yr = tg[bestLag + 1];
       const den = yl - 2 * y0 + yr;
       if (den < 0) { const d = 0.5 * (yl - yr) / den; if (Math.abs(d) < 1) lagF = bestLag + d; }
     }
+
 
     let bpm = (HZ * 60) / lagF;
     // BPM-FILTER: vik in i 80..160 — festmusik ligger dar, och allt utanfor ar
