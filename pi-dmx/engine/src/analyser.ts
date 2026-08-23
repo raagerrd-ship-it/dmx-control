@@ -892,8 +892,6 @@ export class Analyser {
     // = ett slag var ≥300ms, så 200ms suddar aldrig ut en äkta beat — bara brus.
     this.lvlVU += (level - this.lvlVU) * this.aVU;
     this.engSmooth = smooth(this.engSmooth, energy);
-    this.midSmooth = smooth(this.midSmooth, mid);
-    this.trbSmooth = smooth(this.trbSmooth, treble);
     this.centSmooth = smooth(this.centSmooth, centroid);
 
     // SEKTIONSENERGI (0..1) — hur energiskt partiet är RELATIVT låtens eget snitt.
