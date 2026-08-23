@@ -238,7 +238,7 @@ export class Analyser {
    *  blockerade av den föregående falska avfyrningen. */
   private bodyGoneMs = 0;
   private lastBodyGoneMs = -1e9;
-  private wasInZone = false;
+  private lastBodyGoneMs = -1e9;
   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
   private lastDropMs = -1e9;
   // RISER/UPPBYGGNAD (flyttad från effects)
