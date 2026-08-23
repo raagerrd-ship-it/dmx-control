@@ -1051,8 +1051,11 @@ export class Analyser {
       // tyst band (t.ex. diskant i ett intro) smäller till blir det en balanserad
       // respons, inte en överstyrd ljus-chock/pump. (Gemini.)
       const minPeak = this.lvlSmooth * 0.15;
+      // DECAYEN SKALAS MED BIG_EVERY: blocket körs 125/s, inte 375/s. Rå 0.9993 gav
+      // τ ≈ 11 s i stället för kalibrerade ~3.8 s (ett hett band höll sin peak in i
+      // nästa parti → konstlat låg diskant efter en drop). PEAK_DECAY = 0.9993^BIG_EVERY.
       if (gated && avg > this.bandPeak[b]) this.bandPeak[b] = Math.max(avg, minPeak);
-      else this.bandPeak[b] = Math.max(this.bandPeak[b] * 0.9993, minPeak);
+      else this.bandPeak[b] = Math.max(this.bandPeak[b] * Analyser.PEAK_DECAY, minPeak);
       // Nivån smoothas ~90ms PÅ HOP-TAKT → nivå-drivna/lugna effekter (som läser
       // spec via ctx.band) flimrar inte av det råa per-hop-AGC-bruset. onset lämnas
       // skarp (nedan) så transient-drivna effekter behåller sin punch.
