@@ -1024,22 +1024,11 @@ export class Analyser {
     // på lägre takt kan aldrig missa flanken.
     const nowWallA = this.wallNow();
     this.levelCeil = Math.max(this.lvlSmooth, this.levelCeil - dtHop * 0.015 * this.levelCeil);   // tak, decay ~65s
-    // SVACKAN MASTE VARA IHALLANDE. Forut satte VILKEN dipp som helst breakAtMs,
-    // aven en som varade nagra tiondelar - en trumfill eller en kort lucka racker.
-    // I en lat som ligger konstant hogt betyder det att varje sadan mikro-dipp
-    // foljd av ateringang i topp-zonen raknades som en drop.
-    //   MATT pa en lat anvandaren rapporterade som "falsk-droppar hela tiden":
-    //   4.0 drops/min, inZone 90% av tiden, nivan aldrig lag (p10=0.57), och
-    //   intensiteten vid varje drop 0.65-0.83 - alltsa passerade energigrinden
-    //   utan problem. Det var inte energin som var fel utan svack-definitionen.
-    // Ett verkligt breakdown varar sekunder, inte tiondelar. 400ms ihallande.
+    // `breaking` = nivån ligger i en svacka. Exponeras till effektlagret (lugnt läge).
+    // Den GAMLA svack-stämpeln (breakAtMs, 400 ms ihållande) grindade drop-villkoret
+    // innan flanken flyttades till baskroppen; den är borttagen med sitt villkor.
     const breaking = this.lvlSmooth < this.levelCeil * 0.65;
-    if (breaking) {
-      this.breakHoldMs += dtHop * 1000;
-      if (this.breakHoldMs > 400) this.breakAtMs = nowWallA;
-    } else {
-      this.breakHoldMs = 0;
-    }
+
     if (this.lvlSmooth > this.levelCeil * 0.85 && this.lvlSmooth > 0.65) this.inZoneState = true;
     else if (this.lvlSmooth < this.levelCeil * 0.70) this.inZoneState = false;
     const inZone = this.inZoneState;
