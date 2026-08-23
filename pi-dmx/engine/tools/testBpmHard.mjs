@@ -5,6 +5,7 @@ const { defaultConfig } = await import("../dist/config.js");
 const RATE = 48000, HOP = 128;
 
 function sim(name, durS, gen, truth) {
+  resetNoise();
   const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig)));
   an.setGainLock(true, 1);
   const buf = new Float32Array(HOP);
