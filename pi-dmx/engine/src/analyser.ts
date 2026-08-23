@@ -395,8 +395,8 @@ export class Analyser {
       scoreSum += v; scoreCount++;
       if (v > bestVal) { bestVal = v; bestLag = lag; }
     }
-    const env = this.envScratch;     // helbandets whitenade envelope (scoreEnv körde sist)
-    const envPos = this.envPosScratch;
+    const envPos = this.envPosScratch;   // helbandets rektifierade envelope (scoreEnv körde sist)
+
 
     if (bestLag === 0 || bestVal <= 0) return;
     // Peak-to-mean confidence: en tydlig takttopp sticker ut från medelnivån,
