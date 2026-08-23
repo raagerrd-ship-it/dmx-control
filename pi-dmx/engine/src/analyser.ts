@@ -53,6 +53,14 @@ export interface Frame {
    *    beat   = hur tydlig takten är (BPM-konfidens) */
   profile: { punch: number; bass: number; bright: number; beat: number };
   beatAnchorMs: number; // wall-clock ms för ett taktslag (fas)
+  /** >0 = ett trumslag är FÄRDIGMÄTT denna ruta: väggklocka för slagets flux-topp
+   *  med sub-hop-precision (±1.3 ms). Kommer en hop EFTER frame.kick (parabeln
+   *  behöver hoppet efter toppen) och är den enda tidsstämpel PLL:en får mäta
+   *  fasfel mot — Date.now() vid rutans behandling bär ALSA-leveransens jitter. */
+  kickAtMs: number;
+  /** TAKTFAS: hur många slag ankaret ska flyttas FRAMÅT för att landa på ettan
+   *  (0..3), eller -1 när fasen ännu är osäker. Motorn äger ankaret och applicerar. */
+  barShift: number;
   /** Rikt spektrum + per-band onset (anslag) från dubbel-FFT:n (hög-upplöst). */
   spec: Spectrum;       // per-band NIVÅ (AGC 0..1)
   onset: Spectrum;      // per-band ONSET/anslag (halvvågs-flux mot adaptiv baslinje, 0..1)
@@ -158,6 +166,12 @@ export class Analyser {
   /** Ackumulerat tempogram (EMA av hela lag-kurvan mellan anrop). */
   private tempoGram = new Float64Array(Analyser.ENV_LEN);
   private lastVoteMs = 0;   // tidsviktad median-röstning (max 4 röster/s)
+  private lastConfMs = 0;   // tidsbaserad alpha för bpmConfidence (stride-oberoende)
+  /** TAKTFAS: vikt per taktslags-plats (idx mod 4) mot cfg.beat-gridet. Ettan bär
+   *  tyngsta slaget i så gott som all dansmusik — den plats som samlar mest
+   *  kick-tyngd ÄR ettan. Glöms långsamt så ett låtbyte kan flytta fasen. */
+  private barAcc = new Float64Array(4);
+  private barCount = 0;        // antal bokförda slag (bevisunderlag för taktfasen)
   /** Perceptuell prior (log-Gauss runt 120 BPM) per lag — lagg→BPM ar fast, sa
    *  de ~78 Math.exp()-anropen per computeBpm-anrop kan bakas en gang. */
   private priorLut = (() => {
@@ -177,6 +191,7 @@ export class Analyser {
   private kfPrev = 0;
   private kfPrev2 = 0;
   private pendingKickMs = 0;   // >0 = kick väntar på fas-förfining nästa hop
+  private pendingKickW = 1;    // slagets styrka (flux/tröskel) — vikt i taktfas-räkningen
   private gain = 1;
   // Attack/release-smoothed outputs — raw per-hop values update ~370x/s and
   // read as flicker on the lamps. Fast attack keeps hits punchy; the slower
@@ -499,7 +514,10 @@ export class Analyser {
         const lockLag = Math.round((HZ * 60) / this.localBpm);
         const rival = lockLag >= lagMin && lockLag <= lagMax
           ? bestVal / Math.max(1e-9, tg[lockLag]) : 1;
-        if (committed && ++this.newSongVote >= (rival > 1.6 ? 24 : 100)) {
+        // TVÅ DOMINANSSTEG: en ÖVERLÄGSEN rival (>2.5×) är inte ett breakdown — då är
+        // den låsta laggen i praktiken borta ur tempogrammet. Lås om på ~2 s.
+        const need = rival > 2.5 ? 8 : rival > 1.6 ? 24 : 100;
+        if (committed && ++this.newSongVote >= need) {
           this.localBpm = Math.round(med);
           this.newSongVote = 0;
           this.octaveVote = 0;
@@ -508,9 +526,32 @@ export class Analyser {
       }
     }
     // Smooth confidence (undvik hoppig UI); attack snabbt, release långsamt.
+    // TIDSBASERAD alpha: computeBpm() körs 100 Hz olåst men 20 Hz låst (adaptiv
+    // stride). Med fasta 0.35/0.08 rörde konfidensen sig 5× olika snabbt beroende
+    // på läge — och den grindar kick-gridet (>0.5), PLL-frekvenstermen (>0.4) och
+    // hjärtslagets djup. Tidskonstanterna (25 ms upp, 120 ms ner) är valda så att
+    // beteendet i OLÅST läge är exakt som förut.
+    const cNow = this.perfNow();
+    const dt = this.lastConfMs > 0 ? Math.min(0.5, (cNow - this.lastConfMs) / 1000) : 0.01;
+    this.lastConfMs = cNow;
     const cA = this.localBpmConfidence;
-    this.localBpmConfidence = cA + (conf - cA) * (conf > cA ? 0.35 : 0.08);
+    const aC = 1 - Math.exp(-dt / (conf > cA ? 0.025 : 0.120));
+    this.localBpmConfidence = cA + (conf - cA) * aC;
   }
+
+  /** Nollställ tempoläget — anropas när låtminnet BEKRÄFTAT en låtgräns. Då vet vi
+   *  att historiken tillhör förra låten; att medianrösta vidare på den kostade 6 s
+   *  omlåsning. Nästa estimat får låsa direkt (localBpm === 0 ⇒ första röst låser). */
+  resetTempo(): void {
+    this.localBpm = 0; this.localBpmConfidence = 0;
+    this.bpmHistLen = 0; this.bpmHistPos = 0;
+    this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0;
+    this.tempoGram.fill(0);
+    this.barAcc.fill(0); this.barCount = 0;
+  }
+
+  /** Taktfasen är applicerad av motorn (ankaret flyttat) → börja om räkningen. */
+  resetBar(): void { this.barAcc.fill(0); this.barCount = 0; }
 
   private envelope: number;
   private lastKick = 0;
@@ -577,6 +618,7 @@ export class Analyser {
       level: 0, levelRaw: 0, levelVU: 0, energy: 0, mid: 0, treble: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
       dropCount: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
+      kickAtMs: 0, barShift: -1,
       spec: this.outSpec, onset: this.outOnset, drum: this.outDrum,
     };
   }
@@ -718,7 +760,7 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += frameMs0;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; }
+      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0; this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); this.barCount = 0; }
     } else {
       this.silentMs = 0;
     }
@@ -751,6 +793,7 @@ export class Analyser {
     }
     // #2 Förfina förra kickens fas: nu har vi y(-1)=kfPrev2, y(0)=kfPrev, y(+1)=kickFlux
     // runt kick-hopet. Parabelns topp ger sub-hop-offset δ ∈ [-0.5,0.5] hop.
+    let kickAtMs = 0;
     if (this.pendingKickMs > 0) {
       const ym1 = this.kfPrev2, y0 = this.kfPrev, yp1 = kickFlux;
       const denom = ym1 - 2 * y0 + yp1;
@@ -761,8 +804,36 @@ export class Analyser {
         this.beatAnchorMs = this.pendingKickMs + delta * hopMs;
       }
       this.pendingKickMs = 0;
+      // Slaget är färdigmätt → lämna över dess EXAKTA tid till PLL:en.
+      kickAtMs = this.beatAnchorMs;
+      // TAKTFAS: bokför slagets tyngd på sin plats i fyrtakten. Vikten är slagets
+      // EGEN styrka (flux mot sin tröskel, kvadrerad så skillnaden mellan ettans
+      // tunga och mellanslagens lätta trumma verkligen separerar). Bandenergin gick
+      // inte att använda: den är utjämnad över ~100 ms och gav alla fyra platser
+      // samma vikt ⇒ ingen marginal, ingen taktfas (MÄTT 2026-08-23).
+      const g = this.cfg.beat;
+      if (g && g.bpm > 40 && this.localBpmConfidence > 0.5) {
+        const bMs = 60000 / g.bpm;
+        const slot = ((Math.round((kickAtMs - g.anchorMs) / bMs) % 4) + 4) % 4;
+        this.barAcc[slot] += this.pendingKickW * this.pendingKickW;
+        if (this.barCount < 1000) this.barCount++;
+        for (let i = 0; i < 4; i++) this.barAcc[i] *= 0.997;   // ~4 takters glömska
+      }
     }
-    if (kick) { this.beatAnchorMs = this.wallNow(); this.pendingKickMs = this.beatAnchorMs; }
+    if (kick) {
+      this.beatAnchorMs = this.wallNow();
+      this.pendingKickMs = this.beatAnchorMs;
+      this.pendingKickW = kickFlux;   // absolut anslagsstyrka (kvot mot tröskeln mättade)
+    }
+    // Vinnande plats = ettan, men bara med TYDLIG marginal (35 %) och nog med bevis
+    // (~16 slag). Annars -1: bättre ingen taktfas än en som sitter en åtta bort.
+    let barShift = -1;
+    {
+      let bi = 0, best = this.barAcc[0], second = -1;
+      for (let i = 1; i < 4; i++) if (this.barAcc[i] > best) { second = best; best = this.barAcc[i]; bi = i; }
+      for (let i = 0; i < 4; i++) if (i !== bi && this.barAcc[i] > second) second = this.barAcc[i];
+      if (this.barCount >= 16 && best > second * 1.35) barShift = bi;
+    }
     this.kfPrev2 = this.kfPrev;
     this.kfPrev = kickFlux;
 
@@ -1104,6 +1175,7 @@ export class Analyser {
     f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
     f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.intensity = intensity; f.beatAnchorMs = this.beatAnchorMs;
     f.dropCount = this.dropCount; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
+    f.kickAtMs = kickAtMs; f.barShift = barShift;
     return f;
   }
 }

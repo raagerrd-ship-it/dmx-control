@@ -242,7 +242,10 @@ capture.on("chunk", (samples: Float32Array) => {
   if (lnNow) { if (!recorder.active) recorder.start(); recorder.write(samples); }
   // LÅTGRÄNS → mjuk omkalibrering av den löpande dynamiken (auto-rangen får
   // krypa in på nya låtens nivåer inom sekunder i stället för en minut).
-  if (songs.boundaryCount !== lastBoundary) { lastBoundary = songs.boundaryCount; effects.softenRange(); }
+  // Samma sak för TEMPOT: medianfönstret (~5 s) och tempogrammet tillhör förra
+  // låten. Att rösta vidare på dem kostade upp till 6 s omlåsning fastän minnet
+  // just SLAGIT FAST att en ny låt börjat. Nollställt lås tar första estimatet direkt.
+  if (songs.boundaryCount !== lastBoundary) { lastBoundary = songs.boundaryCount; effects.softenRange(); analyser.resetTempo(); }
 
 
   if (songs.recognized) {
@@ -349,9 +352,14 @@ capture.on("chunk", (samples: Float32Array) => {
     // liten del (18%) av felet. Bara när slaget är nära ett taktslag (|fel|<0.25)
     // → syncoperade off-beat-slag stör inte låset. Liten korrektion = mjuk
     // inlåsning utan det flimmer en hård nollställning gav.
-    if (frame.kick && cfg.beat) {
+    //
+    // TIDSSTÄMPELN ÄR SLAGETS EGEN, inte rutans. `frame.kickAtMs` är flux-toppens
+    // väggklocka med sub-hop-precision (±1.3 ms) och kommer en hop efter blixten.
+    // Date.now() vid behandlingen bar ALSA-leveransens batch-jitter (flera hops i
+    // en klump ⇒ upp till ~8 ms slumpfel) och PLL:en integrerade det som fasfel.
+    if (frame.kickAtMs > 0 && cfg.beat) {
       const beatMs = 60000 / cfg.beat.bpm;
-      const ph = ((((Date.now() - cfg.beat.anchorMs) % beatMs) + beatMs) % beatMs) / beatMs;
+      const ph = ((((frame.kickAtMs - cfg.beat.anchorMs) % beatMs) + beatMs) % beatMs) / beatMs;
       const err = ph < 0.5 ? ph : ph - 1;   // -0.5..0.5 av ett taktslag
       const k0 = cfg.beatSyncStrength ?? 0.18;  // ägar-ratt: 0 = av/fri-rullande .. ~0.30 aggressiv
       // #3 ADAPTIV: låt takt-tydligheten (bpmConfidence) modulera ratten runt
@@ -378,6 +386,14 @@ capture.on("chunk", (samples: Float32Array) => {
           if (cfg.beat.bpm < lo) cfg.beat.bpm = lo; else if (cfg.beat.bpm > hi) cfg.beat.bpm = hi;
         }
       }
+    }
+    // TAKTFAS (ettan): analysatorn har mätt vilken av fyrtaktens platser som bär
+    // tyngsta slaget. Flytta ankaret HELA taktslag så takträknaren (beatIdx) börjar
+    // på ettan — effekter som byter var fjärde takt landar då på musikens storsväng
+    // i stället för på ett godtyckligt slag. Fasen inom takten rörs INTE.
+    if (frame.barShift > 0 && cfg.beat && !memoryBeatLocked) {
+      cfg.beat.anchorMs += frame.barShift * (60000 / cfg.beat.bpm);
+      analyser.resetBar();
     }
   }
   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
