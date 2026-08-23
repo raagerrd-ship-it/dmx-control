@@ -299,10 +299,18 @@ export class Analyser {
     const start = (this.envPos - N + L) % L;
     let energy = 0;
     pre[0] = 0;
-    for (let i = 0; i < N; i++) {
-      const v = ring[(start + i) % L];
+    // Ringen läses i TVÅ RAKA BLOCK. `% L` i den inre loopen kostade en modulo per
+    // sampel (N upp till 500, två anrop per computeBpm) helt i onödan.
+    const n1 = Math.min(N, L - start);
+    for (let i = 0; i < n1; i++) {
+      const v = ring[start + i];
       env[i] = v; energy += v; pre[i + 1] = pre[i] + v;
     }
+    for (let i = n1; i < N; i++) {
+      const v = ring[i - n1];
+      env[i] = v; energy += v; pre[i + 1] = pre[i] + v;
+    }
+
     // WHITENING: subtrahera ett LOKALT medel (1 s glidande) i stället för det
     // globala. En långsam nivådrift inom fönstret (uppbyggnad, breakdown, AGC som
     // andas) läcker annars rakt in i autokorrelationen och lyfter de långa laggen.
