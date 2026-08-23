@@ -205,6 +205,13 @@ let lastLiveDrop = 0;        // senast sedda drop-räknare FRÅN analysatorn
 let lastBoundary = 0;        // senast sedda låtgräns-räknare (dynamikens omkalibrering)
 let outDrop = 0;             // drop-räknaren effekterna ser (live eller replay)
 let memoryBeatLocked = false;// taktklockan är låst ur låtminnet
+// COAST: konfidensen dippar i breakdowns/brus men TEMPOT är oftast fortfarande rätt.
+// Släpper vi gridet direkt hoppar effekterna till kick-drift och glider tillbaka när
+// takten kommer igen. Vi håller därför gridet fri-rullande en stund innan vi ger upp.
+const GRID_ON_CONF = 0.35;   // tydlig takt igen → coast avbryts
+const GRID_COAST_MS = 4000;  // så länge håller vi gridet på svag konfidens
+let gridWeakSince = 0;       // ms-tidpunkt då konfidensen föll under grinden (0 = stark)
+let gridCoasting = false;
 const slotsFor = () => Math.max(activeSlots(cfg.fixtures), cfg.fog?.enabled ? cfg.fog.address : 0);
 let curSlots = slotsFor();
 
