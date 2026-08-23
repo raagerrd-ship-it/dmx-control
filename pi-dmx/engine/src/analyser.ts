@@ -693,21 +693,29 @@ export class Analyser {
     // taget, så det räcker att dra av utgående hop och lägga till den inkommande
     // (128 ops i stället för 512 kvadrater, 375 gånger i sekunden). Full omräkning
     // ~1×/s mot flyttalsdrift.
-    let ss = this.sumSq;
-    for (let i = 0; i < hop; i++) { const v = this.buffer[i]; ss -= v * v; }
+    let ss = this.sumSq, sl = this.sumLin;
+    for (let i = 0; i < hop; i++) { const v = this.buffer[i]; ss -= v * v; sl -= v; }
     this.buffer.copyWithin(0, hop);
     this.buffer.set(samples, this.buffer.length - hop);
-    for (let i = 0; i < hop; i++) { const v = samples[i]; ss += v * v; }
+    for (let i = 0; i < hop; i++) { const v = samples[i]; ss += v * v; sl += v; }
     if (++this.rmsRecalc >= 400 || ss < 0) {
-      this.rmsRecalc = 0; ss = 0;
-      for (let i = 0; i < this.buffer.length; i++) { const v = this.buffer[i]; ss += v * v; }
+      this.rmsRecalc = 0; ss = 0; sl = 0;
+      for (let i = 0; i < this.buffer.length; i++) { const v = this.buffer[i]; ss += v * v; sl += v; }
     }
-    this.sumSq = ss;
-    const rms = Math.sqrt(ss / this.buffer.length);
+    this.sumSq = ss; this.sumLin = sl;
+    // DC-BORTTAGNING. Ett litet DC-offset (vanligt på USB/I²S-ingångar) lägger sig
+    // helt i bin 0 och pinnar både bassEnergy och kickFlux-baslinjen. Bin 0 kan INTE
+    // bara uteslutas som i den stora FFT:n: här är binbredden 93.75 Hz, så bin 0 är
+    // 0–94 Hz och innehåller själva bastrumman (MÄTT: utan bin 0 dog låsningen helt
+    // i "brusigt rum 136"). I stället dras fönstrets medelvärde bort — riktig
+    // DC-borttagning, gratis i loopen som redan finns.
+    const mean = sl / this.buffer.length;
+    const varr = ss / this.buffer.length - mean * mean;
+    const rms = Math.sqrt(varr > 0 ? varr : 0);
 
     // Windowed FFT (pre-allokerade scratchpads → ingen alloc/hop)
     const windowed = this.windowed512;
-    for (let i = 0; i < windowed.length; i++) windowed[i] = this.buffer[i] * this.window[i];
+    for (let i = 0; i < windowed.length; i++) windowed[i] = (this.buffer[i] - mean) * this.window[i];
     const spectrum = this.spectrum512;
     this.fft.realTransform(spectrum, windowed);
 
@@ -719,15 +727,12 @@ export class Analyser {
     let kickFlux = 0;                               // onset ENBART i kick-bandet (sub-bas)
     let powSum = 0, powW = 0;                       // för spektralt centroid (EFFEKT-viktat)
     const bassBins = Math.min(16, half);                            // ~0–1.5 kHz
-    const kickBins = Math.min(3, half);                            // bins 1–2 ≈ 90–280 Hz (kick-trumman)
+    const kickBins = Math.min(3, half);                            // bins 0–2 ≈ 0–280 Hz (kick-trumman)
 
-    // BIN 0 = DC och är UTESLUTEN. Ett litet DC-offset (vanligt på USB/I²S-ingångar)
-    // hamnar helt i bin 0 och pinnade både bassEnergy och kickFlux-baslinjen. Den
-    // stora FFT:n har redan Math.max(1, …) i bandLo av samma skäl.
     // MAGNITUD (sqrt) räknas bara i basbanden — det är de enda bin som läses. Övriga
     // 240 sqrt/hop (~90 000/s) fanns bara för centroiden, som nu viktar på EFFEKT
     // (re²+im²) i stället: samma spektrala tyngdpunkt, ingen rot.
-    for (let i = 1; i < half; i++) {
+    for (let i = 0; i < half; i++) {
       const re = spectrum[2 * i];
       const im = spectrum[2 * i + 1];
       const p = re * re + im * im;
@@ -740,6 +745,7 @@ export class Analyser {
       }
       powSum += p; powW += i * p;
     }
+
 
     // Swap: denna hops magnitud blir nästa hops prevMag (zero-copy, ingen alloc).
     { const t = this.prevMag; this.prevMag = this.mag512; this.mag512 = t; }
