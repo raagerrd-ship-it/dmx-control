@@ -190,6 +190,7 @@ export class Analyser {
   private kfPrev = 0;
   private kfPrev2 = 0;
   private pendingKickMs = 0;   // >0 = kick väntar på fas-förfining nästa hop
+  private pendingKickW = 1;    // slagets styrka (flux/tröskel) — vikt i taktfas-räkningen
   private gain = 1;
   // Attack/release-smoothed outputs — raw per-hop values update ~370x/s and
   // read as flicker on the lamps. Fast attack keeps hits punchy; the slower
@@ -817,7 +818,11 @@ export class Analyser {
         for (let i = 0; i < 4; i++) this.barAcc[i] *= 0.997;   // ~4 takters glömska
       }
     }
-    if (kick) { this.beatAnchorMs = this.wallNow(); this.pendingKickMs = this.beatAnchorMs; }
+    if (kick) {
+      this.beatAnchorMs = this.wallNow();
+      this.pendingKickMs = this.beatAnchorMs;
+      this.pendingKickW = Math.min(3, kickFlux / Math.max(1e-9, kickThresh));
+    }
     // Vinnande plats = ettan, men bara med TYDLIG marginal (35 %) och nog med bevis
     // (~16 slag). Annars -1: bättre ingen taktfas än en som sitter en åtta bort.
     let barShift = -1;
