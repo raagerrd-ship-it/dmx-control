@@ -688,15 +688,13 @@ export class Analyser {
     const half = this.cfg.fft.size / 2;
     const mag = this.mag512;
     let bassEnergy = 0;
-    let midEnergy = 0;
-    let trebleEnergy = 0;
     let flux = 0;
     let kickFlux = 0;                               // onset ENBART i kick-bandet (sub-bas)
     let magSum = 0, magW = 0;                       // för spektralt centroid
     const binHz = this.cfg.audio.rate / this.cfg.fft.size;          // ~93.75 Hz @ 48k/512
     const bassBins = Math.min(16, half);                            // ~0–1.5 kHz
     const kickBins = Math.min(3, half);                            // bins 0–2 ≈ 0–280 Hz (kick-trumman)
-    // Diskant = hi-hats/cymbaler ~5–13 kHz (INTE 12 kHz+ där det är tomt).
+
     for (let i = 0; i < half; i++) {
       const re = spectrum[2 * i];
       const im = spectrum[2 * i + 1];
