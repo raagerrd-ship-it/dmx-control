@@ -1,5 +1,11 @@
 # Ändringslogg
 
+## v0.2.2 — grannrättning + reproducerbar bänk
+
+- **Grannrättning av tidigt lås**: ett lås från 0,5 s-fönstret kunde hamna 10–20 % fel (t.ex. 122 mot 136) och satt kvar hela låten — glid-bandet slutar vid ±11 % och oktav-grenen börjar vid 1,4×, felet låg i ett dödområde. Nu räknas ~2 s sammanhållet bevis före commit och låset flyttas. Committade lås rörs inte.
+- **Bänken mäter över flera brus-seeder** (`SEEDS=8`, median + min–max) och markerar när låstiden träffar 500 ms-golvet (= första möjliga anrop, inte en mätning) samt seeder som aldrig låser.
+- Mätning: brusigt rum 136 gick från 1/8 seeder helt fel (0 % rätt hela låten) till 8/8 rätt (den svåra seeden låser på 2,5 s). Övriga scenarier oförändrade; 19–24 µs/hop.
+
 ## v0.2.1 — analysator-städning
 
 - **Grid-coasting**: beat-rutnätet frilöper i 4 s vid låg konfidens i stället för att glida/hoppa; auto-omlås därefter.

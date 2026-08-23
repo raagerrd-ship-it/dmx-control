@@ -4,8 +4,11 @@ const { Analyser } = await import(mod);
 const { defaultConfig } = await import("../dist/config.js");
 const RATE = 48000, HOP = 128;
 
-function sim(name, durS, gen, truth) {
-  resetNoise();
+const SEEDS = (process.env.SEEDS ? +process.env.SEEDS : 8);
+const FLOOR_MS = 500;   // computeBpm() returnerar innan envFilled>=50 (0.5 s @100 Hz)
+
+function run(gen, truth, durS, seed) {
+  resetNoise(seed);
   const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig)));
   an.setGainLock(true, 1);
   const buf = new Float32Array(HOP);
@@ -22,8 +25,28 @@ function sim(name, durS, gen, truth) {
     if (!lockMs && f.bpm > 0 && Math.abs(f.bpm - want) < want * 0.04) lockMs = ms;
     if (ms > durS * 1000 * 0.5) { tot++; if (Math.abs(f.bpm - want) < want * 0.04) ok++; }
   }
-  console.log(name.padEnd(26), "lås", (lockMs || NaN).toFixed(0).padStart(6), "ms   rätt",
-    (100 * ok / tot).toFixed(0).padStart(3) + "%   cpu", (cpu / hops * 1000).toFixed(0) + " µs/hop");
+  return { lockMs: lockMs || NaN, acc: 100 * ok / tot, cpu: cpu / hops * 1000 };
+}
+
+const med = (a) => { const b = a.slice().sort((x, y) => x - y); const n = b.length;
+  return n % 2 ? b[(n - 1) / 2] : (b[n / 2 - 1] + b[n / 2]) / 2; };
+
+function sim(name, durS, gen, truth) {
+  const r = [];
+  for (let s = 0; s < SEEDS; s++) r.push(run(gen, truth, durS, 0x9e3779b9 + s * 0x85ebca6b));
+  const accs = r.map(x => x.acc);
+  const fails = r.filter(x => !isFinite(x.lockMs)).length;
+  const locks = r.filter(x => isFinite(x.lockMs)).map(x => x.lockMs);
+  const mL = locks.length ? med(locks) : NaN, mA = med(accs);
+  const floor = locks.filter(x => x <= FLOOR_MS).length;
+  console.log(name.padEnd(26),
+    "lås med", mL.toFixed(0).padStart(6), "ms",
+    "[" + Math.min(...locks).toFixed(0) + "–" + Math.max(...locks).toFixed(0) + "]",
+    floor ? ("golv " + floor + "/" + SEEDS).padEnd(11) : "".padEnd(11),
+    fails ? ("MISS " + fails + "/" + SEEDS).padEnd(11) : "".padEnd(11),
+    "rätt med", mA.toFixed(0).padStart(3) + "%",
+    "[" + Math.min(...accs).toFixed(0) + "–" + Math.max(...accs).toFixed(0) + "]",
+    "cpu", med(r.map(x => x.cpu)).toFixed(0) + " µs/hop");
 }
 // Seedat brus (mulberry32) → bänken är bit-identisk mellan körningar.
 let rngState = 0x9e3779b9;
@@ -34,7 +57,7 @@ const noise = () => {
   x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
   return (((x ^ (x >>> 14)) >>> 0) / 4294967296) * 2 - 1;
 };
-const resetNoise = () => { rngState = 0x9e3779b9; };
+const resetNoise = (seed = 0x9e3779b9) => { rngState = seed | 0; };
 const kick = (tt, beat, decay = 25) => Math.exp(-((tt % beat) / beat) * beat * decay) * Math.sin(2 * Math.PI * 58 * tt);
 
 // 1. NIVÅDRIFT: långsam fade in/out över fönstret (testar whitening)
