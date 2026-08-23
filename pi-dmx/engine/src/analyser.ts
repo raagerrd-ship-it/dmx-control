@@ -397,7 +397,7 @@ export class Analyser {
     // toppen sparades, varpå medianen fick städa upp efteråt (~5 s till lås). Nu
     // EMA:as HELA lag-kurvan mellan anrop, så bevis ackumuleras där det hör hemma:
     // låset kommer på 1–2 s och oktav-flippar dör innan de hinner synas.
-    const a = this.localBpm === 0 ? 0.30 : 0.15;
+    const a = this.localBpm === 0 ? 0.30 : this.bpmStable < 20 ? 0.22 : 0.15;
     const tg = this.tempoGram;
     let bestLag = 0, bestVal = 0, scoreSum = 0, scoreCount = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
