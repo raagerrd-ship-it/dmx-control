@@ -533,7 +533,7 @@ export class Analyser {
       //    basen kom tillbaka — tillräckligt för att fälla låset (BPM 142→111).
       //    En riktig ny låt har full topp och conf ~1.0. Så: bara ett TYDLIGT tempo
       //    får rösta bort ett fungerande lås.
-      const healthy = conf >= 0.8 && (this.lockPeak <= 0 || bestVal >= this.lockPeak * 0.65);
+      const healthy = conf >= 0.9 && (this.lockPeak <= 0 || bestVal >= this.lockPeak * 0.8);
       if (!committedNow || !rawOff || !healthy) {
         this.newSongVote *= 0.7;
         if (this.newSongVote < 0.5) { this.newSongVote = 0; this.challengerBpm = 0; }
