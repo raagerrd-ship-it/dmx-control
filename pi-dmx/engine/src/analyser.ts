@@ -903,19 +903,23 @@ export class Analyser {
     this.lastT = now;
     const d = this.cfg.detection;
     // AGC körs BARA för mic (aux låser gain på 1× — line-level är hett & stabilt).
-    // Beprövad envelope→autoGainTarget. (Percentil-AGC:n vore bättre men rör bara
-    // denna oanvända mic-väg → behåller det testade.)
+    // PERCENTIL-AGC (från Lotus, live-mätt): envelopen är 95:e percentilen av RÅ rms
+    // över ~2 s, inte en EMA av den gainade momentannivån. Målet är ett TAK för
+    // topparna. Långsam attack (tauUp×2) så uppbyggnader får höras, snabb retreat
+    // (tauDown×0.25) eftersom AGC:n inte kan ta bort redan inbränd klippning.
     if (!this.gainLocked && rms > d.noiseFloor) {
-      const tau = rms * this.gain > this.envelope ? d.tauDown : d.tauUp;
-      const a = 1 - Math.exp(-dt / tau);
-      this.envelope += (rms * this.gain - this.envelope) * a;
-      const desired = (d.autoGainTarget / Math.max(1e-4, this.envelope)) * this.gain;
-      const gTau = desired > this.gain ? d.tauUp : d.tauDown;
-      const ga = 1 - Math.exp(-dt / gTau);
-      this.gain += (desired - this.gain) * ga;
-      if (this.gain < 0.5) this.gain = 0.5;
-      else if (this.gain > 20) this.gain = 20;
+      const env = this.agcEnvelope(rms, now);
+      if (env > 0) {
+        this.envelope = env;
+        const desired = d.autoGainTarget / Math.max(1e-4, env);
+        const gTau = desired > this.gain ? d.tauUp * 2 : d.tauDown * 0.25;
+        const ga = 1 - Math.exp(-dt / gTau);
+        this.gain += (desired - this.gain) * ga;
+        if (this.gain < 0.5) this.gain = 0.5;
+        else if (this.gain > 20) this.gain = 20;
+      }
     }
+
     const level = Math.min(1, rms * this.gain);
 
     // KICK-DETEKTION v2: onset i kick-bandet (sub-bas ~0–280 Hz) mot en ADAPTIV
