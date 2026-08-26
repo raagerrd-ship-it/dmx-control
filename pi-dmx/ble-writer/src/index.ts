@@ -71,6 +71,7 @@ interface Strip {
   lastFrame: [number, number, number];      // last (r,g,b) actually sent
   target:    [number, number, number];      // next (r,g,b) requested
   connecting: boolean;
+  lastConnectAttemptMs: number;              // anti-churn: golv mellan försök
   identifyUntil: number;                    // 0 = normal; >now = blinka i identifieringsfärg
   transient: boolean;                        // true = added by identify, drop after blink om ej parad
   cal: StripCal;                             // per-slinga vitbalans + max-ljus
@@ -104,9 +105,34 @@ noble.on("discover", (p: any) => {
 
 /* ─────────────── connection management ─────────────── */
 
+/** ANTI-CHURN (mätt på Lotus, samma BCM43438-radio): en slinga som ligger utom
+ *  räckhåll eller vägrar GATT gav en oändlig connect→fail-loop. Varje försök
+ *  startar en 4 s scan, och scanningen stjäl radiotid från de slingor som FUNGERAR
+ *  — de började tappa paket och ljuset hackade. Två spärrar:
+ *    • GOLV 2 s mellan försök per slinga (scanningen ensam tar 4 s vid miss).
+ *    • CHURN-GRIND: 5 misslyckade försök inom 30 s → 15 s tystnad för den slingan.
+ *  Grinden nollställs vid lyckad anslutning. Vi ger ALDRIG upp permanent: en slinga
+ *  som får ström igen ska hitta hem själv, utan att någon startar om tjänsten. */
+const CONNECT_FLOOR_MS = 2000;
+const CHURN_WINDOW_MS = 30_000;
+const CHURN_MAX_FAILS = 5;
+const CHURN_PAUSE_MS = 15_000;
+const churn = new Map<string, { fails: number; windowStart: number; pausedUntil: number; lastLogMs: number }>();
+
+function churnState(mac: string) {
+  let c = churn.get(mac);
+  if (!c) { c = { fails: 0, windowStart: 0, pausedUntil: 0, lastLogMs: 0 }; churn.set(mac, c); }
+  return c;
+}
+
 async function connect(strip: Strip): Promise<boolean> {
   if (strip.connecting || strip.char) return !!strip.char;
   if (!nobleReady) return false;
+  const now = Date.now();
+  const c = churnState(strip.mac);
+  if (now < c.pausedUntil) return false;
+  if (now - strip.lastConnectAttemptMs < CONNECT_FLOOR_MS) return false;
+  strip.lastConnectAttemptMs = now;
   strip.connecting = true;
   try {
     // noble caches peripherals internally; if we lost it (adapter reset),
@@ -120,7 +146,7 @@ async function connect(strip: Strip): Promise<boolean> {
         setTimeout(done, 4000);
       });
     }
-    if (!strip.peripheral) { strip.connecting = false; return false; }
+    if (!strip.peripheral) { strip.connecting = false; noteFail(strip.mac); return false; }
     await strip.peripheral.connectAsync();
     const { characteristics } = await strip.peripheral
       .discoverSomeServicesAndCharacteristicsAsync([BLEDOM_SERVICE], [BLEDOM_CHAR]);
@@ -132,14 +158,35 @@ async function connect(strip: Strip): Promise<boolean> {
       setTimeout(() => { connect(strip).catch(() => {}); }, 800 + Math.random() * 1500);
     });
   } catch (e) {
-    console.error("[ble] connect", strip.mac, (e as Error).message);
+    // LOGGTAK: en slinga utom räckhåll ger ett fel var 2:a sekund i all evighet.
+    // Churn-grinden bromsar försöken, men vi tar även bort radspammet: en rad per
+    // slinga per 30 s. Räkningen finns i grinden.
+    const c2 = churnState(strip.mac);
+    if (Date.now() - c2.lastLogMs > 30_000) {
+      c2.lastLogMs = Date.now();
+      console.error("[ble] connect", strip.mac, (e as Error).message);
+    }
     strip.char = null;
   }
   strip.connecting = false;
+  if (strip.char) { c.fails = 0; c.windowStart = 0; c.pausedUntil = 0; }
+  else noteFail(strip.mac);
   broadcastPaired();
   broadcastActive();
   return !!strip.char;
 }
+
+function noteFail(mac: string): void {
+  const c = churnState(mac);
+  const now = Date.now();
+  if (now - c.windowStart > CHURN_WINDOW_MS) { c.windowStart = now; c.fails = 0; }
+  if (++c.fails >= CHURN_MAX_FAILS) {
+    c.pausedUntil = now + CHURN_PAUSE_MS;
+    c.fails = 0; c.windowStart = now;
+    console.error(`[ble] ${mac}: ${CHURN_MAX_FAILS} misslyckade försök — pausar ${CHURN_PAUSE_MS / 1000}s`);
+  }
+}
+
 
 async function writeStrip(strip: Strip, r: number, g: number, b: number) {
   if (!strip.char || strip.chip !== "bledom") return;
@@ -281,7 +328,7 @@ async function handle(sock: net.Socket, msg: any) {
       known.set(mac, {
         mac, name: d.name || mac, chip: d.chip === "bledom" ? "bledom" : "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
-        target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: false,
+        target: [0, 0, 0], connecting: false, lastConnectAttemptMs: 0, identifyUntil: 0, transient: false,
         cal: normalizeCal(d.cal),
       });
     }
@@ -310,7 +357,7 @@ async function handle(sock: net.Socket, msg: any) {
       known.set(mac, {
         mac, name: s?.name || mac, chip: s?.chip || "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
-        target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: false,
+        target: [0, 0, 0], connecting: false, lastConnectAttemptMs: 0, identifyUntil: 0, transient: false,
         cal: { ...DEFAULT_CAL },
       });
     }
@@ -338,7 +385,7 @@ async function handle(sock: net.Socket, msg: any) {
       known.set(mac, {
         mac, name: s?.name || mac, chip: s?.chip || "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
-        target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: true,
+        target: [0, 0, 0], connecting: false, lastConnectAttemptMs: 0, identifyUntil: 0, transient: true,
         cal: { ...DEFAULT_CAL },
       });
     }
@@ -389,3 +436,25 @@ server.listen(SOCK, () => {
 
 function clamp01(x: number) { return x < 0 ? 0 : x > 1 ? 1 : x; }
 function byte(x: number) { return Math.max(0, Math.min(255, Math.round(x))); }
+
+/* ─────────────── shutdown ───────────────
+ * BEGRÄNSAD AVSTÄNGNING: disconnectAsync mot en slinga som redan tappat länken
+ * kan hänga i BlueZ tills GATT-timeouten går ut. Utan tak hänger processen kvar
+ * medan systemd väntar på TimeoutStopSec (90 s default) — det gör en enkel
+ * omstart till en och en halv minut av mörka slingor. Vi försöker koppla ner
+ * snyggt men ger oss efter 800 ms och exitar ändå. */
+let shuttingDown = false;
+function shutdown(): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const bail = setTimeout(() => process.exit(0), 800);
+  bail.unref?.();
+  const jobs: Promise<unknown>[] = [];
+  for (const s of known.values()) {
+    if (!s.peripheral || !s.char) continue;
+    try { jobs.push(Promise.resolve(s.peripheral.disconnectAsync()).catch(() => {})); } catch { /* */ }
+  }
+  Promise.all(jobs).then(() => process.exit(0)).catch(() => process.exit(0));
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);

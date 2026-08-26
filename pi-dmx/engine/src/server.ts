@@ -20,6 +20,8 @@ import type { FogStatus } from "./effects.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, EFFECT_META } from "./effects/registry.js";
 import { logHealth, getHealthLog } from "./healthLog.js";
+import { getRuntimeHealth } from "./runtimeHealth.js";
+
 
 // Version hämtas från package.json vid startup — ingen build-tid-magi, bara en
 // synkron read en gång per process.
@@ -233,8 +235,12 @@ export async function startServer(
   app.get("/api/health-log", async () => ({
     version: PKG_VERSION,
     now: Date.now(),
+    // Realtidsmått (chunk/render-fps, event-loop-lag, jitter, overruns, långa anrop).
+    // Max-värden är peak SEDAN FÖRRA hämtningen — läsningen nollställer dem.
+    runtime: getRuntimeHealth(),
     events: getHealthLog(),
   }));
+
 
   // ---- Config export / import ---------------------------------------------
   // Ägaren kan ladda ner config.json som backup och ladda upp igen — så en
