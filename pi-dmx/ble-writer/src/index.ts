@@ -117,11 +117,11 @@ const CONNECT_FLOOR_MS = 2000;
 const CHURN_WINDOW_MS = 30_000;
 const CHURN_MAX_FAILS = 5;
 const CHURN_PAUSE_MS = 15_000;
-const churn = new Map<string, { fails: number; windowStart: number; pausedUntil: number }>();
+const churn = new Map<string, { fails: number; windowStart: number; pausedUntil: number; lastLogMs: number }>();
 
 function churnState(mac: string) {
   let c = churn.get(mac);
-  if (!c) { c = { fails: 0, windowStart: 0, pausedUntil: 0 }; churn.set(mac, c); }
+  if (!c) { c = { fails: 0, windowStart: 0, pausedUntil: 0, lastLogMs: 0 }; churn.set(mac, c); }
   return c;
 }
 
@@ -158,7 +158,14 @@ async function connect(strip: Strip): Promise<boolean> {
       setTimeout(() => { connect(strip).catch(() => {}); }, 800 + Math.random() * 1500);
     });
   } catch (e) {
-    console.error("[ble] connect", strip.mac, (e as Error).message);
+    // LOGGTAK: en slinga utom räckhåll ger ett fel var 2:a sekund i all evighet.
+    // Churn-grinden bromsar försöken, men vi tar även bort radspammet: en rad per
+    // slinga per 30 s. Räkningen finns i grinden.
+    const c2 = churnState(strip.mac);
+    if (Date.now() - c2.lastLogMs > 30_000) {
+      c2.lastLogMs = Date.now();
+      console.error("[ble] connect", strip.mac, (e as Error).message);
+    }
     strip.char = null;
   }
   strip.connecting = false;
