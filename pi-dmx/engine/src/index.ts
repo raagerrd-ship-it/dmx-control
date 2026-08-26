@@ -587,6 +587,8 @@ capture.on("stderr", (s) => {
   if (/overrun|underrun/i.test(s)) health.noteOverrun();
   console.error("[arecord]", s);
 });
+capture.on("stall", (gap: number) => console.error(`[arecord] tyst i ${gap}ms — startar om capturen`));
+
 capture.on("exit", (code) => console.error("[arecord] exited", code));
 
 // 1 Hz-sampling av hälsomåtten (event-loop-lag mäts som schemats egen försening).
