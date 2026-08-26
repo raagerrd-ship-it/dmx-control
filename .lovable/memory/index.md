@@ -10,7 +10,9 @@ Lifecycle drivs av Sonos playbackState (ignite() vid boot). Manuell UI-disconnec
 BLEDOM HCI-stuck recovery is process.exit via systemd. Never add same-process retry.
 
 ## Memories
+- [pi-dmx driftstabilitet](mem://pi-dmx/runtime/driftstabilitet) — percentil-AGC, runtimeHealth, tyst arecord-stall, heap-tak + swappiness, BLE anti-churn, loggtak
 - [Crossfade-omlåsning](mem://pi/audio/crossfade-relock) — låtbyte utan tystnad: råestimat + sammanhållen utmanare + dominans + frisk takt, bevis i ms
+
 - [DC & interpolation förkastat](mem://pi/audio/dc-och-interpolation-forkastat) — bin 0 kvar, ingen mean-borttagning, RMS utan varians, parabol på acScratch
 - [Beat-lås timing](mem://pi/audio/beat-lock-timing) — kickAtMs till PLL, taktfas/ettan, tidsbaserad konfidens, omlåsning vid låtgräns
 - [Klangskifte bär låtgränsen](mem://pi/lighting/klangskifte-bar-latgransen) — facitmätt: nivådipp/tempo döda vid Spotify-crossfade; novelty mot 8 s bakåt, tröskel 0.68, backdaterad 4 s
