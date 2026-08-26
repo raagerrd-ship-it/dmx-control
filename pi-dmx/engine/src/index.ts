@@ -581,12 +581,26 @@ setInterval(() => {
   lastRenderMs = performance.now();
 }, 20);
 
+// LOGGTAK för overruns: en dålig ALSA-minut kan ge hundratals identiska rader,
+// och på SD-kort kostar journald-skrivningarna mer än felet de beskriver — de
+// dränker dessutom de rader man faktiskt behöver läsa. Vi räknar varje overrun
+// (syns exakt i /api/health-log) men skriver högst en rad per 10 s, med antalet.
+let overrunSinceLog = 0;
+let lastOverrunLogAt = 0;
 capture.on("stderr", (s) => {
-  // "overrun!!!" = ALSA hann inte lämna över bufferten → tappade samples. Räknas
-  // som hälsomått; loggen är oförändrad så journalen ser ut som förut.
-  if (/overrun|underrun/i.test(s)) health.noteOverrun();
+  if (/overrun|underrun/i.test(s)) {
+    health.noteOverrun();
+    overrunSinceLog++;
+    const now = performance.now();
+    if (now - lastOverrunLogAt < 10_000) return;
+    lastOverrunLogAt = now;
+    console.error(`[arecord] overrun ×${overrunSinceLog} (senaste 10s)`);
+    overrunSinceLog = 0;
+    return;
+  }
   console.error("[arecord]", s);
 });
+
 capture.on("stall", (gap: number) => console.error(`[arecord] tyst i ${gap}ms — startar om capturen`));
 
 capture.on("exit", (code) => console.error("[arecord] exited", code));
