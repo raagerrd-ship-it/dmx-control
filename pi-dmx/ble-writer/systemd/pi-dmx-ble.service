@@ -10,7 +10,9 @@ StartLimitIntervalSec=0
 Type=simple
 WorkingDirectory=/opt/pi-dmx-ble
 ExecStartPre=/bin/mkdir -p /run/pi-dmx
-ExecStart=/usr/bin/node --max-old-space-size=80 dist/index.js
+# 64 MB heap räcker med marginal (sidecarn håller bara en socket + noble-state)
+# och lämnar RAM till motorn, som är den som får ont av swap.
+ExecStart=/usr/bin/node --max-old-space-size=64 dist/index.js
 Restart=always
 RestartSec=3
 
