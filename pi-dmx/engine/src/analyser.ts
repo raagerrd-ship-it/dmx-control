@@ -283,13 +283,57 @@ export class Analyser {
     // så env = 0 ger ett enormt tal som slår gainen i 20x-taket innan envelopen
     // konvergerat — en hörbar ljuspump vid varje ingångsbyte.
     this.envelope = this.cfg.detection.autoGainTarget;
+    this.resetAgcBlocks();
   }
 
   /** Lock the AGC (aux: fixed 1x, level tracks the mixer directly) or let it run. */
   setGainLock(locked: boolean, fixed = 1) {
     this.gainLocked = locked;
-    if (locked) { this.gain = fixed; this.envelope = this.cfg.detection.autoGainTarget; }
+    if (locked) { this.gain = fixed; this.envelope = this.cfg.detection.autoGainTarget; this.resetAgcBlocks(); }
   }
+
+  /** PERCENTIL-AGC: 16 blockmaxima à 128 ms (~2 s historik) av RÅ rms. Envelopen är
+   *  näst största blockmaximum ≈ 95:e percentilen — en enstaka transient kan alltså
+   *  inte dra ner gainen, men en ihållande het ingång kan.
+   *  MÄTT I LOTUS: momentan-nivå som AGC-mål pinnade level ≥0.95 i ~55 % av tiden
+   *  med upp till 21 % klipp; uppbyggnader blev osynliga eftersom nivån redan låg i
+   *  taket. Percentilen tar bort inbränningen — därför är målet ett TAK för topparna,
+   *  aldrig ett medelvärde att sikta på. */
+  private static readonly AGC_BLOCKS = 16;
+  private static readonly AGC_BLOCK_MS = 128;
+  private agcBlocks = new Float32Array(Analyser.AGC_BLOCKS);
+  private agcBlockIdx = 0;
+  private agcBlockMax = 0;
+  private agcBlockStartMs = 0;
+  private agcBlocksFilled = 0;
+
+  private resetAgcBlocks(): void {
+    this.agcBlocks.fill(0);
+    this.agcBlockIdx = 0; this.agcBlockMax = 0; this.agcBlockStartMs = 0; this.agcBlocksFilled = 0;
+  }
+
+  /** Mata in rå rms; returnerar näst största av de senaste 16 blockmaxima (0 = ej varm). */
+  private agcEnvelope(rawRms: number, nowMs: number): number {
+    if (rawRms > this.agcBlockMax) this.agcBlockMax = rawRms;
+    if (this.agcBlockStartMs === 0) this.agcBlockStartMs = nowMs;
+    if (nowMs - this.agcBlockStartMs >= Analyser.AGC_BLOCK_MS) {
+      this.agcBlocks[this.agcBlockIdx] = this.agcBlockMax;
+      this.agcBlockIdx = (this.agcBlockIdx + 1) % Analyser.AGC_BLOCKS;
+      if (this.agcBlocksFilled < Analyser.AGC_BLOCKS) this.agcBlocksFilled++;
+      this.agcBlockMax = 0;
+      this.agcBlockStartMs = nowMs;
+    }
+    // Näst största över de fyllda blocken (16 tal → linjär skanning är billigast).
+    if (this.agcBlocksFilled < 2) return 0;
+    let top = 0, second = 0;
+    for (let i = 0; i < this.agcBlocksFilled; i++) {
+      const v = this.agcBlocks[i];
+      if (v > top) { second = top; top = v; }
+      else if (v > second) { second = v; }
+    }
+    return second;
+  }
+
 
   /**
    * BPM (80..160) från onset-envelopens autokorrelation.
