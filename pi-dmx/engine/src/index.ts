@@ -30,6 +30,8 @@ import { BleClient, type BleScanDevice, type BleCal } from "./bleClient.js";
 import { applyIntensity } from "./moods.js";
 import { MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { SongMemory } from "./songMemory.js";
+import * as health from "./runtimeHealth.js";
+
 
 import { activeSlots, fixtureRoles, type Mode } from "./config.js";
 import { EFFECT_KEYS, EFFECT_MAP } from "./effects/registry.js";
@@ -242,9 +244,13 @@ const capture = new AudioCapture({
 });
 
 capture.on("chunk", (samples: Float32Array) => {
+  const t0 = performance.now();
   const frame = analyser.process(samples);
+  health.noteSlowCall("analyser.process", performance.now() - t0);
+  health.noteChunk();
   latestFrame = frame;
   lastChunkAt = Date.now();
+
   // ── LÅTMINNE ──────────────────────────────────────────────────────────────
   // Analysatorns egen drop-flank läses FÖRE vi eventuellt skriver om räknaren
   // (replayen äger dropsen när låten är känd).
@@ -519,9 +525,12 @@ function probeSample(universe: Uint8Array): void {
 function renderAndSend(): void {
     if (!latestFrame) return;   // inget ljud har någonsin kommit — inget att rendera
     lastRenderMs = performance.now();
+    health.noteRender(lastRenderMs, RENDER_MS);
     const universe = effects.render(latestFrame);
     probeSample(universe);
     dmx.send(universe, curSlots);
+    health.noteSlowCall("render+dmx", performance.now() - lastRenderMs);
+
     // Spara ramen så fallback-ticken har något att tona ned om ljudet dör.
     if (!lastUniverse || lastUniverse.length !== universe.length) {
       lastUniverse = new Uint8Array(universe.length);
@@ -613,8 +622,33 @@ setInterval(() => {
   lastRenderMs = performance.now();
 }, 20);
 
-capture.on("stderr", (s) => console.error("[arecord]", s));
+// LOGGTAK för overruns: en dålig ALSA-minut kan ge hundratals identiska rader,
+// och på SD-kort kostar journald-skrivningarna mer än felet de beskriver — de
+// dränker dessutom de rader man faktiskt behöver läsa. Vi räknar varje overrun
+// (syns exakt i /api/health-log) men skriver högst en rad per 10 s, med antalet.
+let overrunSinceLog = 0;
+let lastOverrunLogAt = 0;
+capture.on("stderr", (s) => {
+  if (/overrun|underrun/i.test(s)) {
+    health.noteOverrun();
+    overrunSinceLog++;
+    const now = performance.now();
+    if (now - lastOverrunLogAt < 10_000) return;
+    lastOverrunLogAt = now;
+    console.error(`[arecord] overrun ×${overrunSinceLog} (senaste 10s)`);
+    overrunSinceLog = 0;
+    return;
+  }
+  console.error("[arecord]", s);
+});
+
+capture.on("stall", (gap: number) => console.error(`[arecord] tyst i ${gap}ms — startar om capturen`));
+
 capture.on("exit", (code) => console.error("[arecord] exited", code));
+
+// 1 Hz-sampling av hälsomåtten (event-loop-lag mäts som schemats egen försening).
+setInterval(() => health.sample(), 1000);
+
 
 capture.start();
 

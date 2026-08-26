@@ -13,10 +13,14 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 WorkingDirectory=/opt/audio-dmx-engine
-# --max-old-space-size caps V8 heap at 200 MB (Pi Zero 2 W has 512 MB total).
+# HEAP-TAK 112 MB (var 200). MÄTT PÅ LOTUS, samma Zero 2 W: 200 MB heap + RSS får
+# kärnan att swappa medan V8 växer, och nästa GC läser tillbaka sidorna från
+# SD-kortet — flera hundra ms frysning i ljuset. Motorns faktiska behov är ~45 MB,
+# så 112 MB är gott om luft men tvingar GC att jobba INNAN swap blir aktuellt.
+# --max-semi-space-size=8: större young-generation → färre scavenges i hop-loopen.
 # No --enable-source-maps: it parses every module's map at startup (slower cold
 # boot on the SD card) and this is production — stack traces map to dist anyway.
-ExecStart=/usr/bin/node --max-old-space-size=200 dist/index.js
+ExecStart=/usr/bin/node --max-old-space-size=112 --max-semi-space-size=8 dist/index.js
 Environment=NODE_ENV=production
 Environment=UV_THREADPOOL_SIZE=2
 Environment=PORT=80

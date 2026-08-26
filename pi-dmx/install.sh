@@ -53,6 +53,17 @@ if [[ -f $CMD ]]; then
   fi
 fi
 
+# vm.swappiness=10 — MÄTT PÅ LOTUS (samma Zero 2 W): med default 60 började kärnan
+# swappa ut motorns heap medan V8 växte mot sitt tak, och nästa GC läste in sidorna
+# igen från SD-kortet. Det syntes som flera hundra ms frysningar i ljuset. 10 = swap
+# används bara vid riktig minnesbrist, inte som cache-strategi.
+if [[ -d /etc/sysctl.d ]]; then
+  echo "vm.swappiness=10" > /etc/sysctl.d/99-pi-dmx.conf
+  sysctl -q -w vm.swappiness=10 2>/dev/null || true
+fi
+
+
+
 echo "==> [4/9] disable serial-getty (håll bluetoothd igång — BLE-sidecarn använder hci0)"
 # BT-stacken behövs för BLE-slingorna. hciuart var för PL011/BT-modem-kombon på
 # äldre Pi, irrelevant på Zero 2 W (BT sitter på SDIO).

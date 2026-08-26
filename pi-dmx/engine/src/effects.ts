@@ -55,6 +55,9 @@ const BEAT_PREDIP_FRAC = 0.12;
 const BEAT_PREDIP_MIN_MS = 25;
 const BEAT_PREDIP_MAX_MS = 60;
 const BEAT_PREDIP_DEPTH = 0.35;
+/** Ettan i varje fyrtakt pulserar så här mycket starkare än övriga slag.
+ *  25 % är tydligt men inte ett eget effektläge. */
+const BEAT_DOWNBEAT_ACCENT = 0.25;
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
 const START_FADE_MS = 5000;
@@ -362,6 +365,12 @@ export class EffectEngine {
       // Backar ankaret följer vi med i tysthet men utan att räkna ett slag.
       if (beatIdx > this.lastBeatIdx) { this.lastBeatIdx = beatIdx; beatTick = true; }
       else if (beatIdx < this.lastBeatIdx) this.lastBeatIdx = beatIdx;
+      // DOWNBEAT-ACCENT: förstärk pulsen på ettan i varje fyrtakt. Publiken läser
+      // taktarten intuitivt, så en accent där gör att showen känns "säker" även när
+      // samma puls loopar länge. Analysatorns barShift har redan lagt detekterade
+      // ettor på beatIdx % 4 === 0; innan någon etta hittats är valet godtyckligt
+      // men konsekvent (accenten vandrar inte).
+      if (beatIdx % 4 === 0) beatEnv *= 1 + BEAT_DOWNBEAT_ACCENT;
     }
     // INGEN TICK-VÄG FÖR HJÄRTSLAGET — med flit. Utan pålitlig takt tiger det hellre
     // än pulsar på lösa kicks: en puls som sitter fel är värre än ingen puls. (Grid-

@@ -28,6 +28,15 @@ export class AudioCapture extends EventEmitter {
    *  vid uppstart 163 ms, och enstaka event-loop-stalls ger 341 ms → 1500 ms ger
    *  4× marginal till det värsta uppmätta. Ren försäkring, fyrar aldrig i drift. */
   private static readonly STALE_MS = 1500;
+  /** TYST STALL: arecord kan LEVA men sluta leverera (ALSA-enheten hänger, t.ex.
+   *  när codec-zero:n byter ingång under drift). Då fyrar varken 'exit' eller
+   *  'error', så den befintliga respawn-vägen ser ingenting — riggen tonar ned
+   *  till svart och står så tills någon startar om tjänsten. Vakten dödar
+   *  processen i stället; 'exit'-handlern respawnar den om 1 s.
+   *  1500 ms = samma marginal som STALE_MS (värsta uppmätta batch-lucka 341 ms). */
+  private static readonly STALL_MS = 1500;
+  private lastDataAt = 0;
+  private stallTimer: NodeJS.Timeout | null = null;
   /** Se toMonoFloat32: återanvänd mono-buffert, giltig bara under 'chunk'-handlern. */
   private readonly mono: Float32Array;
 
@@ -41,13 +50,29 @@ export class AudioCapture extends EventEmitter {
   start() {
     this.stopped = false;
     this.spawnArecord();
+    if (!this.stallTimer) {
+      this.stallTimer = setInterval(() => this.checkStall(), 500);
+      this.stallTimer.unref?.();
+    }
   }
 
   stop() {
     this.stopped = true;
+    if (this.stallTimer) { clearInterval(this.stallTimer); this.stallTimer = null; }
     this.proc?.kill("SIGTERM");
     this.proc = null;
   }
+
+  /** Dödar en levande men tyst arecord. Respawn sker via 'exit'-handlern. */
+  private checkStall() {
+    if (this.stopped || !this.proc || this.lastDataAt === 0) return;
+    const gap = Date.now() - this.lastDataAt;
+    if (gap < AudioCapture.STALL_MS) return;
+    this.emit("stall", gap);
+    this.lastDataAt = 0;          // ingen andra dödsstöt innan nästa process levererat
+    this.proc.kill("SIGKILL");    // TERM kan hänga i samma ALSA-anrop som tystnade
+  }
+
 
   private spawnArecord() {
     this.leftover = Buffer.alloc(0);
@@ -69,7 +94,7 @@ export class AudioCapture extends EventEmitter {
     if (p.pid) spawn("taskset", ["-pc", "0", String(p.pid)], { stdio: "ignore" }).on("error", () => {});
     this.proc = p;
 
-    p.stdout.on("data", (buf: Buffer) => this.onData(buf));
+    p.stdout.on("data", (buf: Buffer) => { this.lastDataAt = Date.now(); this.onData(buf); });
     p.stderr.on("data", (buf: Buffer) => {
       const s = buf.toString().trim();
       if (s) this.emit("stderr", s);

@@ -305,13 +305,57 @@ export class Analyser {
     // så env = 0 ger ett enormt tal som slår gainen i 20x-taket innan envelopen
     // konvergerat — en hörbar ljuspump vid varje ingångsbyte.
     this.envelope = this.cfg.detection.autoGainTarget;
+    this.resetAgcBlocks();
   }
 
   /** Lock the AGC (aux: fixed 1x, level tracks the mixer directly) or let it run. */
   setGainLock(locked: boolean, fixed = 1) {
     this.gainLocked = locked;
-    if (locked) { this.gain = fixed; this.envelope = this.cfg.detection.autoGainTarget; }
+    if (locked) { this.gain = fixed; this.envelope = this.cfg.detection.autoGainTarget; this.resetAgcBlocks(); }
   }
+
+  /** PERCENTIL-AGC: 16 blockmaxima à 128 ms (~2 s historik) av RÅ rms. Envelopen är
+   *  näst största blockmaximum ≈ 95:e percentilen — en enstaka transient kan alltså
+   *  inte dra ner gainen, men en ihållande het ingång kan.
+   *  MÄTT I LOTUS: momentan-nivå som AGC-mål pinnade level ≥0.95 i ~55 % av tiden
+   *  med upp till 21 % klipp; uppbyggnader blev osynliga eftersom nivån redan låg i
+   *  taket. Percentilen tar bort inbränningen — därför är målet ett TAK för topparna,
+   *  aldrig ett medelvärde att sikta på. */
+  private static readonly AGC_BLOCKS = 16;
+  private static readonly AGC_BLOCK_MS = 128;
+  private agcBlocks = new Float32Array(Analyser.AGC_BLOCKS);
+  private agcBlockIdx = 0;
+  private agcBlockMax = 0;
+  private agcBlockStartMs = 0;
+  private agcBlocksFilled = 0;
+
+  private resetAgcBlocks(): void {
+    this.agcBlocks.fill(0);
+    this.agcBlockIdx = 0; this.agcBlockMax = 0; this.agcBlockStartMs = 0; this.agcBlocksFilled = 0;
+  }
+
+  /** Mata in rå rms; returnerar näst största av de senaste 16 blockmaxima (0 = ej varm). */
+  private agcEnvelope(rawRms: number, nowMs: number): number {
+    if (rawRms > this.agcBlockMax) this.agcBlockMax = rawRms;
+    if (this.agcBlockStartMs === 0) this.agcBlockStartMs = nowMs;
+    if (nowMs - this.agcBlockStartMs >= Analyser.AGC_BLOCK_MS) {
+      this.agcBlocks[this.agcBlockIdx] = this.agcBlockMax;
+      this.agcBlockIdx = (this.agcBlockIdx + 1) % Analyser.AGC_BLOCKS;
+      if (this.agcBlocksFilled < Analyser.AGC_BLOCKS) this.agcBlocksFilled++;
+      this.agcBlockMax = 0;
+      this.agcBlockStartMs = nowMs;
+    }
+    // Näst största över de fyllda blocken (16 tal → linjär skanning är billigast).
+    if (this.agcBlocksFilled < 2) return 0;
+    let top = 0, second = 0;
+    for (let i = 0; i < this.agcBlocksFilled; i++) {
+      const v = this.agcBlocks[i];
+      if (v > top) { second = top; top = v; }
+      else if (v > second) { second = v; }
+    }
+    return second;
+  }
+
 
   /**
    * BPM (80..160) från onset-envelopens autokorrelation.
@@ -932,19 +976,23 @@ export class Analyser {
     this.lastT = now;
     const d = this.cfg.detection;
     // AGC körs BARA för mic (aux låser gain på 1× — line-level är hett & stabilt).
-    // Beprövad envelope→autoGainTarget. (Percentil-AGC:n vore bättre men rör bara
-    // denna oanvända mic-väg → behåller det testade.)
+    // PERCENTIL-AGC (från Lotus, live-mätt): envelopen är 95:e percentilen av RÅ rms
+    // över ~2 s, inte en EMA av den gainade momentannivån. Målet är ett TAK för
+    // topparna. Långsam attack (tauUp×2) så uppbyggnader får höras, snabb retreat
+    // (tauDown×0.25) eftersom AGC:n inte kan ta bort redan inbränd klippning.
     if (!this.gainLocked && rms > d.noiseFloor) {
-      const tau = rms * this.gain > this.envelope ? d.tauDown : d.tauUp;
-      const a = 1 - Math.exp(-dt / tau);
-      this.envelope += (rms * this.gain - this.envelope) * a;
-      const desired = (d.autoGainTarget / Math.max(1e-4, this.envelope)) * this.gain;
-      const gTau = desired > this.gain ? d.tauUp : d.tauDown;
-      const ga = 1 - Math.exp(-dt / gTau);
-      this.gain += (desired - this.gain) * ga;
-      if (this.gain < 0.5) this.gain = 0.5;
-      else if (this.gain > 20) this.gain = 20;
+      const env = this.agcEnvelope(rms, now);
+      if (env > 0) {
+        this.envelope = env;
+        const desired = d.autoGainTarget / Math.max(1e-4, env);
+        const gTau = desired > this.gain ? d.tauUp * 2 : d.tauDown * 0.25;
+        const ga = 1 - Math.exp(-dt / gTau);
+        this.gain += (desired - this.gain) * ga;
+        if (this.gain < 0.5) this.gain = 0.5;
+        else if (this.gain > 20) this.gain = 20;
+      }
     }
+
     const level = Math.min(1, rms * this.gain);
 
     // KICK-DETEKTION v2: onset i kick-bandet (sub-bas ~0–280 Hz) mot en ADAPTIV
