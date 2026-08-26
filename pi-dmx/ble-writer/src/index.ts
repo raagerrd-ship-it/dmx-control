@@ -104,9 +104,34 @@ noble.on("discover", (p: any) => {
 
 /* ─────────────── connection management ─────────────── */
 
+/** ANTI-CHURN (mätt på Lotus, samma BCM43438-radio): en slinga som ligger utom
+ *  räckhåll eller vägrar GATT gav en oändlig connect→fail-loop. Varje försök
+ *  startar en 4 s scan, och scanningen stjäl radiotid från de slingor som FUNGERAR
+ *  — de började tappa paket och ljuset hackade. Två spärrar:
+ *    • GOLV 2 s mellan försök per slinga (scanningen ensam tar 4 s vid miss).
+ *    • CHURN-GRIND: 5 misslyckade försök inom 30 s → 15 s tystnad för den slingan.
+ *  Grinden nollställs vid lyckad anslutning. Vi ger ALDRIG upp permanent: en slinga
+ *  som får ström igen ska hitta hem själv, utan att någon startar om tjänsten. */
+const CONNECT_FLOOR_MS = 2000;
+const CHURN_WINDOW_MS = 30_000;
+const CHURN_MAX_FAILS = 5;
+const CHURN_PAUSE_MS = 15_000;
+const churn = new Map<string, { fails: number; windowStart: number; pausedUntil: number }>();
+
+function churnState(mac: string) {
+  let c = churn.get(mac);
+  if (!c) { c = { fails: 0, windowStart: 0, pausedUntil: 0 }; churn.set(mac, c); }
+  return c;
+}
+
 async function connect(strip: Strip): Promise<boolean> {
   if (strip.connecting || strip.char) return !!strip.char;
   if (!nobleReady) return false;
+  const now = Date.now();
+  const c = churnState(strip.mac);
+  if (now < c.pausedUntil) return false;
+  if (now - strip.lastConnectAttemptMs < CONNECT_FLOOR_MS) return false;
+  strip.lastConnectAttemptMs = now;
   strip.connecting = true;
   try {
     // noble caches peripherals internally; if we lost it (adapter reset),
@@ -120,7 +145,7 @@ async function connect(strip: Strip): Promise<boolean> {
         setTimeout(done, 4000);
       });
     }
-    if (!strip.peripheral) { strip.connecting = false; return false; }
+    if (!strip.peripheral) { strip.connecting = false; noteFail(strip.mac); return false; }
     await strip.peripheral.connectAsync();
     const { characteristics } = await strip.peripheral
       .discoverSomeServicesAndCharacteristicsAsync([BLEDOM_SERVICE], [BLEDOM_CHAR]);
@@ -136,10 +161,24 @@ async function connect(strip: Strip): Promise<boolean> {
     strip.char = null;
   }
   strip.connecting = false;
+  if (strip.char) { c.fails = 0; c.windowStart = 0; c.pausedUntil = 0; }
+  else noteFail(strip.mac);
   broadcastPaired();
   broadcastActive();
   return !!strip.char;
 }
+
+function noteFail(mac: string): void {
+  const c = churnState(mac);
+  const now = Date.now();
+  if (now - c.windowStart > CHURN_WINDOW_MS) { c.windowStart = now; c.fails = 0; }
+  if (++c.fails >= CHURN_MAX_FAILS) {
+    c.pausedUntil = now + CHURN_PAUSE_MS;
+    c.fails = 0; c.windowStart = now;
+    console.error(`[ble] ${mac}: ${CHURN_MAX_FAILS} misslyckade försök — pausar ${CHURN_PAUSE_MS / 1000}s`);
+  }
+}
+
 
 async function writeStrip(strip: Strip, r: number, g: number, b: number) {
   if (!strip.char || strip.chip !== "bledom") return;
