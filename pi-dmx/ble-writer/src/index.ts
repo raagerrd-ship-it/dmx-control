@@ -429,3 +429,25 @@ server.listen(SOCK, () => {
 
 function clamp01(x: number) { return x < 0 ? 0 : x > 1 ? 1 : x; }
 function byte(x: number) { return Math.max(0, Math.min(255, Math.round(x))); }
+
+/* ─────────────── shutdown ───────────────
+ * BEGRÄNSAD AVSTÄNGNING: disconnectAsync mot en slinga som redan tappat länken
+ * kan hänga i BlueZ tills GATT-timeouten går ut. Utan tak hänger processen kvar
+ * medan systemd väntar på TimeoutStopSec (90 s default) — det gör en enkel
+ * omstart till en och en halv minut av mörka slingor. Vi försöker koppla ner
+ * snyggt men ger oss efter 800 ms och exitar ändå. */
+let shuttingDown = false;
+function shutdown(): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const bail = setTimeout(() => process.exit(0), 800);
+  bail.unref?.();
+  const jobs: Promise<unknown>[] = [];
+  for (const s of known.values()) {
+    if (!s.peripheral || !s.char) continue;
+    try { jobs.push(Promise.resolve(s.peripheral.disconnectAsync()).catch(() => {})); } catch { /* */ }
+  }
+  Promise.all(jobs).then(() => process.exit(0)).catch(() => process.exit(0));
+}
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
