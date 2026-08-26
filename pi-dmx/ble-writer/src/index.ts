@@ -71,6 +71,7 @@ interface Strip {
   lastFrame: [number, number, number];      // last (r,g,b) actually sent
   target:    [number, number, number];      // next (r,g,b) requested
   connecting: boolean;
+  lastConnectAttemptMs: number;              // anti-churn: golv mellan försök
   identifyUntil: number;                    // 0 = normal; >now = blinka i identifieringsfärg
   transient: boolean;                        // true = added by identify, drop after blink om ej parad
   cal: StripCal;                             // per-slinga vitbalans + max-ljus
@@ -320,7 +321,7 @@ async function handle(sock: net.Socket, msg: any) {
       known.set(mac, {
         mac, name: d.name || mac, chip: d.chip === "bledom" ? "bledom" : "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
-        target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: false,
+        target: [0, 0, 0], connecting: false, lastConnectAttemptMs: 0, identifyUntil: 0, transient: false,
         cal: normalizeCal(d.cal),
       });
     }
@@ -349,7 +350,7 @@ async function handle(sock: net.Socket, msg: any) {
       known.set(mac, {
         mac, name: s?.name || mac, chip: s?.chip || "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
-        target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: false,
+        target: [0, 0, 0], connecting: false, lastConnectAttemptMs: 0, identifyUntil: 0, transient: false,
         cal: { ...DEFAULT_CAL },
       });
     }
@@ -377,7 +378,7 @@ async function handle(sock: net.Socket, msg: any) {
       known.set(mac, {
         mac, name: s?.name || mac, chip: s?.chip || "unknown",
         peripheral: null, char: null, lastWriteMs: 0, lastFrame: [-1, -1, -1],
-        target: [0, 0, 0], connecting: false, identifyUntil: 0, transient: true,
+        target: [0, 0, 0], connecting: false, lastConnectAttemptMs: 0, identifyUntil: 0, transient: true,
         cal: { ...DEFAULT_CAL },
       });
     }
