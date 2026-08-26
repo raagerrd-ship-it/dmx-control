@@ -581,8 +581,17 @@ setInterval(() => {
   lastRenderMs = performance.now();
 }, 20);
 
-capture.on("stderr", (s) => console.error("[arecord]", s));
+capture.on("stderr", (s) => {
+  // "overrun!!!" = ALSA hann inte lämna över bufferten → tappade samples. Räknas
+  // som hälsomått; loggen är oförändrad så journalen ser ut som förut.
+  if (/overrun|underrun/i.test(s)) health.noteOverrun();
+  console.error("[arecord]", s);
+});
 capture.on("exit", (code) => console.error("[arecord] exited", code));
+
+// 1 Hz-sampling av hälsomåtten (event-loop-lag mäts som schemats egen försening).
+setInterval(() => health.sample(), 1000);
+
 
 capture.start();
 
