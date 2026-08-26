@@ -190,6 +190,24 @@ async function nameSong(wavPath: string, songId: number): Promise<void> {
   }
 }
 
+/**
+ * FAS-PREDIKTIONSTILLIT — landar verkliga trumslag dar rutnatet pastar?
+ *
+ * Tempogrammets peak-to-mean (`frame.bpmConfidence`) matte fel sak for det har
+ * andamalet. Tva invandningar, bada mekaniska:
+ *   1. Harmonikerna pa 2L och 3L lyfter medelvardet i namnaren och SANKER
+ *      darmed konfidensen — precis nar takten ar som tydligast.
+ *   2. Hjartslaget behover inte veta hur spetsigt tempogrammet ar, utan om
+ *      rutnatet FORUTSAGER slagen. Det ar en annan fraga.
+ * Den fragan ar redan nastan besvarad: PLL:en raknar fasfelet per kick.
+ *
+ * Bevaras: i ett lugnt parti kommer inga kickar, bevisen slutar komma, tilliten
+ * lacker ner och pulsen drar sig undan — samma beteende som forut, men nu med
+ * en principiell grund i stallet for som biprodukt av ett tempogram.
+ */
+let onBeatRate = 0;          // andel kickar med |fasfel| < 0.25
+let lastTrustLog = 0;
+let lastPllKickMs = 0;
 let lastCueSongId = 0;
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
@@ -255,6 +273,25 @@ capture.on("chunk", (samples: Float32Array) => {
   // just SLAGIT FAST att en ny låt börjat. Nollställt lås tar första estimatet direkt.
   if (songs.boundaryCount !== lastBoundary) { lastBoundary = songs.boundaryCount; effects.softenRange(); analyser.resetTempo(); }
 
+
+  // TILLITEN KOMMER FRAN FASPREDIKTIONEN, inte fran tempogrammets form.
+  // Coast: utan kickar finns inga nya bevis, sa tilliten lacker ner over ~4 s i
+  // stallet for att falla direkt. Det ar det som far pulsen att dra sig undan i
+  // ett lugnt parti utan att slockna vid ett enda missat slag.
+  if (cfg.beat && lastPllKickMs) {
+    const quiet = Date.now() - lastPllKickMs;
+    if (quiet > 1500) onBeatRate *= Math.max(0, 1 - (quiet - 1500) / 4000);
+  }
+  if (!memoryBeatLocked) {
+    // DIAGNOSTIK: bada matten loggas sa de gar att jamfora mot varandra och mot
+    // vad ogat ser, i stallet for att bytet ska behova tas pa tro.
+    if (frame.bpmConfidence > 0.05 && Date.now() - lastTrustLog > 4000) {
+      lastTrustLog = Date.now();
+      console.log(`[tillit] tempogram ${frame.bpmConfidence.toFixed(2)} · fasprediktion ${onBeatRate.toFixed(2)} · bpm ${frame.bpm}`);
+    }
+    frame.bpmConfidence = onBeatRate;
+    if (cfg.beat) cfg.beat.confidence = onBeatRate;
+  }
 
   if (songs.recognized) {
     // DIAGNOSTIK: realtidsdetektorn kopplas bort när låten är känd, så ett fel i
@@ -380,6 +417,10 @@ capture.on("chunk", (samples: Float32Array) => {
       // Live fasfel för UI: hur långt slaget låg från gridet, KRAFTIGT utjämnat
       // (~2s) → visar det IHÅLLANDE laget, inte per-slag-jittret. Nära 0 = tight låst.
       if (onBeat) cfg.beatErr = (cfg.beatErr ?? 0) * 0.85 + err * 0.15;
+      // Bevis per kick. Uppdateras BARA nar ett slag faktiskt kom — mellan slagen
+      // finns inget nytt att veta, och att mata in nollor da hade lasts som "fel".
+      onBeatRate += ((onBeat ? 1 : 0) - onBeatRate) * 0.12;
+      lastPllKickMs = Date.now();
       if (k0 > 0 && onBeat) {
         cfg.beat.anchorMs += err * beatMs * k;   // FAS-term: dra ankaret mot slaget
         // FREKVENS-term (PI-integral): en fas-bara-PLL har ett permanent steady-state-

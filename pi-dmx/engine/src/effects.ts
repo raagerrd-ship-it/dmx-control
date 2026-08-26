@@ -9,7 +9,7 @@
 import type { EngineConfig, FixtureConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { FixtureOutput, type SpecialtyValues } from "./output.js";
-import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked } from "./beatClock.js";
+import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { PostProcess } from "./postprocess.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER } from "./effects/registry.js";
@@ -438,7 +438,12 @@ export class EffectEngine {
         // `frame.bpmConfidence` ar redan 1 nar takten kommer ur latminnet —
         // index.ts satter den vid kallan, sa alla konsumenter ser samma sanning
         // och ingen behover vaga in realtidens osakerhet pa en tvattad lat.
-        const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - 0.18) / 0.37));
+        // RAMPEN MASTE BORJA DAR KLOCKANS GRIND SLAPPER IGENOM, inte fore.
+        // Forut startade den pa 0.18 medan `MIN_BEAT_CONFIDENCE` ar 0.20: mellan
+        // dem var tilliten nollskild medan rutnatet var DOTT (hasBeat falskt), sa
+        // pulsen var avstangd samtidigt som diagnostiken visade tillit. Ett
+        // dodband som bara gick att felsoka genom att lasa bada filerna.
+        const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - MIN_BEAT_CONFIDENCE) / 0.37));
         this.beatTrust += (trustRaw - this.beatTrust) * 0.03;
         // PULSEN SKA FÖLJA MUSIKENS ENERGI, INTE BARA TAKTENS TYDLIGHET.
         // MÄTT 2026-08-07: i ett LUGNT parti pulsade riggen 70→100 % på varje taktslag
