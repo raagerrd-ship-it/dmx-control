@@ -30,6 +30,8 @@ import { BleClient, type BleScanDevice, type BleCal } from "./bleClient.js";
 import { applyIntensity } from "./moods.js";
 import { MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { SongMemory } from "./songMemory.js";
+import * as health from "./runtimeHealth.js";
+
 
 import { activeSlots, fixtureRoles, type Mode } from "./config.js";
 import { EFFECT_KEYS, EFFECT_MAP } from "./effects/registry.js";
