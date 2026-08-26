@@ -1,5 +1,15 @@
 # Ändringslogg
 
+## v0.3.0 — driftstabilitet (portat från Lotus-motorn)
+
+- **Percentil-AGC på mic-vägen**: envelopen är 95:e percentilen (näst största av 16 blockmaxima à 128 ms) av RÅ rms i stället för en EMA av den gainade momentannivån. Långsam attack, snabb retreat. Mätt i ny bänk (`tools/testAgc.mjs`, 8 seeder): pinnad nivå 0 %, klipp 0 %, och uppbyggnaden syns (nivå intro/build/drop 0,15 / 0,30 / 0,35). Aux-vägen är oförändrad (gain låst 1×), så hela BPM-sviten ger identiska siffror.
+- **Realtidshälsa** (`runtimeHealth.ts`): chunk-fps, render-fps, event-loop-lag, render-jitter, ALSA-overruns och långa anrop (>50 ms) exponeras i `GET /api/health-log` under `runtime`. Max-värden är peak sedan förra hämtningen.
+- **Tyst stall-detektering**: arecord kan leva men sluta leverera (ALSA-enheten hänger) — då fyrar varken `exit` eller `error`. Vakten dödar processen efter 1500 ms utan data; befintlig respawn tar över.
+- **Minneshärdning**: motorns heap-tak 200 → 112 MB (+ `--max-semi-space-size=8`), BLE-sidecarn 80 → 64 MB, och `vm.swappiness=10` från installern. Swap-in under GC var källan till flera hundra ms frysningar på Zero 2 W.
+- **BLE anti-churn**: golv 2 s mellan anslutningsförsök per slinga, 5 misslyckade inom 30 s → 15 s paus, samt begränsad avstängning (800 ms tak) så en omstart inte fastnar i BlueZ.
+- **Loggtak**: overrun-rader och BLE-anslutningsfel skrivs högst en gång per 10 s respektive 30 s — räkningen finns kvar exakt i hälsomåtten.
+
+
 ## v0.2.2 — grannrättning + reproducerbar bänk
 
 - **Grannrättning av tidigt lås**: ett lås från 0,5 s-fönstret kunde hamna 10–20 % fel (t.ex. 122 mot 136) och satt kvar hela låten — glid-bandet slutar vid ±11 % och oktav-grenen börjar vid 1,4×, felet låg i ett dödområde. Nu räknas ~2 s bevis före commit, med samma tre skydd som låtbytesvägen: sammanhållen utmanare (±4 %), konfidensgolv 0,75 och tömd medianhistorik vid omlåsning. Committade lås rörs inte.
