@@ -20,6 +20,8 @@ import type { FogStatus } from "./effects.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, EFFECT_META } from "./effects/registry.js";
 import { logHealth, getHealthLog } from "./healthLog.js";
+import { getRuntimeHealth } from "./runtimeHealth.js";
+
 
 // Version hämtas från package.json vid startup — ingen build-tid-magi, bara en
 // synkron read en gång per process.
