@@ -94,7 +94,7 @@ export class AudioCapture extends EventEmitter {
     if (p.pid) spawn("taskset", ["-pc", "0", String(p.pid)], { stdio: "ignore" }).on("error", () => {});
     this.proc = p;
 
-    p.stdout.on("data", (buf: Buffer) => this.onData(buf));
+    p.stdout.on("data", (buf: Buffer) => { this.lastDataAt = Date.now(); this.onData(buf); });
     p.stderr.on("data", (buf: Buffer) => {
       const s = buf.toString().trim();
       if (s) this.emit("stderr", s);
