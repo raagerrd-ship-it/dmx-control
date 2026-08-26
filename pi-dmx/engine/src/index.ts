@@ -226,9 +226,13 @@ const capture = new AudioCapture({
 });
 
 capture.on("chunk", (samples: Float32Array) => {
+  const t0 = performance.now();
   const frame = analyser.process(samples);
+  health.noteSlowCall("analyser.process", performance.now() - t0);
+  health.noteChunk();
   latestFrame = frame;
   lastChunkAt = Date.now();
+
   // ── LÅTMINNE ──────────────────────────────────────────────────────────────
   // Analysatorns egen drop-flank läses FÖRE vi eventuellt skriver om räknaren
   // (replayen äger dropsen när låten är känd).
