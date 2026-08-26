@@ -478,9 +478,12 @@ function probeSample(universe: Uint8Array): void {
 function renderAndSend(): void {
     if (!latestFrame) return;   // inget ljud har någonsin kommit — inget att rendera
     lastRenderMs = performance.now();
+    health.noteRender(lastRenderMs, RENDER_MS);
     const universe = effects.render(latestFrame);
     probeSample(universe);
     dmx.send(universe, curSlots);
+    health.noteSlowCall("render+dmx", performance.now() - lastRenderMs);
+
     // Spara ramen så fallback-ticken har något att tona ned om ljudet dör.
     if (!lastUniverse || lastUniverse.length !== universe.length) {
       lastUniverse = new Uint8Array(universe.length);
