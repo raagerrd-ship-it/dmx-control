@@ -201,7 +201,7 @@ const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
 const foldBpm = (b: number): number => {
   if (!(b > 0)) return 0;
   let v = b;
-  while (v < 90) v *= 2;
+  while (v < 60) v *= 2;
   while (v >= 180) v /= 2;
   return v;
 };

@@ -146,14 +146,27 @@ export class Analyser {
   private bpmCounter = 0;
   private localBpm = 0;
   private localBpmConfidence = 0;
-  // TÄCKNING, inte oktav-tydlighet: båda intervallen är exakt en oktav (160=2·80,
-  // 180=2·90), så b och 2b är lika oskiljbara i båda. Vinsten är att 165–180 BPM
-  // (hardstyle, psytrance, dnb-halvtempo) inte längre viks till halvtempo — MÄTT:
-  // 170 lästes som 85. Priset är att 80–89 (ballader) nu viks upp till 160–178.
-  // Rätt affär för partitillämpningen ("hellre den snabbare representanten").
-  private static readonly BPM_MIN = 90;    // festintervall; MAX maste vara exakt 2x MIN
+  // TÄCKNING 60..180 — INTE en oktav (ratio 3). Det är ett medvetet byte av vad
+  // vikningen gör: 60..180 rymmer BÅDA representanterna för allt mellan 60 och 90
+  // (en 70 och en 140 får bo kvar var för sig), så en lugn låt behåller sitt egna
+  // tempo i stället för att tvingas upp till dubbelt. Priset är att vikningen inte
+  // längre GARANTERAR en unik representant — det är oktavgrenarna nedan (och
+  // off-beat-testet i computeBpm) som avgör vilken som gäller, inte `while`-loopen.
+  // Terminering: loopen kräver bara MAX >= 2*MIN (180 >= 120). Med MAX < 2*MIN
+  // (t.ex. 90..170) studsar 175 -> 87.5 -> 175 i all evighet och motorn hänger.
+  // Sömmarna ligger nu vid 60 och 180 i stället för 90/180.
+  private static readonly BPM_MIN = 60;    // MAX måste vara >= 2*MIN (annars evig vikning)
   private static readonly BPM_MAX = 180;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
+  /** Bevis för att DUBBLERA (estimaten pekar högre) mot att HALVERA (lägre).
+   *  ASYMMETRISKT med flit: ett halvtempo-lås gör ljusshowen trögt fel men körbar,
+   *  medan ett dubbeltempo-lås strular med varje effekt — och en breakdown, ett
+   *  glesare parti eller ett sväng-mönster ser ut som halvt tempo långt oftare än
+   *  något ser ut som dubbelt. Uppåt räcker ~2 s bevis; nedåt krävs ~6 s.
+   *  Grannrättningen är däremot SYMMETRISK — se den mätta motiveringen där. */
+  private static readonly OCT_UP = 8;
+  private static readonly OCT_DOWN = 24;
+
   private nearVote = 0;     // bevis för GRANN-fel (t.ex. 122 låst mot 136): bara före commit
   private nearChallenger = 0;  // tempot grann-rösterna pekar på (måste hålla ihop, som challengerBpm)
   private bpmStable = 0;    // antal stabila (finjusterings-)estimat i rad → committa oktaven
@@ -583,12 +596,16 @@ export class Analyser {
 
 
     let bpm = (HZ * 60) / lagF;
-    // BPM-FILTER: vik in i 90..180 — festmusik ligger dar, och allt utanfor ar
-    // en oktav-artefakt (en 85-BPM-ballad ar i praktiken 170, en 190 ar 95).
-    // Intervallet MASTE spanna exakt en oktav (max = 2x min): med t.ex. 90..170
-    // blir 175 -> 87.5 -> 175 -> 87.5 i all evighet och motorn hanger.
+    // BPM-FILTER: vik in i 60..180. Sökningen (lagMin/lagMax) täcker 55..185, så
+    // detta rör bara kanterna: under 60 dubbleras, från 180 halveras. Inne i
+    // intervallet står estimatet KVAR som mätt — en 70-BPM-ballad tvingas inte upp
+    // till 140 längre. Vilken oktav som gäller avgörs av off-beat-testet ovan och
+    // oktavgrenarna nedan (asymmetriska: dubblera lätt, halvera trögt).
+    // Terminering kräver MAX >= 2*MIN; med t.ex. 90..170 blir 175 -> 87.5 -> 175 -> 87.5
+    // i all evighet och motorn hänger.
     while (bpm < Analyser.BPM_MIN) bpm *= 2;
     while (bpm >= Analyser.BPM_MAX) bpm /= 2;
+
     // Median över RÅestimaten (utan oktav-tvång) → dämpar brus men låser inte
     // fast oktaven, så en fel initial låsning kan rättas. Långt fönster (~5s) för
     // att inte studsa på brusiga/tvetydiga låtar.
@@ -642,10 +659,11 @@ export class Analyser {
         if (this.bpmStable < 100000) this.bpmStable++;                              // stabil tid ackumuleras
       } else if (!committed && ratio > 1.4) {
         this.octaveVote = Math.max(0, this.octaveVote) + 1;                          // estimaten HÖGRE oktav
-        if (this.octaveVote >= 8) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
+        if (this.octaveVote >= Analyser.OCT_UP) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
       } else if (!committed && ratio < 0.7) {
         this.octaveVote = Math.min(0, this.octaveVote) - 1;                          // estimaten LÄGRE oktav
-        if (this.octaveVote <= -8) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
+        if (this.octaveVote <= -Analyser.OCT_DOWN) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
+
       } else if (!committed) {
         // GRANNRÄTTNING: ett tidigt lås från 0.5 s fönster kan hamna 10-20 % fel
         // (MÄTT: brusigt rum 136 låste 122 på en av åtta brus-seeder och satt kvar
@@ -662,6 +680,13 @@ export class Analyser {
         // LÅTBYTES-HINT (Sonos): under re-acquisition-fönstret sänks kvalitetsgrinden
         // och röstkravet, så en ny takt kan bekräftas på ~2-3 s i stället för ~5 s.
         // Skydden finns kvar (sammanhållen utmanare + tömd historik) — bara mildare.
+        // INGEN riktnings-asymmetri här (till skillnad från OCT_UP/OCT_DOWN):
+        // PROVAT 2026-08-30 att kräva dubbla röster nedåt (och 1.5×). Det är ett
+        // GRANN-fel på 10–30 %, inte ett oktavfel — den vanligaste nedåträttningen är
+        // "122 låst mot verkligt 136", alltså precis den rättning vi vill ha. MÄTT
+        // över 8 seeder: dubbla röster nedåt sänkte brusigt rum 45 % → 31 % och
+        // shuffle 29 % → 16 %, utan att ge något tillbaka (OCT_DOWN ensamt räddade
+        // både svag bas 132 och breakdown 142). Symmetriskt behålls.
         const reacq = voteNow < this.reacqUntilMs;
         if (conf < (reacq ? 0.55 : 0.75)) {
           this.nearVote = 0; this.nearChallenger = 0;
@@ -669,6 +694,8 @@ export class Analyser {
           this.nearChallenger += (bpm - this.nearChallenger) * 0.3;
           this.nearVote++;
           if (this.nearVote >= (reacq ? 3 : 8)) {
+
+
             this.localBpm = Math.round(med);
             this.bpmHistLen = 0; this.bpmHistPos = 0;
             this.nearVote = 0; this.nearChallenger = 0; this.octaveVote = 0; this.bpmStable = 0;

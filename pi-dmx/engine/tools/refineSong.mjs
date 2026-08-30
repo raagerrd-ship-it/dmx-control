@@ -121,10 +121,13 @@ if (bestLag > LAG_MIN && bestLag < LAG_MAX) {
   if (den !== 0) lagF = bestLag + Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den));
 }
 let bpm = lagF ? 60 * HZ / lagF : 0;
-// Oktavval: håll tempot i 90–180 — SAMMA intervall som analysatorns BPM_MIN/BPM_MAX.
+// Oktavval: håll tempot i 60–180 — SAMMA intervall som analysatorns BPM_MIN/BPM_MAX.
+// Divergens här ger beat-grid på fel oktav: index.ts laddar refinerns tempo med full
+// tillit och skriver över cfg.beat. Intervallet är INTE en oktav (ratio 3), så en lugn
+// låt på 70 behåller sitt tempo i stället för att tvingas upp till 140.
 // Divergerar de viker refinern en 172-BPM-låt till 86 medan analysatorn säger 172, och
 // index.ts laddar refinerns värde med full tillit → beat-gridet går på halvt tempo.
-while (bpm > 0 && bpm < 90) bpm *= 2;
+while (bpm > 0 && bpm < 60) bpm *= 2;
 while (bpm >= 180) bpm /= 2;
 
 // Taktfas: vik onset-kurvan över perioden och ta maxfasen.
@@ -270,7 +273,7 @@ const bpmIn = (t0, t1) => {
     if (s > bs) { bs = s; bl = lag; }
   }
   let v = bl ? 60 * HZ / bl : 0;
-  while (v > 0 && v < 90) v *= 2;
+  while (v > 0 && v < 60) v *= 2;
   while (v >= 180) v /= 2;
   return v;
 };
