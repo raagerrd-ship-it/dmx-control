@@ -39,7 +39,7 @@ if [ "$code" = "200" ]; then rm -f "$STATE"; exit 0; fi
 reason=$(cat /tmp/pi-dmx-health-body 2>/dev/null)
 
 # Ingen svarskod alls = motorn hänger i event-loopen. Riktad åtgärd är omöjlig.
-[ -z "$code" ] || [ "$code" = "000" ] && restart "engine active but /health unreachable"
+if [ -z "$code" ] || [ "$code" = "000" ]; then restart "engine active but /health unreachable"; fi
 
 case "$reason" in
   audio)
