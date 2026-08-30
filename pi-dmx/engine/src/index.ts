@@ -642,9 +642,23 @@ capture.on("stderr", (s) => {
   console.error("[arecord]", s);
 });
 
-capture.on("stall", (gap: number) => console.error(`[arecord] tyst i ${gap}ms — startar om capturen`));
+capture.on("stall", (gap: number) => logHealth("warn", "audio", `tyst i ${gap}ms — startar om capturen`));
 
 capture.on("exit", (code) => console.error("[arecord] exited", code));
+
+// ── ÅTERHÄMTNINGSTRAPPAN (se audio.ts) ────────────────────────────────────────
+// Steg 3–4: ren respawn hjälpte inte → sätt om ALSA-rutten. codec-zero kan hamna
+// i fel ingång när jacket rörs, och då levererar arecord tystnad hur många gånger
+// vi än startar om den.
+capture.on("rebind", (n: number) => {
+  logHealth("warn", "audio", `återhämtning ${n}: sätter om ALSA-ingången (${cfg.audioInput === "mic" ? "mik" : "aux"})`);
+  applyInputRouting(cfg.audioInput === "mic" ? "mic" : "aux");
+});
+// Trappan slut → SÄKERT LÄGE. Riggen står svart via den befintliga uttoningen,
+// men nu står det i hälsologgen VARFÖR, och vi slutar bränna CPU på respawn-jakt.
+capture.on("safe", (n: number) => logHealth("err", "audio", `ingen ljudinfångning efter ${n} försök — säkert läge, nytt försök varje minut`));
+capture.on("recovered", () => logHealth("info", "audio", "ljudinfångningen tillbaka — säkert läge avslutat"));
+
 
 // 1 Hz-sampling av hälsomåtten (event-loop-lag mäts som schemats egen försening).
 setInterval(() => health.sample(), 1000);
