@@ -132,6 +132,7 @@ export class AudioCapture extends EventEmitter {
 
   private spawnArecord() {
     this.leftover = Buffer.alloc(0);
+    this.firstDataAt = 0;
     const args = [
       "-D", this.opts.device,
       "-f", "S16_LE",
@@ -150,14 +151,27 @@ export class AudioCapture extends EventEmitter {
     if (p.pid) spawn("taskset", ["-pc", "0", String(p.pid)], { stdio: "ignore" }).on("error", () => {});
     this.proc = p;
 
-    p.stdout.on("data", (buf: Buffer) => { this.lastDataAt = Date.now(); this.onData(buf); });
+    p.stdout.on("data", (buf: Buffer) => {
+      const now = Date.now();
+      this.lastDataAt = now;
+      // FRISK CAPTURE = oavbruten leverans i 5 s. Först då nollställs trappan:
+      // annars räcker en enda chunk mellan två stall för att nollställa den, och
+      // en enhet som levererar i ryck skulle jaga respawns i evighet.
+      if (this.firstDataAt === 0) this.firstDataAt = now;
+      else if (this.recoveries > 0 && now - this.firstDataAt >= AudioCapture.HEALTHY_MS) {
+        this.recoveries = 0;
+        if (this.safeMode) { this.safeMode = false; this.emit("recovered"); }
+      }
+      this.onData(buf);
+    });
     p.stderr.on("data", (buf: Buffer) => {
       const s = buf.toString().trim();
       if (s) this.emit("stderr", s);
     });
     p.on("exit", (code) => {
       this.emit("exit", code);
-      if (!this.stopped) setTimeout(() => this.spawnArecord(), 1000);
+      this.proc = null;
+      this.scheduleRecovery();
     });
     // 'error' fyrar om själva spawn:en failar (arecord saknas på PATH, eller
     // EAGAIN när fork inte får minne på 512MB-Pi:n). Utan denna lyssnare skulle
@@ -165,9 +179,11 @@ export class AudioCapture extends EventEmitter {
     // fyrar INTE vid spawn-fel, så respawn:en ovan uteblir. Respawna här i stället.
     p.on("error", (err) => {
       this.emit("stderr", `spawn: ${(err as Error).message}`);
-      if (!this.stopped) setTimeout(() => this.spawnArecord(), 1000);
+      this.proc = null;
+      this.scheduleRecovery();
     });
   }
+
 
   private onData(buf: Buffer) {
     // Concat leftover + new; slice into fixed chunks; keep remainder.
