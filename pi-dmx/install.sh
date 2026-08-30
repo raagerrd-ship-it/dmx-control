@@ -143,13 +143,27 @@ install -Dm644 "$REPO_DIR/dmx-helper/systemd/dmx-helper.service" \
 echo "==> [7/8] build + install audio-dmx-engine (Node)"
 cd "$REPO_DIR/engine"
 npm ci --no-audit --no-fund
+# Alltid ren ombyggnad: tsc:s inkrementella cache har vid mer än ett tillfälle
+# lämnat kvar gamla .js-filer efter att en .ts-fil bytt namn/tagits bort.
+rm -rf dist
 npm run build
+# Hård kontroll: dist måste finnas OCH vara nyare än nyaste källfilen.
+NEWEST_SRC="$(find src tsconfig.json package.json -type f -newer dist/index.js 2>/dev/null | head -1 || true)"
+if [ ! -f dist/index.js ]; then
+  echo "❌ Bygget gav ingen dist/index.js — avbryter deploy." >&2
+  exit 1
+fi
+if [ -n "$NEWEST_SRC" ]; then
+  echo "❌ dist/index.js är äldre än $NEWEST_SRC — bygget gick inte igenom." >&2
+  exit 1
+fi
 mkdir -p /opt/audio-dmx-engine /var/lib/audio-dmx-engine
 rsync -a --delete dist/ /opt/audio-dmx-engine/dist/
 rsync -a --delete public/ /opt/audio-dmx-engine/public/
 [ -d ../webapp ] && rsync -a --delete ../webapp/ /opt/audio-dmx-engine/webapp/
 rsync -a --delete node_modules/ /opt/audio-dmx-engine/node_modules/
 install -m644 package.json /opt/audio-dmx-engine/package.json
+
 install -Dm644 systemd/audio-dmx-engine.service /etc/systemd/system/audio-dmx-engine.service
 install -Dm644 systemd/cpu-performance.service /etc/systemd/system/cpu-performance.service
 # Health watchdog — restart engine if /health hangs for 2 checks in a row.
