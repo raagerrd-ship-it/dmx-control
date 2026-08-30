@@ -193,16 +193,16 @@ const NOV_TAU_S = 45;          // glömska på fördelningen (~90 s effektivt f�
 const NOV_DIST_MIN_S = 20;     // innan så mycket data samlats gäller bara absoluta kravet
 const NOV_DIST_BUCKETS = 48;   // d är ett L1-avstånd i 0..2  // klangskifte räknas som evidens så länge efteråt
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
-/** OKTAV-MIGRATION: lagrade låtar kan ha tempot i det GAMLA 80..160-intervallet
- *  (t.ex. 85 där analysatorn i dag säger 170). Blandas de rakt ihop blir m.bpm
- *  nonsens och tempohoppet triggar falska låtgränser. Vi nollställer INTE lagret —
- *  vikning är förlustfri här, så varje läsning och blandning viks in i nuvarande
- *  intervall i stället. Måste hållas i takt med Analyser.BPM_MIN/BPM_MAX. */
+/** OKTAV-MIGRATION: lagrade låtar kan ha tempot i ett ANNAT intervall än dagens
+ *  (60..180 kördes en tid). Blandas de rakt ihop blir m.bpm nonsens och tempohoppet
+ *  triggar falska låtgränser. Vi nollställer INTE lagret — vikning är förlustfri
+ *  här, så varje läsning och blandning viks in i nuvarande intervall i stället.
+ *  Måste hållas i takt med Analyser.BPM_MIN/BPM_MAX (80..160). */
 const foldBpm = (b: number): number => {
   if (!(b > 0)) return 0;
   let v = b;
-  while (v < 60) v *= 2;
-  while (v >= 180) v /= 2;
+  while (v < 80) v *= 2;
+  while (v >= 160) v /= 2;
   return v;
 };
 // IGENKÄNNING SOM GRÄNS. Känner igenkännaren en ANNAN känd låt mitt i ett segment,
