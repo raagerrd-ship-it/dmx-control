@@ -143,13 +143,27 @@ install -Dm644 "$REPO_DIR/dmx-helper/systemd/dmx-helper.service" \
 echo "==> [7/8] build + install audio-dmx-engine (Node)"
 cd "$REPO_DIR/engine"
 npm ci --no-audit --no-fund
+# Alltid ren ombyggnad: tsc:s inkrementella cache har vid mer än ett tillfälle
+# lämnat kvar gamla .js-filer efter att en .ts-fil bytt namn/tagits bort.
+rm -rf dist
 npm run build
+# Hård kontroll: dist måste finnas OCH vara nyare än nyaste källfilen.
+NEWEST_SRC="$(find src tsconfig.json package.json -type f -newer dist/index.js 2>/dev/null | head -1 || true)"
+if [ ! -f dist/index.js ]; then
+  echo "❌ Bygget gav ingen dist/index.js — avbryter deploy." >&2
+  exit 1
+fi
+if [ -n "$NEWEST_SRC" ]; then
+  echo "❌ dist/index.js är äldre än $NEWEST_SRC — bygget gick inte igenom." >&2
+  exit 1
+fi
 mkdir -p /opt/audio-dmx-engine /var/lib/audio-dmx-engine
 rsync -a --delete dist/ /opt/audio-dmx-engine/dist/
 rsync -a --delete public/ /opt/audio-dmx-engine/public/
 [ -d ../webapp ] && rsync -a --delete ../webapp/ /opt/audio-dmx-engine/webapp/
 rsync -a --delete node_modules/ /opt/audio-dmx-engine/node_modules/
 install -m644 package.json /opt/audio-dmx-engine/package.json
+
 install -Dm644 systemd/audio-dmx-engine.service /etc/systemd/system/audio-dmx-engine.service
 install -Dm644 systemd/cpu-performance.service /etc/systemd/system/cpu-performance.service
 # Health watchdog — restart engine if /health hangs for 2 checks in a row.
@@ -169,7 +183,9 @@ echo "==> [7b/8] build + install pi-dmx-ble (BLE sidecar)"
 if [ -d "$REPO_DIR/ble-writer" ]; then
   cd "$REPO_DIR/ble-writer"
   npm ci --no-audit --no-fund
+  rm -rf dist
   npm run build
+  [ -f dist/index.js ] || { echo "❌ BLE-sidecar: bygget gav ingen dist/index.js" >&2; exit 1; }
   mkdir -p /opt/pi-dmx-ble
   rsync -a --delete dist/ /opt/pi-dmx-ble/dist/
   rsync -a --delete node_modules/ /opt/pi-dmx-ble/node_modules/
@@ -178,6 +194,22 @@ if [ -d "$REPO_DIR/ble-writer" ]; then
   mkdir -p /run/pi-dmx
   cd "$REPO_DIR/engine"
 fi
+
+# --- versionsstämpel för varje deploy ---------------------------------------
+# BUILD.json ligger bredvid koden så man kan se exakt vad som kör; deploy-loggen
+# är en historik man kan bläddra i när något började strula "efter en update".
+ENG_VER="$(node -p "require('./package.json').version" 2>/dev/null || echo unknown)"
+GIT_SHA="$(git -C "$REPO_DIR/.." rev-parse --short HEAD 2>/dev/null || echo nogit)"
+GIT_BRANCH="$(git -C "$REPO_DIR/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo nogit)"
+BUILT_AT="$(date -Is)"
+printf '{"engineVersion":"%s","commit":"%s","branch":"%s","builtAt":"%s","node":"%s"}\n' \
+  "$ENG_VER" "$GIT_SHA" "$GIT_BRANCH" "$BUILT_AT" "$(node -v)" \
+  > /opt/audio-dmx-engine/BUILD.json
+echo "$BUILT_AT  engine=v$ENG_VER  commit=$GIT_SHA  branch=$GIT_BRANCH  node=$(node -v)" \
+  >> /var/log/pi-dmx-deploy.log
+echo "  ✓ deploy: engine v$ENG_VER @ $GIT_SHA ($GIT_BRANCH)"
+
+
 
 echo "==> [8/8] enable + start services"
 systemctl daemon-reload

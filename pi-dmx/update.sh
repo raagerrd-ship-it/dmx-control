@@ -36,9 +36,16 @@ BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 git reset --hard "origin/${BRANCH}"
 NEW_SHA="$(git rev-parse HEAD 2>/dev/null || true)"
 
+echo "--- $(date -Is) uppdaterar $CUR_SHA -> $NEW_SHA ---"
+
 bash "$REPO_DIR/pi-dmx/install.sh"
 
+# install.sh skriver BUILD.json + /var/log/pi-dmx-deploy.log — eka den raden hit
+# också så update-loggen ensam räcker för att se vad som faktiskt deployades.
+tail -n1 /var/log/pi-dmx-deploy.log 2>/dev/null || true
+
 echo "--- $(date -Is) install klar, verifierar 60 s stabilitet ---"
+
 # Övervaka motorn i 60 s. Restart=always gör att en enstaka krasch inte syns i
 # `is-active`, så vi räknar NRestarts via `systemctl show` — mer än 2 på en
 # minut = ny release är trasig, rulla tillbaka.
