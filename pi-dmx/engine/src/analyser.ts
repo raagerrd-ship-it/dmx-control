@@ -165,7 +165,7 @@ export class Analyser {
    *  något ser ut som dubbelt. Uppåt räcker ~2 s bevis; nedåt krävs ~6 s.
    *  Samma asymmetri gäller grannrättningen (`med < localBpm` kräver dubbla röster). */
   private static readonly OCT_UP = 8;
-  private static readonly OCT_DOWN = 12;
+  private static readonly OCT_DOWN = 8;
 
   private nearVote = 0;     // bevis för GRANN-fel (t.ex. 122 låst mot 136): bara före commit
   private nearChallenger = 0;  // tempot grann-rösterna pekar på (måste hålla ihop, som challengerBpm)
@@ -686,7 +686,7 @@ export class Analyser {
         // än att låset dras ner mitt i en låt.
         const reacq = voteNow < this.reacqUntilMs;
         const down = this.nearChallenger > 0 && this.nearChallenger < this.localBpm;
-        const needVotes = (reacq ? 3 : 8) * (down ? 1.5 : 1);
+        const needVotes = (reacq ? 3 : 8) * (down ? 1 : 1);
         if (conf < (reacq ? 0.55 : 0.75)) {
           this.nearVote = 0; this.nearChallenger = 0;
         } else if (this.nearChallenger > 0 && Math.abs(bpm / this.nearChallenger - 1) <= 0.04) {
