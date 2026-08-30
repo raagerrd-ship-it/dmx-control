@@ -37,10 +37,10 @@ const realNow = Date.now;
 let t0 = realNow();
 
 const cases = [
-  { bpm: 157, want: [70, 85] },     // halverad
-  { bpm: 150, want: [70, 80] },     // halverad
-  { bpm: 128, want: [122, 134] },   // hysteres: kvar halverad? nej — se nedan
-  { bpm: 100, want: [95, 105] },    // full takt
+  { bpm: 100, want: [92, 108] },    // under tröskeln → full takt
+  { bpm: 157, want: [72, 86] },     // över 135 → halverad
+  { bpm: 128, want: [58, 70] },     // hysteres: kvar halverad (>120)
+  { bpm: 110, want: [102, 118] },   // under 120 → släpper
 ];
 let fail = 0;
 for (const c of cases) {
