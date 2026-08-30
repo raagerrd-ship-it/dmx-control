@@ -659,10 +659,11 @@ export class Analyser {
         if (this.bpmStable < 100000) this.bpmStable++;                              // stabil tid ackumuleras
       } else if (!committed && ratio > 1.4) {
         this.octaveVote = Math.max(0, this.octaveVote) + 1;                          // estimaten HÖGRE oktav
-        if (this.octaveVote >= 8) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
+        if (this.octaveVote >= Analyser.OCT_UP) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
       } else if (!committed && ratio < 0.7) {
         this.octaveVote = Math.min(0, this.octaveVote) - 1;                          // estimaten LÄGRE oktav
-        if (this.octaveVote <= -8) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
+        if (this.octaveVote <= -Analyser.OCT_DOWN) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
+
       } else if (!committed) {
         // GRANNRÄTTNING: ett tidigt lås från 0.5 s fönster kan hamna 10-20 % fel
         // (MÄTT: brusigt rum 136 låste 122 på en av åtta brus-seeder och satt kvar
