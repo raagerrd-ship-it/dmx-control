@@ -23,9 +23,9 @@ function pulsesPerMin(eng, cfg, bpm, sec, startMs) {
     Date.now = () => ms;
     const u = eng.render({ ...frame, bpm });
     let v = 0;
-    for (let i = 0; i < u.length; i++) v = Math.max(v, u[i]);
-    if (v > prev + 1) rising = true;
-    else if (rising && v < prev - 1) { peaks++; rising = false; }
+    for (let i = 0; i < u.length; i++) v += u[i];
+    if (v > prev + 2) rising = true;
+    else if (rising && v < prev - 2) { peaks++; rising = false; }
     prev = v;
   }
   return peaks / sec * 60;
@@ -33,6 +33,7 @@ function pulsesPerMin(eng, cfg, bpm, sec, startMs) {
 
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.beatPulse = true;
+cfg.mode = "mono";
 const eng = new EffectEngine(cfg);
 const realNow = Date.now;
 let t0 = realNow();
