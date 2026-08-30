@@ -21,6 +21,7 @@ function pulsesPerMin(eng, cfg, bpm, sec, startMs) {
   const STEP = 5;
   for (let ms = startMs; ms < startMs + sec * 1000; ms += STEP) {
     Date.now = () => ms;
+    performance.now = () => ms - startMs;
     const u = eng.render({ ...frame, bpm });
     let v = 0;
     for (let i = 0; i < u.length; i++) v += u[i];
@@ -35,7 +36,7 @@ const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.beatPulse = true;
 cfg.mode = "mono";
 const eng = new EffectEngine(cfg);
-const realNow = Date.now;
+const realNow = Date.now, realPerf = performance.now.bind(performance);
 let t0 = realNow();
 
 const cases = [
@@ -52,6 +53,6 @@ for (const c of cases) {
   console.log(`bpm ${c.bpm}  puls ${ppm.toFixed(1)}/min  förväntat ${c.want[0]}–${c.want[1]}  ${ok ? "OK" : "FEL"}`);
   if (!ok) fail++;
 }
-Date.now = realNow;
+Date.now = realNow; performance.now = realPerf;
 if (fail) { console.log("MISSLYCKADES"); process.exit(1); }
 console.log("OK");
