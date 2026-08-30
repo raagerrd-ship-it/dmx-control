@@ -193,6 +193,18 @@ const NOV_TAU_S = 45;          // glömska på fördelningen (~90 s effektivt f�
 const NOV_DIST_MIN_S = 20;     // innan så mycket data samlats gäller bara absoluta kravet
 const NOV_DIST_BUCKETS = 48;   // d är ett L1-avstånd i 0..2  // klangskifte räknas som evidens så länge efteråt
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
+/** OKTAV-MIGRATION: lagrade låtar kan ha tempot i det GAMLA 80..160-intervallet
+ *  (t.ex. 85 där analysatorn i dag säger 170). Blandas de rakt ihop blir m.bpm
+ *  nonsens och tempohoppet triggar falska låtgränser. Vi nollställer INTE lagret —
+ *  vikning är förlustfri här, så varje läsning och blandning viks in i nuvarande
+ *  intervall i stället. Måste hållas i takt med Analyser.BPM_MIN/BPM_MAX. */
+const foldBpm = (b: number): number => {
+  if (!(b > 0)) return 0;
+  let v = b;
+  while (v < 90) v *= 2;
+  while (v >= 180) v /= 2;
+  return v;
+};
 // IGENKÄNNING SOM GRÄNS. Känner igenkännaren en ANNAN känd låt mitt i ett segment,
 // och matchen pekar på låtens BÖRJAN, är det en nära-säker låtgräns — gratis, allt
 // är redan uträknat. Övertrumfar evidens-regeln och minsta längd: exakta gränser
@@ -1392,7 +1404,7 @@ export class SongMemory {
   lockedBeat(): { bpm: number; anchorMs: number } | null {
     const s = this.matchId ? this.songs.get(this.matchId) : undefined;
     if (!s || !s.meta.bpm) return null;
-    return { bpm: s.meta.bpm, anchorMs: this.playStart + s.meta.beatPhaseMs };
+    return { bpm: foldBpm(s.meta.bpm), anchorMs: this.playStart + s.meta.beatPhaseMs };
   }
 
   /** Energikurvan ur minnet (0..1) på nuvarande position, eller null.
@@ -1473,8 +1485,8 @@ export class SongMemory {
       console.log(`[song] låt #${songId} sektionsenergi: ${dump}`);
     }
 
-    const mb = song?.meta.bpm ?? 0;
-    const sb = st?.bpm ?? 0;
+    const mb = foldBpm(song?.meta.bpm ?? 0);
+    const sb = foldBpm(st?.bpm ?? 0);
     if (song && mb > 40 && sb > 40) {
       const r = sb / mb;
       const half = r > 1.8 && r < 2.2;      // lagrat var HALVA det sanna
@@ -1870,7 +1882,10 @@ export class SongMemory {
     const m = s.meta;
     m.plays++; m.lastMs = this.clock();
     if (dur > m.durationMs) m.durationMs = dur;
-    if (bpm > 0) m.bpm = m.bpm ? m.bpm * 0.7 + bpm * 0.3 : bpm;
+    // Båda sidor viks in i nuvarande oktav-intervall innan de blandas — annars ger
+    // en gammal 85 blandad med en ny 170 ett tempo som inte finns i musiken.
+    const nb = foldBpm(bpm), cb = foldBpm(m.bpm);
+    if (nb > 0) m.bpm = cb ? cb * 0.7 + nb * 0.3 : nb;
     for (const d of this.learnDrops) {
       const hit = m.drops.find((x) => Math.abs(x.t - d.t) < 500);
       if (hit) { hit.c++; hit.t = Math.round(hit.t * 0.7 + d.t * 0.3); }
