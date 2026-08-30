@@ -216,6 +216,8 @@ export class Analyser {
     return t;
   })();
   private silentMs = 0;
+  /** true = tystnadssläppningen redan gjord för denna tystnad (flanktriggad). */
+  private silenceArmed = false;
   private beatAnchorMs = 0;
   // #2 sub-hop fas: kick-flankens flux-topp ligger sällan exakt på en hop. Vi
   // sparar de två föregående kick-flux-värdena och gör parabolisk interpolation
@@ -1111,9 +1113,30 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += hopMs;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.clearLockVotes(); this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); this.barCount = 0; }
+      // FLANKTRIGGAT: hela reseten kördes förut VARJE tyst hop efter 350 ms —
+      // tempoGram.fill(0) är 500 skrivningar × 375 Hz i tystnad, och localBpm=0
+      // gjorde återinlåsningen dyrare än den behövde vara (olåst stride = 100 Hz).
+      // Nu: en gång på flanken. Tempot BEHÅLLS som startgissning (låst stride ⇒
+      // billigt, och de flesta tystnader är en paus i samma låt), tempogrammet
+      // halveras i stället för att nollas, konfidensen nollas så beat-effekter inte
+      // fortsätter i fantom-takt. Full släppning först efter 10 s tystnad — då är
+      // det en ny låt/nytt set och historiken är värdelös.
+      if (this.silentMs > 350 && !this.silenceArmed) {
+        this.silenceArmed = true;
+        this.localBpmConfidence = 0;
+        this.clearLockVotes();
+        this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0;
+        this.bpmHistLen = 0; this.bpmHistPos = 0; this.lastVoteMs = 0;
+        for (let i = 0; i < this.tempoGram.length; i++) this.tempoGram[i] *= 0.5;
+        this.envBassAccum = 0;
+        this.barAcc.fill(0); this.barCount = 0;
+      } else if (this.silenceArmed && this.silentMs > 10000 && this.localBpm !== 0) {
+        this.localBpm = 0;
+        this.tempoGram.fill(0);
+      }
     } else {
       this.silentMs = 0;
+      this.silenceArmed = false;
     }
     // --- Onset-envelope → lokal BPM (nedsamplad till 100 Hz) ---
 
