@@ -577,7 +577,7 @@ export class Analyser {
     // BPM-FILTER: vik in i 90..180 — festmusik ligger dar, och allt utanfor ar
     // en oktav-artefakt (en 85-BPM-ballad ar i praktiken 170, en 190 ar 95).
     // Intervallet MASTE spanna exakt en oktav (max = 2x min): med t.ex. 90..170
-    // blir 155 -> 77.5 -> 155 -> 77.5 i all evighet och motorn hanger.
+    // blir 175 -> 87.5 -> 175 -> 87.5 i all evighet och motorn hanger.
     while (bpm < Analyser.BPM_MIN) bpm *= 2;
     while (bpm >= Analyser.BPM_MAX) bpm /= 2;
     // Median över RÅestimaten (utan oktav-tvång) → dämpar brus men låser inte
