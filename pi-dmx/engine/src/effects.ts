@@ -599,7 +599,7 @@ export class EffectEngine {
     // TAKTLÅST NÄR TAKTEN HÖRS. Villkoret var cfg.beat, som är sant så fort en
     // takt NÅGONSIN låsts — inte att den stämmer nu. Och auto-framryckningen låg
     // på 320 ms OAVSETT: vid 134 BPM ligger slaget på 448 ms, så auto-steget hann
-    // alltid först. Hela vårt BPM-intervall (60–180 = 1000–333 ms/slag) ligger över
+    // alltid först. Hela vårt BPM-intervall (80–160 = 750–375 ms/slag) ligger över
     // 320 ms → chase free-rullade på ~187 BPM och stegade ~2× per takt, aldrig i
     // takt. Nu: när takten är trovärdig stegar vi PÅ slaget och auto-steget är
     // bara ett skyddsnät långsammare än det långsammaste slaget (667 ms @90 BPM).
