@@ -147,25 +147,31 @@ export class Analyser {
   private localBpm = 0;
   private localBpmConfidence = 0;
   // TÄCKNING 60..180 — INTE en oktav (ratio 3). Det är ett medvetet byte av vad
-  // vikningen gör: 60..180 rymmer BÅDA representanterna för allt mellan 60 och 90
-  // (en 70 och en 140 får bo kvar var för sig), så en lugn låt behåller sitt egna
-  // tempo i stället för att tvingas upp till dubbelt. Priset är att vikningen inte
-  // längre GARANTERAR en unik representant — det är oktavgrenarna nedan (och
-  // off-beat-testet i computeBpm) som avgör vilken som gäller, inte `while`-loopen.
-  // Terminering: loopen kräver bara MAX >= 2*MIN (180 >= 120). Med MAX < 2*MIN
-  // (t.ex. 90..170) studsar 175 -> 87.5 -> 175 i all evighet och motorn hänger.
-  // Sömmarna ligger nu vid 60 och 180 i stället för 90/180.
-  private static readonly BPM_MIN = 60;    // MAX måste vara >= 2*MIN (annars evig vikning)
-  private static readonly BPM_MAX = 180;
+  // MÄTT I LOTUS 2026-08-30: ett 3×-spann (60..180) går sönder i skarp drift —
+  // 43 tempohopp på 29 min (kvoter 1/2, 2/3, 3/4, 4/3, 3/2, 2/1), 5,2 % av tiden
+  // mer än 12 % fel tempo, och `locked=true, confidence=1.00` under alltihop
+  // (konfidensen mäter tempogrammets SKÄRPA, inte korrektheten). Orsaken är att
+  // vikningen inte längre ger en unik representant, så oktavgrenarna får två
+  // lagliga svar att pendla mellan. 90..180 provades också: allt under 90 vek upp
+  // (en 85-BPM-låt blev 170) → "mycket dubbeltakt".
+  // REGELN: intervallet MÅSTE vara exakt en oktav (MAX = 2 × MIN). 80..160 är
+  // DMX-masterns ursprungliga värde och den enda kombination som både viker unikt
+  // och låter en 85-BPM-ballad bo kvar i sin egen oktav.
+  // Terminering kräver MAX >= 2*MIN; med t.ex. 90..170 studsar 175 -> 87.5 -> 175
+  // i all evighet och motorn hänger.
+  // Långsam puls i lugna/snabba partier löses i PRESENTATIONEN (halveringen i
+  // effects.ts), inte i vikningen.
+  private static readonly BPM_MIN = 80;    // MAX måste vara == 2*MIN (exakt en oktav)
+  private static readonly BPM_MAX = 160;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
   /** Bevis för att DUBBLERA (estimaten pekar högre) mot att HALVERA (lägre).
-   *  ASYMMETRISKT med flit: ett halvtempo-lås gör ljusshowen trögt fel men körbar,
-   *  medan ett dubbeltempo-lås strular med varje effekt — och en breakdown, ett
-   *  glesare parti eller ett sväng-mönster ser ut som halvt tempo långt oftare än
-   *  något ser ut som dubbelt. Uppåt räcker ~2 s bevis; nedåt krävs ~6 s.
-   *  Grannrättningen är däremot SYMMETRISK — se den mätta motiveringen där. */
+   *  SYMMETRISKT (8/8): asymmetrin 8/24 hörde till 60..180-experimentet. Med en
+   *  ÄKTA oktavvikning kollapsar b och 2b, så grenarna fångar 3:2-/triol-artefakter
+   *  — och där vill vi ha snabb rättning åt BÅDA håll.
+   *  Grannrättningen är också symmetrisk — se den mätta motiveringen där. */
   private static readonly OCT_UP = 8;
-  private static readonly OCT_DOWN = 24;
+  private static readonly OCT_DOWN = 8;
+
 
   private nearVote = 0;     // bevis för GRANN-fel (t.ex. 122 låst mot 136): bara före commit
   private nearChallenger = 0;  // tempot grann-rösterna pekar på (måste hålla ihop, som challengerBpm)
@@ -596,11 +602,10 @@ export class Analyser {
 
 
     let bpm = (HZ * 60) / lagF;
-    // BPM-FILTER: vik in i 60..180. Sökningen (lagMin/lagMax) täcker 55..185, så
-    // detta rör bara kanterna: under 60 dubbleras, från 180 halveras. Inne i
-    // intervallet står estimatet KVAR som mätt — en 70-BPM-ballad tvingas inte upp
-    // till 140 längre. Vilken oktav som gäller avgörs av off-beat-testet ovan och
-    // oktavgrenarna nedan (asymmetriska: dubblera lätt, halvera trögt).
+    // BPM-FILTER: vik in i 80..160 (exakt en oktav → UNIK representant). Sökningen
+    // (lagMin/lagMax) täcker 55..185, så vikningen tar kanterna: under 80 dubbleras,
+    // från 160 halveras. Vilken oktav som gäller avgörs av off-beat-testet ovan och
+    // oktavgrenarna nedan (symmetriska, 8/8).
     // Terminering kräver MAX >= 2*MIN; med t.ex. 90..170 blir 175 -> 87.5 -> 175 -> 87.5
     // i all evighet och motorn hänger.
     while (bpm < Analyser.BPM_MIN) bpm *= 2;

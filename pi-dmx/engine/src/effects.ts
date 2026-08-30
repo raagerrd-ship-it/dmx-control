@@ -58,6 +58,13 @@ const BEAT_PREDIP_DEPTH = 0.35;
 /** Ettan i varje fyrtakt pulserar så här mycket starkare än övriga slag.
  *  25 % är tydligt men inte ett eget effektläge. */
 const BEAT_DOWNBEAT_ACCENT = 0.25;
+/** TAKT-BASERAD HALVERING av PRESENTATIONSTAKTEN (portad från Lotus 2026-08-30).
+ *  Analysatorn ger korrekt tempo; dirigenten väljer takten publiken ser. En låt på
+ *  157 BPM pulsar annars i 2,6 Hz och känns hackig. Över tröskeln pulsar hjärtslaget
+ *  på varannat slag. HYSTERESEN är obligatorisk: en fast gräns utan den flappade
+ *  ("dubblade i lugna partier kring tröskeln") i Lotus. */
+const PULSE_HALVE_ABOVE_BPM = 135;
+const PULSE_HALVE_HYST_BPM = 15;
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
 const START_FADE_MS = 5000;
@@ -102,6 +109,8 @@ export class EffectEngine {
   /** Takt-räknare som effekterna ser (beatIdx): stegar på grid-slaget när BPM är
    *  låst, annars på verkliga kicks → grid-effekter fryser aldrig utan BPM-lås. */
   private beatCounter = 0;
+  /** Pulsen körs i halva takten (snabb låt). Hysteresstyrd, se PULSE_HALVE_*. */
+  private pulseHalved = false;
   /** Drops mode: per-lamp fire time + hue; advanced on each beat/kick. */
   private dropPos = 0;
   private dropSector = 0;
@@ -322,13 +331,23 @@ export class EffectEngine {
     if (beatLocked(beat)) {
       const beatMs = beatPeriod(beat);
       const now2 = Date.now();
+      const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
+      // PRESENTATIONSTAKT: över PULSE_HALVE_ABOVE_BPM pulsar hjärtslaget på varannat
+      // slag (hysteres nedåt så gränsen inte flappar). Taktklockan, beatTick och alla
+      // grid-effekter rör vi INTE — bara pulsens form sträcks över två slag.
+      const bpmNow = beatMs > 0 ? 60000 / beatMs : 0;
+      if (bpmNow > 0) {
+        if (!this.pulseHalved) { if (bpmNow > PULSE_HALVE_ABOVE_BPM) this.pulseHalved = true; }
+        else if (bpmNow < PULSE_HALVE_ABOVE_BPM - PULSE_HALVE_HYST_BPM) this.pulseHalved = false;
+      }
+      const pulseMs = this.pulseHalved ? beatMs * 2 : beatMs;
       // HJÄRTSLAG: ATTACK → FADEOUT → VILA.
       // Förr: Math.pow(1 - phase, 2) — ljuset hoppade till fullt på NOLL ms vid varje
       // slag och sjönk sedan hela takten igenom. Ett steg utan attack läses som blixt,
       // och utan vila mellan slagen blir riggen aldrig stilla: MÄTT 2026-08-07 upplevdes
       // det som stroboskop i låtens lugna partier. Nu en kort men verklig attack, en
       // exponentiell utklingning och tystnad tills nästa slag — samma puls, annan form.
-      const atk = Math.max(BEAT_ATTACK_MIN_MS, Math.min(BEAT_ATTACK_MAX_MS, beatMs * BEAT_ATTACK_FRAC));
+      const atk = Math.max(BEAT_ATTACK_MIN_MS, Math.min(BEAT_ATTACK_MAX_MS, pulseMs * BEAT_ATTACK_FRAC));
       // ATTACKEN BÖRJAR FÖRE SLAGET SÅ TOPPEN LANDAR PÅ DET.
       // MÄTT 2026-08-08 på DMX-utgången: ljuset kulminerade vid fas 0,10 av takten,
       // alltså ~48 ms EFTER slaget — attacken startade på slaget och behövde sin
@@ -336,8 +355,15 @@ export class EffectEngine {
       // uppgången `atk` ms före slaget och toppen sammanfaller med det. Samma tanke
       // som REPLAY_LEAD_MS för minnet: ljus är trögare än ljud.
       // Försprånget = attackens längd: klockan ger fasen som om vi låg `atk` ms fram.
-      const tSince = beatPhase(beat, now2, atk + this.showLead) * beatMs;
-      const dec = beatMs * BEAT_DECAY_FRAC;
+      // Vid halvering läggs ett helt slag på när vi står på ett ODDA index, så pulsen
+      // löper obrutet över de två slagen och startar alltid på ett jämnt index.
+      // Pariteten MÅSTE läsas med SAMMA försprång som fasen (atk + showLead), annars
+      // wrappar fasen till nästa slag innan takträknaren stegar → varannan puls blev
+      // dubbelt lång och varannan kapad precis vid slaggränsen.
+      const pulseIdx = beatIndex(beat, now2 + atk + this.showLead);
+      const tSince = beatPhase(beat, now2, atk + this.showLead) * beatMs
+        + (this.pulseHalved && Math.abs(pulseIdx % 2) === 1 ? beatMs : 0);
+      const dec = pulseMs * BEAT_DECAY_FRAC;
       beatEnv = tSince < atk ? tSince / atk : Math.exp(-(tSince - atk) / dec);
       // PRE-DIP: en inandning strax FÖRE anslaget.
       // Ögat läser kontrast, inte absolut nivå. Att sänka ljuset en aning precis
@@ -350,13 +376,12 @@ export class EffectEngine {
       // startar `atk` ms innan slaget. Envelopen får gå NEGATIV: den är ett
       // 0..1-mått som skalas mot pulsdjupet, så negativa värden betyder mörkare
       // än pulsens eget golv. Slutmultiplikatorn klamras separat.
-      const dipMs = Math.max(BEAT_PREDIP_MIN_MS, Math.min(BEAT_PREDIP_MAX_MS, beatMs * BEAT_PREDIP_FRAC));
-      const dipStart = beatMs - dipMs;
+      const dipMs = Math.max(BEAT_PREDIP_MIN_MS, Math.min(BEAT_PREDIP_MAX_MS, pulseMs * BEAT_PREDIP_FRAC));
+      const dipStart = pulseMs - dipMs;
       if (tSince > dipStart) {
         const w = (tSince - dipStart) / dipMs;         // 0 → 1 fram mot anslaget
         beatEnv -= BEAT_PREDIP_DEPTH * w * w;          // kvadratisk: mjuk in, tydlig ut
       }
-      const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
       // BARA FRAMÅT. Villkoret var `!==`, som fyrade på VARJE förändring — även
       // bakåt. PLL:en justerar anchorMs och bpm kontinuerligt i båda riktningar,
       // så nära en taktgräns dittrade index 132 → 131 → 132 och gav TRE slag där
@@ -578,7 +603,7 @@ export class EffectEngine {
     // TAKTLÅST NÄR TAKTEN HÖRS. Villkoret var cfg.beat, som är sant så fort en
     // takt NÅGONSIN låsts — inte att den stämmer nu. Och auto-framryckningen låg
     // på 320 ms OAVSETT: vid 134 BPM ligger slaget på 448 ms, så auto-steget hann
-    // alltid först. Hela vårt BPM-intervall (60–180 = 1000–333 ms/slag) ligger över
+    // alltid först. Hela vårt BPM-intervall (80–160 = 750–375 ms/slag) ligger över
     // 320 ms → chase free-rullade på ~187 BPM och stegade ~2× per takt, aldrig i
     // takt. Nu: när takten är trovärdig stegar vi PÅ slaget och auto-steget är
     // bara ett skyddsnät långsammare än det långsammaste slaget (667 ms @90 BPM).
@@ -664,14 +689,9 @@ export class EffectEngine {
         let tier: Mode[] = intensity < lo ? LUGN : intensity < hi ? FART : FULLFART;
         // Låg-BPM-spärr: en tryckare/ballad ska ALDRIG gå Full Fart, även om dess
         // relativa energi toppar. (bpm 0 = ej låst → ingen spärr.)
-        // RÄKNAD MOT 90..180-INTERVALLET: bandet är nu 90–100 (var 80–95). En ballad
-        // på 80–89 viks upp till 160–178 och är där oskiljbar från hardstyle — den
-        // fångas inte av tempot utan av energi-hysteresen (`lo`/`hi`), som är rätt
-        // instrument för den: en ballad når inte Full Fart-tröskeln annat än i sitt
-        // starkaste refrängparti, och att spärra 160–178 hade dödat hardstyle helt.
-        // 60..180 rymmer båda oktavrepresentanterna, så ett tempo under 100 är nu
-        // oftast en FAKTISKT lugn låt (tidigare kunde det bara vara en 85-ballad vikt
-        // till 170 eller ett halvtempo-lås). Spärren är därför meningsfull igen.
+        // RÄKNAD MOT 80..160-INTERVALLET (exakt en oktav): en ballad på 85 bor kvar
+        // som 85 och fångas av spärren, medan hardstyle 150 ligger tryggt över. Att
+        // spärra högre än 100 hade dödat hardstyle helt, så bandet stannar där.
         if (bpm > 0 && bpm < 100 && tier === FULLFART) tier = FART;
         const tierName = tier === LUGN ? "lugn" : tier === FART ? "fart" : "full";
         // EFFEKT-ORKESTRERING. En effekt ska hinna LÄSAS av publiken innan nästa
