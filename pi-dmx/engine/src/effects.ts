@@ -331,13 +331,23 @@ export class EffectEngine {
     if (beatLocked(beat)) {
       const beatMs = beatPeriod(beat);
       const now2 = Date.now();
+      const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
+      // PRESENTATIONSTAKT: över PULSE_HALVE_ABOVE_BPM pulsar hjärtslaget på varannat
+      // slag (hysteres nedåt så gränsen inte flappar). Taktklockan, beatTick och alla
+      // grid-effekter rör vi INTE — bara pulsens form sträcks över två slag.
+      const bpmNow = beatMs > 0 ? 60000 / beatMs : 0;
+      if (bpmNow > 0) {
+        if (!this.pulseHalved) { if (bpmNow > PULSE_HALVE_ABOVE_BPM) this.pulseHalved = true; }
+        else if (bpmNow < PULSE_HALVE_ABOVE_BPM - PULSE_HALVE_HYST_BPM) this.pulseHalved = false;
+      }
+      const pulseMs = this.pulseHalved ? beatMs * 2 : beatMs;
       // HJÄRTSLAG: ATTACK → FADEOUT → VILA.
       // Förr: Math.pow(1 - phase, 2) — ljuset hoppade till fullt på NOLL ms vid varje
       // slag och sjönk sedan hela takten igenom. Ett steg utan attack läses som blixt,
       // och utan vila mellan slagen blir riggen aldrig stilla: MÄTT 2026-08-07 upplevdes
       // det som stroboskop i låtens lugna partier. Nu en kort men verklig attack, en
       // exponentiell utklingning och tystnad tills nästa slag — samma puls, annan form.
-      const atk = Math.max(BEAT_ATTACK_MIN_MS, Math.min(BEAT_ATTACK_MAX_MS, beatMs * BEAT_ATTACK_FRAC));
+      const atk = Math.max(BEAT_ATTACK_MIN_MS, Math.min(BEAT_ATTACK_MAX_MS, pulseMs * BEAT_ATTACK_FRAC));
       // ATTACKEN BÖRJAR FÖRE SLAGET SÅ TOPPEN LANDAR PÅ DET.
       // MÄTT 2026-08-08 på DMX-utgången: ljuset kulminerade vid fas 0,10 av takten,
       // alltså ~48 ms EFTER slaget — attacken startade på slaget och behövde sin
@@ -345,8 +355,11 @@ export class EffectEngine {
       // uppgången `atk` ms före slaget och toppen sammanfaller med det. Samma tanke
       // som REPLAY_LEAD_MS för minnet: ljus är trögare än ljud.
       // Försprånget = attackens längd: klockan ger fasen som om vi låg `atk` ms fram.
-      const tSince = beatPhase(beat, now2, atk + this.showLead) * beatMs;
-      const dec = beatMs * BEAT_DECAY_FRAC;
+      // Vid halvering läggs ett helt slag på när vi står på ett ODDA index, så pulsen
+      // löper obrutet över de två slagen och startar alltid på ett jämnt index.
+      const tSince = beatPhase(beat, now2, atk + this.showLead) * beatMs
+        + (this.pulseHalved && Math.abs(beatIdx % 2) === 1 ? beatMs : 0);
+      const dec = pulseMs * BEAT_DECAY_FRAC;
       beatEnv = tSince < atk ? tSince / atk : Math.exp(-(tSince - atk) / dec);
       // PRE-DIP: en inandning strax FÖRE anslaget.
       // Ögat läser kontrast, inte absolut nivå. Att sänka ljuset en aning precis
@@ -359,13 +372,12 @@ export class EffectEngine {
       // startar `atk` ms innan slaget. Envelopen får gå NEGATIV: den är ett
       // 0..1-mått som skalas mot pulsdjupet, så negativa värden betyder mörkare
       // än pulsens eget golv. Slutmultiplikatorn klamras separat.
-      const dipMs = Math.max(BEAT_PREDIP_MIN_MS, Math.min(BEAT_PREDIP_MAX_MS, beatMs * BEAT_PREDIP_FRAC));
-      const dipStart = beatMs - dipMs;
+      const dipMs = Math.max(BEAT_PREDIP_MIN_MS, Math.min(BEAT_PREDIP_MAX_MS, pulseMs * BEAT_PREDIP_FRAC));
+      const dipStart = pulseMs - dipMs;
       if (tSince > dipStart) {
         const w = (tSince - dipStart) / dipMs;         // 0 → 1 fram mot anslaget
         beatEnv -= BEAT_PREDIP_DEPTH * w * w;          // kvadratisk: mjuk in, tydlig ut
       }
-      const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
       // BARA FRAMÅT. Villkoret var `!==`, som fyrade på VARJE förändring — även
       // bakåt. PLL:en justerar anchorMs och bpm kontinuerligt i båda riktningar,
       // så nära en taktgräns dittrade index 132 → 131 → 132 och gav TRE slag där
