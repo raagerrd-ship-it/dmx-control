@@ -163,7 +163,7 @@ export class Analyser {
    *  medan ett dubbeltempo-lås strular med varje effekt — och en breakdown, ett
    *  glesare parti eller ett sväng-mönster ser ut som halvt tempo långt oftare än
    *  något ser ut som dubbelt. Uppåt räcker ~2 s bevis; nedåt krävs ~6 s.
-   *  Samma asymmetri gäller grannrättningen (`med < localBpm` kräver dubbla röster). */
+   *  Grannrättningen är däremot SYMMETRISK — se den mätta motiveringen där. */
   private static readonly OCT_UP = 8;
   private static readonly OCT_DOWN = 24;
 
