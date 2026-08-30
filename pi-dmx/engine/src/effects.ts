@@ -58,6 +58,13 @@ const BEAT_PREDIP_DEPTH = 0.35;
 /** Ettan i varje fyrtakt pulserar så här mycket starkare än övriga slag.
  *  25 % är tydligt men inte ett eget effektläge. */
 const BEAT_DOWNBEAT_ACCENT = 0.25;
+/** TAKT-BASERAD HALVERING av PRESENTATIONSTAKTEN (portad från Lotus 2026-08-30).
+ *  Analysatorn ger korrekt tempo; dirigenten väljer takten publiken ser. En låt på
+ *  157 BPM pulsar annars i 2,6 Hz och känns hackig. Över tröskeln pulsar hjärtslaget
+ *  på varannat slag. HYSTERESEN är obligatorisk: en fast gräns utan den flappade
+ *  ("dubblade i lugna partier kring tröskeln") i Lotus. */
+const PULSE_HALVE_ABOVE_BPM = 135;
+const PULSE_HALVE_HYST_BPM = 15;
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
 const START_FADE_MS = 5000;
