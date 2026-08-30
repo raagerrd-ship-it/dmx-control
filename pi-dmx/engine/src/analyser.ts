@@ -602,11 +602,10 @@ export class Analyser {
 
 
     let bpm = (HZ * 60) / lagF;
-    // BPM-FILTER: vik in i 60..180. Sökningen (lagMin/lagMax) täcker 55..185, så
-    // detta rör bara kanterna: under 60 dubbleras, från 180 halveras. Inne i
-    // intervallet står estimatet KVAR som mätt — en 70-BPM-ballad tvingas inte upp
-    // till 140 längre. Vilken oktav som gäller avgörs av off-beat-testet ovan och
-    // oktavgrenarna nedan (asymmetriska: dubblera lätt, halvera trögt).
+    // BPM-FILTER: vik in i 80..160 (exakt en oktav → UNIK representant). Sökningen
+    // (lagMin/lagMax) täcker 55..185, så vikningen tar kanterna: under 80 dubbleras,
+    // från 160 halveras. Vilken oktav som gäller avgörs av off-beat-testet ovan och
+    // oktavgrenarna nedan (symmetriska, 8/8).
     // Terminering kräver MAX >= 2*MIN; med t.ex. 90..170 blir 175 -> 87.5 -> 175 -> 87.5
     // i all evighet och motorn hänger.
     while (bpm < Analyser.BPM_MIN) bpm *= 2;
