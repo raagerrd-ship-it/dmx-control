@@ -146,8 +146,13 @@ export class Analyser {
   private bpmCounter = 0;
   private localBpm = 0;
   private localBpmConfidence = 0;
-  private static readonly BPM_MIN = 80;    // festintervall; MAX maste vara exakt 2x MIN
-  private static readonly BPM_MAX = 160;
+  // TÄCKNING, inte oktav-tydlighet: båda intervallen är exakt en oktav (160=2·80,
+  // 180=2·90), så b och 2b är lika oskiljbara i båda. Vinsten är att 165–180 BPM
+  // (hardstyle, psytrance, dnb-halvtempo) inte längre viks till halvtempo — MÄTT:
+  // 170 lästes som 85. Priset är att 80–89 (ballader) nu viks upp till 160–178.
+  // Rätt affär för partitillämpningen ("hellre den snabbare representanten").
+  private static readonly BPM_MIN = 90;    // festintervall; MAX maste vara exakt 2x MIN
+  private static readonly BPM_MAX = 180;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
   private nearVote = 0;     // bevis för GRANN-fel (t.ex. 122 låst mot 136): bara före commit
   private nearChallenger = 0;  // tempot grann-rösterna pekar på (måste hålla ihop, som challengerBpm)
@@ -156,6 +161,13 @@ export class Analyser {
   private lockPeak = 0;        // tempogram-toppens styrka när takten är frisk (referens)
   private lastSongVoteMs = 0;  // väggklocka för förra låtbytesrösten (bevis mäts i TID)
   private newSongVote = 0;  // ihållande oenighet trots låst oktav → låtbyte utan tystnadslucka
+  /** Antal stabila finjusterings-estimat (@4Hz) innan oktaven committas OCH
+   *  låtbytesvakten öppnar. MÅSTE vara samma tal på båda ställena — se dödläget
+   *  dokumenterat vid `committed` i computeBpm(). */
+  private static readonly BPM_COMMIT = 24;
+  /** Väggklocka för när konfidensen senast var frisk (≥0.3) — grund för den mjuka
+   *  låssläppningen sist i computeBpm(). 0 = ej satt. */
+  private lowConfSinceMs = 0;
   /** Väggklocka: t.o.m. denna tid gäller vidgad tempo-sökning efter en låtbytes-hint. */
   private reacqUntilMs = 0;
 
@@ -204,6 +216,8 @@ export class Analyser {
     return t;
   })();
   private silentMs = 0;
+  /** true = tystnadssläppningen redan gjord för denna tystnad (flanktriggad). */
+  private silenceArmed = false;
   private beatAnchorMs = 0;
   // #2 sub-hop fas: kick-flankens flux-topp ligger sällan exakt på en hop. Vi
   // sparar de två föregående kick-flux-värdena och gör parabolisk interpolation
@@ -358,7 +372,7 @@ export class Analyser {
 
 
   /**
-   * BPM (80..160) från onset-envelopens autokorrelation.
+   * BPM (90..180) från onset-envelopens autokorrelation.
    *  1) Toppen i autokorrelationen ger en kandidat-lag.
    *  2) SUB-HARMONIC-PREFERENS: om dubbla/tredubbla lagget (halva/tredjedels
    *     tempot) resonerar nästan lika bra är det oftast det ÄKTA beatet — annars
@@ -569,10 +583,10 @@ export class Analyser {
 
 
     let bpm = (HZ * 60) / lagF;
-    // BPM-FILTER: vik in i 80..160 — festmusik ligger dar, och allt utanfor ar
-    // en oktav-artefakt (en 76-BPM-last ar i praktiken 152, en 170 ar 85).
-    // Intervallet MASTE spanna exakt en oktav (max = 2x min): med t.ex. 80..150
-    // blir 155 -> 77.5 -> 155 -> 77.5 i all evighet och motorn hanger.
+    // BPM-FILTER: vik in i 90..180 — festmusik ligger dar, och allt utanfor ar
+    // en oktav-artefakt (en 85-BPM-ballad ar i praktiken 170, en 190 ar 95).
+    // Intervallet MASTE spanna exakt en oktav (max = 2x min): med t.ex. 90..170
+    // blir 175 -> 87.5 -> 175 -> 87.5 i all evighet och motorn hanger.
     while (bpm < Analyser.BPM_MIN) bpm *= 2;
     while (bpm >= Analyser.BPM_MAX) bpm /= 2;
     // Median över RÅestimaten (utan oktav-tvång) → dämpar brus men låser inte
@@ -607,11 +621,16 @@ export class Analyser {
       // ihållande pekar på en annan oktav (½× eller 2×) → byt efter ~2s bevis, så
       // en halvtempo-låsning "ökar" till rätt takt istället för att fastna. Ett
       // enstaka breakdown hinner inte nå tröskeln → ingen flimrig växling.
-      // COMMIT: efter ~15s STABIL lås (60 finjusterings-estimat @4Hz) LÅSES oktaven —
+      // COMMIT: efter ~6s STABIL lås (24 finjusterings-estimat @4Hz) LÅSES oktaven —
       // bara finjustering tillåts, aldrig ½×/2× mitt i en låt (en låt byter inte
-      // oktav; halvering nollade takt-gridet & bröt beat-synken). Ett wrong initial-
-      // lås hinner rättas under första 15s. Nollställs vid tystnad/låtbyte (localBpm=0).
-      const committed = this.bpmStable >= 60;
+      // oktav; halvering nollade takt-gridet & bröt beat-synken).
+      // OBS: fönstret för självrättning är nu ~6s, inte 15s. Ett felaktigt initiallås
+      // som INTE ligger i glid-bandet hinner alltså inte alltid rättas här — därför
+      // är `committedNow` (låtbytesvakten) sänkt till SAMMA 24. Annars uppstod ett
+      // dödläge: oktav-/grannrättning stängd vid 24 medan `bpmStable` bara växer i
+      // glid-grenen ⇒ ett lås 33 % fel (t.ex. 90 mot verkligt 120) kunde inte lämnas
+      // förrän tystnad. Konfidenssläppningen sist i denna metod är andra utvägen.
+      const committed = this.bpmStable >= Analyser.BPM_COMMIT;
       const ratio = med / this.localBpm;
       if (ratio >= 0.9 && ratio <= 1.11) {
         this.nearVote = 0; this.nearChallenger = 0;                                 // samma takt → inget grann-fel
@@ -683,7 +702,10 @@ export class Analyser {
       //      ackumulerade tempogrammet? Ett breakdown gör låset svagare men ger ingen
       //      dominant rival — en ny låt gör det.
       // Rösterna räknas i TID, inte i anrop: stride växlar 100→20 Hz med låset.
-      const committedNow = this.bpmStable >= 60;
+      // SAMMA tröskel som oktav-commiten: låtbytesvakten måste öppna i exakt samma
+      // stund som oktav-/grannrättningen stänger, annars finns ett fönster där låset
+      // inte kan lämnas alls (se dödlägesnoten vid `committed` ovan).
+      const committedNow = this.bpmStable >= Analyser.BPM_COMMIT;
       const rawOff = Math.abs(bpm / this.localBpm - 1) > 0.11;
       const sameChallenger = this.challengerBpm > 0 && Math.abs(bpm / this.challengerBpm - 1) <= 0.04;
       // 4. FRISK TAKT. Ett breakdown ser ut som ett låtbyte i allt utom kvaliteten:
@@ -736,6 +758,24 @@ export class Analyser {
     const cA = this.localBpmConfidence;
     const aC = 1 - Math.exp(-dt / (conf > cA ? 0.025 : 0.120));
     this.localBpmConfidence = cA + (conf - cA) * aC;
+
+    // ── KONFIDENSBASERAD LÅSSLÄPPNING ─────────────────────────────────────────
+    // Sista utvägen ur ett fel lås. Oktav- och grannrättning stänger vid
+    // BPM_COMMIT, och låtbytesvakten kräver FRISK takt (conf ≥ 0.9) — ett lås som
+    // är fel och där takten aldrig blir frisk hade därför ingen väg ut alls, utom
+    // 350 ms tystnad. Håller konfidensen sig under 0.3 i 8 s är låset i praktiken
+    // inte längre en beskrivning av musiken: släpp det MJUKT (behåll tempot som
+    // startgissning, töm historik och röster, vidga sökningen) i stället för hårt.
+    // KVARSTÅENDE HÅL: ett SJÄLVSÄKERT men felaktigt lås (conf ≥ 0.3) fyrar inte
+    // här. Det är därför `committedNow` sänktes till samma 24 som `committed`.
+    if (this.localBpmConfidence >= 0.3) {
+      this.lowConfSinceMs = voteNow;
+    } else if (this.lowConfSinceMs > 0 && voteNow - this.lowConfSinceMs > 8000) {
+      this.lowConfSinceMs = voteNow;
+      this.hintTrackChange(5000);
+    } else if (this.lowConfSinceMs === 0) {
+      this.lowConfSinceMs = voteNow;
+    }
   }
 
   /** Nollställ tempoläget — anropas när låtminnet BEKRÄFTAT en låtgräns. Då vet vi
@@ -1073,9 +1113,30 @@ export class Analyser {
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     if (rms < this.cfg.detection.noiseFloor * 1.5) {
       this.silentMs += hopMs;
-      if (this.silentMs > 350) { this.localBpm = 0; this.localBpmConfidence = 0; this.clearLockVotes(); this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0; this.bpmHistLen = 0; this.bpmHistPos = 0; this.tempoGram.fill(0); this.envBassAccum = 0; this.barAcc.fill(0); this.barCount = 0; }
+      // FLANKTRIGGAT: hela reseten kördes förut VARJE tyst hop efter 350 ms —
+      // tempoGram.fill(0) är 500 skrivningar × 375 Hz i tystnad, och localBpm=0
+      // gjorde återinlåsningen dyrare än den behövde vara (olåst stride = 100 Hz).
+      // Nu: en gång på flanken. Tempot BEHÅLLS som startgissning (låst stride ⇒
+      // billigt, och de flesta tystnader är en paus i samma låt), tempogrammet
+      // halveras i stället för att nollas, konfidensen nollas så beat-effekter inte
+      // fortsätter i fantom-takt. Full släppning först efter 10 s tystnad — då är
+      // det en ny låt/nytt set och historiken är värdelös.
+      if (this.silentMs > 350 && !this.silenceArmed) {
+        this.silenceArmed = true;
+        this.localBpmConfidence = 0;
+        this.clearLockVotes();
+        this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0;
+        this.bpmHistLen = 0; this.bpmHistPos = 0; this.lastVoteMs = 0;
+        for (let i = 0; i < this.tempoGram.length; i++) this.tempoGram[i] *= 0.5;
+        this.envBassAccum = 0;
+        this.barAcc.fill(0); this.barCount = 0;
+      } else if (this.silenceArmed && this.silentMs > 10000 && this.localBpm !== 0) {
+        this.localBpm = 0;
+        this.tempoGram.fill(0);
+      }
     } else {
       this.silentMs = 0;
+      this.silenceArmed = false;
     }
     // --- Onset-envelope → lokal BPM (nedsamplad till 100 Hz) ---
 
