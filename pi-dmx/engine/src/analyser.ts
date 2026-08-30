@@ -680,13 +680,20 @@ export class Analyser {
         // LÅTBYTES-HINT (Sonos): under re-acquisition-fönstret sänks kvalitetsgrinden
         // och röstkravet, så en ny takt kan bekräftas på ~2-3 s i stället för ~5 s.
         // Skydden finns kvar (sammanhållen utmanare + tömd historik) — bara mildare.
+        // ASYMMETRI: en rättning NEDÅT (utmanaren är långsammare än låset) kräver
+        // dubbla röster, av samma skäl som OCT_DOWN — glesa partier och sväng-mönster
+        // pekar nedåt betydligt oftare än något pekar uppåt, och trögt-fel är bättre
+        // än att låset dras ner mitt i en låt.
         const reacq = voteNow < this.reacqUntilMs;
+        const down = this.nearChallenger > 0 && this.nearChallenger < this.localBpm;
+        const needVotes = (reacq ? 3 : 8) * (down ? 2 : 1);
         if (conf < (reacq ? 0.55 : 0.75)) {
           this.nearVote = 0; this.nearChallenger = 0;
         } else if (this.nearChallenger > 0 && Math.abs(bpm / this.nearChallenger - 1) <= 0.04) {
           this.nearChallenger += (bpm - this.nearChallenger) * 0.3;
           this.nearVote++;
-          if (this.nearVote >= (reacq ? 3 : 8)) {
+          if (this.nearVote >= needVotes) {
+
             this.localBpm = Math.round(med);
             this.bpmHistLen = 0; this.bpmHistPos = 0;
             this.nearVote = 0; this.nearChallenger = 0; this.octaveVote = 0; this.bpmStable = 0;
