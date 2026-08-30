@@ -9,7 +9,8 @@ const frame = {
   kick: false, gain: 1, bpm: 0, bpmConfidence: 0.9, intensity: 0.5,
   dropCount: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false,
   punch: 0.5, glide: 0.5, warmth: 0.5, busy: 0.5,
-  spec: { bass: 0.5, mid: 0.4, treble: 0.3, bands: new Float32Array(9) },
+  spec: { bass: 0.5, mid: 0.4, treble: 0.3, kick: 0.4, sub: 0.3, bands: new Float32Array(9) },
+  onset: { kick: 0.2, sub: 0.15 },
   beatAnchorMs: 0, kickAtMs: 0, barShift: 0, silence: false,
 };
 
