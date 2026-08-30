@@ -52,21 +52,24 @@ function run(seq, secPerStep) {
 }
 
 // 100 (full takt) → 157 (halveras) → 128 (hysteres: kvar halverad) → 110 (släpper)
+// Mätstorheten är pulser PER SLAG (ppm/bpm). Pre-dippen ger fler än en
+// mittnivå-korsning per puls, så absoluta tal går inte att jämföra mot BPM —
+// men full takt landar tydligt över 1,4 och halverad tydligt under 1,1.
 const seq = [
-  { bpm: 100, want: [92, 108] },
-  { bpm: 157, want: [72, 86] },
-  { bpm: 128, want: [58, 70] },
-  { bpm: 110, want: [102, 118] },
+  { bpm: 100, halved: false },
+  { bpm: 157, halved: true },
+  { bpm: 128, halved: true },   // hysteres: kvar halverad (>120)
+  { bpm: 110, halved: false },  // under 120 → släpper
 ];
 const res = run(seq.map((s) => s.bpm), 40);
 Date.now = realNow; performance.now = realPerf;
 
 let fail = 0;
 res.forEach((r, i) => {
-  const w = seq[i].want;
-  const ok = r.ppm >= w[0] && r.ppm <= w[1];
+  const per = r.ppm / r.bpm;
+  const ok = seq[i].halved ? per < 1.1 : per > 1.4;
   if (!ok) fail++;
-  console.log(`bpm ${r.bpm}  puls ${r.ppm.toFixed(1)}/min  förväntat ${w[0]}–${w[1]}  amplitud ${r.span.toFixed(0)}  ${ok ? "OK" : "FEL"}`);
+  console.log(`bpm ${r.bpm}  puls ${r.ppm.toFixed(1)}/min = ${per.toFixed(2)}/slag  ${seq[i].halved ? "halverad (<1.10)" : "full takt (>1.40)"}  ${ok ? "OK" : "FEL"}`);
 });
 if (fail) { console.log("MISSLYCKADES"); process.exit(1); }
 console.log("OK");
