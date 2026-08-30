@@ -183,7 +183,9 @@ echo "==> [7b/8] build + install pi-dmx-ble (BLE sidecar)"
 if [ -d "$REPO_DIR/ble-writer" ]; then
   cd "$REPO_DIR/ble-writer"
   npm ci --no-audit --no-fund
+  rm -rf dist
   npm run build
+  [ -f dist/index.js ] || { echo "❌ BLE-sidecar: bygget gav ingen dist/index.js" >&2; exit 1; }
   mkdir -p /opt/pi-dmx-ble
   rsync -a --delete dist/ /opt/pi-dmx-ble/dist/
   rsync -a --delete node_modules/ /opt/pi-dmx-ble/node_modules/
@@ -192,6 +194,22 @@ if [ -d "$REPO_DIR/ble-writer" ]; then
   mkdir -p /run/pi-dmx
   cd "$REPO_DIR/engine"
 fi
+
+# --- versionsstämpel för varje deploy ---------------------------------------
+# BUILD.json ligger bredvid koden så man kan se exakt vad som kör; deploy-loggen
+# är en historik man kan bläddra i när något började strula "efter en update".
+ENG_VER="$(node -p "require('./package.json').version" 2>/dev/null || echo unknown)"
+GIT_SHA="$(git -C "$REPO_DIR/.." rev-parse --short HEAD 2>/dev/null || echo nogit)"
+GIT_BRANCH="$(git -C "$REPO_DIR/.." rev-parse --abbrev-ref HEAD 2>/dev/null || echo nogit)"
+BUILT_AT="$(date -Is)"
+printf '{"engineVersion":"%s","commit":"%s","branch":"%s","builtAt":"%s","node":"%s"}\n' \
+  "$ENG_VER" "$GIT_SHA" "$GIT_BRANCH" "$BUILT_AT" "$(node -v)" \
+  > /opt/audio-dmx-engine/BUILD.json
+echo "$BUILT_AT  engine=v$ENG_VER  commit=$GIT_SHA  branch=$GIT_BRANCH  node=$(node -v)" \
+  >> /var/log/pi-dmx-deploy.log
+echo "  ✓ deploy: engine v$ENG_VER @ $GIT_SHA ($GIT_BRANCH)"
+
+
 
 echo "==> [8/8] enable + start services"
 systemctl daemon-reload
