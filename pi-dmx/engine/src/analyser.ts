@@ -596,12 +596,16 @@ export class Analyser {
 
 
     let bpm = (HZ * 60) / lagF;
-    // BPM-FILTER: vik in i 90..180 — festmusik ligger dar, och allt utanfor ar
-    // en oktav-artefakt (en 85-BPM-ballad ar i praktiken 170, en 190 ar 95).
-    // Intervallet MASTE spanna exakt en oktav (max = 2x min): med t.ex. 90..170
-    // blir 175 -> 87.5 -> 175 -> 87.5 i all evighet och motorn hanger.
+    // BPM-FILTER: vik in i 60..180. Sökningen (lagMin/lagMax) täcker 55..185, så
+    // detta rör bara kanterna: under 60 dubbleras, från 180 halveras. Inne i
+    // intervallet står estimatet KVAR som mätt — en 70-BPM-ballad tvingas inte upp
+    // till 140 längre. Vilken oktav som gäller avgörs av off-beat-testet ovan och
+    // oktavgrenarna nedan (asymmetriska: dubblera lätt, halvera trögt).
+    // Terminering kräver MAX >= 2*MIN; med t.ex. 90..170 blir 175 -> 87.5 -> 175 -> 87.5
+    // i all evighet och motorn hänger.
     while (bpm < Analyser.BPM_MIN) bpm *= 2;
     while (bpm >= Analyser.BPM_MAX) bpm /= 2;
+
     // Median över RÅestimaten (utan oktav-tvång) → dämpar brus men låser inte
     // fast oktaven, så en fel initial låsning kan rättas. Långt fönster (~5s) för
     // att inte studsa på brusiga/tvetydiga låtar.
