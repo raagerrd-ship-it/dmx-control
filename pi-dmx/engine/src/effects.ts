@@ -685,14 +685,9 @@ export class EffectEngine {
         let tier: Mode[] = intensity < lo ? LUGN : intensity < hi ? FART : FULLFART;
         // Låg-BPM-spärr: en tryckare/ballad ska ALDRIG gå Full Fart, även om dess
         // relativa energi toppar. (bpm 0 = ej låst → ingen spärr.)
-        // RÄKNAD MOT 90..180-INTERVALLET: bandet är nu 90–100 (var 80–95). En ballad
-        // på 80–89 viks upp till 160–178 och är där oskiljbar från hardstyle — den
-        // fångas inte av tempot utan av energi-hysteresen (`lo`/`hi`), som är rätt
-        // instrument för den: en ballad når inte Full Fart-tröskeln annat än i sitt
-        // starkaste refrängparti, och att spärra 160–178 hade dödat hardstyle helt.
-        // 60..180 rymmer båda oktavrepresentanterna, så ett tempo under 100 är nu
-        // oftast en FAKTISKT lugn låt (tidigare kunde det bara vara en 85-ballad vikt
-        // till 170 eller ett halvtempo-lås). Spärren är därför meningsfull igen.
+        // RÄKNAD MOT 80..160-INTERVALLET (exakt en oktav): en ballad på 85 bor kvar
+        // som 85 och fångas av spärren, medan hardstyle 150 ligger tryggt över. Att
+        // spärra högre än 100 hade dödat hardstyle helt, så bandet stannar där.
         if (bpm > 0 && bpm < 100 && tier === FULLFART) tier = FART;
         const tierName = tier === LUGN ? "lugn" : tier === FART ? "fart" : "full";
         // EFFEKT-ORKESTRERING. En effekt ska hinna LÄSAS av publiken innan nästa
