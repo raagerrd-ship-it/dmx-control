@@ -1,5 +1,16 @@
 # Ändringslogg
 
+## v0.3.1 — BPM-port från lotus-spegeln (riktad cherry-pick)
+
+- **BPM-intervall 80..160 → 90..180** (`Analyser.BPM_MIN/MAX`). Täckningsbyte, inte oktav-tydlighet: 165–180 BPM (hardstyle, psy, dnb-halvtempo) viks inte längre till halvtempo, priset är att 80–89 (ballader) viks upp till 160–178. Samma intervall är portat till `tools/refineSong.mjs` (båda vikningsställena) — divergens där gav beat-grid på halvt tempo eftersom `index.ts` laddar refinerns tempo med full tillit.
+- **Låg-BPM-spärren i `effects.ts`** räknad om mot det nya intervallet (95 → 100) med noten att 80–89-ballader nu är oskiljbara från 160–178 och hanteras av energi-hysteresen i stället.
+- **Oktav-migration i låtminnet**: lagrade tempon kan ligga i det gamla intervallet. Lagret nollställs INTE — `foldBpm()` viker vid varje läsning och innan blandningen i `mergeInto`, så en gammal 85 aldrig blandas med en ny 170.
+- **Oktav-commit 60 → 24 estimat**, och `committedNow` (låtbytesvakten) sänkt till SAMMA tal. Skilda trösklar gav ett dödläge: oktav- och grannrättning stängd medan `bpmStable` bara växer i glid-grenen ⇒ ett lås 33 % fel kunde inte lämnas förrän tystnad.
+- **Konfidensbaserad låssläppning** (ny): `bpmConfidence < 0.3` i 8 s → mjuk `hintTrackChange(5000)` (tempot behålls som startgissning, historik/röster töms, sökningen vidgas). Ger `hintTrackChange()` sin första anropare i DMX.
+- **Flanktriggad tystnads-släppning**: reseten körs en gång på flanken i stället för varje tyst hop (500 tempogram-skrivningar × 375 Hz). Tempot behålls (billig stride, snabb återinlåsning), tempogrammet halveras, full släppning först efter 10 s tystnad.
+- **Inte portat** (medvetet): lotus sammanslagna `hintTrackChange(ms, keepBpm)` — DMX behåller `resetTempo()`/`hintTrackChange()`/`clearLockVotes()` eftersom `resetTempo()` anropas från `index.ts`. Inte heller `Frame.specAbs`/`bandAbs`, `maxGain`-ratten eller grannrättningens no-op-grind.
+
+
 ## v0.3.0 — driftstabilitet (portat från Lotus-motorn)
 
 - **Percentil-AGC på mic-vägen**: envelopen är 95:e percentilen (näst största av 16 blockmaxima à 128 ms) av RÅ rms i stället för en EMA av den gainade momentannivån. Långsam attack, snabb retreat. Mätt i ny bänk (`tools/testAgc.mjs`, 8 seeder): pinnad nivå 0 %, klipp 0 %, och uppbyggnaden syns (nivå intro/build/drop 0,15 / 0,30 / 0,35). Aux-vägen är oförändrad (gain låst 1×), så hela BPM-sviten ger identiska siffror.
