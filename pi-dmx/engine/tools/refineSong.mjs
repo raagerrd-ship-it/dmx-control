@@ -121,9 +121,11 @@ if (bestLag > LAG_MIN && bestLag < LAG_MAX) {
   if (den !== 0) lagF = bestLag + Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den));
 }
 let bpm = lagF ? 60 * HZ / lagF : 0;
-// Oktavval: håll tempot i 80–160, där dansmusik faktiskt bor.
-while (bpm > 0 && bpm < 80) bpm *= 2;
-while (bpm > 165) bpm /= 2;
+// Oktavval: håll tempot i 90–180 — SAMMA intervall som analysatorns BPM_MIN/BPM_MAX.
+// Divergerar de viker refinern en 172-BPM-låt till 86 medan analysatorn säger 172, och
+// index.ts laddar refinerns värde med full tillit → beat-gridet går på halvt tempo.
+while (bpm > 0 && bpm < 90) bpm *= 2;
+while (bpm >= 180) bpm /= 2;
 
 // Taktfas: vik onset-kurvan över perioden och ta maxfasen.
 let beatPhaseMs = 0;
@@ -268,8 +270,8 @@ const bpmIn = (t0, t1) => {
     if (s > bs) { bs = s; bl = lag; }
   }
   let v = bl ? 60 * HZ / bl : 0;
-  while (v > 0 && v < 80) v *= 2;
-  while (v > 165) v /= 2;
+  while (v > 0 && v < 90) v *= 2;
+  while (v >= 180) v /= 2;
   return v;
 };
 const profileOver = (t0, t1) => {
