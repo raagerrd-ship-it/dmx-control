@@ -363,7 +363,7 @@ export class Analyser {
 
 
   /**
-   * BPM (80..160) från onset-envelopens autokorrelation.
+   * BPM (90..180) från onset-envelopens autokorrelation.
    *  1) Toppen i autokorrelationen ger en kandidat-lag.
    *  2) SUB-HARMONIC-PREFERENS: om dubbla/tredubbla lagget (halva/tredjedels
    *     tempot) resonerar nästan lika bra är det oftast det ÄKTA beatet — annars
@@ -574,9 +574,9 @@ export class Analyser {
 
 
     let bpm = (HZ * 60) / lagF;
-    // BPM-FILTER: vik in i 80..160 — festmusik ligger dar, och allt utanfor ar
-    // en oktav-artefakt (en 76-BPM-last ar i praktiken 152, en 170 ar 85).
-    // Intervallet MASTE spanna exakt en oktav (max = 2x min): med t.ex. 80..150
+    // BPM-FILTER: vik in i 90..180 — festmusik ligger dar, och allt utanfor ar
+    // en oktav-artefakt (en 85-BPM-ballad ar i praktiken 170, en 190 ar 95).
+    // Intervallet MASTE spanna exakt en oktav (max = 2x min): med t.ex. 90..170
     // blir 155 -> 77.5 -> 155 -> 77.5 i all evighet och motorn hanger.
     while (bpm < Analyser.BPM_MIN) bpm *= 2;
     while (bpm >= Analyser.BPM_MAX) bpm /= 2;
