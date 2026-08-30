@@ -146,14 +146,27 @@ export class Analyser {
   private bpmCounter = 0;
   private localBpm = 0;
   private localBpmConfidence = 0;
-  // TÄCKNING, inte oktav-tydlighet: båda intervallen är exakt en oktav (160=2·80,
-  // 180=2·90), så b och 2b är lika oskiljbara i båda. Vinsten är att 165–180 BPM
-  // (hardstyle, psytrance, dnb-halvtempo) inte längre viks till halvtempo — MÄTT:
-  // 170 lästes som 85. Priset är att 80–89 (ballader) nu viks upp till 160–178.
-  // Rätt affär för partitillämpningen ("hellre den snabbare representanten").
-  private static readonly BPM_MIN = 90;    // festintervall; MAX maste vara exakt 2x MIN
+  // TÄCKNING 60..180 — INTE en oktav (ratio 3). Det är ett medvetet byte av vad
+  // vikningen gör: 60..180 rymmer BÅDA representanterna för allt mellan 60 och 90
+  // (en 70 och en 140 får bo kvar var för sig), så en lugn låt behåller sitt egna
+  // tempo i stället för att tvingas upp till dubbelt. Priset är att vikningen inte
+  // längre GARANTERAR en unik representant — det är oktavgrenarna nedan (och
+  // off-beat-testet i computeBpm) som avgör vilken som gäller, inte `while`-loopen.
+  // Terminering: loopen kräver bara MAX >= 2*MIN (180 >= 120). Med MAX < 2*MIN
+  // (t.ex. 90..170) studsar 175 -> 87.5 -> 175 i all evighet och motorn hänger.
+  // Sömmarna ligger nu vid 60 och 180 i stället för 90/180.
+  private static readonly BPM_MIN = 60;    // MAX måste vara >= 2*MIN (annars evig vikning)
   private static readonly BPM_MAX = 180;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
+  /** Bevis för att DUBBLERA (estimaten pekar högre) mot att HALVERA (lägre).
+   *  ASYMMETRISKT med flit: ett halvtempo-lås gör ljusshowen trögt fel men körbar,
+   *  medan ett dubbeltempo-lås strular med varje effekt — och en breakdown, ett
+   *  glesare parti eller ett sväng-mönster ser ut som halvt tempo långt oftare än
+   *  något ser ut som dubbelt. Uppåt räcker ~2 s bevis; nedåt krävs ~6 s.
+   *  Samma asymmetri gäller grannrättningen (`med < localBpm` kräver dubbla röster). */
+  private static readonly OCT_UP = 8;
+  private static readonly OCT_DOWN = 24;
+
   private nearVote = 0;     // bevis för GRANN-fel (t.ex. 122 låst mot 136): bara före commit
   private nearChallenger = 0;  // tempot grann-rösterna pekar på (måste hålla ihop, som challengerBpm)
   private bpmStable = 0;    // antal stabila (finjusterings-)estimat i rad → committa oktaven
