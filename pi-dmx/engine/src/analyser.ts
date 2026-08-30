@@ -161,6 +161,13 @@ export class Analyser {
   private lockPeak = 0;        // tempogram-toppens styrka när takten är frisk (referens)
   private lastSongVoteMs = 0;  // väggklocka för förra låtbytesrösten (bevis mäts i TID)
   private newSongVote = 0;  // ihållande oenighet trots låst oktav → låtbyte utan tystnadslucka
+  /** Antal stabila finjusterings-estimat (@4Hz) innan oktaven committas OCH
+   *  låtbytesvakten öppnar. MÅSTE vara samma tal på båda ställena — se dödläget
+   *  dokumenterat vid `committed` i computeBpm(). */
+  private static readonly BPM_COMMIT = 24;
+  /** Väggklocka för när konfidensen senast var frisk (≥0.3) — grund för den mjuka
+   *  låssläppningen sist i computeBpm(). 0 = ej satt. */
+  private lowConfSinceMs = 0;
   /** Väggklocka: t.o.m. denna tid gäller vidgad tempo-sökning efter en låtbytes-hint. */
   private reacqUntilMs = 0;
 
@@ -693,7 +700,10 @@ export class Analyser {
       //      ackumulerade tempogrammet? Ett breakdown gör låset svagare men ger ingen
       //      dominant rival — en ny låt gör det.
       // Rösterna räknas i TID, inte i anrop: stride växlar 100→20 Hz med låset.
-      const committedNow = this.bpmStable >= 60;
+      // SAMMA tröskel som oktav-commiten: låtbytesvakten måste öppna i exakt samma
+      // stund som oktav-/grannrättningen stänger, annars finns ett fönster där låset
+      // inte kan lämnas alls (se dödlägesnoten vid `committed` ovan).
+      const committedNow = this.bpmStable >= Analyser.BPM_COMMIT;
       const rawOff = Math.abs(bpm / this.localBpm - 1) > 0.11;
       const sameChallenger = this.challengerBpm > 0 && Math.abs(bpm / this.challengerBpm - 1) <= 0.04;
       // 4. FRISK TAKT. Ett breakdown ser ut som ett låtbyte i allt utom kvaliteten:
