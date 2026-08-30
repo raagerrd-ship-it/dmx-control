@@ -40,6 +40,27 @@ export class AudioCapture extends EventEmitter {
   /** Se toMonoFloat32: återanvänd mono-buffert, giltig bara under 'chunk'-handlern. */
   private readonly mono: Float32Array;
 
+  // ── ÅTERHÄMTNINGSTRAPPA ────────────────────────────────────────────────────
+  // Portad från Lotus (micRecovery.ts). Blind respawn i all evighet är fel svar:
+  // när ALSA-enheten är verkligt borta (kort tappat på USB/I2S, codec i fel läge)
+  // spawnar vi arecord en gång per sekund för alltid — varje försök kostar CPU och
+  // journald-rader, och riggen står svart utan att någon får veta VARFÖR.
+  // Trappan: 2 rena respawns → 2 respawns med omdirigering av ALSA-ingången
+  // ('rebind', index.ts sätter om mixern) → SÄKERT LÄGE: sluta jaga, säg det högt,
+  // och prova bara en gång per minut. Räknaren nollställs när capturen levererat
+  // oavbrutet i 5 s, så en enstaka nattlig hicka aldrig äter upp trappan.
+  private static readonly CLEAN_RESPAWNS = 2;
+  private static readonly LADDER_MAX = 4;
+  private static readonly HEALTHY_MS = 5000;
+  private static readonly SAFE_RETRY_MS = 60_000;
+  private recoveries = 0;
+  private firstDataAt = 0;
+  private safeMode = false;
+  private respawnTimer: NodeJS.Timeout | null = null;
+
+  /** True när trappan är slut: ingen respawn-jakt, bara ett försök per minut. */
+  get inSafeMode(): boolean { return this.safeMode; }
+
   constructor(private opts: AudioCaptureOptions) {
     super();
     this.bytesPerFrame = 2 * opts.channels;
@@ -59,8 +80,23 @@ export class AudioCapture extends EventEmitter {
   stop() {
     this.stopped = true;
     if (this.stallTimer) { clearInterval(this.stallTimer); this.stallTimer = null; }
+    if (this.respawnTimer) { clearTimeout(this.respawnTimer); this.respawnTimer = null; }
     this.proc?.kill("SIGTERM");
     this.proc = null;
+  }
+
+  /**
+   * Manuellt återhämtningsförsök (watchdogens riktade åtgärd). Nollställer
+   * trappan så capturen får en ärlig ny chans utan att motorn startas om.
+   */
+  recover() {
+    if (this.stopped) return;
+    this.recoveries = 0;
+    this.safeMode = false;
+    if (this.respawnTimer) { clearTimeout(this.respawnTimer); this.respawnTimer = null; }
+    this.lastDataAt = 0;
+    if (this.proc) this.proc.kill("SIGKILL");   // 'exit'-handlern respawnar
+    else this.spawnArecord();
   }
 
   /** Dödar en levande men tyst arecord. Respawn sker via 'exit'-handlern. */
@@ -73,9 +109,30 @@ export class AudioCapture extends EventEmitter {
     this.proc.kill("SIGKILL");    // TERM kan hänga i samma ALSA-anrop som tystnade
   }
 
+  /** Nästa steg i trappan efter att en capture dött eller tystnat. */
+  private scheduleRecovery() {
+    if (this.stopped || this.respawnTimer) return;
+    this.recoveries++;
+    if (this.recoveries > AudioCapture.CLEAN_RESPAWNS && this.recoveries <= AudioCapture.LADDER_MAX) {
+      // Rena respawns räckte inte → ALSA-ingången kan ha hamnat i fel läge
+      // (codec-zero byter rutt när jacket rörs). index.ts sätter om mixern.
+      this.emit("rebind", this.recoveries);
+    }
+    if (this.recoveries > AudioCapture.LADDER_MAX) {
+      if (!this.safeMode) { this.safeMode = true; this.emit("safe", this.recoveries); }
+      this.respawnTimer = setTimeout(() => { this.respawnTimer = null; this.spawnArecord(); }, AudioCapture.SAFE_RETRY_MS);
+      this.respawnTimer.unref?.();
+      return;
+    }
+    this.respawnTimer = setTimeout(() => { this.respawnTimer = null; this.spawnArecord(); }, 1000);
+    this.respawnTimer.unref?.();
+  }
+
+
 
   private spawnArecord() {
     this.leftover = Buffer.alloc(0);
+    this.firstDataAt = 0;
     const args = [
       "-D", this.opts.device,
       "-f", "S16_LE",
@@ -94,14 +151,27 @@ export class AudioCapture extends EventEmitter {
     if (p.pid) spawn("taskset", ["-pc", "0", String(p.pid)], { stdio: "ignore" }).on("error", () => {});
     this.proc = p;
 
-    p.stdout.on("data", (buf: Buffer) => { this.lastDataAt = Date.now(); this.onData(buf); });
+    p.stdout.on("data", (buf: Buffer) => {
+      const now = Date.now();
+      this.lastDataAt = now;
+      // FRISK CAPTURE = oavbruten leverans i 5 s. Först då nollställs trappan:
+      // annars räcker en enda chunk mellan två stall för att nollställa den, och
+      // en enhet som levererar i ryck skulle jaga respawns i evighet.
+      if (this.firstDataAt === 0) this.firstDataAt = now;
+      else if (this.recoveries > 0 && now - this.firstDataAt >= AudioCapture.HEALTHY_MS) {
+        this.recoveries = 0;
+        if (this.safeMode) { this.safeMode = false; this.emit("recovered"); }
+      }
+      this.onData(buf);
+    });
     p.stderr.on("data", (buf: Buffer) => {
       const s = buf.toString().trim();
       if (s) this.emit("stderr", s);
     });
     p.on("exit", (code) => {
       this.emit("exit", code);
-      if (!this.stopped) setTimeout(() => this.spawnArecord(), 1000);
+      this.proc = null;
+      this.scheduleRecovery();
     });
     // 'error' fyrar om själva spawn:en failar (arecord saknas på PATH, eller
     // EAGAIN när fork inte får minne på 512MB-Pi:n). Utan denna lyssnare skulle
@@ -109,9 +179,11 @@ export class AudioCapture extends EventEmitter {
     // fyrar INTE vid spawn-fel, så respawn:en ovan uteblir. Respawna här i stället.
     p.on("error", (err) => {
       this.emit("stderr", `spawn: ${(err as Error).message}`);
-      if (!this.stopped) setTimeout(() => this.spawnArecord(), 1000);
+      this.proc = null;
+      this.scheduleRecovery();
     });
   }
+
 
   private onData(buf: Buffer) {
     // Concat leftover + new; slice into fixed chunks; keep remainder.

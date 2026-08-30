@@ -31,6 +31,8 @@ import { applyIntensity } from "./moods.js";
 import { MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { SongMemory } from "./songMemory.js";
 import * as health from "./runtimeHealth.js";
+import { logHealth } from "./healthLog.js";
+
 
 
 import { activeSlots, fixtureRoles, type Mode } from "./config.js";
@@ -642,9 +644,23 @@ capture.on("stderr", (s) => {
   console.error("[arecord]", s);
 });
 
-capture.on("stall", (gap: number) => console.error(`[arecord] tyst i ${gap}ms — startar om capturen`));
+capture.on("stall", (gap: number) => logHealth("warn", "audio", `tyst i ${gap}ms — startar om capturen`));
 
 capture.on("exit", (code) => console.error("[arecord] exited", code));
+
+// ── ÅTERHÄMTNINGSTRAPPAN (se audio.ts) ────────────────────────────────────────
+// Steg 3–4: ren respawn hjälpte inte → sätt om ALSA-rutten. codec-zero kan hamna
+// i fel ingång när jacket rörs, och då levererar arecord tystnad hur många gånger
+// vi än startar om den.
+capture.on("rebind", (n: number) => {
+  logHealth("warn", "audio", `återhämtning ${n}: sätter om ALSA-ingången (${cfg.audioInput === "mic" ? "mik" : "aux"})`);
+  applyInputRouting(cfg.audioInput === "mic" ? "mic" : "aux");
+});
+// Trappan slut → SÄKERT LÄGE. Riggen står svart via den befintliga uttoningen,
+// men nu står det i hälsologgen VARFÖR, och vi slutar bränna CPU på respawn-jakt.
+capture.on("safe", (n: number) => logHealth("err", "audio", `ingen ljudinfångning efter ${n} försök — säkert läge, nytt försök varje minut`));
+capture.on("recovered", () => logHealth("info", "audio", "ljudinfångningen tillbaka — säkert läge avslutat"));
+
 
 // 1 Hz-sampling av hälsomåtten (event-loop-lag mäts som schemats egen försening).
 setInterval(() => health.sample(), 1000);
@@ -688,7 +704,16 @@ const serverDeps = {
   getActiveMode: () => effects.getActiveMode(),
   // Frisk = en ljud-chunk bearbetad senaste 10 s (arecord + event-loop lever).
   getHealthy: () => Date.now() - lastChunkAt < 10000,
+  // DIAGNOS för watchdogen: är felet ljud eller DMX? Ett ljudfel går att laga
+  // riktat (starta om capturen) utan att slå ner hela showen med en processomstart.
+  getFailReason: () => {
+    if (Date.now() - lastChunkAt >= 10000) return capture.inSafeMode ? "audio-safe" : "audio";
+    if (!dmx.isConnected()) return "dmx";
+    return "";
+  },
+  recoverAudio: () => capture.recover(),
   getDmxConnected: () => dmx.isConnected(),
+
   getFogStatus: () => effects.getFogStatus(),
   resetFogService: () => effects.resetFogService(),
   songMemory: {

@@ -56,6 +56,11 @@ export interface ServerDeps {
   getActiveMode: () => Mode;
   /** True om ljud-pipelinen bearbetat en frame nyligen (för watchdog /health). */
   getHealthy: () => boolean;
+  /** Diagnos när getHealthy() är false: "audio" | "audio-safe" | "dmx" | "". */
+  getFailReason?: () => string;
+  /** Starta om ENBART ljudinfångningen (watchdogens riktade åtgärd). */
+  recoverAudio?: () => void;
+
   /** True om DMX-sockeln mot helpern är öppen. UI:t visar röd banner annars. */
   getDmxConnected: () => boolean;
   /** Rökmaskinens tillstånd (uppvärmning/värmekonto/drifträknare). null = ej ansluten. */
@@ -220,12 +225,18 @@ export async function startServer(
     return reply.code(404).send();
   });
 
-  // Hälsokoll för watchdog: 200 om ljud-pipelinen lever, annars 503 → watchdogen
-  // startar om motorn (fångar ett HÄNG som Restart=always inte ser).
+  // Hälsokoll för watchdog: 200 om ljud-pipelinen lever, annars 503 med DIAGNOS i
+  // kroppen ("audio", "audio-safe" eller "dmx"). Watchdogen kan då laga riktat i
+  // stället för att alltid starta om motorn — en processomstart släcker showen i
+  // ~4 s, en capture-omstart syns knappt.
   app.get("/health", (_req, reply) => {
     if (deps.getHealthy()) reply.code(200).send("ok");
-    else reply.code(503).send("stale");
+    else reply.code(503).send(deps.getFailReason?.() || "stale");
   });
+
+  // Riktad åtgärd: starta om ENBART ljudinfångningen (watchdogens första steg).
+  app.post("/api/audio/recover", async () => { deps.recoverAudio?.(); return { ok: true }; });
+
 
   // ---- Version + systemlogg ------------------------------------------------
   // Uthyrning: när något går fel behöver support kunna se "vilken firmware" och
