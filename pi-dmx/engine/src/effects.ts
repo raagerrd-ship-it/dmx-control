@@ -357,8 +357,12 @@ export class EffectEngine {
       // Försprånget = attackens längd: klockan ger fasen som om vi låg `atk` ms fram.
       // Vid halvering läggs ett helt slag på när vi står på ett ODDA index, så pulsen
       // löper obrutet över de två slagen och startar alltid på ett jämnt index.
+      // Pariteten MÅSTE läsas med SAMMA försprång som fasen (atk + showLead), annars
+      // wrappar fasen till nästa slag innan takträknaren stegar → varannan puls blev
+      // dubbelt lång och varannan kapad precis vid slaggränsen.
+      const pulseIdx = beatIndex(beat, now2 + atk + this.showLead);
       const tSince = beatPhase(beat, now2, atk + this.showLead) * beatMs
-        + (this.pulseHalved && Math.abs(beatIdx % 2) === 1 ? beatMs : 0);
+        + (this.pulseHalved && Math.abs(pulseIdx % 2) === 1 ? beatMs : 0);
       const dec = pulseMs * BEAT_DECAY_FRAC;
       beatEnv = tSince < atk ? tSince / atk : Math.exp(-(tSince - atk) / dec);
       // PRE-DIP: en inandning strax FÖRE anslaget.
