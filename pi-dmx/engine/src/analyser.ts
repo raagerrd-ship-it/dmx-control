@@ -612,11 +612,16 @@ export class Analyser {
       // ihållande pekar på en annan oktav (½× eller 2×) → byt efter ~2s bevis, så
       // en halvtempo-låsning "ökar" till rätt takt istället för att fastna. Ett
       // enstaka breakdown hinner inte nå tröskeln → ingen flimrig växling.
-      // COMMIT: efter ~15s STABIL lås (60 finjusterings-estimat @4Hz) LÅSES oktaven —
+      // COMMIT: efter ~6s STABIL lås (24 finjusterings-estimat @4Hz) LÅSES oktaven —
       // bara finjustering tillåts, aldrig ½×/2× mitt i en låt (en låt byter inte
-      // oktav; halvering nollade takt-gridet & bröt beat-synken). Ett wrong initial-
-      // lås hinner rättas under första 15s. Nollställs vid tystnad/låtbyte (localBpm=0).
-      const committed = this.bpmStable >= 60;
+      // oktav; halvering nollade takt-gridet & bröt beat-synken).
+      // OBS: fönstret för självrättning är nu ~6s, inte 15s. Ett felaktigt initiallås
+      // som INTE ligger i glid-bandet hinner alltså inte alltid rättas här — därför
+      // är `committedNow` (låtbytesvakten) sänkt till SAMMA 24. Annars uppstod ett
+      // dödläge: oktav-/grannrättning stängd vid 24 medan `bpmStable` bara växer i
+      // glid-grenen ⇒ ett lås 33 % fel (t.ex. 90 mot verkligt 120) kunde inte lämnas
+      // förrän tystnad. Konfidenssläppningen sist i denna metod är andra utvägen.
+      const committed = this.bpmStable >= Analyser.BPM_COMMIT;
       const ratio = med / this.localBpm;
       if (ratio >= 0.9 && ratio <= 1.11) {
         this.nearVote = 0; this.nearChallenger = 0;                                 // samma takt → inget grann-fel
