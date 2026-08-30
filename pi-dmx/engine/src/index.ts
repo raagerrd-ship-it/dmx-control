@@ -704,7 +704,16 @@ const serverDeps = {
   getActiveMode: () => effects.getActiveMode(),
   // Frisk = en ljud-chunk bearbetad senaste 10 s (arecord + event-loop lever).
   getHealthy: () => Date.now() - lastChunkAt < 10000,
+  // DIAGNOS för watchdogen: är felet ljud eller DMX? Ett ljudfel går att laga
+  // riktat (starta om capturen) utan att slå ner hela showen med en processomstart.
+  getFailReason: () => {
+    if (Date.now() - lastChunkAt >= 10000) return capture.inSafeMode ? "audio-safe" : "audio";
+    if (!dmx.isConnected()) return "dmx";
+    return "";
+  },
+  recoverAudio: () => capture.recover(),
   getDmxConnected: () => dmx.isConnected(),
+
   getFogStatus: () => effects.getFogStatus(),
   resetFogService: () => effects.resetFogService(),
   songMemory: {
