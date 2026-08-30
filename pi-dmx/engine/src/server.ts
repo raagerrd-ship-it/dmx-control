@@ -56,6 +56,11 @@ export interface ServerDeps {
   getActiveMode: () => Mode;
   /** True om ljud-pipelinen bearbetat en frame nyligen (för watchdog /health). */
   getHealthy: () => boolean;
+  /** Diagnos när getHealthy() är false: "audio" | "audio-safe" | "dmx" | "". */
+  getFailReason?: () => string;
+  /** Starta om ENBART ljudinfångningen (watchdogens riktade åtgärd). */
+  recoverAudio?: () => void;
+
   /** True om DMX-sockeln mot helpern är öppen. UI:t visar röd banner annars. */
   getDmxConnected: () => boolean;
   /** Rökmaskinens tillstånd (uppvärmning/värmekonto/drifträknare). null = ej ansluten. */
