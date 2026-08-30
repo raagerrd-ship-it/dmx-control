@@ -756,6 +756,24 @@ export class Analyser {
     const cA = this.localBpmConfidence;
     const aC = 1 - Math.exp(-dt / (conf > cA ? 0.025 : 0.120));
     this.localBpmConfidence = cA + (conf - cA) * aC;
+
+    // ── KONFIDENSBASERAD LÅSSLÄPPNING ─────────────────────────────────────────
+    // Sista utvägen ur ett fel lås. Oktav- och grannrättning stänger vid
+    // BPM_COMMIT, och låtbytesvakten kräver FRISK takt (conf ≥ 0.9) — ett lås som
+    // är fel och där takten aldrig blir frisk hade därför ingen väg ut alls, utom
+    // 350 ms tystnad. Håller konfidensen sig under 0.3 i 8 s är låset i praktiken
+    // inte längre en beskrivning av musiken: släpp det MJUKT (behåll tempot som
+    // startgissning, töm historik och röster, vidga sökningen) i stället för hårt.
+    // KVARSTÅENDE HÅL: ett SJÄLVSÄKERT men felaktigt lås (conf ≥ 0.3) fyrar inte
+    // här. Det är därför `committedNow` sänktes till samma 24 som `committed`.
+    if (this.localBpmConfidence >= 0.3) {
+      this.lowConfSinceMs = voteNow;
+    } else if (this.lowConfSinceMs > 0 && voteNow - this.lowConfSinceMs > 8000) {
+      this.lowConfSinceMs = voteNow;
+      this.hintTrackChange(5000);
+    } else if (this.lowConfSinceMs === 0) {
+      this.lowConfSinceMs = voteNow;
+    }
   }
 
   /** Nollställ tempoläget — anropas när låtminnet BEKRÄFTAT en låtgräns. Då vet vi
