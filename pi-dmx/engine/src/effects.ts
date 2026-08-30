@@ -109,6 +109,8 @@ export class EffectEngine {
   /** Takt-räknare som effekterna ser (beatIdx): stegar på grid-slaget när BPM är
    *  låst, annars på verkliga kicks → grid-effekter fryser aldrig utan BPM-lås. */
   private beatCounter = 0;
+  /** Pulsen körs i halva takten (snabb låt). Hysteresstyrd, se PULSE_HALVE_*. */
+  private pulseHalved = false;
   /** Drops mode: per-lamp fire time + hue; advanced on each beat/kick. */
   private dropPos = 0;
   private dropSector = 0;
