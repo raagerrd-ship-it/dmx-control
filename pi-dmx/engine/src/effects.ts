@@ -1122,7 +1122,7 @@ export class EffectEngine {
     // effekter. Kanalerna maskas ur ballistiken längre ner (samma spår som
     // strobe) så pulser inte tonas ut och sätter fixtures i mellanhastigheter.
     const drives = effect?.drives;
-    const has = (r: string) => drives ? drives.includes(r) : false;
+    const has = (r: ChannelRole) => drives ? drives.includes(r) : false;
     const clamp255 = (x: number) => x < 0 ? 0 : x > 255 ? 255 : Math.round(x);
     const specialty = {
       hazer:   has("hazer")   ? clamp255(Math.max(140 + audio * 60, wantHazer * 255)) : 0,
