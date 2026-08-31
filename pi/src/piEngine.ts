@@ -1458,8 +1458,18 @@ export class PiLightEngine {
         pct = 100;
         this.lastSentPct = 100; // bypassa deadband så blixten alltid skickas
       }
-      const isPunch = dropFlash || (cal.punchWhiteThreshold < 100 && pct >= cal.punchWhiteThreshold);
-      applyColorCalibrationFast(this.color[0], this.color[1], this.color[2], tc);
+      const isPunch = dropFlash || (tc.punchWhiteThreshold < 100 && pct >= tc.punchWhiteThreshold);
+
+      // Excitation: När DMX-lampan pressas över 80% intensitet, desaturera mot vitt
+      let excR = this.color[0], excG = this.color[1], excB = this.color[2];
+      if (pct > 80 && !isPunch) {
+        const over = (pct - 80) / 20; // 0.0 till 1.0
+        excR += (255 - excR) * over;
+        excG += (255 - excG) * over;
+        excB += (255 - excB) * over;
+      }
+
+      applyColorCalibrationFast(excR, excG, excB, tc);
 
       // ── BLE output (synkron hard-fail) ──
       // sendToBLE returnerar direkt med WriteResult — engine räknar utfallet
