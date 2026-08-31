@@ -61,7 +61,7 @@ export class PostProcess {
     //    en 255 som tonar nedåt skulle få strobe att fara mellan takter.
     const att = 1 - Math.exp(-dtSec * INV_ATTACK_S);
     for (let ch = 0; ch < maxCh; ch++) {
-      if (out.isDirect(ch)) {
+      if (out.direct[ch]) {
         this.smooth[ch] = universe[ch];
         continue;
       }
@@ -76,7 +76,7 @@ export class PostProcess {
     if (ceilingActive && ceilMul < 0.999) {
       out.scale(universe, ceilMul);
       for (let ch = 0; ch < maxCh; ch++) {
-        if (out.isLight(ch)) this.smooth[ch] *= ceilMul;
+        if (out.light[ch]) this.smooth[ch] *= ceilMul;
       }
     }
 
@@ -92,7 +92,7 @@ export class PostProcess {
     //    rent från svart utan pop från en kvarhållen nivå.
     if (blackout) {
       for (let ch = 0; ch < maxCh; ch++) {
-        if (!out.isDirect(ch)) {
+        if (!out.direct[ch]) {
           universe[ch] = 0;
           this.smooth[ch] = 0;
         }
