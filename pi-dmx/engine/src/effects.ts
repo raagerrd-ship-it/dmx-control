@@ -65,6 +65,19 @@ const BEAT_DOWNBEAT_ACCENT = 0.25;
  *  ("dubblade i lugna partier kring tröskeln") i Lotus. */
 const PULSE_HALVE_ABOVE_BPM = 135;
 const PULSE_HALVE_HYST_BPM = 15;
+/** ENERGISTYRD HALVERING (portad från Lotus energySubdiv 2026-08-31).
+ *  BPM-regeln ovan fångar bara snabba låtar. En lugn vers på 118 BPM pulsar ändå
+ *  i full takt, vilket ingen ljustekniker hade gjort — där halverar man för att
+ *  släppa ner luften. Signalen är `frame.intensity` (sektionsenergi relativt
+ *  låtens EGET snitt, 0.5 = snittet), utjämnad över ~8 s: en FAST nivå-tröskel
+ *  kan inte fungera eftersom materialets nivå vandrar (MÄTT i Lotus: 0.480 →
+ *  0.232 median mellan låtar). Hysteres + min-hold är obligatoriska — utan hold
+ *  gav Lotus en fyrkantsvåg som växlade takt var 12:e sekund. */
+const SUBDIV_ENERGY_TAU_MS = 8000;
+const SUBDIV_ENERGY_LO_ON = 0.30;    // under detta: lugnt parti → halvera
+const SUBDIV_ENERGY_LO_OFF = 0.42;   // över detta: släpp halveringen
+const SUBDIV_MIN_HOLD_MS = 10000;
+
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
 const START_FADE_MS = 5000;
