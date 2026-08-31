@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/release.yml'
       - 'pi/**'
+      - 'pi-dmx/**'
       - 'src/**'
       - 'index.html'
       - 'vite.config.ts'
