@@ -13,9 +13,9 @@ export interface Spectrum {
   kick: number;     // ~60–120 Hz  — kick-grundton/kropp (nu SKILD från basen)
   bass: number;     // ~120–250 Hz — basgång/basnoter
   lowMid: number;   // ~250–500 Hz — låg kropp, toms, låg röst
-  mid: number;      // ~0.5–2 kHz  — röst, snare-kropp, synth
-  highMid: number;  // ~2–5 kHz    — närvaro, snare-crack, konsonanter
-  treble: number;   // ~5–10 kHz   — hi-hats, cymbaler
+  mid: number;      // ~0,5–1,2 kHz — röst, snare-kropp, synth
+  highMid: number;  // ~1,2–3,5 kHz — snare-crack/presence (dedikerad backbeat-kanal)
+  treble: number;   // ~3,5–10 kHz — hi-hats, cymbaler
   air: number;      // ~10–16 kHz  — luft/glitter
 }
 
@@ -114,7 +114,7 @@ export class Analyser {
   private prevMagBigView!: Float32Array;
 
   private specBig!: number[];           // scratch complex (fft.js createComplexArray)
-  private static readonly BAND_HZ = [20, 60, 120, 250, 500, 2000, 5000, 10000, 16000];
+  private static readonly BAND_HZ = [20, 60, 120, 250, 500, 1200, 3500, 10000, 16000];
   private bandLo: number[] = [];        // bin-start per band (förberäknat)
   private bandHi: number[] = [];        // bin-slut per band
   private bandPeak = new Float32Array(8);  // per-band AGC-peak (själv-skalande nivå)
@@ -997,7 +997,7 @@ export class Analyser {
     let kickFlux = 0;                               // onset ENBART i kick-bandet (sub-bas)
     let powSum = 0, powW = 0;                       // för spektralt centroid (EFFEKT-viktat)
     const bassBins = Math.min(16, half);                            // ~0–1.5 kHz
-    const kickBins = Math.min(3, half);                            // bins 0–2 ≈ 0–280 Hz (kick-trumman)
+    const kickBins = Math.min(1, half);                             // ENBART bin 0 ≈ 0–94 Hz (bastrummans transient, inte basgången)
 
     // MAGNITUD (sqrt) räknas bara i basbanden — det är de enda bin som läses. Övriga
     // 240 sqrt/hop (~90 000/s) fanns bara för centroiden, som nu viktar på EFFEKT
