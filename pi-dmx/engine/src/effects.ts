@@ -92,6 +92,10 @@ const START_DROP_MUTE_MS = 3000;
  *  0 = allt exakt på slaget. 50 = hela showen 50 ms före.
  *  Hjärtslaget lägger dessutom till sin egen attacktid, så dess TOPP landar rätt. */
 const SHOW_LEAD_DEFAULT = 50;
+/** Golv på taktens tillit när pulsdjupet räknas. Rampen börjar vid
+ *  MIN_BEAT_CONFIDENCE, så utan golv finns ett dödband precis ovanför grinden där
+ *  rutnätet lever men hjärtslaget är släckt. Gäller BARA pulsdjupet. */
+const BEAT_TRUST_FLOOR = 0.35;
 
 export class EffectEngine {
   private universe = new Uint8Array(512);
@@ -511,6 +515,13 @@ export class EffectEngine {
         // dodband som bara gick att felsoka genom att lasa bada filerna.
         const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - MIN_BEAT_CONFIDENCE) / 0.37));
         this.beatTrust += (trustRaw - this.beatTrust) * 0.03;
+        // TILLITSGOLV (portat från Lotus beatTrustFloor 2026-08-31). Rampen börjar exakt
+        // där klockans grind släpper igenom (MIN_BEAT_CONFIDENCE), så vid conf ≈ 0.20 är
+        // rutnätet LEVANDE men tilliten 0 → depth ≈ 0 och hjärtslaget är avstängt fast
+        // takten går. Golvet låter pulsen leva på FAKTISKA transienter när tempot är
+        // svårmätt men hörbart. Golvet sätts BARA här, inte på this.beatTrust: den läses
+        // också av grid-/drop-grindarna (> 0.5) som ska fortsätta kräva riktig tillit.
+        const trustFloored = Math.max(BEAT_TRUST_FLOOR, this.beatTrust);
         // PULSEN SKA FÖLJA MUSIKENS ENERGI, INTE BARA TAKTENS TYDLIGHET.
         // MÄTT 2026-08-07: i ett LUGNT parti pulsade riggen 70→100 % på varje taktslag
         // (två gånger i sekunden vid 117 BPM), vilket lästes som stroboskop. Djupet
@@ -543,7 +554,7 @@ export class EffectEngine {
         // 0.80 → 0.92, och energigolvet 0.35 → 0.50: djupare slag överallt, och märkbart
         // mer även i lugna partier. Pulsen ligger sist i kedjan och passerar inget
         // filter, så hela djupet når fram — det som mäts är det som syns.
-        const depth = 0.92 * this.beatTrust * (0.50 + 0.50 * energy) * calm;
+        const depth = 0.92 * trustFloored * (0.50 + 0.50 * energy) * calm;
         // KLAMRAS NEDAT: pre-dippen far envelopen ga negativ med flit, men
         // multiplikatorn far aldrig slacka riggen helt — da lases dippen som ett
         // blink i stallet for som andning. 0.06 lamnar lamporna tanda.
