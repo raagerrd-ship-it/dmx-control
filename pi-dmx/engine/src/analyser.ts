@@ -13,9 +13,9 @@ export interface Spectrum {
   kick: number;     // ~60–120 Hz  — kick-grundton/kropp (nu SKILD från basen)
   bass: number;     // ~120–250 Hz — basgång/basnoter
   lowMid: number;   // ~250–500 Hz — låg kropp, toms, låg röst
-  mid: number;      // ~0.5–2 kHz  — röst, snare-kropp, synth
+  mid: number;      // ~0,5–1,2 kHz — röst, snare-kropp, synth
   highMid: number;  // ~1,2–3,5 kHz — snare-crack/presence (dedikerad backbeat-kanal)
-  treble: number;   // ~5–10 kHz   — hi-hats, cymbaler
+  treble: number;   // ~3,5–10 kHz — hi-hats, cymbaler
   air: number;      // ~10–16 kHz  — luft/glitter
 }
 
