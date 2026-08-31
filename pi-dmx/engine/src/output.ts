@@ -34,13 +34,21 @@ export interface SpecialtyValues {
 
 const HOLD_MS = 120;
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
-const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid   // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
+const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
+
+// Förberäknad LUT för Gamma 2.2 för att eliminera Math.pow i den heta loopen
+const GAMMA_LUT = new Uint8Array(1024);
+for (let i = 0; i < 1024; i++) {
+  GAMMA_LUT[i] = Math.round(Math.pow(i / 1023, 2.2) * 255);
+}
 
 export class FixtureOutput {
-  private light = new Uint8Array(512);
+  // Publika Array-vyer så postprocess.ts slipper funktionsanrop
+  public readonly light = new Uint8Array(512);
+  public readonly direct = new Uint8Array(512);
+
   private cal = new Uint8Array(512);
   private dimCal = new Uint8Array(512);   // dim: bara tändpunkt (clamp), ingen remap
-  private strobe = new Uint8Array(512);
   private holdVal = new Float32Array(512);
   private holdUntil = new Float32Array(512);
   private builtFor: unknown = null;
@@ -52,16 +60,31 @@ export class FixtureOutput {
   /** Högsta använda kanal + 1 — loopar behöver aldrig gå längre. */
   maxCh = 0;
 
+  // Pre-kalkylerade fixtur-analyser för att slippa strängjämförelser i writeFixture
+  private fastFixtures: Array<{
+    base: number;
+    roles: string[];
+    hasColor: boolean;
+    hasDim: boolean;
+    hasW: boolean;
+  }> = [];
+
   /** Bygg om maskerna när fixture-listan byts (referensjämförelse → gratis per frame). */
   build(fixtures: FixtureConfig[]): void {
     if (this.builtFor === fixtures) return;
     this.builtFor = fixtures;
-    this.light.fill(0); this.cal.fill(0); this.dimCal.fill(0); this.strobe.fill(0);
+    this.light.fill(0); this.cal.fill(0); this.dimCal.fill(0); this.direct.fill(0);
+    this.fastFixtures = [];
     let mx = 0;
+
     for (const fx of fixtures) {
       const roles = fixtureRoles(fx);
       const hasColor = roles.includes("r") || roles.includes("g") || roles.includes("b") || roles.includes("w");
       const hasDim = roles.includes("dim");
+      const hasW = roles.includes("w");
+
+      this.fastFixtures.push({ base: fx.address - 1, roles, hasColor, hasDim, hasW });
+
       for (let r = 0; r < roles.length; r++) {
         const ch = fx.address - 1 + r;
         if (ch < 0 || ch >= 512) continue;   // hög adress får aldrig skriva utanför universet
@@ -70,7 +93,7 @@ export class FixtureOutput {
         // Specialroller skrivs direkt av motorn per frame och får INTE glidas ut av
         // ballistiken: en 255 som tonar nedåt skulle få strobe att fara mellan takter,
         // blinder att klänga kvar en halv sekund och hazer att flimra.
-        if (role === "strobe" || role === "hazer" || role === "uv" || role === "blinder" || role === "laser" || role === "co2") this.strobe[ch] = 1;
+        if (role === "strobe" || role === "hazer" || role === "uv" || role === "blinder" || role === "laser" || role === "co2") this.direct[ch] = 1;
         if (role === "dim") this.light[ch] = 1;
         else if (isColor && !hasDim) this.light[ch] = 1;
         if (isColor || (role === "dim" && !hasColor)) this.cal[ch] = 1;
@@ -84,37 +107,16 @@ export class FixtureOutput {
     this.maxCh = Math.min(512, mx);
   }
 
-  /** Hoppar den här kanalen över ballistiken? (specialroller) */
-  isDirect(ch: number): boolean { return this.strobe[ch] === 1; }
-
-  /** Bär den här kanalen ljusstyrkan? (för buffertar som måste följa med) */
-  isLight(ch: number): boolean { return this.light[ch] === 1; }
-
   /**
    * Skala ljusstyrkan på alla fixturer. Anroparen behöver inte veta något om lampor.
    * @param mul 0..1 multiplikator
-   */
-  /**
-   * SKALA LJUSET — men SLÄCK ALDRIG något som lyser.
-   *
-   * VU-taket och hjärtslaget skalar ner. Rundas ett tänt värde till 0 faller det
-   * genom kalibreringens golv: `calibrate()` lyfter bara `raw > 0` till lampans
-   * tändpunkt, och 0 tolkas som "ska vara släckt". En lampa som bara var svagt
-   * tänd i ett lugnt parti slocknade alltså helt — och att slockna är något helt
-   * annat än att vara svag.
-   * Därför golvas resultatet på 1: kalibreringen tar sedan upp det till lampans
-   * kalibrerade minimum, vilket är precis så mörkt en tänd lampa får bli.
-   *
-   * MÖRKLÄGGNING GÅR FORTFARANDE FRAM. Blackout (drop-svärta, avstängd ingång)
-   * skriver nollor DIREKT i efterbehandlingens steg 4, efter den här skalningen,
-   * och rör inte den här vägen. Det är skillnaden mellan "dämpat" och "släckt".
    */
   scale(universe: Uint8Array, mul: number): void {
     for (let ch = 0; ch < this.maxCh; ch++) {
       if (!this.light[ch]) continue;
       const v = universe[ch];
       if (v === 0) continue;                       // redan släckt — lämna det så
-      const out = Math.round(v * mul);
+      const out = (v * mul + 0.5) | 0;             // Bitvis avrundning
       universe[ch] = out < 1 ? 1 : out;            // tänt förblir tänt
     }
   }
@@ -131,12 +133,14 @@ export class FixtureOutput {
    * @param room hur många DMX-steg över tändpunkten som minsta nivå ska ligga
    */
   ensurePulseRoom(universe: Uint8Array, fixtures: FixtureConfig[], room: number): void {
-    for (const fx of fixtures) {
+    // Vi kan iterera via this.fastFixtures här för snabbare lookup
+    for (let f = 0; f < fixtures.length; f++) {
+      const fx = fixtures[f];
+      const fast = this.fastFixtures[f];
       const on = fx.cal ? (fx.cal.on || 0) : 0;
       const min = on + room;
-      const roles = fixtureRoles(fx);
-      const base = fx.address - 1;
-      for (let i = 0; i < roles.length; i++) {
+      const base = fast.base;
+      for (let i = 0; i < fast.roles.length; i++) {
         const ch = base + i;
         if (ch < 0 || ch >= 512 || !this.light[ch]) continue;
         const v = universe[ch];
@@ -154,35 +158,26 @@ export class FixtureOutput {
 
   /**
    * SISTA STEGET FÖRE UTGÅNG: tändpunkt som GOLV + master som TAK.
-   *   0                → 0 (släckt)
-   *   1 .. on-1        → on          (under tändpunkten lyser dioden inte alls)
-   *   on .. TAK        → orört
-   *   > TAK            → TAK          (TAK = round(255·master))
-   *
-   * Enkel klämning, INTE en remap. En remap (1..255 → on..TAK) sträcker hela
-   * registret och komprimerar då dynamiken — mätt 2026-08-07 plattade den ut
-   * hjärtslaget så att autokorrelationen på DMX-utgången föll 0,53 → 0,15.
-   * Att de lägsta stegen kollapsar till samma värde spelar ingen roll: dioden kan
-   * ändå inte skilja dem åt, den är släckt under sin tändpunkt.
-   *
-   * Varje färg har sin egen tändpunkt (onR/onG/onB/onW) — R, G och B tänder vid
-   * olika DMX på de flesta LED-PAR:ar. `dim` använder det gemensamma `on`.
    */
   calibrate(universe: Uint8Array, fixtures: FixtureConfig[], master: number, nowMs: number): void {
-    const top = Math.round(255 * master);
-    for (const fx of fixtures) {
+    const top = (255 * master + 0.5) | 0;
+    for (let f = 0; f < fixtures.length; f++) {
+      const fx = fixtures[f];
+      const fast = this.fastFixtures[f];
       const c = fx.cal;
-      const roles = fixtureRoles(fx);
-      const base = fx.address - 1;
+      const base = fast.base;
       const on = c ? (c.on || 0) : 0;
-      for (let i = 0; i < roles.length; i++) {
+
+      for (let i = 0; i < fast.roles.length; i++) {
         const ch = base + i;
         if (ch < 0 || ch >= 512) continue;
         const isCal = this.cal[ch] === 1, isDim = this.dimCal[ch] === 1;
         if (!isCal && !isDim) continue;
-        const role = roles[i];
+
+        const role = fast.roles[i];
         const onCh = !c ? 0 : isDim ? on
           : ((role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : role === "w" ? c.onW : undefined) ?? on);
+
         const raw = universe[ch];
         let out: number;
         if (raw > 0) {
@@ -190,9 +185,6 @@ export class FixtureOutput {
           this.holdVal[ch] = out;
           this.holdUntil[ch] = nowMs + HOLD_MS;
         } else if (nowMs < this.holdUntil[ch]) {
-          // SLÄPP-HÅLL: raw dippade till 0 inom hålltiden → håll senaste TÄNDA värdet,
-          // så mikro-0-dippar i tysta partier blir stadig glöd i stället för att bruset
-          // strobar dioden 0↔onCh. Äkta tystnad (>120 ms) faller igenom till rent 0.
           out = this.holdVal[ch];
         } else {
           out = 0;
@@ -202,17 +194,6 @@ export class FixtureOutput {
     }
   }
 
-  /**
-   * RÖKMASKINENS HÅRDVARUSKYDD — en egenskap hos ENHETEN, inte hos musiken.
-   * Motorn säger bara "nu vore ett bra läge för en puff"; den här metoden avgör om
-   * maskinen KAN. Skyddet är tredelat:
-   *   värmebudget  ett datablad ger 40–50 s sprutning i sträck; kontot fylls medan
-   *                den sprutar och dräneras 15 % av realtid när den vilar
-   *   cooldown     musikalisk gleshet — inte puff på puff
-   *   nödstopp     en lång manuell blast får INTE köra värmeblocket i botten bara
-   *                för att den redan hunnit starta
-   * @returns antal ms rök som ska sprutas den här rutan (0 = ingen)
-   */
   fogTick(nowMs: number, dtMs: number, want: boolean, fog: {
     enabled?: boolean; burstMs: number; cooldownMs: number;
     warmStartMs?: number; sprayMs?: number; bursts?: number;
@@ -246,20 +227,13 @@ export class FixtureOutput {
     return nowMs < this.fogUntil;
   }
 
-  /** Rökens tillstånd för UI/telemetri. */
   fogState(nowMs: number): { spraying: boolean; heat: number } {
     return { spraying: nowMs < this.fogUntil, heat: Math.min(1, this.fogHeat / FOG_HEAT_MAX) };
   }
 
-  /**
-   * RÖKMASKIN: en enhet på egen adress, inte en lampa. Skrivs SIST och rått —
-   * instant på/av, ingen ballistik och ingen kalibrering (en fade på en rökventil
-   * betyder ingenting; den är öppen eller stängd).
-   * @param level 0..255 när den ska spruta, annars 0
-   */
   writeFog(u: Uint8Array, address: number, level: number): void {
     const ch = address - 1;
-    if (ch >= 0 && ch < 512) u[ch] = Math.max(0, Math.min(255, Math.round(level)));
+    if (ch >= 0 && ch < 512) u[ch] = Math.max(0, Math.min(255, (level + 0.5) | 0));
   }
 
   /**
@@ -279,40 +253,37 @@ export class FixtureOutput {
     strobeVal = 0,
     specialty?: SpecialtyValues,
   ): void {
-    const roles = fixtureRoles(fx);
-    const base = fx.address - 1;   // DMX är 1-indexerat
+    // Hitta indexet i cfg.fixtures som matchar för att ta fram fastFixture
+    // Alternativt kan anroparen skicka med indexet för O(1) lookup. För nu loopar vi:
+    const fast = this.fastFixtures.find(f => f.base === fx.address - 1);
+    if (!fast) return;
+
+    const base = fast.base;   // DMX är 1-indexerat
     const m = clamp01(master);
     const [r, g, b] = rgb;
     const w = Math.min(r, g, b);
     const dim = Math.max(r, g, b);
-    const hasColor = roles.includes("r") || roles.includes("g") || roles.includes("b");
-    const hasDim = roles.includes("dim");
-    const hasW = roles.includes("w");
-    const colorScale = hasDim ? 1 : m;
+    const colorScale = fast.hasDim ? 1 : m;
 
-    for (let i = 0; i < roles.length; i++) {
+    for (let i = 0; i < fast.roles.length; i++) {
       const ch = base + i;
       if (ch < 0 || ch >= 512) continue;
-      switch (roles[i]) {
-        case "r":       u[ch] = to255((r - (hasW ? w : 0)) * colorScale); break;
-        case "g":       u[ch] = to255((g - (hasW ? w : 0)) * colorScale); break;
-        case "b":       u[ch] = to255((b - (hasW ? w : 0)) * colorScale); break;
-        case "w":       u[ch] = to255(w * colorScale); break;
-        case "dim":     u[ch] = to255(hasColor ? m : dim * m); break;
+
+      switch (fast.roles[i]) {
+        case "r":       u[ch] = GAMMA_LUT[(clamp01((r - (fast.hasW ? w : 0)) * colorScale) * 1023) | 0]; break;
+        case "g":       u[ch] = GAMMA_LUT[(clamp01((g - (fast.hasW ? w : 0)) * colorScale) * 1023) | 0]; break;
+        case "b":       u[ch] = GAMMA_LUT[(clamp01((b - (fast.hasW ? w : 0)) * colorScale) * 1023) | 0]; break;
+        case "w":       u[ch] = GAMMA_LUT[(clamp01(w * colorScale) * 1023) | 0]; break;
+        case "dim":     u[ch] = GAMMA_LUT[(clamp01(fast.hasColor ? m : dim * m) * 1023) | 0]; break;
         case "strobe":  u[ch] = Math.max(0, Math.min(255, Math.max(strobeVal, specialty?.strobe ?? 0))); break;
         case "hazer":   u[ch] = specialty?.hazer   ?? 0; break;
         case "uv":      u[ch] = specialty?.uv      ?? 0; break;
         case "blinder": u[ch] = specialty?.blinder ?? 0; break;
         case "laser":   u[ch] = specialty?.laser   ?? 0; break;
         case "co2":     u[ch] = specialty?.co2     ?? 0; break;
-        case "unused":  break;
       }
     }
   }
 }
 
 const clamp01 = (x: number) => x < 0 ? 0 : x > 1 ? 1 : x;
-// LED-PAR:ar är kraftigt olinjära: DMX 128 ser ut som ~80 % och botten klipper
-// abrupt. Gamma 2.2 gör tonen perceptuellt linjär — halva ser ut som halva, och
-// merparten av DMX-upplösningen hamnar i det synliga låga registret.
-const to255 = (x: number) => Math.round(Math.pow(clamp01(x), 2.2) * 255);
