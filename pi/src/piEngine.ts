@@ -51,6 +51,9 @@ export interface TickConstants {
   transientGain: number;
   perceptualGamma: number;
   dynamicsEnabled: boolean;
+  tickEnergyFloor: number;
+  flickerDeadband: number;
+  punchWhiteThreshold: number;
   lutR: Uint8Array;
   lutG: Uint8Array;
   lutB: Uint8Array;
