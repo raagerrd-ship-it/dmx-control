@@ -53,7 +53,9 @@ export function beatPhase(beat: Beat | null | undefined, nowMs: number, leadMs =
   if (!hasBeat(beat)) return 0;
   const ms = 60000 / beat.bpm;
   const since = nowMs - beat.anchorMs + leadMs;
-  return (((since % ms) + ms) % ms) / ms;
+  // Undvik dubbel modulo: en rest räcker, korrigera bara om den är negativ.
+  const rem = since % ms;
+  return (rem < 0 ? rem + ms : rem) / ms;
 }
 
 /** Löpande taktnummer sedan ankaret — för effekter som byter färg per takt. */
