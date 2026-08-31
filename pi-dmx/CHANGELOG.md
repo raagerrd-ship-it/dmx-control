@@ -1,5 +1,12 @@
 # Ändringslogg
 
+## v0.3.2 — musikalisk bandindelning (0 CPU)
+
+- **`kickBins` 3 → 1**: BPM-envelopen (`kickFlux`, som även sätter `kickAtMs` och därmed beat-fasen) summerade bin 0–2 i 512-FFT:n ≈ 0–280 Hz. Bin 1–2 är basgång och lerighet, inte trumma: en rullande bas (techno/psy) smetade ut kick-pulsen och gjorde autokorrelationen och MAD-tröskeln otydligare. Nu läses ENBART bin 0 (~0–94 Hz), dvs bastrummans transient. Effekternas kick/bas-separation är oförändrad — den kommer från 2048-FFT:n.
+- **Bandkanter `2000/5000` → `1200/3500`**: band 5 (`highMid`) blir en dedikerad snare/presence-kanal 1,2–3,5 kHz där backbeatets snärt faktiskt ligger, i stället för 2–5 kHz som domineras av sångkonsonanter och cymballäckage. `snareHit` (bandOn[5]) och punch-mixen extraherar därmed slag 2 och 4 renare ur mixen.
+- Rå RMS för `level` behålls medvetet (ingen A-viktning/FFT-level): AGC-percentilen och centroid-kalibreringen är fittade mot den, och vinsten motiverar inte omkalibreringen.
+- MÄTT (`testBpmHard.mjs`, 8 seeder): medianer identiska med v0.3.1 — testsignalerna saknar basgång, så ändringen är riskfri där och vinsten ligger i verklig musik. `testPulseHalve.mjs` OK.
+
 ## v0.3.1 — BPM-port från lotus-spegeln (riktad cherry-pick)
 
 - **BPM-intervall 80..160 → 60..180** (`Analyser.BPM_MIN/MAX`). Inte längre en oktav (ratio 3) med flit: 60..180 rymmer BÅDA representanterna för allt mellan 60 och 90, så en lugn låt på 70 behåller sitt tempo i stället för att tvingas upp till 140 — och 165–180 (hardstyle, psy, dnb-halvtempo) viks inte ner till halvtempo. Vikningen garanterar därmed ingen unik representant; oktaven avgörs av off-beat-testet och oktavgrenarna. Terminering kräver bara `MAX >= 2*MIN`. Samma intervall i `tools/refineSong.mjs` (båda vikningsställena) — divergens där gav beat-grid på fel oktav eftersom `index.ts` laddar refinerns tempo med full tillit. Sökningen täcker redan 55..185, så bytet kostar ingen CPU. MÄTT (8 seeder): `kick 1&3 (90)` 0 % → 100 %.
