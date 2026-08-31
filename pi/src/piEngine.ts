@@ -1308,7 +1308,7 @@ export class PiLightEngine {
       // När absolut mic-energi < tickEnergyFloor är det rumsbrus, inte musik.
       // Forcera energyNorm=0 + använd release så smoothed glidar mjukt ner mot
       // brightnessFloor utan att attackAlpha=1.0 snappar upp på brus-spikar.
-      const tickFloor = cal.tickEnergyFloor ?? 0;
+      const tickFloor = tc.tickEnergyFloor;
       const peakBand = Math.max(bands.bassRms, bands.midHiRms);
       const inSilence = tickFloor > 0 && peakBand < tickFloor;
       if (inSilence) energyNorm = 0;
