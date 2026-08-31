@@ -511,6 +511,13 @@ export class EffectEngine {
         // dodband som bara gick att felsoka genom att lasa bada filerna.
         const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - MIN_BEAT_CONFIDENCE) / 0.37));
         this.beatTrust += (trustRaw - this.beatTrust) * 0.03;
+        // TILLITSGOLV (portat från Lotus beatTrustFloor 2026-08-31). Rampen börjar exakt
+        // där klockans grind släpper igenom (MIN_BEAT_CONFIDENCE), så vid conf ≈ 0.20 är
+        // rutnätet LEVANDE men tilliten 0 → depth ≈ 0 och hjärtslaget är avstängt fast
+        // takten går. Golvet låter pulsen leva på FAKTISKA transienter när tempot är
+        // svårmätt men hörbart. Golvet sätts BARA här, inte på this.beatTrust: den läses
+        // också av grid-/drop-grindarna (> 0.5) som ska fortsätta kräva riktig tillit.
+        const trustFloored = Math.max(BEAT_TRUST_FLOOR, this.beatTrust);
         // PULSEN SKA FÖLJA MUSIKENS ENERGI, INTE BARA TAKTENS TYDLIGHET.
         // MÄTT 2026-08-07: i ett LUGNT parti pulsade riggen 70→100 % på varje taktslag
         // (två gånger i sekunden vid 117 BPM), vilket lästes som stroboskop. Djupet
