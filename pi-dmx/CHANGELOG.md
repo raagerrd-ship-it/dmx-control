@@ -1,5 +1,10 @@
 # Ändringslogg
 
+## v0.3.3 — trum-profiljustering (0 CPU)
+
+- **`hatHit` lyssnar på både treble och air**: moderna 909-hats, shakers och sizzle ligger ofta centrerade kring 11–13 kHz, dvs i band 7 (air) snarare än band 6 (treble). hatHit tar nu den starkaste transienten av `bandOn[6]` och `bandOn[7]` så inget driv försvinner.
+- **`profPunch` knyts till den dedikerade kick-detektorn**: efter att kick-transienten isolerades till bin 0 (0–94 Hz) i v0.3.2 läste punch-mätaren fortfarande från `bandOn[1]` (60–120 Hz), där rullande bas drunknar trumman. Nu används `this.kickHit` istället, med faktor sänkt till 0.6 eftersom den är en renare, solidare envelope.
+
 ## v0.3.2 — musikalisk bandindelning (0 CPU)
 
 - **`kickBins` 3 → 1**: BPM-envelopen (`kickFlux`, som även sätter `kickAtMs` och därmed beat-fasen) summerade bin 0–2 i 512-FFT:n ≈ 0–280 Hz. Bin 1–2 är basgång och lerighet, inte trumma: en rullande bas (techno/psy) smetade ut kick-pulsen och gjorde autokorrelationen och MAD-tröskeln otydligare. Nu läses ENBART bin 0 (~0–94 Hz), dvs bastrummans transient. Effekternas kick/bas-separation är oförändrad — den kommer från 2048-FFT:n.
