@@ -1411,8 +1411,8 @@ export class PiLightEngine {
       // deadbandPct skalas: ~0.5×base vid pct=0, ~1.5×base vid pct=100.
       // Om |pct - lastSentPct| under tröskeln → behåll lastSentPct (eliminerar mikrojitter).
       // Stale-write-mekanismen i protocol.ts håller fortfarande BLE-länken vid liv.
-      if (this.lastSentPct >= 0 && cal.flickerDeadband > 0) {
-        const deadbandPct = cal.flickerDeadband * 100 * (1.6 - 1.4 * (pct / 100));
+      if (this.lastSentPct >= 0 && tc.flickerDeadband > 0) {
+        const deadbandPct = tc.flickerDeadband * 100 * (1.6 - 1.4 * (pct / 100));
         if (Math.abs(pct - this.lastSentPct) < deadbandPct) {
           pct = this.lastSentPct;
           bleStatsState.deadbandBlockedCount++;
