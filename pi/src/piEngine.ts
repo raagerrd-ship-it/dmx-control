@@ -51,6 +51,9 @@ export interface TickConstants {
   transientGain: number;
   perceptualGamma: number;
   dynamicsEnabled: boolean;
+  tickEnergyFloor: number;
+  flickerDeadband: number;
+  punchWhiteThreshold: number;
   lutR: Uint8Array;
   lutG: Uint8Array;
   lutB: Uint8Array;
@@ -99,6 +102,9 @@ export function computeTickConstants(tickMs: number, cal: LightCalibration): Tic
     transientGain: cal.transientGain ?? 1.0,
     perceptualGamma: cal.perceptualGamma ?? 0,
     dynamicsEnabled: cal.dynamicsEnabled !== false,
+    tickEnergyFloor: cal.tickEnergyFloor ?? 0,
+    flickerDeadband: cal.flickerDeadband ?? 0,
+    punchWhiteThreshold: cal.punchWhiteThreshold ?? 100,
     lutR,
     lutG,
     lutB,
@@ -1302,7 +1308,7 @@ export class PiLightEngine {
       // När absolut mic-energi < tickEnergyFloor är det rumsbrus, inte musik.
       // Forcera energyNorm=0 + använd release så smoothed glidar mjukt ner mot
       // brightnessFloor utan att attackAlpha=1.0 snappar upp på brus-spikar.
-      const tickFloor = cal.tickEnergyFloor ?? 0;
+      const tickFloor = tc.tickEnergyFloor;
       const peakBand = Math.max(bands.bassRms, bands.midHiRms);
       const inSilence = tickFloor > 0 && peakBand < tickFloor;
       if (inSilence) energyNorm = 0;
@@ -1405,8 +1411,8 @@ export class PiLightEngine {
       // deadbandPct skalas: ~0.5×base vid pct=0, ~1.5×base vid pct=100.
       // Om |pct - lastSentPct| under tröskeln → behåll lastSentPct (eliminerar mikrojitter).
       // Stale-write-mekanismen i protocol.ts håller fortfarande BLE-länken vid liv.
-      if (this.lastSentPct >= 0 && cal.flickerDeadband > 0) {
-        const deadbandPct = cal.flickerDeadband * 100 * (1.6 - 1.4 * (pct / 100));
+      if (this.lastSentPct >= 0 && tc.flickerDeadband > 0) {
+        const deadbandPct = tc.flickerDeadband * 100 * (1.6 - 1.4 * (pct / 100));
         if (Math.abs(pct - this.lastSentPct) < deadbandPct) {
           pct = this.lastSentPct;
           bleStatsState.deadbandBlockedCount++;
@@ -1434,9 +1440,10 @@ export class PiLightEngine {
       this._lastTickAtForFade = _tickStart;
       if (k < 1) {
         const c = this.color; const t = this.colorTarget;
-        c[0] += (t[0] - c[0]) * k;
-        c[1] += (t[1] - c[1]) * k;
-        c[2] += (t[2] - c[2]) * k;
+        // Kvadrerad interpolering bevarar ljusenergin (förhindrar bruna DMX-övergångar)
+        c[0] = Math.sqrt((1 - k) * (c[0] * c[0]) + k * (t[0] * t[0]));
+        c[1] = Math.sqrt((1 - k) * (c[1] * c[1]) + k * (t[1] * t[1]));
+        c[2] = Math.sqrt((1 - k) * (c[2] * c[2]) + k * (t[2] * t[2]));
       } else {
         this.color[0] = this.colorTarget[0];
         this.color[1] = this.colorTarget[1];
@@ -1451,8 +1458,18 @@ export class PiLightEngine {
         pct = 100;
         this.lastSentPct = 100; // bypassa deadband så blixten alltid skickas
       }
-      const isPunch = dropFlash || (cal.punchWhiteThreshold < 100 && pct >= cal.punchWhiteThreshold);
-      applyColorCalibrationFast(this.color[0], this.color[1], this.color[2], tc);
+      const isPunch = dropFlash || (tc.punchWhiteThreshold < 100 && pct >= tc.punchWhiteThreshold);
+
+      // Excitation: När DMX-lampan pressas över 80% intensitet, desaturera mot vitt
+      let excR = this.color[0], excG = this.color[1], excB = this.color[2];
+      if (pct > 80 && !isPunch) {
+        const over = (pct - 80) / 20; // 0.0 till 1.0
+        excR += (255 - excR) * over;
+        excG += (255 - excG) * over;
+        excB += (255 - excB) * over;
+      }
+
+      applyColorCalibrationFast(excR, excG, excB, tc);
 
       // ── BLE output (synkron hard-fail) ──
       // sendToBLE returnerar direkt med WriteResult — engine räknar utfallet
