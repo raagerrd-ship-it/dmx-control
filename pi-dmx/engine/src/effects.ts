@@ -232,6 +232,7 @@ export class EffectEngine {
    *  sekund — talen är alltså tagna med marginal, inte i underkant. */
   private static readonly STROBE_SAFE_HZ = 3;
   private static readonly STROBE_MAX_HZ = 18;
+  private static readonly ANCHOR_MODES = new Set<Mode>(["party", "snap", "bounce", "strobe", "chase", "wave"]);
   private static readonly DEAF_AFTER_MS = 90000;   // låtglapp = sekunder, DJ-paus =
                                                    // någon minut. 90 s utan EN enda
                                                    // transient betyder att vi inte
