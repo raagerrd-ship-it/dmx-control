@@ -92,6 +92,10 @@ const START_DROP_MUTE_MS = 3000;
  *  0 = allt exakt på slaget. 50 = hela showen 50 ms före.
  *  Hjärtslaget lägger dessutom till sin egen attacktid, så dess TOPP landar rätt. */
 const SHOW_LEAD_DEFAULT = 50;
+/** Golv på taktens tillit när pulsdjupet räknas. Rampen börjar vid
+ *  MIN_BEAT_CONFIDENCE, så utan golv finns ett dödband precis ovanför grinden där
+ *  rutnätet lever men hjärtslaget är släckt. Gäller BARA pulsdjupet. */
+const BEAT_TRUST_FLOOR = 0.35;
 
 export class EffectEngine {
   private universe = new Uint8Array(512);
