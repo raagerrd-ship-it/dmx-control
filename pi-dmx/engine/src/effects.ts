@@ -353,11 +353,25 @@ export class EffectEngine {
       // PRESENTATIONSTAKT: över PULSE_HALVE_ABOVE_BPM pulsar hjärtslaget på varannat
       // slag (hysteres nedåt så gränsen inte flappar). Taktklockan, beatTick och alla
       // grid-effekter rör vi INTE — bara pulsens form sträcks över två slag.
+      // Dessutom: i ett genuint LUGNT parti halveras pulsen även i måttligt tempo
+      // (se SUBDIV_*). BPM-REGELN HAR FÖRETRÄDE — i Lotus fick energin skriva över
+      // takt-beslutet och resultatet blev en fyrkantsvåg som växlade var 12:e sekund.
       const bpmNow = beatMs > 0 ? 60000 / beatMs : 0;
-      if (bpmNow > 0) {
-        if (!this.pulseHalved) { if (bpmNow > PULSE_HALVE_ABOVE_BPM) this.pulseHalved = true; }
-        else if (bpmNow < PULSE_HALVE_ABOVE_BPM - PULSE_HALVE_HYST_BPM) this.pulseHalved = false;
+      const aE = Math.min(1, (_dtT * 1000) / SUBDIV_ENERGY_TAU_MS);
+      this.subdivEnergy += (Math.max(0, Math.min(1, frame.intensity)) - this.subdivEnergy) * aE;
+      let wantHalved: boolean | null = null;
+      if (bpmNow > PULSE_HALVE_ABOVE_BPM) wantHalved = true;
+      else if (bpmNow > 0 && bpmNow < PULSE_HALVE_ABOVE_BPM - PULSE_HALVE_HYST_BPM) {
+        // Utanför takt-regelns hysteresband får energin bestämma.
+        if (!this.pulseHalved && this.subdivEnergy < SUBDIV_ENERGY_LO_ON) wantHalved = true;
+        else if (this.pulseHalved && this.subdivEnergy > SUBDIV_ENERGY_LO_OFF) wantHalved = false;
       }
+      if (wantHalved !== null && wantHalved !== this.pulseHalved
+        && (this.subdivChangedAt === 0 || now2 - this.subdivChangedAt >= SUBDIV_MIN_HOLD_MS)) {
+        this.pulseHalved = wantHalved;
+        this.subdivChangedAt = now2;
+      }
+
       const pulseMs = this.pulseHalved ? beatMs * 2 : beatMs;
       // HJÄRTSLAG: ATTACK → FADEOUT → VILA.
       // Förr: Math.pow(1 - phase, 2) — ljuset hoppade till fullt på NOLL ms vid varje
