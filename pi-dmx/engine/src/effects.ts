@@ -65,6 +65,19 @@ const BEAT_DOWNBEAT_ACCENT = 0.25;
  *  ("dubblade i lugna partier kring tröskeln") i Lotus. */
 const PULSE_HALVE_ABOVE_BPM = 135;
 const PULSE_HALVE_HYST_BPM = 15;
+/** ENERGISTYRD HALVERING (portad från Lotus energySubdiv 2026-08-31).
+ *  BPM-regeln ovan fångar bara snabba låtar. En lugn vers på 118 BPM pulsar ändå
+ *  i full takt, vilket ingen ljustekniker hade gjort — där halverar man för att
+ *  släppa ner luften. Signalen är `frame.intensity` (sektionsenergi relativt
+ *  låtens EGET snitt, 0.5 = snittet), utjämnad över ~8 s: en FAST nivå-tröskel
+ *  kan inte fungera eftersom materialets nivå vandrar (MÄTT i Lotus: 0.480 →
+ *  0.232 median mellan låtar). Hysteres + min-hold är obligatoriska — utan hold
+ *  gav Lotus en fyrkantsvåg som växlade takt var 12:e sekund. */
+const SUBDIV_ENERGY_TAU_MS = 8000;
+const SUBDIV_ENERGY_LO_ON = 0.30;    // under detta: lugnt parti → halvera
+const SUBDIV_ENERGY_LO_OFF = 0.42;   // över detta: släpp halveringen
+const SUBDIV_MIN_HOLD_MS = 10000;
+
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
 const START_FADE_MS = 5000;
@@ -109,8 +122,13 @@ export class EffectEngine {
   /** Takt-räknare som effekterna ser (beatIdx): stegar på grid-slaget när BPM är
    *  låst, annars på verkliga kicks → grid-effekter fryser aldrig utan BPM-lås. */
   private beatCounter = 0;
-  /** Pulsen körs i halva takten (snabb låt). Hysteresstyrd, se PULSE_HALVE_*. */
+  /** Pulsen körs i halva takten (snabb låt ELLER lugnt parti). Se PULSE_HALVE_*
+   *  och SUBDIV_*. */
   private pulseHalved = false;
+  /** ~8 s-utjämnad sektionsenergi + när halveringen senast bytte (min-hold). */
+  private subdivEnergy = 0.5;
+  private subdivChangedAt = 0;
+
   /** Drops mode: per-lamp fire time + hue; advanced on each beat/kick. */
   private dropPos = 0;
   private dropSector = 0;
@@ -335,11 +353,25 @@ export class EffectEngine {
       // PRESENTATIONSTAKT: över PULSE_HALVE_ABOVE_BPM pulsar hjärtslaget på varannat
       // slag (hysteres nedåt så gränsen inte flappar). Taktklockan, beatTick och alla
       // grid-effekter rör vi INTE — bara pulsens form sträcks över två slag.
+      // Dessutom: i ett genuint LUGNT parti halveras pulsen även i måttligt tempo
+      // (se SUBDIV_*). BPM-REGELN HAR FÖRETRÄDE — i Lotus fick energin skriva över
+      // takt-beslutet och resultatet blev en fyrkantsvåg som växlade var 12:e sekund.
       const bpmNow = beatMs > 0 ? 60000 / beatMs : 0;
-      if (bpmNow > 0) {
-        if (!this.pulseHalved) { if (bpmNow > PULSE_HALVE_ABOVE_BPM) this.pulseHalved = true; }
-        else if (bpmNow < PULSE_HALVE_ABOVE_BPM - PULSE_HALVE_HYST_BPM) this.pulseHalved = false;
+      const aE = Math.min(1, (_dtT * 1000) / SUBDIV_ENERGY_TAU_MS);
+      this.subdivEnergy += (Math.max(0, Math.min(1, frame.intensity)) - this.subdivEnergy) * aE;
+      let wantHalved: boolean | null = null;
+      if (bpmNow > PULSE_HALVE_ABOVE_BPM) wantHalved = true;
+      else if (bpmNow > 0 && bpmNow < PULSE_HALVE_ABOVE_BPM - PULSE_HALVE_HYST_BPM) {
+        // Utanför takt-regelns hysteresband får energin bestämma.
+        if (!this.pulseHalved && this.subdivEnergy < SUBDIV_ENERGY_LO_ON) wantHalved = true;
+        else if (this.pulseHalved && this.subdivEnergy > SUBDIV_ENERGY_LO_OFF) wantHalved = false;
       }
+      if (wantHalved !== null && wantHalved !== this.pulseHalved
+        && (this.subdivChangedAt === 0 || now2 - this.subdivChangedAt >= SUBDIV_MIN_HOLD_MS)) {
+        this.pulseHalved = wantHalved;
+        this.subdivChangedAt = now2;
+      }
+
       const pulseMs = this.pulseHalved ? beatMs * 2 : beatMs;
       // HJÄRTSLAG: ATTACK → FADEOUT → VILA.
       // Förr: Math.pow(1 - phase, 2) — ljuset hoppade till fullt på NOLL ms vid varje
