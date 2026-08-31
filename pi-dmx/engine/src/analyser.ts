@@ -208,15 +208,15 @@ export class Analyser {
   private envPosScratch = new Float32Array(Analyser.ENV_LEN);
   private acScratch = new Float32Array(Analyser.ENV_LEN);
   private pulseScratch = new Float32Array(Analyser.ENV_LEN);
-  private combScratch = new Float64Array(Analyser.ENV_LEN);
+  private combScratch = new Float32Array(Analyser.ENV_LEN);
   private prefScratch = new Float64Array(Analyser.ENV_LEN + 1);   // prefix-summa → lokalt medel (whitening)
   /** BASBANDETS onset-envelope (kick-flux), samma raster och position som envRing. */
   private envBassRing = new Float32Array(Analyser.ENV_LEN);
   private envBassAccum = 0;
-  private scoreFull = new Float64Array(Analyser.ENV_LEN);
-  private scoreBass = new Float64Array(Analyser.ENV_LEN);
+  private scoreFull = new Float32Array(Analyser.ENV_LEN);
+  private scoreBass = new Float32Array(Analyser.ENV_LEN);
   /** Ackumulerat tempogram (EMA av hela lag-kurvan mellan anrop). */
-  private tempoGram = new Float64Array(Analyser.ENV_LEN);
+  private tempoGram = new Float32Array(Analyser.ENV_LEN);
   private lastVoteMs = 0;   // tidsviktad median-röstning (max 4 röster/s)
   private lastConfMs = 0;   // tidsbaserad alpha för bpmConfidence (stride-oberoende)
   /** TAKTFAS: vikt per taktslags-plats (idx mod 4) mot cfg.beat-gridet. Ettan bär
@@ -227,7 +227,7 @@ export class Analyser {
   /** Perceptuell prior (log-Gauss runt 120 BPM) per lag — lagg→BPM ar fast, sa
    *  de ~78 Math.exp()-anropen per computeBpm-anrop kan bakas en gang. */
   private priorLut = (() => {
-    const t = new Float64Array(Analyser.ENV_LEN);
+    const t = new Float32Array(Analyser.ENV_LEN);
     for (let lag = 1; lag < Analyser.ENV_LEN; lag++) {
       const oct = Math.log2(((Analyser.ENV_HZ * 60) / lag) / 120);
       t[lag] = Math.exp(-(oct * oct) / 2.0);
@@ -407,7 +407,7 @@ export class Analyser {
    *  medelenergi (0 = tyst band → anroparen kan vikta ner det). Scratcharna håller
    *  efteråt den SENAST scorade envelopen — off-beat-testet och den paraboliska
    *  interpolationen läser dem, så helbandet måste scoras sist. */
-  private scoreEnv(ring: Float32Array, N: number, out: Float64Array, lagMin: number, lagMax: number): number {
+  private scoreEnv(ring: Float32Array, N: number, out: Float32Array, lagMin: number, lagMax: number): number {
     const L = Analyser.ENV_LEN;
     const env = this.envScratch;
     const pre = this.prefScratch;
@@ -1085,8 +1085,10 @@ export class Analyser {
       this.kickMad += (Math.abs(kickFlux - this.kickMed) - this.kickMad) * 0.05;
     } else {
       const kStep = 0.002;
-      this.kickMed += Math.sign(kickFlux - this.kickMed) * kStep * (this.kickMed + 0.01);
-      this.kickMad += Math.sign(Math.abs(kickFlux - this.kickMed) - this.kickMad) * kStep * (this.kickMad + 0.01);
+      const dMed = kickFlux - this.kickMed;
+      this.kickMed += (dMed > 0 ? 1 : dMed < 0 ? -1 : 0) * kStep * (this.kickMed + 0.01);
+      const dMad = Math.abs(kickFlux - this.kickMed) - this.kickMad;
+      this.kickMad += (dMad > 0 ? 1 : dMad < 0 ? -1 : 0) * kStep * (this.kickMad + 0.01);
       // KLAMP MOT NOLL — UTAN DEN PARKERAR SPÅRAREN PÅ -0.01 OCH DÖR DÄR.
       // Steget skalas med (x + 0.01), så -0.01 är en ATTRAHERANDE fixpunkt: steget
       // kollapsar geometriskt och efter ~16 s digital tystnad är det under en halv
@@ -1230,7 +1232,7 @@ export class Analyser {
       const g = this.cfg.beat;
       if (g && g.bpm > 40 && this.localBpmConfidence > 0.5) {
         const bMs = 60000 / g.bpm;
-        const slot = ((Math.round((kickAtMs - g.anchorMs) / bMs) % 4) + 4) % 4;
+        const slot = Math.round((kickAtMs - g.anchorMs) / bMs) & 3;
         this.barAcc[slot] += this.pendingKickW * this.pendingKickW;
         if (this.barCount < 1000) this.barCount++;
         // GLOMSKAN AR ~83 TAKTER, INTE 4. Raden korr en gang per DETEKTERAT SLAG,
@@ -1300,7 +1302,7 @@ export class Analyser {
     // glidande just-nu-varde.
     const floorRate = iWarm ? dtHop / 3 : dtHop / 150;
     if (iWarm) this.intensityFloor += (this.intensityEma - this.intensityFloor) * floorRate;   // seed snabbt
-    else this.intensityFloor += Math.sign(this.intensityEma - this.intensityFloor) * floorRate * (this.intensityFloor + 0.05);
+    else this.intensityFloor += (this.intensityEma > this.intensityFloor ? 1 : this.intensityEma < this.intensityFloor ? -1 : 0) * floorRate * (this.intensityFloor + 0.05);
     // SJALVKALIBRERANDE SKALA: den fasta namnaren 0.30 var en GISSNING om hur
     // stor dynamiken ar. Mat den i stallet — ett glidande medelavvikelse-matt
     // (MAD) over avvikelsen fran golvet. Da nyttjar intensity hela 0..1 oavsett
@@ -1329,9 +1331,12 @@ export class Analyser {
     // Bara upp till högsta bin som någon läser (band 8 slutar vid 16 kHz ≈ bin 683,
     // låtminnet slutar vid 5 kHz ≈ bin 218). Resterande ~340 sqrt per stor-FFT hade
     // ingen läsare.
-    for (let i = 0; i < this.magBigMax; i++) {
-      const re = this.specBig[2 * i], im = this.specBig[2 * i + 1];
-      this.magBig[i] = Math.sqrt(re * re + im * im);
+    // Hissade referenser: JIT:en slipper verifiera this-formen per varv och kan
+    // hålla pekarna i register. Samma aritmetik, samma utfall.
+    const specBig = this.specBig, magBig = this.magBig, magMax = this.magBigMax;
+    for (let i = 0; i < magMax; i++) {
+      const re = specBig[2 * i], im = specBig[2 * i + 1];
+      magBig[i] = Math.sqrt(re * re + im * im);
     }
 
     // LÅTMINNET får samma magnitud (ingen extra FFT). Anropas före swap:en nedan,
@@ -1344,13 +1349,17 @@ export class Analyser {
 
     if (gated) this.onsetWarm++; else this.onsetWarm = 0;
 
+    // Samma hissning som magnitud-loopen: pekarna ut ur this före det inre varvet.
+    const bandLo = this.bandLo, bandHi = this.bandHi;
+    const prevMagBig = this.prevMagBig;
     for (let b = 0; b < 8; b++) {
-      const lo = this.bandLo[b], hi = this.bandHi[b];
+      const lo = bandLo[b], hi = bandHi[b];
       const nb = Math.max(1, hi - lo);
       let sum = 0, fl = 0;
       for (let i = lo; i < hi; i++) {
-        sum += this.magBig[i];
-        const d = this.magBig[i] - this.prevMagBig[i];
+        const m = magBig[i];
+        sum += m;
+        const d = m - prevMagBig[i];
         if (d > 0) fl += d;
       }
       const avg = sum / nb;
@@ -1390,8 +1399,10 @@ export class Analyser {
       // Steget skalas med BIG_EVERY sa tidskonstanten blir samma som kickens trots
       // att banden uppdateras var tredje hop.
       const oStep = 0.002 * Analyser.BIG_EVERY;
-      this.onsetMed[b] += Math.sign(fluxN - this.onsetMed[b]) * oStep * (this.onsetMed[b] + 0.01);
-      this.onsetMad[b] += Math.sign(Math.abs(fluxN - this.onsetMed[b]) - this.onsetMad[b]) * oStep * (this.onsetMad[b] + 0.01);
+      const dOMed = fluxN - this.onsetMed[b];
+      this.onsetMed[b] += (dOMed > 0 ? 1 : dOMed < 0 ? -1 : 0) * oStep * (this.onsetMed[b] + 0.01);
+      const dOMad = Math.abs(fluxN - this.onsetMed[b]) - this.onsetMad[b];
+      this.onsetMad[b] += (dOMad > 0 ? 1 : dOMad < 0 ? -1 : 0) * oStep * (this.onsetMad[b] + 0.01);
       // Samma klamp som kick-spåraren ovan, av samma skäl: -0.01 är en dödsfälla.
       // Här blir följden att ALLA åtta band låser på bandOn = 1 konstant.
       if (this.onsetMed[b] < 0) this.onsetMed[b] = 0;
