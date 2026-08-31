@@ -1089,7 +1089,7 @@ export class EffectEngine {
     ctx.cfg = this.cfg; ctx.frame = frame; ctx.t = t; ctx.count = count;
     ctx.audio = audio; ctx.kickEnv = kickEnv; ctx.punch = bassPunch;
     ctx.dropEnv = this.dropEnv; ctx.gravLevel = this.gravLevel;
-    ctx.gravPeak = this.gravPeak; ctx.drum = drum;
+    ctx.gravPeak = this.gravPeak; ctx.drum = frame.drum;
     ctx.beatIdx = beatIdx; ctx.beatFrac = beatFrac; ctx.beatPulse = beatPulse;
     ctx.beatHit = beatHit; ctx.hasBeat = hasBeat;
     ctx.wavePhase = this.wavePhase; ctx.buildUp = frame.buildUp;
