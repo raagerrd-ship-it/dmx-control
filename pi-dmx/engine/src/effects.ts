@@ -1031,8 +1031,7 @@ export class EffectEngine {
     // kör full gas. Ger arkitektoniskt djup — rörelsen poppar mot en stabil bas.
     // Antar lampor i rad V→H (ägar-toggle). Grupp-effekterna (rave/flip/gallop/
     // twin) har redan rumslig struktur → undantagna.
-    const ANCHOR_MODES = new Set<Mode>(["party", "snap", "bounce", "strobe", "chase", "wave"]);
-    const useAnchor = this.cfg.scenicAnchor && count >= 3 && ANCHOR_MODES.has(effMode);
+    const useAnchor = this.cfg.scenicAnchor && count >= 3 && EffectEngine.ANCHOR_MODES.has(effMode);
     const anchorPal = currentPalette();
     const anchorHue = (anchorPal[anchorPal.length - 1] ?? 0) / 6;   // palettens djupaste ton
 
