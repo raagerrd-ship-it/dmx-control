@@ -255,6 +255,24 @@ export class EffectEngine {
   private paletteIdx = 2;     // start: Primär
   private paletteRot = 0;
 
+  // Pre-allokerad kontext för noll-allokering i render-loopen
+  private ctx: EffectContext = {
+    cfg: null as any, frame: null as any, fx: undefined, t: 0, idx: 0, count: 0, want: {},
+    audio: 0, kickEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null as any,
+    beatIdx: 0, beatFrac: 0, beatPulse: 0, beatHit: false, hasBeat: false,
+    wavePhase: 0, buildUp: 0, phaseSpread: 0, punchFloor: 0, chasePos: 0,
+    dropFired: this.dropFired, dropHue: this.dropHue, now: 0,
+    mixedSector,
+    mclk: (beatsPerStep: number, secPerStep: number) =>
+      this.ctx.hasBeat ? Math.floor(this.ctx.beatIdx / beatsPerStep) : Math.floor(this.ctx.t / secPerStep),
+    shaped: (floor: number, x: number) => {
+      const dyn = Math.max(0, Math.min(1, this.ctx.cfg.dynamics ?? 0.6));
+      const f = floor * (1 - dyn);
+      return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.2));
+    },
+    hsv: hsvToRgb,
+  };
+
   /** Välj ny palett vid frasbyte, biasad av klangen (centroid). */
   private pickPalette(centroid: number) {
     const wantWarm = centroid < 0.42, wantCool = centroid > 0.60;
