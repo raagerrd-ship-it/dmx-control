@@ -1051,7 +1051,8 @@ export class EffectEngine {
     // beatPulse: grid-puls när låst, annars den VERKLIGA kick-envelopen → pulsar
     // ALLTID på musiken. (Utan detta gav beatFrac=0 → beatPulse=1 konstant = ingen
     // puls när BPM ej låst → party/pulse/bounce lyste bara jämnt högt.)
-    const beatPulse = hasBeat ? Math.pow(1 - beatFrac, 2) : kickEnv;
+    const _bf = 1 - beatFrac;
+    const beatPulse = hasBeat ? _bf * _bf : kickEnv;
     const beatMs2 = beatPeriod(this.cfg.beat);
     const tempoDeep = Math.max(0, Math.min(1, (beatMs2 - 340) / 260));   // 0 snabbt .. 1 långsamt
     const punchFloor = 0.5 - tempoDeep * 0.42;                            // 0.5 (snabbt) .. 0.08 (långsamt)
