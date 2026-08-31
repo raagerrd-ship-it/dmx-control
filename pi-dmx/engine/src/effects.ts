@@ -550,7 +550,7 @@ export class EffectEngine {
         // 0.80 → 0.92, och energigolvet 0.35 → 0.50: djupare slag överallt, och märkbart
         // mer även i lugna partier. Pulsen ligger sist i kedjan och passerar inget
         // filter, så hela djupet når fram — det som mäts är det som syns.
-        const depth = 0.92 * this.beatTrust * (0.50 + 0.50 * energy) * calm;
+        const depth = 0.92 * trustFloored * (0.50 + 0.50 * energy) * calm;
         // KLAMRAS NEDAT: pre-dippen far envelopen ga negativ med flit, men
         // multiplikatorn far aldrig slacka riggen helt — da lases dippen som ett
         // blink i stallet for som andning. 0.06 lamnar lamporna tanda.
