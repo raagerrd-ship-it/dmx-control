@@ -58,6 +58,7 @@ BLEDOM HCI-stuck recovery is process.exit via systemd. Never add same-process re
 - [Onset energy gate](mem://pi/audio/onset-energy-gate) — onsetEnergyFloor gates processOnset by totalRms (no flashes in silence)
 - [Sonos subscribe-race fix](mem://pi/sonos/subscribe-race-fix) — async fetchStatusOnce + position heartbeat var ~10s
 - [Softness slider](mem://pi/ui/softness-slider-curve) — Exponential mapping for releaseAlpha
+- [Energistyrd halvering](mem://pi-dmx/lighting/energistyrd-halvering) — Pulsen halveras i lugna partier; BPM-regeln 135 har företräde, min-hold 10 s
 - [Native capture](mem://pi/audio/native-capture) — C++ alsa-capture binding with Int16Array
 - [PCC alignment](mem://pi/runtime/pcc-alignment) — Pi Control Center integration and runInstallOnRelease
 - [BLE permissions](mem://pi/ble/permissions-model) — AmbientCapabilities and NoNewPrivileges configuration
