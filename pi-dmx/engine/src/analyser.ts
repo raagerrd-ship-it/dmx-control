@@ -1349,13 +1349,17 @@ export class Analyser {
 
     if (gated) this.onsetWarm++; else this.onsetWarm = 0;
 
+    // Samma hissning som magnitud-loopen: pekarna ut ur this före det inre varvet.
+    const bandLo = this.bandLo, bandHi = this.bandHi;
+    const prevMagBig = this.prevMagBig;
     for (let b = 0; b < 8; b++) {
-      const lo = this.bandLo[b], hi = this.bandHi[b];
+      const lo = bandLo[b], hi = bandHi[b];
       const nb = Math.max(1, hi - lo);
       let sum = 0, fl = 0;
       for (let i = lo; i < hi; i++) {
-        sum += this.magBig[i];
-        const d = this.magBig[i] - this.prevMagBig[i];
+        const m = magBig[i];
+        sum += m;
+        const d = m - prevMagBig[i];
         if (d > 0) fl += d;
       }
       const avg = sum / nb;
