@@ -6,7 +6,7 @@
  * channel-layout is honored (RGB / RGBW / dimmer).
  */
 
-import type { EngineConfig, FixtureConfig, Mode } from "./config.js";
+import type { ChannelRole, EngineConfig, FixtureConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { FixtureOutput, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
