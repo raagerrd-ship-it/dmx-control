@@ -1113,7 +1113,7 @@ export class EffectEngine {
     const maxHz = this.cfg.strobeUnlimited ? EffectEngine.STROBE_MAX_HZ : EffectEngine.STROBE_SAFE_HZ;
     const hz = Math.min(maxHz, 1.5 + frame.buildUp * (maxHz - 1.5));
     const rsWhite = rs ? frame.buildUp * 0.7 : 0;
-    const rsGate = rs ? (Math.floor(t * hz) % 2 === 0 ? 1 : 0.12) : 1;
+    const rsGate = rs ? ((((t * hz) | 0) & 1) === 0 ? 1 : 0.12) : 1;
 
     // SPECIALKANALER (hazer/uv/blinder/strobe/laser/co2). Effektens `drives`-tagg
     // avgör om motorn tänder dem denna frame. Värdena hämtas från samma signaler
