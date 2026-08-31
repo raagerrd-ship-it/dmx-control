@@ -511,13 +511,16 @@ export class Analyser {
     const N = this.envFilled;
     const HZ = Analyser.ENV_HZ;
     const lagMin = Math.floor(HZ * 60 / 185);
-    // MINST HALVA FONSTRET SOM OVERLAPPNING. `ac[lag] = sum / M` med M = N - lag
-    // tar bort BIAS, men lamnar en VARIANS-gradient: vid lag nara N bygger
-    // estimatet pa nagra fa produkter (vid forsta laset ar N = 50, sa lag 49 gav
-    // EN enda produkt) och blir kraftigt brusigt utan att viktas ner — vilket
-    // gynnar langa lag, dvs langsamma tempon. N>>1 stanger det.
-    // Sokfonstret ar fortfarande bredare an vikningen med flit.
-    const lagMax = Math.min(N >> 1, Math.floor(HZ * 60 / 55));
+    // PROVAT OCH FORKASTAT: `lagMax = min(N >> 1, ...)`.
+    // Tanken var riktig i teorin — `ac[lag] = sum / M` med M = N - lag tar bort
+    // BIAS men lamnar en VARIANS-gradient, sa langa lag vilar pa fa produkter och
+    // blir brusiga utan att viktas ner. MATT 2026-08-09 pa testBpm-banken kostade
+    // fixen dock allt: lastid gick fran ~0,5 s till 22-27 s och andelen tid last
+    // fran 100 % till 20-48 %, over alla testade tempon. Att halvera lag-fonstret
+    // svalter tempogrammet under just det uppbyggnadsskede da det ska hitta ratt.
+    // Varians-invandningen kvarstar som teoretiskt korrekt men ar underordnad.
+    // Sokfonstret ar bredare an vikningen med flit.
+    const lagMax = Math.min(N - 1, Math.floor(HZ * 60 / 55));
     // FLERBANDS-ONSET: helbandsfluxen smetas ut av sång och synth — slaget bor i
     // basen. Två OBEROENDE score-kurvor som röstar ihop rättar just de fall där
     // off-beat-testet annars tvekar mellan ballad och danslåt. Helbandet scoras
