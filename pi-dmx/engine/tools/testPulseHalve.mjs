@@ -26,13 +26,14 @@ function run(seq, secPerStep) {
   const out = [];
   let ms = 1700000000000;
   const STEP = 5;
-  for (const bpm of seq) {
+  for (const s of seq) {
+    const bpm = s.bpm, intensity = s.intensity ?? 0.5;
     cfg.beat = { anchorMs: ms, bpm, confidence: 1 };
     const samples = [];
     for (let k = 0; k < (secPerStep * 1000) / STEP; k++, ms += STEP) {
       Date.now = () => ms;
       performance.now = () => ms - 1700000000000;
-      const u = eng.render({ ...frame, bpm });
+      const u = eng.render({ ...frame, bpm, intensity });
       let v = 0;
       for (let i = 0; i < u.length; i++) v += u[i];
       samples.push(v);
@@ -50,6 +51,7 @@ function run(seq, secPerStep) {
   }
   return out;
 }
+
 
 // 100 (full takt) → 157 (halveras) → 128 (hysteres: kvar halverad) → 110 (släpper)
 // Mätstorheten är pulser PER SLAG (ppm/bpm). Pre-dippen ger fler än en
