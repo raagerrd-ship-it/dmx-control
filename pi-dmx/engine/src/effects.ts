@@ -1072,13 +1072,6 @@ export class EffectEngine {
     // → varje anslag fångas, aldrig missat mellan två render-frames. Effekten är en
     // ren konsument. (Flyttat hit; tau 60/110/150ms bevarade i analyser.ts.)
     const drum = frame.drum;
-    const dyn = Math.max(0, Math.min(1, this.cfg.dynamics ?? 0.6));
-    const shaped = (floor: number, x: number) => {
-      const f = floor * (1 - dyn);
-      return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.2));
-    };
-    const mclk = (beatsPerStep: number, secPerStep: number) =>
-      hasBeat ? Math.floor(beatIdx / beatsPerStep) : Math.floor(t / secPerStep);
     // GRAVITATIONS-VU: ljudet knuffar nivån UPP; sen faller den med gravitation.
     // En separat peak-prick håller senaste toppen och sjunker långsamt.
     // Knuffas UPP av låg-enden (kick-anslag + bas), inte av bred-bandsnivån →
@@ -1092,15 +1085,20 @@ export class EffectEngine {
     // Effekternas önskemål om specialenheter, samlade över lamporna.
     let wantStrobe = 0, wantBlinder = 0, wantUv = 0, wantLaser = 0, wantHazer = 0, wantCo2 = 0, wantFogFx = false;
     const effect = EFFECT_MAP.get(effMode);
-    const ctx: EffectContext = {
-      cfg: this.cfg, frame, fx: undefined, t, idx: 0, count, want: {},
-      audio, kickEnv, punch: bassPunch, dropEnv: this.dropEnv, band: 0, gravLevel: this.gravLevel, gravPeak: this.gravPeak, drum,
-      beatIdx, beatFrac, beatPulse, beatHit, hasBeat,
-      wavePhase: this.wavePhase, buildUp: frame.buildUp, phaseSpread: 1 + frame.buildUp * 2.5,
-      punchFloor, chasePos: this.chasePos,
-      dropFired: this.dropFired, dropHue: this.dropHue, now: performance.now(),
-      mixedSector, mclk, hsv: hsvToRgb, shaped,
-    };
+    const ctx = this.ctx;
+    ctx.cfg = this.cfg; ctx.frame = frame; ctx.t = t; ctx.count = count;
+    ctx.audio = audio; ctx.kickEnv = kickEnv; ctx.punch = bassPunch;
+    ctx.dropEnv = this.dropEnv; ctx.gravLevel = this.gravLevel;
+    ctx.gravPeak = this.gravPeak; ctx.drum = drum;
+    ctx.beatIdx = beatIdx; ctx.beatFrac = beatFrac; ctx.beatPulse = beatPulse;
+    ctx.beatHit = beatHit; ctx.hasBeat = hasBeat;
+    ctx.wavePhase = this.wavePhase; ctx.buildUp = frame.buildUp;
+    ctx.phaseSpread = 1 + frame.buildUp * 2.5; ctx.punchFloor = punchFloor;
+    ctx.chasePos = this.chasePos; ctx.dropFired = this.dropFired;
+    ctx.dropHue = this.dropHue; ctx.now = performance.now();
+    ctx.want.strobe = undefined; ctx.want.blinder = undefined;
+    ctx.want.uv = undefined; ctx.want.laser = undefined; ctx.want.fog = undefined;
+    ctx.want.hazer = undefined; ctx.want.co2 = undefined;
 
     // RISER-STROBE (helrigg): under en uppbyggnad accelererar en strobe (3→18 Hz)
     // och färgen kollapsar mot vitt → klassisk EDM-build. Blackouten på själva
