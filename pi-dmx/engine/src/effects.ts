@@ -1121,8 +1121,8 @@ export class EffectEngine {
     // matchande drive-tagg = 0 (svart) → knivskarp av/på, ingen läckage mellan
     // effekter. Kanalerna maskas ur ballistiken längre ner (samma spår som
     // strobe) så pulser inte tonas ut och sätter fixtures i mellanhastigheter.
-    const drivesSet = effect?.drives ? new Set<string>(effect.drives) : null;
-    const has = (r: string) => !!drivesSet && drivesSet.has(r);
+    const drives = effect?.drives;
+    const has = (r: string) => drives ? drives.includes(r) : false;
     const clamp255 = (x: number) => x < 0 ? 0 : x > 255 ? 255 : Math.round(x);
     const specialty = {
       hazer:   has("hazer")   ? clamp255(Math.max(140 + audio * 60, wantHazer * 255)) : 0,
