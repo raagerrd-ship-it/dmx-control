@@ -621,7 +621,7 @@ setInterval(() => {
   // och ska inte tvingas gissa. Vi tonar bara ned DET SOM REDAN LÖSTE och håller
   // svart tills ljudet är tillbaka — ett entydigt felläge utan nya beteenden.
   const k = Math.max(0, 1 - (Date.now() - lastChunkAt) / FALLBACK_FADE_MS);
-  for (let i = 0; i < lastUniverse.length; i++) fadeUniverse[i] = Math.round(lastUniverse[i] * k);
+  for (let i = 0; i < lastUniverse.length; i++) fadeUniverse[i] = (lastUniverse[i] * k + 0.5) | 0;
   probeSample(fadeUniverse);
   dmx.send(fadeUniverse, curSlots);
   lastRenderMs = performance.now();
