@@ -1582,7 +1582,9 @@ export class Analyser {
     let bSum = 1e-6; for (let b = 0; b < 8; b++) bSum += this.bandLvl[b];
     const bassW = (this.bandLvl[0] + this.bandLvl[1] + this.bandLvl[2]) / bSum;   // sub+kick+bas
     const brightW = (this.bandLvl[6] + this.bandLvl[7]) / bSum;                    // diskant+luft
-    const punchNow = Math.min(1, (this.bandOn[1] + this.bandOn[5] + this.bandOn[6]) * 0.8);  // kick+snare+hat-anslag
+    // punch drivs av den dedikerade kick-detektorn (renare transient än bandOn[1],
+    // som ligger i 60–120 Hz och drunknar i rullande bas) plus snare/hat-anslag.
+    const punchNow = Math.min(1, (this.kickHit + this.bandOn[5] + this.bandOn[6]) * 0.6);  // kick+snare+hat
     const pr = this.aProf;
     this.profPunch += (punchNow - this.profPunch) * pr;
     this.profBass += (bassW - this.profBass) * pr;
