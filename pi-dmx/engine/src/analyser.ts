@@ -1425,9 +1425,12 @@ export class Analyser {
     }   // slut på decimerad stor-FFT
     // TRUM-KIT peak-hold-envelopes PÅ HOP-TAKT (var 2.7ms) → fångar varje anslag,
     // aldrig missat mellan två render-frames (100Hz). tau bevarade från effects.ts:
-    // hat 60ms (treble-onset O[6]) / snare 110ms (highMid-onset O[5]) / kick 150ms
+    // hat 60ms (treble+air-onset O[6]/O[7]) / snare 110ms (highMid-onset O[5]) / kick 150ms
     // (ENBART diskret kick — se nedan). bass = spec.bass-NIVÅ (L[2], ingen envelope).
-    this.hatHit = Math.max(this.hatHit * this.dHat, this.bandOn[6]);
+    // Hi-hats/sizzle i modern EDM/trap ligger ofta >10 kHz, så hat får lyssna på både
+    // treble (3,5–10 kHz) och air (10–16 kHz) och ta den starkaste transienten.
+    const hatOnset = this.bandOn[6] > this.bandOn[7] ? this.bandOn[6] : this.bandOn[7];
+    this.hatHit = Math.max(this.hatHit * this.dHat, hatOnset);
     this.snareHit = Math.max(this.snareHit * this.dSnare, this.bandOn[5]);
     // Drivs ENBART av den riktiga kick-detektorn (median + 4.5*MAD). Tidigare
     // fylldes den ocksa pa av bandOn[1], men det bandet (60-120 Hz) domineras av
@@ -1579,7 +1582,9 @@ export class Analyser {
     let bSum = 1e-6; for (let b = 0; b < 8; b++) bSum += this.bandLvl[b];
     const bassW = (this.bandLvl[0] + this.bandLvl[1] + this.bandLvl[2]) / bSum;   // sub+kick+bas
     const brightW = (this.bandLvl[6] + this.bandLvl[7]) / bSum;                    // diskant+luft
-    const punchNow = Math.min(1, (this.bandOn[1] + this.bandOn[5] + this.bandOn[6]) * 0.8);  // kick+snare+hat-anslag
+    // punch drivs av den dedikerade kick-detektorn (renare transient än bandOn[1],
+    // som ligger i 60–120 Hz och drunknar i rullande bas) plus snare/hat-anslag.
+    const punchNow = Math.min(1, (this.kickHit + this.bandOn[5] + this.bandOn[6]) * 0.6);  // kick+snare+hat
     const pr = this.aProf;
     this.profPunch += (punchNow - this.profPunch) * pr;
     this.profBass += (bassW - this.profBass) * pr;
