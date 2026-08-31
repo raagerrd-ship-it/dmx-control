@@ -769,20 +769,7 @@ export class Analyser {
         this.lastSongVoteMs = voteNow;
         this.newSongVote += dtVote;
 
-        // ── RÅ-AC-VETO MOT SUBHARMONIKER ────────────────────────────────────────
-        // Comb-filtret (ac[L] + ½·ac[2L] + ⅓·ac[3L]) är orsaken: en 2/3-kandidat
-        // på lag 1.5P har svag rå AC, men ac[3P] träffar och boostar comb. Därför
-        // räcker det inte med scoreBass — bara rå acScratch skiljer dem.
-        // Asymmetri: subharmonik är långsammare än låset → strikt 0.95; uppåt 0.55.
-        const chLag = Math.round((HZ * 60) / this.challengerBpm);
-        let vetoed = false;
-        if (chLag >= lagMin && chLag <= lagMax && lockLag >= lagMin && lockLag <= lagMax) {
-          const rawCh = this.acScratch[chLag];
-          const rawLock = this.acScratch[lockLag];
-          const slower = this.challengerBpm < this.localBpm;
-          const need = slower ? 0.95 : 0.55;
-          vetoed = rawLock > 0 && rawCh < rawLock * need;
-        }
+        // ── RÅ-AC-VETO MOT SUBHARMONIKER (TEMPORÄRT AVSTÄNGT FÖR JÄMFÖRELSE) ───
 
         if (vetoed) {
           this.newSongVote *= 0.7;   // vädra ut beviset
