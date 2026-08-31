@@ -771,10 +771,7 @@ export class Analyser {
 
         // ── RÅ-AC-VETO MOT SUBHARMONIKER (TEMPORÄRT AVSTÄNGT FÖR JÄMFÖRELSE) ───
 
-        if (vetoed) {
-          this.newSongVote *= 0.7;   // vädra ut beviset
-          if (this.newSongVote < 0.5) { this.newSongVote = 0; this.challengerBpm = 0; }
-        } else if (this.newSongVote >= needMs) {
+        if (this.newSongVote >= needMs) {
           // Lås på UTMANAREN, inte medianen, och kasta historiken: ett medianfönster
           // halvfullt av förra låtens tempo kostade flera sekunder till rätt takt.
           this.localBpm = Math.round(this.challengerBpm);
