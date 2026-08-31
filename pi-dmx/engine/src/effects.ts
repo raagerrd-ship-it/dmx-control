@@ -6,7 +6,7 @@
  * channel-layout is honored (RGB / RGBW / dimmer).
  */
 
-import type { EngineConfig, FixtureConfig, Mode } from "./config.js";
+import type { ChannelRole, EngineConfig, FixtureConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { FixtureOutput, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
@@ -232,6 +232,7 @@ export class EffectEngine {
    *  sekund — talen är alltså tagna med marginal, inte i underkant. */
   private static readonly STROBE_SAFE_HZ = 3;
   private static readonly STROBE_MAX_HZ = 18;
+  private static readonly ANCHOR_MODES = new Set<Mode>(["party", "snap", "bounce", "strobe", "chase", "wave"]);
   private static readonly DEAF_AFTER_MS = 90000;   // låtglapp = sekunder, DJ-paus =
                                                    // någon minut. 90 s utan EN enda
                                                    // transient betyder att vi inte
@@ -253,6 +254,24 @@ export class EffectEngine {
   private phraseBeats = 32;   // taktslag per musikalisk fras → palettbyte
   private paletteIdx = 2;     // start: Primär
   private paletteRot = 0;
+
+  // Pre-allokerad kontext för noll-allokering i render-loopen
+  private ctx: EffectContext = {
+    cfg: null as any, frame: null as any, fx: undefined, t: 0, idx: 0, count: 0, want: {},
+    audio: 0, kickEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null as any,
+    beatIdx: 0, beatFrac: 0, beatPulse: 0, beatHit: false, hasBeat: false,
+    wavePhase: 0, buildUp: 0, phaseSpread: 0, punchFloor: 0, chasePos: 0,
+    dropFired: this.dropFired, dropHue: this.dropHue, now: 0,
+    mixedSector,
+    mclk: (beatsPerStep: number, secPerStep: number) =>
+      this.ctx.hasBeat ? Math.floor(this.ctx.beatIdx / beatsPerStep) : Math.floor(this.ctx.t / secPerStep),
+    shaped: (floor: number, x: number) => {
+      const dyn = Math.max(0, Math.min(1, this.ctx.cfg.dynamics ?? 0.6));
+      const f = floor * (1 - dyn);
+      return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.2));
+    },
+    hsv: hsvToRgb,
+  };
 
   /** Välj ny palett vid frasbyte, biasad av klangen (centroid). */
   private pickPalette(centroid: number) {
@@ -1012,8 +1031,7 @@ export class EffectEngine {
     // kör full gas. Ger arkitektoniskt djup — rörelsen poppar mot en stabil bas.
     // Antar lampor i rad V→H (ägar-toggle). Grupp-effekterna (rave/flip/gallop/
     // twin) har redan rumslig struktur → undantagna.
-    const ANCHOR_MODES = new Set<Mode>(["party", "snap", "bounce", "strobe", "chase", "wave"]);
-    const useAnchor = this.cfg.scenicAnchor && count >= 3 && ANCHOR_MODES.has(effMode);
+    const useAnchor = this.cfg.scenicAnchor && count >= 3 && EffectEngine.ANCHOR_MODES.has(effMode);
     const anchorPal = currentPalette();
     const anchorHue = (anchorPal[anchorPal.length - 1] ?? 0) / 6;   // palettens djupaste ton
 
@@ -1033,7 +1051,8 @@ export class EffectEngine {
     // beatPulse: grid-puls när låst, annars den VERKLIGA kick-envelopen → pulsar
     // ALLTID på musiken. (Utan detta gav beatFrac=0 → beatPulse=1 konstant = ingen
     // puls när BPM ej låst → party/pulse/bounce lyste bara jämnt högt.)
-    const beatPulse = hasBeat ? Math.pow(1 - beatFrac, 2) : kickEnv;
+    const _bf = 1 - beatFrac;
+    const beatPulse = hasBeat ? _bf * _bf : kickEnv;
     const beatMs2 = beatPeriod(this.cfg.beat);
     const tempoDeep = Math.max(0, Math.min(1, (beatMs2 - 340) / 260));   // 0 snabbt .. 1 långsamt
     const punchFloor = 0.5 - tempoDeep * 0.42;                            // 0.5 (snabbt) .. 0.08 (långsamt)
@@ -1053,13 +1072,6 @@ export class EffectEngine {
     // → varje anslag fångas, aldrig missat mellan två render-frames. Effekten är en
     // ren konsument. (Flyttat hit; tau 60/110/150ms bevarade i analyser.ts.)
     const drum = frame.drum;
-    const dyn = Math.max(0, Math.min(1, this.cfg.dynamics ?? 0.6));
-    const shaped = (floor: number, x: number) => {
-      const f = floor * (1 - dyn);
-      return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.2));
-    };
-    const mclk = (beatsPerStep: number, secPerStep: number) =>
-      hasBeat ? Math.floor(beatIdx / beatsPerStep) : Math.floor(t / secPerStep);
     // GRAVITATIONS-VU: ljudet knuffar nivån UPP; sen faller den med gravitation.
     // En separat peak-prick håller senaste toppen och sjunker långsamt.
     // Knuffas UPP av låg-enden (kick-anslag + bas), inte av bred-bandsnivån →
@@ -1073,15 +1085,20 @@ export class EffectEngine {
     // Effekternas önskemål om specialenheter, samlade över lamporna.
     let wantStrobe = 0, wantBlinder = 0, wantUv = 0, wantLaser = 0, wantHazer = 0, wantCo2 = 0, wantFogFx = false;
     const effect = EFFECT_MAP.get(effMode);
-    const ctx: EffectContext = {
-      cfg: this.cfg, frame, fx: undefined, t, idx: 0, count, want: {},
-      audio, kickEnv, punch: bassPunch, dropEnv: this.dropEnv, band: 0, gravLevel: this.gravLevel, gravPeak: this.gravPeak, drum,
-      beatIdx, beatFrac, beatPulse, beatHit, hasBeat,
-      wavePhase: this.wavePhase, buildUp: frame.buildUp, phaseSpread: 1 + frame.buildUp * 2.5,
-      punchFloor, chasePos: this.chasePos,
-      dropFired: this.dropFired, dropHue: this.dropHue, now: performance.now(),
-      mixedSector, mclk, hsv: hsvToRgb, shaped,
-    };
+    const ctx = this.ctx;
+    ctx.cfg = this.cfg; ctx.frame = frame; ctx.t = t; ctx.count = count;
+    ctx.audio = audio; ctx.kickEnv = kickEnv; ctx.punch = bassPunch;
+    ctx.dropEnv = this.dropEnv; ctx.gravLevel = this.gravLevel;
+    ctx.gravPeak = this.gravPeak; ctx.drum = frame.drum;
+    ctx.beatIdx = beatIdx; ctx.beatFrac = beatFrac; ctx.beatPulse = beatPulse;
+    ctx.beatHit = beatHit; ctx.hasBeat = hasBeat;
+    ctx.wavePhase = this.wavePhase; ctx.buildUp = frame.buildUp;
+    ctx.phaseSpread = 1 + frame.buildUp * 2.5; ctx.punchFloor = punchFloor;
+    ctx.chasePos = this.chasePos; ctx.dropFired = this.dropFired;
+    ctx.dropHue = this.dropHue; ctx.now = performance.now();
+    ctx.want.strobe = undefined; ctx.want.blinder = undefined;
+    ctx.want.uv = undefined; ctx.want.laser = undefined; ctx.want.fog = undefined;
+    ctx.want.hazer = undefined; ctx.want.co2 = undefined;
 
     // RISER-STROBE (helrigg): under en uppbyggnad accelererar en strobe (3→18 Hz)
     // och färgen kollapsar mot vitt → klassisk EDM-build. Blackouten på själva
@@ -1096,7 +1113,7 @@ export class EffectEngine {
     const maxHz = this.cfg.strobeUnlimited ? EffectEngine.STROBE_MAX_HZ : EffectEngine.STROBE_SAFE_HZ;
     const hz = Math.min(maxHz, 1.5 + frame.buildUp * (maxHz - 1.5));
     const rsWhite = rs ? frame.buildUp * 0.7 : 0;
-    const rsGate = rs ? (Math.floor(t * hz) % 2 === 0 ? 1 : 0.12) : 1;
+    const rsGate = rs ? ((((t * hz) | 0) & 1) === 0 ? 1 : 0.12) : 1;
 
     // SPECIALKANALER (hazer/uv/blinder/strobe/laser/co2). Effektens `drives`-tagg
     // avgör om motorn tänder dem denna frame. Värdena hämtas från samma signaler
@@ -1104,8 +1121,8 @@ export class EffectEngine {
     // matchande drive-tagg = 0 (svart) → knivskarp av/på, ingen läckage mellan
     // effekter. Kanalerna maskas ur ballistiken längre ner (samma spår som
     // strobe) så pulser inte tonas ut och sätter fixtures i mellanhastigheter.
-    const drivesSet = effect?.drives ? new Set<string>(effect.drives) : null;
-    const has = (r: string) => !!drivesSet && drivesSet.has(r);
+    const drives = effect?.drives;
+    const has = (r: ChannelRole) => drives ? drives.includes(r) : false;
     const clamp255 = (x: number) => x < 0 ? 0 : x > 255 ? 255 : Math.round(x);
     const specialty = {
       hazer:   has("hazer")   ? clamp255(Math.max(140 + audio * 60, wantHazer * 255)) : 0,
