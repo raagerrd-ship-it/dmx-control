@@ -546,16 +546,19 @@ function renderAndSend(): void {
     // effekterna behöver veta om att slingorna finns.
     if (bleClient && cfg.bleDevices && cfg.bleDevices.length > 0) {
       let rs = 0, gs = 0, bs = 0, n = 0;
-      for (const fx of cfg.fixtures) {
+      const fixtures = cfg.fixtures;
+      for (let f = 0; f < fixtures.length; f++) {
+        const fx = fixtures[f];
         const roles = fixtureRoles(fx);
         let r = 0, g = 0, b = 0, w = 0, hasRgb = false;
         for (let i = 0; i < roles.length; i++) {
           const v = universe[fx.address - 1 + i] ?? 0;
-          if (roles[i] === "r") { r = v; hasRgb = true; }
-          else if (roles[i] === "g") { g = v; hasRgb = true; }
-          else if (roles[i] === "b") { b = v; hasRgb = true; }
-          else if (roles[i] === "w") { w = v; }
-          else if (roles[i] === "dim") { r = g = b = v; hasRgb = true; }
+          const role = roles[i];
+          if (role === "r") { r = v; hasRgb = true; }
+          else if (role === "g") { g = v; hasRgb = true; }
+          else if (role === "b") { b = v; hasRgb = true; }
+          else if (role === "w") { w = v; }
+          else if (role === "dim") { r = g = b = v; hasRgb = true; }
         }
         if (hasRgb) { rs += Math.min(255, r + w); gs += Math.min(255, g + w); bs += Math.min(255, b + w); n++; }
       }
