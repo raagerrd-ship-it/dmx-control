@@ -1195,32 +1195,38 @@ export class EffectEngine {
     // Bygg strobe-masken bara när fixtures ändras (inte varje frame).
     this.out.build(this.cfg.fixtures);
     this.maxCh = this.out.maxCh;
+    // MATNING (grindar inget): när nivån är LÅG, vad är det som ändå håller
+    // ljuset uppe? Varje steg i kedjan loggas så orsaken kan pekas ut i stället
+    // för att gissas. Strypt till var 1,5 s. Gjort utanför apply för att slippa
+    // skapa ett objekt i den heta postprocess-loopen.
+    if (frame.level < 0.35 && Date.now() - this.lowLogAt > 1500) {
+      this.lowLogAt = Date.now();
+      console.log(
+        `[lagniva] niva ${frame.level.toFixed(3)} vu ${this.vu.toFixed(2)} tak ${ceilMul.toFixed(2)}` +
+        ` puls ${this.beatMulNow.toFixed(2)} drive ${this.silenceGate.toFixed(2)} md ${md.toFixed(2)}` +
+        ` intensitet ${frame.intensity.toFixed(2)} konf ${frame.bpmConfidence.toFixed(2)}` +
+        ` tillit ${this.beatTrust.toFixed(2)} effekt ${this.smartMode}`
+      );
+    }
+
     // EFTERBEHANDLING: ballistik → ljustak → hjärtslag → blackout → kalibrering →
     // headroom. Ordningen och motiven bor i postprocess.ts; här räknas bara VAD som
     // ska gälla den här rutan. Drop-undantagen bakas in innan de skickas vidare.
-    this.post.apply(this.universe, this.out, {
+    this.post.apply(
+      this.universe,
+      this.out,
+      this.cfg.fixtures,
       dtSec,
       decay,
       ceilMul,
-      pulseMul: Math.max(this.beatMulNow, this.dropEnv),
-      ceilingActive: (this.cfg.energyCeiling || this.memCeiling !== null) && this.silenceGate > 0.5,
-      // MATNING (grindar inget): nar nivan ar LAG, vad ar det som anda haller
-      // ljuset uppe? Varje steg i kedjan loggas sa orsaken kan pekas ut i stallet
-      // for gissas. Strypt till var 1,5 s.
-      ...(frame.level < 0.35 && Date.now() - this.lowLogAt > 1500
-        ? (this.lowLogAt = Date.now(), console.log(
-            `[lagniva] niva ${frame.level.toFixed(3)} vu ${this.vu.toFixed(2)} tak ${ceilMul.toFixed(2)}` +
-            ` puls ${this.beatMulNow.toFixed(2)} drive ${this.silenceGate.toFixed(2)} md ${md.toFixed(2)}` +
-            ` intensitet ${frame.intensity.toFixed(2)} konf ${frame.bpmConfidence.toFixed(2)}` +
-            ` tillit ${this.beatTrust.toFixed(2)} effekt ${this.smartMode}`), {})
-        : {}),
-      pulseActive: !!this.cfg.beatPulse && this.silenceGate > 0.5,
-      blackout: blackout || this.inputOff,
-      master: this.cfg.master ?? 1,
-      fixtures: this.cfg.fixtures,
-      headroomCap: this.cfg.dropHeadroom ? Math.round(255 * Math.min(1, 0.90 + 0.10 * this.dropEnv)) : -1,
-      nowMs: performance.now(),
-    });
+      Math.max(this.beatMulNow, this.dropEnv),
+      (this.cfg.energyCeiling || this.memCeiling !== null) && this.silenceGate > 0.5,
+      !!this.cfg.beatPulse && this.silenceGate > 0.5,
+      blackout || this.inputOff,
+      this.cfg.master ?? 1,
+      this.cfg.dropHeadroom ? Math.round(255 * Math.min(1, 0.90 + 0.10 * this.dropEnv)) : -1,
+      performance.now()
+    );
 
     // Rök: motorn avgör OM den ska spruta, output-tjänsten var signalen hamnar.
     // RÖK: motorn samlar önskemålen — drop, manuell knapp, eller en effekt som bett om
