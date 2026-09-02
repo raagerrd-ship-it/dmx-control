@@ -161,6 +161,18 @@ export class Analyser {
   // i all evighet och motorn hänger.
   // Långsam puls i lugna/snabba partier löses i PRESENTATIONEN (halveringen i
   // effects.ts), inte i vikningen.
+  /**
+   * PROVAT OCH FORKASTAT 2026-08-09, matt pa frozen6 (76 inspelningar, facit ur
+   * bpm_catalog). Baslinje med nuvarande varden: SLUTLAS 64/76 (84 %).
+   *   fonster 90-180, prior 127  ->  58/76 (76 %)
+   *   fonster 85-170, prior 120  ->  58/76 (76 %)
+   *   prior-bredd 2.0            ->  63/76      1.2 -> 64/76      0.7 -> 64/76
+   * Hypotesen var att facit for snabba spar (160-166) viks ner till 80-83, alltsa
+   * till fonstrets kant, medan en triollag (2/3 av sanningen ~107) hamnar bekvamt
+   * mitt i — och att ett flyttat fonster skulle rada bot pa det. Matningen sager
+   * nej at bada hallen. Kvarvarande fel ar trioler (2/3, 4/3, 3/4), och de
+   * angrips av OCT_UP och HARM_PENALTY, inte av fonstret.
+   */
   private static readonly BPM_MIN = 80;    // MAX måste vara == 2*MIN (exakt en oktav)
   private static readonly BPM_MAX = 160;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
@@ -493,6 +505,7 @@ export class Analyser {
       pulse[lag] = best;
       if (best > pulseMax) pulseMax = best;
       // NORMALISERA MOT DE VIKTER SOM FAKTISKT ANVANDES (Klapuri gor det).
+      // MATT pa frozen6: 64/76 med, 63/76 utan (RATT 60 mot 58). Liten men verklig.
       // Utan det far korta lag systematiskt hogre comb bara for att de RYMMER
       // fler harmoniker inom lagMax — alltsa precis den snabbtakts-bias
       // comb-scoringen ska motverka. Varre: poangen blev DISKONTINUERLIG dar
@@ -961,7 +974,19 @@ export class Analyser {
    * ankare. Att bara satta `virtualMs` racker alltsa inte.
    */
   setVirtualClock(ms: number | null) {
+    // BARA VID ETT VERKLIGT KLOCKHOPP. Forsta versionen nollstallde ankarna vid
+    // VARJE anrop — men offline-bankarna satter klockan en gang per hop, sa
+    // `pendingKickMs` nollades innan den hann konsumeras och kickvagen dog helt.
+    //   MATT 2026-08-09 pa frozen6: 0 kickar pa tre av fem spar, och `kickAtMs`
+    //   sattes i NOLL rutor pa samtliga — aven pa det spar som gav 80 kickar.
+    //   Foljden langre ner: `barAcc` fylldes aldrig, sa `barShift` var permanent
+    //   -1 och taktfasen kunde aldrig hittas (testDownbeat misslyckades pa just
+    //   det). Ett stort steg framat eller ett steg BAKAT ar ett verkligt byte;
+    //   ett normalt hop pa 2,7 ms ar det inte.
+    const prev = this.virtualMs;
+    const jump = ms === null || prev === null || ms < prev || ms - prev > 1000;
     this.virtualMs = ms;
+    if (!jump) return;
     this.lastKick = 0;
     this.pendingKickMs = 0;
     this.lastVoteMs = 0;
@@ -1339,6 +1364,12 @@ export class Analyser {
         let bi = 0, best = this.barAcc[0], second = 0;
         for (let i = 1; i < 4; i++) if (this.barAcc[i] > best) { best = this.barAcc[i]; bi = i; }
         for (let i = 0; i < 4; i++) if (i !== bi && this.barAcc[i] > second) second = this.barAcc[i];
+        // PROVAT OCH BACKAT: virvel-onset (bandOn[5]) som oberoende bevis for
+        // ettan, poangsatt som kick minus virvel. Det gav NOLL effekt — och
+        // matningen visade varfor: flaskhalsen ligger uppstroms. Kickdetektorn
+        // fyrar knappt alls pa riktigt material (MATT over 25 spar: 36 % med NOLL
+        // kickar, median 5/min dar ~100-130 vantas), sa `barAcc` fylls aldrig och
+        // ingen poangsattning i varlden kan radda det. Ta kicken forst.
         if (this.barCount >= 16 && best > second * 1.35) barShift = bi;
       }
     }

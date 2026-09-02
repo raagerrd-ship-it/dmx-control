@@ -210,6 +210,7 @@ async function nameSong(wavPath: string, songId: number): Promise<void> {
  * en principiell grund i stallet for som biprodukt av ett tempogram.
  */
 let onBeatRate = 0;          // andel kickar med |fasfel| < 0.25
+let pllKicks = 0;            // hur mycket bevis fasprediktionen faktiskt vilar pa
 let lastTrustLog = 0;
 let lastPllKickMs = 0;
 let lastCueSongId = 0;
@@ -289,7 +290,10 @@ capture.on("chunk", (samples: Float32Array) => {
   // ett lugnt parti utan att slockna vid ett enda missat slag.
   if (cfg.beat && lastPllKickMs) {
     const quiet = Date.now() - lastPllKickMs;
-    if (quiet > 1500) onBeatRate *= Math.max(0, 1 - (quiet - 1500) / 4000);
+    if (quiet > 1500) {
+      onBeatRate *= Math.max(0, 1 - (quiet - 1500) / 4000);
+      if (quiet > 8000) pllKicks = 0;   // bevisen ar gamla — lamna over till tempogrammet
+    }
   }
   if (!memoryBeatLocked) {
     // DIAGNOSTIK: bada matten loggas sa de gar att jamfora mot varandra och mot
@@ -298,8 +302,17 @@ capture.on("chunk", (samples: Float32Array) => {
       lastTrustLog = Date.now();
       console.log(`[tillit] tempogram ${frame.bpmConfidence.toFixed(2)} · fasprediktion ${onBeatRate.toFixed(2)} · bpm ${frame.bpm}`);
     }
-    frame.bpmConfidence = onBeatRate;
-    if (cfg.beat) cfg.beat.confidence = onBeatRate;
+    // FASPREDIKTIONEN KRAVER KICKAR — OCH DE KOMMER INTE ALLTID.
+    // MATT 2026-08-09 over 25 riktiga spar: 36 % gav NOLL kickar, medianen var
+    // 5 kickar/min dar ~100-130 vantas. Pa sadant material (mjuk kick, 80-talspop,
+    // ballader) skulle ett matt som bara uppdateras vid kick lacka mot noll och
+    // slacka hjartslaget helt — dar tempogrammets form fortfarande vet ratt.
+    // Darfor: fasprediktionen galler bara nar den VILAR PA BEVIS. Under det
+    // behalls tempogrammet, som inte behover kickar for att saga nagot.
+    if (pllKicks >= 12) {
+      frame.bpmConfidence = onBeatRate;
+      if (cfg.beat) cfg.beat.confidence = onBeatRate;
+    }
   }
 
   if (songs.recognized) {
@@ -430,6 +443,7 @@ capture.on("chunk", (samples: Float32Array) => {
       // finns inget nytt att veta, och att mata in nollor da hade lasts som "fel".
       onBeatRate += ((onBeat ? 1 : 0) - onBeatRate) * 0.12;
       lastPllKickMs = Date.now();
+      if (pllKicks < 40) pllKicks++;
       if (k0 > 0 && onBeat) {
         cfg.beat.anchorMs += err * beatMs * k;   // FAS-term: dra ankaret mot slaget
         // FREKVENS-term (PI-integral): en fas-bara-PLL har ett permanent steady-state-
