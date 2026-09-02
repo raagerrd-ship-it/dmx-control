@@ -25,3 +25,11 @@ dist-ssr
 
 # byggartefakt fran deploy till Pi
 pi-dmx/engine-dist.tgz
+
+# FRYST TESTLJUD — hor inte hemma i historiken.
+# 2,28 GB WAV under tools/ (frozen*, samt losa testfiler) gjorde varje push
+# omojlig over en hemuppkoppling. Materialet ar dessutom ateranskaffningsbart:
+# det ar inspelningar, inte kallkod. Ligger lokalt hos agaren.
+pi-dmx/engine/tools/frozen*/
+pi-dmx/engine/tools/*.wav
+pi-dmx/engine/tools/*.raw

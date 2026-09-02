@@ -14,6 +14,9 @@ export interface AudioCaptureOptions {
   device: string;
   rate: number;
   channels: 1 | 2;
+  /** Vilken kanal som bar signalen — se EngineConfig.audioChannel. */
+  /** "auto" (standard) later motorn valja sjalv — se toMonoFloat32. */
+  channel?: "mix" | "left" | "right" | "auto";
   hopSamples: number;   // emit chunks of this many mono samples
 }
 
@@ -22,6 +25,12 @@ export class AudioCapture extends EventEmitter {
   private stopped = false;
   private leftover: Buffer = Buffer.alloc(0);
   private readonly bytesPerFrame: number;   // S16LE = 2 bytes/sample × channels
+  /** Kanalbalans-mätning (se toMonoFloat32). Nollställs var tredje sekund. */
+  private balL = 0; private balR = 0; private balN = 0;
+  /** Vad auto-laget valt just nu, och hur manga fonster i rad som pekat dit. */
+  private autoPick: "mix" | "left" | "right" = "mix";
+  private autoVotes = 0;
+  private autoCand: "mix" | "left" | "right" = "mix";
   private readonly chunkBytes: number;
   /** Katastrofgräns: bara när ETT batch bär mer ljud än så är det så gammalt att
    *  en lucka är bättre än att spela det. MÄTT: normala batchar når 32 ms, värsta
@@ -246,8 +255,61 @@ export class AudioCapture extends EventEmitter {
       for (let i = 0; i < n; i++) out[i] = i16[i] * INV;
     } else {
       const INV = 1 / 65536;
+      // KANALBALANS — mäts på köpet, kostar två multiplikationer per sampel.
+      // Vi MEDELVÄRDAR L och R. Bär bara ena kanalen signal (en mono-TS-kontakt i
+      // ett stereouttag, eller en trasig ledare) halveras nivån — exakt 6 dB — och
+      // AGC:n är LÅST på 1× på aux, så ingenting kompenserar. Följden är inte
+      // "lite svagare" utan att drop-vägen stänger: `inZone` kräver ett absolut
+      // golv på 0.65, samma golv som tystade droparna när mobilvolymen var nere.
+      // Den sortens fel är osynligt i ljudet men dödligt för showen, så riggen
+      // ska säga till om det själv i stället för att någon ska gissa.
+      // VAL AV KANAL. "left"/"right" tar EN kanal pa full skala (1/32768) i
+      // stallet for medelvardet — det ar skillnaden mellan full niva och 6 dB for
+      // lag nar en monokalla sitter pa bara en kanal.
+      const setting = this.opts.channel ?? "auto";
+      const pick = setting === "auto" ? this.autoPick : setting;
+      const ONE = 1 / 32768;
+      let sl = 0, sr = 0;
       for (let i = 0, j = 0; i < n; i++, j += 2) {
-        out[i] = (i16[j] + i16[j + 1]) * INV;
+        const l = i16[j], r = i16[j + 1];
+        sl += l * l; sr += r * r;
+        out[i] = pick === "left" ? l * ONE : pick === "right" ? r * ONE : (l + r) * INV;
+      }
+      this.balL += sl; this.balR += sr; this.balN += n;
+      if (this.balN >= this.opts.rate * 3) {
+        const dbL = 10 * Math.log10(this.balL / this.balN + 1e-12);
+        const dbR = 10 * Math.log10(this.balR / this.balN + 1e-12);
+        const quiet = Math.min(dbL, dbR), loud = Math.max(dbL, dbR);
+        // Bara när det finns signal alls, och bara när skillnaden är stor nog att
+        // vara en kopplingsfråga snarare än en panorerad mix.
+        // AUTOMATISKT MONOLAGE.
+        // Bar bara ena kanalen signal halveras medelvardet — exakt 6 dB — och
+        // AGC:n ar last pa 1x pa aux, sa inget kompenserar. Da stanger `inZone`
+        // (absolut golv 0.65) och droparna slutar renderas. Motorn maste alltsa
+        // upptacka det sjalv; att krava ratt kabel ar att bygga in ett tyst fel.
+        //
+        // SVART ATT LURA MED FLIT. Ett panorerat parti i en riktig stereomix far
+        // inte trigga: krav ar 12 dB skillnad i TRE fonster i rad, alltsa ~9 s
+        // sammanhangande bevis. Samma krav at andra hallet for att ga tillbaka,
+        // sa den inte kan flappa. Har agaren satt audioChannel explicit galler det.
+        if (setting === "auto") {
+          const cand: "mix" | "left" | "right" =
+            loud <= -60 ? this.autoPick                      // for tyst for att doma
+            : loud - quiet <= 12 ? "mix"
+            : dbL > dbR ? "left" : "right";
+          if (cand === this.autoCand) this.autoVotes++;
+          else { this.autoCand = cand; this.autoVotes = 1; }
+          if (this.autoVotes >= 3 && cand !== this.autoPick) {
+            const from = this.autoPick;
+            this.autoPick = cand;
+            this.emit("stderr", cand === "mix"
+              ? `KANALLAGE: bada kanalerna bar signal igen — tillbaka till stereosumma (var ${from}).`
+              : `KANALLAGE: bara ${cand === "left" ? "vanster" : "hoger"} kanal bar signal `
+                + `(${Math.min(99, loud - quiet).toFixed(0)} dB skillnad, ~9 s bevis) — byter till den kanalen pa full skala. `
+                + "Utan det hade nivan legat 6 dB for lagt och drop-detektionen stangt.");
+          }
+        }
+        this.balL = 0; this.balR = 0; this.balN = 0;
       }
     }
     return out;

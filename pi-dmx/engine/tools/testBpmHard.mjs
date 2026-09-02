@@ -88,3 +88,28 @@ const kick = (tt, beat, decay = 25) => Math.exp(-((tt % beat) / beat) * beat * d
       + 0.3*Math.exp(-(((tt+b*0.66)%b)/b)*b*60)*noise() + 0.02*noise(); }, () => 116); }
 // 8. NÄRA OKTAVGRÄNS 158
 { const b = 60/158; sim("158 (nära gräns)", 30, tt => 0.6*kick(tt,b)+0.2*noise()*Math.exp(-((tt%(b/2))/(b/2))*b*80)+0.02*noise(), () => 158); }
+
+// 9. SUBHARMONISK FALLA 138: efter 15 s kommer en tung baston var TREDJE slag.
+//    Den skapar en akta 2/3-topp (92 BPM) i tempogrammet. Kicken finns kvar hela
+//    tiden, sa ratt svar ar 138 genom hela klippet — men comb-filtret boostar
+//    2/3-kandidaten via ac[3P], och lasningen kan dyka dit.
+//    MOTSVARAR det uppmatta verkliga felet: 137 -> 93 BPM i 43 s mitt i en lat.
+{ const b = 60/138, b3 = b*3;
+  sim("subharmonisk fälla 138", 40, tt => {
+    // Efter 15 s: kicken forsvagas kraftigt OCH en tung baston kommer var tredje
+    // slag. Grundtakten finns kvar (ratt svar = 138) men 2/3-kandidaten far all
+    // energi. Det ar sa det verkliga felet sag ut: 137 -> 93 i 43 s.
+    const hard = tt > 15;
+    const base = (hard ? 0.14 : 0.55) * kick(tt, b) + 0.02*noise();
+    const sub  = hard ? 1.0*Math.exp(-((tt % b3)/b3)*b3*4)*Math.sin(2*Math.PI*45*tt) : 0;
+    return base + sub;
+  }, () => 138); }
+
+// 10. AKTA NEDATGAENDE LATBYTE 140 -> 92: kontrollerar att vetot INTE blockerar
+//     ett legitimt byte till langsammare tempo. Utan detta test kan man inte
+//     skilja "vetot fungerar" fran "vetot har fastnat".
+{ const b1 = 60/140, b2 = 60/92;
+  sim("äkta byte 140→92", 45, tt => {
+    const b = tt < 20 ? b1 : b2;
+    return 0.6*kick(tt,b) + 0.25*Math.exp(-((tt%(b/2))/(b/2))*b*80)*noise() + 0.02*noise();
+  }, tt => tt < 20 ? 140 : 92); }

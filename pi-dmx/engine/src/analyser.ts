@@ -169,7 +169,19 @@ export class Analyser {
    *  ÄKTA oktavvikning kollapsar b och 2b, så grenarna fångar 3:2-/triol-artefakter
    *  — och där vill vi ha snabb rättning åt BÅDA håll.
    *  Grannrättningen är också symmetrisk — se den mätta motiveringen där. */
-  private static readonly OCT_UP = 8;
+  // OCT_UP 8 -> 24: med EXAKT en oktavs vikning kan ett akta oktavfel aldrig
+  // overleva vikningen, sa ratio > 1.4 ar alltid en triol-artefakt. Far dock inte
+  // stangas helt -- vid 32 fastnade real.wav pa 113. MATT: 8 -> 14.4/53.2/100 %,
+  // 24 -> 25.0/68.2/100 %, 32 -> 25.0/0.0/100 %.
+  private static readonly OCT_UP = 24;
+  private static readonly TG_KEEP = 0;
+  private static readonly WARM_N = 48;
+  private static readonly HOLD_N = 50;
+  private static readonly RELOCK_K = 2;
+  private static readonly REFRAC_N = 20;
+  private static readonly REFRAC_ATT = 0;
+  private static readonly HARM_TOL = 0.035;
+  private static readonly HARM_PENALTY = 6;
   private static readonly OCT_DOWN = 8;
 
 
@@ -226,11 +238,15 @@ export class Analyser {
   private barCount = 0;        // antal bokförda slag (bevisunderlag för taktfasen)
   /** Perceptuell prior (log-Gauss runt 120 BPM) per lag — lagg→BPM ar fast, sa
    *  de ~78 Math.exp()-anropen per computeBpm-anrop kan bakas en gang. */
+  private warmCalls = 0;
+  private holdCalls = 0;
+  private diagLagMin = 0;
+  private diagLagMax = 0;
   private priorLut = (() => {
     const t = new Float32Array(Analyser.ENV_LEN);
     for (let lag = 1; lag < Analyser.ENV_LEN; lag++) {
       const oct = Math.log2(((Analyser.ENV_HZ * 60) / lag) / 120);
-      t[lag] = Math.exp(-(oct * oct) / 2.0);
+      t[lag] = Math.exp(-(oct * oct) / 0.7);
     }
     return t;
   })();
@@ -536,6 +552,7 @@ export class Analyser {
     // låset kommer på 1–2 s och oktav-flippar dör innan de hinner synas.
     const a = this.localBpm === 0 ? 0.30 : 0.15;
     const tg = this.tempoGram;
+    this.diagLagMin = lagMin; this.diagLagMax = lagMax;
     let bestLag = 0, bestVal = 0, scoreSum = 0, scoreCount = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
       const s = wFull * this.scoreFull[lag] + wBass * this.scoreBass[lag];
@@ -637,6 +654,7 @@ export class Analyser {
       scratch[j + 1] = v;
     }
     const med = scratch[n >> 1];
+    if (this.localBpm === 0 && this.warmCalls++ < Analyser.WARM_N) return;
     if (this.localBpm === 0) {
       this.localBpm = Math.round(med);
       this.octaveVote = 0;
@@ -657,6 +675,9 @@ export class Analyser {
       // förrän tystnad. Konfidenssläppningen sist i denna metod är andra utvägen.
       const committed = this.bpmStable >= Analyser.BPM_COMMIT;
       const ratio = med / this.localBpm;
+      const _lockLag = Math.round((HZ * 60) / this.localBpm);
+      const overwhelming = _lockLag >= lagMin && _lockLag <= lagMax
+        && bestVal > tg[_lockLag] * Analyser.RELOCK_K;
       if (ratio >= 0.9 && ratio <= 1.11) {
         this.nearVote = 0; this.nearChallenger = 0;                                 // samma takt → inget grann-fel
         this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);   // samma takt → glid
@@ -664,11 +685,15 @@ export class Analyser {
         // Referens för hur STARK takten är när allt är gott — låtbytesgrinden nedan
         // jämför mot den (ett breakdown har svag takt, en ny låt en full).
         this.lockPeak = this.lockPeak > 0 ? this.lockPeak + (bestVal - this.lockPeak) * 0.05 : bestVal;
-        if (this.bpmStable < 100000) this.bpmStable++;                              // stabil tid ackumuleras
-      } else if (!committed && ratio > 1.4) {
+        if (this.holdCalls < Analyser.HOLD_N) this.holdCalls++;
+        else if (this.bpmStable < 100000) this.bpmStable++;                              // stabil tid ackumuleras
+      // Overvaldigande helhetsbevis: den nya kandidaten ar RELOCK_K ganger
+      // starkare an laset i det ACKUMULERADE tempogrammet, alltsa over hela laten
+      // och inte bara i det just spelade avsnittet.
+      } else if ((!committed || overwhelming) && ratio > 1.4) {
         this.octaveVote = Math.max(0, this.octaveVote) + 1;                          // estimaten HÖGRE oktav
         if (this.octaveVote >= Analyser.OCT_UP) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
-      } else if (!committed && ratio < 0.7) {
+      } else if ((!committed || overwhelming) && ratio < 0.7) {
         this.octaveVote = Math.min(0, this.octaveVote) - 1;                          // estimaten LÄGRE oktav
         if (this.octaveVote <= -Analyser.OCT_DOWN) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
 
@@ -701,7 +726,17 @@ export class Analyser {
         } else if (this.nearChallenger > 0 && Math.abs(bpm / this.nearChallenger - 1) <= 0.04) {
           this.nearChallenger += (bpm - this.nearChallenger) * 0.3;
           this.nearVote++;
-          if (this.nearVote >= (reacq ? 3 : 8)) {
+          // HARMONI-VETO. Grann-bandet [1.11,1.4] rymmer 4/3 och [0.7,0.9] rymmer
+          // 3/4 -- en TRIOLTOPP gar alltsa in genom halet som ar avsett for grannfel,
+          // pa atta roster, och conf stoppar den inte (den mater tempogrammets
+          // SKARPA, inte dess korrekthet: 1.00 aven nar tempot ar 32 % fel).
+          // MATT pa utandig.wav (facit 90): 90 -> 118 vid t=21s, laset kom aldrig
+          // tillbaka. Vetot: 25 % -> 70.6 % ratt, median 119 -> 89.
+          // PROVAT och FORKASTAT: slappa vetot nar utmanaren ar mycket starkare
+          // (rival > 3) -- sankte utandig 70.6 -> 26.2 % utan att hjalpa stranden.
+          const _harm = Math.abs(ratio * 0.75 - 1) <= Analyser.HARM_TOL
+                     || Math.abs(ratio / 0.75 - 1) <= Analyser.HARM_TOL;
+          if (this.nearVote >= (reacq ? 3 : 8) * (_harm ? Analyser.HARM_PENALTY : 1)) {
 
 
             this.localBpm = Math.round(med);
@@ -764,6 +799,15 @@ export class Analyser {
           ? bestVal / Math.max(1e-9, tg[lockLag]) : 1;
         // Dominant rival ⇒ 1,5 s bevis. Svag ⇒ 25 s, som förr: MÄTT tidigare att 6 s
         // halverade BPM 145→73→144 mitt i en låt när ett breakdown nådde tröskeln.
+        // HAR SATT TIDIGARE ETT HARMONI-VETO. BORTTAGET 2026-09-01.
+        // Det mattes till NOLL effekt nar det lades in, och visade sig sedan vara
+        // aktivt skadligt: "LINEDANCE" (facit 145) har 26 s tvetydigt intro dar
+        // bevisen pekar pa 90-100, laset committar pa 96, och forst vid 28 s
+        // framtrader ratt tempo (146.3 @0.77, alltsa 3.5x starkare an 96.8).
+        // Kvoten 146/96 = 1.52 ligger 1.3 % fran 3/2 -- vetot hojde darfor
+        // beviskravet fran 4 s till 24 s, vilket ar omojligt att na.
+        // Vetot i GRANNRATTNINGEN ar validerat (+45 p.e.) och star kvar; det ar
+        // bara den har vagen som tas bort.
         const needMs = rival > 2.5 ? 1500 : rival > 1.6 ? 4000 : 25000;
         const dtVote = this.lastSongVoteMs > 0 ? Math.min(200, voteNow - this.lastSongVoteMs) : 0;
         this.lastSongVoteMs = voteNow;
@@ -858,6 +902,12 @@ export class Analyser {
     // Date.now() gjorde `voteNow < reacqUntilMs` alltid falskt → hinten var död.
     this.reacqUntilMs = this.perfNow() + windowMs;
     this.bpmHistLen = 0; this.bpmHistPos = 0; this.lastVoteMs = 0;
+    // Tempogrammet ar EMA-ackumulerat (a = 0.15 nar last) och overlevde tidigare
+    // latbytet -- forra latens toppar lag alltsa kvar och konkurrerade med den nya
+    // latens bevis under de forsta, avgorande sekunderna.
+    const k = Analyser.TG_KEEP;
+    if (k <= 0) this.tempoGram.fill(0);
+    else if (k < 1) for (let i = 0; i < this.tempoGram.length; i++) this.tempoGram[i] *= k;
     this.clearLockVotes();
     this.barAcc.fill(0); this.barCount = 0;
   }
@@ -865,11 +915,17 @@ export class Analyser {
   /** Nollställ lås-/röst-ackumulatorerna — gemensam kärna för resetTempo/hintTrackChange/
    *  silens, så de tre inte kan divergera (jfr A5-buggen som var just en divergens). */
   private clearLockVotes(): void {
+    this.warmCalls = 0; this.holdCalls = 0;
     this.octaveVote = 0; this.nearVote = 0; this.nearChallenger = 0; this.bpmStable = 0;
     this.newSongVote = 0; this.challengerBpm = 0; this.lastSongVoteMs = 0; this.lockPeak = 0;
   }
 
   /** Taktfasen är applicerad av motorn (ankaret flyttat) → börja om räkningen. */
+  /** DIAGNOSTIK: det ackumulerade tempogrammet, for tools/peaks.mjs. */
+  get tempoGramSnapshot(): Float32Array { return this.tempoGram; }
+  /** DIAGNOSTIK: sokfonstrets granser i lag. */
+  get lagBounds(): [number, number] { return [this.diagLagMin, this.diagLagMax]; }
+
   resetBar(): void { this.barAcc.fill(0); this.barCount = 0; }
 
   private envelope: number;
@@ -1203,7 +1259,17 @@ export class Analyser {
     this.envAccumT += hopMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) {
       this.envAccumT -= 1000 / Analyser.ENV_HZ;
-      this.envRing[this.envPos] = this.envAccum;
+      let _e = this.envAccum;
+      const _R = Analyser.REFRAC_N;
+      if (_R > 0 && _e > 0) {
+        let _big = false;
+        for (let _k = 1; _k <= _R; _k++) {
+          const _i = (this.envPos - _k + Analyser.ENV_LEN * 2) % Analyser.ENV_LEN;
+          if (this.envRing[_i] >= _e) { _big = true; break; }
+        }
+        if (_big) _e *= Analyser.REFRAC_ATT;
+      }
+      this.envRing[this.envPos] = _e;
       this.envBassRing[this.envPos] = this.envBassAccum;
       this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
       this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);

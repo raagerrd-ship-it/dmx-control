@@ -81,6 +81,18 @@ export interface EngineConfig {
    *  RGB innan packet-write, så olika BLEDOM-kloner kan trimmas att se likadana ut. */
   bleDevices?: { mac: string; name: string; chip: "bledom" | "unknown"; cal?: { rGain: number; gGain: number; bGain: number; maxBrightness: number; gamma: number } }[];
   /** Which codec input feeds the show: line on the P1 AUX header or the mic path. */
+  /**
+   * VILKEN INGÅNGSKANAL BÄR SIGNALEN?
+   *   "mix"   — medelvärde av L och R (rätt för en riktig stereokälla)
+   *   "left" / "right" — bara den kanalen, på full skala
+   *   "auto"  — STANDARD: motorn upptäcker själv om bara en kanal bär signal
+   * Kopplar man en monokälla till BARA en kanal blir medelvärdet hälften, alltså
+   * exakt 6 dB för lågt — och AGC:n är låst på 1x på aux, så inget kompenserar.
+   * Det stänger drop-detektionen, eftersom `inZone` har ett ABSOLUT golv på 0.65
+   * (samma golv som tystade droparna när mobilvolymen var nedskruvad).
+   * MÄTT: en 8000-amplituds ton på bara vänster gav topp 0.122 mot 0.244 med båda.
+   */
+  audioChannel?: "mix" | "left" | "right" | "auto";
   audioInput: "aux" | "mic";
   sensitivity: number;    // 0..1 user knob
   /** 0..1 kontrast: 0 = jämnt ljus, 1 = dovt i tystnad + smäll i beats. */

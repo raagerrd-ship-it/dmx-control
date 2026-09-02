@@ -242,6 +242,7 @@ const capture = new AudioCapture({
   device: cfg.audio.device,
   rate: cfg.audio.rate,
   channels: cfg.audio.channels,
+  channel: cfg.audioChannel ?? "auto",
   hopSamples: cfg.fft.hop,
 });
 
