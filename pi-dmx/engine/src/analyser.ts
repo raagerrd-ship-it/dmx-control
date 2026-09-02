@@ -1206,7 +1206,27 @@ export class Analyser {
     }
     const kickThresh = this.kickMed + 4.5 * this.kickMad;
     const KICK_COOLDOWN = 170;                     // ms → max ~350 BPM, hindrar sub-beat-dubbelfyr
-    let above = kickFlux > kickThresh && energy > 0.06;
+    // ENERGIGRINDEN SKA AVVISA TYSTNAD — INTE MUSIK.
+    // Den stod pa 0.06 och avvisade 99,86 % av alla kandidater. MATT 2026-08-09
+    // pa riktigt material (gain last pa 1x, som pa aux) ligger `energy` sa har:
+    //   p1 8.3e-4   p10 3.4e-3   p50 1.0e-2   p90 2.3e-2   p99 4.3e-2
+    // Troskeln lag alltsa OVER p99 — den slog av kickdetektorn i praktiken.
+    // Sannolik orsak: `energy` skalas med `this.gain`, och mic-vagen startar pa
+    // 20x medan aux ar LAST pa 1x. Ett varde kalibrerat pa micen blir 20 ganger
+    // for strangt pa aux.
+    //   UPPMATT FOLJD over 25 spar ur frozen6:
+    //     troskel   spar utan kickar   kickar/min (median)   taktfasbeslut
+    //     0.06            9/25                  5                 2/25
+    //     0.02            3/25                161                20/25
+    //     0.015           0/25                191                20/25
+    //     0.006           0/25                248                22/25
+    //     0.003           0/25                251                22/25
+    //   Tempotraffsakerheten ar OFORANDRAD (65/76) vid alla varden — tempovagen
+    //   gar via onset-envelopen, inte via den diskreta kicken.
+    // Valt 0.006 = p25: klart over tystnad, under all normal musik. Att i stallet
+    // strypa ANTALET kickar hor hemma i cooldownen eller grid-toleransen; en
+    // energigrind som blockerar musik loser fel problem.
+    let above = kickFlux > kickThresh && energy > 0.006;
     // ── TAKT-GRID-GRIND ──────────────────────────────────────────────────────
     // Morfologiska filter kan INTE skilja en synth-stot fran en bastrumma - matt
     // och forkastat tre ganger: SuperFlux (191->222 falska), relativ flux
