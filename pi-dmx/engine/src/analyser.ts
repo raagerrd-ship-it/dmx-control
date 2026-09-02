@@ -1248,7 +1248,15 @@ export class Analyser {
       if (this.kickMad < 0) this.kickMad = 0;
     }
     const kickThresh = this.kickMed + 4.5 * this.kickMad;
-    const KICK_COOLDOWN = 170;                     // ms → max ~350 BPM, hindrar sub-beat-dubbelfyr
+    // COOLDOWN ar TEMPO-RELATIV: ingen kick-blixt narmare an ~0.6 taktslag efter
+    // forra. 170 ms (fast) rackte for att stoppa doubles snabbare an ~350 BPM, men
+    // en attondel vid 137 BPM ar 219 ms — sa taktslag + upptakt slapptes bada
+    // igenom och lamporna blinkade "dubbel takt kort inpa varandra" (agarens ord
+    // 2026-09-02). Griden slapper avsiktligt attondelar; cooldownen ar det som
+    // haller nere ANTALET, precis som kickfix-commiten sa. 0.6 beat kapar paret
+    // men behaller ett rent slag/takt. Golv 170 ms skyddar mycket snabba tempon.
+    // Tempot paverkas inte: det gar via onset-enveloppen, inte den diskreta kicken.
+    const KICK_COOLDOWN = this.localBpm > 40 ? Math.max(170, (60000 / this.localBpm) * 0.6) : 170;
     // ENERGIGRINDEN SKA AVVISA TYSTNAD — INTE MUSIK.
     // Den stod pa 0.06 och avvisade 99,86 % av alla kandidater. MATT 2026-08-09
     // pa riktigt material (gain last pa 1x, som pa aux) ligger `energy` sa har:
