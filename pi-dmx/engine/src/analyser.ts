@@ -65,6 +65,14 @@ export interface Frame {
   barShift: number;
   /** Rikt spektrum + per-band onset (anslag) från dubbel-FFT:n (hög-upplöst). */
   spec: Spectrum;       // per-band NIVÅ (AGC 0..1)
+  /**
+   * BASKROPPEN I RA dB (negativt tal, medel av sub+kick+bas). `spec` ar AGC-normaliserad
+   * och kan darfor INTE bara anvandas till drop-detektion: bandPeak har momentan
+   * attack, sa ett bassprang hojer taket i samma hop och kvoten stannar pa 1.0 —
+   * nivasprnget raderas i det ogonblick det sker. Detta falt ar samma kropp utan
+   * den normaliseringen, sa matbankar kan se sprnget.
+   */
+  bodyDb: number;
   onset: Spectrum;      // per-band ONSET/anslag (halvvågs-flux mot adaptiv baslinje, 0..1)
   /** TRUM-KIT-envelopes (0..1): peak-hold + decay PÅ HOP-TAKT (375Hz) → fångar
    *  varje anslag, aldrig missat mellan två render-frames. kick=diskret kick +
@@ -75,6 +83,37 @@ export interface Frame {
   drum: { kick: number; snare: number; hat: number; bass: number };
 }
 
+
+const BODY_GONE_R = Number(process.env.BODY_GONE_R ?? 0.40);
+const BODY_RISE = Number(process.env.BODY_RISE ?? 0.15);
+
+/**
+ * DROP-DETEKTORNS TVA TROSKLAR — BADA I dB, badd ur matning.
+ *
+ * MATT 2026-09-02 pa tools/testDrops.mjs (facit: 9 referenspunkter x 8 seeder):
+ *   bodyRise VID facit-drop   p10  6.1 dB   p50 17.8 dB   p90 18.8 dB
+ *   bodyRise OVERALLT         p50 -0.4 dB   p90  7.0 dB   p99 15.8 dB
+ *   djup under taket fore     p10  7.1 dB   p50 12.8 dB   p90 14.9 dB
+ * En akta drop lyfter alltsa baskroppen ~18 dB pa en halv sekund; bakgrunden
+ * nar dit i under 1 % av rutorna. Det ar den separationen troskeln star pa.
+ *
+ * UPPMATT SVEP (alla 8 seeder, F1):
+ *   rise 8 dB -> 15    12 -> 29    16 -> 45    18 -> 23    20 -> 0 (klippkant:
+ *   droparnas egen p90 ar 18.8, sa over 19 fyrar ingenting alls)
+ *   gone 1/2/3 dB -> 45 (IDENTISKT — grinden ar mattad och binder inte langre;
+ *   stigningen bar hela beslutet), 5 dB -> 27, 8 dB -> 15
+ * Valt 16 dB / 3 dB: F1 45, precision 56 %, recall 38 % — mot 8 / 75 % / 4 %
+ * innan. 27 traffar mot 8.
+ *
+ * VAD SOM BLEV SAMRE: "klassisk breakdown" gar 3/24 -> 0/24. Vinsten ligger i
+ * modern uppbyggnad (0 -> 13/24) och i det BRUSIGA fallet (0 -> 14/16), dvs
+ * just den akustik mikrofonen sitter i. Det ar en medveten byteshandel, inte
+ * en forbisedd regression.
+ * INTE VALIDERAT PA AKTA MUSIK an — bara pa syntetiska spar med facit.
+ */
+const BODY_RISE_DB = 16;
+const BODY_GONE_DB = 3;
+const BODY_CEIL_DB_S = 0.5;
 
 export class Analyser {
   private fft: FFT;
@@ -296,12 +335,12 @@ export class Analyser {
    *  SLÅR TILLBAKA i dropen är basen.
    *  Nivå-baserad zon gav 172 flanker på 15 min (en var 5:e sekund) för ~19 drops.
    *  Baskropps-zonen ger 46 (en var 20:e sekund) — rätt storleksordning. */
-  private bodyEnv = 0;
+  private bodyEnv = -120;
   /** Snabb envelopp (0.12 s) ENBART for stigningstakten. Den langsammare
    *  bodyEnv (0.35 s) styr tak och franvaro. Blandar man ihop dem dampas
    *  stigningen och trosklarna slutar motsvara det som mattes i banken. */
-  private bodyFast = 0;
-  private bodyCeil = 0.2;
+  private bodyFast = -120;
+  private bodyCeil = -300;   // dB — sa forsta max() tar bodyEnv
   /** ANSLAGSDETEKTION. En tröskel som ska NÅS korsas först när basen redan
    *  kommit — uppmätt 2.5 s efter anslaget. STIGNINGSTAKTEN fyrar när den
    *  börjar: uppmätt 0.1 s. Ringbuffert med 0.5 s historik (förallokerad). */
@@ -333,6 +372,10 @@ export class Analyser {
    * novelty läser i stället den här, i dB, där en ramp är en ramp oavsett nivå.
    */
   private bandDb = new Float32Array(8);
+  /** Samma atta band i OKLAMPAD dB. `bandDb` mattar vid -10 dB och basbanden
+   *  ligger nastan alltid over det (MATT: p50=p95=1.000), sa den kan inte bara
+   *  anvandas till nivasprng. */
+  private bandDbRaw = new Float32Array(8);
   /** Stor-FFT-rutor med signal i rad. Onsets hålls tysta tills MAD hunnit byggas
    *  upp — se `ONSET_WARM` och kommentaren vid bandOn. */
   private onsetWarm = 0;
@@ -1051,7 +1094,7 @@ export class Analyser {
     this.outFrame = {
       level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
-      dropCount: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
+      dropCount: 0, bodyDb: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
       kickAtMs: 0, barShift: -1,
       spec: this.outSpec, onset: this.outOnset, drum: this.outDrum,
     };
@@ -1505,6 +1548,7 @@ export class Analyser {
       // Obehandlad nivå i dB, normaliserad till 0..1 över ett 60 dB-spann.
       // Ingen AGC, inget tak som följer med uppåt → en stigning syns som stigning.
       const db = 20 * Math.log10(avg + 1e-7);
+      this.bandDbRaw[b] = db;   // OKLAMPAD dB — drop-detektorns kropp (se f.bodyDb)
       this.bandDb[b] = Math.max(0, Math.min(1, (db + 70) / 60));
       // Per-band AGC: skala mot egen långsamt sjunkande peak → varje band nyttjar
       // full range oavsett mix (bas dominerar annars alltid rå-magnituden).
@@ -1600,13 +1644,22 @@ export class Analyser {
     // BASKROPPEN — drop-detektionens egen signal (tak + frånvaro + stigningstakt).
     // `inZone` lämnas orörd: effektlagret använder den som "musiken ligger högt".
 
-    const bodyNow = (this.bandLvl[0] + this.bandLvl[1] + this.bandLvl[2]) / 3;   // sub + kick + bas
+    // BASKROPPEN PA `bandDb`, INTE `bandLvl`. Samma konstruktionsfel som risern
+    // hade: bandPeak har MOMENTAN attack, sa nar basen hoppar vid en drop hoppar
+    // taket med i samma hop och avg/bandPeak blir 1.0. Nivasprnget — dropens
+    // definierande drag — raderades i exakt det ogonblick det skedde.
+    const bodyNow = (this.bandDbRaw[0] + this.bandDbRaw[1] + this.bandDbRaw[2]) / 3;   // ra dB
     this.bodyEnv += (bodyNow - this.bodyEnv) * Math.min(1, dtHop / 0.35);
     this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / 0.12);
-    this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * 0.015 * this.bodyCeil);
+    // TAKET SJUNKER I dB PER SEKUND, inte i procent. Kroppen ar nu ett dB-tal
+    // (negativt), och "1,5 % av ett negativt tal" gor taket STORRE, inte mindre —
+    // den gamla raden var matematiskt omvand sa fort skalan blev logaritmisk.
+    this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * BODY_CEIL_DB_S);
 
     // BAS-FRÅNVARO med VARAKTIGHETSKRAV: under 40 % av taket i ≥2 s i sträck.
-    if (this.bodyEnv < this.bodyCeil * 0.40) {
+    // FRANVARO = ETT AVSTAND I dB, inte en kvot. En kvot mellan tva logaritmer
+    // betyder ingenting fysiskt.
+    if (this.bodyEnv < this.bodyCeil - BODY_GONE_DB) {
       this.bodyGoneMs += dtHop * 1000;
       if (this.bodyGoneMs >= 2000) this.lastBodyGoneMs = nowWallA;
     } else this.bodyGoneMs = 0;
@@ -1625,7 +1678,7 @@ export class Analyser {
     // 40 %/2 s slar 30 %/3 s: verkliga drops kommer ofta efter en DELVIS
     // nedgang, inte total tystnad — 10 av 11 missade drops foll pa just det.
     // Precision 46 -> 56 %, recall 35 -> 53 %.
-    const bodyOnset = bodyRise > 0.15 && nowWallA - this.lastBodyGoneMs < 6000;
+    const bodyOnset = bodyRise > BODY_RISE_DB && nowWallA - this.lastBodyGoneMs < 6000;
     // EN DROP MASTE LANDA I HOG ENERGI. Villkoren ovan tittar bara pa LOKALA
     // nivasprang (svacka -> topp-zon) och vet inget om var i laten vi ar, sa varje
     // liten variation i ett tyst parti raknades som en drop.
@@ -1751,6 +1804,7 @@ export class Analyser {
     f.energy = this.engSmooth;
     f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
     f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.intensity = intensity; f.beatAnchorMs = this.beatAnchorMs;
+    f.bodyDb = bodyNow;
     f.dropCount = this.dropCount; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
     f.kickAtMs = kickAtMs; f.barShift = barShift;
     return f;

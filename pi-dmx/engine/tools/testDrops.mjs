@@ -116,10 +116,11 @@ function run(track, seed) {
   const hops = Math.floor(track.dur * RATE / HOP);
   const dtHop = HOP / RATE;
   // samma tillstånd som analyser.ts håller för baskroppen
-  let bodyEnv = 0, bodyFast = 0, bodyCeil = 1e-6, bodyGoneMs = 0, lastBodyGoneMs = -1e9;
+  let bodyEnv = -120, bodyFast = -120, bodyCeil = -300, bodyGoneMs = 0, lastBodyGoneMs = -1e9;
   const HL = 512, hist = new Float32Array(HL); let hp = 0, hl = 0;
   let lastRiserMs = -1e9;
   const cands = [], buildUps = [];
+  const riseLog = [], ratioLog = [], bodyLog = [];
   let riserHops = 0, tot = 0;
   let t = 0;
   for (let hop = 0; hop < hops; hop++) {
@@ -127,18 +128,21 @@ function run(track, seed) {
     const ms = hop * HOP / RATE * 1000;
     an.setVirtualClock(ms);
     const f = an.process(buf);
-    const bodyNow = (f.spec.sub + f.spec.kick + f.spec.bass) / 3;
+    // OBEHANDLAD kropp — f.spec ar AGC:ad och raderar bassprnget (se f.bodyDb).
+    const bodyNow = f.bodyDb;
     bodyEnv += (bodyNow - bodyEnv) * Math.min(1, dtHop / 0.35);
     bodyFast += (bodyNow - bodyFast) * Math.min(1, dtHop / 0.12);
-    bodyCeil = Math.max(bodyEnv, bodyCeil - dtHop * 0.015 * bodyCeil);
-    if (bodyEnv < bodyCeil * 0.40) { bodyGoneMs += dtHop * 1000; if (bodyGoneMs >= 2000) lastBodyGoneMs = ms; }
+    // TAKET SJUNKER I dB/s — inte i procent. Kvoter pa en logskala betyder inget.
+    bodyCeil = Math.max(bodyEnv, bodyCeil - dtHop * (+process.env.CEIL_DB_S || 0.5));
+    if (bodyEnv < bodyCeil - (+process.env.GONE_DB || 3)    /* = BODY_GONE_DB i analyser.ts */) { bodyGoneMs += dtHop * 1000; if (bodyGoneMs >= 2000) lastBodyGoneMs = ms; }
     else bodyGoneMs = 0;
     const oldest = hist[(hp + HL - hl) % HL];
     const bodyRise = bodyFast - oldest;
     hist[hp] = bodyFast; hp = (hp + 1) % HL;
     const want = Math.min(HL - 1, Math.max(1, Math.round(0.5 / dtHop)));
     if (hl < want) hl++;
-    const bodyOnset = bodyRise > 0.15 && ms - lastBodyGoneMs < 6000;
+    const bodyOnset = bodyRise > (+process.env.RISE_DB || 16)   /* = BODY_RISE_DB i analyser.ts */ && ms - lastBodyGoneMs < 6000;
+    if (ms > 2000) { riseLog.push([ms/1000, bodyRise]); ratioLog.push([ms/1000, bodyCeil - bodyEnv]); bodyLog.push(bodyNow); }
     if (f.inRiser) lastRiserMs = ms;
     if (ms > 2000) { tot++; if (f.inRiser) riserHops++; buildUps.push(f.buildUp); }
     if (bodyOnset && ms > 2000) cands.push({
@@ -146,7 +150,16 @@ function run(track, seed) {
       sinceGone: ms - lastBodyGoneMs, sinceRiser: ms - lastRiserMs,
     });
   }
-  return { cands, buildUps, riserPct: 100 * riserHops / tot };
+  // PROB: hur stort ar bassprnget VID de kanda droparna, och hur djup ar svackan fore?
+  const atDrop = [], gonePre = [];
+  for (const d of track.drops) {
+    let mx = -9; for (const [tt, v] of riseLog) if (tt > d - 2 && tt < d + 2 && v > mx) mx = v;
+    if (mx > -9) atDrop.push(mx);
+    let mn = -999; for (const [tt, v] of ratioLog) if (tt > d - 8 && tt < d && v > mn) mn = v;
+    if (mn > -999) gonePre.push(mn);
+  }
+  const allRise = riseLog.map(r => r[1]);
+  return { cands, buildUps, riserPct: 100 * riserHops / tot, atDrop, gonePre, allRise, bodyLog };
 }
 
 /** Applicera grindar + refraktärperiod på kandidatflankerna → fyrade drops. */
@@ -214,4 +227,21 @@ for (const g of COMBOS) {
     " tp", String(tp).padStart(3), "fp", String(fp).padStart(3), "fn", String(fn).padStart(3),
     " | " + Object.entries(perTrack).map(([n, v]) =>
       `${n.split(" ")[0]} ${v.reduce((a, x) => a + x[0], 0)}/${v.reduce((a, x) => a + x[1], 0)}+${v.reduce((a, x) => a + x[2], 0)}fp`).join("  "));
+}
+
+// ── FORDELNINGSPROB (tillagd for att valja trosklar ur matning, inte gissning) ──
+{
+  const pc = (a, p) => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
+  const AD = [], GP = [], AR = [], BL = [];
+  for (const name of Object.keys(TRACKS)) for (let s = 0; s < SEEDS; s++) {
+    const r = run(TRACKS[name], 1000 + s * 7919);
+    AD.push(...r.atDrop); GP.push(...r.gonePre); AR.push(...r.allRise); BL.push(...r.bodyLog);
+  }
+  console.log("");
+  console.log("FORDELNING (bodyDb-kropp):");
+  console.log(`  bodyRise VID facit-drop   p10 ${pc(AD,.1).toFixed(3)}  p50 ${pc(AD,.5).toFixed(3)}  p90 ${pc(AD,.9).toFixed(3)}   (n=${AD.length})`);
+  console.log(`  bodyRise OVERALLT         p50 ${pc(AR,.5).toFixed(3)}  p90 ${pc(AR,.9).toFixed(3)}  p99 ${pc(AR,.99).toFixed(3)}`);
+  console.log(`  RA KROPP bodyDb          p05 ${pc(BL,.05).toFixed(3)}  p50 ${pc(BL,.5).toFixed(3)}  p95 ${pc(BL,.95).toFixed(3)}`);
+  console.log(`  DJUPASTE dB UNDER TAK fore drop p10 ${pc(GP,.1).toFixed(1)}  p50 ${pc(GP,.5).toFixed(1)}  p90 ${pc(GP,.9).toFixed(1)}`);
+  console.log(`  (gammal rad) p10 ${pc(GP,.1).toFixed(3)}  p50 ${pc(GP,.5).toFixed(3)}  p90 ${pc(GP,.9).toFixed(3)}`);
 }
