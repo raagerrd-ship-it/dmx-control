@@ -229,8 +229,10 @@ for (const g of COMBOS) {
       `${n.split(" ")[0]} ${v.reduce((a, x) => a + x[0], 0)}/${v.reduce((a, x) => a + x[1], 0)}+${v.reduce((a, x) => a + x[2], 0)}fp`).join("  "));
 }
 
-// ── FORDELNINGSPROB (tillagd for att valja trosklar ur matning, inte gissning) ──
-{
+// ── FORDELNINGSPROB ── kor om med PROBE=1. Den kor HELA korpusen en gang till,
+// sa den ar avstangd som standard: den fordubblar bankens tid utan att paverka
+// precision/recall-raden ovan. Anvands nar en TROSKEL ska valjas ur matning.
+if (process.env.PROBE) {
   const pc = (a, p) => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
   const AD = [], GP = [], AR = [], BL = [];
   for (const name of Object.keys(TRACKS)) for (let s = 0; s < SEEDS; s++) {
