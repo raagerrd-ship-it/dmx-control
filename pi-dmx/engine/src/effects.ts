@@ -131,7 +131,7 @@ const LIGHT_SOFT = 0.3;            // soft-snap-golv vid låg energi
  */
 const DISCRETE_DROP_LAMPS = true;   // ater PA (agaren i ladan): lamporna ska bloma pa dropen synkat med roken (samma dropCount). Energi-gasen ensam racker inte som drop-markering.
 const STROBE_MIN_BPM = 150;   // effekt-krav: riser-strobe bara i snabba latar (agarens onskemal)
-const BEAT_TRUST_FLOOR = 0.60;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
+const BEAT_TRUST_FLOOR = 0.75;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 
 export class EffectEngine {
   private universe = new Uint8Array(512);
@@ -647,7 +647,7 @@ export class EffectEngine {
         // 0.80 → 0.92, och energigolvet 0.35 → 0.50: djupare slag överallt, och märkbart
         // mer även i lugna partier. Pulsen ligger sist i kedjan och passerar inget
         // filter, så hela djupet når fram — det som mäts är det som syns.
-        const depth = 0.92 * trustFloored * (0.50 + 0.50 * energy) * calm;
+        const depth = 0.92 * trustFloored * (0.62 + 0.45 * energy) * calm;   // 0.50+0.50 -> 0.62+0.45: punchigare hjartslag (agaren "svagare/dimmare" efter effekt-trim)
         // KLAMRAS NEDAT: pre-dippen far envelopen ga negativ med flit, men
         // multiplikatorn far aldrig slacka riggen helt — da lases dippen som ett
         // blink i stallet for som andning. 0.06 lamnar lamporna tanda.
