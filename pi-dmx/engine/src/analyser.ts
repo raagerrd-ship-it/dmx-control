@@ -73,6 +73,14 @@ export interface Frame {
    * den normaliseringen, sa matbankar kan se sprnget.
    */
   bodyDb: number;
+  /**
+   * ABSOLUT mid+diskant-nivå i dB (band 3–7, >250 Hz), RMS-kombinerad, ingen AGC.
+   * Ljusvägens drivsignal (portad från Lotus `bands.midHiRms`): bredbandsnivån är i
+   * praktiken en basmätare (~3,9 dB dynamik) medan mid/diskant bär ~3× mer — så
+   * energin/dynamiken finns HÄR, inte i level/intensity. Effektlagret dB-fönster-
+   * normaliserar den till 0..1.
+   */
+  midHiDb: number;
   onset: Spectrum;      // per-band ONSET/anslag (halvvågs-flux mot adaptiv baslinje, 0..1)
   /** TRUM-KIT-envelopes (0..1): peak-hold + decay PÅ HOP-TAKT (375Hz) → fångar
    *  varje anslag, aldrig missat mellan två render-frames. kick=diskret kick +
@@ -1094,7 +1102,7 @@ export class Analyser {
     this.outFrame = {
       level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
-      dropCount: 0, bodyDb: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
+      dropCount: 0, bodyDb: 0, midHiDb: -120, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
       kickAtMs: 0, barShift: -1,
       spec: this.outSpec, onset: this.outOnset, drum: this.outDrum,
     };
@@ -1818,6 +1826,10 @@ export class Analyser {
     f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
     f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.intensity = intensity; f.beatAnchorMs = this.beatAnchorMs;
     f.bodyDb = bodyNow;
+    // MID+DISKANT ABSOLUT dB (band 3–7, >250 Hz), RMS-kombinerad ur bandDbRaw.
+    // Ljusvägens drivsignal (se fältets doc). bandDbRaw uppdateras på stor-FFT-takt
+    // (~125 Hz) vilket räcker gott för ljus.
+    { let s = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, this.bandDbRaw[b] / 20); s += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s)); }
     f.dropCount = this.dropCount; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
     f.kickAtMs = kickAtMs; f.barShift = barShift;
     return f;

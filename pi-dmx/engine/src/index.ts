@@ -428,7 +428,7 @@ capture.on("chunk", (samples: Float32Array) => {
       const beatMs = 60000 / cfg.beat.bpm;
       const ph = ((((frame.kickAtMs - cfg.beat.anchorMs) % beatMs) + beatMs) % beatMs) / beatMs;
       const err = ph < 0.5 ? ph : ph - 1;   // -0.5..0.5 av ett taktslag
-      const k0 = cfg.beatSyncStrength ?? 0.18;  // ägar-ratt: 0 = av/fri-rullande .. ~0.30 aggressiv
+      const k0 = cfg.beatSyncStrength ?? 0.10;  // 0.18 -> 0.10 (Lotus-varde): mindre fas-jitter/wobble. Agent-bekraftat att detta ar enda PLL-konstanten som skiljer motorerna.
       // #3 ADAPTIV: låt takt-tydligheten (bpmConfidence) modulera ratten runt
       // ägarens val. Tydlig takt → snabbare inlåsning; brusig/osäker → försiktig
       // så bruset inte drar iväg fasen. Ägarens "Av" (0) förblir hårt av.

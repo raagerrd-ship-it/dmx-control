@@ -101,6 +101,18 @@ const BEAT_FLUTTER_RELEASE = 0.09;
 const PULSE_IDX_INIT = -2e9;
 /** Hur mycket sektionsenergin "gasar" ljuset (0 = av). +50 % master vid full energi. */
 const ENERGY_DRIVE = 0.5;
+// Loudness-portens konstanter = Lotus DEFAULT_CAL (piEngine.js:166-239).
+const LIGHT_HI_W = 1.3;            // mid+diskant-vikt
+const LIGHT_BASS_W = 0.25;         // bas-vikt (kropp utan att låsa nivån till basen)
+const LIGHT_SMOOTH_MS = 55;        // release-avbrusning på wlevel
+const LIGHT_WIN_DB = 10;           // fast dB-fönster (LÅST i Lotus)
+const LIGHT_ANCHOR_OFF = 4.5;      // ankar-offset över den långsamma nivån
+const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
+const LIGHT_SHAPE_UP = 25;         // shape-smoothing upp (känsligaste ratten)
+const LIGHT_SHAPE_DOWN = 150;      // shape-smoothing ner
+const LIGHT_REL_A = 0.396;         // log-release-alpha
+const LIGHT_ATK_A = 1.0;           // attack-alpha (instant)
+const LIGHT_SOFT = 0.3;            // soft-snap-golv vid låg energi
 /**
  * Diskret drop-detektion styr LAMPORNA (bloom + look-byte). AV sedan 2026-09-02
  * (ägarens val live): detektorn är ~ett taktslag sen på uppbyggda drops och ~56 %
@@ -174,7 +186,12 @@ export class EffectEngine {
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
-  private energyEnv = 0;         // utjämnad sektionsenergi → "gasar" ljuset (snabb upp, lugn ner)
+  // Loudness-portens tillstånd (Lotus mid+diskant dB-fönster + log-release). Negativa
+  // sentinelvärden = oinitierat (första framen sätter dem utan hopp).
+  private lightWlevel = -1;      // avbrusad linjär mid+diskant-nivå
+  private lightWdbSlow = -300;   // långsamt auto-ankare (dB)
+  private lightShapeSm = -1;     // shape-smoothing
+  private lightLoud = 0;         // log-released loudness 0..1 → driver md
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
@@ -1086,17 +1103,52 @@ export class EffectEngine {
     }
     // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så
     // VU-taket följer nivån direkt utan effekt-ballistikens nedåt-släp.
-    // ENERGISTYRD "GASA" (ägaren 2026-09-02, som slutet på Lotus Light): låt
-    // sektionsenergin lyfta ljuset så en refräng känns intensivare än en vers, och
-    // ljuset gasar UPP genom en uppbyggnad — så dropen känns på plats även när den
-    // diskreta detektionen är sen (röken fyrar på riser, lamporna på detekterad drop
-    // → utan detta ligger lamporna en takt efter). Snabb attack (0.15 s) fångar
-    // stegringen, lugn release (0.5 s) håller uppe mellan slagen. frame.intensity är
-    // brusig per frame → MÅSTE utjämnas, annars fladdrar ljuset.
-    const eT = Math.max(0, Math.min(1, frame.intensity));
-    const eRate = eT > this.energyEnv ? dtNow / 0.15 : dtNow / 0.5;
-    this.energyEnv += (eT - this.energyEnv) * Math.min(1, eRate);
-    const md = drive * (1 + this.energyEnv * ENERGY_DRIVE + frame.buildUp * 0.35 + this.dropEnv * 0.8);
+    // ── LOUDNESS — PORTAD FRÅN LOTUS (piEngine.js:2126-2243, DEFAULT_CAL:166-239) ──
+    // Ägarens observation: energidrivningen känns mycket bättre i Lotus. Orsaken är
+    // TRE saker Lotus gör som den gamla bredbandiga linjära gasen inte gjorde:
+    //  1. Driv från MID+DISKANT (frame.midHiDb, vikt 1.3) + lite bas (bodyDb, 0.25).
+    //     Bredband är i praktiken en basmätare (~3.9 dB dynamik); mid/diskant bär ~3×
+    //     mer, så dynamiken finns där.
+    //  2. dB-FÖNSTER: mappa ett FAST 10 dB-fönster till 0..1 med ett långsamt (~60 s)
+    //     auto-ankare — inte en linjär AGC-skalär som parkerar nivån nära 0.5.
+    //     Ankaret följer källvolymen långsamt → volymoberoende UTAN att döda dynamiken.
+    //  3. LOG-RELEASE: fade med konstant KVOT per tick (perceptuellt jämn), med snabb
+    //     soft-snap-attack. Det är "smooth-hemligheten".
+    const dtMs = dtNow * 1000;
+    const wlin = LIGHT_HI_W * Math.pow(10, frame.midHiDb / 20) + LIGHT_BASS_W * Math.pow(10, frame.bodyDb / 20);
+    // (a) avbrusa wlevel: instant attack, ~55 ms release
+    const wUp = this.lightWlevel < 0 || wlin > this.lightWlevel;
+    const aSm = wUp ? 1 : 1 - Math.exp(-dtMs / LIGHT_SMOOTH_MS);
+    this.lightWlevel = this.lightWlevel < 0 ? wlin : this.lightWlevel + (wlin - this.lightWlevel) * aSm;
+    const wdb = 20 * Math.log10(Math.max(this.lightWlevel, 1e-4));
+    // (b) långsamt auto-ankare (upp 3× långsammare än ner så toppar inte drar upp taket)
+    const anUp = this.lightWdbSlow <= -200 || wdb > this.lightWdbSlow;
+    const anA = 1 - Math.exp(-dtMs / (anUp ? LIGHT_ANCHOR_TAU * 3 : LIGHT_ANCHOR_TAU));
+    this.lightWdbSlow = this.lightWdbSlow <= -200 ? wdb : this.lightWdbSlow + anA * (wdb - this.lightWdbSlow);
+    const anchorDb = this.lightWdbSlow + LIGHT_ANCHOR_OFF;
+    // (c) FAST dB-fönster → 0..1
+    let shape = (wdb - (anchorDb - LIGHT_WIN_DB)) / LIGHT_WIN_DB;
+    shape = shape < 0 ? 0 : shape > 1 ? 1 : shape;
+    // (d) shape-smoothing (asymmetrisk: snabb upp 25 ms, lugn ner 150 ms) — sprider
+    //     ~125 Hz-uppdateringen över render-framesen utan att kväva stegringar.
+    const shMs = shape > this.lightShapeSm ? LIGHT_SHAPE_UP : LIGHT_SHAPE_DOWN;
+    const shA = 1 - Math.exp(-dtMs / shMs);
+    this.lightShapeSm = this.lightShapeSm < 0 ? shape : this.lightShapeSm + shA * (shape - this.lightShapeSm);
+    shape = this.lightShapeSm;
+    // (e) log-release + soft-snap attack
+    const eRatio = dtMs / 125;
+    if (shape < this.lightLoud) {
+      const a = 1 - Math.pow(1 - LIGHT_REL_A, eRatio);
+      const c = this.lightLoud < 1e-4 ? 1e-4 : this.lightLoud;
+      const t = shape < 1e-4 ? 1e-4 : shape;
+      this.lightLoud = c * Math.pow(t / c, a);            // konstant kvot per tick
+    } else {
+      const a = 1 - Math.pow(1 - LIGHT_ATK_A, eRatio);
+      const softK = LIGHT_SOFT + (1 - LIGHT_SOFT) * Math.min(1, shape / 0.5);  // brus snäpper inte, beats gör
+      this.lightLoud += a * softK * (shape - this.lightLoud);
+    }
+    const loudness = this.lightLoud;   // 0..1, ersätter den gamla energyEnv
+    const md = drive * (1 + loudness * ENERGY_DRIVE + frame.buildUp * 0.35 + this.dropEnv * 0.8);
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
