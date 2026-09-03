@@ -371,7 +371,8 @@ export class Analyser {
   private lastBodyGoneMs = -1e9;
   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
   private lastDropMs = -1e9;
-  private lastDropRise = 0;   // bas-lyftet (dB) vid senaste dropen — for eskalerings-refraktaren
+  private lastDropRise = 0;
+  private wasBodyOnset = false;   // for stigande-flank pa drop-kandidaten   // bas-lyftet (dB) vid senaste dropen — for eskalerings-refraktaren
   // RISER/UPPBYGGNAD (flyttad från effects)
   /**
    * OBEHANDLAD LOGBANDNIVÅ — riserdetektorns egen ingång.
@@ -1778,7 +1779,14 @@ export class Analyser {
     // i ägarens musik → dess flanker låg godtyckligt, och 8-takters-spärren blev
     // i praktiken den som VALDE när en drop fyrade (första flanken efter att
     // fönstret löpt ut). Uppmätt resultat: 3 träffar av 19, 16 falsklarm.
-    if (dropSpacingOk && bodyOnset && this.activeMs > 2000) {
+    // STIGANDE FLANK: `bodyOnset` är sann KONTINUERLIGT i höga/pumpande partier (basen
+    // dippar och återhämtar ~17 dB varje takt via sidechain → bodyRise ligger konstant
+    // över tröskeln). MÄTT 2026-09-03: många kandidater/sekund. Fyra bara på den FÖRSTA
+    // framen lyftet passerar tröskeln → ett kandidat-event per verkligt lyft, inte per
+    // frame. Då blir eskalerings-/spärr-kravet meningsfullt (jämför distinkta lyft).
+    const bodyOnsetEdge = bodyOnset && !this.wasBodyOnset;
+    this.wasBodyOnset = bodyOnset;
+    if (dropSpacingOk && bodyOnsetEdge && this.activeMs > 2000) {
       this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise;
     }
 
