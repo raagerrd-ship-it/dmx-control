@@ -216,6 +216,14 @@
     .audio-bar > .segs { position:absolute; inset:0; display:flex; pointer-events:none; }
     .audio-bar > .segs > div { flex:1; border-right:1px solid color-mix(in srgb, var(--bg) 60%, transparent); }
     .audio-bar > .segs > div:last-child { border-right:0; }
+    /* AUX-kalibrering: målzon + mittstreck + löpande max-markör */
+    .audio-bar > .cal-zone { position:absolute; top:0; bottom:0; left:45%; width:22%; background:color-mix(in srgb, var(--ok) 20%, transparent); pointer-events:none; z-index:1; }
+    .audio-bar > .cal-mark { position:absolute; top:-3px; bottom:-3px; left:56%; width:2px; background:var(--ok); box-shadow:0 0 6px var(--ok); pointer-events:none; z-index:2; }
+    .audio-bar > .cal-peak { position:absolute; top:-4px; bottom:-4px; width:3px; margin-left:-1px; background:var(--fg); border-radius:2px; box-shadow:0 0 8px color-mix(in srgb, var(--fg) 80%, transparent); transition:left 90ms linear; pointer-events:none; z-index:3; }
+    .cal-hint { margin-top:9px; font-size:12px; font-weight:600; letter-spacing:.02em; display:flex; align-items:center; gap:6px; }
+    .cal-hint.under { color:var(--warn); }
+    .cal-hint.over { color:var(--hot); }
+    .cal-hint.good { color:var(--ok); }
     /* Aktiv effekt-badge i Effekt-val-summary */
     details.more > summary .fx-active { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:999px; background:color-mix(in srgb, var(--fg) 4%, transparent); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--fg) 10%, transparent); color:color-mix(in srgb, var(--fg) 60%, transparent); font-size:10px; font-weight:700; letter-spacing:.12em; vertical-align:1px; }
     /* Effekt-val: ett kort med avdelare mellan de tre stilarna */
@@ -366,7 +374,11 @@
     <div class="audio-bar" id="levelBarWrap">
       <div class="fill" id="levelBar" style="width:0%"></div>
       <div class="ticks" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <div class="cal-zone" id="calZone" hidden></div>
+      <div class="cal-mark" id="calMark" hidden></div>
+      <div class="cal-peak" id="calPeak" hidden></div>
     </div>
+    <div class="cal-hint" id="calHint" hidden></div>
     <div class="src-seg" id="srcSeg" data-src="aux" role="tablist" aria-label="Ljudkälla" style="margin-top:14px">
       <span class="src-thumb" aria-hidden="true"></span>
       <button id="inAux" class="active" role="tab" aria-selected="true">AUX (kabel)</button>
@@ -748,6 +760,11 @@ if (OWNER_MODE) { const o = document.getElementById("ownerOnly"); if (o) o.hidde
 
 const levelBar = document.getElementById("levelBar");
 const levelVal = document.getElementById("levelVal");
+const calZone = document.getElementById("calZone");
+const calMark = document.getElementById("calMark");
+const calPeak = document.getElementById("calPeak");
+const calHint = document.getElementById("calHint");
+let auxPeak = 0;   // löpande max (peak-hold) av insignalen — AUX-kalibrering
 const songBadge = document.getElementById("songBadge");   // låtminne: lär in / kör på inspelning
 const inAux = document.getElementById("inAux");
 const inMic = document.getElementById("inMic");
@@ -1311,6 +1328,22 @@ function applyFrame(f) {
   levelVal.textContent = pct + "%";
   const hot = f.level > 0.85;
   levelVal.classList.toggle("hot", hot);
+  // AUX-KALIBRERING: löpande max (peak-hold, ~decay) mot målzonen. Skruva
+  // källvolymen så toppen (ljusa strecket) hamnar i det gröna. Bara i AUX-läge —
+  // på mic AGC:ar motorn nivån själv, så en manuell kalibrering vore meningslös.
+  auxPeak = Math.max(f.level, auxPeak - 0.006);
+  const isAux = document.getElementById("srcSeg").dataset.src !== "mic";
+  if (isAux) {
+    const peakPct = Math.min(100, Math.max(0, auxPeak * 100));
+    calPeak.style.left = peakPct + "%";
+    calZone.hidden = calMark.hidden = calPeak.hidden = calHint.hidden = false;
+    const LO = 45, HI = 67;
+    if (peakPct < LO) { calHint.textContent = "▲ Skruva UPP källvolymen"; calHint.className = "cal-hint under"; }
+    else if (peakPct > HI) { calHint.textContent = "▼ Skruva NER källvolymen"; calHint.className = "cal-hint over"; }
+    else { calHint.textContent = "✓ Bra nivå — topparna i det gröna"; calHint.className = "cal-hint good"; }
+  } else {
+    calZone.hidden = calMark.hidden = calPeak.hidden = calHint.hidden = true;
+  }
   // Låtminne-badge: ● lär in (aux) · ▶ kör på inspelning · — inget. f.song är
   // null tills låtminnes-motorn är deployad → badgen står kvar på "—".
   if (songBadge) {
