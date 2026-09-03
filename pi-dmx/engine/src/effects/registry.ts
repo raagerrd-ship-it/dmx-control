@@ -44,6 +44,7 @@ import { sol } from "./sol.js";
 import { konfetti } from "./konfetti.js";
 import { sopa } from "./sopa.js";
 import { neon } from "./neon.js";
+import { varannan } from "./varannan.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
@@ -151,6 +152,7 @@ const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
   chase:    { needsBeat: 0.30 },
   drops:    { needsBeat: 0.30 },
   stege:    { needsBeat: 0.30 },
+  varannan: { needsBeat: 0.35 },
 };
 
 /** Möter effekten sina krav givet nuvarande tempo + karaktärsprofil? */

@@ -62,6 +62,22 @@ export const FIT: Partial<Record<Mode, Fit>> = {
 const W = { punch: 1.0, bass: 0.9, bright: 0.8, beat: 0.9 };
 const NEUTRAL: Fit = { punch: 0.5, bass: 0.5, bright: 0.5, beat: 0.5 };
 
+/**
+ * SPATIALITET (0..1): stegar effekten / rör sig över riggen (lampor gör OLIKA saker
+ * sekventiellt) eller kör alla lampor SAMMA? Ägaren gillar stegande effekter när
+ * basslagen är tydliga. Bonusen nedan lyfter dem när `punch` (anslagstäthet) är hög,
+ * så en löpande/stegande look föredras framför en uniform puls på ett tydligt komp.
+ * Uniforma effekter (pulse/party/snap/rave/strobe/backbeat/hjarta/breathe/mono/
+ * subbreath/sol/neon/airglow/viska) står inte med → 0.
+ */
+const SPATIAL: Partial<Record<Mode, number>> = {
+  chase: 1.0, tick: 1.0, stege: 1.0, sopa: 1.0, gallop: 1.0, bounce: 1.0,
+  ripple: 0.9, eko: 0.9, drumkit: 0.9, eq: 0.9, wave: 0.8, split: 0.8, drops: 0.8,
+  duel: 0.7, konfetti: 0.7, varannan: 1.0, pendel: 0.7, twin: 0.6, tide: 0.6, drift: 0.6, aurora: 0.5,
+};
+/** Hur mycket den spatiala preferensen väger vid full punch (0 = av). */
+const SPATIAL_PREF = 0.18;
+
 /** Hur väl en effekt passar musiken just nu. Högre = bättre (0..1-ish). */
 export function fitScore(mode: Mode, p: { punch: number; bass: number; bright: number; beat: number }): number {
   const f = FIT[mode] ?? NEUTRAL;
@@ -69,5 +85,8 @@ export function fitScore(mode: Mode, p: { punch: number; bass: number; bright: n
           + Math.abs(f.bass - p.bass) * W.bass
           + Math.abs(f.bright - p.bright) * W.bright
           + Math.abs(f.beat - p.beat) * W.beat;
-  return 1 - d / (W.punch + W.bass + W.bright + W.beat);
+  const base = 1 - d / (W.punch + W.bass + W.bright + W.beat);
+  // SPATIAL-BONUS: stegande effekter foredras nar anslagen (basslagen) ar tydliga.
+  const spatialBonus = (SPATIAL[mode] ?? 0) * SPATIAL_PREF * p.punch;
+  return base + spatialBonus;
 }
