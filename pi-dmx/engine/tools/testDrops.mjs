@@ -133,7 +133,7 @@ function run(track, seed) {
     bodyEnv += (bodyNow - bodyEnv) * Math.min(1, dtHop / 0.35);
     bodyFast += (bodyNow - bodyFast) * Math.min(1, dtHop / (+process.env.FAST_TAU || 0.12)   /* = 0.12 s i analyser.ts */);
     // TAKET SJUNKER I dB/s — inte i procent. Kvoter pa en logskala betyder inget.
-    bodyCeil = Math.max(bodyEnv, bodyCeil - dtHop * (+process.env.CEIL_DB_S || 0.5));
+    bodyCeil = Math.max(bodyEnv, bodyCeil - dtHop * (+process.env.CEIL_DB_S || 0.15));
     if (bodyEnv < bodyCeil - (+process.env.GONE_DB || 3)    /* = BODY_GONE_DB i analyser.ts */) { bodyGoneMs += dtHop * 1000; if (bodyGoneMs >= 2000) lastBodyGoneMs = ms; }
     else bodyGoneMs = 0;
     const oldest = hist[(hp + HL - hl) % HL];

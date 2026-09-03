@@ -127,7 +127,7 @@ const BODY_PEAK_DB = 10;       // dropen maste landa inom 10 dB av senaste toppe
 const DROP_SHORT_MS = 4000;    // minsta drop-avstand nar dropen ESKALERAR
 const DROP_LONG_MS = 20000;    // annars maste sa har lang tid ga (mot falska upprepningar)
 const DROP_ESCALATE_DB = 3;    // 1.5 -> 3 (agaren): tatare drops maste vara TYDLIGT starkare for att fyra
-const BODY_CEIL_DB_S = 0.5;
+const BODY_CEIL_DB_S = 0.15;  // 0.5 -> 0.15: taket haller latens loud-referens langre → en liten uppgang i ett tyst parti landar tydligt UNDER → landa-hogt-checken avvisar falska drops "dar laten knappt okar" (agaren)
 
 export class Analyser {
   private fft: FFT;
