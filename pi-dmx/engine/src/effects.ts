@@ -130,6 +130,7 @@ const LIGHT_SOFT = 0.3;            // soft-snap-golv vid låg energi
  * Slå på igen = true, så återvänder bloomen och drop-look-bytet.
  */
 const DISCRETE_DROP_LAMPS = true;   // ater PA (agaren i ladan): lamporna ska bloma pa dropen synkat med roken (samma dropCount). Energi-gasen ensam racker inte som drop-markering.
+const STROBE_MIN_BPM = 150;   // effekt-krav: riser-strobe bara i snabba latar (agarens onskemal)
 const BEAT_TRUST_FLOOR = 0.60;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 
 export class EffectEngine {
@@ -1259,7 +1260,13 @@ export class EffectEngine {
     // till 18 Hz, rakt in i det värsta bandet. Taket är nu 3 Hz (WCAG 2.3.1 och
     // rundradions gräns för allmänt säkert innehåll). Ägaren kan höja det, men
     // bara genom ett uttryckligt val — aldrig som en bieffekt av något annat.
-    const rs = this.cfg.riserStrobe && frame.buildUp > 0.25;
+    // EFFEKT-KRAV: strobe bara i SNABBA låtar (ägaren i ladan 2026-09-03). En strobe
+    // passar hardstyle/uptempo men känns malplacerad i en tryckare. Kräver bpm ≥
+    // STROBE_MIN_BPM. OBS oktav-vikningen (80..160): en låt på 150-160 fångas, men en
+    // riktigt snabb (>160) viks ner under gränsen — så gränsen släpper igenom det
+    // uppmätta 150-bandet där strobe hör hemma. (bpm 0 = ej låst → ingen strobe.)
+    const rsBpm = this.cfg.beat?.bpm ?? 0;
+    const rs = this.cfg.riserStrobe && frame.buildUp > 0.25 && rsBpm >= STROBE_MIN_BPM;
     const maxHz = this.cfg.strobeUnlimited ? EffectEngine.STROBE_MAX_HZ : EffectEngine.STROBE_SAFE_HZ;
     const hz = Math.min(maxHz, 1.5 + frame.buildUp * (maxHz - 1.5));
     const rsWhite = rs ? frame.buildUp * 0.7 : 0;
