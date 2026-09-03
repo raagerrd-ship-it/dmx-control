@@ -95,7 +95,13 @@ const SHOW_LEAD_DEFAULT = 50;
 /** Golv på taktens tillit när pulsdjupet räknas. Rampen börjar vid
  *  MIN_BEAT_CONFIDENCE, så utan golv finns ett dödband precis ovanför grinden där
  *  rutnätet lever men hjärtslaget är släckt. Gäller BARA pulsdjupet. */
-const BEAT_TRUST_FLOOR = 0.35;
+/** Release-tid för hjärtslagets fladder-dämp: slår ihop två toppar 50–100 ms isär. */
+const BEAT_FLUTTER_RELEASE = 0.09;
+/** Sentinel: pulsklockan ännu inte initierad (första framen sätter den utan tick). */
+const PULSE_IDX_INIT = -2e9;
+/** Hur mycket sektionsenergin "gasar" ljuset (0 = av). +50 % master vid full energi. */
+const ENERGY_DRIVE = 0.5;
+const BEAT_TRUST_FLOOR = 0.60;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 
 export class EffectEngine {
   private universe = new Uint8Array(512);
@@ -129,6 +135,12 @@ export class EffectEngine {
   /** Pulsen körs i halva takten (snabb låt ELLER lugnt parti). Se PULSE_HALVE_*
    *  och SUBDIV_*. */
   private pulseHalved = false;
+  /** Monoton pulsklocka (rotfix mot hjärtslags-fladder): pulsens index och paritet
+   *  får bara gå framåt, och tSince hålls icke-avtagande inom en puls, så PLL:ens
+   *  fasrättningar inte kan re-attackera eller flippa pariteten mitt i ett slag. */
+  private lastPulseIdx = PULSE_IDX_INIT;
+  private pulseCount = 0;
+  private pulseFloorMs = 0;
   /** ~8 s-utjämnad sektionsenergi + när halveringen senast bytte (min-hold). */
   private subdivEnergy = 0.5;
   private subdivChangedAt = 0;
@@ -153,6 +165,7 @@ export class EffectEngine {
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
+  private energyEnv = 0;         // utjämnad sektionsenergi → "gasar" ljuset (snabb upp, lugn ner)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
@@ -415,9 +428,26 @@ export class EffectEngine {
       // Pariteten MÅSTE läsas med SAMMA försprång som fasen (atk + showLead), annars
       // wrappar fasen till nästa slag innan takträknaren stegar → varannan puls blev
       // dubbelt lång och varannan kapad precis vid slaggränsen.
+      // MONOTON PULSKLOCKA — ROTORSAK till fladdret. PLL:en rättar anchorMs/bpm varje
+      // frame, så den råa fasen kan hoppa BAKÅT (beatEnv re-attackerar) och pulseIdx-
+      // pariteten kan FLIPPA (tSince hoppar ett helt beatMs) → två toppar tätt = fladder
+      // (ägaren 2026-09-02, kvar även med lågpasset borta → koden, inte insignalen).
+      // Fix: räkna pulsens index/paritet monotont (bara framåt, som beatTick redan gör
+      // för grid-effekterna) och håll tSince icke-avtagande inom en puls. Nollas när en
+      // NY puls börjar. pulseIdx och fasen delar försprång (atk+showLead), så de wrappar
+      // i samma frame → golvet nollas exakt när fasen är ~0 = frisk attack.
       const pulseIdx = beatIndex(beat, now2 + atk + this.showLead);
-      const tSince = beatPhase(beat, now2, atk + this.showLead) * beatMs
-        + (this.pulseHalved && Math.abs(pulseIdx % 2) === 1 ? beatMs : 0);
+      if (this.lastPulseIdx === PULSE_IDX_INIT) this.lastPulseIdx = pulseIdx;
+      if (pulseIdx > this.lastPulseIdx) {
+        this.lastPulseIdx = pulseIdx;
+        this.pulseCount++;                                                         // monoton → paritet flippar aldrig bakåt
+        if (!this.pulseHalved || this.pulseCount % 2 === 0) this.pulseFloorMs = 0;  // ny puls: frisk attack
+      } else if (pulseIdx < this.lastPulseIdx) {
+        this.lastPulseIdx = pulseIdx;                                              // följ bakåt tyst, rör inte pulsen
+      }
+      const halvedOdd = this.pulseHalved && (this.pulseCount % 2 === 1);
+      let tSince = beatPhase(beat, now2, atk + this.showLead) * beatMs + (halvedOdd ? beatMs : 0);
+      if (tSince < this.pulseFloorMs) tSince = this.pulseFloorMs; else this.pulseFloorMs = tSince;
       const dec = pulseMs * BEAT_DECAY_FRAC;
       beatEnv = tSince < atk ? tSince / atk : Math.exp(-(tSince - atk) / dec);
       // PRE-DIP: en inandning strax FÖRE anslaget.
@@ -533,7 +563,7 @@ export class EffectEngine {
         // pulsen var avstangd samtidigt som diagnostiken visade tillit. Ett
         // dodband som bara gick att felsoka genom att lasa bada filerna.
         const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - MIN_BEAT_CONFIDENCE) / 0.37));
-        this.beatTrust += (trustRaw - this.beatTrust) * 0.03;
+        this.beatTrust += (trustRaw - this.beatTrust) * 0.06;   // 0.03 -> 0.06: nar fullt slag efter en overgang pa ~0.7 s i st f ~1.5 s
         // TILLITSGOLV (portat från Lotus beatTrustFloor 2026-08-31). Rampen börjar exakt
         // där klockans grind släpper igenom (MIN_BEAT_CONFIDENCE), så vid conf ≈ 0.20 är
         // rutnätet LEVANDE men tilliten 0 → depth ≈ 0 och hjärtslaget är avstängt fast
@@ -578,7 +608,16 @@ export class EffectEngine {
         // multiplikatorn far aldrig slacka riggen helt — da lases dippen som ett
         // blink i stallet for som andning. 0.06 lamnar lamporna tanda.
         const bm = this.cfg.beatPulse ? (1 - depth) + depth * beatEnv : 1;
-        this.beatMulNow = bm < 0.06 ? 0.06 : bm > 1 ? 1 : bm;
+        // FLADDER-DÄMP (ägaren 2026-09-02, kvar även med lågpasset BORTA → koden, inte
+        // insignalen): hjärtslaget visade en snabb dubbel — en andra topp 50–100 ms efter
+        // den första. Orsak: när PLL:en rättar fasen kan beatEnv hoppa tillbaka UNDER
+        // attacken och re-attackera inom samma slag → två toppar. PEAK-HOLD med mjuk
+        // release fyller gropen mellan dem till EN puls; attacken är momentan så slaget
+        // behåller sin skärpa. lastRenderMs är förra framens tid här (uppdateras senare).
+        const bmClamped = bm < 0.06 ? 0.06 : bm > 1 ? 1 : bm;
+        const bmDt = Math.min(0.05, (performance.now() - this.lastRenderMs) / 1000);
+        if (bmClamped >= this.beatMulNow) this.beatMulNow = bmClamped;                                   // momentan attack
+        else this.beatMulNow += (bmClamped - this.beatMulNow) * Math.min(1, bmDt / BEAT_FLUTTER_RELEASE); // ~90 ms release
     // BAS-PUNCH: en hård/utdragen basstöt (drop) saknar transient, och på en
     // komprimerad signal svänger bas-energin lite. Så spåra ett bas-GOLV = den
     // TYSTA basnivån (sjunker mot tystnad på ~0.4s, stiger mkt långsamt ~5s). En
@@ -595,13 +634,27 @@ export class EffectEngine {
     // det SNABBA kick-anslaget från 512-detektionen (fyrar direkt vid lastKickBoost,
     // ~15ms tidigare än det utjämnade bandet + onset.kick från dubbel-FFT:n som extra
     // säkring). Max av dem → punchen sitter på slaget.
+    // LÅST: hjärtslaget ägs av beatPulse (beatEnv) — EN ren puls på slaget.
+    // Den per-slag-bloom som kickfixen väckte la sig som en ANDRA blixt bredvid
+    // (grid vs kick ur fas → dubbel; efter grid-retiming ett snabbt flimmer <75 ms
+    // eftersom beatTick inte sammanfaller EXAKT med beatEnv-toppen) och gjorde
+    // hjärtslaget otydligt. Så: ingen per-slag-bloom när låst — bloomen är kvar
+    // för DROPS (sustained-svallet + dropEnv). Olåst: kicken är enda taktcuen,
+    // behåll bloomen på den. (Ägaren live 2026-09-02: flimmer + otydligt slag.)
+    const punchLocked = this.beatTrust > 0.5;
     const kickHitFast = Math.max(0, 1 - (performance.now() - this.lastKickBoost) / 180);
     // DUNK-RATIO (Gemini): anslag/energi i låg-enden — hög = knivskarp kick, låg =
     // smetig ihållande basnot. Grinda den UTJÄMNADE bas-svallen mjukt av den så bara
     // riktiga transienter driver punch (de snabba kick-delarna fyrar ändå).
     const dunkRatio = (frame.onset.kick + frame.onset.sub) / (frame.spec.kick + frame.spec.sub + 0.01);
     const sustained = Math.max(0, (frame.energy - this.bassBaseline - 0.05) * 4) * Math.min(1, dunkRatio / 0.4);
-    const bassPunch = Math.max(0, Math.min(1, Math.max(sustained, kickHitFast * 0.9, frame.onset.kick * 0.85)));
+    // Ogrindad onset.kick fyrar på den RÅA kicken → skulle återinföra dubbeln när
+    // låst. Då äger grid-timade kickHitFast slaget; olåst behålls onset som säkring.
+    // PER-SLAG-PUNCH bara när OLÅST (då kicken är enda taktcuen). Låst → 0, så
+    // beatPulse äger slaget rent. `sustained` (bas-svallet) ligger kvar i båda
+    // fallen → DROPS bloomar fortfarande.
+    const perBeatPunch = punchLocked ? 0 : Math.max(kickHitFast * 0.9, frame.onset.kick * 0.85);
+    const bassPunch = Math.max(0, Math.min(1, Math.max(sustained, perBeatPunch)));
     // Uniform bas-punch borttagen ur master — effekterna äger sitt slag via ctx.punch.
     // Effekt-drive (silence-gate + beat-puls). Ljus-taket (cfg.master) läggs SIST
     // i cal-remappen istället — som ett äkta output-tak [onCh..tak], inte en
@@ -1024,7 +1077,17 @@ export class EffectEngine {
     }
     // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så
     // VU-taket följer nivån direkt utan effekt-ballistikens nedåt-släp.
-    const md = drive * (1 + frame.buildUp * 0.35 + this.dropEnv * 0.8);
+    // ENERGISTYRD "GASA" (ägaren 2026-09-02, som slutet på Lotus Light): låt
+    // sektionsenergin lyfta ljuset så en refräng känns intensivare än en vers, och
+    // ljuset gasar UPP genom en uppbyggnad — så dropen känns på plats även när den
+    // diskreta detektionen är sen (röken fyrar på riser, lamporna på detekterad drop
+    // → utan detta ligger lamporna en takt efter). Snabb attack (0.15 s) fångar
+    // stegringen, lugn release (0.5 s) håller uppe mellan slagen. frame.intensity är
+    // brusig per frame → MÅSTE utjämnas, annars fladdrar ljuset.
+    const eT = Math.max(0, Math.min(1, frame.intensity));
+    const eRate = eT > this.energyEnv ? dtNow / 0.15 : dtNow / 0.5;
+    this.energyEnv += (eT - this.energyEnv) * Math.min(1, eRate);
+    const md = drive * (1 + this.energyEnv * ENERGY_DRIVE + frame.buildUp * 0.35 + this.dropEnv * 0.8);
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna

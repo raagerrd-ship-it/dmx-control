@@ -1658,7 +1658,7 @@ export class Analyser {
     // definierande drag — raderades i exakt det ogonblick det skedde.
     const bodyNow = (this.bandDbRaw[0] + this.bandDbRaw[1] + this.bandDbRaw[2]) / 3;   // ra dB
     this.bodyEnv += (bodyNow - this.bodyEnv) * Math.min(1, dtHop / 0.35);
-    this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / 0.12);
+    this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / 0.12);   // 0.06 testat men gav falsklarm live utan att fixa beat-lagget (det sitter i lamp-vagen/energin, inte har)
     // TAKET SJUNKER I dB PER SEKUND, inte i procent. Kroppen ar nu ett dB-tal
     // (negativt), och "1,5 % av ett negativt tal" gor taket STORRE, inte mindre —
     // den gamla raden var matematiskt omvand sa fort skalan blev logaritmisk.
@@ -1721,6 +1721,11 @@ export class Analyser {
     // dar 8 var det kortaste. En drop kan alltsa omojligt folja pa en annan inom
     // 8 takter (32 taktslag). Gransen skalar nu med tempot: ~13s vid 150 BPM,
     // ~21s vid 90 BPM.
+    // REFRAKTAR = 32 taktslag (8 takter). MATT: verkliga drop-avstand 8-40 takter.
+    // TESTAT 2026-09-02 att korta till 16: F1 45 -> 33, +50 falsklarm (modern-spar
+    // fyrar flera ggr per drop utan spärren). "Kroppen-var-borta"-kravet racker INTE
+    // som ensamt skydd → spärren behalls. En falsk drop som lasar ute en riktig loses
+    // med BATTRE PRECISION eller energi-gasen, inte med kortare spärr.
     const minGapMs = this.localBpm > 40 ? (32 * 60000 / this.localBpm) : 13000;
     const dropSpacingOk = nowWallA - this.lastDropMs > minGapMs;
     // RISER-KRAVET AR AVSTANGT — men INTE for att signalen ar dod. Den gamla

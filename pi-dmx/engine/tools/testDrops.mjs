@@ -131,7 +131,7 @@ function run(track, seed) {
     // OBEHANDLAD kropp — f.spec ar AGC:ad och raderar bassprnget (se f.bodyDb).
     const bodyNow = f.bodyDb;
     bodyEnv += (bodyNow - bodyEnv) * Math.min(1, dtHop / 0.35);
-    bodyFast += (bodyNow - bodyFast) * Math.min(1, dtHop / 0.12);
+    bodyFast += (bodyNow - bodyFast) * Math.min(1, dtHop / (+process.env.FAST_TAU || 0.12)   /* = 0.12 s i analyser.ts */);
     // TAKET SJUNKER I dB/s — inte i procent. Kvoter pa en logskala betyder inget.
     bodyCeil = Math.max(bodyEnv, bodyCeil - dtHop * (+process.env.CEIL_DB_S || 0.5));
     if (bodyEnv < bodyCeil - (+process.env.GONE_DB || 3)    /* = BODY_GONE_DB i analyser.ts */) { bodyGoneMs += dtHop * 1000; if (bodyGoneMs >= 2000) lastBodyGoneMs = ms; }
@@ -201,6 +201,24 @@ for (const [name] of Object.entries(TRACKS)) {
 const allB = runs.flatMap(x => x.r.buildUps);
 console.log("  TOTALT        ", "inRiser", med(runs.map(x => x.r.riserPct)).toFixed(1).padStart(5) + "%",
   " buildUp p50", pct(allB, 0.5).toFixed(2), "p90", pct(allB, 0.9).toFixed(2), "p99", pct(allB, 0.99).toFixed(2), "max", allB.reduce((a,x)=>x>a?x:a,0).toFixed(2), "\n");
+
+// ── DROP-LATENS (signerad fire − facit, motorns villkor = "---"-kombon) ──
+{
+  const g = { riser:false, energy:false, window:false };
+  const delays = [];
+  for (const { tr, r } of runs) {
+    const fired = fire(r.cands, g); const used = new Set();
+    for (const d of tr.drops) {
+      let best=-1, bi=-1;
+      fired.forEach((f,ix)=>{ if(!used.has(ix) && Math.abs(f-d)<=TOL){ if(bi<0||Math.abs(f-d)<Math.abs(best)){best=f-d;bi=ix;} }});
+      if(bi>=0){ used.add(bi); delays.push(best*1000); }  // ms
+    }
+  }
+  delays.sort((a,b)=>a-b);
+  const q=(x)=>delays.length?delays[Math.min(delays.length-1,Math.floor(x*delays.length))]:NaN;
+  console.log(`DROP-LATENS (n=${delays.length}): p10 ${q(.1).toFixed(0)}ms  median ${med(delays).toFixed(0)}ms  p90 ${q(.9).toFixed(0)}ms  (negativt = FORE facit)
+`);
+}
 
 // UPPGIFT 2 — grind-kombinationer
 console.log("GRIND-KOMBINATIONER (r=riser>0.35, e=intensity>0.45, w=svack/riser-fönster):");
