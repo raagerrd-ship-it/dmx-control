@@ -226,8 +226,8 @@ export class Analyser {
    * nej at bada hallen. Kvarvarande fel ar trioler (2/3, 4/3, 3/4), och de
    * angrips av OCT_UP och HARM_PENALTY, inte av fonstret.
    */
-  private static readonly BPM_MIN = 80;    // MAX måste vara == 2*MIN (exakt en oktav)
-  private static readonly BPM_MAX = 160;
+  private static readonly BPM_MIN = 100;   // MAX == 2*MIN (exakt en oktav). 80-160 -> 100-200 (agaren: dans-megamixar → snabba latar last pa RATT tempo, inte halva)
+  private static readonly BPM_MAX = 200;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
   /** Bevis för att DUBBLERA (estimaten pekar högre) mot att HALVERA (lägre).
    *  SYMMETRISKT (8/8): asymmetrin 8/24 hörde till 60..180-experimentet. Med en
@@ -310,7 +310,7 @@ export class Analyser {
   private priorLut = (() => {
     const t = new Float32Array(Analyser.ENV_LEN);
     for (let lag = 1; lag < Analyser.ENV_LEN; lag++) {
-      const oct = Math.log2(((Analyser.ENV_HZ * 60) / lag) / 120);
+      const oct = Math.log2(((Analyser.ENV_HZ * 60) / lag) / 150);   // prior-centrum 120 -> 150 (geom. centrum av 100-200, dar dansmusik bor)
       t[lag] = Math.exp(-(oct * oct) / 0.7);
     }
     return t;
