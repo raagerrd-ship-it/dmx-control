@@ -968,8 +968,12 @@ export class EffectEngine {
           this.smartMode = remembered;
           console.log(`[dirigent] ${part}: återser "${remembered}"`);
         } else {
+          // DUBBELTAKT → VARANNAN: på snabbt/dubbeltakt-låst tempo (bpm ≥ 140) boostas
+          // `varannan` (spatial dubbeltakt) hårt så dirigenten väljer den i stället för
+          // att hela riggen blinkar dubbelt uniformt (ägaren i ladan 2026-09-03).
+          const fastBoost = (m: Mode) => (m === "varannan" && bpm >= 140 ? 0.30 : 0);
           const ranked = pool
-            .map((m) => ({ m, s: fitScore(m, frame.profile) }))
+            .map((m) => ({ m, s: fitScore(m, frame.profile) + fastBoost(m) }))
             .sort((a, b) => b.s - a.s);
           const cands = ranked.filter((x) => x.m !== this.smartMode);
           const top = (cands.length ? cands : ranked).slice(0, 3);
