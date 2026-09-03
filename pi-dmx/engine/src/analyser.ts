@@ -119,7 +119,9 @@ const BODY_RISE = Number(process.env.BODY_RISE ?? 0.15);
  * en forbisedd regression.
  * INTE VALIDERAT PA AKTA MUSIK an — bara pa syntetiska spar med facit.
  */
-const BODY_RISE_DB = 16;
+const BODY_RISE_DB = 19;   // 16 -> 19 (ägaren i ladan 2026-09-03: kräv en TYDLIGARE drop).
+                           // Sen inZone-grinden togs bort (som lyft lamp-blixten i tid) fyrar
+                           // den lite för lätt → större bas-lyft krävs för att räknas som drop.
 const BODY_GONE_DB = 3;
 const BODY_CEIL_DB_S = 0.5;
 
