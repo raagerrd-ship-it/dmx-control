@@ -141,7 +141,7 @@ function run(track, seed) {
     hist[hp] = bodyFast; hp = (hp + 1) % HL;
     const want = Math.min(HL - 1, Math.max(1, Math.round(0.5 / dtHop)));
     if (hl < want) hl++;
-    const bodyOnset = bodyRise > (+process.env.RISE_DB || 16)   /* = BODY_RISE_DB i analyser.ts */ && ms - lastBodyGoneMs < 6000;
+    const bodyOnset = bodyRise > (+process.env.RISE_DB || 16)   /* = BODY_RISE_DB i analyser.ts */ && bodyFast > bodyCeil - (+process.env.PEAK_DB || 10) && ms - lastBodyGoneMs < 6000;
     if (ms > 2000) { riseLog.push([ms/1000, bodyRise]); ratioLog.push([ms/1000, bodyCeil - bodyEnv]); bodyLog.push(bodyNow); }
     if (f.inRiser) lastRiserMs = ms;
     if (ms > 2000) { tot++; if (f.inRiser) riserHops++; buildUps.push(f.buildUp); }

@@ -123,6 +123,7 @@ const BODY_RISE_DB = 17;   // 16 -> 17 (agaren: bara LITE hogre krav, inte tappa
                            // Sen inZone-grinden togs bort (som lyft lamp-blixten i tid) fyrar
                            // den lite för lätt → större bas-lyft krävs för att räknas som drop.
 const BODY_GONE_DB = 3;
+const BODY_PEAK_DB = 10;       // dropen maste landa inom 10 dB av senaste toppen (matt: 10 dodar inga riktiga, stoppar quiet-part-falska)
 const DROP_SHORT_MS = 4000;    // minsta drop-avstand nar dropen ESKALERAR
 const DROP_LONG_MS = 20000;    // annars maste sa har lang tid ga (mot falska upprepningar)
 const DROP_ESCALATE_DB = 1.5;  // hur mycket STARKARE (bas-lyft) en snabb upprepning maste vara
@@ -1700,7 +1701,14 @@ export class Analyser {
     // 40 %/2 s slar 30 %/3 s: verkliga drops kommer ofta efter en DELVIS
     // nedgang, inte total tystnad — 10 av 11 missade drops foll pa just det.
     // Precision 46 -> 56 %, recall 35 -> 53 %.
-    const bodyOnset = bodyRise > BODY_RISE_DB && nowWallA - this.lastBodyGoneMs < 6000;
+    // MÅSTE LANDA HÖGT, inte bara stiga. bodyRise är i dB, så en liten uppgång från
+    // nära-tystnad (en djup breakdown) ger ett STORT dB-lyft trots att den landar på
+    // en fortfarande LÅG nivå → falsk drop "där energin knappt gått upp" (ägaren i
+    // ladan 2026-09-03). Kräv att kroppen landar inom BODY_PEAK_DB av den senaste
+    // toppen (bodyCeil) — en riktig drop når nästan sitt eget tak; en uppgång i ett
+    // tyst parti gör det inte.
+    const landsHigh = this.bodyFast > this.bodyCeil - BODY_PEAK_DB;
+    const bodyOnset = bodyRise > BODY_RISE_DB && landsHigh && nowWallA - this.lastBodyGoneMs < 6000;
     // EN DROP MASTE LANDA I HOG ENERGI. Villkoren ovan tittar bara pa LOKALA
     // nivasprang (svacka -> topp-zon) och vet inget om var i laten vi ar, sa varje
     // liten variation i ett tyst parti raknades som en drop.
