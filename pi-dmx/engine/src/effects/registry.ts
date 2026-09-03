@@ -40,6 +40,10 @@ import { tick } from "./tick.js";
 import { stege } from "./stege.js";
 import { eko } from "./eko.js";
 import { hjarta } from "./hjarta.js";
+import { sol } from "./sol.js";
+import { konfetti } from "./konfetti.js";
+import { sopa } from "./sopa.js";
+import { neon } from "./neon.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
