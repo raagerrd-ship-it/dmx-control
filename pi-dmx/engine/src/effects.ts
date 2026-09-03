@@ -745,7 +745,13 @@ export class EffectEngine {
     if (dropHit) this.blackoutUntil = 0;                                                        // dropen fyrade → släpp svärtan, explodera
     const blackout = nowWall < this.blackoutUntil;
     const fog = this.cfg.fog;   // rök beslutas EFTER effekterna (de får önska) — se nedan
-    const dropActive = DISCRETE_DROP_LAMPS && frame.inZone && nowWall < this.dropBangUntil;            // en riktig drop pågår (av → dropEnv stannar 0)
+    // `frame.inZone`-KRAVET BORTTAGET (ägaren i ladan 2026-09-03: bra fångst). Det var
+    // orsaken till att lamp-blixten kom "upp till en takt efter, varierande" medan
+    // RÖKEN (samma dropHit, inget inZone-krav) alltid var i tid: på en drop fyrar
+    // dropHit direkt men inZone (nivå-ballistiken) släpar en takt → blixten väntade in
+    // nivån. Nu fyrar blixten direkt på dropHit-fönstret (dropBangUntil), synkat med
+    // röken. Detektionen kräver redan borta→stigit 16 dB, så det är en riktig drop ändå.
+    const dropActive = DISCRETE_DROP_LAMPS && nowWall < this.dropBangUntil;
     // DROP-ENVELOPE: FULL ATTACK (~30ms) på träffen, HÅLL allt på max under
     // dropen, mjuk FADE ner (~1s) när den släpper. Egen effekt — INGEN
     // hårdvaru-strobe (det gav strobe-känslan), bara ljus + färg på max.
