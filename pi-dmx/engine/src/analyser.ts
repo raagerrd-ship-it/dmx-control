@@ -126,7 +126,7 @@ const BODY_GONE_DB = 3;
 const BODY_PEAK_DB = 10;       // dropen maste landa inom 10 dB av senaste toppen (matt: 10 dodar inga riktiga, stoppar quiet-part-falska)
 const DROP_SHORT_MS = 4000;    // minsta drop-avstand nar dropen ESKALERAR
 const DROP_LONG_MS = 20000;    // annars maste sa har lang tid ga (mot falska upprepningar)
-const DROP_ESCALATE_DB = 1.5;  // hur mycket STARKARE (bas-lyft) en snabb upprepning maste vara
+const DROP_ESCALATE_DB = 3;    // 1.5 -> 3 (agaren): tatare drops maste vara TYDLIGT starkare for att fyra
 const BODY_CEIL_DB_S = 0.5;
 
 export class Analyser {
