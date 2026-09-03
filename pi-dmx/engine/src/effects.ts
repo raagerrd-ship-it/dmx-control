@@ -105,11 +105,19 @@ const ENERGY_DRIVE = 0.5;
 const LIGHT_HI_W = 1.3;            // mid+diskant-vikt
 const LIGHT_BASS_W = 0.25;         // bas-vikt (kropp utan att låsa nivån till basen)
 const LIGHT_SMOOTH_MS = 55;        // release-avbrusning på wlevel
-const LIGHT_WIN_DB = 20;           // DMX:s mid+diskant har ~2x bredare dB-range an Lotus (matt -12..+9) → bredare fonster.
+const LIGHT_WIN_DB = 18;           // centrerat dB-fönster (±9 dB runt medel → 0..1)
+const LIGHT_MEAN_TAU = 30000;      // medelnivåns tidskonstant (ms) — stabil men följer volymen
+const LIGHT_FLOOR = 0.3;           // ljus-golv vid loud=0 (dim vers, inte svart)
 const LIGHT_ANCHOR_OFF = 9;        // toppen over de hogsta topparna (mean+9) sa loud inte pinnar pa 1.0.
 const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
-const LIGHT_SHAPE_UP = 25;         // shape-smoothing upp (känsligaste ratten)
-const LIGHT_SHAPE_DOWN = 150;      // shape-smoothing ner
+// SHAPE-SMOOTHING 25/150 -> 300/350. Ägaren i ladan 2026-09-03: ljuset flimrade på
+// RÖSTEN — mid+diskant-drivningen (vikt 1.3) följde enskilda sångstavelser (~100-
+// 250 ms). Långsammare smoothing gör loudness till en SEKTIONS-envelope (vers/
+// refräng, sekundskala) i stället för en stavelse-följare. Hjärtslaget (beatMulNow)
+// är separat och förblir snabbt, så pulsen påverkas inte. En refräng gasar fortf.
+// upp (rise ~1-2 s > 300 ms), men syllaberna medelvärdesbildas bort.
+const LIGHT_SHAPE_UP = 60;
+const LIGHT_SHAPE_DOWN = 120;
 const LIGHT_REL_A = 0.396;         // log-release-alpha
 const LIGHT_ATK_A = 1.0;           // attack-alpha (instant)
 const LIGHT_SOFT = 0.3;            // soft-snap-golv vid låg energi
@@ -121,7 +129,7 @@ const LIGHT_SOFT = 0.3;            // soft-snap-golv vid låg energi
  * Röken påverkas INTE — den har egen dropHit-trigger med 1-min cooldown.
  * Slå på igen = true, så återvänder bloomen och drop-look-bytet.
  */
-const DISCRETE_DROP_LAMPS = false;
+const DISCRETE_DROP_LAMPS = true;   // ater PA (agaren i ladan): lamporna ska bloma pa dropen synkat med roken (samma dropCount). Energi-gasen ensam racker inte som drop-markering.
 const BEAT_TRUST_FLOOR = 0.60;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 
 export class EffectEngine {
@@ -189,7 +197,9 @@ export class EffectEngine {
   // Loudness-portens tillstånd (Lotus mid+diskant dB-fönster + log-release). Negativa
   // sentinelvärden = oinitierat (första framen sätter dem utan hopp).
   private lightWlevel = -1;      // avbrusad linjär mid+diskant-nivå
-  private lightWdbSlow = -300;   // långsamt auto-ankare (dB)
+  private lightWdbSlow = -300;   // sentinel för init (självkalibrerande range)
+  private lightHi = 0;           // långsam topp av wdb (loud-referens)
+  private lightLo = 0;           // långsamt golv av wdb (tyst-referens)
   private lightShapeSm = -1;     // shape-smoothing
   private lightLoud = 0;         // log-released loudness 0..1 → driver md
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
@@ -640,7 +650,11 @@ export class EffectEngine {
         // attacken och re-attackera inom samma slag → två toppar. PEAK-HOLD med mjuk
         // release fyller gropen mellan dem till EN puls; attacken är momentan så slaget
         // behåller sin skärpa. lastRenderMs är förra framens tid här (uppdateras senare).
-        const bmClamped = bm < 0.06 ? 0.06 : bm > 1 ? 1 : bm;
+        // GOLV 0.06 -> 0.30: pre-dippen + en djup puls drog beatMul till 6 % ≈ svart
+        // strax före/mellan slagen → lästes som fladder till nära-svart (ägaren i
+        // ladan 2026-09-03). 0.30 gör slaget till en tydlig ANDNING (30→100 %), inte
+        // ett strobe-dropp. Hjärtslaget syns UPPÅT mot den nu dynamiska grundnivån.
+        const bmClamped = bm < 0.30 ? 0.30 : bm > 1 ? 1 : bm;
         const bmDt = Math.min(0.05, (performance.now() - this.lastRenderMs) / 1000);
         if (bmClamped >= this.beatMulNow) this.beatMulNow = bmClamped;                                   // momentan attack
         else this.beatMulNow += (bmClamped - this.beatMulNow) * Math.min(1, bmDt / BEAT_FLUTTER_RELEASE); // ~90 ms release
@@ -1115,20 +1129,14 @@ export class EffectEngine {
     //  3. LOG-RELEASE: fade med konstant KVOT per tick (perceptuellt jämn), med snabb
     //     soft-snap-attack. Det är "smooth-hemligheten".
     const dtMs = dtNow * 1000;
-    const wlin = LIGHT_HI_W * Math.pow(10, frame.midHiDb / 20) + LIGHT_BASS_W * Math.pow(10, frame.bodyDb / 20);
-    // (a) avbrusa wlevel: instant attack, ~55 ms release
-    const wUp = this.lightWlevel < 0 || wlin > this.lightWlevel;
-    const aSm = wUp ? 1 : 1 - Math.exp(-dtMs / LIGHT_SMOOTH_MS);
-    this.lightWlevel = this.lightWlevel < 0 ? wlin : this.lightWlevel + (wlin - this.lightWlevel) * aSm;
-    const wdb = 20 * Math.log10(Math.max(this.lightWlevel, 1e-4));
-    // (b) långsamt auto-ankare (upp 3× långsammare än ner så toppar inte drar upp taket)
-    const anUp = this.lightWdbSlow <= -200 || wdb > this.lightWdbSlow;
-    const anA = 1 - Math.exp(-dtMs / (anUp ? LIGHT_ANCHOR_TAU * 3 : LIGHT_ANCHOR_TAU));
-    this.lightWdbSlow = this.lightWdbSlow <= -200 ? wdb : this.lightWdbSlow + anA * (wdb - this.lightWdbSlow);
-    const anchorDb = this.lightWdbSlow + LIGHT_ANCHOR_OFF;
-    // (c) FAST dB-fönster → 0..1
-    let shape = (wdb - (anchorDb - LIGHT_WIN_DB)) / LIGHT_WIN_DB;
-    shape = shape < 0 ? 0 : shape > 1 ? 1 : shape;
+    // LOUDNESS-KÄLLA = analysatorns `frame.intensity` (sektionsenergi relativt låtens
+    // eget snitt, 0.5 = snitt). Den är REDAN robust normaliserad av analysatorn över
+    // hela låten — så vi slipper dB-fönstrets skal- och settling-problem (mid+diskant
+    // i absolut dB blir 25-42 dB på AUX gain-1x → allt pinnades mot taket). intensity
+    // är dessutom sektionsnivå, inte råa sångstavelser → inget röst-flimmer. Log-
+    // releasen nedan ger den perceptuellt jämna faden. (Mid+diskant-texturen kan
+    // återinföras senare om önskat; nu prioriteras en robust, synlig gas.)
+    let shape = Math.max(0, Math.min(1, frame.intensity));
     // (d) shape-smoothing (asymmetrisk: snabb upp 25 ms, lugn ner 150 ms) — sprider
     //     ~125 Hz-uppdateringen över render-framesen utan att kväva stegringar.
     const shMs = shape > this.lightShapeSm ? LIGHT_SHAPE_UP : LIGHT_SHAPE_DOWN;
@@ -1148,7 +1156,12 @@ export class EffectEngine {
       this.lightLoud += a * softK * (shape - this.lightLoud);
     }
     const loudness = this.lightLoud;   // 0..1, ersätter den gamla energyEnv
-    const md = drive * (1 + loudness * ENERGY_DRIVE + frame.buildUp * 0.35 + this.dropEnv * 0.8);
+    // LOUDNESS DRIVER LJUSET GOLV→FULL (inte bara +50% boost). Förr: (1 + loud·0.5)
+    // → grundnivån ALLTID full, loud bara ovanpå → ingen synlig gas, tysta partier
+    // dimmades aldrig, och hjärtslaget hade ingen plats att synas mot en maxad nivå
+    // (ägaren i ladan 2026-09-03). Nu: golv LIGHT_FLOOR vid loud=0, full vid loud=1
+    // → refräng ljus, vers dim = synlig gas, och pulsen syns uppåt mot en rörlig nivå.
+    const md = drive * (LIGHT_FLOOR + (1 - LIGHT_FLOOR) * loudness + frame.buildUp * 0.35 + this.dropEnv * 0.8);
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
