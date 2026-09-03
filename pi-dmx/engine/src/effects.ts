@@ -12,7 +12,7 @@ import { FixtureOutput, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { PostProcess } from "./postprocess.js";
 import type { Frame } from "./analyser.js";
-import { EFFECT_MAP, TIER } from "./effects/registry.js";
+import { EFFECT_MAP, TIER, meetsRequirements } from "./effects/registry.js";
 import { fitScore } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
 import { hsvToRgb } from "./effects/color.js";
@@ -934,7 +934,14 @@ export class EffectEngine {
         this.lastSmartSwitchMs = now;
         this.lastSmartTier = tierName;
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
-        let pool = enabled(wantCalm ? LUGN : tierS);
+        // EFFEKT-KRAV: filtrera bort effekter vars krav (tempo/karaktär) inte möts
+        // just nu — strobe bara i snabb musik, trum-effekter bara med trummor, osv.
+        // (registry.meetsRequirements). Ambient-effekterna kräver inget → utgör
+        // fallbacken. Töms poolen ändå släpper vi kraven (hellre en mindre passande
+        // effekt än ingen).
+        const req = (m: Mode) => meetsRequirements(m, bpm, frame.profile);
+        let pool = enabled(wantCalm ? LUGN : tierS).filter(req);
+        if (pool.length === 0) pool = enabled(wantCalm ? LUGN : tierS);              // krav tömde → släpp dem
         if (pool.length === 0) pool = enabled([...FART, ...LUGN, ...FULLFART]);      // valfri aktiv
         if (pool.length === 0) pool = ["breathe"];                                   // sista fallback
         this.smartCount++;

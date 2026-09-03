@@ -106,3 +106,60 @@ export const TIER: Record<EffectTier, Mode[]> = {
 
 /** Metadata för UI:t (skickas till klienten → en sanningskälla för listorna). */
 export const EFFECT_META = EFFECTS.map(({ key, label, desc, tier, drives }) => ({ key, label, desc, tier, drives: drives ?? [] }));
+
+/**
+ * EFFEKT-KRAV — hårda gates ovanpå tier + fitScore. En effekt vars krav inte möts
+ * utesluts ur dirigentens pool: en strobe fyrar aldrig på en tryckare, en trum-effekt
+ * väljs aldrig när det inte finns trummor, en luft-gnista aldrig utan diskant.
+ *
+ * `minBpm` mäts mot det oktav-vikta tempot (80..160) — en låt på 150-160 fångas,
+ * riktigt snabba (>160) viks ner under gränsen, så gränsen är avsiktligt lågt satt
+ * där den behövs. profil-fälten (punch/bass/bright/beat) är 0..1 (0.5≈snitt), och
+ * `beat` = takt-konfidens. Tomt = inga krav → ambient-effekterna är ALLTID
+ * tillgängliga och utgör poolens fallback. Trösklarna är måttliga och lätta att nudga.
+ */
+export type EffectReq = { minBpm?: number; needsPunch?: number; needsBass?: number; needsBright?: number; needsBeat?: number };
+const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
+  // Snabb/aggressiv → kräver tempo (+ karaktär där det stärker)
+  strobe:   { minBpm: 150 },
+  rave:     { minBpm: 140, needsPunch: 0.40 },
+  snap:     { minBpm: 130, needsPunch: 0.40 },
+  gallop:   { minBpm: 125, needsBeat: 0.35 },
+  // Transient-effekter → kräver anslag (trummor)
+  drumkit:  { needsPunch: 0.45, needsBeat: 0.35 },
+  duel:     { needsPunch: 0.40 },
+  tick:     { needsPunch: 0.35, needsBeat: 0.30 },
+  split:    { needsPunch: 0.35, needsBass: 0.35 },
+  backbeat: { needsPunch: 0.35, needsBeat: 0.35 },
+  // Bas-effekter → kräver låg-end
+  subbreath:{ needsBass: 0.40 },
+  gravity:  { needsBass: 0.35 },
+  tide:     { needsBass: 0.30 },
+  // Luft/diskant-effekter → kräver diskant
+  airglow:  { needsBright: 0.40 },
+  viska:    { needsBright: 0.35 },
+  drift:    { needsBright: 0.30 },
+  aurora:   { needsBright: 0.30 },
+  // Rytm-effekter → kräver en hyfsat tydlig takt
+  ripple:   { needsBeat: 0.35 },
+  eko:      { needsBeat: 0.35 },
+  hjarta:   { needsBeat: 0.35 },
+  chase:    { needsBeat: 0.30 },
+  drops:    { needsBeat: 0.30 },
+  stege:    { needsBeat: 0.30 },
+};
+
+/** Möter effekten sina krav givet nuvarande tempo + karaktärsprofil? */
+export function meetsRequirements(
+  key: Mode, bpm: number,
+  p: { punch: number; bass: number; bright: number; beat: number },
+): boolean {
+  const r = REQUIREMENTS[key];
+  if (!r) return true;
+  if (r.minBpm !== undefined && bpm < r.minBpm) return false;
+  if (r.needsPunch !== undefined && p.punch < r.needsPunch) return false;
+  if (r.needsBass !== undefined && p.bass < r.needsBass) return false;
+  if (r.needsBright !== undefined && p.bright < r.needsBright) return false;
+  if (r.needsBeat !== undefined && p.beat < r.needsBeat) return false;
+  return true;
+}
