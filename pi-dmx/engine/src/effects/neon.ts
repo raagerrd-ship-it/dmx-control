@@ -7,7 +7,7 @@ export const neon: EffectDef = {
   desc: "Mättade neonfärger per lampa som skiftar på takten.",
   render(c) {
     const hue = c.mixedSector(c.idx + Math.floor(c.beatIdx / 2)) / 6;
-    const v = c.shaped(0.30, 0.55 + c.audio * 0.45 + c.beatPulse * 0.25) + c.punch * 0.2;
+    const v = c.shaped(0.12, 0.35 + c.audio * 0.55 + c.beatPulse * 0.15) + c.punch * 0.2;
     return c.hsv(hue, 1, Math.min(1, v));
   },
 };

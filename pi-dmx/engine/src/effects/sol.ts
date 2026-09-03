@@ -10,7 +10,7 @@ export const sol: EffectDef = {
     const hue = c.mixedSector(Math.floor(c.t / 6)) / 6;
     const half = Math.max(1, (c.count - 1) / 2);
     const center = 1 - (Math.abs(c.idx - half) / half) * 0.35;   // mitten ljusare
-    const v = c.shaped(0.25, (0.42 + c.audio * 0.7 + c.beatPulse * 0.2) * center) + c.punch * 0.25;
+    const v = c.shaped(0.12, (0.25 + c.audio * 0.7 + c.beatPulse * 0.2) * center) + c.punch * 0.25;
     return c.hsv(hue, 0.9, Math.min(1, v));
   },
 };

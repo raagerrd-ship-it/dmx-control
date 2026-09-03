@@ -16,6 +16,6 @@ export const aurora: EffectDef = {
     // norrsken har. Varje lampa far sin egen blandning av diskant och luft.
     const skimmer = (c.idx % 2 === 0 ? c.frame.spec.treble : c.frame.spec.air);
     const m = Math.min(1, 0.35 + wash * 0.40 + c.band * 0.20 + skimmer * 0.35 + c.punch * 0.2);
-    return c.hsv(hue, 1, 0.3 + 0.7 * m);
+    return c.hsv(hue, 1, 0.18 + 0.82 * m);   // golv 0.3 nu redundant (md har eget 0.3)
   },
 };

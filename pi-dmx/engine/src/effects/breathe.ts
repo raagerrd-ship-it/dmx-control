@@ -13,9 +13,9 @@ export const breathe: EffectDef = {
     // likadana effekter i en 10-effekters lugn-pool gör att chill upprepar sig.
     // Hela riggen andas SAMTIDIGT (ingen per-lampa-fas) — det är det som skiljer
     // den från aurora (rumslig gradient) och twin (varannan lampa).
-    const djup = 0.35 + c.frame.intensity * 0.65;
+    const djup = 0.6 + c.frame.intensity * 0.4;   // md agar nu sektionsdynamiken → mindre egen koppling
     const breath = 0.5 + 0.5 * Math.sin(c.t * 0.7) * djup;
     const m = Math.min(1, breath * 0.85 + c.audio * 0.2 + c.punch * 0.2);   // riktig dunk → mjuk svall
-    return c.hsv(hue, 1, 0.3 + 0.7 * m);
+    return c.hsv(hue, 1, 0.18 + 0.82 * m);   // golv 0.3 nu redundant (md har eget 0.3)
   },
 };

@@ -19,6 +19,6 @@ export const mono: EffectDef = {
     const hue = 0.015 + 0.11 * ember + c.frame.centroid * 0.04;   // rött → gult, ljusare = varmare
     const m = Math.min(1, 0.4 + ember * 0.4 + c.kickEnv * 0.2 + Math.max(c.frame.spec.sub, c.frame.spec.bass) * 0.22 + crackle * 0.5 + c.punch * 0.25);   // dunk = eld-flare
     const sat = 1 - crackle * 0.5;                              // anslag → kort vit gnista
-    return c.hsv(hue, sat, 0.3 + 0.7 * m);
+    return c.hsv(hue, sat, 0.18 + 0.82 * m);   // golv 0.3 nu redundant (md har eget 0.3)
   },
 };

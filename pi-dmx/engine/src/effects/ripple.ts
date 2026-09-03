@@ -17,7 +17,7 @@ export const ripple: EffectDef = {
     const lit = isOuter === litOuter;
     const pairBase = c.mixedSector(Math.floor(c.beatIdx / 4));
     const hue = ((litOuter ? pairBase + 3 : pairBase) % 6) / 6;   // motfärg mitt vs ytter
-    const v = 0.6 + 0.4 * Math.min(1, c.beatPulse * 0.7 + c.audio * 0.3);
+    const v = 0.30 + 0.70 * Math.min(1, c.beatPulse * 0.7 + c.audio * 0.3);
     // GOA SLAG: en riktig dunk tänder kort ÄVEN den mörka ringen → puls slår ut från
     // mitten OCH hela riggen slammar på basen. Tända ringen gnistrar mot vitt.
     return c.hsv(hue, 1 - c.punch * 0.35, lit ? Math.min(1, v + c.punch * 0.3) : c.punch * 0.45);
