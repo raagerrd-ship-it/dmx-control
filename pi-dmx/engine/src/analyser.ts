@@ -1734,7 +1734,12 @@ export class Analyser {
     // fyrar flera ggr per drop utan spärren). "Kroppen-var-borta"-kravet racker INTE
     // som ensamt skydd → spärren behalls. En falsk drop som lasar ute en riktig loses
     // med BATTRE PRECISION eller energi-gasen, inte med kortare spärr.
-    const minGapMs = this.localBpm > 40 ? (32 * 60000 / this.localBpm) : 13000;
+    // DROP-REFRAKTÄR 4 s (ägaren i ladan 2026-09-03: vill ha tätare lamp-drops).
+    // Var 32 taktslag (~15 s). Röken översprutar INTE av detta — den har egen
+    // cooldown (fog.cooldownMs = 30 s) som gatar den oberoende av lampornas drop.
+    // OBS: kortare spärr → fler drops (och fler falska); medvetet val, agaren dömer
+    // live. testDrops-F1 sjunker (spärren gjorde jobb där) men det är sekundärt här.
+    const minGapMs = 4000;
     const dropSpacingOk = nowWallA - this.lastDropMs > minGapMs;
     // RISER-KRAVET AR AVSTANGT — men INTE for att signalen ar dod. Den gamla
     // motiveringen ("inRiser 0% av tiden, buildUp p99=0.31") mattes mot en

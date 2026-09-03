@@ -265,7 +265,7 @@ export const defaultConfig: EngineConfig = {
   // svavtiden gor att man inte kan angra sig. Maskinen orkar dessutom bara
   // 40-50s i strack innan varmeblocket maste hamta igen, sa 1s/60s ar ~1.6%
   // arbetscykel - den hinner alltid vara varm. Oka vid behov, inte tvartom.
-  fog: { enabled: false, address: 13, onDrop: true, burstMs: 1000, cooldownMs: 60000, level: 255, warmupMs: 600000, sprayMs: 0, bursts: 0 },
+  fog: { enabled: false, address: 13, onDrop: true, burstMs: 1000, cooldownMs: 30000, level: 255, warmupMs: 600000, sprayMs: 0, bursts: 0 },
   dropBlackout: true,     // dramaturgisk tystnad — låg risk, lyfter varje drop
   scenicAnchor: false,    // ägar-val: antar lampor i rad vänster→höger
   energyCeiling: true,    // direkt VU = ljusstyrka; standard på (drop/punch bypassar)

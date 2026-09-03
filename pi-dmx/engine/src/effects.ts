@@ -418,7 +418,14 @@ export class EffectEngine {
     let beatEnv = 0;
     let beatTick = false;
     const beat = this.cfg.beat;
-    if (beatLocked(beat)) {
+    // COASTA PULSEN genom konfidens-svackor. Förr: `beatLocked(beat)` (konf ≥ 0.20).
+    // På det här materialet kraschar konfidensen till 0 ofta (olöst takt-spårnings-
+    // problem) → hjärtslaget dog → tråkigt (ägaren i ladan 2026-09-03). Nu räcker att
+    // ett TEMPO finns (bpm > 40); tempot lever kvar via PLL:ens 8 s-coast, så pulsen
+    // slår vidare på senaste takten genom svackan. Djupet är golvat (BEAT_TRUST_FLOOR)
+    // så den syns, och energiskalningen (calm/intensity) dämpar den ändå i tysta partier
+    // så den inte strobar i tystnad. En puls på ~rätt takt är långt bättre än ingen.
+    if (beat && beat.bpm > 40) {
       const beatMs = beatPeriod(beat);
       const now2 = Date.now();
       const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
