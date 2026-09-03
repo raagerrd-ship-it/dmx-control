@@ -123,6 +123,9 @@ const BODY_RISE_DB = 17;   // 16 -> 17 (agaren: bara LITE hogre krav, inte tappa
                            // Sen inZone-grinden togs bort (som lyft lamp-blixten i tid) fyrar
                            // den lite för lätt → större bas-lyft krävs för att räknas som drop.
 const BODY_GONE_DB = 3;
+const DROP_SHORT_MS = 4000;    // minsta drop-avstand nar dropen ESKALERAR
+const DROP_LONG_MS = 20000;    // annars maste sa har lang tid ga (mot falska upprepningar)
+const DROP_ESCALATE_DB = 1.5;  // hur mycket STARKARE (bas-lyft) en snabb upprepning maste vara
 const BODY_CEIL_DB_S = 0.5;
 
 export class Analyser {
@@ -367,6 +370,7 @@ export class Analyser {
   private lastBodyGoneMs = -1e9;
   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
   private lastDropMs = -1e9;
+  private lastDropRise = 0;   // bas-lyftet (dB) vid senaste dropen — for eskalerings-refraktaren
   // RISER/UPPBYGGNAD (flyttad från effects)
   /**
    * OBEHANDLAD LOGBANDNIVÅ — riserdetektorns egen ingång.
@@ -1741,8 +1745,14 @@ export class Analyser {
     // cooldown (fog.cooldownMs = 30 s) som gatar den oberoende av lampornas drop.
     // OBS: kortare spärr → fler drops (och fler falska); medvetet val, agaren dömer
     // live. testDrops-F1 sjunker (spärren gjorde jobb där) men det är sekundärt här.
-    const minGapMs = 4000;
-    const dropSpacingOk = nowWallA - this.lastDropMs > minGapMs;
+    // ESKALERINGS-REFRAKTÄR (ägaren i ladan 2026-09-03, mot falska drops): en drop
+    // strax efter en annan får BARA fyra om den är TYDLIGT STARKARE (större bas-lyft)
+    // än den förra — annars måste 20 s gå. Riktiga drops eskalerar (varje större);
+    // falska är svagare upprepningar och sållas bort. En eskalerande drop (kvällens
+    // stora ögonblick) släpps ändå igenom direkt (ned till 4 s).
+    const sinceDrop = nowWallA - this.lastDropMs;
+    const stronger = bodyRise > this.lastDropRise + DROP_ESCALATE_DB;
+    const dropSpacingOk = sinceDrop > DROP_LONG_MS || (sinceDrop > DROP_SHORT_MS && stronger);
     // RISER-KRAVET AR AVSTANGT — men INTE for att signalen ar dod. Den gamla
     // motiveringen ("inRiser 0% av tiden, buildUp p99=0.31") mattes mot en
     // aldre riser-detektor och ar RADERAD som falsk.
@@ -1761,7 +1771,7 @@ export class Analyser {
     // i praktiken den som VALDE när en drop fyrade (första flanken efter att
     // fönstret löpt ut). Uppmätt resultat: 3 träffar av 19, 16 falsklarm.
     if (dropSpacingOk && bodyOnset && this.activeMs > 2000) {
-      this.dropCount++; this.lastDropMs = nowWallA;
+      this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise;
     }
 
 
