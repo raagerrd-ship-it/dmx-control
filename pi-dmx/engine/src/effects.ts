@@ -101,6 +101,15 @@ const BEAT_FLUTTER_RELEASE = 0.09;
 const PULSE_IDX_INIT = -2e9;
 /** Hur mycket sektionsenergin "gasar" ljuset (0 = av). +50 % master vid full energi. */
 const ENERGY_DRIVE = 0.5;
+/**
+ * Diskret drop-detektion styr LAMPORNA (bloom + look-byte). AV sedan 2026-09-02
+ * (ägarens val live): detektorn är ~ett taktslag sen på uppbyggda drops och ~56 %
+ * precis — en falsk drop tänder dessutom 8-takters-spärren och låser ute en riktig.
+ * Energi-gasen (ENERGY_DRIVE) bär drop-känslan i stället: ljuset stiger IN i dropen.
+ * Röken påverkas INTE — den har egen dropHit-trigger med 1-min cooldown.
+ * Slå på igen = true, så återvänder bloomen och drop-look-bytet.
+ */
+const DISCRETE_DROP_LAMPS = false;
 const BEAT_TRUST_FLOOR = 0.60;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 
 export class EffectEngine {
@@ -698,7 +707,7 @@ export class EffectEngine {
     if (dropHit) this.blackoutUntil = 0;                                                        // dropen fyrade → släpp svärtan, explodera
     const blackout = nowWall < this.blackoutUntil;
     const fog = this.cfg.fog;   // rök beslutas EFTER effekterna (de får önska) — se nedan
-    const dropActive = frame.inZone && nowWall < this.dropBangUntil;                                  // en riktig drop pågår
+    const dropActive = DISCRETE_DROP_LAMPS && frame.inZone && nowWall < this.dropBangUntil;            // en riktig drop pågår (av → dropEnv stannar 0)
     // DROP-ENVELOPE: FULL ATTACK (~30ms) på träffen, HÅLL allt på max under
     // dropen, mjuk FADE ner (~1s) när den släpper. Egen effekt — INGEN
     // hårdvaru-strobe (det gav strobe-känslan), bara ljus + färg på max.
@@ -827,7 +836,7 @@ export class EffectEngine {
         const DROP_HOLD = 8000;   // drop byter inte oftare än nagot annat (detektorn fyrar tatt pa pulsande musik)
         // Drop-byte bara när energin får driva → en LUGN stämning (chill,
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
-        const dropSwitch = dropHit && this.cfg.energyDrivesMode && held > DROP_HOLD;
+        const dropSwitch = DISCRETE_DROP_LAMPS && dropHit && this.cfg.energyDrivesMode && held > DROP_HOLD;
         // MINNETS STRUKTUR: en tvättad låt vet var karaktären skiftar och var
         // fraserna börjar. Ett byte DÄR känns komponerat; samma byte 1,5 takt fel
         // känns slumpmässigt. Sektionsgräns = byt gärna nu; frasgräns = ok att byta.
