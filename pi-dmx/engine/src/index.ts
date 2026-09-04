@@ -104,6 +104,11 @@ analyser.setSpectrumSink((mag, binHz) => songs.pushSpectrum(mag, binHz, cfg.audi
 const DATA_DIR = dirname(process.env.SONGS_PATH ?? "/var/lib/audio-dmx-engine/songs.bin");
 const recorder = new LearnRecorder(join(DATA_DIR, "learn.wav"), cfg.audio.rate);
 let lastLearningNew = false;
+// DROP-KALIBRERING: DROPCAP=1 tvingar en oavbruten capture av EXAKT signalen
+// analysatorn ser (samma klocka som [dropfire]-loggen) → offline-facit. 10 min-tak.
+const capRec = process.env.DROPCAP === "1"
+  ? new LearnRecorder(join(DATA_DIR, "dropcap.wav"), cfg.audio.rate) : null;
+let capStarted = false;
 const refiner = new RefineQueue(DATA_DIR, (t) => songs.applyRefined(t.songId, t));
 refiner.cleanStale();
 
@@ -289,6 +294,12 @@ capture.on("chunk", (samples: Float32Array) => {
     if (recorder.active) console.log(`[diag] ljudskrivning ${lnNow ? "ÅTER" : "PAUSAD"} vid segmenttid ${(songs.state().positionMs / 1000).toFixed(2)}s — ${songs.learnWhy}`);
   }
   if (lnNow) { if (!recorder.active) recorder.start(); recorder.write(samples); }
+  // Forcerad drop-kalibrerings-capture (oberoende av låtinlärningen).
+  if (capRec) {
+    if (!capRec.active) capRec.start();
+    if (!capStarted) { capStarted = true; console.log(`[capstart] wall=${Date.now()} rate=${cfg.audio.rate}`); }
+    capRec.write(samples);
+  }
   // LÅTGRÄNS → mjuk omkalibrering av den löpande dynamiken (auto-rangen får
   // krypa in på nya låtens nivåer inom sekunder i stället för en minut).
   // Samma sak för TEMPOT: medianfönstret (~5 s) och tempogrammet tillhör förra

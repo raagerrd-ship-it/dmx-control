@@ -122,13 +122,26 @@ const BODY_RISE = Number(process.env.BODY_RISE ?? 0.15);
 const BODY_RISE_DB = 17;   // 16 -> 17 (agaren: bara LITE hogre krav, inte tappa for manga). 18+ halverar traffarna (matt).
                            // Sen inZone-grinden togs bort (som lyft lamp-blixten i tid) fyrar
                            // den lite för lätt → större bas-lyft krävs för att räknas som drop.
-const BODY_GONE_DB = 3;
-const BODY_PEAK_DB = 10;       // dropen maste landa inom 10 dB av senaste toppen (matt: 10 dodar inga riktiga, stoppar quiet-part-falska)
+const BODY_GONE_DB = 5;
+const BODY_GONE_MIN_MS = Number(process.env.BODY_GONE_MIN_MS ?? 2000);   // breakdown-langd som kravs; 2000 = nuvarande live-beteende
+const BODY_PEAK_DB = Number(process.env.BODY_PEAK_DB ?? 10);   // BRED onset-grind (en ren edge per event; snavare = flimmer/dubbelfyrning).
+// HARD KVALITETSGRIND vid sjalva fyrningen. FACIT (dropcap.wav, ladan 2026-09-03):
+// underPeak (bodyPeak-bodyFast) vid fyrning ar BIMODAL — riktiga drops slar till
+// FULL niva (underPeak <3) medan falska ar partiella sidechain-aterhamtningar
+// klumpade vid 9-10 dB. Att kapa i gapet (3.5) dodar de falska, behaller slammen.
+// Sitter vid FYRNINGEN (inte i onset) sa den breda edgen konsumeras utan flimmer.
+const DROP_QUALITY_DB = Number(process.env.DROP_QUALITY_DB ?? 3.5);
 const DROP_SHORT_MS = 4000;    // minsta drop-avstand nar dropen ESKALERAR
 const DROP_LONG_MS = 20000;    // annars maste sa har lang tid ga (mot falska upprepningar)
 const DROP_ESCALATE_DB = 3;    // 1.5 -> 3 (agaren): tatare drops maste vara TYDLIGT starkare for att fyra
 const BODY_CEIL_DB_S = 0.15;  // 0.5 -> 0.15: taket haller latens loud-referens langre → en liten uppgang i ett tyst parti landar tydligt UNDER → landa-hogt-checken avvisar falska drops "dar laten knappt okar" (agaren)
 
+// ── TEMPO-RATTAR för offline-svep (defaults = produktion, allt inert utan env) ──
+const COMB3 = Number(process.env.COMB3 ?? 0.33);      // comb-filtrets 3:e-harmonik-vikt (ac[3·lag])
+const PRIOR_W = Number(process.env.PRIOR_W ?? 0.7);   // log-Gauss-priorns bredd
+const PRIOR_C = process.env.PRIOR_C ? Number(process.env.PRIOR_C) : 0;   // prior-centrum (0 = följ fönstret: 1.5×BPM_MIN)
+const SUBH_MULT = Number(process.env.SUBH_MULT ?? 3);
+const NEAR_REACQ = Number(process.env.NEAR_REACQ ?? 3);   // NEAR-roster i reacq-fonstret (default 3)   // subhSuspect: röst-multiplikator på OCT-DOWN/NEAR (DMX_SUBH_GUARD)
 export class Analyser {
   private fft: FFT;
   private window: Float32Array;
@@ -226,8 +239,8 @@ export class Analyser {
    * nej at bada hallen. Kvarvarande fel ar trioler (2/3, 4/3, 3/4), och de
    * angrips av OCT_UP och HARM_PENALTY, inte av fonstret.
    */
-  private static readonly BPM_MIN = 100;   // MAX == 2*MIN (exakt en oktav). 80-160 -> 100-200 (agaren: dans-megamixar → snabba latar last pa RATT tempo, inte halva)
-  private static readonly BPM_MAX = 200;
+  private static readonly BPM_MIN = Number(process.env.BPM_MIN ?? 100);   // MAX == 2*MIN (exakt en oktav). 80-160 -> 100-200 (agaren: dans-megamixar → snabba latar last pa RATT tempo, inte halva)
+  private static readonly BPM_MAX = Analyser.BPM_MIN * 2;
   private octaveVote = 0;   // ackumulerat bevis för att byta oktav (självrättande lås)
   /** Bevis för att DUBBLERA (estimaten pekar högre) mot att HALVERA (lägre).
    *  SYMMETRISKT (8/8): asymmetrin 8/24 hörde till 60..180-experimentet. Med en
@@ -238,16 +251,16 @@ export class Analyser {
   // overleva vikningen, sa ratio > 1.4 ar alltid en triol-artefakt. Far dock inte
   // stangas helt -- vid 32 fastnade real.wav pa 113. MATT: 8 -> 14.4/53.2/100 %,
   // 24 -> 25.0/68.2/100 %, 32 -> 25.0/0.0/100 %.
-  private static readonly OCT_UP = 24;
+  private static readonly OCT_UP = Number(process.env.OCT_UP ?? 24);
   private static readonly TG_KEEP = 0;
   private static readonly WARM_N = 48;
   private static readonly HOLD_N = 50;
-  private static readonly RELOCK_K = 2;
+  private static readonly RELOCK_K = Number(process.env.RELOCK_K ?? 2);
   private static readonly REFRAC_N = 20;
   private static readonly REFRAC_ATT = 0;
-  private static readonly HARM_TOL = 0.035;
-  private static readonly HARM_PENALTY = 6;
-  private static readonly OCT_DOWN = 8;
+  private static readonly HARM_TOL = Number(process.env.HARM_TOL ?? 0.035);
+  private static readonly HARM_PENALTY = Number(process.env.HARM_PENALTY ?? 6);
+  private static readonly OCT_DOWN = Number(process.env.OCT_DOWN ?? 8);
 
 
   private nearVote = 0;     // bevis för GRANN-fel (t.ex. 122 låst mot 136): bara före commit
@@ -310,14 +323,24 @@ export class Analyser {
   private priorLut = (() => {
     const t = new Float32Array(Analyser.ENV_LEN);
     for (let lag = 1; lag < Analyser.ENV_LEN; lag++) {
-      const oct = Math.log2(((Analyser.ENV_HZ * 60) / lag) / 150);   // prior-centrum 120 -> 150 (geom. centrum av 100-200, dar dansmusik bor)
-      t[lag] = Math.exp(-(oct * oct) / 0.7);
+      const oct = Math.log2(((Analyser.ENV_HZ * 60) / lag) / (PRIOR_C || Analyser.BPM_MIN * 1.5));   // prior-centrum 120 -> 150 (geom. centrum av 100-200, dar dansmusik bor)
+      t[lag] = Math.exp(-(oct * oct) / PRIOR_W);
     }
     return t;
   })();
   private silentMs = 0;
   /** true = tystnadssläppningen redan gjord för denna tystnad (flanktriggad). */
   private silenceArmed = false;
+  private _why = "";   // TRACE: vilken gren bytte tempot (DMX_BPM_TRACE)
+  /** Senast COMMITTADE tempot — minne över ett låtbyte. SUBHARMONIK-GUARD (DMX_SUBH_GUARD, prototyp):
+   *  en kandidat som är exakt 2/3 eller 1/2 av det (±4 %) är nästan alltid comb-filtrets
+   *  ac[3P]-artefakt vid ett byte, inte ett riktigt byte → kräv mångfalt mer bevis. */
+  private lastGoodBpm = 0;
+  private subhSuspect(cand: number): boolean {
+    if (!process.env.DMX_SUBH_GUARD || this.lastGoodBpm <= 0 || cand <= 0) return false;
+    const r = cand / this.lastGoodBpm;
+    return Math.abs(r / (2 / 3) - 1) < 0.04 || (!!process.env.SUBH_HALF && Math.abs(r / 0.5 - 1) < 0.04);
+  }
   private beatAnchorMs = 0;
   // #2 sub-hop fas: kick-flankens flux-topp ligger sällan exakt på en hop. Vi
   // sparar de två föregående kick-flux-värdena och gör parabolisk interpolation
@@ -355,6 +378,7 @@ export class Analyser {
    *  stigningen och trosklarna slutar motsvara det som mattes i banken. */
   private bodyFast = -120;
   private bodyCeil = -300;   // dB — sa forsta max() tar bodyEnv
+  private bodyPeak = -300;   // SEG topp (haller latens loud-referens i minuter) for landa-hogt-checken
   /** ANSLAGSDETEKTION. En tröskel som ska NÅS korsas först när basen redan
    *  kommit — uppmätt 2.5 s efter anslaget. STIGNINGSTAKTEN fyrar när den
    *  börjar: uppmätt 0.1 s. Ringbuffert med 0.5 s historik (förallokerad). */
@@ -368,6 +392,7 @@ export class Analyser {
    *  var 15:e sekund (= spärren) och användarens riktiga drops låg 9-15 s FEL,
    *  blockerade av den föregående falska avfyrningen. */
   private bodyGoneMs = 0;
+  private lastGoneSpanMs = 0;   // langden pa senast avslutade gone-span (diagnostik/facit)
   private lastBodyGoneMs = -1e9;
   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
   private lastDropMs = -1e9;
@@ -573,7 +598,7 @@ export class Analyser {
       let comb = ac[lag];
       let wSum = 1;
       if (2 * lag <= lagMax) { comb += 0.5 * ac[2 * lag]; wSum += 0.5; }
-      if (3 * lag <= lagMax) { comb += 0.33 * ac[3 * lag]; wSum += 0.33; }
+      if (3 * lag <= lagMax) { comb += COMB3 * ac[3 * lag]; wSum += COMB3; }
       comb /= wSum;
       combArr[lag] = comb;
       if (comb > combMax) combMax = comb;
@@ -593,6 +618,8 @@ export class Analyser {
   }
 
   private computeBpm() {
+    const _b0 = this.localBpm;   // TRACE: fångar lås-byten (DMX_BPM_TRACE)
+    this._why = "";
     if (this.envFilled < 50) return;   // ~0.5s → snabbt första grovestimat (täcker ≥~122 BPM;
                                        //  långsammare spår låser på overton tills fönstret växer),
                                        //  förfinas löpande. Halverar time-to-first-lock.
@@ -622,7 +649,9 @@ export class Analyser {
     // toppen sparades, varpå medianen fick städa upp efteråt (~5 s till lås). Nu
     // EMA:as HELA lag-kurvan mellan anrop, så bevis ackumuleras där det hör hemma:
     // låset kommer på 1–2 s och oktav-flippar dör innan de hinner synas.
-    const a = this.localBpm === 0 ? 0.30 : 0.15;
+    // GEMINI #3 (prototyp, DMX_TG_ADAPT): bränn bort gamla låtens ac[3P] fortare när en utmanare får fotfäste.
+    const underChallenge = !!process.env.DMX_TG_ADAPT && (this.newSongVote > 500 || this.localBpmConfidence < 0.6);
+    const a = this.localBpm === 0 ? 0.30 : (underChallenge ? Number(process.env.TG_ADAPT_A ?? 0.35) : 0.15);
     const tg = this.tempoGram;
     this.diagLagMin = lagMin; this.diagLagMax = lagMax;
     let bestLag = 0, bestVal = 0, scoreSum = 0, scoreCount = 0;
@@ -728,6 +757,7 @@ export class Analyser {
     const med = scratch[n >> 1];
     if (this.localBpm === 0 && this.warmCalls++ < Analyser.WARM_N) return;
     if (this.localBpm === 0) {
+      this._why = "FIRST";
       this.localBpm = Math.round(med);
       this.octaveVote = 0;
       this.bpmStable = 0;
@@ -752,7 +782,7 @@ export class Analyser {
         && bestVal > tg[_lockLag] * Analyser.RELOCK_K;
       if (ratio >= 0.9 && ratio <= 1.11) {
         this.nearVote = 0; this.nearChallenger = 0;                                 // samma takt → inget grann-fel
-        this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);   // samma takt → glid
+        this._why = "glide"; this.localBpm = Math.round(this.localBpm + (med - this.localBpm) * 0.35);   // samma takt → glid
         this.octaveVote *= 0.5;
         // Referens för hur STARK takten är när allt är gott — låtbytesgrinden nedan
         // jämför mot den (ett breakdown har svag takt, en ny låt en full).
@@ -764,10 +794,10 @@ export class Analyser {
       // och inte bara i det just spelade avsnittet.
       } else if ((!committed || overwhelming) && ratio > 1.4) {
         this.octaveVote = Math.max(0, this.octaveVote) + 1;                          // estimaten HÖGRE oktav
-        if (this.octaveVote >= Analyser.OCT_UP) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
+        if (this.octaveVote >= Analyser.OCT_UP) { this._why = "OCT-UP"; this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
       } else if ((!committed || overwhelming) && ratio < 0.7) {
         this.octaveVote = Math.min(0, this.octaveVote) - 1;                          // estimaten LÄGRE oktav
-        if (this.octaveVote <= -Analyser.OCT_DOWN) { this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
+        if (this.octaveVote <= -(this.subhSuspect(med) ? Analyser.OCT_DOWN * SUBH_MULT : Analyser.OCT_DOWN)) { this._why = "OCT-DOWN"; this.localBpm = Math.round(med); this.octaveVote = 0; this.bpmStable = 0; }
 
       } else if (!committed) {
         // GRANNRÄTTNING: ett tidigt lås från 0.5 s fönster kan hamna 10-20 % fel
@@ -808,7 +838,7 @@ export class Analyser {
           // (rival > 3) -- sankte utandig 70.6 -> 26.2 % utan att hjalpa stranden.
           const _harm = Math.abs(ratio * 0.75 - 1) <= Analyser.HARM_TOL
                      || Math.abs(ratio / 0.75 - 1) <= Analyser.HARM_TOL;
-          if (this.nearVote >= (reacq ? 3 : 8) * (_harm ? Analyser.HARM_PENALTY : 1)) {
+          if (this.nearVote >= (reacq ? NEAR_REACQ : 8) * (_harm ? Analyser.HARM_PENALTY : 1) * (this.subhSuspect(med) ? SUBH_MULT : 1)) { this._why = "NEAR";
 
 
             this.localBpm = Math.round(med);
@@ -880,7 +910,22 @@ export class Analyser {
         // beviskravet fran 4 s till 24 s, vilket ar omojligt att na.
         // Vetot i GRANNRATTNINGEN ar validerat (+45 p.e.) och star kvar; det ar
         // bara den har vagen som tas bort.
-        const needMs = rival > 2.5 ? 1500 : rival > 1.6 ? 4000 : 25000;
+        const needMs0 = rival > 2.5 ? 1500 : rival > 1.6 ? 4000 : 25000;
+        // GEMINI @564 (prototyp): svag utmanare mot ett spoke i EMA:n. Laggs FORE ghost-wait sa
+        // 2/3-guarden alltid vinner. DMX_DEADBEAT: gamla slaget fysiskt borta ur ra-AC → krav inte 25 s.
+        // DMX_CONFBLEED: sviktande konfidens (<0.6) halverar 25 s-taket.
+        let needMs1 = needMs0;
+        const rawLockNow = (lockLag >= lagMin && lockLag <= lagMax) ? this.acScratch[lockLag] : 0;
+        if (process.env.DMX_DEADBEAT && needMs1 === 25000 && rawLockNow < Number(process.env.DEADBEAT_TH ?? 0.05)) needMs1 = Number(process.env.DEADBEAT_MS ?? 6000);
+        if (process.env.DMX_CONFBLEED && needMs1 === 25000 && this.localBpmConfidence < 0.6) needMs1 = 12500;
+        if (process.env.DMX_BPM_TRACE && process.env.VETO_WIN) { const [wa, wb] = process.env.VETO_WIN.split(',').map(Number); const tt = (this.wallNow() - 1700000000000) / 1000; if (tt >= wa && tt <= wb) console.log(`[ns] t=${tt.toFixed(1)} lock=${this.localBpm} ch=${this.challengerBpm.toFixed(0)} rival=${rival.toFixed(2)} rawLock=${rawLockNow.toFixed(3)} conf=${this.localBpmConfidence.toFixed(2)} nsv=${this.newSongVote.toFixed(0)} needMs=${needMs1}`); }
+        let needMs = this.subhSuspect(this.challengerBpm) ? needMs1 * 4 : needMs1;
+        // GEMINI #2 (prototyp, DMX_GHOST_WAIT): en utmanare på exakt 2/3 eller 3/4 av låset är
+        // statistiskt en crossfade-artefakt → tvinga den att överleva faden (~10 s) innan lås.
+        if (process.env.DMX_GHOST_WAIT && this.localBpm > 0) {
+          const gr = this.challengerBpm / this.localBpm;
+          if (Math.abs(gr - 2 / 3) < 0.04 || (!!process.env.GHOST_34 && Math.abs(gr - 0.75) < 0.04)) needMs = rival > 3.0 ? Number(process.env.GHOST_MS ?? 12000) : 25000;
+        }
         const dtVote = this.lastSongVoteMs > 0 ? Math.min(200, voteNow - this.lastSongVoteMs) : 0;
         this.lastSongVoteMs = voteNow;
         this.newSongVote += dtVote;
@@ -898,6 +943,12 @@ export class Analyser {
           const slower = this.challengerBpm < this.localBpm;
           const need = slower ? 0.95 : 0.55;
           vetoed = rawLock > 0 && rawCh < rawLock * need;
+          // GEMINI #1 (prototyp, DMX_PULSE_VETO): pulse-xcorr som subharmonik-diskriminator i st.f. rå AC.
+          // pulseScratch håller HELBANDETS pulse (sista scoreEnv-anropet = envRing). En 2/3-fantom
+          // missar var tredje riktigt slag → lägre on-beat-energi vid sitt lag.
+          const pCh = this.pulseScratch[chLag], pLock = this.pulseScratch[lockLag];
+          if (process.env.DMX_PULSE_VETO) vetoed = pLock > Number(process.env.PULSE_VETO_MIN ?? 0) && pCh < pLock * Number(process.env.PULSE_VETO_R ?? 0.75);
+          if (process.env.DMX_BPM_TRACE && this.newSongVote >= needMs * 0.85) console.log(`[veto] t=${((this.wallNow()-1700000000000)/1000).toFixed(1)} lock=${this.localBpm} ch=${this.challengerBpm.toFixed(0)} rawCh=${rawCh.toFixed(3)} rawLock=${rawLock.toFixed(3)} kvot=${(rawLock>0?rawCh/rawLock:0).toFixed(2)} need=${need} pCh=${pCh.toFixed(4)} pLock=${pLock.toFixed(4)} pKvot=${(pLock>0?pCh/pLock:0).toFixed(2)} vetoed=${vetoed} rival=${rival.toFixed(2)} needMs=${needMs} nsv=${this.newSongVote.toFixed(0)}`);
         }
 
         if (vetoed) {
@@ -906,7 +957,7 @@ export class Analyser {
         } else if (this.newSongVote >= needMs) {
           // Lås på UTMANAREN, inte medianen, och kasta historiken: ett medianfönster
           // halvfullt av förra låtens tempo kostade flera sekunder till rätt takt.
-          this.localBpm = Math.round(this.challengerBpm);
+          this._why = "NEWSONG"; this.localBpm = Math.round(this.challengerBpm);
           this.bpmHistLen = 0; this.bpmHistPos = 0; this.lastVoteMs = 0;
           this.challengerBpm = 0;
           this.newSongVote = 0;
@@ -925,6 +976,8 @@ export class Analyser {
     const dt = this.lastConfMs > 0 ? Math.min(0.5, (voteNow - this.lastConfMs) / 1000) : 0.01;
     this.lastConfMs = voteNow;
 
+    if (this.bpmStable >= Analyser.BPM_COMMIT) this.lastGoodBpm = this.localBpm;
+    if (process.env.DMX_BPM_TRACE && this.localBpm !== _b0) console.log(`[bpmchg] t=${((this.wallNow()-1700000000000)/1000).toFixed(1)} ${this._why||"?"} ${_b0}->${this.localBpm} stable=${this.bpmStable} nsv=${this.newSongVote.toFixed(0)} ch=${this.challengerBpm} oct=${this.octaveVote} near=${this.nearVote} conf=${this.localBpmConfidence.toFixed(2)}`);
     const cA = this.localBpmConfidence;
     const aC = 1 - Math.exp(-dt / (conf > cA ? 0.025 : 0.120));
     this.localBpmConfidence = cA + (conf - cA) * aC;
@@ -952,6 +1005,7 @@ export class Analyser {
    *  att historiken tillhör förra låten; att medianrösta vidare på den kostade 6 s
    *  omlåsning. Nästa estimat får låsa direkt (localBpm === 0 ⇒ första röst låser). */
   resetTempo(): void {
+    if (process.env.DMX_BPM_TRACE) console.log(`[bpmrst] t=${((this.wallNow()-1700000000000)/1000).toFixed(1)} RESET bpm=${this.localBpm}`);
     this.localBpm = 0; this.localBpmConfidence = 0;
     this.bpmHistLen = 0; this.bpmHistPos = 0;
     this.clearLockVotes();
@@ -970,6 +1024,7 @@ export class Analyser {
    *   • under `windowMs` sänks grann-rättningens conf-grind och röstkrav.
    */
   hintTrackChange(windowMs = 5000): void {
+    if (process.env.DMX_BPM_TRACE) console.log(`[bpmrst] t=${((this.wallNow()-1700000000000)/1000).toFixed(1)} HINT bpm=${this.localBpm} conf=${this.localBpmConfidence.toFixed(2)}`);
     // A5: reacq-fönstret jämförs mot perfNow() (samma tidbas som voteNow).
     // Date.now() gjorde `voteNow < reacqUntilMs` alltid falskt → hinten var död.
     this.reacqUntilMs = this.perfNow() + windowMs;
@@ -1383,6 +1438,7 @@ export class Analyser {
       // fortsätter i fantom-takt. Full släppning först efter 10 s tystnad — då är
       // det en ny låt/nytt set och historiken är värdelös.
       if (this.silentMs > 350 && !this.silenceArmed) {
+        if (process.env.DMX_BPM_TRACE) console.log(`[bpmrst] t=${((this.wallNow()-1700000000000)/1000).toFixed(1)} SILENCE bpm=${this.localBpm}`);
         this.silenceArmed = true;
         this.localBpmConfidence = 0;
         this.clearLockVotes();
@@ -1716,14 +1772,19 @@ export class Analyser {
     // (negativt), och "1,5 % av ett negativt tal" gor taket STORRE, inte mindre —
     // den gamla raden var matematiskt omvand sa fort skalan blev logaritmisk.
     this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * BODY_CEIL_DB_S);
+    this.bodyPeak = Math.max(this.bodyEnv, this.bodyPeak - dtHop * 0.04);   // ~0.04 dB/s ≈ haller loud-referensen i minuter
 
     // BAS-FRÅNVARO med VARAKTIGHETSKRAV: under 40 % av taket i ≥2 s i sträck.
     // FRANVARO = ETT AVSTAND I dB, inte en kvot. En kvot mellan tva logaritmer
     // betyder ingenting fysiskt.
     if (this.bodyEnv < this.bodyCeil - BODY_GONE_DB) {
       this.bodyGoneMs += dtHop * 1000;
-      if (this.bodyGoneMs >= 2000) this.lastBodyGoneMs = nowWallA;
-    } else this.bodyGoneMs = 0;
+      // BODY_GONE_MIN_MS: hur LÄNGE kroppen måste ha varit borta för att räknas
+      // som en riktig breakdown. En 2s sidechain-dipp i en megamix är inte en
+      // drop-förberedelse; en riktig breakdown varar flera sekunder. Env-tunbar
+      // så den kan svepas mot facit offline.
+      if (this.bodyGoneMs >= BODY_GONE_MIN_MS) this.lastBodyGoneMs = nowWallA;
+    } else { if (this.bodyGoneMs > 0) this.lastGoneSpanMs = this.bodyGoneMs; this.bodyGoneMs = 0; }
     // STIGNINGSTAKT över 0.5 s (ringbuffert, ingen allokering).
     const hist = this.bodyHist, HL = hist.length;
     const oldest = hist[(this.bodyHistPos + HL - this.bodyHistLen) % HL];
@@ -1745,7 +1806,10 @@ export class Analyser {
     // ladan 2026-09-03). Kräv att kroppen landar inom BODY_PEAK_DB av den senaste
     // toppen (bodyCeil) — en riktig drop når nästan sitt eget tak; en uppgång i ett
     // tyst parti gör det inte.
-    const landsHigh = this.bodyFast > this.bodyCeil - BODY_PEAK_DB;
+    // Mot SEGA toppen (bodyPeak), inte snabba taket: en falsk drop i ett tyst parti
+    // landar lagt (fast ~10) medan riktiga landar hogt (fast ~34+); den sega toppen
+    // haller loud-referensen (~44) sa den laga landningen avvisas aven om taket tillf. sjunkit.
+    const landsHigh = this.bodyFast > this.bodyPeak - BODY_PEAK_DB;
     const bodyOnset = bodyRise > BODY_RISE_DB && landsHigh && nowWallA - this.lastBodyGoneMs < 6000;
     // EN DROP MASTE LANDA I HOG ENERGI. Villkoren ovan tittar bara pa LOKALA
     // nivasprang (svacka -> topp-zon) och vet inget om var i laten vi ar, sa varje
@@ -1823,8 +1887,10 @@ export class Analyser {
     // frame. Då blir eskalerings-/spärr-kravet meningsfullt (jämför distinkta lyft).
     const bodyOnsetEdge = bodyOnset && !this.wasBodyOnset;
     this.wasBodyOnset = bodyOnset;
-    if (dropSpacingOk && bodyOnsetEdge && this.activeMs > 2000) {
+    const fullSlam = this.bodyPeak - this.bodyFast < DROP_QUALITY_DB;
+    if (dropSpacingOk && bodyOnsetEdge && this.activeMs > 2000 && fullSlam) {
       this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise;
+      console.log(`[dropfire] wall ${this.wallNow()} rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} ceil ${this.bodyCeil.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} sinceDrop ${(sinceDrop/1000).toFixed(1)}s goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s goneSpan ${(this.lastGoneSpanMs/1000).toFixed(1)}s`);
     }
 
 
