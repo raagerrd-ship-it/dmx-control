@@ -247,8 +247,15 @@ const capture = new AudioCapture({
   hopSamples: cfg.fft.hop,
 });
 
+// LJUDKLOCKA: varje chunk ar ett hop (hopSamples = cfg.fft.hop), sa antalet
+// chunkar x hoplangd ar exakt hur mycket ljud som passerat â€” utan leveransjitter.
+// Matas till analysatorn FORE process() sa slagtiden stamplas ur ljudet, inte ur
+// vaggklockan. Se Analyser.setAudioClockMs.
+let audioChunks = 0;
+const HOP_MS = (cfg.fft.hop / cfg.audio.rate) * 1000;
 capture.on("chunk", (samples: Float32Array) => {
   const t0 = performance.now();
+  analyser.setAudioClockMs(audioChunks++ * HOP_MS);
   const frame = analyser.process(samples);
   health.noteSlowCall("analyser.process", performance.now() - t0);
   health.noteChunk();
