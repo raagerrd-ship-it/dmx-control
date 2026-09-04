@@ -253,11 +253,11 @@ const capture = new AudioCapture({
 // vaggklockan. Se Analyser.setAudioClockMs.
 let audioChunks = 0;
 const HOP_MS = (cfg.fft.hop / cfg.audio.rate) * 1000;
-// OPT-IN (DMX_AUDIO_CLOCK=1), INTE DEFAULT. A/B pa lotus 2026-09-04 visade INGEN
-// vinst (|err| p95 28 -> 48 ms; olika latar, alltsa oavgjort men inte till fixens
-// fordel), och ljudklockan star still vid mic-omstart medan offset-filtret slapar
-// efter. Se lotus alsaMic.ts for hela resonemanget. Av tills en matning pa samma
-// lat med varians i kick-intervall visar nagot.
+// OPT-IN (DMX_AUDIO_CLOCK=1) tills det ar matt PA DEN HAR hardvaran. Pa lotus
+// gav samma fix -18 % median-jitter i onset-intervall (samma lat, 2300 intervall
+// per villkor, 2026-09-04) — verkligt men litet (~1 ms). Mic-omstartsrisken ar
+// stangd med en diskontinuitetsvakt i Analyser.setAudioClockMs. Mat med
+// lotus tools/kick-ab.py-upplagget innan default vands.
 const AUDIO_CLOCK_ON = process.env.DMX_AUDIO_CLOCK === '1';
 capture.on("chunk", (samples: Float32Array) => {
   const t0 = performance.now();
