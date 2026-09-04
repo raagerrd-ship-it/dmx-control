@@ -415,7 +415,9 @@ export class Analyser {
   private lastDropMs = -1e9;
   private lastDropRise = 0;
   private wasBodyOnset = false;
-  private dropArmUntil = 0; private dropArmAt = 0; private dropArmGoneMs = -1;   // armerat drop-fonster (DROP_ARM_MS)   // for stigande-flank pa drop-kandidaten   // bas-lyftet (dB) vid senaste dropen — for eskalerings-refraktaren
+  private dropArmUntil = 0; private dropArmAt = 0; private dropArmGoneMs = -1;
+  private dropKickGoneMs = -1; private kickSeenGoneMs = -1;   // KICK-FIRST + [firstkick]-spar per gone-episod
+  private goneEpisodeMs = -1;   // gone-episodens START (lastBodyGoneMs uppdateras varje hop och duger INTE som id)   // armerat drop-fonster (DROP_ARM_MS)   // for stigande-flank pa drop-kandidaten   // bas-lyftet (dB) vid senaste dropen — for eskalerings-refraktaren
   // RISER/UPPBYGGNAD (flyttad från effects)
   /**
    * OBEHANDLAD LOGBANDNIVÅ — riserdetektorns egen ingång.
@@ -1831,7 +1833,10 @@ export class Analyser {
       // som en riktig breakdown. En 2s sidechain-dipp i en megamix är inte en
       // drop-förberedelse; en riktig breakdown varar flera sekunder. Env-tunbar
       // så den kan svepas mot facit offline.
-      if (this.bodyGoneMs >= BODY_GONE_MIN_MS) this.lastBodyGoneMs = nowWallA;
+      if (this.bodyGoneMs >= BODY_GONE_MIN_MS) {
+        if (this.bodyGoneMs - dtHop * 1000 < BODY_GONE_MIN_MS) this.goneEpisodeMs = nowWallA;   // NY episod (korsningen), oforandrad tills nasta
+        this.lastBodyGoneMs = nowWallA;
+      }
     } else { if (this.bodyGoneMs > 0) this.lastGoneSpanMs = this.bodyGoneMs; this.bodyGoneMs = 0; }
     // STIGNINGSTAKT över 0.5 s (ringbuffert, ingen allokering).
     const hist = this.bodyHist, HL = hist.length;
@@ -1938,13 +1943,30 @@ export class Analyser {
     // Armera bara EN gang per "borta"-episod. Floden vid ARM=300 (36 mot 19 pa facit) kom fran
     // UPPREPADE aterhamtnings-edges i samma post-breakdown-fonster. Forsta edgen efter en ny
     // gone-episod armerar (fangar en mjuk drops fordrojda topp); senare edges far bara ogonblicket.
-    if (bodyOnsetEdge && this.lastBodyGoneMs !== this.dropArmGoneMs) { this.dropArmUntil = nowWallA + DROP_ARM_MS; this.dropArmAt = nowWallA; this.dropArmGoneMs = this.lastBodyGoneMs; }
+    if (bodyOnsetEdge && this.goneEpisodeMs !== this.dropArmGoneMs) { this.dropArmUntil = nowWallA + DROP_ARM_MS; this.dropArmAt = nowWallA; this.dropArmGoneMs = this.goneEpisodeMs; }
     const armed = bodyOnsetEdge || nowWallA < this.dropArmUntil;
+    // FORSTA KICKEN efter en gone-episod (spar + KICK-FIRST). Pa mjuka drops sveller basen over en
+    // hel takt: kick & allt annat slar pa takt 1, baskroppen fyller i forst till takt 2 → kropps-
+    // detektorn fyrar takten efter oavsett troskel (ladan 2026-09-04: rise 12 med underPeak 2.5).
+    const goneRecentK = nowWallA - this.lastBodyGoneMs < 6000;
+    if (kick && goneRecentK && this.goneEpisodeMs !== this.kickSeenGoneMs) {
+      this.kickSeenGoneMs = this.goneEpisodeMs;
+      if (process.env.DMX_DROP_TRACE) console.log(`[firstkick] wall ${this.wallNow()} rise ${bodyRise.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s`);
+    }
+    // DROP_KICK_FIRST=1: fyra pa forsta KVALIFICERADE kicken (kroppen borjat lyfta ≥ KICK_FIRST_RISE dB)
+    // efter en gone-episod — en gang per episod; kroppsfyrningen sparras sedan for episoden.
+    const kickFirstOk = !!process.env.DROP_KICK_FIRST && kick && goneRecentK && this.goneEpisodeMs !== this.dropKickGoneMs
+      && bodyRise > Number(process.env.KICK_FIRST_RISE ?? 6) && dropSpacingOk && this.activeMs > 2000;
+    if (kickFirstOk) {
+      this.dropKickGoneMs = this.goneEpisodeMs; this.dropArmUntil = 0;
+      this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise;
+      console.log(`[dropfire] wall ${this.wallNow()} KICKFIRST rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s`);
+    }
     const fullSlam = this.bodyPeak - this.bodyFast < DROP_QUALITY_DB;
     // DMX_DROP_TRACE=1: logga KONSUMERADE edges (kandidat som INTE fyrade) — var ligger kroppen vid
     // forsta takten? Matdata for DROP_QUALITY_DB pa mjukare material (pop) dar inget facit finns.
     if (process.env.DMX_DROP_TRACE && bodyOnsetEdge && !(dropSpacingOk && fullSlam)) console.log(`[dropedge] rise ${bodyRise.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s spacingOk ${dropSpacingOk} sinceDrop ${(sinceDrop/1000).toFixed(1)}s`);
-    if (dropSpacingOk && armed && this.activeMs > 2000 && fullSlam) {
+    if (dropSpacingOk && armed && this.activeMs > 2000 && fullSlam && this.goneEpisodeMs !== this.dropKickGoneMs) {
       this.dropArmUntil = 0;
       this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise;
       console.log(`[dropfire] wall ${this.wallNow()} rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} ceil ${this.bodyCeil.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} sinceDrop ${(sinceDrop/1000).toFixed(1)}s goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s goneSpan ${(this.lastGoneSpanMs/1000).toFixed(1)}s edgeAgo ${(nowWallA - this.dropArmAt).toFixed(0)}ms`);
