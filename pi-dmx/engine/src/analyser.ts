@@ -119,7 +119,7 @@ const BODY_RISE = Number(process.env.BODY_RISE ?? 0.15);
  * en forbisedd regression.
  * INTE VALIDERAT PA AKTA MUSIK an — bara pa syntetiska spar med facit.
  */
-const BODY_RISE_DB = 17;   // 16 -> 17 (agaren: bara LITE hogre krav, inte tappa for manga). 18+ halverar traffarna (matt).
+const BODY_RISE_DB = Number(process.env.BODY_RISE_DB ?? 17);   // 16 -> 17 (agaren: bara LITE hogre krav, inte tappa for manga). 18+ halverar traffarna (matt).
                            // Sen inZone-grinden togs bort (som lyft lamp-blixten i tid) fyrar
                            // den lite för lätt → större bas-lyft krävs för att räknas som drop.
 const BODY_GONE_DB = 5;
@@ -131,6 +131,11 @@ const BODY_PEAK_DB = Number(process.env.BODY_PEAK_DB ?? 10);   // BRED onset-gri
 // klumpade vid 9-10 dB. Att kapa i gapet (3.5) dodar de falska, behaller slammen.
 // Sitter vid FYRNINGEN (inte i onset) sa den breda edgen konsumeras utan flimmer.
 const DROP_QUALITY_DB = Number(process.env.DROP_QUALITY_DB ?? 3.5);
+// ARMERAT FONSTER. Edgen ARMERAR; fyrningen sker nar fullSlam blir sann inom fonstret. Utan detta
+// konsumeras edgen medan kroppen annu stiger (mjuka pop-drops toppar 50-200 ms efter edgen) och
+// fyrningen vantar pa NASTA takts om-korsning av 17 dB -> "drop pa takten efter" (ladan 2026-09-04:
+// rise=17.0 vid VARJE fyrning = farsk korsning). 0 = bara edge-ogonblicket (tidigare beteende).
+const DROP_ARM_MS = Number(process.env.DROP_ARM_MS ?? 0);
 const DROP_SHORT_MS = 4000;    // minsta drop-avstand nar dropen ESKALERAR
 const DROP_LONG_MS = 20000;    // annars maste sa har lang tid ga (mot falska upprepningar)
 const DROP_ESCALATE_DB = 3;    // 1.5 -> 3 (agaren): tatare drops maste vara TYDLIGT starkare for att fyra
@@ -409,7 +414,8 @@ export class Analyser {
   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
   private lastDropMs = -1e9;
   private lastDropRise = 0;
-  private wasBodyOnset = false;   // for stigande-flank pa drop-kandidaten   // bas-lyftet (dB) vid senaste dropen — for eskalerings-refraktaren
+  private wasBodyOnset = false;
+  private dropArmUntil = 0; private dropArmAt = 0;   // armerat drop-fonster (DROP_ARM_MS)   // for stigande-flank pa drop-kandidaten   // bas-lyftet (dB) vid senaste dropen — for eskalerings-refraktaren
   // RISER/UPPBYGGNAD (flyttad från effects)
   /**
    * OBEHANDLAD LOGBANDNIVÅ — riserdetektorns egen ingång.
@@ -1929,10 +1935,16 @@ export class Analyser {
     // frame. Då blir eskalerings-/spärr-kravet meningsfullt (jämför distinkta lyft).
     const bodyOnsetEdge = bodyOnset && !this.wasBodyOnset;
     this.wasBodyOnset = bodyOnset;
+    if (bodyOnsetEdge) { this.dropArmUntil = nowWallA + DROP_ARM_MS; this.dropArmAt = nowWallA; }
+    const armed = bodyOnsetEdge || nowWallA < this.dropArmUntil;
     const fullSlam = this.bodyPeak - this.bodyFast < DROP_QUALITY_DB;
-    if (dropSpacingOk && bodyOnsetEdge && this.activeMs > 2000 && fullSlam) {
+    // DMX_DROP_TRACE=1: logga KONSUMERADE edges (kandidat som INTE fyrade) — var ligger kroppen vid
+    // forsta takten? Matdata for DROP_QUALITY_DB pa mjukare material (pop) dar inget facit finns.
+    if (process.env.DMX_DROP_TRACE && bodyOnsetEdge && !(dropSpacingOk && fullSlam)) console.log(`[dropedge] rise ${bodyRise.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s spacingOk ${dropSpacingOk} sinceDrop ${(sinceDrop/1000).toFixed(1)}s`);
+    if (dropSpacingOk && armed && this.activeMs > 2000 && fullSlam) {
+      this.dropArmUntil = 0;
       this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise;
-      console.log(`[dropfire] wall ${this.wallNow()} rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} ceil ${this.bodyCeil.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} sinceDrop ${(sinceDrop/1000).toFixed(1)}s goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s goneSpan ${(this.lastGoneSpanMs/1000).toFixed(1)}s`);
+      console.log(`[dropfire] wall ${this.wallNow()} rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} ceil ${this.bodyCeil.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} sinceDrop ${(sinceDrop/1000).toFixed(1)}s goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s goneSpan ${(this.lastGoneSpanMs/1000).toFixed(1)}s edgeAgo ${(nowWallA - this.dropArmAt).toFixed(0)}ms`);
     }
 
 
