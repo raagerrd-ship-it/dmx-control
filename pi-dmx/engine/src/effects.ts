@@ -1400,9 +1400,13 @@ export class EffectEngine {
     // RÖK: motorn samlar önskemålen — drop, manuell knapp, eller en effekt som bett om
     // det — och output-tjänsten avgör om maskinen KAN (värmebudget, cooldown, nödstopp).
     if (fog) {
-      const wantBurst = (dropHit && fog.onDrop) || this.cfg.fogTrigger || wantFogFx;
+      // MANUELL puff (Rök nu) kringgår cooldownen: ägaren trycker medvetet. Värmeskyddet (heatOk)
+      // och pågående-puff-spärren gäller fortfarande. Utan detta tappades knappen TYST inom 2 min
+      // efter varje drop-rök (ladan 2026-09-04: bursts stod still, ingen feedback i UI:t).
+      const manualFog = !!this.cfg.fogTrigger;
+      const wantBurst = (dropHit && fog.onDrop) || manualFog || wantFogFx;
       if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;   // engångs-flagga
-      const spraying = this.out.fogTick(nowWall, _dtT * 1000, wantBurst, fog);
+      const spraying = this.out.fogTick(nowWall, _dtT * 1000, wantBurst, fog, manualFog);
       if (fog.enabled) this.out.writeFog(this.universe, fog.address, spraying ? fog.level : 0);
     }
     return this.universe;

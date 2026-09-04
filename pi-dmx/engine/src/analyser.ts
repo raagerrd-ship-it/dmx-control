@@ -415,7 +415,7 @@ export class Analyser {
   private lastDropMs = -1e9;
   private lastDropRise = 0;
   private wasBodyOnset = false;
-  private dropArmUntil = 0; private dropArmAt = 0;   // armerat drop-fonster (DROP_ARM_MS)   // for stigande-flank pa drop-kandidaten   // bas-lyftet (dB) vid senaste dropen — for eskalerings-refraktaren
+  private dropArmUntil = 0; private dropArmAt = 0; private dropArmGoneMs = -1;   // armerat drop-fonster (DROP_ARM_MS)   // for stigande-flank pa drop-kandidaten   // bas-lyftet (dB) vid senaste dropen — for eskalerings-refraktaren
   // RISER/UPPBYGGNAD (flyttad från effects)
   /**
    * OBEHANDLAD LOGBANDNIVÅ — riserdetektorns egen ingång.
@@ -1935,7 +1935,10 @@ export class Analyser {
     // frame. Då blir eskalerings-/spärr-kravet meningsfullt (jämför distinkta lyft).
     const bodyOnsetEdge = bodyOnset && !this.wasBodyOnset;
     this.wasBodyOnset = bodyOnset;
-    if (bodyOnsetEdge) { this.dropArmUntil = nowWallA + DROP_ARM_MS; this.dropArmAt = nowWallA; }
+    // Armera bara EN gang per "borta"-episod. Floden vid ARM=300 (36 mot 19 pa facit) kom fran
+    // UPPREPADE aterhamtnings-edges i samma post-breakdown-fonster. Forsta edgen efter en ny
+    // gone-episod armerar (fangar en mjuk drops fordrojda topp); senare edges far bara ogonblicket.
+    if (bodyOnsetEdge && this.lastBodyGoneMs !== this.dropArmGoneMs) { this.dropArmUntil = nowWallA + DROP_ARM_MS; this.dropArmAt = nowWallA; this.dropArmGoneMs = this.lastBodyGoneMs; }
     const armed = bodyOnsetEdge || nowWallA < this.dropArmUntil;
     const fullSlam = this.bodyPeak - this.bodyFast < DROP_QUALITY_DB;
     // DMX_DROP_TRACE=1: logga KONSUMERADE edges (kandidat som INTE fyrade) — var ligger kroppen vid

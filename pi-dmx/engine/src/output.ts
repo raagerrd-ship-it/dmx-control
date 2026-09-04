@@ -197,7 +197,7 @@ export class FixtureOutput {
   fogTick(nowMs: number, dtMs: number, want: boolean, fog: {
     enabled?: boolean; burstMs: number; cooldownMs: number;
     warmStartMs?: number; sprayMs?: number; bursts?: number;
-  }): boolean {
+  }, manual = false): boolean {
     if (!fog.enabled) {
       if (this.fogWasEnabled) {   // avstängd → glöm uppvärmning och släpp pågående puff,
         this.fogWasEnabled = false;   // annars fastnar rök-kanalen tänd
@@ -217,7 +217,7 @@ export class FixtureOutput {
       this.fogHeat = Math.max(0, this.fogHeat - dtMs * FOG_RECOVER);
     }
     if (spraying && this.fogHeat >= FOG_HEAT_MAX) this.fogUntil = 0;   // nödstopp
-    const gapOk = nowMs - this.lastFogMs > fog.cooldownMs;
+    const gapOk = manual || nowMs - this.lastFogMs > fog.cooldownMs;   // manuell puff (Rok nu) kringgar cooldownen
     const heatOk = this.fogHeat + fog.burstMs <= FOG_HEAT_MAX;
     if (want && !spraying && gapOk && heatOk) {
       this.fogUntil = nowMs + fog.burstMs;
