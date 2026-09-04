@@ -309,6 +309,12 @@ export class Analyser {
   private envHighAccum = 0;
   private scoreHigh = new Float32Array(Analyser.ENV_LEN);
   private _hiTop = 0; private _hiVal = 0; private _eHigh = 0;
+  /** Peak-to-mean over [lagMin,lagMax] — hur SKARP bandets autokorrelationstopp ar. */
+  private sharpOf(arr: Float32Array, lagMin: number, lagMax: number): number {
+    let mx = 0, sum = 0, n = 0;
+    for (let l = lagMin; l <= lagMax; l++) { const v = arr[l]; if (v > mx) mx = v; sum += v; n++; }
+    return n > 0 && sum > 0 ? mx / (sum / n) : 0;
+  }
   private scoreFull = new Float32Array(Analyser.ENV_LEN);
   private scoreBass = new Float32Array(Analyser.ENV_LEN);
   /** Ackumulerat tempogram (EMA av hela lag-kurvan mellan anrop). */
@@ -649,6 +655,7 @@ export class Analyser {
     if (!!process.env.DMX_HIGH_DIAG || !!process.env.DMX_HIGH_VOTE) { this._eHigh = this.scoreEnv(this.envHighRing, N, this.scoreHigh, lagMin, lagMax); let bl = lagMin, bv = -1; for (let l = lagMin; l <= lagMax; l++) if (this.scoreHigh[l] > bv) { bv = this.scoreHigh[l]; bl = l; } this._hiTop = (Analyser.ENV_HZ * 60) / bl; this._hiVal = bv; }
     const eBass = this.scoreEnv(this.envBassRing, N, this.scoreBass, lagMin, lagMax);
     const eFull = this.scoreEnv(this.envRing, N, this.scoreFull, lagMin, lagMax);
+    if (process.env.DMX_BPM_TRACE && process.env.VETO_WIN) { const [wa, wb] = process.env.VETO_WIN.split(',').map(Number); const tt = (this.wallNow() - 1700000000000) / 1000; if (tt >= wa && tt <= wb) console.log(`[eh] t=${tt.toFixed(1)} eHigh=${this._eHigh.toFixed(4)} eFull=${eFull.toFixed(4)} eBass=${eBass.toFixed(4)} mode=${process.env.DMX_HIGH_VOTE}`); }
     if (!!process.env.DMX_HIGH_DIAG && process.env.VETO_WIN) { const [wa, wb] = process.env.VETO_WIN.split(',').map(Number); const tt = (this.wallNow() - 1700000000000) / 1000; if (tt >= wa && tt <= wb) { let fl = lagMin, fv = -1; for (let l = lagMin; l <= lagMax; l++) if (this.scoreFull[l] > fv) { fv = this.scoreFull[l]; fl = l; } console.log(`[hi] t=${tt.toFixed(1)} lock=${this.localBpm} HIGH top=${this._hiTop.toFixed(0)} val=${this._hiVal.toFixed(3)} | FULL top=${((Analyser.ENV_HZ * 60) / fl).toFixed(0)} val=${fv.toFixed(3)}`); } }
     // DISKANT-ROST (prototyp, DMX_HIGH_VOTE=always|cond, HIGH_W). envRing ser bara 0-1.5 kHz;
     // hi-hat-intron bar tempot i diskanten (MATT @564: HIGH 182 stabilt i 22 s medan FULL
@@ -658,7 +665,15 @@ export class Analyser {
     if (eFull <= 0 && eBass <= 0 && wHigh <= 0) return;
     const wBass = eBass > eFull * 0.15 ? 0.55 : 0;   // tomt basband → helbandet ensamt
     const wFull = 1 - wBass;
-    const wNorm = wFull + wBass + wHigh;   // = 1 utan diskant-rost → bit-identiskt
+    // 'sharp' (Gemini: dynamisk tavling): bandet med skarpast topp far dominera. Vikt ∝ skarpa^HIGH_K.
+    let wF = wFull, wB = wBass, wH = wHigh;
+    if (process.env.DMX_HIGH_VOTE === 'sharp' && this._eHigh > 0) {
+      const k = Number(process.env.HIGH_K ?? 2);
+      const sF = this.sharpOf(this.scoreFull, lagMin, lagMax), sB = wBass > 0 ? this.sharpOf(this.scoreBass, lagMin, lagMax) : 0, sH = this.sharpOf(this.scoreHigh, lagMin, lagMax);
+      wF = Math.pow(sF, k); wB = Math.pow(sB, k); wH = Math.pow(sH, k);
+      if (process.env.DMX_BPM_TRACE && process.env.VETO_WIN) { const [wa, wb] = process.env.VETO_WIN.split(',').map(Number); const tt = (this.wallNow() - 1700000000000) / 1000; if (tt >= wa && tt <= wb && ((tt * 10) | 0) % 8 === 0) console.log(`[sharp] t=${tt.toFixed(1)} sF=${sF.toFixed(2)} sB=${sB.toFixed(2)} sH=${sH.toFixed(2)} -> wF=${(wF/(wF+wB+wH)).toFixed(2)} wB=${(wB/(wF+wB+wH)).toFixed(2)} wH=${(wH/(wF+wB+wH)).toFixed(2)}`); }
+    }
+    const wNorm = wF + wB + wH;   // = 1 utan diskant-rost → bit-identiskt
     // TEMPOGRAM-ACKUMULERING: förr kastades hela score-kurvan varje anrop och bara
     // toppen sparades, varpå medianen fick städa upp efteråt (~5 s till lås). Nu
     // EMA:as HELA lag-kurvan mellan anrop, så bevis ackumuleras där det hör hemma:
@@ -670,7 +685,7 @@ export class Analyser {
     this.diagLagMin = lagMin; this.diagLagMax = lagMax;
     let bestLag = 0, bestVal = 0, scoreSum = 0, scoreCount = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
-      const s = (wFull * this.scoreFull[lag] + wBass * this.scoreBass[lag] + wHigh * this.scoreHigh[lag]) / wNorm;
+      const s = (wF * this.scoreFull[lag] + wB * this.scoreBass[lag] + wH * this.scoreHigh[lag]) / wNorm;
       const v = tg[lag] + (s - tg[lag]) * a;
       tg[lag] = v;
       scoreSum += v; scoreCount++;
@@ -1459,7 +1474,7 @@ export class Analyser {
         this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0;
         this.bpmHistLen = 0; this.bpmHistPos = 0; this.lastVoteMs = 0;
         for (let i = 0; i < this.tempoGram.length; i++) this.tempoGram[i] *= 0.5;
-        this.envBassAccum = 0; if (!!process.env.DMX_HIGH_DIAG) this.envHighAccum = 0;
+        this.envBassAccum = 0; if ((!!process.env.DMX_HIGH_DIAG || !!process.env.DMX_HIGH_VOTE)) this.envHighAccum = 0;
         this.barAcc.fill(0); this.barCount = 0;
       } else if (this.silenceArmed && this.silentMs > 10000 && this.localBpm !== 0) {
         this.localBpm = 0;
@@ -1475,7 +1490,7 @@ export class Analyser {
     // Basbandets egen envelope (kick-flux) — samma raster, oberoende signal.
     const bassFluxNorm = Math.min(1, kickFlux * 0.02);
     if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
-    if (!!process.env.DMX_HIGH_DIAG) { const hi = this.bandOn[6] > this.bandOn[7] ? this.bandOn[6] : this.bandOn[7]; if (hi > this.envHighAccum) this.envHighAccum = hi; }
+    if ((!!process.env.DMX_HIGH_DIAG || !!process.env.DMX_HIGH_VOTE)) { const hi = this.bandOn[6] > this.bandOn[7] ? this.bandOn[6] : this.bandOn[7]; if (hi > this.envHighAccum) this.envHighAccum = hi; }
     this.envAccumT += hopMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) {
       this.envAccumT -= 1000 / Analyser.ENV_HZ;
@@ -1491,11 +1506,11 @@ export class Analyser {
       }
       this.envRing[this.envPos] = _e;
       this.envBassRing[this.envPos] = this.envBassAccum;
-      if (!!process.env.DMX_HIGH_DIAG) this.envHighRing[this.envPos] = this.envHighAccum;
+      if ((!!process.env.DMX_HIGH_DIAG || !!process.env.DMX_HIGH_VOTE)) this.envHighRing[this.envPos] = this.envHighAccum;
       this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
       this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
       this.envAccum = 0;
-      this.envBassAccum = 0; if (!!process.env.DMX_HIGH_DIAG) this.envHighAccum = 0;
+      this.envBassAccum = 0; if ((!!process.env.DMX_HIGH_DIAG || !!process.env.DMX_HIGH_VOTE)) this.envHighAccum = 0;
       // Innan lås: räkna på varje ny envelope-sample (100 Hz) för snabbast första estimat.
       // Efter lås: 4 Hz räcker gott — sparar CPU och förfinar med median.
       // TAK PÅ OLÅST TAKT. Den gamla kommentaren här angav 110 µs @ N=500 på x86 —
