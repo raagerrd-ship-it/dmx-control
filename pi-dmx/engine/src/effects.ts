@@ -146,7 +146,13 @@ const LIGHT_SOFT = 0.3;            // soft-snap-golv vid låg energi
  */
 const DISCRETE_DROP_LAMPS = true;   // ater PA (agaren i ladan): lamporna ska bloma pa dropen synkat med roken (samma dropCount). Energi-gasen ensam racker inte som drop-markering.
 const STROBE_MIN_BPM = 150;   // effekt-krav: riser-strobe bara i snabba latar (agarens onskemal)
-const BEAT_MIN = Number(process.env.BEAT_MIN ?? 0.30);   // heartbeat-golv mellan slagen (env-tunbar; hogre = mindre dipp, ljusare)
+const BEAT_MIN = Number(process.env.BEAT_MIN ?? 0.30);
+// LIVE-BEAT (DMX_LIVE_BEAT=1, agaren 2026-09-04): nar tempo-gridden saknas (bpm 0), ar osaker
+// (lag fas-tillit) eller fel (2/3-fantom) pulsar hjartslaget pa de FAKTISKA kickarna i stallet.
+// Crossfade pa tilliten: <= LIVE_TRUST_LO helt live, >= LIVE_TRUST_HI helt grid. Utan env: som forut.
+const LIVE_BEAT = !!process.env.DMX_LIVE_BEAT;
+const LIVE_BEAT_MS = Number(process.env.LIVE_BEAT_MS ?? 240);   // live-pulsens avklingning
+const LIVE_TRUST_LO = Number(process.env.LIVE_TRUST_LO ?? 0.3), LIVE_TRUST_HI = Number(process.env.LIVE_TRUST_HI ?? 0.7);   // heartbeat-golv mellan slagen (env-tunbar; hogre = mindre dipp, ljusare)
 const BEAT_TRUST_FLOOR = 0.75;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 
 export class EffectEngine {
@@ -667,7 +673,14 @@ export class EffectEngine {
         // KLAMRAS NEDAT: pre-dippen far envelopen ga negativ med flit, men
         // multiplikatorn far aldrig slacka riggen helt — da lases dippen som ett
         // blink i stallet for som andning. 0.06 lamnar lamporna tanda.
-        const bm = this.cfg.beatPulse ? (1 - depth) + depth * beatEnv : 1;
+        // LIVE-BEAT: blanda grid-pulsen med en kick-driven puls efter tilliten (se LIVE_BEAT).
+        let hbEnv = beatEnv;
+        if (LIVE_BEAT) {
+          const liveEnv = Math.exp(-Math.max(0, performance.now() - this.lastKickBoost) / LIVE_BEAT_MS);
+          const w = (beat && beat.bpm > 40) ? Math.max(0, Math.min(1, (this.beatTrust - LIVE_TRUST_LO) / (LIVE_TRUST_HI - LIVE_TRUST_LO))) : 0;
+          hbEnv = w * beatEnv + (1 - w) * liveEnv;
+        }
+        const bm = this.cfg.beatPulse ? (1 - depth) + depth * hbEnv : 1;
         // FLADDER-DÄMP (ägaren 2026-09-02, kvar även med lågpasset BORTA → koden, inte
         // insignalen): hjärtslaget visade en snabb dubbel — en andra topp 50–100 ms efter
         // den första. Orsak: när PLL:en rättar fasen kan beatEnv hoppa tillbaka UNDER
