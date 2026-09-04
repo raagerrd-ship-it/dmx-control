@@ -303,6 +303,12 @@ export class Analyser {
   /** BASBANDETS onset-envelope (kick-flux), samma raster och position som envRing. */
   private envBassRing = new Float32Array(Analyser.ENV_LEN);
   private envBassAccum = 0;
+  // DIAGNOSTIK (DMX_HIGH_DIAG): diskant-onset-ring (bandOn[6]/[7] = treble/air) for att MATA om
+  // diskanten bar tempot nar envRing (0-1.5 kHz) ar blind, t.ex. hi-hat-intron. Ingen laslogik ror den.
+  private envHighRing = new Float32Array(Analyser.ENV_LEN);
+  private envHighAccum = 0;
+  private scoreHigh = new Float32Array(Analyser.ENV_LEN);
+  private _hiTop = 0; private _hiVal = 0;
   private scoreFull = new Float32Array(Analyser.ENV_LEN);
   private scoreBass = new Float32Array(Analyser.ENV_LEN);
   /** Ackumulerat tempogram (EMA av hela lag-kurvan mellan anrop). */
@@ -640,8 +646,10 @@ export class Analyser {
     // basen. Två OBEROENDE score-kurvor som röstar ihop rättar just de fall där
     // off-beat-testet annars tvekar mellan ballad och danslåt. Helbandet scoras
     // SIST eftersom scratcharna (env/envPos) används nedan.
+    if (!!process.env.DMX_HIGH_DIAG) { this.scoreEnv(this.envHighRing, N, this.scoreHigh, lagMin, lagMax); let bl = lagMin, bv = -1; for (let l = lagMin; l <= lagMax; l++) if (this.scoreHigh[l] > bv) { bv = this.scoreHigh[l]; bl = l; } this._hiTop = (Analyser.ENV_HZ * 60) / bl; this._hiVal = bv; }
     const eBass = this.scoreEnv(this.envBassRing, N, this.scoreBass, lagMin, lagMax);
     const eFull = this.scoreEnv(this.envRing, N, this.scoreFull, lagMin, lagMax);
+    if (!!process.env.DMX_HIGH_DIAG && process.env.VETO_WIN) { const [wa, wb] = process.env.VETO_WIN.split(',').map(Number); const tt = (this.wallNow() - 1700000000000) / 1000; if (tt >= wa && tt <= wb) { let fl = lagMin, fv = -1; for (let l = lagMin; l <= lagMax; l++) if (this.scoreFull[l] > fv) { fv = this.scoreFull[l]; fl = l; } console.log(`[hi] t=${tt.toFixed(1)} lock=${this.localBpm} HIGH top=${this._hiTop.toFixed(0)} val=${this._hiVal.toFixed(3)} | FULL top=${((Analyser.ENV_HZ * 60) / fl).toFixed(0)} val=${fv.toFixed(3)}`); } }
     if (eFull <= 0 && eBass <= 0) return;
     const wBass = eBass > eFull * 0.15 ? 0.55 : 0;   // tomt basband → helbandet ensamt
     const wFull = 1 - wBass;
@@ -1445,7 +1453,7 @@ export class Analyser {
         this.envFilled = 0; this.beatAnchorMs = 0; this.pendingKickMs = 0;
         this.bpmHistLen = 0; this.bpmHistPos = 0; this.lastVoteMs = 0;
         for (let i = 0; i < this.tempoGram.length; i++) this.tempoGram[i] *= 0.5;
-        this.envBassAccum = 0;
+        this.envBassAccum = 0; if (!!process.env.DMX_HIGH_DIAG) this.envHighAccum = 0;
         this.barAcc.fill(0); this.barCount = 0;
       } else if (this.silenceArmed && this.silentMs > 10000 && this.localBpm !== 0) {
         this.localBpm = 0;
@@ -1461,6 +1469,7 @@ export class Analyser {
     // Basbandets egen envelope (kick-flux) — samma raster, oberoende signal.
     const bassFluxNorm = Math.min(1, kickFlux * 0.02);
     if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
+    if (!!process.env.DMX_HIGH_DIAG) { const hi = this.bandOn[6] > this.bandOn[7] ? this.bandOn[6] : this.bandOn[7]; if (hi > this.envHighAccum) this.envHighAccum = hi; }
     this.envAccumT += hopMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) {
       this.envAccumT -= 1000 / Analyser.ENV_HZ;
@@ -1476,10 +1485,11 @@ export class Analyser {
       }
       this.envRing[this.envPos] = _e;
       this.envBassRing[this.envPos] = this.envBassAccum;
+      if (!!process.env.DMX_HIGH_DIAG) this.envHighRing[this.envPos] = this.envHighAccum;
       this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
       this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
       this.envAccum = 0;
-      this.envBassAccum = 0;
+      this.envBassAccum = 0; if (!!process.env.DMX_HIGH_DIAG) this.envHighAccum = 0;
       // Innan lås: räkna på varje ny envelope-sample (100 Hz) för snabbast första estimat.
       // Efter lås: 4 Hz räcker gott — sparar CPU och förfinar med median.
       // TAK PÅ OLÅST TAKT. Den gamla kommentaren här angav 110 µs @ N=500 på x86 —
