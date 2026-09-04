@@ -151,6 +151,9 @@ const BEAT_MIN = Number(process.env.BEAT_MIN ?? 0.30);
 // (lag fas-tillit) eller fel (2/3-fantom) pulsar hjartslaget pa de FAKTISKA kickarna i stallet.
 // Crossfade pa tilliten: <= LIVE_TRUST_LO helt live, >= LIVE_TRUST_HI helt grid. Utan env: som forut.
 const LIVE_BEAT = !!process.env.DMX_LIVE_BEAT;
+// DEPTH_GAIN (agaren 2026-09-04 'oka styrkan'): multiplicerar hjartslagsdjupet (clamp <= 1) sa slaget
+// nar golvet BEAT_MIN varje takt aven vid lag tillit (trustFloored 0.75 kapade djupet till ~0.6).
+const DEPTH_GAIN = Number(process.env.DEPTH_GAIN ?? 1);
 const LIVE_BEAT_MS = Number(process.env.LIVE_BEAT_MS ?? 240);   // live-pulsens avklingning
 const LIVE_TRUST_LO = Number(process.env.LIVE_TRUST_LO ?? 0.3), LIVE_TRUST_HI = Number(process.env.LIVE_TRUST_HI ?? 0.7);   // heartbeat-golv mellan slagen (env-tunbar; hogre = mindre dipp, ljusare)
 const BEAT_TRUST_FLOOR = 0.75;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
@@ -669,7 +672,7 @@ export class EffectEngine {
         // 0.80 → 0.92, och energigolvet 0.35 → 0.50: djupare slag överallt, och märkbart
         // mer även i lugna partier. Pulsen ligger sist i kedjan och passerar inget
         // filter, så hela djupet når fram — det som mäts är det som syns.
-        const depth = 0.92 * trustFloored * (0.62 + 0.45 * energy) * calm;   // 0.50+0.50 -> 0.62+0.45: punchigare hjartslag (agaren "svagare/dimmare" efter effekt-trim)
+        const depth = Math.min(1, DEPTH_GAIN * 0.92 * trustFloored * (0.62 + 0.45 * energy) * calm);   // 0.50+0.50 -> 0.62+0.45: punchigare hjartslag (agaren "svagare/dimmare" efter effekt-trim)
         // KLAMRAS NEDAT: pre-dippen far envelopen ga negativ med flit, men
         // multiplikatorn far aldrig slacka riggen helt — da lases dippen som ett
         // blink i stallet for som andning. 0.06 lamnar lamporna tanda.
