@@ -308,7 +308,7 @@ export class Analyser {
   private envHighRing = new Float32Array(Analyser.ENV_LEN);
   private envHighAccum = 0;
   private scoreHigh = new Float32Array(Analyser.ENV_LEN);
-  private _hiTop = 0; private _hiVal = 0;
+  private _hiTop = 0; private _hiVal = 0; private _eHigh = 0;
   private scoreFull = new Float32Array(Analyser.ENV_LEN);
   private scoreBass = new Float32Array(Analyser.ENV_LEN);
   /** Ackumulerat tempogram (EMA av hela lag-kurvan mellan anrop). */
@@ -646,13 +646,19 @@ export class Analyser {
     // basen. Två OBEROENDE score-kurvor som röstar ihop rättar just de fall där
     // off-beat-testet annars tvekar mellan ballad och danslåt. Helbandet scoras
     // SIST eftersom scratcharna (env/envPos) används nedan.
-    if (!!process.env.DMX_HIGH_DIAG) { this.scoreEnv(this.envHighRing, N, this.scoreHigh, lagMin, lagMax); let bl = lagMin, bv = -1; for (let l = lagMin; l <= lagMax; l++) if (this.scoreHigh[l] > bv) { bv = this.scoreHigh[l]; bl = l; } this._hiTop = (Analyser.ENV_HZ * 60) / bl; this._hiVal = bv; }
+    if (!!process.env.DMX_HIGH_DIAG || !!process.env.DMX_HIGH_VOTE) { this._eHigh = this.scoreEnv(this.envHighRing, N, this.scoreHigh, lagMin, lagMax); let bl = lagMin, bv = -1; for (let l = lagMin; l <= lagMax; l++) if (this.scoreHigh[l] > bv) { bv = this.scoreHigh[l]; bl = l; } this._hiTop = (Analyser.ENV_HZ * 60) / bl; this._hiVal = bv; }
     const eBass = this.scoreEnv(this.envBassRing, N, this.scoreBass, lagMin, lagMax);
     const eFull = this.scoreEnv(this.envRing, N, this.scoreFull, lagMin, lagMax);
     if (!!process.env.DMX_HIGH_DIAG && process.env.VETO_WIN) { const [wa, wb] = process.env.VETO_WIN.split(',').map(Number); const tt = (this.wallNow() - 1700000000000) / 1000; if (tt >= wa && tt <= wb) { let fl = lagMin, fv = -1; for (let l = lagMin; l <= lagMax; l++) if (this.scoreFull[l] > fv) { fv = this.scoreFull[l]; fl = l; } console.log(`[hi] t=${tt.toFixed(1)} lock=${this.localBpm} HIGH top=${this._hiTop.toFixed(0)} val=${this._hiVal.toFixed(3)} | FULL top=${((Analyser.ENV_HZ * 60) / fl).toFixed(0)} val=${fv.toFixed(3)}`); } }
-    if (eFull <= 0 && eBass <= 0) return;
+    // DISKANT-ROST (prototyp, DMX_HIGH_VOTE=always|cond, HIGH_W). envRing ser bara 0-1.5 kHz;
+    // hi-hat-intron bar tempot i diskanten (MATT @564: HIGH 182 stabilt i 22 s medan FULL
+    // flaxade 91-188). 'cond' = bara nar laset ar instabilt (bpmStable=0 eller conf < HIGH_COND_CONF).
+    let wHigh = 0;
+    { const hv = process.env.DMX_HIGH_VOTE; if (hv && this._eHigh > 0) { const unstable = this.bpmStable === 0 || this.localBpmConfidence < Number(process.env.HIGH_COND_CONF ?? 0.4); if (hv === 'always' || (hv === 'cond' && unstable)) wHigh = Number(process.env.HIGH_W ?? 0.3); } }
+    if (eFull <= 0 && eBass <= 0 && wHigh <= 0) return;
     const wBass = eBass > eFull * 0.15 ? 0.55 : 0;   // tomt basband → helbandet ensamt
     const wFull = 1 - wBass;
+    const wNorm = wFull + wBass + wHigh;   // = 1 utan diskant-rost → bit-identiskt
     // TEMPOGRAM-ACKUMULERING: förr kastades hela score-kurvan varje anrop och bara
     // toppen sparades, varpå medianen fick städa upp efteråt (~5 s till lås). Nu
     // EMA:as HELA lag-kurvan mellan anrop, så bevis ackumuleras där det hör hemma:
@@ -664,7 +670,7 @@ export class Analyser {
     this.diagLagMin = lagMin; this.diagLagMax = lagMax;
     let bestLag = 0, bestVal = 0, scoreSum = 0, scoreCount = 0;
     for (let lag = lagMin; lag <= lagMax; lag++) {
-      const s = wFull * this.scoreFull[lag] + wBass * this.scoreBass[lag];
+      const s = (wFull * this.scoreFull[lag] + wBass * this.scoreBass[lag] + wHigh * this.scoreHigh[lag]) / wNorm;
       const v = tg[lag] + (s - tg[lag]) * a;
       tg[lag] = v;
       scoreSum += v; scoreCount++;
