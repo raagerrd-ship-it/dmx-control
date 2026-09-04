@@ -305,7 +305,7 @@ capture.on("chunk", (samples: Float32Array) => {
   // Samma sak för TEMPOT: medianfönstret (~5 s) och tempogrammet tillhör förra
   // låten. Att rösta vidare på dem kostade upp till 6 s omlåsning fastän minnet
   // just SLAGIT FAST att en ny låt börjat. Nollställt lås tar första estimatet direkt.
-  if (songs.boundaryCount !== lastBoundary) { lastBoundary = songs.boundaryCount; effects.softenRange(); analyser.resetTempo(); }
+  if (songs.boundaryCount !== lastBoundary) { lastBoundary = songs.boundaryCount; effects.softenRange(); if (process.env.DMX_BOUNDARY_SOFT) analyser.hintTrackChange(5000); else analyser.resetTempo(); }   // DMX_BOUNDARY_SOFT: mjuk hint i st.f. hard nollstallning — falska latgranser pa pop kastade tempolaset 5x/5 min (ladan 2026-09-04)
 
 
   // TILLITEN KOMMER FRAN FASPREDIKTIONEN, inte fran tempogrammets form.
