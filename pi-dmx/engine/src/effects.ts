@@ -107,7 +107,7 @@ const LIGHT_BASS_W = 0.25;         // bas-vikt (kropp utan att låsa nivån till
 const LIGHT_SMOOTH_MS = 55;        // release-avbrusning på wlevel
 const LIGHT_WIN_DB = 18;           // centrerat dB-fönster (±9 dB runt medel → 0..1)
 const LIGHT_MEAN_TAU = 30000;      // medelnivåns tidskonstant (ms) — stabil men följer volymen
-const LIGHT_FLOOR = 0.3;           // ljus-golv vid loud=0 (dim vers, inte svart)
+const LIGHT_FLOOR = Number(process.env.LIGHT_FLOOR ?? 0.3);   // env-tunbar (fest: hogre golv = ljusare medelniva)           // ljus-golv vid loud=0 (dim vers, inte svart)
 const LIGHT_ANCHOR_OFF = 9;        // toppen over de hogsta topparna (mean+9) sa loud inte pinnar pa 1.0.
 const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
 // SHAPE-SMOOTHING 25/150 -> 300/350. Ägaren i ladan 2026-09-03: ljuset flimrade på
@@ -131,6 +131,7 @@ const LIGHT_SOFT = 0.3;            // soft-snap-golv vid låg energi
  */
 const DISCRETE_DROP_LAMPS = true;   // ater PA (agaren i ladan): lamporna ska bloma pa dropen synkat med roken (samma dropCount). Energi-gasen ensam racker inte som drop-markering.
 const STROBE_MIN_BPM = 150;   // effekt-krav: riser-strobe bara i snabba latar (agarens onskemal)
+const BEAT_MIN = Number(process.env.BEAT_MIN ?? 0.30);   // heartbeat-golv mellan slagen (env-tunbar; hogre = mindre dipp, ljusare)
 const BEAT_TRUST_FLOOR = 0.75;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 
 export class EffectEngine {
@@ -662,7 +663,7 @@ export class EffectEngine {
         // strax före/mellan slagen → lästes som fladder till nära-svart (ägaren i
         // ladan 2026-09-03). 0.30 gör slaget till en tydlig ANDNING (30→100 %), inte
         // ett strobe-dropp. Hjärtslaget syns UPPÅT mot den nu dynamiska grundnivån.
-        const bmClamped = bm < 0.30 ? 0.30 : bm > 1 ? 1 : bm;
+        const bmClamped = bm < BEAT_MIN ? BEAT_MIN : bm > 1 ? 1 : bm;
         const bmDt = Math.min(0.05, (performance.now() - this.lastRenderMs) / 1000);
         if (bmClamped >= this.beatMulNow) this.beatMulNow = bmClamped;                                   // momentan attack
         else this.beatMulNow += (bmClamped - this.beatMulNow) * Math.min(1, bmDt / BEAT_FLUTTER_RELEASE); // ~90 ms release
