@@ -661,16 +661,20 @@ export class Analyser {
     // hi-hat-intron bar tempot i diskanten (MATT @564: HIGH 182 stabilt i 22 s medan FULL
     // flaxade 91-188). 'cond' = bara nar laset ar instabilt (bpmStable=0 eller conf < HIGH_COND_CONF).
     let wHigh = 0;
-    { const hv = process.env.DMX_HIGH_VOTE; if (hv && this._eHigh > 0) { const unstable = this.bpmStable === 0 || this.localBpmConfidence < Number(process.env.HIGH_COND_CONF ?? 0.4); if (hv === 'always' || (hv === 'cond' && unstable)) wHigh = Number(process.env.HIGH_W ?? 0.3); } }
+    const hvUnstable = this.bpmStable === 0 || this.localBpmConfidence < Number(process.env.HIGH_COND_CONF ?? 0.4);
+    { const hv = process.env.DMX_HIGH_VOTE; if (hv && this._eHigh > 0) { if (hv === 'always' || (hv === 'cond' && hvUnstable)) wHigh = Number(process.env.HIGH_W ?? 0.3); } }
     if (eFull <= 0 && eBass <= 0 && wHigh <= 0) return;
     const wBass = eBass > eFull * 0.15 ? 0.55 : 0;   // tomt basband → helbandet ensamt
     const wFull = 1 - wBass;
     // 'sharp' (Gemini: dynamisk tavling): bandet med skarpast topp far dominera. Vikt ∝ skarpa^HIGH_K.
     let wF = wFull, wB = wBass, wH = wHigh;
-    if (process.env.DMX_HIGH_VOTE === 'sharp' && this._eHigh > 0) {
+    // HIGH_SHARP_COND=1: diskanten rostar bara nar laset ar instabilt (skyddar ett friskt las, sparar CPU).
+    // HIGH_CAP=x: diskantens andel av vikten far aldrig overstiga x.
+    if (process.env.DMX_HIGH_VOTE === 'sharp' && this._eHigh > 0 && (!process.env.HIGH_SHARP_COND || hvUnstable)) {
       const k = Number(process.env.HIGH_K ?? 2);
       const sF = this.sharpOf(this.scoreFull, lagMin, lagMax), sB = wBass > 0 ? this.sharpOf(this.scoreBass, lagMin, lagMax) : 0, sH = this.sharpOf(this.scoreHigh, lagMin, lagMax);
       wF = Math.pow(sF, k); wB = Math.pow(sB, k); wH = Math.pow(sH, k);
+      if (process.env.HIGH_CAP) { const cap = Number(process.env.HIGH_CAP); const tot = wF + wB + wH; if (tot > 0 && wH / tot > cap) wH = cap * (wF + wB) / (1 - cap); }
       if (process.env.DMX_BPM_TRACE && process.env.VETO_WIN) { const [wa, wb] = process.env.VETO_WIN.split(',').map(Number); const tt = (this.wallNow() - 1700000000000) / 1000; if (tt >= wa && tt <= wb && ((tt * 10) | 0) % 8 === 0) console.log(`[sharp] t=${tt.toFixed(1)} sF=${sF.toFixed(2)} sB=${sB.toFixed(2)} sH=${sH.toFixed(2)} -> wF=${(wF/(wF+wB+wH)).toFixed(2)} wB=${(wB/(wF+wB+wH)).toFixed(2)} wH=${(wH/(wF+wB+wH)).toFixed(2)}`); }
     }
     const wNorm = wF + wB + wH;   // = 1 utan diskant-rost → bit-identiskt
@@ -951,8 +955,12 @@ export class Analyser {
         let needMs = this.subhSuspect(this.challengerBpm) ? needMs1 * 4 : needMs1;
         // GEMINI #2 (prototyp, DMX_GHOST_WAIT): en utmanare på exakt 2/3 eller 3/4 av låset är
         // statistiskt en crossfade-artefakt → tvinga den att överleva faden (~10 s) innan lås.
-        if (process.env.DMX_GHOST_WAIT && this.localBpm > 0) {
-          const gr = this.challengerBpm / this.localBpm;
+        // GHOST_LASTGOOD=1: nyckla pa senast COMMITTADE tempot (som subhSuspect), inte det aktuella laset —
+        // ett farskt okommitterat fel (t.ex. 2x forra laten via diskanten) far annars sin rattning blockerad
+        // som 'ghost' (MATT: utandig 90 -> drickervin: las 181, sanningen 124/181=0.685 ≈ 2/3 -> 12 s stopp).
+        const ghostRef = (process.env.GHOST_LASTGOOD && this.lastGoodBpm > 0) ? this.lastGoodBpm : this.localBpm;
+        if (process.env.DMX_GHOST_WAIT && ghostRef > 0) {
+          const gr = this.challengerBpm / ghostRef;
           if (Math.abs(gr - 2 / 3) < 0.04 || (!!process.env.GHOST_34 && Math.abs(gr - 0.75) < 0.04)) needMs = rival > 3.0 ? Number(process.env.GHOST_MS ?? 12000) : 25000;
         }
         const dtVote = this.lastSongVoteMs > 0 ? Math.min(200, voteNow - this.lastSongVoteMs) : 0;
@@ -1071,6 +1079,9 @@ export class Analyser {
   /** Nollställ lås-/röst-ackumulatorerna — gemensam kärna för resetTempo/hintTrackChange/
    *  silens, så de tre inte kan divergera (jfr A5-buggen som var just en divergens). */
   private clearLockVotes(): void {
+    // HIGH_CLEAR=1: nolla diskant-ringen vid varje las-reset (hint/resetTempo/tystnad) sa forra
+    // latens hi-hat-monster aldrig far rosta in i nasta lat (MATT: utandig 90 -> drickervin holl 181=2x90 i 17 s).
+    if (process.env.HIGH_CLEAR && (process.env.DMX_HIGH_DIAG || process.env.DMX_HIGH_VOTE)) { this.envHighRing.fill(0); this.envHighAccum = 0; }
     this.warmCalls = 0; this.holdCalls = 0;
     this.octaveVote = 0; this.nearVote = 0; this.nearChallenger = 0; this.bpmStable = 0;
     this.newSongVote = 0; this.challengerBpm = 0; this.lastSongVoteMs = 0; this.lockPeak = 0;
