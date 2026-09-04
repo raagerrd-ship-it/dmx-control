@@ -248,14 +248,20 @@ const capture = new AudioCapture({
 });
 
 // LJUDKLOCKA: varje chunk ar ett hop (hopSamples = cfg.fft.hop), sa antalet
-// chunkar x hoplangd ar exakt hur mycket ljud som passerat â€” utan leveransjitter.
+// chunkar x hoplangd ar exakt hur mycket ljud som passerat — utan leveransjitter.
 // Matas till analysatorn FORE process() sa slagtiden stamplas ur ljudet, inte ur
 // vaggklockan. Se Analyser.setAudioClockMs.
 let audioChunks = 0;
 const HOP_MS = (cfg.fft.hop / cfg.audio.rate) * 1000;
+// OPT-IN (DMX_AUDIO_CLOCK=1), INTE DEFAULT. A/B pa lotus 2026-09-04 visade INGEN
+// vinst (|err| p95 28 -> 48 ms; olika latar, alltsa oavgjort men inte till fixens
+// fordel), och ljudklockan star still vid mic-omstart medan offset-filtret slapar
+// efter. Se lotus alsaMic.ts for hela resonemanget. Av tills en matning pa samma
+// lat med varians i kick-intervall visar nagot.
+const AUDIO_CLOCK_ON = process.env.DMX_AUDIO_CLOCK === '1';
 capture.on("chunk", (samples: Float32Array) => {
   const t0 = performance.now();
-  analyser.setAudioClockMs(audioChunks++ * HOP_MS);
+  if (AUDIO_CLOCK_ON) analyser.setAudioClockMs(audioChunks++ * HOP_MS);
   const frame = analyser.process(samples);
   health.noteSlowCall("analyser.process", performance.now() - t0);
   health.noteChunk();
