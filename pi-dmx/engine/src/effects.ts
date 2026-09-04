@@ -15,6 +15,21 @@ import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, meetsRequirements } from "./effects/registry.js";
 import { fitScore } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
+// PALETT-LAS (DMX_PALETTE): lås färgerna till en palett oavsett klang och läge. Namn ur listan
+// nedan eller en sektorlista "4,4.6,5.55" (sektor/6 = hue: 0 röd, 1 gul, 2 grön, 3 cyan, 4 blå,
+// 5 magenta — bråkdelar går bra, alla konsumenter räknar mixedSector()/6). Födelsedagsbarnet
+// 2026-09-05 ville ha blå/lila/rosa. Tom/osatt = som förut (dirigenten väljer per fras).
+const NAMED_PALETTES: Record<string, number[]> = {
+  fodelsedag: [4, 4.6, 5.55],   // blå 240°, lila 276°, rosa 333°
+  bla: [3.7, 4, 4.3], rosa: [5.3, 5.55, 5.8], eld: [0, 0.4, 1], regnbage: ALL_SECTORS,
+};
+const PALETTE_LOCK: number[] | null = (() => {
+  const v = (process.env.DMX_PALETTE ?? "").trim(); if (!v) return null;
+  if (NAMED_PALETTES[v.toLowerCase()]) return NAMED_PALETTES[v.toLowerCase()];
+  const nums = v.split(",").map(Number).filter((x) => Number.isFinite(x) && x >= 0 && x < 6);
+  return nums.length ? nums : null;
+})();
+if (PALETTE_LOCK) console.log(`[palett] LÅST till [${PALETTE_LOCK.join(", ")}] via DMX_PALETTE`);
 import { hsvToRgb } from "./effects/color.js";
 import type { EffectContext } from "./effects/types.js";
 import { LiveRange } from "./liveRange.js";
@@ -1001,9 +1016,9 @@ export class EffectEngine {
         this.phraseBeat = 0;
         this.pickPalette(frame.centroid);
       }
-      setPalette(PALETTES[this.paletteIdx].sectors);
+      setPalette(PALETTE_LOCK ?? PALETTES[this.paletteIdx].sectors);
     } else {
-      setPalette(ALL_SECTORS);                             // manuella lägen: obegränsad färg
+      setPalette(PALETTE_LOCK ?? ALL_SECTORS);             // manuella lägen: obegränsad färg (om ej låst)
     }
 
     // Advance the wave phase by dt so speed changes glide instead of jumping.
