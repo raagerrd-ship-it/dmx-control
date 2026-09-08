@@ -136,6 +136,21 @@ const DROP_QUALITY_DB = Number(process.env.DROP_QUALITY_DB ?? 3.5);
 // fyrningen vantar pa NASTA takts om-korsning av 17 dB -> "drop pa takten efter" (ladan 2026-09-04:
 // rise=17.0 vid VARJE fyrning = farsk korsning). 0 = bara edge-ogonblicket (tidigare beteende).
 const DROP_ARM_MS = Number(process.env.DROP_ARM_MS ?? 0);
+// FYR-LAGG. Matt offline (dropLag-harness, disco-env): ra-kant -> fyr p50 221 ms megamix,
+// 365 ms pop, p90 ~440 ms = nastan en takt vid 130 BPM. Hela laggen ar bodyFast-filtret
+// (tau 120 ms) som alla tre villkor laser. BODY_FAST_S sveper tau; DROP_PEEK later
+// villkoren lasa max(bodyFast, ra bodyNow) sa fyrningen inte vantar in filtret.
+const BODY_FAST_S = Number(process.env.BODY_FAST_S ?? 0.12);
+// DROP_PEEK_MS: LOPANDE MINIMUM av ra bodyNow over N ms — "basen har legat minst sa hogt i N ms".
+// Nar stegnivan efter N ms (inte efter filtrets kryp mot 94 %), men en ensam kick-ruta (8 ms) lurar det inte.
+// 0 = av. DROP_PEEK=1 (gammal boolesk) = 0 ms = ra-varde direkt (matt: 3 nya pop-fyrningar pa enskilda kickar).
+const DROP_PEEK_MS = Number(process.env.DROP_PEEK_MS ?? (process.env.DROP_PEEK ? 0 : -1));
+const DROP_PEEK = DROP_PEEK_MS >= 0;
+// DROP_RISE_MIN: stigningen mats mot MINIMUM av bodyFast senaste 0,5 s, inte mot punkten exakt 0,5 s bakat.
+// MATT (pop-facit, signaldump): mjuka pop-drops har ett SUG (dipp 100-200 ms) precis fore dropen; med
+// punkt-referensen nas 17 dB forst nar referensen hamnar i dippen -> fyrningen landar 0,5 s efter dippen
+// = exakt en takt vid 130 BPM ("drop en takt efter"). Min-referensen ser dippen direkt.
+const DROP_RISE_MIN = !!process.env.DROP_RISE_MIN;
 const DROP_SHORT_MS = 4000;    // minsta drop-avstand nar dropen ESKALERAR
 const DROP_LONG_MS = 20000;    // annars maste sa har lang tid ga (mot falska upprepningar)
 const DROP_ESCALATE_DB = 3;    // 1.5 -> 3 (agaren): tatare drops maste vara TYDLIGT starkare for att fyra
@@ -394,6 +409,7 @@ export class Analyser {
    *  bodyEnv (0.35 s) styr tak och franvaro. Blandar man ihop dem dampas
    *  stigningen och trosklarna slutar motsvara det som mattes i banken. */
   private bodyFast = -120;
+  private peekRing = new Float32Array(64).fill(-120); private peekPos = 0;   // DROP_PEEK_MS lopande minimum av ra bodyNow
   private bodyCeil = -300;   // dB — sa forsta max() tar bodyEnv
   private bodyPeak = -300;   // SEG topp (haller latens loud-referens i minuter) for landa-hogt-checken
   /** ANSLAGSDETEKTION. En tröskel som ska NÅS korsas först när basen redan
@@ -1817,7 +1833,14 @@ export class Analyser {
     // definierande drag — raderades i exakt det ogonblick det skedde.
     const bodyNow = (this.bandDbRaw[0] + this.bandDbRaw[1] + this.bandDbRaw[2]) / 3;   // ra dB
     this.bodyEnv += (bodyNow - this.bodyEnv) * Math.min(1, dtHop / 0.35);
-    this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / 0.12);   // 0.06 testat men gav falsklarm live utan att fixa beat-lagget (det sitter i lamp-vagen/energin, inte har)
+    this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / BODY_FAST_S);
+    let bodyPeek = this.bodyFast;
+    if (DROP_PEEK) {   // villkoren far se ra-kanten efter DROP_PEEK_MS (lopande min), inte efter filtret
+      const n = Math.min(63, Math.max(1, Math.round(DROP_PEEK_MS / (dtHop * 1000)) + 1));
+      this.peekRing[this.peekPos] = bodyNow; this.peekPos = (this.peekPos + 1) & 63;
+      let mn = Infinity; for (let k = 1; k <= n; k++) { const v = this.peekRing[(this.peekPos - k) & 63]; if (v < mn) mn = v; }
+      bodyPeek = Math.max(this.bodyFast, mn);
+    }   // 0.06 testat men gav falsklarm live utan att fixa beat-lagget (det sitter i lamp-vagen/energin, inte har)
     // TAKET SJUNKER I dB PER SEKUND, inte i procent. Kroppen ar nu ett dB-tal
     // (negativt), och "1,5 % av ett negativt tal" gor taket STORRE, inte mindre —
     // den gamla raden var matematiskt omvand sa fort skalan blev logaritmisk.
@@ -1841,7 +1864,9 @@ export class Analyser {
     // STIGNINGSTAKT över 0.5 s (ringbuffert, ingen allokering).
     const hist = this.bodyHist, HL = hist.length;
     const oldest = hist[(this.bodyHistPos + HL - this.bodyHistLen) % HL];
-    const bodyRise = this.bodyFast - oldest;
+    let riseRef = oldest;
+    if (DROP_RISE_MIN) { let mn = oldest; for (let k = 1; k <= this.bodyHistLen; k++) { const v = hist[(this.bodyHistPos + HL - k) % HL]; if (v < mn) mn = v; } riseRef = mn; }
+    const bodyRise = bodyPeek - riseRef;
     hist[this.bodyHistPos] = this.bodyFast;
     this.bodyHistPos = (this.bodyHistPos + 1) % HL;
     const want = Math.min(HL - 1, Math.max(1, Math.round(0.5 / dtHop)));
@@ -1862,7 +1887,7 @@ export class Analyser {
     // Mot SEGA toppen (bodyPeak), inte snabba taket: en falsk drop i ett tyst parti
     // landar lagt (fast ~10) medan riktiga landar hogt (fast ~34+); den sega toppen
     // haller loud-referensen (~44) sa den laga landningen avvisas aven om taket tillf. sjunkit.
-    const landsHigh = this.bodyFast > this.bodyPeak - BODY_PEAK_DB;
+    const landsHigh = bodyPeek > this.bodyPeak - BODY_PEAK_DB;
     const bodyOnset = bodyRise > BODY_RISE_DB && landsHigh && nowWallA - this.lastBodyGoneMs < 6000;
     // EN DROP MASTE LANDA I HOG ENERGI. Villkoren ovan tittar bara pa LOKALA
     // nivasprang (svacka -> topp-zon) och vet inget om var i laten vi ar, sa varje
@@ -1962,7 +1987,7 @@ export class Analyser {
       this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise;
       console.log(`[dropfire] wall ${this.wallNow()} KICKFIRST rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s`);
     }
-    const fullSlam = this.bodyPeak - this.bodyFast < DROP_QUALITY_DB;
+    const fullSlam = this.bodyPeak - bodyPeek < DROP_QUALITY_DB;
     // DMX_DROP_TRACE=1: logga KONSUMERADE edges (kandidat som INTE fyrade) — var ligger kroppen vid
     // forsta takten? Matdata for DROP_QUALITY_DB pa mjukare material (pop) dar inget facit finns.
     if (process.env.DMX_DROP_TRACE && bodyOnsetEdge && !(dropSpacingOk && fullSlam)) console.log(`[dropedge] rise ${bodyRise.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s spacingOk ${dropSpacingOk} sinceDrop ${(sinceDrop/1000).toFixed(1)}s`);
