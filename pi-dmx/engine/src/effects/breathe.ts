@@ -5,6 +5,7 @@ import type { EffectDef } from "./types.js";
 export const breathe: EffectDef = {
   key: "breathe", label: "Andas", tier: "lugn",
   desc: "Hela riggen andas som en – djup mjuk våg i en färg.",
+  flat: true,   // statiskt svep → kortare dwell
   render(c) {
     const hue = c.mixedSector(Math.floor(c.t / 11) + Math.round(c.frame.centroid * 3)) / 6;   // centroid → palett-läge
     // Andetagets DJUP följer sektionsenergin: i en svacka blir andningen grund

@@ -98,8 +98,6 @@ const SUBDIV_MIN_HOLD_MS = 10000;
  *  Dirigenten boostar de delade lookerna vid halvering (dubbeltakt ELLER lugnt) och hjärta i
  *  lugna partier, och får byta look när halveringen slår om. Ägaren 2026-09-12. */
 const HALVE_SHOW = process.env.DMX_HALVE_SHOW === "1";
-/** Statiska svep utan takt/kick-rorelse — byts snabbare (DMX_DWELL_FLAT_MS). */
-const FLAT_LOOKS = new Set<Mode>(["airglow", "breathe", "drift", "mono", "subbreath", "tide", "viska", "wave"]);
 
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
@@ -1038,7 +1036,7 @@ export class EffectEngine {
         // ENFORMIG LOOK -> KORTARE DWELL. Agaren 2026-09-12: "ar det en enformig effekt far den garna byta
         // snabbare". De statiska svepen (ingen takt-signal, ingen kick-drift) far DMX_DWELL_FLAT_MS (30 s),
         // taktdrivna looker behaller DMX_DWELL_MS. Satts EFTER valet, eftersom dwellen ovan sattes fore.
-        if (process.env.DMX_DWELL_MS && FLAT_LOOKS.has(this.smartMode)) this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_FLAT_MS) || 30000);
+        if (process.env.DMX_DWELL_MS && EFFECT_MAP[this.smartMode]?.flat) this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_FLAT_MS) || 30000);
       }
       effMode = this.smartMode;
     }

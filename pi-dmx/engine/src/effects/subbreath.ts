@@ -9,6 +9,7 @@ import type { EffectDef } from "./types.js";
 export const subbreath: EffectDef = {
   key: "subbreath", label: "Sub-andning", tier: "lugn",
   desc: "Djup sub-bas-andning med krispigt luft-skimmer i kanterna.",
+  flat: true,   // statiskt svep → kortare dwell
   render(c) {
     const base = Math.min(1, 0.15 + 0.85 * c.shaped(0.1, c.frame.spec.sub) + c.punch * 0.2);   // sub-andning + dunk-svall
     const hue = c.mixedSector(0) / 6;                            // palettens djupa basfärg

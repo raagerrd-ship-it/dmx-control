@@ -7,6 +7,7 @@ import type { EffectDef } from "./types.js";
 export const viska: EffectDef = {
   key: "viska", label: "Viska", tier: "lugn",
   desc: "Nästan mörkt — bara diskreta gnistor från virvel och hi-hat, dov puls på kicken.",
+  flat: true,   // statiskt svep → kortare dwell
   render(c) {
     const d = c.drum;
     const role = c.count > 1 ? c.idx % 3 : -1;

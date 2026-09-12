@@ -8,6 +8,7 @@ import type { EffectDef } from "./types.js";
 export const tide: EffectDef = {
   key: "tide", label: "Tidvatten", tier: "lugn",
   desc: "En vattenlinje som stiger genom riggen med musikens tyngd; skum på toppen.",
+  flat: true,   // statiskt svep → kortare dwell
   render(c) {
     const line = c.gravLevel * c.count;              // vattenlinjens läge i lampor
     const below = line - c.idx;                       // >1 helt under, 0..1 vid ytan

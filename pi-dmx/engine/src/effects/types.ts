@@ -112,6 +112,8 @@ export interface EffectDef {
   label: string;
   /** UI-beskrivning (en mening). */
   desc: string;
+  /** Statiskt svep utan takt-/kick-rorelse: dirigenten byter det snabbare (DMX_DWELL_FLAT_MS). */
+  flat?: boolean;
   /** Smart-lägets energitier. */
   tier: EffectTier;
   /** Specialroller (hazer/uv/blinder/strobe/laser/co2) som effekten aktivt driver

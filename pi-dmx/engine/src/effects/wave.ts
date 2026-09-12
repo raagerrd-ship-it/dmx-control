@@ -8,6 +8,7 @@ import type { EffectDef } from "./types.js";
 export const wave: EffectDef = {
   key: "wave", label: "Våg", tier: "fart",
   desc: "Flödande färgvåg som rullar över hela riggen.",
+  flat: true,   // statiskt svep → kortare dwell
   render(c) {
     // Diskant-nivån (spec.treble) lägger en snabb krusning på vågfasen → en slät
     // sinus blir TAGGIG och vibrerar när hi-hats/cymbaler piskar på. onset.treble

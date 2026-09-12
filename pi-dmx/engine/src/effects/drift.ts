@@ -7,6 +7,7 @@ import type { EffectDef } from "./types.js";
 export const drift: EffectDef = {
   key: "drift", label: "Drift", tier: "lugn",
   desc: "Ljuset vandrar genom riggen efter musikens klangfärg — mörkt åt ena hållet, ljust åt andra.",
+  flat: true,   // statiskt svep → kortare dwell
   render(c) {
     const pos = c.frame.centroid * (c.count - 1);     // klangens läge i lampor
     const d = Math.abs(c.idx - pos);

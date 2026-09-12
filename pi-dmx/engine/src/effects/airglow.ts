@@ -9,6 +9,7 @@ import type { EffectDef } from "./types.js";
 export const airglow: EffectDef = {
   key: "airglow", label: "Luft-glöd", tier: "lugn",
   desc: "Nästan mörkt; varje cymbal/shaker/väsljud tänder en gnista i kanten.",
+  flat: true,   // statiskt svep → kortare dwell
   render(c) {
     const base = 0.20 + 0.06 * (0.5 + 0.5 * Math.sin(c.t * 0.3 + c.idx * 1.7));   // svag vilo-glöd (krispare)
     const spark = c.shaped(0, Math.max(c.frame.onset.air, c.frame.onset.treble)) * 0.95;  // rena anslag (shaker/hi-hat)

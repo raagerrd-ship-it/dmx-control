@@ -6,6 +6,7 @@ import type { EffectDef } from "./types.js";
 export const mono: EffectDef = {
   key: "mono", label: "Eld", tier: "lugn",
   desc: "Varm brasa som flimrar levande, glider rött → gult.",
+  flat: true,   // statiskt svep → kortare dwell
   render(c) {
     const flick = Math.sin(c.t * 6.7 + c.idx * 2.3) * 0.5
                 + Math.sin(c.t * 10.9 + c.idx * 4.1) * 0.3
