@@ -98,6 +98,14 @@ const SUBDIV_MIN_HOLD_MS = 10000;
  *  Dirigenten boostar de delade lookerna vid halvering (dubbeltakt ELLER lugnt) och hjärta i
  *  lugna partier, och får byta look när halveringen slår om. Ägaren 2026-09-12. */
 const HALVE_SHOW = process.env.DMX_HALVE_SHOW === "1";
+/** MINIDROP-REAKTION (agaren 2026-09-12: "minidrops borde markas — effektbyte eller intensitet"): analysatorns
+ *  frame.miniDropCount (monoton) ger look-byte (om looken hallits MIN_HOLD) + en kort stot pa MINI_DROP_ENV av
+ *  en full drop-small (dropEnv), ingen rok, ingen blackout. */
+const MINI_DROP_ENV = Number(process.env.MINI_DROP_ENV ?? 0.35);
+const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);
+/** EXTRA TYDLIG TAKT -> ALLTID inre/yttre (agaren 2026-09-12). profile.beat >= CLEAR_BEAT (matt: 0,90 = 15 % av
+ *  pop-facitets tid, 26 % av megamix) och bpmConfidence >= 0,7. Kraver DMX_HALVE_SHOW. */
+const CLEAR_BEAT = Number(process.env.DMX_CLEAR_BEAT ?? 0.9);
 
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
@@ -226,6 +234,7 @@ export class EffectEngine {
   private ambient = 0;   // 0 = spelar, 1 = varm vila (efter ~2.5s tystnad)
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
+  private lastMiniCount = 0; private miniBangUntil = 0;   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   // Loudness-portens tillstånd (Lotus mid+diskant dB-fönster + log-release). Negativa
@@ -760,6 +769,9 @@ export class EffectEngine {
     const dtNow = Math.min(0.1, (performance.now() - this.lastRenderMs) / 1000);
     const dropHit = frame.dropCount !== this.lastDropCount;
     this.lastDropCount = frame.dropCount;
+    const miniCount = frame.miniDropCount ?? 0;
+    const miniHit = miniCount !== this.lastMiniCount;   // monoton raknare -> flanken kan inte aliaseras bort
+    this.lastMiniCount = miniCount;
     // DROPEN AR EN SMALL, INTE EN PLATA. Hallet var 2s och uttoningen 1s, alltsa
     // ~3s full blast per drop — och eftersom dropEnv KRINGGAR VU-taket (se
     // ceilMul nedan) ar det de enda ogonblick riggen gar till max.
@@ -796,7 +808,9 @@ export class EffectEngine {
     // DROP-ENVELOPE: FULL ATTACK (~30ms) på träffen, HÅLL allt på max under
     // dropen, mjuk FADE ner (~1s) när den släpper. Egen effekt — INGEN
     // hårdvaru-strobe (det gav strobe-känslan), bara ljus + färg på max.
-    const dTarget = dropActive ? 1 : 0;
+    if (miniHit && !dropHit && sinceStart > START_DROP_MUTE_MS) this.miniBangUntil = nowWall + MINI_BANG_MS;
+    const miniActive = nowWall < this.miniBangUntil;
+    const dTarget = dropActive ? 1 : miniActive ? MINI_DROP_ENV : 0;
     const dRate = dTarget > this.dropEnv ? dtNow / 0.03 : dtNow / 1.0;
     this.dropEnv += Math.max(-dRate, Math.min(dRate, dTarget - this.dropEnv));
 
@@ -922,6 +936,7 @@ export class EffectEngine {
         // Drop-byte bara när energin får driva → en LUGN stämning (chill,
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
         const dropSwitch = DISCRETE_DROP_LAMPS && dropHit && this.cfg.energyDrivesMode && held > DROP_HOLD;
+        const miniSwitch = miniHit && this.cfg.energyDrivesMode && held > MIN_HOLD;   // minidrop: byt look om den hallits
         // MINNETS STRUKTUR: en tvättad låt vet var karaktären skiftar och var
         // fraserna börjar. Ett byte DÄR känns komponerat; samma byte 1,5 takt fel
         // känns slumpmässigt. Sektionsgräns = byt gärna nu; frasgräns = ok att byta.
@@ -971,7 +986,7 @@ export class EffectEngine {
         const tierS = tier;
         // Ny låt → glöm förra låtens looker.
         if (this.memSongId !== this.partLookSong) { this.partLook.clear(); this.partLookSong = this.memSongId; }
-        if (!inBuild && (dropSwitch || (wantSwitch && held > MIN_HOLD && gridOk))) {
+        if (!inBuild && (dropSwitch || miniSwitch || (wantSwitch && held > MIN_HOLD && gridOk))) {
         this.lastSmartSwitchMs = now;
         this.lastSmartTier = tierName;
         this.lastHalvedForSwitch = this.pulseHalved;
@@ -1011,7 +1026,12 @@ export class EffectEngine {
         // looker i rad sa fort tiern gick till full. Kravet ar nu bara att
         // effekten alls ar pasagen av agaren.
         const remembered = !wantCalm && part ? this.partLook.get(part) : undefined;
-        if (remembered && this.cfg.rotation?.[remembered] !== false) {
+        const clearBeat = HALVE_SHOW && frame.profile.beat >= CLEAR_BEAT && frame.bpmConfidence >= 0.7
+          && this.cfg.rotation?.innerouter !== false && req("innerouter");
+        if (clearBeat) {
+          if (this.smartMode !== "innerouter") console.log(`[dirigent] tydlig takt (${frame.profile.beat.toFixed(2)}) -> innerouter`);
+          this.smartMode = "innerouter";
+        } else if (remembered && this.cfg.rotation?.[remembered] !== false) {
           this.smartMode = remembered;
           console.log(`[dirigent] ${part}: återser "${remembered}"`);
         } else {

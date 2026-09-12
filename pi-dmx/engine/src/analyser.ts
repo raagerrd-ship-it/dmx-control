@@ -41,6 +41,8 @@ export interface Frame {
    *  en konsument på lägre takt (render 100Hz) kan jämföra mot sitt eget senaste
    *  värde och ALDRIG missa en flank (till skillnad från en enframs-boolean). */
   dropCount: number;    // monoton räknare — +1 per drop
+  /** MINIDROP: mindre lyft (stigning MINI_RISE_DB efter kort svacka) som inte ar en full drop. Monoton. Agaren 09-12: ~10 per lat mot 2 riktiga. */
+  miniDropCount: number;
   inZone: boolean;      // nivån är i låtens topp-zon (ihållande tillstånd, hysteres)
   breaking: boolean;    // nivån är i en svacka/break (ihållande tillstånd)
   /** UPPBYGGNAD (riser): 0..1 tension som ramsar upp mot en drop. Mjuk signal →
@@ -151,6 +153,15 @@ const DROP_PEEK = DROP_PEEK_MS >= 0;
 // punkt-referensen nas 17 dB forst nar referensen hamnar i dippen -> fyrningen landar 0,5 s efter dippen
 // = exakt en takt vid 130 BPM ("drop en takt efter"). Min-referensen ser dippen direkt.
 const DROP_RISE_MIN = !!process.env.DROP_RISE_MIN;
+// MINIDROPS (agaren 2026-09-12: "i en lat ar det ofta ~10 minidrops och 2 riktiga"). Egen losare lyft-detektor:
+// kroppen har legat >= MINI_GONE_DB under taket i >= MINI_GONE_MS och stiger sedan >= MINI_RISE_DB (mot min i
+// 0,5 s-fonstret) och landar inom MINI_PEAK_DB av sega toppen. Eget avstand MINI_SPACING_MS mot bade drops
+// och minidrops. Ingen rok, ingen full small — effektlagret ger look-byte + mindre stot. MINI_SPACING_MS=0 = av.
+const MINI_SPACING_MS = Number(process.env.MINI_SPACING_MS ?? 0);
+const MINI_RISE_DB = Number(process.env.MINI_RISE_DB ?? 10);
+const MINI_GONE_DB = Number(process.env.MINI_GONE_DB ?? 3);
+const MINI_GONE_MS = Number(process.env.MINI_GONE_MS ?? 800);
+const MINI_PEAK_DB = Number(process.env.MINI_PEAK_DB ?? 10);
 const DROP_SHORT_MS = 4000;    // minsta drop-avstand nar dropen ESKALERAR
 const DROP_LONG_MS = 20000;    // annars maste sa har lang tid ga (mot falska upprepningar)
 const DROP_ESCALATE_DB = 3;    // 1.5 -> 3 (agaren): tatare drops maste vara TYDLIGT starkare for att fyra
@@ -428,6 +439,7 @@ export class Analyser {
   private lastGoneSpanMs = 0;   // langden pa senast avslutade gone-span (diagnostik/facit)
   private lastBodyGoneMs = -1e9;
   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
+  private miniDropCount = 0; private lastMiniMs = -1e9; private miniGoneMs = 0; private lastMiniGoneMs = -1e9; private wasMiniOnset = false;
   private lastDropMs = -1e9;
   private lastDropRise = 0;
   private wasBodyOnset = false;
@@ -1266,7 +1278,7 @@ export class Analyser {
     this.outFrame = {
       level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
-      dropCount: 0, bodyDb: 0, midHiDb: -120, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
+      dropCount: 0, miniDropCount: 0, bodyDb: 0, midHiDb: -120, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
       kickAtMs: 0, barShift: -1,
       spec: this.outSpec, onset: this.outOnset, drum: this.outDrum,
     };
@@ -1987,6 +1999,18 @@ export class Analyser {
       this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise;
       console.log(`[dropfire] wall ${this.wallNow()} KICKFIRST rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s`);
     }
+    // MINIDROP-lyftet (se MINI_*). Egen svacka-raknare (kortare/grundare an gone) och egen flank.
+    if (MINI_SPACING_MS > 0) {
+      if (this.bodyEnv < this.bodyCeil - MINI_GONE_DB) { this.miniGoneMs += dtHop * 1000; if (this.miniGoneMs >= MINI_GONE_MS) this.lastMiniGoneMs = nowWallA; }
+      else this.miniGoneMs = 0;
+      let mnRef = oldest; for (let k = 1; k <= this.bodyHistLen; k++) { const v = hist[(this.bodyHistPos + HL - k) % HL]; if (v < mnRef) mnRef = v; }
+      const miniOnset = (bodyPeek - mnRef) > MINI_RISE_DB && bodyPeek > this.bodyPeak - MINI_PEAK_DB && nowWallA - this.lastMiniGoneMs < 4000;
+      const miniEdge = miniOnset && !this.wasMiniOnset; this.wasMiniOnset = miniOnset;
+      if (miniEdge && this.activeMs > 2000 && nowWallA - this.lastDropMs > MINI_SPACING_MS && nowWallA - this.lastMiniMs > MINI_SPACING_MS) {
+        this.miniDropCount++; this.lastMiniMs = nowWallA;
+        if (process.env.DMX_DROP_TRACE) console.log(`[minidrop] wall ${this.wallNow()} rise ${(bodyPeek - mnRef).toFixed(1)} underPeak ${(this.bodyPeak - bodyPeek).toFixed(1)} goneAgo ${((nowWallA - this.lastMiniGoneMs)/1000).toFixed(1)}s`);
+      }
+    }
     const fullSlam = this.bodyPeak - bodyPeek < DROP_QUALITY_DB;
     // DMX_DROP_TRACE=1: logga KONSUMERADE edges (kandidat som INTE fyrade) — var ligger kroppen vid
     // forsta takten? Matdata for DROP_QUALITY_DB pa mjukare material (pop) dar inget facit finns.
@@ -2070,7 +2094,7 @@ export class Analyser {
     // Ljusvägens drivsignal (se fältets doc). bandDbRaw uppdateras på stor-FFT-takt
     // (~125 Hz) vilket räcker gott för ljus.
     { let s = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, this.bandDbRaw[b] / 20); s += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s)); }
-    f.dropCount = this.dropCount; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
+    f.dropCount = this.dropCount; f.miniDropCount = this.miniDropCount; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
     f.kickAtMs = kickAtMs; f.barShift = barShift;
     return f;
   }
