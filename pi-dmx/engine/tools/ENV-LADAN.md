@@ -11,6 +11,8 @@ Två filer, alla värden inerta i default (utan env = validerad baslinje):
 | DROP_RISE_MIN=1 BODY_FAST_S=0.06 | drop | 09-08: stigning mot MIN i 0,5 s-fonstret (suget fore dropen gav exakt en takts lagg) + snabbare kropp. Pop ra-kant->fyr p50 365->80 ms, p90 445->200; megamix 30 fyr, 0 i falska klassen. DROP_PEEK_MS forkastad (oppnar falska). |
 | DMX_DWELL_FLAT_MS=30000 | show | 09-12: enformiga svep (airglow/breathe/drift/mono/subbreath/tide/viska/wave) byts efter 30 s; kraver DMX_DWELL_MS |
 | DMX_DWELL_MS=120000 | show | 09-12: dwell-timern bara nodfallback; dirigenten byter vid tier/sektion/drop/halvering (agaren: "bara vid andringar i laten") |
+| DROP_SNAP_MS=150 | show | 09-12: drop-smallen vantar in nasta slag om det ligger inom 150 ms och taktlaset ar palitligt (agaren: "traffar varje riktig drop men ~100 ms fore"). Roken direkt. |
+| (DROP_UPGRADE_DB=3, AV) | drop | 09-12 matt: inom 4 s-fonstret far en kandidat fyra om den landar >=3 dB narmare toppen; megamix 30->41 (alla <4), pop 9->10. Ej pa: agaren nojd med traffarna. |
 | MINI_SPACING_MS=12000 | drop | 09-12: minidrops (lyft >=10 dB efter >=0,8 s svacka >=3 dB, eget avstand 12 s). Facit: pop 2,4/min, megamix 2,8/min (agaren: ~10 per lat). Effekt: look-byte + stot 0,35 (MINI_DROP_ENV), ingen rok |
 | (DMX_CLEAR_BEAT=0.9) | show | 09-12: profile.beat>=0,9 & conf>=0,7 -> dirigenten valjer ALLTID innerouter (15 % av pop-tiden). Kraver DMX_HALVE_SHOW |
 | DMX_HALVE_SHOW=1 | show | 09-12: halverad effekt-klocka vid dubbeltakt (>135) och lugn energi; dirigenten kor varannan/innerouter/hjarta. Utan env: bara hjartslagets form halveras. |

@@ -153,6 +153,11 @@ const DROP_PEEK = DROP_PEEK_MS >= 0;
 // punkt-referensen nas 17 dB forst nar referensen hamnar i dippen -> fyrningen landar 0,5 s efter dippen
 // = exakt en takt vid 130 BPM ("drop en takt efter"). Min-referensen ser dippen direkt.
 const DROP_RISE_MIN = !!process.env.DROP_RISE_MIN;
+// UPPGRADERING (ladan 2026-09-12, journal): forlyftet fyrade vid underPeak 6,4 (= grinden) och den RIKTIGA
+// smallen 4-6 s senare (underPeak -1,5..3,5) sparrades av avstandsregeln, som bara slapper "starkare STIGNING".
+// DROP_UPGRADE_DB: inom korta fonstret far en kandidat fyra om den landar minst sa har manga dB NARMARE toppen
+// an forra fyrningen. 0 = av.
+const DROP_UPGRADE_DB = Number(process.env.DROP_UPGRADE_DB ?? 0);
 // MINIDROPS (agaren 2026-09-12: "i en lat ar det ofta ~10 minidrops och 2 riktiga"). Egen losare lyft-detektor:
 // kroppen har legat >= MINI_GONE_DB under taket i >= MINI_GONE_MS och stiger sedan >= MINI_RISE_DB (mot min i
 // 0,5 s-fonstret) och landar inom MINI_PEAK_DB av sega toppen. Eget avstand MINI_SPACING_MS mot bade drops
@@ -439,6 +444,7 @@ export class Analyser {
   private lastGoneSpanMs = 0;   // langden pa senast avslutade gone-span (diagnostik/facit)
   private lastBodyGoneMs = -1e9;
   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
+  private lastDropUnderPeak = 99;   // underPeak vid senaste fyrningen (DROP_UPGRADE_DB)
   private miniDropCount = 0; private lastMiniMs = -1e9; private miniGoneMs = 0; private lastMiniGoneMs = -1e9; private wasMiniOnset = false;
   private lastDropMs = -1e9;
   private lastDropRise = 0;
@@ -1952,7 +1958,8 @@ export class Analyser {
     // stora ögonblick) släpps ändå igenom direkt (ned till 4 s).
     const sinceDrop = nowWallA - this.lastDropMs;
     const stronger = bodyRise > this.lastDropRise + DROP_ESCALATE_DB;
-    const dropSpacingOk = sinceDrop > DROP_LONG_MS || (sinceDrop > DROP_SHORT_MS && stronger);
+    const upgrade = DROP_UPGRADE_DB > 0 && sinceDrop > 1500 && (this.bodyPeak - bodyPeek) < this.lastDropUnderPeak - DROP_UPGRADE_DB;
+    const dropSpacingOk = sinceDrop > DROP_LONG_MS || (sinceDrop > DROP_SHORT_MS && stronger) || upgrade;
     // RISER-KRAVET AR AVSTANGT — men INTE for att signalen ar dod. Den gamla
     // motiveringen ("inRiser 0% av tiden, buildUp p99=0.31") mattes mot en
     // aldre riser-detektor och ar RADERAD som falsk.
@@ -2017,7 +2024,7 @@ export class Analyser {
     if (process.env.DMX_DROP_TRACE && bodyOnsetEdge && !(dropSpacingOk && fullSlam)) console.log(`[dropedge] rise ${bodyRise.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s spacingOk ${dropSpacingOk} sinceDrop ${(sinceDrop/1000).toFixed(1)}s`);
     if (dropSpacingOk && armed && this.activeMs > 2000 && fullSlam && this.goneEpisodeMs !== this.dropKickGoneMs) {
       this.dropArmUntil = 0;
-      this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise;
+      this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise; this.lastDropUnderPeak = this.bodyPeak - bodyPeek;
       console.log(`[dropfire] wall ${this.wallNow()} rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} ceil ${this.bodyCeil.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} sinceDrop ${(sinceDrop/1000).toFixed(1)}s goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s goneSpan ${(this.lastGoneSpanMs/1000).toFixed(1)}s edgeAgo ${(nowWallA - this.dropArmAt).toFixed(0)}ms`);
     }
 

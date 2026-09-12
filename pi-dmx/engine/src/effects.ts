@@ -102,6 +102,11 @@ const HALVE_SHOW = process.env.DMX_HALVE_SHOW === "1";
  *  frame.miniDropCount (monoton) ger look-byte (om looken hallits MIN_HOLD) + en kort stot pa MINI_DROP_ENV av
  *  en full drop-small (dropEnv), ingen rok, ingen blackout. */
 const MINI_DROP_ENV = Number(process.env.MINI_DROP_ENV ?? 0.35);
+/** DROP-SNAPP TILL TAKTEN (agaren 2026-09-12: "traffar varje riktig drop men ~100 ms fore"). Detektorn fyrar pa
+ *  forsta bas-slaget, som ofta ar en upptakt/sug-slapp strax FORE ettan. Ar taktlaset palitligt (beatTrust >= 0,5)
+ *  och nasta slag ligger inom DROP_SNAP_MS, vantar smallen in slaget; annars direkt. Aldrig langre an DROP_SNAP_MS,
+ *  aldrig bakat. Roken tar fortfarande dropHit direkt. 0 = av. */
+const DROP_SNAP_MS = Number(process.env.DROP_SNAP_MS ?? 0);
 const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);
 /** EXTRA TYDLIG TAKT -> ALLTID inre/yttre (agaren 2026-09-12). profile.beat >= CLEAR_BEAT (matt: 0,90 = 15 % av
  *  pop-facitets tid, 26 % av megamix) och bpmConfidence >= 0,7. Kraver DMX_HALVE_SHOW. */
@@ -235,6 +240,7 @@ export class EffectEngine {
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastMiniCount = 0; private miniBangUntil = 0;   // minidrop-flank + kort stot
+  private dropPendingAt = 0;   // DROP_SNAP_MS: smallen vantar in nasta slag
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   // Loudness-portens tillstånd (Lotus mid+diskant dB-fönster + log-release). Negativa
@@ -767,8 +773,18 @@ export class EffectEngine {
     // rendern går långsammare än analysen (en enframs-boolean hade aliaserats bort).
     // Här ligger bara show-REAKTIONEN: accent-fönster, blackout, rök, envelope.
     const dtNow = Math.min(0.1, (performance.now() - this.lastRenderMs) / 1000);
-    const dropHit = frame.dropCount !== this.lastDropCount;
+    const dropHitRaw = frame.dropCount !== this.lastDropCount;
     this.lastDropCount = frame.dropCount;
+    // Snapp: dropHit (show-reaktionen) flyttas till nasta slag om det ar nara; roken (wantBurst) tar dropHitRaw.
+    let dropHit = dropHitRaw;
+    if (DROP_SNAP_MS > 0) {
+      if (dropHitRaw && this.beatTrust >= 0.5 && beatLocked(this.cfg.beat)) {
+        const bms = beatPeriod(this.cfg.beat);
+        const toNext = (1 - beatPhase(this.cfg.beat, Date.now(), this.showLead)) * bms;
+        if (bms > 0 && toNext > 15 && toNext <= DROP_SNAP_MS) { this.dropPendingAt = nowWall + toNext; dropHit = false; if (process.env.DMX_DROP_TRACE) console.log(`[dropsnap] +${toNext.toFixed(0)} ms till slaget`); }
+      }
+      if (this.dropPendingAt && nowWall >= this.dropPendingAt) { this.dropPendingAt = 0; dropHit = true; }
+    }
     const miniCount = frame.miniDropCount ?? 0;
     const miniHit = miniCount !== this.lastMiniCount;   // monoton raknare -> flanken kan inte aliaseras bort
     this.lastMiniCount = miniCount;
@@ -1483,7 +1499,7 @@ export class EffectEngine {
       // och pågående-puff-spärren gäller fortfarande. Utan detta tappades knappen TYST inom 2 min
       // efter varje drop-rök (ladan 2026-09-04: bursts stod still, ingen feedback i UI:t).
       const manualFog = !!this.cfg.fogTrigger;
-      const wantBurst = (dropHit && fog.onDrop) || manualFog || wantFogFx;
+      const wantBurst = (dropHitRaw && fog.onDrop) || manualFog || wantFogFx;
       if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;   // engångs-flagga
       const spraying = this.out.fogTick(nowWall, _dtT * 1000, wantBurst, fog, manualFog);
       if (fog.enabled) this.out.writeFog(this.universe, fog.address, spraying ? fog.level : 0);
