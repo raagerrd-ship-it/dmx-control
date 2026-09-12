@@ -112,9 +112,10 @@ const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);
  *  ladan 2026-09-12 19:50-19:54: minidroppen fyrade 24-400 ms FORE 4 av 5 riktiga drops (lyft-detektorn har lagre
  *  krav och reagerar pa forsta bas-slaget) -> ljuset hoppade tidigt och smallen kom sedan ("nagra 100 ms for tidig"). */
 const MINI_DELAY_MS = Number(process.env.MINI_DELAY_MS ?? 500);
-/** EXTRA TYDLIG TAKT -> ALLTID inre/yttre (agaren 2026-09-12). profile.beat >= CLEAR_BEAT (matt: 0,90 = 15 % av
- *  pop-facitets tid, 26 % av megamix) och bpmConfidence >= 0,7. Kraver DMX_HALVE_SHOW. */
-const CLEAR_BEAT = Number(process.env.DMX_CLEAR_BEAT ?? 0.9);
+/** TYDLIG BASGANG -> inre/yttre FOREDRAGEN (agaren 2026-09-12: "tydlig basgang = inner/outer; inte alltid men
+ *  foredragen"). profile.bass >= CLEAR_BASS (matt: 0,4 = 19 % av pop-facitets tid, 97 % av basdrivna Stranden,
+ *  8 % megamix). Vald vid tva av tre byten nar den inte redan ligger, annars boostad i rankingen. Kraver DMX_HALVE_SHOW. */
+const CLEAR_BASS = Number(process.env.DMX_CLEAR_BASS ?? 0.4);
 
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
@@ -1051,10 +1052,10 @@ export class EffectEngine {
         // looker i rad sa fort tiern gick till full. Kravet ar nu bara att
         // effekten alls ar pasagen av agaren.
         const remembered = !wantCalm && part ? this.partLook.get(part) : undefined;
-        const clearBeat = HALVE_SHOW && frame.profile.beat >= CLEAR_BEAT && frame.bpmConfidence >= 0.7
+        const clearBass = HALVE_SHOW && frame.profile.bass >= CLEAR_BASS
           && this.cfg.rotation?.innerouter !== false && req("innerouter");
-        if (clearBeat) {
-          if (this.smartMode !== "innerouter") console.log(`[dirigent] tydlig takt (${frame.profile.beat.toFixed(2)}) -> innerouter`);
+        if (clearBass && this.smartMode !== "innerouter" && this.smartCount % 3 !== 0) {
+          console.log(`[dirigent] tydlig basgang (${frame.profile.bass.toFixed(2)}) -> innerouter`);
           this.smartMode = "innerouter";
         } else if (remembered && this.cfg.rotation?.[remembered] !== false) {
           this.smartMode = remembered;
@@ -1066,6 +1067,7 @@ export class EffectEngine {
           const halvedNow = HALVE_SHOW && this.pulseHalved;
           const fastBoost = (m: Mode) => (m === "varannan" && bpm >= 140 ? 0.30 : 0)
             + (halvedNow && (m === "varannan" || m === "innerouter") ? 0.30 : 0)
+            + (clearBass && m === "innerouter" ? 0.30 : 0)
             + (HALVE_SHOW && m === "hjarta" ? (halvedNow ? 0.30 : (wantCalm || tierS === LUGN) ? 0.20 : 0) : 0);   // halverat: trion varannan/innerouter/hjarta = hela topp-3
           const ranked = pool
             .map((m) => ({ m, s: fitScore(m, frame.profile) + fastBoost(m) }))

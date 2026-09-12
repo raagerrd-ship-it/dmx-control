@@ -15,7 +15,8 @@ Två filer, alla värden inerta i default (utan env = validerad baslinje):
 | (DROP_UPGRADE_DB=3, AV) | drop | 09-12 matt: inom 4 s-fonstret far en kandidat fyra om den landar >=3 dB narmare toppen; megamix 30->41 (alla <4), pop 9->10. Ej pa: agaren nojd med traffarna. |
 | (MINI_DELAY_MS=500) | show | 09-12: mini-reaktionen vantar 0,5 s och avbryts av en riktig drop (minin fyrade 24-400 ms fore 4/5 drops live -> "for tidig") |
 | MINI_SPACING_MS=12000 | drop | 09-12: minidrops (lyft >=10 dB efter >=0,8 s svacka >=3 dB, eget avstand 12 s). Facit: pop 2,4/min, megamix 2,8/min (agaren: ~10 per lat). Effekt: look-byte + stot 0,35 (MINI_DROP_ENV), ingen rok |
-| (DMX_CLEAR_BEAT=0.9) | show | 09-12: profile.beat>=0,9 & conf>=0,7 -> dirigenten valjer ALLTID innerouter (15 % av pop-tiden). Kraver DMX_HALVE_SHOW |
+| (DMX_CLEAR_BASS=0.4) | show | 09-12: profile.bass>=0,4 (19 % av pop-tiden) -> innerouter FOREDRAGEN (2 av 3 byten + boost), inte tvingad. Kraver DMX_HALVE_SHOW |
+| DROP_RISE_LOW_DB=12 | drop | 09-12: stigning 12 dB racker nar landningen ar <3 dB under toppen (DROP_RISE_LOW_Q). Facit: pop 9->12 fyr (alla rena), p90 200->163 ms; megamix 30->32, 0 falska. Fixar "nagot sena" drops med steg knappt over 17 |
 | DMX_HALVE_SHOW=1 | show | 09-12: halverad effekt-klocka vid dubbeltakt (>135) och lugn energi; dirigenten kor varannan/innerouter/hjarta. Utan env: bara hjartslagets form halveras. |
 | DMX_GHOST_WAIT=1 DMX_SUBH_GUARD=1 SUBH_MULT=8 OCT_UP=12 | tempo | 2/3-fantom-guard, validerad (31→17 s) |
 | DMX_BOUNDARY_SOFT=1 | tempo | låtminnets falska gränser nollade låset → mjuk hint |

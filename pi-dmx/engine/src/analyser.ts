@@ -158,6 +158,12 @@ const DROP_RISE_MIN = !!process.env.DROP_RISE_MIN;
 // DROP_UPGRADE_DB: inom korta fonstret far en kandidat fyra om den landar minst sa har manga dB NARMARE toppen
 // an forra fyrningen. 0 = av.
 const DROP_UPGRADE_DB = Number(process.env.DROP_UPGRADE_DB ?? 0);
+// VILLKORAT STIGNINGSKRAV (ladan 2026-09-12 20:08-20:11, "drops nagot sena"): de sena fyrade med rise exakt
+// 17,0 och edgeAgo 1,3-4 s — steget ar knappt over kravet sa filtret maste nastan hela vagen upp. En kandidat
+// som landar NARA TOPPEN (underPeak < DROP_RISE_LOW_Q) far racka med DROP_RISE_LOW_DB; partiella lyft landar
+// aldrig dar. 0 = av.
+const DROP_RISE_LOW_DB = Number(process.env.DROP_RISE_LOW_DB ?? 0);
+const DROP_RISE_LOW_Q = Number(process.env.DROP_RISE_LOW_Q ?? 3);
 // MINIDROPS (agaren 2026-09-12: "i en lat ar det ofta ~10 minidrops och 2 riktiga"). Egen losare lyft-detektor:
 // kroppen har legat >= MINI_GONE_DB under taket i >= MINI_GONE_MS och stiger sedan >= MINI_RISE_DB (mot min i
 // 0,5 s-fonstret) och landar inom MINI_PEAK_DB av sega toppen. Eget avstand MINI_SPACING_MS mot bade drops
@@ -1906,7 +1912,8 @@ export class Analyser {
     // landar lagt (fast ~10) medan riktiga landar hogt (fast ~34+); den sega toppen
     // haller loud-referensen (~44) sa den laga landningen avvisas aven om taket tillf. sjunkit.
     const landsHigh = bodyPeek > this.bodyPeak - BODY_PEAK_DB;
-    const bodyOnset = bodyRise > BODY_RISE_DB && landsHigh && nowWallA - this.lastBodyGoneMs < 6000;
+    const riseOk = bodyRise > BODY_RISE_DB || (DROP_RISE_LOW_DB > 0 && bodyRise > DROP_RISE_LOW_DB && this.bodyPeak - bodyPeek < DROP_RISE_LOW_Q);
+    const bodyOnset = riseOk && landsHigh && nowWallA - this.lastBodyGoneMs < 6000;
     // EN DROP MASTE LANDA I HOG ENERGI. Villkoren ovan tittar bara pa LOKALA
     // nivasprang (svacka -> topp-zon) och vet inget om var i laten vi ar, sa varje
     // liten variation i ett tyst parti raknades som en drop.
