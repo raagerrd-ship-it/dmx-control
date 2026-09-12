@@ -108,6 +108,10 @@ const MINI_DROP_ENV = Number(process.env.MINI_DROP_ENV ?? 0.35);
  *  aldrig bakat. Roken tar fortfarande dropHit direkt. 0 = av. */
 const DROP_SNAP_MS = Number(process.env.DROP_SNAP_MS ?? 0);
 const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);
+/** MINI_DELAY_MS: mini-reaktionen vantar sa har lange och AVBRYTS om en riktig drop kommer under tiden. Journal
+ *  ladan 2026-09-12 19:50-19:54: minidroppen fyrade 24-400 ms FORE 4 av 5 riktiga drops (lyft-detektorn har lagre
+ *  krav och reagerar pa forsta bas-slaget) -> ljuset hoppade tidigt och smallen kom sedan ("nagra 100 ms for tidig"). */
+const MINI_DELAY_MS = Number(process.env.MINI_DELAY_MS ?? 500);
 /** EXTRA TYDLIG TAKT -> ALLTID inre/yttre (agaren 2026-09-12). profile.beat >= CLEAR_BEAT (matt: 0,90 = 15 % av
  *  pop-facitets tid, 26 % av megamix) och bpmConfidence >= 0,7. Kraver DMX_HALVE_SHOW. */
 const CLEAR_BEAT = Number(process.env.DMX_CLEAR_BEAT ?? 0.9);
@@ -239,7 +243,7 @@ export class EffectEngine {
   private ambient = 0;   // 0 = spelar, 1 = varm vila (efter ~2.5s tystnad)
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
-  private lastMiniCount = 0; private miniBangUntil = 0;   // minidrop-flank + kort stot
+  private lastMiniCount = 0; private miniBangUntil = 0; private miniPendingAt = 0;   // minidrop-flank + kort stot + fordrojd reaktion
   private dropPendingAt = 0;   // DROP_SNAP_MS: smallen vantar in nasta slag
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
@@ -786,8 +790,13 @@ export class EffectEngine {
       if (this.dropPendingAt && nowWall >= this.dropPendingAt) { this.dropPendingAt = 0; dropHit = true; }
     }
     const miniCount = frame.miniDropCount ?? 0;
-    const miniHit = miniCount !== this.lastMiniCount;   // monoton raknare -> flanken kan inte aliaseras bort
+    const miniHitRaw = miniCount !== this.lastMiniCount;   // monoton raknare -> flanken kan inte aliaseras bort
     this.lastMiniCount = miniCount;
+    // Fordrojd mini-reaktion: en riktig drop under vantetiden avbryter den (annars laser den som en for tidig drop).
+    let miniHit = false;
+    if (miniHitRaw) this.miniPendingAt = nowWall + MINI_DELAY_MS;
+    if (dropHitRaw) this.miniPendingAt = 0;
+    if (this.miniPendingAt && nowWall >= this.miniPendingAt) { this.miniPendingAt = 0; miniHit = true; }
     // DROPEN AR EN SMALL, INTE EN PLATA. Hallet var 2s och uttoningen 1s, alltsa
     // ~3s full blast per drop — och eftersom dropEnv KRINGGAR VU-taket (se
     // ceilMul nedan) ar det de enda ogonblick riggen gar till max.
