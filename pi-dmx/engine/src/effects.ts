@@ -1036,7 +1036,7 @@ export class EffectEngine {
         // ENFORMIG LOOK -> KORTARE DWELL. Agaren 2026-09-12: "ar det en enformig effekt far den garna byta
         // snabbare". De statiska svepen (ingen takt-signal, ingen kick-drift) far DMX_DWELL_FLAT_MS (30 s),
         // taktdrivna looker behaller DMX_DWELL_MS. Satts EFTER valet, eftersom dwellen ovan sattes fore.
-        if (process.env.DMX_DWELL_MS && EFFECT_MAP[this.smartMode]?.flat) this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_FLAT_MS) || 30000);
+        if (process.env.DMX_DWELL_MS && EFFECT_MAP.get(this.smartMode)?.flat) this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_FLAT_MS) || 30000);
       }
       effMode = this.smartMode;
     }
