@@ -975,7 +975,10 @@ export class EffectEngine {
         this.lastSmartSwitchMs = now;
         this.lastSmartTier = tierName;
         this.lastHalvedForSwitch = this.pulseHalved;
-        this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
+        // DMX_DWELL_MS: agaren 2026-09-12 "dirigenten behover inte byta hela tiden, bara vid andringar i laten".
+        // Stamningens dwell (fest 15 s, galet 10 s) tvingade byten pa klockan; med env satt hogt (120 s) blir
+        // dwell en nodfallback och bytena sker pa tier-byte, sektionsgrans, drop och halvering.
+        this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_MS) || this.cfg.smartDwellMs || 9000);
         // EFFEKT-KRAV: filtrera bort effekter vars krav (tempo/karaktär) inte möts
         // just nu — strobe bara i snabb musik, trum-effekter bara med trummor, osv.
         // (registry.meetsRequirements). Ambient-effekterna kräver inget → utgör

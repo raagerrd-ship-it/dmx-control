@@ -9,6 +9,7 @@ Två filer, alla värden inerta i default (utan env = validerad baslinje):
 |---|---|---|
 | DROP_QUALITY_DB=6.5 BODY_RISE_DB=17 DROP_ARM_MS=300 | drop | facit-kalibrerad + arm once/gone (pop: 7/10 min) |
 | DROP_RISE_MIN=1 BODY_FAST_S=0.06 | drop | 09-08: stigning mot MIN i 0,5 s-fonstret (suget fore dropen gav exakt en takts lagg) + snabbare kropp. Pop ra-kant->fyr p50 365->80 ms, p90 445->200; megamix 30 fyr, 0 i falska klassen. DROP_PEEK_MS forkastad (oppnar falska). |
+| DMX_DWELL_MS=120000 | show | 09-12: dwell-timern bara nodfallback; dirigenten byter vid tier/sektion/drop/halvering (agaren: "bara vid andringar i laten") |
 | DMX_HALVE_SHOW=1 | show | 09-12: halverad effekt-klocka vid dubbeltakt (>135) och lugn energi; dirigenten kor varannan/innerouter/hjarta. Utan env: bara hjartslagets form halveras. |
 | DMX_GHOST_WAIT=1 DMX_SUBH_GUARD=1 SUBH_MULT=8 OCT_UP=12 | tempo | 2/3-fantom-guard, validerad (31→17 s) |
 | DMX_BOUNDARY_SOFT=1 | tempo | låtminnets falska gränser nollade låset → mjuk hint |
