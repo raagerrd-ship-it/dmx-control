@@ -45,6 +45,7 @@ import { konfetti } from "./konfetti.js";
 import { sopa } from "./sopa.js";
 import { neon } from "./neon.js";
 import { varannan } from "./varannan.js";
+import { innerouter } from "./innerouter.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
@@ -53,6 +54,7 @@ export const EFFECTS: EffectDef[] = [
   duel, airglow,
   // Nya (2026-07): fyller lugn- och fart-poolerna till 10+ vardera.
   tide, drift, pendel, viska, backbeat, tick, stege, eko, hjarta,
+  varannan, innerouter,
 ];
 
 /** Specialrolls-mappning: vilka fixture-roller (hazer/uv/blinder/strobe/laser/co2)
@@ -153,6 +155,7 @@ const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
   drops:    { needsBeat: 0.30 },
   stege:    { needsBeat: 0.30 },
   varannan: { needsBeat: 0.35 },
+  innerouter: { needsBeat: 0.35 },
 };
 
 /** Möter effekten sina krav givet nuvarande tempo + karaktärsprofil? */

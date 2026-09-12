@@ -92,6 +92,12 @@ const SUBDIV_ENERGY_TAU_MS = 8000;
 const SUBDIV_ENERGY_LO_ON = 0.30;    // under detta: lugnt parti → halvera
 const SUBDIV_ENERGY_LO_OFF = 0.42;   // över detta: släpp halveringen
 const SUBDIV_MIN_HOLD_MS = 10000;
+/** DMX_HALVE_SHOW: halveringen når hela showen, inte bara hjärtslagets form. Effekt-klockan
+ *  (beatIdx/beatFrac/beatHit) går i halvtakt när pulsen är halverad, så `varannan`/`innerouter`
+ *  ger jämna|inre lampor på slag 1 och udda|yttre på slag 2, och `hjarta` slår varannan takt.
+ *  Dirigenten boostar de delade lookerna vid halvering (dubbeltakt ELLER lugnt) och hjärta i
+ *  lugna partier, och får byta look när halveringen slår om. Ägaren 2026-09-12. */
+const HALVE_SHOW = process.env.DMX_HALVE_SHOW === "1";
 
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
@@ -190,6 +196,8 @@ export class EffectEngine {
   /** Pulsen körs i halva takten (snabb låt ELLER lugnt parti). Se PULSE_HALVE_*
    *  och SUBDIV_*. */
   private pulseHalved = false;
+  private halfTick = 0;                 // DMX_HALVE_SHOW: paritet inom det halverade slaget
+  private lastHalvedForSwitch = false;  // DMX_HALVE_SHOW: halvering vid senaste look-bytet
   /** Monoton pulsklocka (rotfix mot hjärtslags-fladder): pulsens index och paritet
    *  får bara gå framåt, och tSince hålls icke-avtagande inom en puls, så PLL:ens
    *  fasrättningar inte kan re-attackera eller flippa pariteten mitt i ett slag. */
@@ -929,9 +937,10 @@ export class EffectEngine {
         //   MATT 2026-08-08 i en och samma refrang: "ny look chase (tier fart)"
         //   foljt 11 s senare av "ny look ripple (tier full)" — tre looker i en
         //   refrang, driven av att tiern flaxade mellan fart och full.
+        const halvedChanged = HALVE_SHOW && this.pulseHalved !== this.lastHalvedForSwitch;   // dubbeltakt/lugn slog om → delad look
         const wantSwitch = this.memPart
           ? memSection
-          : (tierChanged || memSection || now > this.smartDwellUntil);
+          : (tierChanged || memSection || halvedChanged || now > this.smartDwellUntil);
 
         // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
         // det, inte bara på energinivån. Två regler, båda dramaturgiska:
@@ -965,6 +974,7 @@ export class EffectEngine {
         if (!inBuild && (dropSwitch || (wantSwitch && held > MIN_HOLD && gridOk))) {
         this.lastSmartSwitchMs = now;
         this.lastSmartTier = tierName;
+        this.lastHalvedForSwitch = this.pulseHalved;
         this.smartDwellUntil = now + (this.cfg.smartDwellMs || 9000);
         // EFFEKT-KRAV: filtrera bort effekter vars krav (tempo/karaktär) inte möts
         // just nu — strobe bara i snabb musik, trum-effekter bara med trummor, osv.
@@ -976,6 +986,8 @@ export class EffectEngine {
         if (pool.length === 0) pool = enabled(wantCalm ? LUGN : tierS);              // krav tömde → släpp dem
         if (pool.length === 0) pool = enabled([...FART, ...LUGN, ...FULLFART]);      // valfri aktiv
         if (pool.length === 0) pool = ["breathe"];                                   // sista fallback
+        // HALVERAT: de delade lookerna (och hjärtat) ska finnas i poolen oavsett tier.
+        if (HALVE_SHOW && this.pulseHalved) for (const m of ["varannan", "innerouter", "hjarta"] as Mode[]) if (!pool.includes(m) && this.cfg.rotation?.[m] !== false && req(m)) pool.push(m);
         this.smartCount++;
         // DIRIGENTEN VÄLJER: poängsätt poolen mot musikens KARAKTÄR (frame.profile)
         // istället för att slumpa. Tydliga basslag → drumkit/gravity/duel; luftig
@@ -1003,7 +1015,10 @@ export class EffectEngine {
           // DUBBELTAKT → VARANNAN: på snabbt/dubbeltakt-låst tempo (bpm ≥ 140) boostas
           // `varannan` (spatial dubbeltakt) hårt så dirigenten väljer den i stället för
           // att hela riggen blinkar dubbelt uniformt (ägaren i ladan 2026-09-03).
-          const fastBoost = (m: Mode) => (m === "varannan" && bpm >= 140 ? 0.30 : 0);
+          const halvedNow = HALVE_SHOW && this.pulseHalved;
+          const fastBoost = (m: Mode) => (m === "varannan" && bpm >= 140 ? 0.30 : 0)
+            + (halvedNow && (m === "varannan" || m === "innerouter") ? 0.30 : 0)
+            + (HALVE_SHOW && m === "hjarta" ? (halvedNow ? 0.30 : (wantCalm || tierS === LUGN) ? 0.20 : 0) : 0);   // halverat: trion varannan/innerouter/hjarta = hela topp-3
           const ranked = pool
             .map((m) => ({ m, s: fitScore(m, frame.profile) + fastBoost(m) }))
             .sort((a, b) => b.s - a.s);
@@ -1239,13 +1254,18 @@ export class EffectEngine {
     // (snap/rave/party/ripple/…) fortsätter dansa på trummorna även när BPM-låset
     // tappas, i st.f. att frysa på beatIdx=0. Alla effekter använder beatIdx
     // MODULÄRT (färg/grupp/position) → ren drop-in.
-    const beatHit = beatTick || (!hasBeat && kickHit);   // DISKRET flank: takten gick just fram (grid-slag, annars verklig kick)
-    if (beatHit) this.beatCounter++;
+    let beatHit = beatTick || (!hasBeat && kickHit);   // DISKRET flank: takten gick just fram (grid-slag, annars verklig kick)
+    let beatFracFx = beatFrac;
+    if (HALVE_SHOW && this.pulseHalved && hasBeat) {
+      // HALVERAD EFFEKT-KLOCKA: två riktiga slag = ett effekt-slag. Paritet 0 = "ett", 1 = "två".
+      if (beatHit) { this.halfTick ^= 1; if (this.halfTick === 0) this.beatCounter++; else beatHit = false; }
+      beatFracFx = (this.halfTick + beatFrac) / 2;
+    } else { this.halfTick = 0; if (beatHit) this.beatCounter++; }
     const beatIdx = this.beatCounter;
     // beatPulse: grid-puls när låst, annars den VERKLIGA kick-envelopen → pulsar
     // ALLTID på musiken. (Utan detta gav beatFrac=0 → beatPulse=1 konstant = ingen
     // puls när BPM ej låst → party/pulse/bounce lyste bara jämnt högt.)
-    const _bf = 1 - beatFrac;
+    const _bf = 1 - beatFracFx;
     const beatPulse = hasBeat ? _bf * _bf : kickEnv;
     const beatMs2 = beatPeriod(this.cfg.beat);
     const tempoDeep = Math.max(0, Math.min(1, (beatMs2 - 340) / 260));   // 0 snabbt .. 1 långsamt
@@ -1284,7 +1304,7 @@ export class EffectEngine {
     ctx.audio = audio; ctx.kickEnv = kickEnv; ctx.punch = bassPunch;
     ctx.dropEnv = this.dropEnv; ctx.gravLevel = this.gravLevel;
     ctx.gravPeak = this.gravPeak; ctx.drum = frame.drum;
-    ctx.beatIdx = beatIdx; ctx.beatFrac = beatFrac; ctx.beatPulse = beatPulse;
+    ctx.beatIdx = beatIdx; ctx.beatFrac = beatFracFx; ctx.beatPulse = beatPulse;
     ctx.beatHit = beatHit; ctx.hasBeat = hasBeat;
     ctx.wavePhase = this.wavePhase; ctx.buildUp = frame.buildUp;
     ctx.phaseSpread = 1 + frame.buildUp * 2.5; ctx.punchFloor = punchFloor;
