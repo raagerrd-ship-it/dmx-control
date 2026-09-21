@@ -7,7 +7,7 @@ const { EffectEngine } = await import("../dist/effects.js");
 const { defaultConfig } = await import("../dist/config.js");
 const f = process.argv[2] || "tools/pop_ladan.wav", startS = Number(process.argv[3] || 60), secs = Number(process.argv[4] || 60);
 const d = readFileSync(f); const n = (d.length - 44) / 2; const SR = 48000, HOP = 128;
-const cfg = JSON.parse(JSON.stringify(defaultConfig)); cfg.beatPulse = true; cfg.mode = "mono";
+const cfg = JSON.parse(JSON.stringify(defaultConfig)); cfg.beatPulse = true; cfg.mode = process.env.MODE || "mono"; if (cfg.mode === "smart") cfg.energyDrivesMode = true;
 const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
 const eng = new EffectEngine(cfg);
 const buf = new Float32Array(HOP); let ms0 = 1700000000000; let lastRender = -1; const out = [];

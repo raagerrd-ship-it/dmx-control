@@ -52,3 +52,10 @@ Rekommenderad forsta provning i ladan (allt i EN drop-in `lotus.conf`):
 printf '[Service]\nEnvironment=DMX_GRID_PHASE=1\nEnvironment=DMX_PHASE_FOLLOW=1\nEnvironment=DMX_SECTION=1\nEnvironment=DMX_SECTION_SWITCH=1\nEnvironment=DMX_SECTION_TRACE=1\nEnvironment=DMX_LIVE_LEVEL=1\n' | sudo tee /etc/systemd/system/audio-dmx-engine.service.d/lotus.conf && sudo systemctl daemon-reload && sudo systemctl restart audio-dmx-engine
 ```
 Angra: `sudo rm .../lotus.conf && sudo systemctl daemon-reload && sudo systemctl restart audio-dmx-engine`. Ta en flagga i taget om nagot kanns fel.
+
+## 2026-09-21 senast: dirigenten GASAR pa refrangen (DMX_SECTION_SWITCH, effects.js uppdaterad)
+Vid 'high'-grans snappas tierEma till SECTION_HIGH_SNAP (0,75 = full-fart-poolen direkt, som vid drop) i stallet for att vanta pa
+5 s-medelvardet + hallstid; 'break'/'low' snappar ner (0,35). Master: high x1,12 (SECTION_HIGH_LIFT), break x0,85 (SECTION_BREAK_DIP).
+Standard (utan flaggan) orord. Offline i smart-lage: "[dirigent] live:high: aterser chase" = samma look nar refrangen kommer tillbaka.
+Att kolla i ladan: analysatorns sektioner kan vaxla high<->break med nagra sekunders mellanrum (dwell 8 s) - dirigentens MIN_HOLD
+dampar; annars hoj uppehallstiden i analysatorn (DMX_SECTION_MODE/rank-trosklar) efter logg med DMX_SECTION_TRACE=1.

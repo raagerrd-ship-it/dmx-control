@@ -143,6 +143,8 @@ const LIGHT_ANCHOR_TAU = 60000; // auto-ankarets tidskonstant (ms)
 // DMX_LIVE_LEVEL (2026-09-21): lotus nivakanal - se blocket i render(). Rattar bara for A/B.
 const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH === '1'; // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
 const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
+const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35); // tierEma-snap vid high/break-grans
+const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.12), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.15); // master i refrang/break
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
 const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10); // lotus windowDb 10
 const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 4.5); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
@@ -949,6 +951,15 @@ export class EffectEngine {
             // ett tiotal sekunder EFTER dropen.
             if (dropHit && this.tierEma < 0.75)
                 this.tierEma = 0.75;
+            // SEKTIONEN AR BEVISET (DMX_SECTION_SWITCH, 2026-09-21): analysatorns 'high' = topp-tredjedelen av latens EGEN energi
+            // (rank-lage), sa vid en high-grans vet dirigenten redan att refrangen ar har - gasa direkt (som vid drop), vanta inte
+            // pa 5 s-medelvardet + hallstid. 'break'/'low' vid gransen: slapp ner direkt (musiken slapper -> showen foljer).
+            if (SECTION_SWITCH && (frame.sectionAgeMs ?? 1e9) < 1500) {
+                if (frame.section === 'high' && this.tierEma < SECTION_HIGH_SNAP)
+                    this.tierEma = SECTION_HIGH_SNAP;
+                else if ((frame.section === 'break' || frame.section === 'low') && this.tierEma > SECTION_LOW_SNAP)
+                    this.tierEma = SECTION_LOW_SNAP;
+            }
             const intensity = this.cfg.energyDrivesMode ? this.tierEma : 0.5;
             // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
             // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
@@ -1404,7 +1415,10 @@ export class EffectEngine {
         // dimmades aldrig, och hjärtslaget hade ingen plats att synas mot en maxad nivå
         // (ägaren i ladan 2026-09-03). Nu: golv LIGHT_FLOOR vid loud=0, full vid loud=1
         // → refräng ljus, vers dim = synlig gas, och pulsen syns uppåt mot en rörlig nivå.
-        const md = drive * (LIGHT_FLOOR + (1 - LIGHT_FLOOR) * loudness + frame.buildUp * 0.35 + this.dropEnv * 0.8);
+        const md0 = drive * (LIGHT_FLOOR + (1 - LIGHT_FLOOR) * loudness + frame.buildUp * 0.35 + this.dropEnv * 0.8);
+        // SEKTIONSGAS (DMX_SECTION_SWITCH): refrang lyfter mastern, break sanker - utover loudness (som redan foljer nivan).
+        const secGain = SECTION_SWITCH ? (frame.section === 'high' ? 1 + SECTION_HIGH_LIFT : frame.section === 'break' ? 1 - SECTION_BREAK_DIP : 1) : 1;
+        const md = SECTION_SWITCH ? Math.min(1.2, md0 * secGain) : md0; // standard: orort
         // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
         // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
         // kör full gas. Ger arkitektoniskt djup — rörelsen poppar mot en stabil bas.
