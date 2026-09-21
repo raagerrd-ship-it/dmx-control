@@ -18,6 +18,7 @@ export const rave = {
         // utan BPM-lås). fastMode ger kort utklang så det inte smetas.
         const gnista = Math.max(c.punch, c.beatHit ? 0.7 : 0);
         const v = lit ? 1 : gnista * 0.6;
-        return c.hsv(hue, lit ? 1 - gnista * 0.5 : 1, v);
+        const entry = c.section === 'high' ? c.sectionEntry : 0;
+        return c.hsv(hue, lit ? 1 - Math.max(gnista * 0.5, entry * 0.6) : 1, Math.min(1, v + entry * 0.6));
     },
 };

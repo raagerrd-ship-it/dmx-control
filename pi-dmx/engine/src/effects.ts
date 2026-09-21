@@ -375,7 +375,7 @@ export class EffectEngine {
   // Pre-allokerad kontext för noll-allokering i render-loopen
   private ctx: EffectContext = {
     cfg: null as any, frame: null as any, fx: undefined, t: 0, idx: 0, count: 0, want: {},
-    audio: 0, kickEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null as any, section: 'intro', sectionAgeMs: 0, sectionIndex: 0,
+    audio: 0, kickEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null as any, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionEntry: 0, sectionTier: 1, repeatSim: 0,
     beatIdx: 0, beatFrac: 0, beatPulse: 0, beatHit: false, hasBeat: false,
     wavePhase: 0, buildUp: 0, phaseSpread: 0, punchFloor: 0, chasePos: 0,
     dropFired: this.dropFired, dropHue: this.dropHue, now: 0,
@@ -1422,6 +1422,7 @@ export class EffectEngine {
     const ctx = this.ctx;
     ctx.cfg = this.cfg; ctx.frame = frame; ctx.t = t; ctx.count = count;
     ctx.section = frame.section || 'intro'; ctx.sectionAgeMs = frame.sectionAgeMs || 0; ctx.sectionIndex = frame.sectionIndex || 0;
+    ctx.sectionEntry = SECTION_SWITCH ? Math.max(0, 1 - (frame.sectionAgeMs || 1e9) / 400) : 0; ctx.sectionTier = frame.sectionTier ?? 1; ctx.repeatSim = frame.repeatSim || 0;
     ctx.audio = audio; ctx.kickEnv = kickEnv; ctx.punch = bassPunch;
     ctx.dropEnv = this.dropEnv; ctx.gravLevel = this.gravLevel;
     ctx.gravPeak = this.gravPeak; ctx.drum = frame.drum;

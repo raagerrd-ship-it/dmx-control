@@ -67,3 +67,10 @@ Sedan (ej deployat an, hotspoten forsvann): effekterna ser sektionen (c.section/
 morkt->vitt, tatare puls, UV/hazer, blinder vid drop) och 'andrum' (break: dimmat, langsamt, hjartslaget kvar), och registry.SECTION_POOLS
 = tydliga listor per sektion (intro/low/build/high/break) som dirigenten skar tier-poolen med; build/break tar sina egna fore tiern.
 Deploy: `python tools/deploy-dist.py` utan filargument (md5-diff pa alla dist/*.js + effects/*.js). Kraver lotus.conf for att markas.
+
+## 2026-09-21 fore ladan-tur 2: effekterna far den nya analysen + tre nya/omskrivna
+- Kontext: c.section/sectionAgeMs/sectionIndex/sectionTier/repeatSim + c.sectionEntry (1 -> 0 forsta 400 ms av en sektion).
+- Refrang-entre: party/rave/snap/pulse/konfetti gor en stot (vitare, ljusare, blinder-onskan) nar 'high' borjar.
+- duel v2 (call/response kick/virvel med eko), strobe v2 (bara high; blixt pa slag i snabb musik/drop, het glod emellan), sug (build:
+  ljuset sugs ner sista biten av risern, hazer/UV upp, dropen landar i tomrum). 40 effekter, alla sektionstaggade i sina filer.
+- Deploy: `python tools/deploy-dist.py` utan argument (hela dist inkl. effects/ + config.js). Standard oforandrat (48/76).

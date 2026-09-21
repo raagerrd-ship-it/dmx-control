@@ -1,18 +1,20 @@
 import type { EffectDef } from "./types.js";
 
-// Full fart: DUELL — kick och hi-hat/luft slåss om HELA riggens färg. Vilken
-// frekvensvärld som DOMINERAR (spec.kick vs spec.air, utjämnat) väljer färgen;
-// ANSLAGEN (onset) driver ljus-punchen. Kick-tunga partier → allt rött, pulsar på
-// trumman; breakdowns med bara hi-hats/cymbaler → allt isblått, tickar; riser
-// (bägge starka) → färgen glider mjukt över när balansen skiftar. Bara möjlig med
-// onset/spec-separationen. (Lovable-idé — men färgvalet på spec, inte rått
-//  onset-diff, annars blir det ett röd/blå-strobe frame-för-frame under risers.)
+// DUELL v2 (2026-09-21): call/response mellan kick och virvel med FARGMINNE. Kicken "ropar" i palettens grundfarg pa
+// de inre lamporna, virveln "svarar" i kontrastfargen pa de yttre - och varje anslag lamnar ett avklingande eko sa
+// duellen laser som en dialog, inte som en binar rod/bla-vaxling (v1). Hi-haten glittrar svagt i mitten emellan.
 export const duel: EffectDef = {
   key: "duel", label: "Duell", tier: "full", section: ["high"],
-  desc: "Kick vs hi-hat slåss om riggens färg – röd dunk eller isblå tick.",
+  desc: "Kick ropar i palettfargen, virveln svarar i kontrastfargen - med eko.",
   render(c) {
-    const hue = c.frame.spec.kick >= c.frame.spec.air ? 0.00 : 0.53;   // röd (kick) vs isblå (luft)
-    const v = c.shaped(0.08, Math.max(c.frame.onset.kick, c.frame.onset.air));
-    return c.hsv(hue, 1, v);
+    const d = c.drum;
+    const isOuter = c.count < 3 ? c.idx % 2 === 1 : (c.idx === 0 || c.idx === c.count - 1);
+    const base = c.mixedSector(Math.floor(c.beatIdx / 8));
+    const hueCall = base / 6, hueResp = ((base + 3) % 6) / 6;
+    // anslag med eko: kick/snare ar redan envelopes (0..1) med avklingning i analysatorn
+    const call = Math.pow(d.kick, 0.8), resp = Math.pow(d.snare, 0.7);
+    if (isOuter) return c.hsv(hueResp, 1 - resp * 0.5, Math.min(1, 0.06 + resp * 0.9 + call * 0.15 + c.punch * 0.3));
+    const glitter = d.hat * 0.15;
+    return c.hsv(hueCall, 1 - call * 0.2, Math.min(1, 0.08 + call * 0.85 + resp * 0.1 + glitter + c.punch * 0.3));
   },
 };

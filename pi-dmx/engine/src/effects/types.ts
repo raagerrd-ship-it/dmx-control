@@ -50,6 +50,11 @@ export interface EffectContext {
   section: string;
   sectionAgeMs: number;
   sectionIndex: number;
+  /** INTRADE: 1 exakt nar en ny sektion borjar, faller till 0 pa 400 ms - for entre-stotar (refrangens forsta slag). */
+  sectionEntry: number;
+  /** Sektionens energitier 0..2 (rank mot latens egna block) och upprepning 0..1 ('refrangen ar tillbaka' >= 0,92). */
+  sectionTier: number;
+  repeatSim: number;
   /** Kick-/beat-envelope (0..1). */
   kickEnv: number;
   /** BAS-PUNCH: "goa slaget" — spikar 0..1 på en riktig dunk (bas klart över sin
