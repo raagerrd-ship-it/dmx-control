@@ -158,7 +158,8 @@ const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
 // DMX_LIVE_LEVEL (2026-09-21): lotus nivakanal - se blocket i render(). Rattar bara for A/B.
 const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH === '1';   // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
 const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
-const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);   // lampgolv efter mastern (PAR-tandtroskel)
+const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);
+const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25);   // drop i low/intro kraver riser >= detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35);   // tierEma-snap vid high/break-grans
 const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.45), SECTION_LOW_DIP = Number(process.env.SECTION_LOW_DIP ?? 0.30);   // master: refrang upp, vers/intro ner, break mer ner
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
@@ -269,7 +270,7 @@ export class EffectEngine {
   private lightLo = 0;           // långsamt golv av wdb (tyst-referens)
   private lightShapeSm = -1;     // shape-smoothing
   private lastLiveSection = '';   // DMX_SECTION_SWITCH
-  private lastDropSwitchMs = -1e9;   // senaste drop -> 'high'-pool i 20 s
+  private lastDropSwitchMs = -1e9; dropCalmDenied = 0;   // senaste drop -> 'high'-pool i 20 s
   private liveAnchor?: number; private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
   private lightLoud = 0;         // log-released loudness 0..1 → driver md
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
@@ -794,9 +795,13 @@ export class EffectEngine {
     // rendern går långsammare än analysen (en enframs-boolean hade aliaserats bort).
     // Här ligger bara show-REAKTIONEN: accent-fönster, blackout, rök, envelope.
     const dtNow = Math.min(0.1, (performance.now() - this.lastRenderMs) / 1000);
-    const dropHitRaw = frame.dropCount !== this.lastDropCount;
+    let dropHitRaw = frame.dropCount !== this.lastDropCount;
     this.lastDropCount = frame.dropCount;
     // Snapp: dropHit (show-reaktionen) flyttas till nasta slag om det ar nara; roken (wantBurst) tar dropHitRaw.
+    // DROP I LUGN SEKTION (ladan 20:15: tva falska drops i ett lugnt parti): en riktig drop kommer ur en uppbyggnad eller ett
+    // break. I low/intro kravs att analysatorn sett en riser (buildUp >= DROP_CALM_BUILD) - annars ignoreras dropen.
+    const calmSec = SECTION_SWITCH && (frame.section === 'low' || frame.section === 'intro');
+    if (dropHitRaw && calmSec && frame.buildUp < DROP_CALM_BUILD) { dropHitRaw = false; this.dropCalmDenied++; }
     let dropHit = dropHitRaw;
     if (DROP_SNAP_MS > 0) {
       if (dropHitRaw && this.beatTrust >= 0.5 && beatLocked(this.cfg.beat)) {
