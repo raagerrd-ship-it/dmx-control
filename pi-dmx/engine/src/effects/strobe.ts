@@ -2,7 +2,7 @@ import type { EffectDef } from "./types.js";
 
 // Full fart: hårdvarustrobe (CH5 sätts i motorn); färgen cyklar snabbt, fullt ljus.
 export const strobe: EffectDef = {
-  key: "strobe", label: "Strobe", tier: "full",
+  key: "strobe", label: "Strobe", tier: "full", section: ["high"],
   desc: "Snabb strobe-blixt med skiftande färg.",
   render(c) {
     const hue = c.mixedSector(c.beatIdx) / 6;

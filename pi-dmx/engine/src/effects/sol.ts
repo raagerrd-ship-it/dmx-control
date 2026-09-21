@@ -4,7 +4,7 @@ import type { EffectDef } from "./types.js";
 // trummor/takt, så dirigenten alltid har något att köra på energiska partier utan
 // tydligt komp.
 export const sol: EffectDef = {
-  key: "sol", label: "Sol", tier: "fart",
+  key: "sol", label: "Sol", tier: "fart", section: ["low", "build"],
   desc: "Hela riggen glöder och sväller med nivån, färgen driver långsamt.",
   render(c) {
     const hue = c.mixedSector(Math.floor(c.t / 6)) / 6;

@@ -6,7 +6,7 @@ import type { EffectDef } from "./types.js";
 // mitten-2 ena takten, ytter-2 nästa. Kontrastfärger per ring (som rave, fast
 // RADIELLT i stället för varannan lampa). <3 lampor: faller tillbaka på paritet.
 export const ripple: EffectDef = {
-  key: "ripple", label: "Krusning", tier: "full",
+  key: "ripple", label: "Krusning", tier: "full", section: ["high"],
   desc: "Puls från mitten och ut – inre lampor ena takten, yttre nästa.",
   render(c) {
     const center = (c.count - 1) / 2;

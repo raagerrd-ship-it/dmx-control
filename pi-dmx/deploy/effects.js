@@ -9,7 +9,7 @@ import { fixtureRoles } from "./config.js";
 import { FixtureOutput } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { PostProcess } from "./postprocess.js";
-import { EFFECT_MAP, TIER, SECTION_POOLS, meetsRequirements } from "./effects/registry.js";
+import { EFFECT_MAP, TIER, sectionPool, meetsRequirements } from "./effects/registry.js";
 import { fitScore } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
 // PALETT-LAS (DMX_PALETTE): lås färgerna till en palett oavsett klang och läge. Namn ur listan
@@ -1097,8 +1097,8 @@ export class EffectEngine {
                 let pool = enabled(wantCalm ? LUGN : tierS).filter(req);
                 // SEKTIONSPOOL (DMX_SECTION_SWITCH): skar med sektionens looker (registry.SECTION_POOLS). 'build' och 'break' har egna
                 // effekter (stegring/andrum) som gar fore tiern; for high/low/intro ar snittet med tier-poolen forsta valet.
-                if (SECTION_SWITCH && liveSec && SECTION_POOLS[liveSec]) {
-                    const secList = SECTION_POOLS[liveSec];
+                if (SECTION_SWITCH && liveSec) {
+                    const secList = sectionPool(liveSec);
                     const own = (liveSec === 'build' || liveSec === 'break') ? enabled(secList).filter(req) : [];
                     const cut = pool.filter((m) => secList.includes(m));
                     if (own.length)

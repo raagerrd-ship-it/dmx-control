@@ -5,7 +5,7 @@ import type { EffectDef } from "./types.js";
 // nästan kroppslig känsla som en vanlig enkelpuls inte har — och den syns även
 // på lugnare partier eftersom den inte behöver hårda transienter.
 export const hjarta: EffectDef = {
-  key: "hjarta", label: "Hjärtslag", tier: "fart",
+  key: "hjarta", label: "Hjärtslag", tier: "fart", section: ["low", "break"],
   desc: "Dubbelpuls i takten — ett kraftigt slag och ett svagare efterslag, som ett hjärta.",
   render(c) {
     const f = c.beatFrac;

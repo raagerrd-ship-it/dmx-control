@@ -36,6 +36,10 @@ import { tick } from "./tick.js";
 import { stege } from "./stege.js";
 import { eko } from "./eko.js";
 import { hjarta } from "./hjarta.js";
+import { sol } from "./sol.js";
+import { konfetti } from "./konfetti.js";
+import { sopa } from "./sopa.js";
+import { neon } from "./neon.js";
 import { varannan } from "./varannan.js";
 import { innerouter } from "./innerouter.js";
 import { stegring } from "./stegring.js";
@@ -50,6 +54,8 @@ export const EFFECTS = [
     varannan, innerouter,
     // Sektionseffekter (2026-09-21): valjs av dirigenten vid build-/break-grans (DMX_SECTION_SWITCH).
     stegring, andrum,
+    // Registrerade 2026-09-21 (fanns som filer men inte i poolen): sol, konfetti, sopa, neon.
+    sol, konfetti, sopa, neon,
 ];
 /** Specialrolls-mappning: vilka fixture-roller (hazer/uv/blinder/strobe/laser/co2)
  *  varje effekt aktivt driver. Effekten fungerar utan dessa; matchning styr bara
@@ -86,21 +92,9 @@ const SPECIALTY_DRIVES = {
     stegring: ["uv", "hazer", "blinder"],
     andrum: ["hazer"],
 };
-/** SEKTIONSPOOLER (2026-09-21, agaren: "manga effekter ar bra bara de ar tydligt uppdelade for dirigenten").
- *  Vilka looker som passar VAR i laten. Dirigenten (DMX_SECTION_SWITCH) skar tier-poolen med sektionens pool; ar snittet tomt
- *  galler tier-poolen som forut. En effekt kan sta i flera sektioner. Justera har - inte i effektfilerna. */
-export const SECTION_POOLS = {
-    intro: ["breathe", "aurora", "tide", "drift", "airglow", "viska", "subbreath", "mono"],
-    low: ["twin", "pendel", "pulse", "tick", "stege", "eko", "hjarta", "varannan", "wave", "chase", "eq", "mono"],
-    build: ["stegring", "wave", "pulse", "eq"],
-    high: ["party", "snap", "bounce", "rave", "gallop", "ripple", "gravity", "drumkit", "split", "duel", "backbeat", "drops", "innerouter", "strobe", "chase"],
-    break: ["andrum", "breathe", "subbreath", "viska", "airglow", "tide"],
-};
-for (const [sec, list] of Object.entries(SECTION_POOLS))
-    for (const e of EFFECTS)
-        if (list.includes(e.key)) {
-            (e.section ??= []).includes(sec) || e.section.push(sec);
-        }
+/** SEKTIONSPOOL (2026-09-21): harledd ur varje effekts egen `section`-tagg (ingen oversattningstabell - taggen bor i effektfilen).
+ *  Dirigenten (DMX_SECTION_SWITCH) skar tier-poolen med den; build/break tar sina taggade effekter fore tiern. */
+export function sectionPool(sec) { return EFFECTS.filter((e) => e.section?.includes(sec)).map((e) => e.key); }
 // Injicera drives i effekt-def:erna en gång vid modul-init (så EFFECT_META och
 // alla konsumenter ser samma sanning).
 for (const e of EFFECTS) {

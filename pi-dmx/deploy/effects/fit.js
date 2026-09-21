@@ -1,0 +1,69 @@
+export const FIT = {
+    // ── Nya lugna ──
+    tide: { punch: 0.15, bass: 0.65, bright: 0.20, beat: 0.10 }, // tung vattenlinje, sustained
+    drift: { punch: 0.05, bass: 0.30, bright: 0.50, beat: 0.05 }, // ren klangfärg, rör sig inte på slag
+    pendel: { punch: 0.15, bass: 0.30, bright: 0.30, beat: 0.55 }, // lugn MEN taktlåst
+    viska: { punch: 0.70, bass: 0.35, bright: 0.60, beat: 0.30 }, // lever på perkussion trots låg energi
+    // ── Nya fart ──
+    backbeat: { punch: 0.90, bass: 0.75, bright: 0.45, beat: 0.85 }, // kräver tydlig kick+virvel
+    tick: { punch: 0.75, bass: 0.20, bright: 0.95, beat: 0.60 }, // hi-hat-driven, toppregister
+    stege: { punch: 0.80, bass: 0.55, bright: 0.75, beat: 0.35 }, // anslag i hela spektrat
+    eko: { punch: 0.55, bass: 0.45, bright: 0.40, beat: 0.95 }, // meningslös utan takt
+    hjarta: { punch: 0.35, bass: 0.70, bright: 0.15, beat: 0.90 }, // taktlåst puls, klarar lugnt
+    // ── Lugna: sustained, långsamma ──
+    breathe: { punch: 0.10, bass: 0.55, bright: 0.20, beat: 0.20 }, // andas med sektionsenergin
+    aurora: { punch: 0.10, bass: 0.20, bright: 0.80, beat: 0.10 }, // klangdrivet skimmer
+    mono: { punch: 0.20, bass: 0.60, bright: 0.20, beat: 0.10 }, // eld/glöd, varm
+    subbreath: { punch: 0.10, bass: 0.85, bright: 0.10, beat: 0.10 }, // sub-driven andning
+    airglow: { punch: 0.10, bass: 0.10, bright: 0.90, beat: 0.10 }, // luftig shimmer
+    twin: { punch: 0.15, bass: 0.35, bright: 0.35, beat: 0.70 }, // taktlast vaxelsang
+    // ── Fart: flödande/rytmiska ──
+    wave: { punch: 0.30, bass: 0.40, bright: 0.60, beat: 0.30 },
+    chase: { punch: 0.50, bass: 0.40, bright: 0.35, beat: 0.70 },
+    pulse: { punch: 0.60, bass: 0.60, bright: 0.30, beat: 0.90 },
+    eq: { punch: 0.40, bass: 0.50, bright: 0.55, beat: 0.20 }, // spektrum-mätare
+    drops: { punch: 0.70, bass: 0.50, bright: 0.40, beat: 0.70 },
+    // ── Full fart: punchiga/spatiala ──
+    party: { punch: 0.80, bass: 0.70, bright: 0.40, beat: 0.80 },
+    snap: { punch: 0.70, bass: 0.40, bright: 0.50, beat: 0.95 }, // hårt kap på slaget
+    bounce: { punch: 0.80, bass: 0.50, bright: 0.40, beat: 0.85 },
+    rave: { punch: 0.70, bass: 0.50, bright: 0.40, beat: 0.90 },
+    gallop: { punch: 0.80, bass: 0.60, bright: 0.30, beat: 0.90 },
+    ripple: { punch: 0.60, bass: 0.50, bright: 0.50, beat: 0.80 },
+    gravity: { punch: 0.50, bass: 0.90, bright: 0.20, beat: 0.30 }, // basen knuffar fysiken
+    drumkit: { punch: 0.95, bass: 0.70, bright: 0.50, beat: 0.60 }, // lever på anslag
+    split: { punch: 0.50, bass: 0.50, bright: 0.60, beat: 0.30 },
+    duel: { punch: 0.80, bass: 0.70, bright: 0.60, beat: 0.40 }, // kick vs luft
+    strobe: { punch: 0.90, bass: 0.50, bright: 0.50, beat: 0.80 },
+};
+/** ▲▲▲ JUSTERA HÄR ▲▲▲ */
+/** Vikter per axel — hur mycket varje egenskap väger i matchningen. */
+const W = { punch: 1.0, bass: 0.9, bright: 0.8, beat: 0.9 };
+const NEUTRAL = { punch: 0.5, bass: 0.5, bright: 0.5, beat: 0.5 };
+/**
+ * SPATIALITET (0..1): stegar effekten / rör sig över riggen (lampor gör OLIKA saker
+ * sekventiellt) eller kör alla lampor SAMMA? Ägaren gillar stegande effekter när
+ * basslagen är tydliga. Bonusen nedan lyfter dem när `punch` (anslagstäthet) är hög,
+ * så en löpande/stegande look föredras framför en uniform puls på ett tydligt komp.
+ * Uniforma effekter (pulse/party/snap/rave/strobe/backbeat/hjarta/breathe/mono/
+ * subbreath/sol/neon/airglow/viska) står inte med → 0.
+ */
+const SPATIAL = {
+    chase: 1.0, tick: 1.0, stege: 1.0, sopa: 1.0, gallop: 1.0, bounce: 1.0,
+    ripple: 0.9, eko: 0.9, drumkit: 0.9, eq: 0.9, wave: 0.8, split: 0.8, drops: 0.8,
+    duel: 0.7, konfetti: 0.7, varannan: 1.0, pendel: 0.7, twin: 0.6, tide: 0.6, drift: 0.6, aurora: 0.5,
+};
+/** Hur mycket den spatiala preferensen väger vid full punch (0 = av). */
+const SPATIAL_PREF = 0.18;
+/** Hur väl en effekt passar musiken just nu. Högre = bättre (0..1-ish). */
+export function fitScore(mode, p) {
+    const f = FIT[mode] ?? NEUTRAL;
+    const d = Math.abs(f.punch - p.punch) * W.punch
+        + Math.abs(f.bass - p.bass) * W.bass
+        + Math.abs(f.bright - p.bright) * W.bright
+        + Math.abs(f.beat - p.beat) * W.beat;
+    const base = 1 - d / (W.punch + W.bass + W.bright + W.beat);
+    // SPATIAL-BONUS: stegande effekter foredras nar anslagen (basslagen) ar tydliga.
+    const spatialBonus = (SPATIAL[mode] ?? 0) * SPATIAL_PREF * p.punch;
+    return base + spatialBonus;
+}

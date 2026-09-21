@@ -5,7 +5,7 @@ import type { EffectDef } from "./types.js";
 // vänder exakt på frasgränsen i stället för att glida ur fas med låten.
 // (mclk stegar på taktslag när takt finns, annars på tid → fryser aldrig.)
 export const pendel: EffectDef = {
-  key: "pendel", label: "Pendel", tier: "lugn",
+  key: "pendel", label: "Pendel", tier: "lugn", section: ["low", "intro"],
   desc: "En mjuk ljustopp svänger taktlåst över riggen, ett svep per fras.",
   render(c) {
     const step = c.mclk(1, 0.5);                      // ett steg per taktslag

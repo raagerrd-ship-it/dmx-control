@@ -4,7 +4,7 @@ import type { EffectDef } from "./types.js";
 // kort efterglöd, mörk rigg emellan. Gles och kinetisk; ny ren färg vid varje
 // studs-steg.
 export const bounce: EffectDef = {
-  key: "bounce", label: "Studs", tier: "full",
+  key: "bounce", label: "Studs", tier: "full", section: ["high"],
   desc: "En skarp ljuspunkt studsar fram och tillbaka.",
   render(c) {
     const span = Math.max(1, c.count - 1);

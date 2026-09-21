@@ -4,7 +4,7 @@ import type { EffectDef } from "./types.js";
 // överlappande decays gör rytmen till glidande färgstänk. (Tändtiderna sätts av
 // motorn i dropFired/dropHue.)
 export const drops: EffectDef = {
-  key: "drops", label: "Drops", tier: "fart",
+  key: "drops", label: "Drops", tier: "fart", section: ["high"],
   desc: "Varje slag målar nästa lampa i en ny färg.",
   render(c) {
     const since = (c.now - (c.dropFired[c.idx] ?? -1e9)) / 1000;

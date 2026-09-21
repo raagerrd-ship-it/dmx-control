@@ -5,7 +5,7 @@ import type { EffectDef } from "./types.js";
 // blir det "inre på ett, yttre på två" — ägaren 2026-09-12: vid dubbeltakt och i
 // lugna låtar ska riggen delas i stället för att blinka uniformt.
 export const innerouter: EffectDef = {
-  key: "innerouter", label: "Inre/yttre", tier: "fart",
+  key: "innerouter", label: "Inre/yttre", tier: "fart", section: ["high", "low"],
   desc: "Inre lampor på slaget, yttre på nästa — mitten och kanten turas om.",
   render(c) {
     const isOuter = c.count < 3 ? c.idx % 2 === 1 : (c.idx === 0 || c.idx === c.count - 1);

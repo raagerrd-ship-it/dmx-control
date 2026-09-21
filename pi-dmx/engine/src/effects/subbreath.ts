@@ -7,7 +7,7 @@ import type { EffectDef } from "./types.js";
 // breakdowns / deep house. Bygger på sub- och air-banden som 512:an aldrig såg.
 // (Gemini-idé, anpassad.)
 export const subbreath: EffectDef = {
-  key: "subbreath", label: "Sub-andning", tier: "lugn",
+  key: "subbreath", label: "Sub-andning", tier: "lugn", section: ["intro", "break"],
   desc: "Djup sub-bas-andning med krispigt luft-skimmer i kanterna.",
   flat: true,   // statiskt svep → kortare dwell
   render(c) {

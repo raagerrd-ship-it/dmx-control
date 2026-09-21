@@ -1,0 +1,20 @@
+// Lugnast: hela riggen andas UNISONT i EN långsamt vandrande färg — djup,
+// symmetrisk swell (lång mjuk in-/utandning). Golv 30% så den aldrig släcks.
+export const breathe = {
+    key: "breathe", label: "Andas", tier: "lugn", section: ["intro", "break"],
+    desc: "Hela riggen andas som en – djup mjuk våg i en färg.",
+    flat: true, // statiskt svep → kortare dwell
+    render(c) {
+        const hue = c.mixedSector(Math.floor(c.t / 11) + Math.round(c.frame.centroid * 3)) / 6; // centroid → palett-läge
+        // Andetagets DJUP följer sektionsenergin: i en svacka blir andningen grund
+        // och mörk, i ett refräng djup och full. Utan detta var breathe strukturellt
+        // identisk med aurora och twin — samma sinus, bara olika fasvinkel — och tre
+        // likadana effekter i en 10-effekters lugn-pool gör att chill upprepar sig.
+        // Hela riggen andas SAMTIDIGT (ingen per-lampa-fas) — det är det som skiljer
+        // den från aurora (rumslig gradient) och twin (varannan lampa).
+        const djup = 0.6 + c.frame.intensity * 0.4; // md agar nu sektionsdynamiken → mindre egen koppling
+        const breath = 0.5 + 0.5 * Math.sin(c.t * 0.7) * djup;
+        const m = Math.min(1, breath * 0.85 + c.audio * 0.2 + c.punch * 0.2); // riktig dunk → mjuk svall
+        return c.hsv(hue, 1, 0.18 + 0.82 * m); // golv 0.3 nu redundant (md har eget 0.3)
+    },
+};

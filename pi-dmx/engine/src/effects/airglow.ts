@@ -7,7 +7,7 @@ import type { EffectDef } from "./types.js";
 // grova trebandet knappt såg. Färgtonen glider mot cyan när air är SUSTAINED
 // (stråkar/pads), tillbaka mot grönt på rena transienter. (Lovable-idé.)
 export const airglow: EffectDef = {
-  key: "airglow", label: "Luft-glöd", tier: "lugn",
+  key: "airglow", label: "Luft-glöd", tier: "lugn", section: ["intro", "break"],
   desc: "Nästan mörkt; varje cymbal/shaker/väsljud tänder en gnista i kanten.",
   flat: true,   // statiskt svep → kortare dwell
   render(c) {

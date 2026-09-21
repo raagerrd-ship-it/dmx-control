@@ -13,7 +13,7 @@ import type { EffectDef } from "./types.js";
 // (Motorn kör drumkit i fast-mode → kort ballistik-decay, så hi-hats tickar
 //  skarpt i stället för att smetas ut.)
 export const drumkit: EffectDef = {
-  key: "drumkit", label: "Trumkit", tier: "full",
+  key: "drumkit", label: "Trumkit", tier: "full", section: ["high"],
   desc: "Varje lampa = en trumröst (kick/snare/hi-hat/bas) som punchar på sitt eget anslag.",
   render(c) {
     const d = c.drum;

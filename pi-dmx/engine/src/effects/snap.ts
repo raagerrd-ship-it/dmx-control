@@ -5,7 +5,7 @@ import type { EffectDef } from "./types.js";
 // färg-slideshow i takt; snabb fade ger färgsläp i själva kapet. Motsats till
 // party (mörk throb) och rave (spatial växling).
 export const snap: EffectDef = {
-  key: "snap", label: "Snap", tier: "full",
+  key: "snap", label: "Snap", tier: "full", section: ["high"],
   desc: "Alla lampor byter färg blixtsnabbt på varje slag.",
   render(c) {
     const hue = c.mixedSector(c.beatIdx) / 6;

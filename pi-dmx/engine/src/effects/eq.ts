@@ -8,7 +8,7 @@ import type { EffectDef } from "./types.js";
 // så ett tyst band blir mörkt. En enda lampa = full R/G/B-mix (låg/mel/hög).
 // (Effekten är omedveten om master/beatPulse/VU — de ligger uniformt efter.)
 export const eq: EffectDef = {
-  key: "eq", label: "Spektrum", tier: "fart",
+  key: "eq", label: "Spektrum", tier: "fart", section: ["low", "build"],
   desc: "Spatial spektrumanalysator: låg-bas→röd … diskant→blå, ljus = bandets nivå.",
   render(c) {
     const s = c.frame.spec, o = c.frame.onset;

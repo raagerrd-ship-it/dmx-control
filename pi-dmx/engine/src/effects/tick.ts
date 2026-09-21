@@ -5,7 +5,7 @@ import type { EffectDef } from "./types.js";
 // slår ner hela raden i en mörkröd botten. Motsatsen till bas-tunga effekter:
 // den lever helt i toppregistret.
 export const tick: EffectDef = {
-  key: "tick", label: "Tick", tier: "fart",
+  key: "tick", label: "Tick", tier: "fart", section: ["low"],
   desc: "Hi-hatsen flyttar ljuset steg för steg; kicken slår ner hela raden.",
   render(c) {
     const d = c.drum;

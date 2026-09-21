@@ -6,7 +6,7 @@ import type { EffectDef } from "./types.js";
 // långsamt (minnet av den hårdaste smällen). Motorn räknar fysiken; effekten
 // ritar bara stapeln + pricken. (WLED "Gravcenter"-mekaniken, anpassad för 4 PAR.)
 export const gravity: EffectDef = {
-  key: "gravity", label: "Gravitation", tier: "full",
+  key: "gravity", label: "Gravitation", tier: "full", section: ["high", "low"],
   desc: "Ljudet lyfter en nivå som faller med tyngd; en peak-prick hänger kvar.",
   render(c) {
     const n = Math.max(1, c.count);

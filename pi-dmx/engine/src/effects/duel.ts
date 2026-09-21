@@ -8,7 +8,7 @@ import type { EffectDef } from "./types.js";
 // onset/spec-separationen. (Lovable-idé — men färgvalet på spec, inte rått
 //  onset-diff, annars blir det ett röd/blå-strobe frame-för-frame under risers.)
 export const duel: EffectDef = {
-  key: "duel", label: "Duell", tier: "full",
+  key: "duel", label: "Duell", tier: "full", section: ["high"],
   desc: "Kick vs hi-hat slåss om riggens färg – röd dunk eller isblå tick.",
   render(c) {
     const hue = c.frame.spec.kick >= c.frame.spec.air ? 0.00 : 0.53;   // röd (kick) vs isblå (luft)

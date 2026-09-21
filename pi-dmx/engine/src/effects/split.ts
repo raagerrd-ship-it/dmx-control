@@ -7,7 +7,7 @@ import type { EffectDef } from "./types.js";
 // den ihållande basen och de rappa transienterna kan äntligen skiljas åt.
 // (Gemini-idé, anpassad för 4 PAR.)
 export const split: EffectDef = {
-  key: "split", label: "Klyvning", tier: "full",
+  key: "split", label: "Klyvning", tier: "full", section: ["high"],
   desc: "Inre lampor tung bas-matta, yttre lampor gnistrande diskant-anslag.",
   render(c) {
     const isOuter = c.count < 3 ? c.idx % 2 === 1 : (c.idx === 0 || c.idx === c.count - 1);
