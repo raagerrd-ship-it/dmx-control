@@ -159,7 +159,8 @@ const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
 const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH === '1';   // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
 const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
 const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);
-const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25);   // drop i low/intro kraver riser >= detta   // lampgolv efter mastern (PAR-tandtroskel)
+const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25);   // drop i low/intro kraver riser >= detta
+const DROP_LAND_GAIN = Number(process.env.DROP_LAND_GAIN ?? 1.15);     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35);   // tierEma-snap vid high/break-grans
 const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.45), SECTION_LOW_DIP = Number(process.env.SECTION_LOW_DIP ?? 0.30);   // master: refrang upp, vers/intro ner, break mer ner
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
@@ -270,7 +271,7 @@ export class EffectEngine {
   private lightLo = 0;           // långsamt golv av wdb (tyst-referens)
   private lightShapeSm = -1;     // shape-smoothing
   private lastLiveSection = '';   // DMX_SECTION_SWITCH
-  private lastDropSwitchMs = -1e9; dropCalmDenied = 0;   // senaste drop -> 'high'-pool i 20 s
+  private lastDropSwitchMs = -1e9; dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;   // senaste drop -> 'high'-pool i 20 s
   private liveAnchor?: number; private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
   private lightLoud = 0;         // log-released loudness 0..1 → driver md
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
@@ -803,6 +804,15 @@ export class EffectEngine {
     const calmSec = SECTION_SWITCH && (frame.section === 'low' || frame.section === 'intro');
     if (dropHitRaw && calmSec && frame.buildUp < DROP_CALM_BUILD) { dropHitRaw = false; this.dropCalmDenied++; }
     let dropHit = dropHitRaw;
+    // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
+    // jamfors nivan (lightLoud/liveLevelSm) med nivan strax fore; har den inte stigit >= DROP_LAND_GAIN doms dropen falsk:
+    // envelope klipps, 20 s-high-fonstret och tiersnappen dras tillbaka. Blixten (0,6 s) hinner synas, inte 20 s fel show.
+    if (dropHitRaw) { this.dropCheckAt = nowWall + 600; this.preDropLevel = this.liveLevelSm >= 0 ? this.liveLevelSm : this.lightLoud; this.preDropTier = this.tierEma; }
+    if (this.dropCheckAt > 0 && nowWall >= this.dropCheckAt) {
+      this.dropCheckAt = 0;
+      const lvl = this.liveLevelSm >= 0 ? this.liveLevelSm : this.lightLoud;
+      if (lvl < this.preDropLevel * DROP_LAND_GAIN + 0.02) { this.dropEnv = 0; this.lastDropSwitchMs = -1e9; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
+    }
     if (DROP_SNAP_MS > 0) {
       if (dropHitRaw && this.beatTrust >= 0.5 && beatLocked(this.cfg.beat)) {
         const bms = beatPeriod(this.cfg.beat);
