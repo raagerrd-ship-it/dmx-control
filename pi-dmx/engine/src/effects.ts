@@ -158,8 +158,9 @@ const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
 // DMX_LIVE_LEVEL (2026-09-21): lotus nivakanal - se blocket i render(). Rattar bara for A/B.
 const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH === '1';   // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
 const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
+const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35);   // tierEma-snap vid high/break-grans
-const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.15);   // master i refrang/break
+const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.45), SECTION_LOW_DIP = Number(process.env.SECTION_LOW_DIP ?? 0.30);   // master: refrang upp, vers/intro ner, break mer ner
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
 const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10);        // lotus windowDb 10
 const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 4.5); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
@@ -1333,6 +1334,9 @@ export class EffectEngine {
         else this.liveLevelSm += (1 - Math.exp(-dtMs / LIVE_RELEASE_MS)) * (sh - this.liveLevelSm);
         shape = this.liveLevelSm;
         if (LIVE_TRACE && nowMs - this.liveLogAt > 2000) { this.liveLogAt = nowMs; console.log(`[liveniva] wdb ${wdb.toFixed(1)} ankare ${this.liveAnchor.toFixed(1)} shape ${sh.toFixed(2)} ${fast ? 'SNABB' : ''}`); }
+      } else if (this.liveLevelSm > 0) {
+        // UNDER TYSTNADSGOLVET (ladan 20:02: 'lag kvar ljust nar laten lugnade ner sig'): nivan FROS pa sista varde. Klinga av mot 0.
+        this.liveLevelSm *= Math.exp(-dtMs / LIVE_RELEASE_MS); this.liveShapeRaw = 0; shape = this.liveLevelSm;
       }
     }
     // (d) shape-smoothing (asymmetrisk: snabb upp 25 ms, lugn ner 150 ms) — sprider
@@ -1361,7 +1365,12 @@ export class EffectEngine {
     // → refräng ljus, vers dim = synlig gas, och pulsen syns uppåt mot en rörlig nivå.
     const md0 = drive * (LIGHT_FLOOR + (1 - LIGHT_FLOOR) * loudness + frame.buildUp * 0.35 + this.dropEnv * 0.8);
     // SEKTIONSGAS (DMX_SECTION_SWITCH): refrang lyfter mastern, break sanker - utover loudness (som redan foljer nivan).
-    const secGain = SECTION_SWITCH ? (frame.section === 'high' && (frame.sectionTier ?? 0) >= 2 ? 1 + SECTION_HIGH_LIFT : frame.section === 'break' ? 1 - SECTION_BREAK_DIP : 1) : 1;
+    // SEKTIONSVAXEL (ladan 20:00, agaren: 'ska kunna bli morkare, mer dynamik'): low/intro x(1-LOW_DIP), break x(1-BREAK_DIP),
+    // high x(1+LIFT) nar tiern ar topp. Analysatorns sektion ar latens egen rangordning, sa ett lugnare parti BLIR morkare
+    // oavsett hur komprimerad mixen ar. Efter drop (afterDrop-fonstret) galler high.
+    const secNow = (now - this.lastDropSwitchMs < 20_000) ? 'high' : frame.section;
+    const secGain = SECTION_SWITCH ? (secNow === 'high' ? ((frame.sectionTier ?? 0) >= 2 || now - this.lastDropSwitchMs < 20_000 ? 1 + SECTION_HIGH_LIFT : 1)
+      : secNow === 'break' ? 1 - SECTION_BREAK_DIP : (secNow === 'low' || secNow === 'intro') ? 1 - SECTION_LOW_DIP : 1) : 1;
     const md = SECTION_SWITCH ? Math.min(1.2, md0 * secGain) : md0;   // standard: orort
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
@@ -1528,6 +1537,9 @@ export class EffectEngine {
       rgb[0] = rgb[0] * md + 1.00 * restLvl;
       rgb[1] = rgb[1] * md + 0.30 * restLvl;
       rgb[2] = rgb[2] * md + 0.00 * restLvl;
+      // LAMPGOLV (ladan 20:05, 'manga effekter slacker lamporna'): effekternas egna golv (3-12 %) x mastern hamnar under PAR-lampornas
+      // tandtroskel (~5-8 % DMX) -> helt slackt i stallet for morkt. Allt > 0 mappas till LAMP_MIN..1 under spelning; 0 forblir 0.
+      if (LAMP_MIN > 0 && drive > 0.05) { const mx = Math.max(rgb[0], rgb[1], rgb[2]); if (mx > 0.002 && mx < 1) { const k = (LAMP_MIN + (1 - LAMP_MIN) * mx) / mx; rgb[0] = Math.min(1, rgb[0] * k); rgb[1] = Math.min(1, rgb[1] * k); rgb[2] = Math.min(1, rgb[2] * k); } }
       this.out.writeFixture(this.universe, fx, rgb, 1, strobeVal, specialty);
     }
 
