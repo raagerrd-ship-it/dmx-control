@@ -70,6 +70,11 @@ export interface Frame {
   beatPhaseMs: number; beatPhaseConf: number;
   /** SEKTION (DMX_SECTION=1): intro | low | build | high | break, alder, refrangindex, tier 0..2, upprepning (0..1, ms sedan, etikett). */
   section: string; sectionAgeMs: number; sectionIndex: number; sectionTier: number; repeatSim: number; repeatAgoMs: number; repeatSection: string;
+  /** SEKTIONSMINNE + FORUTSAGELSE (portat fran lotus 2026-09-21, agenttraning: refrangrecall 0,34 -> 0,73, forutsagelse 11/22 @ 2,8 falska/min).
+   *  expectHighInMs: ms tills nasta 'high' vantas (-1 ingen, 0 = i high): frasgitter (PREDICT_LAT takter) fran senaste high-starten nar
+   *  energin stigit PREDICT_RISE block i rad. prevSection: forra sektionen. levelVsHighDb: blockets dB mot senaste refrangens medel
+   *  (negativt = tystare; 0 utan refrang) = latens EGEN dynamikreferens. sectionBars: takter sedan sektionsstart. */
+  expectHighInMs: number; prevSection: string; levelVsHighDb: number; sectionBars: number;
   /** Rikt spektrum + per-band onset (anslag) från dubbel-FFT:n (hög-upplöst). */
   spec: Spectrum;       // per-band NIVÅ (AGC 0..1)
   /**
@@ -279,6 +284,25 @@ export class Analyser {
   private static readonly SECTION_MODE = process.env.DMX_SECTION_MODE || 'rank';
   private static readonly RANK_HI = Number(process.env.DMX_SECTION_RANK_HI) || 0.67;
   private static readonly RANK_LO = Number(process.env.DMX_SECTION_RANK_LO) || 0.33;
+  /** RANK v2 (lotus agent 1, 09-21): rang mot 4 s-FONSTERMEDEL (som facit) i stallet for enskilda block, poang = z(dB) + W_DENS*z(kickar)
+   *  + W_CENT*z(centroid), hysteres HYST kring trosklarna for satt tier, RUN raka block. Lotus-bank: high==high 0,51->0,60, recall 0,34->0,73,
+   *  falsk-high 0,58->0,41, byten/lat 15->7. DMX_SECTION_RANK_WIN=0 = gamla blockrangen. */
+  private static readonly RANK_VS_WIN = process.env.DMX_SECTION_RANK_WIN !== '0';
+  private static readonly RANK_WIN = Number(process.env.DMX_SECTION_WIN) || 4;
+  private static readonly RANK_W_DENS = process.env.DMX_SECTION_W_DENS !== undefined ? Number(process.env.DMX_SECTION_W_DENS) : 0.5;
+  private static readonly RANK_W_CENT = process.env.DMX_SECTION_W_CENT !== undefined ? Number(process.env.DMX_SECTION_W_CENT) : 0.5;
+  private static readonly RANK_HYST = process.env.DMX_SECTION_HYST !== undefined ? Number(process.env.DMX_SECTION_HYST) : 0.15;
+  private static readonly RANK_RUN = Number(process.env.DMX_SECTION_RUN) || 3;
+  /** Forutsagelse (lotus agent 4): DMX_PREDICT_SRC bitmask (1 minne: samma etikett foljdes av high efter N takter forr; 2 fras), gitter
+   *  DMX_PREDICT_LAT takter fran senaste high-starten (DMX_PREDICT_GRID=sec: fran sektionsstart), krav DMX_PREDICT_RISE stigande block (0 = los). */
+  private static readonly PREDICT_SRC = process.env.DMX_PREDICT_SRC !== undefined ? Number(process.env.DMX_PREDICT_SRC) : 2;
+  private static readonly PREDICT_GRID = process.env.DMX_PREDICT_GRID || 'hi';
+  private static readonly PREDICT_LAT = Number(process.env.DMX_PREDICT_LAT) || 4;
+  private static readonly PREDICT_RISE = process.env.DMX_PREDICT_RISE !== undefined ? Number(process.env.DMX_PREDICT_RISE) : 4;
+  private secBlkCentH: number[] = []; private secScoreBuf = new Float32Array(600);
+  expectHighMs = 0; expectSource = 0; prevSection = ''; levelVsHighDb = 0;
+  private secLog: Array<{ label: string; startMs: number; endMs: number; db: number; dens: number }> = [];
+  private secCurDbSum = 0; private secCurDbN = 0; private secCurDens = 0; private lastHighDb = NaN; private secHiStartMs = 0;
   private secBlkRms2 = 0; private secBlkDb: number[] = []; private secBlkDens: number[] = []; private secRankRun = 0; private secRankCand = 1;
   section = 'intro'; sectionStartMs = 0; sectionIndex = 0; sectionTier = 1; repeatSim = 0; repeatAgoMs = 0; repeatSection = '';
   private secBlkMs = 0; private secBlkN = 0; private secBlkInt = 0; private secBlkKicks = 0; private secBlkCent = 0; private secBlkSpec = new Float32Array(8);
@@ -794,10 +818,38 @@ export class Analyser {
     this.phaseLastBeatMs = beatMs; this.beatPhaseMs = beatMs; this.beatPhaseConf = conf;
   }
 
+  /** FORUTSAGELSE av nasta 'high' (portat fran lotus agent 4). Kors per sektionsblock (1 s). */
+  private predictHigh(nowMs: number, bInt: number): void {
+    const bpm = this.localBpm; const barMs = bpm > 0 ? 240000 / bpm : 0;
+    let exp = 0, src = 0;
+    if (this.section !== 'high' && barMs > 0) {
+      if (Analyser.PREDICT_SRC & 1) for (let i = this.secLog.length - 2; i >= 0; i--) {
+        const a = this.secLog[i], b = this.secLog[i + 1];
+        if (a.label !== this.section || b.label !== 'high') continue;
+        const bars = Math.max(4, Math.round((a.endMs - a.startMs) / barMs / 4) * 4);
+        const cand = this.sectionStartMs + bars * barMs;
+        if (cand > nowMs + 500) { exp = cand; src = 1; }
+        break;
+      }
+      const minRise = Analyser.PREDICT_RISE;
+      const rising = minRise > 0 ? this.secRiseRun >= minRise : (this.secRiseRun >= 2 || this.buildUp > 0.35 || bInt > 0.55);
+      if (!exp && (Analyser.PREDICT_SRC & 2) && rising) {
+        const anchor = Analyser.PREDICT_GRID === 'hi' && this.secHiStartMs > 0 ? this.secHiStartMs : this.sectionStartMs;
+        const L = Analyser.PREDICT_LAT * barMs;
+        const elapsed = nowMs - anchor; const k = Math.ceil((elapsed + barMs) / L);
+        const cand = anchor + k * L;
+        if (cand - nowMs <= 16 * barMs) { exp = cand; src = 2; }
+      }
+    }
+    if (exp === 0 && this.expectHighMs > 0 && this.section !== 'high' && this.expectHighMs > nowMs - 2000) { exp = this.expectHighMs; src = this.expectSource; }
+    this.expectHighMs = exp; this.expectSource = src;
+  }
+
   private sectionReset(): void {
     this.section = 'intro'; this.sectionStartMs = 0; this.sectionIndex = 0; this.sectionTier = 1; this.repeatSim = 0; this.repeatAgoMs = 0; this.repeatSection = '';
     this.secBlkMs = 0; this.secBlkN = 0; this.secBlkInt = 0; this.secBlkKicks = 0; this.secBlkCent = 0; this.secBlkSpec.fill(0);
     this.secTierRun = 0; this.secTierCand = 1; this.secRiseRun = 0; this.secSongStartMs = 0; this.secBlkRms2 = 0; this.secBlkDb.length = 0; this.secBlkDens.length = 0; this.secHighSeen = false; this.secDropSeen = this.dropCount; this.secSilentBlocks = 0;
+    this.secBlkCentH.length = 0; this.secLog.length = 0; this.secCurDbSum = 0; this.secCurDbN = 0; this.secCurDens = 0; this.lastHighDb = NaN; this.expectHighMs = 0; this.expectSource = 0; this.prevSection = ''; this.levelVsHighDb = 0; this.secHiStartMs = 0;
     this.secHistN = 0; this.secHistPos = 0; this.secFpN = 0; this.secFpPos = 0; this.secFpLab.length = 0; this.secFpAcc.fill(0); this.secFpAccN = 0;
   }
 
@@ -807,6 +859,7 @@ export class Analyser {
     for (let i = 0; i < 8; i++) this.secBlkSpec[i] += Math.pow(10, this.bandDbRaw[i] / 20);   // absolut bandmagnitud (lotus bandAbs) ur dB
     if (this.secBlkMs < 1000) return;
     const n = this.secBlkN || 1; const bInt = this.secBlkInt / n; const bKicks = this.secBlkKicks; const bCent = this.secBlkCent / n;
+    const blkDb = 10 * Math.log10(this.secBlkRms2 / n + 1e-10);
     // tystnad mellan latar: 3 tysta block -> ny lat
     if (this.activeMs === 0) { if (++this.secSilentBlocks >= 10) { this.sectionReset(); return; } }   // 10 s tystnad (var 3: en tyst vers nollade laten, Regnblota 100 s)
     else this.secSilentBlocks = 0;
@@ -815,22 +868,25 @@ export class Analyser {
     if (Analyser.SECTION_MODE === 'rank') {
       // KAUSAL PERCENTILRANG (15:35): blockets dB (ra rms, fore AGC) och basonset-tathet (kickar/s) z-normeras mot alla block
       // hittills i laten, 4 s-fonstrets medelpoang rangordnas mot alla blockpoang hittills. Minst 20 s historik; innan dess 'intro'.
-      const db = 10 * Math.log10(this.secBlkRms2 / n + 1e-10); this.secBlkDb.push(db); this.secBlkDens.push(bKicks);
-      if (this.secBlkDb.length > 600) { this.secBlkDb.shift(); this.secBlkDens.shift(); }
+      this.secBlkDb.push(blkDb); this.secBlkDens.push(bKicks); this.secBlkCentH.push(bCent);
+      if (this.secBlkDb.length > 600) { this.secBlkDb.shift(); this.secBlkDens.shift(); this.secBlkCentH.shift(); }
       const nb = this.secBlkDb.length;
       if (nb >= 20) {
-        let md = 0, mk = 0; for (let i = 0; i < nb; i++) { md += this.secBlkDb[i]; mk += this.secBlkDens[i]; } md /= nb; mk /= nb;
-        let sd = 0, sk = 0; for (let i = 0; i < nb; i++) { sd += (this.secBlkDb[i] - md) ** 2; sk += (this.secBlkDens[i] - mk) ** 2; }
-        sd = Math.max(1.0, Math.sqrt(sd / nb)); sk = Math.max(0.3, Math.sqrt(sk / nb));
-        const score = (i: number) => (this.secBlkDb[i] - md) / sd + (this.secBlkDens[i] - mk) / sk;
-        let win = 0; const W = Math.min(4, nb); for (let i = nb - W; i < nb; i++) win += score(i); win /= W;
-        let below = 0; for (let i = 0; i < nb; i++) if (score(i) < win) below++;
-        const pct = below / nb;
-        tier = pct >= Analyser.RANK_HI ? 2 : pct <= Analyser.RANK_LO ? 0 : 1;
+        const D = this.secBlkDb, K = this.secBlkDens, C = this.secBlkCentH, wk = Analyser.RANK_W_DENS, wc = Analyser.RANK_W_CENT;
+        let md = 0, mk = 0, mc = 0; for (let i = 0; i < nb; i++) { md += D[i]; mk += K[i]; mc += C[i]; } md /= nb; mk /= nb; mc /= nb;
+        let sd = 0, sk = 0, sc = 0; for (let i = 0; i < nb; i++) { sd += (D[i] - md) ** 2; sk += (K[i] - mk) ** 2; sc += (C[i] - mc) ** 2; }
+        sd = Math.max(1.0, Math.sqrt(sd / nb)); sk = Math.max(0.3, Math.sqrt(sk / nb)); sc = Math.max(0.02, Math.sqrt(sc / nb));
+        const S = this.secScoreBuf; for (let i = 0; i < nb; i++) S[i] = (D[i] - md) / sd + wk * (K[i] - mk) / sk + wc * (C[i] - mc) / sc;
+        let win = 0; const W = Math.min(Analyser.RANK_WIN, nb); for (let i = nb - W; i < nb; i++) win += S[i]; win /= W;
+        let below = 0, cnt = 0;
+        if (Analyser.RANK_VS_WIN) { let acc = 0; for (let e = 1; e <= nb; e++) { acc += S[e - 1]; if (e > W) acc -= S[e - 1 - W]; if (e >= W) { cnt++; if (acc / W < win) below++; } } }
+        else { cnt = nb; for (let i = 0; i < nb; i++) if (S[i] < win) below++; }
+        const pct = below / cnt; const cur = this.sectionTier, h = Analyser.RANK_HYST;
+        tier = pct >= Analyser.RANK_HI - (cur === 2 ? h : 0) ? 2 : pct <= Analyser.RANK_LO + (cur === 0 ? h : 0) ? 0 : 1;
       } else tier = 1;
     }
     if (tier === this.secTierCand) this.secTierRun++; else { this.secTierCand = tier; this.secTierRun = 1; }
-    if (this.secTierRun >= (Analyser.SECTION_MODE === 'rank' ? 2 : 3)) this.sectionTier = this.secTierCand;
+    if (this.secTierRun >= (Analyser.SECTION_MODE === 'rank' ? Analyser.RANK_RUN : 3)) this.sectionTier = this.secTierCand;
     const st = this.sectionTier;
     // trend mot 8 s sedan
     this.secHist[this.secHistPos] = bInt; this.secHistPos = (this.secHistPos + 1) & 15; if (this.secHistN < 16) this.secHistN++;
@@ -855,7 +911,19 @@ export class Analyser {
     // uppehallstid 8 s (var 4: build/low/high bytte var 4 s pa pop 14:30), utom in i 'high' (4 s) och high -> break (direkt)
     const dwellMs = label === 'high' ? 4000 : 8000;
     const dwellOk = nowMs - this.sectionStartMs >= dwellMs || (prev === 'high' && label === 'break');
-    if (label !== prev && dwellOk) { this.sectionStartMs = nowMs; if (label === 'high') { this.sectionIndex++; this.secHighSeen = true; } this.section = label; }
+    if (label !== prev && dwellOk) {
+      // MINNE: avslutad sektion till loggen (medel-dB, kickar/s); refrangens dB blir referensen for levelVsHighDb.
+      const dbMean = this.secCurDbN ? this.secCurDbSum / this.secCurDbN : blkDb;
+      this.secLog.push({ label: prev, startMs: this.sectionStartMs, endMs: nowMs, db: dbMean, dens: this.secCurDbN ? this.secCurDens / this.secCurDbN : 0 });
+      if (this.secLog.length > 48) this.secLog.shift();
+      if (prev === 'high') this.lastHighDb = dbMean;
+      this.prevSection = prev; this.secCurDbSum = 0; this.secCurDbN = 0; this.secCurDens = 0;
+      this.sectionStartMs = nowMs; if (label === 'high') { this.sectionIndex++; this.secHighSeen = true; this.secHiStartMs = nowMs; } this.section = label;
+    }
+    this.secCurDbSum += blkDb; this.secCurDbN++; this.secCurDens += bKicks;
+    if (this.section === 'high') this.lastHighDb = this.secCurDbSum / this.secCurDbN;   // pagaende refrang = farskaste referensen
+    this.levelVsHighDb = Number.isFinite(this.lastHighDb) ? blkDb - this.lastHighDb : 0;
+    this.predictHigh(nowMs, bInt);
     // klangavtryck var 4:e sekund
     let sum = 0; for (let i = 0; i < 8; i++) sum += this.secBlkSpec[i];
     const acc = this.secFpAcc; for (let i = 0; i < 8; i++) acc[i] += sum > 0 ? this.secBlkSpec[i] / sum : 0;
@@ -1597,7 +1665,7 @@ export class Analyser {
       level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
       dropCount: 0, miniDropCount: 0, bodyDb: 0, midHiDb: -120, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
-      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '',
+      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
       spec: this.outSpec, onset: this.outOnset, drum: this.outDrum,
     };
   }
@@ -2423,6 +2491,9 @@ export class Analyser {
     if (Analyser.SECTION_ON) this.sectionHop(intensity, kick, breaking, this.wallNow(), this.dtHop * 1000, rms);
     f.section = this.section; f.sectionAgeMs = this.sectionStartMs > 0 ? this.wallNow() - this.sectionStartMs : 0; f.sectionIndex = this.sectionIndex; f.sectionTier = this.sectionTier;
     f.repeatSim = this.repeatSim; f.repeatAgoMs = this.repeatAgoMs; f.repeatSection = this.repeatSection;
+    { const nowW = this.wallNow(); f.expectHighInMs = this.section === 'high' ? 0 : this.expectHighMs > 0 ? Math.max(0, this.expectHighMs - nowW) : -1;
+      f.prevSection = this.prevSection; f.levelVsHighDb = this.levelVsHighDb;
+      f.sectionBars = this.localBpm > 0 && this.sectionStartMs > 0 ? (nowW - this.sectionStartMs) / (240000 / this.localBpm) : 0; }
     return f;
   }
 }

@@ -156,6 +156,14 @@ const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25); // drop i l
 const DROP_LAND_GAIN = Number(process.env.DROP_LAND_GAIN ?? 1.15); // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35); // tierEma-snap vid high/break-grans
 const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.45), SECTION_LOW_DIP = Number(process.env.SECTION_LOW_DIP ?? 0.30); // master: refrang upp, vers/intro ner, break mer ner
+/** SEKTIONSMINNETS KONSUMENTER (2026-09-21, lotus-porten): (1) FORVARNING - frame.expectHighInMs <= DMX_EXPECT_LEAD_MS raknas som 'high' for
+ *  bytet (dirigenten gasar IN i refrangen), och de sista DMX_EXPECT_LIFT_MS lyfts nivan mot 1 + SECTION_HIGH_LIFT som en riser;
+ *  (2) DYNAMIK - nar en refrang horts ersatter frame.levelVsHighDb (dB mot refrangen) de fasta LOW/BREAK-dipparna: gain = 1 + dB/DMX_SECTION_DYN_DB,
+ *  golv DMX_SECTION_DYN_FLOOR (agaren i ladan: "lyser mycket aven om laten blir tystare" - ankaret sjonk, refrangen ar en fast referens). 0 = av. */
+const EXPECT_LEAD_MS = Math.max(0, Number(process.env.DMX_EXPECT_LEAD_MS ?? 600) || 0);
+const EXPECT_LIFT_MS = Math.max(0, Number(process.env.DMX_EXPECT_LIFT_MS ?? 3000) || 0);
+const SECTION_DYN_DB = Math.max(0, Number(process.env.DMX_SECTION_DYN_DB ?? 12) || 0);
+const SECTION_DYN_FLOOR = Math.min(1, Math.max(0.1, Number(process.env.DMX_SECTION_DYN_FLOOR ?? 0.5) || 0.5));
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
 const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10); // lotus windowDb 10
 const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 4.5); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
@@ -379,7 +387,7 @@ export class EffectEngine {
     // Pre-allokerad kontext för noll-allokering i render-loopen
     ctx = {
         cfg: null, frame: null, fx: undefined, t: 0, idx: 0, count: 0, want: {},
-        audio: 0, kickEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionEntry: 0, sectionTier: 1, repeatSim: 0,
+        audio: 0, kickEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null, expectHighInMs: -1, levelVsHighDb: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionEntry: 0, sectionTier: 1, repeatSim: 0,
         beatIdx: 0, beatFrac: 0, beatPulse: 0, beatHit: false, hasBeat: false,
         wavePhase: 0, buildUp: 0, phaseSpread: 0, punchFloor: 0, chasePos: 0,
         dropFired: this.dropFired, dropHue: this.dropHue, now: 0,
@@ -1073,7 +1081,8 @@ export class EffectEngine {
             if (dropHit)
                 this.lastDropSwitchMs = now;
             const afterDrop = SECTION_SWITCH && now - this.lastDropSwitchMs < 20_000;
-            const liveSec = SECTION_SWITCH ? (afterDrop ? 'high' : (frame.section || '')) : '';
+            const expectSoon = SECTION_SWITCH && EXPECT_LEAD_MS > 0 && (frame.expectHighInMs ?? -1) > 0 && (frame.expectHighInMs ?? 0) <= EXPECT_LEAD_MS; // forvarning: byt FORE refrangen
+            const liveSec = SECTION_SWITCH ? (afterDrop || expectSoon ? 'high' : (frame.section || '')) : '';
             const liveSecChanged = SECTION_SWITCH && liveSec !== '' && this.lastLiveSection !== '' && liveSec !== this.lastLiveSection;
             if (SECTION_SWITCH && liveSec !== '' && liveSec !== this.lastLiveSection) {
                 if (this.lastLiveSection !== '' && SECTION_TRACE)
@@ -1510,7 +1519,17 @@ export class EffectEngine {
         const secNow = (now - this.lastDropSwitchMs < 20_000) ? 'high' : frame.section;
         const secGain = SECTION_SWITCH ? (secNow === 'high' ? ((frame.sectionTier ?? 0) >= 2 || now - this.lastDropSwitchMs < 20_000 ? 1 + SECTION_HIGH_LIFT : 1)
             : secNow === 'break' ? 1 - SECTION_BREAK_DIP : (secNow === 'low' || secNow === 'intro') ? 1 - SECTION_LOW_DIP : 1) : 1;
-        const md = SECTION_SWITCH ? Math.min(1.2, md0 * secGain) : md0; // standard: orort
+        let dynGain = secGain;
+        if (SECTION_SWITCH) {
+            const lv = frame.levelVsHighDb ?? 0, ex = frame.expectHighInMs ?? -1;
+            if (SECTION_DYN_DB > 0 && lv !== 0 && secNow !== 'high')
+                dynGain = Math.max(SECTION_DYN_FLOOR, Math.min(1, 1 + lv / SECTION_DYN_DB)); // latens egen referens
+            if (EXPECT_LIFT_MS > 0 && ex > 0 && ex <= EXPECT_LIFT_MS) {
+                const l = 1 - ex / EXPECT_LIFT_MS;
+                dynGain += (1 + SECTION_HIGH_LIFT - dynGain) * l;
+            } // riser mot refrangen
+        }
+        const md = SECTION_SWITCH ? Math.min(1.2, md0 * dynGain) : md0; // standard: orort
         // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
         // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
         // kör full gas. Ger arkitektoniskt djup — rörelsen poppar mot en stabil bas.
@@ -1602,6 +1621,8 @@ export class EffectEngine {
         ctx.sectionIndex = frame.sectionIndex || 0;
         ctx.sectionEntry = SECTION_SWITCH ? Math.max(0, 1 - (frame.sectionAgeMs || 1e9) / 400) : 0;
         ctx.sectionTier = frame.sectionTier ?? 1;
+        ctx.expectHighInMs = frame.expectHighInMs ?? -1;
+        ctx.levelVsHighDb = frame.levelVsHighDb ?? 0;
         ctx.repeatSim = frame.repeatSim || 0;
         ctx.audio = audio;
         ctx.kickEnv = kickEnv;

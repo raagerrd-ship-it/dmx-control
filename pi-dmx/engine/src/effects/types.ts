@@ -55,6 +55,8 @@ export interface EffectContext {
   /** Sektionens energitier 0..2 (rank mot latens egna block) och upprepning 0..1 ('refrangen ar tillbaka' >= 0,92). */
   sectionTier: number;
   repeatSim: number;
+  /** Forvarning: ms tills nasta refrang vantas (-1 ingen, 0 = i high) och nivan mot senaste refrangen i dB (0 utan refrang). */
+  expectHighInMs: number; levelVsHighDb: number;
   /** Kick-/beat-envelope (0..1). */
   kickEnv: number;
   /** BAS-PUNCH: "goa slaget" — spikar 0..1 på en riktig dunk (bas klart över sin
