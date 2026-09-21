@@ -55,6 +55,7 @@ export interface FogStatus {
 // över ~70 ms tappar den anslaget.
 /** Under den här nivån räknas ingången som avstängd, inte som ett tyst parti. */
 const INPUT_OFF_LEVEL = 0.02;
+const SILENCE_LEVEL = Number(process.env.DMX_SILENCE_LEVEL ?? 0.05), SILENCE_MS = Number(process.env.DMX_SILENCE_MS ?? 250), SILENCE_RELEASE_S = Number(process.env.DMX_SILENCE_RELEASE_S ?? 0.25);
 /** ...men först när den legat där så länge — ett break i låten ska inte släcka showen. */
 const INPUT_OFF_MS = 2000;
 
@@ -1184,10 +1185,12 @@ export class EffectEngine {
     else if (!this.inputLowSince) this.inputLowSince = now;
     this.inputOff = !!this.inputLowSince && now - this.inputLowSince > INPUT_OFF_MS;
 
-    const silenceThreshold = 0.05 * Math.max(1, frame.gain / 3);
+    // TYSTNADSGRIND (ladan 20:35, 'slacker sig under korta perioder'): 250 ms under 0,05 stangde riggen pa 0,25 s - en tyst fras
+    // i laten racker. Env: DMX_SILENCE_LEVEL (0,05), DMX_SILENCE_MS (250), DMX_SILENCE_RELEASE_S (0,25). Ladan: 0,03 / 2000 / 1,0.
+    const silenceThreshold = SILENCE_LEVEL * Math.max(1, frame.gain / 3);
     if (frame.level > silenceThreshold || kickHit) this.lastActiveMs = now;
-    const gateTarget = now - this.lastActiveMs > 250 ? 0 : 1;
-    const gateRate = gateTarget > this.silenceGate ? dtSec / 0.1 : dtSec / 0.25;
+    const gateTarget = now - this.lastActiveMs > SILENCE_MS ? 0 : 1;
+    const gateRate = gateTarget > this.silenceGate ? dtSec / 0.1 : dtSec / SILENCE_RELEASE_S;
     this.silenceGate += Math.max(-gateRate, Math.min(gateRate, gateTarget - this.silenceGate));
     // FLANK: ljudet var borta och kom tillbaka → behandla det som en låtstart.
     // Täcker okända låtar och att någon startar musiken; för kända låtar sätter
