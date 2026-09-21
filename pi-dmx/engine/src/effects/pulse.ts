@@ -2,7 +2,7 @@ import type { EffectDef } from "./types.js";
 
 // Fart: hela riggen samma färg, pulsar på beatet; färg stegar var fjärde takt.
 export const pulse: EffectDef = {
-  key: "pulse", label: "Puls", tier: "fart", section: ["low", "high", "build"],
+  key: "pulse", label: "Puls", tier: "fart", section: ["build"],
   desc: "Hela riggen i en färg som pulsar på beatet.",
   render(c) {
     const hue = c.mixedSector(Math.floor(c.beatIdx / 4)) / 6;
