@@ -1112,7 +1112,7 @@ export class EffectEngine {
         // Par-regel: sektion nr 1-2 delar look, nr 3-4 en ny, osv. (A A B B) - igenkanning utan att fastna.
         const livePart = !!part && part.startsWith('live:');
         const pairKey = livePart ? part + ':' + Math.floor(((frame.sectionIndex ?? 0) + 1) / 2) : part;
-        const remembered = !wantCalm && pairKey ? this.partLook.get(pairKey) : undefined;
+        const remembered = !wantCalm && pairKey && !livePart ? this.partLook.get(pairKey) : undefined;   // 20:33: ingen igenkanning for live-etiketter ('samma effekt igen') - bara latminnet
         const clearBass = HALVE_SHOW && frame.profile.bass >= CLEAR_BASS
           && this.cfg.rotation?.innerouter !== false && req("innerouter");
         if (clearBass && this.smartMode !== "innerouter" && this.smartCount % 3 !== 0) {
