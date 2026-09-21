@@ -159,6 +159,7 @@ const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
 const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH === '1';   // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
 const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
 const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);
+const BEAT_LIFT = Number(process.env.BEAT_LIFT ?? 0.25);   // additivt hjartslagslyft (synlig puls aven i morka effekter)
 const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25);   // drop i low/intro kraver riser >= detta
 const DROP_LAND_GAIN = Number(process.env.DROP_LAND_GAIN ?? 1.15);     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35);   // tierEma-snap vid high/break-grans
@@ -1552,6 +1553,13 @@ export class EffectEngine {
       rgb[0] = rgb[0] * md + 1.00 * restLvl;
       rgb[1] = rgb[1] * md + 0.30 * restLvl;
       rgb[2] = rgb[2] * md + 0.00 * restLvl;
+      // HJARTSLAGSLYFT (ladan 20:25, 'vid manga effekter forsvinner heartbeat'): pulsen ar en multiplikator i post - osynlig nar
+      // effekten sjalv ligger lagt (0,2 -> 0,03). Adderar BEAT_LIFT x puls x (1 - ljus) sa morka/rorliga effekter far en synlig
+      // stot uppat pa slaget; ljusa (nara max) paverkas knappt. Pulsen = beatMulNow normerad (1 pa slaget, 0 vid BEAT_MIN).
+      if (BEAT_LIFT > 0 && this.cfg.beatPulse && drive > 0.05 && this.beatMulNow > BEAT_MIN) {
+        const hb = (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN); const lift = BEAT_LIFT * hb * md;
+        rgb[0] += lift * (1 - rgb[0]); rgb[1] += lift * (1 - rgb[1]); rgb[2] += lift * (1 - rgb[2]);
+      }
       // LAMPGOLV (ladan 20:05, 'manga effekter slacker lamporna'): effekternas egna golv (3-12 %) x mastern hamnar under PAR-lampornas
       // tandtroskel (~5-8 % DMX) -> helt slackt i stallet for morkt. Allt > 0 mappas till LAMP_MIN..1 under spelning; 0 forblir 0.
       if (LAMP_MIN > 0 && drive > 0.05) { const mx = Math.max(rgb[0], rgb[1], rgb[2]); if (mx > 0.002 && mx < 1) { const k = (LAMP_MIN + (1 - LAMP_MIN) * mx) / mx; rgb[0] = Math.min(1, rgb[0] * k); rgb[1] = Math.min(1, rgb[1] * k); rgb[2] = Math.min(1, rgb[2] * k); } }
