@@ -9,7 +9,7 @@ import { fixtureRoles } from "./config.js";
 import { FixtureOutput } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { PostProcess } from "./postprocess.js";
-import { EFFECT_MAP, TIER, meetsRequirements } from "./effects/registry.js";
+import { EFFECT_MAP, TIER, SECTION_POOLS, meetsRequirements } from "./effects/registry.js";
 import { fitScore } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
 // PALETT-LAS (DMX_PALETTE): lås färgerna till en palett oavsett klang och läge. Namn ur listan
@@ -361,7 +361,7 @@ export class EffectEngine {
     // Pre-allokerad kontext för noll-allokering i render-loopen
     ctx = {
         cfg: null, frame: null, fx: undefined, t: 0, idx: 0, count: 0, want: {},
-        audio: 0, kickEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null,
+        audio: 0, kickEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null, section: 'intro', sectionAgeMs: 0, sectionIndex: 0,
         beatIdx: 0, beatFrac: 0, beatPulse: 0, beatHit: false, hasBeat: false,
         wavePhase: 0, buildUp: 0, phaseSpread: 0, punchFloor: 0, chasePos: 0,
         dropFired: this.dropFired, dropHue: this.dropHue, now: 0,
@@ -1095,6 +1095,17 @@ export class EffectEngine {
                 // effekt än ingen).
                 const req = (m) => meetsRequirements(m, bpm, frame.profile);
                 let pool = enabled(wantCalm ? LUGN : tierS).filter(req);
+                // SEKTIONSPOOL (DMX_SECTION_SWITCH): skar med sektionens looker (registry.SECTION_POOLS). 'build' och 'break' har egna
+                // effekter (stegring/andrum) som gar fore tiern; for high/low/intro ar snittet med tier-poolen forsta valet.
+                if (SECTION_SWITCH && liveSec && SECTION_POOLS[liveSec]) {
+                    const secList = SECTION_POOLS[liveSec];
+                    const own = (liveSec === 'build' || liveSec === 'break') ? enabled(secList).filter(req) : [];
+                    const cut = pool.filter((m) => secList.includes(m));
+                    if (own.length)
+                        pool = own;
+                    else if (cut.length)
+                        pool = cut;
+                }
                 if (pool.length === 0)
                     pool = enabled(wantCalm ? LUGN : tierS); // krav tömde → släpp dem
                 if (pool.length === 0)
@@ -1505,6 +1516,9 @@ export class EffectEngine {
         ctx.frame = frame;
         ctx.t = t;
         ctx.count = count;
+        ctx.section = frame.section || 'intro';
+        ctx.sectionAgeMs = frame.sectionAgeMs || 0;
+        ctx.sectionIndex = frame.sectionIndex || 0;
         ctx.audio = audio;
         ctx.kickEnv = kickEnv;
         ctx.punch = bassPunch;

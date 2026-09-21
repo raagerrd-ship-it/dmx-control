@@ -59,3 +59,11 @@ Vid 'high'-grans snappas tierEma till SECTION_HIGH_SNAP (0,75 = full-fart-poolen
 Standard (utan flaggan) orord. Offline i smart-lage: "[dirigent] live:high: aterser chase" = samma look nar refrangen kommer tillbaka.
 Att kolla i ladan: analysatorns sektioner kan vaxla high<->break med nagra sekunders mellanrum (dwell 8 s) - dirigentens MIN_HOLD
 dampar; annars hoj uppehallstiden i analysatorn (DMX_SECTION_MODE/rank-trosklar) efter logg med DMX_SECTION_TRACE=1.
+
+## 2026-09-21 i ladan: sektionseffekter + sektionspooler (effects.js + effects/registry.js + effects/stegring.js + effects/andrum.js)
+Deployat 17:10 (analyser/effects/index) och lotus.conf pa (GRID_PHASE, PHASE_FOLLOW, SECTION, SECTION_SWITCH, SECTION_TRACE, LIVE_LEVEL):
+loggen visade 'sektion intro->build->high' -> 'live:high: ny look party (tier full)' och kickdomaren nekade tre fasflyttar (-310 ms).
+Sedan (ej deployat an, hotspoten forsvann): effekterna ser sektionen (c.section/sectionAgeMs/sectionIndex), nya 'stegring' (build:
+morkt->vitt, tatare puls, UV/hazer, blinder vid drop) och 'andrum' (break: dimmat, langsamt, hjartslaget kvar), och registry.SECTION_POOLS
+= tydliga listor per sektion (intro/low/build/high/break) som dirigenten skar tier-poolen med; build/break tar sina egna fore tiern.
+Deploy: `python tools/deploy-dist.py` utan filargument (md5-diff pa alla dist/*.js + effects/*.js). Kraver lotus.conf for att markas.

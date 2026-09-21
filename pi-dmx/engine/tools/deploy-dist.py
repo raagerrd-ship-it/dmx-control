@@ -29,7 +29,8 @@ print(f"{len(files)} filer, skiljer/saknas pa Pi:n: {todo or 'inga'}")
 if DRY: sys.exit(0)
 ts = time.strftime('%Y%m%d-%H%M'); sf = c.open_sftp()
 for f in todo:
-    tmp = '/tmp/' + f.replace('/', '__')
+    tmp = '/tmp/chk/' + f.replace('/', '__')
+    run("mkdir -p /tmp/chk && [ -f /tmp/chk/package.json ] || echo '{\"type\":\"module\"}' > /tmp/chk/package.json")   # ESM: node --check kraver type module
     with sf.open(tmp, 'wb') as fh: fh.write(files[f])
     rc, out, err = run(f"node --check {tmp}")
     if rc: sys.exit(f"node --check {f} misslyckades: {err[:300]}")

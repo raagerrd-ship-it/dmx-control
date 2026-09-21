@@ -46,6 +46,10 @@ export interface EffectContext {
 
   /** Klippt/normaliserad nivå (0..1). */
   audio: number;
+  /** SEKTION (DMX_SECTION=1, 2026-09-21): intro | low | build | high | break, alder (ms) och refrangindex - annars 'intro'/0. */
+  section: string;
+  sectionAgeMs: number;
+  sectionIndex: number;
   /** Kick-/beat-envelope (0..1). */
   kickEnv: number;
   /** BAS-PUNCH: "goa slaget" — spikar 0..1 på en riktig dunk (bas klart över sin
@@ -116,6 +120,9 @@ export interface EffectDef {
   flat?: boolean;
   /** Smart-lägets energitier. */
   tier: EffectTier;
+  /** SEKTIONSTAGG (2026-09-21): dirigenten foredrar effekter taggade med aktuell sektion (DMX_SECTION_SWITCH) - 'build' = stegring,
+   *  'break' = andrum, 'high' = refrang. Otaggad = som forut. */
+  section?: string[];
   /** Specialroller (hazer/uv/blinder/strobe/laser/co2) som effekten aktivt driver
    *  när den körs. Motorn skriver till fixture-kanaler med matchande roll; UI:t
    *  gråar ut effekter vars drives inte har någon kopplad fixture. Tom/utelämnad
