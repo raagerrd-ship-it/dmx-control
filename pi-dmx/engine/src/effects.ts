@@ -159,7 +159,7 @@ const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
 const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH === '1';   // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
 const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
 const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35);   // tierEma-snap vid high/break-grans
-const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.12), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.15);   // master i refrang/break
+const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.15);   // master i refrang/break
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
 const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10);        // lotus windowDb 10
 const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 4.5); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
@@ -268,6 +268,7 @@ export class EffectEngine {
   private lightLo = 0;           // långsamt golv av wdb (tyst-referens)
   private lightShapeSm = -1;     // shape-smoothing
   private lastLiveSection = '';   // DMX_SECTION_SWITCH
+  private lastDropSwitchMs = -1e9;   // senaste drop -> 'high'-pool i 20 s
   private liveAnchor?: number; private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
   private lightLoud = 0;         // log-released loudness 0..1 → driver md
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
@@ -931,7 +932,8 @@ export class EffectEngine {
       // (rank-lage), sa vid en high-grans vet dirigenten redan att refrangen ar har - gasa direkt (som vid drop), vanta inte
       // pa 5 s-medelvardet + hallstid. 'break'/'low' vid gransen: slapp ner direkt (musiken slapper -> showen foljer).
       if (SECTION_SWITCH && (frame.sectionAgeMs ?? 1e9) < 1500) {
-        if (frame.section === 'high' && this.tierEma < SECTION_HIGH_SNAP) this.tierEma = SECTION_HIGH_SNAP;
+        // KRASEN (ladan 19:55: 'gasade pa i lugnt parti'): bara nar analysatorns egen energitier ocksa sager topp (sectionTier 2).
+        if ((frame.section === 'high' && (frame.sectionTier ?? 0) >= 2) && this.tierEma < SECTION_HIGH_SNAP) this.tierEma = SECTION_HIGH_SNAP;
         else if ((frame.section === 'break' || frame.section === 'low') && this.tierEma > SECTION_LOW_SNAP) this.tierEma = SECTION_LOW_SNAP;
       }
       const intensity = this.cfg.energyDrivesMode ? this.tierEma : 0.5;
@@ -991,7 +993,11 @@ export class EffectEngine {
         // showen aldrig fastnar om gridet skulle vara fel).
         // REALTIDSSEKTION (DMX_SECTION_SWITCH=1, 2026-09-21): analysatorns egen sektion (DMX_SECTION=1: intro/low/build/high/break)
         // ar ett bytesskal precis som latminnets sektionsgrans, och etiketten ger IDENTITET (samma look nar 'high' kommer tillbaka).
-        const liveSec = SECTION_SWITCH ? (frame.section || '') : '';
+        // DROPEN AR REFRANGENS START (ladan 19:56: 'efter en drop dor lamporna'): sektionsdetektorn ligger kvar i 'build' nagra
+        // sekunder efter smallen (uppehallstid) och build-lookerna ar morka av design. I 20 s efter en drop galler poolen 'high'.
+        if (dropHit) this.lastDropSwitchMs = now;
+        const afterDrop = SECTION_SWITCH && now - this.lastDropSwitchMs < 20_000;
+        const liveSec = SECTION_SWITCH ? (afterDrop ? 'high' : (frame.section || '')) : '';
         const liveSecChanged = SECTION_SWITCH && liveSec !== '' && this.lastLiveSection !== '' && liveSec !== this.lastLiveSection;
         if (SECTION_SWITCH && liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '' && SECTION_TRACE) console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; if (liveSec === 'intro') for (const k of [...this.partLook.keys()]) if (k.startsWith('live:')) this.partLook.delete(k); }   // ny lat (analysatorn nollar till intro) -> glom live-lookerna
         const memSection = now - this.memSectionAt < 300 || liveSecChanged;
@@ -1309,11 +1315,14 @@ export class EffectEngine {
         const nowMs = performance.now();
         if (this.liveAnchor === undefined) { this.liveAnchor = wdb; this.liveFastUntil = nowMs + 20_000; }
         const up = wdb > this.liveAnchor;
-        const far = Math.abs(wdb - this.liveAnchor) > LIVE_WIN_DB;
+        // SNABBT BARA UPPAT (ladan 19:58: 'lyser mycket aven nar laten blir tystare'): snabbt nerat gjorde ett tyst parti
+        // till det nya normala pa 12 s. Nerat foljer ankaret bara langsamt (tau), och annu langsammare i low/break (x2).
         const prev = this.liveShapeRaw;
-        if (prev >= 0.98 || prev <= 0.02) { this.liveClipMs += dtMs; if (this.liveClipMs > 10_000) this.liveFastUntil = nowMs + 5_000; } else this.liveClipMs = 0;
-        const fast = far || nowMs < this.liveFastUntil;
-        const a = 1 - Math.exp(-dtMs / (fast ? tauMs / 10 : up ? tauMs * 3 : tauMs));
+        if (prev >= 0.98) { this.liveClipMs += dtMs; if (this.liveClipMs > 10_000) this.liveFastUntil = nowMs + 5_000; } else this.liveClipMs = 0;
+        const farAbove = wdb - this.liveAnchor > LIVE_WIN_DB;
+        const fast = (farAbove || nowMs < this.liveFastUntil) && up;
+        const quietSec = frame.section === 'low' || frame.section === 'break';
+        const a = 1 - Math.exp(-dtMs / (fast ? tauMs / 10 : up ? tauMs * 3 : quietSec ? tauMs * 2 : tauMs));
         this.liveAnchor += a * (wdb - this.liveAnchor);
         const top = this.liveAnchor + LIVE_OFFSET_DB;
         let sh = (wdb - (top - LIVE_WIN_DB)) / LIVE_WIN_DB;
@@ -1352,7 +1361,7 @@ export class EffectEngine {
     // → refräng ljus, vers dim = synlig gas, och pulsen syns uppåt mot en rörlig nivå.
     const md0 = drive * (LIGHT_FLOOR + (1 - LIGHT_FLOOR) * loudness + frame.buildUp * 0.35 + this.dropEnv * 0.8);
     // SEKTIONSGAS (DMX_SECTION_SWITCH): refrang lyfter mastern, break sanker - utover loudness (som redan foljer nivan).
-    const secGain = SECTION_SWITCH ? (frame.section === 'high' ? 1 + SECTION_HIGH_LIFT : frame.section === 'break' ? 1 - SECTION_BREAK_DIP : 1) : 1;
+    const secGain = SECTION_SWITCH ? (frame.section === 'high' && (frame.sectionTier ?? 0) >= 2 ? 1 + SECTION_HIGH_LIFT : frame.section === 'break' ? 1 - SECTION_BREAK_DIP : 1) : 1;
     const md = SECTION_SWITCH ? Math.min(1.2, md0 * secGain) : md0;   // standard: orort
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
