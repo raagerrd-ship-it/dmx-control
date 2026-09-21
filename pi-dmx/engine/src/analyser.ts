@@ -174,6 +174,28 @@ const DROP_UPGRADE_DB = Number(process.env.DROP_UPGRADE_DB ?? 0);
 // aldrig dar. 0 = av.
 const DROP_RISE_LOW_DB = Number(process.env.DROP_RISE_LOW_DB ?? 0);
 const DROP_RISE_LOW_Q = Number(process.env.DROP_RISE_LOW_Q ?? 3);
+// LUGN-SEKTIONS-GRIND (natt 2026-09-21, opt-in DMX_DROP_CALM_GATE=1). Agaren i ladan 09-21: "i lugna sektioner kommer sallan
+// riktig drop - tva falska drops under lugnt parti" + "falsk drop dar laten korde lite uppbyggnad mot lugnt passage". Grinden
+// satt i effektlagret (calmSec + 600 ms landningskontroll pa ljusnivan); har ligger den i analysatorn sa dropCount sjalv blir
+// ren (roken, sektionsminnet och alla konsumenter ser samma dom). LUGNT = sektion low/intro (kraver DMX_SECTION=1) ELLER blocket
+// ligger >= DROP_CALM_DB under senaste horda refrangen (levelVsHighDb). I lugnt lage kravs STARKARE bevis: riser (buildUp >=
+// DROP_CALM_BUILD) eller landning vid sjalva toppen (underPeak < DROP_CALM_Q) eller ett lyft >= BODY_RISE_DB + DROP_CALM_RISE_DB.
+// Annars: DROP_CALM_LAND_MS > 0 -> kandidaten HALLS och fyrar forst nar kroppen legat kvar inom DROP_QUALITY_DB av toppen i sa
+// manga ms (verifierad landning: sen, inte tappad); DROP_CALM_LAND_MS = 0 -> nekas ([dropcalm]-spar med DMX_DROP_TRACE).
+const DROP_CALM_GATE = process.env.DMX_DROP_CALM_GATE === '1';
+const DROP_CALM_DB = Number(process.env.DROP_CALM_DB ?? 6);
+const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25);
+const DROP_CALM_Q = Number(process.env.DROP_CALM_Q ?? 1.5);
+const DROP_CALM_RISE_DB = Number(process.env.DROP_CALM_RISE_DB ?? 8);
+const DROP_CALM_LAND_MS = Number(process.env.DROP_CALM_LAND_MS ?? 0);
+// KICK-LAS (natt 2026-09-21, opt-in DROP_KICK_LOCK_MS > 0). Agaren: "traffar varje riktig drop men ~100 ms fore" = upptakten,
+// basen sveller in FORE ettan. Kroppsvillkoret ARMERAR fyrningen; den sker pa forsta KICKEN darefter, hogst DROP_KICK_LOCK_MS
+// (eller en halv takt om tempot ar kant och kortare) — sedan fyrar den anda. En kick inom de senaste DROP_KICK_RECENT_MS
+// betyder att dropen redan satt PA den kicken -> fyra direkt (annars skulle den flyttas en hel takt). DROP_KICK_LOCK_GRID=1:
+// om taktrastret ar palitligt (DMX_GRID_PHASE=1, beatPhaseConf >= 2) blir nasta rasterslag malet i stallet for en timeout.
+const DROP_KICK_LOCK_MS = Number(process.env.DROP_KICK_LOCK_MS ?? 0);
+const DROP_KICK_RECENT_MS = Number(process.env.DROP_KICK_RECENT_MS ?? 100);
+const DROP_KICK_LOCK_GRID = process.env.DROP_KICK_LOCK_GRID === '1';
 // MINIDROPS (agaren 2026-09-12: "i en lat ar det ofta ~10 minidrops och 2 riktiga"). Egen losare lyft-detektor:
 // kroppen har legat >= MINI_GONE_DB under taket i >= MINI_GONE_MS och stiger sedan >= MINI_RISE_DB (mot min i
 // 0,5 s-fonstret) och landar inom MINI_PEAK_DB av sega toppen. Eget avstand MINI_SPACING_MS mot bade drops
@@ -543,6 +565,8 @@ export class Analyser {
   private wasBodyOnset = false;
   private dropArmUntil = 0; private dropArmAt = 0; private dropArmGoneMs = -1;
   private dropKickGoneMs = -1; private kickSeenGoneMs = -1;   // KICK-FIRST + [firstkick]-spar per gone-episod
+  private calmHoldStart = 0; private calmHoldRise = 0;   // DROP_CALM_LAND_MS: kandidat som halls for verifierad landning
+  private dropPendAt = 0; private dropPendStart = 0; private dropPendRise = 0; private dropPendGrid = false; private lastKickWallMs = -1e9;   // DROP_KICK_LOCK_MS
   private goneEpisodeMs = -1;   // gone-episodens START (lastBodyGoneMs uppdateras varje hop och duger INTE som id)   // armerat drop-fonster (DROP_ARM_MS)   // for stigande-flank pa drop-kandidaten   // bas-lyftet (dB) vid senaste dropen — for eskalerings-refraktaren
   // RISER/UPPBYGGNAD (flyttad från effects)
   /**
@@ -2267,7 +2291,7 @@ export class Analyser {
     const oldest = hist[(this.bodyHistPos + HL - this.bodyHistLen) % HL];
     let riseRef = oldest;
     if (DROP_RISE_MIN) { let mn = oldest; for (let k = 1; k <= this.bodyHistLen; k++) { const v = hist[(this.bodyHistPos + HL - k) % HL]; if (v < mn) mn = v; } riseRef = mn; }
-    const bodyRise = bodyPeek - riseRef;
+    let bodyRise = bodyPeek - riseRef;   // let: CALMLAND/KICKLOCK bar kandidatens lyft vidare till fyrningen
     hist[this.bodyHistPos] = this.bodyFast;
     this.bodyHistPos = (this.bodyHistPos + 1) % HL;
     const want = Math.min(HL - 1, Math.max(1, Math.round(0.5 / dtHop)));
@@ -2406,10 +2430,49 @@ export class Analyser {
     // DMX_DROP_TRACE=1: logga KONSUMERADE edges (kandidat som INTE fyrade) — var ligger kroppen vid
     // forsta takten? Matdata for DROP_QUALITY_DB pa mjukare material (pop) dar inget facit finns.
     if (process.env.DMX_DROP_TRACE && bodyOnsetEdge && !(dropSpacingOk && fullSlam)) console.log(`[dropedge] rise ${bodyRise.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s spacingOk ${dropSpacingOk} sinceDrop ${(sinceDrop/1000).toFixed(1)}s`);
-    if (dropSpacingOk && armed && this.activeMs > 2000 && fullSlam && this.goneEpisodeMs !== this.dropKickGoneMs) {
-      this.dropArmUntil = 0;
-      this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise; this.lastDropUnderPeak = this.bodyPeak - bodyPeek;
-      console.log(`[dropfire] wall ${this.wallNow()} rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} ceil ${this.bodyCeil.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} sinceDrop ${(sinceDrop/1000).toFixed(1)}s goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s goneSpan ${(this.lastGoneSpanMs/1000).toFixed(1)}s edgeAgo ${(nowWallA - this.dropArmAt).toFixed(0)}ms`);
+    if (kick) this.lastKickWallMs = nowWallA;
+    let fireNow = dropSpacingOk && armed && this.activeMs > 2000 && fullSlam && this.goneEpisodeMs !== this.dropKickGoneMs;
+    let fireTag = '';
+    const underNow = this.bodyPeak - bodyPeek;
+    // LUGN-SEKTIONS-GRINDEN (se DROP_CALM_GATE). Domen tas per kandidat-hop; den hallna kandidaten (DROP_CALM_LAND_MS) foljs nedan.
+    if (DROP_CALM_GATE && fireNow) {
+      const calm = (Analyser.SECTION_ON && (this.section === 'low' || this.section === 'intro')) || this.levelVsHighDb <= -DROP_CALM_DB;
+      const strong = this.buildUp >= DROP_CALM_BUILD || underNow < DROP_CALM_Q || bodyRise >= BODY_RISE_DB + DROP_CALM_RISE_DB;
+      if (calm && !strong) {
+        fireNow = false;
+        if (DROP_CALM_LAND_MS > 0 && this.calmHoldStart === 0) { this.calmHoldStart = nowWallA; this.calmHoldRise = bodyRise; }
+        if (process.env.DMX_DROP_TRACE && bodyOnsetEdge) console.log(`[dropcalm] wall ${this.wallNow()} ${DROP_CALM_LAND_MS > 0 ? 'HALLS' : 'NEKAD'} sect ${this.section} lvh ${this.levelVsHighDb.toFixed(1)} build ${this.buildUp.toFixed(2)} underPeak ${underNow.toFixed(1)} rise ${bodyRise.toFixed(1)}`);
+      }
+    }
+    if (this.calmHoldStart > 0) {   // verifierad landning: kroppen maste ligga kvar vid toppen hela DROP_CALM_LAND_MS
+      if (!fullSlam) { if (process.env.DMX_DROP_TRACE) console.log(`[dropcalm] wall ${this.wallNow()} SLAPPT efter ${(nowWallA - this.calmHoldStart).toFixed(0)} ms (underPeak ${underNow.toFixed(1)})`); this.calmHoldStart = 0; }
+      else if (fireNow) this.calmHoldStart = 0;   // fyrar anda (starkare bevis kom)
+      else if (nowWallA - this.calmHoldStart >= DROP_CALM_LAND_MS && dropSpacingOk) { fireNow = true; fireTag = ` CALMLAND +${(nowWallA - this.calmHoldStart).toFixed(0)}ms`; bodyRise = Math.max(bodyRise, this.calmHoldRise); this.calmHoldStart = 0; }
+    }
+    // KICK-LASET (se DROP_KICK_LOCK_MS): kandidaten vantar in forsta kicken, hogst en halv takt / DROP_KICK_LOCK_MS.
+    if (DROP_KICK_LOCK_MS > 0) {
+      if (fireNow && this.dropPendAt === 0) {
+        if (kick || nowWallA - this.lastKickWallMs <= DROP_KICK_RECENT_MS) fireTag += ` KICK ${kick ? 0 : (nowWallA - this.lastKickWallMs).toFixed(0)}ms`;
+        else {
+          let wait = DROP_KICK_LOCK_MS; if (this.localBpm > 0) wait = Math.min(wait, 30000 / this.localBpm);
+          let target = nowWallA + wait; this.dropPendGrid = false;
+          if (DROP_KICK_LOCK_GRID && this.beatPhaseConf >= 2 && this.localBpm > 0 && this.beatPhaseMs > 0) {
+            const per = 60000 / this.localBpm; let nb = this.beatPhaseMs; while (nb < nowWallA + 5) nb += per;
+            if (nb - nowWallA <= wait) { target = nb; this.dropPendGrid = true; }
+          }
+          this.dropPendAt = target; this.dropPendStart = nowWallA; this.dropPendRise = bodyRise; fireNow = false;
+          if (process.env.DMX_DROP_TRACE) console.log(`[dropkick] wall ${this.wallNow()} vantar ${(target - nowWallA).toFixed(0)} ms (${this.dropPendGrid ? 'raster' : 'timeout'}) sedan kick ${(nowWallA - this.lastKickWallMs).toFixed(0)} ms`);
+        }
+      } else if (fireNow) fireNow = false;   // redan en vantande kandidat
+      if (this.dropPendAt > 0 && (kick || nowWallA >= this.dropPendAt)) {
+        fireNow = true; fireTag = ` KICKLOCK +${(nowWallA - this.dropPendStart).toFixed(0)}ms ${kick ? 'kick' : this.dropPendGrid ? 'raster' : 'timeout'}`;
+        bodyRise = Math.max(bodyRise, this.dropPendRise); this.dropPendAt = 0;
+      }
+    }
+    if (fireNow) {
+      this.dropArmUntil = 0; this.calmHoldStart = 0;
+      this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise; this.lastDropUnderPeak = underNow;
+      console.log(`[dropfire] wall ${this.wallNow()}${fireTag} rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} ceil ${this.bodyCeil.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} sinceDrop ${(sinceDrop/1000).toFixed(1)}s goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s goneSpan ${(this.lastGoneSpanMs/1000).toFixed(1)}s edgeAgo ${(nowWallA - this.dropArmAt).toFixed(0)}ms`);
     }
 
 
