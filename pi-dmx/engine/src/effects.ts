@@ -155,6 +155,14 @@ const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
 // refräng, sekundskala) i stället för en stavelse-följare. Hjärtslaget (beatMulNow)
 // är separat och förblir snabbt, så pulsen påverkas inte. En refräng gasar fortf.
 // upp (rise ~1-2 s > 300 ms), men syllaberna medelvärdesbildas bort.
+// DMX_LIVE_LEVEL (2026-09-21): lotus nivakanal - se blocket i render(). Rattar bara for A/B.
+const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
+const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10);        // lotus windowDb 10
+const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 4.5); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
+const LIVE_ANCHOR_S = Number(process.env.LIVE_ANCHOR_S ?? 120);   // lotus autoAnchorSec 120
+const LIVE_RELEASE_MS = Number(process.env.LIVE_RELEASE_MS ?? 350);
+const LIVE_BASS_W = Number(process.env.LIVE_BASS_W ?? 0.25);      // lotus: mid/diskant 1,3 + bas 0,25 -> har som blandning
+const LIVE_TRACE = process.env.DMX_LIVE_TRACE === '1';
 const LIGHT_SHAPE_UP = 60;
 const LIGHT_SHAPE_DOWN = 120;
 const LIGHT_REL_A = 0.396;         // log-release-alpha
@@ -255,6 +263,7 @@ export class EffectEngine {
   private lightHi = 0;           // långsam topp av wdb (loud-referens)
   private lightLo = 0;           // långsamt golv av wdb (tyst-referens)
   private lightShapeSm = -1;     // shape-smoothing
+  private liveAnchor?: number; private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
   private lightLoud = 0;         // log-released loudness 0..1 → driver md
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
@@ -1263,6 +1272,35 @@ export class EffectEngine {
     // releasen nedan ger den perceptuellt jämna faden. (Mid+diskant-texturen kan
     // återinföras senare om önskat; nu prioriteras en robust, synlig gas.)
     let shape = Math.max(0, Math.min(1, frame.intensity));
+    // ── LIV I NIVAN (opt-in DMX_LIVE_LEVEL=1, portat fran lotus 2026-09-21) ──────────────────────────────
+    // intensity ar SEKTIONSNIVA (sekunder) - BLE-remsan kanns "levande" for att lotus driver nivan fran ra mid/diskant per tick
+    // genom ett 10 dB-fonster mot ett LANGSAMT ANKARE: instant attack, ~350 ms release -> nivan foljer varje slag, pulsen ovanpa.
+    // Det som falde den raa vagen 09-03 (allt i taket pa AUX) var att fonstret saknade ankare; ankaret har: tau 120 s, foljer med
+    // tau/10 nar signalen ligger > fonstret utanfor at nagot hall, forsta 20 s efter start och nar ljuset legat klippt/slackt > 10 s.
+    if (LIVE_LEVEL) {
+      const wdb = frame.midHiDb + LIVE_BASS_W * (frame.bodyDb - frame.midHiDb);   // mid/diskant med lite bas
+      const tauMs = LIVE_ANCHOR_S * 1000;
+      if (frame.level > INPUT_OFF_LEVEL && Number.isFinite(wdb) && wdb > -100) {
+        const nowMs = performance.now();
+        if (this.liveAnchor === undefined) { this.liveAnchor = wdb; this.liveFastUntil = nowMs + 20_000; }
+        const up = wdb > this.liveAnchor;
+        const far = Math.abs(wdb - this.liveAnchor) > LIVE_WIN_DB;
+        const prev = this.liveShapeRaw;
+        if (prev >= 0.98 || prev <= 0.02) { this.liveClipMs += dtMs; if (this.liveClipMs > 10_000) this.liveFastUntil = nowMs + 5_000; } else this.liveClipMs = 0;
+        const fast = far || nowMs < this.liveFastUntil;
+        const a = 1 - Math.exp(-dtMs / (fast ? tauMs / 10 : up ? tauMs * 3 : tauMs));
+        this.liveAnchor += a * (wdb - this.liveAnchor);
+        const top = this.liveAnchor + LIVE_OFFSET_DB;
+        let sh = (wdb - (top - LIVE_WIN_DB)) / LIVE_WIN_DB;
+        sh = sh < 0 ? 0 : sh > 1 ? 1 : sh;
+        this.liveShapeRaw = sh;
+        // instant attack, release LIVE_RELEASE_MS (lotus lightSmoothMs 350 = ~ett slag)
+        if (this.liveLevelSm < 0 || sh > this.liveLevelSm) this.liveLevelSm = sh;
+        else this.liveLevelSm += (1 - Math.exp(-dtMs / LIVE_RELEASE_MS)) * (sh - this.liveLevelSm);
+        shape = this.liveLevelSm;
+        if (LIVE_TRACE && nowMs - this.liveLogAt > 2000) { this.liveLogAt = nowMs; console.log(`[liveniva] wdb ${wdb.toFixed(1)} ankare ${this.liveAnchor.toFixed(1)} shape ${sh.toFixed(2)} ${fast ? 'SNABB' : ''}`); }
+      }
+    }
     // (d) shape-smoothing (asymmetrisk: snabb upp 25 ms, lugn ner 150 ms) — sprider
     //     ~125 Hz-uppdateringen över render-framesen utan att kväva stegringar.
     const shMs = shape > this.lightShapeSm ? LIGHT_SHAPE_UP : LIGHT_SHAPE_DOWN;
