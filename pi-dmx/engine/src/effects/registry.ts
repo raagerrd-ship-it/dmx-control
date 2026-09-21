@@ -49,6 +49,9 @@ import { innerouter } from "./innerouter.js";
 import { stegring } from "./stegring.js";
 import { andrum } from "./andrum.js";
 import { sug } from "./sug.js";
+import { vagbrytare } from "./vagbrytare.js";
+import { nedrakning } from "./nedrakning.js";
+import { fyrverkeri } from "./fyrverkeri.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
@@ -59,7 +62,7 @@ export const EFFECTS: EffectDef[] = [
   tide, drift, pendel, viska, backbeat, tick, stege, eko, hjarta,
   varannan, innerouter,
   // Sektionseffekter (2026-09-21): valjs av dirigenten vid build-/break-grans (DMX_SECTION_SWITCH).
-  stegring, andrum, sug,
+  stegring, andrum, sug, vagbrytare, nedrakning, fyrverkeri,
   // Registrerade 2026-09-21 (fanns som filer men inte i poolen): sol, konfetti, sopa, neon.
   sol, konfetti, sopa, neon,
 ];
@@ -98,6 +101,8 @@ const SPECIALTY_DRIVES: Partial<Record<Mode, ChannelRole[]>> = {
   pulse:    ["hazer"],
   stegring: ["uv", "hazer", "blinder"],
   sug:      ["hazer", "blinder", "uv"],
+  nedrakning: ["hazer", "blinder"],
+  fyrverkeri: ["blinder", "strobe"],
   andrum:   ["hazer"],
 };
 
