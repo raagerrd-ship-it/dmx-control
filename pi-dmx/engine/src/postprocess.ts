@@ -28,7 +28,7 @@ import type { FixtureOutput } from "./output.js";
 
 /** Utgångens attack. Kort nog att inte röra hjärtslagets 45 ms-anslag, lång nog att
  *  dämpa effekternas fladder kring 10 Hz. */
-const ATTACK_S = 0.09;
+const ATTACK_S = Math.max(0.005, Number(process.env.DMX_ATTACK_MS ?? 90) / 1000);   // 2026-09-21: env (ladan 20 ms; lotus kor attack 0) - 90 ms smetade ut varje slag
 const INV_ATTACK_S = 1 / ATTACK_S; // Multiplikation är snabbare än division i loopen
 
 /** Minsta mörker under ljuset (DMX-steg över tändpunkten) så hjärtslaget syns även
