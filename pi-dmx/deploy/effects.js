@@ -152,7 +152,11 @@ const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH === '1'; // realtidssektio
 const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
 const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);
 const BEAT_LIFT = Number(process.env.BEAT_LIFT ?? 0.25); // additivt hjartslagslyft (synlig puls aven i morka effekter)
-const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25); // drop i low/intro kraver riser >= detta
+// DROP_CALM_BUILD: drop i low/intro kraver riser >= detta. STANDARD 0 = AV sedan 2026-09-22 (natt-agent B, tools/dropBench.mjs mot
+// 19-drop-facitet + pop/megamix): buildUp ar ~0 (max 0,04) vid ALLA 71 fyrningar och etiketten ar alltid low/break i sjalva
+// dropogonblicket (high forst efterat) -> grinden pa 0,25 nekade 7/12 pop- och 11/32 megamix-drops, dvs nastan allt (live i ladan
+// 09-21 kvall). Vill man ha en lugn-grind: analysatorns DMX_DROP_CALM_GATE=1 DROP_CALM_LAND_MS=300 (tappar inget, 300 ms sen i low).
+const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0);
 const DROP_LAND_GAIN = Number(process.env.DROP_LAND_GAIN ?? 1.15); // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35); // tierEma-snap vid high/break-grans
 const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.45), SECTION_LOW_DIP = Number(process.env.SECTION_LOW_DIP ?? 0.30); // master: refrang upp, vers/intro ner, break mer ner
@@ -828,7 +832,7 @@ export class EffectEngine {
         // DROP I LUGN SEKTION (ladan 20:15: tva falska drops i ett lugnt parti): en riktig drop kommer ur en uppbyggnad eller ett
         // break. I low/intro kravs att analysatorn sett en riser (buildUp >= DROP_CALM_BUILD) - annars ignoreras dropen.
         const calmSec = SECTION_SWITCH && (frame.section === 'low' || frame.section === 'intro');
-        if (dropHitRaw && calmSec && frame.buildUp < DROP_CALM_BUILD) {
+        if (DROP_CALM_BUILD > 0 && dropHitRaw && calmSec && frame.buildUp < DROP_CALM_BUILD) {
             dropHitRaw = false;
             this.dropCalmDenied++;
         }
