@@ -218,6 +218,16 @@ let onBeatRate = 0;          // andel kickar med |fasfel| < 0.25
 let pllKicks = 0;            // hur mycket bevis fasprediktionen faktiskt vilar pa
 let lastTrustLog = 0;
 let lastPllKickMs = 0;
+// FASFOLJARE (portad fran lotus 2026-09-20/21, opt-in DMX_PHASE_FOLLOW=1, kraver DMX_GRID_PHASE=1 i analysatorn):
+// analysatorns gridfas (frame.beatPhaseMs, 4 Hz) styr gridets fas i stallet for kick-PLL:en (som fastnar pa off-beaten:
+// lotus bank mot Beat This! kick-PLL 0,49 median, gridfas 0,95). Foljer bara nar analysatorns tempo = gridets (+-4 %).
+// Flytt > 0,35 slag kraver kvot >= FLIP_CONF i FLIP_VOTES raka OCH att de senaste 8 slagens riktiga kickar ligger
+// narmare den nya fasen (kickdomaren, 09-21: pa 16-delsbas studsade fasen 0,4 slag fram/tillbaka var 20-60 s = "dubbeltakt").
+const PHASE_FOLLOW_ON = process.env.DMX_PHASE_FOLLOW === '1';
+const PHASE_FLIP_CONF = Number(process.env.DMX_PHASE_FLIP_CONF ?? 2.0), PHASE_FLIP_VOTES = Number(process.env.DMX_PHASE_FLIP_VOTES ?? 4);
+const PHASE_KP_HI = 0.4, PHASE_KP_LO = 0.2, PHASE_BIAS_MS = Number(process.env.DMX_PHASE_BIAS_MS ?? 0), PHASE_KI_BPM = Number(process.env.DMX_PHASE_KI_BPM ?? 0.8);
+let phaseLastMs = 0, phaseFlipVotes = 0, phaseFlips = 0, phaseFlipDenied = 0;
+const kickRing = new Float64Array(64); let kickRingPos = 0, kickRingN = 0, kickRingLast = 0;
 let lastCueSongId = 0;
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
@@ -468,7 +478,8 @@ capture.on("chunk", (samples: Float32Array) => {
       onBeatRate += ((onBeat ? 1 : 0) - onBeatRate) * 0.12;
       lastPllKickMs = Date.now();
       if (pllKicks < 40) pllKicks++;
-      if (k0 > 0 && onBeat) {
+      const followerHasPhase = PHASE_FOLLOW_ON && (frame.beatPhaseMs ?? 0) > 0;   // gridfasen styr - kick-PLL:ens fasterm av (lotus: PLL fastnar pa off-beat)
+      if (k0 > 0 && onBeat && !followerHasPhase) {
         cfg.beat.anchorMs += err * beatMs * k;   // FAS-term: dra ankaret mot slaget
         // FREKVENS-term (PI-integral): en fas-bara-PLL har ett permanent steady-state-
         // lag när tempo-SIFFRAN ligger snäppet fel (detekterad ≠ sant tempo) → fasen
@@ -481,6 +492,42 @@ capture.on("chunk", (samples: Float32Array) => {
           const lo = clockDetBpm - 4, hi = clockDetBpm + 4;
           if (cfg.beat.bpm < lo) cfg.beat.bpm = lo; else if (cfg.beat.bpm > hi) cfg.beat.bpm = hi;
         }
+      }
+    }
+    if (frame.kickAtMs > 0 && frame.kickAtMs !== kickRingLast) { kickRingLast = frame.kickAtMs; kickRing[kickRingPos] = frame.kickAtMs; kickRingPos = (kickRingPos + 1) & 63; if (kickRingN < 64) kickRingN++; }
+    if (PHASE_FOLLOW_ON && cfg.beat && !memoryBeatLocked) {
+      const pm = frame.beatPhaseMs ?? 0;
+      if (pm > 0 && pm !== phaseLastMs) {
+        phaseLastMs = pm;
+        const anB = frame.bpm ?? 0;
+        if (anB > 0 && Math.abs(anB / cfg.beat.bpm - 1) < 0.04) {
+          const beatMsNow = 60000 / cfg.beat.bpm;
+          const ph = ((((pm - PHASE_BIAS_MS - cfg.beat.anchorMs) % beatMsNow) + beatMsNow) % beatMsNow) / beatMsNow;
+          const err = ph < 0.5 ? ph : ph - 1;                     // + = analysatorns slag ligger EFTER gridet
+          const pconf = frame.beatPhaseConf ?? 1;
+          cfg.beatErr = (cfg.beatErr ?? 0) * 0.85 + err * 0.15;
+          if (Math.abs(err) > 0.35) {
+            if (pconf >= PHASE_FLIP_CONF && ++phaseFlipVotes >= PHASE_FLIP_VOTES) {
+              phaseFlipVotes = 0;
+              const newAnchor = cfg.beat.anchorMs + err * beatMsNow; const since = Date.now() - 8 * beatMsNow; let n = 0, sCur = 0, sNew = 0;
+              for (let i = 0; i < kickRingN; i++) {
+                const k = kickRing[(kickRingPos - 1 - i + 64) & 63]; if (k < since) break; n++;
+                const pc = ((((k - cfg.beat.anchorMs) % beatMsNow) + beatMsNow) % beatMsNow) / beatMsNow;
+                const pn = ((((k - newAnchor) % beatMsNow) + beatMsNow) % beatMsNow) / beatMsNow;
+                sCur += Math.cos(2 * Math.PI * pc); sNew += Math.cos(2 * Math.PI * pn);
+              }
+              const ok = n < 6 || (sNew / n) > (sCur / n) + 0.15;
+              if (ok) { cfg.beat.anchorMs = newAnchor; phaseFlips++; console.log(`[takt] gridfas: fasen flyttad ${Math.round(err * beatMsNow)} ms (kvot ${pconf.toFixed(2)}, byte ${phaseFlips}, kickar ${n}: ny ${n ? (sNew / n).toFixed(2) : '-'} mot ${n ? (sCur / n).toFixed(2) : '-'})`); }
+              else { phaseFlipDenied++; if (phaseFlipDenied <= 3 || phaseFlipDenied % 20 === 0) console.log(`[takt] gridfas: flytt ${Math.round(err * beatMsNow)} ms NEKAD av kickarna (${n} st: ny ${(sNew / n).toFixed(2)} mot nu ${(sCur / n).toFixed(2)}, nekade ${phaseFlipDenied})`); }
+            }
+          } else {
+            phaseFlipVotes = 0;
+            const kf = pconf >= 1.3 ? PHASE_KP_HI : PHASE_KP_LO;
+            cfg.beat.anchorMs += err * beatMsNow * kf;
+            // INTEGRAL: ihallande fel at samma hall = tempofel (err > 0 = gridet gar for fort -> bpm ner), klamp +-4 % av analysatorns
+            if (PHASE_KI_BPM > 0) { const lo = anB * 0.96, hi = anB * 1.04; let nb = cfg.beat.bpm - err * PHASE_KI_BPM; if (nb < lo) nb = lo; else if (nb > hi) nb = hi; if (nb !== cfg.beat.bpm) { const idx = Math.floor((Date.now() - cfg.beat.anchorMs) / beatMsNow); const fr = ((Date.now() - cfg.beat.anchorMs) / beatMsNow) - idx; cfg.beat.bpm = nb; cfg.beat.anchorMs = Date.now() - (idx + fr) * (60000 / nb); } }   // bevara slagindex + fas (lotus spokpuls-laxan)
+          }
+        } else phaseFlipVotes = 0;
       }
     }
     // TAKTFAS (ettan): analysatorn har mätt vilken av fyrtaktens platser som bär

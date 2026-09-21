@@ -37,3 +37,18 @@ LIVE_ANCHOR_S 120, LIVE_RELEASE_MS 350, LIVE_BASS_W 0,25, DMX_LIVE_TRACE=1 logga
 slagskala 1,4-3,4x, sektionsskala oforandrad. Deploya BADA filerna (analyser.js + effects.js), samma steg som ovan for var fil.
 A/B: `printf '[Service]\nEnvironment=DMX_LIVE_LEVEL=1\n' | sudo tee /etc/systemd/system/audio-dmx-engine.service.d/liveniva.conf && sudo systemctl daemon-reload && sudo systemctl restart audio-dmx-engine`
 Nar nivan lever kan golven i ladan sankas (LIGHT_FLOOR 0,45 -> ~0,3, BEAT_MIN 0,30 -> ~0,2) - annars ar dynamikspannet bara 55 %.
+
+## 2026-09-21 sen kvall: gridfas + fasfoljare + sektioner till dirigenten - index.js tillkommer (TRE filer)
+Portat fran lotus (alla opt-in, standard bit-identisk: frozen6 48/76):
+- `DMX_GRID_PHASE=1` analysatorns egen gridfas (klistrig) -> frame.beatPhaseMs/beatPhaseConf. Bank pa lotus-korpusen (366 latar,
+  Beat This!-fas): i fas 77/130, MOTFAS 5, mellan 48 (median 0,86); lotus-analysatorn 102/148/4.
+- `DMX_PHASE_FOLLOW=1` (index.js) motorn foljer gridfasen i stallet for kick-PLL:en (PLL:ens fasterm av nar fas finns), flytt > 0,35 slag
+  bara med kvot >= 2 i 4 raka OCH kickdomaren (senaste 8 slagens kickar narmare nya fasen). Logg: `[takt] gridfas: fasen flyttad ... / NEKAD`.
+- `DMX_SECTION=1` realtidssektioner intro/low/build/high/break + upprepning i frame.section m.fl.
+- `DMX_SECTION_SWITCH=1` (effects.js) dirigenten: sektionsgrans = bytesskal, build = aldrig byte, break = lugna poolen, etiketten = identitet
+  (`live:high` far tillbaka sin look). `DMX_SECTION_TRACE=1` loggar bytena.
+Rekommenderad forsta provning i ladan (allt i EN drop-in `lotus.conf`):
+```
+printf '[Service]\nEnvironment=DMX_GRID_PHASE=1\nEnvironment=DMX_PHASE_FOLLOW=1\nEnvironment=DMX_SECTION=1\nEnvironment=DMX_SECTION_SWITCH=1\nEnvironment=DMX_SECTION_TRACE=1\nEnvironment=DMX_LIVE_LEVEL=1\n' | sudo tee /etc/systemd/system/audio-dmx-engine.service.d/lotus.conf && sudo systemctl daemon-reload && sudo systemctl restart audio-dmx-engine
+```
+Angra: `sudo rm .../lotus.conf && sudo systemctl daemon-reload && sudo systemctl restart audio-dmx-engine`. Ta en flagga i taget om nagot kanns fel.

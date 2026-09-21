@@ -165,6 +165,63 @@ export class Analyser {
      *  direkt - fler kickar = fler blixtar (agaren 09-02: 'dubbel takt'); har ar standard oforandrad, rattarna ar for banken/A-B. */
     static KICK_NOGATE = process.env.DMX_KICK_NOGATE === '1';
     static KICK_COOLDOWN_MS = Number(process.env.DMX_KICK_COOLDOWN) || 0;
+    /** GRIDFAS (lotus 09-20, opt-in DMX_GRID_PHASE=1): se computeGridPhase. Lotus bank mot Beat This!: i fas 102/148, motfas 4 (kick-PLL 0,49 median). */
+    static GRID_PHASE_ON = process.env.DMX_GRID_PHASE === '1';
+    static GRID_PHASE_MODE = process.env.DMX_GRID_PHASE_MODE || 'sum';
+    static GRID_PHASE_BASS_MIN = Number(process.env.DMX_GRID_PHASE_BASS_MIN) || 1.2;
+    static STICKY_K = process.env.DMX_GRID_PHASE_STICKY === '0' ? 1.0 : (Number(process.env.DMX_GRID_PHASE_STICKY_K) || 1.25);
+    static STICKY_N = process.env.DMX_GRID_PHASE_STICKY === '0' ? 3 : (Number(process.env.DMX_GRID_PHASE_STICKY_N) || 6);
+    envLastWallMs = 0;
+    beatPhaseMs = 0;
+    beatPhaseConf = 0;
+    phaseAnti = 0;
+    phaseLastBeatMs = 0;
+    phaseScratch = new Float32Array(128);
+    phaseScratchB = new Float32Array(128);
+    phaseScratchF = new Float32Array(128);
+    dbgPhase = { conf: 0, bassOn: 0, bassAnti: 0, fullOn: 0, fullAnti: 0, bestPh: 0, nPh: 0, pending: 0 };
+    /** SEKTION (lotus 09-20, opt-in DMX_SECTION=1): realtidens sektion ur latens EGEN historik - se sectionHop. */
+    static SECTION_ON = process.env.DMX_SECTION === '1';
+    static SECTION_MODE = process.env.DMX_SECTION_MODE || 'rank';
+    static RANK_HI = Number(process.env.DMX_SECTION_RANK_HI) || 0.67;
+    static RANK_LO = Number(process.env.DMX_SECTION_RANK_LO) || 0.33;
+    secBlkRms2 = 0;
+    secBlkDb = [];
+    secBlkDens = [];
+    secRankRun = 0;
+    secRankCand = 1;
+    section = 'intro';
+    sectionStartMs = 0;
+    sectionIndex = 0;
+    sectionTier = 1;
+    repeatSim = 0;
+    repeatAgoMs = 0;
+    repeatSection = '';
+    secBlkMs = 0;
+    secBlkN = 0;
+    secBlkInt = 0;
+    secBlkKicks = 0;
+    secBlkCent = 0;
+    secBlkSpec = new Float32Array(8);
+    secTierRun = 0;
+    secTierCand = 1;
+    secRiseRun = 0;
+    secSongStartMs = 0;
+    secHighSeen = false;
+    secDropSeen = 0;
+    secSilentBlocks = 0;
+    secHist = new Float32Array(16);
+    secHistPos = 0;
+    secHistN = 0;
+    static FP_DIM = 11;
+    static FP_MAX = 96;
+    secFp = new Float32Array(Analyser.FP_MAX * Analyser.FP_DIM);
+    secFpT = new Float64Array(Analyser.FP_MAX);
+    secFpLab = [];
+    secFpN = 0;
+    secFpPos = 0;
+    secFpAcc = new Float32Array(Analyser.FP_DIM);
+    secFpAccN = 0;
     envRing = new Float32Array(Analyser.ENV_LEN);
     envPos = 0;
     envFilled = 0;
@@ -664,6 +721,339 @@ export class Analyser {
         }
         return energy / N;
     }
+    computeGridPhase() {
+        const bpm = this.localBpm;
+        if (bpm <= 0 || this.envFilled < 200 || this.envLastWallMs <= 0) {
+            this.beatPhaseMs = 0;
+            this.beatPhaseConf = 0;
+            return;
+        }
+        const LEN = Analyser.ENV_LEN, HZ = Analyser.ENV_HZ;
+        const Lf = (HZ * 60) / bpm; // period i env-sampel (flyttal)
+        const N = Math.min(this.envFilled, Math.round(Lf * 12), 600); // ~12 slag, hogst 6 s
+        if (N < Lf * 4)
+            return;
+        const start = (this.envPos - N + LEN) % LEN;
+        const bass = this.envBassRing, full = this.envRing;
+        let mb = 0, mf = 0;
+        for (let i = 0; i < N; i++) {
+            const j = (start + i) % LEN;
+            mb += bass[j];
+            mf += full[j];
+        }
+        mb = mb / N || 1e-9;
+        mf = mf / N || 1e-9;
+        const at = (ring, i) => {
+            const c = ring[(start + i) % LEN];
+            const a = i > 0 ? ring[(start + i - 1) % LEN] : c;
+            const b = i + 1 < N ? ring[(start + i + 1) % LEN] : c;
+            return c > a ? (c > b ? c : b) : (a > b ? a : b);
+        };
+        const nPh = Math.max(4, Math.min(128, Math.round(Lf)));
+        const scores = this.phaseScratch, sB = this.phaseScratchB, sF = this.phaseScratchF;
+        let bestPh = 0, bestS = -1;
+        for (let p = 0; p < nPh; p++) {
+            const ph = (p * Lf) / nPh;
+            let sb = 0, sf = 0, n = 0;
+            for (let x = ph; x < N; x += Lf) {
+                const i = Math.round(x);
+                if (i >= N)
+                    break;
+                sb += at(bass, i);
+                sf += at(full, i);
+                n++;
+            }
+            sB[p] = n ? sb / n / mb : 0;
+            sF[p] = n ? sf / n / mf : 0;
+            const sc = sB[p] + sF[p];
+            scores[p] = sc;
+            if (sc > bestS) {
+                bestS = sc;
+                bestPh = p;
+            }
+        }
+        if (Analyser.GRID_PHASE_MODE === 'bass') {
+            // BASEN FORST (09-20, Tequila/hardstyle): helbandet domineras av leads/skrik pa off-beaten och rostade ner kicken;
+            // basringen (kick) har fasen nar den ar tydlig. Tvetydig bas (kvot < BASS_MIN) -> summan som forr.
+            let bb = 0;
+            for (let p = 1; p < nPh; p++)
+                if (sB[p] > sB[bb])
+                    bb = p;
+            const ba = (bb + (nPh >> 1)) % nPh;
+            if (sB[ba] > 1e-6 && sB[bb] / sB[ba] >= Analyser.GRID_PHASE_BASS_MIN) {
+                bestPh = bb;
+                bestS = scores[bb];
+            }
+        }
+        const anti = (bestPh + (nPh >> 1)) % nPh;
+        const conf = scores[anti] > 1e-6 ? bestS / scores[anti] : 9;
+        this.dbgPhase.conf = conf;
+        this.dbgPhase.bassOn = sB[bestPh];
+        this.dbgPhase.bassAnti = sB[anti];
+        this.dbgPhase.fullOn = sF[bestPh];
+        this.dbgPhase.fullAnti = sF[anti];
+        this.dbgPhase.bestPh = bestPh;
+        this.dbgPhase.nPh = nPh;
+        this.dbgPhase.pending = this.phaseAnti;
+        const ph0 = (bestPh * Lf) / nPh;
+        const kLast = Math.floor((N - 1 - ph0) / Lf);
+        const iLast = ph0 + kLast * Lf;
+        const beatMs = this.envLastWallMs - (N - 1 - iLast) * (1000 / HZ);
+        const per = 60000 / bpm;
+        if (this.phaseLastBeatMs > 0) {
+            const d = ((((beatMs - this.phaseLastBeatMs) % per) + per) % per) / per;
+            const err = d < 0.5 ? d : d - 1;
+            if (Math.abs(err) > 0.3) {
+                // forra fasens poang i dagens matning: fasbinet narmast forra slaget
+                const prevPh = ((((this.phaseLastBeatMs - this.envLastWallMs) / (1000 / HZ)) % Lf) + Lf) % Lf; // env-sampel-offset for forra fasen
+                const prevBin = Math.round((prevPh / Lf) * nPh) % nPh;
+                const prevScore = scores[prevBin];
+                const strongEnough = prevScore <= 1e-6 || bestS >= prevScore * Analyser.STICKY_K;
+                if (!strongEnough || ++this.phaseAnti < Analyser.STICKY_N) {
+                    // hall forra fasen: rapportera senaste slaget i DEN fasen (sa foljaren inte ser ett hopp)
+                    const kPrev = Math.round((beatMs - this.phaseLastBeatMs) / per);
+                    const held = this.phaseLastBeatMs + kPrev * per;
+                    this.phaseLastBeatMs = held;
+                    this.beatPhaseMs = held;
+                    this.beatPhaseConf = prevScore > 1e-6 ? prevScore / Math.max(1e-6, scores[(prevBin + (nPh >> 1)) % nPh]) : conf;
+                    if (!strongEnough)
+                        this.phaseAnti = 0;
+                    return;
+                }
+            }
+            this.phaseAnti = 0;
+        }
+        this.phaseLastBeatMs = beatMs;
+        this.beatPhaseMs = beatMs;
+        this.beatPhaseConf = conf;
+    }
+    sectionReset() {
+        this.section = 'intro';
+        this.sectionStartMs = 0;
+        this.sectionIndex = 0;
+        this.sectionTier = 1;
+        this.repeatSim = 0;
+        this.repeatAgoMs = 0;
+        this.repeatSection = '';
+        this.secBlkMs = 0;
+        this.secBlkN = 0;
+        this.secBlkInt = 0;
+        this.secBlkKicks = 0;
+        this.secBlkCent = 0;
+        this.secBlkSpec.fill(0);
+        this.secTierRun = 0;
+        this.secTierCand = 1;
+        this.secRiseRun = 0;
+        this.secSongStartMs = 0;
+        this.secBlkRms2 = 0;
+        this.secBlkDb.length = 0;
+        this.secBlkDens.length = 0;
+        this.secHighSeen = false;
+        this.secDropSeen = this.dropCount;
+        this.secSilentBlocks = 0;
+        this.secHistN = 0;
+        this.secHistPos = 0;
+        this.secFpN = 0;
+        this.secFpPos = 0;
+        this.secFpLab.length = 0;
+        this.secFpAcc.fill(0);
+        this.secFpAccN = 0;
+    }
+    sectionHop(intensity, kick, breaking, nowMs, dtHopMs, rms = 0) {
+        if (this.secSongStartMs === 0) {
+            this.secSongStartMs = nowMs;
+            this.sectionStartMs = nowMs;
+            this.secDropSeen = this.dropCount;
+        }
+        this.secBlkMs += dtHopMs;
+        this.secBlkN++;
+        this.secBlkInt += intensity;
+        if (kick)
+            this.secBlkKicks++;
+        this.secBlkCent += this.centSmooth;
+        this.secBlkRms2 += rms * rms;
+        for (let i = 0; i < 8; i++)
+            this.secBlkSpec[i] += Math.pow(10, this.bandDbRaw[i] / 20); // absolut bandmagnitud (lotus bandAbs) ur dB
+        if (this.secBlkMs < 1000)
+            return;
+        const n = this.secBlkN || 1;
+        const bInt = this.secBlkInt / n;
+        const bKicks = this.secBlkKicks;
+        const bCent = this.secBlkCent / n;
+        // tystnad mellan latar: 3 tysta block -> ny lat
+        if (this.activeMs === 0) {
+            if (++this.secSilentBlocks >= 10) {
+                this.sectionReset();
+                return;
+            }
+        } // 10 s tystnad (var 3: en tyst vers nollade laten, Regnblota 100 s)
+        else
+            this.secSilentBlocks = 0;
+        // tier med hysteres
+        let tier = bInt >= 0.62 ? 2 : bInt <= 0.40 ? 0 : 1;
+        if (Analyser.SECTION_MODE === 'rank') {
+            // KAUSAL PERCENTILRANG (15:35): blockets dB (ra rms, fore AGC) och basonset-tathet (kickar/s) z-normeras mot alla block
+            // hittills i laten, 4 s-fonstrets medelpoang rangordnas mot alla blockpoang hittills. Minst 20 s historik; innan dess 'intro'.
+            const db = 10 * Math.log10(this.secBlkRms2 / n + 1e-10);
+            this.secBlkDb.push(db);
+            this.secBlkDens.push(bKicks);
+            if (this.secBlkDb.length > 600) {
+                this.secBlkDb.shift();
+                this.secBlkDens.shift();
+            }
+            const nb = this.secBlkDb.length;
+            if (nb >= 20) {
+                let md = 0, mk = 0;
+                for (let i = 0; i < nb; i++) {
+                    md += this.secBlkDb[i];
+                    mk += this.secBlkDens[i];
+                }
+                md /= nb;
+                mk /= nb;
+                let sd = 0, sk = 0;
+                for (let i = 0; i < nb; i++) {
+                    sd += (this.secBlkDb[i] - md) ** 2;
+                    sk += (this.secBlkDens[i] - mk) ** 2;
+                }
+                sd = Math.max(1.0, Math.sqrt(sd / nb));
+                sk = Math.max(0.3, Math.sqrt(sk / nb));
+                const score = (i) => (this.secBlkDb[i] - md) / sd + (this.secBlkDens[i] - mk) / sk;
+                let win = 0;
+                const W = Math.min(4, nb);
+                for (let i = nb - W; i < nb; i++)
+                    win += score(i);
+                win /= W;
+                let below = 0;
+                for (let i = 0; i < nb; i++)
+                    if (score(i) < win)
+                        below++;
+                const pct = below / nb;
+                tier = pct >= Analyser.RANK_HI ? 2 : pct <= Analyser.RANK_LO ? 0 : 1;
+            }
+            else
+                tier = 1;
+        }
+        if (tier === this.secTierCand)
+            this.secTierRun++;
+        else {
+            this.secTierCand = tier;
+            this.secTierRun = 1;
+        }
+        if (this.secTierRun >= (Analyser.SECTION_MODE === 'rank' ? 2 : 3))
+            this.sectionTier = this.secTierCand;
+        const st = this.sectionTier;
+        // trend mot 8 s sedan
+        this.secHist[this.secHistPos] = bInt;
+        this.secHistPos = (this.secHistPos + 1) & 15;
+        if (this.secHistN < 16)
+            this.secHistN++;
+        const rise = this.secHistN >= 9 ? bInt - this.secHist[(this.secHistPos - 9 + 16) & 15] : 0;
+        this.secRiseRun = rise >= 0.10 ? this.secRiseRun + 1 : 0;
+        const sinceStart = nowMs - this.secSongStartMs;
+        const dropped = this.dropCount !== this.secDropSeen;
+        this.secDropSeen = this.dropCount;
+        const prev = this.section;
+        let label;
+        if (Analyser.SECTION_MODE === 'rank') {
+            // rang-lage: tier 2 = high, tier 0 = low, mitten = 'break' pa vag ner fran high, 'build' pa vag upp fran low/intro, annars kvar
+            if (this.secBlkDb.length < 20)
+                label = 'intro';
+            else if (dropped || st === 2)
+                label = 'high';
+            else if (st === 0)
+                label = 'low';
+            else
+                label = prev === 'high' || prev === 'break' ? 'break' : (prev === 'low' || prev === 'intro' || prev === 'build') ? 'build' : prev;
+        }
+        else if (dropped || st === 2)
+            label = 'high';
+        else if (prev === 'high' && (breaking || rise <= -0.2))
+            label = 'break';
+        else if (this.buildUp > 0.5 || (this.secRiseRun >= 3 && bInt > 0.45))
+            label = 'build'; // stigning i 3 raka block (15:20: var 1 block -> build/low-flimmer var 4 s)
+        else if (st === 0)
+            label = (!this.secHighSeen && sinceStart < 30000) ? 'intro' : (prev === 'break' ? 'break' : 'low');
+        else
+            label = (prev === 'intro' && !this.secHighSeen && sinceStart < 30000) ? 'intro' : 'low';
+        // UPPEHALLSTID (09-20, forsta langfangsten: build/intro/low bytte var 1-3 s): ett byte kravs ha statt >= 4 s i nuvarande
+        // sektion, utom in i 'high' (drop/topp ska synas direkt) och ur 'high' till 'break' (svackan ar en flank).
+        // uppehallstid 8 s (var 4: build/low/high bytte var 4 s pa pop 14:30), utom in i 'high' (4 s) och high -> break (direkt)
+        const dwellMs = label === 'high' ? 4000 : 8000;
+        const dwellOk = nowMs - this.sectionStartMs >= dwellMs || (prev === 'high' && label === 'break');
+        if (label !== prev && dwellOk) {
+            this.sectionStartMs = nowMs;
+            if (label === 'high') {
+                this.sectionIndex++;
+                this.secHighSeen = true;
+            }
+            this.section = label;
+        }
+        // klangavtryck var 4:e sekund
+        let sum = 0;
+        for (let i = 0; i < 8; i++)
+            sum += this.secBlkSpec[i];
+        const acc = this.secFpAcc;
+        for (let i = 0; i < 8; i++)
+            acc[i] += sum > 0 ? this.secBlkSpec[i] / sum : 0;
+        acc[8] += bCent;
+        acc[9] += Math.min(1, bKicks / 4);
+        acc[10] += bInt;
+        this.secFpAccN++;
+        if (this.secFpAccN >= 4) {
+            const D = Analyser.FP_DIM;
+            let nrm = 0;
+            for (let i = 0; i < D; i++) {
+                acc[i] /= this.secFpAccN;
+                nrm += acc[i] * acc[i];
+            }
+            nrm = Math.sqrt(nrm) || 1;
+            for (let i = 0; i < D; i++)
+                acc[i] /= nrm;
+            let best = 0, bestAt = 0, bestLab = '';
+            for (let k = 0; k < this.secFpN; k++) {
+                if (nowMs - this.secFpT[k] < 16000)
+                    continue;
+                let dot = 0;
+                const o = k * D;
+                for (let i = 0; i < D; i++)
+                    dot += acc[i] * this.secFp[o + i];
+                if (dot > best) {
+                    best = dot;
+                    bestAt = this.secFpT[k];
+                    bestLab = this.secFpLab[k];
+                }
+            }
+            this.repeatSim = best;
+            this.repeatAgoMs = best > 0 ? nowMs - bestAt : 0;
+            this.repeatSection = bestLab;
+            const o = this.secFpPos * D;
+            for (let i = 0; i < D; i++)
+                this.secFp[o + i] = acc[i];
+            this.secFpT[this.secFpPos] = nowMs;
+            this.secFpLab[this.secFpPos] = this.section;
+            this.secFpPos = (this.secFpPos + 1) % Analyser.FP_MAX;
+            if (this.secFpN < Analyser.FP_MAX)
+                this.secFpN++;
+            acc.fill(0);
+            this.secFpAccN = 0;
+        }
+        this.secBlkMs = 0;
+        this.secBlkN = 0;
+        this.secBlkInt = 0;
+        this.secBlkKicks = 0;
+        this.secBlkCent = 0;
+        this.secBlkSpec.fill(0);
+        this.secBlkRms2 = 0;
+    }
+    /** GRIDFAS (2026-09-20). Korpusens handelseloggar (39 latar med ratt tempo i samma oktav): motorns pulser i fas i 5,
+     *  i MOTFAS i 9 (lampan pa off-beaten), resten daremellan. Orsak: motorns PLL initieras pa en kick och slapper bara
+     *  in kickar inom +-1/4 slag - ett grid pa attondelsbasen bekraftar sig sjalvt for alltid. Har mats fasen direkt:
+     *  vid last tempo laggs slagen ut med alla faser (1 env-sampel = 10 ms) over de senaste ~12 slagen pa BAS-ringen
+     *  (kickar) OCH helbandsringen (virvel/hi-hat/gitarr; PC-facit 09-20: helbandet ar 1,3-1,7x starkare pa slaget an
+     *  pa halvslaget i alla grupper, aven dar motorn lag i motfas). Vinnande fas = max av summan av de normerade
+     *  medelvardena (max over +-1 sampel, onsets ar nagra sampel breda). Utdata: vaggtiden for det senaste slaget i den
+     *  fasen + on/half-kvot. Hysteres: en fas >0,3 slag fran forra estimatet kravs i 3 raka analyser (0,75 s) innan
+     *  den tas - annars foljs forra fasen. Kostnad: ~nPh x 12 x 2 uppslag = ~2 000 per anrop, 4 Hz. */
     /** SLAGPOANG for en kandidatperiod L (i env-sampel) pa en onset-ring: basta fas av L, medel av ringens varde pa slagen (max +-1
      *  sampel) delat med ringens medel, x (0,5 + traffandel) dar traff = onset >= 30 % av fonstrets 95-percentil. `half` = halvslagens
      *  poang / slagens (oktavbevis). Portat fran lotus-light (analyser.ts alignScore, 2026-09-19). */
@@ -1493,6 +1883,11 @@ export class Analyser {
         this.lastSongVoteMs = 0;
         this.reacqUntilMs = 0;
         this.beatAnchorMs = 0;
+        this.beatPhaseMs = 0;
+        this.beatPhaseConf = 0;
+        this.phaseLastBeatMs = 0;
+        this.phaseAnti = 0;
+        this.sectionReset();
         this.lastT = 0;
     }
     perfNow() { return this.virtualMs ?? performance.now(); }
@@ -1594,7 +1989,7 @@ export class Analyser {
             level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
             kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
             dropCount: 0, miniDropCount: 0, bodyDb: 0, midHiDb: -120, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
-            kickAtMs: 0, barShift: -1,
+            kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '',
             spec: this.outSpec, onset: this.outOnset, drum: this.outDrum,
         };
     }
@@ -1851,6 +2246,10 @@ export class Analyser {
                 this.envFilled = 0;
                 this.beatAnchorMs = 0;
                 this.pendingKickMs = 0;
+                this.beatPhaseMs = 0;
+                this.beatPhaseConf = 0;
+                this.phaseLastBeatMs = 0;
+                this.phaseAnti = 0; // sektionerna nollas inte har (paus i samma lat; egen 10 s-regel)
                 this.bpmHistLen = 0;
                 this.bpmHistPos = 0;
                 this.lastVoteMs = 0;
@@ -1904,6 +2303,8 @@ export class Analyser {
             if ((!!process.env.DMX_HIGH_DIAG || !!process.env.DMX_HIGH_VOTE))
                 this.envHighRing[this.envPos] = this.envHighAccum;
             this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
+            if (Analyser.GRID_PHASE_ON)
+                this.envLastWallMs = this.wallNow();
             this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
             this.envAccum = 0;
             this.envBassAccum = 0;
@@ -1928,6 +2329,8 @@ export class Analyser {
             if (++this.bpmCounter >= stride) {
                 this.bpmCounter = 0;
                 this.computeBpm();
+                if (Analyser.GRID_PHASE_ON && this.localBpm > 0)
+                    this.computeGridPhase();
             }
         }
         // #2 Förfina förra kickens fas: nu har vi y(-1)=kfPrev2, y(0)=kfPrev, y(+1)=kickFlux
@@ -2552,6 +2955,17 @@ export class Analyser {
         f.inRiser = inRiser;
         f.kickAtMs = kickAtMs;
         f.barShift = barShift;
+        f.beatPhaseMs = this.beatPhaseMs;
+        f.beatPhaseConf = this.beatPhaseConf;
+        if (Analyser.SECTION_ON)
+            this.sectionHop(intensity, kick, breaking, this.wallNow(), this.dtHop * 1000, rms);
+        f.section = this.section;
+        f.sectionAgeMs = this.sectionStartMs > 0 ? this.wallNow() - this.sectionStartMs : 0;
+        f.sectionIndex = this.sectionIndex;
+        f.sectionTier = this.sectionTier;
+        f.repeatSim = this.repeatSim;
+        f.repeatAgoMs = this.repeatAgoMs;
+        f.repeatSection = this.repeatSection;
         return f;
     }
 }

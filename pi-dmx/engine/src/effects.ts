@@ -156,6 +156,8 @@ const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
 // är separat och förblir snabbt, så pulsen påverkas inte. En refräng gasar fortf.
 // upp (rise ~1-2 s > 300 ms), men syllaberna medelvärdesbildas bort.
 // DMX_LIVE_LEVEL (2026-09-21): lotus nivakanal - se blocket i render(). Rattar bara for A/B.
+const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH === '1';   // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
+const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
 const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10);        // lotus windowDb 10
 const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 4.5); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
@@ -263,6 +265,7 @@ export class EffectEngine {
   private lightHi = 0;           // långsam topp av wdb (loud-referens)
   private lightLo = 0;           // långsamt golv av wdb (tyst-referens)
   private lightShapeSm = -1;     // shape-smoothing
+  private lastLiveSection = '';   // DMX_SECTION_SWITCH
   private liveAnchor?: number; private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
   private lightLoud = 0;         // log-released loudness 0..1 → driver md
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
@@ -977,7 +980,12 @@ export class EffectEngine {
         // känns slumpmässigt. Sektionsgräns = byt gärna nu; frasgräns = ok att byta.
         // Har låten grid väntar dwell-timern in nästa gräns (men max 20 s extra, så
         // showen aldrig fastnar om gridet skulle vara fel).
-        const memSection = now - this.memSectionAt < 300;
+        // REALTIDSSEKTION (DMX_SECTION_SWITCH=1, 2026-09-21): analysatorns egen sektion (DMX_SECTION=1: intro/low/build/high/break)
+        // ar ett bytesskal precis som latminnets sektionsgrans, och etiketten ger IDENTITET (samma look nar 'high' kommer tillbaka).
+        const liveSec = SECTION_SWITCH ? (frame.section || '') : '';
+        const liveSecChanged = SECTION_SWITCH && liveSec !== '' && this.lastLiveSection !== '' && liveSec !== this.lastLiveSection;
+        if (SECTION_SWITCH && liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '' && SECTION_TRACE) console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; if (liveSec === 'intro') for (const k of [...this.partLook.keys()]) if (k.startsWith('live:')) this.partLook.delete(k); }   // ny lat (analysatorn nollar till intro) -> glom live-lookerna
+        const memSection = now - this.memSectionAt < 300 || liveSecChanged;
         const memPhrase = now - this.memPhraseAt < 250;
         const gridOk = !this.memHasGrid || memSection || memPhrase || now > this.smartDwellUntil + 20000;
         // MED STRUKTUR AR SEKTIONEN ENHETEN. Dwell-timern och tier-bytet ar till
@@ -999,11 +1007,11 @@ export class EffectEngine {
         //    effektbyte där släpper spänningen precis när den ska byggas. Håll
         //    kvar genom hela risern — då landar bytet i stället PÅ dropen, vilket
         //    är det enda ögonblick där ett byte förstärker musiken.
-        const inBuild = frame.inRiser || frame.buildUp > 0.35;
+        const inBuild = frame.inRiser || frame.buildUp > 0.35 || (SECTION_SWITCH && frame.section === 'build');
         // 2) I ett breakdown: gå till den lugna poolen oavsett vad energitiern
         //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
         //    så utan detta fortsätter riggen köra fullfart genom en svacka.
-        const wantCalm = frame.breaking && this.cfg.energyDrivesMode;
+        const wantCalm = (frame.breaking || (SECTION_SWITCH && frame.section === 'break')) && this.cfg.energyDrivesMode;
         // 3) ETIKETTEN STYR INTE NIVÅN — SEKTIONENS UPPMÄTTA ENERGI GÖR DET.
         //    Här stod tidigare musikaliska schabloner: refräng aldrig lugn, vers
         //    aldrig full fart, intro/outro alltid lugnt. De byggde på att energin
@@ -1017,7 +1025,7 @@ export class EffectEngine {
         //      en stillsam refräng och hållit tillbaka en väldig vers — fel åt båda
         //      hållen. Etiketten far darfor styra IDENTITET (samma look aterkommer)
         //      och NAR bytet sker (sektionsgransen), men inte hur starkt det lyser.
-        const part = this.memPart;
+        const part = this.memPart || (SECTION_SWITCH && liveSec && liveSec !== 'intro' ? 'live:' + liveSec : undefined);   // identitet aven utan latminne
         const tierS = tier;
         // Ny låt → glöm förra låtens looker.
         if (this.memSongId !== this.partLookSong) { this.partLook.clear(); this.partLookSong = this.memSongId; }
