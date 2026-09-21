@@ -245,7 +245,20 @@ export class Analyser {
   private kickWasAbove = false;      // stigande-flank-detektion
   private kickPrimed = false;        // false på första framen (skräp-flux) → ingen falsk kick
   private static readonly ENV_HZ = 100;
-  private static readonly ENV_LEN = 100 * 5;
+  /** Onset-ringens langd i sekunder x 100 Hz. DMX_TEMPO_ENV_S (3..20) bara for A/B - 5 s ar driftvardet (lotus kor 10 med evidensval). */
+  private static readonly ENV_LEN = 100 * Math.max(3, Math.min(20, Number(process.env.DMX_TEMPO_ENV_S) || 5));
+  /** EVIDENSVAL (portat fran lotus-light 2026-09-21, opt-in DMX_TEMPO_EVIDENCE=1): tempogrammet som KANDIDATGENERATOR (topp-K lokala
+   *  maxima + oktavpartner), varje kandidats slag laggs ut pa BAS-onset-ringen och poangsatts (alignScore: medel pa slagen / medel,
+   *  x traffandel). Vinnaren ar den vars slag traffar kickarna, inte den hogsta toppen (sub-harmoniska fantomer 3/2, 4/3). Lotus korpus:
+   *  181/288 -> 226/288 ratt tempo. Omlasning: ihallande, sammanhallen och tydlig evidens (>= 1,25 x lasets egen slagpoang) laser om. */
+  private static readonly EVIDENCE_ON = process.env.DMX_TEMPO_EVIDENCE === '1';
+  private static readonly EVIDENCE_K = 5;
+  private static readonly EVID_RELOCK_N = 8;
+  /** KICKRATTAR (lotus 2026-09-20, opt-in): DMX_KICK_NOGATE=1 stanger grid-grinden, DMX_KICK_COOLDOWN=ms satter FAST cooldown i stallet
+   *  for den tempo-relativa (0,6 slag, golv 170). Lotus on-beat-recall 0,63 -> 0,95 med grind av + 100 ms. OBS: DMX blixtrar pa kickar
+   *  direkt - fler kickar = fler blixtar (agaren 09-02: 'dubbel takt'); har ar standard oforandrad, rattarna ar for banken/A-B. */
+  private static readonly KICK_NOGATE = process.env.DMX_KICK_NOGATE === '1';
+  private static readonly KICK_COOLDOWN_MS = Number(process.env.DMX_KICK_COOLDOWN) || 0;
   private envRing = new Float32Array(Analyser.ENV_LEN);
   private envPos = 0;
   private envFilled = 0;
@@ -326,6 +339,16 @@ export class Analyser {
   private static readonly BPM_HIST = 20;
   private bpmHist = new Float64Array(Analyser.BPM_HIST);
   private bpmHistLen = 0;
+  // Evidensval (se EVIDENCE_ON)
+  private candLag = new Int32Array(12); private candVal = new Float32Array(12); private candScore = new Float32Array(12); private candHalf = new Float32Array(12);
+  evidenceScore = 0; evidenceHalf = 0; evidenceCands = 0; evidenceSecond = 0; evidenceLockScore = 0; evidenceRelocks = 0;
+  private evidRelockVotes = 0; private evidRelockBpm = 0;
+  private evidSortScratch = new Float32Array(Analyser.ENV_LEN); private evidThresh = 0; private evidThreshN = -1; private evidThreshPos = -1;
+  debugCandidates(): Array<{ lag: number; bpm: number; tg: number; score: number; half: number }> {
+    const out: Array<{ lag: number; bpm: number; tg: number; score: number; half: number }> = [];
+    for (let i = 0; i < this.evidenceCands; i++) out.push({ lag: this.candLag[i], bpm: Math.round(Analyser.ENV_HZ * 60 / this.candLag[i] * 10) / 10, tg: this.candVal[i], score: this.candScore[i], half: this.candHalf[i] });
+    return out;
+  }
   private bpmHistPos = 0;
   private bpmSortScratch = new Float64Array(Analyser.BPM_HIST);
   // Förberäknade EMA-alfor / decay-faktorer (fasta dtHop + fasta tidskonstanter).
@@ -677,6 +700,36 @@ export class Analyser {
     return energy / N;
   }
 
+  /** SLAGPOANG for en kandidatperiod L (i env-sampel) pa en onset-ring: basta fas av L, medel av ringens varde pa slagen (max +-1
+   *  sampel) delat med ringens medel, x (0,5 + traffandel) dar traff = onset >= 30 % av fonstrets 95-percentil. `half` = halvslagens
+   *  poang / slagens (oktavbevis). Portat fran lotus-light (analyser.ts alignScore, 2026-09-19). */
+  private alignScore(ring: Float32Array, N: number, L: number): { score: number; half: number; hit: number } {
+    const LEN = Analyser.ENV_LEN;
+    const start = (this.envPos - N + LEN) % LEN;
+    const at = (i: number): number => {
+      const c = ring[(start + i) % LEN]; const a = i > 0 ? ring[(start + i - 1) % LEN] : c; const b = i + 1 < N ? ring[(start + i + 1) % LEN] : c;
+      const m = c > a ? (c > b ? c : b) : (a > b ? a : b);
+      return m > 0 ? m : 0;
+    };
+    let tot = 0; for (let i = 0; i < N; i++) { const v = ring[(start + i) % LEN]; if (v > 0) tot += v; }
+    const mean = tot / N;
+    if (mean <= 0 || L < 2) return { score: 0, half: 0, hit: 0 };
+    if (this.evidThreshN !== N || this.evidThreshPos !== this.envPos) {
+      const sc = this.evidSortScratch; let n = 0; for (let i = 0; i < N; i++) { const v = ring[(start + i) % LEN]; sc[n++] = v > 0 ? v : 0; }
+      const sub = sc.subarray(0, n); sub.sort(); this.evidThresh = 0.3 * sub[Math.floor(n * 0.95)]; this.evidThreshN = N; this.evidThreshPos = this.envPos;
+    }
+    const th = this.evidThresh;
+    let bestPh = 0, bestSum = -1, bestHits = 0;
+    for (let ph = 0; ph < L; ph++) {
+      let sum = 0, hits = 0; for (let i = ph; i < N; i += L) { const v = at(i); sum += v; if (v >= th) hits++; }
+      if (sum > bestSum) { bestSum = sum; bestPh = ph; bestHits = hits; }
+    }
+    const nOn = Math.floor((N - 1 - bestPh) / L) + 1; const on = bestSum / nOn; const hit = bestHits / nOn;
+    let hs = 0, nh = 0; for (let i = bestPh + (L >> 1); i < N; i += L) { hs += at(i); nh++; }
+    const half = nh ? hs / nh : 0;
+    return { score: (on / mean) * (0.5 + hit), half: on > 0 ? half / on : 0, hit };
+  }
+
   private computeBpm() {
     const _b0 = this.localBpm;   // TRACE: fångar lås-byten (DMX_BPM_TRACE)
     this._why = "";
@@ -745,6 +798,33 @@ export class Analyser {
     }
     const envPos = this.envPosScratch;   // helbandets rektifierade envelope (scoreEnv körde sist)
 
+    // ── EVIDENSVAL (portat fran lotus-light, opt-in DMX_TEMPO_EVIDENCE=1) ────────────────────────────────
+    if (Analyser.EVIDENCE_ON) {
+      const K = Analyser.EVIDENCE_K; const cL = this.candLag, cV = this.candVal, cS = this.candScore, cH = this.candHalf; let nc = 0;
+      for (let lag = lagMin + 1; lag < lagMax; lag++) {
+        const v = tg[lag];
+        if (v <= 0 || v < tg[lag - 1] || v < tg[lag + 1]) continue;                  // lokalt maximum
+        let dup = false;
+        for (let i = 0; i < nc; i++) if (Math.abs(lag / cL[i] - 1) < 0.03) { if (v > cV[i]) { cV[i] = v; cL[i] = lag; } dup = true; break; }
+        if (dup) continue;
+        if (nc < K) { cL[nc] = lag; cV[nc] = v; nc++; }
+        else { let mi = 0; for (let i = 1; i < K; i++) if (cV[i] < cV[mi]) mi = i; if (v > cV[mi]) { cL[mi] = lag; cV[mi] = v; } }
+      }
+      const nc0 = nc;   // oktavpartner: L/2 och 2L for varje kandidat (inom fonstret, tak 8)
+      for (let i = 0; i < nc0 && nc < 8; i++) for (const L2 of [cL[i] >> 1, cL[i] * 2]) {
+        if (L2 < lagMin || L2 > lagMax) continue;
+        let dup = false; for (let j = 0; j < nc; j++) if (Math.abs(L2 / cL[j] - 1) < 0.03) { dup = true; break; }
+        if (!dup) { cL[nc] = L2; cV[nc] = tg[L2] > 0 ? tg[L2] : 0; nc++; }
+      }
+      if (nc > 0) {
+        let bi = -1, bs = -1;
+        for (let i = 0; i < nc; i++) { const r = this.alignScore(this.envBassRing, N, cL[i]); cS[i] = r.score; cH[i] = r.half; if (r.score > bs) { bs = r.score; bi = i; } }
+        for (let i = 0; i < nc; i++) if (i !== bi && cS[i] >= bs * 0.9 && cV[i] > cV[bi] * 1.15) { bi = i; bs = cS[i]; }
+        let second = 0; for (let i = 0; i < nc; i++) if (i !== bi && cS[i] > second) second = cS[i];
+        this.evidenceScore = bs; this.evidenceHalf = cH[bi]; this.evidenceCands = nc; this.evidenceSecond = second;
+        bestLag = cL[bi]; bestVal = tg[bestLag];
+      }
+    }
 
     if (bestLag === 0 || bestVal <= 0) return;
     // Peak-to-mean confidence: en tydlig takttopp sticker ut från medelnivån,
@@ -836,6 +916,27 @@ export class Analyser {
       scratch[j + 1] = v;
     }
     const med = scratch[n >> 1];
+    // ── EVIDENSOMLASNING (lotus 2026-09-19): laset sitter kvar pa forsta felet annars ────────────────────
+    if (Analyser.EVIDENCE_ON && this.localBpm > 0 && this.evidenceCands >= 1) {
+      const off = Math.abs(bpm / this.localBpm - 1) > 0.11;
+      let worse = false;
+      if (off) {
+        const lockLag = Math.round((HZ * 60) / this.localBpm);
+        const ls = this.alignScore(this.envBassRing, N, lockLag).score;
+        this.evidenceLockScore = ls;
+        worse = this.evidenceScore >= ls * 1.25;
+      }
+      if (worse && (this.evidRelockBpm === 0 || Math.abs(bpm / this.evidRelockBpm - 1) <= 0.04)) {
+        this.evidRelockBpm = this.evidRelockBpm === 0 ? bpm : this.evidRelockBpm + (bpm - this.evidRelockBpm) * 0.3;
+        if (++this.evidRelockVotes >= Analyser.EVID_RELOCK_N) {
+          this._why = "EVIDENCE";
+          this.localBpm = Math.round(this.evidRelockBpm);
+          this.bpmHistLen = 0; this.bpmHistPos = 0;
+          this.nearVote = 0; this.nearChallenger = 0; this.octaveVote = 0; this.bpmStable = 0; this.newSongVote = 0;
+          this.evidRelockVotes = 0; this.evidRelockBpm = 0; this.evidenceRelocks++;
+        }
+      } else if (this.evidRelockVotes > 0) { this.evidRelockVotes = Math.max(0, this.evidRelockVotes - 2); if (this.evidRelockVotes === 0) this.evidRelockBpm = 0; }
+    }
     if (this.localBpm === 0 && this.warmCalls++ < Analyser.WARM_N) return;
     if (this.localBpm === 0) {
       this._why = "FIRST";
@@ -1452,7 +1553,7 @@ export class Analyser {
     // haller nere ANTALET, precis som kickfix-commiten sa. 0.6 beat kapar paret
     // men behaller ett rent slag/takt. Golv 170 ms skyddar mycket snabba tempon.
     // Tempot paverkas inte: det gar via onset-enveloppen, inte den diskreta kicken.
-    const KICK_COOLDOWN = this.localBpm > 40 ? Math.max(170, (60000 / this.localBpm) * 0.6) : 170;
+    const KICK_COOLDOWN = Analyser.KICK_COOLDOWN_MS > 0 ? Analyser.KICK_COOLDOWN_MS : (this.localBpm > 40 ? Math.max(170, (60000 / this.localBpm) * 0.6) : 170);
     // ENERGIGRINDEN SKA AVVISA TYSTNAD — INTE MUSIK.
     // Den stod pa 0.06 och avvisade 99,86 % av alla kandidater. MATT 2026-08-09
     // pa riktigt material (gain last pa 1x, som pa aux) ligger `energy` sa har:
@@ -1497,7 +1598,7 @@ export class Analyser {
 
       const distToGrid = Math.min(offset, gridMs - offset);
       const tolerance = Math.max(30, beatMs * 0.15);   // 60 ms vid 150 BPM (0.15*400)
-      if (distToGrid > tolerance) above = false;    // skarp transient, men felplacerad
+      if (distToGrid > tolerance && !Analyser.KICK_NOGATE) above = false;    // skarp transient, men felplacerad
     }
     // ─────────────────────────────────────────────────────────────────────────
     let kick = false;
