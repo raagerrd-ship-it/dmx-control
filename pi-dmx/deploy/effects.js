@@ -9,7 +9,7 @@ import { fixtureRoles } from "./config.js";
 import { FixtureOutput } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { PostProcess } from "./postprocess.js";
-import { EFFECT_MAP, TIER, sectionPool, meetsRequirements } from "./effects/registry.js";
+import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL } from "./effects/registry.js";
 import { fitScore } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
 // PALETT-LAS (DMX_PALETTE): lås färgerna till en palett oavsett klang och läge. Namn ur listan
@@ -42,6 +42,7 @@ import { LiveRange } from "./liveRange.js";
 // över ~70 ms tappar den anslaget.
 /** Under den här nivån räknas ingången som avstängd, inte som ett tyst parti. */
 const INPUT_OFF_LEVEL = 0.02;
+const SILENCE_LEVEL = Number(process.env.DMX_SILENCE_LEVEL ?? 0.05), SILENCE_MS = Number(process.env.DMX_SILENCE_MS ?? 250), SILENCE_RELEASE_S = Number(process.env.DMX_SILENCE_RELEASE_S ?? 0.25);
 /** ...men först när den legat där så länge — ett break i låten ska inte släcka showen. */
 const INPUT_OFF_MS = 2000;
 const BEAT_ATTACK_FRAC = 0.12;
@@ -98,10 +99,16 @@ const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);
  *  ladan 2026-09-12 19:50-19:54: minidroppen fyrade 24-400 ms FORE 4 av 5 riktiga drops (lyft-detektorn har lagre
  *  krav och reagerar pa forsta bas-slaget) -> ljuset hoppade tidigt och smallen kom sedan ("nagra 100 ms for tidig"). */
 const MINI_DELAY_MS = Number(process.env.MINI_DELAY_MS ?? 500);
-/** TYDLIG BASGANG -> inre/yttre FOREDRAGEN (agaren 2026-09-12: "tydlig basgang = inner/outer; inte alltid men
- *  foredragen"). profile.bass >= CLEAR_BASS (matt: 0,4 = 19 % av pop-facitets tid, 97 % av basdrivna Stranden,
- *  8 % megamix). Vald vid tva av tre byten nar den inte redan ligger, annars boostad i rankingen. Kraver DMX_HALVE_SHOW. */
-const CLEAR_BASS = Number(process.env.DMX_CLEAR_BASS ?? 0.4);
+/** TYDLIG BASGANG -> TOGGLE-EFFEKTER (agaren 2026-09-12: "tydlig basgang = inner/outer; inte alltid men foredragen";
+ *  ladan 2026-09-21: "kanns inte som den aktiverar den vid basgang - gor det tydligare att den skall valja dom").
+ *  Forr: profile.bass (lag-endens ANDEL, 8 s trog) >= 0,4, bara innerouter, bara med DMX_HALVE_SHOW, tva av tre byten.
+ *  Nu: analysatorns profile.bassline (basNOT-anslag per slag, ~1 s) >= CLEAR_BASS ->
+ *   (1) basgangens ankomst ar EN EGEN BYTESORSAK (efter MIN_HOLD, inte i uppbyggnad), och
+ *   (2) dirigenten valjer da ALLTID ur toggle-poolen (effektfilernas `toggle: true`, snitt med sektionens pool nar det gar).
+ *  Sa lange basgangen ligger kvar sker vanliga byten (sektion/tier/dwell) ocksa inom toggle-poolen. DMX_CLEAR_BASS=tröskel,
+ *  hysteres 0,2 nedat. MATT (tools/basslineProbe.mjs, andel av tiden >= 0,7): basdrivna Stranden 81 %, dansband 78 %,
+ *  pop-facit 27 %, megamix 12 %, real.wav 1 %. */
+const CLEAR_BASS = Number(process.env.DMX_CLEAR_BASS ?? 0.7);
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
 const START_FADE_MS = 5000;
@@ -143,8 +150,12 @@ const LIGHT_ANCHOR_TAU = 60000; // auto-ankarets tidskonstant (ms)
 // DMX_LIVE_LEVEL (2026-09-21): lotus nivakanal - se blocket i render(). Rattar bara for A/B.
 const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH === '1'; // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
 const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
+const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);
+const BEAT_LIFT = Number(process.env.BEAT_LIFT ?? 0.25); // additivt hjartslagslyft (synlig puls aven i morka effekter)
+const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25); // drop i low/intro kraver riser >= detta
+const DROP_LAND_GAIN = Number(process.env.DROP_LAND_GAIN ?? 1.15); // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35); // tierEma-snap vid high/break-grans
-const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.12), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.15); // master i refrang/break
+const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.45), SECTION_LOW_DIP = Number(process.env.SECTION_LOW_DIP ?? 0.30); // master: refrang upp, vers/intro ner, break mer ner
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
 const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10); // lotus windowDb 10
 const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 4.5); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
@@ -213,6 +224,7 @@ export class EffectEngine {
     pulseHalved = false;
     halfTick = 0; // DMX_HALVE_SHOW: paritet inom det halverade slaget
     lastHalvedForSwitch = false; // DMX_HALVE_SHOW: halvering vid senaste look-bytet
+    lastBassClearForSwitch = false; // tydlig basgang vid senaste look-bytet (CLEAR_BASS)
     /** Monoton pulsklocka (rotfix mot hjärtslags-fladder): pulsens index och paritet
      *  får bara gå framåt, och tSince hålls icke-avtagande inom en puls, så PLL:ens
      *  fasrättningar inte kan re-attackera eller flippa pariteten mitt i ett slag. */
@@ -254,6 +266,12 @@ export class EffectEngine {
     lightLo = 0; // långsamt golv av wdb (tyst-referens)
     lightShapeSm = -1; // shape-smoothing
     lastLiveSection = ''; // DMX_SECTION_SWITCH
+    lastDropSwitchMs = -1e9;
+    dropCalmDenied = 0;
+    dropFalse = 0;
+    dropCheckAt = 0;
+    preDropLevel = 0;
+    preDropTier = 0; // senaste drop -> 'high'-pool i 20 s
     liveAnchor;
     liveFastUntil = 0;
     liveClipMs = 0;
@@ -796,10 +814,36 @@ export class EffectEngine {
         // rendern går långsammare än analysen (en enframs-boolean hade aliaserats bort).
         // Här ligger bara show-REAKTIONEN: accent-fönster, blackout, rök, envelope.
         const dtNow = Math.min(0.1, (performance.now() - this.lastRenderMs) / 1000);
-        const dropHitRaw = frame.dropCount !== this.lastDropCount;
+        let dropHitRaw = frame.dropCount !== this.lastDropCount;
         this.lastDropCount = frame.dropCount;
         // Snapp: dropHit (show-reaktionen) flyttas till nasta slag om det ar nara; roken (wantBurst) tar dropHitRaw.
+        // DROP I LUGN SEKTION (ladan 20:15: tva falska drops i ett lugnt parti): en riktig drop kommer ur en uppbyggnad eller ett
+        // break. I low/intro kravs att analysatorn sett en riser (buildUp >= DROP_CALM_BUILD) - annars ignoreras dropen.
+        const calmSec = SECTION_SWITCH && (frame.section === 'low' || frame.section === 'intro');
+        if (dropHitRaw && calmSec && frame.buildUp < DROP_CALM_BUILD) {
+            dropHitRaw = false;
+            this.dropCalmDenied++;
+        }
         let dropHit = dropHitRaw;
+        // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
+        // jamfors nivan (lightLoud/liveLevelSm) med nivan strax fore; har den inte stigit >= DROP_LAND_GAIN doms dropen falsk:
+        // envelope klipps, 20 s-high-fonstret och tiersnappen dras tillbaka. Blixten (0,6 s) hinner synas, inte 20 s fel show.
+        if (dropHitRaw) {
+            this.dropCheckAt = nowWall + 600;
+            this.preDropLevel = this.liveLevelSm >= 0 ? this.liveLevelSm : this.lightLoud;
+            this.preDropTier = this.tierEma;
+        }
+        if (this.dropCheckAt > 0 && nowWall >= this.dropCheckAt) {
+            this.dropCheckAt = 0;
+            const lvl = this.liveLevelSm >= 0 ? this.liveLevelSm : this.lightLoud;
+            if (lvl < this.preDropLevel * DROP_LAND_GAIN + 0.02) {
+                this.dropEnv = 0;
+                this.lastDropSwitchMs = -1e9;
+                if (this.tierEma > this.preDropTier)
+                    this.tierEma = this.preDropTier;
+                this.dropFalse++;
+            }
+        }
         if (DROP_SNAP_MS > 0) {
             if (dropHitRaw && this.beatTrust >= 0.5 && beatLocked(this.cfg.beat)) {
                 const bms = beatPeriod(this.cfg.beat);
@@ -955,7 +999,8 @@ export class EffectEngine {
             // (rank-lage), sa vid en high-grans vet dirigenten redan att refrangen ar har - gasa direkt (som vid drop), vanta inte
             // pa 5 s-medelvardet + hallstid. 'break'/'low' vid gransen: slapp ner direkt (musiken slapper -> showen foljer).
             if (SECTION_SWITCH && (frame.sectionAgeMs ?? 1e9) < 1500) {
-                if (frame.section === 'high' && this.tierEma < SECTION_HIGH_SNAP)
+                // KRASEN (ladan 19:55: 'gasade pa i lugnt parti'): bara nar analysatorns egen energitier ocksa sager topp (sectionTier 2).
+                if ((frame.section === 'high' && (frame.sectionTier ?? 0) >= 2) && this.tierEma < SECTION_HIGH_SNAP)
                     this.tierEma = SECTION_HIGH_SNAP;
                 else if ((frame.section === 'break' || frame.section === 'low') && this.tierEma > SECTION_LOW_SNAP)
                     this.tierEma = SECTION_LOW_SNAP;
@@ -1023,7 +1068,12 @@ export class EffectEngine {
             // showen aldrig fastnar om gridet skulle vara fel).
             // REALTIDSSEKTION (DMX_SECTION_SWITCH=1, 2026-09-21): analysatorns egen sektion (DMX_SECTION=1: intro/low/build/high/break)
             // ar ett bytesskal precis som latminnets sektionsgrans, och etiketten ger IDENTITET (samma look nar 'high' kommer tillbaka).
-            const liveSec = SECTION_SWITCH ? (frame.section || '') : '';
+            // DROPEN AR REFRANGENS START (ladan 19:56: 'efter en drop dor lamporna'): sektionsdetektorn ligger kvar i 'build' nagra
+            // sekunder efter smallen (uppehallstid) och build-lookerna ar morka av design. I 20 s efter en drop galler poolen 'high'.
+            if (dropHit)
+                this.lastDropSwitchMs = now;
+            const afterDrop = SECTION_SWITCH && now - this.lastDropSwitchMs < 20_000;
+            const liveSec = SECTION_SWITCH ? (afterDrop ? 'high' : (frame.section || '')) : '';
             const liveSecChanged = SECTION_SWITCH && liveSec !== '' && this.lastLiveSection !== '' && liveSec !== this.lastLiveSection;
             if (SECTION_SWITCH && liveSec !== '' && liveSec !== this.lastLiveSection) {
                 if (this.lastLiveSection !== '' && SECTION_TRACE)
@@ -1045,9 +1095,13 @@ export class EffectEngine {
             //   foljt 11 s senare av "ny look ripple (tier full)" — tre looker i en
             //   refrang, driven av att tiern flaxade mellan fart och full.
             const halvedChanged = HALVE_SHOW && this.pulseHalved !== this.lastHalvedForSwitch; // dubbeltakt/lugn slog om → delad look
+            // BASGANG: tydlig basgang som kommer (eller gar) medan nuvarande look inte matchar -> byt.
+            const bassClear = (frame.profile.bassline ?? 0) >= (this.lastBassClearForSwitch ? CLEAR_BASS - 0.2 : CLEAR_BASS);
+            const curToggle = !!EFFECT_MAP.get(this.smartMode)?.toggle;
+            const bassSwitch = bassClear !== this.lastBassClearForSwitch && (bassClear ? !curToggle : curToggle);
             const wantSwitch = this.memPart
-                ? memSection
-                : (tierChanged || memSection || halvedChanged || now > this.smartDwellUntil);
+                ? (memSection || bassSwitch)
+                : (tierChanged || memSection || halvedChanged || bassSwitch || now > this.smartDwellUntil);
             // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
             // det, inte bara på energinivån. Två regler, båda dramaturgiska:
             //
@@ -1084,6 +1138,7 @@ export class EffectEngine {
                 this.lastSmartSwitchMs = now;
                 this.lastSmartTier = tierName;
                 this.lastHalvedForSwitch = this.pulseHalved;
+                this.lastBassClearForSwitch = bassClear;
                 // DMX_DWELL_MS: agaren 2026-09-12 "dirigenten behover inte byta hela tiden, bara vid andringar i laten".
                 // Stamningens dwell (fest 15 s, galet 10 s) tvingade byten pa klockan; med env satt hogt (120 s) blir
                 // dwell en nodfallback och bytena sker pa tier-byte, sektionsgrans, drop och halvering.
@@ -1136,12 +1191,23 @@ export class EffectEngine {
                 // kastades bort. MATT: "chorus: aterser stege" tva ganger, sedan tre nya
                 // looker i rad sa fort tiern gick till full. Kravet ar nu bara att
                 // effekten alls ar pasagen av agaren.
-                const remembered = !wantCalm && part ? this.partLook.get(part) : undefined;
-                const clearBass = HALVE_SHOW && frame.profile.bass >= CLEAR_BASS
-                    && this.cfg.rotation?.innerouter !== false && req("innerouter");
-                if (clearBass && this.smartMode !== "innerouter" && this.smartCount % 3 !== 0) {
-                    console.log(`[dirigent] tydlig basgang (${frame.profile.bass.toFixed(2)}) -> innerouter`);
-                    this.smartMode = "innerouter";
+                // LIVE-ETIKETT (ladan 20:30, 'fastnade i samma effekt'): generisk etikett ('high') aterser annars samma look hela laten.
+                // Par-regel: sektion nr 1-2 delar look, nr 3-4 en ny, osv. (A A B B) - igenkanning utan att fastna.
+                const livePart = !!part && part.startsWith('live:');
+                const pairKey = livePart ? part + ':' + Math.floor(((frame.sectionIndex ?? 0) + 1) / 2) : part;
+                const remembered = !wantCalm && pairKey && !livePart ? this.partLook.get(pairKey) : undefined; // 20:33: ingen igenkanning for live-etiketter ('samma effekt igen') - bara latminnet
+                // TYDLIG BASGANG -> toggle-poolen (se CLEAR_BASS). Snitt med aktuell pool forst (sektion/tier/krav), annars alla
+                // aktiva toggle-effekter som moter kraven. Bast passande forst, gyllene-snitt-variation bland topp 3, aldrig samma.
+                const toggles = bassClear ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); return cut.length ? cut : enabled(TOGGLE_POOL).filter(req); })() : [];
+                const clearBass = toggles.length > 0;
+                if (clearBass && !(remembered && TOGGLE_POOL.includes(remembered) && this.cfg.rotation?.[remembered] !== false)) {
+                    const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) })).sort((a, b) => b.s - a.s);
+                    const cands = ranked.filter((x) => x.m !== this.smartMode);
+                    const top = (cands.length ? cands : ranked).slice(0, 3);
+                    this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
+                    if (part && !wantCalm)
+                        this.partLook.set(pairKey, this.smartMode);
+                    console.log(`[dirigent] tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}, ${toggles.length} toggles) -> "${this.smartMode}"`);
                 }
                 else if (remembered && this.cfg.rotation?.[remembered] !== false) {
                     this.smartMode = remembered;
@@ -1154,7 +1220,6 @@ export class EffectEngine {
                     const halvedNow = HALVE_SHOW && this.pulseHalved;
                     const fastBoost = (m) => (m === "varannan" && bpm >= 140 ? 0.30 : 0)
                         + (halvedNow && (m === "varannan" || m === "innerouter") ? 0.30 : 0)
-                        + (clearBass && m === "innerouter" ? 0.30 : 0)
                         + (HALVE_SHOW && m === "hjarta" ? (halvedNow ? 0.30 : (wantCalm || tierS === LUGN) ? 0.20 : 0) : 0); // halverat: trion varannan/innerouter/hjarta = hela topp-3
                     const ranked = pool
                         .map((m) => ({ m, s: fitScore(m, frame.profile) + fastBoost(m) }))
@@ -1163,7 +1228,7 @@ export class EffectEngine {
                     const top = (cands.length ? cands : ranked).slice(0, 3);
                     this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
                     if (part && !wantCalm) {
-                        this.partLook.set(part, this.smartMode);
+                        this.partLook.set(pairKey, this.smartMode);
                         console.log(`[dirigent] ${part}: ny look "${this.smartMode}" (tier ${tierS === LUGN ? "lugn" : tierS === FART ? "fart" : "full"})`);
                     }
                 }
@@ -1212,11 +1277,13 @@ export class EffectEngine {
         else if (!this.inputLowSince)
             this.inputLowSince = now;
         this.inputOff = !!this.inputLowSince && now - this.inputLowSince > INPUT_OFF_MS;
-        const silenceThreshold = 0.05 * Math.max(1, frame.gain / 3);
+        // TYSTNADSGRIND (ladan 20:35, 'slacker sig under korta perioder'): 250 ms under 0,05 stangde riggen pa 0,25 s - en tyst fras
+        // i laten racker. Env: DMX_SILENCE_LEVEL (0,05), DMX_SILENCE_MS (250), DMX_SILENCE_RELEASE_S (0,25). Ladan: 0,03 / 2000 / 1,0.
+        const silenceThreshold = SILENCE_LEVEL * Math.max(1, frame.gain / 3);
         if (frame.level > silenceThreshold || kickHit)
             this.lastActiveMs = now;
-        const gateTarget = now - this.lastActiveMs > 250 ? 0 : 1;
-        const gateRate = gateTarget > this.silenceGate ? dtSec / 0.1 : dtSec / 0.25;
+        const gateTarget = now - this.lastActiveMs > SILENCE_MS ? 0 : 1;
+        const gateRate = gateTarget > this.silenceGate ? dtSec / 0.1 : dtSec / SILENCE_RELEASE_S;
         this.silenceGate += Math.max(-gateRate, Math.min(gateRate, gateTarget - this.silenceGate));
         // FLANK: ljudet var borta och kom tillbaka → behandla det som en låtstart.
         // Täcker okända låtar och att någon startar musiken; för kända låtar sätter
@@ -1373,17 +1440,20 @@ export class EffectEngine {
                     this.liveFastUntil = nowMs + 20_000;
                 }
                 const up = wdb > this.liveAnchor;
-                const far = Math.abs(wdb - this.liveAnchor) > LIVE_WIN_DB;
+                // SNABBT BARA UPPAT (ladan 19:58: 'lyser mycket aven nar laten blir tystare'): snabbt nerat gjorde ett tyst parti
+                // till det nya normala pa 12 s. Nerat foljer ankaret bara langsamt (tau), och annu langsammare i low/break (x2).
                 const prev = this.liveShapeRaw;
-                if (prev >= 0.98 || prev <= 0.02) {
+                if (prev >= 0.98) {
                     this.liveClipMs += dtMs;
                     if (this.liveClipMs > 10_000)
                         this.liveFastUntil = nowMs + 5_000;
                 }
                 else
                     this.liveClipMs = 0;
-                const fast = far || nowMs < this.liveFastUntil;
-                const a = 1 - Math.exp(-dtMs / (fast ? tauMs / 10 : up ? tauMs * 3 : tauMs));
+                const farAbove = wdb - this.liveAnchor > LIVE_WIN_DB;
+                const fast = (farAbove || nowMs < this.liveFastUntil) && up;
+                const quietSec = frame.section === 'low' || frame.section === 'break';
+                const a = 1 - Math.exp(-dtMs / (fast ? tauMs / 10 : up ? tauMs * 3 : quietSec ? tauMs * 2 : tauMs));
                 this.liveAnchor += a * (wdb - this.liveAnchor);
                 const top = this.liveAnchor + LIVE_OFFSET_DB;
                 let sh = (wdb - (top - LIVE_WIN_DB)) / LIVE_WIN_DB;
@@ -1399,6 +1469,12 @@ export class EffectEngine {
                     this.liveLogAt = nowMs;
                     console.log(`[liveniva] wdb ${wdb.toFixed(1)} ankare ${this.liveAnchor.toFixed(1)} shape ${sh.toFixed(2)} ${fast ? 'SNABB' : ''}`);
                 }
+            }
+            else if (this.liveLevelSm > 0) {
+                // UNDER TYSTNADSGOLVET (ladan 20:02: 'lag kvar ljust nar laten lugnade ner sig'): nivan FROS pa sista varde. Klinga av mot 0.
+                this.liveLevelSm *= Math.exp(-dtMs / LIVE_RELEASE_MS);
+                this.liveShapeRaw = 0;
+                shape = this.liveLevelSm;
             }
         }
         // (d) shape-smoothing (asymmetrisk: snabb upp 25 ms, lugn ner 150 ms) — sprider
@@ -1428,7 +1504,12 @@ export class EffectEngine {
         // → refräng ljus, vers dim = synlig gas, och pulsen syns uppåt mot en rörlig nivå.
         const md0 = drive * (LIGHT_FLOOR + (1 - LIGHT_FLOOR) * loudness + frame.buildUp * 0.35 + this.dropEnv * 0.8);
         // SEKTIONSGAS (DMX_SECTION_SWITCH): refrang lyfter mastern, break sanker - utover loudness (som redan foljer nivan).
-        const secGain = SECTION_SWITCH ? (frame.section === 'high' ? 1 + SECTION_HIGH_LIFT : frame.section === 'break' ? 1 - SECTION_BREAK_DIP : 1) : 1;
+        // SEKTIONSVAXEL (ladan 20:00, agaren: 'ska kunna bli morkare, mer dynamik'): low/intro x(1-LOW_DIP), break x(1-BREAK_DIP),
+        // high x(1+LIFT) nar tiern ar topp. Analysatorns sektion ar latens egen rangordning, sa ett lugnare parti BLIR morkare
+        // oavsett hur komprimerad mixen ar. Efter drop (afterDrop-fonstret) galler high.
+        const secNow = (now - this.lastDropSwitchMs < 20_000) ? 'high' : frame.section;
+        const secGain = SECTION_SWITCH ? (secNow === 'high' ? ((frame.sectionTier ?? 0) >= 2 || now - this.lastDropSwitchMs < 20_000 ? 1 + SECTION_HIGH_LIFT : 1)
+            : secNow === 'break' ? 1 - SECTION_BREAK_DIP : (secNow === 'low' || secNow === 'intro') ? 1 - SECTION_LOW_DIP : 1) : 1;
         const md = SECTION_SWITCH ? Math.min(1.2, md0 * secGain) : md0; // standard: orort
         // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
         // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
@@ -1642,6 +1723,27 @@ export class EffectEngine {
             rgb[0] = rgb[0] * md + 1.00 * restLvl;
             rgb[1] = rgb[1] * md + 0.30 * restLvl;
             rgb[2] = rgb[2] * md + 0.00 * restLvl;
+            // HJARTSLAGSLYFT (ladan 20:25, 'vid manga effekter forsvinner heartbeat'): pulsen ar en multiplikator i post - osynlig nar
+            // effekten sjalv ligger lagt (0,2 -> 0,03). Adderar BEAT_LIFT x puls x (1 - ljus) sa morka/rorliga effekter far en synlig
+            // stot uppat pa slaget; ljusa (nara max) paverkas knappt. Pulsen = beatMulNow normerad (1 pa slaget, 0 vid BEAT_MIN).
+            if (BEAT_LIFT > 0 && this.cfg.beatPulse && drive > 0.05 && this.beatMulNow > BEAT_MIN) {
+                const hb = (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN);
+                const lift = BEAT_LIFT * hb * md;
+                rgb[0] += lift * (1 - rgb[0]);
+                rgb[1] += lift * (1 - rgb[1]);
+                rgb[2] += lift * (1 - rgb[2]);
+            }
+            // LAMPGOLV (ladan 20:05, 'manga effekter slacker lamporna'): effekternas egna golv (3-12 %) x mastern hamnar under PAR-lampornas
+            // tandtroskel (~5-8 % DMX) -> helt slackt i stallet for morkt. Allt > 0 mappas till LAMP_MIN..1 under spelning; 0 forblir 0.
+            if (LAMP_MIN > 0 && drive > 0.05) {
+                const mx = Math.max(rgb[0], rgb[1], rgb[2]);
+                if (mx > 0.002 && mx < 1) {
+                    const k = (LAMP_MIN + (1 - LAMP_MIN) * mx) / mx;
+                    rgb[0] = Math.min(1, rgb[0] * k);
+                    rgb[1] = Math.min(1, rgb[1] * k);
+                    rgb[2] = Math.min(1, rgb[2] * k);
+                }
+            }
             this.out.writeFixture(this.universe, fx, rgb, 1, strobeVal, specialty);
         }
         // Output ballistics on color/dim channels (never strobe/mode channels —

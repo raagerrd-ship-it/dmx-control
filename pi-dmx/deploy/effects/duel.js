@@ -2,7 +2,7 @@
 // de inre lamporna, virveln "svarar" i kontrastfargen pa de yttre - och varje anslag lamnar ett avklingande eko sa
 // duellen laser som en dialog, inte som en binar rod/bla-vaxling (v1). Hi-haten glittrar svagt i mitten emellan.
 export const duel = {
-    key: "duel", label: "Duell", tier: "full", section: ["high"],
+    key: "duel", label: "Duell", tier: "full", section: ["high"], toggle: true,
     desc: "Kick ropar i palettfargen, virveln svarar i kontrastfargen - med eko.",
     render(c) {
         const d = c.drum;

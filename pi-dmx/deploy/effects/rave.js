@@ -4,7 +4,7 @@
 // "A / B / A / B" (på 3 lampor: 0,2 mot 1) — inte färgbyte varje slag som gör
 // den lik party/snap.
 export const rave = {
-    key: "rave", label: "Rave", tier: "full", section: ["high"],
+    key: "rave", label: "Rave", tier: "full", section: ["high"], toggle: true,
     desc: "Varannan lampa blinkar i motfärger – hård växling.",
     render(c) {
         const even = c.idx % 2 === 0;

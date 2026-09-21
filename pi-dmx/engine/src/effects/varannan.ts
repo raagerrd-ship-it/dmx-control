@@ -3,7 +3,7 @@ import type { EffectDef } from "./types.js";
 // off-beatet (halva takten mellan). Ger en spatial DUBBELTAKT / ping-pong i stället
 // för att hela riggen blinkar dubbelt. De två grupperna har skilda palettfärger.
 export const varannan: EffectDef = {
-  key: "varannan", label: "Varannan", tier: "fart", section: ["low", "high"],
+  key: "varannan", label: "Varannan", tier: "fart", section: ["low", "high"], toggle: true,
   desc: "Varannan lampa tar varannan takt — spatial dubbeltakt.",
   render(c) {
     const off = c.idx % 2;                                       // 0 = jämn (på slaget), 1 = udda (off-beat)

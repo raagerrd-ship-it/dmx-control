@@ -4,7 +4,7 @@
 // byts var 4:e takt. (Rave = grupp släcks helt, flip = båda tända & byter färg;
 // gallop = grupperna delar RYTMEN i off-beat.)
 export const gallop = {
-    key: "gallop", label: "Gallopp", tier: "full", section: ["high"],
+    key: "gallop", label: "Gallopp", tier: "full", section: ["high"], toggle: true,
     desc: "Grupperna slår omlott – beat & off-beat, dubbel rytm.",
     render(c) {
         const even = c.idx % 2 === 0;

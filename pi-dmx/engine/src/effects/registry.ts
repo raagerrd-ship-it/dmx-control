@@ -109,6 +109,8 @@ const SPECIALTY_DRIVES: Partial<Record<Mode, ChannelRole[]>> = {
 /** SEKTIONSPOOL (2026-09-21): harledd ur varje effekts egen `section`-tagg (ingen oversattningstabell - taggen bor i effektfilen).
  *  Dirigenten (DMX_SECTION_SWITCH) skar tier-poolen med den; build/break tar sina taggade effekter fore tiern. */
 export function sectionPool(sec: string): Mode[] { return EFFECTS.filter((e) => e.section?.includes(sec)).map((e) => e.key); }
+/** Effekter taggade `toggle: true` (lampor som slar om i grupper/steg) - basgangens pool. */
+export const TOGGLE_POOL: Mode[] = EFFECTS.filter((e) => e.toggle).map((e) => e.key);
 
 // Injicera drives i effekt-def:erna en gång vid modul-init (så EFFECT_META och
 // alla konsumenter ser samma sanning).

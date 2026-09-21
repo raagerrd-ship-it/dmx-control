@@ -123,6 +123,9 @@ export interface EffectDef {
   desc: string;
   /** Statiskt svep utan takt-/kick-rorelse: dirigenten byter det snabbare (DMX_DWELL_FLAT_MS). */
   flat?: boolean;
+  /** TOGGLAR lampor: diskreta grupper/steg som slar om per slag (inre/yttre, varannan, lopare, studs...). Dirigenten valjer bara
+   *  bland dessa nar analysatorn ser en tydlig basgang (profile.bassline, effects.ts CLEAR_BASS). Taggen bor i effektfilen. */
+  toggle?: boolean;
   /** Smart-lägets energitier. */
   tier: EffectTier;
   /** SEKTIONSTAGG (2026-09-21): dirigenten foredrar effekter taggade med aktuell sektion (DMX_SECTION_SWITCH) - 'build' = stegring,

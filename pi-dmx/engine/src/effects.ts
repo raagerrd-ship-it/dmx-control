@@ -12,7 +12,7 @@ import { FixtureOutput, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { PostProcess } from "./postprocess.js";
 import type { Frame } from "./analyser.js";
-import { EFFECT_MAP, TIER, sectionPool, meetsRequirements } from "./effects/registry.js";
+import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL } from "./effects/registry.js";
 import { fitScore } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
 // PALETT-LAS (DMX_PALETTE): lås färgerna till en palett oavsett klang och läge. Namn ur listan
@@ -113,10 +113,16 @@ const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);
  *  ladan 2026-09-12 19:50-19:54: minidroppen fyrade 24-400 ms FORE 4 av 5 riktiga drops (lyft-detektorn har lagre
  *  krav och reagerar pa forsta bas-slaget) -> ljuset hoppade tidigt och smallen kom sedan ("nagra 100 ms for tidig"). */
 const MINI_DELAY_MS = Number(process.env.MINI_DELAY_MS ?? 500);
-/** TYDLIG BASGANG -> inre/yttre FOREDRAGEN (agaren 2026-09-12: "tydlig basgang = inner/outer; inte alltid men
- *  foredragen"). profile.bass >= CLEAR_BASS (matt: 0,4 = 19 % av pop-facitets tid, 97 % av basdrivna Stranden,
- *  8 % megamix). Vald vid tva av tre byten nar den inte redan ligger, annars boostad i rankingen. Kraver DMX_HALVE_SHOW. */
-const CLEAR_BASS = Number(process.env.DMX_CLEAR_BASS ?? 0.4);
+/** TYDLIG BASGANG -> TOGGLE-EFFEKTER (agaren 2026-09-12: "tydlig basgang = inner/outer; inte alltid men foredragen";
+ *  ladan 2026-09-21: "kanns inte som den aktiverar den vid basgang - gor det tydligare att den skall valja dom").
+ *  Forr: profile.bass (lag-endens ANDEL, 8 s trog) >= 0,4, bara innerouter, bara med DMX_HALVE_SHOW, tva av tre byten.
+ *  Nu: analysatorns profile.bassline (basNOT-anslag per slag, ~1 s) >= CLEAR_BASS ->
+ *   (1) basgangens ankomst ar EN EGEN BYTESORSAK (efter MIN_HOLD, inte i uppbyggnad), och
+ *   (2) dirigenten valjer da ALLTID ur toggle-poolen (effektfilernas `toggle: true`, snitt med sektionens pool nar det gar).
+ *  Sa lange basgangen ligger kvar sker vanliga byten (sektion/tier/dwell) ocksa inom toggle-poolen. DMX_CLEAR_BASS=tröskel,
+ *  hysteres 0,2 nedat. MATT (tools/basslineProbe.mjs, andel av tiden >= 0,7): basdrivna Stranden 81 %, dansband 78 %,
+ *  pop-facit 27 %, megamix 12 %, real.wav 1 %. */
+const CLEAR_BASS = Number(process.env.DMX_CLEAR_BASS ?? 0.7);
 
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
@@ -233,6 +239,7 @@ export class EffectEngine {
   private pulseHalved = false;
   private halfTick = 0;                 // DMX_HALVE_SHOW: paritet inom det halverade slaget
   private lastHalvedForSwitch = false;  // DMX_HALVE_SHOW: halvering vid senaste look-bytet
+  private lastBassClearForSwitch = false;  // tydlig basgang vid senaste look-bytet (CLEAR_BASS)
   /** Monoton pulsklocka (rotfix mot hjärtslags-fladder): pulsens index och paritet
    *  får bara gå framåt, och tSince hålls icke-avtagande inom en puls, så PLL:ens
    *  fasrättningar inte kan re-attackera eller flippa pariteten mitt i ett slag. */
@@ -1029,9 +1036,13 @@ export class EffectEngine {
         //   foljt 11 s senare av "ny look ripple (tier full)" — tre looker i en
         //   refrang, driven av att tiern flaxade mellan fart och full.
         const halvedChanged = HALVE_SHOW && this.pulseHalved !== this.lastHalvedForSwitch;   // dubbeltakt/lugn slog om → delad look
+        // BASGANG: tydlig basgang som kommer (eller gar) medan nuvarande look inte matchar -> byt.
+        const bassClear = (frame.profile.bassline ?? 0) >= (this.lastBassClearForSwitch ? CLEAR_BASS - 0.2 : CLEAR_BASS);
+        const curToggle = !!EFFECT_MAP.get(this.smartMode)?.toggle;
+        const bassSwitch = bassClear !== this.lastBassClearForSwitch && (bassClear ? !curToggle : curToggle);
         const wantSwitch = this.memPart
-          ? memSection
-          : (tierChanged || memSection || halvedChanged || now > this.smartDwellUntil);
+          ? (memSection || bassSwitch)
+          : (tierChanged || memSection || halvedChanged || bassSwitch || now > this.smartDwellUntil);
 
         // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
         // det, inte bara på energinivån. Två regler, båda dramaturgiska:
@@ -1066,6 +1077,7 @@ export class EffectEngine {
         this.lastSmartSwitchMs = now;
         this.lastSmartTier = tierName;
         this.lastHalvedForSwitch = this.pulseHalved;
+        this.lastBassClearForSwitch = bassClear;
         // DMX_DWELL_MS: agaren 2026-09-12 "dirigenten behover inte byta hela tiden, bara vid andringar i laten".
         // Stamningens dwell (fest 15 s, galet 10 s) tvingade byten pa klockan; med env satt hogt (120 s) blir
         // dwell en nodfallback och bytena sker pa tier-byte, sektionsgrans, drop och halvering.
@@ -1114,11 +1126,17 @@ export class EffectEngine {
         const livePart = !!part && part.startsWith('live:');
         const pairKey = livePart ? part + ':' + Math.floor(((frame.sectionIndex ?? 0) + 1) / 2) : part;
         const remembered = !wantCalm && pairKey && !livePart ? this.partLook.get(pairKey) : undefined;   // 20:33: ingen igenkanning for live-etiketter ('samma effekt igen') - bara latminnet
-        const clearBass = HALVE_SHOW && frame.profile.bass >= CLEAR_BASS
-          && this.cfg.rotation?.innerouter !== false && req("innerouter");
-        if (clearBass && this.smartMode !== "innerouter" && this.smartCount % 3 !== 0) {
-          console.log(`[dirigent] tydlig basgang (${frame.profile.bass.toFixed(2)}) -> innerouter`);
-          this.smartMode = "innerouter";
+        // TYDLIG BASGANG -> toggle-poolen (se CLEAR_BASS). Snitt med aktuell pool forst (sektion/tier/krav), annars alla
+        // aktiva toggle-effekter som moter kraven. Bast passande forst, gyllene-snitt-variation bland topp 3, aldrig samma.
+        const toggles = bassClear ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); return cut.length ? cut : enabled(TOGGLE_POOL).filter(req); })() : [];
+        const clearBass = toggles.length > 0;
+        if (clearBass && !(remembered && TOGGLE_POOL.includes(remembered) && this.cfg.rotation?.[remembered] !== false)) {
+          const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) })).sort((a, b) => b.s - a.s);
+          const cands = ranked.filter((x) => x.m !== this.smartMode);
+          const top = (cands.length ? cands : ranked).slice(0, 3);
+          this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
+          if (part && !wantCalm) this.partLook.set(pairKey!, this.smartMode);
+          console.log(`[dirigent] tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}, ${toggles.length} toggles) -> "${this.smartMode}"`);
         } else if (remembered && this.cfg.rotation?.[remembered] !== false) {
           this.smartMode = remembered;
           console.log(`[dirigent] ${part}: återser "${remembered}"`);
@@ -1129,7 +1147,6 @@ export class EffectEngine {
           const halvedNow = HALVE_SHOW && this.pulseHalved;
           const fastBoost = (m: Mode) => (m === "varannan" && bpm >= 140 ? 0.30 : 0)
             + (halvedNow && (m === "varannan" || m === "innerouter") ? 0.30 : 0)
-            + (clearBass && m === "innerouter" ? 0.30 : 0)
             + (HALVE_SHOW && m === "hjarta" ? (halvedNow ? 0.30 : (wantCalm || tierS === LUGN) ? 0.20 : 0) : 0);   // halverat: trion varannan/innerouter/hjarta = hela topp-3
           const ranked = pool
             .map((m) => ({ m, s: fitScore(m, frame.profile) + fastBoost(m) }))

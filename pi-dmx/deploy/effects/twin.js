@@ -2,7 +2,7 @@
 // A stiger sjunker grupp B, som ett stilla anrop-och-svar. Grupp A varm ton,
 // grupp B kall kontrastfärg. Golv 30%. Färgvandring var 8:e takt.
 export const twin = {
-    key: "twin", label: "Tvilling", tier: "lugn", section: ["intro", "low"],
+    key: "twin", label: "Tvilling", tier: "lugn", section: ["intro", "low"], toggle: true,
     desc: "Två grupper andas i motfas – varmt anrop, kallt svar.",
     render(c) {
         const even = c.idx % 2 === 0;

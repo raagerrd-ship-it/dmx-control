@@ -2,7 +2,7 @@
 // kort efterglöd, mörk rigg emellan. Gles och kinetisk; ny ren färg vid varje
 // studs-steg.
 export const bounce = {
-    key: "bounce", label: "Studs", tier: "full", section: ["high"],
+    key: "bounce", label: "Studs", tier: "full", section: ["high"], toggle: true,
     desc: "En skarp ljuspunkt studsar fram och tillbaka.",
     render(c) {
         const span = Math.max(1, c.count - 1);

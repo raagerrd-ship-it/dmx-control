@@ -3,7 +3,7 @@
 // (wave). + hi-hat-glitter: diskant-anslaget (onset.treble) ger en snabb gnista
 // på huvudet, samma pigga tick som wave fick.
 export const chase = {
-    key: "chase", label: "Jakt", tier: "fart", section: ["low", "high"],
+    key: "chase", label: "Jakt", tier: "fart", section: ["low", "high"], toggle: true,
     desc: "En ljuspunkt springer i takt och byter färg.",
     render(c) {
         const d = Math.abs(c.idx - c.chasePos);

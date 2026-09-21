@@ -4,7 +4,7 @@
 // mitten-2 ena takten, ytter-2 nästa. Kontrastfärger per ring (som rave, fast
 // RADIELLT i stället för varannan lampa). <3 lampor: faller tillbaka på paritet.
 export const ripple = {
-    key: "ripple", label: "Krusning", tier: "full", section: ["high"],
+    key: "ripple", label: "Krusning", tier: "full", section: ["high"], toggle: true,
     desc: "Puls från mitten och ut – inre lampor ena takten, yttre nästa.",
     render(c) {
         const center = (c.count - 1) / 2;

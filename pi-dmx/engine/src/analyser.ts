@@ -55,7 +55,7 @@ export interface Frame {
    *    bass   = låg-endens tyngd (sub+kick+bas mot resten)
    *    bright = klang uppåt (hi-hats/luft mot resten)
    *    beat   = hur tydlig takten är (BPM-konfidens) */
-  profile: { punch: number; bass: number; bright: number; beat: number };
+  profile: { punch: number; bass: number; bright: number; beat: number; bassline: number };   // bassline: TYDLIG BASGANG 0..1 (basnot-anslag per slag, ~1 s)
   beatAnchorMs: number; // wall-clock ms för ett taktslag (fas)
   /** >0 = ett trumslag är FÄRDIGMÄTT denna ruta: väggklocka för slagets flux-topp
    *  med sub-hop-precision (±1.3 ms). Kommer en hop EFTER frame.kick (parabeln
@@ -202,7 +202,7 @@ export class Analyser {
   private outSpec: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
   private outOnset: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
   private outDrum = { kick: 0, snare: 0, hat: 0, bass: 0 };   // trum-envelopes (återanvänt)
-  private outProfile = { punch: 0.4, bass: 0.5, bright: 0.3, beat: 0.5 };   // karaktärsprofil (återanvänt)
+  private outProfile = { punch: 0.4, bass: 0.5, bright: 0.3, beat: 0.5, bassline: 0 };   // karaktärsprofil (återanvänt)
   private outFrame!: Frame;             // ETT återanvänt Frame (muteras/hop; säkert — main-tråden läser synkront)
   // TRUM-KIT peak-hold-envelopes (håll mellan hops). Flyttade FRÅN effects.ts render
   // (100Hz) hit (375Hz) → fångar varje onset-topp. tau bevarade: hat 60ms / snare
@@ -396,6 +396,17 @@ export class Analyser {
   /** BASBANDETS onset-envelope (kick-flux), samma raster och position som envRing. */
   private envBassRing = new Float32Array(Analyser.ENV_LEN);
   private envBassAccum = 0;
+  /** TYDLIG BASGANG (agaren i ladan 2026-09-21: "kan den sarskilja pa tydlig basgang och da kora effekter som togglar lampor?").
+   *  profile.bass ar bara lag-endens ANDEL av mixen (8 s tröga) - en sustained sub ger hogt varde utan nagon basgang alls.
+   *  En basgang = basNOTER mellan kickarna. Bandens onset-detektorer ar for triggerglada (bandOn[1]: 8x for manga anslag,
+   *  se kickHit-kommentaren; matt 2026-09-21: bandOn-rakning gav 3-5 anslag/slag pa ALLT material). Har raknas i stallet
+   *  NOTER ur basnivan (bandLvl[1]+bandLvl[2], 60-250 Hz, per-band-AGC:ad) pa env-rastret (100 Hz): en topp ar en not om
+   *  den reser sig >= 25 % av senaste topphojd over dalen sedan forra noten, och den INTE ligger inom 60 ms efter en kick
+   *  (kickens kropp raknas inte). Noter per slag (2 s fonster, lasta tempot): kick-only/sustained sub -> ~0, attondelsbas
+   *  med kick pa slagen -> ~1 (0,75), sextondelar -> 1. Glattat ~1 s (inte 8 s som profilen). */
+  private blAccum = 0; private blPrev1 = 0; private blPrev2 = 0; private blRef = 0.1; private blLastOnset = -100;
+  private blOnsets = new Int32Array(32); private blOnsetPos = 0; private envSeq = 0; private profBassline = 0; private blTrough = 1; private blKickSeq = -100;
+  bassOnsetsPerBeat = 0;
   // DIAGNOSTIK (DMX_HIGH_DIAG): diskant-onset-ring (bandOn[6]/[7] = treble/air) for att MATA om
   // diskanten bar tempot nar envRing (0-1.5 kHz) ar blind, t.ex. hi-hat-intron. Ingen laslogik ror den.
   private envHighRing = new Float32Array(Analyser.ENV_LEN);
@@ -905,6 +916,23 @@ export class Analyser {
     let hs = 0, nh = 0; for (let i = bestPh + (L >> 1); i < N; i += L) { hs += at(i); nh++; }
     const half = nh ? hs / nh : 0;
     return { score: (on / mean) * (0.5 + hit), half: on > 0 ? half / on : 0, hit };
+  }
+
+  /** Basgangens anslagsraknare, en gang per env-sample (100 Hz). Se blAccum. */
+  private stepBassline(): void {
+    const v = this.blAccum; this.blAccum = 0; const seq = ++this.envSeq;
+    const p1 = this.blPrev1;
+    if (v < this.blTrough) this.blTrough = v;
+    if (p1 >= this.blPrev2 && p1 > v && p1 > 0.05 && p1 - this.blTrough >= 0.25 * this.blRef && seq - 1 - this.blLastOnset >= 6) {
+      if (seq - 1 - this.blKickSeq >= 6) { this.blOnsets[this.blOnsetPos] = seq - 1; this.blOnsetPos = (this.blOnsetPos + 1) & 31; }
+      this.blLastOnset = seq - 1; this.blRef += (p1 - this.blRef) * 0.1; this.blTrough = p1;
+    } else if (this.blRef > 0.05) this.blRef *= 0.999;
+    this.blPrev2 = p1; this.blPrev1 = v;
+    let n = 0; for (let i = 0; i < 32; i++) if (seq - this.blOnsets[i] <= 200 && this.blOnsets[i] > 0) n++;
+    const beats2s = (this.localBpm > 0 ? this.localBpm : 120) / 30;
+    const opb = n / beats2s; this.bassOnsetsPerBeat = opb;
+    const raw = Math.max(0, Math.min(1, (opb - 0.4) / 0.8));
+    this.profBassline += (raw - this.profBassline) * 0.01;
   }
 
   private computeBpm() {
@@ -1827,6 +1855,7 @@ export class Analyser {
     // Basbandets egen envelope (kick-flux) — samma raster, oberoende signal.
     const bassFluxNorm = Math.min(1, kickFlux * 0.02);
     if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
+    { const bl = this.bandLvl[1] + this.bandLvl[2]; if (bl > this.blAccum) this.blAccum = bl; if (this.kickHit >= 1) this.blKickSeq = this.envSeq; }
     if ((!!process.env.DMX_HIGH_DIAG || !!process.env.DMX_HIGH_VOTE)) { const hi = this.bandOn[6] > this.bandOn[7] ? this.bandOn[6] : this.bandOn[7]; if (hi > this.envHighAccum) this.envHighAccum = hi; }
     this.envAccumT += hopMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) {
@@ -1843,6 +1872,7 @@ export class Analyser {
       }
       this.envRing[this.envPos] = _e;
       this.envBassRing[this.envPos] = this.envBassAccum;
+      this.stepBassline();
       if ((!!process.env.DMX_HIGH_DIAG || !!process.env.DMX_HIGH_VOTE)) this.envHighRing[this.envPos] = this.envHighAccum;
       this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
       if (Analyser.GRID_PHASE_ON) this.envLastWallMs = this.wallNow();
@@ -2367,6 +2397,7 @@ export class Analyser {
     this.outProfile.bass = cl01((this.profBass - 0.28) / 0.30);
     this.outProfile.bright = cl01((this.profBright - 0.14) / 0.19);
     this.outProfile.beat = cl01(this.profBeat);
+    this.outProfile.bassline = this.profBassline;
 
 
     const L = this.bandLvl, O = this.bandOn;

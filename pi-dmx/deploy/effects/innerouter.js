@@ -4,7 +4,7 @@
 // blir det "inre på ett, yttre på två" — ägaren 2026-09-12: vid dubbeltakt och i
 // lugna låtar ska riggen delas i stället för att blinka uniformt.
 export const innerouter = {
-    key: "innerouter", label: "Inre/yttre", tier: "fart", section: ["high", "low"],
+    key: "innerouter", label: "Inre/yttre", tier: "fart", section: ["high", "low"], toggle: true,
     desc: "Inre lampor på slaget, yttre på nästa — mitten och kanten turas om.",
     render(c) {
         const isOuter = c.count < 3 ? c.idx % 2 === 1 : (c.idx === 0 || c.idx === c.count - 1);
