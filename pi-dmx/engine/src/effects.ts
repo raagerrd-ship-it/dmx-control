@@ -1108,7 +1108,11 @@ export class EffectEngine {
         // kastades bort. MATT: "chorus: aterser stege" tva ganger, sedan tre nya
         // looker i rad sa fort tiern gick till full. Kravet ar nu bara att
         // effekten alls ar pasagen av agaren.
-        const remembered = !wantCalm && part ? this.partLook.get(part) : undefined;
+        // LIVE-ETIKETT (ladan 20:30, 'fastnade i samma effekt'): generisk etikett ('high') aterser annars samma look hela laten.
+        // Par-regel: sektion nr 1-2 delar look, nr 3-4 en ny, osv. (A A B B) - igenkanning utan att fastna.
+        const livePart = !!part && part.startsWith('live:');
+        const pairKey = livePart ? part + ':' + Math.floor(((frame.sectionIndex ?? 0) + 1) / 2) : part;
+        const remembered = !wantCalm && pairKey ? this.partLook.get(pairKey) : undefined;
         const clearBass = HALVE_SHOW && frame.profile.bass >= CLEAR_BASS
           && this.cfg.rotation?.innerouter !== false && req("innerouter");
         if (clearBass && this.smartMode !== "innerouter" && this.smartCount % 3 !== 0) {
@@ -1133,7 +1137,7 @@ export class EffectEngine {
           const top = (cands.length ? cands : ranked).slice(0, 3);
           this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
           if (part && !wantCalm) {
-            this.partLook.set(part, this.smartMode);
+            this.partLook.set(pairKey!, this.smartMode);
             console.log(`[dirigent] ${part}: ny look "${this.smartMode}" (tier ${tierS === LUGN ? "lugn" : tierS === FART ? "fart" : "full"})`);
           }
         }
