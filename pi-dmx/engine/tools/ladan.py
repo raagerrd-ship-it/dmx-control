@@ -34,8 +34,23 @@ SHOW_ENV = [
     ('DMX_GRID_PHASE',     '1',      'fasen ur bas + helband i stallet for senaste kicken (bank: i fas 77/130, motfas 5)'),
     ('DMX_PHASE_FOLLOW',   '1',      'gridet foljer fasmatningen i stallet for enskilda kickar'),
     ('DMX_SECTION',        '1',      'realtidssektioner (intro/low/build/high/break) ur latens egen historik'),
-    ('DMX_SECTION_SWITCH', '1',      'dirigenten gasar pa refrangen och drar ner i break/low'),
+    # DMX_SECTION_SWITCH AV 2026-09-22 22:40 (ladan, live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
+    # -> dirigenten plockade bara ur full-fart-poolen och allt sag likadant ut. Sektionerna ar kvar som DATA (DMX_SECTION=1);
+    # slas pa igen forst nar rangen ger vettig fordelning i ladans material.
     ('DMX_LIVE_LEVEL',     '1',      'nivakanalen genom dB-fonster mot langsamt ankare - liv i nivan'),
+    # LADANS EGNA VARDEN (2026-09-22 23:00): de satt bara i korningen (wsset) och gick forlorade vid varje omstart -
+    # riggen slacktes i tysta fraser ("lamporna stangs av"). Utgangen multipliceras med tystnadsgrinden (drive), sa
+    # standard 0,05/250/0,25 nollar ljuset sa fort en fras dippar. Koden dokumenterar sjalv ladans varden.
+    ('DMX_SILENCE_LEVEL',  '0.03',   'ladans tystnadstroskel - standard 0,05 slackte riggen pa tysta fraser'),
+    ('DMX_SILENCE_MS',     '2000',   'sa lange maste det vara tyst innan grinden borjar stanga (standard 250 ms)'),
+    ('DMX_SILENCE_RELEASE_S', '1.0', 'mjuk aterhamtning i stallet for 0,25 s'),
+    ('BEAT_MIN',           '0.35',   'pulsgolv - 0,30 lat dippen ga svart (ladan 09-21)'),
+    # DROP-GRIND I LUGNA PARTIER (2026-09-22 22:50, ladan live: "kor drop pa intro" + "missa riktiga droppen"):
+    # i low/intro (eller >= 6 dB under senaste refrangen) kravs starkare bevis; en kandidat NEKAS inte utan HALLS och
+    # fyrar forst nar kroppen legat kvar vid toppen i 300 ms. DROP_CALM_BUILD nollades i natt (grinden blev inert) - tillbaka.
+    ('DMX_DROP_CALM_GATE', '1',      'lugna partier kraver starkare bevis for drop'),
+    ('DROP_CALM_BUILD',    '0.25',   'riser-kravet tillbaka (0 = grinden inert)'),
+    ('DROP_CALM_LAND_MS',  '300',    'hall kandidaten och fyra vid verifierad landning i stallet for att neka'),
 ]
 
 
@@ -110,6 +125,7 @@ def main():
     for e in EXTRA: print(f'  {e}   (extra fran kommandoraden)')
     print()
     os.environ['PI_HOST'] = host; os.environ['PI_PASS'] = p
+    os.environ['PYTHONIOENCODING'] = 'utf-8'   # annars dor deploy-dist.py pa en pil i en utskrift (cp1252-konsol i ladan)
     sys.exit(subprocess.run(cmd, cwd=ENGINE).returncode)
 
 
