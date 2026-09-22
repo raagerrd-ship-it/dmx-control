@@ -268,6 +268,7 @@ const capture = new AudioCapture({
 // vaggklockan. Se Analyser.setAudioClockMs.
 let audioChunks = 0;
 const HOP_MS = (cfg.fft.hop / cfg.audio.rate) * 1000;
+health.setAnalyserBudgetMs(HOP_MS);   // en hop far kosta hogst en hop-period
 // OPT-IN (DMX_AUDIO_CLOCK=1) tills det ar matt PA DEN HAR hardvaran. Pa lotus
 // gav samma fix -18 % median-jitter i onset-intervall (samma lat, 2300 intervall
 // per villkor, 2026-09-04) — verkligt men litet (~1 ms). Mic-omstartsrisken ar
@@ -278,7 +279,9 @@ capture.on("chunk", (samples: Float32Array) => {
   const t0 = performance.now();
   if (AUDIO_CLOCK_ON) analyser.setAudioClockMs(audioChunks++ * HOP_MS);
   const frame = analyser.process(samples);
-  health.noteSlowCall("analyser.process", performance.now() - t0);
+  const anMs = performance.now() - t0;
+  health.noteSlowCall("analyser.process", anMs);
+  health.noteAnalyser(anMs);   // kostnad mot hop-budgeten (avgor om DMX ocksa behover worker-delningen)
   health.noteChunk();
   latestFrame = frame;
   lastChunkAt = Date.now();

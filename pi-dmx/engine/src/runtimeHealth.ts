@@ -60,6 +60,21 @@ export function noteSlowCall(op: string, ms: number): void {
 /** En ljud-chunk togs emot. */
 export function noteChunk(): void { chunkTotal++; }
 
+// ── ANALYSATORNS KOSTNAD PER HOP (2026-09-22) ────────────────────────────────
+// Lotus matte samma sak innan analysatorn flyttades till en worker: process() tog 820 us av en 2,67 ms-budget och gick
+// over budget 615 ganger pa 89 s -> workern (egen karna) halverade det. DMX-motorn hade ingen motsvarande matare alls,
+// sa fragan "behover DMX ocksa workern?" gick inte att besvara. hopBudgetMs satts en gang fran ljudkonfigurationen.
+let anMsEMA = 0, anMsMax = 0, anHops = 0, anOver = 0, anBudgetMs = 0;
+export function setAnalyserBudgetMs(ms: number): void { anBudgetMs = ms; }
+export function noteAnalyser(ms: number): void {
+  anHops++; anMsEMA += (ms - anMsEMA) * 0.01;
+  if (ms > anMsMax) anMsMax = ms;
+  if (anBudgetMs > 0 && ms > anBudgetMs) anOver++;
+}
+export function getAnalyserCost(): { msEMA: number; msMax: number; hops: number; overBudget: number; budgetMs: number } {
+  return { msEMA: +anMsEMA.toFixed(3), msMax: +anMsMax.toFixed(2), hops: anHops, overBudget: anOver, budgetMs: +anBudgetMs.toFixed(2) };
+}
+
 /** En DMX-ruta renderades och sändes. `renderMs` = det avsedda intervallet. */
 export function noteRender(nowMs: number, renderMs: number): void {
   renderTotal++;

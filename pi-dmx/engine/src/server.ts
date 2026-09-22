@@ -20,7 +20,7 @@ import type { FogStatus } from "./effects.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, EFFECT_META } from "./effects/registry.js";
 import { logHealth, getHealthLog } from "./healthLog.js";
-import { getRuntimeHealth } from "./runtimeHealth.js";
+import { getRuntimeHealth, getAnalyserCost } from "./runtimeHealth.js";
 
 
 // Version hämtas från package.json vid startup — ingen build-tid-magi, bara en
@@ -249,6 +249,7 @@ export async function startServer(
     // Realtidsmått (chunk/render-fps, event-loop-lag, jitter, overruns, långa anrop).
     // Max-värden är peak SEDAN FÖRRA hämtningen — läsningen nollställer dem.
     runtime: getRuntimeHealth(),
+    analyserCost: getAnalyserCost(),   // us/hop mot hop-budgeten - underlag for worker-beslutet (2026-09-22)
     events: getHealthLog(),
   }));
 
