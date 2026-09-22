@@ -27,3 +27,33 @@ Två filer, alla värden inerta i default (utan env = validerad baslinje):
 | (DMX_PALETTE) | palett | AV — blå/lila läser dimt på RGB-PAR; `fodelsedag`/`bla`/`rosa`/`eld`/`regnbage` eller "4,4.6,5.55" |
 
 Ändra env = `install` + `daemon-reload` + `systemctl restart audio-dmx-engine` (≈10 s hack). Batcha.
+
+
+## Lotus-portarna: `lotus.conf` (2026-09-22) — EN körning i ladan
+
+Ladan körde fram till nu BARA `tempo.conf` + `drop.conf`; allt som portats från lotus (sektioner, gridfas, kickrattar,
+evidens-tempo, nivåkanal) låg mörkt — bänkat men aldrig aktiverat. `tools/ladan.py` gör hela resan i ett steg när Pi:n är
+nåbar: hittar den (AP 192.168.4.1 → hotspot → LAN), bygger om vid behov, md5-deployar dist, skriver show-env till
+`lotus.conf` och startar om EN gång.
+
+```
+cd C:\Users\richa\Desktop\Claude\dmx-control\pi-dmx\engine
+python tools\ladan.py --dry     # visar vad som händer, rör ingenting
+python tools\ladan.py           # deployar + skriver lotus.conf + omstart
+```
+
+| var | värde | varför (bänk) |
+|---|---|---|
+| DMX_TEMPO_EVIDENCE | 1 | tempovalet på slagpoäng i stället för tempogramtopp (lotus-korpus: 57/91 mot 46/91) |
+| DMX_TEMPO_ENV_S | 10 | 10 s onset-ring; kortare gav instabilt tempo på långsamt material |
+| DMX_KICK_NOGATE | 1 | kickarna grindas inte mot eget grid (lotus on-beat-recall 0,63 → 0,95) |
+| DMX_KICK_COOLDOWN | 100 | 170 ms lät en baston strax före slaget skugga slagets kick |
+| DMX_GRID_PHASE | 1 | fasen ur bas + helband i stället för senaste kicken (DMX-bänk: i fas 77/130, motfas 5) |
+| DMX_PHASE_FOLLOW | 1 | gridet följer fasmätningen i stället för enskilda kickar |
+| DMX_SECTION | 1 | realtidssektioner intro/low/build/high/break ur låtens egen historik |
+| DMX_SECTION_SWITCH | 1 | dirigenten gasar på refrängen (tier-snap 0,75, master ×1,12) och drar ner i break/low |
+| DMX_LIVE_LEVEL | 1 | nivåkanalen genom dB-fönster mot långsamt ankare — liv i nivån |
+
+Återgång: ta bort `/etc/systemd/system/audio-dmx-engine.service.d/lotus.conf`, daemon-reload, restart. En enskild ratt tas
+bort genom att radera raden i `SHOW_ENV` i `tools/ladan.py` och köra om — filen skrivs om varje körning, så Pi:n speglar
+alltid skriptet. `--bara-deploy` rör inte env:en; `--fran <mapp>` deployar en fryst (bevisad) kopia i stället för `dist/`.
