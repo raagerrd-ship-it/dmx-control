@@ -37,7 +37,10 @@ SHOW_ENV = [
     # DMX_SECTION_SWITCH AV 2026-09-22 22:40 (ladan, live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
     # -> dirigenten plockade bara ur full-fart-poolen och allt sag likadant ut. Sektionerna ar kvar som DATA (DMX_SECTION=1);
     # slas pa igen forst nar rangen ger vettig fordelning i ladans material.
-    ('DMX_LIVE_LEVEL',     '1',      'nivakanalen genom dB-fonster mot langsamt ankare - liv i nivan'),
+    # DMX_LIVE_LEVEL AV 2026-09-22 22:50 (ladan, live): nivan kollapsade till 0,003-0,012 om och om igen medan RA vu lag
+    # pa 0,2-0,6 - armaturerna gick ner till tandpunkten en efter en ('1, sen 3, sen alla'). 10 dB-fonstret mot det
+    # langsamma ankaret (tau 120 s) bottnar pa ladans komprimerade material. Slas pa igen forst efter tuning av
+    # LIVE_WIN_DB/LIVE_ANCHOR_S mot inspelat ljud fran ladan - inte live mitt i en spelning.
     # LADANS EGNA VARDEN (2026-09-22 23:00): de satt bara i korningen (wsset) och gick forlorade vid varje omstart -
     # riggen slacktes i tysta fraser ("lamporna stangs av"). Utgangen multipliceras med tystnadsgrinden (drive), sa
     # standard 0,05/250/0,25 nollar ljuset sa fort en fras dippar. Koden dokumenterar sjalv ladans varden.

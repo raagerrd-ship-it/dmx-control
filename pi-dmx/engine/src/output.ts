@@ -32,6 +32,7 @@ export interface SpecialtyValues {
   hazer: number; uv: number; blinder: number; strobe: number; laser: number; co2: number;
 }
 
+const MIN_DIM = process.env.DMX_MIN_DIM === '1';
 const HOLD_MS = 120;
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
@@ -49,6 +50,7 @@ export class FixtureOutput {
 
   private cal = new Uint8Array(512);
   private dimCal = new Uint8Array(512);   // dim: bara tändpunkt (clamp), ingen remap
+  // Opt-in: hall DIM pa tandpunkten i stallet for helsvart nar effekten/grinden skickar 0 (se calibrate).
   private holdVal = new Float32Array(512);
   private holdUntil = new Float32Array(512);
   private builtFor: unknown = null;
@@ -186,6 +188,12 @@ export class FixtureOutput {
           this.holdUntil[ch] = nowMs + HOLD_MS;
         } else if (nowMs < this.holdUntil[ch]) {
           out = this.holdVal[ch];
+        } else if (MIN_DIM && isDim && top > 0) {
+          // ALDRIG HELSVART (2026-09-22, agaren i ladan: "lamporna stangs av ... output maste ju anda ske mot kalibrerad
+          // lampa"): tandpunkten lyfter bara varden > 0, sa en ren nolla fran effekten eller tystnadsgrinden gick igenom
+          // som svart armatur. Med DMX_MIN_DIM=1 halls DIM-kanalen pa tandpunkten sa lange showen alls lyser (master > 0);
+          // fargkanalerna lamnas orerda (att lyfta r/g/b skulle andra kuloren). Blackout/master 0 slacker fortfarande.
+          out = onCh;
         } else {
           out = 0;
         }
