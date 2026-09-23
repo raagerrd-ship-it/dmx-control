@@ -366,6 +366,11 @@ export class Analyser {
   private static readonly RANK_WIN = Number(process.env.DMX_SECTION_WIN) || 4;
   private static readonly RANK_W_DENS = process.env.DMX_SECTION_W_DENS !== undefined ? Number(process.env.DMX_SECTION_W_DENS) : 0.5;
   private static readonly RANK_W_CENT = process.env.DMX_SECTION_W_CENT !== undefined ? Number(process.env.DMX_SECTION_W_CENT) : 0.5;
+  /** W_HIGH (lotus agent S1 2026-09-23): de HOGA bandens absolutniva (secBlkSpec 6+7 = 3,5-16 kHz, dB) z-normerad mot latens historik
+   *  som fjarde term i rangpoangen. Separation refrang/vers (AUC mot akustiskt upprepningsfacit): dB 0,65, kickar 0,52, centroid 0,63,
+   *  basonset-tathet 0,48 (skiljer INGET), hoga band 0,71 (per lat 0,79). Lotus test mot bada facit: high==high 0,54->0,57, refrangrecall
+   *  0,65->0,71, refrang 2 <=4 s 7->9/30, falsk high lika, kostnad omatbar. Standard 1,0 (som lotus-Pi:n); DMX_SECTION_W_HIGH=0 = som forr. */
+  private static readonly RANK_W_HIGH = process.env.DMX_SECTION_W_HIGH !== undefined ? Number(process.env.DMX_SECTION_W_HIGH) : 1.0;
   private static readonly RANK_HYST = process.env.DMX_SECTION_HYST !== undefined ? Number(process.env.DMX_SECTION_HYST) : 0.15;
   private static readonly RANK_RUN = Number(process.env.DMX_SECTION_RUN) || 3;
   /** Forutsagelse (lotus agent 4): DMX_PREDICT_SRC bitmask (1 minne: samma etikett foljdes av high efter N takter forr; 2 fras), gitter
@@ -374,7 +379,7 @@ export class Analyser {
   private static readonly PREDICT_GRID = process.env.DMX_PREDICT_GRID || 'hi';
   private static readonly PREDICT_LAT = Number(process.env.DMX_PREDICT_LAT) || 4;
   private static readonly PREDICT_RISE = process.env.DMX_PREDICT_RISE !== undefined ? Number(process.env.DMX_PREDICT_RISE) : 4;
-  private secBlkCentH: number[] = []; private secScoreBuf = new Float32Array(600);
+  private secBlkCentH: number[] = []; private secBlkHighH: number[] = []; private secScoreBuf = new Float32Array(600);
   expectHighMs = 0; expectSource = 0; prevSection = ''; levelVsHighDb = 0;
   private secLog: Array<{ label: string; startMs: number; endMs: number; db: number; dens: number }> = [];
   private secCurDbSum = 0; private secCurDbN = 0; private secCurDens = 0; private lastHighDb = NaN; private secHiStartMs = 0;
@@ -953,7 +958,7 @@ export class Analyser {
     this.section = 'intro'; this.sectionStartMs = 0; this.sectionIndex = 0; this.sectionTier = 1; this.repeatSim = 0; this.repeatAgoMs = 0; this.repeatSection = '';
     this.secBlkMs = 0; this.secBlkN = 0; this.secBlkInt = 0; this.secBlkKicks = 0; this.secBlkCent = 0; this.secBlkSpec.fill(0);
     this.secTierRun = 0; this.secTierCand = 1; this.secRiseRun = 0; this.secSongStartMs = 0; this.secBlkRms2 = 0; this.secBlkDb.length = 0; this.secBlkDens.length = 0; this.secHighSeen = false; this.secDropSeen = this.dropCount; this.secSilentBlocks = 0;
-    this.secBlkCentH.length = 0; this.secLog.length = 0; this.secCurDbSum = 0; this.secCurDbN = 0; this.secCurDens = 0; this.lastHighDb = NaN; this.expectHighMs = 0; this.expectSource = 0; this.prevSection = ''; this.levelVsHighDb = 0; this.secHiStartMs = 0;
+    this.secBlkCentH.length = 0; this.secBlkHighH.length = 0; this.secLog.length = 0; this.secCurDbSum = 0; this.secCurDbN = 0; this.secCurDens = 0; this.lastHighDb = NaN; this.expectHighMs = 0; this.expectSource = 0; this.prevSection = ''; this.levelVsHighDb = 0; this.secHiStartMs = 0;
     this.bndRefN = 0; this.bndRef.fill(0); this.boundaryNov = 0;
     this.secHistN = 0; this.secHistPos = 0; this.secFpN = 0; this.secFpPos = 0; this.secFpLab.length = 0; this.secFpAcc.fill(0); this.secFpAccN = 0;
   }
@@ -1132,15 +1137,16 @@ export class Analyser {
     if (Analyser.SECTION_MODE === 'rank') {
       // KAUSAL PERCENTILRANG (15:35): blockets dB (ra rms, fore AGC) och basonset-tathet (kickar/s) z-normeras mot alla block
       // hittills i laten, 4 s-fonstrets medelpoang rangordnas mot alla blockpoang hittills. Minst 20 s historik; innan dess 'intro'.
-      this.secBlkDb.push(blkDb); this.secBlkDens.push(bKicks); this.secBlkCentH.push(bCent);
-      if (this.secBlkDb.length > 600) { this.secBlkDb.shift(); this.secBlkDens.shift(); this.secBlkCentH.shift(); }
+      const bHigh = 20 * Math.log10((this.secBlkSpec[6] + this.secBlkSpec[7]) / n + 1e-7);   // hoga banden, absolut dB (W_HIGH)
+      this.secBlkDb.push(blkDb); this.secBlkDens.push(bKicks); this.secBlkCentH.push(bCent); this.secBlkHighH.push(bHigh);
+      if (this.secBlkDb.length > 600) { this.secBlkDb.shift(); this.secBlkDens.shift(); this.secBlkCentH.shift(); this.secBlkHighH.shift(); }
       const nb = this.secBlkDb.length;
       if (nb >= 20) {
-        const D = this.secBlkDb, K = this.secBlkDens, C = this.secBlkCentH, wk = Analyser.RANK_W_DENS, wc = Analyser.RANK_W_CENT;
-        let md = 0, mk = 0, mc = 0; for (let i = 0; i < nb; i++) { md += D[i]; mk += K[i]; mc += C[i]; } md /= nb; mk /= nb; mc /= nb;
-        let sd = 0, sk = 0, sc = 0; for (let i = 0; i < nb; i++) { sd += (D[i] - md) ** 2; sk += (K[i] - mk) ** 2; sc += (C[i] - mc) ** 2; }
-        sd = Math.max(1.0, Math.sqrt(sd / nb)); sk = Math.max(0.3, Math.sqrt(sk / nb)); sc = Math.max(0.02, Math.sqrt(sc / nb));
-        const S = this.secScoreBuf; for (let i = 0; i < nb; i++) S[i] = (D[i] - md) / sd + wk * (K[i] - mk) / sk + wc * (C[i] - mc) / sc;
+        const D = this.secBlkDb, K = this.secBlkDens, C = this.secBlkCentH, Hh = this.secBlkHighH, wk = Analyser.RANK_W_DENS, wc = Analyser.RANK_W_CENT, wh = Analyser.RANK_W_HIGH;
+        let md = 0, mk = 0, mc = 0, mh = 0; for (let i = 0; i < nb; i++) { md += D[i]; mk += K[i]; mc += C[i]; mh += Hh[i]; } md /= nb; mk /= nb; mc /= nb; mh /= nb;
+        let sd = 0, sk = 0, sc = 0, sh = 0; for (let i = 0; i < nb; i++) { sd += (D[i] - md) ** 2; sk += (K[i] - mk) ** 2; sc += (C[i] - mc) ** 2; sh += (Hh[i] - mh) ** 2; }
+        sd = Math.max(1.0, Math.sqrt(sd / nb)); sk = Math.max(0.3, Math.sqrt(sk / nb)); sc = Math.max(0.02, Math.sqrt(sc / nb)); sh = Math.max(1.0, Math.sqrt(sh / nb));
+        const S = this.secScoreBuf; for (let i = 0; i < nb; i++) S[i] = (D[i] - md) / sd + wk * (K[i] - mk) / sk + wc * (C[i] - mc) / sc + (wh !== 0 ? wh * (Hh[i] - mh) / sh : 0);
         let win = 0; const W = Math.min(Analyser.RANK_WIN, nb); for (let i = nb - W; i < nb; i++) win += S[i]; win /= W;
         let below = 0, cnt = 0;
         if (Analyser.RANK_VS_WIN) { let acc = 0; for (let e = 1; e <= nb; e++) { acc += S[e - 1]; if (e > W) acc -= S[e - 1 - W]; if (e >= W) { cnt++; if (acc / W < win) below++; } } }

@@ -1,0 +1,134 @@
+/**
+ * runtimeHealth.ts — mätvärden som avslöjar att motorn börjar tappa realtid
+ * INNAN ljuset känns segt. Portad från Lotus-motorn, där dessa tre siffror var
+ * det som gjorde långkörningsproblem diagnoserbara på distans:
+ *
+ *   chunkFps    — ljud-chunkar/s från arecord (förväntat rate/hop ≈ 375 @48k/128).
+ *                 Lägre = ALSA tappar samples eller capturen halkar.
+ *   renderFps   — faktiska DMX-rutor/s (förväntat ~200).
+ *   loopLagMs   — hur sent 1 Hz-schemat kommer = event-loop-blockering.
+ *   tickJitterMs— avvikelse mellan verkliga renderintervall och RENDER_MS.
+ *
+ * CPU-% är INTE ett användbart mått här: ALSA kapar bufferten tyst långt innan
+ * lasten ser mättad ut.
+ *
+ * Ingen egen timer — sample() anropas från den gemensamma 1 Hz-schemaläggaren i
+ * index.ts. Max-värden nollställs vid läsning (peak sedan förra hämtningen).
+ */
+let loopLagEMA = 0;
+let loopLagMax = 0;
+let lastSampleAt = 0;
+let jitterEMA = 0;
+let jitterMax = 0;
+let lastRenderAt = 0;
+let lateRenderTotal = 0;
+let chunkTotal = 0;
+let renderTotal = 0;
+let lastChunkTotal = 0;
+let lastRenderTotal = 0;
+let chunkFps = 0;
+let renderFps = 0;
+let overrunTotal = 0;
+let lastOverrunTotal = 0;
+let overrunPerMin = 0;
+let maxSlowCallMs = 0;
+let slowCallTotal = 0;
+let lastSlowCall = null;
+let lastSlowLogAt = 0;
+const SLOW_MS = 50; // en ruta är 5 ms → 50 ms är tio missade rutor
+const SLOW_LOG_INTERVAL_MS = 10_000; // loggtak: räkna tyst, varna sällan
+/** Tidsstämpla ett anrop som kan blockera event-loopen (analys, render, DMX-write). */
+export function noteSlowCall(op, ms) {
+    if (ms > maxSlowCallMs)
+        maxSlowCallMs = ms;
+    if (ms >= SLOW_MS) {
+        slowCallTotal++;
+        lastSlowCall = { op, ms: Math.round(ms * 10) / 10, atIso: new Date().toISOString() };
+        const now = performance.now();
+        if (now - lastSlowLogAt >= SLOW_LOG_INTERVAL_MS) {
+            lastSlowLogAt = now;
+            console.warn(`[health] slow call: ${op} ${ms.toFixed(1)}ms`);
+        }
+    }
+}
+/** En ljud-chunk togs emot. */
+export function noteChunk() { chunkTotal++; }
+// ── ANALYSATORNS KOSTNAD PER HOP (2026-09-22) ────────────────────────────────
+// Lotus matte samma sak innan analysatorn flyttades till en worker: process() tog 820 us av en 2,67 ms-budget och gick
+// over budget 615 ganger pa 89 s -> workern (egen karna) halverade det. DMX-motorn hade ingen motsvarande matare alls,
+// sa fragan "behover DMX ocksa workern?" gick inte att besvara. hopBudgetMs satts en gang fran ljudkonfigurationen.
+let anMsEMA = 0, anMsMax = 0, anHops = 0, anOver = 0, anBudgetMs = 0;
+export function setAnalyserBudgetMs(ms) { anBudgetMs = ms; }
+export function noteAnalyser(ms) {
+    anHops++;
+    anMsEMA += (ms - anMsEMA) * 0.01;
+    if (ms > anMsMax)
+        anMsMax = ms;
+    if (anBudgetMs > 0 && ms > anBudgetMs)
+        anOver++;
+}
+export function getAnalyserCost() {
+    return { msEMA: +anMsEMA.toFixed(3), msMax: +anMsMax.toFixed(2), hops: anHops, overBudget: anOver, budgetMs: +anBudgetMs.toFixed(2) };
+}
+/** En DMX-ruta renderades och sändes. `renderMs` = det avsedda intervallet. */
+export function noteRender(nowMs, renderMs) {
+    renderTotal++;
+    if (lastRenderAt > 0) {
+        const dt = nowMs - lastRenderAt;
+        const jitter = Math.abs(dt - renderMs);
+        jitterEMA += (jitter - jitterEMA) * 0.05;
+        if (jitter > jitterMax)
+            jitterMax = jitter;
+        if (dt > renderMs * 1.5)
+            lateRenderTotal++;
+    }
+    lastRenderAt = nowMs;
+}
+/** ALSA-overrun (tappade samples) — arecord skriver dem på stderr. */
+export function noteOverrun() { overrunTotal++; }
+/** Monoton räknare över mottagna ljud-chunkar (stall-diagnos i watchdogen). */
+export function getChunkTotal() { return chunkTotal; }
+/** Monoton räknare över sända DMX-rutor. */
+export function getRenderTotal() { return renderTotal; }
+/** Anropas ~1 Hz från den gemensamma schemaläggaren. */
+export function sample() {
+    const now = performance.now();
+    if (lastSampleAt > 0) {
+        const dt = now - lastSampleAt;
+        const lag = Math.max(0, dt - 1000);
+        loopLagEMA += (lag - loopLagEMA) * 0.2;
+        if (lag > loopLagMax)
+            loopLagMax = lag;
+        chunkFps = ((chunkTotal - lastChunkTotal) * 1000) / dt;
+        renderFps = ((renderTotal - lastRenderTotal) * 1000) / dt;
+        overrunPerMin = ((overrunTotal - lastOverrunTotal) * 60000) / dt;
+    }
+    lastSampleAt = now;
+    lastChunkTotal = chunkTotal;
+    lastRenderTotal = renderTotal;
+    lastOverrunTotal = overrunTotal;
+}
+/** LÄSNING NOLLSTÄLLER MAX-VÄRDENA — de är peak sedan förra hämtningen. */
+export function getRuntimeHealth() {
+    const r1 = Math.round;
+    const out = {
+        chunkFps: r1(chunkFps),
+        renderFps: r1(renderFps),
+        loopLagMsEMA: r1(loopLagEMA * 10) / 10,
+        loopLagMsMax: r1(loopLagMax * 10) / 10,
+        jitterMsEMA: r1(jitterEMA * 100) / 100,
+        jitterMsMax: r1(jitterMax * 10) / 10,
+        lateRenderTotal,
+        overrunTotal,
+        overrunPerMin: r1(overrunPerMin),
+        chunkTotal,
+        renderTotal,
+        maxSlowCallMs: r1(maxSlowCallMs * 10) / 10,
+        slowCallTotal,
+        lastSlowCall,
+    };
+    loopLagMax = 0;
+    jitterMax = 0;
+    maxSlowCallMs = 0;
+    return out;
+}

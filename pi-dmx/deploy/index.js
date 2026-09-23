@@ -10,14 +10,10 @@
  * Runtime config is loaded from /var/lib/audio-dmx-engine/config.json and
  * saved back (debounced) whenever anything changes it.
  */
-import { readFileSync, existsSync, renameSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { LearnRecorder } from "./learnRecorder.js";
-import { RefineQueue } from "./refineQueue.js";
-import { StructureQueue } from "./structureQueue.js";
-import { sampleForIdentify, identify, formatNote, wavDuration, SAMPLE_SPOTS } from "./identify.js";
+import { readFileSync, existsSync } from "node:fs";
 import { AudioCapture } from "./audio.js";
-import { Analyser } from "./analyser.js";
+import { BoundaryDetector } from "./boundaryDetector.js";
+import { createAnalyser } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
 import { DmxSender } from "./dmx.js";
 import { startServer, applyInputRouting } from "./server.js";
@@ -28,7 +24,6 @@ import { KnobRing } from "./knobRing.js";
 import { BleClient } from "./bleClient.js";
 import { applyIntensity } from "./moods.js";
 import { MIN_BEAT_CONFIDENCE } from "./beatClock.js";
-import { SongMemory } from "./songMemory.js";
 import * as health from "./runtimeHealth.js";
 import { logHealth } from "./healthLog.js";
 import { activeSlots, fixtureRoles } from "./config.js";
@@ -78,134 +73,22 @@ catch { /* /proc saknas (ej Linux) → behåll det persisterade värdet */ }
 // Re-apply the chosen codec input routing (the boot service restores the aux
 // default; this honors a persisted mic choice).
 applyInputRouting(cfg.audioInput === "mic" ? "mic" : "aux");
-const analyser = new Analyser(cfg);
+// DELAD ANALYSATOR (analyser.ts/split.ts): utan DMX_ANALYSER_SPLIT ar detta exakt `new Analyser(cfg)`.
+// Med DMX_ANALYSER_SPLIT=worker flyttas tempo/gridfas/sektion till en egen trad pa en egen karna —
+// motivet ar matningen 15,6 % av hoppen over budget (0,99 ms snitt, toppar 235 ms mot 2,67 ms).
+const analyser = createAnalyser(cfg);
 analyser.resetGain(cfg.audioInput === "mic" ? 20 : 1);
 analyser.setGainLock(cfg.audioInput !== "mic", 1); // aux: fixed 1x
 const effects = new EffectEngine(cfg);
 const dmx = new DmxSender();
 dmx.setMaxHz(cfg.dmxMaxHz);
-// LÅTMINNE: fingeravtryck + tidslinje per låt. Fylls ur analysatorns stora FFT
-// (ingen extra transform) och äger dropsen när en låt känns igen.
-const songs = new SongMemory();
-await songs.load();
-// Igenkänning körs på båda ingångarna; INLÄRNING bara på aux (miken drar in
-// sorl med 20× gain → smutsigt fingeravtryck).
-analyser.setSpectrumSink((mag, binHz) => songs.pushSpectrum(mag, binHz, cfg.audioInput !== "mic" && cfg.songLearn !== false));
-// ── OFFLINE-TVÄTT ──────────────────────────────────────────────────────────
-// Medan en NY låt lärs in på aux strömmas råljudet till en temp-WAV. När låten
-// tystnat spawnas refinern (egen process, nice 19) som räknar om drops/BPM/
-// energi framåtblickande och skriver en sidecar som ersätter tidslinjen.
-const DATA_DIR = dirname(process.env.SONGS_PATH ?? "/var/lib/audio-dmx-engine/songs.bin");
-const recorder = new LearnRecorder(join(DATA_DIR, "learn.wav"), cfg.audio.rate);
-let lastLearningNew = false;
-// DROP-KALIBRERING: DROPCAP=1 tvingar en oavbruten capture av EXAKT signalen
-// analysatorn ser (samma klocka som [dropfire]-loggen) → offline-facit. 10 min-tak.
-const capRec = process.env.DROPCAP === "1"
-    ? new LearnRecorder(join(DATA_DIR, "dropcap.wav"), cfg.audio.rate) : null;
-let capStarted = false;
-const refiner = new RefineQueue(DATA_DIR, (t) => songs.applyRefined(t.songId, t));
-refiner.cleanStale();
-// STRUKTURKON: skickar varje inlard lat pa analys EN gang och sparar svaret for
-// alltid i structure.json. Analysen ger FUNKTIONSETIKETTER (intro/verse/chorus/
-// bridge/outro) som Pi:n omojligt kan rakna fram sjalv — modellen vill ha ett par
-// GB RAM och maskinen har 416 MB totalt.
-// Kopplingen till IGENKANNINGEN ar hela poangen: strukturen lagras pa songId, och
-// nar fingeravtrycken sager vilken lat som spelas hittar minnet ratt tidslinje.
-const structure = new StructureQueue(DATA_DIR, () => cfg.replicateToken, (songId, st) => songs.setStructure(songId, st));
-// Allt som redan analyserats matas in vid uppstart — annars vore analysen
-// bortkastad efter varje omstart.
-for (const [id, st] of Object.entries(structure.all()))
-    songs.setStructure(Number(id), st);
-// Tvatten lamnar over ljudet i stallet for att radera det.
-refiner.onRefined = (wav, songId) => {
-    // Skicka med latens KANDA langd (efter tvattens trimning) sa strukturanalysen
-    // beskriver exakt det ljud minnets tidslinje ar byggd pa.
-    const meta = songs.list().find((r) => r.id === songId);
-    structure.enqueue(wav, songId, meta?.durationMs);
-};
-songs.onDropLearning = () => recorder.abort();
-// TAKET SLOG TILL (segment > 20 min = glomt stopp). songMemory har redan kastat
-// segmentet; har slas inlarningen av pa riktigt, precis som knappen "Stoppa"
-// gor, sa den inte bara borjar om pa nasta ruta.
-songs.onLearnTimeout = () => {
-    cfg.songLearn = false;
-    recorder.abort();
-    scheduleSave(cfg);
-};
-songs.onCommit = (songId, fresh) => {
-    if (!songId) {
-        recorder.abort();
-        return;
-    } // inget lärdes in → kasta ljudet
-    // Segmentet matchade en KÄND låt → inspelningen är bara den del som spelades,
-    // alltså per definition partiell. Den lagrade tvätten byggde på hela låten och
-    // ska aldrig ersättas av en sämre. Ingen tvätt, inget ljud kvar.
-    if (!fresh) {
-        console.log(`[diag] commit: ingen tvätt (fresh=false), songId=${songId}`);
-        recorder.abort();
-        return;
-    }
-    const wav = recorder.finish();
-    if (!wav)
-        return;
-    // Gaplös ström: nästa låt börjar spelas in i learn.wav i samma sekund som
-    // tvätten läser den. Döp om till <songId>.wav först → ingen kapplöpning.
-    const own = join(DATA_DIR, `${songId}.wav`);
-    try {
-        renameSync(wav, own);
-    }
-    catch (e) {
-        console.error("[refine] kunde inte döpa om temp-WAV:", e.message);
-        return;
-    }
-    // NAMNGE LATEN — innan tvatten hinner radera ljudet. Lasningen ar read-only och
-    // stor inte refinern. Fire-and-forget: showen far ALDRIG vanta pa ett natverk.
-    void nameSong(own, songId);
-    refiner.start(own, songId);
-};
-/**
- * AUTOMATISK NAMNGIVNING via ACRCloud. Fyller bara `note` — samma falt agaren
- * skriver i for hand — och bara nar traffen ar sakert nog. Hittar den inget
- * lamnas faltet TOMT: en sjalvsaker fel titel ar samre an ingen alls.
- * Skriver aldrig over ett namn som redan finns.
- */
-async function nameSong(wavPath, songId) {
-    const host = cfg.acrHost, key = cfg.acrKey, secret = cfg.acrSecret;
-    if (!host || !key || !secret)
-        return;
-    const existing = songs.list().find((r) => r.id === songId);
-    if (existing?.note)
-        return; // agaren har redan dopt den
-    try {
-        const durS = wavDuration(wavPath);
-        if (durS < 40) {
-            console.log(`[namn] låt #${songId}: för kort för igenkänning (${durS.toFixed(0)} s)`);
-            return;
-        }
-        // FLERA STALLEN. Ett enda utdrag racker inte: MATT 2026-08-08 gav mitten av
-        // en lat score 46 pa FEL lat, medan 30 s in och 2/3 in bada gav 100 pa ratt.
-        for (let i = 0; i < SAMPLE_SPOTS.length; i++) {
-            const at = SAMPLE_SPOTS[i](durS);
-            if (at < 0 || at + 12 > durS)
-                continue;
-            const sample = sampleForIdentify(wavPath, at);
-            if (!sample)
-                continue;
-            const hit = await identify(sample, { host, key, secret });
-            if (hit) {
-                const note = formatNote(hit);
-                songs.setNote(songId, note);
-                console.log(`[namn] låt #${songId} = "${note}" (score ${hit.score}, utdrag vid ${at.toFixed(0)} s)`);
-                return;
-            }
-            console.log(`[namn] låt #${songId}: osäker vid ${at.toFixed(0)} s — provar nästa`);
-        }
-        console.log(`[namn] låt #${songId}: ingen säker träff på ${SAMPLE_SPOTS.length} försök — lämnas namnlös`);
-    }
-    catch (e) {
-        console.error(`[namn] låt #${songId} misslyckades:`, e.message);
-    }
-}
+// LATGRANS UR LJUDET (2026-09-23). Det enda som blev kvar av latminnet: allt annat - fingeravtryck,
+// igenkanning, replay, inlarning, offline-tvatt, strukturanalys, namngivning - var offline-arbete som ska ske
+// pa PC:n och kostade i drift synkron disk-I/O + en BigInt-indexombyggnad (sekunder pa Pi:n) vid varje
+// latcommit. Gransdetektorn ar utbruten oforandrad (tools/boundaryEquiv.mjs bevisar samma hop) och matas
+// fran analysatorns stora FFT precis som forr - ingen extra transform.
+const bounds = new BoundaryDetector();
+analyser.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
 /**
  * FAS-PREDIKTIONSTILLIT — landar verkliga trumslag dar rutnatet pastar?
  *
@@ -236,7 +119,6 @@ const PHASE_KP_HI = 0.4, PHASE_KP_LO = 0.2, PHASE_BIAS_MS = Number(process.env.D
 let phaseLastMs = 0, phaseFlipVotes = 0, phaseFlips = 0, phaseFlipDenied = 0;
 const kickRing = new Float64Array(64);
 let kickRingPos = 0, kickRingN = 0, kickRingLast = 0;
-let lastCueSongId = 0;
 let latestFrame = null;
 let lastChunkAt = Date.now(); // hälsokoll: uppdateras varje ljud-chunk
 let lastRenderMs = 0;
@@ -250,7 +132,6 @@ let clockDetBpm = 0; // analysatorns bpm som taktklockan LÅSTES på (om-ankring
 let lastLiveDrop = 0; // senast sedda drop-räknare FRÅN analysatorn
 let lastBoundary = 0; // senast sedda låtgräns-räknare (dynamikens omkalibrering)
 let outDrop = 0; // drop-räknaren effekterna ser (live eller replay)
-let memoryBeatLocked = false; // taktklockan är låst ur låtminnet
 // COAST: konfidensen dippar i breakdowns/brus men TEMPOT är oftast fortfarande rätt.
 // Släpper vi gridet direkt hoppar effekterna till kick-drift och glider tillbaka när
 // takten kommer igen. Vi håller därför gridet fri-rullande en stund innan vi ger upp.
@@ -273,6 +154,7 @@ const capture = new AudioCapture({
 // vaggklockan. Se Analyser.setAudioClockMs.
 let audioChunks = 0;
 const HOP_MS = (cfg.fft.hop / cfg.audio.rate) * 1000;
+health.setAnalyserBudgetMs(HOP_MS); // en hop far kosta hogst en hop-period
 // OPT-IN (DMX_AUDIO_CLOCK=1) tills det ar matt PA DEN HAR hardvaran. Pa lotus
 // gav samma fix -18 % median-jitter i onset-intervall (samma lat, 2300 intervall
 // per villkor, 2026-09-04) — verkligt men litet (~1 ms). Mic-omstartsrisken ar
@@ -284,59 +166,27 @@ capture.on("chunk", (samples) => {
     if (AUDIO_CLOCK_ON)
         analyser.setAudioClockMs(audioChunks++ * HOP_MS);
     const frame = analyser.process(samples);
-    health.noteSlowCall("analyser.process", performance.now() - t0);
+    const anMs = performance.now() - t0;
+    health.noteSlowCall("analyser.process", anMs);
+    health.noteAnalyser(anMs); // kostnad mot hop-budgeten (avgor om DMX ocksa behover worker-delningen)
     health.noteChunk();
     latestFrame = frame;
     lastChunkAt = Date.now();
-    // ── LÅTMINNE ──────────────────────────────────────────────────────────────
-    // Analysatorns egen drop-flank läses FÖRE vi eventuellt skriver om räknaren
-    // (replayen äger dropsen när låten är känd).
     const liveDrop = frame.dropCount !== lastLiveDrop;
     lastLiveDrop = frame.dropCount;
-    songs.tick({
-        level: frame.level, dropped: liveDrop, bpm: frame.bpm,
-        bpmConfidence: frame.bpmConfidence, intensity: frame.intensity,
-        beatAnchorMs: frame.beatAnchorMs, learn: cfg.audioInput !== "mic" && cfg.songLearn !== false,
-    });
-    // Temp-inspelning: bara medan en NY låt lärs in på aux (state().learning),
-    // aldrig på mik och aldrig för en redan känd låt.
-    // DIAGNOSTIK: learningNew kräver !matchId. En kortvarig falsk match under
-    // inspelningen pausar ljudskrivningen medan fingerprintingen fortsätter → WAV:en
-    // blir KORTARE än tidslinjen och tvättens drops/energikurva hamnar för tidigt.
-    const lnNow = songs.learningNew;
-    if (lnNow !== lastLearningNew) {
-        lastLearningNew = lnNow;
-        if (recorder.active)
-            console.log(`[diag] ljudskrivning ${lnNow ? "ÅTER" : "PAUSAD"} vid segmenttid ${(songs.state().positionMs / 1000).toFixed(2)}s — ${songs.learnWhy}`);
-    }
-    if (lnNow) {
-        if (!recorder.active)
-            recorder.start();
-        recorder.write(samples);
-    }
-    // Forcerad drop-kalibrerings-capture (oberoende av låtinlärningen).
-    if (capRec) {
-        if (!capRec.active)
-            capRec.start();
-        if (!capStarted) {
-            capStarted = true;
-            console.log(`[capstart] wall=${Date.now()} rate=${cfg.audio.rate}`);
-        }
-        capRec.write(samples);
-    }
-    // LÅTGRÄNS → mjuk omkalibrering av den löpande dynamiken (auto-rangen får
-    // krypa in på nya låtens nivåer inom sekunder i stället för en minut).
-    // Samma sak för TEMPOT: medianfönstret (~5 s) och tempogrammet tillhör förra
-    // låten. Att rösta vidare på dem kostade upp till 6 s omlåsning fastän minnet
-    // just SLAGIT FAST att en ny låt börjat. Nollställt lås tar första estimatet direkt.
-    if (songs.boundaryCount !== lastBoundary) {
-        lastBoundary = songs.boundaryCount;
+    // LATGRANS (se boundaryDetector.ts) -> mjuk omkalibrering av den lopande dynamiken (auto-rangen far krypa in
+    // pa nya latens nivaer inom sekunder i stallet for en minut) och latbytes-hint till tempot: medianfonstret
+    // (~5 s) och tempogrammet tillhor forra laten. DMX_BOUNDARY_SOFT: mjuk hint i st.f. hard nollstallning -
+    // falska latgranser pa pop kastade tempolaset 5x/5 min (ladan 2026-09-04).
+    bounds.tick({ level: frame.level, bpm: frame.bpm, bpmConfidence: frame.bpmConfidence });
+    if (bounds.boundaryCount !== lastBoundary) {
+        lastBoundary = bounds.boundaryCount;
         effects.softenRange();
         if (process.env.DMX_BOUNDARY_SOFT)
             analyser.hintTrackChange(5000);
         else
             analyser.resetTempo();
-    } // DMX_BOUNDARY_SOFT: mjuk hint i st.f. hard nollstallning — falska latgranser pa pop kastade tempolaset 5x/5 min (ladan 2026-09-04)
+    }
     // TILLITEN KOMMER FRAN FASPREDIKTIONEN, inte fran tempogrammets form.
     // Coast: utan kickar finns inga nya bevis, sa tilliten lacker ner over ~4 s i
     // stallet for att falla direkt. Det ar det som far pulsen att dra sig undan i
@@ -349,7 +199,7 @@ capture.on("chunk", (samples) => {
                 pllKicks = 0; // bevisen ar gamla — lamna over till tempogrammet
         }
     }
-    if (!memoryBeatLocked) {
+    { // (forr: bara nar taktklockan inte var last ur latminnet - alltid sant sedan 2026-09-23)
         // DIAGNOSTIK: bada matten loggas sa de gar att jamfora mot varandra och mot
         // vad ogat ser, i stallet for att bytet ska behova tas pa tro.
         if (frame.bpmConfidence > 0.05 && Date.now() - lastTrustLog > 4000) {
@@ -369,87 +219,8 @@ capture.on("chunk", (samples) => {
                 cfg.beat.confidence = onBeatRate;
         }
     }
-    if (songs.recognized) {
-        // DIAGNOSTIK: realtidsdetektorn kopplas bort när låten är känd, så ett fel i
-        // postens drop-tid korrigeras aldrig. Logga BÅDA med position, så felet kan mätas.
-        if (liveDrop)
-            console.log(`[diag] realtidsdrop vid position ${(songs.state().positionMs / 1000).toFixed(2)}s`);
-        if (songs.takeDrop() > 0) {
-            console.log(`[diag] MINNESDROP: position ${(songs.state().positionMs / 1000).toFixed(2)}s (lagrad drop-tid ${(songs.lastFiredDropMs / 1000).toFixed(2)}s)`);
-            outDrop++; // pre-fired ur minnet
-        }
-        const ri = songs.replayIntensity();
-        // 100 % UR MINNET NÄR SYNKEN ÄR LÅST.
-        // Förr blandades 30 % live-intensitet in i dramaturgin. Ligger den signalen
-        // brusigt eller en aning ur fas syns det som fladder — och hela poängen med en
-        // verifierad tidslinje är att den inte behöver gissa. `recognized` kräver numera
-        // bevisad synk, så det finns inget skäl att väga in realtidens gissning längre.
-        if (ri !== null)
-            frame.intensity = ri;
-        // DRAMATURGI UR MINNET: taket, riser-rampen och strukturen är förberäknade
-        // offline — realtid kan bara gissa hur lång en uppbyggnad är, minnet VET.
-        const cues = songs.replayCues();
-        // MINNETS LJUSTAK ÄR AVSTÄNGT SOM STANDARD. Taket tas ur insignalen (energyCeiling):
-        // det är alltid i fas med musiken, fungerar likadant i realtid och uppspelning, och
-        // kan inte hamna snett av en tidsbas. Minnet bidrar i stället med det bara minnet
-        // vet: drops, uppbyggnader, tempo och när effekter ska bytas.
-        effects.memCeiling = cfg.memCeilingOff === false ? cues.ceiling : null;
-        effects.memHasGrid = cues.hasGrid;
-        if (cues.section)
-            effects.memSectionAt = performance.now();
-        effects.memPart = cues.part;
-        effects.memSongId = cues.songId;
-        effects.memPartEnergy = cues.partEnergy;
-        // LÅTSTART UR MINNET: känns låten igen och vi står tidigt i tidslinjen har en
-        // ny låt just börjat. Flanken tas på songId, så den fyrar en gång per låt och
-        // inte varje ruta. Tystnadsgrindens flank i effects täcker okända låtar.
-        if (cues.songId && cues.songId !== lastCueSongId) {
-            lastCueSongId = cues.songId;
-            const st = songs.state();
-            if (st.positionMs < 12000)
-                effects.noteSongStart();
-        }
-        if (cues.phrase)
-            effects.memPhraseAt = performance.now();
-        if (cues.build !== null) {
-            // Proportionell mot RESTEN av risern → 100 % exakt på dropen, i stället för
-            // realtidens gissning som toppar för tidigt eller för sent.
-            frame.buildUp = cues.build;
-            frame.inRiser = true;
-        }
-        else if (cues.hasRisers) {
-            // Minnet VET var uppbyggnaderna ligger — och här är ingen. Då ska realtidens
-            // gissning inte få starta en, för då byggs spänning där låten inte har någon.
-            frame.buildUp = 0;
-            frame.inRiser = false;
-        }
-        if (!memoryBeatLocked) {
-            const lb = songs.lockedBeat();
-            if (lb && lb.bpm > 40) {
-                cfg.beat = { anchorMs: lb.anchorMs, bpm: lb.bpm, confidence: 1 };
-                clockDetBpm = lb.bpm;
-                memoryBeatLocked = true;
-            } // ur minnet: tvättad på HELA låten → full tillit
-        }
-        // EN INSPELNING ÖVERTRUMFAR REALTIDENS GISSNING — VID KÄLLAN.
-        // Tempot är tvättat på hela låten och verifierat mot strukturmodellen. Att
-        // låta varje konsument väga in realtidens osäkerhet vore att låtsas att vi
-        // vet mindre än vi gör: hjärtslagets djup tunnades ut, `beatOk` föll, och
-        // drop-vägen bytte från takt till kick — allt på en låt vi mätt färdigt.
-        // Sätts här i stället för på fem ställen nedströms.
-        if (memoryBeatLocked)
-            frame.bpmConfidence = 1;
-    }
-    else {
-        memoryBeatLocked = false;
-        effects.memCeiling = null;
-        effects.memHasGrid = false;
-        effects.memPart = null;
-        effects.memSongId = 0;
-        effects.memPartEnergy = -1;
-        if (liveDrop)
-            outDrop++; // realtidsdetektorn som förut
-    }
+    if (liveDrop)
+        outDrop++; // realtidsdetektorn ager dropsen (latminnet borta 2026-09-23)
     frame.dropCount = outDrop;
     frame.beatMul = effects.beatMulNow;
     // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
@@ -459,7 +230,6 @@ capture.on("chunk", (samples) => {
         cfg.beat = null;
         cfg.beatErr = 0;
         clockDetBpm = 0;
-        memoryBeatLocked = false;
     } // tyst → stoppa beat-effekter direkt
     if (effBpm > 0) {
         // Om-ankra bara när ANALYSATORNS bpm ändras (nytt tempo/låt), INTE när vår egen
@@ -470,7 +240,7 @@ capture.on("chunk", (samples) => {
         // och hoppade MÄTT 2026-08-07 mellan 117, 81 och 143 BPM mitt i samma låt. Varje
         // hopp ankrade om taktklockan, fasen kastade sig och pulsen lästes som stroboskop.
         // PLL:en nedan får fortfarande finjustera FASEN mot faktiska trumslag.
-        if (!memoryBeatLocked && (!cfg.beat || Math.abs(effBpm - clockDetBpm) > 2)) {
+        if (!cfg.beat || Math.abs(effBpm - clockDetBpm) > 2) {
             clockDetBpm = effBpm;
             let anchor = frame.beatAnchorMs || Date.now();
             if (cfg.beat) {
@@ -544,7 +314,7 @@ capture.on("chunk", (samples) => {
             if (kickRingN < 64)
                 kickRingN++;
         }
-        if (PHASE_FOLLOW_ON && cfg.beat && !memoryBeatLocked) {
+        if (PHASE_FOLLOW_ON && cfg.beat) {
             const pm = frame.beatPhaseMs ?? 0;
             if (pm > 0 && pm !== phaseLastMs) {
                 phaseLastMs = pm;
@@ -613,7 +383,7 @@ capture.on("chunk", (samples) => {
         // tyngsta slaget. Flytta ankaret HELA taktslag så takträknaren (beatIdx) börjar
         // på ettan — effekter som byter var fjärde takt landar då på musikens storsväng
         // i stället för på ett godtyckligt slag. Fasen inom takten rörs INTE.
-        if (frame.barShift > 0 && cfg.beat && !memoryBeatLocked) {
+        if (frame.barShift > 0 && cfg.beat) {
             cfg.beat.anchorMs += frame.barShift * (60000 / cfg.beat.bpm);
             analyser.resetBar();
         }
@@ -625,7 +395,7 @@ capture.on("chunk", (samples) => {
         // låt-/tempoändring: släpp gridet OCH nolla tempohistoriken så nästa lås tas på
         // ~0,5 s i stället för att medianen släpar med gammalt tempo.
         if (cfg.beat) {
-            const liveConf = memoryBeatLocked ? 1 : (frame.bpmConfidence ?? 0);
+            const liveConf = frame.bpmConfidence ?? 0;
             const nowMs = Date.now();
             if (liveConf >= GRID_ON_CONF) {
                 gridWeakSince = 0;
@@ -639,7 +409,7 @@ capture.on("chunk", (samples) => {
                 else if (nowMs - gridWeakSince >= GRID_COAST_MS) {
                     gridCoasting = false;
                     gridWeakSince = nowMs; // fönstret startar om → ingen spam
-                    if (!memoryBeatLocked) {
+                    {
                         analyser.resetTempo();
                         clockDetBpm = 0;
                     }
@@ -907,22 +677,6 @@ const serverDeps = {
     getDmxConnected: () => dmx.isConnected(),
     getFogStatus: () => effects.getFogStatus(),
     resetFogService: () => effects.resetFogService(),
-    songMemory: {
-        state: () => ({ ...songs.state(), refining: refiner.busy, refiningId: refiner.songId }),
-        forget: () => songs.forget(),
-        // INSPELNINGEN HAR FORETRADE. Tvatten (~70 s CPU per lat, karna 0 delad med
-        // arecord) pausas under hela sessionen och betas av nar Stoppa trycks. En
-        // tappad ljudchunk gar inte att ta igen; en tvatt kan vanta.
-        manualStart: () => { refiner.setPaused(true); songs.manualStart(); },
-        manualNext: () => songs.manualNext(),
-        manualStop: () => { songs.manualStop(); refiner.setPaused(false); },
-        list: () => songs.list(),
-        setNote: (id, note) => songs.setNote(id, note),
-        forgetSong: (id) => songs.forgetSong(id),
-        dumpCurve: (id) => songs.dumpCurve(id),
-    },
-    structureStatus: () => structure.status(),
-    structureInfo: (songId) => structure.info(songId),
     probeDmx: (channels, frames) => {
         dmxProbe.chs = channels;
         dmxProbe.rows = [];
@@ -1076,15 +830,7 @@ setInterval(() => {
         scheduleSave(cfg);
     }
 }, 300000);
-// STRUKTURKÖN betar av sig själv i bakgrunden: en låt i taget, bara när det
-// finns en nyckel OCH något i kön. Uppladdning och pollning är ren I/O — ingen
-// CPU som kan störa showen. 20 s är rikligt; kön har ingen brådska och en låt
-// analyseras en enda gång i sitt liv.
-setInterval(() => structure.tick(), 20000);
 process.on("SIGTERM", () => {
-    recorder.abort();
-    refiner.stop();
-    void songs.flush();
     capture.stop();
     button?.stop();
     knob?.stop();

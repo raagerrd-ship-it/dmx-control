@@ -1,0 +1,207 @@
+/**
+ * WS2812B LED-ring (Electrokit 12-LED, 40 mm) → visuell återkoppling för vredet.
+ *
+ * Varför SPI (GPIO10 MOSI, pin 19) och inte den vanliga PWM-metoden (GPIO18)?
+ * Codec Zero använder I²S på GPIO18–21 → PWM0/PCM krockar med ljudet. SPI0 är
+ * ledig och kan bit-banga WS2812:s 800 kHz-protokoll deterministiskt genom
+ * att köra SPI @ 2.4 MHz och koda varje LED-bit som 3 SPI-bitar:
+ *   WS2812 "0" = 0b100      (T0H ≈ 0.42 µs, T0L ≈ 0.83 µs)
+ *   WS2812 "1" = 0b110      (T1H ≈ 0.83 µs, T1L ≈ 0.42 µs)
+ * Toleransen på riktiga WS2812B är ±150 ns → ligger komfortabelt inom spec.
+ *
+ * Visualisering:
+ *  - Antal tända LEDs = round(intensity * 12), delvis-tänd sista LED för smooth
+ *  - Färg lerp:  chill (kall cyan)  →  fest (varm orange)  →  galet (röd)
+ *  - Beat-puls: +18% ljusstyrka på `beat`-frame, ebbar ut på ~150 ms
+ *  - Blackout-läge: helt släckt
+ *  - Master-clamp: 40% av full brightness (5V-drift, håller strömmen låg och
+ *    hindrar färgen från att blekas till vitt vid full styrka)
+ */
+import SPI from "spi-device";
+const N_LEDS = 12;
+const SPI_SPEED_HZ = 2_400_000; // 2.4 MHz → 3 SPI-bitar = 1 WS2812-bit @ 800 kHz
+const RESET_BYTES = 42; // ~140 µs låg-linje (>50 µs krav) mellan frames
+// 3-bit-mönster för varje WS2812-bit → förberäknad LUT byte→9-bit
+// (för en full byte returnerar vi 3 SPI-bytes).
+const BIT0 = 0b100;
+const BIT1 = 0b110;
+/** Koda en byte (8 bitar) → 3 SPI-bytes (24 bitar). */
+function encodeByte(v, out, offset) {
+    // 24-bit register: högsta biten först
+    let reg = 0;
+    for (let i = 7; i >= 0; i--)
+        reg = (reg << 3) | ((v >> i) & 1 ? BIT1 : BIT0);
+    out[offset] = (reg >> 16) & 0xff;
+    out[offset + 1] = (reg >> 8) & 0xff;
+    out[offset + 2] = reg & 0xff;
+}
+// Färgankare (RGB 0..255) — matchar mood-anchors i moods.ts.
+const CHILL = [10, 120, 200]; // sval cyan/blå
+const FEST = [255, 140, 20]; // varm orange
+const GALET = [255, 25, 25]; // röd
+const DEFAULT_MAX_BRIGHT = 0.40;
+const DEFAULT_PULSE_BOOST = 0.18;
+const DEFAULT_BLACKOUT_FADE_MS = 400;
+function lerpColor(x) {
+    // 0..0.5 → chill→fest, 0.5..1 → fest→galet
+    const [a, b] = x < 0.5 ? [CHILL, FEST] : [FEST, GALET];
+    const t = x < 0.5 ? x * 2 : (x - 0.5) * 2;
+    return [
+        a[0] + (b[0] - a[0]) * t,
+        a[1] + (b[1] - a[1]) * t,
+        a[2] + (b[2] - a[2]) * t,
+    ];
+}
+export class KnobRing {
+    opts;
+    spi = null;
+    timer = null;
+    txBuf;
+    state = { intensity: 0.5, blackout: false, beat: false };
+    beatPulse = 0; // 0..1, avklingar
+    blackoutFade = 1; // 1 = full, 0 = släckt (ebbar mot 0 vid blackout, snappar till 1 annars)
+    standbyGlow = 0; // 0..1 — svag röd standby-glöd, ebbar mjukt in/ut runt blackout
+    maxBright;
+    pulseBoost;
+    blackoutFadeMs;
+    tickMs;
+    constructor(opts = {}) {
+        this.opts = opts;
+        // Layout: [reset låg] [N_LEDS * 3 färgbytes * 3 SPI-bytes] [reset låg]
+        this.txBuf = new Uint8Array(RESET_BYTES + N_LEDS * 3 * 3 + RESET_BYTES);
+        this.maxBright = clamp(opts.maxBright ?? DEFAULT_MAX_BRIGHT, 0.05, 1);
+        this.pulseBoost = clamp(opts.pulseBoost ?? DEFAULT_PULSE_BOOST, 0, 0.5);
+        this.blackoutFadeMs = clamp(opts.blackoutFadeMs ?? DEFAULT_BLACKOUT_FADE_MS, 0, 3000);
+        this.tickMs = Math.round(1000 / (opts.fps ?? 30));
+    }
+    /** Live-justering från UI/config-broadcast. */
+    setOptions(o) {
+        if (o.maxBright !== undefined)
+            this.maxBright = clamp(o.maxBright, 0.05, 1);
+        if (o.pulseBoost !== undefined)
+            this.pulseBoost = clamp(o.pulseBoost, 0, 0.5);
+        if (o.blackoutFadeMs !== undefined)
+            this.blackoutFadeMs = clamp(o.blackoutFadeMs, 0, 3000);
+    }
+    start() {
+        const bus = this.opts.bus ?? 0;
+        const dev = this.opts.device ?? 0;
+        this.spi = SPI.open(bus, dev, (err) => {
+            if (err) {
+                console.error("[ring] spi open failed:", err.message);
+                this.spi = null;
+                return;
+            }
+            this.spi.setOptions({ mode: 0, maxSpeedHz: SPI_SPEED_HZ, bitsPerWord: 8 }, (e) => {
+                if (e)
+                    console.error("[ring] spi setOptions:", e.message);
+            });
+        });
+        this.timer = setInterval(() => this.tick(), this.tickMs);
+    }
+    /** Anropas från motor-loopen: mata in senaste tillstånd. `beat` = true bara
+     *  den frame slaget föll (mock-UI:t skickar samma en-frame-puls). */
+    update(s) {
+        if (s.intensity !== undefined)
+            this.state.intensity = Math.max(0, Math.min(1, s.intensity));
+        if (s.blackout !== undefined)
+            this.state.blackout = s.blackout;
+        if (s.beat)
+            this.beatPulse = 1;
+    }
+    tick() {
+        if (!this.spi || this.closed)
+            return;
+        // Beat-avklingning: exp(-dt/tau), tau ≈ 150 ms, tick ≈ 33 ms
+        this.beatPulse *= 0.80;
+        if (this.beatPulse < 0.01)
+            this.beatPulse = 0;
+        // Blackout-fade: ebbar mjukt både IN (mot 0) och UT (mot 1) med samma tau, så
+        // vridningen från 0 känns like en dimmer som tänds — inte som en snap.
+        // tau = fadeMs/3 → ~95 % framme vid utsatt tid.
+        const fadeMs = Math.max(this.blackoutFadeMs, 1);
+        const fadeTau = fadeMs / 3;
+        const fadeAlpha = 1 - Math.exp(-this.tickMs / fadeTau);
+        const fadeTarget = this.state.blackout ? 0 : 1;
+        this.blackoutFade += (fadeTarget - this.blackoutFade) * fadeAlpha;
+        if (Math.abs(this.blackoutFade - fadeTarget) < 0.005)
+            this.blackoutFade = fadeTarget;
+        // Standby-glöd: ligger något efter blackout-fadet så den svaga röda inte
+        // "krockar" med den utfadande showfärgen — den tonar in när ringen är släckt
+        // och tonar ut igen precis när användaren börjar vrida upp.
+        const glowTau = fadeMs / 2;
+        const glowAlpha = 1 - Math.exp(-this.tickMs / glowTau);
+        const glowTarget = this.state.blackout ? 1 : 0;
+        this.standbyGlow += (glowTarget - this.standbyGlow) * glowAlpha;
+        if (Math.abs(this.standbyGlow - glowTarget) < 0.005)
+            this.standbyGlow = glowTarget;
+        const { intensity } = this.state;
+        const [r, g, b] = lerpColor(intensity);
+        const litFloat = intensity * N_LEDS;
+        const litFull = Math.floor(litFloat);
+        const partial = litFloat - litFull;
+        // Global brightness: intensity ↗ → ökar (0.35 vid chill, 1.0 vid galet) × maxBright,
+        // × blackout-fade × (1 + pulseBoost * beatPulse).
+        const bright = this.maxBright *
+            (0.35 + 0.65 * intensity) *
+            this.blackoutFade *
+            (1 + this.pulseBoost * this.beatPulse);
+        // Standby-röd som crossfadeas ovanpå den utfadande showen. 6 % av maxBright
+        // = tydligt synlig i mörker men lyser inte upp rummet.
+        const standbyR = 255 * this.maxBright * 0.06 * this.standbyGlow;
+        let off = RESET_BYTES;
+        for (let i = 0; i < N_LEDS; i++) {
+            let scale;
+            if (i < litFull)
+                scale = 1;
+            else if (i === litFull)
+                scale = partial;
+            else
+                scale = 0;
+            const k = scale * bright;
+            // WS2812 wire order är GRB. Standby-röd adderas på ALLA 12 LEDs oavsett
+            // scale, så ringen "andas in" i standby och tänds mjukt tillbaka.
+            const rOut = Math.min(255, Math.round(r * k + standbyR));
+            const gOut = Math.min(255, Math.round(g * k));
+            const bOut = Math.min(255, Math.round(b * k));
+            encodeByte(gOut, this.txBuf, off);
+            off += 3;
+            encodeByte(rOut, this.txBuf, off);
+            off += 3;
+            encodeByte(bOut, this.txBuf, off);
+            off += 3;
+        }
+        const msg = [{
+                byteLength: this.txBuf.length,
+                sendBuffer: Buffer.from(this.txBuf.buffer, this.txBuf.byteOffset, this.txBuf.byteLength),
+                speedHz: SPI_SPEED_HZ,
+            }];
+        // KASTAS SYNKRONT NAR ENHETEN AR STANGD. `transfer` slanger EPERM direkt i
+        // stallet for att lamna felet till callbacken, sa felhanteringen nedan aldrig
+        // nas. Vid varje omstart tickade en kvarvarande timer mot en stangd SPI och
+        // gav "Error: EPERM, device closed" i loggen — ofarligt men brusigt, och brus
+        // gor att ett VERKLIGT fel drunknar nar man raknar rader i journalen.
+        try {
+            this.spi.transfer(msg, (err) => {
+                if (err && !this.closed)
+                    console.error("[ring] spi tx:", err.message);
+            });
+        }
+        catch {
+            this.closed = true; // enheten ar borta — sluta forsoka
+        }
+    }
+    closed = false;
+    stop() {
+        if (this.timer) {
+            clearInterval(this.timer);
+            this.timer = null;
+        }
+        // Släck ringen mjukt vid avslut
+        this.state.blackout = true;
+        this.blackoutFade = 0;
+        this.tick();
+        setTimeout(() => { this.closed = true; this.spi?.close(() => { }); }, 50);
+    }
+}
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
