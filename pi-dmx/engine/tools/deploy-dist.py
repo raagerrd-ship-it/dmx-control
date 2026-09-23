@@ -20,7 +20,10 @@ files_arg = [a for i, a in enumerate(args) if not a.startswith('--') and (i == 0
 HERE = os.path.dirname(os.path.abspath(__file__)); LOCAL = os.path.normpath(os.path.join(HERE, '..', 'dist'))
 REMOTE = '/opt/audio-dmx-engine/dist'
 if not files_arg:
-    files_arg = [f for f in os.listdir(LOCAL) if f.endswith('.js')] + ['effects/' + f for f in os.listdir(os.path.join(LOCAL, 'effects')) if f.endswith('.js')] if os.path.isdir(os.path.join(LOCAL, 'effects')) else [f for f in os.listdir(LOCAL) if f.endswith('.js')]
+    # alla toppniva-js + underkatalogerna effects/ och heartbeat/ (2026-09-23: heartbeat/ ar ny - se mkdir -p nedan)
+    files_arg = [f for f in os.listdir(LOCAL) if f.endswith('.js')]
+    for sub in ('effects', 'heartbeat'):
+        if os.path.isdir(os.path.join(LOCAL, sub)): files_arg += [sub + '/' + f for f in os.listdir(os.path.join(LOCAL, sub)) if f.endswith('.js')]
 c = paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 c.connect(HOST, username='pi', password=PW, timeout=15, look_for_keys=False, allow_agent=False)
 def run(cmd, t=300):
@@ -39,7 +42,9 @@ for f in todo:
     with sf.open(tmp, 'wb') as fh: fh.write(files[f])
     rc, out, err = run(f"node --check {tmp}")
     if rc: sys.exit(f"node --check {f} misslyckades: {err[:300]}")
-    rc, out, _ = sudo(f"[ -f {REMOTE}/{f} ] && cp {REMOTE}/{f} {REMOTE}/{f}.bak-{ts}; cp {tmp} {REMOTE}/{f} && chmod 644 {REMOTE}/{f} && ls -la {REMOTE}/{f}")
+    # mkdir -p (2026-09-23, lotus-laxa): ny underkatalog pa Pi:n -> cp foll tyst och index.js pekade pa saknad modul. Avbryt vid fel.
+    rc, out, _ = sudo(f"mkdir -p $(dirname {REMOTE}/{f}) && ([ -f {REMOTE}/{f} ] && cp {REMOTE}/{f} {REMOTE}/{f}.bak-{ts}; true) && cp {tmp} {REMOTE}/{f} && chmod 644 {REMOTE}/{f} && ls -la {REMOTE}/{f}")
+    if rc or not out.strip(): sys.exit(f"cp {f} misslyckades pa Pi:n - aterstall fran .bak-{ts}")
     print(out.strip())
 removed = []
 for pat in REMOVES:
