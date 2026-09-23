@@ -106,3 +106,18 @@ Samma deploy: `python tools\ladan.py` (`--dry` forst). ladan.py REMOVE flyttar i
 - **OGONBEDOM:** forvarningens nedrakning mot en riktig refrang (forutsagelsen finns bara 10-16 % av tiden i banken); basnotslaget i
   chase/eko/stege/basgang (troskeln ar satt pa ogat); tyngdlyft/gravity/ripple pa ladans komprimerade PA (levelVsHighDb ror sig bara
   +-4 dB - blir det platt ar skalan 6/9 dB ratten); att variationen kanns storre. Opt-out for dirigentens nya bonus: `--env DMX_MIX_UNSEEN_BONUS=0`.
+
+### Korschema ladan 2026-09-23 (Claude kor allt fran PC:n, agaren tittar)
+Forberett: `tools/ladan.py` (deploy + env + omstart), `tools/kolla.py` (tjanst/env/kostnad), `tools/ladanWatch.py` (foljer journalen,
+sammanfattar lookbyten/sektioner/drops per minut; `--sedan 5` = facit for de senaste 5 minuterna). Dirigentens "ny look"-logg ar nu
+OVILLKORLIG (del, tier, pool, sektion, basgang) sa valen syns aven utan DMX_SECTION_SWITCH.
+1. `python tools\ladan.py --dry` -> `python tools\ladan.py` (bundeln: mix v2, heart-beat opt-in, W_HIGH, rensningen, effektoversynen).
+   `kolla.py` efterat: tjanst active, env = SHOW_ENV, 0 fel. Musik igang -> `ladanWatch.py` i 5 min = BASLINJE (ogat + siffror).
+2. A/B 1: `--env DMX_SECTION_SWITCH=1` (sektionspoolerna + entre-stoten + halva bytena; rotorsaken 'last pa high' ar rattad).
+   Ogat: lugna partier lugna? refrangen tydligt annorlunda? Siffror: byten/min, olika looker, 'i high'/'i low'-tabellen.
+   Fastnar sektionen pa high (bara fart/full i lugna partier) -> tillbaka utan flaggan, och nattens jobb = sektionsdetektorn i ladan.
+3. A/B 2: `--env DMX_HEARTBEAT=1` (och `DMX_HEARTBEAT_DEPTH=0.5` om pulsen ar svag). Ogat: hjartslag i morka effekter, strobe/fyrverkeri
+   fulla, lugna partier morkare. Tillbaka: `--env DMX_HEARTBEAT=0`.
+4. Effekterna med ogat: forvarning (nedrakning fore refrangen), basgang/chase/eko/stege pa basnoter, tyngdlyft/gravity/ripple pa PA:n,
+   variationen. For platta -> skalan 6/9 dB; for mycket 'forsta chansen' -> `--env DMX_MIX_UNSEEN_BONUS=0`.
+5. Det som ska bli kvar skrivs in i ladan.py SHOW_ENV (inte bara pa Pi:n) och committas.

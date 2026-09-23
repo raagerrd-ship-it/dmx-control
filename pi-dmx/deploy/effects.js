@@ -1294,10 +1294,11 @@ export class EffectEngine {
                     // MIX_V2 (4): valfonstret var alltid topp-3 av passformen -> samma 3-5 looker per tier for evigt; nu topp-MIX_TOP_FRAC av poolen (minst 3)
                     const top = (cands.length ? cands : ranked).slice(0, MIX_V2 ? Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))) : 3);
                     this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
-                    if (part && !wantCalm) {
+                    if (part && !wantCalm)
                         this.partLook.set(pairKey, this.smartMode);
-                        console.log(`[dirigent] ${part}: ny look "${this.smartMode}" (tier ${tierS === LUGN ? "lugn" : tierS === FART ? "fart" : "full"}, pool ${pool.length})`);
-                    }
+                    // LOGGEN AR OVILLKORLIG (2026-09-23): utan DMX_SECTION_SWITCH finns inget `part` och dirigentens val syntes inte alls i
+                    // journalen (ladan 09-22: "vi korde pa hoga effekter" gick inte att belagga). Nu: del, sektion (data), basgang, tier, pool.
+                    console.log(`[dirigent] ${part ?? 'smart'}: ny look "${this.smartMode}" (tier ${tierS === LUGN ? "lugn" : tierS === FART ? "fart" : "full"}, pool ${pool.length}, sektion ${frame.section ?? '-'}, basgang ${(frame.profile.bassline ?? 0).toFixed(2)}${wantCalm ? ', lugn' : ''})`);
                 }
                 // ENFORMIG LOOK -> KORTARE DWELL. Agaren 2026-09-12: "ar det en enformig effekt far den garna byta
                 // snabbare". De statiska svepen (ingen takt-signal, ingen kick-drift) far DMX_DWELL_FLAT_MS (30 s),
