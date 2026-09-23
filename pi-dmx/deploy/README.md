@@ -143,3 +143,7 @@ anslagspulser hogst en per DMX_ENERGY_FB_GAP_MS 330; djupet foljer anslagstathet
 DMX_SYNC_ERR_FRAC 0,2 drar ner tilliten, tappad tillit > 1,5 s nollar slagraknaren. Halvering over 135 BPM fanns redan.
 Bank (hbDump, ladans env): megamix intervall < 0,3 s 29 % -> 6 %, energilage 6 -> 19 % av tiden, djup lika; pop oforandrat (3,3 pulser/s
 bade fore och efter - KOLLA MED OGAT om pop-rastret gar dubbelt). Deploy: `python tools\ladan.py` (bara effects.js skiljer).
+- (22:35) DISTINKTA FARGER i output.js: en svag fargkanal ar tand/slackt efter sin ANDEL av lampans starkaste kanal (tand >= 25 %,
+  slacks < 15 %), inte efter absolut niva - byter bara nar fargen andras, aldrig nar ljuset pulserar; tand kanal halls pa minst
+  tandpunkten. Test (fast orange, puls 25-160 DMX, 10 s): gron kanal av/pa 40 -> 0 ganger vid andel 0,2 och 0,35. Ogat: flimmer vid
+  slackgransen borta? blir nagon farg for "platt" (andelar under 25 % blir rena)? Rattar DMX_HUE_RATIO_ON/OFF.

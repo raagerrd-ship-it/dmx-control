@@ -51,6 +51,12 @@ const HUE_LIFT = process.env.DMX_HUE_LIFT !== '0';
  *  under tandpunkten lat LED:n vackla). Under tandpunkten = HELT AV (0). Tand kanal slocknar forst under HUE_OFF_FRAC x tandpunkten,
  *  och halls pa tandpunkten daremellan, sa en kanal som ligger runt troskeln inte slar av och pa. */
 const HUE_OFF_FRAC = Number(process.env.DMX_HUE_OFF_FRAC ?? 0.6);
+/** DISTINKTA FARGER (2026-09-23 22:30, agaren: "nar nagon av R/G/B kommer vid slackgransen kan den flimra nar den gar over/under -
+ *  styr mot distinkta farger som inte behover under t.ex. 5 %"). En svag fargkanal ar tand eller slackt efter sin ANDEL av lampans
+ *  starkaste kanal, inte efter absolut niva - sa den byter bara nar FARGEN andras, aldrig nar ljusstyrkan pulserar. Tand: >= HUE_RATIO_ON
+ *  av starkaste (halls pa minst tandpunkten); slacks under HUE_RATIO_OFF (hysteres). */
+const HUE_RATIO_ON = Number(process.env.DMX_HUE_RATIO_ON ?? 0.25);
+const HUE_RATIO_OFF = Number(process.env.DMX_HUE_RATIO_OFF ?? 0.15);
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
 
@@ -190,7 +196,7 @@ export class FixtureOutput {
       const on = c ? (c.on || 0) : 0;
 
       // KULORLYFT: lampans starkaste fargkanal (r/g/b/w) och dess tandpunkt -> en gemensam skalfaktor i stallet for lyft per kanal.
-      let hueScale = 1, hueMaxCh = -1;
+      let hueScale = 1, hueMaxCh = -1, hueMaxRaw = 0;
       if (HUE_LIFT && c) {
         let mx = 0, mxOn = 0;
         for (let i = 0; i < fast.roles.length; i++) {
@@ -199,6 +205,7 @@ export class FixtureOutput {
           const raw = universe[ch];
           if (raw > mx) { mx = raw; hueMaxCh = ch; mxOn = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; }
         }
+        hueMaxRaw = mx;
         if (mx > 0 && mx < mxOn) hueScale = mxOn / mx;
       }
 
@@ -217,10 +224,15 @@ export class FixtureOutput {
         if (HUE_LIFT && isColor && raw > 0) {
           // starkaste kanalen (och alla andra) skalas upp till tandpunkten; ovriga kanaler lyfts INTE var for sig
           if (hueScale !== 1) { raw = Math.round(raw * hueScale); if (raw > 255) raw = 255; }
-          if (raw < onCh && ch !== hueMaxCh) {
-            // under tandpunkten: helt av - utom om kanalen redan ar tand och ligger over slackgransen (hysteres) -> hall tandpunkten
-            if (this.hueOn[ch] === 1 && raw >= onCh * HUE_OFF_FRAC) { const v = onCh > top ? top : onCh; universe[ch] = v; this.holdVal[ch] = v; this.holdUntil[ch] = nowMs + HOLD_MS; continue; }
-            this.hueOn[ch] = 0; universe[ch] = 0; this.holdUntil[ch] = 0; continue;
+          if (ch !== hueMaxCh && hueMaxRaw > 0) {
+            // ANDEL av starkaste kanalen (fore skalning) avgor tand/slackt, med hysteres - ljusstyrkans puls paverkar inte beslutet
+            const ratio = universe[ch] / hueMaxRaw;
+            const on = this.hueOn[ch] === 1 ? ratio >= HUE_RATIO_OFF : ratio >= HUE_RATIO_ON;
+            if (!on) { this.hueOn[ch] = 0; universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
+            this.hueOn[ch] = 1;
+            if (raw < onCh) raw = onCh;   // tand kanal halls pa minst tandpunkten (kalibreringen nedan klampar mot taket)
+            const v2 = raw > top ? top : raw; universe[ch] = v2; this.holdVal[ch] = v2; this.holdUntil[ch] = nowMs + HOLD_MS;
+            continue;
           }
           this.hueOn[ch] = 1;
         } else if (HUE_LIFT && isColor) { this.hueOn[ch] = 0; }
