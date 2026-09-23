@@ -88,3 +88,21 @@ Deploy som vanligt: `cd pi-dmx/engine && set PI_PASS=... && python tools\ladan.p
   mangd liv, men fran ett kontrakt i stallet for tva lappningar. OGONBEDOM: A/B med `python tools\ladan.py --env DMX_HEARTBEAT=1` resp. `=0`
   (en omstart per byte): syns hjartslaget i morka effekter? blir strobe/fyrverkeri fulla? blir lugna partier morkare? Vid for svag puls: DEPTH 0,5.
 - Kvar att bedoma fran igar: lugn-grinden av (drops i lugna partier), basgangs-toggles, dirigenten gasar fore refrangen, dynamiken mot refrangen.
+
+## Ladan 2026-09-23 (tur 2): EFFEKTOVERSYNEN - 46 effekter, 5 nya, 2 borta, 17 uppgraderade (effects.js + effects/*.js + moods.js + config.js)
+Samma deploy: `python tools\ladan.py` (`--dry` forst). ladan.py REMOVE flyttar innerouter.js/neon.js till .bak pa Pi:n.
+- **Borta:** innerouter (identisk med varannan upp till lampordning, rPerm 1,00), neon (aldrig vald pa nagon mix, sol ar samma fallback).
+- **Nya:** forvarning (build/low: sista 4 takterna fore FORUTSEDD refrang tands lamporna en i taget utifran och in, vit karna sista takten,
+  slapp pa slaget), basgang (toggle: ljuspunkten stegar pa BASNOTERNA, riggen glimmar med basens sustain), tyngdlyft (djup farg 6 dB under
+  refrangens niva -> vitt vid 0 dB, blinder over), uvpuls (UV pa slaget i refrangen - kraver uv-fixtur, riggens rgb7 har ingen),
+  frasraknare (svep var 4:e takt, vit blixt pa var 8:e takts etta).
+- **Uppgraderade:** chase/eko/stege stegar pa basnoter vid tydlig basgang; party/snap/rave far vitkarna + UV nar refrangen ar tillbaka
+  (repeatSim); wave/breathe har period ur gridet; tide/pendel dyning/svang over 8/4 takter (sectionBars); gravity/ripple skalar mot
+  refrangens niva (levelVsHighDb), ripple omskriven (v1 var ett A/B-flip 0,92 likt rave - nu rullar krusningen ut fran mitten);
+  stegring/nedrakning/sug raknar ner till forutsedd refrang (nedrakningens "allt tands" landar pa slaget); andrum djup ur levelVsHighDb.
+- **Motor:** basnotsraknare (onset.bass-flank, 90 ms), EffectDef.exact (specialkanal utan motorgolv), FIT-rader for sektionseffekterna
+  (stod pa neutral 0,5 och valdes aldrig), osedd-bonus `DMX_MIX_UNSEEN_BONUS` (0,10; 0 = av) sa varje effekt far en forsta chans.
+- **Bank (ladans env, 10 min):** pop 25/43 -> 25/46 effekter, megamix 24/43 -> 31/46; alla fem nya valda pa bada; topp-4 36/34 % -> 31/31 %.
+- **OGONBEDOM:** forvarningens nedrakning mot en riktig refrang (forutsagelsen finns bara 10-16 % av tiden i banken); basnotslaget i
+  chase/eko/stege/basgang (troskeln ar satt pa ogat); tyngdlyft/gravity/ripple pa ladans komprimerade PA (levelVsHighDb ror sig bara
+  +-4 dB - blir det platt ar skalan 6/9 dB ratten); att variationen kanns storre. Opt-out for dirigentens nya bonus: `--env DMX_MIX_UNSEEN_BONUS=0`.

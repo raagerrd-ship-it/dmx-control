@@ -59,6 +59,7 @@ for (let off = 0; off + HOP <= n && off < (startS + secs) * SR; off += HOP) {
     audio: c.audio, kickEnv: c.kickEnv, punch: c.punch, dropEnv: c.dropEnv, band: 0, gravLevel: c.gravLevel, gravPeak: c.gravPeak,
     drum: { ...fr2.drum }, section: c.section, sectionAgeMs: c.sectionAgeMs, sectionIndex: c.sectionIndex, sectionEntry: c.sectionEntry,
     sectionTier: c.sectionTier, repeatSim: c.repeatSim, expectHighInMs: c.expectHighInMs, levelVsHighDb: c.levelVsHighDb,
+    sectionBars: c.sectionBars, bassline: c.bassline, bassNoteIdx: c.bassNoteIdx, bassNoteAge: c.bassNoteAge,   // 2026-09-23: utan dessa blev basgang NaN (medel 0,00) och basnots-/frasgrenarna i chase/eko/stege/tide/pendel/frasraknare/forvarning kordes aldrig
     beatIdx: c.beatIdx, beatFrac: c.beatFrac, beatPulse: c.beatPulse, beatHit: c.beatHit, hasBeat: c.hasBeat,
     wavePhase, buildUp: c.buildUp, phaseSpread: c.phaseSpread, punchFloor: c.punchFloor, chasePos,
     dropFired: [...dropFired], dropHue: [...dropHue], now: ms - ms0, bands, palette: [...currentPalette()],
