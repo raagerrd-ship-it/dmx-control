@@ -110,6 +110,19 @@ const MINI_DELAY_MS = Number(process.env.MINI_DELAY_MS ?? 500);
  *  hysteres 0,2 nedat. MATT (tools/basslineProbe.mjs, andel av tiden >= 0,7): basdrivna Stranden 81 %, dansband 78 %,
  *  pop-facit 27 %, megamix 12 %, real.wav 1 %. */
 const CLEAR_BASS = Number(process.env.DMX_CLEAR_BASS ?? 0.7);
+/** EFFEKTMIX v2 (2026-09-23, agaren: "vi korde pa hoga effekter och hade inte sa manga"; tools/effectMix.mjs pa ladans 10-min-mixar:
+ *  20 av 43 effekter, 23 aldrig valda, chase/varannan/eko/bounce = 46 % av tiden). Tre orsaker, tre rattningar (DMX_MIX_V2=0 = som forr):
+ *  (1) basgangsregeln ersatte HELA poolen sa fort bassline >= 0,7 (nastan all pop) -> nu: pool-ersattning bara >= CLEAR_BASS_HARD (0,85)
+ *      och vartannat byte; daremellan bara en boost (+CLEAR_BASS_BOOST) at toggle-effekterna i rankingen;
+ *  (2) "byt aldrig mitt i en uppbyggnad" blockerade aven bytet IN i build-poolen -> stegring/sug/nedrakning valdes aldrig; nu tillats
+ *      ett byte vid intradet i 'build' (sedan haller uppbyggnaden som forr);
+ *  (3) ingen nyhetsstraff -> samma look kom tillbaka direkt; nu -MIX_RECENT_PENALTY for de MIX_RECENT_N senast valda. */
+const MIX_V2 = process.env.DMX_MIX_V2 !== '0';
+const CLEAR_BASS_HARD = Number(process.env.DMX_CLEAR_BASS_HARD ?? 0.85);
+const CLEAR_BASS_BOOST = Number(process.env.DMX_CLEAR_BASS_BOOST ?? 0.25);
+const MIX_RECENT_N = Number(process.env.DMX_MIX_RECENT_N ?? 4);
+const MIX_RECENT_PENALTY = Number(process.env.DMX_MIX_RECENT_PENALTY ?? 0.2);
+const MIX_TOP_FRAC = Number(process.env.DMX_MIX_TOP_FRAC ?? 0.5); // (4) valfonster = andel av poolen (minst 3)
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
 const START_FADE_MS = 5000;
@@ -392,6 +405,7 @@ export class EffectEngine {
     post = new PostProcess();
     maxCh = 0; // högsta använda kanal + 1
     smartCount = 0;
+    recentLooks = []; // MIX_V2: de senast valda lookerna (nyhetsstraff)
     lastSmartTier = "";
     lastSmartSwitchMs = 0; // tidsstämpel för senaste effektbyte → minsta-intervall
     activeMode = "smart";
@@ -1165,7 +1179,8 @@ export class EffectEngine {
                 this.partLook.clear();
                 this.partLookSong = this.memSongId;
             }
-            if (!inBuild && (dropSwitch || miniSwitch || (wantSwitch && held > MIN_HOLD && gridOk))) {
+            const buildEntry = MIX_V2 && liveSecChanged && liveSec === 'build'; // MIX_V2 (2): ett byte IN i build-poolen tillats
+            if ((!inBuild || buildEntry) && (dropSwitch || miniSwitch || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
                 this.lastSmartSwitchMs = now;
                 this.lastSmartTier = tierName;
                 this.lastHalvedForSwitch = this.pulseHalved;
@@ -1181,6 +1196,10 @@ export class EffectEngine {
                 // effekt än ingen).
                 const req = (m) => meetsRequirements(m, bpm, frame.profile);
                 let pool = enabled(wantCalm ? LUGN : tierS).filter(req);
+                // MIX_V2 (5): i 'high' (refrang/drop) ar energitiern oftast bara 'fart' (full 17-20 % av tiden pa ladans mixar) -> full-fart-
+                // effekterna (party, split, gravity, konfetti, fyrverkeri ...) valdes nastan aldrig. I high far poolen vara fart + full.
+                if (MIX_V2 && !wantCalm && liveSec === 'high' && tierS === FART)
+                    pool = enabled([...FART, ...FULLFART]).filter(req);
                 // SEKTIONSPOOL (DMX_SECTION_SWITCH): skar med sektionens looker (registry.SECTION_POOLS). 'build' och 'break' har egna
                 // effekter (stegring/andrum) som gar fore tiern; for high/low/intro ar snittet med tier-poolen forsta valet.
                 if (SECTION_SWITCH && liveSec) {
@@ -1229,12 +1248,13 @@ export class EffectEngine {
                 const remembered = !wantCalm && pairKey && !livePart ? this.partLook.get(pairKey) : undefined; // 20:33: ingen igenkanning for live-etiketter ('samma effekt igen') - bara latminnet
                 // TYDLIG BASGANG -> toggle-poolen (se CLEAR_BASS). Snitt med aktuell pool forst (sektion/tier/krav), annars alla
                 // aktiva toggle-effekter som moter kraven. Bast passande forst, gyllene-snitt-variation bland topp 3, aldrig samma.
-                const toggles = bassClear ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); return cut.length ? cut : enabled(TOGGLE_POOL).filter(req); })() : [];
+                const bassHard = bassClear && (!MIX_V2 || ((frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD && this.smartCount % 2 === 1)); // MIX_V2 (1)
+                const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); return cut.length ? cut : enabled(TOGGLE_POOL).filter(req); })() : [];
                 const clearBass = toggles.length > 0;
                 if (clearBass && !(remembered && TOGGLE_POOL.includes(remembered) && this.cfg.rotation?.[remembered] !== false)) {
-                    const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) })).sort((a, b) => b.s - a.s);
+                    const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (MIX_V2 && this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) })).sort((a, b) => b.s - a.s);
                     const cands = ranked.filter((x) => x.m !== this.smartMode);
-                    const top = (cands.length ? cands : ranked).slice(0, 3);
+                    const top = (cands.length ? cands : ranked).slice(0, MIX_V2 ? Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))) : 3);
                     this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
                     if (part && !wantCalm)
                         this.partLook.set(pairKey, this.smartMode);
@@ -1250,17 +1270,20 @@ export class EffectEngine {
                     // att hela riggen blinkar dubbelt uniformt (ägaren i ladan 2026-09-03).
                     const halvedNow = HALVE_SHOW && this.pulseHalved;
                     const fastBoost = (m) => (m === "varannan" && bpm >= 140 ? 0.30 : 0)
+                        + (MIX_V2 && bassClear && TOGGLE_POOL.includes(m) ? CLEAR_BASS_BOOST : 0) // MIX_V2 (1): boost, inte pool-byte
+                        - (MIX_V2 && this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) // MIX_V2 (3): nyhetsstraff
                         + (halvedNow && (m === "varannan" || m === "innerouter") ? 0.30 : 0)
                         + (HALVE_SHOW && m === "hjarta" ? (halvedNow ? 0.30 : (wantCalm || tierS === LUGN) ? 0.20 : 0) : 0); // halverat: trion varannan/innerouter/hjarta = hela topp-3
                     const ranked = pool
                         .map((m) => ({ m, s: fitScore(m, frame.profile) + fastBoost(m) }))
                         .sort((a, b) => b.s - a.s);
                     const cands = ranked.filter((x) => x.m !== this.smartMode);
-                    const top = (cands.length ? cands : ranked).slice(0, 3);
+                    // MIX_V2 (4): valfonstret var alltid topp-3 av passformen -> samma 3-5 looker per tier for evigt; nu topp-MIX_TOP_FRAC av poolen (minst 3)
+                    const top = (cands.length ? cands : ranked).slice(0, MIX_V2 ? Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))) : 3);
                     this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
                     if (part && !wantCalm) {
                         this.partLook.set(pairKey, this.smartMode);
-                        console.log(`[dirigent] ${part}: ny look "${this.smartMode}" (tier ${tierS === LUGN ? "lugn" : tierS === FART ? "fart" : "full"})`);
+                        console.log(`[dirigent] ${part}: ny look "${this.smartMode}" (tier ${tierS === LUGN ? "lugn" : tierS === FART ? "fart" : "full"}, pool ${pool.length})`);
                     }
                 }
                 // ENFORMIG LOOK -> KORTARE DWELL. Agaren 2026-09-12: "ar det en enformig effekt far den garna byta
@@ -1268,6 +1291,11 @@ export class EffectEngine {
                 // taktdrivna looker behaller DMX_DWELL_MS. Satts EFTER valet, eftersom dwellen ovan sattes fore.
                 if (process.env.DMX_DWELL_MS && EFFECT_MAP.get(this.smartMode)?.flat)
                     this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_FLAT_MS) || 30000);
+                if (MIX_V2) {
+                    this.recentLooks.push(this.smartMode);
+                    if (this.recentLooks.length > MIX_RECENT_N)
+                        this.recentLooks.shift();
+                }
             }
             effMode = this.smartMode;
         }
