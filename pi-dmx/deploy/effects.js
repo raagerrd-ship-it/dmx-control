@@ -177,6 +177,9 @@ const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
  *      detektorn da satt fast pa high; rotorsaken (ingen nollning vid latbyte) ar rattad 09-23. Ny lat (intro) glommer lookerna. */
 const SECTION_UNIT = SECTION_SWITCH && process.env.DMX_SECTION_UNIT === '1';
 const SECTION_UNIT_RESERVE_MS = Number(process.env.DMX_SECTION_UNIT_RESERVE_MS ?? 60000);
+/** SECTION_UNIT (ladan 16:45): forvarningens 'high' 600 ms fore en forutsedd refrang och drop-fonstrets 'high' raknas INTE som sektionsgrans
+ *  (de gav high<->low-hopp pa 1-2 s nar refrangen uteblev). Bara den raa sektionen, och den maste vara minst DMX_SECTION_UNIT_MIN_MS gammal. */
+const SECTION_UNIT_MIN_MS = Number(process.env.DMX_SECTION_UNIT_MIN_MS ?? 4000);
 const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);
 const BEAT_LIFT = Number(process.env.BEAT_LIFT ?? 0.25); // additivt hjartslagslyft (synlig puls aven i morka effekter)
 /** HEART-BEAT/ENERGI SOM EGEN DEL (2026-09-23, kontrakt heartbeat/contract.ts; opt-in DMX_HEARTBEAT=1, annars gamla vagen orord).
@@ -236,6 +239,14 @@ const LIVE_BEAT = !!process.env.DMX_LIVE_BEAT;
 const DEPTH_GAIN = Number(process.env.DEPTH_GAIN ?? 1);
 const LIVE_BEAT_MS = Number(process.env.LIVE_BEAT_MS ?? 240); // live-pulsens avklingning
 const LIVE_TRUST_LO = Number(process.env.LIVE_TRUST_LO ?? 0.3), LIVE_TRUST_HI = Number(process.env.LIVE_TRUST_HI ?? 0.7); // heartbeat-golv mellan slagen (env-tunbar; hogre = mindre dipp, ljusare)
+/** ENERGIFALLBACK (2026-09-23 ladan, agaren: "den kanns inte som den vaxlar till energistyrd nar heartbeat inte ar last"). Utan taktlas
+ *  blandar LIVE_BEAT over till en kick-driven puls - men utan tydliga kickar ar den pulsen 0 och bm = 1 - depth = KONSTANT dampning, och
+ *  loudness-gasen (lightLoud, log-release) ar for langsam for att kannas. Nu (DMX_ENERGY_FALLBACK=1): (a) utan las pulsar ljuset pa BREDA
+ *  transienter (max av onset bass/kick/treble, avklingning LIVE_BEAT_MS) i stallet for bara kickar; (b) golvet sanks med (1-w) x
+ *  DMX_ENERGY_FB_DIP sa energisvinget far storre omfang nar takten inte bar. w = taktens tillit (LIVE_TRUST_LO..HI). */
+const ENERGY_FB = process.env.DMX_ENERGY_FALLBACK === '1';
+const ENERGY_FB_DIP = Number(process.env.DMX_ENERGY_FB_DIP ?? 0.15);
+const ENERGY_FB_ONSET = Number(process.env.DMX_ENERGY_FB_ONSET ?? 0.30);
 const BEAT_TRUST_FLOOR = 0.75; // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 export class EffectEngine {
     cfg;
@@ -258,6 +269,9 @@ export class EffectEngine {
     showTime = 0; // ackumulerad "show-tid" — accelererar under uppbyggnaden (riser)
     lastShowMs = 0;
     lastKickBoost = 0;
+    transEnv = 0;
+    transAt = 0; // ENERGY_FB: transientpuls (bred onset) med avklingning
+    beatW = 1; // ENERGY_FB: taktens vikt 0..1 (1 = last)
     showVel = 0; // extra show-tids-hastighet från bastransienter (akustisk tröghet)
     pendingKick = 0; // ackumulerade kick-impulser sedan förra rendern (fylls i 375 Hz)
     /** Chase mode: fixture-index of the currently lit head. Advanced on kick and slow-time. */
@@ -798,10 +812,24 @@ export class EffectEngine {
         // blink i stallet for som andning. 0.06 lamnar lamporna tanda.
         // LIVE-BEAT: blanda grid-pulsen med en kick-driven puls efter tilliten (se LIVE_BEAT).
         let hbEnv = beatEnv;
-        if (LIVE_BEAT) {
+        if (LIVE_BEAT || ENERGY_FB) {
             const liveEnv = Math.exp(-Math.max(0, performance.now() - this.lastKickBoost) / LIVE_BEAT_MS);
             const w = (beat && beat.bpm > 40) ? Math.max(0, Math.min(1, (this.beatTrust - LIVE_TRUST_LO) / (LIVE_TRUST_HI - LIVE_TRUST_LO))) : 0;
-            hbEnv = w * beatEnv + (1 - w) * liveEnv;
+            this.beatW = w;
+            let fb = LIVE_BEAT ? liveEnv : 0;
+            if (ENERGY_FB) {
+                // bred transient: bas/kick/diskant-onset (adaptiv baslinje i analysatorn, tal komprimerad PA) -> puls med avklingning
+                const o = frame.onset;
+                const on = o ? Math.max(o.bass ?? 0, o.kick ?? 0, o.treble ?? 0) : 0;
+                const pn = performance.now();
+                if (on >= ENERGY_FB_ONSET && on >= this.transEnv * Math.exp(-(pn - this.transAt) / LIVE_BEAT_MS)) {
+                    this.transEnv = on;
+                    this.transAt = pn;
+                }
+                const tEnv = this.transEnv * Math.exp(-Math.max(0, pn - this.transAt) / LIVE_BEAT_MS);
+                fb = Math.max(fb, tEnv);
+            }
+            hbEnv = w * beatEnv + (1 - w) * fb;
         }
         const bm = this.cfg.beatPulse ? (1 - depth) + depth * hbEnv : 1;
         // FLADDER-DÄMP (ägaren 2026-09-02, kvar även med lågpasset BORTA → koden, inte
@@ -1140,7 +1168,7 @@ export class EffectEngine {
                 this.lastDropSwitchMs = now;
             const afterDrop = SECTION_SWITCH && now - this.lastDropSwitchMs < 20_000;
             const expectSoon = SECTION_SWITCH && EXPECT_LEAD_MS > 0 && (frame.expectHighInMs ?? -1) > 0 && (frame.expectHighInMs ?? 0) <= EXPECT_LEAD_MS; // forvarning: byt FORE refrangen
-            const liveSec = SECTION_SWITCH ? (afterDrop || expectSoon ? 'high' : (frame.section || '')) : '';
+            const liveSec = SECTION_SWITCH ? (SECTION_UNIT ? (frame.section || '') : (afterDrop || expectSoon ? 'high' : (frame.section || ''))) : ''; // SECTION_UNIT: bara raa sektionen
             const liveSecChanged = SECTION_SWITCH && liveSec !== '' && this.lastLiveSection !== '' && liveSec !== this.lastLiveSection;
             if (SECTION_SWITCH && liveSec !== '' && liveSec !== this.lastLiveSection) {
                 if (this.lastLiveSection !== '' && SECTION_TRACE)
@@ -1160,7 +1188,8 @@ export class EffectEngine {
                 }
             }
             if (SECTION_UNIT && liveSecChanged)
-                this.pendingSecSwitch = true; // ny lat (analysatorn nollar till intro) -> glom live-lookerna
+                this.pendingSecSwitch = true;
+            const secOldEnough = !SECTION_UNIT || (frame.sectionAgeMs ?? 1e9) >= SECTION_UNIT_MIN_MS; // SECTION_UNIT: ingen switch pa en sektion yngre an 4 s (detektorflapp)   // ny lat (analysatorn nollar till intro) -> glom live-lookerna
             const memSection = now - this.memSectionAt < 300 || liveSecChanged;
             const memPhrase = now - this.memPhraseAt < 250;
             const gridOk = !this.memHasGrid || memSection || memPhrase || now > this.smartDwellUntil + 20000;
@@ -1179,7 +1208,7 @@ export class EffectEngine {
             const wantSwitch = this.memPart
                 ? (memSection || bassSwitch)
                 : (SECTION_UNIT && liveSec)
-                    ? (memSection || this.pendingSecSwitch || bassSwitch || now > this.smartDwellUntil + SECTION_UNIT_RESERVE_MS) // SECTION_UNIT: sektionen ar enheten
+                    ? (((memSection || this.pendingSecSwitch) && secOldEnough) || bassSwitch || now > this.smartDwellUntil + SECTION_UNIT_RESERVE_MS) // SECTION_UNIT: sektionen ar enheten
                     : (tierChanged || memSection || halvedChanged || bassSwitch || now > this.smartDwellUntil);
             // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
             // det, inte bara på energinivån. Två regler, båda dramaturgiska:
@@ -1214,7 +1243,7 @@ export class EffectEngine {
                 this.partLookSong = this.memSongId;
             }
             const buildEntry = MIX_V2 && liveSecChanged && liveSec === 'build'; // MIX_V2 (2): ett byte IN i build-poolen tillats
-            const secEntry = SECTION_UNIT && this.pendingSecSwitch && liveSec !== 'build'; // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
+            const secEntry = SECTION_UNIT && this.pendingSecSwitch && secOldEnough && liveSec !== 'build'; // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
             if ((!inBuild || buildEntry || secEntry) && (dropSwitch || miniSwitch || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
                 this.lastSmartSwitchMs = now;
                 this.pendingSecSwitch = false;
@@ -1603,7 +1632,8 @@ export class EffectEngine {
         // dimmades aldrig, och hjärtslaget hade ingen plats att synas mot en maxad nivå
         // (ägaren i ladan 2026-09-03). Nu: golv LIGHT_FLOOR vid loud=0, full vid loud=1
         // → refräng ljus, vers dim = synlig gas, och pulsen syns uppåt mot en rörlig nivå.
-        const md0 = drive * (LIGHT_FLOOR + (1 - LIGHT_FLOOR) * loudness + frame.buildUp * 0.35 + this.dropEnv * 0.8);
+        const mdFloor = ENERGY_FB ? Math.max(0.02, LIGHT_FLOOR - (1 - this.beatW) * ENERGY_FB_DIP) : LIGHT_FLOOR; // ENERGY_FB: storre energisving utan las
+        const md0 = drive * (mdFloor + (1 - mdFloor) * loudness + frame.buildUp * 0.35 + this.dropEnv * 0.8);
         // SEKTIONSGAS (DMX_SECTION_SWITCH): refrang lyfter mastern, break sanker - utover loudness (som redan foljer nivan).
         // SEKTIONSVAXEL (ladan 20:00, agaren: 'ska kunna bli morkare, mer dynamik'): low/intro x(1-LOW_DIP), break x(1-BREAK_DIP),
         // high x(1+LIFT) nar tiern ar topp. Analysatorns sektion ar latens egen rangordning, sa ett lugnare parti BLIR morkare

@@ -24,15 +24,23 @@ DRY = '--dry' in ARGS
 ONLY_DEPLOY = '--bara-deploy' in ARGS
 FROZEN = ARGS[ARGS.index('--fran') + 1] if '--fran' in ARGS else None   # deploya en fryst kopia i stallet for dist/
 EXTRA = [ARGS[i + 1] for i, a in enumerate(ARGS) if a == '--env']
+PORTAR = '--portar' in ARGS   # skriv aven PORTAR_EJ_LIVE (lotus-portarna) - eget A/B-steg
 
 # Show-env: EN rad per port, med skalet. Andra har - inte pa Pi:n - sa nasta korning inte tar tillbaka det.
-SHOW_ENV = [
+# LOTUS-PORTARNA (tempo/kick/grid/tystnad) ar INTE live i ladan: lotus.conf rullades tillbaka 09-22 23:35 ("nastan 0 show") och Pi:n
+# kordes 09-22 kvall och 09-23 utan dem. De skrivs bara med flaggan --portar (eget A/B-steg), sa en vanlig korning inte slar pa dem tyst.
+PORTAR_EJ_LIVE = [
     ('DMX_TEMPO_EVIDENCE', '1',      'tempovalet pa slagpoang i stallet for tempogramtopp (lotus: 57/91 mot 46/91)'),
     ('DMX_TEMPO_ENV_S',    '10',     'onset-ringen 10 s - kort ring gav instabilt tempo pa langsamt material'),
     ('DMX_KICK_NOGATE',    '1',      'kickarna grindas inte mot eget grid (lotus: on-beat 0,63 -> 0,95)'),
     ('DMX_KICK_COOLDOWN',  '100',    'baston strax fore slaget skuggade slagets kick i 170 ms'),
     ('DMX_GRID_PHASE',     '1',      'fasen ur bas + helband i stallet for senaste kicken (bank: i fas 77/130, motfas 5)'),
     ('DMX_PHASE_FOLLOW',   '1',      'gridet foljer fasmatningen i stallet for enskilda kickar'),
+    ('DMX_SILENCE_LEVEL',  '0.03',   'ladans tystnadstroskel - standard 0,05 slackte riggen pa tysta fraser'),
+    ('DMX_SILENCE_MS',     '2000',   'sa lange maste det vara tyst innan grinden borjar stanga (standard 250 ms)'),
+    ('DMX_SILENCE_RELEASE_S', '1.0', 'mjuk aterhamtning i stallet for 0,25 s'),
+]
+SHOW_ENV = [
     ('DMX_SECTION',        '1',      'sektioner som DATA - KRAVS av lugn-grinden nedan (levelVsHighDb). INTE lookstyrning, se DMX_SECTION_SWITCH'),
     # DMX_SECTION_SWITCH AV 2026-09-22 22:40 (ladan, live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
     # -> dirigenten plockade bara ur full-fart-poolen och allt sag likadant ut. Sektionerna ar kvar som DATA (DMX_SECTION=1);
@@ -44,9 +52,6 @@ SHOW_ENV = [
     # LADANS EGNA VARDEN (2026-09-22 23:00): de satt bara i korningen (wsset) och gick forlorade vid varje omstart -
     # riggen slacktes i tysta fraser ("lamporna stangs av"). Utgangen multipliceras med tystnadsgrinden (drive), sa
     # standard 0,05/250/0,25 nollar ljuset sa fort en fras dippar. Koden dokumenterar sjalv ladans varden.
-    ('DMX_SILENCE_LEVEL',  '0.03',   'ladans tystnadstroskel - standard 0,05 slackte riggen pa tysta fraser'),
-    ('DMX_SILENCE_MS',     '2000',   'sa lange maste det vara tyst innan grinden borjar stanga (standard 250 ms)'),
-    ('DMX_SILENCE_RELEASE_S', '1.0', 'mjuk aterhamtning i stallet for 0,25 s'),
     # KVALLEN 2026-09-22 23:00-24:00 I LADAN. Varje rad nedan kommer ur ett uttalande + en matning, inte ur en gissning.
     # Filen ar sanningen: allt harunder satt fram till nu BARA som drop-ins pa Pi:n och hade forsvunnit vid nasta korning.
     ('DMX_ATTACK_MS',      '20',     'ladans utgangsattack - 90 ms smetade ut slagen ("heartbeat syns inte")'),
@@ -65,11 +70,17 @@ SHOW_ENV = [
     # annars ar hela grinden inert. Sektionerna ar DATA har.
     ('DMX_DROP_CALM_GATE', '1',      'lugna partier kraver starkare bevis for drop'),
     ('DROP_CALM_BUILD',    '0.25',   'riser-kravet (0 = grinden inert)'),
-    ('DROP_CALM_LAND_MS',  '300',    'hall kandidaten och fyra vid verifierad landning i stallet for att neka'),
+    ('DROP_CALM_LAND_MS',  '0',      'NEKA dropen i lugna partier (agaren i ladan 09-23: "i lugn, ta bort drop helt"); 300 = hall och fyra vid landning'),
     # LATBYTE -> SEKTIONEN NOLLAS (2026-09-23, port fran lotus dar det ar verifierat live: 'intro' vid ny lat 2 % -> 5/5).
     # Sektionsmaskineriet nollades bara vid 10 s tystnad, sa i en megamix jamfordes nya laten mot FORRA latens block och
     # 'intro' (som drop-grinden hanger pa) kunde aldrig intraffa efter forsta laten = "falska drops vid latbyte/intro".
     # Signalen kommer fran boundaryDetector.ts (klangskifte/tempo/nivadipp) via DMX_BOUNDARY_SOFT-hinten i index.ts.
+    # LADAN 09-23 kvall (allt ogonbedomt av agaren, "mycket battre"):
+    ('DMX_SECTION_SWITCH', '1',      'sektionsstyrning PA igen (rotorsaken till last-pa-high ar SECTION_ON_HINT)'),
+    ('DMX_SECTION_UNIT',   '1',      'sektionen ar enheten: byte bara vid ra sektionsgrans (>= 4 s gammal)/drop/basgang, samma look per sektionstyp'),
+    ('DMX_SECTION_TRACE',  '1',      'sektionsbyten i journalen (bara logg)'),
+    ('DMX_ENERGY_FALLBACK','1',      'utan taktlas: puls pa breda transienter + storre energisving ("dor inte emellanat")'),
+    ('DMX_HUE_LIFT',       '1',      'kulorlyft i kalibreringen: starkaste kanalen till tandpunkten, kuloren bevaras (standard pa; 0 = per kanal som forr)'),
     ('DMX_SECTION_ON_HINT', '1',     'latgransen nollar sektionshistoriken - annars jamfors nya laten mot forra latens'),
     # DMX_SECTION_SWITCH AV (2026-09-22 22:40, ladan live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
     # -> dirigenten plockade bara ur full-fart-poolen och allt sag likadant ut. Slas pa igen forst nar rangen ger vettig
@@ -158,7 +169,7 @@ def main():
     else:
         print('bygget ar aktuellt')
 
-    env_pairs = [f'{k}={v}' for k, v, _why in SHOW_ENV] + EXTRA
+    env_pairs = [f'{k}={v}' for k, v, _why in (SHOW_ENV + (PORTAR_EJ_LIVE if PORTAR else []))] + EXTRA
     cmd = [sys.executable, os.path.join(HERE, 'deploy-dist.py')]
     if DRY: cmd.append('--dry')
     if not ONLY_DEPLOY:
