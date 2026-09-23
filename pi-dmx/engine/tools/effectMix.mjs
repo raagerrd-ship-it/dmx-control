@@ -7,11 +7,13 @@ const { Analyser } = await import("../dist/analyser.js");
 const { EffectEngine } = await import("../dist/effects.js");
 const { defaultConfig } = await import("../dist/config.js");
 const { EFFECTS, TIER } = await import("../dist/effects/registry.js");
+const { BoundaryDetector } = await import("../dist/boundaryDetector.js");   // 2026-09-23: latgransen (som index.ts) - utan den nollas aldrig sektion/lookminne vid latbyte i banken
 const f = process.argv[2] || "tools/pop_ladan.wav", startS = Number(process.argv[3] || 0), secs = Number(process.argv[4] || 600);
 const d = readFileSync(f); const n = (d.readUInt32LE(40) || d.length - 44) / 2; const SR = 48000, HOP = 128;
 const cfg = JSON.parse(JSON.stringify(defaultConfig)); cfg.beatPulse = true; cfg.mode = "smart"; cfg.energyDrivesMode = true;
 const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
 const eng = new EffectEngine(cfg);
+let nowMs = 1700000000000; const bounds = new BoundaryDetector(() => nowMs); an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz)); let lastB = 0, nBounds = 0;
 const logs = []; const origLog = console.log; console.log = (...a) => { const s = a.join(" "); if (s.startsWith("[dirigent]")) logs.push(s); };
 const buf = new Float32Array(HOP); let ms0 = 1700000000000; let lastRender = -1;
 const share = new Map(); const secFx = {}; const tierShare = { lugn: 0, fart: 0, full: 0 }; let switches = 0; let last = ""; let lastAt = 0; const dwells = []; const secShare = {};
@@ -19,7 +21,9 @@ for (let off = 0; off + HOP <= n && off < (startS + secs) * SR; off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
   const ms = ms0 + (off / SR) * 1000; an.setVirtualClock(ms);
   Date.now = () => ms; performance.now = () => ms - 1700000000000;
-  const fr = an.process(buf);
+  nowMs = ms; const fr = an.process(buf);
+  bounds.tick({ level: fr.level, bpm: fr.bpm, bpmConfidence: fr.bpmConfidence });
+  if (bounds.boundaryCount !== lastB) { lastB = bounds.boundaryCount; nBounds++; eng.softenRange(); if (process.env.DMX_BOUNDARY_SOFT) an.hintTrackChange(5000); else an.resetTempo(); }
   if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
   if (off / SR >= startS && ms - lastRender >= 25) {
     lastRender = ms; eng.render(fr); const t = off / SR;
@@ -42,4 +46,7 @@ for (const [sec, mm] of Object.entries(secFx)) { const t = [...mm.values()].redu
 const notUsed = EFFECTS.map((e) => e.key).filter((k) => !share.has(k));
 console.log(`aldrig valda (${notUsed.length}): ` + notUsed.join(" "));
 const tiers = logs.map((l) => (l.match(/tier (\w+)/) || [])[1]).filter(Boolean); const tc = {}; for (const t of tiers) tc[t] = (tc[t] || 0) + 1;
+const nAter = logs.filter((l) => /återser|aterser/.test(l)).length, nSekt = logs.filter((l) => /\] sektion /.test(l)).length, nBas = logs.filter((l) => /tydlig basgang/.test(l)).length;
+const nNy = logs.filter((l) => /ny lat: glommer/.test(l)).length;
+console.log(`aterser (samma look nar sektionen kommer tillbaka): ${nAter}, sektionsbyten loggade: ${nSekt}, basgangsval: ${nBas}, latgranser ${nBounds} (lookminne glomt ${nNy} ggr)`);
 console.log(`[dirigent]-rader: ${logs.length}, 'ny look' per tier ${JSON.stringify(tc)}; exempel: ` + logs.slice(0, 6).map((l) => l.replace("[dirigent] ", "")).join(" | "));

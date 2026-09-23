@@ -168,6 +168,15 @@ const LIGHT_ANCHOR_TAU = 60000; // auto-ankarets tidskonstant (ms)
 // DMX_LIVE_LEVEL (2026-09-21): lotus nivakanal - se blocket i render(). Rattar bara for A/B.
 const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH === '1'; // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
 const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
+/** SEKTIONEN AR ENHETEN (2026-09-23, agaren: "jag vill inte att dirigenten bara byter effekt hela tiden, utan mer skapar en anpassad
+ *  show till laten"; opt-in DMX_SECTION_UNIT=1, kraver DMX_SECTION_SWITCH=1). Tva saker:
+ *  (1) BYTE bara vid sektionsgrans, drop/minidrop eller basgang som kommer/gar - inte pa tierflapp, halvering eller dwell-timern
+ *      (kvar som reserv efter dwell + DMX_SECTION_UNIT_RESERVE_MS, om detektorn skulle tystna).
+ *  (2) IGENKANNING for live-sektioner: samma look varje gang samma sektionstyp kommer tillbaka (refrangen ser ut som refrangen,
+ *      versen som versen) - nyckel = etiketten, inte sektionsparet. Var avstangd sedan 09-21 20:33 ("samma effekt igen") for att
+ *      detektorn da satt fast pa high; rotorsaken (ingen nollning vid latbyte) ar rattad 09-23. Ny lat (intro) glommer lookerna. */
+const SECTION_UNIT = SECTION_SWITCH && process.env.DMX_SECTION_UNIT === '1';
+const SECTION_UNIT_RESERVE_MS = Number(process.env.DMX_SECTION_UNIT_RESERVE_MS ?? 60000);
 const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);
 const BEAT_LIFT = Number(process.env.BEAT_LIFT ?? 0.25); // additivt hjartslagslyft (synlig puls aven i morka effekter)
 /** HEART-BEAT/ENERGI SOM EGEN DEL (2026-09-23, kontrakt heartbeat/contract.ts; opt-in DMX_HEARTBEAT=1, annars gamla vagen orord).
@@ -416,6 +425,8 @@ export class EffectEngine {
     maxCh = 0; // högsta använda kanal + 1
     smartCount = 0;
     recentLooks = []; // MIX_V2: de senast valda lookerna (nyhetsstraff)
+    pendingSecSwitch = false; // SECTION_UNIT: sektionsgrans passerad men bytet blockerat (riser/MIN_HOLD) -> gor det sa fort det gar
+    prevSongLook = new Map(); // SECTION_UNIT: forra latens look per sektionstyp (straffas sa nasta lat far en annan)
     lastSmartTier = "";
     lastSmartSwitchMs = 0; // tidsstämpel för senaste effektbyte → minsta-intervall
     activeMode = "smart";
@@ -1135,11 +1146,21 @@ export class EffectEngine {
                 if (this.lastLiveSection !== '' && SECTION_TRACE)
                     console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`);
                 this.lastLiveSection = liveSec;
-                if (liveSec === 'intro')
+                if (liveSec === 'intro') {
+                    let nGl = 0;
                     for (const k of [...this.partLook.keys()])
-                        if (k.startsWith('live:'))
+                        if (k.startsWith('live:')) {
+                            if (SECTION_UNIT)
+                                this.prevSongLook.set(k, this.partLook.get(k));
                             this.partLook.delete(k);
-            } // ny lat (analysatorn nollar till intro) -> glom live-lookerna
+                            nGl++;
+                        }
+                    if (nGl)
+                        console.log(`[dirigent] ny lat: glommer ${nGl} looker`);
+                }
+            }
+            if (SECTION_UNIT && liveSecChanged)
+                this.pendingSecSwitch = true; // ny lat (analysatorn nollar till intro) -> glom live-lookerna
             const memSection = now - this.memSectionAt < 300 || liveSecChanged;
             const memPhrase = now - this.memPhraseAt < 250;
             const gridOk = !this.memHasGrid || memSection || memPhrase || now > this.smartDwellUntil + 20000;
@@ -1157,7 +1178,9 @@ export class EffectEngine {
             const bassSwitch = bassClear !== this.lastBassClearForSwitch && (bassClear ? !curToggle : curToggle);
             const wantSwitch = this.memPart
                 ? (memSection || bassSwitch)
-                : (tierChanged || memSection || halvedChanged || bassSwitch || now > this.smartDwellUntil);
+                : (SECTION_UNIT && liveSec)
+                    ? (memSection || this.pendingSecSwitch || bassSwitch || now > this.smartDwellUntil + SECTION_UNIT_RESERVE_MS) // SECTION_UNIT: sektionen ar enheten
+                    : (tierChanged || memSection || halvedChanged || bassSwitch || now > this.smartDwellUntil);
             // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
             // det, inte bara på energinivån. Två regler, båda dramaturgiska:
             //
@@ -1191,8 +1214,10 @@ export class EffectEngine {
                 this.partLookSong = this.memSongId;
             }
             const buildEntry = MIX_V2 && liveSecChanged && liveSec === 'build'; // MIX_V2 (2): ett byte IN i build-poolen tillats
-            if ((!inBuild || buildEntry) && (dropSwitch || miniSwitch || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
+            const secEntry = SECTION_UNIT && this.pendingSecSwitch && liveSec !== 'build'; // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
+            if ((!inBuild || buildEntry || secEntry) && (dropSwitch || miniSwitch || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
                 this.lastSmartSwitchMs = now;
+                this.pendingSecSwitch = false;
                 this.lastSmartTier = tierName;
                 this.lastHalvedForSwitch = this.pulseHalved;
                 this.lastBassClearForSwitch = bassClear;
@@ -1256,15 +1281,16 @@ export class EffectEngine {
                 // LIVE-ETIKETT (ladan 20:30, 'fastnade i samma effekt'): generisk etikett ('high') aterser annars samma look hela laten.
                 // Par-regel: sektion nr 1-2 delar look, nr 3-4 en ny, osv. (A A B B) - igenkanning utan att fastna.
                 const livePart = !!part && part.startsWith('live:');
-                const pairKey = livePart ? part + ':' + Math.floor(((frame.sectionIndex ?? 0) + 1) / 2) : part;
-                const remembered = !wantCalm && pairKey && !livePart ? this.partLook.get(pairKey) : undefined; // 20:33: ingen igenkanning for live-etiketter ('samma effekt igen') - bara latminnet
+                const pairKey = livePart ? (SECTION_UNIT ? part : part + ':' + Math.floor(((frame.sectionIndex ?? 0) + 1) / 2)) : part; // SECTION_UNIT: nyckel = etiketten
+                const remembered = !wantCalm && pairKey && (!livePart || SECTION_UNIT) ? this.partLook.get(pairKey) : undefined; // SECTION_UNIT: igenkanning aven live
+                const unitPen = (m) => SECTION_UNIT && pairKey && this.prevSongLook.get(pairKey) === m ? 0.5 : 0; // SECTION_UNIT: inte forra latens look for samma sektionstyp   // 20:33: ingen igenkanning for live-etiketter ('samma effekt igen') - bara latminnet
                 // TYDLIG BASGANG -> toggle-poolen (se CLEAR_BASS). Snitt med aktuell pool forst (sektion/tier/krav), annars alla
                 // aktiva toggle-effekter som moter kraven. Bast passande forst, gyllene-snitt-variation bland topp 3, aldrig samma.
                 const bassHard = bassClear && (!MIX_V2 || ((frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD && this.smartCount % 2 === 1)); // MIX_V2 (1)
                 const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); return cut.length ? cut : enabled(TOGGLE_POOL).filter(req); })() : [];
                 const clearBass = toggles.length > 0;
                 if (clearBass && !(remembered && TOGGLE_POOL.includes(remembered) && this.cfg.rotation?.[remembered] !== false)) {
-                    const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (MIX_V2 && this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) + (MIX_V2 && !this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) })).sort((a, b) => b.s - a.s);
+                    const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (MIX_V2 && this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) + (MIX_V2 && !this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) - unitPen(m) })).sort((a, b) => b.s - a.s);
                     const cands = ranked.filter((x) => x.m !== this.smartMode);
                     const top = (cands.length ? cands : ranked).slice(0, MIX_V2 ? Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))) : 3);
                     this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
@@ -1285,6 +1311,7 @@ export class EffectEngine {
                         + (MIX_V2 && bassClear && TOGGLE_POOL.includes(m) ? CLEAR_BASS_BOOST : 0) // MIX_V2 (1): boost, inte pool-byte
                         - (MIX_V2 && this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) // MIX_V2 (3): nyhetsstraff
                         + (MIX_V2 && !this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) // MIX_V2 (6): osedd-bonus
+                        - unitPen(m) // SECTION_UNIT: forra latens look
                         + (halvedNow && (m === "varannan" || m === "basgang") ? 0.30 : 0)
                         + (HALVE_SHOW && m === "hjarta" ? (halvedNow ? 0.30 : (wantCalm || tierS === LUGN) ? 0.20 : 0) : 0); // halverat: trion varannan/innerouter/hjarta = hela topp-3
                     const ranked = pool

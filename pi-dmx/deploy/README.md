@@ -128,3 +128,10 @@ OVILLKORLIG (del, tier, pool, sektion, basgang) sa valen syns aven utan DMX_SECT
    DMX_FLOOR_CH/DMX_TIER_HI i Pi:ns lotus.conf? Ja = de var live i gar. Nej = golvet 16 % och tier-gransen 0,55 ar NYA mot i gar (bedom).
    Smart-laget skiljer sig (korrelation 0,83, medel +6 %, slagskala 0,094 -> 0,073 pa pop) - det ar EFFEKTVALEN (mix v2 + nya effekter),
    inte ljuskurvan; kanns det tammare ar aterstallningen `--env DMX_MIX_V2=0`.
+2b. A/B 1b (agaren 09-23: "inte byta effekt hela tiden, utan en anpassad show till laten"): `--env DMX_SECTION_SWITCH=1 --env DMX_SECTION_UNIT=1`.
+   SEKTIONEN AR ENHETEN: byte bara vid sektionsgrans, drop eller basgang som kommer/gar (inte tierflapp, halvering, dwell - reserv efter
+   dwell + 60 s), och samma look varje gang samma sektionstyp kommer tillbaka i laten (refrangen ser ut som refrangen; 'aterser' i loggen).
+   Ny lat glommer lookerna ("[dirigent] ny lat: glommer N looker") och forra latens look for samma sektionstyp straffas (-0,5).
+   Bank (ladans env + latgransdetektorn, 10 min): pop 35 byten/24 effekter (SWITCH) -> 28 byten/16 effekter/13 aterser (UNIT);
+   megamix 45/36 -> 37/19/17 aterser. Farre olika effekter per 10 min ar AVSIKTEN (4-5 looker per lat, en per sektionstyp).
+   Ogat: kanns showen "gjord for laten"? byter den for sallan (detektorn missar en sektion -> reserven 105 s)? sitter refrangens look?
