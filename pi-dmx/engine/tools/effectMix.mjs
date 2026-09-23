@@ -14,7 +14,7 @@ const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLo
 const eng = new EffectEngine(cfg);
 const logs = []; const origLog = console.log; console.log = (...a) => { const s = a.join(" "); if (s.startsWith("[dirigent]")) logs.push(s); };
 const buf = new Float32Array(HOP); let ms0 = 1700000000000; let lastRender = -1;
-const share = new Map(); const tierShare = { lugn: 0, fart: 0, full: 0 }; let switches = 0; let last = ""; let lastAt = 0; const dwells = []; const secShare = {};
+const share = new Map(); const secFx = {}; const tierShare = { lugn: 0, fart: 0, full: 0 }; let switches = 0; let last = ""; let lastAt = 0; const dwells = []; const secShare = {};
 for (let off = 0; off + HOP <= n && off < (startS + secs) * SR; off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
   const ms = ms0 + (off / SR) * 1000; an.setVirtualClock(ms);
@@ -25,6 +25,7 @@ for (let off = 0; off + HOP <= n && off < (startS + secs) * SR; off += HOP) {
     lastRender = ms; eng.render(fr); const t = off / SR;
     const m = eng.activeMode || eng.smartMode || "?"; share.set(m, (share.get(m) || 0) + 0.025);
     const sec = fr.section || "?"; secShare[sec] = (secShare[sec] || 0) + 0.025;
+    (secFx[sec] ||= new Map()).set(m, (secFx[sec].get(m) || 0) + 0.025);   // effekt x sektion
     if (m !== last) { if (last) { switches++; dwells.push(t - lastAt); } last = m; lastAt = t; }
   }
 }
@@ -37,6 +38,7 @@ const med = (a) => a.length ? [...a].sort((x, y) => x - y)[a.length >> 1] : 0;
 console.log(`${f} ${startS}-${startS + secs}s: ${rows.length} olika effekter av ${EFFECTS.length}, ${switches} byten, uppehall median ${med(dwells).toFixed(0)} s (min ${Math.min(...dwells).toFixed(0)}, max ${Math.max(...dwells).toFixed(0)})`);
 console.log("tid per tier: " + Object.entries(tierShare).map(([k, v]) => `${k} ${(100 * v / tot).toFixed(0)} %`).join(", ") + " | sektioner: " + Object.entries(secShare).map(([k, v]) => `${k} ${(100 * v / tot).toFixed(0)} %`).join(", "));
 console.log("effekter (andel av tiden): " + rows.map(([m, s]) => `${m} ${(100 * s / tot).toFixed(0)}%[${tierOf(m)[0]}]`).join("  "));
+for (const [sec, mm] of Object.entries(secFx)) { const t = [...mm.values()].reduce((a, b) => a + b, 0); console.log(`  i ${sec.padEnd(5)}: ` + [...mm.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([k, v]) => `${k} ${(100 * v / t).toFixed(0)}%`).join("  ")); }
 const notUsed = EFFECTS.map((e) => e.key).filter((k) => !share.has(k));
 console.log(`aldrig valda (${notUsed.length}): ` + notUsed.join(" "));
 const tiers = logs.map((l) => (l.match(/tier (\w+)/) || [])[1]).filter(Boolean); const tc = {}; for (const t of tiers) tc[t] = (tc[t] || 0) + 1;
