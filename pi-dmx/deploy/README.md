@@ -135,3 +135,11 @@ OVILLKORLIG (del, tier, pool, sektion, basgang) sa valen syns aven utan DMX_SECT
    Bank (ladans env + latgransdetektorn, 10 min): pop 35 byten/24 effekter (SWITCH) -> 28 byten/16 effekter/13 aterser (UNIT);
    megamix 45/36 -> 37/19/17 aterser. Farre olika effekter per 10 min ar AVSIKTEN (4-5 looker per lat, en per sektionstyp).
    Ogat: kanns showen "gjord for laten"? byter den for sallan (detektorn missar en sektion -> reserven 105 s)? sitter refrangens look?
+
+## Nasta ladan-tur: lotus-porten i DMX_ENERGY_FALLBACK (effects.js, kod 2026-09-23 kvall, EJ deployad)
+Samma regler som agaren ogonbedomde i kallaren, aktiva med DMX_ENERGY_FALLBACK=1 (redan i SHOW_ENV): las pa RENA SLAG i rad (DMX_BEAT_LOCK_BEATS 8,
+LOCK_CONF 0,6, LOCK_ERR 0,10 av ett slag) i stallet for tid; rastret 0 under vikt 0,35 / fullt fran 0,65 (ingen dubbelpuls lead+anslag);
+anslagspulser hogst en per DMX_ENERGY_FB_GAP_MS 330; djupet foljer anslagstatheten (DMX_ENERGY_ACT_REF 0,25); fasfel |beatErr| >
+DMX_SYNC_ERR_FRAC 0,2 drar ner tilliten, tappad tillit > 1,5 s nollar slagraknaren. Halvering over 135 BPM fanns redan.
+Bank (hbDump, ladans env): megamix intervall < 0,3 s 29 % -> 6 %, energilage 6 -> 19 % av tiden, djup lika; pop oforandrat (3,3 pulser/s
+bade fore och efter - KOLLA MED OGAT om pop-rastret gar dubbelt). Deploy: `python tools\ladan.py` (bara effects.js skiljer).

@@ -247,6 +247,20 @@ const LIVE_TRUST_LO = Number(process.env.LIVE_TRUST_LO ?? 0.3), LIVE_TRUST_HI = 
 const ENERGY_FB = process.env.DMX_ENERGY_FALLBACK === '1';
 const ENERGY_FB_DIP = Number(process.env.DMX_ENERGY_FB_DIP ?? 0.15);
 const ENERGY_FB_ONSET = Number(process.env.DMX_ENERGY_FB_ONSET ?? 0.30);
+/** PORTAT FRAN LOTUS 2026-09-23 kvall (kallaren, agaren ogonbedomde varje steg) - galler med DMX_ENERGY_FALLBACK=1:
+ *  (1) LAS PA RENA SLAG, inte tid: rastret far vikt forst efter DMX_BEAT_LOCK_BEATS rena slag i rad (konf >= LOCK_CONF, |fasfel| <= LOCK_ERR
+ *      av ett slag); smutsigt slag -2; tempobyte > 3 % nollar. "lat den analysera tills den ar saker i borjan av laten".
+ *  (2) INGEN DUBBELPULS: rastret ar 0 under vikt 0,35 och fullt fran 0,65 (lead-pulsen fore + anslagspulsen efter = fladder).
+ *  (3) ANSLAGSPULSER hogst en per DMX_ENERGY_FB_GAP_MS (basgangens attondelar gav 4/s = fladder).
+ *  (4) DJUPET FOLJER ANSLAGSTATHETEN i energilaget (glesa anslag = ljuset ligger vid taket, inte morkt emellan).
+ *  (5) FASFEL = OSAKER: |cfg.beatErr| over DMX_SYNC_ERR_FRAC drar ner tilliten (0 vid dubbla); tappad tillit > 1,5 s nollar slagraknaren
+ *      sa rastret maste bevisa sig igen ("battre tillbaka till energi an osynk", "jobba i bakgrunden med att synka igen"). */
+const LOCK_BEATS = Number(process.env.DMX_BEAT_LOCK_BEATS ?? 8);
+const LOCK_CONF = Number(process.env.DMX_BEAT_LOCK_CONF ?? 0.6);
+const LOCK_ERR = Number(process.env.DMX_BEAT_LOCK_ERR ?? 0.10);
+const ENERGY_FB_GAP_MS = Number(process.env.DMX_ENERGY_FB_GAP_MS ?? 330);
+const ENERGY_ACT_REF = Number(process.env.DMX_ENERGY_ACT_REF ?? 0.25);
+const SYNC_ERR_FRAC = Number(process.env.DMX_SYNC_ERR_FRAC ?? 0.2);
 const BEAT_TRUST_FLOOR = 0.75; // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 export class EffectEngine {
     cfg;
@@ -271,6 +285,11 @@ export class EffectEngine {
     lastKickBoost = 0;
     transEnv = 0;
     transAt = 0; // ENERGY_FB: transientpuls (bred onset) med avklingning
+    lockGood = 0;
+    lockBpmRef = 0;
+    lockRamp = 1;
+    transAct = 0;
+    trustLowSince = 0; // lotus-porten (se LOCK_BEATS)
     beatW = 1; // ENERGY_FB: taktens vikt 0..1 (1 = last)
     showVel = 0; // extra show-tids-hastighet från bastransienter (akustisk tröghet)
     pendingKick = 0; // ackumulerade kick-impulser sedan förra rendern (fylls i 375 Hz)
@@ -763,7 +782,22 @@ export class EffectEngine {
         // pulsen var avstangd samtidigt som diagnostiken visade tillit. Ett
         // dodband som bara gick att felsoka genom att lasa bada filerna.
         const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - MIN_BEAT_CONFIDENCE) / 0.37));
-        this.beatTrust += (trustRaw - this.beatTrust) * 0.06; // 0.03 -> 0.06: nar fullt slag efter en overgang pa ~0.7 s i st f ~1.5 s
+        // (5) FASFEL = OSAKER (lotus-porten): ihallande fasfel drar ner den raa tilliten; tappad tillit > 1,5 s nollar slagraknaren.
+        let trustRawEff = trustRaw;
+        if (ENERGY_FB) {
+            const se = Math.abs(this.cfg.beatErr ?? 0), lim = Math.max(0.02, SYNC_ERR_FRAC);
+            trustRawEff *= se <= lim ? 1 : Math.max(0, 1 - (se - lim) / lim);
+            const nowT = performance.now();
+            if (trustRawEff < 0.2) {
+                if (this.trustLowSince === 0)
+                    this.trustLowSince = nowT;
+                else if (nowT - this.trustLowSince >= 1500)
+                    this.lockGood = 0;
+            }
+            else
+                this.trustLowSince = 0;
+        }
+        this.beatTrust += (trustRawEff - this.beatTrust) * 0.06; // 0.03 -> 0.06: nar fullt slag efter en overgang pa ~0.7 s i st f ~1.5 s
         // TILLITSGOLV (portat från Lotus beatTrustFloor 2026-08-31). Rampen börjar exakt
         // där klockans grind släpper igenom (MIN_BEAT_CONFIDENCE), så vid conf ≈ 0.20 är
         // rutnätet LEVANDE men tilliten 0 → depth ≈ 0 och hjärtslaget är avstängt fast
@@ -806,7 +840,7 @@ export class EffectEngine {
         // 0.80 → 0.92, och energigolvet 0.35 → 0.50: djupare slag överallt, och märkbart
         // mer även i lugna partier. Pulsen ligger sist i kedjan och passerar inget
         // filter, så hela djupet når fram — det som mäts är det som syns.
-        const depth = Math.min(1, DEPTH_GAIN * 0.92 * trustFloored * (0.62 + 0.45 * energy) * calm); // 0.50+0.50 -> 0.62+0.45: punchigare hjartslag (agaren "svagare/dimmare" efter effekt-trim)
+        let depth = Math.min(1, DEPTH_GAIN * 0.92 * trustFloored * (0.62 + 0.45 * energy) * calm); // 0.50+0.50 -> 0.62+0.45: punchigare hjartslag (agaren "svagare/dimmare" efter effekt-trim)
         // KLAMRAS NEDAT: pre-dippen far envelopen ga negativ med flit, men
         // multiplikatorn far aldrig slacka riggen helt — da lases dippen som ett
         // blink i stallet for som andning. 0.06 lamnar lamporna tanda.
@@ -814,22 +848,49 @@ export class EffectEngine {
         let hbEnv = beatEnv;
         if (LIVE_BEAT || ENERGY_FB) {
             const liveEnv = Math.exp(-Math.max(0, performance.now() - this.lastKickBoost) / LIVE_BEAT_MS);
-            const w = (beat && beat.bpm > 40) ? Math.max(0, Math.min(1, (this.beatTrust - LIVE_TRUST_LO) / (LIVE_TRUST_HI - LIVE_TRUST_LO))) : 0;
-            this.beatW = w;
+            let w = (beat && beat.bpm > 40) ? Math.max(0, Math.min(1, (this.beatTrust - LIVE_TRUST_LO) / (LIVE_TRUST_HI - LIVE_TRUST_LO))) : 0;
             let fb = LIVE_BEAT ? liveEnv : 0;
+            let depthEff = depth;
             if (ENERGY_FB) {
-                // bred transient: bas/kick/diskant-onset (adaptiv baslinje i analysatorn, tal komprimerad PA) -> puls med avklingning
+                // (1) LAS PA RENA SLAG: raknas per slag (beatTick), tempobyte > 3 % nollar
+                const bpmNow = (beat && beat.bpm > 40) ? beat.bpm : 0;
+                if (bpmNow <= 0) {
+                    this.lockGood = 0;
+                    this.lockBpmRef = 0;
+                }
+                else {
+                    if (this.lockBpmRef <= 0 || Math.abs(bpmNow - this.lockBpmRef) > this.lockBpmRef * 0.03) {
+                        this.lockBpmRef = bpmNow;
+                        this.lockGood = 0;
+                    }
+                    if (beatTick) {
+                        const clean = (frame.bpmConfidence ?? 0) >= LOCK_CONF && Math.abs(this.cfg.beatErr ?? 0) <= LOCK_ERR;
+                        this.lockGood = clean ? this.lockGood + 1 : Math.max(0, this.lockGood - 2);
+                    }
+                }
+                this.lockRamp = LOCK_BEATS > 0 ? Math.min(1, this.lockGood / LOCK_BEATS) : 1;
+                // (2) rastrets vikt: tillit x bevis, 0 under 0,35 och fullt fran 0,65 -> ingen dubbelpuls i energilaget
+                const wRaw = w * this.lockRamp;
+                w = Math.max(0, Math.min(1, (wRaw - 0.35) / 0.3));
+                // (3) bred transient: bas/kick/diskant-onset -> puls med avklingning, hogst en per ENERGY_FB_GAP_MS
                 const o = frame.onset;
                 const on = o ? Math.max(o.bass ?? 0, o.kick ?? 0, o.treble ?? 0) : 0;
                 const pn = performance.now();
-                if (on >= ENERGY_FB_ONSET && on >= this.transEnv * Math.exp(-(pn - this.transAt) / LIVE_BEAT_MS)) {
+                if (on >= ENERGY_FB_ONSET && pn - this.transAt >= ENERGY_FB_GAP_MS && on >= this.transEnv * Math.exp(-(pn - this.transAt) / LIVE_BEAT_MS)) {
                     this.transEnv = on;
                     this.transAt = pn;
                 }
                 const tEnv = this.transEnv * Math.exp(-Math.max(0, pn - this.transAt) / LIVE_BEAT_MS);
                 fb = Math.max(fb, tEnv);
+                // (4) djupet foljer anslagstatheten i energilaget
+                const dtA = Math.min(0.05, Math.max(0.005, (pn - this.lastRenderMs) / 1000));
+                this.transAct += (tEnv - this.transAct) * Math.min(1, dtA / 1.5);
+                const act = Math.min(1, this.transAct / Math.max(0.02, ENERGY_ACT_REF));
+                depthEff = depth * (w + (1 - w) * act);
             }
+            this.beatW = w;
             hbEnv = w * beatEnv + (1 - w) * fb;
+            depth = depthEff;
         }
         const bm = this.cfg.beatPulse ? (1 - depth) + depth * hbEnv : 1;
         // FLADDER-DÄMP (ägaren 2026-09-02, kvar även med lågpasset BORTA → koden, inte
