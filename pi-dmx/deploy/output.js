@@ -35,13 +35,8 @@ const HOLD_MS = 120;
 /** KULORLYFT (2026-09-23, agaren i ladan: "lamporna kor nastan hela tiden med alla LED R G B paslagna ... kravet ar ju bara att EN
  *  kanal ar over tandpunkten"). Forr lyftes VARJE fargkanal > 0 till sin tandpunkt for sig - ett spar av gront och blatt i en rod
  *  lampa (punch-avmattning, ambient) blev 16/255 pa alla tre = alla LED tanda och kuloren urblekt. Nu: lampans STARKASTE fargkanal
- *  ska na tandpunkten; ar den under skalas alla fargkanaler med samma faktor (kuloren bevaras), och kanaler under tandpunkten som
- *  inte ar starkast lamnas som de ar (LED:n ar da fysiskt slackt - det ar meningen). DIM-kanalen lyfts som forr. DMX_HUE_LIFT=0 = som forr. */
+ *  ska na tandpunkten; ar den under skalas alla fargkanaler med samma faktor (kuloren bevaras), Ovriga kanaler: se DISTINKTA FARGER. DIM-kanalen lyfts som forr. DMX_HUE_LIFT=0 = som forr. */
 const HUE_LIFT = process.env.DMX_HUE_LIFT !== '0';
-/** Hysteres for icke-starkaste fargkanaler (16:35 ladan: "fladdrig i de LED som inte lyser, av och pa hela tiden" - ett ravarde
- *  under tandpunkten lat LED:n vackla). Under tandpunkten = HELT AV (0). Tand kanal slocknar forst under HUE_OFF_FRAC x tandpunkten,
- *  och halls pa tandpunkten daremellan, sa en kanal som ligger runt troskeln inte slar av och pa. */
-const HUE_OFF_FRAC = Number(process.env.DMX_HUE_OFF_FRAC ?? 0.6);
 /** DISTINKTA FARGER (2026-09-23 22:30, agaren: "nar nagon av R/G/B kommer vid slackgransen kan den flimra nar den gar over/under -
  *  styr mot distinkta farger som inte behover under t.ex. 5 %"). En svag fargkanal ar tand eller slackt efter sin ANDEL av lampans
  *  starkaste kanal, inte efter absolut niva - sa den byter bara nar FARGEN andras, aldrig nar ljusstyrkan pulserar. Tand: >= HUE_RATIO_ON
