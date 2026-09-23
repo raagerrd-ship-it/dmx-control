@@ -9,7 +9,11 @@ export const stegring: EffectDef = {
   desc: "Uppbyggnad: morkt till vitt, tatare puls och UV ju narmare dropen.",
   drives: ["uv", "hazer", "blinder"],
   render(c) {
-    const u = Math.min(1, (c.sectionAgeMs / 16000) + c.frame.buildUp * 0.5);   // 0 = borjan, 1 = strax fore dropen
+    // FORUTSEDD REFRANG (2026-09-23): nar analysatorn vantar en refrang (expectHighInMs > 0) driver nedrakningen spanningen -
+    // 8 takter fore = 0, pa slaget = 1 - i stallet for bara sektionens alder/riser. Storsta av de tva vinner.
+    const bpm = c.cfg.beat?.bpm ?? 0; const barMs = bpm > 0 ? 240000 / bpm : 2000;
+    const uEx = c.expectHighInMs > 0 ? Math.max(0, 1 - c.expectHighInMs / (8 * barMs)) : 0;
+    const u = Math.min(1, Math.max(uEx, (c.sectionAgeMs / 16000) + c.frame.buildUp * 0.5));   // 0 = borjan, 1 = strax fore dropen
     const every = u < 0.35 ? 4 : u < 0.7 ? 2 : 1;                                  // pulsen tatnar
     const onBeat = c.hasBeat && c.beatIdx % every === 0;
     const pulse = onBeat ? Math.exp(-c.beatFrac / 0.12) : 0;

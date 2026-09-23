@@ -12,8 +12,10 @@ import { EFFECT_KEYS } from "./effects/registry.js";
  *  Bara dessa är "på"; alla andra sätts AV så smart bara plockar ur poolen. */
 const POOL: Record<MoodId, Mode[]> = {
   chill: ["breathe", "aurora", "mono", "subbreath", "airglow", "twin", "tide", "drift", "pendel", "viska"],
-  fest:  ["breathe", "aurora", "twin", "wave", "chase", "pulse", "drops", "party", "snap", "bounce", "gallop", "ripple", "tide", "pendel", "backbeat", "eko", "hjarta", "stege"],
-  galet: ["party", "snap", "bounce", "rave", "gallop", "ripple", "drops", "drumkit", "duel", "split", "pulse", "strobe", "backbeat", "tick", "stege", "eko"],
+  fest:  ["breathe", "aurora", "twin", "wave", "chase", "pulse", "drops", "party", "snap", "bounce", "gallop", "ripple", "tide", "pendel", "backbeat", "eko", "hjarta", "stege",
+          "forvarning", "basgang", "tyngdlyft", "frasraknare"],   // 2026-09-23: signaleffekterna
+  galet: ["party", "snap", "bounce", "rave", "gallop", "ripple", "drops", "drumkit", "duel", "split", "pulse", "strobe", "backbeat", "tick", "stege", "eko",
+          "forvarning", "basgang", "tyngdlyft", "uvpuls", "frasraknare"],
 };
 
 /** "Känslo-rattarna" per stämning. LÄTT ATT JUSTERA. */

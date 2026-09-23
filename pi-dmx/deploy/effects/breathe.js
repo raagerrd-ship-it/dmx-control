@@ -12,8 +12,12 @@ export const breathe = {
         // likadana effekter i en 10-effekters lugn-pool gör att chill upprepar sig.
         // Hela riggen andas SAMTIDIGT (ingen per-lampa-fas) — det är det som skiljer
         // den från aurora (rumslig gradient) och twin (varannan lampa).
-        const djup = 0.6 + c.frame.intensity * 0.4; // md agar nu sektionsdynamiken → mindre egen koppling
-        const breath = 0.5 + 0.5 * Math.sin(c.t * 0.7) * djup;
+        // FRASPERIOD (2026-09-23): med takt andas riggen ETT andetag per takt (4 slag) ur gridet; djupet foljer nivan mot latens
+        // egen refrang (levelVsHighDb: 9 dB under = grunt, vid refrangens niva = fullt). Utan takt: klocktid som forr.
+        const lv = c.levelVsHighDb;
+        const djup = (0.6 + c.frame.intensity * 0.4) * (lv !== 0 ? Math.max(0.4, Math.min(1, 1 + lv / 9)) : 1);
+        const ph = c.hasBeat ? (2 * Math.PI * (((c.beatIdx % 4) + 4) % 4 + c.beatFrac)) / 4 : c.t * 0.7;
+        const breath = 0.5 + 0.5 * Math.sin(ph) * djup;
         const m = Math.min(1, breath * 0.85 + c.audio * 0.2 + c.punch * 0.2); // riktig dunk → mjuk svall
         return c.hsv(hue, 1, 0.18 + 0.82 * m); // golv 0.3 nu redundant (md har eget 0.3)
     },

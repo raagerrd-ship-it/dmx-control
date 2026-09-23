@@ -7,7 +7,9 @@ export const pendel = {
     desc: "En mjuk ljustopp svänger taktlåst över riggen, ett svep per fras.",
     render(c) {
         const step = c.mclk(1, 0.5); // ett steg per taktslag
-        const phase = (step % 16) / 16; // 16 slag = fram och åter
+        // FRASPERIOD (2026-09-23): med takt svanger pendeln KONTINUERLIGT over 4 takter ur sectionBars (takter sedan sektionsstart)
+        // - den vander exakt pa frasgransen och borjar om nar sektionen byter. Utan takt: 16 steg pa klockan som forr.
+        const phase = c.hasBeat && c.sectionBars > 0 ? (c.sectionBars % 4) / 4 : (step % 16) / 16; // fram och åter
         const tri = phase < 0.5 ? phase * 2 : 2 - phase * 2; // 0..1..0
         const pos = tri * (c.count - 1);
         const d = Math.abs(c.idx - pos);

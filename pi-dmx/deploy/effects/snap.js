@@ -15,6 +15,10 @@ export const snap = {
         const entry = c.section === 'high' ? c.sectionEntry : 0;
         if (entry > 0.5)
             c.want.blinder = entry;
-        return c.hsv(hue, 1 - Math.max(gnista * 0.5, entry), v); // slag → vit-gnista; refrangens entre → vitt
+        // REFRANGEN AR TILLBAKA (2026-09-23): kapet far en vit karna och UV pa slaget nar repeatSim sager att det ar samma refrang igen.
+        const back = c.section === 'high' && c.repeatSim >= 0.92 && c.sectionIndex >= 2 ? gnista : 0;
+        if (back > 0)
+            c.want.uv = back;
+        return c.hsv(hue, 1 - Math.max(gnista * 0.5, entry, back * 0.9), v); // slag → vit-gnista; refrangens entre → vitt
     },
 };

@@ -43,15 +43,18 @@ import { hjarta } from "./hjarta.js";
 import { sol } from "./sol.js";
 import { konfetti } from "./konfetti.js";
 import { sopa } from "./sopa.js";
-import { neon } from "./neon.js";
 import { varannan } from "./varannan.js";
-import { innerouter } from "./innerouter.js";
 import { stegring } from "./stegring.js";
 import { andrum } from "./andrum.js";
 import { sug } from "./sug.js";
 import { vagbrytare } from "./vagbrytare.js";
 import { nedrakning } from "./nedrakning.js";
 import { fyrverkeri } from "./fyrverkeri.js";
+import { forvarning } from "./forvarning.js";
+import { basgang } from "./basgang.js";
+import { tyngdlyft } from "./tyngdlyft.js";
+import { uvpuls } from "./uvpuls.js";
+import { frasraknare } from "./frasraknare.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
@@ -60,11 +63,16 @@ export const EFFECTS: EffectDef[] = [
   duel, airglow,
   // Nya (2026-07): fyller lugn- och fart-poolerna till 10+ vardera.
   tide, drift, pendel, viska, backbeat, tick, stege, eko, hjarta,
-  varannan, innerouter,
+  varannan,
   // Sektionseffekter (2026-09-21): valjs av dirigenten vid build-/break-grans (DMX_SECTION_SWITCH).
   stegring, andrum, sug, vagbrytare, nedrakning, fyrverkeri,
-  // Registrerade 2026-09-21 (fanns som filer men inte i poolen): sol, konfetti, sopa, neon.
-  sol, konfetti, sopa, neon,
+  // Registrerade 2026-09-21 (fanns som filer men inte i poolen): sol, konfetti, sopa.
+  sol, konfetti, sopa,
+  // OVERSYN 2026-09-23 (tools/effectSimilarity.mjs v2 + effectMix): innerouter borttagen (rPerm 1,00 mot varannan, samma pool,
+  // ingen egen signal), neon borttagen (aldrig vald pa nagon av ladans mixar, ingen egen signal - sol ar samma fallback).
+  // Nya effekter pa analysatorns nya signaler: forvarning (expectHighInMs), basgang (bassline/basnoter), tyngdlyft
+  // (levelVsHighDb), uvpuls (UV pa slaget i refrangen), frasraknare (sectionBars).
+  forvarning, basgang, tyngdlyft, uvpuls, frasraknare,
 ];
 
 /** Specialrolls-mappning: vilka fixture-roller (hazer/uv/blinder/strobe/laser/co2)
@@ -82,10 +90,10 @@ export const EFFECTS: EffectDef[] = [
  *  och att hårdvaruskyddet i output.ts släpper fram puffen.) */
 const SPECIALTY_DRIVES: Partial<Record<Mode, ChannelRole[]>> = {
   drops:    ["blinder", "strobe", "laser", "co2", "hazer"],
-  party:    ["blinder", "laser", "co2", "hazer"],
+  party:    ["blinder", "laser", "co2", "hazer", "uv"],
   strobe:   ["strobe", "laser"],
-  rave:     ["strobe", "laser", "blinder", "hazer", "co2"],
-  snap:     ["blinder"],
+  rave:     ["strobe", "laser", "blinder", "hazer", "co2", "uv"],
+  snap:     ["blinder", "uv"],
   bounce:   ["laser"],
   backbeat: ["blinder"],
   hjarta:   ["blinder"],
@@ -104,6 +112,13 @@ const SPECIALTY_DRIVES: Partial<Record<Mode, ChannelRole[]>> = {
   nedrakning: ["hazer", "blinder"],
   fyrverkeri: ["blinder", "strobe"],
   andrum:   ["hazer"],
+  // 2026-09-23
+  forvarning: ["uv", "hazer", "blinder"],
+  tyngdlyft:  ["blinder", "uv"],
+  uvpuls:     ["uv", "blinder"],
+  frasraknare:["blinder"],
+  ripple:     ["blinder"],
+  gravity:    ["blinder"],
 };
 
 /** SEKTIONSPOOL (2026-09-21): harledd ur varje effekts egen `section`-tagg (ingen oversattningstabell - taggen bor i effektfilen).
@@ -178,7 +193,10 @@ const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
   drops:    { needsBeat: 0.30 },
   stege:    { needsBeat: 0.30 },
   varannan: { needsBeat: 0.35 },
-  innerouter: { needsBeat: 0.35 },
+  // 2026-09-23
+  basgang:  { needsBeat: 0.30 },   // inte needsBass: ladans profile.bass ligger 0,0-0,4 (megamix median 0,15); effekten faller sjalv tillbaka pa slaget
+  uvpuls:   { needsBeat: 0.35 },
+  frasraknare: { needsBeat: 0.35 },
 };
 
 /** Möter effekten sina krav givet nuvarande tempo + karaktärsprofil? */

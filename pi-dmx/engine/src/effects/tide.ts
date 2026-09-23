@@ -10,7 +10,10 @@ export const tide: EffectDef = {
   desc: "En vattenlinje som stiger genom riggen med musikens tyngd; skum på toppen.",
   flat: true,   // statiskt svep → kortare dwell
   render(c) {
-    const line = c.gravLevel * c.count;              // vattenlinjens läge i lampor
+    // DYNING (2026-09-23): ovanpa gravitations-VU:n en langsam dyning med period 8 TAKTER (sectionBars, ur sektionsstart) -
+    // vattnet stiger och sjunker med frasen, inte med klockan. Utan takt: bara VU:n.
+    const swell = c.hasBeat && c.sectionBars > 0 ? 0.5 + 0.5 * Math.sin(2 * Math.PI * c.sectionBars / 8 - Math.PI / 2) : 0.5;
+    const line = (c.gravLevel * 0.75 + 0.25 * swell) * c.count;   // vattenlinjens läge i lampor
     const below = line - c.idx;                       // >1 helt under, 0..1 vid ytan
     const fill = Math.max(0, Math.min(1, below));
     // Skum: peak-hållet ligger kvar ovanför ytan → en ljusare rand som dröjer.

@@ -10,9 +10,15 @@ export const gravity: EffectDef = {
   desc: "Ljudet lyfter en nivå som faller med tyngd; en peak-prick hänger kvar.",
   render(c) {
     const n = Math.max(1, c.count);
-    const fill = Math.max(0, Math.min(1, (c.gravLevel - c.idx / n) * n));   // hur mkt av lampan under nivån
-    const peakLamp = Math.min(n - 1, Math.floor(c.gravPeak * n));
-    if (c.idx === peakLamp && c.gravPeak > 0.03) {
+    // REFRANGSKALA (2026-09-23): stapelns tak ar latens egen refrang (levelVsHighDb). 9 dB under refrangen nar stapeln bara
+    // en tredjedel upp; vid refrangens niva fyller den riggen; over den slar pricken i taket och blinder onskas.
+    const lv = c.levelVsHighDb;
+    const scale = lv !== 0 || c.section === 'high' ? Math.max(0.33, Math.min(1.15, 1 + lv / 9)) : 1;
+    const level = Math.min(1, c.gravLevel * scale), peak = Math.min(1, c.gravPeak * scale);
+    if (lv > 1.5 && c.gravPeak > 0.8) c.want.blinder = Math.min(1, lv / 4);
+    const fill = Math.max(0, Math.min(1, (level - c.idx / n) * n));   // hur mkt av lampan under nivån
+    const peakLamp = Math.min(n - 1, Math.floor(peak * n));
+    if (c.idx === peakLamp && peak > 0.03) {
       const peakHue = ((c.mixedSector(Math.floor(c.beatIdx / 8)) + 3) % 6) / 6;   // peak i kontrastfärg
       return c.hsv(peakHue, 1, 1);
     }

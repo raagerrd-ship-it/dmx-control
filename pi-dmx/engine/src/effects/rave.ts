@@ -21,6 +21,9 @@ export const rave: EffectDef = {
     const gnista = Math.max(c.punch, c.beatHit ? 0.7 : 0);
     const v = lit ? 1 : gnista * 0.6;
     const entry = c.section === 'high' ? c.sectionEntry : 0;
-    return c.hsv(hue, lit ? 1 - Math.max(gnista * 0.5, entry * 0.6) : 1, Math.min(1, v + entry * 0.6));
+    // REFRANGEN AR TILLBAKA (2026-09-23): tanda gruppen far vit karna pa vaxlingen + UV pa slaget.
+    const back = c.section === 'high' && c.repeatSim >= 0.92 && c.sectionIndex >= 2 ? gnista : 0;
+    if (back > 0 && lit) c.want.uv = back;
+    return c.hsv(hue, lit ? 1 - Math.max(gnista * 0.5, entry * 0.6, back * 0.9) : 1, Math.min(1, v + entry * 0.6));
   },
 };

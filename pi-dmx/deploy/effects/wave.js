@@ -12,8 +12,11 @@ export const wave = {
         // sinus blir TAGGIG och vibrerar när hi-hats/cymbaler piskar på. onset.treble
         // ger dessutom en skarp ljusflick ovanpå (glitter).
         const ripple = c.frame.spec.treble * Math.sin(c.t * 22 + c.idx * 3);
-        const base = 0.55 + 0.45 * Math.sin(c.wavePhase - c.idx * 1.3 * c.phaseSpread + ripple * 0.8);
-        const hue = c.mixedSector(c.idx + Math.floor(c.wavePhase * 0.4)) / 6;
+        // FRASPERIOD (2026-09-23): med takt rullar vagen EN gang per tva takter (8 slag) ur gridet - den vander pa taktgransen
+        // i stallet for att glida ur fas pa klocktid. Utan takt: motorns wavePhase (klocktid + niva) som forr.
+        const phase = c.hasBeat ? (2 * Math.PI * (c.beatIdx + c.beatFrac)) / 8 : c.wavePhase;
+        const base = 0.55 + 0.45 * Math.sin(phase - c.idx * 1.3 * c.phaseSpread + ripple * 0.8);
+        const hue = c.mixedSector(c.idx + Math.floor(phase * 0.4)) / 6;
         // Vågen BÄR på basen (spec.bass), inte på bredbandsbrus → den tystnar inte av
         // diskant/sång. onset.treble-glitter ligger ovanpå + en snabbare luft-shimmer
         // (onset.air) bara på udda lampor → shimmer-topp utan att flödet tappas.

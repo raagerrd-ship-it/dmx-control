@@ -10,7 +10,11 @@ export const sug: EffectDef = {
   drives: ["hazer", "blinder", "uv"],
   render(c) {
     const b = c.frame.buildUp;
-    const late = Math.max(0, (b - 0.6) / 0.4);                                  // 0 -> 1 sista biten av risern
+    // FORUTSEDD REFRANG (2026-09-23): de sista 4 takterna fore en vantad refrang (expectHighInMs) sugs ljuset ner aven om
+    // risern inte hors - suget landar pa forutsagelsen. Storsta av riser och forutsagelse.
+    const bpm = c.cfg.beat?.bpm ?? 0; const barMs = bpm > 0 ? 240000 / bpm : 2000;
+    const lateEx = c.expectHighInMs > 0 ? Math.max(0, 1 - c.expectHighInMs / (4 * barMs)) : 0;
+    const late = Math.max(lateEx, (b - 0.6) / 0.4);                             // 0 -> 1 sista biten av risern
     const every = late > 0.66 ? 1 : late > 0.33 ? 2 : 4;
     const onBeat = c.hasBeat && c.beatIdx % every === 0;
     const pulse = onBeat ? Math.exp(-c.beatFrac / 0.08) : 0;

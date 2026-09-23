@@ -15,7 +15,10 @@ export const stege = {
                 : p < 0.75 ? o.highMid
                     : Math.max(o.treble, o.air);
         const bed = p < 0.5 ? Math.max(s.sub, s.bass) * 0.25 : s.treble * 0.2;
+        // BASNOTER (2026-09-23): vid tydlig basgang klattrar en pinne per BASNOT uppat i stegen (bassNoteIdx % n) och klingar av
+        // med noten - basgangen syns som en uppgang, ovanpa bandens egna anslag.
+        const climb = c.bassline >= 0.6 && (c.bassNoteIdx % n) === c.idx ? Math.exp(-c.bassNoteAge / 0.2) * 0.7 : 0;
         const hue = 0.02 + p * 0.55; // rött i botten → blått i topp
-        return c.hsv(hue, 1, Math.min(1, 0.05 + bed + hit * 0.95 + c.punch * 0.2));
+        return c.hsv(hue, 1 - climb * 0.3, Math.min(1, 0.05 + bed + hit * 0.95 + climb + c.punch * 0.2));
     },
 };

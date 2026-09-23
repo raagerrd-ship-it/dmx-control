@@ -93,6 +93,9 @@ REMOVE = [
     '/opt/audio-dmx-engine/tools/refineSong.mjs', '/opt/audio-dmx-engine/tools/replay.mjs',   # bara Pi-kopiorna; PC-banken behaller sina
     '/var/lib/audio-dmx-engine/songs.bin', '/var/lib/audio-dmx-engine/structure.json',
     '/var/lib/audio-dmx-engine/*.wav', '/var/lib/audio-dmx-engine/*.pending.wav',
+    # EFFEKTOVERSYNEN 2026-09-23: innerouter (rPerm 1,00 mot varannan) och neon (aldrig vald, ingen egen signal) ar borta ur
+    # registret; filerna pa Pi:n flyttas till .bak sa dist/effects/ inte har spokfiler.
+    '/opt/audio-dmx-engine/dist/effects/innerouter.js', '/opt/audio-dmx-engine/dist/effects/neon.js',
 ]
 
 

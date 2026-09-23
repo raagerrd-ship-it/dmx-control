@@ -123,6 +123,10 @@ const CLEAR_BASS_BOOST = Number(process.env.DMX_CLEAR_BASS_BOOST ?? 0.25);
 const MIX_RECENT_N = Number(process.env.DMX_MIX_RECENT_N ?? 4);
 const MIX_RECENT_PENALTY = Number(process.env.DMX_MIX_RECENT_PENALTY ?? 0.2);
 const MIX_TOP_FRAC = Number(process.env.DMX_MIX_TOP_FRAC ?? 0.5); // (4) valfonster = andel av poolen (minst 3)
+/** (6) OSEDD-BONUS (2026-09-23, effektoversynen): +DMX_MIX_UNSEEN_BONUS i rankingen for effekter som inte valts sedan start -
+ *  med 46 effekter och ~50 byten per 10 min blev annars samma 20-25 valda och resten aldrig (effectMix: 18-19 aldrig valda).
+ *  Bonusen forsvinner sa fort effekten setts en gang, sa den styr bara FORSTA chansen. 0 = av. */
+const MIX_UNSEEN_BONUS = Number(process.env.DMX_MIX_UNSEEN_BONUS ?? 0.10);
 /** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
  *  öppning, kort nog att vara framme innan första refrängen. */
 const START_FADE_MS = 5000;
@@ -251,6 +255,11 @@ export class EffectEngine {
     chasePos = 0;
     chaseDir = 1;
     lastChaseAdvance = 0;
+    /** BASNOTSRAKNARE (2026-09-23): stegar pa basnots-anslag (frame.onset.bass-flank, 90 ms cooldown) - for effekter som "stegar
+     *  pa basnoter" (chase/eko/stege/basgang) nar profile.bassline ar tydlig. Samma slags motorhjalp som chasePos/gravLevel. */
+    bassNoteIdx = 0;
+    lastBassNoteMs = -1e9;
+    prevBassOnset = 0;
     /** Beat clock: last whole-beat index seen (för beatTick-flanken). */
     lastBeatIdx = -1;
     /** Takt-räknare som effekterna ser (beatIdx): stegar på grid-slaget när BPM är
@@ -262,6 +271,7 @@ export class EffectEngine {
     halfTick = 0; // DMX_HALVE_SHOW: paritet inom det halverade slaget
     lastHalvedForSwitch = false; // DMX_HALVE_SHOW: halvering vid senaste look-bytet
     lastBassClearForSwitch = false; // tydlig basgang vid senaste look-bytet (CLEAR_BASS)
+    seenLooks = new Set(); // MIX_V2 (6): effekter som valts sedan start
     /** Monoton pulsklocka (rotfix mot hjärtslags-fladder): pulsens index och paritet
      *  får bara gå framåt, och tSince hålls icke-avtagande inom en puls, så PLL:ens
      *  fasrättningar inte kan re-attackera eller flippa pariteten mitt i ett slag. */
@@ -418,6 +428,7 @@ export class EffectEngine {
     ctx = {
         cfg: null, frame: null, fx: undefined, t: 0, idx: 0, count: 0, want: {},
         audio: 0, kickEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null, expectHighInMs: -1, levelVsHighDb: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionEntry: 0, sectionTier: 1, repeatSim: 0,
+        sectionBars: 0, bassline: 0, bassNoteIdx: 0, bassNoteAge: 9,
         beatIdx: 0, beatFrac: 0, beatPulse: 0, beatHit: false, hasBeat: false,
         wavePhase: 0, buildUp: 0, phaseSpread: 0, punchFloor: 0, chasePos: 0,
         dropFired: this.dropFired, dropHue: this.dropHue, now: 0,
@@ -1218,8 +1229,9 @@ export class EffectEngine {
                 if (pool.length === 0)
                     pool = ["breathe"]; // sista fallback
                 // HALVERAT: de delade lookerna (och hjärtat) ska finnas i poolen oavsett tier.
+                // (innerouter borttagen 2026-09-23: rPerm 1,00 mot varannan - samma effekt upp till lampordning.)
                 if (HALVE_SHOW && this.pulseHalved)
-                    for (const m of ["varannan", "innerouter", "hjarta"])
+                    for (const m of ["varannan", "basgang", "hjarta"])
                         if (!pool.includes(m) && this.cfg.rotation?.[m] !== false && req(m))
                             pool.push(m);
                 this.smartCount++;
@@ -1252,7 +1264,7 @@ export class EffectEngine {
                 const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); return cut.length ? cut : enabled(TOGGLE_POOL).filter(req); })() : [];
                 const clearBass = toggles.length > 0;
                 if (clearBass && !(remembered && TOGGLE_POOL.includes(remembered) && this.cfg.rotation?.[remembered] !== false)) {
-                    const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (MIX_V2 && this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) })).sort((a, b) => b.s - a.s);
+                    const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (MIX_V2 && this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) + (MIX_V2 && !this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) })).sort((a, b) => b.s - a.s);
                     const cands = ranked.filter((x) => x.m !== this.smartMode);
                     const top = (cands.length ? cands : ranked).slice(0, MIX_V2 ? Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))) : 3);
                     this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
@@ -1272,7 +1284,8 @@ export class EffectEngine {
                     const fastBoost = (m) => (m === "varannan" && bpm >= 140 ? 0.30 : 0)
                         + (MIX_V2 && bassClear && TOGGLE_POOL.includes(m) ? CLEAR_BASS_BOOST : 0) // MIX_V2 (1): boost, inte pool-byte
                         - (MIX_V2 && this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) // MIX_V2 (3): nyhetsstraff
-                        + (halvedNow && (m === "varannan" || m === "innerouter") ? 0.30 : 0)
+                        + (MIX_V2 && !this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) // MIX_V2 (6): osedd-bonus
+                        + (halvedNow && (m === "varannan" || m === "basgang") ? 0.30 : 0)
                         + (HALVE_SHOW && m === "hjarta" ? (halvedNow ? 0.30 : (wantCalm || tierS === LUGN) ? 0.20 : 0) : 0); // halverat: trion varannan/innerouter/hjarta = hela topp-3
                     const ranked = pool
                         .map((m) => ({ m, s: fitScore(m, frame.profile) + fastBoost(m) }))
@@ -1295,6 +1308,7 @@ export class EffectEngine {
                     this.recentLooks.push(this.smartMode);
                     if (this.recentLooks.length > MIX_RECENT_N)
                         this.recentLooks.shift();
+                    this.seenLooks.add(this.smartMode);
                 }
             }
             effMode = this.smartMode;
@@ -1701,6 +1715,19 @@ export class EffectEngine {
         ctx.dropFired = this.dropFired;
         ctx.dropHue = this.dropHue;
         ctx.now = performance.now();
+        // BASNOTER: flank pa onset.bass (per-band anslag 0..1, adaptiv baslinje) med 90 ms cooldown -> ett steg per basnot.
+        {
+            const bo = frame.onset?.bass ?? 0;
+            if (bo >= 0.30 && bo - this.prevBassOnset >= 0.10 && now - this.lastBassNoteMs >= 90) {
+                this.bassNoteIdx++;
+                this.lastBassNoteMs = now;
+            }
+            this.prevBassOnset = bo;
+        }
+        ctx.sectionBars = frame.sectionBars ?? 0;
+        ctx.bassline = frame.profile?.bassline ?? 0;
+        ctx.bassNoteIdx = this.bassNoteIdx;
+        ctx.bassNoteAge = Math.min(9, (now - this.lastBassNoteMs) / 1000);
         ctx.want.strobe = undefined;
         ctx.want.blinder = undefined;
         ctx.want.uv = undefined;
@@ -1736,12 +1763,14 @@ export class EffectEngine {
         // strobe) så pulser inte tonas ut och sätter fixtures i mellanhastigheter.
         const drives = effect?.drives;
         const has = (r) => drives ? drives.includes(r) : false;
+        // EXAKT (EffectDef.exact): effektens onskemal ar hela vardet - inget motorgolv. uvpuls vill ha UV AV mellan slagen.
+        const exact = (r) => !!effect?.exact?.includes(r);
         const clamp255 = (x) => x < 0 ? 0 : x > 255 ? 255 : Math.round(x);
         const specialty = {
-            hazer: has("hazer") ? clamp255(Math.max(140 + audio * 60, wantHazer * 255)) : 0,
-            uv: has("uv") ? clamp255(Math.max(180 * md, wantUv * 255)) : 0,
-            blinder: has("blinder") ? clamp255(Math.max(kickEnv * 255, this.dropEnv > 0.6 ? 255 : 0, wantBlinder * 255)) : 0,
-            strobe: has("strobe") ? clamp255(Math.max(effMode === "strobe" ? 210 : (rs ? 220 : 0), wantStrobe * 255)) : 0,
+            hazer: has("hazer") ? clamp255(exact("hazer") ? wantHazer * 255 : Math.max(140 + audio * 60, wantHazer * 255)) : 0,
+            uv: has("uv") ? clamp255(exact("uv") ? wantUv * 255 : Math.max(180 * md, wantUv * 255)) : 0,
+            blinder: has("blinder") ? clamp255(exact("blinder") ? wantBlinder * 255 : Math.max(kickEnv * 255, this.dropEnv > 0.6 ? 255 : 0, wantBlinder * 255)) : 0,
+            strobe: has("strobe") ? clamp255(exact("strobe") ? wantStrobe * 255 : Math.max(effMode === "strobe" ? 210 : (rs ? 220 : 0), wantStrobe * 255)) : 0,
             laser: has("laser") ? clamp255(Math.max(180 + audio * 75, wantLaser * 255)) : 0,
             co2: has("co2") ? clamp255(Math.max(this.dropEnv > 0.85 ? 255 : 0, wantCo2 * 255)) : 0,
         };

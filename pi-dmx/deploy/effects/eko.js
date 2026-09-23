@@ -7,8 +7,12 @@ export const eko = {
     desc: "Taktslaget ekar genom riggen med taktlåst fördröjning, svagare för varje studs.",
     render(c) {
         const DELAY = 0.25; // fjärdedels taktslag per lampa
+        // BASNOTER (2026-09-23): vid tydlig basgang (bassline >= 0,6) ar det BASNOTEN som ekar genom riggen, inte gridslaget -
+        // kallan = tid sedan senaste basnot (i taktslag), sa ekot foljer basgangens rytm (attondelar, synkoper).
+        const beatS = c.cfg.beat?.bpm ? 60 / c.cfg.beat.bpm : 0.5;
+        const src = c.bassline >= 0.6 ? Math.min(1, c.bassNoteAge / beatS) : c.beatFrac;
         // Hur långt sedan DEN HÄR lampans eko slog till (i taktslag, 0..1).
-        let age = c.beatFrac - c.idx * DELAY;
+        let age = src - c.idx * DELAY;
         if (age < 0)
             age += 1; // föregående slags eko
         const decay = Math.exp(-age / 0.18); // skarp attack, kort svans

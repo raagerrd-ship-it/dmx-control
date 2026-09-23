@@ -9,7 +9,9 @@ export const andrum: EffectDef = {
   drives: ["hazer"],
   render(c) {
     const age = Math.min(1, c.sectionAgeMs / 12000);
-    const floor = 0.30 - 0.12 * age + c.frame.buildUp * 0.3;                        // morknar langsamt, oppnar mot uppbyggnad
+    // NIVA MOT REFRANGEN (2026-09-23): ju langre under senaste refrangen breaket ligger (levelVsHighDb), desto djupare golv.
+    const dip = c.levelVsHighDb < 0 ? Math.max(-0.10, c.levelVsHighDb / 60) : 0;
+    const floor = 0.30 - 0.12 * age + c.frame.buildUp * 0.3 + dip;                  // morknar langsamt, oppnar mot uppbyggnad
     const hue = (c.mixedSector(Math.floor(c.t / 13)) / 6 + 0.55) % 1;               // kall komplementton
     const drift = 0.5 + 0.5 * Math.sin(c.t * 0.4 + c.idx * 0.9);
     const beat = c.hasBeat ? Math.exp(-c.beatFrac / 0.08) * 0.25 : c.kickEnv * 0.2;

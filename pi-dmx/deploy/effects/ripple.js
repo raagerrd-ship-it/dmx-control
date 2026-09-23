@@ -1,23 +1,29 @@
-// Full fart: KRUSNING från MITTEN — riggen delas i två grupper efter AVSTÅND
-// från centrum (ytterlamporna vs de inre). Varannan takt tänds mitten, nästa
-// ytterkanten → en puls som slår ut från mitten och in igen. Med 4 lampor:
-// mitten-2 ena takten, ytter-2 nästa. Kontrastfärger per ring (som rave, fast
-// RADIELLT i stället för varannan lampa). <3 lampor: faller tillbaka på paritet.
+// Full fart: KRUSNING från MITTEN. v2 (2026-09-23): varje slag slar ner i MITTEN och krusningen VANDRAR utat - de inre
+// lamporna tands pa slaget, de yttre en fjardedels slag senare, och varje ring klingar av som en vag som rullar ut.
+// (v1 var "mitten ena takten, ytter nasta" - ett flip som matte rPerm 0,92-0,94 mot rave; publiken sag samma A/B-vaxling.
+// Nu ar det en RORELSE ut fran mitten, inte en vaxling.) Krusningens HOJD skalas mot latens egen refrang (levelVsHighDb):
+// 9 dB under refrangen ar den en liten krusning i mitten, vid refrangens niva slar den ut till kanterna med vit kam.
+// Kontrastfarg pa ytterringen (som forr). <3 lampor: paritet = ring.
 export const ripple = {
     key: "ripple", label: "Krusning", tier: "full", section: ["high"], toggle: true,
-    desc: "Puls från mitten och ut – inre lampor ena takten, yttre nästa.",
+    desc: "Slaget slar ner i mitten och krusningen rullar utat, hogre ju narmare refrangens niva.",
     render(c) {
         const center = (c.count - 1) / 2;
         const d = Math.abs(c.idx - center); // avstånd från mitten
         const maxD = center || 1;
-        const isOuter = c.count < 3 ? c.idx % 2 === 0 : d > maxD - 0.01; // ytterlamporna
-        const litOuter = c.beatIdx % 2 === 1; // varannan takt: mitten / ytter
-        const lit = isOuter === litOuter;
+        const ring = c.count < 3 ? (c.idx % 2) : d / maxD; // 0 = mitten .. 1 = kanten
+        const isOuter = ring > 0.99;
+        const lv = c.levelVsHighDb;
+        const amp = lv !== 0 || c.section === 'high' ? Math.max(0.35, Math.min(1, 1 + lv / 9)) : 0.8; // refrangskala
+        const delay = ring * 0.25; // fjardedels slag ut till kanten
+        let age = c.beatFrac - delay;
+        if (age < 0)
+            age += 1; // slag sedan krusningen nadde DEN HAR ringen
+        const wave = Math.exp(-age / 0.16) * (1 - ring * (1 - amp) * 0.8); // yttre ringar svagare nar amp ar lag
         const pairBase = c.mixedSector(Math.floor(c.beatIdx / 4));
-        const hue = ((litOuter ? pairBase + 3 : pairBase) % 6) / 6; // motfärg mitt vs ytter
-        const v = 0.30 + 0.70 * Math.min(1, c.beatPulse * 0.7 + c.audio * 0.3);
-        // GOA SLAG: en riktig dunk tänder kort ÄVEN den mörka ringen → puls slår ut från
-        // mitten OCH hela riggen slammar på basen. Tända ringen gnistrar mot vitt.
-        return c.hsv(hue, 1 - c.punch * 0.35, lit ? Math.min(1, v + c.punch * 0.3) : c.punch * 0.45);
+        const hue = ((isOuter ? pairBase + 3 : pairBase) % 6) / 6; // motfärg mitt vs ytter
+        const crest = amp > 0.9 && isOuter ? wave * 0.6 : 0; // vit kam i kanten vid refrangens niva
+        const v = 0.08 + wave * (0.45 + 0.45 * amp) + c.audio * 0.15 + c.punch * 0.3;
+        return c.hsv(hue, 1 - Math.max(c.punch * 0.35, crest), Math.min(1, v));
     },
 };

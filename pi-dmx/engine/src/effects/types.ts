@@ -57,6 +57,12 @@ export interface EffectContext {
   repeatSim: number;
   /** Forvarning: ms tills nasta refrang vantas (-1 ingen, 0 = i high) och nivan mot senaste refrangen i dB (0 utan refrang). */
   expectHighInMs: number; levelVsHighDb: number;
+  /** TAKTER sedan sektionsstart (bråkdel, 0 utan tempo) - frasperiod (4/8 takter) i stallet for klocktid. */
+  sectionBars: number;
+  /** BASGANG (2026-09-23): analysatorns profile.bassline 0..1 (tydlig basgang >= ~0,7), plus motorns basnotsraknare:
+   *  bassNoteIdx stegar ett per basnots-anslag (onset.bass-flank, 90 ms cooldown), bassNoteAge = s sedan senaste.
+   *  Effekter som "stegar pa basnoter" anvander bassNoteIdx nar bassline ar tydlig och beatIdx annars. */
+  bassline: number; bassNoteIdx: number; bassNoteAge: number;
   /** Kick-/beat-envelope (0..1). */
   kickEnv: number;
   /** BAS-PUNCH: "goa slaget" — spikar 0..1 på en riktig dunk (bas klart över sin
@@ -142,6 +148,10 @@ export interface EffectDef {
    *  gråar ut effekter vars drives inte har någon kopplad fixture. Tom/utelämnad
    *  = effekten drar bara PAR/RGB-lamporna. */
   drives?: ChannelRole[];
+  /** EXAKTA specialkanaler (2026-09-23): roller dar effektens `c.want` ar HELA vardet - motorn lagger inte sitt golv ovanpa
+   *  (uv: 180 x master, blinder: kick, strobe: 210 i strobe-laget). Kravs for en effekt som vill ha kanalen AV mellan slagen
+   *  (uvpuls: UV bara pa slaget). Rollen maste anda sta i drives. */
+  exact?: ChannelRole[];
   /** Rendera EN lampa → [r,g,b] i 0..1. */
   render: (c: EffectContext) => [number, number, number];
 }

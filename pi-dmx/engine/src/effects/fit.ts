@@ -55,6 +55,24 @@ export const FIT: Partial<Record<Mode, Fit>> = {
   split:     { punch: 0.50, bass: 0.50, bright: 0.60, beat: 0.30 },
   duel:      { punch: 0.80, bass: 0.70, bright: 0.60, beat: 0.40 },   // kick vs luft
   strobe:    { punch: 0.90, bass: 0.50, bright: 0.50, beat: 0.80 },
+  // ── Sektions-/signaleffekter (2026-09-23): stod utan passform (NEUTRAL 0,5) och rankades darfor bort - stegring/nedrakning/
+  //    vagbrytare/fyrverkeri valdes ALDRIG pa ladans mixar trots att build var 16 % av tiden. Nu egen rad var. ──
+  stegring:  { punch: 0.40, bass: 0.50, bright: 0.45, beat: 0.60 },   // uppbyggnad: takten ar allt
+  sug:       { punch: 0.45, bass: 0.60, bright: 0.30, beat: 0.60 },
+  nedrakning:{ punch: 0.60, bass: 0.50, bright: 0.40, beat: 0.85 },   // raknar slag - kraver takt
+  vagbrytare:{ punch: 0.50, bass: 0.50, bright: 0.50, beat: 0.90 },   // en vag per TAKT
+  fyrverkeri:{ punch: 0.75, bass: 0.60, bright: 0.55, beat: 0.60 },
+  andrum:    { punch: 0.15, bass: 0.50, bright: 0.25, beat: 0.30 },
+  konfetti:  { punch: 0.65, bass: 0.45, bright: 0.60, beat: 0.75 },
+  sol:       { punch: 0.30, bass: 0.50, bright: 0.45, beat: 0.20 },
+  sopa:      { punch: 0.35, bass: 0.45, bright: 0.45, beat: 0.25 },
+  varannan:  { punch: 0.60, bass: 0.55, bright: 0.40, beat: 0.90 },
+  //    (ladans profil, tools/effectMix: punch 0,7-0,9, bass 0,15-0,4, bright 0,35-0,55, beat 0,85-0,95 - raderna ligger dar)
+  forvarning:{ punch: 0.55, bass: 0.35, bright: 0.40, beat: 0.75 },   // stegar takter mot refrangen
+  basgang:   { punch: 0.70, bass: 0.55, bright: 0.30, beat: 0.70 },   // lever pa basnoterna (bassline, inte profile.bass)
+  tyngdlyft: { punch: 0.65, bass: 0.30, bright: 0.50, beat: 0.65 },   // nivan mot refrangen
+  uvpuls:    { punch: 0.75, bass: 0.35, bright: 0.45, beat: 0.90 },   // UV pa slaget
+  frasraknare:{ punch: 0.50, bass: 0.50, bright: 0.50, beat: 0.85 },  // takter och fraser
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -74,6 +92,7 @@ const SPATIAL: Partial<Record<Mode, number>> = {
   chase: 1.0, tick: 1.0, stege: 1.0, sopa: 1.0, gallop: 1.0, bounce: 1.0,
   ripple: 0.9, eko: 0.9, drumkit: 0.9, eq: 0.9, wave: 0.8, split: 0.8, drops: 0.8,
   duel: 0.7, konfetti: 0.7, varannan: 1.0, pendel: 0.7, twin: 0.6, tide: 0.6, drift: 0.6, aurora: 0.5,
+  basgang: 1.0, forvarning: 0.8, frasraknare: 0.7, nedrakning: 0.8, vagbrytare: 0.8, tyngdlyft: 0.4,
 };
 /** Hur mycket den spatiala preferensen väger vid full punch (0 = av). */
 const SPATIAL_PREF = 0.18;

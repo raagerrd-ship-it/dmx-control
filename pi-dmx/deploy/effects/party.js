@@ -11,6 +11,10 @@ export const party = {
         const entry = c.section === 'high' ? c.sectionEntry : 0; // refrangens forsta slag: stot + blinder
         if (entry > 0)
             c.want.blinder = entry;
-        return c.hsv(hue, 1 - Math.max(c.punch * 0.4, entry * 0.7), Math.min(1, v + entry * 0.5)); // dunk → gnista mot vitt
+        // REFRANGEN AR TILLBAKA (2026-09-23): repeatSim >= 0,92 och minst tredje refrangen -> vit karna pa slaget + UV pa slaget.
+        const back = c.section === 'high' && c.repeatSim >= 0.92 && c.sectionIndex >= 2 ? 1 : 0;
+        if (back)
+            c.want.uv = c.beatPulse;
+        return c.hsv(hue, 1 - Math.max(c.punch * 0.4, entry * 0.7, back * c.beatPulse * 0.6), Math.min(1, v + entry * 0.5)); // dunk → gnista mot vitt
     },
 };

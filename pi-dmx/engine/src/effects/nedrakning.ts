@@ -9,8 +9,13 @@ export const nedrakning: EffectDef = {
   drives: ["hazer", "blinder"],
   render(c) {
     const b = c.frame.buildUp;
-    const cyc = b > 0.7 ? 4 : 8;                                     // tatare nedrakning sist
-    const step = ((c.beatIdx % cyc) + cyc) % cyc;
+    // FORUTSEDD REFRANG (2026-09-23): med expectHighInMs raknas STEGEN bakat fran refrangen sa att "allt tands" (sista steget)
+    // landar exakt pa det forutsedda slaget - inte pa en godtycklig atta. Tatare (4-cykel) sista 16 slagen. Utan
+    // forutsagelse: 8-slagscykler pa beatIdx som forr.
+    const bpm = c.cfg.beat?.bpm ?? 0; const beatMs = bpm > 0 ? 60000 / bpm : 500;
+    const beatsLeft = c.expectHighInMs > 0 ? c.expectHighInMs / beatMs : -1;
+    const cyc = beatsLeft >= 0 ? (beatsLeft > 16 ? 8 : 4) : (b > 0.7 ? 4 : 8);   // tatare nedrakning sist
+    const step = beatsLeft >= 0 ? ((cyc - 1 - Math.floor(beatsLeft)) % cyc + cyc) % cyc : ((c.beatIdx % cyc) + cyc) % cyc;
     const half = (c.count - 1) / 2;
     const ring = Math.abs(c.idx - half);                             // 0 = mitten, storst i kanten
     const maxRing = Math.max(1, half);
