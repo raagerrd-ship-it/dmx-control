@@ -12,7 +12,8 @@ import { FixtureOutput, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { PostProcess } from "./postprocess.js";
 import type { Frame } from "./analyser.js";
-import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL } from "./effects/registry.js";
+import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
+import { composeLamp, type Envelope, type ModulateFlags } from "./heartbeat/contract.js";
 import { fitScore } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
 // PALETT-LAS (DMX_PALETTE): lås färgerna till en palett oavsett klang och läge. Namn ur listan
@@ -167,6 +168,15 @@ const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH === '1';   // realtidssekt
 const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
 const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);
 const BEAT_LIFT = Number(process.env.BEAT_LIFT ?? 0.25);   // additivt hjartslagslyft (synlig puls aven i morka effekter)
+/** HEART-BEAT/ENERGI SOM EGEN DEL (2026-09-23, kontrakt heartbeat/contract.ts; opt-in DMX_HEARTBEAT=1, annars gamla vagen orord).
+ *  Envelope per ram: ceiling = mastern md (loudness-golv, sektionsgas, dynamik mot refrangen, drop) UTAN tystnadsgrinden;
+ *  pulse = hjartslaget beatMulNow normerat (1 pa slaget, 0 vid BEAT_MIN); pulseDepth = DMX_HEARTBEAT_DEPTH x tillit.
+ *  Output: rgb x gate x (energy ? ceiling : 1) x (pulse ? 1 - d + d*pulse : 1) - effektens modulate-flaggor ur dess fil,
+ *  dirigenten skriver over: tillit < DMX_HEARTBEAT_TRUST -> pulse av; break/lugnt -> energy pa. Ersatter BEAT_LIFT (additivt)
+ *  och md-multiplikationen; tystnadsgrinden (gate) galler ALLA effekter. LAMP_MIN-golvet kvar (output-lagrets tandtroskel). */
+const HEARTBEAT = process.env.DMX_HEARTBEAT === '1';
+const HEARTBEAT_DEPTH = Number(process.env.DMX_HEARTBEAT_DEPTH ?? 0.35);
+const HEARTBEAT_TRUST = Number(process.env.DMX_HEARTBEAT_TRUST ?? 0.35);
 // DROP_CALM_BUILD: drop i low/intro kraver riser >= detta. STANDARD 0 = AV sedan 2026-09-22 (natt-agent B, tools/dropBench.mjs mot
 // 19-drop-facitet + pop/megamix): buildUp ar ~0 (max 0,04) vid ALLA 71 fyrningar och etiketten ar alltid low/break i sjalva
 // dropogonblicket (high forst efterat) -> grinden pa 0,25 nekade 7/12 pop- och 11/32 megamix-drops, dvs nastan allt (live i ladan
@@ -224,6 +234,8 @@ export class EffectEngine {
   private get showLead(): number { return this.cfg.showLeadMs ?? SHOW_LEAD_DEFAULT; }
   private beatTrust = 0;
   beatMulNow = 1;                     // hjärtslagets multiplikator — appliceras SIST (publik: diagnostik)
+  /** HEARTBEAT-diagnostik (ws/status): senaste envelopen och flaggorna. */
+  hbLast: { ceiling: number; pulse: number; depth: number; energy: boolean; pulseOn: boolean } = { ceiling: 0, pulse: 0, depth: 0, energy: true, pulseOn: true };
   private prevCeil = 0;               // förra rutans ljustak → hur snabbt det vandrar
   private ceilRateAvg = 0;            // utjämnad takrörelse (enheter/s)
   /** EDGE-SÄKER KICK. frame.kick är en enframs-boolean på analysatorns 375 Hz
@@ -1437,6 +1449,13 @@ export class EffectEngine {
       if (EXPECT_LIFT_MS > 0 && ex > 0 && ex <= EXPECT_LIFT_MS) { const l = 1 - ex / EXPECT_LIFT_MS; dynGain += (1 + SECTION_HIGH_LIFT - dynGain) * l; }   // riser mot refrangen
     }
     const md = SECTION_SWITCH ? Math.min(1.2, md0 * dynGain) : md0;   // standard: orort
+    // HEARTBEAT: envelopen (kontraktet). ceiling = md utan tystnadsgrinden (drive), som appliceras separat pa ALLA effekter.
+    const hbPulse = (this.cfg.beatPulse && this.beatMulNow > BEAT_MIN) ? Math.min(1, (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN)) : 0;
+    const hbEnvelope: Envelope = { ceiling: drive > 1e-6 ? Math.min(1.2, md / drive) : 0, pulse: hbPulse, pulseDepth: Math.min(1, Math.max(0, HEARTBEAT_DEPTH * this.beatTrust)) };
+    const wantCalmNow = frame.breaking || (SECTION_SWITCH && (frame.section === 'break' || frame.section === 'low'));
+    const hbBase = modulateOf(effMode);
+    const hbFlags: ModulateFlags = { energy: hbBase.energy || wantCalmNow, pulse: hbBase.pulse && this.beatTrust >= HEARTBEAT_TRUST };   // dirigentens overstyrning
+    this.hbLast = { ceiling: hbEnvelope.ceiling, pulse: hbEnvelope.pulse, depth: hbEnvelope.pulseDepth, energy: hbFlags.energy, pulseOn: hbFlags.pulse };
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
@@ -1599,13 +1618,20 @@ export class EffectEngine {
       }
       const strobeVal = effMode === "strobe" ? 210 : 0;
       // Effekt (master inkl. silenceGate → tonar ut på tystnad) + varm ambient-glöd in.
+      if (HEARTBEAT) {
+        // OUTPUT-komposition enligt kontraktet: avsikt x grind x (energi?) x (puls?), sedan ambient in.
+        rgb[0] = composeLamp(rgb[0], hbEnvelope, hbFlags) * drive + 1.00 * restLvl;
+        rgb[1] = composeLamp(rgb[1], hbEnvelope, hbFlags) * drive + 0.30 * restLvl;
+        rgb[2] = composeLamp(rgb[2], hbEnvelope, hbFlags) * drive + 0.00 * restLvl;
+      } else {
       rgb[0] = rgb[0] * md + 1.00 * restLvl;
       rgb[1] = rgb[1] * md + 0.30 * restLvl;
       rgb[2] = rgb[2] * md + 0.00 * restLvl;
+      }
       // HJARTSLAGSLYFT (ladan 20:25, 'vid manga effekter forsvinner heartbeat'): pulsen ar en multiplikator i post - osynlig nar
       // effekten sjalv ligger lagt (0,2 -> 0,03). Adderar BEAT_LIFT x puls x (1 - ljus) sa morka/rorliga effekter far en synlig
       // stot uppat pa slaget; ljusa (nara max) paverkas knappt. Pulsen = beatMulNow normerad (1 pa slaget, 0 vid BEAT_MIN).
-      if (BEAT_LIFT > 0 && this.cfg.beatPulse && drive > 0.05 && this.beatMulNow > BEAT_MIN) {
+      if (!HEARTBEAT && BEAT_LIFT > 0 && this.cfg.beatPulse && drive > 0.05 && this.beatMulNow > BEAT_MIN) {
         const hb = (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN); const lift = BEAT_LIFT * hb * md;
         rgb[0] += lift * (1 - rgb[0]); rgb[1] += lift * (1 - rgb[1]); rgb[2] += lift * (1 - rgb[2]);
       }

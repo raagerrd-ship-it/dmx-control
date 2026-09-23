@@ -5,7 +5,7 @@ import type { EffectDef } from "./types.js";
 // (blinder + fullt ljus via dropEnv). Fore 0,6 beter den sig som en morkare stegring. Dirigenten valjer den i build
 // tillsammans med stegring; band vald look for hela sektionen.
 export const sug: EffectDef = {
-  key: "sug", label: "Sug", tier: "fart", section: ["build"],
+  key: "sug", label: "Sug", tier: "fart", modulate: { energy: true, pulse: false }, section: ["build"],
   desc: "Uppbyggnadens slut: ljuset sugs ner, pulsen tatnar, hazer upp - dropen landar i tomrum.",
   drives: ["hazer", "blinder", "uv"],
   render(c) {

@@ -2,7 +2,7 @@
 // fran analysatorn) bryter den med en vit kam over hela riggen. Takten syns som en FORM, inte bara som puls. Riktningen
 // vaxlar varannan takt. Utan taktfas: ettan = slag 0 i fyrgruppen.
 export const vagbrytare = {
-    key: "vagbrytare", label: "Vagbrytare", tier: "full", section: ["high"],
+    key: "vagbrytare", label: "Vagbrytare", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"],
     desc: "En vag per takt over riggen, vit kam pa ettan.",
     render(c) {
         const inBar = ((c.beatIdx % 4) + 4) % 4; // slagets plats i takten (ankaret flyttas till ettan av motorn)

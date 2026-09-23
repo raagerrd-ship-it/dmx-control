@@ -4,7 +4,7 @@ import type { EffectDef } from "./types.js";
 // hjartslaget svagt sa takten aldrig tappas. Ju langre breaket, desto morkare (ner till ett golv), och nar energin
 // borjar komma tillbaka (buildUp) oppnar den forsiktigt. Dirigenten valjer den vid 'break'-gransen (section-tagg).
 export const andrum: EffectDef = {
-  key: "andrum", label: "Andrum", tier: "lugn", section: ["break"],
+  key: "andrum", label: "Andrum", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["break"],
   desc: "Breakdown: dimmat, langsamt, bara hjartslaget kvar.",
   drives: ["hazer"],
   render(c) {

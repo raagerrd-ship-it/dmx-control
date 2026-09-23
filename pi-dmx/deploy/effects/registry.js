@@ -113,6 +113,8 @@ for (const e of EFFECTS) {
 }
 /** Snabb uppslagning nyckel → effekt. */
 export const EFFECT_MAP = new Map(EFFECTS.map((e) => [e.key, e]));
+/** Effektens modulate-flaggor (heartbeat/contract.ts), standard energi+puls. */
+export function modulateOf(key) { return EFFECT_MAP.get(key)?.modulate ?? { energy: true, pulse: true }; }
 /** Alla effekt-nycklar i cykel-ordning (driver MODE_CYCLE + validering). */
 export const EFFECT_KEYS = EFFECTS.map((e) => e.key);
 /** Smart-lägets pooler, härledda ur tier-taggen. */

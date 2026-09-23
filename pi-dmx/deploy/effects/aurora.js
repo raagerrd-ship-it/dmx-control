@@ -2,7 +2,7 @@
 // OBEROENDE korsfades — likt norrsken där färgerna glider var för sig. Per-lampa
 // frekvensband. Golv 30%.
 export const aurora = {
-    key: "aurora", label: "Aurora", tier: "lugn", section: ["intro", "low"],
+    key: "aurora", label: "Aurora", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["intro", "low"],
     desc: "Varje lampa driver i sin egen färg, som norrsken.",
     render(c) {
         const hue = c.mixedSector(c.idx * 2 + c.mclk(8, 7) + Math.round(c.frame.centroid * 3)) / 6; // + centroid → palett-läge

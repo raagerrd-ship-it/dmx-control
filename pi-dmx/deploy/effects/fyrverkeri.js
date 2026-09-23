@@ -2,7 +2,7 @@
 // varje lampa far sin egen tandtid och palettfarg, vit karna som bleknar till farg - och lugnar sedan ner till ett pumpande
 // partylage tills nasta drop. Refrangens entre (sectionEntry) tander en mindre salva.
 export const fyrverkeri = {
-    key: "fyrverkeri", label: "Fyrverkeri", tier: "full", section: ["high"],
+    key: "fyrverkeri", label: "Fyrverkeri", tier: "full", modulate: { energy: false, pulse: false }, section: ["high"],
     desc: "Dropen exploderar lamporna en i taget i palettfarger, sedan pumpande party.",
     drives: ["blinder", "strobe"],
     render(c) {

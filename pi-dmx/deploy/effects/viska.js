@@ -3,7 +3,7 @@
 // dov mörkröd puls. Byggd för en bar tidigt på kvällen: närvaro utan blink.
 // Använder trum-envelopen (drum), som numera slår diskret i stället för att glöda.
 export const viska = {
-    key: "viska", label: "Viska", tier: "lugn", section: ["intro", "break"],
+    key: "viska", label: "Viska", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["intro", "break"],
     desc: "Nästan mörkt — bara diskreta gnistor från virvel och hi-hat, dov puls på kicken.",
     flat: true, // statiskt svep → kortare dwell
     render(c) {

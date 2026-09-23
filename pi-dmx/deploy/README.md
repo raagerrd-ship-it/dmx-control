@@ -74,3 +74,17 @@ Deploy: `python tools/deploy-dist.py` utan filargument (md5-diff pa alla dist/*.
 - duel v2 (call/response kick/virvel med eko), strobe v2 (bara high; blixt pa slag i snabb musik/drop, het glod emellan), sug (build:
   ljuset sugs ner sista biten av risern, hazer/UV upp, dropen landar i tomrum). 40 effekter, alla sektionstaggade i sina filer.
 - Deploy: `python tools/deploy-dist.py` utan argument (hela dist inkl. effects/ + config.js). Standard oforandrat (48/76).
+
+
+## Ladan 2026-09-23: HEART-BEAT/ENERGI som egen del (opt-in) + W_HIGH + rensningen
+Deploy som vanligt: `cd pi-dmx/engine && set PI_PASS=... && python tools\ladan.py` (`--dry` forst). Nytt i bygget:
+- `DMX_SECTION_W_HIGH=1.0` standard (hoga bandens niva i sektionsrangen, lotus-bevisat pa test) - `0` = som forr.
+- **`DMX_HEARTBEAT=1`** (av som standard = gamla vagen orord): kontraktet heartbeat/contract.ts. Output = avsikt x grind x (energi? tak) x
+  (puls? 1-d+d*puls). Effekten deklarerar `modulate` i sin fil: strobe/fyrverkeri/drops/konfetti skippar bada; airglow/breathe/drift/mono/
+  tide/viska/wave/aurora/pendel/andrum/sug/vagbrytare/sopa/neon/sol skippar pulsen; resten energi+puls. Dirigenten: tillit < DMX_HEARTBEAT_TRUST
+  (0,35) -> puls av; break/low -> energi pa. Rattar: `DMX_HEARTBEAT_DEPTH` (0,35 = pulsens djup; hojd = tydligare hjartslag), `DMX_HEARTBEAT_TRUST`.
+  Ersatter BEAT_LIFT (additivt lyft) och md-multiplikationen nar den ar pa; LAMP_MIN-golvet och tystnadsgrinden galler som forr.
+  Bank (testLiveLevel pop_ladan 60-120 s): medel 1,31 -> 1,21, slagskala 0,171 -> 0,145, sektionsskala 0,72 -> 0,73 - alltsa nastan samma
+  mangd liv, men fran ett kontrakt i stallet for tva lappningar. OGONBEDOM: A/B med `python tools\ladan.py --env DMX_HEARTBEAT=1` resp. `=0`
+  (en omstart per byte): syns hjartslaget i morka effekter? blir strobe/fyrverkeri fulla? blir lugna partier morkare? Vid for svag puls: DEPTH 0,5.
+- Kvar att bedoma fran igar: lugn-grinden av (drops i lugna partier), basgangs-toggles, dirigenten gasar fore refrangen, dynamiken mot refrangen.

@@ -4,7 +4,7 @@
 // så vattnet svallar tungt i stället för att följa varje transient.
 // Mekanik: rumslig tröskel, ingen sinus alls → ser inte ut som breathe/aurora.
 export const tide = {
-    key: "tide", label: "Tidvatten", tier: "lugn", section: ["intro", "low"],
+    key: "tide", label: "Tidvatten", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["intro", "low"],
     desc: "En vattenlinje som stiger genom riggen med musikens tyngd; skum på toppen.",
     flat: true, // statiskt svep → kortare dwell
     render(c) {

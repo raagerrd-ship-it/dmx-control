@@ -4,7 +4,7 @@ import type { EffectDef } from "./types.js";
 // slaget i snabb musik. Emellan: en het, mattad glod som andas med nivan, sa looken inte ar en oavbruten blixt (v1 var
 // hsv(hue,1,1) konstant och lamnade allt at motorns strobe-kanal). Strobe-onskan (c.want.strobe) foljer dropen.
 export const strobe: EffectDef = {
-  key: "strobe", label: "Strobe", tier: "full", section: ["high"],
+  key: "strobe", label: "Strobe", tier: "full", modulate: { energy: false, pulse: false }, section: ["high"],
   desc: "Blixt pa slaget och vid drop i refrangen, het glod emellan.",
   render(c) {
     const hue = c.mixedSector(c.beatIdx) / 6;

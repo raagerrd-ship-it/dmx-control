@@ -3,7 +3,7 @@ import type { EffectDef } from "./types.js";
 // Lugnast: hela riggen andas UNISONT i EN långsamt vandrande färg — djup,
 // symmetrisk swell (lång mjuk in-/utandning). Golv 30% så den aldrig släcks.
 export const breathe: EffectDef = {
-  key: "breathe", label: "Andas", tier: "lugn", section: ["intro", "break"],
+  key: "breathe", label: "Andas", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["intro", "break"],
   desc: "Hela riggen andas som en – djup mjuk våg i en färg.",
   flat: true,   // statiskt svep → kortare dwell
   render(c) {

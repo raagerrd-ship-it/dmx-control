@@ -5,7 +5,7 @@ import type { EffectDef } from "./types.js";
 // till andra änden. Ingen tidsbaserad rörelse alls — rör sig bara när musiken
 // byter karaktär, vilket gör den nästan meditativ men aldrig statisk.
 export const drift: EffectDef = {
-  key: "drift", label: "Drift", tier: "lugn", section: ["intro", "low"],
+  key: "drift", label: "Drift", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["intro", "low"],
   desc: "Ljuset vandrar genom riggen efter musikens klangfärg — mörkt åt ena hållet, ljust åt andra.",
   flat: true,   // statiskt svep → kortare dwell
   render(c) {

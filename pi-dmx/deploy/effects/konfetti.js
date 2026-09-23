@@ -2,7 +2,7 @@
 // och tonar ut till nästa slag — konfetti. Använder beatIdx/beatFrac (funkar även
 // coastat), inget trumkrav → energisk variation även utan tydligt komp.
 export const konfetti = {
-    key: "konfetti", label: "Konfetti", tier: "full", section: ["high"],
+    key: "konfetti", label: "Konfetti", tier: "full", modulate: { energy: false, pulse: false }, section: ["high"],
     desc: "Slumpade lampor poppar i slumpfärger på varje taktslag.",
     render(c) {
         const seed = (c.idx * 2654435761 + c.beatIdx * 40503) >>> 0;

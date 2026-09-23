@@ -125,6 +125,10 @@ export interface EffectDef {
   desc: string;
   /** Statiskt svep utan takt-/kick-rorelse: dirigenten byter det snabbare (DMX_DWELL_FLAT_MS). */
   flat?: boolean;
+  /** HEART-BEAT/ENERGI (kontrakt heartbeat/contract.ts): vilka globala modulatorer effekten vill ha. Saknas = { energy: true, pulse: true }.
+   *  energy=false: taket ignoreras (strobe, fyrverkeri, drops, konfetti - de ar sin egen nivan). pulse=false: pulsen ignoreras (statiska
+   *  svep/ambient). Dirigenten far skriva over (tystnad/tillit). Gäller bara med DMX_HEARTBEAT=1. Taggen bor i effektfilen. */
+  modulate?: { energy: boolean; pulse: boolean };
   /** TOGGLAR lampor: diskreta grupper/steg som slar om per slag (inre/yttre, varannan, lopare, studs...). Dirigenten valjer bara
    *  bland dessa nar analysatorn ser en tydlig basgang (profile.bassline, effects.ts CLEAR_BASS). Taggen bor i effektfilen. */
   toggle?: boolean;

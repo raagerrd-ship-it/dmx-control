@@ -3,7 +3,7 @@ import type { EffectDef } from "./types.js";
 // mönstret skiftar färg vartannat taktslag; ljusstyrkan andas med nivån. Inga krav
 // → alltid tillgänglig som färgstark grund.
 export const neon: EffectDef = {
-  key: "neon", label: "Neon", tier: "fart", section: ["low", "high"],
+  key: "neon", label: "Neon", tier: "fart", modulate: { energy: true, pulse: false }, section: ["low", "high"],
   desc: "Mättade neonfärger per lampa som skiftar på takten.",
   render(c) {
     const hue = c.mixedSector(c.idx + Math.floor(c.beatIdx / 2)) / 6;

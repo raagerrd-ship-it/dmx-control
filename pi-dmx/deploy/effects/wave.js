@@ -4,7 +4,7 @@
 // hi-hat/cymbal-ANSLAGET (onset.treble ur dubbel-FFT:n) ger en skarp ljusflick
 // ovanpå vågen — pigg tick i stället för det utsmetade diskantbandet.
 export const wave = {
-    key: "wave", label: "Våg", tier: "fart", section: ["low", "build"],
+    key: "wave", label: "Våg", tier: "fart", modulate: { energy: true, pulse: false }, section: ["low", "build"],
     desc: "Flödande färgvåg som rullar över hela riggen.",
     flat: true, // statiskt svep → kortare dwell
     render(c) {

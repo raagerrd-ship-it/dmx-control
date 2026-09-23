@@ -2,7 +2,7 @@
 // från wave som är en regnbåge och chase som är gles) — en enda palettfärg som
 // glider. Nivådriven, inga krav.
 export const sopa = {
-    key: "sopa", label: "Svep", tier: "fart", section: ["low"],
+    key: "sopa", label: "Svep", tier: "fart", modulate: { energy: true, pulse: false }, section: ["low"],
     desc: "En ljusstråle sveper fram och tillbaka i en färg.",
     render(c) {
         const head = (Math.sin(c.wavePhase * 0.5) * 0.5 + 0.5) * (c.count - 1);

@@ -2,7 +2,7 @@
 // överlappande decays gör rytmen till glidande färgstänk. (Tändtiderna sätts av
 // motorn i dropFired/dropHue.)
 export const drops = {
-    key: "drops", label: "Drops", tier: "fart", section: ["high"],
+    key: "drops", label: "Drops", tier: "fart", modulate: { energy: false, pulse: false }, section: ["high"],
     desc: "Varje slag målar nästa lampa i en ny färg.",
     render(c) {
         const since = (c.now - (c.dropFired[c.idx] ?? -1e9)) / 1000;

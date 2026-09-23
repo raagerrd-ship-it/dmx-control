@@ -121,6 +121,8 @@ for (const e of EFFECTS) {
 
 /** Snabb uppslagning nyckel → effekt. */
 export const EFFECT_MAP: Map<Mode, EffectDef> = new Map(EFFECTS.map((e) => [e.key, e]));
+/** Effektens modulate-flaggor (heartbeat/contract.ts), standard energi+puls. */
+export function modulateOf(key: Mode): { energy: boolean; pulse: boolean } { return EFFECT_MAP.get(key)?.modulate ?? { energy: true, pulse: true }; }
 
 /** Alla effekt-nycklar i cykel-ordning (driver MODE_CYCLE + validering). */
 export const EFFECT_KEYS: Mode[] = EFFECTS.map((e) => e.key);

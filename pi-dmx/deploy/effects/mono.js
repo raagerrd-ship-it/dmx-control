@@ -2,7 +2,7 @@
 // sinusar i otakt, inte hård random), färgen glider rött→bärnsten→gult när lågan
 // flammar upp, och den andas som eld. Varm ton (ej snäppt). Golv 30%.
 export const mono = {
-    key: "mono", label: "Eld", tier: "lugn", section: ["intro", "break", "low"],
+    key: "mono", label: "Eld", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["intro", "break", "low"],
     desc: "Varm brasa som flimrar levande, glider rött → gult.",
     flat: true, // statiskt svep → kortare dwell
     render(c) {
