@@ -67,24 +67,7 @@ export interface ServerDeps {
   getFogStatus: () => FogStatus | null;
   /** Nollställ rökmaskinens drifträknare efter underhåll. */
   resetFogService: () => void;
-  /** Låtminnets tillstånd (igenkänning/inlärning) + glöm-knapp. */
-  songMemory?: {
-    state: () => { songs: number; known: boolean; plays: number; confidence: number; positionMs: number; learning: boolean; refining: boolean };
-    forget: () => void;
-    /** Manuell inlärning: användaren markerar låtgränserna själv. */
-    manualStart: () => void;
-    manualNext: () => void;
-    manualStop: () => void;
-    list: () => { id: number; durationMs: number; plays: number; drops: number; bpm: number; refined: boolean; note: string; dropTimes: number[] }[];
-    setNote: (id: number, note: string) => void;
-    forgetSong: (id: number) => void;
-    dumpCurve: (id: number) => void;
-  };
   probeDmx?: (channels: number[], frames: number) => void;
-  /** Strukturkons lage for UI:t: hur manga vantar, hur manga ar klara. */
-  structureStatus?: () => { pending: number; analysed: number; busy: boolean; error: string };
-  /** Per lat: hur langt strukturanalysen kommit — visas i latlistan. */
-  structureInfo?: (songId: number) => { parts: number; kinds: string[]; pending: boolean; active: boolean };
   onConfigChanged?: () => void;
 
   /** Advance to the next mode in the shared cycle. Returns the new mode. */
@@ -537,7 +520,6 @@ export async function startServer(
       // frame — samma push-rate som resten (20 Hz).
       dmxOk: deps.getDmxConnected(),
       blePairedCount: deps.ble?.paired().length ?? 0,
-      song: deps.songMemory?.state() ?? null,   // låtminne: känd låt / lär in
     });
     pkLevel = 0; pkEnergy = 0; pkKick = false; pkBeat = false;
     for (const c of clients) {
@@ -593,56 +575,8 @@ export async function startServer(
           } else if (msg.type === "cycleMode") {
             const next = deps.cycleMode();
             sendState(sock, "modeChanged", JSON.stringify({ type: "modeChanged", mode: next }));
-          } else if (msg.type === "setSongNote" && typeof msg.id === "number") {
-            deps.songMemory?.setNote(msg.id, typeof msg.note === "string" ? msg.note : "");
-            const l2 = deps.songMemory?.list() ?? [];
-            sendState(sock, "songList", JSON.stringify({ type: "songList", songs: l2 }));
-          } else if (msg.type === "forgetSong" && typeof msg.id === "number") {
-            deps.songMemory?.forgetSong(msg.id);
-            sendState(sock, "songList", JSON.stringify({ type: "songList", songs: deps.songMemory?.list() ?? [] }));
-          } else if (msg.type === "songCurve" && typeof msg.id === "number") {
-            deps.songMemory?.dumpCurve(msg.id);
-          } else if (msg.type === "setReplicateToken" && typeof msg.value === "string") {
-            // Tom strang = sla av analysen. Nyckeln ekas ALDRIG tillbaka.
-            const v = msg.value.trim();
-            deps.cfg.replicateToken = v || undefined;
-            console.log(`[struktur] API-nyckel ${v ? "satt" : "borttagen"}`);
-            sendState(sock, "structureStatus", JSON.stringify({ type: "structureStatus", hasToken: !!v, ...(deps.structureStatus?.() ?? {}) }));
-          } else if (msg.type === "structureStatus") {
-            sendState(sock, "structureStatus", JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, ...(deps.structureStatus?.() ?? {}) }));
-          } else if (msg.type === "setAcrCreds" && typeof msg.key === "string" && typeof msg.secret === "string") {
-            // Hemligheterna ekas ALDRIG tillbaka — bara om de ar satta eller ej.
-            const k = msg.key.trim(), s2 = msg.secret.trim();
-            deps.cfg.acrKey = k || undefined;
-            deps.cfg.acrSecret = s2 || undefined;
-            if (typeof msg.host === "string" && msg.host.trim()) deps.cfg.acrHost = msg.host.trim();
-            console.log(`[namn] ACRCloud-uppgifter ${k && s2 ? "satta" : "borttagna"}`);
-            sendState(sock, "structureStatus", JSON.stringify({ type: "structureStatus", hasToken: !!deps.cfg.replicateToken, hasAcr: !!(deps.cfg.acrKey && deps.cfg.acrSecret), ...(deps.structureStatus?.() ?? {}) }));
           } else if (msg.type === "probeDmx") {
             deps.probeDmx?.(Array.isArray(msg.channels) ? msg.channels.map(Number) : [1, 2, 3, 4, 5, 6, 7], Number(msg.frames) || 400);
-          } else if (msg.type === "listSongs") {
-            const l = deps.songMemory?.list() ?? [];
-            // Berika med strukturlaget sa listan visar bade tvatten OCH analysen.
-            const withStruct = l.map((r: any) => ({ ...r, struct: deps.structureInfo?.(r.id) }));
-            sendState(sock, "songList", JSON.stringify({
-              type: "songList",
-              songs: withStruct,
-              structure: { hasToken: !!deps.cfg.replicateToken, hasAcr: !!(deps.cfg.acrKey && deps.cfg.acrSecret), ...(deps.structureStatus?.() ?? {}) },
-            }));
-          } else if (msg.type === "songManualStart") {
-            // Inlärning ska bara vara på när ägaren faktiskt spelar in. Automatisk
-            // inlärning utanför manuellt läge producerade bara blandposter.
-            deps.cfg.songLearn = true;
-            deps.songMemory?.manualStart();
-          } else if (msg.type === "songManualNext") {
-            deps.songMemory?.manualNext();
-          } else if (msg.type === "songManualStop") {
-            deps.songMemory?.manualStop();
-            deps.cfg.songLearn = false;
-          } else if (msg.type === "forgetSongs") {
-            deps.songMemory?.forget();
-            return;
-
           } else if (msg.type === "setSensitivity") {
             deps.cfg.sensitivity = clamp01(msg.value);
           } else if (msg.type === "setAudioInput" && (msg.value === "aux" || msg.value === "mic")) {
@@ -738,12 +672,8 @@ export async function startServer(
             deps.cfg.ambientGlow = !!msg.value;
           } else if (msg.type === "setRiserStrobe") {
             deps.cfg.riserStrobe = !!msg.value;
-          } else if (msg.type === "setMemCeiling") {
-            deps.cfg.memCeilingOff = !msg.value;   // value=true → taket PÅ
           } else if (msg.type === "setShowLead" && typeof msg.value === "number") {
             deps.cfg.showLeadMs = Math.max(0, Math.min(300, Math.round(msg.value)));
-          } else if (msg.type === "setSongLearn") {
-            deps.cfg.songLearn = !!msg.value;   // frys/tina latminnets inlarning
           } else if (msg.type === "setStrobeUnlimited") {
             deps.cfg.strobeUnlimited = !!msg.value;
           } else if (msg.type === "setDropHeadroom") {

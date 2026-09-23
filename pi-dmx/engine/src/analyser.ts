@@ -336,6 +336,14 @@ export class Analyser {
    *  hanger pa exakt det talet -> den var i praktiken blind, och drops fyrade fritt i lugna partier.
    *  'rank' = latens EGEN hoga niva: percentil (HIGH_REF_P) av ALLA 1 s-block hittills, samma historik som
    *  rang-sektionerna redan for. Referensen slutar folja med nedat nar musiken lugnar sig, vilket ar hela poangen. */
+  /** SEKTIONEN NOLLAS VID LATBYTE (2026-09-23, opt-in DMX_SECTION_ON_HINT=1). Port fran lotus (LOTUS_SECTION_ON_HINT).
+   *  MATT pa 128 fangster fran lotus kvallen 09-22: vid borjan av en NY lat sa etiketten 'low' 77 %, 'high' 12 %,
+   *  'build' 9 % och 'intro' 2 %; sektionsindex median 44, max 174. Sektionsmaskineriet nollas namligen bara vid
+   *  10 s tystnad eller full resetTempo - i en megamix rullar det vidare over latbyten: rang-percentilerna jamfor
+   *  nya laten mot FORRA latens block, levelVsHighDb mater mot forra latens refrang, och 'intro' (som drop-grinden
+   *  hanger pa) kan aldrig intraffa efter forsta laten. Verifierat pa lotus: 5 latbyten i rad -> intro, index 0,
+   *  tempot oskadat. I DMX kommer hinten fran boundaryDetector.ts via index.ts (DMX_BOUNDARY_SOFT). */
+  private static readonly SECTION_ON_HINT = process.env.DMX_SECTION_ON_HINT === '1';
   private static readonly HIGH_REF = process.env.DMX_HIGH_REF || 'section';
   /** LATGRANS-NYHET (2026-09-23, opt-in DMX_BOUNDARY_NOV=1). Utan latminne har motorn INGEN latgrans-signal alls:
    *  sektionsmaskineriet nollas bara vid 10 s tystnad, sa i en megamix rullar det vidare over latbyten. MATT mot
@@ -1780,6 +1788,9 @@ export class Analyser {
     else if (k < 1) for (let i = 0; i < this.tempoGram.length; i++) this.tempoGram[i] *= k;
     this.clearLockVotes();
     this.barAcc.fill(0); this.barCount = 0;
+    // NY LAT = NY STRUKTUR. Tempot bars over (se ovan), men sektionshistoriken tillhor forra laten. sectionReset()
+    // ar samma nollning som 10 s tystnad redan gor - skillnaden ar att vi nu ocksa litar pa latgrans-signalen.
+    if (Analyser.SECTION_ON_HINT) this.sectionReset();
   }
 
   /** Nollställ lås-/röst-ackumulatorerna — gemensam kärna för resetTempo/hintTrackChange/

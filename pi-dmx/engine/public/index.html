@@ -367,7 +367,6 @@
     <div class="audio-head">
       <div class="audio-head-l">
         <span class="audio-lbl">Ljudnivå</span>
-        <span id="songBadge" style="margin-left:8px;font-size:10px;letter-spacing:.02em;color:rgba(255,255,255,.35)">—</span>
       </div>
       <span class="audio-pct" id="levelVal">0%</span>
     </div>
@@ -668,82 +667,6 @@
     </div>
   </div>
 
-  <div class="card">
-    <h2>Låtinlärning</h2>
-    <div class="status">
-      Motorn gissar själv var låtar börjar och slutar, men gissar ofta fel. Markerar du
-      gränserna själv blir inspelningarna rena — och nästa gång låten spelas hittar
-      igenkänningen rätt läge i ljudet på egen hand.
-      <br><br>
-      <b>Starta</b> när låten börjar · <b>Nästa låt</b> precis vid bytet · <b>Stoppa</b> när du är klar.
-      Ett par sekunder hit eller dit spelar ingen roll. Segment under 110 sekunder kastas
-      som feltryck, och spelar du in en låt som redan finns förbättras den i stället för att dubbleras.
-    </div>
-    <div class="fx-actions">
-      <button class="btn primary" id="learnStart">Starta inlärning</button>
-      <button class="btn" id="learnNext" disabled>Nästa låt</button>
-      <button class="btn" id="learnStop" disabled>Stoppa</button>
-    </div>
-    <div class="status" id="learnHint">Inte igång.</div>
-
-    <div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.10)">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-        <b>Analys och namngivning</b>
-        <button class="btn" id="keysEditBtn" style="display:none">Ändra</button>
-      </div>
-
-      <!-- SAMMANFATTNING: allt ar satt, faltena tar bara plats. En engangsgrej. -->
-      <div class="status" id="keysSummary" style="display:none;margin-top:6px">—</div>
-
-      <!-- INSTALLNINGAR: visas nar nagot saknas, eller nar man tryckt Andra. -->
-      <div id="keysEdit">
-        <div class="status" style="margin-top:6px">
-          <b>Strukturanalys.</b> Varje inspelad låt skickas EN gång på analys som märker ut
-          intro, vers, refräng, bridge och outro — det Pi:n inte kan räkna fram själv. Svaret
-          sparas för alltid och ljudet raderas då. Kräver internet; på fest när Pi:n är egen
-          accesspunkt väntar kön tills den kommer hem.
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
-          <input id="structToken" type="password" placeholder="Replicate API-nyckel (r8_…)"
-            style="flex:1;min-width:180px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;padding:6px 8px;font:inherit" />
-          <button class="btn" id="structSave">Spara</button>
-        </div>
-        <div class="status" id="structHint" style="margin-top:6px">—</div>
-
-        <div class="status" style="margin-top:12px">
-          <b>Automatisk namngivning.</b> Ett tolv sekunders utdrag ur mitten av låten skickas
-          till ACRCloud, som känner igen den mot en katalog av riktiga inspelningar. Träffar
-          den säkert fylls namnet i åt dig — annars lämnas fältet tomt. Ett namn du redan
-          skrivit skrivs aldrig över.
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
-          <input id="acrKey" type="text" placeholder="Access Key"
-            style="flex:1;min-width:150px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;padding:6px 8px;font:inherit" />
-          <input id="acrSecret" type="password" placeholder="Secret Key"
-            style="flex:1;min-width:150px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;padding:6px 8px;font:inherit" />
-          <button class="btn" id="acrSave">Spara</button>
-        </div>
-        <div class="status" id="acrHint" style="margin-top:6px">—</div>
-      </div>
-    </div>
-    </div>
-    <div id="songListWrap" style="margin-top:14px;overflow-x:auto">
-      <table id="songList" style="width:100%;border-collapse:collapse;font-size:14px">
-        <thead><tr style="text-align:left;opacity:.6;white-space:nowrap">
-          <th style="padding:4px 6px 4px 0">#</th>
-          <th style="padding:4px 6px;width:99%">Namn</th>
-          <th style="padding:4px 6px">Längd</th>
-          <th style="padding:4px 6px">BPM</th>
-          <th style="padding:4px 6px" title="antal drops">Drops</th>
-          <th style="padding:4px 6px" title="antal spelningar">Spelad</th>
-          <th style="padding:4px 6px;white-space:nowrap">Status</th>
-          <th style="padding:4px 6px;white-space:nowrap" title="strukturanalys: intro/vers/refräng/bridge">Struktur</th>
-          <th style="padding:4px 6px"></th>
-        </tr></thead>
-        <tbody id="songListBody"></tbody>
-      </table>
-    </div>
-  </div>
   </div><!-- /ownerOnly -->
 
   <!-- Dold: anslutningsstatus finns redan i sidfoten. Elementet behålls så
@@ -765,7 +688,6 @@ const calMark = document.getElementById("calMark");
 const calPeak = document.getElementById("calPeak");
 const calHint = document.getElementById("calHint");
 let auxPeak = 0;   // löpande max (peak-hold) av insignalen — AUX-kalibrering
-const songBadge = document.getElementById("songBadge");   // låtminne: lär in / kör på inspelning
 const inAux = document.getElementById("inAux");
 const inMic = document.getElementById("inMic");
 inAux.onclick = () => send({ type: "setAudioInput", value: "aux" });
@@ -882,193 +804,9 @@ function connect() {
     else if (m.type === "effects") applyEffects(m.effects);
     else if (m.type === "bleScanResults") renderBleScan(m.devices || []);
     else if (m.type === "blePaired") renderBlePaired(m.devices || []);
-    else if (m.type === "songList") { renderSongList(m.songs || []); renderStructStatus(m.structure); }
-    else if (m.type === "structureStatus") renderStructStatus(m);
   };
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
-
-// MANUELL LÅTINLÄRNING (bara /setup). Knapparna äger gränserna medan läget är på —
-// den automatiska detektorn är tystad i motorn så länge.
-const learnStart = document.getElementById("learnStart");
-const learnNext  = document.getElementById("learnNext");
-const learnStop  = document.getElementById("learnStop");
-const learnHint  = document.getElementById("learnHint");
-if (learnStart) learnStart.onclick = () => send({ type: "songManualStart" });
-if (learnNext)  learnNext.onclick  = () => send({ type: "songManualNext" });
-if (learnStop)  learnStop.onclick  = () => send({ type: "songManualStop" });
-
-// API-nyckeln skickas EN gang och ekas aldrig tillbaka. Faltet toms direkt efter
-// sandning sa nyckeln inte blir liggande synlig i en flik pa en delad dator.
-const structSave = document.getElementById("structSave");
-if (structSave) structSave.onclick = () => {
-  const el = document.getElementById("structToken");
-  if (!el) return;
-  send({ type: "setReplicateToken", value: el.value });
-  el.value = "";
-  const h = document.getElementById("structHint");
-  if (h) h.textContent = "Sparar nyckel…";
-};
-
-const keysEditBtn = document.getElementById("keysEditBtn");
-if (keysEditBtn) keysEditBtn.onclick = () => {
-  keysForceOpen = !keysForceOpen;
-  keysEditBtn.textContent = keysForceOpen ? "Dölj" : "Ändra";
-  send({ type: "structureStatus" });
-};
-
-const acrSave = document.getElementById("acrSave");
-if (acrSave) acrSave.onclick = () => {
-  const k = document.getElementById("acrKey"), s = document.getElementById("acrSecret");
-  if (!k || !s) return;
-  send({ type: "setAcrCreds", key: k.value, secret: s.value, host: "identify-eu-west-1.acrcloud.com" });
-  k.value = ""; s.value = "";
-  const h = document.getElementById("acrHint");
-  if (h) h.textContent = "Sparar uppgifter…";
-};
-function fmtDur(ms) {
-  const t = Math.round(ms / 1000);
-  return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0");
-}
-// Strukturanalysens lage per lat. Fyra tillstand, och de sager olika saker:
-// klar (hur manga sektioner), analyseras nu, vantar i kon, eller ingenting alls.
-function structCell(x) {
-  if (!x) return '<span style="opacity:.35">—</span>';
-  if (x.parts > 0) {
-    const kinds = (x.kinds || []).join(", ");
-    return '<span style="color:var(--pink,#ff3ea5)" title="' + kinds + '">✓ ' + x.parts + ' delar</span>';
-  }
-  if (x.active) return '<span style="color:#ffd166">◌ Analyseras…</span>';
-  if (x.pending) return '<span style="opacity:.55">○ I kö</span>';
-  return '<span style="opacity:.35">—</span>';
-}
-
-// Faltena ar TOMMA MED FLIT: hemligheter ekas aldrig tillbaka och rutan toms
-// efter sandning, sa en nyckel inte blir liggande lasbar i en oppen flik. Men en
-// tom ruta ser ut som en osparad ruta — darav den tydliga markeringen har.
-let keysForceOpen = false;
-function markSaved(el, saved, name) {
-  if (!el) return;
-  el.placeholder = saved ? "✓ " + name + " sparad — skriv ny för att byta" : name;
-  el.style.borderColor = saved ? "rgba(255,62,165,.55)" : "rgba(255,255,255,.12)";
-}
-
-function renderStructStatus(st) {
-  const el = document.getElementById("structHint");
-  if (!el || !st) return;
-  markSaved(document.getElementById("structToken"), st.hasToken, "Replicate-nyckel");
-  var t = st.hasToken
-    ? "✓ Klar att analysera. "
-    : "⚠ Ingen nyckel — kön står still. ";
-  t += (st.analysed || 0) + " analyserade, " + (st.pending || 0) + " i kö";
-  if (st.busy) t += " · analyserar just nu";
-  if (st.error) t += " · senaste fel: " + st.error;
-  el.textContent = t;
-
-  markSaved(document.getElementById("acrKey"), st.hasAcr, "Access Key");
-  markSaved(document.getElementById("acrSecret"), st.hasAcr, "Secret Key");
-  const a = document.getElementById("acrHint");
-  if (a) a.textContent = st.hasAcr
-    ? "✓ Klar — nya låtar namnges automatiskt."
-    : "⚠ Inga uppgifter — låtar får namnges för hand.";
-
-  // FALLS IHOP NAR ALLT AR SATT. Nycklar fylls i EN gang; darefter ar tva tomma
-  // losenordsrutor bara forvirrande — de ser osparade ut aven nar de inte ar det,
-  // och de kan inte fyllas i for att visa vad som star dar (en hemlighet som ekas
-  // tillbaka blir liggande lasbar i en oppen flik).
-  const done = !!(st.hasToken && st.hasAcr);
-  const sum = document.getElementById("keysSummary");
-  const edit = document.getElementById("keysEdit");
-  const btn = document.getElementById("keysEditBtn");
-  if (!sum || !edit || !btn) return;
-  if (done && !keysForceOpen) {
-    var line = "✓ Strukturanalys och namngivning påslagna · "
-      + (st.analysed || 0) + " analyserade, " + (st.pending || 0) + " i kö";
-    if (st.busy) line += " · analyserar just nu";
-    if (st.error) line += " · senaste fel: " + st.error;
-    sum.textContent = line;
-    sum.style.display = ""; edit.style.display = "none"; btn.style.display = "";
-  } else {
-    sum.style.display = "none"; edit.style.display = ""; btn.style.display = done ? "" : "none";
-  }
-}
-
-function renderSongList(rows) {
-  if (rows) lastRows = rows; else rows = lastRows;
-  const body = document.getElementById("songListBody");
-  if (!body) return;
-  // Rör inte tabellen om markören står i ett namnfält — annars försvinner det man skriver.
-  if (document.activeElement && document.activeElement.classList
-      && document.activeElement.classList.contains("songNote")) return;
-  if (!rows || !rows.length) {
-    body.innerHTML = '<tr><td colspan="9" style="padding:8px 0;opacity:.5">Inga inspelningar än.</td></tr>';
-    return;
-  }
-  body.innerHTML = rows.map(function (r) {
-    const nm = String(r.note || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    // Tvätten körs först efter inspelningen; otvättad post kör på råmätningen.
-    // Tvätten kör som egen process efter inspelningen — visa den medan den pågår.
-    const st = (refiningNow && refiningNow === r.id)
-      ? '<span style="color:#ffd166">◌ Tvättas…</span>'
-      : r.refined
-        ? '<span style="color:var(--pink,#ff3ea5)">✓ Processad</span>'
-        : '<span style="opacity:.55">○ Otvättad</span>';
-    return '<tr style="border-top:1px solid rgba(255,255,255,.08)">'
-      + '<td style="padding:6px 8px 6px 0">#' + r.id + '</td>'
-      + '<td style="padding:6px 8px"><input class="songNote" data-id="' + r.id + '" value="' + nm
-      + '" placeholder="låtnamn…" style="width:100%;min-width:96px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:inherit;padding:4px 6px;font:inherit" /></td>'
-      + '<td style="padding:6px 6px;white-space:nowrap">' + fmtDur(r.durationMs) + '</td>'
-      + '<td style="padding:6px 6px">' + (r.bpm || "—") + '</td>'
-      + '<td style="padding:6px 6px">' + r.drops + '</td>'
-      + '<td style="padding:6px 6px;white-space:nowrap">' + r.plays + '×</td>'
-      + '<td style="padding:6px 6px;white-space:nowrap">' + st + '</td>'
-      + '<td style="padding:6px 6px;white-space:nowrap">' + structCell(r.struct) + '</td>'
-      + '<td style="padding:6px 0 6px 6px"><button class="btn songDel" data-id="' + r.id
-      + '" title="glöm den här inspelningen" style="padding:2px 8px;font-size:13px;opacity:.7">✕</button></td></tr>';
-  }).join("");
-  // Spara vid Enter eller när fältet tappar fokus. Servern svarar med hela listan,
-  // så vi skriver inte över ett fält användaren just skriver i.
-  body.querySelectorAll("button.songDel").forEach(function (el) {
-    el.onclick = function () {
-      const id = Number(el.getAttribute("data-id"));
-      const row = el.closest("tr");
-      const nm = row ? (row.querySelector("input.songNote") || {}).value : "";
-      if (confirm("Glöm inspelningen" + (nm ? ' "' + nm + '"' : " #" + id) + "?")) send({ type: "forgetSong", id: id });
-    };
-  });
-  body.querySelectorAll("input.songNote").forEach(function (el) {
-    el.onkeydown = function (e) { if (e.key === "Enter") el.blur(); };
-    el.onblur = function () {
-      const id = Number(el.getAttribute("data-id"));
-      send({ type: "setSongNote", id: id, note: el.value });
-    };
-  });
-}
-let lastSongCount = -1, lastRefreshAt = 0;
-let refiningNow = 0, lastRows = null, lastRefining = -1;
-function renderLearn(sg) {
-  if (!learnHint) return;
-  const on = !!(sg && sg.manual);
-  if (learnStart) learnStart.disabled = on;
-  if (learnNext)  learnNext.disabled  = !on;
-  if (learnStop)  learnStop.disabled  = !on;
-  // Tvätten startar direkt efter en inspelning — statusraden ska följa med.
-  const rf = (sg && sg.refining) ? (sg.refiningId || 0) : 0;
-  if (rf !== lastRefining) { lastRefining = rf; refiningNow = rf; renderSongList(null); }
-  const n = sg ? sg.songs : 0;
-  const nowT = Date.now();
-  if (n !== lastSongCount || nowT - lastRefreshAt > 10000) {
-    lastSongCount = n; lastRefreshAt = nowT;
-    send({ type: "listSongs" });
-  }
-  if (!on) { learnHint.textContent = "Inte igång. " + n + " låtar i minnet."; return; }
-  const secs = Math.round((sg.positionMs || 0) / 1000);
-  const kort = secs < 110;
-  learnHint.textContent = "● Spelar in — " + secs + " s"
-    + (kort ? " (för kort ännu, kastas om du trycker Nästa nu)" : " (tillräckligt långt)")
-    + " · " + n + " låtar i minnet.";
-}
-
 
 // Effekt-listorna kommer från servern (type:"effects", grupperade på tier) →
 // en enda sanningskälla; ingen hårdkodad lista att hålla i synk med motorn.
@@ -1344,23 +1082,6 @@ function applyFrame(f) {
   } else {
     calZone.hidden = calMark.hidden = calPeak.hidden = calHint.hidden = true;
   }
-  // Låtminne-badge: ● lär in (aux) · ▶ kör på inspelning · — inget. f.song är
-  // null tills låtminnes-motorn är deployad → badgen står kvar på "—".
-  if (songBadge) {
-    const sg = f.song;
-    // De första sekunderna VET motorn inte om låten är känd — fingerprintingen
-    // behöver träffar först (mätt: låser typiskt efter ~3 s). Att säga "spelar in
-    // låt #6" då är missvisande; den lyssnar fortfarande.
-    if (sg && sg.learning && sg.songs > 0 && (sg.positionMs || 0) < 8000) {
-      songBadge.textContent = "◌ Lyssnar…"; songBadge.style.color = "rgba(255,255,255,.55)";
-    }
-    else if (sg && sg.learning) { songBadge.textContent = "● Spelar in låt" + (sg.learningId ? " #" + sg.learningId : ""); songBadge.style.color = "#ff4d4d"; }
-    // Låten är identifierad men tidslinjen ännu inte verifierad → realtid kör showen.
-    else if (sg && sg.known && !sg.synced) { songBadge.textContent = "◌ Synkar " + (sg.note || "inspelning") + "…"; songBadge.style.color = "#ffd166"; }
-    else if (sg && sg.known) { songBadge.textContent = "▶ " + (sg.note ? sg.note : "Kör på inspelning") + " · " + sg.plays + "×"; songBadge.style.color = "var(--pink,#ff3ea5)"; }
-    else { songBadge.textContent = "—"; songBadge.style.color = "rgba(255,255,255,.35)"; }
-  }
-  renderLearn(f.song);
   const barWrap = document.getElementById("levelBarWrap");
   if (barWrap) barWrap.classList.toggle("hot", hot);
 

@@ -66,6 +66,11 @@ SHOW_ENV = [
     ('DMX_DROP_CALM_GATE', '1',      'lugna partier kraver starkare bevis for drop'),
     ('DROP_CALM_BUILD',    '0.25',   'riser-kravet (0 = grinden inert)'),
     ('DROP_CALM_LAND_MS',  '300',    'hall kandidaten och fyra vid verifierad landning i stallet for att neka'),
+    # LATBYTE -> SEKTIONEN NOLLAS (2026-09-23, port fran lotus dar det ar verifierat live: 'intro' vid ny lat 2 % -> 5/5).
+    # Sektionsmaskineriet nollades bara vid 10 s tystnad, sa i en megamix jamfordes nya laten mot FORRA latens block och
+    # 'intro' (som drop-grinden hanger pa) kunde aldrig intraffa efter forsta laten = "falska drops vid latbyte/intro".
+    # Signalen kommer fran boundaryDetector.ts (klangskifte/tempo/nivadipp) via DMX_BOUNDARY_SOFT-hinten i index.ts.
+    ('DMX_SECTION_ON_HINT', '1',     'latgransen nollar sektionshistoriken - annars jamfors nya laten mot forra latens'),
     # DMX_SECTION_SWITCH AV (2026-09-22 22:40, ladan live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
     # -> dirigenten plockade bara ur full-fart-poolen och allt sag likadant ut. Slas pa igen forst nar rangen ger vettig
     # fordelning i ladans material. Sektionerna ar kvar som DATA ovan.
@@ -73,6 +78,21 @@ SHOW_ENV = [
     # energitaket multipliceras ovanpa gick armaturerna ner till tandpunkten en efter en ("lamporna stangs av").
     # dB-fonstrets ankare (tau 120 s) passar inte ladans komprimerade PA. Det ar anda RATT vag - agaren pekar sjalv pa
     # BLE-lampan ("dar har vi skon rytm i brightness") - men den ska tunas mot INSPELAT ladljud, inte live i en spelning.
+]
+
+
+# RENSNINGEN 2026-09-23: inlarnings-/offline-stacken ar borta ur motorn (latminne, fingeravtryck, inspelare, tvatt,
+# strukturko, namngivning - 2 984 rader). deploy-dist.py kopierar bara filer som finns lokalt och raderar aldrig, sa det
+# som lag kvar pa Pi:n skulle ligga kvar for alltid. Allt har flyttas till <namn>.bak-<ts> (aldrig rm) sa det gar att
+# angra. Datafilerna ar inlarningens rester: songs.bin, structure.json, temp-WAV:ar och koade analyser.
+REMOVE = [
+    '/opt/audio-dmx-engine/dist/songMemory.js', '/opt/audio-dmx-engine/dist/fingerprint.js',
+    '/opt/audio-dmx-engine/dist/structureQueue.js', '/opt/audio-dmx-engine/dist/identify.js',
+    '/opt/audio-dmx-engine/dist/learnRecorder.js', '/opt/audio-dmx-engine/dist/refineQueue.js',
+    '/opt/audio-dmx-engine/public/structure-worker.js',
+    '/opt/audio-dmx-engine/tools/refineSong.mjs', '/opt/audio-dmx-engine/tools/replay.mjs',   # bara Pi-kopiorna; PC-banken behaller sina
+    '/var/lib/audio-dmx-engine/songs.bin', '/var/lib/audio-dmx-engine/structure.json',
+    '/var/lib/audio-dmx-engine/*.wav', '/var/lib/audio-dmx-engine/*.pending.wav',
 ]
 
 
@@ -141,6 +161,7 @@ def main():
     if not ONLY_DEPLOY:
         cmd += ['--conf', 'lotus']
         for e in env_pairs: cmd += ['--env', e]
+    for r in REMOVE: cmd += ['--remove', r]   # alltid, aven med --bara-deploy: rensningen ar en del av koden
     print('\nshow-env som skrivs till lotus.conf:' if not ONLY_DEPLOY else '\n(env orord)')
     for k, v, why in SHOW_ENV:
         if not ONLY_DEPLOY: print(f'  {k}={v:<6} {why}')
