@@ -80,6 +80,7 @@ SHOW_ENV = [
     ('DMX_SECTION_UNIT',   '1',      'sektionen ar enheten: byte bara vid ra sektionsgrans (>= 4 s gammal)/drop/basgang, samma look per sektionstyp'),
     ('DMX_SECTION_TRACE',  '1',      'sektionsbyten i journalen (bara logg)'),
     ('DMX_ENERGY_FALLBACK','1',      'utan taktlas: puls pa breda transienter + storre energisving ("dor inte emellanat")'),
+    ('DMX_HEARTBEAT',      '1',      'HEART-BEAT/ENERGI som eget lager (kontrakt heartbeat/contract.ts): effekter med egen taktpuls skippar den globala pulsen ("krockar inte")'),
     ('DMX_HUE_LIFT',       '1',      'kulorlyft i kalibreringen: starkaste kanalen till tandpunkten, kuloren bevaras (standard pa; 0 = per kanal som forr)'),
     ('DMX_SECTION_ON_HINT', '1',     'latgransen nollar sektionshistoriken - annars jamfors nya laten mot forra latens'),
     # DMX_SECTION_SWITCH AV (2026-09-22 22:40, ladan live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)

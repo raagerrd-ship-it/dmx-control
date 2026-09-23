@@ -3,7 +3,7 @@
 // färg-slideshow i takt; snabb fade ger färgsläp i själva kapet. Motsats till
 // party (mörk throb) och rave (spatial växling).
 export const snap = {
-    key: "snap", label: "Snap", tier: "full", section: ["high"],
+    key: "snap", label: "Snap", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"],
     desc: "Alla lampor byter färg blixtsnabbt på varje slag.",
     render(c) {
         const hue = c.mixedSector(c.beatIdx) / 6;

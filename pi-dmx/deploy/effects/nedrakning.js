@@ -2,7 +2,7 @@
 // slag 7 tands ALLT i vitt - och cykeln borjar om, tatare mot slutet av risern (buildUp). Nar dropen kommer (dropEnv) landar
 // den i blinder + fullt ljus. Hazer stiger med risern.
 export const nedrakning = {
-    key: "nedrakning", label: "Nedrakning", tier: "fart", section: ["build"],
+    key: "nedrakning", label: "Nedrakning", tier: "fart", modulate: { energy: true, pulse: false }, section: ["build"],
     desc: "Uppbyggnad: lamporna slacks en i taget utifran och in, allt tands pa attan - om och om igen till dropen.",
     drives: ["hazer", "blinder"],
     render(c) {

@@ -5,7 +5,7 @@
 // megamixen); saknas basnoter (> 1 slag sedan senaste) ligger bara mattan kvar med en mjuk slagpuls sa den aldrig ar dod.
 // Toggle-familjen (dirigenten valjer bland dessa vid tydlig basgang, CLEAR_BASS).
 export const basgang = {
-    key: "basgang", label: "Basgang", tier: "fart", section: ["low", "high"], toggle: true,
+    key: "basgang", label: "Basgang", tier: "fart", modulate: { energy: true, pulse: false }, section: ["low", "high"], toggle: true,
     desc: "Ljuspunkten stegar pa basnoterna, riggen glimmar med basens sustain.",
     render(c) {
         const n = Math.max(1, c.count);

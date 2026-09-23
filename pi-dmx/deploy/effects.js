@@ -1657,7 +1657,7 @@ export class EffectEngine {
         const hbEnvelope = { ceiling: drive > 1e-6 ? Math.min(1.2, md / drive) : 0, pulse: hbPulse, pulseDepth: Math.min(1, Math.max(0, HEARTBEAT_DEPTH * this.beatTrust)) };
         const wantCalmNow = frame.breaking || (SECTION_SWITCH && (frame.section === 'break' || frame.section === 'low'));
         const hbBase = modulateOf(effMode);
-        const hbFlags = { energy: hbBase.energy || wantCalmNow, pulse: hbBase.pulse && this.beatTrust >= HEARTBEAT_TRUST }; // dirigentens overstyrning
+        const hbFlags = { energy: hbBase.energy || wantCalmNow, pulse: hbBase.pulse && (this.beatTrust >= HEARTBEAT_TRUST || ENERGY_FB) }; // ENERGY_FB: transientpulsen far passera utan las   // dirigentens overstyrning
         this.hbLast = { ceiling: hbEnvelope.ceiling, pulse: hbEnvelope.pulse, depth: hbEnvelope.pulseDepth, energy: hbFlags.energy, pulseOn: hbFlags.pulse };
         // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
         // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna

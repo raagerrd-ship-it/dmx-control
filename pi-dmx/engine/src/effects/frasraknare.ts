@@ -5,7 +5,7 @@ import type { EffectDef } from "./types.js";
 // (+ blinder). Takterna raknas ur analysatorns sectionBars (takter sedan sektionsstart, sa frasen alltid borjar dar
 // sektionen borjar) med gridfasen (beatFrac) inom takten; utan tempo faller den tillbaka pa beatIdx. Pool high/low.
 export const frasraknare: EffectDef = {
-  key: "frasraknare", label: "Frasraknare", tier: "fart", section: ["high", "low"],
+  key: "frasraknare", label: "Frasraknare", tier: "fart", modulate: { energy: true, pulse: false }, section: ["high", "low"],
   desc: "Palettpuls pa slaget, svep var fjarde takt, vit blixt pa var attonde takts etta.",
   drives: ["blinder"],
   render(c) {

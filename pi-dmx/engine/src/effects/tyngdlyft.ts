@@ -5,7 +5,7 @@ import type { EffectDef } from "./types.js";
 // fargen smalnar mot vitt - vid 0 dB ar hela riggen vit, och OVER refrangens niva ber den om blinder. Pulsen pa slaget
 // vaxer med lyftet. Utan refrangreferens (forsta refrangen har inte hants) foljer lyftet nivan. Pool high/low.
 export const tyngdlyft: EffectDef = {
-  key: "tyngdlyft", label: "Tyngdlyft", tier: "fart", section: ["high", "low"],
+  key: "tyngdlyft", label: "Tyngdlyft", tier: "fart", modulate: { energy: true, pulse: false }, section: ["high", "low"],
   desc: "Djup farg 6 dB under refrangen, vitt nar nivan nar refrangens - blinder over den.",
   drives: ["blinder", "uv"],
   render(c) {

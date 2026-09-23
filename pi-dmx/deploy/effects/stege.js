@@ -3,7 +3,7 @@
 // av sitt bands ANSLAG (onset), inte av dess nivå. Resultatet är löpande
 // uppgångar när en fill eller ett break rullar uppåt genom registret.
 export const stege = {
-    key: "stege", label: "Stege", tier: "fart", section: ["low"],
+    key: "stege", label: "Stege", tier: "fart", modulate: { energy: true, pulse: false }, section: ["low"],
     desc: "Riggen är en frekvensstege — anslag i varje band tänder sin pinne, fills rullar uppåt.",
     render(c) {
         const o = c.frame.onset, s = c.frame.spec;

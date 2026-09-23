@@ -5,7 +5,7 @@ import type { EffectDef } from "./types.js";
 // (wave). + hi-hat-glitter: diskant-anslaget (onset.treble) ger en snabb gnista
 // på huvudet, samma pigga tick som wave fick.
 export const chase: EffectDef = {
-  key: "chase", label: "Jakt", tier: "fart", section: ["low", "high"], toggle: true,
+  key: "chase", label: "Jakt", tier: "fart", modulate: { energy: true, pulse: false }, section: ["low", "high"], toggle: true,
   desc: "En ljuspunkt springer i takt och byter färg.",
   render(c) {
     // BASNOTER (2026-09-23): vid tydlig basgang (bassline >= 0,6) hoppar huvudet ett steg per BASNOT (ping-pong) i stallet for

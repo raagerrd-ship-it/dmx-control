@@ -4,7 +4,7 @@ import type { EffectDef } from "./types.js";
 // och hela riggen THROBBAR hårt: nästan kolsvart mellan slagen, full på beatet.
 // Lågt golv (5%) + extra kick-drive → rave-hård kontrast som sitter på basen.
 export const party: EffectDef = {
-  key: "party", label: "Party", tier: "full", section: ["high"],
+  key: "party", label: "Party", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"],
   desc: "Färgkaos som pumpar hårt på varje taktslag.",
   render(c) {
     const hue = c.mixedSector(c.beatIdx + c.idx * 2) / 6;

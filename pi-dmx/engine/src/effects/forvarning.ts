@@ -6,7 +6,7 @@ import type { EffectDef } from "./types.js";
 // sedan lamnar dirigenten over till high-poolen). Utan forutsagelse (eller > 4 takter kvar) ar den en lugn vantan: palett-
 // farg, mjuk puls, som langsamt vaknar ju langre sektionen pagatt (sectionBars). Pool build/low.
 export const forvarning: EffectDef = {
-  key: "forvarning", label: "Forvarning", tier: "fart", section: ["build", "low"],
+  key: "forvarning", label: "Forvarning", tier: "fart", modulate: { energy: true, pulse: false }, section: ["build", "low"],
   desc: "Sista fyra takterna fore forutsedd refrang: lamporna tands en i taget utifran och in, vit karna sista takten, slapp pa slaget.",
   drives: ["uv", "hazer", "blinder"],
   render(c) {

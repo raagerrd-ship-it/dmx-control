@@ -5,7 +5,7 @@ import type { EffectDef } from "./types.js";
 // Ekot är TAKTLÅST, så fördröjningen krymper när låten går fortare och känns
 // alltid rätt. Varje eko är svagare än det förra.
 export const eko: EffectDef = {
-  key: "eko", label: "Eko", tier: "fart", section: ["low", "high"], toggle: true,
+  key: "eko", label: "Eko", tier: "fart", modulate: { energy: true, pulse: false }, section: ["low", "high"], toggle: true,
   desc: "Taktslaget ekar genom riggen med taktlåst fördröjning, svagare för varje studs.",
   render(c) {
     const DELAY = 0.25;                                   // fjärdedels taktslag per lampa

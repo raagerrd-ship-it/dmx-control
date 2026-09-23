@@ -3,7 +3,7 @@
 // allt tatare puls (var fjarde -> varannan -> varje slag), UV och hazer foljer med. Nar dropen landar (dropEnv) onskas
 // blinder. Dirigenten valjer den vid 'build'-gransen (section-tagg) och haller den till refrangen.
 export const stegring = {
-    key: "stegring", label: "Stegring", tier: "fart", section: ["build"],
+    key: "stegring", label: "Stegring", tier: "fart", modulate: { energy: true, pulse: false }, section: ["build"],
     desc: "Uppbyggnad: morkt till vitt, tatare puls och UV ju narmare dropen.",
     drives: ["uv", "hazer", "blinder"],
     render(c) {

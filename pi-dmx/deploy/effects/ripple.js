@@ -5,7 +5,7 @@
 // 9 dB under refrangen ar den en liten krusning i mitten, vid refrangens niva slar den ut till kanterna med vit kam.
 // Kontrastfarg pa ytterringen (som forr). <3 lampor: paritet = ring.
 export const ripple = {
-    key: "ripple", label: "Krusning", tier: "full", section: ["high"], toggle: true,
+    key: "ripple", label: "Krusning", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"], toggle: true,
     desc: "Slaget slar ner i mitten och krusningen rullar utat, hogre ju narmare refrangens niva.",
     render(c) {
         const center = (c.count - 1) / 2;

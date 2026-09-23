@@ -4,7 +4,7 @@
 // Detta är effekten som trum-envelope-fixen låste upp: innan låg kick-envelopen
 // tänd 97 % av tiden, så "pulsen" var en konstant glöd utan accent.
 export const backbeat = {
-    key: "backbeat", label: "Backbeat", tier: "full", section: ["high", "low"],
+    key: "backbeat", label: "Backbeat", tier: "full", modulate: { energy: true, pulse: false }, section: ["high", "low"],
     desc: "Dov puls på bastrumman, vit blixt på virveln — den klassiska 2-och-4-känslan.",
     render(c) {
         const d = c.drum;
