@@ -80,7 +80,7 @@ const BEAT_DOWNBEAT_ACCENT = 0.25;
  *  157 BPM pulsar annars i 2,6 Hz och känns hackig. Över tröskeln pulsar hjärtslaget
  *  på varannat slag. HYSTERESEN är obligatorisk: en fast gräns utan den flappade
  *  ("dubblade i lugna partier kring tröskeln") i Lotus. */
-const PULSE_HALVE_ABOVE_BPM = 135;
+const PULSE_HALVE_ABOVE_BPM = 170;   // 135 -> 170 (2026-09-23, samma som lotus: "Gamle Astrid" 148 BPM kandes som halvtakt)
 const PULSE_HALVE_HYST_BPM = 15;
 /** ENERGISTYRD HALVERING (portad från Lotus energySubdiv 2026-08-31).
  *  BPM-regeln ovan fångar bara snabba låtar. En lugn vers på 118 BPM pulsar ändå
@@ -270,7 +270,7 @@ const ENERGY_FB_ONSET = Number(process.env.DMX_ENERGY_FB_ONSET ?? 0.30);
  *  (4) DJUPET FOLJER ANSLAGSTATHETEN i energilaget (glesa anslag = ljuset ligger vid taket, inte morkt emellan).
  *  (5) FASFEL = OSAKER: |cfg.beatErr| over DMX_SYNC_ERR_FRAC drar ner tilliten (0 vid dubbla); tappad tillit > 1,5 s nollar slagraknaren
  *      sa rastret maste bevisa sig igen ("battre tillbaka till energi an osynk", "jobba i bakgrunden med att synka igen"). */
-const LOCK_BEATS = Number(process.env.DMX_BEAT_LOCK_BEATS ?? 8);
+const LOCK_BEATS = Number(process.env.DMX_BEAT_LOCK_BEATS ?? 12);   // 8 -> 12 som lotus ("battre att inte lasa alls an fel")
 const LOCK_CONF = Number(process.env.DMX_BEAT_LOCK_CONF ?? 0.6);
 const LOCK_ERR = Number(process.env.DMX_BEAT_LOCK_ERR ?? 0.10);
 const ENERGY_FB_GAP_MS = Number(process.env.DMX_ENERGY_FB_GAP_MS ?? 330);
