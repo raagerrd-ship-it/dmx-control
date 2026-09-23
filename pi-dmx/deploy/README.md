@@ -121,3 +121,10 @@ OVILLKORLIG (del, tier, pool, sektion, basgang) sa valen syns aven utan DMX_SECT
 4. Effekterna med ogat: forvarning (nedrakning fore refrangen), basgang/chase/eko/stege pa basnoter, tyngdlyft/gravity/ripple pa PA:n,
    variationen. For platta -> skalan 6/9 dB; for mycket 'forsta chansen' -> `--env DMX_MIX_UNSEEN_BONUS=0`.
 5. Det som ska bli kvar skrivs in i ladan.py SHOW_ENV (inte bara pa Pi:n) och committas.
+0. (fore steg 1) DYNAMIKEN FRAN 09-22 KVALL AR KVAR - bevisat i banken 09-23 em: fast effekt (mono), ladans env, pop_ladan 60-300 s:
+   HEAD ar BIT-IDENTISK med morgonens checkpoint 71ea88e (ladans kod 09-22) - 0 av 9000 ramar skiljer, max-lampa 0 DMX-steg. Mot
+   commiten 22:47 (dbc5947) skiljer bara fyra nycklar som den koden inte kande: DMX_FLOOR_CH, DMX_TIER_HI/LO (byggda under ladan-passet,
+   committade 06:58) och DMX_SECTION_ON_HINT (morgonen). Med gemensamma nycklar: 0 diff. FORSTA KOLLEN PA PLATS: `kolla.py` - star
+   DMX_FLOOR_CH/DMX_TIER_HI i Pi:ns lotus.conf? Ja = de var live i gar. Nej = golvet 16 % och tier-gransen 0,55 ar NYA mot i gar (bedom).
+   Smart-laget skiljer sig (korrelation 0,83, medel +6 %, slagskala 0,094 -> 0,073 pa pop) - det ar EFFEKTVALEN (mix v2 + nya effekter),
+   inte ljuskurvan; kanns det tammare ar aterstallningen `--env DMX_MIX_V2=0`.
