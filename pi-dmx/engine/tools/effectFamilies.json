@@ -1,0 +1,172 @@
+{
+ "wav": "tools/megamix_ladan.wav",
+ "from": 60,
+ "secs": 120,
+ "famR": 0.95,
+ "groups": [
+  [
+   "subbreath",
+   "hjarta",
+   "sug",
+   "andrum",
+   "eq"
+  ],
+  [
+   "tide",
+   "mono"
+  ],
+  [
+   "snap"
+  ],
+  [
+   "airglow"
+  ],
+  [
+   "pulse"
+  ],
+  [
+   "strobe"
+  ],
+  [
+   "breathe"
+  ],
+  [
+   "backbeat"
+  ],
+  [
+   "stegring"
+  ],
+  [
+   "drops"
+  ],
+  [
+   "duel"
+  ],
+  [
+   "stege"
+  ],
+  [
+   "neon"
+  ],
+  [
+   "eko"
+  ],
+  [
+   "fyrverkeri"
+  ],
+  [
+   "innerouter"
+  ],
+  [
+   "varannan"
+  ],
+  [
+   "sol"
+  ],
+  [
+   "wave"
+  ],
+  [
+   "party"
+  ],
+  [
+   "konfetti"
+  ],
+  [
+   "aurora"
+  ],
+  [
+   "gravity"
+  ],
+  [
+   "twin"
+  ],
+  [
+   "ripple"
+  ],
+  [
+   "gallop"
+  ],
+  [
+   "split"
+  ],
+  [
+   "sopa"
+  ],
+  [
+   "nedrakning"
+  ],
+  [
+   "pendel"
+  ],
+  [
+   "viska"
+  ],
+  [
+   "vagbrytare"
+  ],
+  [
+   "drumkit"
+  ],
+  [
+   "rave"
+  ],
+  [
+   "bounce"
+  ],
+  [
+   "chase"
+  ],
+  [
+   "tick"
+  ],
+  [
+   "drift"
+  ]
+ ],
+ "map": {
+  "subbreath": 0,
+  "hjarta": 0,
+  "sug": 0,
+  "andrum": 0,
+  "eq": 0,
+  "tide": 1,
+  "mono": 1,
+  "snap": 2,
+  "airglow": 3,
+  "pulse": 4,
+  "strobe": 5,
+  "breathe": 6,
+  "backbeat": 7,
+  "stegring": 8,
+  "drops": 9,
+  "duel": 10,
+  "stege": 11,
+  "neon": 12,
+  "eko": 13,
+  "fyrverkeri": 14,
+  "innerouter": 15,
+  "varannan": 16,
+  "sol": 17,
+  "wave": 18,
+  "party": 19,
+  "konfetti": 20,
+  "aurora": 21,
+  "gravity": 22,
+  "twin": 23,
+  "ripple": 24,
+  "gallop": 25,
+  "split": 26,
+  "sopa": 27,
+  "nedrakning": 28,
+  "pendel": 29,
+  "viska": 30,
+  "vagbrytare": 31,
+  "drumkit": 32,
+  "rave": 33,
+  "bounce": 34,
+  "chase": 35,
+  "tick": 36,
+  "drift": 37
+ }
+}

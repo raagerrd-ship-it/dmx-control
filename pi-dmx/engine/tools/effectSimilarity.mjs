@@ -60,3 +60,43 @@ console.log("\nkontrast/taktmod/rumslighet/fargrorelse (lagt = svag):");
 for (const k of keys.sort((a, b) => stats[a].contrast + stats[a].spatial - stats[b].contrast - stats[b].spatial)) { const s = stats[k]; console.log(`  ${k.padEnd(11)} medel ${s.m.toFixed(2)} kontrast ${s.contrast.toFixed(3)} takt ${s.beatMod.toFixed(3)} rum ${s.spatial.toFixed(3)} farg ${s.hueMove.toFixed(2)}`); }
 console.log("\nnara dubbletter (r >= 0,85 pa per-lampa-ljuskurvor):");
 for (const [r, a, b] of pairs) console.log(`  ${r.toFixed(2)}  ${a} ~ ${b}`);
+
+// ── VISUELLA FAMILJER (2026-09-23) ───────────────────────────────────────────────────────────────────────────
+// Matt kvall 09-22 pa ladans egna inspelningar: dirigenten byter look 57 ganger pa 10 min, men 75 % av tiden ligger
+// den i eko/varannan/twin/chase/innerouter - som mater r = 0,97-0,98 mot varandra. Agaren ser darfor "samma effekt"
+// aven nar showen formellt byter hela tiden. Familjerna ar enkellankad klustring pa korrelationen: tva effekter i
+// samma familj SER likadana ut pa fyra lampor, oavsett vad de heter.
+//   node tools/effectSimilarity.mjs <wav> <start> <sek> --famr 0.95 --famjson dist/effectFamilies.json
+const famR = Number((process.argv.find((a) => a.startsWith("--famr=")) || "").split("=")[1] || process.argv[process.argv.indexOf("--famr") + 1] || 0.95);
+const parent = Object.fromEntries(keys.map((k) => [k, k]));
+const find = (x) => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) {
+  const r = corr(F[keys[i]], F[keys[j]]);
+  if (r >= famR) { const a = find(keys[i]), b = find(keys[j]); if (a !== b) parent[a] = b; }
+}
+const fam = {};
+for (const k of keys) { const root = find(k); (fam[root] ??= []).push(k); }
+const groups = Object.values(fam).sort((a, b) => b.length - a.length);
+console.log(`\nVISUELLA FAMILJER (enkellankad klustring, r >= ${famR}): ${groups.length} familjer av ${keys.length} effekter`);
+groups.forEach((g, i) => console.log(`  ${String(i).padStart(2)} (${String(g.length).padStart(2)} st)  ${g.join(" ")}`));
+const pairIdx = process.argv.indexOf("--pairsjson");
+if (pairIdx >= 0) {
+  // HELA parlistan (r >= 0,70) sa flera korningar kan slas ihop: ett par raknas som "ser likadant ut" forst nar
+  // det gor det pa FLERA inspelningar - en enda latsekvens sager for lite (matt 09-23: varannan~innerouter r 0,98
+  // pa pop men under 0,95 pa megamix).
+  const all = [];
+  for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) {
+    const r = corr(F[keys[i]], F[keys[j]]); if (r >= 0.70) all.push([keys[i], keys[j], Math.round(r * 1000) / 1000]);
+  }
+  const { writeFileSync } = await import("node:fs");
+  writeFileSync(process.argv[pairIdx + 1], JSON.stringify({ wav: f, from: startS, secs, pairs: all }));
+  console.log(`  -> ${all.length} par till ${process.argv[pairIdx + 1]}`);
+}
+const famIdx = process.argv.indexOf("--famjson");
+if (famIdx >= 0) {
+  const map = {};
+  groups.forEach((g, i) => g.forEach((k) => { map[k] = i; }));
+  const { writeFileSync } = await import("node:fs");
+  writeFileSync(process.argv[famIdx + 1], JSON.stringify({ wav: f, from: startS, secs, famR, groups, map }, null, 1));
+  console.log(`  -> ${process.argv[famIdx + 1]}`);
+}

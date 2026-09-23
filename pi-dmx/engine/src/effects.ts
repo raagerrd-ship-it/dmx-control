@@ -985,7 +985,13 @@ export class EffectEngine {
         // pushade mellanenergi till Full Fart och byggde på ett opålitligt
         // bpm-oktavvärde. Full Fart kräver en TYDLIG topp långt över snittet
         // (0.78) → reserverad för riktiga drops, inte varje energiskt parti.
-        const loThr = 0.34, hiThr = 0.78;
+        // ENV-STALLBARA (2026-09-22, ladan). Trosklarna ar satta mot en intensitet som spanner 0..1, men pa ladans
+        // komprimerade PA ligger frame.intensity pa 0,00-0,49 (matt i [lagniva]-loggen) - FULLFART (0,78) var alltsa
+        // OATKOMLIG, och dirigenten plockade kvall efter kvall ur samma lugn/fart-pooler ("kor nastan bara samma
+        // effekter"). Aven drop-snappen stannar pa 0,75, dvs under troskeln. Defaulten ar oforandrad; ladan sanker
+        // via DMX_TIER_HI. Ratt langsiktig fix ar ett nivamatt som spanner skalan (lotus dB-fonster), inte en lagre
+        // troskel - den har raden gor bara poolen atkomlig under tiden.
+        const loThr = Number(process.env.DMX_TIER_LO ?? 0.34), hiThr = Number(process.env.DMX_TIER_HI ?? 0.78);
         // TIER-HYSTERES: utan den flaxar tiern så fort intensiteten pendlar kring en
         // gräns → tierChanged blir sann om och om → effektbyte varje minsta-hålltid
         // (mätt: byte var 8.0s spikrakt). Kräv att man går TYDLIGT förbi gränsen för

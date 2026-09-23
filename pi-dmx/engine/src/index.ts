@@ -18,7 +18,7 @@ import { RefineQueue } from "./refineQueue.js";
 import { StructureQueue } from "./structureQueue.js";
 import { sampleForIdentify, identify, formatNote, wavDuration, SAMPLE_SPOTS } from "./identify.js";
 import { AudioCapture } from "./audio.js";
-import { Analyser, type Frame } from "./analyser.js";
+import { createAnalyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
 import { DmxSender } from "./dmx.js";
 import { startServer, applyInputRouting, type Server } from "./server.js";
@@ -82,7 +82,10 @@ try {
 // Re-apply the chosen codec input routing (the boot service restores the aux
 // default; this honors a persisted mic choice).
 applyInputRouting(cfg.audioInput === "mic" ? "mic" : "aux");
-const analyser = new Analyser(cfg);
+// DELAD ANALYSATOR (analyser.ts/split.ts): utan DMX_ANALYSER_SPLIT ar detta exakt `new Analyser(cfg)`.
+// Med DMX_ANALYSER_SPLIT=worker flyttas tempo/gridfas/sektion till en egen trad pa en egen karna —
+// motivet ar matningen 15,6 % av hoppen over budget (0,99 ms snitt, toppar 235 ms mot 2,67 ms).
+const analyser = createAnalyser(cfg);
 analyser.resetGain(cfg.audioInput === "mic" ? 20 : 1);
 analyser.setGainLock(cfg.audioInput !== "mic", 1);  // aux: fixed 1x
 const effects = new EffectEngine(cfg);

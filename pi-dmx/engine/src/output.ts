@@ -33,6 +33,13 @@ export interface SpecialtyValues {
 }
 
 const MIN_DIM = process.env.DMX_MIN_DIM === '1';
+// SHOW-GOLV (2026-09-22, agaren i ladan: "jag vill ju att de skall ga precis ner till floor men inte under, om
+// effekten inte skall stanga av lampan"). Regeln FANNS redan - calibrate lyfter varje varde > 0 till lampans
+// TANDPUNKT - men tandpunkten ar 16 av 255, dvs 6 %, och det laser ogat som slackt i ett upplyst rum.
+// DMX_FLOOR_CH hojer golvet till ett SYNLIGT varde i DMX-steg. Galler bara DIM-kanaler: att lyfta r/g/b skulle
+// bleka ur kuloren (samma skal som MIN_DIM lamnar dem ifred). En ren nolla ar fortfarande svart - det ar sa
+// effekten sager "slack den har armaturen" - utom med DMX_MIN_DIM=1, som da haller golvet i stallet for tandpunkten.
+const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 0)));
 const HOLD_MS = 120;
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
@@ -181,19 +188,21 @@ export class FixtureOutput {
           : ((role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : role === "w" ? c.onW : undefined) ?? on);
 
         const raw = universe[ch];
+        // Golvet ar tandpunkten, eller DMX_FLOOR_CH nar den ar hogre (bara DIM - se FLOOR_CH). Aldrig over taket.
+        const floorCh = FLOOR_CH > onCh && isDim ? (FLOOR_CH > top ? top : FLOOR_CH) : onCh;
         let out: number;
         if (raw > 0) {
-          out = raw < onCh ? onCh : raw > top ? top : raw;
+          out = raw < floorCh ? floorCh : raw > top ? top : raw;
           this.holdVal[ch] = out;
           this.holdUntil[ch] = nowMs + HOLD_MS;
         } else if (nowMs < this.holdUntil[ch]) {
           out = this.holdVal[ch];
-        } else if (MIN_DIM && isDim && top > 0) {
+        } else if (MIN_DIM && isDim && top > 0) {   // haller GOLVET (inte bara tandpunkten) nar effekten skickar ren nolla
           // ALDRIG HELSVART (2026-09-22, agaren i ladan: "lamporna stangs av ... output maste ju anda ske mot kalibrerad
           // lampa"): tandpunkten lyfter bara varden > 0, sa en ren nolla fran effekten eller tystnadsgrinden gick igenom
           // som svart armatur. Med DMX_MIN_DIM=1 halls DIM-kanalen pa tandpunkten sa lange showen alls lyser (master > 0);
           // fargkanalerna lamnas orerda (att lyfta r/g/b skulle andra kuloren). Blackout/master 0 slacker fortfarande.
-          out = onCh;
+          out = floorCh;
         } else {
           out = 0;
         }

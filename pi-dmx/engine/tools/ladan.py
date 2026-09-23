@@ -33,7 +33,7 @@ SHOW_ENV = [
     ('DMX_KICK_COOLDOWN',  '100',    'baston strax fore slaget skuggade slagets kick i 170 ms'),
     ('DMX_GRID_PHASE',     '1',      'fasen ur bas + helband i stallet for senaste kicken (bank: i fas 77/130, motfas 5)'),
     ('DMX_PHASE_FOLLOW',   '1',      'gridet foljer fasmatningen i stallet for enskilda kickar'),
-    ('DMX_SECTION',        '1',      'realtidssektioner (intro/low/build/high/break) ur latens egen historik'),
+    ('DMX_SECTION',        '1',      'sektioner som DATA - KRAVS av lugn-grinden nedan (levelVsHighDb). INTE lookstyrning, se DMX_SECTION_SWITCH'),
     # DMX_SECTION_SWITCH AV 2026-09-22 22:40 (ladan, live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
     # -> dirigenten plockade bara ur full-fart-poolen och allt sag likadant ut. Sektionerna ar kvar som DATA (DMX_SECTION=1);
     # slas pa igen forst nar rangen ger vettig fordelning i ladans material.
@@ -47,13 +47,32 @@ SHOW_ENV = [
     ('DMX_SILENCE_LEVEL',  '0.03',   'ladans tystnadstroskel - standard 0,05 slackte riggen pa tysta fraser'),
     ('DMX_SILENCE_MS',     '2000',   'sa lange maste det vara tyst innan grinden borjar stanga (standard 250 ms)'),
     ('DMX_SILENCE_RELEASE_S', '1.0', 'mjuk aterhamtning i stallet for 0,25 s'),
-    ('BEAT_MIN',           '0.35',   'pulsgolv - 0,30 lat dippen ga svart (ladan 09-21)'),
-    # DROP-GRIND I LUGNA PARTIER (2026-09-22 22:50, ladan live: "kor drop pa intro" + "missa riktiga droppen"):
-    # i low/intro (eller >= 6 dB under senaste refrangen) kravs starkare bevis; en kandidat NEKAS inte utan HALLS och
-    # fyrar forst nar kroppen legat kvar vid toppen i 300 ms. DROP_CALM_BUILD nollades i natt (grinden blev inert) - tillbaka.
+    # KVALLEN 2026-09-22 23:00-24:00 I LADAN. Varje rad nedan kommer ur ett uttalande + en matning, inte ur en gissning.
+    # Filen ar sanningen: allt harunder satt fram till nu BARA som drop-ins pa Pi:n och hade forsvunnit vid nasta korning.
+    ('DMX_ATTACK_MS',      '20',     'ladans utgangsattack - 90 ms smetade ut slagen ("heartbeat syns inte")'),
+    ('BEAT_MIN',           '0.30',   'pulsgolv; 0,35 var en nodlosning mot svarta dippar - DMX_FLOOR_CH ar ratt fix'),
+    ('LIGHT_FLOOR',        '0.25',   'GASEN: md = golv + (1-golv) x loudness. 0,45 gav bara halva vagen ("pulsar inte med energi")'),
+    ('DMX_FLOOR_CH',       '40',     'SHOW-GOLV i DMX-steg = 16 %. Armaturernas tandpunkt (cal.on=16 av 255) ar 6 % och laser som slackt'),
+    ('DMX_TIER_HI',        '0.55',   'FULLFART var OATKOMLIG: kravde 0,78, ladans intensitet ar 0,00-0,49, drop-snappen 0,75'),
+    ('DMX_TIER_LO',        '0.22',   'ger fart-poolen mer speltid an lugn-poolen ("kor nastan bara samma effekter")'),
+    ('DMX_DWELL_MS',       '45000',  'reservtimer; 120 s gav NOLL lookbyten pa 12 min nar energin sta stilla'),
+    ('DMX_CLEAR_BASS',     '0.78',   'toggle-poolen vid tydlig basgang. 0,4 tvingade den standigt, 0,9 ligger utanfor ladans skala (max 0,75)'),
+    ('DROP_SNAP_MS',       '0',      'smallen vantade in nasta slag (upp till 150 ms) - "drop kommer nastan en takt sent"'),
+    ('BODY_FAST_S',        '0.06',   'baskroppens filter. 0,04 sparade 20 ms men gav "massa drops i lugna partier" - aldrig lagre'),
+    # DROP-GRIND I LUGNA PARTIER ("kor drop pa intro" + "missa riktiga droppen"): i lugna partier (>= 6 dB under senaste
+    # refrangen) kravs starkare bevis; en kandidat NEKAS inte utan HALLS och fyrar forst nar kroppen legat kvar vid toppen
+    # i 300 ms. DMX_SECTION=1 ar ett KRAV - levelVsHighDb raknas bara nar sektionsmaskineriet kors (analyser.ts rad 2783),
+    # annars ar hela grinden inert. Sektionerna ar DATA har.
     ('DMX_DROP_CALM_GATE', '1',      'lugna partier kraver starkare bevis for drop'),
-    ('DROP_CALM_BUILD',    '0.25',   'riser-kravet tillbaka (0 = grinden inert)'),
+    ('DROP_CALM_BUILD',    '0.25',   'riser-kravet (0 = grinden inert)'),
     ('DROP_CALM_LAND_MS',  '300',    'hall kandidaten och fyra vid verifierad landning i stallet for att neka'),
+    # DMX_SECTION_SWITCH AV (2026-09-22 22:40, ladan live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
+    # -> dirigenten plockade bara ur full-fart-poolen och allt sag likadant ut. Slas pa igen forst nar rangen ger vettig
+    # fordelning i ladans material. Sektionerna ar kvar som DATA ovan.
+    # DMX_LIVE_LEVEL AV (2026-09-22 22:50): nivan kollapsade till 0,003-0,012 medan RA vu lag pa 0,2-0,6, och eftersom
+    # energitaket multipliceras ovanpa gick armaturerna ner till tandpunkten en efter en ("lamporna stangs av").
+    # dB-fonstrets ankare (tau 120 s) passar inte ladans komprimerade PA. Det ar anda RATT vag - agaren pekar sjalv pa
+    # BLE-lampan ("dar har vi skon rytm i brightness") - men den ska tunas mot INSPELAT ladljud, inte live i en spelning.
 ]
 
 

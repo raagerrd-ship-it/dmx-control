@@ -47,7 +47,7 @@ def once(c, first):
         print('== fel senaste 10 min ==')
         errs = sh(c, "journalctl -u audio-dmx-engine --since '10 min ago' --no-pager | grep -icE 'error|fatal|crash' || true")
         print('  ', errs, 'rader med error/fatal/crash')
-    raw = sh(c, "curl -s -m 3 http://127.0.0.1/health || curl -s -m 3 http://127.0.0.1:80/health")
+    raw = sh(c, "curl -s -m 4 http://127.0.0.1/api/health-log")   # /health ar bara 'ok'; matarna ligger i /api/health-log
     try:
         d = json.loads(raw)
     except Exception:
