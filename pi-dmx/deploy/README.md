@@ -167,3 +167,7 @@ saknas an for ladan). Nya filer pa Pi:n: tempoTracker.js, analyserProfile.js, re
 - (09-24 kvall) SEKTIONSKONTRAST (DMX_SECTION_CONTRAST=1: starkaste av fast dipp och dynamik, refranglyft alltid, glid 1,2 s) och TIDIG REFRANG
   KRAVER NIVA (DMX_SECTION_EARLY_S=45, gemensam analysator) i SHOW_ENV. Drejbok pop, medelljus refrang/vers: 0,87 -> 1,55, 1,80 -> 2,83, 3,67 -> 4,75
   (lat 3 2,00 -> 1,40, mork overlag). Motorn: tidssteget kan inte bli negativt (bankerna fick NaN i nivan av det - matfalla 37).
+- (09-24 kvall) RANGKONTRAST ersatter etikettkontrasten: DMX_SECTION_CONTRAST=rank, DMX_SECTION_RANK_LOW=0.35. Refrangetiketten skiljer facit-
+  refrang fran vers med AUC 0,55 (82 langfangster); medel av tre kausala nivarangers ger 0,69/0,71. Mat med tools/facitLight.mjs (medelljus i
+  facitets refrang mot vers, train/test): test 41 latar refrang/vers 1,12 (av) -> 1,22 (etikett) -> 1,34 (rang); vers ljusare 18 -> 14 -> 11 latar.
+  Kostnad: medelljus 12 -> 8 % (versen dampas mer). Ogat: for mort i verserna -> DMX_SECTION_RANK_LOW 0.5.

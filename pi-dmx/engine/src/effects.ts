@@ -229,7 +229,13 @@ const SECTION_DYN_FLOOR = Math.min(1, Math.max(0.1, Number(process.env.DMX_SECTI
 /** SEKTIONSKONTRAST (2026-09-24, drejboken: refrang 37 mot vers 33 i 3 av 4 poplatar; opt-in DMX_SECTION_CONTRAST=1): pa komprimerad PA
  *  ar levelVsHighDb nara 0, sa dynamiken ersatte de fasta dipparna med ~1,0. Nu galler den STARKARE av fast dipp och dynamik, refrangen far
  *  sitt lyft alltid (inte bara tier 2), och gainen glider (~1,2 s) i stallet for att hoppa vid sektionsbyten. */
-const SECTION_CONTRAST = process.env.DMX_SECTION_CONTRAST === '1';
+const SECTION_CONTRAST = process.env.DMX_SECTION_CONTRAST === '1' || process.env.DMX_SECTION_CONTRAST === 'rank';
+/** RANGKONTRAST (2026-09-24, DMX_SECTION_CONTRAST=rank): detektorns refrangetikett skiljer facit-refrang fran facit-vers bara med AUC 0,55
+ *  (82 langfangster), medan medel av tre KAUSALA RANGER (4 s-glidande midHiDb, bodyDb, diskantband specAbs.treble+air, rangordnade mot laten
+ *  hittills) ger 0,69 train / 0,71 test. Gain = RANK_LOW + (1 + SECTION_HIGH_LIFT - RANK_LOW) x rang; nollas vid ny lat (section 'intro'). */
+const SECTION_RANK = process.env.DMX_SECTION_CONTRAST === 'rank';
+const RANK_LOW = Number(process.env.DMX_SECTION_RANK_LOW ?? 0.5);
+const RANK_POW = Number(process.env.DMX_SECTION_RANK_POW ?? 1);
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
 const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10);        // lotus windowDb 10
 const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 4.5); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
@@ -474,7 +480,8 @@ export class EffectEngine {
   private post = new PostProcess();
   private maxCh = 0;                           // högsta använda kanal + 1
   private smartCount = 0;
-  private secGainSm = 0;   // SECTION_CONTRAST: glidande sektionsgain
+  private secGainSm = 0;
+  private rkHist: number[][] = [[], [], []]; private rkWin: number[][] = [[], [], []]; private rkLastMs = -1e9; private rkRank = 0.5; private rkPrevSec = '';   // RANGKONTRAST   // SECTION_CONTRAST: glidande sektionsgain
   private recentLooks: Mode[] = [];   // MIX_V2: de senast valda lookerna (nyhetsstraff)
   private unitSlot = 0; private unitPhraseDone = -1;   // FRASVAXLING: look A/B och senaste frasnummer som bytts pa
   private pendingSecSwitch = false;               // SECTION_UNIT: sektionsgrans passerad men bytet blockerat (riser/MIN_HOLD) -> gor det sa fort det gar
@@ -1601,6 +1608,24 @@ export class EffectEngine {
       const lv = frame.levelVsHighDb ?? 0, ex = frame.expectHighInMs ?? -1;
       if (SECTION_DYN_DB > 0 && lv !== 0 && secNow !== 'high') { const dg = Math.max(SECTION_DYN_FLOOR, Math.min(1, 1 + lv / SECTION_DYN_DB)); dynGain = SECTION_CONTRAST ? Math.min(secGain, dg) : dg; }   // latens egen referens (CONTRAST: starkaste dampningen)
       if (EXPECT_LIFT_MS > 0 && ex > 0 && ex <= EXPECT_LIFT_MS) { const l = 1 - ex / EXPECT_LIFT_MS; dynGain += (1 + SECTION_HIGH_LIFT - dynGain) * l; }   // riser mot refrangen
+    }
+    if (SECTION_RANK) {
+      // kausal rang (0..1) av 4 s-medel for tre nivamatt, mot laten hittills; ny lat (analysatorn nollar till intro) -> ny historik
+      if (frame.section === 'intro' && this.rkPrevSec !== 'intro' && this.rkPrevSec !== '') { this.rkHist = [[], [], []]; }
+      this.rkPrevSec = frame.section;
+      const sa = frame.specAbs as any; const vals = [frame.midHiDb, frame.bodyDb, sa ? (sa.treble ?? 0) + (sa.air ?? 0) : 0];
+      if (now - this.rkLastMs >= 250 && vals.every((v) => Number.isFinite(v))) {
+        this.rkLastMs = now; let r = 0;
+        for (let k = 0; k < 3; k++) {
+          const w = this.rkWin[k]; w.push(vals[k]); if (w.length > 16) w.shift(); const m = w.reduce((x, y) => x + y, 0) / w.length;
+          const h = this.rkHist[k]; let lo = 0, hi = h.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (h[mid] < m) lo = mid + 1; else hi = mid; }
+          h.splice(lo, 0, m); if (h.length > 2400) h.splice(Math.floor(Math.random() * h.length), 1);
+          r += h.length > 1 ? lo / (h.length - 1) : 0.5;
+        }
+        this.rkRank = r / 3;
+      }
+      const rr = Math.pow(Math.max(0, Math.min(1, this.rkRank)), RANK_POW);
+      dynGain = RANK_LOW + (1 + SECTION_HIGH_LIFT - RANK_LOW) * rr;
     }
     if (SECTION_CONTRAST) { const a = Math.min(1, dtSec / 1.2); this.secGainSm = this.secGainSm <= 0 ? dynGain : this.secGainSm + (dynGain - this.secGainSm) * a; dynGain = this.secGainSm; }   // glid mellan sektioner
     const md = SECTION_SWITCH ? Math.min(1.2, md0 * dynGain) : md0;   // standard: orort

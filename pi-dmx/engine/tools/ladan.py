@@ -86,7 +86,8 @@ SHOW_ENV = [
     ('DMX_ENERGY_FALLBACK','1',      'utan taktlas: puls pa breda transienter + storre energisving ("dor inte emellanat")'),
     ('DMX_HEARTBEAT',      '1',      'HEART-BEAT/ENERGI som eget lager (kontrakt heartbeat/contract.ts): effekter med egen taktpuls skippar den globala pulsen ("krockar inte")'),
     ('DMX_HUE_LIFT',       '1',      'kulorlyft i kalibreringen: starkaste kanalen till tandpunkten, kuloren bevaras (standard pa; 0 = per kanal som forr)'),
-    ('DMX_SECTION_CONTRAST','1',      'ljuskontrast refrang/vers (09-24 drejbok pop: kvot 0,87/1,80/3,67 -> 1,55/2,83/4,75); glid 1,2 s mellan sektioner'),
+    ('DMX_SECTION_CONTRAST','rank',   'ljus foljer KAUSAL RANG (midHi/bas/diskant mot laten) i st.f. refrangetiketten (AUC 0,55): facit-test 41 latar refrang/vers 1,12 -> 1,34'),
+    ('DMX_SECTION_RANK_LOW','0.35',  'versgolv i rangkontrasten (vald pa train: 0,20/0,35/0,50; test bekraftar 0,35)'),
     ('DMX_SECTION_EARLY_S','45',      'forsta 45 s: refrang kraver +3 dB mot latens median (test: falsk-high 0,50 -> 0,46, refrang 2 igenkand 12 -> 9 s)'),
     ('DMX_SECTION_ON_HINT', '1',     'latgransen nollar sektionshistoriken - annars jamfors nya laten mot forra latens'),
     # DMX_SECTION_SWITCH AV (2026-09-22 22:40, ladan live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
