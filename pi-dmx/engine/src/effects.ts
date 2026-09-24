@@ -195,6 +195,10 @@ const SECTION_UNIT_RESERVE_MS = Number(process.env.DMX_SECTION_UNIT_RESERVE_MS ?
 /** SECTION_UNIT (ladan 16:45): forvarningens 'high' 600 ms fore en forutsedd refrang och drop-fonstrets 'high' raknas INTE som sektionsgrans
  *  (de gav high<->low-hopp pa 1-2 s nar refrangen uteblev). Bara den raa sektionen, och den maste vara minst DMX_SECTION_UNIT_MIN_MS gammal. */
 const SECTION_UNIT_MIN_MS = Number(process.env.DMX_SECTION_UNIT_MIN_MS ?? 4000);
+/** FRASVAXLING (2026-09-24, agaren: "inte en effekt per vers eller refrang, lite mer byte iaf"): inom en sektion byts looken pa var
+ *  DMX_SECTION_UNIT_PHRASE_BARS:e takt (8; 0 = av), och varje sektionstyp har TVA looker som alternerar (A pa sektionsstart, B pa nasta
+ *  fras, A igen ...). Refrangen kommer tillbaka med samma par - identiteten ar kvar, men den star inte still i 50 s. */
+const SECTION_UNIT_PHRASE_BARS = Number(process.env.DMX_SECTION_UNIT_PHRASE_BARS ?? 8);
 const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);
 const BEAT_LIFT = Number(process.env.BEAT_LIFT ?? 0.25);   // additivt hjartslagslyft (synlig puls aven i morka effekter)
 /** HEART-BEAT/ENERGI SOM EGEN DEL (2026-09-23, kontrakt heartbeat/contract.ts; opt-in DMX_HEARTBEAT=1, annars gamla vagen orord).
@@ -467,6 +471,7 @@ export class EffectEngine {
   private maxCh = 0;                           // högsta använda kanal + 1
   private smartCount = 0;
   private recentLooks: Mode[] = [];   // MIX_V2: de senast valda lookerna (nyhetsstraff)
+  private unitSlot = 0; private unitPhraseDone = -1;   // FRASVAXLING: look A/B och senaste frasnummer som bytts pa
   private pendingSecSwitch = false;               // SECTION_UNIT: sektionsgrans passerad men bytet blockerat (riser/MIN_HOLD) -> gor det sa fort det gar
   private prevSongLook = new Map<string, Mode>();  // SECTION_UNIT: forra latens look per sektionstyp (straffas sa nasta lat far en annan)
   private lastSmartTier = "";
@@ -1193,10 +1198,14 @@ export class EffectEngine {
         const bassClear = (frame.profile.bassline ?? 0) >= (this.lastBassClearForSwitch ? CLEAR_BASS - 0.2 : CLEAR_BASS);
         const curToggle = !!EFFECT_MAP.get(this.smartMode)?.toggle;
         const bassSwitch = bassClear !== this.lastBassClearForSwitch && (bassClear ? !curToggle : curToggle);
+        // FRASVAXLING: ny fras (var PHRASE_BARS:e takt sedan sektionsstart) -> byte till sektionens andra look
+        const phraseNo = SECTION_UNIT && SECTION_UNIT_PHRASE_BARS > 0 ? Math.floor((frame.sectionBars ?? 0) / SECTION_UNIT_PHRASE_BARS) : 0;
+        if (liveSecChanged) this.unitPhraseDone = 0;
+        const unitPhrase = SECTION_UNIT && !!liveSec && SECTION_UNIT_PHRASE_BARS > 0 && phraseNo > 0 && phraseNo !== this.unitPhraseDone && !liveSecChanged && !this.pendingSecSwitch;
         const wantSwitch = this.memPart
           ? (memSection || bassSwitch)
           : (SECTION_UNIT && liveSec)
-            ? (((memSection || this.pendingSecSwitch) && secOldEnough) || bassSwitch || now > this.smartDwellUntil + SECTION_UNIT_RESERVE_MS)   // SECTION_UNIT: sektionen ar enheten
+            ? (((memSection || this.pendingSecSwitch) && secOldEnough) || unitPhrase || bassSwitch || now > this.smartDwellUntil + SECTION_UNIT_RESERVE_MS)   // SECTION_UNIT: sektionen ar enheten
             : (tierChanged || memSection || halvedChanged || bassSwitch || now > this.smartDwellUntil);
 
         // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
@@ -1285,7 +1294,8 @@ export class EffectEngine {
         // LIVE-ETIKETT (ladan 20:30, 'fastnade i samma effekt'): generisk etikett ('high') aterser annars samma look hela laten.
         // Par-regel: sektion nr 1-2 delar look, nr 3-4 en ny, osv. (A A B B) - igenkanning utan att fastna.
         const livePart = !!part && part.startsWith('live:');
-        const pairKey = livePart ? (SECTION_UNIT ? part : part + ':' + Math.floor(((frame.sectionIndex ?? 0) + 1) / 2)) : part;   // SECTION_UNIT: nyckel = etiketten
+        if (SECTION_UNIT && livePart) { if (unitPhrase) { this.unitSlot = 1 - this.unitSlot; this.unitPhraseDone = phraseNo; } else this.unitSlot = 0; }
+        const pairKey = livePart ? (SECTION_UNIT ? part + (this.unitSlot ? ':b' : '') : part + ':' + Math.floor(((frame.sectionIndex ?? 0) + 1) / 2)) : part;   // SECTION_UNIT: nyckel = etiketten
         const remembered = !wantCalm && pairKey && (!livePart || SECTION_UNIT) ? this.partLook.get(pairKey) : undefined;   // SECTION_UNIT: igenkanning aven live
         const unitPen = (m: Mode) => SECTION_UNIT && pairKey && this.prevSongLook.get(pairKey) === m ? 0.5 : 0;   // SECTION_UNIT: inte forra latens look for samma sektionstyp   // 20:33: ingen igenkanning for live-etiketter ('samma effekt igen') - bara latminnet
         // TYDLIG BASGANG -> toggle-poolen (se CLEAR_BASS). Snitt med aktuell pool forst (sektion/tier/krav), annars alla

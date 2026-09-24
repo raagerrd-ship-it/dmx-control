@@ -161,3 +161,6 @@ saknas an for ladan). Nya filer pa Pi:n: tempoTracker.js, analyserProfile.js, re
   pulsar kvar = inget blink pa fantomtakt i break; DMX_BEAT_QUIET_BEATS, 0 = av) och ENERGI DIREKT (stigande loudness = omedelbar puls,
   DMX_ENERGY_RISE_K 3, 0 = av). Bank (hbDump med kickar + stabilt ankare som motorn): last 73-80 % av tiden, ingen paus pa mixarna (kickar hela
   tiden). Ogat i ladan: break utan trummor ska inte blinka i gammal takt.
+- (09-24 em) FRASVAXLING i sektionslaget: looken byts var 8:e takt inom en sektion (DMX_SECTION_UNIT_PHRASE_BARS, 0 = av) och varje
+  sektionstyp har tva looker A/B som alternerar - refrangen kommer tillbaka med samma par. Drejbok: tools/showStory.mjs (per lat: sektioner,
+  looker, ljus, takt/energi, drops). Pop-mixen: looken byts nu var ~15 s i stallet for att sta 50-60 s.
