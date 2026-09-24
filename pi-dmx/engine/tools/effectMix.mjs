@@ -24,7 +24,8 @@ for (let off = 0; off + HOP <= n && off < (startS + secs) * SR; off += HOP) {
   nowMs = ms; const fr = an.process(buf);
   bounds.tick({ level: fr.level, bpm: fr.bpm, bpmConfidence: fr.bpmConfidence });
   if (bounds.boundaryCount !== lastB) { lastB = bounds.boundaryCount; nBounds++; eng.softenRange(); if (process.env.DMX_BOUNDARY_SOFT) an.hintTrackChange(5000); else an.resetTempo(); }
-  if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
+  if (fr.kick) eng.registerKick(0.4 + Math.min(1, fr.energy * 1.4) * 0.6);   // som index.ts:394 (matfalla 36)
+  if (fr.bpm > 0) { if (!cfg.beat || Math.abs(cfg.beat.bpm / fr.bpm - 1) > 0.03) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence }; else cfg.beat.confidence = fr.bpmConfidence; }   // stabilt ankare som motorns PLL
   if (off / SR >= startS && ms - lastRender >= 25) {
     lastRender = ms; eng.render(fr); const t = off / SR;
     const m = eng.activeMode || eng.smartMode || "?"; share.set(m, (share.get(m) || 0) + 0.025);

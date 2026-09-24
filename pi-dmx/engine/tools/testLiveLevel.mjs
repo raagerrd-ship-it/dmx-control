@@ -17,7 +17,8 @@ for (let off = 0; off + HOP <= n && off < (startS + secs) * SR; off += HOP) {
   const ms = ms0 + (off / SR) * 1000; an.setVirtualClock(ms);
   Date.now = () => ms; performance.now = () => ms - 1700000000000;
   fr = an.process(buf);
-  if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
+  if (fr.kick) eng.registerKick(0.4 + Math.min(1, fr.energy * 1.4) * 0.6);   // som index.ts:394 (matfalla 36)
+  if (fr.bpm > 0) { if (!cfg.beat || Math.abs(cfg.beat.bpm / fr.bpm - 1) > 0.03) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence }; else cfg.beat.confidence = fr.bpmConfidence; }   // stabilt ankare som motorns PLL
   if (off / SR >= startS && ms - lastRender >= 25) { lastRender = ms; const u = eng.render(fr); let v = 0; for (let i = 0; i < u.length; i++) v += u[i]; out.push([off / SR, v / u.length]); }
 }
 const v = out.map((x) => x[1]); const mean = v.reduce((a, b) => a + b, 0) / v.length;
