@@ -30,6 +30,13 @@ PORTAR = '--portar' in ARGS   # skriv aven PORTAR_EJ_LIVE (lotus-portarna) - ege
 # LOTUS-PORTARNA (tempo/kick/grid/tystnad) ar INTE live i ladan: lotus.conf rullades tillbaka 09-22 23:35 ("nastan 0 show") och Pi:n
 # kordes 09-22 kvall och 09-23 utan dem. De skrivs bara med flaggan --portar (eget A/B-steg), sa en vanlig korning inte slar pa dem tyst.
 PORTAR_EJ_LIVE = [
+    ('DMX_SILENCE_LEVEL',  '0.03',   'ladans tystnadstroskel - standard 0,05 slackte riggen pa tysta fraser'),
+    ('DMX_SILENCE_MS',     '2000',   'sa lange maste det vara tyst innan grinden borjar stanga (standard 250 ms)'),
+    ('DMX_SILENCE_RELEASE_S', '1.0', 'mjuk aterhamtning i stallet for 0,25 s'),
+]
+SHOW_ENV = [
+    # LOTUS-PORTARNA TILLBAKA 2026-09-24 (enad analysator; bank pa ladans mixklipp: tempo 15->18/21, kick 0,30->0,86, puls pa slaget
+    # 0,34->0,90; tillbakarullningen 09-22 berodde pa DMX_LIVE_LEVEL, inte dessa). Ogat i ladan: rader bort vid problem.
     ('DMX_TEMPO_EVIDENCE', '1',      'tempovalet pa slagpoang i stallet for tempogramtopp (lotus: 57/91 mot 46/91)'),
     ('DMX_TEMPO_ENV_S',    '10',     'onset-ringen 10 s - kort ring gav instabilt tempo pa langsamt material'),
     ('DMX_KICK_NOGATE',    '1',      'kickarna grindas inte mot eget grid (lotus: on-beat 0,63 -> 0,95)'),
@@ -38,11 +45,6 @@ PORTAR_EJ_LIVE = [
     ('DMX_PHASE_FOLLOW',   '1',      'gridet foljer fasmatningen i stallet for enskilda kickar'),
     ('DMX_TEMPO_UP43',     '1',      '3+3+2-fantomer uppat (lotus LIVE 09-24: bank 171 -> 180/214); verkar bara med DMX_TEMPO_EVIDENCE=1'),
     ('DMX_GRID_PHASE_OFFSET_MS', '15', 'onset-frontens konstanta 15 ms (lotus LIVE 09-23)'),
-    ('DMX_SILENCE_LEVEL',  '0.03',   'ladans tystnadstroskel - standard 0,05 slackte riggen pa tysta fraser'),
-    ('DMX_SILENCE_MS',     '2000',   'sa lange maste det vara tyst innan grinden borjar stanga (standard 250 ms)'),
-    ('DMX_SILENCE_RELEASE_S', '1.0', 'mjuk aterhamtning i stallet for 0,25 s'),
-]
-SHOW_ENV = [
     ('DMX_SECTION',        '1',      'sektioner som DATA - KRAVS av lugn-grinden nedan (levelVsHighDb). INTE lookstyrning, se DMX_SECTION_SWITCH'),
     # DMX_SECTION_SWITCH AV 2026-09-22 22:40 (ladan, live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
     # -> dirigenten plockade bara ur full-fart-poolen och allt sag likadant ut. Sektionerna ar kvar som DATA (DMX_SECTION=1);

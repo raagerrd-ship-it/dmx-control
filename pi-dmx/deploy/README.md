@@ -154,3 +154,6 @@ analyserProfile.js (DMX-profil). Paritet mot forra DMX-analysatorn: 0 avvikande 
 (450 000 hop), aven via delad analysator och med latbyten. deploy-dist.py vagrar deploya om de gemensamma filerna skiljer mot md5-manifestet
 eller mot lotus-repot bredvid. Inspelaren ar AV (DMX_RECORDER=1 slar pa; fangsterna hamnar i /var/lib/audio-dmx-engine/snippets - PC-hamtningen
 saknas an for ladan). Nya filer pa Pi:n: tempoTracker.js, analyserProfile.js, recorder/recorder.js.
+- (09-24) LOTUS-PORTARNA ingar nu i ladan.py SHOW_ENV (tempoval, kickar, gridfas, UP43, fasoffset 15) - nasta `python tools\ladan.py` slar pa dem.
+  Bank pa ladans mixklipp: tempo 15->18/21, kick-recall 0,30->0,86, puls pa slaget 0,34->0,90. Ogat: takten ska sitta battre; blir
+  showen "dod" ta bort raderna i SHOW_ENV (09-22-tillbakarullningen berodde pa DMX_LIVE_LEVEL, som fortsatt ar AV).
