@@ -346,7 +346,7 @@ export class EffectEngine {
   private showTime = 0;      // ackumulerad "show-tid" — accelererar under uppbyggnaden (riser)
   private lastShowMs = 0;
   private lastKickBoost = 0;
-  private transEnv = 0; private transAt = 0; private pulseAt = -1e9; private riseOn = false; private calmW = 0; private songStartWall = Date.now(); private holdPrevSec = '';   // DMX_PULSE_GAP_MS   // ENERGY_FB: transientpuls (bred onset) med avklingning
+  private transEnv = 0; private transAt = 0; private pulseAt = -1e9; private riseOn = false; private calmW = 0; private songStartWall = Date.now();   // DMX_PULSE_GAP_MS   // ENERGY_FB: transientpuls (bred onset) med avklingning
   private lockGood = 0; private lockBpmRef = 0; private lockRamp = 1; private transAct = 0; private trustLowSince = 0; private heardW = 1; private loudSlow = 0;   // lotus-porten (se LOCK_BEATS)
   private beatW = 1;                            // ENERGY_FB: taktens vikt 0..1 (1 = last)
   private showVel = 0;       // extra show-tids-hastighet från bastransienter (akustisk tröghet)
@@ -471,7 +471,7 @@ export class EffectEngine {
   private partLookSong = 0;
 
   /** Misstänkt låtbyte → låt auto-rangen kalibrera om snabbt mot nya nivåer. */
-  softenRange(): void { this.range.soften(); }
+  softenRange(): void { this.range.soften(); this.songStartWall = Date.now(); }   // latgrans: aven DROP_SONG_HOLD_S-klockan
 
 
 
@@ -1006,10 +1006,8 @@ export class EffectEngine {
     if (DROP_CALM_BUILD > 0 && dropHitRaw && calmSec && frame.buildUp < DROP_CALM_BUILD) { dropHitRaw = false; this.dropCalmDenied++; }
     // INGEN DROP I LATENS INLEDNING (ladan 2026-09-24 23:35, tredje gangen 'fortfarande drop i inledning'): intro-grindarna ovan tittar pa
     // sektionen, men den slar om intro -> build strax FORE smallen (kicken som borjar ar sjalva byggstenen). Med DMX_DROP_SONG_HOLD_S > 0
-    // fyrar ingen drop/minidrop forsta N s av en lat (klockan startar vid motorstart och nar analysatorn gar till intro med nr 0).
+    // fyrar ingen drop/minidrop forsta N s av en lat (klockan startar vid motorstart och vid latgrans = softenRange; INTE pa sektionen - tystnaden fore en drop gor den till intro, 23:31: dropen efter pausen nekades).
     if (DROP_SONG_HOLD_S > 0) {
-      if (frame.section === 'intro' && (frame.sectionIndex ?? 0) === 0 && this.holdPrevSec !== 'intro' && this.holdPrevSec !== 'build') this.songStartWall = nowWall;
-      this.holdPrevSec = frame.section ?? '';
       if (dropHitRaw && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000) { dropHitRaw = false; this.dropCalmDenied++; }
     }
     let dropHit = dropHitRaw;
