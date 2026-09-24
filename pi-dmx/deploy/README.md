@@ -171,3 +171,7 @@ saknas an for ladan). Nya filer pa Pi:n: tempoTracker.js, analyserProfile.js, re
   refrang fran vers med AUC 0,55 (82 langfangster); medel av tre kausala nivarangers ger 0,69/0,71. Mat med tools/facitLight.mjs (medelljus i
   facitets refrang mot vers, train/test): test 41 latar refrang/vers 1,12 (av) -> 1,22 (etikett) -> 1,34 (rang); vers ljusare 18 -> 14 -> 11 latar.
   Kostnad: medelljus 12 -> 8 % (versen dampas mer). Ogat: for mort i verserna -> DMX_SECTION_RANK_LOW 0.5.
+- (09-24 19:20 LADAN, ogonbedomt "mycket battre energi") SHOW_ENV = det som ar live: lotus-portarna AV (tempot vandrade, fladder/dubbeltakt),
+  DMX_HEARTBEAT=0 (lagret gav bara 5 av 46 effekter puls), las/tystnadspaus av, energi direkt med dodzon 6 %, LOTUS NIVAKANAL
+  (DMX_LIVE_LEVEL=1, 6/6 dB: energin rorde sig 0,012/s ur intensity, nu ~0,086/s), fade ner minst 0,25 s (utgang) / 0,2 s (hjartslag),
+  analysator-worker. Kvallens testfiler flyttade till .bak - lotus.conf ar enda kallan for show-env utover de gamla bas-drop-insen.

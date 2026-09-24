@@ -30,14 +30,6 @@ PORTAR = '--portar' in ARGS   # skriv aven PORTAR_EJ_LIVE (lotus-portarna) - ege
 # LOTUS-PORTARNA (tempo/kick/grid/tystnad) ar INTE live i ladan: lotus.conf rullades tillbaka 09-22 23:35 ("nastan 0 show") och Pi:n
 # kordes 09-22 kvall och 09-23 utan dem. De skrivs bara med flaggan --portar (eget A/B-steg), sa en vanlig korning inte slar pa dem tyst.
 PORTAR_EJ_LIVE = [
-    ('DMX_TEMPO_UP43',     '1',      'AV i ladan: med DMX-profilen 18 -> 17/21 pa ladans mixklipp (lotus: 171 -> 180/214, LIVE dar)'),
-    ('DMX_SILENCE_LEVEL',  '0.03',   'ladans tystnadstroskel - standard 0,05 slackte riggen pa tysta fraser'),
-    ('DMX_SILENCE_MS',     '2000',   'sa lange maste det vara tyst innan grinden borjar stanga (standard 250 ms)'),
-    ('DMX_SILENCE_RELEASE_S', '1.0', 'mjuk aterhamtning i stallet for 0,25 s'),
-]
-SHOW_ENV = [
-    # LOTUS-PORTARNA TILLBAKA 2026-09-24 (enad analysator; bank pa ladans mixklipp: tempo 15->18/21, kick 0,30->0,86, puls pa slaget
-    # 0,34->0,90; tillbakarullningen 09-22 berodde pa DMX_LIVE_LEVEL, inte dessa). Ogat i ladan: rader bort vid problem.
     ('DMX_TEMPO_EVIDENCE', '1',      'tempovalet pa slagpoang i stallet for tempogramtopp (lotus: 57/91 mot 46/91)'),
     ('DMX_TEMPO_ENV_S',    '10',     'onset-ringen 10 s - kort ring gav instabilt tempo pa langsamt material'),
     ('DMX_KICK_NOGATE',    '1',      'kickarna grindas inte mot eget grid (lotus: on-beat 0,63 -> 0,95)'),
@@ -45,6 +37,12 @@ SHOW_ENV = [
     ('DMX_GRID_PHASE',     '1',      'fasen ur bas + helband i stallet for senaste kicken (bank: i fas 77/130, motfas 5)'),
     ('DMX_PHASE_FOLLOW',   '1',      'gridet foljer fasmatningen i stallet for enskilda kickar'),
     ('DMX_GRID_PHASE_OFFSET_MS', '15', 'onset-frontens konstanta 15 ms (lotus LIVE 09-23)'),
+    ('DMX_TEMPO_UP43',     '1',      'AV i ladan: med DMX-profilen 18 -> 17/21 pa ladans mixklipp (lotus: 171 -> 180/214, LIVE dar)'),
+    ('DMX_SILENCE_LEVEL',  '0.03',   'ladans tystnadstroskel - standard 0,05 slackte riggen pa tysta fraser'),
+    ('DMX_SILENCE_MS',     '2000',   'sa lange maste det vara tyst innan grinden borjar stanga (standard 250 ms)'),
+    ('DMX_SILENCE_RELEASE_S', '1.0', 'mjuk aterhamtning i stallet for 0,25 s'),
+]
+SHOW_ENV = [
     ('DMX_SECTION',        '1',      'sektioner som DATA - KRAVS av lugn-grinden nedan (levelVsHighDb). INTE lookstyrning, se DMX_SECTION_SWITCH'),
     # DMX_SECTION_SWITCH AV 2026-09-22 22:40 (ladan, live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
     # -> dirigenten plockade bara ur full-fart-poolen och allt sag likadant ut. Sektionerna ar kvar som DATA (DMX_SECTION=1);
@@ -84,11 +82,9 @@ SHOW_ENV = [
     ('DMX_SECTION_UNIT',   '1',      'sektionen ar enheten: byte bara vid ra sektionsgrans (>= 4 s gammal)/drop/basgang, samma look per sektionstyp'),
     ('DMX_SECTION_TRACE',  '1',      'sektionsbyten i journalen (bara logg)'),
     ('DMX_ENERGY_FALLBACK','1',      'utan taktlas: puls pa breda transienter + storre energisving ("dor inte emellanat")'),
-    ('DMX_HEARTBEAT',      '1',      'HEART-BEAT/ENERGI som eget lager (kontrakt heartbeat/contract.ts): effekter med egen taktpuls skippar den globala pulsen ("krockar inte")'),
     ('DMX_HUE_LIFT',       '1',      'kulorlyft i kalibreringen: starkaste kanalen till tandpunkten, kuloren bevaras (standard pa; 0 = per kanal som forr)'),
     ('DMX_SECTION_CONTRAST','rank',   'ljus foljer KAUSAL RANG (midHi/bas/diskant mot laten) i st.f. refrangetiketten (AUC 0,55): facit-test 41 latar refrang/vers 1,12 -> 1,34'),
     ('DMX_SECTION_RANK_LOW','0.35',  'versgolv; full niva fran rangmedianen (RANK_KNEE 0,5 i koden): facit-test refrang/vers 1,12 -> 1,27 med medelljus kvar 12 % (linjart gav 8 %, "knappt heart-beat eller energi")'),
-    ('DMX_HEARTBEAT_DEPTH','0.5',     'djupare hjartslag (ladan 09-24 kvall; 0,35 kandes svagt)'),
     ('DMX_SECTION_EARLY_S','45',      'forsta 45 s: refrang kraver +3 dB mot latens median (test: falsk-high 0,50 -> 0,46, refrang 2 igenkand 12 -> 9 s)'),
     ('DMX_SECTION_ON_HINT', '1',     'latgransen nollar sektionshistoriken - annars jamfors nya laten mot forra latens'),
     # DMX_SECTION_SWITCH AV (2026-09-22 22:40, ladan live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
@@ -98,6 +94,17 @@ SHOW_ENV = [
     # energitaket multipliceras ovanpa gick armaturerna ner till tandpunkten en efter en ("lamporna stangs av").
     # dB-fonstrets ankare (tau 120 s) passar inte ladans komprimerade PA. Det ar anda RATT vag - agaren pekar sjalv pa
     # BLE-lampan ("dar har vi skon rytm i brightness") - men den ska tunas mot INSPELAT ladljud, inte live i en spelning.
+    # LADAN 09-24 KVALL (ogonbedomt): portarna ovan AV igen (tempot vandrade 109-121, fasprediktion 0,4-0,6, fladder/dubbeltakt);
+    # lotus-porten i ENERGY_FB (las pa 12 rena slag, tystnadspaus) gjorde pulsen urvattnad ('puls 0,93') -> av; heart-beat-lagret tog
+    # hjartslaget fran 41 av 46 effekter -> gamla vagen; energin fran intensity rorde sig 0,012/s -> lotus nivakanal 6/6 dB ('mycket battre energi').
+    ('DMX_HEARTBEAT',      '0',      'gamla kompositionen: hjartslag + energi pa alla effekter (lagret gav 5 av 46 effekter puls)'),
+    ('DMX_BEAT_LOCK_BEATS','0',      'inget krav pa rena slag i rad for rastret (natt sallan i ladan)'),
+    ('DMX_BEAT_QUIET_BEATS','0',     'ingen tystnadspaus av rastret'),
+    ('DMX_ENERGY_RISE_K',  '3',      'energi direkt, dodzon 6 % i koden'),
+    ('DMX_LIVE_LEVEL',     '1',      'lotus nivakanal: energin foljer ljudnivan sekund for sekund (intensity rorde sig 0,012/s)'),
+    ('LIVE_WIN_DB',        '6',      'fonster 6 dB (lotus 09-24)'),
+    ('DMX_ANALYSER_SPLIT', 'worker', 'tempo/gridfas/sektion i egen trad (analysatorn 4 ms/hop utan i ladan 09-24)'),
+    ('LIVE_OFFSET_DB',     '6',      'toppen 6 dB over ankaret: pop median 0,69, p10-p90 0,34-0,92'),
 ]
 
 
@@ -116,6 +123,10 @@ REMOVE = [
     # EFFEKTOVERSYNEN 2026-09-23: innerouter (rPerm 1,00 mot varannan) och neon (aldrig vald, ingen egen signal) ar borta ur
     # registret; filerna pa Pi:n flyttas till .bak sa dist/effects/ inte har spokfiler.
     '/opt/audio-dmx-engine/dist/effects/innerouter.js', '/opt/audio-dmx-engine/dist/effects/neon.js',
+    # KVALLENS TESTFILER 09-24 (allt star nu i SHOW_ENV -> lotus.conf); hjarta.conf satte DMX_HEARTBEAT=1 och laddas EFTER lotus.conf.
+    '/etc/systemd/system/audio-dmx-engine.service.d/hjarta.conf', '/etc/systemd/system/audio-dmx-engine.service.d/energi.conf',
+    '/etc/systemd/system/audio-dmx-engine.service.d/sektion.conf', '/etc/systemd/system/audio-dmx-engine.service.d/zzz-lugn.conf',
+    '/etc/systemd/system/audio-dmx-engine.service.d/zzzz-ogat.conf', '/etc/systemd/system/audio-dmx-engine.service.d/split.conf',
 ]
 
 

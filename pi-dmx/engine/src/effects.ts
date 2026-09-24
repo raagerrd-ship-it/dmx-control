@@ -160,7 +160,11 @@ const SHOW_LEAD_DEFAULT = 50;
  *  MIN_BEAT_CONFIDENCE, så utan golv finns ett dödband precis ovanför grinden där
  *  rutnätet lever men hjärtslaget är släckt. Gäller BARA pulsdjupet. */
 /** Release-tid för hjärtslagets fladder-dämp: slår ihop två toppar 50–100 ms isär. */
-const BEAT_FLUTTER_RELEASE = 0.09;
+/** SNABBT UPP, ALLTID FADE NER (ladan 2026-09-24: 'upp far den garna vara snabb men alltid fade nerat'): hjartslagets release 90 ms var
+ *  nastan ett snapp och laggs pa EFTER utgangens ballistik. Nu DMX_BEAT_RELEASE_S (0,2 s); utgangens decay far aldrig vara kortare an
+ *  DMX_FADE_MIN_S (0,25 s; forr 0,08 s i energiska partier). Attacken ar oforandrad (momentan). */
+const BEAT_FLUTTER_RELEASE = Number(process.env.DMX_BEAT_RELEASE_S ?? 0.2);
+const FADE_MIN_S = Number(process.env.DMX_FADE_MIN_S ?? 0.25);
 /** Sentinel: pulsklockan ännu inte initierad (första framen sätter den utan tick). */
 const PULSE_IDX_INIT = -2e9;
 /** Hur mycket sektionsenergin "gasar" ljuset (0 = av). +50 % master vid full energi. */
@@ -298,6 +302,8 @@ const SYNC_ERR_FRAC = Number(process.env.DMX_SYNC_ERR_FRAC ?? 0.2);
  *  ljusnar nar laten lyfter i stallet for forst pa nasta slag. */
 const BEAT_QUIET_BEATS = Number(process.env.DMX_BEAT_QUIET_BEATS ?? 4);
 const ENERGY_RISE_K = Number(process.env.DMX_ENERGY_RISE_K ?? 3);
+/** Dodzon (ladan 09-24: 'mikrofladder' med K 3, 'betydligt mindre dynamiska' med K 0): stigningar under DMX_ENERGY_RISE_DEAD (6 %) ignoreras. */
+const ENERGY_RISE_DEAD = Number(process.env.DMX_ENERGY_RISE_DEAD ?? 0.06);
 const BEAT_TRUST_FLOOR = 0.75;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 
 export class EffectEngine {
@@ -892,7 +898,7 @@ export class EffectEngine {
             // (7) energi direkt: stigande loudness (forra ramens lightLoud) mot ~0,4 s-medel = omedelbar puls
             if (ENERGY_RISE_K > 0) {
               this.loudSlow = this.loudSlow <= 0 ? this.lightLoud : this.loudSlow + (this.lightLoud - this.loudSlow) * Math.min(1, dtA / 0.4);
-              const rise = this.loudSlow > 0.02 ? Math.max(0, Math.min(1, (this.lightLoud / this.loudSlow - 1) * ENERGY_RISE_K)) : 0;
+              const rise = this.loudSlow > 0.02 ? Math.max(0, Math.min(1, (this.lightLoud / this.loudSlow - 1 - ENERGY_RISE_DEAD) * ENERGY_RISE_K)) : 0;
               riseNow = rise; if (rise > 0) depthEff = Math.max(depthEff, depth * rise);
             }
           }
@@ -1841,7 +1847,7 @@ export class EffectEngine {
     // transient); låg energi → lång decay (mjuk andande wash). Utnyttjar diodernas
     // snabba respons — skarpt utan hårdvaru-strobe.
     const sharpen = Math.min(0.65, audio * 0.45 + frame.buildUp * 0.5);   // 0 lugnt .. 0.65 energiskt
-    const tau = Math.max(0.08, (fastMode ? fastTau : (this.cfg.calmDecay ?? 0.42)) * (1 - sharpen));
+    const tau = Math.max(FADE_MIN_S, (fastMode ? fastTau : (this.cfg.calmDecay ?? 0.42)) * (1 - sharpen));
     const decay = Math.exp(-dtSec / tau);
     // Bygg strobe-masken bara när fixtures ändras (inte varje frame).
     this.out.build(this.cfg.fixtures);
