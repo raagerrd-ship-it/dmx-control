@@ -592,6 +592,7 @@ setTimeout(renderTick, RENDER_MS);
 // nytt beteende, ingen andra sanning om när det ska vara mörkt.
 const FALLBACK_AFTER_MS = 40; // 4 missade 100 Hz-rutor → ljudet driver inte längre
 const FALLBACK_FADE_MS = 400; // uttoning till svart när ljudet är borta
+const FALLBACK_HOLD_MS = Number(process.env.DMX_FALLBACK_HOLD_MS ?? 250); // korta ljudluckor: hall ramen, dampa inte
 setInterval(() => {
     // Normal drift: renderingen är alltid färsk (100 Hz) → vi avslutar direkt.
     if (performance.now() - lastRenderMs < FALLBACK_AFTER_MS)
@@ -607,7 +608,9 @@ setInterval(() => {
     // Nu rör vi inte effektmotorn alls under avbrottet. Den har ingen giltig indata
     // och ska inte tvingas gissa. Vi tonar bara ned DET SOM REDAN LÖSTE och håller
     // svart tills ljudet är tillbaka — ett entydigt felläge utan nya beteenden.
-    const k = Math.max(0, 1 - (Date.now() - lastChunkAt) / FALLBACK_FADE_MS);
+    // HALL FORST, TONA SEN (ladan 2026-09-24, DMX-sonden: mikroflimmer). Forr dampade forsta reservramen direkt (10 % efter 40 ms) - ljudblock
+    // som kommer i klump gav en morkare ram mellan tva normala = flimmer over hela riggen. Nu: oforandrad ram FALLBACK_HOLD_MS, sedan uttoning.
+    const k = Math.max(0, 1 - Math.max(0, Date.now() - lastChunkAt - FALLBACK_HOLD_MS) / FALLBACK_FADE_MS);
     for (let i = 0; i < lastUniverse.length; i++)
         fadeUniverse[i] = (lastUniverse[i] * k + 0.5) | 0;
     probeSample(fadeUniverse);

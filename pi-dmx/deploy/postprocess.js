@@ -25,13 +25,18 @@
 /** Utgångens attack. Kort nog att inte röra hjärtslagets 45 ms-anslag, lång nog att
  *  dämpa effekternas fladder kring 10 Hz. */
 const ATTACK_S = Math.max(0.005, Number(process.env.DMX_ATTACK_MS ?? 90) / 1000); // 2026-09-21: env (ladan 20 ms; lotus kor attack 0) - 90 ms smetade ut varje slag
-const INV_ATTACK_S = 1 / ATTACK_S; // Multiplikation är snabbare än division i loopen
+const INV_ATTACK_S = 1 / ATTACK_S;
+/** SISTA FADE-SPARREN (ladan 2026-09-24, DMX-sonden: enramsspikar 2-3/s per armatur = 'flimmer'; agaren: 'upp far den garna vara snabb men
+ *  alltid fade nerat'): allra sist far ingen ljuskanal falla snabbare an en fade med tidskonstant DMX_FINAL_FADE_S (0,12 s); uppat omedelbart.
+ *  Specialkanaler (strobe/hazer/uv/blinder/laser/co2) undantas. 0 = av. */
+const FINAL_FADE_S = Number(process.env.DMX_FINAL_FADE_S ?? 0.12); // Multiplikation är snabbare än division i loopen
 /** Minsta mörker under ljuset (DMX-steg över tändpunkten) så hjärtslaget syns även
  *  i lugna effekter. 44 ⇒ en lampa med tändpunkt 16 lyser lägst på 60. */
 const PULSE_ROOM = 44;
 export class PostProcess {
     /** Ballistikens buffert — per kanal, i flyttal så decayn inte kvantiseras bort. */
     smooth = new Float32Array(512);
+    finalOut = new Float32Array(512); // SISTA FADE-SPARREN (se FINAL_FADE_S)
     apply(universe, out, fixtures, dtSec, decay, ceilMul, pulseMul, ceilingActive, pulseActive, blackout, master, headroomCap, nowMs) {
         const maxCh = out.maxCh;
         // 1. BALLISTIK: mjuk attack, oförändrad decay (peak-hold). En 1-frames-spik når
@@ -76,6 +81,21 @@ export class PostProcess {
         }
         // 5. KALIBRERING + LJUS-TAK (output-tjänsten äger lampkunskapen).
         out.calibrate(universe, fixtures, master, nowMs);
+        if (blackout)
+            this.finalOut.fill(0); // efter blackout: ingen gammal niva att tona ner fran
+        else if (FINAL_FADE_S > 0) {
+            const fk = Math.exp(-dtSec / FINAL_FADE_S);
+            for (let ch = 0; ch < maxCh; ch++) {
+                if (out.direct[ch]) {
+                    this.finalOut[ch] = universe[ch];
+                    continue;
+                }
+                const held = this.finalOut[ch] * fk, v = universe[ch];
+                const o = v >= held ? v : held;
+                this.finalOut[ch] = o;
+                universe[ch] = (o + 0.5) | 0;
+            }
+        }
         // 6. DROP-HEADROOM — sist av allt: kläm normal styrka, släpp drops till fullt.
         if (headroomCap >= 0)
             out.cap(universe, headroomCap);
