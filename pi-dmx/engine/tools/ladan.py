@@ -68,6 +68,7 @@ SHOW_ENV = [
     ('DMX_PULSE_GAP_MS',   '250',    'grind: ny uppat-puls (anslag eller energistigning) hogst var 250 ms, sa den inte fladdrar (agaren, ladan 09-24 23:00)'),
     ('DMX_LIVE_START_FAST_S', '90',  'nivaankaret lar sig snabbt uppat forsta 90 s efter start (20 s: ankaret fastnade lagt -> nastan max efter omstart, ladan 09-24)'),
     ('DMX_SECTION_HINT_LOWCONF', '0', 'taktlost break nollar inte sektionerna (refrangen efter blev intro = seg), riktig latgrans gor det; megamix lat 4 refrang 14->43 (ladan 09-24 23:10)'),
+    ('DMX_LIVE_CEIL',      '1',      'DIM-taket foljer samma dB-fonster som nivan (bas + ankare + tyst-lat-grans) i st.f. latens egen p5..p95 - varje lat fick fullt tak oavsett volym (ladan 09-24 23:20)'),
     ('DROP_CALM_INTRO_STRICT', '1',  'ingen drop i intro utan riser (ladan 09-24)'),
     ('LIGHT_FLOOR',        '0.25',   'GASEN: md = golv + (1-golv) x loudness. 0,45 gav bara halva vagen ("pulsar inte med energi")'),
     ('DMX_FLOOR_CH',       '26',     'SHOW-GOLV i DMX-steg = 10 % (40 = 16 % var for ljust i tysta delar, ladan 09-24 22:50). Armaturernas tandpunkt (cal.on=16 av 255) ar 6 % och laser som slackt'),

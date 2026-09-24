@@ -234,6 +234,7 @@ const LIVE_ANCHOR_S = Number(process.env.LIVE_ANCHOR_S ?? 120); // lotus autoAnc
 const LIVE_RELEASE_MS = Number(process.env.LIVE_RELEASE_MS ?? 350);
 const LIVE_BASS_W = Number(process.env.LIVE_BASS_W ?? 0.25); // lotus: mid/diskant 1,3 + bas 0,25 -> har som blandning
 const LIVE_TRACE = process.env.DMX_LIVE_TRACE === '1';
+const LIVE_CEIL = LIVE_LEVEL && process.env.DMX_LIVE_CEIL === '1';
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
 const LIVE_START_FAST_S = Number(process.env.DMX_LIVE_START_FAST_S ?? 20);
@@ -1659,7 +1660,9 @@ export class EffectEngine {
             // utjämnar sista resten utan lång svans. (Drop bypassar via dropEnv nedan.)
             const lvl = Math.max(0, Math.min(1, frame.levelVU));
             this.range.push(lvl, dtSec);
-            const vuRaw = this.range.norm(lvl);
+            // LIVE_CEIL (ladan 2026-09-24 23:20: 'kor valdigt ljust mot hur hogt det later'): taket (= DIM-kanalen) foljde latens EGEN p5..p95,
+            // sa varje lat fick fullt tak oavsett volym. Med DMX_LIVE_CEIL=1 foljer taket samma dB-fonster som nivan (bas, ankare, tyst-lat-grans).
+            const vuRaw = LIVE_CEIL && this.liveLevelSm >= 0 ? this.liveLevelSm : this.range.norm(lvl);
             // ASYMMETRISK VU: snabb UPP (transienter/drops syns), langsam NER (inget
             // fladder). MATT: med symmetriska 90 ms fladdrade riggen synligt vid MAX
             // ljusstyrka — dar VU:n ror sig 0.8-1.0 och taket appliceras EFTER
