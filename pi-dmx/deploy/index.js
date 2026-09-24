@@ -201,8 +201,11 @@ capture.on("chunk", (samples) => {
         effects.softenRange();
         if (process.env.DMX_BOUNDARY_SOFT)
             analyser.hintTrackChange(5000);
-        else
+        else {
             analyser.resetTempo();
+            if (process.env.DMX_SECTION_HINT_LOWCONF === '0')
+                analyser.hintTrackChange(5000);
+        } // riktig latgrans nollar sektionerna (tempotappet gor det inte langre)
         if (recorder) {
             const name = "ladan-" + lastBoundary;
             recorder.noteTrack(name, "dmx");
