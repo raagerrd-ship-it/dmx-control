@@ -204,6 +204,7 @@ const HEARTBEAT_TRUST = Number(process.env.DMX_HEARTBEAT_TRUST ?? 0.35);
 // dropogonblicket (high forst efterat) -> grinden pa 0,25 nekade 7/12 pop- och 11/32 megamix-drops, dvs nastan allt (live i ladan
 // 09-21 kvall). Vill man ha en lugn-grind: analysatorns DMX_DROP_CALM_GATE=1 DROP_CALM_LAND_MS=300 (tappar inget, 300 ms sen i low).
 const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0);
+const DROP_SONG_HOLD_S = Number(process.env.DMX_DROP_SONG_HOLD_S ?? 0); // se 'INGEN DROP I LATENS INLEDNING'
 const DROP_LAND_GAIN = Number(process.env.DROP_LAND_GAIN ?? 1.15); // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35); // tierEma-snap vid high/break-grans
 const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.45), SECTION_LOW_DIP = Number(process.env.SECTION_LOW_DIP ?? 0.30); // master: refrang upp, vers/intro ner, break mer ner
@@ -334,7 +335,9 @@ export class EffectEngine {
     transAt = 0;
     pulseAt = -1e9;
     riseOn = false;
-    calmW = 0; // DMX_PULSE_GAP_MS   // ENERGY_FB: transientpuls (bred onset) med avklingning
+    calmW = 0;
+    songStartWall = Date.now();
+    holdPrevSec = ''; // DMX_PULSE_GAP_MS   // ENERGY_FB: transientpuls (bred onset) med avklingning
     lockGood = 0;
     lockBpmRef = 0;
     lockRamp = 1;
@@ -1070,6 +1073,18 @@ export class EffectEngine {
             dropHitRaw = false;
             this.dropCalmDenied++;
         }
+        // INGEN DROP I LATENS INLEDNING (ladan 2026-09-24 23:35, tredje gangen 'fortfarande drop i inledning'): intro-grindarna ovan tittar pa
+        // sektionen, men den slar om intro -> build strax FORE smallen (kicken som borjar ar sjalva byggstenen). Med DMX_DROP_SONG_HOLD_S > 0
+        // fyrar ingen drop/minidrop forsta N s av en lat (klockan startar vid motorstart och nar analysatorn gar till intro med nr 0).
+        if (DROP_SONG_HOLD_S > 0) {
+            if (frame.section === 'intro' && (frame.sectionIndex ?? 0) === 0 && this.holdPrevSec !== 'intro' && this.holdPrevSec !== 'build')
+                this.songStartWall = nowWall;
+            this.holdPrevSec = frame.section ?? '';
+            if (dropHitRaw && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000) {
+                dropHitRaw = false;
+                this.dropCalmDenied++;
+            }
+        }
         let dropHit = dropHitRaw;
         // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
         // jamfors nivan (lightLoud/liveLevelSm) med nivan strax fore; har den inte stigit >= DROP_LAND_GAIN doms dropen falsk:
@@ -1111,7 +1126,7 @@ export class EffectEngine {
         this.lastMiniCount = miniCount;
         // Fordrojd mini-reaktion: en riktig drop under vantetiden avbryter den (annars laser den som en for tidig drop).
         let miniHit = false;
-        if (miniHitRaw)
+        if (miniHitRaw && !(DROP_SONG_HOLD_S > 0 && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000))
             this.miniPendingAt = nowWall + MINI_DELAY_MS;
         if (dropHitRaw)
             this.miniPendingAt = 0;

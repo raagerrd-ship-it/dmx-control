@@ -71,6 +71,7 @@ SHOW_ENV = [
     ('DMX_LIVE_CEIL',      '1',      'DIM-taket foljer samma dB-fonster som nivan (bas + ankare + tyst-lat-grans) i st.f. latens egen p5..p95 - varje lat fick fullt tak oavsett volym (ladan 09-24 23:20)'),
     ('DMX_CALM_FADE_S',    '0.6',    'lugna partier (low/break/intro): attack 0,3 s + fade 0,6 s = mjuka overgangar mellan lamporna; pop: lugn 11->6, refrang oforandrad (ladan 09-24 23:25)'),
     ('DMX_LIVE_ANCHOR_MAX_DECAY', '0.03', 'lag volym ska anda leva: tyst-lat-granden slapper 0,03 dB/s (8 dB sankt volym = levande igen pa ~4 min; forr 20 min) (ladan 09-24 23:30)'),
+    ('DMX_DROP_SONG_HOLD_S', '30',   'ingen drop/minidrop forsta 30 s av en lat - sektionen slog om intro->build strax fore smallen sa intro-grindarna missade (ladan 09-24 23:35, megamix: 2 drops nekade)'),
     ('DROP_CALM_INTRO_STRICT', '1',  'ingen drop i intro utan riser (ladan 09-24)'),
     ('LIGHT_FLOOR',        '0.25',   'GASEN: md = golv + (1-golv) x loudness. 0,45 gav bara halva vagen ("pulsar inte med energi")'),
     ('DMX_FLOOR_CH',       '26',     'SHOW-GOLV i DMX-steg = 10 % (40 = 16 % var for ljust i tysta delar, ladan 09-24 22:50). Armaturernas tandpunkt (cal.on=16 av 255) ar 6 % och laser som slackt'),
