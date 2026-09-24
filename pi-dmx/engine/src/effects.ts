@@ -249,6 +249,9 @@ const LIVE_ANCHOR_S = Number(process.env.LIVE_ANCHOR_S ?? 120);   // lotus autoA
 const LIVE_RELEASE_MS = Number(process.env.LIVE_RELEASE_MS ?? 350);
 const LIVE_BASS_W = Number(process.env.LIVE_BASS_W ?? 0.25);      // lotus: mid/diskant 1,3 + bas 0,25 -> har som blandning
 const LIVE_TRACE = process.env.DMX_LIVE_TRACE === '1';
+/** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
+ *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
+const LIVE_START_FAST_S = Number(process.env.DMX_LIVE_START_FAST_S ?? 20);
 /** TYST LAT = TYST LJUS (ladan 2026-09-24 22:30: 'laten ar ganska tyst och den kor ganska ljust'): ankaret ar relativt, sa en tyst lat blev
  *  'det nya normala' och lika ljus som en hog. Ankaret far inte sjunka mer an LIVE_ANCHOR_DROP_DB under det hogsta ankaret pa sistone
  *  (toppen glider ner 0,005 dB/s = 6 dB pa 20 min). 0 = av. Efter omstart ar toppen forsta latens niva tills en hogre lat kommer. */
@@ -1567,7 +1570,7 @@ export class EffectEngine {
       const tauMs = LIVE_ANCHOR_S * 1000;
       if (frame.level > INPUT_OFF_LEVEL && Number.isFinite(wdb) && wdb > -100) {
         const nowMs = performance.now();
-        if (this.liveAnchor === undefined) { this.liveAnchor = wdb; this.liveFastUntil = nowMs + 20_000; }
+        if (this.liveAnchor === undefined) { this.liveAnchor = wdb; this.liveFastUntil = nowMs + LIVE_START_FAST_S * 1000; }
         const up = wdb > this.liveAnchor;
         // SNABBT BARA UPPAT (ladan 19:58: 'lyser mycket aven nar laten blir tystare'): snabbt nerat gjorde ett tyst parti
         // till det nya normala pa 12 s. Nerat foljer ankaret bara langsamt (tau), och annu langsammare i low/break (x2).

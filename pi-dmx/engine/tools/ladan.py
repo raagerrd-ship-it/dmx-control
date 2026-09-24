@@ -66,6 +66,7 @@ SHOW_ENV = [
     ('LIVE_BASS_W',        '1',      'nivan fran BASEN (lotus lightBassWeight 1/HiWeight 0): sang/diskant i tysta partier lyste 70 %+ (ladan 09-24 22:55); pop: lugn 32->27, break 23->16, refrang 19->23'),
     ('DMX_FINAL_FADE_MAX_DT_S', '0.0075', 'efter motorstall (40-240 ms) fortsatter fallet som fade i st.f. ryck (enramsspikarna, ladan 09-24)'),
     ('DMX_PULSE_GAP_MS',   '250',    'grind: ny uppat-puls (anslag eller energistigning) hogst var 250 ms, sa den inte fladdrar (agaren, ladan 09-24 23:00)'),
+    ('DMX_LIVE_START_FAST_S', '90',  'nivaankaret lar sig snabbt uppat forsta 90 s efter start (20 s: ankaret fastnade lagt -> nastan max efter omstart, ladan 09-24)'),
     ('DROP_CALM_INTRO_STRICT', '1',  'ingen drop i intro utan riser (ladan 09-24)'),
     ('LIGHT_FLOOR',        '0.25',   'GASEN: md = golv + (1-golv) x loudness. 0,45 gav bara halva vagen ("pulsar inte med energi")'),
     ('DMX_FLOOR_CH',       '26',     'SHOW-GOLV i DMX-steg = 10 % (40 = 16 % var for ljust i tysta delar, ladan 09-24 22:50). Armaturernas tandpunkt (cal.on=16 av 255) ar 6 % och laser som slackt'),
