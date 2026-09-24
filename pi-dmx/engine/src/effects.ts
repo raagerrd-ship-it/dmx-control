@@ -294,6 +294,9 @@ const LOCK_BEATS = Number(process.env.DMX_BEAT_LOCK_BEATS ?? 12);   // 8 -> 12 s
 const LOCK_CONF = Number(process.env.DMX_BEAT_LOCK_CONF ?? 0.6);
 const LOCK_ERR = Number(process.env.DMX_BEAT_LOCK_ERR ?? 0.10);
 const ENERGY_FB_GAP_MS = Number(process.env.DMX_ENERGY_FB_GAP_MS ?? 330);
+/** BARA ENERGI (agaren 2026-09-24, lotus i kallaren: 'om den bara kor pa energi nu sa ar det nice'): rastret (heart-beat) av helt,
+ *  pulsen = anslag + stigning med fullt djup oberoende av taktens tillit (som lotus energiläge: energyDepth x tathet). Kraver ENERGY_FB. */
+const ENERGY_ONLY = process.env.DMX_ENERGY_ONLY === '1';
 const ENERGY_ACT_REF = Number(process.env.DMX_ENERGY_ACT_REF ?? 0.25);
 const SYNC_ERR_FRAC = Number(process.env.DMX_SYNC_ERR_FRAC ?? 0.2);
 /** PORTAT FRAN LOTUS 2026-09-24 (agaren i kallaren, ogonbedomt): (6) PAUSA RASTRET UTAN HORD TAKT - ingen kick pa DMX_BEAT_QUIET_BEATS
@@ -855,7 +858,7 @@ export class EffectEngine {
         // 0.80 → 0.92, och energigolvet 0.35 → 0.50: djupare slag överallt, och märkbart
         // mer även i lugna partier. Pulsen ligger sist i kedjan och passerar inget
         // filter, så hela djupet når fram — det som mäts är det som syns.
-        let depth = Math.min(1, DEPTH_GAIN * 0.92 * trustFloored * (0.62 + 0.45 * energy) * calm);   // 0.50+0.50 -> 0.62+0.45: punchigare hjartslag (agaren "svagare/dimmare" efter effekt-trim)
+        let depth = Math.min(1, DEPTH_GAIN * 0.92 * (ENERGY_ONLY && ENERGY_FB ? 1 : trustFloored) * (0.62 + 0.45 * energy) * calm);   // 0.50+0.50 -> 0.62+0.45: punchigare hjartslag (agaren "svagare/dimmare" efter effekt-trim)
         // KLAMRAS NEDAT: pre-dippen far envelopen ga negativ med flit, men
         // multiplikatorn far aldrig slacka riggen helt — da lases dippen som ett
         // blink i stallet for som andning. 0.06 lamnar lamporna tanda.
@@ -884,6 +887,7 @@ export class EffectEngine {
               const dtQ = Math.min(0.05, Math.max(0.005, (pnQ - this.lastRenderMs) / 1000)) * 1000;
               this.heardW += ((quiet ? 0 : 1) - this.heardW) * Math.min(1, dtQ / (quiet ? 800 : 200)); }
             w *= this.heardW;
+            if (ENERGY_ONLY) w = 0;
             // (3) bred transient: bas/kick/diskant-onset -> puls med avklingning, hogst en per ENERGY_FB_GAP_MS
             const o = frame.onset; const on = o ? Math.max(o.bass ?? 0, o.kick ?? 0, o.treble ?? 0) : 0;
             const pn = performance.now();
