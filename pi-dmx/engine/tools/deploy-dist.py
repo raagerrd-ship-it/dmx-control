@@ -19,11 +19,19 @@ REMOVES = [args[i + 1] for i, a in enumerate(args) if a == '--remove']
 files_arg = [a for i, a in enumerate(args) if not a.startswith('--') and (i == 0 or args[i - 1] not in ('--conf', '--env', '--remove'))]
 HERE = os.path.dirname(os.path.abspath(__file__)); LOCAL = os.path.normpath(os.path.join(HERE, '..', 'dist'))
 REMOTE = '/opt/audio-dmx-engine/dist'
+# GEMENSAM ANALYSATOR (2026-09-24): vagra INNAN nagot rors pa Pi:n om analysatorn/inspelaren skiljer sig fran den gemensamma
+# (md5-manifestet src/ANALYSER_SHARED.md5, och lotus-kopian om den ar utcheckad bredvid). Se analyser_shared.py.
+sys.path.insert(0, HERE); import analyser_shared
+analyser_shared.check(os.path.normpath(os.path.join(HERE, '..', 'src')), os.path.normpath(os.path.join(HERE, '..', '..', '..', '..', 'lotus-light-link', 'pi', 'src', 'audio-analyser')), LOCAL, {'recorder.ts': 'recorder/recorder.js'})
 if not files_arg:
     # alla toppniva-js + underkatalogerna effects/ och heartbeat/ (2026-09-23: heartbeat/ ar ny - se mkdir -p nedan)
     files_arg = [f for f in os.listdir(LOCAL) if f.endswith('.js')]
-    for sub in ('effects', 'heartbeat'):
+    for sub in ('effects', 'heartbeat', 'recorder'):
         if os.path.isdir(os.path.join(LOCAL, sub)): files_arg += [sub + '/' + f for f in os.listdir(os.path.join(LOCAL, sub)) if f.endswith('.js')]
+# GEMENSAM ANALYSATOR (2026-09-24): vagra INNAN nagot rors pa Pi:n om analysatorn/inspelaren skiljer sig fran den
+# gemensamma (md5-manifestet i src/, och lotus-kopian om den ar utcheckad bredvid). Se analyser_shared.py.
+sys.path.insert(0, HERE); import analyser_shared
+analyser_shared.check(os.path.join(HERE, '..', 'src'), os.path.join(HERE, '..', '..', '..', '..', 'lotus-light-link', 'pi', 'src', 'audio-analyser'), LOCAL)
 c = paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 c.connect(HOST, username='pi', password=PW, timeout=15, look_for_keys=False, allow_agent=False)
 def run(cmd, t=300):

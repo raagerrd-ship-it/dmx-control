@@ -16,6 +16,7 @@ import { dirname, join } from "node:path";
 import { AudioCapture } from "./audio.js";
 import { BoundaryDetector } from "./boundaryDetector.js";
 import { createAnalyser, type Frame } from "./analyser.js";
+import { Recorder } from "./recorder/recorder.js";
 import { EffectEngine } from "./effects.js";
 import { DmxSender } from "./dmx.js";
 import { startServer, applyInputRouting, type Server } from "./server.js";
@@ -173,6 +174,21 @@ health.setAnalyserBudgetMs(HOP_MS);   // en hop far kosta hogst en hop-period
 // stangd med en diskontinuitetsvakt i Analyser.setAudioClockMs. Mat med
 // lotus tools/kick-ab.py-upplagget innan default vands.
 const AUDIO_CLOCK_ON = process.env.DMX_AUDIO_CLOCK === '1';
+// INSPELAREN (recorder/recorder.ts - samma fil som i lotus, bredvid analysatorn). AV i DMX; DMX_RECORDER=1 slar pa. Den far
+// samma hop som analysatorn och laser dropCount/sektion ur ramen; varje latgrans (boundaryDetector) ar en ny "lat"
+// (ladan-<n>). Fangsterna (tempo 10 s in/30 s, drop 15+15 s, max 2 per lat, ko 30) hamnar i DMX_RECORDER_DIR.
+let recorder: Recorder | null = null;
+if (process.env.DMX_RECORDER === "1") {
+  recorder = new Recorder({ dir: process.env.DMX_RECORDER_DIR || "/var/lib/audio-dmx-engine/snippets", sampleRate: cfg.audio.rate, enabled: true }, {
+    latestFrame: () => latestFrame,
+    beatInfo: () => cfg.beat ?? null,
+    isPlaying: () => Date.now() - lastChunkAt < 1000,
+    songKey: (artist, title) => (artist + "|" + title).toLowerCase().replace(/[^a-z0-9|]+/g, ""),
+  });
+  recorder.enablePreroll(true);
+  recorder.noteTrack("ladan-0", "dmx");
+  recorder.start();
+}
 capture.on("chunk", (samples: Float32Array) => {
   const t0 = performance.now();
   if (AUDIO_CLOCK_ON) analyser.setAudioClockMs(audioChunks++ * HOP_MS);
@@ -181,6 +197,7 @@ capture.on("chunk", (samples: Float32Array) => {
   health.noteSlowCall("analyser.process", anMs);
   health.noteAnalyser(anMs);   // kostnad mot hop-budgeten (avgor om DMX ocksa behover worker-delningen)
   health.noteChunk();
+  recorder?.push(samples);   // inspelaren (AV utan DMX_RECORDER=1): samma hop som analysatorn
   latestFrame = frame;
   lastChunkAt = Date.now();
 
@@ -191,7 +208,10 @@ capture.on("chunk", (samples: Float32Array) => {
   // (~5 s) och tempogrammet tillhor forra laten. DMX_BOUNDARY_SOFT: mjuk hint i st.f. hard nollstallning -
   // falska latgranser pa pop kastade tempolaset 5x/5 min (ladan 2026-09-04).
   bounds.tick({ level: frame.level, bpm: frame.bpm, bpmConfidence: frame.bpmConfidence });
-  if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; effects.softenRange(); if (process.env.DMX_BOUNDARY_SOFT) analyser.hintTrackChange(5000); else analyser.resetTempo(); }
+  if (bounds.boundaryCount !== lastBoundary) {
+    lastBoundary = bounds.boundaryCount; effects.softenRange(); if (process.env.DMX_BOUNDARY_SOFT) analyser.hintTrackChange(5000); else analyser.resetTempo();
+    if (recorder) { const name = "ladan-" + lastBoundary; recorder.noteTrack(name, "dmx"); recorder.trackChanged("dmx", name); }
+  }
 
 
   // TILLITEN KOMMER FRAN FASPREDIKTIONEN, inte fran tempogrammets form.
