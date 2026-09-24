@@ -57,7 +57,9 @@ SHOW_ENV = [
     # KVALLEN 2026-09-22 23:00-24:00 I LADAN. Varje rad nedan kommer ur ett uttalande + en matning, inte ur en gissning.
     # Filen ar sanningen: allt harunder satt fram till nu BARA som drop-ins pa Pi:n och hade forsvunnit vid nasta korning.
     ('DMX_ATTACK_MS',      '20',     'ladans utgangsattack - 90 ms smetade ut slagen ("heartbeat syns inte")'),
-    ('BEAT_MIN',           '0.30',   'pulsgolv; 0,35 var en nodlosning mot svarta dippar - DMX_FLOOR_CH ar ratt fix'),
+    ('BEAT_MIN',           '0.2',    'pulsgolv 0,2 med DEPTH_GAIN 0,8: pulsen nar botten precis vid nasta slag i st.f. att klippas och sta platt 170 ms (DMX-sond ladan 09-24: platae+ryck = "hackigt")'),
+    ('DEPTH_GAIN',         '0.8',    'djupfaktor (drop.conf 1,4 klippte pulsen i golvet); lagre faktor + lagre golv = djupare utan platae'),
+    ('DMX_BEAT_RELEASE_S', '0.3',    'hjartslagets fade ner'),
     ('LIGHT_FLOOR',        '0.25',   'GASEN: md = golv + (1-golv) x loudness. 0,45 gav bara halva vagen ("pulsar inte med energi")'),
     ('DMX_FLOOR_CH',       '40',     'SHOW-GOLV i DMX-steg = 16 %. Armaturernas tandpunkt (cal.on=16 av 255) ar 6 % och laser som slackt'),
     ('DMX_TIER_HI',        '0.55',   'FULLFART var OATKOMLIG: kravde 0,78, ladans intensitet ar 0,00-0,49, drop-snappen 0,75'),
