@@ -36,7 +36,11 @@ const INV_ATTACK_S = 1 / ATTACK_S;
 const FINAL_FADE_S = Number(process.env.DMX_FINAL_FADE_S ?? 0.12);
 /** FADE MELLAN LOOKER (agaren i ladan 2026-09-24: 'ev fade mellan dom'): vid lookbyte tonas nya looken IN over DMX_LOOK_FADE_S
  *  (smoothstep 0->1) medan den gamla bilden klingar ut med halva den tiden - bada lever (ny look med energin), inget hart klipp. 0 = av. */
-const LOOK_FADE_S = Number(process.env.DMX_LOOK_FADE_S ?? 0); // Multiplikation är snabbare än division i loopen
+const LOOK_FADE_S = Number(process.env.DMX_LOOK_FADE_S ?? 0);
+/** EFTER HUVUDTRADS-STALL (ladan 09-24, DMX-sonden: renderluckor 40-240 ms 1,6-3,4/s, 22 av 24 enramsspikar vid luckor): dtSec klampas
+ *  till 0,1 s, sa forsta ramen efter en stall fick falla 57 % = frys + ryck ned. DMX_FINAL_FADE_MAX_DT_S > 0 klampar sparrens dt sa fallet
+ *  fortsatter som fade. 0 = av. Offline med emulerade luckor (0,0075): fall >20 % efter lucka 3 010 -> 0, utan luckor identiskt (0/81 750). */
+const FINAL_FADE_MAX_DT_S = Number(process.env.DMX_FINAL_FADE_MAX_DT_S ?? 0); // Multiplikation är snabbare än division i loopen
 
 /** Minsta mörker under ljuset (DMX-steg över tändpunkten) så hjärtslaget syns även
  *  i lugna effekter. 44 ⇒ en lampa med tändpunkt 16 lyser lägst på 60. */
@@ -115,7 +119,8 @@ export class PostProcess {
     else if (FINAL_FADE_S > 0) {
       const xf = LOOK_FADE_S > 0 ? Math.min(1, (nowMs - this.lookFadeAt) / (LOOK_FADE_S * 1000)) : 1;
       const win = xf < 1 ? xf * xf * (3 - 2 * xf) : 1;
-      const fk = Math.exp(-dtSec / (xf < 1 ? Math.max(FINAL_FADE_S, LOOK_FADE_S * 0.5) : FINAL_FADE_S));
+      const fdt = FINAL_FADE_MAX_DT_S > 0 && dtSec > FINAL_FADE_MAX_DT_S ? FINAL_FADE_MAX_DT_S : dtSec;
+      const fk = Math.exp(-fdt / (xf < 1 ? Math.max(FINAL_FADE_S, LOOK_FADE_S * 0.5) : FINAL_FADE_S));
       for (let ch = 0; ch < maxCh; ch++) {
         if (out.direct[ch]) { this.finalOut[ch] = universe[ch]; continue; }
         const held = this.finalOut[ch] * fk, v = universe[ch] * win;
