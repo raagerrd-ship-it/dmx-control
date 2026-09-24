@@ -44,6 +44,8 @@ export class PostProcess {
     /** Ballistikens buffert — per kanal, i flyttal så decayn inte kvantiseras bort. */
     smooth = new Float32Array(512);
     finalOut = new Float32Array(512);
+    /** LUGN MJUKHET (DMX_CALM_FADE_S): effektmotorn satter langre attack i lugna partier; standard = ATTACK_S. */
+    attackS = ATTACK_S;
     lookFadeAt = -1e9; // DMX_LOOK_FADE_S: tid for senaste lookbyte
     lookChanged(nowMs) { if (LOOK_FADE_S > 0)
         this.lookFadeAt = nowMs; } // SISTA FADE-SPARREN (se FINAL_FADE_S)
@@ -52,7 +54,7 @@ export class PostProcess {
         // 1. BALLISTIK: mjuk attack, oförändrad decay (peak-hold). En 1-frames-spik når
         //    bara en bit och klingar sen. Specialroller (strobe/hazer/…) hoppar över —
         //    en 255 som tonar nedåt skulle få strobe att fara mellan takter.
-        const att = 1 - Math.exp(-dtSec * INV_ATTACK_S);
+        const att = 1 - Math.exp(-dtSec * (this.attackS > ATTACK_S ? 1 / this.attackS : INV_ATTACK_S));
         for (let ch = 0; ch < maxCh; ch++) {
             if (out.direct[ch]) {
                 this.smooth[ch] = universe[ch];

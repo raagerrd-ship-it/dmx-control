@@ -319,6 +319,7 @@ const ENERGY_RISE_DEAD = Number(process.env.DMX_ENERGY_RISE_DEAD ?? 0.06);
  *  uppat-puls (anslag ELLER energistigning) far starta hogst en gang per DMX_PULSE_GAP_MS - delad grind for bada. En pagaende
  *  stigning far fortsatta. 0 = av (anslagen har da bara ENERGY_FB_GAP_MS, stigningen ingen grind). */
 const PULSE_GAP_MS = Number(process.env.DMX_PULSE_GAP_MS ?? 0);
+const CALM_FADE_S = Number(process.env.DMX_CALM_FADE_S ?? 0);   // se 'LUGNA PARTIER = MJUKA OVERGANGAR'
 const BEAT_TRUST_FLOOR = 0.75;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 
 export class EffectEngine {
@@ -341,7 +342,7 @@ export class EffectEngine {
   private showTime = 0;      // ackumulerad "show-tid" — accelererar under uppbyggnaden (riser)
   private lastShowMs = 0;
   private lastKickBoost = 0;
-  private transEnv = 0; private transAt = 0; private pulseAt = -1e9; private riseOn = false;   // DMX_PULSE_GAP_MS   // ENERGY_FB: transientpuls (bred onset) med avklingning
+  private transEnv = 0; private transAt = 0; private pulseAt = -1e9; private riseOn = false; private calmW = 0;   // DMX_PULSE_GAP_MS   // ENERGY_FB: transientpuls (bred onset) med avklingning
   private lockGood = 0; private lockBpmRef = 0; private lockRamp = 1; private transAct = 0; private trustLowSince = 0; private heardW = 1; private loudSlow = 0;   // lotus-porten (se LOCK_BEATS)
   private beatW = 1;                            // ENERGY_FB: taktens vikt 0..1 (1 = last)
   private showVel = 0;       // extra show-tids-hastighet från bastransienter (akustisk tröghet)
@@ -1871,7 +1872,15 @@ export class EffectEngine {
     // transient); låg energi → lång decay (mjuk andande wash). Utnyttjar diodernas
     // snabba respons — skarpt utan hårdvaru-strobe.
     const sharpen = Math.min(0.65, audio * 0.45 + frame.buildUp * 0.5);   // 0 lugnt .. 0.65 energiskt
-    const tau = Math.max(FADE_MIN_S, (fastMode ? fastTau : (this.cfg.calmDecay ?? 0.42)) * (1 - sharpen));
+    let tau = Math.max(FADE_MIN_S, (fastMode ? fastTau : (this.cfg.calmDecay ?? 0.42)) * (1 - sharpen));
+    // LUGNA PARTIER = MJUKA OVERGANGAR (ladan 2026-09-24 23:25: 'i lugna perioden hade man onskat mer smooth fade mellan ljusen'):
+    // i low/break/intro (ej drop) glider attack och fade ut mot DMX_CALM_FADE_S - stegen mellan lamporna tonar i stallet for att klippas.
+    if (CALM_FADE_S > 0) {
+      const sec = frame.section; const want = (sec === 'low' || sec === 'break' || sec === 'intro') && this.dropEnv < 0.2 ? 1 : 0;
+      this.calmW += (want - this.calmW) * Math.min(1, dtSec / (want ? 1.5 : 0.4));   // in mjukt, ut snabbt (refrangen ska sla direkt)
+      tau = Math.max(tau, CALM_FADE_S * this.calmW);
+      this.post.attackS = Math.max(0.001, CALM_FADE_S * 0.5 * this.calmW);
+    }
     const decay = Math.exp(-dtSec / tau);
     // Bygg strobe-masken bara när fixtures ändras (inte varje frame).
     this.out.build(this.cfg.fixtures);
