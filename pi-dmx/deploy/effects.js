@@ -221,6 +221,8 @@ const SECTION_CONTRAST = process.env.DMX_SECTION_CONTRAST === '1' || process.env
 const SECTION_RANK = process.env.DMX_SECTION_CONTRAST === 'rank';
 const RANK_LOW = Number(process.env.DMX_SECTION_RANK_LOW ?? 0.5);
 const RANK_POW = Number(process.env.DMX_SECTION_RANK_POW ?? 1);
+/** Rang dar full niva nas (ladan 09-24: 'knappt heart-beat eller energi' - linjart over hela rangen sankte aven refrangerna till ~0,6). 0,5 = ovre halvan full, bara undre dampas. */
+const RANK_KNEE = Math.max(0.1, Number(process.env.DMX_SECTION_RANK_KNEE ?? 0.5));
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
 const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10); // lotus windowDb 10
 const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 4.5); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
@@ -1810,7 +1812,7 @@ export class EffectEngine {
                 }
                 this.rkRank = r / 3;
             }
-            const rr = Math.pow(Math.max(0, Math.min(1, this.rkRank)), RANK_POW);
+            const rr = Math.pow(Math.max(0, Math.min(1, this.rkRank / RANK_KNEE)), RANK_POW);
             dynGain = RANK_LOW + (1 + SECTION_HIGH_LIFT - RANK_LOW) * rr;
         }
         if (SECTION_CONTRAST) {
