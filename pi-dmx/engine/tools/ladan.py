@@ -61,6 +61,7 @@ SHOW_ENV = [
     ('DEPTH_GAIN',         '0.8',    'djupfaktor (drop.conf 1,4 klippte pulsen i golvet); lagre faktor + lagre golv = djupare utan platae'),
     ('DMX_BEAT_RELEASE_S', '0.3',    'hjartslagets fade ner'),
     ('DMX_ENERGY_ONLY',    '1',      'BARA ENERGI: heart-beat-rastret av, anslag+stigning med fullt djup (agaren 09-24, lotus i kallaren "nice")'),
+    ('DMX_LIVE_ANCHOR_DROP_DB', '4',  'tyst lat = tystare ljus: nivaankaret max 4 dB under senaste hoga laten (ladan 09-24 22:30)'),
     ('DROP_CALM_INTRO_STRICT', '1',  'ingen drop i intro utan riser (ladan 09-24)'),
     ('LIGHT_FLOOR',        '0.25',   'GASEN: md = golv + (1-golv) x loudness. 0,45 gav bara halva vagen ("pulsar inte med energi")'),
     ('DMX_FLOOR_CH',       '40',     'SHOW-GOLV i DMX-steg = 16 %. Armaturernas tandpunkt (cal.on=16 av 255) ar 6 % och laser som slackt'),

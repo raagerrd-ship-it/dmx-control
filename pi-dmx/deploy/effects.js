@@ -234,6 +234,10 @@ const LIVE_ANCHOR_S = Number(process.env.LIVE_ANCHOR_S ?? 120); // lotus autoAnc
 const LIVE_RELEASE_MS = Number(process.env.LIVE_RELEASE_MS ?? 350);
 const LIVE_BASS_W = Number(process.env.LIVE_BASS_W ?? 0.25); // lotus: mid/diskant 1,3 + bas 0,25 -> har som blandning
 const LIVE_TRACE = process.env.DMX_LIVE_TRACE === '1';
+/** TYST LAT = TYST LJUS (ladan 2026-09-24 22:30: 'laten ar ganska tyst och den kor ganska ljust'): ankaret ar relativt, sa en tyst lat blev
+ *  'det nya normala' och lika ljus som en hog. Ankaret far inte sjunka mer an LIVE_ANCHOR_DROP_DB under det hogsta ankaret pa sistone
+ *  (toppen glider ner 0,005 dB/s = 6 dB pa 20 min). 0 = av. Efter omstart ar toppen forsta latens niva tills en hogre lat kommer. */
+const LIVE_ANCHOR_DROP_DB = Number(process.env.DMX_LIVE_ANCHOR_DROP_DB ?? 0);
 const LIGHT_SHAPE_UP = 60;
 const LIGHT_SHAPE_DOWN = 120;
 const LIGHT_REL_A = 0.396; // log-release-alpha
@@ -395,6 +399,7 @@ export class EffectEngine {
     preDropLevel = 0;
     preDropTier = 0; // senaste drop -> 'high'-pool i 20 s
     liveAnchor;
+    liveAnchorMax;
     liveFastUntil = 0;
     liveClipMs = 0;
     liveShapeRaw = 0.5;
@@ -1722,6 +1727,11 @@ export class EffectEngine {
                 const quietSec = frame.section === 'low' || frame.section === 'break';
                 const a = 1 - Math.exp(-dtMs / (fast ? tauMs / 10 : up ? tauMs * 3 : quietSec ? tauMs * 2 : tauMs));
                 this.liveAnchor += a * (wdb - this.liveAnchor);
+                if (LIVE_ANCHOR_DROP_DB > 0) {
+                    this.liveAnchorMax = this.liveAnchorMax === undefined || this.liveAnchor > this.liveAnchorMax ? this.liveAnchor : this.liveAnchorMax - dtMs * 0.005 / 1000;
+                    if (this.liveAnchor < this.liveAnchorMax - LIVE_ANCHOR_DROP_DB)
+                        this.liveAnchor = this.liveAnchorMax - LIVE_ANCHOR_DROP_DB;
+                }
                 const top = this.liveAnchor + LIVE_OFFSET_DB;
                 let sh = (wdb - (top - LIVE_WIN_DB)) / LIVE_WIN_DB;
                 sh = sh < 0 ? 0 : sh > 1 ? 1 : sh;
