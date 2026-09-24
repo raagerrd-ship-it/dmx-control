@@ -261,6 +261,12 @@ const LOCK_ERR = Number(process.env.DMX_BEAT_LOCK_ERR ?? 0.10);
 const ENERGY_FB_GAP_MS = Number(process.env.DMX_ENERGY_FB_GAP_MS ?? 330);
 const ENERGY_ACT_REF = Number(process.env.DMX_ENERGY_ACT_REF ?? 0.25);
 const SYNC_ERR_FRAC = Number(process.env.DMX_SYNC_ERR_FRAC ?? 0.2);
+/** PORTAT FRAN LOTUS 2026-09-24 (agaren i kallaren, ogonbedomt): (6) PAUSA RASTRET UTAN HORD TAKT - ingen kick pa DMX_BEAT_QUIET_BEATS
+ *  slag (minst 2 s) -> rastrets vikt tonas ut pa 0,8 s (anslagen pulsar kvar = energilaget, inget blink pa fantomtakt i break), in pa 0,2 s.
+ *  (7) ENERGI DIREKT - stigande loudness mot sitt eget ~0,4 s-medel raknas som puls direkt (DMX_ENERGY_RISE_K, 0 = av), sa riggen
+ *  ljusnar nar laten lyfter i stallet for forst pa nasta slag. */
+const BEAT_QUIET_BEATS = Number(process.env.DMX_BEAT_QUIET_BEATS ?? 4);
+const ENERGY_RISE_K = Number(process.env.DMX_ENERGY_RISE_K ?? 3);
 const BEAT_TRUST_FLOOR = 0.75; // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 export class EffectEngine {
     cfg;
@@ -289,7 +295,9 @@ export class EffectEngine {
     lockBpmRef = 0;
     lockRamp = 1;
     transAct = 0;
-    trustLowSince = 0; // lotus-porten (se LOCK_BEATS)
+    trustLowSince = 0;
+    heardW = 1;
+    loudSlow = 0; // lotus-porten (se LOCK_BEATS)
     beatW = 1; // ENERGY_FB: taktens vikt 0..1 (1 = last)
     showVel = 0; // extra show-tids-hastighet från bastransienter (akustisk tröghet)
     pendingKick = 0; // ackumulerade kick-impulser sedan förra rendern (fylls i 375 Hz)
@@ -851,6 +859,7 @@ export class EffectEngine {
             let w = (beat && beat.bpm > 40) ? Math.max(0, Math.min(1, (this.beatTrust - LIVE_TRUST_LO) / (LIVE_TRUST_HI - LIVE_TRUST_LO))) : 0;
             let fb = LIVE_BEAT ? liveEnv : 0;
             let depthEff = depth;
+            let riseNow = 0;
             if (ENERGY_FB) {
                 // (1) LAS PA RENA SLAG: raknas per slag (beatTick), tempobyte > 3 % nollar
                 const bpmNow = (beat && beat.bpm > 40) ? beat.bpm : 0;
@@ -872,6 +881,15 @@ export class EffectEngine {
                 // (2) rastrets vikt: tillit x bevis, 0 under 0,35 och fullt fran 0,65 -> ingen dubbelpuls i energilaget
                 const wRaw = w * this.lockRamp;
                 w = Math.max(0, Math.min(1, (wRaw - 0.35) / 0.3));
+                // (6) hord takt: ingen kick pa BEAT_QUIET_BEATS slag -> rastret tonas ut (anslagen kvar)
+                {
+                    const pnQ = performance.now();
+                    const bmsQ = bpmNow > 0 ? 60000 / bpmNow : 500;
+                    const quiet = BEAT_QUIET_BEATS > 0 && pnQ - this.lastKickBoost > Math.max(2000, BEAT_QUIET_BEATS * bmsQ);
+                    const dtQ = Math.min(0.05, Math.max(0.005, (pnQ - this.lastRenderMs) / 1000)) * 1000;
+                    this.heardW += ((quiet ? 0 : 1) - this.heardW) * Math.min(1, dtQ / (quiet ? 800 : 200));
+                }
+                w *= this.heardW;
                 // (3) bred transient: bas/kick/diskant-onset -> puls med avklingning, hogst en per ENERGY_FB_GAP_MS
                 const o = frame.onset;
                 const on = o ? Math.max(o.bass ?? 0, o.kick ?? 0, o.treble ?? 0) : 0;
@@ -887,9 +905,19 @@ export class EffectEngine {
                 this.transAct += (tEnv - this.transAct) * Math.min(1, dtA / 1.5);
                 const act = Math.min(1, this.transAct / Math.max(0.02, ENERGY_ACT_REF));
                 depthEff = depth * (w + (1 - w) * act);
+                // (7) energi direkt: stigande loudness (forra ramens lightLoud) mot ~0,4 s-medel = omedelbar puls
+                if (ENERGY_RISE_K > 0) {
+                    this.loudSlow = this.loudSlow <= 0 ? this.lightLoud : this.loudSlow + (this.lightLoud - this.loudSlow) * Math.min(1, dtA / 0.4);
+                    const rise = this.loudSlow > 0.02 ? Math.max(0, Math.min(1, (this.lightLoud / this.loudSlow - 1) * ENERGY_RISE_K)) : 0;
+                    riseNow = rise;
+                    if (rise > 0)
+                        depthEff = Math.max(depthEff, depth * rise);
+                }
             }
             this.beatW = w;
             hbEnv = w * beatEnv + (1 - w) * fb;
+            if (riseNow > hbEnv)
+                hbEnv = riseNow; // (7) energin lyfter direkt aven nar rastret ar last
             depth = depthEff;
         }
         const bm = this.cfg.beatPulse ? (1 - depth) + depth * hbEnv : 1;

@@ -157,3 +157,7 @@ saknas an for ladan). Nya filer pa Pi:n: tempoTracker.js, analyserProfile.js, re
 - (09-24) LOTUS-PORTARNA ingar nu i ladan.py SHOW_ENV (tempoval, kickar, gridfas, UP43, fasoffset 15) - nasta `python tools\ladan.py` slar pa dem.
   Bank pa ladans mixklipp: tempo 15->18/21, kick-recall 0,30->0,86, puls pa slaget 0,34->0,90. Ogat: takten ska sitta battre; blir
   showen "dod" ta bort raderna i SHOW_ENV (09-22-tillbakarullningen berodde pa DMX_LIVE_LEVEL, som fortsatt ar AV).
+- (09-24 em) Fran lotus (ogonbedomt i kallaren): PAUSA RASTRET UTAN HORD TAKT (ingen kick pa 4 slag / 2 s -> rasterpulsen tonas ut, anslagen
+  pulsar kvar = inget blink pa fantomtakt i break; DMX_BEAT_QUIET_BEATS, 0 = av) och ENERGI DIREKT (stigande loudness = omedelbar puls,
+  DMX_ENERGY_RISE_K 3, 0 = av). Bank (hbDump med kickar + stabilt ankare som motorn): last 73-80 % av tiden, ingen paus pa mixarna (kickar hela
+  tiden). Ogat i ladan: break utan trummor ska inte blinka i gammal takt.
