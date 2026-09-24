@@ -296,6 +296,10 @@ const BEAT_QUIET_BEATS = Number(process.env.DMX_BEAT_QUIET_BEATS ?? 4);
 const ENERGY_RISE_K = Number(process.env.DMX_ENERGY_RISE_K ?? 3);
 /** Dodzon (ladan 09-24: 'mikrofladder' med K 3, 'betydligt mindre dynamiska' med K 0): stigningar under DMX_ENERGY_RISE_DEAD (6 %) ignoreras. */
 const ENERGY_RISE_DEAD = Number(process.env.DMX_ENERGY_RISE_DEAD ?? 0.06);
+/** GRIND PA STIGANDE LJUS (agaren i ladan 2026-09-24: 'nu nar vi kor bara pa energi, lagg till gaten igen pa kanske 250 ms'): en ny
+ *  uppat-puls (anslag ELLER energistigning) far starta hogst en gang per DMX_PULSE_GAP_MS - delad grind for bada. En pagaende
+ *  stigning far fortsatta. 0 = av (anslagen har da bara ENERGY_FB_GAP_MS, stigningen ingen grind). */
+const PULSE_GAP_MS = Number(process.env.DMX_PULSE_GAP_MS ?? 0);
 const BEAT_TRUST_FLOOR = 0.75; // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 export class EffectEngine {
     cfg;
@@ -319,7 +323,9 @@ export class EffectEngine {
     lastShowMs = 0;
     lastKickBoost = 0;
     transEnv = 0;
-    transAt = 0; // ENERGY_FB: transientpuls (bred onset) med avklingning
+    transAt = 0;
+    pulseAt = -1e9;
+    riseOn = false; // DMX_PULSE_GAP_MS   // ENERGY_FB: transientpuls (bred onset) med avklingning
     lockGood = 0;
     lockBpmRef = 0;
     lockRamp = 1;
@@ -935,9 +941,10 @@ export class EffectEngine {
                 const o = frame.onset;
                 const on = o ? Math.max(o.bass ?? 0, o.kick ?? 0, o.treble ?? 0) : 0;
                 const pn = performance.now();
-                if (on >= ENERGY_FB_ONSET && pn - this.transAt >= ENERGY_FB_GAP_MS && on >= this.transEnv * Math.exp(-(pn - this.transAt) / LIVE_BEAT_MS)) {
+                if (on >= ENERGY_FB_ONSET && pn - this.transAt >= ENERGY_FB_GAP_MS && pn - this.pulseAt >= PULSE_GAP_MS && on >= this.transEnv * Math.exp(-(pn - this.transAt) / LIVE_BEAT_MS)) {
                     this.transEnv = on;
                     this.transAt = pn;
+                    this.pulseAt = pn;
                 }
                 const tEnv = this.transEnv * Math.exp(-Math.max(0, pn - this.transAt) / LIVE_BEAT_MS);
                 fb = Math.max(fb, tEnv);
@@ -949,7 +956,19 @@ export class EffectEngine {
                 // (7) energi direkt: stigande loudness (forra ramens lightLoud) mot ~0,4 s-medel = omedelbar puls
                 if (ENERGY_RISE_K > 0) {
                     this.loudSlow = this.loudSlow <= 0 ? this.lightLoud : this.loudSlow + (this.lightLoud - this.loudSlow) * Math.min(1, dtA / 0.4);
-                    const rise = this.loudSlow > 0.02 ? Math.max(0, Math.min(1, (this.lightLoud / this.loudSlow - 1 - ENERGY_RISE_DEAD) * ENERGY_RISE_K)) : 0;
+                    let rise = this.loudSlow > 0.02 ? Math.max(0, Math.min(1, (this.lightLoud / this.loudSlow - 1 - ENERGY_RISE_DEAD) * ENERGY_RISE_K)) : 0;
+                    if (PULSE_GAP_MS > 0) {
+                        if (rise <= 0)
+                            this.riseOn = false;
+                        else if (!this.riseOn) {
+                            if (pn - this.pulseAt >= PULSE_GAP_MS) {
+                                this.riseOn = true;
+                                this.pulseAt = pn;
+                            }
+                            else
+                                rise = 0;
+                        }
+                    }
                     riseNow = rise;
                     if (rise > 0)
                         depthEff = Math.max(depthEff, depth * rise);
