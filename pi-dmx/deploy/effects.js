@@ -211,6 +211,10 @@ const EXPECT_LEAD_MS = Math.max(0, Number(process.env.DMX_EXPECT_LEAD_MS ?? 600)
 const EXPECT_LIFT_MS = Math.max(0, Number(process.env.DMX_EXPECT_LIFT_MS ?? 3000) || 0);
 const SECTION_DYN_DB = Math.max(0, Number(process.env.DMX_SECTION_DYN_DB ?? 12) || 0);
 const SECTION_DYN_FLOOR = Math.min(1, Math.max(0.1, Number(process.env.DMX_SECTION_DYN_FLOOR ?? 0.5) || 0.5));
+/** SEKTIONSKONTRAST (2026-09-24, drejboken: refrang 37 mot vers 33 i 3 av 4 poplatar; opt-in DMX_SECTION_CONTRAST=1): pa komprimerad PA
+ *  ar levelVsHighDb nara 0, sa dynamiken ersatte de fasta dipparna med ~1,0. Nu galler den STARKARE av fast dipp och dynamik, refrangen far
+ *  sitt lyft alltid (inte bara tier 2), och gainen glider (~1,2 s) i stallet for att hoppa vid sektionsbyten. */
+const SECTION_CONTRAST = process.env.DMX_SECTION_CONTRAST === '1';
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
 const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10); // lotus windowDb 10
 const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 4.5); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
@@ -469,6 +473,7 @@ export class EffectEngine {
     post = new PostProcess();
     maxCh = 0; // högsta använda kanal + 1
     smartCount = 0;
+    secGainSm = 0; // SECTION_CONTRAST: glidande sektionsgain
     recentLooks = []; // MIX_V2: de senast valda lookerna (nyhetsstraff)
     unitSlot = 0;
     unitPhraseDone = -1; // FRASVAXLING: look A/B och senaste frasnummer som bytts pa
@@ -938,7 +943,7 @@ export class EffectEngine {
         // ladan 2026-09-03). 0.30 gör slaget till en tydlig ANDNING (30→100 %), inte
         // ett strobe-dropp. Hjärtslaget syns UPPÅT mot den nu dynamiska grundnivån.
         const bmClamped = bm < BEAT_MIN ? BEAT_MIN : bm > 1 ? 1 : bm;
-        const bmDt = Math.min(0.05, (performance.now() - this.lastRenderMs) / 1000);
+        const bmDt = Math.max(0, Math.min(0.05, (performance.now() - this.lastRenderMs) / 1000));
         if (bmClamped >= this.beatMulNow)
             this.beatMulNow = bmClamped; // momentan attack
         else
@@ -996,7 +1001,7 @@ export class EffectEngine {
         // jämför mot vårt senast hanterade värde → flanken kan ALDRIG missas trots att
         // rendern går långsammare än analysen (en enframs-boolean hade aliaserats bort).
         // Här ligger bara show-REAKTIONEN: accent-fönster, blackout, rök, envelope.
-        const dtNow = Math.min(0.1, (performance.now() - this.lastRenderMs) / 1000);
+        const dtNow = Math.max(0, Math.min(0.1, (performance.now() - this.lastRenderMs) / 1000)); // aldrig negativt (klockhopp; banker som byter klocka efter konstruktion gav NaN i nivan)
         let dropHitRaw = frame.dropCount !== this.lastDropCount;
         this.lastDropCount = frame.dropCount;
         // Snapp: dropHit (show-reaktionen) flyttas till nasta slag om det ar nara; roken (wantBurst) tar dropHitRaw.
@@ -1747,18 +1752,25 @@ export class EffectEngine {
         // high x(1+LIFT) nar tiern ar topp. Analysatorns sektion ar latens egen rangordning, sa ett lugnare parti BLIR morkare
         // oavsett hur komprimerad mixen ar. Efter drop (afterDrop-fonstret) galler high.
         const secNow = (now - this.lastDropSwitchMs < 20_000) ? 'high' : frame.section;
-        const secGain = SECTION_SWITCH ? (secNow === 'high' ? ((frame.sectionTier ?? 0) >= 2 || now - this.lastDropSwitchMs < 20_000 ? 1 + SECTION_HIGH_LIFT : 1)
+        const secGain = SECTION_SWITCH ? (secNow === 'high' ? (SECTION_CONTRAST || (frame.sectionTier ?? 0) >= 2 || now - this.lastDropSwitchMs < 20_000 ? 1 + SECTION_HIGH_LIFT : 1)
             : secNow === 'break' ? 1 - SECTION_BREAK_DIP : (secNow === 'low' || secNow === 'intro') ? 1 - SECTION_LOW_DIP : 1) : 1;
         let dynGain = secGain;
         if (SECTION_SWITCH) {
             const lv = frame.levelVsHighDb ?? 0, ex = frame.expectHighInMs ?? -1;
-            if (SECTION_DYN_DB > 0 && lv !== 0 && secNow !== 'high')
-                dynGain = Math.max(SECTION_DYN_FLOOR, Math.min(1, 1 + lv / SECTION_DYN_DB)); // latens egen referens
+            if (SECTION_DYN_DB > 0 && lv !== 0 && secNow !== 'high') {
+                const dg = Math.max(SECTION_DYN_FLOOR, Math.min(1, 1 + lv / SECTION_DYN_DB));
+                dynGain = SECTION_CONTRAST ? Math.min(secGain, dg) : dg;
+            } // latens egen referens (CONTRAST: starkaste dampningen)
             if (EXPECT_LIFT_MS > 0 && ex > 0 && ex <= EXPECT_LIFT_MS) {
                 const l = 1 - ex / EXPECT_LIFT_MS;
                 dynGain += (1 + SECTION_HIGH_LIFT - dynGain) * l;
             } // riser mot refrangen
         }
+        if (SECTION_CONTRAST) {
+            const a = Math.min(1, dtSec / 1.2);
+            this.secGainSm = this.secGainSm <= 0 ? dynGain : this.secGainSm + (dynGain - this.secGainSm) * a;
+            dynGain = this.secGainSm;
+        } // glid mellan sektioner
         const md = SECTION_SWITCH ? Math.min(1.2, md0 * dynGain) : md0; // standard: orort
         // HEARTBEAT: envelopen (kontraktet). ceiling = md utan tystnadsgrinden (drive), som appliceras separat pa ALLA effekter.
         const hbPulse = (this.cfg.beatPulse && this.beatMulNow > BEAT_MIN) ? Math.min(1, (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN)) : 0;

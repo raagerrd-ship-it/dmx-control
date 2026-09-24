@@ -164,3 +164,6 @@ saknas an for ladan). Nya filer pa Pi:n: tempoTracker.js, analyserProfile.js, re
 - (09-24 em) FRASVAXLING i sektionslaget: looken byts var 8:e takt inom en sektion (DMX_SECTION_UNIT_PHRASE_BARS, 0 = av) och varje
   sektionstyp har tva looker A/B som alternerar - refrangen kommer tillbaka med samma par. Drejbok: tools/showStory.mjs (per lat: sektioner,
   looker, ljus, takt/energi, drops). Pop-mixen: looken byts nu var ~15 s i stallet for att sta 50-60 s.
+- (09-24 kvall) SEKTIONSKONTRAST (DMX_SECTION_CONTRAST=1: starkaste av fast dipp och dynamik, refranglyft alltid, glid 1,2 s) och TIDIG REFRANG
+  KRAVER NIVA (DMX_SECTION_EARLY_S=45, gemensam analysator) i SHOW_ENV. Drejbok pop, medelljus refrang/vers: 0,87 -> 1,55, 1,80 -> 2,83, 3,67 -> 4,75
+  (lat 3 2,00 -> 1,40, mork overlag). Motorn: tidssteget kan inte bli negativt (bankerna fick NaN i nivan av det - matfalla 37).

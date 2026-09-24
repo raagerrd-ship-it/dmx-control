@@ -17,7 +17,7 @@ for (let off = 0; off + HOP <= n && off < SECS * SR; off += HOP) {
   if (bounds.boundaryCount !== lastB) { lastB = bounds.boundaryCount; eng.softenRange(); if (process.env.DMX_BOUNDARY_SOFT) an.hintTrackChange(5000); else an.resetTempo(); }
   if (fr.kick) eng.registerKick(0.4 + Math.min(1, fr.energy * 1.4) * 0.6);
   if (fr.bpm > 0) { if (!cfg.beat || Math.abs(cfg.beat.bpm / fr.bpm - 1) > 0.03) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence }; else cfg.beat.confidence = fr.bpmConfidence; }
-  if (ms - last >= 25) { last = ms; const o = eng.render(fr); let v = 0; for (let i = 0; i < 32; i++) if (o[i] > v) v = o[i]; rows.push({ t: tNow, look: eng.activeMode || eng.smartMode, sec: fr.section, lvl: 100 * v / 255, bw: eng.beatW ?? 1, bpm: fr.bpm, lvh: fr.levelVsHighDb ?? 0 }); }
+  if (ms - last >= 25) { last = ms; const o = eng.render(fr); let v = 0; for (let f = 0; f < 4; f++) v += Math.max(o[f * 7], o[f * 7 + 1], o[f * 7 + 2]); rows.push({ t: tNow, look: eng.activeMode || eng.smartMode, sec: fr.section, lvl: 100 * v / 4 / 255, bw: eng.beatW ?? 1, bpm: fr.bpm, lvh: fr.levelVsHighDb ?? 0 }); }
 }
 console.log = origLog;
 // latgranser ur loggen
