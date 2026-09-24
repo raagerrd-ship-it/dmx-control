@@ -147,3 +147,10 @@ bade fore och efter - KOLLA MED OGAT om pop-rastret gar dubbelt). Deploy: `pytho
   slacks < 15 %), inte efter absolut niva - byter bara nar fargen andras, aldrig nar ljuset pulserar; tand kanal halls pa minst
   tandpunkten. Test (fast orange, puls 25-160 DMX, 10 s): gron kanal av/pa 40 -> 0 ganger vid andel 0,2 och 0,35. Ogat: flimmer vid
   slackgransen borta? blir nagon farg for "platt" (andelar under 25 % blir rena)? Rattar DMX_HUE_RATIO_ON/OFF.
+
+## ENAD ANALYSATOR (2026-09-24) - samma analysator som lotus, ingen beteendeandring
+analyser/split/slowWorker/tempoTracker + recorder/recorder.js ar nu SAMMA filer som i lotus-light-link; systemskillnaderna ligger i
+analyserProfile.js (DMX-profil). Paritet mot forra DMX-analysatorn: 0 avvikande ramar och dropfyrningar pa ladans bada mixar med ladans env
+(450 000 hop), aven via delad analysator och med latbyten. deploy-dist.py vagrar deploya om de gemensamma filerna skiljer mot md5-manifestet
+eller mot lotus-repot bredvid. Inspelaren ar AV (DMX_RECORDER=1 slar pa; fangsterna hamnar i /var/lib/audio-dmx-engine/snippets - PC-hamtningen
+saknas an for ladan). Nya filer pa Pi:n: tempoTracker.js, analyserProfile.js, recorder/recorder.js.

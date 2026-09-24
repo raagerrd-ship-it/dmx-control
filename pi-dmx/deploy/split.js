@@ -1,52 +1,39 @@
 /**
- * DELAD ANALYSATOR (portad fran lotus-light 2026-09-22, dar den ar i drift sedan 09-21):
- * transporten mellan den SNABBA tradens ljudvag (FFT, band, onset, kick, niva, drop - maste svara
- * inom en hop) och den LANGSAMMA analysen (tempo, gridfas, sektion - sekunder ar ok). Den langsamma
- * kor i en worker_threads-Worker med egen V8-heap och egen karna, sa dess berakningar och
- * skrapsamling aldrig ligger i vagen for hop-loopen.
+ * DELAD ANALYSATOR (2026-09-21): transporten mellan den SNABBA tråden (ljudvägen: FFT, band,
+ * onset, kick, nivå, drop — måste svara inom en hop) och den LÅNGSAMMA (tempo, gridfas,
+ * sektioner, upprepning — sekunder är ok). Den långsamma kör i en worker_threads-Worker
+ * med egen V8-heap och egen kärna, så dess beräkningar och skräpsamling aldrig ligger i
+ * vägen för hop-loopen och ticken. Ägarens fråga: "dela upp analysatorn och lägga en del
+ * på egen cpu som löpande försöker förstå vilken sektion vi är i samt build-up".
  *
- * VARFOR HAR: DMX-motorn mater 15,6 % av hoppen over budget (0,99 ms snitt, toppar 235 ms mot
- * budgeten 2,67 ms vid hop 128 / 48 kHz). Det ar precis computeBpm (~470 us, scoreEnv 2 x 201 us)
- * plus sektionsblocket som ligger i vagen - alltsa just det som flyttas har. Lotus matte
- * process() 820 -> 476 us och over budget 615 -> 187 nar delningen slogs pa.
+ * Snittet (kartlagt med fältanalys av analyser.ts): computeBpm/computeGridPhase läser bara
+ * 100 Hz-ringarna (helband + bas) plus sin egen tid; sectionHop läser blocksummor per hop
+ * (intensitet, kickar, rms², centroid, bandAbs) plus dropCount/activeMs/buildUp. Tillbaka
+ * går ~12 tal: bpm, konfidens, gridfas, sektion, upprepning.
  *
- * Snittet (kartlagt i dmx-analysatorn): computeBpm/computeGridPhase laser bara 100 Hz-ringarna
- * (helband + bas + diskant-diagnosringen) plus sin egen tid; sectionHop laser blocksummor per hop
- * (intensitet, kickar, rms^2, centroid, bandAbs) plus dropCount/activeMs/buildUp. Tillbaka gar
- * ~16 tal: bpm, konfidens, gridfas, sektion, forutsagelse, upprepning.
- *
- * Transport: en SharedArrayBuffer-ring med ett RECORD per env-sampel (100 Hz, 30 doubles) skrivet av
- * den snabba traden, och ett TILLSTANDSBLOCK (seqlock) skrivet av den langsamma. Inga meddelanden i
- * driftvagen, ingen allokering, ingen kopiering. Kommandon (tystnadsnollning, resetTempo,
- * latbyteshint, virtuell klocka) aker som flaggor I recordet, sa ordningen mot ljuddata bevaras
- * exakt - det gor att inline-laget (bada i samma trad, se createAnalyser i analyser.ts) ger
- * BIT-IDENTISKT tempo mot den odelade analysatorn, vilket tools/splitProof.mjs bevisar.
- *
- * SKILLNADER MOT LOTUS-FORLAGAN (medvetna, inte slarv):
- *   - R_HIGH: dmx har en diskantring (envHighRing, DMX_HIGH_DIAG/DMX_HIGH_VOTE) som lotus saknar.
- *     Den bars med i recordet sa prototyp-rosten inte tyst tappas i delat lage.
- *   - Ingen F_RESET_BAR: i dmx lever barAcc/barCount BARA i den snabba hop-vagen (taktfasen,
- *     barShift). resetBar() har alltsa ingen langsam sida att meddela.
- *   - Inget S_BPMF: dmx har ingen finupplost localBpmF.
+ * Transport: en SharedArrayBuffer-ring med ett RECORD per env-sampel (100 Hz, ~26 doubles)
+ * skrivet av den snabba tråden, och ett TILLSTÅNDSBLOCK (seqlock) skrivet av den långsamma.
+ * Inga meddelanden i driftvägen, ingen allokering, ingen kopiering. Kommandon (tystnads-
+ * nollning, resetTempo, låtbyteshint, virtuell klocka) åker som flaggor I recordet, så
+ * ordningen mot ljuddata bevaras exakt — det gör att inline-läget (båda i samma tråd, se
+ * createAnalyser) ger BIT-IDENTISKT tempo mot den odelade analysatorn, vilket körbänken bevisar.
  */
-export const REC_LEN = 30;
-export const RING_N = 1024; // ~10 s vid 100 Hz - workern far ligga efter utan att tappa
-export const RING_MARGIN = 8; // records workern lamnar ororda mot skrivaren (80 ms) - las aldrig narmare kanten
-// Record-falt (Float64)
-export const R_SEQ = 0, R_PERF = 1, R_WALL = 2, R_ENV = 3, R_BASS = 4, R_HIGH = 5, R_FLAGS = 6, R_HINT_MS = 7, R_VCLOCK = 8, R_SEC_N = 9, R_SEC_INT = 10, R_SEC_KICKS = 11, R_SEC_BREAK = 12, R_SEC_RMS2 = 13, R_SEC_CENT = 14, R_SEC_DT = 15, R_SEC_WALL = 16, R_DROPS = 17, R_ACTIVE = 18, R_BUILD = 19, R_SEC_SPEC0 = 20 /* ..27 */, R_TS = 28 /* Date.now() vid skrivning, for lagmatt over tradar */, R_FLAGCNT = 29 /* packade flaggraknare (se packFlagCounts): hur manga ganger varje flagga rests t.o.m. detta record */;
+export const REC_LEN = 34;
+export const RING_N = 1024; // ~10 s vid 100 Hz — workern får ligga efter utan att tappa
+export const RING_MARGIN = 8; // records workern lämnar orörda mot skrivaren (80 ms) — läses aldrig närmare kanten
+// Record-fält (Float64)
+export const R_SEQ = 0, R_PERF = 1, R_WALL = 2, R_ENV = 3, R_BASS = 4, R_FLAGS = 5, R_HINT_MS = 6, R_VCLOCK = 7, R_SEC_N = 8, R_SEC_INT = 9, R_SEC_KICKS = 10, R_SEC_BREAK = 11, R_SEC_RMS2 = 12, R_SEC_CENT = 13, R_SEC_DT = 14, R_DROPS = 15, R_ACTIVE = 16, R_BUILD = 17, R_SEC_SPEC0 = 18 /* ..25 */, R_SEC_WALL = 26, R_TS = 27 /* Date.now() vid skrivning, for lagmatt over tradar */, R_FLAGCNT = 28 /* packade flaggräknare (se packFlagCounts): hur många gånger varje flagga rests t.o.m. detta record */, R_SEC_BON = 29 /* NYA SEKTIONSSARDRAG (09-23): basonset-envelope (dB-flux 20-250 Hz, summa per hop) */, R_SEC_BPK = 30 /* basonset-toppar (librosa-lik toppplockning, antal) */, R_SEC_FLUX = 31 /* helbandsflux (fluxNorm, summa) */, R_SEC_RMS4 = 32 /* summa rms^4 (dynamik inom blocket) */, R_HIGH = 33 /* diskant-onset-ringens sampel (bara med <prefix>HIGH_DIAG/HIGH_VOTE) */;
 // Flaggor (bitmask i R_FLAGS)
-export const F_SIL350 = 1, F_SIL10 = 2, F_RESET_TEMPO = 4, F_HINT = 8, F_VCLOCK_SET = 16, F_VCLOCK_NULL = 32;
-export const FLAG_BITS = 6;
+export const F_SIL350 = 1, F_SIL10 = 2, F_RESET_TEMPO = 4, F_HINT = 8, F_RESET_BAR = 16, F_VCLOCK_SET = 32, F_VCLOCK_NULL = 64;
+export const FLAG_BITS = 7;
 /**
- * FALLA 1 - TAPPADE FLAGGOR. Om workern ligger > RING_N-RING_MARGIN records efter skrivs ringen over
- * och records TAPPAS. En flagga (t.ex. F_SIL10 = "slapp tempot") som lag i ett overskrivet record
- * fick forr ingen konsekvens alls: snabba sidan hade nollat lokalt, men nasta tillstandsblock
- * (S_REC_SEQ >= barrierSeq) aterstallde tempot. Darfor bar varje record en PACKAD RAKNARE per flagga
- * (6 flaggor x 7 bitar = 42 bitar, exakt i en double): antal ganger flaggan rests t.o.m. recordet,
- * modulo 128. Workern jamfor raknaren i recordet den aterupptar vid med raknaren i det senast
- * behandlade och far exakt vilka flaggor som gatt forlorade - utan nagon kapplopning mot skrivaren
- * (allt ligger i recordet, som seq:en). Modulo 128 racker: ingen flagga kan resas 128 ganger pa de
- * <= 10 s ett tapp omfattar.
+ * ROBUSTHET (2026-09-21 natt): om workern ligger > RING_N-RING_MARGIN records efter skrivs ringen över och records
+ * TAPPAS. En flagga (t.ex. F_SIL10 = "släpp tempot") som låg i ett överskrivet record fick förr ingen konsekvens alls:
+ * snabba sidan hade nollat lokalt, men nästa tillståndsblock (S_REC_SEQ ≥ barrierSeq) återställde tempot. Därför bär
+ * varje record en PACKAD RÄKNARE per flagga (7 flaggor × 7 bitar = 49 bitar, exakt i en double): antal gånger flaggan
+ * rests t.o.m. recordet, modulo 128. Workern jämför räknaren i recordet den återupptar vid med räknaren i det senast
+ * behandlade och får exakt vilka flaggor som gått förlorade — utan någon kapplöpning mot skrivaren (allt ligger i
+ * recordet, som seq:en). Modulo 128 räcker: ingen flagga kan resas 128 gånger på de ≤ 10 s ett tapp omfattar.
  */
 export const FLAG_MOD = 128;
 export function packFlagCounts(cnt) {
@@ -57,8 +44,8 @@ export function packFlagCounts(cnt) {
     }
     return v;
 }
-/** Bitmask over flaggor vars raknare skiljer mellan `before` och `after` (packade), minus flaggorna i
- *  `ownFlags` (recordet man aterupptar vid behandlas anda normalt, dess egna flaggor ska inte dubbleras). */
+/** Bitmask över flaggor vars räknare skiljer mellan `before` och `after` (packade), minus flaggorna i `ownFlags`
+ *  (recordet man återupptar vid behandlas ändå normalt, dess egna flaggor ska inte dubbleras). */
 export function lostFlags(before, after, ownFlags) {
     let lost = 0;
     for (let k = 0; k < FLAG_BITS; k++) {
@@ -72,23 +59,22 @@ export function lostFlags(before, after, ownFlags) {
     return lost;
 }
 // Kontrollord (Int32, Atomics)
-export const C_WRITE = 0; // antal skrivna records (monotont) - workern vantar pa detta
-export const C_READ = 1; // antal lasta records
-export const C_STATE_SEQ = 2; // seqlock for tillstandsblocket (udda = skrivning pagar)
-export const C_WAITING = 3; // 1 = workern ligger i Atomics.wait (skrivaren notify:ar bara da)
+export const C_WRITE = 0; // antal skrivna records (monotont) — workern väntar på detta
+export const C_READ = 1; // antal lästa records
+export const C_STATE_SEQ = 2; // seqlock för tillståndsblocket (udda = skrivning pågår)
+export const C_WAITING = 3; // 1 = workern ligger i Atomics.wait (skrivaren notify:ar bara då)
 /**
- * FALLA 2 - SEQ-WRAP. C_WRITE/C_READ ar Int32 och seq:en vaxer 100/s -> 2^31 efter 248 dagar. Bada
- * sidor raknar darfor seq som JS-tal (double, aldrig wrap) och lagger bara de laga 32 bitarna i
- * kontrollordet (`seq | 0`). Lasaren rekonstruerar ur en SIGNERAD 32-bitars skillnad mot sin egen
- * seq, korrekt sa lange avstandet ar < 2^31 records (248 dagar efter varandra - ringen ar 1 024).
- * Aldrig `Atomics.load(C_WRITE)` rakt mot en JS-seq: jamfor med seqDelta().
+ * SEQ-WRAP: C_WRITE/C_READ är Int32 och seq:en växer 100/s → 2^31 efter 248 dagar. Båda sidor räknar därför seq som
+ * JS-tal (double, aldrig wrap) och lägger bara de låga 32 bitarna i kontrollordet (`seq | 0`). Läsaren rekonstruerar
+ * ur en SIGNERAD 32-bitars skillnad mot sin egen seq, korrekt så länge avståndet är < 2^31 records (248 dagar efter
+ * varandra — ringen är 1 024). Aldrig `Atomics.load(C_WRITE)` rakt mot en JS-seq: jämför med seqDelta().
  */
 export function seqLow(seq) { return seq | 0; }
-/** Signerad skillnad (ctrlLow - mySeq) i records, wrap-saker. */
+/** Signerad skillnad (ctrlLow − mySeq) i records, wrap-säker. */
 export function seqDelta(ctrlLow, mySeq) { return (ctrlLow - (mySeq | 0)) | 0; }
-// Tillstandsblock (Float64)
-export const S_REC_SEQ = 0, S_BPM = 1, S_CONF = 2, S_PHASE_MS = 3, S_PHASE_CONF = 4, S_SECTION = 5, S_SEC_START = 6, S_SEC_INDEX = 7, S_SEC_TIER = 8, S_REP_SIM = 9, S_REP_AGO = 10, S_REP_SEC = 11, S_EXPECT_MS = 12, S_EXPECT_SRC = 13, S_PREV_SEC = 14, S_LVL_HIGH = 15, S_PROCESSED = 16, S_LAG_MS = 17, S_LAG_MAX = 18, S_BUSY_US = 19, S_BUSY_MAX_US = 20, S_SKIPPED = 21, S_LOST_FLAGS = 22 /* flaggor aterskapade ur raknarna efter tapp */;
-export const STATE_LEN = 23;
+// Tillståndsblock (Float64)
+export const S_REC_SEQ = 0, S_BPM = 1, S_CONF = 2, S_BPMF = 3, S_PHASE_MS = 4, S_PHASE_CONF = 5, S_SECTION = 6, S_SEC_START = 7, S_SEC_INDEX = 8, S_SEC_TIER = 9, S_REP_SIM = 10, S_REP_AGO = 11, S_REP_SEC = 12, S_PROCESSED = 13, S_LAG_MS = 14, S_LAG_MAX = 15, S_BUSY_US = 16, S_BUSY_MAX_US = 17, S_SKIPPED = 18, S_EXPECT_MS = 19, S_EXPECT_SRC = 20, S_PREV_SEC = 21, S_LVL_HIGH = 22, S_LOST_FLAGS = 23 /* flaggor aterskapade ur raknarna efter tapp */;
+export const STATE_LEN = 24;
 export const SECTIONS = ['', 'intro', 'low', 'build', 'high', 'break'];
 export function sectionCode(s) { const i = SECTIONS.indexOf(s); return i < 0 ? 0 : i; }
 export function createSplitBuffers() {
@@ -101,14 +87,14 @@ export function createSplitBuffers() {
 export function viewsOf(b) {
     return { ctrl: new Int32Array(b.ctrl), ring: new Float64Array(b.ring), state: new Float64Array(b.state) };
 }
-/** Skriv tillstandsblocket under seqlock (skrivaren ar ensam: workern). */
+/** Skriv tillståndsblocket under seqlock (skrivaren är ensam: workern). */
 export function stateWrite(ctrl, state, fill) {
     const s = Atomics.load(ctrl, C_STATE_SEQ);
     Atomics.store(ctrl, C_STATE_SEQ, s + 1);
     fill(state);
     Atomics.store(ctrl, C_STATE_SEQ, s + 2);
 }
-/** Las tillstandsblocket konsistent till `out` (kopia). false = fick ingen konsistent lasning (behall forra). */
+/** Läs tillståndsblocket konsistent till `out` (kopia). false = fick ingen konsistent läsning (behåll förra). */
 export function stateRead(ctrl, state, out) {
     for (let tries = 0; tries < 4; tries++) {
         const s1 = Atomics.load(ctrl, C_STATE_SEQ);
