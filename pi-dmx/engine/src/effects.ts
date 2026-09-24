@@ -381,6 +381,7 @@ export class EffectEngine {
   private wavePhase = 0;
   /** "smart" mode: which effect the feel-chooser currently delegates to. */
   private smartMode: Mode = "wave";
+  private fadeMode: Mode | undefined;   // DMX_LOOK_FADE_S: senast sedda look
   private tierEma = 0.5;   // ihallande intensitet for tier-val (se render)
   private smartDwellUntil = 0;
   private warmMs = 0;
@@ -1881,6 +1882,8 @@ export class EffectEngine {
     // EFTERBEHANDLING: ballistik → ljustak → hjärtslag → blackout → kalibrering →
     // headroom. Ordningen och motiven bor i postprocess.ts; här räknas bara VAD som
     // ska gälla den här rutan. Drop-undantagen bakas in innan de skickas vidare.
+    // LOOKBYTE -> fade (inte vid drop: smallen ska vara omedelbar)
+    if (this.smartMode !== this.fadeMode) { if (this.fadeMode !== undefined && this.dropEnv < 0.2) this.post.lookChanged(performance.now()); this.fadeMode = this.smartMode; }
     this.post.apply(
       this.universe,
       this.out,

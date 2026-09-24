@@ -372,6 +372,7 @@ export class EffectEngine {
     wavePhase = 0;
     /** "smart" mode: which effect the feel-chooser currently delegates to. */
     smartMode = "wave";
+    fadeMode; // DMX_LOOK_FADE_S: senast sedda look
     tierEma = 0.5; // ihallande intensitet for tier-val (se render)
     smartDwellUntil = 0;
     warmMs = 0;
@@ -2138,6 +2139,12 @@ export class EffectEngine {
         // EFTERBEHANDLING: ballistik → ljustak → hjärtslag → blackout → kalibrering →
         // headroom. Ordningen och motiven bor i postprocess.ts; här räknas bara VAD som
         // ska gälla den här rutan. Drop-undantagen bakas in innan de skickas vidare.
+        // LOOKBYTE -> fade (inte vid drop: smallen ska vara omedelbar)
+        if (this.smartMode !== this.fadeMode) {
+            if (this.fadeMode !== undefined && this.dropEnv < 0.2)
+                this.post.lookChanged(performance.now());
+            this.fadeMode = this.smartMode;
+        }
         this.post.apply(this.universe, this.out, this.cfg.fixtures, dtSec, decay, ceilMul, Math.max(this.beatMulNow, this.dropEnv), (this.cfg.energyCeiling || this.memCeiling !== null) && this.silenceGate > 0.5, !!this.cfg.beatPulse && this.silenceGate > 0.5, blackout || this.inputOff, this.cfg.master ?? 1, this.cfg.dropHeadroom ? Math.round(255 * Math.min(1, 0.90 + 0.10 * this.dropEnv)) : -1, performance.now());
         // Rök: motorn avgör OM den ska spruta, output-tjänsten var signalen hamnar.
         // RÖK: motorn samlar önskemålen — drop, manuell knapp, eller en effekt som bett om

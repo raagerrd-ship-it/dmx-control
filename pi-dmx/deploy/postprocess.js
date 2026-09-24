@@ -29,14 +29,20 @@ const INV_ATTACK_S = 1 / ATTACK_S;
 /** SISTA FADE-SPARREN (ladan 2026-09-24, DMX-sonden: enramsspikar 2-3/s per armatur = 'flimmer'; agaren: 'upp far den garna vara snabb men
  *  alltid fade nerat'): allra sist far ingen ljuskanal falla snabbare an en fade med tidskonstant DMX_FINAL_FADE_S (0,12 s); uppat omedelbart.
  *  Specialkanaler (strobe/hazer/uv/blinder/laser/co2) undantas. 0 = av. */
-const FINAL_FADE_S = Number(process.env.DMX_FINAL_FADE_S ?? 0.12); // Multiplikation är snabbare än division i loopen
+const FINAL_FADE_S = Number(process.env.DMX_FINAL_FADE_S ?? 0.12);
+/** FADE MELLAN LOOKER (agaren i ladan 2026-09-24: 'ev fade mellan dom'): vid lookbyte tonas nya looken IN over DMX_LOOK_FADE_S
+ *  (smoothstep 0->1) medan den gamla bilden klingar ut med halva den tiden - bada lever (ny look med energin), inget hart klipp. 0 = av. */
+const LOOK_FADE_S = Number(process.env.DMX_LOOK_FADE_S ?? 0); // Multiplikation är snabbare än division i loopen
 /** Minsta mörker under ljuset (DMX-steg över tändpunkten) så hjärtslaget syns även
  *  i lugna effekter. 44 ⇒ en lampa med tändpunkt 16 lyser lägst på 60. */
 const PULSE_ROOM = 44;
 export class PostProcess {
     /** Ballistikens buffert — per kanal, i flyttal så decayn inte kvantiseras bort. */
     smooth = new Float32Array(512);
-    finalOut = new Float32Array(512); // SISTA FADE-SPARREN (se FINAL_FADE_S)
+    finalOut = new Float32Array(512);
+    lookFadeAt = -1e9; // DMX_LOOK_FADE_S: tid for senaste lookbyte
+    lookChanged(nowMs) { if (LOOK_FADE_S > 0)
+        this.lookFadeAt = nowMs; } // SISTA FADE-SPARREN (se FINAL_FADE_S)
     apply(universe, out, fixtures, dtSec, decay, ceilMul, pulseMul, ceilingActive, pulseActive, blackout, master, headroomCap, nowMs) {
         const maxCh = out.maxCh;
         // 1. BALLISTIK: mjuk attack, oförändrad decay (peak-hold). En 1-frames-spik når
@@ -84,13 +90,15 @@ export class PostProcess {
         if (blackout)
             this.finalOut.fill(0); // efter blackout: ingen gammal niva att tona ner fran
         else if (FINAL_FADE_S > 0) {
-            const fk = Math.exp(-dtSec / FINAL_FADE_S);
+            const xf = LOOK_FADE_S > 0 ? Math.min(1, (nowMs - this.lookFadeAt) / (LOOK_FADE_S * 1000)) : 1;
+            const win = xf < 1 ? xf * xf * (3 - 2 * xf) : 1;
+            const fk = Math.exp(-dtSec / (xf < 1 ? Math.max(FINAL_FADE_S, LOOK_FADE_S * 0.5) : FINAL_FADE_S));
             for (let ch = 0; ch < maxCh; ch++) {
                 if (out.direct[ch]) {
                     this.finalOut[ch] = universe[ch];
                     continue;
                 }
-                const held = this.finalOut[ch] * fk, v = universe[ch];
+                const held = this.finalOut[ch] * fk, v = universe[ch] * win;
                 const o = v >= held ? v : held;
                 this.finalOut[ch] = o;
                 universe[ch] = (o + 0.5) | 0;
