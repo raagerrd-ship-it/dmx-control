@@ -35,6 +35,10 @@ import { logHealth } from "./healthLog.js";
 import { activeSlots, fixtureRoles, type Mode } from "./config.js";
 import { EFFECT_KEYS, EFFECT_MAP } from "./effects/registry.js";
 
+// DMX_QUIET=1 (ladan 2026-09-27, agaren: "inaktivera logg tills vi sager att vi ska kolla nagot"): tystar all console.log
+// (journald pa karna 0 kostar CPU och I/O under spelning). console.warn/error gar fortfarande igenom. Sla av med ladan.py utan --env.
+if (process.env.DMX_QUIET === '1') { console.log = () => {}; console.info = () => {}; console.warn('[quiet] console.log avstangd (DMX_QUIET=1)'); }
+
 // Physical button cycles through the fun modes (skips blackout so the button never kills the show).
 // Härlett ur effekt-registret (samma ordning) → ingen lista att hålla i synk.
 const MODE_CYCLE: Mode[] = ["smart", ...EFFECT_KEYS];
