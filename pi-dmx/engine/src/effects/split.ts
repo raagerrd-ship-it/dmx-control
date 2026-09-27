@@ -10,7 +10,7 @@ export const split: EffectDef = {
   key: "split", label: "Klyvning", tier: "full", section: ["high"], toggle: true,
   desc: "Inre lampor tung bas-matta, yttre lampor gnistrande diskant-anslag.",
   render(c) {
-    const isOuter = c.count < 3 ? c.idx % 2 === 1 : (c.idx === 0 || c.idx === c.count - 1);
+    const isOuter = c.group === 1;   // inre/yttre eller jamn/udda (c.grouping)
     if (isOuter) {
       // Yttre: rappa transienter (snare/clap + hi-hats), släckt mellan slagen.
       const transient = Math.max(c.frame.onset.highMid, c.frame.onset.treble);

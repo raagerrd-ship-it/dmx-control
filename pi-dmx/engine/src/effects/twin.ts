@@ -7,7 +7,7 @@ export const twin: EffectDef = {
   key: "twin", label: "Tvilling", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["intro", "low"], toggle: true,
   desc: "Två grupper andas i motfas – varmt anrop, kallt svar.",
   render(c) {
-    const even = c.idx % 2 === 0;
+    const even = c.group === 0;   // jamn/udda eller inre/yttre (c.grouping)
     // TAKTLAST VAXELSANG. Forut var detta en fri sinus med en halv periods
     // forskjutning mellan varannan lampa - alltsa samma vag som breathe och
     // aurora. Nu byter paren av VARANDRA pa taktrutnatet: ett par lyser upp

@@ -43,6 +43,11 @@ export interface EffectContext {
   /** Lampans index och totalt antal lampor. */
   idx: number;
   count: number;
+  /** TVAGRUPPERING (2026-09-27, agaren: "manga effekter kor varannan - jag vill att de aven kan kora inre/yttre"):
+   *  group = lampans grupp 0/1. grouping vaxlar mellan 'varannan' (jamn/udda) och 'innerouter' (mitten/kant) per look
+   *  och var 32:e slag (DMX_GROUP_ALT=0 = alltid jamn/udda). Tvagruppseffekter ska lasa c.group, inte idx % 2. */
+  group: number;
+  grouping: 'varannan' | 'innerouter';
 
   /** Klippt/normaliserad nivå (0..1). */
   audio: number;

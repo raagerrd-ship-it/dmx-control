@@ -104,6 +104,8 @@ const HALVE_SHOW = process.env.DMX_HALVE_SHOW !== "0";   // standard PA sedan 09
 const EFFECT_HEART = Math.max(0, Math.min(2, Number(process.env.DMX_EFFECT_HEART ?? 1)));
 /** DMX_CALM_FROM_BREAKING=1: lat ra frame.breaking (niva < 65 % av taket) tvinga lugn-poolen som fore 09-27. */
 const CALM_FROM_BREAKING = process.env.DMX_CALM_FROM_BREAKING === '1';
+/** DMX_GROUP_ALT: tvagrupperingen vaxlar jamn/udda <-> inre/yttre per look och var 32:e slag (0 = alltid jamn/udda). */
+const GROUP_ALT = process.env.DMX_GROUP_ALT !== '0';
 /** MINIDROP-REAKTION (agaren 2026-09-12: "minidrops borde markas — effektbyte eller intensitet"): analysatorns
  *  frame.miniDropCount (monoton) ger look-byte (om looken hallits MIN_HOLD) + en kort stot pa MINI_DROP_ENV av
  *  en full drop-small (dropEnv), ingen rok, ingen blackout. */
@@ -532,6 +534,7 @@ export class EffectEngine {
     wavePhase: 0, buildUp: 0, phaseSpread: 0, punchFloor: 0, chasePos: 0,
     dropFired: this.dropFired, dropHue: this.dropHue, now: 0,
     mixedSector,
+    group: 0, grouping: 'varannan',
     heartPulse: 0,
     heart: (depth: number) => { const d = depth * EFFECT_HEART; return 1 - d + d * this.ctx.heartPulse; },
     mclk: (beatsPerStep: number, secPerStep: number) =>
@@ -1757,6 +1760,8 @@ export class EffectEngine {
     ctx.dropEnv = this.dropEnv; ctx.gravLevel = this.gravLevel;
     ctx.gravPeak = this.gravPeak; ctx.drum = frame.drum;
     ctx.beatIdx = beatIdx; ctx.beatFrac = beatFracFx; ctx.beatPulse = beatPulse; ctx.heartPulse = heartPulse;
+    // TVAGRUPPERING: vaxlar per look (smartCount) och var 32:e slag - "skiftar ibland mellan varannan och inre/yttre".
+    ctx.grouping = GROUP_ALT && (((this.smartCount + (beatIdx >> 5)) & 1) === 1) ? 'innerouter' : 'varannan';
     ctx.beatHit = beatHit; ctx.hasBeat = hasBeat;
     ctx.wavePhase = this.wavePhase; ctx.buildUp = frame.buildUp;
     ctx.phaseSpread = 1 + frame.buildUp * 2.5; ctx.punchFloor = punchFloor;
@@ -1821,6 +1826,7 @@ export class EffectEngine {
         rgb = hsvToRgb(anchorHue, 1, 0.4 + 0.06 * Math.sin(t * 0.5 + i));   // fast pelare, knappt levande andning
       } else {
         ctx.idx = i;
+        ctx.group = ctx.grouping === 'innerouter' ? ((count < 3 ? i % 2 === 1 : (i === 0 || i === count - 1)) ? 1 : 0) : i % 2;
         ctx.fx = fx;
         ctx.want.strobe = undefined; ctx.want.blinder = undefined;
         ctx.want.uv = undefined; ctx.want.laser = undefined; ctx.want.fog = undefined;

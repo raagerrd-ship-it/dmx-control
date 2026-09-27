@@ -9,7 +9,7 @@ export const gallop: EffectDef = {
   key: "gallop", label: "Gallopp", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"], toggle: true,
   desc: "Grupperna slår omlott – beat & off-beat, dubbel rytm.",
   render(c) {
-    const even = c.idx % 2 === 0;
+    const even = c.group === 0;   // jamn/udda eller inre/yttre (c.grouping)
     const offFrac = (c.beatFrac + 0.5) % 1;                  // off-beatets fas
     const offPulse = Math.pow(1 - offFrac, 2);
     const groupPulse = even ? c.beatPulse : offPulse;        // A on-beat, B off-beat

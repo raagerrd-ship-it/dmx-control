@@ -14,7 +14,7 @@ export const subbreath: EffectDef = {
     const base = Math.min(1, 0.15 + 0.85 * c.shaped(0.1, c.frame.spec.sub) + c.punch * 0.2);   // sub-andning + dunk-svall
     const hue = c.mixedSector(0) / 6;                            // palettens djupa basfärg
     const air = c.frame.spec.air;
-    const isOuter = c.count < 3 ? c.idx % 2 === 0 : (c.idx === 0 || c.idx === c.count - 1);
+    const isOuter = c.group === 1;   // inre/yttre eller jamn/udda (c.grouping)
     if (isOuter && air > 0.3) {
       const blend = Math.min(1, (air - 0.3) / 0.7);
       // Skifta mot iskallt: sänk mättnad (mot vitt) + lyft ljus lite.
