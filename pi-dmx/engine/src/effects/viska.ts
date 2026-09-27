@@ -16,8 +16,9 @@ export const viska: EffectDef = {
     const n = Math.max(1, c.count);
     const hatPos = c.hasBeat ? Math.floor((c.beatIdx + c.beatFrac) * 2) % n : c.mclk(0.5, 0.12) % n;
     const hat = hatPos === c.idx ? d.hat * 0.6 : 0;
-    const snare = c.group === (c.beatIdx & 1) ? d.snare * 0.75 : d.snare * 0.15;
-    const kick = d.kick * 0.35;
+    // Virveln slar pa lampan MITT EMOT hi-haten (vandrar med den) - gruppvaxling per slag gav backbeat-figuren (rPerm 0,81-0,85).
+    const snare = (hatPos + (n >> 1)) % n === c.idx ? d.snare * 0.75 : d.snare * 0.1;
+    const kick = d.kick * (c.group === 0 ? 0.35 : 0.12);   // dov rod puls, tyngst pa ena gruppen
     const spark = Math.max(hat, snare, kick);
     const hue = spark === hat && hat > 0 ? 0.55 : spark === snare ? 0.10 : 0.02;   // iskall / varmvit / röd
     const sat = hue === 0.10 ? 0.25 : 0.9;
