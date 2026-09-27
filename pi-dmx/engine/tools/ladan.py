@@ -66,7 +66,11 @@ REMOVE = [
     # registret; filerna pa Pi:n flyttas till .bak sa dist/effects/ inte har spokfiler.
     '/opt/audio-dmx-engine/dist/effects/innerouter.js', '/opt/audio-dmx-engine/dist/effects/neon.js',
     # KVALLENS TESTFILER 09-24 (allt star nu i SHOW_ENV -> lotus.conf); hjarta.conf satte DMX_HEARTBEAT=1 och laddas EFTER lotus.conf.
-    # 09-27: de tre drop-ins som bar live-varden - nu standard i koden
+    # 09-27: drop-ins som bar live-varden - nu standard i koden. OBS ordningen: systemd laser alfabetiskt, senare vinner;
+    # zz-dynamik.conf (09-22) skrev over lotus.conf (09-24) for DMX_FLOOR_CH (40 mot 26) och DROP_CALM_LAND_MS (300 mot 0)
+    # - agarens 09-24-beslut var aldrig live. Koden har 09-24-vardena.
+    '/etc/systemd/system/audio-dmx-engine.service.d/ballistik.conf', '/etc/systemd/system/audio-dmx-engine.service.d/bass.conf',
+    '/etc/systemd/system/audio-dmx-engine.service.d/dwell.conf', '/etc/systemd/system/audio-dmx-engine.service.d/zz-dynamik.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/drop.conf', '/etc/systemd/system/audio-dmx-engine.service.d/tempo.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/lotus.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/hjarta.conf', '/etc/systemd/system/audio-dmx-engine.service.d/energi.conf',

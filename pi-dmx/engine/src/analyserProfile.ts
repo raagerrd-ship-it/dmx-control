@@ -26,10 +26,9 @@ export const PROFILE: AnalyserProfile = {
     SECTION_W_HIGH: '1.0',       // lotus: '0'
     SIL_CLEAR_PENDING: '1',      // lotus: '0'
     // LADANS LIVE-VARDEN SOM STANDARD (2026-09-27, rensningen): allt nedan stod i drop-ins pa Pi:n (drop/tempo/lotus.conf)
-    // och ar nu kodens sanning. Env vinner fortfarande (DMX_X=... slar profilen).
+    // och ar nu kodens sanning. Env vinner fortfarande (DMX_X=... slar profilen). Sparen (BPM_TRACE/DROP_TRACE/LIVE_TRACE)
+    // ar INTE standard - de var inte live 09-27 (Pi:ns env lastes fore deployen); sla pa med ladan.py --env vid felsokning.
     ANALYSER_SPLIT: 'worker',     // tempo/gridfas/sektion i egen trad (ladan 09-24)
-    BPM_TRACE: '1',               // [bpmchg]/[bpmrst] i journalen (lag volym)
-    DROP_TRACE: '1',              // [dropfire]/[dropedge]/[minidrop] i journalen
     DROP_CALM_GATE: '1',          // lugna partier kraver starkare bevis for drop
     GHOST_WAIT: '1',              // 2/3-fantom vid latbyte vantar 12 s (tempo-transitions 09-04)
     SUBH_GUARD: '1',              // OCT-DOWN/NEAR x8 mot lastGoodBpm (2/3 only)
