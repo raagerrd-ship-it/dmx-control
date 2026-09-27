@@ -102,6 +102,8 @@ const SUBDIV_MIN_HOLD_MS = 10000;
 const HALVE_SHOW = process.env.DMX_HALVE_SHOW !== "0";   // standard PA sedan 09-27 (ladan)
 /** DMX_EFFECT_HEART: skalar effekternas EGNA hjartpuls (c.heart). 1 = som effektfilerna sager, 0 = av (A/B i ladan 09-27). */
 const EFFECT_HEART = Math.max(0, Math.min(2, Number(process.env.DMX_EFFECT_HEART ?? 1)));
+/** DMX_CALM_FROM_BREAKING=1: lat ra frame.breaking (niva < 65 % av taket) tvinga lugn-poolen som fore 09-27. */
+const CALM_FROM_BREAKING = process.env.DMX_CALM_FROM_BREAKING === '1';
 /** MINIDROP-REAKTION (agaren 2026-09-12: "minidrops borde markas — effektbyte eller intensitet"): analysatorns
  *  frame.miniDropCount (monoton) ger look-byte (om looken hallits MIN_HOLD) + en kort stot pa MINI_DROP_ENV av
  *  en full drop-small (dropEnv), ingen rok, ingen blackout. */
@@ -1259,7 +1261,12 @@ export class EffectEngine {
         // 2) I ett breakdown: gå till den lugna poolen oavsett vad energitiern
         //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
         //    så utan detta fortsätter riggen köra fullfart genom en svacka.
-        const wantCalm = (frame.breaking || (SECTION_SWITCH && frame.section === 'break')) && this.cfg.energyDrivesMode;
+        // LUGN-POOLEN BARA FRAN SEKTIONEN (2026-09-27, ladan): frame.breaking ar 'nivan < 65 % av taket' och var sann sa ofta
+        // pa partypop att 27 av 40 look-val blev lugn-looker (viska/airglow/twin = nastan morka) mitt i sektion high med tier
+        // full -> "ser inte vad effekterna gor", "en lampa lyser konstant". Med sektionsstyrning pa ar 'break' den
+        // genomtankta signalen; DMX_CALM_FROM_BREAKING=1 ger det gamla beteendet.
+        const calmSignal = (SECTION_SWITCH && !CALM_FROM_BREAKING) ? frame.section === 'break' : (frame.breaking || (SECTION_SWITCH && frame.section === 'break'));
+        const wantCalm = calmSignal && this.cfg.energyDrivesMode;
         // 3) ETIKETTEN STYR INTE NIVÅN — SEKTIONENS UPPMÄTTA ENERGI GÖR DET.
         //    Här stod tidigare musikaliska schabloner: refräng aldrig lugn, vers
         //    aldrig full fart, intro/outro alltid lugnt. De byggde på att energin
