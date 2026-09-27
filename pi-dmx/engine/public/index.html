@@ -528,6 +528,20 @@
     </div>
   </div>
 
+  <h1>Ljusnivå</h1>
+  <div class="card" id="levelCard">
+    <div class="row"><label>Lägsta nivå</label>
+      <input type="range" min="4" max="20" step="1" id="lvlWin" style="flex:1;margin:0 10px">
+      <span class="val" id="lvlWinV">–</span>
+    </div>
+    <div class="status" style="margin-top:2px;margin-bottom:8px">Hur många dB under låtens tak ljuset når golvet. Högre värde = tystare musik ger fortfarande ljus.</div>
+    <div class="row"><label>Släckgräns</label>
+      <input type="range" min="1" max="20" step="1" id="lvlSil" style="flex:1;margin:0 10px">
+      <span class="val" id="lvlSilV">–</span>
+    </div>
+    <div class="status" style="margin-top:2px">Under denna nivå släcks lamporna helt.</div>
+  </div>
+
   <h1>Lampor</h1>
   <div class="card">
     <div id="fixtures"></div>
@@ -920,6 +934,7 @@ function applyConfig(cfg) {
 
   segActivate("segDyn", cfg.dynamics ?? 0.6, "dyn");
   segActivate("segMaster", cfg.master ?? 1, "master");
+  syncLevelUi(cfg);
   segActivate("segSpeed", tauDownToAgg(cfg.detection?.tauDown ?? 30) > 0.5 ? 0.85 : 0.15, "agg");
   updateAdvMirror(cfg);
   identifyingIndex = cfg.identify?.index ?? -1;
@@ -929,6 +944,33 @@ function applyConfig(cfg) {
   syncRingUi(cfg.intensityRing);
   if (sfFx) sfFx.textContent = String(Array.isArray(cfg.fixtures) ? cfg.fixtures.length : 0);
 }
+
+/* Ljusnivå (2026-09-27): "Lägsta nivå" = cfg.levelWindowDb (dB under taket), "Släckgräns" = cfg.silenceLevel
+   (0..1, visas i %). Samma mönster som LED-ringens reglage: dirty-flagga medan man drar, 150 ms debounce → WS. */
+let levelDirty = false;
+function syncLevelUi(cfg) {
+  if (levelDirty) return;   // användaren drar → rör inte reglagen
+  const setR = (id, v) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = String(v); };
+  const setV = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
+  const win = Math.round(cfg.levelWindowDb ?? 10), sil = Math.round((cfg.silenceLevel ?? 0.05) * 100);
+  setR("lvlWin", win); setV("lvlWinV", win + " dB");
+  setR("lvlSil", sil); setV("lvlSilV", sil + " %");
+}
+(function wireLevel() {
+  let t = null;
+  const bind = (id, outId, fmt, msg) => {
+    const el = document.getElementById(id), out = document.getElementById(outId);
+    if (!el) return;
+    el.addEventListener("input", () => {
+      levelDirty = true;
+      out.textContent = fmt(Number(el.value));
+      if (t) clearTimeout(t);
+      t = setTimeout(() => { send(msg(Number(el.value))); levelDirty = false; }, 150);
+    });
+  };
+  bind("lvlWin", "lvlWinV", (v) => v + " dB", (v) => ({ type: "setLevelWindowDb", value: v }));
+  bind("lvlSil", "lvlSilV", (v) => v + " %",  (v) => ({ type: "setSilenceLevel",  value: v / 100 }));
+})();
 
 /* LED-ring (WS2812 på vredet) — visas bara om hårdvaran är konfigurerad. */
 let ringDirty = false;

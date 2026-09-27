@@ -56,7 +56,7 @@ export interface FogStatus {
 // över ~70 ms tappar den anslaget.
 /** Under den här nivån räknas ingången som avstängd, inte som ett tyst parti. */
 const INPUT_OFF_LEVEL = 0.02;
-const SILENCE_LEVEL = Number(process.env.DMX_SILENCE_LEVEL ?? 0.05), SILENCE_MS = Number(process.env.DMX_SILENCE_MS ?? 250), SILENCE_RELEASE_S = Number(process.env.DMX_SILENCE_RELEASE_S ?? 0.25);
+const SILENCE_LEVEL = Number(process.env.DMX_SILENCE_LEVEL ?? 0.05), SILENCE_LEVEL_ENV = process.env.DMX_SILENCE_LEVEL !== undefined, SILENCE_MS = Number(process.env.DMX_SILENCE_MS ?? 250), SILENCE_RELEASE_S = Number(process.env.DMX_SILENCE_RELEASE_S ?? 0.25);
 /** ...men först när den legat där så länge — ett break i låten ska inte släcka showen. */
 const INPUT_OFF_MS = 2000;
 
@@ -246,7 +246,10 @@ const RANK_POW = Number(process.env.DMX_SECTION_RANK_POW ?? 1);
 /** Rang dar full niva nas (ladan 09-24: 'knappt heart-beat eller energi' - linjart over hela rangen sankte aven refrangerna till ~0,6). 0,5 = ovre halvan full, bara undre dampas. */
 const RANK_KNEE = Math.max(0.1, Number(process.env.DMX_SECTION_RANK_KNEE ?? 0.5));
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL !== '0';
-const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 6);        // lotus windowDb 10
+/** Fönstret (dB under taket där ljuset når golvet). PRIORITET: env LIVE_WIN_DB > cfg.levelWindowDb (ratt i /setup) > 10.
+ *  Fallback 10 = ladans live-värde 09-27 (var 6 i koden, 10 via drop-in). Läses per frame i render(), inte här. */
+const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10);       // lotus windowDb 10
+const LIVE_WIN_DB_ENV = process.env.LIVE_WIN_DB !== undefined;
 const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 6); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
 const LIVE_ANCHOR_S = Number(process.env.LIVE_ANCHOR_S ?? 120);   // lotus autoAnchorSec 120
 const LIVE_RELEASE_MS = Number(process.env.LIVE_RELEASE_MS ?? 350);
@@ -1434,7 +1437,9 @@ export class EffectEngine {
 
     // TYSTNADSGRIND (ladan 20:35, 'slacker sig under korta perioder'): 250 ms under 0,05 stangde riggen pa 0,25 s - en tyst fras
     // i laten racker. Env: DMX_SILENCE_LEVEL (0,05), DMX_SILENCE_MS (250), DMX_SILENCE_RELEASE_S (0,25). Ladan: 0,03 / 2000 / 1,0.
-    const silenceThreshold = SILENCE_LEVEL * Math.max(1, frame.gain / 3);
+    // Nivån är sedan 09-27 en ratt i /setup (cfg.silenceLevel, "Släckgräns"); env DMX_SILENCE_LEVEL vinner om den är satt.
+    const silenceLevel = SILENCE_LEVEL_ENV ? SILENCE_LEVEL : (this.cfg.silenceLevel ?? SILENCE_LEVEL);
+    const silenceThreshold = silenceLevel * Math.max(1, frame.gain / 3);
     if (frame.level > silenceThreshold || kickHit) this.lastActiveMs = now;
     const gateTarget = now - this.lastActiveMs > SILENCE_MS ? 0 : 1;
     const gateRate = gateTarget > this.silenceGate ? dtSec / 0.1 : dtSec / SILENCE_RELEASE_S;
@@ -1583,6 +1588,7 @@ export class EffectEngine {
     // tau/10 nar signalen ligger > fonstret utanfor at nagot hall, forsta 20 s efter start och nar ljuset legat klippt/slackt > 10 s.
     if (LIVE_LEVEL) {
       const wdb = frame.midHiDb + LIVE_BASS_W * (frame.bodyDb - frame.midHiDb);   // mid/diskant med lite bas
+      const winDb = LIVE_WIN_DB_ENV ? LIVE_WIN_DB : (this.cfg.levelWindowDb ?? LIVE_WIN_DB);   // ratten "Lägsta nivå" (env vinner)
       const tauMs = LIVE_ANCHOR_S * 1000;
       if (frame.level > INPUT_OFF_LEVEL && Number.isFinite(wdb) && wdb > -100) {
         const nowMs = performance.now();
@@ -1592,7 +1598,7 @@ export class EffectEngine {
         // till det nya normala pa 12 s. Nerat foljer ankaret bara langsamt (tau), och annu langsammare i low/break (x2).
         const prev = this.liveShapeRaw;
         if (prev >= 0.98) { this.liveClipMs += dtMs; if (this.liveClipMs > 10_000) this.liveFastUntil = nowMs + 5_000; } else this.liveClipMs = 0;
-        const farAbove = wdb - this.liveAnchor > LIVE_WIN_DB;
+        const farAbove = wdb - this.liveAnchor > winDb;
         const fast = (farAbove || nowMs < this.liveFastUntil) && up;
         const quietSec = frame.section === 'low' || frame.section === 'break';
         const a = 1 - Math.exp(-dtMs / (fast ? tauMs / 10 : up ? tauMs * 3 : quietSec ? tauMs * 2 : tauMs));
@@ -1602,7 +1608,7 @@ export class EffectEngine {
           if (this.liveAnchor < this.liveAnchorMax - LIVE_ANCHOR_DROP_DB) this.liveAnchor = this.liveAnchorMax - LIVE_ANCHOR_DROP_DB;
         }
         const top = this.liveAnchor + LIVE_OFFSET_DB;
-        let sh = (wdb - (top - LIVE_WIN_DB)) / LIVE_WIN_DB;
+        let sh = (wdb - (top - winDb)) / winDb;
         sh = sh < 0 ? 0 : sh > 1 ? 1 : sh;
         this.liveShapeRaw = sh;
         // instant attack, release LIVE_RELEASE_MS (lotus lightSmoothMs 350 = ~ett slag)
