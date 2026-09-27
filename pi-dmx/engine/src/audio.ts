@@ -148,7 +148,10 @@ export class AudioCapture extends EventEmitter {
       "-r", String(this.opts.rate),
       "-c", String(this.opts.channels),
       "-t", "raw",
-      "--buffer-size=1024",   // ~21 ms — håll capture-latensen låg, låt drift droppa via overrun
+      // DMX_ALSA_BUFFER (frames): 1024 = 21 ms. Ladan 2026-09-27: GC-stallar 60-120 ms ~1-2/min pa 200 MB-heapen gav en
+      // overrun (ljudlucka = "krasch" i ljuset) per stall med 21 ms buffert. Storre buffert later motorn hinna ikapp
+      // efter stallen i stallet for att tappa ljud; steady-state-latensen paverkas inte (vi laser allt som kommit).
+      `--buffer-size=${Math.max(512, Math.min(16384, Number(process.env.DMX_ALSA_BUFFER ?? 1024)))}`,
       "--period-size=128",
       "-q",
     ];
