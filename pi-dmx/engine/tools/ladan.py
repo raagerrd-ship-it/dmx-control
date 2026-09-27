@@ -142,7 +142,7 @@ def main():
     cmd = [sys.executable, os.path.join(HERE, 'deploy-dist.py')]
     if DRY: cmd.append('--dry')
     if not ONLY_DEPLOY:
-        cmd += ['--conf', 'lotus']
+        cmd += ['--conf', 'ladan']   # 09-27: EN fil, ladan.conf, for pagaende prov; allt godkant lyfts in i koden
         for e in env_pairs: cmd += ['--env', e]
     for r in REMOVE: cmd += ['--remove', r]   # alltid, aven med --bara-deploy: rensningen ar en del av koden
     print('\nshow-env som skrivs till lotus.conf:' if not ONLY_DEPLOY else '\n(env orord)')
