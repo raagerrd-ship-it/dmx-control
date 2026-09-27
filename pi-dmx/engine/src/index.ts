@@ -17,7 +17,7 @@ import { AudioCapture } from "./audio.js";
 import { BoundaryDetector } from "./boundaryDetector.js";
 import { createAnalyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
-import { warmUp } from "./warmup.js";
+import { warmUpInBackground } from "./warmup.js";
 import { DmxSender } from "./dmx.js";
 import { startServer, applyInputRouting, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
@@ -91,9 +91,11 @@ applyInputRouting(cfg.audioInput === "mic" ? "mic" : "aux");
 {
   const wp = process.env.DMX_WARMUP ?? "/opt/audio-dmx-engine/warmup/warmup.wav";
   if (wp !== "0") {
-    const r = warmUp(cfg, wp);
-    if (r) console.warn(`[warmup] ${r.secs.toFixed(0)} s ljud, ${r.hops} hop pa ${r.ms.toFixed(0)} ms`);
-    else console.warn(`[warmup] hoppas over: ${wp} saknas eller fel format (mono 16-bit ${cfg.audio.rate} Hz)`);
+    // I BAKGRUNDEN i sma bitar (22:49: synkron uppvarmning blockerade /health -> pi-dmx-watchdog startade om i loop).
+    warmUpInBackground(cfg, wp, (r) => {
+      if (r) console.warn(`[warmup] klar: ${r.secs.toFixed(0)} s ljud, ${r.hops} hop pa ${(r.ms / 1000).toFixed(1)} s (i bakgrunden)`);
+      else console.warn(`[warmup] hoppas over: ${wp} saknas eller fel format (mono 16-bit ${cfg.audio.rate} Hz)`);
+    });
   }
 }
 const analyser = createAnalyser(cfg);
