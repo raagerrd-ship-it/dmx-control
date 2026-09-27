@@ -588,6 +588,12 @@ export async function startServer(
             deps.cfg.dynamics = clamp01(msg.value);
           } else if (msg.type === "setMaster") {
             deps.cfg.master = clamp01(msg.value);
+          } else if (msg.type === "setLevelWindowDb" && Number.isFinite(msg.value)) {
+            // "Lägsta nivå": dB under taket där ljuset når golvet (4..20). Env LIVE_WIN_DB vinner om satt — se effects.ts.
+            deps.cfg.levelWindowDb = Math.max(4, Math.min(20, Number(msg.value)));
+          } else if (msg.type === "setSilenceLevel" && Number.isFinite(msg.value)) {
+            // "Släckgräns": frame.level under vilken riggen tonas ut (0,01..0,20). Env DMX_SILENCE_LEVEL vinner om satt.
+            deps.cfg.silenceLevel = Math.max(0.01, Math.min(0.20, Number(msg.value)));
           } else if (msg.type === "setFixtures" && Array.isArray(msg.fixtures)) {
             const cleaned = sanitizeFixtures(msg.fixtures);
             if (cleaned) { deps.cfg.fixtures = cleaned; stopIdentify(); }

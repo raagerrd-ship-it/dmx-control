@@ -113,6 +113,15 @@ export interface EngineConfig {
   /** Hur ofta smart byter läge (ms). */
   smartDwellMs: number;
   master: number;         // 0..1 master brightness
+  /** LÄGSTA NIVÅ (2026-09-27, ägaren: "justera lägsta tröskel på input för att sätta lägsta tröskel på
+   *  lamporna"): hur många dB UNDER låtens tak ljuset når golvet — LIVE_LEVEL-fönstret i effects.ts.
+   *  Högre värde = tystare musik ger fortfarande ljus. 4..20 dB, standard 10 (ladans live-värde).
+   *  PRIORITET: env LIVE_WIN_DB vinner om den är satt (drop-in), annars detta fält, annars 10. */
+  levelWindowDb?: number;
+  /** SLÄCKGRÄNS: under denna frame.level (0..1) räknas det som tystnad och riggen tonas ut
+   *  (tiden styrs av DMX_SILENCE_MS / DMX_SILENCE_RELEASE_S). 0,01..0,20, standard 0,05.
+   *  PRIORITET: env DMX_SILENCE_LEVEL vinner om den är satt, annars detta fält, annars 0,05. */
+  silenceLevel?: number;
   /** "chase" sub-pattern: sweep (L→R loop) or ping-pong (bounce). */
   chaseStyle: "sweep" | "pingpong";
   /** Which modes are included in the physical button / WS cycle. */
@@ -236,6 +245,8 @@ export const defaultConfig: EngineConfig = {
   energyDrivesMode: true,
   smartDwellMs: 15000,
   master: 1.0,
+  levelWindowDb: 10,      // dB under taket där ljuset når golvet (ratt i /setup: "Lägsta nivå")
+  silenceLevel: 0.05,     // släckgräns på frame.level (ratt i /setup: "Släckgräns")
   chaseStyle: "pingpong",
   rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)

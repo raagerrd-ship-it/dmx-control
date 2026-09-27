@@ -17,6 +17,7 @@ ENVS = [args[i + 1] for i, a in enumerate(args) if a == '--env']
 # <fil>.bak-<ts>, aldrig rm - samma angerbarhet som kopieringens backup. Glob expanderas av sh pa Pi:n.
 REMOVES = [args[i + 1] for i, a in enumerate(args) if a == '--remove']
 files_arg = [a for i, a in enumerate(args) if not a.startswith('--') and (i == 0 or args[i - 1] not in ('--conf', '--env', '--remove'))]
+EXPLICIT_FILES = bool(files_arg)   # filargument = bara dessa dist-filer; public/index.html foljer bara med i full deploy
 HERE = os.path.dirname(os.path.abspath(__file__)); LOCAL = os.path.normpath(os.path.join(HERE, '..', 'dist'))
 REMOTE = '/opt/audio-dmx-engine/dist'
 # GEMENSAM ANALYSATOR (2026-09-24): vagra INNAN nagot rors pa Pi:n om analysatorn/inspelaren skiljer sig fran den gemensamma
@@ -63,6 +64,17 @@ if os.path.exists(wl):
         rc, out, _ = sudo("mkdir -p /opt/audio-dmx-engine/warmup && cp /tmp/warmup.wav /opt/audio-dmx-engine/warmup/warmup.wav && chmod 644 /opt/audio-dmx-engine/warmup/warmup.wav && echo ok")
         print(f"warmup.wav -> Pi:n ({len(wd)//1000} kB): {out.strip() or 'FEL'}"); todo.append('warmup/warmup.wav')
     else: print("warmup.wav oforandrad pa Pi:n")
+# SETUP-UI:T (2026-09-27): deploy-dist.py kopierade bara dist/*.js; public/index.html nadde Pi:n enbart via install.sh (rsync, kraver
+# git pa boxen). Nu foljer public/index.html med i en full deploy (utan filargument) nar md5 skiljer -> /opt/audio-dmx-engine/public/.
+# Statisk fil som fastify laser fran disk per anrop: ingen omstart behovs, sa den raknas inte in i `todo`.
+pl = os.path.normpath(os.path.join(HERE, '..', 'public', 'index.html'))
+if os.path.exists(pl) and not EXPLICIT_FILES:
+    pd = open(pl, 'rb').read().replace(b'\r\n', b'\n'); rc, out, _ = run("md5sum /opt/audio-dmx-engine/public/index.html 2>/dev/null")
+    if out.split()[:1] != [hashlib.md5(pd).hexdigest()]:
+        with sf.open('/tmp/index.html', 'wb') as fh: fh.write(pd)
+        rc, out, _ = sudo(f"mkdir -p /opt/audio-dmx-engine/public && ([ -f /opt/audio-dmx-engine/public/index.html ] && cp /opt/audio-dmx-engine/public/index.html /opt/audio-dmx-engine/public/index.html.bak-{ts}; true) && cp /tmp/index.html /opt/audio-dmx-engine/public/index.html && chmod 644 /opt/audio-dmx-engine/public/index.html && echo ok")
+        print(f"public/index.html -> Pi:n ({len(pd)//1000} kB, ingen omstart kravs): {out.strip() or 'FEL'}")
+    else: print("public/index.html oforandrad pa Pi:n")
 removed = []
 for pat in REMOVES:
     # [ -e ] fangar bade fil och katalog; en glob utan traff lamnas orord (mv far aldrig se monstret).
