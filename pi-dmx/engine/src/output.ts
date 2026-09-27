@@ -52,6 +52,16 @@ const HUE_LIFT = process.env.DMX_HUE_LIFT !== '0';
  *  av starkaste (halls pa minst tandpunkten); slacks under HUE_RATIO_OFF (hysteres). */
 const HUE_RATIO_ON = Number(process.env.DMX_HUE_RATIO_ON ?? 0.25);
 const HUE_RATIO_OFF = Number(process.env.DMX_HUE_RATIO_OFF ?? 0.15);
+/** RENA PRIMARFARGER UNDER TANDPUNKTEN (2026-09-27, agaren i ladan: "i tysta partier tands alla LED (R G B), kanns hackigt ...
+ *  vi sabbar manga effekter"). Under tandpunkten kan lampan inte visa en blandfarg: kulorlyftet gav starkaste kanalen 16 och
+ *  varje sidokanal >= 25 % ocksa 16 -> tre lika varden = vitt. Nu: ar starkaste fargkanalen under sin tandpunkt lyser BARA
+ *  den, pa tandpunkten (ren R/G/B); ar den under LOW_OFF_K x tandpunkten ar lampan SLACKT (osynlig anda). DMX_LOW_PURE=0 = som forr. */
+const LOW_PURE = process.env.DMX_LOW_PURE !== '0';
+/** Agaren 21:25: "under kanske 10 % slacks, over ar den redan hojd over slackpunkten". Per FARGKANAL, absolut i DMX-steg:
+ *  pa vid >= LOW_ON_CH (26 = 10 %), av under LOW_OFF_CH (20) - hysteres sa gransen inte flimrar. Ingen lyftning av svaga
+ *  sidokanaler langre (det var det som tande alla tre dioderna). Kanaler pa/over tandpunkten lamnas ifred. */
+const LOW_ON_CH = Number(process.env.DMX_LOW_ON_CH ?? 26);
+const LOW_OFF_CH = Number(process.env.DMX_LOW_OFF_CH ?? 20);
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
 
@@ -191,7 +201,7 @@ export class FixtureOutput {
       const on = c ? (c.on || 0) : 0;
 
       // KULORLYFT: lampans starkaste fargkanal (r/g/b/w) och dess tandpunkt -> en gemensam skalfaktor i stallet for lyft per kanal.
-      let hueScale = 1, hueMaxCh = -1, hueMaxRaw = 0;
+      let hueScale = 1, hueMaxCh = -1, hueMaxRaw = 0, hueMaxOn = 0;
       if (HUE_LIFT && c) {
         let mx = 0, mxOn = 0;
         for (let i = 0; i < fast.roles.length; i++) {
@@ -200,7 +210,7 @@ export class FixtureOutput {
           const raw = universe[ch];
           if (raw > mx) { mx = raw; hueMaxCh = ch; mxOn = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; }
         }
-        hueMaxRaw = mx;
+        hueMaxRaw = mx; hueMaxOn = mxOn;
         if (mx > 0 && mx < mxOn) hueScale = mxOn / mx;
       }
 
@@ -216,6 +226,12 @@ export class FixtureOutput {
           : ((role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : role === "w" ? c.onW : undefined) ?? on);
 
         let raw = universe[ch];
+        if (LOW_PURE && isColor) {
+          // 10 %-REGELN per fargkanal (hysteres): under -> slackt, over -> som den ar (redan over tandpunkten), aldrig lyft.
+          const lit = this.hueOn[ch] === 1 ? raw >= LOW_OFF_CH : raw >= LOW_ON_CH;
+          if (!lit) { this.hueOn[ch] = 0; universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
+          this.hueOn[ch] = 1; if (raw < onCh) raw = onCh; const v1 = raw > top ? top : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
+        }
         if (HUE_LIFT && isColor && raw > 0) {
           // starkaste kanalen (och alla andra) skalas upp till tandpunkten; ovriga kanaler lyfts INTE var for sig
           if (hueScale !== 1) { raw = Math.round(raw * hueScale); if (raw > 255) raw = 255; }
