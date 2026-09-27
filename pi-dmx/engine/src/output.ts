@@ -190,6 +190,7 @@ export class FixtureOutput {
    * SISTA STEGET FÖRE UTGÅNG: tändpunkt som GOLV + master som TAK.
    */
   private hueOn = new Uint8Array(512);   // KULORLYFT: kanalen ar tand (hysteres)
+  private lowLit = new Uint8Array(512);  // 10 %-REGELN: lampan (indexerad pa basadressen) ar tand (hysteres pa starkaste fargkanalen)
 
   calibrate(universe: Uint8Array, fixtures: FixtureConfig[], master: number, nowMs: number): void {
     const top = (255 * master + 0.5) | 0;
@@ -202,7 +203,7 @@ export class FixtureOutput {
 
       // KULORLYFT: lampans starkaste fargkanal (r/g/b/w) och dess tandpunkt -> en gemensam skalfaktor i stallet for lyft per kanal.
       let hueScale = 1, hueMaxCh = -1, hueMaxRaw = 0, hueMaxOn = 0;
-      if (HUE_LIFT && c) {
+      if (HUE_LIFT && c && !LOW_PURE) {   // (hueScale anvands inte under LOW_PURE - hoppa over slingan)
         let mx = 0, mxOn = 0;
         for (let i = 0; i < fast.roles.length; i++) {
           const ch = base + i; if (ch < 0 || ch >= 512 || this.cal[ch] !== 1 || this.dimCal[ch] === 1) continue;
@@ -214,6 +215,21 @@ export class FixtureOutput {
         if (mx > 0 && mx < mxOn) hueScale = mxOn / mx;
       }
 
+      // 10 %-REGELN PER LAMPA (kodgranskning 09-28: per kanal flippade kuloren rod<->orange i takten nar hjartpulsen
+      // pendlade en sidokanal kring 20/26). Nu avgors tand/slackt av lampans STARKASTE fargkanal med hysteres
+      // (pa >= LOW_ON_CH, av < LOW_OFF_CH); tand lampa skickar fargkanalerna RAA (inget lyft - under tandpunkten lyser
+      // de inte fysiskt anda), slackt lampa nollar dem. Kuloren andras bara nar fargen andras, inte med ljusstyrkan.
+      let lampLit = true;
+      if (LOW_PURE && c) {
+        let mxRaw = 0;
+        for (let i = 0; i < fast.roles.length; i++) {
+          const ch = base + i; if (ch < 0 || ch >= 512 || this.cal[ch] !== 1 || this.dimCal[ch] === 1) continue;
+          const role = fast.roles[i]; if (role !== "r" && role !== "g" && role !== "b" && role !== "w") continue;
+          if (universe[ch] > mxRaw) mxRaw = universe[ch];
+        }
+        lampLit = this.lowLit[base] === 1 ? mxRaw >= LOW_OFF_CH : mxRaw >= LOW_ON_CH;
+        this.lowLit[base] = lampLit ? 1 : 0;
+      }
       for (let i = 0; i < fast.roles.length; i++) {
         const ch = base + i;
         if (ch < 0 || ch >= 512) continue;
@@ -227,10 +243,8 @@ export class FixtureOutput {
 
         let raw = universe[ch];
         if (LOW_PURE && isColor) {
-          // 10 %-REGELN per fargkanal (hysteres): under -> slackt, over -> som den ar (redan over tandpunkten), aldrig lyft.
-          const lit = this.hueOn[ch] === 1 ? raw >= LOW_OFF_CH : raw >= LOW_ON_CH;
-          if (!lit) { this.hueOn[ch] = 0; universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
-          this.hueOn[ch] = 1; if (raw < onCh) raw = onCh; const v1 = raw > top ? top : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
+          if (!lampLit) { universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
+          const v1 = raw > top ? top : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
         }
         if (HUE_LIFT && isColor && raw > 0) {
           // starkaste kanalen (och alla andra) skalas upp till tandpunkten; ovriga kanaler lyfts INTE var for sig

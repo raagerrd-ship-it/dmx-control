@@ -214,7 +214,7 @@ capture.on("chunk", (samples: Float32Array) => {
   // falska latgranser pa pop kastade tempolaset 5x/5 min (ladan 2026-09-04).
   bounds.tick({ level: frame.level, bpm: frame.bpm, bpmConfidence: frame.bpmConfidence });
   if (bounds.boundaryCount !== lastBoundary) {
-    lastBoundary = bounds.boundaryCount; effects.softenRange(); if (process.env.DMX_BOUNDARY_SOFT !== '0') analyser.hintTrackChange(5000); else { analyser.resetTempo(); if (process.env.DMX_SECTION_HINT_LOWCONF === '0') analyser.hintTrackChange(5000); }   // riktig latgrans nollar sektionerna (tempotappet gor det inte langre)
+    lastBoundary = bounds.boundaryCount; effects.softenRange(); if (process.env.DMX_BOUNDARY_SOFT !== '0') analyser.hintTrackChange(5000); else { analyser.resetTempo(); if ((process.env.DMX_SECTION_HINT_LOWCONF ?? '0') === '0') analyser.hintTrackChange(5000); }   // riktig latgrans nollar sektionerna (tempotappet gor det inte langre)
     if (recorder) { const name = "ladan-" + lastBoundary; recorder.noteTrack(name, "dmx"); recorder.trackChanged("dmx", name); }
   }
 

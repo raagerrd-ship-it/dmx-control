@@ -29,22 +29,34 @@ export function warmUpInBackground(cfg: EngineConfig, path: string, done: (r: Wa
   const channels = d.readUInt16LE(22), rate = d.readUInt32LE(24), bits = d.readUInt16LE(34);
   if (channels !== 1 || bits !== 16 || rate !== cfg.audio.rate) { done(null); return; }
   const n = (d.length - 44) >> 1, HOP = cfg.fft.hop;
-  const SLICE = Math.max(10, Math.min(2000, Number(process.env.DMX_WARMUP_SLICE ?? 10)));
-  const an = new Analyser(cfg);            // roll 'all' (ingen worker): hela process()-vagen i huvudtraden
+  // TIDSBUDGET per bit (kodgranskning 09-28): 10 hop blev ~30 ms block pa Zero 2 W medan ALSA-bufferten ar 21 ms.
+  // Nu hogst DMX_WARMUP_BUDGET_MS (4) per setImmediate-varv, minst ett hop.
+  const BUDGET_MS = Math.max(1, Math.min(50, Number(process.env.DMX_WARMUP_BUDGET_MS) || 4));
+  // EGEN KONFIG-KLON (kodgranskning 09-28): skrapmotorn skrev i den riktiga cfg:n - fogTick uppdaterade rokens
+  // warmStartMs/sprayMs/bursts (varmebudget, persisteras) och render() nollade fogTrigger ("Rok nu" under uppvarmningen ats).
+  // Roken ar AV i klonen; allt annat lases bara.
+  const scratchCfg: EngineConfig = { ...cfg, fog: { ...cfg.fog, enabled: false, onDrop: false }, fogTrigger: false };
+  const an = new Analyser(scratchCfg);     // roll 'all' (ingen worker): hela process()-vagen i huvudtraden
   an.setGainLock(true, 1);
-  const fx = new EffectEngine(cfg);
+  const fx = new EffectEngine(scratchCfg);
   const buf = new Float32Array(HOP);
   const t0 = performance.now();
   let hops = 0, nextRenderMs = 0, off = 0;
   const step = (): void => {
-    let k = 0;
-    while (k < SLICE && off + HOP <= n) {
-      for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
-      const ms = (off * 1000) / rate;
-      an.setVirtualClock(ms);
-      const f = an.process(buf);
-      hops++; off += HOP; k++;
-      if (ms >= nextRenderMs) { nextRenderMs += 10; fx.render(f); }   // 100 Hz som live
+    try {
+      const tSlice = performance.now();
+      do {
+        for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
+        const ms = (off * 1000) / rate;
+        an.setVirtualClock(ms);
+        const f = an.process(buf);
+        hops++; off += HOP;
+        if (ms >= nextRenderMs) { nextRenderMs += 10; fx.render(f); }   // 100 Hz som live
+      } while (off + HOP <= n && performance.now() - tSlice < BUDGET_MS);
+    } catch (e) {
+      // Ett kast pa skrapinstansen far ALDRIG doda motorn (ingen uncaughtException-hanterare; vakthunden skulle loopa).
+      console.warn(`[warmup] avbruten efter ${hops} hop: ${(e as Error)?.message ?? e}`);
+      done(null); return;
     }
     if (off + HOP <= n) setImmediate(step);
     else done({ hops, ms: performance.now() - t0, secs: n / rate });
