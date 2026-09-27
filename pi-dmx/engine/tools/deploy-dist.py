@@ -65,6 +65,8 @@ if ENVS:
     body = '[Service]\\n# ' + ts + ' via deploy-dist.py\\n' + ''.join(f'Environment={e}\\n' for e in ENVS)
     rc, out, _ = sudo(f"mkdir -p /etc/systemd/system/audio-dmx-engine.service.d && printf \"{body}\" > /etc/systemd/system/audio-dmx-engine.service.d/{name}.conf && cat /etc/systemd/system/audio-dmx-engine.service.d/{name}.conf && systemctl daemon-reload")
     print(out.strip())
+if removed and not ENVS:   # 09-27: borttagna drop-ins maste laddas om, annars startar systemd med den gamla unit-bilden (env kvar)
+    sudo('systemctl daemon-reload')
 if not todo and not ENVS and not removed: sys.exit(0)
 if NORESTART: print('ingen omstart begard'); sys.exit(0)
 rc, out, _ = sudo("systemctl restart audio-dmx-engine")
