@@ -14,7 +14,11 @@ export const frasraknare: EffectDef = {
     const bar = Math.floor(barsF);
     const inBar = barsF - bar;                                                    // 0..1 genom takten
     const hue = c.mixedSector(Math.floor(bar / 4)) / 6;
-    let v = 0.15 + c.beatPulse * 0.35 + c.punch * 0.3;
+    // RAKNA TAKTEN PA LAMPORNA (2026-09-27): fyra lampor = fyra slag i takten. Slag k i takten slar hart pa lampa k (v->h),
+    // resten far bara en svag puls - publiken ser 1-2-3-4 vandra over riggen. Forut var grundpulsen uniform (= pulse) och
+    // effekten syntes bara var 4:e/8:e takt.
+    const mine = Math.min(c.count - 1, Math.floor(inBar * c.count)) === c.idx;   // takten vandrar v->h over riggen (4 lampor = 4 slag)
+    let v = 0.12 + c.beatPulse * (mine ? 0.7 : 0.12) + c.punch * 0.3;
     let sat = 1 - c.punch * 0.3;
     if (bar % 4 === 3) {                                                          // fjarde takten: svep
       const head = inBar * (c.count - 1);

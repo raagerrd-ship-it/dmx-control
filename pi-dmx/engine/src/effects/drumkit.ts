@@ -22,8 +22,11 @@ export const drumkit: EffectDef = {
     switch (voice) {
       case 0: return c.hsv(0.01, 1.00, hit(d.kick, 0.05));   // KICK  → röd dunk
       case 1: return c.hsv(0.09, 0.20, hit(d.snare, 0.04));  // SNARE → varm-vit crack
-      case 2: return c.hsv(0.53, 0.35, hit(d.hat, 0.02));    // HI-HAT→ isig blå-vit tick
-      case 3: return c.hsv(0.83, 1.00, hit(d.bass, 0.06));   // BAS   → magenta pump
+      // HI-HAT: sat 0,35 snapptes till VITT av hsv (< 0,5 = vitt) -> lampa 1 och 2 var bada vita. Nu >= 0,5 = cyan, skild fran virveln.
+      case 2: return c.hsv(0.53, 0.60, hit(d.hat, 0.02));    // HI-HAT→ isig cyan tick
+      // BAS: drum.bass ar SUSTAINED -> lampa 3 lyste konstant magenta medan de andra punchade (agaren 09-27: "en lampa som
+      // lyser konstant medan de andra kor"). Nu pumpar mattan med hjartat sa aven bas-lampan slar i takten.
+      case 3: return c.hsv(0.83, 1.00, hit(d.bass * c.heart(0.6), 0.06));   // BAS   → magenta pump i takten
       default: {
         // Enda lampa: hela kittet i en. Kick+bas driver rött, hi-haten lägger
         // en ljus gnista; snyggast dominant-röst bestämmer färgtonen.

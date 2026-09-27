@@ -31,7 +31,11 @@ export const eq: EffectDef = {
       return [bri(low), bri(s.mid), bri(hi)];
     }
     // Sprid lamporna jämnt över kolumnerna → ett lågt-till-högt spektrum i rummet.
-    const col = COLS[Math.round((c.idx / (c.count - 1)) * (COLS.length - 1))];
-    return c.hsv(col[1], 1, bri(col[0]) * c.heart(0.25));   // spektrumet pulsar i takten (09-27)
+    const ci = Math.round((c.idx / (c.count - 1)) * (COLS.length - 1));
+    const col = COLS[ci];
+    // NIVA-kolumnerna (bas/mellan, index 0-2) ar sustained -> pa fyra lampor lag lampa 0-1 konstant tanda medan
+    // anslagskolumnerna 2-3 tickade (agaren 09-27: "en lampa som lyser konstant"). Nu pumpar nivakolumnerna djupt i
+    // takten; anslagskolumnerna lamnas ororda (de tickar redan).
+    return c.hsv(col[1], 1, bri(col[0]) * (ci <= 2 ? c.heart(0.55) : 1));
   },
 };

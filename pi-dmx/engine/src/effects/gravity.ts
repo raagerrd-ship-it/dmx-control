@@ -20,7 +20,9 @@ export const gravity: EffectDef = {
     const peakLamp = Math.min(n - 1, Math.floor(peak * n));
     if (c.idx === peakLamp && peak > 0.03) {
       const peakHue = ((c.mixedSector(Math.floor(c.beatIdx / 8)) + 3) % 6) / 6;   // peak i kontrastfärg
-      return c.hsv(peakHue, 1, 1);
+      // Pricken var hsv(_,1,1) = en lampa KONSTANT fullt tand medan stapeln pulsade (agaren 09-27). Nu pulsar den med
+      // hjartat (djupare an stapeln sa den fortfarande sticker ut som topp) - minnet av smallen slar i takten.
+      return c.hsv(peakHue, 1, c.heart(0.5));
     }
     const base = c.mixedSector(Math.floor(c.beatIdx / 8)) / 6;               // lugn färgvandring
     return c.hsv(base, 1, (0.05 + 0.95 * fill) * c.heart(0.3));   // nivan pulsar i takten, peak-pricken orord (09-27)
