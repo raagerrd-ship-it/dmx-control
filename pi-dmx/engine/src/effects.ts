@@ -100,6 +100,8 @@ const SUBDIV_MIN_HOLD_MS = 10000;
  *  Dirigenten boostar de delade lookerna vid halvering (dubbeltakt ELLER lugnt) och hjärta i
  *  lugna partier, och får byta look när halveringen slår om. Ägaren 2026-09-12. */
 const HALVE_SHOW = process.env.DMX_HALVE_SHOW !== "0";   // standard PA sedan 09-27 (ladan)
+/** DMX_EFFECT_HEART: skalar effekternas EGNA hjartpuls (c.heart). 1 = som effektfilerna sager, 0 = av (A/B i ladan 09-27). */
+const EFFECT_HEART = Math.max(0, Math.min(2, Number(process.env.DMX_EFFECT_HEART ?? 1)));
 /** MINIDROP-REAKTION (agaren 2026-09-12: "minidrops borde markas — effektbyte eller intensitet"): analysatorns
  *  frame.miniDropCount (monoton) ger look-byte (om looken hallits MIN_HOLD) + en kort stot pa MINI_DROP_ENV av
  *  en full drop-small (dropEnv), ingen rok, ingen blackout. */
@@ -529,7 +531,7 @@ export class EffectEngine {
     dropFired: this.dropFired, dropHue: this.dropHue, now: 0,
     mixedSector,
     heartPulse: 0,
-    heart: (depth: number) => 1 - depth + depth * this.ctx.heartPulse,
+    heart: (depth: number) => { const d = depth * EFFECT_HEART; return 1 - d + d * this.ctx.heartPulse; },
     mclk: (beatsPerStep: number, secPerStep: number) =>
       this.ctx.hasBeat ? Math.floor(this.ctx.beatIdx / beatsPerStep) : Math.floor(this.ctx.t / secPerStep),
     shaped: (floor: number, x: number) => {
