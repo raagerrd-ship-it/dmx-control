@@ -62,11 +62,16 @@ for (let off = 0; off + HOP <= n && off < (startS + secs) * SR; off += HOP) {
     sectionTier: c.sectionTier, repeatSim: c.repeatSim, expectHighInMs: c.expectHighInMs, levelVsHighDb: c.levelVsHighDb,
     sectionBars: c.sectionBars, bassline: c.bassline, bassNoteIdx: c.bassNoteIdx, bassNoteAge: c.bassNoteAge,   // 2026-09-23: utan dessa blev basgang NaN (medel 0,00) och basnots-/frasgrenarna i chase/eko/stege/tide/pendel/frasraknare/forvarning kordes aldrig
     beatIdx: c.beatIdx, beatFrac: c.beatFrac, beatPulse: c.beatPulse, beatHit: c.beatHit, hasBeat: c.hasBeat,
+    // 2026-09-27: heartPulse/heart + group/grouping tillkom i kontraktet (c.heart i 15 effekter, c.group i 7). Utan dem kastade
+    // render() TypeError -> [0,0,0] for alla heart-effekter och c.group === 1 var alltid falskt (alla lampor "inre").
+    heartPulse: c.heartPulse, grouping: c.grouping,
     wavePhase, buildUp: c.buildUp, phaseSpread: c.phaseSpread, punchFloor: c.punchFloor, chasePos,
     dropFired: [...dropFired], dropHue: [...dropHue], now: ms - ms0, bands, palette: [...currentPalette()],
     mixedSector, hsv: hsvToRgb,
   };
   snap.mclk = (b, sec) => snap.hasBeat ? Math.floor(snap.beatIdx / b) : Math.floor(snap.t / sec);
+  snap.heart = (depth) => 1 - depth + depth * snap.heartPulse;   // som effects.ts (DMX_EFFECT_HEART=1)
+  snap.group = 0;
   snap.shaped = (floor, x) => { const dyn = Math.max(0, Math.min(1, cfg.dynamics ?? 0.6)); const fl = floor * (1 - dyn); return Math.min(1, fl + (1 - fl) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.2)); };
   snaps.push(snap);
   void prevBeatIdx;
@@ -75,25 +80,26 @@ console.log = origLog;
 if (!snaps.length) { console.error("inga rutor"); process.exit(1); }
 
 // 2) Rendera varje effekt pa samma serie (effektens avsikt, inga motorlager).
-const rows = {}, H = {}, WANT = {};
+const rows = {}, rowsV = {}, H = {}, WANT = {};
 for (const e of EFFECTS) {
-  const L = [], hues = []; const w = { strobe: 0, blinder: 0, uv: 0, hazer: 0 };
+  const L = [], LV = [], hues = []; const w = { strobe: 0, blinder: 0, uv: 0, hazer: 0 };
   for (const sn of snaps) {
     setPalette(sn.palette);
-    const lamps = []; let r0 = 0, g0 = 0, b0 = 0;
+    const lamps = [], lampsV = []; let r0 = 0, g0 = 0, b0 = 0;
     for (let k = 0; k < LAMPS; k++) {
       sn.idx = k; sn.band = sn.bands[k]; sn.want = {};
+      sn.group = sn.grouping === 'innerouter' ? ((k === 0 || k === LAMPS - 1) ? 1 : 0) : k % 2;   // som effects.ts:1830
       let rgb; try { rgb = e.render(sn); } catch (err) { rgb = [0, 0, 0]; if (!WANT[e.key + ":err"]) { WANT[e.key + ":err"] = 1; console.error(`render-fel ${e.key}: ${err.message}`); } }
       const r = Math.max(0, Math.min(1, rgb[0] || 0)), g = Math.max(0, Math.min(1, rgb[1] || 0)), b = Math.max(0, Math.min(1, rgb[2] || 0));
-      lamps.push((r + g + b) / 3); if (k === 0) { r0 = r; g0 = g; b0 = b; }
+      lamps.push((r + g + b) / 3); lampsV.push(Math.max(r, g, b)); if (k === 0) { r0 = r; g0 = g; b0 = b; }
       for (const key of Object.keys(w)) if (sn.want[key] !== undefined) w[key] += sn.want[key];
     }
-    L.push(lamps);
+    L.push(lamps); LV.push(lampsV);
     const mx = Math.max(r0, g0, b0), mn = Math.min(r0, g0, b0); let h = 0;
     if (mx > mn) { if (mx === r0) h = ((g0 - b0) / (mx - mn)) % 6; else if (mx === g0) h = (b0 - r0) / (mx - mn) + 2; else h = (r0 - g0) / (mx - mn) + 4; h = (h / 6 + 1) % 1; }
     hues.push(h);
   }
-  rows[e.key] = L; H[e.key] = hues; WANT[e.key] = Object.fromEntries(Object.entries(w).map(([k, v]) => [k, v / (snaps.length * LAMPS)]));
+  rows[e.key] = L; rowsV[e.key] = LV; H[e.key] = hues; WANT[e.key] = Object.fromEntries(Object.entries(w).map(([k, v]) => [k, v / (snaps.length * LAMPS)]));
 }
 const mean = (a) => a.reduce((s, v) => s + v, 0) / a.length, std = (a) => { const m = mean(a); return Math.sqrt(mean(a.map((v) => (v - m) ** 2))); };
 const stats = {};
@@ -115,14 +121,20 @@ const corr = (a, b) => { const ma = mean(a), mb = mean(b); let sab = 0, saa = 0,
 const PERMS = []; (function gen(a, k) { if (k === a.length) { PERMS.push([...a]); return; } for (let i = k; i < a.length; i++) { [a[k], a[i]] = [a[i], a[k]]; gen(a, k + 1); [a[k], a[i]] = [a[i], a[k]]; } })([0, 1, 2, 3], 0);
 const COLS = Object.fromEntries(keys.map((k) => [k, [0, 1, 2, 3].map((li) => rows[k].map((l) => l[li]))]));
 const permCorr = (a, b) => { let best = -1; for (const pm of PERMS) { const x = [], y = []; for (let li = 0; li < LAMPS; li++) { x.push(COLS[a][li]); y.push(COLS[b][pm[li]]); } const r = corr(x.flat(), y.flat()); if (r > best) best = r; } return best; };
-const R = {}, RX = {}; for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) { RX[keys[i] + "|" + keys[j]] = corr(F[keys[i]], F[keys[j]]); R[keys[i] + "|" + keys[j]] = permCorr(keys[i], keys[j]); }
+// rV (2026-09-27): samma permutationskorrelation pa LJUSSTYRKAN (max(r,g,b) = hsv:s v) i stallet for medel(r,g,b). Medelvardet
+// bar kuloren (rott = v/3, gult = 2v/3, vitt = v) sa tva effekter med SAMMA rorelsemonster men olika palettvandring foll till ~0,5
+// (gallop~varannan 0,58 trots identisk A-pa-slaget/B-pa-offbeatet). rV ser monstret publiken ser pa fyra lampor; rPerm ser kuloren med.
+const COLSV = Object.fromEntries(keys.map((k) => [k, [0, 1, 2, 3].map((li) => rowsV[k].map((l) => l[li]))]));
+const permCorrV = (a, b) => { let best = -1; for (const pm of PERMS) { const x = [], y = []; for (let li = 0; li < LAMPS; li++) { x.push(COLSV[a][li]); y.push(COLSV[b][pm[li]]); } const r = corr(x.flat(), y.flat()); if (r > best) best = r; } return best; };
+const R = {}, RX = {}, RV = {}; for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) { RX[keys[i] + "|" + keys[j]] = corr(F[keys[i]], F[keys[j]]); R[keys[i] + "|" + keys[j]] = permCorr(keys[i], keys[j]); RV[keys[i] + "|" + keys[j]] = permCorrV(keys[i], keys[j]); }
 const rOf = (a, b) => R[a + "|" + b] ?? R[b + "|" + a] ?? 0;
+const rvOf = (a, b) => RV[a + "|" + b] ?? RV[b + "|" + a] ?? 0;
 const rxOf = (a, b) => RX[a + "|" + b] ?? RX[b + "|" + a] ?? 0;
 // SAMMA POOL = delar tier ELLER en sektionstagg (dirigenten kan stalla dem mot varandra i samma val).
 const def = Object.fromEntries(EFFECTS.map((e) => [e.key, e]));
 const samePool = (a, b) => def[a].tier === def[b].tier || (def[a].section || []).some((s) => (def[b].section || []).includes(s));
 const pairs = [];
-for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) { const r = rOf(keys[i], keys[j]); if (r >= 0.80) pairs.push([r, keys[i], keys[j], samePool(keys[i], keys[j])]); }
+for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) { const r = rOf(keys[i], keys[j]), rv = rvOf(keys[i], keys[j]); if (Math.max(r, rv) >= 0.80) pairs.push([Math.max(r, rv), keys[i], keys[j], samePool(keys[i], keys[j]), r, rv]); }
 pairs.sort((a, b) => b[0] - a[0]);
 console.log(`${f} ${startS}-${startS + secs}s, ${snaps.length} rutor, ${keys.length} effekter (effektens avsikt pa dirigentens ctx-serie)`);
 console.log("\nkontrast/taktmod/rumslighet/fargrorelse (lagt = svag) + onskemal (medel want/lampa):");
@@ -130,10 +142,11 @@ for (const k of [...keys].sort((a, b) => stats[a].contrast + stats[a].spatial - 
   const s = stats[k], w = WANT[k]; const ws = Object.entries(w).filter(([, v]) => v > 0.001).map(([kk, v]) => `${kk} ${v.toFixed(2)}`).join(" ");
   console.log(`  ${k.padEnd(11)} medel ${s.m.toFixed(2)} kontrast ${s.contrast.toFixed(3)} takt ${s.beatMod.toFixed(3)} rum ${s.spatial.toFixed(3)} farg ${s.hueMove.toFixed(2)}${ws ? "  want: " + ws : ""}`);
 }
-console.log("\nnara dubbletter (rPerm >= 0,80: per-lampa-luminans, basta lampomkastning; * = samma pool):");
-for (const [r, a, b, sp] of pairs) console.log(`  ${r.toFixed(2)} ${sp ? "*" : " "} ${a} ~ ${b}  (exakt ${rxOf(a, b).toFixed(2)})`);
-console.log("\nnarmaste granne per effekt:");
-for (const k of keys) { let best = null; for (const o of keys) if (o !== k) { const r = rOf(k, o); if (!best || r > best[0]) best = [r, o]; } console.log(`  ${k.padEnd(11)} ${best[1].padEnd(11)} ${best[0].toFixed(2)}${samePool(k, best[1]) ? " *" : ""}`); }
+console.log("\nnara dubbletter (max(rPerm, rV) >= 0,80; rPerm = medel(r,g,b), rV = LJUSSTYRKA max(r,g,b) - monstret oavsett kulor; basta lampomkastning; * = samma pool):");
+for (const [, a, b, sp, r, rv] of pairs) console.log(`  rPerm ${r.toFixed(2)} rV ${rv.toFixed(2)} ${sp ? "*" : " "} ${a} ~ ${b}  (exakt ${rxOf(a, b).toFixed(2)})`);
+console.log("\nnarmaste granne per effekt (rPerm | rV):");
+for (const k of keys) { let best = null, bestV = null; for (const o of keys) if (o !== k) { const r = rOf(k, o), rv = rvOf(k, o); if (!best || r > best[0]) best = [r, o]; if (!bestV || rv > bestV[0]) bestV = [rv, o]; } console.log(`  ${k.padEnd(11)} ${best[1].padEnd(11)} ${best[0].toFixed(2)}${samePool(k, best[1]) ? " *" : "  "} | ${bestV[1].padEnd(11)} ${bestV[0].toFixed(2)}${samePool(k, bestV[1]) ? " *" : ""}`); }
+console.log(`\nmedel rV over alla par: ${(Object.values(RV).reduce((a, b) => a + b, 0) / Object.values(RV).length).toFixed(3)}, par med rV >= 0,70: ${Object.values(RV).filter((v) => v >= 0.7).length}, >= 0,80: ${Object.values(RV).filter((v) => v >= 0.8).length}, >= 0,90: ${Object.values(RV).filter((v) => v >= 0.9).length}`);
 
 // ── VISUELLA FAMILJER: enkellankad klustring pa korrelationen ─────────────────────────────────────────────
 const famArg = process.argv.find((a) => a.startsWith("--famr=")); const famIx = process.argv.indexOf("--famr");
