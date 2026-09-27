@@ -35,7 +35,7 @@ export function warmUpInBackground(cfg: EngineConfig, path: string, done: (r: Wa
   // EGEN KONFIG-KLON (kodgranskning 09-28): skrapmotorn skrev i den riktiga cfg:n - fogTick uppdaterade rokens
   // warmStartMs/sprayMs/bursts (varmebudget, persisteras) och render() nollade fogTrigger ("Rok nu" under uppvarmningen ats).
   // Roken ar AV i klonen; allt annat lases bara.
-  const scratchCfg: EngineConfig = { ...cfg, fog: { ...cfg.fog, enabled: false, onDrop: false }, fogTrigger: false };
+  const scratchCfg: EngineConfig = { ...cfg, fog: { ...cfg.fog, enabled: false, onDrop: false } as EngineConfig["fog"], fogTrigger: false };
   const an = new Analyser(scratchCfg);     // roll 'all' (ingen worker): hela process()-vagen i huvudtraden
   an.setGainLock(true, 1);
   const fx = new EffectEngine(scratchCfg);
