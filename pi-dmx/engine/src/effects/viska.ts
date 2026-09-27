@@ -10,10 +10,17 @@ export const viska: EffectDef = {
   flat: true,   // statiskt svep → kortare dwell
   render(c) {
     const d = c.drum;
-    const role = c.count > 1 ? c.idx % 3 : -1;
-    const spark = role === 0 ? d.kick * 0.55 : role === 1 ? d.snare * 0.75 : d.hat * 0.6;
-    const hue = role === 0 ? 0.02 : role === 1 ? 0.10 : 0.55;   // röd / varmvit / iskall
-    const sat = role === 1 ? 0.25 : 0.9;
-    return c.hsv(hue, sat, Math.min(1, 0.20 * c.heart(0.35) + spark));   // vilo-glöden pulsar med hjartat, gnistorna ororda (09-27)
+    // VANDRANDE GNISTOR (2026-09-27): forut en fast trumrost per lampa (idx % 3) = samma figur som drumkit (rPerm 0,78-0,96 pa
+    // ladans facit). Nu vandrar hi-hat-gnistan ett steg per attondel runt riggen, virveln slar pa en grupp i taget (jamn/udda
+    // eller inre/yttre via c.grouping) och kicken ar en dov rod puls pa ALLA - viskningen ror sig, drumkit star.
+    const n = Math.max(1, c.count);
+    const hatPos = c.hasBeat ? Math.floor((c.beatIdx + c.beatFrac) * 2) % n : c.mclk(0.5, 0.12) % n;
+    const hat = hatPos === c.idx ? d.hat * 0.6 : 0;
+    const snare = c.group === (c.beatIdx & 1) ? d.snare * 0.75 : d.snare * 0.15;
+    const kick = d.kick * 0.35;
+    const spark = Math.max(hat, snare, kick);
+    const hue = spark === hat && hat > 0 ? 0.55 : spark === snare ? 0.10 : 0.02;   // iskall / varmvit / röd
+    const sat = hue === 0.10 ? 0.25 : 0.9;
+    return c.hsv(hue, sat, Math.min(1, 0.20 * c.heart(0.35) + spark));   // vilo-glöden pulsar med hjartat, gnistorna ororda
   },
 };
