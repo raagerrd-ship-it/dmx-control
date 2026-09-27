@@ -32,6 +32,6 @@ export const eq: EffectDef = {
     }
     // Sprid lamporna jämnt över kolumnerna → ett lågt-till-högt spektrum i rummet.
     const col = COLS[Math.round((c.idx / (c.count - 1)) * (COLS.length - 1))];
-    return c.hsv(col[1], 1, bri(col[0]));
+    return c.hsv(col[1], 1, bri(col[0]) * c.heart(0.25));   // spektrumet pulsar i takten (09-27)
   },
 };

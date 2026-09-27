@@ -115,6 +115,12 @@ export interface EffectContext {
   mixedSector: (n: number) => number;
   /** Musik-klocka: stega på taktslag när takt finns, annars på tid. */
   mclk: (beatsPerStep: number, secPerStep: number) => number;
+  /** EFFEKT-EGEN HJARTPULS (2026-09-27, agaren: "effekter far garna ha egen heart-beat" nu nar den globala ar av).
+   *  heartPulse 0..1 = hjartats lub-dub-kurva pa EFFEKT-klockan (1 pa slaget; halveras med DMX_HALVE_SHOW), utan
+   *  taktlas den verkliga kick-envelopen. heart(djup) = 1 - djup + djup*heartPulse: multiplicera ljuset med den.
+   *  Lugna svep ~0,15-0,2, fart ~0,3, full ~0,35. Trumdrivna effekter (drumkit/backbeat/duel) behover den inte. */
+  heartPulse: number;
+  heart: (depth: number) => number;
   /** HSV→RGB (sektor-snäppt för rena PAR-färger). */
   hsv: (h: number, s: number, v: number) => [number, number, number];
   /** Dynamik-formad kurva (golv + gamma på den ljud-drivna delen). */

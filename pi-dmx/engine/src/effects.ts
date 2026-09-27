@@ -528,6 +528,8 @@ export class EffectEngine {
     wavePhase: 0, buildUp: 0, phaseSpread: 0, punchFloor: 0, chasePos: 0,
     dropFired: this.dropFired, dropHue: this.dropHue, now: 0,
     mixedSector,
+    heartPulse: 0,
+    heart: (depth: number) => 1 - depth + depth * this.ctx.heartPulse,
     mclk: (beatsPerStep: number, secPerStep: number) =>
       this.ctx.hasBeat ? Math.floor(this.ctx.beatIdx / beatsPerStep) : Math.floor(this.ctx.t / secPerStep),
     shaped: (floor: number, x: number) => {
@@ -1699,6 +1701,13 @@ export class EffectEngine {
     // puls när BPM ej låst → party/pulse/bounce lyste bara jämnt högt.)
     const _bf = 1 - beatFracFx;
     const beatPulse = hasBeat ? _bf * _bf : kickEnv;
+    // EFFEKT-EGEN HJARTPULS (kontraktet i types.ts): hjartats form (hjarta.ts) pa effekt-klockan, ettan lite starkare.
+    let heartPulse = kickEnv;
+    if (hasBeat) {
+      const f = beatFracFx;
+      const lub = Math.exp(-f / 0.10), dub = f > 0.22 ? Math.exp(-(f - 0.22) / 0.09) * 0.55 : 0;
+      heartPulse = Math.max(lub, dub) * ((beatIdx & 3) === 0 ? 1 : 0.85);
+    }
     const beatMs2 = beatPeriod(this.cfg.beat);
     const tempoDeep = Math.max(0, Math.min(1, (beatMs2 - 340) / 260));   // 0 snabbt .. 1 långsamt
     const punchFloor = 0.5 - tempoDeep * 0.42;                            // 0.5 (snabbt) .. 0.08 (långsamt)
@@ -1738,7 +1747,7 @@ export class EffectEngine {
     ctx.audio = audio; ctx.kickEnv = kickEnv; ctx.punch = bassPunch;
     ctx.dropEnv = this.dropEnv; ctx.gravLevel = this.gravLevel;
     ctx.gravPeak = this.gravPeak; ctx.drum = frame.drum;
-    ctx.beatIdx = beatIdx; ctx.beatFrac = beatFracFx; ctx.beatPulse = beatPulse;
+    ctx.beatIdx = beatIdx; ctx.beatFrac = beatFracFx; ctx.beatPulse = beatPulse; ctx.heartPulse = heartPulse;
     ctx.beatHit = beatHit; ctx.hasBeat = hasBeat;
     ctx.wavePhase = this.wavePhase; ctx.buildUp = frame.buildUp;
     ctx.phaseSpread = 1 + frame.buildUp * 2.5; ctx.punchFloor = punchFloor;

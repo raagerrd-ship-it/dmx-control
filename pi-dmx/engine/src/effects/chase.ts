@@ -18,6 +18,6 @@ export const chase: EffectDef = {
     const tail = Math.exp(-d * 1.6) * (onBass ? 0.55 + 0.45 * Math.exp(-c.bassNoteAge / 0.3) : 1);
     const hue = c.mixedSector(pos + Math.floor(c.t / 4)) / 6;
     const v = Math.min(1, tail * c.shaped(0.22, 0.55 + c.audio * 0.55 + c.kickEnv * 0.5 + c.frame.onset.treble * 0.35 + (onBass ? c.frame.onset.bass * 0.4 : 0)) + c.punch * 0.3);
-    return c.hsv(hue, 1 - c.punch * 0.25, v);   // riktig dunk → hela svansen blixtrar
+    return c.hsv(hue, 1 - c.punch * 0.25, v * c.heart(0.3));   // riktig dunk → hela svansen blixtrar; egen hjartpuls (09-27)
   },
 };

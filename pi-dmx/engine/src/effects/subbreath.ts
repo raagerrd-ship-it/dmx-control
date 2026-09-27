@@ -20,6 +20,6 @@ export const subbreath: EffectDef = {
       // Skifta mot iskallt: sänk mättnad (mot vitt) + lyft ljus lite.
       return c.hsv(hue, 1 - blend * 0.7, Math.min(1, base + blend * 0.3));
     }
-    return c.hsv(hue, 1, base);
+    return c.hsv(hue, 1, base * c.heart(0.15));   // egen latt hjartpuls (09-27)
   },
 };

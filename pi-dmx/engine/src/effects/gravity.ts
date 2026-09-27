@@ -23,6 +23,6 @@ export const gravity: EffectDef = {
       return c.hsv(peakHue, 1, 1);
     }
     const base = c.mixedSector(Math.floor(c.beatIdx / 8)) / 6;               // lugn färgvandring
-    return c.hsv(base, 1, 0.05 + 0.95 * fill);
+    return c.hsv(base, 1, (0.05 + 0.95 * fill) * c.heart(0.3));   // nivan pulsar i takten, peak-pricken orord (09-27)
   },
 };

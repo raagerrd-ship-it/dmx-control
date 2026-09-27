@@ -11,7 +11,7 @@ export const hjarta: EffectDef = {
     const f = c.beatFrac;
     const lub = Math.exp(-f / 0.10);                      // huvudslaget
     const dub = Math.exp(-Math.max(0, f - 0.22) / 0.09) * (f > 0.22 ? 0.55 : 0);
-    const beat = Math.max(lub, dub);
+    const beat = c.hasBeat ? Math.max(lub, dub) : c.heartPulse;   // utan taktlas: riktiga kickar i stallet for att sta stilla pa 1,0 (09-27)
     // Ytterlamporna slår aningen senare → slaget "sprider sig" utåt i rummet.
     const spread = Math.exp(-Math.max(0, f - c.idx * 0.04) / 0.12) * 0.25;
     const hue = 0.98 + c.frame.spec.bass * 0.04;          // djupröd → varmare med basen

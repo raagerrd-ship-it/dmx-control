@@ -21,6 +21,6 @@ export const stege: EffectDef = {
     // med noten - basgangen syns som en uppgang, ovanpa bandens egna anslag.
     const climb = c.bassline >= 0.6 && (c.bassNoteIdx % n) === c.idx ? Math.exp(-c.bassNoteAge / 0.2) * 0.7 : 0;
     const hue = 0.02 + p * 0.55;                          // rött i botten → blått i topp
-    return c.hsv(hue, 1 - climb * 0.3, Math.min(1, 0.05 + bed + hit * 0.95 + climb + c.punch * 0.2));
+    return c.hsv(hue, 1 - climb * 0.3, Math.min(1, (0.05 + bed) * c.heart(0.35) + hit * 0.95 + climb + c.punch * 0.2));   // badden pulsar, anslagen ororda (09-27)
   },
 };

@@ -20,6 +20,6 @@ export const split: EffectDef = {
     // Inre: tung, andande sub/bas-energi i palettens djupaste färg.
     const bass = Math.max(c.frame.spec.sub, c.frame.spec.bass);
     const hue = c.mixedSector(0) / 6;
-    return c.hsv(hue, 1, 0.05 + 0.95 * bass);
+    return c.hsv(hue, 1, (0.05 + 0.95 * bass) * c.heart(0.35));   // bas-mattan pulsar i takten, anslagen ororda (09-27)
   },
 };
