@@ -325,7 +325,8 @@ const ENERGY_RISE_DEAD = Number(process.env.DMX_ENERGY_RISE_DEAD ?? 0.06);
  *  uppat-puls (anslag ELLER energistigning) far starta hogst en gang per DMX_PULSE_GAP_MS - delad grind for bada. En pagaende
  *  stigning far fortsatta. 0 = av (anslagen har da bara ENERGY_FB_GAP_MS, stigningen ingen grind). */
 const PULSE_GAP_MS = Number(process.env.DMX_PULSE_GAP_MS ?? 250);
-const CALM_FADE_S = Number(process.env.DMX_CALM_FADE_S ?? 0.6);   // se 'LUGNA PARTIER = MJUKA OVERGANGAR'
+const CALM_FADE_S = Number(process.env.DMX_CALM_FADE_S ?? 0.6);
+const CALM_ATTACK = process.env.DMX_CALM_ATTACK === '1';   // lang attack i lugna partier (av sedan 09-27: uppstegning ska ga direkt)   // se 'LUGNA PARTIER = MJUKA OVERGANGAR'
 const BEAT_TRUST_FLOOR = 0.75;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 
 export class EffectEngine {
@@ -1900,7 +1901,11 @@ export class EffectEngine {
       const sec = frame.section; const want = (sec === 'low' || sec === 'break' || sec === 'intro') && this.dropEnv < 0.2 ? 1 : 0;
       this.calmW += (want - this.calmW) * Math.min(1, dtSec / (want ? 1.5 : 0.4));   // in mjukt, ut snabbt (refrangen ska sla direkt)
       tau = Math.max(tau, CALM_FADE_S * this.calmW);
-      this.post.attackS = Math.max(0.001, CALM_FADE_S * 0.5 * this.calmW);
+      // UPPSTEGNING ALLTID DIREKT (agaren i ladan 2026-09-27 22:1x: 'ar lampan mork och vi gar till hogre ljud utan drop ska den
+      // aktiveras direkt som en drop - nu korde den takten efter; uppstegning maste alltid ga direkt'). Den langa attacken
+      // (0,3 s) i lugna partier nadde 90 % forst efter ~700 ms = en takt vid 130 BPM, och sektionen hinner inte bli 'high' pa
+      // forsta slaget. Nu bara FADE:n mjuk i lugna partier; attacken ar alltid DMX_ATTACK_MS. DMX_CALM_ATTACK=1 = som forr.
+      if (CALM_ATTACK) this.post.attackS = Math.max(0.001, CALM_FADE_S * 0.5 * this.calmW);
     }
     const decay = Math.exp(-dtSec / tau);
     // Bygg strobe-masken bara när fixtures ändras (inte varje frame).
