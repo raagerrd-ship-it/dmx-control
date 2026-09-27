@@ -20,6 +20,8 @@ export const split: EffectDef = {
     // Inre: tung, andande sub/bas-energi i palettens djupaste färg.
     const bass = Math.max(c.frame.spec.sub, c.frame.spec.bass);
     const hue = c.mixedSector(0) / 6;
-    return c.hsv(hue, 1, (0.05 + 0.95 * bass) * c.heart(0.35));   // bas-mattan pulsar i takten, anslagen ororda (09-27)
+    // Mattan ar SUSTAINED bas -> de inre lamporna lag konstant tanda medan de yttre gnistrade (agaren 09-27). heart(0.35)
+    // racker inte (65 % kvar mellan slagen); nu djupare sa mattan tydligt pumpar i takten och slacks ner mellan slagen.
+    return c.hsv(hue, 1, (0.05 + 0.95 * bass) * c.heart(0.65));   // bas-mattan pumpar i takten, anslagen ororda
   },
 };
