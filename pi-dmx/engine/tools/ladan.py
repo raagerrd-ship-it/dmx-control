@@ -42,85 +42,12 @@ PORTAR_EJ_LIVE = [
     ('DMX_SILENCE_MS',     '2000',   'sa lange maste det vara tyst innan grinden borjar stanga (standard 250 ms)'),
     ('DMX_SILENCE_RELEASE_S', '1.0', 'mjuk aterhamtning i stallet for 0,25 s'),
 ]
-SHOW_ENV = [
-    ('DMX_SECTION',        '1',      'sektioner som DATA - KRAVS av lugn-grinden nedan (levelVsHighDb). INTE lookstyrning, se DMX_SECTION_SWITCH'),
-    # DMX_SECTION_SWITCH AV 2026-09-22 22:40 (ladan, live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
-    # -> dirigenten plockade bara ur full-fart-poolen och allt sag likadant ut. Sektionerna ar kvar som DATA (DMX_SECTION=1);
-    # slas pa igen forst nar rangen ger vettig fordelning i ladans material.
-    # DMX_LIVE_LEVEL AV 2026-09-22 22:50 (ladan, live): nivan kollapsade till 0,003-0,012 om och om igen medan RA vu lag
-    # pa 0,2-0,6 - armaturerna gick ner till tandpunkten en efter en ('1, sen 3, sen alla'). 10 dB-fonstret mot det
-    # langsamma ankaret (tau 120 s) bottnar pa ladans komprimerade material. Slas pa igen forst efter tuning av
-    # LIVE_WIN_DB/LIVE_ANCHOR_S mot inspelat ljud fran ladan - inte live mitt i en spelning.
-    # LADANS EGNA VARDEN (2026-09-22 23:00): de satt bara i korningen (wsset) och gick forlorade vid varje omstart -
-    # riggen slacktes i tysta fraser ("lamporna stangs av"). Utgangen multipliceras med tystnadsgrinden (drive), sa
-    # standard 0,05/250/0,25 nollar ljuset sa fort en fras dippar. Koden dokumenterar sjalv ladans varden.
-    # KVALLEN 2026-09-22 23:00-24:00 I LADAN. Varje rad nedan kommer ur ett uttalande + en matning, inte ur en gissning.
-    # Filen ar sanningen: allt harunder satt fram till nu BARA som drop-ins pa Pi:n och hade forsvunnit vid nasta korning.
-    ('DMX_ATTACK_MS',      '20',     'ladans utgangsattack - 90 ms smetade ut slagen ("heartbeat syns inte")'),
-    ('BEAT_MIN',           '0.2',    'pulsgolv 0,2 med DEPTH_GAIN 0,8: pulsen nar botten precis vid nasta slag i st.f. att klippas och sta platt 170 ms (DMX-sond ladan 09-24: platae+ryck = "hackigt")'),
-    ('DEPTH_GAIN',         '0.8',    'djupfaktor (drop.conf 1,4 klippte pulsen i golvet); lagre faktor + lagre golv = djupare utan platae'),
-    ('DMX_BEAT_RELEASE_S', '0.3',    'hjartslagets fade ner'),
-    ('DMX_ENERGY_ONLY',    '1',      'BARA ENERGI: heart-beat-rastret av, anslag+stigning med fullt djup (agaren 09-24, lotus i kallaren "nice")'),
-    ('DMX_LIVE_ANCHOR_DROP_DB', '2',  'tyst lat = tystare ljus: nivaankaret max 2 dB under senaste hoga laten (ladan 09-24 22:30)'),
-    ('DMX_LOOK_FADE_S',    '0.6',    'fade mellan looker: ny look tonas in 0,6 s, gamla klingar ut (ej vid drop) - agaren 09-24'),
-    ('LIVE_BASS_W',        '1',      'nivan fran BASEN (lotus lightBassWeight 1/HiWeight 0): sang/diskant i tysta partier lyste 70 %+ (ladan 09-24 22:55); pop: lugn 32->27, break 23->16, refrang 19->23'),
-    ('DMX_FINAL_FADE_MAX_DT_S', '0.0075', 'efter motorstall (40-240 ms) fortsatter fallet som fade i st.f. ryck (enramsspikarna, ladan 09-24)'),
-    ('DMX_PULSE_GAP_MS',   '250',    'grind: ny uppat-puls (anslag eller energistigning) hogst var 250 ms, sa den inte fladdrar (agaren, ladan 09-24 23:00)'),
-    ('DMX_LIVE_START_FAST_S', '90',  'nivaankaret lar sig snabbt uppat forsta 90 s efter start (20 s: ankaret fastnade lagt -> nastan max efter omstart, ladan 09-24)'),
-    ('DMX_SECTION_HINT_LOWCONF', '0', 'taktlost break nollar inte sektionerna (refrangen efter blev intro = seg), riktig latgrans gor det; megamix lat 4 refrang 14->43 (ladan 09-24 23:10)'),
-    ('DMX_LIVE_CEIL',      '1',      'DIM-taket foljer samma dB-fonster som nivan (bas + ankare + tyst-lat-grans) i st.f. latens egen p5..p95 - varje lat fick fullt tak oavsett volym (ladan 09-24 23:20)'),
-    ('DMX_CALM_FADE_S',    '0.6',    'lugna partier (low/break/intro): attack 0,3 s + fade 0,6 s = mjuka overgangar mellan lamporna; pop: lugn 11->6, refrang oforandrad (ladan 09-24 23:25)'),
-    ('DMX_LIVE_ANCHOR_MAX_DECAY', '0.03', 'lag volym ska anda leva: tyst-lat-granden slapper 0,03 dB/s (8 dB sankt volym = levande igen pa ~4 min; forr 20 min) (ladan 09-24 23:30)'),
-    ('DMX_DROP_SONG_HOLD_S', '30',   'ingen drop/minidrop forsta 30 s av en lat - sektionen slog om intro->build strax fore smallen sa intro-grindarna missade (ladan 09-24 23:35, megamix: 2 drops nekade)'),
-    ('DROP_CALM_INTRO_STRICT', '1',  'ingen drop i intro utan riser (ladan 09-24)'),
-    ('LIGHT_FLOOR',        '0.25',   'GASEN: md = golv + (1-golv) x loudness. 0,45 gav bara halva vagen ("pulsar inte med energi")'),
-    ('DMX_FLOOR_CH',       '26',     'SHOW-GOLV i DMX-steg = 10 % (40 = 16 % var for ljust i tysta delar, ladan 09-24 22:50). Armaturernas tandpunkt (cal.on=16 av 255) ar 6 % och laser som slackt'),
-    ('DMX_TIER_HI',        '0.55',   'FULLFART var OATKOMLIG: kravde 0,78, ladans intensitet ar 0,00-0,49, drop-snappen 0,75'),
-    ('DMX_TIER_LO',        '0.22',   'ger fart-poolen mer speltid an lugn-poolen ("kor nastan bara samma effekter")'),
-    ('DMX_DWELL_MS',       '45000',  'reservtimer; 120 s gav NOLL lookbyten pa 12 min nar energin sta stilla'),
-    ('DMX_CLEAR_BASS',     '0.78',   'toggle-poolen vid tydlig basgang. 0,4 tvingade den standigt, 0,9 ligger utanfor ladans skala (max 0,75)'),
-    ('DROP_SNAP_MS',       '0',      'smallen vantade in nasta slag (upp till 150 ms) - "drop kommer nastan en takt sent"'),
-    ('BODY_FAST_S',        '0.06',   'baskroppens filter. 0,04 sparade 20 ms men gav "massa drops i lugna partier" - aldrig lagre'),
-    # DROP-GRIND I LUGNA PARTIER ("kor drop pa intro" + "missa riktiga droppen"): i lugna partier (>= 6 dB under senaste
-    # refrangen) kravs starkare bevis; en kandidat NEKAS inte utan HALLS och fyrar forst nar kroppen legat kvar vid toppen
-    # i 300 ms. DMX_SECTION=1 ar ett KRAV - levelVsHighDb raknas bara nar sektionsmaskineriet kors (analyser.ts rad 2783),
-    # annars ar hela grinden inert. Sektionerna ar DATA har.
-    ('DMX_DROP_CALM_GATE', '1',      'lugna partier kraver starkare bevis for drop'),
-    ('DROP_CALM_BUILD',    '0.25',   'riser-kravet (0 = grinden inert)'),
-    ('DROP_CALM_LAND_MS',  '0',      'NEKA dropen i lugna partier (agaren i ladan 09-23: "i lugn, ta bort drop helt"); 300 = hall och fyra vid landning'),
-    # LATBYTE -> SEKTIONEN NOLLAS (2026-09-23, port fran lotus dar det ar verifierat live: 'intro' vid ny lat 2 % -> 5/5).
-    # Sektionsmaskineriet nollades bara vid 10 s tystnad, sa i en megamix jamfordes nya laten mot FORRA latens block och
-    # 'intro' (som drop-grinden hanger pa) kunde aldrig intraffa efter forsta laten = "falska drops vid latbyte/intro".
-    # Signalen kommer fran boundaryDetector.ts (klangskifte/tempo/nivadipp) via DMX_BOUNDARY_SOFT-hinten i index.ts.
-    # LADAN 09-23 kvall (allt ogonbedomt av agaren, "mycket battre"):
-    ('DMX_SECTION_SWITCH', '1',      'sektionsstyrning PA igen (rotorsaken till last-pa-high ar SECTION_ON_HINT)'),
-    ('DMX_SECTION_UNIT',   '1',      'sektionen ar enheten: byte bara vid ra sektionsgrans (>= 4 s gammal)/drop/basgang, samma look per sektionstyp'),
-    ('DMX_SECTION_TRACE',  '1',      'sektionsbyten i journalen (bara logg)'),
-    ('DMX_ENERGY_FALLBACK','1',      'utan taktlas: puls pa breda transienter + storre energisving ("dor inte emellanat")'),
-    ('DMX_HUE_LIFT',       '1',      'kulorlyft i kalibreringen: starkaste kanalen till tandpunkten, kuloren bevaras (standard pa; 0 = per kanal som forr)'),
-    ('DMX_SECTION_CONTRAST','rank',   'ljus foljer KAUSAL RANG (midHi/bas/diskant mot laten) i st.f. refrangetiketten (AUC 0,55): facit-test 41 latar refrang/vers 1,12 -> 1,34'),
-    ('DMX_SECTION_RANK_LOW','0.35',  'versgolv; full niva fran rangmedianen (RANK_KNEE 0,5 i koden): facit-test refrang/vers 1,12 -> 1,27 med medelljus kvar 12 % (linjart gav 8 %, "knappt heart-beat eller energi")'),
-    ('DMX_SECTION_EARLY_S','45',      'forsta 45 s: refrang kraver +3 dB mot latens median (test: falsk-high 0,50 -> 0,46, refrang 2 igenkand 12 -> 9 s)'),
-    ('DMX_SECTION_ON_HINT', '1',     'latgransen nollar sektionshistoriken - annars jamfors nya laten mot forra latens'),
-    # DMX_SECTION_SWITCH AV (2026-09-22 22:40, ladan live): sektionsdetektorn last pa 'high' (13 av 15 lookbyten i high)
-    # -> dirigenten plockade bara ur full-fart-poolen och allt sag likadant ut. Slas pa igen forst nar rangen ger vettig
-    # fordelning i ladans material. Sektionerna ar kvar som DATA ovan.
-    # DMX_LIVE_LEVEL AV (2026-09-22 22:50): nivan kollapsade till 0,003-0,012 medan RA vu lag pa 0,2-0,6, och eftersom
-    # energitaket multipliceras ovanpa gick armaturerna ner till tandpunkten en efter en ("lamporna stangs av").
-    # dB-fonstrets ankare (tau 120 s) passar inte ladans komprimerade PA. Det ar anda RATT vag - agaren pekar sjalv pa
-    # BLE-lampan ("dar har vi skon rytm i brightness") - men den ska tunas mot INSPELAT ladljud, inte live i en spelning.
-    # LADAN 09-24 KVALL (ogonbedomt): portarna ovan AV igen (tempot vandrade 109-121, fasprediktion 0,4-0,6, fladder/dubbeltakt);
-    # lotus-porten i ENERGY_FB (las pa 12 rena slag, tystnadspaus) gjorde pulsen urvattnad ('puls 0,93') -> av; heart-beat-lagret tog
-    # hjartslaget fran 41 av 46 effekter -> gamla vagen; energin fran intensity rorde sig 0,012/s -> lotus nivakanal 6/6 dB ('mycket battre energi').
-    ('DMX_HEARTBEAT',      '0',      'gamla kompositionen: hjartslag + energi pa alla effekter (lagret gav 5 av 46 effekter puls)'),
-    ('DMX_BEAT_LOCK_BEATS','0',      'inget krav pa rena slag i rad for rastret (natt sallan i ladan)'),
-    ('DMX_BEAT_QUIET_BEATS','0',     'ingen tystnadspaus av rastret'),
-    ('DMX_ENERGY_RISE_K',  '3',      'energi direkt, dodzon 6 % i koden'),
-    ('DMX_LIVE_LEVEL',     '1',      'lotus nivakanal: energin foljer ljudnivan sekund for sekund (intensity rorde sig 0,012/s)'),
-    ('LIVE_WIN_DB',        '6',      'fonster 6 dB (lotus 09-24)'),
-    ('DMX_ANALYSER_SPLIT', 'worker', 'tempo/gridfas/sektion i egen trad (analysatorn 4 ms/hop utan i ladan 09-24)'),
-    ('LIVE_OFFSET_DB',     '6',      'toppen 6 dB over ankaret: pop median 0,69, p10-p90 0,34-0,92'),
-]
+# 2026-09-27 RENSNINGEN: allt som stod har (66 rattar i drop/tempo/lotus.conf) ar nu KODENS STANDARD - effects.ts/index.ts/
+# postprocess.ts/output.ts for DMX-motorn, analyserProfile.ts (DMX-profilen) for den delade analysatorn. Bevis: showBench
+# pop+megamix bit-identiska (gammal kod + live-env == ny kod utan env). Historiken (varje rad = uttalande + matning) finns i
+# git: `git show 38d0401:pi-dmx/engine/tools/ladan.py`. Pi:n kor nu UTAN drop-ins; de tre gamla tas bort via REMOVE nedan.
+# Nya prov gors som forr: EXTRA pa kommandoraden (--env NAMN=VARDE) -> lotus.conf, och lyfts in i koden nar de godkants.
+SHOW_ENV: list = []
 
 
 # RENSNINGEN 2026-09-23: inlarnings-/offline-stacken ar borta ur motorn (latminne, fingeravtryck, inspelare, tvatt,
@@ -139,6 +66,9 @@ REMOVE = [
     # registret; filerna pa Pi:n flyttas till .bak sa dist/effects/ inte har spokfiler.
     '/opt/audio-dmx-engine/dist/effects/innerouter.js', '/opt/audio-dmx-engine/dist/effects/neon.js',
     # KVALLENS TESTFILER 09-24 (allt star nu i SHOW_ENV -> lotus.conf); hjarta.conf satte DMX_HEARTBEAT=1 och laddas EFTER lotus.conf.
+    # 09-27: de tre drop-ins som bar live-varden - nu standard i koden
+    '/etc/systemd/system/audio-dmx-engine.service.d/drop.conf', '/etc/systemd/system/audio-dmx-engine.service.d/tempo.conf',
+    '/etc/systemd/system/audio-dmx-engine.service.d/lotus.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/hjarta.conf', '/etc/systemd/system/audio-dmx-engine.service.d/energi.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/sektion.conf', '/etc/systemd/system/audio-dmx-engine.service.d/zzz-lugn.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/zzzz-ogat.conf', '/etc/systemd/system/audio-dmx-engine.service.d/split.conf',

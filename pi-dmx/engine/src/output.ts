@@ -39,7 +39,7 @@ const MIN_DIM = process.env.DMX_MIN_DIM === '1';
 // DMX_FLOOR_CH hojer golvet till ett SYNLIGT varde i DMX-steg. Galler bara DIM-kanaler: att lyfta r/g/b skulle
 // bleka ur kuloren (samma skal som MIN_DIM lamnar dem ifred). En ren nolla ar fortfarande svart - det ar sa
 // effekten sager "slack den har armaturen" - utom med DMX_MIN_DIM=1, som da haller golvet i stallet for tandpunkten.
-const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 0)));
+const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 26)));
 const HOLD_MS = 120;
 /** KULORLYFT (2026-09-23, agaren i ladan: "lamporna kor nastan hela tiden med alla LED R G B paslagna ... kravet ar ju bara att EN
  *  kanal ar over tandpunkten"). Forr lyftes VARJE fargkanal > 0 till sin tandpunkt for sig - ett spar av gront och blatt i en rod

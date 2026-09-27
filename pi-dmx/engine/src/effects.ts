@@ -99,16 +99,11 @@ const SUBDIV_MIN_HOLD_MS = 10000;
  *  ger jämna|inre lampor på slag 1 och udda|yttre på slag 2, och `hjarta` slår varannan takt.
  *  Dirigenten boostar de delade lookerna vid halvering (dubbeltakt ELLER lugnt) och hjärta i
  *  lugna partier, och får byta look när halveringen slår om. Ägaren 2026-09-12. */
-const HALVE_SHOW = process.env.DMX_HALVE_SHOW === "1";
+const HALVE_SHOW = process.env.DMX_HALVE_SHOW !== "0";   // standard PA sedan 09-27 (ladan)
 /** MINIDROP-REAKTION (agaren 2026-09-12: "minidrops borde markas — effektbyte eller intensitet"): analysatorns
  *  frame.miniDropCount (monoton) ger look-byte (om looken hallits MIN_HOLD) + en kort stot pa MINI_DROP_ENV av
  *  en full drop-small (dropEnv), ingen rok, ingen blackout. */
 const MINI_DROP_ENV = Number(process.env.MINI_DROP_ENV ?? 0.35);
-/** DROP-SNAPP TILL TAKTEN (agaren 2026-09-12: "traffar varje riktig drop men ~100 ms fore"). Detektorn fyrar pa
- *  forsta bas-slaget, som ofta ar en upptakt/sug-slapp strax FORE ettan. Ar taktlaset palitligt (beatTrust >= 0,5)
- *  och nasta slag ligger inom DROP_SNAP_MS, vantar smallen in slaget; annars direkt. Aldrig langre an DROP_SNAP_MS,
- *  aldrig bakat. Roken tar fortfarande dropHit direkt. 0 = av. */
-const DROP_SNAP_MS = Number(process.env.DROP_SNAP_MS ?? 0);
 const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);
 /** MINI_DELAY_MS: mini-reaktionen vantar sa har lange och AVBRYTS om en riktig drop kommer under tiden. Journal
  *  ladan 2026-09-12 19:50-19:54: minidroppen fyrade 24-400 ms FORE 4 av 5 riktiga drops (lyft-detektorn har lagre
@@ -123,7 +118,7 @@ const MINI_DELAY_MS = Number(process.env.MINI_DELAY_MS ?? 500);
  *  Sa lange basgangen ligger kvar sker vanliga byten (sektion/tier/dwell) ocksa inom toggle-poolen. DMX_CLEAR_BASS=tröskel,
  *  hysteres 0,2 nedat. MATT (tools/basslineProbe.mjs, andel av tiden >= 0,7): basdrivna Stranden 81 %, dansband 78 %,
  *  pop-facit 27 %, megamix 12 %, real.wav 1 %. */
-const CLEAR_BASS = Number(process.env.DMX_CLEAR_BASS ?? 0.7);
+const CLEAR_BASS = Number(process.env.DMX_CLEAR_BASS ?? 0.78);
 /** EFFEKTMIX v2 (2026-09-23, agaren: "vi korde pa hoga effekter och hade inte sa manga"; tools/effectMix.mjs pa ladans 10-min-mixar:
  *  20 av 43 effekter, 23 aldrig valda, chase/varannan/eko/bounce = 46 % av tiden). Tre orsaker, tre rattningar (DMX_MIX_V2=0 = som forr):
  *  (1) basgangsregeln ersatte HELA poolen sa fort bassline >= 0,7 (nastan all pop) -> nu: pool-ersattning bara >= CLEAR_BASS_HARD (0,85)
@@ -163,7 +158,7 @@ const SHOW_LEAD_DEFAULT = 50;
 /** SNABBT UPP, ALLTID FADE NER (ladan 2026-09-24: 'upp far den garna vara snabb men alltid fade nerat'): hjartslagets release 90 ms var
  *  nastan ett snapp och laggs pa EFTER utgangens ballistik. Nu DMX_BEAT_RELEASE_S (0,2 s); utgangens decay far aldrig vara kortare an
  *  DMX_FADE_MIN_S (0,25 s; forr 0,08 s i energiska partier). Attacken ar oforandrad (momentan). */
-const BEAT_FLUTTER_RELEASE = Number(process.env.DMX_BEAT_RELEASE_S ?? 0.2);
+const BEAT_FLUTTER_RELEASE = Number(process.env.DMX_BEAT_RELEASE_S ?? 0.3);
 const FADE_MIN_S = Number(process.env.DMX_FADE_MIN_S ?? 0.25);
 /** Sentinel: pulsklockan ännu inte initierad (första framen sätter den utan tick). */
 const PULSE_IDX_INIT = -2e9;
@@ -175,7 +170,7 @@ const LIGHT_BASS_W = 0.25;         // bas-vikt (kropp utan att låsa nivån till
 const LIGHT_SMOOTH_MS = 55;        // release-avbrusning på wlevel
 const LIGHT_WIN_DB = 18;           // centrerat dB-fönster (±9 dB runt medel → 0..1)
 const LIGHT_MEAN_TAU = 30000;      // medelnivåns tidskonstant (ms) — stabil men följer volymen
-const LIGHT_FLOOR = Number(process.env.LIGHT_FLOOR ?? 0.3);   // env-tunbar (fest: hogre golv = ljusare medelniva)           // ljus-golv vid loud=0 (dim vers, inte svart)
+const LIGHT_FLOOR = Number(process.env.LIGHT_FLOOR ?? 0.25);   // env-tunbar (fest: hogre golv = ljusare medelniva)           // ljus-golv vid loud=0 (dim vers, inte svart)
 const LIGHT_ANCHOR_OFF = 9;        // toppen over de hogsta topparna (mean+9) sa loud inte pinnar pa 1.0.
 const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
 // SHAPE-SMOOTHING 25/150 -> 300/350. Ägaren i ladan 2026-09-03: ljuset flimrade på
@@ -185,8 +180,8 @@ const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
 // är separat och förblir snabbt, så pulsen påverkas inte. En refräng gasar fortf.
 // upp (rise ~1-2 s > 300 ms), men syllaberna medelvärdesbildas bort.
 // DMX_LIVE_LEVEL (2026-09-21): lotus nivakanal - se blocket i render(). Rattar bara for A/B.
-const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH === '1';   // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
-const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
+const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH !== '0';   // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
+const SECTION_TRACE = process.env.DMX_SECTION_TRACE !== '0';
 /** SEKTIONEN AR ENHETEN (2026-09-23, agaren: "jag vill inte att dirigenten bara byter effekt hela tiden, utan mer skapar en anpassad
  *  show till laten"; opt-in DMX_SECTION_UNIT=1, kraver DMX_SECTION_SWITCH=1). Tva saker:
  *  (1) BYTE bara vid sektionsgrans, drop/minidrop eller basgang som kommer/gar - inte pa tierflapp, halvering eller dwell-timern
@@ -194,7 +189,7 @@ const SECTION_TRACE = process.env.DMX_SECTION_TRACE === '1';
  *  (2) IGENKANNING for live-sektioner: samma look varje gang samma sektionstyp kommer tillbaka (refrangen ser ut som refrangen,
  *      versen som versen) - nyckel = etiketten, inte sektionsparet. Var avstangd sedan 09-21 20:33 ("samma effekt igen") for att
  *      detektorn da satt fast pa high; rotorsaken (ingen nollning vid latbyte) ar rattad 09-23. Ny lat (intro) glommer lookerna. */
-const SECTION_UNIT = SECTION_SWITCH && process.env.DMX_SECTION_UNIT === '1';
+const SECTION_UNIT = SECTION_SWITCH && process.env.DMX_SECTION_UNIT !== '0';
 const SECTION_UNIT_RESERVE_MS = Number(process.env.DMX_SECTION_UNIT_RESERVE_MS ?? 60000);
 /** SECTION_UNIT (ladan 16:45): forvarningens 'high' 600 ms fore en forutsedd refrang och drop-fonstrets 'high' raknas INTE som sektionsgrans
  *  (de gav high<->low-hopp pa 1-2 s nar refrangen uteblev). Bara den raa sektionen, och den maste vara minst DMX_SECTION_UNIT_MIN_MS gammal. */
@@ -218,8 +213,8 @@ const HEARTBEAT_TRUST = Number(process.env.DMX_HEARTBEAT_TRUST ?? 0.35);
 // 19-drop-facitet + pop/megamix): buildUp ar ~0 (max 0,04) vid ALLA 71 fyrningar och etiketten ar alltid low/break i sjalva
 // dropogonblicket (high forst efterat) -> grinden pa 0,25 nekade 7/12 pop- och 11/32 megamix-drops, dvs nastan allt (live i ladan
 // 09-21 kvall). Vill man ha en lugn-grind: analysatorns DMX_DROP_CALM_GATE=1 DROP_CALM_LAND_MS=300 (tappar inget, 300 ms sen i low).
-const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0);
-const DROP_SONG_HOLD_S = Number(process.env.DMX_DROP_SONG_HOLD_S ?? 0);   // se 'INGEN DROP I LATENS INLEDNING'
+const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25);
+const DROP_SONG_HOLD_S = Number(process.env.DMX_DROP_SONG_HOLD_S ?? 30);   // se 'INGEN DROP I LATENS INLEDNING'
 const DROP_LAND_GAIN = Number(process.env.DROP_LAND_GAIN ?? 1.15);     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35);   // tierEma-snap vid high/break-grans
 const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.45), SECTION_LOW_DIP = Number(process.env.SECTION_LOW_DIP ?? 0.30);   // master: refrang upp, vers/intro ner, break mer ner
@@ -234,33 +229,34 @@ const SECTION_DYN_FLOOR = Math.min(1, Math.max(0.1, Number(process.env.DMX_SECTI
 /** SEKTIONSKONTRAST (2026-09-24, drejboken: refrang 37 mot vers 33 i 3 av 4 poplatar; opt-in DMX_SECTION_CONTRAST=1): pa komprimerad PA
  *  ar levelVsHighDb nara 0, sa dynamiken ersatte de fasta dipparna med ~1,0. Nu galler den STARKARE av fast dipp och dynamik, refrangen far
  *  sitt lyft alltid (inte bara tier 2), och gainen glider (~1,2 s) i stallet for att hoppa vid sektionsbyten. */
-const SECTION_CONTRAST = process.env.DMX_SECTION_CONTRAST === '1' || process.env.DMX_SECTION_CONTRAST === 'rank';
+const SECTION_CONTRAST_MODE = process.env.DMX_SECTION_CONTRAST ?? 'rank';   // standard 'rank' sedan 09-27
+const SECTION_CONTRAST = SECTION_CONTRAST_MODE === '1' || SECTION_CONTRAST_MODE === 'rank';
 /** RANGKONTRAST (2026-09-24, DMX_SECTION_CONTRAST=rank): detektorns refrangetikett skiljer facit-refrang fran facit-vers bara med AUC 0,55
  *  (82 langfangster), medan medel av tre KAUSALA RANGER (4 s-glidande midHiDb, bodyDb, diskantband specAbs.treble+air, rangordnade mot laten
  *  hittills) ger 0,69 train / 0,71 test. Gain = RANK_LOW + (1 + SECTION_HIGH_LIFT - RANK_LOW) x rang; nollas vid ny lat (section 'intro'). */
-const SECTION_RANK = process.env.DMX_SECTION_CONTRAST === 'rank';
-const RANK_LOW = Number(process.env.DMX_SECTION_RANK_LOW ?? 0.5);
+const SECTION_RANK = SECTION_CONTRAST_MODE === 'rank';
+const RANK_LOW = Number(process.env.DMX_SECTION_RANK_LOW ?? 0.35);
 const RANK_POW = Number(process.env.DMX_SECTION_RANK_POW ?? 1);
 /** Rang dar full niva nas (ladan 09-24: 'knappt heart-beat eller energi' - linjart over hela rangen sankte aven refrangerna till ~0,6). 0,5 = ovre halvan full, bara undre dampas. */
 const RANK_KNEE = Math.max(0.1, Number(process.env.DMX_SECTION_RANK_KNEE ?? 0.5));
-const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL === '1';
-const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10);        // lotus windowDb 10
-const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 4.5); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
+const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL !== '0';
+const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 6);        // lotus windowDb 10
+const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 6); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
 const LIVE_ANCHOR_S = Number(process.env.LIVE_ANCHOR_S ?? 120);   // lotus autoAnchorSec 120
 const LIVE_RELEASE_MS = Number(process.env.LIVE_RELEASE_MS ?? 350);
-const LIVE_BASS_W = Number(process.env.LIVE_BASS_W ?? 0.25);      // lotus: mid/diskant 1,3 + bas 0,25 -> har som blandning
+const LIVE_BASS_W = Number(process.env.LIVE_BASS_W ?? 1);      // lotus: mid/diskant 1,3 + bas 0,25 -> har som blandning
 const LIVE_TRACE = process.env.DMX_LIVE_TRACE === '1';
-const LIVE_CEIL = LIVE_LEVEL && process.env.DMX_LIVE_CEIL === '1';
+const LIVE_CEIL = LIVE_LEVEL && process.env.DMX_LIVE_CEIL !== '0';
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
-const LIVE_START_FAST_S = Number(process.env.DMX_LIVE_START_FAST_S ?? 20);
+const LIVE_START_FAST_S = Number(process.env.DMX_LIVE_START_FAST_S ?? 90);
 /** TYST LAT = TYST LJUS (ladan 2026-09-24 22:30: 'laten ar ganska tyst och den kor ganska ljust'): ankaret ar relativt, sa en tyst lat blev
  *  'det nya normala' och lika ljus som en hog. Ankaret far inte sjunka mer an LIVE_ANCHOR_DROP_DB under det hogsta ankaret pa sistone
  *  (toppen glider ner 0,005 dB/s = 6 dB pa 20 min). 0 = av. Efter omstart ar toppen forsta latens niva tills en hogre lat kommer. */
-const LIVE_ANCHOR_DROP_DB = Number(process.env.DMX_LIVE_ANCHOR_DROP_DB ?? 0);
+const LIVE_ANCHOR_DROP_DB = Number(process.env.DMX_LIVE_ANCHOR_DROP_DB ?? 2);
 /** LAG VOLYM = FORTFARANDE LEVANDE (ladan 2026-09-24 23:30): hur fort toppen glider ner (dB/s). 0,005 = 6 dB pa 20 min holl riggen dov
  *  lange efter att volymen skruvats ner; 0,02 = 6 dB pa 5 min - en tyst lat ar dovare sin forsta minut, en sankt volym lever igen inom minuter. */
-const LIVE_ANCHOR_MAX_DECAY = Number(process.env.DMX_LIVE_ANCHOR_MAX_DECAY ?? 0.005);
+const LIVE_ANCHOR_MAX_DECAY = Number(process.env.DMX_LIVE_ANCHOR_MAX_DECAY ?? 0.03);
 const LIGHT_SHAPE_UP = 60;
 const LIGHT_SHAPE_DOWN = 120;
 const LIGHT_REL_A = 0.396;         // log-release-alpha
@@ -276,22 +272,22 @@ const LIGHT_SOFT = 0.3;            // soft-snap-golv vid låg energi
  */
 const DISCRETE_DROP_LAMPS = true;   // ater PA (agaren i ladan): lamporna ska bloma pa dropen synkat med roken (samma dropCount). Energi-gasen ensam racker inte som drop-markering.
 const STROBE_MIN_BPM = 150;   // effekt-krav: riser-strobe bara i snabba latar (agarens onskemal)
-const BEAT_MIN = Number(process.env.BEAT_MIN ?? 0.30);
+const BEAT_MIN = Number(process.env.BEAT_MIN ?? 0.2);
 // LIVE-BEAT (DMX_LIVE_BEAT=1, agaren 2026-09-04): nar tempo-gridden saknas (bpm 0), ar osaker
 // (lag fas-tillit) eller fel (2/3-fantom) pulsar hjartslaget pa de FAKTISKA kickarna i stallet.
 // Crossfade pa tilliten: <= LIVE_TRUST_LO helt live, >= LIVE_TRUST_HI helt grid. Utan env: som forut.
-const LIVE_BEAT = !!process.env.DMX_LIVE_BEAT;
+const LIVE_BEAT = process.env.DMX_LIVE_BEAT !== '0';
 // DEPTH_GAIN (agaren 2026-09-04 'oka styrkan'): multiplicerar hjartslagsdjupet (clamp <= 1) sa slaget
 // nar golvet BEAT_MIN varje takt aven vid lag tillit (trustFloored 0.75 kapade djupet till ~0.6).
-const DEPTH_GAIN = Number(process.env.DEPTH_GAIN ?? 1);
-const LIVE_BEAT_MS = Number(process.env.LIVE_BEAT_MS ?? 240);   // live-pulsens avklingning
-const LIVE_TRUST_LO = Number(process.env.LIVE_TRUST_LO ?? 0.3), LIVE_TRUST_HI = Number(process.env.LIVE_TRUST_HI ?? 0.7);   // heartbeat-golv mellan slagen (env-tunbar; hogre = mindre dipp, ljusare)
+const DEPTH_GAIN = Number(process.env.DEPTH_GAIN ?? 0.8);
+const LIVE_BEAT_MS = Number(process.env.LIVE_BEAT_MS ?? 150);   // live-pulsens avklingning
+const LIVE_TRUST_LO = Number(process.env.LIVE_TRUST_LO ?? 0.2), LIVE_TRUST_HI = Number(process.env.LIVE_TRUST_HI ?? 0.5);   // heartbeat-golv mellan slagen (env-tunbar; hogre = mindre dipp, ljusare)
 /** ENERGIFALLBACK (2026-09-23 ladan, agaren: "den kanns inte som den vaxlar till energistyrd nar heartbeat inte ar last"). Utan taktlas
  *  blandar LIVE_BEAT over till en kick-driven puls - men utan tydliga kickar ar den pulsen 0 och bm = 1 - depth = KONSTANT dampning, och
  *  loudness-gasen (lightLoud, log-release) ar for langsam for att kannas. Nu (DMX_ENERGY_FALLBACK=1): (a) utan las pulsar ljuset pa BREDA
  *  transienter (max av onset bass/kick/treble, avklingning LIVE_BEAT_MS) i stallet for bara kickar; (b) golvet sanks med (1-w) x
  *  DMX_ENERGY_FB_DIP sa energisvinget far storre omfang nar takten inte bar. w = taktens tillit (LIVE_TRUST_LO..HI). */
-const ENERGY_FB = process.env.DMX_ENERGY_FALLBACK === '1';
+const ENERGY_FB = process.env.DMX_ENERGY_FALLBACK !== '0';
 const ENERGY_FB_DIP = Number(process.env.DMX_ENERGY_FB_DIP ?? 0.15);
 const ENERGY_FB_ONSET = Number(process.env.DMX_ENERGY_FB_ONSET ?? 0.30);
 /** PORTAT FRAN LOTUS 2026-09-23 kvall (kallaren, agaren ogonbedomde varje steg) - galler med DMX_ENERGY_FALLBACK=1:
@@ -302,28 +298,28 @@ const ENERGY_FB_ONSET = Number(process.env.DMX_ENERGY_FB_ONSET ?? 0.30);
  *  (4) DJUPET FOLJER ANSLAGSTATHETEN i energilaget (glesa anslag = ljuset ligger vid taket, inte morkt emellan).
  *  (5) FASFEL = OSAKER: |cfg.beatErr| over DMX_SYNC_ERR_FRAC drar ner tilliten (0 vid dubbla); tappad tillit > 1,5 s nollar slagraknaren
  *      sa rastret maste bevisa sig igen ("battre tillbaka till energi an osynk", "jobba i bakgrunden med att synka igen"). */
-const LOCK_BEATS = Number(process.env.DMX_BEAT_LOCK_BEATS ?? 12);   // 8 -> 12 som lotus ("battre att inte lasa alls an fel")
+const LOCK_BEATS = Number(process.env.DMX_BEAT_LOCK_BEATS ?? 0);   // 8 -> 12 som lotus ("battre att inte lasa alls an fel")
 const LOCK_CONF = Number(process.env.DMX_BEAT_LOCK_CONF ?? 0.6);
 const LOCK_ERR = Number(process.env.DMX_BEAT_LOCK_ERR ?? 0.10);
 const ENERGY_FB_GAP_MS = Number(process.env.DMX_ENERGY_FB_GAP_MS ?? 330);
 /** BARA ENERGI (agaren 2026-09-24, lotus i kallaren: 'om den bara kor pa energi nu sa ar det nice'): rastret (heart-beat) av helt,
  *  pulsen = anslag + stigning med fullt djup oberoende av taktens tillit (som lotus energiläge: energyDepth x tathet). Kraver ENERGY_FB. */
-const ENERGY_ONLY = process.env.DMX_ENERGY_ONLY === '1';
+const ENERGY_ONLY = process.env.DMX_ENERGY_ONLY !== '0';
 const ENERGY_ACT_REF = Number(process.env.DMX_ENERGY_ACT_REF ?? 0.25);
 const SYNC_ERR_FRAC = Number(process.env.DMX_SYNC_ERR_FRAC ?? 0.2);
 /** PORTAT FRAN LOTUS 2026-09-24 (agaren i kallaren, ogonbedomt): (6) PAUSA RASTRET UTAN HORD TAKT - ingen kick pa DMX_BEAT_QUIET_BEATS
  *  slag (minst 2 s) -> rastrets vikt tonas ut pa 0,8 s (anslagen pulsar kvar = energilaget, inget blink pa fantomtakt i break), in pa 0,2 s.
  *  (7) ENERGI DIREKT - stigande loudness mot sitt eget ~0,4 s-medel raknas som puls direkt (DMX_ENERGY_RISE_K, 0 = av), sa riggen
  *  ljusnar nar laten lyfter i stallet for forst pa nasta slag. */
-const BEAT_QUIET_BEATS = Number(process.env.DMX_BEAT_QUIET_BEATS ?? 4);
+const BEAT_QUIET_BEATS = Number(process.env.DMX_BEAT_QUIET_BEATS ?? 0);
 const ENERGY_RISE_K = Number(process.env.DMX_ENERGY_RISE_K ?? 3);
 /** Dodzon (ladan 09-24: 'mikrofladder' med K 3, 'betydligt mindre dynamiska' med K 0): stigningar under DMX_ENERGY_RISE_DEAD (6 %) ignoreras. */
 const ENERGY_RISE_DEAD = Number(process.env.DMX_ENERGY_RISE_DEAD ?? 0.06);
 /** GRIND PA STIGANDE LJUS (agaren i ladan 2026-09-24: 'nu nar vi kor bara pa energi, lagg till gaten igen pa kanske 250 ms'): en ny
  *  uppat-puls (anslag ELLER energistigning) far starta hogst en gang per DMX_PULSE_GAP_MS - delad grind for bada. En pagaende
  *  stigning far fortsatta. 0 = av (anslagen har da bara ENERGY_FB_GAP_MS, stigningen ingen grind). */
-const PULSE_GAP_MS = Number(process.env.DMX_PULSE_GAP_MS ?? 0);
-const CALM_FADE_S = Number(process.env.DMX_CALM_FADE_S ?? 0);   // se 'LUGNA PARTIER = MJUKA OVERGANGAR'
+const PULSE_GAP_MS = Number(process.env.DMX_PULSE_GAP_MS ?? 250);
+const CALM_FADE_S = Number(process.env.DMX_CALM_FADE_S ?? 0.6);   // se 'LUGNA PARTIER = MJUKA OVERGANGAR'
 const BEAT_TRUST_FLOOR = 0.75;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 
 export class EffectEngine {
@@ -402,7 +398,6 @@ export class EffectEngine {
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastMiniCount = 0; private miniBangUntil = 0; private miniPendingAt = 0;   // minidrop-flank + kort stot + fordrojd reaktion
-  private dropPendingAt = 0;   // DROP_SNAP_MS: smallen vantar in nasta slag
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   // Loudness-portens tillstånd (Lotus mid+diskant dB-fönster + log-release). Negativa
@@ -999,7 +994,6 @@ export class EffectEngine {
     const dtNow = Math.max(0, Math.min(0.1, (performance.now() - this.lastRenderMs) / 1000));   // aldrig negativt (klockhopp; banker som byter klocka efter konstruktion gav NaN i nivan)
     let dropHitRaw = frame.dropCount !== this.lastDropCount;
     this.lastDropCount = frame.dropCount;
-    // Snapp: dropHit (show-reaktionen) flyttas till nasta slag om det ar nara; roken (wantBurst) tar dropHitRaw.
     // DROP I LUGN SEKTION (ladan 20:15: tva falska drops i ett lugnt parti): en riktig drop kommer ur en uppbyggnad eller ett
     // break. I low/intro kravs att analysatorn sett en riser (buildUp >= DROP_CALM_BUILD) - annars ignoreras dropen.
     const calmSec = SECTION_SWITCH && (frame.section === 'low' || frame.section === 'intro');
@@ -1020,14 +1014,7 @@ export class EffectEngine {
       const lvl = this.liveLevelSm >= 0 ? this.liveLevelSm : this.lightLoud;
       if (lvl < this.preDropLevel * DROP_LAND_GAIN + 0.02) { this.dropEnv = 0; this.lastDropSwitchMs = -1e9; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
     }
-    if (DROP_SNAP_MS > 0) {
-      if (dropHitRaw && this.beatTrust >= 0.5 && beatLocked(this.cfg.beat)) {
-        const bms = beatPeriod(this.cfg.beat);
-        const toNext = (1 - beatPhase(this.cfg.beat, Date.now(), this.showLead)) * bms;
-        if (bms > 0 && toNext > 15 && toNext <= DROP_SNAP_MS) { this.dropPendingAt = nowWall + toNext; dropHit = false; if (process.env.DMX_DROP_TRACE) console.log(`[dropsnap] +${toNext.toFixed(0)} ms till slaget`); }
-      }
-      if (this.dropPendingAt && nowWall >= this.dropPendingAt) { this.dropPendingAt = 0; dropHit = true; }
-    }
+    // (drop-snapp till takten forkastad 09-12: taktlaset resettas vid drops, slog aldrig till / gjorde drops sena.)
     const miniCount = frame.miniDropCount ?? 0;
     const miniHitRaw = miniCount !== this.lastMiniCount;   // monoton raknare -> flanken kan inte aliaseras bort
     this.lastMiniCount = miniCount;
@@ -1177,7 +1164,7 @@ export class EffectEngine {
         // effekter"). Aven drop-snappen stannar pa 0,75, dvs under troskeln. Defaulten ar oforandrad; ladan sanker
         // via DMX_TIER_HI. Ratt langsiktig fix ar ett nivamatt som spanner skalan (lotus dB-fonster), inte en lagre
         // troskel - den har raden gor bara poolen atkomlig under tiden.
-        const loThr = Number(process.env.DMX_TIER_LO ?? 0.34), hiThr = Number(process.env.DMX_TIER_HI ?? 0.78);
+        const loThr = Number(process.env.DMX_TIER_LO ?? 0.22), hiThr = Number(process.env.DMX_TIER_HI ?? 0.55);
         // TIER-HYSTERES: utan den flaxar tiern så fort intensiteten pendlar kring en
         // gräns → tierChanged blir sann om och om → effektbyte varje minsta-hålltid
         // (mätt: byte var 8.0s spikrakt). Kräv att man går TYDLIGT förbi gränsen för
@@ -1296,7 +1283,7 @@ export class EffectEngine {
         // DMX_DWELL_MS: agaren 2026-09-12 "dirigenten behover inte byta hela tiden, bara vid andringar i laten".
         // Stamningens dwell (fest 15 s, galet 10 s) tvingade byten pa klockan; med env satt hogt (120 s) blir
         // dwell en nodfallback och bytena sker pa tier-byte, sektionsgrans, drop och halvering.
-        this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_MS) || this.cfg.smartDwellMs || 9000);
+        this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_MS ?? 45000) || this.cfg.smartDwellMs || 9000);
         // EFFEKT-KRAV: filtrera bort effekter vars krav (tempo/karaktär) inte möts
         // just nu — strobe bara i snabb musik, trum-effekter bara med trummor, osv.
         // (registry.meetsRequirements). Ambient-effekterna kräver inget → utgör
@@ -1389,7 +1376,7 @@ export class EffectEngine {
         // ENFORMIG LOOK -> KORTARE DWELL. Agaren 2026-09-12: "ar det en enformig effekt far den garna byta
         // snabbare". De statiska svepen (ingen takt-signal, ingen kick-drift) far DMX_DWELL_FLAT_MS (30 s),
         // taktdrivna looker behaller DMX_DWELL_MS. Satts EFTER valet, eftersom dwellen ovan sattes fore.
-        if (process.env.DMX_DWELL_MS && EFFECT_MAP.get(this.smartMode)?.flat) this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_FLAT_MS) || 30000);
+        if (EFFECT_MAP.get(this.smartMode)?.flat) this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_FLAT_MS) || 30000);
         if (MIX_V2) { this.recentLooks.push(this.smartMode); if (this.recentLooks.length > MIX_RECENT_N) this.recentLooks.shift(); this.seenLooks.add(this.smartMode); }
       }
       effMode = this.smartMode;

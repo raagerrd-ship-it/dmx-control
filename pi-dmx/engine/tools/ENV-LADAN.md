@@ -1,3 +1,7 @@
+> **2026-09-27: RENSAT.** Alla rader nedan som var live i ladan ar nu kodens STANDARD (effects/index/postprocess/output +
+> analyserProfile.ts). Pi:n kor utan drop-ins. Tabellen ar historik/forklaring; env-namnen fungerar fortfarande for prov.
+> Forkastade och borttagna ur koden: DROP_PEEK/DROP_PEEK_MS, DROP_UPGRADE_DB, DROP_KICK_FIRST/KICK_FIRST_RISE, DROP_SNAP_MS.
+
 # Env i ladan (systemd drop-ins i /etc/systemd/system/audio-dmx-engine.service.d/)
 
 Två filer, alla värden inerta i default (utan env = validerad baslinje):
