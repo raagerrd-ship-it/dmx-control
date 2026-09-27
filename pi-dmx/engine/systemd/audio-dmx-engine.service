@@ -13,14 +13,19 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 WorkingDirectory=/opt/audio-dmx-engine
-# HEAP-TAK 112 MB (var 200). MÄTT PÅ LOTUS, samma Zero 2 W: 200 MB heap + RSS får
-# kärnan att swappa medan V8 växer, och nästa GC läser tillbaka sidorna från
-# SD-kortet — flera hundra ms frysning i ljuset. Motorns faktiska behov är ~45 MB,
-# så 112 MB är gott om luft men tvingar GC att jobba INNAN swap blir aktuellt.
-# --max-semi-space-size=8: större young-generation → färre scavenges i hop-loopen.
+# HEAP-TAK 96 MB PER ISOLAT (var 112 i repot, 200 live pa Pi:n 09-27 = drift). MATT PA PC 2026-09-27 (tools/mem/,
+# 600 s pop-facit genom showBench): levande heap ar 14-25 MB i huvudtraden och 11-16 MB i workern; V8 later heapen
+# vaxa mot taket INNAN den gor Mark-Compact, sa taket bestammer heapTotal-toppen (200 -> 54 MB, 96 -> 30-40 MB) och
+# darmed RSS. Flaggorna galler BADA isolaten (workern arver heap_size_limit, matt 136 MB vid 112+8).
+# SEMI-SPACE 4 MB FAST (min=max). --max-semi-space-size=8 ensamt var verkningslost: V8 vaxer bara young-gen nar
+# overlevnaden ar hog, och har overlever nastan inget -> semi stannade pa 8 MB i ALLA varianter (200/112/96/32).
+# Med 4 MB fast: scavenge-median 0,40 ms (PC), 2x sa manga men kortare, young-gen 12 MB per isolat i stallet for 24
+# (-24 MB RSS for tva isolat), heapTotal-topp 30 MB (var 38-54). Alternativ 2 MB: median 0,26 ms, 2,2 scavenges/s.
+# Skrapet ar 43 kB/hop under uppvarmningen (ooptimerad kod boxar varje flyttal) och 1,2 kB/hop i stabilt lage -
+# antal scavenges styrs av hur lange process() ar ooptimerad, inte av flaggorna.
 # No --enable-source-maps: it parses every module's map at startup (slower cold
 # boot on the SD card) and this is production — stack traces map to dist anyway.
-ExecStart=/usr/bin/node --max-old-space-size=112 --max-semi-space-size=8 dist/index.js
+ExecStart=/usr/bin/node --max-old-space-size=96 --min-semi-space-size=4 --max-semi-space-size=4 dist/index.js
 Environment=NODE_ENV=production
 Environment=UV_THREADPOOL_SIZE=2
 Environment=PORT=80
