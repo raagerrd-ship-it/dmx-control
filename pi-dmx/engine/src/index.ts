@@ -86,18 +86,6 @@ applyInputRouting(cfg.audioInput === "mic" ? "mic" : "aux");
 // DELAD ANALYSATOR (analyser.ts/split.ts): utan DMX_ANALYSER_SPLIT ar detta exakt `new Analyser(cfg)`.
 // Med DMX_ANALYSER_SPLIT=worker flyttas tempo/gridfas/sektion till en egen trad pa en egen karna —
 // motivet ar matningen 15,6 % av hoppen over budget (0,99 ms snitt, toppar 235 ms mot 2,67 ms).
-// UPPVARMNING FORE START (2026-09-27, realtidsprincipen - se warmup.ts): V8 far se alla sallsynta grenar pa
-// skrap-instanser innan de riktiga skapas -> process() optimeras en gang och ligger kvar. DMX_WARMUP=0 stanger av.
-{
-  const wp = process.env.DMX_WARMUP ?? "/opt/audio-dmx-engine/warmup/warmup.wav";
-  if (wp !== "0") {
-    // I BAKGRUNDEN i sma bitar (22:49: synkron uppvarmning blockerade /health -> pi-dmx-watchdog startade om i loop).
-    warmUpInBackground(cfg, wp, (r) => {
-      if (r) console.warn(`[warmup] klar: ${r.secs.toFixed(0)} s ljud, ${r.hops} hop pa ${(r.ms / 1000).toFixed(1)} s (i bakgrunden)`);
-      else console.warn(`[warmup] hoppas over: ${wp} saknas eller fel format (mono 16-bit ${cfg.audio.rate} Hz)`);
-    });
-  }
-}
 const analyser = createAnalyser(cfg);
 analyser.resetGain(cfg.audioInput === "mic" ? 20 : 1);
 analyser.setGainLock(cfg.audioInput !== "mic", 1);  // aux: fixed 1x
@@ -686,6 +674,19 @@ const serverDeps = {
   },
 };
 const s80 = await startServer(serverDeps, Number(process.env.PORT ?? 80));
+// UPPVARMNING (2026-09-27, realtidsprincipen - se warmup.ts): V8 far se alla sallsynta grenar pa skrap-instanser sa att
+// process() optimeras en gang och ligger kvar. Startas EFTER server + ljud (22:54: bitar under uppstarten forsenade /health
+// -> vakthunden startade om) och kors i 10-hop-bitar i bakgrunden. DMX_WARMUP=0 stanger av.
+{
+  const wp = process.env.DMX_WARMUP ?? "/opt/audio-dmx-engine/warmup/warmup.wav";
+  if (wp !== "0") {
+    // I BAKGRUNDEN i sma bitar (22:49: synkron uppvarmning blockerade /health -> pi-dmx-watchdog startade om i loop).
+    warmUpInBackground(cfg, wp, (r) => {
+      if (r) console.warn(`[warmup] klar: ${r.secs.toFixed(0)} s ljud, ${r.hops} hop pa ${(r.ms / 1000).toFixed(1)} s (i bakgrunden)`);
+      else console.warn(`[warmup] hoppas over: ${wp} saknas eller fel format (mono 16-bit ${cfg.audio.rate} Hz)`);
+    });
+  }
+}
 
 // HTTPS on 443 (self-signed) — kept in case future features need a secure
 // context on the phone (getUserMedia etc.). Optional, serves same routes.

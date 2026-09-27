@@ -13,7 +13,7 @@
  * KORS I SMA BITAR via setImmediate (LADAN 22:49: den forsta, synkrona versionen blockerade event-loopen 30-50 s pa Pi:n
  * -> /health svarade inte -> pi-dmx-watchdog startade om motorn i en loop). Nu ar event-loopen fri mellan bitarna:
  * /health svarar, ljudet och ljuset gar direkt (pa annu ooptimerad kod), och uppvarmningen ar klar efter ~1-2 min.
- * DMX_WARMUP=<sokvag> valjer fil, DMX_WARMUP=0 stanger av. DMX_WARMUP_SLICE = hop per bit (standard 150 = ~0,4 s ljud).
+ * DMX_WARMUP=<sokvag> valjer fil, DMX_WARMUP=0 stanger av. DMX_WARMUP_SLICE = hop per bit (standard 10 = ~30 ms CPU pa Zero 2 W; 150 gav 0,5 s-block och overruns).
  */
 import { existsSync, readFileSync } from "node:fs";
 import { Analyser } from "./analyser.js";
@@ -29,7 +29,7 @@ export function warmUpInBackground(cfg: EngineConfig, path: string, done: (r: Wa
   const channels = d.readUInt16LE(22), rate = d.readUInt32LE(24), bits = d.readUInt16LE(34);
   if (channels !== 1 || bits !== 16 || rate !== cfg.audio.rate) { done(null); return; }
   const n = (d.length - 44) >> 1, HOP = cfg.fft.hop;
-  const SLICE = Math.max(10, Math.min(2000, Number(process.env.DMX_WARMUP_SLICE ?? 150)));
+  const SLICE = Math.max(10, Math.min(2000, Number(process.env.DMX_WARMUP_SLICE ?? 10)));
   const an = new Analyser(cfg);            // roll 'all' (ingen worker): hela process()-vagen i huvudtraden
   an.setGainLock(true, 1);
   const fx = new EffectEngine(cfg);
