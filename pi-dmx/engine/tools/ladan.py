@@ -12,7 +12,7 @@ adresserna i ordning och anvander den som svarar. Losenordet las ur PI_PASS elle
 och skrivs aldrig ut.
 
 SHOW-ENV (lotus-portarna, alla bevisade i korbanken pa lotus-korpusen via tools/lotusBenchShim.mjs - se ENV-LADAN.md):
-skrivs till /etc/systemd/system/audio-dmx-engine.service.d/lotus.conf och rorbestaende tempo.conf/drop.conf lamnas ifred.
+skrivs till /etc/systemd/system/audio-dmx-engine.service.d/ladan.conf och rorbestaende tempo.conf/drop.conf lamnas ifred.
 """
 import os, subprocess, sys, time
 
@@ -73,6 +73,7 @@ REMOVE = [
     '/etc/systemd/system/audio-dmx-engine.service.d/dwell.conf', '/etc/systemd/system/audio-dmx-engine.service.d/zz-dynamik.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/drop.conf', '/etc/systemd/system/audio-dmx-engine.service.d/tempo.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/lotus.conf',
+    '/etc/systemd/system/audio-dmx-engine.service.d/ladan.conf',   # forra provet byts ut (REMOVE kor fore conf-skrivningen)
     '/etc/systemd/system/audio-dmx-engine.service.d/hjarta.conf', '/etc/systemd/system/audio-dmx-engine.service.d/energi.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/sektion.conf', '/etc/systemd/system/audio-dmx-engine.service.d/zzz-lugn.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/zzzz-ogat.conf', '/etc/systemd/system/audio-dmx-engine.service.d/split.conf',
@@ -145,7 +146,7 @@ def main():
         cmd += ['--conf', 'ladan']   # 09-27: EN fil, ladan.conf, for pagaende prov; allt godkant lyfts in i koden
         for e in env_pairs: cmd += ['--env', e]
     for r in REMOVE: cmd += ['--remove', r]   # alltid, aven med --bara-deploy: rensningen ar en del av koden
-    print('\nshow-env som skrivs till lotus.conf:' if not ONLY_DEPLOY else '\n(env orord)')
+    print('\nprov-env som skrivs till ladan.conf:' if not ONLY_DEPLOY else '\n(env orord)')
     for k, v, why in SHOW_ENV:
         if not ONLY_DEPLOY: print(f'  {k}={v:<6} {why}')
     for e in EXTRA: print(f'  {e}   (extra fran kommandoraden)')
