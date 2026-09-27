@@ -16,7 +16,6 @@ import { dirname, join } from "node:path";
 import { AudioCapture } from "./audio.js";
 import { BoundaryDetector } from "./boundaryDetector.js";
 import { createAnalyser, type Frame } from "./analyser.js";
-import { Recorder } from "./recorder/recorder.js";
 import { EffectEngine } from "./effects.js";
 import { DmxSender } from "./dmx.js";
 import { startServer, applyInputRouting, type Server } from "./server.js";
@@ -181,8 +180,9 @@ const AUDIO_CLOCK_ON = process.env.DMX_AUDIO_CLOCK === '1';
 // INSPELAREN (recorder/recorder.ts - samma fil som i lotus, bredvid analysatorn). AV i DMX; DMX_RECORDER=1 slar pa. Den far
 // samma hop som analysatorn och laser dropCount/sektion ur ramen; varje latgrans (boundaryDetector) ar en ny "lat"
 // (ladan-<n>). Fangsterna (tempo 10 s in/30 s, drop 15+15 s, max 2 per lat, ko 30) hamnar i DMX_RECORDER_DIR.
-let recorder: Recorder | null = null;
+let recorder: import("./recorder/recorder.js").Recorder | null = null;   // PC-/optimeringsmodul: laddas BARA med DMX_RECORDER=1 (realtidsprincipen)
 if (process.env.DMX_RECORDER === "1") {
+  const { Recorder } = await import("./recorder/recorder.js");
   recorder = new Recorder({ dir: process.env.DMX_RECORDER_DIR || "/var/lib/audio-dmx-engine/snippets", sampleRate: cfg.audio.rate, enabled: true }, {
     latestFrame: () => latestFrame,
     beatInfo: () => cfg.beat ?? null,
