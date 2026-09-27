@@ -54,6 +54,15 @@ for f in todo:
     rc, out, _ = sudo(f"mkdir -p $(dirname {REMOTE}/{f}) && ([ -f {REMOTE}/{f} ] && cp {REMOTE}/{f} {REMOTE}/{f}.bak-{ts}; true) && cp {tmp} {REMOTE}/{f} && chmod 644 {REMOTE}/{f} && ls -la {REMOTE}/{f}")
     if rc or not out.strip(): sys.exit(f"cp {f} misslyckades pa Pi:n - aterstall fran .bak-{ts}")
     print(out.strip())
+# UPPVARMNINGSKLIPPET (2026-09-27): ../warmup/warmup.wav -> /opt/audio-dmx-engine/warmup/ nar md5 skiljer (se src/warmup.ts).
+wl = os.path.normpath(os.path.join(HERE, '..', 'warmup', 'warmup.wav'))
+if os.path.exists(wl):
+    wd = open(wl, 'rb').read(); rc, out, _ = run("md5sum /opt/audio-dmx-engine/warmup/warmup.wav 2>/dev/null")
+    if out.split()[:1] != [hashlib.md5(wd).hexdigest()]:
+        with sf.open('/tmp/warmup.wav', 'wb') as fh: fh.write(wd)
+        rc, out, _ = sudo("mkdir -p /opt/audio-dmx-engine/warmup && cp /tmp/warmup.wav /opt/audio-dmx-engine/warmup/warmup.wav && chmod 644 /opt/audio-dmx-engine/warmup/warmup.wav && echo ok")
+        print(f"warmup.wav -> Pi:n ({len(wd)//1000} kB): {out.strip() or 'FEL'}"); todo.append('warmup/warmup.wav')
+    else: print("warmup.wav oforandrad pa Pi:n")
 removed = []
 for pat in REMOVES:
     # [ -e ] fangar bade fil och katalog; en glob utan traff lamnas orord (mv far aldrig se monstret).

@@ -17,6 +17,7 @@ import { AudioCapture } from "./audio.js";
 import { BoundaryDetector } from "./boundaryDetector.js";
 import { createAnalyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
+import { warmUp } from "./warmup.js";
 import { DmxSender } from "./dmx.js";
 import { startServer, applyInputRouting, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
@@ -85,6 +86,16 @@ applyInputRouting(cfg.audioInput === "mic" ? "mic" : "aux");
 // DELAD ANALYSATOR (analyser.ts/split.ts): utan DMX_ANALYSER_SPLIT ar detta exakt `new Analyser(cfg)`.
 // Med DMX_ANALYSER_SPLIT=worker flyttas tempo/gridfas/sektion till en egen trad pa en egen karna —
 // motivet ar matningen 15,6 % av hoppen over budget (0,99 ms snitt, toppar 235 ms mot 2,67 ms).
+// UPPVARMNING FORE START (2026-09-27, realtidsprincipen - se warmup.ts): V8 far se alla sallsynta grenar pa
+// skrap-instanser innan de riktiga skapas -> process() optimeras en gang och ligger kvar. DMX_WARMUP=0 stanger av.
+{
+  const wp = process.env.DMX_WARMUP ?? "/opt/audio-dmx-engine/warmup/warmup.wav";
+  if (wp !== "0") {
+    const r = warmUp(cfg, wp);
+    if (r) console.warn(`[warmup] ${r.secs.toFixed(0)} s ljud, ${r.hops} hop pa ${r.ms.toFixed(0)} ms`);
+    else console.warn(`[warmup] hoppas over: ${wp} saknas eller fel format (mono 16-bit ${cfg.audio.rate} Hz)`);
+  }
+}
 const analyser = createAnalyser(cfg);
 analyser.resetGain(cfg.audioInput === "mic" ? 20 : 1);
 analyser.setGainLock(cfg.audioInput !== "mic", 1);  // aux: fixed 1x
