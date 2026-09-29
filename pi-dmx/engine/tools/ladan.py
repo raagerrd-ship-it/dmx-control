@@ -47,9 +47,7 @@ PORTAR_EJ_LIVE = [
 # pop+megamix bit-identiska (gammal kod + live-env == ny kod utan env). Historiken (varje rad = uttalande + matning) finns i
 # git: `git show 38d0401:pi-dmx/engine/tools/ladan.py`. Pi:n kor nu UTAN drop-ins; de tre gamla tas bort via REMOVE nedan.
 # Nya prov gors som forr: EXTRA pa kommandoraden (--env NAMN=VARDE) -> lotus.conf, och lyfts in i koden nar de godkants.
-SHOW_ENV: list = [
-    ('DMX_SHAPE_UP_MS',    '25',     'LATENS 09-29: nivans uppgang 60 -> 25 ms som lotus (ca 35 ms snabbare pa uppgangen, fallet orort)'),
-]   # 09-29: provet (RISE_K 10, SHAPE_DOWN 220) + 09-27-kvallens ladan.conf (FLOOR_CH 40, WIN 10, ARECORD_CPU 3, QUIET) ar kodens standard
+SHOW_ENV: list = []   # 09-29: proven (RISE_K 10, SHAPE_DOWN 220, SHAPE_UP 25) + 09-27-kvallens ladan.conf (FLOOR_CH 40, WIN 10, ARECORD_CPU 3, QUIET) ar kodens standard
 
 
 # RENSNINGEN 2026-09-23: inlarnings-/offline-stacken ar borta ur motorn (latminne, fingeravtryck, inspelare, tvatt,
