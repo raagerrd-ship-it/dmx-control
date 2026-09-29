@@ -146,6 +146,7 @@ let clockDetBpm = 0;   // analysatorns bpm som taktklockan LÅSTES på (om-ankri
                        // skild från cfg.beat.bpm som frekvens-termen finjusterar)
 let lastLiveDrop = 0;        // senast sedda drop-räknare FRÅN analysatorn
 let lastBoundary = 0;        // senast sedda låtgräns-räknare (dynamikens omkalibrering)
+let lastCharShift = 0;
 let outDrop = 0;             // drop-räknaren effekterna ser (live eller replay)
 // COAST: konfidensen dippar i breakdowns/brus men TEMPOT är oftast fortfarande rätt.
 // Släpper vi gridet direkt hoppar effekterna till kick-drift och glider tillbaka när
@@ -214,6 +215,7 @@ capture.on("chunk", (samples: Float32Array) => {
   // (~5 s) och tempogrammet tillhor forra laten. DMX_BOUNDARY_SOFT: mjuk hint i st.f. hard nollstallning -
   // falska latgranser pa pop kastade tempolaset 5x/5 min (ladan 2026-09-04).
   bounds.tick({ level: frame.level, bpm: frame.bpm, bpmConfidence: frame.bpmConfidence });
+  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; effects.noteCharShift(); }
   if (bounds.boundaryCount !== lastBoundary) {
     lastBoundary = bounds.boundaryCount; effects.softenRange(); if (process.env.DMX_BOUNDARY_SOFT !== '0') analyser.hintTrackChange(5000); else { analyser.resetTempo(); if ((process.env.DMX_SECTION_HINT_LOWCONF ?? '0') === '0') analyser.hintTrackChange(5000); }   // riktig latgrans nollar sektionerna (tempotappet gor det inte langre)
     if (recorder) { const name = "ladan-" + lastBoundary; recorder.noteTrack(name, "dmx"); recorder.trackChanged("dmx", name); }

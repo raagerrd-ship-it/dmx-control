@@ -487,7 +487,9 @@ export class EffectEngine {
     partLook = new Map();
     partLookSong = 0;
     /** Misstänkt låtbyte → låt auto-rangen kalibrera om snabbt mot nya nivåer. */
-    softenRange() { this.range.soften(); this.songStartWall = Date.now(); } // latgrans: aven DROP_SONG_HOLD_S-klockan
+    softenRange() { this.range.soften(); this.songStartWall = Date.now(); }
+    /** KARAKTARSSKIFTE fran latgransdetektorn (DMX_CHAR_SHIFT_D): dirigenten byter look vid nasta tillfalle (MIN_HOLD, ej i uppbyggnad). */
+    noteCharShift() { this.charShiftUntil = performance.now() + 6000; } // latgrans: aven DROP_SONG_HOLD_S-klockan
     gravLevel = 0; // gravitations-VU: nivå som faller med gravitation
     gravVel = 0; // dess hastighet
     gravPeak = 0; // peak-håll (sjunker långsamt)
@@ -531,7 +533,8 @@ export class EffectEngine {
     recentLooks = []; // MIX_V2: de senast valda lookerna (nyhetsstraff)
     unitSlot = 0;
     unitPhraseDone = -1; // FRASVAXLING: look A/B och senaste frasnummer som bytts pa
-    pendingSecSwitch = false; // SECTION_UNIT: sektionsgrans passerad men bytet blockerat (riser/MIN_HOLD) -> gor det sa fort det gar
+    pendingSecSwitch = false;
+    charShiftUntil = 0; // noteCharShift: bytesskal giltigt 6 s               // SECTION_UNIT: sektionsgrans passerad men bytet blockerat (riser/MIN_HOLD) -> gor det sa fort det gar
     prevSongLook = new Map(); // SECTION_UNIT: forra latens look per sektionstyp (straffas sa nasta lat far en annan)
     lastSmartTier = "";
     lastSmartSwitchMs = 0; // tidsstämpel för senaste effektbyte → minsta-intervall
@@ -1375,11 +1378,12 @@ export class EffectEngine {
             if (liveSecChanged)
                 this.unitPhraseDone = 0;
             const unitPhrase = SECTION_UNIT && !!liveSec && SECTION_UNIT_PHRASE_BARS > 0 && phraseNo > 0 && phraseNo !== this.unitPhraseDone && !liveSecChanged && !this.pendingSecSwitch;
+            const charShift = performance.now() < this.charShiftUntil; // KARAKTARSSKIFTE (noteCharShift)
             const wantSwitch = this.memPart
                 ? (memSection || bassSwitch)
                 : (SECTION_UNIT && liveSec)
-                    ? (((memSection || this.pendingSecSwitch) && secOldEnough) || unitPhrase || bassSwitch || now > this.smartDwellUntil + SECTION_UNIT_RESERVE_MS) // SECTION_UNIT: sektionen ar enheten
-                    : (tierChanged || memSection || halvedChanged || bassSwitch || now > this.smartDwellUntil);
+                    ? (((memSection || this.pendingSecSwitch) && secOldEnough) || unitPhrase || bassSwitch || charShift || now > this.smartDwellUntil + SECTION_UNIT_RESERVE_MS) // SECTION_UNIT: sektionen ar enheten
+                    : (tierChanged || memSection || halvedChanged || bassSwitch || charShift || now > this.smartDwellUntil);
             // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
             // det, inte bara på energinivån. Två regler, båda dramaturgiska:
             //
@@ -1422,6 +1426,10 @@ export class EffectEngine {
             if ((!inBuild || buildEntry || secEntry) && (dropSwitch || miniSwitch || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
                 this.lastSmartSwitchMs = now;
                 this.pendingSecSwitch = false;
+                if (charShift) {
+                    this.charShiftUntil = 0;
+                    console.log('[dirigent] karaktarsskifte i laten -> byter look');
+                }
                 this.lastSmartTier = tierName;
                 this.lastHalvedForSwitch = this.pulseHalved;
                 this.lastBassClearForSwitch = bassClear;

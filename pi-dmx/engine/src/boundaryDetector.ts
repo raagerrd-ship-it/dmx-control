@@ -27,7 +27,9 @@ const DIP_WIN_MS = 6000;       // dipp raknas som evidens sa lange efterat
 const NOV_WIN_MS = 1500;       // klangprofil per 1,5 s
 const NOV_LAG_MS = 8000;       // jamfor mot profilen sa langt bakat (facitmatningens fonster)
 const NOV_STRONG = 0.68;       // MATT: plata 0,60-0,75 gav 2/2 traff, 0 falska -> mitten
-const NOV_WEAK = 0.55;         // ...racker om nivadipp eller temposkifte ocksa fyrar
+const NOV_WEAK = 0.55;
+const CHAR_D = Number(process.env.DMX_CHAR_SHIFT_D ?? 0);             // karaktarsskifte for dirigenten: 0 = av
+const CHAR_REFRACT_MS = Number(process.env.DMX_CHAR_SHIFT_REFRACT_MS ?? 15000);         // ...racker om nivadipp eller temposkifte ocksa fyrar
 const NOV_BACK_MS = 0;
 const NOV_WIN_KEEP_MS = 6000;  // klangskifte raknas som evidens sa lange efterat
 const NOV_Q = 0.97;            // skiftet maste ligga i toppen av de senaste minuterna
@@ -58,6 +60,7 @@ export class BoundaryDetector {
   private novHist: Float32Array[] = [];
   private novIdx = 0;             // nasta slot i ringen
   private novFilled = 0;          // antal skrivna profiler
+  charShiftCount = 0; charShiftD = 0; private charShiftAt = 0;   // KARAKTARSSKIFTE (se nedan)
   private novAt = 0;              // vaggklocka for senaste klangskiftet
   private novPeak = 0;            // L1-avstandet vid det skiftet
   private novDist = new Float32Array(NOV_DIST_BUCKETS);   // fordelning over ALLA d
@@ -139,6 +142,10 @@ export class BoundaryDetector {
       this.novDist[bk] += dt;
       this.novDistTotal += dt;
       if (d >= NOV_WEAK) { this.novAt = now; this.novPeak = d; }
+      // KARAKTARSSKIFTE (ladan 2026-09-29: 'dirigenten ska vaxla om den kanner att laten forandras'): samma klangavstand, men utan
+      // krav pa nivadipp/temposkifte - bara att skiftet ar ovanligt for LATEN (>= dess egen NOV_Q-percentil) och >= CHAR_D. Raknaren
+      // lases av index.ts -> effects.noteCharShift(). Spärr CHAR_REFRACT_MS mellan skiften. Paverkar inte latgransen.
+      if (CHAR_D > 0 && d >= CHAR_D && d >= this.novRelThreshold() && now - this.charShiftAt >= CHAR_REFRACT_MS) { this.charShiftAt = now; this.charShiftCount++; this.charShiftD = d; }
     }
   }
 

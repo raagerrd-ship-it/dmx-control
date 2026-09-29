@@ -52,9 +52,8 @@ SHOW_ENV: list = [
     ('DMX_SECTION_REUSE',  '0',      'aterkommande del far ny look (vers 2 != vers 1)'),
     ('DMX_MIX_RECENT_N',   '8',      'undvik de 8 senaste lookerna (4)'),
     ('DMX_MIX_TOP_FRAC',   '0.8',    'valfonster 80 % av poolen (50 %) = fler effekter i spel'),
-    # PROV 09-29 19:00 'vid lag energi ar lamporna helt svarta': tak 0,20 x md 0,10 = 2 % -> tak-golv 0,5 och md-golv 0,25 = ca 12 %
-    ('DMX_CEIL_FLOOR',     '0.5',    'DIM-takets golv 0,20 -> 0,50'),
-    ('DMX_ENERGY_FB_DIP',  '0',      'md-golvet sanks inte i energilaget (0,25 i st.f. 0,10)'),
+    # 09-29 19:00 golvprovet (CEIL_FLOOR 0,5 + FB_DIP 0) BORTTAGET 19:05: 'kor ratt ljust hela tiden' - agaren ville bara justera slackgransen
+    ('DMX_CHAR_SHIFT_D',   '0.55',   'dirigenten byter look vid karaktarsskifte i laten (klang), minst 15 s mellan; megamix 7 / pop 4 per 10 min'),
 ]   # 09-29: proven (RISE_K 10, SHAPE_DOWN 220, SHAPE_UP 25) + 09-27-kvallens ladan.conf (FLOOR_CH 40, WIN 10, ARECORD_CPU 3, QUIET) ar kodens standard
 
 
