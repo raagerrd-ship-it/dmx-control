@@ -33,3 +33,4 @@ pi-dmx/engine-dist.tgz
 pi-dmx/engine/tools/frozen*/
 pi-dmx/engine/tools/*.wav
 pi-dmx/engine/tools/*.raw
+pi-dmx/pi-backup/
