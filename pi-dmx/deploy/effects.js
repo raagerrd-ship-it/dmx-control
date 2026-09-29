@@ -286,6 +286,7 @@ const LIVE_TRUST_LO = Number(process.env.LIVE_TRUST_LO ?? 0.2), LIVE_TRUST_HI = 
  *  DMX_ENERGY_FB_DIP sa energisvinget far storre omfang nar takten inte bar. w = taktens tillit (LIVE_TRUST_LO..HI). */
 const ENERGY_FB = process.env.DMX_ENERGY_FALLBACK !== '0';
 const ENERGY_FB_DIP = Number(process.env.DMX_ENERGY_FB_DIP ?? 0.15);
+const CEIL_FLOOR = Number(process.env.DMX_CEIL_FLOOR ?? 0.20); // takets (DIM) golv - se 'SVART I LAG ENERGI'
 const ENERGY_FB_ONSET = Number(process.env.DMX_ENERGY_FB_ONSET ?? 0.30);
 /** PORTAT FRAN LOTUS 2026-09-23 kvall (kallaren, agaren ogonbedomde varje steg) - galler med DMX_ENERGY_FALLBACK=1:
  *  (1) LAS PA RENA SLAG, inte tid: rastret far vikt forst efter DMX_BEAT_LOCK_BEATS rena slag i rad (konf >= LOCK_CONF, |fasfel| <= LOCK_ERR
@@ -1704,7 +1705,9 @@ export class EffectEngine {
             // dynamiken. OBS: golvet gäller MULTIPLIKATORN → en effekt som skickar 0
             // (avsiktlig blackout) blir fortfarande 0; äkta TYSTNAD tonas bort av
             // silenceGate i master (effekt→0), inte här. Klubb-läget floras också.
-            const VU_FLOOR = 0.20;
+            // SVART I LAG ENERGI (ladan 09-29 19:00): med LIVE_CEIL foljer bade taket (DIM) och md (RGB) samma niva - golven MULTIPLICERAS:
+            // tak 0,20 x md 0,10 = 2 % = svart. DMX_CEIL_FLOOR hojer takets golv (standard 0,20 = som forr).
+            const VU_FLOOR = CEIL_FLOOR;
             const vuFilter = VU_FLOOR + (1 - VU_FLOOR) * vuBase;
             // BARA DROP skippar VU-golvet: dropEnv (0..1) lyfter taket till full under
             // det korta drop-fönstret, annars styr den golvade VU:n direkt.
