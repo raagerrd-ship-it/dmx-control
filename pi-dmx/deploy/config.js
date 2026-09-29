@@ -31,6 +31,8 @@ export const defaultConfig = {
     energyDrivesMode: true,
     smartDwellMs: 15000,
     master: 1.0,
+    levelWindowDb: 10, // dB under taket där ljuset når golvet (ratt i /setup: "Lägsta nivå")
+    silenceLevel: 0.05, // släckgräns på frame.level (ratt i /setup: "Släckgräns")
     chaseStyle: "pingpong",
     rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },
     modeButton: { chip: "gpiochip0", line: 27 }, // GPIO27 = Codec Zero onboard button (SW1)

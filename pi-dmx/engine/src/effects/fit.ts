@@ -73,6 +73,7 @@ export const FIT: Partial<Record<Mode, Fit>> = {
   tyngdlyft: { punch: 0.65, bass: 0.30, bright: 0.50, beat: 0.65 },   // nivan mot refrangen
   uvpuls:    { punch: 0.75, bass: 0.35, bright: 0.45, beat: 0.90 },   // UV pa slaget
   frasraknare:{ punch: 0.50, bass: 0.50, bright: 0.50, beat: 0.85 },  // takter och fraser
+  vidga:      { punch: 0.55, bass: 0.55, bright: 0.50, beat: 0.70 },  // energin oppnar riggen
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -92,10 +93,10 @@ const SPATIAL: Partial<Record<Mode, number>> = {
   chase: 1.0, tick: 1.0, stege: 1.0, sopa: 1.0, gallop: 1.0, bounce: 1.0,
   ripple: 0.9, eko: 0.9, drumkit: 0.9, eq: 0.9, wave: 0.8, split: 0.8, drops: 0.8,
   duel: 0.7, konfetti: 0.7, varannan: 1.0, pendel: 0.7, twin: 0.6, tide: 0.6, drift: 0.6, aurora: 0.5,
-  basgang: 1.0, forvarning: 0.8, frasraknare: 0.7, nedrakning: 0.8, vagbrytare: 0.8, tyngdlyft: 0.4,
+  basgang: 1.0, forvarning: 0.8, frasraknare: 0.7, nedrakning: 0.8, vagbrytare: 0.8, tyngdlyft: 0.4, vidga: 0.9,
 };
 /** Hur mycket den spatiala preferensen väger vid full punch (0 = av). */
-const SPATIAL_PREF = 0.18;
+const SPATIAL_PREF = Number(process.env.DMX_SPATIAL_PREF ?? 0.18);   // ladan 09-29: "manga effekter lyser bara alla lampor" -> prov 0,5
 
 /** Hur väl en effekt passar musiken just nu. Högre = bättre (0..1-ish). */
 export function fitScore(mode: Mode, p: { punch: number; bass: number; bright: number; beat: number }): number {

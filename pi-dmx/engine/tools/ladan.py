@@ -54,6 +54,7 @@ SHOW_ENV: list = [
     ('DMX_MIX_TOP_FRAC',   '0.8',    'valfonster 80 % av poolen (50 %) = fler effekter i spel'),
     # 09-29 19:00 golvprovet (CEIL_FLOOR 0,5 + FB_DIP 0) BORTTAGET 19:05: 'kor ratt ljust hela tiden' - agaren ville bara justera slackgransen
     ('DMX_DROP_MIN_GAP_S', '15',     'hogst en drop per 15 s i showen (19:02: tre drops pa 10 s via eskaleringsregeln = falska)'),
+    ('DMX_SPATIAL_PREF',   '0.5',    'dirigenten foredrar effekter dar lamporna skiljer sig (0,18): "manga effekter lyser bara alla lampor"'),
     ('DMX_CHAR_SHIFT_D',   '0.55',   'dirigenten byter look vid karaktarsskifte i laten (klang), minst 15 s mellan; megamix 7 / pop 4 per 10 min'),
 ]   # 09-29: proven (RISE_K 10, SHAPE_DOWN 220, SHAPE_UP 25) + 09-27-kvallens ladan.conf (FLOOR_CH 40, WIN 10, ARECORD_CPU 3, QUIET) ar kodens standard
 

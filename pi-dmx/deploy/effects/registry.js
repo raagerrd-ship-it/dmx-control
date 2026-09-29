@@ -51,6 +51,7 @@ import { basgang } from "./basgang.js";
 import { tyngdlyft } from "./tyngdlyft.js";
 import { uvpuls } from "./uvpuls.js";
 import { frasraknare } from "./frasraknare.js";
+import { vidga } from "./vidga.js";
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS = [
     drops, party, chase, wave, breathe, snap, bounce, mono, aurora, pulse,
@@ -68,6 +69,8 @@ export const EFFECTS = [
     // Nya effekter pa analysatorns nya signaler: forvarning (expectHighInMs), basgang (bassline/basnoter), tyngdlyft
     // (levelVsHighDb), uvpuls (UV pa slaget i refrangen), frasraknare (sectionBars).
     forvarning, basgang, tyngdlyft, uvpuls, frasraknare,
+    // 2026-09-29: vidga (energin oppnar riggen utifran och in, alla i takt vid hog energi)
+    vidga,
 ];
 /** Specialrolls-mappning: vilka fixture-roller (hazer/uv/blinder/strobe/laser/co2)
  *  varje effekt aktivt driver. Effekten fungerar utan dessa; matchning styr bara
