@@ -1021,6 +1021,9 @@ export class EffectEngine {
     // INGEN DROP I LATENS INLEDNING (ladan 2026-09-24 23:35, tredje gangen 'fortfarande drop i inledning'): intro-grindarna ovan tittar pa
     // sektionen, men den slar om intro -> build strax FORE smallen (kicken som borjar ar sjalva byggstenen). Med DMX_DROP_SONG_HOLD_S > 0
     // fyrar ingen drop/minidrop forsta N s av en lat (klockan startar vid motorstart och vid latgrans = softenRange; INTE pa sektionen - tystnaden fore en drop gor den till intro, 23:31: dropen efter pausen nekades).
+    // DROP-KEDJOR (ladan 2026-09-29 19:03 'falsk drop'): analysatorns eskaleringsregel slapper en starkare drop redan 4 s efter
+    // den forra - loggen: tre drops pa 10 s (rise 17 -> 20 -> 30). Showen tar hogst en drop per DMX_DROP_MIN_GAP_S. 0 = av.
+    if (DROP_MIN_GAP_S > 0 && dropHitRaw) { if (nowWall - this.lastShowDropWall < DROP_MIN_GAP_S * 1000) { dropHitRaw = false; this.dropCalmDenied++; } else this.lastShowDropWall = nowWall; }
     if (DROP_SONG_HOLD_S > 0) {
       if (dropHitRaw && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000) { dropHitRaw = false; this.dropCalmDenied++; }
     }
