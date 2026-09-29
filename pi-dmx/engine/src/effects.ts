@@ -266,7 +266,7 @@ const LIVE_ANCHOR_DROP_DB = Number(process.env.DMX_LIVE_ANCHOR_DROP_DB ?? 2);
 /** LAG VOLYM = FORTFARANDE LEVANDE (ladan 2026-09-24 23:30): hur fort toppen glider ner (dB/s). 0,005 = 6 dB pa 20 min holl riggen dov
  *  lange efter att volymen skruvats ner; 0,02 = 6 dB pa 5 min - en tyst lat ar dovare sin forsta minut, en sankt volym lever igen inom minuter. */
 const LIVE_ANCHOR_MAX_DECAY = Number(process.env.DMX_LIVE_ANCHOR_MAX_DECAY ?? 0.03);
-const LIGHT_SHAPE_UP = 60;
+const LIGHT_SHAPE_UP = Number(process.env.DMX_SHAPE_UP_MS ?? 60);   // nivans uppgang; lotus shapeSmoothUpMs 25 (09-29 prov: kortare lag pa uppgangen, fallet orort)
 const LIGHT_SHAPE_DOWN = Number(process.env.DMX_SHAPE_DOWN_MS ?? 220);   // lotus shapeSmoothDownMs (lotus 09-29: 150 -> 250 'mycket battre' med energyRiseK 10)
 const LIGHT_REL_A = 0.396;         // log-release-alpha
 const LIGHT_ATK_A = 1.0;           // attack-alpha (instant)
