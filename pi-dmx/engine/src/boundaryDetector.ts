@@ -28,6 +28,7 @@ const NOV_WIN_MS = 1500;       // klangprofil per 1,5 s
 const NOV_LAG_MS = 8000;       // jamfor mot profilen sa langt bakat (facitmatningens fonster)
 const NOV_STRONG = 0.68;       // MATT: plata 0,60-0,75 gav 2/2 traff, 0 falska -> mitten
 const NOV_WEAK = 0.55;
+const BOUNDARY_NEED_DIP = process.env.DMX_BOUNDARY_NEED_DIP === '1';
 const CHAR_D = Number(process.env.DMX_CHAR_SHIFT_D ?? 0);             // karaktarsskifte for dirigenten: 0 = av
 const CHAR_REFRACT_MS = Number(process.env.DMX_CHAR_SHIFT_REFRACT_MS ?? 15000);         // ...racker om nivadipp eller temposkifte ocksa fyrar
 const NOV_BACK_MS = 0;
@@ -204,7 +205,11 @@ export class BoundaryDetector {
     // Tva oberoende bevis racker.
     const novRel = this.novRelThreshold();
     const novSolo = this.novPeak >= NOV_STRONG && this.novPeak >= novRel;
-    if (novFresh && (novSolo || ev.length >= 2)) why = ev.join(" + ");
+    // DROP != LATGRANS (ladan 2026-09-29 19:13, agaren: missad drop, 'samma lat'): klangskifte 0,64 + tempo 94->116 vid dropen raknades
+    // som ny lat -> sektionerna nollades och DROP_SONG_HOLD spärrade 30 s. Med DMX_BOUNDARY_NEED_DIP=1 kraver en svag klang +
+    // tempo-grans aven en nivadipp (latar har en paus/dipp mellan sig, en drop har det inte). Starkt klangskifte ensamt galler som forr.
+    const dipOk = !BOUNDARY_NEED_DIP || novSolo || ev.includes("nivådipp");
+    if (novFresh && (novSolo || ev.length >= 2) && dipOk) why = ev.join(" + ");
     else if (tLive > MAX_SEG_MS) { why = "maxlängd"; back = 0; }   // aldrig en 22-minuters grot igen
     if (!why) return false;
 
