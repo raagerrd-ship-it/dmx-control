@@ -47,7 +47,12 @@ PORTAR_EJ_LIVE = [
 # pop+megamix bit-identiska (gammal kod + live-env == ny kod utan env). Historiken (varje rad = uttalande + matning) finns i
 # git: `git show 38d0401:pi-dmx/engine/tools/ladan.py`. Pi:n kor nu UTAN drop-ins; de tre gamla tas bort via REMOVE nedan.
 # Nya prov gors som forr: EXTRA pa kommandoraden (--env NAMN=VARDE) -> lotus.conf, och lyfts in i koden nar de godkants.
-SHOW_ENV: list = []   # 09-29: proven (RISE_K 10, SHAPE_DOWN 220, SHAPE_UP 25) + 09-27-kvallens ladan.conf (FLOOR_CH 40, WIN 10, ARECORD_CPU 3, QUIET) ar kodens standard
+SHOW_ENV: list = [
+    # PROV 09-29 18:55 'mer variation och kanske fler effekter' (megamix: refrangens looker per lat 6 -> 12)
+    ('DMX_SECTION_REUSE',  '0',      'aterkommande del far ny look (vers 2 != vers 1)'),
+    ('DMX_MIX_RECENT_N',   '8',      'undvik de 8 senaste lookerna (4)'),
+    ('DMX_MIX_TOP_FRAC',   '0.8',    'valfonster 80 % av poolen (50 %) = fler effekter i spel'),
+]   # 09-29: proven (RISE_K 10, SHAPE_DOWN 220, SHAPE_UP 25) + 09-27-kvallens ladan.conf (FLOOR_CH 40, WIN 10, ARECORD_CPU 3, QUIET) ar kodens standard
 
 
 # RENSNINGEN 2026-09-23: inlarnings-/offline-stacken ar borta ur motorn (latminne, fingeravtryck, inspelare, tvatt,

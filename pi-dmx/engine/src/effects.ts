@@ -137,7 +137,10 @@ const CLEAR_BASS_HARD = Number(process.env.DMX_CLEAR_BASS_HARD ?? 0.85);
 const CLEAR_BASS_BOOST = Number(process.env.DMX_CLEAR_BASS_BOOST ?? 0.25);
 const MIX_RECENT_N = Number(process.env.DMX_MIX_RECENT_N ?? 4);
 const MIX_RECENT_PENALTY = Number(process.env.DMX_MIX_RECENT_PENALTY ?? 0.2);
-const MIX_TOP_FRAC = Number(process.env.DMX_MIX_TOP_FRAC ?? 0.5);   // (4) valfonster = andel av poolen (minst 3)
+const MIX_TOP_FRAC = Number(process.env.DMX_MIX_TOP_FRAC ?? 0.5);
+/** MER VARIATION (ladan 2026-09-29 18:50: 'kanns ratt lika hela tiden' - mer variation och fler effekter): DMX_SECTION_REUSE=0 = en aterkommande
+ *  del (vers 2, refrang 2) far en NY look i stallet for att aterse samma (loggen: vers 'sopa' 3 ggr, refrang 'chase' 3 ggr). Standard 1 = som forr. */
+const SECTION_REUSE = process.env.DMX_SECTION_REUSE !== '0';   // (4) valfonster = andel av poolen (minst 3)
 /** (6) OSEDD-BONUS (2026-09-23, effektoversynen): +DMX_MIX_UNSEEN_BONUS i rankingen for effekter som inte valts sedan start -
  *  med 46 effekter och ~50 byten per 10 min blev annars samma 20-25 valda och resten aldrig (effectMix: 18-19 aldrig valda).
  *  Bonusen forsvinner sa fort effekten setts en gang, sa den styr bara FORSTA chansen. 0 = av. */
@@ -1350,7 +1353,7 @@ export class EffectEngine {
         const livePart = !!part && part.startsWith('live:');
         if (SECTION_UNIT && livePart) { if (unitPhrase) { this.unitSlot = 1 - this.unitSlot; this.unitPhraseDone = phraseNo; } else this.unitSlot = 0; }
         const pairKey = livePart ? (SECTION_UNIT ? part + (this.unitSlot ? ':b' : '') : part + ':' + Math.floor(((frame.sectionIndex ?? 0) + 1) / 2)) : part;   // SECTION_UNIT: nyckel = etiketten
-        const remembered = !wantCalm && pairKey && (!livePart || SECTION_UNIT) ? this.partLook.get(pairKey) : undefined;   // SECTION_UNIT: igenkanning aven live
+        const remembered = SECTION_REUSE && !wantCalm && pairKey && (!livePart || SECTION_UNIT) ? this.partLook.get(pairKey) : undefined;   // SECTION_UNIT: igenkanning aven live
         const unitPen = (m: Mode) => SECTION_UNIT && pairKey && this.prevSongLook.get(pairKey) === m ? 0.5 : 0;   // SECTION_UNIT: inte forra latens look for samma sektionstyp   // 20:33: ingen igenkanning for live-etiketter ('samma effekt igen') - bara latminnet
         // TYDLIG BASGANG -> toggle-poolen (se CLEAR_BASS). Snitt med aktuell pool forst (sektion/tier/krav), annars alla
         // aktiva toggle-effekter som moter kraven. Bast passande forst, gyllene-snitt-variation bland topp 3, aldrig samma.
