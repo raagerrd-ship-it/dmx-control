@@ -61,15 +61,10 @@ const DROP_QUALITY_DB = Number(env('DROP_QUALITY_DB') ?? 3.5);
 const DROP_ARM_MS = Number(env('DROP_ARM_MS') ?? 0);
 // FYR-LAGG: hela laggen ar bodyFast-filtret (tau 120 ms) som alla tre villkor laser. BODY_FAST_S sveper tau.
 const BODY_FAST_S = Number(env('BODY_FAST_S') ?? 0.12);
-// DROP_PEEK_MS: lopande minimum av ra bodyNow over N ms. 0 = ra-varde direkt; utelamnad = av.
-const DROP_PEEK_MS = Number(env('DROP_PEEK_MS') ?? (envOn('DROP_PEEK') ? 0 : -1));
-const DROP_PEEK = DROP_PEEK_MS >= 0;
 // DROP_RISE_MIN: stigningen mats mot MINIMUM av bodyFast senaste 0,5 s, inte mot punkten 0,5 s bakat. Mjuka
 // pop-drops har ett SUG (dipp 100-200 ms) fore dropen; med punkt-referensen nas kravet forst nar referensen
 // hamnar i dippen -> fyrningen landar 0,5 s sent = en takt vid 130 BPM ("drop en takt efter").
 const DROP_RISE_MIN = envOn('DROP_RISE_MIN');
-// UPPGRADERING: inom korta fonstret far en kandidat fyra om den landar minst sa har manga dB NARMARE toppen an forra. 0 = av.
-const DROP_UPGRADE_DB = Number(env('DROP_UPGRADE_DB') ?? 0);
 // VILLKORAT STIGNINGSKRAV: landar kandidaten NARA TOPPEN (underPeak < DROP_RISE_LOW_Q) racker DROP_RISE_LOW_DB. 0 = av.
 const DROP_RISE_LOW_DB = Number(env('DROP_RISE_LOW_DB') ?? 0);
 const DROP_RISE_LOW_Q = Number(env('DROP_RISE_LOW_Q') ?? 3);
@@ -80,9 +75,10 @@ const DROP_RISE_LOW_Q = Number(env('DROP_RISE_LOW_Q') ?? 3);
  *  hintTrackChange nollade sektionerna (SECTION_ON_HINT) -> ett taktlost break mitt i laten gjorde refrangen efter till 'intro' utan historik
  *  (ladan 2026-09-24 23:00: 'varfor ar den sa seg pa att komma igang i refrangen?'). 0 = lassslappet ror bara tempot. Standard = som forr. */
 const SECTION_HINT_LOWCONF = sysEnv('SECTION_HINT_LOWCONF') !== '0';
+const DROP_UNDERPEAK_MIN = Number(env('DROP_UNDERPEAK_MIN') ?? 0); // se 'INTE I TAKET'
 const DROP_CALM_GATE = sysEnv('DROP_CALM_GATE') === '1';
 /** STRIKT INTRO (opt-in DROP_CALM_INTRO_STRICT=1, kraver <prefix>DROP_CALM_GATE): i 'intro' fyrar en drop bara efter riser (buildUp >= DROP_CALM_BUILD). */
-const DROP_CALM_INTRO_STRICT = typeof process !== 'undefined' && process.env?.DROP_CALM_INTRO_STRICT === '1';
+const DROP_CALM_INTRO_STRICT = env('DROP_CALM_INTRO_STRICT') === '1'; // bare-ratt (profilen kan satta standard)
 const DROP_CALM_DB = Number(env('DROP_CALM_DB') ?? 6);
 const DROP_CALM_BUILD = Number(env('DROP_CALM_BUILD') ?? 0.25);
 const DROP_CALM_Q = Number(env('DROP_CALM_Q') ?? 1.5);
@@ -93,8 +89,6 @@ const DROP_CALM_LAND_MS = Number(env('DROP_CALM_LAND_MS') ?? 0);
 const DROP_KICK_LOCK_MS = Number(env('DROP_KICK_LOCK_MS') ?? 0);
 const DROP_KICK_RECENT_MS = Number(env('DROP_KICK_RECENT_MS') ?? 100);
 const DROP_KICK_LOCK_GRID = env('DROP_KICK_LOCK_GRID') === '1';
-const DROP_KICK_FIRST = envOn('DROP_KICK_FIRST');
-const KICK_FIRST_RISE = Number(env('KICK_FIRST_RISE') ?? 6);
 // MINIDROPS: egen losare lyft-detektor med eget avstand MINI_SPACING_MS. 0 = av.
 const MINI_SPACING_MS = Number(env('MINI_SPACING_MS') ?? 0);
 const MINI_RISE_DB = Number(env('MINI_RISE_DB') ?? 10);
@@ -136,6 +130,31 @@ const GHOST_MS = Number(env('GHOST_MS') ?? 12000);
 const PULSE_VETO = sysOn('PULSE_VETO');
 const PULSE_VETO_MIN = Number(env('PULSE_VETO_MIN') ?? 0);
 const PULSE_VETO_R = Number(env('PULSE_VETO_R') ?? 0.75);
+/** Instansfalt som MATT (--trace-generalization, 240 s pop-facit, 2026-09-27) byter Smi->Double efter start. Ges Double-form i
+ *  konstruktorn (se slutet av constructor) sa kartan inte deprecerar mitt i driften. Fyra av dem stod har redan sedan 896ab7c. */
+const DOUBLE_FROM_START = [
+    'secHiStartMs', 'secDipExpMs', 'expectHighMs', 'levelVsHighDb',
+    'sumSq', 'lastT', 'dbgRms', 'lastKick', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum', 'lvlSmooth', 'lvlVU', 'engSmooth', 'activeMs',
+    'buildUp', 'novSlow', 'kickHit', 'snareHit', 'hatHit', 'bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs',
+    'lastKickWallMs', 'lastMiniGoneMs', 'lastMiniMs', 'lastRiserMs', 'pendingKickMs', 'pendingKickW', 'kfPrev', 'kfPrev2', 'beatAnchorMs',
+    'blPrev1', 'blPrev2', 'blTrough', 'profBassline', 'bassOnsetsPerBeat',
+    'lastConfMs', 'lastVoteMs', 'lowConfSinceMs', 'newSongVote', 'lockPeak', 'nearChallenger', 'octaveVote', 'rawBpmLast', 'localBpmConfidence',
+    'secPct', 'secSongStartMs', 'sectionStartMs', 'secBlkMs', 'secBlkInt', 'secBlkCent', 'secBlkRms2', 'secCurDbSum', 'repeatSim', 'repeatAgoMs',
+    'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', // byter forst vid forsta drop-episoden (sags i andra matningen)
+];
+/** TYPSTABILA TALFALT (2026-09-27, realtidsprincipen): skriv ett icke-heltal och sedan ursprungsvardet, sa V8 ger faltet
+ *  Double-representation fran start. Ett Smi-initierat falt (0, -1 ...) som senare far ett decimaltal deprecerar objektets
+ *  form, och TurboFan kastar all kod som lastes med den formen (matt: 'wrong map'-deopts av process() i stabilt lage). */
+function stabiliseNumbers(o) {
+    const r = o;
+    for (const k of Object.keys(r)) {
+        const v = r[k];
+        if (typeof v === 'number') {
+            r[k] = 0.5;
+            r[k] = v;
+        }
+    }
+}
 export class Analyser {
     fft;
     window;
@@ -715,9 +734,9 @@ export class Analyser {
     nearVote = 0; // bevis för GRANN-fel (t.ex. 122 låst mot 136): bara före commit
     nearChallenger = 0; // tempot grann-rösterna pekar på (måste hålla ihop, som challengerBpm)
     bpmStable = 0; // antal stabila (finjusterings-)estimat i rad → committa oktaven
-    challengerBpm = 0; // tempot rösterna faktiskt pekar på (måste hålla ihop)
+    challengerBpm = -0; // typstabilt (Double fran start)   // tempot rösterna faktiskt pekar på (måste hålla ihop)
     lockPeak = 0; // tempogram-toppens styrka när takten är frisk (referens)
-    lastSongVoteMs = 0; // väggklocka för förra låtbytesrösten (bevis mäts i TID)
+    lastSongVoteMs = -0; // typstabilt (Double fran start)  // väggklocka för förra låtbytesrösten (bevis mäts i TID)
     newSongVote = 0; // ihållande oenighet trots låst oktav → låtbyte utan tystnadslucka
     /** Antal stabila finjusterings-estimat (@4Hz) innan oktaven committas OCH
      *  låtbytesvakten öppnar. MÅSTE vara samma tal på båda ställena — se dödläget
@@ -727,7 +746,7 @@ export class Analyser {
      *  låssläppningen sist i computeBpm(). 0 = ej satt. */
     lowConfSinceMs = 0;
     /** Väggklocka: t.o.m. denna tid gäller vidgad tempo-sökning efter en låtbytes-hint. */
-    reacqUntilMs = 0;
+    reacqUntilMs = -0; // typstabilt (se lastDropRise)
     // Ringbuffert för senaste råestimat (~5s) → median-stabilisering utan allokering.
     static BPM_HIST = 20;
     bpmHist = new Float64Array(Analyser.BPM_HIST);
@@ -770,7 +789,7 @@ export class Analyser {
      *  tyngsta slaget i så gott som all dansmusik — den plats som samlar mest
      *  kick-tyngd ÄR ettan. Glöms långsamt så ett låtbyte kan flytta fasen. */
     barAcc = new Float64Array(4);
-    barCount = 0; // antal bokförda slag (bevisunderlag för taktfasen)
+    barCount = -0; // (typstabilt) antal bokförda slag (bevisunderlag för taktfasen)
     /** Perceptuell prior (log-Gauss runt 120 BPM) per lag — lagg→BPM ar fast, sa
      *  de ~78 Math.exp()-anropen per computeBpm-anrop kan bakas en gang. */
     priorLut = (() => {
@@ -798,7 +817,7 @@ export class Analyser {
         }
         return t;
     })();
-    silentMs = 0;
+    silentMs = -0; // typstabilt (se lastDropRise)
     diagLagMin = 0;
     diagLagMax = 0;
     _why = ""; // TRACE: vilken gren bytte tempot (<prefix>BPM_TRACE)
@@ -890,7 +909,7 @@ export class Analyser {
     bodyCeil = -300; // dB
     bodyPeak = -300; // SEG topp (loud-referens i minuter) for landa-hogt
     lastGoneSpanMs = 0;
-    lastDropRise = 0;
+    lastDropRise = -0; // -0 = HeapNumber: Double-falt fran start (typstabilt), beter sig som 0
     wasBodyOnset = false;
     /** ANSLAGSDETEKTION. En tröskel som ska NÅS korsas först när basen redan
      *  kommit — uppmätt 2.5 s efter anslaget. STIGNINGSTAKTEN fyrar när den
@@ -906,9 +925,6 @@ export class Analyser {
      *  blockerade av den föregående falska avfyrningen. */
     bodyGoneMs = 0;
     lastBodyGoneMs = -1e9;
-    peekRing = new Float32Array(64).fill(-120);
-    peekPos = 0; // DROP_PEEK_MS lopande minimum av ra bodyNow
-    lastDropUnderPeak = 99; // underPeak vid senaste fyrningen (DROP_UPGRADE_DB)
     miniDropCount = 0;
     lastMiniMs = -1e9;
     miniGoneMs = 0;
@@ -916,19 +932,18 @@ export class Analyser {
     wasMiniOnset = false;
     dropArmUntil = 0;
     dropArmAt = 0;
-    dropArmGoneMs = -1; // armerat drop-fonster (DROP_ARM_MS)
-    dropKickGoneMs = -1;
-    kickSeenGoneMs = -1; // KICK-FIRST + [firstkick]-spar per gone-episod
-    calmHoldStart = 0;
-    calmHoldRise = 0; // DROP_CALM_LAND_MS: kandidat som halls for verifierad landning
+    dropArmGoneMs = -1.5; // armerat drop-fonster (DROP_ARM_MS)
+    calmHoldStart = -0;
+    calmHoldRise = -0; // DROP_CALM_LAND_MS: kandidat som halls for verifierad landning
     dropPendAt = 0;
     dropPendStart = 0;
     dropPendRise = 0;
     dropPendGrid = false;
     lastKickWallMs = -1e9; // DROP_KICK_LOCK_MS
-    goneEpisodeMs = -1; // gone-episodens START (lastBodyGoneMs uppdateras varje hop och duger INTE som id)
+    barShiftOut = -1; // kickRefine -> process(): taktfas-forslaget for hopet (Smi -1..3, ingen allokering)
+    goneEpisodeMs = -1.5; // (double fran start, se dropArmGoneMs) gone-episodens START (lastBodyGoneMs uppdateras varje hop och duger INTE som id)
     dropCount = 0; // monoton drop-räknare (edge-säker för konsumenter)
-    lastDropMs = -1e9;
+    lastDropMs = -1.5e9; // utanfor Smi-intervallet -> Double fran start (typstabilt)
     // RISER/UPPBYGGNAD (flyttad från effects)
     /**
      * OBEHANDLAD LOGBANDNIVÅ — riserdetektorns egen ingång.
@@ -1372,6 +1387,10 @@ export class Analyser {
             this.secBlkSpec[i] += spec[specOff + i];
         if (this.secBlkMs < 1000)
             return;
+        this.sectionBlock(nowMs, breaking);
+    }
+    /** Blockets sardrag och etikett (1 s): den kalla delen av sectionHop, egen funktion sa att dess sallan korda grenar inte deoptimerar 100 Hz-ackumuleringen. */
+    sectionBlock(nowMs, breaking) {
         const n = this.secBlkN || 1;
         const bInt = this.secBlkInt / n;
         const bKicks = this.secBlkKicks;
@@ -2633,7 +2652,8 @@ export class Analyser {
     slowStep(o) {
         const r = this.splitRing;
         this.applyFlags(r[o + R_FLAGS], r[o + R_HINT_MS], r[o + R_VCLOCK]);
-        this.virtualMs = r[o + R_PERF]; // perfNow() = snabba tradens tid vid sampeln (deterministiskt)
+        this.virtualMs = r[o + R_PERF];
+        this.virtualOn = true; // perfNow() = snabba tradens tid vid sampeln (deterministiskt)
         this.envRing[this.envPos] = r[o + R_ENV];
         this.envBassRing[this.envPos] = r[o + R_BASS];
         if (HIGH_ON)
@@ -3615,7 +3635,10 @@ export class Analyser {
      *  samma bildrutor ut, oavsett hur fort man matar den. Det är förutsättningen
      *  för en regressionsbänk — och för att kunna välja tröskelvärden mot tjugo
      *  låtar i stället för mot en. Live är beteendet oförändrat (null = riktig tid). */
-    virtualMs = null;
+    // TYPSTABIL (2026-09-27, realtidsprincipen): aldrig null<->tal i ett falt som lases varje hop - det deprecerar
+    // instansens map och kastar TurboFan-koden. virtualOn ar vaxeln, virtualMs alltid ett tal (NaN nar av).
+    virtualMs = NaN;
+    virtualOn = false;
     /** Driv analysatorn på en virtuell klocka (offline-uppspelning). Anropas med
      *  ackumulerad ljudtid i ms före varje process(). null = tillbaka till realtid. */
     /**
@@ -3640,8 +3663,15 @@ export class Analyser {
         // LAGESBYTE bara vid ett HOPP (forsta anropet, bakat, eller > 1 s framat): en bank som anropar per hop med
         // ljudtiden far bara klockan flyttad (som advanceVirtualClock) - ankarna nollas inte varje hop.
         const prev = this.virtualMs;
-        const jump = ms === null || prev === null || ms < prev || ms - prev > 1000;
-        this.virtualMs = ms;
+        const jump = ms === null || !this.virtualOn || ms < prev || ms - prev > 1000;
+        if (ms === null) {
+            this.virtualOn = false;
+            this.virtualMs = NaN;
+        }
+        else {
+            this.virtualOn = true;
+            this.virtualMs = ms;
+        }
         if (!jump)
             return;
         this.lastKick = 0;
@@ -3662,8 +3692,8 @@ export class Analyser {
     /** KORBANK (09-20): flytta bara den virtuella klockan, utan att nolla nagra ankare. setVirtualClock() ar ett
      *  LAGESBYTE (nollar lastT/lastKick/pendingKickMs/lastVoteMs...) och far bara anropas en gang - anropad per hop
      *  fros AGC:n (dt=0), kickar forfinades aldrig (0 kickar) och rosterna foll varje anrop. */
-    advanceVirtualClock(ms) { this.virtualMs = ms; }
-    perfNow() { return this.virtualMs ?? performance.now(); }
+    advanceVirtualClock(ms) { this.virtualMs = ms; this.virtualOn = true; }
+    perfNow() { return this.virtualOn ? this.virtualMs : performance.now(); }
     /**
      * LJUDKLOCKAN — ms sedan start raknat ur ANTALET BEARBETADE SAMPEL, satt av
      * matningen strax fore varje process(). -1 = inte satt (aldre anropare).
@@ -3705,7 +3735,7 @@ export class Analyser {
     /** Tillbaka till Date.now(). Nasta setAudioClockMs sar om offseten. */
     clearAudioClock() { this.audioClockMs = -1; this.audioOffsetSeeded = false; this.audioToWallOffset = 0; }
     wallNow() {
-        if (this.virtualMs !== null)
+        if (this.virtualOn)
             return this.virtualEpoch + this.virtualMs;
         return this.audioClockMs >= 0 ? this.audioClockMs + this.audioToWallOffset : Date.now();
     }
@@ -3805,6 +3835,22 @@ export class Analyser {
             kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
             spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
         };
+        // Ramen och dess delobjekt skrivs varje hop av optimerad kod: ge alla talfalt Double-form redan har (se stabiliseNumbers).
+        for (const o of [this.outFrame, this.outProfile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum])
+            stabiliseNumbers(o);
+        // Instansfalt som i stabilt lage bytte Smi->Double forst vid sallsynta handelser (V8 --trace-generalization, 540 s).
+        // FORSLAG 2026-09-27 (minnesgranskningen, tools/mem/): --trace-generalization over 240 s pop-facit visade att 60 instansfalt
+        // byter Smi->Double EFTER start (var och en deprecerar Analyser-kartan: +10..+369 kartor per falt) -> scoreEnv deoptades 41 ggr,
+        // process() 13 ggr ("wrong map", "Maps became deprecated during optimization"), och ooptimerad kod boxar varje flyttal:
+        // 43 kB skrap/hop kallt mot 1,2 kB/hop stabilt (--no-opt: 1 MB/hop). Listan ar exakt de falt som mattes generalisera.
+        for (const k of DOUBLE_FROM_START) {
+            const v = this[k];
+            if (typeof v === 'number') {
+                this[k] = 0.5;
+                this[k] = v;
+            }
+        }
+        stabiliseNumbers(this.secRank);
     }
     /** Feed a hop-sized chunk of mono samples, get a frame back. */
     process(samples) {
@@ -3939,21 +3985,143 @@ export class Analyser {
         // topparna. Långsam attack (tauUp×2) så uppbyggnader får höras, snabb retreat
         // (tauDown×0.25) eftersom AGC:n inte kan ta bort redan inbränd klippning.
         this.dbgRms = rms;
-        if (!this.gainLocked && rms > d.noiseFloor) {
-            const env = this.agcEnvelope(rms, now);
-            if (env > 0) {
-                this.envelope = env;
-                const desired = d.autoGainTarget / Math.max(1e-4, env);
-                const gTau = desired > this.gain ? d.tauUp * 2 : d.tauDown * 0.25;
-                const ga = 1 - Math.exp(-dt / gTau);
-                this.gain += (desired - this.gain) * ga;
-                if (this.gain < 0.5)
-                    this.gain = 0.5;
-                else if (this.gain > 20)
-                    this.gain = 20;
-            }
-        }
+        if (!this.gainLocked && rms > d.noiseFloor)
+            this.agcStep(rms, now, dt);
         const level = Math.min(1, rms * this.gain);
+        const kick = this.kickStep(kickFlux, energy, now);
+        // Hoppets längd i ms. (Tva stallen nedan raknar fortfarande `dtHop * 1000`
+        // for hand i stallet for att lasa den har — numeriskt identiskt, men
+        // pastaendet "en enda forberaknad konstant" var inte sant.)
+        const hopMs = this.hopMs;
+        // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
+        this.silenceStep(rms, hopMs);
+        // --- Onset-envelope → lokal BPM (nedsamplad till 100 Hz) ---
+        this.envAccum = Math.max(this.envAccum, fluxNorm);
+        // Basbandets egen envelope (kick-flux) — samma raster, oberoende signal.
+        const bassFluxNorm = Math.min(1, kickFlux * (this.cfg.onset.enhancements ? 0.5 : 0.02));
+        if (bassFluxNorm > this.envBassAccum)
+            this.envBassAccum = bassFluxNorm;
+        // TYDLIG BASGANG: basnivans topp per env-sampel + senaste kick (se stepBassline).
+        {
+            const bl = this.bandLvl[1] + this.bandLvl[2];
+            if (bl > this.blAccum)
+                this.blAccum = bl;
+            if (this.kickHit >= 1)
+                this.blKickSeq = this.envSeq;
+        }
+        if (HIGH_ON) {
+            const hi = this.bandOn[6] > this.bandOn[7] ? this.bandOn[6] : this.bandOn[7];
+            if (hi > this.envHighAccum)
+                this.envHighAccum = hi;
+        }
+        this.envAccumT += hopMs;
+        if (this.envAccumT >= 1000 / Analyser.ENV_HZ)
+            this.envSampleStep();
+        // #2 Förfina förra kickens fas: nu har vi y(-1)=kfPrev2, y(0)=kfPrev, y(+1)=kickFlux
+        // runt kick-hopet. Parabelns topp ger sub-hop-offset δ ∈ [-0.5,0.5] hop.
+        let kickAtMs = 0;
+        let barShift = -1;
+        if (this.pendingKickMs > 0) {
+            kickAtMs = this.kickRefine(kickFlux, hopMs);
+            barShift = this.barShiftOut;
+        }
+        if (kick) {
+            this.beatAnchorMs = this.wallNow();
+            this.pendingKickMs = this.beatAnchorMs;
+            this.pendingKickW = kickFlux; // absolut anslagsstyrka (kvot mot tröskeln mättade)
+        }
+        this.kfPrev2 = this.kfPrev;
+        this.kfPrev = kickFlux;
+        const dtHop = this.dtHop;
+        const aAtt = this.aAtt;
+        const aRel = this.aRel;
+        // Modulnivå-funktion, inte closure: två closures per hop (~750/s) allokerades
+        // rakt emot filens 0-alloc-ambition.
+        this.lvlSmooth = ema(this.lvlSmooth, level, aAtt, aRel);
+        // VU-nivå: symmetrisk ~200ms lågpass PÅ HOP-TAKT (integrerar alla 375 hops/s
+        // → långt mindre brus än att smootha rå-nivån efter 50Hz-decimering). ≤200 BPM
+        // = ett slag var ≥300ms, så 200ms suddar aldrig ut en äkta beat — bara brus.
+        this.lvlVU += (level - this.lvlVU) * this.aVU;
+        this.engSmooth = ema(this.engSmooth, energy, aAtt, aRel);
+        this.centSmooth = ema(this.centSmooth, centroid, aAtt, aRel);
+        const intensity = this.intensityStep(rms);
+        // --- DUBBEL-FFT: hög-upplöst log-spektrum för effekterna ---
+        // Egen glidande 2048-buffert, matas samma hop. Ger 23 Hz/bin i botten så
+        // sub/kick/bas separeras. Per-band AGC-nivå + per-band adaptiv onset.
+        // Bufferten matas VARJE hop (glidande fönster måste vara obrutet)...
+        this.bufferBig.copyWithin(0, hop); // skjut vänster med en hop
+        this.bufferBig.set(samples, this.bufferBig.length - hop);
+        // ...men själva FFT:n + band-analysen körs bara var BIG_EVERY:e hop. 2048-FFT:n
+        // är analysatorns dyraste steg och spec-NIVÅERNA smoothas ändå ~90ms — de behöver
+        // inte 375Hz. MÄTT: analysen tog 3.8ms/hop mot 2.67ms budget → ljud droppades och
+        // ljuset låg 40–140ms efter. Decimeringen får den att rymmas i realtid.
+        // Tidssteget skalas (bigDt) så smoothing-tidskonstanterna blir oförändrade.
+        if (++this.bigCounter >= Analyser.BIG_EVERY)
+            this.bigStep(rms);
+        // TRUM-KIT peak-hold-envelopes PÅ HOP-TAKT (var 2.7ms) → fångar varje anslag,
+        // aldrig missat mellan två render-frames (100Hz). tau bevarade från effects.ts:
+        // hat 60ms (treble+air-onset O[6]/O[7]) / snare 110ms (highMid-onset O[5]) / kick 150ms
+        // (ENBART diskret kick — se nedan). bass = spec.bass-NIVÅ (L[2], ingen envelope).
+        // Hi-hats/sizzle i modern EDM/trap ligger ofta >10 kHz, så hat får lyssna på både
+        // treble (3,5–10 kHz) och air (10–16 kHz) och ta den starkaste transienten.
+        const hatOnset = this.bandOn[6] > this.bandOn[7] ? this.bandOn[6] : this.bandOn[7];
+        this.hatHit = Math.max(this.hatHit * this.dHat, hatOnset);
+        this.snareHit = Math.max(this.snareHit * this.dSnare, this.bandOn[5]);
+        // Drivs ENBART av den riktiga kick-detektorn (median + 4.5*MAD). Tidigare
+        // fylldes den ocksa pa av bandOn[1], men det bandet (60-120 Hz) domineras av
+        // sustained bas: MATT 816-1377 anslag/min dar ~110 fanns, dvs 8x for manga.
+        // Den svammade over den korrekta detektorn sa envelopen aldrig slocknade och
+        // kicken forlorade sin accent.
+        if (kick)
+            this.kickHit = 1;
+        else
+            this.kickHit = this.kickHit * this.dKick;
+        // ── DROP-DETEKTION (flyttad hit: att AVGÖRA om det är en drop är analys) ──
+        // En "riktig" drop = nivån surgar upp mot låtens tak EFTER en break (svacka).
+        // Topp-zonen har hysteres (in vid 85% av taket, ut först vid 70%) så nivån inte
+        // flimrar kring tröskeln. Kräver ≥2s musik så låtens INTRO (tystnad→musik) inte
+        // läses som en drop. Resultatet exponeras som en MONOTON räknare → en konsument
+        // på lägre takt kan aldrig missa flanken.
+        const nowWallA = this.wallNow();
+        this.levelCeil = Math.max(this.lvlSmooth, this.levelCeil - dtHop * 0.015 * this.levelCeil); // tak, decay ~65s
+        // `breaking` = nivån ligger i en svacka. Exponeras till effektlagret (lugnt läge).
+        // Den GAMLA svack-stämpeln (breakAtMs, 400 ms ihållande) grindade drop-villkoret
+        // innan flanken flyttades till baskroppen; den är borttagen med sitt villkor.
+        const breaking = this.lvlSmooth < this.levelCeil * 0.65;
+        // TRE villkor, inte tva: utover hysteresen (85 % in / 70 % ut) finns ett
+        // ABSOLUT golv pa 0.65 som saknar motsvarighet pa vagen ut. Det kan ensamt
+        // halla inZone falsk genom en hel tyst lat. Odokumenterat tidigare.
+        if (this.lvlSmooth > this.levelCeil * 0.85 && this.lvlSmooth > 0.65)
+            this.inZoneState = true;
+        else if (this.lvlSmooth < this.levelCeil * 0.70)
+            this.inZoneState = false;
+        const inZone = this.inZoneState;
+        // BASKROPPEN — drop-detektionens egen signal (tak + frånvaro + stigningstakt).
+        // `inZone` lämnas orörd: effektlagret använder den som "musiken ligger högt".
+        const bodyNow = (this.bandDbRaw[0] + this.bandDbRaw[1] + this.bandDbRaw[2]) / 3; // ra dB
+        this.dropStep(kick, nowWallA, bodyNow);
+        const inRiser = this.riserStep(nowWallA);
+        this.profileStep();
+        return this.fillFrame(level, fluxNorm, kick, intensity, bodyNow, inZone, breaking, inRiser, kickAtMs, barShift, rms, nowWallA);
+    }
+    /** AGC (bara mic): utbruten ur process() 2026-09-27 — anropas nar gainen ar olast och signalen over golvet. */
+    agcStep(rms, now, dt) {
+        const d = this.cfg.detection;
+        const env = this.agcEnvelope(rms, now);
+        if (env > 0) {
+            this.envelope = env;
+            const desired = d.autoGainTarget / Math.max(1e-4, env);
+            const gTau = desired > this.gain ? d.tauUp * 2 : d.tauDown * 0.25;
+            const ga = 1 - Math.exp(-dt / gTau);
+            this.gain += (desired - this.gain) * ga;
+            if (this.gain < 0.5)
+                this.gain = 0.5;
+            else if (this.gain > 20)
+                this.gain = 20;
+        }
+    }
+    /** Kick-detektorn (median/MAD-troskel, taktgrind, flank + cooldown). Het varje hop; egen funktion sa att process() ar kompakt. */
+    kickStep(kickFlux, energy, now) {
         // KICK-DETEKTION v2: onset i kick-bandet (sub-bas ~0–280 Hz) mot en ADAPTIV
         // baslinje (långsam EMA av kick-fluxen). En kick = flux tydligt över
         // baslinjen; tröskeln skalar med signalen → fyrar pålitligt även på
@@ -4031,11 +4199,10 @@ export class Analyser {
         }
         this.kickWasAbove = above;
         this.kickPrimed = true;
-        // Hoppets längd i ms. (Tva stallen nedan raknar fortfarande `dtHop * 1000`
-        // for hand i stallet for att lasa den har — numeriskt identiskt, men
-        // pastaendet "en enda forberaknad konstant" var inte sant.)
-        const hopMs = this.hopMs;
-        // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
+        return kick;
+    }
+    /** Tystnadsflanken (350 ms / 10 s). Sallan korda grenar: i egen funktion sa att en forsta korning inte deoptimerar hetslingan. */
+    silenceStep(rms, hopMs) {
         if (rms < this.cfg.detection.noiseFloor * 1.5) {
             this.silentMs += hopMs;
             // FLANKTRIGGAT: hela reseten kördes förut VARJE tyst hop efter 350 ms —
@@ -4082,159 +4249,126 @@ export class Analyser {
             this.silentMs = 0;
             this.silenceArmed = false;
         }
-        // --- Onset-envelope → lokal BPM (nedsamplad till 100 Hz) ---
-        this.envAccum = Math.max(this.envAccum, fluxNorm);
-        // Basbandets egen envelope (kick-flux) — samma raster, oberoende signal.
-        const bassFluxNorm = Math.min(1, kickFlux * (this.cfg.onset.enhancements ? 0.5 : 0.02));
-        if (bassFluxNorm > this.envBassAccum)
-            this.envBassAccum = bassFluxNorm;
-        // TYDLIG BASGANG: basnivans topp per env-sampel + senaste kick (se stepBassline).
-        {
-            const bl = this.bandLvl[1] + this.bandLvl[2];
-            if (bl > this.blAccum)
-                this.blAccum = bl;
-            if (this.kickHit >= 1)
-                this.blKickSeq = this.envSeq;
-        }
-        if (HIGH_ON) {
-            const hi = this.bandOn[6] > this.bandOn[7] ? this.bandOn[6] : this.bandOn[7];
-            if (hi > this.envHighAccum)
-                this.envHighAccum = hi;
-        }
-        this.envAccumT += hopMs;
-        if (this.envAccumT >= 1000 / Analyser.ENV_HZ) {
-            this.envAccumT -= 1000 / Analyser.ENV_HZ;
-            // DUBBELSLAG: tva anslag narmare an REFRAC_N sampel ar SAMMA handelse.
-            // Anvandarens regel: "om det ar mindre an X ms mellan slag ar det ett
-            // dubbelslag och 1a ska raknas till bpm". Implementerad som icke-max-
-            // undertryckning (standard onset-peakplockning): ett sampel som foregas av
-            // ett STORRE inom fonstret dampas bort.
-            // 200 ms (20 sampel @ ENV_HZ 100) UPPMATT som optimum pa 110 ljudklipp
-            // ur tva genrer: unika latar ratt 13/18 -> 15/18, snitt 89.7 -> 91.7 %.
-            //   100 ms 13/18 · 150 ms 15/18 (90.8) · 200 ms 15/18 (91.7) · 250 ms 12/18
-            //   300 ms 14/18 · 400 ms 13/18
-            // Att 200 slar 300 ar logiskt: vid 150 BPM ar en attondel exakt 200 ms, sa
-            // ett bredare fonster borjar ata genuina attondelar i stallet for prydnadsslag.
-            // Loste dessutom syntetscenariot "svag bas + pad 132" som legat pa 0 % sedan
-            // lange -- just utsmetade anslag ar dar dubbelslagen gor mest skada.
-            let _e = this.envAccum;
-            const _R = Analyser.REFRAC_N;
-            if (_R > 0 && _e > 0) {
-                let _big = false;
-                for (let _k = 1; _k <= _R; _k++) {
-                    const _i = (this.envPos - _k + Analyser.ENV_LEN * 2) % Analyser.ENV_LEN;
-                    if (this.envRing[_i] >= _e) {
-                        _big = true;
-                        break;
-                    }
+    }
+    /** Ett onset-envelope-sampel (ENV_HZ): dubbelslagsdampning, ringar, basgang, sektionsflush/record till workern. */
+    envSampleStep() {
+        this.envAccumT -= 1000 / Analyser.ENV_HZ;
+        // DUBBELSLAG: tva anslag narmare an REFRAC_N sampel ar SAMMA handelse.
+        // Anvandarens regel: "om det ar mindre an X ms mellan slag ar det ett
+        // dubbelslag och 1a ska raknas till bpm". Implementerad som icke-max-
+        // undertryckning (standard onset-peakplockning): ett sampel som foregas av
+        // ett STORRE inom fonstret dampas bort.
+        // 200 ms (20 sampel @ ENV_HZ 100) UPPMATT som optimum pa 110 ljudklipp
+        // ur tva genrer: unika latar ratt 13/18 -> 15/18, snitt 89.7 -> 91.7 %.
+        //   100 ms 13/18 · 150 ms 15/18 (90.8) · 200 ms 15/18 (91.7) · 250 ms 12/18
+        //   300 ms 14/18 · 400 ms 13/18
+        // Att 200 slar 300 ar logiskt: vid 150 BPM ar en attondel exakt 200 ms, sa
+        // ett bredare fonster borjar ata genuina attondelar i stallet for prydnadsslag.
+        // Loste dessutom syntetscenariot "svag bas + pad 132" som legat pa 0 % sedan
+        // lange -- just utsmetade anslag ar dar dubbelslagen gor mest skada.
+        let _e = this.envAccum;
+        const _R = Analyser.REFRAC_N;
+        if (_R > 0 && _e > 0) {
+            let _big = false;
+            for (let _k = 1; _k <= _R; _k++) {
+                const _i = (this.envPos - _k + Analyser.ENV_LEN * 2) % Analyser.ENV_LEN;
+                if (this.envRing[_i] >= _e) {
+                    _big = true;
+                    break;
                 }
-                if (_big)
-                    _e *= Analyser.REFRAC_ATT;
             }
-            const _b = this.envBassAccum, _h = this.envHighAccum;
-            this.envRing[this.envPos] = _e;
-            this.envBassRing[this.envPos] = _b;
-            this.stepBassline();
-            if (HIGH_ON)
-                this.envHighRing[this.envPos] = _h;
-            this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
-            if (Analyser.GRID_PHASE_ON)
-                this.envLastWallMs = this.wallNow();
-            this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
-            this.envAccum = 0;
-            this.envBassAccum = 0;
-            if (HIGH_ON)
-                this.envHighAccum = 0;
-            // Sektionens blocksummor levereras per ENV-SAMPEL i bada rollerna (SECTION_AGG 'env': samma kodvag -> delad och odelad
-            // analysator ar bit-identiska). SECTION_AGG 'hop': odelad analysator kor sectionHop per hop sist i process().
-            if (this.role === 'fast') {
-                this.pushSlowRecord(_e, _b, _h);
-            }
-            else {
-                this.envStep();
-                if (!SECTION_AGG_HOP)
-                    this.sectionFlushAgg();
-            }
+            if (_big)
+                _e *= Analyser.REFRAC_ATT;
         }
-        // #2 Förfina förra kickens fas: nu har vi y(-1)=kfPrev2, y(0)=kfPrev, y(+1)=kickFlux
-        // runt kick-hopet. Parabelns topp ger sub-hop-offset δ ∈ [-0.5,0.5] hop.
+        const _b = this.envBassAccum, _h = this.envHighAccum;
+        this.envRing[this.envPos] = _e;
+        this.envBassRing[this.envPos] = _b;
+        this.stepBassline();
+        if (HIGH_ON)
+            this.envHighRing[this.envPos] = _h;
+        this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
+        if (Analyser.GRID_PHASE_ON)
+            this.envLastWallMs = this.wallNow();
+        this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
+        this.envAccum = 0;
+        this.envBassAccum = 0;
+        if (HIGH_ON)
+            this.envHighAccum = 0;
+        // Sektionens blocksummor levereras per ENV-SAMPEL i bada rollerna (SECTION_AGG 'env': samma kodvag -> delad och odelad
+        // analysator ar bit-identiska). SECTION_AGG 'hop': odelad analysator kor sectionHop per hop sist i process().
+        if (this.role === 'fast') {
+            this.pushSlowRecord(_e, _b, _h);
+        }
+        else {
+            this.envStep();
+            if (!SECTION_AGG_HOP)
+                this.sectionFlushAgg();
+        }
+    }
+    /** Forfinar forra kickens fas (parabel) och bokfor taktfasen. Returnerar kickAtMs; taktfas-forslaget laggs i barShiftOut (-1 = inget). */
+    kickRefine(kickFlux, hopMs) {
         let kickAtMs = 0;
         let barShift = -1;
-        if (this.pendingKickMs > 0) {
-            const ym1 = this.kfPrev2, y0 = this.kfPrev, yp1 = kickFlux;
-            const denom = ym1 - 2 * y0 + yp1;
-            if (denom < 0) { // konkav → äkta topp
-                let delta = 0.5 * (ym1 - yp1) / denom;
-                if (delta > 0.5)
-                    delta = 0.5;
-                else if (delta < -0.5)
-                    delta = -0.5;
-                this.beatAnchorMs = this.pendingKickMs + delta * hopMs;
-            }
-            this.pendingKickMs = 0;
-            // Slaget är färdigmätt → lämna över dess EXAKTA tid till PLL:en.
-            kickAtMs = this.beatAnchorMs;
-            if (Analyser.GRID_PHASE_TRIM_ON)
-                this.phaseTrimSample(kickAtMs);
-            // TAKTFAS: bokför slagets tyngd på sin plats i fyrtakten. Vikten är slagets
-            // EGEN styrka (ABSOLUT flux — kvoten mot troskeln mattade — kvadrerad sa
-            // skillnaden mellan ettans
-            // tunga och mellanslagens lätta trumma verkligen separerar). Bandenergin gick
-            // inte att använda: den är utjämnad över ~100 ms och gav alla fyra platser
-            // samma vikt ⇒ ingen marginal, ingen taktfas (MÄTT 2026-08-23).
-            const g = this.beatSrc.beat;
-            if (g && g.bpm > 40 && this.localBpmConfidence > 0.5) {
-                const bMs = 60000 / g.bpm;
-                const slot = Math.round((kickAtMs - g.anchorMs) / bMs) & 3;
-                this.barAcc[slot] += this.pendingKickW * this.pendingKickW;
-                if (this.barCount < 1000)
-                    this.barCount++;
-                // GLOMSKAN AR ~83 TAKTER, INTE 4. Raden korr en gang per DETEKTERAT SLAG,
-                // sa 0.997 ger tidskonstanten 1/0.003 = 333 slag = ~83 takter = ~2,5 min.
-                // Kommentaren sa forut "~4 takters glomska" — fel med faktor 20, och en
-                // tuningfalla: taktfasen bars over latgranser utom dar barAcc nollas explicit.
-                for (let i = 0; i < 4; i++)
-                    this.barAcc[i] *= 0.997;
-                // VINNANDE PLATS räknas ut HÄR, inte varje hop: barAcc ändras bara när ett
-                // slag bokförs, så mellanliggande hops gav exakt samma svar. Vinsten är
-                // dessutom att förslaget kommer högst en gång per slag i stället för i varje
-                // ruta fram till att motorn hunnit flytta ankaret.
-                // Kravet: TYDLIG marginal (35 %) och nog med bevis (~16 slag). Annars -1 —
-                // bättre ingen taktfas än en som sitter en åtta bort.
-                // `second` raknas om i sin egen loop nedan over alla i != bi, sa att satta
-                // den har var en dod tilldelning (och startvardet -1 alltid overskrivet).
-                let bi = 0, best = this.barAcc[0], second = 0;
-                for (let i = 1; i < 4; i++)
-                    if (this.barAcc[i] > best) {
-                        best = this.barAcc[i];
-                        bi = i;
-                    }
-                for (let i = 0; i < 4; i++)
-                    if (i !== bi && this.barAcc[i] > second)
-                        second = this.barAcc[i];
-                if (this.barCount >= 16 && best > second * 1.35)
-                    barShift = bi;
-            }
+        const ym1 = this.kfPrev2, y0 = this.kfPrev, yp1 = kickFlux;
+        const denom = ym1 - 2 * y0 + yp1;
+        if (denom < 0) { // konkav → äkta topp
+            let delta = 0.5 * (ym1 - yp1) / denom;
+            if (delta > 0.5)
+                delta = 0.5;
+            else if (delta < -0.5)
+                delta = -0.5;
+            this.beatAnchorMs = this.pendingKickMs + delta * hopMs;
         }
-        if (kick) {
-            this.beatAnchorMs = this.wallNow();
-            this.pendingKickMs = this.beatAnchorMs;
-            this.pendingKickW = kickFlux; // absolut anslagsstyrka (kvot mot tröskeln mättade)
+        this.pendingKickMs = 0;
+        // Slaget är färdigmätt → lämna över dess EXAKTA tid till PLL:en.
+        kickAtMs = this.beatAnchorMs;
+        if (Analyser.GRID_PHASE_TRIM_ON)
+            this.phaseTrimSample(kickAtMs);
+        // TAKTFAS: bokför slagets tyngd på sin plats i fyrtakten. Vikten är slagets
+        // EGEN styrka (ABSOLUT flux — kvoten mot troskeln mattade — kvadrerad sa
+        // skillnaden mellan ettans
+        // tunga och mellanslagens lätta trumma verkligen separerar). Bandenergin gick
+        // inte att använda: den är utjämnad över ~100 ms och gav alla fyra platser
+        // samma vikt ⇒ ingen marginal, ingen taktfas (MÄTT 2026-08-23).
+        const g = this.beatSrc.beat;
+        if (g && g.bpm > 40 && this.localBpmConfidence > 0.5) {
+            const bMs = 60000 / g.bpm;
+            const slot = Math.round((kickAtMs - g.anchorMs) / bMs) & 3;
+            this.barAcc[slot] += this.pendingKickW * this.pendingKickW;
+            if (this.barCount < 1000)
+                this.barCount++;
+            // GLOMSKAN AR ~83 TAKTER, INTE 4. Raden korr en gang per DETEKTERAT SLAG,
+            // sa 0.997 ger tidskonstanten 1/0.003 = 333 slag = ~83 takter = ~2,5 min.
+            // Kommentaren sa forut "~4 takters glomska" — fel med faktor 20, och en
+            // tuningfalla: taktfasen bars over latgranser utom dar barAcc nollas explicit.
+            for (let i = 0; i < 4; i++)
+                this.barAcc[i] *= 0.997;
+            // VINNANDE PLATS räknas ut HÄR, inte varje hop: barAcc ändras bara när ett
+            // slag bokförs, så mellanliggande hops gav exakt samma svar. Vinsten är
+            // dessutom att förslaget kommer högst en gång per slag i stället för i varje
+            // ruta fram till att motorn hunnit flytta ankaret.
+            // Kravet: TYDLIG marginal (35 %) och nog med bevis (~16 slag). Annars -1 —
+            // bättre ingen taktfas än en som sitter en åtta bort.
+            // `second` raknas om i sin egen loop nedan over alla i != bi, sa att satta
+            // den har var en dod tilldelning (och startvardet -1 alltid overskrivet).
+            let bi = 0, best = this.barAcc[0], second = 0;
+            for (let i = 1; i < 4; i++)
+                if (this.barAcc[i] > best) {
+                    best = this.barAcc[i];
+                    bi = i;
+                }
+            for (let i = 0; i < 4; i++)
+                if (i !== bi && this.barAcc[i] > second)
+                    second = this.barAcc[i];
+            if (this.barCount >= 16 && best > second * 1.35)
+                barShift = bi;
         }
-        this.kfPrev2 = this.kfPrev;
-        this.kfPrev = kickFlux;
+        this.barShiftOut = barShift;
+        return kickAtMs;
+    }
+    /** Sektionsenergi 0..1 (aktiv tid, EMA, sjalvkalibrerande golv och spann). Returnerar intensity. */
+    intensityStep(rms) {
         const dtHop = this.dtHop;
-        const aAtt = this.aAtt;
-        const aRel = this.aRel;
-        // Modulnivå-funktion, inte closure: två closures per hop (~750/s) allokerades
-        // rakt emot filens 0-alloc-ambition.
-        this.lvlSmooth = ema(this.lvlSmooth, level, aAtt, aRel);
-        // VU-nivå: symmetrisk ~200ms lågpass PÅ HOP-TAKT (integrerar alla 375 hops/s
-        // → långt mindre brus än att smootha rå-nivån efter 50Hz-decimering). ≤200 BPM
-        // = ett slag var ≥300ms, så 200ms suddar aldrig ut en äkta beat — bara brus.
-        this.lvlVU += (level - this.lvlVU) * this.aVU;
-        this.engSmooth = ema(this.engSmooth, energy, aAtt, aRel);
-        this.centSmooth = ema(this.centSmooth, centroid, aAtt, aRel);
         // SEKTIONSENERGI (0..1) — hur energiskt partiet är RELATIVT låtens eget snitt.
         // Ren analys av nivån över tid → hör hemma här, inte i show-orkestreringen.
         // En komprimerad signal ligger jämnt högt, så absolut nivå säger inget; jämför
@@ -4274,223 +4408,165 @@ export class Analyser {
         this.intensitySpread += (Math.abs(dev) - this.intensitySpread) * (iWarm ? dtHop / 3 : dtHop / 60);
         const scale = Math.max(0.015, this.intensitySpread) * 4;
         const intensity = Math.max(0, Math.min(1, 0.5 + dev / scale));
-        // --- DUBBEL-FFT: hög-upplöst log-spektrum för effekterna ---
-        // Egen glidande 2048-buffert, matas samma hop. Ger 23 Hz/bin i botten så
-        // sub/kick/bas separeras. Per-band AGC-nivå + per-band adaptiv onset.
-        // Bufferten matas VARJE hop (glidande fönster måste vara obrutet)...
-        this.bufferBig.copyWithin(0, hop); // skjut vänster med en hop
-        this.bufferBig.set(samples, this.bufferBig.length - hop);
-        // ...men själva FFT:n + band-analysen körs bara var BIG_EVERY:e hop. 2048-FFT:n
-        // är analysatorns dyraste steg och spec-NIVÅERNA smoothas ändå ~90ms — de behöver
-        // inte 375Hz. MÄTT: analysen tog 3.8ms/hop mot 2.67ms budget → ljud droppades och
-        // ljuset låg 40–140ms efter. Decimeringen får den att rymmas i realtid.
-        // Tidssteget skalas (bigDt) så smoothing-tidskonstanterna blir oförändrade.
-        if (++this.bigCounter >= Analyser.BIG_EVERY) {
-            this.bigCounter = 0;
-            for (let i = 0; i < this.bufferBig.length; i++)
-                this.windowedBig[i] = this.bufferBig[i] * this.windowBig[i];
-            this.fftBig.realTransform(this.specBig, this.windowedBig);
-            // Bara upp till högsta bin som någon läser (band 8 slutar vid 16 kHz ≈ bin 683,
-            // låtminnet slutar vid 5 kHz ≈ bin 218). Resterande ~340 sqrt per stor-FFT hade
-            // ingen läsare.
-            // Hissade referenser: JIT:en slipper verifiera this-formen per varv och kan
-            // hålla pekarna i register. Samma aritmetik, samma utfall.
-            const specBig = this.specBig, magBig = this.magBig, magMax = this.magBigMax;
-            for (let i = 0; i < magMax; i++) {
-                const re = specBig[2 * i], im = specBig[2 * i + 1];
-                magBig[i] = Math.sqrt(re * re + im * im);
-            }
-            // LÅTMINNET får samma magnitud (ingen extra FFT). Anropas före swap:en nedan,
-            // så bufferten faktiskt innehåller DENNA frames spektrum. Skickas som cachad vy
-            // (0..magBigMax) — svansen räknas inte, så ingen läsare kan tyst få nollor.
-            this.specSink?.(this.magBigView, this.cfg.audio.rate / this.bufferBig.length);
-            const gated = rms > this.cfg.detection.noiseFloor * 1.5;
-            // Signal i rad? Räknaren driver ONSET_WARM ovan.
-            if (gated)
-                this.onsetWarm++;
-            else
-                this.onsetWarm = 0;
-            // Samma hissning som magnitud-loopen: pekarna ut ur this före det inre varvet.
-            const bandLo = this.bandLo, bandHi = this.bandHi;
-            const prevMagBig = this.prevMagBig;
-            if (Analyser.SECTION_ON) {
-                // BASONSET-ENVELOPE (09-23, sektionssardrag): som librosa onset_strength(fmax 220): medel over basbinen (20-250 Hz) av
-                // halvvagslikriktad dB-skillnad mot forra stor-FFT:n. Toppplockning som onset_detect (pre_max/avg/post_avg/wait/delta) pa
-                // 8 ms-raster med 100 ms fordrojning (post_avg) - toppen raknas i det block som pagar, sa fordrojningen ar harmlos.
-                const lo = bandLo[0], hi = bandHi[2];
-                let o = 0;
-                for (let i = lo; i < hi; i++) {
-                    const d = 20 * Math.log10((magBig[i] + 1e-6) / (prevMagBig[i] + 1e-6));
-                    if (d > 0)
-                        o += d;
-                }
-                o /= Math.max(1, hi - lo);
-                const L = Analyser.BASSON_LEN, R = this.bassOnRing, n = this.bassOnN, A = Analyser.BASSON_AVG;
-                R[n % L] = o;
-                this.bassOnN = n + 1;
-                // kandidat c = n - A (100 ms bakat): lokalt max over [c - pre_max, c], >= medel over [c - A, c + A] + delta, wait sedan forra toppen
-                if (n >= 2 * A) {
-                    const c = n - A;
-                    const xc = R[c % L];
-                    let ok = true;
-                    for (let k = 1; k <= Analyser.BASSON_MAX && ok; k++)
-                        if (R[(c - k) % L] > xc)
-                            ok = false;
-                    if (ok) {
-                        let s = 0;
-                        for (let k = c - A; k <= n; k++)
-                            s += R[k % L];
-                        if (xc < s / (2 * A + 1) + Analyser.BASSON_DELTA)
-                            ok = false;
-                    }
-                    if (ok && c - this.bassOnLastPk > Analyser.BASSON_WAIT) {
-                        this.bassOnLastPk = c;
-                        this.bassOnPeak = true;
-                    }
-                }
-            }
-            for (let b = 0; b < 8; b++) {
-                const lo = bandLo[b], hi = bandHi[b];
-                const nb = Math.max(1, hi - lo);
-                let sum = 0, fl = 0;
-                for (let i = lo; i < hi; i++) {
-                    const m = magBig[i];
-                    sum += m;
-                    const d = m - prevMagBig[i];
-                    if (d > 0)
-                        fl += d;
-                }
-                const avg = sum / nb;
-                // Lotus-adaptern använder rå bandmagnitud som spektral andel för ljuset.
-                // Den får inte ersättas av bandLvl, som är per-band AGC-normaliserad.
-                this.bandAbs[b] = avg;
-                // Obehandlad nivå i dB, normaliserad till 0..1 över ett 60 dB-spann.
-                // Ingen AGC, inget tak som följer med uppåt → en stigning syns som stigning.
-                const db = 20 * Math.log10(avg + 1e-7);
-                this.bandDbRaw[b] = db; // RA dB (drop-kropp)
-                this.bandDb[b] = Math.max(0, Math.min(1, (db + 70) / 60));
-                // Per-band AGC: skala mot egen långsamt sjunkande peak → varje band nyttjar
-                // full range oavsett mix (bas dominerar annars alltid rå-magnituden).
-                // GOLV (~0.15·lvlSmooth): peaken nollställs INTE i tystnad → när ett tidigare
-                // tyst band (t.ex. diskant i ett intro) smäller till blir det en balanserad
-                // respons, inte en överstyrd ljus-chock/pump. (Gemini.)
-                const minPeak = this.lvlSmooth * 0.15;
-                // DECAYEN SKALAS MED BIG_EVERY: blocket körs 125/s, inte 375/s. Rå 0.9993 gav
-                // τ ≈ 11 s i stället för kalibrerade ~3.8 s (ett hett band höll sin peak in i
-                // nästa parti → konstlat låg diskant efter en drop). PEAK_DECAY = 0.9993^BIG_EVERY.
-                if (gated && avg > this.bandPeak[b])
-                    this.bandPeak[b] = Math.max(avg, minPeak);
-                else
-                    this.bandPeak[b] = Math.max(this.bandPeak[b] * Analyser.PEAK_DECAY, minPeak);
-                // Nivån smoothas ~90ms PÅ HOP-TAKT → nivå-drivna/lugna effekter (som läser
-                // spec via ctx.band) flimrar inte av det råa per-hop-AGC-bruset. onset lämnas
-                // skarp (nedan) så transient-drivna effekter behåller sin punch.
-                const lvlRawB = gated ? Math.min(1, avg / (this.bandPeak[b] + 1e-6)) : 0;
-                // EN array, inte tva. `bandLvlSm` hade exakt en lasare — kopieringen till
-                // `bandLvl` — sa tva Float32Array(8) bar identiska varden hela tiden.
-                this.bandLvl[b] += (lvlRawB - this.bandLvl[b]) * this.aBandLvl;
-                // Per-band onset: halvvågs-flux mot adaptiv baslinje (som kick-detektorn) →
-                // rena anslag oberoende av bandets absoluta energi.
-                const fluxN = fl / nb;
-                // ROBUST PROMINENS-GRIND (samma som kick-detektorn anvander, banden fick den
-                // aldrig). Den gamla grinden var "1.3x en EMA-baslinje x6", vilket slapper
-                // igenom varje transient i bandet i stallet for verkliga trumslag.
-                //   MATT vid BPM 134: kick 1116 slag/min (borde ~134, 8x for manga),
-                //   virvel 429/min (borde ~67, 6x). Darfor kandes trum-envelopen alltid pa
-                //   och gav ingen musikalisk accent - den var inte matttad, den overtriggade.
-                // Sign-baserad median + MAD ar okanslig for outliers (ett slag ar en outlier
-                // och far darfor INTE dra upp sin egen troskel, till skillnad fran en EMA).
-                // Steget skalas med BIG_EVERY sa tidskonstanten blir samma som kickens trots
-                // att banden uppdateras var tredje hop.
-                const oStep = 0.002 * Analyser.BIG_EVERY;
-                const dOMed = fluxN - this.onsetMed[b];
-                this.onsetMed[b] += (dOMed > 0 ? 1 : dOMed < 0 ? -1 : 0) * oStep * (this.onsetMed[b] + 0.01);
-                const dOMad = Math.abs(fluxN - this.onsetMed[b]) - this.onsetMad[b];
-                this.onsetMad[b] += (dOMad > 0 ? 1 : dOMad < 0 ? -1 : 0) * oStep * (this.onsetMad[b] + 0.01);
-                // Samma klamp som kick-spåraren ovan, av samma skäl: -0.01 är en dödsfälla.
-                // Här blir följden att ALLA åtta band låser på bandOn = 1 konstant.
-                if (this.onsetMed[b] < 0)
-                    this.onsetMed[b] = 0;
-                if (this.onsetMad[b] < 0)
-                    this.onsetMad[b] = 0;
-                const oThr = this.onsetMed[b] + Analyser.ONSET_K * this.onsetMad[b];
-                // Skala mot MAD i stallet for en fast faktor -> sjalvskalande per band.
-                // UPPVÄRMNING — ANNARS BLIXTRAR ALLA ÅTTA BAND TILL 1,0 EFTER VARJE TYSTNAD.
-                // Nämnaren är MAD, och MAD sjunker mot noll under tystnad (τ ≈ 1,3 s). När
-                // musiken kommer tillbaka slår `gated` om i samma ögonblick, nämnaren står
-                // på golvet 1e-6, och varje positivt flux klampar till 1 — i ~1,5 s, i alla
-                // band samtidigt. Alltså en fullskalig ljussmäll vid varje låtgräns med paus.
-                // Vi väntar in MAD i stället för att gissa en amplitudtröskel: räknaren mäter
-                // exakt den uppbyggnadstid nämnaren behöver.
-                this.bandOn[b] = (gated && this.onsetWarm >= Analyser.ONSET_WARM)
-                    ? Math.max(0, Math.min(1, (fluxN - oThr) / Math.max(1e-6, this.onsetMad[b] * 3)))
-                    : 0;
-            }
-            {
-                const t = this.prevMagBig;
-                this.prevMagBig = this.magBig;
-                this.magBig = t;
-                const v = this.prevMagBigView;
-                this.prevMagBigView = this.magBigView;
-                this.magBigView = v;
-            }
-        } // slut på decimerad stor-FFT
-        // TRUM-KIT peak-hold-envelopes PÅ HOP-TAKT (var 2.7ms) → fångar varje anslag,
-        // aldrig missat mellan två render-frames (100Hz). tau bevarade från effects.ts:
-        // hat 60ms (treble+air-onset O[6]/O[7]) / snare 110ms (highMid-onset O[5]) / kick 150ms
-        // (ENBART diskret kick — se nedan). bass = spec.bass-NIVÅ (L[2], ingen envelope).
-        // Hi-hats/sizzle i modern EDM/trap ligger ofta >10 kHz, så hat får lyssna på både
-        // treble (3,5–10 kHz) och air (10–16 kHz) och ta den starkaste transienten.
-        const hatOnset = this.bandOn[6] > this.bandOn[7] ? this.bandOn[6] : this.bandOn[7];
-        this.hatHit = Math.max(this.hatHit * this.dHat, hatOnset);
-        this.snareHit = Math.max(this.snareHit * this.dSnare, this.bandOn[5]);
-        // Drivs ENBART av den riktiga kick-detektorn (median + 4.5*MAD). Tidigare
-        // fylldes den ocksa pa av bandOn[1], men det bandet (60-120 Hz) domineras av
-        // sustained bas: MATT 816-1377 anslag/min dar ~110 fanns, dvs 8x for manga.
-        // Den svammade over den korrekta detektorn sa envelopen aldrig slocknade och
-        // kicken forlorade sin accent.
-        if (kick)
-            this.kickHit = 1;
+        return intensity;
+    }
+    /** Decimerad stor-FFT (var BIG_EVERY:e hop): 2048-magnitud, latminnets spec-sink, basonset-envelope, 8 band (niva/AGC/onset) + swap. */
+    bigStep(rms) {
+        this.bigCounter = 0;
+        for (let i = 0; i < this.bufferBig.length; i++)
+            this.windowedBig[i] = this.bufferBig[i] * this.windowBig[i];
+        this.fftBig.realTransform(this.specBig, this.windowedBig);
+        // Bara upp till högsta bin som någon läser (band 8 slutar vid 16 kHz ≈ bin 683,
+        // låtminnet slutar vid 5 kHz ≈ bin 218). Resterande ~340 sqrt per stor-FFT hade
+        // ingen läsare.
+        // Hissade referenser: JIT:en slipper verifiera this-formen per varv och kan
+        // hålla pekarna i register. Samma aritmetik, samma utfall.
+        const specBig = this.specBig, magBig = this.magBig, magMax = this.magBigMax;
+        for (let i = 0; i < magMax; i++) {
+            const re = specBig[2 * i], im = specBig[2 * i + 1];
+            magBig[i] = Math.sqrt(re * re + im * im);
+        }
+        // LÅTMINNET får samma magnitud (ingen extra FFT). Anropas före swap:en nedan,
+        // så bufferten faktiskt innehåller DENNA frames spektrum. Skickas som cachad vy
+        // (0..magBigMax) — svansen räknas inte, så ingen läsare kan tyst få nollor.
+        this.specSink?.(this.magBigView, this.cfg.audio.rate / this.bufferBig.length);
+        const gated = rms > this.cfg.detection.noiseFloor * 1.5;
+        // Signal i rad? Räknaren driver ONSET_WARM ovan.
+        if (gated)
+            this.onsetWarm++;
         else
-            this.kickHit = this.kickHit * this.dKick;
-        // ── DROP-DETEKTION (flyttad hit: att AVGÖRA om det är en drop är analys) ──
-        // En "riktig" drop = nivån surgar upp mot låtens tak EFTER en break (svacka).
-        // Topp-zonen har hysteres (in vid 85% av taket, ut först vid 70%) så nivån inte
-        // flimrar kring tröskeln. Kräver ≥2s musik så låtens INTRO (tystnad→musik) inte
-        // läses som en drop. Resultatet exponeras som en MONOTON räknare → en konsument
-        // på lägre takt kan aldrig missa flanken.
-        const nowWallA = this.wallNow();
-        this.levelCeil = Math.max(this.lvlSmooth, this.levelCeil - dtHop * 0.015 * this.levelCeil); // tak, decay ~65s
-        // `breaking` = nivån ligger i en svacka. Exponeras till effektlagret (lugnt läge).
-        // Den GAMLA svack-stämpeln (breakAtMs, 400 ms ihållande) grindade drop-villkoret
-        // innan flanken flyttades till baskroppen; den är borttagen med sitt villkor.
-        const breaking = this.lvlSmooth < this.levelCeil * 0.65;
-        // TRE villkor, inte tva: utover hysteresen (85 % in / 70 % ut) finns ett
-        // ABSOLUT golv pa 0.65 som saknar motsvarighet pa vagen ut. Det kan ensamt
-        // halla inZone falsk genom en hel tyst lat. Odokumenterat tidigare.
-        if (this.lvlSmooth > this.levelCeil * 0.85 && this.lvlSmooth > 0.65)
-            this.inZoneState = true;
-        else if (this.lvlSmooth < this.levelCeil * 0.70)
-            this.inZoneState = false;
-        const inZone = this.inZoneState;
-        // BASKROPPEN — drop-detektionens egen signal (tak + frånvaro + stigningstakt).
-        // `inZone` lämnas orörd: effektlagret använder den som "musiken ligger högt".
-        const bodyNow = (this.bandDbRaw[0] + this.bandDbRaw[1] + this.bandDbRaw[2]) / 3; // ra dB
+            this.onsetWarm = 0;
+        // Samma hissning som magnitud-loopen: pekarna ut ur this före det inre varvet.
+        const bandLo = this.bandLo, bandHi = this.bandHi;
+        const prevMagBig = this.prevMagBig;
+        if (Analyser.SECTION_ON) {
+            // BASONSET-ENVELOPE (09-23, sektionssardrag): som librosa onset_strength(fmax 220): medel over basbinen (20-250 Hz) av
+            // halvvagslikriktad dB-skillnad mot forra stor-FFT:n. Toppplockning som onset_detect (pre_max/avg/post_avg/wait/delta) pa
+            // 8 ms-raster med 100 ms fordrojning (post_avg) - toppen raknas i det block som pagar, sa fordrojningen ar harmlos.
+            const lo = bandLo[0], hi = bandHi[2];
+            let o = 0;
+            for (let i = lo; i < hi; i++) {
+                const d = 20 * Math.log10((magBig[i] + 1e-6) / (prevMagBig[i] + 1e-6));
+                if (d > 0)
+                    o += d;
+            }
+            o /= Math.max(1, hi - lo);
+            const L = Analyser.BASSON_LEN, R = this.bassOnRing, n = this.bassOnN, A = Analyser.BASSON_AVG;
+            R[n % L] = o;
+            this.bassOnN = n + 1;
+            // kandidat c = n - A (100 ms bakat): lokalt max over [c - pre_max, c], >= medel over [c - A, c + A] + delta, wait sedan forra toppen
+            if (n >= 2 * A) {
+                const c = n - A;
+                const xc = R[c % L];
+                let ok = true;
+                for (let k = 1; k <= Analyser.BASSON_MAX && ok; k++)
+                    if (R[(c - k) % L] > xc)
+                        ok = false;
+                if (ok) {
+                    let s = 0;
+                    for (let k = c - A; k <= n; k++)
+                        s += R[k % L];
+                    if (xc < s / (2 * A + 1) + Analyser.BASSON_DELTA)
+                        ok = false;
+                }
+                if (ok && c - this.bassOnLastPk > Analyser.BASSON_WAIT) {
+                    this.bassOnLastPk = c;
+                    this.bassOnPeak = true;
+                }
+            }
+        }
+        for (let b = 0; b < 8; b++) {
+            const lo = bandLo[b], hi = bandHi[b];
+            const nb = Math.max(1, hi - lo);
+            let sum = 0, fl = 0;
+            for (let i = lo; i < hi; i++) {
+                const m = magBig[i];
+                sum += m;
+                const d = m - prevMagBig[i];
+                if (d > 0)
+                    fl += d;
+            }
+            const avg = sum / nb;
+            // Lotus-adaptern använder rå bandmagnitud som spektral andel för ljuset.
+            // Den får inte ersättas av bandLvl, som är per-band AGC-normaliserad.
+            this.bandAbs[b] = avg;
+            // Obehandlad nivå i dB, normaliserad till 0..1 över ett 60 dB-spann.
+            // Ingen AGC, inget tak som följer med uppåt → en stigning syns som stigning.
+            const db = 20 * Math.log10(avg + 1e-7);
+            this.bandDbRaw[b] = db; // RA dB (drop-kropp)
+            this.bandDb[b] = Math.max(0, Math.min(1, (db + 70) / 60));
+            // Per-band AGC: skala mot egen långsamt sjunkande peak → varje band nyttjar
+            // full range oavsett mix (bas dominerar annars alltid rå-magnituden).
+            // GOLV (~0.15·lvlSmooth): peaken nollställs INTE i tystnad → när ett tidigare
+            // tyst band (t.ex. diskant i ett intro) smäller till blir det en balanserad
+            // respons, inte en överstyrd ljus-chock/pump. (Gemini.)
+            const minPeak = this.lvlSmooth * 0.15;
+            // DECAYEN SKALAS MED BIG_EVERY: blocket körs 125/s, inte 375/s. Rå 0.9993 gav
+            // τ ≈ 11 s i stället för kalibrerade ~3.8 s (ett hett band höll sin peak in i
+            // nästa parti → konstlat låg diskant efter en drop). PEAK_DECAY = 0.9993^BIG_EVERY.
+            if (gated && avg > this.bandPeak[b])
+                this.bandPeak[b] = Math.max(avg, minPeak);
+            else
+                this.bandPeak[b] = Math.max(this.bandPeak[b] * Analyser.PEAK_DECAY, minPeak);
+            // Nivån smoothas ~90ms PÅ HOP-TAKT → nivå-drivna/lugna effekter (som läser
+            // spec via ctx.band) flimrar inte av det råa per-hop-AGC-bruset. onset lämnas
+            // skarp (nedan) så transient-drivna effekter behåller sin punch.
+            const lvlRawB = gated ? Math.min(1, avg / (this.bandPeak[b] + 1e-6)) : 0;
+            // EN array, inte tva. `bandLvlSm` hade exakt en lasare — kopieringen till
+            // `bandLvl` — sa tva Float32Array(8) bar identiska varden hela tiden.
+            this.bandLvl[b] += (lvlRawB - this.bandLvl[b]) * this.aBandLvl;
+            // Per-band onset: halvvågs-flux mot adaptiv baslinje (som kick-detektorn) →
+            // rena anslag oberoende av bandets absoluta energi.
+            const fluxN = fl / nb;
+            // ROBUST PROMINENS-GRIND (samma som kick-detektorn anvander, banden fick den
+            // aldrig). Den gamla grinden var "1.3x en EMA-baslinje x6", vilket slapper
+            // igenom varje transient i bandet i stallet for verkliga trumslag.
+            //   MATT vid BPM 134: kick 1116 slag/min (borde ~134, 8x for manga),
+            //   virvel 429/min (borde ~67, 6x). Darfor kandes trum-envelopen alltid pa
+            //   och gav ingen musikalisk accent - den var inte matttad, den overtriggade.
+            // Sign-baserad median + MAD ar okanslig for outliers (ett slag ar en outlier
+            // och far darfor INTE dra upp sin egen troskel, till skillnad fran en EMA).
+            // Steget skalas med BIG_EVERY sa tidskonstanten blir samma som kickens trots
+            // att banden uppdateras var tredje hop.
+            const oStep = 0.002 * Analyser.BIG_EVERY;
+            const dOMed = fluxN - this.onsetMed[b];
+            this.onsetMed[b] += (dOMed > 0 ? 1 : dOMed < 0 ? -1 : 0) * oStep * (this.onsetMed[b] + 0.01);
+            const dOMad = Math.abs(fluxN - this.onsetMed[b]) - this.onsetMad[b];
+            this.onsetMad[b] += (dOMad > 0 ? 1 : dOMad < 0 ? -1 : 0) * oStep * (this.onsetMad[b] + 0.01);
+            // Samma klamp som kick-spåraren ovan, av samma skäl: -0.01 är en dödsfälla.
+            // Här blir följden att ALLA åtta band låser på bandOn = 1 konstant.
+            if (this.onsetMed[b] < 0)
+                this.onsetMed[b] = 0;
+            if (this.onsetMad[b] < 0)
+                this.onsetMad[b] = 0;
+            const oThr = this.onsetMed[b] + Analyser.ONSET_K * this.onsetMad[b];
+            // Skala mot MAD i stallet for en fast faktor -> sjalvskalande per band.
+            // UPPVÄRMNING — ANNARS BLIXTRAR ALLA ÅTTA BAND TILL 1,0 EFTER VARJE TYSTNAD.
+            // Nämnaren är MAD, och MAD sjunker mot noll under tystnad (τ ≈ 1,3 s). När
+            // musiken kommer tillbaka slår `gated` om i samma ögonblick, nämnaren står
+            // på golvet 1e-6, och varje positivt flux klampar till 1 — i ~1,5 s, i alla
+            // band samtidigt. Alltså en fullskalig ljussmäll vid varje låtgräns med paus.
+            // Vi väntar in MAD i stället för att gissa en amplitudtröskel: räknaren mäter
+            // exakt den uppbyggnadstid nämnaren behöver.
+            this.bandOn[b] = (gated && this.onsetWarm >= Analyser.ONSET_WARM)
+                ? Math.max(0, Math.min(1, (fluxN - oThr) / Math.max(1e-6, this.onsetMad[b] * 3)))
+                : 0;
+        }
+        {
+            const t = this.prevMagBig;
+            this.prevMagBig = this.magBig;
+            this.magBig = t;
+            const v = this.prevMagBigView;
+            this.prevMagBigView = this.magBigView;
+            this.magBigView = v;
+        }
+    }
+    /** Drop-detektionen (baskropp, franvaro, stigning, armering, minidrop, lugn-grind, kick-las, fyrning). Manga kalla grenar: egen funktion sa att en deopt bara kostar den har, inte hetslingan. */
+    dropStep(kick, nowWallA, bodyNow) {
+        const dtHop = this.dtHop;
         this.bodyEnv += (bodyNow - this.bodyEnv) * Math.min(1, dtHop / 0.35);
         this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / BODY_FAST_S);
-        let bodyPeek = this.bodyFast;
-        if (DROP_PEEK) { // villkoren far se ra-kanten efter DROP_PEEK_MS (lopande min), inte efter filtret
-            const n = Math.min(63, Math.max(1, Math.round(DROP_PEEK_MS / (dtHop * 1000)) + 1));
-            this.peekRing[this.peekPos] = bodyNow;
-            this.peekPos = (this.peekPos + 1) & 63;
-            let mn = Infinity;
-            for (let k = 1; k <= n; k++) {
-                const v = this.peekRing[(this.peekPos - k) & 63];
-                if (v < mn)
-                    mn = v;
-            }
-            bodyPeek = Math.max(this.bodyFast, mn);
-        } // 0.06 testat men gav falsklarm live utan att fixa beat-lagget (det sitter i lamp-vagen/energin, inte har)
+        const bodyPeek = this.bodyFast; // (DROP_PEEK forkastad 09-08: ra-min oppnade falska klassen)   // 0.06 testat men gav falsklarm live utan att fixa beat-lagget (det sitter i lamp-vagen/energin, inte har)
         // TAKET SJUNKER I dB PER SEKUND, inte i procent. Kroppen ar nu ett dB-tal
         // (negativt), och "1,5 % av ett negativt tal" gor taket STORRE, inte mindre —
         // den gamla raden var matematiskt omvand sa fort skalan blev logaritmisk.
@@ -4604,8 +4680,7 @@ export class Analyser {
         // stora ögonblick) släpps ändå igenom direkt (ned till 4 s).
         const sinceDrop = nowWallA - this.lastDropMs;
         const stronger = bodyRise > this.lastDropRise + DROP_ESCALATE_DB;
-        const upgrade = DROP_UPGRADE_DB > 0 && sinceDrop > 1500 && (this.bodyPeak - bodyPeek) < this.lastDropUnderPeak - DROP_UPGRADE_DB;
-        const dropSpacingOk = sinceDrop > DROP_LONG_MS || (sinceDrop > DROP_SHORT_MS && stronger) || upgrade;
+        const dropSpacingOk = sinceDrop > DROP_LONG_MS || (sinceDrop > DROP_SHORT_MS && stronger); // (DROP_UPGRADE_DB matt 09-12, av: risk for dubbelsmall)
         // RISER-KRAVET AR AVSTANGT — men INTE for att signalen ar dod. Den gamla
         // motiveringen ("inRiser 0% av tiden, buildUp p99=0.31") mattes mot en
         // aldre riser-detektor och ar RADERAD som falsk.
@@ -4637,27 +4712,7 @@ export class Analyser {
             this.dropArmGoneMs = this.goneEpisodeMs;
         }
         const armed = bodyOnsetEdge || nowWallA < this.dropArmUntil;
-        // FORSTA KICKEN efter en gone-episod (spar + KICK-FIRST). Pa mjuka drops sveller basen over en
-        // hel takt: kick & allt annat slar pa takt 1, baskroppen fyller i forst till takt 2 → kropps-
-        // detektorn fyrar takten efter oavsett troskel (ladan 2026-09-04: rise 12 med underPeak 2.5).
-        const goneRecentK = nowWallA - this.lastBodyGoneMs < 6000;
-        if (kick && goneRecentK && this.goneEpisodeMs !== this.kickSeenGoneMs) {
-            this.kickSeenGoneMs = this.goneEpisodeMs;
-            if (DROP_TRACE)
-                console.log(`[firstkick] wall ${this.wallNow()} rise ${bodyRise.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs) / 1000).toFixed(1)}s`);
-        }
-        // DROP_KICK_FIRST=1: fyra pa forsta KVALIFICERADE kicken (kroppen borjat lyfta ≥ KICK_FIRST_RISE dB)
-        // efter en gone-episod — en gang per episod; kroppsfyrningen sparras sedan for episoden.
-        const kickFirstOk = DROP_KICK_FIRST && kick && goneRecentK && this.goneEpisodeMs !== this.dropKickGoneMs
-            && bodyRise > KICK_FIRST_RISE && dropSpacingOk && this.activeMs > 2000;
-        if (kickFirstOk) {
-            this.dropKickGoneMs = this.goneEpisodeMs;
-            this.dropArmUntil = 0;
-            this.dropCount++;
-            this.lastDropMs = nowWallA;
-            this.lastDropRise = bodyRise;
-            console.log(`[dropfire] wall ${this.wallNow()} KICKFIRST rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs) / 1000).toFixed(1)}s`);
-        }
+        // (KICK-FIRST forkastad 09-04: flod pa megamix; [firstkick]-sparet borttaget 09-27.)
         // MINIDROP-lyftet (se MINI_*). Egen svacka-raknare (kortare/grundare an gone) och egen flank.
         if (MINI_SPACING_MS > 0) {
             if (this.bodyEnv < this.bodyCeil - MINI_GONE_DB) {
@@ -4676,7 +4731,8 @@ export class Analyser {
             const miniOnset = (bodyPeek - mnRef) > MINI_RISE_DB && bodyPeek > this.bodyPeak - MINI_PEAK_DB && nowWallA - this.lastMiniGoneMs < 4000;
             const miniEdge = miniOnset && !this.wasMiniOnset;
             this.wasMiniOnset = miniOnset;
-            if (miniEdge && this.activeMs > 2000 && nowWallA - this.lastDropMs > MINI_SPACING_MS && nowWallA - this.lastMiniMs > MINI_SPACING_MS) {
+            if (miniEdge && this.activeMs > 2000 && nowWallA - this.lastDropMs > MINI_SPACING_MS && nowWallA - this.lastMiniMs > MINI_SPACING_MS
+                && (DROP_UNDERPEAK_MIN <= 0 || this.bodyPeak - bodyPeek >= DROP_UNDERPEAK_MIN)) { // INTE I TAKET galler aven minidrops (19:19: 'falsk' = minidrop med underPeak 0,6)
                 this.miniDropCount++;
                 this.lastMiniMs = nowWallA;
                 if (DROP_TRACE)
@@ -4690,7 +4746,10 @@ export class Analyser {
             console.log(`[dropedge] rise ${bodyRise.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs) / 1000).toFixed(1)}s spacingOk ${dropSpacingOk} sinceDrop ${(sinceDrop / 1000).toFixed(1)}s`);
         if (kick)
             this.lastKickWallMs = nowWallA;
-        let fireNow = dropSpacingOk && armed && this.activeMs > 2000 && fullSlam && this.goneEpisodeMs !== this.dropKickGoneMs;
+        // INTE I TAKET (opt-in DROP_UNDERPEAK_MIN, ladan 2026-09-29): en drop som fyrar nar kroppen redan ligger vid sin topp (underPeak
+        // 0,4/0,8 dB) ar en upprepning av samma small, inte en ny - agarens markeringar: ratta 2,4-6,5 dB, falska 0,4/0,8/2,9. 0 = av.
+        const notAtCeil = DROP_UNDERPEAK_MIN <= 0 || this.bodyPeak - this.bodyFast >= DROP_UNDERPEAK_MIN;
+        let fireNow = dropSpacingOk && armed && this.activeMs > 2000 && fullSlam && notAtCeil;
         let fireTag = '';
         const underNow = this.bodyPeak - bodyPeek;
         // LUGN-SEKTIONS-GRINDEN (se DROP_CALM_GATE). Domen tas per kandidat-hop; den hallna kandidaten (DROP_CALM_LAND_MS) foljs nedan.
@@ -4769,9 +4828,12 @@ export class Analyser {
             this.dropCount++;
             this.lastDropMs = nowWallA;
             this.lastDropRise = bodyRise;
-            this.lastDropUnderPeak = underNow;
             console.log(`[dropfire] wall ${this.wallNow()}${fireTag} rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} ceil ${this.bodyCeil.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} sinceDrop ${(sinceDrop / 1000).toFixed(1)}s goneAgo ${((nowWallA - this.lastBodyGoneMs) / 1000).toFixed(1)}s goneSpan ${(this.lastGoneSpanMs / 1000).toFixed(1)}s edgeAgo ${(nowWallA - this.dropArmAt).toFixed(0)}ms`);
         }
+    }
+    /** Uppbyggnad/riser (spektral novelty + klang/niva). Returnerar inRiser och uppdaterar buildUp. */
+    riserStep(nowWallA) {
+        const dtHop = this.dtHop;
         // ── UPPBYGGNAD / RISER (flyttad hit) ──
         // Spektral NOVELTY = summan av bandens POSITIVA avvikelse från en ~2s baslinje,
         // ihållande ~1.5s. Mätt validerad: ramsar 0.25→0.78 in i en drop. Relativt en
@@ -4804,6 +4866,10 @@ export class Analyser {
         const bTarget = inRiser ? 1 : 0;
         const bRate = bTarget > this.buildUp ? dtHop / 3.5 : dtHop / 1.0; // bygg ~3.5s, klinga ~1s
         this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
+        return inRiser;
+    }
+    /** Karaktarsprofilen (~8 s) → outProfile. */
+    profileStep() {
         // ── KARAKTÄRSPROFIL (~8s) — musikens KARAKTÄR, inte dess energinivå ──
         // Banden är redan per-band AGC:ade (0..1 var), så vi jobbar med RELATIONER:
         // hur stor del av ljudbilden som är låg-end resp. luft, och hur transientrikt
@@ -4829,6 +4895,60 @@ export class Analyser {
         this.outProfile.bright = cl01((this.profBright - 0.14) / 0.19);
         this.outProfile.beat = cl01(this.profBeat);
         this.outProfile.bassline = this.profBassline;
+    }
+    /** Sektionens blocksummor per hop (SECTION_AGG 'env': ackumulator; 'hop': sectionHop direkt / snabba sidans aggregat). */
+    sectionAggStep(intensity, kick, breaking, rms, fluxNorm, nowWallA) {
+        const dtHop = this.dtHop;
+        if (SECTION_AGG_HOP) {
+            // Aldre vagen: bandens magnitud ur band-dB; odelad analysator kor sectionHop per hop, snabba sidan aggregerar.
+            const sp = this.secSpecHop;
+            for (let i = 0; i < 8; i++)
+                sp[i] = Math.pow(10, this.bandDbRaw[i] / 20);
+            if (this.role === 'fast') {
+                const g = this.secAgg;
+                g.n++;
+                g.int += intensity;
+                if (kick)
+                    g.kicks++;
+                g.rms2 += rms * rms;
+                g.cent += this.centSmooth;
+                g.dt += this.dtHop * 1000;
+                g.breaking = breaking ? 1 : 0;
+                g.wall = this.wallNow();
+                g.drops = this.dropCount;
+                g.active = this.activeMs;
+                g.build = this.buildUp;
+                for (let i = 0; i < 8; i++)
+                    g.spec[i] += sp[i];
+            }
+            else
+                this.sectionHop(1, intensity, kick ? 1 : 0, breaking, this.wallNow(), this.dtHop * 1000, rms * rms, this.centSmooth, sp);
+        }
+        else {
+            const g = this.secAgg;
+            g.n++;
+            g.int += intensity;
+            if (kick)
+                g.kicks++;
+            if (breaking)
+                g.breaking = 1;
+            g.rms2 += rms * rms;
+            g.cent += this.centSmooth;
+            g.dt += dtHop * 1000;
+            g.wall = nowWallA;
+            for (let i = 0; i < 8; i++)
+                g.spec[i] += this.bandAbs[i];
+            g.bon += this.bassOnRing[(this.bassOnN - 1 + Analyser.BASSON_LEN) % Analyser.BASSON_LEN];
+            if (this.bassOnPeak) {
+                g.bpk++;
+                this.bassOnPeak = false;
+            }
+            g.flux += fluxNorm;
+            g.rms4 += rms * rms * rms * rms;
+        }
+    }
+    /** Muterar det ateranvanda Frame:t (spec/onset/drum + alla skalarer) och kor sektionsaggregatet. Bara skalarer in: ingen allokering per hop. */
+    fillFrame(level, fluxNorm, kick, intensity, bodyNow, inZone, breaking, inRiser, kickAtMs, barShift, rms, nowWallA) {
         const L = this.bandLvl, A = this.bandAbs, O = this.bandOn;
         const spec = this.outSpec, specAbs = this.outSpecAbs, onset = this.outOnset;
         spec.sub = L[0];
@@ -4894,55 +5014,8 @@ export class Analyser {
         // Gridfasen ut: konstant offset (detektorns slap) och/eller trim. Bada 0/av som standard => oforandrad fas.
         f.beatPhaseMs = this.beatPhaseMs > 0 ? this.beatPhaseMs - Analyser.GRID_PHASE_OFFSET_MS + (Analyser.GRID_PHASE_TRIM_ON ? this.phaseTrimMs() : 0) : this.beatPhaseMs;
         f.beatPhaseConf = this.beatPhaseConf;
-        if (Analyser.SECTION_ON) {
-            if (SECTION_AGG_HOP) {
-                // Aldre vagen: bandens magnitud ur band-dB; odelad analysator kor sectionHop per hop, snabba sidan aggregerar.
-                const sp = this.secSpecHop;
-                for (let i = 0; i < 8; i++)
-                    sp[i] = Math.pow(10, this.bandDbRaw[i] / 20);
-                if (this.role === 'fast') {
-                    const g = this.secAgg;
-                    g.n++;
-                    g.int += intensity;
-                    if (kick)
-                        g.kicks++;
-                    g.rms2 += rms * rms;
-                    g.cent += this.centSmooth;
-                    g.dt += this.dtHop * 1000;
-                    g.breaking = breaking ? 1 : 0;
-                    g.wall = this.wallNow();
-                    g.drops = this.dropCount;
-                    g.active = this.activeMs;
-                    g.build = this.buildUp;
-                    for (let i = 0; i < 8; i++)
-                        g.spec[i] += sp[i];
-                }
-                else
-                    this.sectionHop(1, intensity, kick ? 1 : 0, breaking, this.wallNow(), this.dtHop * 1000, rms * rms, this.centSmooth, sp);
-            }
-            else {
-                const g = this.secAgg;
-                g.n++;
-                g.int += intensity;
-                if (kick)
-                    g.kicks++;
-                if (breaking)
-                    g.breaking = 1;
-                g.rms2 += rms * rms;
-                g.cent += this.centSmooth;
-                g.dt += dtHop * 1000;
-                g.wall = nowWallA;
-                for (let i = 0; i < 8; i++)
-                    g.spec[i] += this.bandAbs[i];
-                g.bon += this.bassOnRing[(this.bassOnN - 1 + Analyser.BASSON_LEN) % Analyser.BASSON_LEN];
-                if (this.bassOnPeak) {
-                    g.bpk++;
-                    this.bassOnPeak = false;
-                }
-                g.flux += fluxNorm;
-                g.rms4 += rms * rms * rms * rms;
-            }
-        }
+        if (Analyser.SECTION_ON)
+            this.sectionAggStep(intensity, kick, breaking, rms, fluxNorm, nowWallA);
         const nowS = SECTION_AGG_HOP ? this.wallNow() : nowWallA;
         f.section = this.section;
         f.sectionAgeMs = this.sectionStartMs > 0 ? nowS - this.sectionStartMs : 0;
