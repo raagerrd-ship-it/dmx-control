@@ -14,8 +14,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { AudioCapture } from "./audio.js";
 import { BoundaryDetector } from "./boundaryDetector.js";
 import { createAnalyser } from "./analyser.js";
-import { Recorder } from "./recorder/recorder.js";
 import { EffectEngine } from "./effects.js";
+import { warmUpInBackground } from "./warmup.js";
 import { DmxSender } from "./dmx.js";
 import { startServer, applyInputRouting } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
@@ -29,6 +29,13 @@ import * as health from "./runtimeHealth.js";
 import { logHealth } from "./healthLog.js";
 import { activeSlots, fixtureRoles } from "./config.js";
 import { EFFECT_KEYS, EFFECT_MAP } from "./effects/registry.js";
+// DMX_QUIET=1 (ladan 2026-09-27, agaren: "inaktivera logg tills vi sager att vi ska kolla nagot"): tystar all console.log
+// (journald pa karna 0 kostar CPU och I/O under spelning). console.warn/error gar fortfarande igenom. Standard PA sedan 09-29; DMX_QUIET=0 slar pa loggen.
+if (process.env.DMX_QUIET !== '0') { // standard PA sedan 09-29 (ladan-provet lyft in i koden); DMX_QUIET=0 for felsokning
+    console.log = () => { };
+    console.info = () => { };
+    console.warn('[quiet] console.log avstangd (DMX_QUIET=1)');
+}
 // Physical button cycles through the fun modes (skips blackout so the button never kills the show).
 // Härlett ur effekt-registret (samma ordning) → ingen lista att hålla i synk.
 const MODE_CYCLE = ["smart", ...EFFECT_KEYS];
@@ -165,8 +172,9 @@ const AUDIO_CLOCK_ON = process.env.DMX_AUDIO_CLOCK === '1';
 // INSPELAREN (recorder/recorder.ts - samma fil som i lotus, bredvid analysatorn). AV i DMX; DMX_RECORDER=1 slar pa. Den far
 // samma hop som analysatorn och laser dropCount/sektion ur ramen; varje latgrans (boundaryDetector) ar en ny "lat"
 // (ladan-<n>). Fangsterna (tempo 10 s in/30 s, drop 15+15 s, max 2 per lat, ko 30) hamnar i DMX_RECORDER_DIR.
-let recorder = null;
+let recorder = null; // PC-/optimeringsmodul: laddas BARA med DMX_RECORDER=1 (realtidsprincipen)
 if (process.env.DMX_RECORDER === "1") {
+    const { Recorder } = await import("./recorder/recorder.js");
     recorder = new Recorder({ dir: process.env.DMX_RECORDER_DIR || "/var/lib/audio-dmx-engine/snippets", sampleRate: cfg.audio.rate, enabled: true }, {
         latestFrame: () => latestFrame,
         beatInfo: () => cfg.beat ?? null,
@@ -199,11 +207,11 @@ capture.on("chunk", (samples) => {
     if (bounds.boundaryCount !== lastBoundary) {
         lastBoundary = bounds.boundaryCount;
         effects.softenRange();
-        if (process.env.DMX_BOUNDARY_SOFT)
+        if (process.env.DMX_BOUNDARY_SOFT !== '0')
             analyser.hintTrackChange(5000);
         else {
             analyser.resetTempo();
-            if (process.env.DMX_SECTION_HINT_LOWCONF === '0')
+            if ((process.env.DMX_SECTION_HINT_LOWCONF ?? '0') === '0')
                 analyser.hintTrackChange(5000);
         } // riktig latgrans nollar sektionerna (tempotappet gor det inte langre)
         if (recorder) {
@@ -740,6 +748,21 @@ const serverDeps = {
     },
 };
 const s80 = await startServer(serverDeps, Number(process.env.PORT ?? 80));
+// UPPVARMNING (2026-09-27, realtidsprincipen - se warmup.ts): V8 far se alla sallsynta grenar pa skrap-instanser sa att
+// process() optimeras en gang och ligger kvar. Startas EFTER server + ljud (22:54: bitar under uppstarten forsenade /health
+// -> vakthunden startade om) och kors i 10-hop-bitar i bakgrunden. DMX_WARMUP=0 stanger av.
+{
+    const wp = process.env.DMX_WARMUP ?? "/opt/audio-dmx-engine/warmup/warmup.wav";
+    if (wp !== "0") {
+        // I BAKGRUNDEN i sma bitar (22:49: synkron uppvarmning blockerade /health -> pi-dmx-watchdog startade om i loop).
+        warmUpInBackground(cfg, wp, (r) => {
+            if (r)
+                console.warn(`[warmup] klar: ${r.secs.toFixed(0)} s ljud, ${r.hops} hop pa ${(r.ms / 1000).toFixed(1)} s (i bakgrunden)`);
+            else
+                console.warn(`[warmup] hoppas over: ${wp} saknas eller fel format (mono 16-bit ${cfg.audio.rate} Hz)`);
+        });
+    }
+}
 // HTTPS on 443 (self-signed) — kept in case future features need a secure
 // context on the phone (getUserMedia etc.). Optional, serves same routes.
 let s443 = null;

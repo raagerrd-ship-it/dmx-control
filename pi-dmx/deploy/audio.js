@@ -146,7 +146,10 @@ export class AudioCapture extends EventEmitter {
             "-r", String(this.opts.rate),
             "-c", String(this.opts.channels),
             "-t", "raw",
-            "--buffer-size=1024", // ~21 ms — håll capture-latensen låg, låt drift droppa via overrun
+            // DMX_ALSA_BUFFER (frames): 1024 = 21 ms. Ladan 2026-09-27: GC-stallar 60-120 ms ~1-2/min pa 200 MB-heapen gav en
+            // overrun (ljudlucka = "krasch" i ljuset) per stall med 21 ms buffert. Storre buffert later motorn hinna ikapp
+            // efter stallen i stallet for att tappa ljud; steady-state-latensen paverkas inte (vi laser allt som kommit).
+            `--buffer-size=${Math.max(512, Math.min(16384, (Number(process.env.DMX_ALSA_BUFFER) || 1024)))}`,
             "--period-size=128",
             "-q",
         ];
@@ -155,8 +158,10 @@ export class AudioCapture extends EventEmitter {
         // (CPUAffinity=1 2) och slåss då om kärna med analys/render. Egen kärna =
         // ALSA-bufferten töms i tid även när motorn har en burst. Fire-and-forget:
         // saknas taskset fortsätter arecord ändå, bara utan pinning.
+        // DMX_ARECORD_CPU (ladan 2026-09-27): karna 0 delas med kernel/WiFi/sshd (matt: sshd 28 % + systemd 32 % under ssh-
+        // matning) -> arecord svalts -> overrun. Karna 3 ar isolerad (isolcpus=3) och bar bara dmx-helper (~4 %).
         if (p.pid)
-            spawn("taskset", ["-pc", "0", String(p.pid)], { stdio: "ignore" }).on("error", () => { });
+            spawn("taskset", ["-pc", String(process.env.DMX_ARECORD_CPU ?? "3"), String(p.pid)], { stdio: "ignore" }).on("error", () => { });
         this.proc = p;
         p.stdout.on("data", (buf) => {
             const now = Date.now();

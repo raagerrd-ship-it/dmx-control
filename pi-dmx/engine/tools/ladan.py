@@ -47,16 +47,7 @@ PORTAR_EJ_LIVE = [
 # pop+megamix bit-identiska (gammal kod + live-env == ny kod utan env). Historiken (varje rad = uttalande + matning) finns i
 # git: `git show 38d0401:pi-dmx/engine/tools/ladan.py`. Pi:n kor nu UTAN drop-ins; de tre gamla tas bort via REMOVE nedan.
 # Nya prov gors som forr: EXTRA pa kommandoraden (--env NAMN=VARDE) -> lotus.conf, och lyfts in i koden nar de godkants.
-SHOW_ENV: list = [
-    # KVALLEN 09-27 (stod i Pi:ns ladan.conf 20260927-2304, saknades har - ateruppsatt 09-29 18:15)
-    ('DMX_FLOOR_CH',       '40',     'golv 40 (09-27 kvall)'),
-    ('LIVE_WIN_DB',        '10',     'nivafonster 10 dB (09-27 kvall)'),
-    ('DMX_ARECORD_CPU',    '3',      'arecord pa karna 3 (09-27 kvall)'),
-    ('DMX_QUIET',          '1',      '09-27 kvall'),
-    # PROV 2026-09-29 (godkant pa lotus i kallaren: "mycket battre nu, porta till DMX") - lyfts in i koden nar ladan godkant
-    ('DMX_ENERGY_RISE_K',  '10',     'attacken: energistigning ger tydligare uppgang (lotus energyRiseK 3->10; bank r 0,65->0,72, lag oforandrad)'),
-    ('DMX_SHAPE_DOWN_MS',  '220',    'langre fade-ner pa nivan mot fladdret fran starkare attack (lotus shapeSmoothDownMs 150->250)'),
-]
+SHOW_ENV: list = []   # 09-29: provet (RISE_K 10, SHAPE_DOWN 220) + 09-27-kvallens ladan.conf (FLOOR_CH 40, WIN 10, ARECORD_CPU 3, QUIET) ar kodens standard
 
 
 # RENSNINGEN 2026-09-23: inlarnings-/offline-stacken ar borta ur motorn (latminne, fingeravtryck, inspelare, tvatt,

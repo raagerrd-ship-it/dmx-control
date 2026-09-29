@@ -162,7 +162,7 @@ export class AudioCapture extends EventEmitter {
     // saknas taskset fortsätter arecord ändå, bara utan pinning.
     // DMX_ARECORD_CPU (ladan 2026-09-27): karna 0 delas med kernel/WiFi/sshd (matt: sshd 28 % + systemd 32 % under ssh-
     // matning) -> arecord svalts -> overrun. Karna 3 ar isolerad (isolcpus=3) och bar bara dmx-helper (~4 %).
-    if (p.pid) spawn("taskset", ["-pc", String(process.env.DMX_ARECORD_CPU ?? "0"), String(p.pid)], { stdio: "ignore" }).on("error", () => {});
+    if (p.pid) spawn("taskset", ["-pc", String(process.env.DMX_ARECORD_CPU ?? "3"), String(p.pid)], { stdio: "ignore" }).on("error", () => {});
     this.proc = p;
 
     p.stdout.on("data", (buf: Buffer) => {

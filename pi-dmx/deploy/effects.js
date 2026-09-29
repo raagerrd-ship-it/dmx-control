@@ -252,7 +252,7 @@ const LIVE_ANCHOR_DROP_DB = Number(process.env.DMX_LIVE_ANCHOR_DROP_DB ?? 2);
  *  lange efter att volymen skruvats ner; 0,02 = 6 dB pa 5 min - en tyst lat ar dovare sin forsta minut, en sankt volym lever igen inom minuter. */
 const LIVE_ANCHOR_MAX_DECAY = Number(process.env.DMX_LIVE_ANCHOR_MAX_DECAY ?? 0.03);
 const LIGHT_SHAPE_UP = 60;
-const LIGHT_SHAPE_DOWN = Number(process.env.DMX_SHAPE_DOWN_MS ?? 120); // lotus shapeSmoothDownMs (lotus 09-29: 150 -> 250 'mycket battre' med energyRiseK 10)
+const LIGHT_SHAPE_DOWN = Number(process.env.DMX_SHAPE_DOWN_MS ?? 220); // lotus shapeSmoothDownMs (lotus 09-29: 150 -> 250 'mycket battre' med energyRiseK 10)
 const LIGHT_REL_A = 0.396; // log-release-alpha
 const LIGHT_ATK_A = 1.0; // attack-alpha (instant)
 const LIGHT_SOFT = 0.3; // soft-snap-golv vid låg energi
@@ -306,7 +306,7 @@ const SYNC_ERR_FRAC = Number(process.env.DMX_SYNC_ERR_FRAC ?? 0.2);
  *  (7) ENERGI DIREKT - stigande loudness mot sitt eget ~0,4 s-medel raknas som puls direkt (DMX_ENERGY_RISE_K, 0 = av), sa riggen
  *  ljusnar nar laten lyfter i stallet for forst pa nasta slag. */
 const BEAT_QUIET_BEATS = Number(process.env.DMX_BEAT_QUIET_BEATS ?? 0);
-const ENERGY_RISE_K = Number(process.env.DMX_ENERGY_RISE_K ?? 3);
+const ENERGY_RISE_K = Number(process.env.DMX_ENERGY_RISE_K ?? 10); // 3 -> 10 (lotus + ladan 09-29 godkant);
 /** Dodzon (ladan 09-24: 'mikrofladder' med K 3, 'betydligt mindre dynamiska' med K 0): stigningar under DMX_ENERGY_RISE_DEAD (6 %) ignoreras. */
 const ENERGY_RISE_DEAD = Number(process.env.DMX_ENERGY_RISE_DEAD ?? 0.06);
 /** GRIND PA STIGANDE LJUS (agaren i ladan 2026-09-24: 'nu nar vi kor bara pa energi, lagg till gaten igen pa kanske 250 ms'): en ny

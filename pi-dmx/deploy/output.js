@@ -30,7 +30,7 @@ const MIN_DIM = process.env.DMX_MIN_DIM === '1';
 // DMX_FLOOR_CH hojer golvet till ett SYNLIGT varde i DMX-steg. Galler bara DIM-kanaler: att lyfta r/g/b skulle
 // bleka ur kuloren (samma skal som MIN_DIM lamnar dem ifred). En ren nolla ar fortfarande svart - det ar sa
 // effekten sager "slack den har armaturen" - utom med DMX_MIN_DIM=1, som da haller golvet i stallet for tandpunkten.
-const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 0)));
+const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 40)));
 const HOLD_MS = 120;
 /** KULORLYFT (2026-09-23, agaren i ladan: "lamporna kor nastan hela tiden med alla LED R G B paslagna ... kravet ar ju bara att EN
  *  kanal ar over tandpunkten"). Forr lyftes VARJE fargkanal > 0 till sin tandpunkt for sig - ett spar av gront och blatt i en rod
@@ -43,6 +43,16 @@ const HUE_LIFT = process.env.DMX_HUE_LIFT !== '0';
  *  av starkaste (halls pa minst tandpunkten); slacks under HUE_RATIO_OFF (hysteres). */
 const HUE_RATIO_ON = Number(process.env.DMX_HUE_RATIO_ON ?? 0.25);
 const HUE_RATIO_OFF = Number(process.env.DMX_HUE_RATIO_OFF ?? 0.15);
+/** RENA PRIMARFARGER UNDER TANDPUNKTEN (2026-09-27, agaren i ladan: "i tysta partier tands alla LED (R G B), kanns hackigt ...
+ *  vi sabbar manga effekter"). Under tandpunkten kan lampan inte visa en blandfarg: kulorlyftet gav starkaste kanalen 16 och
+ *  varje sidokanal >= 25 % ocksa 16 -> tre lika varden = vitt. Nu: ar starkaste fargkanalen under sin tandpunkt lyser BARA
+ *  den, pa tandpunkten (ren R/G/B); ar den under LOW_OFF_K x tandpunkten ar lampan SLACKT (osynlig anda). DMX_LOW_PURE=0 = som forr. */
+const LOW_PURE = process.env.DMX_LOW_PURE !== '0';
+/** Agaren 21:25: "under kanske 10 % slacks, over ar den redan hojd over slackpunkten". Per FARGKANAL, absolut i DMX-steg:
+ *  pa vid >= LOW_ON_CH (26 = 10 %), av under LOW_OFF_CH (20) - hysteres sa gransen inte flimrar. Ingen lyftning av svaga
+ *  sidokanaler langre (det var det som tande alla tre dioderna). Kanaler pa/over tandpunkten lamnas ifred. */
+const LOW_ON_CH = Number(process.env.DMX_LOW_ON_CH ?? 26);
+const LOW_OFF_CH = Number(process.env.DMX_LOW_OFF_CH ?? 20);
 const FOG_HEAT_MAX = 45000; // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15; // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
 // Förberäknad LUT för Gamma 2.2 för att eliminera Math.pow i den heta loopen
@@ -169,6 +179,7 @@ export class FixtureOutput {
      * SISTA STEGET FÖRE UTGÅNG: tändpunkt som GOLV + master som TAK.
      */
     hueOn = new Uint8Array(512); // KULORLYFT: kanalen ar tand (hysteres)
+    lowLit = new Uint8Array(512); // 10 %-REGELN: lampan (indexerad pa basadressen) ar tand (hysteres pa starkaste fargkanalen)
     calibrate(universe, fixtures, master, nowMs) {
         const top = (255 * master + 0.5) | 0;
         for (let f = 0; f < fixtures.length; f++) {
@@ -178,8 +189,8 @@ export class FixtureOutput {
             const base = fast.base;
             const on = c ? (c.on || 0) : 0;
             // KULORLYFT: lampans starkaste fargkanal (r/g/b/w) och dess tandpunkt -> en gemensam skalfaktor i stallet for lyft per kanal.
-            let hueScale = 1, hueMaxCh = -1, hueMaxRaw = 0;
-            if (HUE_LIFT && c) {
+            let hueScale = 1, hueMaxCh = -1, hueMaxRaw = 0, hueMaxOn = 0;
+            if (HUE_LIFT && c && !LOW_PURE) { // (hueScale anvands inte under LOW_PURE - hoppa over slingan)
                 let mx = 0, mxOn = 0;
                 for (let i = 0; i < fast.roles.length; i++) {
                     const ch = base + i;
@@ -196,8 +207,29 @@ export class FixtureOutput {
                     }
                 }
                 hueMaxRaw = mx;
+                hueMaxOn = mxOn;
                 if (mx > 0 && mx < mxOn)
                     hueScale = mxOn / mx;
+            }
+            // 10 %-REGELN PER LAMPA (kodgranskning 09-28: per kanal flippade kuloren rod<->orange i takten nar hjartpulsen
+            // pendlade en sidokanal kring 20/26). Nu avgors tand/slackt av lampans STARKASTE fargkanal med hysteres
+            // (pa >= LOW_ON_CH, av < LOW_OFF_CH); tand lampa skickar fargkanalerna RAA (inget lyft - under tandpunkten lyser
+            // de inte fysiskt anda), slackt lampa nollar dem. Kuloren andras bara nar fargen andras, inte med ljusstyrkan.
+            let lampLit = true;
+            if (LOW_PURE && c) {
+                let mxRaw = 0;
+                for (let i = 0; i < fast.roles.length; i++) {
+                    const ch = base + i;
+                    if (ch < 0 || ch >= 512 || this.cal[ch] !== 1 || this.dimCal[ch] === 1)
+                        continue;
+                    const role = fast.roles[i];
+                    if (role !== "r" && role !== "g" && role !== "b" && role !== "w")
+                        continue;
+                    if (universe[ch] > mxRaw)
+                        mxRaw = universe[ch];
+                }
+                lampLit = this.lowLit[base] === 1 ? mxRaw >= LOW_OFF_CH : mxRaw >= LOW_ON_CH;
+                this.lowLit[base] = lampLit ? 1 : 0;
             }
             for (let i = 0; i < fast.roles.length; i++) {
                 const ch = base + i;
@@ -211,6 +243,18 @@ export class FixtureOutput {
                 const onCh = !c ? 0 : isDim ? on
                     : ((role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : role === "w" ? c.onW : undefined) ?? on);
                 let raw = universe[ch];
+                if (LOW_PURE && isColor) {
+                    if (!lampLit) {
+                        universe[ch] = 0;
+                        this.holdUntil[ch] = 0;
+                        continue;
+                    }
+                    const v1 = raw > top ? top : raw;
+                    universe[ch] = v1;
+                    this.holdVal[ch] = v1;
+                    this.holdUntil[ch] = nowMs + HOLD_MS;
+                    continue;
+                }
                 if (HUE_LIFT && isColor && raw > 0) {
                     // starkaste kanalen (och alla andra) skalas upp till tandpunkten; ovriga kanaler lyfts INTE var for sig
                     if (hueScale !== 1) {
