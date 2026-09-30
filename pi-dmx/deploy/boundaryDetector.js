@@ -27,7 +27,7 @@ const NOV_WIN_MS = 1500; // klangprofil per 1,5 s
 const NOV_LAG_MS = 8000; // jamfor mot profilen sa langt bakat (facitmatningens fonster)
 const NOV_STRONG = 0.68; // MATT: plata 0,60-0,75 gav 2/2 traff, 0 falska -> mitten
 const NOV_WEAK = 0.55;
-const BOUNDARY_NEED_DIP = process.env.DMX_BOUNDARY_NEED_DIP === '1';
+const BOUNDARY_NEED_DIP = process.env.DMX_BOUNDARY_NEED_DIP !== '0'; // standard PA sedan 09-30 (tar bort falsk latgrans vid 111 s pa pop); =0 som forr
 const CHAR_D = Number(process.env.DMX_CHAR_SHIFT_D ?? 0); // karaktarsskifte for dirigenten: 0 = av
 const CHAR_REFRACT_MS = Number(process.env.DMX_CHAR_SHIFT_REFRACT_MS ?? 15000); // ...racker om nivadipp eller temposkifte ocksa fyrar
 const NOV_BACK_MS = 0;
