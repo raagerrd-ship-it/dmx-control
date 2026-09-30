@@ -69,10 +69,9 @@ if not RUN: sys.exit('\n(torrkorning - lagg till --kor for att gora det; reboot 
 
 ts = time.strftime('%Y%m%d-%H%M')
 sf = c.open_sftp()
-for local, remote in FILES:   # aldrig CRLF till systemd (git autocrlf pa Windows): '300M' vore ett ogiltigt varde
-    with sf.open('/tmp/' + os.path.basename(local), 'wb') as f: f.write(open(os.path.join(SYSD, local), 'rb').read().replace(b'
-', b'
-'))
+for local, remote in FILES:   # aldrig CRLF till systemd (git autocrlf pa Windows): ett CR sist pa raden ger ogiltiga varden
+    data = open(os.path.join(SYSD, local), 'rb').read().replace(bytes([13, 10]), bytes([10]))
+    with sf.open('/tmp/' + os.path.basename(local), 'wb') as f: f.write(data)
 sf.close()
 script = f"""set -e
 cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.bak-{ts}
