@@ -12,7 +12,10 @@ export const andrum = {
         const floor = 0.30 - 0.12 * age + c.frame.buildUp * 0.3 + dip; // morknar langsamt, oppnar mot uppbyggnad
         const hue = (c.mixedSector(Math.floor(c.t / 13)) / 6 + 0.55) % 1; // kall komplementton
         const drift = 0.5 + 0.5 * Math.sin(c.t * 0.4 + c.idx * 0.9);
-        const beat = c.hasBeat ? Math.exp(-c.beatFrac / 0.08) * 0.25 : c.kickEnv * 0.2;
+        // HJARTSLAGET VANDRAR (2026-09-27): slaget landar pa en grupp i taget (jamn/udda eller inre/yttre via c.grouping) sa aven
+        // breaket har rorelse mellan lamporna - forut var pulsen uniform och andrum lastes som hjarta/subbreath (rV-familjen).
+        const mine = c.group === (c.beatIdx & 1);
+        const beat = (c.hasBeat ? Math.exp(-c.beatFrac / 0.08) * 0.25 : c.kickEnv * 0.2) * (mine ? 1 : 0.3);
         c.want.hazer = 0.5;
         return c.hsv(hue, 0.9, Math.min(1, floor + drift * 0.12 + beat));
     },

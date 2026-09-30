@@ -7,9 +7,10 @@ export const tick = {
     desc: "Hi-hatsen flyttar ljuset steg för steg; kicken slår ner hela raden.",
     render(c) {
         const d = c.drum;
-        // Position stegar med hat-anslagens ACKUMULERADE takt (mclk håller den
-        // musikalisk även när hatsen tystnar) — hat-envelopen sätter skärpan.
-        const step = c.mclk(0.5, 0.12);
+        // Position stegar i ATTONDELAR (tva steg per slag) - hat-envelopen sätter skärpan.
+        // BUGG (2026-09-27): mclk(0.5) = floor(beatIdx / 0.5) = 2*beatIdx, dvs steget hoppade TVA lampor per slag och pa fyra
+        // lampor tandes bara lampa 0 och 2 (lampa 1 och 3 fick aldrig "lit"). Nu attondelar ur beatFrac sa alla fyra vandras.
+        const step = c.hasBeat ? Math.floor((c.beatIdx + c.beatFrac) * 2) : c.mclk(0.5, 0.12);
         const lit = (step % Math.max(1, c.count)) === c.idx;
         const sharp = 0.25 + d.hat * 0.75;
         const hue = 0.5 + c.frame.spec.air * 0.12; // cyan → blå med luften

@@ -10,7 +10,10 @@ export const backbeat = {
         const d = c.drum;
         const hue = c.mixedSector(Math.floor(c.beatIdx / 8)) / 6;
         const body = 0.12 + d.kick * 0.55 + c.frame.spec.bass * 0.2; // kickens kropp
-        const crack = d.snare * 0.9; // virvelns smäll
+        // TVA OCH TVA (2026-09-27): kicken pumpar hela riggen, men virvelns vita small HOPPAR mellan de tva grupperna varje slag
+        // (jamn/udda eller inre/yttre via c.grouping). Forut var backbeat helt uniform - pa fyra lampor oskiljbar fran pulse/party.
+        const mine = c.group === (c.beatIdx & 1);
+        const crack = d.snare * (mine ? 0.9 : 0.25); // virvelns smäll: hard pa min grupp, svag pa den andra
         return c.hsv(hue, 1 - crack * 0.85, Math.min(1, body + crack));
     },
 };

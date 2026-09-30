@@ -18,7 +18,12 @@ export const fyrverkeri = {
             c.want.blinder = c.dropEnv;
         if (c.dropEnv > 0.9)
             c.want.strobe = 0.5;
-        const party = 0.10 + 0.9 * Math.min(1, c.beatPulse * 0.9 + c.kickEnv * 0.6 + c.punch * 0.6);
+        // MELLAN SALVORNA (2026-09-27): pumpen gar TVA OCH TVA - en grupp per slag (jamn/udda eller inre/yttre via c.grouping),
+        // den andra glimmar bara. Forut pumpade alla fyra unisont = party (rV 0,94-0,96, samma pool high); nu star salvan ut mot
+        // en glesare bakgrund och effekten har egen rorelse mellan dropparna.
+        const mine = c.group === (c.beatIdx & 1);
+        const pump = Math.min(1, c.beatPulse * 0.9 + c.kickEnv * 0.6 + c.punch * 0.6);
+        const party = 0.10 + 0.9 * pump * (mine ? 1 : 0.25);
         const v = Math.max(party * (1 - burst * 0.5), burst);
         return c.hsv(hue, 1 - burst * 0.85, Math.min(1, v));
     },

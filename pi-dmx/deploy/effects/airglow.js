@@ -10,8 +10,13 @@ export const airglow = {
     flat: true, // statiskt svep → kortare dwell
     render(c) {
         const base = 0.20 + 0.06 * (0.5 + 0.5 * Math.sin(c.t * 0.3 + c.idx * 1.7)); // svag vilo-glöd (krispare)
-        const spark = c.shaped(0, Math.max(c.frame.onset.air, c.frame.onset.treble)) * 0.95; // rena anslag (shaker/hi-hat)
+        // GNISTOR I TVA GRUPPER (2026-09-27): hi-hat/shaker (onset.treble) tander grupp 0, luften/vasljuden (onset.air) grupp 1
+        // (jamn/udda eller inre/yttre via c.grouping). Forut fick alla fyra lampor SAMMA gnista (onset ar rigg-globalt) -> ingen
+        // rorelse mellan lamporna alls, bara ett unisont flimmer.
+        const own = c.group === 0 ? c.frame.onset.treble : c.frame.onset.air;
+        const other = c.group === 0 ? c.frame.onset.air : c.frame.onset.treble;
+        const spark = c.shaped(0, Math.max(own, other * 0.35)) * 0.95; // egen rost fullt, den andra svagt
         const hue = 0.40 + c.frame.spec.air * 0.10; // grön → cyan när air sustained
-        return c.hsv(hue, 1, Math.min(1, base + spark + c.punch * 0.25)); // riktig dunk lyfter glöden kort
+        return c.hsv(hue, 1, Math.min(1, base * c.heart(0.3) + spark + c.punch * 0.25)); // glöden pulsar med hjartat, gnistorna ororda (09-27)
     },
 };

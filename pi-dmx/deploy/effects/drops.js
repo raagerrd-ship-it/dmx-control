@@ -7,6 +7,6 @@ export const drops = {
     render(c) {
         const since = (c.now - (c.dropFired[c.idx] ?? -1e9)) / 1000;
         const v = Math.exp(-since / 0.55) * (0.6 + 0.4 * Math.min(1, c.audio + c.kickEnv)) + c.punch * 0.3;
-        return c.hsv(c.dropHue[c.idx] ?? 0, 1 - c.punch * 0.3, Math.min(1, v)); // riktig dunk lyfter hela stänket
+        return c.hsv(c.dropHue[c.idx] ?? 0, 1 - c.punch * 0.3, Math.min(1, v) * c.heart(0.3)); // riktig dunk lyfter hela stänket; egen hjartpuls (09-27)
     },
 };

@@ -6,7 +6,7 @@ export const duel = {
     desc: "Kick ropar i palettfargen, virveln svarar i kontrastfargen - med eko.",
     render(c) {
         const d = c.drum;
-        const isOuter = c.count < 3 ? c.idx % 2 === 1 : (c.idx === 0 || c.idx === c.count - 1);
+        const isOuter = c.group === 1; // inre/yttre eller jamn/udda (c.grouping)
         const base = c.mixedSector(Math.floor(c.beatIdx / 8));
         const hueCall = base / 6, hueResp = ((base + 3) % 6) / 6;
         // anslag med eko: kick/snare ar redan envelopes (0..1) med avklingning i analysatorn

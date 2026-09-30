@@ -24,7 +24,7 @@
  */
 /** Utgångens attack. Kort nog att inte röra hjärtslagets 45 ms-anslag, lång nog att
  *  dämpa effekternas fladder kring 10 Hz. */
-const ATTACK_S = Math.max(0.005, Number(process.env.DMX_ATTACK_MS ?? 90) / 1000); // 2026-09-21: env (ladan 20 ms; lotus kor attack 0) - 90 ms smetade ut varje slag
+const ATTACK_S = Math.max(0.005, Number(process.env.DMX_ATTACK_MS ?? 20) / 1000); // 2026-09-21: env (ladan 20 ms; lotus kor attack 0) - 90 ms smetade ut varje slag
 const INV_ATTACK_S = 1 / ATTACK_S;
 /** SISTA FADE-SPARREN (ladan 2026-09-24, DMX-sonden: enramsspikar 2-3/s per armatur = 'flimmer'; agaren: 'upp far den garna vara snabb men
  *  alltid fade nerat'): allra sist far ingen ljuskanal falla snabbare an en fade med tidskonstant DMX_FINAL_FADE_S (0,12 s); uppat omedelbart.
@@ -32,11 +32,11 @@ const INV_ATTACK_S = 1 / ATTACK_S;
 const FINAL_FADE_S = Number(process.env.DMX_FINAL_FADE_S ?? 0.12);
 /** FADE MELLAN LOOKER (agaren i ladan 2026-09-24: 'ev fade mellan dom'): vid lookbyte tonas nya looken IN over DMX_LOOK_FADE_S
  *  (smoothstep 0->1) medan den gamla bilden klingar ut med halva den tiden - bada lever (ny look med energin), inget hart klipp. 0 = av. */
-const LOOK_FADE_S = Number(process.env.DMX_LOOK_FADE_S ?? 0);
+const LOOK_FADE_S = Number(process.env.DMX_LOOK_FADE_S ?? 0.6);
 /** EFTER HUVUDTRADS-STALL (ladan 09-24, DMX-sonden: renderluckor 40-240 ms 1,6-3,4/s, 22 av 24 enramsspikar vid luckor): dtSec klampas
  *  till 0,1 s, sa forsta ramen efter en stall fick falla 57 % = frys + ryck ned. DMX_FINAL_FADE_MAX_DT_S > 0 klampar sparrens dt sa fallet
  *  fortsatter som fade. 0 = av. Offline med emulerade luckor (0,0075): fall >20 % efter lucka 3 010 -> 0, utan luckor identiskt (0/81 750). */
-const FINAL_FADE_MAX_DT_S = Number(process.env.DMX_FINAL_FADE_MAX_DT_S ?? 0); // Multiplikation är snabbare än division i loopen
+const FINAL_FADE_MAX_DT_S = Number(process.env.DMX_FINAL_FADE_MAX_DT_S ?? 0.0075); // Multiplikation är snabbare än division i loopen
 /** Minsta mörker under ljuset (DMX-steg över tändpunkten) så hjärtslaget syns även
  *  i lugna effekter. 44 ⇒ en lampa med tändpunkt 16 lyser lägst på 60. */
 const PULSE_ROOM = 44;

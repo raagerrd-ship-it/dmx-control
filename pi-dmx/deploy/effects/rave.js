@@ -7,7 +7,7 @@ export const rave = {
     key: "rave", label: "Rave", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"], toggle: true,
     desc: "Varannan lampa blinkar i motfärger – hård växling.",
     render(c) {
-        const even = c.idx % 2 === 0;
+        const even = c.group === 0; // jamn/udda eller inre/yttre (c.grouping)
         const flip = c.beatIdx % 2 === 0;
         const lit = even === flip;
         const pairBase = c.mixedSector(Math.floor(c.beatIdx / 4));

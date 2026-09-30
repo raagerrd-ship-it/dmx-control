@@ -9,13 +9,16 @@ export const chase = {
         // BASNOTER (2026-09-23): vid tydlig basgang (bassline >= 0,6) hoppar huvudet ett steg per BASNOT (ping-pong) i stallet for
         // per slag, och svansen klingar med noten - loparen foljer basgangen, inte bara takten.
         const onBass = c.bassline >= 0.6;
-        const span = Math.max(1, c.count - 1);
-        const cyc = c.bassNoteIdx % (span * 2);
-        const pos = onBass ? (cyc <= span ? cyc : span * 2 - cyc) : c.chasePos;
-        const d = Math.abs(c.idx - pos);
+        // LOPARE MED SVANS (2026-09-27): huvudet springer ETT VARV v->h och borjar om (wrap), svansen ligger BAKOM i lopriktningen.
+        // Forut ping-pongade huvudet (chasePos, cfg.chaseStyle 'pingpong') med symmetrisk svans = samma figur som bounce (som ocksa
+        // ping-pongar ett steg per slag) - pa fyra lampor tva likadana effekter i samma pool. Steg: basnot vid tydlig basgang,
+        // annars slaget (mclk faller tillbaka pa klockan utan takt).
+        const n = Math.max(1, c.count);
+        const pos = (onBass ? c.bassNoteIdx : c.mclk(1, 0.5)) % n;
+        const d = (pos - c.idx + n) % n; // 0 = huvudet, 1 = lampan bakom, ... (framfor = morkt)
         const tail = Math.exp(-d * 1.6) * (onBass ? 0.55 + 0.45 * Math.exp(-c.bassNoteAge / 0.3) : 1);
         const hue = c.mixedSector(pos + Math.floor(c.t / 4)) / 6;
         const v = Math.min(1, tail * c.shaped(0.22, 0.55 + c.audio * 0.55 + c.kickEnv * 0.5 + c.frame.onset.treble * 0.35 + (onBass ? c.frame.onset.bass * 0.4 : 0)) + c.punch * 0.3);
-        return c.hsv(hue, 1 - c.punch * 0.25, v); // riktig dunk → hela svansen blixtrar
+        return c.hsv(hue, 1 - c.punch * 0.25, v * c.heart(0.3)); // riktig dunk → hela svansen blixtrar; egen hjartpuls (09-27)
     },
 };
