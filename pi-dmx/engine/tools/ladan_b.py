@@ -4,17 +4,20 @@ r"""LADAN B (2026-09-30, resursgranskningen): systemfixar pa Pi-DMX som kraver e
   2. systemd/audio-dmx-engine.d.memory.conf  -> motorn swappar aldrig, tak 300 MB.
   3. systemd/pi-dmx-watchdog.d.quiet.conf    -> watchdogens rutinrader (var 30:e s) ut ur journalen.
   4. systemd/journald-zz-dmx.conf            -> journalen i RAM (ingen SD-slitning), 8 MB.
-  5. triggerhappy av (anvands inte).
+  5. triggerhappy, cron (inga jobb) och getty@tty1 (ingen skarm) av. timesyncd far vara kvar: hotspoten ger internet
+     under besoken och klockan behovs ratt i loggarna.
 Sedan reboot, vanta tills Pi:n svarar igen, och verifiera allt. Backup: cmdline.txt.bak-<ts> och alla ersatta filer .bak-<ts>.
 Ordning i ladan: forst `python tools\ladan.py` (koden), sedan `python tools\ladan_b.py --kor`.
   python tools\ladan_b.py          visar planen och nulaget, ror ingenting
   python tools\ladan_b.py --kor    gor det (reboot ingar)
+  python tools\ladan_b.py --mat    MATNING medan musik spelar: CPU per trad och process i 60 s + motorns halsa -> pi-backup/
 PI_HOST valfri; annars pi-dmx.local (mDNS) och ladans kanda adresser. Losenordet som i ladan.py (pw())."""
 import os, socket, sys, time, paramiko
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ladan
 HERE = os.path.dirname(os.path.abspath(__file__)); SYSD = os.path.join(HERE, '..', 'systemd')
 RUN = '--kor' in sys.argv
+MEASURE = '--mat' in sys.argv
 FILES = [('audio-dmx-engine.d.memory.conf', '/etc/systemd/system/audio-dmx-engine.service.d/memory.conf'),
          ('pi-dmx-watchdog.d.quiet.conf', '/etc/systemd/system/pi-dmx-watchdog.service.d/quiet.conf'),
          ('journald-zz-dmx.conf', '/etc/systemd/journald.conf.d/zz-dmx.conf')]
@@ -53,11 +56,11 @@ def status(c):
     _, mx = run(c, f'cat {CG}/memory.max 2>/dev/null || echo saknas')
     _, act = run(c, 'systemctl is-active audio-dmx-engine')
     _, stor = run(c, "ls /var/log/journal 2>/dev/null | head -1; systemctl show -p Storage systemd-journald 2>/dev/null")
-    _, th = run(c, 'systemctl is-enabled triggerhappy 2>/dev/null || true')
+    _, th = run(c, 'for s in triggerhappy cron getty@tty1; do printf "%s=%s " $s $(systemctl is-enabled $s 2>/dev/null); done')
     _, wd = run(c, "journalctl -u pi-dmx-watchdog --since '-10 min' --no-pager -o cat 2>/dev/null | wc -l")
     return {'cgroup-flaggor i /proc/cmdline': 'cgroup_enable=memory' in cmd, 'motor memory.swap.max': swp, 'motor memory.max': mx,
             'motor': act, 'persistent journal (/var/log/journal)': bool(stor.split('\n')[0]) if stor else False,
-            'triggerhappy': th or '-', 'watchdog-rader senaste 10 min': wd}
+            'avstangningsbara tjanster': th or '-', 'watchdog-rader senaste 10 min': wd}
 
 c, host = connect()
 if not c: sys.exit('Pi-DMX nas inte (pi-dmx.local / PI_HOST). Ar du i ladan med hotspoten pa?')
@@ -65,7 +68,18 @@ print(f'Pi-DMX pa {host}')
 for k, v in status(c).items(): print(f'  {k}: {v}')
 _, line = run(c, 'cat /boot/firmware/cmdline.txt'); _, n = run(c, 'wc -l < /boot/firmware/cmdline.txt')
 print(f'  cmdline.txt ({n} radbrytning): {line}')
-if not RUN: sys.exit('\n(torrkorning - lagg till --kor for att gora det; reboot ingar)')
+if MEASURE:
+    # MATNING (ladan, musik PA): vad anvander CPU nar ljud blir ljus? top -H pa motorns tradar + alla processer, 2 x 30 s.
+    _, pid = run(c, 'systemctl show -p MainPID --value audio-dmx-engine')
+    _, h0 = run(c, 'curl -s -m 5 http://127.0.0.1/api/health-log')
+    _, top = run(c, f'top -b -H -d 30 -n 2 -p {pid} | tail -25; echo ===; top -b -d 30 -n 2 -o %CPU | tail -30', 120)
+    _, h1 = run(c, 'curl -s -m 5 http://127.0.0.1/api/health-log')
+    _, extra = run(c, 'uptime; free -m; cat /proc/pressure/cpu /proc/pressure/memory /proc/pressure/io 2>/dev/null; grep -E "ctxt|procs_running" /proc/stat')
+    out = os.path.join(HERE, '..', '..', 'pi-backup', time.strftime('matning-%Y%m%d-%H%M.txt'))
+    with open(out, 'w', encoding='utf-8') as f:
+        f.write(f'# ladan_b --mat {time.ctime()} pa {host}\n\n## top\n{top}\n\n## health fore\n{h0}\n\n## health efter\n{h1}\n\n## system\n{extra}\n')
+    print(top[:3000]); print(f'\nsparat: {os.path.normpath(out)}'); sys.exit(0)
+if not RUN: sys.exit('\n(torrkorning - lagg till --kor for att gora det; reboot ingar; --mat = matning under musik)')
 
 ts = time.strftime('%Y%m%d-%H%M')
 sf = c.open_sftp()
@@ -82,7 +96,7 @@ grep -q 'root=PARTUUID' /boot/firmware/cmdline.txt && grep -q 'cgroup_enable=mem
 for local, remote in FILES:
     d = os.path.dirname(remote); b = os.path.basename(local)
     script += f"mkdir -p {d}; [ -f {remote} ] && cp {remote} {remote}.bak-{ts} || true; cp /tmp/{b} {remote}; chmod 644 {remote}\n"
-script += "systemctl disable --now triggerhappy.service triggerhappy.socket 2>/dev/null || true\nsystemctl daemon-reload\necho FILER_OK\ncat /boot/firmware/cmdline.txt\n"
+script += "systemctl disable --now triggerhappy.service triggerhappy.socket cron.service getty@tty1.service 2>/dev/null || true\nsystemctl daemon-reload\necho FILER_OK\ncat /boot/firmware/cmdline.txt\n"
 rc, out = sudo(c, script)
 print(out)
 if 'FILER_OK' not in out: sys.exit(f'AVBRUTET fore reboot (rc {rc}) - cmdline.txt.bak-{ts} finns, inget omstartat')
