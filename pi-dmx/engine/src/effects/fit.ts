@@ -34,7 +34,6 @@ export const FIT: Partial<Record<Mode, Fit>> = {
   breathe:   { punch: 0.10, bass: 0.55, bright: 0.20, beat: 0.20 },   // andas med sektionsenergin
   aurora:    { punch: 0.10, bass: 0.20, bright: 0.80, beat: 0.10 },   // klangdrivet skimmer
   mono:      { punch: 0.20, bass: 0.60, bright: 0.20, beat: 0.10 },   // eld/glöd, varm
-  subbreath: { punch: 0.10, bass: 0.85, bright: 0.10, beat: 0.10 },   // sub-driven andning
   airglow:   { punch: 0.10, bass: 0.10, bright: 0.90, beat: 0.10 },   // luftig shimmer
   twin:      { punch: 0.15, bass: 0.35, bright: 0.35, beat: 0.70 },   // taktlast vaxelsang
   // ── Fart: flödande/rytmiska ──
@@ -64,14 +63,12 @@ export const FIT: Partial<Record<Mode, Fit>> = {
   fyrverkeri:{ punch: 0.75, bass: 0.60, bright: 0.55, beat: 0.60 },
   andrum:    { punch: 0.15, bass: 0.50, bright: 0.25, beat: 0.30 },
   konfetti:  { punch: 0.65, bass: 0.45, bright: 0.60, beat: 0.75 },
-  sol:       { punch: 0.30, bass: 0.50, bright: 0.45, beat: 0.20 },
   sopa:      { punch: 0.35, bass: 0.45, bright: 0.45, beat: 0.25 },
   varannan:  { punch: 0.60, bass: 0.55, bright: 0.40, beat: 0.90 },
   //    (ladans profil, tools/effectMix: punch 0,7-0,9, bass 0,15-0,4, bright 0,35-0,55, beat 0,85-0,95 - raderna ligger dar)
   forvarning:{ punch: 0.55, bass: 0.35, bright: 0.40, beat: 0.75 },   // stegar takter mot refrangen
   basgang:   { punch: 0.70, bass: 0.55, bright: 0.30, beat: 0.70 },   // lever pa basnoterna (bassline, inte profile.bass)
   tyngdlyft: { punch: 0.65, bass: 0.30, bright: 0.50, beat: 0.65 },   // nivan mot refrangen
-  uvpuls:    { punch: 0.75, bass: 0.35, bright: 0.45, beat: 0.90 },   // UV pa slaget
   frasraknare:{ punch: 0.50, bass: 0.50, bright: 0.50, beat: 0.85 },  // takter och fraser
   vidga:      { punch: 0.55, bass: 0.55, bright: 0.50, beat: 0.70 },  // energin oppnar riggen
 };

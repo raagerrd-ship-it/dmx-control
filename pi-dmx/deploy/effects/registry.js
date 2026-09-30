@@ -24,7 +24,6 @@ import { ripple } from "./ripple.js";
 import { gravity } from "./gravity.js";
 import { drumkit } from "./drumkit.js";
 import { split } from "./split.js";
-import { subbreath } from "./subbreath.js";
 import { duel } from "./duel.js";
 import { airglow } from "./airglow.js";
 import { tide } from "./tide.js";
@@ -36,7 +35,6 @@ import { tick } from "./tick.js";
 import { stege } from "./stege.js";
 import { eko } from "./eko.js";
 import { hjarta } from "./hjarta.js";
-import { sol } from "./sol.js";
 import { konfetti } from "./konfetti.js";
 import { sopa } from "./sopa.js";
 import { varannan } from "./varannan.js";
@@ -49,13 +47,12 @@ import { fyrverkeri } from "./fyrverkeri.js";
 import { forvarning } from "./forvarning.js";
 import { basgang } from "./basgang.js";
 import { tyngdlyft } from "./tyngdlyft.js";
-import { uvpuls } from "./uvpuls.js";
 import { frasraknare } from "./frasraknare.js";
 import { vidga } from "./vidga.js";
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS = [
     drops, party, chase, wave, breathe, snap, bounce, mono, aurora, pulse,
-    strobe, rave, eq, gallop, twin, ripple, gravity, drumkit, split, subbreath,
+    strobe, rave, eq, gallop, twin, ripple, gravity, drumkit, split,
     duel, airglow,
     // Nya (2026-07): fyller lugn- och fart-poolerna till 10+ vardera.
     tide, drift, pendel, viska, backbeat, tick, stege, eko, hjarta,
@@ -63,12 +60,14 @@ export const EFFECTS = [
     // Sektionseffekter (2026-09-21): valjs av dirigenten vid build-/break-grans (DMX_SECTION_SWITCH).
     stegring, andrum, sug, vagbrytare, nedrakning, fyrverkeri,
     // Registrerade 2026-09-21 (fanns som filer men inte i poolen): sol, konfetti, sopa.
-    sol, konfetti, sopa,
+    konfetti, sopa,
     // OVERSYN 2026-09-23 (tools/effectSimilarity.mjs v2 + effectMix): innerouter borttagen (rPerm 1,00 mot varannan, samma pool,
     // ingen egen signal), neon borttagen (aldrig vald pa nagon av ladans mixar, ingen egen signal - sol ar samma fallback).
     // Nya effekter pa analysatorns nya signaler: forvarning (expectHighInMs), basgang (bassline/basnoter), tyngdlyft
     // (levelVsHighDb), uvpuls (UV pa slaget i refrangen), frasraknare (sectionBars).
-    forvarning, basgang, tyngdlyft, uvpuls, frasraknare,
+    forvarning, basgang, tyngdlyft, frasraknare,
+    // BORTTAGNA 2026-09-30 (effektoversynen, agaren "kor"): uvpuls (samma monster som pulse, likhet 0,88-0,90, ladan har ingen UV),
+    // sol (rankades alltid sist, aldrig vald), subbreath (bara andning, inget eget monster). Filerna finns i git-historiken.
     // 2026-09-29: vidga (energin oppnar riggen utifran och in, alla i takt vid hog energi)
     vidga,
 ];
@@ -97,7 +96,6 @@ const SPECIALTY_DRIVES = {
     gallop: ["laser"],
     chase: ["laser"],
     aurora: ["hazer", "uv"],
-    subbreath: ["hazer"],
     wave: ["hazer"],
     tide: ["hazer", "uv"],
     drift: ["hazer", "uv"],
@@ -112,7 +110,6 @@ const SPECIALTY_DRIVES = {
     // 2026-09-23
     forvarning: ["uv", "hazer", "blinder"],
     tyngdlyft: ["blinder", "uv"],
-    uvpuls: ["uv", "blinder"],
     frasraknare: ["blinder"],
     ripple: ["blinder"],
     gravity: ["blinder"],
@@ -156,7 +153,6 @@ const REQUIREMENTS = {
     split: { needsPunch: 0.35, needsBass: 0.35 },
     backbeat: { needsPunch: 0.35, needsBeat: 0.35 },
     // Bas-effekter → kräver låg-end
-    subbreath: { needsBass: 0.40 },
     gravity: { needsBass: 0.35 },
     tide: { needsBass: 0.30 },
     // Luft/diskant-effekter → kräver diskant
@@ -174,7 +170,6 @@ const REQUIREMENTS = {
     varannan: { needsBeat: 0.35 },
     // 2026-09-23
     basgang: { needsBeat: 0.30 }, // inte needsBass: ladans profile.bass ligger 0,0-0,4 (megamix median 0,15); effekten faller sjalv tillbaka pa slaget
-    uvpuls: { needsBeat: 0.35 },
     frasraknare: { needsBeat: 0.35 },
 };
 /** Möter effekten sina krav givet nuvarande tempo + karaktärsprofil? */
