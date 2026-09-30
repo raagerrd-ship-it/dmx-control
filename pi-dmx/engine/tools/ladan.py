@@ -76,6 +76,13 @@ REMOVE = [
     # EFFEKTOVERSYNEN 2026-09-23: innerouter (rPerm 1,00 mot varannan) och neon (aldrig vald, ingen egen signal) ar borta ur
     # registret; filerna pa Pi:n flyttas till .bak sa dist/effects/ inte har spokfiler.
     '/opt/audio-dmx-engine/dist/effects/innerouter.js', '/opt/audio-dmx-engine/dist/effects/neon.js',
+    # DRIFTGRANSKNING 2026-09-30 (backup pi-backup/2026-09-29): spokfiler pa Pi:n som inget i bygget importerar
+    # (effekter borttagna ur registret tidigare + den pensionerade smartsync/analyserOld).
+    '/opt/audio-dmx-engine/dist/analyserOld.js', '/opt/audio-dmx-engine/dist/smartsync.js',
+    '/opt/audio-dmx-engine/dist/effects/cascade.js', '/opt/audio-dmx-engine/dist/effects/cycle.js',
+    '/opt/audio-dmx-engine/dist/effects/flip.js', '/opt/audio-dmx-engine/dist/effects/interlace.js',
+    '/opt/audio-dmx-engine/dist/effects/jump.js', '/opt/audio-dmx-engine/dist/effects/prisma.js',
+    '/opt/audio-dmx-engine/dist/effects/seismisk.js', '/opt/audio-dmx-engine/dist/effects/sweep.js',
     # KVALLENS TESTFILER 09-24 (allt star nu i SHOW_ENV -> lotus.conf); hjarta.conf satte DMX_HEARTBEAT=1 och laddas EFTER lotus.conf.
     # 09-27: drop-ins som bar live-varden - nu standard i koden. OBS ordningen: systemd laser alfabetiskt, senare vinner;
     # zz-dynamik.conf (09-22) skrev over lotus.conf (09-24) for DMX_FLOOR_CH (40 mot 26) och DROP_CALM_LAND_MS (300 mot 0)
