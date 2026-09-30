@@ -18,7 +18,12 @@ import os, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENGINE = os.path.normpath(os.path.join(HERE, '..'))
-HOSTS = ([os.environ['PI_HOST']] if os.environ.get('PI_HOST') else []) + ['192.168.4.1', '172.29.167.218', '192.168.1.176']
+def _mdns():
+    # SNABBAST (agaren 09-30): pi-dmx.local loser via mDNS pa telefonens hotspot; IPv4 och IPv6 byter per hotspot-session
+    import socket
+    try: return [socket.getaddrinfo('pi-dmx.local', 22, socket.AF_INET)[0][4][0]]
+    except Exception: return []
+HOSTS = ([os.environ['PI_HOST']] if os.environ.get('PI_HOST') else []) + _mdns() + ['192.168.4.1', '172.29.167.218', '192.168.1.176']
 ARGS = sys.argv[1:]
 DRY = '--dry' in ARGS
 ONLY_DEPLOY = '--bara-deploy' in ARGS
