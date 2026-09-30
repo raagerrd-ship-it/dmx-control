@@ -2,8 +2,11 @@
 // alla, men kor t.ex. i takt / heart-beat"). Energin (gravLevel) oppnar riggen utifran och in: lag energi = bara ytterlamporna
 // glor, mer energi = mittlamporna tands en i taget, hog energi = alla slar i takt med effektens egen hjartpuls. Pulsen djupnar
 // med energin, sa lugnt = andning och fullt = tydligt slag.
+// VALDES ALDRIG (bank 09-30): utan section-tagg ar vidga aldrig med i sectionPool(), och dirigenten (DMX_SECTION_SWITCH, standard pa)
+// skar poolen med sektionens looker i low/high/intro -> vidga skars alltid bort. DMX_VIDGA_SECTION=1 taggar den low+high (opt-in).
+const VIDGA_SECTION = process.env.DMX_VIDGA_SECTION === '1';
 export const vidga = {
-    key: "vidga", label: "Vidga", tier: "fart", modulate: { energy: true, pulse: false },
+    key: "vidga", label: "Vidga", tier: "fart", modulate: { energy: true, pulse: false }, ...(VIDGA_SECTION ? { section: ["low", "high"] } : {}),
     desc: "Ytterlamporna vid lag energi, oppnar inat med energin, alla i takt vid hog.",
     render(c) {
         const e = Math.max(0, Math.min(1, c.gravLevel));
