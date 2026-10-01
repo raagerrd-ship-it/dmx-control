@@ -233,7 +233,15 @@ export class FixtureOutput {
           const ch = base + i; if (ch < 0 || ch >= 512) continue;
           const role = fast.roles[i];
           if (role === "dim") universe[ch] = dimOut;
-          else if (role === "r" || role === "g" || role === "b" || role === "w") universe[ch] = lit && mx > 0 ? Math.round(cTop * universe[ch] / mx) : 0;
+          else if (role === "r" || role === "g" || role === "b" || role === "w") {
+            // FLIMMER PER DIOD (ladan 10-01): en svag fargandel nara tandgransen tandes/slacktes i takt med niva-rippel. Hysteres:
+            // andelen av starkaste fargen (pa >= 25 %, av < 15 %) OCH DIM x varde (pa >= 1,15 x PMIN, av < 0,85 x PMIN).
+            const raw = universe[ch]; const v = lit && mx > 0 ? Math.round(cTop * raw / mx) : 0;
+            const was = this.hueOn[ch] === 1; const ratio = mx > 0 ? raw / mx : 0;
+            const prod = (dimCh >= 0 ? dimOut : CAL_DMAX) * v;
+            const keep = v > 0 && (raw === mx || (ratio >= (was ? 0.15 : 0.25) && prod >= (was ? 0.85 : 1.15) * CAL_PMIN));   // starkaste fargen styrs av B (lit)
+            this.hueOn[ch] = keep ? 1 : 0; universe[ch] = keep ? v : 0;
+          }
         }
         continue;
       }
