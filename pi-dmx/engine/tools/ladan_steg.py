@@ -16,7 +16,7 @@ c = paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy()
 c.connect(host, username='pi', password=ladan.pw(), timeout=10, look_for_keys=False, allow_agent=False)
 msg = json.dumps({'type': 'setLevelTest', 'values': vals, 'channel': farg})
 js = ("const W=require('/opt/audio-dmx-engine/node_modules/ws');const w=new W('ws://127.0.0.1/ws');"
-      "w.on('open',()=>{w.send(process.argv[1]);setTimeout(()=>process.exit(0),300)});w.on('error',e=>{console.log('ws-fel',e.message);process.exit(1)})")
+      "w.on('open',()=>{w.send(process.argv[2]);setTimeout(()=>process.exit(0),300)});w.on('error',e=>{console.log('ws-fel',e.message);process.exit(1)})")
 sf = c.open_sftp()
 with sf.open('/tmp/steg.js', 'w') as f: f.write(js)
 sf.close()
