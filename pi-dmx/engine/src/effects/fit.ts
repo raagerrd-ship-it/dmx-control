@@ -93,7 +93,7 @@ const SPATIAL: Partial<Record<Mode, number>> = {
   basgang: 1.0, forvarning: 0.8, frasraknare: 0.7, nedrakning: 0.8, vagbrytare: 0.8, tyngdlyft: 0.4, vidga: 0.9,
 };
 /** Hur mycket den spatiala preferensen väger vid full punch (0 = av). */
-const SPATIAL_PREF = Number(process.env.DMX_SPATIAL_PREF ?? 0.18);   // ladan 09-29: "manga effekter lyser bara alla lampor" -> prov 0,5
+const SPATIAL_PREF = Number(process.env.DMX_SPATIAL_PREF ?? 0.5);   // 0,18 -> 0,5 (ladan 10-01 godkant)   // ladan 09-29: "manga effekter lyser bara alla lampor" -> prov 0,5
 
 /** Hur väl en effekt passar musiken just nu. Högre = bättre (0..1-ish). */
 export function fitScore(mode: Mode, p: { punch: number; bass: number; bright: number; beat: number }): number {

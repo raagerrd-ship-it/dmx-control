@@ -135,12 +135,12 @@ const CLEAR_BASS = Number(process.env.DMX_CLEAR_BASS ?? 0.78);
 const MIX_V2 = process.env.DMX_MIX_V2 !== '0';
 const CLEAR_BASS_HARD = Number(process.env.DMX_CLEAR_BASS_HARD ?? 0.85);
 const CLEAR_BASS_BOOST = Number(process.env.DMX_CLEAR_BASS_BOOST ?? 0.25);
-const MIX_RECENT_N = Number(process.env.DMX_MIX_RECENT_N ?? 4);
+const MIX_RECENT_N = Number(process.env.DMX_MIX_RECENT_N ?? 8);   // 4 -> 8 (ladan 10-01 godkant)
 const MIX_RECENT_PENALTY = Number(process.env.DMX_MIX_RECENT_PENALTY ?? 0.2);
-const MIX_TOP_FRAC = Number(process.env.DMX_MIX_TOP_FRAC ?? 0.5);
+const MIX_TOP_FRAC = Number(process.env.DMX_MIX_TOP_FRAC ?? 0.8);   // 0,5 -> 0,8 (ladan 10-01 godkant)
 /** MER VARIATION (ladan 2026-09-29 18:50: 'kanns ratt lika hela tiden' - mer variation och fler effekter): DMX_SECTION_REUSE=0 = en aterkommande
  *  del (vers 2, refrang 2) far en NY look i stallet for att aterse samma (loggen: vers 'sopa' 3 ggr, refrang 'chase' 3 ggr). Standard 1 = som forr. */
-const SECTION_REUSE = process.env.DMX_SECTION_REUSE !== '0';   // (4) valfonster = andel av poolen (minst 3)
+const SECTION_REUSE = process.env.DMX_SECTION_REUSE === '1';   // standard AV sedan 10-01 (ladan: 'mer variation'); =1 som forr   // (4) valfonster = andel av poolen (minst 3)
 /** (6) OSEDD-BONUS (2026-09-23, effektoversynen): +DMX_MIX_UNSEEN_BONUS i rankingen for effekter som inte valts sedan start -
  *  med 46 effekter och ~50 byten per 10 min blev annars samma 20-25 valda och resten aldrig (effectMix: 18-19 aldrig valda).
  *  Bonusen forsvinner sa fort effekten setts en gang, sa den styr bara FORSTA chansen. 0 = av. */
