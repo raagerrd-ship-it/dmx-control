@@ -43,6 +43,13 @@ const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 40
 /** DIM-TAK (ladan 10-01, stegtest: lamporna mattar vid DIM ~85 - 85/110/255 ser lika ut, DIM 1 lyser redan): skala DIM-kanalen
  *  linjart sa full show = DMX_DIM_MAX i stallet for 255; allt over ~85 var dod skala. 255 = av (som forr). Tant varde blir aldrig 0. */
 const DIM_MAX = Math.max(1, Math.min(255, Number(process.env.DMX_DIM_MAX ?? 255)));
+/** KALIBRERAD UTGANG v2 (se calibrate): opt-in DMX_CAL_V2=1. Ladans uppmatta varden 10-01 som standard. */
+const CAL_V2 = process.env.DMX_CAL_V2 === '1';
+const CAL_PMIN = Number(process.env.DMX_CAL_PMIN ?? 270);    // tandgransen DIM x farg
+const CAL_DMAX = Number(process.env.DMX_CAL_DMAX ?? 127);    // DIM full (>= 128 = lampans fulllage)
+const CAL_CMAX = Number(process.env.DMX_CAL_CMAX ?? 120);    // farg full
+const CAL_PMAX = CAL_DMAX * CAL_CMAX;
+const CAL_BMIN = Number(process.env.DMX_CAL_BMIN ?? 0.002);  // under detta = slackt
 const HOLD_MS = 120;
 /** KULORLYFT (2026-09-23, agaren i ladan: "lamporna kor nastan hela tiden med alla LED R G B paslagna ... kravet ar ju bara att EN
  *  kanal ar over tandpunkten"). Forr lyftes VARJE fargkanal > 0 till sin tandpunkt for sig - ett spar av gront och blatt i en rod
@@ -203,6 +210,32 @@ export class FixtureOutput {
       const c = fx.cal;
       const base = fast.base;
       const on = c ? (c.on || 0) : 0;
+
+      // KALIBRERAD UTGANG v2 (DMX_CAL_V2=1, ladan 10-01 - full kalibrering med agarens oga): lampan lyser nar DIM x farg >= ~270,
+      // ar full vid DIM 127 x farg 120, och ogat ser fordubblingar. Motorns DIM x starkaste farg (0..1) blir EN ljusstyrka B som
+      // mappas exponentiellt fran tandgransen till max: P = PMIN * (PMAX/PMIN)^B, delas som DIM ~ sqrt(P*DMAX/CMAX) och farg = P/DIM;
+      // kuloren (forhallandet mellan r/g/b) behalls. Ersatter golv 40, tandpunkt 16, kulorlyft och DIM_MAX. B = 0 -> slackt.
+      if (CAL_V2) {
+        let dimCh = -1, dimRaw = 255, mx = 0;
+        for (let i = 0; i < fast.roles.length; i++) {
+          const ch = base + i; if (ch < 0 || ch >= 512) continue;
+          const role = fast.roles[i];
+          if (role === "dim") { dimCh = ch; dimRaw = universe[ch]; }
+          else if (role === "r" || role === "g" || role === "b" || role === "w") { if (universe[ch] > mx) mx = universe[ch]; }
+        }
+        const B = (dimCh >= 0 ? dimRaw / 255 : 1) * (mx / 255) * master;
+        const lit = B > CAL_BMIN;
+        const P = lit ? CAL_PMIN * Math.pow(CAL_PMAX / CAL_PMIN, Math.min(1, B)) : 0;
+        const dimOut = !lit ? 0 : dimCh >= 0 ? Math.max(1, Math.min(CAL_DMAX, Math.round(Math.sqrt(P * CAL_DMAX / CAL_CMAX)))) : 0;
+        const cTop = !lit ? 0 : dimCh >= 0 ? Math.min(CAL_CMAX, P / dimOut) : Math.min(CAL_CMAX, P / CAL_DMAX);
+        for (let i = 0; i < fast.roles.length; i++) {
+          const ch = base + i; if (ch < 0 || ch >= 512) continue;
+          const role = fast.roles[i];
+          if (role === "dim") universe[ch] = dimOut;
+          else if (role === "r" || role === "g" || role === "b" || role === "w") universe[ch] = lit && mx > 0 ? Math.round(cTop * universe[ch] / mx) : 0;
+        }
+        continue;
+      }
 
       // KULORLYFT: lampans starkaste fargkanal (r/g/b/w) och dess tandpunkt -> en gemensam skalfaktor i stallet for lyft per kanal.
       let hueScale = 1, hueMaxCh = -1, hueMaxRaw = 0, hueMaxOn = 0;
