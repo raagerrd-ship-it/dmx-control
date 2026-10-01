@@ -594,11 +594,12 @@ export async function startServer(deps, port = 80, tls) {
                         // STEGTEST (ljuskurvan, ladan 10-01): DIM-varde per lampa, fargen full. values saknas/tom = av.
                         const vals = Array.isArray(msg.values) ? msg.values.map((v) => Math.max(0, Math.min(255, Math.floor(Number(v)) || 0))) : [];
                         const chSel = (["all", "r", "g", "b", "w"].includes(msg.channel) ? msg.channel : "all");
+                        const cvals = Array.isArray(msg.colorValues) ? msg.colorValues.map((v) => Math.max(0, Math.min(255, Math.floor(Number(v)) || 0))) : undefined;
                         if (vals.length) {
                             stopIdentify();
                             deps.cfg.calTest = null;
                             deps.cfg.walkTest = null;
-                            deps.cfg.levelTest = { values: vals, channel: chSel };
+                            deps.cfg.levelTest = { values: vals, channel: chSel, colorValues: cvals?.length ? cvals : undefined };
                         }
                         else
                             deps.cfg.levelTest = null;

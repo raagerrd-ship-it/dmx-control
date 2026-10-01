@@ -859,8 +859,10 @@ export class EffectEngine {
                         continue;
                     if (role === "dim")
                         this.universe[ch] = v;
-                    else if (role === "r" || role === "g" || role === "b" || role === "w")
-                        this.universe[ch] = (chSel === "all" || role === chSel) ? (hasDim ? 255 : v) : 0;
+                    else if (role === "r" || role === "g" || role === "b" || role === "w") {
+                        const cv = lt.colorValues ? lt.colorValues[Math.min(f, lt.colorValues.length - 1)] : 255;
+                        this.universe[ch] = (chSel === "all" || role === chSel) ? (hasDim ? cv : v) : 0;
+                    }
                 }
             }
             return this.universe;

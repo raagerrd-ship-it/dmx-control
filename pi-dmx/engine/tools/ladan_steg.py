@@ -10,15 +10,17 @@ import ladan
 args = [a for a in sys.argv[1:]]
 farg = 'all'
 if '--farg' in args: i = args.index('--farg'); farg = args[i + 1]; del args[i:i + 2]
+cv = None   # --fargvarden a b c d: fargkanalernas varde per lampa (standard 255)
+if '--fargvarden' in args: i = args.index('--fargvarden'); cv = [int(x) for x in args[i + 1:i + 5]]; del args[i:i + 5]
 vals = [] if (not args or args[0] == 'av') else [int(a) for a in args]
 host = os.environ.get('PI_HOST') or socket.getaddrinfo('pi-dmx.local', 22, socket.AF_INET)[0][4][0]
 c = paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 c.connect(host, username='pi', password=ladan.pw(), timeout=10, look_for_keys=False, allow_agent=False)
-msg = json.dumps({'type': 'setLevelTest', 'values': vals, 'channel': farg})
+msg = json.dumps({'type': 'setLevelTest', 'values': vals, 'channel': farg, **({'colorValues': cv} if cv else {})})
 js = ("const W=require('/opt/audio-dmx-engine/node_modules/ws');const w=new W('ws://127.0.0.1/ws');"
       "w.on('open',()=>{w.send(process.argv[2]);setTimeout(()=>process.exit(0),300)});w.on('error',e=>{console.log('ws-fel',e.message);process.exit(1)})")
 sf = c.open_sftp()
 with sf.open('/tmp/steg.js', 'w') as f: f.write(js)
 sf.close()
 i, o, e = c.exec_command("cd /tmp && node /tmp/steg.js '" + msg.replace("'", "") + "'", timeout=20)
-o.channel.recv_exit_status(); print(o.read().decode().strip() or ('stegtest: ' + (', '.join(f'lampa {n+1}={v}' for n, v in enumerate(vals)) + f' ({farg})' if vals else 'AV - showen tillbaka')))
+o.channel.recv_exit_status(); print(o.read().decode().strip() or ('stegtest: ' + (', '.join(f'lampa {n+1}={v}' for n, v in enumerate(vals)) + f' ({farg}' + (f', farg {cv}' if cv else '') + ')' if vals else 'AV - showen tillbaka')))

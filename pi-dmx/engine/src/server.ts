@@ -620,7 +620,8 @@ export async function startServer(
             // STEGTEST (ljuskurvan, ladan 10-01): DIM-varde per lampa, fargen full. values saknas/tom = av.
             const vals = Array.isArray(msg.values) ? (msg.values as unknown[]).map((v) => Math.max(0, Math.min(255, Math.floor(Number(v)) || 0))) : [];
             const chSel = (["all", "r", "g", "b", "w"].includes(msg.channel as string) ? msg.channel : "all") as "all" | "r" | "g" | "b" | "w";
-            if (vals.length) { stopIdentify(); deps.cfg.calTest = null; deps.cfg.walkTest = null; deps.cfg.levelTest = { values: vals, channel: chSel }; }
+            const cvals = Array.isArray(msg.colorValues) ? (msg.colorValues as unknown[]).map((v) => Math.max(0, Math.min(255, Math.floor(Number(v)) || 0))) : undefined;
+            if (vals.length) { stopIdentify(); deps.cfg.calTest = null; deps.cfg.walkTest = null; deps.cfg.levelTest = { values: vals, channel: chSel, colorValues: cvals?.length ? cvals : undefined }; }
             else deps.cfg.levelTest = null;
           } else if (msg.type === "setWalkTest") {
             // Walk-test: tänd en rå DMX-kanal på mål-fixturen. index<0 = av.
