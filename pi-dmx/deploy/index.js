@@ -31,7 +31,8 @@ import { activeSlots, fixtureRoles } from "./config.js";
 import { EFFECT_KEYS, EFFECT_MAP } from "./effects/registry.js";
 // DMX_QUIET=1 (ladan 2026-09-27, agaren: "inaktivera logg tills vi sager att vi ska kolla nagot"): tystar all console.log
 // (journald pa karna 0 kostar CPU och I/O under spelning). console.warn/error gar fortfarande igenom. Standard PA sedan 09-29; DMX_QUIET=0 slar pa loggen.
-if (process.env.DMX_QUIET !== '0') { // standard PA sedan 09-29 (ladan-provet lyft in i koden); DMX_QUIET=0 for felsokning
+const LOG_ON = process.env.DMX_QUIET === '0'; // periodiska diagnosrader byggs bara nar loggen ar pa (skrapjakten 10-01)
+if (!LOG_ON) { // standard PA sedan 09-29 (ladan-provet lyft in i koden); DMX_QUIET=0 for felsokning
     console.log = () => { };
     console.info = () => { };
     console.warn('[quiet] console.log avstangd (DMX_QUIET=1)');
@@ -186,6 +187,9 @@ if (process.env.DMX_RECORDER === "1") {
     recorder.noteTrack("ladan-0", "dmx");
     recorder.start();
 }
+// Argumentobjekt som fylls per hop i stallet for nya literaler (skrapjakten 10-01: 375 Hz). Mottagarna laser dem synkront.
+const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
+const ringArg = { intensity: 0.5, blackout: false, beat: false };
 capture.on("chunk", (samples) => {
     const t0 = performance.now();
     if (AUDIO_CLOCK_ON)
@@ -204,7 +208,10 @@ capture.on("chunk", (samples) => {
     // pa nya latens nivaer inom sekunder i stallet for en minut) och latbytes-hint till tempot: medianfonstret
     // (~5 s) och tempogrammet tillhor forra laten. DMX_BOUNDARY_SOFT: mjuk hint i st.f. hard nollstallning -
     // falska latgranser pa pop kastade tempolaset 5x/5 min (ladan 2026-09-04).
-    bounds.tick({ level: frame.level, bpm: frame.bpm, bpmConfidence: frame.bpmConfidence });
+    boundsArg.level = frame.level;
+    boundsArg.bpm = frame.bpm;
+    boundsArg.bpmConfidence = frame.bpmConfidence;
+    bounds.tick(boundsArg);
     if (bounds.charShiftCount !== lastCharShift) {
         lastCharShift = bounds.charShiftCount;
         effects.noteCharShift();
@@ -242,7 +249,8 @@ capture.on("chunk", (samples) => {
         // vad ogat ser, i stallet for att bytet ska behova tas pa tro.
         if (frame.bpmConfidence > 0.05 && Date.now() - lastTrustLog > 4000) {
             lastTrustLog = Date.now();
-            console.log(`[tillit] tempogram ${frame.bpmConfidence.toFixed(2)} · fasprediktion ${onBeatRate.toFixed(2)} · bpm ${frame.bpm}`);
+            if (LOG_ON)
+                console.log(`[tillit] tempogram ${frame.bpmConfidence.toFixed(2)} · fasprediktion ${onBeatRate.toFixed(2)} · bpm ${frame.bpm}`);
         }
         // FASPREDIKTIONEN KRAVER KICKAR — OCH DE KOMMER INTE ALLTID.
         // MATT 2026-08-09 over 25 riktiga spar: 36 % gav NOLL kickar, medianen var
@@ -469,11 +477,12 @@ capture.on("chunk", (samples) => {
     }
     // WS2812-ringen: mata intensity + kick-puls varje frame (billig update; ringen
     // renderar själv i egen takt @ 30 Hz och avklingar puffen mjukt).
-    ring?.update({
-        intensity: cfg.activeIntensity ?? 0.5,
-        blackout: cfg.mode === "blackout",
-        beat: frame.kick,
-    });
+    if (ring) {
+        ringArg.intensity = cfg.activeIntensity ?? 0.5;
+        ringArg.blackout = cfg.mode === "blackout";
+        ringArg.beat = frame.kick;
+        ring.update(ringArg);
+    }
     // Renderingen ligger INTE här längre — se renderTick nedan. Analysen (FFT/onset/
     // BPM) körs varje chunk (~375 Hz) för tighta drops; effekterna renderas på ett
     // EGET fast raster så renderintervallet inte längre varierar med analyslasten.

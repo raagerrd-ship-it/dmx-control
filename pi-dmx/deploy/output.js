@@ -366,12 +366,19 @@ export class FixtureOutput {
     writeFixture(u, fx, rgb, master, strobeVal = 0, specialty) {
         // Hitta indexet i cfg.fixtures som matchar för att ta fram fastFixture
         // Alternativt kan anroparen skicka med indexet för O(1) lookup. För nu loopar vi:
-        const fast = this.fastFixtures.find(f => f.base === fx.address - 1);
+        // (skrapjakten 10-01: forr .find med en closure per lampa och ruta; samma forsta traff med en slinga)
+        const want = fx.address - 1;
+        let fast;
+        for (let k = 0; k < this.fastFixtures.length; k++)
+            if (this.fastFixtures[k].base === want) {
+                fast = this.fastFixtures[k];
+                break;
+            }
         if (!fast)
             return;
         const base = fast.base; // DMX är 1-indexerat
         const m = clamp01(master);
-        const [r, g, b] = rgb;
+        const r = rgb[0], g = rgb[1], b = rgb[2];
         const w = Math.min(r, g, b);
         const dim = Math.max(r, g, b);
         const colorScale = fast.hasDim ? 1 : m;

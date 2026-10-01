@@ -48,6 +48,9 @@ export class BoundaryDetector {
     lastBoundary = "";
     /** Gransignaler som var aktiva vid senaste kontrollen (diagnostik). */
     lastEvidence = [];
+    evBuf = [];
+    novStr = '';
+    novStrFor = NaN;
     playStart = 0; // vaggklocka da segmentet borjade
     lastLoud = 0;
     loudSince = 0;
@@ -235,9 +238,15 @@ export class BoundaryDetector {
         if (tLive < MIN_SEG_MS + NOV_BACK_MS)
             return false;
         const novFresh = this.novAt > 0 && now - this.novAt < NOV_WIN_KEEP_MS;
-        const ev = [];
-        if (novFresh)
-            ev.push(`klangskifte ${this.novPeak.toFixed(2)}`);
+        const ev = this.evBuf;
+        ev.length = 0; // ateranvand (skrapjakten 10-01: forr en ny array per hop, 375 Hz)
+        if (novFresh) {
+            if (this.novStrFor !== this.novPeak) {
+                this.novStrFor = this.novPeak;
+                this.novStr = `klangskifte ${this.novPeak.toFixed(2)}`;
+            }
+            ev.push(this.novStr);
+        } // strangen byggs bara nar toppen andras
         if (bpmShift)
             ev.push(bpmShift);
         if (this.dipAt && now - this.dipAt < DIP_WIN_MS)

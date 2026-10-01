@@ -3,6 +3,16 @@
 // takten smalnar allt mot en vit karna medan UV och hazer stiger - och pa slaget slapps allt (vit stot pa refrangens entre,
 // sedan lamnar dirigenten over till high-poolen). Utan forutsagelse (eller > 4 takter kvar) ar den en lugn vantan: palett-
 // farg, mjuk puls, som langsamt vaknar ju langre sektionen pagatt (sectionBars). Pool build/low.
+// Tandordningen beror bara pa antalet lampor -> raknas om bara nar det andras (skrapjakten 10-01: forr en ny array + sort per lampa och ruta).
+let orderN = -1, orderCache = [];
+function tandOrdning(n) {
+    if (n !== orderN) {
+        const half = (n - 1) / 2;
+        orderCache = [...Array(n).keys()].sort((a, b) => (Math.abs(b - half) - Math.abs(a - half)) || (a - b));
+        orderN = n;
+    }
+    return orderCache;
+}
 export const forvarning = {
     key: "forvarning", label: "Forvarning", tier: "fart", modulate: { energy: true, pulse: false }, section: ["build", "low"],
     desc: "Sista fyra takterna fore forutsedd refrang: lamporna tands en i taget utifran och in, vit karna sista takten, slapp pa slaget.",
@@ -14,9 +24,7 @@ export const forvarning = {
         const barsLeft = ex > 0 ? ex / barMs : -1; // takter kvar till refrangen (-1 = okant)
         const n = Math.max(1, c.count);
         // Tandordning utifran och in, vanster fore hoger vid lika avstand: 4 lampor -> 0, 3, 1, 2.
-        const half = (n - 1) / 2;
-        const order = [...Array(n).keys()].sort((a, b) => (Math.abs(b - half) - Math.abs(a - half)) || (a - b));
-        const rank = order.indexOf(c.idx);
+        const rank = tandOrdning(n).indexOf(c.idx);
         const hue = c.mixedSector(Math.floor(c.sectionBars / 4)) / 6;
         if (c.section === "high" || ex === 0) {
             // SLAPPET: refrangen ar har - vit stot som faller pa 400 ms, sedan en full puls tills dirigenten byter.

@@ -129,7 +129,9 @@ for (const e of EFFECTS) {
 /** Snabb uppslagning nyckel → effekt. */
 export const EFFECT_MAP = new Map(EFFECTS.map((e) => [e.key, e]));
 /** Effektens modulate-flaggor (heartbeat/contract.ts), standard energi+puls. */
-export function modulateOf(key) { return EFFECT_MAP.get(key)?.modulate ?? { energy: true, pulse: true }; }
+// Standardflaggorna delas (skrapjakten 10-01: forr ett nytt objekt per render-ruta for varje effekt utan egen modulate). Lases, muteras aldrig.
+const MODULATE_DEFAULT = { energy: true, pulse: true };
+export function modulateOf(key) { return EFFECT_MAP.get(key)?.modulate ?? MODULATE_DEFAULT; }
 /** Alla effekt-nycklar i cykel-ordning (driver MODE_CYCLE + validering). */
 export const EFFECT_KEYS = EFFECTS.map((e) => e.key);
 /** Smart-lägets pooler, härledda ur tier-taggen. */
