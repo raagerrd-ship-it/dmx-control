@@ -246,7 +246,7 @@ export async function startServer(
     // replicateToken strippas OCKSA: exporten ar en fil agaren delar och sparar,
     // och en API-nyckel i klartext dar ar en lackande hemlighet som overlever
     // langt efter att den glomts bort. Den bor bara i configen pa Pi:n.
-    const { identify: _1, beat: _2, beatErr: _3, fogTrigger: _4, walkTest: _5, calTest: _6, replicateToken: _7,
+    const { identify: _1, beat: _2, beatErr: _3, fogTrigger: _4, walkTest: _5, calTest: _6, levelTest: _10, replicateToken: _7,
             acrKey: _8, acrSecret: _9, ...persist } = deps.cfg as any;
     const body = JSON.stringify({ version: PKG_VERSION, exportedAt: new Date().toISOString(), config: persist }, null, 2);
     const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -616,6 +616,12 @@ export async function startServer(
             } else {
               deps.cfg.calTest = null;
             }
+          } else if (msg.type === "setLevelTest") {
+            // STEGTEST (ljuskurvan, ladan 10-01): DIM-varde per lampa, fargen full. values saknas/tom = av.
+            const vals = Array.isArray(msg.values) ? (msg.values as unknown[]).map((v) => Math.max(0, Math.min(255, Math.floor(Number(v)) || 0))) : [];
+            const chSel = (["all", "r", "g", "b", "w"].includes(msg.channel as string) ? msg.channel : "all") as "all" | "r" | "g" | "b" | "w";
+            if (vals.length) { stopIdentify(); deps.cfg.calTest = null; deps.cfg.walkTest = null; deps.cfg.levelTest = { values: vals, channel: chSel }; }
+            else deps.cfg.levelTest = null;
           } else if (msg.type === "setWalkTest") {
             // Walk-test: tänd en rå DMX-kanal på mål-fixturen. index<0 = av.
             const idx = Math.floor(Number(msg.index));

@@ -135,6 +135,8 @@ export interface EngineConfig {
    *  tänd/släck-punkt. index<0 = av. channel = vilken färg testet driver ("all"
    *  = alla lika, annars bara r/g/b/w → kalibrera per färg). */
   calTest?: { index: number; value: number; channel?: "all" | "r" | "g" | "b" | "w" } | null;
+  /** STEGTEST (ladan 10-01, ljuskurvan): DIM per lampa = values[i], fargkanalerna (channel) pa 255 - alla lampor samtidigt. Transient. */
+  levelTest?: { values: number[]; channel?: "all" | "r" | "g" | "b" | "w" } | null;
   /** Transient walk-test — inte persisterad. Tänder EN rå DMX-kanal (255) på
    *  fixture[index]+channel-offset så användaren kan avgöra vad varje kanal gör
    *  (R/G/B/W/Dim/Strobe/Auto/inget). Används av /setup för att gissa preset

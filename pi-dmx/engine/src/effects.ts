@@ -820,6 +820,25 @@ export class EffectEngine {
       return this.universe;
     }
 
+    // STEGTEST (ladan 10-01): alla lampor samtidigt, DIM = values[i], vald farg pa 255 (lampa utan DIM: fargen = values[i]).
+    // Raa DMX-varden forbi show/VU/kalibrering - for att mata lampornas ljuskurva med ogat.
+    const lt = this.cfg.levelTest;
+    if (lt && lt.values.length) {
+      this.universe.fill(0);
+      const chSel = lt.channel ?? "all";
+      for (let f = 0; f < this.cfg.fixtures.length; f++) {
+        const fx = this.cfg.fixtures[f]; const roles = fixtureRoles(fx); const base = fx.address - 1;
+        const v = Math.max(0, Math.min(255, Math.round(lt.values[Math.min(f, lt.values.length - 1)])));
+        const hasDim = roles.includes("dim");
+        for (let i = 0; i < roles.length; i++) {
+          const role = roles[i]; const ch = base + i; if (ch < 0 || ch >= 512) continue;
+          if (role === "dim") this.universe[ch] = v;
+          else if (role === "r" || role === "g" || role === "b" || role === "w") this.universe[ch] = (chSel === "all" || role === chSel) ? (hasDim ? 255 : v) : 0;
+        }
+      }
+      return this.universe;
+    }
+
     // Walk-test: tänd EN rå DMX-kanal på mål-fixturen till 255 (allt annat 0)
     // så användaren kan avgöra vad kanalen gör och gissa 3/4/7-kanals-preset.
     const wt = this.cfg.walkTest;
