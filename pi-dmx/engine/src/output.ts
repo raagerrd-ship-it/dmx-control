@@ -50,6 +50,7 @@ const CAL_DMAX = Number(process.env.DMX_CAL_DMAX ?? 127);    // DIM full (>= 128
 const CAL_CMAX = Number(process.env.DMX_CAL_CMAX ?? 120);    // farg full
 const CAL_PMAX = CAL_DMAX * CAL_CMAX;
 const CAL_GAMMA = Number(process.env.DMX_CAL_GAMMA ?? 1);   // < 1 lyfter mitten: showens typiska B 0,1-0,4 landade i den doda nedre delen (ladan 10-01)
+const CAL_DIM_TAU_S = Number(process.env.DMX_CAL_DIM_TAU_S ?? 0.5);   // DIM:s trog (fladder), 0 = som forst
 const CAL_BMIN = Number(process.env.DMX_CAL_BMIN ?? 0.002);  // under detta = slackt
 const HOLD_MS = 120;
 /** KULORLYFT (2026-09-23, agaren i ladan: "lamporna kor nastan hela tiden med alla LED R G B paslagna ... kravet ar ju bara att EN
@@ -200,7 +201,8 @@ export class FixtureOutput {
   /**
    * SISTA STEGET FÖRE UTGÅNG: tändpunkt som GOLV + master som TAK.
    */
-  private hueOn = new Uint8Array(512);   // KULORLYFT: kanalen ar tand (hysteres)
+  private hueOn = new Uint8Array(512);
+  private calDim = new Float64Array(64); private calDimAt = new Float64Array(64);   // CAL_V2: langsam DIM per lampa   // KULORLYFT: kanalen ar tand (hysteres)
   private lowLit = new Uint8Array(512);  // 10 %-REGELN: lampan (indexerad pa basadressen) ar tand (hysteres pa starkaste fargkanalen)
 
   calibrate(universe: Uint8Array, fixtures: FixtureConfig[], master: number, nowMs: number): void {
@@ -227,7 +229,16 @@ export class FixtureOutput {
         const B = (dimCh >= 0 ? dimRaw / 255 : 1) * (mx / 255) * master;
         const lit = B > CAL_BMIN;
         const P = lit ? CAL_PMIN * Math.pow(CAL_PMAX / CAL_PMIN, Math.pow(Math.min(1, B), CAL_GAMMA)) : 0;
-        const dimOut = !lit ? 0 : dimCh >= 0 ? Math.max(1, Math.min(CAL_DMAX, Math.round(Math.sqrt(P * CAL_DMAX / CAL_CMAX)))) : 0;
+        // FLADDER (ladan 10-01): DIM och farg hoppade bada varje ruta; ett DIM-steg vid 17 ar 6 % och lampan avrundar produkten.
+        // DIM foljer nu malet LANGSAMT (CAL_DIM_TAU_S, 0,5 s) och fargen bar de snabba andringarna (finare steg). Upp snabbare an ned.
+        const dimTarget = Math.sqrt(P * CAL_DMAX / CAL_CMAX);
+        if (lit && dimCh >= 0) {
+          const prevT = this.calDimAt[f] || nowMs; const dtS = Math.max(0, Math.min(0.2, (nowMs - prevT) / 1000)); this.calDimAt[f] = nowMs;
+          const cur = this.calDim[f] > 0 ? this.calDim[f] : dimTarget;
+          const tau = dimTarget > cur ? CAL_DIM_TAU_S * 0.2 : CAL_DIM_TAU_S;   // upp 0,1 s (smallar ska na fram), ned 0,5 s
+          this.calDim[f] = CAL_DIM_TAU_S > 0 ? cur + (dimTarget - cur) * Math.min(1, dtS / tau) : dimTarget;
+        } else { this.calDim[f] = 0; this.calDimAt[f] = nowMs; }
+        const dimOut = !lit ? 0 : dimCh >= 0 ? Math.max(1, Math.min(CAL_DMAX, Math.round(this.calDim[f]))) : 0;
         const cTop = !lit ? 0 : dimCh >= 0 ? Math.min(CAL_CMAX, P / dimOut) : Math.min(CAL_CMAX, P / CAL_DMAX);
         for (let i = 0; i < fast.roles.length; i++) {
           const ch = base + i; if (ch < 0 || ch >= 512) continue;
