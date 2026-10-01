@@ -31,6 +31,9 @@ const MIN_DIM = process.env.DMX_MIN_DIM === '1';
 // bleka ur kuloren (samma skal som MIN_DIM lamnar dem ifred). En ren nolla ar fortfarande svart - det ar sa
 // effekten sager "slack den har armaturen" - utom med DMX_MIN_DIM=1, som da haller golvet i stallet for tandpunkten.
 const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 40)));
+/** DIM-TAK (ladan 10-01, stegtest: lamporna mattar vid DIM ~85 - 85/110/255 ser lika ut, DIM 1 lyser redan): skala DIM-kanalen
+ *  linjart sa full show = DMX_DIM_MAX i stallet for 255; allt over ~85 var dod skala. 255 = av (som forr). Tant varde blir aldrig 0. */
+const DIM_MAX = Math.max(1, Math.min(255, Number(process.env.DMX_DIM_MAX ?? 255)));
 const HOLD_MS = 120;
 /** KULORLYFT (2026-09-23, agaren i ladan: "lamporna kor nastan hela tiden med alla LED R G B paslagna ... kravet ar ju bara att EN
  *  kanal ar over tandpunkten"). Forr lyftes VARJE fargkanal > 0 till sin tandpunkt for sig - ett spar av gront och blatt i en rod
@@ -307,7 +310,7 @@ export class FixtureOutput {
                 else {
                     out = 0;
                 }
-                universe[ch] = out;
+                universe[ch] = isDim && DIM_MAX < 255 && out > 0 ? Math.max(1, Math.round(out * DIM_MAX / 255)) : out; // DMX_DIM_MAX: se ovan
             }
         }
     }
