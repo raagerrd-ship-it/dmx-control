@@ -185,7 +185,8 @@ export class KnobRing {
       encodeByte(bOut, this.txBuf, off); off += 3;
     }
 
-    const msg: SPI.SpiMessage = [{
+    // Meddelandet (en vy over txBuf) byggs en gang - samma minne som forr, men inget nytt objekt/array/Buffer per tick (skrapjakten 10-01).
+    const msg = this.msg ??= [{
       byteLength: this.txBuf.length,
       sendBuffer: Buffer.from(this.txBuf.buffer, this.txBuf.byteOffset, this.txBuf.byteLength),
       speedHz: SPI_SPEED_HZ,
@@ -205,6 +206,7 @@ export class KnobRing {
   }
 
   private closed = false;
+  private msg: SPI.SpiMessage | null = null;
 
   stop() {
     if (this.timer) { clearInterval(this.timer); this.timer = null; }

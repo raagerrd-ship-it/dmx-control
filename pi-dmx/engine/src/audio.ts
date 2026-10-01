@@ -23,7 +23,8 @@ export interface AudioCaptureOptions {
 export class AudioCapture extends EventEmitter {
   private proc: ChildProcessByStdio<null, Readable, Readable> | null = null;
   private stopped = false;
-  private leftover: Buffer = Buffer.alloc(0);
+  private static readonly EMPTY: Buffer = Buffer.alloc(0);
+  private leftover: Buffer = AudioCapture.EMPTY;
   private readonly bytesPerFrame: number;   // S16LE = 2 bytes/sample × channels
   /** Kanalbalans-mätning (se toMonoFloat32). Nollställs var tredje sekund. */
   private balL = 0; private balR = 0; private balN = 0;
@@ -48,6 +49,9 @@ export class AudioCapture extends EventEmitter {
   private stallTimer: NodeJS.Timeout | null = null;
   /** Se toMonoFloat32: återanvänd mono-buffert, giltig bara under 'chunk'-handlern. */
   private readonly mono: Float32Array;
+  /** Ett hops raa S16-bytes (kopierade ur pipen) och en fast Int16-vy over dem - se onData. */
+  private readonly stage: Buffer;
+  private readonly stage16: Int16Array;
 
   // ── ÅTERHÄMTNINGSTRAPPA ────────────────────────────────────────────────────
   // Portad från Lotus (micRecovery.ts). Blind respawn i all evighet är fel svar:
@@ -75,6 +79,8 @@ export class AudioCapture extends EventEmitter {
     this.bytesPerFrame = 2 * opts.channels;
     this.chunkBytes = opts.hopSamples * this.bytesPerFrame;
     this.mono = new Float32Array(opts.hopSamples);
+    this.stage = Buffer.alloc(this.chunkBytes);   // egen ArrayBuffer, byteOffset 0 -> Int16-vyn alltid justerad
+    this.stage16 = new Int16Array(this.stage.buffer, this.stage.byteOffset, this.chunkBytes >> 1);
   }
 
   start() {
@@ -140,7 +146,7 @@ export class AudioCapture extends EventEmitter {
 
 
   private spawnArecord() {
-    this.leftover = Buffer.alloc(0);
+    this.leftover = AudioCapture.EMPTY;
     this.firstDataAt = 0;
     const args = [
       "-D", this.opts.device,
@@ -205,9 +211,11 @@ export class AudioCapture extends EventEmitter {
       ? Buffer.concat([this.leftover, buf])
       : buf;
 
+    // INGEN NY VY PER HOP (skrapjakten 10-01, som lotus alsaMic 09-30): forr en Buffer-vy (subarray) + en Int16Array-vy per hop
+    // (375 Hz) = ~56 kB/s skrap. Nu kopieras hoppets bytes (memcpy, 512 B) in i en fast stage-buffert med en fast Int16-vy.
     let offset = 0;
     while (combined.length - offset >= this.chunkBytes) {
-      const chunk = combined.subarray(offset, offset + this.chunkBytes);
+      const chunkStart = offset;
       offset += this.chunkBytes;
 
       // Ett STORT batch betyder inte att vi ligger efter — det betyder att node
@@ -228,9 +236,10 @@ export class AudioCapture extends EventEmitter {
       const staleMs = ((combined.length - offset) / this.bytesPerFrame / this.opts.rate) * 1000;
       if (staleMs > AudioCapture.STALE_MS) continue;   // katastrofal stall → lucka slår gammalt ljud
 
-      this.emit("chunk", this.toMonoFloat32(chunk));
+      combined.copy(this.stage, 0, chunkStart, offset);
+      this.emit("chunk", this.toMonoFloat32(this.stage16, 0));
     }
-    this.leftover = combined.subarray(offset);
+    this.leftover = offset === combined.length ? AudioCapture.EMPTY : combined.subarray(offset);
   }
 
   /**
@@ -244,20 +253,14 @@ export class AudioCapture extends EventEmitter {
    * emittar en chunk i taget så nästa skrivning sker efter att den förra är
    * konsumerad. EN KONSUMENT SOM SPARAR ARRAYEN MELLAN CHUNKAR MÅSTE KOPIERA.
    */
-  private toMonoFloat32(buf: Buffer): Float32Array {
+  private toMonoFloat32(i16: Int16Array, at: number): Float32Array {
     const n = this.opts.hopSamples;
     const out = this.mono;
-    // Zero-copy Int16Array view over the incoming buffer. Pi Zero 2 W is
-    // little-endian, matching S16_LE, so no byteswap needed. ~3-4× faster
-    // than readInt16LE() in a hot loop.
-    const i16 = new Int16Array(
-      buf.buffer,
-      buf.byteOffset,
-      buf.byteLength >> 1,
-    );
+    // Int16Array-vy over hoppets bytes (stage16, se onData; `at` = forsta sampel). Pi Zero 2 W is little-endian,
+    // matching S16_LE, so no byteswap needed. ~3-4× faster than readInt16LE() in a hot loop.
     if (this.opts.channels === 1) {
       const INV = 1 / 32768;
-      for (let i = 0; i < n; i++) out[i] = i16[i] * INV;
+      for (let i = 0; i < n; i++) out[i] = i16[at + i] * INV;
     } else {
       const INV = 1 / 65536;
       // KANALBALANS — mäts på köpet, kostar två multiplikationer per sampel.
@@ -275,7 +278,7 @@ export class AudioCapture extends EventEmitter {
       const pick = setting === "auto" ? this.autoPick : setting;
       const ONE = 1 / 32768;
       let sl = 0, sr = 0;
-      for (let i = 0, j = 0; i < n; i++, j += 2) {
+      for (let i = 0, j = at; i < n; i++, j += 2) {
         const l = i16[j], r = i16[j + 1];
         sl += l * l; sr += r * r;
         out[i] = pick === "left" ? l * ONE : pick === "right" ? r * ONE : (l + r) * INV;

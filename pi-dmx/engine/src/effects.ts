@@ -335,7 +335,16 @@ const ENERGY_RISE_DEAD = Number(process.env.DMX_ENERGY_RISE_DEAD ?? 0.06);
 const PULSE_GAP_MS = Number(process.env.DMX_PULSE_GAP_MS ?? 250);
 const CALM_FADE_S = Number(process.env.DMX_CALM_FADE_S ?? 0.6);
 const CALM_ATTACK = process.env.DMX_CALM_ATTACK === '1';   // lang attack i lugna partier (av sedan 09-27: uppstegning ska ga direkt)   // se 'LUGNA PARTIER = MJUKA OVERGANGAR'
+// LOGGEN: index.ts tystar console.log nar DMX_QUIET != '0' (standard). Periodiska diagnosrader byggs da inte alls (skrapjakten 10-01).
+const LOG_ON = process.env.DMX_QUIET === '0';
+const TIER_LO = Number(process.env.DMX_TIER_LO ?? 0.22), TIER_HI = Number(process.env.DMX_TIER_HI ?? 0.55);   // se DMX_TIER_LO/HI i render
 const BEAT_TRUST_FLOOR = 0.75;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
+// SKRAPJAKTEN 10-01 (render 200 Hz): hjalpare och konstanter som forr skapades PER RENDER (closures, objektliteraler) ligger
+// har en gang. Samma varden, samma ordning - bara utan allokering i render-loopen.
+const BAND_IDX = { bass: 0, mid: 1, treble: 2, kick: 3, low: 4 } as const;
+const clamp255 = (x: number) => x < 0 ? 0 : x > 255 ? 255 : Math.round(x);
+const drivesHas = (drives: readonly ChannelRole[] | undefined, r: ChannelRole) => drives ? drives.includes(r) : false;
+const exactHas = (effect: { exact?: readonly ChannelRole[] } | undefined, r: ChannelRole) => !!effect?.exact?.includes(r);
 
 export class EffectEngine {
   private universe = new Uint8Array(512);
@@ -346,6 +355,12 @@ export class EffectEngine {
   beatMulNow = 1;                     // hjärtslagets multiplikator — appliceras SIST (publik: diagnostik)
   /** HEARTBEAT-diagnostik (ws/status): senaste envelopen och flaggorna. */
   hbLast: { ceiling: number; pulse: number; depth: number; energy: boolean; pulseOn: boolean } = { ceiling: 0, pulse: 0, depth: 0, energy: true, pulseOn: true };
+  // SKRAPJAKTEN 10-01: objekt/arrayer som render() fyller i stallet for att skapa nya varje ruta (200 Hz). Lases bara synkront.
+  private hbEnv: Envelope = { ceiling: 0, pulse: 0, pulseDepth: 0 };
+  private hbFl: ModulateFlags = { energy: true, pulse: true };
+  private bandsBuf: number[] = [0.5, 0.5, 0.5, 0.5, 0.5];
+  private specBuf: SpecialtyValues = { hazer: 0, uv: 0, blinder: 0, strobe: 0, laser: 0, co2: 0 };
+  private rkVals: number[] = [0.5, 0.5, 0.5];
   private prevCeil = 0;               // förra rutans ljustak → hur snabbt det vandrar
   private ceilRateAvg = 0;            // utjämnad takrörelse (enheter/s)
   /** EDGE-SÄKER KICK. frame.kick är en enframs-boolean på analysatorns 375 Hz
@@ -424,7 +439,7 @@ export class EffectEngine {
   private lightShapeSm = -1;     // shape-smoothing
   private lastLiveSection = '';   // DMX_SECTION_SWITCH
   private lastDropSwitchMs = -1e9; dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;   // senaste drop -> 'high'-pool i 20 s
-  private liveAnchor?: number; private liveAnchorMax?: number; private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
+  private liveAnchor = NaN; private liveAnchorMax = NaN;   /* NaN = ej satt (forr undefined: taggat falt -> ny HeapNumber per ruta) */ private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
   private lightLoud = 0;         // log-released loudness 0..1 → driver md
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
@@ -1178,7 +1193,6 @@ export class EffectEngine {
         const FART = TIER.fart;
         const FULLFART = TIER.full;
         const bpm = this.cfg.beat?.bpm ?? 0;
-        const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
         // Fasta trösklar på (relativ) energi. Ingen bpm-sänkning längre — den
         // pushade mellanenergi till Full Fart och byggde på ett opålitligt
         // bpm-oktavvärde. Full Fart kräver en TYDLIG topp långt över snittet
@@ -1189,7 +1203,7 @@ export class EffectEngine {
         // effekter"). Aven drop-snappen stannar pa 0,75, dvs under troskeln. Defaulten ar oforandrad; ladan sanker
         // via DMX_TIER_HI. Ratt langsiktig fix ar ett nivamatt som spanner skalan (lotus dB-fonster), inte en lagre
         // troskel - den har raden gor bara poolen atkomlig under tiden.
-        const loThr = Number(process.env.DMX_TIER_LO ?? 0.22), hiThr = Number(process.env.DMX_TIER_HI ?? 0.55);
+        const loThr = TIER_LO, hiThr = TIER_HI;   // env lases en gang (modulniva), inte per ruta
         // TIER-HYSTERES: utan den flaxar tiern så fort intensiteten pendlar kring en
         // gräns → tierChanged blir sann om och om → effektbyte varje minsta-hålltid
         // (mätt: byte var 8.0s spikrakt). Kräv att man går TYDLIGT förbi gränsen för
@@ -1300,7 +1314,6 @@ export class EffectEngine {
         //      en stillsam refräng och hållit tillbaka en väldig vers — fel åt båda
         //      hållen. Etiketten far darfor styra IDENTITET (samma look aterkommer)
         //      och NAR bytet sker (sektionsgransen), men inte hur starkt det lyser.
-        const part = this.memPart || (SECTION_SWITCH && liveSec && liveSec !== 'intro' ? 'live:' + liveSec : undefined);   // identitet aven utan latminne
         const tierS = tier;
         // Ny låt → glöm förra låtens looker.
         if (this.memSongId !== this.partLookSong) { this.partLook.clear(); this.partLookSong = this.memSongId; }
@@ -1308,6 +1321,9 @@ export class EffectEngine {
         const secEntry = SECTION_UNIT && this.pendingSecSwitch && secOldEnough && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
         if ((!inBuild || buildEntry || secEntry) && (dropSwitch || miniSwitch || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false;
+        // (skrapjakten 10-01: enabled/part skapades forr pa varje ruta men anvands bara har, i bytet)
+        const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
+        const part = this.memPart || (SECTION_SWITCH && liveSec && liveSec !== 'intro' ? 'live:' + liveSec : undefined);   // identitet aven utan latminne
         if (charShift) { this.charShiftUntil = 0; console.log('[dirigent] karaktarsskifte i laten -> byter look'); }
         this.lastSmartTier = tierName;
         this.lastHalvedForSwitch = this.pulseHalved;
@@ -1608,7 +1624,7 @@ export class EffectEngine {
       const tauMs = LIVE_ANCHOR_S * 1000;
       if (frame.level > INPUT_OFF_LEVEL && Number.isFinite(wdb) && wdb > -100) {
         const nowMs = performance.now();
-        if (this.liveAnchor === undefined) { this.liveAnchor = wdb; this.liveFastUntil = nowMs + LIVE_START_FAST_S * 1000; }
+        if (Number.isNaN(this.liveAnchor)) { this.liveAnchor = wdb; this.liveFastUntil = nowMs + LIVE_START_FAST_S * 1000; }
         const up = wdb > this.liveAnchor;
         // SNABBT BARA UPPAT (ladan 19:58: 'lyser mycket aven nar laten blir tystare'): snabbt nerat gjorde ett tyst parti
         // till det nya normala pa 12 s. Nerat foljer ankaret bara langsamt (tau), och annu langsammare i low/break (x2).
@@ -1620,7 +1636,7 @@ export class EffectEngine {
         const a = 1 - Math.exp(-dtMs / (fast ? tauMs / 10 : up ? tauMs * 3 : quietSec ? tauMs * 2 : tauMs));
         this.liveAnchor += a * (wdb - this.liveAnchor);
         if (LIVE_ANCHOR_DROP_DB > 0) {
-          this.liveAnchorMax = this.liveAnchorMax === undefined || this.liveAnchor > this.liveAnchorMax ? this.liveAnchor : this.liveAnchorMax - dtMs * LIVE_ANCHOR_MAX_DECAY / 1000;
+          this.liveAnchorMax = Number.isNaN(this.liveAnchorMax) || this.liveAnchor > this.liveAnchorMax ? this.liveAnchor : this.liveAnchorMax - dtMs * LIVE_ANCHOR_MAX_DECAY / 1000;
           if (this.liveAnchor < this.liveAnchorMax - LIVE_ANCHOR_DROP_DB) this.liveAnchor = this.liveAnchorMax - LIVE_ANCHOR_DROP_DB;
         }
         const top = this.liveAnchor + LIVE_OFFSET_DB;
@@ -1680,8 +1696,8 @@ export class EffectEngine {
       // kausal rang (0..1) av 4 s-medel for tre nivamatt, mot laten hittills; ny lat (analysatorn nollar till intro) -> ny historik
       if (frame.section === 'intro' && this.rkPrevSec !== 'intro' && this.rkPrevSec !== '') { this.rkHist = [[], [], []]; }
       this.rkPrevSec = frame.section;
-      const sa = frame.specAbs as any; const vals = [frame.midHiDb, frame.bodyDb, sa ? (sa.treble ?? 0) + (sa.air ?? 0) : 0];
-      if (now - this.rkLastMs >= 250 && vals.every((v) => Number.isFinite(v))) {
+      const sa = frame.specAbs as any; const vals = this.rkVals; vals[0] = frame.midHiDb; vals[1] = frame.bodyDb; vals[2] = sa ? (sa.treble ?? 0) + (sa.air ?? 0) : 0;
+      if (now - this.rkLastMs >= 250 && Number.isFinite(vals[0]) && Number.isFinite(vals[1]) && Number.isFinite(vals[2])) {
         this.rkLastMs = now; let r = 0;
         for (let k = 0; k < 3; k++) {
           const w = this.rkWin[k]; w.push(vals[k]); if (w.length > 16) w.shift(); const m = w.reduce((x, y) => x + y, 0) / w.length;
@@ -1698,11 +1714,11 @@ export class EffectEngine {
     const md = SECTION_SWITCH ? Math.min(1.2, md0 * dynGain) : md0;   // standard: orort
     // HEARTBEAT: envelopen (kontraktet). ceiling = md utan tystnadsgrinden (drive), som appliceras separat pa ALLA effekter.
     const hbPulse = (this.cfg.beatPulse && this.beatMulNow > BEAT_MIN) ? Math.min(1, (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN)) : 0;
-    const hbEnvelope: Envelope = { ceiling: drive > 1e-6 ? Math.min(1.2, md / drive) : 0, pulse: hbPulse, pulseDepth: Math.min(1, Math.max(0, HEARTBEAT_DEPTH * this.beatTrust)) };
+    const hbEnvelope = this.hbEnv; hbEnvelope.ceiling = drive > 1e-6 ? Math.min(1.2, md / drive) : 0; hbEnvelope.pulse = hbPulse; hbEnvelope.pulseDepth = Math.min(1, Math.max(0, HEARTBEAT_DEPTH * this.beatTrust));
     const wantCalmNow = frame.breaking || (SECTION_SWITCH && (frame.section === 'break' || frame.section === 'low'));
     const hbBase = modulateOf(effMode);
-    const hbFlags: ModulateFlags = { energy: hbBase.energy || wantCalmNow, pulse: hbBase.pulse && (this.beatTrust >= HEARTBEAT_TRUST || ENERGY_FB) };   // ENERGY_FB: transientpulsen far passera utan las   // dirigentens overstyrning
-    this.hbLast = { ceiling: hbEnvelope.ceiling, pulse: hbEnvelope.pulse, depth: hbEnvelope.pulseDepth, energy: hbFlags.energy, pulseOn: hbFlags.pulse };
+    const hbFlags = this.hbFl; hbFlags.energy = hbBase.energy || wantCalmNow; hbFlags.pulse = hbBase.pulse && (this.beatTrust >= HEARTBEAT_TRUST || ENERGY_FB);   // ENERGY_FB: transientpulsen far passera utan las   // dirigentens overstyrning
+    { const hl = this.hbLast; hl.ceiling = hbEnvelope.ceiling; hl.pulse = hbEnvelope.pulse; hl.depth = hbEnvelope.pulseDepth; hl.energy = hbFlags.energy; hl.pulseOn = hbFlags.pulse; }
 
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
@@ -1750,14 +1766,12 @@ export class EffectEngine {
     // NU ur dubbel-FFT:ns separerade, per-band-AGC-spektrum i stället för det grova
     // 512-trebandet → renare, mer musikaliskt per-lampa-svar som alltid nyttjar range.
     const s = frame.spec;
-    const bands = [
-      Math.max(s.kick, s.bass),                                       // "bass": låg-end (kick+bas)
-      Math.max(s.lowMid, s.mid),                                      // "mid": röst/synth/virvel
-      Math.max(s.treble, s.air),                                      // "treble": hi-hats/cymbaler/luft
-      Math.min(1, Math.max(s.kick, frame.onset.kick) * 0.6 + kickEnv * 0.6),  // "kick": transient
-      Math.max(0, (0.5 - audio) * 2) * 0.6,                           // "low": lugn glöd när tyst, ur vägen när högt
-    ];
-    const BAND_IDX = { bass: 0, mid: 1, treble: 2, kick: 3, low: 4 } as const;
+    const bands = this.bandsBuf;
+    bands[0] = Math.max(s.kick, s.bass);                                       // "bass": låg-end (kick+bas)
+    bands[1] = Math.max(s.lowMid, s.mid);                                      // "mid": röst/synth/virvel
+    bands[2] = Math.max(s.treble, s.air);                                      // "treble": hi-hats/cymbaler/luft
+    bands[3] = Math.min(1, Math.max(s.kick, frame.onset.kick) * 0.6 + kickEnv * 0.6);  // "kick": transient
+    bands[4] = Math.max(0, (0.5 - audio) * 2) * 0.6;                           // "low": lugn glöd när tyst, ur vägen när högt
     // DRUM-KIT onset-envelopes: nu FÄRDIGBERÄKNADE i analysern PÅ HOP-TAKT (375Hz)
     // → varje anslag fångas, aldrig missat mellan två render-frames. Effekten är en
     // ren konsument. (Flyttat hit; tau 60/110/150ms bevarade i analyser.ts.)
@@ -1828,18 +1842,14 @@ export class EffectEngine {
     // effekter. Kanalerna maskas ur ballistiken längre ner (samma spår som
     // strobe) så pulser inte tonas ut och sätter fixtures i mellanhastigheter.
     const drives = effect?.drives;
-    const has = (r: ChannelRole) => drives ? drives.includes(r) : false;
-    // EXAKT (EffectDef.exact): effektens onskemal ar hela vardet - inget motorgolv. uvpuls vill ha UV AV mellan slagen.
-    const exact = (r: ChannelRole) => !!effect?.exact?.includes(r);
-    const clamp255 = (x: number) => x < 0 ? 0 : x > 255 ? 255 : Math.round(x);
-    const specialty = {
-      hazer:   has("hazer")   ? clamp255(exact("hazer") ? wantHazer * 255 : Math.max(140 + audio * 60, wantHazer * 255)) : 0,
-      uv:      has("uv")      ? clamp255(exact("uv") ? wantUv * 255 : Math.max(180 * md, wantUv * 255)) : 0,
-      blinder: has("blinder") ? clamp255(exact("blinder") ? wantBlinder * 255 : Math.max(kickEnv * 255, this.dropEnv > 0.6 ? 255 : 0, wantBlinder * 255)) : 0,
-      strobe:  has("strobe")  ? clamp255(exact("strobe") ? wantStrobe * 255 : Math.max(effMode === "strobe" ? 210 : (rs ? 220 : 0), wantStrobe * 255)) : 0,
-      laser:   has("laser")   ? clamp255(Math.max(180 + audio * 75, wantLaser * 255)) : 0,
-      co2:     has("co2")     ? clamp255(Math.max(this.dropEnv > 0.85 ? 255 : 0, wantCo2 * 255)) : 0,
-    };
+    // (skrapjakten 10-01: has/exact/clamp255 var tre closures + ett nytt objekt per ruta; nu modulfunktioner + this.specBuf)
+    const specialty = this.specBuf;
+    specialty.hazer   = drivesHas(drives, "hazer")   ? clamp255(exactHas(effect, "hazer") ? wantHazer * 255 : Math.max(140 + audio * 60, wantHazer * 255)) : 0;
+    specialty.uv      = drivesHas(drives, "uv")      ? clamp255(exactHas(effect, "uv") ? wantUv * 255 : Math.max(180 * md, wantUv * 255)) : 0;
+    specialty.blinder = drivesHas(drives, "blinder") ? clamp255(exactHas(effect, "blinder") ? wantBlinder * 255 : Math.max(kickEnv * 255, this.dropEnv > 0.6 ? 255 : 0, wantBlinder * 255)) : 0;
+    specialty.strobe  = drivesHas(drives, "strobe")  ? clamp255(exactHas(effect, "strobe") ? wantStrobe * 255 : Math.max(effMode === "strobe" ? 210 : (rs ? 220 : 0), wantStrobe * 255)) : 0;
+    specialty.laser   = drivesHas(drives, "laser")   ? clamp255(Math.max(180 + audio * 75, wantLaser * 255)) : 0;
+    specialty.co2     = drivesHas(drives, "co2")     ? clamp255(Math.max(this.dropEnv > 0.85 ? 255 : 0, wantCo2 * 255)) : 0;
 
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
@@ -1854,7 +1864,8 @@ export class EffectEngine {
         ctx.want.strobe = undefined; ctx.want.blinder = undefined;
         ctx.want.uv = undefined; ctx.want.laser = undefined; ctx.want.fog = undefined;
         ctx.want.hazer = undefined; ctx.want.co2 = undefined;
-        ctx.band = fx?.bands?.length ? Math.max(...fx.bands.map((b) => bands[BAND_IDX[b]])) : bands[i % bands.length];
+        if (fx?.bands?.length) { let mb = -Infinity; for (let k = 0; k < fx.bands.length; k++) mb = Math.max(mb, bands[BAND_IDX[fx.bands[k]]]); ctx.band = mb; }   // = Math.max(...fx.bands.map(...)) utan spread/closure
+        else ctx.band = bands[i % bands.length];
         rgb = effect ? effect.render(ctx) : [0, 0, 0];
         // EFFEKTENS ÖNSKEMÅL. Den vet sin egen dramaturgi bäst; motorn avgör om det
         // blir av (fixturen måste ha rollen, och rök går genom hårdvaruskyddet).
@@ -1939,7 +1950,7 @@ export class EffectEngine {
     // skapa ett objekt i den heta postprocess-loopen.
     if (frame.level < 0.35 && Date.now() - this.lowLogAt > 1500) {
       this.lowLogAt = Date.now();
-      console.log(
+      if (LOG_ON) console.log(   // strangen byggs bara nar loggen ar pa (DMX_QUIET=0)
         `[lagniva] niva ${frame.level.toFixed(3)} vu ${this.vu.toFixed(2)} tak ${ceilMul.toFixed(2)}` +
         ` puls ${this.beatMulNow.toFixed(2)} drive ${this.silenceGate.toFixed(2)} md ${md.toFixed(2)}` +
         ` intensitet ${frame.intensity.toFixed(2)} konf ${frame.bpmConfidence.toFixed(2)}` +

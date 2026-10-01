@@ -23,6 +23,9 @@ export class DmxSender {
   // släppt bufferten (kärnan har kopierat ut den) innan vi skriver över den nästa
   // frame. INFÖR ALDRIG en send-kö utan att först ge varje kö-post en egen buffert.
   private outBuf = Buffer.alloc(514);
+  /** Vyn som skrivs (header + n kanaler) - skapas bara nar n andras (skrapjakten 10-01: forr tva nya vyer per ram). */
+  private outView: Buffer = this.outBuf.subarray(0, 2);
+  private outN = -1;
 
   constructor(private sockPath = "/run/dmx.sock") {
     this.connect();
@@ -73,8 +76,11 @@ export class DmxSender {
     const n = Math.max(24, Math.min(512, slots | 0));
     this.outBuf[0] = n & 0xff;
     this.outBuf[1] = (n >> 8) & 0xff;
-    this.outBuf.set(universe.subarray(0, n), 2);
-    this.sock.write(this.outBuf.subarray(0, 2 + n));   // view, ingen kopia — säker pga guarden ovan
+    // = outBuf.set(universe.subarray(0, n), 2) utan ny vy: kopiera hogst universe.length, resten ororda som forr
+    const m = n < universe.length ? n : universe.length;
+    for (let i = 0; i < m; i++) this.outBuf[2 + i] = universe[i];
+    if (n !== this.outN) { this.outN = n; this.outView = this.outBuf.subarray(0, 2 + n); }
+    this.sock.write(this.outView);   // samma vy over outBuf, ingen kopia — säker pga guarden ovan
   }
 
   close() { this.closed = true; this.sock?.destroy(); this.sock = null; }
