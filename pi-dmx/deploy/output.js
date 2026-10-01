@@ -40,6 +40,7 @@ const CAL_PMIN = Number(process.env.DMX_CAL_PMIN ?? 270); // tandgransen DIM x f
 const CAL_DMAX = Number(process.env.DMX_CAL_DMAX ?? 127); // DIM full (>= 128 = lampans fulllage)
 const CAL_CMAX = Number(process.env.DMX_CAL_CMAX ?? 120); // farg full
 const CAL_PMAX = CAL_DMAX * CAL_CMAX;
+const CAL_GAMMA = Number(process.env.DMX_CAL_GAMMA ?? 1); // < 1 lyfter mitten: showens typiska B 0,1-0,4 landade i den doda nedre delen (ladan 10-01)
 const CAL_BMIN = Number(process.env.DMX_CAL_BMIN ?? 0.002); // under detta = slackt
 const HOLD_MS = 120;
 /** KULORLYFT (2026-09-23, agaren i ladan: "lamporna kor nastan hela tiden med alla LED R G B paslagna ... kravet ar ju bara att EN
@@ -220,7 +221,7 @@ export class FixtureOutput {
                 }
                 const B = (dimCh >= 0 ? dimRaw / 255 : 1) * (mx / 255) * master;
                 const lit = B > CAL_BMIN;
-                const P = lit ? CAL_PMIN * Math.pow(CAL_PMAX / CAL_PMIN, Math.min(1, B)) : 0;
+                const P = lit ? CAL_PMIN * Math.pow(CAL_PMAX / CAL_PMIN, Math.pow(Math.min(1, B), CAL_GAMMA)) : 0;
                 const dimOut = !lit ? 0 : dimCh >= 0 ? Math.max(1, Math.min(CAL_DMAX, Math.round(Math.sqrt(P * CAL_DMAX / CAL_CMAX)))) : 0;
                 const cTop = !lit ? 0 : dimCh >= 0 ? Math.min(CAL_CMAX, P / dimOut) : Math.min(CAL_CMAX, P / CAL_DMAX);
                 for (let i = 0; i < fast.roles.length; i++) {
