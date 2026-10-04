@@ -10,7 +10,12 @@ import fastifyStatic from "@fastify/static";
 import fastifyWebsocket from "@fastify/websocket";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { spawn, execFileSync } from "node:child_process";
+import { spawn, execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { isLogOn, setLogOn } from "./quiet.js";
+// 2026-10-04 (som lotus): git/nmcli asynkront - den synkrona varianten holl showens huvudtrad tills kommandot var klart nar
+// nagon oppnade uppdaterings- eller wifi-panelen. Utan skal (nmcli far SSID/losenord fran anvandaren).
+const execFileP = promisify(execFile);
 import { readFileSync, existsSync, writeFileSync, copyFileSync } from "node:fs";
 import { fixtureRoles } from "./config.js";
 import { applyMood, applyIntensity, isMood } from "./moods.js";
@@ -172,6 +177,15 @@ export async function startServer(deps, port = 80, tls) {
     // "vad hände de senaste minuterna" utan SSH. Version läses en gång vid start
     // (PKG_VERSION), logg är en ring­buffert i minnet (se healthLog.ts).
     app.get("/api/version", async () => ({ version: PKG_VERSION }));
+    // LOGGBRYTAREN (2026-10-04, samma som lotus): PUT {enabled:true|false} slar console.log pa/av utan omstart; startlaget = DMX_QUIET.
+    // record finns inte har - inspelaren laddas bara med DMX_RECORDER=1 (som LOTUS_RECORDER).
+    app.get("/api/debug/verbose", async () => ({ enabled: isLogOn(), record: false }));
+    app.put("/api/debug/verbose", async (req) => {
+        const on = (req.body ?? {}).enabled === true;
+        setLogOn(on);
+        console.warn(`[debug] felsokningslogg ${on ? "PA" : "AV"}`);
+        return { enabled: isLogOn(), record: false };
+    });
     app.get("/api/health-log", async () => ({
         version: PKG_VERSION,
         now: Date.now(),
@@ -238,11 +252,10 @@ export async function startServer(deps, port = 80, tls) {
     // Override with PI_DMX_REPO=/path if you cloned elsewhere.
     const REPO = process.env.PI_DMX_REPO ?? "/root/pi-dmx-src";
     const UPDATE_LOG = "/var/log/pi-dmx-update.log";
-    const gitInfo = () => {
+    const git = async (...args) => (await execFileP("git", ["-C", REPO, ...args], { encoding: "utf8" })).stdout.trim();
+    const gitInfo = async () => {
         try {
-            const sha = execFileSync("git", ["-C", REPO, "rev-parse", "--short", "HEAD"], { encoding: "utf8" }).trim();
-            const msg = execFileSync("git", ["-C", REPO, "log", "-1", "--pretty=%s"], { encoding: "utf8" }).trim();
-            const date = execFileSync("git", ["-C", REPO, "log", "-1", "--pretty=%cI"], { encoding: "utf8" }).trim();
+            const [sha, msg, date] = await Promise.all([git("rev-parse", "--short", "HEAD"), git("log", "-1", "--pretty=%s"), git("log", "-1", "--pretty=%cI")]);
             return { sha, msg, date, repo: REPO };
         }
         catch (e) {
@@ -253,7 +266,7 @@ export async function startServer(deps, port = 80, tls) {
         const log = existsSync(UPDATE_LOG)
             ? readFileSync(UPDATE_LOG, "utf8").split("\n").slice(-40).join("\n")
             : "";
-        return { ...gitInfo(), log };
+        return { ...(await gitInfo()), log };
     });
     app.post("/update", async (_req, reply) => {
         // Detach via systemd-run so the install.sh restart of audio-dmx-engine
@@ -316,10 +329,10 @@ export async function startServer(deps, port = 80, tls) {
     // autoconnect-priority: the user's phone hotspot (200, internet for updates
     // and online features) wins over the own AP "pi-dmx" (100, offline gigs).
     const HOTSPOT_CON = "phone-hotspot";
-    const nmcli = (...args) => execFileSync("nmcli", args, { encoding: "utf8" }).trim();
-    const hotspotSsid = () => {
+    const nmcli = async (...args) => (await execFileP("nmcli", args, { encoding: "utf8" })).stdout.trim();
+    const hotspotSsid = async () => {
         try {
-            const ssid = nmcli("-g", "802-11-wireless.ssid", "con", "show", HOTSPOT_CON);
+            const ssid = await nmcli("-g", "802-11-wireless.ssid", "con", "show", HOTSPOT_CON);
             return ssid || null;
         }
         catch {
@@ -328,9 +341,9 @@ export async function startServer(deps, port = 80, tls) {
     };
     app.get("/wifi/status", async () => {
         try {
-            const active = nmcli("-t", "-f", "NAME,DEVICE", "con", "show", "--active")
+            const active = (await nmcli("-t", "-f", "NAME,DEVICE", "con", "show", "--active"))
                 .split("\n").find((l) => l.endsWith(":wlan0"))?.split(":")[0] ?? null;
-            return { active, apCon: active === "pi-dmx-ap", hotspotSsid: hotspotSsid() };
+            return { active, apCon: active === "pi-dmx-ap", hotspotSsid: await hotspotSsid() };
         }
         catch (e) {
             return { error: e.message };
@@ -346,13 +359,13 @@ export async function startServer(deps, port = 80, tls) {
             return reply.code(400).send({ error: "Lösenord måste vara 8–63 tecken (eller tomt för öppet nät)" });
         try {
             try {
-                nmcli("con", "delete", HOTSPOT_CON);
+                await nmcli("con", "delete", HOTSPOT_CON);
             }
             catch { /* didn't exist */ }
-            nmcli("con", "add", "type", "wifi", "ifname", "wlan0", "con-name", HOTSPOT_CON, "ssid", ssid, "autoconnect", "yes");
-            nmcli("con", "modify", HOTSPOT_CON, "connection.autoconnect-priority", "200");
+            await nmcli("con", "add", "type", "wifi", "ifname", "wlan0", "con-name", HOTSPOT_CON, "ssid", ssid, "autoconnect", "yes");
+            await nmcli("con", "modify", HOTSPOT_CON, "connection.autoconnect-priority", "200");
             if (password !== "") {
-                nmcli("con", "modify", HOTSPOT_CON, "802-11-wireless-security.key-mgmt", "wpa-psk", "802-11-wireless-security.psk", password);
+                await nmcli("con", "modify", HOTSPOT_CON, "802-11-wireless-security.key-mgmt", "wpa-psk", "802-11-wireless-security.psk", password);
             }
             return { saved: true, ssid };
         }
@@ -361,7 +374,7 @@ export async function startServer(deps, port = 80, tls) {
         }
     });
     app.post("/wifi/hotspot/connect", async (_req, reply) => {
-        if (!hotspotSsid())
+        if (!(await hotspotSsid()))
             return reply.code(400).send({ error: "Ingen hotspot sparad" });
         // Detached: switching wlan0 away from the AP kills this HTTP connection,
         // so fire-and-forget and let the client show its own guidance.
@@ -371,7 +384,7 @@ export async function startServer(deps, port = 80, tls) {
     });
     app.delete("/wifi/hotspot", async (_req, reply) => {
         try {
-            nmcli("con", "delete", HOTSPOT_CON);
+            await nmcli("con", "delete", HOTSPOT_CON);
             return { deleted: true };
         }
         catch (e) {

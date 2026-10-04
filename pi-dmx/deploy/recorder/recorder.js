@@ -196,6 +196,7 @@ export class Recorder {
     isEnabled() { return this.enabled; }
     setEnabled(on) {
         this.enabled = on;
+        this.enablePreroll(on); // 2026-10-04: forbufferten (48 kHz kopiering per sampel) bara nar fangster kan ske
         if (this.cfg.enabledFile)
             import('node:fs/promises').then((fsp) => fsp.writeFile(this.cfg.enabledFile, JSON.stringify({ enabled: on, at: Date.now() }))).catch(() => { });
         this.log(`[tempo] fangster ${on ? 'PA' : 'AV'} (capture-enabled)`);

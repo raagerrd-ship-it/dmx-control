@@ -11,6 +11,7 @@
  * saved back (debounced) whenever anything changes it.
  */
 
+import { isLogOn } from "./quiet.js";   // FORST: tystar console.log innan ovriga moduler hinner logga (DMX_QUIET)
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { AudioCapture } from "./audio.js";
@@ -37,9 +38,7 @@ import { EFFECT_KEYS, EFFECT_MAP } from "./effects/registry.js";
 
 // DMX_QUIET=1 (ladan 2026-09-27, agaren: "inaktivera logg tills vi sager att vi ska kolla nagot"): tystar all console.log
 // (journald pa karna 0 kostar CPU och I/O under spelning). console.warn/error gar fortfarande igenom. Standard PA sedan 09-29; DMX_QUIET=0 slar pa loggen.
-const LOG_ON = process.env.DMX_QUIET === '0';   // periodiska diagnosrader byggs bara nar loggen ar pa (skrapjakten 10-01)
-if (!LOG_ON) {   // standard PA sedan 09-29 (ladan-provet lyft in i koden); DMX_QUIET=0 for felsokning
-  console.log = () => {}; console.info = () => {}; console.warn('[quiet] console.log avstangd (DMX_QUIET=1)'); }
+// Brytaren bor i quiet.ts (importerad forst, se ovan) och kan slas om under drift: PUT /api/debug/verbose (2026-10-04).
 
 // Physical button cycles through the fun modes (skips blackout so the button never kills the show).
 // Härlett ur effekt-registret (samma ordning) → ingen lista att hålla i synk.
@@ -243,7 +242,7 @@ capture.on("chunk", (samples: Float32Array) => {
     // vad ogat ser, i stallet for att bytet ska behova tas pa tro.
     if (frame.bpmConfidence > 0.05 && Date.now() - lastTrustLog > 4000) {
       lastTrustLog = Date.now();
-      if (LOG_ON) console.log(`[tillit] tempogram ${frame.bpmConfidence.toFixed(2)} · fasprediktion ${onBeatRate.toFixed(2)} · bpm ${frame.bpm}`);
+      if (isLogOn()) console.log(`[tillit] tempogram ${frame.bpmConfidence.toFixed(2)} · fasprediktion ${onBeatRate.toFixed(2)} · bpm ${frame.bpm}`);
     }
     // FASPREDIKTIONEN KRAVER KICKAR — OCH DE KOMMER INTE ALLTID.
     // MATT 2026-08-09 over 25 riktiga spar: 36 % gav NOLL kickar, medianen var

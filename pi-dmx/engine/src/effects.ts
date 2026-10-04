@@ -6,6 +6,7 @@
  * channel-layout is honored (RGB / RGBW / dimmer).
  */
 
+import { isLogOn } from "./quiet.js";
 import type { ChannelRole, EngineConfig, FixtureConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { FixtureOutput, type SpecialtyValues } from "./output.js";
@@ -336,7 +337,7 @@ const PULSE_GAP_MS = Number(process.env.DMX_PULSE_GAP_MS ?? 250);
 const CALM_FADE_S = Number(process.env.DMX_CALM_FADE_S ?? 0.6);
 const CALM_ATTACK = process.env.DMX_CALM_ATTACK === '1';   // lang attack i lugna partier (av sedan 09-27: uppstegning ska ga direkt)   // se 'LUGNA PARTIER = MJUKA OVERGANGAR'
 // LOGGEN: index.ts tystar console.log nar DMX_QUIET != '0' (standard). Periodiska diagnosrader byggs da inte alls (skrapjakten 10-01).
-const LOG_ON = process.env.DMX_QUIET === '0';
+// (brytaren under drift: quiet.ts / PUT /api/debug/verbose)
 const TIER_LO = Number(process.env.DMX_TIER_LO ?? 0.22), TIER_HI = Number(process.env.DMX_TIER_HI ?? 0.55);   // se DMX_TIER_LO/HI i render
 const BEAT_TRUST_FLOOR = 0.75;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 // SKRAPJAKTEN 10-01 (render 200 Hz): hjalpare och konstanter som forr skapades PER RENDER (closures, objektliteraler) ligger
@@ -1969,7 +1970,7 @@ export class EffectEngine {
     // skapa ett objekt i den heta postprocess-loopen.
     if (frame.level < 0.35 && Date.now() - this.lowLogAt > 1500) {
       this.lowLogAt = Date.now();
-      if (LOG_ON) console.log(   // strangen byggs bara nar loggen ar pa (DMX_QUIET=0)
+      if (isLogOn()) console.log(   // strangen byggs bara nar loggen ar pa (DMX_QUIET=0)
         `[lagniva] niva ${frame.level.toFixed(3)} vu ${this.vu.toFixed(2)} tak ${ceilMul.toFixed(2)}` +
         ` puls ${this.beatMulNow.toFixed(2)} drive ${this.silenceGate.toFixed(2)} md ${md.toFixed(2)}` +
         ` intensitet ${frame.intensity.toFixed(2)} konf ${frame.bpmConfidence.toFixed(2)}` +
