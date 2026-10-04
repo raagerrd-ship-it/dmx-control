@@ -116,6 +116,10 @@ const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);
  *  ladan 2026-09-12 19:50-19:54: minidroppen fyrade 24-400 ms FORE 4 av 5 riktiga drops (lyft-detektorn har lagre
  *  krav och reagerar pa forsta bas-slaget) -> ljuset hoppade tidigt och smallen kom sedan ("nagra 100 ms for tidig"). */
 const MINI_DELAY_MS = Number(process.env.MINI_DELAY_MS ?? 500);
+/** ROK-HUNGER (agaren i ladan 2026-10-04: "har rokmaskinen inte kort pa kanske 5 min, gor det enklare att kora en puff"):
+ *  efter DMX_FOG_HUNGRY_S utan puff racker en minidrop eller att musiken gar in i en high-sektion (i stallet for bara en
+ *  riktig drop). Cooldownen och varmeskyddet i output.fogTick galler som forut. 0 = av. */
+const FOG_HUNGRY_S = Number(process.env.DMX_FOG_HUNGRY_S ?? 300);
 /** TYDLIG BASGANG -> TOGGLE-EFFEKTER (agaren 2026-09-12: "tydlig basgang = inner/outer; inte alltid men foredragen";
  *  ladan 2026-09-21: "kanns inte som den aktiverar den vid basgang - gor det tydligare att den skall valja dom").
  *  Forr: profile.bass (lag-endens ANDEL, 8 s trog) >= 0,4, bara innerouter, bara med DMX_HALVE_SHOW, tva av tre byten.
@@ -428,6 +432,7 @@ export class EffectEngine {
   private ambient = 0;   // 0 = spelar, 1 = varm vila (efter ~2.5s tystnad)
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
+  private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
   private lastMiniCount = 0; private miniBangUntil = 0; private miniPendingAt = 0;   // minidrop-flank + kort stot + fordrojd reaktion
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
@@ -2007,9 +2012,16 @@ export class EffectEngine {
       // och pågående-puff-spärren gäller fortfarande. Utan detta tappades knappen TYST inom 2 min
       // efter varje drop-rök (ladan 2026-09-04: bursts stod still, ingen feedback i UI:t).
       const manualFog = !!this.cfg.fogTrigger;
-      const wantBurst = (dropHitRaw && fog.onDrop) || manualFog || wantFogFx;
+      // HUNGER: lange sedan senaste puff -> aven en minidrop eller intrade i high-sektion far bli rok.
+      const sec = frame.section ?? '';
+      const highEntry = sec === 'high' && this.fogLastSec !== '' && this.fogLastSec !== 'high';
+      if (sec) this.fogLastSec = sec;
+      const hungry = FOG_HUNGRY_S > 0 && fog.onDrop && nowWall - this.lastFogWall > FOG_HUNGRY_S * 1000;
+      const wantBurst = (dropHitRaw && fog.onDrop) || manualFog || wantFogFx || (hungry && (miniHit || highEntry));
       if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;   // engångs-flagga
       const spraying = this.out.fogTick(nowWall, _dtT * 1000, wantBurst, fog, manualFog);
+      if (spraying && !this.fogWasSpraying) this.lastFogWall = nowWall;   // puffen startade (vilken orsak som helst)
+      this.fogWasSpraying = spraying;
       if (fog.enabled) this.out.writeFog(this.universe, fog.address, spraying ? fog.level : 0);
     }
     return this.universe;
