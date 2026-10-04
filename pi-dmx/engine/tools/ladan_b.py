@@ -6,6 +6,7 @@ r"""LADAN B (2026-09-30, resursgranskningen): systemfixar pa Pi-DMX som kraver e
   4. systemd/journald-zz-dmx.conf            -> journalen i RAM (ingen SD-slitning), 8 MB.
   5. triggerhappy, cron (inga jobb) och getty@tty1 (ingen skarm) av. timesyncd far vara kvar: hotspoten ger internet
      under besoken och klockan behovs ratt i loggarna.
+  6. systemd/<timer>.timer.d.natt.conf      -> apt/man-db/logrotate/fstrim/e2scrub bara 03-06, Persistent=false (2026-10-04).
 Sedan reboot, vanta tills Pi:n svarar igen, och verifiera allt. Backup: cmdline.txt.bak-<ts> och alla ersatta filer .bak-<ts>.
 Ordning i ladan: forst `python tools\ladan.py` (koden), sedan `python tools\ladan_b.py --kor`.
   python tools\ladan_b.py          visar planen och nulaget, ror ingenting
@@ -21,6 +22,9 @@ MEASURE = '--mat' in sys.argv
 FILES = [('audio-dmx-engine.d.memory.conf', '/etc/systemd/system/audio-dmx-engine.service.d/memory.conf'),
          ('pi-dmx-watchdog.d.quiet.conf', '/etc/systemd/system/pi-dmx-watchdog.service.d/quiet.conf'),
          ('journald-zz-dmx.conf', '/etc/systemd/journald.conf.d/zz-dmx.conf')]
+# 6. (2026-10-04, portat fran lotus) Debians systemtimers bara 03-06 och utan ikappkorning vid uppstart (Persistent=false).
+FILES += [(f'{t}.timer.d.natt.conf', f'/etc/systemd/system/{t}.timer.d/natt.conf')
+          for t in ('logrotate', 'dpkg-db-backup', 'apt-daily', 'apt-daily-upgrade', 'man-db', 'fstrim', 'e2scrub_all')]
 FLAGS = 'cgroup_enable=memory cgroup_memory=1'
 CG = '/sys/fs/cgroup/system.slice/audio-dmx-engine.service'
 
