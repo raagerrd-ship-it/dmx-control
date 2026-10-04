@@ -191,6 +191,7 @@ export async function startServer(deps, port = 80, tls) {
         now: Date.now(),
         // Realtidsmått (chunk/render-fps, event-loop-lag, jitter, overruns, långa anrop).
         // Max-värden är peak SEDAN FÖRRA hämtningen — läsningen nollställer dem.
+        measuring: isLogOn(), // runtime/analyserCost mats bara med felsokning pa (PUT /api/debug/verbose, 2026-10-04) - annars star de still
         runtime: getRuntimeHealth(),
         analyserCost: getAnalyserCost(), // us/hop mot hop-budgeten - underlag for worker-beslutet (2026-09-22)
         events: getHealthLog(),

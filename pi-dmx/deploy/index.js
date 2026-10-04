@@ -187,14 +187,19 @@ if (process.env.DMX_RECORDER === "1") {
 const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
 const ringArg = { intensity: 0.5, blackout: false, beat: false };
 capture.on("chunk", (samples) => {
-    const t0 = performance.now();
+    // MATNING BARA VID FELSOKNING (2026-10-04, agaren): runtimeHealth ar ren diagnostik (/api/health-log); watchdogens /health
+    // bygger pa lastChunkAt och paverkas inte. PUT /api/debug/verbose {enabled:true} slar pa tidtagningen.
+    const diag = isLogOn();
+    const t0 = diag ? performance.now() : 0;
     if (AUDIO_CLOCK_ON)
         analyser.setAudioClockMs(audioChunks++ * HOP_MS);
     const frame = analyser.process(samples);
-    const anMs = performance.now() - t0;
-    health.noteSlowCall("analyser.process", anMs);
-    health.noteAnalyser(anMs); // kostnad mot hop-budgeten (avgor om DMX ocksa behover worker-delningen)
-    health.noteChunk();
+    if (diag) {
+        const anMs = performance.now() - t0;
+        health.noteSlowCall("analyser.process", anMs);
+        health.noteAnalyser(anMs); // kostnad mot hop-budgeten (avgor om DMX ocksa behover worker-delningen)
+        health.noteChunk();
+    }
     recorder?.push(samples); // inspelaren (AV utan DMX_RECORDER=1): samma hop som analysatorn
     latestFrame = frame;
     lastChunkAt = Date.now();
@@ -515,12 +520,15 @@ function probeSample(universe) {
 function renderAndSend() {
     if (!latestFrame)
         return; // inget ljud har någonsin kommit — inget att rendera
-    lastRenderMs = performance.now();
-    health.noteRender(lastRenderMs, RENDER_MS);
+    lastRenderMs = performance.now(); // FUNKTIONELL (fallback-ticken laser den) - alltid
+    const diag = isLogOn(); // halsomatningen bara vid felsokning (se chunk-hanteraren)
+    if (diag)
+        health.noteRender(lastRenderMs, RENDER_MS);
     const universe = effects.render(latestFrame);
     probeSample(universe);
     dmx.send(universe, curSlots);
-    health.noteSlowCall("render+dmx", performance.now() - lastRenderMs);
+    if (diag)
+        health.noteSlowCall("render+dmx", performance.now() - lastRenderMs);
     // Spara ramen så fallback-ticken har något att tona ned om ljudet dör.
     if (!lastUniverse || lastUniverse.length !== universe.length) {
         lastUniverse = new Uint8Array(universe.length);
@@ -673,7 +681,8 @@ capture.on("rebind", (n) => {
 capture.on("safe", (n) => logHealth("err", "audio", `ingen ljudinfångning efter ${n} försök — säkert läge, nytt försök varje minut`));
 capture.on("recovered", () => logHealth("info", "audio", "ljudinfångningen tillbaka — säkert läge avslutat"));
 // 1 Hz-sampling av hälsomåtten (event-loop-lag mäts som schemats egen försening).
-setInterval(() => health.sample(), 1000);
+setInterval(() => { if (isLogOn())
+    health.sample(); }, 1000); // diagnostik bara vid felsokning
 capture.start();
 // Shared mode cycler — used by both the physical button and the WS "cycleMode" message,
 // so UI and hardware follow the exact same path.
