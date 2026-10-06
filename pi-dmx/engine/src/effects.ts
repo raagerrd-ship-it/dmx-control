@@ -102,7 +102,14 @@ const SUBDIV_MIN_HOLD_MS = 10000;
  *  lugna partier, och får byta look när halveringen slår om. Ägaren 2026-09-12. */
 const HALVE_SHOW = process.env.DMX_HALVE_SHOW !== "0";   // standard PA sedan 09-27 (ladan)
 /** DMX_EFFECT_HEART: skalar effekternas EGNA hjartpuls (c.heart). 1 = som effektfilerna sager, 0 = av (A/B i ladan 09-27). */
-const EFFECT_HEART = Math.max(0, Math.min(2, Number(process.env.DMX_EFFECT_HEART ?? 1)));
+// STANDARD 1,4 sedan 2026-10-06 (live-prov i ladan 22:41, agaren: "mycket battre knyck, satt det som standard").
+// Bakgrund: nar det additiva hjartslagslyftet togs bort samma kvall foll riggens topp 5-9 % (matt med
+// tools/riseProbe.mjs: mono 184 -> 168, drift 155 -> 143) och agaren laste det som "riggen ar 100 ms efter".
+// Fordrojningen var MATT OFORANDRAD (170 -> 170 ms); det var styrkan som foll, inte tidpunkten. Lyftet gav bade
+// ljus OCH vithet, sa att lagga tillbaka ljus hade tagit tillbaka vitheten. I stallet fordjupas effekternas EGEN
+// puls: c.heart ger morkare MELLAN slagen, alltsa mer upplevd knyck utan att addera ljus och utan att rora
+// kuloren - och den bor inne i effekterna, dar agarens kontrakt sager att den hor hemma.
+const EFFECT_HEART = Math.max(0, Math.min(2, Number(process.env.DMX_EFFECT_HEART ?? 1.4)));
 /** DMX_CALM_FROM_BREAKING=1: lat ra frame.breaking (niva < 65 % av taket) tvinga lugn-poolen som fore 09-27. */
 const CALM_FROM_BREAKING = process.env.DMX_CALM_FROM_BREAKING === '1';
 /** DMX_GROUP_ALT: tvagrupperingen vaxlar jamn/udda <-> inre/yttre per look och var 32:e slag (0 = alltid jamn/udda). */
