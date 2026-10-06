@@ -52,6 +52,17 @@ const CAL_PMAX = CAL_DMAX * CAL_CMAX;
 const CAL_GAMMA = Number(process.env.DMX_CAL_GAMMA ?? 1);   // < 1 lyfter mitten: showens typiska B 0,1-0,4 landade i den doda nedre delen (ladan 10-01)
 const CAL_DIM_TAU_S = Number(process.env.DMX_CAL_DIM_TAU_S ?? 0.5);   // DIM:s trog (fladder), 0 = som forst
 const CAL_BMIN = Number(process.env.DMX_CAL_BMIN ?? 0.002);  // under detta = slackt
+/** B-REFERENS (2026-10-06). B = (dim/255) x (starkaste fargen/255) x master, dvs POLERINGEN gange EFFEKTENS styrka.
+ *  Arkitekturen (writeFixture): effekten skriver sin farg OCH sin styrka i r/g/b, dim skrivs pa fullt (m = 1), och
+ *  poleringen (ljustak, puls) drar ner dim efterat. Showen hamnar darfor pa dim ~0,35 x farg ~0,45 = B ~0,16, och
+ *  B kan i praktiken ALDRIG na 1 - taket gor sitt jobb. Kurvan P = PMIN x (PMAX/PMIN)^B mappade da hela
+ *  energivariationen till botten: B 0,1 -> P 404, B 0,4 -> P 1356, av ett tak pa 15 240 (nedersta 9 %).
+ *  LIVE-PROV 2026-10-06 20:29 med CAL_BREF = 1: agaren "blev nu mycket samre, foljer tex inte energi alls".
+ *  Bortagen 20:3x. Kodens egen kommentar vid CAL_GAMMA sa redan samma sak fran ladan 10-01 ("showens typiska
+ *  B 0,1-0,4 landade i den doda nedre delen") - men standarden lamnades pa 1, sa botemedlet var aldrig aktivt.
+ *  BREF normerar B mot showens VERKLIGA fullskala i stallet for mot en teoretisk etta: B_eff = min(1, B / BREF).
+ *  Matt BREF med tools/calProbe.mjs pa ladans inspelningar. 1 = som forr (och som forkastades). */
+const CAL_BREF = Math.max(0.01, Number(process.env.DMX_CAL_BREF ?? 1));
 const HOLD_MS = 120;
 /** KULORLYFT (2026-09-23, agaren i ladan: "lamporna kor nastan hela tiden med alla LED R G B paslagna ... kravet ar ju bara att EN
  *  kanal ar over tandpunkten"). Forr lyftes VARJE fargkanal > 0 till sin tandpunkt for sig - ett spar av gront och blatt i en rod
@@ -232,7 +243,8 @@ export class FixtureOutput {
           if (role === "dim") { dimCh = ch; dimRaw = universe[ch]; }
           else if (role === "r" || role === "g" || role === "b" || role === "w") { if (universe[ch] > mx) mx = universe[ch]; }
         }
-        const B = (dimCh >= 0 ? dimRaw / 255 : 1) * (mx / 255) * master;
+        const Braw = (dimCh >= 0 ? dimRaw / 255 : 1) * (mx / 255) * master;
+        const B = CAL_BREF === 1 ? Braw : Math.min(1, Braw / CAL_BREF);   // se CAL_BREF
         const lit = B > CAL_BMIN;
         const P = lit ? CAL_PMIN * Math.pow(CAL_PMAX / CAL_PMIN, Math.pow(Math.min(1, B), CAL_GAMMA)) : 0;
         // FLADDER (ladan 10-01): DIM och farg hoppade bada varje ruta; ett DIM-steg vid 17 ar 6 % och lampan avrundar produkten.
