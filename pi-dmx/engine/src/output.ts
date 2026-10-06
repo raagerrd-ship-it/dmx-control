@@ -174,7 +174,12 @@ export class FixtureOutput {
    * — vilket också var önskemålet "behåll gärna 20 % ljusstyrka".
    * @param room hur många DMX-steg över tändpunkten som minsta nivå ska ligga
    */
-  ensurePulseRoom(universe: Uint8Array, fixtures: FixtureConfig[], room: number): void {
+  /** Lyfter ljuskanaler till tandpunkt + `room` sa en multiplikativ puls har nagot att modulera nedat.
+   *  dimOnly=true: BARA dim-kanalen. Agarens regel 2026-10-06: "energilagret ska bara MINSKA R G B separat" —
+   *  och den har metoden ADDERAR ljus. Pa fargkanaler ar det ren vitning: en dampad rod pa 80 blev 80/60/60,
+   *  dvs nastan vitt, eftersom G och B lyftes fran ~1 till on+room = 60. Pulsen behover utrymme pa MASTERN,
+   *  dar det inte ror kuloren; ar en fargkanal mork ska pulsen inte ha nagot att modulera dar. */
+  ensurePulseRoom(universe: Uint8Array, fixtures: FixtureConfig[], room: number, dimOnly = false): void {
     // Vi kan iterera via this.fastFixtures här för snabbare lookup
     for (let f = 0; f < fixtures.length; f++) {
       const fx = fixtures[f];
@@ -185,6 +190,7 @@ export class FixtureOutput {
       for (let i = 0; i < fast.roles.length; i++) {
         const ch = base + i;
         if (ch < 0 || ch >= 512 || !this.light[ch]) continue;
+        if (dimOnly && this.dimCal[ch] !== 1) continue;   // farg ororda (se doc ovan)
         const v = universe[ch];
         if (v > 0 && v < min) universe[ch] = min;
       }

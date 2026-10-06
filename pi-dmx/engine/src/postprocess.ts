@@ -44,7 +44,11 @@ const FINAL_FADE_MAX_DT_S = Number(process.env.DMX_FINAL_FADE_MAX_DT_S ?? 0.0075
 
 /** Minsta mörker under ljuset (DMX-steg över tändpunkten) så hjärtslaget syns även
  *  i lugna effekter. 44 ⇒ en lampa med tändpunkt 16 lyser lägst på 60. */
-const PULSE_ROOM = 44;
+// DMX_PULSE_ROOM: hur hogt pulsutrymmet lyfter (DMX-steg over tandpunkten). DMX_PULSE_ROOM_DIM=0 later det
+// galla aven fargkanaler som forr — men da ADDERAS ljus per fargkanal, vilket vitnar: matt 2026-10-06 pa
+// ladans egen inspelning (tools/colorBench.mjs) nedan. Standard: bara DIM.
+const PULSE_ROOM = Number(process.env.DMX_PULSE_ROOM ?? 44);
+const PULSE_ROOM_DIM_ONLY = process.env.DMX_PULSE_ROOM_DIM !== '0';
 
 export class PostProcess {
   /** Ballistikens buffert — per kanal, i flyttal så decayn inte kvantiseras bort. */
@@ -100,7 +104,7 @@ export class PostProcess {
     //    Först ges ljuset utrymme att pulsa i: en lugn effekt kan ligga så nära
     //    tändpunkten att hela slaget klipps bort av kalibreringsgolvet.
     if (pulseActive && pulseMul < 0.999) {
-      out.ensurePulseRoom(universe, fixtures, PULSE_ROOM);
+      out.ensurePulseRoom(universe, fixtures, PULSE_ROOM, PULSE_ROOM_DIM_ONLY);
       out.scale(universe, pulseMul);
     }
 

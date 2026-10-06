@@ -55,6 +55,9 @@ for (let off = 0; off + HOP <= n && off < (startS + secs) * SR; off += HOP) {
 if (!frames.length) { say("inga rutor - kolla start/langd mot filens langd"); process.exit(2); }
 
 // ── 2. Kanalindex per lampa ur motorns egen rollkarta ────────────────────────────────────────────
+// LADANS KALIBRERING: armaturerna har cal {off:0, on:16}; defaultConfig har ingen. Tandpunkten satter bade
+// kalibreringsgolvet och pulsutrymmets troskel (on + room), sa utan den mater banken en annan rigg an ladans.
+const BARN_CAL = { off: 0, on: 16 };
 const probe = JSON.parse(JSON.stringify(defaultConfig));
 const lamps = probe.fixtures.map((fx) => {
   const roles = fixtureRoles(fx);
@@ -70,6 +73,7 @@ for (const e of EFFECTS) {
   // --bara-energi: inget hjartslag EFTER effekten (agaren 2026-10-06: "vi kor inte med heartbeat efter
   // effekten utan bara energi"). cfg.beatPulse grindar de fyra post-stallena (bm/beatMulNow, hbPulse,
   // BEAT_LIFT, pulseActive); effekternas EGEN puls (ctx.beatPulse, c.heart) satts separat och ar orord.
+  for (const fx of cfg.fixtures) fx.cal = { ...BARN_CAL };   // som ladan
   cfg.mode = e.key; cfg.beatPulse = !flag("--bara-energi"); cfg.master = 1; cfg.energyCeiling = true; cfg.energyDrivesMode = true;
   // MATFALLA: klockan far ALDRIG ga bakat over motorns konstruktion. Insamlingen lamnade performance.now()
   // vid fonstrets SLUT; konstrueras motorn da satter den sin lastRenderMs dit, och forsta renderingen (fonstrets
