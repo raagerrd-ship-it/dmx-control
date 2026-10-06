@@ -569,6 +569,11 @@ export class EffectEngine {
   private pendingSecSwitch = false;
   private charShiftUntil = 0;
   private charShiftWhy = 'karaktarsskifte';
+  /** DIAGNOSTIK (2026-10-06, natt-banken): VARFOR senaste look-bytet skedde, och hur manga byten som skett.
+   *  Skrivs bara - inget beslut i motorn laser dem, sa showen ar bit-identisk. 'dwell' betyder att klockan var
+   *  det ENDA skalet, alltsa ett byte utan musikalisk grund; alla andra varden ar nagot i laten. */
+  switchWhy = '';
+  switchCount = 0;
   private lastShowDropWall = 0;   // DMX_DROP_MIN_GAP_S   // noteCharShift: bytesskal giltigt 6 s               // SECTION_UNIT: sektionsgrans passerad men bytet blockerat (riser/MIN_HOLD) -> gor det sa fort det gar
   private prevSongLook = new Map<string, Mode>();  // SECTION_UNIT: forra latens look per sektionstyp (straffas sa nasta lat far en annan)
   private lastSmartTier = "";
@@ -1377,6 +1382,11 @@ export class EffectEngine {
         const secEntry = SECTION_UNIT && this.pendingSecSwitch && secOldEnough && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
         if ((!inBuild || buildEntry || secEntry) && (dropSwitch || miniSwitch || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false;
+        // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
+        this.switchWhy = dropSwitch ? 'drop' : miniSwitch ? 'minidrop' : charShift ? (this.charShiftWhy.startsWith('tempovaxling') ? 'tempo' : 'karaktar')
+          : (memSection || secEntry) ? 'sektion' : unitPhrase ? 'fras' : bassSwitch ? 'basgang'
+          : buildEntry ? 'build' : halvedChanged ? 'halvering' : tierChanged ? 'tier' : 'dwell';
+        this.switchCount++;
         // (skrapjakten 10-01: enabled/part skapades forr pa varje ruta men anvands bara har, i bytet)
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
         const part = this.memPart || (SECTION_SWITCH && liveSec && liveSec !== 'intro' ? 'live:' + liveSec : undefined);   // identitet aven utan latminne
