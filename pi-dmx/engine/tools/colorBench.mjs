@@ -74,6 +74,7 @@ for (const e of EFFECTS) {
   // effekten utan bara energi"). cfg.beatPulse grindar de fyra post-stallena (bm/beatMulNow, hbPulse,
   // BEAT_LIFT, pulseActive); effekternas EGEN puls (ctx.beatPulse, c.heart) satts separat och ar orord.
   for (const fx of cfg.fixtures) fx.cal = { ...BARN_CAL };   // som ladan
+  if (process.env.BENCH_CALM_DECAY) cfg.calmDecay = Number(process.env.BENCH_CALM_DECAY);   // isolera ballistikens utsmetning
   cfg.mode = e.key; cfg.beatPulse = !flag("--bara-energi"); cfg.master = 1; cfg.energyCeiling = true; cfg.energyDrivesMode = true;
   // MATFALLA: klockan far ALDRIG ga bakat over motorns konstruktion. Insamlingen lamnade performance.now()
   // vid fonstrets SLUT; konstrueras motorn da satter den sin lastRenderMs dit, och forsta renderingen (fonstrets

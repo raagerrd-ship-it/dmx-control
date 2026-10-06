@@ -24,6 +24,8 @@ export const rave: EffectDef = {
     // REFRANGEN AR TILLBAKA (2026-09-23): tanda gruppen far vit karna pa vaxlingen + UV pa slaget.
     const back = c.section === 'high' && c.repeatSim >= 0.92 && c.sectionIndex >= 2 ? gnista : 0;
     if (back > 0 && lit) c.want.uv = back;
-    return c.hsv(hue, lit ? 1 - Math.max(gnista * 0.5, entry * 0.6, back * 0.9) : 1, Math.min(1, v + entry * 0.6));
+    // Raven lever pa att de tva grupperna har MOTSATTA kulorer (pairBase +3); blixtrar de till vitt forsvinner
+    // just det som skiljer dem. Avmattningen halverad.
+    return c.hsv(hue, lit ? 1 - Math.max(gnista * 0.25, entry * 0.3, back * 0.4) : 1, Math.min(1, v + entry * 0.6));
   },
 };

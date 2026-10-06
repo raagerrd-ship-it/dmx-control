@@ -12,6 +12,6 @@ export const konfetti: EffectDef = {
     const decay = Math.max(0, 1 - c.beatFrac * 2.0);          // tona ut efter slaget
     const v = lit ? c.shaped(0.04, decay * (0.6 + c.audio * 0.5) + c.punch * 0.4) : c.punchFloor * 0.15;
     const entry = c.section === 'high' ? c.sectionEntry : 0;   // refrangens entre: ALLA poppar
-    return c.hsv(hue, 1 - entry * 0.5, Math.min(1, Math.max(v, entry * 0.9)));
+    return c.hsv(hue, 1 - entry * 0.25, Math.min(1, Math.max(v, entry * 0.9)));   // entren syns i ljuset, inte i avmattningen
   },
 };

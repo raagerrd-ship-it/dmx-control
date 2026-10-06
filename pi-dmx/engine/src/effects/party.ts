@@ -15,6 +15,8 @@ export const party: EffectDef = {
     // REFRANGEN AR TILLBAKA (2026-09-23): repeatSim >= 0,92 och minst tredje refrangen -> vit karna pa slaget + UV pa slaget.
     const back = c.section === 'high' && c.repeatSim >= 0.92 && c.sectionIndex >= 2 ? 1 : 0;
     if (back) c.want.uv = c.beatPulse;
-    return c.hsv(hue, 1 - Math.max(c.punch * 0.4, entry * 0.7, back * c.beatPulse * 0.6), Math.min(1, v + entry * 0.5));   // dunk → gnista mot vitt
+    // Dunken bars av `v` (pump) och entren av `v + entry*0.5`; avmattningen var en extra barare mot vitt.
+    // Halverad, och entren far mest eftersom en refrangentre AR en vit stot.
+    return c.hsv(hue, 1 - Math.max(c.punch * 0.2, entry * 0.35, back * c.beatPulse * 0.3), Math.min(1, v + entry * 0.5));   // dunk → gnista, kuloren kvar
   },
 };

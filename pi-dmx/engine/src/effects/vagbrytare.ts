@@ -17,6 +17,8 @@ export const vagbrytare: EffectDef = {
     const hue = c.mixedSector(barNo) / 6;
     const body = Math.exp(-d * d * 0.5) * (0.55 + c.audio * 0.45) + c.beatPulse * 0.15;
     const v = Math.min(1, 0.08 + body + crest * 0.7 + c.punch * 0.3 + c.sectionEntry * 0.5);
-    return c.hsv(hue, 1 - Math.max(crest * 0.9, c.punch * 0.3), v);
+    // Kammen PA ettan ska vara vitaktig - det ar effektens ide - men 0,9 gjorde varje takts etta nastan helt vit.
+    // 0,45 later den lasas som en ljus kam i latens kulor i stallet for som en vit blixt.
+    return c.hsv(hue, 1 - Math.max(crest * 0.45, c.punch * 0.2), v);
   },
 };

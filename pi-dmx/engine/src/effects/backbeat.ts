@@ -16,6 +16,8 @@ export const backbeat: EffectDef = {
     // (jamn/udda eller inre/yttre via c.grouping). Forut var backbeat helt uniform - pa fyra lampor oskiljbar fran pulse/party.
     const mine = c.group === (c.beatIdx & 1);
     const crack = d.snare * (mine ? 0.9 : 0.25);                    // virvelns smäll: hard pa min grupp, svag pa den andra
-    return c.hsv(hue, 1 - crack * 0.85, Math.min(1, body + crack));
+    // Virveln bars redan av ljuset (body + crack) OCH av grupphoppet (mine) - avmattningen var en tredje,
+    // overflodig barare som dessutom tog kuloren. 0,85 -> 0,3.
+    return c.hsv(hue, 1 - crack * 0.3, Math.min(1, body + crack));
   },
 };

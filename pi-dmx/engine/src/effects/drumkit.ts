@@ -21,7 +21,7 @@ export const drumkit: EffectDef = {
     const voice = c.count > 1 ? c.idx % 4 : -1;
     switch (voice) {
       case 0: return c.hsv(0.01, 1.00, hit(d.kick, 0.05));   // KICK  → röd dunk
-      case 1: return c.hsv(0.09, 0.20, hit(d.snare, 0.04));  // SNARE → varm-vit crack
+      case 1: return c.hsv(0.09, 0.45, hit(d.snare, 0.04));  // SNARE → varm crack (0,20 var urtvattat vitt)
       // HI-HAT: sat 0,35 snapptes till VITT av hsv (< 0,5 = vitt) -> lampa 1 och 2 var bada vita. Nu >= 0,5 = cyan, skild fran virveln.
       case 2: return c.hsv(0.53, 0.60, hit(d.hat, 0.02));    // HI-HAT→ isig cyan tick
       // BAS: drum.bass ar SUSTAINED -> lampa 3 lyste konstant magenta medan de andra punchade (agaren 09-27: "en lampa som

@@ -21,7 +21,8 @@ export const viska: EffectDef = {
     const kick = d.kick * (c.group === 0 ? 0.35 : 0.12);   // dov rod puls, tyngst pa ena gruppen
     const spark = Math.max(hat, snare, kick);
     const hue = spark === hat && hat > 0 ? 0.55 : spark === snare ? 0.10 : 0.02;   // iskall / varmvit / röd
-    const sat = hue === 0.10 ? 0.25 : 0.9;
+    // 0,25 pa virvelns 'varmvita' gav mattnad 0,31 for hela effekten. Varmvitt far vara varmt men inte urtvattat.
+    const sat = hue === 0.10 ? 0.5 : 0.95;
     return c.hsv(hue, sat, Math.min(1, 0.20 * c.heart(0.35) + spark));   // vilo-glöden pulsar med hjartat, gnistorna ororda
   },
 };

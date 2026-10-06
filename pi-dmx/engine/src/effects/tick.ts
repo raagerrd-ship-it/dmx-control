@@ -17,6 +17,8 @@ export const tick: EffectDef = {
     const sharp = 0.25 + d.hat * 0.75;
     const hue = 0.5 + c.frame.spec.air * 0.12;        // cyan → blå med luften
     const v = lit ? sharp : 0.04 + d.hat * 0.12;
-    return c.hsv(hue, 0.7 - d.hat * 0.4, Math.min(1, v + d.kick * 0.35));
+    // Grundmattnaden var 0,7 och gick till 0,3 pa hi-hat - cyanen blev aldrig ren. Hatten syns redan i `v`
+    // (sharp) och i vilken lampa som ar `lit`; den behover inte ta fargen med sig.
+    return c.hsv(hue, 1 - d.hat * 0.25, Math.min(1, v + d.kick * 0.35));
   },
 };

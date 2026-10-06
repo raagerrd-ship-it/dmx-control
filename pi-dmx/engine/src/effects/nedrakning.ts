@@ -25,6 +25,7 @@ export const nedrakning: EffectDef = {
     c.want.hazer = 0.3 + 0.7 * b; if (c.dropEnv > 0.6) c.want.blinder = c.dropEnv;
     const base = off ? 0.03 : 0.35 + 0.35 * b + c.beatPulse * 0.25;
     const v = Math.min(1, base + all * 0.9 + c.dropEnv);
-    return c.hsv(hue, 1 - all * 0.9, v);
+    // Sista steget ('alla tands') bars av ljuset; 0,9 gjorde finalen vit i stallet for mattad. 0,9 -> 0,4.
+    return c.hsv(hue, 1 - all * 0.4, v);
   },
 };

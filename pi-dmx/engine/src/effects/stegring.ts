@@ -18,7 +18,9 @@ export const stegring: EffectDef = {
     const onBeat = c.hasBeat && c.beatIdx % every === 0;
     const pulse = onBeat ? Math.exp(-c.beatFrac / 0.12) : 0;
     const hue = c.mixedSector(Math.floor(c.t / 9)) / 6;
-    const sat = 1 - u * 0.85;                                                       // smalnar mot vitt
+    // Uppbyggnaden bars av ljuset (base), av hur manga lampor som ar med (spatial) och av att pulsen tatnar
+    // (every). Att OCKSA dra mattnaden till 0,15 gjorde hela stegringen vit. 0,85 -> 0,35.
+    const sat = 1 - u * 0.35;                                                       // bleknar nagot, men behaller kuloren
     const base = 0.12 + 0.55 * u * u;                                               // lyfter mot taket
     const spatial = 1 - Math.abs((c.idx + 0.5) / c.count - 0.5) * (1 - u) * 0.6;    // mitten forst, kanterna kommer med
     c.want.uv = u; c.want.hazer = 0.3 + 0.7 * u;

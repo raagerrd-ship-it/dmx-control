@@ -19,6 +19,7 @@ export const snap: EffectDef = {
     // REFRANGEN AR TILLBAKA (2026-09-23): kapet far en vit karna och UV pa slaget nar repeatSim sager att det ar samma refrang igen.
     const back = c.section === 'high' && c.repeatSim >= 0.92 && c.sectionIndex >= 2 ? gnista : 0;
     if (back > 0) c.want.uv = back;
-    return c.hsv(hue, 1 - Math.max(gnista * 0.5, entry, back * 0.9), v);   // slag → vit-gnista; refrangens entre → vitt
+    // `entry` var 1,0 = helt vitt genom hela refrangentren. Gnistan syns i `v`; kuloren ska bara bloma, inte forsvinna.
+    return c.hsv(hue, 1 - Math.max(gnista * 0.25, entry * 0.45, back * 0.4), v);   // slag → gnista, kuloren kvar
   },
 };

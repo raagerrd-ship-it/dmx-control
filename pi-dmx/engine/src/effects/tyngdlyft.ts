@@ -21,6 +21,10 @@ export const tyngdlyft: EffectDef = {
     const pulse = c.hasBeat ? Math.exp(-c.beatFrac / 0.14) : c.kickEnv;
     if (over > 0.2) { c.want.blinder = over; c.want.uv = over; }
     const v = 0.08 + on * (0.25 + 0.45 * lift) + pulse * (0.1 + 0.35 * lift) * on + c.punch * 0.3 + over * 0.3;
-    return c.hsv(hue, 1 - Math.max(lift * 0.9 * on, over), Math.min(1, v));
+    // LYFTET BARS AV LJUS OCH ANTAL LAMPOR, inte av avmattning. `lift` ar pinnad nara 1 nar levelVsHighDb ~ 0
+    // (vilket den nastan alltid ar - se pi-dmx-minnet), sa `1 - lift*0.9*on` gav mattnad 0,02: VIT hela tiden.
+    // Nu: ingen avmattning utan riktig refrangreferens, och da hogst 0,3 - 'over refrangen' far bloma mer.
+    const desat = hasRef ? Math.max(lift * on * 0.3, over * 0.6) : 0;
+    return c.hsv(hue, 1 - desat, Math.min(1, v));
   },
 };
