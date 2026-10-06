@@ -147,6 +147,7 @@ let clockDetBpm = 0;   // analysatorns bpm som taktklockan LÅSTES på (om-ankri
 let lastLiveDrop = 0;        // senast sedda drop-räknare FRÅN analysatorn
 let lastBoundary = 0;        // senast sedda låtgräns-räknare (dynamikens omkalibrering)
 let lastCharShift = 0;
+let lastTempoShift = 0;
 let outDrop = 0;             // drop-räknaren effekterna ser (live eller replay)
 // COAST: konfidensen dippar i breakdowns/brus men TEMPOT är oftast fortfarande rätt.
 // Släpper vi gridet direkt hoppar effekterna till kick-drift och glider tillbaka när
@@ -225,6 +226,8 @@ capture.on("chunk", (samples: Float32Array) => {
   boundsArg.level = frame.level; boundsArg.bpm = frame.bpm; boundsArg.bpmConfidence = frame.bpmConfidence;
   bounds.tick(boundsArg);
   if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; effects.noteCharShift(); }
+  // TEMPOVAXLING UPPAT -> samma bytesskal som karaktarsskiftet (6 s giltigt, MIN_HOLD galler), egen text i loggen.
+  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; effects.noteCharShift(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
   if (bounds.boundaryCount !== lastBoundary) {
     lastBoundary = bounds.boundaryCount; effects.softenRange(); if (process.env.DMX_BOUNDARY_SOFT !== '0') analyser.hintTrackChange(5000); else { analyser.resetTempo(); if ((process.env.DMX_SECTION_HINT_LOWCONF ?? '0') === '0') analyser.hintTrackChange(5000); }   // riktig latgrans nollar sektionerna (tempotappet gor det inte langre)
     if (recorder) { const name = "ladan-" + lastBoundary; recorder.noteTrack(name, "dmx"); recorder.trackChanged("dmx", name); }

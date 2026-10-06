@@ -38,6 +38,18 @@ const NOV_TAU_S = 45;          // glomska pa fordelningen (~90 s effektivt fonst
 const NOV_DIST_MIN_S = 20;     // innan sa mycket data samlats galler bara absoluta kravet
 const NOV_DIST_BUCKETS = 48;   // d ar ett L1-avstand i 0..2
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
+// TEMPOVAXLING UPPAT (agaren i ladan 2026-10-06: "nar laten okar tempo sa kanske dirigenten direkt skall byta
+// effekt. nu syns det knappt nar latar kor som mini drop/tempovaxling"). Egen raknare, skild fran latgransen:
+// gransen kraver 7 % i 4 s OCH anvands bara som evidens; det har ar ett BYTESSKAL och maste ga snabbt.
+// Bara UPPAT - en tempookning ar ett energilyft; att sakta ner ar nagot annat och ska inte byta look.
+// Octav-vaktet ar viktigt: analysatorn kan hoppa 2x eller 1,5x (halv-/dubbeltakt) utan att musiken andrats,
+// sa bara okningar i intervallet [PCT, MAX] raknas - 2x (100 %) och 1,5x (50 %) faller utanfor.
+const TEMPO_SHIFT_ON = process.env.DMX_TEMPO_SHIFT !== '0';
+const TEMPO_SHIFT_PCT = Number(process.env.DMX_TEMPO_SHIFT_PCT ?? 0.06);      // minst sa mycket snabbare
+const TEMPO_SHIFT_MAX = Number(process.env.DMX_TEMPO_SHIFT_MAX ?? 0.40);      // mer = troligen oktavhopp, inte musik
+const TEMPO_SHIFT_HOLD_MS = Number(process.env.DMX_TEMPO_SHIFT_HOLD_MS ?? 900);   // sa lange maste okningen sta
+const TEMPO_SHIFT_REFRACT_MS = Number(process.env.DMX_TEMPO_SHIFT_REFRACT_MS ?? 12000);
+const TEMPO_REF_S = Number(process.env.DMX_TEMPO_REF_S ?? 20);   // latens etablerade tempo: langsamt medel
 
 export class BoundaryDetector {
   constructor(private readonly clock: () => number = Date.now) {}
@@ -46,6 +58,15 @@ export class BoundaryDetector {
   boundaryCount = 0;
   /** Varfor senaste gransen sattes (diagnostik). */
   lastBoundary = "";
+  /** Stiger vid varje tempoVAXLING uppat (se TEMPO_SHIFT_*). Lases av index.ts som bytesskal. */
+  tempoShiftCount = 0;
+  /** Tempot vaxlingen gick fran -> till (diagnostik). */
+  tempoShiftFrom = 0; tempoShiftTo = 0;
+  private tempoUpSince = 0;
+  private tempoUpFrom = 0;
+  private tempoRef = 0;
+  private tempoRefAt = 0;
+  private tempoShiftAt = -1e9;
   /** Gransignaler som var aktiva vid senaste kontrollen (diagnostik). */
   lastEvidence: string[] = [];
   private evBuf: string[] = [];
@@ -189,6 +210,36 @@ export class BoundaryDetector {
         this.bpmOffSince = 0;
         this.segBpm = this.segBpm * 0.95 + o.bpm * 0.05;
         this.segBpmConf = Math.max(this.segBpmConf, o.bpmConfidence);
+      }
+      // TEMPOVAXLING UPPAT (se TEMPO_SHIFT_*). EGEN LANGSAM REFERENS, inte segBpm: den jagar tempot med
+      // tidskonstant ~50 ms (0,95/0,05 per HOP) och ar till for gransens 7 %-grind. Mot den matte jag bara
+      // "bpm 6 % over ett ogonblickligt medel av sig sjalv", dvs brus - MATT pa megamix_ladan: 563 s och 575 s
+      // fyrade tva ganger pa samma 92->110, och ett 1,5x-oktavhopp (87->130) smog igenom som 33 %.
+      // tempoRef ar ett langsamt medel (TEMPO_REF_S) sa en akta vaxling star ut mot latens etablerade tempo.
+      if (TEMPO_SHIFT_ON && o.bpmConfidence > 0.5 && o.bpm > 40) {
+        if (!this.tempoRef) this.tempoRef = o.bpm;
+        const up = (o.bpm - this.tempoRef) / this.tempoRef;
+        if (up >= TEMPO_SHIFT_PCT) {
+          if (!this.tempoUpSince) { this.tempoUpSince = now; this.tempoUpFrom = this.tempoRef; }
+          else if (now - this.tempoUpSince >= TEMPO_SHIFT_HOLD_MS && now - this.tempoShiftAt >= TEMPO_SHIFT_REFRACT_MS) {
+            const trueUp = (o.bpm - this.tempoUpFrom) / this.tempoUpFrom;
+            // Oktavvakt: 1,5x (halv-/dubbeltakt) och allt over MAX ar analysatorns hopp, inte musikens tempo.
+            const octave = Math.abs(trueUp - 0.5) < 0.07 || trueUp > TEMPO_SHIFT_MAX;
+            this.tempoUpSince = 0;
+            if (!octave) {
+              this.tempoShiftAt = now;
+              this.tempoShiftFrom = Math.round(this.tempoUpFrom); this.tempoShiftTo = Math.round(o.bpm);
+              this.tempoShiftCount++;
+              this.tempoRef = o.bpm; this.tempoRefAt = now;   // nya tempot ar nu det etablerade
+            }
+          }
+        } else {
+          this.tempoUpSince = 0;
+          const dtS = this.tempoRefAt ? Math.min(0.5, (now - this.tempoRefAt) / 1000) : 0;
+          const a = TEMPO_REF_S > 0 ? Math.min(1, dtS / TEMPO_REF_S) : 1;
+          this.tempoRef += (o.bpm - this.tempoRef) * a;   // glider bara nar tempot INTE sticker upp
+          this.tempoRefAt = now;
+        }
       }
     }
 

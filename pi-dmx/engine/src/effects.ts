@@ -524,7 +524,7 @@ export class EffectEngine {
   /** Misstänkt låtbyte → låt auto-rangen kalibrera om snabbt mot nya nivåer. */
   softenRange(): void { this.range.soften(); this.songStartWall = Date.now(); }
   /** KARAKTARSSKIFTE fran latgransdetektorn (DMX_CHAR_SHIFT_D): dirigenten byter look vid nasta tillfalle (MIN_HOLD, ej i uppbyggnad). */
-  noteCharShift(): void { this.charShiftUntil = performance.now() + 6000; }   // latgrans: aven DROP_SONG_HOLD_S-klockan
+  noteCharShift(reason = 'karaktarsskifte'): void { this.charShiftUntil = performance.now() + 6000; this.charShiftWhy = reason; }   // latgrans: aven DROP_SONG_HOLD_S-klockan
 
 
 
@@ -568,6 +568,7 @@ export class EffectEngine {
   private unitSlot = 0; private unitPhraseDone = -1;   // FRASVAXLING: look A/B och senaste frasnummer som bytts pa
   private pendingSecSwitch = false;
   private charShiftUntil = 0;
+  private charShiftWhy = 'karaktarsskifte';
   private lastShowDropWall = 0;   // DMX_DROP_MIN_GAP_S   // noteCharShift: bytesskal giltigt 6 s               // SECTION_UNIT: sektionsgrans passerad men bytet blockerat (riser/MIN_HOLD) -> gor det sa fort det gar
   private prevSongLook = new Map<string, Mode>();  // SECTION_UNIT: forra latens look per sektionstyp (straffas sa nasta lat far en annan)
   private lastSmartTier = "";
@@ -1379,7 +1380,7 @@ export class EffectEngine {
         // (skrapjakten 10-01: enabled/part skapades forr pa varje ruta men anvands bara har, i bytet)
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
         const part = this.memPart || (SECTION_SWITCH && liveSec && liveSec !== 'intro' ? 'live:' + liveSec : undefined);   // identitet aven utan latminne
-        if (charShift) { this.charShiftUntil = 0; console.log('[dirigent] karaktarsskifte i laten -> byter look'); }
+        if (charShift) { this.charShiftUntil = 0; console.log(`[dirigent] ${this.charShiftWhy} i laten -> byter look`); }
         this.lastSmartTier = tierName;
         this.lastHalvedForSwitch = this.pulseHalved;
         this.lastBassClearForSwitch = bassClear;
