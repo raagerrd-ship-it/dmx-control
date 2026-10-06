@@ -213,7 +213,20 @@ const SECTION_UNIT_MIN_MS = Number(process.env.DMX_SECTION_UNIT_MIN_MS ?? 4000);
  *  fras, A igen ...). Refrangen kommer tillbaka med samma par - identiteten ar kvar, men den star inte still i 50 s. */
 const SECTION_UNIT_PHRASE_BARS = Number(process.env.DMX_SECTION_UNIT_PHRASE_BARS ?? 8);
 const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);
-const BEAT_LIFT = Number(process.env.BEAT_LIFT ?? 0.25);   // additivt hjartslagslyft (synlig puls aven i morka effekter)
+// BEAT_LIFT: additivt hjartslagslyft EFTER effekten. STANDARD 0 = AV sedan 2026-10-06.
+// Agaren: "vi kor inte med heartbeat efter effekten utan bara energi" - hjartslaget togs bort for en vecka
+// sedan och bor i effekterna sjalva (c.heart). Det har lyftet var kvar och gav ett slag per takt, men varre:
+// `kanal += lyft x (1 - kanal)` drar VARJE kanal mot ett, dvs mot VITT. Det ar ett konstruktionsfel, inte en
+// avvagning - en additiv term mot 1 kan inte bevara kuloren.
+// MATT 2026-10-06 (tools/colorBench.mjs, pop_ladan 60-150 s, 44 effekter, median):
+//   med lyft:  alla tre dioder tanda 42 % av tiden, exakt en kanal 19 %, mattnad 0,75
+//   utan:      alla tre 23 %, en kanal 30 %, mattnad 0,87
+//   ljuset tappar INGET: kanalspridning 56 -> 59, lampspridning 30 -> 30.
+// Den MULTIPLIKATIVA pulsen (beatMulNow i postprocess) ar orord - den bevarar kuloren exakt (matt: samma
+// fargtal med och utan den), sa ljusstyrkan foljer energin precis som forr. BEAT_LIFT=0.25 aterstaller.
+const BEAT_LIFT = Number(process.env.BEAT_LIFT ?? 0);
+/** Undre grans for effekternas mattnad (se ctx.hsv). 0 = av. */
+const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)));
 /** HEART-BEAT/ENERGI SOM EGEN DEL (2026-09-23, kontrakt heartbeat/contract.ts; opt-in DMX_HEARTBEAT=1, annars gamla vagen orord).
  *  Envelope per ram: ceiling = mastern md (loudness-golv, sektionsgas, dynamik mot refrangen, drop) UTAN tystnadsgrinden;
  *  pulse = hjartslaget beatMulNow normerat (1 pa slaget, 0 vid BEAT_MIN); pulseDepth = DMX_HEARTBEAT_DEPTH x tillit.
@@ -578,7 +591,17 @@ export class EffectEngine {
       const f = floor * (1 - dyn);
       return Math.min(1, f + (1 - f) * Math.pow(Math.max(0, Math.min(1, x)), 1 + dyn * 1.2));
     },
-    hsv: hsvToRgb,
+    // MATTNADSGOLV (2026-10-06, DMX_SAT_FLOOR). Nio effekter uttrycker sin ACCENT genom att dra ner
+    // mattnaden - `c.hsv(hue, 1 - traff, v)` = "blixtra till vitt pa traffen". Accenten laser da som VITT i
+    // stallet for som farg, och darmed ser effekterna likadana ut pa riggen (agaren 2026-10-06: "den tander
+    // nastan alltid alla RGB-dioderna"). MATT utan lyftet: tyngdlyft mattnad 0,03, tick 0,17, backbeat 0,32,
+    // viska 0,31, party 0,32, stegring 0,31 - dvs nastan vitt.
+    // Golvet satter en undre grans pa mattnaden i EN punkt, sa alla effekter trafas likformigt och ratten kan
+    // provas live. 0 = som forr. Varden > 0 later accenten finnas kvar men behalla kuloren; ljusstyrkan rors
+    // inte (v gar oforandrat vidare).
+    hsv: SAT_FLOOR > 0
+      ? ((h: number, sv: number, v: number) => hsvToRgb(h, sv < SAT_FLOOR ? SAT_FLOOR : sv, v))
+      : hsvToRgb,
   };
 
   /** Välj ny palett vid frasbyte, biasad av klangen (centroid). */
