@@ -40,6 +40,12 @@ const MIN_DIM = process.env.DMX_MIN_DIM === '1';
 // bleka ur kuloren (samma skal som MIN_DIM lamnar dem ifred). En ren nolla ar fortfarande svart - det ar sa
 // effekten sager "slack den har armaturen" - utom med DMX_MIN_DIM=1, som da haller golvet i stallet for tandpunkten.
 const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 40)));
+/** LINJAR MAPPNING (agaren i ladan 2026-10-07: "skall inte 1-100% fran effekten rakt mappas mot GOLV+1 till 95%? Sa drop syns"),
+ *  opt-in DMX_LIN_MAP=1. Forr KLAMPADES DIM-kanalen: allt under golvet (40 = 16 %) blev golvet och resten gick igenom ororda, sa
+ *  effektens nedersta 16 % var en dod zon. Nu: 1..255 -> golv+1..tak linjart, 0 = slackt som forr. Mappningen ar SISTA steget
+ *  och ingen annan modul vet om den (agaren: "energi ska inte veta om min mappning"). Drop-utrymmet finns redan fore utgangen:
+ *  energitaket haller vanlig show under fullt och bara dropEnv lyfter det till 1 - ett 95 %-tak har skulle kapa dropen lika mycket. */
+const LIN_MAP = process.env.DMX_LIN_MAP === '1';
 /** DIM-TAK (ladan 10-01, stegtest: lamporna mattar vid DIM ~85 - 85/110/255 ser lika ut, DIM 1 lyser redan): skala DIM-kanalen
  *  linjart sa full show = DMX_DIM_MAX i stallet for 255; allt over ~85 var dod skala. 255 = av (som forr). Tant varde blir aldrig 0. */
 const DIM_MAX = Math.max(1, Math.min(255, Number(process.env.DMX_DIM_MAX ?? 255)));
@@ -339,7 +345,8 @@ export class FixtureOutput {
         const floorCh = FLOOR_CH > onCh && isDim ? (FLOOR_CH > top ? top : FLOOR_CH) : onCh;
         let out: number;
         if (raw > 0) {
-          out = raw < floorCh ? floorCh : raw > top ? top : raw;
+          out = LIN_MAP && isDim && top > floorCh ? Math.min(top, floorCh + 1 + Math.round((top - floorCh - 1) * (raw - 1) / 254))   // DMX_LIN_MAP
+            : raw < floorCh ? floorCh : raw > top ? top : raw;
           this.holdVal[ch] = out;
           this.holdUntil[ch] = nowMs + HOLD_MS;
         } else if (nowMs < this.holdUntil[ch]) {
