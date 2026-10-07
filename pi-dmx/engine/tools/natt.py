@@ -13,7 +13,8 @@ och skriver en jamforbar dygnspost:
   --snabb      bara mixarna (~30 s) - for att prova en kandidat fort
   --tag/--env  A/B av en kandidat: raden taggas sa den inte blandas med baslinjen; env laggs OVANPA ladans
   --lista      annan manifest.tsv (standard tools/frozen6/manifest.tsv)
-  --norm DBFS  nivaanpassa KLIPPEN till ladans aux-niva (showTight --norm; matfalla 35: frozen6 ~28 dB under ladan)
+  --norm DBFS  nivaanpassa KLIPPEN till ladans aux-niva, STANDARD -3.5 sedan 10-07 (matfalla 35: frozen6 ~28 dB
+               under ladan; korpusrader fore 10-07 v2-norm ar INTE jamforbara); --norm 999 = utan
 
 MIXARNA bar look-/sektions-/dropmatten (10 min var, riktig dramaturgi). KLIPPEN (40 s) ar for korta for
 look-byten (MIN_HOLD 8 s, dwell 45 s) men ger bredd for kick/energi/farg over 100+ artister - rapportera
@@ -61,7 +62,7 @@ def main():
     ap.add_argument('--snabb', action='store_true')
     ap.add_argument('--tag', default='')
     ap.add_argument('--env', action='append', default=[])
-    ap.add_argument('--norm', type=float, default=None)
+    ap.add_argument('--norm', type=float, default=-3.5)   # STANDARD fran 2026-10-07 (matfalla 35): korpusen pa ladans aux-niva; --norm 999 = ingen
     ap.add_argument('--lista', default=os.path.join(HERE, 'frozen6', 'manifest.tsv'))
     a = ap.parse_args()
 
@@ -87,7 +88,7 @@ def main():
         jobs = [(r[1], r[2], os.path.join(base, r[-1])) for r in rows if len(r) >= 6 and os.path.exists(os.path.join(base, r[-1]))]
         res = []
         with ThreadPoolExecutor(max_workers=2) as ex:   # hogst tva bankar parallellt (regeln fran lotus-rutinen)
-            for (artist, title, wav), r in zip(jobs, ex.map(lambda j: run_one(j[2], env, norm=a.norm), jobs)):
+            for (artist, title, wav), r in zip(jobs, ex.map(lambda j: run_one(j[2], env, norm=None if a.norm == 999 else a.norm), jobs)):
                 r['artist'] = artist; r['title'] = title; res.append(r)
         ok = [r for r in res if 'tajt' in r]
         korpus = {'n': len(ok), 'fel': len(res) - len(ok), 'lista': os.path.relpath(a.lista, ENGINE), 'median': {}, 'samst': {}, 'latar': ok}
