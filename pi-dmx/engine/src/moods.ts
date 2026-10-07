@@ -53,12 +53,11 @@ const FEEL: Record<MoodId, {
    */
   energyCeiling: boolean;
   riserStrobe: boolean;   // accelererande strobe + vit-kollaps under uppbyggnad → drama
-  dropHeadroom: boolean;  // normal ≤90%, drops → 100% (drops poppar hårdare)
   beatSyncStrength: number; // hur hårt PLL-fasen knuffas mot trumslag (0/0.10/0.18/0.30)
 }> = {
-  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  energyDrivesMode: false, smartDwellMs: 40000, master: 0.30, calmDecay: 1.20, energyCeiling: true, riserStrobe: false, dropHeadroom: false, beatSyncStrength: 0.10 },
-  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 15000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: false, dropHeadroom: false, beatSyncStrength: 0.18 },
-  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 10000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: true,  dropHeadroom: true,  beatSyncStrength: 0.30 },
+  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  energyDrivesMode: false, smartDwellMs: 40000, master: 0.30, calmDecay: 1.20, energyCeiling: true, riserStrobe: false, beatSyncStrength: 0.10 },
+  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 15000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: false, beatSyncStrength: 0.18 },
+  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 10000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, riserStrobe: true,  beatSyncStrength: 0.30 },
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -85,7 +84,6 @@ export function applyMood(cfg: EngineConfig, mood: MoodId): void {
     cfg.ambientGlow = f.ambientGlow;
     cfg.energyCeiling = f.energyCeiling;   // Regi (pro): VU-ljustak
     cfg.riserStrobe = f.riserStrobe;       // Regi (pro): uppbyggnads-strobe
-    cfg.dropHeadroom = f.dropHeadroom;     // Regi (pro): drop-pop
   }
   if (!cfg.beatSyncOverride) cfg.beatSyncStrength = f.beatSyncStrength; // PLL-styrka mot trumslag
   // Rotation: bara stämningens pool aktiv (allt annat AV → smart väljer bara ur poolen).
@@ -128,7 +126,6 @@ export function applyIntensity(cfg: EngineConfig, xRaw: number): void {
     cfg.ambientGlow      = bf.ambientGlow;
     cfg.energyCeiling    = bf.energyCeiling;
     cfg.riserStrobe      = bf.riserStrobe;
-    cfg.dropHeadroom     = bf.dropHeadroom;
   }
   if (!cfg.beatSyncOverride) cfg.beatSyncStrength = bf.beatSyncStrength;
   const pool = new Set<Mode>(POOL[bucket]);

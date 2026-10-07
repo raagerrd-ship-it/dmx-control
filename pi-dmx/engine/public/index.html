@@ -434,7 +434,6 @@
         <div class="advflag" id="fAmb"><span class="dot"></span>Vilo-glöd</div>
         <div class="advflag" id="fCeil"><span class="dot"></span>Dynamiskt ljustak</div>
         <div class="advflag" id="fRiser"><span class="dot"></span>Riser-strobe</div>
-        <div class="advflag" id="fHead"><span class="dot"></span>Drop-headroom</div>
         <div class="advflag" id="fFog"><span class="dot"></span>Rökmaskin aktiv</div>
         <div class="advflag" id="fStrobeCh"><span class="dot"></span>DMX-strobe aktiv</div>
         <div class="advflag" id="fHazer"><span class="dot"></span>Hazer aktiv</div>
@@ -524,7 +523,6 @@
     <label class="tgl"><span>Klubb-läge (hård kontrast)<br><small style="opacity:.6">Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna.</small></span><input type="checkbox" id="tClubMode"></label>
     <label class="tgl"><span>Varm vilo-glöd i tystnad<br><small style="opacity:.6">Dim bärnsten-glöd när ingen musik spelar, istället för helt mörkt.</small></span><input type="checkbox" id="tAmbientGlow"></label>
     <label class="tgl"><span>Riser-strobe (build → drop)<br><small style="opacity:.6">Accelererande strobe under uppbyggnad, blackout på dropen. Begränsad till 1,5/s.</small></span><input type="checkbox" id="tRiserStrobe"></label>
-    <label class="tgl"><span>Drop-headroom (max 90%, drops 100%)<br><small style="opacity:.6">Normalläget kapas till 90% så drops poppar tydligare.</small></span><input type="checkbox" id="tDropHeadroom"></label>
     </div>
   </div>
 
@@ -911,7 +909,6 @@ function applyConfig(cfg) {
   if (tAmbientGlow) tAmbientGlow.checked = !!cfg.ambientGlow;
   if (tRiserStrobe) tRiserStrobe.checked = !!cfg.riserStrobe;
   if (tStrobeUnlimited) tStrobeUnlimited.checked = !!cfg.strobeUnlimited;
-  if (tDropHeadroom) tDropHeadroom.checked = !!cfg.dropHeadroom;
   if (tRegiPro) { tRegiPro.checked = !!cfg.regiPro; applyRegiProUi(!!cfg.regiPro); }
   {
     const bsOv = !!cfg.beatSyncOverride;
@@ -1048,7 +1045,6 @@ function updateAdvMirror(cfg) {
   flag("fAmb",    cfg.ambientGlow);
   flag("fCeil",   cfg.energyCeiling);
   flag("fRiser",  cfg.riserStrobe);
-  flag("fHead",   cfg.dropHeadroom);
   // Fog: DMX-drivet — kräver att användaren aktiverat den OCH satt en giltig
   // DMX-adress. Utan adress finns ingen hårdvara att skicka till, så flaggan
   // ska inte lysa även om enabled är på.
@@ -1666,8 +1662,6 @@ tStrobeUnlimited.onchange = () => {
   }
   send({ type: "setStrobeUnlimited", value: tStrobeUnlimited.checked });
 };
-const tDropHeadroom = document.getElementById("tDropHeadroom");
-tDropHeadroom.onchange = () => send({ type: "setDropHeadroom", value: tDropHeadroom.checked });
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.

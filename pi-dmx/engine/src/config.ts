@@ -209,12 +209,9 @@ export interface EngineConfig {
    *  finns för att det beslutet ska vara MEDVETET och synligt, aldrig något
    *  motorn gör i tysthet. Standard av. */
   strobeUnlimited?: boolean;
-  /** REGI: drop-headroom — kapa normal ljusstyrka till ~95%, men låt DROPS gå
-   *  ända till 100% → drops poppar, och konstant full blast dämpas. */
-  dropHeadroom: boolean;
   /** Master-toggle för Regi (pro): när false rör stämnings-vredet INTE de sex
    *  Regi-flaggorna (dropBlackout, energyCeiling, clubMode, ambientGlow,
-   *  riserStrobe, dropHeadroom). Ägaren äger då dem själv. Default false. */
+   *  riserStrobe). Ägaren äger då dem själv. Default false. (dropHeadroom borttagen 10-07: utgångens LIN_MAP gör jobbet.) */
   regiPro?: boolean;
 }
 
@@ -270,7 +267,6 @@ export const defaultConfig: EngineConfig = {
   ambientGlow: false,     // tystnad = HELT mörkt som standard; slå på för varm vilo-glöd
   riserStrobe: false,     // ägar-val: accelererande strobe + vit-kollaps under risers
   strobeUnlimited: false, // säkert tak (3 Hz) som standard — se kommentaren i typen
-  dropHeadroom: false,    // ägar-val: normal ≤95%, drops → 100% (huvudrum för pop)
   regiPro: false,         // master-toggle: när AV rör stämnings-vredet inte Regi-flaggorna
 };
 

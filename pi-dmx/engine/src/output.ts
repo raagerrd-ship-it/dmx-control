@@ -45,7 +45,7 @@ const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 40
  *  effektens nedersta 16 % var en dod zon. Nu: 1..255 -> golv+1..MAP_TOP x tak linjart, 0 = slackt som forr. Effekten FAR ge 100 %;
  *  det blir 95 %. Bara en drop oppnar de sista 5 %: utgangen far energilagrets drop-envelope (dropOpen 0..1) och taket blir
  *  MAP_TOP + (1 - MAP_TOP) x dropOpen. Mappningen och 95 % ags av utgangen - energilagret vet inte om dem (agaren 10-07). */
-const LIN_MAP = process.env.DMX_LIN_MAP === '1';
+const LIN_MAP = process.env.DMX_LIN_MAP !== '0';   // STANDARD sedan 2026-10-07 (godkand i ladan); =0 = klampning som forr
 const MAP_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_MAP_TOP ?? 0.95)));
 /** DIM-TAK (ladan 10-01, stegtest: lamporna mattar vid DIM ~85 - 85/110/255 ser lika ut, DIM 1 lyser redan): skala DIM-kanalen
  *  linjart sa full show = DMX_DIM_MAX i stallet for 255; allt over ~85 var dod skala. 255 = av (som forr). Tant varde blir aldrig 0. */
@@ -215,12 +215,6 @@ export class FixtureOutput {
     }
   }
 
-  /** Kläm ljusstyrkan mot ett tak i byte (drop-headroom) — skalar inte, klipper bara. */
-  cap(universe: Uint8Array, capByte: number): void {
-    for (let ch = 0; ch < this.maxCh; ch++) {
-      if (this.light[ch] && universe[ch] > capByte) universe[ch] = capByte;
-    }
-  }
 
   /**
    * SISTA STEGET FÖRE UTGÅNG: tändpunkt som GOLV + master som TAK.

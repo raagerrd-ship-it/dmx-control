@@ -702,8 +702,6 @@ export async function startServer(
             deps.cfg.showLeadMs = Math.max(0, Math.min(300, Math.round(msg.value)));
           } else if (msg.type === "setStrobeUnlimited") {
             deps.cfg.strobeUnlimited = !!msg.value;
-          } else if (msg.type === "setDropHeadroom") {
-            deps.cfg.dropHeadroom = !!msg.value;
           } else if (msg.type === "setRegiPro") {
             deps.cfg.regiPro = !!msg.value;
           } else if (msg.type === "setRing" && msg.ring && typeof msg.ring === "object" && deps.cfg.intensityRing) {

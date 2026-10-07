@@ -17,7 +17,7 @@
  *                  in i ballistiken börjar den släpa och tappar anslaget.
  *   4. blackout    stenhård klippning förbi ballistiken.
  *   5. kalibrering tändpunkt + ljus-tak (output-tjänsten).
- *   6. headroom    klämmer normal styrka så drops sticker ut.
+ *   (6. headroom borttagen 2026-10-07 - utgangens LIN_MAP: effekt 100 % = 95 %, drop oppnar resten)
  *
  * BÅDE taket och hjärtslaget har DROP-UNDANTAG (`Math.max(..., dropEnv)`) — en drop
  * som landar mellan två slag ska inte dämpas av pulsen.
@@ -71,7 +71,6 @@ export class PostProcess {
     pulseActive: boolean,
     blackout: boolean,
     master: number,
-    headroomCap: number,
     nowMs: number,
     dropOpen = 0   // energilagrets drop-envelope 0..1 - utgangens LIN_MAP oppnar sitt tak med den (se output.ts)
   ): void {
@@ -135,7 +134,6 @@ export class PostProcess {
       }
     }
 
-    // 6. DROP-HEADROOM — sist av allt: kläm normal styrka, släpp drops till fullt.
-    if (headroomCap >= 0) out.cap(universe, headroomCap);
+    // (6. DROP-HEADROOM borttagen 2026-10-07: dubblett av utgangens LIN_MAP, dar dropen oppnar de sista 5 %.)
   }
 }
