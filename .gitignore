@@ -31,6 +31,7 @@ pi-dmx/engine-dist.tgz
 # omojlig over en hemuppkoppling. Materialet ar dessutom ateranskaffningsbart:
 # det ar inspelningar, inte kallkod. Ligger lokalt hos agaren.
 pi-dmx/engine/tools/frozen*/
+pi-dmx/engine/tools/tempo-facit/*.wav
 pi-dmx/engine/tools/*.wav
 pi-dmx/engine/tools/*.raw
 pi-dmx/pi-backup/

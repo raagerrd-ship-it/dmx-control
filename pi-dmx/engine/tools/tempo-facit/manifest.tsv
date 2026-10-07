@@ -1,0 +1,13 @@
+fil	t_s	fran->till	kvot	kalla
+ts01_8p_018_tomas-ledin-hoor-kommer-den-nya-tiden.wav	20.00	101->109	1.08	syntes: Tomas Ledin - Här kommer den nya tiden (frozen6 18), librosa time_stretch
+ts02_12p_033_tomas-ledin-jag-vet-inte-varfoor.wav	20.00	134->150	1.12	syntes: Tomas Ledin - Jag vet inte varför (frozen6 33), librosa time_stretch
+ts03_15p_061_tomas-ledin-alltid-en-voon-i-mej.wav	20.00	100->115	1.15	syntes: Tomas Ledin - Alltid en vän i mej (frozen6 61), librosa time_stretch
+ts04_8p_106_tomas-ledin-hon-goor-allt-foor-att-goora-mig-lycklig.wav	20.00	105->113	1.08	syntes: Tomas Ledin - Hon gör allt för att göra mig lycklig (frozen6 106), librosa time_stretch
+ts05_12p_140_the-stickmen-project-the-gambler.wav	20.00	125->140	1.12	syntes: The Stickmen Project - The Gambler (frozen6 140), librosa time_stretch
+ts06_15p_143_aaron-goodvin-lonely-drum.wav	20.00	111->128	1.15	syntes: Aaron Goodvin - Lonely Drum (frozen6 143), librosa time_stretch
+ts07_8p_148_dan-davidson-found.wav	20.00	109->118	1.08	syntes: Dan Davidson - Found (frozen6 148), librosa time_stretch
+ts08_12p_152_fredrik-lundman-hillbilly-rock-hillbilly-roll.wav	20.00	93->104	1.12	syntes: Fredrik Lundman - Hillbilly Rock, Hillbilly Roll (frozen6 152), librosa time_stretch
+ts09_15p_158_tyler-hubbard-dancin-in-the-country.wav	20.00	115->132	1.15	syntes: Tyler Hubbard - Dancin’ In The Country (frozen6 158), librosa time_stretch
+ts10_8p_159_luke-combs-hurricane.wav	20.00	100->108	1.08	syntes: Luke Combs - Hurricane (frozen6 159), librosa time_stretch
+ts11_12p_170_andrea-hegard-it-aint-my-fault.wav	20.00	122->137	1.12	syntes: Andrea Hegard - It Aint My Fault (frozen6 170), librosa time_stretch
+ts12_15p_172_cody-johnson-the-painter.wav	20.00	99->114	1.15	syntes: Cody Johnson - The Painter (frozen6 172), librosa time_stretch
