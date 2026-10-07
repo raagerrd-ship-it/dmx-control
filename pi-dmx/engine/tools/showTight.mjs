@@ -26,6 +26,15 @@
  * bestammer farg/styrka/lampa, energilagret polerar precis innan utskick). Da ar fragan inte hur ljust det ar
  * utan om ljuset ROR SIG med musiken. r ar det matt som svarar pa det, och det ar jamforbart natt mot natt.
  *
+ * LATGRANS/KARAKTAR/TEMPOVAXLING (bank v2, natt-agenten 2026-10-07): index.ts matar BoundaryDetector fran
+ * analysatorns spektrum och ger motorn bytesskal (noteCharShift: karaktarsskifte + tempovaxling uppat) och
+ * latgranser (softenRange + analyser.hintTrackChange). Bank v1 hade INTE den sidokedjan - "tempovaxlingen fyrade
+ * 0 ganger pa mixarna" 10-06 var darfor banken, inte motorn (matfalla 34). Speglas har rad for rad fran index.ts.
+ * --norm DBFS (bank v2): frozen6-klippen ligger ~28 dB under ladans aux-inspelningar (median 100 ms-RMS -31,7 mot
+ * pop -3,4 / megamix -4,1 dBFS) och aux kor med last gain 1 - utan nivaanpassning matar korpusen en rigg som far
+ * en tjugondel av signalen (matfalla 35). --norm skalar klippet sa medianen hamnar pa DBFS (hard klippning vid +-1).
+ * --trace ut.json skriver per-ruta-serier + handelser (tempoShiftBench.mjs laser den).
+ *
  * MATFALLA: analysatorn ateranvander SAMMA ruta-objekt varje hop - allt som sparas maste klonas (det var felet
  * som gav 0 i alla effektbankar i tre dygn). Och den virtuella klockan maste sta FORE motorn skapas, annars blir
  * forsta dt negativ och tystnadsgrinden oppnar aldrig.
@@ -48,6 +57,7 @@ const { Analyser } = await import("../dist/analyser.js");
 const { EffectEngine } = await import("../dist/effects.js");
 const { defaultConfig, fixtureRoles } = await import("../dist/config.js");
 const { EFFECT_KEYS } = await import("../dist/effects/registry.js");
+const { BoundaryDetector } = await import("../dist/boundaryDetector.js");
 
 const d = readFileSync(path);
 if (d.toString("ascii", 0, 4) !== "RIFF") { say("inte en WAV"); process.exit(2); }
@@ -55,6 +65,13 @@ if (d.readUInt32LE(24) !== 48000 || d.readUInt16LE(34) !== 16 || d.readUInt16LE(
   say("kraver 48 kHz mono 16-bit"); process.exit(2);
 }
 const nSamples = (d.length - 44) >> 1;
+let GAIN = 1;
+if (opt("--norm", null) !== null) {   // median 100 ms-RMS -> malniva (se huvudet, matfalla 35)
+  const blk = 4800, rms = [];
+  for (let o = 0; o + blk <= nSamples; o += blk) { let q = 0; for (let i = 0; i < blk; i++) { const x = d.readInt16LE(44 + (o + i) * 2) / 32768; q += x * x; } const r = Math.sqrt(q / blk); if (r > 1e-4) rms.push(r); }
+  rms.sort((a, b) => a - b);
+  if (rms.length) GAIN = Math.pow(10, Number(opt("--norm")) / 20) / rms[rms.length >> 1];
+}
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = 25;   // 25 ms = riggens egen takt
 
 // LADANS CONFIG: smart-lage, alla lookar pa, master 1. Annars matas en annan rigg an den som star i ladan.
@@ -73,6 +90,12 @@ const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig)));
 // GAIN: motorn laser forstarkningen bara pa aux (index.ts: setGainLock(cfg.audioInput !== "mic", 1)).
 // Kor ladan pa mikrofon ar AGC:n aktiv dar men inte har; --agc kor som mikrofoningang.
 if (!flag("--agc")) an.setGainLock(true, 1);
+// LATGRANSENS SIDOKEDJA som i index.ts (se huvudet). Klockan ar Date.now = den virtuella.
+const bounds = new BoundaryDetector();
+an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
+const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
+let lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0;
+const EV = [];   // {t, typ, txt}
 
 // Klockan FORE motorn skapas (matfallan ovan).
 const t00 = EPOCH + startS * 1000;
@@ -85,7 +108,7 @@ const origLog = console.log;
 console.log = (...a) => { const s = a.join(" "); if (s.startsWith("[dirigent]")) dirigent.push(s); };
 
 const buf = new Float32Array(HOP);
-const T = [], LIT = [], INT = [], LVL = [], BPM = [], TE = [];   // per renderruta (TE = motorns tierEma)
+const T = [], LIT = [], INT = [], LVL = [], BPM = [], TE = [], LSPR = [], LOOK = [], WHY = [];   // per renderruta (TE = motorns tierEma)
 const KICK = [];                                      // index i T dar en kick lag
 const DROP = [];                                      // {t, i, sec, lvh}
 const lookRuns = [];                                  // {look, t0, t1}
@@ -96,10 +119,18 @@ let lastRender = -1, lastLook = null, lastSwitch = 0, lastDrop = 0, kickPending 
 const endSample = Math.min(nSamples, Math.floor((startS + maxS) * SR));
 
 for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off += HOP) {
-  for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
+  for (let i = 0; i < HOP; i++) { const x = d.readInt16LE(44 + (off + i) * 2) / 32768 * GAIN; buf[i] = x > 1 ? 1 : x < -1 ? -1 : x; }
   const tS = off / SR, ms = EPOCH + tS * 1000;
   an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
   const fr = an.process(buf);
+  boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence;
+  bounds.tick(boundsArg);
+  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift(); EV.push({ t: tS, typ: 'karaktar' }); }
+  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); EV.push({ t: tS, typ: 'tempo', fran: bounds.tempoShiftFrom, till: bounds.tempoShiftTo }); }
+  if (bounds.boundaryCount !== lastBoundary) {
+    lastBoundary = bounds.boundaryCount; eng.softenRange(); EV.push({ t: tS, typ: 'grans' });
+    if (process.env.DMX_BOUNDARY_SOFT !== '0') an.hintTrackChange(5000); else { an.resetTempo(); if ((process.env.DMX_SECTION_HINT_LOWCONF ?? '0') === '0') an.hintTrackChange(5000); }
+  }
   if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
   if (fr.kick) kickPending = true;                                   // tappa ingen kick mellan renderrutorna
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
@@ -132,6 +163,7 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
     if (v < lmin) lmin = v; if (v > lmax) lmax = v;
   }
   lamsprSum += lmax - lmin; lamsprN++;
+  LSPR.push(lmax - lmin);
 
   const i = T.length;
   T.push(tS); LIT.push(lit); INT.push(fr.intensity ?? 0); LVL.push(fr.level ?? 0); BPM.push(fr.bpm ?? 0); TE.push(eng.tierEma ?? 0);
@@ -144,7 +176,8 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
     lastLook = look;
   }
   lookTime.set(look, (lookTime.get(look) ?? 0) + dt);
-  if (eng.switchCount !== lastSwitch) { lastSwitch = eng.switchCount; const w = eng.switchWhy || '?'; whyCount.set(w, (whyCount.get(w) ?? 0) + 1); }
+  LOOK.push(look);
+  if (eng.switchCount !== lastSwitch) { lastSwitch = eng.switchCount; const w = eng.switchWhy || '?'; whyCount.set(w, (whyCount.get(w) ?? 0) + 1); WHY.push({ t: tS, why: w, look }); }
 }
 if (lastLook !== null) lookRuns.push({ look: lastLook, t0: lookRuns.length ? lookRuns[lookRuns.length - 1].t1 : startS, t1: T[T.length - 1] ?? startS });
 console.log = origLog;
@@ -230,7 +263,7 @@ const switches = [...whyCount.values()].reduce((a, b) => a + b, 0);
 const musical = switches - (whyCount.get('dwell') ?? 0);
 const DARK = 0.02;
 const res = {
-  wav: path, startS, totS: Math.round(totS), rutor: T.length,
+  wav: path, startS, gainDb: +(20 * Math.log10(GAIN)).toFixed(1), totS: Math.round(totS), rutor: T.length,
   tajt: {
     kickLagMs: med(lags), kickar: kickTested, kickTraff: kickTested ? kickWithRise / kickTested : NaN,
     kickHojd: med(heights),
@@ -244,6 +277,8 @@ const res = {
     byten: switches, bytenPerMin: totS > 0 ? switches / (totS / 60) : NaN,
     musikByten: switches ? musical / switches : NaN, orsaker: Object.fromEntries(whyCount),
     drops: DROP.length,
+    granser: EV.filter((e) => e.typ === 'grans').length, karaktarsskiften: EV.filter((e) => e.typ === 'karaktar').length,
+    tempovaxlingar: EV.filter((e) => e.typ === 'tempo').length,
     dropSprangLugn: avg(jumps.filter((j) => calmSec(j.sec)), 'jump'),
     dropSprangHog: avg(jumps.filter((j) => !calmSec(j.sec)), 'jump'),
     dropsLugna: jumps.filter((j) => calmSec(j.sec)).length,
@@ -259,6 +294,8 @@ const res = {
   lookTime: [...lookTime.entries()].sort((a, b) => b[1] - a[1]),
 };
 
+const traceOut = opt("--trace", null);
+if (traceOut) writeFileSync(traceOut, JSON.stringify({ T, LIT, LSPR, LOOK, BPM, KICK, EV, WHY, STEP_MS }));
 const jsonOut = opt("--json", null);
 if (jsonOut) writeFileSync(jsonOut, JSON.stringify(res, null, 1));
 if (QUIET) { say(JSON.stringify(res)); process.exit(0); }

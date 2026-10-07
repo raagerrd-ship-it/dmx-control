@@ -13,6 +13,7 @@ och skriver en jamforbar dygnspost:
   --snabb      bara mixarna (~30 s) - for att prova en kandidat fort
   --tag/--env  A/B av en kandidat: raden taggas sa den inte blandas med baslinjen; env laggs OVANPA ladans
   --lista      annan manifest.tsv (standard tools/frozen6/manifest.tsv)
+  --norm DBFS  nivaanpassa KLIPPEN till ladans aux-niva (showTight --norm; matfalla 35: frozen6 ~28 dB under ladan)
 
 MIXARNA bar look-/sektions-/dropmatten (10 min var, riktig dramaturgi). KLIPPEN (40 s) ar for korta for
 look-byten (MIN_HOLD 8 s, dwell 45 s) men ger bredd for kick/energi/farg over 100+ artister - rapportera
@@ -33,8 +34,9 @@ METRIC_TAJT = ['kickLagMs', 'kickTraff', 'kickHojd', 'energiR', 'energiRtopp', '
 METRIC_SNYGG = ['alla3', 'en', 'matt', 'lampspr', 'morkt', 'litP50', 'litP90']
 
 
-def run_one(wav, env, start=0, sek=None):
+def run_one(wav, env, start=0, sek=None, norm=None):
     cmd = ['node', 'tools/showTight.mjs', wav, '--tyst']
+    if norm is not None: cmd += ['--norm', str(norm)]
     if start: cmd += ['--start', str(start)]
     if sek: cmd += ['--sek', str(sek)]
     r = subprocess.run(cmd, cwd=ENGINE, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=600)
@@ -59,6 +61,7 @@ def main():
     ap.add_argument('--snabb', action='store_true')
     ap.add_argument('--tag', default='')
     ap.add_argument('--env', action='append', default=[])
+    ap.add_argument('--norm', type=float, default=None)
     ap.add_argument('--lista', default=os.path.join(HERE, 'frozen6', 'manifest.tsv'))
     a = ap.parse_args()
 
@@ -70,7 +73,7 @@ def main():
     git = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=ENGINE, capture_output=True, text=True).stdout.strip()
     t0 = time.time()
     out = {'datum': a.datum, 'tag': a.tag, 'git': git, 'env': {k: v for k, v, _ in SHOW_ENV} | {e.partition('=')[0]: e.partition('=')[2] for e in a.env},
-           'mixar': {}, 'korpus': None, 'effekter': None}
+           'mixar': {}, 'korpus': None, 'effekter': None, 'norm': a.norm}
 
     # 1. MIXARNA i full langd (look-/sektions-/dropmatt bor har)
     for namn, wav in MIXAR:
@@ -84,7 +87,7 @@ def main():
         jobs = [(r[1], r[2], os.path.join(base, r[-1])) for r in rows if len(r) >= 6 and os.path.exists(os.path.join(base, r[-1]))]
         res = []
         with ThreadPoolExecutor(max_workers=2) as ex:   # hogst tva bankar parallellt (regeln fran lotus-rutinen)
-            for (artist, title, wav), r in zip(jobs, ex.map(lambda j: run_one(j[2], env), jobs)):
+            for (artist, title, wav), r in zip(jobs, ex.map(lambda j: run_one(j[2], env, norm=a.norm), jobs)):
                 r['artist'] = artist; r['title'] = title; res.append(r)
         ok = [r for r in res if 'tajt' in r]
         korpus = {'n': len(ok), 'fel': len(res) - len(ok), 'lista': os.path.relpath(a.lista, ENGINE), 'median': {}, 'samst': {}, 'latar': ok}
