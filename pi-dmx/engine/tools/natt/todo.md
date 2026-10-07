@@ -57,3 +57,10 @@ postprocess, output). Ta bort onödiga beräkningar i ljusvägen (allokering per
 att det är där hänget försvinner. Rapportera före/efter i ms.
 Rapportera under egen rubrik. Markera detta avsnitt "KLART <datum>: <en rad>" när steg 1–5 är gjorda
 (annars "PÅGÅR <datum>: steg X klart").
+
+## Från kvällen 2026-10-07 (sent) — INGÅNGEN VAR ÖVERSTYRD
+Ladans inspelningar pop_ladan.wav/megamix_ladan.wav är tagna med en ÖVERSTYRD ingång (22–29 % klippta sampel, 97–99 % av
+sekunderna i 0 dBFS, nivåspann 5 dB). Ingången är sänkt 13,5 dB som standard (server.ts: Aux 49, Mixin PGA 3) och ägaren:
+"mycket bättre nu". Konsekvens för bänken: mixarna motsvarar inte längre riggen för energi/nivå/tystnad — skriv det i
+rapporten, jämför inte energimått mot gamla rader, och be ägaren spela in nya ladan-mixar (DMX_RECORDER=1) nästa gång.
+Simulera inte nivåsänkningen på de klippta filerna (klippningen går inte att ta bort i efterhand).
