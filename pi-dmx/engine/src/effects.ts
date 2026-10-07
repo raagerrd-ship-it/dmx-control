@@ -119,6 +119,20 @@ const GROUP_ALT = process.env.DMX_GROUP_ALT !== '0';
  *  en full drop-small (dropEnv), ingen rok, ingen blackout. */
 const MINI_DROP_ENV = Number(process.env.MINI_DROP_ENV ?? 0.35);
 const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);
+/** NASTAN-DROP (agaren 2026-10-07: "analysen av NASTAN-drops, sa de aterspeglas pa nagot bra satt i ljuset"), opt-in
+ *  DMX_NEAR_DROP=1. Allt som bygger mot en small utan att bli en full drop (partiella drops som kvalitetsgrinden nekar
+ *  tyst, minidrops, en build som landar halvt) har samma ljudavtryck: baskroppen (frame.bodyDb, ra dB) DYKER under
+ *  latens normalniva och KOMMER TILLBAKA. Hur djupt den dok och hur hart den kom tillbaka ar hur nara en drop det var.
+ *  Graderad: dropEnv far ett golv NEAR_MIN..NEAR_MAX (30-60 % av en full drop) i MINI_BANG_MS, sedan samma 1 s-utton
+ *  som allt annat (fallet rors inte). Inget look-byte, ingen rok. Analysatorn rors inte - bara redan exporterade falt.
+ *  Sond pa pop_ladan (10 min): sprang >= 10 dB efter dipp >= 8 dB ~1 per 30 s, de flesta pa minidrops/drops. */
+const NEAR_DROP = process.env.DMX_NEAR_DROP === '1';
+const NEAR_RISE_DB = Number(process.env.DMX_NEAR_RISE_DB ?? 10);    // sprang fran dippens botten
+const NEAR_DIP_DB = Number(process.env.DMX_NEAR_DIP_DB ?? 8);       // dippen under latens normalniva (8 s-medel)
+const NEAR_FULL_DB = Number(process.env.DMX_NEAR_FULL_DB ?? 24);    // sprang som ger NEAR_MAX
+const NEAR_MIN = Number(process.env.DMX_NEAR_MIN ?? 0.3);
+const NEAR_MAX = Number(process.env.DMX_NEAR_MAX ?? 0.6);
+const NEAR_REFRACT_MS = Number(process.env.DMX_NEAR_REFRACT_MS ?? 4000);
 /** MINI_DELAY_MS: mini-reaktionen vantar sa har lange och AVBRYTS om en riktig drop kommer under tiden. Journal
  *  ladan 2026-09-12 19:50-19:54: minidroppen fyrade 24-400 ms FORE 4 av 5 riktiga drops (lyft-detektorn har lagre
  *  krav och reagerar pa forsta bas-slaget) -> ljuset hoppade tidigt och smallen kom sedan ("nagra 100 ms for tidig"). */
@@ -453,6 +467,7 @@ export class EffectEngine {
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
+  private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0;   // NASTAN-DROP
   private lastMiniCount = 0; private miniBangUntil = 0; private miniPendingAt = 0;   // minidrop-flank + kort stot + fordrojd reaktion
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
@@ -1162,7 +1177,24 @@ export class EffectEngine {
     // hårdvaru-strobe (det gav strobe-känslan), bara ljus + färg på max.
     if (miniHit && !dropHit && sinceStart > START_DROP_MUTE_MS) this.miniBangUntil = nowWall + MINI_BANG_MS;
     const miniActive = nowWall < this.miniBangUntil;
-    const dTarget = dropActive ? 1 : miniActive ? MINI_DROP_ENV : 0;
+    let dTarget = dropActive ? 1 : miniActive ? MINI_DROP_ENV : 0;
+    if (NEAR_DROP) {
+      // Baskroppen glattad (120 ms), normalnivan (8 s) och dippens botten (minsta pa 1,5 s, 25 ms-rutor).
+      const x = Math.max(-90, frame.bodyDb ?? -90);
+      if (this.nearB === null) { this.nearB = x; this.nearNorm = x; }
+      this.nearB += (x - this.nearB) * Math.min(1, dtNow / 0.12);
+      this.nearNorm += (this.nearB - this.nearNorm) * Math.min(1, dtNow / 8);
+      const h = this.nearHist; h.push(this.nearB); if (h.length > 60) h.shift();
+      let floor = 1e9; for (const v of h) if (v < floor) floor = v;
+      const rise = this.nearB - floor, dip = this.nearNorm - floor;
+      if (rise >= NEAR_RISE_DB && dip >= NEAR_DIP_DB && this.nearB >= this.nearNorm - 1 && nowWall - this.nearAt > NEAR_REFRACT_MS
+          && !dropActive && sinceStart > START_DROP_MUTE_MS) {
+        const g = Math.max(0, Math.min(1, (rise - NEAR_RISE_DB) / Math.max(1, NEAR_FULL_DB - NEAR_RISE_DB)));
+        this.nearAt = nowWall; this.nearUntil = nowWall + MINI_BANG_MS; this.nearLevel = NEAR_MIN + (NEAR_MAX - NEAR_MIN) * g; this.nearCount++;
+        console.log(`[dirigent] nastan-drop: sprang ${rise.toFixed(1)} dB efter dipp ${dip.toFixed(1)} dB -> ljus ${(this.nearLevel * 100).toFixed(0)} % av en drop`);
+      }
+      if (nowWall < this.nearUntil && this.nearLevel > dTarget) dTarget = this.nearLevel;
+    }
     const dRate = dTarget > this.dropEnv ? dtNow / 0.03 : dtNow / 1.0;
     this.dropEnv += Math.max(-dRate, Math.min(dRate, dTarget - this.dropEnv));
 
