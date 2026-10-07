@@ -325,7 +325,7 @@ const ENERGY_SRC_INT = process.env.DMX_ENERGY_SRC === 'intensity';
  *  md till 1,2). E = analysatorns sektionsenergi frame.intensity ENERGY_LO..HI -> 0..1 (ra ingangsniva matte r -0,13 pa ladans
  *  komprimerade mixar - nivan ror sig knappt), direkt upp, E_RELEASE_MS ner, golv E_FLOOR; faktor E_FLOOR..1 pa effektens RGB,
  *  ALDRIG over 1. Drop slapper dampningen (faktor 1) men lyfter aldrig over effekten. */
-const ENERGY_SIMPLE = process.env.DMX_ENERGY_SIMPLE === '1';
+const ENERGY_SIMPLE = process.env.DMX_ENERGY_SIMPLE !== '0';   // STANDARD sedan 2026-10-07 (agaren: 'mycket battre energifoljning nu')
 const E_RELEASE_MS = Number(process.env.DMX_E_RELEASE_MS ?? 400), E_FLOOR = Number(process.env.DMX_E_FLOOR ?? 0.15);
 const ENERGY_LO = Number(process.env.DMX_ENERGY_LO ?? 0.05), ENERGY_HI = Number(process.env.DMX_ENERGY_HI ?? 0.85);
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
