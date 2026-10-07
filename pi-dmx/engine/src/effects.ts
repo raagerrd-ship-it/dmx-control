@@ -120,22 +120,22 @@ const GROUP_ALT = process.env.DMX_GROUP_ALT !== '0';
 const MINI_DROP_ENV = Number(process.env.MINI_DROP_ENV ?? 0.35);
 const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);
 /** NASTAN-DROP (agaren 2026-10-07: "analysen av NASTAN-drops, sa de aterspeglas pa nagot bra satt i ljuset"), opt-in
- *  DMX_NEAR_DROP=1. Allt som bygger mot en small utan att bli en full drop (partiella drops som kvalitetsgrinden nekar
+ *  STANDARD sedan 2026-10-07 (DMX_NEAR_DROP=0 stanger av). Allt som bygger mot en small utan att bli en full drop (partiella drops som kvalitetsgrinden nekar
  *  tyst, minidrops, en build som landar halvt) har samma ljudavtryck: baskroppen (frame.bodyDb, ra dB) DYKER under
  *  latens normalniva och KOMMER TILLBAKA. Hur djupt den dok och hur hart den kom tillbaka ar hur nara en drop det var.
- *  Graderad: dropEnv far ett golv NEAR_MIN..NEAR_MAX (30-60 % av en full drop) i MINI_BANG_MS, sedan samma 1 s-utton
+ *  Graderad: dropEnv far ett golv NEAR_MIN..NEAR_MAX (50-85 % av en full drop) i MINI_BANG_MS, sedan samma 1 s-utton
  *  som allt annat (fallet rors inte). Inget look-byte, ingen rok. Analysatorn rors inte - bara redan exporterade falt.
  *  Sond pa pop_ladan (10 min): sprang >= 10 dB efter dipp >= 8 dB ~1 per 30 s, de flesta pa minidrops/drops. */
-const NEAR_DROP = process.env.DMX_NEAR_DROP === '1';
+const NEAR_DROP = process.env.DMX_NEAR_DROP !== '0';   // STANDARD sedan 2026-10-07 (godkand i ladan); =0 av
 const NEAR_RISE_DB = Number(process.env.DMX_NEAR_RISE_DB ?? 10);    // sprang fran dippens botten
 const NEAR_DIP_DB = Number(process.env.DMX_NEAR_DIP_DB ?? 8);       // dippen under latens normalniva (8 s-medel)
 const NEAR_FULL_DB = Number(process.env.DMX_NEAR_FULL_DB ?? 24);    // sprang som ger NEAR_MAX
-const NEAR_MIN = Number(process.env.DMX_NEAR_MIN ?? 0.3);
-const NEAR_MAX = Number(process.env.DMX_NEAR_MAX ?? 0.6);
+const NEAR_MIN = Number(process.env.DMX_NEAR_MIN ?? 0.5);   // ladan 10-07: 0,3/0,6 'syns for lite' -> 0,5/0,85 godkant
+const NEAR_MAX = Number(process.env.DMX_NEAR_MAX ?? 0.85);
 const NEAR_REFRACT_MS = Number(process.env.DMX_NEAR_REFRACT_MS ?? 4000);
-/** DMX_NEAR_DROP_SWITCH=1 (agaren i ladan 10-07: "far aven dirigenten denna info och kan byta direkt"): en nastan-drop
+/** NEAR_DROP_SWITCH (agaren i ladan 10-07: "far aven dirigenten denna info och kan byta direkt"): en nastan-drop
  *  ar ocksa ett bytesskal - looken byts direkt, med samma regel som minidropen (looken maste ha hallits MIN_HOLD 8 s). */
-const NEAR_SWITCH = NEAR_DROP && process.env.DMX_NEAR_DROP_SWITCH === '1';
+const NEAR_SWITCH = NEAR_DROP && process.env.DMX_NEAR_DROP_SWITCH !== '0';   // STANDARD sedan 2026-10-07; =0 av
 /** MINI_DELAY_MS: mini-reaktionen vantar sa har lange och AVBRYTS om en riktig drop kommer under tiden. Journal
  *  ladan 2026-09-12 19:50-19:54: minidroppen fyrade 24-400 ms FORE 4 av 5 riktiga drops (lyft-detektorn har lagre
  *  krav och reagerar pa forsta bas-slaget) -> ljuset hoppade tidigt och smallen kom sedan ("nagra 100 ms for tidig"). */
