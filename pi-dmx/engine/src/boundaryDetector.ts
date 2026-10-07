@@ -50,6 +50,13 @@ const TEMPO_SHIFT_MAX = Number(process.env.DMX_TEMPO_SHIFT_MAX ?? 0.40);      //
 const TEMPO_SHIFT_HOLD_MS = Number(process.env.DMX_TEMPO_SHIFT_HOLD_MS ?? 900);   // sa lange maste okningen sta
 const TEMPO_SHIFT_REFRACT_MS = Number(process.env.DMX_TEMPO_SHIFT_REFRACT_MS ?? 12000);
 const TEMPO_REF_S = Number(process.env.DMX_TEMPO_REF_S ?? 20);   // latens etablerade tempo: langsamt medel
+// INSVANGNING (natt-agenten 2026-10-07, opt-in): referensen ar ett 20 s-medel och ar inte "latens etablerade tempo"
+// forran den funnits sa lange. MATT (tools/tempoShiftBench.mjs, ladans niva): 5 av de 7 falska fyrningarna pa
+// oktavhoppsklippen och den falska pa facitklipp ts02 lag 3-15 s efter start, medan lasets forsta sekunder satte sig
+// (125 -> 133 ar inlasning, inte musik). SETTLE_S > 0: referensen foljer laset direkt och ingen vaxling
+// fyrar forran den ar sa gammal, och en latgrans
+// (commit) nollar referensen - nasta lat ar inte en acceleration av den forra. 0 = som forr.
+const TEMPO_SHIFT_SETTLE_MS = Number(process.env.DMX_TEMPO_SHIFT_SETTLE_S ?? 0) * 1000;
 
 export class BoundaryDetector {
   constructor(private readonly clock: () => number = Date.now) {}
@@ -66,6 +73,7 @@ export class BoundaryDetector {
   private tempoUpFrom = 0;
   private tempoRef = 0;
   private tempoRefAt = 0;
+  private tempoRefSince = 0;   // nar referensen sattes (INSVANGNING)
   private tempoShiftAt = -1e9;
   /** Gransignaler som var aktiva vid senaste kontrollen (diagnostik). */
   lastEvidence: string[] = [];
@@ -217,9 +225,11 @@ export class BoundaryDetector {
       // fyrade tva ganger pa samma 92->110, och ett 1,5x-oktavhopp (87->130) smog igenom som 33 %.
       // tempoRef ar ett langsamt medel (TEMPO_REF_S) sa en akta vaxling star ut mot latens etablerade tempo.
       if (TEMPO_SHIFT_ON && o.bpmConfidence > 0.5 && o.bpm > 40) {
-        if (!this.tempoRef) this.tempoRef = o.bpm;
+        if (!this.tempoRef) { this.tempoRef = o.bpm; this.tempoRefSince = now; }
         const up = (o.bpm - this.tempoRef) / this.tempoRef;
-        if (up >= TEMPO_SHIFT_PCT) {
+        if (TEMPO_SHIFT_SETTLE_MS > 0 && now - this.tempoRefSince < TEMPO_SHIFT_SETTLE_MS) {
+          this.tempoRef = o.bpm; this.tempoRefAt = now; this.tempoUpSince = 0;   // INSVANGNING: folj laset, vaxla inte
+        } else if (up >= TEMPO_SHIFT_PCT) {
           if (!this.tempoUpSince) { this.tempoUpSince = now; this.tempoUpFrom = this.tempoRef; }
           else if (now - this.tempoUpSince >= TEMPO_SHIFT_HOLD_MS && now - this.tempoShiftAt >= TEMPO_SHIFT_REFRACT_MS) {
             const trueUp = (o.bpm - this.tempoUpFrom) / this.tempoUpFrom;
@@ -283,5 +293,6 @@ export class BoundaryDetector {
     this.playStart = 0;
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.resetNovelty();
     this.levAvg = 0; this.dipAt = 0; this.loudSince = 0;
+    if (TEMPO_SHIFT_SETTLE_MS > 0) { this.tempoRef = 0; this.tempoUpSince = 0; }   // INSVANGNING: ny lat, ny referens
   }
 }
