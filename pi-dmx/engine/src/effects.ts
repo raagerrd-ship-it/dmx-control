@@ -133,6 +133,9 @@ const NEAR_FULL_DB = Number(process.env.DMX_NEAR_FULL_DB ?? 24);    // sprang so
 const NEAR_MIN = Number(process.env.DMX_NEAR_MIN ?? 0.3);
 const NEAR_MAX = Number(process.env.DMX_NEAR_MAX ?? 0.6);
 const NEAR_REFRACT_MS = Number(process.env.DMX_NEAR_REFRACT_MS ?? 4000);
+/** DMX_NEAR_DROP_SWITCH=1 (agaren i ladan 10-07: "far aven dirigenten denna info och kan byta direkt"): en nastan-drop
+ *  ar ocksa ett bytesskal - looken byts direkt, med samma regel som minidropen (looken maste ha hallits MIN_HOLD 8 s). */
+const NEAR_SWITCH = NEAR_DROP && process.env.DMX_NEAR_DROP_SWITCH === '1';
 /** MINI_DELAY_MS: mini-reaktionen vantar sa har lange och AVBRYTS om en riktig drop kommer under tiden. Journal
  *  ladan 2026-09-12 19:50-19:54: minidroppen fyrade 24-400 ms FORE 4 av 5 riktiga drops (lyft-detektorn har lagre
  *  krav och reagerar pa forsta bas-slaget) -> ljuset hoppade tidigt och smallen kom sedan ("nagra 100 ms for tidig"). */
@@ -467,7 +470,7 @@ export class EffectEngine {
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
-  private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0;   // NASTAN-DROP
+  private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
   private lastMiniCount = 0; private miniBangUntil = 0; private miniPendingAt = 0;   // minidrop-flank + kort stot + fordrojd reaktion
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
@@ -1178,6 +1181,7 @@ export class EffectEngine {
     if (miniHit && !dropHit && sinceStart > START_DROP_MUTE_MS) this.miniBangUntil = nowWall + MINI_BANG_MS;
     const miniActive = nowWall < this.miniBangUntil;
     let dTarget = dropActive ? 1 : miniActive ? MINI_DROP_ENV : 0;
+    this.nearHit = false;   // bara rutan da nastan-dropen fyrar (lases av dirigenten langre ner i samma ruta)
     if (NEAR_DROP) {
       // Baskroppen glattad (120 ms), normalnivan (8 s) och dippens botten (minsta pa 1,5 s, 25 ms-rutor).
       const x = Math.max(-90, frame.bodyDb ?? -90);
@@ -1190,7 +1194,7 @@ export class EffectEngine {
       if (rise >= NEAR_RISE_DB && dip >= NEAR_DIP_DB && this.nearB >= this.nearNorm - 1 && nowWall - this.nearAt > NEAR_REFRACT_MS
           && !dropActive && sinceStart > START_DROP_MUTE_MS) {
         const g = Math.max(0, Math.min(1, (rise - NEAR_RISE_DB) / Math.max(1, NEAR_FULL_DB - NEAR_RISE_DB)));
-        this.nearAt = nowWall; this.nearUntil = nowWall + MINI_BANG_MS; this.nearLevel = NEAR_MIN + (NEAR_MAX - NEAR_MIN) * g; this.nearCount++;
+        this.nearAt = nowWall; this.nearUntil = nowWall + MINI_BANG_MS; this.nearLevel = NEAR_MIN + (NEAR_MAX - NEAR_MIN) * g; this.nearCount++; this.nearHit = true;
         console.log(`[dirigent] nastan-drop: sprang ${rise.toFixed(1)} dB efter dipp ${dip.toFixed(1)} dB -> ljus ${(this.nearLevel * 100).toFixed(0)} % av en drop`);
       }
       if (nowWall < this.nearUntil && this.nearLevel > dTarget) dTarget = this.nearLevel;
@@ -1334,6 +1338,7 @@ export class EffectEngine {
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
         const dropSwitch = DISCRETE_DROP_LAMPS && dropHit && this.cfg.energyDrivesMode && held > DROP_HOLD;
         const miniSwitch = miniHit && this.cfg.energyDrivesMode && held > MIN_HOLD;   // minidrop: byt look om den hallits
+        const nearSwitch = NEAR_SWITCH && this.nearHit && this.cfg.energyDrivesMode && held > MIN_HOLD;   // nastan-drop: samma regel
         // MINNETS STRUKTUR: en tvättad låt vet var karaktären skiftar och var
         // fraserna börjar. Ett byte DÄR känns komponerat; samma byte 1,5 takt fel
         // känns slumpmässigt. Sektionsgräns = byt gärna nu; frasgräns = ok att byta.
@@ -1412,10 +1417,10 @@ export class EffectEngine {
         if (this.memSongId !== this.partLookSong) { this.partLook.clear(); this.partLookSong = this.memSongId; }
         const buildEntry = MIX_V2 && liveSecChanged && liveSec === 'build';   // MIX_V2 (2): ett byte IN i build-poolen tillats
         const secEntry = SECTION_UNIT && this.pendingSecSwitch && secOldEnough && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
-        if ((!inBuild || buildEntry || secEntry) && (dropSwitch || miniSwitch || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
+        if ((!inBuild || buildEntry || secEntry) && (dropSwitch || miniSwitch || nearSwitch || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false;
         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
-        this.switchWhy = dropSwitch ? 'drop' : miniSwitch ? 'minidrop' : charShift ? (this.charShiftWhy.startsWith('tempovaxling') ? 'tempo' : 'karaktar')
+        this.switchWhy = dropSwitch ? 'drop' : miniSwitch ? 'minidrop' : nearSwitch ? 'nastan-drop' : charShift ? (this.charShiftWhy.startsWith('tempovaxling') ? 'tempo' : 'karaktar')
           : (memSection || secEntry) ? 'sektion' : unitPhrase ? 'fras' : bassSwitch ? 'basgang'
           : buildEntry ? 'build' : halvedChanged ? 'halvering' : tierChanged ? 'tier' : 'dwell';
         this.switchCount++;
