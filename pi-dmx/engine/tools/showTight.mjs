@@ -91,7 +91,7 @@ const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig)));
 // Kor ladan pa mikrofon ar AGC:n aktiv dar men inte har; --agc kor som mikrofoningang.
 if (!flag("--agc")) an.setGainLock(true, 1);
 // LATGRANSENS SIDOKEDJA som i index.ts (se huvudet). Klockan ar Date.now = den virtuella.
-const bounds = new BoundaryDetector();
+const bounds = new BoundaryDetector(() => Date.now());   // INTE standardklockan: den fangar Date.now-funktionen vid konstruktion, och banken byter den per hop
 an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
 const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
 let lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0;
