@@ -47,7 +47,9 @@ export function applyInputRouting(input: "aux" | "mic") {
   // Hela analoga kedjan sätts explicit — restore tappar även Aux-amp/mixins.
   const sw = input === "aux"
     ? "amixer -c 0 -q set 'AUX Jack' on; amixer -c 0 -q set 'Onboard MIC' off; amixer -c 0 -q set 'MIC Jack' off; " +
-      "amixer -c 0 -q set 'Aux' 53 on; amixer -c 0 -q set 'Mixin Left Aux Left' on; amixer -c 0 -q set 'Mixin Right Aux Right' on"
+      // INGANGSNIVA (ladan 2026-10-07, agaren: "mycket battre nu"): Aux 53 (0 dB) + Mixin PGA +6/+3 dB overstyrde - 22-29 % av
+      // samplen klippta, nastan varje sekund i 0 dBFS, nivaskillnaderna nadde aldrig analysatorn. Aux 49 = -6 dB, PGA 3 = 0 dB.
+      "amixer -c 0 -q set 'Aux' 49 on; amixer -c 0 -q set 'Mixin PGA' 3; amixer -c 0 -q set 'Mixin Left Aux Left' on; amixer -c 0 -q set 'Mixin Right Aux Right' on"
     : "amixer -c 0 -q set 'Onboard MIC' on; amixer -c 0 -q set 'AUX Jack' off; amixer -c 0 -q set 'MIC Jack' off; " +
       "amixer -c 0 -q set 'Aux' 0 off; amixer -c 0 -q set 'Mixin Left Aux Left' off; amixer -c 0 -q set 'Mixin Right Aux Right' off";
   spawn("sh", ["-c", `alsactl restore 0 -f /etc/alsa/codec-zero-${input}.state 2>/dev/null; ${sw}`], { stdio: "ignore" })
