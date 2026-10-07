@@ -60,6 +60,11 @@ const INPUT_OFF_LEVEL = 0.02;
 const SILENCE_LEVEL = Number(process.env.DMX_SILENCE_LEVEL ?? 0.05), SILENCE_LEVEL_ENV = process.env.DMX_SILENCE_LEVEL !== undefined, SILENCE_MS = Number(process.env.DMX_SILENCE_MS ?? 250), SILENCE_RELEASE_S = Number(process.env.DMX_SILENCE_RELEASE_S ?? 0.25);
 /** ...men först när den legat där så länge — ett break i låten ska inte släcka showen. */
 const INPUT_OFF_MS = 2000;
+/** HARD INGANGSGRANS (agaren i ladan 2026-10-07: "lagsta input till analysatorn ... dar gor vi hard grans som vi kan justera. Inga
+ *  starttider mm"), opt-in DMX_HARD_GATE=1. Analysatorns niva (frame.level) under Slackgransen (/setup, eller DMX_SILENCE_LEVEL) = svart,
+ *  over = tant - direkt, ingen hålltid (SILENCE_MS), ingen ton in/ut, ingen gain-skalning av gransen, ingen intoning vid latstart
+ *  (START_FADE_MS) och gransens flank startar ingen 'ny lat'. Analysatorn hor fortfarande allt (takten tappas inte i tysta partier). */
+const HARD_GATE = process.env.DMX_HARD_GATE === '1';
 
 const BEAT_ATTACK_FRAC = 0.12;
 const BEAT_ATTACK_MIN_MS = 30;
@@ -1571,15 +1576,18 @@ export class EffectEngine {
     // i laten racker. Env: DMX_SILENCE_LEVEL (0,05), DMX_SILENCE_MS (250), DMX_SILENCE_RELEASE_S (0,25). Ladan: 0,03 / 2000 / 1,0.
     // Nivån är sedan 09-27 en ratt i /setup (cfg.silenceLevel, "Släckgräns"); env DMX_SILENCE_LEVEL vinner om den är satt.
     const silenceLevel = SILENCE_LEVEL_ENV ? SILENCE_LEVEL : (this.cfg.silenceLevel ?? SILENCE_LEVEL);
-    const silenceThreshold = silenceLevel * Math.max(1, frame.gain / 3);
+    const silenceThreshold = HARD_GATE ? silenceLevel : silenceLevel * Math.max(1, frame.gain / 3);
     if (frame.level > silenceThreshold || kickHit) this.lastActiveMs = now;
+    if (HARD_GATE) this.silenceGate = frame.level > silenceThreshold ? 1 : 0;   // DMX_HARD_GATE: hard grans, inga tider
+    else {
     const gateTarget = now - this.lastActiveMs > SILENCE_MS ? 0 : 1;
     const gateRate = gateTarget > this.silenceGate ? dtSec / 0.1 : dtSec / SILENCE_RELEASE_S;
     this.silenceGate += Math.max(-gateRate, Math.min(gateRate, gateTarget - this.silenceGate));
+    }
     // FLANK: ljudet var borta och kom tillbaka → behandla det som en låtstart.
     // Täcker okända låtar och att någon startar musiken; för kända låtar sätter
     // index.ts samma sak när minnet låser tidigt i tidslinjen.
-    if (this.gatePrev < 0.2 && this.silenceGate > 0.8) this.songStartAt = performance.now();
+    if (!HARD_GATE && this.gatePrev < 0.2 && this.silenceGate > 0.8) this.songStartAt = performance.now();
     this.gatePrev = this.silenceGate;
     // Warmup-räknare för baslinjen: ackumulera medan aktiv, nollställ vid tystnad.
     if (this.silenceGate > 0.5) this.warmMs += dtSec * 1000; else this.warmMs = 0;
@@ -1689,7 +1697,7 @@ export class EffectEngine {
     // upp tillsammans i stället för att enskilda kanaler beter sig olika. Kvadraten
     // gör starten mjuk och slutet snabbt — en linjär ramp känns som en dimmer som
     // dras, en kvadratisk som att musiken kommer igång.
-    if (sinceStart < START_FADE_MS) {
+    if (!HARD_GATE && sinceStart < START_FADE_MS) {
       const w = sinceStart / START_FADE_MS;
       ceilMul = Math.min(ceilMul, w * w);
     }
