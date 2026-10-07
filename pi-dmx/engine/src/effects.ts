@@ -2079,7 +2079,8 @@ export class EffectEngine {
       blackout || this.inputOff,
       this.cfg.master ?? 1,
       this.cfg.dropHeadroom ? Math.round(255 * Math.min(1, 0.90 + 0.10 * this.dropEnv)) : -1,
-      performance.now()
+      performance.now(),
+      this.dropEnv
     );
 
     // Rök: motorn avgör OM den ska spruta, output-tjänsten var signalen hamnar.

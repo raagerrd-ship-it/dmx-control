@@ -72,7 +72,8 @@ export class PostProcess {
     blackout: boolean,
     master: number,
     headroomCap: number,
-    nowMs: number
+    nowMs: number,
+    dropOpen = 0   // energilagrets drop-envelope 0..1 - utgangens LIN_MAP oppnar sitt tak med den (se output.ts)
   ): void {
     const maxCh = out.maxCh;
 
@@ -120,7 +121,7 @@ export class PostProcess {
     }
 
     // 5. KALIBRERING + LJUS-TAK (output-tjänsten äger lampkunskapen).
-    out.calibrate(universe, fixtures, master, nowMs);
+    out.calibrate(universe, fixtures, master, nowMs, dropOpen);
     if (blackout) this.finalOut.fill(0);   // efter blackout: ingen gammal niva att tona ner fran
     else if (FINAL_FADE_S > 0) {
       const xf = LOOK_FADE_S > 0 ? Math.min(1, (nowMs - this.lookFadeAt) / (LOOK_FADE_S * 1000)) : 1;

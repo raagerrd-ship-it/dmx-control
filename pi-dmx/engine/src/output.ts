@@ -42,10 +42,11 @@ const MIN_DIM = process.env.DMX_MIN_DIM === '1';
 const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 40)));
 /** LINJAR MAPPNING (agaren i ladan 2026-10-07: "skall inte 1-100% fran effekten rakt mappas mot GOLV+1 till 95%? Sa drop syns"),
  *  opt-in DMX_LIN_MAP=1. Forr KLAMPADES DIM-kanalen: allt under golvet (40 = 16 %) blev golvet och resten gick igenom ororda, sa
- *  effektens nedersta 16 % var en dod zon. Nu: 1..255 -> golv+1..tak linjart, 0 = slackt som forr. Mappningen ar SISTA steget
- *  och ingen annan modul vet om den (agaren: "energi ska inte veta om min mappning"). Drop-utrymmet finns redan fore utgangen:
- *  energitaket haller vanlig show under fullt och bara dropEnv lyfter det till 1 - ett 95 %-tak har skulle kapa dropen lika mycket. */
+ *  effektens nedersta 16 % var en dod zon. Nu: 1..255 -> golv+1..MAP_TOP x tak linjart, 0 = slackt som forr. Effekten FAR ge 100 %;
+ *  det blir 95 %. Bara en drop oppnar de sista 5 %: utgangen far energilagrets drop-envelope (dropOpen 0..1) och taket blir
+ *  MAP_TOP + (1 - MAP_TOP) x dropOpen. Mappningen och 95 % ags av utgangen - energilagret vet inte om dem (agaren 10-07). */
 const LIN_MAP = process.env.DMX_LIN_MAP === '1';
+const MAP_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_MAP_TOP ?? 0.95)));
 /** DIM-TAK (ladan 10-01, stegtest: lamporna mattar vid DIM ~85 - 85/110/255 ser lika ut, DIM 1 lyser redan): skala DIM-kanalen
  *  linjart sa full show = DMX_DIM_MAX i stallet for 255; allt over ~85 var dod skala. 255 = av (som forr). Tant varde blir aldrig 0. */
 const DIM_MAX = Math.max(1, Math.min(255, Number(process.env.DMX_DIM_MAX ?? 255)));
@@ -228,8 +229,9 @@ export class FixtureOutput {
   private calDim = new Float64Array(64); private calDimAt = new Float64Array(64);   // CAL_V2: langsam DIM per lampa   // KULORLYFT: kanalen ar tand (hysteres)
   private lowLit = new Uint8Array(512);  // 10 %-REGELN: lampan (indexerad pa basadressen) ar tand (hysteres pa starkaste fargkanalen)
 
-  calibrate(universe: Uint8Array, fixtures: FixtureConfig[], master: number, nowMs: number): void {
+  calibrate(universe: Uint8Array, fixtures: FixtureConfig[], master: number, nowMs: number, dropOpen = 0): void {
     const top = (255 * master + 0.5) | 0;
+    const mapTop = LIN_MAP ? Math.round(top * (MAP_TOP + (1 - MAP_TOP) * Math.max(0, Math.min(1, dropOpen)))) : top;   // DMX_LIN_MAP
     for (let f = 0; f < fixtures.length; f++) {
       const fx = fixtures[f];
       const fast = this.fastFixtures[f];
@@ -345,7 +347,7 @@ export class FixtureOutput {
         const floorCh = FLOOR_CH > onCh && isDim ? (FLOOR_CH > top ? top : FLOOR_CH) : onCh;
         let out: number;
         if (raw > 0) {
-          out = LIN_MAP && isDim && top > floorCh ? Math.min(top, floorCh + 1 + Math.round((top - floorCh - 1) * (raw - 1) / 254))   // DMX_LIN_MAP
+          out = LIN_MAP && isDim && mapTop > floorCh ? Math.min(mapTop, floorCh + 1 + Math.round((mapTop - floorCh - 1) * (raw - 1) / 254))   // DMX_LIN_MAP
             : raw < floorCh ? floorCh : raw > top ? top : raw;
           this.holdVal[ch] = out;
           this.holdUntil[ch] = nowMs + HOLD_MS;
