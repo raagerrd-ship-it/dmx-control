@@ -327,6 +327,12 @@ const ENERGY_SRC_INT = process.env.DMX_ENERGY_SRC === 'intensity';
  *  ALDRIG over 1. Drop slapper dampningen (faktor 1) men lyfter aldrig over effekten. */
 const ENERGY_SIMPLE = process.env.DMX_ENERGY_SIMPLE !== '0';   // STANDARD sedan 2026-10-07 (agaren: 'mycket battre energifoljning nu')
 const E_RELEASE_MS = Number(process.env.DMX_E_RELEASE_MS ?? 400), E_FLOOR = Number(process.env.DMX_E_FLOOR ?? 0.15);
+/** REN OVERSATTNING (agaren 10-07: "gar det inte gora denna rena oversattning av ljud till ljus?"), DMX_ENERGY_VOL=1: energin = ingangens
+ *  VOLYM i dB rakt mellan Slackgransen (samma tal som tystnadsgrinden, /setup) och FULLNIVAN DMX_E_FULL (frame.level). Inga relativa matt,
+ *  inga ankare, inget golv: vid gransen ger effektens 1 % slack+1 (utgangens mappning), vid fullnivan gar effekten igenom orord.
+ *  Rattar: Slackgrans, Fullniva, avklingning (E_RELEASE_MS). */
+const ENERGY_VOL = process.env.DMX_ENERGY_VOL === '1';
+const E_FULL = Number(process.env.DMX_E_FULL ?? 0.9);
 const ENERGY_LO = Number(process.env.DMX_ENERGY_LO ?? 0.05), ENERGY_HI = Number(process.env.DMX_ENERGY_HI ?? 0.85);
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
@@ -516,7 +522,7 @@ export class EffectEngine {
   private lastDropSwitchMs = -1e9; dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;   // senaste drop -> 'high'-pool i 20 s
   private liveAnchor = NaN; private liveAnchorMax = NaN;   /* NaN = ej satt (forr undefined: taggat falt -> ny HeapNumber per ruta) */ private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
   private lightLoud = 0;         // log-released loudness 0..1 → driver md
-  private eSm = 0; eSimple = 0;   // ENERGY_SIMPLE
+  private eSm = 0; eSimple = 0; private eGate = 0.05;   // ENERGY_SIMPLE / ENERGY_VOL
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
@@ -1607,6 +1613,7 @@ export class EffectEngine {
     // i laten racker. Env: DMX_SILENCE_LEVEL (0,05), DMX_SILENCE_MS (250), DMX_SILENCE_RELEASE_S (0,25). Ladan: 0,03 / 2000 / 1,0.
     // Nivån är sedan 09-27 en ratt i /setup (cfg.silenceLevel, "Släckgräns"); env DMX_SILENCE_LEVEL vinner om den är satt.
     const silenceLevel = SILENCE_LEVEL_ENV ? SILENCE_LEVEL : (this.cfg.silenceLevel ?? SILENCE_LEVEL);
+    this.eGate = silenceLevel;   // ENERGY_VOL: samma grans som tystnadsgrinden
     const silenceThreshold = HARD_GATE ? silenceLevel : silenceLevel * Math.max(1, frame.gain / 3);
     if (frame.level > silenceThreshold || kickHit) this.lastActiveMs = now;
     if (HARD_GATE) this.silenceGate = frame.level > silenceThreshold ? 1 : 0;   // DMX_HARD_GATE: hard grans, inga tider
@@ -1857,10 +1864,13 @@ export class EffectEngine {
     if (SECTION_CONTRAST) { const a = Math.min(1, dtSec / 1.2); this.secGainSm = this.secGainSm <= 0 ? dynGain : this.secGainSm + (dynGain - this.secGainSm) * a; dynGain = this.secGainSm; }   // glid mellan sektioner
     let md = SECTION_SWITCH ? Math.min(1.2, md0 * dynGain) : md0;   // standard: orort
     if (ENERGY_SIMPLE) {   // se ENERGY_SIMPLE: ersatter md0/sektionsgas
-      let e = ((frame.intensity ?? 0.5) - ENERGY_LO) / Math.max(0.05, ENERGY_HI - ENERGY_LO); e = e < 0 ? 0 : e > 1 ? 1 : e;
+      let e = ENERGY_VOL
+        ? Math.log(Math.max(1e-6, frame.level) / this.eGate) / Math.log(Math.max(this.eGate * 1.01, E_FULL) / this.eGate)   // ren: volym i dB, grans..full
+        : ((frame.intensity ?? 0.5) - ENERGY_LO) / Math.max(0.05, ENERGY_HI - ENERGY_LO);
+      e = e < 0 ? 0 : e > 1 ? 1 : e;
       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
       this.eSimple = this.eSm;
-      md = drive * Math.min(1, Math.max(E_FLOOR + (1 - E_FLOOR) * this.eSm, this.dropEnv));   // bara dampning: aldrig over 1
+      md = drive * Math.min(1, Math.max(ENERGY_VOL ? this.eSm : E_FLOOR + (1 - E_FLOOR) * this.eSm, this.dropEnv));   // bara dampning: aldrig over 1
     }
     // HEARTBEAT: envelopen (kontraktet). ceiling = md utan tystnadsgrinden (drive), som appliceras separat pa ALLA effekter.
     const hbPulse = (this.cfg.beatPulse && this.beatMulNow > BEAT_MIN) ? Math.min(1, (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN)) : 0;
