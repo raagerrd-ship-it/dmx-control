@@ -236,7 +236,6 @@ const SECTION_UNIT_MIN_MS = Number(process.env.DMX_SECTION_UNIT_MIN_MS ?? 4000);
  *  DMX_SECTION_UNIT_PHRASE_BARS:e takt (8; 0 = av), och varje sektionstyp har TVA looker som alternerar (A pa sektionsstart, B pa nasta
  *  fras, A igen ...). Refrangen kommer tillbaka med samma par - identiteten ar kvar, men den star inte still i 50 s. */
 const SECTION_UNIT_PHRASE_BARS = Number(process.env.DMX_SECTION_UNIT_PHRASE_BARS ?? 8);
-const LAMP_MIN = Number(process.env.LAMP_MIN ?? 0.08);
 // BEAT_LIFT: additivt hjartslagslyft EFTER effekten. STANDARD 0 = AV sedan 2026-10-06.
 // Agaren: "vi kor inte med heartbeat efter effekten utan bara energi" - hjartslaget togs bort for en vecka
 // sedan och bor i effekterna sjalva (c.heart). Det har lyftet var kvar och gav ett slag per takt, men varre:
@@ -256,7 +255,7 @@ const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)
  *  pulse = hjartslaget beatMulNow normerat (1 pa slaget, 0 vid BEAT_MIN); pulseDepth = DMX_HEARTBEAT_DEPTH x tillit.
  *  Output: rgb x gate x (energy ? ceiling : 1) x (pulse ? 1 - d + d*pulse : 1) - effektens modulate-flaggor ur dess fil,
  *  dirigenten skriver over: tillit < DMX_HEARTBEAT_TRUST -> pulse av; break/lugnt -> energy pa. Ersatter BEAT_LIFT (additivt)
- *  och md-multiplikationen; tystnadsgrinden (gate) galler ALLA effekter. LAMP_MIN-golvet kvar (output-lagrets tandtroskel). */
+ *  och md-multiplikationen; tystnadsgrinden (gate) galler ALLA effekter. (LAMP_MIN borttaget 10-07, se output.ts LIN_MAP.) */
 const HEARTBEAT = process.env.DMX_HEARTBEAT === '1';
 const HEARTBEAT_DEPTH = Number(process.env.DMX_HEARTBEAT_DEPTH ?? 0.35);
 const HEARTBEAT_TRUST = Number(process.env.DMX_HEARTBEAT_TRUST ?? 0.35);
@@ -2014,9 +2013,7 @@ export class EffectEngine {
         const hb = (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN); const lift = BEAT_LIFT * hb * md;
         rgb[0] += lift * (1 - rgb[0]); rgb[1] += lift * (1 - rgb[1]); rgb[2] += lift * (1 - rgb[2]);
       }
-      // LAMPGOLV (ladan 20:05, 'manga effekter slacker lamporna'): effekternas egna golv (3-12 %) x mastern hamnar under PAR-lampornas
-      // tandtroskel (~5-8 % DMX) -> helt slackt i stallet for morkt. Allt > 0 mappas till LAMP_MIN..1 under spelning; 0 forblir 0.
-      if (LAMP_MIN > 0 && drive > 0.05) { const mx = Math.max(rgb[0], rgb[1], rgb[2]); if (mx > 0.002 && mx < 1) { const k = (LAMP_MIN + (1 - LAMP_MIN) * mx) / mx; rgb[0] = Math.min(1, rgb[0] * k); rgb[1] = Math.min(1, rgb[1] * k); rgb[2] = Math.min(1, rgb[2] * k); } }
+      // (LAMPGOLV LAMP_MIN borttaget 2026-10-07: utgangens LIN_MAP mappar effektens 1 % till lampans tandpunkt + 1.)
       this.out.writeFixture(this.universe, fx, rgb, 1, strobeVal, specialty);
     }
 

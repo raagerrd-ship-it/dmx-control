@@ -295,16 +295,23 @@ export class FixtureOutput {
       // pendlade en sidokanal kring 20/26). Nu avgors tand/slackt av lampans STARKASTE fargkanal med hysteres
       // (pa >= LOW_ON_CH, av < LOW_OFF_CH); tand lampa skickar fargkanalerna RAA (inget lyft - under tandpunkten lyser
       // de inte fysiskt anda), slackt lampa nollar dem. Kuloren andras bara nar fargen andras, inte med ljusstyrkan.
-      let lampLit = true;
+      let lampLit = true, colK = 1;
       if (LOW_PURE && c) {
-        let mxRaw = 0;
+        let mxRaw = 0, mxOn = on;
         for (let i = 0; i < fast.roles.length; i++) {
           const ch = base + i; if (ch < 0 || ch >= 512 || this.cal[ch] !== 1 || this.dimCal[ch] === 1) continue;
           const role = fast.roles[i]; if (role !== "r" && role !== "g" && role !== "b" && role !== "w") continue;
-          if (universe[ch] > mxRaw) mxRaw = universe[ch];
+          if (universe[ch] > mxRaw) { mxRaw = universe[ch]; mxOn = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; }
         }
-        lampLit = this.lowLit[base] === 1 ? mxRaw >= LOW_OFF_CH : mxRaw >= LOW_ON_CH;
-        this.lowLit[base] = lampLit ? 1 : 0;
+        if (LIN_MAP) {
+          // EFFEKTENS STYRKA (starkaste fargkanalen) 1..255 -> SLACK+1 (lampans tandpunkt + 1)..tak, linjart; alla fargkanaler
+          // skalas med samma faktor sa kuloren bevaras. 0 = slackt. Ersatter 10 %-regeln och effektlagrets LAMP_MIN (agaren 10-07).
+          lampLit = mxRaw > 0;
+          if (lampLit) colK = (mxOn + 1 + (top - mxOn - 1) * (mxRaw - 1) / 254) / mxRaw;
+        } else {
+          lampLit = this.lowLit[base] === 1 ? mxRaw >= LOW_OFF_CH : mxRaw >= LOW_ON_CH;
+          this.lowLit[base] = lampLit ? 1 : 0;
+        }
       }
       for (let i = 0; i < fast.roles.length; i++) {
         const ch = base + i;
@@ -320,6 +327,7 @@ export class FixtureOutput {
         let raw = universe[ch];
         if (LOW_PURE && isColor) {
           if (!lampLit) { universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
+          if (colK !== 1) raw = Math.round(raw * colK);   // LIN_MAP (se ovan)
           const v1 = raw > top ? top : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
         }
         if (HUE_LIFT && isColor && raw > 0) {
