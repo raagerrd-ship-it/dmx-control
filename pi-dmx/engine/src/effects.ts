@@ -379,6 +379,11 @@ const ENERGY_RISE_DEAD = Number(process.env.DMX_ENERGY_RISE_DEAD ?? 0.06);
  *  uppat-puls (anslag ELLER energistigning) far starta hogst en gang per DMX_PULSE_GAP_MS - delad grind for bada. En pagaende
  *  stigning far fortsatta. 0 = av (anslagen har da bara ENERGY_FB_GAP_MS, stigningen ingen grind). */
 const PULSE_GAP_MS = Number(process.env.DMX_PULSE_GAP_MS ?? 250);
+/** DUBBELTAKT (agaren i ladan 10-07: "kanns som dubbeltakt ligger nagonstans i koden"). MATT: megamix (92 BPM) 628 av 1 230 pulsintervall
+ *  = ett HALVT slag, 123 pulser/min mot 92 slag - de fasta grindarna (330/250 ms) slapper igenom attondelar vid ~90 BPM (halvt slag 326 ms).
+ *  DMX_PULSE_GAP_BEAT > 0 (opt-in): minsta mellanrum mellan uppat-pulser = sa manga SLAG nar tempot ar kant (de fasta ms-grindarna galler
+ *  som golv). 0 = som forr. */
+const PULSE_GAP_BEAT = Number(process.env.DMX_PULSE_GAP_BEAT ?? 0);
 const CALM_FADE_S = Number(process.env.DMX_CALM_FADE_S ?? 0.6);
 const CALM_ATTACK = process.env.DMX_CALM_ATTACK === '1';   // lang attack i lugna partier (av sedan 09-27: uppstegning ska ga direkt)   // se 'LUGNA PARTIER = MJUKA OVERGANGAR'
 // LOGGEN: index.ts tystar console.log nar DMX_QUIET != '0' (standard). Periodiska diagnosrader byggs da inte alls (skrapjakten 10-01).
@@ -1024,7 +1029,8 @@ export class EffectEngine {
             // (3) bred transient: bas/kick/diskant-onset -> puls med avklingning, hogst en per ENERGY_FB_GAP_MS
             const o = frame.onset; const on = o ? Math.max(o.bass ?? 0, o.kick ?? 0, o.treble ?? 0) : 0;
             const pn = performance.now();
-            if (on >= ENERGY_FB_ONSET && pn - this.transAt >= ENERGY_FB_GAP_MS && pn - this.pulseAt >= PULSE_GAP_MS && on >= this.transEnv * Math.exp(-(pn - this.transAt) / LIVE_BEAT_MS)) { this.transEnv = on; this.transAt = pn; this.pulseAt = pn; }
+            const beatGap = PULSE_GAP_BEAT > 0 && bpmNow > 0 ? PULSE_GAP_BEAT * 60000 / bpmNow : 0;   // DUBBELTAKT (se PULSE_GAP_BEAT)
+            if (on >= ENERGY_FB_ONSET && pn - this.transAt >= Math.max(ENERGY_FB_GAP_MS, beatGap) && pn - this.pulseAt >= Math.max(PULSE_GAP_MS, beatGap) && on >= this.transEnv * Math.exp(-(pn - this.transAt) / LIVE_BEAT_MS)) { this.transEnv = on; this.transAt = pn; this.pulseAt = pn; }
             const tEnv = this.transEnv * Math.exp(-Math.max(0, pn - this.transAt) / LIVE_BEAT_MS);
             fb = Math.max(fb, tEnv);
             // (4) djupet foljer anslagstatheten i energilaget
@@ -1036,7 +1042,7 @@ export class EffectEngine {
             if (ENERGY_RISE_K > 0) {
               this.loudSlow = this.loudSlow <= 0 ? this.lightLoud : this.loudSlow + (this.lightLoud - this.loudSlow) * Math.min(1, dtA / 0.4);
               let rise = this.loudSlow > 0.02 ? Math.max(0, Math.min(1, (this.lightLoud / this.loudSlow - 1 - ENERGY_RISE_DEAD) * ENERGY_RISE_K)) : 0;
-              if (PULSE_GAP_MS > 0) { if (rise <= 0) this.riseOn = false; else if (!this.riseOn) { if (pn - this.pulseAt >= PULSE_GAP_MS) { this.riseOn = true; this.pulseAt = pn; } else rise = 0; } }
+              if (PULSE_GAP_MS > 0) { if (rise <= 0) this.riseOn = false; else if (!this.riseOn) { if (pn - this.pulseAt >= Math.max(PULSE_GAP_MS, beatGap)) { this.riseOn = true; this.pulseAt = pn; } else rise = 0; } }
               riseNow = rise; if (rise > 0) depthEff = Math.max(depthEff, depth * rise);
             }
           }
