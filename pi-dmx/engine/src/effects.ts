@@ -315,6 +315,11 @@ const LIVE_CEIL = LIVE_LEVEL && process.env.DMX_LIVE_CEIL !== '0';
  *  DMX_ENERGY_GAMMA (opt-in, 1 = som forr): nivafonstrets form upphojd till gamma - topparna star nastan kvar, mitten trycks ner.
  *  EN ratt for energins kontrast. */
 const ENERGY_GAMMA = Math.max(0.3, Math.min(4, Number(process.env.DMX_ENERGY_GAMMA ?? 1)));
+/** ENERGIKALLA (ladan 10-07: 'energilagret jobbar fortfarande inte sa bra'). MATT: dB-fonstret mattar (megamix median 0,94) och foljer
+ *  analysatorns sektionsenergi svagt (r 0,46 pop / 0,22 megamix). DMX_ENERGY_SRC=intensity (opt-in): fonstrets form = analysatorns
+ *  frame.intensity (sektionsenergi relativt latens eget snitt, 0,5 = snittet) mappad DMX_ENERGY_LO..HI -> 0..1. Pulsen star for slaget. */
+const ENERGY_SRC_INT = process.env.DMX_ENERGY_SRC === 'intensity';
+const ENERGY_LO = Number(process.env.DMX_ENERGY_LO ?? 0.05), ENERGY_HI = Number(process.env.DMX_ENERGY_HI ?? 0.85);
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
 const LIVE_START_FAST_S = Number(process.env.DMX_LIVE_START_FAST_S ?? 90);
@@ -1769,6 +1774,7 @@ export class EffectEngine {
         const top = this.liveAnchor + LIVE_OFFSET_DB;
         let sh = (wdb - (top - winDb)) / winDb;
         sh = sh < 0 ? 0 : sh > 1 ? 1 : sh;
+        if (ENERGY_SRC_INT) { const it = frame.intensity ?? 0.5; sh = (it - ENERGY_LO) / Math.max(0.05, ENERGY_HI - ENERGY_LO); sh = sh < 0 ? 0 : sh > 1 ? 1 : sh; }   // DMX_ENERGY_SRC
         if (ENERGY_GAMMA !== 1) sh = Math.pow(sh, ENERGY_GAMMA);   // DMX_ENERGY_GAMMA
         this.liveShapeRaw = sh;
         // instant attack, release LIVE_RELEASE_MS (lotus lightSmoothMs 350 = ~ett slag)
