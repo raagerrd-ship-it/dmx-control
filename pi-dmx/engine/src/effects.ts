@@ -1169,7 +1169,7 @@ export class EffectEngine {
       const h = this.nearHist; h.push(this.nearB); if (h.length > 60) h.shift();
       let floor = 1e9; for (const v of h) if (v < floor) floor = v;
       const rise = this.nearB - floor, dip = this.nearNorm - floor;
-      if (rise >= NEAR_RISE_DB && dip >= NEAR_DIP_DB && this.nearB >= this.nearNorm - 1 && nowWall - this.nearAt > NEAR_REFRACT_MS
+      if (rise >= NEAR_RISE_DB && dip >= NEAR_DIP_DB && floor > -80 && this.nearB >= this.nearNorm - 1 && nowWall - this.nearAt > NEAR_REFRACT_MS   // floor > -80: inspelningsavbrott (overrun) ar ingen dipp ('sprang 107 dB', ladan 10-08)
           && !dropActive && sinceStart > START_DROP_MUTE_MS) {
         const g = Math.max(0, Math.min(1, (rise - NEAR_RISE_DB) / Math.max(1, NEAR_FULL_DB - NEAR_RISE_DB)));
         this.nearAt = nowWall; this.nearUntil = nowWall + MINI_BANG_MS; this.nearLevel = NEAR_MIN + (NEAR_MAX - NEAR_MIN) * g; this.nearCount++; this.nearHit = true;
