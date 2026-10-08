@@ -363,8 +363,8 @@ const PULSE_GAP_MS = Number(process.env.DMX_PULSE_GAP_MS ?? 250);
 /** DUBBELTAKT (agaren i ladan 10-07: "kanns som dubbeltakt ligger nagonstans i koden"). MATT: megamix (92 BPM) 628 av 1 230 pulsintervall
  *  = ett HALVT slag, 123 pulser/min mot 92 slag - de fasta grindarna (330/250 ms) slapper igenom attondelar vid ~90 BPM (halvt slag 326 ms).
  *  DMX_PULSE_GAP_BEAT > 0 (opt-in): minsta mellanrum mellan uppat-pulser = sa manga SLAG nar tempot ar kant (de fasta ms-grindarna galler
- *  som golv). 0 = som forr. */
-const PULSE_GAP_BEAT = Number(process.env.DMX_PULSE_GAP_BEAT ?? 0);
+ *  som golv). STANDARD 0,75 (ladan 10-08); 0 = bara de fasta grindarna. */
+const PULSE_GAP_BEAT = Number(process.env.DMX_PULSE_GAP_BEAT ?? 0.75);   // STANDARD 0,75 sedan 2026-10-08 (godkand i ladan)
 const CALM_FADE_S = Number(process.env.DMX_CALM_FADE_S ?? 0.6);
 const CALM_ATTACK = process.env.DMX_CALM_ATTACK === '1';   // lang attack i lugna partier (av sedan 09-27: uppstegning ska ga direkt)   // se 'LUGNA PARTIER = MJUKA OVERGANGAR'
 // LOGGEN: index.ts tystar console.log nar DMX_QUIET != '0' (standard). Periodiska diagnosrader byggs da inte alls (skrapjakten 10-01).

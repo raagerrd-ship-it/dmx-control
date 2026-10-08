@@ -41,12 +41,12 @@ Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulöre
 | Ratt | Standard | Vad den gör |
 |---|---|---|
 | `DMX_EFFECT_HEART` | 1,4 | Effekternas egen hjärtpuls (djup). |
-| `DMX_PULSE_GAP_MS` | 250 | Minsta tid mellan pulser. |
+| `DMX_PULSE_GAP_BEAT` | 0,75 | Minsta tid mellan pulser i SLAG (tar bort dubbeltakt vid ~90 BPM). |
+| `DMX_PULSE_GAP_MS` | 250 | Fast golv för pulsgrinden när tempot är okänt. |
 | `DMX_ATTACK_MS` | 20 | Lampans uppgång. |
 | `DMX_FADE_MIN_S` | 0,25 | Lampans uttoning — **snabbare är förbjudet** (ägaren 09-29). |
 
 ## Prov som inte är standard (ladan 10-07, väntar på ägarens beslut)
-`DMX_HARD_GATE=1` (hård ingångsgräns utan tider), `DMX_DIM_MAX=85`, `DMX_PULSE_GAP_BEAT=0.75` (dubbeltakt vid ~90 BPM),
-`DMX_MINI_FULL=1` (minidrop väljer full-poolen), `DMX_ALSA_BUFFER=8192`, `DMX_FAST_RECOVER=1` (tapp 2,5 → 0,5 s),
+`DMX_DIM_MAX=85`, `DMX_MINI_FULL=1` (minidrop väljer full-poolen), `DMX_ALSA_BUFFER=8192`, `DMX_FAST_RECOVER=1` (tapp 2,5 → 0,5 s),
 `DMX_E_RELEASE_MS=200`, `DMX_ENERGY_LO=0.3`, `DMX_ENERGY_VOL=1` (ren volym, ej provad live).
 Godkänt ⇒ standard och den gamla vägen bort samma gång. Inte godkänt ⇒ ratten tas bort.
