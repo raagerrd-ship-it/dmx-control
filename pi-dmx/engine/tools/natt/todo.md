@@ -32,12 +32,14 @@ GÖR:
    vägen i output.ts (färggrenen): sidokanalens andel avgör på/av med hysteres; tänd sidokanal hålls minst på sin tändpunkt+1 så
    den inte blinkar vid låg ljusstyrka; släckt = 0. Kulörens förhållande bevaras i övrigt. Mät med colorBench (per kanal) + ett
    nytt mått: antal på/av-växlingar per sidokanal och minut (ska ner mot 0 när färgen står still). Opt-in först, redo för ladan.
-   ALTERNATIV B (ägarens förslag 10-08: "eller om effekterna styr rent R G och B helt separat?"): kvantisera KULÖREN i EN funktion,
-   hsvToRgb i src/effects/color.ts (mättnaden är redan kvantiserad där, s >= 0,5 ? 1 : 0), till närmaste av 6 rena kombinationer
-   (R, G, B, R+G, G+B, R+B) så varje kanal är antingen 0 eller v - inga svaga sidokanaler kan finnas. Förlust: mellantoner
-   (orange/rosa/turkos). Bygg BÅDA (A = andelsregel i output, B = kvantiserad kulör) som opt-in, mät sidokanals-växlingar/min +
-   alla3/mättnad/lampspr + hur många olika kulörer showen visar; ägarens öga väljer. B är enklast (en funktion) - föredra den om
-   den inte gör showen fattigare i mätningen. Effekter som MÅSTE ha mellantoner: lista dem i rapporten.
+   FÖRSTAHANDSVAL (ägaren 10-08: "den skall ju kunna köra 50% blå och 30% röd") = PER-KANAL-MAPPNING: i output.ts färggren mappas
+   VARJE färgkanal för sig: 0 = släckt, 1..255 -> den kanalens tändpunkt+1 (onR/onG/onB, annars on) .. tak - i stället för att
+   alla kanaler skalas med den starkaste kanalens faktor (colK). Då kan ingen kanal som effekten säger är PÅ hamna under sin
+   tändpunkt, och 50 % B + 30 % R lyser båda stabilt. Ägarens regel "1 % = släck+1" per diod. Ingen hysteres/andelsregel behövs.
+   Bevaka: (a) avrundning - energi/puls kan skala en svag kanal till raw 0 (8 bitar) -> av/på nära botten; mät och räkna i
+   flyttal hela vägen till mappningen om det fladdrar; (b) kulören blir något ljusare nära botten (ej proportionell) - acceptabelt.
+   (Alternativ B, kvantiserad kulör, STRUKEN: klarar inte blandningar som 50/30.) Alternativ A (andelsregeln) bara om
+   per-kanal-mappningen mäter sämre.
 
 ## Från kvällen 2026-10-07 — KODOPTIMERING AV LJUSVÄGEN
 
