@@ -1954,7 +1954,7 @@ export class EffectEngine {
       blackout || this.inputOff,
       this.cfg.master ?? 1,
       performance.now(),
-      this.dropEnv
+      this.dropColEnv   // BARA full drop gar forbi utgangens mappning (minidrop/nastan-drop foljer den)
     );
 
     // Rök: motorn avgör OM den ska spruta, output-tjänsten var signalen hamnar.

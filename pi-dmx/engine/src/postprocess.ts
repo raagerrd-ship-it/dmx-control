@@ -70,7 +70,7 @@ export class PostProcess {
     blackout: boolean,
     master: number,
     nowMs: number,
-    dropOpen = 0   // energilagrets drop-envelope 0..1 - utgangens LIN_MAP oppnar sitt tak med den (se output.ts)
+    dropOpen = 0   // FULL drop 0..1 (dropColEnv) - utgangens mappning oppnar till 255 med den (se output.ts)
   ): void {
     const maxCh = out.maxCh;
 

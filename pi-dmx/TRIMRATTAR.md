@@ -20,11 +20,11 @@ Faktor = golv..1 ur analysatorns sektionsenergi (`frame.intensity`), direkt upp,
 | `DMX_E_RELEASE_MS` | 200 | Hur snabbt dämpningen följer när energin faller. |
 
 ## 3. Utgången (en mappning, sista steget)
-Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulören bevaras). DIM 1–100 % → golv+1 … `MAP_TOP` × lampans fullpunkt; halv drop → fullpunkten, full drop → 255.
+Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulören bevaras). DIM 1–100 % → golv+1 … `MAP_TOP` × lampans fullpunkt; bara full drop går förbi mappningen, till 255.
 | Ratt | Standard | Vad den gör |
 |---|---|---|
 | `DMX_FLOOR_CH` | 40 | DIM-golvet i DMX-steg (0–255). |
-| `DMX_MAP_TOP` | 0,95 | Taket för vanlig show (andel av fullpunkten). Halv drop → fullpunkten, full drop → 255. |
+| `DMX_MAP_TOP` | 0,95 | Taket (andel av fullpunkten) för allt — även minidrop och nästan-drop. Bara full drop går förbi, till 255. |
 | Släckpunkt per lampa | 16 | /setup → lampan → Alla/R/G/B: dra tills den precis tänder, Spara (`cal.on`, `onR/G/B`). |
 | Fullpunkt per lampa | 255 | /setup → lampan → Full: lampan lyser vitt, dra DIM tills den inte blir ljusare, Spara (`cal.full`; stegtest 10-01 ~85, kändes för lågt 10-08). |
 
