@@ -32,6 +32,12 @@ GÖR:
    vägen i output.ts (färggrenen): sidokanalens andel avgör på/av med hysteres; tänd sidokanal hålls minst på sin tändpunkt+1 så
    den inte blinkar vid låg ljusstyrka; släckt = 0. Kulörens förhållande bevaras i övrigt. Mät med colorBench (per kanal) + ett
    nytt mått: antal på/av-växlingar per sidokanal och minut (ska ner mot 0 när färgen står still). Opt-in först, redo för ladan.
+   ALTERNATIV B (ägarens förslag 10-08: "eller om effekterna styr rent R G och B helt separat?"): kvantisera KULÖREN i EN funktion,
+   hsvToRgb i src/effects/color.ts (mättnaden är redan kvantiserad där, s >= 0,5 ? 1 : 0), till närmaste av 6 rena kombinationer
+   (R, G, B, R+G, G+B, R+B) så varje kanal är antingen 0 eller v - inga svaga sidokanaler kan finnas. Förlust: mellantoner
+   (orange/rosa/turkos). Bygg BÅDA (A = andelsregel i output, B = kvantiserad kulör) som opt-in, mät sidokanals-växlingar/min +
+   alla3/mättnad/lampspr + hur många olika kulörer showen visar; ägarens öga väljer. B är enklast (en funktion) - föredra den om
+   den inte gör showen fattigare i mätningen. Effekter som MÅSTE ha mellantoner: lista dem i rapporten.
 
 ## Från kvällen 2026-10-07 — KODOPTIMERING AV LJUSVÄGEN
 
