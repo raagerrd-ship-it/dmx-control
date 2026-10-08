@@ -1680,7 +1680,7 @@ export class EffectEngine {
     let md: number;
     {   // ENKEL ENERGI (se ENERGY_SIMPLE-dokumentationen). md0/sektionsgas/rang borttagna 10-08.
       let e = ENERGY_VOL
-        ? Math.log(Math.max(1e-6, frame.level) / this.eGate) / Math.log(Math.max(this.eGate * 1.01, E_FULL) / this.eGate)   // ren: volym i dB, grans..full
+        ? Math.log(Math.max(1e-6, frame.levelVU ?? frame.level) / this.eGate) / Math.log(Math.max(this.eGate * 1.01, E_FULL) / this.eGate)   // ren: volym i dB (levelVU ~200 ms, snabbare an level:s 400 ms release), grans..full
         : ((frame.intensity ?? 0.5) - ENERGY_LO) / Math.max(0.05, ENERGY_HI - ENERGY_LO);
       e = e < 0 ? 0 : e > 1 ? 1 : e;
       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
