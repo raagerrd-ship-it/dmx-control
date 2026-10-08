@@ -183,9 +183,6 @@ const SECTION_REUSE = process.env.DMX_SECTION_REUSE === '1';   // standard AV se
  *  Bonusen forsvinner sa fort effekten setts en gang, sa den styr bara FORSTA chansen. 0 = av. */
 const MIX_UNSEEN_BONUS = Number(process.env.DMX_MIX_UNSEEN_BONUS ?? 0.10);
 
-/** Hur länge ljuset tonar in vid låtstart. Långsamt nog att kännas som en
- *  öppning, kort nog att vara framme innan första refrängen. */
-const START_FADE_MS = 5000;
 /** Drops ignoreras helt så länge — täcker påslaget och de första takterna. */
 const START_DROP_MUTE_MS = 3000;
 /** HELA SHOWENS FÖRSPRÅNG mot musiken — hjärtslag, grid-byten, takträknare.
@@ -208,17 +205,7 @@ const BEAT_FLUTTER_RELEASE = Number(process.env.DMX_BEAT_RELEASE_S ?? 0.3);
 const FADE_MIN_S = Number(process.env.DMX_FADE_MIN_S ?? 0.25);
 /** Sentinel: pulsklockan ännu inte initierad (första framen sätter den utan tick). */
 const PULSE_IDX_INIT = -2e9;
-/** Hur mycket sektionsenergin "gasar" ljuset (0 = av). +50 % master vid full energi. */
-const ENERGY_DRIVE = 0.5;
 // Loudness-portens konstanter = Lotus DEFAULT_CAL (piEngine.js:166-239).
-const LIGHT_HI_W = 1.3;            // mid+diskant-vikt
-const LIGHT_BASS_W = 0.25;         // bas-vikt (kropp utan att låsa nivån till basen)
-const LIGHT_SMOOTH_MS = 55;        // release-avbrusning på wlevel
-const LIGHT_WIN_DB = 18;           // centrerat dB-fönster (±9 dB runt medel → 0..1)
-const LIGHT_MEAN_TAU = 30000;      // medelnivåns tidskonstant (ms) — stabil men följer volymen
-const LIGHT_FLOOR = Number(process.env.LIGHT_FLOOR ?? 0.25);   // env-tunbar (fest: hogre golv = ljusare medelniva)           // ljus-golv vid loud=0 (dim vers, inte svart)
-const LIGHT_ANCHOR_OFF = 9;        // toppen over de hogsta topparna (mean+9) sa loud inte pinnar pa 1.0.
-const LIGHT_ANCHOR_TAU = 60000;    // auto-ankarets tidskonstant (ms)
 // SHAPE-SMOOTHING 25/150 -> 300/350. Ägaren i ladan 2026-09-03: ljuset flimrade på
 // RÖSTEN — mid+diskant-drivningen (vikt 1.3) följde enskilda sångstavelser (~100-
 // 250 ms). Långsammare smoothing gör loudness till en SEKTIONS-envelope (vers/
@@ -282,22 +269,6 @@ const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION
  *  (2) DYNAMIK - nar en refrang horts ersatter frame.levelVsHighDb (dB mot refrangen) de fasta LOW/BREAK-dipparna: gain = 1 + dB/DMX_SECTION_DYN_DB,
  *  golv DMX_SECTION_DYN_FLOOR (agaren i ladan: "lyser mycket aven om laten blir tystare" - ankaret sjonk, refrangen ar en fast referens). 0 = av. */
 const EXPECT_LEAD_MS = Math.max(0, Number(process.env.DMX_EXPECT_LEAD_MS ?? 600) || 0);
-const EXPECT_LIFT_MS = Math.max(0, Number(process.env.DMX_EXPECT_LIFT_MS ?? 3000) || 0);
-const SECTION_DYN_DB = Math.max(0, Number(process.env.DMX_SECTION_DYN_DB ?? 12) || 0);
-const SECTION_DYN_FLOOR = Math.min(1, Math.max(0.1, Number(process.env.DMX_SECTION_DYN_FLOOR ?? 0.5) || 0.5));
-/** SEKTIONSKONTRAST (2026-09-24, drejboken: refrang 37 mot vers 33 i 3 av 4 poplatar; opt-in DMX_SECTION_CONTRAST=1): pa komprimerad PA
- *  ar levelVsHighDb nara 0, sa dynamiken ersatte de fasta dipparna med ~1,0. Nu galler den STARKARE av fast dipp och dynamik, refrangen far
- *  sitt lyft alltid (inte bara tier 2), och gainen glider (~1,2 s) i stallet for att hoppa vid sektionsbyten. */
-const SECTION_CONTRAST_MODE = process.env.DMX_SECTION_CONTRAST ?? 'rank';   // standard 'rank' sedan 09-27
-const SECTION_CONTRAST = SECTION_CONTRAST_MODE === '1' || SECTION_CONTRAST_MODE === 'rank';
-/** RANGKONTRAST (2026-09-24, DMX_SECTION_CONTRAST=rank): detektorns refrangetikett skiljer facit-refrang fran facit-vers bara med AUC 0,55
- *  (82 langfangster), medan medel av tre KAUSALA RANGER (4 s-glidande midHiDb, bodyDb, diskantband specAbs.treble+air, rangordnade mot laten
- *  hittills) ger 0,69 train / 0,71 test. Gain = RANK_LOW + (1 + SECTION_HIGH_LIFT - RANK_LOW) x rang; nollas vid ny lat (section 'intro'). */
-const SECTION_RANK = SECTION_CONTRAST_MODE === 'rank';
-const RANK_LOW = Number(process.env.DMX_SECTION_RANK_LOW ?? 0.35);
-const RANK_POW = Number(process.env.DMX_SECTION_RANK_POW ?? 1);
-/** Rang dar full niva nas (ladan 09-24: 'knappt heart-beat eller energi' - linjart over hela rangen sankte aven refrangerna till ~0,6). 0,5 = ovre halvan full, bara undre dampas. */
-const RANK_KNEE = Math.max(0.1, Number(process.env.DMX_SECTION_RANK_KNEE ?? 0.5));
 const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL !== '0';
 /** Fönstret (dB under taket där ljuset når golvet). PRIORITET: env LIVE_WIN_DB > cfg.levelWindowDb (ratt i /setup) > 10.
  *  Fallback 10 = ladans live-värde 09-27 (var 6 i koden, 10 via drop-in). Läses per frame i render(), inte här. */
@@ -308,24 +279,12 @@ const LIVE_ANCHOR_S = Number(process.env.LIVE_ANCHOR_S ?? 120);   // lotus autoA
 const LIVE_RELEASE_MS = Number(process.env.LIVE_RELEASE_MS ?? 350);
 const LIVE_BASS_W = Number(process.env.LIVE_BASS_W ?? 1);      // lotus: mid/diskant 1,3 + bas 0,25 -> har som blandning
 const LIVE_TRACE = process.env.DMX_LIVE_TRACE === '1';
-const LIVE_CEIL = LIVE_LEVEL && process.env.DMX_LIVE_CEIL !== '0';
-/** ENERGINS DYNAMIK (agaren i ladan 10-07: "bara energi som fortfarande inte ar tillrackligt dynamisk"). Ladans musik ar hart komprimerad
- *  (pop median -3,4 dBFS) och ligger nastan alltid i mitten-ovre delen av nivafonstret; golven matte ~0 (LIGHT_FLOOR/CEIL_FLOOR
- *  0,25/0,20 -> 0,08/0,05 flyttade ljus per tier i tredje decimalen) och ett smalare fonster bytte mest ljus mot morker.
- *  DMX_ENERGY_GAMMA (opt-in, 1 = som forr): nivafonstrets form upphojd till gamma - topparna star nastan kvar, mitten trycks ner.
- *  EN ratt for energins kontrast. */
-const ENERGY_GAMMA = Math.max(0.3, Math.min(4, Number(process.env.DMX_ENERGY_GAMMA ?? 1)));
-/** ENERGIKALLA (ladan 10-07: 'energilagret jobbar fortfarande inte sa bra'). MATT: dB-fonstret mattar (megamix median 0,94) och foljer
- *  analysatorns sektionsenergi svagt (r 0,46 pop / 0,22 megamix). DMX_ENERGY_SRC=intensity (opt-in): fonstrets form = analysatorns
- *  frame.intensity (sektionsenergi relativt latens eget snitt, 0,5 = snittet) mappad DMX_ENERGY_LO..HI -> 0..1. Pulsen star for slaget. */
-const ENERGY_SRC_INT = process.env.DMX_ENERGY_SRC === 'intensity';
 /** ENKEL ENERGI (agaren i ladan 10-07: "foljer det inte bara inputs energiniva med liten fade out?", "sa simpelt och snabbt som
  *  mojligt", "energilagret ska ENBART kunna dampa ljuset, effekten styr max", "korta anklingningen"), DMX_ENERGY_SIMPLE=1:
  *  ERSATTER hela energikedjan (dB-fonster/ankare, tre utjamningar, DIM-taket, sektionsgasen, buildUp-/drop-PASLAGEN som lyfte
  *  md till 1,2). E = analysatorns sektionsenergi frame.intensity ENERGY_LO..HI -> 0..1 (ra ingangsniva matte r -0,13 pa ladans
  *  komprimerade mixar - nivan ror sig knappt), direkt upp, E_RELEASE_MS ner, golv E_FLOOR; faktor E_FLOOR..1 pa effektens RGB,
  *  ALDRIG over 1. Drop slapper dampningen (faktor 1) men lyfter aldrig over effekten. */
-const ENERGY_SIMPLE = process.env.DMX_ENERGY_SIMPLE !== '0';   // STANDARD sedan 2026-10-07 (agaren: 'mycket battre energifoljning nu')
 const E_RELEASE_MS = Number(process.env.DMX_E_RELEASE_MS ?? 400), E_FLOOR = Number(process.env.DMX_E_FLOOR ?? 0.15);
 /** REN OVERSATTNING (agaren 10-07: "gar det inte gora denna rena oversattning av ljud till ljus?"), DMX_ENERGY_VOL=1: energin = ingangens
  *  VOLYM i dB rakt mellan Slackgransen (samma tal som tystnadsgrinden, /setup) och FULLNIVAN DMX_E_FULL (frame.level). Inga relativa matt,
@@ -375,8 +334,6 @@ const LIVE_TRUST_LO = Number(process.env.LIVE_TRUST_LO ?? 0.2), LIVE_TRUST_HI = 
  *  transienter (max av onset bass/kick/treble, avklingning LIVE_BEAT_MS) i stallet for bara kickar; (b) golvet sanks med (1-w) x
  *  DMX_ENERGY_FB_DIP sa energisvinget far storre omfang nar takten inte bar. w = taktens tillit (LIVE_TRUST_LO..HI). */
 const ENERGY_FB = process.env.DMX_ENERGY_FALLBACK !== '0';
-const ENERGY_FB_DIP = Number(process.env.DMX_ENERGY_FB_DIP ?? 0.15);
-const CEIL_FLOOR = Number(process.env.DMX_CEIL_FLOOR ?? 0.20);   // takets (DIM) golv - se 'SVART I LAG ENERGI'
 const ENERGY_FB_ONSET = Number(process.env.DMX_ENERGY_FB_ONSET ?? 0.30);
 /** PORTAT FRAN LOTUS 2026-09-23 kvall (kallaren, agaren ogonbedomde varje steg) - galler med DMX_ENERGY_FALLBACK=1:
  *  (1) LAS PA RENA SLAG, inte tid: rastret far vikt forst efter DMX_BEAT_LOCK_BEATS rena slag i rad (konf >= LOCK_CONF, |fasfel| <= LOCK_ERR
@@ -439,9 +396,6 @@ export class EffectEngine {
   private hbFl: ModulateFlags = { energy: true, pulse: true };
   private bandsBuf: number[] = [0.5, 0.5, 0.5, 0.5, 0.5];
   private specBuf: SpecialtyValues = { hazer: 0, uv: 0, blinder: 0, strobe: 0, laser: 0, co2: 0 };
-  private rkVals: number[] = [0.5, 0.5, 0.5];
-  private prevCeil = 0;               // förra rutans ljustak → hur snabbt det vandrar
-  private ceilRateAvg = 0;            // utjämnad takrörelse (enheter/s)
   /** EDGE-SÄKER KICK. frame.kick är en enframs-boolean på analysatorns 375 Hz
    *  medan render kör 100 Hz → en direkt läsning missar ~73 % av kickarna.
    *  Räknaren matas i registerKick (375 Hz) och konsumeras som en flank i
@@ -513,10 +467,6 @@ export class EffectEngine {
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   // Loudness-portens tillstånd (Lotus mid+diskant dB-fönster + log-release). Negativa
   // sentinelvärden = oinitierat (första framen sätter dem utan hopp).
-  private lightWlevel = -1;      // avbrusad linjär mid+diskant-nivå
-  private lightWdbSlow = -300;   // sentinel för init (självkalibrerande range)
-  private lightHi = 0;           // långsam topp av wdb (loud-referens)
-  private lightLo = 0;           // långsamt golv av wdb (tyst-referens)
   private lightShapeSm = -1;     // shape-smoothing
   private lastLiveSection = '';   // DMX_SECTION_SWITCH
   private lastDropSwitchMs = -1e9; dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;   // senaste drop -> 'high'-pool i 20 s
@@ -618,8 +568,6 @@ export class EffectEngine {
   private post = new PostProcess();
   private maxCh = 0;                           // högsta använda kanal + 1
   private smartCount = 0;
-  private secGainSm = 0;
-  private rkHist: number[][] = [[], [], []]; private rkWin: number[][] = [[], [], []]; private rkLastMs = -1e9; private rkRank = 0.5; private rkPrevSec = '';   // RANGKONTRAST   // SECTION_CONTRAST: glidande sektionsgain
   private recentLooks: Mode[] = [];   // MIX_V2: de senast valda lookerna (nyhetsstraff)
   private unitSlot = 0; private unitPhraseDone = -1;   // FRASVAXLING: look A/B och senaste frasnummer som bytts pa
   private pendingSecSwitch = false;
@@ -1013,12 +961,6 @@ export class EffectEngine {
         // realtidsläget. Dämpningen ska skydda mot att TAKET vandrar, inte mot att
         // musiken lever.
         let calm = 1;
-        if (this.memCeiling !== null) {
-          const ceilRate = Math.abs(this.memCeiling - this.prevCeil) * 100;   // enheter/s (render 100 Hz)
-          this.prevCeil = this.memCeiling;
-          this.ceilRateAvg += (ceilRate - this.ceilRateAvg) * 0.02;           // ~0,5 s
-          calm = Math.max(0.5, 1 - this.ceilRateAvg * 4);
-        } else { this.ceilRateAvg = 0; }
         // 0.55 → 0.70: ett kraftigare hjärtslag DOMINERAR över småfladder i nivån i
         // stället för att konkurrera med det — användarens förslag, och det ger dessutom
         // mer av den känsla pulsen finns till för.
@@ -1673,73 +1615,8 @@ export class EffectEngine {
     // Samma bärnstens-kanal som vilo-glöden; den starkare av de två vinner så
     // lägena inte adderas till något ljusare än någon av dem var tänkt att vara.
     const restLvl = Math.max(ambLvl, deafLvl);
-    // DIREKT VU-FILTER: den INGÅENDE ljudnivån styr den UTGÅENDE ljusstyrkan
-    // direkt, som ett SISTA filter efter allt annat (effekter, beatPulse, ...).
-    // Effekterna formar fortfarande sitt eget ljus; VU:n justerar slutresultatet
-    // mot den råa nivån. BARA en drop får skippa filtret (går fram på full).
-    let ceilMul = 1;
-    if (this.memCeiling !== null) {
-      // MINNESTAK: låten är igenkänd och tvättad → vi VET kurvan i förväg. Den är
-      // normaliserad (p5..p95) och sekundmjuk, så full dynamik utan en enda
-      // fladder-risk. Live-VU:n (som fladdrade vid höga nivåer) står åt sidan.
-      const MEM_FLOOR = 0.20;
-      ceilMul = Math.max(MEM_FLOOR + (1 - MEM_FLOOR) * this.memCeiling, this.dropEnv);
-    } else if (this.cfg.energyCeiling) {
-
-      // LÖPANDE NORMALISERING: samma kurva som minnestaket, räknad kausalt. Rå VU
-      // är en ABSOLUT skala → platt i tysta låtar, mättad i höga. Auto-rangen
-      // mappar nivån mot låtens EGNA p5..p95 så dynamiken blir full oavsett hur
-      // hårt mastrad låten är, utan att veta vilken låt det är.
-      // frame.levelVU = ~200ms smoothat PÅ HOP-TAKT (375Hz) i analysatorn → ser alla
-      // hops, mycket lägre jitter än att smootha rå-nivån efter render-decimering (som
-      // aliasade per-hop-rippel till synligt flimmer). En lätt ~90ms-glidning här
-      // utjämnar sista resten utan lång svans. (Drop bypassar via dropEnv nedan.)
-      const lvl = Math.max(0, Math.min(1, frame.levelVU));
-      this.range.push(lvl, dtSec);
-      // LIVE_CEIL (ladan 2026-09-24 23:20: 'kor valdigt ljust mot hur hogt det later'): taket (= DIM-kanalen) foljde latens EGEN p5..p95,
-      // sa varje lat fick fullt tak oavsett volym. Med DMX_LIVE_CEIL=1 foljer taket samma dB-fonster som nivan (bas, ankare, tyst-lat-grans).
-      const vuRaw = LIVE_CEIL && this.liveLevelSm >= 0 ? this.liveLevelSm : this.range.norm(lvl);
-      // ASYMMETRISK VU: snabb UPP (transienter/drops syns), langsam NER (inget
-      // fladder). MATT: med symmetriska 90 ms fladdrade riggen synligt vid MAX
-      // ljusstyrka — dar VU:n ror sig 0.8-1.0 och taket appliceras EFTER
-      // ballistiken, alltsa helt outjamnat. Av/pa-test av energyCeiling
-      // isolerade det: flimret forsvann helt med taket av, och en lampa pa
-      // ratt DMX 255 stod samtidigt HELT stabil (= hardvaran ar frisk).
-      // MJUKARE TAK ("soothing"): 0.12/0.60 → 0.25/0.85. Den snabba attacken lät taket
-      // hoppa upp på varje transient; med en längre uppgång andas det med låten i
-      // stället för att rycka. Hjärtslaget står för det snabba — taket för nivån.
-      // Ytterligare mjukat: 0.25/0.85 → 0.45/1.20. Taket ska följa låtens NIVÅ, inte
-      // dess anslag — allt snabbt kommer från hjärtslaget. Priset är att en verklig
-      // nivåändring (vers → refräng) tar en halv sekund extra att slå igenom.
-      const vuTau = vuRaw > this.vu ? 0.45 : 1.20;
-      this.vu += (vuRaw - this.vu) * (1 - Math.exp(-dtSec / vuTau));
-      // KLUBB-LÄGE: kvadrera → hård kontrast (mörkt mellan, explosion på topp).
-      // Kvadreringen biter nu på den NORMALISERADE kurvan → meningsfull i alla låtar.
-      const vuBase = this.cfg.clubMode ? this.vu * this.vu : this.vu;
-      // VU-GOLV: mappa om VU-spannet så det ALDRIG drar ner under VU_FLOOR. 0% VU →
-      // VU_FLOOR, 100% VU → 100%, linjärt. Håller riggen närvarande i tysta partier
-      // (i st.f. att krossas mot tändpunkten där bruset strobar) utan att döda
-      // dynamiken. OBS: golvet gäller MULTIPLIKATORN → en effekt som skickar 0
-      // (avsiktlig blackout) blir fortfarande 0; äkta TYSTNAD tonas bort av
-      // silenceGate i master (effekt→0), inte här. Klubb-läget floras också.
-      // SVART I LAG ENERGI (ladan 09-29 19:00): med LIVE_CEIL foljer bade taket (DIM) och md (RGB) samma niva - golven MULTIPLICERAS:
-      // tak 0,20 x md 0,10 = 2 % = svart. DMX_CEIL_FLOOR hojer takets golv (standard 0,20 = som forr).
-      const VU_FLOOR = CEIL_FLOOR;
-      const vuFilter = VU_FLOOR + (1 - VU_FLOOR) * vuBase;
-      // BARA DROP skippar VU-golvet: dropEnv (0..1) lyfter taket till full under
-      // det korta drop-fönstret, annars styr den golvade VU:n direkt.
-      ceilMul = Math.max(vuFilter, this.dropEnv);
-    }
-    // Ljus-boost: swell UNDER uppbyggnaden (riser) → EXPLOSION på dropen.
-    // INTONING VID LÅTSTART. Klämmer taket, inte effekten: allt som lyser tonar
-    // upp tillsammans i stället för att enskilda kanaler beter sig olika. Kvadraten
-    // gör starten mjuk och slutet snabbt — en linjär ramp känns som en dimmer som
-    // dras, en kvadratisk som att musiken kommer igång.
-    if (!HARD_GATE && sinceStart < START_FADE_MS) {
-      const w = sinceStart / START_FADE_MS;
-      ceilMul = Math.min(ceilMul, w * w);
-    }
-    if (ENERGY_SIMPLE) ceilMul = 1;   // ENERGY_SIMPLE: energin appliceras en gang (RGB), DIM-taket ar borta
+    // ENERGIN APPLICERAS EN GANG (RGB, se ENERGY_SIMPLE). DIM-taket (vu/range/CEIL_FLOOR/minnestak/intoning) borttaget 10-08.
+    const ceilMul = 1;
     // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så
     // VU-taket följer nivån direkt utan effekt-ballistikens nedåt-släp.
     // ── LOUDNESS — PORTAD FRÅN LOTUS (piEngine.js:2126-2243, DEFAULT_CAL:166-239) ──
@@ -1791,8 +1668,6 @@ export class EffectEngine {
         const top = this.liveAnchor + LIVE_OFFSET_DB;
         let sh = (wdb - (top - winDb)) / winDb;
         sh = sh < 0 ? 0 : sh > 1 ? 1 : sh;
-        if (ENERGY_SRC_INT) { const it = frame.intensity ?? 0.5; sh = (it - ENERGY_LO) / Math.max(0.05, ENERGY_HI - ENERGY_LO); sh = sh < 0 ? 0 : sh > 1 ? 1 : sh; }   // DMX_ENERGY_SRC
-        if (ENERGY_GAMMA !== 1) sh = Math.pow(sh, ENERGY_GAMMA);   // DMX_ENERGY_GAMMA
         this.liveShapeRaw = sh;
         // instant attack, release LIVE_RELEASE_MS (lotus lightSmoothMs 350 = ~ett slag)
         if (this.liveLevelSm < 0 || sh > this.liveLevelSm) this.liveLevelSm = sh;
@@ -1822,48 +1697,13 @@ export class EffectEngine {
       const softK = LIGHT_SOFT + (1 - LIGHT_SOFT) * Math.min(1, shape / 0.5);  // brus snäpper inte, beats gör
       this.lightLoud += a * softK * (shape - this.lightLoud);
     }
-    const loudness = this.lightLoud;   // 0..1, ersätter den gamla energyEnv
     // LOUDNESS DRIVER LJUSET GOLV→FULL (inte bara +50% boost). Förr: (1 + loud·0.5)
     // → grundnivån ALLTID full, loud bara ovanpå → ingen synlig gas, tysta partier
     // dimmades aldrig, och hjärtslaget hade ingen plats att synas mot en maxad nivå
     // (ägaren i ladan 2026-09-03). Nu: golv LIGHT_FLOOR vid loud=0, full vid loud=1
     // → refräng ljus, vers dim = synlig gas, och pulsen syns uppåt mot en rörlig nivå.
-    const mdFloor = ENERGY_FB ? Math.max(0.02, LIGHT_FLOOR - (1 - this.beatW) * ENERGY_FB_DIP) : LIGHT_FLOOR;   // ENERGY_FB: storre energisving utan las
-    const md0 = drive * (mdFloor + (1 - mdFloor) * loudness + frame.buildUp * 0.35 + this.dropEnv * 0.8);
-    // SEKTIONSGAS (DMX_SECTION_SWITCH): refrang lyfter mastern, break sanker - utover loudness (som redan foljer nivan).
-    // SEKTIONSVAXEL (ladan 20:00, agaren: 'ska kunna bli morkare, mer dynamik'): low/intro x(1-LOW_DIP), break x(1-BREAK_DIP),
-    // high x(1+LIFT) nar tiern ar topp. Analysatorns sektion ar latens egen rangordning, sa ett lugnare parti BLIR morkare
-    // oavsett hur komprimerad mixen ar. Efter drop (afterDrop-fonstret) galler high.
-    const secNow = (now - this.lastDropSwitchMs < 20_000) ? 'high' : frame.section;
-    const secGain = SECTION_SWITCH ? (secNow === 'high' ? (SECTION_CONTRAST || (frame.sectionTier ?? 0) >= 2 || now - this.lastDropSwitchMs < 20_000 ? 1 + SECTION_HIGH_LIFT : 1)
-      : secNow === 'break' ? 1 - SECTION_BREAK_DIP : (secNow === 'low' || secNow === 'intro') ? 1 - SECTION_LOW_DIP : 1) : 1;
-    let dynGain = secGain;
-    if (SECTION_SWITCH) {
-      const lv = frame.levelVsHighDb ?? 0, ex = frame.expectHighInMs ?? -1;
-      if (SECTION_DYN_DB > 0 && lv !== 0 && secNow !== 'high') { const dg = Math.max(SECTION_DYN_FLOOR, Math.min(1, 1 + lv / SECTION_DYN_DB)); dynGain = SECTION_CONTRAST ? Math.min(secGain, dg) : dg; }   // latens egen referens (CONTRAST: starkaste dampningen)
-      if (EXPECT_LIFT_MS > 0 && ex > 0 && ex <= EXPECT_LIFT_MS) { const l = 1 - ex / EXPECT_LIFT_MS; dynGain += (1 + SECTION_HIGH_LIFT - dynGain) * l; }   // riser mot refrangen
-    }
-    if (SECTION_RANK) {
-      // kausal rang (0..1) av 4 s-medel for tre nivamatt, mot laten hittills; ny lat (analysatorn nollar till intro) -> ny historik
-      if (frame.section === 'intro' && this.rkPrevSec !== 'intro' && this.rkPrevSec !== '') { this.rkHist = [[], [], []]; }
-      this.rkPrevSec = frame.section;
-      const sa = frame.specAbs as any; const vals = this.rkVals; vals[0] = frame.midHiDb; vals[1] = frame.bodyDb; vals[2] = sa ? (sa.treble ?? 0) + (sa.air ?? 0) : 0;
-      if (now - this.rkLastMs >= 250 && Number.isFinite(vals[0]) && Number.isFinite(vals[1]) && Number.isFinite(vals[2])) {
-        this.rkLastMs = now; let r = 0;
-        for (let k = 0; k < 3; k++) {
-          const w = this.rkWin[k]; w.push(vals[k]); if (w.length > 16) w.shift(); const m = w.reduce((x, y) => x + y, 0) / w.length;
-          const h = this.rkHist[k]; let lo = 0, hi = h.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (h[mid] < m) lo = mid + 1; else hi = mid; }
-          h.splice(lo, 0, m); if (h.length > 2400) h.splice(Math.floor(Math.random() * h.length), 1);
-          r += h.length > 1 ? lo / (h.length - 1) : 0.5;
-        }
-        this.rkRank = r / 3;
-      }
-      const rr = Math.pow(Math.max(0, Math.min(1, this.rkRank / RANK_KNEE)), RANK_POW);
-      dynGain = RANK_LOW + (1 + SECTION_HIGH_LIFT - RANK_LOW) * rr;
-    }
-    if (SECTION_CONTRAST) { const a = Math.min(1, dtSec / 1.2); this.secGainSm = this.secGainSm <= 0 ? dynGain : this.secGainSm + (dynGain - this.secGainSm) * a; dynGain = this.secGainSm; }   // glid mellan sektioner
-    let md = SECTION_SWITCH ? Math.min(1.2, md0 * dynGain) : md0;   // standard: orort
-    if (ENERGY_SIMPLE) {   // se ENERGY_SIMPLE: ersatter md0/sektionsgas
+    let md: number;
+    {   // ENKEL ENERGI (se ENERGY_SIMPLE-dokumentationen). md0/sektionsgas/rang borttagna 10-08.
       let e = ENERGY_VOL
         ? Math.log(Math.max(1e-6, frame.level) / this.eGate) / Math.log(Math.max(this.eGate * 1.01, E_FULL) / this.eGate)   // ren: volym i dB, grans..full
         : ((frame.intensity ?? 0.5) - ENERGY_LO) / Math.max(0.05, ENERGY_HI - ENERGY_LO);
