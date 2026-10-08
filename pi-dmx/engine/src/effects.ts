@@ -163,9 +163,6 @@ const CLEAR_BASS = Number(process.env.DMX_CLEAR_BASS ?? 0.78);
  *      ett byte vid intradet i 'build' (sedan haller uppbyggnaden som forr);
  *  (3) ingen nyhetsstraff -> samma look kom tillbaka direkt; nu -MIX_RECENT_PENALTY for de MIX_RECENT_N senast valda. */
 const MIX_V2 = process.env.DMX_MIX_V2 !== '0';
-/** MINIDROP -> FULL FART (agaren i ladan 10-07: "vid minidrops kanske dirigenten skall valja effekt med hog fart"), opt-in DMX_MINI_FULL=1:
- *  ett byte orsakat av minidrop eller nastan-drop valjer ur full-poolen (tier 'full'), oavsett energitier och sektion. */
-const MINI_FULL = process.env.DMX_MINI_FULL === '1';
 const CLEAR_BASS_HARD = Number(process.env.DMX_CLEAR_BASS_HARD ?? 0.85);
 const CLEAR_BASS_BOOST = Number(process.env.DMX_CLEAR_BASS_BOOST ?? 0.25);
 const MIX_RECENT_N = Number(process.env.DMX_MIX_RECENT_N ?? 8);   // 4 -> 8 (ladan 10-01 godkant)
@@ -281,14 +278,16 @@ const LIVE_TRACE = process.env.DMX_LIVE_TRACE === '1';
  *  md till 1,2). E = analysatorns sektionsenergi frame.intensity ENERGY_LO..HI -> 0..1 (ra ingangsniva matte r -0,13 pa ladans
  *  komprimerade mixar - nivan ror sig knappt), direkt upp, E_RELEASE_MS ner, golv E_FLOOR; faktor E_FLOOR..1 pa effektens RGB,
  *  ALDRIG over 1. Drop slapper dampningen (faktor 1) men lyfter aldrig over effekten. */
-const E_RELEASE_MS = Number(process.env.DMX_E_RELEASE_MS ?? 400), E_FLOOR = Number(process.env.DMX_E_FLOOR ?? 0.15);
+const E_RELEASE_MS = Number(process.env.DMX_E_RELEASE_MS ?? 200),   // 400 -> 200 STANDARD 2026-10-08 (agaren: 'sanka den snabbare')
+  E_FLOOR = Number(process.env.DMX_E_FLOOR ?? 0.15);
 /** REN OVERSATTNING (agaren 10-07: "gar det inte gora denna rena oversattning av ljud till ljus?"), DMX_ENERGY_VOL=1: energin = ingangens
  *  VOLYM i dB rakt mellan Slackgransen (samma tal som tystnadsgrinden, /setup) och FULLNIVAN DMX_E_FULL (frame.level). Inga relativa matt,
  *  inga ankare, inget golv: vid gransen ger effektens 1 % slack+1 (utgangens mappning), vid fullnivan gar effekten igenom orord.
  *  Rattar: Slackgrans, Fullniva, avklingning (E_RELEASE_MS). */
 const ENERGY_VOL = process.env.DMX_ENERGY_VOL === '1';
 const E_FULL = Number(process.env.DMX_E_FULL ?? 0.9);
-const ENERGY_LO = Number(process.env.DMX_ENERGY_LO ?? 0.05), ENERGY_HI = Number(process.env.DMX_ENERGY_HI ?? 0.85);
+const ENERGY_LO = Number(process.env.DMX_ENERGY_LO ?? 0.3),   // 0,05 -> 0,3 STANDARD 2026-10-08: intensity gar sallan under ~0,3, golvet nas ~10 % av tiden
+  ENERGY_HI = Number(process.env.DMX_ENERGY_HI ?? 0.85);
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
 const LIVE_START_FAST_S = Number(process.env.DMX_LIVE_START_FAST_S ?? 90);
@@ -1418,11 +1417,9 @@ export class EffectEngine {
         // MIX_V2 (5): i 'high' (refrang/drop) ar energitiern oftast bara 'fart' (full 17-20 % av tiden pa ladans mixar) -> full-fart-
         // effekterna (party, split, gravity, konfetti, fyrverkeri ...) valdes nastan aldrig. I high far poolen vara fart + full.
         if (MIX_V2 && !wantCalm && liveSec === 'high' && tierS === FART) pool = enabled([...FART, ...FULLFART]).filter(req);
-        const miniFull = MINI_FULL && (miniSwitch || nearSwitch);   // DMX_MINI_FULL: minidrop/nastan-drop -> full fart
-        if (miniFull) { const fp = enabled(FULLFART).filter(req); if (fp.length) pool = fp; }
         // SEKTIONSPOOL (DMX_SECTION_SWITCH): skar med sektionens looker (registry.SECTION_POOLS). 'build' och 'break' har egna
         // effekter (stegring/andrum) som gar fore tiern; for high/low/intro ar snittet med tier-poolen forsta valet.
-        if (SECTION_SWITCH && liveSec && !miniFull) {
+        if (SECTION_SWITCH && liveSec) {
           const secList = sectionPool(liveSec);
           const own = (liveSec === 'build' || liveSec === 'break') ? enabled(secList).filter(req) : [];
           const cut = pool.filter((m) => secList.includes(m));

@@ -15,9 +15,9 @@ Faktor = golv..1 ur analysatorns sektionsenergi (`frame.intensity`), direkt upp,
 | Ratt | Standard | Vad den gör |
 |---|---|---|
 | `DMX_E_FLOOR` | 0,15 | Hur mörkt det lugnaste får bli. |
-| `DMX_ENERGY_LO` | 0,05 | Sektionsenergi som ger golvet (intensity går i praktiken sällan under ~0,3). |
+| `DMX_ENERGY_LO` | 0,3 | Sektionsenergi som ger golvet. intensity går sällan under ~0,3: golvet nås ~10 % av tiden (0,4 ⇒ ~16 %). |
 | `DMX_ENERGY_HI` | 0,85 | Sektionsenergi som ger fullt. |
-| `DMX_E_RELEASE_MS` | 400 | Hur snabbt dämpningen följer när energin faller. |
+| `DMX_E_RELEASE_MS` | 200 | Hur snabbt dämpningen följer när energin faller. |
 
 ## 3. Utgången (en mappning, sista steget)
 Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulören bevaras). DIM 1–100 % → golv+1 … `MAP_TOP` × tak; drop öppnar resten.
@@ -46,6 +46,9 @@ Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulöre
 | `DMX_ATTACK_MS` | 20 | Lampans uppgång. |
 | `DMX_FADE_MIN_S` | 0,25 | Lampans uttoning — **snabbare är förbjudet** (ägaren 09-29). |
 
-## Prov som inte är standard (ladan 10-07, väntar på ägarens beslut)
-`DMX_DIM_MAX=85`, `DMX_MINI_FULL=1` (minidrop väljer full-poolen), `DMX_ALSA_BUFFER=8192`, `DMX_E_RELEASE_MS=200`, `DMX_ENERGY_LO=0.3`, `DMX_ENERGY_VOL=1` (ren volym, ej provad live).
+## Prov som inte är standard (väntar på nästa besök i ladan)
+`DMX_DIM_MAX` — lampans verkliga fulla DIM. 85 (stegtest 10-01) kändes för lågt 10-08; prova 120 mot 85/255 på samma låt.
+`DMX_E_RELEASE_MS=100` — ännu snabbare energinedgång (standard 200).
+`DMX_ENERGY_LO=0.4` — om lugna partier oftare ska nå golvet.
+`DMX_ENERGY_VOL=1` — ren volym (ingångens dB) som energi i stället för sektionsenergin; ej provad live efter ingångsfixen.
 Godkänt ⇒ standard och den gamla vägen bort samma gång. Inte godkänt ⇒ ratten tas bort.
