@@ -139,10 +139,8 @@ const NEAR_REFRACT_MS = Number(process.env.DMX_NEAR_REFRACT_MS ?? 4000);
 /** NEAR_DROP_SWITCH (agaren i ladan 10-07: "far aven dirigenten denna info och kan byta direkt"): en nastan-drop
  *  ar ocksa ett bytesskal - looken byts direkt, med samma regel som minidropen (looken maste ha hallits MIN_HOLD 8 s). */
 const NEAR_SWITCH = NEAR_DROP && process.env.DMX_NEAR_DROP_SWITCH !== '0';   // STANDARD sedan 2026-10-07; =0 av
-/** MINI_DELAY_MS: mini-reaktionen vantar sa har lange och AVBRYTS om en riktig drop kommer under tiden. Journal
- *  ladan 2026-09-12 19:50-19:54: minidroppen fyrade 24-400 ms FORE 4 av 5 riktiga drops (lyft-detektorn har lagre
- *  krav och reagerar pa forsta bas-slaget) -> ljuset hoppade tidigt och smallen kom sedan ("nagra 100 ms for tidig"). */
-const MINI_DELAY_MS = Number(process.env.MINI_DELAY_MS ?? 500);
+/** (MINI_DELAY_MS borttagen 2026-10-08, agaren: 'varfor, bara vaxla till full annars?' - minidropen lyfter direkt; kommer en riktig
+ *  drop tar den over. Vantan fran 09-12 gallde nar minidropen blixtrade vitt/dropfargat.) */
 /** ROK-HUNGER (agaren i ladan 2026-10-04: "har rokmaskinen inte kort pa kanske 5 min, gor det enklare att kora en puff"):
  *  efter DMX_FOG_HUNGRY_S utan puff racker en minidrop eller att musiken gar in i en high-sektion (i stallet for bara en
  *  riktig drop). Cooldownen och varmeskyddet i output.fogTick galler som forut. 0 = av. */
@@ -460,7 +458,7 @@ export class EffectEngine {
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
   private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
-  private lastMiniCount = 0; private miniBangUntil = 0; private miniPendingAt = 0;   // minidrop-flank + kort stot + fordrojd reaktion
+  private lastMiniCount = 0; private miniBangUntil = 0;   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
@@ -1113,11 +1111,9 @@ export class EffectEngine {
     const miniCount = frame.miniDropCount ?? 0;
     const miniHitRaw = miniCount !== this.lastMiniCount;   // monoton raknare -> flanken kan inte aliaseras bort
     this.lastMiniCount = miniCount;
-    // Fordrojd mini-reaktion: en riktig drop under vantetiden avbryter den (annars laser den som en for tidig drop).
+    // Minidrop direkt; en riktig drop samma ruta gar fore (och tar annars over via dropEnv/dropColEnv).
     let miniHit = false;
-    if (miniHitRaw && !(DROP_SONG_HOLD_S > 0 && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000)) this.miniPendingAt = nowWall + MINI_DELAY_MS;
-    if (dropHitRaw) this.miniPendingAt = 0;
-    if (this.miniPendingAt && nowWall >= this.miniPendingAt) { this.miniPendingAt = 0; miniHit = true; }
+    if (miniHitRaw && !dropHitRaw && !(DROP_SONG_HOLD_S > 0 && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000)) miniHit = true;   // direkt (ingen vantan)
     // DROPEN AR EN SMALL, INTE EN PLATA. Hallet var 2s och uttoningen 1s, alltsa
     // ~3s full blast per drop — och eftersom dropEnv KRINGGAR VU-taket (se
     // ceilMul nedan) ar det de enda ogonblick riggen gar till max.

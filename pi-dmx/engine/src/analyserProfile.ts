@@ -46,7 +46,7 @@ export const PROFILE: AnalyserProfile = {
     DROP_RISE_MIN: '1',          // stigning mot MIN i 0,5 s-fonstret (suget fore dropen)
     DROP_RISE_LOW_DB: '12',      // 12 dB racker nar landningen ar <3 dB under toppen
     DROP_CALM_INTRO_STRICT: '1', // ingen drop i intro utan riser
-    MINI_SPACING_MS: '12000',    // minidrops (~10 per lat)
+    MINI_SPACING_MS: '1',        // minidrops UTAN sparr (agaren i ladan 2026-10-08; var 12000). 0 = av helt, darfor 1
     DROP_UNDERPEAK_MIN: '1.5',   // 09-30 i koden: ingen drop/minidrop vid kroppens topp (agarens 9 markeringar + bank: pop 11->7, megamix 31->29)
     OCT_UP: '12',                // oktav upp snabbare (tempo-transitions)
     SUBH_MULT: '8',              // subharmonisk guard x8
