@@ -286,6 +286,11 @@ const E_RELEASE_MS = Number(process.env.DMX_E_RELEASE_MS ?? 200),   // 400 -> 20
  *  Rattar: Slackgrans, Fullniva, avklingning (E_RELEASE_MS). */
 const ENERGY_VOL = process.env.DMX_ENERGY_VOL === '1';
 const E_FULL = Number(process.env.DMX_E_FULL ?? 0.9);
+/** FOLJANDE FONSTER (agaren i ladan 10-08: "har du fullt spann nu? kanns som energi inte justerar sa mycket"): en fast fullniva passar
+ *  aldrig - matt live samma kvall: en del av laten 0,08-0,22, en annan 0,20-0,33. DMX_E_WIN_S > 0 (opt-in, kraver ENERGY_VOL): fonstrets
+ *  topp och botten foljer volymen sjalv (topp: direkt upp, glider ner; botten: direkt ner, glider upp, tidskonstant E_WIN_S), minst
+ *  E_MIN_DB brett. Da anvands alltid hela 0..1 oavsett lat och mixervolym. Slackgransen galler fortfarande for tystnad. */
+const E_WIN_S = Number(process.env.DMX_E_WIN_S ?? 0), E_MIN_DB = Number(process.env.DMX_E_MIN_DB ?? 4);
 const ENERGY_LO = Number(process.env.DMX_ENERGY_LO ?? 0.3),   // 0,05 -> 0,3 STANDARD 2026-10-08: intensity gar sallan under ~0,3, golvet nas ~10 % av tiden
   ENERGY_HI = Number(process.env.DMX_ENERGY_HI ?? 0.85);
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
@@ -468,7 +473,7 @@ export class EffectEngine {
   private lastDropSwitchMs = -1e9; dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;   // senaste drop -> 'high'-pool i 20 s
   private liveAnchor = NaN; private liveAnchorMax = NaN;   /* NaN = ej satt (forr undefined: taggat falt -> ny HeapNumber per ruta) */ private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
   private lightLoud = 0;         // log-released loudness 0..1 → driver md
-  private eSm = 0; eSimple = 0; private eGate = 0.05;   // ENERGY_SIMPLE / ENERGY_VOL
+  private eSm = 0; eSimple = 0; private eGate = 0.05; private eHi = NaN; private eLo = NaN;   // ENERGY_SIMPLE / ENERGY_VOL / E_WIN_S
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
@@ -1679,7 +1684,16 @@ export class EffectEngine {
     // → refräng ljus, vers dim = synlig gas, och pulsen syns uppåt mot en rörlig nivå.
     let md: number;
     {   // ENKEL ENERGI (se ENERGY_SIMPLE-dokumentationen). md0/sektionsgas/rang borttagna 10-08.
-      let e = ENERGY_VOL
+      let e = ENERGY_VOL && E_WIN_S > 0 ? (() => {   // FOLJANDE FONSTER (se E_WIN_S)
+          const db = 20 * Math.log10(Math.max(1e-5, frame.levelVU ?? frame.level));
+          if (Number.isNaN(this.eHi)) { this.eHi = db; this.eLo = db; }
+          const k = Math.min(1, dtSec / E_WIN_S);
+          this.eHi = db > this.eHi ? db : this.eHi + (db - this.eHi) * k;
+          this.eLo = db < this.eLo ? db : this.eLo + (db - this.eLo) * k;
+          const span = Math.max(E_MIN_DB, this.eHi - this.eLo);
+          return (db - (this.eHi - span)) / span;
+        })()
+        : ENERGY_VOL
         ? Math.log(Math.max(1e-6, frame.levelVU ?? frame.level) / this.eGate) / Math.log(Math.max(this.eGate * 1.01, E_FULL) / this.eGate)   // ren: volym i dB (levelVU ~200 ms, snabbare an level:s 400 ms release), grans..full
         : ((frame.intensity ?? 0.5) - ENERGY_LO) / Math.max(0.05, ENERGY_HI - ENERGY_LO);
       e = e < 0 ? 0 : e > 1 ? 1 : e;
