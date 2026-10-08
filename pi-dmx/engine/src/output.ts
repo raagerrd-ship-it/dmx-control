@@ -178,7 +178,7 @@ export class FixtureOutput {
     // EN MAPPNING, SISTA STEGET (agarens ljuskontrakt 2026-10-07). Effekten/energin levererar 0..255 utan hardvarukunskap.
     //   farg (effektens styrka = lampans starkaste fargkanal): 0 = slackt, 1..255 -> tandpunkt+1..tak, alla fargkanaler
     //        med samma faktor sa kuloren bevaras.
-    //   DIM  (energi/puls): 0 = slackt, 1..255 -> golv+1..MAP_TOP x FULLPUNKT (cal.full, annars tak); drop oppnar resten.
+    //   DIM  (energi/puls): 0 = slackt, 1..255 -> golv+1..MAP_TOP x FULLPUNKT (cal.full, annars tak); drop oppnar till 255.
     //   Bada haller sista vardet HOLD_MS over enstaka nollor (mikro-0-dippar ska inte strobba dioden).
     const top = (255 * master + 0.5) | 0;
     for (let f = 0; f < fixtures.length; f++) {
@@ -189,7 +189,9 @@ export class FixtureOutput {
       const on = c ? (c.on || 0) : 0;
       // FULLPUNKT (cal.full): DIM-mappningens tak for just den har lampan. Golvet ar absolut (DMX_FLOOR_CH) och klipps mot fullpunkten.
       const dimTop = c && c.full && c.full < 255 ? Math.round(c.full * master) : top;
-      const dimMapTop = Math.round(dimTop * (MAP_TOP + (1 - MAP_TOP) * Math.max(0, Math.min(1, dropOpen))));
+      // Vanlig show: MAP_TOP x fullpunkten. Drop oppnar hela vagen till tak (255 x master) - agaren 10-08: "drop far dock kora 255".
+      const showTop = dimTop * MAP_TOP;
+      const dimMapTop = Math.round(showTop + (top - showTop) * Math.max(0, Math.min(1, dropOpen)));
 
       let lampLit = true, colK = 1;
       if (c) {
@@ -223,7 +225,7 @@ export class FixtureOutput {
         let out: number;
         if (raw > 0) {
           out = isDim && dimMapTop > floorCh ? Math.min(dimMapTop, floorCh + 1 + Math.round((dimMapTop - floorCh - 1) * (raw - 1) / 254))
-            : raw < floorCh ? floorCh : raw > (isDim ? dimTop : top) ? (isDim ? dimTop : top) : raw;
+            : raw < floorCh ? floorCh : raw > top ? top : raw;
           this.holdVal[ch] = out;
           this.holdUntil[ch] = nowMs + HOLD_MS;
         } else if (nowMs < this.holdUntil[ch]) {
