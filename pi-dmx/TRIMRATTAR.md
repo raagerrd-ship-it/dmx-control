@@ -47,6 +47,5 @@ Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulöre
 | `DMX_FADE_MIN_S` | 0,25 | Lampans uttoning — **snabbare är förbjudet** (ägaren 09-29). |
 
 ## Prov som inte är standard (ladan 10-07, väntar på ägarens beslut)
-`DMX_DIM_MAX=85`, `DMX_MINI_FULL=1` (minidrop väljer full-poolen), `DMX_ALSA_BUFFER=8192`, `DMX_FAST_RECOVER=1` (tapp 2,5 → 0,5 s),
-`DMX_E_RELEASE_MS=200`, `DMX_ENERGY_LO=0.3`, `DMX_ENERGY_VOL=1` (ren volym, ej provad live).
+`DMX_DIM_MAX=85`, `DMX_MINI_FULL=1` (minidrop väljer full-poolen), `DMX_ALSA_BUFFER=8192`, `DMX_E_RELEASE_MS=200`, `DMX_ENERGY_LO=0.3`, `DMX_ENERGY_VOL=1` (ren volym, ej provad live).
 Godkänt ⇒ standard och den gamla vägen bort samma gång. Inte godkänt ⇒ ratten tas bort.
