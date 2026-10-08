@@ -79,6 +79,7 @@ REMOVE = [
     # DRIFTGRANSKNING 2026-09-30 (backup pi-backup/2026-09-29): spokfiler pa Pi:n som inget i bygget importerar
     # (effekter borttagna ur registret tidigare + den pensionerade smartsync/analyserOld).
     '/opt/audio-dmx-engine/dist/analyserOld.js', '/opt/audio-dmx-engine/dist/smartsync.js',
+    '/opt/audio-dmx-engine/dist/liveRange.js',   # 2026-10-08: rullande nivarangen matade bara DIM-taket (borttaget, energin = ENERGY_SIMPLE)
     '/opt/audio-dmx-engine/dist/effects/cascade.js', '/opt/audio-dmx-engine/dist/effects/cycle.js',
     '/opt/audio-dmx-engine/dist/effects/flip.js', '/opt/audio-dmx-engine/dist/effects/interlace.js',
     '/opt/audio-dmx-engine/dist/effects/jump.js', '/opt/audio-dmx-engine/dist/effects/prisma.js',

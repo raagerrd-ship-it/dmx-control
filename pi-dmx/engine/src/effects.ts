@@ -34,7 +34,6 @@ const PALETTE_LOCK: number[] | null = (() => {
 if (PALETTE_LOCK) console.log(`[palett] LÅST till [${PALETTE_LOCK.join(", ")}] via DMX_PALETTE`);
 import { hsvToRgb } from "./effects/color.js";
 import type { EffectContext } from "./effects/types.js";
-import { LiveRange } from "./liveRange.js";
 
 /** Rökmaskinens tillstånd, för UI:t. */
 export interface FogStatus {
@@ -484,12 +483,9 @@ export class EffectEngine {
   private hotMs = 0;             // hur länge musiken pumpat → adaptiv tystnads-landning
   private wasBreaking = false;   // flankdetektor för nivå-svacka (drop-blackout)
   private blackoutUntil = 0;     // dramaturgisk tystnad: kolsvart till (wall-clock ms)
-  private vu = 0;                // direkt VU-envelope (snabb attack / ~180ms release) för ljustaket
-  private range = new LiveRange();   // rullande p5..p95 av nivån → normaliserad dynamik live
   // ── DRAMATURGI UR LÅTMINNET (sätts av index.ts, bara för IGENKÄNDA låtar) ──
   // En FÖRBERÄKNAD kurva kan inte fladdra som live-VU:n gjorde: ett värde per
   // sekund, mjukt interpolerat. Okänd låt → allt är null/0 och showen kör som förut.
-  memCeiling: number | null = null;   // normaliserat ljustak 0..1 ur minnet
   memSectionAt = 0;                   // performance.now() för senaste sektionsgräns
   memPhraseAt = 0;                    // ...och senaste frasgräns
   memHasGrid = false;                 // låten har sektioner/frasgrid att vänta in
@@ -528,7 +524,7 @@ export class EffectEngine {
   private partLookSong = 0;
 
   /** Misstänkt låtbyte → låt auto-rangen kalibrera om snabbt mot nya nivåer. */
-  softenRange(): void { this.range.soften(); this.songStartWall = Date.now(); }
+  softenRange(): void { this.songStartWall = Date.now(); }   // (rullande nivarangen borttagen 10-08 - den matade bara DIM-taket)
   /** KARAKTARSSKIFTE fran latgransdetektorn (DMX_CHAR_SHIFT_D): dirigenten byter look vid nasta tillfalle (MIN_HOLD, ej i uppbyggnad). */
   noteCharShift(reason = 'karaktarsskifte'): void { this.charShiftUntil = performance.now() + 6000; this.charShiftWhy = reason; }   // latgrans: aven DROP_SONG_HOLD_S-klockan
 
@@ -1616,9 +1612,6 @@ export class EffectEngine {
     // lägena inte adderas till något ljusare än någon av dem var tänkt att vara.
     const restLvl = Math.max(ambLvl, deafLvl);
     // ENERGIN APPLICERAS EN GANG (RGB, se ENERGY_SIMPLE). DIM-taket (vu/range/CEIL_FLOOR/minnestak/intoning) borttaget 10-08.
-    const ceilMul = 1;
-    // OBS: ceilMul appliceras INTE här — det läggs sist (efter ballistiken) så
-    // VU-taket följer nivån direkt utan effekt-ballistikens nedåt-släp.
     // ── LOUDNESS — PORTAD FRÅN LOTUS (piEngine.js:2126-2243, DEFAULT_CAL:166-239) ──
     // Ägarens observation: energidrivningen känns mycket bättre i Lotus. Orsaken är
     // TRE saker Lotus gör som den gamla bredbandiga linjära gasen inte gjorde:
@@ -1949,7 +1942,7 @@ export class EffectEngine {
     if (frame.level < 0.35 && Date.now() - this.lowLogAt > 1500) {
       this.lowLogAt = Date.now();
       if (isLogOn()) console.log(   // strangen byggs bara nar loggen ar pa (DMX_QUIET=0)
-        `[lagniva] niva ${frame.level.toFixed(3)} vu ${this.vu.toFixed(2)} tak ${ceilMul.toFixed(2)}` +
+        `[lagniva] niva ${frame.level.toFixed(3)} ` +
         ` puls ${this.beatMulNow.toFixed(2)} drive ${this.silenceGate.toFixed(2)} md ${md.toFixed(2)}` +
         ` intensitet ${frame.intensity.toFixed(2)} konf ${frame.bpmConfidence.toFixed(2)}` +
         ` tillit ${this.beatTrust.toFixed(2)} effekt ${this.smartMode}`
@@ -1967,9 +1960,7 @@ export class EffectEngine {
       this.cfg.fixtures,
       dtSec,
       decay,
-      ceilMul,
       Math.max(this.beatMulNow, this.dropEnv),
-      (this.cfg.energyCeiling || this.memCeiling !== null) && this.silenceGate > 0.5,
       !!this.cfg.beatPulse && this.silenceGate > 0.5,
       blackout || this.inputOff,
       this.cfg.master ?? 1,

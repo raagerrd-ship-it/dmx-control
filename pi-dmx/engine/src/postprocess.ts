@@ -65,9 +65,7 @@ export class PostProcess {
     fixtures: FixtureConfig[],
     dtSec: number,
     decay: number,
-    ceilMul: number,
     pulseMul: number,
-    ceilingActive: boolean,
     pulseActive: boolean,
     blackout: boolean,
     master: number,
@@ -92,13 +90,7 @@ export class PostProcess {
       universe[ch] = (v + 0.5) | 0; // Bitvis avrundning sparar ett funktionsanrop per kanal
     }
 
-    // 2. LJUSTAK — efter ballistiken, så det följer nivån direkt utan att släpa.
-    if (ceilingActive && ceilMul < 0.999) {
-      out.scale(universe, ceilMul);
-      for (let ch = 0; ch < maxCh; ch++) {
-        if (out.light[ch]) this.smooth[ch] *= ceilMul;
-      }
-    }
+    // (2. LJUSTAK borttaget 2026-10-08: energin appliceras en gang, pa effektens RGB i effects.ts - se ENERGY_SIMPLE.)
 
     // 3. HJÄRTSLAG — sist, i egen pass, buffert orörd.
     //    Först ges ljuset utrymme att pulsa i: en lugn effekt kan ligga så nära
