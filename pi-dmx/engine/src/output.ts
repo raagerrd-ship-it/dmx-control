@@ -178,7 +178,7 @@ export class FixtureOutput {
     // EN MAPPNING, SISTA STEGET (agarens ljuskontrakt 2026-10-07). Effekten/energin levererar 0..255 utan hardvarukunskap.
     //   farg (effektens styrka = lampans starkaste fargkanal): 0 = slackt, 1..255 -> tandpunkt+1..tak, alla fargkanaler
     //        med samma faktor sa kuloren bevaras.
-    //   DIM  (energi/puls): 0 = slackt, 1..255 -> golv+1..MAP_TOP x FULLPUNKT (cal.full, annars tak); drop oppnar till 255.
+    //   DIM  (energi/puls): 0 = slackt, 1..255 -> golv+1..MAP_TOP x FULLPUNKT (cal.full, annars tak); halv drop -> fullpunkten, full drop -> 255.
     //   Bada haller sista vardet HOLD_MS over enstaka nollor (mikro-0-dippar ska inte strobba dioden).
     const top = (255 * master + 0.5) | 0;
     for (let f = 0; f < fixtures.length; f++) {
@@ -189,9 +189,10 @@ export class FixtureOutput {
       const on = c ? (c.on || 0) : 0;
       // FULLPUNKT (cal.full): DIM-mappningens tak for just den har lampan. Golvet ar absolut (DMX_FLOOR_CH) och klipps mot fullpunkten.
       const dimTop = c && c.full && c.full < 255 ? Math.round(c.full * master) : top;
-      // Vanlig show: MAP_TOP x fullpunkten. Drop oppnar hela vagen till tak (255 x master) - agaren 10-08: "drop far dock kora 255".
-      const showTop = dimTop * MAP_TOP;
-      const dimMapTop = Math.round(showTop + (top - showTop) * Math.max(0, Math.min(1, dropOpen)));
+      // Vanlig show: MAP_TOP x fullpunkten. Drop oppnar i tva steg (agaren 10-08: "drop far dock kora 255", "borde inte halvdrop
+      // ga till fullpunkt"): 0..0,5 -> MAP_TOP x full .. full, 0,5..1 -> full .. tak (255 x master).
+      const showTop = dimTop * MAP_TOP, d = Math.max(0, Math.min(1, dropOpen));
+      const dimMapTop = Math.round(d <= 0.5 ? showTop + (dimTop - showTop) * (d / 0.5) : dimTop + (top - dimTop) * ((d - 0.5) / 0.5));
 
       let lampLit = true, colK = 1;
       if (c) {
