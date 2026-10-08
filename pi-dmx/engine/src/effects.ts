@@ -121,7 +121,7 @@ const GROUP_ALT = process.env.DMX_GROUP_ALT !== '0';
  *  frame.miniDropCount (monoton) ger look-byte (om looken hallits MIN_HOLD) + en kort stot pa MINI_DROP_ENV av
  *  en full drop-small (dropEnv), ingen rok, ingen blackout. */
 const MINI_DROP_ENV = Number(process.env.MINI_DROP_ENV ?? 0.9);   // 0,35 -> 0,9 STANDARD 2026-10-08 (agaren i ladan; lyfter bara ljusstyrkan, se dropColEnv)
-const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);
+const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 150);   // 350 -> 150 STANDARD 2026-10-08 (minidrops utan sparr holl annars ljuset pa 0,9)
 /** NASTAN-DROP (agaren 2026-10-07: "analysen av NASTAN-drops, sa de aterspeglas pa nagot bra satt i ljuset"), opt-in
  *  STANDARD sedan 2026-10-07 (DMX_NEAR_DROP=0 stanger av). Allt som bygger mot en small utan att bli en full drop (partiella drops som kvalitetsgrinden nekar
  *  tyst, minidrops, en build som landar halvt) har samma ljudavtryck: baskroppen (frame.bodyDb, ra dB) DYKER under
@@ -272,31 +272,14 @@ const LIVE_ANCHOR_S = Number(process.env.LIVE_ANCHOR_S ?? 120);   // lotus autoA
 const LIVE_RELEASE_MS = Number(process.env.LIVE_RELEASE_MS ?? 350);
 const LIVE_BASS_W = Number(process.env.LIVE_BASS_W ?? 1);      // lotus: mid/diskant 1,3 + bas 0,25 -> har som blandning
 const LIVE_TRACE = process.env.DMX_LIVE_TRACE === '1';
-/** ENKEL ENERGI (agaren i ladan 10-07: "foljer det inte bara inputs energiniva med liten fade out?", "sa simpelt och snabbt som
- *  mojligt", "energilagret ska ENBART kunna dampa ljuset, effekten styr max", "korta anklingningen"), DMX_ENERGY_SIMPLE=1:
- *  ERSATTER hela energikedjan (dB-fonster/ankare, tre utjamningar, DIM-taket, sektionsgasen, buildUp-/drop-PASLAGEN som lyfte
- *  md till 1,2). E = analysatorns sektionsenergi frame.intensity ENERGY_LO..HI -> 0..1 (ra ingangsniva matte r -0,13 pa ladans
- *  komprimerade mixar - nivan ror sig knappt), direkt upp, E_RELEASE_MS ner, golv E_FLOOR; faktor E_FLOOR..1 pa effektens RGB,
- *  ALDRIG over 1. Drop slapper dampningen (faktor 1) men lyfter aldrig over effekten. */
-const E_RELEASE_MS = Number(process.env.DMX_E_RELEASE_MS ?? 200),   // 400 -> 200 STANDARD 2026-10-08 (agaren: 'sanka den snabbare')
-  E_FLOOR = Number(process.env.DMX_E_FLOOR ?? 0.15);
-/** REN OVERSATTNING (agaren 10-07: "gar det inte gora denna rena oversattning av ljud till ljus?"), DMX_ENERGY_VOL=1: energin = ingangens
- *  VOLYM i dB rakt mellan Slackgransen (samma tal som tystnadsgrinden, /setup) och FULLNIVAN DMX_E_FULL (frame.level). Inga relativa matt,
- *  inga ankare, inget golv: vid gransen ger effektens 1 % slack+1 (utgangens mappning), vid fullnivan gar effekten igenom orord.
- *  Rattar: Slackgrans, Fullniva, avklingning (E_RELEASE_MS). */
-const ENERGY_VOL = process.env.DMX_ENERGY_VOL === '1';
-const E_FULL = Number(process.env.DMX_E_FULL ?? 0.9);
-/** FOLJANDE FONSTER (agaren i ladan 10-08: "har du fullt spann nu? kanns som energi inte justerar sa mycket"): en fast fullniva passar
- *  aldrig - matt live samma kvall: en del av laten 0,08-0,22, en annan 0,20-0,33. DMX_E_WIN_S > 0 (opt-in, kraver ENERGY_VOL): fonstrets
- *  topp och botten foljer volymen sjalv (topp: direkt upp, glider ner; botten: direkt ner, glider upp, tidskonstant E_WIN_S), minst
- *  E_MIN_DB brett. Da anvands alltid hela 0..1 oavsett lat och mixervolym. Slackgransen galler fortfarande for tystnad. */
-const E_WIN_S = Number(process.env.DMX_E_WIN_S ?? 0), E_MIN_DB = Number(process.env.DMX_E_MIN_DB ?? 4);
-/** UPPLEVD ENERGI (ladan 10-08: "kanns inte som energin jobbar sarskilt mycket", fast faktorn matte 0,35-0,95): ogat ar ungefar
- *  logaritmiskt - 0,35 -> 0,95 ar knappt ett steg. DMX_E_CURVE (opt-in, 1 = linjart): energins form upphojd till kurvan innan den
- *  blir dampningsfaktor; 2 => 0,35 -> 0,12, 0,76 -> 0,58, 0,95 -> 0,90 (lugnt morkare, toppen nastan orord). */
-const E_CURVE = Math.max(0.3, Math.min(4, Number(process.env.DMX_E_CURVE ?? 1)));
-const ENERGY_LO = Number(process.env.DMX_ENERGY_LO ?? 0.3),   // 0,05 -> 0,3 STANDARD 2026-10-08: intensity gar sallan under ~0,3, golvet nas ~10 % av tiden
-  ENERGY_HI = Number(process.env.DMX_ENERGY_HI ?? 0.85);
+/** ENERGIN (agarens modell, STANDARD 2026-10-08 i ladan: "mycket battre nu"): ingangens VOLYM (frame.levelVU, ~200 ms) i dB i ett
+ *  FOLJANDE FONSTER - topp: direkt upp, glider ner; botten: direkt ner, glider upp, tidskonstant E_WIN_S, minst E_MIN_DB brett - sa hela
+ *  0..1 anvands oavsett lat och mixerniva. Direkt upp, E_RELEASE_MS ner, upphojd till E_CURVE (ogat ar logaritmiskt), och blir EN
+ *  dampningsfaktor 0..1 pa effektens RGB - aldrig over 1 (effekten styr max). Drop slapper dampningen. Slackgransen galler for tystnad.
+ *  Ersatte 10-08: sektionsenergin (frame.intensity, for trog: "svanger lite och ratt morkt") och en fast fullniva (passade aldrig). */
+const E_WIN_S = Number(process.env.DMX_E_WIN_S ?? 20), E_MIN_DB = Number(process.env.DMX_E_MIN_DB ?? 4);
+const E_RELEASE_MS = Number(process.env.DMX_E_RELEASE_MS ?? 100);
+const E_CURVE = Math.max(0.3, Math.min(4, Number(process.env.DMX_E_CURVE ?? 2)));
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
 const LIVE_START_FAST_S = Number(process.env.DMX_LIVE_START_FAST_S ?? 90);
@@ -477,7 +460,7 @@ export class EffectEngine {
   private lastDropSwitchMs = -1e9; dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;   // senaste drop -> 'high'-pool i 20 s
   private liveAnchor = NaN; private liveAnchorMax = NaN;   /* NaN = ej satt (forr undefined: taggat falt -> ny HeapNumber per ruta) */ private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
   private lightLoud = 0;         // log-released loudness 0..1 → driver md
-  private eSm = 0; eSimple = 0; private eGate = 0.05; private eHi = NaN; private eLo = NaN;   // ENERGY_SIMPLE / ENERGY_VOL / E_WIN_S
+  private eSm = 0; eSimple = 0; private eHi = NaN; private eLo = NaN;   // ENERGIN (se E_WIN_S)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
@@ -1553,7 +1536,6 @@ export class EffectEngine {
 
     // TYSTNADSGRIND = HARD INGANGSGRANS (se konstanten ovan). Slackgransen ar ratten i /setup (cfg.silenceLevel); env vinner om satt.
     const silenceLevel = SILENCE_LEVEL_ENV ? SILENCE_LEVEL : (this.cfg.silenceLevel ?? SILENCE_LEVEL);
-    this.eGate = silenceLevel;   // ENERGY_VOL: samma grans som tystnadsgrinden
     if (frame.level > silenceLevel || kickHit) this.lastActiveMs = now;   // (ambient-/dovhets-klockorna nedan)
     this.silenceGate = frame.level > silenceLevel ? 1 : 0;
     // Warmup-räknare för baslinjen: ackumulera medan aktiv, nollställ vid tystnad.
@@ -1688,23 +1670,19 @@ export class EffectEngine {
     // → refräng ljus, vers dim = synlig gas, och pulsen syns uppåt mot en rörlig nivå.
     let md: number;
     {   // ENKEL ENERGI (se ENERGY_SIMPLE-dokumentationen). md0/sektionsgas/rang borttagna 10-08.
-      let e = ENERGY_VOL && E_WIN_S > 0 ? (() => {   // FOLJANDE FONSTER (se E_WIN_S)
-          const db = 20 * Math.log10(Math.max(1e-5, frame.levelVU ?? frame.level));
-          if (Number.isNaN(this.eHi)) { this.eHi = db; this.eLo = db; }
-          const k = Math.min(1, dtSec / E_WIN_S);
-          this.eHi = db > this.eHi ? db : this.eHi + (db - this.eHi) * k;
-          this.eLo = db < this.eLo ? db : this.eLo + (db - this.eLo) * k;
-          const span = Math.max(E_MIN_DB, this.eHi - this.eLo);
-          return (db - (this.eHi - span)) / span;
-        })()
-        : ENERGY_VOL
-        ? Math.log(Math.max(1e-6, frame.levelVU ?? frame.level) / this.eGate) / Math.log(Math.max(this.eGate * 1.01, E_FULL) / this.eGate)   // ren: volym i dB (levelVU ~200 ms, snabbare an level:s 400 ms release), grans..full
-        : ((frame.intensity ?? 0.5) - ENERGY_LO) / Math.max(0.05, ENERGY_HI - ENERGY_LO);
+      // FOLJANDE FONSTER (se E_WIN_S)
+      const db = 20 * Math.log10(Math.max(1e-5, frame.levelVU ?? frame.level));
+      if (Number.isNaN(this.eHi)) { this.eHi = db; this.eLo = db; }
+      const k = Math.min(1, dtSec / E_WIN_S);
+      this.eHi = db > this.eHi ? db : this.eHi + (db - this.eHi) * k;
+      this.eLo = db < this.eLo ? db : this.eLo + (db - this.eLo) * k;
+      const span = Math.max(E_MIN_DB, this.eHi - this.eLo);
+      let e = (db - (this.eHi - span)) / span;
       e = e < 0 ? 0 : e > 1 ? 1 : e;
       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
       this.eSimple = this.eSm;
-      const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);   // DMX_E_CURVE
-      md = drive * Math.min(1, Math.max(ENERGY_VOL ? eC : E_FLOOR + (1 - E_FLOOR) * eC, this.dropEnv));   // bara dampning: aldrig over 1
+      const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);
+      md = drive * Math.min(1, Math.max(eC, this.dropEnv));   // bara dampning: aldrig over 1
     }
     // HEARTBEAT: envelopen (kontraktet). ceiling = md utan tystnadsgrinden (drive), som appliceras separat pa ALLA effekter.
     const hbPulse = (this.cfg.beatPulse && this.beatMulNow > BEAT_MIN) ? Math.min(1, (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN)) : 0;

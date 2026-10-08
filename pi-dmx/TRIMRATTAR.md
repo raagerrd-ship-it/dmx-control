@@ -8,16 +8,17 @@ det ägaren godkänner blir kodens standard, inte en drop-in.*
 | Ratt | Standard | Var | Vad den gör |
 |---|---|---|---|
 | Släckgräns | 0,015 (cfg) | /setup, eller `DMX_SILENCE_LEVEL` (låser reglaget) | Under denna nivå är riggen svart. |
-| Ingångsförstärkning | Aux −6 dB, Mixin PGA 0 dB | `src/server.ts` applyInputRouting | Före 10-07 överstyrd (22–29 % klippta sampel). Sänk mixerns aux om det klipper ändå. |
+| Ingångsförstärkning | Aux −18 dB, Mixin PGA 0 dB | `src/server.ts` applyInputRouting | 0 dB/+6 dB och −6 dB klippte i kodeken (mätt 10-07/08). Mixern behöver inte sänkas. |
 
 ## 2. Energin (en faktor, kan bara dämpa)
-Faktor = golv..1 ur analysatorns sektionsenergi (`frame.intensity`), direkt upp, kort ner, på effektens färger. Drop släpper dämpningen.
+Ingångens volym (dB) i ett fönster som följer musiken självt → 0..1 → upphöjd till kurvan → dämpning på effektens färger.
+Direkt upp, kort ner, aldrig över effekten. Drop släpper dämpningen. Godkänd i ladan 10-08 ("mycket bättre nu").
 | Ratt | Standard | Vad den gör |
 |---|---|---|
-| `DMX_E_FLOOR` | 0,15 | Hur mörkt det lugnaste får bli. |
-| `DMX_ENERGY_LO` | 0,3 | Sektionsenergi som ger golvet. intensity går sällan under ~0,3: golvet nås ~10 % av tiden (0,4 ⇒ ~16 %). |
-| `DMX_ENERGY_HI` | 0,85 | Sektionsenergi som ger fullt. |
-| `DMX_E_RELEASE_MS` | 200 | Hur snabbt dämpningen följer när energin faller. |
+| `DMX_E_WIN_S` | 20 | Hur snabbt fönstrets topp/botten följer musiken (s). Kortare = större svängningar, mindre vers/refräng-skillnad. |
+| `DMX_E_MIN_DB` | 4 | Fönstrets minsta bredd i dB. Smalare = mer svängning när musiken är jämn. |
+| `DMX_E_CURVE` | 2 | Kurva (ögat är logaritmiskt): 1,5 = ljusare lugna partier, 3 = mörkare. |
+| `DMX_E_RELEASE_MS` | 100 | Hur snabbt dämpningen följer när volymen faller. |
 
 ## 3. Utgången (en mappning, sista steget)
 Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulören bevaras). DIM 1–100 % → golv+1 … `MAP_TOP` × lampans fullpunkt; bara full drop går förbi mappningen, till 255.
@@ -36,6 +37,7 @@ Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulöre
 | `DMX_NEAR_RISE_DB` / `DMX_NEAR_DIP_DB` | 10 / 8 | Hur stort språng efter hur djup dipp som räknas. |
 | `DMX_NEAR_DROP_SWITCH` | på | Dirigenten byter look på nästan-drop (=0 av). |
 | `MINI_DROP_ENV` | 0,9 | Minidropens ljuslyft (bara ljusstyrka, kulören kvar; full drop har dropfärg + vit kärna). |
+| `MINI_BANG_MS` | 150 | Hur länge minidropens lyft håller. Minidrops har ingen spärr, så längre = ljuset fastnar högt. |
 
 ## 5. Puls och ballistik
 | Ratt | Standard | Vad den gör |
@@ -46,9 +48,5 @@ Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulöre
 | `DMX_ATTACK_MS` | 20 | Lampans uppgång. |
 | `DMX_FADE_MIN_S` | 0,25 | Lampans uttoning — **snabbare är förbjudet** (ägaren 09-29). |
 
-## Prov som inte är standard (väntar på nästa besök i ladan)
-Fullpunkten — mätt 10-08: 255 (standard) på alla fyra lamporna.
-`DMX_E_RELEASE_MS=100` — ännu snabbare energinedgång (standard 200).
-`DMX_ENERGY_LO=0.4` — om lugna partier oftare ska nå golvet.
-`DMX_ENERGY_VOL=1` — ren volym (ingångens dB) som energi i stället för sektionsenergin; ej provad live efter ingångsfixen.
-Godkänt ⇒ standard och den gamla vägen bort samma gång. Inte godkänt ⇒ ratten tas bort.
+## Prov som inte är standard
+Inga just nu (ladan 10-08).
