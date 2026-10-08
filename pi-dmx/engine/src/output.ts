@@ -32,66 +32,22 @@ export interface SpecialtyValues {
   hazer: number; uv: number; blinder: number; strobe: number; laser: number; co2: number;
 }
 
-const MIN_DIM = process.env.DMX_MIN_DIM === '1';
 // SHOW-GOLV (2026-09-22, agaren i ladan: "jag vill ju att de skall ga precis ner till floor men inte under, om
 // effekten inte skall stanga av lampan"). Regeln FANNS redan - calibrate lyfter varje varde > 0 till lampans
 // TANDPUNKT - men tandpunkten ar 16 av 255, dvs 6 %, och det laser ogat som slackt i ett upplyst rum.
 // DMX_FLOOR_CH hojer golvet till ett SYNLIGT varde i DMX-steg. Galler bara DIM-kanaler: att lyfta r/g/b skulle
-// bleka ur kuloren (samma skal som MIN_DIM lamnar dem ifred). En ren nolla ar fortfarande svart - det ar sa
-// effekten sager "slack den har armaturen" - utom med DMX_MIN_DIM=1, som da haller golvet i stallet for tandpunkten.
+// bleka ur kuloren. En ren nolla ar fortfarande svart - det ar sa effekten sager "slack den har armaturen".
 const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 40)));
 /** LINJAR MAPPNING (agaren i ladan 2026-10-07: "skall inte 1-100% fran effekten rakt mappas mot GOLV+1 till 95%? Sa drop syns"),
- *  opt-in DMX_LIN_MAP=1. Forr KLAMPADES DIM-kanalen: allt under golvet (40 = 16 %) blev golvet och resten gick igenom ororda, sa
+ *  STANDARD sedan 10-07 (enda vagen sedan 10-08). Forr KLAMPADES DIM-kanalen: allt under golvet (40 = 16 %) blev golvet och resten gick igenom ororda, sa
  *  effektens nedersta 16 % var en dod zon. Nu: 1..255 -> golv+1..MAP_TOP x tak linjart, 0 = slackt som forr. Effekten FAR ge 100 %;
  *  det blir 95 %. Bara en drop oppnar de sista 5 %: utgangen far energilagrets drop-envelope (dropOpen 0..1) och taket blir
  *  MAP_TOP + (1 - MAP_TOP) x dropOpen. Mappningen och 95 % ags av utgangen - energilagret vet inte om dem (agaren 10-07). */
-const LIN_MAP = process.env.DMX_LIN_MAP !== '0';   // STANDARD sedan 2026-10-07 (godkand i ladan); =0 = klampning som forr
 const MAP_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_MAP_TOP ?? 0.95)));
 /** DIM-TAK (ladan 10-01, stegtest: lamporna mattar vid DIM ~85 - 85/110/255 ser lika ut, DIM 1 lyser redan): skala DIM-kanalen
  *  linjart sa full show = DMX_DIM_MAX i stallet for 255; allt over ~85 var dod skala. 255 = av (som forr). Tant varde blir aldrig 0. */
 const DIM_MAX = Math.max(1, Math.min(255, Number(process.env.DMX_DIM_MAX ?? 255)));
-/** KALIBRERAD UTGANG v2 (se calibrate): opt-in DMX_CAL_V2=1. Ladans uppmatta varden 10-01 som standard. */
-const CAL_V2 = process.env.DMX_CAL_V2 === '1';
-const CAL_PMIN = Number(process.env.DMX_CAL_PMIN ?? 270);    // tandgransen DIM x farg
-const CAL_DMAX = Number(process.env.DMX_CAL_DMAX ?? 127);    // DIM full (>= 128 = lampans fulllage)
-const CAL_CMAX = Number(process.env.DMX_CAL_CMAX ?? 120);    // farg full
-const CAL_PMAX = CAL_DMAX * CAL_CMAX;
-const CAL_GAMMA = Number(process.env.DMX_CAL_GAMMA ?? 1);   // < 1 lyfter mitten: showens typiska B 0,1-0,4 landade i den doda nedre delen (ladan 10-01)
-const CAL_DIM_TAU_S = Number(process.env.DMX_CAL_DIM_TAU_S ?? 0.5);   // DIM:s trog (fladder), 0 = som forst
-const CAL_BMIN = Number(process.env.DMX_CAL_BMIN ?? 0.002);  // under detta = slackt
-/** B-REFERENS (2026-10-06). B = (dim/255) x (starkaste fargen/255) x master, dvs POLERINGEN gange EFFEKTENS styrka.
- *  Arkitekturen (writeFixture): effekten skriver sin farg OCH sin styrka i r/g/b, dim skrivs pa fullt (m = 1), och
- *  poleringen (ljustak, puls) drar ner dim efterat. Showen hamnar darfor pa dim ~0,35 x farg ~0,45 = B ~0,16, och
- *  B kan i praktiken ALDRIG na 1 - taket gor sitt jobb. Kurvan P = PMIN x (PMAX/PMIN)^B mappade da hela
- *  energivariationen till botten: B 0,1 -> P 404, B 0,4 -> P 1356, av ett tak pa 15 240 (nedersta 9 %).
- *  LIVE-PROV 2026-10-06 20:29 med CAL_BREF = 1: agaren "blev nu mycket samre, foljer tex inte energi alls".
- *  Bortagen 20:3x. Kodens egen kommentar vid CAL_GAMMA sa redan samma sak fran ladan 10-01 ("showens typiska
- *  B 0,1-0,4 landade i den doda nedre delen") - men standarden lamnades pa 1, sa botemedlet var aldrig aktivt.
- *  BREF normerar B mot showens VERKLIGA fullskala i stallet for mot en teoretisk etta: B_eff = min(1, B / BREF).
- *  Matt BREF med tools/calProbe.mjs pa ladans inspelningar. 1 = som forr (och som forkastades). */
-const CAL_BREF = Math.max(0.01, Number(process.env.DMX_CAL_BREF ?? 1));
 const HOLD_MS = 120;
-/** KULORLYFT (2026-09-23, agaren i ladan: "lamporna kor nastan hela tiden med alla LED R G B paslagna ... kravet ar ju bara att EN
- *  kanal ar over tandpunkten"). Forr lyftes VARJE fargkanal > 0 till sin tandpunkt for sig - ett spar av gront och blatt i en rod
- *  lampa (punch-avmattning, ambient) blev 16/255 pa alla tre = alla LED tanda och kuloren urblekt. Nu: lampans STARKASTE fargkanal
- *  ska na tandpunkten; ar den under skalas alla fargkanaler med samma faktor (kuloren bevaras), Ovriga kanaler: se DISTINKTA FARGER. DIM-kanalen lyfts som forr. DMX_HUE_LIFT=0 = som forr. */
-const HUE_LIFT = process.env.DMX_HUE_LIFT !== '0';
-/** DISTINKTA FARGER (2026-09-23 22:30, agaren: "nar nagon av R/G/B kommer vid slackgransen kan den flimra nar den gar over/under -
- *  styr mot distinkta farger som inte behover under t.ex. 5 %"). En svag fargkanal ar tand eller slackt efter sin ANDEL av lampans
- *  starkaste kanal, inte efter absolut niva - sa den byter bara nar FARGEN andras, aldrig nar ljusstyrkan pulserar. Tand: >= HUE_RATIO_ON
- *  av starkaste (halls pa minst tandpunkten); slacks under HUE_RATIO_OFF (hysteres). */
-const HUE_RATIO_ON = Number(process.env.DMX_HUE_RATIO_ON ?? 0.25);
-const HUE_RATIO_OFF = Number(process.env.DMX_HUE_RATIO_OFF ?? 0.15);
-/** RENA PRIMARFARGER UNDER TANDPUNKTEN (2026-09-27, agaren i ladan: "i tysta partier tands alla LED (R G B), kanns hackigt ...
- *  vi sabbar manga effekter"). Under tandpunkten kan lampan inte visa en blandfarg: kulorlyftet gav starkaste kanalen 16 och
- *  varje sidokanal >= 25 % ocksa 16 -> tre lika varden = vitt. Nu: ar starkaste fargkanalen under sin tandpunkt lyser BARA
- *  den, pa tandpunkten (ren R/G/B); ar den under LOW_OFF_K x tandpunkten ar lampan SLACKT (osynlig anda). DMX_LOW_PURE=0 = som forr. */
-const LOW_PURE = process.env.DMX_LOW_PURE !== '0';
-/** Agaren 21:25: "under kanske 10 % slacks, over ar den redan hojd over slackpunkten". Per FARGKANAL, absolut i DMX-steg:
- *  pa vid >= LOW_ON_CH (26 = 10 %), av under LOW_OFF_CH (20) - hysteres sa gransen inte flimrar. Ingen lyftning av svaga
- *  sidokanaler langre (det var det som tande alla tre dioderna). Kanaler pa/over tandpunkten lamnas ifred. */
-const LOW_ON_CH = Number(process.env.DMX_LOW_ON_CH ?? 26);
-const LOW_OFF_CH = Number(process.env.DMX_LOW_OFF_CH ?? 20);
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
 
@@ -108,7 +64,7 @@ export class FixtureOutput {
 
   private cal = new Uint8Array(512);
   private dimCal = new Uint8Array(512);   // dim: bara tändpunkt (clamp), ingen remap
-  // Opt-in: hall DIM pa tandpunkten i stallet for helsvart nar effekten/grinden skickar 0 (se calibrate).
+  // HOLD_MS: sista vardet halls over enstaka nollor (se calibrate).
   private holdVal = new Float32Array(512);
   private holdUntil = new Float32Array(512);
   private builtFor: unknown = null;
@@ -219,13 +175,15 @@ export class FixtureOutput {
   /**
    * SISTA STEGET FÖRE UTGÅNG: tändpunkt som GOLV + master som TAK.
    */
-  private hueOn = new Uint8Array(512);
-  private calDim = new Float64Array(64); private calDimAt = new Float64Array(64);   // CAL_V2: langsam DIM per lampa   // KULORLYFT: kanalen ar tand (hysteres)
-  private lowLit = new Uint8Array(512);  // 10 %-REGELN: lampan (indexerad pa basadressen) ar tand (hysteres pa starkaste fargkanalen)
 
   calibrate(universe: Uint8Array, fixtures: FixtureConfig[], master: number, nowMs: number, dropOpen = 0): void {
+    // EN MAPPNING, SISTA STEGET (agarens ljuskontrakt 2026-10-07). Effekten/energin levererar 0..255 utan hardvarukunskap.
+    //   farg (effektens styrka = lampans starkaste fargkanal): 0 = slackt, 1..255 -> tandpunkt+1..tak, alla fargkanaler
+    //        med samma faktor sa kuloren bevaras.
+    //   DIM  (energi/puls): 0 = slackt, 1..255 -> golv+1..MAP_TOP x tak; drop (dropOpen) oppnar de sista procenten.
+    //   Bada haller sista vardet HOLD_MS over enstaka nollor (mikro-0-dippar ska inte strobba dioden).
     const top = (255 * master + 0.5) | 0;
-    const mapTop = LIN_MAP ? Math.round(top * (MAP_TOP + (1 - MAP_TOP) * Math.max(0, Math.min(1, dropOpen)))) : top;   // DMX_LIN_MAP
+    const mapTop = Math.round(top * (MAP_TOP + (1 - MAP_TOP) * Math.max(0, Math.min(1, dropOpen))));
     for (let f = 0; f < fixtures.length; f++) {
       const fx = fixtures[f];
       const fast = this.fastFixtures[f];
@@ -233,85 +191,16 @@ export class FixtureOutput {
       const base = fast.base;
       const on = c ? (c.on || 0) : 0;
 
-      // KALIBRERAD UTGANG v2 (DMX_CAL_V2=1, ladan 10-01 - full kalibrering med agarens oga): lampan lyser nar DIM x farg >= ~270,
-      // ar full vid DIM 127 x farg 120, och ogat ser fordubblingar. Motorns DIM x starkaste farg (0..1) blir EN ljusstyrka B som
-      // mappas exponentiellt fran tandgransen till max: P = PMIN * (PMAX/PMIN)^B, delas som DIM ~ sqrt(P*DMAX/CMAX) och farg = P/DIM;
-      // kuloren (forhallandet mellan r/g/b) behalls. Ersatter golv 40, tandpunkt 16, kulorlyft och DIM_MAX. B = 0 -> slackt.
-      if (CAL_V2) {
-        let dimCh = -1, dimRaw = 255, mx = 0;
-        for (let i = 0; i < fast.roles.length; i++) {
-          const ch = base + i; if (ch < 0 || ch >= 512) continue;
-          const role = fast.roles[i];
-          if (role === "dim") { dimCh = ch; dimRaw = universe[ch]; }
-          else if (role === "r" || role === "g" || role === "b" || role === "w") { if (universe[ch] > mx) mx = universe[ch]; }
-        }
-        const Braw = (dimCh >= 0 ? dimRaw / 255 : 1) * (mx / 255) * master;
-        const B = CAL_BREF === 1 ? Braw : Math.min(1, Braw / CAL_BREF);   // se CAL_BREF
-        const lit = B > CAL_BMIN;
-        const P = lit ? CAL_PMIN * Math.pow(CAL_PMAX / CAL_PMIN, Math.pow(Math.min(1, B), CAL_GAMMA)) : 0;
-        // FLADDER (ladan 10-01): DIM och farg hoppade bada varje ruta; ett DIM-steg vid 17 ar 6 % och lampan avrundar produkten.
-        // DIM foljer nu malet LANGSAMT (CAL_DIM_TAU_S, 0,5 s) och fargen bar de snabba andringarna (finare steg). Upp snabbare an ned.
-        const dimTarget = Math.sqrt(P * CAL_DMAX / CAL_CMAX);
-        if (lit && dimCh >= 0) {
-          const prevT = this.calDimAt[f] || nowMs; const dtS = Math.max(0, Math.min(0.2, (nowMs - prevT) / 1000)); this.calDimAt[f] = nowMs;
-          const cur = this.calDim[f] > 0 ? this.calDim[f] : dimTarget;
-          const tau = dimTarget > cur ? CAL_DIM_TAU_S * 0.2 : CAL_DIM_TAU_S;   // upp 0,1 s (smallar ska na fram), ned 0,5 s
-          this.calDim[f] = CAL_DIM_TAU_S > 0 ? cur + (dimTarget - cur) * Math.min(1, dtS / tau) : dimTarget;
-        } else { this.calDim[f] = 0; this.calDimAt[f] = nowMs; }
-        const dimOut = !lit ? 0 : dimCh >= 0 ? Math.max(1, Math.min(CAL_DMAX, Math.round(this.calDim[f]))) : 0;
-        const cTop = !lit ? 0 : dimCh >= 0 ? Math.min(CAL_CMAX, P / dimOut) : Math.min(CAL_CMAX, P / CAL_DMAX);
-        for (let i = 0; i < fast.roles.length; i++) {
-          const ch = base + i; if (ch < 0 || ch >= 512) continue;
-          const role = fast.roles[i];
-          if (role === "dim") universe[ch] = dimOut;
-          else if (role === "r" || role === "g" || role === "b" || role === "w") {
-            // FLIMMER PER DIOD (ladan 10-01): en svag fargandel nara tandgransen tandes/slacktes i takt med niva-rippel. Hysteres:
-            // andelen av starkaste fargen (pa >= 25 %, av < 15 %) OCH DIM x varde (pa >= 1,15 x PMIN, av < 0,85 x PMIN).
-            const raw = universe[ch]; const v = lit && mx > 0 ? Math.round(cTop * raw / mx) : 0;
-            const was = this.hueOn[ch] === 1; const ratio = mx > 0 ? raw / mx : 0;
-            const prod = (dimCh >= 0 ? dimOut : CAL_DMAX) * v;
-            const keep = v > 0 && (raw === mx || (ratio >= (was ? 0.15 : 0.25) && prod >= (was ? 0.85 : 1.15) * CAL_PMIN));   // starkaste fargen styrs av B (lit)
-            this.hueOn[ch] = keep ? 1 : 0; universe[ch] = keep ? v : 0;
-          }
-        }
-        continue;
-      }
-
-      // KULORLYFT: lampans starkaste fargkanal (r/g/b/w) och dess tandpunkt -> en gemensam skalfaktor i stallet for lyft per kanal.
-      let hueScale = 1, hueMaxCh = -1, hueMaxRaw = 0, hueMaxOn = 0;
-      if (HUE_LIFT && c && !LOW_PURE) {   // (hueScale anvands inte under LOW_PURE - hoppa over slingan)
-        let mx = 0, mxOn = 0;
-        for (let i = 0; i < fast.roles.length; i++) {
-          const ch = base + i; if (ch < 0 || ch >= 512 || this.cal[ch] !== 1 || this.dimCal[ch] === 1) continue;
-          const role = fast.roles[i]; if (role !== "r" && role !== "g" && role !== "b" && role !== "w") continue;
-          const raw = universe[ch];
-          if (raw > mx) { mx = raw; hueMaxCh = ch; mxOn = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; }
-        }
-        hueMaxRaw = mx; hueMaxOn = mxOn;
-        if (mx > 0 && mx < mxOn) hueScale = mxOn / mx;
-      }
-
-      // 10 %-REGELN PER LAMPA (kodgranskning 09-28: per kanal flippade kuloren rod<->orange i takten nar hjartpulsen
-      // pendlade en sidokanal kring 20/26). Nu avgors tand/slackt av lampans STARKASTE fargkanal med hysteres
-      // (pa >= LOW_ON_CH, av < LOW_OFF_CH); tand lampa skickar fargkanalerna RAA (inget lyft - under tandpunkten lyser
-      // de inte fysiskt anda), slackt lampa nollar dem. Kuloren andras bara nar fargen andras, inte med ljusstyrkan.
       let lampLit = true, colK = 1;
-      if (LOW_PURE && c) {
+      if (c) {
         let mxRaw = 0, mxOn = on;
         for (let i = 0; i < fast.roles.length; i++) {
           const ch = base + i; if (ch < 0 || ch >= 512 || this.cal[ch] !== 1 || this.dimCal[ch] === 1) continue;
           const role = fast.roles[i]; if (role !== "r" && role !== "g" && role !== "b" && role !== "w") continue;
           if (universe[ch] > mxRaw) { mxRaw = universe[ch]; mxOn = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; }
         }
-        if (LIN_MAP) {
-          // EFFEKTENS STYRKA (starkaste fargkanalen) 1..255 -> SLACK+1 (lampans tandpunkt + 1)..tak, linjart; alla fargkanaler
-          // skalas med samma faktor sa kuloren bevaras. 0 = slackt. Ersatter 10 %-regeln och effektlagrets LAMP_MIN (agaren 10-07).
-          lampLit = mxRaw > 0;
-          if (lampLit) colK = (mxOn + 1 + (top - mxOn - 1) * (mxRaw - 1) / 254) / mxRaw;
-        } else {
-          lampLit = this.lowLit[base] === 1 ? mxRaw >= LOW_OFF_CH : mxRaw >= LOW_ON_CH;
-          this.lowLit[base] = lampLit ? 1 : 0;
-        }
+        lampLit = mxRaw > 0;
+        if (lampLit) colK = (mxOn + 1 + (top - mxOn - 1) * (mxRaw - 1) / 254) / mxRaw;
       }
       for (let i = 0; i < fast.roles.length; i++) {
         const ch = base + i;
@@ -321,46 +210,24 @@ export class FixtureOutput {
 
         const role = fast.roles[i];
         const isColor = !isDim && (role === "r" || role === "g" || role === "b" || role === "w");
-        const onCh = !c ? 0 : isDim ? on
-          : ((role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : role === "w" ? c.onW : undefined) ?? on);
-
         let raw = universe[ch];
-        if (LOW_PURE && isColor) {
+        if (isColor) {   // farg: aven utan kalibrering (lampLit = sant, colK = 1) - noll nollar direkt, ingen hallning
           if (!lampLit) { universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
-          if (colK !== 1) raw = Math.round(raw * colK);   // LIN_MAP (se ovan)
+          if (colK !== 1) raw = Math.round(raw * colK);
           const v1 = raw > top ? top : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
         }
-        if (HUE_LIFT && isColor && raw > 0) {
-          // starkaste kanalen (och alla andra) skalas upp till tandpunkten; ovriga kanaler lyfts INTE var for sig
-          if (hueScale !== 1) { raw = Math.round(raw * hueScale); if (raw > 255) raw = 255; }
-          if (ch !== hueMaxCh && hueMaxRaw > 0) {
-            // ANDEL av starkaste kanalen (fore skalning) avgor tand/slackt, med hysteres - ljusstyrkans puls paverkar inte beslutet
-            const ratio = universe[ch] / hueMaxRaw;
-            const on = this.hueOn[ch] === 1 ? ratio >= HUE_RATIO_OFF : ratio >= HUE_RATIO_ON;
-            if (!on) { this.hueOn[ch] = 0; universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
-            this.hueOn[ch] = 1;
-            if (raw < onCh) raw = onCh;   // tand kanal halls pa minst tandpunkten (kalibreringen nedan klampar mot taket)
-            const v2 = raw > top ? top : raw; universe[ch] = v2; this.holdVal[ch] = v2; this.holdUntil[ch] = nowMs + HOLD_MS;
-            continue;
-          }
-          this.hueOn[ch] = 1;
-        } else if (HUE_LIFT && isColor) { this.hueOn[ch] = 0; }
-        // Golvet ar tandpunkten, eller DMX_FLOOR_CH nar den ar hogre (bara DIM - se FLOOR_CH). Aldrig over taket.
+        const onCh = !c ? 0 : isDim ? on
+          : ((role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : role === "w" ? c.onW : undefined) ?? on);
+        // Golvet ar tandpunkten, eller DMX_FLOOR_CH nar den ar hogre (bara DIM). Aldrig over taket.
         const floorCh = FLOOR_CH > onCh && isDim ? (FLOOR_CH > top ? top : FLOOR_CH) : onCh;
         let out: number;
         if (raw > 0) {
-          out = LIN_MAP && isDim && mapTop > floorCh ? Math.min(mapTop, floorCh + 1 + Math.round((mapTop - floorCh - 1) * (raw - 1) / 254))   // DMX_LIN_MAP
+          out = isDim && mapTop > floorCh ? Math.min(mapTop, floorCh + 1 + Math.round((mapTop - floorCh - 1) * (raw - 1) / 254))
             : raw < floorCh ? floorCh : raw > top ? top : raw;
           this.holdVal[ch] = out;
           this.holdUntil[ch] = nowMs + HOLD_MS;
         } else if (nowMs < this.holdUntil[ch]) {
           out = this.holdVal[ch];
-        } else if (MIN_DIM && isDim && top > 0) {   // haller GOLVET (inte bara tandpunkten) nar effekten skickar ren nolla
-          // ALDRIG HELSVART (2026-09-22, agaren i ladan: "lamporna stangs av ... output maste ju anda ske mot kalibrerad
-          // lampa"): tandpunkten lyfter bara varden > 0, sa en ren nolla fran effekten eller tystnadsgrinden gick igenom
-          // som svart armatur. Med DMX_MIN_DIM=1 halls DIM-kanalen pa tandpunkten sa lange showen alls lyser (master > 0);
-          // fargkanalerna lamnas orerda (att lyfta r/g/b skulle andra kuloren). Blackout/master 0 slacker fortfarande.
-          out = floorCh;
         } else {
           out = 0;
         }
