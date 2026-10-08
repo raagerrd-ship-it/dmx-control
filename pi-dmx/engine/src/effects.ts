@@ -464,6 +464,7 @@ export class EffectEngine {
   private lastMiniCount = 0; private miniBangUntil = 0; private miniPendingAt = 0;   // minidrop-flank + kort stot + fordrojd reaktion
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
+  private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
   // Loudness-portens tillstånd (Lotus mid+diskant dB-fönster + log-release). Negativa
   // sentinelvärden = oinitierat (första framen sätter dem utan hopp).
   private lightShapeSm = -1;     // shape-smoothing
@@ -1178,6 +1179,7 @@ export class EffectEngine {
     }
     const dRate = dTarget > this.dropEnv ? dtNow / 0.03 : dtNow / 1.0;
     this.dropEnv += Math.max(-dRate, Math.min(dRate, dTarget - this.dropEnv));
+    { const cT = dropActive ? 1 : 0, cR = cT > this.dropColEnv ? dtNow / 0.03 : dtNow / 1.0; this.dropColEnv += Math.max(-cR, Math.min(cR, cT - this.dropColEnv)); }
 
     // UPPBYGGNAD: analysatorn räknar riser/novelty och ger oss frame.buildUp (0..1).
     // Reaktionerna (riser-strobe, md-swell, phaseSpread, show-tid) ligger kvar här.
@@ -1877,10 +1879,17 @@ export class EffectEngine {
         rgb[1] = (rgb[1] + (1 - rgb[1]) * rsWhite) * rsGate;
         rgb[2] = (rgb[2] + (1 - rgb[2]) * rsWhite) * rsGate;
       }
-      if (this.dropEnv > 0.005) {
+      // LYFT UTAN FARG (agaren i ladan 10-08: minidrop "90 fast inte vitt utan bara ljusstyrka"): minidrop/nastan-drop skalar
+      // effektens egna farger mot fullt med kuloren bevarad; dropfarg + vit karna galler bara en FULL drop (dropColEnv).
+      const liftK = this.dropEnv - this.dropColEnv;
+      if (liftK > 0.005) {
+        const mx = Math.max(rgb[0], rgb[1], rgb[2]);
+        if (mx > 0.002 && mx < 1) { const g = 1 + (1 / mx - 1) * liftK; rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
+      }
+      if (this.dropColEnv > 0.005) {
         const dc = hsvToRgb(mixedSector(this.dropSector + i) / 6, 1, 1);
-        const vitKarna = Math.max(0, (this.dropEnv - 0.6) / 0.4);   // bara vid toppen
-        const k = this.dropEnv;
+        const vitKarna = Math.max(0, (this.dropColEnv - 0.6) / 0.4);   // bara vid toppen
+        const k = this.dropColEnv;
         for (let c = 0; c < 3; c++) {
           rgb[c] += ((dc[c] + (1 - dc[c]) * vitKarna) - rgb[c]) * k;
         }
