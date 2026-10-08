@@ -20,13 +20,13 @@ Faktor = golv..1 ur analysatorns sektionsenergi (`frame.intensity`), direkt upp,
 | `DMX_E_RELEASE_MS` | 200 | Hur snabbt dämpningen följer när energin faller. |
 
 ## 3. Utgången (en mappning, sista steget)
-Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulören bevaras). DIM 1–100 % → golv+1 … `MAP_TOP` × tak; drop öppnar resten.
+Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulören bevaras). DIM 1–100 % → golv+1 … `MAP_TOP` × lampans fullpunkt; drop öppnar resten.
 | Ratt | Standard | Vad den gör |
 |---|---|---|
 | `DMX_FLOOR_CH` | 40 | DIM-golvet i DMX-steg (0–255). |
 | `DMX_MAP_TOP` | 0,95 | Taket för vanlig show; drop får 100 %. |
-| `DMX_DIM_MAX` | 255 | Lampans verkliga fulla DIM (stegtest 10-01: ~85). |
-| Tändpunkt per lampa | 16 | Kalibreringen i /setup (`cal.on`, `onR/G/B`). |
+| Släckpunkt per lampa | 16 | /setup → lampan → Alla/R/G/B: dra tills den precis tänder, Spara (`cal.on`, `onR/G/B`). |
+| Fullpunkt per lampa | 255 | /setup → lampan → Full: lampan lyser vitt, dra DIM tills den inte blir ljusare, Spara (`cal.full`; stegtest 10-01 ~85, kändes för lågt 10-08). |
 
 ## 4. Drops och nästan-drops
 | Ratt | Standard | Vad den gör |
@@ -47,7 +47,7 @@ Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulöre
 | `DMX_FADE_MIN_S` | 0,25 | Lampans uttoning — **snabbare är förbjudet** (ägaren 09-29). |
 
 ## Prov som inte är standard (väntar på nästa besök i ladan)
-`DMX_DIM_MAX` — lampans verkliga fulla DIM. 85 (stegtest 10-01) kändes för lågt 10-08; prova 120 mot 85/255 på samma låt.
+Fullpunkten — sätts i /setup (Full), inte som ratt. 85 kändes för lågt 10-08.
 `DMX_E_RELEASE_MS=100` — ännu snabbare energinedgång (standard 200).
 `DMX_ENERGY_LO=0.4` — om lugna partier oftare ska nå golvet.
 `DMX_ENERGY_VOL=1` — ren volym (ingångens dB) som energi i stället för sektionsenergin; ej provad live efter ingångsfixen.

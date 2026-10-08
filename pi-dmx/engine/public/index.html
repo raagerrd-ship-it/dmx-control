@@ -1292,8 +1292,8 @@ function renderFixtures() {
                   + (errByIdx.has(i) ? " err" : "")
                   + (i === identifyingIndex ? " identifying" : "");
     const _c = fx.cal;
-    const calBadge = (_c && (_c.on || _c.onR || _c.onG || _c.onB))
-      ? [_c.on ? `alla ${_c.on}` : "", _c.onR ? `R${_c.onR}` : "", _c.onG ? `G${_c.onG}` : "", _c.onB ? `B${_c.onB}` : ""].filter(Boolean).join(" · ")
+    const calBadge = (_c && (_c.on || _c.onR || _c.onG || _c.onB || _c.full))
+      ? [_c.on ? `alla ${_c.on}` : "", _c.onR ? `R${_c.onR}` : "", _c.onG ? `G${_c.onG}` : "", _c.onB ? `B${_c.onB}` : "", _c.full ? `full ${_c.full}` : ""].filter(Boolean).join(" · ")
       : "ej satt";
     div.innerHTML = `
       <div class="fx-head">
@@ -1311,14 +1311,14 @@ function renderFixtures() {
       </div>
       <div class="fx-cal">
         <div class="fx-cal-head">
-          <span class="fx-cal-title">Lägsta ljus</span>
+          <span class="fx-cal-title">Släckpunkt och fullpunkt</span>
           <span class="fx-cal-badge ${calBadge === "ej satt" ? "unset" : ""}" data-cal-badge="${i}">${calBadge}</span>
         </div>
-        <div class="fx-cal-hint">Välj färg, dra tills <b>just den</b> precis tänder, tryck spara. <b>Alla</b> = gemensam tröskel · R/G/B = per färg (dioderna tänder vid olika DMX).</div>
+        <div class="fx-cal-hint">Välj färg, dra tills <b>just den</b> precis tänder, tryck spara. <b>Alla</b> = gemensam tröskel · R/G/B = per färg (dioderna tänder vid olika DMX). <b>Full</b> = lampan lyser vitt, dra DIM tills den <b>inte blir ljusare</b>, tryck spara.</div>
         <div class="fx-cal-chips">
-          ${["all","r","g","b"].map((c) => `<button type="button" class="fx-cal-chip${(calSel[i] || "all") === c ? " on" : ""}" data-cal-ch="${c}" data-cal-ch-i="${i}">${({all:"Alla",r:"R",g:"G",b:"B"})[c]}</button>`).join("")}
+          ${["all","r","g","b","full"].map((c) => `<button type="button" class="fx-cal-chip${(calSel[i] || "all") === c ? " on" : ""}" data-cal-ch="${c}" data-cal-ch-i="${i}">${({all:"Alla",r:"R",g:"G",b:"B",full:"Full"})[c]}</button>`).join("")}
         </div>
-        <input type="range" min="0" max="64" value="0" step="1" data-caltest-i="${i}" />
+        <input type="range" min="0" max="${calSel[i] === "full" ? 255 : 64}" value="0" step="1" data-caltest-i="${i}" />
         <div class="fx-cal-row">
           <span class="fx-cal-live" data-caltest-val="${i}">reglaget: av</span>
           <button type="button" class="fx-cal-btn" data-cal-set="on" data-cal-set-i="${i}">Spara</button>
@@ -1399,6 +1399,7 @@ function renderFixtures() {
       calSel[i] = ch;
       fxEl.querySelectorAll(`[data-cal-ch-i="${i}"]`).forEach((b) => b.classList.toggle("on", b.dataset.calCh === ch));
       const slider = fxEl.querySelector(`[data-caltest-i="${i}"]`);
+      if (slider) slider.max = ch === "full" ? "255" : "64";   // fullpunkt: hela DIM-skalan
       const v = slider ? (parseInt(slider.value, 10) || 0) : 0;
       calTestActive = v > 0;
       send({ type: "setCalTest", index: v > 0 ? i : -1, value: v, channel: ch });   // byt färg live
@@ -1412,8 +1413,9 @@ function renderFixtures() {
       const slider = fxEl.querySelector(`[data-caltest-i="${i}"]`);
       const v = slider ? (parseInt(slider.value, 10) || 0) : 0;
       const cal = fxDraft[i].cal ?? { off: 0, on: 0 };
-      if (ch === "all") cal.on = v; else cal["on" + ch.toUpperCase()] = v;   // onR/onG/onB
-      if (!cal.on && !cal.onR && !cal.onG && !cal.onB && !cal.onW) delete fxDraft[i].cal; else fxDraft[i].cal = cal;
+      if (ch === "full") { if (v > 0 && v < 255) cal.full = v; else delete cal.full; }   // fullpunkt (DIM)
+      else if (ch === "all") cal.on = v; else cal["on" + ch.toUpperCase()] = v;   // onR/onG/onB
+      if (!cal.on && !cal.onR && !cal.onG && !cal.onB && !cal.onW && !cal.full) delete fxDraft[i].cal; else fxDraft[i].cal = cal;
       calTestActive = false;
       send({ type: "setCalTest", index: -1, value: 0 });   // klar → tillbaka till showen
       markDirty();   // ritar om → badgen visar nya värdet, reglaget nollas

@@ -44,9 +44,7 @@ const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 40
  *  det blir 95 %. Bara en drop oppnar de sista 5 %: utgangen far energilagrets drop-envelope (dropOpen 0..1) och taket blir
  *  MAP_TOP + (1 - MAP_TOP) x dropOpen. Mappningen och 95 % ags av utgangen - energilagret vet inte om dem (agaren 10-07). */
 const MAP_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_MAP_TOP ?? 0.95)));
-/** DIM-TAK (ladan 10-01, stegtest: lamporna mattar vid DIM ~85 - 85/110/255 ser lika ut, DIM 1 lyser redan): skala DIM-kanalen
- *  linjart sa full show = DMX_DIM_MAX i stallet for 255; allt over ~85 var dod skala. 255 = av (som forr). Tant varde blir aldrig 0. */
-const DIM_MAX = Math.max(1, Math.min(255, Number(process.env.DMX_DIM_MAX ?? 255)));
+// (DMX_DIM_MAX borttagen 2026-10-08: lampans fulla DIM ar nu FULLPUNKTEN i kalibreringen, cal.full - en mappning, inget efterskalningssteg.)
 const HOLD_MS = 120;
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
@@ -180,16 +178,18 @@ export class FixtureOutput {
     // EN MAPPNING, SISTA STEGET (agarens ljuskontrakt 2026-10-07). Effekten/energin levererar 0..255 utan hardvarukunskap.
     //   farg (effektens styrka = lampans starkaste fargkanal): 0 = slackt, 1..255 -> tandpunkt+1..tak, alla fargkanaler
     //        med samma faktor sa kuloren bevaras.
-    //   DIM  (energi/puls): 0 = slackt, 1..255 -> golv+1..MAP_TOP x tak; drop (dropOpen) oppnar de sista procenten.
+    //   DIM  (energi/puls): 0 = slackt, 1..255 -> golv+1..MAP_TOP x FULLPUNKT (cal.full, annars tak); drop oppnar resten.
     //   Bada haller sista vardet HOLD_MS over enstaka nollor (mikro-0-dippar ska inte strobba dioden).
     const top = (255 * master + 0.5) | 0;
-    const mapTop = Math.round(top * (MAP_TOP + (1 - MAP_TOP) * Math.max(0, Math.min(1, dropOpen))));
     for (let f = 0; f < fixtures.length; f++) {
       const fx = fixtures[f];
       const fast = this.fastFixtures[f];
       const c = fx.cal;
       const base = fast.base;
       const on = c ? (c.on || 0) : 0;
+      // FULLPUNKT (cal.full): DIM-mappningens tak for just den har lampan. Golvet ar absolut (DMX_FLOOR_CH) och klipps mot fullpunkten.
+      const dimTop = c && c.full && c.full < 255 ? Math.round(c.full * master) : top;
+      const dimMapTop = Math.round(dimTop * (MAP_TOP + (1 - MAP_TOP) * Math.max(0, Math.min(1, dropOpen))));
 
       let lampLit = true, colK = 1;
       if (c) {
@@ -219,11 +219,11 @@ export class FixtureOutput {
         const onCh = !c ? 0 : isDim ? on
           : ((role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : role === "w" ? c.onW : undefined) ?? on);
         // Golvet ar tandpunkten, eller DMX_FLOOR_CH nar den ar hogre (bara DIM). Aldrig over taket.
-        const floorCh = FLOOR_CH > onCh && isDim ? (FLOOR_CH > top ? top : FLOOR_CH) : onCh;
+        const floorCh = FLOOR_CH > onCh && isDim ? (FLOOR_CH > dimTop ? dimTop : FLOOR_CH) : onCh;
         let out: number;
         if (raw > 0) {
-          out = isDim && mapTop > floorCh ? Math.min(mapTop, floorCh + 1 + Math.round((mapTop - floorCh - 1) * (raw - 1) / 254))
-            : raw < floorCh ? floorCh : raw > top ? top : raw;
+          out = isDim && dimMapTop > floorCh ? Math.min(dimMapTop, floorCh + 1 + Math.round((dimMapTop - floorCh - 1) * (raw - 1) / 254))
+            : raw < floorCh ? floorCh : raw > (isDim ? dimTop : top) ? (isDim ? dimTop : top) : raw;
           this.holdVal[ch] = out;
           this.holdUntil[ch] = nowMs + HOLD_MS;
         } else if (nowMs < this.holdUntil[ch]) {
@@ -231,7 +231,7 @@ export class FixtureOutput {
         } else {
           out = 0;
         }
-        universe[ch] = isDim && DIM_MAX < 255 && out > 0 ? Math.max(1, Math.round(out * DIM_MAX / 255)) : out;   // DMX_DIM_MAX: se ovan
+        universe[ch] = out;
       }
     }
   }

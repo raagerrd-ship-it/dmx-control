@@ -853,7 +853,9 @@ export class EffectEngine {
         const ch = cbase + i;
         if (ch < 0 || ch >= 512) continue;
         // Driv bara vald färg (all = alla lika). dim = enfärgs-dimmer → alltid.
-        this.universe[ch] = (chSel === "all" || role === chSel || role === "dim") ? val : 0;
+        // full = FULLPUNKT: vitt (färgerna på 255) och DIM = reglaget; lampa utan DIM: färgerna = reglaget.
+        if (chSel === "full") this.universe[ch] = role === "dim" || !roles.includes("dim") ? val : 255;
+        else this.universe[ch] = (chSel === "all" || role === chSel || role === "dim") ? val : 0;
       }
       return this.universe;
     }

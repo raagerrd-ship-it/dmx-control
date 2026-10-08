@@ -33,8 +33,10 @@ export interface FixtureConfig {
    *  on  = TÄNDTRÖSKEL: minsta tända värde lyfts till on (LED:ns tändpunkt) →
    *        dim-toningar syns jämnt, ingen kanal i dödzonen. off (svartpunkt) legacy.
    *  onR/onG/onB/onW = valfria PER-FÄRG-trösklar (R/G/B tänder vid olika DMX). En
-   *        kanal använder sin egen tröskel om satt, annars gemensamma `on`. */
-  cal?: { off: number; on: number; onR?: number; onG?: number; onB?: number; onW?: number };
+   *        kanal använder sin egen tröskel om satt, annars gemensamma `on`.
+   *  full = FULLPUNKT för DIM (2026-10-08, ägaren: "inte dim utan mappning, lika som vi sätter släckpunkt"): DIM-värdet där
+   *        lampan inte blir ljusare (stegtest 10-01: ~85). Utgångens mappning går golv+1..MAP_TOP × full. Utan = 255. */
+  cal?: { off: number; on: number; onR?: number; onG?: number; onB?: number; onW?: number; full?: number };
 }
 
 export interface EngineConfig {
@@ -134,7 +136,7 @@ export interface EngineConfig {
    *  rått DMX-värde (0..255) på ljuskanalerna, bypassar show/VU/cal → hitta exakt
    *  tänd/släck-punkt. index<0 = av. channel = vilken färg testet driver ("all"
    *  = alla lika, annars bara r/g/b/w → kalibrera per färg). */
-  calTest?: { index: number; value: number; channel?: "all" | "r" | "g" | "b" | "w" } | null;
+  calTest?: { index: number; value: number; channel?: "all" | "r" | "g" | "b" | "w" | "full" } | null;   // full = vitt, DIM = value
   /** STEGTEST (ladan 10-01, ljuskurvan): DIM per lampa = values[i], fargkanalerna (channel) pa 255 - alla lampor samtidigt. Transient. */
   levelTest?: { values: number[]; channel?: "all" | "r" | "g" | "b" | "w"; colorValues?: number[] } | null;
   /** Transient walk-test — inte persisterad. Tänder EN rå DMX-kanal (255) på
