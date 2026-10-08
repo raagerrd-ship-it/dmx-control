@@ -42,15 +42,15 @@ export class AudioCapture extends EventEmitter {
    *  när codec-zero:n byter ingång under drift). Då fyrar varken 'exit' eller
    *  'error', så den befintliga respawn-vägen ser ingenting — riggen tonar ned
    *  till svart och står så tills någon startar om tjänsten. Vakten dödar
-   *  processen i stället; 'exit'-handlern respawnar den om 1 s.
-   *  1500 ms = samma marginal som STALE_MS (värsta uppmätta batch-lucka 341 ms). */
-  private static readonly STALL_MS = process.env.DMX_FAST_RECOVER === '1' ? 400 : 1500;
-  /** SNABB ATERHAMTNING (ladan 2026-10-07, opt-in DMX_FAST_RECOVER=1): efter kallstarten 18:29 gav varje arecord-overrun att
+   *  processen i stället; 'exit'-handlern respawnar den (30 ms för de rena försöken).
+   *  400 ms: strax över värsta uppmätta normala lucka (341 ms), se SNABB ATERHAMTNING nedan. */
+  private static readonly STALL_MS = 400;
+  /** SNABB ATERHAMTNING (ladan 2026-10-07; STANDARD 2026-10-08, gamla 1,5 s/1 s-vagen borttagen): efter kallstarten 18:29 gav varje arecord-overrun att
    *  kodeken tappade I2S-synken -> inget ljud -> 1,5 s till tystnaden upptacktes + 1 s till respawn = ~2,5 s svart, och en drop
    *  missades. 22 overruns pa en kvall (0 st 10-04..10-06); bufferten 21 -> 170 ms hjalpte inte (3 overruns pa 6 min).
-   *  Med flaggan: tyst efter 400 ms (vardsta uppmatta normala lucka 341 ms) och de rena respawnerna sker direkt. Felet kvarstar,
+   *  Nu: tyst efter 400 ms (vardsta uppmatta normala lucka 341 ms) och de rena respawnerna sker direkt. Felet kvarstar,
    *  tappet krymper till ~0,5 s. */
-  private static readonly FIRST_RESPAWN_MS = process.env.DMX_FAST_RECOVER === '1' ? 30 : 1000;
+  private static readonly FIRST_RESPAWN_MS = 30;
   private lastDataAt = 0;
   private stallTimer: NodeJS.Timeout | null = null;
   /** Se toMonoFloat32: återanvänd mono-buffert, giltig bara under 'chunk'-handlern. */
@@ -93,7 +93,7 @@ export class AudioCapture extends EventEmitter {
     this.stopped = false;
     this.spawnArecord();
     if (!this.stallTimer) {
-      this.stallTimer = setInterval(() => this.checkStall(), process.env.DMX_FAST_RECOVER === '1' ? 100 : 500);   // DMX_FAST_RECOVER: se STALL_MS
+      this.stallTimer = setInterval(() => this.checkStall(), 100);   // se STALL_MS (snabb aterhamtning)
       this.stallTimer.unref?.();
     }
   }
