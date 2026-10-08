@@ -291,6 +291,10 @@ const E_FULL = Number(process.env.DMX_E_FULL ?? 0.9);
  *  topp och botten foljer volymen sjalv (topp: direkt upp, glider ner; botten: direkt ner, glider upp, tidskonstant E_WIN_S), minst
  *  E_MIN_DB brett. Da anvands alltid hela 0..1 oavsett lat och mixervolym. Slackgransen galler fortfarande for tystnad. */
 const E_WIN_S = Number(process.env.DMX_E_WIN_S ?? 0), E_MIN_DB = Number(process.env.DMX_E_MIN_DB ?? 4);
+/** UPPLEVD ENERGI (ladan 10-08: "kanns inte som energin jobbar sarskilt mycket", fast faktorn matte 0,35-0,95): ogat ar ungefar
+ *  logaritmiskt - 0,35 -> 0,95 ar knappt ett steg. DMX_E_CURVE (opt-in, 1 = linjart): energins form upphojd till kurvan innan den
+ *  blir dampningsfaktor; 2 => 0,35 -> 0,12, 0,76 -> 0,58, 0,95 -> 0,90 (lugnt morkare, toppen nastan orord). */
+const E_CURVE = Math.max(0.3, Math.min(4, Number(process.env.DMX_E_CURVE ?? 1)));
 const ENERGY_LO = Number(process.env.DMX_ENERGY_LO ?? 0.3),   // 0,05 -> 0,3 STANDARD 2026-10-08: intensity gar sallan under ~0,3, golvet nas ~10 % av tiden
   ENERGY_HI = Number(process.env.DMX_ENERGY_HI ?? 0.85);
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
@@ -1699,7 +1703,8 @@ export class EffectEngine {
       e = e < 0 ? 0 : e > 1 ? 1 : e;
       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
       this.eSimple = this.eSm;
-      md = drive * Math.min(1, Math.max(ENERGY_VOL ? this.eSm : E_FLOOR + (1 - E_FLOOR) * this.eSm, this.dropEnv));   // bara dampning: aldrig over 1
+      const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);   // DMX_E_CURVE
+      md = drive * Math.min(1, Math.max(ENERGY_VOL ? eC : E_FLOOR + (1 - E_FLOOR) * eC, this.dropEnv));   // bara dampning: aldrig over 1
     }
     // HEARTBEAT: envelopen (kontraktet). ceiling = md utan tystnadsgrinden (drive), som appliceras separat pa ALLA effekter.
     const hbPulse = (this.cfg.beatPulse && this.beatMulNow > BEAT_MIN) ? Math.min(1, (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN)) : 0;
