@@ -1418,7 +1418,10 @@ function renderFixtures() {
       if (!cal.on && !cal.onR && !cal.onG && !cal.onB && !cal.onW && !cal.full) delete fxDraft[i].cal; else fxDraft[i].cal = cal;
       calTestActive = false;
       send({ type: "setCalTest", index: -1, value: 0 });   // klar → tillbaka till showen
-      markDirty();   // ritar om → badgen visar nya värdet, reglaget nollas
+      // SPARA DIREKT (ladan 2026-10-08: fullpunkterna "sparades" men nadde aldrig motorn - knappen andrade bara utkastet och
+      // "Spara ändringar" langst ner kravdes ocksa). Kalibreringen skickas nu direkt om resten av listan ar giltig.
+      if (validateAll().length === 0) { send({ type: "setFixtures", fixtures: fxDraft }); fxDirty = false; fxSaveBtn.disabled = true; renderFixtures(); }
+      else markDirty();   // ogiltig lista (t.ex. adresskrock) -> som forr: "Spara ändringar" kravs
     });
   });
   fxEl.querySelectorAll("[data-del]").forEach((el) => {
