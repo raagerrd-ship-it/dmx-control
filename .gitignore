@@ -32,6 +32,7 @@ pi-dmx/engine-dist.tgz
 # det ar inspelningar, inte kallkod. Ligger lokalt hos agaren.
 pi-dmx/engine/tools/frozen*/
 pi-dmx/engine/tools/tempo-facit/*.wav
+pi-dmx/engine/tools/ladan-*/
 pi-dmx/engine/tools/*.wav
 pi-dmx/engine/tools/*.raw
 pi-dmx/pi-backup/
