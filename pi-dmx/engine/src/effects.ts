@@ -292,6 +292,25 @@ const E_CURVE = Math.max(0.3, Math.min(4, Number(process.env.DMX_E_CURVE ?? 2)))
  *  -90 dB i 10 s och sedan 6 dB tystare holl dampningen 0,78-0,87 (nastan fullt) i 30 s. Nu uppdateras fonstret bara nar ingangen
  *  ar over ingangsgransen. (Prov 10-09 med fonster ur medel +- spridning foll: pop-mixen morkt 13 -> 56 %.) */
 const E_GATE = process.env.DMX_E_GATE === "1";
+/** SEKTIONSDYNAMIK (opt-in DMX_E_SLOW_MS, ladan 2026-10-09: "vill ha mycket mer dynamik i energi-lagret, ar knappt nagot nu"). Fonstrets
+ *  topp/botten foljde den SNABBA nivan (levelVU ~200 ms) - varje slags dal blev botten och varje slags topp taket, sa fonstret blev lika
+ *  brett som slagens svangning och vers/refrang hamnade pa samma stalle i det (bank: energin svangde 2,6 steg ruta for ruta men ljusets
+ *  1 s-medel bara ~2,4 steg oavsett kurva). Med E_SLOW_MS > 0 foljer topp/botten nivan utjamnad over E_SLOW_MS: fonstret spanner
+ *  sektionernas nivaer, och e (ljuset) raknas fortfarande pa den snabba nivan med samma avklingning (E_RELEASE_MS). 0 = som forr. */
+const E_SLOW_MS = Number(process.env.DMX_E_SLOW_MS ?? 0);
+/** ENERGIN AGER SPANNET (opt-in DMX_E_NORM_S, ladan 2026-10-09: "mycket mer dynamik i energi-lagret ... jobba mellan 1-95 %"). MATT pa
+ *  ladans inspelningar: vid full energi lyste riggen bara ~20 % - effekternas egen niva efter gamman 2,2 (v 0,5 -> 22 %) och monster med
+ *  slackta lampor - sa energin (som bara far sanka) hade 5 -> 20 % att jobba med, ~2 steg. Med E_NORM_S > 0 skalas effektens bild sa
+ *  dess TOPP (alla lampor, foljd med direkt upp och avklingning E_NORM_S) blir 100 %: slagpulser och skillnad mellan lampor finns kvar,
+ *  kuloren bevaras (alla kanaler lika), och energin ger sedan hela spannet golv+1..95 %. Hogst x E_NORM_MAX. 0 = av.
+ *  OBS: detta LYFTER effektens niva (agarens regel 1) - darfor bara som prov, agaren avgor i ladan. */
+const E_NORM_S = Number(process.env.DMX_E_NORM_S ?? 0);
+const E_NORM_MAX = Number(process.env.DMX_E_NORM_MAX ?? 6);
+/** ENERGIN I DMX-PROCENT (opt-in DMX_E_LIN=1, ladan 2026-10-09). Energin multiplicerades FORE utgangens gamma (2,2), sa kurvan blev i
+ *  praktiken e^(E_CURVE x 2,2) = e^6,6 med kurva 3: energi 0,9 -> ~50 % ljus, 0,7 -> 10 %. Med E_LIN tas gamman ut ur dampningen
+ *  (md^(1/gamma) fore gamman) - e^E_CURVE blir rak andel av DMX-utgangen. */
+const E_LIN = process.env.DMX_E_LIN === "1";
+const E_LIN_INV = 1 / Math.max(1, Math.min(3, Number(process.env.DMX_GAMMA ?? 2.2)));
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
 const LIVE_START_FAST_S = Number(process.env.DMX_LIVE_START_FAST_S ?? 90);
@@ -478,7 +497,7 @@ export class EffectEngine {
   private lastDropSwitchMs = -1e9; dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;   // senaste drop -> 'high'-pool i 20 s
   private liveAnchor = NaN; private liveAnchorMax = NaN;   /* NaN = ej satt (forr undefined: taggat falt -> ny HeapNumber per ruta) */ private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
   private lightLoud = 0;         // log-released loudness 0..1 → driver md
-  private eSm = 0; eSimple = 0; private eHi = NaN; private eLo = NaN;   // ENERGIN (se E_WIN_S)
+  private eSm = 0; eSimple = 0; private eHi = NaN; private eLo = NaN; private eDbSlow = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
@@ -1701,8 +1720,10 @@ export class EffectEngine {
       if (Number.isNaN(this.eHi) && (!E_GATE || frame.level > INPUT_OFF_LEVEL)) { this.eHi = db; this.eLo = db; }
       const k = Math.min(1, dtSec / E_WIN_S);
       if (!E_GATE || frame.level > INPUT_OFF_LEVEL) {   // E_GATE: tystnad flyttar inte fonstret
-        this.eHi = db > this.eHi ? db : this.eHi + (db - this.eHi) * k;
-        this.eLo = db < this.eLo ? db : this.eLo + (db - this.eLo) * k;
+        let dw = db;
+        if (E_SLOW_MS > 0) { this.eDbSlow = Number.isNaN(this.eDbSlow) ? db : this.eDbSlow + (db - this.eDbSlow) * Math.min(1, dtSec * 1000 / E_SLOW_MS); dw = this.eDbSlow; }   // SEKTIONSDYNAMIK
+        this.eHi = dw > this.eHi ? dw : this.eHi + (dw - this.eHi) * k;
+        this.eLo = dw < this.eLo ? dw : this.eLo + (dw - this.eLo) * k;
       }
       const span = Math.max(E_MIN_DB, this.eHi - this.eLo);
       let e = (db - (this.eHi - span)) / span;
@@ -1712,6 +1733,7 @@ export class EffectEngine {
       this.eSimple = this.eSm;
       const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);
       md = drive * Math.min(1, Math.max(eC, this.dropEnv));   // bara dampning: aldrig over 1
+      if (E_LIN) md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
     }
     // HEARTBEAT: envelopen (kontraktet). ceiling = md utan tystnadsgrinden (drive), som appliceras separat pa ALLA effekter.
     const hbPulse = (this.cfg.beatPulse && this.beatMulNow > BEAT_MIN) ? Math.min(1, (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN)) : 0;
@@ -1852,6 +1874,7 @@ export class EffectEngine {
     specialty.laser   = drivesHas(drives, "laser")   ? clamp255(Math.max(180 + audio * 75, wantLaser * 255)) : 0;
     specialty.co2     = drivesHas(drives, "co2")     ? clamp255(Math.max(this.dropEnv > 0.85 ? 255 : 0, wantCo2 * 255)) : 0;
 
+    this.fxPeakNow = 0;
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const isAnchor = useAnchor && i > 0 && i < count - 1;   // mittlamporna = ankare
@@ -1868,6 +1891,11 @@ export class EffectEngine {
         if (fx?.bands?.length) { let mb = -Infinity; for (let k = 0; k < fx.bands.length; k++) mb = Math.max(mb, bands[BAND_IDX[fx.bands[k]]]); ctx.band = mb; }   // = Math.max(...fx.bands.map(...)) utan spread/closure
         else ctx.band = bands[i % bands.length];
         rgb = effect ? effect.render(ctx) : [0, 0, 0];
+        if (E_NORM_S > 0) {   // ENERGIN AGER SPANNET (se E_NORM_S): forra rutans normering, denna rutas topp
+          const m = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
+          if (m > this.fxPeakNow) this.fxPeakNow = m;
+          const n = this.fxNorm; rgb[0] = Math.min(1, rgb[0] * n); rgb[1] = Math.min(1, rgb[1] * n); rgb[2] = Math.min(1, rgb[2] * n);
+        }
         // EFFEKTENS ÖNSKEMÅL. Den vet sin egen dramaturgi bäst; motorn avgör om det
         // blir av (fixturen måste ha rollen, och rök går genom hårdvaruskyddet).
         // Högsta önskemål bland lamporna vinner — en effekt som vill stroba på EN
@@ -1923,6 +1951,7 @@ export class EffectEngine {
       this.out.writeFixture(this.universe, fx, rgb, 1, strobeVal, specialty);
     }
 
+    if (E_NORM_S > 0) { this.fxPeak = Math.max(this.fxPeakNow, this.fxPeak * Math.exp(-dtSec / E_NORM_S)); this.fxNorm = Math.min(E_NORM_MAX, 1 / Math.max(0.05, this.fxPeak)); }
     // Output ballistics on color/dim channels (never strobe/mode channels —
     // a decaying strobe value would sweep through real strobe speeds).
     // Snappare fade-out i energiska lägen så pumpen syns; lugna behåller mjukheten.

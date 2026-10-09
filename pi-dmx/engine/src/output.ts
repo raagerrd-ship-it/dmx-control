@@ -59,9 +59,13 @@ const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
 
 // Förberäknad LUT för Gamma 2.2 för att eliminera Math.pow i den heta loopen
+/** GAMMA (DMX_GAMMA, prov ladan 2026-10-09: "varfor jobbar inte effekten med starkare ljus?"): effektens 0..1 -> DMX som v^GAMMA. 2,2 gor
+ *  att 0,5 -> 22 % och 0,7 -> 46 % - effekterna ligger mest 0,4-0,7 och riggen lyser darfor ~20 % vid full energi. Lagre gamma = starkare
+ *  mellanlagen (men energins dampning far ocksa mindre verkan i DMX, md^GAMMA). Standard 2,2 = oforandrat. */
+const GAMMA = Math.max(1, Math.min(3, Number(process.env.DMX_GAMMA ?? 2.2)));
 const GAMMA_LUT = new Uint8Array(1024);
 for (let i = 0; i < 1024; i++) {
-  GAMMA_LUT[i] = Math.round(Math.pow(i / 1023, 2.2) * 255);
+  GAMMA_LUT[i] = Math.round(Math.pow(i / 1023, GAMMA) * 255);
 }
 
 export class FixtureOutput {

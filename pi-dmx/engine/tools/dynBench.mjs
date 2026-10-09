@@ -207,12 +207,16 @@ const stegUt = STEG ? (() => { const gs = STEG.split(","), segS = Number(opt("--
   const a = Math.floor(k * per + per / 2), b = Math.floor((k + 1) * per);   // andra halvan av steget (fonstret hinner stalla in sig)
   const m = (A) => { let s2 = 0, n = 0; for (let i = a; i < b && i < A.length; i++) { s2 += A[i]; n++; } return n ? s2 / n : NaN; };
   return { dB: +g, inDb: +m(DB).toFixed(1), e: +m(ES).toFixed(2), md: +m(MD).toFixed(2), dim: +(100 * m(DIMP)).toFixed(0), lit: +(100 * m(LIT)).toFixed(0) }; }); })() : undefined;
+const mdBins = (() => { const m = envel(MD), l = envel(LIT), dm = envel(DIMP); const ix = m.map((_, i) => i).sort((a, b) => m[a] - m[b]); const out = [];
+  for (let q = 0; q < 5; q++) { const sl = ix.slice(Math.floor(q * ix.length / 5), Math.floor((q + 1) * ix.length / 5)); const av = (A) => sl.reduce((s2, i) => s2 + A[i], 0) / Math.max(1, sl.length); out.push([+av(m).toFixed(2), +(100 * av(l)).toFixed(1), +(100 * av(dm)).toFixed(0)]); } return out; })();
+// TANDA LAMPORS STYRKA (agaren 10-09: "dom far garna slackas om effekten vill det") - medel over lamprutor som lyser (> 2 %)
+const litOn = (() => { const v = []; for (const S of LAMP) for (const x of S) if (x > 0.02) v.push(x); return [pctl(v, .1), pctl(v, .5), pctl(v, .9)].map((x) => +(100 * x).toFixed(0)); })();
 const res = {
   wav: path, sek: Math.round(T.length * STEP_MS / 1000), on: ON,
-  levande: { mdSteg: +steg(MD).toFixed(2), ljusSteg: +steg(eL).toFixed(2), rDb: +pear(eL, eD).toFixed(3), kontrast: +(hiL / Math.max(1e-3, loL)).toFixed(2),
+  levande: { mdSteg: +steg(MD).toFixed(2), mdSteg1s: +steg(envel(MD)).toFixed(2), rMdLjus: +pear(envel(MD).map((x) => Math.log2(Math.max(1 / 64, x))), envel(LIT).map((x) => Math.log2(Math.max(1 / 256, x)))).toFixed(2), rMdDim: +pear(envel(MD), envel(DIMP)).toFixed(2), ljusSteg: +steg(eL).toFixed(2), rDb: +pear(eL, eD).toFixed(3), kontrast: +(hiL / Math.max(1e-3, loL)).toFixed(2),
     dbSpann: +(pctl(DB, 0.9) - pctl(DB, 0.1)).toFixed(1), litP10: +pctl(LIT, .1).toFixed(3), litP50: +pctl(LIT, .5).toFixed(3), litP90: +pctl(LIT, .9).toFixed(3) },
   fladder: { fladderMin: +(fladder / nl / minutes).toFixed(1), pulsPerKick: +(pulsar / nl / Math.max(1, KICKT.length)).toFixed(2), kickarMin: +(KICKT.length / minutes).toFixed(0), perLook: flLook },
-  spann, stegUt,
+  spann, stegUt, mdBins, litOn,
   rgb: { sidoVaxlMin: +(vaxl / nl / minutes).toFixed(1), sidoBlinkMin: +(blink / nl / minutes).toFixed(1), alla3: +(a3 / Math.max(1, litN)).toFixed(3), ofrivBlinkMin: +(ofriv / nl / minutes).toFixed(1) },
 };
 say(QUIET ? JSON.stringify(res) : JSON.stringify(res, null, 1));
