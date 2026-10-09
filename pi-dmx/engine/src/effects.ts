@@ -286,7 +286,7 @@ const LIVE_TRACE = process.env.DMX_LIVE_TRACE === '1';
  *  Ersatte 10-08: sektionsenergin (frame.intensity, for trog: "svanger lite och ratt morkt") och en fast fullniva (passade aldrig). */
 const E_WIN_S = Number(process.env.DMX_E_WIN_S ?? 20), E_MIN_DB = Number(process.env.DMX_E_MIN_DB ?? 4);
 const E_RELEASE_MS = Number(process.env.DMX_E_RELEASE_MS ?? 100);
-const E_CURVE = Math.max(0.3, Math.min(4, Number(process.env.DMX_E_CURVE ?? 2)));
+const E_CURVE = Math.max(0.3, Math.min(10, Number(process.env.DMX_E_CURVE ?? 2)));   // tak 4 -> 10 (ladan 10-09: "overdriv energivariationen")
 /** TYSTNAD RAKNAS INTE (opt-in DMX_E_GATE=1, ladan 2026-10-09: "tacker den hela spannet ... 1-95 %"). Fonstrets botten foljer minsta
  *  vardet DIREKT - en paus mellan latar eller ett avbrott drog den mot -100 dB, och den kryper upp med E_WIN_S: matt med samma musik
  *  -90 dB i 10 s och sedan 6 dB tystare holl dampningen 0,78-0,87 (nastan fullt) i 30 s. Nu uppdateras fonstret bara nar ingangen
