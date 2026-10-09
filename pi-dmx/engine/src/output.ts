@@ -44,6 +44,15 @@ const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 40
  *  det blir 95 %. Bara en drop oppnar de sista 5 %: utgangen far energilagrets drop-envelope (dropOpen 0..1) och taket blir
  *  MAP_TOP + (1 - MAP_TOP) x dropOpen. Mappningen och 95 % ags av utgangen - energilagret vet inte om dem (agaren 10-07). */
 const MAP_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_MAP_TOP ?? 0.95)));
+/** PER-KANAL-MAPPNING (opt-in DMX_CH_MAP=1, natt-agenten 2026-10-09; agaren 10-08: "nu kan tex R lysa och B fladdra till" och
+ *  "den skall ju kunna kora 50% bla och 30% rod"). Forr skalades alla fargkanaler med den STARKASTE kanalens faktor (colK), sa en
+ *  svag sidokanal (B i en rodaktig kulor) hamnade UNDER sin diods tandpunkt och tandes/slacktes i takt med ljusstyrkan (energi/puls),
+ *  inte med fargen. Nu mappas VARJE kanal for sig: 0 = slackt, 1..255 -> den kanalens tandpunkt+1..tak. En kanal effekten sager ar PA
+ *  lyser alltsa alltid (kuloren blir nagot ljusare nara botten - accepterat). writeFixture haller dessutom en tand kanal pa minst 1
+ *  efter gamman, annars kan energin runda en svag kanal till 0 och samma blink kommer tillbaka en vaning ner.
+ *  BARA BEGARDA KANALER (intent): mappades aven ballistikens utklingande svans per kanal holls den pa tandpunkt+1 tills den
+ *  rundades till 0 - alla tre dioderna tanda 2 % -> 22 % av tiden (dynBench alla3). Svansen gar darfor den gamla vagen (colK). */
+const CH_MAP = process.env.DMX_CH_MAP === "1";
 // (DMX_DIM_MAX borttagen 2026-10-08: lampans fulla DIM ar nu FULLPUNKTEN i kalibreringen, cal.full - en mappning, inget efterskalningssteg.)
 const HOLD_MS = 120;
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
@@ -62,6 +71,9 @@ export class FixtureOutput {
 
   private cal = new Uint8Array(512);
   private dimCal = new Uint8Array(512);   // dim: bara tändpunkt (clamp), ingen remap
+  /** CH_MAP: 1 = effekten BEGAR kanalen den har rutan (writeFixture, fore ballistiken). En kanal som klingar ut efter ett
+   *  kulorbyte (ballistikens svans) har 0 och mappas som forr - svansen blir varken langre eller kortare an i dag. */
+  intent = new Uint8Array(512);
   // HOLD_MS: sista vardet halls over enstaka nollor (se calibrate).
   private holdVal = new Float32Array(512);
   private holdUntil = new Float32Array(512);
@@ -194,9 +206,9 @@ export class FixtureOutput {
       const showTop = dimTop * MAP_TOP;
       const dimMapTop = Math.round(showTop + (top - showTop) * Math.max(0, Math.min(1, dropOpen)));
 
-      let lampLit = true, colK = 1;
+      let lampLit = true, colK = 1, mxRaw = 0;
       if (c) {
-        let mxRaw = 0, mxOn = on;
+        let mxOn = on;
         for (let i = 0; i < fast.roles.length; i++) {
           const ch = base + i; if (ch < 0 || ch >= 512 || this.cal[ch] !== 1 || this.dimCal[ch] === 1) continue;
           const role = fast.roles[i]; if (role !== "r" && role !== "g" && role !== "b" && role !== "w") continue;
@@ -216,7 +228,10 @@ export class FixtureOutput {
         let raw = universe[ch];
         if (isColor) {   // farg: aven utan kalibrering (lampLit = sant, colK = 1) - noll nollar direkt, ingen hallning
           if (!lampLit) { universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
-          if (colK !== 1) raw = Math.round(raw * colK);
+          if (CH_MAP && c && raw > 0 && this.intent[ch]) {
+            const onC = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on;
+            raw = Math.round(onC + 1 + (top - onC - 1) * (raw - 1) / 254);
+          } else if (colK !== 1) raw = Math.round(raw * colK);
           const v1 = raw > top ? top : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
         }
         const onCh = !c ? 0 : isDim ? on
@@ -312,15 +327,16 @@ export class FixtureOutput {
     const w = Math.min(r, g, b);
     const dim = Math.max(r, g, b);
     const colorScale = fast.hasDim ? 1 : m;
+    const lo = CH_MAP ? 1 : 0;   // CH_MAP: en begard kanal far inte avrundas till 0 av gamman (energin skulle annars tanda/slacka den)
 
     for (let i = 0; i < fast.roles.length; i++) {
       const ch = base + i;
       if (ch < 0 || ch >= 512) continue;
 
       switch (fast.roles[i]) {
-        case "r":       u[ch] = GAMMA_LUT[(clamp01((r - (fast.hasW ? w : 0)) * colorScale) * 1023) | 0]; break;
-        case "g":       u[ch] = GAMMA_LUT[(clamp01((g - (fast.hasW ? w : 0)) * colorScale) * 1023) | 0]; break;
-        case "b":       u[ch] = GAMMA_LUT[(clamp01((b - (fast.hasW ? w : 0)) * colorScale) * 1023) | 0]; break;
+        case "r":       { const x = clamp01((r - (fast.hasW ? w : 0)) * colorScale), q = GAMMA_LUT[(x * 1023) | 0]; u[ch] = q === 0 && x > 0 ? lo : q; this.intent[ch] = x > 0 ? 1 : 0; break; }
+        case "g":       { const x = clamp01((g - (fast.hasW ? w : 0)) * colorScale), q = GAMMA_LUT[(x * 1023) | 0]; u[ch] = q === 0 && x > 0 ? lo : q; this.intent[ch] = x > 0 ? 1 : 0; break; }
+        case "b":       { const x = clamp01((b - (fast.hasW ? w : 0)) * colorScale), q = GAMMA_LUT[(x * 1023) | 0]; u[ch] = q === 0 && x > 0 ? lo : q; this.intent[ch] = x > 0 ? 1 : 0; break; }
         case "w":       u[ch] = GAMMA_LUT[(clamp01(w * colorScale) * 1023) | 0]; break;
         case "dim":     u[ch] = GAMMA_LUT[(clamp01(fast.hasColor ? m : dim * m) * 1023) | 0]; break;
         case "strobe":  u[ch] = Math.max(0, Math.min(255, Math.max(strobeVal, specialty?.strobe ?? 0))); break;
