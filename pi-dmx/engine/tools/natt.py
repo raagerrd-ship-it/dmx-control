@@ -14,7 +14,8 @@ och skriver en jamforbar dygnspost:
   (utan --snabb kors aven ladans 20 inspelningar 10-08 genom tools/dynSet.py -> tools/natt/dynamik.md)
   --tag/--env  A/B av en kandidat: raden taggas sa den inte blandas med baslinjen; env laggs OVANPA ladans
   --lista      annan manifest.tsv (standard tools/frozen6/manifest.tsv)
-  --norm DBFS  nivaanpassa KLIPPEN till ladans aux-niva, STANDARD -3.5 sedan 10-07 (matfalla 35: frozen6 ~28 dB
+  --norm DBFS  nivaanpassa KLIPPEN till ladans aux-niva, STANDARD -17 sedan 10-09 (ladans ingang Aux -18 dB: inspelningarna 10-08 p50 -17,4 dBFS; -3,5 var den OVERSTYRDA
+               ingangen och klippte kickarna platt = matfalla 42; korpusrader fore 10-09 norm-17 ar INTE jamforbara). Forr -3.5 (matfalla 35: frozen6 ~28 dB
                under ladan; korpusrader fore 10-07 v2-norm ar INTE jamforbara); --norm 999 = utan
 
 MIXARNA bar look-/sektions-/dropmatten (10 min var, riktig dramaturgi). KLIPPEN (40 s) ar for korta for
@@ -63,7 +64,7 @@ def main():
     ap.add_argument('--snabb', action='store_true')
     ap.add_argument('--tag', default='')
     ap.add_argument('--env', action='append', default=[])
-    ap.add_argument('--norm', type=float, default=-3.5)   # STANDARD fran 2026-10-07 (matfalla 35): korpusen pa ladans aux-niva; --norm 999 = ingen
+    ap.add_argument('--norm', type=float, default=-17)   # STANDARD fran 2026-10-09 (matfalla 42; -3.5 10-07..10-09, matfalla 35): korpusen pa ladans aux-niva; --norm 999 = ingen
     ap.add_argument('--lista', default=os.path.join(HERE, 'frozen6', 'manifest.tsv'))
     a = ap.parse_args()
 

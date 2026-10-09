@@ -13,7 +13,7 @@
  *
  *   node tools/tempoShiftBench.mjs [--neg] [--env K=V ...] [--json ut.json]
  *
- * Klippen nivaanpassas till ladans aux-niva (--norm -3.5, matfalla 35). Env = ladans SHOW_ENV ur ladan.py (aldrig PORTAR_EJ_LIVE, matfalla 26) + --env.
+ * Klippen nivaanpassas till ladans aux-niva (--norm -17 sedan 2026-10-09: Aux -18 dB, inspelningarna p50 -17,4 dBFS; -3,5 klippte kickarna och TEMPO_SHIFT fyrade 0/12 = matfalla 42). Env = ladans SHOW_ENV ur ladan.py (aldrig PORTAR_EJ_LIVE, matfalla 26) + --env.
  */
 import { execFileSync, execFile } from "node:child_process";
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
@@ -41,7 +41,7 @@ const neg = NEG ? tsv(join(HERE, "frozen6", "manifest.tsv")).filter((r) => { con
 const tmp = mkdtempSync(join(tmpdir(), "tsb-"));
 const run = (job, k) => new Promise((res) => {
   const out = join(tmp, `t${k}.json`);
-  execFile("node", ["tools/showTight.mjs", job.wav, "--tyst", "--norm", "-3.5", "--trace", out], { cwd: ENGINE, env, maxBuffer: 1 << 26 }, (err) => {
+  execFile("node", ["tools/showTight.mjs", job.wav, "--tyst", "--norm", "-17", "--trace", out], { cwd: ENGINE, env, maxBuffer: 1 << 26 }, (err) => {
     try { res({ ...job, tr: JSON.parse(readFileSync(out, "utf-8")) }); } catch { res({ ...job, fel: String(err).slice(0, 200) }); }
   });
 });
