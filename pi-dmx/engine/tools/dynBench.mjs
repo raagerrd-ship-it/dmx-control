@@ -105,7 +105,7 @@ console.log = () => {};
 
 const E_CURVE = Math.max(0.3, Math.min(4, Number(process.env.DMX_E_CURVE ?? 2)));
 const T = [], LIT = [], DB = [], MD = [], ES = [], DIMP = [], LAMP = lamps.map(() => []), CH = lamps.map(() => [[], [], []]), INTENT = lamps.map(() => [[], [], []]);
-const KICKT = [], BEATT = [], LOOK = [];
+const KICKT = [], BEATT = [], LOOK = [], BPMS = [], CONF = [];
 let lastRender = -1, kickPending = false, lastBeatIdx = null;
 const buf = new Float32Array(HOP);
 const endSample = Math.min(samples.length, Math.floor((startS + maxS) * SR));
@@ -118,7 +118,8 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
   bounds.tick(boundsArg);
   if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift(); }
   if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
-  if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; eng.softenRange(); an.hintTrackChange(5000); }
+  if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; if (process.env.DYN_GRANS_LOG) process.stderr.write(`GRANS ${(off / SR).toFixed(1)}
+`); if (!process.env.DYN_INGEN_GRANS) { eng.softenRange(); an.hintTrackChange(5000); } }
   if (fr.bpm > 0) {
     cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
     const per = 60000 / fr.bpm, idx = Math.floor((ms - cfg.beat.anchorMs) / per);
@@ -136,7 +137,7 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
     const l = Math.max(...v) / 255 * dim; LAMP[k].push(l); lit += l;
     for (let c = 0; c < 3; c++) { CH[k][c].push(v[c]); INTENT[k][c].push(eng.out?.intent ? eng.out.intent[L.ch[c]] : 1); }
   });
-  LOOK.push(eng.smartMode); T.push(tS * 1000); LIT.push(lit / lamps.length);
+  LOOK.push(eng.smartMode); BPMS.push(fr.bpm ?? 0); CONF.push(fr.bpmConfidence ?? 0); T.push(tS * 1000); LIT.push(lit / lamps.length);
   DB.push(20 * Math.log10(Math.max(1e-5, fr.levelVU ?? fr.level)));
   MD.push(Math.pow(eng.eSimple ?? 0, E_CURVE)); ES.push(eng.eSimple ?? 0);
   { let dm = 0, n = 0; for (const L of lamps) if (L.dim >= 0) { dm += (u[L.dim] ?? 0) / 255; n++; } DIMP.push(n ? dm / n : NaN); }
@@ -211,12 +212,42 @@ const mdBins = (() => { const m = envel(MD), l = envel(LIT), dm = envel(DIMP); c
   for (let q = 0; q < 5; q++) { const sl = ix.slice(Math.floor(q * ix.length / 5), Math.floor((q + 1) * ix.length / 5)); const av = (A) => sl.reduce((s2, i) => s2 + A[i], 0) / Math.max(1, sl.length); out.push([+av(m).toFixed(2), +(100 * av(l)).toFixed(1), +(100 * av(dm)).toFixed(0)]); } return out; })();
 // TANDA LAMPORS STYRKA (agaren 10-09: "dom far garna slackas om effekten vill det") - medel over lamprutor som lyser (> 2 %)
 const litOn = (() => { const v = []; for (const S of LAMP) for (const x of S) if (x > 0.02) v.push(x); return [pctl(v, .1), pctl(v, .5), pctl(v, .9)].map((x) => +(100 * x).toFixed(0)); })();
+// TANDNING EFTER SLACKT (agaren 10-09: "fran att lamporna slacks tar det lite tid innan de kommer igang, kanns inte synkat"): per lampa,
+// nar effekten BEGAR ljus igen (intent pa nagon fargkanal) efter >= 300 ms slackt (lampan < 2 %), ms tills lampan nar 90 % av sin topp
+// inom 500 ms. Median och p90.
+const tand = (() => { const ds = [];
+  lamps.forEach((L, k) => { const S = LAMP[k]; let dark = 0;
+    for (let i = 1; i < S.length - 20; i++) {
+      const want = INTENT[k][0][i] || INTENT[k][1][i] || INTENT[k][2][i];
+      if (S[i] < 0.02 && !want) { dark++; continue; }
+      if (want && dark * STEP_MS >= 300 && S[i - 1] < 0.02) {
+        let mx = 0; for (let j = i; j < i + 20; j++) mx = Math.max(mx, S[j]);
+        if (mx > 0.05) { let j = i; while (S[j] < 0.9 * mx) j++; ds.push((j - i) * STEP_MS); }
+      }
+      dark = 0;
+    } });
+  ds.sort((a, b) => a - b); return { n: ds.length, medMs: ds[ds.length >> 1] ?? NaN, p90Ms: ds[Math.floor(ds.length * 0.9)] ?? NaN }; })();
+// ATERKOMST EFTER MORKER (rigg-niva): riggen < 3 % i >= 300 ms, sedan stiger ingangen >= 6 dB over morkrets niva -> ms tills riggen
+// nar 50 % av sin topp inom 1,5 s.
+const aterkomst = (() => { const ds = []; let dark = 0, darkDb = 0;
+  for (let i = 1; i < LIT.length - 60; i++) {
+    if (LIT[i] < 0.03) { if (dark === 0) darkDb = DB[i]; dark++; darkDb = Math.min(darkDb, DB[i]); continue; }
+    if (dark * STEP_MS >= 300) {
+      let a = i - dark; while (a < i && DB[a] < darkDb + 6) a++;   // ljudet tillbaka
+      let mx = 0; for (let j = a; j < a + 60; j++) mx = Math.max(mx, LIT[j]);
+      if (mx > 0.06) { let j = a; while (LIT[j] < 0.5 * mx) j++; ds.push((j - a) * STEP_MS); }
+    }
+    dark = 0;
+  }
+  ds.sort((x, y) => x - y); return { n: ds.length, ms: ds }; })();
 const res = {
   wav: path, sek: Math.round(T.length * STEP_MS / 1000), on: ON,
   levande: { mdSteg: +steg(MD).toFixed(2), mdSteg1s: +steg(envel(MD)).toFixed(2), rMdLjus: +pear(envel(MD).map((x) => Math.log2(Math.max(1 / 64, x))), envel(LIT).map((x) => Math.log2(Math.max(1 / 256, x)))).toFixed(2), rMdDim: +pear(envel(MD), envel(DIMP)).toFixed(2), ljusSteg: +steg(eL).toFixed(2), rDb: +pear(eL, eD).toFixed(3), kontrast: +(hiL / Math.max(1e-3, loL)).toFixed(2),
     dbSpann: +(pctl(DB, 0.9) - pctl(DB, 0.1)).toFixed(1), litP10: +pctl(LIT, .1).toFixed(3), litP50: +pctl(LIT, .5).toFixed(3), litP90: +pctl(LIT, .9).toFixed(3) },
   fladder: { fladderMin: +(fladder / nl / minutes).toFixed(1), pulsPerKick: +(pulsar / nl / Math.max(1, KICKT.length)).toFixed(2), kickarMin: +(KICKT.length / minutes).toFixed(0), perLook: flLook },
-  spann, stegUt, mdBins, litOn,
+  spann, stegUt, mdBins, litOn, tand, aterkomst,
   rgb: { sidoVaxlMin: +(vaxl / nl / minutes).toFixed(1), sidoBlinkMin: +(blink / nl / minutes).toFixed(1), alla3: +(a3 / Math.max(1, litN)).toFixed(3), ofrivBlinkMin: +(ofriv / nl / minutes).toFixed(1), blinkLook },
 };
+if (opt("--kurva", null)) { const [a, b] = opt("--kurva").split("-").map(Number); for (let i = 0; i < T.length; i++) if (T[i] >= a * 1000 && T[i] <= b * 1000 && i % 2 === 0) process.stderr.write(`${(T[i] / 1000).toFixed(2)} in ${DB[i].toFixed(0)} dB  e ${ES[i].toFixed(2)} md ${MD[i].toFixed(2)} dim ${(100 * DIMP[i]).toFixed(0)}  bpm ${BPMS[i].toFixed(0)} konf ${CONF[i].toFixed(2)} rigg ${(100 * LIT[i]).toFixed(0)}% lampor ${LAMP.map((S2) => (100 * S2[i]).toFixed(0)).join('/')} ${LOOK[i]}
+`); }
 say(QUIET ? JSON.stringify(res) : JSON.stringify(res, null, 1));

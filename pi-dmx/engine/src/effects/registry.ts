@@ -201,12 +201,12 @@ const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
 
 /** ALLA LOOKER (opt-in DMX_ALLA_LOOKER=1, 2026-10-09, agaren: "se sa alla kan anvandas"). Matt pa ladans mixar (122 byten):
  *  i high var tempot >= 130 BPM bara 3/55 ganger och aldrig >= 140 -> snap/rave/strobe valdes ALDRIG; profile.bass median 0,23 ->
- *  gravity (0,35) foll pa kravet 46 ganger. Trappan 115/120/125 ger de tre snabba var sin troskel (20/18/14 av 55 high-byten). */
+ *  gravity (0,35) foll pa kravet 46 ganger. Snap 115 och rave 120 (20/18 av 55 high-byten); strobe ligger kvar pa 150 (agaren 10-09). */
 export const ALLA_LOOKER = process.env.DMX_ALLA_LOOKER === "1";
 const REQ_ALLA: Partial<Record<Mode, EffectReq>> = {
   snap:    { minBpm: 115, needsPunch: 0.40 },
   rave:    { minBpm: 120, needsPunch: 0.40 },
-  strobe:  { minBpm: 125 },
+  strobe:  { minBpm: 150 },   // agaren i ladan 10-09: 'strobe borde bara aktiveras pa latar over tex 150 bpm' (provet 125 tillbaka)
   gravity: { needsBass: 0.20 },
 };
 
