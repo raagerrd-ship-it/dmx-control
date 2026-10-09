@@ -212,6 +212,7 @@ const mdBins = (() => { const m = envel(MD), l = envel(LIT), dm = envel(DIMP); c
   for (let q = 0; q < 5; q++) { const sl = ix.slice(Math.floor(q * ix.length / 5), Math.floor((q + 1) * ix.length / 5)); const av = (A) => sl.reduce((s2, i) => s2 + A[i], 0) / Math.max(1, sl.length); out.push([+av(m).toFixed(2), +(100 * av(l)).toFixed(1), +(100 * av(dm)).toFixed(0)]); } return out; })();
 // TANDA LAMPORS STYRKA (agaren 10-09: "dom far garna slackas om effekten vill det") - medel over lamprutor som lyser (> 2 %)
 const litOn = (() => { const v = []; for (const S of LAMP) for (const x of S) if (x > 0.02) v.push(x); return [pctl(v, .1), pctl(v, .5), pctl(v, .9)].map((x) => +(100 * x).toFixed(0)); })();
+const litOnFull = (() => { const v = []; for (const S of LAMP) for (const x of S) if (x > 0.005) v.push(x); return [.01, .05, .25, .5, .75, .95, .99, 1].map((q) => +(100 * pctl(v, q)).toFixed(1)); })();
 // TANDNING EFTER SLACKT (agaren 10-09: "fran att lamporna slacks tar det lite tid innan de kommer igang, kanns inte synkat"): per lampa,
 // nar effekten BEGAR ljus igen (intent pa nagon fargkanal) efter >= 300 ms slackt (lampan < 2 %), ms tills lampan nar 90 % av sin topp
 // inom 500 ms. Median och p90.
@@ -245,7 +246,7 @@ const res = {
   levande: { mdSteg: +steg(MD).toFixed(2), mdSteg1s: +steg(envel(MD)).toFixed(2), rMdLjus: +pear(envel(MD).map((x) => Math.log2(Math.max(1 / 64, x))), envel(LIT).map((x) => Math.log2(Math.max(1 / 256, x)))).toFixed(2), rMdDim: +pear(envel(MD), envel(DIMP)).toFixed(2), ljusSteg: +steg(eL).toFixed(2), rDb: +pear(eL, eD).toFixed(3), kontrast: +(hiL / Math.max(1e-3, loL)).toFixed(2),
     dbSpann: +(pctl(DB, 0.9) - pctl(DB, 0.1)).toFixed(1), litP10: +pctl(LIT, .1).toFixed(3), litP50: +pctl(LIT, .5).toFixed(3), litP90: +pctl(LIT, .9).toFixed(3) },
   fladder: { fladderMin: +(fladder / nl / minutes).toFixed(1), pulsPerKick: +(pulsar / nl / Math.max(1, KICKT.length)).toFixed(2), kickarMin: +(KICKT.length / minutes).toFixed(0), perLook: flLook },
-  spann, stegUt, mdBins, litOn, tand, aterkomst,
+  spann, stegUt, mdBins, litOn, litOnFull, tand, aterkomst,
   rgb: { sidoVaxlMin: +(vaxl / nl / minutes).toFixed(1), sidoBlinkMin: +(blink / nl / minutes).toFixed(1), alla3: +(a3 / Math.max(1, litN)).toFixed(3), ofrivBlinkMin: +(ofriv / nl / minutes).toFixed(1), blinkLook },
 };
 if (opt("--kurva", null)) { const [a, b] = opt("--kurva").split("-").map(Number); for (let i = 0; i < T.length; i++) if (T[i] >= a * 1000 && T[i] <= b * 1000 && i % 2 === 0) process.stderr.write(`${(T[i] / 1000).toFixed(2)} in ${DB[i].toFixed(0)} dB  e ${ES[i].toFixed(2)} md ${MD[i].toFixed(2)} dim ${(100 * DIMP[i]).toFixed(0)}  bpm ${BPMS[i].toFixed(0)} konf ${CONF[i].toFixed(2)} rigg ${(100 * LIT[i]).toFixed(0)}% lampor ${LAMP.map((S2) => (100 * S2[i]).toFixed(0)).join('/')} ${LOOK[i]}
