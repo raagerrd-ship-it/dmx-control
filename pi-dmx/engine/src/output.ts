@@ -68,6 +68,9 @@ export class FixtureOutput {
   // Publika Array-vyer så postprocess.ts slipper funktionsanrop
   public readonly light = new Uint8Array(512);
   public readonly direct = new Uint8Array(512);
+  /** Fargkanalerna (r/g/b/w) per lampa och som mask - postprocess HUE_CUT kor ballistiken per lampa, inte per kanal. */
+  public colorGroups: number[][] = [];
+  public readonly colorMask = new Uint8Array(512);
 
   private cal = new Uint8Array(512);
   private dimCal = new Uint8Array(512);   // dim: bara tändpunkt (clamp), ingen remap
@@ -99,8 +102,8 @@ export class FixtureOutput {
   build(fixtures: FixtureConfig[]): void {
     if (this.builtFor === fixtures) return;
     this.builtFor = fixtures;
-    this.light.fill(0); this.cal.fill(0); this.dimCal.fill(0); this.direct.fill(0);
-    this.fastFixtures = [];
+    this.light.fill(0); this.cal.fill(0); this.dimCal.fill(0); this.direct.fill(0); this.colorMask.fill(0);
+    this.fastFixtures = []; this.colorGroups = [];
     let mx = 0;
 
     for (const fx of fixtures) {
@@ -110,6 +113,9 @@ export class FixtureOutput {
       const hasW = roles.includes("w");
 
       this.fastFixtures.push({ base: fx.address - 1, roles, hasColor, hasDim, hasW });
+      const grp: number[] = [];
+      for (let r = 0; r < roles.length; r++) { const ch = fx.address - 1 + r; const ro = roles[r]; if (ch >= 0 && ch < 512 && (ro === "r" || ro === "g" || ro === "b" || ro === "w")) grp.push(ch); }
+      if (grp.length) { this.colorGroups.push(grp); for (const ch of grp) this.colorMask[ch] = 1; }
 
       for (let r = 0; r < roles.length; r++) {
         const ch = fx.address - 1 + r;
