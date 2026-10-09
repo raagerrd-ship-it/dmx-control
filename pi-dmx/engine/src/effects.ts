@@ -315,6 +315,14 @@ const E_LIN = process.env.DMX_E_LIN === "1";
  *  bevaras, en slackt lampa forblir slackt (agaren: "dom far garna slackas om effekten vill det"), och lyftet rampar in under 10 % sa
  *  en lampa som tonar ut inte hoppar. Lagt efter E_NORM (effektens topp = 1). 0 = av. */
 const FX_FLOOR = Math.max(0, Math.min(0.8, Number(process.env.DMX_FX_FLOOR ?? 0)));
+/** DIMMERNS PULSDJUP (DMX_DIM_PULS 0..1, ladan 2026-10-09: "dra upp de till 95 % sa energi har nagot att dampa"). Dimmern far taktpulsen
+ *  (max(beatMul, dropEnv)) och lag i snitt ~80 % - darfor nadde tanda lampor sallan over 65-78 % av 1-95 %. 1 = som forr, 0 = dimmern star
+ *  pa fullt (95 %) och pulsen bars av effekterna (c.heart/FX_FLOOR); daremellan grundare. */
+const DIM_PULS = Math.max(0, Math.min(1, Number(process.env.DMX_DIM_PULS ?? 1)));
+/** ENERGINS TOPP (DMX_E_TOP 0,5..1, ladan 2026-10-09: "dra upp till 95 % sa energi har nagot att dampa"). Fonstrets tak foljer varje
+ *  enskild ljudtopp direkt, sa ett vanligt starkt parti lag pa e ~0,9 - med kurva 7 bara ~50 % ljus. e / E_TOP (klampat till 1): starka
+ *  partier nar full energi (= effektens 95 %), och kurvan dampar allt under. 1 = som forr. */
+const E_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_E_TOP ?? 1)));
 const E_LIN_INV = 1 / Math.max(1, Math.min(3, Number(process.env.DMX_GAMMA ?? 2.2)));
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
@@ -1734,6 +1742,7 @@ export class EffectEngine {
       let e = (db - (this.eHi - span)) / span;
       e = e < 0 ? 0 : e > 1 ? 1 : e;
       if (e !== e) e = 0;   // E_GATE: inget fonster an (bara tystnad sedan start)
+      if (E_TOP < 1) e = e >= E_TOP ? 1 : e / E_TOP;   // ENERGINS TOPP (se E_TOP)
       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
       this.eSimple = this.eSm;
       const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);
@@ -2013,7 +2022,7 @@ export class EffectEngine {
       this.cfg.fixtures,
       dtSec,
       decay,
-      Math.max(this.beatMulNow, this.dropEnv),
+      DIM_PULS === 1 ? Math.max(this.beatMulNow, this.dropEnv) : 1 - DIM_PULS * (1 - Math.max(this.beatMulNow, this.dropEnv)),   // DIM_PULS
       !!this.cfg.beatPulse && this.silenceGate > 0.5,
       blackout || this.inputOff,
       this.cfg.master ?? 1,
