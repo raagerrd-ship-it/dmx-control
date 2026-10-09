@@ -20,7 +20,7 @@ export const wave: EffectDef = {
     const base = 0.55 + 0.45 * Math.sin(phase - c.idx * 1.3 * c.phaseSpread + ripple * 0.8);
     // KULOR PA HELA TAKTER (ladan 2026-10-09, sidokanal-fladder): floor(phase*0.4) ur slag + BRAKDEL kunde vicka over en grans nar takten
     // justerades -> kuloren slog fram och tillbaka (bank: wave 446 korta sidoblink). Med takt: ny kulor per takt ur heltalsslaget.
-    const hue = c.mixedSector(c.idx + (c.hasBeat ? Math.floor(c.beatIdx / 4) : Math.floor(phase * 0.4))) / 6;
+    const hue = c.mixedSector(c.idx + Math.floor(c.beatIdx / 4)) / 6;   // en klocka (beatIdx stegar pa grid eller kick), inget hopp nar laset fladdrar
     // Vågen BÄR på basen (spec.bass), inte på bredbandsbrus → den tystnar inte av
     // diskant/sång. onset.treble-glitter ligger ovanpå + en snabbare luft-shimmer
     // (onset.air) bara på udda lampor → shimmer-topp utan att flödet tappas.

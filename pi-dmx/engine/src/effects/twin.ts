@@ -3,6 +3,7 @@ import type { EffectDef } from "./types.js";
 // Lugn CALL-AND-RESPONSE: två grupper (varannan lampa) andas i MOTFAS — när grupp
 // A stiger sjunker grupp B, som ett stilla anrop-och-svar. Grupp A varm ton,
 // grupp B kall kontrastfärg. Golv 30%. Färgvandring var 8:e takt.
+let twinSec = -1;   // vald klangsektor (hysteres)
 export const twin: EffectDef = {
   key: "twin", label: "Tvilling", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["intro", "low"], toggle: true,
   desc: "Två grupper andas i motfas – varmt anrop, kallt svar.",
@@ -17,7 +18,9 @@ export const twin: EffectDef = {
     const vaxel = (c.mclk(4, 2) % 2 === 0) === even ? 1 : 0;   // vems tur ar det?
     const mjuk = 0.5 - 0.5 * Math.cos(Math.PI * Math.min(1, c.beatFrac * 2));   // mjuk overgang
     const wash = vaxel ? 0.35 + 0.65 * mjuk : 0.65 - 0.45 * mjuk;
-    const pairBase = c.mixedSector(c.mclk(8, 10) + Math.round(c.frame.centroid * 3));   // centroid → palett-läge (som breathe/aurora)
+    // KLANGEN MED HYSTERES (ladan 10-09, sidokanalfladder): Math.round(centroid*3) fladdrade med klangbruset -> kulorparet hoppade.
+    const cs = c.frame.centroid * 3; if (twinSec < 0 || Math.abs(cs - twinSec) > 0.9) twinSec = Math.round(cs);
+    const pairBase = c.mixedSector(c.mclk(8, 10) + twinSec);   // centroid → palett-läge (som breathe/aurora)
     const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;
     const m = Math.min(1, wash * 0.7 + c.band * 0.3 + c.punch * 0.2);   // + dunk-svall
     return c.hsv(hue, 1, 0.18 + 0.82 * m);   // golv 0.3 nu redundant (md har eget 0.3)

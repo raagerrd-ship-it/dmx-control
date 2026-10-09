@@ -21,7 +21,7 @@ export const nedrakning: EffectDef = {
     const maxRing = Math.max(1, half);
     const off = step < cyc - 1 && ring > maxRing * (1 - step / (cyc - 1)) - 1e-6;   // slackt om lampan "raknats ner"
     const all = step === cyc - 1 ? Math.exp(-c.beatFrac / 0.15) : 0;
-    const hue = c.mixedSector(Math.floor(c.beatIdx / cyc)) / 6;
+    const hue = c.mixedSector(Math.floor(c.beatIdx / 8)) / 6;   // fast 8 (ladan 10-09): cyc vaxlar 4/8 och kulorindex hoppade -> sidokanalfladder
     c.want.hazer = 0.3 + 0.7 * b; if (c.dropEnv > 0.6) c.want.blinder = c.dropEnv;
     const base = off ? 0.03 : 0.35 + 0.35 * b + c.beatPulse * 0.25;
     const v = Math.min(1, base + all * 0.9 + c.dropEnv);

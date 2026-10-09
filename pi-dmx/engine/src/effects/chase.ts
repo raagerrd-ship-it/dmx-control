@@ -19,7 +19,9 @@ export const chase: EffectDef = {
     const pos = (onBass ? c.bassNoteIdx : c.mclk(1, 0.5)) % n;
     const d = (pos - c.idx + n) % n;                                      // 0 = huvudet, 1 = lampan bakom, ... (framfor = morkt)
     const tail = Math.exp(-d * 1.6) * (onBass ? 0.55 + 0.45 * Math.exp(-c.bassNoteAge / 0.3) : 1);
-    const hue = c.mixedSector(pos + Math.floor(c.t / 4)) / 6;
+    // KULOR PER TAKT (ladan 2026-10-09, fladder pa sekundarfargen): forr mixedSector(pos + ...) - hela riggen bytte kulor pa VARJE steg
+    // och sidokanalen slog av/pa (bank: chase 102 korta sidoblink, flest av alla). Loparen springer som forr; kuloren byts per takt.
+    const hue = c.mixedSector(Math.floor(c.beatIdx / 4)) / 6;   // beatIdx stegar pa grid eller kick - en klocka, inget hopp nar laset fladdrar
     const v = Math.min(1, tail * c.shaped(0.22, 0.55 + c.audio * 0.55 + c.kickEnv * 0.5 + c.frame.onset.treble * 0.35 + (onBass ? c.frame.onset.bass * 0.4 : 0)) + c.punch * 0.3);
     return c.hsv(hue, 1 - c.punch * 0.25, v * c.heart(0.3));   // riktig dunk → hela svansen blixtrar; egen hjartpuls (09-27)
   },
