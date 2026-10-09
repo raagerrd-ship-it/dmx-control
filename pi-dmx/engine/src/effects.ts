@@ -287,6 +287,11 @@ const LIVE_TRACE = process.env.DMX_LIVE_TRACE === '1';
 const E_WIN_S = Number(process.env.DMX_E_WIN_S ?? 20), E_MIN_DB = Number(process.env.DMX_E_MIN_DB ?? 4);
 const E_RELEASE_MS = Number(process.env.DMX_E_RELEASE_MS ?? 100);
 const E_CURVE = Math.max(0.3, Math.min(4, Number(process.env.DMX_E_CURVE ?? 2)));
+/** TYSTNAD RAKNAS INTE (opt-in DMX_E_GATE=1, ladan 2026-10-09: "tacker den hela spannet ... 1-95 %"). Fonstrets botten foljer minsta
+ *  vardet DIREKT - en paus mellan latar eller ett avbrott drog den mot -100 dB, och den kryper upp med E_WIN_S: matt med samma musik
+ *  -90 dB i 10 s och sedan 6 dB tystare holl dampningen 0,78-0,87 (nastan fullt) i 30 s. Nu uppdateras fonstret bara nar ingangen
+ *  ar over ingangsgransen. (Prov 10-09 med fonster ur medel +- spridning foll: pop-mixen morkt 13 -> 56 %.) */
+const E_GATE = process.env.DMX_E_GATE === "1";
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
 const LIVE_START_FAST_S = Number(process.env.DMX_LIVE_START_FAST_S ?? 90);
@@ -1693,13 +1698,16 @@ export class EffectEngine {
     {   // ENKEL ENERGI (se ENERGY_SIMPLE-dokumentationen). md0/sektionsgas/rang borttagna 10-08.
       // FOLJANDE FONSTER (se E_WIN_S)
       const db = 20 * Math.log10(Math.max(1e-5, frame.levelVU ?? frame.level));
-      if (Number.isNaN(this.eHi)) { this.eHi = db; this.eLo = db; }
+      if (Number.isNaN(this.eHi) && (!E_GATE || frame.level > INPUT_OFF_LEVEL)) { this.eHi = db; this.eLo = db; }
       const k = Math.min(1, dtSec / E_WIN_S);
-      this.eHi = db > this.eHi ? db : this.eHi + (db - this.eHi) * k;
-      this.eLo = db < this.eLo ? db : this.eLo + (db - this.eLo) * k;
+      if (!E_GATE || frame.level > INPUT_OFF_LEVEL) {   // E_GATE: tystnad flyttar inte fonstret
+        this.eHi = db > this.eHi ? db : this.eHi + (db - this.eHi) * k;
+        this.eLo = db < this.eLo ? db : this.eLo + (db - this.eLo) * k;
+      }
       const span = Math.max(E_MIN_DB, this.eHi - this.eLo);
       let e = (db - (this.eHi - span)) / span;
       e = e < 0 ? 0 : e > 1 ? 1 : e;
+      if (e !== e) e = 0;   // E_GATE: inget fonster an (bara tystnad sedan start)
       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
       this.eSimple = this.eSm;
       const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);

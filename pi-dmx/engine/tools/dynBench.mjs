@@ -65,6 +65,14 @@ if (synt) {
     for (let i = 0; i < n; i++) samples[i] = Math.max(-1, Math.min(1, samples[i] * g));
   }
 }
+// NIVASTEG (--steg "0,-6,-12,-6,0" [--stegS 15]): klippet loopat i nivasteg - visar om utsignalen gar fran botten till toppen
+// nar SAMMA musik spelas tystare/starkare (det ar fragan "tacker den hela spannet"; ett 30 s-klipp ar mest slag-for-slag-variation).
+const STEG = opt("--steg", null);
+if (STEG) {
+  const gs = STEG.split(",").map(Number), segN = Math.round(Number(opt("--stegS", 15)) * SR), out = new Float32Array(gs.length * segN);
+  for (let k = 0; k < gs.length; k++) { const g = Math.pow(10, gs[k] / 20); for (let i = 0; i < segN; i++) out[k * segN + i] = samples[(k * segN + i) % samples.length] * g; }
+  samples = out;
+}
 const startS = Number(opt("--start", 0)), maxS = Number(opt("--sek", 1e9));
 
 const { Analyser } = await import("../dist/analyser.js");
@@ -96,7 +104,7 @@ const eng = new EffectEngine(cfg);
 console.log = () => {};
 
 const E_CURVE = Math.max(0.3, Math.min(4, Number(process.env.DMX_E_CURVE ?? 2)));
-const T = [], LIT = [], DB = [], MD = [], LAMP = lamps.map(() => []), CH = lamps.map(() => [[], [], []]), INTENT = lamps.map(() => [[], [], []]);
+const T = [], LIT = [], DB = [], MD = [], ES = [], DIMP = [], LAMP = lamps.map(() => []), CH = lamps.map(() => [[], [], []]), INTENT = lamps.map(() => [[], [], []]);
 const KICKT = [], BEATT = [], LOOK = [];
 let lastRender = -1, kickPending = false, lastBeatIdx = null;
 const buf = new Float32Array(HOP);
@@ -130,7 +138,8 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
   });
   LOOK.push(eng.smartMode); T.push(tS * 1000); LIT.push(lit / lamps.length);
   DB.push(20 * Math.log10(Math.max(1e-5, fr.levelVU ?? fr.level)));
-  MD.push(Math.pow(eng.eSimple ?? 0, E_CURVE));
+  MD.push(Math.pow(eng.eSimple ?? 0, E_CURVE)); ES.push(eng.eSimple ?? 0);
+  { let dm = 0, n = 0; for (const L of lamps) if (L.dim >= 0) { dm += (u[L.dim] ?? 0) / 255; n++; } DIMP.push(n ? dm / n : NaN); }
 }
 
 const pctl = (a, p) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p * s.length))] : NaN; };
@@ -187,11 +196,23 @@ for (const [li, L] of CH.entries()) for (let c = 0; c < 3; c++) {
 let a3 = 0, litN = 0;
 for (const L of CH) for (let i = 0; i < L[0].length; i++) { const n = (L[0][i] > ON) + (L[1][i] > ON) + (L[2][i] > ON); if (n) { litN++; if (n === 3) a3++; } }
 const nl = lamps.length; if (globalThis.__chHist) process.stderr.write("hist " + JSON.stringify(globalThis.__chHist) + "\n");
+// SPANNET IN -> UT (agaren i ladan 10-09: "tacker den hela spannet med insignalen mot utsignalen, 1-95 %"):
+// ingangens dB i tiondelar (klippets egna p0..p100) -> medel av e (energins fonster 0..1), md (dampningen) och DIM (% av 255)
+const spann = (() => {
+  const idx = DB.map((d, i) => i).filter((i) => Number.isFinite(DB[i]) && DB[i] > -80).sort((a, b) => DB[a] - DB[b]);
+  const dec = []; for (let q = 0; q < 10; q++) { const sl = idx.slice(Math.floor(q * idx.length / 10), Math.floor((q + 1) * idx.length / 10)); const m = (A) => sl.reduce((s2, i) => s2 + A[i], 0) / Math.max(1, sl.length); dec.push({ db: +m(DB).toFixed(1), e: +m(ES).toFixed(2), md: +m(MD).toFixed(2), dim: +(100 * m(DIMP)).toFixed(0), lit: +(100 * m(LIT)).toFixed(0) }); }
+  return { dec, eP: [pctl(ES, .01), pctl(ES, .5), pctl(ES, .99)].map((x) => +x.toFixed(2)), dimP: [pctl(DIMP, .01), pctl(DIMP, .5), pctl(DIMP, .99)].map((x) => +(100 * x).toFixed(0)) };
+})();
+const stegUt = STEG ? (() => { const gs = STEG.split(","), segS = Number(opt("--stegS", 15)), per = segS * 1000 / STEP_MS; return gs.map((g, k) => {
+  const a = Math.floor(k * per + per / 2), b = Math.floor((k + 1) * per);   // andra halvan av steget (fonstret hinner stalla in sig)
+  const m = (A) => { let s2 = 0, n = 0; for (let i = a; i < b && i < A.length; i++) { s2 += A[i]; n++; } return n ? s2 / n : NaN; };
+  return { dB: +g, inDb: +m(DB).toFixed(1), e: +m(ES).toFixed(2), md: +m(MD).toFixed(2), dim: +(100 * m(DIMP)).toFixed(0), lit: +(100 * m(LIT)).toFixed(0) }; }); })() : undefined;
 const res = {
   wav: path, sek: Math.round(T.length * STEP_MS / 1000), on: ON,
   levande: { mdSteg: +steg(MD).toFixed(2), ljusSteg: +steg(eL).toFixed(2), rDb: +pear(eL, eD).toFixed(3), kontrast: +(hiL / Math.max(1e-3, loL)).toFixed(2),
     dbSpann: +(pctl(DB, 0.9) - pctl(DB, 0.1)).toFixed(1), litP10: +pctl(LIT, .1).toFixed(3), litP50: +pctl(LIT, .5).toFixed(3), litP90: +pctl(LIT, .9).toFixed(3) },
   fladder: { fladderMin: +(fladder / nl / minutes).toFixed(1), pulsPerKick: +(pulsar / nl / Math.max(1, KICKT.length)).toFixed(2), kickarMin: +(KICKT.length / minutes).toFixed(0), perLook: flLook },
+  spann, stegUt,
   rgb: { sidoVaxlMin: +(vaxl / nl / minutes).toFixed(1), sidoBlinkMin: +(blink / nl / minutes).toFixed(1), alla3: +(a3 / Math.max(1, litN)).toFixed(3), ofrivBlinkMin: +(ofriv / nl / minutes).toFixed(1) },
 };
 say(QUIET ? JSON.stringify(res) : JSON.stringify(res, null, 1));
