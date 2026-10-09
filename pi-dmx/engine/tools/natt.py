@@ -11,6 +11,7 @@ och skriver en jamforbar dygnspost:
     python tools/natt.py [--datum YYYY-MM-DD] [--snabb] [--tag namn] [--env K=V ...]
 
   --snabb      bara mixarna (~30 s) - for att prova en kandidat fort
+  (utan --snabb kors aven ladans 20 inspelningar 10-08 genom tools/dynSet.py -> tools/natt/dynamik.md)
   --tag/--env  A/B av en kandidat: raden taggas sa den inte blandas med baslinjen; env laggs OVANPA ladans
   --lista      annan manifest.tsv (standard tools/frozen6/manifest.tsv)
   --norm DBFS  nivaanpassa KLIPPEN till ladans aux-niva, STANDARD -3.5 sedan 10-07 (matfalla 35: frozen6 ~28 dB
@@ -104,6 +105,16 @@ def main():
         out['korpus'] = korpus
         print(f'  korpus   {len(ok)} klipp ({len(res) - len(ok)} fel)  kick->ljus {f(korpus["median"]["kickLagMs"], 0)} ms  traff {f(korpus["median"]["kickTraff"])}  r {f(korpus["median"]["energiR"])}  alla3 {f(korpus["median"]["alla3"])}')
 
+    # 2b. LADANS INSPELNINGAR 10-08 (Aux -18 dB, 0 % klippt, 13 dB spann): DYNAMIK + FLADDER + R/G/B med ladans tandpunkt
+    #     (tools/dynSet.py -> dynBench.mjs). De gamla mixarna ar klippta (5 dB spann) och sager inget om dynamik.
+    if not a.snabb and os.path.isdir(os.path.join(HERE, 'ladan-2026-10-08')):
+        r = subprocess.run([sys.executable, 'tools/dynSet.py'] + sum((['--env', e] for e in a.env), []), cwd=ENGINE,
+                           capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=1800)
+        line = next((l for l in reversed(r.stdout.splitlines()) if l.startswith('{')), None)
+        out['ladan1008'] = json.loads(line) if line else {'fel': (r.stderr or '')[-300:]}
+        lv = out['ladan1008'].get('levande', {})
+        print(f'  ladan1008 {out["ladan1008"].get("n", 0)} klipp  mdSteg {f(lv.get("mdSteg"))}  rDb {f(lv.get("rDb"))}  fladder/min {f(out["ladan1008"].get("fladder", {}).get("fladderMin"), 1)}')
+
     # 3. EFFEKTERNA: speltid per look over bada mixarna + de som aldrig valdes (gallringsunderlag)
     try:
         reg = subprocess.run(['node', '-e', 'import("./dist/effects/registry.js").then(m=>console.log(JSON.stringify(m.EFFECTS.map(e=>[e.key,e.tier,e.section||null]))))'],
@@ -141,6 +152,17 @@ def main():
            f'{(out["korpus"] or {}).get("n", "-")} | {f(km.get("kickLagMs"), 0)}/{f(km.get("kickTraff"))} | {f(km.get("energiR"))} | {f(km.get("alla3"))}/{f(km.get("matt"))} | {f(km.get("morkt"))} | '
            f'{len(out["effekter"]["aldrigValda"])} |\n')
     io.open(sb, 'a', encoding='utf-8').write(row)
+    if out.get('ladan1008', {}).get('levande'):
+        dm = os.path.join(d, 'dynamik.md')
+        if not os.path.exists(dm):
+            io.open(dm, 'w', encoding='utf-8').write(
+                '# Dynamik pa ladans inspelningar 10-08 (tools/dynSet.py, medianer over 20 klipp a 30 s, tandpunkt 16)\n\n'
+                '| datum | git | tag | mdSteg | ljusSteg | rDb | kontrast | litP50 | fladder/min | R/G/B blink/min | ofrivillig blink/min | alla3 |\n'
+                '|---|---|---|---|---|---|---|---|---|---|---|---|\n')
+        L = out['ladan1008']; lv = L['levande']; fl = L['fladder']; rg = L['rgb']
+        io.open(dm, 'a', encoding='utf-8').write(
+            f'| {a.datum} | {git} | {a.tag or "-"} | {f(lv["mdSteg"])} | {f(lv["ljusSteg"])} | {f(lv["rDb"])} | {f(lv["kontrast"])} | {f(lv["litP50"], 3)} | '
+            f'{f(fl["fladderMin"], 1)} | {f(rg["sidoBlinkMin"], 1)} | {f(rg.get("ofrivBlinkMin"), 1)} | {f(rg.get("alla3"), 3)} |\n')
     print(f'\nskrev {os.path.relpath(fn, ENGINE)} och en rad i tools/natt/scoreboard.md ({out["tidS"]} s)')
     print(f'aldrig valda i mixarna: {", ".join(out["effekter"]["aldrigValda"]) or "(inga)"}')
 
