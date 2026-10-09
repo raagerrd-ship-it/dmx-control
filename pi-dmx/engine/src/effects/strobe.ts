@@ -12,7 +12,7 @@ export const strobe: EffectDef = {
     const fast = bpm >= 128;
     const flash = c.dropEnv > 0.5 || (fast && c.beatHit) || c.punch > 0.8;
     c.want.strobe = Math.max(c.dropEnv, flash ? 0.6 : 0);
-    if (flash) return c.hsv(hue, 0.3, 1);
+    if (flash) return c.hsv(hue, 0.65, 1);   // 0,3 -> 0,65 (2026-10-09): under 0,5 kvantiseras mattnaden till VITT (alla3 90 %) - blixten behaller kuloren
     const glow = 0.25 + c.audio * 0.5 + c.beatPulse * 0.2;
     return c.hsv(hue, 1, Math.min(1, glow));
   },
