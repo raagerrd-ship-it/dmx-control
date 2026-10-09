@@ -199,12 +199,23 @@ const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
   frasraknare: { needsBeat: 0.35 },
 };
 
+/** ALLA LOOKER (opt-in DMX_ALLA_LOOKER=1, 2026-10-09, agaren: "se sa alla kan anvandas"). Matt pa ladans mixar (122 byten):
+ *  i high var tempot >= 130 BPM bara 3/55 ganger och aldrig >= 140 -> snap/rave/strobe valdes ALDRIG; profile.bass median 0,23 ->
+ *  gravity (0,35) foll pa kravet 46 ganger. Trappan 115/120/125 ger de tre snabba var sin troskel (20/18/14 av 55 high-byten). */
+export const ALLA_LOOKER = process.env.DMX_ALLA_LOOKER === "1";
+const REQ_ALLA: Partial<Record<Mode, EffectReq>> = {
+  snap:    { minBpm: 115, needsPunch: 0.40 },
+  rave:    { minBpm: 120, needsPunch: 0.40 },
+  strobe:  { minBpm: 125 },
+  gravity: { needsBass: 0.20 },
+};
+
 /** Möter effekten sina krav givet nuvarande tempo + karaktärsprofil? */
 export function meetsRequirements(
   key: Mode, bpm: number,
   p: { punch: number; bass: number; bright: number; beat: number },
 ): boolean {
-  const r = REQUIREMENTS[key];
+  const r = (ALLA_LOOKER && REQ_ALLA[key]) || REQUIREMENTS[key];
   if (!r) return true;
   if (r.minBpm !== undefined && bpm < r.minBpm) return false;
   if (r.needsPunch !== undefined && p.punch < r.needsPunch) return false;

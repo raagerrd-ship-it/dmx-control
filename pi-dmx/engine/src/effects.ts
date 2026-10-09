@@ -13,7 +13,7 @@ import { FixtureOutput, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { PostProcess } from "./postprocess.js";
 import type { Frame } from "./analyser.js";
-import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
+import { EFFECT_MAP, TIER, sectionPool, ALLA_LOOKER, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
 import { composeLamp, type Envelope, type ModulateFlags } from "./heartbeat/contract.js";
 import { fitScore } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
@@ -175,6 +175,13 @@ const SECTION_REUSE = process.env.DMX_SECTION_REUSE === '1';   // standard AV se
  *  med 46 effekter och ~50 byten per 10 min blev annars samma 20-25 valda och resten aldrig (effectMix: 18-19 aldrig valda).
  *  Bonusen forsvinner sa fort effekten setts en gang, sa den styr bara FORSTA chansen. 0 = av. */
 const MIX_UNSEEN_BONUS = Number(process.env.DMX_MIX_UNSEEN_BONUS ?? 0.10);
+/** ALLA LOOKER (opt-in DMX_ALLA_LOOKER=1, 2026-10-09; kraven ligger i registry.ts). Tva dirigentregler:
+ *  (a) BUILD-INTRADE: analysatorns sektion 'build' kom bara 8 ganger pa 20 min mix, och "byt aldrig mitt i en uppbyggnad" blockerade
+ *      allt annat -> build-poolen (pulse/stegring/sug) valdes 1 av 122 byten. Nu raknas en uppbyggnad som hallit i ALLA_BUILD_S
+ *      (inRiser/buildUp ar fladdriga: 355 flanker, de flesta < 0,3 s) som intrade: ETT byte till build-poolen (look hallen > 4 s).
+ *  (b) MINST SPELAD: bland de basta kandidaterna (passform + nyhet, samma topp-urval som forr) tas den som spelats minst sedan
+ *      start, i stallet for gyllene snittets turordning - sa varje look som alls kommer i fraga till slut far sin tur. */
+const ALLA_BUILD_S = 1.5;
 
 /** Drops ignoreras helt så länge — täcker påslaget och de första takterna. */
 const START_DROP_MUTE_MS = 3000;
@@ -440,6 +447,12 @@ export class EffectEngine {
   private wavePhase = 0;
   /** "smart" mode: which effect the feel-chooser currently delegates to. */
   private smartMode: Mode = "wave";
+  /** Valet bland topp-kandidaterna: gyllene snittets turordning, eller (ALLA_LOOKER b) den som spelats minst sedan start. */
+  private pickLook(top: { m: Mode }[]): Mode {
+    if (ALLA_LOOKER) { let best = top[0].m, bt = Infinity; for (const x of top) { const t = this.lookPlayMs.get(x.m) ?? 0; if (t < bt) { bt = t; best = x.m; } } return best; }
+    return top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
+  }
+  private buildSince = -1; private buildEntered = false; private lookPlayMs = new Map<Mode, number>();   // ALLA_LOOKER
   private fadeMode: Mode | undefined;   // DMX_LOOK_FADE_S: senast sedda look
   private tierEma = 0.5;   // ihallande intensitet for tier-val (se render)
   private smartDwellUntil = 0;
@@ -1356,6 +1369,12 @@ export class EffectEngine {
         //    kvar genom hela risern — då landar bytet i stället PÅ dropen, vilket
         //    är det enda ögonblick där ett byte förstärker musiken.
         const inBuild = frame.inRiser || frame.buildUp > 0.35 || (SECTION_SWITCH && frame.section === 'build');
+        // ALLA_LOOKER (a): en uppbyggnad som hallit ALLA_BUILD_S = intrade -> ETT byte till build-poolen
+        let allaBuild = false;
+        if (ALLA_LOOKER) {
+          if (!inBuild) { this.buildSince = -1; this.buildEntered = false; }
+          else { if (this.buildSince < 0) this.buildSince = now; allaBuild = !this.buildEntered && now - this.buildSince >= ALLA_BUILD_S * 1000 && held > 4000; }
+        }
         // 2) I ett breakdown: gå till den lugna poolen oavsett vad energitiern
         //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
         //    så utan detta fortsätter riggen köra fullfart genom en svacka.
@@ -1383,12 +1402,12 @@ export class EffectEngine {
         if (this.memSongId !== this.partLookSong) { this.partLook.clear(); this.partLookSong = this.memSongId; }
         const buildEntry = MIX_V2 && liveSecChanged && liveSec === 'build';   // MIX_V2 (2): ett byte IN i build-poolen tillats
         const secEntry = SECTION_UNIT && this.pendingSecSwitch && secOldEnough && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
-        if ((!inBuild || buildEntry || secEntry) && (dropSwitch || miniSwitch || nearSwitch || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
-        this.lastSmartSwitchMs = now; this.pendingSecSwitch = false;
+        if ((!inBuild || buildEntry || secEntry || allaBuild) && (dropSwitch || miniSwitch || nearSwitch || allaBuild || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
+        this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
         this.switchWhy = dropSwitch ? 'drop' : miniSwitch ? 'minidrop' : nearSwitch ? 'nastan-drop' : charShift ? (this.charShiftWhy.startsWith('tempovaxling') ? 'tempo' : 'karaktar')
           : (memSection || secEntry) ? 'sektion' : unitPhrase ? 'fras' : bassSwitch ? 'basgang'
-          : buildEntry ? 'build' : halvedChanged ? 'halvering' : tierChanged ? 'tier' : 'dwell';
+          : (buildEntry || allaBuild) ? 'build' : halvedChanged ? 'halvering' : tierChanged ? 'tier' : 'dwell';
         this.switchCount++;
         // (skrapjakten 10-01: enabled/part skapades forr pa varje ruta men anvands bara har, i bytet)
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
@@ -1413,9 +1432,10 @@ export class EffectEngine {
         if (MIX_V2 && !wantCalm && liveSec === 'high' && tierS === FART) pool = enabled([...FART, ...FULLFART]).filter(req);
         // SEKTIONSPOOL (DMX_SECTION_SWITCH): skar med sektionens looker (registry.SECTION_POOLS). 'build' och 'break' har egna
         // effekter (stegring/andrum) som gar fore tiern; for high/low/intro ar snittet med tier-poolen forsta valet.
-        if (SECTION_SWITCH && liveSec) {
-          const secList = sectionPool(liveSec);
-          const own = (liveSec === 'build' || liveSec === 'break') ? enabled(secList).filter(req) : [];
+        const secKey = allaBuild ? 'build' : liveSec;   // ALLA_LOOKER (a): uppbyggnaden valjer ur build-poolen aven nar etiketten sager annat
+        if (SECTION_SWITCH && secKey) {
+          const secList = sectionPool(secKey);
+          const own = (secKey === 'build' || secKey === 'break') ? enabled(secList).filter(req) : [];
           const cut = pool.filter((m) => secList.includes(m));
           if (own.length) pool = own; else if (cut.length) pool = cut;
         }
@@ -1453,14 +1473,14 @@ export class EffectEngine {
         const unitPen = (m: Mode) => SECTION_UNIT && pairKey && this.prevSongLook.get(pairKey) === m ? 0.5 : 0;   // SECTION_UNIT: inte forra latens look for samma sektionstyp   // 20:33: ingen igenkanning for live-etiketter ('samma effekt igen') - bara latminnet
         // TYDLIG BASGANG -> toggle-poolen (se CLEAR_BASS). Snitt med aktuell pool forst (sektion/tier/krav), annars alla
         // aktiva toggle-effekter som moter kraven. Bast passande forst, gyllene-snitt-variation bland topp 3, aldrig samma.
-        const bassHard = bassClear && (!MIX_V2 || ((frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD && this.smartCount % 2 === 1));   // MIX_V2 (1)
+        const bassHard = !allaBuild && bassClear && (!MIX_V2 || ((frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD && this.smartCount % 2 === 1));   // MIX_V2 (1)
         const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); return cut.length ? cut : enabled(TOGGLE_POOL).filter(req); })() : [];
         const clearBass = toggles.length > 0;
         if (clearBass && !(remembered && TOGGLE_POOL.includes(remembered) && this.cfg.rotation?.[remembered] !== false)) {
           const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (MIX_V2 && this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) + (MIX_V2 && !this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) - unitPen(m) })).sort((a, b) => b.s - a.s);
           const cands = ranked.filter((x) => x.m !== this.smartMode);
           const top = (cands.length ? cands : ranked).slice(0, MIX_V2 ? Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))) : 3);
-          this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
+          this.smartMode = this.pickLook(top);
           if (part && !wantCalm) this.partLook.set(pairKey!, this.smartMode);
           console.log(`[dirigent] tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}, ${toggles.length} toggles) -> "${this.smartMode}"`);
         } else if (remembered && this.cfg.rotation?.[remembered] !== false) {
@@ -1484,7 +1504,7 @@ export class EffectEngine {
           const cands = ranked.filter((x) => x.m !== this.smartMode);
           // MIX_V2 (4): valfonstret var alltid topp-3 av passformen -> samma 3-5 looker per tier for evigt; nu topp-MIX_TOP_FRAC av poolen (minst 3)
           const top = (cands.length ? cands : ranked).slice(0, MIX_V2 ? Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))) : 3);
-          this.smartMode = top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
+          this.smartMode = this.pickLook(top);
           if (part && !wantCalm) this.partLook.set(pairKey!, this.smartMode);
           // LOGGEN AR OVILLKORLIG (2026-09-23): utan DMX_SECTION_SWITCH finns inget `part` och dirigentens val syntes inte alls i
           // journalen (ladan 09-22: "vi korde pa hoga effekter" gick inte att belagga). Nu: del, sektion (data), basgang, tier, pool.
@@ -1597,6 +1617,7 @@ export class EffectEngine {
     //  3. LOG-RELEASE: fade med konstant KVOT per tick (perceptuellt jämn), med snabb
     //     soft-snap-attack. Det är "smooth-hemligheten".
     const dtMs = dtNow * 1000;
+    if (ALLA_LOOKER) this.lookPlayMs.set(this.smartMode, (this.lookPlayMs.get(this.smartMode) ?? 0) + dtMs);
     // LOUDNESS-KÄLLA = analysatorns `frame.intensity` (sektionsenergi relativt låtens
     // eget snitt, 0.5 = snitt). Den är REDAN robust normaliserad av analysatorn över
     // hela låten — så vi slipper dB-fönstrets skal- och settling-problem (mid+diskant
