@@ -179,14 +179,14 @@ for (const S of LAMP) {
   }
 }
 // R/G/B: kanal tand = DMX > ON, lampan tand = nagon kanal > ON
-let vaxl = 0, blink = 0, ofriv = 0;
+let vaxl = 0, blink = 0, ofriv = 0; const blinkLook = {};
 for (const [li, L] of CH.entries()) for (let c = 0; c < 3; c++) {
   let state = null, since = 0; const I = INTENT[li][c];
   for (let i = 0; i < L[c].length; i++) {
     const lampOn = L[0][i] > ON || L[1][i] > ON || L[2][i] > ON;
     if (!lampOn) { state = null; continue; }
     const s = L[c][i] > ON;
-    if (state !== null && s !== state) { vaxl++; if ((i - since) * STEP_MS < 300) { let held = true; for (let q = Math.max(0, since - 1); q <= i; q++) if (!I[q]) { held = false; break; } if (held) ofriv++; if (process.env.DYN_BLINK && blink < 12) process.stderr.write(`blink ${LOOK[i]} k${c} t ${(T[i] / 1000).toFixed(2)} ${[0, 1, 2].map((q) => L[q].slice(i - 6, i + 3).join(',')).join(' | ')}
+    if (state !== null && s !== state) { vaxl++; if ((i - since) * STEP_MS < 300) { blinkLook[LOOK[i]] = (blinkLook[LOOK[i]] ?? 0) + 1; let held = true; for (let q = Math.max(0, since - 1); q <= i; q++) if (!I[q]) { held = false; break; } if (held) ofriv++; if (process.env.DYN_BLINK && blink < 12) process.stderr.write(`blink ${LOOK[i]} k${c} t ${(T[i] / 1000).toFixed(2)} ${[0, 1, 2].map((q) => L[q].slice(i - 6, i + 3).join(',')).join(' | ')}
 `); blink++; } since = i; }
     else if (state === null) since = i;
     state = s;
@@ -217,6 +217,6 @@ const res = {
     dbSpann: +(pctl(DB, 0.9) - pctl(DB, 0.1)).toFixed(1), litP10: +pctl(LIT, .1).toFixed(3), litP50: +pctl(LIT, .5).toFixed(3), litP90: +pctl(LIT, .9).toFixed(3) },
   fladder: { fladderMin: +(fladder / nl / minutes).toFixed(1), pulsPerKick: +(pulsar / nl / Math.max(1, KICKT.length)).toFixed(2), kickarMin: +(KICKT.length / minutes).toFixed(0), perLook: flLook },
   spann, stegUt, mdBins, litOn,
-  rgb: { sidoVaxlMin: +(vaxl / nl / minutes).toFixed(1), sidoBlinkMin: +(blink / nl / minutes).toFixed(1), alla3: +(a3 / Math.max(1, litN)).toFixed(3), ofrivBlinkMin: +(ofriv / nl / minutes).toFixed(1) },
+  rgb: { sidoVaxlMin: +(vaxl / nl / minutes).toFixed(1), sidoBlinkMin: +(blink / nl / minutes).toFixed(1), alla3: +(a3 / Math.max(1, litN)).toFixed(3), ofrivBlinkMin: +(ofriv / nl / minutes).toFixed(1), blinkLook },
 };
 say(QUIET ? JSON.stringify(res) : JSON.stringify(res, null, 1));

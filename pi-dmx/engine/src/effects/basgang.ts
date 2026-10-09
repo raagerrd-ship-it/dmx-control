@@ -21,7 +21,10 @@ export const basgang: EffectDef = {
     const note = Math.exp(-age / 0.22) * (0.55 + c.frame.onset.bass * 0.45) * (0.6 + 0.4 * c.bassline);
     const idle = Math.max(0, Math.min(1, age / beatS - 1));                       // > 1 slag utan not: mattan + mjuk slagpuls
     const bed = 0.06 + c.drum.bass * 0.28 + idle * c.beatPulse * 0.18;           // basens sustain over hela riggen
-    const hue = c.mixedSector(step) / 6;
+    // KULOR PER FYRA NOTER (ladan 2026-10-09: "fladder mellan slackt och inte pa 'inte huvudfargen'"): forr ny kulor pa VARJE basnot pa
+    // alla lampor -> sidokanalen (G i gul -> rod) slog av/pa per not; med DMX_HUE_CUT syntes varje byte (bank: basgang 510 av 1170 korta
+    // sidoblink). Positionen hoppar fortfarande per not; kuloren byts per fyra noter.
+    const hue = c.mixedSector(Math.floor(step / 4)) / 6;
     const v = d < 0.5 ? Math.min(1, bed + note * 0.9 + c.punch * 0.3) : Math.min(1, bed + note * Math.exp(-d * 2.2) * 0.35 + c.punch * 0.15);
     return c.hsv(hue, 1 - (d < 0.5 ? c.punch * 0.4 : 0), v);
   },
