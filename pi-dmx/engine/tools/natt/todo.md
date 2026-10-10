@@ -2,7 +2,7 @@
 
 ## STANDARD ÄNDRAD 2026-10-10 19:50 (ladan): "Lägsta nivå" energyFloor 0 -> 0,2 (låtbyten och tysta intron var svarta 10-15 s: energifönstret mindes förra låten + brant kurva). Ny baslinje i bänken - kör om natt.py-baslinjen före jämförelser.
 
-## LÄGET 2026-10-10 20:20 (ladan, kvällens fyra fixar - båda STANDARD, filerna på Pi:n md5-verifierade, aktiva vid nästa omstart)
+## LÄGET 2026-10-10 20:30 (ladan, kvällens fem fixar - båda STANDARD, filerna på Pi:n md5-verifierade, aktiva vid nästa omstart)
 1. LÅSNINGARNA LÖSTA (e5012f0): "låser sig ibland" var att ljudet slutade komma 0,5-2 s ~15-22 ggr/h (I2S SYNC error efter varje omstart
    av capturen). Orsak: arecord låg på kärna 3 med vanlig prioritet bredvid dmx-helperns FIFO-50-tråd -> 21 ms-bufferten rann över.
    Fix: audio.ts spawnar `chrt -f -p 60` på arecord. Prov 15 min: 0 avbrott (väntat ~5). Kodekens state är rätt (127 kontroller jämförda).
@@ -19,6 +19,15 @@
    Bänk: byten/min oförändrat (pop 6,2->6,0, megamix 6,8) - MIN_HOLD 8 s styr takten, bytena hamnar nu på nästan-drop/sektion/basgång.
    Ägaren: "låt 8 sekunder ligga" - rör inte MIN_HOLD. Minidrops är redan många (pop 11/min, megamix 58/min vid MINI_RISE_DB 10):
    sänk inte minidrop-kravet. showTight.mjs räknar nu minidrops (tajt.minidrops).
+5. PARVISA EFFEKTER SYNS (6b8603d, live 20:27): toggle-effekter (EffectDef.toggle, nu även backbeat) får ingen FX_FLOOR - golvet lyfte
+   'av'-gruppen till ~55 %, kontrast (max-min)/max bara 0,03-0,12 (tools/pairBench.mjs). Dirigenten tar varannat look-byte ur toggle-
+   poolen när takten är låst och beatTrust >= 0,85 (ägaren: "är bpm låst och tydlig takt så vill jag att dirigenten föredrar dom").
+   Bänk: toggle-andel pop 0,25->0,44, megamix 0,35->0,48, lampspr 50->64 / 28->40, ljus p50 0,59->0,50 / 0,70->0,64.
+   MÄTFÄLLA 43 (gäller ALLA bänkar - showTight/pairBench/dynBench): bänken sätter cfg.beat.anchorMs = fr.beatAnchorMs varje hop, live
+   (index.ts) har en PLL som nudgar ankaret. I bänken hoppar ctx.beatFrac 0,00->0,45 på 27 ms varje slag (halverad effektklocka +
+   ankarhopp -> halfTick flippar fel), så grupp A:s topp ritas aldrig. UPPGIFT: gör bänkens taktmatning som live (bryt ut PLL-delen
+   ur index.ts och använd den i bänkarna, bevisa identisk), mät sedan pairBench igen och skriv kontrasten per toggle-effekt. Kolla
+   också om halfTick-flippen kan ske live (beatTick vs beatFrac-wrap när ankaret nudgas). Ändra aldrig den delade analysatorn.
 
 ## Från 2026-10-10 eftermiddag — NYA DROP-KLIPP + LÅNG INSPELNING (efter "FÄRRE REGLAGE")
 Ägaren i ladan 10-10 ("ja, lägg in båda"). LÄGET: kodens standard deployad 10-10 ~14:10 (TRE STEG, dimmern konstant, minsta på-tid
