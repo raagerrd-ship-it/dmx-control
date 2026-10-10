@@ -377,12 +377,14 @@ export class EffectEngine {
    *  effekter: (a) DROP-LOOKEN - kolsvart i den dramaturgiska tystnaden fore smallen (blackout), och vid full drop blandas drops-effektens
    *  dropfarg per lampa + vit karna i toppen in med dropColEnv; (b) topp-normering - effektens topp over lamporna (foljd E_NORM_S) blir
    *  100 %; (c) grundniva FX_FLOOR for tanda lampor (slackt forblir slackt); (d) minidrop/nastan-drop lyfter mot fullt med kuloren kvar. */
-  private effektNiva(rgb: [number, number, number], ctx: EffectContext, blackout: boolean): [number, number, number] {
+  private effektNiva(rgb: [number, number, number], ctx: EffectContext, blackout: boolean, toggle = false): [number, number, number] {
     if (blackout) { rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; return rgb; }
     let m = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
     if (m > this.fxPeakNow) this.fxPeakNow = m;
     if (E_NORM_S > 0) { const n = this.fxNorm; rgb[0] = Math.min(1, rgb[0] * n); rgb[1] = Math.min(1, rgb[1] * n); rgb[2] = Math.min(1, rgb[2] * n); m = Math.min(1, m * n); }
-    if (FX_FLOOR > 0 && m > 0.001 && m < 1) { const k = (m + FX_FLOOR * (1 - m) * Math.min(1, m / 0.1)) / m; rgb[0] *= k; rgb[1] *= k; rgb[2] *= k; m *= k; }
+    // TOGGLE-EFFEKTER UTAN GRUNDNIVA (ladan 10-10, agaren: parvisa effekter i takt syns inte): golvet lyfte 'av'-gruppen till ~55 % -
+    // parbanken (tools/pairBench.mjs) matte kontrast (max-min)/max 0,03-0,12. Den morka gruppen i en toggle-effekt ska vara mork.
+    if (FX_FLOOR > 0 && !toggle && m > 0.001 && m < 1) { const k = (m + FX_FLOOR * (1 - m) * Math.min(1, m / 0.1)) / m; rgb[0] *= k; rgb[1] *= k; rgb[2] *= k; m *= k; }
     const liftK = this.dropEnv - this.dropColEnv;   // minidrop/nastan-drop: ljusstyrka mot fullt, kuloren kvar
     if (liftK > 0.005 && m > 0.002 && m < 1) { const g = 1 + (1 / m - 1) * liftK; rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
     if (this.dropColEnv > 0.005) {   // full drop: dropfarg per lampa + vit karna i toppen (agaren 10-08), blandas in med dropColEnv
@@ -1306,7 +1308,10 @@ export class EffectEngine {
         const unitPen = (m: Mode) => SECTION_UNIT && pairKey && this.prevSongLook.get(pairKey) === m ? 0.5 : 0;   // SECTION_UNIT: inte forra latens look for samma sektionstyp   // 20:33: ingen igenkanning for live-etiketter ('samma effekt igen') - bara latminnet
         // TYDLIG BASGANG -> toggle-poolen (se CLEAR_BASS). Snitt med aktuell pool forst (sektion/tier/krav), annars alla
         // aktiva toggle-effekter som moter kraven. Bast passande forst, gyllene-snitt-variation bland topp 3, aldrig samma.
-        const bassHard = !allaBuild && bassClear && (!MIX_V2 || ((frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD && this.smartCount % 2 === 1));   // MIX_V2 (1)
+        // LAST OCH TYDLIG TAKT (ladan 10-10, agaren: 'ar bpm last och tydlig takt sa vill jag att dirigenten foredrar dom'): som tydlig
+        // basgang - varannat look-byte tas ur toggle-poolen (parvisa/gruppvisa effekter i takt) nar takten ar last och tilliten >= 0,85.
+        const beatClear = !allaBuild && beatLocked(this.cfg.beat) && this.beatTrust >= 0.85 && this.smartCount % 2 === 1;
+        const bassHard = beatClear || (!allaBuild && bassClear && (!MIX_V2 || ((frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD && this.smartCount % 2 === 1)));   // MIX_V2 (1)
         const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); return cut.length ? cut : enabled(TOGGLE_POOL).filter(req); })() : [];
         const clearBass = toggles.length > 0;
         if (clearBass && !(remembered && TOGGLE_POOL.includes(remembered) && this.cfg.rotation?.[remembered] !== false)) {
@@ -1315,7 +1320,7 @@ export class EffectEngine {
           const top = (cands.length ? cands : ranked).slice(0, MIX_V2 ? Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))) : 3);
           this.smartMode = this.pickLook(top);
           if (part && !wantCalm) this.partLook.set(pairKey!, this.smartMode);
-          console.log(`[dirigent] tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}, ${toggles.length} toggles) -> "${this.smartMode}"`);
+          console.log(`[dirigent] ${beatClear ? `last takt (tillit ${this.beatTrust.toFixed(2)})` : `tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}`}, ${toggles.length} toggles) -> "${this.smartMode}"`);
         } else if (remembered && this.cfg.rotation?.[remembered] !== false) {
           this.smartMode = remembered;
           console.log(`[dirigent] ${part}: återser "${remembered}"`);
@@ -1597,6 +1602,7 @@ export class EffectEngine {
     this.fxPeakNow = 0;
     const fadeK = Math.exp(-dtSec / (FADE_MIN_S / E_LIN_INV));
     const renderNow = performance.now();
+    const fxToggle = !!EFFECT_MAP.get(effMode)?.toggle;   // toggle-effekt: ingen grundniva (se effektNiva)
     const fastLight = !!EFFECT_MAP.get(effMode)?.fastLight;   // effekten skippar minsta pa-tid (EffectDef.fastLight)   // STEG 2: uttoningens tidskonstant i DMX-ljus (FADE_MIN_S x gamma fore gamman)
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
@@ -1614,7 +1620,7 @@ export class EffectEngine {
         if (fx?.bands?.length) { let mb = -Infinity; for (let k = 0; k < fx.bands.length; k++) mb = Math.max(mb, bands[BAND_IDX[fx.bands[k]]]); ctx.band = mb; }   // = Math.max(...fx.bands.map(...)) utan spread/closure
         else ctx.band = bands[i % bands.length];
         rgb = effect ? effect.render(ctx) : [0, 0, 0];
-        rgb = this.effektNiva(rgb, ctx, blackout);   // STEG 1 forts.: effektens niva och drop-looken (se effektNiva)
+        rgb = this.effektNiva(rgb, ctx, blackout, fxToggle);   // STEG 1 forts.: effektens niva och drop-looken (se effektNiva)
         // EFFEKTENS ÖNSKEMÅL. Den vet sin egen dramaturgi bäst; motorn avgör om det
         // blir av (fixturen måste ha rollen, och rök går genom hårdvaruskyddet).
         // Högsta önskemål bland lamporna vinner — en effekt som vill stroba på EN
