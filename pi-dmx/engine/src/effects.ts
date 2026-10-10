@@ -111,10 +111,7 @@ const HALVE_SHOW = process.env.DMX_HALVE_SHOW !== "0";   // standard PA sedan 09
 // puls: c.heart ger morkare MELLAN slagen, alltsa mer upplevd knyck utan att addera ljus och utan att rora
 // kuloren - och den bor inne i effekterna, dar agarens kontrakt sager att den hor hemma.
 const EFFECT_HEART = Math.max(0, Math.min(2, Number(process.env.DMX_EFFECT_HEART ?? 1.4)));
-/** DMX_CALM_FROM_BREAKING=1: lat ra frame.breaking (niva < 65 % av taket) tvinga lugn-poolen som fore 09-27. */
-const CALM_FROM_BREAKING = process.env.DMX_CALM_FROM_BREAKING === '1';
-/** DMX_GROUP_ALT: tvagrupperingen vaxlar jamn/udda <-> inre/yttre per look och var 32:e slag (0 = alltid jamn/udda). */
-const GROUP_ALT = process.env.DMX_GROUP_ALT !== '0';
+/** TVAGRUPPERINGEN vaxlar jamn/udda <-> inre/yttre per look och var 32:e slag (av-brytaren DMX_GROUP_ALT borttagen 10-10). */
 /** MINIDROP-REAKTION (agaren 2026-09-12: "minidrops borde markas — effektbyte eller intensitet"): analysatorns
  *  frame.miniDropCount (monoton) ger look-byte (om looken hallits MIN_HOLD) + en kort stot pa MINI_DROP_ENV av
  *  en full drop-small (dropEnv), ingen rok, ingen blackout. */
@@ -127,16 +124,14 @@ const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 150);   // 350 -> 150 ST
  *  Graderad: dropEnv far ett golv NEAR_MIN..NEAR_MAX (50-85 % av en full drop) i MINI_BANG_MS, sedan samma 1 s-utton
  *  som allt annat (fallet rors inte). Inget look-byte, ingen rok. Analysatorn rors inte - bara redan exporterade falt.
  *  Sond pa pop_ladan (10 min): sprang >= 10 dB efter dipp >= 8 dB ~1 per 30 s, de flesta pa minidrops/drops. */
-const NEAR_DROP = process.env.DMX_NEAR_DROP !== '0';   // STANDARD sedan 2026-10-07 (godkand i ladan); =0 av
 const NEAR_RISE_DB = Number(process.env.DMX_NEAR_RISE_DB ?? 10);    // sprang fran dippens botten
 const NEAR_DIP_DB = Number(process.env.DMX_NEAR_DIP_DB ?? 8);       // dippen under latens normalniva (8 s-medel)
 const NEAR_FULL_DB = Number(process.env.DMX_NEAR_FULL_DB ?? 24);    // sprang som ger NEAR_MAX
 const NEAR_MIN = Number(process.env.DMX_NEAR_MIN ?? 0.5);   // ladan 10-07: 0,3/0,6 'syns for lite' -> 0,5/0,85 godkant
 const NEAR_MAX = Number(process.env.DMX_NEAR_MAX ?? 0.85);
 const NEAR_REFRACT_MS = Number(process.env.DMX_NEAR_REFRACT_MS ?? 4000);
-/** NEAR_DROP_SWITCH (agaren i ladan 10-07: "far aven dirigenten denna info och kan byta direkt"): en nastan-drop
+/** NASTAN-DROP BYTER LOOK (alltid; av-brytaren DMX_NEAR_DROP_SWITCH borttagen 10-10) (agaren i ladan 10-07: "far aven dirigenten denna info och kan byta direkt"): en nastan-drop
  *  ar ocksa ett bytesskal - looken byts direkt, med samma regel som minidropen (looken maste ha hallits MIN_HOLD 8 s). */
-const NEAR_SWITCH = NEAR_DROP && process.env.DMX_NEAR_DROP_SWITCH !== '0';   // STANDARD sedan 2026-10-07; =0 av
 /** (MINI_DELAY_MS borttagen 2026-10-08, agaren: 'varfor, bara vaxla till full annars?' - minidropen lyfter direkt; kommer en riktig
  *  drop tar den over. Vantan fran 09-12 gallde nar minidropen blixtrade vitt/dropfargat.) */
 /** ROK-HUNGER (agaren i ladan 2026-10-04: "har rokmaskinen inte kort pa kanske 5 min, gor det enklare att kora en puff"):
@@ -206,7 +201,6 @@ const PULSE_IDX_INIT = -2e9;
 // upp (rise ~1-2 s > 300 ms), men syllaberna medelvärdesbildas bort.
 // DMX_LIVE_LEVEL (2026-09-21): lotus nivakanal - se blocket i render(). Rattar bara for A/B.
 const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH !== '0';   // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
-const SECTION_TRACE = process.env.DMX_SECTION_TRACE !== '0';
 /** SEKTIONEN AR ENHETEN (2026-09-23, agaren: "jag vill inte att dirigenten bara byter effekt hela tiden, utan mer skapar en anpassad
  *  show till laten"; opt-in DMX_SECTION_UNIT=1, kraver DMX_SECTION_SWITCH=1). Tva saker:
  *  (1) BYTE bara vid sektionsgrans, drop/minidrop eller basgang som kommer/gar - inte pa tierflapp, halvering eller dwell-timern
@@ -987,7 +981,7 @@ export class EffectEngine {
     const miniActive = nowWall < this.miniBangUntil;
     let dTarget = dropActive ? 1 : miniActive ? MINI_DROP_ENV : 0;
     this.nearHit = false;   // bara rutan da nastan-dropen fyrar (lases av dirigenten langre ner i samma ruta)
-    if (NEAR_DROP) {
+    {   // NASTAN-DROP (standard sedan 10-07; av-brytaren DMX_NEAR_DROP borttagen 10-10)
       // Baskroppen glattad (120 ms), normalnivan (8 s) och dippens botten (minsta pa 1,5 s, 25 ms-rutor).
       const x = Math.max(-90, frame.bodyDb ?? -90);
       if (this.nearB === null) { this.nearB = x; this.nearNorm = x; }
@@ -1144,7 +1138,7 @@ export class EffectEngine {
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
         const dropSwitch = DISCRETE_DROP_LAMPS && dropHit && this.cfg.energyDrivesMode && held > DROP_HOLD;
         // (minidrop byter INTE look sedan 2026-10-10, agaren i ladan: 'minidrop maste ju inte orsaka look-byten' - den lyfter bara ljuset)
-        const nearSwitch = NEAR_SWITCH && this.nearHit && this.cfg.energyDrivesMode && held > MIN_HOLD;   // nastan-drop: samma regel
+        const nearSwitch = this.nearHit && this.cfg.energyDrivesMode && held > MIN_HOLD;   // nastan-drop: samma regel
         // MINNETS STRUKTUR: en tvättad låt vet var karaktären skiftar och var
         // fraserna börjar. Ett byte DÄR känns komponerat; samma byte 1,5 takt fel
         // känns slumpmässigt. Sektionsgräns = byt gärna nu; frasgräns = ok att byta.
@@ -1159,7 +1153,7 @@ export class EffectEngine {
         const expectSoon = SECTION_SWITCH && EXPECT_LEAD_MS > 0 && (frame.expectHighInMs ?? -1) > 0 && (frame.expectHighInMs ?? 0) <= EXPECT_LEAD_MS;   // forvarning: byt FORE refrangen
         const liveSec = SECTION_SWITCH ? (SECTION_UNIT ? (frame.section || '') : (afterDrop || expectSoon ? 'high' : (frame.section || ''))) : '';   // SECTION_UNIT: bara raa sektionen
         const liveSecChanged = SECTION_SWITCH && liveSec !== '' && this.lastLiveSection !== '' && liveSec !== this.lastLiveSection;
-        if (SECTION_SWITCH && liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '' && SECTION_TRACE) console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; if (liveSec === 'intro') { let nGl = 0; for (const k of [...this.partLook.keys()]) if (k.startsWith('live:')) { if (SECTION_UNIT) this.prevSongLook.set(k, this.partLook.get(k)!); this.partLook.delete(k); nGl++; } if (nGl) console.log(`[dirigent] ny lat: glommer ${nGl} looker`); } }
+        if (SECTION_SWITCH && liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '') console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; if (liveSec === 'intro') { let nGl = 0; for (const k of [...this.partLook.keys()]) if (k.startsWith('live:')) { if (SECTION_UNIT) this.prevSongLook.set(k, this.partLook.get(k)!); this.partLook.delete(k); nGl++; } if (nGl) console.log(`[dirigent] ny lat: glommer ${nGl} looker`); } }
         if (SECTION_UNIT && liveSecChanged) this.pendingSecSwitch = true;
         const secOldEnough = !SECTION_UNIT || (frame.sectionAgeMs ?? 1e9) >= SECTION_UNIT_MIN_MS;   // SECTION_UNIT: ingen switch pa en sektion yngre an 4 s (detektorflapp)   // ny lat (analysatorn nollar till intro) -> glom live-lookerna
         const memSection = now - this.memSectionAt < 300 || liveSecChanged;
@@ -1206,8 +1200,8 @@ export class EffectEngine {
         // LUGN-POOLEN BARA FRAN SEKTIONEN (2026-09-27, ladan): frame.breaking ar 'nivan < 65 % av taket' och var sann sa ofta
         // pa partypop att 27 av 40 look-val blev lugn-looker (viska/airglow/twin = nastan morka) mitt i sektion high med tier
         // full -> "ser inte vad effekterna gor", "en lampa lyser konstant". Med sektionsstyrning pa ar 'break' den
-        // genomtankta signalen; DMX_CALM_FROM_BREAKING=1 ger det gamla beteendet.
-        const calmSignal = (SECTION_SWITCH && !CALM_FROM_BREAKING) ? frame.section === 'break' : (frame.breaking || (SECTION_SWITCH && frame.section === 'break'));
+        // genomtankta signalen (av-brytaren DMX_CALM_FROM_BREAKING borttagen 10-10).
+        const calmSignal = SECTION_SWITCH ? frame.section === 'break' : frame.breaking;
         const wantCalm = calmSignal && this.cfg.energyDrivesMode;
         // 3) ETIKETTEN STYR INTE NIVÅN — SEKTIONENS UPPMÄTTA ENERGI GÖR DET.
         //    Här stod tidigare musikaliska schabloner: refräng aldrig lugn, vers
@@ -1539,7 +1533,7 @@ export class EffectEngine {
     }
     ctx.beatIdx = beatIdx; ctx.beatFrac = beatFracFx; ctx.beatPulse = beatPulse; ctx.heartPulse = heartPulse;
     // TVAGRUPPERING: vaxlar per look (smartCount) och var 32:e slag - "skiftar ibland mellan varannan och inre/yttre".
-    ctx.grouping = GROUP_ALT && (((this.smartCount + (beatIdx >> 5)) & 1) === 1) ? 'innerouter' : 'varannan';
+    ctx.grouping = (((this.smartCount + (beatIdx >> 5)) & 1) === 1) ? 'innerouter' : 'varannan';
     ctx.beatHit = beatHit; ctx.hasBeat = hasBeat;
     ctx.wavePhase = this.wavePhase; ctx.buildUp = frame.buildUp;
     ctx.phaseSpread = 1 + frame.buildUp * 2.5; ctx.punchFloor = punchFloor;
