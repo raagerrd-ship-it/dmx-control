@@ -71,13 +71,15 @@ export class AudioCapture extends EventEmitter {
   private static readonly CLEAN_RESPAWNS = 2;
   private static readonly LADDER_MAX = 4;
   private static readonly HEALTHY_MS = 5000;
-  private static readonly SAFE_RETRY_MS = 60_000;
+  /** 60 s -> 3 s (ladan 2026-10-10): efter en kallstart tappar kodeken I2S-synken tatt i ~1 min; trappan var slut efter ~25 s och
+   *  saket lage vantade sedan en hel minut med slackt rigg ("just nu lyser dom inte alls"). Ett arecord-forsok var 3:e s kostar inget. */
+  private static readonly SAFE_RETRY_MS = 3_000;
   private recoveries = 0;
   private firstDataAt = 0;
   private safeMode = false;
   private respawnTimer: NodeJS.Timeout | null = null;
 
-  /** True när trappan är slut: ingen respawn-jakt, bara ett försök per minut. */
+  /** True när trappan är slut: ingen snabb respawn-jakt, ett försök per SAFE_RETRY_MS (3 s). */
   get inSafeMode(): boolean { return this.safeMode; }
 
   constructor(private opts: AudioCaptureOptions) {
