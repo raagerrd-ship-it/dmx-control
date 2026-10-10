@@ -600,7 +600,7 @@ capture.on("rebind", (n: number) => {
 });
 // Trappan slut → SÄKERT LÄGE. Riggen står svart via den befintliga uttoningen,
 // men nu står det i hälsologgen VARFÖR, och vi slutar bränna CPU på respawn-jakt.
-capture.on("safe", (n: number) => logHealth("err", "audio", `ingen ljudinfångning efter ${n} försök — säkert läge, nytt försök varje minut`));
+capture.on("safe", (n: number) => logHealth("err", "audio", `ingen ljudinfångning efter ${n} försök — säkert läge, nytt försök var 3:e sekund`));
 capture.on("recovered", () => logHealth("info", "audio", "ljudinfångningen tillbaka — säkert läge avslutat"));
 
 
