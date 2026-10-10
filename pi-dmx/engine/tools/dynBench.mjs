@@ -77,6 +77,7 @@ const startS = Number(opt("--start", 0)), maxS = Number(opt("--sek", 1e9));
 
 const { Analyser } = await import("../dist/analyser.js");
 const { EffectEngine } = await import("../dist/effects.js");
+const { BeatFeed } = await import("../dist/beatFeed.js");   // taktmatningen som i motorn (matfalla 43)
 const { defaultConfig, fixtureRoles } = await import("../dist/config.js");
 const { EFFECT_KEYS } = await import("../dist/effects/registry.js");
 const { BoundaryDetector } = await import("../dist/boundaryDetector.js");
@@ -92,6 +93,7 @@ const lamps = cfg.fixtures.map((fx) => {
 });
 
 const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig)));
+const feed = new BeatFeed();
 an.setGainLock(true, 1);
 const bounds = new BoundaryDetector(() => Date.now());
 an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
@@ -120,9 +122,9 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
   if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
   if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; if (process.env.DYN_GRANS_LOG) process.stderr.write(`GRANS ${(off / SR).toFixed(1)}
 `); if (!process.env.DYN_INGEN_GRANS) { eng.softenRange(); an.hintTrackChange(5000); } }
-  if (fr.bpm > 0) {
-    cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
-    const per = 60000 / fr.bpm, idx = Math.floor((ms - cfg.beat.anchorMs) / per);
+  feed.update(fr, cfg, an);   // TAKTMATNINGEN SOM LIVE (beatFeed.ts, matfalla 43; forr anchorMs = fr.beatAnchorMs varje hop)
+  if (fr.bpm > 0 && cfg.beat) {
+    const per = 60000 / cfg.beat.bpm, idx = Math.floor((ms - cfg.beat.anchorMs) / per);
     if (lastBeatIdx !== null && idx !== lastBeatIdx) BEATT.push(cfg.beat.anchorMs + idx * per - EPOCH);
     lastBeatIdx = idx;
   }

@@ -55,6 +55,7 @@ const QUIET = flag("--tyst");
 
 const { Analyser } = await import("../dist/analyser.js");
 const { EffectEngine } = await import("../dist/effects.js");
+const { BeatFeed } = await import("../dist/beatFeed.js");   // taktmatningen som i motorn (matfalla 43)
 const { defaultConfig, fixtureRoles } = await import("../dist/config.js");
 const { EFFECT_KEYS } = await import("../dist/effects/registry.js");
 const { BoundaryDetector } = await import("../dist/boundaryDetector.js");
@@ -87,6 +88,7 @@ const lamps = cfg.fixtures.map((fx) => {
 });
 
 const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig)));
+const feed = new BeatFeed();
 // GAIN: motorn laser forstarkningen bara pa aux (index.ts: setGainLock(cfg.audioInput !== "mic", 1)).
 // Kor ladan pa mikrofon ar AGC:n aktiv dar men inte har; --agc kor som mikrofoningang.
 if (!flag("--agc")) an.setGainLock(true, 1);
@@ -132,7 +134,7 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
     lastBoundary = bounds.boundaryCount; eng.softenRange(); EV.push({ t: tS, typ: 'grans' });
     if (process.env.DMX_BOUNDARY_SOFT !== '0') an.hintTrackChange(5000); else { an.resetTempo(); if ((process.env.DMX_SECTION_HINT_LOWCONF ?? '0') === '0') an.hintTrackChange(5000); }
   }
-  if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
+  feed.update(fr, cfg, an);   // TAKTMATNINGEN SOM LIVE (beatFeed.ts, matfalla 43; forr anchorMs = fr.beatAnchorMs varje hop)
   if (fr.kick) kickPending = true;                                   // tappa ingen kick mellan renderrutorna
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
 

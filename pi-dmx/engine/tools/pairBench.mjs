@@ -15,6 +15,7 @@ const LOOKS = opt("--look", "varannan,duel,twin,split,backbeat,gallop,pulse").sp
 
 const { Analyser } = await import("../dist/analyser.js");
 const { EffectEngine } = await import("../dist/effects.js");
+const { BeatFeed } = await import("../dist/beatFeed.js");   // taktmatningen som i motorn (matfalla 43)
 const { defaultConfig, fixtureRoles } = await import("../dist/config.js");
 
 const d = readFileSync(path);
@@ -26,6 +27,7 @@ for (const look of LOOKS) {
   cfg.mode = look; cfg.master = 1; cfg.beatPulse = true;
   const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = (fx.address ?? 1) - 1; const at = (r) => { const i = roles.indexOf(r); return i < 0 ? -1 : base + i; }; return [at("r"), at("g"), at("b")]; });
   const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
+  const feed = new BeatFeed();
   const t00 = EPOCH + startS * 1000; Date.now = () => t00; performance.now = () => t00 - EPOCH;
   const eng = new EffectEngine(cfg);
   const buf = new Float32Array(HOP); const K = []; let dark = 0, n = 0, lastRender = -1, locked = 0;
@@ -34,7 +36,7 @@ for (const look of LOOKS) {
     for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
     const ms = EPOCH + off / SR * 1000; an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
     const fr = an.process(buf);
-    if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
+    feed.update(fr, cfg, an);   // TAKTMATNINGEN SOM LIVE (beatFeed.ts, matfalla 43; forr anchorMs = fr.beatAnchorMs varje hop)
     if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
     lastRender = ms; eng.render(fr); const u = eng.universe; if (!u) continue;
     if (off / SR - startS < 20) continue;   // uppvarmning (takten laser)
