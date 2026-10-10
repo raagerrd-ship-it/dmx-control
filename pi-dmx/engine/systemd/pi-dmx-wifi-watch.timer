@@ -1,0 +1,10 @@
+[Unit]
+Description=Pi-DMX wifi-vakt var 60:e sekund
+
+[Timer]
+OnBootSec=90
+OnUnitActiveSec=60
+AccuracySec=5
+
+[Install]
+WantedBy=timers.target

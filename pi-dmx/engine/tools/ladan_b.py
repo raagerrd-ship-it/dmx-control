@@ -25,6 +25,10 @@ FILES = [('audio-dmx-engine.d.memory.conf', '/etc/systemd/system/audio-dmx-engin
 # 6. (2026-10-04, portat fran lotus) Debians systemtimers bara 03-06 och utan ikappkorning vid uppstart (Persistent=false).
 FILES += [(f'{t}.timer.d.natt.conf', f'/etc/systemd/system/{t}.timer.d/natt.conf')
           for t in ('logrotate', 'dpkg-db-backup', 'apt-daily', 'apt-daily-upgrade', 'man-db', 'fstrim', 'e2scrub_all')]
+# 7. (2026-10-10) WIFI-VAKT: egen AP (pi-dmx) -> tillbaka till telefonens hotspot nar den syns (se systemd/pi-dmx-wifi-watch.sh).
+FILES += [('pi-dmx-wifi-watch.sh', '/usr/local/bin/pi-dmx-wifi-watch.sh'),
+          ('pi-dmx-wifi-watch.service', '/etc/systemd/system/pi-dmx-wifi-watch.service'),
+          ('pi-dmx-wifi-watch.timer', '/etc/systemd/system/pi-dmx-wifi-watch.timer')]
 FLAGS = 'cgroup_enable=memory cgroup_memory=1'
 CG = '/sys/fs/cgroup/system.slice/audio-dmx-engine.service'
 
@@ -100,6 +104,9 @@ grep -q 'root=PARTUUID' /boot/firmware/cmdline.txt && grep -q 'cgroup_enable=mem
 for local, remote in FILES:
     d = os.path.dirname(remote); b = os.path.basename(local)
     script += f"mkdir -p {d}; [ -f {remote} ] && cp {remote} {remote}.bak-{ts} || true; cp /tmp/{b} {remote}; chmod 644 {remote}\n"
+script += "chmod 755 /usr/local/bin/pi-dmx-wifi-watch.sh
+systemctl enable pi-dmx-wifi-watch.timer 2>/dev/null || true
+"
 script += "systemctl disable --now triggerhappy.service triggerhappy.socket cron.service getty@tty1.service 2>/dev/null || true\nsystemctl daemon-reload\necho FILER_OK\ncat /boot/firmware/cmdline.txt\n"
 rc, out = sudo(c, script)
 print(out)
