@@ -13,7 +13,6 @@
 
 import { isLogOn } from "./quiet.js";   // FORST: tystar console.log innan ovriga moduler hinner logga (DMX_QUIET)
 import { readFileSync, existsSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { AudioCapture } from "./audio.js";
 import { BoundaryDetector } from "./boundaryDetector.js";
 import { createAnalyser, type Frame } from "./analyser.js";

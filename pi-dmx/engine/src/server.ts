@@ -19,7 +19,7 @@ import { isLogOn, setLogOn } from "./quiet.js";
 const execFileP = promisify(execFile);
 import { readFileSync, existsSync, writeFileSync, copyFileSync } from "node:fs";
 import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
-import { fixtureRoles, defaultConfig } from "./config.js";
+import { fixtureRoles } from "./config.js";
 import { applyMood, applyIntensity, isMood } from "./moods.js";
 import type { FogStatus } from "./effects.js";
 import type { Frame } from "./analyser.js";

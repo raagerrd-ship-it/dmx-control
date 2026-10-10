@@ -7,7 +7,7 @@
  */
 
 import { isLogOn } from "./quiet.js";
-import type { ChannelRole, EngineConfig, FixtureConfig, Mode } from "./config.js";
+import type { ChannelRole, EngineConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { FixtureOutput, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
@@ -234,7 +234,6 @@ const DROP_SONG_HOLD_S = Number(process.env.DMX_DROP_SONG_HOLD_S ?? 30);
 const DROP_MIN_GAP_S = Number(process.env.DMX_DROP_MIN_GAP_S ?? 0);   // se 'DROP-KEDJOR'   // se 'INGEN DROP I LATENS INLEDNING'
 const DROP_LAND_GAIN = Number(process.env.DROP_LAND_GAIN ?? 1.15);     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35);   // tierEma-snap vid high/break-grans
-const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION_BREAK_DIP = Number(process.env.SECTION_BREAK_DIP ?? 0.45), SECTION_LOW_DIP = Number(process.env.SECTION_LOW_DIP ?? 0.30);   // master: refrang upp, vers/intro ner, break mer ner
 /** SEKTIONSMINNETS KONSUMENTER (2026-09-21, lotus-porten): (1) FORVARNING - frame.expectHighInMs <= DMX_EXPECT_LEAD_MS raknas som 'high' for
  *  bytet (dirigenten gasar IN i refrangen), och de sista DMX_EXPECT_LIFT_MS lyfts nivan mot 1 + SECTION_HIGH_LIFT som en riser;
  *  (2) DYNAMIK - nar en refrang horts ersatter frame.levelVsHighDb (dB mot refrangen) de fasta LOW/BREAK-dipparna: gain = 1 + dB/DMX_SECTION_DYN_DB,
@@ -294,7 +293,6 @@ const E_MIN_LIT = Math.pow(1 / 255, E_LIN_INV) * 1.02;   // agarens 1 %: gammans
  * Slå på igen = true, så återvänder bloomen och drop-look-bytet.
  */
 const DISCRETE_DROP_LAMPS = true;   // ater PA (agaren i ladan): lamporna ska bloma pa dropen synkat med roken (samma dropCount). Energi-gasen ensam racker inte som drop-markering.
-const STROBE_MIN_BPM = 150;   // effekt-krav: riser-strobe bara i snabba latar (agarens onskemal)
 /** FASFEL SANKER TAKTENS TILLIT (lotus-porten 09-23): ihallande fasfel > SYNC_ERR_FRAC drar ner tilliten som dirigentens grindar laser. */
 const ENERGY_FB = process.env.DMX_ENERGY_FALLBACK !== '0';
 const SYNC_ERR_FRAC = Number(process.env.DMX_SYNC_ERR_FRAC ?? 0.2);
@@ -491,8 +489,6 @@ export class EffectEngine {
    *  eye sees a fast rise and a soft fall (~0.1–0.4 s), whatever the modes do. */
   /** Output-tjänsten äger ALL kunskap om hur lampor tar emot ljus. */
   private out = new FixtureOutput();
-  /** Efterbehandlingen äger slutkedjan: ballistik → tak → hjärtslag → kalibrering. */
-  private maxCh = 0;                           // högsta använda kanal + 1
   private smartCount = 0;
   private recentLooks: Mode[] = [];   // MIX_V2: de senast valda lookerna (nyhetsstraff)
   private unitSlot = 0; private unitPhraseDone = -1;   // FRASVAXLING: look A/B och senaste frasnummer som bytts pa
@@ -1513,7 +1509,6 @@ export class EffectEngine {
     // DRUM-KIT onset-envelopes: nu FÄRDIGBERÄKNADE i analysern PÅ HOP-TAKT (375Hz)
     // → varje anslag fångas, aldrig missat mellan två render-frames. Effekten är en
     // ren konsument. (Flyttat hit; tau 60/110/150ms bevarade i analyser.ts.)
-    const drum = frame.drum;
     // GRAVITATIONS-VU: ljudet knuffar nivån UPP; sen faller den med gravitation.
     // En separat peak-prick håller senaste toppen och sjunker långsamt.
     // Knuffas UPP av låg-enden (kick-anslag + bas), inte av bred-bandsnivån →
@@ -1560,20 +1555,8 @@ export class EffectEngine {
     ctx.want.uv = undefined; ctx.want.laser = undefined; ctx.want.fog = undefined;
     ctx.want.hazer = undefined; ctx.want.co2 = undefined;
 
-    // RISER-STROBE (helrigg): under en uppbyggnad accelererar en strobe (3→18 Hz)
-    // och färgen kollapsar mot vitt → klassisk EDM-build. Blackouten på själva
-    // dropen sköts redan separat. Beräknas en gång/frame.
-    // FREKVENSEN ÄR TAKAD. Blinkande ljus kan utlösa epileptiska anfall; risken
-    // är störst mellan ~15 och 25 Hz och värst när HELA synfältet blinkar
-    // synkront i vitt — vilket är precis vad det här gör. Den gamla rampen gick
-    // till 18 Hz, rakt in i det värsta bandet. Taket är nu 3 Hz (WCAG 2.3.1 och
-    // rundradions gräns för allmänt säkert innehåll). Ägaren kan höja det, men
-    // bara genom ett uttryckligt val — aldrig som en bieffekt av något annat.
-    // EFFEKT-KRAV: strobe bara i SNABBA låtar (ägaren i ladan 2026-09-03). En strobe
-    // passar hardstyle/uptempo men känns malplacerad i en tryckare. Kräver bpm ≥
-    // STROBE_MIN_BPM. OBS oktav-vikningen (80..160): en låt på 150-160 fångas, men en
-    // riktigt snabb (>160) viks ner under gränsen — så gränsen släpper igenom det
-    // uppmätta 150-bandet där strobe hör hemma. (bpm 0 = ej låst → ingen strobe.)
+    // STROBE (2026-10-10): riser-stroben och dess Hz-tak ar borttagna; strobe-effekten (effects/strobe.ts) blixtrar i RGB en gang per slag
+    // och valjs bara vid >= 150 BPM (registry). Lampornas egen strobe-kanal drivs inte (strobe.ts saknar `drives`).
     // (Riser-stroben - vit-kollaps + accelererande strobe under risers, cfg.riserStrobe - borttagen 2026-10-10; build-effekterna tar risern.)
 
     // SPECIALKANALER (hazer/uv/blinder/strobe/laser/co2). Effektens `drives`-tagg
@@ -1676,7 +1659,6 @@ export class EffectEngine {
     if (E_NORM_S > 0) { this.fxPeak = Math.max(this.fxPeakNow, this.fxPeak * Math.exp(-dtSec / E_NORM_S)); this.fxNorm = Math.min(E_NORM_MAX, 1 / Math.max(0.05, this.fxPeak)); }   // STEG 1: effektens topp
     // Bygg strobe-masken bara när fixtures ändras (inte varje frame).
     this.out.build(this.cfg.fixtures);
-    this.maxCh = this.out.maxCh;
     // MATNING (grindar inget): när nivån är LÅG, vad är det som ändå håller
     // ljuset uppe? Varje steg i kedjan loggas så orsaken kan pekas ut i stället
     // för att gissas. Strypt till var 1,5 s. Gjort utanför apply för att slippa
