@@ -52,9 +52,11 @@ en tänd lampa). Live-mätning 10-10: 19 looks/3 min, färg DMX p5/50/95 18/75/2
 ## Från 2026-10-10 kväll — KONSERTSHOW ⭐ (efter de två ovan; "löser du det får du en stjärna i kanten")
 STEG 1+2 KLART 2026-10-10 natt (51c237b, rapport-artifact v4): tools/concertBench.mjs + sektionspalett opt-in DMX_SECTION_PALETTE=1
 (paletter/sektion 2->1, palettbyte på gräns 0,1->0,97, återseende 0,23->1,0; av json-identisk; resultat i tools/natt/konsert/).
-RANGORDNAT NÄSTA (mät med concertBench före/efter, opt-in): 1 frasbundna look-byten (bytePaFras 0,09-0,22 ≈ slump 0,19),
-2 kulör per fras i stället för per takt i effekterna (kulörbyten 17-21/min), 3 lamptrappa via DIRIGENTEN (allaTanda 0,81-0,88; aldrig
-i energilagret), 4 tydligare vers/refräng (0,06-0,12), 5 strobe/rök vid rätt ögonblick.
+ÄVEN BYGGT samma natt (opt-in, av json-identisk): DMX_PHRASE_SWITCH=1 frasbundna byten (cf67e68; pop bytePaFras 0,22->0,45,
+megamix 0,09->0,18), DMX_LAMP_STAIR=1 lamptrappa via dirigenten (712ee4b; pop allaTanda 0,81->0,69, versRefrang 0,06->0,21,
+natt r 0,17->0,34; PRIS 11 aldrig valda mot 5). Alla tre ihop: tools/natt/konsert/*-alla3.json. VÄNTAR PÅ ÄGARENS ÖGA i ladan.
+NÄSTA: (a) fler SPARSAMMA effekter (lugn-effekterna tänder alla 4 svagt) så trappan inte kostar variation, (b) kulör per fras i
+stället för per takt (stilval, ägaren avgör), (c) strobe/rök vid rätt ögonblick.
 Ägaren: "Hur kan vi få ljusshowen mer lik en riktig konsert-show?" Riggen: 4 RGB-parlampor (dimmer konstant, R/G/B bär allt),
 rökmaskin, inga movers; allt i realtid ur aux (ingen låtlista, inget låtminne). Arkitekturen är fast: TRE STEG (effekt -> energi ->
 kalibrering), effekterna äger färg/styrka/lampa, dirigenten väljer look.
@@ -74,8 +76,8 @@ kalibrering), effekterna äger färg/styrka/lampa, dirigenten väljer look.
 ## Från 2026-10-10 — FÄRRE REGLAGE (går före allt annat)
 DELVIS KLART 2026-10-10 kväll (sessionen, allt json-identiskt mot natt/2026-10-10-baslinje-beatfeed.json): 7 döda config-/UI-flaggor
 (4177e02: beatPulse, calmDecay, energyCeiling, clubMode, ambientGlow, strobeUnlimited, regiPro), oanvända konstanter (4ed3851),
-5 env-brytare (2f0c662). KVAR: SECTION_REUSE (av; döda grenen kaskaderar i partLook/remembered - rensa med bevis), av-brytarna för
-MIX_V2/SECTION_SWITCH/SECTION_UNIT/HALVE_SHOW/BOUNDARY_SOFT/ENERGY_FALLBACK (många användningar), inventeringstabellen (steg 1) med
+5 env-brytare (2f0c662), SECTION_REUSE (66d5f5c), ENERGY_FALLBACK. KVAR: av-brytarna för
+MIX_V2/SECTION_SWITCH/SECTION_UNIT/HALVE_SHOW/BOUNDARY_SOFT (många användningar - en i taget med json-bevis), inventeringstabellen (steg 1) med
 mätt effekt per numerisk ratt, dubbletterna (steg 3). Behåll som prov: DMX_PHASE_FOLLOW (lotus gridfas 0,95 mot kick-PLL 0,49 -
 kandidat för bättre takt, kräver GRID_PHASE i DMX-profilen) och DMX_AUDIO_CLOCK (omätt på Pi-DMX). OBS ny baslinje: kick->ljus 125->150 ms
 i bänken är MÄTNINGEN (beatFeed som live, mätfälla 43), inte koden.
