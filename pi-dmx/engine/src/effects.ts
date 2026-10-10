@@ -274,6 +274,8 @@ const FX_FLOOR = Math.max(0, Math.min(0.8, Number(process.env.DMX_FX_FLOOR ?? 0.
  *  partier nar full energi (= effektens 95 %), och kurvan dampar allt under. 1 = som forr. */
 const E_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_E_TOP ?? 0.95)));   // 1 -> 0,95 (ladan 10-09, standard 10-10)
 const E_LIN_INV = 1 / Math.max(1, Math.min(3, Number(process.env.DMX_GAMMA ?? 1.6)));   // samma standard som output.ts GAMMA
+/** Minsta tanda niva fore gamman: gammans forsta DMX-steg (1/255 -> tandpunkt+1 i utgangen) = agarens 1 %. */
+const E_MIN_LIT = Math.pow(1 / 255, E_LIN_INV) * 1.02;   // agarens 1 %: gammans forsta DMX-steg (-> tandpunkt+1), se ENERGIN SLACKER ALDRIG
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
 /** TYST LAT = TYST LJUS (ladan 2026-09-24 22:30: 'laten ar ganska tyst och den kor ganska ljust'): ankaret ar relativt, sa en tyst lat blev
@@ -1623,7 +1625,15 @@ export class EffectEngine {
       //   Inget annat ror ljuset: ingen normering, grundniva, dropfarg/vit karna, minidrop-lyft, riser-strobe, vantelagesglod eller
       //   utgangstoning (backup fore: git-taggen backup/fore-tre-steg-2026-10-10).
       const k = inputGate * (modulateOf(effMode).energy ? md : drive);
+      const m0 = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
       rgb[0] *= k; rgb[1] *= k; rgb[2] *= k;
+      // ENERGIN SLACKER ALDRIG (agaren 2026-10-10: "energi skall aldrig slacka om effekten vill ha pa en lampa"): vill effekten ha
+      // lampan tand (m0 > 0) och ingangen ar pa (k > 0) halls den pa lagst 1 % (gammans forsta steg -> utgangens tandpunkt+1).
+      // Bara effekten sjalv eller slackgransen (tystnad) slacker. Kuloren bevaras (alla kanaler med samma faktor).
+      if (m0 > 0 && k > 0) {
+        const m = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
+        if (m < E_MIN_LIT) { const g = E_MIN_LIT / Math.max(1e-9, m); rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
+      }
       // STEG 2 forts. - EN UTTONING (DMX_FADE_MIN_S, justerbar): lampans ljusstyrka upp direkt, ner med tidskonstanten; kuloren foljer
       // effekten direkt (slacker effekten lampan tonar den ut i sin sista kulor). Ersatter utgangens toning, sista toningen och
       // lookbytets toning (tre toningar -> en). Snabbare uttoning ar forbjudet (agaren 09-29) - standard 0,25 s som forr.
