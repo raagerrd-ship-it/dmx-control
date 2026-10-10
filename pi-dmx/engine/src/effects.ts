@@ -13,7 +13,6 @@ import { FixtureOutput, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
-import { type Envelope, type ModulateFlags } from "./heartbeat/contract.js";
 import { fitScore } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
 // PALETT-LAS (DMX_PALETTE): lås färgerna till en palett oavsett klang och läge. Namn ur listan
@@ -193,14 +192,7 @@ const START_DROP_MUTE_MS = 3000;
  *  0 = allt exakt på slaget. 50 = hela showen 50 ms före.
  *  Hjärtslaget lägger dessutom till sin egen attacktid, så dess TOPP landar rätt. */
 const SHOW_LEAD_DEFAULT = 50;
-/** Golv på taktens tillit när pulsdjupet räknas. Rampen börjar vid
- *  MIN_BEAT_CONFIDENCE, så utan golv finns ett dödband precis ovanför grinden där
- *  rutnätet lever men hjärtslaget är släckt. Gäller BARA pulsdjupet. */
-/** Release-tid för hjärtslagets fladder-dämp: slår ihop två toppar 50–100 ms isär. */
-/** SNABBT UPP, ALLTID FADE NER (ladan 2026-09-24: 'upp far den garna vara snabb men alltid fade nerat'): hjartslagets release 90 ms var
- *  nastan ett snapp och laggs pa EFTER utgangens ballistik. Nu DMX_BEAT_RELEASE_S (0,2 s); utgangens decay far aldrig vara kortare an
- *  DMX_FADE_MIN_S (0,25 s; forr 0,08 s i energiska partier). Attacken ar oforandrad (momentan). */
-const BEAT_FLUTTER_RELEASE = Number(process.env.DMX_BEAT_RELEASE_S ?? 0.3);
+/** STEG 2: den ENDA uttoningen (lampans ljusstyrka, tidskonstant i DMX-ljus). Snabbare ar forbjudet (agaren 09-29). */
 const FADE_MIN_S = Number(process.env.DMX_FADE_MIN_S ?? 0.25);
 /** Sentinel: pulsklockan ännu inte initierad (första framen sätter den utan tick). */
 const PULSE_IDX_INIT = -2e9;
@@ -208,8 +200,7 @@ const PULSE_IDX_INIT = -2e9;
 // SHAPE-SMOOTHING 25/150 -> 300/350. Ägaren i ladan 2026-09-03: ljuset flimrade på
 // RÖSTEN — mid+diskant-drivningen (vikt 1.3) följde enskilda sångstavelser (~100-
 // 250 ms). Långsammare smoothing gör loudness till en SEKTIONS-envelope (vers/
-// refräng, sekundskala) i stället för en stavelse-följare. Hjärtslaget (beatMulNow)
-// är separat och förblir snabbt, så pulsen påverkas inte. En refräng gasar fortf.
+// refräng, sekundskala) i stället för en stavelse-följare. En refräng gasar fortf.
 // upp (rise ~1-2 s > 300 ms), men syllaberna medelvärdesbildas bort.
 // DMX_LIVE_LEVEL (2026-09-21): lotus nivakanal - se blocket i render(). Rattar bara for A/B.
 const SECTION_SWITCH = process.env.DMX_SECTION_SWITCH !== '0';   // realtidssektioner som bytesskal + identitet (kraver DMX_SECTION=1)
@@ -230,29 +221,8 @@ const SECTION_UNIT_MIN_MS = Number(process.env.DMX_SECTION_UNIT_MIN_MS ?? 4000);
  *  DMX_SECTION_UNIT_PHRASE_BARS:e takt (8; 0 = av), och varje sektionstyp har TVA looker som alternerar (A pa sektionsstart, B pa nasta
  *  fras, A igen ...). Refrangen kommer tillbaka med samma par - identiteten ar kvar, men den star inte still i 50 s. */
 const SECTION_UNIT_PHRASE_BARS = Number(process.env.DMX_SECTION_UNIT_PHRASE_BARS ?? 8);
-// BEAT_LIFT: additivt hjartslagslyft EFTER effekten. STANDARD 0 = AV sedan 2026-10-06.
-// Agaren: "vi kor inte med heartbeat efter effekten utan bara energi" - hjartslaget togs bort for en vecka
-// sedan och bor i effekterna sjalva (c.heart). Det har lyftet var kvar och gav ett slag per takt, men varre:
-// `kanal += lyft x (1 - kanal)` drar VARJE kanal mot ett, dvs mot VITT. Det ar ett konstruktionsfel, inte en
-// avvagning - en additiv term mot 1 kan inte bevara kuloren.
-// MATT 2026-10-06 (tools/colorBench.mjs, pop_ladan 60-150 s, 44 effekter, median):
-//   med lyft:  alla tre dioder tanda 42 % av tiden, exakt en kanal 19 %, mattnad 0,75
-//   utan:      alla tre 23 %, en kanal 30 %, mattnad 0,87
-//   ljuset tappar INGET: kanalspridning 56 -> 59, lampspridning 30 -> 30.
-// Den MULTIPLIKATIVA pulsen (beatMulNow i postprocess) ar orord - den bevarar kuloren exakt (matt: samma
-// fargtal med och utan den), sa ljusstyrkan foljer energin precis som forr. BEAT_LIFT=0.25 aterstaller.
-const BEAT_LIFT = Number(process.env.BEAT_LIFT ?? 0);
 /** Undre grans for effekternas mattnad (se ctx.hsv). 0 = av. */
 const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)));
-/** HEART-BEAT/ENERGI SOM EGEN DEL (2026-09-23, kontrakt heartbeat/contract.ts; opt-in DMX_HEARTBEAT=1, annars gamla vagen orord).
- *  Envelope per ram: ceiling = mastern md (loudness-golv, sektionsgas, dynamik mot refrangen, drop) UTAN tystnadsgrinden;
- *  pulse = hjartslaget beatMulNow normerat (1 pa slaget, 0 vid BEAT_MIN); pulseDepth = DMX_HEARTBEAT_DEPTH x tillit.
- *  Output: rgb x gate x (energy ? ceiling : 1) x (pulse ? 1 - d + d*pulse : 1) - effektens modulate-flaggor ur dess fil,
- *  dirigenten skriver over: tillit < DMX_HEARTBEAT_TRUST -> pulse av; break/lugnt -> energy pa. Ersatter BEAT_LIFT (additivt)
- *  och md-multiplikationen; tystnadsgrinden (gate) galler ALLA effekter. (LAMP_MIN borttaget 10-07, se output.ts LIN_MAP.) */
-const HEARTBEAT = process.env.DMX_HEARTBEAT === '1';
-const HEARTBEAT_DEPTH = Number(process.env.DMX_HEARTBEAT_DEPTH ?? 0.35);
-const HEARTBEAT_TRUST = Number(process.env.DMX_HEARTBEAT_TRUST ?? 0.35);
 // DROP_CALM_BUILD: drop i low/intro kraver riser >= detta. STANDARD 0 = AV sedan 2026-09-22 (natt-agent B, tools/dropBench.mjs mot
 // 19-drop-facitet + pop/megamix): buildUp ar ~0 (max 0,04) vid ALLA 71 fyrningar och etiketten ar alltid low/break i sjalva
 // dropogonblicket (high forst efterat) -> grinden pa 0,25 nekade 7/12 pop- och 11/32 megamix-drops, dvs nastan allt (live i ladan
@@ -339,61 +309,12 @@ const LIGHT_SOFT = 0.3;            // soft-snap-golv vid låg energi
  */
 const DISCRETE_DROP_LAMPS = true;   // ater PA (agaren i ladan): lamporna ska bloma pa dropen synkat med roken (samma dropCount). Energi-gasen ensam racker inte som drop-markering.
 const STROBE_MIN_BPM = 150;   // effekt-krav: riser-strobe bara i snabba latar (agarens onskemal)
-const BEAT_MIN = Number(process.env.BEAT_MIN ?? 0.2);
-// LIVE-BEAT (DMX_LIVE_BEAT=1, agaren 2026-09-04): nar tempo-gridden saknas (bpm 0), ar osaker
-// (lag fas-tillit) eller fel (2/3-fantom) pulsar hjartslaget pa de FAKTISKA kickarna i stallet.
-// Crossfade pa tilliten: <= LIVE_TRUST_LO helt live, >= LIVE_TRUST_HI helt grid. Utan env: som forut.
-const LIVE_BEAT = process.env.DMX_LIVE_BEAT !== '0';
-// DEPTH_GAIN (agaren 2026-09-04 'oka styrkan'): multiplicerar hjartslagsdjupet (clamp <= 1) sa slaget
-// nar golvet BEAT_MIN varje takt aven vid lag tillit (trustFloored 0.75 kapade djupet till ~0.6).
-const DEPTH_GAIN = Number(process.env.DEPTH_GAIN ?? 0.8);
-const LIVE_BEAT_MS = Number(process.env.LIVE_BEAT_MS ?? 150);   // live-pulsens avklingning
-const LIVE_TRUST_LO = Number(process.env.LIVE_TRUST_LO ?? 0.2), LIVE_TRUST_HI = Number(process.env.LIVE_TRUST_HI ?? 0.5);   // heartbeat-golv mellan slagen (env-tunbar; hogre = mindre dipp, ljusare)
-/** ENERGIFALLBACK (2026-09-23 ladan, agaren: "den kanns inte som den vaxlar till energistyrd nar heartbeat inte ar last"). Utan taktlas
- *  blandar LIVE_BEAT over till en kick-driven puls - men utan tydliga kickar ar den pulsen 0 och bm = 1 - depth = KONSTANT dampning, och
- *  loudness-gasen (lightLoud, log-release) ar for langsam for att kannas. Nu (DMX_ENERGY_FALLBACK=1): (a) utan las pulsar ljuset pa BREDA
- *  transienter (max av onset bass/kick/treble, avklingning LIVE_BEAT_MS) i stallet for bara kickar; (b) golvet sanks med (1-w) x
- *  DMX_ENERGY_FB_DIP sa energisvinget far storre omfang nar takten inte bar. w = taktens tillit (LIVE_TRUST_LO..HI). */
+/** FASFEL SANKER TAKTENS TILLIT (lotus-porten 09-23): ihallande fasfel > SYNC_ERR_FRAC drar ner tilliten som dirigentens grindar laser. */
 const ENERGY_FB = process.env.DMX_ENERGY_FALLBACK !== '0';
-const ENERGY_FB_ONSET = Number(process.env.DMX_ENERGY_FB_ONSET ?? 0.30);
-/** PORTAT FRAN LOTUS 2026-09-23 kvall (kallaren, agaren ogonbedomde varje steg) - galler med DMX_ENERGY_FALLBACK=1:
- *  (1) LAS PA RENA SLAG, inte tid: rastret far vikt forst efter DMX_BEAT_LOCK_BEATS rena slag i rad (konf >= LOCK_CONF, |fasfel| <= LOCK_ERR
- *      av ett slag); smutsigt slag -2; tempobyte > 3 % nollar. "lat den analysera tills den ar saker i borjan av laten".
- *  (2) INGEN DUBBELPULS: rastret ar 0 under vikt 0,35 och fullt fran 0,65 (lead-pulsen fore + anslagspulsen efter = fladder).
- *  (3) ANSLAGSPULSER hogst en per DMX_ENERGY_FB_GAP_MS (basgangens attondelar gav 4/s = fladder).
- *  (4) DJUPET FOLJER ANSLAGSTATHETEN i energilaget (glesa anslag = ljuset ligger vid taket, inte morkt emellan).
- *  (5) FASFEL = OSAKER: |cfg.beatErr| over DMX_SYNC_ERR_FRAC drar ner tilliten (0 vid dubbla); tappad tillit > 1,5 s nollar slagraknaren
- *      sa rastret maste bevisa sig igen ("battre tillbaka till energi an osynk", "jobba i bakgrunden med att synka igen"). */
-const LOCK_BEATS = Number(process.env.DMX_BEAT_LOCK_BEATS ?? 0);   // 8 -> 12 som lotus ("battre att inte lasa alls an fel")
-const LOCK_CONF = Number(process.env.DMX_BEAT_LOCK_CONF ?? 0.6);
-const LOCK_ERR = Number(process.env.DMX_BEAT_LOCK_ERR ?? 0.10);
-const ENERGY_FB_GAP_MS = Number(process.env.DMX_ENERGY_FB_GAP_MS ?? 330);
-/** BARA ENERGI (agaren 2026-09-24, lotus i kallaren: 'om den bara kor pa energi nu sa ar det nice'): rastret (heart-beat) av helt,
- *  pulsen = anslag + stigning med fullt djup oberoende av taktens tillit (som lotus energiläge: energyDepth x tathet). Kraver ENERGY_FB. */
-const ENERGY_ONLY = process.env.DMX_ENERGY_ONLY !== '0';
-const ENERGY_ACT_REF = Number(process.env.DMX_ENERGY_ACT_REF ?? 0.25);
 const SYNC_ERR_FRAC = Number(process.env.DMX_SYNC_ERR_FRAC ?? 0.2);
-/** PORTAT FRAN LOTUS 2026-09-24 (agaren i kallaren, ogonbedomt): (6) PAUSA RASTRET UTAN HORD TAKT - ingen kick pa DMX_BEAT_QUIET_BEATS
- *  slag (minst 2 s) -> rastrets vikt tonas ut pa 0,8 s (anslagen pulsar kvar = energilaget, inget blink pa fantomtakt i break), in pa 0,2 s.
- *  (7) ENERGI DIREKT - stigande loudness mot sitt eget ~0,4 s-medel raknas som puls direkt (DMX_ENERGY_RISE_K, 0 = av), sa riggen
- *  ljusnar nar laten lyfter i stallet for forst pa nasta slag. */
-const BEAT_QUIET_BEATS = Number(process.env.DMX_BEAT_QUIET_BEATS ?? 0);
-const ENERGY_RISE_K = Number(process.env.DMX_ENERGY_RISE_K ?? 10)   // 3 -> 10 (lotus + ladan 09-29 godkant);
-/** Dodzon (ladan 09-24: 'mikrofladder' med K 3, 'betydligt mindre dynamiska' med K 0): stigningar under DMX_ENERGY_RISE_DEAD (6 %) ignoreras. */
-const ENERGY_RISE_DEAD = Number(process.env.DMX_ENERGY_RISE_DEAD ?? 0.06);
-/** GRIND PA STIGANDE LJUS (agaren i ladan 2026-09-24: 'nu nar vi kor bara pa energi, lagg till gaten igen pa kanske 250 ms'): en ny
- *  uppat-puls (anslag ELLER energistigning) far starta hogst en gang per DMX_PULSE_GAP_MS - delad grind for bada. En pagaende
- *  stigning far fortsatta. 0 = av (anslagen har da bara ENERGY_FB_GAP_MS, stigningen ingen grind). */
-const PULSE_GAP_MS = Number(process.env.DMX_PULSE_GAP_MS ?? 250);
-/** DUBBELTAKT (agaren i ladan 10-07: "kanns som dubbeltakt ligger nagonstans i koden"). MATT: megamix (92 BPM) 628 av 1 230 pulsintervall
- *  = ett HALVT slag, 123 pulser/min mot 92 slag - de fasta grindarna (330/250 ms) slapper igenom attondelar vid ~90 BPM (halvt slag 326 ms).
- *  DMX_PULSE_GAP_BEAT > 0 (opt-in): minsta mellanrum mellan uppat-pulser = sa manga SLAG nar tempot ar kant (de fasta ms-grindarna galler
- *  som golv). STANDARD 0,75 (ladan 10-08); 0 = bara de fasta grindarna. */
-const PULSE_GAP_BEAT = Number(process.env.DMX_PULSE_GAP_BEAT ?? 0.75);   // STANDARD 0,75 sedan 2026-10-08 (godkand i ladan)
 // LOGGEN: index.ts tystar console.log nar DMX_QUIET != '0' (standard). Periodiska diagnosrader byggs da inte alls (skrapjakten 10-01).
 // (brytaren under drift: quiet.ts / PUT /api/debug/verbose)
 const TIER_LO = Number(process.env.DMX_TIER_LO ?? 0.22), TIER_HI = Number(process.env.DMX_TIER_HI ?? 0.55);   // se DMX_TIER_LO/HI i render
-const BEAT_TRUST_FLOOR = 0.75;   // 0.35 -> 0.60 (agaren 2026-09-02): sen bloomen togs bort ags hjartslaget av beatPulse ensam, och djupet ~trust. Vid megamix-overgangar foll trusten och slaget bottnade pa 35% + rampade tragt tillbaka. Beatmatchad mix = palitlig takt, sa ett hogre golv ger starkt slag direkt. Energiskalningen skyddar anda tysta partier fran strobe.
 // SKRAPJAKTEN 10-01 (render 200 Hz): hjalpare och konstanter som forr skapades PER RENDER (closures, objektliteraler) ligger
 // har en gang. Samma varden, samma ordning - bara utan allokering i render-loopen.
 const BAND_IDX = { bass: 0, mid: 1, treble: 2, kick: 3, low: 4 } as const;
@@ -407,12 +328,7 @@ export class EffectEngine {
   /** Showens försprång i ms — läses ur config varje frame så ratten biter live. */
   private get showLead(): number { return this.cfg.showLeadMs ?? SHOW_LEAD_DEFAULT; }
   private beatTrust = 0;
-  beatMulNow = 1;                     // hjärtslagets multiplikator — appliceras SIST (publik: diagnostik)
-  /** HEARTBEAT-diagnostik (ws/status): senaste envelopen och flaggorna. */
-  hbLast: { ceiling: number; pulse: number; depth: number; energy: boolean; pulseOn: boolean } = { ceiling: 0, pulse: 0, depth: 0, energy: true, pulseOn: true };
   // SKRAPJAKTEN 10-01: objekt/arrayer som render() fyller i stallet for att skapa nya varje ruta (200 Hz). Lases bara synkront.
-  private hbEnv: Envelope = { ceiling: 0, pulse: 0, pulseDepth: 0 };
-  private hbFl: ModulateFlags = { energy: true, pulse: true };
   private bandsBuf: number[] = [0.5, 0.5, 0.5, 0.5, 0.5];
   private specBuf: SpecialtyValues = { hazer: 0, uv: 0, blinder: 0, strobe: 0, laser: 0, co2: 0 };
   /** EDGE-SÄKER KICK. frame.kick är en enframs-boolean på analysatorns 375 Hz
@@ -424,9 +340,8 @@ export class EffectEngine {
   private showTime = 0;      // ackumulerad "show-tid" — accelererar under uppbyggnaden (riser)
   private lastShowMs = 0;
   private lastKickBoost = 0;
-  private transEnv = 0; private transAt = 0; private pulseAt = -1e9; private riseOn = false; private songStartWall = Date.now();   // DMX_PULSE_GAP_MS   // ENERGY_FB: transientpuls (bred onset) med avklingning
-  private lockGood = 0; private lockBpmRef = 0; private lockRamp = 1; private transAct = 0; private trustLowSince = 0; private heardW = 1; private loudSlow = 0;   // lotus-porten (se LOCK_BEATS)
-  private beatW = 1;                            // ENERGY_FB: taktens vikt 0..1 (1 = last)
+  private songStartWall = Date.now();   // DMX_PULSE_GAP_MS   // ENERGY_FB: transientpuls (bred onset) med avklingning
+     // lotus-porten (se LOCK_BEATS)
   private showVel = 0;       // extra show-tids-hastighet från bastransienter (akustisk tröghet)
   private pendingKick = 0;   // ackumulerade kick-impulser sedan förra rendern (fylls i 375 Hz)
   /** Chase mode: fixture-index of the currently lit head. Advanced on kick and slow-time. */
@@ -964,9 +879,6 @@ export class EffectEngine {
         if (ENERGY_FB) {
           const se = Math.abs(this.cfg.beatErr ?? 0), lim = Math.max(0.02, SYNC_ERR_FRAC);
           trustRawEff *= se <= lim ? 1 : Math.max(0, 1 - (se - lim) / lim);
-          const nowT = performance.now();
-          if (trustRawEff < 0.2) { if (this.trustLowSince === 0) this.trustLowSince = nowT; else if (nowT - this.trustLowSince >= 1500) this.lockGood = 0; }
-          else this.trustLowSince = 0;
         }
         this.beatTrust += (trustRawEff - this.beatTrust) * 0.06;   // 0.03 -> 0.06: nar fullt slag efter en overgang pa ~0.7 s i st f ~1.5 s
         // TILLITSGOLV (portat från Lotus beatTrustFloor 2026-08-31). Rampen börjar exakt
@@ -975,103 +887,8 @@ export class EffectEngine {
         // takten går. Golvet låter pulsen leva på FAKTISKA transienter när tempot är
         // svårmätt men hörbart. Golvet sätts BARA här, inte på this.beatTrust: den läses
         // också av grid-/drop-grindarna (> 0.5) som ska fortsätta kräva riktig tillit.
-        const trustFloored = Math.max(BEAT_TRUST_FLOOR, this.beatTrust);
-        // PULSEN SKA FÖLJA MUSIKENS ENERGI, INTE BARA TAKTENS TYDLIGHET.
-        // MÄTT 2026-08-07: i ett LUGNT parti pulsade riggen 70→100 % på varje taktslag
-        // (två gånger i sekunden vid 117 BPM), vilket lästes som stroboskop. Djupet
-        // styrdes enbart av bpmConfidence — takten är ju lika tydlig i ett stilla parti
-        // som i ett kraftigt. Nu skalas det med energin: mild puls när låten andas,
-        // full puls när den går för fullt. frame.intensity kommer ur minnets kurva när
-        // en inspelning är synkad, annars ur realtidsanalysen.
-        const energy = Math.max(0, Math.min(1, frame.intensity));
-        // TAKET OCH PULSEN FÅR INTE VANDRA SAMTIDIGT.
-        // MÄTT 2026-08-07: i låtens första 30 s rör sig minnets ljustak 42→57→47→60 % i
-        // sekundtakt medan taktpulsen går 2,65 ggr/s ovanpå. Var för sig är båda lugna —
-        // tillsammans blir pulsen oregelbunden, och oregelbunden puls läses som strobe.
-        // Efter 30 s ligger taket still och samma puls upplevs som en jämn rytm, vilket
-        // är precis vad användaren rapporterade. Lösningen dämpar INTE taket (dynamiken
-        // är poängen) utan tonar ner pulsen medan taket rör sig.
-        // BARA när ett minnestak finns. I realtid föll den förr tillbaka på energin, som
-        // fladdrar 10 Hz — då bottnade calm på 0,25 och hjärtslaget försvann helt ur
-        // realtidsläget. Dämpningen ska skydda mot att TAKET vandrar, inte mot att
-        // musiken lever.
-        let calm = 1;
-        // 0.55 → 0.70: ett kraftigare hjärtslag DOMINERAR över småfladder i nivån i
-        // stället för att konkurrera med det — användarens förslag, och det ger dessutom
-        // mer av den känsla pulsen finns till för.
-        // 0.80 → 0.92, och energigolvet 0.35 → 0.50: djupare slag överallt, och märkbart
-        // mer även i lugna partier. Pulsen ligger sist i kedjan och passerar inget
-        // filter, så hela djupet når fram — det som mäts är det som syns.
-        let depth = Math.min(1, DEPTH_GAIN * 0.92 * (ENERGY_ONLY && ENERGY_FB ? 1 : trustFloored) * (0.62 + 0.45 * energy) * calm);   // 0.50+0.50 -> 0.62+0.45: punchigare hjartslag (agaren "svagare/dimmare" efter effekt-trim)
-        // KLAMRAS NEDAT: pre-dippen far envelopen ga negativ med flit, men
-        // multiplikatorn far aldrig slacka riggen helt — da lases dippen som ett
-        // blink i stallet for som andning. 0.06 lamnar lamporna tanda.
-        // LIVE-BEAT: blanda grid-pulsen med en kick-driven puls efter tilliten (se LIVE_BEAT).
-        let hbEnv = beatEnv;
-        if (LIVE_BEAT || ENERGY_FB) {
-          const liveEnv = Math.exp(-Math.max(0, performance.now() - this.lastKickBoost) / LIVE_BEAT_MS);
-          let w = (beat && beat.bpm > 40) ? Math.max(0, Math.min(1, (this.beatTrust - LIVE_TRUST_LO) / (LIVE_TRUST_HI - LIVE_TRUST_LO))) : 0;
-          let fb = LIVE_BEAT ? liveEnv : 0;
-          let depthEff = depth; let riseNow = 0;
-          if (ENERGY_FB) {
-            // (1) LAS PA RENA SLAG: raknas per slag (beatTick), tempobyte > 3 % nollar
-            const bpmNow = (beat && beat.bpm > 40) ? beat.bpm : 0;
-            if (bpmNow <= 0) { this.lockGood = 0; this.lockBpmRef = 0; }
-            else {
-              if (this.lockBpmRef <= 0 || Math.abs(bpmNow - this.lockBpmRef) > this.lockBpmRef * 0.03) { this.lockBpmRef = bpmNow; this.lockGood = 0; }
-              if (beatTick) { const clean = (frame.bpmConfidence ?? 0) >= LOCK_CONF && Math.abs(this.cfg.beatErr ?? 0) <= LOCK_ERR; this.lockGood = clean ? this.lockGood + 1 : Math.max(0, this.lockGood - 2); }
-            }
-            this.lockRamp = LOCK_BEATS > 0 ? Math.min(1, this.lockGood / LOCK_BEATS) : 1;
-            // (2) rastrets vikt: tillit x bevis, 0 under 0,35 och fullt fran 0,65 -> ingen dubbelpuls i energilaget
-            const wRaw = w * this.lockRamp;
-            w = Math.max(0, Math.min(1, (wRaw - 0.35) / 0.3));
-            // (6) hord takt: ingen kick pa BEAT_QUIET_BEATS slag -> rastret tonas ut (anslagen kvar)
-            { const pnQ = performance.now(); const bmsQ = bpmNow > 0 ? 60000 / bpmNow : 500;
-              const quiet = BEAT_QUIET_BEATS > 0 && pnQ - this.lastKickBoost > Math.max(2000, BEAT_QUIET_BEATS * bmsQ);
-              const dtQ = Math.min(0.05, Math.max(0.005, (pnQ - this.lastRenderMs) / 1000)) * 1000;
-              this.heardW += ((quiet ? 0 : 1) - this.heardW) * Math.min(1, dtQ / (quiet ? 800 : 200)); }
-            w *= this.heardW;
-            if (ENERGY_ONLY) w = 0;
-            // (3) bred transient: bas/kick/diskant-onset -> puls med avklingning, hogst en per ENERGY_FB_GAP_MS
-            const o = frame.onset; const on = o ? Math.max(o.bass ?? 0, o.kick ?? 0, o.treble ?? 0) : 0;
-            const pn = performance.now();
-            const beatGap = PULSE_GAP_BEAT > 0 && bpmNow > 0 ? PULSE_GAP_BEAT * 60000 / bpmNow : 0;   // DUBBELTAKT (se PULSE_GAP_BEAT)
-            if (on >= ENERGY_FB_ONSET && pn - this.transAt >= Math.max(ENERGY_FB_GAP_MS, beatGap) && pn - this.pulseAt >= Math.max(PULSE_GAP_MS, beatGap) && on >= this.transEnv * Math.exp(-(pn - this.transAt) / LIVE_BEAT_MS)) { this.transEnv = on; this.transAt = pn; this.pulseAt = pn; }
-            const tEnv = this.transEnv * Math.exp(-Math.max(0, pn - this.transAt) / LIVE_BEAT_MS);
-            fb = Math.max(fb, tEnv);
-            // (4) djupet foljer anslagstatheten i energilaget
-            const dtA = Math.min(0.05, Math.max(0.005, (pn - this.lastRenderMs) / 1000));
-            this.transAct += (tEnv - this.transAct) * Math.min(1, dtA / 1.5);
-            const act = Math.min(1, this.transAct / Math.max(0.02, ENERGY_ACT_REF));
-            depthEff = depth * (w + (1 - w) * act);
-            // (7) energi direkt: stigande loudness (forra ramens lightLoud) mot ~0,4 s-medel = omedelbar puls
-            if (ENERGY_RISE_K > 0) {
-              this.loudSlow = this.loudSlow <= 0 ? this.lightLoud : this.loudSlow + (this.lightLoud - this.loudSlow) * Math.min(1, dtA / 0.4);
-              let rise = this.loudSlow > 0.02 ? Math.max(0, Math.min(1, (this.lightLoud / this.loudSlow - 1 - ENERGY_RISE_DEAD) * ENERGY_RISE_K)) : 0;
-              if (PULSE_GAP_MS > 0) { if (rise <= 0) this.riseOn = false; else if (!this.riseOn) { if (pn - this.pulseAt >= Math.max(PULSE_GAP_MS, beatGap)) { this.riseOn = true; this.pulseAt = pn; } else rise = 0; } }
-              riseNow = rise; if (rise > 0) depthEff = Math.max(depthEff, depth * rise);
-            }
-          }
-          this.beatW = w;
-          hbEnv = w * beatEnv + (1 - w) * fb;
-          if (riseNow > hbEnv) hbEnv = riseNow;   // (7) energin lyfter direkt aven nar rastret ar last
-          depth = depthEff;
-        }
-        const bm = this.cfg.beatPulse ? (1 - depth) + depth * hbEnv : 1;
-        // FLADDER-DÄMP (ägaren 2026-09-02, kvar även med lågpasset BORTA → koden, inte
-        // insignalen): hjärtslaget visade en snabb dubbel — en andra topp 50–100 ms efter
-        // den första. Orsak: när PLL:en rättar fasen kan beatEnv hoppa tillbaka UNDER
-        // attacken och re-attackera inom samma slag → två toppar. PEAK-HOLD med mjuk
-        // release fyller gropen mellan dem till EN puls; attacken är momentan så slaget
-        // behåller sin skärpa. lastRenderMs är förra framens tid här (uppdateras senare).
-        // GOLV 0.06 -> 0.30: pre-dippen + en djup puls drog beatMul till 6 % ≈ svart
-        // strax före/mellan slagen → lästes som fladder till nära-svart (ägaren i
-        // ladan 2026-09-03). 0.30 gör slaget till en tydlig ANDNING (30→100 %), inte
-        // ett strobe-dropp. Hjärtslaget syns UPPÅT mot den nu dynamiska grundnivån.
-        const bmClamped = bm < BEAT_MIN ? BEAT_MIN : bm > 1 ? 1 : bm;
-        const bmDt = Math.max(0, Math.min(0.05, (performance.now() - this.lastRenderMs) / 1000));
-        if (bmClamped >= this.beatMulNow) this.beatMulNow = bmClamped;                                   // momentan attack
-        else this.beatMulNow += (bmClamped - this.beatMulNow) * Math.min(1, bmDt / BEAT_FLUTTER_RELEASE); // ~90 ms release
+        // (Taktpulsen till lamporna - beatMulNow, transient-/stigningspuls, djup, peak-hold - borttagen 2026-10-10: TRE STEG FOR LJUSET.
+        //  Effekterna har sin egen puls (c.heart, ctx.beatPulse/heartPulse); tilliten ovan laser dirigentens grindar.)
     // BAS-PUNCH: en hård/utdragen basstöt (drop) saknar transient, och på en
     // komprimerad signal svänger bas-energin lite. Så spåra ett bas-GOLV = den
     // TYSTA basnivån (sjunker mot tystnad på ~0.4s, stiger mkt långsamt ~5s). En
@@ -1722,14 +1539,6 @@ export class EffectEngine {
       md = drive * Math.min(1, Math.max(eC, this.dropEnv));   // bara dampning: aldrig over 1
       md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
     }
-    // HEARTBEAT: envelopen (kontraktet). ceiling = md utan tystnadsgrinden (drive), som appliceras separat pa ALLA effekter.
-    const hbPulse = (this.cfg.beatPulse && this.beatMulNow > BEAT_MIN) ? Math.min(1, (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN)) : 0;
-    const hbEnvelope = this.hbEnv; hbEnvelope.ceiling = drive > 1e-6 ? Math.min(1.2, md / drive) : 0; hbEnvelope.pulse = hbPulse; hbEnvelope.pulseDepth = Math.min(1, Math.max(0, HEARTBEAT_DEPTH * this.beatTrust));
-    const wantCalmNow = frame.breaking || (SECTION_SWITCH && (frame.section === 'break' || frame.section === 'low'));
-    const hbBase = modulateOf(effMode);
-    const hbFlags = this.hbFl; hbFlags.energy = hbBase.energy || wantCalmNow; hbFlags.pulse = hbBase.pulse && (this.beatTrust >= HEARTBEAT_TRUST || ENERGY_FB);   // ENERGY_FB: transientpulsen far passera utan las   // dirigentens overstyrning
-    { const hl = this.hbLast; hl.ceiling = hbEnvelope.ceiling; hl.pulse = hbEnvelope.pulse; hl.depth = hbEnvelope.pulseDepth; hl.energy = hbFlags.energy; hl.pulseOn = hbFlags.pulse; }
-
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
     // kör full gas. Ger arkitektoniskt djup — rörelsen poppar mot en stabil bas.
@@ -1926,7 +1735,7 @@ export class EffectEngine {
       this.lowLogAt = Date.now();
       if (isLogOn()) console.log(   // strangen byggs bara nar loggen ar pa (DMX_QUIET=0)
         `[lagniva] niva ${frame.level.toFixed(3)} ` +
-        ` puls ${this.beatMulNow.toFixed(2)} drive ${this.silenceGate.toFixed(2)} md ${md.toFixed(2)} e ${this.eSm.toFixed(2)} drop ${this.dropEnv.toFixed(2)}/${this.dropColEnv.toFixed(2)} fonster ${this.eLo.toFixed(1)}..${this.eHi.toFixed(1)} dB` +
+        ` drive ${this.silenceGate.toFixed(2)} md ${md.toFixed(2)} e ${this.eSm.toFixed(2)} drop ${this.dropEnv.toFixed(2)}/${this.dropColEnv.toFixed(2)} fonster ${this.eLo.toFixed(1)}..${this.eHi.toFixed(1)} dB` +
         ` intensitet ${frame.intensity.toFixed(2)} konf ${frame.bpmConfidence.toFixed(2)}` +
         ` tillit ${this.beatTrust.toFixed(2)} effekt ${this.smartMode}`
       );

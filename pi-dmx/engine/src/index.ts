@@ -268,7 +268,6 @@ capture.on("chunk", (samples: Float32Array) => {
   if (liveDrop) outDrop++;   // realtidsdetektorn ager dropsen (latminnet borta 2026-09-23)
 
   frame.dropCount = outDrop;
-  (frame as unknown as Record<string, number>).beatMul = effects.beatMulNow;
   // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
   // (om)lås; att sätta det på varje kick fick pulsen att flimra.
   const effBpm = frame.bpm;

@@ -514,7 +514,6 @@ export async function startServer(
       bpmConfidence: r3(frame.bpmConfidence),
       intensity: r3(frame.intensity),   // sektionsenergi (diagnostik)
       dropCount: frame.dropCount,   // monoton drop-räknare (diagnostik)
-      beatMul: r3((frame as unknown as Record<string, number>).beatMul),   // hjärtslagets faktiska djup (diagnostik)
       buildUp: r3(frame.buildUp),    // uppbyggnad 0..1 (diagnostik)
       inRiser: frame.inRiser,       // riser PÅGÅR — utan detta fältet läser en
                                     // extern mätning undefined, vilket i en
