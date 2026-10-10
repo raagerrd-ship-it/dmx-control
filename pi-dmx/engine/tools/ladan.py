@@ -64,6 +64,8 @@ SHOW_ENV: list = [
 # som lag kvar pa Pi:n skulle ligga kvar for alltid. Allt har flyttas till <namn>.bak-<ts> (aldrig rm) sa det gar att
 # angra. Datafilerna ar inlarningens rester: songs.bin, structure.json, temp-WAV:ar och koade analyser.
 REMOVE = [
+    # TRE STEG FOR LJUSET 2026-10-10: efterbehandlingen (ballistik/puls/toning) borttagen - effekt -> energi -> kalibrering.
+    '/opt/audio-dmx-engine/dist/postprocess.js',
     # EFFEKTOVERSYNEN 2026-09-30: uvpuls, sol, subbreath borttagna ur registret -> Pi-filerna till .bak
     '/opt/audio-dmx-engine/dist/effects/uvpuls.js', '/opt/audio-dmx-engine/dist/effects/sol.js', '/opt/audio-dmx-engine/dist/effects/subbreath.js',
     '/opt/audio-dmx-engine/dist/songMemory.js', '/opt/audio-dmx-engine/dist/fingerprint.js',
