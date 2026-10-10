@@ -2009,8 +2009,6 @@ export class EffectEngine {
       this.cfg.fixtures,
       dtSec,
       decay,
-      Math.max(this.beatMulNow, this.dropEnv),
-      !!this.cfg.beatPulse && this.silenceGate > 0.5,
       blackout || this.inputOff,
       this.cfg.master ?? 1,
       performance.now(),

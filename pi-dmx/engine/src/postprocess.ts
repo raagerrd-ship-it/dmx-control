@@ -25,7 +25,6 @@
 
 import type { FixtureConfig } from "./config.js";
 import type { FixtureOutput } from "./output.js";
-import { DIM_FULL } from "./output.js";
 
 /** Utgångens attack. Kort nog att inte röra hjärtslagets 45 ms-anslag, lång nog att
  *  dämpa effekternas fladder kring 10 Hz. */
@@ -43,19 +42,13 @@ const LOOK_FADE_S = Number(process.env.DMX_LOOK_FADE_S ?? 0.6);
  *  fortsatter som fade. 0 = av. Offline med emulerade luckor (0,0075): fall >20 % efter lucka 3 010 -> 0, utan luckor identiskt (0/81 750). */
 const FINAL_FADE_MAX_DT_S = Number(process.env.DMX_FINAL_FADE_MAX_DT_S ?? 0.0075); // Multiplikation är snabbare än division i loopen
 
-/** Minsta mörker under ljuset (DMX-steg över tändpunkten) så hjärtslaget syns även
- *  i lugna effekter. 44 ⇒ en lampa med tändpunkt 16 lyser lägst på 60. */
-// DMX_PULSE_ROOM: hur hogt pulsutrymmet lyfter (DMX-steg over tandpunkten). DMX_PULSE_ROOM_DIM=0 later det
-// galla aven fargkanaler som forr — men da ADDERAS ljus per fargkanal, vilket vitnar: matt 2026-10-06 pa
-// ladans egen inspelning (tools/colorBench.mjs) nedan. Standard: bara DIM.
-const PULSE_ROOM = Number(process.env.DMX_PULSE_ROOM ?? 44);
+// (Pulsutrymmet DMX_PULSE_ROOM och dimmerpulsen borttagna 2026-10-10: dimmern ar en konstant, se output.ts EN VAG FOR LJUSET.)
 /** KULOR DIREKT, LJUSSTYRKAN TONAR (prov DMX_HUE_CUT 2026-10-09, ENDA VAGEN sedan 10-10; agaren: "det ar ju bara energi som har begransning pa sin
  *  nedtoning"). Ballistiken (peak-hold decay, FADE_MIN_S) och sista fade-sparren kordes PER FARGKANAL: vid ett kulorbyte klingade den
  *  gamla kanalen ut medan den nya tandes -> alla tre dioderna tanda en stund efter varje byte (snap 76 %, party 73 % i colorBench).
  *  Nu kors de per LAMPA pa dess ljusstyrka (starkaste fargkanalen): ljusstyrkan stiger och faller EXAKT som forr, kulorens
  *  forhallanden tas direkt ur effektens bild. Slacker effekten lampan tonar den ut i sin sista kulor. DIM/special rors inte. */
 // (DMX_HUE_CUT_MS - kulorblandningen glider - provat 10-09, 29 -> 21 sidoblink, borttaget 10-10; fladdret rattades i effekterna.)
-const PULSE_ROOM_DIM_ONLY = process.env.DMX_PULSE_ROOM_DIM !== '0';
 
 /** HUE_CUT: en lampas fargkanaler som EN ljusstyrka (starkaste kanalen). Upp: attack mot malet; ner: peak-hold med decay - exakt som
  *  kanalvisa ballistiken gjorde for den starkaste kanalen. Kulorens forhallanden tas ur malbilden (effekten), sa ett kulorbyte
@@ -83,8 +76,6 @@ export class PostProcess {
     fixtures: FixtureConfig[],
     dtSec: number,
     decay: number,
-    pulseMul: number,
-    pulseActive: boolean,
     blackout: boolean,
     master: number,
     nowMs: number,
@@ -112,13 +103,7 @@ export class PostProcess {
 
     // (2. LJUSTAK borttaget 2026-10-08: energin appliceras en gang, pa effektens RGB i effects.ts - se ENERGY_SIMPLE.)
 
-    // 3. HJÄRTSLAG — sist, i egen pass, buffert orörd.
-    //    Först ges ljuset utrymme att pulsa i: en lugn effekt kan ligga så nära
-    //    tändpunkten att hela slaget klipps bort av kalibreringsgolvet.
-    if (pulseActive && pulseMul < 0.999) {
-      out.ensurePulseRoom(universe, fixtures, PULSE_ROOM, PULSE_ROOM_DIM_ONLY);
-      out.scale(universe, pulseMul);
-    }
+    // (3. HJARTSLAG pa dimmern borttaget 2026-10-10 - dimmern ar en konstant; ljuset bars av R/G/B.)
 
     // 4. BLACKOUT — kolsvart nu, och nolla bufferten så explosionen efteråt reser sig
     //    rent från svart utan pop från en kvarhållen nivå.
@@ -140,15 +125,13 @@ export class PostProcess {
       const fdt = FINAL_FADE_MAX_DT_S > 0 && dtSec > FINAL_FADE_MAX_DT_S ? FINAL_FADE_MAX_DT_S : dtSec;
       const fk = Math.exp(-fdt / (xf < 1 ? Math.max(FINAL_FADE_S, LOOK_FADE_S * 0.5) : FINAL_FADE_S));
       for (let ch = 0; ch < maxCh; ch++) {
-        if (out.direct[ch]) { this.finalOut[ch] = universe[ch]; continue; }
+        if (out.direct[ch] || out.dimCal[ch]) { this.finalOut[ch] = universe[ch]; continue; }   // dimmern ar en konstant (EN VAG)
         if (out.colorMask[ch]) continue;   // fargkanaler: per lampa nedan
         const held = this.finalOut[ch] * fk, v = universe[ch] * win;
         const o = v >= held ? v : held; this.finalOut[ch] = o; universe[ch] = (o + 0.5) | 0;
       }
       for (const g of out.colorGroups) lampFade(this.finalOut, universe, g, fk, 1, win);
     }
-
-    if (DIM_FULL) out.foldDim(universe, fixtures);   // DIMMERN PA MAX: dimmern oversatt till fargen, allra sist (se output.ts)
 
     // (6. DROP-HEADROOM borttagen 2026-10-07: dubblett av utgangens LIN_MAP, dar dropen oppnar de sista 5 %.)
   }

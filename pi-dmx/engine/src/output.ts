@@ -7,20 +7,9 @@
  * vilka som är specialroller (strobe/hazer/uv/blinder/laser/co2) och hur varje
  * armaturs tändpunkt ska mappas.
  *
- * MOTIVET ÄR MÄTT (2026-08-07): kunskapen låg utspridd i ljustaket, hjärtslaget,
- * drop-headroom och kalibreringen — var och en via en kanalmask som måste minnas
- * att `dim` finns. Den glömdes: i en rigg med rollerna [dim,r,g,b,strobe,…] låg dim
- * på 183/255 medan färgkanalerna låg på 17 och 0, och eftersom masken uteslöt dim
- * nådde hjärtslaget aldrig lamporna (autokorrelation på DMX-utgången +0,09 vid
- * takten mot +0,11 för kontrollfördröjningen = ren slump). Efter inkapslingen:
- * +0,81 mot +0,24.
- *
- * Två masker med SKILDA syften — de var förut en, vilket var själva felet:
- *   light : kanalen som bär LJUSSTYRKAN (dim om fixturen har en, annars färgen).
- *           Bara en av dem, annars blir dämpningen kvadratisk.
- *   cal   : kanaler som ska KALIBRERAS — färg (och dim på en fixtur utan färg).
- *           Tändpunkten är en egenskap hos dioden; dim har ingen. Att ta med dim
- *           här komprimerade bort hjärtslaget (autokorrelation föll 0,53 → 0,15).
+ * Masker: `cal` = kanaler som kalibreras (färg, och dim på en fixtur utan färg), `dimCal` = dim på en färgfixtur (en konstant,
+ * se EN VAG FOR LJUSET), `colorMask`/`colorGroups` = färgkanalerna per lampa (postprocess tonar per lampa), `direct` = specialroller.
+ * (Ljusmasken `light` - dimmern bar ljusstyrkan och hjärtslaget - borttagen 2026-10-10.)
  */
 
 import type { FixtureConfig } from "./config.js";
@@ -32,25 +21,13 @@ export interface SpecialtyValues {
   hazer: number; uv: number; blinder: number; strobe: number; laser: number; co2: number;
 }
 
-// SHOW-GOLV (2026-09-22, agaren i ladan: "jag vill ju att de skall ga precis ner till floor men inte under, om
-// effekten inte skall stanga av lampan"). Regeln FANNS redan - calibrate lyfter varje varde > 0 till lampans
-// TANDPUNKT - men tandpunkten ar 16 av 255, dvs 6 %, och det laser ogat som slackt i ett upplyst rum.
-// DMX_FLOOR_CH hojer golvet till ett SYNLIGT varde i DMX-steg. Galler bara DIM-kanaler: att lyfta r/g/b skulle
-// bleka ur kuloren. En ren nolla ar fortfarande svart - det ar sa effekten sager "slack den har armaturen".
-const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 40)));
-/** LINJAR MAPPNING (agaren i ladan 2026-10-07: "skall inte 1-100% fran effekten rakt mappas mot GOLV+1 till 95%? Sa drop syns"),
- *  STANDARD sedan 10-07 (enda vagen sedan 10-08). Forr KLAMPADES DIM-kanalen: allt under golvet (40 = 16 %) blev golvet och resten gick igenom ororda, sa
- *  effektens nedersta 16 % var en dod zon. Nu: 1..255 -> golv+1..MAP_TOP x tak linjart, 0 = slackt som forr. Effekten FAR ge 100 %;
- *  det blir 95 %. Bara en drop oppnar de sista 5 %: utgangen far energilagrets drop-envelope (dropOpen 0..1) och taket blir
- *  MAP_TOP + (1 - MAP_TOP) x dropOpen. Mappningen och 95 % ags av utgangen - energilagret vet inte om dem (agaren 10-07). */
+/** EN VAG FOR LJUSET (agaren 2026-10-10: "jag forstar inte varfor det maste vara separat? allt kanns bara som vi gor det krangligare
+ *  och svarare att stalla in"). Forr tva vagar: energin pa fargen och taktpuls/drop/golv pa dimmern, var sin mappning och toning.
+ *  Nu bar R/G/B allt och DIMMERN AR EN KONSTANT (lampans fullpunkt) - inget i motorn raknar pa den.
+ *  MAPPNINGEN (sist): effektens 1..255 -> lampans tandpunkt+1 (agarens 1 %) .. MAP_TOP x tak (95 %); 0 = slackt. Bara en FULL drop
+ *  oppnar de sista 5 %: taket = MAP_TOP + (1 - MAP_TOP) x dropOpen. (Backup fore: git-taggen backup/fore-ett-ljus-2026-10-10;
+ *  borta: DMX_FLOOR_CH, DMX_PULSE_ROOM, dimmerns mappning/puls, DMX_DIM_FULL.) */
 const MAP_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_MAP_TOP ?? 0.95)));
-// (DMX_CH_MAP - per-kanal-mappning - prov 10-09, onodig med kulor-direkt-vagen (0 ofrivilliga blink), borttagen 10-10.)
-// (DMX_DIM_MAX borttagen 2026-10-08: lampans fulla DIM ar nu FULLPUNKTEN i kalibreringen, cal.full - en mappning, inget efterskalningssteg.)
-/** DIMMERN PA MAX (opt-in DMX_DIM_FULL=1, agaren 2026-10-10: "satt dim pa max och styr bara R G och B" - "den borde val inte rensa
- *  nagot om vi bara oversatter det till fargen"). Allt raknas som forr; SIST, precis fore DMX, bakas dimmerns varde in i fargen:
- *  R/G/B x dim/255, dimmern = 255. Ljuset ar detsamma (farg x dimmer) - utom att en tand fargkanal aldrig hamnar under sin tandpunkt+1
- *  (agarens 1 %). Proven ar alltsa bara hardvaruvagen: lampans dimmer-PWM ovanpa fargens kan slå mot varandra vid laga nivaer. */
-export const DIM_FULL = process.env.DMX_DIM_FULL === "1";
 const HOLD_MS = 120;
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
@@ -67,14 +44,13 @@ for (let i = 0; i < 1024; i++) {
 
 export class FixtureOutput {
   // Publika Array-vyer så postprocess.ts slipper funktionsanrop
-  public readonly light = new Uint8Array(512);
   public readonly direct = new Uint8Array(512);
   /** Fargkanalerna (r/g/b/w) per lampa och som mask - postprocess kor ballistiken per lampa, inte per kanal. */
   public colorGroups: number[][] = [];
   public readonly colorMask = new Uint8Array(512);
 
   private cal = new Uint8Array(512);
-  private dimCal = new Uint8Array(512);   // dim: bara tändpunkt (clamp), ingen remap
+  readonly dimCal = new Uint8Array(512);   // dim på en färgfixtur: en konstant (fullpunkten), se EN VAG FOR LJUSET
   /** 1 = effekten BEGAR kanalen den har rutan (writeFixture, fore ballistiken) - matvarde for tools/dynBench (ofrivillig blink). En kanal som klingar ut efter ett
    *  kulorbyte (ballistikens svans) har 0 och mappas som forr - svansen blir varken langre eller kortare an i dag. */
   intent = new Uint8Array(512);
@@ -103,7 +79,7 @@ export class FixtureOutput {
   build(fixtures: FixtureConfig[]): void {
     if (this.builtFor === fixtures) return;
     this.builtFor = fixtures;
-    this.light.fill(0); this.cal.fill(0); this.dimCal.fill(0); this.direct.fill(0); this.colorMask.fill(0);
+    this.cal.fill(0); this.dimCal.fill(0); this.direct.fill(0); this.colorMask.fill(0);
     this.fastFixtures = []; this.colorGroups = [];
     let mx = 0;
 
@@ -127,8 +103,6 @@ export class FixtureOutput {
         // ballistiken: en 255 som tonar nedåt skulle få strobe att fara mellan takter,
         // blinder att klänga kvar en halv sekund och hazer att flimra.
         if (role === "strobe" || role === "hazer" || role === "uv" || role === "blinder" || role === "laser" || role === "co2") this.direct[ch] = 1;
-        if (role === "dim") this.light[ch] = 1;
-        else if (isColor && !hasDim) this.light[ch] = 1;
         if (isColor || (role === "dim" && !hasColor)) this.cal[ch] = 1;
         // DIM PÅ EN FÄRGFIXTUR: tändpunkten gäller ändå — dioden lyser inte under den —
         // men bara som ett GOLV. Full remap (1..255 → on..tak) skulle komprimera
@@ -144,139 +118,47 @@ export class FixtureOutput {
    * Skala ljusstyrkan på alla fixturer. Anroparen behöver inte veta något om lampor.
    * @param mul 0..1 multiplikator
    */
-  /** DIM_FULL: oversatt dimmern till fargen (se DIM_FULL). Kors allra sist, efter kalibrering och sista toningen. */
-  foldDim(universe: Uint8Array, fixtures: FixtureConfig[]): void {
-    for (let f = 0; f < fixtures.length && f < this.fastFixtures.length; f++) {
-      const fast = this.fastFixtures[f];
-      if (!fast.hasDim || !fast.hasColor) continue;
-      const c = fixtures[f].cal, on = c ? (c.on || 0) : 0;
-      let dimCh = -1;
-      for (let i = 0; i < fast.roles.length; i++) if (fast.roles[i] === "dim") { dimCh = fast.base + i; break; }
-      if (dimCh < 0 || dimCh >= 512) continue;
-      const k = universe[dimCh] / 255;
-      for (let i = 0; i < fast.roles.length; i++) {
-        const role = fast.roles[i], ch = fast.base + i;
-        if (ch < 0 || ch >= 512 || (role !== "r" && role !== "g" && role !== "b" && role !== "w")) continue;
-        const v = universe[ch];
-        if (v === 0) continue;
-        if (k <= 0) { universe[ch] = 0; continue; }
-        const onC = c ? ((role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on) : 0;
-        const nv = Math.round(v * k);
-        universe[ch] = nv < onC + 1 ? onC + 1 : nv;
-      }
-      universe[dimCh] = 255;
-    }
-  }
-
-  scale(universe: Uint8Array, mul: number): void {
-    for (let ch = 0; ch < this.maxCh; ch++) {
-      if (!this.light[ch]) continue;
-      const v = universe[ch];
-      if (v === 0) continue;                       // redan släckt — lämna det så
-      const out = (v * mul + 0.5) | 0;             // Bitvis avrundning
-      universe[ch] = out < 1 ? 1 : out;            // tänt förblir tänt
-    }
-  }
-
-  /**
-   * GE HJÄRTSLAGET UTRYMME ATT PULSA I.
-   * En lugn effekt kan ligga strax över tändpunkten — MÄTT 2026-08-07 gav `breathe`
-   * DMX 18 med tändpunkt 16. Pulsen vill då ta 18 → 8, men kalibreringsgolvet lyfter
-   * tillbaka till 16: åtta av tio steg äts upp och slaget syns inte alls.
-   * Lösningen är inte att ändra pulsen utan att se till att det FINNS mörker under
-   * ljuset. Allt som lyser men ligger under `on + room` lyfts till den nivån; ljusa
-   * partier rörs inte. Effekten blir att lugna lägen ligger på ~20 % i stället för 7 %
-   * — vilket också var önskemålet "behåll gärna 20 % ljusstyrka".
-   * @param room hur många DMX-steg över tändpunkten som minsta nivå ska ligga
-   */
-  /** Lyfter ljuskanaler till tandpunkt + `room` sa en multiplikativ puls har nagot att modulera nedat.
-   *  dimOnly=true: BARA dim-kanalen. Agarens regel 2026-10-06: "energilagret ska bara MINSKA R G B separat" —
-   *  och den har metoden ADDERAR ljus. Pa fargkanaler ar det ren vitning: en dampad rod pa 80 blev 80/60/60,
-   *  dvs nastan vitt, eftersom G och B lyftes fran ~1 till on+room = 60. Pulsen behover utrymme pa MASTERN,
-   *  dar det inte ror kuloren; ar en fargkanal mork ska pulsen inte ha nagot att modulera dar. */
-  ensurePulseRoom(universe: Uint8Array, fixtures: FixtureConfig[], room: number, dimOnly = false): void {
-    // Vi kan iterera via this.fastFixtures här för snabbare lookup
-    for (let f = 0; f < fixtures.length; f++) {
-      const fx = fixtures[f];
-      const fast = this.fastFixtures[f];
-      const on = fx.cal ? (fx.cal.on || 0) : 0;
-      const min = on + room;
-      const base = fast.base;
-      for (let i = 0; i < fast.roles.length; i++) {
-        const ch = base + i;
-        if (ch < 0 || ch >= 512 || !this.light[ch]) continue;
-        if (dimOnly && this.dimCal[ch] !== 1) continue;   // farg ororda (se doc ovan)
-        const v = universe[ch];
-        if (v > 0 && v < min) universe[ch] = min;
-      }
-    }
-  }
-
-
-  /**
-   * SISTA STEGET FÖRE UTGÅNG: tändpunkt som GOLV + master som TAK.
-   */
-
+  /** SISTA STEGET FORE UTGANG - EN mappning (se EN VAG FOR LJUSET). */
   calibrate(universe: Uint8Array, fixtures: FixtureConfig[], master: number, nowMs: number, dropOpen = 0): void {
-    // EN MAPPNING, SISTA STEGET (agarens ljuskontrakt 2026-10-07). Effekten/energin levererar 0..255 utan hardvarukunskap.
-    //   farg (effektens styrka = lampans starkaste fargkanal): 0 = slackt, 1..255 -> tandpunkt+1..tak, alla fargkanaler
-    //        med samma faktor sa kuloren bevaras.
-    //   DIM  (energi/puls): 0 = slackt, 1..255 -> golv+1..MAP_TOP x FULLPUNKT (cal.full, annars tak); bara FULL drop gar forbi till 255.
-    //   Bada haller sista vardet HOLD_MS over enstaka nollor (mikro-0-dippar ska inte strobba dioden).
     const top = (255 * master + 0.5) | 0;
+    const colTop = Math.round(top * MAP_TOP + (top - top * MAP_TOP) * Math.max(0, Math.min(1, dropOpen)));   // 95 %, full drop -> tak
     for (let f = 0; f < fixtures.length; f++) {
       const fx = fixtures[f];
       const fast = this.fastFixtures[f];
       const c = fx.cal;
       const base = fast.base;
       const on = c ? (c.on || 0) : 0;
-      // FULLPUNKT (cal.full): DIM-mappningens tak for just den har lampan. Golvet ar absolut (DMX_FLOOR_CH) och klipps mot fullpunkten.
-      const dimTop = c && c.full && c.full < 255 ? Math.round(c.full * master) : top;
-      // Allt foljer mappningen (MAP_TOP x fullpunkten) - UTOM full drop, som gar forbi den hela vagen till tak (255 x master).
-      // Agaren 10-08: "ar val bara fulldrop som inte skall folja mappningen". dropOpen = BARA full drop (minidrop/nastan-drop = 0).
-      const showTop = dimTop * MAP_TOP;
-      const dimMapTop = Math.round(showTop + (top - showTop) * Math.max(0, Math.min(1, dropOpen)));
-
-      let lampLit = true, colK = 1, mxRaw = 0;
+      const dimTop = c && c.full && c.full < 255 ? Math.round(c.full * master) : top;   // FULLPUNKT (cal.full) = dimmerns konstant
+      // FARGEN: lampans starkaste kanal 1..255 -> dess tandpunkt+1..colTop, alla fargkanaler med samma faktor (kuloren bevaras).
+      let lampLit = true, colK = 1;
       if (c) {
-        let mxOn = on;
+        let mxRaw = 0, mxOn = on;
         for (let i = 0; i < fast.roles.length; i++) {
           const ch = base + i; if (ch < 0 || ch >= 512 || this.cal[ch] !== 1 || this.dimCal[ch] === 1) continue;
           const role = fast.roles[i]; if (role !== "r" && role !== "g" && role !== "b" && role !== "w") continue;
           if (universe[ch] > mxRaw) { mxRaw = universe[ch]; mxOn = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; }
         }
         lampLit = mxRaw > 0;
-        if (lampLit) colK = (mxOn + 1 + (top - mxOn - 1) * (mxRaw - 1) / 254) / mxRaw;
+        if (lampLit) colK = (mxOn + 1 + (colTop - mxOn - 1) * (mxRaw - 1) / 254) / mxRaw;
       }
       for (let i = 0; i < fast.roles.length; i++) {
         const ch = base + i;
         if (ch < 0 || ch >= 512) continue;
-        const isCal = this.cal[ch] === 1, isDim = this.dimCal[ch] === 1;
-        if (!isCal && !isDim) continue;
-
+        if (this.dimCal[ch] === 1) { universe[ch] = dimTop; continue; }   // DIMMERN: konstant
+        if (this.cal[ch] !== 1) continue;
         const role = fast.roles[i];
-        const isColor = !isDim && (role === "r" || role === "g" || role === "b" || role === "w");
         let raw = universe[ch];
-        if (isColor) {   // farg: aven utan kalibrering (lampLit = sant, colK = 1) - noll nollar direkt, ingen hallning
+        if (role === "r" || role === "g" || role === "b" || role === "w") {   // farg: noll nollar direkt, ingen hallning
           if (!lampLit) { universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
           if (colK !== 1) raw = Math.round(raw * colK);
-          const v1 = raw > top ? top : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
+          const v1 = raw > colTop ? colTop : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
         }
-        const onCh = !c ? 0 : isDim ? on
-          : ((role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : role === "w" ? c.onW : undefined) ?? on);
-        // Golvet ar tandpunkten, eller DMX_FLOOR_CH nar den ar hogre (bara DIM). Aldrig over taket.
-        const floorCh = FLOOR_CH > onCh && isDim ? (FLOOR_CH > dimTop ? dimTop : FLOOR_CH) : onCh;
+        // Dimmer pa en fixtur UTAN farg (monokrom): samma mappning som fargen, sista vardet halls HOLD_MS over enstaka nollor.
         let out: number;
         if (raw > 0) {
-          out = isDim && dimMapTop > floorCh ? Math.min(dimMapTop, floorCh + 1 + Math.round((dimMapTop - floorCh - 1) * (raw - 1) / 254))
-            : raw < floorCh ? floorCh : raw > top ? top : raw;
-          this.holdVal[ch] = out;
-          this.holdUntil[ch] = nowMs + HOLD_MS;
-        } else if (nowMs < this.holdUntil[ch]) {
-          out = this.holdVal[ch];
-        } else {
-          out = 0;
-        }
+          out = Math.min(colTop, on + 1 + Math.round((colTop - on - 1) * (raw - 1) / 254));
+          this.holdVal[ch] = out; this.holdUntil[ch] = nowMs + HOLD_MS;
+        } else out = nowMs < this.holdUntil[ch] ? this.holdVal[ch] : 0;
         universe[ch] = out;
       }
     }
@@ -330,8 +212,8 @@ export class FixtureOutput {
    * översättningen bor här. En ny fixturtyp kräver bara en rolltabell.
    *
    * RGBW: vitt = min(r,g,b) så färgkanalerna behåller sin mättnad.
-   * Har fixturen en dim bär DEN ljusstyrkan (färgen skalas inte av master), annars
-   * skalas färgen — samma princip som `light`-masken ovan.
+   * Har fixturen en dim skrivs den här, men kalibreringen sätter den till lampans fullpunkt (en konstant);
+   * ljusstyrkan bärs av färgen.
    */
   writeFixture(
     u: Uint8Array,
