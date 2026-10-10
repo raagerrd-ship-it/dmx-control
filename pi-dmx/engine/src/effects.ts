@@ -27,6 +27,11 @@ const NAMED_PALETTES: Record<string, number[]> = {
  *  (3 kulorer) byts vid SEKTIONSGRANS i stallet for var 32:e slag, och samma sektionstyp far SAMMA palett igen i samma lat
  *  (igenkanning: refrangen ser ut som refrangen). Latgransen (softenRange) glommer paletterna. Av = som forr (frasraknaren). */
 const SECTION_PALETTE = process.env.DMX_SECTION_PALETTE === '1';
+/** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
+ *  look-bytena landar på en 4-taktsgräns (slumpen ger 19 %) - gridOk hängde på låtminnets grid som är borttaget. Med takten låst
+ *  (tillit >= 0,5) väntar vanliga byten (inte drop/nästan-drop/uppbyggnad) på frasens första slag (effektklockans beatIdx % 16 = 0),
+ *  högst en fras extra. Av = som förr. */
+const PHRASE_SWITCH = process.env.DMX_PHRASE_SWITCH === '1';
 const PALETTE_LOCK: number[] | null = (() => {
   const v = (process.env.DMX_PALETTE ?? "").trim(); if (!v) return null;
   if (NAMED_PALETTES[v.toLowerCase()]) return NAMED_PALETTES[v.toLowerCase()];
@@ -1164,6 +1169,8 @@ export class EffectEngine {
         const memSection = now - this.memSectionAt < 300 || liveSecChanged;
         const memPhrase = now - this.memPhraseAt < 250;
         const gridOk = !this.memHasGrid || memSection || memPhrase || now > this.smartDwellUntil + 20000;
+        const phraseMs = this.cfg.beat && this.cfg.beat.bpm > 0 ? 16 * 60000 / this.cfg.beat.bpm * (this.pulseHalved ? 2 : 1) : 0;
+        const phraseOk = !PHRASE_SWITCH || !beatLocked(this.cfg.beat) || this.beatTrust < 0.5 || (this.beatCounter % 16) === 0 || held > MIN_HOLD + phraseMs;
         // MED STRUKTUR AR SEKTIONEN ENHETEN. Dwell-timern och tier-bytet ar till
         // for OKANDA latar, dar showen inte har nagot battre att ga pa. Har vi en
         // analyserad struktur ska looken sitta HELA sektionen ut — annars byter
@@ -1226,7 +1233,7 @@ export class EffectEngine {
         if (this.memSongId !== this.partLookSong) { this.partLook.clear(); this.partLookSong = this.memSongId; }
         const buildEntry = MIX_V2 && liveSecChanged && liveSec === 'build';   // MIX_V2 (2): ett byte IN i build-poolen tillats
         const secEntry = SECTION_UNIT && this.pendingSecSwitch && secOldEnough && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
-        if ((!inBuild || buildEntry || secEntry || allaBuild) && (dropSwitch || nearSwitch || allaBuild || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
+        if ((!inBuild || buildEntry || secEntry || allaBuild) && (dropSwitch || nearSwitch || allaBuild || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk && phraseOk))) {
         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
         this.switchWhy = dropSwitch ? 'drop' : nearSwitch ? 'nastan-drop' : charShift ? (this.charShiftWhy.startsWith('tempovaxling') ? 'tempo' : 'karaktar')
