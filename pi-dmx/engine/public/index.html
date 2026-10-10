@@ -951,7 +951,7 @@ function syncLevelUi(cfg) {
   if (levelDirty) return;   // användaren drar → rör inte reglagen
   const setR = (id, v) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = String(v); };
   const setV = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
-  const sil = Math.round((cfg.silenceLevel ?? 0.05) * 100), flo = Math.round((cfg.energyFloor ?? 0) * 100);
+  const sil = Math.round((cfg.silenceLevel ?? 0.05) * 100), flo = Math.round((cfg.energyFloor ?? 0.2) * 100);
   setR("lvlFloor", flo); setV("lvlFloorV", flo + " %");
   const hold = Math.round((cfg.silenceHoldS ?? 0) * 10); setR("lvlHold", hold); setV("lvlHoldV", (hold / 10).toFixed(1) + " s");
   setR("lvlSil", sil); setV("lvlSilV", sil + " %");

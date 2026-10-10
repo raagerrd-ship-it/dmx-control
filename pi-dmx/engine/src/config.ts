@@ -249,7 +249,7 @@ export const defaultConfig: EngineConfig = {
   energyDrivesMode: true,
   smartDwellMs: 15000,
   master: 1.0,
-  energyFloor: 0,       // energins golv (ratt i /setup: "Lägsta nivå")
+  energyFloor: 0.2,     // energins golv (ratt i /setup: "Lägsta nivå"); 0,2 = standard (ladan 10-10: låtbyten och lugna partier lyser)
   silenceHoldS: 3,      // släcktid (ratt i /setup: "Släcktid"); 3 s = ägarens val i ladan 10-10
   silenceLevel: 0.05,     // släckgräns på frame.level (ratt i /setup: "Släckgräns")
   chaseStyle: "pingpong",
