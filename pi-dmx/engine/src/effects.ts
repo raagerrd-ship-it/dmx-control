@@ -1151,7 +1151,7 @@ export class EffectEngine {
         // Drop-byte bara när energin får driva → en LUGN stämning (chill,
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
         const dropSwitch = DISCRETE_DROP_LAMPS && dropHit && this.cfg.energyDrivesMode && held > DROP_HOLD;
-        const miniSwitch = miniHit && this.cfg.energyDrivesMode && held > MIN_HOLD;   // minidrop: byt look om den hallits
+        // (minidrop byter INTE look sedan 2026-10-10, agaren i ladan: 'minidrop maste ju inte orsaka look-byten' - den lyfter bara ljuset)
         const nearSwitch = NEAR_SWITCH && this.nearHit && this.cfg.energyDrivesMode && held > MIN_HOLD;   // nastan-drop: samma regel
         // MINNETS STRUKTUR: en tvättad låt vet var karaktären skiftar och var
         // fraserna börjar. Ett byte DÄR känns komponerat; samma byte 1,5 takt fel
@@ -1235,10 +1235,10 @@ export class EffectEngine {
         if (this.memSongId !== this.partLookSong) { this.partLook.clear(); this.partLookSong = this.memSongId; }
         const buildEntry = MIX_V2 && liveSecChanged && liveSec === 'build';   // MIX_V2 (2): ett byte IN i build-poolen tillats
         const secEntry = SECTION_UNIT && this.pendingSecSwitch && secOldEnough && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
-        if ((!inBuild || buildEntry || secEntry || allaBuild) && (dropSwitch || miniSwitch || nearSwitch || allaBuild || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
+        if ((!inBuild || buildEntry || secEntry || allaBuild) && (dropSwitch || nearSwitch || allaBuild || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk))) {
         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
-        this.switchWhy = dropSwitch ? 'drop' : miniSwitch ? 'minidrop' : nearSwitch ? 'nastan-drop' : charShift ? (this.charShiftWhy.startsWith('tempovaxling') ? 'tempo' : 'karaktar')
+        this.switchWhy = dropSwitch ? 'drop' : nearSwitch ? 'nastan-drop' : charShift ? (this.charShiftWhy.startsWith('tempovaxling') ? 'tempo' : 'karaktar')
           : (memSection || secEntry) ? 'sektion' : unitPhrase ? 'fras' : bassSwitch ? 'basgang'
           : (buildEntry || allaBuild) ? 'build' : halvedChanged ? 'halvering' : tierChanged ? 'tier' : 'dwell';
         this.switchCount++;

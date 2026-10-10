@@ -116,6 +116,7 @@ const lookTime = new Map();
 const whyCount = new Map();
 let alla3 = 0, en = 0, litFrames = 0, mattSum = [], lamsprSum = 0, lamsprN = 0;
 let lastRender = -1, lastLook = null, lastSwitch = 0, lastDrop = 0, kickPending = false;
+let lastMini = 0, MINIS = 0;   // minidrops (analysatorns miniDropCount-flanker)
 const endSample = Math.min(nSamples, Math.floor((startS + maxS) * SR));
 
 for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off += HOP) {
@@ -168,6 +169,7 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
   const i = T.length;
   T.push(tS); LIT.push(lit); INT.push(fr.intensity ?? 0); LVL.push(fr.level ?? 0); BPM.push(fr.bpm ?? 0); TE.push(eng.tierEma ?? 0);
   if (kickPending) { KICK.push(i); kickPending = false; }
+  if ((fr.miniDropCount ?? 0) !== lastMini) { lastMini = fr.miniDropCount ?? 0; MINIS++; }
   if ((fr.dropCount ?? 0) !== lastDrop) { lastDrop = fr.dropCount ?? 0; DROP.push({ t: tS, i, sec: fr.section, lvh: fr.levelVsHighDb ?? 0 }); }
 
   const look = eng.smartMode;
@@ -276,7 +278,7 @@ const res = {
     sekLugn: tierLit[0].length, sekFart: tierLit[1].length, sekFull: tierLit[2].length,
     byten: switches, bytenPerMin: totS > 0 ? switches / (totS / 60) : NaN,
     musikByten: switches ? musical / switches : NaN, orsaker: Object.fromEntries(whyCount),
-    drops: DROP.length,
+    drops: DROP.length, minidrops: MINIS,
     granser: EV.filter((e) => e.typ === 'grans').length, karaktarsskiften: EV.filter((e) => e.typ === 'karaktar').length,
     tempovaxlingar: EV.filter((e) => e.typ === 'tempo').length,
     dropSprangLugn: avg(jumps.filter((j) => calmSec(j.sec)), 'jump'),
