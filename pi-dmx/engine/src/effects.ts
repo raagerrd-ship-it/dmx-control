@@ -238,16 +238,6 @@ const SECTION_HIGH_LIFT = Number(process.env.SECTION_HIGH_LIFT ?? 0.06), SECTION
  *  (2) DYNAMIK - nar en refrang horts ersatter frame.levelVsHighDb (dB mot refrangen) de fasta LOW/BREAK-dipparna: gain = 1 + dB/DMX_SECTION_DYN_DB,
  *  golv DMX_SECTION_DYN_FLOOR (agaren i ladan: "lyser mycket aven om laten blir tystare" - ankaret sjonk, refrangen ar en fast referens). 0 = av. */
 const EXPECT_LEAD_MS = Math.max(0, Number(process.env.DMX_EXPECT_LEAD_MS ?? 600) || 0);
-const LIVE_LEVEL = process.env.DMX_LIVE_LEVEL !== '0';
-/** Fönstret (dB under taket där ljuset når golvet). PRIORITET: env LIVE_WIN_DB > cfg.levelWindowDb (ratt i /setup) > 10.
- *  Fallback 10 = ladans live-värde 09-27 (var 6 i koden, 10 via drop-in). Läses per frame i render(), inte här. */
-const LIVE_WIN_DB = Number(process.env.LIVE_WIN_DB ?? 10);       // lotus windowDb 10
-const LIVE_WIN_DB_ENV = process.env.LIVE_WIN_DB !== undefined;
-const LIVE_OFFSET_DB = Number(process.env.LIVE_OFFSET_DB ?? 6); // lotus anchorOffsetDb 4,5 (taket = ankare + offset)
-const LIVE_ANCHOR_S = Number(process.env.LIVE_ANCHOR_S ?? 120);   // lotus autoAnchorSec 120
-const LIVE_RELEASE_MS = Number(process.env.LIVE_RELEASE_MS ?? 350);
-const LIVE_BASS_W = Number(process.env.LIVE_BASS_W ?? 1);      // lotus: mid/diskant 1,3 + bas 0,25 -> har som blandning
-const LIVE_TRACE = process.env.DMX_LIVE_TRACE === '1';
 /** ENERGIN (agarens modell, STANDARD 2026-10-08 i ladan: "mycket battre nu"): ingangens VOLYM (frame.levelVU, ~200 ms) i dB i ett
  *  FOLJANDE FONSTER - topp: direkt upp, glider ner; botten: direkt ner, glider upp, tidskonstant E_WIN_S, minst E_MIN_DB brett - sa hela
  *  0..1 anvands oavsett lat och mixerniva. Direkt upp, E_RELEASE_MS ner, upphojd till E_CURVE (ogat ar logaritmiskt), och blir EN
@@ -286,19 +276,11 @@ const E_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_E_TOP ?? 0.95)));
 const E_LIN_INV = 1 / Math.max(1, Math.min(3, Number(process.env.DMX_GAMMA ?? 1.6)));   // samma standard som output.ts GAMMA
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
-const LIVE_START_FAST_S = Number(process.env.DMX_LIVE_START_FAST_S ?? 90);
 /** TYST LAT = TYST LJUS (ladan 2026-09-24 22:30: 'laten ar ganska tyst och den kor ganska ljust'): ankaret ar relativt, sa en tyst lat blev
  *  'det nya normala' och lika ljus som en hog. Ankaret far inte sjunka mer an LIVE_ANCHOR_DROP_DB under det hogsta ankaret pa sistone
  *  (toppen glider ner 0,005 dB/s = 6 dB pa 20 min). 0 = av. Efter omstart ar toppen forsta latens niva tills en hogre lat kommer. */
-const LIVE_ANCHOR_DROP_DB = Number(process.env.DMX_LIVE_ANCHOR_DROP_DB ?? 2);
 /** LAG VOLYM = FORTFARANDE LEVANDE (ladan 2026-09-24 23:30): hur fort toppen glider ner (dB/s). 0,005 = 6 dB pa 20 min holl riggen dov
  *  lange efter att volymen skruvats ner; 0,02 = 6 dB pa 5 min - en tyst lat ar dovare sin forsta minut, en sankt volym lever igen inom minuter. */
-const LIVE_ANCHOR_MAX_DECAY = Number(process.env.DMX_LIVE_ANCHOR_MAX_DECAY ?? 0.03);
-const LIGHT_SHAPE_UP = Number(process.env.DMX_SHAPE_UP_MS ?? 25);   // nivans uppgang 60 -> 25 som lotus (ladan 09-29 'rise ser bra ut'); fallet orort
-const LIGHT_SHAPE_DOWN = Number(process.env.DMX_SHAPE_DOWN_MS ?? 220);   // lotus shapeSmoothDownMs (lotus 09-29: 150 -> 250 'mycket battre' med energyRiseK 10)
-const LIGHT_REL_A = 0.396;         // log-release-alpha
-const LIGHT_ATK_A = 1.0;           // attack-alpha (instant)
-const LIGHT_SOFT = 0.3;            // soft-snap-golv vid låg energi
 /**
  * Diskret drop-detektion styr LAMPORNA (bloom + look-byte). AV sedan 2026-09-02
  * (ägarens val live): detektorn är ~ett taktslag sen på uppbyggda drops och ~56 %
@@ -421,13 +403,8 @@ export class EffectEngine {
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
-  // Loudness-portens tillstånd (Lotus mid+diskant dB-fönster + log-release). Negativa
-  // sentinelvärden = oinitierat (första framen sätter dem utan hopp).
-  private lightShapeSm = -1;     // shape-smoothing
   private lastLiveSection = '';   // DMX_SECTION_SWITCH
   private lastDropSwitchMs = -1e9; dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;   // senaste drop -> 'high'-pool i 20 s
-  private liveAnchor = NaN; private liveAnchorMax = NaN;   /* NaN = ej satt (forr undefined: taggat falt -> ny HeapNumber per ruta) */ private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
-  private lightLoud = 0;         // log-released loudness 0..1 → driver md
   private eSm = 0; eSimple = 0; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
   private lampLvl = new Float32Array(64); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
@@ -958,12 +935,12 @@ export class EffectEngine {
     }
     let dropHit = dropHitRaw;
     // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
-    // jamfors nivan (lightLoud/liveLevelSm) med nivan strax fore; har den inte stigit >= DROP_LAND_GAIN doms dropen falsk:
+    // jamfors energin (eSm, se E_WIN_S) med energin strax fore; har den inte stigit >= DROP_LAND_GAIN doms dropen falsk:
     // envelope klipps, 20 s-high-fonstret och tiersnappen dras tillbaka. Blixten (0,6 s) hinner synas, inte 20 s fel show.
-    if (dropHitRaw) { this.dropCheckAt = nowWall + 600; this.preDropLevel = this.liveLevelSm >= 0 ? this.liveLevelSm : this.lightLoud; this.preDropTier = this.tierEma; }
+    if (dropHitRaw) { this.dropCheckAt = nowWall + 600; this.preDropLevel = this.eSm; this.preDropTier = this.tierEma; }
     if (this.dropCheckAt > 0 && nowWall >= this.dropCheckAt) {
       this.dropCheckAt = 0;
-      const lvl = this.liveLevelSm >= 0 ? this.liveLevelSm : this.lightLoud;
+      const lvl = this.eSm;
       if (lvl < this.preDropLevel * DROP_LAND_GAIN + 0.02) { this.dropEnv = 0; this.lastDropSwitchMs = -1e9; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
     }
     // (drop-snapp till takten forkastad 09-12: taktlaset resettas vid drops, slog aldrig till / gjorde drops sena.)
@@ -1446,77 +1423,8 @@ export class EffectEngine {
     //     soft-snap-attack. Det är "smooth-hemligheten".
     const dtMs = dtNow * 1000;
     this.lookPlayMs.set(this.smartMode, (this.lookPlayMs.get(this.smartMode) ?? 0) + dtMs);
-    // LOUDNESS-KÄLLA = analysatorns `frame.intensity` (sektionsenergi relativt låtens
-    // eget snitt, 0.5 = snitt). Den är REDAN robust normaliserad av analysatorn över
-    // hela låten — så vi slipper dB-fönstrets skal- och settling-problem (mid+diskant
-    // i absolut dB blir 25-42 dB på AUX gain-1x → allt pinnades mot taket). intensity
-    // är dessutom sektionsnivå, inte råa sångstavelser → inget röst-flimmer. Log-
-    // releasen nedan ger den perceptuellt jämna faden. (Mid+diskant-texturen kan
-    // återinföras senare om önskat; nu prioriteras en robust, synlig gas.)
-    let shape = Math.max(0, Math.min(1, frame.intensity));
-    // ── LIV I NIVAN (opt-in DMX_LIVE_LEVEL=1, portat fran lotus 2026-09-21) ──────────────────────────────
-    // intensity ar SEKTIONSNIVA (sekunder) - BLE-remsan kanns "levande" for att lotus driver nivan fran ra mid/diskant per tick
-    // genom ett 10 dB-fonster mot ett LANGSAMT ANKARE: instant attack, ~350 ms release -> nivan foljer varje slag, pulsen ovanpa.
-    // Det som falde den raa vagen 09-03 (allt i taket pa AUX) var att fonstret saknade ankare; ankaret har: tau 120 s, foljer med
-    // tau/10 nar signalen ligger > fonstret utanfor at nagot hall, forsta 20 s efter start och nar ljuset legat klippt/slackt > 10 s.
-    if (LIVE_LEVEL) {
-      const wdb = frame.midHiDb + LIVE_BASS_W * (frame.bodyDb - frame.midHiDb);   // mid/diskant med lite bas
-      const winDb = LIVE_WIN_DB_ENV ? LIVE_WIN_DB : (this.cfg.levelWindowDb ?? LIVE_WIN_DB);   // ratten "Lägsta nivå" (env vinner)
-      const tauMs = LIVE_ANCHOR_S * 1000;
-      if (frame.level > INPUT_OFF_LEVEL && Number.isFinite(wdb) && wdb > -100) {
-        const nowMs = performance.now();
-        if (Number.isNaN(this.liveAnchor)) { this.liveAnchor = wdb; this.liveFastUntil = nowMs + LIVE_START_FAST_S * 1000; }
-        const up = wdb > this.liveAnchor;
-        // SNABBT BARA UPPAT (ladan 19:58: 'lyser mycket aven nar laten blir tystare'): snabbt nerat gjorde ett tyst parti
-        // till det nya normala pa 12 s. Nerat foljer ankaret bara langsamt (tau), och annu langsammare i low/break (x2).
-        const prev = this.liveShapeRaw;
-        if (prev >= 0.98) { this.liveClipMs += dtMs; if (this.liveClipMs > 10_000) this.liveFastUntil = nowMs + 5_000; } else this.liveClipMs = 0;
-        const farAbove = wdb - this.liveAnchor > winDb;
-        const fast = (farAbove || nowMs < this.liveFastUntil) && up;
-        const quietSec = frame.section === 'low' || frame.section === 'break';
-        const a = 1 - Math.exp(-dtMs / (fast ? tauMs / 10 : up ? tauMs * 3 : quietSec ? tauMs * 2 : tauMs));
-        this.liveAnchor += a * (wdb - this.liveAnchor);
-        if (LIVE_ANCHOR_DROP_DB > 0) {
-          this.liveAnchorMax = Number.isNaN(this.liveAnchorMax) || this.liveAnchor > this.liveAnchorMax ? this.liveAnchor : this.liveAnchorMax - dtMs * LIVE_ANCHOR_MAX_DECAY / 1000;
-          if (this.liveAnchor < this.liveAnchorMax - LIVE_ANCHOR_DROP_DB) this.liveAnchor = this.liveAnchorMax - LIVE_ANCHOR_DROP_DB;
-        }
-        const top = this.liveAnchor + LIVE_OFFSET_DB;
-        let sh = (wdb - (top - winDb)) / winDb;
-        sh = sh < 0 ? 0 : sh > 1 ? 1 : sh;
-        this.liveShapeRaw = sh;
-        // instant attack, release LIVE_RELEASE_MS (lotus lightSmoothMs 350 = ~ett slag)
-        if (this.liveLevelSm < 0 || sh > this.liveLevelSm) this.liveLevelSm = sh;
-        else this.liveLevelSm += (1 - Math.exp(-dtMs / LIVE_RELEASE_MS)) * (sh - this.liveLevelSm);
-        shape = this.liveLevelSm;
-        if (LIVE_TRACE && nowMs - this.liveLogAt > 2000) { this.liveLogAt = nowMs; console.log(`[liveniva] wdb ${wdb.toFixed(1)} ankare ${this.liveAnchor.toFixed(1)} shape ${sh.toFixed(2)} ${fast ? 'SNABB' : ''}`); }
-      } else if (this.liveLevelSm > 0) {
-        // UNDER TYSTNADSGOLVET (ladan 20:02: 'lag kvar ljust nar laten lugnade ner sig'): nivan FROS pa sista varde. Klinga av mot 0.
-        this.liveLevelSm *= Math.exp(-dtMs / LIVE_RELEASE_MS); this.liveShapeRaw = 0; shape = this.liveLevelSm;
-      }
-    }
-    // (d) shape-smoothing (asymmetrisk: snabb upp 25 ms, lugn ner 150 ms) — sprider
-    //     ~125 Hz-uppdateringen över render-framesen utan att kväva stegringar.
-    const shMs = shape > this.lightShapeSm ? LIGHT_SHAPE_UP : LIGHT_SHAPE_DOWN;
-    const shA = 1 - Math.exp(-dtMs / shMs);
-    this.lightShapeSm = this.lightShapeSm < 0 ? shape : this.lightShapeSm + shA * (shape - this.lightShapeSm);
-    shape = this.lightShapeSm;
-    // (e) log-release + soft-snap attack
-    const eRatio = dtMs / 125;
-    if (shape < this.lightLoud) {
-      const a = 1 - Math.pow(1 - LIGHT_REL_A, eRatio);
-      const c = this.lightLoud < 1e-4 ? 1e-4 : this.lightLoud;
-      const t = shape < 1e-4 ? 1e-4 : shape;
-      this.lightLoud = c * Math.pow(t / c, a);            // konstant kvot per tick
-    } else {
-      const a = 1 - Math.pow(1 - LIGHT_ATK_A, eRatio);
-      const softK = LIGHT_SOFT + (1 - LIGHT_SOFT) * Math.min(1, shape / 0.5);  // brus snäpper inte, beats gör
-      this.lightLoud += a * softK * (shape - this.lightLoud);
-    }
-    // LOUDNESS DRIVER LJUSET GOLV→FULL (inte bara +50% boost). Förr: (1 + loud·0.5)
-    // → grundnivån ALLTID full, loud bara ovanpå → ingen synlig gas, tysta partier
-    // dimmades aldrig, och hjärtslaget hade ingen plats att synas mot en maxad nivå
-    // (ägaren i ladan 2026-09-03). Nu: golv LIGHT_FLOOR vid loud=0, full vid loud=1
-    // → refräng ljus, vers dim = synlig gas, och pulsen syns uppåt mot en rörlig nivå.
+    // (Den gamla nivakedjan - intensity/LIVE_LEVEL-fonster mot ankare, shape-smoothing, log-release, lightLoud - borttagen 2026-10-10:
+    //  ljuset styrs av energin nedan, och drop-kontrollen laser samma energi.)
     let md: number;
     {   // ENKEL ENERGI (se ENERGY_SIMPLE-dokumentationen). md0/sektionsgas/rang borttagna 10-08.
       // FOLJANDE FONSTER (se E_WIN_S)
