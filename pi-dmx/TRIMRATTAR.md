@@ -1,5 +1,10 @@
 # Trimrattar på ljusvägen
 
+**TRE STEG (ägaren 2026-10-10):** 1) **Effekten** sätter ljusstyrka per lampa och per R/G/B, och om ljuset får ändras efter (`modulate.energy`);
+den gemensamma effektnivån (topp-normering `DMX_E_NORM_S`, grundnivå `DMX_FX_FLOOR`, minidrop-lyft, drop-looken) hör till effekten.
+2) **Energin** (om effekten tillåter) + **en uttoning** (`DMX_FADE_MIN_S`, justerbar; kulören direkt). 3) **Kalibreringen** sist (gamma,
+tändpunkt+1 … 95 %, full drop → 100 %, dimmern konstant). Inget annat rör ljuset. Backup: git-taggarna `backup/fore-ett-ljus-2026-10-10`, `backup/fore-tre-steg-2026-10-10`.
+
 *Ägarens trimyta (2026-10-08). Kedjan: ljud in → effekt 0–100 % → energi (bara dämpning) → en mappning i utgången.
 Allt annat är kod. Ändra en ratt i ladan med `python tools\ladan.py --env K=V` (alla prov på samma rad, annars försvinner de);
 det ägaren godkänner blir kodens standard, inte en drop-in.*
@@ -47,8 +52,7 @@ EN VÄG (10-10): effektens 0 = släckt, färg 1–100 % → lampans tändpunkt+1
 | Ratt | Standard | Vad den gör |
 |---|---|---|
 | `DMX_EFFECT_HEART` | 1,4 | Effekternas egen hjärtpuls (djup) – den enda pulsen sedan 10-10 (dimmerpulsen borta). |
-| `DMX_ATTACK_MS` | 20 | Lampans uppgång. |
-| `DMX_FADE_MIN_S` | 0,25 | Lampans uttoning — **snabbare är förbjudet** (ägaren 09-29). Gäller ljusstyrkan: kulören byts direkt (ägaren 10-09: "det är ju bara energi som har begränsning på sin nedtoning"), ballistiken körs per lampa på starkaste färgkanalen. |
+| `DMX_FADE_MIN_S` | 0,25 | STEG 2: den ENDA uttoningen (lampans ljusstyrka; upp direkt) — **snabbare är förbjudet** (ägaren 09-29). Gäller ljusstyrkan: kulören byts direkt (ägaren 10-09: "det är ju bara energi som har begränsning på sin nedtoning"), ballistiken körs per lampa på starkaste färgkanalen. |
 
 ## 6. Dirigenten och takten (standard 10-10)
 - Alla 44 effekter kan väljas: snap ≥ 115 BPM, rave ≥ 120, strobe ≥ 150 (ägaren 10-09), gravity bas ≥ 0,20; en uppbyggnad som hållit 1,5 s ger ett byte till build-effekterna; bland de bäst passande väljs den som spelats minst.
