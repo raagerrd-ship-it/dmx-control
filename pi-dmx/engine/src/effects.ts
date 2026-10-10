@@ -23,6 +23,10 @@ const NAMED_PALETTES: Record<string, number[]> = {
   fodelsedag: [4, 4.6, 5.55],   // blå 240°, lila 276°, rosa 333°
   bla: [3.7, 4, 4.3], rosa: [5.3, 5.55, 5.8], eld: [0, 0.4, 1], regnbage: ALL_SECTORS,
 };
+/** SEKTIONSPALETT (opt-in DMX_SECTION_PALETTE=1, natt 2026-10-10, KONSERTSHOW - agaren: 'mer lik en riktig konsert-show'): paletten
+ *  (3 kulorer) byts vid SEKTIONSGRANS i stallet for var 32:e slag, och samma sektionstyp far SAMMA palett igen i samma lat
+ *  (igenkanning: refrangen ser ut som refrangen). Latgransen (softenRange) glommer paletterna. Av = som forr (frasraknaren). */
+const SECTION_PALETTE = process.env.DMX_SECTION_PALETTE === '1';
 const PALETTE_LOCK: number[] | null = (() => {
   const v = (process.env.DMX_PALETTE ?? "").trim(); if (!v) return null;
   if (NAMED_PALETTES[v.toLowerCase()]) return NAMED_PALETTES[v.toLowerCase()];
@@ -456,7 +460,7 @@ export class EffectEngine {
   private partLookSong = 0;
 
   /** Misstänkt låtbyte → låt auto-rangen kalibrera om snabbt mot nya nivåer. */
-  softenRange(): void { this.songStartWall = Date.now(); }   // (rullande nivarangen borttagen 10-08 - den matade bara DIM-taket)
+  softenRange(): void { this.songStartWall = Date.now(); this.secPalette.clear(); }   // (rullande nivarangen borttagen 10-08 - den matade bara DIM-taket)
   /** KARAKTARSSKIFTE fran latgransdetektorn (DMX_CHAR_SHIFT_D): dirigenten byter look vid nasta tillfalle (MIN_HOLD, ej i uppbyggnad). */
   noteCharShift(reason = 'karaktarsskifte'): void { this.charShiftUntil = performance.now() + 6000; this.charShiftWhy = reason; }   // latgrans: aven DROP_SONG_HOLD_S-klockan
 
@@ -503,6 +507,7 @@ export class EffectEngine {
   private phraseBeat = 0;
   private phraseBeats = 32;   // taktslag per musikalisk fras → palettbyte
   private paletteIdx = 2;     // start: Primär
+  private secPalette = new Map<string, number>(); private secPaletteKey = '';   // SECTION_PALETTE: etikett -> palett i laten
   private paletteRot = 0;
 
   // Pre-allokerad kontext för noll-allokering i render-loopen
@@ -1347,7 +1352,15 @@ export class EffectEngine {
     // att slumpa färg. Paletten väljs efter klangen (centroid): mörk/bastung →
     // varmt, ljus/diskantig → svalt. Övergången sker mjukt via färg-ballistiken.
     if (this.cfg.mode === "smart") {
-      if (frame.bpm === 0) this.phraseBeat = 0;            // tyst/ej låst → nollställ frasen
+      const secKey = SECTION_PALETTE ? (frame.section ?? '') : '';
+      if (secKey !== '') {
+        // SEKTIONSPALETT: byte bara nar sektionen byts; samma etikett i samma lat -> samma palett (se SECTION_PALETTE).
+        if (secKey !== this.secPaletteKey) {
+          this.secPaletteKey = secKey;
+          const rem = this.secPalette.get(secKey);
+          if (rem !== undefined) this.paletteIdx = rem; else { this.pickPalette(frame.centroid); this.secPalette.set(secKey, this.paletteIdx); }
+        }
+      } else if (frame.bpm === 0) this.phraseBeat = 0;            // tyst/ej låst → nollställ frasen
       // Räkna bara takter när BPM är PÅLITLIGT (confidence) → palettbytena
       // hamnar på riktiga fraser, inte på ett hoppigt/osäkert tempo.
       else if (beatTick && frame.bpmConfidence > 0.35 && ++this.phraseBeat >= this.phraseBeats) {
