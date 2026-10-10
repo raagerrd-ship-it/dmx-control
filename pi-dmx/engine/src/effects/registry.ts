@@ -168,9 +168,10 @@ export const EFFECT_META = EFFECTS.map(({ key, label, desc, tier, drives }) => (
 export type EffectReq = { minBpm?: number; needsPunch?: number; needsBass?: number; needsBright?: number; needsBeat?: number };
 const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
   // Snabb/aggressiv → kräver tempo (+ karaktär där det stärker)
-  strobe:   { minBpm: 150 },
-  rave:     { minBpm: 140, needsPunch: 0.40 },
-  snap:     { minBpm: 130, needsPunch: 0.40 },
+  // ALLA LOOKER (standard 10-10): i high var tempot >= 130 bara 3/55 ganger och aldrig >= 140 -> snap/rave valdes aldrig
+  strobe:   { minBpm: 150 },   // agaren 10-09: bara over ~150 BPM
+  rave:     { minBpm: 120, needsPunch: 0.40 },   // 140 -> 120
+  snap:     { minBpm: 115, needsPunch: 0.40 },   // 130 -> 115
   gallop:   { minBpm: 125, needsBeat: 0.35 },
   // Transient-effekter → kräver anslag (trummor)
   drumkit:  { needsPunch: 0.45, needsBeat: 0.35 },
@@ -179,7 +180,7 @@ const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
   split:    { needsPunch: 0.35, needsBass: 0.35 },
   backbeat: { needsPunch: 0.35, needsBeat: 0.35 },
   // Bas-effekter → kräver låg-end
-  gravity:  { needsBass: 0.35 },
+  gravity:  { needsBass: 0.20 },   // 0,35 -> 0,20 (ladans profile.bass median 0,23; ALLA LOOKER standard 10-10)
   tide:     { needsBass: 0.30 },
   // Luft/diskant-effekter → kräver diskant
   airglow:  { needsBright: 0.40 },
@@ -199,23 +200,12 @@ const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
   frasraknare: { needsBeat: 0.35 },
 };
 
-/** ALLA LOOKER (opt-in DMX_ALLA_LOOKER=1, 2026-10-09, agaren: "se sa alla kan anvandas"). Matt pa ladans mixar (122 byten):
- *  i high var tempot >= 130 BPM bara 3/55 ganger och aldrig >= 140 -> snap/rave/strobe valdes ALDRIG; profile.bass median 0,23 ->
- *  gravity (0,35) foll pa kravet 46 ganger. Snap 115 och rave 120 (20/18 av 55 high-byten); strobe ligger kvar pa 150 (agaren 10-09). */
-export const ALLA_LOOKER = process.env.DMX_ALLA_LOOKER === "1";
-const REQ_ALLA: Partial<Record<Mode, EffectReq>> = {
-  snap:    { minBpm: 115, needsPunch: 0.40 },
-  rave:    { minBpm: 120, needsPunch: 0.40 },
-  strobe:  { minBpm: 150 },   // agaren i ladan 10-09: 'strobe borde bara aktiveras pa latar over tex 150 bpm' (provet 125 tillbaka)
-  gravity: { needsBass: 0.20 },
-};
-
 /** Möter effekten sina krav givet nuvarande tempo + karaktärsprofil? */
 export function meetsRequirements(
   key: Mode, bpm: number,
   p: { punch: number; bass: number; bright: number; beat: number },
 ): boolean {
-  const r = (ALLA_LOOKER && REQ_ALLA[key]) || REQUIREMENTS[key];
+  const r = REQUIREMENTS[key];
   if (!r) return true;
   if (r.minBpm !== undefined && bpm < r.minBpm) return false;
   if (r.needsPunch !== undefined && p.punch < r.needsPunch) return false;

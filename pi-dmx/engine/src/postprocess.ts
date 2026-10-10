@@ -48,32 +48,22 @@ const FINAL_FADE_MAX_DT_S = Number(process.env.DMX_FINAL_FADE_MAX_DT_S ?? 0.0075
 // galla aven fargkanaler som forr — men da ADDERAS ljus per fargkanal, vilket vitnar: matt 2026-10-06 pa
 // ladans egen inspelning (tools/colorBench.mjs) nedan. Standard: bara DIM.
 const PULSE_ROOM = Number(process.env.DMX_PULSE_ROOM ?? 44);
-/** KULOR DIREKT, LJUSSTYRKAN TONAR (opt-in DMX_HUE_CUT=1, 2026-10-09; agaren: "det ar ju bara energi som har begransning pa sin
+/** KULOR DIREKT, LJUSSTYRKAN TONAR (prov DMX_HUE_CUT 2026-10-09, ENDA VAGEN sedan 10-10; agaren: "det ar ju bara energi som har begransning pa sin
  *  nedtoning"). Ballistiken (peak-hold decay, FADE_MIN_S) och sista fade-sparren kordes PER FARGKANAL: vid ett kulorbyte klingade den
  *  gamla kanalen ut medan den nya tandes -> alla tre dioderna tanda en stund efter varje byte (snap 76 %, party 73 % i colorBench).
  *  Nu kors de per LAMPA pa dess ljusstyrka (starkaste fargkanalen): ljusstyrkan stiger och faller EXAKT som forr, kulorens
  *  forhallanden tas direkt ur effektens bild. Slacker effekten lampan tonar den ut i sin sista kulor. DIM/special rors inte. */
-const HUE_CUT = process.env.DMX_HUE_CUT === '1';
-/** HUE_CUT_MS (ladan 2026-10-09: "mycket mer fladder mellan slackt och inte, pa 'inte huvudfargen'"): med HUE_CUT klipptes effektens egna
- *  korta pa/av av en sidokanal hart (bank: korta sidoblink 9,6 -> 29/min). Kulorens BLANDNING (kanalernas andel av lampans ljusstyrka)
- *  glider nu mot effektens med tidskonstant HUE_CUT_MS - korta pa/av jamnas ut, ett kulorbyte tar ~3 x HUE_CUT_MS. Ljusstyrkan ror sig
- *  som forr. 0 = momentant. */
-const HUE_CUT_MS = Number(process.env.DMX_HUE_CUT_MS ?? 0);
+// (DMX_HUE_CUT_MS - kulorblandningen glider - provat 10-09, 29 -> 21 sidoblink, borttaget 10-10; fladdret rattades i effekterna.)
 const PULSE_ROOM_DIM_ONLY = process.env.DMX_PULSE_ROOM_DIM !== '0';
 
 /** HUE_CUT: en lampas fargkanaler som EN ljusstyrka (starkaste kanalen). Upp: attack mot malet; ner: peak-hold med decay - exakt som
  *  kanalvisa ballistiken gjorde for den starkaste kanalen. Kulorens forhallanden tas ur malbilden (effekten), sa ett kulorbyte
  *  lamnar ingen svans. Mal 0 (lampan slackt) = tona ut i sista kulor. */
-function lampFade(buf: Float32Array, u: Uint8Array, g: number[], decay: number, att: number, win: number, ratio?: Float32Array, ra = 1): void {
+function lampFade(buf: Float32Array, u: Uint8Array, g: number[], decay: number, att: number, win: number): void {
   let T = 0, H = 0;
   for (let i = 0; i < g.length; i++) { const ch = g[i]; const t = u[ch] * win; if (t > T) T = t; const h = buf[ch] * decay; if (h > H) H = h; }
   const B = T >= H ? H + (T - H) * att : H;
-  if (T > 0 && ratio && ra < 1) {   // HUE_CUT_MS: blandningen glider, normerad sa starkaste kanalen = B
-    let R = 0;
-    for (let i = 0; i < g.length; i++) { const ch = g[i]; const r = ratio[ch] + ((u[ch] * win) / T - ratio[ch]) * ra; ratio[ch] = r; if (r > R) R = r; }
-    const k = R > 0 ? B / R : 0;
-    for (let i = 0; i < g.length; i++) { const ch = g[i]; const v = ratio[ch] * k; buf[ch] = v; u[ch] = (v + 0.5) | 0; }
-  } else if (T > 0) { const k = B / T; for (let i = 0; i < g.length; i++) { const ch = g[i]; const v = u[ch] * win * k; buf[ch] = v; u[ch] = (v + 0.5) | 0; if (ratio) ratio[ch] = (u[ch] * win) / T; } }
+  if (T > 0) { const k = B / T; for (let i = 0; i < g.length; i++) { const ch = g[i]; const v = u[ch] * win * k; buf[ch] = v; u[ch] = (v + 0.5) | 0; } }
   else for (let i = 0; i < g.length; i++) { const ch = g[i]; const v = buf[ch] * decay; buf[ch] = v; u[ch] = (v + 0.5) | 0; }
 }
 
@@ -81,7 +71,6 @@ export class PostProcess {
   /** Ballistikens buffert — per kanal, i flyttal så decayn inte kvantiseras bort. */
   private smooth = new Float32Array(512);
   private finalOut = new Float32Array(512);
-  private hueRatio = new Float32Array(512);   // HUE_CUT_MS: kanalens andel av lampans ljusstyrka
   /** LUGN MJUKHET (DMX_CALM_FADE_S): effektmotorn satter langre attack i lugna partier; standard = ATTACK_S. */
   attackS = ATTACK_S;
   private lookFadeAt = -1e9;   // DMX_LOOK_FADE_S: tid for senaste lookbyte
@@ -111,14 +100,14 @@ export class PostProcess {
         this.smooth[ch] = universe[ch];
         continue;
       }
-      if (HUE_CUT && out.colorMask[ch]) continue;   // per lampa nedan
+      if (out.colorMask[ch]) continue;   // fargkanaler: per lampa nedan (lampFade)
       const held = this.smooth[ch] * decay;
       const target = universe[ch];
       const v = target >= held ? held + (target - held) * att : held;
       this.smooth[ch] = v;
       universe[ch] = (v + 0.5) | 0; // Bitvis avrundning sparar ett funktionsanrop per kanal
     }
-    if (HUE_CUT) { const ra = HUE_CUT_MS > 0 ? 1 - Math.exp(-dtSec * 1000 / HUE_CUT_MS) : 1; for (const g of out.colorGroups) lampFade(this.smooth, universe, g, decay, att, 1, this.hueRatio, ra); }
+    for (const g of out.colorGroups) lampFade(this.smooth, universe, g, decay, att, 1);
 
     // (2. LJUSTAK borttaget 2026-10-08: energin appliceras en gang, pa effektens RGB i effects.ts - se ENERGY_SIMPLE.)
 
@@ -151,11 +140,11 @@ export class PostProcess {
       const fk = Math.exp(-fdt / (xf < 1 ? Math.max(FINAL_FADE_S, LOOK_FADE_S * 0.5) : FINAL_FADE_S));
       for (let ch = 0; ch < maxCh; ch++) {
         if (out.direct[ch]) { this.finalOut[ch] = universe[ch]; continue; }
-        if (HUE_CUT && out.colorMask[ch]) continue;   // per lampa nedan
+        if (out.colorMask[ch]) continue;   // fargkanaler: per lampa nedan
         const held = this.finalOut[ch] * fk, v = universe[ch] * win;
         const o = v >= held ? v : held; this.finalOut[ch] = o; universe[ch] = (o + 0.5) | 0;
       }
-      if (HUE_CUT) for (const g of out.colorGroups) lampFade(this.finalOut, universe, g, fk, 1, win);
+      for (const g of out.colorGroups) lampFade(this.finalOut, universe, g, fk, 1, win);
     }
 
     // (6. DROP-HEADROOM borttagen 2026-10-07: dubblett av utgangens LIN_MAP, dar dropen oppnar de sista 5 %.)

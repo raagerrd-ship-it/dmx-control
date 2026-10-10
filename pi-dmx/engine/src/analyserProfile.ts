@@ -21,6 +21,8 @@ export const PROFILE: AnalyserProfile = {
     KICK_COOLDOWN: '0',          // tempoanpassad (0,6 slag, minst 170 ms); lotus: 170
     KICK_EFLOOR: '0.006',        // lotus: 0.06
     TEMPO_LAGMAX: 'full',        // lag upp till N-1; lotus: 'half'
+    TEMPO_SHIFT: '1',            // tempolyft inom lat (ladan 10-09, standard 10-10); lotus: av
+    TEMPO_HOLD: '1',             // takten halls over kort paus (ladan 10-09, standard 10-10); lotus: av
     SECTION_AGG: 'hop',          // lotus: 'env'
     SECTION_SCORE_F32: '1',      // lotus: '0'
     SECTION_W_HIGH: '1.0',       // lotus: '0'

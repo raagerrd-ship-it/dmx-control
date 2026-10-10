@@ -13,7 +13,7 @@ import { FixtureOutput, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import { PostProcess } from "./postprocess.js";
 import type { Frame } from "./analyser.js";
-import { EFFECT_MAP, TIER, sectionPool, ALLA_LOOKER, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
+import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
 import { composeLamp, type Envelope, type ModulateFlags } from "./heartbeat/contract.js";
 import { fitScore } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
@@ -175,7 +175,7 @@ const SECTION_REUSE = process.env.DMX_SECTION_REUSE === '1';   // standard AV se
  *  med 46 effekter och ~50 byten per 10 min blev annars samma 20-25 valda och resten aldrig (effectMix: 18-19 aldrig valda).
  *  Bonusen forsvinner sa fort effekten setts en gang, sa den styr bara FORSTA chansen. 0 = av. */
 const MIX_UNSEEN_BONUS = Number(process.env.DMX_MIX_UNSEEN_BONUS ?? 0.10);
-/** ALLA LOOKER (opt-in DMX_ALLA_LOOKER=1, 2026-10-09; kraven ligger i registry.ts). Tva dirigentregler:
+/** ALLA LOOKER (prov 2026-10-09, STANDARD sedan 2026-10-10 - agaren i ladan; kraven ligger i registry.ts). Tva dirigentregler:
  *  (a) BUILD-INTRADE: analysatorns sektion 'build' kom bara 8 ganger pa 20 min mix, och "byt aldrig mitt i en uppbyggnad" blockerade
  *      allt annat -> build-poolen (pulse/stegring/sug) valdes 1 av 122 byten. Nu raknas en uppbyggnad som hallit i ALLA_BUILD_S
  *      (inRiser/buildUp ar fladdriga: 355 flanker, de flesta < 0,3 s) som intrade: ETT byte till build-poolen (look hallen > 4 s).
@@ -284,46 +284,37 @@ const LIVE_TRACE = process.env.DMX_LIVE_TRACE === '1';
  *  0..1 anvands oavsett lat och mixerniva. Direkt upp, E_RELEASE_MS ner, upphojd till E_CURVE (ogat ar logaritmiskt), och blir EN
  *  dampningsfaktor 0..1 pa effektens RGB - aldrig over 1 (effekten styr max). Drop slapper dampningen. Slackgransen galler for tystnad.
  *  Ersatte 10-08: sektionsenergin (frame.intensity, for trog: "svanger lite och ratt morkt") och en fast fullniva (passade aldrig). */
-const E_WIN_S = Number(process.env.DMX_E_WIN_S ?? 20), E_MIN_DB = Number(process.env.DMX_E_MIN_DB ?? 4);
+const E_WIN_S = Number(process.env.DMX_E_WIN_S ?? 10),   // 20 -> 10 (ladan 10-09, standard 10-10)
+      E_MIN_DB = Number(process.env.DMX_E_MIN_DB ?? 4);
 const E_RELEASE_MS = Number(process.env.DMX_E_RELEASE_MS ?? 100);
-const E_CURVE = Math.max(0.3, Math.min(10, Number(process.env.DMX_E_CURVE ?? 2)));   // tak 4 -> 10 (ladan 10-09: "overdriv energivariationen")
-/** TYSTNAD RAKNAS INTE (opt-in DMX_E_GATE=1, ladan 2026-10-09: "tacker den hela spannet ... 1-95 %"). Fonstrets botten foljer minsta
+const E_CURVE = Math.max(0.3, Math.min(10, Number(process.env.DMX_E_CURVE ?? 10)));   // 2 -> 10 (ladan 10-09, standard 10-10; i DMX-procent efter gamman); tak 4 -> 10 (ladan 10-09: "overdriv energivariationen")
+/** TYSTNAD RAKNAS INTE (ladan 2026-10-09, STANDARD 10-10: "tacker den hela spannet ... 1-95 %"). Fonstrets botten foljer minsta
  *  vardet DIREKT - en paus mellan latar eller ett avbrott drog den mot -100 dB, och den kryper upp med E_WIN_S: matt med samma musik
  *  -90 dB i 10 s och sedan 6 dB tystare holl dampningen 0,78-0,87 (nastan fullt) i 30 s. Nu uppdateras fonstret bara nar ingangen
  *  ar over ingangsgransen. (Prov 10-09 med fonster ur medel +- spridning foll: pop-mixen morkt 13 -> 56 %.) */
-const E_GATE = process.env.DMX_E_GATE === "1";
-/** SEKTIONSDYNAMIK (opt-in DMX_E_SLOW_MS, ladan 2026-10-09: "vill ha mycket mer dynamik i energi-lagret, ar knappt nagot nu"). Fonstrets
- *  topp/botten foljde den SNABBA nivan (levelVU ~200 ms) - varje slags dal blev botten och varje slags topp taket, sa fonstret blev lika
- *  brett som slagens svangning och vers/refrang hamnade pa samma stalle i det (bank: energin svangde 2,6 steg ruta for ruta men ljusets
- *  1 s-medel bara ~2,4 steg oavsett kurva). Med E_SLOW_MS > 0 foljer topp/botten nivan utjamnad over E_SLOW_MS: fonstret spanner
- *  sektionernas nivaer, och e (ljuset) raknas fortfarande pa den snabba nivan med samma avklingning (E_RELEASE_MS). 0 = som forr. */
-const E_SLOW_MS = Number(process.env.DMX_E_SLOW_MS ?? 0);
+// (DMX_E_SLOW_MS - fonstret pa utjamnad niva - provat 10-09, gav ingen dynamik, borttaget 10-10.)
 /** ENERGIN AGER SPANNET (opt-in DMX_E_NORM_S, ladan 2026-10-09: "mycket mer dynamik i energi-lagret ... jobba mellan 1-95 %"). MATT pa
  *  ladans inspelningar: vid full energi lyste riggen bara ~20 % - effekternas egen niva efter gamman 2,2 (v 0,5 -> 22 %) och monster med
  *  slackta lampor - sa energin (som bara far sanka) hade 5 -> 20 % att jobba med, ~2 steg. Med E_NORM_S > 0 skalas effektens bild sa
  *  dess TOPP (alla lampor, foljd med direkt upp och avklingning E_NORM_S) blir 100 %: slagpulser och skillnad mellan lampor finns kvar,
  *  kuloren bevaras (alla kanaler lika), och energin ger sedan hela spannet golv+1..95 %. Hogst x E_NORM_MAX. 0 = av.
  *  OBS: detta LYFTER effektens niva (agarens regel 1) - darfor bara som prov, agaren avgor i ladan. */
-const E_NORM_S = Number(process.env.DMX_E_NORM_S ?? 0);
+const E_NORM_S = Number(process.env.DMX_E_NORM_S ?? 2);   // 0 -> 2 (ladan 10-09, standard 10-10)
 const E_NORM_MAX = Number(process.env.DMX_E_NORM_MAX ?? 6);
-/** ENERGIN I DMX-PROCENT (opt-in DMX_E_LIN=1, ladan 2026-10-09). Energin multiplicerades FORE utgangens gamma (2,2), sa kurvan blev i
+/** ENERGIN I DMX-PROCENT (ladan 2026-10-09, STANDARD 10-10). Energin multiplicerades FORE utgangens gamma (2,2), sa kurvan blev i
  *  praktiken e^(E_CURVE x 2,2) = e^6,6 med kurva 3: energi 0,9 -> ~50 % ljus, 0,7 -> 10 %. Med E_LIN tas gamman ut ur dampningen
  *  (md^(1/gamma) fore gamman) - e^E_CURVE blir rak andel av DMX-utgangen. */
-const E_LIN = process.env.DMX_E_LIN === "1";
 /** GRUNDNIVA MELLAN SLAGEN (opt-in DMX_FX_FLOOR 0..0,8, ladan 2026-10-09: "hoj grundnivan mellan slagen sa pulsen blir grundare").
  *  En TAND lampa (effektens starkaste kanal > 0) lyfts mot golvet: m' = m + FLOOR x (1 - m) x min(1, m / 0,1) - kulorens forhallanden
  *  bevaras, en slackt lampa forblir slackt (agaren: "dom far garna slackas om effekten vill det"), och lyftet rampar in under 10 % sa
  *  en lampa som tonar ut inte hoppar. Lagt efter E_NORM (effektens topp = 1). 0 = av. */
-const FX_FLOOR = Math.max(0, Math.min(0.8, Number(process.env.DMX_FX_FLOOR ?? 0)));
-/** DIMMERNS PULSDJUP (DMX_DIM_PULS 0..1, ladan 2026-10-09: "dra upp de till 95 % sa energi har nagot att dampa"). Dimmern far taktpulsen
- *  (max(beatMul, dropEnv)) och lag i snitt ~80 % - darfor nadde tanda lampor sallan over 65-78 % av 1-95 %. 1 = som forr, 0 = dimmern star
- *  pa fullt (95 %) och pulsen bars av effekterna (c.heart/FX_FLOOR); daremellan grundare. */
-const DIM_PULS = Math.max(0, Math.min(1, Number(process.env.DMX_DIM_PULS ?? 1)));
+const FX_FLOOR = Math.max(0, Math.min(0.8, Number(process.env.DMX_FX_FLOOR ?? 0.6)));   // 0 -> 0,6 (ladan 10-09, standard 10-10)
+// (DMX_DIM_PULS - dimmern pa fullt - forkastad i ogat 10-09, borttagen 10-10.)
 /** ENERGINS TOPP (DMX_E_TOP 0,5..1, ladan 2026-10-09: "dra upp till 95 % sa energi har nagot att dampa"). Fonstrets tak foljer varje
  *  enskild ljudtopp direkt, sa ett vanligt starkt parti lag pa e ~0,9 - med kurva 7 bara ~50 % ljus. e / E_TOP (klampat till 1): starka
  *  partier nar full energi (= effektens 95 %), och kurvan dampar allt under. 1 = som forr. */
-const E_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_E_TOP ?? 1)));
-const E_LIN_INV = 1 / Math.max(1, Math.min(3, Number(process.env.DMX_GAMMA ?? 2.2)));
+const E_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_E_TOP ?? 0.95)));   // 1 -> 0,95 (ladan 10-09, standard 10-10)
+const E_LIN_INV = 1 / Math.max(1, Math.min(3, Number(process.env.DMX_GAMMA ?? 1.6)));   // samma standard som output.ts GAMMA
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
 const LIVE_START_FAST_S = Number(process.env.DMX_LIVE_START_FAST_S ?? 90);
@@ -484,10 +475,9 @@ export class EffectEngine {
   private wavePhase = 0;
   /** "smart" mode: which effect the feel-chooser currently delegates to. */
   private smartMode: Mode = "wave";
-  /** Valet bland topp-kandidaterna: gyllene snittets turordning, eller (ALLA_LOOKER b) den som spelats minst sedan start. */
+  /** Valet bland topp-kandidaterna: den som spelats minst sedan start (ALLA LOOKER b; gyllene snittets turordning borttagen 10-10). */
   private pickLook(top: { m: Mode }[]): Mode {
-    if (ALLA_LOOKER) { let best = top[0].m, bt = Infinity; for (const x of top) { const t = this.lookPlayMs.get(x.m) ?? 0; if (t < bt) { bt = t; best = x.m; } } return best; }
-    return top[Math.floor(((this.smartCount * 0.61803398875) % 1) * top.length)].m;
+    let best = top[0].m, bt = Infinity; for (const x of top) { const t = this.lookPlayMs.get(x.m) ?? 0; if (t < bt) { bt = t; best = x.m; } } return best;
   }
   private buildSince = -1; private buildEntered = false; private lookPlayMs = new Map<Mode, number>();   // ALLA_LOOKER
   private fadeMode: Mode | undefined;   // DMX_LOOK_FADE_S: senast sedda look
@@ -510,7 +500,7 @@ export class EffectEngine {
   private lastDropSwitchMs = -1e9; dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;   // senaste drop -> 'high'-pool i 20 s
   private liveAnchor = NaN; private liveAnchorMax = NaN;   /* NaN = ej satt (forr undefined: taggat falt -> ny HeapNumber per ruta) */ private liveFastUntil = 0; private liveClipMs = 0; private liveShapeRaw = 0.5; private liveLevelSm = -1; private liveLogAt = 0;   // DMX_LIVE_LEVEL
   private lightLoud = 0;         // log-released loudness 0..1 → driver md
-  private eSm = 0; eSimple = 0; private eHi = NaN; private eLo = NaN; private eDbSlow = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
+  private eSm = 0; eSimple = 0; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
@@ -1408,10 +1398,8 @@ export class EffectEngine {
         const inBuild = frame.inRiser || frame.buildUp > 0.35 || (SECTION_SWITCH && frame.section === 'build');
         // ALLA_LOOKER (a): en uppbyggnad som hallit ALLA_BUILD_S = intrade -> ETT byte till build-poolen
         let allaBuild = false;
-        if (ALLA_LOOKER) {
-          if (!inBuild) { this.buildSince = -1; this.buildEntered = false; }
-          else { if (this.buildSince < 0) this.buildSince = now; allaBuild = !this.buildEntered && now - this.buildSince >= ALLA_BUILD_S * 1000 && held > 4000; }
-        }
+        if (!inBuild) { this.buildSince = -1; this.buildEntered = false; }
+        else { if (this.buildSince < 0) this.buildSince = now; allaBuild = !this.buildEntered && now - this.buildSince >= ALLA_BUILD_S * 1000 && held > 4000; }
         // 2) I ett breakdown: gå till den lugna poolen oavsett vad energitiern
         //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
         //    så utan detta fortsätter riggen köra fullfart genom en svacka.
@@ -1654,7 +1642,7 @@ export class EffectEngine {
     //  3. LOG-RELEASE: fade med konstant KVOT per tick (perceptuellt jämn), med snabb
     //     soft-snap-attack. Det är "smooth-hemligheten".
     const dtMs = dtNow * 1000;
-    if (ALLA_LOOKER) this.lookPlayMs.set(this.smartMode, (this.lookPlayMs.get(this.smartMode) ?? 0) + dtMs);
+    this.lookPlayMs.set(this.smartMode, (this.lookPlayMs.get(this.smartMode) ?? 0) + dtMs);
     // LOUDNESS-KÄLLA = analysatorns `frame.intensity` (sektionsenergi relativt låtens
     // eget snitt, 0.5 = snitt). Den är REDAN robust normaliserad av analysatorn över
     // hela låten — så vi slipper dB-fönstrets skal- och settling-problem (mid+diskant
@@ -1730,24 +1718,23 @@ export class EffectEngine {
     {   // ENKEL ENERGI (se ENERGY_SIMPLE-dokumentationen). md0/sektionsgas/rang borttagna 10-08.
       // FOLJANDE FONSTER (se E_WIN_S)
       const db = 20 * Math.log10(Math.max(1e-5, frame.levelVU ?? frame.level));
-      if (Number.isNaN(this.eHi) && (!E_GATE || frame.level > INPUT_OFF_LEVEL)) { this.eHi = db; this.eLo = db; }
+      if (Number.isNaN(this.eHi) && frame.level > INPUT_OFF_LEVEL) { this.eHi = db; this.eLo = db; }
       const k = Math.min(1, dtSec / E_WIN_S);
-      if (!E_GATE || frame.level > INPUT_OFF_LEVEL) {   // E_GATE: tystnad flyttar inte fonstret
-        let dw = db;
-        if (E_SLOW_MS > 0) { this.eDbSlow = Number.isNaN(this.eDbSlow) ? db : this.eDbSlow + (db - this.eDbSlow) * Math.min(1, dtSec * 1000 / E_SLOW_MS); dw = this.eDbSlow; }   // SEKTIONSDYNAMIK
+      if (frame.level > INPUT_OFF_LEVEL) {   // tystnad flyttar inte fonstret (se TYSTNAD RAKNAS INTE)
+        const dw = db;
         this.eHi = dw > this.eHi ? dw : this.eHi + (dw - this.eHi) * k;
         this.eLo = dw < this.eLo ? dw : this.eLo + (dw - this.eLo) * k;
       }
       const span = Math.max(E_MIN_DB, this.eHi - this.eLo);
       let e = (db - (this.eHi - span)) / span;
       e = e < 0 ? 0 : e > 1 ? 1 : e;
-      if (e !== e) e = 0;   // E_GATE: inget fonster an (bara tystnad sedan start)
+      if (e !== e) e = 0;   // inget fonster an (bara tystnad sedan start)
       if (E_TOP < 1) e = e >= E_TOP ? 1 : e / E_TOP;   // ENERGINS TOPP (se E_TOP)
       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
       this.eSimple = this.eSm;
       const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);
       md = drive * Math.min(1, Math.max(eC, this.dropEnv));   // bara dampning: aldrig over 1
-      if (E_LIN) md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
+      md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
     }
     // HEARTBEAT: envelopen (kontraktet). ceiling = md utan tystnadsgrinden (drive), som appliceras separat pa ALLA effekter.
     const hbPulse = (this.cfg.beatPulse && this.beatMulNow > BEAT_MIN) ? Math.min(1, (this.beatMulNow - BEAT_MIN) / Math.max(1e-6, 1 - BEAT_MIN)) : 0;
@@ -2022,7 +2009,7 @@ export class EffectEngine {
       this.cfg.fixtures,
       dtSec,
       decay,
-      DIM_PULS === 1 ? Math.max(this.beatMulNow, this.dropEnv) : 1 - DIM_PULS * (1 - Math.max(this.beatMulNow, this.dropEnv)),   // DIM_PULS
+      Math.max(this.beatMulNow, this.dropEnv),
       !!this.cfg.beatPulse && this.silenceGate > 0.5,
       blackout || this.inputOff,
       this.cfg.master ?? 1,
