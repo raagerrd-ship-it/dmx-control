@@ -27,6 +27,7 @@ import { KnobRing } from "./knobRing.js";
 import { BleClient, type BleScanDevice, type BleCal } from "./bleClient.js";
 import { applyIntensity } from "./moods.js";
 import { BeatFeed } from "./beatFeed.js";
+import { LongRecord } from "./longRecord.js";
 import * as health from "./runtimeHealth.js";
 import { logHealth } from "./healthLog.js";
 
@@ -106,6 +107,11 @@ analyser.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
 
 // TAKTMATNINGEN (kick-PLL, tillit, fasfoljare, coast) bor i beatFeed.ts - samma kod som bankerna kor (matfalla 43).
 const beatFeed = new BeatFeed();
+// LANGINSPELNING (longRecord.ts): samma mapp som inspelarens fangster, sa hamtaren/banken ser dem.
+const longRec = new LongRecord(process.env.DMX_RECORDER_DIR || "/var/lib/audio-dmx-engine/snippets", cfg.audio.rate, {
+  latestFrame: () => latestFrame, look: () => effects.getActiveMode(), why: () => effects.switchWhy,
+  beat: () => (cfg.beat ? { bpm: cfg.beat.bpm, confidence: cfg.beat.confidence ?? 0 } : null),
+});
 let latestFrame: Frame | null = null;
 let lastChunkAt = Date.now();   // hälsokoll: uppdateras varje ljud-chunk
 let lastRenderMs = 0;
@@ -177,6 +183,7 @@ capture.on("chunk", (samples: Float32Array) => {
     health.noteChunk();
   }
   recorder?.push(samples);   // inspelaren (AV utan DMX_RECORDER=1): samma hop som analysatorn
+  longRec.push(samples);     // langinspelningen (knappen i /setup; en null-koll i vila, se longRecord.ts)
   latestFrame = frame;
   lastChunkAt = Date.now();
 
@@ -438,6 +445,7 @@ const serverDeps = {
   cfg,
   getLatestFrame: () => latestFrame,
   getActiveMode: () => effects.getActiveMode(),
+  longRecord: longRec,
   // Frisk = en ljud-chunk bearbetad senaste 10 s (arecord + event-loop lever).
   getHealthy: () => Date.now() - lastChunkAt < 10000,
   // DIAGNOS för watchdogen: är felet ljud eller DMX? Ett ljudfel går att laga

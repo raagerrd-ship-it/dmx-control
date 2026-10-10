@@ -530,6 +530,15 @@
     <div class="status" style="margin-top:2px">Hur länge det ska vara tyst innan lamporna släcks. De tänds direkt igen. 0 s = direkt.</div>
   </div>
 
+  <h1>Inspelning</h1>
+  <div class="card" id="recCard">
+    <div class="fx-actions">
+      <button class="btn" id="recStart">Spela in 5 min</button>
+      <button class="btn" id="recStop" style="display:none">Stoppa och spara</button>
+    </div>
+    <div class="status" id="recState" style="margin-top:6px">Spelar in ingången och showens händelser i ett stycke, till nattagentens bänk. Lamporna påverkas inte.</div>
+  </div>
+
   <h1>Lampor</h1>
   <div class="card">
     <div id="fixtures"></div>
@@ -809,6 +818,22 @@ function connect() {
   };
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
+/* LANGINSPELNING (longRecord.ts, /api/longrec): knappen startar 5 min, statusen pollas medan den spelar in. */
+const recStart = document.getElementById("recStart"), recStop = document.getElementById("recStop"), recState = document.getElementById("recState");
+let recPoll = null;
+const recShow = (st) => {
+  if (!st || !recState) return;
+  const on = !!st.active;
+  recStart.style.display = on ? "none" : ""; recStop.style.display = on ? "" : "none";
+  if (on) recState.textContent = `Spelar in: ${Math.floor(st.seconds / 60)}:${String(Math.floor(st.seconds % 60)).padStart(2, "0")} av ${Math.round(st.target / 60)} min`;
+  else if (st.error) recState.textContent = "Inspelningen: " + st.error;
+  else if (st.file) recState.textContent = "Klar: " + st.file;
+  if (on && !recPoll) recPoll = setInterval(recFetch, 2000);
+  if (!on && recPoll) { clearInterval(recPoll); recPoll = null; }
+};
+const recFetch = () => fetch("/api/longrec").then((r) => r.json()).then(recShow).catch(() => {});
+const recPost = (body) => fetch("/api/longrec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json()).then(recShow).catch(() => {});
+if (recStart) { recStart.onclick = () => recPost({ seconds: 300 }); recStop.onclick = () => recPost({ stop: true }); recFetch(); }
 
 // Effekt-listorna kommer från servern (type:"effects", grupperade på tier) →
 // en enda sanningskälla; ingen hårdkodad lista att hålla i synk med motorn.

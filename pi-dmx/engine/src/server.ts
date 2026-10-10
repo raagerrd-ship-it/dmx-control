@@ -63,6 +63,8 @@ export interface ServerDeps {
   getLatestFrame: () => Frame | null;
   /** Effekten som renderas just nu (smart-läget roterar). */
   getActiveMode: () => Mode;
+  /** Langinspelningen (knappen "Spela in 5 min" i /setup). */
+  longRecord?: { start(seconds: number): unknown; stop(): unknown; status(): unknown };
   /** True om ljud-pipelinen bearbetat en frame nyligen (för watchdog /health). */
   getHealthy: () => boolean;
   /** Diagnos när getHealthy() är false: "audio" | "audio-safe" | "dmx" | "". */
@@ -242,6 +244,13 @@ export async function startServer(
     const on = ((req.body ?? {}) as Record<string, unknown>).enabled === true;
     setLogOn(on); console.warn(`[debug] felsokningslogg ${on ? "PA" : "AV"}`);
     return { enabled: isLogOn(), record: false };
+  });
+  // LANGINSPELNING (longRecord.ts): POST {seconds} startar (10..600), POST {stop:true} sparar det som finns, GET = status.
+  app.get("/api/longrec", async () => deps.longRecord?.status() ?? { active: false, error: "saknas" });
+  app.post("/api/longrec", async (req) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (!deps.longRecord) return { active: false, error: "saknas" };
+    return b.stop === true ? deps.longRecord.stop() : deps.longRecord.start(Number(b.seconds ?? 300));
   });
   app.get("/api/health-log", async () => ({
     version: PKG_VERSION,
