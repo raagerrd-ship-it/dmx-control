@@ -104,9 +104,7 @@ grep -q 'root=PARTUUID' /boot/firmware/cmdline.txt && grep -q 'cgroup_enable=mem
 for local, remote in FILES:
     d = os.path.dirname(remote); b = os.path.basename(local)
     script += f"mkdir -p {d}; [ -f {remote} ] && cp {remote} {remote}.bak-{ts} || true; cp /tmp/{b} {remote}; chmod 644 {remote}\n"
-script += "chmod 755 /usr/local/bin/pi-dmx-wifi-watch.sh
-systemctl enable pi-dmx-wifi-watch.timer 2>/dev/null || true
-"
+script += "chmod 755 /usr/local/bin/pi-dmx-wifi-watch.sh\nsystemctl enable pi-dmx-wifi-watch.timer 2>/dev/null || true\n"
 script += "systemctl disable --now triggerhappy.service triggerhappy.socket cron.service getty@tty1.service 2>/dev/null || true\nsystemctl daemon-reload\necho FILER_OK\ncat /boot/firmware/cmdline.txt\n"
 rc, out = sudo(c, script)
 print(out)
