@@ -25,12 +25,11 @@ effekten. Drop släpper dämpningen. Godkänd i ladan 10-08; överdriven och lyf
 | `DMX_FX_FLOOR` | 0,6 | Grundnivå mellan slagen: en tänd lampa lyfts mot denna andel (släckt förblir släckt). Grundare puls. |
 
 ## 3. Utgången (en mappning, sista steget)
-Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulören bevaras). DIM 1–100 % → golv+1 … `MAP_TOP` × lampans fullpunkt; bara full drop går förbi mappningen, till 255.
+EN VÄG (10-10): effektens 0 = släckt, färg 1–100 % → lampans tändpunkt+1 … `MAP_TOP` (95 %), kulören bevaras; bara full drop öppnar till 100 %. **Dimmern är en konstant** (lampans fullpunkt) – inget i motorn räknar på den. Backup före: git-taggen `backup/fore-ett-ljus-2026-10-10`.
 | Ratt | Standard | Vad den gör |
 |---|---|---|
-| `DMX_FLOOR_CH` | 40 | DIM-golvet i DMX-steg (0–255). |
 | `DMX_GAMMA` | 1,6 | Effektens 0..1 → DMX som v^gamma (var 2,2: 0,5 → 22 %). Lägre = starkare mellanlägen. |
-| `DMX_MAP_TOP` | 0,95 | Taket (andel av fullpunkten) för allt — även minidrop och nästan-drop. Bara full drop går förbi, till 255. |
+| `DMX_MAP_TOP` | 0,95 | Färgens tak — även minidrop och nästan-drop. Bara full drop går förbi, till 100 %. |
 | Släckpunkt per lampa | 16 | /setup → lampan → Alla/R/G/B: dra tills den precis tänder, Spara (`cal.on`, `onR/G/B`). |
 | Fullpunkt per lampa | 255 | /setup → lampan → Full: lampan lyser vitt, dra DIM tills den inte blir ljusare, Spara (`cal.full`; MÄTT i ladan 10-08: lamporna blir ljusare ända till 255 ⇒ fullpunkt 255 = standard; stegtestet 10-01 (~85) gäller inte). |
 
@@ -47,9 +46,7 @@ Effektens 0 = släckt. Färg 1–100 % → lampans tändpunkt+1 … tak (kulöre
 ## 5. Puls och ballistik
 | Ratt | Standard | Vad den gör |
 |---|---|---|
-| `DMX_EFFECT_HEART` | 1,4 | Effekternas egen hjärtpuls (djup). |
-| `DMX_PULSE_GAP_BEAT` | 0,75 | Minsta tid mellan pulser i SLAG (tar bort dubbeltakt vid ~90 BPM). |
-| `DMX_PULSE_GAP_MS` | 250 | Fast golv för pulsgrinden när tempot är okänt. |
+| `DMX_EFFECT_HEART` | 1,4 | Effekternas egen hjärtpuls (djup) – den enda pulsen sedan 10-10 (dimmerpulsen borta). |
 | `DMX_ATTACK_MS` | 20 | Lampans uppgång. |
 | `DMX_FADE_MIN_S` | 0,25 | Lampans uttoning — **snabbare är förbjudet** (ägaren 09-29). Gäller ljusstyrkan: kulören byts direkt (ägaren 10-09: "det är ju bara energi som har begränsning på sin nedtoning"), ballistiken körs per lampa på starkaste färgkanalen. |
 
