@@ -32,6 +32,11 @@ const SECTION_PALETTE = process.env.DMX_SECTION_PALETTE === '1';
  *  (tillit >= 0,5) väntar vanliga byten (inte drop/nästan-drop/uppbyggnad) på frasens första slag (effektklockans beatIdx % 16 = 0),
  *  högst en fras extra. Av = som förr. */
 const PHRASE_SWITCH = process.env.DMX_PHRASE_SWITCH === '1';
+/** LAMPTRAPPA (opt-in DMX_LAMP_STAIR=1, natt 2026-10-10, KONSERTSHOW idé 3): en ljusdesigner sparar hela riggen till refrängen - här
+ *  var alla fyra lamporna tända 81-88 % av tiden. Dirigenten (inte energin: den släcker aldrig en tänd lampa) väljer i vers/intro bara
+ *  SPARSAMMA looks och i refrängen inga sparsamma. Listan är MÄTT (tools/lampCount.mjs, pop+megamix): snitt <= ~2,9 tända lampor av 4. */
+const LAMP_STAIR = process.env.DMX_LAMP_STAIR === '1';
+const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
 const PALETTE_LOCK: number[] | null = (() => {
   const v = (process.env.DMX_PALETTE ?? "").trim(); if (!v) return null;
   if (NAMED_PALETTES[v.toLowerCase()]) return NAMED_PALETTES[v.toLowerCase()];
@@ -1276,6 +1281,13 @@ export class EffectEngine {
         // HALVERAT: de delade lookerna (och hjärtat) ska finnas i poolen oavsett tier.
         // (innerouter borttagen 2026-09-23: rPerm 1,00 mot varannan - samma effekt upp till lampordning.)
         if (HALVE_SHOW && this.pulseHalved) for (const m of ["varannan", "basgang", "hjarta"] as Mode[]) if (!pool.includes(m) && this.cfg.rotation?.[m] !== false && req(m)) pool.push(m);
+        if (LAMP_STAIR && !allaBuild && (liveSec === 'low' || liveSec === 'intro')) {   // LAMPTRAPPA: vers/intro -> sparsamt
+          const cut = pool.filter((m) => SPARSAM.includes(m));
+          const any = enabled(SPARSAM).filter(req);
+          if (cut.length) pool = cut; else if (any.length) pool = any;
+        } else if (LAMP_STAIR && liveSec === 'high') {                                   // LAMPTRAPPA: refrängen -> hela riggen
+          const full = pool.filter((m) => !SPARSAM.includes(m)); if (full.length) pool = full;
+        }
         this.smartCount++;
         // DIRIGENTEN VÄLJER: poängsätt poolen mot musikens KARAKTÄR (frame.profile)
         // istället för att slumpa. Tydliga basslag → drumkit/gravity/duel; luftig
