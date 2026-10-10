@@ -25,6 +25,7 @@
 
 import type { FixtureConfig } from "./config.js";
 import type { FixtureOutput } from "./output.js";
+import { DIM_FULL } from "./output.js";
 
 /** Utgångens attack. Kort nog att inte röra hjärtslagets 45 ms-anslag, lång nog att
  *  dämpa effekternas fladder kring 10 Hz. */
@@ -115,8 +116,11 @@ export class PostProcess {
     //    Först ges ljuset utrymme att pulsa i: en lugn effekt kan ligga så nära
     //    tändpunkten att hela slaget klipps bort av kalibreringsgolvet.
     if (pulseActive && pulseMul < 0.999) {
-      out.ensurePulseRoom(universe, fixtures, PULSE_ROOM, PULSE_ROOM_DIM_ONLY);
-      out.scale(universe, pulseMul);
+      if (DIM_FULL) out.scaleColor(universe, pulseMul);   // DIMMERN PA MAX: pulsen pa fargen (inget pulsutrymme - det lyfte bara dimmern)
+      else {
+        out.ensurePulseRoom(universe, fixtures, PULSE_ROOM, PULSE_ROOM_DIM_ONLY);
+        out.scale(universe, pulseMul);
+      }
     }
 
     // 4. BLACKOUT — kolsvart nu, och nolla bufferten så explosionen efteråt reser sig
@@ -139,7 +143,7 @@ export class PostProcess {
       const fdt = FINAL_FADE_MAX_DT_S > 0 && dtSec > FINAL_FADE_MAX_DT_S ? FINAL_FADE_MAX_DT_S : dtSec;
       const fk = Math.exp(-fdt / (xf < 1 ? Math.max(FINAL_FADE_S, LOOK_FADE_S * 0.5) : FINAL_FADE_S));
       for (let ch = 0; ch < maxCh; ch++) {
-        if (out.direct[ch]) { this.finalOut[ch] = universe[ch]; continue; }
+        if (out.direct[ch] || (DIM_FULL && out.light[ch] && !out.colorMask[ch])) { this.finalOut[ch] = universe[ch]; continue; }   // DIM_FULL: dimmern star still
         if (out.colorMask[ch]) continue;   // fargkanaler: per lampa nedan
         const held = this.finalOut[ch] * fk, v = universe[ch] * win;
         const o = v >= held ? v : held; this.finalOut[ch] = o; universe[ch] = (o + 0.5) | 0;
