@@ -119,7 +119,6 @@ export interface EngineConfig {
    *  lamporna"): hur många dB UNDER låtens tak ljuset når golvet — LIVE_LEVEL-fönstret i effects.ts.
    *  Högre värde = tystare musik ger fortfarande ljus. 4..20 dB, standard 10 (ladans live-värde).
    *  PRIORITET: env LIVE_WIN_DB vinner om den är satt (drop-in), annars detta fält, annars 10. */
-  levelWindowDb?: number;
   /** SLÄCKGRÄNS: under denna frame.level (0..1) räknas det som tystnad och riggen tonas ut
    *  (tiden styrs av DMX_SILENCE_MS / DMX_SILENCE_RELEASE_S). 0,01..0,20, standard 0,05.
    *  PRIORITET: env DMX_SILENCE_LEVEL vinner om den är satt, annars detta fält, annars 0,05. */
@@ -197,7 +196,6 @@ export interface EngineConfig {
   /** REGI: riser-strobe — under en uppbyggnad accelererar en strobe + färgen
    *  kollapsar mot vitt, sen blackout på dropen (klassisk EDM-build).
    *  Frekvensen är takad — se `strobeUnlimited`. */
-  riserStrobe: boolean;
   /** ÄGARENS MEDVETNA VAL att släppa strobe-taket från 3 Hz till 18 Hz.
    *
    *  FOTOSENSITIV EPILEPSI. Blinkande ljus kan utlösa anfall. Risken är störst
@@ -212,8 +210,7 @@ export interface EngineConfig {
    *  motorn gör i tysthet. Standard av. */
   strobeUnlimited?: boolean;
   /** Master-toggle för Regi (pro): när false rör stämnings-vredet INTE de sex
-   *  Regi-flaggorna (dropBlackout, energyCeiling, clubMode, ambientGlow,
-   *  riserStrobe). Ägaren äger då dem själv. Default false. (dropHeadroom borttagen 10-07: utgångens LIN_MAP gör jobbet.) */
+   *  Regi-flaggorna (dropBlackout, energyCeiling, clubMode, ambientGlow). Ägaren äger då dem själv. Default false. (dropHeadroom borttagen 10-07: utgångens LIN_MAP gör jobbet.) */
   regiPro?: boolean;
 }
 
@@ -246,7 +243,6 @@ export const defaultConfig: EngineConfig = {
   energyDrivesMode: true,
   smartDwellMs: 15000,
   master: 1.0,
-  levelWindowDb: 10,      // dB under taket där ljuset når golvet (ratt i /setup: "Lägsta nivå")
   silenceLevel: 0.05,     // släckgräns på frame.level (ratt i /setup: "Släckgräns")
   chaseStyle: "pingpong",
   rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },
@@ -267,7 +263,6 @@ export const defaultConfig: EngineConfig = {
   energyCeiling: true,    // direkt VU = ljusstyrka; standard på (drop/punch bypassar)
   clubMode: false,        // hård kontrast (VU²); opt-in — rör inte det trogna linjära läget
   ambientGlow: false,     // tystnad = HELT mörkt som standard; slå på för varm vilo-glöd
-  riserStrobe: false,     // ägar-val: accelererande strobe + vit-kollaps under risers
   strobeUnlimited: false, // säkert tak (3 Hz) som standard — se kommentaren i typen
   regiPro: false,         // master-toggle: när AV rör stämnings-vredet inte Regi-flaggorna
 };

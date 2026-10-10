@@ -433,7 +433,6 @@
         <div class="advflag" id="fClub"><span class="dot"></span>Klubb-läge</div>
         <div class="advflag" id="fAmb"><span class="dot"></span>Vilo-glöd</div>
         <div class="advflag" id="fCeil"><span class="dot"></span>Dynamiskt ljustak</div>
-        <div class="advflag" id="fRiser"><span class="dot"></span>Riser-strobe</div>
         <div class="advflag" id="fFog"><span class="dot"></span>Rökmaskin aktiv</div>
         <div class="advflag" id="fStrobeCh"><span class="dot"></span>DMX-strobe aktiv</div>
         <div class="advflag" id="fHazer"><span class="dot"></span>Hazer aktiv</div>
@@ -522,17 +521,11 @@
     <label class="tgl"><span>Dynamiskt ljustak (VU)<br><small style="opacity:.6">Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%.</small></span><input type="checkbox" id="tEnergyCeiling"></label>
     <label class="tgl"><span>Klubb-läge (hård kontrast)<br><small style="opacity:.6">Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna.</small></span><input type="checkbox" id="tClubMode"></label>
     <label class="tgl"><span>Varm vilo-glöd i tystnad<br><small style="opacity:.6">Dim bärnsten-glöd när ingen musik spelar, istället för helt mörkt.</small></span><input type="checkbox" id="tAmbientGlow"></label>
-    <label class="tgl"><span>Riser-strobe (build → drop)<br><small style="opacity:.6">Accelererande strobe under uppbyggnad, blackout på dropen. Begränsad till 1,5/s.</small></span><input type="checkbox" id="tRiserStrobe"></label>
     </div>
   </div>
 
   <h1>Ljusnivå</h1>
   <div class="card" id="levelCard">
-    <div class="row"><label>Lägsta nivå</label>
-      <input type="range" min="4" max="20" step="1" id="lvlWin" style="flex:1;margin:0 10px">
-      <span class="val" id="lvlWinV">–</span>
-    </div>
-    <div class="status" style="margin-top:2px;margin-bottom:8px">Hur många dB under låtens tak ljuset når golvet. Högre värde = tystare musik ger fortfarande ljus.</div>
     <div class="row"><label>Släckgräns</label>
       <input type="range" min="1" max="20" step="1" id="lvlSil" style="flex:1;margin:0 10px">
       <span class="val" id="lvlSilV">–</span>
@@ -907,7 +900,6 @@ function applyConfig(cfg) {
   if (tEnergyCeiling) tEnergyCeiling.checked = !!cfg.energyCeiling;
   if (tClubMode) tClubMode.checked = !!cfg.clubMode;
   if (tAmbientGlow) tAmbientGlow.checked = !!cfg.ambientGlow;
-  if (tRiserStrobe) tRiserStrobe.checked = !!cfg.riserStrobe;
   if (tStrobeUnlimited) tStrobeUnlimited.checked = !!cfg.strobeUnlimited;
   if (tRegiPro) { tRegiPro.checked = !!cfg.regiPro; applyRegiProUi(!!cfg.regiPro); }
   {
@@ -942,15 +934,14 @@ function applyConfig(cfg) {
   if (sfFx) sfFx.textContent = String(Array.isArray(cfg.fixtures) ? cfg.fixtures.length : 0);
 }
 
-/* Ljusnivå (2026-09-27): "Lägsta nivå" = cfg.levelWindowDb (dB under taket), "Släckgräns" = cfg.silenceLevel
+/* Ljusnivå (2026-09-27; "Lägsta nivå" borttagen 2026-10-10): "Släckgräns" = cfg.silenceLevel
    (0..1, visas i %). Samma mönster som LED-ringens reglage: dirty-flagga medan man drar, 150 ms debounce → WS. */
 let levelDirty = false;
 function syncLevelUi(cfg) {
   if (levelDirty) return;   // användaren drar → rör inte reglagen
   const setR = (id, v) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = String(v); };
   const setV = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
-  const win = Math.round(cfg.levelWindowDb ?? 10), sil = Math.round((cfg.silenceLevel ?? 0.05) * 100);
-  setR("lvlWin", win); setV("lvlWinV", win + " dB");
+  const sil = Math.round((cfg.silenceLevel ?? 0.05) * 100);
   setR("lvlSil", sil); setV("lvlSilV", sil + " %");
 }
 (function wireLevel() {
@@ -965,7 +956,6 @@ function syncLevelUi(cfg) {
       t = setTimeout(() => { send(msg(Number(el.value))); levelDirty = false; }, 150);
     });
   };
-  bind("lvlWin", "lvlWinV", (v) => v + " dB", (v) => ({ type: "setLevelWindowDb", value: v }));
   bind("lvlSil", "lvlSilV", (v) => v + " %",  (v) => ({ type: "setSilenceLevel",  value: v / 100 }));
 })();
 
@@ -1044,7 +1034,6 @@ function updateAdvMirror(cfg) {
   flag("fClub",   cfg.clubMode);
   flag("fAmb",    cfg.ambientGlow);
   flag("fCeil",   cfg.energyCeiling);
-  flag("fRiser",  cfg.riserStrobe);
   // Fog: DMX-drivet — kräver att användaren aktiverat den OCH satt en giltig
   // DMX-adress. Utan adress finns ingen hårdvara att skicka till, så flaggan
   // ska inte lysa även om enabled är på.
@@ -1654,8 +1643,6 @@ const tClubMode = document.getElementById("tClubMode");
 tClubMode.onchange = () => send({ type: "setClubMode", value: tClubMode.checked });
 const tAmbientGlow = document.getElementById("tAmbientGlow");
 tAmbientGlow.onchange = () => send({ type: "setAmbientGlow", value: tAmbientGlow.checked });
-const tRiserStrobe = document.getElementById("tRiserStrobe");
-tRiserStrobe.onchange = () => send({ type: "setRiserStrobe", value: tRiserStrobe.checked });
 const tStrobeUnlimited = document.getElementById("tStrobeUnlimited");
 // Att HÖJA taket kräver ett aktivt ja; att sänka det gör det aldrig.
 tStrobeUnlimited.onchange = () => {
