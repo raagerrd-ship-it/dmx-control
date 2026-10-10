@@ -30,6 +30,10 @@
    också om halfTick-flippen kan ske live (beatTick vs beatFrac-wrap när ankaret nudgas). Ändra aldrig den delade analysatorn.
 
 ## Från 2026-10-10 eftermiddag — NYA DROP-KLIPP + LÅNG INSPELNING (efter "FÄRRE REGLAGE")
+KLART 2026-10-10 natt (8a3f782): (1) tools/dropFacit.mjs - bänken 0/10 fulla drops men minidrop vid dropen 10/10 (±0,4 s, rise 10-27 dB);
+klippen börjar 15 s före dropen så analysatorn ser aldrig kropp->borta->tillbaka (live hade minuters historik) - breaklängden går inte
+att mäta ur dem. (2) "Spela in 5 min" i /setup (src/longRecord.ts, /api/longrec; egen modul, recorder.ts är delad med lotus), alltid
+tillgänglig, ingen kostnad i vila. NÄSTA: när ägaren spelat in lang-*.wav - kör dropFacit/showTight på dem (drops med historik).
 Ägaren i ladan 10-10 ("ja, lägg in båda"). LÄGET: kodens standard deployad 10-10 ~14:10 (TRE STEG, dimmern konstant, minsta på-tid
 lampa 150 ms / färgkanal 100 ms med EffectDef.fastLight (strobe), Släcktid 3 s, Lägsta nivå 0 % (energins golv), energin släcker aldrig
 en tänd lampa). Live-mätning 10-10: 19 looks/3 min, färg DMX p5/50/95 18/75/215, max 242, DIM 255.
@@ -46,6 +50,11 @@ en tänd lampa). Live-mätning 10-10: 19 looks/3 min, färg DMX p5/50/95 18/75/2
    föreslå hur den kan vara på utan att belasta showen. Status i UI (spelar in / klar / fil). Deploya aldrig; "redo för ladan".
 
 ## Från 2026-10-10 kväll — KONSERTSHOW ⭐ (efter de två ovan; "löser du det får du en stjärna i kanten")
+STEG 1+2 KLART 2026-10-10 natt (51c237b, rapport-artifact v4): tools/concertBench.mjs + sektionspalett opt-in DMX_SECTION_PALETTE=1
+(paletter/sektion 2->1, palettbyte på gräns 0,1->0,97, återseende 0,23->1,0; av json-identisk; resultat i tools/natt/konsert/).
+RANGORDNAT NÄSTA (mät med concertBench före/efter, opt-in): 1 frasbundna look-byten (bytePaFras 0,09-0,22 ≈ slump 0,19),
+2 kulör per fras i stället för per takt i effekterna (kulörbyten 17-21/min), 3 lamptrappa via DIRIGENTEN (allaTanda 0,81-0,88; aldrig
+i energilagret), 4 tydligare vers/refräng (0,06-0,12), 5 strobe/rök vid rätt ögonblick.
 Ägaren: "Hur kan vi få ljusshowen mer lik en riktig konsert-show?" Riggen: 4 RGB-parlampor (dimmer konstant, R/G/B bär allt),
 rökmaskin, inga movers; allt i realtid ur aux (ingen låtlista, inget låtminne). Arkitekturen är fast: TRE STEG (effekt -> energi ->
 kalibrering), effekterna äger färg/styrka/lampa, dirigenten väljer look.
