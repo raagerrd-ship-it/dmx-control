@@ -406,6 +406,7 @@ export class EffectEngine {
   private lastLiveSection = '';   // DMX_SECTION_SWITCH
   private lastDropSwitchMs = -1e9; dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;   // senaste drop -> 'high'-pool i 20 s
   private eSm = 0; eSimple = 0; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
+  private trebleEnv = 0; private airEnv = 0; private punchEnv = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
   private lampLvl = new Float32Array(64); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
@@ -517,7 +518,7 @@ export class EffectEngine {
   // Pre-allokerad kontext för noll-allokering i render-loopen
   private ctx: EffectContext = {
     cfg: null as any, frame: null as any, fx: undefined, t: 0, idx: 0, count: 0, want: {},
-    audio: 0, kickEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null as any, expectHighInMs: -1, levelVsHighDb: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionEntry: 0, sectionTier: 1, repeatSim: 0,
+    audio: 0, kickEnv: 0, trebleEnv: 0, airEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null as any, expectHighInMs: -1, levelVsHighDb: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionEntry: 0, sectionTier: 1, repeatSim: 0,
     sectionBars: 0, bassline: 0, bassNoteIdx: 0, bassNoteAge: 9,
     beatIdx: 0, beatFrac: 0, beatPulse: 0, beatHit: false, hasBeat: false,
     wavePhase: 0, buildUp: 0, phaseSpread: 0, punchFloor: 0, chasePos: 0,
@@ -1520,9 +1521,17 @@ export class EffectEngine {
     ctx.cfg = this.cfg; ctx.frame = frame; ctx.t = t; ctx.count = count;
     ctx.section = frame.section || 'intro'; ctx.sectionAgeMs = frame.sectionAgeMs || 0; ctx.sectionIndex = frame.sectionIndex || 0;
     ctx.sectionEntry = SECTION_SWITCH ? Math.max(0, 1 - (frame.sectionAgeMs || 1e9) / 400) : 0; ctx.sectionTier = frame.sectionTier ?? 1; ctx.expectHighInMs = frame.expectHighInMs ?? -1; ctx.levelVsHighDb = frame.levelVsHighDb ?? 0; ctx.repeatSim = frame.repeatSim || 0;
-    ctx.audio = audio; ctx.kickEnv = kickEnv; ctx.punch = bassPunch;
+    // PUNCH MED AVKLINGNING (2026-10-10): bassPunch spikade ruta for ruta och gav fladder rakt in i ljuset (chase 39 -> 4 utan den).
+    // Upp direkt, ~120 ms avklingning - dunken behaller sin skarpa uppgang men blir EN puls i stallet for ett flimmer.
+    this.punchEnv = Math.max(bassPunch, this.punchEnv * Math.exp(-dtSec / 0.12));
+    ctx.audio = audio; ctx.kickEnv = kickEnv; ctx.punch = this.punchEnv;
     ctx.dropEnv = this.dropEnv; ctx.gravLevel = this.gravLevel;
     ctx.gravPeak = this.gravPeak; ctx.drum = frame.drum;
+    {   // GLITTER-ENVELOPER (se types.ts trebleEnv/airEnv): upp direkt, ~120 ms avklingning
+      const gk = Math.exp(-dtSec / 0.12), o = frame.onset;
+      this.trebleEnv = Math.max(o?.treble ?? 0, this.trebleEnv * gk); this.airEnv = Math.max(o?.air ?? 0, this.airEnv * gk);
+      ctx.trebleEnv = this.trebleEnv; ctx.airEnv = this.airEnv;
+    }
     ctx.beatIdx = beatIdx; ctx.beatFrac = beatFracFx; ctx.beatPulse = beatPulse; ctx.heartPulse = heartPulse;
     // TVAGRUPPERING: vaxlar per look (smartCount) och var 32:e slag - "skiftar ibland mellan varannan och inre/yttre".
     ctx.grouping = GROUP_ALT && (((this.smartCount + (beatIdx >> 5)) & 1) === 1) ? 'innerouter' : 'varannan';

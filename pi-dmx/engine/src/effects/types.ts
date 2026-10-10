@@ -70,6 +70,10 @@ export interface EffectContext {
   bassline: number; bassNoteIdx: number; bassNoteAge: number;
   /** Kick-/beat-envelope (0..1). */
   kickEnv: number;
+  /** GLITTER-ENVELOPER (2026-10-10): diskant- (hi-hat/cymbal) och luftanslaget (frame.onset.treble/air) med direkt uppgang och
+   *  ~120 ms avklingning. Rått onset ar en spik per hop (25-50 ms) och gav fladder rakt in i ljuset (wave/chase stod for 145 av 167
+   *  fladder i banken) - effekter som vill ha gnistor pa hi-hats ska lasa dessa. */
+  trebleEnv: number; airEnv: number;
   /** BAS-PUNCH: "goa slaget" — spikar 0..1 på en riktig dunk (bas klart över sin
    *  baslinje), noll annars. Effekten avgör själv hur hårt den ska slå. */
   punch: number;

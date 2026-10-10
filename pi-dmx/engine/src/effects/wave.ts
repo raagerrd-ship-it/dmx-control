@@ -13,7 +13,7 @@ export const wave: EffectDef = {
     // Diskant-nivån (spec.treble) lägger en snabb krusning på vågfasen → en slät
     // sinus blir TAGGIG och vibrerar när hi-hats/cymbaler piskar på. onset.treble
     // ger dessutom en skarp ljusflick ovanpå (glitter).
-    const ripple = c.frame.spec.treble * Math.sin(c.t * 22 + c.idx * 3);
+    const ripple = c.trebleEnv * Math.sin(c.t * 22 + c.idx * 3);   // mjukad diskant (10-10: ra spec.treble ryckte fasen = fladder)
     // FRASPERIOD (2026-09-23): med takt rullar vagen EN gang per tva takter (8 slag) ur gridet - den vander pa taktgransen
     // i stallet for att glida ur fas pa klocktid. Utan takt: motorns wavePhase (klocktid + niva) som forr.
     const phase = c.hasBeat ? (2 * Math.PI * (c.beatIdx + c.beatFrac)) / 8 : c.wavePhase;
@@ -24,8 +24,8 @@ export const wave: EffectDef = {
     // Vågen BÄR på basen (spec.bass), inte på bredbandsbrus → den tystnar inte av
     // diskant/sång. onset.treble-glitter ligger ovanpå + en snabbare luft-shimmer
     // (onset.air) bara på udda lampor → shimmer-topp utan att flödet tappas.
-    const shimmer = c.idx % 2 === 1 ? c.frame.onset.air * 0.25 : 0;
-    const v = c.shaped(0.12, base * (0.35 + c.frame.spec.bass * 0.7) + c.kickEnv * 0.2 + c.frame.onset.treble * 0.4 + shimmer) + c.punch * 0.3;
+    const shimmer = c.idx % 2 === 1 ? c.airEnv * 0.25 : 0;   // mjukad luft (10-10: ra onset gav fladder)
+    const v = c.shaped(0.12, base * (0.35 + c.frame.spec.bass * 0.7) + c.kickEnv * 0.2 + c.trebleEnv * 0.4 + shimmer) + c.punch * 0.3;
     return c.hsv(hue, 1 - c.punch * 0.25, Math.min(1, v));   // riktig dunk lyfter hela vågen kort
   },
 };
