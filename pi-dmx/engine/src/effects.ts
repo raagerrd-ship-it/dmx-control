@@ -298,8 +298,8 @@ const E_MIN_LIT = Math.pow(1 / 255, E_LIN_INV) * 1.02;   // agarens 1 %: gammans
  * Slå på igen = true, så återvänder bloomen och drop-look-bytet.
  */
 const DISCRETE_DROP_LAMPS = true;   // ater PA (agaren i ladan): lamporna ska bloma pa dropen synkat med roken (samma dropCount). Energi-gasen ensam racker inte som drop-markering.
-/** FASFEL SANKER TAKTENS TILLIT (lotus-porten 09-23): ihallande fasfel > SYNC_ERR_FRAC drar ner tilliten som dirigentens grindar laser. */
-const ENERGY_FB = process.env.DMX_ENERGY_FALLBACK !== '0';
+/** FASFEL SANKER TAKTENS TILLIT (lotus-porten 09-23): ihallande fasfel > SYNC_ERR_FRAC drar ner tilliten som dirigentens grindar laser.
+ *  (Av-brytaren DMX_ENERGY_FALLBACK borttagen 10-10 - alltid pa.) */
 const SYNC_ERR_FRAC = Number(process.env.DMX_SYNC_ERR_FRAC ?? 0.2);
 // LOGGEN: index.ts tystar console.log nar DMX_QUIET != '0' (standard). Periodiska diagnosrader byggs da inte alls (skrapjakten 10-01).
 // (brytaren under drift: quiet.ts / PUT /api/debug/verbose)
@@ -329,7 +329,7 @@ export class EffectEngine {
   private showTime = 0;      // ackumulerad "show-tid" — accelererar under uppbyggnaden (riser)
   private lastShowMs = 0;
   private lastKickBoost = 0;
-  private songStartWall = Date.now();   // DMX_PULSE_GAP_MS   // ENERGY_FB: transientpuls (bred onset) med avklingning
+  private songStartWall = Date.now();
      // lotus-porten (se LOCK_BEATS)
   private showVel = 0;       // extra show-tids-hastighet från bastransienter (akustisk tröghet)
   private pendingKick = 0;   // ackumulerade kick-impulser sedan förra rendern (fylls i 375 Hz)
@@ -856,7 +856,7 @@ export class EffectEngine {
         const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - MIN_BEAT_CONFIDENCE) / 0.37));
         // (5) FASFEL = OSAKER (lotus-porten): ihallande fasfel drar ner den raa tilliten; tappad tillit > 1,5 s nollar slagraknaren.
         let trustRawEff = trustRaw;
-        if (ENERGY_FB) {
+        {
           const se = Math.abs(this.cfg.beatErr ?? 0), lim = Math.max(0.02, SYNC_ERR_FRAC);
           trustRawEff *= se <= lim ? 1 : Math.max(0, 1 - (se - lim) / lim);
         }
