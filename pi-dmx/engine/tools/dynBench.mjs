@@ -103,7 +103,7 @@ if (process.env.DYN_HIST) globalThis.__chHist = [];
 const eng = new EffectEngine(cfg);
 console.log = () => {};
 
-const E_CURVE = Math.max(0.3, Math.min(4, Number(process.env.DMX_E_CURVE ?? 2)));
+const E_CURVE = Math.max(0.3, Math.min(10, Number(process.env.DMX_E_CURVE ?? 10)));   // = motorns standard sedan 10-10
 const T = [], LIT = [], DB = [], MD = [], ES = [], DIMP = [], LAMP = lamps.map(() => []), CH = lamps.map(() => [[], [], []]), INTENT = lamps.map(() => [[], [], []]);
 const KICKT = [], BEATT = [], LOOK = [], BPMS = [], CONF = [];
 let lastRender = -1, kickPending = false, lastBeatIdx = null;

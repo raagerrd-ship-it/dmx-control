@@ -1,0 +1,3450 @@
+{
+ "summ": {
+  "levande": {
+   "mdSteg": 5,
+   "mdSteg1s": 2.69,
+   "rMdLjus": 0.84,
+   "rMdDim": 0.43,
+   "ljusSteg": 2.54,
+   "rDb": 0.55,
+   "kontrast": 1.99,
+   "dbSpann": 7.8,
+   "litP10": 0.075,
+   "litP50": 0.31,
+   "litP90": 0.583
+  },
+  "fladder": {
+   "fladderMin": 1.6,
+   "pulsPerKick": 0.44,
+   "kickarMin": 196
+  },
+  "rgb": {
+   "sidoVaxlMin": 45.9,
+   "sidoBlinkMin": 2.1,
+   "alla3": 0,
+   "ofrivBlinkMin": 0,
+   "blinkLook": null
+  },
+  "fladderPerLook": {
+   "wave": 60,
+   "forvarning": 12,
+   "chase": 5,
+   "nedrakning": 4,
+   "basgang": 4,
+   "varannan": 2
+  },
+  "n": 20,
+  "env": [
+   "DMX_HUE_CUT=1",
+   "DMX_ALLA_LOOKER=1",
+   "DMX_E_CURVE=10",
+   "DMX_E_TOP=0.95",
+   "DMX_E_WIN_S=10",
+   "DMX_E_GATE=1",
+   "DMX_GAMMA=1.6",
+   "DMX_E_NORM_S=2",
+   "DMX_E_LIN=1",
+   "DMX_FX_FLOOR=0.6",
+   "DMX_TEMPO_SHIFT=1",
+   "DMX_TEMPO_HOLD=1"
+  ]
+ },
+ "klipp": [
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan1.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 5,
+    "mdSteg1s": 3.94,
+    "rMdLjus": 0.87,
+    "rMdDim": 0.32,
+    "ljusSteg": 2.13,
+    "rDb": 0.162,
+    "kontrast": 1.26,
+    "dbSpann": 5.9,
+    "litP10": 0.079,
+    "litP50": 0.309,
+    "litP90": 0.573
+   },
+   "fladder": {
+    "fladderMin": 0,
+    "pulsPerKick": 0.44,
+    "kickarMin": 207,
+    "perLook": {}
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -22.9,
+      "e": 0.52,
+      "md": 0.21,
+      "dim": 78,
+      "lit": 23
+     },
+     {
+      "db": -19.9,
+      "e": 0.59,
+      "md": 0.28,
+      "dim": 79,
+      "lit": 23
+     },
+     {
+      "db": -18.9,
+      "e": 0.65,
+      "md": 0.34,
+      "dim": 80,
+      "lit": 25
+     },
+     {
+      "db": -18.2,
+      "e": 0.74,
+      "md": 0.43,
+      "dim": 80,
+      "lit": 26
+     },
+     {
+      "db": -17.5,
+      "e": 0.8,
+      "md": 0.53,
+      "dim": 80,
+      "lit": 29
+     },
+     {
+      "db": -16.5,
+      "e": 0.87,
+      "md": 0.65,
+      "dim": 79,
+      "lit": 38
+     },
+     {
+      "db": -15.9,
+      "e": 0.89,
+      "md": 0.67,
+      "dim": 79,
+      "lit": 33
+     },
+     {
+      "db": -15.5,
+      "e": 0.92,
+      "md": 0.73,
+      "dim": 78,
+      "lit": 35
+     },
+     {
+      "db": -14.9,
+      "e": 0.96,
+      "md": 0.86,
+      "dim": 79,
+      "lit": 41
+     },
+     {
+      "db": -14.2,
+      "e": 0.99,
+      "md": 0.96,
+      "dim": 77,
+      "lit": 47
+     }
+    ],
+    "eP": [
+     0.05,
+     0.89,
+     1
+    ],
+    "dimP": [
+     56,
+     80,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.11,
+     13.5,
+     77
+    ],
+    [
+     0.46,
+     25.9,
+     77
+    ],
+    [
+     0.62,
+     33.2,
+     79
+    ],
+    [
+     0.72,
+     39.7,
+     81
+    ],
+    [
+     0.87,
+     45.1,
+     81
+    ]
+   ],
+   "litOn": [
+    8,
+    30,
+    58
+   ],
+   "litOnFull": [
+    4.3,
+    5.9,
+    15.8,
+    29.7,
+    45.5,
+    68.7,
+    81.3,
+    88.6
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 46.9,
+    "sidoBlinkMin": 2.7,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "varannan": 2,
+     "basgang": 3
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan10_dmuzzabv3.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 3.72,
+    "mdSteg1s": 2.47,
+    "rMdLjus": 0.77,
+    "rMdDim": -0.11,
+    "ljusSteg": 1.69,
+    "rDb": 0.23,
+    "kontrast": 1.39,
+    "dbSpann": 9,
+    "litP10": 0.126,
+    "litP50": 0.361,
+    "litP90": 0.555
+   },
+   "fladder": {
+    "fladderMin": 6.4,
+    "pulsPerKick": 0.43,
+    "kickarMin": 222,
+    "perLook": {
+     "wave": 8,
+     "nedrakning": 4
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -28.3,
+      "e": 0.63,
+      "md": 0.46,
+      "dim": 88,
+      "lit": 29
+     },
+     {
+      "db": -22.1,
+      "e": 0.58,
+      "md": 0.18,
+      "dim": 81,
+      "lit": 23
+     },
+     {
+      "db": -19.8,
+      "e": 0.77,
+      "md": 0.43,
+      "dim": 81,
+      "lit": 26
+     },
+     {
+      "db": -18.7,
+      "e": 0.85,
+      "md": 0.58,
+      "dim": 80,
+      "lit": 31
+     },
+     {
+      "db": -18.1,
+      "e": 0.89,
+      "md": 0.65,
+      "dim": 77,
+      "lit": 32
+     },
+     {
+      "db": -17.7,
+      "e": 0.92,
+      "md": 0.72,
+      "dim": 78,
+      "lit": 36
+     },
+     {
+      "db": -17.3,
+      "e": 0.95,
+      "md": 0.83,
+      "dim": 76,
+      "lit": 39
+     },
+     {
+      "db": -16.9,
+      "e": 0.97,
+      "md": 0.88,
+      "dim": 78,
+      "lit": 44
+     },
+     {
+      "db": -16.2,
+      "e": 0.97,
+      "md": 0.89,
+      "dim": 81,
+      "lit": 44
+     },
+     {
+      "db": -15.2,
+      "e": 1,
+      "md": 0.99,
+      "dim": 83,
+      "lit": 50
+     }
+    ],
+    "eP": [
+     0.03,
+     0.93,
+     1
+    ],
+    "dimP": [
+     53,
+     82,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.23,
+     17.6,
+     84
+    ],
+    [
+     0.6,
+     34.5,
+     80
+    ],
+    [
+     0.7,
+     33.5,
+     75
+    ],
+    [
+     0.81,
+     41.6,
+     80
+    ],
+    [
+     0.9,
+     47.1,
+     82
+    ]
+   ],
+   "litOn": [
+    12,
+    35,
+    60
+   ],
+   "litOnFull": [
+    6.1,
+    8.3,
+    20.5,
+    34.9,
+    47.4,
+    68.9,
+    83.5,
+    91.1
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 64,
+    "sidoBlinkMin": 1.6,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "varannan": 3
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan1_dmuzyk2bc.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 3.48,
+    "mdSteg1s": 2.17,
+    "rMdLjus": 0.95,
+    "rMdDim": 0.67,
+    "ljusSteg": 2.97,
+    "rDb": 0.651,
+    "kontrast": 2.33,
+    "dbSpann": 5,
+    "litP10": 0.073,
+    "litP50": 0.322,
+    "litP90": 0.638
+   },
+   "fladder": {
+    "fladderMin": 1.1,
+    "pulsPerKick": 0.32,
+    "kickarMin": 190,
+    "perLook": {
+     "wave": 2
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -20.8,
+      "e": 0.49,
+      "md": 0.12,
+      "dim": 73,
+      "lit": 13
+     },
+     {
+      "db": -18.3,
+      "e": 0.68,
+      "md": 0.26,
+      "dim": 75,
+      "lit": 16
+     },
+     {
+      "db": -17.1,
+      "e": 0.74,
+      "md": 0.38,
+      "dim": 78,
+      "lit": 19
+     },
+     {
+      "db": -16.5,
+      "e": 0.8,
+      "md": 0.48,
+      "dim": 77,
+      "lit": 24
+     },
+     {
+      "db": -16.1,
+      "e": 0.86,
+      "md": 0.62,
+      "dim": 78,
+      "lit": 31
+     },
+     {
+      "db": -15.7,
+      "e": 0.9,
+      "md": 0.72,
+      "dim": 77,
+      "lit": 35
+     },
+     {
+      "db": -15.3,
+      "e": 0.93,
+      "md": 0.79,
+      "dim": 78,
+      "lit": 41
+     },
+     {
+      "db": -14.8,
+      "e": 0.98,
+      "md": 0.91,
+      "dim": 82,
+      "lit": 50
+     },
+     {
+      "db": -14.4,
+      "e": 0.99,
+      "md": 0.97,
+      "dim": 83,
+      "lit": 56
+     },
+     {
+      "db": -13.8,
+      "e": 1,
+      "md": 0.99,
+      "dim": 79,
+      "lit": 54
+     }
+    ],
+    "eP": [
+     0.25,
+     0.93,
+     1
+    ],
+    "dimP": [
+     54,
+     78,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.21,
+     9,
+     71
+    ],
+    [
+     0.34,
+     18.8,
+     76
+    ],
+    [
+     0.61,
+     32.1,
+     75
+    ],
+    [
+     0.92,
+     47.8,
+     80
+    ],
+    [
+     0.99,
+     57.9,
+     86
+    ]
+   ],
+   "litOn": [
+    7,
+    30,
+    67
+   ],
+   "litOnFull": [
+    5.6,
+    6.3,
+    12.9,
+    30.4,
+    51.4,
+    74.7,
+    85.6,
+    90.4
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 46.9,
+    "sidoBlinkMin": 0,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {}
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan1_dmuzykrvq.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 6,
+    "mdSteg1s": 3.49,
+    "rMdLjus": 0.91,
+    "rMdDim": 0.43,
+    "ljusSteg": 2.75,
+    "rDb": 0.599,
+    "kontrast": 1.52,
+    "dbSpann": 6.8,
+    "litP10": 0.075,
+    "litP50": 0.345,
+    "litP90": 0.586
+   },
+   "fladder": {
+    "fladderMin": 1.1,
+    "pulsPerKick": 0.44,
+    "kickarMin": 228,
+    "perLook": {
+     "wave": 2
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -23.9,
+      "e": 0.18,
+      "md": 0.04,
+      "dim": 74,
+      "lit": 7
+     },
+     {
+      "db": -18.9,
+      "e": 0.63,
+      "md": 0.32,
+      "dim": 83,
+      "lit": 21
+     },
+     {
+      "db": -16.9,
+      "e": 0.88,
+      "md": 0.62,
+      "dim": 85,
+      "lit": 38
+     },
+     {
+      "db": -16.2,
+      "e": 0.89,
+      "md": 0.69,
+      "dim": 84,
+      "lit": 40
+     },
+     {
+      "db": -16,
+      "e": 0.87,
+      "md": 0.62,
+      "dim": 79,
+      "lit": 34
+     },
+     {
+      "db": -15.7,
+      "e": 0.88,
+      "md": 0.63,
+      "dim": 79,
+      "lit": 36
+     },
+     {
+      "db": -15.5,
+      "e": 0.91,
+      "md": 0.7,
+      "dim": 80,
+      "lit": 39
+     },
+     {
+      "db": -15.2,
+      "e": 0.94,
+      "md": 0.81,
+      "dim": 82,
+      "lit": 45
+     },
+     {
+      "db": -14.8,
+      "e": 0.96,
+      "md": 0.87,
+      "dim": 79,
+      "lit": 43
+     },
+     {
+      "db": -14,
+      "e": 0.99,
+      "md": 0.98,
+      "dim": 78,
+      "lit": 44
+     }
+    ],
+    "eP": [
+     0.02,
+     0.92,
+     1
+    ],
+    "dimP": [
+     55,
+     82,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.15,
+     13.3,
+     76
+    ],
+    [
+     0.53,
+     26.4,
+     76
+    ],
+    [
+     0.69,
+     32.7,
+     77
+    ],
+    [
+     0.79,
+     43.4,
+     82
+    ],
+    [
+     0.93,
+     54.4,
+     88
+    ]
+   ],
+   "litOn": [
+    8,
+    34,
+    62
+   ],
+   "litOnFull": [
+    2.4,
+    5.5,
+    21.2,
+    33.8,
+    47.2,
+    69.3,
+    82.7,
+    90
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 36.3,
+    "sidoBlinkMin": 1.1,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "basgang": 2
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan2.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 6,
+    "mdSteg1s": 5.85,
+    "rMdLjus": 0.95,
+    "rMdDim": 0.4,
+    "ljusSteg": 5.17,
+    "rDb": 0.77,
+    "kontrast": 3.51,
+    "dbSpann": 8.9,
+    "litP10": 0.007,
+    "litP50": 0.23,
+    "litP90": 0.535
+   },
+   "fladder": {
+    "fladderMin": 3.2,
+    "pulsPerKick": 0.27,
+    "kickarMin": 203,
+    "perLook": {
+     "wave": 6
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -24.7,
+      "e": 0.14,
+      "md": 0.04,
+      "dim": 74,
+      "lit": 2
+     },
+     {
+      "db": -22.2,
+      "e": 0.17,
+      "md": 0.02,
+      "dim": 79,
+      "lit": 7
+     },
+     {
+      "db": -18.7,
+      "e": 0.56,
+      "md": 0.19,
+      "dim": 79,
+      "lit": 15
+     },
+     {
+      "db": -17,
+      "e": 0.69,
+      "md": 0.29,
+      "dim": 81,
+      "lit": 21
+     },
+     {
+      "db": -16.5,
+      "e": 0.76,
+      "md": 0.38,
+      "dim": 77,
+      "lit": 24
+     },
+     {
+      "db": -16,
+      "e": 0.86,
+      "md": 0.58,
+      "dim": 83,
+      "lit": 34
+     },
+     {
+      "db": -15.7,
+      "e": 0.9,
+      "md": 0.67,
+      "dim": 82,
+      "lit": 38
+     },
+     {
+      "db": -15.3,
+      "e": 0.93,
+      "md": 0.77,
+      "dim": 81,
+      "lit": 39
+     },
+     {
+      "db": -14.8,
+      "e": 0.97,
+      "md": 0.89,
+      "dim": 80,
+      "lit": 39
+     },
+     {
+      "db": -14.2,
+      "e": 1,
+      "md": 0.99,
+      "dim": 81,
+      "lit": 49
+     }
+    ],
+    "eP": [
+     0.01,
+     0.83,
+     1
+    ],
+    "dimP": [
+     54,
+     81,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.01,
+     2.5,
+     78
+    ],
+    [
+     0.3,
+     18.1,
+     79
+    ],
+    [
+     0.48,
+     24.1,
+     77
+    ],
+    [
+     0.65,
+     33.2,
+     79
+    ],
+    [
+     0.89,
+     51.4,
+     85
+    ]
+   ],
+   "litOn": [
+    9,
+    26,
+    56
+   ],
+   "litOnFull": [
+    1,
+    5.1,
+    14.3,
+    25.6,
+    43.3,
+    64.3,
+    79.9,
+    90
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 45.9,
+    "sidoBlinkMin": 3.2,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "nedrakning": 6
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan3.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 5.42,
+    "mdSteg1s": 2.98,
+    "rMdLjus": 0.8,
+    "rMdDim": 0.14,
+    "ljusSteg": 2.57,
+    "rDb": 0.529,
+    "kontrast": 1.99,
+    "dbSpann": 7.8,
+    "litP10": 0.07,
+    "litP50": 0.285,
+    "litP90": 0.559
+   },
+   "fladder": {
+    "fladderMin": 0,
+    "pulsPerKick": 0.59,
+    "kickarMin": 192,
+    "perLook": {}
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -25.6,
+      "e": 0.23,
+      "md": 0.03,
+      "dim": 83,
+      "lit": 10
+     },
+     {
+      "db": -21.6,
+      "e": 0.55,
+      "md": 0.13,
+      "dim": 81,
+      "lit": 14
+     },
+     {
+      "db": -19.1,
+      "e": 0.76,
+      "md": 0.39,
+      "dim": 82,
+      "lit": 27
+     },
+     {
+      "db": -17.9,
+      "e": 0.76,
+      "md": 0.42,
+      "dim": 79,
+      "lit": 30
+     },
+     {
+      "db": -17.1,
+      "e": 0.81,
+      "md": 0.48,
+      "dim": 81,
+      "lit": 33
+     },
+     {
+      "db": -16.6,
+      "e": 0.84,
+      "md": 0.54,
+      "dim": 80,
+      "lit": 31
+     },
+     {
+      "db": -16.1,
+      "e": 0.87,
+      "md": 0.63,
+      "dim": 82,
+      "lit": 33
+     },
+     {
+      "db": -15.7,
+      "e": 0.9,
+      "md": 0.71,
+      "dim": 80,
+      "lit": 33
+     },
+     {
+      "db": -15.3,
+      "e": 0.97,
+      "md": 0.88,
+      "dim": 83,
+      "lit": 42
+     },
+     {
+      "db": -14.4,
+      "e": 0.99,
+      "md": 0.97,
+      "dim": 81,
+      "lit": 49
+     }
+    ],
+    "eP": [
+     0.03,
+     0.86,
+     1
+    ],
+    "dimP": [
+     49,
+     83,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.1,
+     12.6,
+     82
+    ],
+    [
+     0.37,
+     21.8,
+     80
+    ],
+    [
+     0.53,
+     31,
+     81
+    ],
+    [
+     0.7,
+     34.6,
+     77
+    ],
+    [
+     0.83,
+     47.9,
+     86
+    ]
+   ],
+   "litOn": [
+    7,
+    28,
+    57
+   ],
+   "litOnFull": [
+    2.6,
+    5.8,
+    12,
+    27.9,
+    44.4,
+    65.8,
+    80.2,
+    91.1
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 1,
+    "ms": [
+     400
+    ]
+   },
+   "rgb": {
+    "sidoVaxlMin": 42.7,
+    "sidoBlinkMin": 3.2,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "nedrakning": 4,
+     "basgang": 2
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan4.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 5.89,
+    "mdSteg1s": 5.89,
+    "rMdLjus": 0.84,
+    "rMdDim": 0.6,
+    "ljusSteg": 3.62,
+    "rDb": 0.55,
+    "kontrast": 4.28,
+    "dbSpann": 10.8,
+    "litP10": 0.032,
+    "litP50": 0.121,
+    "litP90": 0.529
+   },
+   "fladder": {
+    "fladderMin": 0,
+    "pulsPerKick": 0.23,
+    "kickarMin": 194,
+    "perLook": {}
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -27.3,
+      "e": 0.23,
+      "md": 0.04,
+      "dim": 79,
+      "lit": 7
+     },
+     {
+      "db": -25.2,
+      "e": 0.37,
+      "md": 0.04,
+      "dim": 77,
+      "lit": 11
+     },
+     {
+      "db": -24.3,
+      "e": 0.4,
+      "md": 0.06,
+      "dim": 80,
+      "lit": 9
+     },
+     {
+      "db": -23.3,
+      "e": 0.54,
+      "md": 0.13,
+      "dim": 82,
+      "lit": 9
+     },
+     {
+      "db": -21.8,
+      "e": 0.64,
+      "md": 0.33,
+      "dim": 81,
+      "lit": 22
+     },
+     {
+      "db": -18.3,
+      "e": 0.66,
+      "md": 0.26,
+      "dim": 79,
+      "lit": 18
+     },
+     {
+      "db": -16.9,
+      "e": 0.8,
+      "md": 0.44,
+      "dim": 84,
+      "lit": 23
+     },
+     {
+      "db": -16.3,
+      "e": 0.83,
+      "md": 0.48,
+      "dim": 85,
+      "lit": 22
+     },
+     {
+      "db": -15.5,
+      "e": 0.89,
+      "md": 0.63,
+      "dim": 82,
+      "lit": 27
+     },
+     {
+      "db": -13.9,
+      "e": 0.97,
+      "md": 0.9,
+      "dim": 86,
+      "lit": 52
+     }
+    ],
+    "eP": [
+     0.03,
+     0.7,
+     1
+    ],
+    "dimP": [
+     55,
+     83,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.01,
+     4.3,
+     78
+    ],
+    [
+     0.1,
+     10.3,
+     80
+    ],
+    [
+     0.28,
+     14.9,
+     82
+    ],
+    [
+     0.42,
+     21.2,
+     82
+    ],
+    [
+     0.79,
+     46.1,
+     86
+    ]
+   ],
+   "litOn": [
+    5,
+    13,
+    52
+   ],
+   "litOnFull": [
+    0.7,
+    1.9,
+    6.6,
+    12.5,
+    28.1,
+    66,
+    84.2,
+    90
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 2,
+    "ms": [
+     0,
+     950
+    ]
+   },
+   "rgb": {
+    "sidoVaxlMin": 42.7,
+    "sidoBlinkMin": 0,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {}
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan4_dmuzyryic.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 4.61,
+    "mdSteg1s": 2.41,
+    "rMdLjus": 0.92,
+    "rMdDim": 0.68,
+    "ljusSteg": 1.96,
+    "rDb": -0.026,
+    "kontrast": 0.95,
+    "dbSpann": 7.2,
+    "litP10": 0.106,
+    "litP50": 0.282,
+    "litP90": 0.576
+   },
+   "fladder": {
+    "fladderMin": 3.2,
+    "pulsPerKick": 0.35,
+    "kickarMin": 211,
+    "perLook": {
+     "wave": 6
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -26.3,
+      "e": 0.4,
+      "md": 0.2,
+      "dim": 72,
+      "lit": 18
+     },
+     {
+      "db": -23.1,
+      "e": 0.71,
+      "md": 0.31,
+      "dim": 80,
+      "lit": 25
+     },
+     {
+      "db": -22,
+      "e": 0.82,
+      "md": 0.54,
+      "dim": 83,
+      "lit": 35
+     },
+     {
+      "db": -21.3,
+      "e": 0.83,
+      "md": 0.61,
+      "dim": 79,
+      "lit": 35
+     },
+     {
+      "db": -20.7,
+      "e": 0.86,
+      "md": 0.67,
+      "dim": 78,
+      "lit": 34
+     },
+     {
+      "db": -20.1,
+      "e": 0.79,
+      "md": 0.57,
+      "dim": 76,
+      "lit": 35
+     },
+     {
+      "db": -19.2,
+      "e": 0.77,
+      "md": 0.44,
+      "dim": 73,
+      "lit": 31
+     },
+     {
+      "db": -18,
+      "e": 0.83,
+      "md": 0.49,
+      "dim": 76,
+      "lit": 29
+     },
+     {
+      "db": -17,
+      "e": 0.93,
+      "md": 0.75,
+      "dim": 79,
+      "lit": 32
+     },
+     {
+      "db": -16,
+      "e": 0.98,
+      "md": 0.93,
+      "dim": 76,
+      "lit": 40
+     }
+    ],
+    "eP": [
+     0.02,
+     0.88,
+     1
+    ],
+    "dimP": [
+     49,
+     77,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.18,
+     16.8,
+     71
+    ],
+    [
+     0.48,
+     24.1,
+     72
+    ],
+    [
+     0.55,
+     30.6,
+     79
+    ],
+    [
+     0.67,
+     36.6,
+     79
+    ],
+    [
+     0.82,
+     47.1,
+     84
+    ]
+   ],
+   "litOn": [
+    9,
+    28,
+    58
+   ],
+   "litOnFull": [
+    4,
+    5.1,
+    17.5,
+    28.5,
+    42.9,
+    66.4,
+    81.3,
+    90.8
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 38.4,
+    "sidoBlinkMin": 2.7,
+    "alla3": 0,
+    "ofrivBlinkMin": 1.6,
+    "blinkLook": {
+     "tick": 5
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan4_dmuzyt2yx.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 1.9,
+    "mdSteg1s": 1.23,
+    "rMdLjus": 0.66,
+    "rMdDim": 0.6,
+    "ljusSteg": 1.96,
+    "rDb": 0.128,
+    "kontrast": 1.24,
+    "dbSpann": 10.6,
+    "litP10": 0.117,
+    "litP50": 0.345,
+    "litP90": 0.651
+   },
+   "fladder": {
+    "fladderMin": 2.1,
+    "pulsPerKick": 0.53,
+    "kickarMin": 203,
+    "perLook": {
+     "wave": 4
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -27.3,
+      "e": 0.82,
+      "md": 0.51,
+      "dim": 76,
+      "lit": 23
+     },
+     {
+      "db": -24.7,
+      "e": 0.82,
+      "md": 0.69,
+      "dim": 80,
+      "lit": 35
+     },
+     {
+      "db": -23.3,
+      "e": 0.92,
+      "md": 0.84,
+      "dim": 78,
+      "lit": 43
+     },
+     {
+      "db": -19.3,
+      "e": 0.66,
+      "md": 0.34,
+      "dim": 77,
+      "lit": 31
+     },
+     {
+      "db": -17.1,
+      "e": 0.83,
+      "md": 0.5,
+      "dim": 78,
+      "lit": 29
+     },
+     {
+      "db": -16.4,
+      "e": 0.87,
+      "md": 0.59,
+      "dim": 80,
+      "lit": 36
+     },
+     {
+      "db": -15.9,
+      "e": 0.88,
+      "md": 0.64,
+      "dim": 78,
+      "lit": 37
+     },
+     {
+      "db": -15.5,
+      "e": 0.93,
+      "md": 0.77,
+      "dim": 78,
+      "lit": 40
+     },
+     {
+      "db": -15,
+      "e": 0.98,
+      "md": 0.91,
+      "dim": 75,
+      "lit": 47
+     },
+     {
+      "db": -14.4,
+      "e": 1,
+      "md": 0.98,
+      "dim": 77,
+      "lit": 48
+     }
+    ],
+    "eP": [
+     0.04,
+     0.92,
+     1
+    ],
+    "dimP": [
+     51,
+     78,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.36,
+     21,
+     74
+    ],
+    [
+     0.56,
+     24.4,
+     75
+    ],
+    [
+     0.69,
+     34.6,
+     76
+    ],
+    [
+     0.76,
+     42,
+     77
+    ],
+    [
+     0.96,
+     59.8,
+     84
+    ]
+   ],
+   "litOn": [
+    11,
+    34,
+    67
+   ],
+   "litOnFull": [
+    5.9,
+    8.1,
+    19.2,
+    34.3,
+    53.1,
+    74.7,
+    86.7,
+    92.3
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 44.8,
+    "sidoBlinkMin": 1.1,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "nedrakning": 2
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan5.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 3.01,
+    "mdSteg1s": 1.97,
+    "rMdLjus": 0.83,
+    "rMdDim": 0.4,
+    "ljusSteg": 1.36,
+    "rDb": -0.601,
+    "kontrast": 0.68,
+    "dbSpann": 6.5,
+    "litP10": 0.116,
+    "litP50": 0.319,
+    "litP90": 0.551
+   },
+   "fladder": {
+    "fladderMin": 7.5,
+    "pulsPerKick": 0.26,
+    "kickarMin": 198,
+    "perLook": {
+     "wave": 8,
+     "basgang": 4,
+     "varannan": 2
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -23.8,
+      "e": 0.88,
+      "md": 0.79,
+      "dim": 88,
+      "lit": 49
+     },
+     {
+      "db": -20.2,
+      "e": 0.76,
+      "md": 0.64,
+      "dim": 81,
+      "lit": 39
+     },
+     {
+      "db": -18,
+      "e": 0.69,
+      "md": 0.36,
+      "dim": 74,
+      "lit": 28
+     },
+     {
+      "db": -16.7,
+      "e": 0.72,
+      "md": 0.35,
+      "dim": 76,
+      "lit": 26
+     },
+     {
+      "db": -16.3,
+      "e": 0.79,
+      "md": 0.44,
+      "dim": 79,
+      "lit": 26
+     },
+     {
+      "db": -16,
+      "e": 0.82,
+      "md": 0.48,
+      "dim": 77,
+      "lit": 25
+     },
+     {
+      "db": -15.7,
+      "e": 0.86,
+      "md": 0.58,
+      "dim": 78,
+      "lit": 29
+     },
+     {
+      "db": -15.3,
+      "e": 0.92,
+      "md": 0.74,
+      "dim": 79,
+      "lit": 34
+     },
+     {
+      "db": -15,
+      "e": 0.95,
+      "md": 0.81,
+      "dim": 77,
+      "lit": 34
+     },
+     {
+      "db": -14.3,
+      "e": 0.98,
+      "md": 0.93,
+      "dim": 78,
+      "lit": 37
+     }
+    ],
+    "eP": [
+     0.03,
+     0.91,
+     1
+    ],
+    "dimP": [
+     55,
+     79,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.25,
+     18.1,
+     79
+    ],
+    [
+     0.47,
+     25.9,
+     76
+    ],
+    [
+     0.63,
+     26.1,
+     73
+    ],
+    [
+     0.77,
+     39.2,
+     81
+    ],
+    [
+     0.9,
+     51.7,
+     84
+    ]
+   ],
+   "litOn": [
+    10,
+    31,
+    57
+   ],
+   "litOnFull": [
+    5.8,
+    8,
+    17.9,
+    31.1,
+    45.2,
+    65.2,
+    84.2,
+    90.8
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 44.8,
+    "sidoBlinkMin": 2.1,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "nedrakning": 4
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan5_dmuzywgfy.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 5.33,
+    "mdSteg1s": 2.69,
+    "rMdLjus": 0.79,
+    "rMdDim": 0.62,
+    "ljusSteg": 2.25,
+    "rDb": 0.689,
+    "kontrast": 3.16,
+    "dbSpann": 6,
+    "litP10": 0.083,
+    "litP50": 0.258,
+    "litP90": 0.589
+   },
+   "fladder": {
+    "fladderMin": 5.9,
+    "pulsPerKick": 0.49,
+    "kickarMin": 183,
+    "perLook": {
+     "wave": 11
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -22.9,
+      "e": 0.31,
+      "md": 0.08,
+      "dim": 74,
+      "lit": 14
+     },
+     {
+      "db": -20.4,
+      "e": 0.5,
+      "md": 0.1,
+      "dim": 74,
+      "lit": 13
+     },
+     {
+      "db": -19,
+      "e": 0.67,
+      "md": 0.24,
+      "dim": 75,
+      "lit": 16
+     },
+     {
+      "db": -18.1,
+      "e": 0.78,
+      "md": 0.4,
+      "dim": 78,
+      "lit": 21
+     },
+     {
+      "db": -17.5,
+      "e": 0.83,
+      "md": 0.49,
+      "dim": 78,
+      "lit": 25
+     },
+     {
+      "db": -16.9,
+      "e": 0.88,
+      "md": 0.62,
+      "dim": 81,
+      "lit": 29
+     },
+     {
+      "db": -16.4,
+      "e": 0.95,
+      "md": 0.81,
+      "dim": 83,
+      "lit": 40
+     },
+     {
+      "db": -15.9,
+      "e": 0.97,
+      "md": 0.88,
+      "dim": 81,
+      "lit": 44
+     },
+     {
+      "db": -15.4,
+      "e": 0.99,
+      "md": 0.95,
+      "dim": 84,
+      "lit": 53
+     },
+     {
+      "db": -14.7,
+      "e": 0.99,
+      "md": 0.95,
+      "dim": 78,
+      "lit": 48
+     }
+    ],
+    "eP": [
+     0.05,
+     0.87,
+     1
+    ],
+    "dimP": [
+     54,
+     80,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.16,
+     15.5,
+     74
+    ],
+    [
+     0.34,
+     16.5,
+     75
+    ],
+    [
+     0.52,
+     23.6,
+     79
+    ],
+    [
+     0.74,
+     39.1,
+     79
+    ],
+    [
+     0.93,
+     52.7,
+     85
+    ]
+   ],
+   "litOn": [
+    8,
+    25,
+    61
+   ],
+   "litOnFull": [
+    4.9,
+    6.6,
+    12,
+    25.3,
+    46.2,
+    68.8,
+    80.1,
+    90.8
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 70.4,
+    "sidoBlinkMin": 6.4,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "varannan": 4,
+     "basgang": 8
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan6.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 2.36,
+    "mdSteg1s": 2.11,
+    "rMdLjus": 0.91,
+    "rMdDim": 0.55,
+    "ljusSteg": 3.01,
+    "rDb": -0.396,
+    "kontrast": 1.05,
+    "dbSpann": 6.8,
+    "litP10": 0.072,
+    "litP50": 0.31,
+    "litP90": 0.638
+   },
+   "fladder": {
+    "fladderMin": 2.7,
+    "pulsPerKick": 0.5,
+    "kickarMin": 196,
+    "perLook": {
+     "wave": 5
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -27.4,
+      "e": 0.98,
+      "md": 0.96,
+      "dim": 91,
+      "lit": 57
+     },
+     {
+      "db": -19,
+      "e": 0.72,
+      "md": 0.48,
+      "dim": 78,
+      "lit": 34
+     },
+     {
+      "db": -17,
+      "e": 0.75,
+      "md": 0.38,
+      "dim": 78,
+      "lit": 19
+     },
+     {
+      "db": -16.7,
+      "e": 0.8,
+      "md": 0.47,
+      "dim": 78,
+      "lit": 24
+     },
+     {
+      "db": -16.4,
+      "e": 0.83,
+      "md": 0.52,
+      "dim": 75,
+      "lit": 23
+     },
+     {
+      "db": -16.2,
+      "e": 0.88,
+      "md": 0.62,
+      "dim": 78,
+      "lit": 28
+     },
+     {
+      "db": -16,
+      "e": 0.91,
+      "md": 0.71,
+      "dim": 78,
+      "lit": 30
+     },
+     {
+      "db": -15.7,
+      "e": 0.95,
+      "md": 0.82,
+      "dim": 78,
+      "lit": 36
+     },
+     {
+      "db": -15.5,
+      "e": 0.97,
+      "md": 0.89,
+      "dim": 77,
+      "lit": 38
+     },
+     {
+      "db": -14.9,
+      "e": 0.99,
+      "md": 0.98,
+      "dim": 78,
+      "lit": 46
+     }
+    ],
+    "eP": [
+     0.33,
+     0.94,
+     1
+    ],
+    "dimP": [
+     53,
+     80,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.23,
+     11.3,
+     75
+    ],
+    [
+     0.54,
+     18.2,
+     73
+    ],
+    [
+     0.72,
+     31.2,
+     78
+    ],
+    [
+     0.87,
+     41.1,
+     82
+    ],
+    [
+     0.98,
+     61.1,
+     86
+    ]
+   ],
+   "litOn": [
+    7,
+    31,
+    66
+   ],
+   "litOnFull": [
+    4.7,
+    5.9,
+    13.8,
+    30.6,
+    48.8,
+    75.4,
+    87.6,
+    91.5
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 54.4,
+    "sidoBlinkMin": 2.7,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "basgang": 5
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan6_dmuzyzyhl.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 6,
+    "mdSteg1s": 5.95,
+    "rMdLjus": 0.91,
+    "rMdDim": 0.21,
+    "ljusSteg": 3.4,
+    "rDb": 0.773,
+    "kontrast": 3.79,
+    "dbSpann": 14.7,
+    "litP10": 0.06,
+    "litP50": 0.353,
+    "litP90": 0.613
+   },
+   "fladder": {
+    "fladderMin": 1.6,
+    "pulsPerKick": 0.6,
+    "kickarMin": 179,
+    "perLook": {
+     "wave": 3
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -29.4,
+      "e": 0.13,
+      "md": 0.02,
+      "dim": 78,
+      "lit": 5
+     },
+     {
+      "db": -25.4,
+      "e": 0.25,
+      "md": 0.02,
+      "dim": 78,
+      "lit": 10
+     },
+     {
+      "db": -21,
+      "e": 0.59,
+      "md": 0.17,
+      "dim": 83,
+      "lit": 26
+     },
+     {
+      "db": -17,
+      "e": 0.86,
+      "md": 0.59,
+      "dim": 84,
+      "lit": 38
+     },
+     {
+      "db": -15.5,
+      "e": 0.93,
+      "md": 0.77,
+      "dim": 83,
+      "lit": 41
+     },
+     {
+      "db": -14.9,
+      "e": 0.94,
+      "md": 0.8,
+      "dim": 83,
+      "lit": 41
+     },
+     {
+      "db": -14.3,
+      "e": 0.96,
+      "md": 0.87,
+      "dim": 83,
+      "lit": 43
+     },
+     {
+      "db": -13.8,
+      "e": 0.97,
+      "md": 0.89,
+      "dim": 81,
+      "lit": 44
+     },
+     {
+      "db": -13.2,
+      "e": 0.99,
+      "md": 0.95,
+      "dim": 81,
+      "lit": 46
+     },
+     {
+      "db": -12.3,
+      "e": 1,
+      "md": 1,
+      "dim": 79,
+      "lit": 48
+     }
+    ],
+    "eP": [
+     0.02,
+     0.93,
+     1
+    ],
+    "dimP": [
+     55,
+     84,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.01,
+     4.8,
+     80
+    ],
+    [
+     0.37,
+     26.5,
+     80
+    ],
+    [
+     0.72,
+     39.5,
+     84
+    ],
+    [
+     0.91,
+     43.6,
+     78
+    ],
+    [
+     0.96,
+     52.3,
+     85
+    ]
+   ],
+   "litOn": [
+    8,
+    36,
+    65
+   ],
+   "litOnFull": [
+    1.1,
+    5.5,
+    16.7,
+    35.5,
+    52,
+    70.8,
+    80.6,
+    89.6
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 46.9,
+    "sidoBlinkMin": 3.7,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "basgang": 7
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan7.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 6,
+    "mdSteg1s": 5.72,
+    "rMdLjus": 0.81,
+    "rMdDim": -0.26,
+    "ljusSteg": 2.79,
+    "rDb": 0.668,
+    "kontrast": 4.39,
+    "dbSpann": 17.1,
+    "litP10": 0.064,
+    "litP50": 0.202,
+    "litP90": 0.532
+   },
+   "fladder": {
+    "fladderMin": 0.5,
+    "pulsPerKick": 0.38,
+    "kickarMin": 183,
+    "perLook": {
+     "wave": 1
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -40.2,
+      "e": 0.03,
+      "md": 0.01,
+      "dim": 93,
+      "lit": 4
+     },
+     {
+      "db": -25.6,
+      "e": 0.39,
+      "md": 0.09,
+      "dim": 83,
+      "lit": 14
+     },
+     {
+      "db": -22.5,
+      "e": 0.69,
+      "md": 0.27,
+      "dim": 83,
+      "lit": 12
+     },
+     {
+      "db": -21.8,
+      "e": 0.76,
+      "md": 0.39,
+      "dim": 77,
+      "lit": 15
+     },
+     {
+      "db": -21.2,
+      "e": 0.79,
+      "md": 0.46,
+      "dim": 76,
+      "lit": 18
+     },
+     {
+      "db": -20.7,
+      "e": 0.86,
+      "md": 0.6,
+      "dim": 74,
+      "lit": 25
+     },
+     {
+      "db": -20.2,
+      "e": 0.9,
+      "md": 0.71,
+      "dim": 77,
+      "lit": 30
+     },
+     {
+      "db": -19.4,
+      "e": 0.94,
+      "md": 0.81,
+      "dim": 80,
+      "lit": 37
+     },
+     {
+      "db": -16.5,
+      "e": 0.94,
+      "md": 0.82,
+      "dim": 82,
+      "lit": 44
+     },
+     {
+      "db": -13.4,
+      "e": 0.99,
+      "md": 0.95,
+      "dim": 87,
+      "lit": 53
+     }
+    ],
+    "eP": [
+     0,
+     0.86,
+     1
+    ],
+    "dimP": [
+     48,
+     84,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.03,
+     9.4,
+     89
+    ],
+    [
+     0.32,
+     12.7,
+     78
+    ],
+    [
+     0.49,
+     19.7,
+     78
+    ],
+    [
+     0.73,
+     31.6,
+     79
+    ],
+    [
+     0.91,
+     48.3,
+     82
+    ]
+   ],
+   "litOn": [
+    7,
+    21,
+    53
+   ],
+   "litOnFull": [
+    1.1,
+    5.8,
+    10.1,
+    20.3,
+    39.3,
+    60.4,
+    74,
+    89.3
+   ],
+   "tand": {
+    "n": 4,
+    "medMs": 475,
+    "p90Ms": 475
+   },
+   "aterkomst": {
+    "n": 1,
+    "ms": [
+     50
+    ]
+   },
+   "rgb": {
+    "sidoVaxlMin": 22.4,
+    "sidoBlinkMin": 0,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {}
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan7_dmuzz1tdo.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 6,
+    "mdSteg1s": 2.66,
+    "rMdLjus": 0.69,
+    "rMdDim": -0.1,
+    "ljusSteg": 3.02,
+    "rDb": 0.767,
+    "kontrast": 4.43,
+    "dbSpann": 17.4,
+    "litP10": 0.065,
+    "litP50": 0.347,
+    "litP90": 0.592
+   },
+   "fladder": {
+    "fladderMin": 7.5,
+    "pulsPerKick": 0.37,
+    "kickarMin": 169,
+    "perLook": {
+     "wave": 1,
+     "chase": 5,
+     "forvarning": 8
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -37.4,
+      "e": 0.21,
+      "md": 0.04,
+      "dim": 87,
+      "lit": 11
+     },
+     {
+      "db": -29.6,
+      "e": 0.59,
+      "md": 0.16,
+      "dim": 85,
+      "lit": 10
+     },
+     {
+      "db": -28.4,
+      "e": 0.66,
+      "md": 0.22,
+      "dim": 80,
+      "lit": 10
+     },
+     {
+      "db": -23.8,
+      "e": 0.72,
+      "md": 0.47,
+      "dim": 83,
+      "lit": 39
+     },
+     {
+      "db": -19.1,
+      "e": 0.93,
+      "md": 0.78,
+      "dim": 87,
+      "lit": 44
+     },
+     {
+      "db": -15.5,
+      "e": 0.9,
+      "md": 0.67,
+      "dim": 77,
+      "lit": 38
+     },
+     {
+      "db": -14.7,
+      "e": 0.93,
+      "md": 0.75,
+      "dim": 77,
+      "lit": 36
+     },
+     {
+      "db": -14.1,
+      "e": 0.95,
+      "md": 0.83,
+      "dim": 79,
+      "lit": 41
+     },
+     {
+      "db": -13.5,
+      "e": 0.98,
+      "md": 0.91,
+      "dim": 80,
+      "lit": 48
+     },
+     {
+      "db": -12.7,
+      "e": 1,
+      "md": 0.99,
+      "dim": 80,
+      "lit": 55
+     }
+    ],
+    "eP": [
+     0,
+     0.91,
+     1
+    ],
+    "dimP": [
+     49,
+     85,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.11,
+     11.1,
+     82
+    ],
+    [
+     0.32,
+     21.1,
+     83
+    ],
+    [
+     0.65,
+     34.6,
+     81
+    ],
+    [
+     0.83,
+     46.9,
+     80
+    ],
+    [
+     0.94,
+     48.7,
+     82
+    ]
+   ],
+   "litOn": [
+    7,
+    32,
+    64
+   ],
+   "litOnFull": [
+    4.7,
+    5.9,
+    10.7,
+    32.1,
+    48.9,
+    72.8,
+    84.5,
+    89.6
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 36.3,
+    "sidoBlinkMin": 0,
+    "alla3": 0.019,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {}
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan7_dmuzz39ku.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 5.29,
+    "mdSteg1s": 3.94,
+    "rMdLjus": 0.83,
+    "rMdDim": 0.45,
+    "ljusSteg": 2.37,
+    "rDb": 0.416,
+    "kontrast": 1.47,
+    "dbSpann": 6.1,
+    "litP10": 0.07,
+    "litP50": 0.275,
+    "litP90": 0.596
+   },
+   "fladder": {
+    "fladderMin": 0,
+    "pulsPerKick": 0.58,
+    "kickarMin": 156,
+    "perLook": {}
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -23.5,
+      "e": 0.4,
+      "md": 0.11,
+      "dim": 77,
+      "lit": 13
+     },
+     {
+      "db": -19.2,
+      "e": 0.58,
+      "md": 0.22,
+      "dim": 75,
+      "lit": 18
+     },
+     {
+      "db": -17.8,
+      "e": 0.72,
+      "md": 0.37,
+      "dim": 78,
+      "lit": 20
+     },
+     {
+      "db": -17.1,
+      "e": 0.73,
+      "md": 0.42,
+      "dim": 80,
+      "lit": 27
+     },
+     {
+      "db": -16.5,
+      "e": 0.79,
+      "md": 0.49,
+      "dim": 81,
+      "lit": 33
+     },
+     {
+      "db": -16.2,
+      "e": 0.85,
+      "md": 0.59,
+      "dim": 79,
+      "lit": 39
+     },
+     {
+      "db": -15.8,
+      "e": 0.9,
+      "md": 0.71,
+      "dim": 78,
+      "lit": 43
+     },
+     {
+      "db": -15.4,
+      "e": 0.91,
+      "md": 0.74,
+      "dim": 82,
+      "lit": 45
+     },
+     {
+      "db": -14.6,
+      "e": 0.91,
+      "md": 0.72,
+      "dim": 78,
+      "lit": 34
+     },
+     {
+      "db": -13.4,
+      "e": 0.98,
+      "md": 0.94,
+      "dim": 77,
+      "lit": 37
+     }
+    ],
+    "eP": [
+     0.02,
+     0.85,
+     1
+    ],
+    "dimP": [
+     53,
+     79,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.08,
+     14.1,
+     76
+    ],
+    [
+     0.37,
+     18.1,
+     75
+    ],
+    [
+     0.56,
+     30.5,
+     75
+    ],
+    [
+     0.7,
+     37.4,
+     81
+    ],
+    [
+     0.89,
+     52.1,
+     84
+    ]
+   ],
+   "litOn": [
+    7,
+    27,
+    60
+   ],
+   "litOnFull": [
+    4.2,
+    5.9,
+    14,
+    27.2,
+    44.4,
+    69.9,
+    88.2,
+    92.3
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 59.7,
+    "sidoBlinkMin": 4.3,
+    "alla3": 0,
+    "ofrivBlinkMin": 1.1,
+    "blinkLook": {
+     "varannan": 4,
+     "basgang": 4
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan8_dmuzz51ru.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 4.34,
+    "mdSteg1s": 2.26,
+    "rMdLjus": 0.68,
+    "rMdDim": 0.48,
+    "ljusSteg": 1.98,
+    "rDb": 0.471,
+    "kontrast": 1.71,
+    "dbSpann": 5.2,
+    "litP10": 0.09,
+    "litP50": 0.267,
+    "litP90": 0.517
+   },
+   "fladder": {
+    "fladderMin": 1.1,
+    "pulsPerKick": 0.58,
+    "kickarMin": 190,
+    "perLook": {
+     "wave": 2
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -21.4,
+      "e": 0.63,
+      "md": 0.28,
+      "dim": 78,
+      "lit": 17
+     },
+     {
+      "db": -18.2,
+      "e": 0.75,
+      "md": 0.45,
+      "dim": 84,
+      "lit": 21
+     },
+     {
+      "db": -17.6,
+      "e": 0.77,
+      "md": 0.49,
+      "dim": 82,
+      "lit": 20
+     },
+     {
+      "db": -17.2,
+      "e": 0.72,
+      "md": 0.42,
+      "dim": 80,
+      "lit": 25
+     },
+     {
+      "db": -16.5,
+      "e": 0.64,
+      "md": 0.23,
+      "dim": 76,
+      "lit": 29
+     },
+     {
+      "db": -16,
+      "e": 0.71,
+      "md": 0.29,
+      "dim": 74,
+      "lit": 32
+     },
+     {
+      "db": -15.5,
+      "e": 0.77,
+      "md": 0.39,
+      "dim": 78,
+      "lit": 33
+     },
+     {
+      "db": -14.9,
+      "e": 0.84,
+      "md": 0.53,
+      "dim": 76,
+      "lit": 34
+     },
+     {
+      "db": -14,
+      "e": 0.92,
+      "md": 0.74,
+      "dim": 74,
+      "lit": 33
+     },
+     {
+      "db": -13.2,
+      "e": 0.99,
+      "md": 0.97,
+      "dim": 77,
+      "lit": 48
+     }
+    ],
+    "eP": [
+     0.17,
+     0.85,
+     1
+    ],
+    "dimP": [
+     49,
+     79,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.16,
+     12.3,
+     76
+    ],
+    [
+     0.38,
+     28.6,
+     74
+    ],
+    [
+     0.5,
+     37.4,
+     73
+    ],
+    [
+     0.56,
+     23.3,
+     81
+    ],
+    [
+     0.74,
+     42.9,
+     85
+    ]
+   ],
+   "litOn": [
+    8,
+    27,
+    54
+   ],
+   "litOnFull": [
+    5,
+    6.4,
+    15.3,
+    26.5,
+    40.9,
+    60.6,
+    75.1,
+    90.8
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 34.1,
+    "sidoBlinkMin": 2.1,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "basgang": 4
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan8_dmuzz6kop.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 4.04,
+    "mdSteg1s": 2.84,
+    "rMdLjus": 0.89,
+    "rMdDim": 0.28,
+    "ljusSteg": 2.02,
+    "rDb": -0.339,
+    "kontrast": 0.96,
+    "dbSpann": 10.9,
+    "litP10": 0.088,
+    "litP50": 0.325,
+    "litP90": 0.582
+   },
+   "fladder": {
+    "fladderMin": 0.5,
+    "pulsPerKick": 0.52,
+    "kickarMin": 196,
+    "perLook": {
+     "wave": 1
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -27.5,
+      "e": 0.57,
+      "md": 0.19,
+      "dim": 82,
+      "lit": 29
+     },
+     {
+      "db": -24.1,
+      "e": 0.8,
+      "md": 0.46,
+      "dim": 80,
+      "lit": 30
+     },
+     {
+      "db": -22.6,
+      "e": 0.94,
+      "md": 0.81,
+      "dim": 83,
+      "lit": 43
+     },
+     {
+      "db": -22,
+      "e": 0.97,
+      "md": 0.91,
+      "dim": 81,
+      "lit": 49
+     },
+     {
+      "db": -21.1,
+      "e": 0.94,
+      "md": 0.92,
+      "dim": 82,
+      "lit": 50
+     },
+     {
+      "db": -18,
+      "e": 0.47,
+      "md": 0.09,
+      "dim": 77,
+      "lit": 12
+     },
+     {
+      "db": -16.5,
+      "e": 0.74,
+      "md": 0.34,
+      "dim": 79,
+      "lit": 25
+     },
+     {
+      "db": -15.8,
+      "e": 0.82,
+      "md": 0.47,
+      "dim": 78,
+      "lit": 30
+     },
+     {
+      "db": -15,
+      "e": 0.88,
+      "md": 0.64,
+      "dim": 76,
+      "lit": 30
+     },
+     {
+      "db": -13.7,
+      "e": 0.98,
+      "md": 0.94,
+      "dim": 78,
+      "lit": 41
+     }
+    ],
+    "eP": [
+     0.17,
+     0.89,
+     1
+    ],
+    "dimP": [
+     53,
+     81,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.15,
+     14,
+     79
+    ],
+    [
+     0.47,
+     30.9,
+     77
+    ],
+    [
+     0.6,
+     35.6,
+     81
+    ],
+    [
+     0.71,
+     35,
+     76
+    ],
+    [
+     0.89,
+     51.3,
+     85
+    ]
+   ],
+   "litOn": [
+    9,
+    33,
+    60
+   ],
+   "litOnFull": [
+    4,
+    5.8,
+    19.8,
+    32.7,
+    46.4,
+    67.7,
+    80.1,
+    90.8
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 45.9,
+    "sidoBlinkMin": 0,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {}
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan9.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 2.94,
+    "mdSteg1s": 2.64,
+    "rMdLjus": 0.82,
+    "rMdDim": -0.17,
+    "ljusSteg": 2.54,
+    "rDb": 0.749,
+    "kontrast": 2.96,
+    "dbSpann": 12.2,
+    "litP10": 0.078,
+    "litP50": 0.251,
+    "litP90": 0.583
+   },
+   "fladder": {
+    "fladderMin": 2.1,
+    "pulsPerKick": 0.27,
+    "kickarMin": 166,
+    "perLook": {
+     "forvarning": 4
+    }
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -32.3,
+      "e": 0.49,
+      "md": 0.16,
+      "dim": 89,
+      "lit": 13
+     },
+     {
+      "db": -29.3,
+      "e": 0.66,
+      "md": 0.21,
+      "dim": 84,
+      "lit": 12
+     },
+     {
+      "db": -28.2,
+      "e": 0.75,
+      "md": 0.33,
+      "dim": 80,
+      "lit": 14
+     },
+     {
+      "db": -27.7,
+      "e": 0.82,
+      "md": 0.46,
+      "dim": 81,
+      "lit": 18
+     },
+     {
+      "db": -27,
+      "e": 0.89,
+      "md": 0.64,
+      "dim": 77,
+      "lit": 23
+     },
+     {
+      "db": -26.2,
+      "e": 0.92,
+      "md": 0.77,
+      "dim": 78,
+      "lit": 34
+     },
+     {
+      "db": -25.2,
+      "e": 0.92,
+      "md": 0.73,
+      "dim": 84,
+      "lit": 37
+     },
+     {
+      "db": -24.2,
+      "e": 0.96,
+      "md": 0.85,
+      "dim": 83,
+      "lit": 40
+     },
+     {
+      "db": -21.6,
+      "e": 0.96,
+      "md": 0.86,
+      "dim": 82,
+      "lit": 48
+     },
+     {
+      "db": -16.3,
+      "e": 0.97,
+      "md": 0.89,
+      "dim": 81,
+      "lit": 55
+     }
+    ],
+    "eP": [
+     0.11,
+     0.89,
+     1
+    ],
+    "dimP": [
+     52,
+     85,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.16,
+     11.7,
+     85
+    ],
+    [
+     0.41,
+     14.3,
+     84
+    ],
+    [
+     0.64,
+     26,
+     77
+    ],
+    [
+     0.77,
+     43.7,
+     83
+    ],
+    [
+     0.9,
+     48.4,
+     81
+    ]
+   ],
+   "litOn": [
+    7,
+    25,
+    60
+   ],
+   "litOnFull": [
+    5.2,
+    6.6,
+    11,
+    24.9,
+    43.6,
+    70.4,
+    84.9,
+    90.8
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 51.2,
+    "sidoBlinkMin": 4.3,
+    "alla3": 0.006,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "forvarning": 8
+    }
+   }
+  },
+  {
+   "wav": "C:\\Users\\richa\\Desktop\\Claude\\dmx-control\\pi-dmx\\engine\\tools\\ladan-2026-10-08\\dmx__ladan9_dmuzz9rxu.wav",
+   "sek": 28,
+   "on": 16,
+   "levande": {
+    "mdSteg": 4.52,
+    "mdSteg1s": 2.56,
+    "rMdLjus": 0.94,
+    "rMdDim": 0.43,
+    "ljusSteg": 1.78,
+    "rDb": 0.64,
+    "kontrast": 2.27,
+    "dbSpann": 6.5,
+    "litP10": 0.067,
+    "litP50": 0.345,
+    "litP90": 0.583
+   },
+   "fladder": {
+    "fladderMin": 0,
+    "pulsPerKick": 0.4,
+    "kickarMin": 209,
+    "perLook": {}
+   },
+   "spann": {
+    "dec": [
+     {
+      "db": -27.2,
+      "e": 0.26,
+      "md": 0.09,
+      "dim": 79,
+      "lit": 11
+     },
+     {
+      "db": -21.1,
+      "e": 0.59,
+      "md": 0.16,
+      "dim": 79,
+      "lit": 16
+     },
+     {
+      "db": -20.1,
+      "e": 0.72,
+      "md": 0.28,
+      "dim": 83,
+      "lit": 19
+     },
+     {
+      "db": -19.3,
+      "e": 0.79,
+      "md": 0.4,
+      "dim": 82,
+      "lit": 21
+     },
+     {
+      "db": -18.5,
+      "e": 0.86,
+      "md": 0.58,
+      "dim": 83,
+      "lit": 33
+     },
+     {
+      "db": -17.6,
+      "e": 0.92,
+      "md": 0.73,
+      "dim": 83,
+      "lit": 41
+     },
+     {
+      "db": -17,
+      "e": 0.95,
+      "md": 0.84,
+      "dim": 85,
+      "lit": 48
+     },
+     {
+      "db": -16.4,
+      "e": 0.97,
+      "md": 0.89,
+      "dim": 84,
+      "lit": 46
+     },
+     {
+      "db": -15.8,
+      "e": 0.99,
+      "md": 0.96,
+      "dim": 84,
+      "lit": 50
+     },
+     {
+      "db": -15.1,
+      "e": 1,
+      "md": 1,
+      "dim": 84,
+      "lit": 51
+     }
+    ],
+    "eP": [
+     0.04,
+     0.9,
+     1
+    ],
+    "dimP": [
+     58,
+     84,
+     94
+    ]
+   },
+   "mdBins": [
+    [
+     0.17,
+     13.3,
+     80
+    ],
+    [
+     0.4,
+     22.4,
+     82
+    ],
+    [
+     0.59,
+     35.7,
+     83
+    ],
+    [
+     0.8,
+     41.8,
+     81
+    ],
+    [
+     0.94,
+     52.3,
+     87
+    ]
+   ],
+   "litOn": [
+    7,
+    34,
+    62
+   ],
+   "litOnFull": [
+    3.3,
+    5.3,
+    14,
+    33.5,
+    49.9,
+    69.9,
+    81.2,
+    90.8
+   ],
+   "tand": {
+    "n": 0,
+    "medMs": null,
+    "p90Ms": null
+   },
+   "aterkomst": {
+    "n": 0,
+    "ms": []
+   },
+   "rgb": {
+    "sidoVaxlMin": 49.6,
+    "sidoBlinkMin": 1.6,
+    "alla3": 0,
+    "ofrivBlinkMin": 0,
+    "blinkLook": {
+     "varannan": 3
+    }
+   }
+  }
+ ]
+}
