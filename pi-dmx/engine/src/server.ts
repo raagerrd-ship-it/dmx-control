@@ -664,8 +664,6 @@ export async function startServer(
             const a = Math.max(0, Math.min(1, msg.value));
             deps.cfg.detection.tauUp   = 180 * Math.pow(10 / 180, a);
             deps.cfg.detection.tauDown = 60  * Math.pow(2  / 60,  a);
-          } else if (msg.type === "setBeatPulse") {
-            deps.cfg.beatPulse = !!msg.value;
           } else if (msg.type === "setBeatSyncStrength" && typeof msg.value === "number") {
             deps.cfg.beatSyncStrength = Math.max(0, Math.min(0.5, msg.value));
           } else if (msg.type === "setBeatSyncOverride") {
@@ -696,18 +694,8 @@ export async function startServer(
             deps.cfg.dropBlackout = !!msg.value;
           } else if (msg.type === "setScenicAnchor") {
             deps.cfg.scenicAnchor = !!msg.value;
-          } else if (msg.type === "setEnergyCeiling") {
-            deps.cfg.energyCeiling = !!msg.value;
-          } else if (msg.type === "setClubMode") {
-            deps.cfg.clubMode = !!msg.value;
-          } else if (msg.type === "setAmbientGlow") {
-            deps.cfg.ambientGlow = !!msg.value;
           } else if (msg.type === "setShowLead" && typeof msg.value === "number") {
             deps.cfg.showLeadMs = Math.max(0, Math.min(300, Math.round(msg.value)));
-          } else if (msg.type === "setStrobeUnlimited") {
-            deps.cfg.strobeUnlimited = !!msg.value;
-          } else if (msg.type === "setRegiPro") {
-            deps.cfg.regiPro = !!msg.value;
           } else if (msg.type === "setRing" && msg.ring && typeof msg.ring === "object" && deps.cfg.intensityRing) {
             const r = msg.ring as Record<string, unknown>;
             const cur = deps.cfg.intensityRing;

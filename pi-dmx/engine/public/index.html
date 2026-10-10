@@ -424,15 +424,10 @@
       <div class="advrow"><label>Dynamik</label><div class="meter"><div id="advDyn" style="width:0%"></div></div><span class="val" id="advDynV">–</span></div>
       <div class="advrow"><label>Reaktion</label><div class="meter"><div id="advSens" style="width:0%"></div></div><span class="val" id="advSensV">–</span></div>
       <div class="advrow"><label>Ljustak</label><div class="meter"><div id="advMaster" style="width:0%"></div></div><span class="val" id="advMasterV">–</span></div>
-      <div class="advrow"><label>Tröghet</label><div class="meter"><div id="advDecay" style="width:0%"></div></div><span class="val" id="advDecayV">–</span></div>
       <div class="advrow"><label>Byter effekt</label><div class="meter"><div id="advDwell" style="width:0%"></div></div><span class="val" id="advDwellV">–</span></div>
       <div class="advflags">
         <div class="advflag" id="fEnergy"><span class="dot"></span>Energi styr läget</div>
-        <div class="advflag" id="fBeat"><span class="dot"></span>Pulsa på taktslag</div>
         <div class="advflag" id="fDropBl"><span class="dot"></span>Drop-blackout</div>
-        <div class="advflag" id="fClub"><span class="dot"></span>Klubb-läge</div>
-        <div class="advflag" id="fAmb"><span class="dot"></span>Vilo-glöd</div>
-        <div class="advflag" id="fCeil"><span class="dot"></span>Dynamiskt ljustak</div>
         <div class="advflag" id="fFog"><span class="dot"></span>Rökmaskin aktiv</div>
         <div class="advflag" id="fStrobeCh"><span class="dot"></span>DMX-strobe aktiv</div>
         <div class="advflag" id="fHazer"><span class="dot"></span>Hazer aktiv</div>
@@ -509,19 +504,11 @@
     </div>
   </div>
 
-  <h1>Regi (pro)</h1>
+  <h1>Regi</h1>
   <div class="card">
-    <label class="tgl"><span>Regi (pro) aktiv<br><small style="opacity:.6">När av: stämnings-vredet rör inte flaggorna nedan — du äger dem själv. När på: Chill/Fest/Galet sätter dem som preset, du kan justera fritt efteråt.</small></span><input type="checkbox" id="tRegiPro"></label>
-    <div style="border-top:1px solid rgba(255,255,255,.08);margin:10px 0 6px"></div>
     <label class="tgl"><span>Sceniskt djup<br><small style="opacity:.6">Mittlamporna hålls som fasta uplights i höga lägen. Kräver lampor i rad V→H.</small></span><input type="checkbox" id="tScenicAnchor"></label>
-    <label class="tgl"><span>Släpp strobe-taket (scenläge)<br><small style="opacity:.6">⚠ Höjer blixttakten från 1,5 till 9 per sekund. Blinkande ljus kan utlösa epileptiska anfall — risken är störst när hela riggen blinkar synkront i vitt. Gränsen för allmänt säkert innehåll är 3 blixtar/s. Slå bara på detta om lokalen skyltar om strobe vid entrén.</small></span><input type="checkbox" id="tStrobeUnlimited"></label>
-    <div id="regiProGroup">
     <div style="border-top:1px solid rgba(255,255,255,.08);margin:10px 0 6px"></div>
     <label class="tgl"><span>Drop-blackout<br><small style="opacity:.6">Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast.</small></span><input type="checkbox" id="tDropBlackout"></label>
-    <label class="tgl"><span>Dynamiskt ljustak (VU)<br><small style="opacity:.6">Max-styrkan följer sektionsenergin — lugna partier lyser dämpat, bara topparna når 100%.</small></span><input type="checkbox" id="tEnergyCeiling"></label>
-    <label class="tgl"><span>Klubb-läge (hård kontrast)<br><small style="opacity:.6">Kvadrerar VU-taket → mörkt mellan slagen, explosion på topparna.</small></span><input type="checkbox" id="tClubMode"></label>
-    <label class="tgl"><span>Varm vilo-glöd i tystnad<br><small style="opacity:.6">Dim bärnsten-glöd när ingen musik spelar, istället för helt mörkt.</small></span><input type="checkbox" id="tAmbientGlow"></label>
-    </div>
   </div>
 
   <h1>Ljusnivå</h1>
@@ -900,18 +887,12 @@ function applyConfig(cfg) {
   const x = typeof cfg.activeIntensity === "number" ? cfg.activeIntensity : 0.5;
   lastIntensity = x;
   updateMoodUi(x, cfg.mode !== "blackout", cfg.mode === "blackout");
-  if (tBeatPulse) tBeatPulse.checked = !!cfg.beatPulse;
   const fog = cfg.fog || {};
   if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 128; }
   const fogSettings = document.getElementById("fogSettings");
   if (fogSettings) fogSettings.style.display = fog.enabled ? "" : "none";
   if (tDropBlackout) tDropBlackout.checked = cfg.dropBlackout !== false;   // default på
   if (tScenicAnchor) tScenicAnchor.checked = !!cfg.scenicAnchor;
-  if (tEnergyCeiling) tEnergyCeiling.checked = !!cfg.energyCeiling;
-  if (tClubMode) tClubMode.checked = !!cfg.clubMode;
-  if (tAmbientGlow) tAmbientGlow.checked = !!cfg.ambientGlow;
-  if (tStrobeUnlimited) tStrobeUnlimited.checked = !!cfg.strobeUnlimited;
-  if (tRegiPro) { tRegiPro.checked = !!cfg.regiPro; applyRegiProUi(!!cfg.regiPro); }
   {
     const bsOv = !!cfg.beatSyncOverride;
     const bsBadge = document.getElementById("beatSyncBadge");
@@ -1028,13 +1009,10 @@ function updateAdvMirror(cfg) {
   const dyn = cfg.dynamics ?? 0.6;
   const sens = cfg.sensitivity ?? 0.6;
   const mst = cfg.master ?? 1;
-  const dec = cfg.calmDecay ?? 0.42;               // 0.30..1.20 s enligt moods.ts
   const dwellMs = cfg.smartDwellMs ?? 9000;        // 10 000..40 000 typiskt
   setBar("advDyn",    dyn * 100,             Math.round(dyn * 100) + "%");
   setBar("advSens",   sens * 100,            Math.round(sens * 100) + "%");
   setBar("advMaster", mst * 100,             Math.round(mst * 100) + "%");
-  // Tröghet: mappa 0.30 s → 0%, 1.20 s → 100%
-  setBar("advDecay",  ((dec - 0.30) / 0.90) * 100, dec.toFixed(2) + "s");
   // Byter effekt: kort dwell → hög "aktivitet". Mappa 5 000 → 100%, 40 000 → 0%
   setBar("advDwell",  ((40000 - dwellMs) / 35000) * 100,
     dwellMs >= 20000 ? "Sällan" : dwellMs >= 10000 ? "Normal" : "Ofta");
@@ -1043,11 +1021,7 @@ function updateAdvMirror(cfg) {
     if (el) el.classList.toggle("on", !!on);
   };
   flag("fEnergy", cfg.energyDrivesMode);
-  flag("fBeat",   cfg.beatPulse);
   flag("fDropBl", cfg.dropBlackout);
-  flag("fClub",   cfg.clubMode);
-  flag("fAmb",    cfg.ambientGlow);
-  flag("fCeil",   cfg.energyCeiling);
   // Fog: DMX-drivet — kräver att användaren aktiverat den OCH satt en giltig
   // DMX-adress. Utan adress finns ingen hårdvara att skicka till, så flaggan
   // ska inte lysa även om enabled är på.
@@ -1598,9 +1572,7 @@ fxSaveBtn.onclick = () => {
 };
 
 
-const tBeatPulse = document.getElementById("tBeatPulse");
 const tEnergy = document.getElementById("tEnergy");
-if (tBeatPulse) tBeatPulse.onchange = () => send({ type: "setBeatPulse", value: tBeatPulse.checked });
 
 
 // Live beat-diagnostik under LEVEL (uppdateras i applyFrame).
@@ -1637,37 +1609,11 @@ fogServiceReset.onclick = () => {
 };
 
 /* ── Regi (pro) ──────────────────────────────────────────────────────────
- * Alla flaggor är ägar-val. Stämnings-vredet sätter dem som preset när det
- * ändras; ägaren kan justera fritt efteråt. */
-const tRegiPro = document.getElementById("tRegiPro");
-const regiProGroup = document.getElementById("regiProGroup");
-function applyRegiProUi(on){
-  if (!regiProGroup) return;
-  regiProGroup.style.opacity = on ? "1" : "0.45";
-  regiProGroup.querySelectorAll("input").forEach(i => i.disabled = !on);
-}
-tRegiPro.onchange = () => { send({ type: "setRegiPro", value: tRegiPro.checked }); applyRegiProUi(tRegiPro.checked); };
+ * Ägar-val; stämnings-vredet rör dem inte (regiPro och de döda VU-/klubb-/glöd-/strobe-tak-flaggorna borttagna 2026-10-10). */
 const tDropBlackout = document.getElementById("tDropBlackout");
 tDropBlackout.onchange = () => send({ type: "setDropBlackout", value: tDropBlackout.checked });
 const tScenicAnchor = document.getElementById("tScenicAnchor");
 tScenicAnchor.onchange = () => send({ type: "setScenicAnchor", value: tScenicAnchor.checked });
-const tEnergyCeiling = document.getElementById("tEnergyCeiling");
-tEnergyCeiling.onchange = () => send({ type: "setEnergyCeiling", value: tEnergyCeiling.checked });
-const tClubMode = document.getElementById("tClubMode");
-tClubMode.onchange = () => send({ type: "setClubMode", value: tClubMode.checked });
-const tAmbientGlow = document.getElementById("tAmbientGlow");
-tAmbientGlow.onchange = () => send({ type: "setAmbientGlow", value: tAmbientGlow.checked });
-const tStrobeUnlimited = document.getElementById("tStrobeUnlimited");
-// Att HÖJA taket kräver ett aktivt ja; att sänka det gör det aldrig.
-tStrobeUnlimited.onchange = () => {
-  const varning = "Höjer blixttakten till 9 per sekund.\n\n" +
-    "Blinkande ljus kan utlösa epileptiska anfall. Gränsen för allmänt säkert innehåll är 3 blixtar/s.\n\n" +
-    "Slå bara på detta om lokalen skyltar om strobe vid entrén. Fortsätta?";
-  if (tStrobeUnlimited.checked && !confirm(varning)) {
-    tStrobeUnlimited.checked = false; return;
-  }
-  send({ type: "setStrobeUnlimited", value: tStrobeUnlimited.checked });
-};
 // Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
 // AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
 // just nu så det inte hoppar, sen väljer du fritt.

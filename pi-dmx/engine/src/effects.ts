@@ -483,12 +483,6 @@ export class EffectEngine {
    *  som slår på lådan 22:00 står ensam bakom disken utan laptop — riggen är den
    *  enda skärm som finns, och den måste kunna säga tre olika saker.
    *  Ej opt-in: ett grundbeteende, inte en inställning man kan råka slå av. */
-  /** Strobe-tak i Hz. SAFE = gränsen för allmänt säkert innehåll (WCAG 2.3.1
-   *  och rundradions riktlinjer: högst 3 blixtar/s). MAX = ägarens medvetna
-   *  scenläge. Notera att `Math.floor(t*hz) % 2` ger hz/2 hela blixtcykler per
-   *  sekund — talen är alltså tagna med marginal, inte i underkant. */
-  private static readonly STROBE_SAFE_HZ = 3;
-  private static readonly STROBE_MAX_HZ = 18;
   private static readonly ANCHOR_MODES = new Set<Mode>(["party", "snap", "bounce", "strobe", "chase", "wave"]);
                                                    // någon minut. 90 s utan EN enda
                                                    // transient betyder att vi inte

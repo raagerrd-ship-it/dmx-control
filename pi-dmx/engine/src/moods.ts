@@ -22,41 +22,14 @@ const POOL: Record<MoodId, Mode[]> = {
 const FEEL: Record<MoodId, {
   dynamics: number;      // 0 = jämnt, 1 = hård kontrast (mörkt mellan, smäll på topp)
   sensitivity: number;   // 0..1 reaktions-känslighet
-  beatPulse: boolean;    // pulsa hela riggen på taktslag
-  dropBlackout: boolean; // kort kolsvart just före drop-explosionen
-  clubMode: boolean;     // kvadrera VU-taket → extra hård kontrast
-  ambientGlow: boolean;  // varm vilo-glöd i tystnad (annars helt mörkt)
   energyDrivesMode: boolean; // låt energin driva effekt-BYTEN (av = byter bara på dwell-timern → lugnt)
   smartDwellMs: number;  // hur ofta smart byter effekt (lägre = piggare)
   master: number;        // ljus-tak (0..1): hela riggens max-styrka
-  calmDecay: number;     // output-decay (s) för lugna/fart-effekter: högre = trögare,
-                         //   ljuset tonar långsamt = "långsam reaktion". (fart-lägen
-                         //   har egen kort decay; detta rör calm/fart.)
-  // ── Regi (pro) — anpassas per stämning (scenicAnchor lämnas till ägaren; layout-beroende) ──
-  /** Dynamiskt VU-ljustak. AV i alla stamningar sedan 2026-08-07: det var
-   *  ENDA signalen som applicerades EFTER ballistiken (outjamnad, med flit) och
-   *  gav synligt FLADDER vid max ljusstyrka, dar VU:n ror sig 0.8-1.0.
-   *  Isolerat med tre test: clubMode av = ingen skillnad; en lampa pa ratt
-   *  DMX 255 stod HELT stabil (hardvaran frisk); energyCeiling av = fladdret
-   *  BORTA. Agarens dom med den av: "betydligt battre och jamnare".
-   *  Effekterna reagerar anda pa musiken via c.audio/c.punch — VU-taket var ett
-   *  EXTRA globalt lager, inte sjalva musikreaktiviteten.
-   *  Kan fortfarande slas pa manuellt i Regi (pro). */
-  /** LJUSTAK UR INSIGNALEN (p5..p95 rullande, 0,12 s attack / 0,60 s release).
-   *  Stod länge på false: taket fladdrade. Två orsaker hittades 2026-08-07 —
-   *  (1) en glappkontakt på AUX halverade signalen, vilket halverade brusmarginalen
-   *  i just de tysta partier där taket rör sig mest, och (2) hjärtslaget och
-   *  utgångens ballistik var två attack/decay-enveloper i SERIE. Med hel kabel och
-   *  en envelope är taket lugnt — och det kan aldrig hamna ur fas med musiken,
-   *  eftersom det ÄR musiken. Minnets förberäknade kurva behövs inte för detta.
-   *  ("nu blev det känsla!! hjärtslagen ihop med dynamiska ljusstyrkan")
-   */
-  energyCeiling: boolean;
   beatSyncStrength: number; // hur hårt PLL-fasen knuffas mot trumslag (0/0.10/0.18/0.30)
 }> = {
-  chill: { dynamics: 0.30, sensitivity: 0.50, beatPulse: false, dropBlackout: false, clubMode: false, ambientGlow: true,  energyDrivesMode: false, smartDwellMs: 40000, master: 0.30, calmDecay: 1.20, energyCeiling: true, beatSyncStrength: 0.10 },
-  fest:  { dynamics: 0.60, sensitivity: 0.60, beatPulse: true,  dropBlackout: true,  clubMode: false, ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 15000,  master: 1.00, calmDecay: 0.42, energyCeiling: true, beatSyncStrength: 0.18 },
-  galet: { dynamics: 0.85, sensitivity: 0.70, beatPulse: true,  dropBlackout: true,  clubMode: true,  ambientGlow: false, energyDrivesMode: true,  smartDwellMs: 10000,  master: 1.00, calmDecay: 0.42, energyCeiling: true,  beatSyncStrength: 0.30 },
+  chill: { dynamics: 0.30, sensitivity: 0.50,  energyDrivesMode: false, smartDwellMs: 40000, master: 0.30, beatSyncStrength: 0.10 },
+  fest:  { dynamics: 0.60, sensitivity: 0.60, energyDrivesMode: true,  smartDwellMs: 15000,  master: 1.00, beatSyncStrength: 0.18 },
+  galet: { dynamics: 0.85, sensitivity: 0.70, energyDrivesMode: true,  smartDwellMs: 10000,  master: 1.00,  beatSyncStrength: 0.30 },
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -75,14 +48,6 @@ export function applyMood(cfg: EngineConfig, mood: MoodId): void {
   cfg.sensitivity = f.sensitivity;
   cfg.smartDwellMs = f.smartDwellMs;
   cfg.master = f.master;           // ljus-tak
-  cfg.calmDecay = f.calmDecay;      // reaktions-tröghet (output-decay)
-  cfg.beatPulse = f.beatPulse;
-  if (cfg.regiPro) {
-    cfg.dropBlackout = f.dropBlackout;
-    cfg.clubMode = f.clubMode;
-    cfg.ambientGlow = f.ambientGlow;
-    cfg.energyCeiling = f.energyCeiling;   // Regi (pro): VU-ljustak
-  }
   if (!cfg.beatSyncOverride) cfg.beatSyncStrength = f.beatSyncStrength; // PLL-styrka mot trumslag
   // Rotation: bara stämningens pool aktiv (allt annat AV → smart väljer bara ur poolen).
   const pool = new Set<Mode>(POOL[mood]);
@@ -94,8 +59,7 @@ export function applyMood(cfg: EngineConfig, mood: MoodId): void {
 }
 
 /** Kontinuerlig stämning från ETT vred (KY-040) eller UI-slider: 0..1
- *  (Chill → Galet). Kontinuerliga rattar (dynamics/sensitivity/master/calm­
- *  Decay/smartDwellMs) lerpas mjukt mellan tre ankare; poolen och boolean-
+ *  (Chill → Galet). Kontinuerliga rattar (dynamics/sensitivity/master/smartDwellMs) lerpas mjukt mellan tre ankare; poolen och boolean-
  *  flaggorna snäpper vid 1/3 och 2/3 så motorns rotation-set byts stegvis. */
 export function applyIntensity(cfg: EngineConfig, xRaw: number): void {
   const x = Math.max(0, Math.min(1, xRaw));
@@ -110,20 +74,12 @@ export function applyIntensity(cfg: EngineConfig, xRaw: number): void {
   cfg.dynamics       = lerp(a.dynamics, b.dynamics);
   cfg.sensitivity    = lerp(a.sensitivity, b.sensitivity);
   cfg.master         = lerp(a.master, b.master);
-  cfg.calmDecay      = lerp(a.calmDecay, b.calmDecay);
   cfg.smartDwellMs   = Math.round(lerp(a.smartDwellMs, b.smartDwellMs));
 
   // Bucket-snäpp på ~1/3 och ~2/3 (matchar POOL/FEEL-anchoreringen ovan).
   const bucket: MoodId = x < 1 / 3 ? "chill" : x < 2 / 3 ? "fest" : "galet";
   const bf = FEEL[bucket];
   cfg.energyDrivesMode = bf.energyDrivesMode;
-  cfg.beatPulse        = bf.beatPulse;
-  if (cfg.regiPro) {
-    cfg.dropBlackout     = bf.dropBlackout;
-    cfg.clubMode         = bf.clubMode;
-    cfg.ambientGlow      = bf.ambientGlow;
-    cfg.energyCeiling    = bf.energyCeiling;
-  }
   if (!cfg.beatSyncOverride) cfg.beatSyncStrength = bf.beatSyncStrength;
   const pool = new Set<Mode>(POOL[bucket]);
   const rot: Partial<Record<Mode, boolean>> = {};

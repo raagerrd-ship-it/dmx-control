@@ -46,7 +46,8 @@ EN VÄG (10-10): effektens 0 = släckt, färg 1–100 % → lampans tändpunkt+1
 | `DMX_NEAR_RISE_DB` / `DMX_NEAR_DIP_DB` | 10 / 8 | Hur stort språng efter hur djup dipp som räknas. |
 | `DMX_NEAR_DROP_SWITCH` | på | Dirigenten byter look på nästan-drop (=0 av). |
 | `MINI_DROP_ENV` | 0,9 | Minidropens ljuslyft (bara ljusstyrka, kulören kvar; full drop har dropfärg + vit kärna). |
-| `MINI_BANG_MS` | 150 | Hur länge minidropens lyft håller. Minidrops har ingen spärr, så längre = ljuset fastnar högt. |
+| `MINI_BANG_MS` | 150 | Hur länge minidropens lyft håller. Minidrops har ingen spärr, så längre = ljuset fastnar högt. Minidrop byter aldrig look (10-10). |
+| `BODY_GONE_MIN_MS` (DMX-profilen) | 4000 | Riktig drop kräver så långt break före (var 2000; ägaren 10-10: "hellre färre drops, mini fångar dom"). |
 
 ## 5. Puls och ballistik
 | Ratt | Standard | Vad den gör |
@@ -55,8 +56,12 @@ EN VÄG (10-10): effektens 0 = släckt, färg 1–100 % → lampans tändpunkt+1
 | `DMX_FADE_MIN_S` | 0,25 | STEG 2: den ENDA uttoningen (lampans ljusstyrka; upp direkt) — **snabbare är förbjudet** (ägaren 09-29). Gäller ljusstyrkan: kulören byts direkt (ägaren 10-09: "det är ju bara energi som har begränsning på sin nedtoning"), ballistiken körs per lampa på starkaste färgkanalen. |
 
 ## 6. Dirigenten och takten (standard 10-10)
+- Toggle-effekter (`EffectDef.toggle`, lampgrupper som slår om per slag) får ingen grundnivå `DMX_FX_FLOOR` (den mörka gruppen är mörk) och dirigenten tar vartannat look-byte ur dem när takten är låst och tilliten ≥ 0,85 (10-10). Minsta hålltid per look 8 s (ägaren: ligger).
 - Alla 44 effekter kan väljas: snap ≥ 115 BPM, rave ≥ 120, strobe ≥ 150 (ägaren 10-09), gravity bas ≥ 0,20; en uppbyggnad som hållit 1,5 s ger ett byte till build-effekterna; bland de bäst passande väljs den som spelats minst.
 - Analysatorns tempo (DMX-profilen `src/analyserProfile.ts`, inte den delade `analyser.ts`): `TEMPO_SHIFT` 1 (följer tempolyft inom låt), `TEMPO_HOLD` 1 (takten hålls över kort paus, 0,35–10 s). Lotus har dem av.
+
+## Borttagna reglage 10-10 (döda: lästes inte av motorn, bänken json-identisk)
+Config/stämningar/server/UI: `beatPulse`, `calmDecay` ("Tröghet"), `energyCeiling`, `clubMode`, `ambientGlow`, `strobeUnlimited` ("Släpp strobe-taket" — RGB-stroben blixtrar en gång per slag vid ≥ 150 BPM, lampornas strobe-kanal drivs inte), `regiPro` (styrde bara om stämningen fick sätta drop-blackout; nu äger ägaren drop-blackout själv). Oanvända `STROBE_SAFE_HZ/MAX_HZ` i effects.ts.
 
 ## Prov som inte är standard
 Inga just nu. Kvällen 10-09 blev standard 10-10 (bit-identiskt bevisat); borttagna prov: `DMX_E_SLOW_MS`, `DMX_HUE_CUT_MS`, `DMX_DIM_PULS`, `DMX_CH_MAP`, flaggorna `DMX_HUE_CUT`/`DMX_ALLA_LOOKER`/`DMX_E_GATE`/`DMX_E_LIN` (nu enda vägen).

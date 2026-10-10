@@ -99,11 +99,6 @@ export interface EngineConfig {
   sensitivity: number;    // 0..1 user knob
   /** 0..1 kontrast: 0 = jämnt ljus, 1 = dovt i tystnad + smäll i beats. */
   dynamics: number;
-  /** Output-ballistikens decay (s) för lugna/fart-effekter — högre = ljuset tonar
-   *  långsammare = "långsam reaktion". Sätts per stämning (moods.ts); default 0.42. */
-  calmDecay: number;
-  /** Pulsa hela riggen på taktslag. */
-  beatPulse: boolean;
   /** Hur aggressivt beat-PLL:en knuffar takt-ankaret mot faktiska trumslag
    *  (0 = av/fri-rullande, ~0.10 mjuk, 0.18 normal, ~0.30 aggressiv). */
   beatSyncStrength: number;
@@ -193,31 +188,6 @@ export interface EngineConfig {
   dropBlackout: boolean;
   /** REGI: sceniskt djup — mittlamporna hålls som fasta uplights i höga lägen. */
   scenicAnchor: boolean;
-  /** REGI: dynamiskt ljustak (VU) — max-styrka följer sektionsenergin; drop bypassar. */
-  energyCeiling: boolean;
-  /** REGI: klubb-läge — kvadrerar VU-taket (hård kontrast: mörkt mellan, explosion på topp). */
-  clubMode: boolean;
-  /** REGI: varm vilo-glöd i tystnad — dim bärnsten när ingen musik spelar (annars helt mörkt). */
-  ambientGlow: boolean;
-  /** REGI: riser-strobe — under en uppbyggnad accelererar en strobe + färgen
-   *  kollapsar mot vitt, sen blackout på dropen (klassisk EDM-build).
-   *  Frekvensen är takad — se `strobeUnlimited`. */
-  /** ÄGARENS MEDVETNA VAL att släppa strobe-taket från 3 Hz till 18 Hz.
-   *
-   *  FOTOSENSITIV EPILEPSI. Blinkande ljus kan utlösa anfall. Risken är störst
-   *  mellan ~15 och 25 Hz, och värst när HELA synfältet blinkar synkront i vitt
-   *  — exakt vad en helriggs-strobe gör. Etablerad gräns för allmänt säkert
-   *  innehåll (WCAG 2.3.1, och rundradions riktlinjer) är HÖGST 3 blixtar per
-   *  sekund. Därför är 3 Hz standard här.
-   *
-   *  Scenstrobar går snabbare än så och är lagliga — men då är det ett aktivt
-   *  beslut av den som driver lokalen, med skyltning vid entrén. Den här flaggan
-   *  finns för att det beslutet ska vara MEDVETET och synligt, aldrig något
-   *  motorn gör i tysthet. Standard av. */
-  strobeUnlimited?: boolean;
-  /** Master-toggle för Regi (pro): när false rör stämnings-vredet INTE de sex
-   *  Regi-flaggorna (dropBlackout, energyCeiling, clubMode, ambientGlow). Ägaren äger då dem själv. Default false. (dropHeadroom borttagen 10-07: utgångens LIN_MAP gör jobbet.) */
-  regiPro?: boolean;
 }
 
 export const defaultConfig: EngineConfig = {
@@ -242,8 +212,6 @@ export const defaultConfig: EngineConfig = {
   audioInput: "aux",
   sensitivity: 0.6,
   dynamics: 0.6,
-  calmDecay: 0.42,
-  beatPulse: true,
   beatSyncStrength: 0.18,   // normal PLL-korrektion mot trumslag
   beatSyncOverride: false,  // stämnings-vredet styr som default
   energyDrivesMode: true,
@@ -268,11 +236,6 @@ export const defaultConfig: EngineConfig = {
   fog: { enabled: false, address: 13, onDrop: true, burstMs: 1000, cooldownMs: 120000, level: 255, warmupMs: 600000, sprayMs: 0, bursts: 0 },
   dropBlackout: true,     // dramaturgisk tystnad — låg risk, lyfter varje drop
   scenicAnchor: false,    // ägar-val: antar lampor i rad vänster→höger
-  energyCeiling: true,    // direkt VU = ljusstyrka; standard på (drop/punch bypassar)
-  clubMode: false,        // hård kontrast (VU²); opt-in — rör inte det trogna linjära läget
-  ambientGlow: false,     // tystnad = HELT mörkt som standard; slå på för varm vilo-glöd
-  strobeUnlimited: false, // säkert tak (3 Hz) som standard — se kommentaren i typen
-  regiPro: false,         // master-toggle: när AV rör stämnings-vredet inte Regi-flaggorna
 };
 
 export const PRESET_ROLES: Record<Exclude<FixturePreset, "custom">, ChannelRole[]> = {
