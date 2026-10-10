@@ -177,6 +177,9 @@ export class AudioCapture extends EventEmitter {
     // DMX_ARECORD_CPU (ladan 2026-09-27): karna 0 delas med kernel/WiFi/sshd (matt: sshd 28 % + systemd 32 % under ssh-
     // matning) -> arecord svalts -> overrun. Karna 3 ar isolerad (isolcpus=3) och bar bara dmx-helper (~4 %).
     if (p.pid) spawn("taskset", ["-pc", String(process.env.DMX_ARECORD_CPU ?? "3"), String(p.pid)], { stdio: "ignore" }).on("error", () => {});
+    // REALTIDSPRIORITET (ladan 2026-10-10): pa karna 3 tryckte dmx-helperns FIFO-50-trad undan arecord (vanlig prioritet) sa
+    // 21 ms-bufferten hann rinna over -> kodeken tappar I2S-synken -> 0,5-2 s tyst ljus, ~20/h. FIFO 60 (over helpern): 0 pa provet.
+    if (p.pid) spawn("chrt", ["-f", "-p", "60", String(p.pid)], { stdio: "ignore" }).on("error", () => {});
     this.proc = p;
 
     p.stdout.on("data", (buf: Buffer) => {
