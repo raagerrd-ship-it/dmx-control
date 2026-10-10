@@ -526,6 +526,11 @@
 
   <h1>Ljusnivå</h1>
   <div class="card" id="levelCard">
+    <div class="row"><label>Lägsta nivå</label>
+      <input type="range" min="0" max="50" step="1" id="lvlFloor" style="flex:1;margin:0 10px">
+      <span class="val" id="lvlFloorV">–</span>
+    </div>
+    <div class="status" style="margin-top:2px;margin-bottom:8px">Energins golv: tysta partier lyser minst så här mycket av effektens ljus. 0 % = full dynamik.</div>
     <div class="row"><label>Släckgräns</label>
       <input type="range" min="1" max="20" step="1" id="lvlSil" style="flex:1;margin:0 10px">
       <span class="val" id="lvlSilV">–</span>
@@ -941,7 +946,8 @@ function syncLevelUi(cfg) {
   if (levelDirty) return;   // användaren drar → rör inte reglagen
   const setR = (id, v) => { const el = document.getElementById(id); if (el && document.activeElement !== el) el.value = String(v); };
   const setV = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
-  const sil = Math.round((cfg.silenceLevel ?? 0.05) * 100);
+  const sil = Math.round((cfg.silenceLevel ?? 0.05) * 100), flo = Math.round((cfg.energyFloor ?? 0) * 100);
+  setR("lvlFloor", flo); setV("lvlFloorV", flo + " %");
   setR("lvlSil", sil); setV("lvlSilV", sil + " %");
 }
 (function wireLevel() {
@@ -956,6 +962,7 @@ function syncLevelUi(cfg) {
       t = setTimeout(() => { send(msg(Number(el.value))); levelDirty = false; }, 150);
     });
   };
+  bind("lvlFloor", "lvlFloorV", (v) => v + " %", (v) => ({ type: "setEnergyFloor", value: v / 100 }));
   bind("lvlSil", "lvlSilV", (v) => v + " %",  (v) => ({ type: "setSilenceLevel",  value: v / 100 }));
 })();
 

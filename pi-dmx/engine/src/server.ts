@@ -604,6 +604,9 @@ export async function startServer(
             deps.cfg.dynamics = clamp01(msg.value);
           } else if (msg.type === "setMaster") {
             deps.cfg.master = clamp01(msg.value);
+          } else if (msg.type === "setEnergyFloor" && Number.isFinite(msg.value)) {
+            // "Lägsta nivå": energins golv (0..0,5) - tysta partier lyser minst så här mycket av effektens ljus.
+            deps.cfg.energyFloor = Math.max(0, Math.min(0.5, Number(msg.value)));
           } else if (msg.type === "setSilenceLevel" && Number.isFinite(msg.value)) {
             // "Släckgräns": frame.level under vilken riggen tonas ut (0,01..0,20). Env DMX_SILENCE_LEVEL vinner om satt.
             deps.cfg.silenceLevel = Math.max(0.01, Math.min(0.20, Number(msg.value)));

@@ -1445,7 +1445,8 @@ export class EffectEngine {
       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
       this.eSimple = this.eSm;
       const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);
-      md = drive * Math.min(1, Math.max(eC, this.dropEnv));   // bara dampning: aldrig over 1
+      const eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0));   // "Lägsta nivå" i /setup
+      md = drive * Math.min(1, Math.max(eFloor + (1 - eFloor) * eC, this.dropEnv));   // bara dampning: aldrig over 1
       md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
     }
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
