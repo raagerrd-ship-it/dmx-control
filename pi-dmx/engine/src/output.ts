@@ -46,11 +46,10 @@ const FLOOR_CH = Math.max(0, Math.min(255, Number(process.env.DMX_FLOOR_CH ?? 40
 const MAP_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_MAP_TOP ?? 0.95)));
 // (DMX_CH_MAP - per-kanal-mappning - prov 10-09, onodig med kulor-direkt-vagen (0 ofrivilliga blink), borttagen 10-10.)
 // (DMX_DIM_MAX borttagen 2026-10-08: lampans fulla DIM ar nu FULLPUNKTEN i kalibreringen, cal.full - en mappning, inget efterskalningssteg.)
-/** DIMMERN PA MAX (opt-in DMX_DIM_FULL=1, agaren 2026-10-10: "en som satter dim pa max, och ovriga bara styr R G och B separat").
- *  Ljuset var farg x dimmer, tva reglage med olika toning (energi pa fargen, taktpuls/drop pa dimmern) som kan vicka mot varandra,
- *  och billiga parlampor gor dimmern som en egen PWM ovanpa fargens - vid laga nivaer kan de sla mot varandra (flimmer). Med DIM_FULL
- *  star dimmern still pa lampans fullpunkt; taktpulsen dampar fargkanalerna (postprocess) och fargens tak blir MAP_TOP (95 %), som
- *  bara en FULL drop oppnar till 255 - samma kontrakt som dimmern hade. 1 % = tandpunkt+1 ar fortfarande 1 % (kalibreringen). */
+/** DIMMERN PA MAX (opt-in DMX_DIM_FULL=1, agaren 2026-10-10: "satt dim pa max och styr bara R G och B" - "den borde val inte rensa
+ *  nagot om vi bara oversatter det till fargen"). Allt raknas som forr; SIST, precis fore DMX, bakas dimmerns varde in i fargen:
+ *  R/G/B x dim/255, dimmern = 255. Ljuset ar detsamma (farg x dimmer) - utom att en tand fargkanal aldrig hamnar under sin tandpunkt+1
+ *  (agarens 1 %). Proven ar alltsa bara hardvaruvagen: lampans dimmer-PWM ovanpa fargens kan slå mot varandra vid laga nivaer. */
 export const DIM_FULL = process.env.DMX_DIM_FULL === "1";
 const HOLD_MS = 120;
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
@@ -145,14 +144,27 @@ export class FixtureOutput {
    * Skala ljusstyrkan på alla fixturer. Anroparen behöver inte veta något om lampor.
    * @param mul 0..1 multiplikator
    */
-  /** DIM_FULL: taktpulsen pa fargkanalerna i stallet for dimmern (samma regel som scale: tant forblir tant). */
-  scaleColor(universe: Uint8Array, mul: number): void {
-    for (let ch = 0; ch < this.maxCh; ch++) {
-      if (!this.colorMask[ch]) continue;
-      const v = universe[ch];
-      if (v === 0) continue;
-      const out = (v * mul + 0.5) | 0;
-      universe[ch] = out < 1 ? 1 : out;
+  /** DIM_FULL: oversatt dimmern till fargen (se DIM_FULL). Kors allra sist, efter kalibrering och sista toningen. */
+  foldDim(universe: Uint8Array, fixtures: FixtureConfig[]): void {
+    for (let f = 0; f < fixtures.length && f < this.fastFixtures.length; f++) {
+      const fast = this.fastFixtures[f];
+      if (!fast.hasDim || !fast.hasColor) continue;
+      const c = fixtures[f].cal, on = c ? (c.on || 0) : 0;
+      let dimCh = -1;
+      for (let i = 0; i < fast.roles.length; i++) if (fast.roles[i] === "dim") { dimCh = fast.base + i; break; }
+      if (dimCh < 0 || dimCh >= 512) continue;
+      const k = universe[dimCh] / 255;
+      for (let i = 0; i < fast.roles.length; i++) {
+        const role = fast.roles[i], ch = fast.base + i;
+        if (ch < 0 || ch >= 512 || (role !== "r" && role !== "g" && role !== "b" && role !== "w")) continue;
+        const v = universe[ch];
+        if (v === 0) continue;
+        if (k <= 0) { universe[ch] = 0; continue; }
+        const onC = c ? ((role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on) : 0;
+        const nv = Math.round(v * k);
+        universe[ch] = nv < onC + 1 ? onC + 1 : nv;
+      }
+      universe[dimCh] = 255;
     }
   }
 
@@ -225,8 +237,6 @@ export class FixtureOutput {
       const showTop = dimTop * MAP_TOP;
       const dimMapTop = Math.round(showTop + (top - showTop) * Math.max(0, Math.min(1, dropOpen)));
 
-      // DIM_FULL: fargens tak = MAP_TOP x tak, full drop oppnar till taket (som dimmern forr). Annars som forr: fargen gar till taket.
-      const colTop = DIM_FULL ? Math.round(top * MAP_TOP + (top - top * MAP_TOP) * Math.max(0, Math.min(1, dropOpen))) : top;
       let lampLit = true, colK = 1, mxRaw = 0;
       if (c) {
         let mxOn = on;
@@ -236,7 +246,7 @@ export class FixtureOutput {
           if (universe[ch] > mxRaw) { mxRaw = universe[ch]; mxOn = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; }
         }
         lampLit = mxRaw > 0;
-        if (lampLit) colK = (mxOn + 1 + (colTop - mxOn - 1) * (mxRaw - 1) / 254) / mxRaw;
+        if (lampLit) colK = (mxOn + 1 + (top - mxOn - 1) * (mxRaw - 1) / 254) / mxRaw;
       }
       for (let i = 0; i < fast.roles.length; i++) {
         const ch = base + i;
@@ -250,16 +260,14 @@ export class FixtureOutput {
         if (isColor) {   // farg: aven utan kalibrering (lampLit = sant, colK = 1) - noll nollar direkt, ingen hallning
           if (!lampLit) { universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
           if (colK !== 1) raw = Math.round(raw * colK);
-          const v1 = raw > colTop ? colTop : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
+          const v1 = raw > top ? top : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
         }
         const onCh = !c ? 0 : isDim ? on
           : ((role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : role === "w" ? c.onW : undefined) ?? on);
         // Golvet ar tandpunkten, eller DMX_FLOOR_CH nar den ar hogre (bara DIM). Aldrig over taket.
         const floorCh = FLOOR_CH > onCh && isDim ? (FLOOR_CH > dimTop ? dimTop : FLOOR_CH) : onCh;
         let out: number;
-        if (DIM_FULL && isDim) {
-          out = dimTop;   // DIMMERN PA MAX (se DIM_FULL): fullpunkten, alltid
-        } else if (raw > 0) {
+        if (raw > 0) {
           out = isDim && dimMapTop > floorCh ? Math.min(dimMapTop, floorCh + 1 + Math.round((dimMapTop - floorCh - 1) * (raw - 1) / 254))
             : raw < floorCh ? floorCh : raw > top ? top : raw;
           this.holdVal[ch] = out;
