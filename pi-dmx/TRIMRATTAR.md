@@ -44,7 +44,7 @@ EN VÄG (10-10): effektens 0 = släckt, färg 1–100 % → lampans tändpunkt+1
 | `DMX_DROP_MIN_GAP_S` | 15 (ladan) | Högst en drop per så många sekunder. |
 | `DMX_NEAR_MIN` / `DMX_NEAR_MAX` | 0,5 / 0,85 | Nästan-dropens lyft, andel av en full drop. |
 | `DMX_NEAR_RISE_DB` / `DMX_NEAR_DIP_DB` | 10 / 8 | Hur stort språng efter hur djup dipp som räknas. |
-| `DMX_NEAR_DROP_SWITCH` | på | Dirigenten byter look på nästan-drop (=0 av). |
+| (nästan-drop byter look) | alltid | Av-brytaren `DMX_NEAR_DROP_SWITCH` borttagen 10-10. |
 | `MINI_DROP_ENV` | 0,9 | Minidropens ljuslyft (bara ljusstyrka, kulören kvar; full drop har dropfärg + vit kärna). |
 | `MINI_BANG_MS` | 150 | Hur länge minidropens lyft håller. Minidrops har ingen spärr, så längre = ljuset fastnar högt. Minidrop byter aldrig look (10-10). |
 | `BODY_GONE_MIN_MS` (DMX-profilen) | 4000 | Riktig drop kräver så långt break före (var 2000; ägaren 10-10: "hellre färre drops, mini fångar dom"). |
@@ -61,7 +61,7 @@ EN VÄG (10-10): effektens 0 = släckt, färg 1–100 % → lampans tändpunkt+1
 - Analysatorns tempo (DMX-profilen `src/analyserProfile.ts`, inte den delade `analyser.ts`): `TEMPO_SHIFT` 1 (följer tempolyft inom låt), `TEMPO_HOLD` 1 (takten hålls över kort paus, 0,35–10 s). Lotus har dem av.
 
 ## Borttagna reglage 10-10 (döda: lästes inte av motorn, bänken json-identisk)
-Config/stämningar/server/UI: `beatPulse`, `calmDecay` ("Tröghet"), `energyCeiling`, `clubMode`, `ambientGlow`, `strobeUnlimited` ("Släpp strobe-taket" — RGB-stroben blixtrar en gång per slag vid ≥ 150 BPM, lampornas strobe-kanal drivs inte), `regiPro` (styrde bara om stämningen fick sätta drop-blackout; nu äger ägaren drop-blackout själv). Oanvända `STROBE_SAFE_HZ/MAX_HZ` i effects.ts.
+Config/stämningar/server/UI: `beatPulse`, `calmDecay` ("Tröghet"), `energyCeiling`, `clubMode`, `ambientGlow`, `strobeUnlimited` ("Släpp strobe-taket" — RGB-stroben blixtrar en gång per slag vid ≥ 150 BPM, lampornas strobe-kanal drivs inte), `regiPro` (styrde bara om stämningen fick sätta drop-blackout; nu äger ägaren drop-blackout själv). Oanvända `STROBE_SAFE_HZ/MAX_HZ`, `SECTION_HIGH_LIFT/BREAK_DIP/LOW_DIP`, `STROBE_MIN_BPM` i effects.ts. Env-brytare (standardvägen är enda vägen): `DMX_NEAR_DROP`, `DMX_NEAR_DROP_SWITCH`, `DMX_GROUP_ALT`, `DMX_SECTION_TRACE`, `DMX_CALM_FROM_BREAKING`.
 
 ## Prov som inte är standard
 Inga just nu. Kvällen 10-09 blev standard 10-10 (bit-identiskt bevisat); borttagna prov: `DMX_E_SLOW_MS`, `DMX_HUE_CUT_MS`, `DMX_DIM_PULS`, `DMX_CH_MAP`, flaggorna `DMX_HUE_CUT`/`DMX_ALLA_LOOKER`/`DMX_E_GATE`/`DMX_E_LIN` (nu enda vägen).
