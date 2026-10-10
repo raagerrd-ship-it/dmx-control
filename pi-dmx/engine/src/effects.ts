@@ -175,9 +175,6 @@ const CLEAR_BASS_BOOST = Number(process.env.DMX_CLEAR_BASS_BOOST ?? 0.25);
 const MIX_RECENT_N = Number(process.env.DMX_MIX_RECENT_N ?? 8);   // 4 -> 8 (ladan 10-01 godkant)
 const MIX_RECENT_PENALTY = Number(process.env.DMX_MIX_RECENT_PENALTY ?? 0.2);
 const MIX_TOP_FRAC = Number(process.env.DMX_MIX_TOP_FRAC ?? 0.8);   // 0,5 -> 0,8 (ladan 10-01 godkant)
-/** MER VARIATION (ladan 2026-09-29 18:50: 'kanns ratt lika hela tiden' - mer variation och fler effekter): DMX_SECTION_REUSE=0 = en aterkommande
- *  del (vers 2, refrang 2) far en NY look i stallet for att aterse samma (loggen: vers 'sopa' 3 ggr, refrang 'chase' 3 ggr). Standard 1 = som forr. */
-const SECTION_REUSE = process.env.DMX_SECTION_REUSE === '1';   // standard AV sedan 10-01 (ladan: 'mer variation'); =1 som forr   // (4) valfonster = andel av poolen (minst 3)
 /** (6) OSEDD-BONUS (2026-09-23, effektoversynen): +DMX_MIX_UNSEEN_BONUS i rankingen for effekter som inte valts sedan start -
  *  med 46 effekter och ~50 byten per 10 min blev annars samma 20-25 valda och resten aldrig (effectMix: 18-19 aldrig valda).
  *  Bonusen forsvinner sa fort effekten setts en gang, sa den styr bara FORSTA chansen. 0 = av. */
@@ -1312,7 +1309,8 @@ export class EffectEngine {
         const livePart = !!part && part.startsWith('live:');
         if (SECTION_UNIT && livePart) { if (unitPhrase) { this.unitSlot = 1 - this.unitSlot; this.unitPhraseDone = phraseNo; } else this.unitSlot = 0; }
         const pairKey = livePart ? (SECTION_UNIT ? part + (this.unitSlot ? ':b' : '') : part + ':' + Math.floor(((frame.sectionIndex ?? 0) + 1) / 2)) : part;   // SECTION_UNIT: nyckel = etiketten
-        const remembered = SECTION_REUSE && !wantCalm && pairKey && (!livePart || SECTION_UNIT) ? this.partLook.get(pairKey) : undefined;   // SECTION_UNIT: igenkanning aven live
+        // (ATERSEENDE av looken per sektion - DMX_SECTION_REUSE - borttaget 10-10: av sedan 10-01, 'mer variation'. Sektionspaletten
+        //  DMX_SECTION_PALETTE ger igenkanningen i kulorerna i stallet.)
         const unitPen = (m: Mode) => SECTION_UNIT && pairKey && this.prevSongLook.get(pairKey) === m ? 0.5 : 0;   // SECTION_UNIT: inte forra latens look for samma sektionstyp   // 20:33: ingen igenkanning for live-etiketter ('samma effekt igen') - bara latminnet
         // TYDLIG BASGANG -> toggle-poolen (se CLEAR_BASS). Snitt med aktuell pool forst (sektion/tier/krav), annars alla
         // aktiva toggle-effekter som moter kraven. Bast passande forst, gyllene-snitt-variation bland topp 3, aldrig samma.
@@ -1322,16 +1320,13 @@ export class EffectEngine {
         const bassHard = beatClear || (!allaBuild && bassClear && (!MIX_V2 || ((frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD && this.smartCount % 2 === 1)));   // MIX_V2 (1)
         const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); return cut.length ? cut : enabled(TOGGLE_POOL).filter(req); })() : [];
         const clearBass = toggles.length > 0;
-        if (clearBass && !(remembered && TOGGLE_POOL.includes(remembered) && this.cfg.rotation?.[remembered] !== false)) {
+        if (clearBass) {
           const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (MIX_V2 && this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) + (MIX_V2 && !this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) - unitPen(m) })).sort((a, b) => b.s - a.s);
           const cands = ranked.filter((x) => x.m !== this.smartMode);
           const top = (cands.length ? cands : ranked).slice(0, MIX_V2 ? Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))) : 3);
           this.smartMode = this.pickLook(top);
           if (part && !wantCalm) this.partLook.set(pairKey!, this.smartMode);
-          console.log(`[dirigent] ${beatClear ? `last takt (tillit ${this.beatTrust.toFixed(2)})` : `tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}`}, ${toggles.length} toggles) -> "${this.smartMode}"`);
-        } else if (remembered && this.cfg.rotation?.[remembered] !== false) {
-          this.smartMode = remembered;
-          console.log(`[dirigent] ${part}: återser "${remembered}"`);
+          console.log(`[dirigent] ${beatClear ? `last takt (tillit ${this.beatTrust.toFixed(2)}` : `tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}`}, ${toggles.length} toggles) -> "${this.smartMode}"`);
         } else {
           // DUBBELTAKT → VARANNAN: på snabbt/dubbeltakt-låst tempo (bpm ≥ 140) boostas
           // `varannan` (spatial dubbeltakt) hårt så dirigenten väljer den i stället för
