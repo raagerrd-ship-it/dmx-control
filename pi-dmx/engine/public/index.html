@@ -535,7 +535,12 @@
       <input type="range" min="1" max="20" step="1" id="lvlSil" style="flex:1;margin:0 10px">
       <span class="val" id="lvlSilV">–</span>
     </div>
-    <div class="status" style="margin-top:2px">Under denna nivå släcks lamporna helt.</div>
+    <div class="status" style="margin-top:2px;margin-bottom:8px">Under denna nivå släcks lamporna helt.</div>
+    <div class="row"><label>Släcktid</label>
+      <input type="range" min="0" max="50" step="1" id="lvlHold" style="flex:1;margin:0 10px">
+      <span class="val" id="lvlHoldV">–</span>
+    </div>
+    <div class="status" style="margin-top:2px">Hur länge det ska vara tyst innan lamporna släcks. De tänds direkt igen. 0 s = direkt.</div>
   </div>
 
   <h1>Lampor</h1>
@@ -948,6 +953,7 @@ function syncLevelUi(cfg) {
   const setV = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
   const sil = Math.round((cfg.silenceLevel ?? 0.05) * 100), flo = Math.round((cfg.energyFloor ?? 0) * 100);
   setR("lvlFloor", flo); setV("lvlFloorV", flo + " %");
+  const hold = Math.round((cfg.silenceHoldS ?? 0) * 10); setR("lvlHold", hold); setV("lvlHoldV", (hold / 10).toFixed(1) + " s");
   setR("lvlSil", sil); setV("lvlSilV", sil + " %");
 }
 (function wireLevel() {
@@ -962,6 +968,7 @@ function syncLevelUi(cfg) {
       t = setTimeout(() => { send(msg(Number(el.value))); levelDirty = false; }, 150);
     });
   };
+  bind("lvlHold", "lvlHoldV", (v) => (v / 10).toFixed(1) + " s", (v) => ({ type: "setSilenceHold", value: v / 10 }));
   bind("lvlFloor", "lvlFloorV", (v) => v + " %", (v) => ({ type: "setEnergyFloor", value: v / 100 }));
   bind("lvlSil", "lvlSilV", (v) => v + " %",  (v) => ({ type: "setSilenceLevel",  value: v / 100 }));
 })();

@@ -604,6 +604,9 @@ export async function startServer(
             deps.cfg.dynamics = clamp01(msg.value);
           } else if (msg.type === "setMaster") {
             deps.cfg.master = clamp01(msg.value);
+          } else if (msg.type === "setSilenceHold" && Number.isFinite(msg.value)) {
+            // "Släcktid": sekunder under släckgränsen innan riggen släcks (0..5).
+            deps.cfg.silenceHoldS = Math.max(0, Math.min(5, Number(msg.value)));
           } else if (msg.type === "setEnergyFloor" && Number.isFinite(msg.value)) {
             // "Lägsta nivå": energins golv (0..0,5) - tysta partier lyser minst så här mycket av effektens ljus.
             deps.cfg.energyFloor = Math.max(0, Math.min(0.5, Number(msg.value)));

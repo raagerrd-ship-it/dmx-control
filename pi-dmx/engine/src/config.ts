@@ -126,6 +126,9 @@ export interface EngineConfig {
   /** "Lägsta nivå" (2026-10-10, ägaren i ladan: "så den lyser på lite tystare partier"): energins golv 0..0,5 - energin dämpar
    *  aldrig under denna andel av effektens ljus (i DMX-procent). 0 = som förr (kurvan ensam). */
   energyFloor?: number;
+  /** "Släcktid" (2026-10-10, ägaren i ladan): sekunder ingången måste ligga under släckgränsen innan riggen släcks (0..5).
+   *  Tänds direkt när ljudet är tillbaka. 0 = som förr (direkt). */
+  silenceHoldS?: number;
   /** "chase" sub-pattern: sweep (L→R loop) or ping-pong (bounce). */
   chaseStyle: "sweep" | "pingpong";
   /** Which modes are included in the physical button / WS cycle. */
@@ -247,6 +250,7 @@ export const defaultConfig: EngineConfig = {
   smartDwellMs: 15000,
   master: 1.0,
   energyFloor: 0,       // energins golv (ratt i /setup: "Lägsta nivå")
+  silenceHoldS: 0,      // släcktid (ratt i /setup: "Släcktid")
   silenceLevel: 0.05,     // släckgräns på frame.level (ratt i /setup: "Släckgräns")
   chaseStyle: "pingpong",
   rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },

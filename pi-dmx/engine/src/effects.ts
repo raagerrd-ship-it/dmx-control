@@ -408,7 +408,7 @@ export class EffectEngine {
   private lastLiveSection = '';   // DMX_SECTION_SWITCH
   private lastDropSwitchMs = -1e9; dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;   // senaste drop -> 'high'-pool i 20 s
   private eSm = 0; eSimple = 0; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
-  private trebleEnv = 0; private airEnv = 0; private punchEnv = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
+  private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
   private lampLvl = new Float32Array(64); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
@@ -1387,7 +1387,13 @@ export class EffectEngine {
 
     // TYSTNADSGRIND = HARD INGANGSGRANS (se konstanten ovan). Slackgransen ar ratten i /setup (cfg.silenceLevel); env vinner om satt.
     const silenceLevel = SILENCE_LEVEL_ENV ? SILENCE_LEVEL : (this.cfg.silenceLevel ?? SILENCE_LEVEL);
-    this.silenceGate = frame.level > silenceLevel ? 1 : 0;
+    // SLACKTID (cfg.silenceHoldS, /setup): slack forst nar nivan legat under gransen sa lange; tand direkt. 0 = direkt (som forr).
+    if (frame.level > silenceLevel) { this.silenceGate = 1; this.belowSince = 0; }
+    else {
+      const holdMs = Math.max(0, Math.min(5, this.cfg.silenceHoldS ?? 0)) * 1000;
+      if (this.belowSince === 0) this.belowSince = performance.now();
+      if (performance.now() - this.belowSince >= holdMs) this.silenceGate = 0;
+    }
     // Warmup-räknare för baslinjen: ackumulera medan aktiv, nollställ vid tystnad.
     if (this.silenceGate > 0.5) this.warmMs += dtSec * 1000; else this.warmMs = 0;
     if (effMode === "wave") this.wavePhase += dtSec * (1.6 + audio * 4);
