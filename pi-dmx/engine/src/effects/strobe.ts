@@ -5,6 +5,7 @@ import type { EffectDef } from "./types.js";
 // hsv(hue,1,1) konstant och lamnade allt at motorns strobe-kanal). Strobe-onskan (c.want.strobe) foljer dropen.
 export const strobe: EffectDef = {
   key: "strobe", label: "Strobe", tier: "full", modulate: { energy: false, pulse: false }, section: ["high"],
+  fastLight: true,   // strobe ar byggd pa korta blixtar - ingen minsta pa-tid
   desc: "Blixt pa slaget och vid drop i refrangen, het glod emellan.",
   render(c) {
     const hue = c.mixedSector(c.beatIdx) / 6;

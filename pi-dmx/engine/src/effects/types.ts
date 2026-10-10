@@ -150,6 +150,9 @@ export interface EffectDef {
    *  energy=false: taket ignoreras (strobe, fyrverkeri, drops, konfetti - de ar sin egen nivan). pulse=false: pulsen ignoreras (statiska
    *  svep/ambient). Dirigenten far skriva over (tystnad/tillit). Gäller bara med DMX_HEARTBEAT=1. Taggen bor i effektfilen. */
   modulate?: { energy: boolean; pulse: boolean };
+  /** SNABBT LJUS (2026-10-10, agaren: "ge effekter mojlighet att aktivt skippa den, da ar det ju uttankt att kora sa"): true = effekten
+   *  hoppar over minsta pa-tiden (lampans DMX_MIN_ON_MS och fargkanalens DMX_CH_MIN_ON_MS) - for effekter byggda pa korta blixtar. */
+  fastLight?: boolean;
   /** TOGGLAR lampor: diskreta grupper/steg som slar om per slag (inre/yttre, varannan, lopare, studs...). Dirigenten valjer bara
    *  bland dessa nar analysatorn ser en tydlig basgang (profile.bassline, effects.ts CLEAR_BASS). Taggen bor i effektfilen. */
   toggle?: boolean;

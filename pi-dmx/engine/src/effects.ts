@@ -194,7 +194,8 @@ const START_DROP_MUTE_MS = 3000;
 const SHOW_LEAD_DEFAULT = 50;
 /** STEG 2: den ENDA uttoningen (lampans ljusstyrka, tidskonstant i DMX-ljus). Snabbare ar forbjudet (agaren 09-29). */
 const FADE_MIN_S = Number(process.env.DMX_FADE_MIN_S ?? 0.25);
-const MIN_ON_MS = Number(process.env.DMX_MIN_ON_MS ?? 150);   // STEG 2: minsta pa-tid innan uttoningen (se MINSTA PA-TID)
+const MIN_ON_MS = Number(process.env.DMX_MIN_ON_MS ?? 150);
+const CH_MIN_ON_MS = Number(process.env.DMX_CH_MIN_ON_MS ?? 100);   // STEG 2: minsta pa-tid per fargkanal (se MINSTA PA-TID PER FARGKANAL)   // STEG 2: minsta pa-tid innan uttoningen (se MINSTA PA-TID)
 /** Sentinel: pulsklockan ännu inte initierad (första framen sätter den utan tick). */
 const PULSE_IDX_INIT = -2e9;
 // Loudness-portens konstanter = Lotus DEFAULT_CAL (piEngine.js:166-239).
@@ -410,7 +411,7 @@ export class EffectEngine {
   private lastDropSwitchMs = -1e9; dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;   // senaste drop -> 'high'-pool i 20 s
   private eSm = 0; eSimple = 0; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
-  private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
+  private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
@@ -1595,7 +1596,8 @@ export class EffectEngine {
     const inputGate = this.inputOff ? 0 : 1;   // ingangen avstangd -> morkt (del av steg 2)
     this.fxPeakNow = 0;
     const fadeK = Math.exp(-dtSec / (FADE_MIN_S / E_LIN_INV));
-    const renderNow = performance.now();   // STEG 2: uttoningens tidskonstant i DMX-ljus (FADE_MIN_S x gamma fore gamman)
+    const renderNow = performance.now();
+    const fastLight = !!EFFECT_MAP.get(effMode)?.fastLight;   // effekten skippar minsta pa-tid (EffectDef.fastLight)   // STEG 2: uttoningens tidskonstant i DMX-ljus (FADE_MIN_S x gamma fore gamman)
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const isAnchor = useAnchor && i > 0 && i < count - 1;   // mittlamporna = ankare
@@ -1649,9 +1651,18 @@ export class EffectEngine {
         const mT = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
         // MINSTA PA-TID (DMX_MIN_ON_MS, agaren i ladan 10-10: "kan man ge effekterna en minsta tankt 'pa' tid? nu blev det lite
         // flimrande igen"): en nivå lampan nått hålls minst MIN_ON_MS innan uttoningen börjar - korta blixtar blir en puls. Upp direkt.
-        const holding = renderNow - this.lampPeakAt[i] < MIN_ON_MS;
+        const holding = !fastLight && renderNow - this.lampPeakAt[i] < MIN_ON_MS;
         const fall = holding ? this.lampLvl[i] : this.lampLvl[i] * fadeK, o = i * 3;
-        if (mT > 0) { this.lampRatio[o] = rgb[0] / mT; this.lampRatio[o + 1] = rgb[1] / mT; this.lampRatio[o + 2] = rgb[2] / mT; }
+        if (mT > 0) {
+          // MINSTA PA-TID PER FARGKANAL (agaren 10-10: "lyser R sa far inte B bara komma igang under 100 ms"): en kanal som tands
+          // halls tand minst CH_MIN_ON_MS med sin senaste andel av lampans ljus, aven om effekten slacker den direkt.
+          for (let c = 0; c < 3; c++) {
+            const q = o + c, r = rgb[c] / mT;
+            if (r > 0) { if (this.chOnAt[q] === 0) this.chOnAt[q] = renderNow; this.lampRatio[q] = r; }
+            else if (!fastLight && this.chOnAt[q] !== 0 && renderNow - this.chOnAt[q] < CH_MIN_ON_MS) rgb[c] = this.lampRatio[q] * mT;   // hall kvar
+            else { this.chOnAt[q] = 0; this.lampRatio[q] = 0; }
+          }
+        }
         if (mT >= fall) { if (mT > this.lampLvl[i] + 0.005 || !holding) this.lampPeakAt[i] = renderNow; this.lampLvl[i] = mT; }
         else {
           this.lampLvl[i] = fall;
