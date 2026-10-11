@@ -1,5 +1,22 @@
 # Natt-agentens uppdrag
 
+## LÄGET 2026-10-11 eftermiddag - LÄS FÖRST (ersätter äldre "LÄGET"-rader nedan där de krockar)
+KÖR LIVE i ladan (deploy 10-10 20:27): TRE STEG, Lägsta nivå 0,2, 4 s break före riktig drop, minidrop byter inte look, toggle-effekter
+utan grundnivå + föredras vid låst takt, arecord FIFO 60. COMMITTAT MEN EJ DEPLOYAT (identiskt i bänken, ägaren kör `python tools\ladan.py`):
+beatFeed.ts, långinspelningen (/setup "Spela in 5 min"), reglagerensningen (döda flaggor, env-brytare, dwell = fast 45 s, gamma en källa,
+släckgräns bara /setup). OPT-IN SOM VÄNTAR PÅ ÄGARENS ÖGA (rör inte deras standard; mät gärna mer):
+  DMX_SECTION_PALETTE=1, DMX_PHRASE_SWITCH=1, DMX_LAMP_STAIR=1 (v2: glesa lamppar i vers/intro), DMX_HUE_PHRASE=1  = konsertpaketet
+  DMX_TIER_OPEN=0.6 (full ljusare än fart)   DMX_DROP_STROBE=<DMX> (lampans strobe-kanal vid drop, ≤ 3 blixtar/s, kalibreras i ladan)
+  Siffror: tools/natt/konsert/*.json, rapport-artifacten (tools/natt/artifact.txt). Bänk: tools/concertBench.mjs, lampCount.mjs, knobSweep.py.
+NÄSTA FÖR NATTAGENTEN, i ordning:
+  1. Om ägaren spelat in lang-*.wav (snippets, hämtas i ladan): lägg dem i bänken (natt.py-mängd), mät drops med historik (dropFacit.mjs),
+     breaklängd före riktiga drops (är 4 s rätt?), och om de "döda" rattarna i tools/natt/rattar.md (SECTION_UNIT_RESERVE_MS, SYNC_ERR_FRAC,
+     DROP_CALM_BUILD, DROP_LAND_GAIN, E_RELEASE_MS, MIX_UNSEEN_BONUS, NEAR_FULL_DB) är döda även på riktigt material -> ta bort med json-bevis.
+  2. Lugn-effekterna (breathe, mono, airglow) väljs aldrig - mixarna har ~60 s lugnt. Mät på långinspelningar/lugna korpusklipp innan gallring.
+  3. Kick->ljus 150 ms (bara uppgången får kortas) - ny baslinje sedan beatFeed (mätfälla 43); budgeten i rapporten.
+  4. Konsertshowen vidare om ägaren godkänt paketet: fler SPARSAMMA effekter (egna 1-2-lampsvarianter), kulör per sektion i fler effekter.
+Mätfällor sedan 10-10: 43 = bänkens taktmatning (nu beatFeed som live), 44 = korpusens första 15 s (analysatorns uppvärmning; använd energiR15).
+
 ## STANDARD ÄNDRAD 2026-10-10 19:50 (ladan): "Lägsta nivå" energyFloor 0 -> 0,2 (låtbyten och tysta intron var svarta 10-15 s: energifönstret mindes förra låten + brant kurva). Ny baslinje i bänken - kör om natt.py-baslinjen före jämförelser.
 
 ## LÄGET 2026-10-10 20:30 (ladan, kvällens fem fixar - båda STANDARD, filerna på Pi:n md5-verifierade, aktiva vid nästa omstart)
