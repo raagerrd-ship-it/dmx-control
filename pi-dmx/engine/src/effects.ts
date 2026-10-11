@@ -53,7 +53,7 @@ const DROP_JUMP_DB = Number(process.env.DMX_DROP_JUMP_DB ?? 17), DROP_PAIR_MS = 
 /** MINIDROPEN LYFTER OCH HÅLLER (ägaren i ladan 10-11: "låten ökar energi, kör minidrop men ljuset visar inget"): bänken visade att
  *  blinken kom (0,40 -> 0,95) men bara i 150 ms - sedan föll ljuset tillbaka. Nu släpper energin helt i MINI_LIFT_MS efter minidropen
  *  (effekten lyser med full egen styrka) och glider tillbaka på MINI_LIFT_FALL_MS. Bara mindre dämpning. */
-const MINI_LIFT_MS = Number(process.env.DMX_MINI_LIFT_MS ?? 400), MINI_LIFT_FALL_MS = Number(process.env.DMX_MINI_LIFT_FALL_MS ?? 400);   // 1000/800 -> 400/400 (ägaren: 'bara allt lyser')   // 500/600 -> 1000/800 (kandes inte)   // ägaren: 'behöver inte vara 2 s' - 2 s bara med felsökning på (synligt kvitto)
+const MINI_LIFT_MS = Number(process.env.DMX_MINI_LIFT_MS ?? 4000), MINI_LIFT_FALL_MS = Number(process.env.DMX_MINI_LIFT_FALL_MS ?? 1500);   // 400/400 -> 4000/1500 (ladan 10-11 21:50, efter V123 när minidropen bara kommer på riktiga lyft: 'med dessa miss skulle jag önskat minidrop med ökad energi')   // 1000/800 -> 400/400 (ägaren: 'bara allt lyser')   // 500/600 -> 1000/800 (kandes inte)   // ägaren: 'behöver inte vara 2 s' - 2 s bara med felsökning på (synligt kvitto)
 /** ENERGILYFT (ägaren i ladan 10-11: "jag ser allt från att det varit lugnt till ett tydligt energilyft (även om det är lägre) med
  *  basslag som minidrop"): analysatorns minidrop/nästan-drop jämför mot de senaste sekunderna, som efter ett lugnt parti har anpassat
  *  sig. Här: basens kropp (nearB, 120 ms) medlad över 0,6 s mot medlet för 6..2 s sedan; LIFT_DB över det -> samma minidrop-look
@@ -1097,7 +1097,7 @@ export class EffectEngine {
       const sec = frame.section ?? '';
       if (sec === 'high' && this.prevRawSec !== '' && this.prevRawSec !== 'high' && nowWall - this.lastHighWall > 8000 && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive) {
         this.liftAt = nowWall; this.liftCount++; this.lastMiniWall = nowWall; this.miniSector = mixedSector(this.liftCount + 7);
-        this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + (isLogOn() ? 2000 : MINI_LIFT_MS);
+        this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + MINI_LIFT_MS;
         if (isLogOn()) console.log(`[dirigent] sektionslyft: ${this.prevRawSec} -> high`);
       }
       if (sec === 'high') this.lastHighWall = nowWall;
@@ -1112,7 +1112,7 @@ export class EffectEngine {
         if (calm > -80 && lift >= LIFT_DB) {
           this.liftAt = nowWall; this.liftCount++; this.lastMiniWall = nowWall; this.miniSector = mixedSector(this.liftCount + 7);
           if (this.nearRise >= DROP_JUMP_DB && nowWall - this.nearAt <= DROP_PAIR_MS) { this.upgradeHit = true; this.buildLookAt = 0; if (isLogOn()) console.log(`[dirigent] lyft ${lift.toFixed(1)} dB + sprang -> drop`); }   // LYFT + SPRÅNG (språnget först)
-          else { this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + (isLogOn() ? 2000 : MINI_LIFT_MS); }
+          else { this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + MINI_LIFT_MS; }
           if (isLogOn()) console.log(`[dirigent] energilyft: kropp ${lift.toFixed(1)} dB over lugnet`);
         }
       }
