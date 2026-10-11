@@ -1365,7 +1365,7 @@ export class EffectEngine {
         // HALVERAT: de delade lookerna (och hjärtat) ska finnas i poolen oavsett tier.
         // (innerouter borttagen 2026-09-23: rPerm 1,00 mot varannan - samma effekt upp till lampordning.)
         if (this.pulseHalved) for (const m of ["varannan", "basgang", "hjarta"] as Mode[]) if (!pool.includes(m) && this.cfg.rotation?.[m] !== false && req(m)) pool.push(m);
-        if (CONCERT) { const show = pool.filter((m) => !UNIFORM.includes(m) && !(CALM_ONLY.includes(m) && !(bpm > 0 && bpm < CALM_BPM))); if (show.length) pool = show; }
+        if (CONCERT) { const show = pool.filter((m) => !(CALM_ONLY.includes(m) && !(bpm > 0 && bpm < CALM_BPM))); if (show.length) pool = show; }   // UNIFORM tillbaka 10-11 (energi pa utvalda lampor)
         if (CONCERT && secKey === 'build') { const b = pool.filter((m) => BUILD_LOOKS.includes(m)); pool = b.length ? b : enabled(BUILD_LOOKS); }   // BUILD SOM HÅLLER   // KONSERTLÄGET: ingen enhetlig look
         if (LAMP_STAIR && liveSec === 'high') {                                   // LAMPTRAPPA: refrängen -> hela riggen
           const full = pool.filter((m) => !SPARSAM.includes(m)); if (full.length) pool = full;
@@ -1538,7 +1538,7 @@ export class EffectEngine {
     this.lookPlayMs.set(this.smartMode, (this.lookPlayMs.get(this.smartMode) ?? 0) + dtMs);
     // (Den gamla nivakedjan - intensity/LIVE_LEVEL-fonster mot ankare, shape-smoothing, log-release, lightLoud - borttagen 2026-10-10:
     //  ljuset styrs av energin nedan, och drop-kontrollen laser samma energi.)
-    let md: number;
+    let md: number; let mdSel = 1;   // mdSel: energin UTAN konsertgolvet - for enhetliga effekters utvalda lampor (se UNIFORM)
     {   // ENKEL ENERGI (se ENERGY_SIMPLE-dokumentationen). md0/sektionsgas/rang borttagna 10-08.
       // FOLJANDE FONSTER (se E_WIN_S)
       const db = 20 * Math.log10(Math.max(1e-5, frame.levelVU ?? frame.level));
@@ -1558,6 +1558,7 @@ export class EffectEngine {
       this.eSimple = this.eSm;
       const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);
       let eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
+      const eFloorSel = eFloor;
       if (CONCERT && CONCERT_E_FLOOR > eFloor) eFloor = CONCERT_E_FLOOR;   // EFFEKTEN LEDER (se CONCERT_E_FLOOR)
       if (CONCERT && nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) {   // MINIDROPEN LYFTER OCH HALLER (se MINI_LIFT_MS)
         const left = this.miniLiftUntil - nowWall, a = left >= 0 ? 1 : Math.max(0, 1 + left / MINI_LIFT_FALL_MS);
@@ -1566,6 +1567,7 @@ export class EffectEngine {
       if (TIER_OPEN > 0) { const fullAmt = Math.max(0, Math.min(1, (this.tierEma - TIER_HI) / (1 - TIER_HI))); eFloor += (1 - eFloor) * TIER_OPEN * fullAmt; }   // FULL OPPNAR (se TIER_OPEN)
       md = drive * Math.min(1, Math.max(eFloor + (1 - eFloor) * eC, this.dropEnv));   // bara dampning: aldrig over 1
       md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
+      mdSel = Math.pow(drive * Math.min(1, Math.max(eFloorSel + (1 - eFloorSel) * eC, this.dropEnv)), E_LIN_INV);
     }
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
@@ -1739,8 +1741,12 @@ export class EffectEngine {
       // (>= 0,85) nar hogst EN annan lampa var over halva dess niva forra rutan = den hoppande spotten -> forbi energin ("95 % pa en lampa").
       this.fxNow[i] = m0;
       let useE = lampWantE ?? modulateOf(effMode).energy;
-      if (lampWantE === undefined && CONCERT && useE && m0 >= 0.85) { let n = 0; for (let q = 0; q < count; q++) if (q !== i && this.fxPrev[q] > 0.5 * m0) n++; if (n <= 1) useE = false; }
-      const k = inputGate * (useE ? md : drive);
+      let mdUse = md;
+      if (lampWantE === undefined && CONCERT && UNIFORM.includes(effMode)) {   // ENERGI PA UTVALDA LAMPOR (agaren 10-11: 'de far garna lysa lika, men lagg da pa energieffekt pa utvalda lampor')
+        const sel = ctx.group === (Math.floor(ctx.beatIdx / 16) & 1);   // paret byts varje fras
+        useE = sel; mdUse = mdSel;
+      } else if (lampWantE === undefined && CONCERT && useE && m0 >= 0.85) { let n = 0; for (let q = 0; q < count; q++) if (q !== i && this.fxPrev[q] > 0.5 * m0) n++; if (n <= 1) useE = false; }
+      const k = inputGate * (useE ? mdUse : drive);
       rgb[0] *= k; rgb[1] *= k; rgb[2] *= k;
       // ENERGIN SLACKER ALDRIG (agaren 2026-10-10: "energi skall aldrig slacka om effekten vill ha pa en lampa"): vill effekten ha
       // lampan tand (m0 > 0) och ingangen ar pa (k > 0) halls den pa lagst 1 % (gammans forsta steg -> utgangens tandpunkt+1).
