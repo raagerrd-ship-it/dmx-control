@@ -1108,7 +1108,7 @@ export class EffectEngine {
     }
     if (CONCERT && this.nearB !== null) {   // ENERGILYFT (se LIFT_DB)
       const h = this.liftHist; h.push(this.nearB); if (h.length > 240) h.shift();   // ~6 s i 25 ms-rutor
-      if (h.length >= 240 && nowWall - this.liftAt > LIFT_REFRACT_MS && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && kickEnv > 0.3) {
+      if (h.length >= 240 && nowWall - this.liftAt > LIFT_REFRACT_MS && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && kickEnv > 0.3 && !BUILD_LOOKS.includes(this.smartMode)) {   // inte under en build (stegringen hör till builden)
         let sum = 0, mx = -1e9; for (let q = 0; q < 160; q++) { sum += h[q]; if (h[q] > mx) mx = h[q]; }
         const calm = sum / 160;
         if (calm > -80 && this.nearB - calm >= LIFT_DB && this.nearB - mx >= LIFT_DB / 2) {
@@ -1351,7 +1351,8 @@ export class EffectEngine {
         const concertBuild = CONCERT && buildEntry && held > 2000;   // konsertläget: in i build direkt
         // refrängen kom utan drop -> lämna builden direkt; även ett energilyft/sektionslyft (ladan 16:05: virvel hängde kvar i 'low' efter lyftet)
         // + intensiteten på topp (ladan 17:09 'miss': upptakt låg kvar 10 s i int 0,9-1,0 - sektionen gick low -> build -> intro, aldrig high)
-        const buildExit = CONCERT && BUILD_LOOKS.includes(this.smartMode) && (frame.section === 'high' || (this.buildLookAt > 0 && nowWall - this.buildLookAt > 2000 && (nowWall - this.liftAt < 300 || (frame.intensity ?? 0) >= 0.85)));
+        // (ladan 17:12 'falsk': lyftet och int 0,86 kom UNDER builden - dropen fyrade före smällen. Lyft inom build räknas inte; topp = 0,95.)
+        const buildExit = CONCERT && BUILD_LOOKS.includes(this.smartMode) && (frame.section === 'high' || (this.buildLookAt > 0 && nowWall - this.buildLookAt > 2000 && (frame.intensity ?? 0) >= 0.95));
         // BUILDEN LANDAR I REFRÄNGEN (ägaren i ladan 16:01 'miss': fyllning -> high, nivån +8 dB, men varken drop (20 dB-kravet) eller
         // sektionslyft (minidropens 2 s-spärr) fyrade): har builden pågått >= BUILD_DROP_MIN_MS och sektionen går till high = DROPEN.
         if (buildExit && this.buildLookAt > 0 && nowWall - this.buildLookAt > BUILD_DROP_MIN_MS && !dropHit) { this.upgradeHit = true; this.buildLookAt = 0; if (isLogOn()) console.log('[dirigent] builden landar i refrangen -> drop'); }
