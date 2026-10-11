@@ -15,6 +15,8 @@ NÄSTA FÖR NATTAGENTEN, i ordning:
   2. Lugn-effekterna (breathe, mono, airglow) väljs aldrig - mixarna har ~60 s lugnt. Mät på långinspelningar/lugna korpusklipp innan gallring.
   3. Kick->ljus 150 ms (bara uppgången får kortas) - ny baslinje sedan beatFeed (mätfälla 43); budgeten i rapporten.
   4. Konsertshowen vidare om ägaren godkänt paketet: fler SPARSAMMA effekter (egna 1-2-lampsvarianter), kulör per sektion i fler effekter.
+AGENTERNA 10-11: nattagentens instruktion omskriven (kortare, dagens ljusväg; gamla i tools/natt/agent-backup/). Analysatorfel skrivs till
+tools/natt/analysator-fynd.md - lotus-morgonagenten läser den varje morgon (dess steg 4e) och fyller i Status.
 Mätfällor sedan 10-10: 43 = bänkens taktmatning (nu beatFeed som live), 44 = korpusens första 15 s (analysatorns uppvärmning; använd energiR15).
 
 ## STANDARD ÄNDRAD 2026-10-10 19:50 (ladan): "Lägsta nivå" energyFloor 0 -> 0,2 (låtbyten och tysta intron var svarta 10-15 s: energifönstret mindes förra låten + brant kurva). Ny baslinje i bänken - kör om natt.py-baslinjen före jämförelser.
