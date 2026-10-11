@@ -42,6 +42,15 @@ const UNIFORM: Mode[] = ['breathe', 'snap', 'mono', 'pulse', 'party', 'airglow',
  *  showen (drop-look, rök, drop-look-byte) - analysatorns 4 s-break-krav missar dropen efter en trumvirvel-build. */
 const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning'];
 const BUILD_DROP_MIN_MS = Number(process.env.DMX_BUILD_DROP_MIN_MS ?? 4000), BUILD_DROP_RISE_DB = Number(process.env.DMX_BUILD_DROP_RISE_DB ?? 17);   // builden >= 4 s, språnget >= 17 dB
+/** MINIDROPEN LYFTER OCH HÅLLER (ägaren i ladan 10-11: "låten ökar energi, kör minidrop men ljuset visar inget"): bänken visade att
+ *  blinken kom (0,40 -> 0,95) men bara i 150 ms - sedan föll ljuset tillbaka. Nu släpper energin helt i MINI_LIFT_MS efter minidropen
+ *  (effekten lyser med full egen styrka) och glider tillbaka på MINI_LIFT_FALL_MS. Bara mindre dämpning. */
+const MINI_LIFT_MS = Number(process.env.DMX_MINI_LIFT_MS ?? 500), MINI_LIFT_FALL_MS = Number(process.env.DMX_MINI_LIFT_FALL_MS ?? 600);   // ägaren: 'behöver inte vara 2 s' - 2 s bara med felsökning på (synligt kvitto)
+/** ENERGILYFT (ägaren i ladan 10-11: "jag ser allt från att det varit lugnt till ett tydligt energilyft (även om det är lägre) med
+ *  basslag som minidrop"): analysatorns minidrop/nästan-drop jämför mot de senaste sekunderna, som efter ett lugnt parti har anpassat
+ *  sig. Här: basens kropp (nearB, 120 ms) mot medlet för 6..2 s sedan; LIFT_DB över det, LIFT_DB/2 över toppen där, och kickar nu
+ *  -> samma minidrop-look (alla lampor lika + lyft). Högst en per LIFT_REFRACT_MS. Bara DMX-sidan (frame.bodyDb), delade analysatorn orörd. */
+const LIFT_DB = Number(process.env.DMX_LIFT_DB ?? 8), LIFT_REFRACT_MS = Number(process.env.DMX_LIFT_REFRACT_MS ?? 6000);
 const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math.max(0, Math.min(1, Number(process.env.DMX_MINI_UNI ?? 0.9)));
 /** BUILD FÖRE DROPEN (konsertläget, ägaren 10-11: "dirigenten skall bli snabbare att byta till BUILD innan drops"): analysatorns buildUp
  *  är ~0 på ladans material (0 av 15 drops i megamix hade en build-look före). Dropdetektorn kräver att baskroppen varit BORTA en stund;
@@ -458,7 +467,7 @@ export class EffectEngine {
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
   private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
   private buildLookAt = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
-  private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0;   // minidrop-flank + kort stot
+  private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private liftHist: number[] = []; private liftAt = -1e12; liftCount = 0;   // ENERGILYFT   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
@@ -1003,8 +1012,8 @@ export class EffectEngine {
     this.lastMiniCount = miniCount;
     // Minidrop direkt; en riktig drop samma ruta gar fore (och tar annars over via dropEnv/dropColEnv).
     let miniHit = false;
-    if (miniHitRaw && !dropHitRaw && !(DROP_SONG_HOLD_S > 0 && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000)) miniHit = true;   // direkt (ingen vantan)
-    if (miniHit && CONCERT) { if (nowWall - this.lastMiniWall < MINI_GAP_MS) miniHit = false; else { this.lastMiniWall = nowWall; this.miniSector = mixedSector(miniCount); } }   // MINIDROPS SOM SHOW
+    if (miniHitRaw && !dropHitRaw && (CONCERT || !(DROP_SONG_HOLD_S > 0 && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000))) miniHit = true;   // konsertlaget: latens forsta 30 s sparrar bara riktiga drops   // direkt (ingen vantan)
+    if (miniHit && CONCERT) { if (nowWall - this.lastMiniWall < MINI_GAP_MS) miniHit = false; else { this.lastMiniWall = nowWall; this.miniSector = mixedSector(miniCount); this.miniLiftUntil = nowWall + (isLogOn() ? 2000 : MINI_LIFT_MS); } }   // MINIDROPS SOM SHOW
     // DROPEN AR EN SMALL, INTE EN PLATA. Hallet var 2s och uttoningen 1s, alltsa
     // ~3s full blast per drop — och eftersom dropEnv KRINGGAR VU-taket (se
     // ceilMul nedan) ar det de enda ogonblick riggen gar till max.
@@ -1063,6 +1072,18 @@ export class EffectEngine {
         console.log(`[dirigent] nastan-drop: sprang ${rise.toFixed(1)} dB efter dipp ${dip.toFixed(1)} dB -> ljus ${(this.nearLevel * 100).toFixed(0)} % av en drop`);
       }
       if (nowWall < this.nearUntil && this.nearLevel > dTarget) dTarget = this.nearLevel;
+    }
+    if (CONCERT && this.nearB !== null) {   // ENERGILYFT (se LIFT_DB)
+      const h = this.liftHist; h.push(this.nearB); if (h.length > 240) h.shift();   // ~6 s i 25 ms-rutor
+      if (h.length >= 240 && nowWall - this.liftAt > LIFT_REFRACT_MS && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && kickEnv > 0.3) {
+        let sum = 0, mx = -1e9; for (let q = 0; q < 160; q++) { sum += h[q]; if (h[q] > mx) mx = h[q]; }
+        const calm = sum / 160;
+        if (calm > -80 && this.nearB - calm >= LIFT_DB && this.nearB - mx >= LIFT_DB / 2) {
+          this.liftAt = nowWall; this.liftCount++; this.lastMiniWall = nowWall; this.miniSector = mixedSector(this.liftCount + 7);
+          this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + (isLogOn() ? 2000 : MINI_LIFT_MS);
+          if (isLogOn()) console.log(`[dirigent] energilyft: kropp ${(this.nearB - calm).toFixed(1)} dB over lugnet (${(this.nearB - mx).toFixed(1)} over toppen)`);
+        }
+      }
     }
     const dRate = dTarget > this.dropEnv ? dtNow / 0.03 : dtNow / 1.0;
     this.dropEnv += Math.max(-dRate, Math.min(dRate, dTarget - this.dropEnv));
@@ -1533,6 +1554,10 @@ export class EffectEngine {
       const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);
       let eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
       if (CONCERT && CONCERT_E_FLOOR > eFloor) eFloor = CONCERT_E_FLOOR;   // EFFEKTEN LEDER (se CONCERT_E_FLOOR)
+      if (CONCERT && nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) {   // MINIDROPEN LYFTER OCH HALLER (se MINI_LIFT_MS)
+        const left = this.miniLiftUntil - nowWall, a = left >= 0 ? 1 : Math.max(0, 1 + left / MINI_LIFT_FALL_MS);
+        eFloor += (1 - eFloor) * a;
+      }
       if (TIER_OPEN > 0) { const fullAmt = Math.max(0, Math.min(1, (this.tierEma - TIER_HI) / (1 - TIER_HI))); eFloor += (1 - eFloor) * TIER_OPEN * fullAmt; }   // FULL OPPNAR (se TIER_OPEN)
       md = drive * Math.min(1, Math.max(eFloor + (1 - eFloor) * eC, this.dropEnv));   // bara dampning: aldrig over 1
       md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
