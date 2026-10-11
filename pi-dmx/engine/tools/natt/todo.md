@@ -12,6 +12,11 @@ build-effekter ur poolen; minidrop = högst en per 2 s och alla fyra lamporna sa
 FÖRSTA LÅNGINSPELNINGEN: tools/ladan-2026-10-11/lang-20261011T103310.wav (10 min, 48 kHz, ladans nivå, ägaren spelade låtar med builds
 och drops; .events.json har drop/minidrop/sektion/look per 100 ms MED DEN GAMLA build-logiken före 3eeab5a). Inte i git (gitignore
 ladan-*). ANDRA: lang-20261011T105428.wav (10 min, MED nya build/minidrop-logiken 3eeab5a - jämför de två). TREDJE: lang-20261011T112342.wav (10 min, MED build som håller och landar 1feda46 - en drop per build, mät att dropen landar på smällen). Kör showTight/concertBench/dropFacit på dem: breaklängd före riktiga drops (4 s-kravet), build före drop, minidrops.
+ÄGAREN GILLADE 10-11 ~13:3x: "när den fadar av på sekundära färgen sen byter, det var riktigt snyggt" - MITT I en effekt (inte efter
+blink/drop). Troligen kulörbytet per fras (HUE_PHRASE) + uttoningens svans (gamla kulörkanalen tonar 0,25 s, nya tänds direkt). Den
+"kulörsvans" som förr räknades som en brist ska BEHÅLLAS. Ta inte bort den, och tänk på den när effekter görs om.
+MINIDROPS 08188fc: energilyft (lugnt -> basslag) + lyft som håller 0,5 s; ägaren: minidrop = "från lugnt till ett tydligt energilyft
+(även om det är lägre) med basslag". Mät på långinspelningarna om lyften sitter på rätt ställen.
 ÖPPET FRÅN ÄGAREN: "mindre drops [minidrops] ska vi kanske justera så att alla lampor då lyser lika iaf eller något, vet ej exakt än" -
 förbered förslag med mått (t.ex. minidrop = alla fyra lamporna lyfts lika en kort stund, i steg 1), bygg som opt-in, ägaren avgör.
 GALLRING att föreslå: UNIFORM-effekterna (breathe, snap, mono, pulse, party, airglow, hjarta, tyngdlyft, strobe) väljs aldrig längre i
