@@ -12,7 +12,7 @@ export const rave: EffectDef = {
     const even = c.group === 0;   // jamn/udda eller inre/yttre (c.grouping)
     const flip = c.beatIdx % 2 === 0;
     const lit = even === flip;
-    const pairBase = c.mixedSector(Math.floor(c.beatIdx / 4));
+    const pairBase = c.mixedSector(Math.floor(c.hueIdx / 4));
     const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;
     // GOA SLAG + VÄXEL-GNISTA: på grid-flanken (beatHit) ELLER en riktig dunk tänds
     // ÄVEN den släckta gruppen kort → hela riggen slår till på VÄXLINGEN, sen tillbaka

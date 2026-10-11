@@ -10,7 +10,7 @@ export const backbeat: EffectDef = {
   desc: "Dov puls på bastrumman, vit blixt på virveln — den klassiska 2-och-4-känslan.",
   render(c) {
     const d = c.drum;
-    const hue = c.mixedSector(Math.floor(c.beatIdx / 8)) / 6;
+    const hue = c.mixedSector(Math.floor(c.hueIdx / 8)) / 6;
     const body = 0.12 + d.kick * 0.55 + c.frame.spec.bass * 0.2;   // kickens kropp
     // TVA OCH TVA (2026-09-27): kicken pumpar hela riggen, men virvelns vita small HOPPAR mellan de tva grupperna varje slag
     // (jamn/udda eller inre/yttre via c.grouping). Forut var backbeat helt uniform - pa fyra lampor oskiljbar fran pulse/party.

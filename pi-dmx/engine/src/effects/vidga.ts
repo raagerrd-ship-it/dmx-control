@@ -19,7 +19,7 @@ export const vidga: EffectDef = {
     const x = Math.max(0, Math.min(1, (e - thr) / 0.15));
     const open = edge >= 0.99 ? 0.35 + 0.65 * x : x * x * (3 - 2 * x);  // ytterlamporna glor alltid lite
     const beat = c.heart(0.25 + 0.55 * e);                             // andning vid lag energi, tydligt slag vid hog
-    const hue = (c.mixedSector(Math.floor(c.beatIdx / 32)) / 6 + (edge >= 0.99 ? 0 : 0.08)) % 1;
+    const hue = (c.mixedSector(Math.floor(c.hueIdx / 32)) / 6 + (edge >= 0.99 ? 0 : 0.08)) % 1;
     return c.hsv(hue, 0.95, Math.min(1, open * (0.55 + 0.45 * e) * beat));
   },
 };

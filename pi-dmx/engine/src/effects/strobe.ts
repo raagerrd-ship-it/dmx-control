@@ -8,7 +8,7 @@ export const strobe: EffectDef = {
   fastLight: true,   // strobe ar byggd pa korta blixtar - ingen minsta pa-tid
   desc: "Blixt pa slaget och vid drop i refrangen, het glod emellan.",
   render(c) {
-    const hue = c.mixedSector(c.beatIdx) / 6;
+    const hue = c.mixedSector(c.hueIdx) / 6;
     const bpm = c.cfg.beat?.bpm ?? 0;
     const fast = bpm >= 128;
     const flash = c.dropEnv > 0.5 || (fast && c.beatHit) || c.punch > 0.8;

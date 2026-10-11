@@ -61,7 +61,7 @@ for (let off = 0; off + HOP <= n && off < (startS + secs) * SR; off += HOP) {
     drum: { ...fr2.drum }, section: c.section, sectionAgeMs: c.sectionAgeMs, sectionIndex: c.sectionIndex, sectionEntry: c.sectionEntry,
     sectionTier: c.sectionTier, repeatSim: c.repeatSim, expectHighInMs: c.expectHighInMs, levelVsHighDb: c.levelVsHighDb,
     sectionBars: c.sectionBars, bassline: c.bassline, bassNoteIdx: c.bassNoteIdx, bassNoteAge: c.bassNoteAge,   // 2026-09-23: utan dessa blev basgang NaN (medel 0,00) och basnots-/frasgrenarna i chase/eko/stege/tide/pendel/frasraknare/forvarning kordes aldrig
-    beatIdx: c.beatIdx, beatFrac: c.beatFrac, beatPulse: c.beatPulse, beatHit: c.beatHit, hasBeat: c.hasBeat,
+    beatIdx: c.beatIdx, hueIdx: c.hueIdx ?? c.beatIdx, beatFrac: c.beatFrac, beatPulse: c.beatPulse, beatHit: c.beatHit, hasBeat: c.hasBeat,
     // 2026-09-27: heartPulse/heart + group/grouping tillkom i kontraktet (c.heart i 15 effekter, c.group i 7). Utan dem kastade
     // render() TypeError -> [0,0,0] for alla heart-effekter och c.group === 1 var alltid falskt (alla lampor "inre").
     heartPulse: c.heartPulse, grouping: c.grouping,

@@ -9,7 +9,7 @@ export const duel: EffectDef = {
   render(c) {
     const d = c.drum;
     const isOuter = c.group === 1;   // inre/yttre eller jamn/udda (c.grouping)
-    const base = c.mixedSector(Math.floor(c.beatIdx / 8));
+    const base = c.mixedSector(Math.floor(c.hueIdx / 8));
     const hueCall = base / 6, hueResp = ((base + 3) % 6) / 6;
     // anslag med eko: kick/snare ar redan envelopes (0..1) med avklingning i analysatorn
     const call = Math.pow(d.kick, 0.8), resp = Math.pow(d.snare, 0.7);

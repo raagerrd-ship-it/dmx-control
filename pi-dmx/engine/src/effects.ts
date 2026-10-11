@@ -36,6 +36,9 @@ const PHRASE_SWITCH = process.env.DMX_PHRASE_SWITCH === '1';
  *  var alla fyra lamporna tända 81-88 % av tiden. Dirigenten (inte energin: den släcker aldrig en tänd lampa) väljer i vers/intro bara
  *  SPARSAMMA looks och i refrängen inga sparsamma. Listan är MÄTT (tools/lampCount.mjs, pop+megamix): snitt <= ~2,9 tända lampor av 4. */
 const LAMP_STAIR = process.env.DMX_LAMP_STAIR === '1';
+/** KULÖR PER FRAS (opt-in DMX_HUE_PHRASE=1, 10-11, KONSERTSHOW): effekternas kulörklocka ctx.hueIdx stegar bara vid frasgräns (16 slag på
+ *  effektklockan) i stället för per takt/slag - konsertbänken mätte 17-21 kulörbyten/min. Rörelse och puls följer fortfarande beatIdx. */
+const HUE_PHRASE = process.env.DMX_HUE_PHRASE === '1';
 const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
 const PALETTE_LOCK: number[] | null = (() => {
   const v = (process.env.DMX_PALETTE ?? "").trim(); if (!v) return null;
@@ -514,7 +517,7 @@ export class EffectEngine {
     cfg: null as any, frame: null as any, fx: undefined, t: 0, idx: 0, count: 0, want: {},
     audio: 0, kickEnv: 0, trebleEnv: 0, airEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null as any, expectHighInMs: -1, levelVsHighDb: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionEntry: 0, sectionTier: 1, repeatSim: 0,
     sectionBars: 0, bassline: 0, bassNoteIdx: 0, bassNoteAge: 9,
-    beatIdx: 0, beatFrac: 0, beatPulse: 0, beatHit: false, hasBeat: false,
+    beatIdx: 0, hueIdx: 0, beatFrac: 0, beatPulse: 0, beatHit: false, hasBeat: false,
     wavePhase: 0, buildUp: 0, phaseSpread: 0, punchFloor: 0, chasePos: 0,
     dropFired: this.dropFired, dropHue: this.dropHue, now: 0,
     mixedSector,
@@ -1545,7 +1548,7 @@ export class EffectEngine {
       this.trebleEnv = Math.max(o?.treble ?? 0, this.trebleEnv * gk); this.airEnv = Math.max(o?.air ?? 0, this.airEnv * gk);
       ctx.trebleEnv = this.trebleEnv; ctx.airEnv = this.airEnv;
     }
-    ctx.beatIdx = beatIdx; ctx.beatFrac = beatFracFx; ctx.beatPulse = beatPulse; ctx.heartPulse = heartPulse;
+    ctx.beatIdx = beatIdx; ctx.hueIdx = HUE_PHRASE ? Math.floor(beatIdx / 16) * 16 : beatIdx; ctx.beatFrac = beatFracFx; ctx.beatPulse = beatPulse; ctx.heartPulse = heartPulse;
     // TVAGRUPPERING: vaxlar per look (smartCount) och var 32:e slag - "skiftar ibland mellan varannan och inre/yttre".
     ctx.grouping = (((this.smartCount + (beatIdx >> 5)) & 1) === 1) ? 'innerouter' : 'varannan';
     ctx.beatHit = beatHit; ctx.hasBeat = hasBeat;

@@ -11,7 +11,7 @@ export const bounce: EffectDef = {
     const cyc = c.beatIdx % (span * 2);
     const pos = cyc <= span ? cyc : span * 2 - cyc;   // triangel-våg
     const d = Math.abs(c.idx - pos);
-    const hue = c.mixedSector(c.beatIdx) / 6;
+    const hue = c.mixedSector(c.hueIdx) / 6;
     // LANDNING: på steget (beatHit) landar huvudet på sin nya lampa → kort vit pop
     // just där, exakt på slaget (även svag bas / utan BPM-lås). Övriga riggen blixtrar
     // fortfarande på en riktig dunk (punch). fastMode → kort utklang.

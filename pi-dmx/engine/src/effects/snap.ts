@@ -8,7 +8,7 @@ export const snap: EffectDef = {
   key: "snap", label: "Snap", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"],
   desc: "Alla lampor byter färg blixtsnabbt på varje slag.",
   render(c) {
-    const hue = c.mixedSector(c.beatIdx) / 6;
+    const hue = c.mixedSector(c.hueIdx) / 6;
     // Vit-kap på SLAGET: gnista = grid-flanken (beatHit) ELLER en riktig dunk →
     // varje färgbyte punkteras av en kort vit gnista även när basen är svag, och
     // sitter på gridet (eller kicken utan BPM-lås). fastMode ger den kort utklang.

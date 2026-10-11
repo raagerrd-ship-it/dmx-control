@@ -17,7 +17,7 @@ export const tyngdlyft: EffectDef = {
     const half = (n - 1) / 2;
     const rank = Math.abs(c.idx - half) / Math.max(0.5, half);                             // 0 mitten .. 1 kanten
     const on = Math.max(0, Math.min(1, (lift * 1.15 - rank * 0.6) / 0.45));                // mitten forst, kanten sist
-    const hue = c.mixedSector(Math.floor(c.beatIdx / 16)) / 6;
+    const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;
     const pulse = c.hasBeat ? Math.exp(-c.beatFrac / 0.14) : c.kickEnv;
     if (over > 0.2) { c.want.blinder = over; c.want.uv = over; }
     const v = 0.08 + on * (0.25 + 0.45 * lift) + pulse * (0.1 + 0.35 * lift) * on + c.punch * 0.3 + over * 0.3;

@@ -7,7 +7,7 @@ export const party: EffectDef = {
   key: "party", label: "Party", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"],
   desc: "Färgkaos som pumpar hårt på varje taktslag.",
   render(c) {
-    const hue = c.mixedSector(c.beatIdx + c.idx * 2) / 6;
+    const hue = c.mixedSector(c.hueIdx + c.idx * 2) / 6;
     const pump = Math.min(1, c.beatPulse * 1.0 + c.kickEnv * 0.9 + c.punch * 0.7);   // riktig dunk slår igenom
     const v = 0.12 + 0.88 * pump;   // motorns hjartslag dippar redan till 0.30 → hoj eget golv sa det inte blir strobe                                     // djupare throb (mörkare mellan slagen)
     const entry = c.section === 'high' ? c.sectionEntry : 0;   // refrangens forsta slag: stot + blinder

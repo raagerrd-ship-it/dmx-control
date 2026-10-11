@@ -95,6 +95,9 @@ export interface EffectContext {
 
   /** Taktindex + fas (0..1) från BPM-klockan; beatPulse = mjuk puls-envelope. */
   beatIdx: number;
+  /** KULÖRKLOCKAN: som beatIdx, men med DMX_HUE_PHRASE=1 stegar den bara vid frasgräns (16 slag) - effekterna tar kulören härifrån
+   *  ("kulörbyte per fras i stället för per takt", KONSERTSHOW 10-11). Av = beatIdx. */
+  hueIdx: number;
   beatFrac: number;
   beatPulse: number;
   /** DISKRET flank: true exakt den frame takten går fram (grid-slag när BPM är

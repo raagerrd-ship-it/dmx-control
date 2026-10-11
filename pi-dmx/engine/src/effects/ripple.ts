@@ -20,7 +20,7 @@ export const ripple: EffectDef = {
     const delay = ring * 0.25;                               // fjardedels slag ut till kanten
     let age = c.beatFrac - delay; if (age < 0) age += 1;     // slag sedan krusningen nadde DEN HAR ringen
     const wave = Math.exp(-age / 0.16) * (1 - ring * (1 - amp) * 0.8);   // yttre ringar svagare nar amp ar lag
-    const pairBase = c.mixedSector(Math.floor(c.beatIdx / 4));
+    const pairBase = c.mixedSector(Math.floor(c.hueIdx / 4));
     const hue = ((isOuter ? pairBase + 3 : pairBase) % 6) / 6;   // motfärg mitt vs ytter
     const crest = amp > 0.9 && isOuter ? wave * 0.6 : 0;         // vit kam i kanten vid refrangens niva
     const v = 0.08 + wave * (0.45 + 0.45 * amp) + c.audio * 0.15 + c.punch * 0.3;
