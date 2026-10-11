@@ -20,7 +20,7 @@ export interface LongRecordHooks {
 export class LongRecord {
   private buf: Int16Array | null = null; private len = 0; private target = 0;
   private startWall = 0; private file = ''; private error = '';
-  private events: unknown[][] = []; private tick: ReturnType<typeof setInterval> | null = null; private lastKey = '';
+  private events: unknown[][] = []; private marks: { wallMs: number; kind: string }[] = []; private tick: ReturnType<typeof setInterval> | null = null; private lastKey = '';
   constructor(private readonly dir: string, private readonly sr: number, private readonly hooks: LongRecordHooks) {}
 
   status(): LongRecordStatus { return { active: !!this.buf, seconds: this.len / this.sr, target: this.target / this.sr, file: this.file, error: this.error }; }
@@ -31,9 +31,18 @@ export class LongRecord {
     const sec = Math.max(10, Math.min(600, Math.round(Number(seconds) || 300)));
     this.target = sec * this.sr; this.len = 0; this.error = ''; this.file = '';
     try { this.buf = new Int16Array(this.target); } catch (e) { this.error = 'minne: ' + (e as Error).message; return this.status(); }
-    this.startWall = Date.now(); this.events = []; this.lastKey = '';
+    this.startWall = Date.now(); this.events = []; this.marks = []; this.lastKey = '';
     this.tick = setInterval(() => this.sample(), 100);
     return this.status();
+  }
+
+  /** ÄGARENS MARKERING (knapparna 'Minidrop!'/'Drop!' i /setup, 2026-10-11): facit för nattagenten. Sparas i .events.json (marks)
+   *  om en inspelning pågår, och alltid i marks.jsonl i snippets-mappen. */
+  mark(kind: string): { ok: boolean; recording: boolean } {
+    const m = { wallMs: Date.now(), kind: String(kind).slice(0, 20) };
+    if (this.buf) this.marks.push(m);
+    (async () => { await mkdir(this.dir, { recursive: true }); const { appendFile } = await import('node:fs/promises'); await appendFile(`${this.dir}/marks.jsonl`, JSON.stringify(m) + '\n'); })().catch(() => {});
+    return { ok: true, recording: !!this.buf };
   }
 
   /** Avbryt och spara det som finns (minst 10 s), annars kasta. */
@@ -73,7 +82,7 @@ export class LongRecord {
     Buffer.from(b.buffer, b.byteOffset, dataBytes).copy(wav, 44);
     const seconds = len / this.sr;
     const events = { id, kind: 'lang', captureStartWallMs: this.startWall, rate: this.sr, seconds,
-      columns: ['wallMs', 'dropCount', 'miniDropCount', 'section', 'sectionIndex', 'buildUp', 'breaking', 'bpm', 'beatConf', 'look', 'why'], flags: this.events };
+      columns: ['wallMs', 'dropCount', 'miniDropCount', 'section', 'sectionIndex', 'buildUp', 'breaking', 'bpm', 'beatConf', 'look', 'why'], flags: this.events, marks: this.marks };
     this.file = id + '.wav';
     // Asynkront: en 29 MB-fil pa SD-kortet far inte stalla event-loopen. Index-json SIST (hamtaren ser aldrig en halv fangst).
     (async () => {

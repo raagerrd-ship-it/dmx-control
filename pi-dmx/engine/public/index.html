@@ -535,6 +535,11 @@
       <button class="btn" id="recStart">Spela in 5 min</button>
       <button class="btn" id="recStop" style="display:none">Stoppa och spara</button>
     </div>
+    <div class="fx-actions" style="margin-top:8px">
+      <button class="btn" id="markMini">Minidrop!</button>
+      <button class="btn" id="markDrop">Drop!</button>
+    </div>
+    <div class="status" id="markState" style="margin-top:4px">Tryck exakt när du hör en minidrop eller drop - blir facit för nattagenten (sparas i inspelningen).</div>
     <div class="status" id="recState" style="margin-top:6px">Spelar in ingången och showens händelser i ett stycke, till nattagentens bänk. Lamporna påverkas inte.</div>
   </div>
 
@@ -828,6 +833,9 @@ const recShow = (st) => {
 };
 const recFetch = () => fetch("/api/longrec").then((r) => r.json()).then(recShow).catch(() => {});
 const recPost = (body) => fetch("/api/longrec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json()).then(recShow).catch(() => {});
+const markPost = (kind) => fetch("/api/mark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind }) }).then((r) => r.json()).then((st) => { const el = document.getElementById("markState"); if (el) el.textContent = (kind === "drop" ? "Drop" : "Minidrop") + " markerad " + new Date().toLocaleTimeString() + (st.recording ? " (i inspelningen)" : " (ingen inspelning igång - sparad i marks.jsonl)"); }).catch(() => {});
+const markMini = document.getElementById("markMini"), markDrop = document.getElementById("markDrop");
+if (markMini) { markMini.onclick = () => markPost("mini"); markDrop.onclick = () => markPost("drop"); }
 if (recStart) { recStart.onclick = () => recPost({ seconds: 300 }); recStop.onclick = () => recPost({ stop: true }); recFetch(); }
 
 // Effekt-listorna kommer från servern (type:"effects", grupperade på tier) →

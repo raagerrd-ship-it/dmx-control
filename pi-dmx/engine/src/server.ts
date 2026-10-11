@@ -64,7 +64,7 @@ export interface ServerDeps {
   /** Effekten som renderas just nu (smart-läget roterar). */
   getActiveMode: () => Mode;
   /** Langinspelningen (knappen "Spela in 5 min" i /setup). */
-  longRecord?: { start(seconds: number): unknown; stop(): unknown; status(): unknown };
+  longRecord?: { start(seconds: number): unknown; stop(): unknown; status(): unknown; mark(kind: string): unknown };
   /** True om ljud-pipelinen bearbetat en frame nyligen (för watchdog /health). */
   getHealthy: () => boolean;
   /** Diagnos när getHealthy() är false: "audio" | "audio-safe" | "dmx" | "". */
@@ -252,6 +252,8 @@ export async function startServer(
     if (!deps.longRecord) return { active: false, error: "saknas" };
     return b.stop === true ? deps.longRecord.stop() : deps.longRecord.start(Number(b.seconds ?? 300));
   });
+  // ÄGARENS MARKERING (facit): POST {kind:'mini'|'drop'} - se LongRecord.mark.
+  app.post("/api/mark", async (req) => deps.longRecord?.mark(String(((req.body ?? {}) as Record<string, unknown>).kind ?? 'mini')) ?? { ok: false });
   app.get("/api/health-log", async () => ({
     version: PKG_VERSION,
     now: Date.now(),
