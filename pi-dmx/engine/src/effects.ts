@@ -49,7 +49,7 @@ const CALM_BPM = Number(process.env.DMX_CALM_BPM ?? 90);
 /** LYFT + SPRÅNG = DROP (ladan 10-11 21:4x, ersätter 'builden landar': sektionslandningen gav 'falsk' 21:42:39 och låg bara 17 % på
  *  ett baslyft i bänken): energilyftet och en nästan-drop med språng >= DROP_JUMP_DB inom DROP_PAIR_MS av varandra = en riktig drop.
  *  Bänken 115 min: 0,27/min (~en per låt), 91 % på ihållande baslyft; fångar ägarens missar 21:28:36 och 21:42:09. */
-const DROP_JUMP_DB = Number(process.env.DMX_DROP_JUMP_DB ?? 17), DROP_PAIR_MS = 600;
+const DROP_JUMP_DB = Number(process.env.DMX_DROP_JUMP_DB ?? 14), DROP_PAIR_MS = 600;   // 17 -> 14 (ladan 22:12:09: lyft + 14,6 dB-språng blev bara minidrop, ägaren 'då borde någon typ av drop kört'; bänken 0,33/min, 88 % på baslyft)
 /** MINIDROPEN LYFTER OCH HÅLLER (ägaren i ladan 10-11: "låten ökar energi, kör minidrop men ljuset visar inget"): bänken visade att
  *  blinken kom (0,40 -> 0,95) men bara i 150 ms - sedan föll ljuset tillbaka. Nu släpper energin helt i MINI_LIFT_MS efter minidropen
  *  (effekten lyser med full egen styrka) och glider tillbaka på MINI_LIFT_FALL_MS. Bara mindre dämpning. */
