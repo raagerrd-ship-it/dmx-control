@@ -1,5 +1,25 @@
 # Natt-agentens uppdrag
 
+## LADAN 10-11 KVÄLL 21:15-22:15 (allt LIVE, ägarens live-omdömen i parentes)
+- V123 live 21:16 (se nedan + analys-2026-10-11.md).
+- BODY_GONE_MIN_MS 1000 -> 2000 (analyserProfile): falska drops var 30:e s på pumpande bas ('falsk' x3).
+- 'Builden landar i refrängen' BORTTAGEN (falsk 21:42:39) -> LYFT + SPRÅNG = DROP: energilyft och nästan-drop >= 17 dB inom 600 ms
+  (DROP_JUMP_DB). Bänk: 0,27/min, 91 % på baslyft. 14 dB provat och backat (ägaren: 'vill inte ha fler riktiga drops').
+- Minidrop: energilyft 4 s + 1,5 s uttoning ('perfekt'), looken 600 ms (var 350; 'såg inte att det ens blev minidrop' - energin
+  stod redan på max i starka partier -> minidropen syns bara som kulören. NÄSTA: kontrast, t.ex. kort svärta före eller vitare kärna).
+- Huvuddropen: max 700 ms (var 1300), energilyft efter 4 s (var 2) - 'energin ska fortsätta efter'.
+- Lampordningen växlar framåt/bakåt/utifrån-in/inifrån-ut per look och var 32:a slag (ctx.idx; c.group orörd).
+- Uppbyggnaden laddar: motorns buildProg (32 slag från builden start) ersätter analysatorns DÖDA buildUp i build-effekterna
+  + energigolvet stiger med förloppet under build-looker ('kändes inte som den laddade'). Bänken visar liten ökning i medelljus -
+  mät hellre antal tända lampor/takt mot slutet. Efter: 'träff', 'perfekt', 'nja inte 100'.
+- ÖPPET: 'sen' drops (analysatorn väntar tills kroppen är inom 3 dB från toppen, edgeAgo ~200 ms; QUALITY 6,5 gav bara fler
+  drops); falska låtgränser mitt i låtar (sektion -> intro, 'ny låt: glömmer looker') ger lookbyte vid refrängen;
+  'energi dog efter' 21:31 = sektionen high -> break 7 s efter dropen.
+- Inspelningar med ägarens rapporter: lang-20261011T191741 (21:17-21:27), 193430 (21:34-21:40) i tools/ladan-2026-10-11/.
+  Rapporttiderna finns i chattloggen (ej marks.jsonl): 21:18:42 falsk (dropfire 21:18:38), 21:20:56 miss, 21:28:36 miss
+  (lyft + 27,7 dB), 21:29:11 träff, 21:29:57 sen, 21:31:12 rätt, 21:31:37 falsk, 21:32:26 miss, 21:42:1x miss, 21:42:45 falsk,
+  21:49:0x miss, 21:52:5x sen, 22:12:18 'nja' (lyft + 14,6 dB).
+
 ## ANALYSEN AV KONSERTLÄGET 10-11 KVÄLL (läs först: tools/natt/konsert/analys-2026-10-11.md)
 Showen reagerar 9,3 ggr/min men bara 15 % på riktiga baslyft (nästan-dropen = slump, analysatorns minidrops 17/min); build-looker
 32 % av tiden mot sektion build 12 %; refrängen inte ljusare än builden. Provad ersättning V123 (ingen look/blixt från minidrops/
