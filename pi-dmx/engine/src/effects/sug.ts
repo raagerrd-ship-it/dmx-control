@@ -9,7 +9,7 @@ export const sug: EffectDef = {
   desc: "Uppbyggnadens slut: ljuset sugs ner, pulsen tatnar, hazer upp - dropen landar i tomrum.",
   drives: ["hazer", "blinder", "uv"],
   render(c) {
-    const b = c.frame.buildUp;
+    const b = c.buildUp;
     // FORUTSEDD REFRANG (2026-09-23): de sista 4 takterna fore en vantad refrang (expectHighInMs) sugs ljuset ner aven om
     // risern inte hors - suget landar pa forutsagelsen. Storsta av riser och forutsagelse.
     const bpm = c.cfg.beat?.bpm ?? 0; const barMs = bpm > 0 ? 240000 / bpm : 2000;

@@ -9,7 +9,7 @@ export const fyllning: EffectDef = {
   render(c) {
     const n = Math.max(1, c.count);
     const bar = Math.floor(c.beatIdx / 4), beatInBar = ((c.beatIdx % 4) + 4) % 4;
-    const lit = (bar % n) + 1;                                      // 1..n lampor tända denna takt
+    const lit = c.buildUp > 0 ? Math.min(n, 1 + Math.floor(c.buildUp * n)) : (bar % n) + 1;   // riggen fylls över hela uppbyggnaden (32 slag), annars en lampa till per takt
     const rank = c.idx < n / 2 ? 2 * c.idx : 2 * (n - 1 - c.idx) + 1;   // utifrån och in: 0, sista, 1, näst sista ...
     const on = rank < lit;
     const last = lit >= n && beatInBar === 3;                        // frasens sista slag: alla
@@ -17,6 +17,6 @@ export const fyllning: EffectDef = {
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;
     if (last) return c.hsv(hue, 0.85, Math.min(1, 0.5 + 0.5 * hit));
     if (!on) return c.hsv(hue, 1, 0);
-    return c.hsv(hue, 1, Math.min(1, (0.35 + 0.4 * lit / n) + 0.25 * hit));
+    return c.hsv(hue, 1, Math.min(1, (0.35 + 0.4 * Math.max(lit / n, c.buildUp)) + 0.25 * hit));
   },
 };

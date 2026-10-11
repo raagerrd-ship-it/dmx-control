@@ -8,7 +8,7 @@ export const nedrakning: EffectDef = {
   desc: "Uppbyggnad: lamporna slacks en i taget utifran och in, allt tands pa attan - om och om igen till dropen.",
   drives: ["hazer", "blinder"],
   render(c) {
-    const b = c.frame.buildUp;
+    const b = c.buildUp;   // motorns förlopp (analysatorns buildUp är död, 10-11)
     // FORUTSEDD REFRANG (2026-09-23): med expectHighInMs raknas STEGEN bakat fran refrangen sa att "allt tands" (sista steget)
     // landar exakt pa det forutsedda slaget - inte pa en godtycklig atta. Tatare (4-cykel) sista 16 slagen. Utan
     // forutsagelse: 8-slagscykler pa beatIdx som forr.
