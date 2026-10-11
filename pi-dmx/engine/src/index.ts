@@ -191,7 +191,7 @@ capture.on("chunk", (samples: Float32Array) => {
   lastLiveDrop = frame.dropCount;
   // LATGRANS (se boundaryDetector.ts) -> mjuk omkalibrering av den lopande dynamiken (auto-rangen far krypa in
   // pa nya latens nivaer inom sekunder i stallet for en minut) och latbytes-hint till tempot: medianfonstret
-  // (~5 s) och tempogrammet tillhor forra laten. DMX_BOUNDARY_SOFT: mjuk hint i st.f. hard nollstallning -
+  // (~5 s) och tempogrammet tillhor forra laten. Mjuk hint i st.f. hard nollstallning (brytaren DMX_BOUNDARY_SOFT borttagen 10-11) -
   // falska latgranser pa pop kastade tempolaset 5x/5 min (ladan 2026-09-04).
   boundsArg.level = frame.level; boundsArg.bpm = frame.bpm; boundsArg.bpmConfidence = frame.bpmConfidence;
   bounds.tick(boundsArg);
@@ -199,7 +199,7 @@ capture.on("chunk", (samples: Float32Array) => {
   // TEMPOVAXLING UPPAT -> samma bytesskal som karaktarsskiftet (6 s giltigt, MIN_HOLD galler), egen text i loggen.
   if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; effects.noteCharShift(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
   if (bounds.boundaryCount !== lastBoundary) {
-    lastBoundary = bounds.boundaryCount; effects.softenRange(); if (process.env.DMX_BOUNDARY_SOFT !== '0') analyser.hintTrackChange(5000); else { analyser.resetTempo(); if ((process.env.DMX_SECTION_HINT_LOWCONF ?? '0') === '0') analyser.hintTrackChange(5000); }   // riktig latgrans nollar sektionerna (tempotappet gor det inte langre)
+    lastBoundary = bounds.boundaryCount; effects.softenRange(); analyser.hintTrackChange(5000);   // riktig latgrans nollar sektionerna (tempotappet gor det inte langre)
     if (recorder) { const name = "ladan-" + lastBoundary; recorder.noteTrack(name, "dmx"); recorder.trackChanged("dmx", name); }
   }
 
