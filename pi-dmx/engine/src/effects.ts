@@ -40,7 +40,7 @@ const UNIFORM: Mode[] = ['breathe', 'snap', 'mono', 'pulse', 'party', 'airglow',
  *  är bara BUILD_LOOKS, och när en build-look väl börjat bryts den bara av drop/nästan-drop (långinspelningen: upptakt -> eq -> basgang
  *  på 4 s, avbrutet av basgång/fras/sektion); (2) en NÄSTAN-DROP 2..20 s efter att build-looken började räknas som en RIKTIG drop i
  *  showen (drop-look, rök, drop-look-byte) - analysatorns 4 s-break-krav missar dropen efter en trumvirvel-build. */
-const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning'];
+const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning', 'fyllning', 'pingpong', 'virvel'];   // 10-11: tre nya build-effekter (ägaren: fler per gren)
 /** NÄSTAN ENHETLIGA (ägaren i ladan 10-11: "finns någon effekt där alla lampor har samma effekt och bara energi fadas lite svagt, den
  *  borde ha bpm-spärr, under kanske 80"): spridning < ~0,16 i båda mixarna (tools/effectDyn.mjs). Analysatorn rapporterar 80..160 BPM
  *  (DMX-profilen BPM_MIN 80, långsamma låtar vikes upp) - 'under 80' finns inte, så de får bara väljas under CALM_BPM (90). */
@@ -75,6 +75,10 @@ const CONCERT_BEAT = Math.max(0, Math.min(0.8, Number(process.env.DMX_CONCERT_BE
 const CONCERT_KICK = Math.max(0, Math.min(1, Number(process.env.DMX_CONCERT_KICK ?? 0)));
 /** BASSLAGEN I ENERGILAGRET (ägaren 10-11: "förstärka basslagen mer" + "och lägga det i sista energilagret"): energin dämpar
  *  MELLAN basslagen och släpper på slaget: k x ((1 - KICK_E) + KICK_E x kickEnv) för lampor som följer energin. Bara dämpning. */
+/** DROPEN BÄR IN I REFRÄNGEN (ägaren i ladan 10-11: "efter drop känns som energin dör varje gång"): dropen är det starkaste
+ *  ögonblicket och drar upp energifönstrets topp - refrängen efter mäts mot den och dämpas. Efter en drop släpper energin helt i
+ *  DROP_LIFT_MS och glider tillbaka på DROP_LIFT_FALL_MS. Bara mindre dämpning. */
+const DROP_LIFT_MS = Number(process.env.DMX_DROP_LIFT_MS ?? 4000), DROP_LIFT_FALL_MS = Number(process.env.DMX_DROP_LIFT_FALL_MS ?? 3000);
 const KICK_E = Math.max(0, Math.min(0.8, Number(process.env.DMX_KICK_E ?? 0.8)));
 const CONCERT_E_FLOOR = Math.max(0, Math.min(0.9, Number(process.env.DMX_CONCERT_E_FLOOR ?? 0.4)));
 const SECTION_PALETTE = CONCERT;
@@ -479,7 +483,7 @@ export class EffectEngine {
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
   private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
   private buildLookAt = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
-  private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private liftHist: number[] = []; private liftAt = -1e12; liftCount = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
+  private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist: number[] = []; private liftAt = -1e12; liftCount = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
@@ -1009,6 +1013,7 @@ export class EffectEngine {
     }
     if (this.upgradeHit) { this.upgradeHit = false; dropHitRaw = true; this.lastShowDropWall = nowWall; this.buildUpgrades++; }   // BUILD SOM LANDAR: forra rutans nastan-drop efter en build
     let dropHit = dropHitRaw;
+    if (CONCERT && dropHit) this.dropLiftUntil = nowWall + DROP_LIFT_MS;   // DROPEN BÄR IN I REFRÄNGEN
     // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
     // jamfors energin (eSm, se E_WIN_S) med energin strax fore; har den inte stigit >= DROP_LAND_GAIN doms dropen falsk:
     // envelope klipps, 20 s-high-fonstret och tiersnappen dras tillbaka. Blixten (0,6 s) hinner synas, inte 20 s fel show.
@@ -1016,7 +1021,7 @@ export class EffectEngine {
     if (this.dropCheckAt > 0 && nowWall >= this.dropCheckAt) {
       this.dropCheckAt = 0;
       const lvl = this.eSm;
-      if (lvl < this.preDropLevel * DROP_LAND_GAIN + 0.02) { this.dropEnv = 0; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
+      if (lvl < this.preDropLevel * DROP_LAND_GAIN + 0.02) { this.dropEnv = 0; this.dropLiftUntil = 0; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
     }
     // (drop-snapp till takten forkastad 09-12: taktlaset resettas vid drops, slog aldrig till / gjorde drops sena.)
     const miniCount = frame.miniDropCount ?? 0;
@@ -1589,6 +1594,10 @@ export class EffectEngine {
       let eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
       const eFloorSel = eFloor;
       if (CONCERT && CONCERT_E_FLOOR > eFloor) eFloor = CONCERT_E_FLOOR;   // EFFEKTEN LEDER (se CONCERT_E_FLOOR)
+      if (CONCERT && nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) {   // DROPEN BÄR IN I REFRÄNGEN (se DROP_LIFT_MS)
+        const left = this.dropLiftUntil - nowWall, a = left >= 0 ? 1 : Math.max(0, 1 + left / DROP_LIFT_FALL_MS);
+        eFloor += (1 - eFloor) * a;
+      }
       if (CONCERT && nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) {   // MINIDROPEN LYFTER OCH HALLER (se MINI_LIFT_MS)
         const left = this.miniLiftUntil - nowWall, a = left >= 0 ? 1 : Math.max(0, 1 + left / MINI_LIFT_FALL_MS);
         eFloor += (1 - eFloor) * a;

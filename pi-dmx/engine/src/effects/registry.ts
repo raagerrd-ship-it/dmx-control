@@ -48,6 +48,11 @@ import { sug } from "./sug.js";
 import { vagbrytare } from "./vagbrytare.js";
 import { nedrakning } from "./nedrakning.js";
 import { upptakt } from "./upptakt.js";
+import { fyllning } from "./fyllning.js";
+import { pingpong } from "./pingpong.js";
+import { virvel } from "./virvel.js";
+import { fyr } from "./fyr.js";
+import { rullandning } from "./rullandning.js";
 import { fyrverkeri } from "./fyrverkeri.js";
 import { forvarning } from "./forvarning.js";
 import { basgang } from "./basgang.js";
@@ -64,7 +69,7 @@ export const EFFECTS: EffectDef[] = [
   tide, drift, pendel, viska, backbeat, tick, stege, eko, hjarta,
   varannan,
   // Sektionseffekter (2026-09-21): valjs av dirigenten vid build-/break-grans (DMX_SECTION_SWITCH).
-  stegring, andrum, sug, vagbrytare, nedrakning, upptakt, fyrverkeri,
+  stegring, andrum, sug, vagbrytare, nedrakning, upptakt, fyllning, pingpong, virvel, fyr, rullandning, fyrverkeri,
   // Registrerade 2026-09-21 (fanns som filer men inte i poolen): sol, konfetti, sopa.
   konfetti, sopa,
   // OVERSYN 2026-09-23 (tools/effectSimilarity.mjs v2 + effectMix): innerouter borttagen (rPerm 1,00 mot varannan, samma pool,
