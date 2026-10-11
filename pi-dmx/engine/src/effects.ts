@@ -1405,6 +1405,7 @@ export class EffectEngine {
         const bassHard = !(CONCERT && secKey === 'build') && (beatClear || (!allaBuild && bassClear && ((frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD && this.smartCount % 2 === 1)));   // MIX_V2 (1); konsertlaget: aldrig i build
         const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); return cut.length ? cut : enabled(TOGGLE_POOL).filter(req); })() : [];
         const clearBass = toggles.length > 0;
+        const lastLookBeforeSwitch = this.smartMode;
         if (clearBass) {
           const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) + (!this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) - unitPen(m) })).sort((a, b) => b.s - a.s);
           const cands = ranked.filter((x) => x.m !== this.smartMode);
@@ -1440,6 +1441,10 @@ export class EffectEngine {
         // snabbare". De statiska svepen (ingen takt-signal, ingen kick-drift) far DMX_DWELL_FLAT_MS (30 s),
         // taktdrivna looker behaller 45 s. Satts EFTER valet, eftersom dwellen ovan sattes fore.
         if (EFFECT_MAP.get(this.smartMode)?.flat) this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_FLAT_MS) || 30000);
+        // EKO FÖRST VID TYDLIG BASGÅNG (ägaren i ladan 10-11: basslaget som glider genom lamporna som en våg -> 'ja' till förstaval):
+        // bassline >= 0,6 (där eko själv följer basnoterna) -> eko, utom i build, efter drop, eller om eko just gick.
+        if (CONCERT && (frame.profile.bassline ?? 0) >= 0.6 && this.smartMode !== 'eko' && lastLookBeforeSwitch !== 'eko' && !BUILD_LOOKS.includes(this.smartMode)
+            && this.switchWhy !== 'drop' && this.cfg.rotation?.eko !== false) this.smartMode = 'eko';
         if (CONCERT) this.buildLookAt = BUILD_LOOKS.includes(this.smartMode) ? nowWall : 0;   // BUILD SOM HÅLLER: när build-looken började
         this.recentLooks.push(this.smartMode); if (this.recentLooks.length > MIX_RECENT_N) this.recentLooks.shift(); this.seenLooks.add(this.smartMode);
       }
