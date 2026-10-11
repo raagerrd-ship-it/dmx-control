@@ -50,7 +50,7 @@ const BUILD_DROP_MIN_MS = Number(process.env.DMX_BUILD_DROP_MIN_MS ?? 4000), BUI
 /** MINIDROPEN LYFTER OCH HÅLLER (ägaren i ladan 10-11: "låten ökar energi, kör minidrop men ljuset visar inget"): bänken visade att
  *  blinken kom (0,40 -> 0,95) men bara i 150 ms - sedan föll ljuset tillbaka. Nu släpper energin helt i MINI_LIFT_MS efter minidropen
  *  (effekten lyser med full egen styrka) och glider tillbaka på MINI_LIFT_FALL_MS. Bara mindre dämpning. */
-const MINI_LIFT_MS = Number(process.env.DMX_MINI_LIFT_MS ?? 1000), MINI_LIFT_FALL_MS = Number(process.env.DMX_MINI_LIFT_FALL_MS ?? 800);   // 500/600 -> 1000/800 (kandes inte)   // ägaren: 'behöver inte vara 2 s' - 2 s bara med felsökning på (synligt kvitto)
+const MINI_LIFT_MS = Number(process.env.DMX_MINI_LIFT_MS ?? 400), MINI_LIFT_FALL_MS = Number(process.env.DMX_MINI_LIFT_FALL_MS ?? 400);   // 1000/800 -> 400/400 (ägaren: 'bara allt lyser')   // 500/600 -> 1000/800 (kandes inte)   // ägaren: 'behöver inte vara 2 s' - 2 s bara med felsökning på (synligt kvitto)
 /** ENERGILYFT (ägaren i ladan 10-11: "jag ser allt från att det varit lugnt till ett tydligt energilyft (även om det är lägre) med
  *  basslag som minidrop"): analysatorns minidrop/nästan-drop jämför mot de senaste sekunderna, som efter ett lugnt parti har anpassat
  *  sig. Här: basens kropp (nearB, 120 ms) mot medlet för 6..2 s sedan; LIFT_DB över det, LIFT_DB/2 över toppen där, och kickar nu
@@ -78,8 +78,8 @@ const CONCERT_KICK = Math.max(0, Math.min(1, Number(process.env.DMX_CONCERT_KICK
 /** DROPEN BÄR IN I REFRÄNGEN (ägaren i ladan 10-11: "efter drop känns som energin dör varje gång"): dropen är det starkaste
  *  ögonblicket och drar upp energifönstrets topp - refrängen efter mäts mot den och dämpas. Efter en drop släpper energin helt i
  *  DROP_LIFT_MS och glider tillbaka på DROP_LIFT_FALL_MS. Bara mindre dämpning. */
-const DROP_LIFT_MS = Number(process.env.DMX_DROP_LIFT_MS ?? 4000), DROP_LIFT_FALL_MS = Number(process.env.DMX_DROP_LIFT_FALL_MS ?? 3000);
-const KICK_E = Math.max(0, Math.min(0.8, Number(process.env.DMX_KICK_E ?? 0.8)));
+const DROP_LIFT_MS = Number(process.env.DMX_DROP_LIFT_MS ?? 2000), DROP_LIFT_FALL_MS = Number(process.env.DMX_DROP_LIFT_FALL_MS ?? 1500);   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
+const KICK_E = Math.max(0, Math.min(0.8, Number(process.env.DMX_KICK_E ?? 0.5)));
 const CONCERT_E_FLOOR = Math.max(0, Math.min(0.9, Number(process.env.DMX_CONCERT_E_FLOOR ?? 0.4)));
 const SECTION_PALETTE = CONCERT;
 /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
@@ -100,7 +100,7 @@ const HUE_PHRASE = CONCERT;
  *  megamix 0,63 -> 0,61). Energin ar ett FOLJANDE 10 s-fonster: i en lang stark refrang glider botten upp och full ger samma
  *  energi som fart. Har hojs energins GOLV med hur langt in i full tiern (tierEma) ligger: golv + (1 - golv) * TIER_OPEN * andel.
  *  Bara mindre dampning (aldrig over effektens eget ljus), i steg 2. 0 = av. */
-const TIER_OPEN = Math.max(0, Math.min(1, Number(process.env.DMX_TIER_OPEN ?? (CONCERT ? 0.6 : 0))));
+const TIER_OPEN = Math.max(0, Math.min(1, Number(process.env.DMX_TIER_OPEN ?? (CONCERT ? 0.3 : 0))));
 /** STROBE VID DROPEN (opt-in DMX_DROP_STROBE = DMX-varde 1..255 pa lampornas EGEN strobe-kanal, 10-11, KONSERTSHOW 'strobe vid ratt
  *  ogonblick'): en konsert anvander stroben som ett ogonblick, inte en look. RGB kan inte strobea (uttoningen smetar blixten, och
  *  snabbare uttoning ar forbjudet) - lampans strobe-kanal gar forbi uttoningen. Satts bara under drop-smallen (dropBangUntil, 1,3 s).
@@ -1084,7 +1084,7 @@ export class EffectEngine {
           && !dropActive && sinceStart > START_DROP_MUTE_MS) {
         const g = Math.max(0, Math.min(1, (rise - NEAR_RISE_DB) / Math.max(1, NEAR_FULL_DB - NEAR_RISE_DB)));
         this.nearAt = nowWall; this.nearUntil = nowWall + MINI_BANG_MS; this.nearLevel = NEAR_MIN + (NEAR_MAX - NEAR_MIN) * g; this.nearCount++; this.nearHit = true;
-        if (CONCERT && nowWall - this.lastMiniWall >= MINI_GAP_MS) {   // KONSERTLÄGET: varje nästan-drop ger minidrop-looken (ägaren 15:01: lyft i high syntes inte)
+        if (CONCERT && frame.section !== 'high' && nowWall - this.lastMiniWall >= MINI_GAP_MS) {   // KONSERTLÄGET: nästan-drop UTANFÖR refrängen ger minidrop-looken (i high kom de jämt) (ägaren 15:01: lyft i high syntes inte)
           this.lastMiniWall = nowWall; this.miniSector = mixedSector(this.nearCount + 3); this.miniBangUntil = nowWall + MINI_BANG_MS;
           this.miniLiftUntil = nowWall + (isLogOn() ? 2000 : MINI_LIFT_MS);
         }
@@ -1788,7 +1788,10 @@ export class EffectEngine {
         const sel = ctx.group === (Math.floor(ctx.beatIdx / 16) & 1);   // paret byts varje fras
         useE = sel; mdUse = mdSel;
       } else if (lampWantE === undefined && CONCERT && useE && m0 >= 0.85) { let n = 0; for (let q = 0; q < count; q++) if (q !== i && this.fxPrev[q] > 0.5 * m0) n++; if (n <= 1) useE = false; }
-      const k = inputGate * (useE ? mdUse * (KICK_E > 0 && CONCERT ? (1 - KICK_E) + KICK_E * Math.min(1, ctx.kickEnv) : 1) : drive);   // + BASSLAGEN (se KICK_E)
+      // TAKTSLAGEN PÅ ALLA LAMPOR (ägaren 10-11 kväll: "det jag vill öka är taktslagen i energieffekten ... bara allt lyser"): dämpningen
+      // mellan slagen gäller ALLA lampor (även spot och enhetliga effekters egna par), inte drop-looken och inte fastLight (strobe).
+      const beatK = KICK_E > 0 && CONCERT && !fastLight && this.dropColEnv <= 0.005 ? (1 - KICK_E) + KICK_E * Math.min(1, ctx.kickEnv) : 1;
+      const k = inputGate * (useE ? mdUse : drive) * beatK;   // + TAKTSLAGEN (se KICK_E)
       rgb[0] *= k; rgb[1] *= k; rgb[2] *= k;
       // ENERGIN SLACKER ALDRIG (agaren 2026-10-10: "energi skall aldrig slacka om effekten vill ha pa en lampa"): vill effekten ha
       // lampan tand (m0 > 0) och ingangen ar pa (k > 0) halls den pa lagst 1 % (gammans forsta steg -> utgangens tandpunkt+1).
