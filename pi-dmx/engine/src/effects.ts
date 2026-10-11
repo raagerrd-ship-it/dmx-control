@@ -41,6 +41,11 @@ const UNIFORM: Mode[] = ['breathe', 'snap', 'mono', 'pulse', 'party', 'airglow',
  *  på 4 s, avbrutet av basgång/fras/sektion); (2) en NÄSTAN-DROP 2..20 s efter att build-looken började räknas som en RIKTIG drop i
  *  showen (drop-look, rök, drop-look-byte) - analysatorns 4 s-break-krav missar dropen efter en trumvirvel-build. */
 const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning'];
+/** NÄSTAN ENHETLIGA (ägaren i ladan 10-11: "finns någon effekt där alla lampor har samma effekt och bara energi fadas lite svagt, den
+ *  borde ha bpm-spärr, under kanske 80"): spridning < ~0,16 i båda mixarna (tools/effectDyn.mjs). Analysatorn rapporterar 80..160 BPM
+ *  (DMX-profilen BPM_MIN 80, långsamma låtar vikes upp) - 'under 80' finns inte, så de får bara väljas under CALM_BPM (90). */
+const CALM_ONLY: Mode[] = ['tide', 'aurora', 'andrum'];
+const CALM_BPM = Number(process.env.DMX_CALM_BPM ?? 90);
 const BUILD_DROP_MIN_MS = Number(process.env.DMX_BUILD_DROP_MIN_MS ?? 4000), BUILD_DROP_RISE_DB = Number(process.env.DMX_BUILD_DROP_RISE_DB ?? 17);   // builden >= 4 s, språnget >= 17 dB
 /** MINIDROPEN LYFTER OCH HÅLLER (ägaren i ladan 10-11: "låten ökar energi, kör minidrop men ljuset visar inget"): bänken visade att
  *  blinken kom (0,40 -> 0,95) men bara i 150 ms - sedan föll ljuset tillbaka. Nu släpper energin helt i MINI_LIFT_MS efter minidropen
@@ -1360,7 +1365,7 @@ export class EffectEngine {
         // HALVERAT: de delade lookerna (och hjärtat) ska finnas i poolen oavsett tier.
         // (innerouter borttagen 2026-09-23: rPerm 1,00 mot varannan - samma effekt upp till lampordning.)
         if (this.pulseHalved) for (const m of ["varannan", "basgang", "hjarta"] as Mode[]) if (!pool.includes(m) && this.cfg.rotation?.[m] !== false && req(m)) pool.push(m);
-        if (CONCERT) { const show = pool.filter((m) => !UNIFORM.includes(m)); if (show.length) pool = show; }
+        if (CONCERT) { const show = pool.filter((m) => !UNIFORM.includes(m) && !(CALM_ONLY.includes(m) && !(bpm > 0 && bpm < CALM_BPM))); if (show.length) pool = show; }
         if (CONCERT && secKey === 'build') { const b = pool.filter((m) => BUILD_LOOKS.includes(m)); pool = b.length ? b : enabled(BUILD_LOOKS); }   // BUILD SOM HÅLLER   // KONSERTLÄGET: ingen enhetlig look
         if (LAMP_STAIR && liveSec === 'high') {                                   // LAMPTRAPPA: refrängen -> hela riggen
           const full = pool.filter((m) => !SPARSAM.includes(m)); if (full.length) pool = full;
