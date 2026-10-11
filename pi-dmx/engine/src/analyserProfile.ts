@@ -44,7 +44,7 @@ export const PROFILE: AnalyserProfile = {
     // Drop-detektorn, facit-kalibrerad i ladan 09-03..09-12 (se tools/ENV-LADAN.md, pi-dmx-drop). Lotus har egna varden.
     BODY_FAST_S: '0.06',         // baskroppens filter (0,04 gav drops i lugna partier - aldrig lagre)
     DROP_ARM_MS: '300',          // armerat fonster once/gone
-    BODY_GONE_MIN_MS: '1000',    // 10-11 eftermiddag: agaren 'ta bort timer pa riktig drop, satt snavt mal' -> 4000 -> 1000 (bara en kort svacka kravs)
+    BODY_GONE_MIN_MS: '2000',    // 10-11 kväll 21:2x: 1000 gav falsk drop var 30:e s på pumpande bas (3 'falsk' på en minut); bänken 115 min: drops 0,58 -> 0,38/min, ägarens 'träff' 17:08 kvar. // 10-11 eftermiddag: agaren 'ta bort timer pa riktig drop, satt snavt mal' -> 4000 -> 1000 (bara en kort svacka kravs)
     BODY_RISE_DB: '20',          // SNAVT MAL: kroppen ska stiga 20 dB (var 17)
     //    // riktig drop kraver 4 s break (var 2 s; agaren i ladan 10-10: 'hellre farre drops, mini fangar dom'). Bank: megamix 27->15, pop 4->2, minidrops 23->25
     DROP_QUALITY_DB: '3',        // SNAVT MAL 10-11: landa inom 3 dB fran toppen = full small (var 6,5)
