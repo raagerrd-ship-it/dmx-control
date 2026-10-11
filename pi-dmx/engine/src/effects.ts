@@ -75,7 +75,7 @@ const CONCERT_BEAT = Math.max(0, Math.min(0.8, Number(process.env.DMX_CONCERT_BE
 const CONCERT_KICK = Math.max(0, Math.min(1, Number(process.env.DMX_CONCERT_KICK ?? 0)));
 /** BASSLAGEN I ENERGILAGRET (ägaren 10-11: "förstärka basslagen mer" + "och lägga det i sista energilagret"): energin dämpar
  *  MELLAN basslagen och släpper på slaget: k x ((1 - KICK_E) + KICK_E x kickEnv) för lampor som följer energin. Bara dämpning. */
-const KICK_E = Math.max(0, Math.min(0.8, Number(process.env.DMX_KICK_E ?? 0.6)));
+const KICK_E = Math.max(0, Math.min(0.8, Number(process.env.DMX_KICK_E ?? 0.8)));
 const CONCERT_E_FLOOR = Math.max(0, Math.min(0.9, Number(process.env.DMX_CONCERT_E_FLOOR ?? 0.6)));
 const SECTION_PALETTE = CONCERT;
 /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
