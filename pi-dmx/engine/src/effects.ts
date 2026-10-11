@@ -1593,6 +1593,7 @@ export class EffectEngine {
         const left = this.dropLiftUntil - nowWall, a = left >= 0 ? 1 : Math.max(0, 1 + left / DROP_LIFT_FALL_MS);
         eFloor += (1 - eFloor) * a;
       }
+      if (CONCERT && BUILD_LOOKS.includes(this.smartMode)) eFloor += (1 - eFloor) * this.buildProg;   // UPPBYGGNADEN LADDAR: energins golv stiger med förloppet - suget före dropen får inte dimma builden (ladan 22:05)
       if (CONCERT && nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) {   // MINIDROPEN LYFTER OCH HALLER (se MINI_LIFT_MS)
         const left = this.miniLiftUntil - nowWall, a = left >= 0 ? 1 : Math.max(0, 1 + left / MINI_LIFT_FALL_MS);
         eFloor += (1 - eFloor) * a;
