@@ -58,8 +58,16 @@ natt r 0,17->0,34; PRIS 11 aldrig valda mot 5). Alla tre ihop: tools/natt/konser
 10-11 FÖRMIDDAG (sessionen): (a) KLART a0b4b22 - lamptrappan glesar ut icke-sparsamma effekter till ett lamppar i vers/intro
 (steg 1) i st.f. att begränsa poolen: allaTanda pop 0,53, megamix 0,74, versRefrang 0,26/0,29, aldrig valda 4. (b) KLART 24a0109 -
 DMX_HUE_PHRASE=1 (ctx.hueIdx): kulörbyten/min 17->13 / 21->16. ALLA FYRA ihop (tools/natt/konsert/*-alla4.json): kulörbyten 11/14,
-kulörer/sektion 3, paletter/sektion 1, allaTanda 0,54/0,76, versRefrang 0,25/0,28, aldrig valda 8. KVAR: (c) strobe/rök vid rätt
-ögonblick; inventeringstabellen per numerisk ratt + dubbletter. VÄNTAR PÅ ÄGARENS ÖGA i ladan (alla fyra opt-in).
+kulörer/sektion 3, paletter/sektion 1, allaTanda 0,54/0,76, versRefrang 0,25/0,28, aldrig valda 8. (c) KLART 9bca6cd: DMX_DROP_STROBE=<DMX> = lampornas EGEN strobe-kanal under drop-smällen (RGB kan inte strobea -
+uttoningen; snabbare fade förbjudet). KALIBRERAS I LADAN med lågt värde, max 3 blixtar/s. Röken var redan rätt (drop + hunger 300 s).
+VÄNTAR PÅ ÄGARENS ÖGA i ladan (alla opt-in).
+FART->FULL (nattagentens brist) KLART 9bca6cd: DMX_TIER_OPEN=0,6 (energins golv höjs med andelen full): full mot fart korpus
+0,29->0,35 (fart 0,28), megamix 0,61->0,66 (fart 0,63), pop 0,56->0,63 (fart 0,50); r upp överallt. Opt-in, redo för ladan.
+RATTSVEPET KLART 9bca6cd: tools/knobSweep.py -> tools/natt/rattar.md. Döda på mixarna: DWELL_MS (env-standarden 45 s vinner
+alltid över cfg.smartDwellMs -> stämningarnas/UI:ts 'Byter effekt' är verkningslös), SECTION_UNIT_RESERVE_MS, SYNC_ERR_FRAC,
+DROP_CALM_BUILD; nära noll DROP_LAND_GAIN/E_RELEASE_MS/MIX_UNSEEN_BONUS/NEAR_FULL_DB/NEAR_MIN. Dubbletter rättade: DMX_GAMMA en källa
+(output.ts), DMX_SILENCE_LEVEL bort (/setup enda källan). NÄSTA: avgör per död ratt om den är död även live (lugnt material,
+lång-inspelningarna) innan borttagning; dwell-frågan (cfg.smartDwellMs + UI) är ägarens.
 Ägaren: "Hur kan vi få ljusshowen mer lik en riktig konsert-show?" Riggen: 4 RGB-parlampor (dimmer konstant, R/G/B bär allt),
 rökmaskin, inga movers; allt i realtid ur aux (ingen låtlista, inget låtminne). Arkitekturen är fast: TRE STEG (effekt -> energi ->
 kalibrering), effekterna äger färg/styrka/lampa, dirigenten väljer look.
