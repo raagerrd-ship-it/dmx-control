@@ -30,7 +30,7 @@ const NAMED_PALETTES: Record<string, number[]> = {
  *  lampor" + "får vi till det så är det det enda mode vi skall ha"): EN brytare = hela konsertpaketet (sektionspalett, frasbyten, lamptrappa,
  *  kulör per fras, full öppnar 0,6) + dirigenten väljer ALDRIG en enhetlig effekt (UNIFORM: alla fyra lamporna lika, mätt med
  *  tools/effectDyn.mjs - spridning < 0,1 i båda mixarna). Build-effekterna (stegring, sug, forvarning) är enhetliga med avsikt och får vara kvar. */
-const CONCERT = process.env.DMX_CONCERT === '1';
+const CONCERT = true;   // ENDA LÄGET sedan 2026-10-11 (ägaren i ladan: "mycket bättre, gör det till enda läget"); env-brytaren DMX_CONCERT borttagen
 const UNIFORM: Mode[] = ['breathe', 'snap', 'mono', 'pulse', 'party', 'airglow', 'hjarta', 'tyngdlyft', 'strobe'];
 /** BUILD FÖRE DROPEN (konsertläget, ägaren 10-11: "dirigenten skall bli snabbare att byta till BUILD innan drops"): analysatorns buildUp
  *  är ~0 på ladans material (0 av 15 drops i megamix hade en build-look före). Dropdetektorn kräver att baskroppen varit BORTA en stund;
@@ -46,21 +46,21 @@ const PRE_DROP_DB = Number(process.env.DMX_PRE_DROP_DB ?? 5), PRE_DROP_S = Numbe
  *  och fastLight-effekter (strobe) undantas. */
 const CONCERT_BEAT = Math.max(0, Math.min(0.8, Number(process.env.DMX_CONCERT_BEAT ?? 0.3)));
 const CONCERT_E_FLOOR = Math.max(0, Math.min(0.9, Number(process.env.DMX_CONCERT_E_FLOOR ?? 0.6)));
-const SECTION_PALETTE = CONCERT || process.env.DMX_SECTION_PALETTE === '1';
+const SECTION_PALETTE = CONCERT;
 /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
  *  look-bytena landar på en 4-taktsgräns (slumpen ger 19 %) - gridOk hängde på låtminnets grid som är borttaget. Med takten låst
  *  (tillit >= 0,5) väntar vanliga byten (inte drop/nästan-drop/uppbyggnad) på frasens första slag (effektklockans beatIdx % 16 = 0),
  *  högst en fras extra. Av = som förr. */
-const PHRASE_SWITCH = CONCERT || process.env.DMX_PHRASE_SWITCH === '1';
+const PHRASE_SWITCH = CONCERT;
 /** LAMPTRAPPA (opt-in DMX_LAMP_STAIR=1, natt 2026-10-10, KONSERTSHOW idé 3): en ljusdesigner sparar hela riggen till refrängen - här
  *  var alla fyra lamporna tända 81-88 % av tiden. Dirigenten (inte energin: den släcker aldrig en tänd lampa) väljer i vers/intro bara
  *  SPARSAMMA looks och i refrängen inga sparsamma. Listan är MÄTT (tools/lampCount.mjs, pop+megamix): snitt <= ~2,9 tända lampor av 4.
  *  10-11 ("fler sparsamma effekter, så att lamptrappan inte kostar variation"): vers/intro väljer ur HELA poolen igen, men en effekt som
  *  inte är sparsam tänder bara ETT lamppar (ctx.group, paret byts varje fras) - i steg 1 (effektNiva), aldrig i energin. Drops tänder allt. */
-const LAMP_STAIR = CONCERT || process.env.DMX_LAMP_STAIR === '1';
+const LAMP_STAIR = CONCERT;
 /** KULÖR PER FRAS (opt-in DMX_HUE_PHRASE=1, 10-11, KONSERTSHOW): effekternas kulörklocka ctx.hueIdx stegar bara vid frasgräns (16 slag på
  *  effektklockan) i stället för per takt/slag - konsertbänken mätte 17-21 kulörbyten/min. Rörelse och puls följer fortfarande beatIdx. */
-const HUE_PHRASE = CONCERT || process.env.DMX_HUE_PHRASE === '1';
+const HUE_PHRASE = CONCERT;
 /** FULL OPPNAR RIGGEN (opt-in DMX_TIER_OPEN 0..1, 10-11, nattagentens brist 'fart -> full stiger inte': korpus 0,26 -> 0,23,
  *  megamix 0,63 -> 0,61). Energin ar ett FOLJANDE 10 s-fonster: i en lang stark refrang glider botten upp och full ger samma
  *  energi som fart. Har hojs energins GOLV med hur langt in i full tiern (tierEma) ligger: golv + (1 - golv) * TIER_OPEN * andel.

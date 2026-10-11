@@ -317,7 +317,7 @@
       <p>Så här styr du lamporna från din telefon:</p>
       <div class="welcome-steps">
         <div class="welcome-step"><div class="n">1</div><div class="t"><b>Tryck ⏻ för att tända</b><span>Stora knappen längst upp tänder och släcker hela riggen.</span></div></div>
-        <div class="welcome-step"><div class="n">2</div><div class="t"><b>Dra Stämning</b><span>Chill = lugnt. Fest = takt. Galet = full fart. Slidern gör allt annat själv.</span></div></div>
+        <div class="welcome-step"><div class="n">2</div><div class="t"><b>Dra Ljusstyrka</b><span>Showen sköter sig själv - slidern ställer bara hur starkt det lyser.</span></div></div>
         <div class="welcome-step"><div class="n">3</div><div class="t"><b>Spela musik</b><span>Ljuset följer musiken. Ingen musik = ingen rörelse.</span></div></div>
       </div>
       <button class="welcome-btn" id="welcomeBtn">Kör igång</button>
@@ -358,9 +358,9 @@
 
     <div class="mood-track-wrap">
       <div class="mood-ticks" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-      <input type="range" id="moodSlider" class="mood-range" min="0" max="10" step="1" value="5" aria-label="Stämning från Av till Galet" />
+      <input type="range" id="moodSlider" class="mood-range" min="0" max="10" step="1" value="5" aria-label="Ljusstyrka från Av till Max" />
     </div>
-    <div class="mood-slider-legend"><span id="legAv">AV</span><span id="legFest">Fest</span><span id="legGalet">MAX</span></div>
+    <div class="mood-slider-legend"><span id="legAv">AV</span><span id="legFest">Ljus</span><span id="legGalet">MAX</span></div>
   </section>
 
   <section class="audio-section">
@@ -420,7 +420,7 @@
   <details class="more" style="margin-top:14px">
     <summary>Avancerat</summary>
     <div style="padding:14px">
-      <div class="advhint">Skrivskyddad vy. Stämnings-slidern (och det fysiska vredet) sätter allt nedan — dessa värden speglar motorn i realtid.</div>
+      <div class="advhint">Skrivskyddad vy. Ljusstyrke-slidern (och det fysiska vredet) sätter ljustaket — dessa värden speglar motorn i realtid.</div>
       <div class="advrow"><label>Dynamik</label><div class="meter"><div id="advDyn" style="width:0%"></div></div><span class="val" id="advDynV">–</span></div>
       <div class="advrow"><label>Reaktion</label><div class="meter"><div id="advSens" style="width:0%"></div></div><span class="val" id="advSensV">–</span></div>
       <div class="advrow"><label>Ljustak</label><div class="meter"><div id="advMaster" style="width:0%"></div></div><span class="val" id="advMasterV">–</span></div>
@@ -467,7 +467,7 @@
   <h1>Beat-synk</h1>
   <div class="card" id="beatSyncCard">
     <div class="setrow">
-      <label>Beat-synk <em class="mood-badge" id="beatSyncBadge">Följer stämning</em></label>
+      <label>Beat-synk <em class="mood-badge" id="beatSyncBadge">Standard</em></label>
       <div class="seg" id="segBeatSync">
         <button data-bs="auto">Auto</button>
         <button data-bs="0">Av</button>
@@ -476,7 +476,7 @@
         <button data-bs="0.30">Aggressiv</button>
       </div>
     </div>
-    <div class="status" style="margin-top:8px">Hur hårt pulsen knuffas i fas mot faktiska trumslag. <b>Auto</b> följer stämningen (Chill=Lugnt, Fest=Normal, Galet=Aggressiv). Välj en styrka manuellt för att åsidosätta.</div>
+    <div class="status" style="margin-top:8px">Hur hårt pulsen knuffas i fas mot faktiska trumslag. <b>Auto</b> = standardstyrkan. Välj en styrka manuellt för att åsidosätta.</div>
   </div>
 
 
@@ -715,12 +715,8 @@ const moodNum = document.getElementById("moodNum");
 const legFest = document.getElementById("legFest");
 const legGalet = document.getElementById("legGalet");
 function moodInfoFor(v) {
-  if (v <= 0) return { name: "Av",     desc: "Ljuset är släckt — dra åt höger för att tända" };
-  if (v <= 2) return { name: "Chill",  desc: "Mjukt och långsamt, följer inte taktslag" };
-  if (v <= 4) return { name: "Chill+", desc: "Följer musiken lugnt" };
-  if (v <= 6) return { name: "Fest",   desc: "Pulsar på taktslag, byter effekt ibland" };
-  if (v <= 8) return { name: "Fest+",  desc: "Klubb-läge, byter effekt oftare" };
-  return               { name: "Galet", desc: "Full fart, drop-blackout, riser-strobe" };
+  if (v <= 0) return { name: "Av", desc: "Ljuset är släckt — dra åt höger för att tända" };
+  return { name: "Ljus " + Math.round(20 + 80 * (v - 1) / 9) + " %", desc: "Konsertshow — slidern styr bara ljusstyrkan" };
 }
 // Visning: v=0 → 0/10 (av). v≥1 → mappar på (v-1)/9 → 0..1.
 function updateMoodUi(v01, active, forceZero) {
@@ -733,7 +729,7 @@ function updateMoodUi(v01, active, forceZero) {
   moodSlider.style.setProperty("--mood-fill", (v / 10 * 100) + "%");
   moodSlider.classList.toggle("is-off", off);
   if (moodPill) moodPill.classList.toggle("off", off);
-  if (legFest)  { legFest.textContent = off ? "Fest" : info.name.toUpperCase(); legFest.classList.toggle("on", !off); }
+  if (legFest)  { legFest.textContent = off ? "Ljus" : info.name.toUpperCase(); legFest.classList.toggle("on", !off); }
   if (legGalet) legGalet.classList.toggle("on", !off && v >= 9);
 
 }
@@ -925,7 +921,7 @@ function applyConfig(cfg) {
       const active = bsOv ? String(cfg.beatSyncStrength ?? 0.18) : "auto";
       seg.querySelectorAll("button").forEach((b) => b.classList.toggle("primary", b.dataset.bs === active));
     }
-    if (bsBadge) bsBadge.textContent = bsOv ? "Manuell" : "Följer stämning";
+    if (bsBadge) bsBadge.textContent = bsOv ? "Manuell" : "Standard";
   }
   const curSrc = (cfg.audioInput ?? "aux") === "mic" ? "mic" : "aux";
   const srcSeg = document.getElementById("srcSeg");
@@ -1660,7 +1656,7 @@ document.querySelectorAll("#segBeatSync button").forEach((b) =>
     }
     document.querySelectorAll("#segBeatSync button").forEach((x) => x.classList.toggle("primary", x === b));
     const bsBadge = document.getElementById("beatSyncBadge");
-    if (bsBadge) bsBadge.textContent = v === "auto" ? "Följer stämning" : "Manuell";
+    if (bsBadge) bsBadge.textContent = v === "auto" ? "Standard" : "Manuell";
   });
 renderCategories();
 connect();

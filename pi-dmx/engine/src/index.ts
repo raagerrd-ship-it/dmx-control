@@ -25,7 +25,7 @@ import { Button } from "./button.js";
 import { IntensityKnob } from "./intensityKnob.js";
 import { KnobRing } from "./knobRing.js";
 import { BleClient, type BleScanDevice, type BleCal } from "./bleClient.js";
-import { applyIntensity } from "./moods.js";
+import { applyIntensity, migrateFromMoods } from "./moods.js";
 import { BeatFeed } from "./beatFeed.js";
 import { LongRecord } from "./longRecord.js";
 import * as health from "./runtimeHealth.js";
@@ -45,6 +45,7 @@ import { EFFECT_KEYS, EFFECT_MAP } from "./effects/registry.js";
 const MODE_CYCLE: Mode[] = ["smart", ...EFFECT_KEYS];
 
 const cfg = await loadConfig();
+if (migrateFromMoods(cfg)) { scheduleSave(cfg); console.error('[config] stämningarna borttagna 2026-10-11: vredet på max (ljustak 1)'); }
 // Migrate legacy mode names from persisted configs.
 // Migrera BORTTAGNA lägesnamn (strobe/pulse är RIKTIGA nuvarande lägen → ej här).
 const LEGACY_MODES: Record<string, Mode> = { auto: "wave", comet: "wave", spectrum: "eq", vu: "gravity" };

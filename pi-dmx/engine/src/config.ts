@@ -6,7 +6,6 @@
 export type Mode = "smart" | "stegring" | "andrum" | "sug" | "vagbrytare" | "nedrakning" | "fyrverkeri" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "strobe" | "rave" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "duel" | "airglow" | "tide" | "drift" | "pendel" | "viska" | "backbeat" | "tick" | "stege" | "eko" | "hjarta" | "konfetti" | "sopa" | "varannan" | "forvarning" | "basgang" | "tyngdlyft" | "frasraknare" | "vidga" | "blackout";
 
 /** Hyresgäst-stämning: ETT val ställer in hela riggens känsla (se moods.ts). */
-export type MoodId = "chill" | "fest" | "galet";
 
 /**
  * A fixture is placed at `address` and occupies channels in a defined role
@@ -57,11 +56,7 @@ export interface EngineConfig {
   };
   fixtures: FixtureConfig[];
   mode: Mode;
-  /** Senast valda hyresgäst-stämning (chill/fest/galet) — för att UI:t ska kunna
-   *  markera rätt knapp. Sätts av setMood; en manuell effekt-ändring gör den inaktuell. */
-  activeMood?: MoodId;
-  /** Kontinuerlig stämning 0..1 (Chill → Galet) från fysiskt vred (KY-040) eller
-   *  slider i UI. Speglar samma bucket som activeMood men med lerp mellan ankarna. */
+  /** Vredets/sliderns läge 0..1 = ljustaket (moods.ts applyIntensity; stämningarna borttagna 2026-10-11). */
   activeIntensity?: number;
   /** Fysiskt vred (KY-040) för stämnings-intensitet. Null = inget vred anslutet. */
   intensityKnob?: { chip: string; clk: number; dt: number; sw?: number } | null;
