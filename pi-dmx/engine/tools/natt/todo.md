@@ -12,6 +12,9 @@
 - Uppbyggnaden laddar: motorns buildProg (32 slag från builden start) ersätter analysatorns DÖDA buildUp i build-effekterna
   + energigolvet stiger med förloppet under build-looker ('kändes inte som den laddade'). Bänken visar liten ökning i medelljus -
   mät hellre antal tända lampor/takt mot slutet. Efter: 'träff', 'perfekt', 'nja inte 100'.
+- NÄSTA LADAN-BESÖK (ägaren 22:2x): kalibrera ingångsnivån - riktvärde för Flow 8 MON-reglaget till Pi:n (EQ rak, fast nivå;
+  10-11 kväll låg ingången ~10 dB under eftermiddagen, fönster -35..-24 dB, ljuset mörkare). Geminis lågpass < 120 Hz AVRÅTT
+  (takt, riser, virvel, sektioner, låtgränser behöver hela spektrumet).
 - ÖPPET: 'sen' drops (analysatorn väntar tills kroppen är inom 3 dB från toppen, edgeAgo ~200 ms; QUALITY 6,5 gav bara fler
   drops); falska låtgränser mitt i låtar (sektion -> intro, 'ny låt: glömmer looker') ger lookbyte vid refrängen;
   'energi dog efter' 21:31 = sektionen high -> break 7 s efter dropen.
