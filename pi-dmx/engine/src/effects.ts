@@ -79,7 +79,7 @@ const CONCERT_KICK = Math.max(0, Math.min(1, Number(process.env.DMX_CONCERT_KICK
 /** DROPEN BÄR IN I REFRÄNGEN (ägaren i ladan 10-11: "efter drop känns som energin dör varje gång"): dropen är det starkaste
  *  ögonblicket och drar upp energifönstrets topp - refrängen efter mäts mot den och dämpas. Efter en drop släpper energin helt i
  *  DROP_LIFT_MS och glider tillbaka på DROP_LIFT_FALL_MS. Bara mindre dämpning. */
-const DROP_LIFT_MS = Number(process.env.DMX_DROP_LIFT_MS ?? 2000), DROP_LIFT_FALL_MS = Number(process.env.DMX_DROP_LIFT_FALL_MS ?? 1500);   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
+const DROP_LIFT_MS = Number(process.env.DMX_DROP_LIFT_MS ?? 4000), DROP_LIFT_FALL_MS = Number(process.env.DMX_DROP_LIFT_FALL_MS ?? 1500);   // 2000 -> 4000 (ladan 22:0x: 'se till så energin efter fortsätter', som minidropens lyft som var 'perfekt')   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
 const KICK_E = Math.max(0, Math.min(0.8, Number(process.env.DMX_KICK_E ?? 0.5)));
 const CONCERT_E_FLOOR = Math.max(0, Math.min(0.9, Number(process.env.DMX_CONCERT_E_FLOOR ?? 0.4)));
 const SECTION_PALETTE = CONCERT;
@@ -1044,7 +1044,7 @@ export class EffectEngine {
     // mitten. Har ar anvandarens oga ratt matinstrument: hur lange en drop ska
     // halla ar en upplevelseparameter, inte en troskel att mata fram.
     const sinceStart = this.songStartAt ? performance.now() - this.songStartAt : 1e9;
-    if (dropHit && sinceStart > START_DROP_MUTE_MS) this.dropBangUntil = nowWall + 1300;
+    if (dropHit && sinceStart > START_DROP_MUTE_MS) this.dropBangUntil = nowWall + 700;   // 1300 -> 700 (ladan 10-11 22:0x, ägaren: 'huvuddrop, vi kan nog minska tiden den är på'); uttoningen 1 s orörd
     // DROP-BLACKOUT (dramaturgisk tystnad): en riser som BRYTS ner i en svacka
     // strax före dropen → tvinga kolsvart i max 250ms. Svärtan STARTAR på
     // svackans flank (bara om vi faktiskt byggt upp: buildUp>0.35) och SLÄPPS i
