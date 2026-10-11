@@ -1688,6 +1688,10 @@ export class EffectEngine {
     ctx.beatIdx = beatIdx; ctx.hueIdx = HUE_PHRASE ? Math.floor(beatIdx / 16) * 16 : beatIdx; ctx.beatFrac = beatFracFx; ctx.beatPulse = beatPulse; ctx.heartPulse = heartPulse;
     // TVAGRUPPERING: vaxlar per look (smartCount) och var 32:e slag - "skiftar ibland mellan varannan och inre/yttre".
     ctx.grouping = (((this.smartCount + (beatIdx >> 5)) & 1) === 1) ? 'innerouter' : 'varannan';
+    // LAMPORDNINGEN VÄXLAR (ägaren i ladan 10-11 21:5x: "effekten som togglar mellan lampor, vore snyggt om den inte alltid kör samma
+    // håll, eller ytter/inner osv"): c.idx = lampans plats i ordningen framåt / bakåt / utifrån-in / inifrån-ut, byts per look och var
+    // 32:a slag som grupperingen. Svep, pendlar och ekon går då åt olika håll; c.group (två grupper) är oförändrad.
+    const ordSel = (this.smartCount * 3 + (beatIdx >> 5)) & 3;
     ctx.beatHit = beatHit; ctx.hasBeat = hasBeat;
     ctx.wavePhase = this.wavePhase; ctx.buildUp = frame.buildUp;
     ctx.phaseSpread = 1 + frame.buildUp * 2.5; ctx.punchFloor = punchFloor;
@@ -1739,7 +1743,8 @@ export class EffectEngine {
       if (isAnchor) {
         rgb = hsvToRgb(anchorHue, 1, 0.4 + 0.06 * Math.sin(t * 0.5 + i));   // fast pelare, knappt levande andning
       } else {
-        ctx.idx = i;
+        { const n = count, e = Math.min(i, n - 1 - i), side = i < n - 1 - i ? 0 : 1;   // e = avstånd till närmaste kant
+          ctx.idx = ordSel === 0 ? i : ordSel === 1 ? n - 1 - i : ordSel === 2 ? Math.min(n - 1, 2 * e + side) : Math.max(0, n - 1 - (2 * e + side)); }
         ctx.group = ctx.grouping === 'innerouter' ? ((count < 3 ? i % 2 === 1 : (i === 0 || i === count - 1)) ? 1 : 0) : i % 2;
         ctx.fx = fx;
         ctx.want.strobe = undefined; ctx.want.blinder = undefined;
