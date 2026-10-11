@@ -41,7 +41,8 @@ const t00 = EPOCH + startS * 1000; Date.now = () => t00; performance.now = () =>
 const eng = new EffectEngine(cfg);
 console.log = () => {};
 const buf = new Float32Array(HOP);
-let lastRender = -1, lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0, song = 0;
+let lastRender = -1, lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0, song = 0, lastDrop = 0;
+const DROPS = [], BUILDSW = [];   // drop-tider, tider for byten med orsak 'build'
 // per ruta
 const R = [];   // {t, sec, secIdx, song, look, pal, hueSet, nLit, allLit, light, int, beatIdx}
 const end = Math.min(nSamples, Math.floor((startS + maxS) * SR));
@@ -56,8 +57,10 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= end; off += HOP
   if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
   if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; song++; eng.softenRange(); an.hintTrackChange(5000); }
   feed.update(fr, cfg, an);
+  if ((fr.dropCount ?? 0) !== lastDrop) { lastDrop = fr.dropCount ?? 0; DROPS.push(tS); }
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
-  lastRender = ms; eng.render(fr); const u = eng.universe; if (!u) continue;
+  lastRender = ms; const prevLook = eng.getActiveMode(); eng.render(fr); const u = eng.universe; if (!u) continue;
+  if (eng.getActiveMode() !== prevLook && eng.switchWhy === 'build') BUILDSW.push(tS);
   const v = lamps.map((L) => [u[L.r] ?? 0, u[L.g] ?? 0, u[L.b] ?? 0]);
   const lv = v.map(([r, g, b]) => Math.max(r, g, b)), mx = Math.max(...lv);
   const hs = new Set(); v.forEach(([r, g, b], k) => { if (lv[k] > 40) { const s = sector(r, g, b); if (s >= 0) hs.add(s); } });
@@ -94,6 +97,10 @@ const res = {
   lampAntalR: +corr(R.map((r) => r.nLit), R.map((r) => r.int)).toFixed(2),
   versRefrang: +(lightOf((r) => r.sec === "high") - lightOf((r) => r.sec === "low" || r.sec === "intro")).toFixed(2),
   aterseende: again ? +(same / again).toFixed(2) : null, aterkommande: again,
+  // BUILD FORE DROP: andel drops med ett build-byte 1..20 s fore, och median hur langt fore (s)
+  buildForeDrop: DROPS.length ? +(DROPS.filter((t) => BUILDSW.some((b) => t - b > 0.3 && t - b <= 20)).length / DROPS.length).toFixed(2) : null,
+  buildLedS: (() => { const l = DROPS.map((t) => { const b = BUILDSW.filter((x) => t - x > 0.3 && t - x <= 20); return b.length ? t - b[b.length - 1] : null; }).filter((x) => x !== null); return l.length ? +med(l).toFixed(1) : null; })(),
+  drops: DROPS.length, buildByten: BUILDSW.length,
 };
 process.stdout.write(JSON.stringify(res) + "\n");
 if (opt("--json", null)) writeFileSync(opt("--json"), JSON.stringify(res, null, 1));

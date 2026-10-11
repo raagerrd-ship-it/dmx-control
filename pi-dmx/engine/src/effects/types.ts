@@ -29,6 +29,10 @@ export interface EffectWants {
   co2?: number;
   /** true = "nu vore ett bra läge för en puff". Motorn kan neka (värme/cooldown). */
   fog?: boolean;
+  /** ENERGI PER LAMPA (ägaren 10-11: "effekterna skall ställa in vilken lampa som får köra energi och inte"): false = den här lampan går
+   *  förbi energin (lyser med effektens egen styrka; tystnadsgränsen gäller ändå), true = energin gäller. Osatt = effektens modulate.energy,
+   *  och i konsertläget standardregeln SPOT (ensam ljus lampa går förbi energin). Sätts per lampa i render(). */
+  energy?: boolean;
 }
 
 export interface EffectContext {

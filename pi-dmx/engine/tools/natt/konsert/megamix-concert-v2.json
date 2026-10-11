@@ -1,0 +1,21 @@
+{
+ "wav": "tools/megamix_ladan.wav",
+ "min": 9.4,
+ "kulorbytenPerMin": 17.4,
+ "kulorerPerSektion": 3,
+ "paletterPerSektion": 1,
+ "sektioner": 37,
+ "palettbytenPerMin": 4.16,
+ "palettPaGrans": 0.97,
+ "lookbytenPerMin": 8.5,
+ "bytePaFras": 0.24,
+ "allaTanda": 0.7,
+ "lampAntalR": 0.21,
+ "versRefrang": 0.26,
+ "aterseende": 1,
+ "aterkommande": 22,
+ "buildForeDrop": 0.47,
+ "buildLedS": 5.9,
+ "drops": 15,
+ "buildByten": 22
+}

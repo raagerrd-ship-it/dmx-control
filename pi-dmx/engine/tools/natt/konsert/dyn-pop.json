@@ -1,0 +1,222 @@
+{
+ "drops": {
+  "spridning": 0.67,
+  "rorelse": 0.68,
+  "niva": 0.75
+ },
+ "party": {
+  "spridning": 0,
+  "rorelse": 0.59,
+  "niva": 0.63
+ },
+ "chase": {
+  "spridning": 0.98,
+  "rorelse": 0.98,
+  "niva": 0.61
+ },
+ "wave": {
+  "spridning": 0.35,
+  "rorelse": 0.59,
+  "niva": 0.7
+ },
+ "breathe": {
+  "spridning": 0,
+  "rorelse": 0.55,
+  "niva": 0.73
+ },
+ "snap": {
+  "spridning": 0,
+  "rorelse": 0.52,
+  "niva": 0.8
+ },
+ "bounce": {
+  "spridning": 0.97,
+  "rorelse": 0.97,
+  "niva": 0.8
+ },
+ "mono": {
+  "spridning": 0.08,
+  "rorelse": 0.54,
+  "niva": 0.81
+ },
+ "aurora": {
+  "spridning": 0.16,
+  "rorelse": 0.57,
+  "niva": 0.77
+ },
+ "pulse": {
+  "spridning": 0,
+  "rorelse": 0.59,
+  "niva": 0.65
+ },
+ "strobe": {
+  "spridning": 0,
+  "rorelse": 0,
+  "niva": 0.95
+ },
+ "rave": {
+  "spridning": 0.56,
+  "rorelse": 0.82,
+  "niva": 0.81
+ },
+ "eq": {
+  "spridning": 0.59,
+  "rorelse": 0.69,
+  "niva": 0.53
+ },
+ "gallop": {
+  "spridning": 0.43,
+  "rorelse": 0.69,
+  "niva": 0.71
+ },
+ "twin": {
+  "spridning": 0.56,
+  "rorelse": 0.68,
+  "niva": 0.73
+ },
+ "ripple": {
+  "spridning": 0.22,
+  "rorelse": 0.74,
+  "niva": 0.44
+ },
+ "gravity": {
+  "spridning": 0.22,
+  "rorelse": 0.57,
+  "niva": 0.71
+ },
+ "drumkit": {
+  "spridning": 0.41,
+  "rorelse": 0.58,
+  "niva": 0.67
+ },
+ "split": {
+  "spridning": 0.77,
+  "rorelse": 0.86,
+  "niva": 0.4
+ },
+ "duel": {
+  "spridning": 0.26,
+  "rorelse": 0.69,
+  "niva": 0.61
+ },
+ "airglow": {
+  "spridning": 0.03,
+  "rorelse": 0.56,
+  "niva": 0.53
+ },
+ "tide": {
+  "spridning": 0.12,
+  "rorelse": 0.56,
+  "niva": 0.79
+ },
+ "drift": {
+  "spridning": 0.43,
+  "rorelse": 0.55,
+  "niva": 0.78
+ },
+ "pendel": {
+  "spridning": 0.35,
+  "rorelse": 0.58,
+  "niva": 0.73
+ },
+ "viska": {
+  "spridning": 0.26,
+  "rorelse": 0.59,
+  "niva": 0.65
+ },
+ "backbeat": {
+  "spridning": 0.22,
+  "rorelse": 0.68,
+  "niva": 0.63
+ },
+ "tick": {
+  "spridning": 0.28,
+  "rorelse": 0.61,
+  "niva": 0.67
+ },
+ "stege": {
+  "spridning": 0.49,
+  "rorelse": 0.62,
+  "niva": 0.72
+ },
+ "eko": {
+  "spridning": 0.84,
+  "rorelse": 0.78,
+  "niva": 0.53
+ },
+ "hjarta": {
+  "spridning": 0.09,
+  "rorelse": 0.58,
+  "niva": 0.57
+ },
+ "varannan": {
+  "spridning": 0.55,
+  "rorelse": 0.76,
+  "niva": 0.59
+ },
+ "stegring": {
+  "spridning": 0.01,
+  "rorelse": 0.6,
+  "niva": 0.6
+ },
+ "andrum": {
+  "spridning": 0.14,
+  "rorelse": 0.58,
+  "niva": 0.7
+ },
+ "sug": {
+  "spridning": 0,
+  "rorelse": 0.55,
+  "niva": 0.73
+ },
+ "vagbrytare": {
+  "spridning": 0.4,
+  "rorelse": 0.6,
+  "niva": 0.81
+ },
+ "nedrakning": {
+  "spridning": 0.7,
+  "rorelse": 0.69,
+  "niva": 0.56
+ },
+ "fyrverkeri": {
+  "spridning": 0.22,
+  "rorelse": 0.44,
+  "niva": 0.81
+ },
+ "konfetti": {
+  "spridning": 0.69,
+  "rorelse": 0.84,
+  "niva": 0.65
+ },
+ "sopa": {
+  "spridning": 0.39,
+  "rorelse": 0.57,
+  "niva": 0.71
+ },
+ "forvarning": {
+  "spridning": 0,
+  "rorelse": 0.58,
+  "niva": 0.7
+ },
+ "basgang": {
+  "spridning": 0.78,
+  "rorelse": 0.89,
+  "niva": 0.34
+ },
+ "tyngdlyft": {
+  "spridning": 0.14,
+  "rorelse": 0.55,
+  "niva": 0.73
+ },
+ "frasraknare": {
+  "spridning": 0.3,
+  "rorelse": 0.61,
+  "niva": 0.61
+ },
+ "vidga": {
+  "spridning": 1,
+  "rorelse": 0.57,
+  "niva": 0.64
+ }
+}
