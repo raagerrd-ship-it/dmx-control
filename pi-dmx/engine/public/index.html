@@ -424,7 +424,6 @@
       <div class="advrow"><label>Dynamik</label><div class="meter"><div id="advDyn" style="width:0%"></div></div><span class="val" id="advDynV">–</span></div>
       <div class="advrow"><label>Reaktion</label><div class="meter"><div id="advSens" style="width:0%"></div></div><span class="val" id="advSensV">–</span></div>
       <div class="advrow"><label>Ljustak</label><div class="meter"><div id="advMaster" style="width:0%"></div></div><span class="val" id="advMasterV">–</span></div>
-      <div class="advrow"><label>Byter effekt</label><div class="meter"><div id="advDwell" style="width:0%"></div></div><span class="val" id="advDwellV">–</span></div>
       <div class="advflags">
         <div class="advflag" id="fEnergy"><span class="dot"></span>Energi styr läget</div>
         <div class="advflag" id="fDropBl"><span class="dot"></span>Drop-blackout</div>
@@ -928,7 +927,6 @@ function applyConfig(cfg) {
     }
     if (bsBadge) bsBadge.textContent = bsOv ? "Manuell" : "Följer stämning";
   }
-  segActivateStr("segDwell", (cfg.smartDwellMs ?? 9000) <= 5000 ? "fast" : (cfg.smartDwellMs ?? 9000) >= 15000 ? "slow" : "normal", "dwell");
   const curSrc = (cfg.audioInput ?? "aux") === "mic" ? "mic" : "aux";
   const srcSeg = document.getElementById("srcSeg");
   if (srcSeg) srcSeg.dataset.src = curSrc;
@@ -1034,13 +1032,9 @@ function updateAdvMirror(cfg) {
   const dyn = cfg.dynamics ?? 0.6;
   const sens = cfg.sensitivity ?? 0.6;
   const mst = cfg.master ?? 1;
-  const dwellMs = cfg.smartDwellMs ?? 9000;        // 10 000..40 000 typiskt
   setBar("advDyn",    dyn * 100,             Math.round(dyn * 100) + "%");
   setBar("advSens",   sens * 100,            Math.round(sens * 100) + "%");
   setBar("advMaster", mst * 100,             Math.round(mst * 100) + "%");
-  // Byter effekt: kort dwell → hög "aktivitet". Mappa 5 000 → 100%, 40 000 → 0%
-  setBar("advDwell",  ((40000 - dwellMs) / 35000) * 100,
-    dwellMs >= 20000 ? "Sällan" : dwellMs >= 10000 ? "Normal" : "Ofta");
   const flag = (id, on) => {
     const el = document.getElementById(id);
     if (el) el.classList.toggle("on", !!on);
@@ -1668,8 +1662,6 @@ document.querySelectorAll("#segBeatSync button").forEach((b) =>
     const bsBadge = document.getElementById("beatSyncBadge");
     if (bsBadge) bsBadge.textContent = v === "auto" ? "Följer stämning" : "Manuell";
   });
-document.querySelectorAll("#segDwell button").forEach((b) =>
-  b.onclick = () => { send({ type: "setSmartDwell", mode: b.dataset.dwell }); segActivateStr("segDwell", b.dataset.dwell, "dwell"); });
 renderCategories();
 connect();
 // Läget (smart eller manuellt vald effekt) kommer från serverns config —

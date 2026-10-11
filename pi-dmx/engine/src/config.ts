@@ -107,8 +107,6 @@ export interface EngineConfig {
   beatSyncOverride?: boolean;
   /** Energi (lokal) väljer läge i smart-läget. */
   energyDrivesMode: boolean;
-  /** Hur ofta smart byter läge (ms). */
-  smartDwellMs: number;
   master: number;         // 0..1 master brightness
   /** LÄGSTA NIVÅ (2026-09-27, ägaren: "justera lägsta tröskel på input för att sätta lägsta tröskel på
    *  lamporna"): hur många dB UNDER låtens tak ljuset når golvet — LIVE_LEVEL-fönstret i effects.ts.
@@ -215,7 +213,6 @@ export const defaultConfig: EngineConfig = {
   beatSyncStrength: 0.18,   // normal PLL-korrektion mot trumslag
   beatSyncOverride: false,  // stämnings-vredet styr som default
   energyDrivesMode: true,
-  smartDwellMs: 15000,
   master: 1.0,
   energyFloor: 0.2,     // energins golv (ratt i /setup: "Lägsta nivå"); 0,2 = standard (ladan 10-10: låtbyten och lugna partier lyser)
   silenceHoldS: 3,      // släcktid (ratt i /setup: "Släcktid"); 3 s = ägarens val i ladan 10-10

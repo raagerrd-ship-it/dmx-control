@@ -1253,10 +1253,10 @@ export class EffectEngine {
         this.lastSmartTier = tierName;
         this.lastHalvedForSwitch = this.pulseHalved;
         this.lastBassClearForSwitch = bassClear;
-        // DMX_DWELL_MS: agaren 2026-09-12 "dirigenten behover inte byta hela tiden, bara vid andringar i laten".
-        // Stamningens dwell (fest 15 s, galet 10 s) tvingade byten pa klockan; med env satt hogt (120 s) blir
-        // dwell en nodfallback och bytena sker pa tier-byte, sektionsgrans, drop och halvering.
-        this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_MS ?? 45000) || this.cfg.smartDwellMs || 9000);
+        // DWELL 45 s (agaren 2026-09-12 "dirigenten behover inte byta hela tiden, bara vid andringar i laten"): en nodfallback - bytena
+        // sker pa sektionsgrans, drop, basgang och halvering. 10-11: env-ratten DMX_DWELL_MS och stamningarnas/UI:ts smartDwellMs bort
+        // (env-standarden vann alltid over cfg; rattsvepet: 22,5/67,5 s json-identiskt pa mixarna).
+        this.smartDwellUntil = now + 45000;
         // EFFEKT-KRAV: filtrera bort effekter vars krav (tempo/karaktär) inte möts
         // just nu — strobe bara i snabb musik, trum-effekter bara med trummor, osv.
         // (registry.meetsRequirements). Ambient-effekterna kräver inget → utgör
@@ -1353,7 +1353,7 @@ export class EffectEngine {
         }
         // ENFORMIG LOOK -> KORTARE DWELL. Agaren 2026-09-12: "ar det en enformig effekt far den garna byta
         // snabbare". De statiska svepen (ingen takt-signal, ingen kick-drift) far DMX_DWELL_FLAT_MS (30 s),
-        // taktdrivna looker behaller DMX_DWELL_MS. Satts EFTER valet, eftersom dwellen ovan sattes fore.
+        // taktdrivna looker behaller 45 s. Satts EFTER valet, eftersom dwellen ovan sattes fore.
         if (EFFECT_MAP.get(this.smartMode)?.flat) this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_FLAT_MS) || 30000);
         this.recentLooks.push(this.smartMode); if (this.recentLooks.length > MIX_RECENT_N) this.recentLooks.shift(); this.seenLooks.add(this.smartMode);
       }

@@ -23,13 +23,12 @@ const FEEL: Record<MoodId, {
   dynamics: number;      // 0 = jämnt, 1 = hård kontrast (mörkt mellan, smäll på topp)
   sensitivity: number;   // 0..1 reaktions-känslighet
   energyDrivesMode: boolean; // låt energin driva effekt-BYTEN (av = byter bara på dwell-timern → lugnt)
-  smartDwellMs: number;  // hur ofta smart byter effekt (lägre = piggare)
   master: number;        // ljus-tak (0..1): hela riggens max-styrka
   beatSyncStrength: number; // hur hårt PLL-fasen knuffas mot trumslag (0/0.10/0.18/0.30)
 }> = {
-  chill: { dynamics: 0.30, sensitivity: 0.50,  energyDrivesMode: false, smartDwellMs: 40000, master: 0.30, beatSyncStrength: 0.10 },
-  fest:  { dynamics: 0.60, sensitivity: 0.60, energyDrivesMode: true,  smartDwellMs: 15000,  master: 1.00, beatSyncStrength: 0.18 },
-  galet: { dynamics: 0.85, sensitivity: 0.70, energyDrivesMode: true,  smartDwellMs: 10000,  master: 1.00,  beatSyncStrength: 0.30 },
+  chill: { dynamics: 0.30, sensitivity: 0.50,  energyDrivesMode: false, master: 0.30, beatSyncStrength: 0.10 },
+  fest:  { dynamics: 0.60, sensitivity: 0.60, energyDrivesMode: true,  master: 1.00, beatSyncStrength: 0.18 },
+  galet: { dynamics: 0.85, sensitivity: 0.70, energyDrivesMode: true,  master: 1.00,  beatSyncStrength: 0.30 },
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -46,7 +45,6 @@ export function applyMood(cfg: EngineConfig, mood: MoodId): void {
   cfg.energyDrivesMode = f.energyDrivesMode;   // chill: av → byter effekt bara på dwell
   cfg.dynamics = f.dynamics;
   cfg.sensitivity = f.sensitivity;
-  cfg.smartDwellMs = f.smartDwellMs;
   cfg.master = f.master;           // ljus-tak
   if (!cfg.beatSyncOverride) cfg.beatSyncStrength = f.beatSyncStrength; // PLL-styrka mot trumslag
   // Rotation: bara stämningens pool aktiv (allt annat AV → smart väljer bara ur poolen).
@@ -59,7 +57,7 @@ export function applyMood(cfg: EngineConfig, mood: MoodId): void {
 }
 
 /** Kontinuerlig stämning från ETT vred (KY-040) eller UI-slider: 0..1
- *  (Chill → Galet). Kontinuerliga rattar (dynamics/sensitivity/master/smartDwellMs) lerpas mjukt mellan tre ankare; poolen och boolean-
+ *  (Chill → Galet). Kontinuerliga rattar (dynamics/sensitivity/master) lerpas mjukt mellan tre ankare; poolen och boolean-
  *  flaggorna snäpper vid 1/3 och 2/3 så motorns rotation-set byts stegvis. */
 export function applyIntensity(cfg: EngineConfig, xRaw: number): void {
   const x = Math.max(0, Math.min(1, xRaw));
@@ -74,7 +72,6 @@ export function applyIntensity(cfg: EngineConfig, xRaw: number): void {
   cfg.dynamics       = lerp(a.dynamics, b.dynamics);
   cfg.sensitivity    = lerp(a.sensitivity, b.sensitivity);
   cfg.master         = lerp(a.master, b.master);
-  cfg.smartDwellMs   = Math.round(lerp(a.smartDwellMs, b.smartDwellMs));
 
   // Bucket-snäpp på ~1/3 och ~2/3 (matchar POOL/FEEL-anchoreringen ovan).
   const bucket: MoodId = x < 1 / 3 ? "chill" : x < 2 / 3 ? "fest" : "galet";
