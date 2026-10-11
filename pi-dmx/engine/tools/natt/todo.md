@@ -1,6 +1,17 @@
 # Natt-agentens uppdrag
 
-## LÄGET 2026-10-11 eftermiddag - LÄS FÖRST (ersätter äldre "LÄGET"-rader nedan där de krockar)
+## LÄGET 2026-10-11 12:31 - KONSERTLÄGET ÄR ENDA LÄGET (LIVE i ladan, ägaren: "mycket bättre, gör det till enda läget")
+Live sedan 12:31 (a3ce847, deployad, ingen env utöver DROP_MIN_GAP_S): CONCERT = true i koden = sektionspalett, frasbyten, lamptrappa v2,
+kulör per fras, full öppnar 0,6, aldrig enhetliga effekter (UNIFORM), BUILD före drop (kroppen borta 5 dB/1,5 s; build-sektion direkt),
+effekten leder (energins golv 0,6), varje slag (dämpning mellan slagen 0,3 i steg 1), energi per lampa (EffectWants.energy, SPOT-regeln).
+STÄMNINGARNA chill/fest/galet BORTTAGNA: vredet/slidern = bara ljustak (master 0,2..1). Bänken = live nu (natt.py kör samma kod).
+Mått (enda-laget): lampspr 99/74, kickTraff 0,47/0,39, build före drop 0,50/0,47. Ny baslinje: natt/2026-10-11-enda-laget.json.
+ÖPPET FRÅN ÄGAREN: "mindre drops [minidrops] ska vi kanske justera så att alla lampor då lyser lika iaf eller något, vet ej exakt än" -
+förbered förslag med mått (t.ex. minidrop = alla fyra lamporna lyfts lika en kort stund, i steg 1), bygg som opt-in, ägaren avgör.
+GALLRING att föreslå: UNIFORM-effekterna (breathe, snap, mono, pulse, party, airglow, hjarta, tyngdlyft, strobe) väljs aldrig längre i
+smart-läget - bara manuellt. Föreslå gallring eller omgörning till spatiala varianter; gallra inte utan ägaren.
+
+## (äldre) LÄGET 2026-10-11 eftermiddag (ersätter äldre "LÄGET"-rader nedan där de krockar)
 KÖR LIVE i ladan (deploy 10-10 20:27): TRE STEG, Lägsta nivå 0,2, 4 s break före riktig drop, minidrop byter inte look, toggle-effekter
 utan grundnivå + föredras vid låst takt, arecord FIFO 60. COMMITTAT MEN EJ DEPLOYAT (identiskt i bänken, ägaren kör `python tools\ladan.py`):
 beatFeed.ts, långinspelningen (/setup "Spela in 5 min"), reglagerensningen (döda flaggor, env-brytare, dwell = fast 45 s, gamma en källa,
