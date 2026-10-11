@@ -1350,7 +1350,8 @@ export class EffectEngine {
         const secEntry = this.pendingSecSwitch && secOldEnough && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
         const concertBuild = CONCERT && buildEntry && held > 2000;   // konsertläget: in i build direkt
         // refrängen kom utan drop -> lämna builden direkt; även ett energilyft/sektionslyft (ladan 16:05: virvel hängde kvar i 'low' efter lyftet)
-        const buildExit = CONCERT && BUILD_LOOKS.includes(this.smartMode) && (frame.section === 'high' || (nowWall - this.liftAt < 300 && this.buildLookAt > 0 && nowWall - this.buildLookAt > 2000));
+        // + intensiteten på topp (ladan 17:09 'miss': upptakt låg kvar 10 s i int 0,9-1,0 - sektionen gick low -> build -> intro, aldrig high)
+        const buildExit = CONCERT && BUILD_LOOKS.includes(this.smartMode) && (frame.section === 'high' || (this.buildLookAt > 0 && nowWall - this.buildLookAt > 2000 && (nowWall - this.liftAt < 300 || (frame.intensity ?? 0) >= 0.85)));
         // BUILDEN LANDAR I REFRÄNGEN (ägaren i ladan 16:01 'miss': fyllning -> high, nivån +8 dB, men varken drop (20 dB-kravet) eller
         // sektionslyft (minidropens 2 s-spärr) fyrade): har builden pågått >= BUILD_DROP_MIN_MS och sektionen går till high = DROPEN.
         if (buildExit && this.buildLookAt > 0 && nowWall - this.buildLookAt > BUILD_DROP_MIN_MS && !dropHit) { this.upgradeHit = true; this.buildLookAt = 0; if (isLogOn()) console.log('[dirigent] builden landar i refrangen -> drop'); }
