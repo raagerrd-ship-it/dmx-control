@@ -4,7 +4,8 @@
 Showen reagerar 9,3 ggr/min men bara 15 % på riktiga baslyft (nästan-dropen = slump, analysatorns minidrops 17/min); build-looker
 32 % av tiden mot sektion build 12 %; refrängen inte ljusare än builden. Provad ersättning V123 (ingen look/blixt från minidrops/
 nästan-drop, build bara på sektion build, ny lyftdetektor 0,6 s ≥ 10 dB) -> 2,7 reaktioner/min, 42 % på lyft, build-look 15 %.
-VÄNTAR PÅ ÄGARENS BESLUT - implementera inte förrän det står här att det är godkänt.
+GODKÄNT AV ÄGAREN 10-11 kväll ("jag vill testa 123") och INFÖRT i src/effects.ts (bänken identisk med provet: 2,7/min, 42 % på lyft,
+build-look 15 %). Nästa: refrängen ljusare än builden (ljus high 0,32 mot build 0,34), sedan drops mot ägarens Drop!-markeringar.
 
 ## FACIT FRÅN ÄGAREN: MINIDROP-/DROP-MARKERINGAR (10-11 kväll, går först när det finns markeringar)
 Knapparna "Minidrop!"/"Drop!" i /setup (0dc7885): ägaren trycker när hen HÖR en minidrop/drop. Tiderna finns i långinspelningarnas

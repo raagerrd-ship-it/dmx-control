@@ -53,15 +53,13 @@ const BUILD_DROP_MIN_MS = Number(process.env.DMX_BUILD_DROP_MIN_MS ?? 4000), BUI
 const MINI_LIFT_MS = Number(process.env.DMX_MINI_LIFT_MS ?? 400), MINI_LIFT_FALL_MS = Number(process.env.DMX_MINI_LIFT_FALL_MS ?? 400);   // 1000/800 -> 400/400 (ägaren: 'bara allt lyser')   // 500/600 -> 1000/800 (kandes inte)   // ägaren: 'behöver inte vara 2 s' - 2 s bara med felsökning på (synligt kvitto)
 /** ENERGILYFT (ägaren i ladan 10-11: "jag ser allt från att det varit lugnt till ett tydligt energilyft (även om det är lägre) med
  *  basslag som minidrop"): analysatorns minidrop/nästan-drop jämför mot de senaste sekunderna, som efter ett lugnt parti har anpassat
- *  sig. Här: basens kropp (nearB, 120 ms) mot medlet för 6..2 s sedan; LIFT_DB över det, LIFT_DB/2 över toppen där, och kickar nu
- *  -> samma minidrop-look (alla lampor lika + lyft). Högst en per LIFT_REFRACT_MS. Bara DMX-sidan (frame.bodyDb), delade analysatorn orörd. */
-const LIFT_DB = Number(process.env.DMX_LIFT_DB ?? 8), LIFT_REFRACT_MS = Number(process.env.DMX_LIFT_REFRACT_MS ?? 6000);
+ *  sig. Här: basens kropp (nearB, 120 ms) medlad över 0,6 s mot medlet för 6..2 s sedan; LIFT_DB över det -> samma minidrop-look
+ *  (alla lampor lika + lyft). Högst en per LIFT_REFRACT_MS. Bara DMX-sidan (frame.bodyDb), delade analysatorn orörd.
+ *  V123 (analysen 10-11 kväll, tools/natt/konsert/analys-2026-10-11.md, ägaren: "jag vill testa 123"): 0,6 s-medel, 10 dB, 8 s,
+ *  inget kick- eller över-toppen-krav. Ensam: 72 % av fyrningarna på ett ihållande baslyft, fångar 85 %, latens 0,11 s; fyrar vid
+ *  alla sju av ägarens markeringar. Lyftet (+ sektionslyftet) är nu ENDA källan till minidrop-looken. */
+const LIFT_DB = Number(process.env.DMX_LIFT_DB ?? 10), LIFT_REFRACT_MS = Number(process.env.DMX_LIFT_REFRACT_MS ?? 8000);
 const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math.max(0, Math.min(1, Number(process.env.DMX_MINI_UNI ?? 1)));
-/** BUILD FÖRE DROPEN (konsertläget, ägaren 10-11: "dirigenten skall bli snabbare att byta till BUILD innan drops"): analysatorns buildUp
- *  är ~0 på ladans material (0 av 15 drops i megamix hade en build-look före). Dropdetektorn kräver att baskroppen varit BORTA en stund;
- *  samma tillstånd följs här ur frame.bodyDb (toppföljare, borta = PRE_DROP_DB under toppen i PRE_DROP_S) -> ETT direkt byte till
- *  build-poolen per break. Sektionen 'build' byter också direkt (ingen hålltid/frasvänta) och risern räcker efter 0,5 s. */
-const PRE_DROP_DB = Number(process.env.DMX_PRE_DROP_DB ?? 5), PRE_DROP_S = Number(process.env.DMX_PRE_DROP_S ?? 1.5);   // megamix: drops med build fore 0 -> 0,47, ledtid 5,9 s
 /** EFFEKTEN LEDER (konsertläget, ägaren 10-11: "energi-lagret skall ligga bara som att lamporna inte känns platta i partier där effekten
  *  inte lyckas helt" + "95 % på en lampa i taget som hoppar runt ... får köra ljusare så de syns"): energins golv höjs till
  *  CONCERT_E_FLOOR - effekten kör nära sin egen styrka, energin dämpar högst lite. Fortfarande bara dämpning. */
@@ -474,7 +472,7 @@ export class EffectEngine {
   }
   private fxFast = false;   // aktuell effekt ar fastLight (VARJE SLAG undantar den)
   private fxNow = new Float32Array(64); private fxPrev = new Float32Array(64);   // effektens niva per lampa (SPOT-regeln, forra rutan)
-  private buildSince = -1; private buildEntered = false; private bodyPk = -200; private bodyGoneAt = 0; private preDropUsed = false; private lookPlayMs = new Map<Mode, number>();   // ALLA_LOOKER
+  private buildSince = -1; private buildEntered = false; private lookPlayMs = new Map<Mode, number>();   // ALLA_LOOKER
   private tierEma = 0.5;   // ihallande intensitet for tier-val (se render)
   private smartDwellUntil = 0;
   private warmMs = 0;
@@ -1030,7 +1028,7 @@ export class EffectEngine {
     // Minidrop direkt; en riktig drop samma ruta gar fore (och tar annars over via dropEnv/dropColEnv).
     let miniHit = false;
     if (miniHitRaw && !dropHitRaw && (CONCERT || !(DROP_SONG_HOLD_S > 0 && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000))) miniHit = true;   // konsertlaget: latens forsta 30 s sparrar bara riktiga drops   // direkt (ingen vantan)
-    if (miniHit && CONCERT) { if (nowWall - this.lastMiniWall < MINI_GAP_MS) miniHit = false; else { this.lastMiniWall = nowWall; this.miniSector = mixedSector(miniCount); this.miniLiftUntil = nowWall + (isLogOn() ? 2000 : MINI_LIFT_MS); } }   // MINIDROPS SOM SHOW
+    if (CONCERT) miniHit = false;   // V123 (10-11 kväll): analysatorns minidrops (17/min) är ingen minidrop i konsertläget - bara energilyftet/sektionslyftet ger looken
     // DROPEN AR EN SMALL, INTE EN PLATA. Hallet var 2s och uttoningen 1s, alltsa
     // ~3s full blast per drop — och eftersom dropEnv KRINGGAR VU-taket (se
     // ceilMul nedan) ar det de enda ogonblick riggen gar till max.
@@ -1084,15 +1082,11 @@ export class EffectEngine {
           && !dropActive && sinceStart > START_DROP_MUTE_MS) {
         const g = Math.max(0, Math.min(1, (rise - NEAR_RISE_DB) / Math.max(1, NEAR_FULL_DB - NEAR_RISE_DB)));
         this.nearAt = nowWall; this.nearUntil = nowWall + MINI_BANG_MS; this.nearLevel = NEAR_MIN + (NEAR_MAX - NEAR_MIN) * g; this.nearCount++; this.nearHit = true;
-        if (CONCERT && frame.section !== 'high' && nowWall - this.lastMiniWall >= MINI_GAP_MS) {   // KONSERTLÄGET: nästan-drop UTANFÖR refrängen ger minidrop-looken (i high kom de jämt) (ägaren 15:01: lyft i high syntes inte)
-          this.lastMiniWall = nowWall; this.miniSector = mixedSector(this.nearCount + 3); this.miniBangUntil = nowWall + MINI_BANG_MS;
-          this.miniLiftUntil = nowWall + (isLogOn() ? 2000 : MINI_LIFT_MS);
-        }
         if (CONCERT && this.buildLookAt > 0 && nowWall - this.buildLookAt > BUILD_DROP_MIN_MS && nowWall - this.buildLookAt < 20000 && rise >= BUILD_DROP_RISE_DB
             ) { this.upgradeHit = true; this.buildLookAt = 0; }   // (15 s-spärren borttagen 10-11: inga timrar)   // BUILD SOM LANDAR (en per build)
         console.log(`[dirigent] nastan-drop: sprang ${rise.toFixed(1)} dB efter dipp ${dip.toFixed(1)} dB -> ljus ${(this.nearLevel * 100).toFixed(0)} % av en drop`);
       }
-      if (nowWall < this.nearUntil && this.nearLevel > dTarget) dTarget = this.nearLevel;
+      if (!CONCERT && nowWall < this.nearUntil && this.nearLevel > dTarget) dTarget = this.nearLevel;   // V123: i konsertläget ingen blixt (nästan-dropen träffar ett lyft lika ofta som slumpen) - bara build-landningen ovan
     }
     // SEKTIONSLYFT (ägaren i ladan 10-11 'nu': build -> high, intensitet 0,74 -> 0,88, men varken drop, nästan-drop eller energilyft
     // fyrade - basen spelade redan i builden): analysatorns övergång till 'high' från lugnt/build är också ett energilyft.
@@ -1108,13 +1102,14 @@ export class EffectEngine {
     }
     if (CONCERT && this.nearB !== null) {   // ENERGILYFT (se LIFT_DB)
       const h = this.liftHist; h.push(this.nearB); if (h.length > 240) h.shift();   // ~6 s i 25 ms-rutor
-      if (h.length >= 240 && nowWall - this.liftAt > LIFT_REFRACT_MS && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && kickEnv > 0.3 && !BUILD_LOOKS.includes(this.smartMode)) {   // inte under en build (stegringen hör till builden)
-        let sum = 0, mx = -1e9; for (let q = 0; q < 160; q++) { sum += h[q]; if (h[q] > mx) mx = h[q]; }
-        const calm = sum / 160;
-        if (calm > -80 && this.nearB - calm >= LIFT_DB && this.nearB - mx >= LIFT_DB / 2) {
+      if (h.length >= 240 && nowWall - this.liftAt > LIFT_REFRACT_MS && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && !BUILD_LOOKS.includes(this.smartMode)) {   // inte under en build (stegringen hör till builden)
+        let sum = 0; for (let q = 0; q < 160; q++) sum += h[q];
+        let now6 = 0; for (let q = h.length - 24; q < h.length; q++) now6 += h[q];
+        const calm = sum / 160, lift = now6 / 24 - calm;   // senaste 0,6 s mot 6..2 s sedan
+        if (calm > -80 && lift >= LIFT_DB) {
           this.liftAt = nowWall; this.liftCount++; this.lastMiniWall = nowWall; this.miniSector = mixedSector(this.liftCount + 7);
           this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + (isLogOn() ? 2000 : MINI_LIFT_MS);
-          if (isLogOn()) console.log(`[dirigent] energilyft: kropp ${(this.nearB - calm).toFixed(1)} dB over lugnet (${(this.nearB - mx).toFixed(1)} over toppen)`);
+          if (isLogOn()) console.log(`[dirigent] energilyft: kropp ${lift.toFixed(1)} dB over lugnet`);
         }
       }
     }
@@ -1259,7 +1254,7 @@ export class EffectEngine {
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
         const dropSwitch = DISCRETE_DROP_LAMPS && dropHit && this.cfg.energyDrivesMode && (held > DROP_HOLD || (CONCERT && BUILD_LOOKS.includes(this.smartMode)));   // konsertlaget: dropen avslutar builden direkt
         // (minidrop byter INTE look sedan 2026-10-10, agaren i ladan: 'minidrop maste ju inte orsaka look-byten' - den lyfter bara ljuset)
-        const nearSwitch = this.nearHit && this.cfg.energyDrivesMode && held > MIN_HOLD;   // nastan-drop: samma regel
+        const nearSwitch = !CONCERT && this.nearHit && this.cfg.energyDrivesMode && held > MIN_HOLD;   // V123: inget lookbyte på nästan-drop i konsertläget (var vanligaste bytet, 1,6/min)   // nastan-drop: samma regel
         // MINNETS STRUKTUR: en tvättad låt vet var karaktären skiftar och var
         // fraserna börjar. Ett byte DÄR känns komponerat; samma byte 1,5 takt fel
         // känns slumpmässigt. Sektionsgräns = byt gärna nu; frasgräns = ok att byta.
@@ -1312,15 +1307,7 @@ export class EffectEngine {
         let allaBuild = false;
         if (!inBuild) { this.buildSince = -1; this.buildEntered = false; }
         else { if (this.buildSince < 0) this.buildSince = now; allaBuild = !this.buildEntered && now - this.buildSince >= (CONCERT ? 0.5 : ALLA_BUILD_S) * 1000 && held > (CONCERT ? 2000 : 4000); }
-        // BUILD FÖRE DROPEN (se PRE_DROP_DB): kroppens toppföljare (upp direkt, ner 0,5 dB/s), borta = PRE_DROP_DB under toppen.
-        let preDrop = false;
-        if (CONCERT) {
-          const b = frame.bodyDb ?? -200, dtB = Math.min(0.1, dtNow);
-          this.bodyPk = b > this.bodyPk ? b : this.bodyPk - 0.5 * dtB;
-          if (b < this.bodyPk - PRE_DROP_DB) { if (this.bodyGoneAt === 0) this.bodyGoneAt = now; }
-          else { this.bodyGoneAt = 0; this.preDropUsed = false; }
-          preDrop = !this.preDropUsed && this.bodyGoneAt > 0 && now - this.bodyGoneAt >= PRE_DROP_S * 1000 && held > 2000 && frame.section !== 'high';   // aldrig i refrangen (ladan 14:57: break -> high gav upptakt)
-        }
+        // (preDrop - kroppen borta 1,5 s -> build-looken - borttagen 10-11 kväll, V123: valde build-looker mitt i verserna; build-look 32 % av tiden mot sektion build 12 %)
         // 2) I ett breakdown: gå till den lugna poolen oavsett vad energitiern
         //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
         //    så utan detta fortsätter riggen köra fullfart genom en svacka.
@@ -1356,13 +1343,13 @@ export class EffectEngine {
         // BUILDEN LANDAR I REFRÄNGEN (ägaren i ladan 16:01 'miss': fyllning -> high, nivån +8 dB, men varken drop (20 dB-kravet) eller
         // sektionslyft (minidropens 2 s-spärr) fyrade): har builden pågått >= BUILD_DROP_MIN_MS och sektionen går till high = DROPEN.
         if (buildExit && this.buildLookAt > 0 && nowWall - this.buildLookAt > BUILD_DROP_MIN_MS && !dropHit) { this.upgradeHit = true; this.buildLookAt = 0; if (isLogOn()) console.log('[dirigent] builden landar i refrangen -> drop'); }
-        const buildLock = CONCERT && this.buildLookAt > 0 && BUILD_LOOKS.includes(this.smartMode) && nowWall - this.buildLookAt < 30000 && !dropSwitch && !nearSwitch && !buildExit;   // BUILD SOM HÅLLER
-        if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild || preDrop) && (dropSwitch || nearSwitch || allaBuild || preDrop || concertBuild || buildExit || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk && phraseOk))) {
-        this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true; if (preDrop) this.preDropUsed = true;
+        const buildLock = CONCERT && frame.section === 'build' && this.buildLookAt > 0 && BUILD_LOOKS.includes(this.smartMode) && nowWall - this.buildLookAt < 30000 && !dropSwitch && !nearSwitch && !buildExit;   // BUILD SOM HÅLLER - V123: bara så länge sektionen ÄR build
+        if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild) && (dropSwitch || nearSwitch || allaBuild || concertBuild || buildExit || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk && phraseOk))) {
+        this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
         this.switchWhy = dropSwitch ? 'drop' : nearSwitch ? 'nastan-drop' : charShift ? (this.charShiftWhy.startsWith('tempovaxling') ? 'tempo' : 'karaktar')
           : (memSection || secEntry) ? 'sektion' : unitPhrase ? 'fras' : bassSwitch ? 'basgang'
-          : (buildEntry || allaBuild || preDrop) ? 'build' : halvedChanged ? 'halvering' : tierChanged ? 'tier' : 'dwell';
+          : (buildEntry || allaBuild) ? 'build' : halvedChanged ? 'halvering' : tierChanged ? 'tier' : 'dwell';
         this.switchCount++;
         // (skrapjakten 10-01: enabled/part skapades forr pa varje ruta men anvands bara har, i bytet)
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
@@ -1387,7 +1374,7 @@ export class EffectEngine {
         if (!wantCalm && liveSec === 'high' && tierS === FART) pool = enabled([...FART, ...FULLFART]).filter(req);
         // SEKTIONSPOOL (DMX_SECTION_SWITCH): skar med sektionens looker (registry.SECTION_POOLS). 'build' och 'break' har egna
         // effekter (stegring/andrum) som gar fore tiern; for high/low/intro ar snittet med tier-poolen forsta valet.
-        const secKey = (allaBuild || preDrop) ? 'build' : liveSec;   // ALLA_LOOKER (a): uppbyggnaden valjer ur build-poolen aven nar etiketten sager annat
+        const secKey = allaBuild ? 'build' : liveSec;   // ALLA_LOOKER (a): uppbyggnaden valjer ur build-poolen aven nar etiketten sager annat
         if (secKey) {
           const secList = sectionPool(secKey);
           const own = (secKey === 'build' || secKey === 'break') ? enabled(secList).filter(req) : [];
