@@ -69,7 +69,13 @@ const PRE_DROP_DB = Number(process.env.DMX_PRE_DROP_DB ?? 5), PRE_DROP_S = Numbe
  *  i steg 1 (effektNiva) dämpas effektens ljus MELLAN slagen: nivå x ((1 - CONCERT_BEAT) + CONCERT_BEAT x beatPulse). beatPulse är
  *  rastret när takten är låst, annars de riktiga kickarna. Bara dämpning (slaget = effektens eget ljus), uttoningen orörd; drop-looken
  *  och fastLight-effekter (strobe) undantas. */
-const CONCERT_BEAT = Math.max(0, Math.min(0.8, Number(process.env.DMX_CONCERT_BEAT ?? 0.3)));
+const CONCERT_BEAT = Math.max(0, Math.min(0.8, Number(process.env.DMX_CONCERT_BEAT ?? 0)));
+/** BASSLAGEN (ägaren i ladan 10-11: "jag vill ändå förstärka basslagen mer"): andel av slagpulsen som kommer från det RIKTIGA kickslaget
+ *  (ctx.kickEnv) i stället för taktrastret (beatPulse). 0 = bara rastret (som förr), 1 = bara kicken. */
+const CONCERT_KICK = Math.max(0, Math.min(1, Number(process.env.DMX_CONCERT_KICK ?? 0)));
+/** BASSLAGEN I ENERGILAGRET (ägaren 10-11: "förstärka basslagen mer" + "och lägga det i sista energilagret"): energin dämpar
+ *  MELLAN basslagen och släpper på slaget: k x ((1 - KICK_E) + KICK_E x kickEnv) för lampor som följer energin. Bara dämpning. */
+const KICK_E = Math.max(0, Math.min(0.8, Number(process.env.DMX_KICK_E ?? 0.6)));
 const CONCERT_E_FLOOR = Math.max(0, Math.min(0.9, Number(process.env.DMX_CONCERT_E_FLOOR ?? 0.6)));
 const SECTION_PALETTE = CONCERT;
 /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
@@ -443,7 +449,8 @@ export class EffectEngine {
     // parbanken (tools/pairBench.mjs) matte kontrast (max-min)/max 0,03-0,12. Den morka gruppen i en toggle-effekt ska vara mork.
     if (FX_FLOOR > 0 && !toggle && m > 0.001 && m < 1) { const k = (m + FX_FLOOR * (1 - m) * Math.min(1, m / 0.1)) / m; rgb[0] *= k; rgb[1] *= k; rgb[2] *= k; m *= k; }
     if (CONCERT && CONCERT_BEAT > 0 && !this.fxFast && this.dropColEnv <= 0.005 && m > 0.001) {   // VARJE SLAG (se CONCERT_BEAT)
-      const g = (1 - CONCERT_BEAT) + CONCERT_BEAT * Math.max(0, Math.min(1, ctx.beatPulse)); rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; m *= g;
+      const pulse = CONCERT_KICK > 0 ? Math.max(ctx.beatPulse * (1 - CONCERT_KICK), ctx.kickEnv) : ctx.beatPulse;   // BASSLAGEN (se CONCERT_KICK)
+      const g = (1 - CONCERT_BEAT) + CONCERT_BEAT * Math.max(0, Math.min(1, pulse)); rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; m *= g;
     }
     const liftK = this.dropEnv - this.dropColEnv;   // minidrop/nastan-drop: ljusstyrka mot fullt, kuloren kvar
     if (liftK > 0.005 && m > 0.002 && m < 1) { const g = 1 + (1 / m - 1) * liftK; rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
@@ -1768,7 +1775,7 @@ export class EffectEngine {
         const sel = ctx.group === (Math.floor(ctx.beatIdx / 16) & 1);   // paret byts varje fras
         useE = sel; mdUse = mdSel;
       } else if (lampWantE === undefined && CONCERT && useE && m0 >= 0.85) { let n = 0; for (let q = 0; q < count; q++) if (q !== i && this.fxPrev[q] > 0.5 * m0) n++; if (n <= 1) useE = false; }
-      const k = inputGate * (useE ? mdUse : drive);
+      const k = inputGate * (useE ? mdUse * (KICK_E > 0 && CONCERT ? (1 - KICK_E) + KICK_E * Math.min(1, ctx.kickEnv) : 1) : drive);   // + BASSLAGEN (se KICK_E)
       rgb[0] *= k; rgb[1] *= k; rgb[2] *= k;
       // ENERGIN SLACKER ALDRIG (agaren 2026-10-10: "energi skall aldrig slacka om effekten vill ha pa en lampa"): vill effekten ha
       // lampan tand (m0 > 0) och ingangen ar pa (k > 0) halls den pa lagst 1 % (gammans forsta steg -> utgangens tandpunkt+1).
