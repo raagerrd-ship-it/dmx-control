@@ -1350,6 +1350,9 @@ export class EffectEngine {
         const secEntry = this.pendingSecSwitch && secOldEnough && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
         const concertBuild = CONCERT && buildEntry && held > 2000;   // konsertläget: in i build direkt
         const buildExit = CONCERT && BUILD_LOOKS.includes(this.smartMode) && frame.section === 'high';   // refrängen kom utan drop -> lämna builden direkt
+        // BUILDEN LANDAR I REFRÄNGEN (ägaren i ladan 16:01 'miss': fyllning -> high, nivån +8 dB, men varken drop (20 dB-kravet) eller
+        // sektionslyft (minidropens 2 s-spärr) fyrade): har builden pågått >= BUILD_DROP_MIN_MS och sektionen går till high = DROPEN.
+        if (buildExit && this.buildLookAt > 0 && nowWall - this.buildLookAt > BUILD_DROP_MIN_MS && !dropHit) { this.upgradeHit = true; this.buildLookAt = 0; if (isLogOn()) console.log('[dirigent] builden landar i refrangen -> drop'); }
         const buildLock = CONCERT && this.buildLookAt > 0 && BUILD_LOOKS.includes(this.smartMode) && nowWall - this.buildLookAt < 30000 && !dropSwitch && !nearSwitch && !buildExit;   // BUILD SOM HÅLLER
         if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild || preDrop) && (dropSwitch || nearSwitch || allaBuild || preDrop || concertBuild || buildExit || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk && phraseOk))) {
         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true; if (preDrop) this.preDropUsed = true;
