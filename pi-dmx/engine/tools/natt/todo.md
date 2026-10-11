@@ -1,5 +1,18 @@
 # Natt-agentens uppdrag
 
+## FACIT FRÅN ÄGAREN: MINIDROP-/DROP-MARKERINGAR (10-11 kväll, går först när det finns markeringar)
+Knapparna "Minidrop!"/"Drop!" i /setup (0dc7885): ägaren trycker när hen HÖR en minidrop/drop. Tiderna finns i långinspelningarnas
+.events.json ("marks": [{wallMs, kind}]) och i snippets/marks.jsonl. Inspelningarna hämtas till tools/ladan-2026-10-11/ (och senare datum).
+GÖR: per markering, vad gjorde detektorerna +-2 s (analysatorns drop/minidrop, DMX-sidans nästan-drop, energilyft, sektionslyft,
+'builden landar', minidrop-looken miniColEnv) - träff/för sen/miss, och vilka fyrningar som saknar markering (falska). Ställ in
+trösklarna (LIFT_DB, PRE_DROP_*, NEAR_*, BUILD_DROP_*, MINI_GAP_MS, analysatorprofilens drop-krav) mot markeringarna med bänken
+(tools/window.mjs-mönstret i scratch: replay av wav med 100 ms-utskrift). Ägarens definition: minidrop = "från lugnt till ett tydligt
+energilyft (även om det är lägre) med basslag"; riktiga drops: inga timrar, snävt mål. Allt nytt opt-in, redo för ladan.
+Live 10-11 kväll (efter 1cff9df..0dc7885): drops utan timrar (BODY_GONE 1000, RISE 20, QUALITY 3), sektionslyft, energilyft, build
+landar i refrängen = drop, energilyft avslutar build, minidrop-look 350 ms + lyft 1 s, basslagen i energilagret KICK_E 0,8,
+konsertgolv 0,4, dropen bär in i refrängen (4 s), eko förstaval vid basgång, enhetliga effekter med energi på utvalda lampor,
+tide/aurora/andrum bara < 90 BPM, fem nya effekter (fyllning, pingpong, virvel, fyr, rullandning).
+
 ## STORA PROJEKTET: SITUATIONSRUTNÄTET, ÖVER 100 EFFEKTER (ägaren i ladan 2026-10-11, går före gallring/rattar)
 Ägaren: "den skall ju kunna välja - lugn låt och intro och få några val. Fartfylld låt, refräng, tydlig basgång, och få några val
 osv. så kanske över 100 effekter". Dirigenten känner igen LÄGET och har 4-6 effekter byggda för just det läget.
