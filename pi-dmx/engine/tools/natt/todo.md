@@ -6,6 +6,12 @@ kulör per fras, full öppnar 0,6, aldrig enhetliga effekter (UNIFORM), BUILD f�
 effekten leder (energins golv 0,6), varje slag (dämpning mellan slagen 0,3 i steg 1), energi per lampa (EffectWants.energy, SPOT-regeln).
 STÄMNINGARNA chill/fest/galet BORTTAGNA: vredet/slidern = bara ljustak (master 0,2..1). Bänken = live nu (natt.py kör samma kod).
 Mått (enda-laget): lampspr 99/74, kickTraff 0,47/0,39, build före drop 0,50/0,47. Ny baslinje: natt/2026-10-11-enda-laget.json.
+UPPBYGGNAD + MINIDROPS LIVE 12:5x (3eeab5a): effekten upptakt (en lampa pendlar, farten dubblas var 4:e takt) tar builden, enhetliga
+build-effekter ur poolen; minidrop = högst en per 2 s och alla fyra lamporna samma kulör fullt en kort stund. Ägaren hade sett att
+"uppbyggnad och mindre drops" var svagast - mät dem på långinspelningen nedan och föreslå förbättringar.
+FÖRSTA LÅNGINSPELNINGEN: tools/ladan-2026-10-11/lang-20261011T103310.wav (10 min, 48 kHz, ladans nivå, ägaren spelade låtar med builds
+och drops; .events.json har drop/minidrop/sektion/look per 100 ms MED DEN GAMLA build-logiken före 3eeab5a). Inte i git (gitignore
+ladan-*). Kör showTight/concertBench/dropFacit på den: breaklängd före riktiga drops (4 s-kravet), build före drop, minidrops.
 ÖPPET FRÅN ÄGAREN: "mindre drops [minidrops] ska vi kanske justera så att alla lampor då lyser lika iaf eller något, vet ej exakt än" -
 förbered förslag med mått (t.ex. minidrop = alla fyra lamporna lyfts lika en kort stund, i steg 1), bygg som opt-in, ägaren avgör.
 GALLRING att föreslå: UNIFORM-effekterna (breathe, snap, mono, pulse, party, airglow, hjarta, tyngdlyft, strobe) väljs aldrig längre i
