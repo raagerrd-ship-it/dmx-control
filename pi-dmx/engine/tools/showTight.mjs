@@ -266,6 +266,7 @@ const medOr = (a) => a.length ? med(a) : NaN;
 const switches = [...whyCount.values()].reduce((a, b) => a + b, 0);
 const musical = switches - (whyCount.get('dwell') ?? 0);
 const DARK = 0.02;
+const I15 = Math.max(0, T.findIndex((t) => t >= startS + 15));
 const res = {
   wav: path, startS, gainDb: +(20 * Math.log10(GAIN)).toFixed(1), totS: Math.round(totS), rutor: T.length,
   tajt: {
@@ -274,6 +275,9 @@ const res = {
     energiR: pear(envel(LIT, 1), envel(INT, 1)), nivaR: pear(envel(LIT, 1), envel(LVL, 1)),
     energiRtopp: pear(envelMax(LIT, 1), envel(INT, 1)),   // 1 s TOPP mot energi - straffar inte flimmer
     energiRruta: pear(LIT, INT),       // ruta-mot-ruta (pulsen mot enveloppen) - referens, inte malet
+    // UTAN UPPVARMNING (natt 10-11, matfalla 44): de forsta 15 s stiger frame.intensity i VARJE klipp (+0,26 median, analysatorns
+    // uppvarmning) medan forsta looken ofta ar ljusare - pa 40 s-klipp gav det korpusens energiR -0,39 fast ljuset foljer nivan (r +0,46 fran 15 s).
+    energiR15: pear(envel(LIT.slice(I15), 1), envel(INT.slice(I15), 1)), nivaR15: pear(envel(LIT.slice(I15), 1), envel(LVL.slice(I15), 1)),
     bpmMed, kickFonsterMs: W * STEP_MS,
     litLugn: medOr(tierLit[0]), litFart: medOr(tierLit[1]), litFull: medOr(tierLit[2]),
     toppLugn: medOr(tierTop[0]), toppFart: medOr(tierTop[1]), toppFull: medOr(tierTop[2]),
@@ -299,7 +303,7 @@ const res = {
 };
 
 const traceOut = opt("--trace", null);
-if (traceOut) writeFileSync(traceOut, JSON.stringify({ T, LIT, LSPR, LOOK, BPM, KICK, EV, WHY, STEP_MS }));
+if (traceOut) writeFileSync(traceOut, JSON.stringify({ T, LIT, INT, LVL, TE, LSPR, LOOK, BPM, KICK, EV, WHY, STEP_MS }));
 const jsonOut = opt("--json", null);
 if (jsonOut) writeFileSync(jsonOut, JSON.stringify(res, null, 1));
 if (QUIET) { say(JSON.stringify(res)); process.exit(0); }

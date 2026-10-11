@@ -33,7 +33,7 @@ sys.path.insert(0, HERE)
 from ladan import SHOW_ENV   # ladans sanning: det som faktiskt kor i riggen (utover kodens standard)
 
 MIXAR = [('pop', 'tools/pop_ladan.wav'), ('megamix', 'tools/megamix_ladan.wav')]
-METRIC_TAJT = ['kickLagMs', 'kickTraff', 'kickHojd', 'energiR', 'energiRtopp', 'nivaR', 'litLugn', 'litFart', 'litFull']
+METRIC_TAJT = ['kickLagMs', 'kickTraff', 'kickHojd', 'energiR', 'energiRtopp', 'nivaR', 'energiR15', 'nivaR15', 'litLugn', 'litFart', 'litFull']
 METRIC_SNYGG = ['alla3', 'en', 'matt', 'lampspr', 'morkt', 'litP50', 'litP90']
 
 
@@ -104,7 +104,7 @@ def main():
         korpus['samst'] = {'energiR lagst': worst('energiR', 'tajt'), 'kickTraff lagst': worst('kickTraff', 'tajt'),
                            'alla3 hogst': worst('alla3', 'snygg', True), 'morkt hogst': worst('morkt', 'snygg', True)}
         out['korpus'] = korpus
-        print(f'  korpus   {len(ok)} klipp ({len(res) - len(ok)} fel)  kick->ljus {f(korpus["median"]["kickLagMs"], 0)} ms  traff {f(korpus["median"]["kickTraff"])}  r {f(korpus["median"]["energiR"])}  alla3 {f(korpus["median"]["alla3"])}')
+        print(f'  korpus   {len(ok)} klipp ({len(res) - len(ok)} fel)  kick->ljus {f(korpus["median"]["kickLagMs"], 0)} ms  traff {f(korpus["median"]["kickTraff"])}  r {f(korpus["median"]["energiR"])} (fran 15 s {f(korpus["median"].get("energiR15"))}, niva {f(korpus["median"].get("nivaR15"))})  alla3 {f(korpus["median"]["alla3"])}')
 
     # 2b. LADANS INSPELNINGAR 10-08 (Aux -18 dB, 0 % klippt, 13 dB spann): DYNAMIK + FLADDER + R/G/B med ladans tandpunkt
     #     (tools/dynSet.py -> dynBench.mjs). De gamla mixarna ar klippta (5 dB spann) och sager inget om dynamik.
