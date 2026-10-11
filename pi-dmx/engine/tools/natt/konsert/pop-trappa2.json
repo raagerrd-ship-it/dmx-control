@@ -1,0 +1,17 @@
+{
+ "wav": "tools/pop_ladan.wav",
+ "min": 9.4,
+ "kulorbytenPerMin": 16.5,
+ "kulorerPerSektion": 4,
+ "paletterPerSektion": 2,
+ "sektioner": 31,
+ "palettbytenPerMin": 4.16,
+ "palettPaGrans": 0.08,
+ "lookbytenPerMin": 6.4,
+ "bytePaFras": 0.22,
+ "allaTanda": 0.53,
+ "lampAntalR": 0.31,
+ "versRefrang": 0.26,
+ "aterseende": 0.23,
+ "aterkommande": 13
+}

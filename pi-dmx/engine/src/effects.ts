@@ -34,7 +34,9 @@ const SECTION_PALETTE = process.env.DMX_SECTION_PALETTE === '1';
 const PHRASE_SWITCH = process.env.DMX_PHRASE_SWITCH === '1';
 /** LAMPTRAPPA (opt-in DMX_LAMP_STAIR=1, natt 2026-10-10, KONSERTSHOW idé 3): en ljusdesigner sparar hela riggen till refrängen - här
  *  var alla fyra lamporna tända 81-88 % av tiden. Dirigenten (inte energin: den släcker aldrig en tänd lampa) väljer i vers/intro bara
- *  SPARSAMMA looks och i refrängen inga sparsamma. Listan är MÄTT (tools/lampCount.mjs, pop+megamix): snitt <= ~2,9 tända lampor av 4. */
+ *  SPARSAMMA looks och i refrängen inga sparsamma. Listan är MÄTT (tools/lampCount.mjs, pop+megamix): snitt <= ~2,9 tända lampor av 4.
+ *  10-11 ("fler sparsamma effekter, så att lamptrappan inte kostar variation"): vers/intro väljer ur HELA poolen igen, men en effekt som
+ *  inte är sparsam tänder bara ETT lamppar (ctx.group, paret byts varje fras) - i steg 1 (effektNiva), aldrig i energin. Drops tänder allt. */
 const LAMP_STAIR = process.env.DMX_LAMP_STAIR === '1';
 /** KULÖR PER FRAS (opt-in DMX_HUE_PHRASE=1, 10-11, KONSERTSHOW): effekternas kulörklocka ctx.hueIdx stegar bara vid frasgräns (16 slag på
  *  effektklockan) i stället för per takt/slag - konsertbänken mätte 17-21 kulörbyten/min. Rörelse och puls följer fortfarande beatIdx. */
@@ -375,8 +377,10 @@ export class EffectEngine {
    *  effekter: (a) DROP-LOOKEN - kolsvart i den dramaturgiska tystnaden fore smallen (blackout), och vid full drop blandas drops-effektens
    *  dropfarg per lampa + vit karna i toppen in med dropColEnv; (b) topp-normering - effektens topp over lamporna (foljd E_NORM_S) blir
    *  100 %; (c) grundniva FX_FLOOR for tanda lampor (slackt forblir slackt); (d) minidrop/nastan-drop lyfter mot fullt med kuloren kvar. */
-  private effektNiva(rgb: [number, number, number], ctx: EffectContext, blackout: boolean, toggle = false): [number, number, number] {
+  private effektNiva(rgb: [number, number, number], ctx: EffectContext, blackout: boolean, toggle = false, sparse = false): [number, number, number] {
     if (blackout) { rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; return rgb; }
+    // LAMPTRAPPA (DMX_LAMP_STAIR, vers/intro): icke-sparsam effekt -> bara ett lamppar, paret byts varje fras; drop-looken tänder allt.
+    if (sparse && this.dropColEnv <= 0.005 && ctx.group !== ((Math.floor(ctx.beatIdx / 16) & 1))) { rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; return rgb; }
     let m = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
     if (m > this.fxPeakNow) this.fxPeakNow = m;
     if (E_NORM_S > 0) { const n = this.fxNorm; rgb[0] = Math.min(1, rgb[0] * n); rgb[1] = Math.min(1, rgb[1] * n); rgb[2] = Math.min(1, rgb[2] * n); m = Math.min(1, m * n); }
@@ -1268,11 +1272,7 @@ export class EffectEngine {
         // HALVERAT: de delade lookerna (och hjärtat) ska finnas i poolen oavsett tier.
         // (innerouter borttagen 2026-09-23: rPerm 1,00 mot varannan - samma effekt upp till lampordning.)
         if (this.pulseHalved) for (const m of ["varannan", "basgang", "hjarta"] as Mode[]) if (!pool.includes(m) && this.cfg.rotation?.[m] !== false && req(m)) pool.push(m);
-        if (LAMP_STAIR && !allaBuild && (liveSec === 'low' || liveSec === 'intro')) {   // LAMPTRAPPA: vers/intro -> sparsamt
-          const cut = pool.filter((m) => SPARSAM.includes(m));
-          const any = enabled(SPARSAM).filter(req);
-          if (cut.length) pool = cut; else if (any.length) pool = any;
-        } else if (LAMP_STAIR && liveSec === 'high') {                                   // LAMPTRAPPA: refrängen -> hela riggen
+        if (LAMP_STAIR && liveSec === 'high') {                                   // LAMPTRAPPA: refrängen -> hela riggen
           const full = pool.filter((m) => !SPARSAM.includes(m)); if (full.length) pool = full;
         }
         this.smartCount++;
@@ -1591,6 +1591,7 @@ export class EffectEngine {
     const fadeK = Math.exp(-dtSec / (FADE_MIN_S / E_LIN_INV));
     const renderNow = performance.now();
     const fxToggle = !!EFFECT_MAP.get(effMode)?.toggle;   // toggle-effekt: ingen grundniva (se effektNiva)
+    const fxSparse = LAMP_STAIR && (frame.section === 'low' || frame.section === 'intro') && !SPARSAM.includes(effMode) && count >= 4;   // LAMPTRAPPA (se SPARSAM)
     const fastLight = !!EFFECT_MAP.get(effMode)?.fastLight;   // effekten skippar minsta pa-tid (EffectDef.fastLight)   // STEG 2: uttoningens tidskonstant i DMX-ljus (FADE_MIN_S x gamma fore gamman)
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
@@ -1608,7 +1609,7 @@ export class EffectEngine {
         if (fx?.bands?.length) { let mb = -Infinity; for (let k = 0; k < fx.bands.length; k++) mb = Math.max(mb, bands[BAND_IDX[fx.bands[k]]]); ctx.band = mb; }   // = Math.max(...fx.bands.map(...)) utan spread/closure
         else ctx.band = bands[i % bands.length];
         rgb = effect ? effect.render(ctx) : [0, 0, 0];
-        rgb = this.effektNiva(rgb, ctx, blackout, fxToggle);   // STEG 1 forts.: effektens niva och drop-looken (se effektNiva)
+        rgb = this.effektNiva(rgb, ctx, blackout, fxToggle, fxSparse);   // STEG 1 forts.: effektens niva och drop-looken (se effektNiva)
         // EFFEKTENS ÖNSKEMÅL. Den vet sin egen dramaturgi bäst; motorn avgör om det
         // blir av (fixturen måste ha rollen, och rök går genom hårdvaruskyddet).
         // Högsta önskemål bland lamporna vinner — en effekt som vill stroba på EN
