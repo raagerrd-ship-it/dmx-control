@@ -49,7 +49,7 @@ const CALM_BPM = Number(process.env.DMX_CALM_BPM ?? 90);
 /** LYFT + SPRÅNG = DROP (ladan 10-11 21:4x, ersätter 'builden landar': sektionslandningen gav 'falsk' 21:42:39 och låg bara 17 % på
  *  ett baslyft i bänken): energilyftet och en nästan-drop med språng >= DROP_JUMP_DB inom DROP_PAIR_MS av varandra = en riktig drop.
  *  Bänken 115 min: 0,27/min (~en per låt), 91 % på ihållande baslyft; fångar ägarens missar 21:28:36 och 21:42:09. */
-const DROP_JUMP_DB = Number(process.env.DMX_DROP_JUMP_DB ?? 14), DROP_PAIR_MS = 600;   // 17 -> 14 (ladan 22:12:09: lyft + 14,6 dB-språng blev bara minidrop, ägaren 'då borde någon typ av drop kört'; bänken 0,33/min, 88 % på baslyft)
+const DROP_JUMP_DB = Number(process.env.DMX_DROP_JUMP_DB ?? 17), DROP_PAIR_MS = 600;   // 14 provat 22:13 och backat: ägaren 'jag vill inte ha fler riktiga drops' - minidropen ska synas i stället
 /** MINIDROPEN LYFTER OCH HÅLLER (ägaren i ladan 10-11: "låten ökar energi, kör minidrop men ljuset visar inget"): bänken visade att
  *  blinken kom (0,40 -> 0,95) men bara i 150 ms - sedan föll ljuset tillbaka. Nu släpper energin helt i MINI_LIFT_MS efter minidropen
  *  (effekten lyser med full egen styrka) och glider tillbaka på MINI_LIFT_FALL_MS. Bara mindre dämpning. */
@@ -200,7 +200,7 @@ const EFFECT_HEART = Math.max(0, Math.min(2, Number(process.env.DMX_EFFECT_HEART
  *  frame.miniDropCount (monoton) ger look-byte (om looken hallits MIN_HOLD) + en kort stot pa MINI_DROP_ENV av
  *  en full drop-small (dropEnv), ingen rok, ingen blackout. */
 const MINI_DROP_ENV = Number(process.env.MINI_DROP_ENV ?? 0.9);   // 0,35 -> 0,9 STANDARD 2026-10-08 (agaren i ladan; lyfter bara ljusstyrkan, se dropColEnv)
-const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);   // 150 -> 350 (ladan 10-11 16:0x: minidropen 'kandes inte'; minidrops har nu 2 s-sparr i konsertlaget)   // 350 -> 150 STANDARD 2026-10-08 (minidrops utan sparr holl annars ljuset pa 0,9)
+const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 600);   // 350 -> 600 (ladan 10-11 22:14: 'jag såg inte att det ens blev minidrop' - energin stod redan på max, bara looken syns)   // 150 -> 350 (ladan 10-11 16:0x: minidropen 'kandes inte'; minidrops har nu 2 s-sparr i konsertlaget)   // 350 -> 150 STANDARD 2026-10-08 (minidrops utan sparr holl annars ljuset pa 0,9)
 /** NASTAN-DROP (agaren 2026-10-07: "analysen av NASTAN-drops, sa de aterspeglas pa nagot bra satt i ljuset"), opt-in
  *  STANDARD sedan 2026-10-07 (DMX_NEAR_DROP=0 stanger av). Allt som bygger mot en small utan att bli en full drop (partiella drops som kvalitetsgrinden nekar
  *  tyst, minidrops, en build som landar halvt) har samma ljudavtryck: baskroppen (frame.bodyDb, ra dB) DYKER under
