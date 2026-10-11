@@ -31,7 +31,12 @@ const NAMED_PALETTES: Record<string, number[]> = {
  *  kulör per fras, full öppnar 0,6) + dirigenten väljer ALDRIG en enhetlig effekt (UNIFORM: alla fyra lamporna lika, mätt med
  *  tools/effectDyn.mjs - spridning < 0,1 i båda mixarna). Build-effekterna (stegring, sug, forvarning) är enhetliga med avsikt och får vara kvar. */
 const CONCERT = true;   // ENDA LÄGET sedan 2026-10-11 (ägaren i ladan: "mycket bättre, gör det till enda läget"); env-brytaren DMX_CONCERT borttagen
-const UNIFORM: Mode[] = ['breathe', 'snap', 'mono', 'pulse', 'party', 'airglow', 'hjarta', 'tyngdlyft', 'strobe'];
+const UNIFORM: Mode[] = ['breathe', 'snap', 'mono', 'pulse', 'party', 'airglow', 'hjarta', 'tyngdlyft', 'strobe',
+  'stegring', 'sug', 'forvarning'];   // 10-11: aven de enhetliga build-effekterna (agaren: 'uppbyggnad ... dar ar vi inte bra') - upptakt tar builden
+/** MINIDROPS SOM SHOW (agaren 10-11: 'mindre drops ... sa att alla lampor da lyser lika'): hogst en per MINI_GAP_MS (bänken: 11-58/min
+ *  = brus), och minidropen gör ALLA fyra lamporna lika i en kulör ur paletten en kort stund (miniColEnv, steg 1, som drop-looken men
+ *  utan vit kärna). */
+const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math.max(0, Math.min(1, Number(process.env.DMX_MINI_UNI ?? 0.9)));
 /** BUILD FÖRE DROPEN (konsertläget, ägaren 10-11: "dirigenten skall bli snabbare att byta till BUILD innan drops"): analysatorns buildUp
  *  är ~0 på ladans material (0 av 15 drops i megamix hade en build-look före). Dropdetektorn kräver att baskroppen varit BORTA en stund;
  *  samma tillstånd följs här ur frame.bodyDb (toppföljare, borta = PRE_DROP_DB under toppen i PRE_DROP_S) -> ETT direkt byte till
@@ -410,7 +415,7 @@ export class EffectEngine {
   private effektNiva(rgb: [number, number, number], ctx: EffectContext, blackout: boolean, toggle = false, sparse = false): [number, number, number] {
     if (blackout) { rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; return rgb; }
     // LAMPTRAPPA (DMX_LAMP_STAIR, vers/intro): icke-sparsam effekt -> bara ett lamppar, paret byts varje fras; drop-looken tänder allt.
-    if (sparse && this.dropColEnv <= 0.005 && ctx.group !== ((Math.floor(ctx.beatIdx / 16) & 1))) { rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; return rgb; }
+    if (sparse && this.dropColEnv <= 0.005 && this.miniColEnv <= 0.005 && ctx.group !== ((Math.floor(ctx.beatIdx / 16) & 1))) { rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; return rgb; }
     let m = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
     if (m > this.fxPeakNow) this.fxPeakNow = m;
     if (E_NORM_S > 0) { const n = this.fxNorm; rgb[0] = Math.min(1, rgb[0] * n); rgb[1] = Math.min(1, rgb[1] * n); rgb[2] = Math.min(1, rgb[2] * n); m = Math.min(1, m * n); }
@@ -422,6 +427,10 @@ export class EffectEngine {
     }
     const liftK = this.dropEnv - this.dropColEnv;   // minidrop/nastan-drop: ljusstyrka mot fullt, kuloren kvar
     if (liftK > 0.005 && m > 0.002 && m < 1) { const g = 1 + (1 / m - 1) * liftK; rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
+    if (this.miniColEnv > 0.005 && this.dropColEnv <= 0.005) {   // MINIDROPS SOM SHOW: alla lampor samma kulör, fullt
+      const d = hsvToRgb(this.miniSector / 6, 1, 1), k = this.miniColEnv * MINI_UNI;
+      for (let c = 0; c < 3; c++) rgb[c] += (d[c] - rgb[c]) * k;
+    }
     if (this.dropColEnv > 0.005) {   // full drop: dropfarg per lampa + vit karna i toppen (agaren 10-08), blandas in med dropColEnv
       const d = hsvToRgb(mixedSector(this.dropSector + ctx.idx) / 6, 1, 1), vit = Math.max(0, (this.dropColEnv - 0.6) / 0.4), k = this.dropColEnv;
       for (let c = 0; c < 3; c++) rgb[c] += ((d[c] + (1 - d[c]) * vit) - rgb[c]) * k;
@@ -442,7 +451,7 @@ export class EffectEngine {
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
   private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
-  private lastMiniCount = 0; private miniBangUntil = 0;   // minidrop-flank + kort stot
+  private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0;   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
@@ -987,6 +996,7 @@ export class EffectEngine {
     // Minidrop direkt; en riktig drop samma ruta gar fore (och tar annars over via dropEnv/dropColEnv).
     let miniHit = false;
     if (miniHitRaw && !dropHitRaw && !(DROP_SONG_HOLD_S > 0 && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000)) miniHit = true;   // direkt (ingen vantan)
+    if (miniHit && CONCERT) { if (nowWall - this.lastMiniWall < MINI_GAP_MS) miniHit = false; else { this.lastMiniWall = nowWall; this.miniSector = mixedSector(miniCount); } }   // MINIDROPS SOM SHOW
     // DROPEN AR EN SMALL, INTE EN PLATA. Hallet var 2s och uttoningen 1s, alltsa
     // ~3s full blast per drop — och eftersom dropEnv KRINGGAR VU-taket (se
     // ceilMul nedan) ar det de enda ogonblick riggen gar till max.
@@ -1047,6 +1057,7 @@ export class EffectEngine {
     const dRate = dTarget > this.dropEnv ? dtNow / 0.03 : dtNow / 1.0;
     this.dropEnv += Math.max(-dRate, Math.min(dRate, dTarget - this.dropEnv));
     { const cT = dropActive ? 1 : 0, cR = cT > this.dropColEnv ? dtNow / 0.03 : dtNow / 1.0; this.dropColEnv += Math.max(-cR, Math.min(cR, cT - this.dropColEnv)); }
+    { const mT = CONCERT && nowWall < this.miniBangUntil ? 1 : 0, mR = mT > this.miniColEnv ? dtNow / 0.03 : dtNow / 0.3; this.miniColEnv += Math.max(-mR, Math.min(mR, mT - this.miniColEnv)); }   // MINIDROPS SOM SHOW
 
     // UPPBYGGNAD: analysatorn räknar riser/novelty och ger oss frame.buildUp (0..1).
     // Reaktionerna (riser-strobe, md-swell, phaseSpread, show-tid) ligger kvar här.
