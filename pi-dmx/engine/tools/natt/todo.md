@@ -74,6 +74,7 @@ kalibrering), effekterna äger färg/styrka/lampa, dirigenten väljer look.
 3. Resten av idéerna som en rangordnad lista (nytta för ögat / insats) i rapporten - ägaren väljer nästa.
 
 ## Från 2026-10-10 — FÄRRE REGLAGE (går före allt annat)
+KLART 2026-10-11 natt (16e43da): av-brytarna MIX_V2/SECTION_SWITCH/SECTION_UNIT/HALVE_SHOW/BOUNDARY_SOFT + döda DMX_EXPECT_LEAD_MS bort, effects.ts env-läsningar 52 -> 47, json-identisk (mixar + 222 klipp + ladans 20). Kvar som eget spår: inventeringstabellen med mätt effekt per numerisk ratt + dubbletterna.
 DELVIS KLART 2026-10-10 kväll (sessionen, allt json-identiskt mot natt/2026-10-10-baslinje-beatfeed.json): 7 döda config-/UI-flaggor
 (4177e02: beatPulse, calmDecay, energyCeiling, clubMode, ambientGlow, strobeUnlimited, regiPro), oanvända konstanter (4ed3851),
 5 env-brytare (2f0c662), SECTION_REUSE (66d5f5c), ENERGY_FALLBACK. KVAR: av-brytarna för
