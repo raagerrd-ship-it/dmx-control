@@ -9,7 +9,7 @@
 import { isLogOn } from "./quiet.js";
 import type { ChannelRole, EngineConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
-import { FixtureOutput, type SpecialtyValues } from "./output.js";
+import { FixtureOutput, GAMMA, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
@@ -41,6 +41,16 @@ const LAMP_STAIR = process.env.DMX_LAMP_STAIR === '1';
 /** KULÖR PER FRAS (opt-in DMX_HUE_PHRASE=1, 10-11, KONSERTSHOW): effekternas kulörklocka ctx.hueIdx stegar bara vid frasgräns (16 slag på
  *  effektklockan) i stället för per takt/slag - konsertbänken mätte 17-21 kulörbyten/min. Rörelse och puls följer fortfarande beatIdx. */
 const HUE_PHRASE = process.env.DMX_HUE_PHRASE === '1';
+/** FULL OPPNAR RIGGEN (opt-in DMX_TIER_OPEN 0..1, 10-11, nattagentens brist 'fart -> full stiger inte': korpus 0,26 -> 0,23,
+ *  megamix 0,63 -> 0,61). Energin ar ett FOLJANDE 10 s-fonster: i en lang stark refrang glider botten upp och full ger samma
+ *  energi som fart. Har hojs energins GOLV med hur langt in i full tiern (tierEma) ligger: golv + (1 - golv) * TIER_OPEN * andel.
+ *  Bara mindre dampning (aldrig over effektens eget ljus), i steg 2. 0 = av. */
+const TIER_OPEN = Math.max(0, Math.min(1, Number(process.env.DMX_TIER_OPEN ?? 0)));
+/** STROBE VID DROPEN (opt-in DMX_DROP_STROBE = DMX-varde 1..255 pa lampornas EGEN strobe-kanal, 10-11, KONSERTSHOW 'strobe vid ratt
+ *  ogonblick'): en konsert anvander stroben som ett ogonblick, inte en look. RGB kan inte strobea (uttoningen smetar blixten, och
+ *  snabbare uttoning ar forbjudet) - lampans strobe-kanal gar forbi uttoningen. Satts bara under drop-smallen (dropBangUntil, 1,3 s).
+ *  Vardet -> blixttakt beror pa lampmodellen: KALIBRERA I LADAN med ett lagt varde, hogst 3 blixtar/s (fotosensitiv epilepsi). 0 = av. */
+const DROP_STROBE = Math.max(0, Math.min(255, Math.round(Number(process.env.DMX_DROP_STROBE ?? 0))));
 const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
 const PALETTE_LOCK: number[] | null = (() => {
   const v = (process.env.DMX_PALETTE ?? "").trim(); if (!v) return null;
@@ -73,11 +83,11 @@ export interface FogStatus {
 // över ~70 ms tappar den anslaget.
 /** Under den här nivån räknas ingången som avstängd, inte som ett tyst parti. */
 const INPUT_OFF_LEVEL = 0.02;
-const SILENCE_LEVEL = Number(process.env.DMX_SILENCE_LEVEL ?? 0.05), SILENCE_LEVEL_ENV = process.env.DMX_SILENCE_LEVEL !== undefined;
+const SILENCE_LEVEL = 0.05;   // standard om cfg saknar silenceLevel (env-ratten DMX_SILENCE_LEVEL borttagen 10-11: den gjorde /setup-reglaget verkningslost)
 /** ...men först när den legat där så länge — ett break i låten ska inte släcka showen. */
 const INPUT_OFF_MS = 2000;
 /** HARD INGANGSGRANS (agaren i ladan 2026-10-07: "lagsta input till analysatorn ... dar gor vi hard grans som vi kan justera. Inga
- *  starttider mm"; STANDARD 2026-10-08): analysatorns niva (frame.level) under Slackgransen (/setup, eller DMX_SILENCE_LEVEL) = svart,
+ *  starttider mm"; STANDARD 2026-10-08): analysatorns niva (frame.level) under Slackgransen (/setup) = svart,
  *  over = tant - direkt. Ingen hålltid, ingen ton in/ut, ingen gain-skalning, och gransens flank startar ingen 'ny lat'
  *  (gamla grinden med SILENCE_MS/SILENCE_RELEASE_S borttagen). Analysatorn hor fortfarande allt. */
 
@@ -276,7 +286,7 @@ const FX_FLOOR = Math.max(0, Math.min(0.8, Number(process.env.DMX_FX_FLOOR ?? 0.
  *  enskild ljudtopp direkt, sa ett vanligt starkt parti lag pa e ~0,9 - med kurva 7 bara ~50 % ljus. e / E_TOP (klampat till 1): starka
  *  partier nar full energi (= effektens 95 %), och kurvan dampar allt under. 1 = som forr. */
 const E_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_E_TOP ?? 0.95)));   // 1 -> 0,95 (ladan 10-09, standard 10-10)
-const E_LIN_INV = 1 / Math.max(1, Math.min(3, Number(process.env.DMX_GAMMA ?? 1.6)));   // samma standard som output.ts GAMMA
+const E_LIN_INV = 1 / GAMMA;   // utgangens gamma (output.ts ager DMX_GAMMA - en kalla, 10-11; forr last pa tva stallen med var sin standard)
 /** Minsta tanda niva fore gamman: gammans forsta DMX-steg (1/255 -> tandpunkt+1 i utgangen) = agarens 1 %. */
 const E_MIN_LIT = Math.pow(1 / 255, E_LIN_INV) * 1.02;   // agarens 1 %: gammans forsta DMX-steg (-> tandpunkt+1), se ENERGIN SLACKER ALDRIG
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
@@ -1393,8 +1403,8 @@ export class EffectEngine {
     else if (!this.inputLowSince) this.inputLowSince = now;
     this.inputOff = !!this.inputLowSince && now - this.inputLowSince > INPUT_OFF_MS;
 
-    // TYSTNADSGRIND = HARD INGANGSGRANS (se konstanten ovan). Slackgransen ar ratten i /setup (cfg.silenceLevel); env vinner om satt.
-    const silenceLevel = SILENCE_LEVEL_ENV ? SILENCE_LEVEL : (this.cfg.silenceLevel ?? SILENCE_LEVEL);
+    // TYSTNADSGRIND = HARD INGANGSGRANS (se konstanten ovan). Slackgransen ar ratten i /setup (cfg.silenceLevel) - enda kallan.
+    const silenceLevel = this.cfg.silenceLevel ?? SILENCE_LEVEL;
     // SLACKTID (cfg.silenceHoldS, /setup): slack forst nar nivan legat under gransen sa lange; tand direkt. 0 = direkt (som forr).
     if (frame.level > silenceLevel) { this.silenceGate = 1; this.belowSince = 0; }
     else {
@@ -1461,7 +1471,8 @@ export class EffectEngine {
       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
       this.eSimple = this.eSm;
       const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);
-      const eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
+      let eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
+      if (TIER_OPEN > 0) { const fullAmt = Math.max(0, Math.min(1, (this.tierEma - TIER_HI) / (1 - TIER_HI))); eFloor += (1 - eFloor) * TIER_OPEN * fullAmt; }   // FULL OPPNAR (se TIER_OPEN)
       md = drive * Math.min(1, Math.max(eFloor + (1 - eFloor) * eC, this.dropEnv));   // bara dampning: aldrig over 1
       md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
     }
@@ -1583,6 +1594,7 @@ export class EffectEngine {
     specialty.uv      = drivesHas(drives, "uv")      ? clamp255(exactHas(effect, "uv") ? wantUv * 255 : Math.max(180 * md, wantUv * 255)) : 0;
     specialty.blinder = drivesHas(drives, "blinder") ? clamp255(exactHas(effect, "blinder") ? wantBlinder * 255 : Math.max(kickEnv * 255, this.dropEnv > 0.6 ? 255 : 0, wantBlinder * 255)) : 0;
     specialty.strobe  = drivesHas(drives, "strobe")  ? clamp255(exactHas(effect, "strobe") ? wantStrobe * 255 : Math.max(effMode === "strobe" ? 210 : 0, wantStrobe * 255)) : 0;
+    if (DROP_STROBE > 0 && nowWall < this.dropBangUntil) specialty.strobe = Math.max(specialty.strobe, DROP_STROBE);   // STROBE VID DROPEN (se DROP_STROBE)
     specialty.laser   = drivesHas(drives, "laser")   ? clamp255(Math.max(180 + audio * 75, wantLaser * 255)) : 0;
     specialty.co2     = drivesHas(drives, "co2")     ? clamp255(Math.max(this.dropEnv > 0.85 ? 255 : 0, wantCo2 * 255)) : 0;
 

@@ -620,7 +620,7 @@ export async function startServer(
             // "Lägsta nivå": energins golv (0..0,5) - tysta partier lyser minst så här mycket av effektens ljus.
             deps.cfg.energyFloor = Math.max(0, Math.min(0.5, Number(msg.value)));
           } else if (msg.type === "setSilenceLevel" && Number.isFinite(msg.value)) {
-            // "Släckgräns": frame.level under vilken riggen tonas ut (0,01..0,20). Env DMX_SILENCE_LEVEL vinner om satt.
+            // "Släckgräns": frame.level under vilken riggen tonas ut (0,01..0,20). Enda källan sedan 10-11.
             deps.cfg.silenceLevel = Math.max(0.01, Math.min(0.20, Number(msg.value)));
           } else if (msg.type === "setFixtures" && Array.isArray(msg.fixtures)) {
             const cleaned = sanitizeFixtures(msg.fixtures);

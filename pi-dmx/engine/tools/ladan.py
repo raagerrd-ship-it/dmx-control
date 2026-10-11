@@ -43,7 +43,6 @@ PORTAR_EJ_LIVE = [
     ('DMX_PHASE_FOLLOW',   '1',      'gridet foljer fasmatningen i stallet for enskilda kickar'),
     ('DMX_GRID_PHASE_OFFSET_MS', '15', 'onset-frontens konstanta 15 ms (lotus LIVE 09-23)'),
     ('DMX_TEMPO_UP43',     '1',      'AV i ladan: med DMX-profilen 18 -> 17/21 pa ladans mixklipp (lotus: 171 -> 180/214, LIVE dar)'),
-    ('DMX_SILENCE_LEVEL',  '0.03',   'ladans tystnadstroskel - standard 0,05 slackte riggen pa tysta fraser'),
     ('DMX_SILENCE_MS',     '2000',   'sa lange maste det vara tyst innan grinden borjar stanga (standard 250 ms)'),
     ('DMX_SILENCE_RELEASE_S', '1.0', 'mjuk aterhamtning i stallet for 0,25 s'),
 ]

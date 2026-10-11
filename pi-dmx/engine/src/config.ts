@@ -116,7 +116,7 @@ export interface EngineConfig {
    *  PRIORITET: env LIVE_WIN_DB vinner om den är satt (drop-in), annars detta fält, annars 10. */
   /** SLÄCKGRÄNS: under denna frame.level (0..1) räknas det som tystnad och riggen tonas ut
    *  (tiden styrs av DMX_SILENCE_MS / DMX_SILENCE_RELEASE_S). 0,01..0,20, standard 0,05.
-   *  PRIORITET: env DMX_SILENCE_LEVEL vinner om den är satt, annars detta fält, annars 0,05. */
+   *  Enda källan (env-ratten DMX_SILENCE_LEVEL borttagen 2026-10-11); saknas fältet gäller 0,05. */
   silenceLevel?: number;
   /** "Lägsta nivå" (2026-10-10, ägaren i ladan: "så den lyser på lite tystare partier"): energins golv 0..0,5 - energin dämpar
    *  aldrig under denna andel av effektens ljus (i DMX-procent). 0 = som förr (kurvan ensam). */

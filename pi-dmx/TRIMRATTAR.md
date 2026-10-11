@@ -12,7 +12,7 @@ det ägaren godkänner blir kodens standard, inte en drop-in.*
 ## 1. Ingången
 | Ratt | Standard | Var | Vad den gör |
 |---|---|---|---|
-| Släckgräns | 0,015 (cfg) | /setup, eller `DMX_SILENCE_LEVEL` (låser reglaget) | Under denna nivå är riggen svart. |
+| Släckgräns | 0,015 (cfg) | /setup (enda källan sedan 10-11) | Under denna nivå är riggen svart. |
 | Ingångsförstärkning | Aux −18 dB, Mixin PGA 0 dB | `src/server.ts` applyInputRouting | 0 dB/+6 dB och −6 dB klippte i kodeken (mätt 10-07/08). Mixern behöver inte sänkas. |
 
 ## 2. Energin (en faktor, kan bara dämpa)
