@@ -1,5 +1,26 @@
 # Natt-agentens uppdrag
 
+## STORA PROJEKTET: SITUATIONSRUTNÄTET, ÖVER 100 EFFEKTER (ägaren i ladan 2026-10-11, går före gallring/rattar)
+Ägaren: "den skall ju kunna välja - lugn låt och intro och få några val. Fartfylld låt, refräng, tydlig basgång, och få några val
+osv. så kanske över 100 effekter". Dirigenten känner igen LÄGET och har 4-6 effekter byggda för just det läget.
+AXLAR (finns redan som taggar/signaler): (1) låtens fart = tier lugn/fart/full (EffectDef.tier, tierEma), (2) del av låten =
+section intro/low(vers)/build/high(refräng)/break (EffectDef.section, frame.section), (3) vad musiken gör = tydlig basgång
+(bassline >= 0,6, EffectDef.toggle-poolen, eko förstaval), tydlig kick/låst takt (beatTrust >= 0,85), ingen takt (hasBeat falskt).
+LÄGET 10-11 (50 effekter, "rumsl" = lamporna lyser olika; tools/effectDyn.mjs spridning >= 0,3):
+  tier/sektion | intro       | low(vers)    | build       | high(refräng) | break
+  lugn         | 11 (8 rumsl)| 6 (5)        | 0           | 0             | 7 (4)
+  fart         | 0           | 14 (11)      | 11 (7)      | 8 (7)         | 1 (0)
+  full         | 0           | 2 (2)        | 0           | 15 (12)       | 0
+GÖR, några rutor per natt (5-8 nya effekter), tomma rutor först: lugn x high (lugn låts refräng), lugn x build, fart x intro,
+fart x break, full x build, full x intro, full x break, full x low. Sedan varje ruta upp till 4-6, och inom rutan minst en per
+musikdimension (basgång / kick / ingen takt). REGLER för en ny effekt: egen signal ur rutan (inte en dubblett), rumslig (spridning
+>= 0,3 i effectDyn, aldrig alla lampor lika - de enhetliga får energi på utvalda lampor), kulör ur paletten via c.hueIdx (kulörsvansen
+vid frasbytet ska finnas kvar - ägaren gillar den), ingen vitning (avmättnad <= 0,35), fastLight bara om stegen är kortare än 150 ms,
+strobe <= 3 Hz synkront. Bevis per effekt: effectDyn (spridning/rörelse/nivå), effectSimilarity mot syskonen i rutan (< 0,9), att
+dirigenten väljer den i rätt läge (showTight/concertBench lookTime på mixar + ladan-2026-10-11-inspelningarna). Effekter på tagg
+(section/tier/toggle) räcker för att dirigenten ska hitta dem; kontrollera att poolen inte töms (fallbacks i effects.ts).
+Deploya aldrig - "redo för ladan" med listan av nya effekter, ägaren tittar.
+
 ## LÄGET 2026-10-11 12:31 - KONSERTLÄGET ÄR ENDA LÄGET (LIVE i ladan, ägaren: "mycket bättre, gör det till enda läget")
 Live sedan 12:31 (a3ce847, deployad, ingen env utöver DROP_MIN_GAP_S): CONCERT = true i koden = sektionspalett, frasbyten, lamptrappa v2,
 kulör per fras, full öppnar 0,6, aldrig enhetliga effekter (UNIFORM), BUILD före drop (kroppen borta 5 dB/1,5 s; build-sektion direkt),
