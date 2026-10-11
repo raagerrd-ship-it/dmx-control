@@ -46,7 +46,10 @@ const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning', 'fyllning', 'pingpong', 'v
  *  (DMX-profilen BPM_MIN 80, långsamma låtar vikes upp) - 'under 80' finns inte, så de får bara väljas under CALM_BPM (90). */
 const CALM_ONLY: Mode[] = ['tide', 'aurora', 'andrum'];
 const CALM_BPM = Number(process.env.DMX_CALM_BPM ?? 90);
-const BUILD_DROP_MIN_MS = Number(process.env.DMX_BUILD_DROP_MIN_MS ?? 4000), BUILD_DROP_RISE_DB = Number(process.env.DMX_BUILD_DROP_RISE_DB ?? 17);   // builden >= 4 s, språnget >= 17 dB
+/** LYFT + SPRÅNG = DROP (ladan 10-11 21:4x, ersätter 'builden landar': sektionslandningen gav 'falsk' 21:42:39 och låg bara 17 % på
+ *  ett baslyft i bänken): energilyftet och en nästan-drop med språng >= DROP_JUMP_DB inom DROP_PAIR_MS av varandra = en riktig drop.
+ *  Bänken 115 min: 0,27/min (~en per låt), 91 % på ihållande baslyft; fångar ägarens missar 21:28:36 och 21:42:09. */
+const DROP_JUMP_DB = Number(process.env.DMX_DROP_JUMP_DB ?? 17), DROP_PAIR_MS = 600;
 /** MINIDROPEN LYFTER OCH HÅLLER (ägaren i ladan 10-11: "låten ökar energi, kör minidrop men ljuset visar inget"): bänken visade att
  *  blinken kom (0,40 -> 0,95) men bara i 150 ms - sedan föll ljuset tillbaka. Nu släpper energin helt i MINI_LIFT_MS efter minidropen
  *  (effekten lyser med full egen styrka) och glider tillbaka på MINI_LIFT_FALL_MS. Bara mindre dämpning. */
@@ -479,7 +482,7 @@ export class EffectEngine {
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
-  private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
+  private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearRise = 0; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
   private buildLookAt = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
   private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist: number[] = []; private liftAt = -1e12; liftCount = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
@@ -1082,8 +1085,8 @@ export class EffectEngine {
           && !dropActive && sinceStart > START_DROP_MUTE_MS) {
         const g = Math.max(0, Math.min(1, (rise - NEAR_RISE_DB) / Math.max(1, NEAR_FULL_DB - NEAR_RISE_DB)));
         this.nearAt = nowWall; this.nearUntil = nowWall + MINI_BANG_MS; this.nearLevel = NEAR_MIN + (NEAR_MAX - NEAR_MIN) * g; this.nearCount++; this.nearHit = true;
-        if (CONCERT && this.buildLookAt > 0 && nowWall - this.buildLookAt > BUILD_DROP_MIN_MS && nowWall - this.buildLookAt < 20000 && rise >= BUILD_DROP_RISE_DB
-            ) { this.upgradeHit = true; this.buildLookAt = 0; }   // (15 s-spärren borttagen 10-11: inga timrar)   // BUILD SOM LANDAR (en per build)
+        this.nearRise = rise;
+        if (CONCERT && rise >= DROP_JUMP_DB && nowWall - this.liftAt <= DROP_PAIR_MS) { this.upgradeHit = true; this.buildLookAt = 0; if (isLogOn()) console.log(`[dirigent] lyft + sprang ${rise.toFixed(1)} dB -> drop`); }   // LYFT + SPRÅNG (lyftet först)
         console.log(`[dirigent] nastan-drop: sprang ${rise.toFixed(1)} dB efter dipp ${dip.toFixed(1)} dB -> ljus ${(this.nearLevel * 100).toFixed(0)} % av en drop`);
       }
       if (!CONCERT && nowWall < this.nearUntil && this.nearLevel > dTarget) dTarget = this.nearLevel;   // V123: i konsertläget ingen blixt (nästan-dropen träffar ett lyft lika ofta som slumpen) - bara build-landningen ovan
@@ -1108,7 +1111,8 @@ export class EffectEngine {
         const calm = sum / 160, lift = now6 / 24 - calm;   // senaste 0,6 s mot 6..2 s sedan
         if (calm > -80 && lift >= LIFT_DB) {
           this.liftAt = nowWall; this.liftCount++; this.lastMiniWall = nowWall; this.miniSector = mixedSector(this.liftCount + 7);
-          this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + (isLogOn() ? 2000 : MINI_LIFT_MS);
+          if (this.nearRise >= DROP_JUMP_DB && nowWall - this.nearAt <= DROP_PAIR_MS) { this.upgradeHit = true; this.buildLookAt = 0; if (isLogOn()) console.log(`[dirigent] lyft ${lift.toFixed(1)} dB + sprang -> drop`); }   // LYFT + SPRÅNG (språnget först)
+          else { this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + (isLogOn() ? 2000 : MINI_LIFT_MS); }
           if (isLogOn()) console.log(`[dirigent] energilyft: kropp ${lift.toFixed(1)} dB over lugnet`);
         }
       }
@@ -1340,9 +1344,7 @@ export class EffectEngine {
         // + intensiteten på topp (ladan 17:09 'miss': upptakt låg kvar 10 s i int 0,9-1,0 - sektionen gick low -> build -> intro, aldrig high)
         // (ladan 17:12 'falsk': lyftet och int 0,86 kom UNDER builden - dropen fyrade före smällen. Lyft inom build räknas inte; topp = 0,95.)
         const buildExit = CONCERT && BUILD_LOOKS.includes(this.smartMode) && (frame.section === 'high' || (this.buildLookAt > 0 && nowWall - this.buildLookAt > 2000 && (frame.intensity ?? 0) >= 0.95));
-        // BUILDEN LANDAR I REFRÄNGEN (ägaren i ladan 16:01 'miss': fyllning -> high, nivån +8 dB, men varken drop (20 dB-kravet) eller
-        // sektionslyft (minidropens 2 s-spärr) fyrade): har builden pågått >= BUILD_DROP_MIN_MS och sektionen går till high = DROPEN.
-        if (buildExit && this.buildLookAt > 0 && nowWall - this.buildLookAt > BUILD_DROP_MIN_MS && !dropHit) { this.upgradeHit = true; this.buildLookAt = 0; if (isLogOn()) console.log('[dirigent] builden landar i refrangen -> drop'); }
+        // (BUILDEN LANDAR I REFRÄNGEN - sektionen high efter >= 4 s build = drop - borttagen 10-11 kväll: 'falsk' 21:42:39, 17 % på baslyft; se DROP_JUMP_DB)
         const buildLock = CONCERT && frame.section === 'build' && this.buildLookAt > 0 && BUILD_LOOKS.includes(this.smartMode) && nowWall - this.buildLookAt < 30000 && !dropSwitch && !nearSwitch && !buildExit;   // BUILD SOM HÅLLER - V123: bara så länge sektionen ÄR build
         if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild) && (dropSwitch || nearSwitch || allaBuild || concertBuild || buildExit || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk && phraseOk))) {
         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
