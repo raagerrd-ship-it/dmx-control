@@ -55,8 +55,11 @@ STEG 1+2 KLART 2026-10-10 natt (51c237b, rapport-artifact v4): tools/concertBenc
 ÄVEN BYGGT samma natt (opt-in, av json-identisk): DMX_PHRASE_SWITCH=1 frasbundna byten (cf67e68; pop bytePaFras 0,22->0,45,
 megamix 0,09->0,18), DMX_LAMP_STAIR=1 lamptrappa via dirigenten (712ee4b; pop allaTanda 0,81->0,69, versRefrang 0,06->0,21,
 natt r 0,17->0,34; PRIS 11 aldrig valda mot 5). Alla tre ihop: tools/natt/konsert/*-alla3.json. VÄNTAR PÅ ÄGARENS ÖGA i ladan.
-NÄSTA: (a) fler SPARSAMMA effekter (lugn-effekterna tänder alla 4 svagt) så trappan inte kostar variation, (b) kulör per fras i
-stället för per takt (stilval, ägaren avgör), (c) strobe/rök vid rätt ögonblick.
+10-11 FÖRMIDDAG (sessionen): (a) KLART a0b4b22 - lamptrappan glesar ut icke-sparsamma effekter till ett lamppar i vers/intro
+(steg 1) i st.f. att begränsa poolen: allaTanda pop 0,53, megamix 0,74, versRefrang 0,26/0,29, aldrig valda 4. (b) KLART 24a0109 -
+DMX_HUE_PHRASE=1 (ctx.hueIdx): kulörbyten/min 17->13 / 21->16. ALLA FYRA ihop (tools/natt/konsert/*-alla4.json): kulörbyten 11/14,
+kulörer/sektion 3, paletter/sektion 1, allaTanda 0,54/0,76, versRefrang 0,25/0,28, aldrig valda 8. KVAR: (c) strobe/rök vid rätt
+ögonblick; inventeringstabellen per numerisk ratt + dubbletter. VÄNTAR PÅ ÄGARENS ÖGA i ladan (alla fyra opt-in).
 Ägaren: "Hur kan vi få ljusshowen mer lik en riktig konsert-show?" Riggen: 4 RGB-parlampor (dimmer konstant, R/G/B bär allt),
 rökmaskin, inga movers; allt i realtid ur aux (ingen låtlista, inget låtminne). Arkitekturen är fast: TRE STEG (effekt -> energi ->
 kalibrering), effekterna äger färg/styrka/lampa, dirigenten väljer look.
