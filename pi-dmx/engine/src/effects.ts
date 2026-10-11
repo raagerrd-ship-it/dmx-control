@@ -50,13 +50,13 @@ const BUILD_DROP_MIN_MS = Number(process.env.DMX_BUILD_DROP_MIN_MS ?? 4000), BUI
 /** MINIDROPEN LYFTER OCH HÅLLER (ägaren i ladan 10-11: "låten ökar energi, kör minidrop men ljuset visar inget"): bänken visade att
  *  blinken kom (0,40 -> 0,95) men bara i 150 ms - sedan föll ljuset tillbaka. Nu släpper energin helt i MINI_LIFT_MS efter minidropen
  *  (effekten lyser med full egen styrka) och glider tillbaka på MINI_LIFT_FALL_MS. Bara mindre dämpning. */
-const MINI_LIFT_MS = Number(process.env.DMX_MINI_LIFT_MS ?? 500), MINI_LIFT_FALL_MS = Number(process.env.DMX_MINI_LIFT_FALL_MS ?? 600);   // ägaren: 'behöver inte vara 2 s' - 2 s bara med felsökning på (synligt kvitto)
+const MINI_LIFT_MS = Number(process.env.DMX_MINI_LIFT_MS ?? 1000), MINI_LIFT_FALL_MS = Number(process.env.DMX_MINI_LIFT_FALL_MS ?? 800);   // 500/600 -> 1000/800 (kandes inte)   // ägaren: 'behöver inte vara 2 s' - 2 s bara med felsökning på (synligt kvitto)
 /** ENERGILYFT (ägaren i ladan 10-11: "jag ser allt från att det varit lugnt till ett tydligt energilyft (även om det är lägre) med
  *  basslag som minidrop"): analysatorns minidrop/nästan-drop jämför mot de senaste sekunderna, som efter ett lugnt parti har anpassat
  *  sig. Här: basens kropp (nearB, 120 ms) mot medlet för 6..2 s sedan; LIFT_DB över det, LIFT_DB/2 över toppen där, och kickar nu
  *  -> samma minidrop-look (alla lampor lika + lyft). Högst en per LIFT_REFRACT_MS. Bara DMX-sidan (frame.bodyDb), delade analysatorn orörd. */
 const LIFT_DB = Number(process.env.DMX_LIFT_DB ?? 8), LIFT_REFRACT_MS = Number(process.env.DMX_LIFT_REFRACT_MS ?? 6000);
-const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math.max(0, Math.min(1, Number(process.env.DMX_MINI_UNI ?? 0.9)));
+const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math.max(0, Math.min(1, Number(process.env.DMX_MINI_UNI ?? 1)));
 /** BUILD FÖRE DROPEN (konsertläget, ägaren 10-11: "dirigenten skall bli snabbare att byta till BUILD innan drops"): analysatorns buildUp
  *  är ~0 på ladans material (0 av 15 drops i megamix hade en build-look före). Dropdetektorn kräver att baskroppen varit BORTA en stund;
  *  samma tillstånd följs här ur frame.bodyDb (toppföljare, borta = PRE_DROP_DB under toppen i PRE_DROP_S) -> ETT direkt byte till
@@ -199,7 +199,7 @@ const EFFECT_HEART = Math.max(0, Math.min(2, Number(process.env.DMX_EFFECT_HEART
  *  frame.miniDropCount (monoton) ger look-byte (om looken hallits MIN_HOLD) + en kort stot pa MINI_DROP_ENV av
  *  en full drop-small (dropEnv), ingen rok, ingen blackout. */
 const MINI_DROP_ENV = Number(process.env.MINI_DROP_ENV ?? 0.9);   // 0,35 -> 0,9 STANDARD 2026-10-08 (agaren i ladan; lyfter bara ljusstyrkan, se dropColEnv)
-const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 150);   // 350 -> 150 STANDARD 2026-10-08 (minidrops utan sparr holl annars ljuset pa 0,9)
+const MINI_BANG_MS = Number(process.env.MINI_BANG_MS ?? 350);   // 150 -> 350 (ladan 10-11 16:0x: minidropen 'kandes inte'; minidrops har nu 2 s-sparr i konsertlaget)   // 350 -> 150 STANDARD 2026-10-08 (minidrops utan sparr holl annars ljuset pa 0,9)
 /** NASTAN-DROP (agaren 2026-10-07: "analysen av NASTAN-drops, sa de aterspeglas pa nagot bra satt i ljuset"), opt-in
  *  STANDARD sedan 2026-10-07 (DMX_NEAR_DROP=0 stanger av). Allt som bygger mot en small utan att bli en full drop (partiella drops som kvalitetsgrinden nekar
  *  tyst, minidrops, en build som landar halvt) har samma ljudavtryck: baskroppen (frame.bodyDb, ra dB) DYKER under
@@ -459,7 +459,7 @@ export class EffectEngine {
     const liftK = this.dropEnv - this.dropColEnv;   // minidrop/nastan-drop: ljusstyrka mot fullt, kuloren kvar
     if (liftK > 0.005 && m > 0.002 && m < 1) { const g = 1 + (1 / m - 1) * liftK; rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
     if (this.miniColEnv > 0.005 && this.dropColEnv <= 0.005) {   // MINIDROPS SOM SHOW: alla lampor samma kulör, fullt
-      const d = hsvToRgb(this.miniSector / 6, 1, 1), k = this.miniColEnv * MINI_UNI;
+      const d = hsvToRgb(this.miniSector / 6, 1 - 0.3 * this.miniColEnv, 1), k = this.miniColEnv * MINI_UNI;   // ljusare karna, avmattnad <= 0,3 (ingen vitning)
       for (let c = 0; c < 3; c++) rgb[c] += (d[c] - rgb[c]) * k;
     }
     if (this.dropColEnv > 0.005) {   // full drop: dropfarg per lampa + vit karna i toppen (agaren 10-08), blandas in med dropColEnv
@@ -1121,7 +1121,7 @@ export class EffectEngine {
     const dRate = dTarget > this.dropEnv ? dtNow / 0.03 : dtNow / 1.0;
     this.dropEnv += Math.max(-dRate, Math.min(dRate, dTarget - this.dropEnv));
     { const cT = dropActive ? 1 : 0, cR = cT > this.dropColEnv ? dtNow / 0.03 : dtNow / 1.0; this.dropColEnv += Math.max(-cR, Math.min(cR, cT - this.dropColEnv)); }
-    { const mT = CONCERT && nowWall < this.miniBangUntil ? 1 : 0, mR = mT > this.miniColEnv ? dtNow / 0.03 : dtNow / 0.3; this.miniColEnv += Math.max(-mR, Math.min(mR, mT - this.miniColEnv)); }   // MINIDROPS SOM SHOW
+    { const mT = CONCERT && nowWall < this.miniBangUntil ? 1 : 0, mR = mT > this.miniColEnv ? dtNow / 0.03 : dtNow / 0.6; this.miniColEnv += Math.max(-mR, Math.min(mR, mT - this.miniColEnv)); }   // MINIDROPS SOM SHOW
 
     // UPPBYGGNAD: analysatorn räknar riser/novelty och ger oss frame.buildUp (0..1).
     // Reaktionerna (riser-strobe, md-swell, phaseSpread, show-tid) ligger kvar här.
