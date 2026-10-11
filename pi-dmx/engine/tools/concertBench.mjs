@@ -100,7 +100,7 @@ const res = {
   // BUILD FORE DROP: andel drops med ett build-byte 1..20 s fore, och median hur langt fore (s)
   buildForeDrop: DROPS.length ? +(DROPS.filter((t) => BUILDSW.some((b) => t - b > 0.3 && t - b <= 20)).length / DROPS.length).toFixed(2) : null,
   buildLedS: (() => { const l = DROPS.map((t) => { const b = BUILDSW.filter((x) => t - x > 0.3 && t - x <= 20); return b.length ? t - b[b.length - 1] : null; }).filter((x) => x !== null); return l.length ? +med(l).toFixed(1) : null; })(),
-  drops: DROPS.length, buildByten: BUILDSW.length,
+  drops: DROPS.length, buildByten: BUILDSW.length, buildDrops: eng.buildUpgrades ?? 0,   // nastan-drops efter build som blev riktiga drops
 };
 process.stdout.write(JSON.stringify(res) + "\n");
 if (opt("--json", null)) writeFileSync(opt("--json"), JSON.stringify(res, null, 1));

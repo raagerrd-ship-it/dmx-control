@@ -36,6 +36,12 @@ const UNIFORM: Mode[] = ['breathe', 'snap', 'mono', 'pulse', 'party', 'airglow',
 /** MINIDROPS SOM SHOW (agaren 10-11: 'mindre drops ... sa att alla lampor da lyser lika'): hogst en per MINI_GAP_MS (bänken: 11-58/min
  *  = brus), och minidropen gör ALLA fyra lamporna lika i en kulör ur paletten en kort stund (miniColEnv, steg 1, som drop-looken men
  *  utan vit kärna). */
+/** BUILD SOM HÅLLER OCH LANDAR (ägaren i ladan 10-11: "uppbyggnad och drop missa den precis, den va jättetydlig"): (1) build-poolen
+ *  är bara BUILD_LOOKS, och när en build-look väl börjat bryts den bara av drop/nästan-drop (långinspelningen: upptakt -> eq -> basgang
+ *  på 4 s, avbrutet av basgång/fras/sektion); (2) en NÄSTAN-DROP 2..20 s efter att build-looken började räknas som en RIKTIG drop i
+ *  showen (drop-look, rök, drop-look-byte) - analysatorns 4 s-break-krav missar dropen efter en trumvirvel-build. */
+const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning'];
+const BUILD_DROP_MIN_MS = Number(process.env.DMX_BUILD_DROP_MIN_MS ?? 4000), BUILD_DROP_RISE_DB = Number(process.env.DMX_BUILD_DROP_RISE_DB ?? 17);   // builden >= 4 s, språnget >= 17 dB
 const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math.max(0, Math.min(1, Number(process.env.DMX_MINI_UNI ?? 0.9)));
 /** BUILD FÖRE DROPEN (konsertläget, ägaren 10-11: "dirigenten skall bli snabbare att byta till BUILD innan drops"): analysatorns buildUp
  *  är ~0 på ladans material (0 av 15 drops i megamix hade en build-look före). Dropdetektorn kräver att baskroppen varit BORTA en stund;
@@ -451,6 +457,7 @@ export class EffectEngine {
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
   private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
+  private buildLookAt = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
   private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0;   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
@@ -979,6 +986,7 @@ export class EffectEngine {
     if (DROP_SONG_HOLD_S > 0) {
       if (dropHitRaw && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000) { dropHitRaw = false; this.dropCalmDenied++; }
     }
+    if (this.upgradeHit) { this.upgradeHit = false; dropHitRaw = true; this.lastShowDropWall = nowWall; this.buildUpgrades++; }   // BUILD SOM LANDAR: forra rutans nastan-drop efter en build
     let dropHit = dropHitRaw;
     // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
     // jamfors energin (eSm, se E_WIN_S) med energin strax fore; har den inte stigit >= DROP_LAND_GAIN doms dropen falsk:
@@ -1050,6 +1058,8 @@ export class EffectEngine {
           && !dropActive && sinceStart > START_DROP_MUTE_MS) {
         const g = Math.max(0, Math.min(1, (rise - NEAR_RISE_DB) / Math.max(1, NEAR_FULL_DB - NEAR_RISE_DB)));
         this.nearAt = nowWall; this.nearUntil = nowWall + MINI_BANG_MS; this.nearLevel = NEAR_MIN + (NEAR_MAX - NEAR_MIN) * g; this.nearCount++; this.nearHit = true;
+        if (CONCERT && this.buildLookAt > 0 && nowWall - this.buildLookAt > BUILD_DROP_MIN_MS && nowWall - this.buildLookAt < 20000 && rise >= BUILD_DROP_RISE_DB
+            && nowWall - this.lastShowDropWall >= Math.max(DROP_MIN_GAP_S, 15) * 1000) { this.upgradeHit = true; this.buildLookAt = 0; }   // BUILD SOM LANDAR (en per build)
         console.log(`[dirigent] nastan-drop: sprang ${rise.toFixed(1)} dB efter dipp ${dip.toFixed(1)} dB -> ljus ${(this.nearLevel * 100).toFixed(0)} % av en drop`);
       }
       if (nowWall < this.nearUntil && this.nearLevel > dTarget) dTarget = this.nearLevel;
@@ -1193,7 +1203,7 @@ export class EffectEngine {
         const DROP_HOLD = 8000;   // drop byter inte oftare än nagot annat (detektorn fyrar tatt pa pulsande musik)
         // Drop-byte bara när energin får driva → en LUGN stämning (chill,
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
-        const dropSwitch = DISCRETE_DROP_LAMPS && dropHit && this.cfg.energyDrivesMode && held > DROP_HOLD;
+        const dropSwitch = DISCRETE_DROP_LAMPS && dropHit && this.cfg.energyDrivesMode && (held > DROP_HOLD || (CONCERT && BUILD_LOOKS.includes(this.smartMode)));   // konsertlaget: dropen avslutar builden direkt
         // (minidrop byter INTE look sedan 2026-10-10, agaren i ladan: 'minidrop maste ju inte orsaka look-byten' - den lyfter bara ljuset)
         const nearSwitch = this.nearHit && this.cfg.energyDrivesMode && held > MIN_HOLD;   // nastan-drop: samma regel
         // MINNETS STRUKTUR: en tvättad låt vet var karaktären skiftar och var
@@ -1285,7 +1295,8 @@ export class EffectEngine {
         const buildEntry = liveSecChanged && liveSec === 'build';   // MIX_V2 (2): ett byte IN i build-poolen tillats
         const secEntry = this.pendingSecSwitch && secOldEnough && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
         const concertBuild = CONCERT && buildEntry && held > 2000;   // konsertläget: in i build direkt
-        if ((!inBuild || buildEntry || secEntry || allaBuild || preDrop) && (dropSwitch || nearSwitch || allaBuild || preDrop || concertBuild || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk && phraseOk))) {
+        const buildLock = CONCERT && this.buildLookAt > 0 && BUILD_LOOKS.includes(this.smartMode) && nowWall - this.buildLookAt < 30000 && !dropSwitch && !nearSwitch;   // BUILD SOM HÅLLER
+        if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild || preDrop) && (dropSwitch || nearSwitch || allaBuild || preDrop || concertBuild || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk && phraseOk))) {
         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true; if (preDrop) this.preDropUsed = true;
         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
         this.switchWhy = dropSwitch ? 'drop' : nearSwitch ? 'nastan-drop' : charShift ? (this.charShiftWhy.startsWith('tempovaxling') ? 'tempo' : 'karaktar')
@@ -1328,7 +1339,8 @@ export class EffectEngine {
         // HALVERAT: de delade lookerna (och hjärtat) ska finnas i poolen oavsett tier.
         // (innerouter borttagen 2026-09-23: rPerm 1,00 mot varannan - samma effekt upp till lampordning.)
         if (this.pulseHalved) for (const m of ["varannan", "basgang", "hjarta"] as Mode[]) if (!pool.includes(m) && this.cfg.rotation?.[m] !== false && req(m)) pool.push(m);
-        if (CONCERT) { const show = pool.filter((m) => !UNIFORM.includes(m)); if (show.length) pool = show; }   // KONSERTLÄGET: ingen enhetlig look
+        if (CONCERT) { const show = pool.filter((m) => !UNIFORM.includes(m)); if (show.length) pool = show; }
+        if (CONCERT && secKey === 'build') { const b = pool.filter((m) => BUILD_LOOKS.includes(m)); pool = b.length ? b : enabled(BUILD_LOOKS); }   // BUILD SOM HÅLLER   // KONSERTLÄGET: ingen enhetlig look
         if (LAMP_STAIR && liveSec === 'high') {                                   // LAMPTRAPPA: refrängen -> hela riggen
           const full = pool.filter((m) => !SPARSAM.includes(m)); if (full.length) pool = full;
         }
@@ -1364,7 +1376,7 @@ export class EffectEngine {
         // LAST OCH TYDLIG TAKT (ladan 10-10, agaren: 'ar bpm last och tydlig takt sa vill jag att dirigenten foredrar dom'): som tydlig
         // basgang - varannat look-byte tas ur toggle-poolen (parvisa/gruppvisa effekter i takt) nar takten ar last och tilliten >= 0,85.
         const beatClear = !allaBuild && beatLocked(this.cfg.beat) && this.beatTrust >= 0.85 && this.smartCount % 2 === 1;
-        const bassHard = beatClear || (!allaBuild && bassClear && ((frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD && this.smartCount % 2 === 1));   // MIX_V2 (1)
+        const bassHard = !(CONCERT && secKey === 'build') && (beatClear || (!allaBuild && bassClear && ((frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD && this.smartCount % 2 === 1)));   // MIX_V2 (1); konsertlaget: aldrig i build
         const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); return cut.length ? cut : enabled(TOGGLE_POOL).filter(req); })() : [];
         const clearBass = toggles.length > 0;
         if (clearBass) {
@@ -1402,6 +1414,7 @@ export class EffectEngine {
         // snabbare". De statiska svepen (ingen takt-signal, ingen kick-drift) far DMX_DWELL_FLAT_MS (30 s),
         // taktdrivna looker behaller 45 s. Satts EFTER valet, eftersom dwellen ovan sattes fore.
         if (EFFECT_MAP.get(this.smartMode)?.flat) this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_FLAT_MS) || 30000);
+        if (CONCERT) this.buildLookAt = BUILD_LOOKS.includes(this.smartMode) ? nowWall : 0;   // BUILD SOM HÅLLER: när build-looken började
         this.recentLooks.push(this.smartMode); if (this.recentLooks.length > MIX_RECENT_N) this.recentLooks.shift(); this.seenLooks.add(this.smartMode);
       }
       effMode = this.smartMode;
