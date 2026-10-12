@@ -113,11 +113,13 @@ const DROP_STROBE = Math.max(0, Math.min(255, Math.round(Number(process.env.DMX_
  *  DMX_EKO_HIGH=0: eko tände 1,1 lampa och refrängen blev mörkare än builden). Replay 22 ladan-filer: eko 30 -> 10 %, variation
  *  (effektivt antal looker) 21 -> 34, nya rutnätseffekter 16 %, break-effekterna väljs. Eko finns kvar i poolerna. */
 const EKO_BASS = 0.85;
-/** REFRÄNGEN LYSER STARKAST (ägaren 10-12; konsertregeln: vers gles, build laddar, refrängen fullt). Replay 22 ladan-filer, ljus
- *  (DMX, medel över lamporna): refräng 0,39 -> 0,51, build 0,47 -> 0,42, vers 0,22. Spaken var taktdippen (KICK_E): i refrängen
- *  dippar lamporna 25 % mellan slagen i stället för 50 % (slagen syns kvar), + energigolv 0,6 i refrängen och builden laddar
- *  halvt (BUILD_CHARGE). Ljustak per sektion och en grundton på mörka lampor provades och gav inget (SPOT-regeln åt grundtonen). */
-const KICK_E_HIGH = 0.25, HIGH_E_FLOOR = 0.6, BUILD_CHARGE = 0.5;
+/** REFRÄNGEN LYSER STARKAST OCH SLÅR HÅRDAST (ägaren 10-12: "i refräng vill man ha takten så den känns så mycket som möjligt" +
+ *  "lampor skall lysa olika och inte alla vara tända - justera hur vi beräknar ljusstyrkan i sektionerna"). Måttet är den LJUSASTE
+ *  lampan (inte medel över riggen - det belönade att tända fler lampor). Före: toppen ~0,78 i alla sektioner. Nu: tak per sektion
+ *  på den ljusaste lampan (SEC_CEIL vers/intro/break, builden stiger mot SEC_CEIL_BUILD, refräng/drop fullt), djupare taktdipp i
+ *  refrängen (KICK_E_HIGH 0,6) och energigolv 0,8 där. Replay 22 ladan-filer: topp refräng 0,76 / build 0,66 / vers 0,62,
+ *  slagdjup refräng 68 % (djupast), tända lampor oförändrade (2,4). Grundton på mörka lampor och kickblixt på alla förkastade. */
+const SEC_CEIL = 0.65, SEC_CEIL_BUILD = 0.85, KICK_E_HIGH = 0.6, HIGH_E_FLOOR = 0.8, BUILD_CHARGE = 0.5;
 const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
 const PALETTE_LOCK: number[] | null = (() => {
   const v = (process.env.DMX_PALETTE ?? "").trim(); if (!v) return null;
@@ -494,7 +496,7 @@ export class EffectEngine {
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
   private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearRise = 0; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
-  private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+  private secCeil = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
   private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist: number[] = []; private liftAt = -1e12; liftCount = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
@@ -1865,7 +1867,17 @@ export class EffectEngine {
     }
 
     // STEG 3 - KALIBRERINGEN, sist (se TRE STEG FOR LJUSET).
-    this.out.calibrate(this.universe, this.cfg.fixtures, this.cfg.master ?? 1, performance.now(), this.dropColEnv);
+    // SEKTIONENS TAK (ägaren 10-12: "lampor skall lysa olika och inte alla vara tända" + refrängen starkast): taket för den LJUSASTE
+    // lampan per sektion - versen/introt/breaket toppar lägre, builden stiger mot dropen, refrängen och dropen når fullt.
+    if (CONCERT) {
+      const sec = frame.section ?? '';
+      let tgt = sec === 'high' || sec === '' ? 1 : sec === 'build' ? SEC_CEIL + (SEC_CEIL_BUILD - SEC_CEIL) * this.buildProg : SEC_CEIL;
+      if (this.dropColEnv > 0.005 || nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) tgt = 1;   // dropen alltid fullt
+      else if (nowWall < this.miniLiftUntil) tgt = Math.min(1, tgt + 0.15);                    // minidropen lyfter taket
+      const r = tgt > this.secCeil ? dtNow / 0.3 : dtNow / 2.0;                                  // upp snabbt, ner långsamt
+      this.secCeil += Math.max(-r, Math.min(r, tgt - this.secCeil));
+    }
+    this.out.calibrate(this.universe, this.cfg.fixtures, (this.cfg.master ?? 1) * (CONCERT ? this.secCeil : 1), performance.now(), this.dropColEnv);
 
     // Rök: motorn avgör OM den ska spruta, output-tjänsten var signalen hamnar.
     // RÖK: motorn samlar önskemålen — drop, manuell knapp, eller en effekt som bett om

@@ -35,7 +35,7 @@ console.log = (...a) => { const s = a.join(" "); if (/^\[dirigent\]/.test(s)) LO
 const buf = new Float32Array(HOP);
 let lastRender = -1, lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0, lastRow = -1;
 const ROWS = [];   // [t, look, why, sec, int, light, nLit, drops, near, lift, miniLook, upgrades, bpm]
-let acc = { light: 0, nLit: 0, n: 0, mini: 0 };
+let acc = { light: 0, nLit: 0, n: 0, mini: 0, hi: 0, lo: 9, top: 0 };
 for (let off = 0; off + HOP <= nSamples; off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
   const tS = off / SR, ms = EPOCH + tS * 1000; tNow = tS;
@@ -49,15 +49,16 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
   lastRender = ms; eng.render(fr); const u = eng.universe; if (!u) continue;
   const lv = lamps.map((L) => Math.max(u[L.r] ?? 0, u[L.g] ?? 0, u[L.b] ?? 0));
-  acc.light += lv.reduce((a, b) => a + b, 0) / (4 * 255); acc.nLit += lv.filter((x) => x > 0.3 * 255).length; acc.n++;
+  { const L = lv.reduce((a, b) => a + b, 0) / (4 * 255), T = Math.max(...lv) / 255; acc.light += L; acc.top = (acc.top ?? 0) + T; if (T > acc.hi) acc.hi = T; if (T < acc.lo) acc.lo = T; }
+  acc.nLit += lv.filter((x) => x > 0.3 * 255).length; acc.n++;   // hi/lo/top = ljusaste lampan
   if (ms < eng.miniBangUntil) acc.mini = 1;
   if (ms - lastRow >= 100) {
     lastRow = ms;
     ROWS.push([+tS.toFixed(2), eng.getActiveMode(), eng.switchWhy, fr.section ?? '', +(fr.intensity ?? 0).toFixed(2), +(acc.light / acc.n).toFixed(3), +(acc.nLit / acc.n).toFixed(1),
-      fr.dropCount ?? 0, eng.nearCount ?? 0, eng.liftCount ?? 0, acc.mini, eng.buildUpgrades ?? 0, Math.round(fr.bpm ?? 0), +(fr.bodyDb ?? -90).toFixed(1), fr.miniDropCount ?? 0, +(fr.profile?.bassline ?? 0).toFixed(2)]);
-    acc = { light: 0, nLit: 0, n: 0, mini: 0 };
+      fr.dropCount ?? 0, eng.nearCount ?? 0, eng.liftCount ?? 0, acc.mini, eng.buildUpgrades ?? 0, Math.round(fr.bpm ?? 0), +(fr.bodyDb ?? -90).toFixed(1), fr.miniDropCount ?? 0, +(fr.profile?.bassline ?? 0).toFixed(2), +acc.hi.toFixed(3), +acc.lo.toFixed(3), +((acc.top ?? 0) / acc.n).toFixed(3)]);
+    acc = { light: 0, nLit: 0, n: 0, mini: 0, hi: 0, lo: 9, top: 0 };
   }
 }
-const out = { wav: path, columns: ['t', 'look', 'why', 'sec', 'int', 'light', 'nLit', 'drops', 'near', 'lift', 'miniLook', 'upgrades', 'bpm', 'bodyDb', 'aMini', 'bass'], rows: ROWS, log: LOG };
+const out = { wav: path, columns: ['t', 'look', 'why', 'sec', 'int', 'light', 'nLit', 'drops', 'near', 'lift', 'miniLook', 'upgrades', 'bpm', 'bodyDb', 'aMini', 'bass', 'hi', 'lo', 'top'], rows: ROWS, log: LOG };
 writeFileSync(opt("--json", "replay.json"), JSON.stringify(out));
 process.stdout.write(`${path}: ${ROWS.length} rader, ${LOG.length} loggrader\n`);

@@ -72,9 +72,11 @@ KLART 2026-10-12 (dagsession): BASGÅNGSGRÄNSEN - bassline är hög i ALLA sekt
   borta). De 14 nya effekterna fick FIT/SPATIAL i fit.ts (saknades -> neutral passform, valdes nästan aldrig). Replay 22 filer:
   eko 30 -> 10 %, variation (2^entropi) 21 -> 34, nya 6 -> 16 %, break-effekter valda. Toggle-gränserna (CLEAR_BASS 0,78/0,85)
   spelade nästan ingen roll.
-KLART 2026-10-12: REFRÄNGEN LJUSAST - taktdipp 25 % i refrängen (var 50), energigolv 0,6 i refrängen, builden laddar halvt,
-  siren 0,25+0,45p. Replay: refräng 0,39 -> 0,51, build 0,47 -> 0,42, vers 0,22; drops/minidrops oförändrade. Ljustak per sektion
-  och grundton på mörka lampor gav inget (SPOT-regeln) - provat och borta.
+KLART 2026-10-12: REFRÄNGEN STARKAST OCH TYDLIGAST TAKT (ägaren: takten ska kännas mest i refrängen, lamporna ska lysa olika).
+  MÅTTET = LJUSASTE LAMPAN + slagdjup (topp/dal i 0,6 s-fönster), INTE medel över riggen (det belönar att tända fler lampor).
+  Tak per sektion på ljusaste lampan (vers/intro/break 0,65, build 0,65 -> 0,85 med förloppet, refräng/drop 1), taktdipp 60 % i
+  refrängen (50 annars), energigolv 0,8 i refrängen, build laddar halvt, siren 0,25+0,45p. Replay: topp refräng 0,76 / build 0,66 /
+  vers 0,62 (före ~0,78 överallt), slagdjup refräng 68 %, tända lampor oförändrade. Förkastat: grundton på mörka lampor, kickblixt på alla.
 KLART 2026-10-12 (dagsession): alla rutor >= 2 (ägaren: "gärna att alla har minst 2 st") - flod (lugn x build), famn (lugn x high),
   spaning (fart x intro), startskott (full x intro), siren (full x build), skuggor (full x break). 64 effekter. Närmaste syskon
   flod-rullandning 0,78. effectSimilarity saknade c.lamp/trebleEnv/airEnv (rättat). Replay: 14 nya = 6,3 % av tiden, 47 olika looker;
