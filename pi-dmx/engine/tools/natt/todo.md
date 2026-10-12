@@ -1,5 +1,13 @@
 # Natt-agentens uppdrag
 
+## NATTEN 2026-10-12 (nattagenten, inget deployat)
+KLART 2026-10-12: baslinje natt/2026-10-12.json (pop 125/0,50 r 0,42; mega 175/0,50 r 0,07; korpus 150/0,48; 22 aldrig valda).
+KLART 2026-10-12: refrängen ljusare än builden -> opt-in DMX_EKO_HIGH=0 (56c6527): eko-förstavalet vid basgång gäller inte i high.
+  Ljus high 0,28->0,36 / 0,38->0,42 (ladan 21:17/21:34), pop 0,34->0,45, mega 0,36->0,43; build oförändrad. Redo: ladan.py --env DMX_EKO_HIGH=0.
+ÖPPET: minidrop-kontrasten - 4/26 minidrops på kvällens inspelningar har ljus 0,73-0,93 redan före (ingen synlig skillnad);
+  förslag blixt på lampans strobe-kanal när DROP_STROBE är kalibrerad. Mega kick->ljus 150<->175 = 25 ms-rastrets kant (ej regression).
+  Analysatorfynd: buildUp död (0,000 även i build). Situationsrutnätet (nya effekter) ej påbörjat i natt.
+
 ## LADAN 10-11 KVÄLL 21:15-22:15 (allt LIVE, ägarens live-omdömen i parentes)
 - V123 live 21:16 (se nedan + analys-2026-10-11.md).
 - BODY_GONE_MIN_MS 1000 -> 2000 (analyserProfile): falska drops var 30:e s på pumpande bas ('falsk' x3).
