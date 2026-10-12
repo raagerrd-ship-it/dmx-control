@@ -119,9 +119,11 @@ export class FixtureOutput {
    * @param mul 0..1 multiplikator
    */
   /** SISTA STEGET FORE UTGANG - EN mappning (se EN VAG FOR LJUSET). */
-  calibrate(universe: Uint8Array, fixtures: FixtureConfig[], master: number, nowMs: number, dropOpen = 0): void {
+  calibrate(universe: Uint8Array, fixtures: FixtureConfig[], master: number, nowMs: number, dropOpen = 0, ceil = 1): void {
     const top = (255 * master + 0.5) | 0;
-    const colTop = Math.round(top * MAP_TOP + (top - top * MAP_TOP) * Math.max(0, Math.min(1, dropOpen)));   // 95 %, full drop -> tak
+    // ceil = SEKTIONENS TAK (effects.ts): bara på färgen/ljusstyrkan - dimmern på en färgfixtur står på master (förr fick rgb7-lamporna
+    // taket två gånger: master*tak på dimmern OCH på färgen -> 0,65 blev ~0,42).
+    const colTop = Math.round(top * ceil * MAP_TOP + (top * ceil - top * ceil * MAP_TOP) * Math.max(0, Math.min(1, dropOpen)));   // 95 %, full drop -> tak
     for (let f = 0; f < fixtures.length; f++) {
       const fx = fixtures[f];
       const fast = this.fastFixtures[f];

@@ -61,25 +61,12 @@ const MINI_LIFT_MS = Number(process.env.DMX_MINI_LIFT_MS ?? 4000), MINI_LIFT_FAL
  *  alla sju av ägarens markeringar. Lyftet (+ sektionslyftet) är nu ENDA källan till minidrop-looken. */
 const LIFT_DB = Number(process.env.DMX_LIFT_DB ?? 10), LIFT_REFRACT_MS = Number(process.env.DMX_LIFT_REFRACT_MS ?? 8000);
 const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math.max(0, Math.min(1, Number(process.env.DMX_MINI_UNI ?? 1)));
-/** EFFEKTEN LEDER (konsertläget, ägaren 10-11: "energi-lagret skall ligga bara som att lamporna inte känns platta i partier där effekten
- *  inte lyckas helt" + "95 % på en lampa i taget som hoppar runt ... får köra ljusare så de syns"): energins golv höjs till
- *  CONCERT_E_FLOOR - effekten kör nära sin egen styrka, energin dämpar högst lite. Fortfarande bara dämpning. */
-/** VARJE SLAG I BRÖSTET OCH ÖGONEN (konsertläget, ägaren 10-11: "i show vill man att varje slag skall kännas både i bröstet och i ögonen"):
- *  i steg 1 (effektNiva) dämpas effektens ljus MELLAN slagen: nivå x ((1 - CONCERT_BEAT) + CONCERT_BEAT x beatPulse). beatPulse är
- *  rastret när takten är låst, annars de riktiga kickarna. Bara dämpning (slaget = effektens eget ljus), uttoningen orörd; drop-looken
- *  och fastLight-effekter (strobe) undantas. */
-const CONCERT_BEAT = Math.max(0, Math.min(0.8, Number(process.env.DMX_CONCERT_BEAT ?? 0)));
-/** BASSLAGEN (ägaren i ladan 10-11: "jag vill ändå förstärka basslagen mer"): andel av slagpulsen som kommer från det RIKTIGA kickslaget
- *  (ctx.kickEnv) i stället för taktrastret (beatPulse). 0 = bara rastret (som förr), 1 = bara kicken. */
-const CONCERT_KICK = Math.max(0, Math.min(1, Number(process.env.DMX_CONCERT_KICK ?? 0)));
-/** BASSLAGEN I ENERGILAGRET (ägaren 10-11: "förstärka basslagen mer" + "och lägga det i sista energilagret"): energin dämpar
- *  MELLAN basslagen och släpper på slaget: k x ((1 - KICK_E) + KICK_E x kickEnv) för lampor som följer energin. Bara dämpning. */
+// (EFFEKTEN LEDER/CONCERT_E_FLOOR, VARJE SLAG/CONCERT_BEAT, BASSLAGEN/CONCERT_KICK och BASSLAGEN I ENERGILAGRET/KICK_E borttagna 10-12:
+//  ersatta av BASENERGIN, se B_CURVE.)
 /** DROPEN BÄR IN I REFRÄNGEN (ägaren i ladan 10-11: "efter drop känns som energin dör varje gång"): dropen är det starkaste
  *  ögonblicket och drar upp energifönstrets topp - refrängen efter mäts mot den och dämpas. Efter en drop släpper energin helt i
  *  DROP_LIFT_MS och glider tillbaka på DROP_LIFT_FALL_MS. Bara mindre dämpning. */
 const DROP_LIFT_MS = Number(process.env.DMX_DROP_LIFT_MS ?? 4000), DROP_LIFT_FALL_MS = Number(process.env.DMX_DROP_LIFT_FALL_MS ?? 1500);   // 2000 -> 4000 (ladan 22:0x: 'se till så energin efter fortsätter', som minidropens lyft som var 'perfekt')   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
-const KICK_E = Math.max(0, Math.min(0.9, Number(process.env.DMX_KICK_E ?? 0.7)));   // 0,5 -> 0,7 (ladan 10-12 12:4x: 'lamporna får gärna gå djupare')
-const CONCERT_E_FLOOR = Math.max(0, Math.min(0.9, Number(process.env.DMX_CONCERT_E_FLOOR ?? 0.4)));
 const SECTION_PALETTE = CONCERT;
 /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
  *  look-bytena landar på en 4-taktsgräns (slumpen ger 19 %) - gridOk hängde på låtminnets grid som är borttaget. Med takten låst
@@ -95,11 +82,7 @@ const LAMP_STAIR = CONCERT;
 /** KULÖR PER FRAS (opt-in DMX_HUE_PHRASE=1, 10-11, KONSERTSHOW): effekternas kulörklocka ctx.hueIdx stegar bara vid frasgräns (16 slag på
  *  effektklockan) i stället för per takt/slag - konsertbänken mätte 17-21 kulörbyten/min. Rörelse och puls följer fortfarande beatIdx. */
 const HUE_PHRASE = CONCERT;
-/** FULL OPPNAR RIGGEN (opt-in DMX_TIER_OPEN 0..1, 10-11, nattagentens brist 'fart -> full stiger inte': korpus 0,26 -> 0,23,
- *  megamix 0,63 -> 0,61). Energin ar ett FOLJANDE 10 s-fonster: i en lang stark refrang glider botten upp och full ger samma
- *  energi som fart. Har hojs energins GOLV med hur langt in i full tiern (tierEma) ligger: golv + (1 - golv) * TIER_OPEN * andel.
- *  Bara mindre dampning (aldrig over effektens eget ljus), i steg 2. 0 = av. */
-const TIER_OPEN = Math.max(0, Math.min(1, Number(process.env.DMX_TIER_OPEN ?? (CONCERT ? 0.3 : 0))));
+// (FULL OPPNAR RIGGEN / DMX_TIER_OPEN borttagen 10-12: ett golv på energin - sektionstaket och basenergin tar det, se B_CURVE.)
 /** STROBE VID DROPEN (opt-in DMX_DROP_STROBE = DMX-varde 1..255 pa lampornas EGEN strobe-kanal, 10-11, KONSERTSHOW 'strobe vid ratt
  *  ogonblick'): en konsert anvander stroben som ett ogonblick, inte en look. RGB kan inte strobea (uttoningen smetar blixten, och
  *  snabbare uttoning ar forbjudet) - lampans strobe-kanal gar forbi uttoningen. Satts bara under drop-smallen (dropBangUntil, 1,3 s).
@@ -115,9 +98,9 @@ const EKO_BASS = 0.85;
  *  "lampor skall lysa olika och inte alla vara tända - justera hur vi beräknar ljusstyrkan i sektionerna"). Måttet är den LJUSASTE
  *  lampan (inte medel över riggen - det belönade att tända fler lampor). Före: toppen ~0,78 i alla sektioner. Nu: tak per sektion
  *  på den ljusaste lampan (SEC_CEIL vers/intro/break, builden stiger mot SEC_CEIL_BUILD, refräng/drop fullt), djupare taktdipp i
- *  refrängen (KICK_E_HIGH 0,6) och energigolv 0,8 där. Replay 22 ladan-filer: topp refräng 0,76 / build 0,66 / vers 0,62,
+ *  refrängen (KICK_E_HIGH 0,6) och energigolv 0,8 där (dippen och golvet ersatta av BASENERGIN 10-12, taket kvar). Replay 22 ladan-filer: topp refräng 0,76 / build 0,66 / vers 0,62,
  *  slagdjup refräng 68 % (djupast), tända lampor oförändrade (2,4). Grundton på mörka lampor och kickblixt på alla förkastade. */
-const SEC_CEIL = 0.65, SEC_CEIL_BUILD = 0.85, KICK_E_HIGH = 0.8, HIGH_E_FLOOR = 0.8, BUILD_CHARGE = 0.5;
+const SEC_CEIL = 0.65, SEC_CEIL_BUILD = 0.85;
 const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
 const PALETTE_LOCK: number[] | null = (() => {
   const v = (process.env.DMX_PALETTE ?? "").trim(); if (!v) return null;
@@ -323,11 +306,11 @@ const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION
  *  FOLJANDE FONSTER - topp: direkt upp, glider ner; botten: direkt ner, glider upp, tidskonstant E_WIN_S, minst E_MIN_DB brett - sa hela
  *  0..1 anvands oavsett lat och mixerniva. Direkt upp, E_RELEASE_MS ner, upphojd till E_CURVE (ogat ar logaritmiskt), och blir EN
  *  dampningsfaktor 0..1 pa effektens RGB - aldrig over 1 (effekten styr max). Drop slapper dampningen. Slackgransen galler for tystnad.
- *  Ersatte 10-08: sektionsenergin (frame.intensity, for trog: "svanger lite och ratt morkt") och en fast fullniva (passade aldrig). */
+ *  Ersatte 10-08: sektionsenergin (frame.intensity, for trog: "svanger lite och ratt morkt") och en fast fullniva (passade aldrig).
+ *  10-12: ljuset drivs av BASENERGIN (se B_CURVE); volymfonstret (eSm) finns kvar bara for dropens efterkontroll. */
 const E_WIN_S = Number(process.env.DMX_E_WIN_S ?? 10),   // 20 -> 10 (ladan 10-09, standard 10-10)
       E_MIN_DB = Number(process.env.DMX_E_MIN_DB ?? 4);
 const E_RELEASE_MS = Number(process.env.DMX_E_RELEASE_MS ?? 100);
-const E_CURVE = Math.max(0.3, Math.min(10, Number(process.env.DMX_E_CURVE ?? 10)));   // 2 -> 10 (ladan 10-09, standard 10-10; i DMX-procent efter gamman); tak 4 -> 10 (ladan 10-09: "overdriv energivariationen")
 /** TYSTNAD RAKNAS INTE (ladan 2026-10-09, STANDARD 10-10: "tacker den hela spannet ... 1-95 %"). Fonstrets botten foljer minsta
  *  vardet DIREKT - en paus mellan latar eller ett avbrott drog den mot -100 dB, och den kryper upp med E_WIN_S: matt med samma musik
  *  -90 dB i 10 s och sedan 6 dB tystare holl dampningen 0,78-0,87 (nastan fullt) i 30 s. Nu uppdateras fonstret bara nar ingangen
@@ -354,6 +337,16 @@ const FX_FLOOR = Math.max(0, Math.min(0.8, Number(process.env.DMX_FX_FLOOR ?? 0.
  *  enskild ljudtopp direkt, sa ett vanligt starkt parti lag pa e ~0,9 - med kurva 7 bara ~50 % ljus. e / E_TOP (klampat till 1): starka
  *  partier nar full energi (= effektens 95 %), och kurvan dampar allt under. 1 = som forr. */
 const E_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_E_TOP ?? 0.95)));   // 1 -> 0,95 (ladan 10-09, standard 10-10)
+/** BASENERGIN (ägaren 10-12: "följa basgången mer än diskant. Samma känsla som man får i magen av en sub vill jag ha i ögonen av ljuset.
+ *  De får gärna svänga mycket, bara att sänka taket beroende på var i låten man är" + "kör inte energilagret på två ställen - då dämpas
+ *  allt bara"). EN energi ur baskroppen (frame.bodyDb) i stället för volymen (levelVU): topp direkt upp, glider ner på E_WIN_S; dal
+ *  direkt ner, glider upp på B_LO_S (1 s) - energin följer bastrycken och basgången över hela skalan i stället för att parkera högt i en
+ *  tät refräng. Minst B_MIN_DB brett, E_TOP, upp direkt / ner E_RELEASE_MS (uttoningen som förr), upphöjd till B_CURVE (3; förr E_CURVE
+ *  10 = nästan av/på). Golvet = "Lägsta nivå" (cfg.energyFloor). Sektionen sätter bara TAKET (secCeil), effekten mönstret, drops och
+ *  minidrops lyfter. ERSATTE (bänk tools/energiMatt.mjs, 23 ladan-filer): konsertgolvet 0,4, refränggolvet 0,8, buildladdningen och
+ *  TIER_OPEN (golv som gjorde energin verkningslös), taktdippen KICK_E/KICK_E_HIGH på kickEnv (dubbel kickmodulering ovanpå effektens
+ *  egen c.heart), SPOT-regeln och UNIFORM:s ovalda par (förbivägar runt energin). */
+const B_CURVE = 3, B_MIN_DB = 6, B_LO_S = 1;
 const E_LIN_INV = 1 / GAMMA;   // utgangens gamma (output.ts ager DMX_GAMMA - en kalla, 10-11; forr last pa tva stallen med var sin standard)
 /** Minsta tanda niva fore gamman: gammans forsta DMX-steg (1/255 -> tandpunkt+1 i utgangen) = agarens 1 %. */
 const E_MIN_LIT = Math.pow(1 / 255, E_LIN_INV) * 1.02;   // agarens 1 %: gammans forsta DMX-steg (-> tandpunkt+1), se ENERGIN SLACKER ALDRIG
@@ -465,10 +458,6 @@ export class EffectEngine {
     // TOGGLE-EFFEKTER UTAN GRUNDNIVA (ladan 10-10, agaren: parvisa effekter i takt syns inte): golvet lyfte 'av'-gruppen till ~55 % -
     // parbanken (tools/pairBench.mjs) matte kontrast (max-min)/max 0,03-0,12. Den morka gruppen i en toggle-effekt ska vara mork.
     if (FX_FLOOR > 0 && !toggle && m > 0.001 && m < 1) { const k = (m + FX_FLOOR * (1 - m) * Math.min(1, m / 0.1)) / m; rgb[0] *= k; rgb[1] *= k; rgb[2] *= k; m *= k; }
-    if (CONCERT && CONCERT_BEAT > 0 && !this.fxFast && this.dropColEnv <= 0.005 && m > 0.001) {   // VARJE SLAG (se CONCERT_BEAT)
-      const pulse = CONCERT_KICK > 0 ? Math.max(ctx.beatPulse * (1 - CONCERT_KICK), ctx.kickEnv) : ctx.beatPulse;   // BASSLAGEN (se CONCERT_KICK)
-      const g = (1 - CONCERT_BEAT) + CONCERT_BEAT * Math.max(0, Math.min(1, pulse)); rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; m *= g;
-    }
     const liftK = this.dropEnv - this.dropColEnv;   // minidrop/nastan-drop: ljusstyrka mot fullt, kuloren kvar
     if (liftK > 0.005 && m > 0.002 && m < 1) { const g = 1 + (1 / m - 1) * liftK; rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
     if (this.miniColEnv > 0.005 && this.dropColEnv <= 0.005) {   // MINIDROPS SOM SHOW: alla lampor samma kulör, fullt
@@ -486,7 +475,6 @@ export class EffectEngine {
     let best = top[0].m, bt = Infinity; for (const x of top) { const t = this.lookPlayMs.get(x.m) ?? 0; if (t < bt) { bt = t; best = x.m; } } return best;
   }
   private fxFast = false;   // aktuell effekt ar fastLight (VARJE SLAG undantar den)
-  private fxNow = new Float32Array(64); private fxPrev = new Float32Array(64);   // effektens niva per lampa (SPOT-regeln, forra rutan)
   private buildSince = -1; private buildEntered = false; private lookPlayMs = new Map<Mode, number>();   // ALLA_LOOKER
   private tierEma = 0.5;   // ihallande intensitet for tier-val (se render)
   private smartDwellUntil = 0;
@@ -502,7 +490,7 @@ export class EffectEngine {
   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
   private lastLiveSection = '';   // DMX_SECTION_SWITCH
   dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;
-  private eSm = 0; eSimple = 0; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
+  private eSm = 0; eSimple = 0; private eBass = 0; private bHi = NaN; private bLo = NaN; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
   private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
@@ -1587,7 +1575,7 @@ export class EffectEngine {
     this.lookPlayMs.set(this.smartMode, (this.lookPlayMs.get(this.smartMode) ?? 0) + dtMs);
     // (Den gamla nivakedjan - intensity/LIVE_LEVEL-fonster mot ankare, shape-smoothing, log-release, lightLoud - borttagen 2026-10-10:
     //  ljuset styrs av energin nedan, och drop-kontrollen laser samma energi.)
-    let md: number; let mdSel = 1;   // mdSel: energin UTAN konsertgolvet - for enhetliga effekters utvalda lampor (se UNIFORM)
+    let md: number;
     {   // ENKEL ENERGI (se ENERGY_SIMPLE-dokumentationen). md0/sektionsgas/rang borttagna 10-08.
       // FOLJANDE FONSTER (se E_WIN_S)
       const db = 20 * Math.log10(Math.max(1e-5, frame.levelVU ?? frame.level));
@@ -1604,25 +1592,26 @@ export class EffectEngine {
       if (e !== e) e = 0;   // inget fonster an (bara tystnad sedan start)
       if (E_TOP < 1) e = e >= E_TOP ? 1 : e / E_TOP;   // ENERGINS TOPP (se E_TOP)
       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
-      this.eSimple = this.eSm;
-      const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);
-      let eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
-      const eFloorSel = eFloor;
-      if (CONCERT && CONCERT_E_FLOOR > eFloor && frame.section !== 'intro' && frame.section !== 'low' && frame.section !== 'break') eFloor = CONCERT_E_FLOOR;   // EFFEKTEN LEDER (se CONCERT_E_FLOOR) - inte i intro/vers/break: där ska energin synas tydligt (ägaren i ladan 10-12), taket 0,65 håller dem under max
-      if (CONCERT && nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) {   // DROPEN BÄR IN I REFRÄNGEN (se DROP_LIFT_MS)
-        const left = this.dropLiftUntil - nowWall, a = left >= 0 ? 1 : Math.max(0, 1 + left / DROP_LIFT_FALL_MS);
-        eFloor += (1 - eFloor) * a;
+      // (volymfönstret ovan - eSm - styr inte ljuset längre, bara dropens efterkontroll (DROP_LAND_GAIN); orört så dropsen är desamma)
+      // BASENERGIN (se B_CURVE): baskroppen (frame.bodyDb, sub+kick+bas i rå dB) i ett följande fönster - topp direkt upp/E_WIN_S ner,
+      // dal direkt ner/B_LO_S upp - energin mäter hur långt över basens senaste dal vi är: varje bastryck svänger över skalan.
+      const bdb = frame.bodyDb ?? -90;
+      if (Number.isNaN(this.bHi) && frame.level > INPUT_OFF_LEVEL) { this.bHi = bdb; this.bLo = bdb; }
+      if (frame.level > INPUT_OFF_LEVEL) {   // tystnad flyttar inte fönstret
+        this.bHi = bdb > this.bHi ? bdb : this.bHi + (bdb - this.bHi) * k;
+        this.bLo = bdb < this.bLo ? bdb : this.bLo + (bdb - this.bLo) * Math.min(1, dtSec / B_LO_S);
       }
-      if (CONCERT && BUILD_LOOKS.includes(this.smartMode)) eFloor += (1 - eFloor) * this.buildProg * BUILD_CHARGE;
-      if (CONCERT && frame.section === 'high') eFloor = Math.max(eFloor, HIGH_E_FLOOR);   // UPPBYGGNADEN LADDAR: energins golv stiger med förloppet - suget före dropen får inte dimma builden (ladan 22:05)
-      if (CONCERT && nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) {   // MINIDROPEN LYFTER OCH HALLER (se MINI_LIFT_MS)
-        const left = this.miniLiftUntil - nowWall, a = left >= 0 ? 1 : Math.max(0, 1 + left / MINI_LIFT_FALL_MS);
-        eFloor += (1 - eFloor) * a;
-      }
-      if (TIER_OPEN > 0) { const fullAmt = Math.max(0, Math.min(1, (this.tierEma - TIER_HI) / (1 - TIER_HI))); eFloor += (1 - eFloor) * TIER_OPEN * fullAmt; }   // FULL OPPNAR (se TIER_OPEN)
-      md = drive * Math.min(1, Math.max(eFloor + (1 - eFloor) * eC, this.dropEnv));   // bara dampning: aldrig over 1
+      const bSpan = Math.max(B_MIN_DB, this.bHi - this.bLo);
+      let eb = (bdb - (this.bHi - bSpan)) / bSpan; eb = eb < 0 ? 0 : eb > 1 ? 1 : eb; if (eb !== eb) eb = 0;
+      if (E_TOP < 1) eb = eb >= E_TOP ? 1 : eb / E_TOP;   // ENERGINS TOPP (se E_TOP)
+      this.eBass = eb > this.eBass ? eb : this.eBass + (eb - this.eBass) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));   // upp direkt, ner E_RELEASE_MS (som förr)
+      this.eSimple = this.eBass;
+      const eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
+      let lift = this.dropEnv;   // DROPS OCH MINIDROPS LYFTER (se DROP_LIFT_MS / MINI_LIFT_MS): energin släpper helt och glider tillbaka
+      if (CONCERT && nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) { const left = this.dropLiftUntil - nowWall; lift = Math.max(lift, left >= 0 ? 1 : 1 + left / DROP_LIFT_FALL_MS); }
+      if (CONCERT && nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) { const left = this.miniLiftUntil - nowWall; lift = Math.max(lift, left >= 0 ? 1 : 1 + left / MINI_LIFT_FALL_MS); }
+      md = drive * Math.min(1, Math.max(eFloor + (1 - eFloor) * Math.pow(this.eBass, B_CURVE), lift));   // bara dampning: aldrig over 1
       md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
-      mdSel = Math.pow(drive * Math.min(1, Math.max(eFloorSel + (1 - eFloorSel) * eC, this.dropEnv)), E_LIN_INV);
     }
     // SCENISKT DJUP (scenic anchor): i "alla-flänger"-lägena hålls mittlamporna
     // som FASTA uplights i en djup, mättad palettfärg (~40%) medan ytterlamporna
@@ -1764,7 +1753,6 @@ export class EffectEngine {
     const fxToggle = !!EFFECT_MAP.get(effMode)?.toggle;   // toggle-effekt: ingen grundniva (se effektNiva)
     const fxSparse = LAMP_STAIR && (frame.section === 'low' || frame.section === 'intro') && !SPARSAM.includes(effMode) && count >= 4;   // LAMPTRAPPA (se SPARSAM)
     const fastLight = !!EFFECT_MAP.get(effMode)?.fastLight; this.fxFast = fastLight;   // effekten skippar minsta pa-tid (EffectDef.fastLight)   // STEG 2: uttoningens tidskonstant i DMX-ljus (FADE_MIN_S x gamma fore gamman)
-    this.fxPrev.set(this.fxNow);   // SPOT-regeln jamfor mot forra rutans effektnivaer
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const isAnchor = useAnchor && i > 0 && i < count - 1;   // mittlamporna = ankare
@@ -1799,26 +1787,16 @@ export class EffectEngine {
       }
       // TRE STEG FOR LJUSET (agaren 2026-10-10: "jag vill bara ha 3 stallen dar ljuset styrs"):
       //   1. EFFEKTEN satter ljusstyrka per lampa och per R/G/B - och om ljuset far andras efter (modulate.energy, standard ja).
-      //   2. ENERGIN (om effekten tillater): en faktor 0..1 ur ingangens volym med justerbar uttoning (DMX_E_RELEASE_MS); ingangsgransen
+      //   2. ENERGIN (om effekten tillater): en faktor 0..1 ur basen (BASENERGIN, se B_CURVE) med justerbar uttoning (DMX_E_RELEASE_MS); ingangsgransen
       //      (tystnad/avstangd ingang) galler alltid.
       //   3. KALIBRERINGEN sist (out.writeFixture: gamma; out.calibrate: tandpunkt+1 .. 95 %, full drop -> 100 %, dimmern konstant).
       //   Inget annat ror ljuset: ingen normering, grundniva, dropfarg/vit karna, minidrop-lyft, riser-strobe, vantelagesglod eller
       //   utgangstoning (backup fore: git-taggen backup/fore-tre-steg-2026-10-10).
       const m0 = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
-      // ENERGI PER LAMPA (EffectWants.energy): effekten bestammer; osatt -> modulate.energy, och i konsertlaget SPOT: en ljus lampa
-      // (>= 0,85) nar hogst EN annan lampa var over halva dess niva forra rutan = den hoppande spotten -> forbi energin ("95 % pa en lampa").
-      this.fxNow[i] = m0;
-      let useE = lampWantE ?? modulateOf(effMode).energy;
-      let mdUse = md;
-      if (lampWantE === undefined && CONCERT && UNIFORM.includes(effMode)) {   // ENERGI PA UTVALDA LAMPOR (agaren 10-11: 'de far garna lysa lika, men lagg da pa energieffekt pa utvalda lampor')
-        const sel = ctx.group === (Math.floor(ctx.beatIdx / 16) & 1);   // paret byts varje fras
-        useE = sel; mdUse = mdSel;
-      } else if (lampWantE === undefined && CONCERT && useE && m0 >= 0.85) { let n = 0; for (let q = 0; q < count; q++) if (q !== i && this.fxPrev[q] > 0.5 * m0) n++; if (n <= 1) useE = false; }
-      // TAKTSLAGEN PÅ ALLA LAMPOR (ägaren 10-11 kväll: "det jag vill öka är taktslagen i energieffekten ... bara allt lyser"): dämpningen
-      // mellan slagen gäller ALLA lampor (även spot och enhetliga effekters egna par), inte drop-looken och inte fastLight (strobe).
-      const kE = frame.section === 'high' ? KICK_E_HIGH : KICK_E;
-      const beatK = kE > 0 && CONCERT && !fastLight && this.dropColEnv <= 0.005 ? (1 - kE) + kE * Math.min(1, ctx.kickEnv) : 1;
-      const k = inputGate * (useE ? mdUse : drive) * beatK;   // + TAKTSLAGEN (se KICK_E)
+      // ENERGI PER LAMPA (EffectWants.energy): effekten bestammer; osatt -> modulate.energy.
+      const useE = lampWantE ?? modulateOf(effMode).energy;
+      // (SPOT-regeln, UNIFORM:s ovalda par och taktdippen KICK_E borttagna 10-12 - förbivägar/dubbelmodulering, se B_CURVE)
+      const k = inputGate * (useE ? md : drive);
       rgb[0] *= k; rgb[1] *= k; rgb[2] *= k;
       // ENERGIN SLACKER ALDRIG (agaren 2026-10-10: "energi skall aldrig slacka om effekten vill ha pa en lampa"): vill effekten ha
       // lampan tand (m0 > 0) och ingangen ar pa (k > 0) halls den pa lagst 1 % (gammans forsta steg -> utgangens tandpunkt+1).
@@ -1885,7 +1863,7 @@ export class EffectEngine {
       const r = tgt > this.secCeil ? dtNow / 0.3 : dtNow / 2.0;                                  // upp snabbt, ner långsamt
       this.secCeil += Math.max(-r, Math.min(r, tgt - this.secCeil));
     }
-    this.out.calibrate(this.universe, this.cfg.fixtures, (this.cfg.master ?? 1) * (CONCERT ? this.secCeil : 1), performance.now(), this.dropColEnv);
+    this.out.calibrate(this.universe, this.cfg.fixtures, this.cfg.master ?? 1, performance.now(), this.dropColEnv, CONCERT ? this.secCeil : 1);
 
     // Rök: motorn avgör OM den ska spruta, output-tjänsten var signalen hamnar.
     // RÖK: motorn samlar önskemålen — drop, manuell knapp, eller en effekt som bett om
