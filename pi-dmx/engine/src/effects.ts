@@ -80,7 +80,7 @@ const CONCERT_KICK = Math.max(0, Math.min(1, Number(process.env.DMX_CONCERT_KICK
  *  ögonblicket och drar upp energifönstrets topp - refrängen efter mäts mot den och dämpas. Efter en drop släpper energin helt i
  *  DROP_LIFT_MS och glider tillbaka på DROP_LIFT_FALL_MS. Bara mindre dämpning. */
 const DROP_LIFT_MS = Number(process.env.DMX_DROP_LIFT_MS ?? 4000), DROP_LIFT_FALL_MS = Number(process.env.DMX_DROP_LIFT_FALL_MS ?? 1500);   // 2000 -> 4000 (ladan 22:0x: 'se till så energin efter fortsätter', som minidropens lyft som var 'perfekt')   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
-const KICK_E = Math.max(0, Math.min(0.8, Number(process.env.DMX_KICK_E ?? 0.5)));
+const KICK_E = Math.max(0, Math.min(0.9, Number(process.env.DMX_KICK_E ?? 0.7)));   // 0,5 -> 0,7 (ladan 10-12 12:4x: 'lamporna får gärna gå djupare')
 const CONCERT_E_FLOOR = Math.max(0, Math.min(0.9, Number(process.env.DMX_CONCERT_E_FLOOR ?? 0.4)));
 const SECTION_PALETTE = CONCERT;
 /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
@@ -119,7 +119,7 @@ const EKO_BASS = 0.85;
  *  på den ljusaste lampan (SEC_CEIL vers/intro/break, builden stiger mot SEC_CEIL_BUILD, refräng/drop fullt), djupare taktdipp i
  *  refrängen (KICK_E_HIGH 0,6) och energigolv 0,8 där. Replay 22 ladan-filer: topp refräng 0,76 / build 0,66 / vers 0,62,
  *  slagdjup refräng 68 % (djupast), tända lampor oförändrade (2,4). Grundton på mörka lampor och kickblixt på alla förkastade. */
-const SEC_CEIL = 0.65, SEC_CEIL_BUILD = 0.85, KICK_E_HIGH = 0.6, HIGH_E_FLOOR = 0.8, BUILD_CHARGE = 0.5;
+const SEC_CEIL = 0.65, SEC_CEIL_BUILD = 0.85, KICK_E_HIGH = 0.8, HIGH_E_FLOOR = 0.8, BUILD_CHARGE = 0.5;
 const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
 const PALETTE_LOCK: number[] | null = (() => {
   const v = (process.env.DMX_PALETTE ?? "").trim(); if (!v) return null;
