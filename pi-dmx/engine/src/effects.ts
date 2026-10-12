@@ -704,6 +704,14 @@ export class EffectEngine {
     this.kickCount++;
   }
 
+  /** SPÄRRAD DROP = MINIDROP (10-12): drop inom SHOW_DROP_GAP_MS från förra -> minidrop-looken + lyftet i stället. */
+  private gapMini(nowWall: number): void {
+    if (nowWall - this.lastMiniWall < MINI_GAP_MS) return;
+    this.lastMiniWall = nowWall; this.liftCount++; this.miniSector = mixedSector(this.liftCount + 7);
+    this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + MINI_LIFT_MS;
+    if (isLogOn()) console.log('[dirigent] drop inom spärren -> minidrop');
+  }
+
   render(frame: Frame): Uint8Array {
     // Fri-rullande "show-tid": normalt 1× realtid, men accelererar under en
     // uppbyggnad (buildUp från förra framen) så mönstren snabbar upp mot dropen.
@@ -1025,11 +1033,11 @@ export class EffectEngine {
     // EN SPÄRR FÖR ALLA DROPS (ladan 10-12 12:45 'fel drop': lyft+språng-dropen 12:45:41, sedan analysatorns drop 14 s senare - analysatorns
     // 20 s-spärr (DROP_LONG_MS) räknar bara sina egna). Konsertläget: ingen drop inom SHOW_DROP_GAP_MS från förra, oavsett källa.
     const dropGapMs = DROP_MIN_GAP_S > 0 ? DROP_MIN_GAP_S * 1000 : CONCERT ? SHOW_DROP_GAP_MS : 0;
-    if (dropGapMs > 0 && dropHitRaw) { if (nowWall - this.lastShowDropWall < dropGapMs) { dropHitRaw = false; this.dropCalmDenied++; } else this.lastShowDropWall = nowWall; }
+    if (dropGapMs > 0 && dropHitRaw) { if (nowWall - this.lastShowDropWall < dropGapMs) { dropHitRaw = false; this.dropCalmDenied++; if (CONCERT) this.gapMini(nowWall); } else this.lastShowDropWall = nowWall; }   // spärrad drop -> minidrop (ägaren 10-12: 'tidsspärren skall gälla riktiga bara, så kör den annars som minidrop')
     if (DROP_SONG_HOLD_S > 0) {
       if (dropHitRaw && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000) { dropHitRaw = false; this.dropCalmDenied++; }
     }
-    if (this.upgradeHit) { this.upgradeHit = false; if (!(CONCERT && nowWall - this.lastShowDropWall < SHOW_DROP_GAP_MS)) { dropHitRaw = true; this.lastShowDropWall = nowWall; this.buildUpgrades++; } }   // BUILD SOM LANDAR: forra rutans nastan-drop efter en build
+    if (this.upgradeHit) { this.upgradeHit = false; if (!(CONCERT && nowWall - this.lastShowDropWall < SHOW_DROP_GAP_MS)) { dropHitRaw = true; this.lastShowDropWall = nowWall; this.buildUpgrades++; } else this.gapMini(nowWall); }   // BUILD SOM LANDAR: forra rutans nastan-drop efter en build
     let dropHit = dropHitRaw;
     if (CONCERT && dropHit) this.dropLiftUntil = nowWall + DROP_LIFT_MS;   // DROPEN BÄR IN I REFRÄNGEN
     // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
