@@ -8,6 +8,14 @@
   (b) LYFT + SPRÅNG (effects.ts DROP_JUMP_DB 17, DROP_PAIR_MS 600): energilyftet (0,6 s-medel >= 10 dB) och nästan-drop-språnget
       samtidigt - kräver 0,6 s medel, alltså byggt för att komma efter flanken.
   + gemensam spärr SHOW_DROP_GAP_MS 12 s; en spärrad drop blir minidrop.
+INSPELNING MED FACIT 10-12: tools/ladan-2026-10-11/lang-20261012T110658.wav (13:06:58-13:16:58, 10 min) + journalens [dropfire]/
+  [dirigent] 13:06-13:18 (felsökning på). Ägarens rapporter (skrivtid, händelsen ~3-15 s före): 13:06:59 'drop, lite sen', 13:11:13
+  'drop, ok', 13:12:31 'drop, full körde mini' (ville full drop, fick minidrop ~13:12:13-26), 13:13:34 'drop, kunde vart mini'
+  (lyft+språng-drop 13:13:28), 13:13:57 'drop miss', 13:14:21 'förra skulle dock vara mini', 13:14:30 'minidrop miss', 13:14:46 'fel
+  drop skulle vara mini' (lyft+språng 13:14:37), 13:15:07 'drop miss' (fick minidrop 13:15:04), 13:15:32 'sen drop' (dropfire 13:15:29),
+  13:15:42 'kunde också vart mini'. Analysatorns drops med edgeAgo 4795 ms (13:17:44) och 13675 ms (13:16:23) = fyrar SEKUNDER efter
+  flanken - huvudmisstänkt för 'sen'. EFTER detta (13:21 LIVE): lyft+språng-dropen BORTTAGEN (lyft = minidrop), riktiga drops bara
+  från analysatorn, spärr 12 s, spärrad drop -> minidrop. Ägaren: 'hellre öka gränsen till riktig drop, bara minidrops kör vidare'.
 GÖR: mät timingen per källa mot ljudet - var är smällen (baskroppens/kickens flank, onset) och när fyrar ljuset (inkl. kedjan:
 fade-in 30 ms, BLE/DMX-latens ~0)? Fördelning tidig/rätt/sen per källa på alla långinspelningar (tools/ladan-2026-10-11/, och nya
 från 10-12 om de finns), facit = ägarens rapporter (tider i todo ovan: 'sen' 21:29:57, 21:52:5x; 'lite tidig' 10-12 ~12:47;
