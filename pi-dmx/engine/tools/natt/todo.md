@@ -2,6 +2,9 @@
 
 ## ÄGARENS UPPDRAG 10-12 KVÄLL: RÖD TRÅD - "nu känns det bara som olika effekter hoppar hela tiden. Kan man få någon bra röd tråd,
 ## mer som att den är förprogrammerad?" (går före situationsrutnätet; drop-timingen nedan är lika viktig)
+MÅLET I ÄGARENS ORD (tillägg): "så allt mer känns anpassat efter låten och som att de hänger ihop" - looken ska matcha LÅTENS
+karaktär (tempo, basgång, energi, lugn/fart/full) och delarna ska höra ihop (samma kulörfamilj/gruppering genom låten, refrängen
+en förhöjd version av versen snarare än en helt annan effekt, builden leder in i refrängens look).
 Läget (main 41e06a5, LIVE 19:05): 78 effekter, dirigenten byter look 4,9 ggr/min (median ~12 s per look) och väljer ~60 olika looker
 per 2 h; orsaker (replay 22 filer): sektion ~40 %, fras ~30 %, basgång, karaktär, drop, build, tempo. Sektionsdetektorn fladdrar
 (low/build/high/intro byts ofta på 5-20 s, falska låtgränser -> 'ny låt: glömmer looker'), och varje fladder blir ett lookbyte.
