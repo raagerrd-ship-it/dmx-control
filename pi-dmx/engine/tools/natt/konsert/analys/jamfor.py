@@ -1,6 +1,6 @@
 import json,glob,statistics as st,collections,sys,bisect
 B='C:/Users/richa/Desktop/Claude/dmx-control/pi-dmx/engine/tools/natt/konsert/'
-BUILD={'upptakt','nedrakning','fyllning','pingpong','virvel'}
+BUILD={'upptakt','nedrakning','fyllning','pingpong','virvel','gryning','rulle'}
 def lifts(R,TH=8):
     t=[r[0] for r in R]; b=[max(-60,r[13]) for r in R]; n=len(R); S=[]
     for i in range(n):

@@ -40,7 +40,7 @@ const UNIFORM: Mode[] = ['breathe', 'snap', 'mono', 'pulse', 'party', 'airglow',
  *  är bara BUILD_LOOKS, och när en build-look väl börjat bryts den bara av drop/nästan-drop (långinspelningen: upptakt -> eq -> basgang
  *  på 4 s, avbrutet av basgång/fras/sektion); (2) en NÄSTAN-DROP 2..20 s efter att build-looken började räknas som en RIKTIG drop i
  *  showen (drop-look, rök, drop-look-byte) - analysatorns 4 s-break-krav missar dropen efter en trumvirvel-build. */
-const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning', 'fyllning', 'pingpong', 'virvel'];   // 10-11: tre nya build-effekter (ägaren: fler per gren)
+const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning', 'fyllning', 'pingpong', 'virvel', 'gryning', 'rulle'];   // + gryning (lugn) och rulle (full), situationsrutnätet 10-12   // 10-11: tre nya build-effekter (ägaren: fler per gren)
 /** NÄSTAN ENHETLIGA (ägaren i ladan 10-11: "finns någon effekt där alla lampor har samma effekt och bara energi fadas lite svagt, den
  *  borde ha bpm-spärr, under kanske 80"): spridning < ~0,16 i båda mixarna (tools/effectDyn.mjs). Analysatorn rapporterar 80..160 BPM
  *  (DMX-profilen BPM_MIN 80, långsamma låtar vikes upp) - 'under 80' finns inte, så de får bara väljas under CALM_BPM (90). */

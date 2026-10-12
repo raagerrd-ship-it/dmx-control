@@ -62,6 +62,11 @@ LÄGET 10-11 (50 effekter, "rumsl" = lamporna lyser olika; tools/effectDyn.mjs s
   lugn         | 11 (8 rumsl)| 6 (5)        | 0           | 0             | 7 (4)
   fart         | 0           | 14 (11)      | 11 (7)      | 8 (7)         | 1 (0)
   full         | 0           | 2 (2)        | 0           | 15 (12)       | 0
+KLART 2026-10-12 (dagsession, ej deployat): 8 nya - svall (lugn x high), gryning (lugn x build), ankomst (fart x intro), glimt
+  (fart x break), rulle (full x build), kickregn (full x intro), efterskalv (full x break), motor (full x low). effectDyn spridning
+  1,00 alla. Replay 22 ladan-filer: valda 5,8 % av tiden (ankomst 2,2, gryning 0,9, motor 0,9, rulle 0,8, kickregn 0,6, svall 0,4);
+  glimt/efterskalv 0 - ladans 'break' har nästan alltid basgång (eko/toggle-poolen tar dem). BUILD_LOOKS + gryning, rulle.
+  c.lamp = fysisk lampa (ring-effekterna), c.idx = växlande ordning. NÄSTA: fyll varje ruta till 4-6 (lugn x high/build har 1).
 GÖR, några rutor per natt (5-8 nya effekter), tomma rutor först: lugn x high (lugn låts refräng), lugn x build, fart x intro,
 fart x break, full x build, full x intro, full x break, full x low. Sedan varje ruta upp till 4-6, och inom rutan minst en per
 musikdimension (basgång / kick / ingen takt). REGLER för en ny effekt: egen signal ur rutan (inte en dubblett), rumslig (spridning

@@ -2,7 +2,7 @@ import json,glob,os,collections,datetime
 D='C:/Users/richa/Desktop/Claude/dmx-control/pi-dmx/engine/tools/ladan-2026-10-11/'
 TZ=datetime.timezone(datetime.timedelta(hours=2))
 f=lambda ms: datetime.datetime.fromtimestamp(ms/1000,TZ).strftime('%H:%M:%S')
-BUILD={'upptakt','nedrakning','fyllning','pingpong','virvel'}
+BUILD={'upptakt','nedrakning','fyllning','pingpong','virvel','gryning','rulle'}
 tot=collections.Counter(); whyc=collections.Counter(); sect=collections.Counter(); T=0; SW=0; DR=0; MI=0
 for p in sorted(glob.glob(D+'lang-*.events.json')):
     d=json.load(open(p)); fl=d['flags']; s0=d['captureStartWallMs']; sec=d['seconds']; end=s0+sec*1000

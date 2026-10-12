@@ -59,6 +59,14 @@ import { basgang } from "./basgang.js";
 import { tyngdlyft } from "./tyngdlyft.js";
 import { frasraknare } from "./frasraknare.js";
 import { vidga } from "./vidga.js";
+import { svall } from "./svall.js";
+import { gryning } from "./gryning.js";
+import { ankomst } from "./ankomst.js";
+import { glimt } from "./glimt.js";
+import { rulle } from "./rulle.js";
+import { kickregn } from "./kickregn.js";
+import { efterskalv } from "./efterskalv.js";
+import { motor } from "./motor.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
@@ -81,6 +89,8 @@ export const EFFECTS: EffectDef[] = [
   // sol (rankades alltid sist, aldrig vald), subbreath (bara andning, inget eget monster). Filerna finns i git-historiken.
   // 2026-09-29: vidga (energin oppnar riggen utifran och in, alla i takt vid hog energi)
   vidga,
+  // SITUATIONSRUTNATET 2026-10-12 (agaren: "kor vidare med fler effekter"): en effekt per tom ruta tier x sektion.
+  svall, gryning, ankomst, glimt, rulle, kickregn, efterskalv, motor,
 ];
 
 /** Specialrolls-mappning: vilka fixture-roller (hazer/uv/blinder/strobe/laser/co2)
@@ -118,6 +128,7 @@ const SPECIALTY_DRIVES: Partial<Record<Mode, ChannelRole[]>> = {
   sug:      ["hazer", "blinder", "uv"],
   nedrakning: ["hazer", "blinder"],
   upptakt:  ["hazer"],
+  rulle:    ["hazer"],
   fyrverkeri: ["blinder", "strobe"],
   andrum:   ["hazer"],
   // 2026-09-23

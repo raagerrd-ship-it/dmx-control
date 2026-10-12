@@ -3,7 +3,7 @@
  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
  */
 
-export type Mode = "smart" | "stegring" | "andrum" | "sug" | "vagbrytare" | "nedrakning" | "upptakt" | "fyllning" | "pingpong" | "virvel" | "fyr" | "rullandning" | "fyrverkeri" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "strobe" | "rave" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "duel" | "airglow" | "tide" | "drift" | "pendel" | "viska" | "backbeat" | "tick" | "stege" | "eko" | "hjarta" | "konfetti" | "sopa" | "varannan" | "forvarning" | "basgang" | "tyngdlyft" | "frasraknare" | "vidga" | "blackout";
+export type Mode = "smart" | "stegring" | "andrum" | "sug" | "vagbrytare" | "nedrakning" | "upptakt" | "fyllning" | "pingpong" | "virvel" | "fyr" | "rullandning" | "fyrverkeri" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "strobe" | "rave" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "duel" | "airglow" | "tide" | "drift" | "pendel" | "viska" | "backbeat" | "tick" | "stege" | "eko" | "hjarta" | "konfetti" | "sopa" | "varannan" | "forvarning" | "basgang" | "tyngdlyft" | "frasraknare" | "vidga" | "svall" | "gryning" | "ankomst" | "glimt" | "rulle" | "kickregn" | "efterskalv" | "motor" | "blackout";
 
 /** Hyresgäst-stämning: ETT val ställer in hela riggens känsla (se moods.ts). */
 
