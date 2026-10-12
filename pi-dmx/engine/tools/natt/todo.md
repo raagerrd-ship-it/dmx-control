@@ -1,5 +1,22 @@
 # Natt-agentens uppdrag
 
+## ÄGARENS UPPDRAG 10-12 (går först): FULL DROP-TIMINGEN - "känns som bara var 3:e träffar rätt"
+Ägaren i ladan 10-12 13:0x. Två källor till riktiga drops (live sedan 10-11 kväll / 10-12):
+  (a) analysatorns drop ([dropfire] i journalen: rise/underPeak/goneSpan/edgeAgo; edgeAgo = tid från baskroppens stigande flank till
+      fyrningen - 10-12 12:45:55 var edgeAgo 2160 ms (!), 12:46:45 224 ms; 10-11 21:52:43 202 ms 'sen'), kräver 2 s bastystnad
+      (BODY_GONE_MIN_MS 2000) och kroppen inom 3 dB från toppen (DROP_QUALITY_DB) - väntan på toppen gör den sen;
+  (b) LYFT + SPRÅNG (effects.ts DROP_JUMP_DB 17, DROP_PAIR_MS 600): energilyftet (0,6 s-medel >= 10 dB) och nästan-drop-språnget
+      samtidigt - kräver 0,6 s medel, alltså byggt för att komma efter flanken.
+  + gemensam spärr SHOW_DROP_GAP_MS 12 s; en spärrad drop blir minidrop.
+GÖR: mät timingen per källa mot ljudet - var är smällen (baskroppens/kickens flank, onset) och när fyrar ljuset (inkl. kedjan:
+fade-in 30 ms, BLE/DMX-latens ~0)? Fördelning tidig/rätt/sen per källa på alla långinspelningar (tools/ladan-2026-10-11/, och nya
+från 10-12 om de finns), facit = ägarens rapporter (tider i todo ovan: 'sen' 21:29:57, 21:52:5x; 'lite tidig' 10-12 ~12:47;
+'rätt' 21:31:12, 12:46:0x; 'fel drop' 12:46:0x) + ihållande baslyft (konsertReplay + analys-2026-10-11.md). Hitta varför 2 av 3
+känns fel (för sen? för tidig? fel ställe?) och föreslå EN ersättning bevisad i bänken (t.ex. fyra på flanken när bastystnaden
+varit lång nog, i stället för att vänta på toppen). Ändra inte den delade analysatorn (analyser.ts) - profilen (analyserProfile.ts)
+och effects.ts går bra. Deploya aldrig; 'redo för ladan' med siffror.
+
+
 ## NATTEN 2026-10-12 (nattagenten, inget deployat)
 KLART 2026-10-12: baslinje natt/2026-10-12.json (pop 125/0,50 r 0,42; mega 175/0,50 r 0,07; korpus 150/0,48; 22 aldrig valda).
 KLART 2026-10-12: refrängen ljusare än builden -> opt-in DMX_EKO_HIGH=0 (56c6527): eko-förstavalet vid basgång gäller inte i high.
