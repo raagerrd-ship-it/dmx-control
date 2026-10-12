@@ -18,7 +18,7 @@ export const sug: EffectDef = {
     const every = late > 0.66 ? 1 : late > 0.33 ? 2 : 4;
     const onBeat = c.hasBeat && c.beatIdx % every === 0;
     const pulse = onBeat ? Math.exp(-c.beatFrac / 0.08) : 0;
-    const center = 1 - Math.abs((c.idx + 0.5) / c.count - 0.5) * 2;              // 1 i mitten, 0 i kanten
+    const center = 1 - Math.abs((c.lamp + 0.5) / c.count - 0.5) * 2;              // 1 i mitten, 0 i kanten
     const hue = c.mixedSector(Math.floor(c.t / 9)) / 6;
     const base = (0.35 + 0.3 * Math.min(1, b / 0.6)) * (1 - late * 0.92);        // sugs ner mot svart
     c.want.hazer = 0.4 + 0.6 * Math.max(late, b * 0.5); c.want.uv = late * 0.8;

@@ -10,7 +10,7 @@ export const fyllning: EffectDef = {
     const n = Math.max(1, c.count);
     const bar = Math.floor(c.beatIdx / 4), beatInBar = ((c.beatIdx % 4) + 4) % 4;
     const lit = c.buildUp > 0 ? Math.min(n, 1 + Math.floor(c.buildUp * n)) : (bar % n) + 1;   // riggen fylls över hela uppbyggnaden (32 slag), annars en lampa till per takt
-    const rank = c.idx < n / 2 ? 2 * c.idx : 2 * (n - 1 - c.idx) + 1;   // utifrån och in: 0, sista, 1, näst sista ...
+    const rank = c.lamp < n / 2 ? 2 * c.lamp : 2 * (n - 1 - c.lamp) + 1;   // utifrån och in: 0, sista, 1, näst sista ...
     const on = rank < lit;
     const last = lit >= n && beatInBar === 3;                        // frasens sista slag: alla
     const hit = Math.exp(-c.beatFrac / 0.18);

@@ -22,7 +22,7 @@ export const stegring: EffectDef = {
     // (every). Att OCKSA dra mattnaden till 0,15 gjorde hela stegringen vit. 0,85 -> 0,35.
     const sat = 1 - u * 0.35;                                                       // bleknar nagot, men behaller kuloren
     const base = 0.12 + 0.55 * u * u;                                               // lyfter mot taket
-    const spatial = 1 - Math.abs((c.idx + 0.5) / c.count - 0.5) * (1 - u) * 0.6;    // mitten forst, kanterna kommer med
+    const spatial = 1 - Math.abs((c.lamp + 0.5) / c.count - 0.5) * (1 - u) * 0.6;    // mitten forst, kanterna kommer med
     c.want.uv = u; c.want.hazer = 0.3 + 0.7 * u;
     if (c.dropEnv > 0.7) c.want.blinder = c.dropEnv;
     return c.hsv(hue, sat, Math.min(1, (base + pulse * (0.3 + 0.5 * u)) * spatial + c.dropEnv * 0.6));

@@ -11,9 +11,9 @@ export const ripple: EffectDef = {
   desc: "Slaget slar ner i mitten och krusningen rullar utat, hogre ju narmare refrangens niva.",
   render(c) {
     const center = (c.count - 1) / 2;
-    const d = Math.abs(c.idx - center);                      // avstånd från mitten
+    const d = Math.abs(c.lamp - center);                      // avstånd från mitten
     const maxD = center || 1;
-    const ring = c.count < 3 ? (c.idx % 2) : d / maxD;       // 0 = mitten .. 1 = kanten
+    const ring = c.count < 3 ? (c.lamp % 2) : d / maxD;       // 0 = mitten .. 1 = kanten
     const isOuter = ring > 0.99;
     const lv = c.levelVsHighDb;
     const amp = lv !== 0 || c.section === 'high' ? Math.max(0.35, Math.min(1, 1 + lv / 9)) : 0.8;   // refrangskala

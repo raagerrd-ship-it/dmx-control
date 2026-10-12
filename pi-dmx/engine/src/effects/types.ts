@@ -98,6 +98,9 @@ export interface EffectContext {
   drum: { kick: number; snare: number; hat: number; bass: number };
 
   /** Taktindex + fas (0..1) från BPM-klockan; beatPulse = mjuk puls-envelope. */
+  /** FYSISK LAMPA (10-12): lampans riktiga plats i riggen 0..count-1. c.idx är platsen i den växlande ordningen (framåt/bakåt/
+   *  utifrån-in/inifrån-ut, 10-11); effekter som bygger på mitten/kanten (ring, utifrån och in) ska läsa c.lamp. */
+  lamp: number;
   beatIdx: number;
   /** KULÖRKLOCKAN: som beatIdx, men med DMX_HUE_PHRASE=1 stegar den bara vid frasgräns (16 slag) - effekterna tar kulören härifrån
    *  ("kulörbyte per fras i stället för per takt", KONSERTSHOW 10-11). Av = beatIdx. */

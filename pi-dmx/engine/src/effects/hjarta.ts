@@ -12,7 +12,7 @@ export const hjarta: EffectDef = {
     // ar forskjuten per ring, inte bara en liten additiv term (forr 0,25 x en 0,04-slags glidning per idx: osynlig pa fyra
     // lampor, sa hjarta lastes som en uniform puls = pulse). Ring = avstand fran mitten (0,5 / 1,5 pa fyra lampor).
     const half = (c.count - 1) / 2;
-    const ring = Math.max(0, Math.abs(c.idx - half) - 0.5) / Math.max(0.5, half - 0.5);   // 0 inre .. 1 yttre
+    const ring = Math.max(0, Math.abs(c.lamp - half) - 0.5) / Math.max(0.5, half - 0.5);   // 0 inre .. 1 yttre
     let f = c.beatFrac - ring * 0.12; if (f < 0) f += 1;   // kantens slag ar forra slagets svans tills det nar dit
     const lub = Math.exp(-f / 0.10);                      // huvudslaget
     const dub = Math.exp(-Math.max(0, f - 0.22) / 0.09) * (f > 0.22 ? 0.55 : 0);

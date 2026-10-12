@@ -599,7 +599,7 @@ export class EffectEngine {
 
   // Pre-allokerad kontext för noll-allokering i render-loopen
   private ctx: EffectContext = {
-    cfg: null as any, frame: null as any, fx: undefined, t: 0, idx: 0, count: 0, want: {},
+    cfg: null as any, frame: null as any, fx: undefined, t: 0, idx: 0, lamp: 0, count: 0, want: {},
     audio: 0, kickEnv: 0, trebleEnv: 0, airEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null as any, expectHighInMs: -1, levelVsHighDb: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionEntry: 0, sectionTier: 1, repeatSim: 0,
     sectionBars: 0, bassline: 0, bassNoteIdx: 0, bassNoteAge: 9,
     beatIdx: 0, hueIdx: 0, beatFrac: 0, beatPulse: 0, beatHit: false, hasBeat: false,
@@ -1755,6 +1755,7 @@ export class EffectEngine {
       if (isAnchor) {
         rgb = hsvToRgb(anchorHue, 1, 0.4 + 0.06 * Math.sin(t * 0.5 + i));   // fast pelare, knappt levande andning
       } else {
+        ctx.lamp = i;
         { const n = count, e = Math.min(i, n - 1 - i), side = i < n - 1 - i ? 0 : 1;   // e = avstånd till närmaste kant
           ctx.idx = ordSel === 0 ? i : ordSel === 1 ? n - 1 - i : ordSel === 2 ? Math.min(n - 1, 2 * e + side) : Math.max(0, n - 1 - (2 * e + side)); }
         ctx.group = ctx.grouping === 'innerouter' ? ((count < 3 ? i % 2 === 1 : (i === 0 || i === count - 1)) ? 1 : 0) : i % 2;

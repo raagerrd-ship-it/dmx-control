@@ -17,7 +17,7 @@ export const nedrakning: EffectDef = {
     const cyc = beatsLeft >= 0 ? (beatsLeft > 16 ? 8 : 4) : (b > 0.7 ? 4 : 8);   // tatare nedrakning sist
     const step = beatsLeft >= 0 ? ((cyc - 1 - Math.floor(beatsLeft)) % cyc + cyc) % cyc : ((c.beatIdx % cyc) + cyc) % cyc;
     const half = (c.count - 1) / 2;
-    const ring = Math.abs(c.idx - half);                             // 0 = mitten, storst i kanten
+    const ring = Math.abs(c.lamp - half);                             // 0 = mitten, storst i kanten
     const maxRing = Math.max(1, half);
     const off = step < cyc - 1 && ring > maxRing * (1 - step / (cyc - 1)) - 1e-6;   // slackt om lampan "raknats ner"
     const all = step === cyc - 1 ? Math.exp(-c.beatFrac / 0.15) : 0;

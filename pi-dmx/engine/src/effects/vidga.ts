@@ -14,7 +14,7 @@ export const vidga: EffectDef = {
   render(c) {
     const e = Math.max(0, Math.min(1, (c.frame.intensity - 0.3) / 0.6));
     const half = Math.max(1, (c.count - 1) / 2);
-    const edge = Math.abs(c.idx - (c.count - 1) / 2) / half;          // 1 = ytterlampa, 0 = mitten
+    const edge = Math.abs(c.lamp - (c.count - 1) / 2) / half;          // 1 = ytterlampa, 0 = mitten
     const thr = 0.20 + 0.45 * (1 - edge);                              // ytter 0,20 - mitten 0,65 (4 lampor: inre 0,50)
     const x = Math.max(0, Math.min(1, (e - thr) / 0.15));
     const open = edge >= 0.99 ? 0.35 + 0.65 * x : x * x * (3 - 2 * x);  // ytterlamporna glor alltid lite
