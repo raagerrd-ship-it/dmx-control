@@ -1,5 +1,16 @@
 # Natt-agentens uppdrag
 
+## 10-13 NATT (huvudsessionen, MERGAT I MAIN, EJ DEPLOYAT): RÖD TRÅD + FLANK-DROP + TIDSBASERAD HISTORIK
+- RÖD TRÅD (låtmanus, branch 4586c1c mergad): en look per sektionstyp per låt som återkommer, byten bara vid sektion/build/drop,
+  en kulörfamilj per låt, refrängen släkt med versen. Kedja 141 min: lookbyten 5,2 -> 3,1/min, unika looker/låt 12 -> 5,
+  återseende 2 -> 78 %, variation över kvällen kvar (71 looker, 15/15 rutor). Drops/minidrops oförändrade. Mått: tools/rodTrad.mjs.
+- FLANK-DROP (83ce52c mergad, OPT-IN DMX_FLANK_DROP=1, DMX_FLANK_BREAK_S 3): rätt drops 33 % -> 78 % (4 s: 80 %, 0,31/min),
+  falska 17 -> 2, median 91 -> 24 ms. Förslag till ägaren: slå på med break 4 s i ladan.
+- HISTORIKEN TIDSBASERAD (be586f7): energilyftets/nästan-dropens fönster räknades i renderrutor - live 200 Hz gav 5x kortare
+  fönster än bänken (live 3,4 minidrops/min mot bänkens 2,1). MÄTFÄLLA 46: allt som räknar i renderrutor måste vara tidsbaserat;
+  konsertReplay --step 5 kör som live.
+
+
 ## ÄGARENS UPPDRAG 10-12 KVÄLL: RÖD TRÅD - "nu känns det bara som olika effekter hoppar hela tiden. Kan man få någon bra röd tråd,
 ## mer som att den är förprogrammerad?" (går före situationsrutnätet; drop-timingen nedan är lika viktig)
 MÅLET I ÄGARENS ORD (tillägg): "så allt mer känns anpassat efter låten och som att de hänger ihop" - looken ska matcha LÅTENS
