@@ -39,7 +39,6 @@ import { tick } from "./tick.js";
 import { stege } from "./stege.js";
 import { eko } from "./eko.js";
 import { hjarta } from "./hjarta.js";
-import { konfetti } from "./konfetti.js";
 import { sopa } from "./sopa.js";
 import { varannan } from "./varannan.js";
 import { stegring } from "./stegring.js";
@@ -85,7 +84,9 @@ export const EFFECTS: EffectDef[] = [
   // Sektionseffekter (2026-09-21): valjs av dirigenten vid build-/break-grans (DMX_SECTION_SWITCH).
   stegring, andrum, sug, vagbrytare, nedrakning, upptakt, fyllning, pingpong, virvel, fyr, rullandning, fyrverkeri,
   // Registrerade 2026-09-21 (fanns som filer men inte i poolen): sol, konfetti, sopa.
-  konfetti, sopa,
+  // konfetti BORTTAGEN 2026-10-12 (ägaren i ladan: "kör inte strobe i lugnt parti ... ta bort den effekten helt" - slumpade lampor
+  // fullt på varje slag, energy:false -> såg ut som strobe och följde med in i versen). Filen finns kvar i git-historiken.
+  sopa,
   // OVERSYN 2026-09-23 (tools/effectSimilarity.mjs v2 + effectMix): innerouter borttagen (rPerm 1,00 mot varannan, samma pool,
   // ingen egen signal), neon borttagen (aldrig vald pa nagon av ladans mixar, ingen egen signal - sol ar samma fallback).
   // Nya effekter pa analysatorns nya signaler: forvarning (expectHighInMs), basgang (bassline/basnoter), tyngdlyft
