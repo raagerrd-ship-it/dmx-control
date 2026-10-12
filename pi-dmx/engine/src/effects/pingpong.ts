@@ -8,7 +8,7 @@ export const pingpong: EffectDef = {
   render(c) {
     const bpm = c.cfg.beat?.bpm ?? 0; const beatS = bpm > 0 ? 60 / bpm : 0.5;
     const p = c.buildUp;   // uppbyggnadens förlopp 0..1 (32 slag från builden start, 10-11 22:05)
-    const rate = p >= 0.5 || (c.expectHighInMs > 0 && c.expectHighInMs < 8 * beatS * 1000) ? 2 : 1;
+    const rate = 1;   // var 2 efter halva uppbyggnaden (ägaren 10-12: 'inte kännas som en strobe' - aldrig snabbare än takten)
     const step = Math.floor(c.beatIdx * rate + c.beatFrac * rate);
     const turn = (step & 1) === c.group;
     const hit = Math.exp(-((c.beatFrac * rate) % 1) / 0.2);

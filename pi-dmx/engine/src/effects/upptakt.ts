@@ -6,14 +6,14 @@ import type { EffectDef } from "./types.js";
 // går den till full fart de sista 8 slagen. En kulör (palettens, per fras). fastLight: stegen är kortare än minsta på-tiden.
 // Varje lampa blinkar högst ~2 ggr/s även på högsta farten (stegen går runt riggen) - aldrig hela riggen synkront.
 export const upptakt: EffectDef = {
-  key: "upptakt", label: "Upptakt", tier: "fart", modulate: { energy: true, pulse: false }, section: ["build"], toggle: true, fastLight: true,
+  key: "upptakt", label: "Upptakt", tier: "fart", modulate: { energy: true, pulse: false }, section: ["build"], toggle: true,
   desc: "Uppbyggnad: en lampa i taget pendlar i takt och dubblar farten var fjärde takt medan ljuset stiger.",
   drives: ["hazer"],
   render(c) {
     const bpm = c.cfg.beat?.bpm ?? 0; const beatS = bpm > 0 ? 60 / bpm : 0.5;
     const p = c.buildUp;   // uppbyggnadens förlopp 0..1 (32 slag från builden start, 10-11 22:05)
     const nearHigh = c.expectHighInMs > 0 && c.expectHighInMs < 8 * beatS * 1000;
-    const rate = nearHigh || p >= 0.5 ? 2 : 1;   // 10-11 ägaren: på 4 steg/slag smetade uttoningen ut pendeln -> alla lampor lika. Max 2.
+    const rate = 1;   // var 2 nära refrängen (ägaren 10-12: 'inte kännas som en strobe' - aldrig snabbare än takten); void nearHigh   // 10-11 ägaren: på 4 steg/slag smetade uttoningen ut pendeln -> alla lampor lika. Max 2.
     const n = Math.max(1, c.count), seq = n > 2 ? 2 * n - 2 : n;   // pendel 0..n-1..1
     const s = Math.floor(c.beatIdx * rate + c.beatFrac * rate) % seq;
     const pos = s < n ? s : seq - s;
