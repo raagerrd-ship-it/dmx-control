@@ -67,6 +67,12 @@ import { rulle } from "./rulle.js";
 import { kickregn } from "./kickregn.js";
 import { efterskalv } from "./efterskalv.js";
 import { motor } from "./motor.js";
+import { flod } from "./flod.js";
+import { famn } from "./famn.js";
+import { spaning } from "./spaning.js";
+import { startskott } from "./startskott.js";
+import { siren } from "./siren.js";
+import { skuggor } from "./skuggor.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
@@ -91,6 +97,8 @@ export const EFFECTS: EffectDef[] = [
   vidga,
   // SITUATIONSRUTNATET 2026-10-12 (agaren: "kor vidare med fler effekter"): en effekt per tom ruta tier x sektion.
   svall, gryning, ankomst, glimt, rulle, kickregn, efterskalv, motor,
+  // andra effekten i varje ruta som hade en (agaren 10-12: "garna att alla har minst 2 st")
+  flod, famn, spaning, startskott, siren, skuggor,
 ];
 
 /** Specialrolls-mappning: vilka fixture-roller (hazer/uv/blinder/strobe/laser/co2)

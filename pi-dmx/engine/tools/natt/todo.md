@@ -66,7 +66,11 @@ KLART 2026-10-12 (dagsession, ej deployat): 8 nya - svall (lugn x high), gryning
   (fart x break), rulle (full x build), kickregn (full x intro), efterskalv (full x break), motor (full x low). effectDyn spridning
   1,00 alla. Replay 22 ladan-filer: valda 5,8 % av tiden (ankomst 2,2, gryning 0,9, motor 0,9, rulle 0,8, kickregn 0,6, svall 0,4);
   glimt/efterskalv 0 - ladans 'break' har nästan alltid basgång (eko/toggle-poolen tar dem). BUILD_LOOKS + gryning, rulle.
-  c.lamp = fysisk lampa (ring-effekterna), c.idx = växlande ordning. NÄSTA: fyll varje ruta till 4-6 (lugn x high/build har 1).
+  c.lamp = fysisk lampa (ring-effekterna), c.idx = växlande ordning.
+KLART 2026-10-12 (dagsession): alla rutor >= 2 (ägaren: "gärna att alla har minst 2 st") - flod (lugn x build), famn (lugn x high),
+  spaning (fart x intro), startskott (full x intro), siren (full x build), skuggor (full x break). 64 effekter. Närmaste syskon
+  flod-rullandning 0,78. effectSimilarity saknade c.lamp/trebleEnv/airEnv (rättat). Replay: 14 nya = 6,3 % av tiden, 47 olika looker;
+  break-rutorna (glimt, efterskalv, skuggor) väljs aldrig - ladans 'break' har basgång (eko 30 %). NÄSTA: rutorna till 4-6.
 GÖR, några rutor per natt (5-8 nya effekter), tomma rutor först: lugn x high (lugn låts refräng), lugn x build, fart x intro,
 fart x break, full x build, full x intro, full x break, full x low. Sedan varje ruta upp till 4-6, och inom rutan minst en per
 musikdimension (basgång / kick / ingen takt). REGLER för en ny effekt: egen signal ur rutan (inte en dubblett), rumslig (spridning

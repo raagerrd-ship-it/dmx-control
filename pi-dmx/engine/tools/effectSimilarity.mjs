@@ -64,7 +64,7 @@ for (let off = 0; off + HOP <= n && off < (startS + secs) * SR; off += HOP) {
     beatIdx: c.beatIdx, hueIdx: c.hueIdx ?? c.beatIdx, beatFrac: c.beatFrac, beatPulse: c.beatPulse, beatHit: c.beatHit, hasBeat: c.hasBeat,
     // 2026-09-27: heartPulse/heart + group/grouping tillkom i kontraktet (c.heart i 15 effekter, c.group i 7). Utan dem kastade
     // render() TypeError -> [0,0,0] for alla heart-effekter och c.group === 1 var alltid falskt (alla lampor "inre").
-    heartPulse: c.heartPulse, grouping: c.grouping,
+    heartPulse: c.heartPulse, grouping: c.grouping, trebleEnv: c.trebleEnv, airEnv: c.airEnv,   // 10-12: glitter-enveloperna saknades
     wavePhase, buildUp: c.buildUp, phaseSpread: c.phaseSpread, punchFloor: c.punchFloor, chasePos,
     dropFired: [...dropFired], dropHue: [...dropHue], now: ms - ms0, bands, palette: [...currentPalette()],
     mixedSector, hsv: hsvToRgb,
@@ -87,7 +87,7 @@ for (const e of EFFECTS) {
     setPalette(sn.palette);
     const lamps = [], lampsV = []; let r0 = 0, g0 = 0, b0 = 0;
     for (let k = 0; k < LAMPS; k++) {
-      sn.idx = k; sn.band = sn.bands[k]; sn.want = {};
+      sn.idx = k; sn.lamp = k; sn.band = sn.bands[k]; sn.want = {};   // lamp = fysisk lampa (10-12)
       sn.group = sn.grouping === 'innerouter' ? ((k === 0 || k === LAMPS - 1) ? 1 : 0) : k % 2;   // som effects.ts:1830
       let rgb; try { rgb = e.render(sn); } catch (err) { rgb = [0, 0, 0]; if (!WANT[e.key + ":err"]) { WANT[e.key + ":err"] = 1; console.error(`render-fel ${e.key}: ${err.message}`); } }
       const r = Math.max(0, Math.min(1, rgb[0] || 0)), g = Math.max(0, Math.min(1, rgb[1] || 0)), b = Math.max(0, Math.min(1, rgb[2] || 0));
