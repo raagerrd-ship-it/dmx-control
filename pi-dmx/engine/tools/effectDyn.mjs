@@ -31,12 +31,12 @@ for (const look of LOOKS) {
   const t00 = EPOCH + startS * 1000; Date.now = () => t00; performance.now = () => t00 - EPOCH;
   const eng = new EffectEngine(cfg);
   const buf = new Float32Array(HOP); let lastRender = -1;
-  const SP = [], LV = [], hist = lamps.map(() => []), MOV = [];
+  const SP = [], LV = [], hist = lamps.map(() => []), MOV = [], BPM = [];
   const end = Math.min(nSamples, Math.floor((startS + maxS) * SR));
   for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= end; off += HOP) {
     for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
     const ms = EPOCH + off / SR * 1000; an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
-    const fr = an.process(buf); feed.update(fr, cfg, an);
+    const fr = an.process(buf); feed.update(fr, cfg, an); if (fr.bpm > 0) BPM.push(fr.bpm);
     if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
     lastRender = ms; eng.render(fr); const u = eng.universe; if (!u || off / SR - startS < 15) continue;
     const v = lamps.map(([r, g, b]) => Math.max(u[r] ?? 0, u[g] ?? 0, u[b] ?? 0));
@@ -49,8 +49,13 @@ for (const look of LOOKS) {
     const w = h.slice(s, s + WIN).sort((a, b) => a - b); const p90 = w[Math.floor(WIN * 0.9)], p10 = w[Math.floor(WIN * 0.1)];
     if (p90 >= 20) MOV.push((p90 - p10) / p90);
   }
-  out[look] = { spridning: +med(SP).toFixed(2), rorelse: +med(MOV).toFixed(2), niva: +med(LV).toFixed(2) };
+  // BLINKAR PER SLAG OCH LAMPA (10-12, ägaren: 'bara 1 gång per takt per lampa'): en blink = lampan når över 50 % av sin p90 efter att ha
+  // varit under 25 % sedan förra blinken. Max över lamporna, delat med antalet slag (median-BPM).
+  const bpm = med(BPM) || 120, beats = hist[0].length * STEP_MS / 60000 * bpm;
+  const blink = Math.max(...hist.map((h) => { const s2 = [...h].sort((a, b) => a - b), p90 = s2[Math.floor(s2.length * 0.9)] || 0; if (p90 < 20) return 0;
+    let n = 0, low = true; for (const x of h) { if (low && x > 0.5 * p90) { n++; low = false; } else if (!low && x < 0.25 * p90) low = true; } return n; })) / Math.max(1, beats);
+  out[look] = { spridning: +med(SP).toFixed(2), rorelse: +med(MOV).toFixed(2), niva: +med(LV).toFixed(2), blinkPerSlag: +blink.toFixed(2) };
 }
 const rows = Object.entries(out).sort((a, b) => (a[1].spridning + a[1].rorelse) - (b[1].spridning + b[1].rorelse));
-process.stdout.write(rows.map(([k, v]) => `${k.padEnd(12)} spridning ${v.spridning.toFixed(2)}  rorelse ${v.rorelse.toFixed(2)}  niva ${v.niva.toFixed(2)}`).join("\n") + "\n");
+process.stdout.write(rows.map(([k, v]) => `${k.padEnd(12)} spridning ${v.spridning.toFixed(2)}  rorelse ${v.rorelse.toFixed(2)}  niva ${v.niva.toFixed(2)}  blink/slag ${v.blinkPerSlag.toFixed(2)}`).join("\n") + "\n");
 if (opt("--json", null)) writeFileSync(opt("--json"), JSON.stringify(out, null, 1));

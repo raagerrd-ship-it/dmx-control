@@ -122,7 +122,8 @@ fart x break, full x build, full x intro, full x break, full x low. Sedan varje 
 musikdimension (basgång / kick / ingen takt). REGLER för en ny effekt: egen signal ur rutan (inte en dubblett), rumslig (spridning
 >= 0,3 i effectDyn, aldrig alla lampor lika - de enhetliga får energi på utvalda lampor), kulör ur paletten via c.hueIdx (kulörsvansen
 vid frasbytet ska finnas kvar - ägaren gillar den), ingen vitning (avmättnad <= 0,35), fastLight bara om stegen är kortare än 150 ms,
-strobe <= 3 Hz synkront. Bevis per effekt: effectDyn (spridning/rörelse/nivå), effectSimilarity mot syskonen i rutan (< 0,9), att
+strobe <= 3 Hz synkront. ÄGAREN 10-12: INGET SKA KÄNNAS SOM STROBE - högst 1 blink per slag och LAMPA (som rulle: grupper får
+turas om), kulörbyten högst 1 per slag. Mät med effectDyn 'blink/slag' (alla 78 <= 0,42 den 10-12). Bevis per effekt: effectDyn (spridning/rörelse/nivå), effectSimilarity mot syskonen i rutan (< 0,9), att
 dirigenten väljer den i rätt läge (showTight/concertBench lookTime på mixar + ladan-2026-10-11-inspelningarna). Effekter på tagg
 (section/tier/toggle) räcker för att dirigenten ska hitta dem; kontrollera att poolen inte töms (fallbacks i effects.ts).
 Deploya aldrig - "redo för ladan" med listan av nya effekter, ägaren tittar.
