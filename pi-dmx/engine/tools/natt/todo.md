@@ -1,5 +1,21 @@
 # Natt-agentens uppdrag
 
+## ÄGARENS UPPDRAG 10-12 KVÄLL: RÖD TRÅD - "nu känns det bara som olika effekter hoppar hela tiden. Kan man få någon bra röd tråd,
+## mer som att den är förprogrammerad?" (går före situationsrutnätet; drop-timingen nedan är lika viktig)
+Läget (main 41e06a5, LIVE 19:05): 78 effekter, dirigenten byter look 4,9 ggr/min (median ~12 s per look) och väljer ~60 olika looker
+per 2 h; orsaker (replay 22 filer): sektion ~40 %, fras ~30 %, basgång, karaktär, drop, build, tempo. Sektionsdetektorn fladdrar
+(low/build/high/intro byts ofta på 5-20 s, falska låtgränser -> 'ny låt: glömmer looker'), och varje fladder blir ett lookbyte.
+En ljustekniker programmerar en låt: få looker per låt som ÅTERKOMMER (vers-look, build-look, refräng-look, break-look), byten på
+riktiga sektionsgränser, en kulörfamilj per låt, variation inom looken (kulör per fras, lampordning) i stället för nya looker.
+GÖR: (1) mät 'röd tråd' i bänken (tools/konsertReplay.mjs): lookbyten/min, unika looker per låt, andel byten som sker vid en
+sektionsgräns som håller >= 8 s, återseende (samma sektionstyp i samma låt -> samma look), hur ofta en look visas < 8 s; (2) föreslå
+EN ersättning som ger tydlig röd tråd, t.ex. 'låtens manus': vid låtstart väljs en liten uppsättning looker per sektionstyp ur
+rutnätet (tier x sektion x basgång/kick) som sedan återanvänds hela låten; fras/basgång/karaktär byter inte look (bara kulör/
+lampordning/gruppering), sektionsbyte kräver att sektionen hållit sig X s (eller att det är build/drop), nya looker bara vid ny låt;
+(3) bevisa i bänken att drops/minidrops/energi är oförändrade och att variationen över en kväll finns kvar (alla rutor används över
+många låtar). 'Ersätt, lägg inte till lager/rattar'. Deploya aldrig - 'redo för ladan' med siffror före/efter.
+
+
 ## 10-12 EFTERMIDDAG: NY ENERGIKEDJA I MAIN (ej deployad) - läs först
 Ägaren: 'energin kändes inte ... vill att ljuset följer basgången, sub-känslan i ögonen, svänga mycket, taket sänks efter var i låten'.
 Tre agenter: granskning (dubbelmodulering: kickdipp 3-4 ggr, SPOT/UNIFORM förbi energin, golv som låser energin, E_CURVE 10 binär,
