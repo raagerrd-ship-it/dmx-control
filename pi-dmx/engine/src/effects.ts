@@ -317,6 +317,7 @@ const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)
 // 09-21 kvall). Vill man ha en lugn-grind: analysatorns DMX_DROP_CALM_GATE=1 DROP_CALM_LAND_MS=300 (tappar inget, 300 ms sen i low).
 const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25);
 const DROP_SONG_HOLD_S = Number(process.env.DMX_DROP_SONG_HOLD_S ?? 0);   // 30 -> 0 (agaren 10-11: inga timrar pa riktig drop - snavt mal i analysatorn i stallet)
+const SHOW_DROP_GAP_MS = 20000;   // = analysatorns DROP_LONG_MS, nu för alla drop-källor (10-12)
 const DROP_MIN_GAP_S = Number(process.env.DMX_DROP_MIN_GAP_S ?? 0);   // se 'DROP-KEDJOR'   // se 'INGEN DROP I LATENS INLEDNING'
 const DROP_LAND_GAIN = Number(process.env.DROP_LAND_GAIN ?? 1.15);     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = Number(process.env.SECTION_HIGH_SNAP ?? 0.75), SECTION_LOW_SNAP = Number(process.env.SECTION_LOW_SNAP ?? 0.35);   // tierEma-snap vid high/break-grans
@@ -1021,11 +1022,14 @@ export class EffectEngine {
     // fyrar ingen drop/minidrop forsta N s av en lat (klockan startar vid motorstart och vid latgrans = softenRange; INTE pa sektionen - tystnaden fore en drop gor den till intro, 23:31: dropen efter pausen nekades).
     // DROP-KEDJOR (ladan 2026-09-29 19:03 'falsk drop'): analysatorns eskaleringsregel slapper en starkare drop redan 4 s efter
     // den forra - loggen: tre drops pa 10 s (rise 17 -> 20 -> 30). Showen tar hogst en drop per DMX_DROP_MIN_GAP_S. 0 = av.
-    if (DROP_MIN_GAP_S > 0 && dropHitRaw) { if (nowWall - this.lastShowDropWall < DROP_MIN_GAP_S * 1000) { dropHitRaw = false; this.dropCalmDenied++; } else this.lastShowDropWall = nowWall; }
+    // EN SPÄRR FÖR ALLA DROPS (ladan 10-12 12:45 'fel drop': lyft+språng-dropen 12:45:41, sedan analysatorns drop 14 s senare - analysatorns
+    // 20 s-spärr (DROP_LONG_MS) räknar bara sina egna). Konsertläget: ingen drop inom SHOW_DROP_GAP_MS från förra, oavsett källa.
+    const dropGapMs = DROP_MIN_GAP_S > 0 ? DROP_MIN_GAP_S * 1000 : CONCERT ? SHOW_DROP_GAP_MS : 0;
+    if (dropGapMs > 0 && dropHitRaw) { if (nowWall - this.lastShowDropWall < dropGapMs) { dropHitRaw = false; this.dropCalmDenied++; } else this.lastShowDropWall = nowWall; }
     if (DROP_SONG_HOLD_S > 0) {
       if (dropHitRaw && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000) { dropHitRaw = false; this.dropCalmDenied++; }
     }
-    if (this.upgradeHit) { this.upgradeHit = false; dropHitRaw = true; this.lastShowDropWall = nowWall; this.buildUpgrades++; }   // BUILD SOM LANDAR: forra rutans nastan-drop efter en build
+    if (this.upgradeHit) { this.upgradeHit = false; if (!(CONCERT && nowWall - this.lastShowDropWall < SHOW_DROP_GAP_MS)) { dropHitRaw = true; this.lastShowDropWall = nowWall; this.buildUpgrades++; } }   // BUILD SOM LANDAR: forra rutans nastan-drop efter en build
     let dropHit = dropHitRaw;
     if (CONCERT && dropHit) this.dropLiftUntil = nowWall + DROP_LIFT_MS;   // DROPEN BÄR IN I REFRÄNGEN
     // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
@@ -1099,7 +1103,8 @@ export class EffectEngine {
         const g = Math.max(0, Math.min(1, (rise - NEAR_RISE_DB) / Math.max(1, NEAR_FULL_DB - NEAR_RISE_DB)));
         this.nearAt = nowWall; this.nearUntil = nowWall + MINI_BANG_MS; this.nearLevel = NEAR_MIN + (NEAR_MAX - NEAR_MIN) * g; this.nearCount++; this.nearHit = true;
         this.nearRise = rise;
-        if (CONCERT && rise >= DROP_JUMP_DB && nowWall - this.liftAt <= DROP_PAIR_MS) { this.upgradeHit = true; this.buildLookAt = 0; if (isLogOn()) console.log(`[dirigent] lyft + sprang ${rise.toFixed(1)} dB -> drop`); }   // LYFT + SPRÅNG (lyftet först)
+        if (CONCERT && rise >= DROP_JUMP_DB && rise <= 60 && nowWall - this.liftAt <= DROP_PAIR_MS)   // <= 60: 'sprang 110 dB' ladan 10-12 12:45:21 = mätfel
+            { this.upgradeHit = true; this.buildLookAt = 0; if (isLogOn()) console.log(`[dirigent] lyft + sprang ${rise.toFixed(1)} dB -> drop`); }   // LYFT + SPRÅNG (lyftet först)
         console.log(`[dirigent] nastan-drop: sprang ${rise.toFixed(1)} dB efter dipp ${dip.toFixed(1)} dB -> ljus ${(this.nearLevel * 100).toFixed(0)} % av en drop`);
       }
       if (!CONCERT && nowWall < this.nearUntil && this.nearLevel > dTarget) dTarget = this.nearLevel;   // V123: i konsertläget ingen blixt (nästan-dropen träffar ett lyft lika ofta som slumpen) - bara build-landningen ovan
@@ -1124,7 +1129,7 @@ export class EffectEngine {
         const calm = sum / 160, lift = now6 / 24 - calm;   // senaste 0,6 s mot 6..2 s sedan
         if (calm > -80 && lift >= LIFT_DB) {
           this.liftAt = nowWall; this.liftCount++; this.lastMiniWall = nowWall; this.miniSector = mixedSector(this.liftCount + 7);
-          if (this.nearRise >= DROP_JUMP_DB && nowWall - this.nearAt <= DROP_PAIR_MS) { this.upgradeHit = true; this.buildLookAt = 0; if (isLogOn()) console.log(`[dirigent] lyft ${lift.toFixed(1)} dB + sprang -> drop`); }   // LYFT + SPRÅNG (språnget först)
+          if (this.nearRise >= DROP_JUMP_DB && this.nearRise <= 60 && nowWall - this.nearAt <= DROP_PAIR_MS) { this.upgradeHit = true; this.buildLookAt = 0; if (isLogOn()) console.log(`[dirigent] lyft ${lift.toFixed(1)} dB + sprang -> drop`); }   // LYFT + SPRÅNG (språnget först)
           else { this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + MINI_LIFT_MS; }
           if (isLogOn()) console.log(`[dirigent] energilyft: kropp ${lift.toFixed(1)} dB over lugnet`);
         }
