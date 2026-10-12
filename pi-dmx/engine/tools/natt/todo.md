@@ -67,6 +67,12 @@ KLART 2026-10-12 (dagsession, ej deployat): 8 nya - svall (lugn x high), gryning
   1,00 alla. Replay 22 ladan-filer: valda 5,8 % av tiden (ankomst 2,2, gryning 0,9, motor 0,9, rulle 0,8, kickregn 0,6, svall 0,4);
   glimt/efterskalv 0 - ladans 'break' har nästan alltid basgång (eko/toggle-poolen tar dem). BUILD_LOOKS + gryning, rulle.
   c.lamp = fysisk lampa (ring-effekterna), c.idx = växlande ordning.
+KLART 2026-10-12 (dagsession): BASGÅNGSGRÄNSEN - bassline är hög i ALLA sektioner (median 0,62-0,77, break 0,69) -> eko-förstavalet
+  (>= 0,6) tog 30 %. Ny standard: eko förstaval bara >= 0,85 och aldrig i refrängen (nattagentens EKO_HIGH=0 nu standard, brytaren
+  borta). De 14 nya effekterna fick FIT/SPATIAL i fit.ts (saknades -> neutral passform, valdes nästan aldrig). Replay 22 filer:
+  eko 30 -> 10 %, variation (2^entropi) 21 -> 34, nya 6 -> 16 %, break-effekter valda. Toggle-gränserna (CLEAR_BASS 0,78/0,85)
+  spelade nästan ingen roll. ÖPPET: build lyser nu MER än refrängen (0,47 mot 0,39; buildProg-golvet + siren 0,95) - konsertregeln
+  säger refrängen ljusast, rätta.
 KLART 2026-10-12 (dagsession): alla rutor >= 2 (ägaren: "gärna att alla har minst 2 st") - flod (lugn x build), famn (lugn x high),
   spaning (fart x intro), startskott (full x intro), siren (full x build), skuggor (full x break). 64 effekter. Närmaste syskon
   flod-rullandning 0,78. effectSimilarity saknade c.lamp/trebleEnv/airEnv (rättat). Replay: 14 nya = 6,3 % av tiden, 47 olika looker;

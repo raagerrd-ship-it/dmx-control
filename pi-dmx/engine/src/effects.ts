@@ -107,10 +107,12 @@ const TIER_OPEN = Math.max(0, Math.min(1, Number(process.env.DMX_TIER_OPEN ?? (C
  *  snabbare uttoning ar forbjudet) - lampans strobe-kanal gar forbi uttoningen. Satts bara under drop-smallen (dropBangUntil, 1,3 s).
  *  Vardet -> blixttakt beror pa lampmodellen: KALIBRERA I LADAN med ett lagt varde, hogst 3 blixtar/s (fotosensitiv epilepsi). 0 = av. */
 const DROP_STROBE = Math.max(0, Math.min(255, Math.round(Number(process.env.DMX_DROP_STROBE ?? 0))));
-/** EKO I REFRÄNGEN (opt-in DMX_EKO_HIGH=0, nattagenten 10-12): eko-förstavalet vid basgång (1,1 tända lampor, glest) tog 94 av 214 s
- *  av refrängen i ladan 10-11 21:17 - refrängen blev mörkare än builden (ljus 0,28 mot 0,37). 0 = förstavalet gäller inte i sektion
- *  high (refrängen väljer ur sin pool som vanligt; eko finns kvar där). 1 = som förut (standard). */
-const EKO_HIGH = process.env.DMX_EKO_HIGH !== '0';
+/** EKO SOM FÖRSTAVAL (standard 10-12, ägaren: "analysera vilken gräns för basgång för att få igång mer variation"): basgångsvärdet
+ *  (profile.bassline) är högt i ALLA sektioner på ladans musik (median 0,62 intro .. 0,77 refräng, break 0,69), så gränsen 0,6 gjorde
+ *  eko till förstaval nästan jämt - 30 % av tiden. Nu bara vid tydlig basgång (>= 0,85) och aldrig i refrängen (nattagentens
+ *  DMX_EKO_HIGH=0: eko tände 1,1 lampa och refrängen blev mörkare än builden). Replay 22 ladan-filer: eko 30 -> 10 %, variation
+ *  (effektivt antal looker) 21 -> 34, nya rutnätseffekter 16 %, break-effekterna väljs. Eko finns kvar i poolerna. */
+const EKO_BASS = 0.85;
 const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
 const PALETTE_LOCK: number[] | null = (() => {
   const v = (process.env.DMX_PALETTE ?? "").trim(); if (!v) return null;
@@ -1471,8 +1473,8 @@ export class EffectEngine {
         if (EFFECT_MAP.get(this.smartMode)?.flat) this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_FLAT_MS) || 30000);
         // EKO FÖRST VID TYDLIG BASGÅNG (ägaren i ladan 10-11: basslaget som glider genom lamporna som en våg -> 'ja' till förstaval):
         // bassline >= 0,6 (där eko själv följer basnoterna) -> eko, utom i build, efter drop, eller om eko just gick.
-        if (CONCERT && (frame.profile.bassline ?? 0) >= 0.6 && this.smartMode !== 'eko' && lastLookBeforeSwitch !== 'eko' && !BUILD_LOOKS.includes(this.smartMode)
-            && this.switchWhy !== 'drop' && this.cfg.rotation?.eko !== false && (EKO_HIGH || frame.section !== 'high')) this.smartMode = 'eko';
+        if (CONCERT && (frame.profile.bassline ?? 0) >= EKO_BASS && this.smartMode !== 'eko' && lastLookBeforeSwitch !== 'eko' && !BUILD_LOOKS.includes(this.smartMode)
+            && this.switchWhy !== 'drop' && this.cfg.rotation?.eko !== false && frame.section !== 'high') this.smartMode = 'eko';
         if (CONCERT) this.buildLookAt = BUILD_LOOKS.includes(this.smartMode) ? nowWall : 0;   // BUILD SOM HÅLLER: när build-looken började
         this.recentLooks.push(this.smartMode); if (this.recentLooks.length > MIX_RECENT_N) this.recentLooks.shift(); this.seenLooks.add(this.smartMode);
       }

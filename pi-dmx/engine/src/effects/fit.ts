@@ -71,6 +71,20 @@ export const FIT: Partial<Record<Mode, Fit>> = {
   tyngdlyft: { punch: 0.65, bass: 0.30, bright: 0.50, beat: 0.65 },   // nivan mot refrangen
   frasraknare:{ punch: 0.50, bass: 0.50, bright: 0.50, beat: 0.85 },  // takter och fraser
   vidga:      { punch: 0.55, bass: 0.55, bright: 0.50, beat: 0.70 },  // energin oppnar riggen
+  svall:      { punch: 0.30, bass: 0.40, bright: 0.40, beat: 0.50 },   // lugn refrang, motfas (situationsrutnatet 10-12)
+  famn:       { punch: 0.40, bass: 0.50, bright: 0.40, beat: 0.50 },   // lugn refrang, ettan (situationsrutnatet 10-12)
+  gryning:    { punch: 0.30, bass: 0.40, bright: 0.40, beat: 0.40 },   // lugn uppbyggnad (situationsrutnatet 10-12)
+  flod:       { punch: 0.30, bass: 0.40, bright: 0.40, beat: 0.40 },   // lugn uppbyggnad, vag (situationsrutnatet 10-12)
+  ankomst:    { punch: 0.50, bass: 0.40, bright: 0.50, beat: 0.70 },   // intro, slag (situationsrutnatet 10-12)
+  spaning:    { punch: 0.50, bass: 0.40, bright: 0.50, beat: 0.70 },   // intro, baktakt (situationsrutnatet 10-12)
+  kickregn:   { punch: 0.80, bass: 0.60, bright: 0.50, beat: 0.80 },   // intro, kick (situationsrutnatet 10-12)
+  startskott: { punch: 0.70, bass: 0.50, bright: 0.50, beat: 0.80 },   // intro, takter (situationsrutnatet 10-12)
+  rulle:      { punch: 0.60, bass: 0.50, bright: 0.60, beat: 0.70 },   // uppbyggnad, virvel (situationsrutnatet 10-12)
+  siren:      { punch: 0.60, bass: 0.50, bright: 0.60, beat: 0.70 },   // uppbyggnad, fargbyte (situationsrutnatet 10-12)
+  glimt:      { punch: 0.30, bass: 0.20, bright: 0.70, beat: 0.50 },   // break, diskant (situationsrutnatet 10-12)
+  efterskalv: { punch: 0.50, bass: 0.40, bright: 0.40, beat: 0.70 },   // break, halvtakt (situationsrutnatet 10-12)
+  skuggor:    { punch: 0.50, bass: 0.40, bright: 0.40, beat: 0.60 },   // break, ytter/inner (situationsrutnatet 10-12)
+  motor:      { punch: 0.80, bass: 0.60, bright: 0.60, beat: 0.80 },   // vers, kick/hat (situationsrutnatet 10-12)
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -91,6 +105,9 @@ const SPATIAL: Partial<Record<Mode, number>> = {
   ripple: 0.9, eko: 0.9, drumkit: 0.9, eq: 0.9, wave: 0.8, split: 0.8, drops: 0.8,
   duel: 0.7, konfetti: 0.7, varannan: 1.0, pendel: 0.7, twin: 0.6, tide: 0.6, drift: 0.6, aurora: 0.5,
   basgang: 1.0, forvarning: 0.8, frasraknare: 0.7, nedrakning: 0.8, vagbrytare: 0.8, tyngdlyft: 0.4, vidga: 0.9,
+  // situationsrutnatet 10-12 (utan post fick de neutral passform och ingen rumsbonus -> valdes nastan aldrig)
+  svall: 0.7, famn: 0.6, gryning: 0.6, flod: 0.8, ankomst: 1.0, spaning: 0.8, kickregn: 1.0, startskott: 0.8, rulle: 1.0, siren: 0.7,
+  glimt: 0.8, efterskalv: 0.7, skuggor: 0.8, motor: 0.8,
 };
 /** Hur mycket den spatiala preferensen väger vid full punch (0 = av). */
 const SPATIAL_PREF = Number(process.env.DMX_SPATIAL_PREF ?? 0.5);   // 0,18 -> 0,5 (ladan 10-01 godkant)   // ladan 09-29: "manga effekter lyser bara alla lampor" -> prov 0,5
