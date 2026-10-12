@@ -15,6 +15,17 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-12 frame.buildUp är död (0,000) även i sektion build
+Vad: nattagenten 10-12 körde analysatorn (dist, DMX-profil, virtuell klocka) över lang-20261011T191741.wav (10 min, ladans nivå, 81 s
+sektion build) och pop_ladan.wav: buildUp medel 0,000 i ALLA sektioner, max 0,00 resp. 0,13 (low), andel > 0,3 = 0 %. Kommentaren vid
+bandDb (analyser.ts ~979) säger att p50 = p90 = 0 skulle vara fixat - det är det inte på det här materialet. Följd: DMX ersatte buildUp
+med motorns eget förlopp (32 slag från build-lookens start, 287bdc4) och analysatorns egna regler som läser buildUp (label 'build' vid
+buildUp > 0,5, rising-regeln > 0,35, DROP_CALM_BUILD) är i praktiken av. Var: buildUp/novSlow/novBaseline (riser). Material:
+tools/ladan-2026-10-11/lang-20261011T191741.wav (+ 193430, 112342 som har builds med drop), tools/pop_ladan.wav. Önskat: en buildUp
+som stiger 0 -> 1 under en riktig uppbyggnad (risers, virvel, filtersvep) - eller beslut att fältet tas bort ur rutan.
+Sidoobservation (DMX-profilens sak, inte er): dropfire edgeAgo 256/299 ms på kvällens inspelning = ägarens 'sen' drop.
+Status:
+
 ## ÖPPET 2026-10-11 Riktiga drops med kort break blir minidrops efter BODY_GONE_MIN_MS 4000
 Vad: ägaren valde 10-10 "hellre färre drops" -> DMX-profilen BODY_GONE_MIN_MS 2000 -> 4000 (megamix 27 -> 15 riktiga, minidrops tar resten).
 Ladans 10 dropklipp (tools/ladan-2026-10-10, drop vid 15,0 s) går inte att använda som facit: klippen börjar 15 s före dropen, så
