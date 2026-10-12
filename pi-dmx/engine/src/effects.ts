@@ -113,6 +113,11 @@ const DROP_STROBE = Math.max(0, Math.min(255, Math.round(Number(process.env.DMX_
  *  DMX_EKO_HIGH=0: eko tände 1,1 lampa och refrängen blev mörkare än builden). Replay 22 ladan-filer: eko 30 -> 10 %, variation
  *  (effektivt antal looker) 21 -> 34, nya rutnätseffekter 16 %, break-effekterna väljs. Eko finns kvar i poolerna. */
 const EKO_BASS = 0.85;
+/** REFRÄNGEN LYSER STARKAST (ägaren 10-12; konsertregeln: vers gles, build laddar, refrängen fullt). Replay 22 ladan-filer, ljus
+ *  (DMX, medel över lamporna): refräng 0,39 -> 0,51, build 0,47 -> 0,42, vers 0,22. Spaken var taktdippen (KICK_E): i refrängen
+ *  dippar lamporna 25 % mellan slagen i stället för 50 % (slagen syns kvar), + energigolv 0,6 i refrängen och builden laddar
+ *  halvt (BUILD_CHARGE). Ljustak per sektion och en grundton på mörka lampor provades och gav inget (SPOT-regeln åt grundtonen). */
+const KICK_E_HIGH = 0.25, HIGH_E_FLOOR = 0.6, BUILD_CHARGE = 0.5;
 const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
 const PALETTE_LOCK: number[] | null = (() => {
   const v = (process.env.DMX_PALETTE ?? "").trim(); if (!v) return null;
@@ -1433,7 +1438,7 @@ export class EffectEngine {
         // basgang - varannat look-byte tas ur toggle-poolen (parvisa/gruppvisa effekter i takt) nar takten ar last och tilliten >= 0,85.
         const beatClear = !allaBuild && beatLocked(this.cfg.beat) && this.beatTrust >= 0.85 && this.smartCount % 2 === 1;
         const bassHard = !(CONCERT && secKey === 'build') && (beatClear || (!allaBuild && bassClear && ((frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD && this.smartCount % 2 === 1)));   // MIX_V2 (1); konsertlaget: aldrig i build
-        const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); return cut.length ? cut : enabled(TOGGLE_POOL).filter(req); })() : [];
+        const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); const t = cut.length ? cut : enabled(TOGGLE_POOL).filter(req); const full = LAMP_STAIR && liveSec === 'high' ? t.filter((m) => !SPARSAM.includes(m)) : t; return full.length ? full : t; })() : [];   // refrängen: inga glesa looker via basgången heller (10-12)
         const clearBass = toggles.length > 0;
         const lastLookBeforeSwitch = this.smartMode;
         if (clearBass) {
@@ -1599,7 +1604,8 @@ export class EffectEngine {
         const left = this.dropLiftUntil - nowWall, a = left >= 0 ? 1 : Math.max(0, 1 + left / DROP_LIFT_FALL_MS);
         eFloor += (1 - eFloor) * a;
       }
-      if (CONCERT && BUILD_LOOKS.includes(this.smartMode)) eFloor += (1 - eFloor) * this.buildProg;   // UPPBYGGNADEN LADDAR: energins golv stiger med förloppet - suget före dropen får inte dimma builden (ladan 22:05)
+      if (CONCERT && BUILD_LOOKS.includes(this.smartMode)) eFloor += (1 - eFloor) * this.buildProg * BUILD_CHARGE;
+      if (CONCERT && frame.section === 'high') eFloor = Math.max(eFloor, HIGH_E_FLOOR);   // UPPBYGGNADEN LADDAR: energins golv stiger med förloppet - suget före dropen får inte dimma builden (ladan 22:05)
       if (CONCERT && nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) {   // MINIDROPEN LYFTER OCH HALLER (se MINI_LIFT_MS)
         const left = this.miniLiftUntil - nowWall, a = left >= 0 ? 1 : Math.max(0, 1 + left / MINI_LIFT_FALL_MS);
         eFloor += (1 - eFloor) * a;
@@ -1801,7 +1807,8 @@ export class EffectEngine {
       } else if (lampWantE === undefined && CONCERT && useE && m0 >= 0.85) { let n = 0; for (let q = 0; q < count; q++) if (q !== i && this.fxPrev[q] > 0.5 * m0) n++; if (n <= 1) useE = false; }
       // TAKTSLAGEN PÅ ALLA LAMPOR (ägaren 10-11 kväll: "det jag vill öka är taktslagen i energieffekten ... bara allt lyser"): dämpningen
       // mellan slagen gäller ALLA lampor (även spot och enhetliga effekters egna par), inte drop-looken och inte fastLight (strobe).
-      const beatK = KICK_E > 0 && CONCERT && !fastLight && this.dropColEnv <= 0.005 ? (1 - KICK_E) + KICK_E * Math.min(1, ctx.kickEnv) : 1;
+      const kE = frame.section === 'high' ? KICK_E_HIGH : KICK_E;
+      const beatK = kE > 0 && CONCERT && !fastLight && this.dropColEnv <= 0.005 ? (1 - kE) + kE * Math.min(1, ctx.kickEnv) : 1;
       const k = inputGate * (useE ? mdUse : drive) * beatK;   // + TAKTSLAGEN (se KICK_E)
       rgb[0] *= k; rgb[1] *= k; rgb[2] *= k;
       // ENERGIN SLACKER ALDRIG (agaren 2026-10-10: "energi skall aldrig slacka om effekten vill ha pa en lampa"): vill effekten ha

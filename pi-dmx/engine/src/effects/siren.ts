@@ -12,6 +12,6 @@ export const siren: EffectDef = {
     const flip = Math.floor((c.beatIdx + c.beatFrac) * rate) & 1;
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = (((c.group ^ flip) ? base + 3 : base) % 6) / 6;
-    return c.hsv(hue, 1, Math.min(1, 0.45 + 0.5 * p));
+    return c.hsv(hue, 1, Math.min(1, 0.25 + 0.45 * p));   // 0,45 + 0,5p -> 0,25 + 0,45p (10-12: builden fick inte lysa mer än refrängen)
   },
 };
