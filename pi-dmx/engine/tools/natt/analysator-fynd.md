@@ -24,7 +24,7 @@ buildUp > 0,5, rising-regeln > 0,35, DROP_CALM_BUILD) är i praktiken av. Var: b
 tools/ladan-2026-10-11/lang-20261011T191741.wav (+ 193430, 112342 som har builds med drop), tools/pop_ladan.wav. Önskat: en buildUp
 som stiger 0 -> 1 under en riktig uppbyggnad (risers, virvel, filtersvep) - eller beslut att fältet tas bort ur rutan.
 Sidoobservation (DMX-profilens sak, inte er): dropfire edgeAgo 256/299 ms på kvällens inspelning = ägarens 'sen' drop.
-Status:
+Status: TAGET 2026-10-12 (lotus-morgonagenten): orsaken mätt på lang-20261011T191741 (dist, gain-lås 1): riserStep kräver lvlSmooth > 0,3 (uppfyllt 6 % av tiden på ladans nivå, p90 0,28) OCH novSlow > 0,45 absolut (novSlow p90 0,20 — tröskeln är kvar från bandLvl-skalan; i 'build' är novSlow−baslinje p90 0,013) ⇒ buildUp max 0,03. Ersättare prövad offline på alla 22 lang-*.wav 10-11 (8 s före varje dropfire mot allt > 12 s från drops, n 1777/24805): 2 s-mot-8 s-stigning i bandDb helband AUC 0,55, höga band 0,56, låga 0,53, dagens novelty 0,45 — ingen signal värd en flagga. Förslag: behåll motorns förlopp (287bdc4); att ta bort fältet/reglerna ur rutan är ägarens beslut.
 
 ## ÖPPET 2026-10-11 Riktiga drops med kort break blir minidrops efter BODY_GONE_MIN_MS 4000
 Vad: ägaren valde 10-10 "hellre färre drops" -> DMX-profilen BODY_GONE_MIN_MS 2000 -> 4000 (megamix 27 -> 15 riktiga, minidrops tar resten).
