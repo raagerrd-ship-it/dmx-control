@@ -299,6 +299,18 @@ const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)
 const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25);
 const DROP_SONG_HOLD_S = Number(process.env.DMX_DROP_SONG_HOLD_S ?? 0);   // 30 -> 0 (agaren 10-11: inga timrar pa riktig drop - snavt mal i analysatorn i stallet)
 const LEVEL_RAMP = 2, LEVEL_RAMP_FALL_S = 2;   // fullt ljus vid 2 x släckgränsen (3 x dämpade versen 40 %, 2 x 19 %, refrängen 3 %); nivån sjunker mjukt på 2 s (se RAMPEN OVANFÖR SLÄCKGRÄNSEN)
+/** FULL DROP PÅ FLANKEN (opt-in DMX_FLANK_DROP=1, 10-12 efter ägarens 'bara var 3:e träffar rätt' och 'hellre öka gränsen till riktig drop,
+ *  bara minidrops kör vidare'). Mätt (tools/dropTiming.mjs + dropTimingStat.mjs, 23 ladan-inspelningar, 141 min): analysatorns drop kräver
+ *  20 dB stigning på 0,5 s och kroppen inom 3 dB från toppen -> den fyrar på DJUPA HACK som återhämtar sig (sidechain-pump, 1 s-avbrott,
+ *  ett pumpslag sekunder efter att takten kommit tillbaka: edgeAgo 13 653 ms), sent på flanken (stigningen når 20 dB först vid toppen) och
+ *  missar drops efter halvtyst break (12-15 dB lyft). Showens drops: 15/46 rätt (33 %), 11 sena, 17 utan baslyft.
+ *  HÄR: motorn själv på frame.bodyDb. Riktig drop = baskroppen (toppen över FLANK_HOLD_S, så pumpande bas räknas som närvarande) har legat
+ *  >= FLANK_GONE_DB under taket i >= FLANK_BREAK_S, och fyrar på FLANKEN: när kroppen (60 ms) går upp till taket - FLANK_LAND_DB med
+ *  >= FLANK_RISE_DB stigning på 0,5 s. Analysatorns drop utan egen flank (inom 2 s) blir minidrop. Bänk: 55 drops (0,39/min), 96 % på
+ *  ihållande baslyft, 43 rätt / 6 sena / 4 tidiga (<= 54 ms) / 2 falska, fördröjning p50 24 ms (var 91). Tidsbaserat (render går 200 Hz live, 40 Hz i bänken). */
+const FLANK_DROP = process.env.DMX_FLANK_DROP === '1';
+const FLANK_GONE_DB = 10, FLANK_BREAK_S = Number(process.env.DMX_FLANK_BREAK_S ?? 3),   // ratt för live-prov: 4 = färre (bänk 0,30/min)
+       FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;
 const SHOW_DROP_GAP_MS = 12000;   // spärr mellan riktiga drops från alla källor (10-12; 20 s missade en riktig drop efter en tidig, ägaren 'jag tror det va tiden mellan')
 const DROP_MIN_GAP_S = Number(process.env.DMX_DROP_MIN_GAP_S ?? 0);   // se 'DROP-KEDJOR'   // se 'INGEN DROP I LATENS INLEDNING'
 const DROP_LAND_GAIN = Number(process.env.DROP_LAND_GAIN ?? 1.15);     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
@@ -680,6 +692,26 @@ export class EffectEngine {
     fog.serviceAtMs = Date.now();
   }
   private lastRenderMs = performance.now();
+  // FULL DROP PÅ FLANKEN (se FLANK_DROP): kropp 60 ms / 350 ms, tak, break-tid, tidsstämplade fönster (topp 0,6 s, min 0,5 s).
+  private fdF: number | null = null; private fdS = 0; private fdC = -90; private fdGone = 0; private fdSpan = 0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12;
+  private fdT: number[] = []; private fdV: number[] = [];
+  private flankStep(bodyDb: number, dt: number, now: number): boolean {
+    const x = Math.max(-90, bodyDb);
+    if (this.fdF === null) { this.fdF = x; this.fdS = x; this.fdC = x; }
+    this.fdF += (x - this.fdF) * Math.min(1, dt / 0.06);
+    this.fdS += (x - this.fdS) * Math.min(1, dt / 0.35);
+    this.fdC = Math.max(this.fdS, this.fdC - dt * 0.15);
+    const T = this.fdT, V = this.fdV; T.push(now); V.push(this.fdF);
+    while (T.length > 1 && now - T[0] > FLANK_HOLD_S * 1000) { T.shift(); V.shift(); }
+    let top = -1e9, low = 1e9; for (let i = 0; i < T.length; i++) { if (V[i] > top) top = V[i]; if (now - T[i] <= 500 && V[i] < low) low = V[i]; }
+    if (top < this.fdC - FLANK_GONE_DB) this.fdGone += dt; else { if (this.fdGone > 0) { this.fdSpan = this.fdGone; this.fdEnd = now; } this.fdGone = 0; }
+    const above = this.fdF > this.fdC - FLANK_LAND_DB, edge = above && !this.fdAbove; this.fdAbove = above;
+    const span = this.fdGone > 0 ? this.fdGone : now - this.fdEnd < FLANK_GRACE_S * 1000 ? this.fdSpan : 0;
+    if (!edge || span < FLANK_BREAK_S || this.fdF - low < FLANK_RISE_DB) return false;
+    this.fdGone = 0; this.fdSpan = 0; this.fdAt = now;
+    if (isLogOn()) console.log(`[dirigent] full drop pa flanken: break ${span.toFixed(1)} s, stigning ${(this.fdF - low).toFixed(1)} dB`);
+    return true;
+  }
 
   constructor(private cfg: EngineConfig) {}
 
@@ -1008,10 +1040,15 @@ export class EffectEngine {
     const dtNow = Math.max(0, Math.min(0.1, (performance.now() - this.lastRenderMs) / 1000));   // aldrig negativt (klockhopp; banker som byter klocka efter konstruktion gav NaN i nivan)
     let dropHitRaw = frame.dropCount !== this.lastDropCount;
     this.lastDropCount = frame.dropCount;
+    if (FLANK_DROP) {   // FULL DROP PÅ FLANKEN: motorns egen flank är drop-källan; analysatorns drop utan egen flank inom 2 s = minidrop
+      const anaHit = dropHitRaw;
+      dropHitRaw = this.flankStep(frame.bodyDb ?? -90, dtNow, nowWall);
+      if (anaHit && !dropHitRaw && nowWall - this.fdAt > 2000) this.gapMini(nowWall);
+    }
     // DROP I LUGN SEKTION (ladan 20:15: tva falska drops i ett lugnt parti): en riktig drop kommer ur en uppbyggnad eller ett
     // break. I low/intro kravs att analysatorn sett en riser (buildUp >= DROP_CALM_BUILD) - annars ignoreras dropen.
     const calmSec = (frame.section === 'low' || frame.section === 'intro');
-    if (DROP_CALM_BUILD > 0 && dropHitRaw && calmSec && frame.buildUp < DROP_CALM_BUILD) { dropHitRaw = false; this.dropCalmDenied++; }
+    if (!FLANK_DROP && DROP_CALM_BUILD > 0 && dropHitRaw && calmSec && frame.buildUp < DROP_CALM_BUILD) { dropHitRaw = false; this.dropCalmDenied++; }
     // INGEN DROP I LATENS INLEDNING (ladan 2026-09-24 23:35, tredje gangen 'fortfarande drop i inledning'): intro-grindarna ovan tittar pa
     // sektionen, men den slar om intro -> build strax FORE smallen (kicken som borjar ar sjalva byggstenen). Med DMX_DROP_SONG_HOLD_S > 0
     // fyrar ingen drop/minidrop forsta N s av en lat (klockan startar vid motorstart och vid latgrans = softenRange; INTE pa sektionen - tystnaden fore en drop gor den till intro, 23:31: dropen efter pausen nekades).

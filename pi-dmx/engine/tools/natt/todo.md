@@ -53,6 +53,13 @@ från 10-12 om de finns), facit = ägarens rapporter (tider i todo ovan: 'sen' 2
 känns fel (för sen? för tidig? fel ställe?) och föreslå EN ersättning bevisad i bänken (t.ex. fyra på flanken när bastystnaden
 varit lång nog, i stället för att vänta på toppen). Ändra inte den delade analysatorn (analyser.ts) - profilen (analyserProfile.ts)
 och effects.ts går bra. Deploya aldrig; 'redo för ladan' med siffror.
+REDO FÖR LADAN 10-12 (agent, ej deployat): DMX_FLANK_DROP=1 (effects.ts 'FULL DROP PÅ FLANKEN'): motorn tar riktiga drops själv på
+  frame.bodyDb - break >= 3 s (0,6 s-topp >= 10 dB under taket) och fyr på flanken (taket - 6 dB, >= 12 dB på 0,5 s); analysatorns drop
+  utan egen flank = minidrop. Bänk 23 filer/141 min (tools/dropTiming*.mjs): 46 -> 55 drops (0,33 -> 0,39/min), på baslyft 63 -> 96 %,
+  rätt 15 -> 43, sen 11 -> 6, falsk 17 -> 2, fördröjning p50 91 -> 24 ms, p75 155 -> 43; 1012-filen: före 264/328 falska, 510 sen (ägaren
+  'sen drop'/'kunde vart mini'), 565 5 s efter takten - efter 225,7 + 250,7 ('drop, ok' 13:11:13) + 315,1 ('full körde mini' 13:12:31).
+  Lookbyten/ljus oförändrade (+-3 byten, +-0,01), minidrop-looker 277 -> 321. Färre: DMX_FLANK_BREAK_S=4 (44 drops, 0,31/min, 95 %).
+  Kvar: 486 s ('drop miss' 13:15:07 - kroppen sjunker gradvis, break < 3 s) och 415 s (bara 5 dB baslyft) fångas inte.
 
 
 ## NATTEN 2026-10-12 (nattagenten, inget deployat)
