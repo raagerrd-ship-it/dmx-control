@@ -85,6 +85,22 @@ export const FIT: Partial<Record<Mode, Fit>> = {
   efterskalv: { punch: 0.50, bass: 0.40, bright: 0.40, beat: 0.70 },   // break, halvtakt (situationsrutnatet 10-12)
   skuggor:    { punch: 0.50, bass: 0.40, bright: 0.40, beat: 0.60 },   // break, ytter/inner (situationsrutnatet 10-12)
   motor:      { punch: 0.80, bass: 0.60, bright: 0.60, beat: 0.80 },   // vers, kick/hat (situationsrutnatet 10-12)
+  // situationsrutnatet 10-12, minst 4 per ruta
+  stjarnor:   { punch: 0.45, bass: 0.30, bright: 0.55, beat: 0.55 },   // lugn uppbyggnad, tindrar utan takt
+  mullra:     { punch: 0.55, bass: 0.50, bright: 0.35, beat: 0.65 },   // lugn uppbyggnad, basens sustain
+  kaskad:     { punch: 0.40, bass: 0.40, bright: 0.40, beat: 0.70 },   // lugn refrang, en lampa per slag
+  droppar:    { punch: 0.40, bass: 0.55, bright: 0.35, beat: 0.50 },   // lugn refrang, basnoter
+  uppvarmning:{ punch: 0.60, bass: 0.25, bright: 0.75, beat: 0.60 },   // intro, hi-hat
+  dunk:       { punch: 0.85, bass: 0.55, bright: 0.35, beat: 0.70 },   // intro, basslagets styrka
+  glesna:     { punch: 0.50, bass: 0.35, bright: 0.45, beat: 0.80 },   // break, slaget glesnar
+  dyning:     { punch: 0.50, bass: 0.45, bright: 0.40, beat: 0.60 },   // break, bas utan takt
+  blixtnedslag:{ punch: 0.85, bass: 0.35, bright: 0.60, beat: 0.80 },  // intro, virveln
+  mellanslag: { punch: 0.75, bass: 0.55, bright: 0.45, beat: 0.90 },   // intro, offbeat
+  pump:       { punch: 0.80, bass: 0.50, bright: 0.40, beat: 0.90 },   // vers, sidechain
+  hiss:       { punch: 0.60, bass: 0.40, bright: 0.65, beat: 0.70 },   // uppbyggnad, klattrar
+  tratt:      { punch: 0.75, bass: 0.50, bright: 0.45, beat: 0.80 },   // uppbyggnad, kicken i mitten
+  morkerslag: { punch: 0.50, bass: 0.40, bright: 0.40, beat: 0.75 },   // break, hal pa slaget
+  urladdning: { punch: 0.55, bass: 0.40, bright: 0.40, beat: 0.70 },   // break, tid
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -108,6 +124,8 @@ const SPATIAL: Partial<Record<Mode, number>> = {
   // situationsrutnatet 10-12 (utan post fick de neutral passform och ingen rumsbonus -> valdes nastan aldrig)
   svall: 0.7, famn: 0.6, gryning: 0.6, flod: 0.8, ankomst: 1.0, spaning: 0.8, kickregn: 1.0, startskott: 0.8, rulle: 1.0, siren: 0.7,
   glimt: 0.8, efterskalv: 0.7, skuggor: 0.8, motor: 0.8,
+  stjarnor: 0.7, mullra: 0.6, kaskad: 1.0, droppar: 0.9, uppvarmning: 0.8, dunk: 0.8, glesna: 0.8, dyning: 0.8,
+  blixtnedslag: 1.0, mellanslag: 1.0, pump: 0.6, hiss: 1.0, tratt: 0.7, morkerslag: 0.8, urladdning: 0.6,
 };
 /** Hur mycket den spatiala preferensen väger vid full punch (0 = av). */
 const SPATIAL_PREF = Number(process.env.DMX_SPATIAL_PREF ?? 0.5);   // 0,18 -> 0,5 (ladan 10-01 godkant)   // ladan 09-29: "manga effekter lyser bara alla lampor" -> prov 0,5

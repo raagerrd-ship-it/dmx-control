@@ -73,6 +73,21 @@ import { spaning } from "./spaning.js";
 import { startskott } from "./startskott.js";
 import { siren } from "./siren.js";
 import { skuggor } from "./skuggor.js";
+import { stjarnor } from "./stjarnor.js";
+import { mullra } from "./mullra.js";
+import { kaskad } from "./kaskad.js";
+import { droppar } from "./droppar.js";
+import { uppvarmning } from "./uppvarmning.js";
+import { dunk } from "./dunk.js";
+import { glesna } from "./glesna.js";
+import { dyning } from "./dyning.js";
+import { blixtnedslag } from "./blixtnedslag.js";
+import { mellanslag } from "./mellanslag.js";
+import { pump } from "./pump.js";
+import { hiss } from "./hiss.js";
+import { tratt } from "./tratt.js";
+import { morkerslag } from "./morkerslag.js";
+import { urladdning } from "./urladdning.js";
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
@@ -99,6 +114,8 @@ export const EFFECTS: EffectDef[] = [
   svall, gryning, ankomst, glimt, rulle, kickregn, efterskalv, motor,
   // andra effekten i varje ruta som hade en (agaren 10-12: "garna att alla har minst 2 st")
   flod, famn, spaning, startskott, siren, skuggor,
+  // minst 4 per ruta (agaren 10-12: "over 100 effekter"): lugn build/high, fart intro/break, full intro/low/build/break
+  stjarnor, mullra, kaskad, droppar, uppvarmning, dunk, glesna, dyning, blixtnedslag, mellanslag, pump, hiss, tratt, morkerslag, urladdning,
 ];
 
 /** Specialrolls-mappning: vilka fixture-roller (hazer/uv/blinder/strobe/laser/co2)
