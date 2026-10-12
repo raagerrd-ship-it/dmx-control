@@ -484,7 +484,7 @@ export class EffectEngine {
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
   private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
-  private secCeil = 1; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+  private secCeil = 1; private histAt = -1e12; private liftHistAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
   private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist: number[] = []; private liftAt = -1e12; liftCount = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
@@ -1090,7 +1090,10 @@ export class EffectEngine {
       if (this.nearB === null) { this.nearB = x; this.nearNorm = x; }
       this.nearB += (x - this.nearB) * Math.min(1, dtNow / 0.12);
       this.nearNorm += (this.nearB - this.nearNorm) * Math.min(1, dtNow / 8);
-      const h = this.nearHist; h.push(this.nearB); if (h.length > 60) h.shift();
+      // HISTORIKEN I 25 MS-RUTOR AV TID, inte per rendering (drop-agenten 10-12): live renderar motorn i 200 Hz (index.ts RENDER_MS 5),
+      // bänken i 40 Hz - räknat i rutor blev fönstren 5x kortare i ladan än det som mätts (energilyftet jämförde 0,12 s mot 0,4-1,2 s).
+      const pushHist = nowWall - this.histAt >= 25; if (pushHist) this.histAt = nowWall;
+      const h = this.nearHist; if (pushHist) { h.push(this.nearB); if (h.length > 60) h.shift(); }
       let floor = 1e9; for (const v of h) if (v < floor) floor = v;
       const rise = this.nearB - floor, dip = this.nearNorm - floor;
       if (rise >= NEAR_RISE_DB && dip >= NEAR_DIP_DB && floor > -80 && this.nearB >= this.nearNorm - 1 && nowWall - this.nearAt > NEAR_REFRACT_MS   // floor > -80: inspelningsavbrott (overrun) ar ingen dipp ('sprang 107 dB', ladan 10-08)
@@ -1114,7 +1117,7 @@ export class EffectEngine {
       if (sec !== '') this.prevRawSec = sec;
     }
     if (CONCERT && this.nearB !== null) {   // ENERGILYFT (se LIFT_DB)
-      const h = this.liftHist; h.push(this.nearB); if (h.length > 240) h.shift();   // ~6 s i 25 ms-rutor
+      const h = this.liftHist; if (nowWall - this.liftHistAt >= 25) { this.liftHistAt = nowWall; h.push(this.nearB); if (h.length > 240) h.shift(); }   // 6 s i 25 ms-rutor AV TID (se HISTORIKEN)
       if (h.length >= 240 && nowWall - this.liftAt > LIFT_REFRACT_MS && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && !BUILD_LOOKS.includes(this.smartMode)) {   // inte under en build (stegringen hör till builden)
         let sum = 0; for (let q = 0; q < 160; q++) sum += h[q];
         let now6 = 0; for (let q = h.length - 24; q < h.length; q++) now6 += h[q];
