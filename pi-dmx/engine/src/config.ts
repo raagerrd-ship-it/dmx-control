@@ -114,6 +114,8 @@ export interface EngineConfig {
   /** "Lägsta nivå" (2026-10-10, ägaren i ladan: "så den lyser på lite tystare partier"): energins golv 0..0,5 - energin dämpar
    *  aldrig under denna andel av effektens ljus (i DMX-procent). 0 = som förr (kurvan ensam). */
   energyFloor?: number;
+  /** "Tak i vers" (10-12): ljustaket i vers/intro/break 0,3..1 (refrängen alltid fullt, builden stiger mot 0,85). */
+  verseCeil?: number;
   /** "Släcktid" (2026-10-10, ägaren i ladan): sekunder ingången måste ligga under släckgränsen innan riggen släcks (0..5).
    *  Tänds direkt när ljudet är tillbaka. 0 = som förr (direkt). */
   silenceHoldS?: number;
@@ -209,6 +211,7 @@ export const defaultConfig: EngineConfig = {
   beatSyncOverride: false,  // stämnings-vredet styr som default
   energyDrivesMode: true,
   master: 1.0,
+  verseCeil: 0.65,     // "Tak i vers" i /setup (10-12)
   energyFloor: 0.2,     // energins golv (ratt i /setup: "Lägsta nivå"); 0,2 = standard (ladan 10-10: låtbyten och lugna partier lyser)
   silenceHoldS: 3,      // släcktid (ratt i /setup: "Släcktid"); 3 s = ägarens val i ladan 10-10
   silenceLevel: 0.05,     // släckgräns på frame.level (ratt i /setup: "Släckgräns")

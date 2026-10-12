@@ -616,6 +616,9 @@ export async function startServer(
           } else if (msg.type === "setEnergyFloor" && Number.isFinite(msg.value)) {
             // "Lägsta nivå": energins golv (0..0,5) - tysta partier lyser minst så här mycket av effektens ljus.
             deps.cfg.energyFloor = Math.max(0, Math.min(0.5, Number(msg.value)));
+          } else if (msg.type === "setVerseCeil" && Number.isFinite(msg.value)) {
+            // "Tak i vers": ljustaket i vers/intro/break (0,3..1), ägaren 10-12 'gör det justerbart'.
+            deps.cfg.verseCeil = Math.max(0.3, Math.min(1, Number(msg.value)));
           } else if (msg.type === "setSilenceLevel" && Number.isFinite(msg.value)) {
             // "Släckgräns": frame.level under vilken riggen tonas ut (0,01..0,20). Enda källan sedan 10-11.
             deps.cfg.silenceLevel = Math.max(0.01, Math.min(0.20, Number(msg.value)));

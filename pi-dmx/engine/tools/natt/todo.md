@@ -1,5 +1,16 @@
 # Natt-agentens uppdrag
 
+## 10-12 EFTERMIDDAG: NY ENERGIKEDJA I MAIN (ej deployad) - läs först
+Ägaren: 'energin kändes inte ... vill att ljuset följer basgången, sub-känslan i ögonen, svänga mycket, taket sänks efter var i låten'.
+Tre agenter: granskning (dubbelmodulering: kickdipp 3-4 ggr, SPOT/UNIFORM förbi energin, golv som låser energin, E_CURVE 10 binär,
+TAKET TVÅ GÅNGER via dimmern rgb7 -> vers 0,65 blev ~0,42), mätning (branch worktree-agent-aea10e8f12cc72c8a, ej mergad: energin
+6-13 % av svingen, lagren tar ut 4/5 av varandra, beatK följer inte basen r~0), prototyp MERGAD (89dde8f via merge): basenergi ur
+frame.bodyDb (topp glider 10 s, dal 1 s, min 6 dB, kurva 3), golven/beatK/SPOT/UNIFORM-mdSel/död kod borta, taket bara på färgen.
+Bänk 23 filer: följer basen r 0,12-0,18 -> 0,32-0,47 (diskant ~0,1), topp vers 0,40 -> 0,76, refräng 0,80 -> 0,95; drops/mini/
+lookbyten identiska. 'Tak i vers' (cfg.verseCeil, /setup, 0,65) justerbart. Öppet: refrängens relativa slagdjup (0,52) < versens
+(0,56) - tät bas lyser mellan slagen; uttoningen får inte bli snabbare.
+
+
 ## ÄGARENS UPPDRAG 10-12 (går först): FULL DROP-TIMINGEN - "känns som bara var 3:e träffar rätt"
 Ägaren i ladan 10-12 13:0x. Två källor till riktiga drops (live sedan 10-11 kväll / 10-12):
   (a) analysatorns drop ([dropfire] i journalen: rise/underPeak/goneSpan/edgeAgo; edgeAgo = tid från baskroppens stigande flank till

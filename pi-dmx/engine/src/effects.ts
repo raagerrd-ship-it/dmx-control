@@ -1856,7 +1856,8 @@ export class EffectEngine {
     // lampan per sektion - versen/introt/breaket toppar lägre, builden stiger mot dropen, refrängen och dropen når fullt.
     if (CONCERT) {
       const sec = frame.section ?? '';
-      let tgt = sec === 'high' || sec === '' ? 1 : sec === 'build' ? SEC_CEIL + (SEC_CEIL_BUILD - SEC_CEIL) * this.buildProg : SEC_CEIL;
+      const vc = Math.max(0.3, Math.min(1, this.cfg.verseCeil ?? SEC_CEIL)), bc = Math.max(vc, SEC_CEIL_BUILD);   // "Tak i vers" i /setup
+      let tgt = sec === 'high' || sec === '' ? 1 : sec === 'build' ? vc + (bc - vc) * this.buildProg : vc;
       if (this.dropColEnv > 0.005 || nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) tgt = 1;   // dropen alltid fullt
       else if (nowWall < this.miniBangUntil) { tgt = 1; this.secCeil = 1; }                   // minidrop-looken alltid till 95 % (ägaren 10-12), direkt
       else if (nowWall < this.miniLiftUntil) tgt = Math.min(1, tgt + 0.15);                    // minidropen lyfter taket
