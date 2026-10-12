@@ -4,7 +4,7 @@ import type { EffectDef } from "./types.js";
 // lyser hela tiden men BYTER KULÖR med varandra som en siren - varannat slag, och varje slag efter halva uppbyggnaden
 // (c.buildUp) - aldrig snabbare än takten. Ljuset stiger med förloppet. Rulle blinkar; siren växlar färg.
 export const siren: EffectDef = {
-  key: "siren", label: "Siren", tier: "full", modulate: { energy: true, pulse: false }, section: ["build"], fastLight: true, toggle: true,
+  key: "siren", label: "Siren", tier: "full", modulate: { energy: true, pulse: false }, section: ["build"], toggle: true,
   desc: "Uppbyggnad i full fart: två lampgrupper byter kulör med varandra, varannat slag och sedan varje slag mot dropen.",
   render(c) {
     const p = c.buildUp;
