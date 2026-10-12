@@ -298,6 +298,7 @@ const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)
 // 09-21 kvall). Vill man ha en lugn-grind: analysatorns DMX_DROP_CALM_GATE=1 DROP_CALM_LAND_MS=300 (tappar inget, 300 ms sen i low).
 const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25);
 const DROP_SONG_HOLD_S = Number(process.env.DMX_DROP_SONG_HOLD_S ?? 0);   // 30 -> 0 (agaren 10-11: inga timrar pa riktig drop - snavt mal i analysatorn i stallet)
+const LEVEL_RAMP = 2, LEVEL_RAMP_FALL_S = 2;   // fullt ljus vid 2 x släckgränsen (3 x dämpade versen 40 %, 2 x 19 %, refrängen 3 %); nivån sjunker mjukt på 2 s (se RAMPEN OVANFÖR SLÄCKGRÄNSEN)
 const SHOW_DROP_GAP_MS = 12000;   // spärr mellan riktiga drops från alla källor (10-12; 20 s missade en riktig drop efter en tidig, ägaren 'jag tror det va tiden mellan')
 const DROP_MIN_GAP_S = Number(process.env.DMX_DROP_MIN_GAP_S ?? 0);   // se 'DROP-KEDJOR'   // se 'INGEN DROP I LATENS INLEDNING'
 const DROP_LAND_GAIN = Number(process.env.DROP_LAND_GAIN ?? 1.15);     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
@@ -483,7 +484,7 @@ export class EffectEngine {
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
   private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
-  private secCeil = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+  private secCeil = 1; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
   private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist: number[] = []; private liftAt = -1e12; liftCount = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
@@ -997,7 +998,7 @@ export class EffectEngine {
     // HJÄRTSLAGET LIGGER NUMERA SIST, efter ballistiken — se nedan. Låg det här
     // smetades det ut av utgångens decay (0,42 s), som är mycket långsammare än
     // pulsens egen (121 ms): ljuset hölls kvar mellan slagen och slaget kändes knappt.
-    const drive = this.silenceGate;
+    const drive = this.silenceGate * this.levelRamp;   // + RAMPEN OVANFÖR SLÄCKGRÄNSEN (se levelRamp)
     // Synlig punch: en hård basstöt (eller drop-flash) BLOOMAR färgen till full
     // styrka — inte bara ljusare master (som är osynligt när effekten redan lyser).
     // DROP: analysatorn AVGÖR om det är en drop (frame.dropCount är MONOTON). Vi
@@ -1529,6 +1530,11 @@ export class EffectEngine {
     // TYSTNADSGRIND = HARD INGANGSGRANS (se konstanten ovan). Slackgransen ar ratten i /setup (cfg.silenceLevel) - enda kallan.
     const silenceLevel = this.cfg.silenceLevel ?? SILENCE_LEVEL;
     // SLACKTID (cfg.silenceHoldS, /setup): slack forst nar nivan legat under gransen sa lange; tand direkt. 0 = direkt (som forr).
+    // RAMPEN OVANFÖR SLÄCKGRÄNSEN (ägaren 10-12: 'lamporna lyser en hel del även på släckgräns+1'): grinden var av/på, och energin är
+    // relativ - knappt hörbar musik gav fullt ljus. Nu: ljuset skalas från 0 vid släckgränsen till fullt vid LEVEL_RAMP x släckgränsen,
+    // på en nivå som följer upp direkt och ner mjukt (LEVEL_RAMP_FALL_S) så korta luckor inte dimmar. Ladans musik: level median 0,19.
+    { const lv = frame.level; this.rampLvl = lv > this.rampLvl ? lv : this.rampLvl + (lv - this.rampLvl) * Math.min(1, dtSec / LEVEL_RAMP_FALL_S);
+      const x = (this.rampLvl - silenceLevel) / Math.max(1e-4, (LEVEL_RAMP - 1) * silenceLevel); this.levelRamp = x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x); }
     if (frame.level > silenceLevel) { this.silenceGate = 1; this.belowSince = 0; }
     else {
       const holdMs = Math.max(0, Math.min(5, this.cfg.silenceHoldS ?? 0)) * 1000;
@@ -1845,7 +1851,7 @@ export class EffectEngine {
       this.lowLogAt = Date.now();
       if (isLogOn()) console.log(   // strangen byggs bara nar loggen ar pa (DMX_QUIET=0)
         `[lagniva] niva ${frame.level.toFixed(3)} ` +
-        ` drive ${this.silenceGate.toFixed(2)} md ${md.toFixed(2)} e ${this.eSm.toFixed(2)} drop ${this.dropEnv.toFixed(2)}/${this.dropColEnv.toFixed(2)} fonster ${this.eLo.toFixed(1)}..${this.eHi.toFixed(1)} dB` +
+        ` drive ${(this.silenceGate * this.levelRamp).toFixed(2)} md ${md.toFixed(2)} e ${this.eSm.toFixed(2)} drop ${this.dropEnv.toFixed(2)}/${this.dropColEnv.toFixed(2)} fonster ${this.eLo.toFixed(1)}..${this.eHi.toFixed(1)} dB` +
         ` intensitet ${frame.intensity.toFixed(2)} konf ${frame.bpmConfidence.toFixed(2)}` +
         ` tillit ${this.beatTrust.toFixed(2)} effekt ${this.smartMode}`
       );
