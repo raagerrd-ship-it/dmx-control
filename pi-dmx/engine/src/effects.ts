@@ -1614,7 +1614,7 @@ export class EffectEngine {
       const eC = E_CURVE === 1 ? this.eSm : Math.pow(this.eSm, E_CURVE);
       let eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
       const eFloorSel = eFloor;
-      if (CONCERT && CONCERT_E_FLOOR > eFloor) eFloor = CONCERT_E_FLOOR;   // EFFEKTEN LEDER (se CONCERT_E_FLOOR)
+      if (CONCERT && CONCERT_E_FLOOR > eFloor && frame.section !== 'intro' && frame.section !== 'low' && frame.section !== 'break') eFloor = CONCERT_E_FLOOR;   // EFFEKTEN LEDER (se CONCERT_E_FLOOR) - inte i intro/vers/break: där ska energin synas tydligt (ägaren i ladan 10-12), taket 0,65 håller dem under max
       if (CONCERT && nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) {   // DROPEN BÄR IN I REFRÄNGEN (se DROP_LIFT_MS)
         const left = this.dropLiftUntil - nowWall, a = left >= 0 ? 1 : Math.max(0, 1 + left / DROP_LIFT_FALL_MS);
         eFloor += (1 - eFloor) * a;
