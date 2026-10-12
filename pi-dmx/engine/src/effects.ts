@@ -107,6 +107,10 @@ const TIER_OPEN = Math.max(0, Math.min(1, Number(process.env.DMX_TIER_OPEN ?? (C
  *  snabbare uttoning ar forbjudet) - lampans strobe-kanal gar forbi uttoningen. Satts bara under drop-smallen (dropBangUntil, 1,3 s).
  *  Vardet -> blixttakt beror pa lampmodellen: KALIBRERA I LADAN med ett lagt varde, hogst 3 blixtar/s (fotosensitiv epilepsi). 0 = av. */
 const DROP_STROBE = Math.max(0, Math.min(255, Math.round(Number(process.env.DMX_DROP_STROBE ?? 0))));
+/** EKO I REFRÄNGEN (opt-in DMX_EKO_HIGH=0, nattagenten 10-12): eko-förstavalet vid basgång (1,1 tända lampor, glest) tog 94 av 214 s
+ *  av refrängen i ladan 10-11 21:17 - refrängen blev mörkare än builden (ljus 0,28 mot 0,37). 0 = förstavalet gäller inte i sektion
+ *  high (refrängen väljer ur sin pool som vanligt; eko finns kvar där). 1 = som förut (standard). */
+const EKO_HIGH = process.env.DMX_EKO_HIGH !== '0';
 const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
 const PALETTE_LOCK: number[] | null = (() => {
   const v = (process.env.DMX_PALETTE ?? "").trim(); if (!v) return null;
@@ -1468,7 +1472,7 @@ export class EffectEngine {
         // EKO FÖRST VID TYDLIG BASGÅNG (ägaren i ladan 10-11: basslaget som glider genom lamporna som en våg -> 'ja' till förstaval):
         // bassline >= 0,6 (där eko själv följer basnoterna) -> eko, utom i build, efter drop, eller om eko just gick.
         if (CONCERT && (frame.profile.bassline ?? 0) >= 0.6 && this.smartMode !== 'eko' && lastLookBeforeSwitch !== 'eko' && !BUILD_LOOKS.includes(this.smartMode)
-            && this.switchWhy !== 'drop' && this.cfg.rotation?.eko !== false) this.smartMode = 'eko';
+            && this.switchWhy !== 'drop' && this.cfg.rotation?.eko !== false && (EKO_HIGH || frame.section !== 'high')) this.smartMode = 'eko';
         if (CONCERT) this.buildLookAt = BUILD_LOOKS.includes(this.smartMode) ? nowWall : 0;   // BUILD SOM HÅLLER: när build-looken började
         this.recentLooks.push(this.smartMode); if (this.recentLooks.length > MIX_RECENT_N) this.recentLooks.shift(); this.seenLooks.add(this.smartMode);
       }
