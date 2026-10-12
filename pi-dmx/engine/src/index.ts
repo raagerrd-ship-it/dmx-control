@@ -123,8 +123,6 @@ let fadeUniverse = new Uint8Array(0);
 const dmxProbe = { left: 0, chs: [] as number[], rows: [] as string[], t0: 0 };
 let lastLiveDrop = 0;        // senast sedda drop-räknare FRÅN analysatorn
 let lastBoundary = 0;        // senast sedda låtgräns-räknare (dynamikens omkalibrering)
-let lastCharShift = 0;
-let lastTempoShift = 0;
 let outDrop = 0;             // drop-räknaren effekterna ser (live eller replay)
 const slotsFor = () => Math.max(activeSlots(cfg.fixtures), cfg.fog?.enabled ? cfg.fog.address : 0);
 let curSlots = slotsFor();
@@ -196,9 +194,7 @@ capture.on("chunk", (samples: Float32Array) => {
   // falska latgranser pa pop kastade tempolaset 5x/5 min (ladan 2026-09-04).
   boundsArg.level = frame.level; boundsArg.bpm = frame.bpm; boundsArg.bpmConfidence = frame.bpmConfidence;
   bounds.tick(boundsArg);
-  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; effects.noteCharShift(); }
-  // TEMPOVAXLING UPPAT -> samma bytesskal som karaktarsskiftet (6 s giltigt, MIN_HOLD galler), egen text i loggen.
-  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; effects.noteCharShift(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
+  // (KARAKTARSSKIFTE och TEMPOVAXLING som lookbyte borttagna 10-12: LÅTMANUS i effects.ts - looken foljer latens sektioner, inte klangen.)
   if (bounds.boundaryCount !== lastBoundary) {
     lastBoundary = bounds.boundaryCount; effects.softenRange(); analyser.hintTrackChange(5000);   // riktig latgrans nollar sektionerna (tempotappet gor det inte langre)
     if (recorder) { const name = "ladan-" + lastBoundary; recorder.noteTrack(name, "dmx"); recorder.trackChanged("dmx", name); }

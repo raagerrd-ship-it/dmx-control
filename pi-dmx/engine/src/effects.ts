@@ -13,7 +13,7 @@ import { FixtureOutput, GAMMA, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
-import { fitScore } from "./effects/fit.js";
+import { fitScore, fitDistance } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
 // PALETT-LAS (DMX_PALETTE): lås färgerna till en palett oavsett klang och läge. Namn ur listan
 // nedan eller en sektorlista "4,4.6,5.55" (sektor/6 = hue: 0 röd, 1 gul, 2 grön, 3 cyan, 4 blå,
@@ -25,7 +25,8 @@ const NAMED_PALETTES: Record<string, number[]> = {
 };
 /** SEKTIONSPALETT (opt-in DMX_SECTION_PALETTE=1, natt 2026-10-10, KONSERTSHOW - agaren: 'mer lik en riktig konsert-show'): paletten
  *  (3 kulorer) byts vid SEKTIONSGRANS i stallet for var 32:e slag, och samma sektionstyp far SAMMA palett igen i samma lat
- *  (igenkanning: refrangen ser ut som refrangen). Latgransen (softenRange) glommer paletterna. Av = som forr (frasraknaren). */
+ *  (igenkanning: refrangen ser ut som refrangen). Latgransen (softenRange) glommer paletterna. Av = som forr (frasraknaren).
+ *  10-12: LÅTMANUS - EN palett per lat (inte per sektionstyp), se MANUS_REL. */
 /** KONSERTLÄGET (DMX_CONCERT=1, ägaren i ladan 2026-10-11: "konsert-mode skall ju vara show, inte lite lätt pulserande i samma färg på alla
  *  lampor" + "får vi till det så är det det enda mode vi skall ha"): EN brytare = hela konsertpaketet (sektionspalett, frasbyten, lamptrappa,
  *  kulör per fras, full öppnar 0,6) + dirigenten väljer ALDRIG en enhetlig effekt (UNIFORM: alla fyra lamporna lika, mätt med
@@ -277,19 +278,23 @@ const PULSE_IDX_INIT = -2e9;
 // REALTIDSSEKTIONER som bytesskal + identitet: alltid sedan 10-11 (brytarna DMX_SECTION_SWITCH/DMX_SECTION_UNIT borttagna).
 /** SEKTIONEN AR ENHETEN (2026-09-23, agaren: "jag vill inte att dirigenten bara byter effekt hela tiden, utan mer skapar en anpassad
  *  show till laten"; opt-in DMX_SECTION_UNIT=1, kraver DMX_SECTION_SWITCH=1). Tva saker:
- *  (1) BYTE bara vid sektionsgrans, drop/minidrop eller basgang som kommer/gar - inte pa tierflapp, halvering eller dwell-timern
- *      (kvar som reserv efter dwell + DMX_SECTION_UNIT_RESERVE_MS, om detektorn skulle tystna).
+ *  (1) BYTE bara vid sektionsgrans, build och drop - inte pa tierflapp, halvering eller dwell-timern (se LÅTMANUS).
  *  (2) IGENKANNING for live-sektioner: samma look varje gang samma sektionstyp kommer tillbaka (refrangen ser ut som refrangen,
  *      versen som versen) - nyckel = etiketten, inte sektionsparet. Var avstangd sedan 09-21 20:33 ("samma effekt igen") for att
- *      detektorn da satt fast pa high; rotorsaken (ingen nollning vid latbyte) ar rattad 09-23. Ny lat (intro) glommer lookerna. */
-const SECTION_UNIT_RESERVE_MS = Number(process.env.DMX_SECTION_UNIT_RESERVE_MS ?? 60000);
+ *      detektorn da satt fast pa high; rotorsaken (ingen nollning vid latbyte) ar rattad 09-23. Sedan 10-12: LÅTMANUS. */
 /** SECTION_UNIT (ladan 16:45): forvarningens 'high' 600 ms fore en forutsedd refrang och drop-fonstrets 'high' raknas INTE som sektionsgrans
  *  (de gav high<->low-hopp pa 1-2 s nar refrangen uteblev). Bara den raa sektionen, och den maste vara minst DMX_SECTION_UNIT_MIN_MS gammal. */
 const SECTION_UNIT_MIN_MS = Number(process.env.DMX_SECTION_UNIT_MIN_MS ?? 4000);
-/** FRASVAXLING (2026-09-24, agaren: "inte en effekt per vers eller refrang, lite mer byte iaf"): inom en sektion byts looken pa var
- *  DMX_SECTION_UNIT_PHRASE_BARS:e takt (8; 0 = av), och varje sektionstyp har TVA looker som alternerar (A pa sektionsstart, B pa nasta
- *  fras, A igen ...). Refrangen kommer tillbaka med samma par - identiteten ar kvar, men den star inte still i 50 s. */
-const SECTION_UNIT_PHRASE_BARS = Number(process.env.DMX_SECTION_UNIT_PHRASE_BARS ?? 8);
+/** LÅTMANUS (10-12 kväll, ägaren: "olika effekter hoppar hela tiden ... mer som att den är förprogrammerad" + "allt mer känns anpassat
+ *  efter låten och som att de hänger ihop"). ERSÄTTER frasväxlingen (A/B-look var 8:e takt), basgångs-, karaktärs- och tempobytet,
+ *  reservklockan och 'ny låt' på sektionen intro. Låten får ETT manus: första gången en sektionstyp (intro/low/build/high/break) kommer
+ *  väljs dess look ur rutnätet (tier x sektion x basgång/takt, passform mot låtens profil) och sedan ÅTERKOMMER den varje gång typen
+ *  kommer tillbaka i låten. Refrängen/versen väljs som SLÄKT med låtens första look (samma gruppering, nära passform, refrängen gärna en
+ *  tier upp - MANUS_REL). Look byts bara vid sektionsgräns som hållit SECTION_UNIT_MIN_MS, build och drop (dropen landar i refrängens
+ *  look). Inom looken varierar kulören per fras, lampordningen och grupperingen som förut. En kulörfamilj (palett) per låt.
+ *  Manuset glöms bara på en VERKLIG låtgräns (softenRange från gränsdetektorn) - analysatorns sektionsnollning (intro mitt i låten)
+ *  glömmer inget längre. Förra låtens manus straffas (prevSongLook) så nästa låt får andra looker. */
+const MANUS_REL = 0.5;
 /** Undre grans for effekternas mattnad (se ctx.hsv). 0 = av. */
 const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)));
 // DROP_CALM_BUILD: drop i low/intro kraver riser >= detta. STANDARD 0 = AV sedan 2026-09-22 (natt-agent B, tools/dropBench.mjs mot
@@ -552,13 +557,16 @@ export class EffectEngine {
   private songStartAt = 0;
   /** Låten började — tona in ljuset och ignorera drops en stund. */
   noteSongStart(): void { this.songStartAt = performance.now(); }
-  private partLook = new Map<string, Mode>();
-  private partLookSong = 0;
+  /** LÅTMANUS: sektionstyp -> låtens look för den (se MANUS_REL). Glöms bara på en verklig låtgräns (softenRange). */
+  private manus = new Map<string, Mode>();
+  private songPal = -1;   // LÅTMANUS: låtens kulörfamilj (palettindex), -1 = väljs vid nästa sektion
+  private songNo = 0; private manusTog: boolean | null = null;   // LÅTMANUS: låtnummer och om låten är en toggle-låt (null = ej avgjort)
 
   /** Misstänkt låtbyte → låt auto-rangen kalibrera om snabbt mot nya nivåer. */
-  softenRange(): void { this.songStartWall = Date.now(); this.secPalette.clear(); }   // (rullande nivarangen borttagen 10-08 - den matade bara DIM-taket)
-  /** KARAKTARSSKIFTE fran latgransdetektorn (DMX_CHAR_SHIFT_D): dirigenten byter look vid nasta tillfalle (MIN_HOLD, ej i uppbyggnad). */
-  noteCharShift(reason = 'karaktarsskifte'): void { this.charShiftUntil = performance.now() + 6000; this.charShiftWhy = reason; }   // latgrans: aven DROP_SONG_HOLD_S-klockan
+  softenRange(): void {
+    this.songStartWall = Date.now(); this.songPal = -1; this.songNo++; this.manusTog = null;
+    if (this.manus.size) { for (const [k, m] of this.manus) this.prevSongLook.set(k, m); console.log(`[dirigent] latgrans: nytt manus (forra: ${[...this.manus].map(([k, m]) => k + '=' + m).join(' ')})`); this.manus.clear(); }
+  }   // (rullande nivarangen borttagen 10-08 - den matade bara DIM-taket)
 
 
 
@@ -585,10 +593,7 @@ export class EffectEngine {
   private out = new FixtureOutput();
   private smartCount = 0;
   private recentLooks: Mode[] = [];   // MIX_V2: de senast valda lookerna (nyhetsstraff)
-  private unitSlot = 0; private unitPhraseDone = -1;   // FRASVAXLING: look A/B och senaste frasnummer som bytts pa
   private pendingSecSwitch = false;
-  private charShiftUntil = 0;
-  private charShiftWhy = 'karaktarsskifte';
   /** DIAGNOSTIK (2026-10-06, natt-banken): VARFOR senaste look-bytet skedde, och hur manga byten som skett.
    *  Skrivs bara - inget beslut i motorn laser dem, sa showen ar bit-identisk. 'dwell' betyder att klockan var
    *  det ENDA skalet, alltsa ett byte utan musikalisk grund; alla andra varden ar nagot i laten. */
@@ -603,7 +608,6 @@ export class EffectEngine {
   private phraseBeat = 0;
   private phraseBeats = 32;   // taktslag per musikalisk fras → palettbyte
   private paletteIdx = 2;     // start: Primär
-  private secPalette = new Map<string, number>(); private secPaletteKey = '';   // SECTION_PALETTE: etikett -> palett i laten
   private paletteRot = 0;
 
   // Pre-allokerad kontext för noll-allokering i render-loopen
@@ -1317,14 +1321,17 @@ export class EffectEngine {
         // ar ett bytesskal precis som latminnets sektionsgrans, och etiketten ger IDENTITET (samma look nar 'high' kommer tillbaka).
         const liveSec = frame.section || '';   // bara raa sektionen (forvarningens/drop-fonstrets 'high' raknas inte, se SECTION_UNIT_MIN_MS)
         const liveSecChanged = liveSec !== '' && this.lastLiveSection !== '' && liveSec !== this.lastLiveSection;
-        if (liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '') console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; if (liveSec === 'intro') { let nGl = 0; for (const k of [...this.partLook.keys()]) if (k.startsWith('live:')) { this.prevSongLook.set(k, this.partLook.get(k)!); this.partLook.delete(k); nGl++; } if (nGl) console.log(`[dirigent] ny lat: glommer ${nGl} looker`); } }
+        if (liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '') console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; }   // (intro glommer inte lookerna langre - LÅTMANUS glomms bara pa en verklig latgrans)
         if (liveSecChanged) this.pendingSecSwitch = true;
-        const secOldEnough = (frame.sectionAgeMs ?? 1e9) >= SECTION_UNIT_MIN_MS;   // SECTION_UNIT: ingen switch pa en sektion yngre an 4 s (detektorflapp)   // ny lat (analysatorn nollar till intro) -> glom live-lookerna
+        const secOldEnough = (frame.sectionAgeMs ?? 1e9) >= SECTION_UNIT_MIN_MS;   // SECTION_UNIT: ingen switch pa en sektion yngre an SECTION_UNIT_MIN_MS (detektorflapp)
         const memSection = now - this.memSectionAt < 300 || liveSecChanged;
         const memPhrase = now - this.memPhraseAt < 250;
         const gridOk = !this.memHasGrid || memSection || memPhrase || now > this.smartDwellUntil + 20000;
         const phraseMs = this.cfg.beat && this.cfg.beat.bpm > 0 ? 16 * 60000 / this.cfg.beat.bpm * (this.pulseHalved ? 2 : 1) : 0;
-        const phraseOk = !PHRASE_SWITCH || !beatLocked(this.cfg.beat) || this.beatTrust < 0.5 || (this.beatCounter % 16) === 0 || held > MIN_HOLD + phraseMs;
+        // LÅTMANUS: sektionsbytet landar på sektionens EGET taktraster (början av takt 2, 4, 6 ... sedan sektionsstart) i stället för
+        // effektklockans 16-slagsfras, vars fas är godtycklig mot låten (bänken: bytet väntade upp till 24 s efter en hållen sektion).
+        const secBars = frame.sectionBars ?? 0, secBarOk = secBars > 0 && Math.floor(secBars) % 2 === 0 && secBars % 1 < 0.25;
+        const phraseOk = !PHRASE_SWITCH || !beatLocked(this.cfg.beat) || this.beatTrust < 0.5 || (liveSec && secBars > 0 ? secBarOk : (this.beatCounter % 16) === 0) || held > MIN_HOLD + phraseMs;
         // MED STRUKTUR AR SEKTIONEN ENHETEN. Dwell-timern och tier-bytet ar till
         // for OKANDA latar, dar showen inte har nagot battre att ga pa. Har vi en
         // analyserad struktur ska looken sitta HELA sektionen ut — annars byter
@@ -1333,20 +1340,15 @@ export class EffectEngine {
         //   foljt 11 s senare av "ny look ripple (tier full)" — tre looker i en
         //   refrang, driven av att tiern flaxade mellan fart och full.
         const halvedChanged = this.pulseHalved !== this.lastHalvedForSwitch;   // dubbeltakt/lugn slog om → delad look
-        // BASGANG: tydlig basgang som kommer (eller gar) medan nuvarande look inte matchar -> byt.
+        // BASGANG: tydlig basgang styr VALET av look (toggle-poolen), men byter inte look (LÅTMANUS).
         const bassClear = (frame.profile.bassline ?? 0) >= (this.lastBassClearForSwitch ? CLEAR_BASS - 0.2 : CLEAR_BASS);
-        const curToggle = !!EFFECT_MAP.get(this.smartMode)?.toggle;
-        const bassSwitch = bassClear !== this.lastBassClearForSwitch && (bassClear ? !curToggle : curToggle);
-        // FRASVAXLING: ny fras (var PHRASE_BARS:e takt sedan sektionsstart) -> byte till sektionens andra look
-        const phraseNo = SECTION_UNIT_PHRASE_BARS > 0 ? Math.floor((frame.sectionBars ?? 0) / SECTION_UNIT_PHRASE_BARS) : 0;
-        if (liveSecChanged) this.unitPhraseDone = 0;
-        const unitPhrase = !!liveSec && SECTION_UNIT_PHRASE_BARS > 0 && phraseNo > 0 && phraseNo !== this.unitPhraseDone && !liveSecChanged && !this.pendingSecSwitch;
-        const charShift = performance.now() < this.charShiftUntil;   // KARAKTARSSKIFTE (noteCharShift)
+        // LÅTMANUS: med sektioner byts looken bara pa sektionsgrans (+ build/drop nedan); fras, basgang, karaktar, tempo och
+        // reservklockan byter inte langre. Utan sektion (ingen analys an) galler tier/halvering/dwell som forut.
         const wantSwitch = this.memPart
-          ? (memSection || bassSwitch)
+          ? memSection
           : liveSec
-            ? (((memSection || this.pendingSecSwitch) && secOldEnough) || unitPhrase || bassSwitch || charShift || now > this.smartDwellUntil + SECTION_UNIT_RESERVE_MS)   // SECTION_UNIT: sektionen ar enheten
-            : (tierChanged || memSection || halvedChanged || bassSwitch || charShift || now > this.smartDwellUntil);
+            ? ((memSection || this.pendingSecSwitch) && secOldEnough)
+            : (tierChanged || memSection || halvedChanged || now > this.smartDwellUntil);
 
         // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
         // det, inte bara på energinivån. Två regler, båda dramaturgiska:
@@ -1384,8 +1386,6 @@ export class EffectEngine {
         //      hållen. Etiketten far darfor styra IDENTITET (samma look aterkommer)
         //      och NAR bytet sker (sektionsgransen), men inte hur starkt det lyser.
         const tierS = tier;
-        // Ny låt → glöm förra låtens looker.
-        if (this.memSongId !== this.partLookSong) { this.partLook.clear(); this.partLookSong = this.memSongId; }
         const buildEntry = liveSecChanged && liveSec === 'build';   // MIX_V2 (2): ett byte IN i build-poolen tillats
         const secEntry = this.pendingSecSwitch && secOldEnough && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
         const concertBuild = CONCERT && buildEntry && held > 2000;   // konsertläget: in i build direkt
@@ -1396,16 +1396,27 @@ export class EffectEngine {
         // (BUILDEN LANDAR I REFRÄNGEN - sektionen high efter >= 4 s build = drop - borttagen 10-11 kväll: 'falsk' 21:42:39, 17 % på baslyft; se DROP_JUMP_DB)
         const buildLock = CONCERT && frame.section === 'build' && this.buildLookAt > 0 && BUILD_LOOKS.includes(this.smartMode) && nowWall - this.buildLookAt < 30000 && !dropSwitch && !nearSwitch && !buildExit;   // BUILD SOM HÅLLER - V123: bara så länge sektionen ÄR build
         if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild) && (dropSwitch || nearSwitch || allaBuild || concertBuild || buildExit || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk && phraseOk))) {
+        // (skrapjakten 10-01: enabled/req skapades forr pa varje ruta men anvands bara har, i bytet)
+        const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
+        const req = (m: Mode) => meetsRequirements(m, bpm, frame.profile);
+        // LÅTMANUS: vilken del av manuset bytet galler. Builden (aven ALLA_LOOKER-builden) -> build; drop och build som slutar ->
+        // refrangens look (dropen landar i refrangen); annars sektionen. Utan sektion (ingen analys an) finns inget manus.
+        const secKey = allaBuild ? 'build' : (dropSwitch || buildExit) && liveSec !== 'break' ? 'high' : liveSec;
+        const calm = secKey === 'break';   // breakdown -> lugna poolen (var wantCalm)
+        const tierRank = (m: Mode) => { const t = EFFECT_MAP.get(m)?.tier; return t === 'lugn' ? 0 : t === 'full' ? 2 : 1; };
+        const tierNow = tierS === LUGN ? 0 : tierS === FART ? 1 : 2;
+        const kept = secKey ? this.manus.get(secKey) : undefined;
+        // Manusets look galler om den fortfarande ar pa och passar (krav, och inte tva tiers fran energin just nu - en lugn vers-look i en
+        // vers som blivit full far en ny look, som blir manusets nya).
+        const keep = !!kept && this.cfg.rotation?.[kept] !== false && req(kept) && (calm || secKey === 'build' || Math.abs(tierRank(kept) - tierNow) <= 1);
+        if (keep && kept === this.smartMode) { this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true; }   // manuset sager samma look - inget byte
+        else {
         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
-        this.switchWhy = dropSwitch ? 'drop' : nearSwitch ? 'nastan-drop' : charShift ? (this.charShiftWhy.startsWith('tempovaxling') ? 'tempo' : 'karaktar')
-          : (memSection || secEntry) ? 'sektion' : unitPhrase ? 'fras' : bassSwitch ? 'basgang'
-          : (buildEntry || allaBuild) ? 'build' : halvedChanged ? 'halvering' : tierChanged ? 'tier' : 'dwell';
+        this.switchWhy = dropSwitch ? 'drop' : nearSwitch ? 'nastan-drop'
+          : (memSection || secEntry) ? 'sektion'
+          : (buildEntry || allaBuild) ? 'build' : buildExit ? 'build-slut' : halvedChanged ? 'halvering' : tierChanged ? 'tier' : 'dwell';
         this.switchCount++;
-        // (skrapjakten 10-01: enabled/part skapades forr pa varje ruta men anvands bara har, i bytet)
-        const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
-        const part = this.memPart || (liveSec && liveSec !== 'intro' ? 'live:' + liveSec : undefined);   // identitet aven utan latminne
-        if (charShift) { this.charShiftUntil = 0; console.log(`[dirigent] ${this.charShiftWhy} i laten -> byter look`); }
         this.lastSmartTier = tierName;
         this.lastHalvedForSwitch = this.pulseHalved;
         this.lastBassClearForSwitch = bassClear;
@@ -1418,21 +1429,22 @@ export class EffectEngine {
         // (registry.meetsRequirements). Ambient-effekterna kräver inget → utgör
         // fallbacken. Töms poolen ändå släpper vi kraven (hellre en mindre passande
         // effekt än ingen).
-        const req = (m: Mode) => meetsRequirements(m, bpm, frame.profile);
-        let pool = enabled(wantCalm ? LUGN : tierS).filter(req);
+        const lastLookBeforeSwitch = this.smartMode;
+        if (keep) { this.smartMode = kept!; console.log(`[dirigent] manus ${secKey}: "${kept}" igen`); }
+        else {
+        let pool = enabled(calm ? LUGN : tierS).filter(req);
         // MIX_V2 (5): i 'high' (refrang/drop) ar energitiern oftast bara 'fart' (full 17-20 % av tiden pa ladans mixar) -> full-fart-
         // effekterna (party, split, gravity, konfetti, fyrverkeri ...) valdes nastan aldrig. I high far poolen vara fart + full.
-        if (!wantCalm && liveSec === 'high' && tierS === FART) pool = enabled([...FART, ...FULLFART]).filter(req);
+        if (!calm && secKey === 'high' && tierS === FART) pool = enabled([...FART, ...FULLFART]).filter(req);
         // SEKTIONSPOOL (DMX_SECTION_SWITCH): skar med sektionens looker (registry.SECTION_POOLS). 'build' och 'break' har egna
         // effekter (stegring/andrum) som gar fore tiern; for high/low/intro ar snittet med tier-poolen forsta valet.
-        const secKey = allaBuild ? 'build' : liveSec;   // ALLA_LOOKER (a): uppbyggnaden valjer ur build-poolen aven nar etiketten sager annat
         if (secKey) {
           const secList = sectionPool(secKey);
           const own = (secKey === 'build' || secKey === 'break') ? enabled(secList).filter(req) : [];
           const cut = pool.filter((m) => secList.includes(m));
           if (own.length) pool = own; else if (cut.length) pool = cut;
         }
-        if (pool.length === 0) pool = enabled(wantCalm ? LUGN : tierS);              // krav tömde → släpp dem
+        if (pool.length === 0) pool = enabled(calm ? LUGN : tierS);              // krav tömde → släpp dem
         if (pool.length === 0) pool = enabled([...FART, ...LUGN, ...FULLFART]);      // valfri aktiv
         if (pool.length === 0) pool = ["breathe"];                                   // sista fallback
         // HALVERAT: de delade lookerna (och hjärtat) ska finnas i poolen oavsett tier.
@@ -1440,7 +1452,7 @@ export class EffectEngine {
         if (this.pulseHalved) for (const m of ["varannan", "basgang", "hjarta"] as Mode[]) if (!pool.includes(m) && this.cfg.rotation?.[m] !== false && req(m)) pool.push(m);
         if (CONCERT) { const show = pool.filter((m) => !(CALM_ONLY.includes(m) && !(bpm > 0 && bpm < CALM_BPM))); if (show.length) pool = show; }   // UNIFORM tillbaka 10-11 (energi pa utvalda lampor)
         if (CONCERT && secKey === 'build') { const b = pool.filter((m) => BUILD_LOOKS.includes(m)); pool = b.length ? b : enabled(BUILD_LOOKS); }   // BUILD SOM HÅLLER   // KONSERTLÄGET: ingen enhetlig look
-        if (LAMP_STAIR && liveSec === 'high') {                                   // LAMPTRAPPA: refrängen -> hela riggen
+        if (LAMP_STAIR && secKey === 'high') {                                   // LAMPTRAPPA: refrängen -> hela riggen
           const full = pool.filter((m) => !SPARSAM.includes(m)); if (full.length) pool = full;
         }
         this.smartCount++;
@@ -1462,30 +1474,32 @@ export class EffectEngine {
         // kastades bort. MATT: "chorus: aterser stege" tva ganger, sedan tre nya
         // looker i rad sa fort tiern gick till full. Kravet ar nu bara att
         // effekten alls ar pasagen av agaren.
-        // LIVE-ETIKETT (ladan 20:30, 'fastnade i samma effekt'): generisk etikett ('high') aterser annars samma look hela laten.
-        // Par-regel: sektion nr 1-2 delar look, nr 3-4 en ny, osv. (A A B B) - igenkanning utan att fastna.
-        const livePart = !!part && part.startsWith('live:');
-        if (livePart) { if (unitPhrase) { this.unitSlot = 1 - this.unitSlot; this.unitPhraseDone = phraseNo; } else this.unitSlot = 0; }
-        const pairKey = livePart ? part + (this.unitSlot ? ':b' : '') : part;   // SECTION_UNIT: nyckel = etiketten
-        // (ATERSEENDE av looken per sektion - DMX_SECTION_REUSE - borttaget 10-10: av sedan 10-01, 'mer variation'. Sektionspaletten
-        //  DMX_SECTION_PALETTE ger igenkanningen i kulorerna i stallet.)
-        const unitPen = (m: Mode) => pairKey && this.prevSongLook.get(pairKey) === m ? 0.5 : 0;   // SECTION_UNIT: inte forra latens look for samma sektionstyp   // 20:33: ingen igenkanning for live-etiketter ('samma effekt igen') - bara latminnet
+        // (Frasvaxlingens A/B-par och 'ny lat' pa intro borttagna 10-12: LÅTMANUS - aterseendet ar manuset, nyckel = sektionstypen.)
+        const unitPen = (m: Mode) => secKey && this.prevSongLook.get(secKey) === m ? 0.5 : 0;   // inte forra latens look for samma sektionstyp
+        // LÅTMANUS: SLAKT med latens forsta look (vers/refrang/intro) - samma gruppering (toggle) och nara passform; refrangen garna en
+        // tier upp ('forhojd'). Breaken ar sin egen.
+        const anchor = calm ? undefined : (['low', 'high', 'intro'] as const).map((k) => k === secKey ? undefined : this.manus.get(k)).find((m) => !!m);
+        const togOf = (m: Mode) => !!EFFECT_MAP.get(m)?.toggle;
+        const rel = (m: Mode) => !anchor ? 0 : MANUS_REL * ((togOf(m) === togOf(anchor) ? 0.5 : 0) + 0.5 * Math.max(0, 1 - fitDistance(m, anchor) / 0.8))
+          + (secKey === 'high' && tierRank(m) > tierRank(anchor) ? 0.1 : 0);
         // TYDLIG BASGANG -> toggle-poolen (se CLEAR_BASS). Snitt med aktuell pool forst (sektion/tier/krav), annars alla
         // aktiva toggle-effekter som moter kraven. Bast passande forst, gyllene-snitt-variation bland topp 3, aldrig samma.
         // LAST OCH TYDLIG TAKT (ladan 10-10, agaren: 'ar bpm last och tydlig takt sa vill jag att dirigenten foredrar dom'): som tydlig
         // basgang - varannat look-byte tas ur toggle-poolen (parvisa/gruppvisa effekter i takt) nar takten ar last och tilliten >= 0,85.
-        const beatClear = !allaBuild && beatLocked(this.cfg.beat) && this.beatTrust >= 0.85 && this.smartCount % 2 === 1;
-        const bassHard = !(CONCERT && secKey === 'build') && (beatClear || (!allaBuild && bassClear && ((frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD && this.smartCount % 2 === 1)));   // MIX_V2 (1); konsertlaget: aldrig i build
-        const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); const t = cut.length ? cut : enabled(TOGGLE_POOL).filter(req); const full = LAMP_STAIR && liveSec === 'high' ? t.filter((m) => !SPARSAM.includes(m)) : t; return full.length ? full : t; })() : [];   // refrängen: inga glesa looker via basgången heller (10-12)
+        // LÅTMANUS: med manus avgors det per LAT i stallet for vartannat byte - varannan lat med last takt/tydlig basgang blir en
+        // toggle-lat (hela laten samma gruppering); annars hade samma sektionstyp alltid hamnat pa samma paritet.
+        const takt = !allaBuild && beatLocked(this.cfg.beat) && this.beatTrust >= 0.85, bas = !allaBuild && bassClear && (frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD;
+        if (secKey && this.manusTog === null) this.manusTog = this.songNo % 2 === 1 && (takt || bas);
+        const beatClear = secKey ? !!this.manusTog && takt : takt && this.smartCount % 2 === 1;
+        const bassHard = !(CONCERT && secKey === 'build') && (secKey ? !!this.manusTog && !allaBuild : (beatClear || (bas && this.smartCount % 2 === 1)));   // MIX_V2 (1); konsertlaget: aldrig i build
+        const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); const t = cut.length ? cut : enabled(TOGGLE_POOL).filter(req); const full = LAMP_STAIR && secKey === 'high' ? t.filter((m) => !SPARSAM.includes(m)) : t; return full.length ? full : t; })() : [];   // refrängen: inga glesa looker via basgången heller (10-12)
         const clearBass = toggles.length > 0;
-        const lastLookBeforeSwitch = this.smartMode;
         if (clearBass) {
-          const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) + (!this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) - unitPen(m) })).sort((a, b) => b.s - a.s);
+          const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) + (!this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) - unitPen(m) + rel(m) })).sort((a, b) => b.s - a.s);
           const cands = ranked.filter((x) => x.m !== this.smartMode);
           const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))));
           this.smartMode = this.pickLook(top);
-          if (part && !wantCalm) this.partLook.set(pairKey!, this.smartMode);
-          console.log(`[dirigent] ${beatClear ? `last takt (tillit ${this.beatTrust.toFixed(2)}` : `tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}`}, ${toggles.length} toggles) -> "${this.smartMode}"`);
+          console.log(`[dirigent] ${secKey ? 'manus ' + secKey + ': ' : ''}${beatClear ? `last takt (tillit ${this.beatTrust.toFixed(2)}` : `tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}`}, ${toggles.length} toggles) -> "${this.smartMode}"`);
         } else {
           // DUBBELTAKT → VARANNAN: på snabbt/dubbeltakt-låst tempo (bpm ≥ 140) boostas
           // `varannan` (spatial dubbeltakt) hårt så dirigenten väljer den i stället för
@@ -1495,9 +1509,10 @@ export class EffectEngine {
             + (bassClear && TOGGLE_POOL.includes(m) ? CLEAR_BASS_BOOST : 0)                    // MIX_V2 (1): boost, inte pool-byte
             - (this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0)                          // MIX_V2 (3): nyhetsstraff
             + (!this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0)                                 // MIX_V2 (6): osedd-bonus
-            - unitPen(m)                                                                                  // SECTION_UNIT: forra latens look
+            - unitPen(m)                                                                                  // forra latens look
+            + rel(m)                                                                                      // LÅTMANUS: slakt med latens look
             + (halvedNow && (m === "varannan" || m === "basgang") ? 0.30 : 0)
-            + (m === "hjarta" ? (halvedNow ? 0.30 : (wantCalm || tierS === LUGN) ? 0.20 : 0) : 0);   // halverat: trion varannan/innerouter/hjarta = hela topp-3
+            + (m === "hjarta" ? (halvedNow ? 0.30 : (calm || tierS === LUGN) ? 0.20 : 0) : 0);   // halverat: trion varannan/innerouter/hjarta = hela topp-3
           const ranked = pool
             .map((m) => ({ m, s: fitScore(m, frame.profile) + fastBoost(m) }))
             .sort((a, b) => b.s - a.s);
@@ -1505,10 +1520,9 @@ export class EffectEngine {
           // MIX_V2 (4): valfonstret var alltid topp-3 av passformen -> samma 3-5 looker per tier for evigt; nu topp-MIX_TOP_FRAC av poolen (minst 3)
           const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))));
           this.smartMode = this.pickLook(top);
-          if (part && !wantCalm) this.partLook.set(pairKey!, this.smartMode);
           // LOGGEN AR OVILLKORLIG (2026-09-23): utan DMX_SECTION_SWITCH finns inget `part` och dirigentens val syntes inte alls i
           // journalen (ladan 09-22: "vi korde pa hoga effekter" gick inte att belagga). Nu: del, sektion (data), basgang, tier, pool.
-          console.log(`[dirigent] ${part ?? 'smart'}: ny look "${this.smartMode}" (tier ${tierS === LUGN ? "lugn" : tierS === FART ? "fart" : "full"}, pool ${pool.length}, sektion ${frame.section ?? '-'}, basgang ${(frame.profile.bassline ?? 0).toFixed(2)}${wantCalm ? ', lugn' : ''})`);
+          console.log(`[dirigent] ${secKey ? 'manus ' + secKey : 'smart'}: ny look "${this.smartMode}" (tier ${tierS === LUGN ? "lugn" : tierS === FART ? "fart" : "full"}, pool ${pool.length}, sektion ${frame.section ?? '-'}, basgang ${(frame.profile.bassline ?? 0).toFixed(2)}${calm ? ', lugn' : ''}${anchor ? ', slakt med ' + anchor : ''})`);
         }
         // ENFORMIG LOOK -> KORTARE DWELL. Agaren 2026-09-12: "ar det en enformig effekt far den garna byta
         // snabbare". De statiska svepen (ingen takt-signal, ingen kick-drift) far DMX_DWELL_FLAT_MS (30 s),
@@ -1517,9 +1531,12 @@ export class EffectEngine {
         // EKO FÖRST VID TYDLIG BASGÅNG (ägaren i ladan 10-11: basslaget som glider genom lamporna som en våg -> 'ja' till förstaval):
         // bassline >= 0,6 (där eko själv följer basnoterna) -> eko, utom i build, efter drop, eller om eko just gick.
         if (CONCERT && (frame.profile.bassline ?? 0) >= EKO_BASS && this.smartMode !== 'eko' && lastLookBeforeSwitch !== 'eko' && !BUILD_LOOKS.includes(this.smartMode)
-            && this.switchWhy !== 'drop' && this.cfg.rotation?.eko !== false && frame.section !== 'high') this.smartMode = 'eko';
+            && this.switchWhy !== 'drop' && this.cfg.rotation?.eko !== false && frame.section !== 'high' && secKey !== 'high') this.smartMode = 'eko';
+        if (secKey) this.manus.set(secKey, this.smartMode);   // LÅTMANUS: sektionstypens look resten av laten
+        }
         if (CONCERT) this.buildLookAt = BUILD_LOOKS.includes(this.smartMode) ? nowWall : 0;   // BUILD SOM HÅLLER: när build-looken började
         this.recentLooks.push(this.smartMode); if (this.recentLooks.length > MIX_RECENT_N) this.recentLooks.shift(); this.seenLooks.add(this.smartMode);
+        }
       }
       effMode = this.smartMode;
     }
@@ -1532,12 +1549,10 @@ export class EffectEngine {
     if (this.cfg.mode === "smart") {
       const secKey = SECTION_PALETTE ? (frame.section ?? '') : '';
       if (secKey !== '') {
-        // SEKTIONSPALETT: byte bara nar sektionen byts; samma etikett i samma lat -> samma palett (se SECTION_PALETTE).
-        if (secKey !== this.secPaletteKey) {
-          this.secPaletteKey = secKey;
-          const rem = this.secPalette.get(secKey);
-          if (rem !== undefined) this.paletteIdx = rem; else { this.pickPalette(frame.centroid); this.secPalette.set(secKey, this.paletteIdx); }
-        }
+        // LÅTMANUS: EN kulorfamilj per lat - valjs (efter klangen) vid latens forsta sektion och galler tills en verklig latgrans
+        // (softenRange). Kuloren roterar inom familjen per fras (HUE_PHRASE). (Sektionspaletten - en palett per sektionstyp - ersatt 10-12.)
+        if (this.songPal < 0) { this.pickPalette(frame.centroid); this.songPal = this.paletteIdx; }
+        this.paletteIdx = this.songPal;
       } else if (frame.bpm === 0) this.phraseBeat = 0;            // tyst/ej låst → nollställ frasen
       // Räkna bara takter när BPM är PÅLITLIGT (confidence) → palettbytena
       // hamnar på riktiga fraser, inte på ett hoppigt/osäkert tempo.

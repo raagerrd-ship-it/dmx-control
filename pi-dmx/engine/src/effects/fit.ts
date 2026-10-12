@@ -142,3 +142,9 @@ export function fitScore(mode: Mode, p: { punch: number; bass: number; bright: n
   const spatialBonus = (SPATIAL[mode] ?? 0) * SPATIAL_PREF * p.punch;
   return base + spatialBonus;
 }
+
+/** LÅTMANUS (effects.ts MANUS_REL): avstånd mellan två effekters passform (0 = samma sorts musik). */
+export function fitDistance(a: Mode, b: Mode): number {
+  const x = FIT[a] ?? NEUTRAL, y = FIT[b] ?? NEUTRAL;
+  return Math.hypot(x.punch - y.punch, x.bass - y.bass, x.bright - y.bright, x.beat - y.beat);
+}
