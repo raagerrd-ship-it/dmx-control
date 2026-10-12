@@ -2,6 +2,7 @@
  * KONSERTREPLAY (2026-10-11 kväll, analysen av konsertläget efter ladan): kör en långinspelning (lang-*.wav) genom analysatorn +
  * effektmotorn som concertBench (ladans config, beatFeed, låtgränser) och skriver en tidslinje i 10 Hz med det showen GÖR:
  *   look, orsak (switchWhy), sektion, intensitet, ljus (medel 0..1), tända lampor, drop/nästan-drop/lyft/minidrop-look/build-landning.
+ *   (+ 'pal' = palettindex, kulörfamiljen; mäts med tools/rodTrad.mjs)
  * Jämförs med inspelningens events.json (det som hände live, med dåvarande kod) och ägarens markeringar.
  *   node tools/konsertReplay.mjs <wav> --json ut.json [--trace ut.f32]
  *  --trace (10-12, energikedjan): varje renderruta (40 Hz) som Float32 x 10: t, sektion (0 intro 1 low 2 build 3 high 4 break 5 annat),
@@ -46,8 +47,8 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
   const fr = an.process(buf);
   boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
-  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift(); }
-  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
+  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); }
+  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
   if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; eng.softenRange(); an.hintTrackChange(5000); LOG.push([+tS.toFixed(2), 'LATGRANS']); }
   feed.update(fr, cfg, an);
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
@@ -61,11 +62,11 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   if (ms - lastRow >= 100) {
     lastRow = ms;
     ROWS.push([+tS.toFixed(2), eng.getActiveMode(), eng.switchWhy, fr.section ?? '', +(fr.intensity ?? 0).toFixed(2), +(acc.light / acc.n).toFixed(3), +(acc.nLit / acc.n).toFixed(1),
-      fr.dropCount ?? 0, eng.nearCount ?? 0, eng.liftCount ?? 0, acc.mini, eng.buildUpgrades ?? 0, Math.round(fr.bpm ?? 0), +(fr.bodyDb ?? -90).toFixed(1), fr.miniDropCount ?? 0, +(fr.profile?.bassline ?? 0).toFixed(2), +acc.hi.toFixed(3), +acc.lo.toFixed(3), +((acc.top ?? 0) / acc.n).toFixed(3)]);
+      fr.dropCount ?? 0, eng.nearCount ?? 0, eng.liftCount ?? 0, acc.mini, eng.buildUpgrades ?? 0, Math.round(fr.bpm ?? 0), +(fr.bodyDb ?? -90).toFixed(1), fr.miniDropCount ?? 0, +(fr.profile?.bassline ?? 0).toFixed(2), +acc.hi.toFixed(3), +acc.lo.toFixed(3), +((acc.top ?? 0) / acc.n).toFixed(3), eng.paletteIdx ?? -1]);
     acc = { light: 0, nLit: 0, n: 0, mini: 0, hi: 0, lo: 9, top: 0 };
   }
 }
-const out = { wav: path, columns: ['t', 'look', 'why', 'sec', 'int', 'light', 'nLit', 'drops', 'near', 'lift', 'miniLook', 'upgrades', 'bpm', 'bodyDb', 'aMini', 'bass', 'hi', 'lo', 'top'], rows: ROWS, log: LOG };
+const out = { wav: path, columns: ['t', 'look', 'why', 'sec', 'int', 'light', 'nLit', 'drops', 'near', 'lift', 'miniLook', 'upgrades', 'bpm', 'bodyDb', 'aMini', 'bass', 'hi', 'lo', 'top', 'pal'], rows: ROWS, log: LOG };
 writeFileSync(opt("--json", "replay.json"), JSON.stringify(out));
 if (TRACE) writeFileSync(opt("--trace"), Buffer.from(new Float32Array(TRACE).buffer));
 process.stdout.write(`${path}: ${ROWS.length} rader, ${LOG.length} loggrader\n`);

@@ -118,8 +118,8 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
   const fr = an.process(buf);
   boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence;
   bounds.tick(boundsArg);
-  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift(); }
-  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
+  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); }
+  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
   if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; if (process.env.DYN_GRANS_LOG) process.stderr.write(`GRANS ${(off / SR).toFixed(1)}
 `); if (!process.env.DYN_INGEN_GRANS) { eng.softenRange(); an.hintTrackChange(5000); } }
   feed.update(fr, cfg, an);   // TAKTMATNINGEN SOM LIVE (beatFeed.ts, matfalla 43; forr anchorMs = fr.beatAnchorMs varje hop)
