@@ -11,6 +11,15 @@
   konsertReplay --step 5 kör som live.
 
 
+## NATTEN 2026-10-13 (nattagenten, inget deployat)
+KLART 2026-10-13: baslinje natt/2026-10-13.json (pop 125/0,42 r 0,42 byten 3,1/min; mega 125/0,42 r 0,22 3,7/min; korpus 125/0,42 r 0,46;
+  kickträff 0,50 -> 0,42 = basenergin följer bodyDb, inte varje kick; 54 aldrig valda i mixarna = röd tråd, kvällen 37 looker/14 rutor).
+KLART 2026-10-13: opt-in DMX_MANUS_RETURN=1 - när sektionens look faller (tier 2 steg, ögonblickskrav punch/beat) prövas låtens tidigare
+  looker för sektionen först, utan ögonblickskraven. 23 inspelningar: omval inom låt 15 -> 6, återseende 78 -> 83 %, hör ihop 82 -> 79 %,
+  drops/mini/ljus oförändrade, av json-identiskt. Redo: ladan.py --env DMX_MANUS_RETURN=1.
+ÖPPET: halva resten av återseende-missarna = looken byts först sekunder in i sektionen (fras/raster); refrängens slagdjup 0,56 < vers 0,61
+  (dal 0,17); minidrop-kontrasten nu ok (median +0,54, 5/38 svaga, alla i hög refräng).
+
 ## ÄGARENS UPPDRAG 10-12 KVÄLL: RÖD TRÅD - "nu känns det bara som olika effekter hoppar hela tiden. Kan man få någon bra röd tråd,
 ## mer som att den är förprogrammerad?" (går före situationsrutnätet; drop-timingen nedan är lika viktig)
 MÅLET I ÄGARENS ORD (tillägg): "så allt mer känns anpassat efter låten och som att de hänger ihop" - looken ska matcha LÅTENS
