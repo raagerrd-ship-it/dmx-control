@@ -1496,7 +1496,7 @@ export class EffectEngine {
         // LÅTMANUS: med manus avgors det per LAT i stallet for vartannat byte - varannan lat med last takt/tydlig basgang blir en
         // toggle-lat (hela laten samma gruppering); annars hade samma sektionstyp alltid hamnat pa samma paritet.
         const takt = !allaBuild && beatLocked(this.cfg.beat) && this.beatTrust >= 0.85, bas = !allaBuild && bassClear && (frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD;
-        if (secKey && this.manusTog === null) this.manusTog = this.songNo % 2 === 1 && (takt || bas);
+        if (secKey && this.manusTog === null) this.manusTog = takt || bas;   // ALLA låtar med låst takt/tydlig basgång = stegande/gruppvisa effekter (ägaren 10-13: 'tydlig basgång effekter med stegande lampor'); var varannan låt
         const beatClear = secKey ? !!this.manusTog && takt : takt && this.smartCount % 2 === 1;
         const bassHard = !(CONCERT && secKey === 'build') && (secKey ? !!this.manusTog && !allaBuild : (beatClear || (bas && this.smartCount % 2 === 1)));   // MIX_V2 (1); konsertlaget: aldrig i build
         const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); const t = cut.length ? cut : enabled(TOGGLE_POOL).filter(req); const full = LAMP_STAIR && secKey === 'high' ? t.filter((m) => !SPARSAM.includes(m)) : t; return full.length ? full : t; })() : [];   // refrängen: inga glesa looker via basgången heller (10-12)
