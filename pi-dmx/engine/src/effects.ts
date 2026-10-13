@@ -483,8 +483,10 @@ export class EffectEngine {
     if (FX_FLOOR > 0 && !toggle && m > 0.001 && m < 1) { const k = (m + FX_FLOOR * (1 - m) * Math.min(1, m / 0.1)) / m; rgb[0] *= k; rgb[1] *= k; rgb[2] *= k; m *= k; }
     const liftK = this.dropEnv - this.dropColEnv;   // minidrop/nastan-drop: ljusstyrka mot fullt, kuloren kvar
     if (liftK > 0.005 && m > 0.002 && m < 1) { const g = 1 + (1 / m - 1) * liftK; rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
-    if (this.miniColEnv > 0.005 && this.dropColEnv <= 0.005) {   // MINIDROPS SOM SHOW: alla lampor samma kulör, fullt
-      const d = hsvToRgb(this.miniSector / 6, 1 - 0.3 * this.miniColEnv, 1), k = this.miniColEnv * MINI_UNI;   // ljusare karna, avmattnad <= 0,3 (ingen vitning)
+    if (this.miniColEnv > 0.005 && this.dropColEnv <= 0.005) {   // MINIDROPS SOM SHOW: alla lampor tänds i den TÄNDA lampans kulör, fullt
+      // (ägaren i ladan 10-13: 'alla tänds och kopierar bara de tända lamporna, sen fadar de mörka ut' - förr en ny kulör ur paletten,
+      // som i refrängen bara blev ett kulörbyte på en redan full rigg; live-sond: refrängens lampor median 195/242)
+      const d = this.miniRgb, k = this.miniColEnv * MINI_UNI;
       for (let c = 0; c < 3; c++) rgb[c] += (d[c] - rgb[c]) * k;
     }
     if (this.dropColEnv > 0.005) {   // full drop: dropfarg per lampa + vit karna i toppen (agaren 10-08), blandas in med dropColEnv
@@ -515,6 +517,7 @@ export class EffectEngine {
   dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;
   private eSm = 0; eSimple = 0; private eBass = 0; private bHi = NaN; private bLo = NaN; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
+  private miniRgb: [number, number, number] = [1, 1, 1];   // minidropens kulör = den tända lampans (se MINIDROPS SOM SHOW)
   private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
@@ -1178,6 +1181,11 @@ export class EffectEngine {
     const dRate = dTarget > this.dropEnv ? dtNow / 0.03 : dtNow / 1.0;
     this.dropEnv += Math.max(-dRate, Math.min(dRate, dTarget - this.dropEnv));
     { const cT = dropActive ? 1 : 0, cR = cT > this.dropColEnv ? dtNow / 0.03 : dtNow / 1.0; this.dropColEnv += Math.max(-cR, Math.min(cR, cT - this.dropColEnv)); }
+    if (CONCERT && nowWall < this.miniBangUntil && this.miniColEnv <= 0.005) {   // minidropen börjar: kopiera den ljusaste tända lampans kulör (förra rutan)
+      let best = -1, lv = 0; for (let i = 0; i < this.cfg.fixtures.length; i++) if (this.lampLvl[i] > lv) { lv = this.lampLvl[i]; best = i; }
+      if (best >= 0 && lv > 0.002) for (let c = 0; c < 3; c++) this.miniRgb[c] = this.lampRatio[best * 3 + c];
+      else { const d = hsvToRgb(this.miniSector / 6, 1, 1); for (let c = 0; c < 3; c++) this.miniRgb[c] = d[c]; }   // allt släckt: paletten som förr
+    }
     { const mT = CONCERT && nowWall < this.miniBangUntil ? 1 : 0, mR = mT > this.miniColEnv ? dtNow / 0.03 : dtNow / 0.6; this.miniColEnv += Math.max(-mR, Math.min(mR, mT - this.miniColEnv)); }   // MINIDROPS SOM SHOW
 
     // UPPBYGGNAD: analysatorn räknar riser/novelty och ger oss frame.buildUp (0..1).
