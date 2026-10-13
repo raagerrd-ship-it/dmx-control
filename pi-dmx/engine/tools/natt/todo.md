@@ -14,6 +14,14 @@
    >= 0,85) är grov. Mål: ett basgångsmått relativt låtens egen nivå som skiljer en vers med melodisk basgång från pumpande sub.
 4. TAKTSÄKERHET: beatConf ofta 0,3-0,6 i ladan, tempohopp inom låt (81 -> 144 -> 108). Mål: färre tempohopp inom låt (bänken
    396/503 + ladans inspelningar), högre tillit där takten är tydlig.
+   KLART 10-13 (nattagenten, branch, ej deployat): TILLITEN = MÖNSTRET ÅTERKOMMER (beatFeed.ts TRUST_REPEAT, DMX_TRUST_REPEAT=0 = av):
+   kick räknas som bevis om den ligger på slaget ELLER upprepar en kick 2 slag tidigare (±6 %). Ladan 141 min (konsertReplay
+   --delad-cfg --step 5): tillit > 0,5 52,6 -> 98,8 %, bpmConfidence median 0,41 -> 0,99; tempo/drops bit-lika, minidrop-looker
+   321 -> 318, lookbyten 447 -> 438. Korpus (tools/taktKorpus.mjs): klockan 81,5 % oförändrad; gamla måttet gynnade FEL tempo
+   (AUC 0,43), nya 0,64. Tempohoppen (2,9/låt) är kvar - två DMX-ersättare förkastade, förslag i analysator-fynd.md.
+   MÄTFÄLLA 47 (konsertReplay --delad-cfg: live får analysatorn motorns cfg -> kickgrinden på) och 48 (setVirtualClock(EPOCH+t) =
+   dubbel epok, kickarna 1,7e12 ms före Date.now(): effekternas slag satt godtyckligt från kickarna i ALLA bänkar som gör så -
+   rättat i konsertReplay/taktKorpus, övriga bänkar (concertBench, showTight, dropTiming, dynBench, ...) har kvar felet).
 5. STARTEN EFTER OMSTART (~15 s uppvärmning, ojämnt ljus/snabba lookbyten) - morgonagenten har tagit uppvärmningen (analysator-fynd).
 6. RENDERRUTOR -> TID: gå igenom allt i effects.ts (och effekter) som räknar i antal renderingar/rutor i stället för tid
    (mätfälla 46: live 200 Hz, bänk 40 Hz) och jämför konsertReplay --step 25 mot --step 5; allt ska ge samma.

@@ -27,7 +27,9 @@ const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.master = 1;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
 const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = (fx.address ?? 1) - 1; const at = (r) => { const i = roles.indexOf(r); return i < 0 ? -1 : base + i; }; return { r: at("r"), g: at("g"), b: at("b"), dim: at("dim") }; });
-const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
+// --delad-cfg (MÄTFÄLLA 47, 10-13): live får analysatorn MOTORNS cfg (index.ts createAnalyser(cfg)), så kickgrinden mot taktgridet
+// och taktfasen (analyser.ts beatSrc.beat = cfg.beat) är PÅ live - med en egen kopia (bänkarnas standard) är cfg.beat alltid null där.
+const an = new Analyser(args.includes("--delad-cfg") ? cfg : JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
 const feed = new BeatFeed();
 const bounds = new BoundaryDetector(() => Date.now());
 an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
@@ -44,7 +46,11 @@ let acc = { light: 0, nLit: 0, n: 0, mini: 0, hi: 0, lo: 9, top: 0 };
 for (let off = 0; off + HOP <= nSamples; off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
   const tS = off / SR, ms = EPOCH + tS * 1000; tNow = tS;
-  an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
+  // MÄTFÄLLA 48 (10-13): analysatorns virtuella väggklocka är virtualEpoch (1,7e12) + det som skickas in - med EPOCH + t blev
+  // kickAtMs/beatAnchorMs 1,7e12 ms före Date.now() (beatFeed/effekterna), så taktklockans fas efter varje tempobyte och
+  // effekternas slag satt en godtycklig, tempoberoende bit från kickarna (128 BPM: 0,67 slag). Live är båda Date.now().
+  // --epok-fel = gamla (felaktiga) vägen för jämförelse mot äldre json.
+  an.setVirtualClock(args.includes("--epok-fel") ? ms : ms - EPOCH); Date.now = () => ms; performance.now = () => ms - EPOCH;
   const fr = an.process(buf);
   boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
   if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); }
@@ -62,11 +68,12 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   if (ms - lastRow >= 100) {
     lastRow = ms;
     ROWS.push([+tS.toFixed(2), eng.getActiveMode(), eng.switchWhy, fr.section ?? '', +(fr.intensity ?? 0).toFixed(2), +(acc.light / acc.n).toFixed(3), +(acc.nLit / acc.n).toFixed(1),
-      fr.dropCount ?? 0, eng.nearCount ?? 0, eng.liftCount ?? 0, acc.mini, eng.buildUpgrades ?? 0, Math.round(fr.bpm ?? 0), +(fr.bodyDb ?? -90).toFixed(1), fr.miniDropCount ?? 0, +(fr.profile?.bassline ?? 0).toFixed(2), +acc.hi.toFixed(3), +acc.lo.toFixed(3), +((acc.top ?? 0) / acc.n).toFixed(3), eng.paletteIdx ?? -1]);
+      fr.dropCount ?? 0, eng.nearCount ?? 0, eng.liftCount ?? 0, acc.mini, eng.buildUpgrades ?? 0, Math.round(fr.bpm ?? 0), +(fr.bodyDb ?? -90).toFixed(1), fr.miniDropCount ?? 0, +(fr.profile?.bassline ?? 0).toFixed(2), +acc.hi.toFixed(3), +acc.lo.toFixed(3), +((acc.top ?? 0) / acc.n).toFixed(3), eng.paletteIdx ?? -1,
+      +(fr.bpmConfidence ?? 0).toFixed(2), +(eng.beatTrust ?? 0).toFixed(2), +(cfg.beat?.bpm ?? 0).toFixed(1), cfg.beat && cfg.beat.bpm > 40 && (cfg.beat.confidence ?? 0) >= 0.2 ? 1 : 0]);
     acc = { light: 0, nLit: 0, n: 0, mini: 0, hi: 0, lo: 9, top: 0 };
   }
 }
-const out = { wav: path, columns: ['t', 'look', 'why', 'sec', 'int', 'light', 'nLit', 'drops', 'near', 'lift', 'miniLook', 'upgrades', 'bpm', 'bodyDb', 'aMini', 'bass', 'hi', 'lo', 'top', 'pal'], rows: ROWS, log: LOG };
+const out = { wav: path, columns: ['t', 'look', 'why', 'sec', 'int', 'light', 'nLit', 'drops', 'near', 'lift', 'miniLook', 'upgrades', 'bpm', 'bodyDb', 'aMini', 'bass', 'hi', 'lo', 'top', 'pal', 'conf', 'trust', 'cbpm', 'lock'], rows: ROWS, log: LOG };
 writeFileSync(opt("--json", "replay.json"), JSON.stringify(out));
 if (TRACE) writeFileSync(opt("--trace"), Buffer.from(new Float32Array(TRACE).buffer));
 process.stdout.write(`${path}: ${ROWS.length} rader, ${LOG.length} loggrader\n`);

@@ -15,6 +15,26 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-13 Tempohopp inom låt i ladan: 2,9 klockbyten/låt, 43 % av tempona står < 8 s
+Vad: DMX-nattagenten 10-13 (taktsäkerheten, ägarens punkt 4) körde alla 23 lang-*.wav (141 min, 64 låtar mellan LATGRANS) genom
+konsertReplay --delad-cfg --step 5 (som live, se mätfälla 47/48 nedan): analysatorns bpm byter 3,2 ggr/låt (2:3 24, 3:4 38, 'nära'
+4-19 % 117, annat 24, oktav 0), taktklockan följer (2,9/låt), 74 % av musiktiden på låtens vanligaste tempo, 38 utflykter som går
+tillbaka till förra tempot (21 kortare än 8 s). DMX-sidan prövade två ersättare mot katalogfacit (tools/taktKorpus.mjs, frozen6, 161
+klipp, klockan 81,5 % rätt): (a) kickarnas fasspridning väljer 3/2, 2/3, 4/3, 3/4 av analysatorns tempo -> 79,9 % (shufflelåtar har
+kickar på triolens 2/3 och drogs till 3/2); (b) klockan tar ett nytt tempo först efter 4 s (om inte kickarna passar det bättre) ->
+75,5 % (varje klipps första korrigering 4 s senare). Båda förkastade - tempovalet måste göras där tempogrammet finns.
+Fynd om kickarna: på ladans material kommer kickdetektorns kickar sällan på varje slag (en kick 1 slag tidigare: ~0 %, 2 slag
+tidigare: 82 % median på rätt tempo) - mönster som 314/416/315 ms vid 114,5 BPM (3 kickar per 2 slag, exakt periodiska över 2 slag).
+Var: tempovalet/låsbytena (lock votes, TEMPO_SHIFT 'nära'-byten, ghost/2:3-vägarna). Material: tools/ladan-2026-10-11/lang-*.wav,
+tools/frozen6 (+ tools/taktKorpus.mjs som dömer både analysatorn och taktklockan som live). Önskat: färre 'nära'-byten och utflykter
+inom låt (ett tempo som håller >= 8 s), utan att korpusens 81,6 % sjunker.
+MÄTFÄLLOR för er bänk (samma fil i båda repona): 47 - live får analysatorn MOTORNS cfg (beatSrc.beat = taktklockan -> kickgrinden och
+taktfasen är på), alla DMX-bänkar gav en kopia (cfg.beat null); 48 - setVirtualClock(EPOCH + t) ger wallNow = 2*EPOCH + t, så
+kickAtMs låg 1,7e12 ms före Date.now() i bänkarna: klockans fas efter varje tempobyte och effekternas slag hamnade en godtycklig,
+tempoberoende bit från kickarna (128 BPM: 0,67 slag). Med båda rättade återger replay live-tilliten (p10/25/50/75/90 0,29/0,33/0,41/
+0,62/0,68 mot live-loggens 0,29/0,33/0,38/0,59/0,67).
+Status:
+
 ## ÖPPET 2026-10-12 frame.buildUp är död (0,000) även i sektion build
 Vad: nattagenten 10-12 körde analysatorn (dist, DMX-profil, virtuell klocka) över lang-20261011T191741.wav (10 min, ladans nivå, 81 s
 sektion build) och pop_ladan.wav: buildUp medel 0,000 i ALLA sektioner, max 0,00 resp. 0,13 (low), andel > 0,3 = 0 %. Kommentaren vid

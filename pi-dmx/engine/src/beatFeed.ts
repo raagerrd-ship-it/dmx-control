@@ -23,6 +23,21 @@ const PHASE_KP_HI = 0.4, PHASE_KP_LO = 0.2, PHASE_BIAS_MS = Number(process.env.D
 const GRID_ON_CONF = 0.35;   // tydlig takt igen → coast avbryts
 const GRID_COAST_MS = 4000;  // så länge håller vi gridet på svag konfidens
 
+// TILLITEN = MÖNSTRET ÅTERKOMMER (natt 10-13, ägarens punkt 4 'taktsäkerhet', 'varje slag ska kännas'). Förr räknades en kick
+// som bevis bara om den låg inom ±0,25 slag från gridets slag. Mätt på katalogkorpusen frozen6 (161 klipp, taktklockan mot
+// facit, var 0,25 s): det måttet var SÄMRE än slumpen på att skilja rätt tempo från fel (AUC 0,43 - rätt klocka median 0,41,
+// fel klocka 0,48), för ±0,25 slag täcker halva cirkeln (slumpkickar ger 0,5) och synkoperade mönster räknas som miss.
+// I ladan (23 inspelningar, konsertReplay med MÄTFÄLLA 47+48 rättade) stod tilliten i cykeln 0,29/0,33/0,38 = träff-miss-miss
+// 42 % av tiden: kickmönster med 3 kickar per 2 slag (314/416/315 ms vid 114,5 BPM) - exakt periodiska över 2 slag, klockan
+// rätt, men 2 av 3 kickar 'av'. Nu räknas kicken som bevis om den ligger på slaget (som förr) ELLER om en kick kom exakt TVÅ
+// SLAG tidigare (±6 % av slaget): då förutsäger gridets tempo mönstret, vilken plats i takten kicken än har. Korpusen: rätt
+// klocka median 0,41 -> 0,95, fel klocka 0,48 -> 0,87 (AUC 0,43 -> 0,64: måttet gynnar inte längre fel tempo). Tempot rörs inte:
+// PLL:ens förstärkning/frekvensterm och coastens tempo-nollning läser fortfarande fasträffarna (pllConf) - med det nya måttet
+// även där nollades tempot mer sällan och korpusens klocka föll 81,5 -> 76,7 % (fel tidiga lås hölls kvar).
+// DMX_TRUST_REPEAT=0 = gamla måttet (bit-identiskt).
+const TRUST_REPEAT = process.env.DMX_TRUST_REPEAT !== '0';
+const TRUST_REPEAT_BEATS = 2, TRUST_REPEAT_TOL = 0.06;
+
 /**
  * FAS-PREDIKTIONSTILLIT — landar verkliga trumslag dar rutnatet pastar?
  *
@@ -39,7 +54,8 @@ const GRID_COAST_MS = 4000;  // så länge håller vi gridet på svag konfidens
  * en principiell grund i stallet for som biprodukt av ett tempogram.
  */
 export class BeatFeed {
-  onBeatRate = 0;          // andel kickar med |fasfel| < 0.25
+  onBeatRate = 0;          // andel kickar med |fasfel| < 0.25 (PLL:ens förstärkning/frekvensterm; tilliten utan TRUST_REPEAT)
+  repeatRate = 0;          // TRUST_REPEAT: andel kickar på slaget ELLER som upprepar en kick två slag tidigare (tilliten)
   pllKicks = 0;            // hur mycket bevis fasprediktionen faktiskt vilar pa
   private lastTrustLog = 0;
   private lastPllKickMs = 0;
@@ -49,6 +65,17 @@ export class BeatFeed {
   clockDetBpm = 0;
   private gridWeakSince = 0;       // ms-tidpunkt då konfidensen föll under grinden (0 = stark)
   private gridCoasting = false;
+
+  /** Kom en tidigare kick (ringen, före denna) lag ms före t, inom ±tol? (TRUST_REPEAT) */
+  private kickRepeats(t: number, lag: number, tol: number): boolean {
+    const want = t - lag;
+    for (let i = 0; i < this.kickRingN; i++) {
+      const k = this.kickRing[(this.kickRingPos - 1 - i + 64) & 63];
+      if (k < want - tol) return false;
+      if (Math.abs(k - want) < tol) return true;
+    }
+    return false;
+  }
 
   /** En hop: tilliten (kan skriva frame.bpmConfidence) och taktklockan (cfg.beat). Anropas efter dropraknaren, fore effekterna. */
   update(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void }): void {
@@ -60,6 +87,7 @@ export class BeatFeed {
       const quiet = Date.now() - this.lastPllKickMs;
       if (quiet > 1500) {
         this.onBeatRate *= Math.max(0, 1 - (quiet - 1500) / 4000);
+        this.repeatRate *= Math.max(0, 1 - (quiet - 1500) / 4000);
         if (quiet > 8000) this.pllKicks = 0;   // bevisen ar gamla — lamna over till tempogrammet
       }
     }
@@ -82,6 +110,9 @@ export class BeatFeed {
         if (cfg.beat) cfg.beat.confidence = this.onBeatRate;
       }
     }
+    // PLL och coast vilar kvar på fasträffarna (pllConf, se TRUST_REPEAT); tilliten som går ut till effekterna är mönstret.
+    const pllConf = frame.bpmConfidence ?? 0;
+    if (TRUST_REPEAT && this.pllKicks >= 12) { frame.bpmConfidence = this.repeatRate; if (cfg.beat) cfg.beat.confidence = this.repeatRate; }
 
     // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
     // (om)lås; att sätta det på varje kick fick pulsen att flimra.
@@ -129,7 +160,7 @@ export class BeatFeed {
         // #3 ADAPTIV: låt takt-tydligheten (bpmConfidence) modulera ratten runt
         // ägarens val. Tydlig takt → snabbare inlåsning; brusig/osäker → försiktig
         // så bruset inte drar iväg fasen. Ägarens "Av" (0) förblir hårt av.
-        const conf = frame.bpmConfidence ?? 0;
+        const conf = pllConf;
         let k = k0 * (0.3 + 1.4 * conf);          // conf 0→×0.3, 0.5→×1.0, 1→×1.7
         if (k > 0.4) k = 0.4; else if (k < 0.03) k = 0.03;
         const onBeat = Math.abs(err) < 0.25;      // off-beat/synkoperade slag räknas ej
@@ -139,6 +170,7 @@ export class BeatFeed {
         // Bevis per kick. Uppdateras BARA nar ett slag faktiskt kom — mellan slagen
         // finns inget nytt att veta, och att mata in nollor da hade lasts som "fel".
         this.onBeatRate += ((onBeat ? 1 : 0) - this.onBeatRate) * 0.12;
+        if (TRUST_REPEAT) this.repeatRate += ((onBeat || this.kickRepeats(frame.kickAtMs, TRUST_REPEAT_BEATS * beatMs, TRUST_REPEAT_TOL * beatMs) ? 1 : 0) - this.repeatRate) * 0.12;
         this.lastPllKickMs = Date.now();
         if (this.pllKicks < 40) this.pllKicks++;
         const followerHasPhase = PHASE_FOLLOW_ON && (frame.beatPhaseMs ?? 0) > 0;   // gridfasen styr - kick-PLL:ens fasterm av (lotus: PLL fastnar pa off-beat)
@@ -211,8 +243,9 @@ export class BeatFeed {
       if (cfg.beat) {
         const liveConf = frame.bpmConfidence ?? 0;
         const nowMs = Date.now();
-        if (liveConf >= GRID_ON_CONF) { this.gridWeakSince = 0; this.gridCoasting = false; }
-        else if (liveConf < MIN_BEAT_CONFIDENCE) {
+        // coastens släpp/tempo-nollning på fasträffarna som förr (TRUST_REPEAT: färre nollningar höll kvar fel tidiga lås)
+        if (pllConf >= GRID_ON_CONF) { this.gridWeakSince = 0; this.gridCoasting = false; }
+        else if (pllConf < MIN_BEAT_CONFIDENCE) {
           if (this.gridWeakSince === 0) { this.gridWeakSince = nowMs; this.gridCoasting = true; }
           else if (nowMs - this.gridWeakSince >= GRID_COAST_MS) {
             this.gridCoasting = false;
