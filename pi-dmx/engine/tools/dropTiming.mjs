@@ -48,8 +48,8 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   if (fr.dropCount !== lastDrop) { lastDrop = fr.dropCount; EV.fire.push(+tS.toFixed(3)); }
   if ((fr.section ?? '') !== prevSec) { prevSec = fr.section ?? ''; EV.sec.push([+tS.toFixed(2), prevSec]); }
   boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
-  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift(); }
-  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
+  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); }
+  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
   if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; eng.softenRange(); an.hintTrackChange(5000); }
   feed.update(fr, cfg, an);
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
