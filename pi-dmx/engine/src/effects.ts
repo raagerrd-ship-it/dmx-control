@@ -295,11 +295,11 @@ const SECTION_UNIT_MIN_MS = Number(process.env.DMX_SECTION_UNIT_MIN_MS ?? 4000);
  *  Manuset glöms bara på en VERKLIG låtgräns (softenRange från gränsdetektorn) - analysatorns sektionsnollning (intro mitt i låten)
  *  glömmer inget längre. Förra låtens manus straffas (prevSongLook) så nästa låt får andra looker. */
 const MANUS_REL = 0.5;
-// ÅTERVÄNDANDE MANUS (opt-in DMX_MANUS_RETURN=1, natten 10-13): när sektionens look inte passar längre (tier två steg bort, krav)
+// ÅTERVÄNDANDE MANUS (STANDARD sedan 10-13 kväll, ägaren i ladan; DMX_MANUS_RETURN=0 = av. Från natten 10-13): när sektionens look inte passar längre (tier två steg bort, krav)
 // prövas lookerna sektionen redan haft i låten innan en ny väljs - refrängen full -> lugn -> full får tillbaka sin första look
 // (lang-191741: gallop -> duel -> kaskad -> rave blir gallop/kaskad). Manusets looker prövas utan ögonblickskraven (punch/beat i
 // rutan vid bytet - looken klarade dem när låten valde den; gallop föll på beat < 0,35 mitt i refrängen). Av = bit-identiskt.
-const MANUS_RETURN = process.env.DMX_MANUS_RETURN === '1';
+const MANUS_RETURN = process.env.DMX_MANUS_RETURN !== '0';
 /** Undre grans for effekternas mattnad (se ctx.hsv). 0 = av. */
 const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)));
 // DROP_CALM_BUILD: drop i low/intro kraver riser >= detta. STANDARD 0 = AV sedan 2026-09-22 (natt-agent B, tools/dropBench.mjs mot
