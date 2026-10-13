@@ -6,7 +6,7 @@ import type { EffectDef } from "./types.js";
 // Använder trum-envelopen (drum), som numera slår diskret i stället för att glöda.
 export const viska: EffectDef = {
   key: "viska", label: "Viska", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["intro", "break"],
-  desc: "Nästan mörkt — bara diskreta gnistor från virvel och hi-hat, dov puls på kicken.",
+  desc: "Nästan mörkt — en mjuk glimt vandrar runt riggen på åttondelarna, starkare när hi-haten hörs.",
   flat: true,   // statiskt svep → kortare dwell
   render(c) {
     const d = c.drum;
@@ -15,14 +15,15 @@ export const viska: EffectDef = {
     // eller inre/yttre via c.grouping) och kicken ar en dov rod puls pa ALLA - viskningen ror sig, drumkit star.
     const n = Math.max(1, c.count);
     const hatPos = c.hasBeat ? Math.floor((c.beatIdx + c.beatFrac) * 2) % n : c.mclk(0.5, 0.12) % n;
-    const hat = hatPos === c.idx ? d.hat * 0.6 : 0;
-    // Virveln slar pa lampan MITT EMOT hi-haten (vandrar med den) - gruppvaxling per slag gav backbeat-figuren (rPerm 0,81-0,85).
-    const snare = (hatPos + (n >> 1)) % n === c.idx ? d.snare * 0.75 : d.snare * 0.1;
-    const kick = d.kick * (c.group === 0 ? 0.35 : 0.12);   // dov rod puls, tyngst pa ena gruppen
-    const spark = Math.max(hat, snare, kick);
-    const hue = spark === hat && hat > 0 ? 0.55 : spark === snare ? 0.10 : 0.02;   // iskall / varmvit / röd
-    // 0,25 pa virvelns 'varmvita' gav mattnad 0,31 for hela effekten. Varmvitt far vara varmt men inte urtvattat.
-    const sat = hue === 0.10 ? 0.5 : 0.95;
-    return c.hsv(hue, sat, Math.min(1, 0.20 * c.heart(0.35) + spark));   // vilo-glöden pulsar med hjartat, gnistorna ororda
+    // EFFEKTGENOMGÅNGEN 10-13 (effectDyn i intro/break: 144 kulörhopp/min per lampa - kulören hoppade mellan iskall/varmvit/röd
+    // efter vilken trumma som gnistrade; vilo-glöden 0,20 lyftes av motorns grundnivå så 'nästan mörkt' blev halvljust): varje lampa
+    // har nu en FAST kulör ur paletten (grannkulörer, byts per fras), vilan är nästan mörk, och gnistan är en mjuk glimt som vandrar
+    // ett steg per åttondel (varje lampa högst en glimt per två slag) - hi-haten avgör bara hur stark glimten blir, aldrig om den
+    // flimrar. Kick-pulsen (kick som NIVÅ mot basenergin) borttagen.
+    const age = c.hasBeat ? (((c.beatIdx + c.beatFrac) * 2) % 1) : 0.5;
+    const hat = hatPos === c.idx ? Math.exp(-age / 0.35) * (0.45 + 0.4 * Math.min(1, d.hat * 1.5)) : 0;
+    const base = c.mixedSector(Math.floor(c.hueIdx / 16));
+    const hue = (((c.lamp & 1) ? base + 1 : base) % 6) / 6;
+    return c.hsv(hue, 1, Math.min(1, 0.015 + hat));
   },
 };

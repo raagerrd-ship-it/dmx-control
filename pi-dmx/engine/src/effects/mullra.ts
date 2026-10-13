@@ -10,9 +10,12 @@ export const mullra: EffectDef = {
     const n = Math.max(1, c.count), p = c.buildUp;
     const base = c.mixedSector(Math.floor(c.hueIdx / 32));
     const outer = c.lamp === 0 || c.lamp === n - 1;
-    if (!outer) return c.hsv(base / 6, 1, Math.min(1, (0.1 + 0.65 * Math.min(1, c.drum.bass * 1.3)) * c.heart(0.15)));
+    // 10-13 (effectDyn): motorns grundnivå (FX_FLOOR 0,6) lyfter allt över ~0,1 till minst 64 % - "låg glöd" måste ligga på ~0,01-0,03.
+    //   Spridningen var 0,24: kanternas botten 0,04 + 0,28p syntes som nästan fullt. Nu släckta mellan tickarna. Mittens mullrande
+    //   bärs av basenergin (drum.bass som NIVÅ dubbelmodulerade mot den) - mitten glöder jämnt med hjärtat.
+    if (!outer) return c.hsv(base / 6, 1, Math.min(1, 0.5 * c.heart(0.3)));
     const mine = ((c.beatIdx & 1) === 0) === (c.lamp === 0);
     const tickV = mine ? Math.exp(-c.beatFrac / 0.3) : 0;
-    return c.hsv(((base + 3) % 6) / 6, 0.95, Math.min(1, 0.04 + 0.5 * p * (0.55 + 0.45 * tickV)));
+    return c.hsv(((base + 3) % 6) / 6, 0.95, Math.min(1, 0.01 + (0.15 + 0.5 * p) * tickV));
   },
 };

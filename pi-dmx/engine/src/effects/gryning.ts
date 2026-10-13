@@ -12,7 +12,8 @@ export const gryning: EffectDef = {
     const p = c.buildUp;
     const awake = Math.max(0, Math.min(1, p * n - rank + 0.5));        // mjuk tändning när förloppet når lampan
     const hue = c.mixedSector(Math.floor(c.hueIdx / 32)) / 6;
-    const v = (0.08 + 0.72 * awake * (0.5 + 0.5 * p)) * c.heart(0.18);
+    // 10-13 (effectDyn: spridning 0,26 - de sovande lampornas 0,08 lyftes av motorns grundnivå till drygt halva ljuset): sover = 0,015.
+    const v = (0.015 + 0.72 * awake * (0.5 + 0.5 * p)) * c.heart(0.18);
     return c.hsv(hue, 1 - 0.2 * p, Math.min(1, v));
   },
 };

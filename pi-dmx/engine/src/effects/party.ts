@@ -7,8 +7,14 @@ export const party: EffectDef = {
   key: "party", label: "Party", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"],
   desc: "Färgkaos som pumpar hårt på varje taktslag.",
   render(c) {
-    const hue = c.mixedSector(c.hueIdx + c.idx * 2) / 6;
-    const pump = Math.min(1, c.beatPulse * 1.0 + c.kickEnv * 0.9 + c.punch * 0.7);   // riktig dunk slår igenom
+    // EFFEKTGENOMGÅNGEN 10-13 (effectDyn i refrängen: spridning 0,00, rum 0,00 - alla fyra pumpade lika; kickEnv/punch som NIVÅ
+    // dubbelmodulerade mot basenergin): pumpen sitter på slaget (taktklockan), och en lampa VILAR per slag - hålet vandrar ett steg
+    // per slag runt riggen, så pumpen rör sig. Egen kulör per lampa ur paletten (byts per fras).
+    const n = Math.max(1, c.count);
+    const hole = ((c.beatIdx % n) + n) % n;
+    const hue = c.mixedSector(Math.floor(c.hueIdx / 16) + c.idx * 2) / 6;
+    if (n >= 3 && c.idx === hole && c.sectionEntry < 0.05) return c.hsv(hue, 1, 0);
+    const pump = c.hasBeat ? Math.exp(-c.beatFrac / 0.2) : c.beatPulse;
     const v = 0.12 + 0.88 * pump;   // motorns hjartslag dippar redan till 0.30 → hoj eget golv sa det inte blir strobe                                     // djupare throb (mörkare mellan slagen)
     const entry = c.section === 'high' ? c.sectionEntry : 0;   // refrangens forsta slag: stot + blinder
     if (entry > 0) c.want.blinder = entry;
@@ -17,6 +23,6 @@ export const party: EffectDef = {
     if (back) c.want.uv = c.beatPulse;
     // Dunken bars av `v` (pump) och entren av `v + entry*0.5`; avmattningen var en extra barare mot vitt.
     // Halverad, och entren far mest eftersom en refrangentre AR en vit stot.
-    return c.hsv(hue, 1 - Math.max(c.punch * 0.2, entry * 0.35, back * c.beatPulse * 0.3), Math.min(1, v + entry * 0.5));   // dunk → gnista, kuloren kvar
+    return c.hsv(hue, 1 - Math.max(entry * 0.35, back * c.beatPulse * 0.3), Math.min(1, v + entry * 0.5));   // dunk → gnista, kuloren kvar
   },
 };

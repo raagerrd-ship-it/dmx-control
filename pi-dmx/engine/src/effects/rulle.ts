@@ -13,6 +13,8 @@ export const rulle: EffectDef = {
     const flash = Math.exp(-ph / 0.12);
     c.want.hazer = 0.3 + 0.5 * p;
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;
-    return c.hsv(hue, 1, Math.min(1, (0.15 + 0.85 * flash) * (0.5 + 0.5 * p)));
+    // 10-13 (effectDyn: spridning 0,19 - golvet 0,15 lyftes av motorns grundnivå till nästan fullt, så grupperna syntes inte turas om):
+    // mörkt mellan blinkarna, blinken klingar av till svart.
+    return c.hsv(hue, 1, Math.min(1, (flash > 0.08 ? flash : 0) * (0.5 + 0.5 * p)));
   },
 };

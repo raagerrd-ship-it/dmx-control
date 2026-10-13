@@ -12,6 +12,8 @@ export const skuggor: EffectDef = {
     const on = ((c.beatIdx & 1) === 0) === outer;
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((outer ? base : base + 2) % 6) / 6;
-    return c.hsv(hue, 1, on ? 0.1 + 0.5 * Math.exp(-c.beatFrac / 0.3) : 0.05);
+    // 10-13 (effectDyn): motorns grundnivå (FX_FLOOR 0,6) lyfter allt över ~0,1 till minst 64 % - "låg glöd" måste ligga på ~0,01-0,03.
+    //   Spridningen var 0,27: vilan 0,05 -> 0,01 och pulsen klingar av till 0,02.
+    return c.hsv(hue, 1, on ? 0.02 + 0.6 * Math.exp(-c.beatFrac / 0.3) : 0.01);
   },
 };

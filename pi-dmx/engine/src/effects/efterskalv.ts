@@ -9,8 +9,10 @@ export const efterskalv: EffectDef = {
   render(c) {
     const lead = c.group === (Math.floor(c.beatIdx / 16) & 1);
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    if (!lead) return c.hsv(((base + 3) % 6) / 6, 1, 0.12);
+    // 10-13 (effectDyn): motorns grundnivå (FX_FLOOR 0,6) lyfter allt över ~0,1 till minst 64 % - "låg glöd" måste ligga på ~0,01-0,03.
+    //   Spridningen var 0,10 (glöden 0,12 och pulsens botten 0,15 syntes som nästan fullt): glöd 0,02, pulsen klingar av till 0,02.
+    if (!lead) return c.hsv(((base + 3) % 6) / 6, 1, 0.02);
     const ph = ((((c.beatIdx % 2) + 2) % 2) + c.beatFrac) / 2;        // halvtakt: ett slag per två
-    return c.hsv(base / 6, 1, Math.min(1, 0.15 + 0.8 * Math.exp(-ph / 0.18)));
+    return c.hsv(base / 6, 1, Math.min(1, 0.02 + 0.9 * Math.exp(-ph / 0.18)));
   },
 };

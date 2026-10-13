@@ -12,7 +12,9 @@ export const glesna: EffectDef = {
     const h = Math.imul(c.beatIdx + 3, 2654435761) >>> 0;
     const rank = (c.lamp * (1 + 2 * ((h >>> 3) & 1)) + h) % n;        // ny blandning per slag
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    if (rank >= m) return c.hsv(base / 6, 1, 0.03);
-    return c.hsv(((base + 2 * (rank & 1)) % 6) / 6, 1, Math.min(1, 0.06 + 0.85 * Math.exp(-c.beatFrac / 0.25)));
+    // 10-13 (effectDyn: 39,5 kulörhopp/min - kulören följde den slumpade rangen, så lamporna bytte kulör varje slag): fast kulör per lampa.
+    const hue = (((c.lamp & 1) ? base + 2 : base) % 6) / 6;
+    if (rank >= m) return c.hsv(hue, 1, 0.015);
+    return c.hsv(hue, 1, Math.min(1, 0.06 + 0.85 * Math.exp(-c.beatFrac / 0.25)));
   },
 };
