@@ -295,6 +295,11 @@ const SECTION_UNIT_MIN_MS = Number(process.env.DMX_SECTION_UNIT_MIN_MS ?? 4000);
  *  Manuset glöms bara på en VERKLIG låtgräns (softenRange från gränsdetektorn) - analysatorns sektionsnollning (intro mitt i låten)
  *  glömmer inget längre. Förra låtens manus straffas (prevSongLook) så nästa låt får andra looker. */
 const MANUS_REL = 0.5;
+// ÅTERVÄNDANDE MANUS (opt-in DMX_MANUS_RETURN=1, natten 10-13): när sektionens look inte passar längre (tier två steg bort, krav)
+// prövas lookerna sektionen redan haft i låten innan en ny väljs - refrängen full -> lugn -> full får tillbaka sin första look
+// (lang-191741: gallop -> duel -> kaskad -> rave blir gallop/kaskad). Manusets looker prövas utan ögonblickskraven (punch/beat i
+// rutan vid bytet - looken klarade dem när låten valde den; gallop föll på beat < 0,35 mitt i refrängen). Av = bit-identiskt.
+const MANUS_RETURN = process.env.DMX_MANUS_RETURN === '1';
 /** Undre grans for effekternas mattnad (se ctx.hsv). 0 = av. */
 const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)));
 // DROP_CALM_BUILD: drop i low/intro kraver riser >= detta. STANDARD 0 = AV sedan 2026-09-22 (natt-agent B, tools/dropBench.mjs mot
@@ -558,14 +563,14 @@ export class EffectEngine {
   /** Låten började — tona in ljuset och ignorera drops en stund. */
   noteSongStart(): void { this.songStartAt = performance.now(); }
   /** LÅTMANUS: sektionstyp -> låtens look för den (se MANUS_REL). Glöms bara på en verklig låtgräns (softenRange). */
-  private manus = new Map<string, Mode>();
+  private manus = new Map<string, Mode>(); private manusHist = new Map<string, Mode[]>();   // manusHist: MANUS_RETURN, sektionens looker i låten
   private songPal = -1;   // LÅTMANUS: låtens kulörfamilj (palettindex), -1 = väljs vid nästa sektion
   private songNo = 0; private manusTog: boolean | null = null;   // LÅTMANUS: låtnummer och om låten är en toggle-låt (null = ej avgjort)
 
   /** Misstänkt låtbyte → låt auto-rangen kalibrera om snabbt mot nya nivåer. */
   softenRange(): void {
     this.songStartWall = Date.now(); this.songPal = -1; this.songNo++; this.manusTog = null;
-    if (this.manus.size) { for (const [k, m] of this.manus) this.prevSongLook.set(k, m); console.log(`[dirigent] latgrans: nytt manus (forra: ${[...this.manus].map(([k, m]) => k + '=' + m).join(' ')})`); this.manus.clear(); }
+    if (this.manus.size) { for (const [k, m] of this.manus) this.prevSongLook.set(k, m); console.log(`[dirigent] latgrans: nytt manus (forra: ${[...this.manus].map(([k, m]) => k + '=' + m).join(' ')})`); this.manus.clear(); this.manusHist.clear(); }
   }   // (rullande nivarangen borttagen 10-08 - den matade bara DIM-taket)
 
 
@@ -1405,10 +1410,12 @@ export class EffectEngine {
         const calm = secKey === 'break';   // breakdown -> lugna poolen (var wantCalm)
         const tierRank = (m: Mode) => { const t = EFFECT_MAP.get(m)?.tier; return t === 'lugn' ? 0 : t === 'full' ? 2 : 1; };
         const tierNow = tierS === LUGN ? 0 : tierS === FART ? 1 : 2;
-        const kept = secKey ? this.manus.get(secKey) : undefined;
+        let kept = secKey ? this.manus.get(secKey) : undefined;
         // Manusets look galler om den fortfarande ar pa och passar (krav, och inte tva tiers fran energin just nu - en lugn vers-look i en
         // vers som blivit full far en ny look, som blir manusets nya).
-        const keep = !!kept && this.cfg.rotation?.[kept] !== false && req(kept) && (calm || secKey === 'build' || Math.abs(tierRank(kept) - tierNow) <= 1);
+        const fits = (m: Mode) => this.cfg.rotation?.[m] !== false && (MANUS_RETURN || req(m)) && (calm || secKey === 'build' || Math.abs(tierRank(m) - tierNow) <= 1);
+        let keep = !!kept && fits(kept);
+        if (MANUS_RETURN && !keep && secKey) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m)); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
         if (keep && kept === this.smartMode) { this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true; }   // manuset sager samma look - inget byte
         else {
         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
@@ -1533,6 +1540,7 @@ export class EffectEngine {
         if (CONCERT && (frame.profile.bassline ?? 0) >= EKO_BASS && this.smartMode !== 'eko' && lastLookBeforeSwitch !== 'eko' && !BUILD_LOOKS.includes(this.smartMode)
             && this.switchWhy !== 'drop' && this.cfg.rotation?.eko !== false && frame.section !== 'high' && secKey !== 'high') this.smartMode = 'eko';
         if (secKey) this.manus.set(secKey, this.smartMode);   // LÅTMANUS: sektionstypens look resten av laten
+        if (MANUS_RETURN && secKey) { const h = this.manusHist.get(secKey) ?? []; if (!h.includes(this.smartMode)) h.push(this.smartMode); this.manusHist.set(secKey, h); }
         }
         if (CONCERT) this.buildLookAt = BUILD_LOOKS.includes(this.smartMode) ? nowWall : 0;   // BUILD SOM HÅLLER: när build-looken började
         this.recentLooks.push(this.smartMode); if (this.recentLooks.length > MIX_RECENT_N) this.recentLooks.shift(); this.seenLooks.add(this.smartMode);
