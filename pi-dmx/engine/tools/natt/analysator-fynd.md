@@ -32,11 +32,11 @@ Ladans 10 dropklipp (tools/ladan-2026-10-10, drop vid 15,0 s) går inte att anv�
 analysatorn ser aldrig kropp -> borta -> tillbaka (dropFacit.mjs: 0/10 fulla, minidrop vid dropen 10/10). Material: långinspelningar
 (lang-*.wav, knappen "Spela in 5 min" i /setup) när ägaren tagit några. Önskat: mät breaklängden före riktiga drops på material med
 historik; är 4 s fel för vanlig pop? Bara DMX-profilen berörs om svaret är ett annat värde - ingen ändring i delad kod väntas.
-Status:
+Status: DMX-PROFIL (lotus-morgonagenten 2026-10-13): BODY_GONE_MIN_MS är en profilratt, nattagentens.
 
 ## ÖPPET 2026-10-11 Analysatorns uppvärmning de första ~15 s
 Vad: nattagenten (mätfälla 44): frame.intensity stiger +0,26 under de första 15 s i varje 40 s-korpusklipp, vilket vände korpusens
 energiR till -0,39 (från 15 s: +0,27). I riggen märks det vid motorstart och efter långa pauser. Var: intensity/tierEma-baslinjen.
 Material: frozen6-korpusen (dmx-control tools/frozen6). Önskat: kortare inlärning eller bättre startvärde, om det går utan att
 läsningen blir instabil. Låg prioritet - live körs motorn i timmar.
-Status:
+Status: TAGET 2026-10-13 (lotus-morgonagenten): mätt per sekund på bench-manifestet (lotus-stil, AGC fri). Två delar: (1) MATERIAL — dropklippen (_dmu, 91 st) har sin drop vid 15 s, därav steget 0,66→0,87 vid 15 s; (2) ÄKTA ARTEFAKT — på 34 klipp utan drop: intensity 0,19 → 0,01 (1 s) → 0,73 (13 s) och ligger kvar 0,60–0,69 till 29 s i stället för ~0,5. Orsak: intensityFloor/Ema startar på 0,5, lvlSmooth dyker till 0,26 vid 3 s (AGC/nivåns egen start) och stiger till 0,40 vid 13 s; golvet följer dykningen med tau 3 s under 8 s-värmen och kryper sedan med ~0,0025/s ⇒ ~40 s för 0,1. Gain-lås ändrar inte bilden. Längre värme (15/25 s) flyttar inte 0–14 s, sänker 15–29 s 0,72→0,66/0,56. Förslag (opt-in, ej byggt): sätt Ema=Floor=lvlSmooth vid första aktiva hopet + värme tills |Ema−Floor| < spread i stället för fast 8 s; bänkas mot sektionsbanken (tier) + energiR. activeMs nollas vid varje tystnad ⇒ samma värme efter låtbyten med paus, så det är inte bara ett korpusfenomen.
