@@ -309,7 +309,7 @@ const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)
 const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25);
 const DROP_SONG_HOLD_S = Number(process.env.DMX_DROP_SONG_HOLD_S ?? 0);   // 30 -> 0 (agaren 10-11: inga timrar pa riktig drop - snavt mal i analysatorn i stallet)
 const LEVEL_RAMP = 2, LEVEL_RAMP_FALL_S = 2;   // fullt ljus vid 2 x släckgränsen (3 x dämpade versen 40 %, 2 x 19 %, refrängen 3 %); nivån sjunker mjukt på 2 s (se RAMPEN OVANFÖR SLÄCKGRÄNSEN)
-/** FULL DROP PÅ FLANKEN (opt-in DMX_FLANK_DROP=1, 10-12 efter ägarens 'bara var 3:e träffar rätt' och 'hellre öka gränsen till riktig drop,
+/** FULL DROP PÅ FLANKEN (STANDARD sedan 10-13 efter ägarens öga i ladan: 'droparna känns bra, på smällen'; DMX_FLANK_DROP=0 = gamla vägen. Infördes 10-12 efter ägarens 'bara var 3:e träffar rätt' och 'hellre öka gränsen till riktig drop,
  *  bara minidrops kör vidare'). Mätt (tools/dropTiming.mjs + dropTimingStat.mjs, 23 ladan-inspelningar, 141 min): analysatorns drop kräver
  *  20 dB stigning på 0,5 s och kroppen inom 3 dB från toppen -> den fyrar på DJUPA HACK som återhämtar sig (sidechain-pump, 1 s-avbrott,
  *  ett pumpslag sekunder efter att takten kommit tillbaka: edgeAgo 13 653 ms), sent på flanken (stigningen når 20 dB först vid toppen) och
@@ -318,8 +318,8 @@ const LEVEL_RAMP = 2, LEVEL_RAMP_FALL_S = 2;   // fullt ljus vid 2 x släckgrän
  *  >= FLANK_GONE_DB under taket i >= FLANK_BREAK_S, och fyrar på FLANKEN: när kroppen (60 ms) går upp till taket - FLANK_LAND_DB med
  *  >= FLANK_RISE_DB stigning på 0,5 s. Analysatorns drop utan egen flank (inom 2 s) blir minidrop. Bänk: 55 drops (0,39/min), 96 % på
  *  ihållande baslyft, 43 rätt / 6 sena / 4 tidiga (<= 54 ms) / 2 falska, fördröjning p50 24 ms (var 91). Tidsbaserat (render går 200 Hz live, 40 Hz i bänken). */
-const FLANK_DROP = process.env.DMX_FLANK_DROP === '1';
-const FLANK_GONE_DB = 10, FLANK_BREAK_S = Number(process.env.DMX_FLANK_BREAK_S ?? 3),   // ratt för live-prov: 4 = färre (bänk 0,30/min)
+const FLANK_DROP = process.env.DMX_FLANK_DROP !== '0';
+const FLANK_GONE_DB = 10, FLANK_BREAK_S = Number(process.env.DMX_FLANK_BREAK_S ?? 4),   // 4 s godkänt i ladan 10-13 (bänk 0,31/min, rätt 35/44, p50 30 ms); 3 = fler
        FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;
 const SHOW_DROP_GAP_MS = 12000;   // spärr mellan riktiga drops från alla källor (10-12; 20 s missade en riktig drop efter en tidig, ägaren 'jag tror det va tiden mellan')
 const DROP_MIN_GAP_S = Number(process.env.DMX_DROP_MIN_GAP_S ?? 0);   // se 'DROP-KEDJOR'   // se 'INGEN DROP I LATENS INLEDNING'
