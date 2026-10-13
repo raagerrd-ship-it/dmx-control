@@ -1,5 +1,24 @@
 # Natt-agentens uppdrag
 
+## ANALYSATORN - ÄGARENS PRIORITERING 10-13 (i denna ordning; mät före/efter på alla lang-*.wav i tools/ladan-2026-10-11/, kör
+## även konsertReplay --step 5 = live-takt; den delade analysatorn src/analyser.ts ändras INTE utan att lotus-sidan tar samma sak -
+## lös i profilen (analyserProfile.ts) och/eller DMX-sidan (effects.ts/egen modul), eller lägg förslaget i analysator-fynd.md)
+1. SEKTIONER SOM HÅLLER + INGA FALSKA LÅTGRÄNSER: sektionen fladdrar (low/build/high/intro byts på 5-20 s) och låtgränsdetektorn
+   ger 'ny låt' mitt i låtar. Röd tråd, sektionstaket och build-valen hänger på det. Mål: sektioner >= 8 s (andel byten kortare än
+   8 s ner kraftigt), falska låtgränser ~0 mot inspelningarnas riktiga låtbyten (lyssna/räkna dem en gång, spara som facit-fil).
+2. UPPBYGGNADEN TIDIGARE: analysatorns buildUp är död på ladans nivå (morgonagenten 10-12: ingen ersättare med AUC > 0,56);
+   motorns buildProg börjar först när sektionen säger build. Ägaren (10-11): 'dirigenten skall bli snabbare att byta till BUILD
+   innan drops'. Mål: känna igen builden 4-8 takter före dropen (facit = flank-dropparna, tools/dropTiming*.mjs), utan att
+   fyra i verser.
+3. BASGÅNG SOM SKILJER: profile.bassline ligger 0,62-0,77 i median i ALLA sektioner -> 'tydlig basgång' (toggle-låt, eko
+   >= 0,85) är grov. Mål: ett basgångsmått relativt låtens egen nivå som skiljer en vers med melodisk basgång från pumpande sub.
+4. TAKTSÄKERHET: beatConf ofta 0,3-0,6 i ladan, tempohopp inom låt (81 -> 144 -> 108). Mål: färre tempohopp inom låt (bänken
+   396/503 + ladans inspelningar), högre tillit där takten är tydlig.
+5. STARTEN EFTER OMSTART (~15 s uppvärmning, ojämnt ljus/snabba lookbyten) - morgonagenten har tagit uppvärmningen (analysator-fynd).
+6. RENDERRUTOR -> TID: gå igenom allt i effects.ts (och effekter) som räknar i antal renderingar/rutor i stället för tid
+   (mätfälla 46: live 200 Hz, bänk 40 Hz) och jämför konsertReplay --step 25 mot --step 5; allt ska ge samma.
+
+
 ## 10-13 NATT (huvudsessionen, MERGAT I MAIN, EJ DEPLOYAT): RÖD TRÅD + FLANK-DROP + TIDSBASERAD HISTORIK
 - RÖD TRÅD (låtmanus, branch 4586c1c mergad): en look per sektionstyp per låt som återkommer, byten bara vid sektion/build/drop,
   en kulörfamilj per låt, refrängen släkt med versen. Kedja 141 min: lookbyten 5,2 -> 3,1/min, unika looker/låt 12 -> 5,
