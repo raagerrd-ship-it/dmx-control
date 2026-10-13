@@ -7,15 +7,13 @@ export const aurora: EffectDef = {
   key: "aurora", label: "Aurora", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["intro", "low"],
   desc: "Varje lampa driver i sin egen färg, som norrsken.",
   render(c) {
-    const hue = c.mixedSector(c.idx * 2 + c.mclk(8, 7) + Math.round(c.frame.centroid * 3)) / 6;   // + centroid → palett-läge
-    const wash = 0.5 + 0.5 * Math.sin(c.t * 0.45 - c.idx * 1.3 * c.phaseSpread);
-    // NORRSKENETS SKIMMER: draperiet lyser starkare dar de HOGA banden ligger.
-    // Utan detta var aurora bara en sinusvag med rumslig gradient - strukturellt
-    // samma effekt som breathe och twin, bara annan fasvinkel. Nu ar rorelsen
-    // rumslig OCH ljusstyrkan klangdriven, vilket ger det flimrande djup ett
-    // norrsken har. Varje lampa far sin egen blandning av diskant och luft.
-    const skimmer = (c.idx % 2 === 0 ? c.frame.spec.treble : c.frame.spec.air);
-    const m = Math.min(1, 0.35 + wash * 0.40 + c.band * 0.20 + skimmer * 0.35 + c.punch * 0.2);
-    return c.hsv(hue, 1, (0.18 + 0.82 * m) * c.heart(0.18));   // egen latt hjartpuls (09-27)
+    // EFFEKTGENOMGÅNGEN 10-13 (effectDyn i intro/low: 22,7 kulörhopp/min - centroid-avrundningen fladdrade kulören; skimret
+    // (diskant/luft), bandet och punch som NIVÅ dubbelmodulerade mot basenergin, och golvet 0,35 + motorns grundnivå höll alla
+    // lampor nästan fulla): varje lampa har sin egen kulör ur paletten (byts per fras) och sitt eget långsamma draperi som går
+    // ner i nästan mörker - norrskenet rör sig i olika takt i varje lampa (egen period 7-11 s), inte i takt med musiken.
+    const hue = c.mixedSector(Math.floor(c.hueIdx / 16) + c.idx * 2) / 6;
+    const per = 7 + ((c.lamp * 5) % 4) * 1.3;                                // 7 / 8,3 / 9,6 / 10,9 s - draperierna glider isär
+    const wash = 0.5 + 0.5 * Math.sin((2 * Math.PI * c.t) / per + c.lamp * 1.9);
+    return c.hsv(hue, 1, (0.01 + 0.9 * wash * wash) * c.heart(0.18));   // egen latt hjartpuls (09-27)
   },
 };

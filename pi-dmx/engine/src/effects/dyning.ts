@@ -9,8 +9,9 @@ export const dyning: EffectDef = {
   render(c) {
     const n = Math.max(1, c.count);
     const w = 0.5 + 0.5 * Math.cos(2 * Math.PI * (c.t / 2.5 - c.idx / n));
-    const amp = 0.15 + 0.75 * Math.min(1, Math.max(c.drum.bass * 1.3, 0.5 * (c.frame.intensity ?? 0)));
+    // EFFEKTGENOMGÅNGEN 10-13 (effectDyn i breaket: 48 kulörhopp/min - lampan bytte kulör varje gång vågen passerade mitten; basens
+    // sustain som NIVÅ dubbelmodulerade mot basenergin, som redan gör dyningen hög med basen): fast kulör per lampa, fast höjd.
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    return c.hsv(((base + (w > 0.5 ? 0 : 1)) % 6) / 6, 0.95, Math.min(1, 0.03 + amp * w ** 3));
+    return c.hsv((((c.lamp & 1) ? base + 1 : base) % 6) / 6, 0.95, Math.min(1, 0.015 + 0.85 * w ** 3));
   },
 };

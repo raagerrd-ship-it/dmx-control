@@ -15,9 +15,13 @@ export const droppar: EffectDef = {
     const h = (x: number) => (Math.imul(x + 11, 2654435761) >>> 0) % n;
     const cur = h(idx);
     let prev = h(idx - 1); if (prev === cur) prev = (cur + 1) % n;
+    // EFFEKTGENOMGÅNGEN 10-13 (effectDyn: 70,9 kulörhopp/min - lampan bytte kulör när den gick från 'droppe' till 'förra droppen'
+    // till vila, varje basnot): FAST kulör per lampa (grannkulörer), bara ljuset faller och klingar av. Vilan 0,04 -> 0,015 (motorns
+    // grundnivå lyfte 0,04 till en tredjedel).
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    if (c.lamp === cur) return c.hsv(base / 6, 0.95, Math.min(1, 0.08 + 0.85 * Math.exp(-age / 1.4)));
-    if (c.lamp === prev) return c.hsv(((base + 1) % 6) / 6, 0.95, 0.06 + 0.45 * Math.exp(-(age + 0.4) / 1.4));
-    return c.hsv(base / 6, 1, 0.04);
+    const hue = (((c.lamp & 1) ? base + 1 : base) % 6) / 6;
+    if (c.lamp === cur) return c.hsv(hue, 0.95, Math.min(1, 0.08 + 0.85 * Math.exp(-age / 1.4)));
+    if (c.lamp === prev) return c.hsv(hue, 0.95, 0.06 + 0.45 * Math.exp(-(age + 0.4) / 1.4));
+    return c.hsv(hue, 1, 0.015);
   },
 };

@@ -17,14 +17,20 @@ export const stegring: EffectDef = {
     const every = u < 0.35 ? 4 : u < 0.7 ? 2 : 1;                                  // pulsen tatnar
     const onBeat = c.hasBeat && c.beatIdx % every === 0;
     const pulse = onBeat ? Math.exp(-c.beatFrac / 0.12) : 0;
-    const hue = c.mixedSector(Math.floor(c.t / 9)) / 6;
+    const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;   // kulören per fras (var c.t/9)
     // Uppbyggnaden bars av ljuset (base), av hur manga lampor som ar med (spatial) och av att pulsen tatnar
     // (every). Att OCKSA dra mattnaden till 0,15 gjorde hela stegringen vit. 0,85 -> 0,35.
     const sat = 1 - u * 0.35;                                                       // bleknar nagot, men behaller kuloren
     const base = 0.12 + 0.55 * u * u;                                               // lyfter mot taket
-    const spatial = 1 - Math.abs((c.lamp + 0.5) / c.count - 0.5) * (1 - u) * 0.6;    // mitten forst, kanterna kommer med
+    // EFFEKTGENOMGÅNGEN 10-13 (effectDyn: spridning 0,00 - motorns grundnivå (FX_FLOOR) lyfte de 'dämpade' kanterna till nästan
+    // fullt, och u når 0,5 på några sekunder): mitten bär ljuset; kanterna är mörka och blixtrar bara på pulsen, vänster och höger
+    // kant varannan puls - när pulsen tätnar studsar den allt fortare mellan kanterna (högst en blixt per slag och lampa).
+    const e = Math.abs((c.lamp + 0.5) / c.count - 0.5) * 2;                        // 0 mitten .. 1 kanten
+    const side = c.lamp < c.count / 2 ? 0 : 1;
+    const edgeHit = onBeat && (Math.floor(c.beatIdx / every) & 1) === side;
     c.want.uv = u; c.want.hazer = 0.3 + 0.7 * u;
     if (c.dropEnv > 0.7) c.want.blinder = c.dropEnv;
-    return c.hsv(hue, sat, Math.min(1, (base + pulse * (0.3 + 0.5 * u)) * spatial + c.dropEnv * 0.6));
+    const v = e < 0.5 || c.count < 3 ? base + pulse * (0.3 + 0.5 * u) : (edgeHit ? pulse * (0.5 + 0.5 * u) : 0.02);
+    return c.hsv(hue, sat, Math.min(1, v + c.dropEnv * 0.6));
   },
 };

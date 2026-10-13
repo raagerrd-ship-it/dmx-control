@@ -13,6 +13,8 @@ export const svall: EffectDef = {
     const one = (((c.beatIdx % 4) + 4) % 4) === 0 ? Math.exp(-c.beatFrac / 0.35) : 0;   // taktens etta
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((c.group ? base + 1 : base) % 6) / 6;
-    return c.hsv(hue, 0.95, Math.min(1, 0.22 + 0.6 * mine + 0.18 * one));
+    // 10-13 (effectDyn): motorns grundnivå (FX_FLOOR 0,6) lyfter allt över ~0,1 till minst 64 % - "låg glöd" måste ligga på ~0,01-0,03.
+    //   Spridningen var 0,29 (botten 0,22 syntes som nästan fullt): grupperna sväller nu ner i nästan mörker (0,01) mellan.
+    return c.hsv(hue, 0.95, Math.min(1, 0.01 + 0.8 * mine * mine + 0.18 * one));
   },
 };

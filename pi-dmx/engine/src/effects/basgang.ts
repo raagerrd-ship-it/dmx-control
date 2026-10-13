@@ -24,7 +24,7 @@ export const basgang: EffectDef = {
     // KULOR PER FYRA NOTER (ladan 2026-10-09: "fladder mellan slackt och inte pa 'inte huvudfargen'"): forr ny kulor pa VARJE basnot pa
     // alla lampor -> sidokanalen (G i gul -> rod) slog av/pa per not; med DMX_HUE_CUT syntes varje byte (bank: basgang 510 av 1170 korta
     // sidoblink). Positionen hoppar fortfarande per not; kuloren byts per fyra noter.
-    const hue = c.mixedSector(Math.floor(step / 4)) / 6;
+    const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;   // kulören per fras (10-13: var var 4:e basnot = 14,5 kulörhopp/min)
     const v = d < 0.5 ? Math.min(1, bed + note * 0.9 + c.punch * 0.3) : Math.min(1, bed + note * Math.exp(-d * 2.2) * 0.35 + c.punch * 0.15);
     return c.hsv(hue, 1 - (d < 0.5 ? c.punch * 0.4 : 0), v);
   },

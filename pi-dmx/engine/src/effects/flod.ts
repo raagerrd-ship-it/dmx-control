@@ -13,6 +13,8 @@ export const flod: EffectDef = {
     const w = 0.5 + 0.5 * Math.cos(2 * Math.PI * (beats / cyc - c.idx / n));
     const depth = 0.4 + 0.5 * p;
     const hue = c.mixedSector(Math.floor(c.hueIdx / 32)) / 6;
-    return c.hsv(hue, 0.95, Math.min(1, (0.12 + 0.3 * p) + depth * w * (0.55 + 0.45 * p)));
+    // 10-13 (effectDyn: spridning 0,30 - golvet 0,12 + 0,3p lyftes av motorns grundnivå så vågens dal syntes som nästan fullt):
+    // vågen går ner i nästan mörker (w i kvadrat ger en smalare, mjukare rygg).
+    return c.hsv(hue, 0.95, Math.min(1, 0.01 + depth * w * w * (0.7 + 0.3 * p)));
   },
 };

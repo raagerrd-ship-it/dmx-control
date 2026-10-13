@@ -14,11 +14,13 @@ export const vagbrytare: EffectDef = {
     const head = (dir > 0 ? prog : 1 - prog) * (c.count - 1);
     const d = Math.abs(c.idx - head);
     const crest = inBar === 0 ? Math.exp(-c.beatFrac / 0.12) : 0;   // ettan: vit kam
-    const hue = c.mixedSector(barNo) / 6;
-    const body = Math.exp(-d * d * 0.5) * (0.55 + c.audio * 0.45) + c.beatPulse * 0.15;
-    const v = Math.min(1, 0.08 + body + crest * 0.7 + c.punch * 0.3 + c.sectionEntry * 0.5);
+    // EFFEKTGENOMGÅNGEN 10-13 (effectDyn: 29,7 kulörhopp/min - kulören byttes varje takt; c.audio/punch/beatPulse som NIVÅ
+    // dubbelmodulerade mot basenergin och 0,08-golvet lyftes av motorns grundnivå): kulören per fras, mörkt framför och bakom vågen.
+    const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;
+    const body = Math.exp(-d * d * 0.9);
+    const v = Math.min(1, (body > 0.1 ? body : 0) + crest * 0.7 + c.sectionEntry * 0.5);
     // Kammen PA ettan ska vara vitaktig - det ar effektens ide - men 0,9 gjorde varje takts etta nastan helt vit.
     // 0,45 later den lasas som en ljus kam i latens kulor i stallet for som en vit blixt.
-    return c.hsv(hue, 1 - Math.max(crest * 0.45, c.punch * 0.2), v);
+    return c.hsv(hue, 1 - crest * 0.45, v);
   },
 };

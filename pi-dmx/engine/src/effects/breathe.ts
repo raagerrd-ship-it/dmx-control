@@ -1,26 +1,21 @@
 import type { EffectDef } from "./types.js";
 
-// Lugnast: hela riggen andas UNISONT i EN långsamt vandrande färg — djup,
-// symmetrisk swell (lång mjuk in-/utandning). Golv 30% så den aldrig släcks.
+// Lugnast: riggen andas - djup, symmetrisk swell (lång mjuk in-/utandning) som rullar från mitten och ut (10-13; var unison).
 export const breathe: EffectDef = {
   key: "breathe", label: "Andas", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["intro", "break"],
-  desc: "Hela riggen andas som en – djup mjuk våg i en färg.",
+  desc: "Riggen andas från mitten och ut - mittparet först, kanten efter, långsamt och djupt.",
   flat: true,   // statiskt svep → kortare dwell
   render(c) {
-    const hue = c.mixedSector(Math.floor(c.t / 11) + Math.round(c.frame.centroid * 3)) / 6;   // centroid → palett-läge
-    // Andetagets DJUP följer sektionsenergin: i en svacka blir andningen grund
-    // och mörk, i ett refräng djup och full. Utan detta var breathe strukturellt
-    // identisk med aurora och twin — samma sinus, bara olika fasvinkel — och tre
-    // likadana effekter i en 10-effekters lugn-pool gör att chill upprepar sig.
-    // Hela riggen andas SAMTIDIGT (ingen per-lampa-fas) — det är det som skiljer
-    // den från aurora (rumslig gradient) och twin (varannan lampa).
-    // FRASPERIOD (2026-09-23): med takt andas riggen ETT andetag per takt (4 slag) ur gridet; djupet foljer nivan mot latens
-    // egen refrang (levelVsHighDb: 9 dB under = grunt, vid refrangens niva = fullt). Utan takt: klocktid som forr.
-    const lv = c.levelVsHighDb;
-    const djup = (0.6 + c.frame.intensity * 0.4) * (lv !== 0 ? Math.max(0.4, Math.min(1, 1 + lv / 9)) : 1);
-    const ph = c.hasBeat ? (2 * Math.PI * (((c.beatIdx % 4) + 4) % 4 + c.beatFrac)) / 4 : c.t * 0.7;
-    const breath = 0.5 + 0.5 * Math.sin(ph) * djup;
-    const m = Math.min(1, breath * 0.85 + c.audio * 0.2 + c.punch * 0.2);   // riktig dunk → mjuk svall
-    return c.hsv(hue, 1, 0.18 + 0.82 * m);   // golv 0.3 nu redundant (md har eget 0.3)
+    // EFFEKTGENOMGÅNGEN 10-13 (effectDyn i intro/break: spridning 0,23 - alla fyra lika, mot regeln 'lamporna ska lysa olika'; 41,6
+    // kulörhopp/min - kulören hoppade när centroiden fladdrade över en avrundningsgräns; c.audio/punch som NIVÅ dubbelmodulerade mot
+    // basenergin; golvet 0,18 lyftes av motorns grundnivå så andetaget nästan inte syntes): andetaget går nu UTIFRÅN MITTEN - mittparet
+    // andas först, ytterparet en kvarts andetag efter, ett andetag per två takter, ner i nästan mörker mellan. Mitten i palettens
+    // kulör, kanten i grannkulören, kulören per fras.
+    const half = (c.count - 1) / 2;
+    const ring = c.count > 2 ? (Math.abs(c.lamp - half) > 1 ? 1 : 0) : (c.lamp & 1);   // 0 mittparet, 1 ytterparet
+    const ph = (c.hasBeat ? (c.beatIdx + c.beatFrac) / 8 : c.t / 8) - ring * 0.25;
+    const b = 0.5 - 0.5 * Math.cos(2 * Math.PI * ph);
+    const base = c.mixedSector(Math.floor(c.hueIdx / 16));
+    return c.hsv(((ring ? base + 1 : base) % 6) / 6, 1, 0.01 + 0.9 * b * b);
   },
 };
