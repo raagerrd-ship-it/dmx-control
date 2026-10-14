@@ -6,6 +6,17 @@
 1. SEKTIONER SOM HÅLLER + INGA FALSKA LÅTGRÄNSER: sektionen fladdrar (low/build/high/intro byts på 5-20 s) och låtgränsdetektorn
    ger 'ny låt' mitt i låtar. Röd tråd, sektionstaket och build-valen hänger på det. Mål: sektioner >= 8 s (andel byten kortare än
    8 s ner kraftigt), falska låtgränser ~0 mot inspelningarnas riktiga låtbyten (lyssna/räkna dem en gång, spara som facit-fil).
+   KLART 2026-10-14 (nattagenten, sektionsdelen, ej deployat, INGEN kodändring - befintliga profilrattar): REDO FÖR LADAN
+   `python tools/ladan.py --env DMX_SECTION_RUN=5 --env DMX_SECTION_RUN_IN=3` (ur refrängen/mellanlägen kräver 5 raka 1 s-block i
+   stället för 3, IN i refrängen fortfarande 3). 23 lang-*.wav (tools/sektionMatt.mjs + sektionStat.mjs): fladder (kort, ej build, ej
+   nollning) 41 -> 17, sektionsbyten 3,12 -> 2,34/min, < 8 s 23 -> 18 % (resten = build 4-7 s före refrängen, avsiktligt kvar), high-start
+   oförändrad (medel -0,04 s), tid high 40 -> 45 %, low 24 -> 21 %, build 13 % oförändrad. konsertReplay --delad-cfg --step 5: lookbyten
+   3,14 -> 2,58/min, återseende 71 -> 81 %, hör ihop 77 -> 80 %, kort look 16 -> 14 %, variation 26 -> 27 looker 11/15 rutor. Showens drops
+   bit-lika (dropTiming 44, rätt 35/sen 5), minidrop-looker 320 -> 312. energiMatt (ladans nivå): r_bas high 0,45 -> 0,48, slagdjup lika.
+   Kostnad: megamix (överstyrd) r energi 0,18 -> 0,08, pop 0,37 -> 0,33. Svagare alternativ utan r-kostnad: DMX_SECTION_REPEAT=32
+   (fladder 41 -> 28, byten 3,0/min). Prövat och förkastat: SECTION_HYST 0,25 (build 13 -> 10 % = emot prio 2).
+   ÖPPET: falska låtgränser - facit saknas (kräver öron: 49 gränser på 141 min, flera 127 -> 127 BPM med grund nivådipp i 15:xx-seten
+   är misstänkta). Efter varje gräns är sektionen 'intro' 20 s (17 % av tiden) -> analysator-fynd.md 10-14.
 2. UPPBYGGNADEN TIDIGARE: analysatorns buildUp är död på ladans nivå (morgonagenten 10-12: ingen ersättare med AUC > 0,56);
    motorns buildProg börjar först när sektionen säger build. Ägaren (10-11): 'dirigenten skall bli snabbare att byta till BUILD
    innan drops'. Mål: känna igen builden 4-8 takter före dropen (facit = flank-dropparna, tools/dropTiming*.mjs), utan att

@@ -15,6 +15,17 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-14 Sektionen efter låtgräns: 20 s 'intro' hårdkodat (17 % av ladans tid), högt->break->högt-fladder
+Vad: DMX-nattagenten 10-14 (ägarens prio 1: sektioner som håller) mätte 23 lang-*.wav (141 min, tools/sektionMatt.mjs + sektionStat.mjs,
+analysatorn + låtgränsdetektorn som konsertReplay): 441 inre sektioner, 23 % kortare än 8 s; fladder (kort, ej build, ej nollning)
+41 st, mest high>break>high (18) och high>low>high (6). 'intro' står 17 % av tiden: efter varje hintTrackChange (49 låtgränser, 3,5/10 min)
+är sektionen 'intro' tills secBlkDb har 20 block (analyser.ts ~1371) - en falsk låtgräns ger 20 s intro mitt i en refräng.
+DMX löser fladdret i profilen (prov: DMX_SECTION_RUN=5 + DMX_SECTION_RUN_IN=3 -> fladder 41 -> 17, byten 3,1 -> 2,3/min, high-start
+oförändrad, build 13 % oförändrad). Var: sectionReset/rangens 20-blockskrav, RANK_RUN. Material: tools/ladan-2026-10-11/lang-*.wav.
+Önskat: (a) efter en låtgräns: ta med de senaste ~20 s blocken (eller deras fördelning) i stället för att börja om helt - då blir en falsk
+gräns ofarlig för sektionen; (b) överväg RUN 5 / RUN_IN 3 även för lotus om ni ser samma fladder.
+Status:
+
 ## ÖPPET 2026-10-13 Tempohopp inom låt i ladan: 2,9 klockbyten/låt, 43 % av tempona står < 8 s
 Vad: DMX-nattagenten 10-13 (taktsäkerheten, ägarens punkt 4) körde alla 23 lang-*.wav (141 min, 64 låtar mellan LATGRANS) genom
 konsertReplay --delad-cfg --step 5 (som live, se mätfälla 47/48 nedan): analysatorns bpm byter 3,2 ggr/låt (2:3 24, 3:4 38, 'nära'
