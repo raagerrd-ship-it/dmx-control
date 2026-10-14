@@ -268,9 +268,9 @@ const MIN_ON_MS = Number(process.env.DMX_MIN_ON_MS ?? 150);
 /** KULÖRTONING (opt-in DMX_HUE_GLIDE_MS > 0, ägaren i ladan 10-14: "fada snyggt mellan färger hela tiden när det inte skall vara skarpt
  *  färgskifte" - "vissa gör det snyggt idag ... oftast inte huvudfärgen"). STEG 1 (effektens färg, före energin): byter en TÄND lampa kulör
  *  glider kulören runt färghjulet (kortaste vägen, aldrig mot vitt) på ~GLIDE_MS; ljusstyrkan är effektens, direkt - attacken och slagen
- *  rörs inte. Skarpt som förr: drop- och minidrop-looken, lampa som var släckt (< 8 % av nya ljuset), vitt (mättnad < 0,5, hsvToRgb snäpper
- *  ändå) och fastLight-effekter. 0 = av = bit-identiskt. */
-const HUE_GLIDE_MS = Number(process.env.DMX_HUE_GLIDE_MS ?? 0);
+ *  rörs inte, och glidkulören har alltid effektens totala ljus (kanalsumman) - går det inte blir bytet skarpt. Skarpt som förr: drop- och minidrop-looken, lampa som var släckt (< 8 % av nya ljuset), vitt (mättnad < 0,5, hsvToRgb snäpper
+ *  ändå) och fastLight-effekter. DMX_HUE_GLIDE_MS=0 = av (som före 10-14). */
+const HUE_GLIDE_MS = Number(process.env.DMX_HUE_GLIDE_MS ?? 400);   // STANDARD 400 sedan 10-14 (ägaren i ladan: 'känns mer polerat nu', 'gör det till standard direkt')
 const CH_MIN_ON_MS = Number(process.env.DMX_CH_MIN_ON_MS ?? 100);   // STEG 2: minsta pa-tid per fargkanal (se MINSTA PA-TID PER FARGKANAL)   // STEG 2: minsta pa-tid innan uttoningen (se MINSTA PA-TID)
 /** Sentinel: pulsklockan ännu inte initierad (första framen sätter den utan tick). */
 const PULSE_IDX_INIT = -2e9;
@@ -488,7 +488,11 @@ export class EffectEngine {
     let dh = h - this.glH[i]; if (dh > 0.5) dh -= 1; else if (dh < -0.5) dh += 1;
     if (Math.abs(dh) < 0.002) { this.glH[i] = h; return; }   // framme: effektens egen färg, orörd
     this.glH[i] = ((this.glH[i] + dh * (1 - Math.exp(-dtSec / (HUE_GLIDE_MS / 3000)))) % 1 + 1) % 1;
-    const o = hsvToRgb(this.glH[i], 1, v); rgb[0] = o[0]; rgb[1] = o[1]; rgb[2] = o[2];
+    // SAMMA LJUS SOM EFFEKTEN (ägaren 10-14: 'i en effekt påverkade den även energin ... fade är bara när det går'): glidkulören skalas
+    // till effektens kanalsumma efter gamman (det lamporna faktiskt lyser); skulle någon kanal då gå över effektens starkaste kanal går det inte -> skarpt byte som förr.
+    const o = hsvToRgb(this.glH[i], 1, v), G = GAMMA, so = o[0] ** G + o[1] ** G + o[2] ** G, k = so > 0 ? ((r ** G + g ** G + b ** G) / so) ** (1 / G) : 0;   // efter utgångens gamma
+    if (k * v > v * 1.0001 || k <= 0) { this.glH[i] = h; return; }
+    rgb[0] = o[0] * k; rgb[1] = o[1] * k; rgb[2] = o[2] * k;
   }
 
   private effektNiva(rgb: [number, number, number], ctx: EffectContext, blackout: boolean, toggle = false, sparse = false): [number, number, number] {
