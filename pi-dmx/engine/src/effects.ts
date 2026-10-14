@@ -265,6 +265,12 @@ const SHOW_LEAD_DEFAULT = 50;
 /** STEG 2: den ENDA uttoningen (lampans ljusstyrka, tidskonstant i DMX-ljus). Snabbare ar forbjudet (agaren 09-29). */
 const FADE_MIN_S = Number(process.env.DMX_FADE_MIN_S ?? 0.25);
 const MIN_ON_MS = Number(process.env.DMX_MIN_ON_MS ?? 150);
+/** KULÖRTONING (opt-in DMX_HUE_GLIDE_MS > 0, ägaren i ladan 10-14: "fada snyggt mellan färger hela tiden när det inte skall vara skarpt
+ *  färgskifte" - "vissa gör det snyggt idag ... oftast inte huvudfärgen"). STEG 1 (effektens färg, före energin): byter en TÄND lampa kulör
+ *  glider kulören runt färghjulet (kortaste vägen, aldrig mot vitt) på ~GLIDE_MS; ljusstyrkan är effektens, direkt - attacken och slagen
+ *  rörs inte. Skarpt som förr: drop- och minidrop-looken, lampa som var släckt (< 8 % av nya ljuset), vitt (mättnad < 0,5, hsvToRgb snäpper
+ *  ändå) och fastLight-effekter. 0 = av = bit-identiskt. */
+const HUE_GLIDE_MS = Number(process.env.DMX_HUE_GLIDE_MS ?? 0);
 const CH_MIN_ON_MS = Number(process.env.DMX_CH_MIN_ON_MS ?? 100);   // STEG 2: minsta pa-tid per fargkanal (se MINSTA PA-TID PER FARGKANAL)   // STEG 2: minsta pa-tid innan uttoningen (se MINSTA PA-TID)
 /** Sentinel: pulsklockan ännu inte initierad (första framen sätter den utan tick). */
 const PULSE_IDX_INIT = -2e9;
@@ -471,6 +477,20 @@ export class EffectEngine {
    *  effekter: (a) DROP-LOOKEN - kolsvart i den dramaturgiska tystnaden fore smallen (blackout), och vid full drop blandas drops-effektens
    *  dropfarg per lampa + vit karna i toppen in med dropColEnv; (b) topp-normering - effektens topp over lamporna (foljd E_NORM_S) blir
    *  100 %; (c) grundniva FX_FLOOR for tanda lampor (slackt forblir slackt); (d) minidrop/nastan-drop lyfter mot fullt med kuloren kvar. */
+  /** KULÖRTONING (se HUE_GLIDE_MS): rgb skrivs om på plats; skarp = byt direkt. */
+  private hueGlide(i: number, rgb: [number, number, number], dtSec: number, skarp: boolean): void {
+    const r = rgb[0], g = rgb[1], b = rgb[2], v = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+    const prevV = this.glV[i]; this.glV[i] = v;
+    if (v <= 0) return;
+    if (v - mn < 0.5 * v) { this.glOn[i] = 0; return; }   // vitt/omättat: som förr
+    const d = v - mn; let h = r === v ? (g - b) / d : g === v ? 2 + (b - r) / d : 4 + (r - g) / d; h = ((h / 6) % 1 + 1) % 1;
+    if (skarp || !this.glOn[i] || prevV < 0.08 * v) { this.glH[i] = h; this.glOn[i] = 1; return; }
+    let dh = h - this.glH[i]; if (dh > 0.5) dh -= 1; else if (dh < -0.5) dh += 1;
+    if (Math.abs(dh) < 0.002) { this.glH[i] = h; return; }   // framme: effektens egen färg, orörd
+    this.glH[i] = ((this.glH[i] + dh * (1 - Math.exp(-dtSec / (HUE_GLIDE_MS / 3000)))) % 1 + 1) % 1;
+    const o = hsvToRgb(this.glH[i], 1, v); rgb[0] = o[0]; rgb[1] = o[1]; rgb[2] = o[2];
+  }
+
   private effektNiva(rgb: [number, number, number], ctx: EffectContext, blackout: boolean, toggle = false, sparse = false): [number, number, number] {
     if (blackout) { rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; return rgb; }
     // LAMPTRAPPA (DMX_LAMP_STAIR, vers/intro): icke-sparsam effekt -> bara ett lamppar, paret byts varje fras; drop-looken tänder allt.
@@ -518,6 +538,7 @@ export class EffectEngine {
   private eSm = 0; eSimple = 0; private eBass = 0; private bHi = NaN; private bLo = NaN; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
   private miniRgb: [number, number, number] = [1, 1, 1];   // minidropens kulör = den tända lampans (se MINIDROPS SOM SHOW)
+  private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
   private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
@@ -1862,6 +1883,7 @@ export class EffectEngine {
         if (ctx.want.fog) wantFogFx = true;
         lampWantE = ctx.want.energy;
       }
+      if (HUE_GLIDE_MS > 0) this.hueGlide(i, rgb, dtSec, fastLight || this.dropColEnv > 0.005 || this.miniColEnv > 0.005 || nowWall < this.miniBangUntil);   // KULÖRTONING (steg 1)
       // TRE STEG FOR LJUSET (agaren 2026-10-10: "jag vill bara ha 3 stallen dar ljuset styrs"):
       //   1. EFFEKTEN satter ljusstyrka per lampa och per R/G/B - och om ljuset far andras efter (modulate.energy, standard ja).
       //   2. ENERGIN (om effekten tillater): en faktor 0..1 ur basen (BASENERGIN, se B_CURVE) med justerbar uttoning (DMX_E_RELEASE_MS); ingangsgransen
