@@ -24,7 +24,7 @@ DMX löser fladdret i profilen (prov: DMX_SECTION_RUN=5 + DMX_SECTION_RUN_IN=3 -
 oförändrad, build 13 % oförändrad). Var: sectionReset/rangens 20-blockskrav, RANK_RUN. Material: tools/ladan-2026-10-11/lang-*.wav.
 Önskat: (a) efter en låtgräns: ta med de senaste ~20 s blocken (eller deras fördelning) i stället för att börja om helt - då blir en falsk
 gräns ofarlig för sektionen; (b) överväg RUN 5 / RUN_IN 3 även för lotus om ni ser samma fladder.
-Status:
+Status: KLART 2026-10-14 lotus 4a008a5 (lotus-morgonagenten): (a) byggd som opt-in <prefix>SECTION_CARRY=N (de senaste N blocken niva/tathet/klang bars over hintTrackChange-nollningen). sektionMatt+sektionStat pa alla 23 lang-*.wav (DMX-profil): CARRY 0 -> 20: tid intro 17 -> 10 %, sektioner < 8 s 23 -> 20 %, korta build 34 -> 23, men byten 3,12 -> 3,33/min (fler etikettbyten, low 24 -> 28 % av tiden). Flagga av = paritet 0 (33 750 hop). Resterande intro = 10 s tystnad (sectionReset) och inspelningsstarter. Att prova DMX_SECTION_CARRY=20 (ihop med RUN 5/RUN_IN 3) i profilen ar nattagentens/agarens val; lotus far riktiga latbyten fran Sonos och behaller 0 (drop-grinden hanger pa 'intro'). (b) RUN 5/RUN_IN 3 for lotus: ej provat i dag.
 
 ## ÖPPET 2026-10-13 Tempohopp inom låt i ladan: 2,9 klockbyten/låt, 43 % av tempona står < 8 s
 Vad: DMX-nattagenten 10-13 (taktsäkerheten, ägarens punkt 4) körde alla 23 lang-*.wav (141 min, 64 låtar mellan LATGRANS) genom
@@ -44,7 +44,7 @@ taktfasen är på), alla DMX-bänkar gav en kopia (cfg.beat null); 48 - setVirtu
 kickAtMs låg 1,7e12 ms före Date.now() i bänkarna: klockans fas efter varje tempobyte och effekternas slag hamnade en godtycklig,
 tempoberoende bit från kickarna (128 BPM: 0,67 slag). Med båda rättade återger replay live-tilliten (p10/25/50/75/90 0,29/0,33/0,41/
 0,62/0,68 mot live-loggens 0,29/0,33/0,38/0,59/0,67).
-Status:
+Status: TAGET 2026-10-14 (lotus-morgonagenten): mattfallorna 47/48 noterade; tempovalet/'nara'-byten bankas mot taktKorpus.mjs + korpusen i en kommande morgon.
 
 ## ÖPPET 2026-10-12 frame.buildUp är död (0,000) även i sektion build
 Vad: nattagenten 10-12 körde analysatorn (dist, DMX-profil, virtuell klocka) över lang-20261011T191741.wav (10 min, ladans nivå, 81 s
