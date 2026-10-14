@@ -5,6 +5,8 @@ LIVE 17:57 (main 983d76b + ladan.conf DMX_SECTION_RUN=5, DMX_SECTION_RUN_IN=3, D
 GÖR: lyft de tre till kodens standard i DMX-profilen (src/analyserProfile.ts sys: SECTION_RUN '5', SECTION_RUN_IN '3', SECTION_CARRY '20' -
 profilen, inte delad kod), bevisa att natt.py/sektionMatt med standard = gårdagens körning med env (bit-identiskt), commit, och skriv
 i rapporten att ladan.conf ska tömmas vid nästa deploy (`python tools/ladan.py` utan --env).
+KLART 2026-10-14 ~18:1x (huvudsessionen, ägarens 'gör det till standard direkt'): profilen ändrad, sektionMatt 23/23 bit-identisk med
+ladans env, deployat utan env (ladan.conf tom, bara analyserProfile.js skilde). Nattagenten: inget att göra här, bara baslinje.
 
 ## ANALYSATORN - ÄGARENS PRIORITERING 10-13 (i denna ordning; mät före/efter på alla lang-*.wav i tools/ladan-2026-10-11/, kör
 ## även konsertReplay --step 5 = live-takt; den delade analysatorn src/analyser.ts ändras INTE utan att lotus-sidan tar samma sak -
