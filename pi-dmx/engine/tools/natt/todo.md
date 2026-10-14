@@ -1,5 +1,13 @@
 # Natt-agentens uppdrag
 
+## Från kvällen 2026-10-14 - NY LÅNGINSPELNING MED ÄGARENS MARKERINGAR (går före allt annat)
+tools/ladan-2026-10-14/lang-20261014T161434.wav (+ .events.json, marks.jsonl; gitignorerad, ligger lokalt): 18:14:34-18:24:34, 10 min,
+ladans nivå, kod = main med sektionsstandarden (RUN 5/RUN_IN 3/CARRY 20), TRUST_REPEAT, flank-drop, manus-return, minidrop-kulören.
+Ägarens knappar (s från start): drop 54, mini 67, drop 108, drop 173, mini 181, drop 209, mini 262, drop 273, mini 304, drop 341,
+mini 447, drop 530, drop 598. GÖR: kör konsertReplay --delad-cfg --step 5 + dropTiming på filen; jämför showens drops/minidrops mot
+markeringarna (träff/miss/falsk, fördröjning) och mot events.json (det som hände live); sektionMatt på filen (fladder, intro-andel).
+Rapportera vad markeringarna säger om drop-/minidrop-gränsen (ägaren tryckte Drop! 8 ggr på 10 min - fler än showens ~0,3/min?).
+
 ## Från kvällen 2026-10-14 - SEKTIONSPROVET GODKÄNT I LADAN (går före allt annat)
 LIVE 17:57 (main 983d76b + ladan.conf DMX_SECTION_RUN=5, DMX_SECTION_RUN_IN=3, DMX_SECTION_CARRY=20). Ägaren i ladan: "mycket go känsla nu".
 GÖR: lyft de tre till kodens standard i DMX-profilen (src/analyserProfile.ts sys: SECTION_RUN '5', SECTION_RUN_IN '3', SECTION_CARRY '20' -
