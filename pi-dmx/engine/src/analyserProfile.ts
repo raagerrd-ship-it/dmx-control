@@ -38,6 +38,11 @@ export const PROFILE: AnalyserProfile = {
     SECTION_EARLY_S: '45',        // forsta 45 s: refrang kraver +3 dB mot latens median
     SECTION_ON_HINT: '1',         // latgransen nollar sektionshistoriken
     SECTION_HINT_LOWCONF: '0',    // taktlost break nollar INTE sektionerna (ladan 09-24 23:10)
+    // SEKTIONER SOM HALLER (agaren i ladan 10-14: 'mycket go kansla nu'; 23 lang-*.wav: intro 17 -> 10 % av tiden, < 8 s 23 -> 15 %,
+    // fladder 41 -> 22, sektionsbyten 3,12 -> 2,44/min, refrangstart oforandrad). Ur refrang/mellanlage kravs 5 raka block, in i refrangen 3.
+    SECTION_RUN: '5',             // var 3
+    SECTION_RUN_IN: '3',          // var 0 (= RUN)
+    SECTION_CARRY: '20',          // block som bars over latgransen (lotus 4a008a5); var 0
   },
   bare: {
     BPM_MIN: '80',               // fest 80-160 (var 100 + tempo.conf=80); lotus: 80
