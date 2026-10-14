@@ -3,6 +3,9 @@
 ## Från kvällen 2026-10-14 - KULÖRTONINGEN GODKÄND I LADAN (går före allt annat)
 LIVE ~18:55 via ladan.conf DMX_HUE_GLIDE_MS=400 (commit "Kulörtoning opt-in"). Ägaren: "känns mer polerat nu". GÖR: standard 400 i effects.ts
 (DMX_HUE_GLIDE_MS=0 = av), bevisa natt --snabb bit-identisk med --env DMX_HUE_GLIDE_MS=400, commit; rapporten: nästa deploy utan --env.
+KLART 2026-10-14 ~19:2x (huvudsessionen): standard 400 + SAMMA LJUS SOM EFFEKTEN (ägaren: 'påverkade även energin ... fade är bara när
+det går' -> glidkulören skalas till effektens ljus efter gamman, annars skarpt), deployat utan env, 0 filer skiljer. Nattagenten: mät gärna
+skarpa kulörhopp på tända lampor (hue-sond: rgb ur eng.universe, hopp > 1/12 per renderruta) och hur ofta toningen faller till skarpt.
 
 ## Från kvällen 2026-10-14 - NY LÅNGINSPELNING MED ÄGARENS MARKERINGAR (går före allt annat)
 tools/ladan-2026-10-14/lang-20261014T161434.wav (+ .events.json, marks.jsonl; gitignorerad, ligger lokalt): 18:14:34-18:24:34, 10 min,
