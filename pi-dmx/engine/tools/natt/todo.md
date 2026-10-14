@@ -1,5 +1,9 @@
 # Natt-agentens uppdrag
 
+## Från kvällen 2026-10-14 - KULÖRTONINGEN GODKÄND I LADAN (går före allt annat)
+LIVE ~18:55 via ladan.conf DMX_HUE_GLIDE_MS=400 (commit "Kulörtoning opt-in"). Ägaren: "känns mer polerat nu". GÖR: standard 400 i effects.ts
+(DMX_HUE_GLIDE_MS=0 = av), bevisa natt --snabb bit-identisk med --env DMX_HUE_GLIDE_MS=400, commit; rapporten: nästa deploy utan --env.
+
 ## Från kvällen 2026-10-14 - NY LÅNGINSPELNING MED ÄGARENS MARKERINGAR (går före allt annat)
 tools/ladan-2026-10-14/lang-20261014T161434.wav (+ .events.json, marks.jsonl; gitignorerad, ligger lokalt): 18:14:34-18:24:34, 10 min,
 ladans nivå, kod = main med sektionsstandarden (RUN 5/RUN_IN 3/CARRY 20), TRUST_REPEAT, flank-drop, manus-return, minidrop-kulören.
