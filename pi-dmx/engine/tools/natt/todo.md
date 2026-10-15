@@ -22,6 +22,8 @@ Mini-markeringar: 2/5 fick minidrop-look (262 blev drop, 304), 3/5 inget (67, 18
 Analysatorns miniDropCount räknar i skurar (140 på 10 min) -> analysator-fynd 10-15. Idé byggd: DMX_FLANK_SHORT_S=1 (opt-in, 9f417c0):
 break >= 1 s räcker om breaket ligger >= 24 dB under taket -> 7/8 drop-markeringar, 1 mini-markering blir drop; 23 filer 0,31 -> 0,72/min,
 rätt 34 -> 87, falska 3 -> 7. REDO FÖR LADAN: `python tools/ladan.py --env DMX_FLANK_SHORT_S=1`. NÄSTA: de 3 missade minidrop-markeringarna.
+IHOP MED LOTUS 10-15: lotus föreslog MINI_SPACING_MS 1500 (profilen, i stället för 1) mot skurarna; kört ihop med FLANK_SHORT på lang-1014 i
+live-takt: bit-identiskt (konsertläget läser inte miniDropCount) -> ingen ljusvinst, bara läsbara loggar. Inte infört.
 
 ## Från kvällen 2026-10-14 - SEKTIONSPROVET GODKÄNT I LADAN (går före allt annat)
 LIVE 17:57 (main 983d76b + ladan.conf DMX_SECTION_RUN=5, DMX_SECTION_RUN_IN=3, DMX_SECTION_CARRY=20). Ägaren i ladan: "mycket go känsla nu".
