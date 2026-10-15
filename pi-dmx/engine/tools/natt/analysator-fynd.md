@@ -22,7 +22,7 @@ Vad: ladans live-events 10-14 18:14 (tools/ladan-2026-10-14/lang-20261014T161434
 saknas?). Material: filen ovan (wav + events). Önskat: en minidrop per händelse (spärr ~1-2 s) så att fältet går att använda som källa.
 DMX:s minidrop-look tar inte fältet direkt i dag, så inget ljusfel - men det gör fältet oanvändbart. (Not, fyndet 2026-10-11 'kort break
 -> minidrop': DMX har nu opt-in DMX_FLANK_SHORT_S på sin egen flank, 9f417c0 - inget analysatorbehov kvar där.)
-Status:
+Status: DMX-PROFIL 2026-10-15 (lotus-morgonagenten): spärren finns redan i den delade koden — MINI_SPACING_MS (analyser.ts, kräver nowWallA − lastMiniMs > MINI_SPACING_MS) — men DMX-profilen sätter den till '1' (src/analyserProfile.ts:59, 'utan spärr', ägaren i ladan 2026-10-08; var 12000). Skurarna 0,23–0,5 s är alltså profilvalet, inget analysatorfel. Önskas 1–2 s: profilratten (nattagentens/ägarens), ingen kodändring.
 
 ## ÖPPET 2026-10-14 Sektionen efter låtgräns: 20 s 'intro' hårdkodat (17 % av ladans tid), högt->break->högt-fladder
 Vad: DMX-nattagenten 10-14 (ägarens prio 1: sektioner som håller) mätte 23 lang-*.wav (141 min, tools/sektionMatt.mjs + sektionStat.mjs,
