@@ -1,5 +1,12 @@
 # Natt-agentens uppdrag
 
+## Från kvällen 2026-10-15 - LOTUS: BASEN SOM DMX, SUB+KICK GODKÄND I KÄLLAREN (porterat, opt-in, ej deployat i ladan)
+Lotus fick DMX:s basenergi (LOTUS_BASS_BODY, lotus a5e972d/668ffc3). Ägaren: =1 (baskroppen 20-250 Hz) 'lite mörkare, ok, men följer inte bara
+bas'; =2 (bara sub+kick 20-120 Hz) 'känns bättre'. Porterat till DMX som opt-in DMX_BASS_SUBKICK=1 (effects.ts BASENERGIN; flank-dropen läser
+fortfarande bodyDb). natt --snabb: av json-identiskt; på: kick->ljus pop 125 -> 100 ms, megamix 150 -> 125 ms, r energi 0,34/0,09 oförändrat,
+mörkt 0,02/0,03 oförändrat. Lotus-bänken (samma källa): r mot 250-1200 Hz 0,20 -> 0,15 (ladan-wav). REDO FÖR LADAN:
+`python tools/ladan.py --env DMX_BASS_SUBKICK=1`. Nattagenten: mät gärna energiMatt med sub+kick som referens.
+
 ## Från kvällen 2026-10-14 - KULÖRTONINGEN GODKÄND I LADAN (går före allt annat)
 LIVE ~18:55 via ladan.conf DMX_HUE_GLIDE_MS=400 (commit "Kulörtoning opt-in"). Ägaren: "känns mer polerat nu". GÖR: standard 400 i effects.ts
 (DMX_HUE_GLIDE_MS=0 = av), bevisa natt --snabb bit-identisk med --env DMX_HUE_GLIDE_MS=400, commit; rapporten: nästa deploy utan --env.

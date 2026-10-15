@@ -381,6 +381,11 @@ const E_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_E_TOP ?? 0.95)));
  *  TIER_OPEN (golv som gjorde energin verkningslös), taktdippen KICK_E/KICK_E_HIGH på kickEnv (dubbel kickmodulering ovanpå effektens
  *  egen c.heart), SPOT-regeln och UNIFORM:s ovalda par (förbivägar runt energin). */
 const B_CURVE = 3, B_MIN_DB = 6, B_LO_S = 1;
+/** BASENERGIN BARA SUB+KICK (opt-in DMX_BASS_SUBKICK=1, porterat från lotus 10-15: ägaren i källaren 'känns dock som att den följer inte bara
+ *  bas' med baskroppen 20-250 Hz, 'känns bättre' med sub+kick 20-120 Hz). Basenergins källa = medel av sub- och kickbandets rå dB ur
+ *  frame.specAbs (samma bandmedel som bodyDb, utan bandet 120-250 Hz där röstens grundton och virvelns kropp ligger). Flank-dropen läser
+ *  fortfarande bodyDb. 0 = av (som före). */
+const BASS_SUBKICK = process.env.DMX_BASS_SUBKICK === '1';
 const E_LIN_INV = 1 / GAMMA;   // utgangens gamma (output.ts ager DMX_GAMMA - en kalla, 10-11; forr last pa tva stallen med var sin standard)
 /** Minsta tanda niva fore gamman: gammans forsta DMX-steg (1/255 -> tandpunkt+1 i utgangen) = agarens 1 %. */
 const E_MIN_LIT = Math.pow(1 / 255, E_LIN_INV) * 1.02;   // agarens 1 %: gammans forsta DMX-steg (-> tandpunkt+1), se ENERGIN SLACKER ALDRIG
@@ -1702,7 +1707,7 @@ export class EffectEngine {
       // (volymfönstret ovan - eSm - styr inte ljuset längre, bara dropens efterkontroll (DROP_LAND_GAIN); orört så dropsen är desamma)
       // BASENERGIN (se B_CURVE): baskroppen (frame.bodyDb, sub+kick+bas i rå dB) i ett följande fönster - topp direkt upp/E_WIN_S ner,
       // dal direkt ner/B_LO_S upp - energin mäter hur långt över basens senaste dal vi är: varje bastryck svänger över skalan.
-      const bdb = frame.bodyDb ?? -90;
+      const bdb = BASS_SUBKICK && frame.specAbs ? (20 * Math.log10(frame.specAbs.sub + 1e-7) + 20 * Math.log10(frame.specAbs.kick + 1e-7)) / 2 : (frame.bodyDb ?? -90);   // BASS_SUBKICK: bara 20-120 Hz
       if (Number.isNaN(this.bHi) && frame.level > INPUT_OFF_LEVEL) { this.bHi = bdb; this.bLo = bdb; }
       if (frame.level > INPUT_OFF_LEVEL) {   // tystnad flyttar inte fönstret
         this.bHi = bdb > this.bHi ? bdb : this.bHi + (bdb - this.bHi) * k;
