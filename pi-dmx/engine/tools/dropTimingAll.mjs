@@ -1,5 +1,5 @@
 /** Kör tools/dropTiming.mjs på alla lang-*.wav i en katalog, N parallellt. Env (t.ex. DMX_*) ärvs av barnen.
- *   node tools/dropTimingAll.mjs <wavkatalog> <utkatalog> [--par 8] [--dist dir] */
+ *   node tools/dropTimingAll.mjs <wavkatalog> <utkatalog> [--par 8] [--dist dir] [--step 5] */
 import { readdirSync, mkdirSync } from "node:fs";
 import { spawn } from "node:child_process";
 const [dir, out] = process.argv.slice(2);
@@ -12,7 +12,7 @@ const tool = new URL("./dropTiming.mjs", import.meta.url).pathname.replace(/^\/(
 let i = 0;
 const next = () => new Promise((res) => {
   const f = files[i++]; if (!f) return res();
-  const a = [tool, `${dir}/${f}`, "--json", `${out}/${f.replace(/\.wav$/, ".json")}`]; if (dist) a.push("--dist", dist);
+  const a = [tool, `${dir}/${f}`, "--json", `${out}/${f.replace(/\.wav$/, ".json")}`]; if (dist) a.push("--dist", dist); if (opt("--step", null)) a.push("--step", opt("--step"));
   const p = spawn(process.execPath, a, { stdio: ["ignore", "pipe", "ignore"] });
   p.stdout.on("data", (b) => { const s = String(b).split("\n").filter((l) => l && !l.startsWith("[quiet]")).join("\n"); if (s) console.log(s); });
   p.on("close", () => next().then(res));
