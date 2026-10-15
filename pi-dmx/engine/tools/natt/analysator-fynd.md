@@ -15,6 +15,15 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-15 miniDropCount räknar i skurar var 0,4-0,5 s (27 st på 13 s)
+Vad: ladans live-events 10-14 18:14 (tools/ladan-2026-10-14/lang-20261014T161434.events.json, kolumn miniDropCount, fr.miniDropCount)
+ökar 27 gånger på 288-301 s och 18 gånger på 333-337 s (var 0,23-0,5 s), och var ~2,5 s genom hela 448-568 s (50 st) - totalt 140 på
+10 min mot ägarens 5 minidrop-markeringar. Ingen av skurarna sammanfaller med en markering. Var: miniDrop-räknaren (spärr/omladdning
+saknas?). Material: filen ovan (wav + events). Önskat: en minidrop per händelse (spärr ~1-2 s) så att fältet går att använda som källa.
+DMX:s minidrop-look tar inte fältet direkt i dag, så inget ljusfel - men det gör fältet oanvändbart. (Not, fyndet 2026-10-11 'kort break
+-> minidrop': DMX har nu opt-in DMX_FLANK_SHORT_S på sin egen flank, 9f417c0 - inget analysatorbehov kvar där.)
+Status:
+
 ## ÖPPET 2026-10-14 Sektionen efter låtgräns: 20 s 'intro' hårdkodat (17 % av ladans tid), högt->break->högt-fladder
 Vad: DMX-nattagenten 10-14 (ägarens prio 1: sektioner som håller) mätte 23 lang-*.wav (141 min, tools/sektionMatt.mjs + sektionStat.mjs,
 analysatorn + låtgränsdetektorn som konsertReplay): 441 inre sektioner, 23 % kortare än 8 s; fladder (kort, ej build, ej nollning)
