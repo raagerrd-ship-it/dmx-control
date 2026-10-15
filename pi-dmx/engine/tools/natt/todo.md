@@ -6,6 +6,8 @@ LIVE ~18:55 via ladan.conf DMX_HUE_GLIDE_MS=400 (commit "Kulörtoning opt-in"). 
 KLART 2026-10-14 ~19:2x (huvudsessionen): standard 400 + SAMMA LJUS SOM EFFEKTEN (ägaren: 'påverkade även energin ... fade är bara när
 det går' -> glidkulören skalas till effektens ljus efter gamman, annars skarpt), deployat utan env, 0 filer skiljer. Nattagenten: mät gärna
 skarpa kulörhopp på tända lampor (hue-sond: rgb ur eng.universe, hopp > 1/12 per renderruta) och hur ofta toningen faller till skarpt.
+KLART 2026-10-15 (nattagenten): tools/hueSond.mjs (--delad-cfg --step 5) på lang-1014: skarpa hopp 149 -> 69 (14,9 -> 6,9/min) med 400 ms;
+toningen faller till skarpt pga ljuskravet i 95 av 4760 glidbara byten (2 %); resten av hoppen = drop/mini/fastLight (38) och nytända (52).
 
 ## Från kvällen 2026-10-14 - NY LÅNGINSPELNING MED ÄGARENS MARKERINGAR (går före allt annat)
 tools/ladan-2026-10-14/lang-20261014T161434.wav (+ .events.json, marks.jsonl; gitignorerad, ligger lokalt): 18:14:34-18:24:34, 10 min,
@@ -14,6 +16,12 @@ ladans nivå, kod = main med sektionsstandarden (RUN 5/RUN_IN 3/CARRY 20), TRUST
 mini 447, drop 530, drop 598. GÖR: kör konsertReplay --delad-cfg --step 5 + dropTiming på filen; jämför showens drops/minidrops mot
 markeringarna (träff/miss/falsk, fördröjning) och mot events.json (det som hände live); sektionMatt på filen (fladder, intro-andel).
 Rapportera vad markeringarna säger om drop-/minidrop-gränsen (ägaren tryckte Drop! 8 ggr på 10 min - fler än showens ~0,3/min?).
+KLART 2026-10-15 (nattagenten): live-takt (dropTiming --step 5). Showen gav full drop vid 2/8 drop-markeringar (273, 597); 5 av de 6 övriga
+låg på analysatorns fyrning (±1,1 s) efter bara 1,1-2,0 s basbreak (en takt) och blev minidrop pga flankens 4 s-krav; 341 = minidrop.
+Mini-markeringar: 2/5 fick minidrop-look (262 blev drop, 304), 3/5 inget (67, 181 = bara nästan-drop 73 %, 447). Omarkerad show-drop: 333.
+Analysatorns miniDropCount räknar i skurar (140 på 10 min) -> analysator-fynd 10-15. Idé byggd: DMX_FLANK_SHORT_S=1 (opt-in, 9f417c0):
+break >= 1 s räcker om breaket ligger >= 24 dB under taket -> 7/8 drop-markeringar, 1 mini-markering blir drop; 23 filer 0,31 -> 0,72/min,
+rätt 34 -> 87, falska 3 -> 7. REDO FÖR LADAN: `python tools/ladan.py --env DMX_FLANK_SHORT_S=1`. NÄSTA: de 3 missade minidrop-markeringarna.
 
 ## Från kvällen 2026-10-14 - SEKTIONSPROVET GODKÄNT I LADAN (går före allt annat)
 LIVE 17:57 (main 983d76b + ladan.conf DMX_SECTION_RUN=5, DMX_SECTION_RUN_IN=3, DMX_SECTION_CARRY=20). Ägaren i ladan: "mycket go känsla nu".
