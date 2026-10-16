@@ -4,8 +4,9 @@
 LIVE 15:23/15:3x (main 1d5a3de + ladan.conf DMX_FLANK_SHORT_S=1, DMX_STOP_MINI_S=0.6; deploy med nyckel ~/.ssh/id_pidmx, 97da1f6).
 Ägaren: 'dropparna känns bra' (kort break), 'minidropparna känns bra, behåll stopp-minidroppen'. GÖR: lyft båda till kodens standard
 i effects.ts (FLANK_SHORT_S 1, STOP_MINI_S 0,6; =0 = av), bevisa natt --snabb + dropTiming --step 5 bit-identiska med env-proven, commit,
-och skriv i rapporten att nästa deploy är `python tools/ladan.py` utan --env (tömmer ladan.conf). DMX_BASS_SUBKICK=1 är INTE prövad i ladan
-(och lotus-omdömet 10-15 gällde gamla koden - bass-body kom aldrig ut på lotus-Pi:n).
+och skriv i rapporten att nästa deploy är `python tools/ladan.py` utan --env (tömmer ladan.conf).
++ ~15:5x DMX_BASS_SUBKICK=1 LIVE ihop med de två, ägaren: 'sub+kick känns bättre, behåll den' -> lyft även den till standard (basenergin
+ur sub+kick; =0 = bodyDb som förr), samma bevis. (Lotus-omdömet 10-15 gällde gamla koden - bass-body kom aldrig ut på lotus-Pi:n.)
 
 ## Från kvällen 2026-10-15 - LOTUS: BASEN SOM DMX, SUB+KICK GODKÄND I KÄLLAREN (porterat, opt-in, ej deployat i ladan)
 Lotus fick DMX:s basenergi (LOTUS_BASS_BODY, lotus a5e972d/668ffc3). Ägaren: =1 (baskroppen 20-250 Hz) 'lite mörkare, ok, men följer inte bara
