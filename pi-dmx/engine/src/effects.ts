@@ -1998,7 +1998,8 @@ export class EffectEngine {
       const highEntry = sec === 'high' && this.fogLastSec !== '' && this.fogLastSec !== 'high';
       if (sec) this.fogLastSec = sec;
       const hungry = FOG_HUNGRY_S > 0 && fog.onDrop && nowWall - this.lastFogWall > FOG_HUNGRY_S * 1000;
-      const wantBurst = (dropHitRaw && fog.onDrop) || manualFog || wantFogFx || (hungry && highEntry);   // (miniHit var alltid falskt i konsertläget)
+      const miniNow = this.lastMiniWall === nowWall;   // fireMini satte looken i denna ruta (10-16: förr analysatorns miniHit, alltid falskt i konsertläget -> minidrop gav aldrig hungrig rök)
+      const wantBurst = (dropHitRaw && fog.onDrop) || manualFog || wantFogFx || (hungry && (miniNow || highEntry));
       if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;   // engångs-flagga
       const spraying = this.out.fogTick(nowWall, _dtT * 1000, wantBurst, fog, manualFog);
       if (spraying && !this.fogWasSpraying) this.lastFogWall = nowWall;   // puffen startade (vilken orsak som helst)
