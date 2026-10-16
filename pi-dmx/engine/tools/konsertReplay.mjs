@@ -8,6 +8,7 @@
  *  --trace (10-12, energikedjan): varje renderruta (40 Hz) som Float32 x 10: t, sektion (0 intro 1 low 2 build 3 high 4 break 5 annat),
  *  lampa 0..3 (starkaste kanalen efter kalibreringen, 0..1), bodyDb, diskant-dB (specAbs treble+air), drop-look (dropColEnv>0 eller
  *  minidrop-looken), energin (eBass). Mäts med tools/energiMatt.mjs.
+ *  --bas-ref subkick (10-16): trace-kolumnen 'bas' = sub+kick (20-120 Hz, medel av sub- och kick-dB som DMX_BASS_SUBKICK) i stället för bodyDb.
  */
 import { readFileSync, writeFileSync } from "node:fs";
 const args = process.argv.slice(2);
@@ -40,7 +41,7 @@ let tNow = 0; const LOG = [];
 console.log = (...a) => { const s = a.join(" "); if (/^\[dirigent\]/.test(s)) LOG.push([+tNow.toFixed(2), s.slice(11, 140)]); };
 const buf = new Float32Array(HOP);
 let lastRender = -1, lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0, lastRow = -1;
-const TRACE = opt("--trace", null) ? [] : null; const SEC = { intro: 0, low: 1, build: 2, high: 3, break: 4 };
+const TRACE = opt("--trace", null) ? [] : null; const REF_SK = opt("--bas-ref", "body") === "subkick"; const SEC = { intro: 0, low: 1, build: 2, high: 3, break: 4 };
 const ROWS = [];   // [t, look, why, sec, int, light, nLit, drops, near, lift, miniLook, upgrades, bpm]
 let acc = { light: 0, nLit: 0, n: 0, mini: 0, hi: 0, lo: 9, top: 0 };
 for (let off = 0; off + HOP <= nSamples; off += HOP) {
@@ -60,7 +61,7 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
   lastRender = ms; eng.render(fr); const u = eng.universe; if (!u) continue;
   const lv = lamps.map((L) => Math.max(u[L.r] ?? 0, u[L.g] ?? 0, u[L.b] ?? 0) * (L.dim >= 0 ? u[L.dim] / 255 : 1));   // verkligt ljus = färg x dimmer
-  if (TRACE) { const sa = fr.specAbs ?? {}; TRACE.push(tS, SEC[fr.section] ?? 5, lv[0] / 255, lv[1] / 255, lv[2] / 255, lv[3] / 255, fr.bodyDb ?? -90,
+  if (TRACE) { const sa = fr.specAbs ?? {}; TRACE.push(tS, SEC[fr.section] ?? 5, lv[0] / 255, lv[1] / 255, lv[2] / 255, lv[3] / 255, REF_SK && sa.sub != null ? (20 * Math.log10(sa.sub + 1e-7) + 20 * Math.log10(sa.kick + 1e-7)) / 2 : fr.bodyDb ?? -90,
     20 * Math.log10((sa.treble ?? 0) + (sa.air ?? 0) + 1e-7), (eng.dropColEnv ?? 0) > 0.005 || ms < eng.miniBangUntil ? 1 : 0, eng.eBass ?? eng.eSm ?? 0); }
   { const L = lv.reduce((a, b) => a + b, 0) / (4 * 255), T = Math.max(...lv) / 255; acc.light += L; acc.top = (acc.top ?? 0) + T; if (T > acc.hi) acc.hi = T; if (T < acc.lo) acc.lo = T; }
   acc.nLit += lv.filter((x) => x > 0.3 * 255).length; acc.n++;   // hi/lo/top = ljusaste lampan
