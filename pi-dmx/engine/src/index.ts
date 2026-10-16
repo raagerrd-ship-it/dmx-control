@@ -29,6 +29,7 @@ import { applyIntensity, migrateFromMoods } from "./moods.js";
 import { BeatFeed } from "./beatFeed.js";
 import { LongRecord } from "./longRecord.js";
 import * as health from "./runtimeHealth.js";
+import { noteRenderMs } from "./perfStats.js";   // GC/rendering/loop alltid på, GET /api/perf (10-16)
 import { logHealth } from "./healthLog.js";
 
 
@@ -265,7 +266,8 @@ function renderAndSend(): void {
     const universe = effects.render(latestFrame);
     probeSample(universe);
     dmx.send(universe, curSlots);
-    if (diag) health.noteSlowCall("render+dmx", performance.now() - lastRenderMs);
+    const rdMs = performance.now() - lastRenderMs; noteRenderMs(rdMs);   // perfStats: alltid (två klockanrop per ruta)
+    if (diag) health.noteSlowCall("render+dmx", rdMs);
 
     // Spara ramen så fallback-ticken har något att tona ned om ljudet dör.
     if (!lastUniverse || lastUniverse.length !== universe.length) {

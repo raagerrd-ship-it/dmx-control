@@ -26,6 +26,7 @@ import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, EFFECT_META } from "./effects/registry.js";
 import { logHealth, getHealthLog } from "./healthLog.js";
 import { getRuntimeHealth, getAnalyserCost } from "./runtimeHealth.js";
+import { getPerf } from "./perfStats.js";
 
 
 // Version hämtas från package.json vid startup — ingen build-tid-magi, bara en
@@ -254,6 +255,8 @@ export async function startServer(
   });
   // ÄGARENS MARKERING (facit): POST {kind:'mini'|'drop'} - se LongRecord.mark.
   app.post("/api/mark", async (req) => deps.longRecord?.mark(String(((req.body ?? {}) as Record<string, unknown>).kind ?? 'mini')) ?? { ok: false });
+  // GC-stopp per sort, renderingstid och händelseloopens fördröjning per minut - alltid på (perfStats.ts, 10-16)
+  app.get("/api/perf", async () => getPerf());
   app.get("/api/health-log", async () => ({
     version: PKG_VERSION,
     now: Date.now(),
