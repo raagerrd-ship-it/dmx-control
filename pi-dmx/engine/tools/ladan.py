@@ -94,6 +94,7 @@ REMOVE = [
     '/etc/systemd/system/audio-dmx-engine.service.d/dwell.conf', '/etc/systemd/system/audio-dmx-engine.service.d/zz-dynamik.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/drop.conf', '/etc/systemd/system/audio-dmx-engine.service.d/tempo.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/lotus.conf',
+    '/etc/systemd/system/audio-dmx-engine.service.d/zz-semi16.conf',   # A/B 2026-10-16: semi-space 16 MB (lagd for hand) - nasta deploy backar till heap.conf (4 MB)
     '/etc/systemd/system/audio-dmx-engine.service.d/ladan.conf',   # forra provet byts ut (REMOVE kor fore conf-skrivningen)
     '/etc/systemd/system/audio-dmx-engine.service.d/hjarta.conf', '/etc/systemd/system/audio-dmx-engine.service.d/energi.conf',
     '/etc/systemd/system/audio-dmx-engine.service.d/sektion.conf', '/etc/systemd/system/audio-dmx-engine.service.d/zzz-lugn.conf',
