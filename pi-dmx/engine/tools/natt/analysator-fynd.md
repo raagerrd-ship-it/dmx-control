@@ -15,6 +15,19 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-16 Analysatorns skräp (GC) – huvudtrådens näst största källa
+Vad: DMX-ägaren jagar GC-stopp (live GET /api/perf: ~15 minor-GC/min, längsta 6–10 ms; stora 27–63 ms bara de första minuterna efter
+start). Allokeringsprofil (DMX tools/allocProf.mjs = V8:s samplande heap-profilerare inkl. bortstädade objekt, konsertReplay --delad-cfg
+--step 5, lang-20261014T161434.wav): motorn 1,9 MB per s ljud över 10 min, analyser.js 29 % (560 kB/s) - de första 3 min 1,4 MB/s (39 %,
+uppvärmningen). Per funktion (10 min, kB per s ljud): bigStep 152, computeBpm 106, process 100, scoreEnv 46, sectionBlock 41, dropStep 39,
+fillFrame 15, intensityStep 14, riserStep 11, kickStep 9; under uppvärmningen process 292, bigStep 471, scoreEnv 162, computeBpm 152, dropStep
+106. Var (konkret, sectionBlock): per block `new Float32Array(FP2_DIM)` (REPEAT-grenen), `terms`-arrayen av objekt + closuren `add` per block,
+`D.slice().sort(...)` per block. Övriga funktioner: profileraren ger funktion, inte rad - kör `node tools/allocProf.mjs <wav>` i dmx-control
+för samma lista. DMX kör analysatorn i HUVUDTRÅDEN (ingen DMX_ANALYSER_SPLIT), så dess skräp delar GC med renderingen.
+Önskat: återanvända buffertar/objekt i de heta stegen (bigStep, computeBpm, process, scoreEnv, dropStep) och i sectionBlock, bit-identiskt
+(paritet + bänk 396/503). Målet är färre minor-GC per minut, inte ändrade värden.
+Status:
+
 ## ÖPPET 2026-10-15 miniDropCount räknar i skurar var 0,4-0,5 s (27 st på 13 s)
 Vad: ladans live-events 10-14 18:14 (tools/ladan-2026-10-14/lang-20261014T161434.events.json, kolumn miniDropCount, fr.miniDropCount)
 ökar 27 gånger på 288-301 s och 18 gånger på 333-337 s (var 0,23-0,5 s), och var ~2,5 s genom hela 448-568 s (50 st) - totalt 140 på
