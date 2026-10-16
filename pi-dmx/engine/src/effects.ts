@@ -61,6 +61,10 @@ const MINI_LIFT_MS = Number(process.env.DMX_MINI_LIFT_MS ?? 4000), MINI_LIFT_FAL
  *  inget kick- eller över-toppen-krav. Ensam: 72 % av fyrningarna på ett ihållande baslyft, fångar 85 %, latens 0,11 s; fyrar vid
  *  alla sju av ägarens markeringar. Lyftet (+ sektionslyftet) är nu ENDA källan till minidrop-looken. */
 const LIFT_DB = Number(process.env.DMX_LIFT_DB ?? 10), LIFT_REFRACT_MS = Number(process.env.DMX_LIFT_REFRACT_MS ?? 8000);
+/** STOPP-MINI (opt-in DMX_STOP_MINI_S, natt 10-16, ägarens mini-markeringar lang-1014 67/181/447 s): basen borta en kort stund mitt i låten
+ *  (baskroppen > 12 dB under 8 s-normalnivån i minst STOP_MINI_S s, högst 3 s) och tillbaka till normalnivån i refrängen (sektion high) = ett 'stopp' före nästa fras ->
+ *  minidrop-looken (600 ms, utan minidropens energilyft). Nästan-dropen ger inget ljus i konsertläget och energilyftet ser inte en dipp som går tillbaka till samma nivå. 0 = av. */
+const STOP_MINI_S = Number(process.env.DMX_STOP_MINI_S ?? 0);
 const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math.max(0, Math.min(1, Number(process.env.DMX_MINI_UNI ?? 1)));
 // (EFFEKTEN LEDER/CONCERT_E_FLOOR, VARJE SLAG/CONCERT_BEAT, BASSLAGEN/CONCERT_KICK och BASSLAGEN I ENERGILAGRET/KICK_E borttagna 10-12:
 //  ersatta av BASENERGIN, se B_CURVE.)
@@ -543,7 +547,7 @@ export class EffectEngine {
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
   private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
   private secCeil = 1; private histAt = -1e12; private liftHistAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
-  private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist: number[] = []; private liftAt = -1e12; liftCount = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
+  private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist: number[] = []; private liftAt = -1e12; liftCount = 0; private stopRunS = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
@@ -1199,6 +1203,17 @@ export class EffectEngine {
       }
       if (sec === 'high') this.lastHighWall = nowWall;
       if (sec !== '') this.prevRawSec = sec;
+    }
+    if (STOP_MINI_S > 0 && CONCERT && this.nearB !== null) {   // STOPP-MINI (se STOP_MINI_S)
+      if (this.nearB < this.nearNorm - 12) this.stopRunS += dtNow;
+      else if (this.nearB >= this.nearNorm - 1) {
+        if (this.stopRunS >= STOP_MINI_S && this.stopRunS <= 3 && frame.section === 'high' && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && sinceStart > START_DROP_MUTE_MS) {
+          this.liftCount++; this.lastMiniWall = nowWall; this.miniSector = mixedSector(this.liftCount + 7);
+          this.miniBangUntil = nowWall + MINI_BANG_MS;   // utan MINI_LIFT: basen är redan tillbaka på normalnivån (lyftet tog r_bas_hp i refrängen 0,42 -> 0,38)
+          if (isLogOn()) console.log(`[dirigent] stopp-mini: basen borta ${this.stopRunS.toFixed(2)} s`);
+        }
+        this.stopRunS = 0;
+      }
     }
     if (CONCERT && this.nearB !== null) {   // ENERGILYFT (se LIFT_DB)
       const h = this.liftHist; if (nowWall - this.liftHistAt >= 25) { this.liftHistAt = nowWall; h.push(this.nearB); if (h.length > 240) h.shift(); }   // 6 s i 25 ms-rutor AV TID (se HISTORIKEN)
