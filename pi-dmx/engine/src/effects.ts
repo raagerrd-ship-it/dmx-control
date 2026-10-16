@@ -255,8 +255,6 @@ const MIX_UNSEEN_BONUS = Number(process.env.DMX_MIX_UNSEEN_BONUS ?? 0.10);
  *      start, i stallet for gyllene snittets turordning - sa varje look som alls kommer i fraga till slut far sin tur. */
 const ALLA_BUILD_S = 1.5;
 
-/** Drops ignoreras helt så länge — täcker påslaget och de första takterna. */
-const START_DROP_MUTE_MS = 3000;
 /** HELA SHOWENS FÖRSPRÅNG mot musiken — hjärtslag, grid-byten, takträknare.
  *  Analysatorns eget ankare (`cfg.beat.anchorMs`) är och förblir sanningen om var
  *  slaget ligger i LJUDET; den dömer kickar och drops mot det och får aldrig
@@ -317,7 +315,6 @@ const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)
 // dropogonblicket (high forst efterat) -> grinden pa 0,25 nekade 7/12 pop- och 11/32 megamix-drops, dvs nastan allt (live i ladan
 // 09-21 kvall). Vill man ha en lugn-grind: analysatorns DMX_DROP_CALM_GATE=1 DROP_CALM_LAND_MS=300 (tappar inget, 300 ms sen i low).
 const DROP_CALM_BUILD = Number(process.env.DROP_CALM_BUILD ?? 0.25);
-const DROP_SONG_HOLD_S = Number(process.env.DMX_DROP_SONG_HOLD_S ?? 0);   // 30 -> 0 (agaren 10-11: inga timrar pa riktig drop - snavt mal i analysatorn i stallet)
 const LEVEL_RAMP = 2, LEVEL_RAMP_FALL_S = 2;   // fullt ljus vid 2 x släckgränsen (3 x dämpade versen 40 %, 2 x 19 %, refrängen 3 %); nivån sjunker mjukt på 2 s (se RAMPEN OVANFÖR SLÄCKGRÄNSEN)
 /** FULL DROP PÅ FLANKEN (STANDARD sedan 10-13 efter ägarens öga i ladan: 'droparna känns bra, på smällen'; DMX_FLANK_DROP=0 = gamla vägen. Infördes 10-12 efter ägarens 'bara var 3:e träffar rätt' och 'hellre öka gränsen till riktig drop,
  *  bara minidrops kör vidare'). Mätt (tools/dropTiming.mjs + dropTimingStat.mjs, 23 ladan-inspelningar, 141 min): analysatorns drop kräver
@@ -440,7 +437,6 @@ export class EffectEngine {
   private showTime = 0;      // ackumulerad "show-tid" — accelererar under uppbyggnaden (riser)
   private lastShowMs = 0;
   private lastKickBoost = 0;
-  private songStartWall = Date.now();
      // lotus-porten (se LOCK_BEATS)
   private showVel = 0;       // extra show-tids-hastighet från bastransienter (akustisk tröghet)
   private pendingKick = 0;   // ackumulerade kick-impulser sedan förra rendern (fylls i 375 Hz)
@@ -545,9 +541,9 @@ export class EffectEngine {
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
-  private nearB: number | null = null; private nearNorm = 0; private nearHist: number[] = []; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
-  private secCeil = 1; private histAt = -1e12; private liftHistAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
-  private lastMiniCount = 0; private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist: number[] = []; private liftAt = -1e12; liftCount = 0; private stopRunS = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
+  private nearB: number | null = null; private nearNorm = 0; private nearFloor = 1e9; private liftCalm = 0; private liftLift = 0; private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
+  private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+  private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist: number[] = []; private liftAt = -1e12; liftCount = 0; private stopRunS = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
@@ -598,12 +594,9 @@ export class EffectEngine {
    * första sekunderna är nästan alltid att LJUDET slogs på, inte att musiken
    * gjorde något: nivån går från noll till full på ett ögonblick, vilket är
    * exakt vad en drop-detektor letar efter.
-   * Sätts av index.ts när en känd låt låser tidigt i tidslinjen, och av
-   * tystnadsgrindens flank här nedan när ljudet kommer tillbaka (okända låtar).
+   * (songStartAt/noteSongStart/START_DROP_MUTE_MS och DMX_DROP_SONG_HOLD_S borttagna 10-16: noteSongStart anropades aldrig, spärren var
+   *  standard 0 - ägaren 10-11 'inga timrar på riktig drop'.)
    */
-  private songStartAt = 0;
-  /** Låten började — tona in ljuset och ignorera drops en stund. */
-  noteSongStart(): void { this.songStartAt = performance.now(); }
   /** LÅTMANUS: sektionstyp -> låtens look för den (se MANUS_REL). Glöms bara på en verklig låtgräns (softenRange). */
   private manus = new Map<string, Mode>(); private manusHist = new Map<string, Mode[]>();   // manusHist: MANUS_RETURN, sektionens looker i låten
   private songPal = -1;   // LÅTMANUS: låtens kulörfamilj (palettindex), -1 = väljs vid nästa sektion
@@ -611,7 +604,7 @@ export class EffectEngine {
 
   /** Misstänkt låtbyte → låt auto-rangen kalibrera om snabbt mot nya nivåer. */
   softenRange(): void {
-    this.songStartWall = Date.now(); this.songPal = -1; this.songNo++; this.manusTog = null;
+    this.songPal = -1; this.songNo++; this.manusTog = null;
     if (this.manus.size) { for (const [k, m] of this.manus) this.prevSongLook.set(k, m); console.log(`[dirigent] latgrans: nytt manus (forra: ${[...this.manus].map(([k, m]) => k + '=' + m).join(' ')})`); this.manus.clear(); this.manusHist.clear(); }
   }   // (rullande nivarangen borttagen 10-08 - den matade bara DIM-taket)
 
@@ -774,11 +767,17 @@ export class EffectEngine {
     this.kickCount++;
   }
 
+  /** MINIDROP-LOOKEN, EN VÄG IN (10-16; förr fyra kopior): räknaren, spärren mot nästa (MINI_GAP_MS), kulören, looken (MINI_BANG_MS)
+   *  och - utom stopp-minin - energilyftet (MINI_LIFT_MS). setLiftAt: energilyftets refraktärtid räknas från denna. */
+  private fireMini(nowWall: number, setLiftAt: boolean, lift: boolean): void {
+    if (setLiftAt) this.liftAt = nowWall;
+    this.lastMiniWall = nowWall; this.liftCount++; this.miniSector = mixedSector(this.liftCount + 7);
+    this.miniBangUntil = nowWall + MINI_BANG_MS; if (lift) this.miniLiftUntil = nowWall + MINI_LIFT_MS;
+  }
   /** SPÄRRAD DROP = MINIDROP (10-12): drop inom SHOW_DROP_GAP_MS från förra -> minidrop-looken + lyftet i stället. */
   private gapMini(nowWall: number): void {
     if (nowWall - this.lastMiniWall < MINI_GAP_MS) return;
-    this.lastMiniWall = nowWall; this.liftCount++; this.miniSector = mixedSector(this.liftCount + 7);
-    this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + MINI_LIFT_MS;
+    this.fireMini(nowWall, false, true);
     if (isLogOn()) console.log('[dirigent] drop inom spärren -> minidrop');
   }
 
@@ -789,10 +788,13 @@ export class EffectEngine {
     // Konsumera kick-flanken EN gång per render (se kickCount ovan).
     const kickHit = this.kickCount !== this.lastKickSeen;
     this.lastKickSeen = this.kickCount;
-    const _np = performance.now();
-    if (this.lastShowMs === 0) this.lastShowMs = _np;
-    const _dtT = Math.min(0.1, (_np - this.lastShowMs) / 1000);
-    this.lastShowMs = _np;
+    // EN KLOCKA PER RUTA (10-16): tidpunkterna och tidssteget läses EN gång och återanvänds i hela renderingen (förr ~12 klockanrop
+    // och tre tidssteg per ruta - show-tidens, drop-envelopernas och vågens - samma värde räknat tre gånger, 200 ggr/s på Pi:n).
+    const nowP = performance.now(), nowWall = Date.now();
+    const dtSec = Math.max(0, Math.min(0.1, (nowP - this.lastRenderMs) / 1000));   // aldrig negativt (klockhopp)
+    this.lastRenderMs = nowP;
+    const _dtT = this.lastShowMs === 0 ? 0 : dtSec;   // show-tiden startar på 0 första rutan (som förr)
+    this.lastShowMs = nowP;
     // AKUSTISK TRÖGHET (fluid friction): mönstren flyter i en trög vätska. Varje
     // bastransient ger show-tiden en IMPULS framåt; "vätskefriktionen" bromsar
     // sedan mjukt tillbaka till normaltempo → vågor/eld/aurora RYCKER till och
@@ -805,7 +807,7 @@ export class EffectEngine {
     // upp till 2.5× snabbare vid full uppbyggnad + kick-ryck ovanpå
     this.showTime += _dtT * (1 + Math.max(frame.buildUp, this.buildProg) * 1.5 + this.showVel);
     const t = this.showTime;
-    if (kickHit) this.lastKickBoost = performance.now();
+    if (kickHit) this.lastKickBoost = nowP;
 
     // BPM-taktklocka → förutsagt slag: pulsa i låtens exakta tempo, fas-låst av
     // beat-PLL:en (index.ts riktar ankaret mot faktiska kicks). Bättre än ren
@@ -820,9 +822,10 @@ export class EffectEngine {
     // slår vidare på senaste takten genom svackan. Djupet är golvat (BEAT_TRUST_FLOOR)
     // så den syns, och energiskalningen (calm/intensity) dämpar den ändå i tysta partier
     // så den inte strobar i tystnad. En puls på ~rätt takt är långt bättre än ingen.
+    const beatMs = beatPeriod(beat);   // EN taktperiod per ruta (förr räknad fyra gånger)
+    const hasBeat = beatLocked(beat), rawBeatMs = beat && beat.bpm > 0 ? 60000 / beat.bpm : 0;
     if (beat && beat.bpm > 40) {
-      const beatMs = beatPeriod(beat);
-      const now2 = Date.now();
+      const now2 = nowWall;
       const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
       // PRESENTATIONSTAKT: över PULSE_HALVE_ABOVE_BPM pulsar hjärtslaget på varannat
       // slag (hysteres nedåt så gränsen inte flappar). Taktklockan, beatTick och alla
@@ -925,7 +928,7 @@ export class EffectEngine {
     // EFFEKTERNA faller däremot tillbaka på verkliga kicks, se beatHit längre ner —
     // de byter bild, de slår inte takt.)
     const kickEnv = Math.max(
-      Math.max(0, 1 - (performance.now() - this.lastKickBoost) / 250),
+      Math.max(0, 1 - (nowP - this.lastKickBoost) / 250),
       beatEnv * 0.8,
     );
 
@@ -993,8 +996,6 @@ export class EffectEngine {
       return this.universe;
     }
 
-    const nowWall = Date.now();
-
         // Normalize against the AGC target so "at target loudness" = full drive —
         // the AGC otherwise parks the level around ~0.5 and v never reaches 1.
         const audio = Math.min(1, (frame.level / Math.max(0.15, this.cfg.detection.autoGainTarget)) * (0.35 + this.cfg.sensitivity * 0.5));
@@ -1060,8 +1061,9 @@ export class EffectEngine {
     // hjärtslaget otydligt. Så: ingen per-slag-bloom när låst — bloomen är kvar
     // för DROPS (sustained-svallet + dropEnv). Olåst: kicken är enda taktcuen,
     // behåll bloomen på den. (Ägaren live 2026-09-02: flimmer + otydligt slag.)
-    const punchLocked = this.beatTrust > 0.5;
-    const kickHitFast = Math.max(0, 1 - (performance.now() - this.lastKickBoost) / 180);
+    const beatOk = this.beatTrust > 0.5;   // EN tillitsgrind per ruta: punchen, chase-steget och drops-effekten
+    const punchLocked = beatOk;
+    const kickHitFast = Math.max(0, 1 - (nowP - this.lastKickBoost) / 180);
     // DUNK-RATIO (Gemini): anslag/energi i låg-enden — hög = knivskarp kick, låg =
     // smetig ihållande basnot. Grinda den UTJÄMNADE bas-svallen mjukt av den så bara
     // riktiga transienter driver punch (de snabba kick-delarna fyrar ändå).
@@ -1088,7 +1090,7 @@ export class EffectEngine {
     // jämför mot vårt senast hanterade värde → flanken kan ALDRIG missas trots att
     // rendern går långsammare än analysen (en enframs-boolean hade aliaserats bort).
     // Här ligger bara show-REAKTIONEN: accent-fönster, blackout, rök, envelope.
-    const dtNow = Math.max(0, Math.min(0.1, (performance.now() - this.lastRenderMs) / 1000));   // aldrig negativt (klockhopp; banker som byter klocka efter konstruktion gav NaN i nivan)
+    const dtNow = dtSec;   // (se EN KLOCKA PER RUTA)
     let dropHitRaw = frame.dropCount !== this.lastDropCount;
     this.lastDropCount = frame.dropCount;
     if (FLANK_DROP) {   // FULL DROP PÅ FLANKEN: motorns egen flank är drop-källan; analysatorns drop utan egen flank inom 2 s = minidrop
@@ -1109,9 +1111,6 @@ export class EffectEngine {
     // 20 s-spärr (DROP_LONG_MS) räknar bara sina egna). Konsertläget: ingen drop inom SHOW_DROP_GAP_MS från förra, oavsett källa.
     const dropGapMs = DROP_MIN_GAP_S > 0 ? DROP_MIN_GAP_S * 1000 : CONCERT ? SHOW_DROP_GAP_MS : 0;
     if (dropGapMs > 0 && dropHitRaw) { if (nowWall - this.lastShowDropWall < dropGapMs) { dropHitRaw = false; this.dropCalmDenied++; if (CONCERT) this.gapMini(nowWall); } else this.lastShowDropWall = nowWall; }   // spärrad drop -> minidrop (ägaren 10-12: 'tidsspärren skall gälla riktiga bara, så kör den annars som minidrop')
-    if (DROP_SONG_HOLD_S > 0) {
-      if (dropHitRaw && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000) { dropHitRaw = false; this.dropCalmDenied++; }
-    }
     if (this.upgradeHit) { this.upgradeHit = false; if (!(CONCERT && nowWall - this.lastShowDropWall < SHOW_DROP_GAP_MS)) { dropHitRaw = true; this.lastShowDropWall = nowWall; this.buildUpgrades++; } else this.gapMini(nowWall); }   // BUILD SOM LANDAR: forra rutans nastan-drop efter en build
     let dropHit = dropHitRaw;
     if (CONCERT && dropHit) this.dropLiftUntil = nowWall + DROP_LIFT_MS;   // DROPEN BÄR IN I REFRÄNGEN
@@ -1125,13 +1124,8 @@ export class EffectEngine {
       if (lvl < this.preDropLevel * DROP_LAND_GAIN + 0.02) { this.dropEnv = 0; this.dropLiftUntil = 0; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
     }
     // (drop-snapp till takten forkastad 09-12: taktlaset resettas vid drops, slog aldrig till / gjorde drops sena.)
-    const miniCount = frame.miniDropCount ?? 0;
-    const miniHitRaw = miniCount !== this.lastMiniCount;   // monoton raknare -> flanken kan inte aliaseras bort
-    this.lastMiniCount = miniCount;
-    // Minidrop direkt; en riktig drop samma ruta gar fore (och tar annars over via dropEnv/dropColEnv).
-    let miniHit = false;
-    if (miniHitRaw && !dropHitRaw && (CONCERT || !(DROP_SONG_HOLD_S > 0 && nowWall - this.songStartWall < DROP_SONG_HOLD_S * 1000))) miniHit = true;   // konsertlaget: latens forsta 30 s sparrar bara riktiga drops   // direkt (ingen vantan)
-    if (CONCERT) miniHit = false;   // V123 (10-11 kväll): analysatorns minidrops (17/min) är ingen minidrop i konsertläget - bara energilyftet/sektionslyftet ger looken
+    // (analysatorns minidrop-räknare frame.miniDropCount läses inte: V123 10-11 kväll - 17/min, ingen minidrop i konsertläget; bara
+    //  energilyftet, sektionslyftet, stopp-minin och spärrad drop ger looken, alla via fireMini)
     // DROPEN AR EN SMALL, INTE EN PLATA. Hallet var 2s och uttoningen 1s, alltsa
     // ~3s full blast per drop — och eftersom dropEnv KRINGGAR VU-taket (se
     // ceilMul nedan) ar det de enda ogonblick riggen gar till max.
@@ -1143,8 +1137,7 @@ export class EffectEngine {
     // 2000ms kandes som for mycket max-ljus, 800ms som for kort - 1300ms ar
     // mitten. Har ar anvandarens oga ratt matinstrument: hur lange en drop ska
     // halla ar en upplevelseparameter, inte en troskel att mata fram.
-    const sinceStart = this.songStartAt ? performance.now() - this.songStartAt : 1e9;
-    if (dropHit && sinceStart > START_DROP_MUTE_MS) this.dropBangUntil = nowWall + 700;   // 1300 -> 700 (ladan 10-11 22:0x, ägaren: 'huvuddrop, vi kan nog minska tiden den är på'); uttoningen 1 s orörd
+    if (dropHit) this.dropBangUntil = nowWall + 700;   // 1300 -> 700 (ladan 10-11 22:0x, ägaren: 'huvuddrop, vi kan nog minska tiden den är på'); uttoningen 1 s orörd
     // DROP-BLACKOUT (dramaturgisk tystnad): en riser som BRYTS ner i en svacka
     // strax före dropen → tvinga kolsvart i max 250ms. Svärtan STARTAR på
     // svackans flank (bara om vi faktiskt byggt upp: buildUp>0.35) och SLÄPPS i
@@ -1168,7 +1161,6 @@ export class EffectEngine {
     // DROP-ENVELOPE: FULL ATTACK (~30ms) på träffen, HÅLL allt på max under
     // dropen, mjuk FADE ner (~1s) när den släpper. Egen effekt — INGEN
     // hårdvaru-strobe (det gav strobe-känslan), bara ljus + färg på max.
-    if (miniHit && !dropHit && sinceStart > START_DROP_MUTE_MS) this.miniBangUntil = nowWall + MINI_BANG_MS;
     const miniActive = nowWall < this.miniBangUntil;
     let dTarget = dropActive ? 1 : miniActive ? MINI_DROP_ENV : 0;
     this.nearHit = false;   // bara rutan da nastan-dropen fyrar (lases av dirigenten langre ner i samma ruta)
@@ -1180,12 +1172,23 @@ export class EffectEngine {
       this.nearNorm += (this.nearB - this.nearNorm) * Math.min(1, dtNow / 8);
       // HISTORIKEN I 25 MS-RUTOR AV TID, inte per rendering (drop-agenten 10-12): live renderar motorn i 200 Hz (index.ts RENDER_MS 5),
       // bänken i 40 Hz - räknat i rutor blev fönstren 5x kortare i ladan än det som mätts (energilyftet jämförde 0,12 s mot 0,4-1,2 s).
-      const pushHist = nowWall - this.histAt >= 25; if (pushHist) this.histAt = nowWall;
-      const h = this.nearHist; if (pushHist) { h.push(this.nearB); if (h.length > 60) h.shift(); }
-      let floor = 1e9; for (const v of h) if (v < floor) floor = v;
+      // EN HISTORIK (10-16): nästan-dropens botten (senaste 60 rutor = 1,5 s) och energilyftets lugn (6..2 s) läser samma lista (förr två
+      // listor med två klockor); botten och lyftet räknas bara när en ny ruta kommer (var 25:e ms), inte varje rendering.
+      const h = this.liftHist;
+      if (nowWall - this.histAt >= 25) {
+        this.histAt = nowWall; h.push(this.nearB); if (h.length > 240) h.shift();
+        let f = 1e9; for (let q = Math.max(0, h.length - 60); q < h.length; q++) if (h[q] < f) f = h[q];
+        this.nearFloor = f;
+        if (h.length >= 240) {
+          let sum = 0; for (let q = 0; q < 160; q++) sum += h[q];
+          let now6 = 0; for (let q = h.length - 24; q < h.length; q++) now6 += h[q];
+          this.liftCalm = sum / 160; this.liftLift = now6 / 24 - this.liftCalm;   // senaste 0,6 s mot 6..2 s sedan
+        }
+      }
+      const floor = this.nearFloor;
       const rise = this.nearB - floor, dip = this.nearNorm - floor;
       if (rise >= NEAR_RISE_DB && dip >= NEAR_DIP_DB && floor > -80 && this.nearB >= this.nearNorm - 1 && nowWall - this.nearAt > NEAR_REFRACT_MS   // floor > -80: inspelningsavbrott (overrun) ar ingen dipp ('sprang 107 dB', ladan 10-08)
-          && !dropActive && sinceStart > START_DROP_MUTE_MS) {
+          && !dropActive) {
         const g = Math.max(0, Math.min(1, (rise - NEAR_RISE_DB) / Math.max(1, NEAR_FULL_DB - NEAR_RISE_DB)));
         this.nearAt = nowWall; this.nearUntil = nowWall + MINI_BANG_MS; this.nearLevel = NEAR_MIN + (NEAR_MAX - NEAR_MIN) * g; this.nearCount++; this.nearHit = true;
         console.log(`[dirigent] nastan-drop: sprang ${rise.toFixed(1)} dB efter dipp ${dip.toFixed(1)} dB -> ljus ${(this.nearLevel * 100).toFixed(0)} % av en drop`);
@@ -1197,8 +1200,7 @@ export class EffectEngine {
     if (CONCERT) {
       const sec = frame.section ?? '';
       if (sec === 'high' && this.prevRawSec !== '' && this.prevRawSec !== 'high' && nowWall - this.lastHighWall > 8000 && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive) {
-        this.liftAt = nowWall; this.liftCount++; this.lastMiniWall = nowWall; this.miniSector = mixedSector(this.liftCount + 7);
-        this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + MINI_LIFT_MS;
+        this.fireMini(nowWall, true, true);
         if (isLogOn()) console.log(`[dirigent] sektionslyft: ${this.prevRawSec} -> high`);
       }
       if (sec === 'high') this.lastHighWall = nowWall;
@@ -1207,25 +1209,19 @@ export class EffectEngine {
     if (STOP_MINI_S > 0 && CONCERT && this.nearB !== null) {   // STOPP-MINI (se STOP_MINI_S)
       if (this.nearB < this.nearNorm - 12) this.stopRunS += dtNow;
       else if (this.nearB >= this.nearNorm - 1) {
-        if (this.stopRunS >= STOP_MINI_S && this.stopRunS <= 3 && frame.section === 'high' && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && sinceStart > START_DROP_MUTE_MS) {
-          this.liftCount++; this.lastMiniWall = nowWall; this.miniSector = mixedSector(this.liftCount + 7);
-          this.miniBangUntil = nowWall + MINI_BANG_MS;   // utan MINI_LIFT: basen är redan tillbaka på normalnivån (lyftet tog r_bas_hp i refrängen 0,42 -> 0,38)
+        if (this.stopRunS >= STOP_MINI_S && this.stopRunS <= 3 && frame.section === 'high' && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive) {
+          this.fireMini(nowWall, false, false);   // utan MINI_LIFT: basen är redan tillbaka på normalnivån (lyftet tog r_bas_hp i refrängen 0,42 -> 0,38)
           if (isLogOn()) console.log(`[dirigent] stopp-mini: basen borta ${this.stopRunS.toFixed(2)} s`);
         }
         this.stopRunS = 0;
       }
     }
     if (CONCERT && this.nearB !== null) {   // ENERGILYFT (se LIFT_DB)
-      const h = this.liftHist; if (nowWall - this.liftHistAt >= 25) { this.liftHistAt = nowWall; h.push(this.nearB); if (h.length > 240) h.shift(); }   // 6 s i 25 ms-rutor AV TID (se HISTORIKEN)
-      if (h.length >= 240 && nowWall - this.liftAt > LIFT_REFRACT_MS && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && !BUILD_LOOKS.includes(this.smartMode)) {   // inte under en build (stegringen hör till builden)
-        let sum = 0; for (let q = 0; q < 160; q++) sum += h[q];
-        let now6 = 0; for (let q = h.length - 24; q < h.length; q++) now6 += h[q];
-        const calm = sum / 160, lift = now6 / 24 - calm;   // senaste 0,6 s mot 6..2 s sedan
-        if (calm > -80 && lift >= LIFT_DB) {
-          this.liftAt = nowWall; this.liftCount++; this.lastMiniWall = nowWall; this.miniSector = mixedSector(this.liftCount + 7);
-          this.miniBangUntil = nowWall + MINI_BANG_MS; this.miniLiftUntil = nowWall + MINI_LIFT_MS;
-          if (isLogOn()) console.log(`[dirigent] energilyft: kropp ${lift.toFixed(1)} dB over lugnet`);
-        }
+      // 6 s i 25 ms-rutor AV TID (se HISTORIKEN); lugnet och lyftet räknas i nästan-dropens block (se EN HISTORIK)
+      if (this.liftHist.length >= 240 && nowWall - this.liftAt > LIFT_REFRACT_MS && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && !BUILD_LOOKS.includes(this.smartMode)   // inte under en build (stegringen hör till builden)
+          && this.liftCalm > -80 && this.liftLift >= LIFT_DB) {
+        this.fireMini(nowWall, true, true);
+        if (isLogOn()) console.log(`[dirigent] energilyft: kropp ${this.liftLift.toFixed(1)} dB over lugnet`);
       }
     }
     const dRate = dTarget > this.dropEnv ? dtNow / 0.03 : dtNow / 1.0;
@@ -1246,7 +1242,7 @@ export class EffectEngine {
     // Chase state machine — kick advances one step, plus a slow auto-advance
     // so it never stalls in silence. Runs regardless of mode so the head
     // stays coherent when the user switches into it.
-    const now = performance.now();
+    const now = nowP;
     // TAKTLÅST NÄR TAKTEN HÖRS. Villkoret var cfg.beat, som är sant så fort en
     // takt NÅGONSIN låsts — inte att den stämmer nu. Och auto-framryckningen låg
     // på 320 ms OAVSETT: vid 134 BPM ligger slaget på 448 ms, så auto-steget hann
@@ -1254,7 +1250,6 @@ export class EffectEngine {
     // 320 ms → chase free-rullade på ~187 BPM och stegade ~2× per takt, aldrig i
     // takt. Nu: när takten är trovärdig stegar vi PÅ slaget och auto-steget är
     // bara ett skyddsnät långsammare än det långsammaste slaget (667 ms @90 BPM).
-    const beatOk = this.beatTrust > 0.5;
     const autoAdvanceMs = beatOk ? 1200 : 320;
     const advance = beatOk ? beatTick : kickHit;
     if (count > 0 && (advance || now - this.lastChaseAdvance > autoAdvanceMs)) {
@@ -1394,7 +1389,7 @@ export class EffectEngine {
         // LÅTMANUS: sektionsbytet landar på sektionens EGET taktraster (början av takt 2, 4, 6 ... sedan sektionsstart) i stället för
         // effektklockans 16-slagsfras, vars fas är godtycklig mot låten (bänken: bytet väntade upp till 24 s efter en hållen sektion).
         const secBars = frame.sectionBars ?? 0, secBarOk = secBars > 0 && Math.floor(secBars) % 2 === 0 && secBars % 1 < 0.25;
-        const phraseOk = !PHRASE_SWITCH || !beatLocked(this.cfg.beat) || this.beatTrust < 0.5 || (liveSec && secBars > 0 ? secBarOk : (this.beatCounter % 16) === 0) || held > MIN_HOLD + phraseMs;
+        const phraseOk = !PHRASE_SWITCH || !hasBeat || this.beatTrust < 0.5 || (liveSec && secBars > 0 ? secBarOk : (this.beatCounter % 16) === 0) || held > MIN_HOLD + phraseMs;
         // MED STRUKTUR AR SEKTIONEN ENHETEN. Dwell-timern och tier-bytet ar till
         // for OKANDA latar, dar showen inte har nagot battre att ga pa. Har vi en
         // analyserad struktur ska looken sitta HELA sektionen ut — annars byter
@@ -1631,9 +1626,7 @@ export class EffectEngine {
       setPalette(PALETTE_LOCK ?? ALL_SECTORS);             // manuella lägen: obegränsad färg (om ej låst)
     }
 
-    // Advance the wave phase by dt so speed changes glide instead of jumping.
-    const dtSec = Math.min(0.1, (now - this.lastRenderMs) / 1000);
-    this.lastRenderMs = now;
+    // Advance the wave phase by dt so speed changes glide instead of jumping. (dtSec: se EN KLOCKA PER RUTA)
     // Silence gate: below threshold for 250 ms → fade the effect out over ~0.25 s
     // (aggressive so the light sits tight to the audio); music back → fade in fast.
     // The warm ambient glow (below) takes over so a gap lands on amber, not black.
@@ -1659,8 +1652,8 @@ export class EffectEngine {
     if (frame.level > silenceLevel) { this.silenceGate = 1; this.belowSince = 0; }
     else {
       const holdMs = Math.max(0, Math.min(5, this.cfg.silenceHoldS ?? 0)) * 1000;
-      if (this.belowSince === 0) this.belowSince = performance.now();
-      if (performance.now() - this.belowSince >= holdMs) this.silenceGate = 0;
+      if (this.belowSince === 0) this.belowSince = nowP;
+      if (nowP - this.belowSince >= holdMs) this.silenceGate = 0;
     }
     // Warmup-räknare för baslinjen: ackumulera medan aktiv, nollställ vid tystnad.
     if (this.silenceGate > 0.5) this.warmMs += dtSec * 1000; else this.warmMs = 0;
@@ -1670,7 +1663,7 @@ export class EffectEngine {
     // Samma sak för drops: läste frame.kick i render (100 Hz) → aliasat, OCH
     // fyrade på både kick och grid-slag → upp till 2 tändningar per takt.
     // En tändning per slag när takten hörs, annars på den edge-säkra kicken.
-    const dropAdvance = this.beatTrust > 0.5 ? beatTick : kickHit;
+    const dropAdvance = beatOk ? beatTick : kickHit;
     if (effMode === "drops" && count > 0 && dropAdvance && now - this.lastDropAdvance > 140) {
       this.lastDropAdvance = now;
       this.dropCount++;
@@ -1752,8 +1745,7 @@ export class EffectEngine {
 
     // ── EFFEKT-KONTEXT (framräknat en gång per frame; idx/fx/band muteras per
     // lampa så samma objekt återanvänds → ingen allokering i loopen) ──────────
-    const hasBeat = beatLocked(this.cfg.beat);
-    const beatFrac = beatPhase(this.cfg.beat, Date.now(), this.showLead);
+    const beatFrac = beatPhase(this.cfg.beat, nowWall, this.showLead);
     // TAKT-RÄKNARE med graceful degradation: stegar på GRID-slaget (beatTick) när
     // BPM är låst, annars på VERKLIGA kicks (frame.kick). Så grid-effekterna
     // (snap/rave/party/ripple/…) fortsätter dansa på trummorna även när BPM-låset
@@ -1779,8 +1771,7 @@ export class EffectEngine {
       const lub = Math.exp(-f / 0.10), dub = f > 0.22 ? Math.exp(-(f - 0.22) / 0.09) * 0.55 : 0;
       heartPulse = Math.max(lub, dub) * ((beatIdx & 3) === 0 ? 1 : 0.85);
     }
-    const beatMs2 = beatPeriod(this.cfg.beat);
-    const tempoDeep = Math.max(0, Math.min(1, (beatMs2 - 340) / 260));   // 0 snabbt .. 1 långsamt
+    const tempoDeep = Math.max(0, Math.min(1, (beatMs - 340) / 260));   // 0 snabbt .. 1 långsamt
     const punchFloor = 0.5 - tempoDeep * 0.42;                            // 0.5 (snabbt) .. 0.08 (långsamt)
     // Per-lampa frekvensband (driver aurora/twin + fixture.bands).
     // NU ur dubbel-FFT:ns separerade, per-band-AGC-spektrum i stället för det grova
@@ -1834,14 +1825,14 @@ export class EffectEngine {
     // UPPBYGGNADENS FÖRLOPP (ladan 10-11 22:05: "kändes inte som den laddade för en drop"): analysatorns buildUp är död på ladans
     // material (max 0,17 på 115 min), så build-effekterna trappade aldrig upp. buildProg = slag sedan sektionen blev build / 32
     // (0..1), räknat från uppbyggnadens START (inte lookens - looken kan bytas mitt i), håller över < 2 s sektionsfladder.
-    { const nw = Date.now();
+    { const nw = nowWall;
       if (frame.section === 'build') { if (this.buildSecAt === 0 || nw - this.buildSecSeen > 2000) this.buildSecAt = nw; this.buildSecSeen = nw; }
-      const beatMs = (this.cfg.beat?.bpm ?? 0) > 0 ? 60000 / this.cfg.beat!.bpm : 500;
+      const beatMs = rawBeatMs > 0 ? rawBeatMs : 500;
       this.buildProg = this.buildSecAt > 0 && nw - this.buildSecSeen <= 2000 ? Math.min(1, (nw - this.buildSecAt) / (32 * beatMs)) : 0; }
     ctx.wavePhase = this.wavePhase; ctx.buildUp = Math.max(frame.buildUp, this.buildProg);
     ctx.phaseSpread = 1 + ctx.buildUp * 2.5; ctx.punchFloor = punchFloor;
     ctx.chasePos = this.chasePos; ctx.dropFired = this.dropFired;
-    ctx.dropHue = this.dropHue; ctx.now = performance.now();
+    ctx.dropHue = this.dropHue; ctx.now = nowP;
     // BASNOTER: flank pa onset.bass (per-band anslag 0..1, adaptiv baslinje) med 90 ms cooldown -> ett steg per basnot.
     { const bo = frame.onset?.bass ?? 0;
       if (bo >= 0.30 && bo - this.prevBassOnset >= 0.10 && now - this.lastBassNoteMs >= 90) { this.bassNoteIdx++; this.lastBassNoteMs = now; }
@@ -1876,10 +1867,11 @@ export class EffectEngine {
     const inputGate = this.inputOff ? 0 : 1;   // ingangen avstangd -> morkt (del av steg 2)
     this.fxPeakNow = 0;
     const fadeK = Math.exp(-dtSec / (FADE_MIN_S / E_LIN_INV));
-    const renderNow = performance.now();
-    const fxToggle = !!EFFECT_MAP.get(effMode)?.toggle;   // toggle-effekt: ingen grundniva (se effektNiva)
+    const renderNow = nowP;
+    const fxToggle = !!effect?.toggle;   // toggle-effekt: ingen grundniva (se effektNiva)
     const fxSparse = LAMP_STAIR && (frame.section === 'low' || frame.section === 'intro') && !SPARSAM.includes(effMode) && count >= 4;   // LAMPTRAPPA (se SPARSAM)
-    const fastLight = !!EFFECT_MAP.get(effMode)?.fastLight; this.fxFast = fastLight;   // effekten skippar minsta pa-tid (EffectDef.fastLight)   // STEG 2: uttoningens tidskonstant i DMX-ljus (FADE_MIN_S x gamma fore gamman)
+    const fastLight = !!effect?.fastLight; this.fxFast = fastLight;   // effekten skippar minsta pa-tid (EffectDef.fastLight)   // STEG 2: uttoningens tidskonstant i DMX-ljus (FADE_MIN_S x gamma fore gamman)
+    const modE = modulateOf(effMode).energy, strobeVal = effMode === "strobe" ? 210 : 0;   // samma för alla lampor - en gång per ruta
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const isAnchor = useAnchor && i > 0 && i < count - 1;   // mittlamporna = ankare
@@ -1922,7 +1914,7 @@ export class EffectEngine {
       //   utgangstoning (backup fore: git-taggen backup/fore-tre-steg-2026-10-10).
       const m0 = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
       // ENERGI PER LAMPA (EffectWants.energy): effekten bestammer; osatt -> modulate.energy.
-      const useE = lampWantE ?? modulateOf(effMode).energy;
+      const useE = lampWantE ?? modE;
       // (SPOT-regeln, UNIFORM:s ovalda par och taktdippen KICK_E borttagna 10-12 - förbivägar/dubbelmodulering, se B_CURVE)
       const k = inputGate * (useE ? md : drive);
       rgb[0] *= k; rgb[1] *= k; rgb[2] *= k;
@@ -1958,7 +1950,6 @@ export class EffectEngine {
           rgb[0] = this.lampRatio[o] * fall; rgb[1] = this.lampRatio[o + 1] * fall; rgb[2] = this.lampRatio[o + 2] * fall;
         }
       }
-      const strobeVal = effMode === "strobe" ? 210 : 0;
       this.out.writeFixture(this.universe, fx, rgb, 1, strobeVal, specialty);
     }
 
@@ -1969,8 +1960,8 @@ export class EffectEngine {
     // ljuset uppe? Varje steg i kedjan loggas så orsaken kan pekas ut i stället
     // för att gissas. Strypt till var 1,5 s. Gjort utanför apply för att slippa
     // skapa ett objekt i den heta postprocess-loopen.
-    if (frame.level < 0.35 && Date.now() - this.lowLogAt > 1500) {
-      this.lowLogAt = Date.now();
+    if (frame.level < 0.35 && nowWall - this.lowLogAt > 1500) {
+      this.lowLogAt = nowWall;
       if (isLogOn()) console.log(   // strangen byggs bara nar loggen ar pa (DMX_QUIET=0)
         `[lagniva] niva ${frame.level.toFixed(3)} ` +
         ` drive ${(this.silenceGate * this.levelRamp).toFixed(2)} md ${md.toFixed(2)} e ${this.eSm.toFixed(2)} drop ${this.dropEnv.toFixed(2)}/${this.dropColEnv.toFixed(2)} fonster ${this.eLo.toFixed(1)}..${this.eHi.toFixed(1)} dB` +
@@ -1992,7 +1983,7 @@ export class EffectEngine {
       const r = tgt > this.secCeil ? dtNow / 0.3 : dtNow / 2.0;                                  // upp snabbt, ner långsamt
       this.secCeil += Math.max(-r, Math.min(r, tgt - this.secCeil));
     }
-    this.out.calibrate(this.universe, this.cfg.fixtures, this.cfg.master ?? 1, performance.now(), this.dropColEnv, CONCERT ? this.secCeil : 1);
+    this.out.calibrate(this.universe, this.cfg.fixtures, this.cfg.master ?? 1, nowP, this.dropColEnv, CONCERT ? this.secCeil : 1);
 
     // Rök: motorn avgör OM den ska spruta, output-tjänsten var signalen hamnar.
     // RÖK: motorn samlar önskemålen — drop, manuell knapp, eller en effekt som bett om
@@ -2007,7 +1998,7 @@ export class EffectEngine {
       const highEntry = sec === 'high' && this.fogLastSec !== '' && this.fogLastSec !== 'high';
       if (sec) this.fogLastSec = sec;
       const hungry = FOG_HUNGRY_S > 0 && fog.onDrop && nowWall - this.lastFogWall > FOG_HUNGRY_S * 1000;
-      const wantBurst = (dropHitRaw && fog.onDrop) || manualFog || wantFogFx || (hungry && (miniHit || highEntry));
+      const wantBurst = (dropHitRaw && fog.onDrop) || manualFog || wantFogFx || (hungry && highEntry);   // (miniHit var alltid falskt i konsertläget)
       if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;   // engångs-flagga
       const spraying = this.out.fogTick(nowWall, _dtT * 1000, wantBurst, fog, manualFog);
       if (spraying && !this.fogWasSpraying) this.lastFogWall = nowWall;   // puffen startade (vilken orsak som helst)
