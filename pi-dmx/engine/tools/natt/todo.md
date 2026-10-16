@@ -6,6 +6,9 @@ bas'; =2 (bara sub+kick 20-120 Hz) 'känns bättre'. Porterat till DMX som opt-i
 fortfarande bodyDb). natt --snabb: av json-identiskt; på: kick->ljus pop 125 -> 100 ms, megamix 150 -> 125 ms, r energi 0,34/0,09 oförändrat,
 mörkt 0,02/0,03 oförändrat. Lotus-bänken (samma källa): r mot 250-1200 Hz 0,20 -> 0,15 (ladan-wav). REDO FÖR LADAN:
 `python tools/ladan.py --env DMX_BASS_SUBKICK=1`. Nattagenten: mät gärna energiMatt med sub+kick som referens.
+KLART 2026-10-16 (nattagenten): konsertReplay --bas-ref subkick (716eefa), 24 lang-*.wav (151 min, energiMatt): med sub+kick som referens
+lyfter DMX_BASS_SUBKICK=1 r bara +0,01-0,02 (high r_bas 0,49 -> 0,50, r_bas_hp 0,42 -> 0,44; build hp 0,42 -> 0,44), diskanten ner (high r_disk
+0,19 -> 0,17), refrängens dal 0,09 -> 0,07, slagdjup/sving lika. Mot bodyDb-referensen oförändrat. Liten skillnad i bänken - ägarens öga avgör.
 
 ## Från kvällen 2026-10-14 - KULÖRTONINGEN GODKÄND I LADAN (går före allt annat)
 LIVE ~18:55 via ladan.conf DMX_HUE_GLIDE_MS=400 (commit "Kulörtoning opt-in"). Ägaren: "känns mer polerat nu". GÖR: standard 400 i effects.ts
@@ -29,6 +32,12 @@ Mini-markeringar: 2/5 fick minidrop-look (262 blev drop, 304), 3/5 inget (67, 18
 Analysatorns miniDropCount räknar i skurar (140 på 10 min) -> analysator-fynd 10-15. Idé byggd: DMX_FLANK_SHORT_S=1 (opt-in, 9f417c0):
 break >= 1 s räcker om breaket ligger >= 24 dB under taket -> 7/8 drop-markeringar, 1 mini-markering blir drop; 23 filer 0,31 -> 0,72/min,
 rätt 34 -> 87, falska 3 -> 7. REDO FÖR LADAN: `python tools/ladan.py --env DMX_FLANK_SHORT_S=1`. NÄSTA: de 3 missade minidrop-markeringarna.
+KLART 2026-10-16 (nattagenten, de 3 missade): alla tre (67, 181, 447) = basen borta ~1 s mitt i refrängen och tillbaka; nästan-dropen
+fyrar där men ger inget ljus i konsertläget (V123), energilyftet ser inte en dipp som återgår (67 dessutom blockerad av nästan-dropens 4 s-spärr).
+Prov 972feb2 DMX_STOP_MINI_S=0.6 (opt-in): stopp 0,6-3 s i high -> minidrop-looken utan energilyft. Live-takt: mini-markeringar 2/5 -> 4/5
+(+ drop-markeringen 341 som mini), 2 nya omarkerade; 151 min: minidrops 2,20 -> 2,73/min, drops identiska. Kostnad: blixt 0,1-0,3 s före
+10/62 drops (dropSprångHög mega 0,35 -> 0,29). REDO FÖR LADAN: `python tools/ladan.py --env DMX_STOP_MINI_S=0.6` (ihop med
+DMX_FLANK_SHORT_S=1 på lang-1014 live-takt: mini-markeringar 2/5 -> 4/5 även där, +1 omarkerad (291), drops lika).
 IHOP MED LOTUS 10-15: lotus föreslog MINI_SPACING_MS 1500 (profilen, i stället för 1) mot skurarna; kört ihop med FLANK_SHORT på lang-1014 i
 live-takt: bit-identiskt (konsertläget läser inte miniDropCount) -> ingen ljusvinst, bara läsbara loggar. Inte infört.
 
