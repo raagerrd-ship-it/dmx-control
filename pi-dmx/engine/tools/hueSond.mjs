@@ -38,9 +38,9 @@ const hue = (c) => { const [r, g, b] = c, v = Math.max(r, g, b), mn = Math.min(r
 const prevH = [null, null, null, null]; let nLit = 0, hops = 0; const hopT = [];
 const G = { glid: 0, flag: 0, ljus: 0, ny: 0 };
 { const orig = eng.hueGlide.bind(eng);
-  eng.hueGlide = (i, rgb, dt, skarp) => {
+  eng.hueGlide = (i, rgb, skarp) => {   // (10-16: tidssteget är fältet eng.rDt, inte ett argument)
     const before = [rgb[0], rgb[1], rgb[2]], on = eng.glOn[i], gh = eng.glH[i], pv = eng.glV[i];
-    orig(i, rgb, dt, skarp);
+    orig(i, rgb, skarp);
     const v = Math.max(...before), mn = Math.min(...before); if (v <= 0 || v - mn < 0.5 * v) return;
     const d = v - mn, r = before[0], g = before[1], b = before[2]; let h = r === v ? (g - b) / d : g === v ? 2 + (b - r) / d : 4 + (r - g) / d; h = ((h / 6) % 1 + 1) % 1;
     const dh = Math.abs(((h - gh + 1.5) % 1) - 0.5); if (!on) return; if (dh <= 1 / 12) return;
