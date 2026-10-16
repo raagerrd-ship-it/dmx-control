@@ -7,8 +7,8 @@ vanta pa tjansten. Inga hemligheter i repot:
 --remove (2026-09-23): filer pa Pi:n som inte langre finns i bygget flyttas till <fil>.bak-<ts> (aldrig rm); ladan.py bar listan.
 Utan filargument: alla dist/*.js (toppniva) + dist/effects/*.js som skiljer sig. Bygg forst: npx tsc -p . (i pi-dmx/engine)."""
 import hashlib, os, sys, time, paramiko
-HOST = os.environ.get('PI_HOST', '192.168.4.1'); PW = os.environ.get('PI_PASS')
-if not PW: sys.exit('PI_PASS saknas')
+HOST = os.environ.get('PI_HOST', '192.168.4.1'); PW = os.environ.get('PI_PASS'); KEY = os.environ.get('PI_KEY')   # PI_KEY (10-16): nyckel + sudo -n, inget losenord
+if not PW and not KEY: sys.exit('PI_PASS eller PI_KEY saknas')
 args = sys.argv[1:]
 DRY = '--dry' in args; NORESTART = '--no-restart' in args
 CONF = args[args.index('--conf') + 1] if '--conf' in args else None
@@ -34,10 +34,11 @@ if not files_arg:
 sys.path.insert(0, HERE); import analyser_shared
 analyser_shared.check(os.path.join(HERE, '..', 'src'), os.path.join(HERE, '..', '..', '..', '..', 'lotus-light-link', 'pi', 'src', 'audio-analyser'), LOCAL)
 c = paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-c.connect(HOST, username='pi', password=PW, timeout=15, look_for_keys=False, allow_agent=False)
+if KEY: c.connect(HOST, username='pi', key_filename=KEY, timeout=15, look_for_keys=False, allow_agent=False)
+else: c.connect(HOST, username='pi', password=PW, timeout=15, look_for_keys=False, allow_agent=False)
 def run(cmd, t=300):
     i, o, e = c.exec_command(cmd, timeout=t); rc = o.channel.recv_exit_status(); return rc, o.read().decode('utf-8', 'replace'), e.read().decode('utf-8', 'replace')
-def sudo(cmd, t=300): return run(f"echo {PW} | sudo -S sh -c '{cmd}' 2>/dev/null", t)
+def sudo(cmd, t=300): return run(f"sudo -n sh -c '{cmd}' 2>/dev/null", t) if KEY else run(f"echo {PW} | sudo -S sh -c '{cmd}' 2>/dev/null", t)
 files = {f: open(os.path.join(LOCAL, f), 'rb').read().replace(b'\r\n', b'\n') for f in files_arg}
 rc, out, _ = run(f"cd {REMOTE} && md5sum {' '.join(files_arg)} 2>/dev/null"); remote = {l.split()[1]: l.split()[0] for l in out.splitlines() if len(l.split()) == 2}
 todo = [f for f, d in files.items() if remote.get(f) != hashlib.md5(d).hexdigest()]

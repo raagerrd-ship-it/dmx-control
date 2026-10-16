@@ -107,11 +107,18 @@ def pw():
     return 'raspberry'   # Pi-DMX:ns standardlosenord (appliance utan internet); PI_PASS eller ~/.lotus-secrets/pi-dmx.pass vinner
 
 
+# NYCKELLAGE (2026-10-16): finns ~/.ssh/id_pidmx (lagd pa Pi:n en gang av agaren) loggar skripten in med nyckeln och kor sudo -n -
+# inget losenord behovs eller skickas. Utan nyckelfilen: losenordet som forr.
+KEY = os.path.expanduser('~/.ssh/id_pidmx')
+KEY = KEY if os.path.exists(KEY) else None
+
+
 def reachable(host, pw_):
     try:
         import paramiko
         c = paramiko.SSHClient(); c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        c.connect(host, username='pi', password=pw_, timeout=6, look_for_keys=False, allow_agent=False)
+        if KEY: c.connect(host, username='pi', key_filename=KEY, timeout=6, look_for_keys=False, allow_agent=False)
+        else: c.connect(host, username='pi', password=pw_, timeout=6, look_for_keys=False, allow_agent=False)
         i, o, e = c.exec_command('systemctl is-active audio-dmx-engine', timeout=10)
         st = o.read().decode().strip(); c.close()
         return st
@@ -129,7 +136,8 @@ def newest(path, exts):
 
 
 def main():
-    p = pw()
+    p = None if KEY else pw()
+    if KEY: print(f'nyckellage: {KEY}')
     host = None
     for h in HOSTS:
         st = reachable(h, p)
@@ -170,7 +178,9 @@ def main():
         if not ONLY_DEPLOY: print(f'  {k}={v:<6} {why}')
     for e in EXTRA: print(f'  {e}   (extra fran kommandoraden)')
     print()
-    os.environ['PI_HOST'] = host; os.environ['PI_PASS'] = p
+    os.environ['PI_HOST'] = host
+    if KEY: os.environ['PI_KEY'] = KEY
+    else: os.environ['PI_PASS'] = p
     os.environ['PYTHONIOENCODING'] = 'utf-8'   # annars dor deploy-dist.py pa en pil i en utskrift (cp1252-konsol i ladan)
     sys.exit(subprocess.run(cmd, cwd=ENGINE).returncode)
 
