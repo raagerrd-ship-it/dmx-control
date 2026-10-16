@@ -19,7 +19,6 @@ import { bounce } from "./bounce.js";
 import { mono } from "./mono.js";
 import { aurora } from "./aurora.js";
 import { pulse } from "./pulse.js";
-import { strobe } from "./strobe.js";
 import { rave } from "./rave.js";
 import { eq } from "./eq.js";
 import { gallop } from "./gallop.js";
@@ -91,7 +90,7 @@ import { urladdning } from "./urladdning.js";
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
   drops, party, chase, wave, breathe, snap, bounce, mono, aurora, pulse,
-  strobe, rave, eq, gallop, twin, ripple, gravity, drumkit, split,
+  rave, eq, gallop, twin, ripple, gravity, drumkit, split,
   duel, airglow,
   // Nya (2026-07): fyller lugn- och fart-poolerna till 10+ vardera.
   tide, drift, pendel, viska, backbeat, tick, stege, eko, hjarta,
@@ -101,6 +100,9 @@ export const EFFECTS: EffectDef[] = [
   // Registrerade 2026-09-21 (fanns som filer men inte i poolen): sol, konfetti, sopa.
   // konfetti BORTTAGEN 2026-10-12 (ägaren i ladan: "kör inte strobe i lugnt parti ... ta bort den effekten helt" - slumpade lampor
   // fullt på varje slag, energy:false -> såg ut som strobe och följde med in i versen). Filen finns kvar i git-historiken.
+  // strobe BORTTAGEN 2026-10-16 (ägaren i ladan: 'nu är det lugnt, men den kör strobe som jag har för mig att vi tog bort'): energy:false
+  // -> blixtrade fullt på varje slag även när sektionen 'high' hade lugnat sig, drev lampornas egen strobe-kanal (153) vid varje blixt,
+  // och låtmanuset återanvände den utan 150 BPM-kravet. Filen finns kvar i git-historiken.
   sopa,
   // OVERSYN 2026-09-23 (tools/effectSimilarity.mjs v2 + effectMix): innerouter borttagen (rPerm 1,00 mot varannan, samma pool,
   // ingen egen signal), neon borttagen (aldrig vald pa nagon av ladans mixar, ingen egen signal - sol ar samma fallback).
@@ -135,7 +137,6 @@ export const EFFECTS: EffectDef[] = [
 const SPECIALTY_DRIVES: Partial<Record<Mode, ChannelRole[]>> = {
   drops:    ["blinder", "strobe", "laser", "co2", "hazer"],
   party:    ["blinder", "laser", "co2", "hazer", "uv"],
-  strobe:   ["strobe", "laser"],
   rave:     ["strobe", "laser", "blinder", "hazer", "co2", "uv"],
   snap:     ["blinder", "uv"],
   bounce:   ["laser"],
@@ -213,7 +214,6 @@ export type EffectReq = { minBpm?: number; needsPunch?: number; needsBass?: numb
 const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
   // Snabb/aggressiv → kräver tempo (+ karaktär där det stärker)
   // ALLA LOOKER (standard 10-10): i high var tempot >= 130 bara 3/55 ganger och aldrig >= 140 -> snap/rave valdes aldrig
-  strobe:   { minBpm: 150 },   // agaren 10-09: bara over ~150 BPM
   rave:     { minBpm: 120, needsPunch: 0.40 },   // 140 -> 120
   snap:     { minBpm: 115, needsPunch: 0.40 },   // 130 -> 115
   gallop:   { minBpm: 125, needsBeat: 0.35 },

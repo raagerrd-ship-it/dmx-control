@@ -65,6 +65,8 @@ REMOVE = [
     # TRE STEG FOR LJUSET 2026-10-10: efterbehandlingen (ballistik/puls/toning) borttagen - effekt -> energi -> kalibrering.
     '/opt/audio-dmx-engine/dist/postprocess.js',
     # EFFEKTOVERSYNEN 2026-09-30: uvpuls, sol, subbreath borttagna ur registret -> Pi-filerna till .bak
+    # STROBE-EFFEKTEN 2026-10-16 borttagen ur registret (ägaren: 'kör strobe i lugnt parti') -> Pi-filen till .bak
+    '/opt/audio-dmx-engine/dist/effects/strobe.js',
     '/opt/audio-dmx-engine/dist/effects/uvpuls.js', '/opt/audio-dmx-engine/dist/effects/sol.js', '/opt/audio-dmx-engine/dist/effects/subbreath.js',
     '/opt/audio-dmx-engine/dist/songMemory.js', '/opt/audio-dmx-engine/dist/fingerprint.js',
     '/opt/audio-dmx-engine/dist/structureQueue.js', '/opt/audio-dmx-engine/dist/identify.js',

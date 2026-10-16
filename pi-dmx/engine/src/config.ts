@@ -3,7 +3,7 @@
  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
  */
 
-export type Mode = "smart" | "stegring" | "andrum" | "sug" | "vagbrytare" | "nedrakning" | "upptakt" | "fyllning" | "pingpong" | "virvel" | "fyr" | "rullandning" | "fyrverkeri" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "strobe" | "rave" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "duel" | "airglow" | "tide" | "drift" | "pendel" | "viska" | "backbeat" | "tick" | "stege" | "eko" | "hjarta" | "konfetti" | "sopa" | "varannan" | "forvarning" | "basgang" | "tyngdlyft" | "frasraknare" | "vidga" | "svall" | "gryning" | "ankomst" | "glimt" | "rulle" | "kickregn" | "efterskalv" | "motor" | "flod" | "famn" | "spaning" | "startskott" | "siren" | "skuggor" | "stjarnor" | "mullra" | "kaskad" | "droppar" | "uppvarmning" | "dunk" | "glesna" | "dyning" | "blixtnedslag" | "mellanslag" | "pump" | "hiss" | "tratt" | "morkerslag" | "urladdning" | "blackout";
+export type Mode = "smart" | "stegring" | "andrum" | "sug" | "vagbrytare" | "nedrakning" | "upptakt" | "fyllning" | "pingpong" | "virvel" | "fyr" | "rullandning" | "fyrverkeri" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "rave" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "duel" | "airglow" | "tide" | "drift" | "pendel" | "viska" | "backbeat" | "tick" | "stege" | "eko" | "hjarta" | "konfetti" | "sopa" | "varannan" | "forvarning" | "basgang" | "tyngdlyft" | "frasraknare" | "vidga" | "svall" | "gryning" | "ankomst" | "glimt" | "rulle" | "kickregn" | "efterskalv" | "motor" | "flod" | "famn" | "spaning" | "startskott" | "siren" | "skuggor" | "stjarnor" | "mullra" | "kaskad" | "droppar" | "uppvarmning" | "dunk" | "glesna" | "dyning" | "blixtnedslag" | "mellanslag" | "pump" | "hiss" | "tratt" | "morkerslag" | "urladdning" | "blackout";
 
 /** Hyresgäst-stämning: ETT val ställer in hela riggens känsla (se moods.ts). */
 
@@ -216,7 +216,7 @@ export const defaultConfig: EngineConfig = {
   silenceHoldS: 3,      // släcktid (ratt i /setup: "Släcktid"); 3 s = ägarens val i ladan 10-10
   silenceLevel: 0.05,     // släckgräns på frame.level (ratt i /setup: "Släckgräns")
   chaseStyle: "pingpong",
-  rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, strobe: true, rave: true },
+  rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, rave: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   intensityRing: { bus: 0, device: 0, maxBright: 0.40, pulseBoost: 0.18, blackoutFadeMs: 400 },  // WS2812 12-LED på SPI0 MOSI (GPIO10, pin 19)
   bleDevices: [],   // paras via /setup — sidecarn respawnar utan att tappa listan

@@ -32,7 +32,7 @@ const NAMED_PALETTES: Record<string, number[]> = {
  *  kulör per fras, full öppnar 0,6) + dirigenten väljer ALDRIG en enhetlig effekt (UNIFORM: alla fyra lamporna lika, mätt med
  *  tools/effectDyn.mjs - spridning < 0,1 i båda mixarna). Build-effekterna (stegring, sug, forvarning) är enhetliga med avsikt och får vara kvar. */
 const CONCERT = true;   // ENDA LÄGET sedan 2026-10-11 (ägaren i ladan: "mycket bättre, gör det till enda läget"); env-brytaren DMX_CONCERT borttagen
-const UNIFORM: Mode[] = ['breathe', 'snap', 'mono', 'pulse', 'party', 'airglow', 'hjarta', 'tyngdlyft', 'strobe',
+const UNIFORM: Mode[] = ['breathe', 'snap', 'mono', 'pulse', 'party', 'airglow', 'hjarta', 'tyngdlyft',
   'stegring', 'sug', 'forvarning'];   // 10-11: aven de enhetliga build-effekterna (agaren: 'uppbyggnad ... dar ar vi inte bra') - upptakt tar builden
 /** MINIDROPS SOM SHOW (agaren 10-11: 'mindre drops ... sa att alla lampor da lyser lika'): hogst en per MINI_GAP_MS (bänken: 11-58/min
  *  = brus), och minidropen gör ALLA fyra lamporna lika i en kulör ur paletten en kort stund (miniColEnv, steg 1, som drop-looken men
@@ -623,7 +623,7 @@ export class EffectEngine {
    *  som slår på lådan 22:00 står ensam bakom disken utan laptop — riggen är den
    *  enda skärm som finns, och den måste kunna säga tre olika saker.
    *  Ej opt-in: ett grundbeteende, inte en inställning man kan råka slå av. */
-  private static readonly ANCHOR_MODES = new Set<Mode>(["party", "snap", "bounce", "strobe", "chase", "wave"]);
+  private static readonly ANCHOR_MODES = new Set<Mode>(["party", "snap", "bounce", "chase", "wave"]);
                                                    // någon minut. 90 s utan EN enda
                                                    // transient betyder att vi inte
                                                    // hör källan, inte att det är tyst.
@@ -1843,8 +1843,8 @@ export class EffectEngine {
     ctx.want.uv = undefined; ctx.want.laser = undefined; ctx.want.fog = undefined;
     ctx.want.hazer = undefined; ctx.want.co2 = undefined;
 
-    // STROBE (2026-10-10): riser-stroben och dess Hz-tak ar borttagna; strobe-effekten (effects/strobe.ts) blixtrar i RGB en gang per slag
-    // och valjs bara vid >= 150 BPM (registry). Lampornas egen strobe-kanal drivs inte (strobe.ts saknar `drives`).
+    // STROBE (2026-10-10): riser-stroben och dess Hz-tak ar borttagna; strobe-effekten borttagen 2026-10-16 (se registry.ts). Lampornas
+    // egen strobe-kanal drivs bara av DMX_DROP_STROBE (opt-in) och fyrverkeriets want.strobe vid full drop.
     // (Riser-stroben - vit-kollaps + accelererande strobe under risers, cfg.riserStrobe - borttagen 2026-10-10; build-effekterna tar risern.)
 
     // SPECIALKANALER (hazer/uv/blinder/strobe/laser/co2). Effektens `drives`-tagg
@@ -1859,7 +1859,7 @@ export class EffectEngine {
     specialty.hazer   = drivesHas(drives, "hazer")   ? clamp255(exactHas(effect, "hazer") ? wantHazer * 255 : Math.max(140 + audio * 60, wantHazer * 255)) : 0;
     specialty.uv      = drivesHas(drives, "uv")      ? clamp255(exactHas(effect, "uv") ? wantUv * 255 : Math.max(180 * md, wantUv * 255)) : 0;
     specialty.blinder = drivesHas(drives, "blinder") ? clamp255(exactHas(effect, "blinder") ? wantBlinder * 255 : Math.max(kickEnv * 255, this.dropEnv > 0.6 ? 255 : 0, wantBlinder * 255)) : 0;
-    specialty.strobe  = drivesHas(drives, "strobe")  ? clamp255(exactHas(effect, "strobe") ? wantStrobe * 255 : Math.max(effMode === "strobe" ? 210 : 0, wantStrobe * 255)) : 0;
+    specialty.strobe  = drivesHas(drives, "strobe")  ? clamp255(exactHas(effect, "strobe") ? wantStrobe * 255 : wantStrobe * 255) : 0;
     if (DROP_STROBE > 0 && nowWall < this.dropBangUntil) specialty.strobe = Math.max(specialty.strobe, DROP_STROBE);   // STROBE VID DROPEN (se DROP_STROBE)
     specialty.laser   = drivesHas(drives, "laser")   ? clamp255(Math.max(180 + audio * 75, wantLaser * 255)) : 0;
     specialty.co2     = drivesHas(drives, "co2")     ? clamp255(Math.max(this.dropEnv > 0.85 ? 255 : 0, wantCo2 * 255)) : 0;
@@ -1871,7 +1871,7 @@ export class EffectEngine {
     const fxToggle = !!effect?.toggle;   // toggle-effekt: ingen grundniva (se effektNiva)
     const fxSparse = LAMP_STAIR && (frame.section === 'low' || frame.section === 'intro') && !SPARSAM.includes(effMode) && count >= 4;   // LAMPTRAPPA (se SPARSAM)
     const fastLight = !!effect?.fastLight; this.fxFast = fastLight;   // effekten skippar minsta pa-tid (EffectDef.fastLight)   // STEG 2: uttoningens tidskonstant i DMX-ljus (FADE_MIN_S x gamma fore gamman)
-    const modE = modulateOf(effMode).energy, strobeVal = effMode === "strobe" ? 210 : 0;   // samma för alla lampor - en gång per ruta
+    const modE = modulateOf(effMode).energy;   // samma för alla lampor - en gång per ruta
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const isAnchor = useAnchor && i > 0 && i < count - 1;   // mittlamporna = ankare
@@ -1950,7 +1950,7 @@ export class EffectEngine {
           rgb[0] = this.lampRatio[o] * fall; rgb[1] = this.lampRatio[o + 1] * fall; rgb[2] = this.lampRatio[o + 2] * fall;
         }
       }
-      this.out.writeFixture(this.universe, fx, rgb, 1, strobeVal, specialty);
+      this.out.writeFixture(this.universe, fx, rgb, 1, 0, specialty);
     }
 
     if (E_NORM_S > 0) { this.fxPeak = Math.max(this.fxPeakNow, this.fxPeak * Math.exp(-dtSec / E_NORM_S)); this.fxNorm = Math.min(E_NORM_MAX, 1 / Math.max(0.05, this.fxPeak)); }   // STEG 1: effektens topp

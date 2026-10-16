@@ -53,7 +53,6 @@ export const FIT: Partial<Record<Mode, Fit>> = {
   drumkit:   { punch: 0.95, bass: 0.70, bright: 0.50, beat: 0.60 },   // lever på anslag
   split:     { punch: 0.50, bass: 0.50, bright: 0.60, beat: 0.30 },
   duel:      { punch: 0.80, bass: 0.70, bright: 0.60, beat: 0.40 },   // kick vs luft
-  strobe:    { punch: 0.90, bass: 0.50, bright: 0.50, beat: 0.80 },
   // ── Sektions-/signaleffekter (2026-09-23): stod utan passform (NEUTRAL 0,5) och rankades darfor bort - stegring/nedrakning/
   //    vagbrytare/fyrverkeri valdes ALDRIG pa ladans mixar trots att build var 16 % av tiden. Nu egen rad var. ──
   stegring:  { punch: 0.40, bass: 0.50, bright: 0.45, beat: 0.60 },   // uppbyggnad: takten ar allt
