@@ -71,6 +71,10 @@ const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math
 /** DROPEN BÄR IN I REFRÄNGEN (ägaren i ladan 10-11: "efter drop känns som energin dör varje gång"): dropen är det starkaste
  *  ögonblicket och drar upp energifönstrets topp - refrängen efter mäts mot den och dämpas. Efter en drop släpper energin helt i
  *  DROP_LIFT_MS och glider tillbaka på DROP_LIFT_FALL_MS. Bara mindre dämpning. */
+/** LYFTET HÅLLER I REFRÄNGEN (opt-in DMX_DROP_LIFT_HIGH=1, ägaren i ladan 10-17: 'energi efter drop dör fort ... blev det refräng så skall
+ *  den ju fortsätta energin'): så länge sektionen är high efter en drop förlängs lyftet (minst DROP_LIFT_MS, sedan så länge refrängen varar,
+ *  med 1 s marginal mot kort fladder); när refrängen tar slut glider energin tillbaka på DROP_LIFT_FALL_MS som förut. 0 = av (som före). */
+const DROP_LIFT_HIGH = process.env.DMX_DROP_LIFT_HIGH === '1';
 const DROP_LIFT_MS = Number(process.env.DMX_DROP_LIFT_MS ?? 4000), DROP_LIFT_FALL_MS = Number(process.env.DMX_DROP_LIFT_FALL_MS ?? 1500);   // 2000 -> 4000 (ladan 22:0x: 'se till så energin efter fortsätter', som minidropens lyft som var 'perfekt')   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
 const SECTION_PALETTE = CONCERT;
 /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
@@ -1545,6 +1549,7 @@ export class EffectEngine {
     if (this.upgradeHit) { this.upgradeHit = false; if (!(CONCERT && nowWall - this.lastShowDropWall < SHOW_DROP_GAP_MS)) { dropHitRaw = true; this.lastShowDropWall = nowWall; this.buildUpgrades++; } else this.gapMini(nowWall); }   // BUILD SOM LANDAR: forra rutans nastan-drop efter en build
     let dropHit = dropHitRaw;
     if (CONCERT && dropHit) this.dropLiftUntil = nowWall + DROP_LIFT_MS;   // DROPEN BÄR IN I REFRÄNGEN
+    if (DROP_LIFT_HIGH && CONCERT && nowWall <= this.dropLiftUntil && frame.section === 'high' && this.dropLiftUntil < nowWall + 1000) this.dropLiftUntil = nowWall + 1000;   // LYFTET HÅLLER I REFRÄNGEN
     // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
     // jamfors energin (eSm, se E_WIN_S) med energin strax fore; har den inte stigit >= DROP_LAND_GAIN doms dropen falsk:
     // envelope klipps, 20 s-high-fonstret och tiersnappen dras tillbaka. Blixten (0,6 s) hinner synas, inte 20 s fel show.
