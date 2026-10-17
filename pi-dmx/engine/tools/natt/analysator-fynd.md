@@ -15,6 +15,17 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-17 Tempot vandrar i breaket före/efter drops
+Vad: 24 lang-*.wav (konsertReplay --delad-cfg --step 5): 14 av 29 show-drops har tempobyte i frame.bpm (> 2 BPM) mellan 8 s före och 10 s
+efter dropen - ofta glidning i 3 BPM-steg (126 -> 123 -> 120 -> 117 -> 114 på 3 s, lang-105428 447 s) eller hopp till fel tempo som håller
+i flera sekunder (117 -> 88, 133 -> 94, 128 -> 86, 125 -> 81). Kickarna saknas när basen är borta, så tempogrammet driver. Ägaren i ladan:
+'efter drop känns det som effekten inte vet vad den skall göra i några sekunder' / 'taktlåset ... inte helt släppas efter drop'.
+Var: computeBpm under breaket (inga/få kickar, onset-ringen domineras av riser/virvel). Material: tools/ladan-2026-10-1*/lang-*.wav,
+tidpunkterna i natt-todo 10-17. Önskat: håll tempot (som lotus TEMPO_HOLD gör i tystnad) när basen/kickarna försvinner i ett break, och
+släpp först när ett nytt tempo bevisats efter att basen kommit tillbaka. DMX har ett eget filter i taktklockan (beatFeed DMX_TEMPO_PERSIST_S,
+live-prov 10-17 15:3x: tempohopp 3,36 -> 1,35/min) men analysatorns frame.bpm är fortfarande fel i de sekunderna.
+Status:
+
 ## ÖPPET 2026-10-17 Sektionen säger nästan aldrig 'build' före en drop
 Vad: 24 lang-*.wav (149 min, konsertReplay --delad-cfg --step 5, DMX-profilen RUN 5/RUN_IN 3/CARRY 20): av analysatorns 62 drops har
 37 sektion 'high' redan 20 s före (23 st high hela vägen -20..-1 s), bara ~10 st har 'build' någon gång inom 20 s före. 'build' är ändå
