@@ -48,6 +48,9 @@ EN VÄG (10-10): effektens 0 = släckt, färg 1–100 % → lampans tändpunkt+1
 | `MINI_DROP_ENV` | 0,9 | Minidropens ljuslyft (bara ljusstyrka, kulören kvar; full drop har dropfärg + vit kärna). |
 | `MINI_BANG_MS` | 150 | Hur länge minidropens lyft håller. Minidrops har ingen spärr, så längre = ljuset fastnar högt. Minidrop byter aldrig look (10-10). |
 | `BODY_GONE_MIN_MS` (DMX-profilen) | 4000 | Riktig drop kräver så långt break före (var 2000; ägaren 10-10: "hellre färre drops, mini fångar dom"). |
+| `DMX_FLANK_SHORT_S` | 1 (standard 10-17) | Kort break (≥ 1 s) räcker för full drop om breaket ligger ≥ 24 dB (`DMX_FLANK_SHORT_RISE_DB`) under taket. Ägaren 10-16: 'dropparna känns bra'. 0 = av. |
+| `DMX_STOP_MINI_S` | 0,6 (standard 10-17) | Basen borta 0,6–3 s mitt i refrängen och tillbaka → minidrop-looken. Ägaren 10-16: 'minidropparna känns bra, behåll'. 0 = av. |
+| `DMX_BASS_SUBKICK` | 1 (standard 10-17) | Basenergin ur sub+kick (20–120 Hz) i stället för baskroppen 20–250 Hz. Ägaren 10-16: 'känns bättre, behåll'. 0 = bodyDb. |
 
 ## 5. Puls och ballistik
 | Ratt | Standard | Vad den gör |

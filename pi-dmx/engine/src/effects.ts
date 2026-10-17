@@ -64,7 +64,7 @@ const LIFT_DB = Number(process.env.DMX_LIFT_DB ?? 10), LIFT_REFRACT_MS = Number(
 /** STOPP-MINI (opt-in DMX_STOP_MINI_S, natt 10-16, ägarens mini-markeringar lang-1014 67/181/447 s): basen borta en kort stund mitt i låten
  *  (baskroppen > 12 dB under 8 s-normalnivån i minst STOP_MINI_S s, högst 3 s) och tillbaka till normalnivån i refrängen (sektion high) = ett 'stopp' före nästa fras ->
  *  minidrop-looken (600 ms, utan minidropens energilyft). Nästan-dropen ger inget ljus i konsertläget och energilyftet ser inte en dipp som går tillbaka till samma nivå. 0 = av. */
-const STOP_MINI_S = Number(process.env.DMX_STOP_MINI_S ?? 0);
+const STOP_MINI_S = Number(process.env.DMX_STOP_MINI_S ?? 0.6);   // STANDARD 0,6 sedan 10-17 (ägaren i ladan 10-16: 'minidropparna känns bra, behåll')
 const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math.max(0, Math.min(1, Number(process.env.DMX_MINI_UNI ?? 1)));
 // (EFFEKTEN LEDER/CONCERT_E_FLOOR, VARJE SLAG/CONCERT_BEAT, BASSLAGEN/CONCERT_KICK och BASSLAGEN I ENERGILAGRET/KICK_E borttagna 10-12:
 //  ersatta av BASENERGIN, se B_CURVE.)
@@ -342,7 +342,7 @@ const FLANK_GONE_DB = 10, FLANK_BREAK_S = Number(process.env.DMX_FLANK_BREAK_S ?
  *  analysatorns drop efter bara 1,1-2,0 s basbreak (en takt) med 26-46 dB stigning - 4 s-kravet gjorde dem till minidrop). Ett kortare
  *  break räcker när breaket är minst FLANK_SHORT_RISE_DB under taket (taket - lägsta kroppen 0,5 s; inte stigningen vid korsningen, som
  *  beror på renderstegets översläng - live 200 Hz ger mindre än bänkens 40 Hz, mätfälla 46). 0 = av (som före). */
-const FLANK_SHORT_S = Number(process.env.DMX_FLANK_SHORT_S ?? 0), FLANK_SHORT_RISE_DB = Number(process.env.DMX_FLANK_SHORT_RISE_DB ?? 24);
+const FLANK_SHORT_S = Number(process.env.DMX_FLANK_SHORT_S ?? 1), FLANK_SHORT_RISE_DB = Number(process.env.DMX_FLANK_SHORT_RISE_DB ?? 24);   // STANDARD 1 sedan 10-17 (ägaren i ladan 10-16: 'dropparna känns bra'); =0 = av
 const SHOW_DROP_GAP_MS = 12000;   // spärr mellan riktiga drops från alla källor (10-12; 20 s missade en riktig drop efter en tidig, ägaren 'jag tror det va tiden mellan')
 const DROP_MIN_GAP_S = Number(process.env.DMX_DROP_MIN_GAP_S ?? 0);   // se 'DROP-KEDJOR'   // se 'INGEN DROP I LATENS INLEDNING'
 const DROP_LAND_GAIN = Number(process.env.DROP_LAND_GAIN ?? 1.15);     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
@@ -396,7 +396,7 @@ const B_CURVE = 3, B_MIN_DB = 6, B_LO_S = 1;
  *  bas' med baskroppen 20-250 Hz, 'känns bättre' med sub+kick 20-120 Hz). Basenergins källa = medel av sub- och kickbandets rå dB ur
  *  frame.specAbs (samma bandmedel som bodyDb, utan bandet 120-250 Hz där röstens grundton och virvelns kropp ligger). Flank-dropen läser
  *  fortfarande bodyDb. 0 = av (som före). */
-const BASS_SUBKICK = process.env.DMX_BASS_SUBKICK === '1';
+const BASS_SUBKICK = (process.env.DMX_BASS_SUBKICK ?? '1') === '1';   // STANDARD sedan 10-17 (ägaren i ladan 10-16: 'känns bättre, behåll'); =0 = bodyDb som förr
 const E_LIN_INV = 1 / GAMMA;   // utgangens gamma (output.ts ager DMX_GAMMA - en kalla, 10-11; forr last pa tva stallen med var sin standard)
 /** Minsta tanda niva fore gamman: gammans forsta DMX-steg (1/255 -> tandpunkt+1 i utgangen) = agarens 1 %. */
 const E_MIN_LIT = Math.pow(1 / 255, E_LIN_INV) * 1.02;   // agarens 1 %: gammans forsta DMX-steg (-> tandpunkt+1), se ENERGIN SLACKER ALDRIG
