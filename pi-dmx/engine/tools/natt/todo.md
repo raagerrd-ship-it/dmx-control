@@ -12,6 +12,8 @@ av ägaren - se SKILL-undantaget) mot Node 22 med/utan flagga; gör jakten med N
 hjälpa?' med siffror och risker. Uppgradera inget på Pi:erna.
 LADAN 10-17 14:58: deployat utan env (skräpfixar + FLANK_SHORT/STOP_MINI/SUBKICK standard); 15:00 LIVE prov DMX_SECTION_UNIT_MIN_MS=0
 (ladan.conf), väntar på ägarens öga. MÄTFÄLLA 49: Pi:erna kör Node 18 (V8 10.2) - flaggan finns inte där.
+15:09 BACKAT (ägaren: 'den missar en hel del minidrops iaf') - ladan kör 14:58-läget utan ladan.conf. Bänken (24 lang) gav inte färre
+minidrops med provet (390 -> 395); orsaken okänd tills ägarens öga/inspelning med Mini!-markeringar säger mer. Rör inte SECTION_UNIT i natt.
 
 ## Från kvällen 2026-10-17 - SKRÄPET HITTAT (DMX-sessionen, ägaren: 'målet var att få bort allt skräp analysatorn skapar löpande')
 Mätt i stabilt läge (allocProf --fran 300, lang-1014): motorn 450 kB/s, analysatorn 183, effects 146, boundaryDetector 47. Störst: V8 optimerar
