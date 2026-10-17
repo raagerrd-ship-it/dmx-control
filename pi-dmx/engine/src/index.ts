@@ -11,6 +11,7 @@
  * saved back (debounced) whenever anything changes it.
  */
 
+import "./v8Tiering.js";   // FORST: V8 optimerar om efter 100 anrop i st f 3000 (skrapet 450 -> 185 kB/s, se filen)
 import { isLogOn } from "./quiet.js";   // FORST: tystar console.log innan ovriga moduler hinner logga (DMX_QUIET)
 import { readFileSync, existsSync } from "node:fs";
 import { AudioCapture } from "./audio.js";
