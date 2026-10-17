@@ -1,5 +1,13 @@
 # Natt-agentens uppdrag
 
+## Från kvällen 2026-10-17 - SKRÄPJAKTEN (ägaren: nattens ENDA uppgift natten till 10-18, se engångsundantaget i nattagentens SKILL.md)
+Läget efter dagen (allt på PC, stabilt läge, med V8-flaggan): DMX-motorn 112 kB/s (effects.js 35, boundaryDetector.js 32, analysatorn 21);
+lotus-motorn 203 kB/s (tickInner 75 utspritt över ~20 anropsställen med decimaltal, analysatorn 56 med låtbyten, alsaMic 31).
+Klart 10-17: delade analysatorn (dmx 6b4963e / lotus 4e264e9, LIVE på lotus 14:04), v8Tiering.ts i båda (dmx a8966ee, lotus 1a0365a LIVE
+14:45), lotus micvägens periodbuffert (LIVE 14:45). Ladan: allt väntar på nästa `python tools/ladan.py`.
+GÖR i natt: (A) lotus tickInner + helpers (bassBody.step, subKickDb, pulseSplit, trustSmooth, updateBeatClock, processOnset, processDrop,
+emitBands) och (B) DMX effects.ts + effects/*.ts + boundaryDetector.ts med recepten; bevisa byte-identiskt efter varje steg; deploya inte.
+
 ## Från kvällen 2026-10-17 - SKRÄPET HITTAT (DMX-sessionen, ägaren: 'målet var att få bort allt skräp analysatorn skapar löpande')
 Mätt i stabilt läge (allocProf --fran 300, lang-1014): motorn 450 kB/s, analysatorn 183, effects 146, boundaryDetector 47. Störst: V8 optimerar
 om en funktion först efter 3000 anrop - computeBpm (4 Hz) och dropStep deoptas på sällsynta grenar och kör sedan otolkat i minuter (TurboFan bara

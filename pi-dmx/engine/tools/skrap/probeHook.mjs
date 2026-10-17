@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 const acc = new Float64Array(400), cnt = new Float64Array(400); let last = -1, prevU = 0;
 const hs = () => v8.getHeapStatistics().used_heap_size;
 globalThis.__probe = (k) => {
-  if (Date.now() - 1700000000000 < 300000) { last = -1; return; }
+  if (Date.now() - Number(process.env.PROBE_EPOCH ?? 1700000000000) < Number(process.env.PROBE_FROM_MS ?? 300000)) { last = -1; return; }
   const u = hs();
   if (last >= 0 && u >= prevU) { acc[last] += u - prevU; cnt[last]++; }
   last = k < 0 ? -1 : k; prevU = hs();
