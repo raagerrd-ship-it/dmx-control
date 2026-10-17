@@ -7,6 +7,11 @@ Klart 10-17: delade analysatorn (dmx 6b4963e / lotus 4e264e9, LIVE på lotus 14:
 14:45), lotus micvägens periodbuffert (LIVE 14:45). Ladan: allt väntar på nästa `python tools/ladan.py`.
 GÖR i natt: (A) lotus tickInner + helpers (bassBody.step, subKickDb, pulseSplit, trustSmooth, updateBeatClock, processOnset, processDrop,
 emitBands) och (B) DMX effects.ts + effects/*.ts + boundaryDetector.ts med recepten; bevisa byte-identiskt efter varje steg; deploya inte.
++ (ägaren ~15:05) FÖRST: mät båda motorerna med Node 18.20.4 (Pi:ernas version, portabel zip i C:/Users/richa/node18, nedladdningen godkänd
+av ägaren - se SKILL-undantaget) mot Node 22 med/utan flagga; gör jakten med Node 18 som huvudmått; rapportera 'skulle Node 22 på Pi:erna
+hjälpa?' med siffror och risker. Uppgradera inget på Pi:erna.
+LADAN 10-17 14:58: deployat utan env (skräpfixar + FLANK_SHORT/STOP_MINI/SUBKICK standard); 15:00 LIVE prov DMX_SECTION_UNIT_MIN_MS=0
+(ladan.conf), väntar på ägarens öga. MÄTFÄLLA 49: Pi:erna kör Node 18 (V8 10.2) - flaggan finns inte där.
 
 ## Från kvällen 2026-10-17 - SKRÄPET HITTAT (DMX-sessionen, ägaren: 'målet var att få bort allt skräp analysatorn skapar löpande')
 Mätt i stabilt läge (allocProf --fran 300, lang-1014): motorn 450 kB/s, analysatorn 183, effects 146, boundaryDetector 47. Störst: V8 optimerar
