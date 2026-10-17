@@ -26,7 +26,7 @@ fillFrame 15, intensityStep 14, riserStep 11, kickStep 9; under uppvärmningen p
 för samma lista. DMX kör analysatorn i HUVUDTRÅDEN (ingen DMX_ANALYSER_SPLIT), så dess skräp delar GC med renderingen.
 Önskat: återanvända buffertar/objekt i de heta stegen (bigStep, computeBpm, process, scoreEnv, dropStep) och i sectionBlock, bit-identiskt
 (paritet + bänk 396/503). Målet är färre minor-GC per minut, inte ändrade värden.
-Status:
+Status: TAGET 2026-10-17 (lotus-morgonagenten): allocProf på pop_ladan 240 s bekräftar ordningen (bigStep 280, process 210, dropStep 118, scoreEnv 114, computeBpm 88, sectionBlock 49 kB/s). Men bigStep/scoreEnv/dropStep har INGA explicita allokeringar (alla band-/onset-buffertar är Float32Array, inga slice/map/objekt) och --trace-opt/--trace-deopt (120 s) visar att de heta funktionerna ligger i TurboFan i stabilt läge (deopt var ~10–20 s: dropStep 'insufficient type feedback for generic named access' 5×, bigStep/process 'wrong map' = Analyser-objektets form ändras efter konstruktorn, lazy deopt vid bytecode 13 i bigStep). Profilerarens rad = funktionens startrad, inte allokeringsraden ⇒ resten är troligen HeapNumber-boxning eller inlinade anropades skräp (Array.prototype.sort kopierar till arbetsarray: templStep/sectionBlock sorterar ~600 element per block). Nästa steg (ej gjort): A/B med --trace-gc (scavenges/min) mot en dist där Analyser-fälten initieras i konstruktorn (stabil form) resp. sort ersatt med Float64Array-scratch + subarray().sort(); bit-identiskt kräver samma jämförelseordning (NaN fritt).
 
 ## ÖPPET 2026-10-15 miniDropCount räknar i skurar var 0,4-0,5 s (27 st på 13 s)
 Vad: ladans live-events 10-14 18:14 (tools/ladan-2026-10-14/lang-20261014T161434.events.json, kolumn miniDropCount, fr.miniDropCount)
