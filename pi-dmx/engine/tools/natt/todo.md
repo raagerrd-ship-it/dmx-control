@@ -6,9 +6,8 @@ om en funktion först efter 3000 anrop - computeBpm (4 Hz) och dropStep deoptas 
 44 % av tiden), och då boxas alla tal. Flaggan `--invocation-count-for-turbofan=100`: motorn 450 -> 187 kB/s (effects 146 -> 35, analysatorn
 183 -> 95), ljuset byte-identiskt på 3 inspelningar. Analysatorns kodfixar (decimaltal via fält, sällsynta grenar i egna metoder, scratch-
 buffertar) -> lotus-morgonagenten (analysator-fynd.md 10-17 kväll + lotus morning-todo); med flaggan + kodfixarna 138 kB/s.
-REDO FÖR LADAN (ägarens beslut, ej deployat): lägg flaggan i ExecStart (systemd/audio-dmx-engine.service: `node --max-old-space-size=96
---min-semi-space-size=4 --max-semi-space-size=4 --invocation-count-for-turbofan=100 dist/index.js`), titta på GET /api/perf (minor GC/min,
-längsta, major) mot 10-16:s siffror (minor ~15/min, längst ~10 ms). Risk: fler TurboFan-kompileringar i början (sker på bakgrundstråd).
+I KODEN SEDAN 10-17 (src/v8Tiering.ts, först i index.ts, följer med nästa `python tools/ladan.py`; 24/24 inspelningar byte-identiska).
+Titta efter deployen på GET /api/perf mot 10-16 (minor ~15/min, längsta ~10 ms, major ~0 i stabilt läge).
 Nattagenten: mät effects.js i stabilt läge med flaggan (vad som är kvar av 35 kB/s) och boundaryDetector (32 kB/s).
 
 ## Från eftermiddagen 2026-10-16 - KORT BREAK + STOPP-MINI GODKÄNDA I LADAN (går före allt annat)
