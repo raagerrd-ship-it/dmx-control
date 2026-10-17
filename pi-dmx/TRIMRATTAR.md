@@ -51,6 +51,10 @@ EN VÄG (10-10): effektens 0 = släckt, färg 1–100 % → lampans tändpunkt+1
 | `DMX_FLANK_SHORT_S` | 1 (standard 10-17) | Kort break (≥ 1 s) räcker för full drop om breaket ligger ≥ 24 dB (`DMX_FLANK_SHORT_RISE_DB`) under taket. Ägaren 10-16: 'dropparna känns bra'. 0 = av. |
 | `DMX_STOP_MINI_S` | 0,6 (standard 10-17) | Basen borta 0,6–3 s mitt i refrängen och tillbaka → minidrop-looken. Ägaren 10-16: 'minidropparna känns bra, behåll'. 0 = av. |
 | `DMX_BASS_SUBKICK` | 1 (standard 10-17) | Basenergin ur sub+kick (20–120 Hz) i stället för baskroppen 20–250 Hz. Ägaren 10-16: 'känns bättre, behåll'. 0 = bodyDb. |
+| `DMX_DROP_LIFT_MS` / `DMX_DROP_LIFT_FALL_MS` | 8000 / 3000 (standard 10-17) | Efter en drop släpper energin dämpningen i så många ms och glider tillbaka på FALL (var 4000/1500; ägaren: 'energi efter drop dör fort'). |
+| `DMX_DROP_LIFT_HIGH` | på (standard 10-17) | Lyftet håller så länge sektionen är refräng (high) efter dropen. 0 = av. |
+| `DMX_DROP_BASS_LOOK` | på (standard 10-17) | En drop byter till en basstark full-effekt (bas ≥ 0,6, punch ≥ 0,75) om looken inte redan är basstark. 0 = av. |
+| `DMX_TEMPO_PERSIST_S` | 3 (standard 10-17) | Taktklockan tar ett nytt tempo först när det hållit i sig så här länge (12 s i breaket/dropen, `DMX_TEMPO_PERSIST_DROP_S`). 0 = av. |
 
 ## 5. Puls och ballistik
 | Ratt | Standard | Vad den gör |

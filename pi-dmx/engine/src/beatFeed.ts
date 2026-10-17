@@ -41,7 +41,7 @@ const TRUST_REPEAT = process.env.DMX_TRUST_REPEAT !== '0';
  *  har tempohopp -8..+10 s, ofta steg om 3 BPM 126 -> 114 på 3 s eller hopp 117 -> 88) och varje hopp tog om taktklockans tempo. Här byter
  *  klockan tempo först när analysatorns nya tempo hållit i sig så här många sekunder (inom +-2 BPM); under tiden rullar klockan vidare i det
  *  gamla tempot och PLL:en synkar fasen mot kickarna som vanligt. 0 = av (som före: varje ändring > 2 BPM tas direkt). */
-const TEMPO_PERSIST_MS = Math.max(0, Number(process.env.DMX_TEMPO_PERSIST_S ?? 0)) * 1000;
+const TEMPO_PERSIST_MS = Math.max(0, Number(process.env.DMX_TEMPO_PERSIST_S ?? 3)) * 1000;   // STANDARD 3 s sedan 10-17 (ägaren i ladan: 'dropparna känns bra nu'); 0 = av
 /** ...och i BREAKET/DROPEN (samma prov): när basen är borta (baskroppen > 12 dB under sin topp de senaste ~8 s) och 8 s efter att den kommit
  *  tillbaka gäller DMX_TEMPO_PERSIST_DROP_S (standard 12 s) - analysatorns felaktiga tempon där håller i sig flera sekunder (123 -> 88 i > 3 s). */
 const TEMPO_PERSIST_DROP_MS = Math.max(0, Number(process.env.DMX_TEMPO_PERSIST_DROP_S ?? 12)) * 1000;

@@ -74,14 +74,14 @@ const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math
 /** LYFTET HÅLLER I REFRÄNGEN (opt-in DMX_DROP_LIFT_HIGH=1, ägaren i ladan 10-17: 'energi efter drop dör fort ... blev det refräng så skall
  *  den ju fortsätta energin'): så länge sektionen är high efter en drop förlängs lyftet (minst DROP_LIFT_MS, sedan så länge refrängen varar,
  *  med 1 s marginal mot kort fladder); när refrängen tar slut glider energin tillbaka på DROP_LIFT_FALL_MS som förut. 0 = av (som före). */
-const DROP_LIFT_HIGH = process.env.DMX_DROP_LIFT_HIGH === '1';
+const DROP_LIFT_HIGH = process.env.DMX_DROP_LIFT_HIGH !== '0';   // STANDARD sedan 10-17 (ägaren i ladan: 'dropparna känns bra nu, gör proven till kodens standard'); =0 = av
 /** BASSTARK LOOK EFTER DROPEN (opt-in DMX_DROP_BASS_LOOK=1, ägaren i ladan 10-17: 'dirigenten borde bli bättre på effekten som väljs direkt
  *  efter drop, att den kör på med mycket energikänslan (känner basljudet)' -> 'alltid ny look vid drop och välj en basstark full-effekt'):
  *  (1) en show-drop byter look direkt om looken inte redan är basstark (förr bara om looken hållit DROP_HOLD 8 s: 24 lang 30 av 62 drops
  *      behöll looken från före dropen); en basstark look som redan kör behålls;
  *  (2) looken är en basstark full-effekt (passform bas >= 0,6 och punch >= 0,75, bäst först) - låtens refrängslook behålls om den redan är
  *  basstark och inte är looken från före dropen; annars väljs en ur listan och blir låtens refrängslook (manuset). 0 = av (som före). */
-const DROP_BASS_LOOK = process.env.DMX_DROP_BASS_LOOK === '1';
+const DROP_BASS_LOOK = process.env.DMX_DROP_BASS_LOOK !== '0';   // STANDARD sedan 10-17 (ägaren i ladan); =0 = av
 /** BASEN DIREKT EFTER DROPEN (opt-in DMX_DROP_BASS_SNAP=1, ägaren i ladan 10-17: 'drop, alla lyser, sen känns det som effekten inte vet vad
  *  den skall göra i några sekunder tills den till slut hittar t.ex. basen'): basenergin mäter hur långt över basens senaste DAL vi är, och
  *  under breaket före dropen sjönk dalen lågt (basen borta) - efter smällen gled den upp på B_LO_S, så de första sekunderna var skalan bred
@@ -91,7 +91,7 @@ const DROP_BASS_SNAP = process.env.DMX_DROP_BASS_SNAP === '1';
 /** LYFTET SOM GOLV (opt-in DMX_DROP_LIFT_FLOOR < 1, samma ägarcitat): drop-lyftet satte energin till 1 rakt av - allt fullt och platt, ingen
  *  bas syns. Med golv x lyfter dropen energin till minst x och basen svänger ovanför. 1 = som före (platt). */
 const DROP_LIFT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_DROP_LIFT_FLOOR ?? 1)));
-const DROP_LIFT_MS = Number(process.env.DMX_DROP_LIFT_MS ?? 4000), DROP_LIFT_FALL_MS = Number(process.env.DMX_DROP_LIFT_FALL_MS ?? 1500);   // 2000 -> 4000 (ladan 22:0x: 'se till så energin efter fortsätter', som minidropens lyft som var 'perfekt')   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
+const DROP_LIFT_MS = Number(process.env.DMX_DROP_LIFT_MS ?? 8000), DROP_LIFT_FALL_MS = Number(process.env.DMX_DROP_LIFT_FALL_MS ?? 3000);   // 4000/1500 -> 8000/3000 STANDARD 10-17 (ägaren i ladan: 'energi efter drop dör fort' -> 'känns bra nu')   // 2000 -> 4000 (ladan 22:0x: 'se till så energin efter fortsätter', som minidropens lyft som var 'perfekt')   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
 const SECTION_PALETTE = CONCERT;
 /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
  *  look-bytena landar på en 4-taktsgräns (slumpen ger 19 %) - gridOk hängde på låtminnets grid som är borttaget. Med takten låst
