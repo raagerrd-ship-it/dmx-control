@@ -14,6 +14,8 @@ LADAN 10-17 14:58: deployat utan env (skräpfixar + FLANK_SHORT/STOP_MINI/SUBKIC
 (ladan.conf), väntar på ägarens öga. MÄTFÄLLA 49: Pi:erna kör Node 18 (V8 10.2) - flaggan finns inte där.
 15:09 BACKAT (ägaren: 'den missar en hel del minidrops iaf') - ladan kör 14:58-läget utan ladan.conf. Bänken (24 lang) gav inte färre
 minidrops med provet (390 -> 395); orsaken okänd tills ägarens öga/inspelning med Mini!-markeringar säger mer. Rör inte SECTION_UNIT i natt.
+15:5x LIVE (ladan.conf, väntar på ögat): DMX_DROP_LIFT_MS=8000 DMX_DROP_LIFT_FALL_MS=3000 DMX_DROP_LIFT_HIGH=1 DMX_TEMPO_PERSIST_S=3
+DMX_DROP_BASS_LOOK=1 (a653837/80039f8/53156e4). Skräpjakten i natt ska bevisas identisk även MED dessa env (kör konsertReplay-beviset med dem också).
 
 ## Från kvällen 2026-10-17 - SKRÄPET HITTAT (DMX-sessionen, ägaren: 'målet var att få bort allt skräp analysatorn skapar löpande')
 Mätt i stabilt läge (allocProf --fran 300, lang-1014): motorn 450 kB/s, analysatorn 183, effects 146, boundaryDetector 47. Störst: V8 optimerar
