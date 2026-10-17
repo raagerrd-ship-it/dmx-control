@@ -25,7 +25,10 @@ WorkingDirectory=/opt/audio-dmx-engine
 # antal scavenges styrs av hur lange process() ar ooptimerad, inte av flaggorna.
 # No --enable-source-maps: it parses every module's map at startup (slower cold
 # boot on the SD card) and this is production — stack traces map to dist anyway.
-ExecStart=/usr/bin/node --max-old-space-size=96 --min-semi-space-size=4 --max-semi-space-size=4 dist/index.js
+# OMOPTIMERING EFTER 100 ANROP (2026-10-17, skrapjakten): V8:s standard ar 3000 anrop innan en deoptad funktion optimeras om.
+# computeBpm (4 Hz) deoptas pa sallsynta grenar och korde da otolkat i minuter (TurboFan 44 % av tiden) och boxade varje flyttal.
+# Matt pa PC (allocProf --fran 300, lang-1014): motorn 450 -> 187 kB/s skrap, effects 146 -> 35, analysatorn 183 -> 95; ljuset byte-identiskt.
+ExecStart=/usr/bin/node --max-old-space-size=96 --min-semi-space-size=4 --max-semi-space-size=4 --invocation-count-for-turbofan=100 dist/index.js
 Environment=NODE_ENV=production
 Environment=UV_THREADPOOL_SIZE=2
 Environment=PORT=80
