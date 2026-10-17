@@ -13,7 +13,7 @@ import { FixtureOutput, GAMMA, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
-import { fitScore, fitDistance } from "./effects/fit.js";
+import { fitScore, fitDistance, FIT } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
 // PALETT-LAS (DMX_PALETTE): lås färgerna till en palett oavsett klang och läge. Namn ur listan
 // nedan eller en sektorlista "4,4.6,5.55" (sektor/6 = hue: 0 röd, 1 gul, 2 grön, 3 cyan, 4 blå,
@@ -75,6 +75,13 @@ const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math
  *  den ju fortsätta energin'): så länge sektionen är high efter en drop förlängs lyftet (minst DROP_LIFT_MS, sedan så länge refrängen varar,
  *  med 1 s marginal mot kort fladder); när refrängen tar slut glider energin tillbaka på DROP_LIFT_FALL_MS som förut. 0 = av (som före). */
 const DROP_LIFT_HIGH = process.env.DMX_DROP_LIFT_HIGH === '1';
+/** BASSTARK LOOK EFTER DROPEN (opt-in DMX_DROP_BASS_LOOK=1, ägaren i ladan 10-17: 'dirigenten borde bli bättre på effekten som väljs direkt
+ *  efter drop, att den kör på med mycket energikänslan (känner basljudet)' -> 'alltid ny look vid drop och välj en basstark full-effekt'):
+ *  (1) en show-drop byter look direkt om looken inte redan är basstark (förr bara om looken hållit DROP_HOLD 8 s: 24 lang 30 av 62 drops
+ *      behöll looken från före dropen); en basstark look som redan kör behålls;
+ *  (2) looken är en basstark full-effekt (passform bas >= 0,6 och punch >= 0,75, bäst först) - låtens refrängslook behålls om den redan är
+ *  basstark och inte är looken från före dropen; annars väljs en ur listan och blir låtens refrängslook (manuset). 0 = av (som före). */
+const DROP_BASS_LOOK = process.env.DMX_DROP_BASS_LOOK === '1';
 /** BASEN DIREKT EFTER DROPEN (opt-in DMX_DROP_BASS_SNAP=1, ägaren i ladan 10-17: 'drop, alla lyser, sen känns det som effekten inte vet vad
  *  den skall göra i några sekunder tills den till slut hittar t.ex. basen'): basenergin mäter hur långt över basens senaste DAL vi är, och
  *  under breaket före dropen sjönk dalen lågt (basen borta) - efter smällen gled den upp på B_LO_S, så de första sekunderna var skalan bred
@@ -822,6 +829,13 @@ export class EffectEngine {
   /** DIRIGENTEN (kall väg ur render, 10-16 GC-jakten): tier, sektion, manus och lookbytet. Ordagrant flyttat ur render - samma ordning. */
   /** LOOKBYTET (kall väg ur stepDirigent, 10-16 GC-jakten): closures (enabled/req/fits ...) fångade frame/bpm och gav ett kontextobjekt
    *  per ruta i stepDirigent - här skapas de bara vid ett byte. Ordagrant flyttat. */
+  /** BASSTARK LOOK EFTER DROPEN (se DROP_BASS_LOOK): full-effekter med passform bas >= 0,6 och punch >= 0,75, bäst (bas + punch) först. */
+  private static bassDropLooks: Mode[] | null = null;
+  private bassStrong(m: Mode): boolean { const f = FIT[m], e = EFFECT_MAP.get(m); return !!f && !!e && e.tier === 'full' && f.bass >= 0.6 && f.punch >= 0.75; }
+  private bassDropLooks(): Mode[] {
+    if (!EffectEngine.bassDropLooks) EffectEngine.bassDropLooks = ([...EFFECT_MAP.keys()] as Mode[]).filter((m) => this.bassStrong(m)).sort((a, b) => (FIT[b]!.bass + FIT[b]!.punch) - (FIT[a]!.bass + FIT[a]!.punch));
+    return EffectEngine.bassDropLooks;
+  }
   private switchLook(frame: Frame, bpm: number, tierS: Mode[], tierName: string, bassClear: boolean, allaBuild: boolean, buildEntry: boolean, buildExit: boolean, dropSwitch: boolean, nearSwitch: boolean, halvedChanged: boolean, liveSec: string, memSection: boolean, secEntry: boolean, tierChanged: boolean): void {
     const now = this.rNowP, nowWall = this.rNowWall, LUGN = TIER.lugn, FART = TIER.fart, FULLFART = TIER.full;
         // (skrapjakten 10-01: enabled/req skapades forr pa varje ruta men anvands bara har, i bytet)
@@ -837,8 +851,8 @@ export class EffectEngine {
         // Manusets look galler om den fortfarande ar pa och passar (krav, och inte tva tiers fran energin just nu - en lugn vers-look i en
         // vers som blivit full far en ny look, som blir manusets nya).
         const fits = (m: Mode) => this.cfg.rotation?.[m] !== false && (MANUS_RETURN || req(m)) && (calm || secKey === 'build' || Math.abs(tierRank(m) - tierNow) <= 1);
-        let keep = !!kept && fits(kept);
-        if (MANUS_RETURN && !keep && secKey) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m)); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
+        let keep = !!kept && fits(kept) && !(DROP_BASS_LOOK && dropSwitch && !this.bassStrong(kept));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark
+        if (MANUS_RETURN && !keep && secKey && !(DROP_BASS_LOOK && dropSwitch)) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m)); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
         if (keep && kept === this.smartMode) { this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true; }   // manuset sager samma look - inget byte
         else {
         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
@@ -957,6 +971,11 @@ export class EffectEngine {
         // ENFORMIG LOOK -> KORTARE DWELL. Agaren 2026-09-12: "ar det en enformig effekt far den garna byta
         // snabbare". De statiska svepen (ingen takt-signal, ingen kick-drift) far DMX_DWELL_FLAT_MS (30 s),
         // taktdrivna looker behaller 45 s. Satts EFTER valet, eftersom dwellen ovan sattes fore.
+        if (DROP_BASS_LOOK && dropSwitch && !this.bassStrong(this.smartMode)) {   // BASSTARK LOOK EFTER DROPEN
+          const c = enabled(this.bassDropLooks()).filter((m) => m !== lastLookBeforeSwitch && req(m));
+          const c2 = c.length ? c : enabled(this.bassDropLooks()).filter((m) => m !== lastLookBeforeSwitch);
+          if (c2.length) { this.smartMode = this.pickLook(c2.slice(0, 3).map((m) => ({ m }))); console.log(`[dirigent] drop: basstark look "${this.smartMode}"`); }
+        }
         if (EFFECT_MAP.get(this.smartMode)?.flat) this.smartDwellUntil = now + (Number(process.env.DMX_DWELL_FLAT_MS) || 30000);
         // EKO FÖRST VID TYDLIG BASGÅNG (ägaren i ladan 10-11: basslaget som glider genom lamporna som en våg -> 'ja' till förstaval):
         // bassline >= 0,6 (där eko själv följer basnoterna) -> eko, utom i build, efter drop, eller om eko just gick.
@@ -1071,7 +1090,7 @@ export class EffectEngine {
         const DROP_HOLD = 8000;   // drop byter inte oftare än nagot annat (detektorn fyrar tatt pa pulsande musik)
         // Drop-byte bara när energin får driva → en LUGN stämning (chill,
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
-        const dropSwitch = DISCRETE_DROP_LAMPS && dropHit && this.cfg.energyDrivesMode && (held > DROP_HOLD || (CONCERT && BUILD_LOOKS.includes(this.smartMode)));   // konsertlaget: dropen avslutar builden direkt
+        const dropSwitch = DISCRETE_DROP_LAMPS && dropHit && this.cfg.energyDrivesMode && (held > DROP_HOLD || (CONCERT && ((DROP_BASS_LOOK && !this.bassStrong(this.smartMode)) || BUILD_LOOKS.includes(this.smartMode))));   // konsertlaget: dropen avslutar builden direkt
         // (minidrop byter INTE look sedan 2026-10-10, agaren i ladan: 'minidrop maste ju inte orsaka look-byten' - den lyfter bara ljuset)
         const nearSwitch = !CONCERT && this.nearHit && this.cfg.energyDrivesMode && held > MIN_HOLD;   // V123: inget lookbyte på nästan-drop i konsertläget (var vanligaste bytet, 1,6/min)   // nastan-drop: samma regel
         // MINNETS STRUKTUR: en tvättad låt vet var karaktären skiftar och var
