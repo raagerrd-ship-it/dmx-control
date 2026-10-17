@@ -15,6 +15,17 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-17 Sektionen säger nästan aldrig 'build' före en drop
+Vad: 24 lang-*.wav (149 min, konsertReplay --delad-cfg --step 5, DMX-profilen RUN 5/RUN_IN 3/CARRY 20): av analysatorns 62 drops har
+37 sektion 'high' redan 20 s före (23 st high hela vägen -20..-1 s), bara ~10 st har 'build' någon gång inom 20 s före. 'build' är ändå
+13,4 % av tiden - den ligger alltså mest före refränger utan drop. DMX-ersättaren basen borta (bodyDb > 12/18/24 dB under 10 s-taket i 1-3 s)
+förkastad i natt: bara 18-26 % av sådana händelser följs av en drop inom 20 s (0,3-2,2 händelser/min), oavsett djup/längd. Samma bild som
+morgonens buildUp-fynd 10-12 (AUC <= 0,56). Var: sektionsklassningen (sectionBlock) - pre-drop-breaket/risern i EDM klassas 'high'
+(hög nivå/täthet) eftersom bara basen försvinner. Material: tools/ladan-2026-10-1*/lang-*.wav. Önskat (ägarens prio 2, 'byta till BUILD
+innan drops'): ett build-mått som skiljer pre-drop-uppbyggnaden inne i high från refrängen, 4-8 takter före; facit = analysatorns drops
+(dropTiming). Inget brådskande - DMX har ingen egen signal som fungerar.
+Status:
+
 ## ÖPPET 2026-10-16 Analysatorns skräp (GC) – huvudtrådens näst största källa
 Vad: DMX-ägaren jagar GC-stopp (live GET /api/perf: ~15 minor-GC/min, längsta 6–10 ms; stora 27–63 ms bara de första minuterna efter
 start). Allokeringsprofil (DMX tools/allocProf.mjs = V8:s samplande heap-profilerare inkl. bortstädade objekt, konsertReplay --delad-cfg
