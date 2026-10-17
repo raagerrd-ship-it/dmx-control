@@ -1,5 +1,16 @@
 # Natt-agentens uppdrag
 
+## Från kvällen 2026-10-17 - SKRÄPET HITTAT (DMX-sessionen, ägaren: 'målet var att få bort allt skräp analysatorn skapar löpande')
+Mätt i stabilt läge (allocProf --fran 300, lang-1014): motorn 450 kB/s, analysatorn 183, effects 146, boundaryDetector 47. Störst: V8 optimerar
+om en funktion först efter 3000 anrop - computeBpm (4 Hz) och dropStep deoptas på sällsynta grenar och kör sedan otolkat i minuter (TurboFan bara
+44 % av tiden), och då boxas alla tal. Flaggan `--invocation-count-for-turbofan=100`: motorn 450 -> 187 kB/s (effects 146 -> 35, analysatorn
+183 -> 95), ljuset byte-identiskt på 3 inspelningar. Analysatorns kodfixar (decimaltal via fält, sällsynta grenar i egna metoder, scratch-
+buffertar) -> lotus-morgonagenten (analysator-fynd.md 10-17 kväll + lotus morning-todo); med flaggan + kodfixarna 138 kB/s.
+REDO FÖR LADAN (ägarens beslut, ej deployat): lägg flaggan i ExecStart (systemd/audio-dmx-engine.service: `node --max-old-space-size=96
+--min-semi-space-size=4 --max-semi-space-size=4 --invocation-count-for-turbofan=100 dist/index.js`), titta på GET /api/perf (minor GC/min,
+längsta, major) mot 10-16:s siffror (minor ~15/min, längst ~10 ms). Risk: fler TurboFan-kompileringar i början (sker på bakgrundstråd).
+Nattagenten: mät effects.js i stabilt läge med flaggan (vad som är kvar av 35 kB/s) och boundaryDetector (32 kB/s).
+
 ## Från eftermiddagen 2026-10-16 - KORT BREAK + STOPP-MINI GODKÄNDA I LADAN (går före allt annat)
 LIVE 15:23/15:3x (main 1d5a3de + ladan.conf DMX_FLANK_SHORT_S=1, DMX_STOP_MINI_S=0.6; deploy med nyckel ~/.ssh/id_pidmx, 97da1f6).
 Ägaren: 'dropparna känns bra' (kort break), 'minidropparna känns bra, behåll stopp-minidroppen'. GÖR: lyft båda till kodens standard

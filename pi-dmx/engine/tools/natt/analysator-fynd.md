@@ -26,6 +26,32 @@ innan drops'): ett build-mått som skiljer pre-drop-uppbyggnaden inne i high fr�
 (dropTiming). Inget brådskande - DMX har ingen egen signal som fungerar.
 Status:
 
+## ÖPPET 2026-10-17 kväll SKRÄPET HITTAT – tre orsaker, alla bevisade bit-identiska (ersätter gissningarna nedan)
+Mätt i STABILT läge (allocProf --fran 300, lang-20261014T161434.wav, konsertReplay --delad-cfg --step 5; utan --fran mäts mest
+uppvärmningen - därför såg 10-17-morgonens 240 s bigStep/scoreEnv som störst; i stabilt läge är de ~0). Analysatorn 183 kB/s:
+computeBpm 66, process 47, sectionBlock 39, dropStep 14, intensityStep 5, alignScore 4, bigStep 2.
+(1) OMOPTIMERINGEN ÄR FÖR LÅNGSAM - störst. V8 kräver 3000 anrop innan en funktion optimeras om (--invocation-count-for-turbofan=3000).
+    computeBpm deoptas på sällsynta grenar (dist-rad 3321 oktavrösten 'ratio > 1.4', 3442 '!sameChallenger', 'Insufficient type feedback
+    for generic named access') och körs 4 ggr/s ⇒ upp till 12,5 min otolkad, där varje tal boxas (10,8 kB/anrop i off-beat-loopen,
+    8,4 kB i tempogramloopen). Mätt (tools/skrap/optStat.mjs): computeBpm i TurboFan bara 44 % av tiden 300-600 s. Samma för dropStep.
+    Med node --invocation-count-for-turbofan=100: computeBpm 79 % TurboFan, 66 -> 16-23 kB/s, dropStep 17 -> 1-4, sectionBlock 43 -> 15,
+    HELA MOTORN 450 -> 187 kB/s (effects 146 -> 35 - DMX-effekterna hade samma problem). Ljuset byte-identiskt (3 inspelningar).
+    Kodfix (lotus): flytta de sällsynta grenarna i computeBpm (oktavröst, utmanare/newSongVote, veto, nollningar) och dropStep (dist-rad
+    4811/4945/4983/4990) till egna små metoder, så att en deopt där inte kastar den stora funktionen. Flaggan är processens (systemd).
+(2) DECIMALTAL ÖVER ANROPSGRÄNSEN BOXAS - process 47 -> 6 kB/s. Varje decimaltal som skickas som argument till, eller returneras från,
+    en metod som inte inlinas blir ett HeapNumber per anrop. Bevis (tools/skrap/skrapPatch1.py + skrapPatch2.py på en dist-kopia: argumenten
+    via this._<metod>_<param>-fält, initierade i konstruktorn, resultatet via fält): intensityStep 4,9 -> 0 (returvärdet), fillFrame 22,5 -> 0,
+    process 47 -> 5,9, lang-1014 byte-identisk. Metoderna: fillFrame (12 arg), sectionAggStep (6), sectionHop (14, 3 anropsställen), kickStep,
+    silenceStep, bigStep, riserStep, kickRefine (+ returvärdet), dropStep, intensityStep (returvärdet).
+(3) EXPLICITA ALLOKERINGAR i sectionBlock (15 kB/s kvar efter (1)), alignScore (2,3) - per block/anrop: new Float32Array(FP2_DIM) i
+    REPEAT-grenen, terms-arrayen av objekt + closuren add, D.slice().sort(), secBlkDb.slice(nb-8, nb-2).sort(), Array.prototype.slice.call(
+    phaseTrimRing).sort(), closurerna score/isHi/zOf/idx/pct per block; alignScore: closuren at + returobjektet {score, half, hit} (ring av
+    4 objekt prövad: 4,1 -> 2,7, bit-identiskt). Återanvänd scratch-buffertar (Float64Array + subarray().sort()) och metoder i st f closurer.
+(1)+(2) tillsammans: analysatorn 183 -> 46 kB/s, hela motorn 450 -> 138 kB/s. Gjort med doubleFields på hela Analyser-objektet: SÄMRE
+(dropStep 14 -> 72) - gör inte det.
+Önskat: (2) och (3) i analyser.ts, bit-identiskt (paritet 0, bänk 396/503), och (1) som kodfix. DMX prövar flaggan i ladan.
+Status:
+
 ## ÖPPET 2026-10-16 Analysatorns skräp (GC) – huvudtrådens näst största källa
 Vad: DMX-ägaren jagar GC-stopp (live GET /api/perf: ~15 minor-GC/min, längsta 6–10 ms; stora 27–63 ms bara de första minuterna efter
 start). Allokeringsprofil (DMX tools/allocProf.mjs = V8:s samplande heap-profilerare inkl. bortstädade objekt, konsertReplay --delad-cfg
