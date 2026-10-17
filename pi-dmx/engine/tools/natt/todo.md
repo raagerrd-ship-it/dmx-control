@@ -7,6 +7,11 @@ i effects.ts (FLANK_SHORT_S 1, STOP_MINI_S 0,6; =0 = av), bevisa natt --snabb + 
 och skriv i rapporten att nästa deploy är `python tools/ladan.py` utan --env (tömmer ladan.conf).
 + ~15:5x DMX_BASS_SUBKICK=1 LIVE ihop med de två, ägaren: 'sub+kick känns bättre, behåll den' -> lyft även den till standard (basenergin
 ur sub+kick; =0 = bodyDb som förr), samma bevis. (Lotus-omdömet 10-15 gällde gamla koden - bass-body kom aldrig ut på lotus-Pi:n.)
+KLART 2026-10-17 (nattagenten, 5ebefe5): FLANK_SHORT_S 1, STOP_MINI_S 0,6, BASS_SUBKICK 1 är kodens standard (=0 = av); natt --snabb json-identisk
+med gårdagens env, dropTiming --step 5 lang-1014 byte-identisk. NÄSTA DEPLOY: `python tools/ladan.py` utan --env (tömmer ladan.conf).
+NYTT PROV 2026-10-17 (nattagenten, ingen kodändring): `python tools/ladan.py --env DMX_SECTION_UNIT_MIN_MS=0` - looken byts PÅ sektionsgränsen
+i stället för 4 s in (24 lang: återseende 84 -> 94 %, kort look 13 -> 9 %, byten 2,55 -> 2,70/min; pop kick->ljus 100 -> 125 ms). Titta: kommer
+refrängens look på refrängens första slag, och fladdrar det vid korta sektioner? Förkastat: build före drop ur basen borta (precision ~0,2).
 
 ## Från kvällen 2026-10-15 - LOTUS: BASEN SOM DMX, SUB+KICK GODKÄND I KÄLLAREN (porterat, opt-in, ej deployat i ladan)
 Lotus fick DMX:s basenergi (LOTUS_BASS_BODY, lotus a5e972d/668ffc3). Ägaren: =1 (baskroppen 20-250 Hz) 'lite mörkare, ok, men följer inte bara
