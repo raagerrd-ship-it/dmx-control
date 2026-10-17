@@ -50,7 +50,17 @@ computeBpm 66, process 47, sectionBlock 39, dropStep 14, intensityStep 5, alignS
 (1)+(2) tillsammans: analysatorn 183 -> 46 kB/s, hela motorn 450 -> 138 kB/s. Gjort med doubleFields på hela Analyser-objektet: SÄMRE
 (dropStep 14 -> 72) - gör inte det.
 Önskat: (2) och (3) i analyser.ts, bit-identiskt (paritet 0, bänk 396/503), och (1) som kodfix. DMX prövar flaggan i ladan.
-Status:
+Status: KLART 2026-10-17 kväll (DMX-sessionen, ägaren: 'gör kodfixen nu i båda repona', analyser.ts md5 656c093a i båda): hoppets
+decimaltal via h*-fält (agcStep/kickStep/silenceStep/kickRefine/intensityStep/bigStep/dropStep/riserStep/sectionAggStep/fillFrame) och
+shIn (sectionHop, 3 anropsställen); computeBpm:s tunga loopar utbrutna (tempoGramStep, offBeatStep, bpmHistSort) och sectionBlock:s
+rangberäkning (rankTier) - små metoder med tunga loopar optimeras på loopbudgeten även när den stora deoptas (att lyfta ut SÄLLSYNTA
+grenar hjälper inte: ett anrop utan typåterkoppling deoptar också); secScoreSorted = Float64Array som sorteras på plats (var number[] +
+sort(jämförare): ~10 kB per block), RANK_W-termerna i fasta objekt + metod, särdragsvektorn återanvänds, alignScore: modulfunktion
+alignAt + ring av 4 resultatobjekt. Bevis: DMX konsertReplay 24/24 byte-identiska, natt --snabb mixar identiska; lotus analyserParity 0
+avvikande hop (450 000 hop x 4 varianter: plain, --grid, --split inline, hint/reset), bänken live 396/503, syntet 6/8, on-beat 0,84.
+Skräp i stabilt läge (lang-1014): DMX analysatorn 183 -> 39 kB/s utan flagga, 21 med (motorn 450 -> 112 med flagga); lotus (lotus-
+profil, ingen split) 72 -> 18 kB/s. KVAR (lotus): riserStep 6,7 + agcStep 5,8 kB/s bara i lotus mic-läge (ingen synlig allokering, inte
+fältform - prövat), computeBpm 4-14 och dropStep 4-15 kB/s = otolkad tid efter deopt (flaggan halverar). Ej deployat någonstans.
 
 ## ÖPPET 2026-10-16 Analysatorns skräp (GC) – huvudtrådens näst största källa
 Vad: DMX-ägaren jagar GC-stopp (live GET /api/perf: ~15 minor-GC/min, längsta 6–10 ms; stora 27–63 ms bara de första minuterna efter
