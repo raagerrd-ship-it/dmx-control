@@ -75,6 +75,15 @@ const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math
  *  den ju fortsätta energin'): så länge sektionen är high efter en drop förlängs lyftet (minst DROP_LIFT_MS, sedan så länge refrängen varar,
  *  med 1 s marginal mot kort fladder); när refrängen tar slut glider energin tillbaka på DROP_LIFT_FALL_MS som förut. 0 = av (som före). */
 const DROP_LIFT_HIGH = process.env.DMX_DROP_LIFT_HIGH === '1';
+/** BASEN DIREKT EFTER DROPEN (opt-in DMX_DROP_BASS_SNAP=1, ägaren i ladan 10-17: 'drop, alla lyser, sen känns det som effekten inte vet vad
+ *  den skall göra i några sekunder tills den till slut hittar t.ex. basen'): basenergin mäter hur långt över basens senaste DAL vi är, och
+ *  under breaket före dropen sjönk dalen lågt (basen borta) - efter smällen gled den upp på B_LO_S, så de första sekunderna var skalan bred
+ *  och varje bastryck såg likadant ut. Vid dropen sätts dalen direkt till smällens nivå - B_MIN_DB (dal direkt ner tar den sedan till
+ *  refrängens egen dal inom ett slag). 0 = av (som före). */
+const DROP_BASS_SNAP = process.env.DMX_DROP_BASS_SNAP === '1';
+/** LYFTET SOM GOLV (opt-in DMX_DROP_LIFT_FLOOR < 1, samma ägarcitat): drop-lyftet satte energin till 1 rakt av - allt fullt och platt, ingen
+ *  bas syns. Med golv x lyfter dropen energin till minst x och basen svänger ovanför. 1 = som före (platt). */
+const DROP_LIFT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_DROP_LIFT_FLOOR ?? 1)));
 const DROP_LIFT_MS = Number(process.env.DMX_DROP_LIFT_MS ?? 4000), DROP_LIFT_FALL_MS = Number(process.env.DMX_DROP_LIFT_FALL_MS ?? 1500);   // 2000 -> 4000 (ladan 22:0x: 'se till så energin efter fortsätter', som minidropens lyft som var 'perfekt')   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
 const SECTION_PALETTE = CONCERT;
 /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
@@ -1364,7 +1373,7 @@ export class EffectEngine {
       this.eSimple = this.eBass;
       const eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
       let lift = this.dropEnv;   // DROPS OCH MINIDROPS LYFTER (se DROP_LIFT_MS / MINI_LIFT_MS): energin släpper helt och glider tillbaka
-      if (CONCERT && nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) { const left = this.dropLiftUntil - nowWall; lift = Math.max(lift, left >= 0 ? 1 : 1 + left / DROP_LIFT_FALL_MS); }
+      if (CONCERT && nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) { const left = this.dropLiftUntil - nowWall; lift = Math.max(lift, (left >= 0 ? 1 : 1 + left / DROP_LIFT_FALL_MS) * DROP_LIFT_FLOOR); }   // LYFTET SOM GOLV (1 = platt som förr)
       if (CONCERT && nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) { const left = this.miniLiftUntil - nowWall; lift = Math.max(lift, left >= 0 ? 1 : 1 + left / MINI_LIFT_FALL_MS); }
       md = drive * Math.min(1, Math.max(eFloor + (1 - eFloor) * Math.pow(this.eBass, B_CURVE), lift));   // bara dampning: aldrig over 1
       md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
@@ -1549,6 +1558,7 @@ export class EffectEngine {
     if (this.upgradeHit) { this.upgradeHit = false; if (!(CONCERT && nowWall - this.lastShowDropWall < SHOW_DROP_GAP_MS)) { dropHitRaw = true; this.lastShowDropWall = nowWall; this.buildUpgrades++; } else this.gapMini(nowWall); }   // BUILD SOM LANDAR: forra rutans nastan-drop efter en build
     let dropHit = dropHitRaw;
     if (CONCERT && dropHit) this.dropLiftUntil = nowWall + DROP_LIFT_MS;   // DROPEN BÄR IN I REFRÄNGEN
+    if (DROP_BASS_SNAP && CONCERT && dropHit && !Number.isNaN(this.bHi)) this.bLo = Math.max(this.bLo, this.bHi - B_MIN_DB);   // BASEN DIREKT EFTER DROPEN
     if (DROP_LIFT_HIGH && CONCERT && nowWall <= this.dropLiftUntil && frame.section === 'high' && this.dropLiftUntil < nowWall + 1000) this.dropLiftUntil = nowWall + 1000;   // LYFTET HÅLLER I REFRÄNGEN
     // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
     // jamfors energin (eSm, se E_WIN_S) med energin strax fore; har den inte stigit >= DROP_LAND_GAIN doms dropen falsk:

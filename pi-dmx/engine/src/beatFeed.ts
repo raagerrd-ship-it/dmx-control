@@ -36,6 +36,15 @@ const GRID_COAST_MS = 4000;  // så länge håller vi gridet på svag konfidens
 // även där nollades tempot mer sällan och korpusens klocka föll 81,5 -> 76,7 % (fel tidiga lås hölls kvar).
 // DMX_TRUST_REPEAT=0 = gamla måttet (bit-identiskt).
 const TRUST_REPEAT = process.env.DMX_TRUST_REPEAT !== '0';
+/** TAKTEN SLÄPPS INTE VID DROPEN (opt-in DMX_TEMPO_PERSIST_S > 0, ägaren i ladan 10-17: 'taktlåset måste vi nog fixa så det inte helt släpps
+ *  efter drop, utan kanske bara snabb synkning'): runt dropparna vandrar analysatorns tempo när kickarna saknas (24 lang: 14 av 29 show-drops
+ *  har tempohopp -8..+10 s, ofta steg om 3 BPM 126 -> 114 på 3 s eller hopp 117 -> 88) och varje hopp tog om taktklockans tempo. Här byter
+ *  klockan tempo först när analysatorns nya tempo hållit i sig så här många sekunder (inom +-2 BPM); under tiden rullar klockan vidare i det
+ *  gamla tempot och PLL:en synkar fasen mot kickarna som vanligt. 0 = av (som före: varje ändring > 2 BPM tas direkt). */
+const TEMPO_PERSIST_MS = Math.max(0, Number(process.env.DMX_TEMPO_PERSIST_S ?? 0)) * 1000;
+/** ...och i BREAKET/DROPEN (samma prov): när basen är borta (baskroppen > 12 dB under sin topp de senaste ~8 s) och 8 s efter att den kommit
+ *  tillbaka gäller DMX_TEMPO_PERSIST_DROP_S (standard 12 s) - analysatorns felaktiga tempon där håller i sig flera sekunder (123 -> 88 i > 3 s). */
+const TEMPO_PERSIST_DROP_MS = Math.max(0, Number(process.env.DMX_TEMPO_PERSIST_DROP_S ?? 12)) * 1000;
 const TRUST_REPEAT_BEATS = 2, TRUST_REPEAT_TOL = 0.06;
 
 /**
@@ -63,6 +72,8 @@ export class BeatFeed {
   private readonly kickRing = new Float64Array(64); private kickRingPos = 0; private kickRingN = 0; private kickRingLast = 0;
   /** analysatorns bpm som taktklockan LÅSTES på (om-ankrings-referens, skild från cfg.beat.bpm som frekvens-termen finjusterar) */
   clockDetBpm = 0;
+  private tempoCandBpm = 0; private tempoCandSince = 0;   // TEMPO_PERSIST
+  private bodyTop = -200; private bodyTopAt = 0; private breakUntil = 0; private bodyLastMs = 0;   // TEMPO_PERSIST: breakzonen
   private gridWeakSince = 0;       // ms-tidpunkt då konfidensen föll under grinden (0 = stark)
   private gridCoasting = false;
 
@@ -128,7 +139,19 @@ export class BeatFeed {
       // och hoppade MÄTT 2026-08-07 mellan 117, 81 och 143 BPM mitt i samma låt. Varje
       // hopp ankrade om taktklockan, fasen kastade sig och pulsen lästes som stroboskop.
       // PLL:en nedan får fortfarande finjustera FASEN mot faktiska trumslag.
-      if (!cfg.beat || Math.abs(effBpm - this.clockDetBpm) > 2) {
+      let persistOk = true;   // TEMPO_PERSIST: ett nytt tempo tas först när det hållit i sig
+      if (TEMPO_PERSIST_MS > 0) {
+        const nowP = Date.now(), bd = frame.bodyDb ?? -200;
+        // breakzonen: baskroppens topp följer upp direkt och sjunker 1,5 dB/s; basen > 12 dB under toppen = break, + 8 s efteråt
+        const dtB = this.bodyLastMs ? Math.min(0.1, (nowP - this.bodyLastMs) / 1000) : 0; this.bodyLastMs = nowP;
+        this.bodyTop = bd > this.bodyTop ? bd : this.bodyTop - 1.5 * dtB;
+        if (bd < this.bodyTop - 12) this.breakUntil = nowP + 8000;
+        if (cfg.beat && Math.abs(effBpm - this.clockDetBpm) > 2) {
+          if (Math.abs(effBpm - this.tempoCandBpm) > 2) { this.tempoCandBpm = effBpm; this.tempoCandSince = nowP; }
+          persistOk = nowP - this.tempoCandSince >= (nowP < this.breakUntil ? TEMPO_PERSIST_DROP_MS : TEMPO_PERSIST_MS);
+        }
+      }
+      if (!cfg.beat || (persistOk && Math.abs(effBpm - this.clockDetBpm) > 2)) {
         this.clockDetBpm = effBpm;
         let anchor = frame.beatAnchorMs || Date.now();
         if (cfg.beat) {
