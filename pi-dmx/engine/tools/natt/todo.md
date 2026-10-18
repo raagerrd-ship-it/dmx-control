@@ -18,6 +18,15 @@ minidrops med provet (390 -> 395); orsaken okänd tills ägarens öga/inspelning
 DMX_DROP_BASS_LOOK=1 (a653837/80039f8/53156e4). Skräpjakten i natt ska bevisas identisk även MED dessa env (kör konsertReplay-beviset med dem också).
 KLART 15:53: ägaren 'dropparna känns bra nu' -> alla fem är KODENS STANDARD (2273bb9) och deployat utan env (ladan.conf tom). Natten jämför
 mot den nya standarden (ingen env behövs). Ny baslinje natt/2026-10-17-drop-std.json: pop kick->ljus 125 ms (var 100), r 0,30 (0,33).
+KLART 2026-10-18 (nattagenten, skräpjakten, inget deployat): stabilt läge = ANDRA VARVET av materialet (första varvet = deopt vid nya
+grenar, en rigg med dagars drift ligger i andra). Node 18 (Pi:ns V8) DMX 113 -> 74 kB/s (79ba733 låtgränsen, 85f650a effekterna,
+fb70598 dirigenten), lotus 85 -> 41 (9e6501c, 153f7aa, d3cd59d, pushat). Allt byte-identiskt (DMX 24/24 lang + dropTiming + natt
+--snabb; lotus engineReplay). MÄTFÄLLA 50: Node 18:s heap-profilerare visar bara överlevare -> tools/skrap/winAlloc.mjs (+ skrapReplay
+--varv/--mode, n18compat, probe.py PROBE_RET). Största orsaken på Node 18: decimaltal i modulvariabler (let) boxas vid varje skrivning.
+Kvar: analysatorn 20-27 kB/s (analysator-fynd 10-18, computeBpm 0 % TurboFan på Node 18) och DMX-effekterna ~40 kB/s (billiga som fast
+look, 70-145 B/anrop i rotation; V8 slutar inlina hsvToRgb i långkörande processen - olöst, fxLab.mjs/fxHook.mjs). Node 22 på Pi:erna:
+bara med flaggan (v8Tiering sätter den) DMX 74 -> 49, lotus 41 -> 39; utan flaggan sämre (lotus 94) - rekommendation i rapporten: inte nu.
+Nästa deploy `python tools/ladan.py` tar med skräpfixarna (ljuset byte-identiskt) - titta på GET /api/perf mot 10-17.
 
 ## Från kvällen 2026-10-17 - SKRÄPET HITTAT (DMX-sessionen, ägaren: 'målet var att få bort allt skräp analysatorn skapar löpande')
 Mätt i stabilt läge (allocProf --fran 300, lang-1014): motorn 450 kB/s, analysatorn 183, effects 146, boundaryDetector 47. Störst: V8 optimerar

@@ -15,6 +15,21 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-18 Analysatorn allokerar 54-73 B per hop på Node 18 (Pi:ernas V8) i stabilt läge
+Vad: skräpjakten 10-18 mätte med Node 18.20.4 (Pi:ernas version, C:/Users/richa/node18) i stabilt läge = andra varvet av
+materialet (alla grenar körda en gång). Analyser.process inklusive: lotus 73 B/hop = 27 kB/s (engineReplay playlist-lang, 710-1090 s),
+DMX 54 B/hop = 20 kB/s (skrapReplay lang-1014 --varv 2, 900-1140 s). Det är nu största enskilda posten i lotus (motorn 41 kB/s totalt,
+varav bänken ~7) och ~30 % i DMX. MÄTFÄLLA: Node 18:s samplande heap-profilerare saknar includeObjectsCollectedBy*GC och kör en GC
+före rapporten - den visar bara överlevare (DMX 1,9 kB/s mot verkliga ~200). PC-profilerna (Node 22) säger inte vad Pi:n allokerar.
+Mekanismer som bevisats i motorerna i natt och troligen finns i analysatorn: decimaltal i modulvariabler (let) boxas vid varje skrivning
+i V8 10 (analysatorn har inga sådana - bra), decimaltal som argument/retur till icke-inlinade metoder, Map med decimaltal som värde,
+strängar/arrayer som byggs per hop. Var: Analyser.process och dess steg. Material: dmx tools/skrap/winAlloc.mjs (WIN_INCL, Node 18,
+--min/max-semi-space-size=512), probe.py (PROBE_RET=1) + probeHook.mjs, skrapReplay.mjs --varv 2; lotus engineReplay (__winPatch-krok).
+Önskat: ner mot 0 på Node 18 med samma recept; mät på Node 18, inte 22.
+Dessutom (optStat.mjs, lang-1014 från 300 s): computeBpm är TurboFan 0 % av tiden på Node 18 (och på Node 22 utan flagga; 21 % med
+--invocation-count-for-turbofan=100) - den kör otolkad/Sparkplug på Pi:erna och boxar då varje tal; process/sectionBlock 100 % på Node 18.
+Status:
+
 ## ÖPPET 2026-10-17 Tempot vandrar i breaket före/efter drops
 Vad: 24 lang-*.wav (konsertReplay --delad-cfg --step 5): 14 av 29 show-drops har tempobyte i frame.bpm (> 2 BPM) mellan 8 s före och 10 s
 efter dropen - ofta glidning i 3 BPM-steg (126 -> 123 -> 120 -> 117 -> 114 på 3 s, lang-105428 447 s) eller hopp till fel tempo som håller
