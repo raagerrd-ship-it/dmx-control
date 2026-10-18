@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // Full fart: GALLOPP — två grupper (varannan lampa) slår OMLOTT: grupp A exakt
 // på taktslaget, grupp B på off-beatet (&) → dubbel upplevd rytm, ett "dun-ka
@@ -18,6 +19,6 @@ export const gallop: EffectDef = {
     const pairBase = c.mixedSector(Math.floor(c.hueIdx / 4));
     const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;   // motfärger
     const v = 0.1 + 0.9 * Math.min(1, groupPulse * (0.85 + c.audio * 0.3) + c.kickEnv * 0.2 + c.punch * 0.5);
-    return c.hsv(hue, 1 - c.punch * 0.3, v);   // riktig dunk slår igenom rytmen
+    return hsv(hue, 1 - c.punch * 0.3, v);   // riktig dunk slår igenom rytmen
   },
 };

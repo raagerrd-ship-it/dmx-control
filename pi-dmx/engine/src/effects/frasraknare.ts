@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // FRASRAKNARE (2026-09-23): takten som FORM over fraserna. Grunden ar en palettpuls pa slaget; var 4:e takt (fjarde takten i
 // varje fyrtaktsfras) sveper ett ljust huvud over riggen genom takten, och pa var 8:e takts etta blixtrar hela riggen vitt
@@ -30,6 +31,6 @@ export const frasraknare: EffectDef = {
       c.want.blinder = flash;
       v = Math.max(v, flash); sat = Math.min(sat, 1 - flash * 0.9);
     }
-    return c.hsv(hue, sat, Math.min(1, v));
+    return hsv(hue, sat, Math.min(1, v));
   },
 };

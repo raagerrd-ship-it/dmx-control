@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // TYNGDLYFT (2026-09-23): nivan mot LATENS EGEN refrang (levelVsHighDb) lyfter riggen. 6 dB under senaste refrangen ar
 // ljuset djupt och mattat, bara mittlamporna; ju narmare refrangens niva desto fler lampor kommer med (inifran och ut) och
@@ -25,6 +26,6 @@ export const tyngdlyft: EffectDef = {
     // (vilket den nastan alltid ar - se pi-dmx-minnet), sa `1 - lift*0.9*on` gav mattnad 0,02: VIT hela tiden.
     // Nu: ingen avmattning utan riktig refrangreferens, och da hogst 0,3 - 'over refrangen' far bloma mer.
     const desat = hasRef ? Math.max(lift * on * 0.3, over * 0.6) : 0;
-    return c.hsv(hue, 1 - desat, Math.min(1, v));
+    return hsv(hue, 1 - desat, Math.min(1, v));
   },
 };

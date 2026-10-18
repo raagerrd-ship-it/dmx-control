@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // FYRVERKERI (high, 2026-09-21): dropen ar festen. Nar dropEnv slar till exploderar lamporna i slumpad ordning under ~2 s -
 // varje lampa far sin egen tandtid och palettfarg, vit karna som bleknar till farg - och lugnar sedan ner till ett pumpande
@@ -24,6 +25,6 @@ export const fyrverkeri: EffectDef = {
     const pump = Math.min(1, c.beatPulse * 0.9 + c.kickEnv * 0.6 + c.punch * 0.6);
     const party = 0.10 + 0.9 * pump * (mine ? 1 : 0.25);
     const v = Math.max(party * (1 - burst * 0.5), burst);
-    return c.hsv(hue, 1 - burst * 0.85, Math.min(1, v));
+    return hsv(hue, 1 - burst * 0.85, Math.min(1, v));
   },
 };

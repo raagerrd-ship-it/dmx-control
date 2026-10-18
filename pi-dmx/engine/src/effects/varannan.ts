@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 // Fart: VARANNAN lampa tar VARANNAN takt — jämna lampor slår på taktslaget, udda på
 // off-beatet (halva takten mellan). Ger en spatial DUBBELTAKT / ping-pong i stället
 // för att hela riggen blinkar dubbelt. De två grupperna har skilda palettfärger.
@@ -12,6 +13,6 @@ export const varannan: EffectDef = {
     // KULOR PER TAKT (ladan 2026-10-09, fladder pa sekundarfargen): forr nytt kulorpar varannat slag; nu per takt (grupperna har kvar var sin).
     const hue = c.mixedSector(Math.floor(c.hueIdx / 4) * 2 + off) / 6;
     const v = c.shaped(0.08, pulse * (0.6 + c.audio * 0.4) + c.punch * 0.25);
-    return c.hsv(hue, 1, Math.min(1, v));
+    return hsv(hue, 1, Math.min(1, v));
   },
 };

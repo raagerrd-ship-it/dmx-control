@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // BACKBEAT: den klassiska rock/pop-känslan. Kicken ger en DOV puls över hela
 // riggen, virveln en VIT blixt — och eftersom virveln ligger på 2 och 4 uppstår
@@ -18,6 +19,6 @@ export const backbeat: EffectDef = {
     const crack = d.snare * (mine ? 0.9 : 0.25);                    // virvelns smäll: hard pa min grupp, svag pa den andra
     // Virveln bars redan av ljuset (body + crack) OCH av grupphoppet (mine) - avmattningen var en tredje,
     // overflodig barare som dessutom tog kuloren. 0,85 -> 0,3.
-    return c.hsv(hue, 1 - crack * 0.3, Math.min(1, body + crack));
+    return hsv(hue, 1 - crack * 0.3, Math.min(1, body + crack));
   },
 };

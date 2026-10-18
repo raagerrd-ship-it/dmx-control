@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // RULLANDE ANDNING (break/intro, 2026-10-11): en långsam andning (en per takt) som rullar över lamporna - varje lampa en kvarts
 // andetag efter grannen, så riggen andas som en våg i stället för alla samtidigt. Två kulörer (palettens), varannan lampa.
@@ -11,6 +12,6 @@ export const rullandning: EffectDef = {
     const b = 0.5 - 0.5 * Math.cos(2 * Math.PI * ph);
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((c.idx % 2 ? base + 2 : base) % 6) / 6;
-    return c.hsv(hue, 1, 0.06 + 0.8 * b * b);
+    return hsv(hue, 1, 0.06 + 0.8 * b * b);
   },
 };

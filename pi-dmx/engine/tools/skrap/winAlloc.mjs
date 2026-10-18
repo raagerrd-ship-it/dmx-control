@@ -28,7 +28,7 @@ if (process.env.WIN_INCL) {
   const wrapAll = () => { for (const ent of process.env.WIN_INCL.split(",")) {
     const [url, cm] = ent.split("#"), [cls, meth] = cm.split(".");
     import(url).then((M) => { const P = M[cls].prototype, o = P[meth], r = { k: cm, b: 0, n: 0 }; rows.push(r);
-      P[meth] = function (a0, a1, a2, a3) { if (st !== 1) return o.call(this, a0, a1, a2, a3); const u0 = hs(), u1 = hs(); const x = o.call(this, a0, a1, a2, a3); const u2 = hs(); if (u2 >= u0) { r.b += (u2 - u1) - (u1 - u0); r.n++; } return x; }; });   // (u1-u0) = mätningens egen kostnad i samma kodväg
+      P[meth] = function (...a) { if (st !== 1) return o.apply(this, a); const u0 = hs(), u1 = hs(); const x = o.apply(this, a);   /* 10-18: rest-parametrar (förr högst 4 argument); arrayen skapas före u0 och räknas inte */ const u2 = hs(); if (u2 >= u0) { r.b += (u2 - u1) - (u1 - u0); r.n++; } return x; }; });   // (u1-u0) = mätningens egen kostnad i samma kodväg
   } };
   const prevPatch = globalThis.__winPatch; globalThis.__winPatch = (C) => { prevPatch(C); wrapAll(); };
   if (process.env.WIN_MOD) wrapAll();

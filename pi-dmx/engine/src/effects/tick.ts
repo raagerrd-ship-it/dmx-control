@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // TICK: hi-hatsen driver showen. Varje hat-anslag flyttar ljuset ett steg i
 // riggen (16-delar går fort → ett strimmigt, nervöst flimmer), medan kicken
@@ -19,6 +20,6 @@ export const tick: EffectDef = {
     const v = lit ? sharp : 0.04 + d.hat * 0.12;
     // Grundmattnaden var 0,7 och gick till 0,3 pa hi-hat - cyanen blev aldrig ren. Hatten syns redan i `v`
     // (sharp) och i vilken lampa som ar `lit`; den behover inte ta fargen med sig.
-    return c.hsv(hue, 1 - d.hat * 0.25, Math.min(1, v + d.kick * 0.35));
+    return hsv(hue, 1 - d.hat * 0.25, Math.min(1, v + d.kick * 0.35));
   },
 };

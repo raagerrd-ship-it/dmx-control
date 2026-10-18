@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // PINGPONG (build, 2026-10-11): yttre och inre paret (c.group via grupperingen) turas om - ett par per slag, efter fyra takter två
 // gånger per slag. Paret som har tur slår fullt, det andra är släckt. Ljuset stiger med tiden. En kulör per fras, paren i motfärg.
@@ -15,6 +16,6 @@ export const pingpong: EffectDef = {
     const ramp = Math.min(1, 0.55 + 0.45 * p);
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((c.group ? base + 3 : base) % 6) / 6;
-    return c.hsv(hue, 1, turn ? Math.min(1, ramp * (0.6 + 0.4 * hit)) : 0);
+    return hsv(hue, 1, turn ? Math.min(1, ramp * (0.6 + 0.4 * hit)) : 0);
   },
 };

@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // Lugnast: riggen andas - djup, symmetrisk swell (lång mjuk in-/utandning) som rullar från mitten och ut (10-13; var unison).
 export const breathe: EffectDef = {
@@ -16,6 +17,6 @@ export const breathe: EffectDef = {
     const ph = (c.hasBeat ? (c.beatIdx + c.beatFrac) / 8 : c.t / 8) - ring * 0.25;
     const b = 0.5 - 0.5 * Math.cos(2 * Math.PI * ph);
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    return c.hsv(((ring ? base + 1 : base) % 6) / 6, 1, 0.01 + 0.9 * b * b);
+    return hsv(((ring ? base + 1 : base) % 6) / 6, 1, 0.01 + 0.9 * b * b);
   },
 };

@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // Full fart: en SKARP ljuspunkt studsar fram och tillbaka, ett steg per takt,
 // kort efterglöd, mörk rigg emellan. Gles och kinetisk; ny ren färg vid varje
@@ -18,6 +19,6 @@ export const bounce: EffectDef = {
     const land = (d < 0.5 && c.beatHit) ? 0.8 : 0;
     const gnista = Math.max(c.punch, land);
     const v = Math.exp(-d * 1.7) * Math.min(1, 0.85 + c.beatPulse * 0.15 + c.kickEnv * 0.4 + land * 0.2) + c.punch * 0.35;
-    return c.hsv(hue, 1 - gnista * 0.3, Math.min(1, v));   // dunk/landning → vit gnista
+    return hsv(hue, 1 - gnista * 0.3, Math.min(1, v));   // dunk/landning → vit gnista
   },
 };

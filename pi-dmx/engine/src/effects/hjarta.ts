@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // HJÄRTSLAG: dubbelslaget. Ett kraftigt slag på taktslaget och ett svagare strax
 // efter (lub-DUB), taktlåst så det alltid ligger rätt i tempot. Ger en organisk,
@@ -19,6 +20,6 @@ export const hjarta: EffectDef = {
     const beat = c.hasBeat ? Math.max(lub, dub) : c.heartPulse;   // utan taktlas: riktiga kickar i stallet for att sta stilla pa 1,0 (09-27)
     const hue = 0.98 + c.frame.spec.bass * 0.04;          // djupröd → varmare med basen
     const v = 0.10 + beat * (0.75 + 0.1 * (1 - ring)) + c.frame.spec.kick * 0.15;   // mitten slar en aning hardare
-    return c.hsv(hue % 1, 1 - beat * 0.25, Math.min(1, v));
+    return hsv(hue % 1, 1 - beat * 0.25, Math.min(1, v));
   },
 };

@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // (skräpjakten 10-18: förr en closure/array som skapades i render per lampa och ruta - samma räkning)
 const h = (x: number, n: number) => (Math.imul(x, 2654435761) >>> 0) % n;
@@ -13,8 +14,8 @@ export const kickregn: EffectDef = {
     const n = Math.max(1, c.count);
     const on = h(c.beatIdx, n), off = (on + 1 + (h(c.beatIdx + 7, n) % Math.max(1, n - 1))) % n;
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    if (c.idx === on) return c.hsv(base / 6, 1, Math.min(1, 0.2 + 0.8 * Math.max(c.kickEnv, Math.exp(-c.beatFrac / 0.2))));
-    if (c.idx === off && c.beatFrac >= 0.5) return c.hsv(((base + 3) % 6) / 6, 1, 0.5 * Math.exp(-(c.beatFrac - 0.5) / 0.15));
-    return c.hsv(0, 0, 0);
+    if (c.idx === on) return hsv(base / 6, 1, Math.min(1, 0.2 + 0.8 * Math.max(c.kickEnv, Math.exp(-c.beatFrac / 0.2))));
+    if (c.idx === off && c.beatFrac >= 0.5) return hsv(((base + 3) % 6) / 6, 1, 0.5 * Math.exp(-(c.beatFrac - 0.5) / 0.15));
+    return hsv(0, 0, 0);
   },
 };

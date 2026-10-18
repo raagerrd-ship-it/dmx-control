@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // SUG (build, 2026-09-21): slutet av uppbyggnaden. Nar analysatorns riser (buildUp) passerar 0,6 SUGS ljuset ner mot
 // nastan svart - bara en smal, allt snabbare puls i mitten - medan hazern stiger, sa dropen far landa i tom luft
@@ -27,6 +28,6 @@ export const sug: EffectDef = {
     c.want.hazer = 0.4 + 0.6 * Math.max(late, b * 0.5); c.want.uv = late * 0.8;
     if (c.dropEnv > 0.6) c.want.blinder = c.dropEnv;
     const v = edge ? (late > 0.25 ? 0 : 0.03 + pulse * 0.5) + c.dropEnv : base + pulse * (0.25 + 0.6 * late) + c.dropEnv;
-    return c.hsv(hue, 1 - late * 0.5, Math.min(1, v));
+    return hsv(hue, 1 - late * 0.5, Math.min(1, v));
   },
 };

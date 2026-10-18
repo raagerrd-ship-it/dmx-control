@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // VISKA: nästan svart rum där bara PERKUSSIONEN syns. Ingen grundnivå att tala
 // om — virvel och hi-hat tänder korta gnistor på var sin lampa, kicken ger en
@@ -24,6 +25,6 @@ export const viska: EffectDef = {
     const hat = hatPos === c.idx ? Math.exp(-age / 0.35) * (0.45 + 0.4 * Math.min(1, d.hat * 1.5)) : 0;
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = (((c.lamp & 1) ? base + 1 : base) % 6) / 6;
-    return c.hsv(hue, 1, Math.min(1, 0.015 + hat));
+    return hsv(hue, 1, Math.min(1, 0.015 + hat));
   },
 };

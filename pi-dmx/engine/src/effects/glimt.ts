@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // (skräpjakten 10-18: förr en closure/array som skapades i render per lampa och ruta - samma räkning)
 const sel0 = (b: number, n: number) => (Math.imul(b + 5, 2654435761) >>> 0) % n;
@@ -18,6 +19,6 @@ export const glimt: EffectDef = {
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = (((c.lamp & 1) ? base + 3 : base) % 6) / 6;
     const g = c.idx === sel ? Math.exp(-c.beatFrac / 0.3) * (0.5 + 0.5 * Math.min(1, c.trebleEnv * 1.5)) : 0;
-    return c.hsv(hue, 0.9, Math.min(1, 0.015 + 0.85 * g));
+    return hsv(hue, 0.9, Math.min(1, 0.015 + 0.85 * g));
   },
 };

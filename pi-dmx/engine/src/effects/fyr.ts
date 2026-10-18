@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // FYR (break/intro, 2026-10-11): en långsam stråle sveper runt riggen - ett varv på två takter - mjukt övertonad mellan lamporna,
 // de andra nästan släckta. Lugn men rumslig (break hade bara enhetliga looks utom viska). En kulör, mättad.
@@ -13,6 +14,6 @@ export const fyr: EffectDef = {
     let d = Math.abs(c.idx + 0.5 - p); d = Math.min(d, n - d);        // avstånd runt riggen
     const v = Math.max(0, 1 - d / 1.1);
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;
-    return c.hsv(hue, 1, 0.04 + 0.86 * v * v);
+    return hsv(hue, 1, 0.04 + 0.86 * v * v);
   },
 };

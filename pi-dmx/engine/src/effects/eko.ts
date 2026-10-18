@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // EKO: varje taktslag tänder första lampan, och slaget ekar vidare genom riggen
 // med en fjärdedels taktslag mellan lamporna — som ett delay-pedal på ljuset.
@@ -20,6 +21,6 @@ export const eko: EffectDef = {
     const damp = Math.pow(0.72, c.idx);                   // varje studs svagare
     const hue = c.mixedSector(Math.floor(c.hueIdx / 4) + c.idx) / 6;
     const v = decay * damp * (0.55 + c.audio * 0.45) + c.frame.spec.kick * 0.12;
-    return c.hsv(hue, 1, Math.min(1, 0.04 + v + c.punch * 0.25));
+    return hsv(hue, 1, Math.min(1, 0.04 + v + c.punch * 0.25));
   },
 };

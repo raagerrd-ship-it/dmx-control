@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // STEGRING (build, 2026-09-21): spanningen stiger med sektionens alder. Borjar morkt och mattat i en farg, smalnar
 // mot vitt och lyfter mot taket ju langre uppbyggnaden pagatt (antagen langd ~16 s, klamp), takten markeras med en
@@ -31,6 +32,6 @@ export const stegring: EffectDef = {
     c.want.uv = u; c.want.hazer = 0.3 + 0.7 * u;
     if (c.dropEnv > 0.7) c.want.blinder = c.dropEnv;
     const v = e < 0.5 || c.count < 3 ? base + pulse * (0.3 + 0.5 * u) : (edgeHit ? pulse * (0.5 + 0.5 * u) : 0.02);
-    return c.hsv(hue, sat, Math.min(1, v + c.dropEnv * 0.6));
+    return hsv(hue, sat, Math.min(1, v + c.dropEnv * 0.6));
   },
 };

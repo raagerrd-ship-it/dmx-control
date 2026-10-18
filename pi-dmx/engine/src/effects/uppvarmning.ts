@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // UPPVÄRMNING (fart x intro, situationsrutnätet 2026-10-12 - rutan hade två effekter, syskon ankomst/spaning): introt värms upp på
 // hi-hatten. Lamporna som "lyssnar" fladdrar på varje hi-hat (c.drum.hat), resten är mörka; antalet lyssnande lampor växer med
@@ -13,7 +14,7 @@ export const uppvarmning: EffectDef = {
     const start = ((Math.floor(c.beatIdx / 4) % n) + n) % n;
     const rank = (c.idx - start + n) % n;
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    if (rank >= k) return c.hsv(base / 6, 1, 0.02);
-    return c.hsv(((base + 2 * (rank & 1)) % 6) / 6, 0.9, Math.min(1, 0.06 + 0.9 * Math.min(1, c.drum.hat * 1.2)));
+    if (rank >= k) return hsv(base / 6, 1, 0.02);
+    return hsv(((base + 2 * (rank & 1)) % 6) / 6, 0.9, Math.min(1, 0.06 + 0.9 * Math.min(1, c.drum.hat * 1.2)));
   },
 };

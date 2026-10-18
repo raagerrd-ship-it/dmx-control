@@ -134,7 +134,7 @@ const PALETTE_LOCK: number[] | null = (() => {
   return nums.length ? nums : null;
 })();
 if (PALETTE_LOCK) console.log(`[palett] LÅST till [${PALETTE_LOCK.join(", ")}] via DMX_PALETTE`);
-import { hsvToRgb } from "./effects/color.js";
+import { hsvToRgb, hsv as hsvFx } from "./effects/color.js";
 const ZERO3: [number, number, number] = [0, 0, 0];
 /** TALFÄLTEN SOM DECIMALTAL FRÅN START (10-16, GC-jakten): ett fält som startar som heltal (`= 0`) och senare får ett decimaltal byter
  *  objektets form (V8 'map') - då kastas all optimerad kod som läser objektet ('wrong map'-deopt) och det hände fält för fält, minut för
@@ -339,7 +339,7 @@ const MANUS_REL = 0.5;
 // rutan vid bytet - looken klarade dem när låten valde den; gallop föll på beat < 0,35 mitt i refrängen). Av = bit-identiskt.
 const MANUS_RETURN = process.env.DMX_MANUS_RETURN !== '0';
 /** Undre grans for effekternas mattnad (se ctx.hsv). 0 = av. */
-const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)));
+// (SAT_FLOOR / DMX_SAT_FLOOR bor i effects/color.ts sedan 10-18 - effekternas hsv)
 // DROP_CALM_BUILD: drop i low/intro kraver riser >= detta. STANDARD 0 = AV sedan 2026-09-22 (natt-agent B, tools/dropBench.mjs mot
 // 19-drop-facitet + pop/megamix): buildUp ar ~0 (max 0,04) vid ALLA 71 fyrningar och etiketten ar alltid low/break i sjalva
 // dropogonblicket (high forst efterat) -> grinden pa 0,25 nekade 7/12 pop- och 11/32 megamix-drops, dvs nastan allt (live i ladan
@@ -717,9 +717,7 @@ export class EffectEngine {
     // Golvet satter en undre grans pa mattnaden i EN punkt, sa alla effekter trafas likformigt och ratten kan
     // provas live. 0 = som forr. Varden > 0 later accenten finnas kvar men behalla kuloren; ljusstyrkan rors
     // inte (v gar oforandrat vidare).
-    hsv: SAT_FLOOR > 0
-      ? ((h: number, sv: number, v: number) => hsvToRgb(h, sv < SAT_FLOOR ? SAT_FLOOR : sv, v))
-      : hsvToRgb,
+    hsv: hsvFx,   // effekternas färg (color.ts hsv, med mättnadsgolvet) - effekterna importerar den direkt (se color.ts)
   };
 
   /** Välj ny palett vid frasbyte, biasad av klangen (centroid). */

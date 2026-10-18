@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // BASGANG (2026-09-23): ljuset stegar pa BASNOTERNA. Motorn raknar basnots-anslag (bassNoteIdx ur onset.bass) och nar
 // analysatorn ser en tydlig basgang (profile.bassline) hoppar en skarp ljuspunkt ett steg per not (ping-pong over riggen) och
@@ -26,6 +27,6 @@ export const basgang: EffectDef = {
     // sidoblink). Positionen hoppar fortfarande per not; kuloren byts per fyra noter.
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;   // kulören per fras (10-13: var var 4:e basnot = 14,5 kulörhopp/min)
     const v = d < 0.5 ? Math.min(1, bed + note * 0.9 + c.punch * 0.3) : Math.min(1, bed + note * Math.exp(-d * 2.2) * 0.35 + c.punch * 0.15);
-    return c.hsv(hue, 1 - (d < 0.5 ? c.punch * 0.4 : 0), v);
+    return hsv(hue, 1 - (d < 0.5 ? c.punch * 0.4 : 0), v);
   },
 };

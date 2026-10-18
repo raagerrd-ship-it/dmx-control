@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // DUNK (fart x intro, situationsrutnätet 2026-10-12 - syskon ankomst/spaning/uppvärmning): introts basslag mäts upp i riggen.
 // Varje riktig dunk (c.punch, annars kicken) tänder lampor inifrån och ut efter styrkan - ett svagt slag bara mitten, ett hårt
@@ -13,6 +14,6 @@ export const dunk: EffectDef = {
     const reach = hit * (n - 1);                                       // hur många lampor slaget når (max n-1)
     const on = Math.max(0, Math.min(1, reach - rank + 0.3));
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    return c.hsv(((base + (rank >= 2 ? 3 : 0)) % 6) / 6, 1, Math.min(1, 0.03 + 0.92 * on * hit));
+    return hsv(((base + (rank >= 2 ? 3 : 0)) % 6) / 6, 1, Math.min(1, 0.03 + 0.92 * on * hit));
   },
 };

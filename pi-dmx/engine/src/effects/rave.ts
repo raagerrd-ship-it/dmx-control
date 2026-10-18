@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // Full fart: TVÅFÄRGS-VÄXELSPEL — riggen delas varannan lampa i två grupper med
 // KONTRASTFÄRGER (motsatta sidor av hjulet) som PINGPONGAR plats varje takt,
@@ -26,6 +27,6 @@ export const rave: EffectDef = {
     if (back > 0 && lit) c.want.uv = back;
     // Raven lever pa att de tva grupperna har MOTSATTA kulorer (pairBase +3); blixtrar de till vitt forsvinner
     // just det som skiljer dem. Avmattningen halverad.
-    return c.hsv(hue, lit ? 1 - Math.max(gnista * 0.25, entry * 0.3, back * 0.4) : 1, Math.min(1, v + entry * 0.6));
+    return hsv(hue, lit ? 1 - Math.max(gnista * 0.25, entry * 0.3, back * 0.4) : 1, Math.min(1, v + entry * 0.6));
   },
 };

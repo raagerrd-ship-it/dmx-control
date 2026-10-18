@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // BLIXTNEDSLAG (full x intro, situationsrutnätet 2026-10-12 - rutan hade två effekter, syskon kickregn/startskott): introt i en
 // fullfartslåt på virveln. Baktakten (slag 2 och 4, och varje virvelslag c.drum.snare) slår ner som en blixt i en lampa (ny plats
@@ -16,11 +17,11 @@ export const blixtnedslag: EffectDef = {
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     if (c.lamp === strike) {
       const f = back ? Math.max(Math.exp(-c.beatFrac / 0.2), c.drum.snare) : 0.5 * c.drum.snare;
-      return c.hsv(base / 6, 0.85, Math.min(1, 0.03 + 0.95 * f));
+      return hsv(base / 6, 0.85, Math.min(1, 0.03 + 0.95 * f));
     }
     // (efterblixten i grannlampan borttagen 10-12, ägaren: 'inte kännas som en strobe'; void branch)
     void branch;
-    if (c.lamp === (strike + 2) % n) return c.hsv(((base + 3) % 6) / 6, 1, 0.03 + 0.2 * c.drum.kick);
-    return c.hsv(base / 6, 1, 0);
+    if (c.lamp === (strike + 2) % n) return hsv(((base + 3) % 6) / 6, 1, 0.03 + 0.2 * c.drum.kick);
+    return hsv(base / 6, 1, 0);
   },
 };

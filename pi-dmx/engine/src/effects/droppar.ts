@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // (skräpjakten 10-18: förr en closure/array som skapades i render per lampa och ruta - samma räkning)
 const h = (x: number, n: number) => (Math.imul(x + 11, 2654435761) >>> 0) % n;
@@ -22,8 +23,8 @@ export const droppar: EffectDef = {
     // grundnivå lyfte 0,04 till en tredjedel).
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = (((c.lamp & 1) ? base + 1 : base) % 6) / 6;
-    if (c.lamp === cur) return c.hsv(hue, 0.95, Math.min(1, 0.08 + 0.85 * Math.exp(-age / 1.4)));
-    if (c.lamp === prev) return c.hsv(hue, 0.95, 0.06 + 0.45 * Math.exp(-(age + 0.4) / 1.4));
-    return c.hsv(hue, 1, 0.015);
+    if (c.lamp === cur) return hsv(hue, 0.95, Math.min(1, 0.08 + 0.85 * Math.exp(-age / 1.4)));
+    if (c.lamp === prev) return hsv(hue, 0.95, 0.06 + 0.45 * Math.exp(-(age + 0.4) / 1.4));
+    return hsv(hue, 1, 0.015);
   },
 };

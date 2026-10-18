@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // (skräpjakten 10-18: förr en closure/array som skapades i render per lampa och ruta - samma räkning)
 const LVL = [0.03, 0.25, 0.45];
@@ -17,6 +18,6 @@ export const morkerslag: EffectDef = {
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((base + 2 * (c.lamp & 1)) % 6) / 6;
     const v = c.lamp === hole ? lvl * (1 - Math.exp(-c.beatFrac / 0.35)) : lvl;
-    return c.hsv(hue, 1, Math.min(1, 0.02 + v));
+    return hsv(hue, 1, Math.min(1, 0.02 + v));
   },
 };

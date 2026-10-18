@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // TIDVATTEN: en vattenlinje som stiger och sjunker genom riggen. Lamporna under
 // linjen lyser fullt, lampan VID linjen glöder delvis, ovanför är mörkt. Nivån
@@ -19,6 +20,6 @@ export const tide: EffectDef = {
     // Skum: peak-hållet ligger kvar ovanför ytan → en ljusare rand som dröjer.
     const foam = Math.max(0, Math.min(1, c.gravPeak * c.count - c.idx)) - fill;
     const hue = c.mixedSector(0) / 6 + 0.06 * fill;   // djupare färg längre ner
-    return c.hsv(hue, 1 - foam * 0.6, (0.20 + 0.75 * fill + foam * 0.35) * c.heart(0.15));   // egen latt hjartpuls (09-27)
+    return hsv(hue, 1 - foam * 0.6, (0.20 + 0.75 * fill + foam * 0.35) * c.heart(0.15));   // egen latt hjartpuls (09-27)
   },
 };

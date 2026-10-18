@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // FORVARNING (2026-09-23): analysatorns forutsagelse (expectHighInMs = ms till nasta vantade refrang) blir en synlig
 // nedrakning: de sista 4 takterna fore refrangen tands lamporna EN I TAGET utifran och in (4 lampor = en per takt), sista
@@ -28,7 +29,7 @@ export const forvarning: EffectDef = {
       // SLAPPET: refrangen ar har - vit stot som faller pa 400 ms, sedan en full puls tills dirigenten byter.
       const e = c.sectionEntry;
       if (e > 0.5) c.want.blinder = e;
-      return c.hsv(hue, 1 - e, Math.min(1, 0.5 + c.beatPulse * 0.4 + e * 0.5 + c.punch * 0.3));
+      return hsv(hue, 1 - e, Math.min(1, 0.5 + c.beatPulse * 0.4 + e * 0.5 + c.punch * 0.3));
     }
     if (barsLeft >= 0 && barsLeft <= 4) {
       const prog = 1 - barsLeft / 4;                                              // 0 -> 1 genom de fyra takterna
@@ -38,11 +39,11 @@ export const forvarning: EffectDef = {
       c.want.hazer = 0.3 + 0.6 * prog; c.want.uv = last;
       const pulse = c.hasBeat ? Math.exp(-c.beatFrac / 0.12) : c.kickEnv;
       const v = lit ? Math.min(1, 0.35 + 0.35 * prog + pulse * 0.3 + last * 0.3) : 0.04 + pulse * 0.08 * prog;
-      return c.hsv(hue, lit ? 1 - last * 0.9 : 1, v);
+      return hsv(hue, lit ? 1 - last * 0.9 : 1, v);
     }
     // VANTAN: lugn palettpuls som vaknar med sektionens langd (16 takter -> fullt vaken).
     const wake = Math.min(1, c.sectionBars / 16);
     const v = 0.18 + 0.15 * wake + c.beatPulse * (0.15 + 0.2 * wake) + c.punch * 0.25;
-    return c.hsv(hue, 1, Math.min(1, v));
+    return hsv(hue, 1, Math.min(1, v));
   },
 };

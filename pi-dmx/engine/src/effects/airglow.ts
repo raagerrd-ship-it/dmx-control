@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // Lugn: LUFT-GLÖD — riggen är nästan mörk med en svag, långsamt driftande blågrön
 // glöd; varje cymbal-splash, shaker och sib-konsonant i sången (air 10–16 kHz)
@@ -21,6 +22,6 @@ export const airglow: EffectDef = {
     const other = c.group === 0 ? c.airEnv : c.trebleEnv;
     const spark = c.shaped(0, Math.max(own, other * 0.35)) * 0.95;                 // egen rost fullt, den andra svagt
     const hue = 0.40 + c.frame.spec.air * 0.10;                    // grön → cyan när air sustained
-    return c.hsv(hue, 1, Math.min(1, base * c.heart(0.3) + spark));   // glöden pulsar med hjartat, gnistorna ororda (09-27)
+    return hsv(hue, 1, Math.min(1, base * c.heart(0.3) + spark));   // glöden pulsar med hjartat, gnistorna ororda (09-27)
   },
 };

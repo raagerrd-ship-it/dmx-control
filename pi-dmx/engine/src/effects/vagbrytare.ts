@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // VAGBRYTARE (high, 2026-09-21): en vag per TAKT (4 slag) rullar fran ena kanten till den andra, och pa ettan (barShift
 // fran analysatorn) bryter den med en vit kam over hela riggen. Takten syns som en FORM, inte bara som puls. Riktningen
@@ -21,6 +22,6 @@ export const vagbrytare: EffectDef = {
     const v = Math.min(1, (body > 0.1 ? body : 0) + crest * 0.7 + c.sectionEntry * 0.5);
     // Kammen PA ettan ska vara vitaktig - det ar effektens ide - men 0,9 gjorde varje takts etta nastan helt vit.
     // 0,45 later den lasas som en ljus kam i latens kulor i stallet for som en vit blixt.
-    return c.hsv(hue, 1 - crest * 0.45, v);
+    return hsv(hue, 1 - crest * 0.45, v);
   },
 };

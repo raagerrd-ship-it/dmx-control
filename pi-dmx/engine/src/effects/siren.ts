@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // SIREN (full x uppbyggnad, situationsrutnätet 2026-10-12 - andra effekten i rutan, syskon rulle): båda lampgrupperna (c.group)
 // lyser hela tiden men BYTER KULÖR med varandra som en siren - varannat slag, och varje slag efter halva uppbyggnaden
@@ -21,6 +22,6 @@ export const siren: EffectDef = {
       const v = Math.max(0, 1 - d / width);
       if (v > best) { best = v; hue = ((k ? base + 3 : base) % 6) / 6; }
     }
-    return c.hsv(hue, 1, Math.min(1, (0.45 + 0.4 * p) * best * best));
+    return hsv(hue, 1, Math.min(1, (0.45 + 0.4 * p) * best * best));
   },
 };

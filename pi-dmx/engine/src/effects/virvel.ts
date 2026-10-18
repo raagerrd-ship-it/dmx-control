@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // VIRVEL (build, 2026-10-11): uppbyggnader har ofta en virvelrulle som tätnar. Varje virvelslag (drum.snare-flank) flyttar ljuset
 // till nästa lampa runt riggen - rullen syns som en snurr som går fortare och fortare. Utan virvel: stegar på slaget. En kulör.
@@ -16,7 +17,7 @@ export const virvel: EffectDef = {
       else if (c.beatIdx !== lastBeat) lastBeat = c.beatIdx;
     }
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;
-    if (c.idx === pos) return c.hsv(hue, 1, 0.6 + 0.35 * c.buildUp);   // starkare mot dropen
-    return c.hsv(hue, 1, 0);
+    if (c.idx === pos) return hsv(hue, 1, 0.6 + 0.35 * c.buildUp);   // starkare mot dropen
+    return hsv(hue, 1, 0);
   },
 };

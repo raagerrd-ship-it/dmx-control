@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // (skräpjakten 10-18: förr en closure/array som skapades i render per lampa och ruta - samma räkning)
 const pairOf = (b: number) => (Math.imul(b + 3, 2654435761) >>> 0) % 6;
@@ -18,7 +19,7 @@ export const snap: EffectDef = {
     const lit = one || n < 4 || PAIRS[pr].includes(c.lamp % 4);
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = (((c.lamp & 1) ? base + 3 : base) % 6) / 6;
-    if (!lit) return c.hsv(hue, 1, 0);
+    if (!lit) return hsv(hue, 1, 0);
     // Vit-kap på SLAGET: gnista = grid-flanken (beatHit) ELLER en riktig dunk →
     // varje färgbyte punkteras av en kort vit gnista även när basen är svag, och
     // sitter på gridet (eller kicken utan BPM-lås). fastMode ger den kort utklang.
@@ -30,6 +31,6 @@ export const snap: EffectDef = {
     const back = c.section === 'high' && c.repeatSim >= 0.92 && c.sectionIndex >= 2 ? gnista : 0;
     if (back > 0) c.want.uv = back;
     // `entry` var 1,0 = helt vitt genom hela refrangentren. Gnistan syns i `v`; kuloren ska bara bloma, inte forsvinna.
-    return c.hsv(hue, 1 - Math.max(gnista * 0.25, entry * 0.45, back * 0.4), v);   // slag → gnista, kuloren kvar
+    return hsv(hue, 1 - Math.max(gnista * 0.25, entry * 0.45, back * 0.4), v);   // slag → gnista, kuloren kvar
   },
 };

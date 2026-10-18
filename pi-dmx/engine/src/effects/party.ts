@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // Full fart: FÄRGKAOS-PUMP — varje lampa egen ren färg (blandas om varje takt)
 // och hela riggen THROBBAR hårt: nästan kolsvart mellan slagen, full på beatet.
@@ -13,7 +14,7 @@ export const party: EffectDef = {
     const n = Math.max(1, c.count);
     const hole = ((c.beatIdx % n) + n) % n;
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16) + c.idx * 2) / 6;
-    if (n >= 3 && c.idx === hole && c.sectionEntry < 0.05) return c.hsv(hue, 1, 0);
+    if (n >= 3 && c.idx === hole && c.sectionEntry < 0.05) return hsv(hue, 1, 0);
     const pump = c.hasBeat ? Math.exp(-c.beatFrac / 0.2) : c.beatPulse;
     const v = 0.12 + 0.88 * pump;   // motorns hjartslag dippar redan till 0.30 → hoj eget golv sa det inte blir strobe                                     // djupare throb (mörkare mellan slagen)
     const entry = c.section === 'high' ? c.sectionEntry : 0;   // refrangens forsta slag: stot + blinder
@@ -23,6 +24,6 @@ export const party: EffectDef = {
     if (back) c.want.uv = c.beatPulse;
     // Dunken bars av `v` (pump) och entren av `v + entry*0.5`; avmattningen var en extra barare mot vitt.
     // Halverad, och entren far mest eftersom en refrangentre AR en vit stot.
-    return c.hsv(hue, 1 - Math.max(entry * 0.35, back * c.beatPulse * 0.3), Math.min(1, v + entry * 0.5));   // dunk → gnista, kuloren kvar
+    return hsv(hue, 1 - Math.max(entry * 0.35, back * c.beatPulse * 0.3), Math.min(1, v + entry * 0.5));   // dunk → gnista, kuloren kvar
   },
 };

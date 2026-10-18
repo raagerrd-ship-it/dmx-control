@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // URLADDNING (full x break, situationsrutnätet 2026-10-12 - syskon efterskalv/skuggor/mörkerslag): dropens energi som rinner ur
 // riggen. När breaket börjar står lamporna laddade på olika nivå (en redan mörk) och laddas ur var för sig i egen takt (c.idx:
@@ -14,6 +15,6 @@ export const urladdning: EffectDef = {
     const bar = ((Math.floor(c.beatIdx / 4) % n) + n) % n;
     const one = c.idx === bar && (((c.beatIdx % 4) + 4) % 4) === 0 ? 0.35 * Math.exp(-c.beatFrac / 0.4) : 0;
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    return c.hsv(((base + (c.idx & 1)) % 6) / 6, 1, Math.min(1, 0.03 + charge + one));
+    return hsv(((base + (c.idx & 1)) % 6) / 6, 1, Math.min(1, 0.03 + charge + one));
   },
 };

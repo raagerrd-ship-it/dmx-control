@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // STJÄRNOR (lugn x uppbyggnad, situationsrutnätet 2026-10-12 - rutan hade två effekter, syskon gryning/flod): en lugn låts
 // uppbyggnad utan takt i ljuset. Varje lampa tindrar på sin egen tid (hash per lampa och tidslucka, ingen takt), och himlen tätnar
@@ -15,6 +16,6 @@ export const stjarnor: EffectDef = {
     const tw = r < 0.2 + 0.55 * p ? Math.sin(Math.PI * ph) ** 2 : 0;   // tindring: upp och ned över luckan
     const base = c.mixedSector(Math.floor(c.hueIdx / 32));
     const hue = ((c.lamp & 1 ? base + 1 : base) % 6) / 6;
-    return c.hsv(hue, 0.9, Math.min(1, 0.04 + (0.3 + 0.55 * p + 0.15 * c.trebleEnv) * tw));
+    return hsv(hue, 0.9, Math.min(1, 0.04 + (0.3 + 0.55 * p + 0.15 * c.trebleEnv) * tw));
   },
 };

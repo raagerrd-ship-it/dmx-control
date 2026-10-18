@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // NEDRAKNING (build, 2026-09-21): en visuell nedrakning i 8-slagscykler: slag 0-6 slacks lamporna en i taget utifran och in,
 // slag 7 tands ALLT i vitt - och cykeln borjar om, tatare mot slutet av risern (buildUp). Nar dropen kommer (dropEnv) landar
@@ -26,6 +27,6 @@ export const nedrakning: EffectDef = {
     const base = off ? 0.03 : 0.35 + 0.35 * b + c.beatPulse * 0.25;
     const v = Math.min(1, base + all * 0.9 + c.dropEnv);
     // Sista steget ('alla tands') bars av ljuset; 0,9 gjorde finalen vit i stallet for mattad. 0,9 -> 0,4.
-    return c.hsv(hue, 1 - all * 0.4, v);
+    return hsv(hue, 1 - all * 0.4, v);
   },
 };

@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // FLOD (lugn x uppbyggnad, situationsrutnätet 2026-10-12 - andra effekten i rutan, syskon gryning): en mjuk våg som rullar över
 // riggen (c.idx-ordningen, så hållet växlar) och växer med uppbyggnaden (c.buildUp): långsam och låg i början, snabbare och djupare
@@ -15,6 +16,6 @@ export const flod: EffectDef = {
     const hue = c.mixedSector(Math.floor(c.hueIdx / 32)) / 6;
     // 10-13 (effectDyn: spridning 0,30 - golvet 0,12 + 0,3p lyftes av motorns grundnivå så vågens dal syntes som nästan fullt):
     // vågen går ner i nästan mörker (w i kvadrat ger en smalare, mjukare rygg).
-    return c.hsv(hue, 0.95, Math.min(1, 0.01 + depth * w * w * (0.7 + 0.3 * p)));
+    return hsv(hue, 0.95, Math.min(1, 0.01 + depth * w * w * (0.7 + 0.3 * p)));
   },
 };

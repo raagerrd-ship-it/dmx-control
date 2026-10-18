@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // FYLLNING (build, 2026-10-11, ägaren i ladan: "dirigenten borde ha fler specifika effekter inom varje gren" - build hade bara två):
 // riggen fylls - en lampa till tänds varje takt (1, 2, 3, 4 lampor) i ordning utifrån och in, och på frasens sista slag blixtrar alla.
@@ -15,8 +16,8 @@ export const fyllning: EffectDef = {
     const last = lit >= n && beatInBar === 3;                        // frasens sista slag: alla
     const hit = Math.exp(-c.beatFrac / 0.18);
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;
-    if (last) return c.hsv(hue, 0.85, Math.min(1, 0.5 + 0.5 * hit));
-    if (!on) return c.hsv(hue, 1, 0);
-    return c.hsv(hue, 1, Math.min(1, (0.35 + 0.4 * Math.max(lit / n, c.buildUp)) + 0.25 * hit));
+    if (last) return hsv(hue, 0.85, Math.min(1, 0.5 + 0.5 * hit));
+    if (!on) return hsv(hue, 1, 0);
+    return hsv(hue, 1, Math.min(1, (0.35 + 0.4 * Math.max(lit / n, c.buildUp)) + 0.25 * hit));
   },
 };

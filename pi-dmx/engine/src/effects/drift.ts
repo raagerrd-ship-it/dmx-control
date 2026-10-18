@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // DRIFT: musikens KLANG bestämmer var i rummet ljuset ligger. Mörk, bastung
 // musik samlar ljuset i ena änden av riggen; ljus, diskantrik musik drar det
@@ -19,6 +20,6 @@ export const drift: EffectDef = {
     if (driftSec < 0 || Math.abs(cs - driftSec) > 0.9) driftSec = Math.round(cs);
     const hue = c.mixedSector(driftSec) / 6;
     const m = glow * (0.45 + c.audio * 0.4) + 0.20 + c.punch * 0.15;
-    return c.hsv(hue, 1, Math.min(1, m) * c.heart(0.18));   // egen latt hjartpuls (09-27)
+    return hsv(hue, 1, Math.min(1, m) * c.heart(0.18));   // egen latt hjartpuls (09-27)
   },
 };

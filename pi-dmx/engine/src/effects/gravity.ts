@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // Full fart: GRAVITATIONS-VU — ljudet KNUFFAR upp en nivå som sen FALLER med
 // gravitation; lamporna fylls vänster→höger upp till nivån → fysisk tyngd, inte
@@ -22,9 +23,9 @@ export const gravity: EffectDef = {
       const peakHue = ((c.mixedSector(Math.floor(c.hueIdx / 8)) + 3) % 6) / 6;   // peak i kontrastfärg
       // Pricken var hsv(_,1,1) = en lampa KONSTANT fullt tand medan stapeln pulsade (agaren 09-27). Nu pulsar den med
       // hjartat (djupare an stapeln sa den fortfarande sticker ut som topp) - minnet av smallen slar i takten.
-      return c.hsv(peakHue, 1, c.heart(0.5));
+      return hsv(peakHue, 1, c.heart(0.5));
     }
     const base = c.mixedSector(Math.floor(c.hueIdx / 8)) / 6;               // lugn färgvandring
-    return c.hsv(base, 1, (0.05 + 0.95 * fill) * c.heart(0.3));   // nivan pulsar i takten, peak-pricken orord (09-27)
+    return hsv(base, 1, (0.05 + 0.95 * fill) * c.heart(0.3));   // nivan pulsar i takten, peak-pricken orord (09-27)
   },
 };

@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // Lugn: varje lampa håller sin EGEN långsamt driftande färg med mjuka,
 // OBEROENDE korsfades — likt norrsken där färgerna glider var för sig. Per-lampa
@@ -14,6 +15,6 @@ export const aurora: EffectDef = {
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16) + c.idx * 2) / 6;
     const per = 7 + ((c.lamp * 5) % 4) * 1.3;                                // 7 / 8,3 / 9,6 / 10,9 s - draperierna glider isär
     const wash = 0.5 + 0.5 * Math.sin((2 * Math.PI * c.t) / per + c.lamp * 1.9);
-    return c.hsv(hue, 1, (0.01 + 0.9 * wash * wash) * c.heart(0.18));   // egen latt hjartpuls (09-27)
+    return hsv(hue, 1, (0.01 + 0.9 * wash * wash) * c.heart(0.18));   // egen latt hjartpuls (09-27)
   },
 };

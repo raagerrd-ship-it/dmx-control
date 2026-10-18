@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // SPEKTRUM: en spatial spektrumanalysator. Riggen sprids över dubbel-FFT:ns
 // separerade band (låg-bas → luft) med en rainbow-färg per band (varmt lågt →
@@ -36,6 +37,6 @@ export const eq: EffectDef = {
     // NIVA-kolumnerna (bas/mellan, index 0-2) ar sustained -> pa fyra lampor lag lampa 0-1 konstant tanda medan
     // anslagskolumnerna 2-3 tickade (agaren 09-27: "en lampa som lyser konstant"). Nu pumpar nivakolumnerna djupt i
     // takten; anslagskolumnerna lamnas ororda (de tickar redan).
-    return c.hsv(COL_HUE[ci], 1, bri(lvl) * (ci <= 2 ? c.heart(0.55) : 1));
+    return hsv(COL_HUE[ci], 1, bri(lvl) * (ci <= 2 ? c.heart(0.55) : 1));
   },
 };

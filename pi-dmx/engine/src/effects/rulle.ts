@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // RULLE (full x uppbyggnad, situationsrutnätet 2026-10-12 - rutan var tom): en fullfartslåts uppbyggnad som en trumvirvel över
 // riggen. Varje lampa blinkar på sin egen del av slaget (förskjuten 1/n), så blinkarna rullar runt; 1 blink per slag och lampa,
@@ -15,6 +16,6 @@ export const rulle: EffectDef = {
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;
     // 10-13 (effectDyn: spridning 0,19 - golvet 0,15 lyftes av motorns grundnivå till nästan fullt, så grupperna syntes inte turas om):
     // mörkt mellan blinkarna, blinken klingar av till svart.
-    return c.hsv(hue, 1, Math.min(1, (flash > 0.08 ? flash : 0) * (0.5 + 0.5 * p)));
+    return hsv(hue, 1, Math.min(1, (flash > 0.08 ? flash : 0) * (0.5 + 0.5 * p)));
   },
 };

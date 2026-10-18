@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // Full fart: KRUSNING från MITTEN. v2 (2026-09-23): varje slag slar ner i MITTEN och krusningen VANDRAR utat - de inre
 // lamporna tands pa slaget, de yttre en fjardedels slag senare, och varje ring klingar av som en vag som rullar ut.
@@ -24,6 +25,6 @@ export const ripple: EffectDef = {
     const hue = ((isOuter ? pairBase + 3 : pairBase) % 6) / 6;   // motfärg mitt vs ytter
     const crest = amp > 0.9 && isOuter ? wave * 0.6 : 0;         // vit kam i kanten vid refrangens niva
     const v = 0.08 + wave * (0.45 + 0.45 * amp) + c.audio * 0.15 + c.punch * 0.3;
-    return c.hsv(hue, 1 - Math.max(c.punch * 0.35, crest), Math.min(1, v));
+    return hsv(hue, 1 - Math.max(c.punch * 0.35, crest), Math.min(1, v));
   },
 };

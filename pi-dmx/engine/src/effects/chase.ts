@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // Snabb LÖPARE: skarpt huvud som hoppar ETT steg per taktslag, kort svans, och
 // BYTER ren färg medan det springer → rytmiskt och gles, inte en full färgvåg
@@ -23,6 +24,6 @@ export const chase: EffectDef = {
     // och sidokanalen slog av/pa (bank: chase 102 korta sidoblink, flest av alla). Loparen springer som forr; kuloren byts per takt.
     const hue = c.mixedSector(Math.floor(c.hueIdx / 4)) / 6;   // beatIdx stegar pa grid eller kick - en klocka, inget hopp nar laset fladdrar
     const v = Math.min(1, tail * c.shaped(0.22, 0.55 + c.audio * 0.55 + c.kickEnv * 0.5 + c.trebleEnv * 0.35 + (onBass ? c.frame.onset.bass * 0.4 : 0)) + c.punch * 0.3);
-    return c.hsv(hue, 1 - c.punch * 0.25, v * c.heart(0.3));   // riktig dunk → hela svansen blixtrar; egen hjartpuls (09-27)
+    return hsv(hue, 1 - c.punch * 0.25, v * c.heart(0.3));   // riktig dunk → hela svansen blixtrar; egen hjartpuls (09-27)
   },
 };

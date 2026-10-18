@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // Flödande FÄRGVÅG: varje lampa har sin egen rena färg och hela regnbågen glider
 // över riggen. Full rigg tänd med en mjuk ljusvåg ovanpå — handlar om FÄRG i
@@ -26,6 +27,6 @@ export const wave: EffectDef = {
     // (onset.air) bara på udda lampor → shimmer-topp utan att flödet tappas.
     const shimmer = c.idx % 2 === 1 ? c.airEnv * 0.25 : 0;   // mjukad luft (10-10: ra onset gav fladder)
     const v = c.shaped(0.12, base * (0.35 + c.frame.spec.bass * 0.7) + c.kickEnv * 0.2 + c.trebleEnv * 0.4 + shimmer) + c.punch * 0.3;
-    return c.hsv(hue, 1 - c.punch * 0.25, Math.min(1, v));   // riktig dunk lyfter hela vågen kort
+    return hsv(hue, 1 - c.punch * 0.25, Math.min(1, v));   // riktig dunk lyfter hela vågen kort
   },
 };

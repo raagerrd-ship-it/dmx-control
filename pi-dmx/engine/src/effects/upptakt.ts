@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // UPPTAKT (build, 2026-10-11, ägaren i ladan: "uppbyggnad ... där är vi inte bra" + "95 % på en lampa i taget som hoppar runt,
 // ytter inner, loops"): EN lampa i taget pendlar över riggen (0-1-2-3-2-1) i takt och FÖRDUBBLAR farten efter fyra takter (1 -> 2 steg/slag;
@@ -20,7 +21,7 @@ export const upptakt: EffectDef = {
     const ramp = Math.min(1, 0.55 + 0.45 * p);
     c.want.hazer = 0.2 + 0.6 * p;
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;
-    if (c.idx === pos) return c.hsv(hue, 1, 0.95 * ramp);
-    return c.hsv(hue, 1, 0);   // övriga SLÄCKTA (6 % syntes som ~17 % efter gamma/tändpunkt)
+    if (c.idx === pos) return hsv(hue, 1, 0.95 * ramp);
+    return hsv(hue, 1, 0);   // övriga SLÄCKTA (6 % syntes som ~17 % efter gamma/tändpunkt)
   },
 };

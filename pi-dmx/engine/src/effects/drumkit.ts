@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // (skräpjakten 10-18: förr en closure/array som skapades i render per lampa och ruta - samma räkning)
 const hit = (env: number, floor: number): number => floor + (1 - floor) * Math.min(1, env);
@@ -22,19 +23,19 @@ export const drumkit: EffectDef = {
     const d = c.drum;
     const voice = c.count > 1 ? c.idx % 4 : -1;
     switch (voice) {
-      case 0: return c.hsv(0.01, 1.00, hit(d.kick, 0.05));   // KICK  → röd dunk
-      case 1: return c.hsv(0.09, 0.45, hit(d.snare, 0.04));  // SNARE → varm crack (0,20 var urtvattat vitt)
+      case 0: return hsv(0.01, 1.00, hit(d.kick, 0.05));   // KICK  → röd dunk
+      case 1: return hsv(0.09, 0.45, hit(d.snare, 0.04));  // SNARE → varm crack (0,20 var urtvattat vitt)
       // HI-HAT: sat 0,35 snapptes till VITT av hsv (< 0,5 = vitt) -> lampa 1 och 2 var bada vita. Nu >= 0,5 = cyan, skild fran virveln.
-      case 2: return c.hsv(0.53, 0.60, hit(d.hat, 0.02));    // HI-HAT→ isig cyan tick
+      case 2: return hsv(0.53, 0.60, hit(d.hat, 0.02));    // HI-HAT→ isig cyan tick
       // BAS: drum.bass ar SUSTAINED -> lampa 3 lyste konstant magenta medan de andra punchade (agaren 09-27: "en lampa som
       // lyser konstant medan de andra kor"). Nu pumpar mattan med hjartat sa aven bas-lampan slar i takten.
-      case 3: return c.hsv(0.83, 1.00, hit(d.bass * c.heart(0.6), 0.06));   // BAS   → magenta pump i takten
+      case 3: return hsv(0.83, 1.00, hit(d.bass * c.heart(0.6), 0.06));   // BAS   → magenta pump i takten
       default: {
         // Enda lampa: hela kittet i en. Kick+bas driver rött, hi-haten lägger
         // en ljus gnista; snyggast dominant-röst bestämmer färgtonen.
         const v = Math.min(1, d.kick + d.bass * 0.6 + d.snare * 0.5 + d.hat * 0.4);
         const hue = d.hat > Math.max(d.kick, d.bass) ? 0.53 : 0.02;
-        return c.hsv(hue, 0.8, 0.05 + 0.95 * v);
+        return hsv(hue, 0.8, 0.05 + 0.95 * v);
       }
     }
   },

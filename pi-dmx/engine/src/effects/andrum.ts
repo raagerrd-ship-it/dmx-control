@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // ANDRUM (break, 2026-09-21): breakdownen ar en paus - riggen dimmar till en djup ton, ror sig langsamt och behaller bara
 // hjartslaget svagt sa takten aldrig tappas. Ju langre breaket, desto morkare (ner till ett golv), och nar energin
@@ -21,6 +22,6 @@ export const andrum: EffectDef = {
     const mine = c.group === (c.beatIdx & 1);
     const beat = mine ? (c.hasBeat ? Math.exp(-c.beatFrac / 0.12) * 0.3 : c.heartPulse * 0.25) : 0;
     c.want.hazer = 0.5;
-    return c.hsv(hue, 0.9, Math.min(1, 0.01 + 0.45 * drift * drift * deep + beat));
+    return hsv(hue, 0.9, Math.min(1, 0.01 + 0.45 * drift * drift * deep + beat));
   },
 };

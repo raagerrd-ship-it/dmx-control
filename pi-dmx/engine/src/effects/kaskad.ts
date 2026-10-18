@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { hsv } from "./color.js";
 
 // KASKAD (lugn x refräng, situationsrutnätet 2026-10-12 - rutan hade två effekter, syskon svall/famn): en lugn refräng som fylls
 // och töms i varje takt. Slag 1, 2 och 3 tänder en lampa var (c.idx-ordningen) som LIGGER KVAR och växer sakta, på slag 4 släpper
@@ -14,12 +15,12 @@ export const kaskad: EffectDef = {
     const rank = (c.idx - start + n) % n;                              // 0..2 tänds på slag 1..3, n-1 vilar
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = (((c.lamp & 1) ? base + 1 : base) % 6) / 6;   // 10-13: fast kulör per lampa (rangens kulör roterade per takt = 17 kulörhopp/min)
-    if (rank >= Math.min(3, n - 1)) return c.hsv(hue, 1, 0.015);
+    if (rank >= Math.min(3, n - 1)) return hsv(hue, 1, 0.015);
     let v: number;
     if (bib === 3) v = (0.35 + 0.1 * (2 - rank)) * Math.exp(-c.beatFrac / 0.35);                 // slag 4: alla släpper
     else if (rank < bib) v = 0.35 + 0.1 * (bib - rank) + 0.05 * c.beatFrac;                      // tända tidigare i takten, växer
     else if (rank === bib) v = 0.15 + 0.45 * (1 - Math.exp(-c.beatFrac / 0.12));                // tänds nu, mjuk attack
     else v = 0.015;
-    return c.hsv(hue, 0.95, Math.min(1, v));
+    return hsv(hue, 0.95, Math.min(1, v));
   },
 };
