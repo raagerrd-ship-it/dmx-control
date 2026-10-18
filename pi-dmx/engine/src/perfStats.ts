@@ -1,7 +1,7 @@
 /**
  * perfStats.ts - GC, renderingstid och händelseloopens fördröjning, ALLTID PÅ (10-16, ägaren: 'mät först' innan skräpjakten).
  * Svarar på frågan: vilken sorts GC-stopp (små scavenge eller stora mark-compact) stoppar huvudtråden, hur ofta och hur länge, och
- * hur lång tid tar en rendering (effects.render + DMX-sändningen). Ingen loggning, inget i ljusvägen: läses via GET /api/perf.
+ * hur lång tid tar en rendering (DMX: effects.render + DMX-sändningen; lotus: tickInner). Samma fil i båda repona. Ingen loggning, inget i ljusvägen: läses via GET /api/perf.
  *
  * Kostnad: GC-observatören och loopmätaren är nodens egna (native, en post per GC resp. ett histogram); renderingstiden = två
  * performance.now() per ruta. Analysatorns tråd (om DMX_ANALYSER_SPLIT=worker) har egen GC som inte stoppar renderingen - syns inte här.
@@ -43,12 +43,15 @@ const obs = new PerformanceObserver((list) => {
 });
 obs.observe({ entryTypes: ["gc"] });
 
-/** En rendering (effects.render + dmx.send) tog `ms`. Anropas från index.ts renderAndSend. */
-export function noteRenderMs(ms: number): void {
-  for (const r of [cur.render, total.render]) {
-    r.n++; r.ms += ms; if (ms > r.max) r.max = ms;
-    if (ms > 1) r.over1++; if (ms > 2) r.over2++; if (ms > 5) r.over5++;
-  }
+/** EN RENDERING / TICK: renderBegin() före, renderEnd() efter (DMX: effects.render + dmx.send; lotus: tickInner). Skräpfritt på Node 18
+ *  (10-18): inga argument (ett decimaltal som argument packas in), ingen array per anrop, starttiden i en Float64Array (en decimal-`let`
+ *  på modulnivå packas in vid varje skrivning). Förr noteRenderMs(ms) med `for (const r of [cur.render, total.render])` = ~48 B/rendering. */
+const T0 = new Float64Array(1);
+export function renderBegin(): void { T0[0] = performance.now(); }
+export function renderEnd(): void {
+  const ms = performance.now() - T0[0];
+  let r = cur.render; r.n++; r.ms += ms; if (ms > r.max) r.max = ms; if (ms > 1) r.over1++; if (ms > 2) r.over2++; if (ms > 5) r.over5++;
+  r = total.render; r.n++; r.ms += ms; if (ms > r.max) r.max = ms; if (ms > 1) r.over1++; if (ms > 2) r.over2++; if (ms > 5) r.over5++;
 }
 
 function closeMinute(): void {

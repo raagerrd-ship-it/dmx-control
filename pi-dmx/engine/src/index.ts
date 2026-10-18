@@ -30,7 +30,7 @@ import { applyIntensity, migrateFromMoods } from "./moods.js";
 import { BeatFeed } from "./beatFeed.js";
 import { LongRecord } from "./longRecord.js";
 import * as health from "./runtimeHealth.js";
-import { noteRenderMs } from "./perfStats.js";   // GC/rendering/loop alltid på, GET /api/perf (10-16)
+import { renderBegin, renderEnd } from "./perfStats.js";   // GC/rendering/loop alltid på, GET /api/perf (10-16)
 import { logHealth } from "./healthLog.js";
 
 
@@ -262,13 +262,14 @@ function probeSample(universe: Uint8Array): void {
 function renderAndSend(): void {
     if (!latestFrame) return;   // inget ljud har någonsin kommit — inget att rendera
     lastRenderMs = performance.now();   // FUNKTIONELL (fallback-ticken laser den) - alltid
+    renderBegin();   // perfStats (skräpfritt)
     const diag = isLogOn();   // halsomatningen bara vid felsokning (se chunk-hanteraren)
     if (diag) health.noteRender(lastRenderMs, RENDER_MS);
     const universe = effects.render(latestFrame);
     probeSample(universe);
     dmx.send(universe, curSlots);
-    const rdMs = performance.now() - lastRenderMs; noteRenderMs(rdMs);   // perfStats: alltid (två klockanrop per ruta)
-    if (diag) health.noteSlowCall("render+dmx", rdMs);
+    renderEnd();   // perfStats: alltid
+    if (diag) health.noteSlowCall("render+dmx", performance.now() - lastRenderMs);
 
     // Spara ramen så fallback-ticken har något att tona ned om ljudet dör.
     if (!lastUniverse || lastUniverse.length !== universe.length) {
