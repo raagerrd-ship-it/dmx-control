@@ -28,7 +28,7 @@ strängar/arrayer som byggs per hop. Var: Analyser.process och dess steg. Materi
 Önskat: ner mot 0 på Node 18 med samma recept; mät på Node 18, inte 22.
 Dessutom (optStat.mjs, lang-1014 från 300 s): computeBpm är TurboFan 0 % av tiden på Node 18 (och på Node 22 utan flagga; 21 % med
 --invocation-count-for-turbofan=100) - den kör otolkad/Sparkplug på Pi:erna och boxar då varje tal; process/sectionBlock 100 % på Node 18.
-Status:
+Status: TAGET 2026-10-18 (lotus-morgonagenten): computeBpm-delen ORSAKSBESTÄMD på Node 18.20.4 (--trace-opt-verbose, lang-1014): 'not enough ticks: 1–2/18, too large: 17084' — bytekoden är 17 kB ⇒ V8 kräver 3 + 17084/1100 = 18 avbrottsbudgetar, och tickarna nollas vid varje IC-ändring (sällsynta grenar) ⇒ 4 Hz-anropen når aldrig dit (0 % TurboFan på 300 s). Prov: --bytecode-size-allowance-per-tick=20000 (kräver 3 tickar) ⇒ computeBpm 0 → 43 % TurboFan (200–300 s), övriga oförändrat 100 %. Två vägar: (a) kodväg = bryt ut computeBpm i fler små metoder (som tempoGramStep 10-17) tills varje del < ~5 kB bytekod, bit-identiskt + paritet — inte gjort i dag; (b) nodflagga i ExecStart (båda Pi:erna) — ändrar inga värden men är drift, mät på Pi:n (--trace-gc scavenges/min) först, ägarens beslut. 54–73 B/hop i process: ej angripet än.
 
 ## ÖPPET 2026-10-17 Tempot vandrar i breaket före/efter drops
 Vad: 24 lang-*.wav (konsertReplay --delad-cfg --step 5): 14 av 29 show-drops har tempobyte i frame.bpm (> 2 BPM) mellan 8 s före och 10 s
@@ -39,7 +39,7 @@ Var: computeBpm under breaket (inga/få kickar, onset-ringen domineras av riser/
 tidpunkterna i natt-todo 10-17. Önskat: håll tempot (som lotus TEMPO_HOLD gör i tystnad) när basen/kickarna försvinner i ett break, och
 släpp först när ett nytt tempo bevisats efter att basen kommit tillbaka. DMX har ett eget filter i taktklockan (beatFeed DMX_TEMPO_PERSIST_S,
 live-prov 10-17 15:3x: tempohopp 3,36 -> 1,35/min) men analysatorns frame.bpm är fortfarande fel i de sekunderna.
-Status:
+Status: TAGET 2026-10-18 (lotus-morgonagenten): idé = utvidga TEMPO_HOLD från tystnad till 'basen borta' (bodyDb långt under taket) — håll frame.bpm tills ny evidens bevisats efter att basen kommit tillbaka; bänkas på lang-*.wav (tempobyten ±8/10 s runt drops) + korpus. Ej byggt i dag.
 
 ## ÖPPET 2026-10-17 Sektionen säger nästan aldrig 'build' före en drop
 Vad: 24 lang-*.wav (149 min, konsertReplay --delad-cfg --step 5, DMX-profilen RUN 5/RUN_IN 3/CARRY 20): av analysatorns 62 drops har
