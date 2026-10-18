@@ -569,10 +569,10 @@ export class EffectEngine {
   }
   /** Valet bland topp-kandidaterna: den som spelats minst sedan start (ALLA LOOKER b; gyllene snittets turordning borttagen 10-10). */
   private pickLook(top: { m: Mode }[]): Mode {
-    let best = top[0].m, bt = Infinity; for (const x of top) { const t = this.lookPlayMs.get(x.m) ?? 0; if (t < bt) { bt = t; best = x.m; } } return best;
+    let best = top[0].m, bt = Infinity; for (const x of top) { const t = this.lookPlayMs.get(x.m)?.[0] ?? 0; if (t < bt) { bt = t; best = x.m; } } return best;
   }
   private fxFast = false;   // aktuell effekt ar fastLight (VARJE SLAG undantar den)
-  private buildSince = -1; private buildEntered = false; private lookPlayMs = new Map<Mode, number>();   // ALLA_LOOKER
+  private buildSince = -1; private buildEntered = false; private lookPlayMs = new Map<Mode, Float64Array>();   // ALLA_LOOKER (speltid per look i en cell: ett decimaltal som Map-värde packades in vid varje set, per ruta - 10-18)
   private tierEma = 0.5;   // ihallande intensitet for tier-val (se render)
   private smartDwellUntil = 0;
   private warmMs = 0;
@@ -781,9 +781,9 @@ export class EffectEngine {
    private fdS = 0; private fdC = -90; private fdGone = 0; private fdSpan = 0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12;
   // RINGBUFFERT (10-16, GC-jakten; förr push/shift på två listor 200 ggr/s): tid och kropp för toppens fönster (FLANK_HOLD_S), äldst vid fdS0.
   private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;
-  private flankStep(bodyDb: number): boolean {
+  private flankStep(frame: Frame): boolean {   // (ramen in i st f bodyDb: ett decimaltal som argument packas in per ruta - skräpjakten 10-18)
     const dt = this.rDt, now = this.rNowWall;
-    const x = Math.max(-90, bodyDb);
+    const x = Math.max(-90, frame.bodyDb ?? -90);
     if (!this.fdOn) { this.fdOn = true; this.fdF = x; this.fdS = x; this.fdC = x; }
     this.fdF += (x - this.fdF) * Math.min(1, dt / 0.06);
     this.fdS += (x - this.fdS) * Math.min(1, dt / 0.35);
@@ -1558,7 +1558,7 @@ export class EffectEngine {
     this.lastDropCount = frame.dropCount;
     if (FLANK_DROP) {   // FULL DROP PÅ FLANKEN: motorns egen flank är drop-källan; analysatorns drop utan egen flank inom 2 s = minidrop
       const anaHit = dropHitRaw;
-      dropHitRaw = this.flankStep(frame.bodyDb ?? -90);
+      dropHitRaw = this.flankStep(frame);
       if (anaHit && !dropHitRaw && nowWall - this.fdAt > 2000) this.gapMini(nowWall);
     }
     // DROP I LUGN SEKTION (ladan 20:15: tva falska drops i ett lugnt parti): en riktig drop kommer ur en uppbyggnad eller ett
@@ -1930,7 +1930,7 @@ export class EffectEngine {
     //  3. LOG-RELEASE: fade med konstant KVOT per tick (perceptuellt jämn), med snabb
     //     soft-snap-attack. Det är "smooth-hemligheten".
     const dtMs = dtNow * 1000;
-    this.lookPlayMs.set(this.smartMode, (this.lookPlayMs.get(this.smartMode) ?? 0) + dtMs);
+    { let cell = this.lookPlayMs.get(this.smartMode); if (!cell) this.lookPlayMs.set(this.smartMode, cell = new Float64Array(1)); cell[0] += dtMs; }
     // (Den gamla nivakedjan - intensity/LIVE_LEVEL-fonster mot ankare, shape-smoothing, log-release, lightLoud - borttagen 2026-10-10:
     //  ljuset styrs av energin nedan, och drop-kontrollen laser samma energi.)
     let md: number;
