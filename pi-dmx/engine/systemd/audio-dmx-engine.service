@@ -26,7 +26,7 @@ WorkingDirectory=/opt/audio-dmx-engine
 # No --enable-source-maps: it parses every module's map at startup (slower cold
 # boot on the SD card) and this is production — stack traces map to dist anyway.
 # (Omoptimering efter 100 anrop satts i koden, src/v8Tiering.ts - foljer med deployen.)
-ExecStart=/usr/bin/node --max-old-space-size=96 --min-semi-space-size=4 --max-semi-space-size=4 dist/index.js
+ExecStart=/opt/node24/bin/node --max-old-space-size=96 --min-semi-space-size=4 --max-semi-space-size=4 dist/index.js
 Environment=NODE_ENV=production
 Environment=UV_THREADPOOL_SIZE=2
 Environment=PORT=80

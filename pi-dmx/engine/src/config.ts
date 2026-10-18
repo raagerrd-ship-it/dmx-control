@@ -67,16 +67,6 @@ export interface EngineConfig {
    *  pulseBoost  0..0.5     — extra ljusstyrka på beat-frame, ebbar ut ~150 ms.
    *  blackoutFadeMs 0..3000 — mjuk fade när blackout slås på (0 = snap). */
   intensityRing?: { bus: number; device: number; maxBright: number; pulseBoost: number; blackoutFadeMs: number } | null;
-  /** BLE-slingor (BLEDOM-klonade RGB-LED-band) parade med boxen. Sidecar-processen
-   *  äger hci0 och tar emot färger via /run/pi-dmx/ble.sock — huvudmotorn vet inget
-   *  om Bluetooth själv. Persisteras så att slingorna återansluter automatiskt
-   *  vid boot; ägaren parar dem en gång via /setup. `chip: "unknown"` = enhet
-   *  hittad men vet ej protokoll (spara ändå så listan inte tappas). */
-  /** cal = vitbalans-, max-ljus- och gamma-kalibrering per slinga.
-   *  rGain/gGain/bGain/maxBrightness 0..1 (default 1,1,1,1). gamma 0.3..3.0 (default 1.0
-   *  = linjär; >1 mörknar botten, <1 ljusnar botten). Sidecarn applicerar dessa på
-   *  RGB innan packet-write, så olika BLEDOM-kloner kan trimmas att se likadana ut. */
-  bleDevices?: { mac: string; name: string; chip: "bledom" | "unknown"; cal?: { rGain: number; gGain: number; bGain: number; maxBrightness: number; gamma: number } }[];
   /** Which codec input feeds the show: line on the P1 AUX header or the mic path. */
   /**
    * VILKEN INGÅNGSKANAL BÄR SIGNALEN?
@@ -219,7 +209,6 @@ export const defaultConfig: EngineConfig = {
   rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, rave: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   intensityRing: { bus: 0, device: 0, maxBright: 0.40, pulseBoost: 0.18, blackoutFadeMs: 400 },  // WS2812 12-LED på SPI0 MOSI (GPIO10, pin 19)
-  bleDevices: [],   // paras via /setup — sidecarn respawnar utan att tappa listan
   showLeadMs: 50,
   dmxMaxHz: 100, // 100 Hz för tightare bas/drop-synk; helper cappar till wire-limit
   // Rok-defaults satta for Ibiza LSM1500PRO + Cameo XTRA HEAVY: maskinen ger

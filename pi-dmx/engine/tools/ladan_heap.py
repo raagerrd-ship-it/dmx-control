@@ -31,7 +31,7 @@ if BACKA:
 elif KOR:
     if 'NEJ' in run('test -f /opt/audio-dmx-engine/dist/gcDark.js && echo ja || echo NEJ'): sys.exit('gcDark.js saknas - kor python tools/ladan.py forst')
     cmd = (f"cd {D} && (test -f heap.conf.bak-heapgrow || cp -p heap.conf heap.conf.bak-heapgrow) && "
-           f"grep -q heap-growing-percent heap.conf || sed -i 's#^ExecStart=/usr/bin/node #ExecStart=/usr/bin/node --heap-growing-percent=200 --expose-gc #' heap.conf; "
+           f"grep -q heap-growing-percent heap.conf || sed -i -E 's#^(ExecStart=/[^ ]*node) #\\1 --heap-growing-percent=200 --expose-gc #' heap.conf; "
            f"printf '%s\\n' '[Service]' '# 2026-10-18 (agaren): full GC nar riggen ar mork och gamla minnet >= 60 % av gransen (src/gcDark.ts). Av: ta bort filen.' "
            f"'Environment=DMX_GC_DARK=0.6' > gc-dark.conf && systemctl daemon-reload && systemctl restart audio-dmx-engine")
     print(run(f"{SUDO}sh -c \"{cmd}\" 2>&1 | grep -v password"))

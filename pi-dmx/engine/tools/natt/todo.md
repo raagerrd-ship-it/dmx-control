@@ -3,17 +3,25 @@
 ## NÄSTA LADAN-BESÖK (förberett 2026-10-18 av DMX-sessionen - ägaren: "förbered för dmx-pi") - INGET AV DETTA ÄR UTE ÄN
 1. `python tools/ladan.py` (utan --env; ladan.conf ska vara tom sedan drop-proven blev standard 10-17). Tar med allt sedan 10-17 15:53:
    skräpjakten (render i steg, doubleFields, hsv direkt import + tabell, kalibreringens tal via fält, --interrupt-budget=32768 på Node 18
-   i v8Tiering.ts, perfStats skräpfri, bleClient.sendDue före medelfärgen), nattens 10-18-fixar, computeBpm orörd. Ljuset byte-identiskt.
+   i v8Tiering.ts, perfStats skräpfri, BLE borttaget), nattens 10-18-fixar, computeBpm orörd. Ljuset byte-identiskt.
 2. Efter 15 min musik: `curl http://<pi>/api/perf` - jämför med 10-16 16:58-17:11 (minor 15/min, längsta 6-10 ms, major ~0, loop max
    14-22 ms). Väntat (bänk Node 18): ~25-45 kB/s skräp -> en liten städning var 1,5-3 min.
-3. BLE-sidovagnen: `python tools/ladan_noble.py` (kontroll) - finns /opt/pi-dmx-ble och används BLE-slingor, kör `--kor` (noble-
-   loggraderna skyddas som på lotus; ny install.sh gör det automatiskt). Sidovagnen är egen process - motorn påverkas inte.
+3. BLE BORTTAGET UR DMX (10-18, ägaren: 'om det inte är exakt samma BLE-modul som lotus, ta bort den' - DMX hade @abandonware/noble i
+   sidovagnen pi-dmx-ble, lotus @stoprocent/noble i motorn). Punkt 1 tar ut motorn utan BLE (bleClient, /setup-sidans BLE-kort, ws-
+   meddelandena); sidovagnen + bluetoothd städas bort av punkt 5. Ingen ljusändring - BLE läste bara den färdiga ramen.
 4. HEAP-FLAGGAN + STÄDA NÄR RIGGEN ÄR MÖRK (portat från lotus 10-18, där: 0 storstädningar på 28 min med flaggan, tvingad GC ~93 ms):
    EFTER punkt 1: `python tools/ladan_heap.py` (torrkörning) och sedan `--kor` - lägger --heap-growing-percent=200 --expose-gc i heap.conf
    och gc-dark.conf (DMX_GC_DARK=0.6: full GC bara när tystnadsgrinden är stängd >= 1,5 s, ramen helt släckt och gamla minnet >= 60 % av
    gränsen; src/gcDark.ts). Läs /api/perf `forcedGc` (paus, fyllnad) efter en paus mellan låtar + `total.gc.major`. Backa: `--backa`.
-5. Lotus-läxan: DMX-Pi:n kör Node 18 (lotus kör Node 24). Live-allokeringsprofil som på lotus (SIGUSR1 + HeapProfiler inkl. bortstädat)
-   går INTE på Node 18 (flaggorna finns inte) - /api/perf är måttet.
+5. NODE 24 (10-18, ägaren: 'ta backup och kör på Node 24 i stället för extra kod och toggles'). EFTER punkt 4 (heap-flaggan läggs
+   på node-raden oavsett sökväg): `python tools/ladan_node24.py` (torrkörning: arkitektur måste vara aarch64) och sedan `--kor`:
+   backup /home/pi/dmx-backup-node18-20261018.tgz (enhetsfil + drop-ins + spi.node) -> Node 24.18.0 i /opt/node24 (tarbollen från
+   ~/node24dl på PC:n, sha256-kontrollerad) -> ExecStart pekas om -> spi.node byts mot tools/node24/spi-node24-arm64.node (byggd på
+   lotus mot 24.18.0, require + ESM-import provade) -> pi-dmx-ble + bluetooth bort -> omstart, skriver health/perf/journal.
+   Stegen provkörda mot en låtsasrot på lotus (backup, byte, sed i drop-ins, återställning). Kontrollera: vredets LED-ring lyser
+   (spi-device), /api/perf efter 15 min musik mot punkt 2 (bänk: 34 mot 43 kB/s på Node 22 mot 18). v8Tiering.ts väljer själv
+   --invocation-count-for-turbofan=100 på V8 >= 12. Backa: `--backa` (packar upp backupen, omstart). Live-allokeringsprofil som på
+   lotus (SIGUSR1 + HeapProfiler inkl. bortstädat) går nu även här.
 
 ## Från kvällen 2026-10-17 - SKRÄPJAKTEN (ägaren: nattens ENDA uppgift natten till 10-18, se engångsundantaget i nattagentens SKILL.md)
 Läget efter dagen (allt på PC, stabilt läge, med V8-flaggan): DMX-motorn 112 kB/s (effects.js 35, boundaryDetector.js 32, analysatorn 21);

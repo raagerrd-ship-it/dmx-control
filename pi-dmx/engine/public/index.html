@@ -264,7 +264,7 @@
     .advfx-list .advfx-row .n span { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:color-mix(in srgb, var(--dim) 60%, transparent); }
     .advfx-list .advfx-row .a { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric:tabular-nums; font-size:13px; color:color-mix(in srgb, var(--fg) 70%, transparent); }
     /* Drift-hälsa: sticky banner högst upp när något inte är som det ska.
-       Röd = allvarligt (WS/DMX nere), gul = varning (BLE tappat, mic tyst länge). */
+       Röd = allvarligt (WS/DMX nere), gul = varning (mic tyst länge). */
     .health-banner { position:sticky; top:0; z-index:50; margin:8px -16px 8px; padding:10px 16px; font-size:13px; line-height:1.35; display:none; }
     .health-banner.show { display:block; }
     .health-banner.err  { background:color-mix(in srgb, var(--hot) 22%, var(--bg));  border-top:2px solid var(--hot);  border-bottom:1px solid var(--hot);  color:#fff; }
@@ -434,7 +434,6 @@
         <div class="advflag" id="fBlinder"><span class="dot"></span>Blinder aktiv</div>
         <div class="advflag" id="fLaser"><span class="dot"></span>Laser aktiv</div>
         <div class="advflag" id="fCo2"><span class="dot"></span>CO₂ aktiv</div>
-        <div class="advflag" id="fBle"><span class="dot"></span>BLE-slingor aktiva</div>
       </div>
       <div class="advfx-list" id="advFxList">
         <div class="advfx-head">
@@ -457,7 +456,6 @@
     <div class="status" style="margin:0 0 10px">Så här får du boxen att lira på 3 minuter:</div>
     <ol style="margin:0 0 10px 20px;line-height:1.7;font-size:13px">
       <li><b>Lägg till lampor</b> under <em>Lampor</em>: sätt DMX-adress + preset (RGB / RGBW / RGB7). Osäker på kanaler? Tryck <em>Walk-test</em>.</li>
-      <li><b>Para BLE-slingor</b> (om du har några) under <em>BLE-slingor</em> → Sök → Blinka → Para.</li>
       <li><b>Testa</b>: gå tillbaka till hyresgäst-vyn (adressen utan <b>/setup</b>), tryck Power, dra Stämning. Musik i mikrofonen → lamporna rör sig.</li>
       <li><b>Exportera config</b> under <em>System</em> när allt funkar — då har du en backup ifall något strular.</li>
     </ol>
@@ -562,22 +560,6 @@
     <div class="status" id="fxHint">Kalibrera varje lampas lägsta ljus med reglaget. "Blinka alla" hjälper dig hitta vilken lampa som är vilken.</div>
   </div>
 
-  <h1>BLE-slingor</h1>
-  <div class="card">
-    <div class="status" id="bleStatus">Söker sidecar…</div>
-    <div id="blePairedList" style="margin-top:10px"></div>
-    <div class="fx-actions" style="margin-top:10px">
-      <button class="btn primary" id="bleScanBtn">Sök nya slingor (8 s)</button>
-    </div>
-    <div id="bleScanList" style="margin-top:8px"></div>
-    <div class="status" style="margin-top:8px;opacity:.7">
-      BLEDOM-klonade RGB-LED-band paras här. Tryck <b>Blinka</b> på en post för
-      att pulsa lampan i magenta i några sekunder — då ser du direkt vilken
-      fysisk slinga det är innan du parar den. Sidecarn kör på egen CPU-kärna
-      så Bluetooth-scanningen aldrig stör ljud- eller DMX-timingen. Riggens
-      genomsnittsfärg speglas till slingorna live (~60 Hz).
-    </div>
-  </div>
 
   <h1 id="ringHdr" hidden>LED-ring (vred)</h1>
   <div class="card" id="ringCard" hidden>
@@ -818,8 +800,6 @@ function connect() {
     if (m.type === "config") applyConfig(m.config);
     else if (m.type === "frame") applyFrame(m);
     else if (m.type === "effects") applyEffects(m.effects);
-    else if (m.type === "bleScanResults") renderBleScan(m.devices || []);
-    else if (m.type === "blePaired") renderBlePaired(m.devices || []);
   };
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
@@ -1070,10 +1050,6 @@ function updateAdvMirror(cfg) {
   flag("fBlinder",  isActive("blinder"));
   flag("fLaser",    isActive("laser"));
   flag("fCo2",      isActive("co2"));
-  // BLE: kräver minst en FAKTISKT uppkopplad slinga (sidecarn rapporterar
-  // .connected per device). Bara "parad" räcker inte — då är slingan avstängd
-  // eller utom räckvidd och flaggan skulle ljuga.
-  flag("fBle",      bleConnectedCount > 0);
   // Lampor-lista: adress + typ (RGB / RGBW / RGB7 …) från cfg.fixtures.
   const fxRows = document.getElementById("advFxRows");
   const fxWrap = document.getElementById("advFxList");
@@ -1103,8 +1079,6 @@ function updateAdvMirror(cfg) {
   }
   renderCategories();   // fixtures kan ha ändrats → uppdatera "kräver: X"-taggar
 }
-let bleConnectedCount = 0;
-let lastBleActive = 0;
 function applyFrame(f) {
   const pct = Math.round(f.level * 100);
   levelBar.style.width = pct + "%";
@@ -1130,11 +1104,8 @@ function applyFrame(f) {
   const barWrap = document.getElementById("levelBarWrap");
   if (barWrap) barWrap.classList.toggle("hot", hot);
 
-  lastBleActive = f.bleActive ?? 0;
   // Drift-hälsa: uppdatera flaggorna som banner-logiken läser.
   dmxOk = f.dmxOk !== false;                           // undef = gammal engine → anta OK
-  blePairedCount = f.blePairedCount ?? 0;
-  bleConnectedCount = lastBleActive;
   const now = Date.now();
   if (f.level > 0.02) lastAudibleMs = now;             // "hörs något?" – ~2% level = klart över brus
   renderHealth();
@@ -2211,14 +2182,10 @@ if (welcomeOv && welcomeBtn && !OWNER_MODE) {
 }
 
 // ---- Drift-hälsa banner --------------------------------------------------
-// Trippel-sanning: WS-anslutning, DMX-sockeln mot helpern, samt "parade
-// BLE-slingor som TAPPAT kontakt". Mic-tyst-varning är HÖGKONTEXT (spelar
+// Dubbel sanning: WS-anslutning och DMX-sockeln mot helpern. Mic-tyst-varning är HÖGKONTEXT (spelar
 // användaren musik just nu?) → använd bara som gul varning efter 30s tystnad
 // medan power är på och vi faktiskt gör en show.
-let wsOk = false, dmxOk = true, blePairedCount = 0;
-// bleConnectedCount deklareras redan högre upp (~rad 1039) — dubbel let här gav
-// SyntaxError som stoppade HELA skriptet → connect() kördes aldrig, allt fastnade
-// på "Connecting...". Delas nu mellan ring-flaggan och BLE-statusen (bad merge).
+let wsOk = false, dmxOk = true;
 let lastAudibleMs = Date.now();
 const healthBanner = document.getElementById("healthBanner");
 function renderHealth() {
@@ -2227,12 +2194,6 @@ function renderHealth() {
   let sev = "";   // "err" | "warn"
   if (!wsOk) { msgs.push("<b>Inte ansluten</b> — kontrollera att telefonen är på pi-dmx-nätet."); sev = "err"; }
   else if (!dmxOk) { msgs.push("<b>DMX-utgången är nere</b> — kontrollera USB-DMX-kabeln till lamporna."); sev = "err"; }
-  // BLE-varning: bara om ägaren HAR parat slingor men NÅGON tappat kontakt.
-  if (blePairedCount > 0 && bleConnectedCount < blePairedCount) {
-    const off = blePairedCount - bleConnectedCount;
-    msgs.push(`<b>${off} av ${blePairedCount} BLE-slinga${blePairedCount === 1 ? "" : "or"} tappade kontakt</b> — sätt på strömmen eller flytta närmare.`);
-    if (sev !== "err") sev = "warn";
-  }
   // Mic-tyst: bara relevant om ljuset är på (curMode !== blackout) och det gått
   // >30s sen vi hörde nåt. Låg prio → adderas bara om inget värre är fel.
   if (curMode !== "blackout" && Date.now() - lastAudibleMs > 30000 && sev === "") {
@@ -2248,198 +2209,6 @@ renderHealth();
 
 
 
-/* ── BLE-slingor (owner-only) ──────────────────────────────────────────── */
-const bleStatus       = document.getElementById("bleStatus");
-const bleScanBtn      = document.getElementById("bleScanBtn");
-const bleScanList     = document.getElementById("bleScanList");
-const blePairedList   = document.getElementById("blePairedList");
-let blePairedDevices  = [];
-
-function macKey(d) { return (d.mac || "").toLowerCase(); }
-
-function renderBlePaired(devices) {
-  blePairedDevices = devices;
-  bleConnectedCount = devices.filter((d) => d.connected).length;
-  // Spegla i "BLE-slingor aktiva"-flaggan omedelbart när status ändras
-  // (annars uppdateras den först när nästa cfg-broadcast kommer).
-  const bleFlag = document.getElementById("fBle");
-  if (bleFlag) bleFlag.classList.toggle("on", bleConnectedCount > 0);
-  if (!blePairedList) return;
-  if (!devices.length) {
-    blePairedList.innerHTML = `<div class="status" style="opacity:.7">Inga slingor parade ännu. Tryck "Sök" nedan.</div>`;
-    bleStatus.textContent = "Sidecar ansluten. Inga parade slingor.";
-    return;
-  }
-  bleStatus.textContent = `${bleConnectedCount}/${devices.length} slinga${devices.length === 1 ? "" : "or"} uppkopplade.`;
-  blePairedList.innerHTML = devices.map((d) => {
-    const cal = d.cal || { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1, gamma: 1 };
-    const pct = (x) => Math.round((x ?? 1) * 100);
-    const gammaVal = (typeof cal.gamma === "number" ? cal.gamma : 1);
-    return `
-    <div class="row" style="flex-direction:column;align-items:stretch;gap:8px;padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px">
-      <div style="display:flex;align-items:center;gap:10px">
-        <span class="dot${d.connected ? " on" : ""}"></span>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:600">${escapeHtml(d.name || d.mac)}</div>
-          <div style="opacity:.6;font-size:11px">${escapeHtml(d.mac)} · ${d.chip}</div>
-        </div>
-        <button class="btn" data-ble-identify="${escapeHtml(d.mac)}" title="Blinka lampan så du ser vilken det är">Blinka</button>
-        <button class="btn" data-ble-unpair="${escapeHtml(d.mac)}">Ta bort</button>
-      </div>
-      <details style="margin-top:2px">
-        <summary style="cursor:pointer;font-size:12px;opacity:.75">Kalibrering (vitbalans, max-ljus &amp; gamma)</summary>
-        <div style="display:grid;grid-template-columns:80px 1fr 44px;gap:6px 10px;align-items:center;margin-top:8px;font-size:12px">
-          <label>Röd</label>       <input type="range" min="0" max="100" value="${pct(cal.rGain)}"        data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="rGain">        <span data-cal-out="${escapeHtml(d.mac)}-rGain">${pct(cal.rGain)}%</span>
-          <label>Grön</label>      <input type="range" min="0" max="100" value="${pct(cal.gGain)}"        data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="gGain">        <span data-cal-out="${escapeHtml(d.mac)}-gGain">${pct(cal.gGain)}%</span>
-          <label>Blå</label>       <input type="range" min="0" max="100" value="${pct(cal.bGain)}"        data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="bGain">        <span data-cal-out="${escapeHtml(d.mac)}-bGain">${pct(cal.bGain)}%</span>
-          <label>Max ljus</label>  <input type="range" min="0" max="100" value="${pct(cal.maxBrightness)}" data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="maxBrightness"> <span data-cal-out="${escapeHtml(d.mac)}-maxBrightness">${pct(cal.maxBrightness)}%</span>
-          <label>Gamma</label>     <input type="range" min="30" max="300" value="${Math.round(gammaVal * 100)}" data-ble-cal="${escapeHtml(d.mac)}" data-cal-key="gamma"> <span data-cal-out="${escapeHtml(d.mac)}-gamma">${gammaVal.toFixed(2)}</span>
-        </div>
-        <div style="margin-top:6px;font-size:11px;opacity:.6">
-          Trimma per slinga så olika BLEDOM-kloner ser likadana ut. Gamma 1.00 = linjär; höj (t.ex. 1.5) om en slinga tänder för aggressivt i låga värden, sänk (t.ex. 0.7) om den är seg innan den tänder.
-        </div>
-        <div class="fx-actions" style="margin-top:6px">
-          <button class="btn" data-ble-cal-reset="${escapeHtml(d.mac)}">Nollställ</button>
-          <button class="btn" data-ble-cal-copy="${escapeHtml(d.mac)}">Kopiera till…</button>
-        </div>
-        <div data-ble-cal-copy-panel="${escapeHtml(d.mac)}" hidden style="margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:8px;font-size:12px"></div>
-      </details>
-    </div>
-  `;}).join("");
-  blePairedList.querySelectorAll("[data-ble-identify]").forEach((btn) => {
-    btn.onclick = () => {
-      send({ type: "bleIdentify", mac: btn.dataset.bleIdentify });
-      btn.disabled = true; const orig = btn.textContent; btn.textContent = "Blinkar…";
-      setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 6000);
-    };
-  });
-  blePairedList.querySelectorAll("[data-ble-unpair]").forEach((btn) => {
-    btn.onclick = () => {
-      if (!confirm("Ta bort slingan?")) return;
-      send({ type: "bleUnpair", mac: btn.dataset.bleUnpair });
-    };
-  });
-  // Kalibrerings-sliders: skicka bleCal live medan användaren drar. Sidecarn
-  // applicerar per frame, så justeringen syns direkt på slingan.
-  const readCalFor = (mac) => {
-    const dev = blePairedDevices.find((x) => x.mac === mac);
-    const base = (dev && dev.cal) || { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1, gamma: 1 };
-    const cal = { ...base };
-    blePairedList.querySelectorAll(`[data-ble-cal="${mac}"]`).forEach((el) => {
-      const key = el.dataset.calKey;
-      // Gamma-slidern går 30..300 → 0.30..3.00; övriga går 0..100 → 0..1.
-      cal[key] = key === "gamma" ? Number(el.value) / 100 : Number(el.value) / 100;
-    });
-    return cal;
-  };
-  let calDebounce = null;
-  blePairedList.querySelectorAll("[data-ble-cal]").forEach((slider) => {
-    slider.oninput = () => {
-      const mac = slider.dataset.bleCal;
-      const key = slider.dataset.calKey;
-      const out = blePairedList.querySelector(`[data-cal-out="${mac}-${key}"]`);
-      if (out) out.textContent = key === "gamma" ? (Number(slider.value) / 100).toFixed(2) : `${slider.value}%`;
-      if (calDebounce) clearTimeout(calDebounce);
-      calDebounce = setTimeout(() => { send({ type: "bleCal", mac, cal: readCalFor(mac) }); }, 40);
-    };
-  });
-  blePairedList.querySelectorAll("[data-ble-cal-reset]").forEach((btn) => {
-    btn.onclick = () => {
-      send({ type: "bleCal", mac: btn.dataset.bleCalReset, cal: { rGain: 1, gGain: 1, bGain: 1, maxBrightness: 1, gamma: 1 } });
-    };
-  });
-  // "Kopiera till…" — kopiera aktuella cal-värden (inkl. gamma) till valda slingor.
-  blePairedList.querySelectorAll("[data-ble-cal-copy]").forEach((btn) => {
-    btn.onclick = () => {
-      const srcMac = btn.dataset.bleCalCopy;
-      const panel  = blePairedList.querySelector(`[data-ble-cal-copy-panel="${srcMac}"]`);
-      if (!panel) return;
-      if (!panel.hidden) { panel.hidden = true; panel.innerHTML = ""; return; }
-      const targets = blePairedDevices.filter((x) => x.mac !== srcMac);
-      if (!targets.length) { panel.hidden = false; panel.innerHTML = `<div style="opacity:.7">Inga andra slingor att kopiera till.</div>`; return; }
-      panel.hidden = false;
-      panel.innerHTML = `
-        <div style="margin-bottom:6px;opacity:.75">Kopiera vitbalans, max-ljus &amp; gamma till:</div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          ${targets.map((t) => `<label style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-copy-tgt="${escapeHtml(t.mac)}" checked> ${escapeHtml(t.name || t.mac)}</label>`).join("")}
-        </div>
-        <div class="fx-actions" style="margin-top:8px">
-          <button class="btn" data-copy-all>Alla / Ingen</button>
-          <button class="btn primary" data-copy-go>Kopiera</button>
-          <button class="btn" data-copy-cancel>Avbryt</button>
-        </div>`;
-      panel.querySelector("[data-copy-all]").onclick = () => {
-        const boxes = panel.querySelectorAll("[data-copy-tgt]");
-        const anyOff = Array.from(boxes).some((b) => !b.checked);
-        boxes.forEach((b) => { b.checked = anyOff; });
-      };
-      panel.querySelector("[data-copy-cancel]").onclick = () => { panel.hidden = true; panel.innerHTML = ""; };
-      panel.querySelector("[data-copy-go]").onclick = () => {
-        const srcCal = readCalFor(srcMac);
-        const macs = Array.from(panel.querySelectorAll("[data-copy-tgt]:checked")).map((b) => b.dataset.copyTgt);
-        if (!macs.length) { panel.hidden = true; panel.innerHTML = ""; return; }
-        macs.forEach((mac) => send({ type: "bleCal", mac, cal: srcCal }));
-        panel.innerHTML = `<div style="color:var(--ok)">Kopierade till ${macs.length} slinga${macs.length === 1 ? "" : "or"}.</div>`;
-        setTimeout(() => { panel.hidden = true; panel.innerHTML = ""; }, 1400);
-      };
-    };
-  });
-}
-
-function renderBleScan(devices) {
-  bleScanBtn.disabled = false;
-  bleScanBtn.textContent = "Sök nya slingor (8 s)";
-  const paired = new Set(blePairedDevices.map(macKey));
-  // Visa BLEDOM-träffar först, sen okända (dimmade). Filtera bort redan parade.
-  const fresh = devices.filter((d) => !paired.has(macKey(d)))
-    .sort((a, b) => (a.chip === "bledom" ? -1 : 1) - (b.chip === "bledom" ? -1 : 1) || b.rssi - a.rssi);
-  if (!fresh.length) {
-    bleScanList.innerHTML = `<div class="status" style="opacity:.7">Inga nya slingor hittade. Se till att strömmen är på och att den inte redan är ansluten till en annan app.</div>`;
-    return;
-  }
-  bleScanList.innerHTML = fresh.map((d) => `
-    <div class="row" style="align-items:center;gap:8px;opacity:${d.chip === "bledom" ? "1" : ".55"}">
-      <div style="flex:1;min-width:0">
-        <div style="font-weight:600">${escapeHtml(d.name || d.mac)}</div>
-        <div style="opacity:.6;font-size:11px">${escapeHtml(d.mac)} · ${d.chip} · ${d.rssi} dBm</div>
-      </div>
-      <button class="btn" data-ble-identify="${escapeHtml(d.mac)}" title="Blinka så du ser vilken lampa detta är">Blinka</button>
-      <button class="btn primary" data-ble-pair="${escapeHtml(d.mac)}" data-ble-name="${escapeHtml(d.name || d.mac)}" data-ble-chip="${d.chip}">
-        ${d.chip === "bledom" ? "Para" : "Testa"}
-      </button>
-    </div>
-  `).join("");
-  bleScanList.querySelectorAll("[data-ble-identify]").forEach((btn) => {
-    btn.onclick = () => {
-      send({ type: "bleIdentify", mac: btn.dataset.bleIdentify });
-      btn.disabled = true; const orig = btn.textContent; btn.textContent = "Blinkar…";
-      setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 6000);
-    };
-  });
-  bleScanList.querySelectorAll("[data-ble-pair]").forEach((btn) => {
-    btn.onclick = () => {
-      send({ type: "blePair", mac: btn.dataset.blePair, name: btn.dataset.bleName, chip: btn.dataset.bleChip });
-      btn.disabled = true; btn.textContent = "Parar…";
-    };
-  });
-}
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-}
-
-if (bleScanBtn) {
-  bleScanBtn.onclick = () => {
-    bleScanBtn.disabled = true;
-    bleScanBtn.textContent = "Söker…";
-    bleScanList.innerHTML = `<div class="status" style="opacity:.7">Söker i 8 sekunder…</div>`;
-    send({ type: "bleScan" });
-    // Fail-safe: knapp ska aldrig fastna om sidecarn inte svarar.
-    setTimeout(() => { if (bleScanBtn.disabled) { bleScanBtn.disabled = false; bleScanBtn.textContent = "Sök nya slingor (8 s)"; } }, 12000);
-  };
-  // Ta emot initialläget så snart WS är uppe (server broadcastar blePaired vid ändring).
-  setTimeout(() => renderBlePaired([]), 200);
-}
 
 
 </script>

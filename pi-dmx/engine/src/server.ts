@@ -87,22 +87,6 @@ export interface ServerDeps {
   /** Reset the AGC after an input-routing switch. */
   resetAgc: (startGain?: number) => void;
   setGainLock: (locked: boolean) => void;
-  /** BLE sidecar bridge. Optional — null when hardware / sidecar isn't available. */
-  ble?: {
-    activeCount: () => number;
-    paired: () => { mac: string; name: string; chip: "bledom" | "unknown"; connected: boolean; cal?: { rGain: number; gGain: number; bGain: number; maxBrightness: number; gamma: number } }[];
-    scan: () => void;
-    pair: (mac: string) => void;
-    unpair: (mac: string) => void;
-    /** Blinka en specifik slinga i identifieringsfärg så användaren kan bekräfta vilken fysisk enhet det är. */
-    identify: (mac: string) => void;
-    /** Live-uppdatera vitbalans, max-ljus och gamma per slinga. */
-    setCal: (mac: string, cal: { rGain: number; gGain: number; bGain: number; maxBrightness: number; gamma: number }) => void;
-    /** Register a listener called whenever a scan finishes. */
-    onScan: (fn: (devices: { mac: string; name: string; chip: "bledom" | "unknown"; rssi: number }[]) => void) => void;
-    /** Register a listener called whenever the paired list changes. */
-    onPaired: (fn: () => void) => void;
-  };
 }
 
 export interface Server {
@@ -543,12 +527,8 @@ export async function startServer(
       activeIntensity: r3(deps.cfg.activeIntensity),   // vred/slider-position (0..1)
 
       fog: deps.getFogStatus(),     // null när maskinen inte är ansluten
-      bleActive: deps.ble?.activeCount() ?? 0,   // antal parade BLE-slingor som är uppkopplade
-      // Drift-hälsa: UI:t visar en banner om DMX-helpern är nere eller
-      // om parade BLE-slingor tappat kontakt. Billigt att skicka varje
-      // frame — samma push-rate som resten (20 Hz).
+      // Drift-hälsa: UI:t visar en banner om DMX-helpern är nere.
       dmxOk: deps.getDmxConnected(),
-      blePairedCount: deps.ble?.paired().length ?? 0,
     });
     pkLevel = 0; pkEnergy = 0; pkKick = false; pkBeat = false;
     for (const c of clients) {
@@ -718,50 +698,6 @@ export async function startServer(
             deps.cfg.fogTrigger = true;   // engångs-puff (motorn nollställer flaggan)
           } else if (msg.type === "fogService") {
             deps.resetFogService();       // tank påfylld / rengjord → nollställ räknarna
-          } else if (msg.type === "bleScan") {
-            // Åtta-sekunders scan i sidecarn; resultatet kommer via bleScanResults nedan.
-            deps.ble?.scan();
-            return;
-          } else if (msg.type === "blePair" && typeof msg.mac === "string") {
-            deps.ble?.pair(msg.mac);
-            // Kom ihåg i cfg så en respawn av sidecarn (eller reboot) återansluter av sig själv.
-            const list = deps.cfg.bleDevices ?? (deps.cfg.bleDevices = []);
-            if (!list.some((d) => d.mac.toLowerCase() === msg.mac.toLowerCase())) {
-              list.push({ mac: msg.mac.toLowerCase(), name: typeof msg.name === "string" ? msg.name : msg.mac, chip: msg.chip === "bledom" ? "bledom" : "unknown" });
-            }
-          } else if (msg.type === "bleUnpair" && typeof msg.mac === "string") {
-            deps.ble?.unpair(msg.mac);
-            if (deps.cfg.bleDevices) {
-              deps.cfg.bleDevices = deps.cfg.bleDevices.filter((d) => d.mac.toLowerCase() !== msg.mac.toLowerCase());
-            }
-          } else if (msg.type === "bleIdentify" && typeof msg.mac === "string") {
-            // "Blinka lampan" — hjälper användaren identifiera vilken fysisk slinga
-            // en post motsvarar. Ingen cfg-mutation; sidecarn hanterar timeout.
-            deps.ble?.identify(msg.mac);
-            return;
-          } else if (msg.type === "bleCal" && typeof msg.mac === "string" && msg.cal) {
-            // Vitbalans, max-ljus och gamma per slinga. Persistera i cfg så värdena
-            // överlever reboot; skicka till sidecarn för direkt effekt.
-            const clamp01 = (x: any) => {
-              const n = typeof x === "number" && Number.isFinite(x) ? x : 1;
-              return n < 0 ? 0 : n > 1 ? 1 : n;
-            };
-            const clampGamma = (x: any) => {
-              const n = typeof x === "number" && Number.isFinite(x) ? x : 1;
-              return n < 0.3 ? 0.3 : n > 3.0 ? 3.0 : n;
-            };
-            const cal = {
-              rGain: clamp01(msg.cal.rGain),
-              gGain: clamp01(msg.cal.gGain),
-              bGain: clamp01(msg.cal.bGain),
-              maxBrightness: clamp01(msg.cal.maxBrightness),
-              gamma: clampGamma(msg.cal.gamma),
-            };
-            const mac = msg.mac.toLowerCase();
-            const list = deps.cfg.bleDevices ?? (deps.cfg.bleDevices = []);
-            const entry = list.find((d) => d.mac.toLowerCase() === mac);
-            if (entry) entry.cal = cal;
-            deps.ble?.setCal(mac, cal);
           }
           deps.onConfigChanged?.();
           // Echo back — koalescerat: en långsam klient får bara den senaste configen.
@@ -779,19 +715,6 @@ export async function startServer(
 
   const broadcastConfig = () => broadcast();
 
-  // Sidecar events → fan out to every connected browser. Same server instance
-  // registers per port (80 + 443) so both listeners see the same events; the
-  // sidecar only fires ONE event per action, so this doubles up harmlessly.
-  deps.ble?.onScan((devices) => {
-    logHealth("info", "ble", `scan hittade ${devices.length} enhet(er)`);
-    broadcast({ type: "bleScanResults", devices });
-  });
-  deps.ble?.onPaired(() => {
-    const list = deps.ble!.paired();
-    const online = list.filter((d) => d.connected).length;
-    logHealth("info", "ble", `parad lista uppdaterad: ${online}/${list.length} uppkopplade`);
-    broadcast({ type: "blePaired", devices: list });
-  });
   return { app, broadcastConfig };
 }
 

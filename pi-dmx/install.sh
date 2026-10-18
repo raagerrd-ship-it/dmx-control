@@ -22,9 +22,17 @@ BOOT_DIR="/boot/firmware"
 echo "==> [1/9] apt packages"
 apt-get update -qq
 apt-get install -y --no-install-recommends \
-  build-essential nodejs npm \
-  alsa-utils gpiod libcap2-bin \
-  bluetooth bluez libbluetooth-dev
+  build-essential python3 curl xz-utils \
+  alsa-utils gpiod libcap2-bin
+
+# Node 24 (2026-10-18, samma som lotus) i /opt/node24 - Debians nodejs är 18. npm ci nedan bygger spi-device mot den här noden.
+NODE_V=v24.18.0
+if [ "$(/opt/node24/bin/node -v 2>/dev/null)" != "$NODE_V" ]; then
+  curl -fsSL "https://nodejs.org/dist/$NODE_V/node-$NODE_V-linux-arm64.tar.xz" -o /tmp/node24.tar.xz
+  echo "58c9520501f6ae2b52d5b210444e24b9d0c029a58c5011b797bc1fe7105886f6  /tmp/node24.tar.xz" | sha256sum -c -
+  rm -rf /opt/node24 && mkdir -p /opt/node24 && tar xJf /tmp/node24.tar.xz -C /opt/node24 --strip-components=1
+fi
+export PATH="/opt/node24/bin:$PATH"
 
 echo "==> [2/9] /boot config — UART, Codec Zero, force_turbo"
 CFG="$BOOT_DIR/config.txt"
@@ -64,11 +72,10 @@ fi
 
 
 
-echo "==> [4/9] disable serial-getty (håll bluetoothd igång — BLE-sidecarn använder hci0)"
-# BT-stacken behövs för BLE-slingorna. hciuart var för PL011/BT-modem-kombon på
-# äldre Pi, irrelevant på Zero 2 W (BT sitter på SDIO).
-systemctl disable --now hciuart serial-getty@ttyAMA0 2>/dev/null || true
-systemctl enable --now bluetooth 2>/dev/null || true
+echo "==> [4/9] disable serial-getty + bluetooth (ingen BLE på DMX-boxen sedan 2026-10-18)"
+# BLE-sidovagnen (pi-dmx-ble) är borttagen: den körde en annan BLE-modul än lotus. hciuart var för PL011/BT-modem-kombon på
+# äldre Pi, irrelevant på Zero 2 W.
+systemctl disable --now hciuart serial-getty@ttyAMA0 bluetooth 2>/dev/null || true
 
 AP_SSID="${AP_SSID:-pi-dmx}"
 AP_PASS="${AP_PASS:-}"                 # empty = open network (no password)
@@ -179,22 +186,10 @@ if [ ! -f /etc/audio-dmx/tls/cert.pem ]; then
   openssl req -x509 -newkey rsa:2048 -keyout /etc/audio-dmx/tls/key.pem     -out /etc/audio-dmx/tls/cert.pem -days 3650 -nodes -subj "/CN=pi-dmx.local" 2>/dev/null
 fi
 
-echo "==> [7b/8] build + install pi-dmx-ble (BLE sidecar)"
-if [ -d "$REPO_DIR/ble-writer" ]; then
-  cd "$REPO_DIR/ble-writer"
-  npm ci --no-audit --no-fund
-  rm -rf dist
-  npm run build
-  [ -f dist/index.js ] || { echo "❌ BLE-sidecar: bygget gav ingen dist/index.js" >&2; exit 1; }
-  mkdir -p /opt/pi-dmx-ble
-  rsync -a --delete dist/ /opt/pi-dmx-ble/dist/
-  rsync -a --delete node_modules/ /opt/pi-dmx-ble/node_modules/
-  # NOBLE UTAN LOGGSKRÄP (2026-10-18, samma som lotus): skydda noble:s loggrader (if (debug.enabled)) - de byggde strängar per BLE-paket
-  python3 "$REPO_DIR/ble-writer/scripts/patch-noble-debug.py" /opt/pi-dmx-ble/node_modules/@abandonware/noble/lib || echo "VARNING: noble-patchen misslyckades (ofarligt, bara mer skräp)"
-  install -m644 package.json /opt/pi-dmx-ble/package.json
-  install -Dm644 systemd/pi-dmx-ble.service /etc/systemd/system/pi-dmx-ble.service
-  mkdir -p /run/pi-dmx
-  cd "$REPO_DIR/engine"
+# Gammal BLE-sidovagn (borttagen 2026-10-18) - städa bort den om den finns kvar från en äldre installation.
+if [ -f /etc/systemd/system/pi-dmx-ble.service ]; then
+  systemctl disable --now pi-dmx-ble 2>/dev/null || true
+  rm -f /etc/systemd/system/pi-dmx-ble.service; rm -rf /opt/pi-dmx-ble /run/pi-dmx/ble.sock
 fi
 
 # --- versionsstämpel för varje deploy ---------------------------------------
@@ -216,10 +211,8 @@ echo "  ✓ deploy: engine v$ENG_VER @ $GIT_SHA ($GIT_BRANCH)"
 echo "==> [8/8] enable + start services"
 systemctl daemon-reload
 systemctl enable --now cpu-performance codec-zero-linein dmx-helper audio-dmx-engine pi-dmx-watchdog.timer
-[ -f /etc/systemd/system/pi-dmx-ble.service ] && systemctl enable --now pi-dmx-ble
 # enable --now does not restart already-running units — force the new build live.
 systemctl restart dmx-helper audio-dmx-engine
-[ -f /etc/systemd/system/pi-dmx-ble.service ] && systemctl restart pi-dmx-ble
 
 echo
 echo "Done. Reboot once so /boot config + isolcpus take effect:"
