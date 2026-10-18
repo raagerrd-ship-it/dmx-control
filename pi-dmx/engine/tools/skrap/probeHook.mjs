@@ -10,6 +10,7 @@ globalThis.__probe = (k) => {
   if (last >= 0 && u >= prevU) { acc[last] += u - prevU; cnt[last]++; }
   last = k < 0 ? -1 : k; prevU = hs();
 };
+globalThis.__probeRet = (v) => { globalThis.__probe(-1); return v; };   // probe.py PROBE_RET=1
 process.on("exit", () => {
   const map = JSON.parse(readFileSync(process.env.PROBE_MAP, "utf8")); const rows = [];
   for (let k = 0; k < 400; k++) if (cnt[k]) rows.push([k, acc[k] / cnt[k], cnt[k]]);

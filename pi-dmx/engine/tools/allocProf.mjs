@@ -3,10 +3,11 @@
  * koppel som live) under V8:s samplande heap-profilerare MED objekt som städats bort av minor/major GC - alltså allt skräp, inte bara
  * det som lever kvar - och skriver bytes per sekund ljud per källa (fil:funktion:rad), sorterat. Bänkens egna rader (konsertReplay,
  * allocProf) visas separat så de inte förväxlas med motorn.
- *   node tools/allocProf.mjs <wav> [--step 5] [--top 40] [--sekunder 120] [--dist <patchad dist-kopia>]
+ *   node tools/allocProf.mjs <wav> [--step 5] [--top 40] [--sekunder 120] [--dist <patchad dist-kopia>] [--fran <s>]
+ * (--fran: börja sampla först efter <s> s ljud = efter uppvärmningen/stabilt läge; startas synkront i render-anropet som passerar tiden.)
  * (--sekunder: profilera bara de första N s av filen via en avkortad kopia i temp.)
  */
-import { Session } from "node:inspector/promises";
+import { Session as CbSess } from "node:inspector";   // callback-API (node:inspector/promises finns inte i Node 18 = Pi:ernas version)
 import { readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, basename } from "node:path";
@@ -22,11 +23,22 @@ if (SEK > 0) {   // avkortad kopia: 44 byte huvud + SEK s mono 16 bit 48 kHz
   const c = Buffer.from(d.subarray(0, n)); c.writeUInt32LE(n - 8, 4); c.writeUInt32LE(n - 44, 40);
   wav = join(tmp, basename(wav)); writeFileSync(wav, c);
 }
-const secs = (readFileSync(wav).length - 44) / 96000;
+const secsAll = (readFileSync(wav).length - 44) / 96000;
+const secs = secsAll - Number(opt("--fran", 0));
 
-const s = new Session(); s.connect();
+const FRAN = Number(opt("--fran", 0));
+const SAMPLE = { samplingInterval: 4096, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true };
+const s0 = new CbSess(); s0.connect();
+const s = { post: (m, p) => new Promise((ok, no) => s0.post(m, p ?? {}, (e, r) => (e ? no(e) : ok(r)))) };
 await s.post("HeapProfiler.enable");
-await s.post("HeapProfiler.startSampling", { samplingInterval: 4096, includeObjectsCollectedByMajorGC: true, includeObjectsCollectedByMinorGC: true });
+if (FRAN > 0) {   // synkron start mitt i den synkrona replay-loopen: den vanliga (callback-)sessionen levererar direkt i samma tråd
+  const { Session: CbSession } = await import("node:inspector");
+  const cb = new CbSession(); cb.connect();
+  const distUrl = opt("--dist", null) ? pathToFileURL(opt("--dist") + "/").href : new URL("../dist/", import.meta.url).href;
+  const { EffectEngine } = await import(distUrl + "effects.js");
+  const orig = EffectEngine.prototype.render; let started = false;
+  EffectEngine.prototype.render = function (fr) { if (!started && Date.now() - 1700000000000 >= FRAN * 1000) { started = true; cb.post("HeapProfiler.startSampling", SAMPLE, () => {}); } return orig.call(this, fr); };
+} else await s.post("HeapProfiler.startSampling", SAMPLE);
 process.argv = [process.argv[0], "konsertReplay.mjs", wav, "--delad-cfg", "--step", STEP, "--json", join(tmp, "r.json"), ...(opt("--dist", null) ? ["--dist", opt("--dist")] : [])];
 const t0 = Date.now();
 const realNow = Date.now;
