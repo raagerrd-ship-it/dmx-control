@@ -75,9 +75,11 @@ export class BoundaryDetector {
   private tempoRefAt = 0;
   private tempoRefSince = 0;   // nar referensen sattes (INSVANGNING)
   private tempoShiftAt = -1e9;
-  /** Gransignaler som var aktiva vid senaste kontrollen (diagnostik). */
-  lastEvidence: string[] = [];
-  private evBuf: string[] = [];
+  /** Gransignaler som var aktiva vid senaste kontrollen (diagnostik). Byggs vid lasning ur tre falt (skrapjakten 10-18: forr en
+   *  array som tomdes och fylldes per hop - ny backing store vid varje push efter length = 0). Samma innehall och ordning. */
+  get lastEvidence(): string[] { const a: string[] = []; if (this.evNov) a.push(this.evNov); if (this.evBpm) a.push(this.evBpm); if (this.evDip) a.push("nivådipp"); return a; }
+  private evNov = ''; private evBpm = ''; private evDip = false;
+  private bsA = NaN; private bsB = NaN; private bsStr = '';   // tempoevidensens strang byggs bara nar talen andras (forr per hop, 375 Hz)
   private novStr = ''; private novStrFor = NaN;
 
   private playStart = 0;          // vaggklocka da segmentet borjade
@@ -213,7 +215,10 @@ export class BoundaryDetector {
       const dev = Math.abs(o.bpm - this.segBpm) / this.segBpm;
       if (dev > BPM_JUMP) {
         if (!this.bpmOffSince) this.bpmOffSince = now;
-        if (now - this.bpmOffSince > BPM_HOLD_MS) bpmShift = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`;
+        if (now - this.bpmOffSince > BPM_HOLD_MS) {
+          if (this.bsA !== this.segBpm || this.bsB !== o.bpm) { this.bsA = this.segBpm; this.bsB = o.bpm; this.bsStr = `tempo ${this.segBpm.toFixed(0)}→${o.bpm.toFixed(0)} BPM`; }
+          bpmShift = this.bsStr;
+        }
       } else {
         this.bpmOffSince = 0;
         this.segBpm = this.segBpm * 0.95 + o.bpm * 0.05;
@@ -256,11 +261,11 @@ export class BoundaryDetector {
     if (tLive < MIN_SEG_MS + NOV_BACK_MS) return false;
 
     const novFresh = this.novAt > 0 && now - this.novAt < NOV_WIN_KEEP_MS;
-    const ev = this.evBuf; ev.length = 0;   // ateranvand (skrapjakten 10-01: forr en ny array per hop, 375 Hz)
-    if (novFresh) { if (this.novStrFor !== this.novPeak) { this.novStrFor = this.novPeak; this.novStr = `klangskifte ${this.novPeak.toFixed(2)}`; } ev.push(this.novStr); }   // strangen byggs bara nar toppen andras
-    if (bpmShift) ev.push(bpmShift);
-    if (this.dipAt && now - this.dipAt < DIP_WIN_MS) ev.push("nivådipp");
-    this.lastEvidence = ev;
+    // EVIDENSEN i tre falt (se lastEvidence; forr en array per hop). Ordningen som forr: klang, tempo, nivadipp.
+    if (novFresh && this.novStrFor !== this.novPeak) { this.novStrFor = this.novPeak; this.novStr = `klangskifte ${this.novPeak.toFixed(2)}`; }   // strangen byggs bara nar toppen andras
+    const evDip = !!(this.dipAt && now - this.dipAt < DIP_WIN_MS);
+    this.evNov = novFresh ? this.novStr : ''; this.evBpm = bpmShift; this.evDip = evDip;
+    const evN = (novFresh ? 1 : 0) + (bpmShift ? 1 : 0) + (evDip ? 1 : 0);
 
     let why = "";
     let back = NOV_BACK_MS;
@@ -271,8 +276,8 @@ export class BoundaryDetector {
     // DROP != LATGRANS (ladan 2026-09-29 19:13, agaren: missad drop, 'samma lat'): klangskifte 0,64 + tempo 94->116 vid dropen raknades
     // som ny lat -> sektionerna nollades och DROP_SONG_HOLD spärrade 30 s. Med DMX_BOUNDARY_NEED_DIP=1 kraver en svag klang +
     // tempo-grans aven en nivadipp (latar har en paus/dipp mellan sig, en drop har det inte). Starkt klangskifte ensamt galler som forr.
-    const dipOk = !BOUNDARY_NEED_DIP || novSolo || ev.includes("nivådipp");
-    if (novFresh && (novSolo || ev.length >= 2) && dipOk) why = ev.join(" + ");
+    const dipOk = !BOUNDARY_NEED_DIP || novSolo || evDip;
+    if (novFresh && (novSolo || evN >= 2) && dipOk) why = this.lastEvidence.join(" + ");
     else if (tLive > MAX_SEG_MS) { why = "maxlängd"; back = 0; }   // aldrig en 22-minuters grot igen
     if (!why) return false;
 
