@@ -1,6 +1,11 @@
 # Natt-agentens uppdrag
 
-## NÄSTA LADAN-BESÖK (förberett 2026-10-18 av DMX-sessionen - ägaren: "förbered för dmx-pi") - INGET AV DETTA ÄR UTE ÄN
+## LADAN-BESÖKET 2026-10-18 15:45-16:20 - ALLT NEDAN ÄR UTE (PC på telefonens hotspot, Pi:n 10.38.24.218, PI_HOST=...)
+Resultat: små städningar 15/min -> 8-13/min, längsta liten 4-7 ms på Node 24, render snitt 0,25 -> 0,20 ms. Node 18 (apt nodejs/npm
++ 130 node-paket) AVINSTALLERAD efter ägarens beslut; node/npm/npx = länkar till /opt/node24 i /usr/local/bin. Stora städningar och
+mörkerstädningen (forcedGc) ej färdigutvärderade - läs /api/perf nästa gång (efter pauser mellan låtar).
+
+### (checklistan som den var)
 1. `python tools/ladan.py` (utan --env; ladan.conf ska vara tom sedan drop-proven blev standard 10-17). Tar med allt sedan 10-17 15:53:
    skräpjakten (render i steg, doubleFields, hsv direkt import + tabell, kalibreringens tal via fält, --interrupt-budget=32768 på Node 18
    i v8Tiering.ts, perfStats skräpfri, BLE borttaget), nattens 10-18-fixar, computeBpm orörd. Ljuset byte-identiskt.

@@ -33,6 +33,8 @@ if [ "$(/opt/node24/bin/node -v 2>/dev/null)" != "$NODE_V" ]; then
   rm -rf /opt/node24 && mkdir -p /opt/node24 && tar xJf /tmp/node24.tar.xz -C /opt/node24 --strip-components=1
 fi
 export PATH="/opt/node24/bin:$PATH"
+# node/npm/npx i PATH för alla (deploy-dist.py kör `node --check` över ssh). Node 18 (apt nodejs) är borttagen 2026-10-18.
+ln -sf /opt/node24/bin/node /opt/node24/bin/npm /opt/node24/bin/npx /usr/local/bin/
 
 echo "==> [2/9] /boot config — UART, Codec Zero, force_turbo"
 CFG="$BOOT_DIR/config.txt"

@@ -5,7 +5,7 @@ Node 24-byggda spi.node (byggd på lotus 10-18, laddad och testad med require + 
 gamla BLE-sidovagnen (pi-dmx-ble + bluetoothd) - BLE är borttaget ur DMX 10-18 (annan BLE-modul än lotus).
   python tools/ladan_node24.py          (torrkörning: arkitektur, node, ExecStart, sidovagnen)
   python tools/ladan_node24.py --kor    (backup -> byte -> omstart -> kontroll)
-  python tools/ladan_node24.py --backa  (packar upp backupen: Node 18-ExecStart + gamla spi.node, omstart)
+  (--backa borttagen 2026-10-18: Node 18 avinstallerad, node/npm/npx länkade till /opt/node24 i /usr/local/bin)
 Kör EFTER ladan.py och ladan_heap.py. Kräver Node-tarbollen på PC:n (NODE24_TGZ, standard ~/node24dl).
 """
 import hashlib, os, sys, time
@@ -37,6 +37,8 @@ print('Pi-DMX:', host, '|', arch, '| system-node', run('node --version'))
 print('ExecStart nu:\n' + run('systemctl cat audio-dmx-engine | grep -E "^ExecStart=/"'))
 print('sidovagnen pi-dmx-ble:', run('systemctl is-enabled pi-dmx-ble 2>&1; systemctl is-active pi-dmx-ble 2>&1').replace('\n', ' '), '| bluetooth:', run('systemctl is-active bluetooth 2>&1'))
 if BACKA:
+    sys.exit('--backa finns inte langre: Node 18 (apt nodejs) avinstallerades 2026-10-18 (agaren: kor pa Node 24). '
+             'Aterstallning = installera nodejs via apt och packa upp ' + BAK)
     if 'ja' not in run(f'test -f {BAK} && echo ja'): sys.exit(f'{BAK} saknas - inget att backa till')
     print(sudo(f'tar xzf {BAK} -C / && systemctl daemon-reload && systemctl restart audio-dmx-engine'))
 elif KOR:
