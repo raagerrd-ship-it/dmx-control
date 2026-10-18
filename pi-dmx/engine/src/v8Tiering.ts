@@ -10,3 +10,8 @@ import { setFlagsFromString } from "node:v8";
 // Flaggan finns bara i V8 >= 12 (Node 22, PC:n). Pi:erna kör Node 18 (V8 10.2): där är tieringen budgetbaserad (--interrupt-budget,
 // --ticks-before-optimization), flaggan okänd ("Error: unrecognized flag", 10-17 i ladan) och regeln om 3000 anrop finns inte - ingen effekt.
 if (Number(process.versions.v8.split(".")[0]) >= 12) setFlagsFromString("--invocation-count-for-turbofan=100");
+// NODE 18 / V8 10 (Pi:erna, 10-18): tieringen är budgetbaserad - en funktion optimeras efter 3 genomgångar av --interrupt-budget
+// (132 KB körd bytekod). En effekt som byts in efter ett lookbyte kör då otolkad (och boxar varje decimaltal) tills budgeten räckt.
+// 32 KB = fyra gånger snabbare: Node 18, lang-1014 andra varvet, effekterna i rotation (renderLamps) 19,7 -> 10,6 kB/s, motorn
+// 54 -> 46 kB/s skräp; ljuset byte-identiskt (flaggan ändrar bara NÄR V8 optimerar). 8 KB gav 44 - inte värt mer kompilering.
+else setFlagsFromString("--interrupt-budget=32768");
