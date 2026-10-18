@@ -1,5 +1,8 @@
 import type { EffectDef } from "./types.js";
 
+// (skräpjakten 10-18: förr en closure/array som skapades i render per lampa och ruta - samma räkning)
+const h = (x: number, n: number) => (Math.imul(x + 11, 2654435761) >>> 0) % n;
+
 // DROPPAR (lugn x refräng, situationsrutnätet 2026-10-12 - syskon svall/famn/kaskad): en lugn refräng med basgång. Varje basnot
 // (c.bassNoteIdx, vid tydlig basgång) faller som en droppe i en ny lampa (hash) och klingar av långsamt; förra droppen syns ännu
 // svagare i grannkulören. Utan tydlig basgång faller en droppe per två slag. Övriga lampor ligger nästan mörka.
@@ -12,9 +15,8 @@ export const droppar: EffectDef = {
     const beatS = c.cfg.beat?.bpm ? 60 / c.cfg.beat.bpm : 0.5;
     const idx = clear ? c.bassNoteIdx : Math.floor(c.beatIdx / 2);     // utan basgång: halvtakt (en droppe per två slag)
     const age = clear ? c.bassNoteAge : ((((c.beatIdx % 2) + 2) % 2) + c.beatFrac) * beatS;   // sekunder sedan droppen
-    const h = (x: number) => (Math.imul(x + 11, 2654435761) >>> 0) % n;
-    const cur = h(idx);
-    let prev = h(idx - 1); if (prev === cur) prev = (cur + 1) % n;
+    const cur = h(idx, n);
+    let prev = h(idx - 1, n); if (prev === cur) prev = (cur + 1) % n;
     // EFFEKTGENOMGÅNGEN 10-13 (effectDyn: 70,9 kulörhopp/min - lampan bytte kulör när den gick från 'droppe' till 'förra droppen'
     // till vila, varje basnot): FAST kulör per lampa (grannkulörer), bara ljuset faller och klingar av. Vilan 0,04 -> 0,015 (motorns
     // grundnivå lyfte 0,04 till en tredjedel).

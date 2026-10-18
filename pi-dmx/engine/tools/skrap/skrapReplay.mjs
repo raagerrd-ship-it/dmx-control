@@ -20,7 +20,7 @@ const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
 const d = readFileSync(path); const nSamples = (d.length - 44) >> 1;
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = Number(opt("--step", 5)), VARV = Number(opt("--varv", 1));
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
-cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.master = 1;
+cfg.mode = opt("--mode", "smart"); cfg.energyDrivesMode = cfg.mode === "smart"; cfg.master = 1;   // --mode <look>: en fast look (skräpmätning per effekt)
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
 const an = new Analyser(cfg); an.setGainLock(true, 1);
 const feed = new BeatFeed();

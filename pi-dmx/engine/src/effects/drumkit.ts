@@ -1,5 +1,8 @@
 import type { EffectDef } from "./types.js";
 
+// (skräpjakten 10-18: förr en closure/array som skapades i render per lampa och ruta - samma räkning)
+const hit = (env: number, floor: number): number => floor + (1 - floor) * Math.min(1, env);
+
 // TRUM-KIT: varje lampa är en trumröst som PUNCHAR på sitt eget anslag och
 // slocknar snabbt — inte en jämn EQ-mätare utan diskreta trumslag. Motorn ger
 // oss färdiga onset-envelopes (c.drum): kick = sub-transient, snare = mellan-
@@ -17,7 +20,6 @@ export const drumkit: EffectDef = {
   desc: "Varje lampa = en trumröst (kick/snare/hi-hat/bas) som punchar på sitt eget anslag.",
   render(c) {
     const d = c.drum;
-    const hit = (env: number, floor: number): number => floor + (1 - floor) * Math.min(1, env);
     const voice = c.count > 1 ? c.idx % 4 : -1;
     switch (voice) {
       case 0: return c.hsv(0.01, 1.00, hit(d.kick, 0.05));   // KICK  → röd dunk

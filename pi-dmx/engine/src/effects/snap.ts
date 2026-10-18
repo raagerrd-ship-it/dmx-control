@@ -1,5 +1,9 @@
 import type { EffectDef } from "./types.js";
 
+// (skräpjakten 10-18: förr en closure/array som skapades i render per lampa och ruta - samma räkning)
+const pairOf = (b: number) => (Math.imul(b + 3, 2654435761) >>> 0) % 6;
+const PAIRS = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
+
 // Full fart: HÅRT KAP — KONSTANT ljus (ingen pump), och på varje taktslag kapas ljuset till ett nytt lamppar (10-13; var unisont
 // färgslag i alla fyra = spridning 0). Motsats till party (throb med vandrande hål) och rave (fast jämn/udda-växling).
 export const snap: EffectDef = {
@@ -10,9 +14,7 @@ export const snap: EffectDef = {
     // lamppar per slag (6 par, aldrig samma två slag i rad), andra paret släckt; taktens etta tänder alla. Kulören per fras (hueIdx/16).
     const n = Math.max(1, c.count);
     const one = (((c.beatIdx % 4) + 4) % 4) === 0;
-    const pairOf = (b: number) => (Math.imul(b + 3, 2654435761) >>> 0) % 6;
     let pr = pairOf(c.beatIdx); if (pr === pairOf(c.beatIdx - 1)) pr = (pr + 1) % 6;
-    const PAIRS = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
     const lit = one || n < 4 || PAIRS[pr].includes(c.lamp % 4);
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = (((c.lamp & 1) ? base + 3 : base) % 6) / 6;
