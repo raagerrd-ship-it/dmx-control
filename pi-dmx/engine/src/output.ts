@@ -119,7 +119,11 @@ export class FixtureOutput {
    * @param mul 0..1 multiplikator
    */
   /** SISTA STEGET FORE UTGANG - EN mappning (se EN VAG FOR LJUSET). */
-  calibrate(universe: Uint8Array, fixtures: FixtureConfig[], master: number, nowMs: number, dropOpen = 0, ceil = 1): void {
+  /** KALIBRERINGENS TAL via fält (10-18, skräpjakten på Node 18): decimaltal som argument till calibrate/fogTick packades in vid varje
+   *  rendering (32 B/ruta, stegLab). Sätts av motorn direkt före anropet. Startvärdena är decimaltal så fälten har decimalform från början. */
+  calMaster = 0.5; calNow = 0.5; calDrop = 0.5; calCeil = 0.5; fogNow = 0.5; fogDt = 0.5;
+  calibrate(universe: Uint8Array, fixtures: FixtureConfig[]): void {
+    const master = this.calMaster, nowMs = this.calNow, dropOpen = this.calDrop, ceil = this.calCeil;
     const top = (255 * master + 0.5) | 0;
     // ceil = SEKTIONENS TAK (effects.ts): bara på färgen/ljusstyrkan - dimmern på en färgfixtur står på master (förr fick rgb7-lamporna
     // taket två gånger: master*tak på dimmern OCH på färgen -> 0,65 blev ~0,42).
@@ -166,10 +170,11 @@ export class FixtureOutput {
     }
   }
 
-  fogTick(nowMs: number, dtMs: number, want: boolean, fog: {
+  fogTick(want: boolean, fog: {
     enabled?: boolean; burstMs: number; cooldownMs: number;
     warmStartMs?: number; sprayMs?: number; bursts?: number;
   }, manual = false): boolean {
+    const nowMs = this.fogNow, dtMs = this.fogDt;   // (se KALIBRERINGENS TAL)
     if (!fog.enabled) {
       if (this.fogWasEnabled) {   // avstängd → glöm uppvärmning och släpp pågående puff,
         this.fogWasEnabled = false;   // annars fastnar rök-kanalen tänd

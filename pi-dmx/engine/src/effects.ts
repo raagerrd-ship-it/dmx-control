@@ -2105,7 +2105,7 @@ export class EffectEngine {
       const r = tgt > this.secCeil ? dtNow / 0.3 : dtNow / 2.0;                                  // upp snabbt, ner långsamt
       this.secCeil += Math.max(-r, Math.min(r, tgt - this.secCeil));
     }
-    this.out.calibrate(this.universe, this.cfg.fixtures, this.cfg.master ?? 1, nowP, this.dropColEnv, CONCERT ? this.secCeil : 1);
+    { const o = this.out; o.calMaster = this.cfg.master ?? 1; o.calNow = nowP; o.calDrop = this.dropColEnv; o.calCeil = CONCERT ? this.secCeil : 1; o.calibrate(this.universe, this.cfg.fixtures); }   // talen via fält (se output.ts)
 
     // Rök: motorn avgör OM den ska spruta, output-tjänsten var signalen hamnar.
     // RÖK: motorn samlar önskemålen — drop, manuell knapp, eller en effekt som bett om
@@ -2123,7 +2123,7 @@ export class EffectEngine {
       const miniNow = this.lastMiniWall === nowWall;   // fireMini satte looken i denna ruta (10-16: förr analysatorns miniHit, alltid falskt i konsertläget -> minidrop gav aldrig hungrig rök)
       const wantBurst = (dropHitRaw && fog.onDrop) || manualFog || wantFogFx || (hungry && (miniNow || highEntry));
       if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;   // engångs-flagga
-      const spraying = this.out.fogTick(nowWall, _dtT * 1000, wantBurst, fog, manualFog);
+      this.out.fogNow = nowWall; this.out.fogDt = _dtT * 1000; const spraying = this.out.fogTick(wantBurst, fog, manualFog);
       if (spraying && !this.fogWasSpraying) this.lastFogWall = nowWall;   // puffen startade (vilken orsak som helst)
       this.fogWasSpraying = spraying;
       if (fog.enabled) this.out.writeFog(this.universe, fog.address, spraying ? fog.level : 0);
