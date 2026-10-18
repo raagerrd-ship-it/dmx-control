@@ -282,7 +282,7 @@ function renderAndSend(): void {
     // skickas som separat brightness så sidecarn kan gamma-korrigera. Billigt
     // (max ~40 iterationer @ 100 Hz) och håller BLE i takt med DMX utan att
     // effekterna behöver veta om att slingorna finns.
-    if (bleClient && cfg.bleDevices && cfg.bleDevices.length > 0) {
+    if (bleClient && cfg.bleDevices && cfg.bleDevices.length > 0 && bleClient.sendDue()) {   // spärren först (se bleClient.sendDue)
       let rs = 0, gs = 0, bs = 0, n = 0;
       const fixtures = cfg.fixtures;
       for (let f = 0; f < fixtures.length; f++) {

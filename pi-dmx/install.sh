@@ -189,6 +189,8 @@ if [ -d "$REPO_DIR/ble-writer" ]; then
   mkdir -p /opt/pi-dmx-ble
   rsync -a --delete dist/ /opt/pi-dmx-ble/dist/
   rsync -a --delete node_modules/ /opt/pi-dmx-ble/node_modules/
+  # NOBLE UTAN LOGGSKRÄP (2026-10-18, samma som lotus): skydda noble:s loggrader (if (debug.enabled)) - de byggde strängar per BLE-paket
+  python3 "$REPO_DIR/ble-writer/scripts/patch-noble-debug.py" /opt/pi-dmx-ble/node_modules/@abandonware/noble/lib || echo "VARNING: noble-patchen misslyckades (ofarligt, bara mer skräp)"
   install -m644 package.json /opt/pi-dmx-ble/package.json
   install -Dm644 systemd/pi-dmx-ble.service /etc/systemd/system/pi-dmx-ble.service
   mkdir -p /run/pi-dmx

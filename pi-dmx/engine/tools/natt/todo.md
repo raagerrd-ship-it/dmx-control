@@ -1,5 +1,16 @@
 # Natt-agentens uppdrag
 
+## NÄSTA LADAN-BESÖK (förberett 2026-10-18 av DMX-sessionen - ägaren: "förbered för dmx-pi") - INGET AV DETTA ÄR UTE ÄN
+1. `python tools/ladan.py` (utan --env; ladan.conf ska vara tom sedan drop-proven blev standard 10-17). Tar med allt sedan 10-17 15:53:
+   skräpjakten (render i steg, doubleFields, hsv direkt import + tabell, kalibreringens tal via fält, --interrupt-budget=32768 på Node 18
+   i v8Tiering.ts, perfStats skräpfri, bleClient.sendDue före medelfärgen), nattens 10-18-fixar, computeBpm orörd. Ljuset byte-identiskt.
+2. Efter 15 min musik: `curl http://<pi>/api/perf` - jämför med 10-16 16:58-17:11 (minor 15/min, längsta 6-10 ms, major ~0, loop max
+   14-22 ms). Väntat (bänk Node 18): ~25-45 kB/s skräp -> en liten städning var 1,5-3 min.
+3. BLE-sidovagnen: `python tools/ladan_noble.py` (kontroll) - finns /opt/pi-dmx-ble och används BLE-slingor, kör `--kor` (noble-
+   loggraderna skyddas som på lotus; ny install.sh gör det automatiskt). Sidovagnen är egen process - motorn påverkas inte.
+4. Lotus-läxan: DMX-Pi:n kör Node 18 (lotus kör Node 24). Live-allokeringsprofil som på lotus (SIGUSR1 + HeapProfiler inkl. bortstädat)
+   går INTE på Node 18 (flaggorna finns inte) - /api/perf är måttet.
+
 ## Från kvällen 2026-10-17 - SKRÄPJAKTEN (ägaren: nattens ENDA uppgift natten till 10-18, se engångsundantaget i nattagentens SKILL.md)
 Läget efter dagen (allt på PC, stabilt läge, med V8-flaggan): DMX-motorn 112 kB/s (effects.js 35, boundaryDetector.js 32, analysatorn 21);
 lotus-motorn 203 kB/s (tickInner 75 utspritt över ~20 anropsställen med decimaltal, analysatorn 56 med låtbyten, alsaMic 31).

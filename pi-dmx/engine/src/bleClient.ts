@@ -97,11 +97,16 @@ export class BleClient {
     try { this.sock.write(JSON.stringify(obj) + "\n"); } catch { /* dropped */ }
   }
 
-  /** r/g/b/brightness all 0..1 — sidecar does gamma + premultiply. */
-  setColor(r: number, g: number, b: number, brightness: number) {
+  /** SPÄRREN FÖRST (2026-10-18, skräpjakten): index.ts frågar sendDue() innan medelfärgen räknas - förr räknades den och fyra
+   *  decimaltal skickades som argument (packas in) varje rendering, fast setColor släppte igenom högst en per MIN_SEND_MS. */
+  sendDue(): boolean {
     const now = performance.now();
-    if (now - this.lastSendMs < MIN_SEND_MS) return;
+    if (now - this.lastSendMs < MIN_SEND_MS) return false;
     this.lastSendMs = now;
+    return true;
+  }
+  /** r/g/b/brightness all 0..1 — sidecar does gamma + premultiply. Anropas bara när sendDue() sagt ja. */
+  setColor(r: number, g: number, b: number, brightness: number) {
     // Engine speaks in 0..1 floats; sidecar converts to 0..255 bytes.
     this.send({ type: "color", r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255), brightness });
   }
