@@ -24,7 +24,6 @@ import { startServer, applyInputRouting, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 import { IntensityKnob } from "./intensityKnob.js";
-import { KnobRing } from "./knobRing.js";
 import { applyIntensity, migrateFromMoods } from "./moods.js";
 import { BeatFeed } from "./beatFeed.js";
 import { LongRecord } from "./longRecord.js";
@@ -169,7 +168,6 @@ if (process.env.DMX_RECORDER === "1") {
 }
 // Argumentobjekt som fylls per hop i stallet for nya literaler (skrapjakten 10-01: 375 Hz). Mottagarna laser dem synkront.
 const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
-const ringArg = { intensity: 0.5, blackout: false, beat: false };
 capture.on("chunk", (samples: Float32Array) => {
   // MATNING BARA VID FELSOKNING (2026-10-04, agaren): runtimeHealth ar ren diagnostik (/api/health-log); watchdogens /health
   // bygger pa lastChunkAt och paverkas inte. PUT /api/debug/verbose {enabled:true} slar pa tidtagningen.
@@ -215,15 +213,6 @@ capture.on("chunk", (samples: Float32Array) => {
   // exakt det ögonblick ögat jämför mot örat. Rendera direkt och flytta fram
   // rasterdeadlinen så vi inte får två rutor på 1 ms.
   if (frame.kick) { renderAndSend(); nextRenderAt = performance.now() + RENDER_MS; }
-
-  // WS2812-ringen: mata intensity + kick-puls varje frame (billig update; ringen
-  // renderar själv i egen takt @ 30 Hz och avklingar puffen mjukt).
-  if (ring) {
-    ringArg.intensity = cfg.activeIntensity ?? 0.5;
-    ringArg.blackout = cfg.mode === "blackout";
-    ringArg.beat = frame.kick;
-    ring.update(ringArg);
-  }
 
   // Renderingen ligger INTE här längre — se renderTick nedan. Analysen (FFT/onset/
   // BPM) körs varje chunk (~375 Hz) för tighta drops; effekterna renderas på ett
@@ -434,11 +423,6 @@ const serverDeps = {
     scheduleSave(cfg);
     curSlots = slotsFor();
     dmx.setMaxHz(cfg.dmxMaxHz);
-    if (ring && cfg.intensityRing) ring.setOptions({
-      maxBright: cfg.intensityRing.maxBright,
-      pulseBoost: cfg.intensityRing.pulseBoost,
-      blackoutFadeMs: cfg.intensityRing.blackoutFadeMs,
-    });
   },
 };
 const s80 = await startServer(serverDeps, Number(process.env.PORT ?? 80));
@@ -555,18 +539,9 @@ if (cfg.intensityKnob) {
   }
 }
 
-// WS2812B LED-ring (Electrokit 12-LED) — visuell återkoppling för vredet på
-// själva boxen: hyresgäster ser direkt vilket steg de valt utan att titta i UI:t.
-let ring: KnobRing | null = null;
-if (cfg.intensityRing) {
-  const r = cfg.intensityRing;
-  ring = new KnobRing({
-    bus: r.bus, device: r.device,
-    maxBright: r.maxBright, pulseBoost: r.pulseBoost, blackoutFadeMs: r.blackoutFadeMs,
-  });
-  ring.start();
-  console.log(`intensity-ring on SPI${r.bus}.${r.device} (12 × WS2812B, max ${Math.round(r.maxBright * 100)}%)`);
-}
+// WS2812B LED-RINGEN AVSTÄNGD TILLSVIDARE (2026-10-18, ägaren). Koden ligger kvar i knobRing.ts men laddas inte (spi-device
+// laddas alltså inte heller). Config-fältet nollas så /setup döljer ringkortet. Tillbaka: återställ ringblocket ur git (före 10-18).
+cfg.intensityRing = null;
 
 // Rökens drifträknare tickar i RENDERLOOPEN, inte via config-meddelanden — utan
 // det här skulle de bara nå flashen av en slump (nästa gång någon råkar röra en
@@ -584,7 +559,6 @@ process.on("SIGTERM", () => {
   button?.stop();
   knob?.stop();
   knobSw?.stop();
-  ring?.stop();
   dmx.close();
   process.exit(0);
 });

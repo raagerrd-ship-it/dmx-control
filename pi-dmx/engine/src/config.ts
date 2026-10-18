@@ -208,7 +208,7 @@ export const defaultConfig: EngineConfig = {
   chaseStyle: "pingpong",
   rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, rave: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
-  intensityRing: { bus: 0, device: 0, maxBright: 0.40, pulseBoost: 0.18, blackoutFadeMs: 400 },  // WS2812 12-LED på SPI0 MOSI (GPIO10, pin 19)
+  intensityRing: null,   // avstängd tillsvidare 2026-10-18 (förr { bus: 0, device: 0, maxBright: 0.40, pulseBoost: 0.18, blackoutFadeMs: 400 })  // WS2812 12-LED på SPI0 MOSI (GPIO10, pin 19)
   showLeadMs: 50,
   dmxMaxHz: 100, // 100 Hz för tightare bas/drop-synk; helper cappar till wire-limit
   // Rok-defaults satta for Ibiza LSM1500PRO + Cameo XTRA HEAVY: maskinen ger

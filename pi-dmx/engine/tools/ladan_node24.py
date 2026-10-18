@@ -1,6 +1,6 @@
 """NODE 24 PÅ LADAN-PI:N (2026-10-18, ägaren: 'ta backup och kör på Node 24' - inget A/B, inga rattar). Lotus kör Node 24 (V8 13);
 DMX:s körbänk: 34,4 kB/s skräp på Node 22 mot 43,1 på Node 18, samma kontrollsumma. Byter bara motorns node: Node 24.18.0 packas upp i
-/opt/node24, ExecStart (enhetsfilen + drop-ins) pekas om från /usr/bin/node, och spi-device (vredets LED-ring, inbyggd modul) får sin
+/opt/node24, ExecStart (enhetsfilen + drop-ins) pekas om från /usr/bin/node, och spi-device (vredets LED-ring - AVSTÄNGD tillsvidare 10-18, laddas inte; bytet är för en framtida påslagning) får sin
 Node 24-byggda spi.node (byggd på lotus 10-18, laddad och testad med require + ESM-import i node 24.18.0). Städar samtidigt bort den
 gamla BLE-sidovagnen (pi-dmx-ble + bluetoothd) - BLE är borttaget ur DMX 10-18 (annan BLE-modul än lotus).
   python tools/ladan_node24.py          (torrkörning: arkitektur, node, ExecStart, sidovagnen)

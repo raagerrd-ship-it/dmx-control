@@ -18,8 +18,8 @@
    backup /home/pi/dmx-backup-node18-20261018.tgz (enhetsfil + drop-ins + spi.node) -> Node 24.18.0 i /opt/node24 (tarbollen från
    ~/node24dl på PC:n, sha256-kontrollerad) -> ExecStart pekas om -> spi.node byts mot tools/node24/spi-node24-arm64.node (byggd på
    lotus mot 24.18.0, require + ESM-import provade) -> pi-dmx-ble + bluetooth bort -> omstart, skriver health/perf/journal.
-   Stegen provkörda mot en låtsasrot på lotus (backup, byte, sed i drop-ins, återställning). Kontrollera: vredets LED-ring lyser
-   (spi-device), /api/perf efter 15 min musik mot punkt 2 (bänk: 34 mot 43 kB/s på Node 22 mot 18). v8Tiering.ts väljer själv
+   Stegen provkörda mot en låtsasrot på lotus (backup, byte, sed i drop-ins, återställning). LED-RINGEN ÄR AVSTÄNGD TILLSVIDARE (10-18, ägaren) -
+   spi-device laddas inte alls, spi.node-bytet är bara för en framtida påslagning. Kontrollera /api/perf efter 15 min musik mot punkt 2 (bänk: 34 mot 43 kB/s på Node 22 mot 18). v8Tiering.ts väljer själv
    --invocation-count-for-turbofan=100 på V8 >= 12. Backa: `--backa` (packar upp backupen, omstart). Live-allokeringsprofil som på
    lotus (SIGUSR1 + HeapProfiler inkl. bortstädat) går nu även här.
 
