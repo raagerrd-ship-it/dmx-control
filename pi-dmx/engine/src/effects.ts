@@ -657,6 +657,9 @@ export class EffectEngine {
   private inputLowSince = 0;     // väggklocka: sedan när nivån legat under gränsen
   private inputOff = false;      // ingången bedöms avstängd → riggen mörk
   private silenceGate = 1;
+  /** Hur länge riggen varit mörk av tystnad (ms sedan nivån föll under släckgränsen och grinden stängt), 0 = inte mörk. Läses av
+   *  gcDark.ts efter sändningen - påverkar inte ljuset. (10-18) */
+  darkForMs(): number { return this.inputOff ? 1e9 : this.silenceGate === 0 && this.belowSince > 0 ? performance.now() - this.belowSince : 0; }
   private lowLogAt = 0;
   /** LEVER MEN HÖR INGENTING. Utan den här signalen ser "aux-kabeln sitter inte
    *  i" exakt likadant ut som "strömmen är av" och "säkringen gick": svart. Den

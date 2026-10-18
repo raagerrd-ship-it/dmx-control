@@ -8,7 +8,11 @@
    14-22 ms). Väntat (bänk Node 18): ~25-45 kB/s skräp -> en liten städning var 1,5-3 min.
 3. BLE-sidovagnen: `python tools/ladan_noble.py` (kontroll) - finns /opt/pi-dmx-ble och används BLE-slingor, kör `--kor` (noble-
    loggraderna skyddas som på lotus; ny install.sh gör det automatiskt). Sidovagnen är egen process - motorn påverkas inte.
-4. Lotus-läxan: DMX-Pi:n kör Node 18 (lotus kör Node 24). Live-allokeringsprofil som på lotus (SIGUSR1 + HeapProfiler inkl. bortstädat)
+4. HEAP-FLAGGAN + STÄDA NÄR RIGGEN ÄR MÖRK (portat från lotus 10-18, där: 0 storstädningar på 28 min med flaggan, tvingad GC ~93 ms):
+   EFTER punkt 1: `python tools/ladan_heap.py` (torrkörning) och sedan `--kor` - lägger --heap-growing-percent=200 --expose-gc i heap.conf
+   och gc-dark.conf (DMX_GC_DARK=0.6: full GC bara när tystnadsgrinden är stängd >= 1,5 s, ramen helt släckt och gamla minnet >= 60 % av
+   gränsen; src/gcDark.ts). Läs /api/perf `forcedGc` (paus, fyllnad) efter en paus mellan låtar + `total.gc.major`. Backa: `--backa`.
+5. Lotus-läxan: DMX-Pi:n kör Node 18 (lotus kör Node 24). Live-allokeringsprofil som på lotus (SIGUSR1 + HeapProfiler inkl. bortstädat)
    går INTE på Node 18 (flaggorna finns inte) - /api/perf är måttet.
 
 ## Från kvällen 2026-10-17 - SKRÄPJAKTEN (ägaren: nattens ENDA uppgift natten till 10-18, se engångsundantaget i nattagentens SKILL.md)

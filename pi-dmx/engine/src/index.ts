@@ -30,7 +30,8 @@ import { applyIntensity, migrateFromMoods } from "./moods.js";
 import { BeatFeed } from "./beatFeed.js";
 import { LongRecord } from "./longRecord.js";
 import * as health from "./runtimeHealth.js";
-import { renderBegin, renderEnd } from "./perfStats.js";   // GC/rendering/loop alltid på, GET /api/perf (10-16)
+import { renderBegin, renderEnd } from "./perfStats.js";
+import { gcWhenDark } from "./gcDark.js";   // DMX_GC_DARK (opt-in): full GC när riggen är mörk och gamla minnet nära gränsen   // GC/rendering/loop alltid på, GET /api/perf (10-16)
 import { logHealth } from "./healthLog.js";
 
 
@@ -269,6 +270,7 @@ function renderAndSend(): void {
     probeSample(universe);
     dmx.send(universe, curSlots);
     renderEnd();   // perfStats: alltid
+    gcWhenDark(effects.darkForMs(), universe);   // (av utan DMX_GC_DARK + --expose-gc; se gcDark.ts)
     if (diag) health.noteSlowCall("render+dmx", performance.now() - lastRenderMs);
 
     // Spara ramen så fallback-ticken har något att tona ned om ljudet dör.
