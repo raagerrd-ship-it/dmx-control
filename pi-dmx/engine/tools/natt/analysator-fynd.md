@@ -29,6 +29,13 @@ strängar/arrayer som byggs per hop. Var: Analyser.process och dess steg. Materi
 Dessutom (optStat.mjs, lang-1014 från 300 s): computeBpm är TurboFan 0 % av tiden på Node 18 (och på Node 22 utan flagga; 21 % med
 --invocation-count-for-turbofan=100) - den kör otolkad/Sparkplug på Pi:erna och boxar då varje tal; process/sectionBlock 100 % på Node 18.
 Status: TAGET 2026-10-18 (lotus-morgonagenten): computeBpm-delen ORSAKSBESTÄMD på Node 18.20.4 (--trace-opt-verbose, lang-1014): 'not enough ticks: 1–2/18, too large: 17084' — bytekoden är 17 kB ⇒ V8 kräver 3 + 17084/1100 = 18 avbrottsbudgetar, och tickarna nollas vid varje IC-ändring (sällsynta grenar) ⇒ 4 Hz-anropen når aldrig dit (0 % TurboFan på 300 s). Prov: --bytecode-size-allowance-per-tick=20000 (kräver 3 tickar) ⇒ computeBpm 0 → 43 % TurboFan (200–300 s), övriga oförändrat 100 %. Två vägar: (a) kodväg = bryt ut computeBpm i fler små metoder (som tempoGramStep 10-17) tills varje del < ~5 kB bytekod, bit-identiskt + paritet — inte gjort i dag; (b) nodflagga i ExecStart (båda Pi:erna) — ändrar inga värden men är drift, mät på Pi:n (--trace-gc scavenges/min) först, ägarens beslut. 54–73 B/hop i process: ej angripet än.
+DMX-sessionen 2026-10-18 (ägaren: 'dela upp computeBpm känns som rätt väg'): väg (a) PROVAD, INTE INFÖRD. computeBpm delad ordagrant i
+bpmLockClassic/bpmOctaveTrack/bpmEvidenceScan/bpmLockHmm/bpmLockEvidence (decimaltal via fält, uppvärmningens return som boolesk retur):
+bytekod 17084 -> 3935 (+ 585/3389), paritet 0/112 500 hop (dmx, --grid). TurboFan Node 18: computeBpm 1:a varvet 0 -> 72 %, 2:a 80 -> 100 %,
+men oktavdelen (egen metod, 4 Hz) bara 20 % - V8 10 optimerar små sällananropade metoder sent. Skräp (winAlloc Node 18, 2:a varvet 900-1140 s):
+computeBpm 435 -> 532 B/anrop (1,7 -> 2,1 kB/s), Analyser.process 10,9 -> 9,4 kB/s (inom bruset). computeBpm är ~2 kB/s av Pi:ns ~74 -
+ingen mätbar vinst, så den delade filen lämnades orörd. Patchen: dmx tools/skrap/computeBpm-split-2026-10-18.patch. Väg (b) (flaggan) av
+samma skäl inte värd driftändringen. Det som är kvar i process (26-30 B/hop) sitter inte i computeBpm.
 
 ## ÖPPET 2026-10-17 Tempot vandrar i breaket före/efter drops
 Vad: 24 lang-*.wav (konsertReplay --delad-cfg --step 5): 14 av 29 show-drops har tempobyte i frame.bpm (> 2 BPM) mellan 8 s före och 10 s

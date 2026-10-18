@@ -34,7 +34,8 @@ EffectEngine.prototype.render = function (fr) {
 // funktionen körts - funktioner med bara bit 0 i hela fönstret listas inte.
 const ever = {};
 const orig2 = EffectEngine.prototype.render;
-EffectEngine.prototype.render = function (fr) { const r = orig2.call(this, fr); if (Date.now() - 1700000000000 >= FROM && (n & 255) === 0) for (const k in fns) { const s = st(fns[k].f); if (s & (8 | 16 | 32 | 64 | 2048)) ever[k] = true; } return r; };
+EffectEngine.prototype.render = function (fr) { const r = orig2.call(this, fr); if (Date.now() - 1700000000000 >= FROM && (n & 255) === 0) for (const k in fns) { const s = st(fns[k].f); if (s & (16 | 64 | 128 | 32768)) ever[k] = true; } return r; };
+// ^ optimerad/TurboFan/tolkad/baseline = har körts (10-18 rättat: tolkad 128 och baseline 32768 saknades - aldrig optimerade funktioner doldes)
 process.on("exit", () => {
   const rows = Object.keys(tot).filter((k) => ever[k]).map((k) => [k, 100 * (tf[k] ?? 0) / tot[k], drop[k] ?? 0, fns[k].f.toString().length]);
   rows.sort((a, b) => a[1] - b[1]);
