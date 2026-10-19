@@ -1,7 +1,10 @@
 # Natt-agentens uppdrag
 
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
-1. `python tools/ladan.py --env DMX_DROP_NO_BUILD_S=8` (nattens dc6c64c). Nå Pi:n: PC på telefonens hotspot Pixel_9285, Pi:n hamnade där på
+1. GRUNDFIXEN (ägaren 10-19, ersätter nattens DMX_DROP_NO_BUILD_S som togs bort): `python tools/ladan.py --env DMX_SECTION_BODY_HIGH=2000
+   --env DMX_SECTION_BODY_HIGH_DB=2` (delade analysatorn de111d4). Bänk 24 lang (konsertReplay --delad-cfg --step 5, av -> på): high +2 s
+   efter drop 12 -> 33, +8 s 22 -> 36, build 0,5-8 s efter drop 21 -> 14, korta looker 20 -> 16 %, lookbyten 404 -> 413, drops 66 -> 69,
+   sektionsbyten 2,64 -> 3,08/min. Nå Pi:n: PC på telefonens hotspot Pixel_9285, Pi:n hamnade där på
    10.38.24.218 senast (port 22-skanning av hotspotnätet hittar den) -> `PI_HOST=<ip> python tools/ladan.py ...`.
 2. /api/perf efter en kväll: `major` nära 0, `forcedGc` efter pauser (Node 24 + heap-flaggan, ute sedan 10-18).
 
@@ -9,7 +12,7 @@
 KLART 2026-10-19: baslinje natt/2026-10-19.json byte-identisk med 10-18 (pop 125/0,46 r 0,30; mega 150/0,41 r 0,12; korpus 125/0,44 r 0,26).
 KLART 2026-10-19: opt-in DMX_DROP_NO_BUILD_S=8 (dc6c64c) - build inom 8 s efter show-drop = dropens landning, ingen build-look förrän
   sektionen lämnat build. 24 lang: kort look 20 -> 17 %, drop->build-korta 12 -> 0, lookbyten 404 -> 377, återseende 80 -> 82 %, hör ihop
-  70 -> 74 %, drops 62 lika; mega byten 3,7 -> 3,0/min, ljus full 0,52 -> 0,60. REDO FÖR LADAN: `python tools/ladan.py --env DMX_DROP_NO_BUILD_S=8`.
+  70 -> 74 %, drops 62 lika; mega byten 3,7 -> 3,0/min, ljus full 0,52 -> 0,60. ERSATT 10-19 av grundfixen SECTION_BODY_HIGH (ägaren) - koden borttagen.
 ÖPPET: sektionen high bara 4/68 vid show-drop, 22/68 efter 8 s (analysator-fynd 10-19); lugn-effekterna (20) väljs inte i mixarna;
   sektionsfladder 31 av 76 korta looker.
 
