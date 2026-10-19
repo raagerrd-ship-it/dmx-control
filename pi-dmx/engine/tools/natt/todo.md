@@ -1,5 +1,13 @@
 # Natt-agentens uppdrag
 
+## NATTEN 2026-10-19 (nattagenten, inget deployat)
+KLART 2026-10-19: baslinje natt/2026-10-19.json byte-identisk med 10-18 (pop 125/0,46 r 0,30; mega 150/0,41 r 0,12; korpus 125/0,44 r 0,26).
+KLART 2026-10-19: opt-in DMX_DROP_NO_BUILD_S=8 (dc6c64c) - build inom 8 s efter show-drop = dropens landning, ingen build-look förrän
+  sektionen lämnat build. 24 lang: kort look 20 -> 17 %, drop->build-korta 12 -> 0, lookbyten 404 -> 377, återseende 80 -> 82 %, hör ihop
+  70 -> 74 %, drops 62 lika; mega byten 3,7 -> 3,0/min, ljus full 0,52 -> 0,60. REDO FÖR LADAN: `python tools/ladan.py --env DMX_DROP_NO_BUILD_S=8`.
+ÖPPET: sektionen high bara 4/68 vid show-drop, 22/68 efter 8 s (analysator-fynd 10-19); lugn-effekterna (20) väljs inte i mixarna;
+  sektionsfladder 31 av 76 korta looker.
+
 ## LADAN-BESÖKET 2026-10-18 15:45-16:20 - ALLT NEDAN ÄR UTE (PC på telefonens hotspot, Pi:n 10.38.24.218, PI_HOST=...)
 Resultat: små städningar 15/min -> 8-13/min, längsta liten 4-7 ms på Node 24, render snitt 0,25 -> 0,20 ms. Node 18 (apt nodejs/npm
 + 130 node-paket) AVINSTALLERAD efter ägarens beslut; node/npm/npx = länkar till /opt/node24 i /usr/local/bin. Stora städningar och

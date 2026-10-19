@@ -15,6 +15,16 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-19 Sektionen följer inte dropen upp i 'high' (och passerar 'build' efter smällen)
+Vad: 24 lang-*.wav (151 min, konsertReplay --delad-cfg --step 5, DMX-profilen RUN 5/RUN_IN 3/CARRY 20), 68 show-drops (DMX flank-drop
+på bodyDb = basen tillbaka efter break): frame.section vid dropen intro 18 / low 30 / build 12 / break 4 / high 4; +4 s high 14, +8 s high
+22 (low 25, build 12), +15 s high 24 (low 26, build 16). 12 av 68 går in i 'build' 2,1-7,7 s EFTER smällen (median 5,4 s) - uppgången
+klassas som uppbyggnad när den redan är refräng. Var: sectionBlock (1 s-block, RUN_IN 3 + nivå/täthet mot låtens egen skala - breaket
+före drar ner skalan?). Material: tools/ladan-2026-10-1*/lang-*.wav; tidpunkter = rader med why 'drop' i konsertReplay-json.
+Önskat: när basen kommer tillbaka med full kraft efter ett break (frame.bodyDb nära taket efter >= 1 s borta) ska sektionen bli 'high'
+inom ~2 s och inte passera 'build'. DMX har en egen spärr som opt-in (DMX_DROP_NO_BUILD_S, 10-19), men manus/återseende hänger på etiketten.
+Status:
+
 ## ÖPPET 2026-10-18 Analysatorn allokerar 54-73 B per hop på Node 18 (Pi:ernas V8) i stabilt läge
 Vad: skräpjakten 10-18 mätte med Node 18.20.4 (Pi:ernas version, C:/Users/richa/node18) i stabilt läge = andra varvet av
 materialet (alla grenar körda en gång). Analyser.process inklusive: lotus 73 B/hop = 27 kB/s (engineReplay playlist-lang, 710-1090 s),
