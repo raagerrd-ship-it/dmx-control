@@ -88,6 +88,10 @@ const DROP_BASS_LOOK = process.env.DMX_DROP_BASS_LOOK !== '0';   // STANDARD sed
  *  och varje bastryck såg likadant ut. Vid dropen sätts dalen direkt till smällens nivå - B_MIN_DB (dal direkt ner tar den sedan till
  *  refrängens egen dal inom ett slag). 0 = av (som före). */
 const DROP_BASS_SNAP = process.env.DMX_DROP_BASS_SNAP === '1';
+/** INGEN BUILD EFTER DROPEN (opt-in DMX_DROP_NO_BUILD_S=N, natt 10-19): sektionen hänger efter smällen - break/intro/low -> 'build' 2-8 s
+ *  EFTER dropen (24 lang: 12 av 76 looker < 8 s var drop-looken som byttes mot build-looken). En build som börjar inom N s efter en show-drop
+ *  räknas som dropens landning: ingen build-look förrän sektionen lämnat build. 0 = av (som före). */
+const DROP_NO_BUILD_MS = Number(process.env.DMX_DROP_NO_BUILD_S ?? 0) * 1000;
 /** LYFTET SOM GOLV (opt-in DMX_DROP_LIFT_FLOOR < 1, samma ägarcitat): drop-lyftet satte energin till 1 rakt av - allt fullt och platt, ingen
  *  bas syns. Med golv x lyfter dropen energin till minst x och basen svänger ovanför. 1 = som före (platt). */
 const DROP_LIFT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_DROP_LIFT_FLOOR ?? 1)));
@@ -1144,6 +1148,8 @@ export class EffectEngine {
         let allaBuild = false;
         if (!inBuild) { this.buildSince = -1; this.buildEntered = false; }
         else { if (this.buildSince < 0) this.buildSince = now; allaBuild = !this.buildEntered && now - this.buildSince >= (CONCERT ? 0.5 : ALLA_BUILD_S) * 1000 && held > (CONCERT ? 2000 : 4000); }
+        const postDropBuild = DROP_NO_BUILD_MS > 0 && inBuild && !this.buildEntered && nowWall - this.lastShowDropWall < DROP_NO_BUILD_MS;   // INGEN BUILD EFTER DROPEN
+        if (postDropBuild) { allaBuild = false; this.buildEntered = true; }
         // (preDrop - kroppen borta 1,5 s -> build-looken - borttagen 10-11 kväll, V123: valde build-looker mitt i verserna; build-look 32 % av tiden mot sektion build 12 %)
         // 2) I ett breakdown: gå till den lugna poolen oavsett vad energitiern
         //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
@@ -1168,7 +1174,7 @@ export class EffectEngine {
         //      hållen. Etiketten far darfor styra IDENTITET (samma look aterkommer)
         //      och NAR bytet sker (sektionsgransen), men inte hur starkt det lyser.
         const tierS = tier;
-        const buildEntry = liveSecChanged && liveSec === 'build';   // MIX_V2 (2): ett byte IN i build-poolen tillats
+        const buildEntry = liveSecChanged && liveSec === 'build' && !(DROP_NO_BUILD_MS > 0 && this.buildEntered && nowWall - this.lastShowDropWall < DROP_NO_BUILD_MS);   // MIX_V2 (2): ett byte IN i build-poolen tillats
         const secEntry = this.pendingSecSwitch && secOldEnough && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
         const concertBuild = CONCERT && buildEntry && held > 2000;   // konsertläget: in i build direkt
         // refrängen kom utan drop -> lämna builden direkt; även ett energilyft/sektionslyft (ladan 16:05: virvel hängde kvar i 'low' efter lyftet)
@@ -1177,7 +1183,7 @@ export class EffectEngine {
         const buildExit = CONCERT && BUILD_LOOKS.includes(this.smartMode) && (frame.section === 'high' || (this.buildLookAt > 0 && nowWall - this.buildLookAt > 2000 && (frame.intensity ?? 0) >= 0.95));
         // (BUILDEN LANDAR I REFRÄNGEN - sektionen high efter >= 4 s build = drop - borttagen 10-11 kväll: 'falsk' 21:42:39, 17 % på baslyft; se DROP_JUMP_DB)
         const buildLock = CONCERT && frame.section === 'build' && this.buildLookAt > 0 && BUILD_LOOKS.includes(this.smartMode) && nowWall - this.buildLookAt < 30000 && !dropSwitch && !nearSwitch && !buildExit;   // BUILD SOM HÅLLER - V123: bara så länge sektionen ÄR build
-        if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild) && (dropSwitch || nearSwitch || allaBuild || concertBuild || buildExit || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk && phraseOk))) {
+        if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild || (postDropBuild && dropSwitch)) &&(dropSwitch || nearSwitch || allaBuild || concertBuild || buildExit || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk && phraseOk))) {
         this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, nearSwitch, halvedChanged, liveSec, memSection, secEntry, tierChanged);
       }
       return this.smartMode;
