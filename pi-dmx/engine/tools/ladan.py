@@ -40,7 +40,6 @@ PORTAR_EJ_LIVE = [
     ('DMX_KICK_NOGATE',    '1',      'kickarna grindas inte mot eget grid (lotus: on-beat 0,63 -> 0,95)'),
     ('DMX_KICK_COOLDOWN',  '100',    'baston strax fore slaget skuggade slagets kick i 170 ms'),
     ('DMX_GRID_PHASE',     '1',      'fasen ur bas + helband i stallet for senaste kicken (bank: i fas 77/130, motfas 5)'),
-    ('DMX_PHASE_FOLLOW',   '1',      'gridet foljer fasmatningen i stallet for enskilda kickar'),
     ('DMX_GRID_PHASE_OFFSET_MS', '15', 'onset-frontens konstanta 15 ms (lotus LIVE 09-23)'),
     ('DMX_TEMPO_UP43',     '1',      'AV i ladan: med DMX-profilen 18 -> 17/21 pa ladans mixklipp (lotus: 171 -> 180/214, LIVE dar)'),
     ('DMX_SILENCE_MS',     '2000',   'sa lange maste det vara tyst innan grinden borjar stanga (standard 250 ms)'),

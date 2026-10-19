@@ -656,10 +656,6 @@ export async function startServer(
             const a = Math.max(0, Math.min(1, msg.value));
             deps.cfg.detection.tauUp   = 180 * Math.pow(10 / 180, a);
             deps.cfg.detection.tauDown = 60  * Math.pow(2  / 60,  a);
-          } else if (msg.type === "setBeatSyncStrength" && typeof msg.value === "number") {
-            deps.cfg.beatSyncStrength = Math.max(0, Math.min(0.5, msg.value));
-          } else if (msg.type === "setBeatSyncOverride") {
-            deps.cfg.beatSyncOverride = !!msg.value;
           } else if (msg.type === "setEnergyDrivesMode") {
             deps.cfg.energyDrivesMode = !!msg.value;
           } else if (msg.type === "setRotation" && typeof msg.mode === "string") {

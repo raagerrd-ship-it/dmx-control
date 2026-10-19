@@ -1,5 +1,5 @@
 /**
- * TAKTMATNINGEN (utbruten ur index.ts 2026-10-10, ordagrant): kick-PLL:en, fasprediktionstilliten, fasfoljaren, taktfasen
+ * TAKTMATNINGEN (utbruten ur index.ts 2026-10-10, ordagrant): fasprediktionstilliten, den löpande takten (10-19, ersatte kick-PLL:en och fasfoljaren), taktfasen
  * (ettan) och coasten som haller cfg.beat (ankare + bpm + konfidens) levande per hop. Samma kod i motorn OCH i bankarna -
  * matfalla 43: bankerna satte cfg.beat.anchorMs = fr.beatAnchorMs varje hop, sa ctx.beatFrac hoppade 0,00 -> 0,45 pa 27 ms per slag
  * (halverad effektklocka + ankarhopp) och takteffekternas toppar ritades aldrig i banken. Klockan ar Date.now() (banken byter den per hop).
@@ -9,14 +9,6 @@ import { MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import type { Frame } from "./analyser.js";
 import type { EngineConfig } from "./config.js";
 
-// FASFOLJARE (portad fran lotus 2026-09-20/21, opt-in DMX_PHASE_FOLLOW=1, kraver DMX_GRID_PHASE=1 i analysatorn):
-// analysatorns gridfas (frame.beatPhaseMs, 4 Hz) styr gridets fas i stallet for kick-PLL:en (som fastnar pa off-beaten:
-// lotus bank mot Beat This! kick-PLL 0,49 median, gridfas 0,95). Foljer bara nar analysatorns tempo = gridets (+-4 %).
-// Flytt > 0,35 slag kraver kvot >= FLIP_CONF i FLIP_VOTES raka OCH att de senaste 8 slagens riktiga kickar ligger
-// narmare den nya fasen (kickdomaren, 09-21: pa 16-delsbas studsade fasen 0,4 slag fram/tillbaka var 20-60 s = "dubbeltakt").
-const PHASE_FOLLOW_ON = process.env.DMX_PHASE_FOLLOW === '1';
-const PHASE_FLIP_CONF = Number(process.env.DMX_PHASE_FLIP_CONF ?? 2.0), PHASE_FLIP_VOTES = Number(process.env.DMX_PHASE_FLIP_VOTES ?? 4);
-const PHASE_KP_HI = 0.4, PHASE_KP_LO = 0.2, PHASE_BIAS_MS = Number(process.env.DMX_PHASE_BIAS_MS ?? 0), PHASE_KI_BPM = Number(process.env.DMX_PHASE_KI_BPM ?? 0.8);
 // COAST: konfidensen dippar i breakdowns/brus men TEMPOT är oftast fortfarande rätt.
 // Släpper vi gridet direkt hoppar effekterna till kick-drift och glider tillbaka när
 // takten kommer igen. Vi håller därför gridet fri-rullande en stund innan vi ger upp.
@@ -32,20 +24,18 @@ const GRID_COAST_MS = 4000;  // så länge håller vi gridet på svag konfidens
 // rätt, men 2 av 3 kickar 'av'. Nu räknas kicken som bevis om den ligger på slaget (som förr) ELLER om en kick kom exakt TVÅ
 // SLAG tidigare (±6 % av slaget): då förutsäger gridets tempo mönstret, vilken plats i takten kicken än har. Korpusen: rätt
 // klocka median 0,41 -> 0,95, fel klocka 0,48 -> 0,87 (AUC 0,43 -> 0,64: måttet gynnar inte längre fel tempo). Tempot rörs inte:
-// PLL:ens förstärkning/frekvensterm och coastens tempo-nollning läser fortfarande fasträffarna (pllConf) - med det nya måttet
+// Coastens tempo-nollning läser fortfarande fasträffarna (pllConf) - med det nya måttet
 // även där nollades tempot mer sällan och korpusens klocka föll 81,5 -> 76,7 % (fel tidiga lås hölls kvar).
 // DMX_TRUST_REPEAT=0 = gamla måttet (bit-identiskt).
 const TRUST_REPEAT = process.env.DMX_TRUST_REPEAT !== '0';
-/** TAKTEN SLÄPPS INTE VID DROPEN (opt-in DMX_TEMPO_PERSIST_S > 0, ägaren i ladan 10-17: 'taktlåset måste vi nog fixa så det inte helt släpps
- *  efter drop, utan kanske bara snabb synkning'): runt dropparna vandrar analysatorns tempo när kickarna saknas (24 lang: 14 av 29 show-drops
- *  har tempohopp -8..+10 s, ofta steg om 3 BPM 126 -> 114 på 3 s eller hopp 117 -> 88) och varje hopp tog om taktklockans tempo. Här byter
- *  klockan tempo först när analysatorns nya tempo hållit i sig så här många sekunder (inom +-2 BPM); under tiden rullar klockan vidare i det
- *  gamla tempot och PLL:en synkar fasen mot kickarna som vanligt. 0 = av (som före: varje ändring > 2 BPM tas direkt). */
-const TEMPO_PERSIST_MS = Math.max(0, Number(process.env.DMX_TEMPO_PERSIST_S ?? 3)) * 1000;   // STANDARD 3 s sedan 10-17 (ägaren i ladan: 'dropparna känns bra nu'); 0 = av
-/** ...och i BREAKET/DROPEN (samma prov): när basen är borta (baskroppen > 12 dB under sin topp de senaste ~8 s) och 8 s efter att den kommit
- *  tillbaka gäller DMX_TEMPO_PERSIST_DROP_S (standard 12 s) - analysatorns felaktiga tempon där håller i sig flera sekunder (123 -> 88 i > 3 s). */
-const TEMPO_PERSIST_DROP_MS = Math.max(0, Number(process.env.DMX_TEMPO_PERSIST_DROP_S ?? 12)) * 1000;
 const TRUST_REPEAT_BEATS = 2, TRUST_REPEAT_TOL = 0.06;
+/** LÖPANDE TAKT - RUTNÄTET PÅ LJUDETS SLAG (ägaren 10-19: 'allt i bakgrunden så snabbt som möjligt, effekten får info om exakta
+ *  takten så snabbt det går'). Mätt i bänken (showTight --step 5, pop): kickbandets anslag (frame.onset.kick) är tydligt periodiskt, men
+ *  rutnätets slag låg 40-160 ms fel och gled (tempo 1-1,5 BPM fel) - kick-PLL:en drar 10 % per kick och 'kick' fyrar på kylningens kant.
+ *  Här viks de senaste ONSET_WIN_MS av onset.kick var ONSET_EVERY_MS på tempon kring det låsta (+-2,5 %), och rutnätet sätts DIREKT på
+ *  toppen (fas + tempo, slagindex bevaras). Sökningen sker kring rutnätets eget tempo OCH analysatorns (nytt tempo/låt); utan tydlig
+ *  topp (< ONSET_MIN_PEAK x medel) rullar rutnätet vidare som det är. Ersatte kick-PLL:en, TEMPO_PERSIST och fasföljaren (enda vägen). */
+const ONSET_WIN_MS = 5000, ONSET_EVERY_MS = 250, ONSET_BINS = 48, ONSET_RING = 1024, ONSET_MIN_PEAK = 1.5;
 
 /**
  * FAS-PREDIKTIONSTILLIT — landar verkliga trumslag dar rutnatet pastar?
@@ -63,19 +53,68 @@ const TRUST_REPEAT_BEATS = 2, TRUST_REPEAT_TOL = 0.06;
  * en principiell grund i stallet for som biprodukt av ett tempogram.
  */
 export class BeatFeed {
-  onBeatRate = 0;          // andel kickar med |fasfel| < 0.25 (PLL:ens förstärkning/frekvensterm; tilliten utan TRUST_REPEAT)
+  onBeatRate = 0;          // andel kickar med |fasfel| < 0.25 (coasten; tilliten utan TRUST_REPEAT)
   repeatRate = 0;          // TRUST_REPEAT: andel kickar på slaget ELLER som upprepar en kick två slag tidigare (tilliten)
   pllKicks = 0;            // hur mycket bevis fasprediktionen faktiskt vilar pa
   private lastTrustLog = 0;
   private lastPllKickMs = 0;
-  private phaseLastMs = 0; private phaseFlipVotes = 0; phaseFlips = 0; phaseFlipDenied = 0;
   private readonly kickRing = new Float64Array(64); private kickRingPos = 0; private kickRingN = 0; private kickRingLast = 0;
   /** analysatorns bpm som taktklockan LÅSTES på (om-ankrings-referens, skild från cfg.beat.bpm som frekvens-termen finjusterar) */
   clockDetBpm = 0;
-  private tempoCandBpm = 0; private tempoCandSince = 0;   // TEMPO_PERSIST
-  private bodyTop = -200; private bodyTopAt = 0; private breakUntil = 0; private bodyLastMs = 0;   // TEMPO_PERSIST: breakzonen
   private gridWeakSince = 0;       // ms-tidpunkt då konfidensen föll under grinden (0 = stark)
   private gridCoasting = false;
+  // LÖPANDE TAKT: ring med (tid, onset.kick) per hop + vikningens arbetsytor (inga allokeringar per hop)
+  private readonly onT = new Float64Array(ONSET_RING); private readonly onV = new Float32Array(ONSET_RING); private onPos = 0; private onN = 0; private onHalf = false; private onPrev = 0;
+  private readonly foldS = new Float64Array(ONSET_BINS); private readonly foldN = new Float64Array(ONSET_BINS); private onNext = 0;
+  onsetFixes = 0;
+
+  private foldMean(k: number): number { const q = (k + ONSET_BINS) % ONSET_BINS; return this.foldN[q] ? this.foldS[q] / this.foldN[q] : 0; }
+
+  // Sökningen sprids över hoppen: ETT tempo per hop (Pi Zero: hela sökningen i ett anrop = 2 ms på PC:n, ~20 ms på Pi:n = stopp i slingan).
+  private scanC = 99; private scanEnd = 0; private scanRef = 0; private scanNow = 0; private scanC0 = 0; private scanC1 = 0;
+  private bestScore = 0; private bestBpm = 0; private bestPh = 0;
+
+  /** LÖPANDE TAKT: ett hop av sökningen - vik ringen (fönstret före sökningens start) på nästa tempo; sist läggs rutnätet på toppen. */
+  private onsetStep(cfg: EngineConfig, now: number): void {
+    const beat = cfg.beat; if (!beat || beat.bpm <= 0) { this.scanC = 99; return; }
+    if (this.scanC > this.scanEnd) {   // ingen sökning pågår
+      if (now < this.onNext) return;
+      this.onNext = now + ONSET_EVERY_MS;
+      this.scanRef = beat.anchorMs; this.scanNow = now; this.scanC0 = beat.bpm; this.scanC1 = this.clockDetBpm;
+      this.scanEnd = this.scanC1 > 0 && Math.abs(this.scanC1 / this.scanC0 - 1) > 0.025 ? 16 : 5;   // analysatorns tempo = andra sökcentrum
+      this.scanC = -5; this.bestScore = 0;
+    }
+    const c = this.scanC++, ref = this.scanRef;
+    const bpm = c <= 5 ? this.scanC0 * (1 + c * 0.005) : this.scanC1 * (1 + (c - 11) * 0.005), bm = 60000 / bpm;
+    this.foldS.fill(0); this.foldN.fill(0);
+    let tot = 0, n = 0;
+    for (let i = 0; i < this.onN; i++) {
+      const j = (this.onPos - 1 - i + ONSET_RING) % ONSET_RING, t = this.onT[j];
+      if (t > this.scanNow) continue;   // kom in efter sökningens start
+      if (this.scanNow - t > ONSET_WIN_MS) break;
+      const r = (t - ref) % bm, b = Math.floor(((r < 0 ? r + bm : r) / bm) * ONSET_BINS) % ONSET_BINS;
+      this.foldS[b] += this.onV[j]; this.foldN[b]++; tot += this.onV[j]; n++;
+    }
+    if (n >= 100 && tot > 0) {
+      const mean = tot / n; let mx = 0, mb = 0;
+      for (let b = 0; b < ONSET_BINS; b++) { const v = this.foldN[b] ? this.foldS[b] / this.foldN[b] : 0; if (v > mx) { mx = v; mb = b; } }
+      const score = mx / mean;
+      if (score > this.bestScore) {
+        const a = this.foldMean(mb - 1), cc = this.foldMean(mb), d = this.foldMean(mb + 1), den = a - 2 * cc + d;   // parabel genom toppen
+        const off = den < 0 ? 0.5 * (a - d) / den : 0;
+        this.bestScore = score; this.bestBpm = bpm; this.bestPh = (mb + 0.5 + off) / ONSET_BINS;
+      }
+    }
+    if (c < this.scanEnd || this.bestScore < ONSET_MIN_PEAK) return;
+    // nytt tempo med bevarat slagindex + fas, sedan fasen direkt på toppen (toppen låg på bestPh räknat från sökningens ankare)
+    const oldMs = 60000 / beat.bpm, idx = Math.floor((now - beat.anchorMs) / oldMs), fr = (now - beat.anchorMs) / oldMs - idx;
+    const nb = 60000 / this.bestBpm;
+    beat.bpm = this.bestBpm; beat.anchorMs = now - (idx + fr) * nb;
+    const shift = ((((beat.anchorMs - ref) % nb) + nb) % nb) / nb;   // nya ankarets fas mot sökningens ankare
+    let err = this.bestPh - shift; err -= Math.round(err);
+    beat.anchorMs += err * nb;
+    this.onsetFixes++;
+  }
 
   /** Kom en tidigare kick (ringen, före denna) lag ms före t, inom ±tol? (TRUST_REPEAT) */
   private kickRepeats(t: number, lag: number, tol: number): boolean {
@@ -121,132 +160,37 @@ export class BeatFeed {
         if (cfg.beat) cfg.beat.confidence = this.onBeatRate;
       }
     }
-    // PLL och coast vilar kvar på fasträffarna (pllConf, se TRUST_REPEAT); tilliten som går ut till effekterna är mönstret.
+    // Coasten vilar kvar på fasträffarna (pllConf, se TRUST_REPEAT); tilliten som går ut till effekterna är mönstret.
     const pllConf = frame.bpmConfidence ?? 0;
     if (TRUST_REPEAT && this.pllKicks >= 12) { frame.bpmConfidence = this.repeatRate; if (cfg.beat) cfg.beat.confidence = this.repeatRate; }
 
-    // Lokal BPM → taktklocka med STABIL fri-rullande fas. Ankaret sätts bara vid
-    // (om)lås; att sätta det på varje kick fick pulsen att flimra.
+    // LÖPANDE TAKT (10-19, ersätter kick-PLL:en, tempospärren och fasföljaren - backup-taggen backup/fore-lopande-takt-2026-10-19):
+    // analysatorns bpm ger bara det första låset och ett sökcentrum; sedan sätter onsetStep() fas och tempo direkt ur kickbandets
+    // anslag var ONSET_EVERY_MS. Kickarna rör inte längre rutnätet - de mäter bara tilliten (som effekterna läser).
     const effBpm = frame.bpm;
-    if (effBpm === 0) { cfg.beat = null; cfg.beatErr = 0; this.clockDetBpm = 0; }   // tyst → stoppa beat-effekter direkt
+    if (effBpm === 0) { cfg.beat = null; cfg.beatErr = 0; this.clockDetBpm = 0; this.onN = 0; this.scanC = 99; }   // tyst → stoppa beat-effekter direkt
     if (effBpm > 0) {
-
-      // Om-ankra bara när ANALYSATORNS bpm ändras (nytt tempo/låt), INTE när vår egen
-      // frekvens-finjustering flyttat cfg.beat.bpm — annars nollar korrektionen sig själv.
-      //
-      // OCH ALDRIG NÄR TEMPOT ÄR LÅST UR MINNET. En igenkänd, synkad låt har ett tempo
-      // som tvätten räknat fram på HELA låten; realtidsdetektorn gissar på några sekunder
-      // och hoppade MÄTT 2026-08-07 mellan 117, 81 och 143 BPM mitt i samma låt. Varje
-      // hopp ankrade om taktklockan, fasen kastade sig och pulsen lästes som stroboskop.
-      // PLL:en nedan får fortfarande finjustera FASEN mot faktiska trumslag.
-      let persistOk = true;   // TEMPO_PERSIST: ett nytt tempo tas först när det hållit i sig
-      if (TEMPO_PERSIST_MS > 0) {
-        const nowP = Date.now(), bd = frame.bodyDb ?? -200;
-        // breakzonen: baskroppens topp följer upp direkt och sjunker 1,5 dB/s; basen > 12 dB under toppen = break, + 8 s efteråt
-        const dtB = this.bodyLastMs ? Math.min(0.1, (nowP - this.bodyLastMs) / 1000) : 0; this.bodyLastMs = nowP;
-        this.bodyTop = bd > this.bodyTop ? bd : this.bodyTop - 1.5 * dtB;
-        if (bd < this.bodyTop - 12) this.breakUntil = nowP + 8000;
-        if (cfg.beat && Math.abs(effBpm - this.clockDetBpm) > 2) {
-          if (Math.abs(effBpm - this.tempoCandBpm) > 2) { this.tempoCandBpm = effBpm; this.tempoCandSince = nowP; }
-          persistOk = nowP - this.tempoCandSince >= (nowP < this.breakUntil ? TEMPO_PERSIST_DROP_MS : TEMPO_PERSIST_MS);
-        }
-      }
-      if (!cfg.beat || (persistOk && Math.abs(effBpm - this.clockDetBpm) > 2)) {
-        this.clockDetBpm = effBpm;
-        let anchor = frame.beatAnchorMs || Date.now();
-        if (cfg.beat) {
-          // Bevara nuvarande fas vid tempoändring så pulsen inte hoppar.
-          const oldMs = 60000 / cfg.beat.bpm, newMs = 60000 / effBpm;
-          const phase = (((Date.now() - cfg.beat.anchorMs) % oldMs) + oldMs) % oldMs / oldMs;
-          anchor = Date.now() - phase * newMs;
-        }
-        cfg.beat = { anchorMs: anchor, bpm: effBpm, confidence: frame.bpmConfidence };
-      }
-      // annars: behåll ankaret → jämn, kontinuerlig fas
-
-      // FAS-LÅS (PLL): knuffa takt-ankaret mot faktiska trumslag så pulsen sitter
-      // i takt även om BPM-SIFFRAN är någon enhet fel. Vid varje kick, mät hur
-      // långt slaget ligger från närmaste förutsagda taktslag och korrigera en
-      // liten del (18%) av felet. Bara när slaget är nära ett taktslag (|fel|<0.25)
-      // → syncoperade off-beat-slag stör inte låset. Liten korrektion = mjuk
-      // inlåsning utan det flimmer en hård nollställning gav.
-      //
-      // TIDSSTÄMPELN ÄR SLAGETS EGEN, inte rutans. `frame.kickAtMs` är flux-toppens
-      // väggklocka med sub-hop-precision (±1.3 ms) och kommer en hop efter blixten.
-      // Date.now() vid behandlingen bar ALSA-leveransens batch-jitter (flera hops i
-      // en klump ⇒ upp till ~8 ms slumpfel) och PLL:en integrerade det som fasfel.
-      if (frame.kickAtMs > 0 && cfg.beat) {
+      if (!cfg.beat) cfg.beat = { anchorMs: frame.beatAnchorMs || Date.now(), bpm: effBpm, confidence: frame.bpmConfidence };
+      this.clockDetBpm = effBpm;
+      // TILLITEN: landar kickarna på rutnätets slag? (tidsstämpeln är slagets egen, frame.kickAtMs)
+      if (frame.kickAtMs > 0) {
         const beatMs = 60000 / cfg.beat.bpm;
         const ph = ((((frame.kickAtMs - cfg.beat.anchorMs) % beatMs) + beatMs) % beatMs) / beatMs;
         const err = ph < 0.5 ? ph : ph - 1;   // -0.5..0.5 av ett taktslag
-        const k0 = cfg.beatSyncStrength ?? 0.10;  // 0.18 -> 0.10 (Lotus-varde): mindre fas-jitter/wobble. Agent-bekraftat att detta ar enda PLL-konstanten som skiljer motorerna.
-        // #3 ADAPTIV: låt takt-tydligheten (bpmConfidence) modulera ratten runt
-        // ägarens val. Tydlig takt → snabbare inlåsning; brusig/osäker → försiktig
-        // så bruset inte drar iväg fasen. Ägarens "Av" (0) förblir hårt av.
-        const conf = pllConf;
-        let k = k0 * (0.3 + 1.4 * conf);          // conf 0→×0.3, 0.5→×1.0, 1→×1.7
-        if (k > 0.4) k = 0.4; else if (k < 0.03) k = 0.03;
-        const onBeat = Math.abs(err) < 0.25;      // off-beat/synkoperade slag räknas ej
-        // Live fasfel för UI: hur långt slaget låg från gridet, KRAFTIGT utjämnat
-        // (~2s) → visar det IHÅLLANDE laget, inte per-slag-jittret. Nära 0 = tight låst.
-        if (onBeat) cfg.beatErr = (cfg.beatErr ?? 0) * 0.85 + err * 0.15;
-        // Bevis per kick. Uppdateras BARA nar ett slag faktiskt kom — mellan slagen
-        // finns inget nytt att veta, och att mata in nollor da hade lasts som "fel".
+        const onBeat = Math.abs(err) < 0.25;  // off-beat/synkoperade slag räknas ej
+        if (onBeat) cfg.beatErr = (cfg.beatErr ?? 0) * 0.85 + err * 0.15;   // UI: ihållande fasfel
         this.onBeatRate += ((onBeat ? 1 : 0) - this.onBeatRate) * 0.12;
         if (TRUST_REPEAT) this.repeatRate += ((onBeat || this.kickRepeats(frame.kickAtMs, TRUST_REPEAT_BEATS * beatMs, TRUST_REPEAT_TOL * beatMs) ? 1 : 0) - this.repeatRate) * 0.12;
         this.lastPllKickMs = Date.now();
         if (this.pllKicks < 40) this.pllKicks++;
-        const followerHasPhase = PHASE_FOLLOW_ON && (frame.beatPhaseMs ?? 0) > 0;   // gridfasen styr - kick-PLL:ens fasterm av (lotus: PLL fastnar pa off-beat)
-        if (k0 > 0 && onBeat && !followerHasPhase) {
-          cfg.beat.anchorMs += err * beatMs * k;   // FAS-term: dra ankaret mot slaget
-          // FREKVENS-term (PI-integral): en fas-bara-PLL har ett permanent steady-state-
-          // lag när tempo-SIFFRAN ligger snäppet fel (detekterad ≠ sant tempo) → fasen
-          // driftar och rycks tillbaka (sågtand). Fin-justera bpm i fasfelets riktning
-          // så laget nollas. conf-gated; bundet inom ±4 av LÅS-referensen (this.clockDetBpm)
-          // så ett par bpm tempofel kan tas ut helt, utan att trigga om-ankring (>2 mot
-          // referensen, inte mot vår justerade bpm).
-          if (conf > 0.4) {
-            cfg.beat.bpm += err * 0.35 * conf;
-            const lo = this.clockDetBpm - 4, hi = this.clockDetBpm + 4;
-            if (cfg.beat.bpm < lo) cfg.beat.bpm = lo; else if (cfg.beat.bpm > hi) cfg.beat.bpm = hi;
-          }
-        }
       }
       if (frame.kickAtMs > 0 && frame.kickAtMs !== this.kickRingLast) { this.kickRingLast = frame.kickAtMs; this.kickRing[this.kickRingPos] = frame.kickAtMs; this.kickRingPos = (this.kickRingPos + 1) & 63; if (this.kickRingN < 64) this.kickRingN++; }
-      if (PHASE_FOLLOW_ON && cfg.beat) {
-        const pm = frame.beatPhaseMs ?? 0;
-        if (pm > 0 && pm !== this.phaseLastMs) {
-          this.phaseLastMs = pm;
-          const anB = frame.bpm ?? 0;
-          if (anB > 0 && Math.abs(anB / cfg.beat.bpm - 1) < 0.04) {
-            const beatMsNow = 60000 / cfg.beat.bpm;
-            const ph = ((((pm - PHASE_BIAS_MS - cfg.beat.anchorMs) % beatMsNow) + beatMsNow) % beatMsNow) / beatMsNow;
-            const err = ph < 0.5 ? ph : ph - 1;                     // + = analysatorns slag ligger EFTER gridet
-            const pconf = frame.beatPhaseConf ?? 1;
-            cfg.beatErr = (cfg.beatErr ?? 0) * 0.85 + err * 0.15;
-            if (Math.abs(err) > 0.35) {
-              if (pconf >= PHASE_FLIP_CONF && ++this.phaseFlipVotes >= PHASE_FLIP_VOTES) {
-                this.phaseFlipVotes = 0;
-                const newAnchor = cfg.beat.anchorMs + err * beatMsNow; const since = Date.now() - 8 * beatMsNow; let n = 0, sCur = 0, sNew = 0;
-                for (let i = 0; i < this.kickRingN; i++) {
-                  const k = this.kickRing[(this.kickRingPos - 1 - i + 64) & 63]; if (k < since) break; n++;
-                  const pc = ((((k - cfg.beat.anchorMs) % beatMsNow) + beatMsNow) % beatMsNow) / beatMsNow;
-                  const pn = ((((k - newAnchor) % beatMsNow) + beatMsNow) % beatMsNow) / beatMsNow;
-                  sCur += Math.cos(2 * Math.PI * pc); sNew += Math.cos(2 * Math.PI * pn);
-                }
-                const ok = n < 6 || (sNew / n) > (sCur / n) + 0.15;
-                if (ok) { cfg.beat.anchorMs = newAnchor; this.phaseFlips++; console.log(`[takt] gridfas: fasen flyttad ${Math.round(err * beatMsNow)} ms (kvot ${pconf.toFixed(2)}, byte ${this.phaseFlips}, kickar ${n}: ny ${n ? (sNew / n).toFixed(2) : '-'} mot ${n ? (sCur / n).toFixed(2) : '-'})`); }
-                else { this.phaseFlipDenied++; if (this.phaseFlipDenied <= 3 || this.phaseFlipDenied % 20 === 0) console.log(`[takt] gridfas: flytt ${Math.round(err * beatMsNow)} ms NEKAD av kickarna (${n} st: ny ${(sNew / n).toFixed(2)} mot nu ${(sCur / n).toFixed(2)}, nekade ${this.phaseFlipDenied})`); }
-              }
-            } else {
-              this.phaseFlipVotes = 0;
-              const kf = pconf >= 1.3 ? PHASE_KP_HI : PHASE_KP_LO;
-              cfg.beat.anchorMs += err * beatMsNow * kf;
-              // INTEGRAL: ihallande fel at samma hall = tempofel (err > 0 = gridet gar for fort -> bpm ner), klamp +-4 % av analysatorns
-              if (PHASE_KI_BPM > 0) { const lo = anB * 0.96, hi = anB * 1.04; let nb = cfg.beat.bpm - err * PHASE_KI_BPM; if (nb < lo) nb = lo; else if (nb > hi) nb = hi; if (nb !== cfg.beat.bpm) { const idx = Math.floor((Date.now() - cfg.beat.anchorMs) / beatMsNow); const fr = ((Date.now() - cfg.beat.anchorMs) / beatMsNow) - idx; cfg.beat.bpm = nb; cfg.beat.anchorMs = Date.now() - (idx + fr) * (60000 / nb); } }   // bevara slagindex + fas (lotus spokpuls-laxan)
-            }
-          } else this.phaseFlipVotes = 0;
-        }
+      {   // ringen + vikningen
+        const nowO = Date.now();
+        const ok = frame.onset?.kick ?? 0;   // var 2:a hop in i ringen (max av de två, ~187 Hz) - halva sökkostnaden
+        if (this.onHalf) { this.onT[this.onPos] = nowO; this.onV[this.onPos] = ok > this.onPrev ? ok : this.onPrev; this.onPos = (this.onPos + 1) % ONSET_RING; if (this.onN < ONSET_RING) this.onN++; }
+        this.onPrev = ok; this.onHalf = !this.onHalf;
+        this.onsetStep(cfg, nowO);
       }
       // TAKTFAS (ettan): analysatorn har mätt vilken av fyrtaktens platser som bär
       // tyngsta slaget. Flytta ankaret HELA taktslag så takträknaren (beatIdx) börjar

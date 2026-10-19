@@ -84,12 +84,6 @@ export interface EngineConfig {
   sensitivity: number;    // 0..1 user knob
   /** 0..1 kontrast: 0 = jämnt ljus, 1 = dovt i tystnad + smäll i beats. */
   dynamics: number;
-  /** Hur aggressivt beat-PLL:en knuffar takt-ankaret mot faktiska trumslag
-   *  (0 = av/fri-rullande, ~0.10 mjuk, 0.18 normal, ~0.30 aggressiv). */
-  beatSyncStrength: number;
-  /** Ägar-override: när true rör stämnings-vredet INTE beatSyncStrength,
-   *  och segmentet i /setup blir redigerbart igen. */
-  beatSyncOverride?: boolean;
   /** Energi (lokal) väljer läge i smart-läget. */
   energyDrivesMode: boolean;
   master: number;         // 0..1 master brightness
@@ -197,8 +191,6 @@ export const defaultConfig: EngineConfig = {
   audioInput: "aux",
   sensitivity: 0.6,
   dynamics: 0.6,
-  beatSyncStrength: 0.18,   // normal PLL-korrektion mot trumslag
-  beatSyncOverride: false,  // stämnings-vredet styr som default
   energyDrivesMode: true,
   master: 1.0,
   verseCeil: 0.65,     // "Tak i vers" i /setup (10-12)

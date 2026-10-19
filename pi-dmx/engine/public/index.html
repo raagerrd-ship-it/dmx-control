@@ -462,20 +462,6 @@
     <button class="btn primary" id="wizDismiss">Jag är klar — dölj denna guide</button>
   </div>
 
-  <h1>Beat-synk</h1>
-  <div class="card" id="beatSyncCard">
-    <div class="setrow">
-      <label>Beat-synk <em class="mood-badge" id="beatSyncBadge">Standard</em></label>
-      <div class="seg" id="segBeatSync">
-        <button data-bs="auto">Auto</button>
-        <button data-bs="0">Av</button>
-        <button data-bs="0.10">Lugnt</button>
-        <button data-bs="0.18">Normal</button>
-        <button data-bs="0.30">Aggressiv</button>
-      </div>
-    </div>
-    <div class="status" style="margin-top:8px">Hur hårt pulsen knuffas i fas mot faktiska trumslag. <b>Auto</b> = standardstyrkan. Välj en styrka manuellt för att åsidosätta.</div>
-  </div>
 
 
   <h1>Rökmaskin</h1>
@@ -906,16 +892,6 @@ function applyConfig(cfg) {
   if (fogSettings) fogSettings.style.display = fog.enabled ? "" : "none";
   if (tDropBlackout) tDropBlackout.checked = cfg.dropBlackout !== false;   // default på
   if (tScenicAnchor) tScenicAnchor.checked = !!cfg.scenicAnchor;
-  {
-    const bsOv = !!cfg.beatSyncOverride;
-    const bsBadge = document.getElementById("beatSyncBadge");
-    const seg = document.getElementById("segBeatSync");
-    if (seg) {
-      const active = bsOv ? String(cfg.beatSyncStrength ?? 0.18) : "auto";
-      seg.querySelectorAll("button").forEach((b) => b.classList.toggle("primary", b.dataset.bs === active));
-    }
-    if (bsBadge) bsBadge.textContent = bsOv ? "Manuell" : "Standard";
-  }
   const curSrc = (cfg.audioInput ?? "aux") === "mic" ? "mic" : "aux";
   const srcSeg = document.getElementById("srcSeg");
   if (srcSeg) srcSeg.dataset.src = curSrc;
@@ -1631,19 +1607,6 @@ if (tEnergy) tEnergy.onchange = () => {
   refreshModeView();
 };
 
-document.querySelectorAll("#segBeatSync button").forEach((b) =>
-  b.onclick = () => {
-    const v = b.dataset.bs;
-    if (v === "auto") {
-      send({ type: "setBeatSyncOverride", value: false });
-    } else {
-      send({ type: "setBeatSyncOverride", value: true });
-      send({ type: "setBeatSyncStrength", value: Number(v) });
-    }
-    document.querySelectorAll("#segBeatSync button").forEach((x) => x.classList.toggle("primary", x === b));
-    const bsBadge = document.getElementById("beatSyncBadge");
-    if (bsBadge) bsBadge.textContent = v === "auto" ? "Standard" : "Manuell";
-  });
 renderCategories();
 connect();
 // Läget (smart eller manuellt vald effekt) kommer från serverns config —
