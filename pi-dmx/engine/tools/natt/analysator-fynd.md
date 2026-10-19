@@ -23,7 +23,13 @@ klassas som uppbyggnad när den redan är refräng. Var: sectionBlock (1 s-block
 före drar ner skalan?). Material: tools/ladan-2026-10-1*/lang-*.wav; tidpunkter = rader med why 'drop' i konsertReplay-json.
 Önskat: när basen kommer tillbaka med full kraft efter ett break (frame.bodyDb nära taket efter >= 1 s borta) ska sektionen bli 'high'
 inom ~2 s och inte passera 'build'. DMX har en egen spärr som opt-in (DMX_DROP_NO_BUILD_S, 10-19), men manus/återseende hänger på etiketten.
-Status:
+Status: KLART 2026-10-19 (lotus-morgonagenten), opt-in <prefix>SECTION_BODY_HIGH=<ms borta> (+ _DB, standard 3): basen borta >= N ms
+(bodyEnv under taket - BODY_GONE_DB) och inom 2 s tillbaka till bodyPeak - DB räknas som drop för sektionen ('high' direkt, förbi
+uppehållstiden; räknaren går via R_DROPS till workern). Flagga av = paritet 0 (lotus, 146 250 hop), splitProof med flaggan 0/90 000.
+konsertReplay --delad-cfg --step 5, 24 lang-*.wav: AV drops 66, high +2 s 12, +4 s 14, +8 s 22, build-inträde 0,5-8 s efter 11, byten 2,64/min;
+1000/3 dB: high +2 s 33/70, build 6, byten 3,55/min (break +4 s 6 -> 14); 2000/2 dB: high +2 s 33/69, +8 s 36, build 5, byten 3,08/min,
+tid high 45 -> 49 %. Rekommendation för DMX-profilen: DMX_SECTION_BODY_HIGH=2000 DMX_SECTION_BODY_HIGH_DB=2 (nattagentens/ägarens val,
+kan ersätta DMX_DROP_NO_BUILD_S). Inte för lotus: sektionsbanken test high==high 0,73 / falsk 0,33 oförändrat men gränsfel 0,43 -> 0,50.
 
 ## ÖPPET 2026-10-18 Analysatorn allokerar 54-73 B per hop på Node 18 (Pi:ernas V8) i stabilt läge
 Vad: skräpjakten 10-18 mätte med Node 18.20.4 (Pi:ernas version, C:/Users/richa/node18) i stabilt läge = andra varvet av
