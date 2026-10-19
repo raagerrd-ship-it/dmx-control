@@ -1,5 +1,10 @@
 # Natt-agentens uppdrag
 
+## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
+1. `python tools/ladan.py --env DMX_DROP_NO_BUILD_S=8` (nattens dc6c64c). Nå Pi:n: PC på telefonens hotspot Pixel_9285, Pi:n hamnade där på
+   10.38.24.218 senast (port 22-skanning av hotspotnätet hittar den) -> `PI_HOST=<ip> python tools/ladan.py ...`.
+2. /api/perf efter en kväll: `major` nära 0, `forcedGc` efter pauser (Node 24 + heap-flaggan, ute sedan 10-18).
+
 ## NATTEN 2026-10-19 (nattagenten, inget deployat)
 KLART 2026-10-19: baslinje natt/2026-10-19.json byte-identisk med 10-18 (pop 125/0,46 r 0,30; mega 150/0,41 r 0,12; korpus 125/0,44 r 0,26).
 KLART 2026-10-19: opt-in DMX_DROP_NO_BUILD_S=8 (dc6c64c) - build inom 8 s efter show-drop = dropens landning, ingen build-look förrän
