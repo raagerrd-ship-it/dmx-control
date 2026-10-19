@@ -1,5 +1,9 @@
 # Natt-agentens uppdrag
 
+## LADAN 2026-10-19 KVÄLL
+19:21 LÖPANDE TAKT UTE (ladan.py utan env, md5 lika, NRestarts 0). Ägaren: 'takten sitter bra nu' -> GODKÄND, är redan kodens enda väg.
+19:27 PROV LIVE (ladan.conf): DMX_SECTION_BODY_HIGH=2000 DMX_SECTION_BODY_HIGH_DB=2 (grundfixen, delade analysatorn de111d4) - väntar på ögat.
+
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
 1. GRUNDFIXEN (ägaren 10-19, ersätter nattens DMX_DROP_NO_BUILD_S som togs bort): `python tools/ladan.py --env DMX_SECTION_BODY_HIGH=2000
    --env DMX_SECTION_BODY_HIGH_DB=2` (delade analysatorn de111d4). Bänk 24 lang (konsertReplay --delad-cfg --step 5, av -> på): high +2 s
