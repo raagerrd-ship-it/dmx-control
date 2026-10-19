@@ -15,6 +15,17 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-19 frame.kick fyrar på kylningens kant (~0,6 slag) i stället för på kickarna
+Vad: showTight --step 5 med motorns cfg (som live, mätfälla 47), pop_ladan 600 s vid 125-130 BPM: frame.kick ~3,1/s, medianintervall
+283-309 ms i varje 60 s-fönster oavsett låt = KICK_COOLDOWN = max(170, 0,6 x slaget) (analyser.ts ~3157). Kickarnas fas mot ljudets
+slag är nästan likformig (resultantlängd R 0,03-0,18 per minut). Kickbandets anslag (frame.onset.kick) är däremot tydligt periodiskt
+(vikning topp/medel 1,7-2,9 per 10 s). Följd i DMX: kick-PLL:en drog rutnätet mot slumpfaser - rutnätet låg i median 156 ms fel mot
+kickbandet (12 % av 10 s-fönstren inom +-25 ms), och 'kick -> ljus' i bänkarna mätte brus. DMX har ersatt PLL:en med en löpande vikning
+av onset.kick (beatFeed.ts 10-19), men kicken används fortfarande av tilliten, drop-/minidrop-logiken och effekternas kickEnv.
+Var: kickdetektorn (flux-tröskel + KICK_COOLDOWN). Jämför profilrattarna DMX_KICK_NOGATE / DMX_KICK_COOLDOWN=100 i ladan.py PORTAR_EJ_LIVE.
+Material: tools/pop_ladan.wav, megamix_ladan.wav, lang-*.wav. Önskat: en kick per riktigt kickanslag (frame.kick i fas med onset.kick-toppen).
+Status:
+
 ## ÖPPET 2026-10-19 Sektionen följer inte dropen upp i 'high' (och passerar 'build' efter smällen)
 Vad: 24 lang-*.wav (151 min, konsertReplay --delad-cfg --step 5, DMX-profilen RUN 5/RUN_IN 3/CARRY 20), 68 show-drops (DMX flank-drop
 på bodyDb = basen tillbaka efter break): frame.section vid dropen intro 18 / low 30 / build 12 / break 4 / high 4; +4 s high 14, +8 s high

@@ -53,12 +53,14 @@ const startS = Number(opt("--start", 0));
 const maxS = Number(opt("--sek", 1e9));
 const QUIET = flag("--tyst");
 
-const { Analyser } = await import("../dist/analyser.js");
-const { EffectEngine } = await import("../dist/effects.js");
-const { BeatFeed } = await import("../dist/beatFeed.js");   // taktmatningen som i motorn (matfalla 43)
-const { defaultConfig, fixtureRoles } = await import("../dist/config.js");
-const { EFFECT_KEYS } = await import("../dist/effects/registry.js");
-const { BoundaryDetector } = await import("../dist/boundaryDetector.js");
+const { pathToFileURL } = await import("node:url");
+const DIST = opt("--dist", null) ? pathToFileURL(opt("--dist") + "/").href : new URL("../dist/", import.meta.url).href;   // --dist: annan bygd kopia (A/B)
+const { Analyser } = await import(DIST + "analyser.js");
+const { EffectEngine } = await import(DIST + "effects.js");
+const { BeatFeed } = await import(DIST + "beatFeed.js");   // taktmatningen som i motorn (matfalla 43)
+const { defaultConfig, fixtureRoles } = await import(DIST + "config.js");
+const { EFFECT_KEYS } = await import(DIST + "effects/registry.js");
+const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
 
 const d = readFileSync(path);
 if (d.toString("ascii", 0, 4) !== "RIFF") { say("inte en WAV"); process.exit(2); }
@@ -73,7 +75,7 @@ if (opt("--norm", null) !== null) {   // median 100 ms-RMS -> malniva (se huvude
   rms.sort((a, b) => a - b);
   if (rms.length) GAIN = Math.pow(10, Number(opt("--norm")) / 20) / rms[rms.length >> 1];
 }
-const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = 25;   // 25 ms = riggens egen takt
+const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = Number(opt("--step", 25));   // 25 ms = bänkens standard; --step 5 = som live (200 Hz)
 
 // LADANS CONFIG: smart-lage, alla lookar pa, master 1. Annars matas en annan rigg an den som star i ladan.
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
@@ -87,7 +89,9 @@ const lamps = cfg.fixtures.map((fx) => {
   return { r: at("r"), g: at("g"), b: at("b"), dim: at("dim") };
 });
 
-const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig)));
+// MÄTFÄLLA 47 (rättad här 10-19): live får analysatorn MOTORNS cfg (index.ts), så kickgrinden mot taktgridet är på - med en egen kopia
+// fyrade 'kick' var ~290 ms oavsett låt. --egen-cfg = gamla vägen.
+const an = new Analyser(flag("--egen-cfg") ? JSON.parse(JSON.stringify(defaultConfig)) : cfg);
 const feed = new BeatFeed();
 // GAIN: motorn laser forstarkningen bara pa aux (index.ts: setGainLock(cfg.audioInput !== "mic", 1)).
 // Kor ladan pa mikrofon ar AGC:n aktiv dar men inte har; --agc kor som mikrofoningang.
@@ -110,13 +114,16 @@ const origLog = console.log;
 console.log = (...a) => { const s = a.join(" "); if (s.startsWith("[dirigent]")) dirigent.push(s); };
 
 const buf = new Float32Array(HOP);
+const LAMP = [];   // per renderruta: varje lampas ljus (starkaste kanalen x dimmer, 0..1)
 const T = [], LIT = [], INT = [], LVL = [], BPM = [], TE = [], LSPR = [], LOOK = [], WHY = [];   // per renderruta (TE = motorns tierEma)
-const KICK = [];                                      // index i T dar en kick lag
+const ONS = [], ANC = [];
+const KICK = [], PH = [], PH2 = new Float64Array(40), PH2N = new Float64Array(40);                                      // index i T dar en kick lag
 const DROP = [];                                      // {t, i, sec, lvh}
 const lookRuns = [];                                  // {look, t0, t1}
 const lookTime = new Map();
 const whyCount = new Map();
 let alla3 = 0, en = 0, litFrames = 0, mattSum = [], lamsprSum = 0, lamsprN = 0;
+let kickAtS = 0; const KICKT = new Map();   // renderrutans index -> kickens exakta tid (s)
 let lastRender = -1, lastLook = null, lastSwitch = 0, lastDrop = 0, kickPending = false;
 let lastMini = 0, MINIS = 0;   // minidrops (analysatorns miniDropCount-flanker)
 const endSample = Math.min(nSamples, Math.floor((startS + maxS) * SR));
@@ -124,7 +131,9 @@ const endSample = Math.min(nSamples, Math.floor((startS + maxS) * SR));
 for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off += HOP) {
   for (let i = 0; i < HOP; i++) { const x = d.readInt16LE(44 + (off + i) * 2) / 32768 * GAIN; buf[i] = x > 1 ? 1 : x < -1 ? -1 : x; }
   const tS = off / SR, ms = EPOCH + tS * 1000;
-  an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
+  // MÄTFÄLLA 48 (rättad här 10-19): analysatorns klocka = virtualEpoch + det som skickas in -> skicka t, inte EPOCH + t (annars hamnar
+  // kickarna 1,7e12 ms före Date.now() och effekternas slag får en godtycklig fas mot kickarna). --epok-fel = gamla vägen.
+  an.setVirtualClock(flag("--epok-fel") ? ms : ms - EPOCH); Date.now = () => ms; performance.now = () => ms - EPOCH;
   const fr = an.process(buf);
   boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence;
   bounds.tick(boundsArg);
@@ -135,7 +144,9 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
     if (process.env.DMX_BOUNDARY_SOFT !== '0') an.hintTrackChange(5000); else { an.resetTempo(); if ((process.env.DMX_SECTION_HINT_LOWCONF ?? '0') === '0') an.hintTrackChange(5000); }
   }
   feed.update(fr, cfg, an);   // TAKTMATNINGEN SOM LIVE (beatFeed.ts, matfalla 43; forr anchorMs = fr.beatAnchorMs varje hop)
-  if (fr.kick) kickPending = true;                                   // tappa ingen kick mellan renderrutorna
+  if (process.env.ST_ONS) { ONS.push(+(fr.onset?.kick ?? 0).toFixed(4)); ANC.push(cfg.beat ? [cfg.beat.anchorMs - EPOCH, cfg.beat.bpm] : null); }
+  if (process.env.ST_PHASE2 && cfg.beat && cfg.beat.bpm > 0) { const bm = 60000 / cfg.beat.bpm; const ph = ((((ms - cfg.beat.anchorMs) % bm) + bm) % bm) / bm; const bi = Math.floor(ph * 40); PH2[bi] += (fr.onset?.kick ?? 0); PH2N[bi]++; }
+  if (fr.kick) { if (!kickPending) kickAtS = tS; kickPending = true; }                                   // tappa ingen kick mellan renderrutorna
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
 
   const dt = lastRender < 0 ? STEP_MS / 1000 : (ms - lastRender) / 1000;
@@ -159,6 +170,7 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
     }
   }
   lit /= lamps.length;
+  LAMP.push(lamps.map((L) => (Math.max(u[L.r] ?? 0, u[L.g] ?? 0, u[L.b] ?? 0) / 255) * (L.dim >= 0 ? (u[L.dim] ?? 0) / 255 : 1)));
   // RUMSLIGHET: spridningen MELLAN lampornas ljus. Lika pa alla lampor = platt vagg.
   let lmin = 1e9, lmax = -1e9;
   for (const L of lamps) {
@@ -170,7 +182,8 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
 
   const i = T.length;
   T.push(tS); LIT.push(lit); INT.push(fr.intensity ?? 0); LVL.push(fr.level ?? 0); BPM.push(fr.bpm ?? 0); TE.push(eng.tierEma ?? 0);
-  if (kickPending) { KICK.push(i); kickPending = false; }
+  if (kickPending) { KICK.push(i); KICKT.set(i, kickAtS); kickPending = false; }
+  if (process.env.ST_PHASE && KICKT.get(i) === kickAtS && KICK[KICK.length - 1] === i) PH.push([+(tS - kickAtS).toFixed(4), tS, +(cfg.beat && cfg.beat.bpm > 0 ? ((((ms - cfg.beat.anchorMs) % (60000 / cfg.beat.bpm)) + 60000 / cfg.beat.bpm) % (60000 / cfg.beat.bpm)) / (60000 / cfg.beat.bpm) : -1).toFixed(3), cfg.beat && cfg.beat.bpm > 0 ? 1 : 0, +(cfg.beat?.bpm ?? 0).toFixed(1)]);
   if ((fr.miniDropCount ?? 0) !== lastMini) { lastMini = fr.miniDropCount ?? 0; MINIS++; }
   if ((fr.dropCount ?? 0) !== lastDrop) { lastDrop = fr.dropCount ?? 0; DROP.push({ t: tS, i, sec: fr.section, lvh: fr.levelVsHighDb ?? 0 }); }
 
@@ -235,6 +248,21 @@ for (const i of KICK) {
   let k = 1; while (k <= at && LIT[i + k] < thr) k++;
   lags.push(k * STEP_MS); heights.push(mx - LIT[i]);
 }
+// KICK -> LAMPAN PÅ MÅL (ägaren 10-19: 'mätningen skall alltid visa till där lampan precis nått sin målljusstyrka, inte något medel'):
+// per kick och per lampa som tänds upp (> 15 % över nivån vid kicken, minst 0,05): tiden tills LAMPAN når sin topp inom fönstret
+// (= där uppgången slutar, målnivån) - inte riggens medel, inte 90 %. Kicken räknas från renderrutan där den låg (raster = STEP_MS).
+const lampLags = [], DUMP = [];
+for (const i of KICK) {
+  if (i < 1 || i + W >= LAMP.length || nearDrop(i)) continue;
+  for (let l = 0; l < lamps.length; l++) {
+    const v0 = LAMP[i - 1][l];
+    let mx = v0, at = 0;
+    for (let k = 0; k <= W; k++) if (LAMP[i + k][l] > mx) { mx = LAMP[i + k][l]; at = k; }
+    if (mx - v0 < 0.05 || mx <= v0 * 1.15) continue;
+    lampLags.push(Math.round((T[i + at] - KICKT.get(i)) * 1000));   // exakt tid från kicken (inte rutans raster)
+    if (process.env.ST_DUMP) { let st = 0; while (st < at && LAMP[i + st][l] <= v0 + 0.15 * (mx - v0)) st++; DUMP.push([Math.round((T[i + st] - KICKT.get(i)) * 1000), Math.round((T[i + at] - T[i + st]) * 1000), LOOK[i] ?? '', +(mx - v0).toFixed(2), i]); }
+  }
+}
 
 // DROP-SPRANGET: riggens ljus 0,5 s FORE mot hogsta inom 0,8 s EFTER, lugna och hoga partier skilt.
 const jumps = DROP.map((dp) => {
@@ -270,7 +298,7 @@ const I15 = Math.max(0, T.findIndex((t) => t >= startS + 15));
 const res = {
   wav: path, startS, gainDb: +(20 * Math.log10(GAIN)).toFixed(1), totS: Math.round(totS), rutor: T.length,
   tajt: {
-    kickLagMs: med(lags), kickar: kickTested, kickTraff: kickTested ? kickWithRise / kickTested : NaN,
+    kickLagMs: med(lampLags), kickLagP75: lampLags.length ? Float64Array.from(lampLags).sort()[Math.floor(lampLags.length * 0.75)] : NaN, kickLagRigg90: med(lags), lampUpp: lampLags.length, kickar: kickTested, kickTraff: kickTested ? kickWithRise / kickTested : NaN,
     kickHojd: med(heights),
     energiR: pear(envel(LIT, 1), envel(INT, 1)), nivaR: pear(envel(LIT, 1), envel(LVL, 1)),
     energiRtopp: pear(envelMax(LIT, 1), envel(INT, 1)),   // 1 s TOPP mot energi - straffar inte flimmer
@@ -304,6 +332,8 @@ const res = {
 
 const traceOut = opt("--trace", null);
 if (traceOut) writeFileSync(traceOut, JSON.stringify({ T, LIT, INT, LVL, TE, LSPR, LOOK, BPM, KICK, EV, WHY, STEP_MS }));
+if (process.env.ST_DUMP) require_dump(DUMP);
+if (process.env.ST_ONS) writeFileSync(process.env.ST_ONS, JSON.stringify({ ONS, ANC }));
 const jsonOut = opt("--json", null);
 if (jsonOut) writeFileSync(jsonOut, JSON.stringify(res, null, 1));
 if (QUIET) { say(JSON.stringify(res)); process.exit(0); }
@@ -313,7 +343,9 @@ const f0 = (x) => Number.isFinite(x) ? x.toFixed(0) : " -";
 const p1 = (x) => Number.isFinite(x) ? `${(100 * x).toFixed(1)} %` : "   -";
 say(`\n=== ${path}  ${startS}-${(startS + totS).toFixed(0)} s, ${T.length} rutor a ${STEP_MS} ms ===`);
 say(`\nTAJT MOT LATEN`);
-say(`  kick -> ljus       ${f0(res.tajt.kickLagMs)} ms (median, ljusvagen, fonster ${W * STEP_MS} ms vid ${f0(bpmMed)} BPM) pa ${kickWithRise}/${kickTested} kickar = ${p1(res.tajt.kickTraff)}`);
+if (process.env.ST_PHASE2) writeFileSync(process.env.ST_PHASE2, JSON.stringify(Array.from(PH2, (v, i) => +(v / Math.max(1, PH2N[i])).toFixed(4))));
+if (process.env.ST_PHASE) writeFileSync(process.env.ST_PHASE, JSON.stringify(PH));
+say(`  kick -> lampan pa mal ${f0(res.tajt.kickLagMs)} ms (median, p75 ${f0(res.tajt.kickLagP75)}, ${res.tajt.lampUpp} lampuppgangar; gamla riggmedel 90 %: ${f0(res.tajt.kickLagRigg90)} ms, fonster ${W * STEP_MS} ms vid ${f0(bpmMed)} BPM) pa ${kickWithRise}/${kickTested} kickar = ${p1(res.tajt.kickTraff)}`);
 say(`  uppgangens storlek ${f2(res.tajt.kickHojd)} av riggens 0-1 skala`);
 say(`  ljus mot energi    r ${f2(res.tajt.energiR)} pa 1 s-MEDEL, ${f2(res.tajt.energiRtopp)} pa 1 s-TOPP (ruta-mot-ruta ${f2(res.tajt.energiRruta)}), ljus mot niva r ${f2(res.tajt.nivaR)}`);
 say(`  ljus per tier      lugn ${f2(res.tajt.litLugn)}/${f2(res.tajt.toppLugn)}  fart ${f2(res.tajt.litFart)}/${f2(res.tajt.toppFart)}  full ${f2(res.tajt.litFull)}/${f2(res.tajt.toppFull)}  (medel/topp, ${res.tajt.sekLugn}/${res.tajt.sekFart}/${res.tajt.sekFull} s)`);
@@ -328,3 +360,5 @@ say(`  riggens ljus       p10 ${f2(res.snygg.litP10)}  p50 ${f2(res.snygg.litP50
 if (dirigent.length) { say(`\n-- dirigenten (${dirigent.length} rader, 12 forsta) --`); for (const s of dirigent.slice(0, 12)) say("   " + s); }
 say(`\nTAJT = kick->ljus lagt, kickTraff hogt, r hogt, musikByten hogt. SNYGGT = alla3 lagt, mattnad och lampspr hoga,`);
 say(`flera lookar utan langa stillastaende stunder, och ett ljusspann som anvands. Jamfor natt mot natt, aldrig i absoluta tal.`);
+
+function require_dump(D) { writeFileSync(process.env.ST_DUMP, JSON.stringify(D)); }
