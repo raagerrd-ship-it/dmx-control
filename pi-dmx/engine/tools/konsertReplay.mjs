@@ -30,7 +30,12 @@ cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
 const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = (fx.address ?? 1) - 1; const at = (r) => { const i = roles.indexOf(r); return i < 0 ? -1 : base + i; }; return { r: at("r"), g: at("g"), b: at("b"), dim: at("dim") }; });
 // --delad-cfg (MÄTFÄLLA 47, 10-13): live får analysatorn MOTORNS cfg (index.ts createAnalyser(cfg)), så kickgrinden mot taktgridet
 // och taktfasen (analyser.ts beatSrc.beat = cfg.beat) är PÅ live - med en egen kopia (bänkarnas standard) är cfg.beat alltid null där.
-const an = new Analyser(args.includes("--delad-cfg") ? cfg : JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
+// DELNINGEN SOM LIVE (10-19): ladan kör den delade analysatorn delad (DMX-profilen ANALYSER_SPLIT 'worker') - snabba sidan i motorns
+// tråd med motorns cfg, långsamma (tempo/gridfas/sektion) i en worker som får en KOPIA av cfg vid start (structured clone). Här
+// körs den långsamma sidan synkront (inline, deterministiskt) med en kopia som i workern. --odelad = en analysator i en tråd (förr).
+const { createSplitBuffers } = await import(DIST + "split.js");
+const liveAnalyser = (c) => { if (args.includes("--odelad")) return new Analyser(c); const b = createSplitBuffers(); const fast = new Analyser(c, { role: "fast", split: b }); fast.setInlinePeer(new Analyser(structuredClone(c), { role: "slow", split: b })); return fast; };
+const an = liveAnalyser(args.includes("--delad-cfg") ? cfg : JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
 const feed = new BeatFeed();
 const bounds = new BoundaryDetector(() => Date.now());
 an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));

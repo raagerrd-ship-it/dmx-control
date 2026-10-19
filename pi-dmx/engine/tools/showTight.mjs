@@ -91,7 +91,12 @@ const lamps = cfg.fixtures.map((fx) => {
 
 // MÄTFÄLLA 47 (rättad här 10-19): live får analysatorn MOTORNS cfg (index.ts), så kickgrinden mot taktgridet är på - med en egen kopia
 // fyrade 'kick' var ~290 ms oavsett låt. --egen-cfg = gamla vägen.
-const an = new Analyser(flag("--egen-cfg") ? JSON.parse(JSON.stringify(defaultConfig)) : cfg);
+// DELNINGEN SOM LIVE (10-19): ladan kör den delade analysatorn delad (DMX-profilen ANALYSER_SPLIT 'worker') - snabba sidan i motorns
+// tråd med motorns cfg, långsamma (tempo/gridfas/sektion) i en worker som får en KOPIA av cfg vid start (structured clone). Här
+// körs den långsamma sidan synkront (inline, deterministiskt) med en kopia som i workern. --odelad = en analysator i en tråd (förr).
+const { createSplitBuffers } = await import(DIST + "split.js");
+const liveAnalyser = (c) => { if (args.includes("--odelad")) return new Analyser(c); const b = createSplitBuffers(); const fast = new Analyser(c, { role: "fast", split: b }); fast.setInlinePeer(new Analyser(structuredClone(c), { role: "slow", split: b })); return fast; };
+const an = liveAnalyser(flag("--egen-cfg") ? JSON.parse(JSON.stringify(defaultConfig)) : cfg);
 const feed = new BeatFeed();
 // GAIN: motorn laser forstarkningen bara pa aux (index.ts: setGainLock(cfg.audioInput !== "mic", 1)).
 // Kor ladan pa mikrofon ar AGC:n aktiv dar men inte har; --agc kor som mikrofoningang.

@@ -15,6 +15,16 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-19 Workern får en KOPIA av cfg vid start (createAnalyser worker-läget) - ingen effekt i dag, men en fälla
+Vad: createAnalyser (analyser.ts ~3863) startar workern med workerData { cfg: { ...cfg } } = structured clone. Den långsamma sidan ser
+alltså cfg som den var vid start och aldrig motorns uppdateringar (cfg.beat = taktrutnätet, som DMX nu flyttar var 250 ms med den
+löpande takten, och ev. UI-ändrade detection-värden). I dag läser bara den SNABBA sidan cfg.beat (beatSrc: kickgrinden ~3174 och
+taktfasens barAcc ~3302), så resultatet är detsamma - men inline-läget (bänken) gav den långsamma sidan SAMMA objekt, så en framtida
+cfg-läsning i den långsamma delen skulle bete sig olika i bänk och live utan att någon märker det. Bänkarna showTight/konsertReplay
+kör sedan 10-19 delningen inline med structuredClone(cfg) till den långsamma sidan, som live. Var: createAnalyser/slowWorker.
+Önskat: antingen dokumentera i split.ts att den långsamma sidan aldrig får läsa cfg efter start, eller skicka cfg.beat i recorden.
+Status:
+
 ## ÖPPET 2026-10-19 frame.kick fyrar på kylningens kant (~0,6 slag) i stället för på kickarna
 Vad: showTight --step 5 med motorns cfg (som live, mätfälla 47), pop_ladan 600 s vid 125-130 BPM: frame.kick ~3,1/s, medianintervall
 283-309 ms i varje 60 s-fönster oavsett låt = KICK_COOLDOWN = max(170, 0,6 x slaget) (analyser.ts ~3157). Kickarnas fas mot ljudets
