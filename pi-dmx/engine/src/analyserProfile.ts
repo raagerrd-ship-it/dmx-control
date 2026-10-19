@@ -43,6 +43,10 @@ export const PROFILE: AnalyserProfile = {
     SECTION_RUN: '5',             // var 3
     SECTION_RUN_IN: '3',          // var 0 (= RUN)
     SECTION_CARRY: '20',          // block som bars over latgransen (lotus 4a008a5); var 0
+    // BASEN TILLBAKA = HIGH (agaren i ladan 10-19: 'refrangen haller efter dropen'; 24 lang: high +2 s efter drop 12 -> 33, build
+    // 0,5-8 s efter drop 21 -> 14). Backup: git-taggen backup/fore-section-body-high-2026-10-19.
+    SECTION_BODY_HIGH: '2000',    // var 0 (av)
+    SECTION_BODY_HIGH_DB: '2',    // var 3 (koden)
   },
   bare: {
     BPM_MIN: '80',               // fest 80-160 (var 100 + tempo.conf=80); lotus: 80

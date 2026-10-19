@@ -65,6 +65,7 @@ EN VÄG (10-10): effektens 0 = släckt, färg 1–100 % → lampans tändpunkt+1
 - **LÖPANDE TAKT (10-19, enda vägen):** taktrutnätet läggs var 250:e ms direkt på kickbandets anslag (vikning av de senaste 5 s, tempo ±2,5 % kring rutnätets och analysatorns), inget lås och ingen PLL. Analysatorns BPM = första lås + sökcentrum + dirigentens val. Inga rattar. Backup: git-taggen `backup/fore-lopande-takt-2026-10-19` (kick-PLL, `DMX_TEMPO_PERSIST_S`, `DMX_PHASE_FOLLOW`, Beat-synk-reglaget).
 - Toggle-effekter (`EffectDef.toggle`, lampgrupper som slår om per slag) får ingen grundnivå `DMX_FX_FLOOR` (den mörka gruppen är mörk) och dirigenten tar vartannat look-byte ur dem när takten är låst och tilliten ≥ 0,85 (10-10). Minsta hålltid per look 8 s (ägaren: ligger).
 - Alla 44 effekter kan väljas: snap ≥ 115 BPM, rave ≥ 120, strobe ≥ 150 (ägaren 10-09), gravity bas ≥ 0,20; en uppbyggnad som hållit 1,5 s ger ett byte till build-effekterna; bland de bäst passande väljs den som spelats minst.
+- Sektionen efter drop (DMX-profilen, standard 10-19, ägaren: 'refrängen håller efter dropen'): `SECTION_BODY_HIGH` 2000 ms / `SECTION_BODY_HIGH_DB` 2 - basen tillbaka nära toppen efter ett break = 'high' direkt, förbi builden. Backup: `backup/fore-section-body-high-2026-10-19`.
 - Analysatorns tempo (DMX-profilen `src/analyserProfile.ts`, inte den delade `analyser.ts`): `TEMPO_SHIFT` 1 (följer tempolyft inom låt), `TEMPO_HOLD` 1 (takten hålls över kort paus, 0,35–10 s). Lotus har dem av.
 
 ## Borttagna reglage 10-10 (döda: lästes inte av motorn, bänken json-identisk)
