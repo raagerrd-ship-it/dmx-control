@@ -54,7 +54,6 @@ EN VÄG (10-10): effektens 0 = släckt, färg 1–100 % → lampans tändpunkt+1
 | `DMX_DROP_LIFT_MS` / `DMX_DROP_LIFT_FALL_MS` | 8000 / 3000 (standard 10-17) | Efter en drop släpper energin dämpningen i så många ms och glider tillbaka på FALL (var 4000/1500; ägaren: 'energi efter drop dör fort'). |
 | `DMX_DROP_LIFT_HIGH` | på (standard 10-17) | Lyftet håller så länge sektionen är refräng (high) efter dropen. 0 = av. |
 | `DMX_DROP_BASS_LOOK` | på (standard 10-17) | En drop byter till en basstark full-effekt (bas ≥ 0,6, punch ≥ 0,75) om looken inte redan är basstark. 0 = av. |
-| `DMX_TEMPO_PERSIST_S` | 3 (standard 10-17) | Taktklockan tar ett nytt tempo först när det hållit i sig så här länge (12 s i breaket/dropen, `DMX_TEMPO_PERSIST_DROP_S`). 0 = av. |
 
 ## 5. Puls och ballistik
 | Ratt | Standard | Vad den gör |
@@ -63,6 +62,7 @@ EN VÄG (10-10): effektens 0 = släckt, färg 1–100 % → lampans tändpunkt+1
 | `DMX_FADE_MIN_S` | 0,25 | STEG 2: den ENDA uttoningen (lampans ljusstyrka; upp direkt) — **snabbare är förbjudet** (ägaren 09-29). Gäller ljusstyrkan: kulören byts direkt (ägaren 10-09: "det är ju bara energi som har begränsning på sin nedtoning"), ballistiken körs per lampa på starkaste färgkanalen. |
 
 ## 6. Dirigenten och takten (standard 10-10)
+- **LÖPANDE TAKT (10-19, enda vägen):** taktrutnätet läggs var 250:e ms direkt på kickbandets anslag (vikning av de senaste 5 s, tempo ±2,5 % kring rutnätets och analysatorns), inget lås och ingen PLL. Analysatorns BPM = första lås + sökcentrum + dirigentens val. Inga rattar. Backup: git-taggen `backup/fore-lopande-takt-2026-10-19` (kick-PLL, `DMX_TEMPO_PERSIST_S`, `DMX_PHASE_FOLLOW`, Beat-synk-reglaget).
 - Toggle-effekter (`EffectDef.toggle`, lampgrupper som slår om per slag) får ingen grundnivå `DMX_FX_FLOOR` (den mörka gruppen är mörk) och dirigenten tar vartannat look-byte ur dem när takten är låst och tilliten ≥ 0,85 (10-10). Minsta hålltid per look 8 s (ägaren: ligger).
 - Alla 44 effekter kan väljas: snap ≥ 115 BPM, rave ≥ 120, strobe ≥ 150 (ägaren 10-09), gravity bas ≥ 0,20; en uppbyggnad som hållit 1,5 s ger ett byte till build-effekterna; bland de bäst passande väljs den som spelats minst.
 - Analysatorns tempo (DMX-profilen `src/analyserProfile.ts`, inte den delade `analyser.ts`): `TEMPO_SHIFT` 1 (följer tempolyft inom låt), `TEMPO_HOLD` 1 (takten hålls över kort paus, 0,35–10 s). Lotus har dem av.

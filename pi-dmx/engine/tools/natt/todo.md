@@ -6,6 +6,9 @@
    efter drop 12 -> 33, +8 s 22 -> 36, build 0,5-8 s efter drop 21 -> 14, korta looker 20 -> 16 %, lookbyten 404 -> 413, drops 66 -> 69,
    sektionsbyten 2,64 -> 3,08/min. Nå Pi:n: PC på telefonens hotspot Pixel_9285, Pi:n hamnade där på
    10.38.24.218 senast (port 22-skanning av hotspotnätet hittar den) -> `PI_HOST=<ip> python tools/ladan.py ...`.
+0. LÖPANDE TAKT (10-19, i koden, d51f8da; backup-tagg backup/fore-lopande-takt-2026-10-19): rutnätet på kickbandets anslag i stället
+   för kick-PLL + tempospärr. Bänk: rutnätets fel mot ljudet 132 -> 28 ms (24 lang), pop 144 -> 6, megamix 198 -> 9. Följer med
+   `python tools/ladan.py`. TITTA: sitter gallop/chase/siren/rulle på slagen nu? Backa: deploya taggen.
 2. /api/perf efter en kväll: `major` nära 0, `forcedGc` efter pauser (Node 24 + heap-flaggan, ute sedan 10-18).
 
 ## NATTEN 2026-10-19 (nattagenten, inget deployat)
