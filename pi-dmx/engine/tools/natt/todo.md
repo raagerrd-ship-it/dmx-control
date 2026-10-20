@@ -12,6 +12,9 @@
    smällen (10 av 67 drops). Med provet blir dropens look refrängens manus-look och ligger kvar. 24 lang: återseende 68 -> 71 %, hör ihop
    85 -> 89 %, drops/minidrops lika. TITTA: ligger looken kvar genom refrängen efter en drop som kommer direkt ur en uppbyggnad?
    Godkänt -> enda vägen (ta bort flaggan, ingen opt-in kvar). (Punkt 1 nedan är UTE sedan 10-19 19:32.)
+4. LOTUS-FIXEN 19bebf7 (10-20 morgon, delade analysatorn, ingen flagga - följer med vilken `ladan.py` som helst): SECTION_BODY_HIGH även
+   i intro efter låtgräns. Kontroll 10-20 (24 lang): ensam återseende 68 -> 67 %, hör ihop 85 -> 81 %, drops 67 -> 68, minis 383 -> 388;
+   ihop med DMX_DROP_SEC_HIGH=1: 70 % / 85 %, dvs provet ger samma +3/+4 ovanpå. TITTA på båda samtidigt.
 1. GRUNDFIXEN (ägaren 10-19, ersätter nattens DMX_DROP_NO_BUILD_S som togs bort): `python tools/ladan.py --env DMX_SECTION_BODY_HIGH=2000
    --env DMX_SECTION_BODY_HIGH_DB=2` (delade analysatorn de111d4). Bänk 24 lang (konsertReplay --delad-cfg --step 5, av -> på): high +2 s
    efter drop 12 -> 33, +8 s 22 -> 36, build 0,5-8 s efter drop 21 -> 14, korta looker 20 -> 16 %, lookbyten 404 -> 413, drops 66 -> 69,
