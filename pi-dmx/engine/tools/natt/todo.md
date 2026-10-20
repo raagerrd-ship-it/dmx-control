@@ -1,5 +1,22 @@
 # Natt-agentens uppdrag
 
+## Från kvällen 2026-10-20 - DEN TVÅDELADE ANALYSATORN (ägaren: nattens uppgift, går före allt annat)
+Ägaren: "analysera den tvådelade analysatorn. Kan vi förbättra den och göra fördelningen bättre? Ena med mål snabbaste latens och andra
+bästa analys." DMX kör delningen live (analyserProfile.ts ANALYSER_SPLIT 'worker' sedan 09-24): snabba sidan i motorns tråd, långsamma
+(tempo/gridfas/sektion) i slowWorker på egen kärna. GÖR:
+1. KARTA: vad räknas var i dag (analyser.ts + split.ts + slowWorker.ts + beatFeed.ts), per hop: µs, vilka fält ljuset läser direkt från
+   den snabba sidan (kick, onset, bodyDb, nivå, drop/mini) och vilka som kommer från den långsamma (med hur många hop/ms fördröjning).
+   Mät med Node 24 (Pi:ns version) i bänken: process() p50/p99 per sida, recordens storlek/frekvens, kö/fördröjning snabb -> långsam -> tillbaka.
+2. FELPLACERAT: det som ligger på snabba sidan men inte behövs inom ett hop (flytta ut = lägre latens/jitter), och det som ligger på
+   långsamma sidan men borde vara snabbt (drop/onset-beslut som väntar), eller som fick sämre analys för att det tvingades vara billigt
+   (kortare fönster, grövre upplösning, färre tempokandidater) - där den långsamma sidan har budget för mer. Även beatFeed.ts (DMX-sidan,
+   viker onset.kick var 250 ms i motorns tråd) - hör den hemma på långsamma sidan?
+3. FÖRSLAG med siffror: snabba sidans µs/hop och kedjan ljud -> DMX före/efter; analysens kvalitet (tempo/sektion/drop mot facit,
+   konsertReplay 24 lang) före/efter. Bit-identiskt där bara platsen byts (splitProof).
+REGLER: delade filerna (analyser.ts, split.ts, slowWorker.ts, tempoTracker.ts) ändrar du INTE - förslagen skrivs i analysator-fynd.md
+(lotus-morgonagenten bygger dem i båda repona). DMX-sidan (beatFeed.ts, index.ts, analyserProfile.ts) får du prova, med bevis. Rapportera
+i artifacten under egen rubrik. Inget deployas.
+
 ## LADAN 2026-10-19 KVÄLL
 19:21 LÖPANDE TAKT UTE (ladan.py utan env, md5 lika, NRestarts 0). Ägaren: 'takten sitter bra nu' -> GODKÄND, är redan kodens enda väg.
 19:27 PROV LIVE (ladan.conf): DMX_SECTION_BODY_HIGH=2000 DMX_SECTION_BODY_HIGH_DB=2 (grundfixen, delade analysatorn de111d4) - väntar på ögat.
