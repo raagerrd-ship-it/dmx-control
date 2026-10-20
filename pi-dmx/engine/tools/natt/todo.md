@@ -4,7 +4,13 @@
 Ägaren: "analysera den tvådelade analysatorn. Kan vi förbättra den och göra fördelningen bättre? Ena med mål snabbaste latens och andra
 bästa analys." PRINCIPEN (ägaren): SNABBA DELEN = LJUSSTYRNINGEN (det ljuset reagerar på direkt: kick/onset, basenergi, nivå,
 drop/minidrop-smällen, taktens puls) - minsta latens och jitter, inget annat. LÅNGSAMMA DELEN = INPUT TILL DIRIGENTEN (tempo, taktfas,
-sektion, karaktär/profil, build/refräng, låtgräns) - bästa analys, får ta tid. Mät varje fält mot den regeln. DMX kör delningen live (analyserProfile.ts ANALYSER_SPLIT 'worker' sedan 09-24): snabba sidan i motorns tråd, långsamma
+sektion, karaktär/profil, build/refräng, låtgräns) - bästa analys, får ta tid. Mät varje fält mot den regeln. KEDJAN HELA VÄGEN (ägaren):
+snabb analys -> EFFEKTEN (render per ruta, ljusstyrning) och långsam analys -> DIRIGENTEN -> EFFEKTEN (vilken look, palett, tier, manus).
+Kartlägg även gränsen dirigent -> effekt: dirigenten (stepDirigent/switchLook, stepPalette) körs i dag inne i render() varje ruta (200 Hz)
+i motorns tråd fast den fattar beslut några gånger per minut - vad kostar den per ruta (µs, skräp), vad behöver den läsa varje ruta, och
+kan den köras sällan/utanför den heta vägen (t.ex. på långsamma sidans takt) så att render bara gör effekt + energi + kalibrering?
+Undantag som MÅSTE vara snabba: dropens/minidropens lookbyte och smäll (drop-steget). Förslag med µs per ruta före/efter och bevis
+att showen är identisk (konsertReplay 24 lang, natt --snabb). Dirigenten och effects.ts är DMX:s egna - får provas (opt-in/bevis). DMX kör delningen live (analyserProfile.ts ANALYSER_SPLIT 'worker' sedan 09-24): snabba sidan i motorns tråd, långsamma
 (tempo/gridfas/sektion) i slowWorker på egen kärna. GÖR:
 1. KARTA: vad räknas var i dag (analyser.ts + split.ts + slowWorker.ts + beatFeed.ts), per hop: µs, vilka fält ljuset läser direkt från
    den snabba sidan (kick, onset, bodyDb, nivå, drop/mini) och vilka som kommer från den långsamma (med hur många hop/ms fördröjning).
