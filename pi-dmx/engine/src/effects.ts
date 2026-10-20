@@ -82,6 +82,10 @@ const DROP_LIFT_HIGH = process.env.DMX_DROP_LIFT_HIGH !== '0';   // STANDARD sed
  *  (2) looken är en basstark full-effekt (passform bas >= 0,6 och punch >= 0,75, bäst först) - låtens refrängslook behålls om den redan är
  *  basstark och inte är looken från före dropen; annars väljs en ur listan och blir låtens refrängslook (manuset). 0 = av (som före). */
 const DROP_BASS_LOOK = process.env.DMX_DROP_BASS_LOOK !== '0';   // STANDARD sedan 10-17 (ägaren i ladan); =0 = av
+/** DROPEN GÅR FÖRE BUILDEN I MANUSET (natt 10-20, prov): när dropen kommer i samma ruta som build-inträdet (allaBuild) valdes looken i
+ *  build-manuset - dropens basstarka look sparades som låtens build-look och refrängens manus fick den aldrig (10 av 67 drops, 24 lang).
+ *  =1: dropen räknas till 'high' som andra drops. Standard av (bit-identiskt) tills ägaren sett det. */
+const DROP_SEC_HIGH = process.env.DMX_DROP_SEC_HIGH === '1';
 /** BASEN DIREKT EFTER DROPEN (opt-in DMX_DROP_BASS_SNAP=1, ägaren i ladan 10-17: 'drop, alla lyser, sen känns det som effekten inte vet vad
  *  den skall göra i några sekunder tills den till slut hittar t.ex. basen'): basenergin mäter hur långt över basens senaste DAL vi är, och
  *  under breaket före dropen sjönk dalen lågt (basen borta) - efter smällen gled den upp på B_LO_S, så de första sekunderna var skalan bred
@@ -844,7 +848,7 @@ export class EffectEngine {
         const req = (m: Mode) => meetsRequirements(m, bpm, frame.profile);
         // LÅTMANUS: vilken del av manuset bytet galler. Builden (aven ALLA_LOOKER-builden) -> build; drop och build som slutar ->
         // refrangens look (dropen landar i refrangen); annars sektionen. Utan sektion (ingen analys an) finns inget manus.
-        const secKey = allaBuild ? 'build' : (dropSwitch || buildExit) && liveSec !== 'break' ? 'high' : liveSec;
+        const secKey = allaBuild && !(DROP_SEC_HIGH && dropSwitch && liveSec !== 'break') ? 'build' : (dropSwitch || buildExit) && liveSec !== 'break' ? 'high' : liveSec;
         const calm = secKey === 'break';   // breakdown -> lugna poolen (var wantCalm)
         const tierRank = (m: Mode) => { const t = EFFECT_MAP.get(m)?.tier; return t === 'lugn' ? 0 : t === 'full' ? 2 : 1; };
         const tierNow = tierS === LUGN ? 0 : tierS === FART ? 1 : 2;
