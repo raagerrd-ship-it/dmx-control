@@ -25,7 +25,7 @@ från intro (eller nollas med gränsen). 16 av 67 drops har 'build' inom 8 s eft
 Var: sectionBlock + hintTrackChange-nollningen / SECTION_BODY_HIGH-villkoret. Material: tidpunkterna ovan (s från filstart).
 Önskat: basen tillbaka med full kraft efter break = 'high' även när sektionen står i intro efter en låtgräns (eller låtgräns i breaket
 före en drop räknas inte som ny låt).
-Status:
+Status: KLART 2026-10-20 (lotus-morgonagenten, lotus + dmx samma analyser.ts): inom SECTION_BODY_HIGH (ingen ny flagga) - i rangens första 20 block efter låtgräns blir basen tillbaka 'high' direkt och står kvar tills rangen har 20 block (förr alltid 'intro'). 24 lang, konsertReplay --delad-cfg --step 5, 67 show-drops: high +2/+4/+8/+15 s 33/39/43/50 -> 36/42/46/53, intro/build utan high inom 8 s 13 -> 10, build inom 8 s efter 16 -> 15, byten/min 3,13 -> 3,17. Lotus (flaggan av) paritet 0 (90 000 hop), splitProof flagga på 0/135 000. Resterande 10: basen når inte bodyPeak - _DB inom 2 s (ej undersökt). EJ deployat - ladan.
 
 ## ÖPPET 2026-10-19 Workern får en KOPIA av cfg vid start (createAnalyser worker-läget) - ingen effekt i dag, men en fälla
 Vad: createAnalyser (analyser.ts ~3863) startar workern med workerData { cfg: { ...cfg } } = structured clone. Den långsamma sidan ser
