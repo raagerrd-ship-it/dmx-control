@@ -2,7 +2,9 @@
 
 ## Från kvällen 2026-10-20 - DEN TVÅDELADE ANALYSATORN (ägaren: nattens uppgift, går före allt annat)
 Ägaren: "analysera den tvådelade analysatorn. Kan vi förbättra den och göra fördelningen bättre? Ena med mål snabbaste latens och andra
-bästa analys." DMX kör delningen live (analyserProfile.ts ANALYSER_SPLIT 'worker' sedan 09-24): snabba sidan i motorns tråd, långsamma
+bästa analys." PRINCIPEN (ägaren): SNABBA DELEN = LJUSSTYRNINGEN (det ljuset reagerar på direkt: kick/onset, basenergi, nivå,
+drop/minidrop-smällen, taktens puls) - minsta latens och jitter, inget annat. LÅNGSAMMA DELEN = INPUT TILL DIRIGENTEN (tempo, taktfas,
+sektion, karaktär/profil, build/refräng, låtgräns) - bästa analys, får ta tid. Mät varje fält mot den regeln. DMX kör delningen live (analyserProfile.ts ANALYSER_SPLIT 'worker' sedan 09-24): snabba sidan i motorns tråd, långsamma
 (tempo/gridfas/sektion) i slowWorker på egen kärna. GÖR:
 1. KARTA: vad räknas var i dag (analyser.ts + split.ts + slowWorker.ts + beatFeed.ts), per hop: µs, vilka fält ljuset läser direkt från
    den snabba sidan (kick, onset, bodyDb, nivå, drop/mini) och vilka som kommer från den långsamma (med hur många hop/ms fördröjning).
