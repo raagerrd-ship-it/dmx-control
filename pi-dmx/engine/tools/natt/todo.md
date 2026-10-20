@@ -7,6 +7,11 @@
    backup/fore-section-body-high-2026-10-19), env-provet = profilen byte-identiskt (2 lang), deployat utan env, ladan.conf tom, md5 lika.
 
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
+3. PROV (natt 10-20, 171720b): `python tools/ladan.py --env DMX_DROP_SEC_HIGH=1` - en drop som kommer i samma ruta som build-
+   inträdet sparades i build-manuset (dropens basstarka look blev låtens build-look) och refrängen bytte bort droplooken 5-10 s efter
+   smällen (10 av 67 drops). Med provet blir dropens look refrängens manus-look och ligger kvar. 24 lang: återseende 68 -> 71 %, hör ihop
+   85 -> 89 %, drops/minidrops lika. TITTA: ligger looken kvar genom refrängen efter en drop som kommer direkt ur en uppbyggnad?
+   Godkänt -> enda vägen (ta bort flaggan, ingen opt-in kvar). (Punkt 1 nedan är UTE sedan 10-19 19:32.)
 1. GRUNDFIXEN (ägaren 10-19, ersätter nattens DMX_DROP_NO_BUILD_S som togs bort): `python tools/ladan.py --env DMX_SECTION_BODY_HIGH=2000
    --env DMX_SECTION_BODY_HIGH_DB=2` (delade analysatorn de111d4). Bänk 24 lang (konsertReplay --delad-cfg --step 5, av -> på): high +2 s
    efter drop 12 -> 33, +8 s 22 -> 36, build 0,5-8 s efter drop 21 -> 14, korta looker 20 -> 16 %, lookbyten 404 -> 413, drops 66 -> 69,
@@ -16,6 +21,15 @@
    för kick-PLL + tempospärr. Bänk: rutnätets fel mot ljudet 132 -> 28 ms (24 lang), pop 144 -> 6, megamix 198 -> 9. Följer med
    `python tools/ladan.py`. TITTA: sitter gallop/chase/siren/rulle på slagen nu? Backa: deploya taggen.
 2. /api/perf efter en kväll: `major` nära 0, `forcedGc` efter pauser (Node 24 + heap-flaggan, ute sedan 10-18).
+
+## NATTEN 2026-10-20 (nattagenten, inget deployat)
+KLART 2026-10-20: baslinje natt/2026-10-20.json (a2999d9): pop kick->ljus 99 ms/träff 0,48 r 0,33; mega 37 ms/0,38 r 0,13; korpus 117/0,42
+  r 0,30. Mot 10-19: kick->ljus är nu per lampa till topp (showTight a23d4c3, mätfälla 51) + löpande takt + SECTION_BODY_HIGH.
+KLART 2026-10-20: 24 lang baslinje (rodTrad): byten 2,77/min, återseende 68 %, kort look 17 %, hör ihop 85 %, drops 67, unika 31/77.
+KLART 2026-10-20: opt-in DMX_DROP_SEC_HIGH=1 (171720b), se NÄSTA LADAN-BESÖK punkt 3. Av = 24/24 byte-identiska.
+ÖPPET: återseende-missarna (37/116): 24 = sektionsbytet kommer ~4 s in (SECTION_UNIT_MIN_MS 4000, median 4,1 s, p90 7,5) så förra
+  sektionens look dominerar korta delar - rörs inte (ägaren backade =0 10-17). 22 av 77 effekter valda i mixarna, 31 på 24 lang.
+  Analysatorfynd 10-20: drops i 'intro' efter låtgräns når inte 'high' (12/29).
 
 ## NATTEN 2026-10-19 (nattagenten, inget deployat)
 KLART 2026-10-19: baslinje natt/2026-10-19.json byte-identisk med 10-18 (pop 125/0,46 r 0,30; mega 150/0,41 r 0,12; korpus 125/0,44 r 0,26).

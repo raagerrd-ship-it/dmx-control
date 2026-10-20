@@ -15,6 +15,18 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-20 SECTION_BODY_HIGH når inte drops i 'intro' (efter låtgräns) eller sena drops i 'build'
+Vad: 24 lang-*.wav (konsertReplay --delad-cfg --step 5, DMX-profilen med SECTION_BODY_HIGH 2000/_DB 2 = live sedan 10-19), 67 show-drops:
+29 sker med frame.section intro (19) eller build (10). 12 av dem når 'high' först efter > 8 s eller inte alls inom 30 s (intro 10: 1011T103310
+345 s, 1011T112342 279 s, 1011T142953 11 s, 1011T145248 9 s, 1011T151032 8 s/117 s (14 s), 1011T150641 17 s (23 s), 1011T151414 399 s (19 s),
+1011T155632 185 s/304 s (9 s), 1011T193430 314 s (11 s); build 2: 1011T155632 135 s, 1011T191741 168 s (24 s)). 9 av intro-fallen har en
+LATGRANS 0,1-7 s FÖRE dropen - låtgränsen nollar sektionen till intro mitt i breaket och SECTION_BODY_HIGH-räknaren verkar inte gälla
+från intro (eller nollas med gränsen). 16 av 67 drops har 'build' inom 8 s efter smällen (10 från build, 5 från intro, 1 från low).
+Var: sectionBlock + hintTrackChange-nollningen / SECTION_BODY_HIGH-villkoret. Material: tidpunkterna ovan (s från filstart).
+Önskat: basen tillbaka med full kraft efter break = 'high' även när sektionen står i intro efter en låtgräns (eller låtgräns i breaket
+före en drop räknas inte som ny låt).
+Status:
+
 ## ÖPPET 2026-10-19 Workern får en KOPIA av cfg vid start (createAnalyser worker-läget) - ingen effekt i dag, men en fälla
 Vad: createAnalyser (analyser.ts ~3863) startar workern med workerData { cfg: { ...cfg } } = structured clone. Den långsamma sidan ser
 alltså cfg som den var vid start och aldrig motorns uppdateringar (cfg.beat = taktrutnätet, som DMX nu flyttar var 250 ms med den
