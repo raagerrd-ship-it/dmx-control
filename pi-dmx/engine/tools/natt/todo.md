@@ -48,6 +48,8 @@ Backa ett prov: `python tools/ladan.py --env <det andra>`; båda: `python tools/
   SEKTIONSETIKETTEN MÄTT (tools/sektionLag.mjs, 25 inspelningar 150 min, ljudets nivåskifte >= 5 dB -> etikett): WIN 4 (i dag) upp 0,7 s /
   ned 2,9 s (p75 5,2), korta delar 165/513, 3,12 byten/min; SECTION_WIN=2: upp 0,3 / ned 1,3 s (p75 4,2), korta 143/467, 2,83/min (snabbare
   OCH mindre fladder). RUN 3 snabbare ned men fladder 233/649 - nej. 23:1x PROV DMX_SECTION_WIN=2 i ladan.conf (5 prov nu).
+  Showen 24 lang (konsertReplay, kvällens 4 prov -> + WIN 2): byten 2,87 -> 2,62/min, återseende 73 -> 76 %, hör ihop 77 -> 78 %, kort look
+  16 -> 15 %, dropens look kvar +10 s 68 -> 76 %, drops 68 -> 66. (Före kvällens prov: byten 2,79, återseende 67, hör ihop 81.)
 
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
 FÖRBERETT 2026-10-21 (ägaren: 'förbered båda') - lotus-fixen 19bebf7 + DMX_DROP_SEC_HIGH=1 i EN körning:
