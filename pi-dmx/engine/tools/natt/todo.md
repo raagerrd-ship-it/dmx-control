@@ -1,5 +1,27 @@
 # Natt-agentens uppdrag
 
+## Från kvällen 2026-10-21 - DIRIGENTENS FÖRSTÅELSE (ägaren: nattens uppdrag, går före allt annat, i denna ordning)
+Ägaren i ladan 10-21: "inte latensen det största, utan hur snabbt dirigenten förstår typ av sektion/låt". Latensen är nu ~40 ms till första
+rörelse (FAST_BANDS standard) - jaga den INTE vidare. Läget: LADAN 2026-10-21 KVÄLL nedan (fem prov blev standard 23:4x).
+1. LÅTSTARTEN: efter låtgräns står sektionen 'intro' i 20 block (rangen kräver 20 s historik). Kvällens inspelning
+   (tools/ladan-2026-10-21/lang-20261021T203952.wav, ej i git): ny låt ~140 s, 'high' först 151 s och sedan fladder. MÄT med
+   tools/sektionLag.mjs + en ny del i den: tid från låtgräns (LATGRANS/boundaryCount) till första rätta sektion och första look som håller
+   >= 8 s, på 24 lang + kvällens. PROVA i DMX-profilen först (SECTION_CARRY, SECTION_EARLY_S, ...); behövs ändring i delade analysatorn
+   (t.ex. bär nivåskalan från förra låten / jämför mot kvällens block i stället för bara låtens 20) -> analysator-fynd.md (eller bygg opt-in
+   med paritet i båda repona som 10-21 FAST_BANDS, om ägaren sagt till). Målet: rätt sektion inom ~5 s efter låtstart utan mer fladder.
+2. NATTENS MÅTT: natt.py:s 'kick->ljus' mäter från frame.kick, som är brus (fynd 10-19). Lägg in tools/ljusLag.py (riggens ljus mot ljudets
+   basanslag: korskorr + 90 % av toppen) och tools/sektionLag.mjs (etikett mot ljudets nivåskifte upp/ned + fladder) i natt.py och
+   scoreboard.md, så varje natt mäter det ägaren bryr sig om. Ny baslinje-rad efter bytet.
+3. RÖDA TRÅDENS TAPP: med FAST_BANDS sjönk 'hör ihop' 81 -> 77 % och återseende 67 -> 64 % (24 lang; SECTION_WIN 2 tog tillbaka en del:
+   återseende 76 %). Hypotes: beatFeed viker nu det snabbare onset.kick -> rutnätet flyttas ~20 ms -> kickgrinden -> sektionerna skiljer 8 %.
+   Bevisa/fälla hypotesen (t.ex. mata beatFeed med 2048-vägens onset i en bänkvariant) och föreslå en fix som behåller tajtheten.
+4. KICKFLAGGAN (fynd 10-19, öppet hos lotus): frame.kick fyrar på kylningens kant (66-94 ms före slaget) och driver KICK-BYPASS-rendern,
+   registerKick och tilliten. Följ upp med lotus via analysator-fynd.md; DMX-sidan får prova att ersätta KICK-BYPASS/registerKick med
+   onset.kick-toppen (nu 5 ms efter ljudet) - opt-in med bevis.
+5. FACIT: be ägaren (i rapporten) om fler långinspelningar med 'Drop!'/'Minidrop!'-markeringar och gärna refrängstarter - det mesta i kväll
+   vilar på bänkens egna mått.
+INTE NU: mer latensjakt, snabb dropkropp (FAST_BANDS '2'-varianten gav drops 68 -> 57; kräver omkalibrering mot facit).
+
 ## Från kvällen 2026-10-20 - DEN TVÅDELADE ANALYSATORN (ägaren: nattens uppgift, går före allt annat)
 Ägaren: "analysera den tvådelade analysatorn. Kan vi förbättra den och göra fördelningen bättre? Ena med mål snabbaste latens och andra
 bästa analys." PRINCIPEN (ägaren): SNABBA DELEN = LJUSSTYRNINGEN (det ljuset reagerar på direkt: kick/onset, basenergi, nivå,
