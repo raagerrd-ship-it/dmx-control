@@ -27,7 +27,7 @@ tools/faltLatens.mjs, tools/ljusLag.py (riggens ljus mot ljudet), dropFacit/drop
 Önskat (opt-in, standard bit-identisk): banden för LJUSET ur en snabb väg - 512-FFT:n för banden >= 250 Hz och en IIR-filterbank i
 tidsdomänen för sub/kick/bas (två biquads per band, ~2-3 µs/hop PC) - och 2048-FFT:n kvar som analys (sektion, låtgräns, låtminne),
 gärna på långsamma sidan. Väntat -15..-20 ms på bandstyrda effekter och dropkroppen. Hela kartan: tools/natt/delning-2026-10-21.md.
-Status:
+Status: TAGET 2026-10-21 (lotus-morgonagenten): morgonens latensidé. Plan: opt-in <prefix>FAST_BANDS=1 - banden >= 250 Hz ur 512-FFT:n, sub/kick/bas ur biquad-bank i tidsdomänen, 2048 kvar för sektion/låtgräns; bevis faltLatens.mjs (-15..-20 ms väntat på bodyDb/spec), paritet 0 med flaggan av, korpusbänken oförändrad (tempot läser inte banden). Ej byggt i dag.
 
 ## ÖPPET 2026-10-21 Workern har ~40x marginal - tempot räknas fortfarande 4 Hz efter lås (gammal enkeltrådskompromiss)
 Vad: långsamma sidan kostar 2,5-2,8 ms CPU per s ljud på PC med Node 24 (computeBpm 0,8 + scoreEnv 1,5 ms/s, 200 µs/anrop, sectionHop
@@ -36,7 +36,7 @@ en Zero 2 W-kärna' (2026-08-09, när allt låg i en tråd). Riktig worker: lagM
 Var: envStep stride (ENV_HZ / 4). Material: taktKorpus.mjs + frozen6, 24 lang (omlåsning efter låtgräns).
 Önskat: pröva 10-20 Hz efter lås med tempogrammets EMA-alfa skalad mot steget (samma tidskonstant) - mät omlåsningstid efter låtbyte och
 tempostabilitet. Låg prioritet: DMX:s ljus följer den löpande takten (beatFeed), inte analysatorns tempo direkt.
-Status:
+Status: TAGET 2026-10-21 (lotus-morgonagenten): låg prioritet (lotus i energiläge, DMX följer beatFeed). Bänkas mot omlåsning efter låtbyte i korpusen (TEMPO_SHIFT-måttet 4,8 s) när det byggs; ej byggt i dag.
 
 ## ÖPPET 2026-10-20 SECTION_BODY_HIGH når inte drops i 'intro' (efter låtgräns) eller sena drops i 'build'
 Vad: 24 lang-*.wav (konsertReplay --delad-cfg --step 5, DMX-profilen med SECTION_BODY_HIGH 2000/_DB 2 = live sedan 10-19), 67 show-drops:
@@ -58,7 +58,7 @@ taktfasens barAcc ~3302), så resultatet är detsamma - men inline-läget (bänk
 cfg-läsning i den långsamma delen skulle bete sig olika i bänk och live utan att någon märker det. Bänkarna showTight/konsertReplay
 kör sedan 10-19 delningen inline med structuredClone(cfg) till den långsamma sidan, som live. Var: createAnalyser/slowWorker.
 Önskat: antingen dokumentera i split.ts att den långsamma sidan aldrig får läsa cfg efter start, eller skicka cfg.beat i recorden.
-Status:
+Status: KLART 2026-10-21 (lotus-morgonagenten): dokumenterat i split.ts (WorkerData) i båda repona - den långsamma sidan får aldrig läsa cfg efter start, levande värden skickas i recorden. Bara kommentar på ett typ-interface: split.js byte-identisk (md5 2e4cae7d = dist), manifestet synkat i båda repona.
 
 ## ÖPPET 2026-10-19 frame.kick fyrar på kylningens kant (~0,6 slag) i stället för på kickarna
 Vad: showTight --step 5 med motorns cfg (som live, mätfälla 47), pop_ladan 600 s vid 125-130 BPM: frame.kick ~3,1/s, medianintervall
@@ -72,7 +72,7 @@ Material: tools/pop_ladan.wav, megamix_ladan.wav, lang-*.wav. Önskat: en kick p
 Tillägg 2026-10-21 (Node 24, delad inline som live): onset.kick-summan runt frame.kick är platt (pop 155-179 över -160..+160 ms, lang
 112342 99-134, ingen topp); vikt på den löpande takten ligger kickarna 66-94 ms FÖRE slaget (pop, megamix, 2 lang). Motorns KICK-BYPASS
 (render direkt vid frame.kick) och effekternas registerKick fyrar alltså i slumpfas. Det är den snabba sidans enda kick-bool.
-Status:
+Status: TAGET 2026-10-21 (lotus-morgonagenten): lotus kör KICK_NOGATE + COOLDOWN 100 och energiläge (pulsen läser inte frame.kick), så felet syns mest i DMX. Idé (ej byggd): opt-in där frame.kick fyrar på onset.kick-toppen (lokalt max i kickbandets anslag över adaptiv tröskel) i stället för flux-tröskeln, döms på on-beat-recall/precision i korpusen + fasresultant på pop/lang.
 
 ## ÖPPET 2026-10-19 Sektionen följer inte dropen upp i 'high' (och passerar 'build' efter smällen)
 Vad: 24 lang-*.wav (151 min, konsertReplay --delad-cfg --step 5, DMX-profilen RUN 5/RUN_IN 3/CARRY 20), 68 show-drops (DMX flank-drop
