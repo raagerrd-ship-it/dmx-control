@@ -65,6 +65,12 @@ const LIFT_DB = Number(process.env.DMX_LIFT_DB ?? 10), LIFT_REFRACT_MS = Number(
  *  (baskroppen > 12 dB under 8 s-normalnivån i minst STOP_MINI_S s, högst 3 s) och tillbaka till normalnivån i refrängen (sektion high) = ett 'stopp' före nästa fras ->
  *  minidrop-looken (600 ms, utan minidropens energilyft). Nästan-dropen ger inget ljus i konsertläget och energilyftet ser inte en dipp som går tillbaka till samma nivå. 0 = av. */
 const STOP_MINI_S = Number(process.env.DMX_STOP_MINI_S ?? 0.6);   // STANDARD 0,6 sedan 10-17 (ägaren i ladan 10-16: 'minidropparna känns bra, behåll')
+/** MINIDROP EFTER ENERGIN (opt-in DMX_MINI_ENERGY=1, ägaren i ladan 10-21: 'inte på fast tid utan beroende på energin, så återhämtar den
+ *  sig snabbare, men ändå ett drop som syns'). Minidropens stöt (MINI_BANG_MS) och takets lyft (MINI_LIFT_MS) släpps när baskroppen
+ *  (frame.bodyDb, 30 ms) fallit under halva lyftet räknat från nivån före minidropen (1 s-medel) - tidigast efter MINI_E_MIN_MS, senast
+ *  de fasta tiderna som förr. Bara när de SLÄPPS ändras; uttoningarna (stöt 1 s, kulör 0,6 s, tak 2 s) är orörda (fade-down låst).
+ *  Mätt på ladans 5 min 10-21: halva baslyftet ligger kvar median 0,26 s (73 % < 0,6 s, 18 % > 4 s). */
+const MINI_ENERGY = process.env.DMX_MINI_ENERGY === '1', MINI_E_MIN_MS = Number(process.env.DMX_MINI_E_MIN_MS ?? 250);
 const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math.max(0, Math.min(1, Number(process.env.DMX_MINI_UNI ?? 1)));
 // (EFFEKTEN LEDER/CONCERT_E_FLOOR, VARJE SLAG/CONCERT_BEAT, BASSLAGEN/CONCERT_KICK och BASSLAGEN I ENERGILAGRET/KICK_E borttagna 10-12:
 //  ersatta av BASENERGIN, se B_CURVE.)
@@ -587,6 +593,7 @@ export class EffectEngine {
    private nearNorm = 0; private nearFloor = 1e9; private liftCalm = 0; private liftLift = 0; private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rFadeK = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
   private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+  private miniBodyFast = -90; private miniBodySlow = -90; private miniPre = -90; private miniPeak = -200;   // MINI_ENERGY
   private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftAt = -1e12; liftCount = 0; private stopRunS = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
@@ -823,6 +830,7 @@ export class EffectEngine {
     if (setLiftAt) this.liftAt = nowWall;
     this.lastMiniWall = nowWall; this.liftCount++; this.miniSector = mixedSector(this.liftCount + 7);
     this.miniBangUntil = nowWall + MINI_BANG_MS; if (lift) this.miniLiftUntil = nowWall + MINI_LIFT_MS;
+    if (MINI_ENERGY) { this.miniPre = this.miniBodySlow; this.miniPeak = -200; }
   }
   /** SPÄRRAD DROP = MINIDROP (10-12): drop inom SHOW_DROP_GAP_MS från förra -> minidrop-looken + lyftet i stället. */
   private gapMini(nowWall: number): void {
@@ -1813,6 +1821,18 @@ export class EffectEngine {
     // DROP-ENVELOPE: FULL ATTACK (~30ms) på träffen, HÅLL allt på max under
     // dropen, mjuk FADE ner (~1s) när den släpper. Egen effekt — INGEN
     // hårdvaru-strobe (det gav strobe-känslan), bara ljus + färg på max.
+    if (MINI_ENERGY) {   // MINIDROP EFTER ENERGIN: släpp stöten och lyftet när basen fallit tillbaka (se MINI_ENERGY)
+      const bd = Math.max(-90, frame.bodyDb ?? -90), inMini = nowWall < this.miniBangUntil || nowWall < this.miniLiftUntil;
+      this.miniBodyFast += (bd - this.miniBodyFast) * Math.min(1, dtNow / 0.03);
+      if (!inMini) this.miniBodySlow += (bd - this.miniBodySlow) * Math.min(1, dtNow / 1.0);
+      else {
+        if (this.miniBodyFast > this.miniPeak) this.miniPeak = this.miniBodyFast;
+        if (nowWall - this.lastMiniWall >= MINI_E_MIN_MS && this.miniBodyFast < this.miniPre + 0.5 * (this.miniPeak - this.miniPre)) {
+          if (this.miniBangUntil > nowWall) this.miniBangUntil = nowWall;
+          if (this.miniLiftUntil > nowWall) this.miniLiftUntil = nowWall;
+        }
+      }
+    }
     const miniActive = nowWall < this.miniBangUntil;
     let dTarget = dropActive ? 1 : miniActive ? MINI_DROP_ENV : 0;
     this.nearHit = false;   // bara rutan da nastan-dropen fyrar (lases av dirigenten langre ner i samma ruta)
