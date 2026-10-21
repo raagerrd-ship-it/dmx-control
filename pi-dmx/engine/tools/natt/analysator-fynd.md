@@ -15,6 +15,29 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-21 Ljusets bandvärden kommer ur 2048-FFT:n och ligger 21-27 ms efter ljudet (delningen: analys i ljusvägen)
+Vad: ägarens uppdrag 10-20 (snabba sidan = ljusstyrning, minsta latens; långsamma = dirigentens input, bästa analys). Mätt med Node 24
+(tools/faltLatens.mjs: stigande flanker korskorrelerade mot nollfas-filtrerat ljud, pop + lang 191741 + lang 112342, identiskt på alla
+tre): level (512-RMS) 8 ms, kickdetektorn 3 ms, men spec/specAbs/bodyDb 21 ms, onset.kick 27 ms, onset.treble/drum.hat 13-24 ms - allt
+ur 2048-FFT:n (42,7 ms Hann, var 3:e hop). Dropkroppen (bodyFast) får de 21 ms ovanpå BODY_FAST_S. Det är snabba sidans största
+latensbidrag, i fält ljuset läser direkt. Kostnad i dag (tools/splitKarta.mjs --wrap): bigStep 6,9 ms/s PC = 43 % av snabba sidan
+(FFT:n 61 µs/anrop av 94), 2048-spektrat matar också låtgränsen och sektionens basonset (analys).
+Var: bigStep (bandLvl/bandOn/bandAbs/bandDbRaw), fillFrame. Material: tools/pop_ladan.wav, tools/ladan-2026-10-11/lang-*.wav; mått
+tools/faltLatens.mjs, tools/ljusLag.py (riggens ljus mot ljudet), dropFacit/dropTiming.
+Önskat (opt-in, standard bit-identisk): banden för LJUSET ur en snabb väg - 512-FFT:n för banden >= 250 Hz och en IIR-filterbank i
+tidsdomänen för sub/kick/bas (två biquads per band, ~2-3 µs/hop PC) - och 2048-FFT:n kvar som analys (sektion, låtgräns, låtminne),
+gärna på långsamma sidan. Väntat -15..-20 ms på bandstyrda effekter och dropkroppen. Hela kartan: tools/natt/delning-2026-10-21.md.
+Status:
+
+## ÖPPET 2026-10-21 Workern har ~40x marginal - tempot räknas fortfarande 4 Hz efter lås (gammal enkeltrådskompromiss)
+Vad: långsamma sidan kostar 2,5-2,8 ms CPU per s ljud på PC med Node 24 (computeBpm 0,8 + scoreEnv 1,5 ms/s, 200 µs/anrop, sectionHop
+0,07), ~2,5 % av en Pi-kärna. envStep kör computeBpm/computeGridPhase var 25:e env-sampel efter lås med motiveringen '20 Hz = ~10 % av
+en Zero 2 W-kärna' (2026-08-09, när allt låg i en tråd). Riktig worker: lagMs 0, behind 1 record, skipped 0 (start: lagMax 232 ms).
+Var: envStep stride (ENV_HZ / 4). Material: taktKorpus.mjs + frozen6, 24 lang (omlåsning efter låtgräns).
+Önskat: pröva 10-20 Hz efter lås med tempogrammets EMA-alfa skalad mot steget (samma tidskonstant) - mät omlåsningstid efter låtbyte och
+tempostabilitet. Låg prioritet: DMX:s ljus följer den löpande takten (beatFeed), inte analysatorns tempo direkt.
+Status:
+
 ## ÖPPET 2026-10-20 SECTION_BODY_HIGH når inte drops i 'intro' (efter låtgräns) eller sena drops i 'build'
 Vad: 24 lang-*.wav (konsertReplay --delad-cfg --step 5, DMX-profilen med SECTION_BODY_HIGH 2000/_DB 2 = live sedan 10-19), 67 show-drops:
 29 sker med frame.section intro (19) eller build (10). 12 av dem når 'high' först efter > 8 s eller inte alls inom 30 s (intro 10: 1011T103310
@@ -46,6 +69,9 @@ kickbandet (12 % av 10 s-fönstren inom +-25 ms), och 'kick -> ljus' i bänkarna
 av onset.kick (beatFeed.ts 10-19), men kicken används fortfarande av tilliten, drop-/minidrop-logiken och effekternas kickEnv.
 Var: kickdetektorn (flux-tröskel + KICK_COOLDOWN). Jämför profilrattarna DMX_KICK_NOGATE / DMX_KICK_COOLDOWN=100 i ladan.py PORTAR_EJ_LIVE.
 Material: tools/pop_ladan.wav, megamix_ladan.wav, lang-*.wav. Önskat: en kick per riktigt kickanslag (frame.kick i fas med onset.kick-toppen).
+Tillägg 2026-10-21 (Node 24, delad inline som live): onset.kick-summan runt frame.kick är platt (pop 155-179 över -160..+160 ms, lang
+112342 99-134, ingen topp); vikt på den löpande takten ligger kickarna 66-94 ms FÖRE slaget (pop, megamix, 2 lang). Motorns KICK-BYPASS
+(render direkt vid frame.kick) och effekternas registerKick fyrar alltså i slumpfas. Det är den snabba sidans enda kick-bool.
 Status:
 
 ## ÖPPET 2026-10-19 Sektionen följer inte dropen upp i 'high' (och passerar 'build' efter smällen)
