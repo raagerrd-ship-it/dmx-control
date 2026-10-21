@@ -43,6 +43,9 @@ KLART 2026-10-21 (nattagenten): karta + förslag i tools/natt/delning-2026-10-21
 4. LOTUS-FIXEN 19bebf7 (10-20 morgon, delade analysatorn, ingen flagga - följer med vilken `ladan.py` som helst): SECTION_BODY_HIGH även
    i intro efter låtgräns. Kontroll 10-20 (24 lang): ensam återseende 68 -> 67 %, hör ihop 85 -> 81 %, drops 67 -> 68, minis 383 -> 388;
    ihop med DMX_DROP_SEC_HIGH=1: 70 % / 85 %, dvs provet ger samma +3/+4 ovanpå. TITTA på båda samtidigt.
+   OMKÖRT 10-21 (24 lang, konsertReplay --step 5 --delad-cfg, ladan nu = före 19bebf7): ladan nu 68 % / 85 %, + flaggan 71 / 89,
+   + lotus-fixen 67 / 81, båda 70 / 85. Dropens look kvar +10 s: 67 -> 72 % med flaggan (lotus-fixen 0). Sektion high efter drop
+   +2/+4/+8 s 90/79/79 % i alla fyra. Lotus-fixen = +1 drop, +5 minidrops, annars brus/svagt minus för DMX; flaggan = liten vinst.
 1. GRUNDFIXEN (ägaren 10-19, ersätter nattens DMX_DROP_NO_BUILD_S som togs bort): `python tools/ladan.py --env DMX_SECTION_BODY_HIGH=2000
    --env DMX_SECTION_BODY_HIGH_DB=2` (delade analysatorn de111d4). Bänk 24 lang (konsertReplay --delad-cfg --step 5, av -> på): high +2 s
    efter drop 12 -> 33, +8 s 22 -> 36, build 0,5-8 s efter drop 21 -> 14, korta looker 20 -> 16 %, lookbyten 404 -> 413, drops 66 -> 69,
