@@ -34,6 +34,12 @@ KLART 2026-10-21 (nattagenten): karta + förslag i tools/natt/delning-2026-10-21
 19:32 GODKÄND (ägaren: 'refrängen håller efter dropen') -> STANDARD i DMX-profilen (SECTION_BODY_HIGH 2000 / _DB 2, backup-tagg
    backup/fore-section-body-high-2026-10-19), env-provet = profilen byte-identiskt (2 lang), deployat utan env, ladan.conf tom, md5 lika.
 
+## LADAN 2026-10-21 KVÄLL
+22:37 UTE (Pi 10.38.24.218 via hotspot Pixel_9285): lotus-fixen 19bebf7 + FAST_BANDS-koden (analyser.js, effects.js, md5 lika) och
+PROV i ladan.conf: DMX_DROP_SEC_HIGH=1 DMX_FAST_BANDS=1. NRestarts 0, båda flaggorna i processens env. Första körningen avbröts av
+'Unable to open channel' i warmup-steget (Pi:n uppe 2 min) efter filkopian - omkörning gick igenom. Väntar på ägarens öga.
+Backa ett prov: `python tools/ladan.py --env <det andra>`; båda: `python tools/ladan.py`.
+
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
 FÖRBERETT 2026-10-21 (ägaren: 'förbered båda') - lotus-fixen 19bebf7 + DMX_DROP_SEC_HIGH=1 i EN körning:
   Lokalt kontrollerat: tsc bygger, node --check 0 fel på dist, deployspärren (analyser_shared.check) ok, flaggan finns i dist/effects.js,
