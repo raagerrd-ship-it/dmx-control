@@ -45,7 +45,9 @@ Backa ett prov: `python tools/ladan.py --env <det andra>`; båda: `python tools/
   (SECTION_UNIT_MIN_MS 4000), sektionsetiketten själv 3-8 s efter ljudet. 22:5x PROV DMX_SECTION_UNIT_MIN_MS=2000 (replay: 4,0 -> 2,0 s,
   korta looker 3 -> 2, minidrops lika). + ÄGAREN: minidrop efter energin -> opt-in DMX_MINI_ENERGY=1 (look+stöt 0,60 -> 0,31 s,
   tillbaka 3,9 -> 0,9 s). ladan.conf nu: DROP_SEC_HIGH, FAST_BANDS, SECTION_UNIT_MIN_MS=2000, MINI_ENERGY. Väntar på ögat.
-  NÄSTA för dirigentens förståelse: sektionsetiketten (analysatorn: 1 s-block, RUN_IN 3 / RUN 5, låtgränsens intro) - mät ljud -> etikett.
+  SEKTIONSETIKETTEN MÄTT (tools/sektionLag.mjs, 25 inspelningar 150 min, ljudets nivåskifte >= 5 dB -> etikett): WIN 4 (i dag) upp 0,7 s /
+  ned 2,9 s (p75 5,2), korta delar 165/513, 3,12 byten/min; SECTION_WIN=2: upp 0,3 / ned 1,3 s (p75 4,2), korta 143/467, 2,83/min (snabbare
+  OCH mindre fladder). RUN 3 snabbare ned men fladder 233/649 - nej. 23:1x PROV DMX_SECTION_WIN=2 i ladan.conf (5 prov nu).
 
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
 FÖRBERETT 2026-10-21 (ägaren: 'förbered båda') - lotus-fixen 19bebf7 + DMX_DROP_SEC_HIGH=1 i EN körning:
