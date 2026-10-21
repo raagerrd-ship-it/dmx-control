@@ -28,6 +28,12 @@ tools/faltLatens.mjs, tools/ljusLag.py (riggens ljus mot ljudet), dropFacit/drop
 tidsdomänen för sub/kick/bas (två biquads per band, ~2-3 µs/hop PC) - och 2048-FFT:n kvar som analys (sektion, låtgräns, låtminne),
 gärna på långsamma sidan. Väntat -15..-20 ms på bandstyrda effekter och dropkroppen. Hela kartan: tools/natt/delning-2026-10-21.md.
 Status: TAGET 2026-10-21 (lotus-morgonagenten): morgonens latensidé. Plan: opt-in <prefix>FAST_BANDS=1 - banden >= 250 Hz ur 512-FFT:n, sub/kick/bas ur biquad-bank i tidsdomänen, 2048 kvar för sektion/låtgräns; bevis faltLatens.mjs (-15..-20 ms väntat på bodyDb/spec), paritet 0 med flaggan av, korpusbänken oförändrad (tempot läser inte banden). Ej byggt i dag.
+KLART 2026-10-21 kväll (DMX-sessionen på ägarens begäran, samma analyser.ts i båda repona, manifest 20a9d62e): opt-in <prefix>FAST_BANDS=1.
+Egen uppsättning (fb*) bara för ramens LJUSFÄLT (spec/specAbs/onset/drum.hat+snare+bass/midHiDb); 2048-vägen räknas oförändrat och matar
+dropkroppen, sektionen, profilen, basgången. Av = natt --snabb json-identiskt. På (24 lang): drops 68 = 68 med identiska tider, fältlatens
+specAbs.kick 21 -> 5 ms, onset.kick 27 -> 5, diskant 21 -> 3; riggens ljus korskorr 25 -> 10 ms (19/24 filer); röd tråd återseende 67 -> 64 %,
+hör ihop 81 -> 75 % (sektionerna skiljer 8 % via kickgrinden: rutnätet viker det snabbare onset.kick). Snabba sidan ~+7 µs/hop PC.
+Prövat och struket: även dropkroppen snabb - drops 68 -> 57, bara 42 samma (ägarens 161434-facit 6/8 i båda) - kräver omkalibrering.
 
 ## ÖPPET 2026-10-21 Workern har ~40x marginal - tempot räknas fortfarande 4 Hz efter lås (gammal enkeltrådskompromiss)
 Vad: långsamma sidan kostar 2,5-2,8 ms CPU per s ljud på PC med Node 24 (computeBpm 0,8 + scoreEnv 1,5 ms/s, 200 µs/anrop, sectionHop

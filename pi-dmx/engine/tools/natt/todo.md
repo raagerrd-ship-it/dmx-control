@@ -44,6 +44,10 @@ FÖRBERETT 2026-10-21 (ägaren: 'förbered båda') - lotus-fixen 19bebf7 + DMX_D
   3. `PI_HOST=<ip> python tools/ladan.py --env DMX_DROP_SEC_HIGH=1` - en omstart; kolla md5 lika och NRestarts 0.
   TITTA: ligger looken kvar genom refrängen när dropen kommer direkt ur en uppbyggnad? Godkänt -> flaggan blir kodens enda väg.
   Backa flaggan: `python tools/ladan.py` (utan --env, ladan.conf skrivs om tom). Lotus-fixen backas bara med gammal dist (a2999d9).
+  + SNABBA BANDEN (10-21 kväll, opt-in i delade analysatorn): `--env DMX_FAST_BANDS=1` i samma körning. Ljusets bandfält (spec, onset,
+  trumenveloper) 5 ms efter ljudet i stället för 21-27; drops identiska; riggens ljus 15 ms tidigare (korskorr, 19/24 filer). Pris i bänken:
+  röd tråd återseende 70 -> 67 %, hör ihop 85 -> 75 % (med DMX_DROP_SEC_HIGH). TITTA: känns ljuset tajtare på trummor/bas? Tappar
+  looken sammanhanget mellan vers och refräng? Backa: utan --env DMX_FAST_BANDS=1.
 3. PROV (natt 10-20, 171720b): `python tools/ladan.py --env DMX_DROP_SEC_HIGH=1` - en drop som kommer i samma ruta som build-
    inträdet sparades i build-manuset (dropens basstarka look blev låtens build-look) och refrängen bytte bort droplooken 5-10 s efter
    smällen (10 av 67 drops). Med provet blir dropens look refrängens manus-look och ligger kvar. 24 lang: återseende 68 -> 71 %, hör ihop
