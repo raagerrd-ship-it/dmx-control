@@ -39,6 +39,13 @@ KLART 2026-10-21 (nattagenten): karta + förslag i tools/natt/delning-2026-10-21
 PROV i ladan.conf: DMX_DROP_SEC_HIGH=1 DMX_FAST_BANDS=1. NRestarts 0, båda flaggorna i processens env. Första körningen avbröts av
 'Unable to open channel' i warmup-steget (Pi:n uppe 2 min) efter filkopian - omkörning gick igenom. Väntar på ägarens öga.
 Backa ett prov: `python tools/ladan.py --env <det andra>`; båda: `python tools/ladan.py`.
+22:39 LIVEINSPELNING 5 min (tools/ladan-2026-10-21/lang-20261021T203952, ej i git): perf render 0,20 ms, minor 8-12/min max 4-6 ms.
+  Tajthet på kvällens ljud (ljusLag): 90 % av toppen 105 -> 40 ms med FAST_BANDS, korskorr 90 -> 10 ms.
+ÄGAREN: 'inte latensen det största, utan hur snabbt dirigenten förstår typ av sektion/låt'. Live: ny look 4-6 s efter sektionsbytet
+  (SECTION_UNIT_MIN_MS 4000), sektionsetiketten själv 3-8 s efter ljudet. 22:5x PROV DMX_SECTION_UNIT_MIN_MS=2000 (replay: 4,0 -> 2,0 s,
+  korta looker 3 -> 2, minidrops lika). + ÄGAREN: minidrop efter energin -> opt-in DMX_MINI_ENERGY=1 (look+stöt 0,60 -> 0,31 s,
+  tillbaka 3,9 -> 0,9 s). ladan.conf nu: DROP_SEC_HIGH, FAST_BANDS, SECTION_UNIT_MIN_MS=2000, MINI_ENERGY. Väntar på ögat.
+  NÄSTA för dirigentens förståelse: sektionsetiketten (analysatorn: 1 s-block, RUN_IN 3 / RUN 5, låtgränsens intro) - mät ljud -> etikett.
 
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
 FÖRBERETT 2026-10-21 (ägaren: 'förbered båda') - lotus-fixen 19bebf7 + DMX_DROP_SEC_HIGH=1 i EN körning:
