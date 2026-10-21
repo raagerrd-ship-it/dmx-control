@@ -24,6 +24,9 @@ att showen är identisk (konsertReplay 24 lang, natt --snabb). Dirigenten och ef
 REGLER: delade filerna (analyser.ts, split.ts, slowWorker.ts, tempoTracker.ts) ändrar du INTE - förslagen skrivs i analysator-fynd.md
 (lotus-morgonagenten bygger dem i båda repona). DMX-sidan (beatFeed.ts, index.ts, analyserProfile.ts) får du prova, med bevis. Rapportera
 i artifacten under egen rubrik. Inget deployas.
+KLART 2026-10-21 (nattagenten): karta + förslag i tools/natt/delning-2026-10-21.md, fynd P1/P5 + kick-tillägg i analysator-fynd.md.
+  Node 24 PC: snabba 13,6-15,8 ms/s (FFT:erna ~61 %), långsamma 2,5-2,8 (~40x marginal), dirigenten 0,15 ms/s (lämnas i render).
+  Ljusets bandfält ur 2048-FFT:n 21-27 ms efter ljudet = största latensen (P1 till lotus). DMX_ONSET_LAG_MS=15 provad och förkastad.
 
 ## LADAN 2026-10-19 KVÄLL
 19:21 LÖPANDE TAKT UTE (ladan.py utan env, md5 lika, NRestarts 0). Ägaren: 'takten sitter bra nu' -> GODKÄND, är redan kodens enda väg.
@@ -49,6 +52,13 @@ i artifacten under egen rubrik. Inget deployas.
    för kick-PLL + tempospärr. Bänk: rutnätets fel mot ljudet 132 -> 28 ms (24 lang), pop 144 -> 6, megamix 198 -> 9. Följer med
    `python tools/ladan.py`. TITTA: sitter gallop/chase/siren/rulle på slagen nu? Backa: deploya taggen.
 2. /api/perf efter en kväll: `major` nära 0, `forcedGc` efter pauser (Node 24 + heap-flaggan, ute sedan 10-18).
+
+## NATTEN 2026-10-21 (nattagenten, inget deployat)
+KLART 2026-10-21: baslinje natt/2026-10-21.json (50e487f) json-identisk med 10-20 i mixarna (pop 99/0,48 r 0,33; mega 37/0,38 r 0,13;
+  korpus 117/0,42 r 0,30). Nytt ärligt tajthetsmått tools/ljusLag.py (riggens ljus mot ljudets basanslag): 24 lang medelljusets 90 %
+  50 ms efter anslaget (median), korskorr 25 ms.
+FÖRKASTAT 2026-10-21: DMX_ONSET_LAG_MS=15 (rutnätet på ljudet: -16 -> -0,5 ms, men riggens ljus oförändrat över 24 lang). Reverterat.
+ÖPPET: analysatorfynd P1 (bandfälten ur snabb väg, -15..-20 ms) och kickflaggan (10-19) - lotus.
 
 ## NATTEN 2026-10-20 (nattagenten, inget deployat)
 KLART 2026-10-20: baslinje natt/2026-10-20.json (a2999d9): pop kick->ljus 99 ms/träff 0,48 r 0,33; mega 37 ms/0,38 r 0,13; korpus 117/0,42
