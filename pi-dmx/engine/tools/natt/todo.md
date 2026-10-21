@@ -35,6 +35,15 @@ KLART 2026-10-21 (nattagenten): karta + förslag i tools/natt/delning-2026-10-21
    backup/fore-section-body-high-2026-10-19), env-provet = profilen byte-identiskt (2 lang), deployat utan env, ladan.conf tom, md5 lika.
 
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
+FÖRBERETT 2026-10-21 (ägaren: 'förbered båda') - lotus-fixen 19bebf7 + DMX_DROP_SEC_HIGH=1 i EN körning:
+  Lokalt kontrollerat: tsc bygger, node --check 0 fel på dist, deployspärren (analyser_shared.check) ok, flaggan finns i dist/effects.js,
+  24 lang (konsertReplay --step 5 --delad-cfg) ladan nu 68/85 % -> båda 70/85 %, dropens look kvar +10 s 67 -> 71 %, drops 67 -> 68.
+  1. PC på hotspot Pixel_9285, hitta Pi:n (senast 10.38.24.218).
+  2. `PI_HOST=<ip> python tools/ladan.py --dry --env DMX_DROP_SEC_HIGH=1` - väntat: analyser.js (+ effects.js, beatFeed/split
+     om de skiljer) och ladan.conf med DMX_DROP_SEC_HIGH=1; inget annat.
+  3. `PI_HOST=<ip> python tools/ladan.py --env DMX_DROP_SEC_HIGH=1` - en omstart; kolla md5 lika och NRestarts 0.
+  TITTA: ligger looken kvar genom refrängen när dropen kommer direkt ur en uppbyggnad? Godkänt -> flaggan blir kodens enda väg.
+  Backa flaggan: `python tools/ladan.py` (utan --env, ladan.conf skrivs om tom). Lotus-fixen backas bara med gammal dist (a2999d9).
 3. PROV (natt 10-20, 171720b): `python tools/ladan.py --env DMX_DROP_SEC_HIGH=1` - en drop som kommer i samma ruta som build-
    inträdet sparades i build-manuset (dropens basstarka look blev låtens build-look) och refrängen bytte bort droplooken 5-10 s efter
    smällen (10 av 67 drops). Med provet blir dropens look refrängens manus-look och ligger kvar. 24 lang: återseende 68 -> 71 %, hör ihop
