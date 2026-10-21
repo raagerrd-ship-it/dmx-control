@@ -65,12 +65,12 @@ const LIFT_DB = Number(process.env.DMX_LIFT_DB ?? 10), LIFT_REFRACT_MS = Number(
  *  (baskroppen > 12 dB under 8 s-normalnivån i minst STOP_MINI_S s, högst 3 s) och tillbaka till normalnivån i refrängen (sektion high) = ett 'stopp' före nästa fras ->
  *  minidrop-looken (600 ms, utan minidropens energilyft). Nästan-dropen ger inget ljus i konsertläget och energilyftet ser inte en dipp som går tillbaka till samma nivå. 0 = av. */
 const STOP_MINI_S = Number(process.env.DMX_STOP_MINI_S ?? 0.6);   // STANDARD 0,6 sedan 10-17 (ägaren i ladan 10-16: 'minidropparna känns bra, behåll')
-/** MINIDROP EFTER ENERGIN (opt-in DMX_MINI_ENERGY=1, ägaren i ladan 10-21: 'inte på fast tid utan beroende på energin, så återhämtar den
+/** MINIDROP EFTER ENERGIN (STANDARD ladan 10-21, ägaren 'kör standard'; ägaren: 'inte på fast tid utan beroende på energin, så återhämtar den
  *  sig snabbare, men ändå ett drop som syns'). Minidropens stöt (MINI_BANG_MS) och takets lyft (MINI_LIFT_MS) släpps när baskroppen
  *  (frame.bodyDb, 30 ms) fallit under halva lyftet räknat från nivån före minidropen (1 s-medel) - tidigast efter MINI_E_MIN_MS, senast
  *  de fasta tiderna som förr. Bara när de SLÄPPS ändras; uttoningarna (stöt 1 s, kulör 0,6 s, tak 2 s) är orörda (fade-down låst).
  *  Mätt på ladans 5 min 10-21: halva baslyftet ligger kvar median 0,26 s (73 % < 0,6 s, 18 % > 4 s). */
-const MINI_ENERGY = process.env.DMX_MINI_ENERGY === '1', MINI_E_MIN_MS = Number(process.env.DMX_MINI_E_MIN_MS ?? 250);
+const MINI_E_MIN_MS = Number(process.env.DMX_MINI_E_MIN_MS ?? 250);
 const MINI_GAP_MS = Number(process.env.DMX_MINI_GAP_MS ?? 2000), MINI_UNI = Math.max(0, Math.min(1, Number(process.env.DMX_MINI_UNI ?? 1)));
 // (EFFEKTEN LEDER/CONCERT_E_FLOOR, VARJE SLAG/CONCERT_BEAT, BASSLAGEN/CONCERT_KICK och BASSLAGEN I ENERGILAGRET/KICK_E borttagna 10-12:
 //  ersatta av BASENERGIN, se B_CURVE.)
@@ -88,10 +88,10 @@ const DROP_LIFT_HIGH = process.env.DMX_DROP_LIFT_HIGH !== '0';   // STANDARD sed
  *  (2) looken är en basstark full-effekt (passform bas >= 0,6 och punch >= 0,75, bäst först) - låtens refrängslook behålls om den redan är
  *  basstark och inte är looken från före dropen; annars väljs en ur listan och blir låtens refrängslook (manuset). 0 = av (som före). */
 const DROP_BASS_LOOK = process.env.DMX_DROP_BASS_LOOK !== '0';   // STANDARD sedan 10-17 (ägaren i ladan); =0 = av
-/** DROPEN GÅR FÖRE BUILDEN I MANUSET (natt 10-20, prov): när dropen kommer i samma ruta som build-inträdet (allaBuild) valdes looken i
- *  build-manuset - dropens basstarka look sparades som låtens build-look och refrängens manus fick den aldrig (10 av 67 drops, 24 lang).
- *  =1: dropen räknas till 'high' som andra drops. Standard av (bit-identiskt) tills ägaren sett det. */
-const DROP_SEC_HIGH = process.env.DMX_DROP_SEC_HIGH === '1';
+/** DROPEN GÅR FÖRE BUILDEN I MANUSET (natt 10-20; STANDARD ladan 10-21, ägaren 'kör standard', backup-tagg
+ *  backup/fore-kvallens-prov-2026-10-21): när dropen kommer i samma ruta som build-inträdet (allaBuild) valdes looken förr i build-manuset -
+ *  dropens basstarka look sparades som låtens build-look och refrängens manus fick den aldrig (10 av 67 drops, 24 lang). Nu räknas
+ *  dropen till 'high' som andra drops (se secKey i switchLook). */
 /** BASEN DIREKT EFTER DROPEN (opt-in DMX_DROP_BASS_SNAP=1, ägaren i ladan 10-17: 'drop, alla lyser, sen känns det som effekten inte vet vad
  *  den skall göra i några sekunder tills den till slut hittar t.ex. basen'): basenergin mäter hur långt över basens senaste DAL vi är, och
  *  under breaket före dropen sjönk dalen lågt (basen borta) - efter smällen gled den upp på B_LO_S, så de första sekunderna var skalan bred
@@ -332,7 +332,7 @@ const PULSE_IDX_INIT = -2e9;
  *      detektorn da satt fast pa high; rotorsaken (ingen nollning vid latbyte) ar rattad 09-23. Sedan 10-12: LÅTMANUS. */
 /** SECTION_UNIT (ladan 16:45): forvarningens 'high' 600 ms fore en forutsedd refrang och drop-fonstrets 'high' raknas INTE som sektionsgrans
  *  (de gav high<->low-hopp pa 1-2 s nar refrangen uteblev). Bara den raa sektionen, och den maste vara minst DMX_SECTION_UNIT_MIN_MS gammal. */
-const SECTION_UNIT_MIN_MS = Number(process.env.DMX_SECTION_UNIT_MIN_MS ?? 4000);
+const SECTION_UNIT_MIN_MS = Number(process.env.DMX_SECTION_UNIT_MIN_MS ?? 2000);   // 4000 -> 2000 (ladan 10-21: ny look 4-6 s efter sektionsbytet; replay 4,0 -> 2,0 s, korta looker 3 -> 2)
 /** LÅTMANUS (10-12 kväll, ägaren: "olika effekter hoppar hela tiden ... mer som att den är förprogrammerad" + "allt mer känns anpassat
  *  efter låten och som att de hänger ihop"). ERSÄTTER frasväxlingen (A/B-look var 8:e takt), basgångs-, karaktärs- och tempobytet,
  *  reservklockan och 'ny låt' på sektionen intro. Låten får ETT manus: första gången en sektionstyp (intro/low/build/high/break) kommer
@@ -593,7 +593,7 @@ export class EffectEngine {
    private nearNorm = 0; private nearFloor = 1e9; private liftCalm = 0; private liftLift = 0; private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rFadeK = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
   private nearAt = -1e12; private nearUntil = 0; private nearLevel = 0; nearCount = 0; private nearHit = false;   // NASTAN-DROP
   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
-  private miniBodyFast = -90; private miniBodySlow = -90; private miniPre = -90; private miniPeak = -200;   // MINI_ENERGY
+  private miniBodyFast = -90; private miniBodySlow = -90; private miniPre = -90; private miniPeak = -200;   // minidrop efter energin
   private miniBangUntil = 0; private lastMiniWall = -1e12; private miniSector = 0; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftAt = -1e12; liftCount = 0; private stopRunS = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
@@ -830,7 +830,7 @@ export class EffectEngine {
     if (setLiftAt) this.liftAt = nowWall;
     this.lastMiniWall = nowWall; this.liftCount++; this.miniSector = mixedSector(this.liftCount + 7);
     this.miniBangUntil = nowWall + MINI_BANG_MS; if (lift) this.miniLiftUntil = nowWall + MINI_LIFT_MS;
-    if (MINI_ENERGY) { this.miniPre = this.miniBodySlow; this.miniPeak = -200; }
+    this.miniPre = this.miniBodySlow; this.miniPeak = -200;   // MINIDROP EFTER ENERGIN
   }
   /** SPÄRRAD DROP = MINIDROP (10-12): drop inom SHOW_DROP_GAP_MS från förra -> minidrop-looken + lyftet i stället. */
   private gapMini(nowWall: number): void {
@@ -856,7 +856,7 @@ export class EffectEngine {
         const req = (m: Mode) => meetsRequirements(m, bpm, frame.profile);
         // LÅTMANUS: vilken del av manuset bytet galler. Builden (aven ALLA_LOOKER-builden) -> build; drop och build som slutar ->
         // refrangens look (dropen landar i refrangen); annars sektionen. Utan sektion (ingen analys an) finns inget manus.
-        const secKey = allaBuild && !(DROP_SEC_HIGH && dropSwitch && liveSec !== 'break') ? 'build' : (dropSwitch || buildExit) && liveSec !== 'break' ? 'high' : liveSec;
+        const secKey = allaBuild && !(dropSwitch && liveSec !== 'break') ? 'build' : (dropSwitch || buildExit) && liveSec !== 'break' ? 'high' : liveSec;
         const calm = secKey === 'break';   // breakdown -> lugna poolen (var wantCalm)
         const tierRank = (m: Mode) => { const t = EFFECT_MAP.get(m)?.tier; return t === 'lugn' ? 0 : t === 'full' ? 2 : 1; };
         const tierNow = tierS === LUGN ? 0 : tierS === FART ? 1 : 2;
@@ -1821,7 +1821,7 @@ export class EffectEngine {
     // DROP-ENVELOPE: FULL ATTACK (~30ms) på träffen, HÅLL allt på max under
     // dropen, mjuk FADE ner (~1s) när den släpper. Egen effekt — INGEN
     // hårdvaru-strobe (det gav strobe-känslan), bara ljus + färg på max.
-    if (MINI_ENERGY) {   // MINIDROP EFTER ENERGIN: släpp stöten och lyftet när basen fallit tillbaka (se MINI_ENERGY)
+    {   // MINIDROP EFTER ENERGIN: släpp stöten och lyftet när basen fallit tillbaka (se MINI_E_MIN_MS)
       const bd = Math.max(-90, frame.bodyDb ?? -90), inMini = nowWall < this.miniBangUntil || nowWall < this.miniLiftUntil;
       this.miniBodyFast += (bd - this.miniBodyFast) * Math.min(1, dtNow / 0.03);
       if (!inMini) this.miniBodySlow += (bd - this.miniBodySlow) * Math.min(1, dtNow / 1.0);

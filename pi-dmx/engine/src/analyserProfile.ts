@@ -47,6 +47,9 @@ export const PROFILE: AnalyserProfile = {
     // 0,5-8 s efter drop 21 -> 14). Backup: git-taggen backup/fore-section-body-high-2026-10-19.
     SECTION_BODY_HIGH: '2000',    // var 0 (av)
     SECTION_BODY_HIGH_DB: '2',    // var 3 (koden)
+    // LADAN 10-21 KVÄLL, ägaren 'kör standard' (backup-tagg backup/fore-kvallens-prov-2026-10-21):
+    FAST_BANDS: '1',              // ljusets bandfält ur snabb väg (IIR + 512-FFT): 21-27 -> 3-5 ms efter ljudet, drops identiska; lotus: av
+    SECTION_WIN: '2',             // sektionspoängen över 2 s i st f 4: etiketten ned ur refrängen 2,9 -> 1,3 s, korta delar 165 -> 143 (25 inspelningar)
   },
   bare: {
     BPM_MIN: '80',               // fest 80-160 (var 100 + tempo.conf=80); lotus: 80

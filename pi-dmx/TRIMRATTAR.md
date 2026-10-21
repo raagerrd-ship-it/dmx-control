@@ -46,7 +46,9 @@ EN VÄG (10-10): effektens 0 = släckt, färg 1–100 % → lampans tändpunkt+1
 | `DMX_NEAR_RISE_DB` / `DMX_NEAR_DIP_DB` | 10 / 8 | Hur stort språng efter hur djup dipp som räknas. |
 | (nästan-drop byter look) | alltid | Av-brytaren `DMX_NEAR_DROP_SWITCH` borttagen 10-10. |
 | `MINI_DROP_ENV` | 0,9 | Minidropens ljuslyft (bara ljusstyrka, kulören kvar; full drop har dropfärg + vit kärna). |
-| `MINI_BANG_MS` | 150 | Hur länge minidropens lyft håller. Minidrops har ingen spärr, så längre = ljuset fastnar högt. Minidrop byter aldrig look (10-10). |
+| `MINI_BANG_MS` | 600 | Längsta tid minidropens stöt håller. Sedan 10-21 släpps den (och takets lyft `DMX_MINI_LIFT_MS` 4000) när baskroppen fallit under halva lyftet - tidigast efter `DMX_MINI_E_MIN_MS` (250 ms). Ladan 10-21: stöt 0,31 s, tillbaka på nivån 0,9 s. |
+| `DMX_MINI_E_MIN_MS` | 250 | Minsta tid minidropens stöt syns innan energin får släppa den (ägaren 10-21: 'ändå ett drop som syns'). |
+| `DMX_SECTION_UNIT_MIN_MS` | 2000 (10-21, var 4000) | Dirigenten byter look först när sektionen hållit så här länge (skydd mot detektorfladder). |
 | `BODY_GONE_MIN_MS` (DMX-profilen) | 4000 | Riktig drop kräver så långt break före (var 2000; ägaren 10-10: "hellre färre drops, mini fångar dom"). |
 | `DMX_FLANK_SHORT_S` | 1 (standard 10-17) | Kort break (≥ 1 s) räcker för full drop om breaket ligger ≥ 24 dB (`DMX_FLANK_SHORT_RISE_DB`) under taket. Ägaren 10-16: 'dropparna känns bra'. 0 = av. |
 | `DMX_STOP_MINI_S` | 0,6 (standard 10-17) | Basen borta 0,6–3 s mitt i refrängen och tillbaka → minidrop-looken. Ägaren 10-16: 'minidropparna känns bra, behåll'. 0 = av. |

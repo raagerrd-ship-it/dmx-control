@@ -35,6 +35,9 @@ KLART 2026-10-21 (nattagenten): karta + förslag i tools/natt/delning-2026-10-21
    backup/fore-section-body-high-2026-10-19), env-provet = profilen byte-identiskt (2 lang), deployat utan env, ladan.conf tom, md5 lika.
 
 ## LADAN 2026-10-21 KVÄLL
+23:4x STANDARD (ägaren: 'kör standard'; backup-tagg backup/fore-kvallens-prov-2026-10-21): DROP_SEC_HIGH (enda vägen), MINI_ENERGY (enda
+vägen, golv DMX_MINI_E_MIN_MS 250), SECTION_UNIT_MIN_MS 4000 -> 2000, DMX-profilen FAST_BANDS '1' + SECTION_WIN '2'. Bevis: env-provet ==
+ny standard byte-identiskt (natt --snabb + kvällens inspelning). Deployat utan env, ladan.conf borta, md5 lika, NRestarts 0.
 22:37 UTE (Pi 10.38.24.218 via hotspot Pixel_9285): lotus-fixen 19bebf7 + FAST_BANDS-koden (analyser.js, effects.js, md5 lika) och
 PROV i ladan.conf: DMX_DROP_SEC_HIGH=1 DMX_FAST_BANDS=1. NRestarts 0, båda flaggorna i processens env. Första körningen avbröts av
 'Unable to open channel' i warmup-steget (Pi:n uppe 2 min) efter filkopian - omkörning gick igenom. Väntar på ägarens öga.
