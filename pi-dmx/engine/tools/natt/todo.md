@@ -39,9 +39,10 @@ FÖRBERETT 2026-10-21 (ägaren: 'förbered båda') - lotus-fixen 19bebf7 + DMX_D
   Lokalt kontrollerat: tsc bygger, node --check 0 fel på dist, deployspärren (analyser_shared.check) ok, flaggan finns i dist/effects.js,
   24 lang (konsertReplay --step 5 --delad-cfg) ladan nu 68/85 % -> båda 70/85 %, dropens look kvar +10 s 67 -> 71 %, drops 67 -> 68.
   1. PC på hotspot Pixel_9285, hitta Pi:n (senast 10.38.24.218).
-  2. `PI_HOST=<ip> python tools/ladan.py --dry --env DMX_DROP_SEC_HIGH=1` - väntat: analyser.js (+ effects.js, beatFeed/split
-     om de skiljer) och ladan.conf med DMX_DROP_SEC_HIGH=1; inget annat.
-  3. `PI_HOST=<ip> python tools/ladan.py --env DMX_DROP_SEC_HIGH=1` - en omstart; kolla md5 lika och NRestarts 0.
+  2. `PI_HOST=<ip> python tools/ladan.py --dry --env DMX_DROP_SEC_HIGH=1 --env DMX_FAST_BANDS=1` - väntat: analyser.js (+ effects.js,
+     beatFeed/split om de skiljer) och ladan.conf med DMX_DROP_SEC_HIGH=1 och DMX_FAST_BANDS=1; inget annat.
+  3. `PI_HOST=<ip> python tools/ladan.py --env DMX_DROP_SEC_HIGH=1 --env DMX_FAST_BANDS=1` - en omstart; kolla md5 lika och NRestarts 0.
+     (Ägaren 10-21: snabba banden MED i paketet.)
   TITTA: ligger looken kvar genom refrängen när dropen kommer direkt ur en uppbyggnad? Godkänt -> flaggan blir kodens enda väg.
   Backa flaggan: `python tools/ladan.py` (utan --env, ladan.conf skrivs om tom). Lotus-fixen backas bara med gammal dist (a2999d9).
   + SNABBA BANDEN (10-21 kväll, opt-in i delade analysatorn): `--env DMX_FAST_BANDS=1` i samma körning. Ljusets bandfält (spec, onset,
