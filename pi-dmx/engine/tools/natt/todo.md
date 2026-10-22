@@ -19,6 +19,8 @@ rörelse (FAST_BANDS standard) - jaga den INTE vidare. Läget: LADAN 2026-10-21 
    registerKick och tilliten. Följ upp med lotus via analysator-fynd.md; DMX-sidan får prova att ersätta KICK-BYPASS/registerKick med
    onset.kick-toppen (nu 5 ms efter ljudet) - opt-in med bevis.
 1-2 KLART 2026-10-22: latStart.mjs + natt.py bank v3 (ljusLag/sektionLag); låtstartens fel = starka låtstarter (hiStart 38 %), inte intro -> prov EARLY_DB 1,5.
+3 KLART 2026-10-22: --feed2048 == FAST_BANDS=0 (sektion/look 0 % olika) - mekanismen bekräftad, men med dagens standard ger FAST_BANDS återseende 73 -> 76, hör ihop 76 -> 79: inget tapp, ingen fix.
+4 KLART 2026-10-22: mätfälla 52 (bänkarna utan registerKick/KICK-BYPASS, konsertReplay --live-kick, ±5 ms); onset.kick klampad 0/1 -> kick på toppen kräver analysatorn (fynd 10-22).
 5. FACIT: be ägaren (i rapporten) om fler långinspelningar med 'Drop!'/'Minidrop!'-markeringar och gärna refrängstarter - det mesta i kväll
    vilar på bänkens egna mått.
 INTE NU: mer latensjakt, snabb dropkropp (FAST_BANDS '2'-varianten gav drops 68 -> 57; kräver omkalibrering mot facit).
