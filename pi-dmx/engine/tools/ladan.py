@@ -63,6 +63,8 @@ SHOW_ENV: list = [
 REMOVE = [
     # TRE STEG FOR LJUSET 2026-10-10: efterbehandlingen (ballistik/puls/toning) borttagen - effekt -> energi -> kalibrering.
     '/opt/audio-dmx-engine/dist/postprocess.js',
+    # FLAGGSTADNINGEN 2026-10-22: tempoTracker.js (HMM-tempofoljaren, opt-in som aldrig kordes i nagot system) borttagen ur delade analysatorn
+    '/opt/audio-dmx-engine/dist/tempoTracker.js',
     # EFFEKTOVERSYNEN 2026-09-30: uvpuls, sol, subbreath borttagna ur registret -> Pi-filerna till .bak
     # STROBE-EFFEKTEN 2026-10-16 borttagen ur registret (ägaren: 'kör strobe i lugnt parti') -> Pi-filen till .bak
     '/opt/audio-dmx-engine/dist/effects/strobe.js',
