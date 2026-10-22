@@ -27,7 +27,7 @@ export interface SpecialtyValues {
  *  MAPPNINGEN (sist): effektens 1..255 -> lampans tandpunkt+1 (agarens 1 %) .. MAP_TOP x tak (95 %); 0 = slackt. Bara en FULL drop
  *  oppnar de sista 5 %: taket = MAP_TOP + (1 - MAP_TOP) x dropOpen. (Backup fore: git-taggen backup/fore-ett-ljus-2026-10-10;
  *  borta: DMX_FLOOR_CH, DMX_PULSE_ROOM, dimmerns mappning/puls, DMX_DIM_FULL.) */
-const MAP_TOP = Math.max(0.5, Math.min(1, Number(process.env.DMX_MAP_TOP ?? 0.95)));
+const MAP_TOP = Math.max(0.5, Math.min(1, 0.95));
 const HOLD_MS = 120;
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
@@ -36,7 +36,7 @@ const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll
 /** GAMMA (DMX_GAMMA, prov ladan 2026-10-09: "varfor jobbar inte effekten med starkare ljus?"): effektens 0..1 -> DMX som v^GAMMA. 2,2 gor
  *  att 0,5 -> 22 % och 0,7 -> 46 % - effekterna ligger mest 0,4-0,7 och riggen lyser darfor ~20 % vid full energi. Lagre gamma = starkare
  *  mellanlagen (men energins dampning far ocksa mindre verkan i DMX, md^GAMMA). Standard 2,2 = oforandrat. */
-export const GAMMA = Math.max(1, Math.min(3, Number(process.env.DMX_GAMMA ?? 1.6)));   // 2,2 -> 1,6 (ladan 10-09, standard 10-10)
+export const GAMMA = Math.max(1, Math.min(3, 1.6));   // 2,2 -> 1,6 (ladan 10-09, standard 10-10)
 const GAMMA_LUT = new Uint8Array(1024);
 for (let i = 0; i < 1024; i++) {
   GAMMA_LUT[i] = Math.round(Math.pow(i / 1023, GAMMA) * 255);

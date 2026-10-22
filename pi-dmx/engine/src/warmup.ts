@@ -31,7 +31,7 @@ export function warmUpInBackground(cfg: EngineConfig, path: string, done: (r: Wa
   const n = (d.length - 44) >> 1, HOP = cfg.fft.hop;
   // TIDSBUDGET per bit (kodgranskning 09-28): 10 hop blev ~30 ms block pa Zero 2 W medan ALSA-bufferten ar 21 ms.
   // Nu hogst DMX_WARMUP_BUDGET_MS (4) per setImmediate-varv, minst ett hop.
-  const BUDGET_MS = Math.max(1, Math.min(50, Number(process.env.DMX_WARMUP_BUDGET_MS) || 4));
+  const BUDGET_MS = Math.max(1, Math.min(50, 4));
   // EGEN KONFIG-KLON (kodgranskning 09-28): skrapmotorn skrev i den riktiga cfg:n - fogTick uppdaterade rokens
   // warmStartMs/sprayMs/bursts (varmebudget, persisteras) och render() nollade fogTrigger ("Rok nu" under uppvarmningen ats).
   // Roken ar AV i klonen; allt annat lases bara.

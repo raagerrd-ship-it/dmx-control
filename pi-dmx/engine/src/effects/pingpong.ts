@@ -7,7 +7,6 @@ export const pingpong: EffectDef = {
   key: "pingpong", label: "Pingpong", tier: "fart", modulate: { energy: true, pulse: false }, section: ["build"], toggle: true,
   desc: "Uppbyggnad: yttre och inre paret turas om på slaget, dubbel fart efter fyra takter.",
   render(c) {
-    const bpm = c.cfg.beat?.bpm ?? 0; const beatS = bpm > 0 ? 60 / bpm : 0.5;
     const p = c.buildUp;   // uppbyggnadens förlopp 0..1 (32 slag från builden start, 10-11 22:05)
     const rate = 1;   // var 2 efter halva uppbyggnaden (ägaren 10-12: 'inte kännas som en strobe' - aldrig snabbare än takten)
     const step = Math.floor(c.beatIdx * rate + c.beatFrac * rate);

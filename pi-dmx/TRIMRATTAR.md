@@ -6,8 +6,9 @@ den gemensamma effektnivån (topp-normering `DMX_E_NORM_S`, grundnivå `DMX_FX_F
 tändpunkt+1 … 95 %, full drop → 100 %, dimmern konstant). Inget annat rör ljuset. Backup: git-taggarna `backup/fore-ett-ljus-2026-10-10`, `backup/fore-tre-steg-2026-10-10`.
 
 *Ägarens trimyta (2026-10-08). Kedjan: ljud in → effekt 0–100 % → energi (bara dämpning) → en mappning i utgången.
-Allt annat är kod. Ändra en ratt i ladan med `python tools\ladan.py --env K=V` (alla prov på samma rad, annars försvinner de);
-det ägaren godkänner blir kodens standard, inte en drop-in.*
+Allt annat är kod. **Sedan 2026-10-22 (flaggstädningen) är rattarna KONSTANTER i koden, inga env-rattar** - namnen nedan
+(`DMX_...`) är konstanternas gamla env-namn och visar var värdet bor. Ett live-prov = en tillfällig env-flagga i koden under provet
+(`python tools\ladan.py --env K=V`); godkänt -> konstant, underkänt -> koden bort. Bortvalda prov: minnet feedback-kodstadning-flaggor.*
 
 ## 1. Ingången
 | Ratt | Standard | Var | Vad den gör |

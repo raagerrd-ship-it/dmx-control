@@ -12,8 +12,8 @@ import { getHeapStatistics, getHeapSpaceStatistics } from "node:v8";
 import { PerformanceObserver, constants } from "node:perf_hooks";
 import { noteForcedGc } from "./perfStats.js";
 
-const FRAC = Number(process.env.DMX_GC_DARK ?? 0);
-const DARK_MS = Number(process.env.DMX_GC_DARK_MS ?? 1500);
+const FRAC = 0.6;
+const DARK_MS = 1500;
 const GC_FN: (() => void) | null = typeof (globalThis as { gc?: unknown }).gc === "function" ? (globalThis as unknown as { gc: () => void }).gc : null;
 const HEAP_GROW = (() => { const a = process.execArgv.find((x) => x.startsWith("--heap-growing-percent=")); return a ? 1 + Number(a.split("=")[1]) / 100 : 1.4; })();
 export const GC_DARK_ON = FRAC > 0 && GC_FN !== null;

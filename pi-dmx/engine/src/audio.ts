@@ -165,7 +165,7 @@ export class AudioCapture extends EventEmitter {
       // DMX_ALSA_BUFFER (frames): 1024 = 21 ms. Ladan 2026-09-27: GC-stallar 60-120 ms ~1-2/min pa 200 MB-heapen gav en
       // overrun (ljudlucka = "krasch" i ljuset) per stall med 21 ms buffert. Storre buffert later motorn hinna ikapp
       // efter stallen i stallet for att tappa ljud; steady-state-latensen paverkas inte (vi laser allt som kommit).
-      `--buffer-size=${Math.max(512, Math.min(16384, (Number(process.env.DMX_ALSA_BUFFER) || 1024)))}`,
+      `--buffer-size=${Math.max(512, Math.min(16384, 1024))}`,
       "--period-size=128",
       "-q",
     ];
@@ -176,7 +176,7 @@ export class AudioCapture extends EventEmitter {
     // saknas taskset fortsätter arecord ändå, bara utan pinning.
     // DMX_ARECORD_CPU (ladan 2026-09-27): karna 0 delas med kernel/WiFi/sshd (matt: sshd 28 % + systemd 32 % under ssh-
     // matning) -> arecord svalts -> overrun. Karna 3 ar isolerad (isolcpus=3) och bar bara dmx-helper (~4 %).
-    if (p.pid) spawn("taskset", ["-pc", String(process.env.DMX_ARECORD_CPU ?? "3"), String(p.pid)], { stdio: "ignore" }).on("error", () => {});
+    if (p.pid) spawn("taskset", ["-pc", "3", String(p.pid)], { stdio: "ignore" }).on("error", () => {});
     // REALTIDSPRIORITET (ladan 2026-10-10): pa karna 3 tryckte dmx-helperns FIFO-50-trad undan arecord (vanlig prioritet) sa
     // 21 ms-bufferten hann rinna over -> kodeken tappar I2S-synken -> 0,5-2 s tyst ljus, ~20/h. FIFO 60 (over helpern): 0 pa provet.
     if (p.pid) spawn("chrt", ["-f", "-p", "60", String(p.pid)], { stdio: "ignore" }).on("error", () => {});

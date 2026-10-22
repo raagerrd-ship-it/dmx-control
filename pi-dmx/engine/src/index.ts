@@ -137,19 +137,8 @@ const capture = new AudioCapture({
   hopSamples: cfg.fft.hop,
 });
 
-// LJUDKLOCKA: varje chunk ar ett hop (hopSamples = cfg.fft.hop), sa antalet
-// chunkar x hoplangd ar exakt hur mycket ljud som passerat — utan leveransjitter.
-// Matas till analysatorn FORE process() sa slagtiden stamplas ur ljudet, inte ur
-// vaggklockan. Se Analyser.setAudioClockMs.
-let audioChunks = 0;
 const HOP_MS = (cfg.fft.hop / cfg.audio.rate) * 1000;
 health.setAnalyserBudgetMs(HOP_MS);   // en hop far kosta hogst en hop-period
-// OPT-IN (DMX_AUDIO_CLOCK=1) tills det ar matt PA DEN HAR hardvaran. Pa lotus
-// gav samma fix -18 % median-jitter i onset-intervall (samma lat, 2300 intervall
-// per villkor, 2026-09-04) — verkligt men litet (~1 ms). Mic-omstartsrisken ar
-// stangd med en diskontinuitetsvakt i Analyser.setAudioClockMs. Mat med
-// lotus tools/kick-ab.py-upplagget innan default vands.
-const AUDIO_CLOCK_ON = process.env.DMX_AUDIO_CLOCK === '1';
 // INSPELAREN (recorder/recorder.ts - samma fil som i lotus, bredvid analysatorn). AV i DMX; DMX_RECORDER=1 slar pa. Den far
 // samma hop som analysatorn och laser dropCount/sektion ur ramen; varje latgrans (boundaryDetector) ar en ny "lat"
 // (ladan-<n>). Fangsterna (tempo 10 s in/30 s, drop 15+15 s, max 2 per lat, ko 30) hamnar i DMX_RECORDER_DIR.
@@ -173,7 +162,6 @@ capture.on("chunk", (samples: Float32Array) => {
   // bygger pa lastChunkAt och paverkas inte. PUT /api/debug/verbose {enabled:true} slar pa tidtagningen.
   const diag = isLogOn();
   const t0 = diag ? performance.now() : 0;
-  if (AUDIO_CLOCK_ON) analyser.setAudioClockMs(audioChunks++ * HOP_MS);
   const frame = analyser.process(samples);
   if (diag) {
     const anMs = performance.now() - t0;
@@ -310,7 +298,7 @@ setTimeout(renderTick, RENDER_MS);
 // nytt beteende, ingen andra sanning om när det ska vara mörkt.
 const FALLBACK_AFTER_MS = 40;   // 4 missade 100 Hz-rutor → ljudet driver inte längre
 const FALLBACK_FADE_MS = 400;   // uttoning till svart när ljudet är borta
-const FALLBACK_HOLD_MS = Number(process.env.DMX_FALLBACK_HOLD_MS ?? 250);   // korta ljudluckor: hall ramen, dampa inte
+const FALLBACK_HOLD_MS = 250;   // korta ljudluckor: hall ramen, dampa inte
 setInterval(() => {
   // Normal drift: renderingen är alltid färsk (100 Hz) → vi avslutar direkt.
   if (performance.now() - lastRenderMs < FALLBACK_AFTER_MS) return;

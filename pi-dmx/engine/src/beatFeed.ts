@@ -27,7 +27,6 @@ const GRID_COAST_MS = 4000;  // så länge håller vi gridet på svag konfidens
 // Coastens tempo-nollning läser fortfarande fasträffarna (pllConf) - med det nya måttet
 // även där nollades tempot mer sällan och korpusens klocka föll 81,5 -> 76,7 % (fel tidiga lås hölls kvar).
 // DMX_TRUST_REPEAT=0 = gamla måttet (bit-identiskt).
-const TRUST_REPEAT = process.env.DMX_TRUST_REPEAT !== '0';
 const TRUST_REPEAT_BEATS = 2, TRUST_REPEAT_TOL = 0.06;
 /** LÖPANDE TAKT - RUTNÄTET PÅ LJUDETS SLAG (ägaren 10-19: 'allt i bakgrunden så snabbt som möjligt, effekten får info om exakta
  *  takten så snabbt det går'). Mätt i bänken (showTight --step 5, pop): kickbandets anslag (frame.onset.kick) är tydligt periodiskt, men
@@ -162,7 +161,7 @@ export class BeatFeed {
     }
     // Coasten vilar kvar på fasträffarna (pllConf, se TRUST_REPEAT); tilliten som går ut till effekterna är mönstret.
     const pllConf = frame.bpmConfidence ?? 0;
-    if (TRUST_REPEAT && this.pllKicks >= 12) { frame.bpmConfidence = this.repeatRate; if (cfg.beat) cfg.beat.confidence = this.repeatRate; }
+    if (this.pllKicks >= 12) { frame.bpmConfidence = this.repeatRate; if (cfg.beat) cfg.beat.confidence = this.repeatRate; }
 
     // LÖPANDE TAKT (10-19, ersätter kick-PLL:en, tempospärren och fasföljaren - backup-taggen backup/fore-lopande-takt-2026-10-19):
     // analysatorns bpm ger bara det första låset och ett sökcentrum; sedan sätter onsetStep() fas och tempo direkt ur kickbandets
@@ -180,7 +179,7 @@ export class BeatFeed {
         const onBeat = Math.abs(err) < 0.25;  // off-beat/synkoperade slag räknas ej
         if (onBeat) cfg.beatErr = (cfg.beatErr ?? 0) * 0.85 + err * 0.15;   // UI: ihållande fasfel
         this.onBeatRate += ((onBeat ? 1 : 0) - this.onBeatRate) * 0.12;
-        if (TRUST_REPEAT) this.repeatRate += ((onBeat || this.kickRepeats(frame.kickAtMs, TRUST_REPEAT_BEATS * beatMs, TRUST_REPEAT_TOL * beatMs) ? 1 : 0) - this.repeatRate) * 0.12;
+        this.repeatRate += ((onBeat || this.kickRepeats(frame.kickAtMs, TRUST_REPEAT_BEATS * beatMs, TRUST_REPEAT_TOL * beatMs) ? 1 : 0) - this.repeatRate) * 0.12;
         this.lastPllKickMs = Date.now();
         if (this.pllKicks < 40) this.pllKicks++;
       }

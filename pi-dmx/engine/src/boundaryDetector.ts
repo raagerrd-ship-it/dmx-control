@@ -28,9 +28,8 @@ const NOV_WIN_MS = 1500;       // klangprofil per 1,5 s
 const NOV_LAG_MS = 8000;       // jamfor mot profilen sa langt bakat (facitmatningens fonster)
 const NOV_STRONG = 0.68;       // MATT: plata 0,60-0,75 gav 2/2 traff, 0 falska -> mitten
 const NOV_WEAK = 0.55;
-const BOUNDARY_NEED_DIP = process.env.DMX_BOUNDARY_NEED_DIP !== '0';   // standard PA sedan 09-30 (tar bort falsk latgrans vid 111 s pa pop); =0 som forr
-const CHAR_D = Number(process.env.DMX_CHAR_SHIFT_D ?? 0.55);   // 10-01 i koden ('mer variation pa effekterna nu');             // karaktarsskifte for dirigenten: 0 = av
-const CHAR_REFRACT_MS = Number(process.env.DMX_CHAR_SHIFT_REFRACT_MS ?? 15000);         // ...racker om nivadipp eller temposkifte ocksa fyrar
+const CHAR_D = 0.55;   // 10-01 i koden ('mer variation pa effekterna nu');             // karaktarsskifte for dirigenten: 0 = av
+const CHAR_REFRACT_MS = 15000;         // ...racker om nivadipp eller temposkifte ocksa fyrar
 const NOV_BACK_MS = 0;
 const NOV_WIN_KEEP_MS = 6000;  // klangskifte raknas som evidens sa lange efterat
 const NOV_Q = 0.97;            // skiftet maste ligga i toppen av de senaste minuterna
@@ -44,19 +43,11 @@ const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
 // Bara UPPAT - en tempookning ar ett energilyft; att sakta ner ar nagot annat och ska inte byta look.
 // Octav-vaktet ar viktigt: analysatorn kan hoppa 2x eller 1,5x (halv-/dubbeltakt) utan att musiken andrats,
 // sa bara okningar i intervallet [PCT, MAX] raknas - 2x (100 %) och 1,5x (50 %) faller utanfor.
-const TEMPO_SHIFT_ON = process.env.DMX_TEMPO_SHIFT !== '0';
-const TEMPO_SHIFT_PCT = Number(process.env.DMX_TEMPO_SHIFT_PCT ?? 0.06);      // minst sa mycket snabbare
-const TEMPO_SHIFT_MAX = Number(process.env.DMX_TEMPO_SHIFT_MAX ?? 0.40);      // mer = troligen oktavhopp, inte musik
-const TEMPO_SHIFT_HOLD_MS = Number(process.env.DMX_TEMPO_SHIFT_HOLD_MS ?? 900);   // sa lange maste okningen sta
-const TEMPO_SHIFT_REFRACT_MS = Number(process.env.DMX_TEMPO_SHIFT_REFRACT_MS ?? 12000);
-const TEMPO_REF_S = Number(process.env.DMX_TEMPO_REF_S ?? 20);   // latens etablerade tempo: langsamt medel
-// INSVANGNING (natt-agenten 2026-10-07, opt-in): referensen ar ett 20 s-medel och ar inte "latens etablerade tempo"
-// forran den funnits sa lange. MATT (tools/tempoShiftBench.mjs, ladans niva): 5 av de 7 falska fyrningarna pa
-// oktavhoppsklippen och den falska pa facitklipp ts02 lag 3-15 s efter start, medan lasets forsta sekunder satte sig
-// (125 -> 133 ar inlasning, inte musik). SETTLE_S > 0: referensen foljer laset direkt och ingen vaxling
-// fyrar forran den ar sa gammal, och en latgrans
-// (commit) nollar referensen - nasta lat ar inte en acceleration av den forra. 0 = som forr.
-const TEMPO_SHIFT_SETTLE_MS = Number(process.env.DMX_TEMPO_SHIFT_SETTLE_S ?? 0) * 1000;
+const TEMPO_SHIFT_PCT = 0.06;      // minst sa mycket snabbare
+const TEMPO_SHIFT_MAX = 0.40;      // mer = troligen oktavhopp, inte musik
+const TEMPO_SHIFT_HOLD_MS = 900;   // sa lange maste okningen sta
+const TEMPO_SHIFT_REFRACT_MS = 12000;
+const TEMPO_REF_S = 20;   // latens etablerade tempo: langsamt medel
 
 export class BoundaryDetector {
   constructor(private readonly clock: () => number = Date.now) {}
@@ -73,7 +64,6 @@ export class BoundaryDetector {
   private tempoUpFrom = 0;
   private tempoRef = 0;
   private tempoRefAt = 0;
-  private tempoRefSince = 0;   // nar referensen sattes (INSVANGNING)
   private tempoShiftAt = -1e9;
   /** Gransignaler som var aktiva vid senaste kontrollen (diagnostik). Byggs vid lasning ur tre falt (skrapjakten 10-18: forr en
    *  array som tomdes och fylldes per hop - ny backing store vid varje push efter length = 0). Samma innehall och ordning. */
@@ -229,12 +219,10 @@ export class BoundaryDetector {
       // "bpm 6 % over ett ogonblickligt medel av sig sjalv", dvs brus - MATT pa megamix_ladan: 563 s och 575 s
       // fyrade tva ganger pa samma 92->110, och ett 1,5x-oktavhopp (87->130) smog igenom som 33 %.
       // tempoRef ar ett langsamt medel (TEMPO_REF_S) sa en akta vaxling star ut mot latens etablerade tempo.
-      if (TEMPO_SHIFT_ON && o.bpmConfidence > 0.5 && o.bpm > 40) {
-        if (!this.tempoRef) { this.tempoRef = o.bpm; this.tempoRefSince = now; }
+      if (o.bpmConfidence > 0.5 && o.bpm > 40) {
+        if (!this.tempoRef) this.tempoRef = o.bpm;
         const up = (o.bpm - this.tempoRef) / this.tempoRef;
-        if (TEMPO_SHIFT_SETTLE_MS > 0 && now - this.tempoRefSince < TEMPO_SHIFT_SETTLE_MS) {
-          this.tempoRef = o.bpm; this.tempoRefAt = now; this.tempoUpSince = 0;   // INSVANGNING: folj laset, vaxla inte
-        } else if (up >= TEMPO_SHIFT_PCT) {
+        if (up >= TEMPO_SHIFT_PCT) {
           if (!this.tempoUpSince) { this.tempoUpSince = now; this.tempoUpFrom = this.tempoRef; }
           else if (now - this.tempoUpSince >= TEMPO_SHIFT_HOLD_MS && now - this.tempoShiftAt >= TEMPO_SHIFT_REFRACT_MS) {
             const trueUp = (o.bpm - this.tempoUpFrom) / this.tempoUpFrom;
@@ -276,7 +264,7 @@ export class BoundaryDetector {
     // DROP != LATGRANS (ladan 2026-09-29 19:13, agaren: missad drop, 'samma lat'): klangskifte 0,64 + tempo 94->116 vid dropen raknades
     // som ny lat -> sektionerna nollades och DROP_SONG_HOLD spärrade 30 s. Med DMX_BOUNDARY_NEED_DIP=1 kraver en svag klang +
     // tempo-grans aven en nivadipp (latar har en paus/dipp mellan sig, en drop har det inte). Starkt klangskifte ensamt galler som forr.
-    const dipOk = !BOUNDARY_NEED_DIP || novSolo || evDip;
+    const dipOk = novSolo || evDip;
     if (novFresh && (novSolo || evN >= 2) && dipOk) why = this.lastEvidence.join(" + ");
     else if (tLive > MAX_SEG_MS) { why = "maxlängd"; back = 0; }   // aldrig en 22-minuters grot igen
     if (!why) return false;
@@ -298,6 +286,5 @@ export class BoundaryDetector {
     this.playStart = 0;
     this.segBpm = 0; this.segBpmConf = 0; this.bpmOffSince = 0; this.resetNovelty();
     this.levAvg = 0; this.dipAt = 0; this.loudSince = 0;
-    if (TEMPO_SHIFT_SETTLE_MS > 0) { this.tempoRef = 0; this.tempoUpSince = 0; }   // INSVANGNING: ny lat, ny referens
   }
 }

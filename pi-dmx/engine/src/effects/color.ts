@@ -22,9 +22,7 @@ const SEL = new Uint8Array([0, 3, 2, /*1*/ 1, 0, 2, /*2*/ 2, 0, 3, /*3*/ 2, 1, 0
  *  anropet genom ctx i den långkörande processen och packade då in h/s/v vid varje anrop (16-48 B per lampa och ruta, ~34 kB/s);
  *  en modulfunktion är en konstant som V8 kan inlina. Egen kopia av räkningen (inte ett anrop till hsvToRgb) - samma kontrakt
  *  som hsvToRgb: resultatet är en av ringens arrayer, använd direkt eller kopiera. */
-const SAT_FLOOR = Math.max(0, Math.min(1, Number(process.env.DMX_SAT_FLOOR ?? 0)));
 export function hsv(h: number, s: number, v: number): [number, number, number] {
-  if (SAT_FLOOR > 0 && s < SAT_FLOOR) s = SAT_FLOOR;
   s = s >= 0.5 ? 1 : 0;
   const i = Math.floor(h * 6);
   const f = h * 6 - i;
