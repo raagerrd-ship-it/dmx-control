@@ -8,6 +8,7 @@
  *  --trace (10-12, energikedjan): varje renderruta (40 Hz) som Float32 x 10: t, sektion (0 intro 1 low 2 build 3 high 4 break 5 annat),
  *  lampa 0..3 (starkaste kanalen efter kalibreringen, 0..1), bodyDb, diskant-dB (specAbs treble+air), drop-look (dropColEnv>0 eller
  *  minidrop-looken), energin (eBass). Mäts med tools/energiMatt.mjs.
+ *  --feed2048 (10-22): takten (beatFeed) får 2048-FFT:ns onset.kick som före FAST_BANDS - ljusfälten är fortfarande de snabba.
  *  --bas-ref subkick (10-16): trace-kolumnen 'bas' = sub+kick (20-120 Hz, medel av sub- och kick-dB som DMX_BASS_SUBKICK) i stället för bodyDb.
  */
 import { readFileSync, writeFileSync } from "node:fs";
@@ -37,6 +38,10 @@ const { createSplitBuffers } = await import(DIST + "split.js");
 const liveAnalyser = (c) => { if (args.includes("--odelad")) return new Analyser(c); const b = createSplitBuffers(); const fast = new Analyser(c, { role: "fast", split: b }); fast.setInlinePeer(new Analyser(structuredClone(c), { role: "slow", split: b })); return fast; };
 const an = liveAnalyser(args.includes("--delad-cfg") ? cfg : JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
 const feed = new BeatFeed();
+// --feed2048 (natt 10-22, röda trådens tapp): beatFeed viker 2048-vägens onset.kick (som före FAST_BANDS) i stället för ramens snabba.
+const FEED2048 = args.includes("--feed2048");
+const LIVE_KICK = args.includes("--live-kick") || args.includes("--kick-onset"), KICK_ONSET = args.includes("--kick-onset");
+const KON_THR = Number(opt("--kon-thr", 2)), KON_MIN = Number(opt("--kon-min", 0.05)); let konAvg = 0, konPrev = 0, konPrev2 = 0, konLast = -1e9, kickN = 0;
 const bounds = new BoundaryDetector(() => Date.now());
 an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
 const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
@@ -62,8 +67,16 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); }
   if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
   if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; eng.softenRange(); an.hintTrackChange(5000); LOG.push([+tS.toFixed(2), 'LATGRANS']); }
-  feed.update(fr, cfg, an);
-  if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
+  if (FEED2048) { const ok = fr.onset.kick; fr.onset.kick = an.bandOn[1]; feed.update(fr, cfg, an); fr.onset.kick = ok; } else feed.update(fr, cfg, an);
+  // --live-kick (natt 10-22, MÄTFÄLLA 52): live (index.ts) matar registerKick och renderar direkt (KICK-BYPASS) på frame.kick - bänkarna
+  // gjorde det inte. --kick-onset: händelsen = onset.kick-toppen (lokalt max över KON_THR x 2 s-medel) i stället för frame.kick.
+  let kickEv = false;
+  if (LIVE_KICK) {
+    if (KICK_ONSET) { const o = fr.onset.kick; konAvg += (o - konAvg) * 0.0013; kickEv = konPrev > konPrev2 && konPrev >= o && konPrev > KON_THR * konAvg + KON_MIN && ms - konLast > 120; if (kickEv) konLast = ms; konPrev2 = konPrev; konPrev = o; }
+    else kickEv = !!fr.kick;
+    if (kickEv) { eng.registerKick(0.4 + Math.min(1, fr.energy * 1.4) * 0.6); kickN++; }
+  }
+  if (!kickEv && ms - lastRender < STEP_MS && lastRender >= 0) continue;
   lastRender = ms; eng.render(fr); const u = eng.universe; if (!u) continue;
   const lv = lamps.map((L) => Math.max(u[L.r] ?? 0, u[L.g] ?? 0, u[L.b] ?? 0) * (L.dim >= 0 ? u[L.dim] / 255 : 1));   // verkligt ljus = färg x dimmer
   if (TRACE) { const sa = fr.specAbs ?? {}; TRACE.push(tS, SEC[fr.section] ?? 5, lv[0] / 255, lv[1] / 255, lv[2] / 255, lv[3] / 255, REF_SK && sa.sub != null ? (20 * Math.log10(sa.sub + 1e-7) + 20 * Math.log10(sa.kick + 1e-7)) / 2 : fr.bodyDb ?? -90,
@@ -82,4 +95,4 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
 const out = { wav: path, columns: ['t', 'look', 'why', 'sec', 'int', 'light', 'nLit', 'drops', 'near', 'lift', 'miniLook', 'upgrades', 'bpm', 'bodyDb', 'aMini', 'bass', 'hi', 'lo', 'top', 'pal', 'conf', 'trust', 'cbpm', 'lock'], rows: ROWS, log: LOG };
 writeFileSync(opt("--json", "replay.json"), JSON.stringify(out));
 if (TRACE) writeFileSync(opt("--trace"), Buffer.from(new Float32Array(TRACE).buffer));
-process.stdout.write(`${path}: ${ROWS.length} rader, ${LOG.length} loggrader\n`);
+process.stdout.write(`${path}: ${ROWS.length} rader, ${LOG.length} loggrader${LIVE_KICK ? `, kickhändelser ${kickN}` : ""}\n`);

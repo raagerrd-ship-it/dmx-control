@@ -33,6 +33,30 @@ sys.path.insert(0, HERE)
 from ladan import SHOW_ENV   # ladans sanning: det som faktiskt kor i riggen (utover kodens standard)
 
 MIXAR = [('pop', 'tools/pop_ladan.wav'), ('megamix', 'tools/megamix_ladan.wav')]
+# AGARENS MATT (natt 10-22, uppdrag 10-21): ljus mot LJUDETS basanslag (ljusLag.py, inte frame.kick som ar brus - fynd 10-19) och
+# sektionsetiketten mot ljudets nivaskiften + fladder (sektionLag.mjs). Mixarna + kvallens inspelning 10-21 (ratt aux-niva).
+ARLIGA = MIXAR + [('lang1021', 'tools/ladan-2026-10-21/lang-20261021T203952.wav')]
+
+
+def run_ljuslag(wav, env):
+    import re
+    r = subprocess.run([sys.executable, 'tools/ljusLag.py', wav, '--s', '300'], cwd=ENGINE, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=900)
+    m1 = re.search(r'korskorr\) (-?\d+) ms', r.stdout); m2 = re.search(r'90 % vid (-?\d+) ms', r.stdout)
+    return {'korskorr': int(m1.group(1)) if m1 else None, 't90': int(m2.group(1)) if m2 else None} if m1 else {'fel': (r.stderr or r.stdout)[-300:]}
+
+
+def run_sektionlag(wavs, env):
+    import tempfile
+    fd, js = tempfile.mkstemp(suffix='.json'); os.close(fd)
+    r = subprocess.run(['node', 'tools/sektionLag.mjs'] + wavs + ['--json', js], cwd=ENGINE, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=1800)
+    try:
+        t = json.load(io.open(js, encoding='utf-8'))['tot']
+    except Exception:
+        return {'fel': (r.stderr or r.stdout)[-300:]}
+    finally:
+        os.remove(js)
+    return {'uppMed': med(t['upLag']), 'uppTraff': f"{t['upHit']}/{t['up']}", 'nedMed': med(t['downLag']), 'nedTraff': f"{t['downHit']}/{t['down']}",
+            'korta': f"{t['short']}/{t['segs']}", 'bytenMin': t['changes'] / max(1e-9, t['min'])}
 METRIC_TAJT = ['kickLagMs', 'kickTraff', 'kickHojd', 'energiR', 'energiRtopp', 'nivaR', 'energiR15', 'nivaR15', 'litLugn', 'litFart', 'litFull']
 METRIC_SNYGG = ['alla3', 'en', 'matt', 'lampspr', 'morkt', 'litP50', 'litP90']
 
@@ -82,6 +106,15 @@ def main():
     for namn, wav in MIXAR:
         out['mixar'][namn] = run_one(wav, env)
         print(f'  {namn:8s} {out["mixar"][namn].get("totS", "?")} s  kick->ljus {f(out["mixar"][namn].get("tajt", {}).get("kickLagMs"), 0)} ms  r {f(out["mixar"][namn].get("tajt", {}).get("energiR"))}')
+
+    # 1b. AGARENS MATT: ljus mot ljudets basanslag + sektionsetikettens lagg/fladder (aven --snabb)
+    arl = [(n, w) for n, w in ARLIGA if os.path.exists(os.path.join(ENGINE, w))]
+    with ThreadPoolExecutor(max_workers=2) as ex:
+        ll = list(ex.map(lambda nw: run_ljuslag(nw[1], env), arl))
+    out['ljusLag'] = {n: r for (n, _w), r in zip(arl, ll)}
+    out['sektionLag'] = run_sektionlag([w for _n, w in arl], env)
+    print('  ljusLag  ' + '  '.join(f'{n} {f(r.get("korskorr"), 0)}/{f(r.get("t90"), 0)} ms' for n, r in out['ljusLag'].items()) + '  (korskorr/90 %)')
+    sl = out['sektionLag']; print(f'  sektion  upp {f(sl.get("uppMed"), 1)} s ({sl.get("uppTraff")})  ned {f(sl.get("nedMed"), 1)} s ({sl.get("nedTraff")})  korta {sl.get("korta")}  {f(sl.get("bytenMin"))}/min')
 
     # 2. KLIPPEN (bredd: kick/energi/farg, aldrig lookar)
     if not a.snabb and os.path.exists(a.lista):
@@ -135,6 +168,15 @@ def main():
     fn = os.path.join(d, f'{a.datum}{"-" + a.tag if a.tag else ""}.json')
     io.open(fn, 'w', encoding='utf-8').write(json.dumps(out, ensure_ascii=False, indent=1))
     sb = os.path.join(d, 'scoreboard.md')
+    if os.path.exists(sb) and 'Bank v3' not in io.open(sb, encoding='utf-8').read():
+        io.open(sb, 'a', encoding='utf-8').write(
+            '\n**Bank v3 fran 2026-10-22 (uppdrag 10-21):** forst AGARENS MATT - ljus mot ljudets basanslag (ljusLag.py, korskorr/90 % av medelljusets topp, ms, '
+            'forsta 300 s) pa pop/mega/kvallens inspelning 10-21, och sektionsetiketten mot ljudets nivaskiften (sektionLag.mjs, alla tre: upp/ned median s, '
+            'korta delar < 8 s, byten/min). Darefter de gamla kolumnerna (kick->ljus = fran frame.kick, brus - fynd 10-19).\n\n'
+            '| datum | git | tag | ljus pop | ljus mega | ljus 1021 | sektion upp/ned s | korta | sek byten/min | pop kick->ljus/traff | pop r energi | pop byten/min musik% | pop alla3/lampspr | pop lookar/langst | pop morkt | '
+            'mega kick->ljus/traff | mega r | mega byten/min musik% | mega alla3/lampspr | mega lookar/langst | mega morkt | mega drops lugna/hoga | '
+            'korpus n | k kick->ljus/traff | k r | k alla3/matt | k morkt | aldrig valda |\n'
+            '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n')
     if not os.path.exists(sb):
         io.open(sb, 'w', encoding='utf-8').write(
             '# DMX natt-scoreboard\n\nEn rad per korning av tools/natt.py. Mixar = pop/megamix i full langd (lookar/drops bor har), '
@@ -149,7 +191,9 @@ def main():
                 f'{f(s.get("alla3"))}/{f(s.get("lampspr"), 0)} | {f(s.get("lookar"), 0)}/{f(s.get("lookLangstaS"), 0)} s | {f(s.get("morkt"))}')
     km = (out['korpus'] or {}).get('median', {})
     mt = out['mixar'].get('megamix', {}).get('tajt', {})
-    row = (f'| {a.datum} | {git} | {a.tag or "-"} | {mix("pop")} | {mix("megamix")} | {f(mt.get("dropsLugna"), 0)}/{f((mt.get("drops") or 0) - (mt.get("dropsLugna") or 0), 0)} | '
+    LL = out.get('ljusLag', {}); SL = out.get('sektionLag', {})
+    lj = lambda n: f'{f(LL.get(n, {}).get("korskorr"), 0)}/{f(LL.get(n, {}).get("t90"), 0)}'
+    row = (f'| {a.datum} | {git} | {a.tag or "-"} | {lj("pop")} | {lj("megamix")} | {lj("lang1021")} | {f(SL.get("uppMed"), 1)}/{f(SL.get("nedMed"), 1)} | {SL.get("korta", "-")} | {f(SL.get("bytenMin"))} | {mix("pop")} | {mix("megamix")} | {f(mt.get("dropsLugna"), 0)}/{f((mt.get("drops") or 0) - (mt.get("dropsLugna") or 0), 0)} | '
            f'{(out["korpus"] or {}).get("n", "-")} | {f(km.get("kickLagMs"), 0)}/{f(km.get("kickTraff"))} | {f(km.get("energiR"))} | {f(km.get("alla3"))}/{f(km.get("matt"))} | {f(km.get("morkt"))} | '
            f'{len(out["effekter"]["aldrigValda"])} |\n')
     io.open(sb, 'a', encoding='utf-8').write(row)

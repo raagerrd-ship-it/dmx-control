@@ -171,3 +171,11 @@ En rad per korning av tools/natt.py. Mixar = pop/megamix i full langd (lookar/dr
 | 2026-10-21 | 399d16a | mini-av | 99/0.48 | 0.33 | 3.1 100% | 0.05/88 | 19/63 s | 0.01 | 37/0.38 | 0.13 | 3.8 100% | 0.05/68 | 14/103 s | 0.04 | 9/12 | - | -/- | - | -/- | - | 54 |
 | 2026-10-21 | 1af0075 | prov5-env | 96/0.47 | 0.31 | 2.4 100% | 0.05/80 | 17/100 s | 0.02 | 67/0.38 | 0.17 | 3.6 100% | 0.04/53 | 12/63 s | 0.03 | 6/15 | - | -/- | - | -/- | - | 58 |
 | 2026-10-21 | 1af0075 | standard-1021 | 96/0.47 | 0.31 | 2.4 100% | 0.05/80 | 17/100 s | 0.02 | 67/0.38 | 0.17 | 3.6 100% | 0.04/53 | 12/63 s | 0.03 | 6/15 | - | -/- | - | -/- | - | 58 |
+| 2026-10-22 | 7020bf9 | - | 96/0.47 | 0.31 | 2.4 100% | 0.05/80 | 17/100 s | 0.02 | 67/0.38 | 0.17 | 3.6 100% | 0.04/53 | 12/63 s | 0.03 | 6/15 | 222 | 123/0.41 | 0.31 | 0/1 | 0.02 | 58 |
+
+**Bank v3 fran 2026-10-22 (uppdrag 10-21):** forst AGARENS MATT - ljus mot ljudets basanslag (ljusLag.py, korskorr/90 % av medelljusets topp, ms, forsta 300 s) pa pop/mega/kvallens inspelning 10-21, och sektionsetiketten mot ljudets nivaskiften (sektionLag.mjs, alla tre: upp/ned median s, korta delar < 8 s, byten/min). Darefter de gamla kolumnerna (kick->ljus = fran frame.kick, brus - fynd 10-19).
+
+| datum | git | tag | ljus pop | ljus mega | ljus 1021 | sektion upp/ned s | korta | sek byten/min | pop kick->ljus/traff | pop r energi | pop byten/min musik% | pop alla3/lampspr | pop lookar/langst | pop morkt | mega kick->ljus/traff | mega r | mega byten/min musik% | mega alla3/lampspr | mega lookar/langst | mega morkt | mega drops lugna/hoga | korpus n | k kick->ljus/traff | k r | k alla3/matt | k morkt | aldrig valda |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-10-22 | 7020bf9 | edb15 | 10/45 | 5/60 | 10/35 | 2.6/5.4 | 27/80 | 3.08 | 96/0.47 | 0.32 | 2.4 100% | 0.05/80 | 17/100 s | 0.02 | 67/0.38 | 0.17 | 3.6 100% | 0.04/53 | 12/63 s | 0.03 | 6/15 | - | -/- | - | -/- | - | 58 |
+| 2026-10-22 | 7020bf9 | bank-v3 | 10/45 | 5/60 | 10/40 | 4.1/5.4 | 27/81 | 3.12 | 96/0.47 | 0.31 | 2.4 100% | 0.05/80 | 17/100 s | 0.02 | 67/0.38 | 0.17 | 3.6 100% | 0.04/53 | 12/63 s | 0.03 | 6/15 | - | -/- | - | -/- | - | 58 |
