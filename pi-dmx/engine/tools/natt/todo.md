@@ -18,6 +18,7 @@ rörelse (FAST_BANDS standard) - jaga den INTE vidare. Läget: LADAN 2026-10-21 
 4. KICKFLAGGAN (fynd 10-19, öppet hos lotus): frame.kick fyrar på kylningens kant (66-94 ms före slaget) och driver KICK-BYPASS-rendern,
    registerKick och tilliten. Följ upp med lotus via analysator-fynd.md; DMX-sidan får prova att ersätta KICK-BYPASS/registerKick med
    onset.kick-toppen (nu 5 ms efter ljudet) - opt-in med bevis.
+1-2 KLART 2026-10-22: latStart.mjs + natt.py bank v3 (ljusLag/sektionLag); låtstartens fel = starka låtstarter (hiStart 38 %), inte intro -> prov EARLY_DB 1,5.
 5. FACIT: be ägaren (i rapporten) om fler långinspelningar med 'Drop!'/'Minidrop!'-markeringar och gärna refrängstarter - det mesta i kväll
    vilar på bänkens egna mått.
 INTE NU: mer latensjakt, snabb dropkropp (FAST_BANDS '2'-varianten gav drops 68 -> 57; kräver omkalibrering mot facit).
@@ -77,6 +78,12 @@ Backa ett prov: `python tools/ladan.py --env <det andra>`; båda: `python tools/
   16 -> 15 %, dropens look kvar +10 s 68 -> 76 %, drops 68 -> 66. (Före kvällens prov: byten 2,79, återseende 67, hör ihop 81.)
 
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
+PROV 2026-10-22 (nattagenten, ägaren på väg till ladan): `PI_HOST=<ip> python tools/ladan.py --env DMX_SECTION_EARLY_DB=1.5` - bara
+  DMX-profilens ratt (ingen ändring i delade analysatorn, dist = main 5fd4a8e). Tidiga-refrängspärren (första 45 s efter låtgräns kräver
+  high +3 dB över låtens median, men medianen räknas på förra låtens bärda block) sänkt till 1,5 dB. 25 lang (latStart.mjs): high i
+  låtens första 20 s 38 -> 49 %, fel 28 -> 25 %, etikett upp p75 4,1 -> 3,0 s, fladder 143 -> 141, hör ihop 79 -> 77 %, drops 66 -> 67;
+  mixarna lika. TITTA: kommer refrängens look direkt när en låt startar stark (kvällens 10-21: låten 144 s, high först 151 s)?
+  Backa: `python tools/ladan.py` (utan --env). Godkänt -> SECTION_EARLY_DB '1.5' i analyserProfile.ts (standard).
 FÖRBERETT 2026-10-21 (ägaren: 'förbered båda') - lotus-fixen 19bebf7 + DMX_DROP_SEC_HIGH=1 i EN körning:
   Lokalt kontrollerat: tsc bygger, node --check 0 fel på dist, deployspärren (analyser_shared.check) ok, flaggan finns i dist/effects.js,
   24 lang (konsertReplay --step 5 --delad-cfg) ladan nu 68/85 % -> båda 70/85 %, dropens look kvar +10 s 67 -> 71 %, drops 67 -> 68.
