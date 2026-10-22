@@ -5,7 +5,7 @@ Här: konsertReplay --step 5 --delad-cfg --trace (varje renderruta, 200 Hz: lamp
   ljus: summan av lampornas positiva steg per ruta
 Korskorrelation över -50..+200 ms; toppen = ljusets fördröjning efter ljudet. Vikning av ljuset på ljudets anslag (de 30 %
 starkaste lokala topparna) ger dessutom medianen till ljusets största stigning inom 0..150 ms efter anslaget.
-  python tools/ljusLag.py <wav> [--s 300] [--env K=V ...]
+  python tools/ljusLag.py <wav> [--s 300] [--env K=V ...]   (env LJUSLAG_REPLAY_ARGS='--live-kick' = extra argument till konsertReplay)
 """
 import os, subprocess, sys, tempfile
 import numpy as np
@@ -29,7 +29,7 @@ clip = wav
 if len(x) < os.path.getsize(wav) // 2 - 100:
     fd, clip = tempfile.mkstemp(suffix='.wav'); os.close(fd)
     wavfile.write(clip, sr, (x * 32767).astype(np.int16))
-subprocess.run(['node', os.path.join(here, 'konsertReplay.mjs'), clip, '--step', '5', '--delad-cfg', '--json', js, '--trace', tr], env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+subprocess.run(['node', os.path.join(here, 'konsertReplay.mjs'), clip, '--step', '5', '--delad-cfg', '--json', js, '--trace', tr] + os.environ.get('LJUSLAG_REPLAY_ARGS', '').split(), env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 T = np.fromfile(tr, dtype=np.float32).reshape(-1, 10)
 t = T[:, 0].astype(np.float64); L = T[:, 2:6].astype(np.float64).sum(axis=1)
 # ljud på 5 ms-rastret (renderrutornas tider)

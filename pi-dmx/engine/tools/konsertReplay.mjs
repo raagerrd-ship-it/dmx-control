@@ -41,7 +41,7 @@ const feed = new BeatFeed();
 // --feed2048 (natt 10-22, röda trådens tapp): beatFeed viker 2048-vägens onset.kick (som före FAST_BANDS) i stället för ramens snabba.
 const FEED2048 = args.includes("--feed2048");
 const LIVE_KICK = args.includes("--live-kick") || args.includes("--kick-onset"), KICK_ONSET = args.includes("--kick-onset");
-const KON_THR = Number(opt("--kon-thr", 2)), KON_MIN = Number(opt("--kon-min", 0.05)); let konAvg = 0, konPrev = 0, konPrev2 = 0, konLast = -1e9, kickN = 0;
+const KON_THR = Number(opt("--kon-thr", 0.5)), KON_MIN = Number(opt("--kon-min", 0.05)); let konAvg = 0, konPrev = 0, konPrev2 = 0, konLast = -1e9, kickN = 0;
 const bounds = new BoundaryDetector(() => Date.now());
 an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
 const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
@@ -69,10 +69,10 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; eng.softenRange(); an.hintTrackChange(5000); LOG.push([+tS.toFixed(2), 'LATGRANS']); }
   if (FEED2048) { const ok = fr.onset.kick; fr.onset.kick = an.bandOn[1]; feed.update(fr, cfg, an); fr.onset.kick = ok; } else feed.update(fr, cfg, an);
   // --live-kick (natt 10-22, MÄTFÄLLA 52): live (index.ts) matar registerKick och renderar direkt (KICK-BYPASS) på frame.kick - bänkarna
-  // gjorde det inte. --kick-onset: händelsen = onset.kick-toppen (lokalt max över KON_THR x 2 s-medel) i stället för frame.kick.
+  // gjorde det inte. --kick-onset: händelsen = onset.kick-toppen (lokalt max över --kon-thr x avklingande toppen, tau 2 s, minst 150 ms isär) i stället för frame.kick.
   let kickEv = false;
   if (LIVE_KICK) {
-    if (KICK_ONSET) { const o = fr.onset.kick; konAvg += (o - konAvg) * 0.0013; kickEv = konPrev > konPrev2 && konPrev >= o && konPrev > KON_THR * konAvg + KON_MIN && ms - konLast > 120; if (kickEv) konLast = ms; konPrev2 = konPrev; konPrev = o; }
+    if (KICK_ONSET) { const o = fr.onset.kick; konAvg = Math.max(o, konAvg * 0.99867); kickEv = konPrev > konPrev2 && konPrev >= o && konPrev > KON_THR * konAvg && konPrev > KON_MIN && ms - konLast > 150; if (kickEv) konLast = ms; konPrev2 = konPrev; konPrev = o; }
     else kickEv = !!fr.kick;
     if (kickEv) { eng.registerKick(0.4 + Math.min(1, fr.energy * 1.4) * 0.6); kickN++; }
   }

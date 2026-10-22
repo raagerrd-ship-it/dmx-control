@@ -15,6 +15,31 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-22 Låtstarten: SECTION_EARLY:s median räknas på förra låtens bärda block - starka låtstarter får inte 'high'
+Vad: ägaren 10-21 'hur snabbt dirigenten förstår typ av sektion/låt'. tools/latStart.mjs (nytt, konsertReplay-json + wav: facit = 1 s-dB
+rangordnad INOM låten) på 25 lang, 41 låtgränser: av facit-high-sekunderna i låtens första 20 s säger etiketten high bara 38 % (resten av
+låten 82 %). Exempel lang-20261021T203952: låten startar på full nivå 144 s, 'intro' till 151 s. Orsak: med SECTION_CARRY 20 har rangen
+historik direkt, men SECTION_EARLY (första SECTION_EARLY_S s: high kräver m4 >= median + SECTION_EARLY_DB) tar medianen över secBlkDb
+som innehåller förra låtens 20 bärda block (ofta dess refräng) -> en låt som startar stark når inte +3 dB. DMX provar profilratten
+SECTION_EARLY_DB 1,5 (hiStart 38 -> 49 %, fladder lika, ute som prov 10-22). Fri intro (uppehållstiden ur 'intro' av) PRÖVAD och
+FÖRKASTAD: intro 3,3 -> 0,3 s men etiketten fastnade i fel sektion (look >= 8 s 5,8 -> 8,1 s, fladder 143 -> 192).
+Var: sectionBlock, SECTION_EARLY-grenen (median över this.secBlkDb). Material: tools/ladan-2026-10-1*/lang-*.wav + ladan-2026-10-21;
+mått tools/latStart.mjs (hiStart, fel20), tools/sektionLag.mjs, rodTrad.mjs.
+Önskat (opt-in, av = bit-identiskt): SECTION_EARLY:s median bara över blocken EFTER låtgränsen (de bärda blocken räknas inte), så
+regeln jämför låten mot sig själv; döms på hiStart utan att 'hör ihop'/fladder går ner.
+Status:
+
+## ÖPPET 2026-10-22 onset.kick är klampad 0/1 (q90 = 1) - går inte att toppvälja (tillägg till kickflaggan 10-19)
+Vad: uppdrag 10-21 punkt 4 (ersätt KICK-BYPASS/registerKick med onset.kick-toppen). Mätt med FAST_BANDS (lang 203952 + 191741, 120 s
+efter uppvärmningen): onset.kick q10/q50 0, q90/q99 1,000 - mättad i > 10 % av hoppen; stigande kant mot 1 med 150 ms spärr ger
+5,8-6,4 händelser/s (kickarna ~2/s), frame.kick 2,5-3,7/s. Toppen bär ingen amplitud, så en kickhändelse kan inte väljas ur fältet utan
+tempospärr (= dagens kylningskant). Bänkfälla hittad på vägen (DMX, mätfälla 52): konsertReplay/showTight/ljusLag matade aldrig
+registerKick/KICK-BYPASS - konsertReplay --live-kick gör det nu; påverkan på ljusLag liten (korskorr median 10 -> 5 ms, 90 % 42 -> 48 ms).
+Var: bandOn/fbOn (onset per band, klampning), kickdetektorn. Material: som ovan, tools/natt/ (ondist i rapporten).
+Önskat: ett omättat kickonset (t.ex. onset.kick före klampningen, eller kickbandets stigning i dB) i ramen, eller frame.kick på det
+lokala maxet av det - då kan DMX prova registerKick/KICK-BYPASS på det. Lotus plan 10-21 (kick på onset-toppen) täcker detta.
+Status:
+
 ## ÖPPET 2026-10-21 Ljusets bandvärden kommer ur 2048-FFT:n och ligger 21-27 ms efter ljudet (delningen: analys i ljusvägen)
 Vad: ägarens uppdrag 10-20 (snabba sidan = ljusstyrning, minsta latens; långsamma = dirigentens input, bästa analys). Mätt med Node 24
 (tools/faltLatens.mjs: stigande flanker korskorrelerade mot nollfas-filtrerat ljud, pop + lang 191741 + lang 112342, identiskt på alla
