@@ -15,6 +15,17 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## INFO 2026-10-22 Flaggstädningen i delade analysatorn (ägaren) - läs innan nästa ändring
+Vad: ägaren 10-22 'koden skall vara optimal, inga massa flaggor'. Gjort i båda repona (dmx 42905b4, lotus 3d992a2, md5 8c771759): flaggor
+med samma effektiva värde i DMX och lotus (profil + repots lotus-drop-ins) är kod, flaggor av i båda är borttagna (HMM/tempoTracker.ts,
+EVIDLOCK, SHIFT_DOWN, PULSE_VETO, DEADBEAT, CONFBLEED, TG_ADAPT, GHOST_LASTGOOD/34, SUBH_HALF, HIGH_VOTE m.fl., GRID_PHASE_TRIM, BOUNDARY_NOV,
+SECTION_MODE != rank, LEVELREF, HOLD_BARS, REENTRY, PREDICT_STRICT/DIP, klangmallen REPEAT 256/512/768, REPEAT 2/8/128, DROP_KICK_LOCK).
+Bevis: lotus analyserParity med lotus drop-in-env 0 avvikande hop av 787 500 (rakt+grid+hint, split inline, reset); DMX byte-identisk.
+OBS lotus: drop-ins för de nu inbyggda (SECTION, SECTION_ON_HINT, SECTION_EARLY_S, SECTION_W_HIGH, TEMPO_HOLD/SHIFT, DROP_CALM_GATE,
+DROP_CALM_INTRO_STRICT, drop-fix-värdena BODY_FAST_S/DROP_ARM_MS/DROP_RISE_MIN) läses inte längre; repots drop-in-filer är förutsättningen -
+om lotus-Pi:n har ANDRA värden än repot gäller det inte. Lotus ej deployad. Pi:ns dist/tempoTracker.js blir över (ofarlig).
+Status:
+
 ## ÖPPET 2026-10-22 Låtstarten: SECTION_EARLY:s median räknas på förra låtens bärda block - starka låtstarter får inte 'high'
 Vad: ägaren 10-21 'hur snabbt dirigenten förstår typ av sektion/låt'. tools/latStart.mjs (nytt, konsertReplay-json + wav: facit = 1 s-dB
 rangordnad INOM låten) på 25 lang, 41 låtgränser: av facit-high-sekunderna i låtens första 20 s säger etiketten high bara 38 % (resten av

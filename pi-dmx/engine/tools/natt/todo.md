@@ -1,5 +1,12 @@
 # Natt-agentens uppdrag
 
+## FLAGGSTÄDNINGEN 2026-10-22 (ägaren: 'allt som är standard ... inga massa flaggor, koden skall vara optimal') - KLART, inget deployat
+DMX-sidan d1dae8a: 71 env-rattar = konstanter (ladans värden, DMX_GC_DARK 0,6), konsertläget + delflaggor enda vägen, avstängda prov bort.
+Delade analysatorn (båda repona, dmx b1a3fb8+42905b4, lotus 3d992a2, md5 8c771759): lika i båda = kod, av i båda = bort, tempoTracker.ts
+raderad. Bevis: konsertReplay 25 lang + mixar byte-identiska, natt.py identisk, lotus analyserParity 0/787 500 hop. Bortvalda prov: minnet
+feedback-kodstadning-flaggor (föreslå inte igen utan nytt skäl). NY REGEL: rattar finns inte som env längre - ett live-prov = tillfällig
+env-flagga i koden, godkänt -> konstant, underkänt -> bort. Nästa `ladan.py` tar med städningen (ljuset identiskt) + flyttar tempoTracker.js.
+
 ## Från kvällen 2026-10-21 - DIRIGENTENS FÖRSTÅELSE (ägaren: nattens uppdrag, går före allt annat, i denna ordning)
 Ägaren i ladan 10-21: "inte latensen det största, utan hur snabbt dirigenten förstår typ av sektion/låt". Latensen är nu ~40 ms till första
 rörelse (FAST_BANDS standard) - jaga den INTE vidare. Läget: LADAN 2026-10-21 KVÄLL nedan (fem prov blev standard 23:4x).
