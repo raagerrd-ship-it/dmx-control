@@ -13,6 +13,11 @@ on:
       - 'vite.config.ts'
       - 'package.json'
 
+# En release i taget: tata pushar (eller flera korningar pa samma commit) krockade i action-gh-release pa 'latest' (10-22).
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
