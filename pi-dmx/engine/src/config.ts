@@ -163,8 +163,6 @@ export interface EngineConfig {
   };
   /** Transient one-shot: sätt true för en manuell rök-puff — inte persisterad. */
   fogTrigger?: boolean;
-  /** REGI: dramaturgisk tystnad — kort kolsvart just före drop-explosionen. */
-  dropBlackout: boolean;
   /** REGI: sceniskt djup — mittlamporna hålls som fasta uplights i höga lägen. */
   scenicAnchor: boolean;
 }
@@ -210,7 +208,6 @@ export const defaultConfig: EngineConfig = {
   // 40-50s i strack innan varmeblocket maste hamta igen, sa 1s/60s ar ~1.6%
   // arbetscykel - den hinner alltid vara varm. Oka vid behov, inte tvartom.
   fog: { enabled: false, address: 13, onDrop: true, burstMs: 1000, cooldownMs: 120000, level: 255, warmupMs: 600000, sprayMs: 0, bursts: 0 },
-  dropBlackout: true,     // dramaturgisk tystnad — låg risk, lyfter varje drop
   scenicAnchor: false,    // ägar-val: antar lampor i rad vänster→höger
 };
 

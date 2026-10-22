@@ -52,7 +52,7 @@
     .fx.dirty { border-color: var(--warn); }
     .fx.err   { border-color: var(--hot); }
     .fx-head { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-    .fx-head input.name { flex: 1; background: transparent; border: 0; color: var(--fg); font-size: 15px; font-weight: 500; padding: 6px 0; }
+    .fx-head input.name { flex: 1; min-width: 0; background: transparent; border: 0; color: var(--fg); font-size: 15px; font-weight: 500; padding: 6px 0; }
     .fx-head button.del { background: transparent; border: 0; color: var(--dim); font-size: 18px; cursor: pointer; padding: 4px 8px; }
     .fx-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .fx-field label { display: block; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 3px; }
@@ -240,6 +240,7 @@
     /* Ingen chevron — såg konstig ut. Öppet/stängt syns ändå på att kortet fälls ut. */
     details.more > summary::after { display:none; }
     details.more[open] > summary::after { display:none; }
+    body::after { content:""; display:block; height:52px; }
     .status-footer { position:fixed; left:0; right:0; bottom:0; z-index:40; padding: 10px 16px calc(env(safe-area-inset-bottom) + 10px); text-align:center; font-size:10px; letter-spacing:.24em; text-transform:uppercase; color:color-mix(in srgb, var(--dim) 55%, transparent); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-top: 1px solid color-mix(in srgb, var(--line) 55%, transparent); }
     .status-footer.offline { color:color-mix(in srgb, var(--warn) 80%, transparent); }
     /* Spegel-sliders: skrivskyddad vy av vad Stämningen just nu har satt */
@@ -314,11 +315,11 @@
   <div class="welcome-ov" id="welcomeOv" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
     <div class="welcome-card">
       <h2 id="welcomeTitle">Välkommen 👋</h2>
-      <p>Så här styr du lamporna från din telefon:</p>
+      <p>Så här styr du ljuset från telefonen:</p>
       <div class="welcome-steps">
-        <div class="welcome-step"><div class="n">1</div><div class="t"><b>Tryck ⏻ för att tända</b><span>Stora knappen längst upp tänder och släcker hela riggen.</span></div></div>
-        <div class="welcome-step"><div class="n">2</div><div class="t"><b>Dra Ljusstyrka</b><span>Showen sköter sig själv - slidern ställer bara hur starkt det lyser.</span></div></div>
-        <div class="welcome-step"><div class="n">3</div><div class="t"><b>Spela musik</b><span>Ljuset följer musiken. Ingen musik = ingen rörelse.</span></div></div>
+        <div class="welcome-step"><div class="n">1</div><div class="t"><b>Dra reglaget</b><span>Det styr hur starkt det lyser. Längst till vänster = släckt.</span></div></div>
+        <div class="welcome-step"><div class="n">2</div><div class="t"><b>Spela musik</b><span>Showen sköter sig själv och följer musiken. Ingen musik = mörkt.</span></div></div>
+        <div class="welcome-step"><div class="n">3</div><div class="t"><b>Kolla ljudnivån</b><span>Topparna ska hamna i det gröna. Annars: skruva volymen på musiken.</span></div></div>
       </div>
       <button class="welcome-btn" id="welcomeBtn">Kör igång</button>
     </div>
@@ -355,7 +356,6 @@
 
   <section class="hero-card">
     <section class="mood-slider" id="moodSliderCard">
-
     <div class="mood-track-wrap">
       <div class="mood-ticks" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
       <input type="range" id="moodSlider" class="mood-range" min="0" max="10" step="1" value="5" aria-label="Ljusstyrka från Av till Max" />
@@ -378,33 +378,82 @@
       <div class="cal-peak" id="calPeak" hidden></div>
     </div>
     <div class="cal-hint" id="calHint" hidden></div>
-    <div class="src-seg" id="srcSeg" data-src="aux" role="tablist" aria-label="Ljudkälla" style="margin-top:14px">
-      <span class="src-thumb" aria-hidden="true"></span>
-      <button id="inAux" class="active" role="tab" aria-selected="true">AUX (kabel)</button>
-      <button id="inMic" role="tab" aria-selected="false">Mikrofon</button>
-    </div>
 
     <div class="tech-strip">
       <div class="tech-cells">
         <div class="tech-cell">
-          <div class="lbl">BPM <span class="dot" id="bpmDot" style="display:none"></span><span class="pulse-dot" id="bpmPulseDot"></span></div>
+          <div class="lbl">Takt (BPM) <span class="dot" id="bpmDot" style="display:none"></span><span class="pulse-dot" id="bpmPulseDot"></span></div>
           <div class="val muted" id="bpmVal">— —</div>
         </div>
-        <div class="tech-cell">
-          <div class="lbl">Konfidens</div>
-          <div class="val muted" id="confVal">— —</div>
-        </div>
       </div>
-      <div class="mood-desc" id="moodDesc">Ljuset är släckt — dra åt höger för att tända</div>
+      <div class="mood-desc" id="moodDesc">Ljuset följer musiken — reglaget styr bara ljusstyrkan</div>
     </div>
   </section>
   </section>
 
+  <div id="statusFooter" class="status-footer">Ansluten · <span id="sfVer">–</span> · <span id="sfFx">–</span> lampor</div>
+
+  <div id="ownerOnly" hidden>
+  <div class="owner-banner">🔧 Ägarläge. Gästerna öppnar adressen utan <b>/setup</b> och ser bara ljusreglaget.</div>
+
+  <div id="setupWizard" class="card" hidden style="border:1px solid var(--warn);background:linear-gradient(180deg,rgba(255,180,60,.08),rgba(255,180,60,.02))">
+    <h1 style="margin:0 0 6px;font-size:18px">👋 Kom igång</h1>
+    <ol style="margin:0 0 10px 20px;line-height:1.7;font-size:13px">
+      <li><b>Lampor:</b> lägg till varje lampa med sin DMX-adress. Osäker på kanalerna? Tryck <em>Identifiera</em>.</li>
+      <li><b>Kalibrera:</b> dra reglaget under varje lampa tills den precis tänder och tryck <em>Spara</em>.</li>
+      <li><b>Testa:</b> spela musik i AUX-ingången och dra ljusreglaget överst.</li>
+      <li><b>Backup:</b> <em>Exportera inställningar</em> under System när allt fungerar.</li>
+    </ol>
+    <button class="btn primary" id="wizDismiss">Klart — dölj guiden</button>
+  </div>
+
+  <h1>Lampor</h1>
+  <div class="card">
+    <div class="status" style="margin:0 0 10px">Kalibrera varje lampa: välj <b>Alla</b> (eller R/G/B för en färg i taget), dra reglaget tills lampan <b>precis tänder</b> och tryck <b>Spara</b>. <b>Full</b>: dra tills lampan <b>inte blir ljusare</b> och spara. <b>Hitta</b> blinkar lampan, <b>Identifiera</b> tar reda på kanalerna.</div>
+    <div id="fixtures"></div>
+    <div class="fx-actions">
+      <button class="btn" id="fxAdd">+ Lägg till lampa</button>
+      <button class="btn" id="fxAutoPack">Auto-adressera</button>
+    </div>
+    <div class="fx-actions">
+      <button class="btn ok" id="fxIdentifyAll" title="Blinkar varje lampa i tur och ordning så du ser vilken som är vilken">Blinka alla</button>
+      <button class="btn primary" id="fxSave" disabled>Spara ändringar</button>
+    </div>
+    <div class="status" id="fxHint">"Blinka alla" visar vilken lampa som är vilken.</div>
+  </div>
 
 
+  <h1>Ljusnivå</h1>
+  <div class="card" id="levelCard">
+    <div class="row"><label>Lägsta nivå</label>
+      <input type="range" min="0" max="50" step="1" id="lvlFloor" style="flex:1;margin:0 10px">
+      <span class="val" id="lvlFloorV">–</span>
+    </div>
+    <div class="status" style="margin-top:2px;margin-bottom:8px">Hur mycket det lyser även i lugna partier. 0 % = full dynamik (standard).</div>
+    <div class="row"><label>Tak i vers</label>
+      <input type="range" min="30" max="100" step="1" id="lvlVerse" style="flex:1;margin:0 10px">
+      <span class="val" id="lvlVerseV">–</span>
+    </div>
+    <div class="status" style="margin-top:2px;margin-bottom:8px">Hur ljust vers, intro och break får bli. Refrängen och dropen lyser alltid fullt.</div>
+    <div class="row"><label>Släckgräns</label>
+      <input type="range" min="1" max="20" step="1" id="lvlSil" style="flex:1;margin:0 10px">
+      <span class="val" id="lvlSilV">–</span>
+    </div>
+    <div class="status" style="margin-top:2px;margin-bottom:8px">Ljudnivå under denna gräns räknas som tystnad - då släcks lamporna.</div>
+    <div class="row"><label>Släcktid</label>
+      <input type="range" min="0" max="50" step="1" id="lvlHold" style="flex:1;margin:0 10px">
+      <span class="val" id="lvlHoldV">–</span>
+    </div>
+    <div class="status" style="margin-top:2px">Hur länge det ska vara tyst innan lamporna släcks. De tänds direkt igen. 0 s = direkt.</div>
+  </div>
 
-  <details class="more">
-    <summary>Effekt-val <span class="fx-active" id="fxActiveBadge" style="display:none"></span></summary>
+  <h1>Show</h1>
+  <div class="card">
+    <label class="tgl"><span>Sceniskt djup<br><small style="opacity:.6">Mittlamporna står som fasta uplights i chase, bounce och wave. Kräver lamporna i rad vänster → höger.</small></span><input type="checkbox" id="tScenicAnchor"></label>
+  </div>
+  <details class="more" style="margin-top:10px">
+    <summary>Effekter i showen <span class="fx-active" id="fxActiveBadge" style="display:none"></span></summary>
+    <div class="status" style="padding:10px 14px 0">Dirigenten väljer själv bland de påslagna effekterna. Stäng av en effekt för att aldrig få den.</div>
     <div class="fx-card">
       <div class="fx-cat">Lugna effekter</div>
       <div id="calmList" class="rotlist"></div>
@@ -416,53 +465,6 @@
       <div id="fullList" class="rotlist"></div>
     </div>
   </details>
-
-  <details class="more" style="margin-top:14px">
-    <summary>Avancerat</summary>
-    <div style="padding:14px">
-      <div class="advhint">Skrivskyddad vy. Ljusstyrke-slidern (och det fysiska vredet) sätter ljustaket — dessa värden speglar motorn i realtid.</div>
-      <div class="advrow"><label>Dynamik</label><div class="meter"><div id="advDyn" style="width:0%"></div></div><span class="val" id="advDynV">–</span></div>
-      <div class="advrow"><label>Reaktion</label><div class="meter"><div id="advSens" style="width:0%"></div></div><span class="val" id="advSensV">–</span></div>
-      <div class="advrow"><label>Ljustak</label><div class="meter"><div id="advMaster" style="width:0%"></div></div><span class="val" id="advMasterV">–</span></div>
-      <div class="advflags">
-        <div class="advflag" id="fEnergy"><span class="dot"></span>Energi styr läget</div>
-        <div class="advflag" id="fDropBl"><span class="dot"></span>Drop-blackout</div>
-        <div class="advflag" id="fFog"><span class="dot"></span>Rökmaskin aktiv</div>
-        <div class="advflag" id="fStrobeCh"><span class="dot"></span>DMX-strobe aktiv</div>
-        <div class="advflag" id="fHazer"><span class="dot"></span>Hazer aktiv</div>
-        <div class="advflag" id="fUv"><span class="dot"></span>UV aktiv</div>
-        <div class="advflag" id="fBlinder"><span class="dot"></span>Blinder aktiv</div>
-        <div class="advflag" id="fLaser"><span class="dot"></span>Laser aktiv</div>
-        <div class="advflag" id="fCo2"><span class="dot"></span>CO₂ aktiv</div>
-      </div>
-      <div class="advfx-list" id="advFxList">
-        <div class="advfx-head">
-          <span>Enheter</span><span>DMX-adress</span>
-        </div>
-        <div class="advfx-rows" id="advFxRows"></div>
-      </div>
-    </div>
-  </details>
-
-  <div id="statusFooter" class="status-footer">Ansluten · <span id="sfVer">–</span> · <span id="sfFx">–</span> lampor</div>
-
-
-
-  <div id="ownerOnly" hidden>
-  <div class="owner-banner">🔧 Ägarläge (setup). Den här sidan är dold för hyresgäster — de öppnar adressen utan <b>/setup</b>.</div>
-
-  <div id="setupWizard" class="card" hidden style="border:1px solid var(--warn);background:linear-gradient(180deg,rgba(255,180,60,.08),rgba(255,180,60,.02))">
-    <h1 style="margin:0 0 6px;font-size:18px">👋 Kom igång — första start</h1>
-    <div class="status" style="margin:0 0 10px">Så här får du boxen att lira på 3 minuter:</div>
-    <ol style="margin:0 0 10px 20px;line-height:1.7;font-size:13px">
-      <li><b>Lägg till lampor</b> under <em>Lampor</em>: sätt DMX-adress + preset (RGB / RGBW / RGB7). Osäker på kanaler? Tryck <em>Walk-test</em>.</li>
-      <li><b>Testa</b>: gå tillbaka till hyresgäst-vyn (adressen utan <b>/setup</b>), tryck Power, dra Stämning. Musik i mikrofonen → lamporna rör sig.</li>
-      <li><b>Exportera config</b> under <em>System</em> när allt funkar — då har du en backup ifall något strular.</li>
-    </ol>
-    <button class="btn primary" id="wizDismiss">Jag är klar — dölj denna guide</button>
-  </div>
-
-
 
   <h1>Rökmaskin</h1>
   <div class="card">
@@ -487,37 +489,6 @@
     </div>
   </div>
 
-  <h1>Regi</h1>
-  <div class="card">
-    <label class="tgl"><span>Sceniskt djup<br><small style="opacity:.6">Mittlamporna hålls som fasta uplights i höga lägen. Kräver lampor i rad V→H.</small></span><input type="checkbox" id="tScenicAnchor"></label>
-    <div style="border-top:1px solid rgba(255,255,255,.08);margin:10px 0 6px"></div>
-    <label class="tgl"><span>Drop-blackout<br><small style="opacity:.6">Kort kolsvart just före drop-explosionen — dubbelt så hård kontrast.</small></span><input type="checkbox" id="tDropBlackout"></label>
-  </div>
-
-  <h1>Ljusnivå</h1>
-  <div class="card" id="levelCard">
-    <div class="row"><label>Lägsta nivå</label>
-      <input type="range" min="0" max="50" step="1" id="lvlFloor" style="flex:1;margin:0 10px">
-      <span class="val" id="lvlFloorV">–</span>
-    </div>
-    <div class="status" style="margin-top:2px;margin-bottom:8px">Energins golv: tysta partier lyser minst så här mycket av effektens ljus. 0 % = full dynamik.</div>
-    <div class="row"><label>Tak i vers</label>
-      <input type="range" min="30" max="100" step="1" id="lvlVerse" style="flex:1;margin:0 10px">
-      <span class="val" id="lvlVerseV">–</span>
-    </div>
-    <div class="status" style="margin-top:2px;margin-bottom:8px">Hur ljust vers, intro och break får bli. Refrängen når alltid fullt, uppbyggnaden stiger mot dropen.</div>
-    <div class="row"><label>Släckgräns</label>
-      <input type="range" min="1" max="20" step="1" id="lvlSil" style="flex:1;margin:0 10px">
-      <span class="val" id="lvlSilV">–</span>
-    </div>
-    <div class="status" style="margin-top:2px;margin-bottom:8px">Under denna nivå släcks lamporna helt.</div>
-    <div class="row"><label>Släcktid</label>
-      <input type="range" min="0" max="50" step="1" id="lvlHold" style="flex:1;margin:0 10px">
-      <span class="val" id="lvlHoldV">–</span>
-    </div>
-    <div class="status" style="margin-top:2px">Hur länge det ska vara tyst innan lamporna släcks. De tänds direkt igen. 0 s = direkt.</div>
-  </div>
-
   <h1>Inspelning</h1>
   <div class="card" id="recCard">
     <div class="fx-actions">
@@ -531,21 +502,6 @@
     <div class="status" id="markState" style="margin-top:4px">Tryck exakt när du hör en minidrop eller drop - blir facit för nattagenten (sparas i inspelningen).</div>
     <div class="status" id="recState" style="margin-top:6px">Spelar in ingången och showens händelser i ett stycke, till nattagentens bänk. Lamporna påverkas inte.</div>
   </div>
-
-  <h1>Lampor</h1>
-  <div class="card">
-    <div id="fixtures"></div>
-    <div class="fx-actions">
-      <button class="btn" id="fxAdd">+ Lägg till lampa</button>
-      <button class="btn" id="fxAutoPack">Auto-adressera</button>
-    </div>
-    <div class="fx-actions">
-      <button class="btn ok" id="fxIdentifyAll" title="Blinkar varje lampa i tur och ordning så du ser vilken som är vilken">Blinka alla</button>
-      <button class="btn primary" id="fxSave" disabled>Spara ändringar</button>
-    </div>
-    <div class="status" id="fxHint">Kalibrera varje lampas lägsta ljus med reglaget. "Blinka alla" hjälper dig hitta vilken lampa som är vilken.</div>
-  </div>
-
 
   <h1 id="ringHdr" hidden>LED-ring (vred)</h1>
   <div class="card" id="ringCard" hidden>
@@ -565,70 +521,6 @@
       Max = takljus för hela ringen. Pulse-boost = extra puff på taktslag. Blackout-fade = hur mjukt ringen tonar ut vid släckt läge.
     </div>
   </div>
-
-  <h1>System</h1>
-  <div class="card">
-    <div class="row"><label>Motor-version</label><span class="val" id="engVer">–</span></div>
-    <div class="row"><label>Git-SHA</label><span class="val" id="verSha">–</span></div>
-    <div class="status" id="verMsg" style="margin-top:2px"></div>
-    <div class="fx-actions" style="margin-top:10px">
-      <button class="btn primary" id="btnUpdate">Uppdatera till senaste</button>
-      <button class="btn" id="btnRollback">Rulla tillbaka</button>
-    </div>
-    <div class="fx-actions" style="margin-top:8px">
-      <button class="btn" id="btnCfgExport">Exportera config</button>
-      <button class="btn" id="btnCfgImport">Importera config</button>
-      <input type="file" id="cfgImportFile" accept="application/json,.json" style="display:none">
-    </div>
-    <div class="fx-actions" style="margin-top:8px">
-      <button class="btn" id="btnFactory" style="border-color:var(--warn);color:var(--warn)">Fabriks-reset (raderar fixtures)</button>
-    </div>
-    <pre id="updLog" class="status" style="white-space:pre-wrap;max-height:180px;overflow:auto;margin-top:10px;display:none;font-family:ui-monospace,Menlo,monospace;font-size:11px"></pre>
-    <details style="margin-top:10px">
-      <summary style="cursor:pointer;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:4px 0">Systemlogg (senaste händelser)</summary>
-      <div class="fx-actions" style="margin:8px 0">
-        <button class="btn" id="btnHealthRefresh">Uppdatera</button>
-        <button class="btn" id="btnHealthDownload">Ladda ner som JSON</button>
-      </div>
-      <div id="healthLogList" class="status" style="max-height:280px;overflow:auto;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.5">Laddar…</div>
-    </details>
-  </div>
-
-  <h1>Typskylt</h1>
-  <div class="card">
-    <div class="status" style="margin-bottom:8px">
-      Obligatorisk märkning på varje enhet som säljs/hyrs ut i EU. Fyll i fälten nedan — förhandsvisningen uppdateras och kan skickas till etiketttrycket.
-    </div>
-    <div class="fx-grid">
-      <div class="fx-field"><label>Företagsnamn / tillverkare</label><input type="text" id="tsMfg" placeholder="t.ex. Firma AB" /></div>
-      <div class="fx-field"><label>Org.nr (valfritt)</label><input type="text" id="tsOrg" placeholder="556123-4567" /></div>
-      <div class="fx-field"><label>Postadress</label><input type="text" id="tsAddr1" placeholder="Gatan 1" /></div>
-      <div class="fx-field"><label>Postnr &amp; ort</label><input type="text" id="tsAddr2" placeholder="123 45 Ort" /></div>
-      <div class="fx-field"><label>Land</label><input type="text" id="tsCountry" placeholder="Sverige" /></div>
-      <div class="fx-field"><label>Kontakt (e-post/URL)</label><input type="text" id="tsContact" placeholder="support@…" /></div>
-      <div class="fx-field"><label>Modell</label><input type="text" id="tsModel" placeholder="PDMX-1" /></div>
-      <div class="fx-field"><label>Serienummer</label><input type="text" id="tsSN" placeholder="2026-0001" /></div>
-      <div class="fx-field"><label>Tillverkningsdatum (ISO-vecka)</label><input type="text" id="tsMfgDate" placeholder="2026-W03" /></div>
-      <div class="fx-field"><label>IP-klass</label><input type="text" id="tsIp" placeholder="IP20" /></div>
-    </div>
-    <pre id="tsPreview" class="status" style="white-space:pre;overflow:auto;margin-top:12px;padding:12px;background:#0a0a0a;border:1px solid var(--line);border-radius:8px;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.5;color:#ddd"></pre>
-    <div class="fx-actions" style="margin-top:8px">
-      <button class="btn" id="tsCopy">Kopiera etikett</button>
-      <button class="btn" id="tsPrint">Skriv ut</button>
-      <button class="btn primary" id="tsDoc">EU-DoC (PDF)</button>
-    </div>
-
-    <details style="margin-top:10px">
-      <summary style="cursor:pointer;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:4px 0">Måste också medfölja enheten (inte på skylten)</summary>
-      <ul style="margin:8px 0 0 18px;padding:0;font-size:12px;color:var(--dim);line-height:1.6">
-        <li>EU-försäkran om överensstämmelse (DoC) — signerad, listar RED 2014/53/EU + RoHS 2011/65/EU</li>
-        <li>Bruksanvisning på svenska — säkerhet, uppkoppling, epilepsi- &amp; rökmaskin-varning</li>
-        <li>WEEE-registrering hos El-Kretsen innan första försäljning</li>
-        <li>Serienummerregister — vem hyrde/köpte vilken SN, arkiveras i 10 år</li>
-      </ul>
-    </details>
-  </div>
-
 
   <h1>WiFi</h1>
   <div class="card">
@@ -650,8 +542,30 @@
       <button class="btn" id="wifiForget" disabled>Glöm</button>
     </div>
     <div class="status" id="wifiHint">
-      Sparad hotspot används automatiskt vid uppstart om den är igång (ger internet
-      för uppdateringar m.m.). Annars startar Pi:n sin egen AP "pi-dmx".
+      Vid uppstart ansluter boxen till den sparade hotspoten om den är igång - så når datorn den för
+      inspelningar och ny programvara. Annars startar den sitt eget nät "pi-dmx".
+    </div>
+  </div>
+
+  <h1>System</h1>
+  <div class="card">
+    <div class="row"><label>Motor-version</label><span class="val" id="engVer">–</span></div>
+    <div class="fx-actions" style="margin-top:10px">
+      <button class="btn" id="btnCfgExport">Exportera inställningar</button>
+      <button class="btn" id="btnCfgImport">Importera inställningar</button>
+      <input type="file" id="cfgImportFile" accept="application/json,.json" style="display:none">
+    </div>
+    <div class="status" style="margin-top:6px">Ny programvara läggs in från datorn (<code>tools/ladan.py</code>).</div>
+    <details style="margin-top:10px">
+      <summary style="cursor:pointer;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:4px 0">Systemlogg (senaste händelser)</summary>
+      <div class="fx-actions" style="margin:8px 0">
+        <button class="btn" id="btnHealthRefresh">Uppdatera</button>
+        <button class="btn" id="btnHealthDownload">Ladda ner som JSON</button>
+      </div>
+      <div id="healthLogList" class="status" style="max-height:280px;overflow:auto;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.5">Laddar…</div>
+    </details>
+    <div class="fx-actions" style="margin-top:12px">
+      <button class="btn" id="btnFactory" style="border-color:var(--warn);color:var(--warn)">Fabriksåterställning (raderar lamporna)</button>
     </div>
   </div>
 
@@ -676,10 +590,6 @@ const calMark = document.getElementById("calMark");
 const calPeak = document.getElementById("calPeak");
 const calHint = document.getElementById("calHint");
 let auxPeak = 0;   // löpande max (peak-hold) av insignalen — AUX-kalibrering
-const inAux = document.getElementById("inAux");
-const inMic = document.getElementById("inMic");
-inAux.onclick = () => send({ type: "setAudioInput", value: "aux" });
-inMic.onclick = () => send({ type: "setAudioInput", value: "mic" });
 
 // STÄMNING: 0..10-slider speglar det fysiska KY-040-vredet. 0 = släckt (blackout),
 // 1..10 = aktiv stämning. Skickar setIntensity (0..1) → motorn. lastIntensity håller
@@ -694,7 +604,7 @@ const legFest = document.getElementById("legFest");
 const legGalet = document.getElementById("legGalet");
 function moodInfoFor(v) {
   if (v <= 0) return { name: "Av", desc: "Ljuset är släckt — dra åt höger för att tända" };
-  return { name: "Ljus " + Math.round(20 + 80 * (v - 1) / 9) + " %", desc: "Konsertshow — slidern styr bara ljusstyrkan" };
+  return { name: "Ljus " + Math.round(20 + 80 * (v - 1) / 9) + " %", desc: "Ljuset följer musiken — reglaget styr bara ljusstyrkan" };
 }
 // Visning: v=0 → 0/10 (av). v≥1 → mappar på (v-1)/9 → 0..1.
 function updateMoodUi(v01, active, forceZero) {
@@ -727,43 +637,6 @@ moodSlider.addEventListener("input", () => {
 });
 const connEl = document.getElementById("conn");
 
-// Inverse of server's log curve: derive aggressiveness 0..1 from tauDown seconds.
-// tauDown = 60 * (2/60)^a  →  a = log(tauDown/60) / log(2/60)
-function tauDownToAgg(tauDown) {
-  if (!(tauDown > 0)) return 0;
-  const a = Math.log(tauDown / 60) / Math.log(2 / 60);
-  return Math.max(0, Math.min(1, a));
-}
-function aggToTau(a) {
-  return {
-    up:   180 * Math.pow(10 / 180, a),
-    down:  60 * Math.pow(2  / 60,  a),
-  };
-}
-
-// Segmenterade kontroller: markera knappen närmast configvärdet.
-function segActivateStr(groupId, value, attr) {
-  const g = document.getElementById(groupId);
-  if (!g) return;
-  g.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset[attr] === value));
-}
-function segActivate(groupId, value, attr) {
-  const g = document.getElementById(groupId);
-  if (!g) return;
-  let best = null, bd = 1e9;
-  g.querySelectorAll("button").forEach((b) => {
-    const d = Math.abs(Number(b.dataset[attr]) - value);
-    if (d < bd) { bd = d; best = b; }
-    b.classList.remove("active");
-  });
-  if (best) best.classList.add("active");
-}
-document.querySelectorAll("#segSpeed button").forEach((b) =>
-  b.onclick = () => { send({ type: "setAgcAggressiveness", value: Number(b.dataset.agg) }); segActivate("segSpeed", Number(b.dataset.agg), "agg"); });
-document.querySelectorAll("#segDyn button").forEach((b) =>
-  b.onclick = () => { send({ type: "setDynamics", value: Number(b.dataset.dyn) }); segActivate("segDyn", Number(b.dataset.dyn), "dyn"); });
-document.querySelectorAll("#segMaster button").forEach((b) =>
-  b.onclick = () => { send({ type: "setMaster", value: Number(b.dataset.master) }); segActivate("segMaster", Number(b.dataset.master), "master"); });
 
 const statusFooter = document.getElementById("statusFooter");
 const sfVer = document.getElementById("sfVer");
@@ -812,10 +685,8 @@ if (recStart) { recStart.onclick = () => recPost({ seconds: 300 }); recStop.oncl
 // Effekt-listorna kommer från servern (type:"effects", grupperade på tier) →
 // en enda sanningskälla; ingen hårdkodad lista att hålla i synk med motorn.
 let CALM_MODES = [], FAST_MODES = [], FULL_MODES = [];
-// Vilka SPECIALROLLER (hazer/uv/blinder/strobe/laser/co2) varje effekt aktivt
-// driver — kommer från EFFECT_META på servern. Används för att gråa ut rader
-// i "Effekt-val" när kravd roll saknar kopplad fixture, och för att lysa
-// "aktiv"-flaggorna i Avancerat när nuvarande läge driver rollen.
+// Vilka specialroller (strobe m.fl.) varje effekt driver - från EFFECT_META på servern. Gråar ut rader
+// i "Effekter i showen" när rollen saknar en kopplad lampa.
 let MODE_DRIVES = {};
 let curFixtures = [];
 function hasRoleGlobal(r) {
@@ -877,6 +748,7 @@ function refreshModeView() {
 
 
 function applyConfig(cfg) {
+  curFixtures = Array.isArray(cfg.fixtures) ? cfg.fixtures : [];
   curRotation = cfg.rotation || {};
   curMode = cfg.mode || "smart";
   if (typeof window.__maybeShowWizard === "function") window.__maybeShowWizard(cfg);
@@ -890,21 +762,8 @@ function applyConfig(cfg) {
   if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 128; }
   const fogSettings = document.getElementById("fogSettings");
   if (fogSettings) fogSettings.style.display = fog.enabled ? "" : "none";
-  if (tDropBlackout) tDropBlackout.checked = cfg.dropBlackout !== false;   // default på
   if (tScenicAnchor) tScenicAnchor.checked = !!cfg.scenicAnchor;
-  const curSrc = (cfg.audioInput ?? "aux") === "mic" ? "mic" : "aux";
-  const srcSeg = document.getElementById("srcSeg");
-  if (srcSeg) srcSeg.dataset.src = curSrc;
-  inAux.classList.toggle("active", curSrc === "aux");
-  inAux.setAttribute("aria-selected", curSrc === "aux" ? "true" : "false");
-  inMic.classList.toggle("active", curSrc === "mic");
-  inMic.setAttribute("aria-selected", curSrc === "mic" ? "true" : "false");
-
-  segActivate("segDyn", cfg.dynamics ?? 0.6, "dyn");
-  segActivate("segMaster", cfg.master ?? 1, "master");
   syncLevelUi(cfg);
-  segActivate("segSpeed", tauDownToAgg(cfg.detection?.tauDown ?? 30) > 0.5 ? 0.85 : 0.15, "agg");
-  updateAdvMirror(cfg);
   identifyingIndex = cfg.identify?.index ?? -1;
   if (calTestActive) { /* kalibrering pågår → rör inte fixture-DOM:en (nollar annars slidern) */ }
   else if (!fxDirty) { fxDraft = deepClone(cfg.fixtures); renderFixtures(); }
@@ -989,93 +848,23 @@ function syncRingUi(r) {
 })();
 
 
-/** Uppdatera "Avancerat · spegel av stämningen" — skrivskyddade sliders + dots. */
-function updateAdvMirror(cfg) {
-  const setBar = (id, pct, label) => {
-    const b = document.getElementById(id); const v = document.getElementById(id + "V");
-    if (b) b.style.width = Math.max(0, Math.min(100, pct)) + "%";
-    if (v) v.textContent = label;
-  };
-  const dyn = cfg.dynamics ?? 0.6;
-  const sens = cfg.sensitivity ?? 0.6;
-  const mst = cfg.master ?? 1;
-  setBar("advDyn",    dyn * 100,             Math.round(dyn * 100) + "%");
-  setBar("advSens",   sens * 100,            Math.round(sens * 100) + "%");
-  setBar("advMaster", mst * 100,             Math.round(mst * 100) + "%");
-  const flag = (id, on) => {
-    const el = document.getElementById(id);
-    if (el) el.classList.toggle("on", !!on);
-  };
-  flag("fEnergy", cfg.energyDrivesMode);
-  flag("fDropBl", cfg.dropBlackout);
-  // Fog: DMX-drivet — kräver att användaren aktiverat den OCH satt en giltig
-  // DMX-adress. Utan adress finns ingen hårdvara att skicka till, så flaggan
-  // ska inte lysa även om enabled är på.
-  const fogAddr = Number(cfg.fog?.address ?? 0);
-  flag("fFog",    !!(cfg.fog && cfg.fog.enabled && fogAddr > 0));
-  curFixtures = Array.isArray(cfg.fixtures) ? cfg.fixtures : [];
-  // "aktiv" = nuvarande läge driver rollen OCH minst en fixture har den rollen.
-  // Ren "kopplad utan att spelas" släcker flaggan — den ska ge en LEVANDE bild
-  // av vad rök/hazer/blinder/UV/laser/CO₂ faktiskt gör just nu, inte bara vad
-  // som är kabeldraget.
-  const drivesNow = MODE_DRIVES[cfg.mode] || [];
-  const isActive = (r) => drivesNow.includes(r) && curFixtures.some(fx => Array.isArray(fx.roles) && fx.roles.includes(r));
-  flag("fStrobeCh", isActive("strobe"));
-  flag("fHazer",    isActive("hazer"));
-  flag("fUv",       isActive("uv"));
-  flag("fBlinder",  isActive("blinder"));
-  flag("fLaser",    isActive("laser"));
-  flag("fCo2",      isActive("co2"));
-  // Lampor-lista: adress + typ (RGB / RGBW / RGB7 …) från cfg.fixtures.
-  const fxRows = document.getElementById("advFxRows");
-  const fxWrap = document.getElementById("advFxList");
-  if (fxRows && fxWrap) {
-    if (!curFixtures.length) {
-      fxWrap.style.display = "none";
-    } else {
-      fxWrap.style.display = "";
-      const presetLbl = (p) => {
-        const s = String(p || "").toLowerCase();
-        if (s === "rgb7") return "RGB 7-kanal";
-        if (s === "rgbw") return "RGBW";
-        if (s === "rgb")  return "RGB 3-kanal";
-        return s ? s.toUpperCase() : "Fixture";
-      };
-      fxRows.innerHTML = curFixtures.map((fx) => (
-        '<div class="advfx-row"><div class="n"><b>' +
-        (fx.name || "Lampa") + '</b><span>' + presetLbl(fx.preset) +
-        '</span></div><span class="a">' + (fx.address ?? "–") + '</span></div>'
-      )).join("")
-      // Rökmaskinen visas som en rad i samma lista så användaren SER dess kanal
-      // (läsbar; själva adressen sätts på /setup). Bara när den är ansluten.
-      + ((cfg.fog && cfg.fog.enabled && cfg.fog.address)
-          ? '<div class="advfx-row"><div class="n"><b>Rökmaskin</b><span>1-kanal · rök</span></div><span class="a">' + cfg.fog.address + '</span></div>'
-          : "");
-    }
-  }
-  renderCategories();   // fixtures kan ha ändrats → uppdatera "kräver: X"-taggar
-}
 function applyFrame(f) {
   const pct = Math.round(f.level * 100);
   levelBar.style.width = pct + "%";
   levelVal.textContent = pct + "%";
   const hot = f.level > 0.85;
   levelVal.classList.toggle("hot", hot);
-  // AUX-KALIBRERING: löpande max (peak-hold, ~decay) mot målzonen. Skruva
-  // källvolymen så toppen (ljusa strecket) hamnar i det gröna. Bara i AUX-läge —
-  // på mic AGC:ar motorn nivån själv, så en manuell kalibrering vore meningslös.
+  // VOLYMHJÄLP: löpande max (peak-hold, ~decay) mot målzonen. Skruva källvolymen så toppen (ljusa strecket)
+  // hamnar i det gröna - AUX-ingången har fast förstärkning.
   auxPeak = Math.max(f.level, auxPeak - 0.006);
-  const isAux = document.getElementById("srcSeg").dataset.src !== "mic";
-  if (isAux) {
+  {
     const peakPct = Math.min(100, Math.max(0, auxPeak * 100));
     calPeak.style.left = peakPct + "%";
     calZone.hidden = calMark.hidden = calPeak.hidden = calHint.hidden = false;
     const LO = 45, HI = 67;
-    if (peakPct < LO) { calHint.textContent = "▲ Skruva UPP källvolymen"; calHint.className = "cal-hint under"; }
-    else if (peakPct > HI) { calHint.textContent = "▼ Skruva NER källvolymen"; calHint.className = "cal-hint over"; }
+    if (peakPct < LO) { calHint.textContent = "▲ Skruva UPP volymen på musiken"; calHint.className = "cal-hint under"; }
+    else if (peakPct > HI) { calHint.textContent = "▼ Skruva NER volymen på musiken"; calHint.className = "cal-hint over"; }
     else { calHint.textContent = "✓ Bra nivå — topparna i det gröna"; calHint.className = "cal-hint good"; }
-  } else {
-    calZone.hidden = calMark.hidden = calPeak.hidden = calHint.hidden = true;
   }
   const barWrap = document.getElementById("levelBarWrap");
   if (barWrap) barWrap.classList.toggle("hot", hot);
@@ -1092,9 +881,8 @@ function applyFrame(f) {
     const row = document.querySelector('.rotrow[data-mode="' + f.mode + '"]');
     if (row) row.classList.add("playing");
   }
-  // Live beat-diagnostik under LEVEL
+  // Takten under ljudnivån
   const locked = typeof f.bpm === "number" && f.bpm > 0;
-  const confPct = typeof f.bpmConfidence === "number" ? Math.round(f.bpmConfidence * 100) : 0;
   const moodV = parseInt(moodSlider.value, 10) || 0;
   const modeInfo = moodInfoFor(moodV);
   const bpmPulseDot = document.getElementById("bpmPulseDot");
@@ -1109,12 +897,9 @@ function applyFrame(f) {
     bpmVal.classList.add("muted");
     if (bpmPulseDot) bpmPulseDot.style.display = "inline-block";
   }
-  confVal.textContent = locked ? confPct + "%" : "— —";
-  confVal.classList.toggle("on", locked && confPct >= 70);
-  confVal.classList.toggle("muted", !locked);
   if (moodDesc) moodDesc.textContent = moodV > 0 ? modeInfo.desc : "Ljuset är släckt — dra åt höger för att tända";
 
-  // Aktiv effekt-badge i Effekt-val-summary
+  // Aktiv effekt-badge i "Effekter i showen"
   const fxBadge = document.getElementById("fxActiveBadge");
   if (fxBadge) {
     const playing = f.mode || curPlaying;
@@ -1213,19 +998,19 @@ function validateAll() {
   const used = new Map(); // channel → fixture index
   fxDraft.forEach((fx, i) => {
     const width = rolesOf(fx).length;
-    if (!fx.name || fx.name.trim() === "") errs.push({ i, msg: "Name required" });
+    if (!fx.name || fx.name.trim() === "") errs.push({ i, msg: "Namn saknas" });
     if (!Number.isInteger(fx.address) || fx.address < 1 || fx.address > 512)
-      errs.push({ i, msg: "Address 1–512" });
+      errs.push({ i, msg: "Adress 1–512" });
     else if (fx.address + width - 1 > 512)
-      errs.push({ i, msg: `Overflows universe (needs ${width} ch)` });
+      errs.push({ i, msg: `Får inte plats (behöver ${width} kanaler)` });
     else {
       for (let c = fx.address; c < fx.address + width; c++) {
-        if (used.has(c)) errs.push({ i, msg: `Ch ${c} overlaps "${fxDraft[used.get(c)].name}"` });
+        if (used.has(c)) errs.push({ i, msg: `Kanal ${c} krockar med "${fxDraft[used.get(c)].name}"` });
         else used.set(c, i);
       }
     }
     if (fx.preset === "custom" && (!fx.roles || fx.roles.length === 0))
-      errs.push({ i, msg: "Add at least one channel" });
+      errs.push({ i, msg: "Lägg till minst en kanal" });
   });
   return errs;
 }
@@ -1268,7 +1053,6 @@ function renderFixtures() {
           <span class="fx-cal-title">Släckpunkt och fullpunkt</span>
           <span class="fx-cal-badge ${calBadge === "ej satt" ? "unset" : ""}" data-cal-badge="${i}">${calBadge}</span>
         </div>
-        <div class="fx-cal-hint">Välj färg, dra tills <b>just den</b> precis tänder, tryck spara. <b>Alla</b> = gemensam tröskel · R/G/B = per färg (dioderna tänder vid olika DMX). <b>Full</b> = lampan lyser vitt, dra DIM tills den <b>inte blir ljusare</b>, tryck spara.</div>
         <div class="fx-cal-chips">
           ${["all","r","g","b","full"].map((c) => `<button type="button" class="fx-cal-chip${(calSel[i] || "all") === c ? " on" : ""}" data-cal-ch="${c}" data-cal-ch-i="${i}">${({all:"Alla",r:"R",g:"G",b:"B",full:"Full"})[c]}</button>`).join("")}
         </div>
@@ -1308,8 +1092,8 @@ function renderFixtures() {
   });
 
   fxHint.textContent = fxDirty
-    ? (errs.length ? `${errs.length} problem${errs.length > 1 ? "s" : ""} to fix before saving` : "Ready to save")
-    : "Tap a fixture to edit. Changes are validated before saving.";
+    ? (errs.length ? `${errs.length} fel att rätta innan du sparar` : "Redo att spara")
+    : "Ändra namn, adress eller kalibrering - kontrolleras innan det sparas.";
   fxSaveBtn.disabled = !fxDirty || errs.length > 0;
 
   // Wire up
@@ -1388,7 +1172,7 @@ function renderFixtures() {
     el.addEventListener("click", (e) => {
       // Only useful on saved fixtures — the engine renders from cfg.fixtures,
       // not fxDraft. Warn if there are unsaved edits.
-      if (fxDirty) { fxHint.textContent = "Save changes before identifying"; return; }
+      if (fxDirty) { fxHint.textContent = "Spara ändringarna först"; return; }
       send({ type: "identifyOne", index: Number(e.target.dataset.id) });
     });
   });
@@ -1496,8 +1280,8 @@ function escapeHtml(s) {
 
 document.getElementById("fxAdd").onclick = () => {
   const addr = nextFreeAddress(3, fxDraft);
-  if (addr === 0) { fxHint.textContent = "Universe full — remove a fixture first"; return; }
-  fxDraft.push({ name: `Fixture ${fxDraft.length + 1}`, address: addr, preset: "rgb" });
+  if (addr === 0) { fxHint.textContent = "Alla 512 kanaler är upptagna — ta bort en lampa först"; return; }
+  fxDraft.push({ name: `Lampa ${fxDraft.length + 1}`, address: addr, preset: "rgb" });
   markDirty();
 };
 
@@ -1524,7 +1308,7 @@ document.getElementById("fxAutoPack").onclick = () => {
   let addr = 1;
   for (const fx of fxDraft) {
     const w = rolesOf(fx).length;
-    if (addr + w - 1 > 512) { fxHint.textContent = "Universe full — can't fit all fixtures"; return; }
+    if (addr + w - 1 > 512) { fxHint.textContent = "Alla lampor får inte plats på 512 kanaler"; return; }
     fx.address = addr;
     addr += w;
   }
@@ -1532,7 +1316,7 @@ document.getElementById("fxAutoPack").onclick = () => {
 };
 
 document.getElementById("fxIdentifyAll").onclick = () => {
-  if (fxDirty) { fxHint.textContent = "Save changes before identifying"; return; }
+  if (fxDirty) { fxHint.textContent = "Spara ändringarna först"; return; }
   // Toggle: if something is already blinking, stop it; otherwise start.
   if (identifyingIndex >= 0) send({ type: "identifyStop" });
   else send({ type: "identifyAll", stepMs: 700 });
@@ -1549,13 +1333,11 @@ fxSaveBtn.onclick = () => {
 };
 
 
-const tEnergy = document.getElementById("tEnergy");
 
 
 // Live beat-diagnostik under LEVEL (uppdateras i applyFrame).
 const bpmVal = document.getElementById("bpmVal");
 const bpmDot = document.getElementById("bpmDot");
-const confVal = document.getElementById("confVal");
 const moodDesc = document.getElementById("moodDesc");
 
 let beatTimer;
@@ -1585,27 +1367,10 @@ fogServiceReset.onclick = () => {
   if (confirm("Nollställ rökmaskinens räknare? Gör detta efter påfylld tank / rengöring.")) send({ type: "fogService" });
 };
 
-/* ── Regi (pro) ──────────────────────────────────────────────────────────
- * Ägar-val; stämnings-vredet rör dem inte (regiPro och de döda VU-/klubb-/glöd-/strobe-tak-flaggorna borttagna 2026-10-10). */
-const tDropBlackout = document.getElementById("tDropBlackout");
-tDropBlackout.onchange = () => send({ type: "setDropBlackout", value: tDropBlackout.checked });
+
+/* ── Show ── */
 const tScenicAnchor = document.getElementById("tScenicAnchor");
 tScenicAnchor.onchange = () => send({ type: "setScenicAnchor", value: tScenicAnchor.checked });
-// Smart/Manuell-brytare. PÅ = smart (energi styr, checkboxar väljer poolen).
-// AV = manuellt — listorna blir tryckknappar; vi fryser på effekten som spelas
-// just nu så det inte hoppar, sen väljer du fritt.
-if (tEnergy) tEnergy.onchange = () => {
-  if (tEnergy.checked) {
-    curMode = "smart";
-    send({ type: "setEnergyDrivesMode", value: true });
-    send({ type: "setMode", mode: "smart" });
-  } else {
-    const pick = (curPlaying && curPlaying !== "smart" && curPlaying !== "blackout") ? curPlaying : "wave";
-    curMode = pick;
-    send({ type: "setMode", mode: pick });
-  }
-  refreshModeView();
-};
 
 renderCategories();
 connect();
@@ -1673,77 +1438,10 @@ wifiForgetBtn.onclick = async () => {
   await refreshWifi();
 };
 
-// ---- Self-update ----------------------------------------------------------
-const verSha = document.getElementById("verSha");
-const verMsg = document.getElementById("verMsg");
+
+// ---- Motor-version + fabriks-reset ----------------------------------------
 const engVer = document.getElementById("engVer");
-const btnUpdate = document.getElementById("btnUpdate");
-const updLog = document.getElementById("updLog");
-let updPoll = null;
-
-async function refreshVersion() {
-  try {
-    const [status, ver] = await Promise.all([
-      fetch("/update/status").then(r => r.json()).catch(() => ({})),
-      fetch("/api/version").then(r => r.json()).catch(() => ({})),
-    ]);
-    if (engVer) engVer.textContent = ver.version ? `v${ver.version}` : "–";
-    verSha.textContent = status.sha ? `${status.sha} · ${new Date(status.date).toLocaleString("sv-SE")}` : (status.error ?? "unknown");
-    verMsg.textContent = status.msg ?? "";
-    if (status.log) { updLog.textContent = status.log; }
-  } catch {}
-}
-refreshVersion();
-
-btnUpdate.onclick = async () => {
-  if (!confirm("Uppdatera till senaste versionen? Tjänsten startas om. Om nya versionen kraschar rullar vi automatiskt tillbaka efter 60 s.")) return;
-  btnUpdate.disabled = true;
-  btnUpdate.textContent = "Uppdaterar…";
-  updLog.style.display = "block";
-  updLog.textContent = "Startar…";
-  try {
-    await fetch("/update", { method: "POST" });
-  } catch {}
-  // Poll status + version; when SHA changes we're done.
-  const startedSha = verSha.textContent;
-  if (updPoll) clearInterval(updPoll);
-  updPoll = setInterval(async () => {
-    await refreshVersion();
-    if (verSha.textContent && verSha.textContent !== startedSha && !/–|unknown/.test(verSha.textContent)) {
-      clearInterval(updPoll); updPoll = null;
-      btnUpdate.disabled = false;
-      btnUpdate.textContent = "Uppdatera till senaste";
-    }
-  }, 2000);
-  // Safety timeout — 4 min räcker för install + 60 s stabilitetsfönstret.
-  setTimeout(() => {
-    if (updPoll) { clearInterval(updPoll); updPoll = null; }
-    btnUpdate.disabled = false;
-    btnUpdate.textContent = "Uppdatera till senaste";
-  }, 240000);
-};
-
-// ---- Rollback + fabriks-reset --------------------------------------------
-// Rollback: går tillbaka till förra SHA (sparad av update.sh). Bara meningsfullt
-// om en tidigare /update har körts sen boxen kom från fabriken.
-const btnRollback = document.getElementById("btnRollback");
-if (btnRollback) btnRollback.onclick = async () => {
-  if (!confirm("Rulla tillbaka till föregående version? Tjänsten startas om.")) return;
-  btnRollback.disabled = true;
-  btnRollback.textContent = "Rullar tillbaka…";
-  updLog.style.display = "block";
-  updLog.textContent = "Startar rollback…";
-  try { await fetch("/update/rollback", { method: "POST" }); } catch {}
-  // Samma poll-mönster som update: version ändras → klar
-  const startedSha = verSha.textContent;
-  const p = setInterval(async () => {
-    await refreshVersion();
-    if (verSha.textContent && verSha.textContent !== startedSha && !/–|unknown/.test(verSha.textContent)) {
-      clearInterval(p); btnRollback.disabled = false; btnRollback.textContent = "Rulla tillbaka";
-    }
-  }, 2000);
-  setTimeout(() => { clearInterval(p); btnRollback.disabled = false; btnRollback.textContent = "Rulla tillbaka"; }, 180000);
-};
+fetch("/api/version").then(r => r.json()).then(v => { if (engVer) engVer.textContent = v.version ? `v${v.version}` : "–"; }).catch(() => {});
 
 // Fabriks-reset: nolla config (fixtures FÖRSVINNER). Konfigen sparas som
 // .factory-<ts>-backup så ägaren kan återställa manuellt om det var fel knapp.
@@ -1836,180 +1534,6 @@ if (btnHealthDownload) btnHealthDownload.onclick = async () => {
 // Ladda in en första omgång direkt när owner-vyn öppnas.
 if (OWNER_MODE) refreshHealthLog();
 
-// ---- Typskylt ------------------------------------------------------------
-// CE-krav: varje enhet i EU måste ha en typskylt med tillverkare, modell, SN,
-// spänning, radio-EIRP, CE + WEEE-symbol. Ägaren fyller i sina fält och får
-// ut en färdig etikett-text att skicka till trycket.
-const TS_FIELDS = ["Mfg","Org","Addr1","Addr2","Country","Contact","Model","SN","MfgDate","Ip"];
-const TS_DEFAULTS = { Country: "Sverige", Model: "PDMX-1", Ip: "IP20" };
-const tsPreview = document.getElementById("tsPreview");
-function tsGet() {
-  const v = {};
-  for (const k of TS_FIELDS) {
-    const el = document.getElementById("ts" + k);
-    v[k] = el ? el.value.trim() : "";
-  }
-  return v;
-}
-function tsRender() {
-  if (!tsPreview) return;
-  const v = tsGet();
-  const pad = (s, n) => (s + " ".repeat(n)).slice(0, n);
-  const line = "──────────────────────────────────────────────────────";
-  const L = [
-    "  pi-dmx Controller           Model: " + (v.Model || "PDMX-1"),
-    "  " + line,
-    "  SN: " + pad(v.SN || "—", 22) + " Mfg: " + (v.MfgDate || "—"),
-    "",
-    "  Input:  5 V ⎓  3 A max  (USB-C)",
-    "  Power:  15 W max",
-    "  IP:     " + (v.Ip || "IP20") + "  (indoor use only)",
-    "",
-    "  Radio:  Wi-Fi 2.4 GHz  ≤100 mW EIRP",
-    "          BT 4.2 LE      ≤10 mW EIRP",
-    "",
-    "  Manufacturer:",
-    "    " + (v.Mfg || "[företagsnamn]") + (v.Org ? "  (" + v.Org + ")" : ""),
-    "    " + (v.Addr1 || "[gatuadress]"),
-    "    " + (v.Addr2 || "[postnr ort]") + ", " + (v.Country || "Sverige"),
-    "    " + (v.Contact || "[e-post/URL]"),
-    "",
-    "  Made in " + (v.Country || "Sweden"),
-    "",
-    "      ( C E )        ( WEEE — överkryssad soptunna )",
-    "",
-    "  ⚠ Stroboskop — se manual. Endast inomhus.",
-    "  ⚠ Strobe — see manual. Indoor use only.",
-  ];
-  tsPreview.textContent = L.join("\n");
-  try { localStorage.setItem("pi-dmx-typskylt-v1", JSON.stringify(v)); } catch {}
-}
-(function tsInit(){
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem("pi-dmx-typskylt-v1") || "{}"); } catch {}
-  for (const k of TS_FIELDS) {
-    const el = document.getElementById("ts" + k);
-    if (!el) continue;
-    el.value = saved[k] ?? TS_DEFAULTS[k] ?? "";
-    el.addEventListener("input", tsRender);
-  }
-  tsRender();
-  const cp = document.getElementById("tsCopy");
-  if (cp) cp.onclick = async () => {
-    try { await navigator.clipboard.writeText(tsPreview.textContent); cp.textContent = "Kopierat ✓"; setTimeout(()=>cp.textContent="Kopiera etikett", 1500); }
-    catch { alert("Kunde inte kopiera — markera texten manuellt."); }
-  };
-  const pr = document.getElementById("tsPrint");
-  if (pr) pr.onclick = () => {
-    const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.write("<pre style='font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:20px'>" + tsPreview.textContent.replace(/</g,"&lt;") + "</pre>");
-    w.document.close(); w.focus(); w.print();
-  };
-  const dc = document.getElementById("tsDoc");
-  if (dc) dc.onclick = () => {
-    const v = tsGet();
-    const esc = (s) => (s || "").replace(/[&<>]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" })[c]);
-    const today = new Date().toISOString().slice(0,10);
-    const mfg = esc(v.Mfg || "[Företagsnamn]");
-    const addr = [v.Addr1, v.Addr2, v.Country].filter(Boolean).map(esc).join(", ") || "[Adress]";
-    const model = esc(v.Model || "PDMX-1");
-    const sn = esc(v.SN || "[Serienummer / batch]");
-    const contact = esc(v.Contact || "[E-post/URL]");
-    const html = `<!doctype html><html lang="sv"><head><meta charset="utf-8">
-<title>EU Declaration of Conformity — ${model}</title>
-<style>
-  @page { size: A4; margin: 22mm 20mm; }
-  body { font-family: Georgia, "Times New Roman", serif; color:#111; font-size:11pt; line-height:1.55; }
-  h1 { font-size:16pt; margin:0 0 4px; letter-spacing:.02em; }
-  h2 { font-size:11pt; margin:22px 0 6px; text-transform:uppercase; letter-spacing:.08em; border-bottom:1px solid #333; padding-bottom:2px; }
-  .sub { color:#555; font-size:10pt; margin-bottom:18px; }
-  table { width:100%; border-collapse:collapse; margin:6px 0; }
-  td { padding:4px 6px; vertical-align:top; border-bottom:1px solid #eee; }
-  td.k { width:38%; color:#555; }
-  ul { margin:4px 0 4px 20px; padding:0; }
-  li { margin:2px 0; }
-  .sig { margin-top:36px; display:flex; gap:40px; }
-  .sig div { flex:1; }
-  .sig .line { border-top:1px solid #111; margin-top:48px; padding-top:4px; font-size:9pt; color:#555; }
-  .foot { margin-top:24px; font-size:9pt; color:#666; }
-  .warn { font-size:9pt; color:#555; font-style:italic; }
-  @media print { .noprint { display:none; } }
-  .noprint { position:fixed; top:8px; right:8px; }
-  .noprint button { font:inherit; padding:8px 14px; cursor:pointer; }
-</style></head><body>
-<div class="noprint"><button onclick="window.print()">Skriv ut / Spara som PDF</button></div>
-
-<h1>EU Declaration of Conformity</h1>
-<div class="sub">EU-försäkran om överensstämmelse · Utfärdad ${today}</div>
-
-<h2>1. Product / Produkt</h2>
-<table>
-  <tr><td class="k">Product name</td><td>pi-dmx Controller — audio-reactive DMX lighting controller</td></tr>
-  <tr><td class="k">Model / Type</td><td>${model}</td></tr>
-  <tr><td class="k">Serial number / Batch</td><td>${sn}</td></tr>
-</table>
-
-<h2>2. Manufacturer / Tillverkare</h2>
-<table>
-  <tr><td class="k">Name</td><td>${mfg}${v.Org ? " (Org.nr " + esc(v.Org) + ")" : ""}</td></tr>
-  <tr><td class="k">Address</td><td>${addr}</td></tr>
-  <tr><td class="k">Contact</td><td>${contact}</td></tr>
-</table>
-
-<h2>3. Object of the declaration</h2>
-<p>This declaration of conformity is issued under the sole responsibility of the manufacturer.
-Föremålet för försäkran ovan överensstämmer med relevant harmoniserad unionslagstiftning:</p>
-<ul>
-  <li><b>Radio Equipment Directive (RED)</b> — 2014/53/EU</li>
-  <li><b>RoHS</b> — 2011/65/EU (as amended by (EU) 2015/863)</li>
-  <li><b>WEEE</b> — 2012/19/EU</li>
-  <li><b>General Product Safety Regulation</b> — (EU) 2023/988</li>
-</ul>
-
-<h2>4. Harmonised standards applied</h2>
-<ul>
-  <li>EN 301 489-1 / EN 301 489-17 — EMC for radio equipment (Wi-Fi/BT)</li>
-  <li>EN 300 328 — Wideband transmission systems, 2.4 GHz band</li>
-  <li>EN IEC 62368-1 — Audio/video, information and communication technology equipment — Safety</li>
-  <li>EN IEC 63000 — Technical documentation for restriction of hazardous substances</li>
-  <li>EN 62479 — Assessment of low-power electronic equipment (RF exposure)</li>
-</ul>
-<p class="warn">Justera listan efter faktiskt genomförd provning. Ta bort standarder som inte tillämpats.</p>
-
-<h2>5. Radio characteristics</h2>
-<table>
-  <tr><td class="k">Frequency band</td><td>2400–2483.5 MHz</td></tr>
-  <tr><td class="k">Wi-Fi max EIRP</td><td>≤ 100 mW (20 dBm)</td></tr>
-  <tr><td class="k">Bluetooth LE max EIRP</td><td>≤ 10 mW (10 dBm)</td></tr>
-  <tr><td class="k">Radio module</td><td>Integrated in Raspberry Pi Zero 2 W (CYW43438)</td></tr>
-</table>
-
-<h2>6. Additional information</h2>
-<table>
-  <tr><td class="k">Input</td><td>5 V DC, 3 A max, USB-C</td></tr>
-  <tr><td class="k">Power consumption</td><td>15 W max</td></tr>
-  <tr><td class="k">Ingress protection</td><td>${esc(v.Ip || "IP20")} — indoor use only</td></tr>
-  <tr><td class="k">Manufacturing date / batch</td><td>${esc(v.MfgDate || "—")}</td></tr>
-</table>
-
-<h2>7. Signature / Undertecknat för och på uppdrag av tillverkaren</h2>
-<div class="sig">
-  <div><div class="line">Ort och datum / Place and date</div></div>
-  <div><div class="line">Namn, befattning / Name, position</div></div>
-  <div><div class="line">Underskrift / Signature</div></div>
-</div>
-
-<div class="foot">
-  Dokumentet ska arkiveras hos tillverkaren i minst 10 år efter att den sista enheten släppts på marknaden.
-  Kopia medföljer varje enhet vid leverans.
-</div>
-</body></html>`;
-    const w = window.open("", "_blank");
-    if (!w) { alert("Popup blockerad — tillåt popups för att generera DoC."); return; }
-    w.document.write(html); w.document.close(); w.focus();
-  };
-})();
 
 
 
@@ -2090,7 +1614,7 @@ function walkGuess(answers) {
   if (hasR && hasG && hasB && hasW) return { preset: "rgbw", why: "Alla fyra grundfärger identifierade" };
   if (hasR && hasG && hasB) return { preset: "rgb", why: "Endast R/G/B — inget som antyder fler kanaler" };
   if (hasDim && !hasR && !hasG && !hasB) return { preset: "dimmer", why: "Bara ljusstyrka reagerar" };
-  return { preset: null, why: "Osäkert — testa igen eller välj preset manuellt i Avancerat." };
+  return { preset: null, why: "Osäkert — testa igen eller välj typ under lampans Avancerat." };
 }
 function walkFinish() {
   const g = walkGuess(walkState.answers);
@@ -2160,7 +1684,7 @@ function renderHealth() {
   // Mic-tyst: bara relevant om ljuset är på (curMode !== blackout) och det gått
   // >30s sen vi hörde nåt. Låg prio → adderas bara om inget värre är fel.
   if (curMode !== "blackout" && Date.now() - lastAudibleMs > 30000 && sev === "") {
-    msgs.push("<b>Ingen ljud-signal på 30s</b> — spela musik eller kolla mikrofonen/AUX-kabeln.");
+    msgs.push("<b>Ingen musik på 30 s</b> — spela musik eller kolla AUX-kabeln.");
     sev = "warn";
   }
   healthBanner.className = "health-banner" + (msgs.length ? " show " + sev : "");

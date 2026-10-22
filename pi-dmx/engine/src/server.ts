@@ -17,7 +17,7 @@ import { isLogOn, setLogOn } from "./quiet.js";
 // 2026-10-04 (som lotus): git/nmcli asynkront - den synkrona varianten holl showens huvudtrad tills kommandot var klart nar
 // nagon oppnade uppdaterings- eller wifi-panelen. Utan skal (nmcli far SSID/losenord fran anvandaren).
 const execFileP = promisify(execFile);
-import { readFileSync, existsSync, writeFileSync, copyFileSync } from "node:fs";
+import { readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { applyIntensity } from "./moods.js";
@@ -307,67 +307,6 @@ export async function startServer(
   });
 
 
-  // ---- Self-update ---------------------------------------------------------
-  // The repo lives at /root/pi-dmx-src (or wherever `git clone` put it).
-  // Override with PI_DMX_REPO=/path if you cloned elsewhere.
-  const REPO = process.env.PI_DMX_REPO ?? "/root/pi-dmx-src";
-  const UPDATE_LOG = "/var/log/pi-dmx-update.log";
-
-  const git = async (...args: string[]) => (await execFileP("git", ["-C", REPO, ...args], { encoding: "utf8" })).stdout.trim();
-  const gitInfo = async () => {
-    try {
-      const [sha, msg, date] = await Promise.all([git("rev-parse", "--short", "HEAD"), git("log", "-1", "--pretty=%s"), git("log", "-1", "--pretty=%cI")]);
-      return { sha, msg, date, repo: REPO };
-    } catch (e) {
-      return { error: (e as Error).message, repo: REPO };
-    }
-  };
-
-  app.get("/update/status", async () => {
-    const log = existsSync(UPDATE_LOG)
-      ? readFileSync(UPDATE_LOG, "utf8").split("\n").slice(-40).join("\n")
-      : "";
-    return { ...(await gitInfo()), log };
-  });
-
-  app.post("/update", async (_req, reply) => {
-    // Detach via systemd-run so the install.sh restart of audio-dmx-engine
-    // doesn't kill the updater mid-run.
-    try {
-      const up = spawn("systemd-run", [
-        "--unit=pi-dmx-update",
-        "--collect",
-        "--quiet",
-        "/bin/bash", `${REPO}/pi-dmx/update.sh`,
-      ], { detached: true, stdio: "ignore" });
-      up.on("error", (e) => console.error("[update] spawn:", (e as Error).message));   // ej krascha om systemd-run saknas
-      up.unref();
-      logHealth("info", "update", "OTA-uppdatering startad");
-      return reply.send({ started: true });
-    } catch (e) {
-      logHealth("err", "update", `start misslyckades: ${(e as Error).message}`);
-      return reply.code(500).send({ error: (e as Error).message });
-    }
-  });
-
-  // Rollback: kör rollback.sh som checkar ut `.prev-sha` sparad av senaste
-  // update.sh och kör om install. Samma detachning som /update — annars killar
-  // engine-restarten scriptet halvvägs.
-  app.post("/update/rollback", async (_req, reply) => {
-    try {
-      const up = spawn("systemd-run", [
-        "--unit=pi-dmx-rollback", "--collect", "--quiet",
-        "/bin/bash", `${REPO}/pi-dmx/rollback.sh`,
-      ], { detached: true, stdio: "ignore" });
-      up.on("error", (e) => console.error("[rollback] spawn:", (e as Error).message));
-      up.unref();
-      logHealth("warn", "update", "rollback startad");
-      return reply.send({ started: true });
-    } catch (e) {
-      logHealth("err", "update", `rollback misslyckades: ${(e as Error).message}`);
-      return reply.code(500).send({ error: (e as Error).message });
-    }
-  });
 
   // Fabriks-reset: flytta undan configen (BEHÅLL den som .factory-<ts> för
   // återhämtning om ägaren ångrar sig), tvinga en systemd-restart så motorn
@@ -582,15 +521,6 @@ export async function startServer(
             sendState(sock, "modeChanged", JSON.stringify({ type: "modeChanged", mode: next }));
           } else if (msg.type === "probeDmx") {
             deps.probeDmx?.(Array.isArray(msg.channels) ? msg.channels.map(Number) : [1, 2, 3, 4, 5, 6, 7], Number(msg.frames) || 400);
-          } else if (msg.type === "setSensitivity") {
-            deps.cfg.sensitivity = clamp01(msg.value);
-          } else if (msg.type === "setAudioInput" && (msg.value === "aux" || msg.value === "mic")) {
-            deps.cfg.audioInput = msg.value;
-            applyInputRouting(msg.value);
-            deps.resetAgc(msg.value === "mic" ? 20 : 1);
-            deps.setGainLock(msg.value !== "mic");
-          } else if (msg.type === "setDynamics") {
-            deps.cfg.dynamics = clamp01(msg.value);
           } else if (msg.type === "setMaster") {
             deps.cfg.master = clamp01(msg.value);
           } else if (msg.type === "setSilenceHold" && Number.isFinite(msg.value)) {
@@ -645,19 +575,6 @@ export async function startServer(
             } else {
               deps.cfg.walkTest = null;
             }
-          } else if (msg.type === "setDmxMaxHz" && typeof msg.value === "number") {
-            deps.cfg.dmxMaxHz = Math.max(30, Math.min(500, Math.round(msg.value)));
-          } else if (msg.type === "setAgcTarget" && typeof msg.value === "number") {
-            // Target loudness the AGC aims for (0.2 = subtle, 0.8 = punchy).
-            deps.cfg.detection.autoGainTarget = Math.max(0.1, Math.min(0.9, msg.value));
-          } else if (msg.type === "setAgcAggressiveness" && typeof msg.value === "number") {
-            // Single knob → both tau values on a log curve.
-            // 0 = slow (tauUp 180 s / tauDown 60 s), 1 = fast (10 s / 2 s).
-            const a = Math.max(0, Math.min(1, msg.value));
-            deps.cfg.detection.tauUp   = 180 * Math.pow(10 / 180, a);
-            deps.cfg.detection.tauDown = 60  * Math.pow(2  / 60,  a);
-          } else if (msg.type === "setEnergyDrivesMode") {
-            deps.cfg.energyDrivesMode = !!msg.value;
           } else if (msg.type === "setRotation" && typeof msg.mode === "string") {
             deps.cfg.rotation = { ...deps.cfg.rotation, [msg.mode]: !!msg.value };
           } else if (msg.type === "setFog" && msg.fog && typeof msg.fog === "object") {
@@ -675,12 +592,8 @@ export async function startServer(
               // Drifträknarna ägs av motorn — aldrig satta av klienten.
               sprayMs: cur.sprayMs, bursts: cur.bursts, serviceAtMs: cur.serviceAtMs, warmStartMs: cur.warmStartMs,
             };
-          } else if (msg.type === "setDropBlackout") {
-            deps.cfg.dropBlackout = !!msg.value;
           } else if (msg.type === "setScenicAnchor") {
             deps.cfg.scenicAnchor = !!msg.value;
-          } else if (msg.type === "setShowLead" && typeof msg.value === "number") {
-            deps.cfg.showLeadMs = Math.max(0, Math.min(300, Math.round(msg.value)));
           } else if (msg.type === "setRing" && msg.ring && typeof msg.ring === "object" && deps.cfg.intensityRing) {
             const r = msg.ring as Record<string, unknown>;
             const cur = deps.cfg.intensityRing;

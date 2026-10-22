@@ -502,8 +502,7 @@ export class EffectEngine {
     rgb[0] = o[0] * k; rgb[1] = o[1] * k; rgb[2] = o[2] * k;
   }
 
-  private effektNiva(rgb: [number, number, number], ctx: EffectContext, blackout: boolean, toggle = false, sparse = false): [number, number, number] {
-    if (blackout) { rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; return rgb; }
+  private effektNiva(rgb: [number, number, number], ctx: EffectContext, toggle = false, sparse = false): [number, number, number] {
     // LAMPTRAPPA (DMX_LAMP_STAIR, vers/intro): icke-sparsam effekt -> bara ett lamppar, paret byts varje fras; drop-looken tänder allt.
     if (sparse && this.dropColEnv <= 0.005 && this.miniColEnv <= 0.005 && ctx.group !== ((Math.floor(ctx.beatIdx / 16) & 1))) { rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; return rgb; }
     let m = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
@@ -561,8 +560,6 @@ export class EffectEngine {
                                                    // → 1 s rök ≈ 6,7 s återhämtning
                                  // (själva starttiden bor i cfg.fog.warmStartMs → överlever omstart)
   // NOVELTY-UPPBYGGNADS-DETEKTOR: spektral novelty leder dropen (mätt validerat).
-  private wasBreaking = false;   // flankdetektor för nivå-svacka (drop-blackout)
-  private blackoutUntil = 0;     // dramaturgisk tystnad: kolsvart till (wall-clock ms)
   // ── DRAMATURGI UR LÅTMINNET (sätts av index.ts, bara för IGENKÄNDA låtar) ──
   // En FÖRBERÄKNAD kurva kan inte fladdra som live-VU:n gjorde: ett värde per
   // sekund, mjukt interpolerat. Okänd låt → allt är null/0 och showen kör som förut.
@@ -1358,7 +1355,7 @@ export class EffectEngine {
   }
 
   /** LAMPORNA: effekt -> effektNiva -> kulörtoning -> energi -> uttoning -> utgång, per lampa (utbrutet ur render 10-16, GC-jakten: ordagrant flyttat, samma ordning). */
-  private renderLamps(effect: EffectDef | undefined, count: number, ordSel: number, useAnchor: boolean, blackout: boolean, fxToggle: boolean, fxSparse: boolean, fastLight: boolean, modE: boolean): boolean {
+  private renderLamps(effect: EffectDef | undefined, count: number, ordSel: number, useAnchor: boolean, fxToggle: boolean, fxSparse: boolean, fastLight: boolean, modE: boolean): boolean {
     const t = this.rT, anchorHue = this.rAnchorHue, nowWall = this.rNowWall, inputGate = this.rInputGate, md = this.rMd, drive = this.rDrive, renderNow = this.rNowP, fadeK = this.rFadeK;
     const ctx = this.ctx, bands = this.bandsBuf, specialty = this.specBuf;
     let wantStrobe = 0, wantBlinder = 0, wantUv = 0, wantLaser = 0, wantHazer = 0, wantCo2 = 0, wantFogFx = false;
@@ -1380,7 +1377,7 @@ export class EffectEngine {
         if (fx?.bands?.length) { let mb = -Infinity; for (let k = 0; k < fx.bands.length; k++) mb = Math.max(mb, bands[BAND_IDX[fx.bands[k]]]); ctx.band = mb; }   // = Math.max(...fx.bands.map(...)) utan spread/closure
         else ctx.band = bands[i % bands.length];
         rgb = effect ? this.lampColor(i, effect.render(ctx)) : this.lampColor(i, ZERO3);   // (se lampColor)
-        rgb = this.effektNiva(rgb, ctx, blackout, fxToggle, fxSparse);   // STEG 1 forts.: effektens niva och drop-looken (se effektNiva)
+        rgb = this.effektNiva(rgb, ctx, fxToggle, fxSparse);   // STEG 1 forts.: effektens niva och drop-looken (se effektNiva)
         // EFFEKTENS ÖNSKEMÅL. Den vet sin egen dramaturgi bäst; motorn avgör om det
         // blir av (fixturen måste ha rollen, och rök går genom hårdvaruskyddet).
         // Högsta önskemål bland lamporna vinner — en effekt som vill stroba på EN
@@ -1555,17 +1552,6 @@ export class EffectEngine {
     // mitten. Har ar anvandarens oga ratt matinstrument: hur lange en drop ska
     // halla ar en upplevelseparameter, inte en troskel att mata fram.
     if (dropHit) this.dropBangUntil = nowWall + 700;   // 1300 -> 700 (ladan 10-11 22:0x, ägaren: 'huvuddrop, vi kan nog minska tiden den är på'); uttoningen 1 s orörd
-    // DROP-BLACKOUT (dramaturgisk tystnad): en riser som BRYTS ner i en svacka
-    // strax före dropen → tvinga kolsvart i max 250ms. Svärtan STARTAR på
-    // svackans flank (bara om vi faktiskt byggt upp: buildUp>0.35) och SLÄPPS i
-    // samma stund dropen fyrar → explosionen landar exakt i takt, aldrig
-    // fördröjd. Rinner risern ut utan drop kommer ljuset bara tillbaka.
-    const nowBreaking = frame.breaking;
-    if (this.cfg.dropBlackout && nowBreaking && !this.wasBreaking && frame.buildUp > 0.35) {
-      this.blackoutUntil = nowWall + 250;
-    }
-    this.wasBreaking = nowBreaking;
-    if (dropHit) this.blackoutUntil = 0;                                                        // dropen fyrade → släpp svärtan, explodera
     return dropHitRaw;
   }
 
@@ -1748,7 +1734,6 @@ export class EffectEngine {
     // Här ligger bara show-REAKTIONEN: accent-fönster, blackout, rök, envelope.
     const dtNow = dtSec;   // (se EN KLOCKA PER RUTA)
     const dropHitRaw = this.stepDrop(frame), dropHit = dropHitRaw;
-    const blackout = nowWall < this.blackoutUntil;
     const fog = this.cfg.fog;   // rök beslutas EFTER effekterna (de får önska) — se nedan
     // `frame.inZone`-KRAVET BORTTAGET (ägaren i ladan 2026-09-03: bra fångst). Det var
     // orsaken till att lamp-blixten kom "upp till en takt efter, varierande" medan
@@ -2036,7 +2021,7 @@ export class EffectEngine {
     const fastLight = !!effect?.fastLight;   // effekten skippar minsta pa-tid (EffectDef.fastLight)   // STEG 2: uttoningens tidskonstant i DMX-ljus (FADE_MIN_S x gamma fore gamman)
     const modE = modulateOf(effMode).energy;   // samma för alla lampor - en gång per ruta
     this.rT = t; this.rAnchorHue = anchorHue; this.rInputGate = inputGate; this.rMd = md; this.rDrive = drive; this.rFadeK = fadeK;
-    wantFogFx = this.renderLamps(effect, count, ordSel, useAnchor, blackout, fxToggle, fxSparse, fastLight, modE);
+    wantFogFx = this.renderLamps(effect, count, ordSel, useAnchor, fxToggle, fxSparse, fastLight, modE);
 
     if (E_NORM_S > 0) { this.fxPeak = Math.max(this.fxPeakNow, this.fxPeak * Math.exp(-dtSec / E_NORM_S)); this.fxNorm = Math.min(E_NORM_MAX, 1 / Math.max(0.05, this.fxPeak)); }   // STEG 1: effektens topp
     // Bygg strobe-masken bara när fixtures ändras (inte varje frame).
