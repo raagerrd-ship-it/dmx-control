@@ -1,0 +1,81 @@
+diff --git a/pi-dmx/engine/src/config.ts b/pi-dmx/engine/src/config.ts
+index 1eabd05..556e19d 100644
+--- a/pi-dmx/engine/src/config.ts
++++ b/pi-dmx/engine/src/config.ts
+@@ -3,7 +3,7 @@
+  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
+  */
+ 
+-export type Mode = "smart" | "stegring" | "andrum" | "sug" | "vagbrytare" | "nedrakning" | "upptakt" | "fyllning" | "pingpong" | "virvel" | "fyr" | "rullandning" | "fyrverkeri" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "rave" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "duel" | "airglow" | "tide" | "drift" | "pendel" | "viska" | "backbeat" | "tick" | "stege" | "eko" | "hjarta" | "konfetti" | "sopa" | "varannan" | "forvarning" | "basgang" | "tyngdlyft" | "frasraknare" | "vidga" | "svall" | "gryning" | "ankomst" | "glimt" | "rulle" | "kickregn" | "efterskalv" | "motor" | "flod" | "famn" | "spaning" | "startskott" | "siren" | "skuggor" | "stjarnor" | "mullra" | "kaskad" | "droppar" | "uppvarmning" | "dunk" | "glesna" | "dyning" | "blixtnedslag" | "mellanslag" | "pump" | "hiss" | "tratt" | "morkerslag" | "urladdning" | "blackout";
++export type Mode = "smart" | "stegring" | "andrum" | "sug" | "vagbrytare" | "nedrakning" | "upptakt" | "fyllning" | "pingpong" | "virvel" | "fyr" | "rullandning" | "fyrverkeri" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "rave" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "duel" | "airglow" | "tide" | "drift" | "pendel" | "viska" | "backbeat" | "tick" | "stege" | "eko" | "hjarta" | "konfetti" | "sopa" | "varannan" | "forvarning" | "basgang" | "tyngdlyft" | "frasraknare" | "vidga" | "svall" | "gryning" | "ankomst" | "glimt" | "rulle" | "kickregn" | "efterskalv" | "motor" | "flod" | "famn" | "spaning" | "startskott" | "siren" | "skuggor" | "stjarnor" | "mullra" | "kaskad" | "droppar" | "uppvarmning" | "dunk" | "glesna" | "dyning" | "blixtnedslag" | "mellanslag" | "pump" | "hiss" | "tratt" | "morkerslag" | "urladdning" | "kors" | "blackout";
+ 
+ /** Hyresgäst-stämning: ETT val ställer in hela riggens känsla (se moods.ts). */
+ 
+diff --git a/pi-dmx/engine/src/effects/fit.ts b/pi-dmx/engine/src/effects/fit.ts
+index 8c2cb61..73d04f0 100644
+--- a/pi-dmx/engine/src/effects/fit.ts
++++ b/pi-dmx/engine/src/effects/fit.ts
+@@ -53,6 +53,7 @@ export const FIT: Partial<Record<Mode, Fit>> = {
+   drumkit:   { punch: 0.95, bass: 0.70, bright: 0.50, beat: 0.60 },   // lever på anslag
+   split:     { punch: 0.50, bass: 0.50, bright: 0.60, beat: 0.30 },
+   duel:      { punch: 0.80, bass: 0.70, bright: 0.60, beat: 0.40 },   // kick vs luft
++  kors:      { punch: 0.85, bass: 0.70, bright: 0.50, beat: 0.85 },   // prov 10-23: helrigg, kulörerna korsar på slaget
+   // ── Sektions-/signaleffekter (2026-09-23): stod utan passform (NEUTRAL 0,5) och rankades darfor bort - stegring/nedrakning/
+   //    vagbrytare/fyrverkeri valdes ALDRIG pa ladans mixar trots att build var 16 % av tiden. Nu egen rad var. ──
+   stegring:  { punch: 0.40, bass: 0.50, bright: 0.45, beat: 0.60 },   // uppbyggnad: takten ar allt
+@@ -125,6 +126,7 @@ const SPATIAL: Partial<Record<Mode, number>> = {
+   glimt: 0.8, efterskalv: 0.7, skuggor: 0.8, motor: 0.8,
+   stjarnor: 0.7, mullra: 0.6, kaskad: 1.0, droppar: 0.9, uppvarmning: 0.8, dunk: 0.8, glesna: 0.8, dyning: 0.8,
+   blixtnedslag: 1.0, mellanslag: 1.0, pump: 0.6, hiss: 1.0, tratt: 0.7, morkerslag: 0.8, urladdning: 0.6,
++  kors: 0.7,
+ };
+ /** Hur mycket den spatiala preferensen väger vid full punch (0 = av). */
+ const SPATIAL_PREF = 0.5;   // 0,18 -> 0,5 (ladan 10-01 godkant)   // ladan 09-29: "manga effekter lyser bara alla lampor" -> prov 0,5
+diff --git a/pi-dmx/engine/src/effects/kors.ts b/pi-dmx/engine/src/effects/kors.ts
+new file mode 100644
+index 0000000..2e3fc04
+--- /dev/null
++++ b/pi-dmx/engine/src/effects/kors.ts
+@@ -0,0 +1,21 @@
++import type { EffectDef } from "./types.js";
++import { hsv } from "./color.js";
++
++// KORS (prov 2026-10-23, nattagenten, opt-in DMX_KORS=1): refrängens helrigg-toggle. Båda grupperna lyser hela tiden (lamptrappan: refrängen
++// = hela riggen) i två palettkulörer en tredjedel isär, och grupperna BYTER kulör med varandra på varje slag - kulörerna korsar riggen.
++// Kicken pumpar hela riggen, den grupp som just fick ny kulör får slagets accent. Skäl: i toggle-låtar (låst takt = nästan varje låt sedan
++// löpande takten 10-19) har refrängen bara duel/backbeat/rave/gallop kvar efter glesningsregeln (25 lang: duel 20 % av kvällen).
++// Över 150 BPM byts kulören vartannat slag (högst ~1,25 byten/s per lampa).
++export const kors: EffectDef = {
++  key: "kors", label: "Kors", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"], toggle: true,
++  desc: "Hela riggen i två kulörer som byter plats på varje slag - kicken pumpar.",
++  render(c) {
++    const step = (c.frame.bpm ?? 0) > 150 ? Math.floor(c.beatIdx / 2) : c.beatIdx;
++    const base = c.mixedSector(Math.floor(c.hueIdx / 8));
++    const mine = (c.group + step) & 1;                                   // vilken av de två kulörerna gruppen har nu
++    const hue = ((mine ? base + 2 : base) % 6) / 6;
++    const accent = mine ? c.beatPulse : c.beatPulse * 0.35;              // gruppen som just bytte till andra kulören får slaget
++    const v = 0.12 + 0.88 * Math.min(1, accent * 0.55 + c.drum.kick * 0.5 + c.punch * 0.3);
++    return hsv(hue, 1 - c.punch * 0.25, v);
++  },
++};
+diff --git a/pi-dmx/engine/src/effects/registry.ts b/pi-dmx/engine/src/effects/registry.ts
+index 5e01e47..9345d0d 100644
+--- a/pi-dmx/engine/src/effects/registry.ts
++++ b/pi-dmx/engine/src/effects/registry.ts
+@@ -86,6 +86,7 @@ import { hiss } from "./hiss.js";
+ import { tratt } from "./tratt.js";
+ import { morkerslag } from "./morkerslag.js";
+ import { urladdning } from "./urladdning.js";
++import { kors } from "./kors.js";
+ 
+ // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
+ export const EFFECTS: EffectDef[] = [
+@@ -119,6 +120,8 @@ export const EFFECTS: EffectDef[] = [
+   flod, famn, spaning, startskott, siren, skuggor,
+   // minst 4 per ruta (agaren 10-12: "over 100 effekter"): lugn build/high, fart intro/break, full intro/low/build/break
+   stjarnor, mullra, kaskad, droppar, uppvarmning, dunk, glesna, dyning, blixtnedslag, mellanslag, pump, hiss, tratt, morkerslag, urladdning,
++  // PROV 2026-10-23 (opt-in DMX_KORS=1): refrängens helrigg-toggle, se kors.ts. Av = registret som förr (bit-identiskt).
++  ...(process.env.DMX_KORS === '1' ? [kors] : []),
+ ];
+ 
+ /** Specialrolls-mappning: vilka fixture-roller (hazer/uv/blinder/strobe/laser/co2)

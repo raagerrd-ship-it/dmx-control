@@ -128,6 +128,17 @@ FÖRBERETT 2026-10-21 (ägaren: 'förbered båda') - lotus-fixen 19bebf7 + DMX_D
    `python tools/ladan.py`. TITTA: sitter gallop/chase/siren/rulle på slagen nu? Backa: deploya taggen.
 2. /api/perf efter en kväll: `major` nära 0, `forcedGc` efter pauser (Node 24 + heap-flaggan, ute sedan 10-18).
 
+## NATTEN 2026-10-23 (nattagenten, inget deployat)
+KLART 2026-10-23: baslinje natt/2026-10-23.json json-identisk med 10-22 (UI-städningen c1aa111 ljusneutral). Inga nya kvällsuppdrag.
+BRIST: refrängen likadan i varje låt - 25 lang: duel 33 % av refrängtiden, duel+gallop+backbeat 66 %; kvällen 35/77 effekter, effektivt 17.
+  Rotorsak: manusTog = takt || bas och löpande takten ger tillit ~1,00 -> nästan varje låt toggle-låt; i high lämnar SPARSAM + tempokrav
+  rave/gallop/duel/backbeat (17/20 refrängval hade 2-3 kandidater).
+FÖRKASTAT 2026-10-23: (a) toggle-låt bara vid basgång (+takt-förtur): unika 35 -> 42, hör ihop 81 -> 72; (b) utan förtur: hör ihop 64;
+  (c) ny helrigg-toggle 'kors' (DMX_KORS, patch tools/natt/kors-2026-10-23.patch): duel i refrängen 33 -> 17 men kors 27 %, mega r 0,17 -> 0,13,
+  lampspr 80 -> 71 / 53 -> 45, hör ihop 81 -> 79. Toggle-tvånget är det som håller ihop vers/refräng.
+NÄSTA SPÅR: fler helrigg-toggles för high som inte vinner passformen var för sig, eller kvällsminne (straff efter speltid i kvällen) i
+  toggle-grenen. Mät med scratch-mönstret: konsertReplay 25 lang --step 5 --delad-cfg --live-kick + rodTrad + refrängens lookandel.
+
 ## NATTEN 2026-10-21 (nattagenten, inget deployat)
 KLART 2026-10-21: baslinje natt/2026-10-21.json (50e487f) json-identisk med 10-20 i mixarna (pop 99/0,48 r 0,33; mega 37/0,38 r 0,13;
   korpus 117/0,42 r 0,30). Nytt ärligt tajthetsmått tools/ljusLag.py (riggens ljus mot ljudets basanslag): 24 lang medelljusets 90 %
