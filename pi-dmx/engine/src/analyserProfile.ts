@@ -43,6 +43,10 @@ export const PROFILE: AnalyserProfile = {
     // LADAN 10-21 KVÄLL, ägaren 'kör standard' (backup-tagg backup/fore-kvallens-prov-2026-10-21):
     FAST_BANDS: '1',              // ljusets bandfält ur snabb väg (IIR + 512-FFT): 21-27 -> 3-5 ms efter ljudet, drops identiska; lotus: av
     SECTION_WIN: '2',             // sektionspoängen över 2 s i st f 4: etiketten ned ur refrängen 2,9 -> 1,3 s, korta delar 165 -> 143 (25 inspelningar)
+    // LÅTSTARTEN (ladan 10-23, ägaren: 'ser bra ut' / 'ser effekterna mer när ljuset har mer dynamik'; backup-tagg
+    // backup/fore-early-db-2026-10-23): första 45 s kräver refrängen +1,5 dB över medianen i st f +3 - starka låtstarter får high
+    // snabbare. 25 lang: high i låtens första 20 s 38 -> 49 %, fel 28 -> 25 %, etikett upp p75 4,1 -> 3,0 s, fladder lika; lotus: 3.
+    SECTION_EARLY_DB: '1.5',
   },
   bare: {
     // Drop-detektorn, facit-kalibrerad i ladan 09-03..09-12 (se tools/ENV-LADAN.md, pi-dmx-drop). Lotus har egna varden.

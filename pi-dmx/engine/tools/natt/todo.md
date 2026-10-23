@@ -1,5 +1,12 @@
 # Natt-agentens uppdrag
 
+## LADAN 2026-10-23 (ägaren i ladan, Pi 10.153.152.219 via hotspot)
+15:58 UTE: flaggstädningen (DMX + delade analysatorn) + UI-städningen + PROV DMX_SECTION_EARLY_DB=1.5. md5 lika, NRestarts 0.
+  Ett arecord-läsfel 5 s efter omstarten (pcm_read I/O error), ramar kom ändå; vid omdeployen 16:08 inget fel, arecord kör.
+16:05 GODKÄNT (ägaren: 'nu börjar jag även kunna se de olika effekterna mer när ljuset har mer dynamik', 'ser bra ut') ->
+  STANDARD i DMX-profilen SECTION_EARLY_DB '1.5' (backup-tagg backup/fore-early-db-2026-10-23). Profil = provet byte-identiskt
+  (konsertReplay 3 lang + pop). 16:08 deployat utan env, ladan.conf borta, md5 lika, NRestarts 0.
+
 ## FLAGGSTÄDNINGEN 2026-10-22 (ägaren: 'allt som är standard ... inga massa flaggor, koden skall vara optimal') - KLART, inget deployat
 DMX-sidan d1dae8a: 71 env-rattar = konstanter (ladans värden, DMX_GC_DARK 0,6), konsertläget + delflaggor enda vägen, avstängda prov bort.
 Delade analysatorn (båda repona, dmx b1a3fb8+42905b4, lotus 3d992a2, md5 8c771759): lika i båda = kod, av i båda = bort, tempoTracker.ts
@@ -87,7 +94,7 @@ Backa ett prov: `python tools/ladan.py --env <det andra>`; båda: `python tools/
   16 -> 15 %, dropens look kvar +10 s 68 -> 76 %, drops 68 -> 66. (Före kvällens prov: byten 2,79, återseende 67, hör ihop 81.)
 
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
-PROV 2026-10-22 (nattagenten, ägaren på väg till ladan): `PI_HOST=<ip> python tools/ladan.py --env DMX_SECTION_EARLY_DB=1.5` - bara
+KLART 2026-10-23 (STANDARD + UTE, se LADAN 2026-10-23): `PI_HOST=<ip> python tools/ladan.py --env DMX_SECTION_EARLY_DB=1.5` - bara
   DMX-profilens ratt (ingen ändring i delade analysatorn, dist = main 5fd4a8e). Tidiga-refrängspärren (första 45 s efter låtgräns kräver
   high +3 dB över låtens median, men medianen räknas på förra låtens bärda block) sänkt till 1,5 dB. 25 lang (latStart.mjs): high i
   låtens första 20 s 38 -> 49 %, fel 28 -> 25 %, etikett upp p75 4,1 -> 3,0 s, fladder 143 -> 141, hör ihop 79 -> 77 %, drops 66 -> 67;
