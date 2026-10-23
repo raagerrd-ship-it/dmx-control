@@ -38,7 +38,11 @@ Var: sectionBlock, SECTION_EARLY-grenen (median över this.secBlkDb). Material: 
 mått tools/latStart.mjs (hiStart, fel20), tools/sektionLag.mjs, rodTrad.mjs.
 Önskat (opt-in, av = bit-identiskt): SECTION_EARLY:s median bara över blocken EFTER låtgränsen (de bärda blocken räknas inte), så
 regeln jämför låten mot sig själv; döms på hiStart utan att 'hör ihop'/fladder går ner.
-Status:
+Status: AVVISAT 2026-10-23 (lotus-morgonagenten): byggt som opt-in SECTION_EARLY_OWN=1 (medianen bara över låtens egna block, regeln
+vilar tills 4 egna block finns; flagga av paritet 0 på 112 500 hop, även med CARRY 20). 25 lang, konsertReplay --step 5 --delad-cfg,
+latStart: låtar hiStart 38 -> 27 %, fel20 28 -> 30 %, rätt p75 2,4 -> 5,8 s, look>=8 s 5,8 -> 6,0 s - sämre. Skäl: en låt som startar
+på full nivå har egen median = sin egen nivå, så +3 dB nås aldrig mot sig själv; de bärda blocken var paradoxalt nog det som gav high.
+Koden borttagen igen (ingen commit i analysatorn). DMX:s EARLY_DB 1,5-prov är rätt spår.
 
 ## ÖPPET 2026-10-22 onset.kick är klampad 0/1 (q90 = 1) - går inte att toppvälja (tillägg till kickflaggan 10-19)
 Vad: uppdrag 10-21 punkt 4 (ersätt KICK-BYPASS/registerKick med onset.kick-toppen). Mätt med FAST_BANDS (lang 203952 + 191741, 120 s
@@ -49,7 +53,8 @@ registerKick/KICK-BYPASS - konsertReplay --live-kick gör det nu; påverkan på 
 Var: bandOn/fbOn (onset per band, klampning), kickdetektorn. Material: som ovan, tools/natt/ (ondist i rapporten).
 Önskat: ett omättat kickonset (t.ex. onset.kick före klampningen, eller kickbandets stigning i dB) i ramen, eller frame.kick på det
 lokala maxet av det - då kan DMX prova registerKick/KICK-BYPASS på det. Lotus plan 10-21 (kick på onset-toppen) täcker detta.
-Status:
+Status: TAGET 2026-10-23 (lotus-morgonagenten): slås ihop med fyndet 10-19 (kick på onset-toppen) - klampningen 0/1 måste bort först
+(omättat fält, t.ex. kickbandets stigning i dB före klampning, som nytt ramfält så befintliga konsumenter är orörda). Ej byggt i dag.
 
 ## ÖPPET 2026-10-21 Ljusets bandvärden kommer ur 2048-FFT:n och ligger 21-27 ms efter ljudet (delningen: analys i ljusvägen)
 Vad: ägarens uppdrag 10-20 (snabba sidan = ljusstyrning, minsta latens; långsamma = dirigentens input, bästa analys). Mätt med Node 24
