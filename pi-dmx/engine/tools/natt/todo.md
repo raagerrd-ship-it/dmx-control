@@ -135,6 +135,19 @@ FÖRBERETT 2026-10-21 (ägaren: 'förbered båda') - lotus-fixen 19bebf7 + DMX_D
    `python tools/ladan.py`. TITTA: sitter gallop/chase/siren/rulle på slagen nu? Backa: deploya taggen.
 2. /api/perf efter en kväll: `major` nära 0, `forcedGc` efter pauser (Node 24 + heap-flaggan, ute sedan 10-18).
 
+## NATTEN 2026-10-24 (nattagenten, inget deployat)
+KLART 2026-10-24: baslinje natt/2026-10-24.json = 10-23 + SECTION_EARLY_DB 1,5 (identisk med provet edb15 10-22): sektion upp 4,1 -> 2,6 s, ljus 1021 40 -> 35 ms.
+MÄTFÄLLA 53: bänken kör varje lang-fil med NY motor -> kvällens minne (lookPlayMs i pickLook, seenLooks, recentLooks, prevSongLook) nollas
+  per fil -> bäst passform (duel) vinner i varje fils början. 10-23-bristen 'duel 33 % av refrängen' = BÄNKARTEFAKT: 10-11-kvällens 23 lang
+  skarvade till EN wav (141 min, scratch-skript: rå PCM efter 44-bytes huvud, mono 48k) -> duel 15 %, topp3 43 %, effektivt 11,8 (fil för fil 7,7).
+  Men live-bristen syns bara där: hör ihop 56 % (fil för fil 83 %) - pickLook tar minst spelade bland topp 80 %, rel väger noll.
+PROV REDO (ce9269e): `python tools/ladan.py --env DMX_MANUS_TOP=2` - med manus väljs bara bland de 2 bäst rankade. Kvällen i ett svep:
+  hör ihop 56 -> 63 %, återseende 73 -> 76, refrängen effektivt 11,8 -> 11,1, unika 61 -> 56, drops 60 lika; 25 lang fil för fil och mixarna
+  oförändrade; av = 25/25 byte-identiska. TITTA: refrängens look släkt med versens även sent på kvällen? Godkänt -> konstant, flaggan bort.
+FÖRKASTAT 2026-10-24: kvällsminne-straff i rankingen (DMX_KVALL_REF) - 0 effekt, rankingen väljer inte när alla ryms i topplistan.
+NÄSTA: lägg kvällen i ett svep i natt.py (röda tråden mäts där); 16/77 effekter aldrig valda på hela kvällen (breathe pulse airglow tide
+  stegring andrum sug svall famn startskott droppar dyning blixtnedslag mellanslag pump urladdning) - ägarens öga om gallring.
+
 ## NATTEN 2026-10-23 (nattagenten, inget deployat)
 KLART 2026-10-23: baslinje natt/2026-10-23.json json-identisk med 10-22 (UI-städningen c1aa111 ljusneutral). Inga nya kvällsuppdrag.
 BRIST: refrängen likadan i varje låt - 25 lang: duel 33 % av refrängtiden, duel+gallop+backbeat 66 %; kvällen 35/77 effekter, effektivt 17.
