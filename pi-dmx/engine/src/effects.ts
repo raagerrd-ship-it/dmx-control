@@ -249,6 +249,10 @@ const MIX_TOP_FRAC = 0.8;   // 0,5 -> 0,8 (ladan 10-01 godkant)
  *  med 46 effekter och ~50 byten per 10 min blev annars samma 20-25 valda och resten aldrig (effectMix: 18-19 aldrig valda).
  *  Bonusen forsvinner sa fort effekten setts en gang, sa den styr bara FORSTA chansen. 0 = av. */
 const MIX_UNSEEN_BONUS = 0.10;
+/** MANUS-TOPP (prov natt 2026-10-24, DMX_MANUS_TOP=N, 0 = av = bit-identiskt): pickLook tar minst spelade i kvällen bland topp-MIX_TOP_FRAC,
+ *  så när poolen är liten ryms alla och släktskapen med låtens manus (rel) väger noll - 10-11-kvällen körd i ETT svep: 'hör ihop' 56 %
+ *  (fil för fil 83 %, där kvällens speltid nollas per fil). Med N: när låten redan har ett manus (anchor) väljs bara bland de N bäst rankade. */
+const MANUS_TOP = Number(process.env.DMX_MANUS_TOP ?? 0);
 /** ALLA LOOKER (prov 2026-10-09, STANDARD sedan 2026-10-10 - agaren i ladan; kraven ligger i registry.ts). Tva dirigentregler:
  *  (a) BUILD-INTRADE: analysatorns sektion 'build' kom bara 8 ganger pa 20 min mix, och "byt aldrig mitt i en uppbyggnad" blockerade
  *      allt annat -> build-poolen (pulse/stegring/sug) valdes 1 av 122 byten. Nu raknas en uppbyggnad som hallit i ALLA_BUILD_S
@@ -899,7 +903,7 @@ export class EffectEngine {
         if (clearBass) {
           const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) + (!this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) - unitPen(m) + rel(m) })).sort((a, b) => b.s - a.s);
           const cands = ranked.filter((x) => x.m !== this.smartMode);
-          const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))));
+          const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, (anchor && MANUS_TOP > 0 ? MANUS_TOP : Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC)))));
           this.smartMode = this.pickLook(top);
           console.log(`[dirigent] ${secKey ? 'manus ' + secKey + ': ' : ''}${beatClear ? `last takt (tillit ${this.beatTrust.toFixed(2)}` : `tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}`}, ${toggles.length} toggles) -> "${this.smartMode}"`);
         } else {
@@ -920,7 +924,7 @@ export class EffectEngine {
             .sort((a, b) => b.s - a.s);
           const cands = ranked.filter((x) => x.m !== this.smartMode);
           // MIX_V2 (4): valfonstret var alltid topp-3 av passformen -> samma 3-5 looker per tier for evigt; nu topp-MIX_TOP_FRAC av poolen (minst 3)
-          const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC))));
+          const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, (anchor && MANUS_TOP > 0 ? MANUS_TOP : Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC)))));
           this.smartMode = this.pickLook(top);
           // LOGGEN AR OVILLKORLIG (2026-09-23): utan DMX_SECTION_SWITCH finns inget `part` och dirigentens val syntes inte alls i
           // journalen (ladan 09-22: "vi korde pa hoga effekter" gick inte att belagga). Nu: del, sektion (data), basgang, tier, pool.
