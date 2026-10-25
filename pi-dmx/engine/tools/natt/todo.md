@@ -137,6 +137,19 @@ FÖRBERETT 2026-10-21 (ägaren: 'förbered båda') - lotus-fixen 19bebf7 + DMX_D
    `python tools/ladan.py`. TITTA: sitter gallop/chase/siren/rulle på slagen nu? Backa: deploya taggen.
 2. /api/perf efter en kväll: `major` nära 0, `forcedGc` efter pauser (Node 24 + heap-flaggan, ute sedan 10-18).
 
+## TAGGRÄTTNINGEN 2026-10-25 (ägaren: 'rätta taggarna ... som prov med bevis i bänken', inget deployat)
+ROTORSAK (kvällen i ett svep, 217 lookval med dirigentlogg): de 16 aldrig valda var blockerade av taggar, inte av passform. Build-trion
+  (pulse/stegring/sug) taggad build men saknas i BUILD_LOOKS (36/36 build-val filtrerade bort dem); sju i rutor som nästan aldrig inträffar
+  (svall/famn/droppar lugn x refräng 4/66, startskott/blixtnedslag/mellanslag full x intro 7/42 - alla via toggle-tvånget, pump full x vers
+  2/49); andrum föll på 90-spärren 21/24; tide även needsBass 0,30 (ladans median 0,23); airglow needsBright 0,40 (19 ggr); 58 % av valen
+  toggle-tvång.
+PROV REDO: DMX_TAGFIX=1 - build-trion in i BUILD_LOOKS, de sju ett tier-steg till 'fart' (registry.TIER_FIX), andrum/tide ur CALM_ONLY.
+  Kvällen i ett svep: av = byte-identisk med kv-baslinjen; på: pulse 6, stegring 4, sug 3 (alla i build), pump 2 (vers), startskott/
+  blixtnedslag/mellanslag 1 var (intro); unika 61 -> 67, effektivt 25,8 -> 26,2, återseende 73 -> 74, hör ihop 56 lika, byten 2,57 -> 2,56,
+  drops 60 lika; mixarna json-lika i allt (natt/2026-10-25-tagfix.json). Fortfarande 0: svall/famn/droppar, andrum, tide, airglow, breathe,
+  dyning, urladdning - toggle-tvånget (refräng och break) och krav, inte taggar. `python tools/ladan.py --env DMX_TAGFIX=1`.
+  TITTA: build-trion under uppbyggnaden, startskott/pump när de dyker upp. Godkänt -> taggarna rättas i effektfilerna, flaggan bort.
+
 ## NATTEN 2026-10-25 (nattagenten, inget deployat)
 KLART 2026-10-25: 'kvällen i ett svep i natt.py' (NÄSTA 10-24) - bank v4 (cf804de): 10-11-kvällen skarvad (kvall-svep.wav, ej i git) genom
   konsertReplay som live + rodTrad i varje körning, även --snabb (~6 min). Baslinje json-identisk med 10-24; kvällen hör ihop 56 / återseende 73 %.

@@ -30,11 +30,12 @@ import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "
  *  är bara BUILD_LOOKS, och när en build-look väl börjat bryts den bara av drop/nästan-drop (långinspelningen: upptakt -> eq -> basgang
  *  på 4 s, avbrutet av basgång/fras/sektion); (2) en NÄSTAN-DROP 2..20 s efter att build-looken började räknas som en RIKTIG drop i
  *  showen (drop-look, rök, drop-look-byte) - analysatorns 4 s-break-krav missar dropen efter en trumvirvel-build. */
-const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning', 'fyllning', 'pingpong', 'virvel', 'gryning', 'rulle', 'flod', 'siren', 'stjarnor', 'mullra', 'hiss', 'tratt'];   // + gryning (lugn) och rulle (full), situationsrutnätet 10-12   // 10-11: tre nya build-effekter (ägaren: fler per gren)
+const TAGFIX = process.env.DMX_TAGFIX === '1';   // TAGGRÄTTNING (prov 10-25, se registry.TIER_FIX): build-trion in i BUILD_LOOKS, andrum/tide ur CALM_ONLY
+const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning', 'fyllning', 'pingpong', 'virvel', 'gryning', 'rulle', 'flod', 'siren', 'stjarnor', 'mullra', 'hiss', 'tratt', ...(TAGFIX ? ['pulse', 'stegring', 'sug'] as Mode[] : [])];   // + gryning (lugn) och rulle (full), situationsrutnätet 10-12   // 10-11: tre nya build-effekter (ägaren: fler per gren)
 /** NÄSTAN ENHETLIGA (ägaren i ladan 10-11: "finns någon effekt där alla lampor har samma effekt och bara energi fadas lite svagt, den
  *  borde ha bpm-spärr, under kanske 80"): spridning < ~0,16 i båda mixarna (tools/effectDyn.mjs). Analysatorn rapporterar 80..160 BPM
  *  (DMX-profilen BPM_MIN 80, långsamma låtar vikes upp) - 'under 80' finns inte, så de får bara väljas under CALM_BPM (90). */
-const CALM_ONLY: Mode[] = ['tide', 'aurora', 'andrum'];
+const CALM_ONLY: Mode[] = TAGFIX ? ['aurora'] : ['tide', 'aurora', 'andrum'];   // andrum föll på 90-spärren 21/24 (break-effekt, analysatorn ger 80..160)
 const CALM_BPM = 90;
 /* (LYFT + SPRÅNG = DROP, 10-11 kväll -> 10-12: BORTTAGEN. Ägaren i ladan 10-12 13:13/13:14: 'drop, kunde vart mini', 'fel drop skulle
    vara mini' - båda var lyft+språng-drops (32 dB); 'hellre öka gränsen till riktig drop, bara minidrops kör vidare'. Lyften är minidrops.) */
