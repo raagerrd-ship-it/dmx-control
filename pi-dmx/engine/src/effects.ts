@@ -253,6 +253,11 @@ const MIX_UNSEEN_BONUS = 0.10;
  *  så när poolen är liten ryms alla och släktskapen med låtens manus (rel) väger noll - 10-11-kvällen körd i ETT svep: 'hör ihop' 56 %
  *  (fil för fil 83 %, där kvällens speltid nollas per fil). Med N: när låten redan har ett manus (anchor) väljs bara bland de N bäst rankade. */
 const MANUS_TOP = Number(process.env.DMX_MANUS_TOP ?? 0);
+/** BYTE PÅ SLAGET (prov natt 2026-10-25, DMX_SWITCH_ON=N, 0 = av = bit-identiskt): sektionens lookbyte släpptes när sektionen var
+ *  SECTION_UNIT_MIN_MS gammal - phraseOk:s reserv (held > MIN_HOLD + en fras) är nästan alltid sann efter en hållen look, så bytet landade
+ *  var som helst i takten (konsertReplay --slag). Med N väntar bytet (wantSwitch/buildEntry, inte drop/build-händelserna) in nästa
+ *  taktklocka-tick med beatIdx % N = 0 (1 = nästa slag, 4 = ettan), högst N slag x 1,25. */
+const SWITCH_ON = Number(process.env.DMX_SWITCH_ON ?? 0);
 /** ALLA LOOKER (prov 2026-10-09, STANDARD sedan 2026-10-10 - agaren i ladan; kraven ligger i registry.ts). Tva dirigentregler:
  *  (a) BUILD-INTRADE: analysatorns sektion 'build' kom bara 8 ganger pa 20 min mix, och "byt aldrig mitt i en uppbyggnad" blockerade
  *      allt annat -> build-poolen (pulse/stegring/sug) valdes 1 av 122 byten. Nu raknas en uppbyggnad som hallit i ALLA_BUILD_S
@@ -443,7 +448,7 @@ export class EffectEngine {
   private lastBassNoteMs = -1e9;
   private prevBassOnset = 0;
   /** Beat clock: last whole-beat index seen (för beatTick-flanken). */
-  private lastBeatIdx = -1;
+  private lastBeatIdx = -1; private slagWaitAt = -1;
   /** Takt-räknare som effekterna ser (beatIdx): stegar på grid-slaget när BPM är
    *  låst, annars på verkliga kicks → grid-effekter fryser aldrig utan BPM-lås. */
   private beatCounter = 0;
@@ -1072,7 +1077,7 @@ export class EffectEngine {
         const phraseMs = this.cfg.beat && this.cfg.beat.bpm > 0 ? 16 * 60000 / this.cfg.beat.bpm * (this.pulseHalved ? 2 : 1) : 0;
         // LÅTMANUS: sektionsbytet landar på sektionens EGET taktraster (början av takt 2, 4, 6 ... sedan sektionsstart) i stället för
         // effektklockans 16-slagsfras, vars fas är godtycklig mot låten (bänken: bytet väntade upp till 24 s efter en hållen sektion).
-        const secBars = frame.sectionBars ?? 0, secBarOk = secBars > 0 && Math.floor(secBars) % 2 === 0 && secBars % 1 < 0.25;
+        const secBars = frame.sectionBars ?? 0, secBarOk = secBars > 0 && (SWITCH_ON > 0 || (Math.floor(secBars) % 2 === 0 && secBars % 1 < 0.25));   // SWITCH_ON: slaggrinden nedan tar tajmningen (fönstret missade ticken -> 2 takter extra)
         const phraseOk = !hasBeat || this.beatTrust < 0.5 || (liveSec && secBars > 0 ? secBarOk : (this.beatCounter % 16) === 0) || held > MIN_HOLD + phraseMs;
         // MED STRUKTUR AR SEKTIONEN ENHETEN. Dwell-timern och tier-bytet ar till
         // for OKANDA latar, dar showen inte har nagot battre att ga pa. Har vi en
@@ -1135,7 +1140,14 @@ export class EffectEngine {
         const buildExit = BUILD_LOOKS.includes(this.smartMode) && (frame.section === 'high' || (this.buildLookAt > 0 && nowWall - this.buildLookAt > 2000 && (frame.intensity ?? 0) >= 0.95));
         // (BUILDEN LANDAR I REFRÄNGEN - sektionen high efter >= 4 s build = drop - borttagen 10-11 kväll: 'falsk' 21:42:39, 17 % på baslyft; se DROP_JUMP_DB)
         const buildLock = frame.section === 'build' && this.buildLookAt > 0 && BUILD_LOOKS.includes(this.smartMode) && nowWall - this.buildLookAt < 30000 && !dropSwitch && !buildExit;   // BUILD SOM HÅLLER - V123: bara så länge sektionen ÄR build
-        if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild) && (dropSwitch || allaBuild || concertBuild || buildExit || ((wantSwitch || buildEntry) && held > MIN_HOLD && gridOk && phraseOk))) {
+        const ready = (wantSwitch || buildEntry) && held > MIN_HOLD && gridOk && phraseOk;
+        let slagOk = true;   // BYTE PÅ SLAGET (SWITCH_ON)
+        if (SWITCH_ON > 0) {
+          if (!ready) this.slagWaitAt = -1; else if (this.slagWaitAt < 0) this.slagWaitAt = now;
+          if (ready && hasBeat && bpm > 0 && this.beatTrust >= 0.5 && !(this.tickNow && this.lastBeatIdx % SWITCH_ON === 0))
+            slagOk = now - this.slagWaitAt > SWITCH_ON * 1.25 * 60000 / bpm * (this.pulseHalved ? 2 : 1);
+        }
+        if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild) && (dropSwitch || allaBuild || concertBuild || buildExit || (ready && slagOk))) {
         this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, halvedChanged, liveSec, memSection, secEntry, tierChanged);
       }
       return this.smartMode;

@@ -52,6 +52,9 @@ console.log = (...a) => { const s = a.join(" "); if (/^\[dirigent\]/.test(s)) LO
 const buf = new Float32Array(HOP);
 let lastRender = -1, lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0, lastRow = -1;
 const TRACE = opt("--trace", null) ? [] : null; const REF_SK = opt("--bas-ref", "body") === "subkick"; const SEC = { intro: 0, low: 1, build: 2, high: 3, break: 4 };
+// --slag (natt 10-25): var i takten landar varje lookbyte - på en taktklocka-tick (slaget), på ettan (beatIdx % 4 = 0, analysatorns
+// barShift), och ms sedan senaste tick - per orsak (switchWhy). Skrivs till stdout, json:en ändras inte.
+const SLAG = args.includes("--slag") ? new Map() : null; let slagTick = -1e12, slagLook = null;
 const ROWS = [];   // [t, look, why, sec, int, light, nLit, drops, near, lift, miniLook, upgrades, bpm]
 let acc = { light: 0, nLit: 0, n: 0, mini: 0, hi: 0, lo: 9, top: 0 };
 for (let off = 0; off + HOP <= nSamples; off += HOP) {
@@ -78,6 +81,7 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   }
   if (!kickEv && ms - lastRender < STEP_MS && lastRender >= 0) continue;
   lastRender = ms; eng.render(fr); const u = eng.universe; if (!u) continue;
+  if (SLAG) { if (eng.tickNow) slagTick = ms; const lk = eng.getActiveMode(); if (lk !== slagLook) { if (slagLook !== null) { const w = eng.switchWhy || '-'; const k = SLAG.get(w) ?? { n: 0, tick: 0, one: 0, after: [] }; k.n++; if (eng.tickNow) { k.tick++; if (eng.lastBeatIdx % 4 === 0) k.one++; } k.after.push(ms - slagTick); SLAG.set(w, k); } slagLook = lk; } }
   const lv = lamps.map((L) => Math.max(u[L.r] ?? 0, u[L.g] ?? 0, u[L.b] ?? 0) * (L.dim >= 0 ? u[L.dim] / 255 : 1));   // verkligt ljus = färg x dimmer
   if (TRACE) { const sa = fr.specAbs ?? {}; TRACE.push(tS, SEC[fr.section] ?? 5, lv[0] / 255, lv[1] / 255, lv[2] / 255, lv[3] / 255, REF_SK && sa.sub != null ? (20 * Math.log10(sa.sub + 1e-7) + 20 * Math.log10(sa.kick + 1e-7)) / 2 : fr.bodyDb ?? -90,
     20 * Math.log10((sa.treble ?? 0) + (sa.air ?? 0) + 1e-7), (eng.dropColEnv ?? 0) > 0.005 || ms < eng.miniBangUntil ? 1 : 0, eng.eBass ?? eng.eSm ?? 0); }
@@ -95,4 +99,5 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
 const out = { wav: path, columns: ['t', 'look', 'why', 'sec', 'int', 'light', 'nLit', 'drops', 'near', 'lift', 'miniLook', 'upgrades', 'bpm', 'bodyDb', 'aMini', 'bass', 'hi', 'lo', 'top', 'pal', 'conf', 'trust', 'cbpm', 'lock'], rows: ROWS, log: LOG };
 writeFileSync(opt("--json", "replay.json"), JSON.stringify(out));
 if (TRACE) writeFileSync(opt("--trace"), Buffer.from(new Float32Array(TRACE).buffer));
+if (SLAG) for (const [w, k] of [...SLAG].sort((x, y) => y[1].n - x[1].n)) { const af = [...k.after].sort((x, y) => x - y); process.stdout.write(`slag ${w}: ${k.n} byten, på slaget ${(100 * k.tick / k.n).toFixed(0)} %, på ettan ${(100 * k.one / k.n).toFixed(0)} %, ms efter slaget p50 ${af[af.length >> 1]?.toFixed(0)} p90 ${af[Math.floor(af.length * 0.9)]?.toFixed(0)}\n`); }
 process.stdout.write(`${path}: ${ROWS.length} rader, ${LOG.length} loggrader${LIVE_KICK ? `, kickhändelser ${kickN}` : ""}\n`);
