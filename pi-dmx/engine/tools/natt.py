@@ -10,7 +10,7 @@ och skriver en jamforbar dygnspost:
 
     python tools/natt.py [--datum YYYY-MM-DD] [--snabb] [--tag namn] [--env K=V ...]
 
-  --snabb      bara mixarna (~30 s) - for att prova en kandidat fort
+  --snabb      bara mixarna + agarens matt + kvallen i ett svep (~6 min) - for att prova en kandidat
   (utan --snabb kors aven ladans 20 inspelningar 10-08 genom tools/dynSet.py -> tools/natt/dynamik.md)
   --tag/--env  A/B av en kandidat: raden taggas sa den inte blandas med baslinjen; env laggs OVANPA ladans
   --lista      annan manifest.tsv (standard tools/frozen6/manifest.tsv)
@@ -57,6 +57,42 @@ def run_sektionlag(wavs, env):
         os.remove(js)
     return {'uppMed': med(t['upLag']), 'uppTraff': f"{t['upHit']}/{t['up']}", 'nedMed': med(t['downLag']), 'nedTraff': f"{t['downHit']}/{t['down']}",
             'korta': f"{t['short']}/{t['segs']}", 'bytenMin': t['changes'] / max(1e-9, t['min'])}
+# KVALLEN I ETT SVEP (natt 10-25, matfalla 53): bankarna kor varje lang-fil med ny motor -> kvallens minne (lookPlayMs, seenLooks,
+# recentLooks, prevSongLook) nollas per fil. Rod trad mats darfor pa 10-11-kvallens 23 lang skarvade till EN wav (141 min, ra PCM
+# efter 44-byteshuvudet, mono 48k) genom konsertReplay som live (--step 5 --delad-cfg --live-kick) + rodTrad.mjs.
+KVALL_DIR = 'tools/ladan-2026-10-11'
+KVALL_WAV = KVALL_DIR + '/kvall-svep.wav'
+
+
+def kvall_wav():
+    import glob, struct
+    fs = sorted(glob.glob(os.path.join(ENGINE, KVALL_DIR, 'lang-*.wav')))
+    ut = os.path.join(ENGINE, KVALL_WAV)
+    if not fs: return None
+    n = sum(os.path.getsize(f) - 44 for f in fs)
+    if os.path.exists(ut) and os.path.getsize(ut) == n + 44: return ut
+    with open(ut, 'wb') as o:
+        o.write(b'RIFF' + struct.pack('<I', 36 + n) + b'WAVEfmt ' + struct.pack('<IHHIIHH', 16, 1, 1, 48000, 96000, 2, 16) + b'data' + struct.pack('<I', n))
+        for f in fs:
+            with open(f, 'rb') as i: i.seek(44); o.write(i.read())
+    return ut
+
+
+def run_kvall(env):
+    import tempfile
+    wav = kvall_wav()
+    if not wav: return {'fel': 'inga lang-*.wav i ' + KVALL_DIR}
+    fd, js = tempfile.mkstemp(suffix='.json'); os.close(fd)
+    try:
+        r = subprocess.run(['node', '--max-old-space-size=4096', 'tools/konsertReplay.mjs', wav, '--step', '5', '--delad-cfg', '--live-kick', '--json', js],
+                           cwd=ENGINE, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=3600)
+        if r.returncode: return {'fel': (r.stderr or r.stdout)[-300:]}
+        r = subprocess.run(['node', 'tools/rodTrad.mjs', js], cwd=ENGINE, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=600)
+        return json.loads(r.stdout[r.stdout.index('{'):])
+    except Exception as e:
+        return {'fel': str(e)[-300:]}
+    finally:
+        os.remove(js)
 METRIC_TAJT = ['kickLagMs', 'kickTraff', 'kickHojd', 'energiR', 'energiRtopp', 'nivaR', 'energiR15', 'nivaR15', 'litLugn', 'litFart', 'litFull']
 METRIC_SNYGG = ['alla3', 'en', 'matt', 'lampspr', 'morkt', 'litP50', 'litP90']
 
@@ -115,6 +151,10 @@ def main():
     out['sektionLag'] = run_sektionlag([w for _n, w in arl], env)
     print('  ljusLag  ' + '  '.join(f'{n} {f(r.get("korskorr"), 0)}/{f(r.get("t90"), 0)} ms' for n, r in out['ljusLag'].items()) + '  (korskorr/90 %)')
     sl = out['sektionLag']; print(f'  sektion  upp {f(sl.get("uppMed"), 1)} s ({sl.get("uppTraff")})  ned {f(sl.get("nedMed"), 1)} s ({sl.get("nedTraff")})  korta {sl.get("korta")}  {f(sl.get("bytenMin"))}/min')
+
+    # 1c. ROD TRAD: kvallen 10-11 i ett svep (matfalla 53), aven --snabb
+    out['kvall'] = kv = run_kvall(env)
+    print(f'  kvall    {kv.get("minuter", "?")} min  hor ihop {kv.get("hör ihop")}  ateseende {kv.get("återseende")}  unika {kv.get("unika kvällen")}  effektivt {kv.get("effektivt antal")}  byten/min {kv.get("byten/min")}  drops {kv.get("drops")}' if 'fel' not in kv else f'  kvall    FEL {kv["fel"]}')
 
     # 2. KLIPPEN (bredd: kick/energi/farg, aldrig lookar)
     if not a.snabb and os.path.exists(a.lista):
@@ -177,6 +217,14 @@ def main():
             'mega kick->ljus/traff | mega r | mega byten/min musik% | mega alla3/lampspr | mega lookar/langst | mega morkt | mega drops lugna/hoga | '
             'korpus n | k kick->ljus/traff | k r | k alla3/matt | k morkt | aldrig valda |\n'
             '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n')
+    if os.path.exists(sb) and 'Bank v4' not in io.open(sb, encoding='utf-8').read():
+        io.open(sb, 'a', encoding='utf-8').write(
+            '\n**Bank v4 fran 2026-10-25 (matfalla 53):** samma kolumner som v3 plus ROD TRAD sist - 10-11-kvallens 23 lang i ETT svep (141 min, '
+            'kvallens minne nollas inte per fil): hor ihop % / ateseende % / unika looker / effektivt antal / lookbyten per min (rodTrad.mjs).\n\n'
+            '| datum | git | tag | ljus pop | ljus mega | ljus 1021 | sektion upp/ned s | korta | sek byten/min | pop kick->ljus/traff | pop r energi | pop byten/min musik% | pop alla3/lampspr | pop lookar/langst | pop morkt | '
+            'mega kick->ljus/traff | mega r | mega byten/min musik% | mega alla3/lampspr | mega lookar/langst | mega morkt | mega drops lugna/hoga | '
+            'korpus n | k kick->ljus/traff | k r | k alla3/matt | k morkt | aldrig valda | kvall hor ihop/ateseende | kvall unika/effektivt | kvall byten/min |\n'
+            '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n')
     if not os.path.exists(sb):
         io.open(sb, 'w', encoding='utf-8').write(
             '# DMX natt-scoreboard\n\nEn rad per korning av tools/natt.py. Mixar = pop/megamix i full langd (lookar/drops bor har), '
@@ -191,11 +239,11 @@ def main():
                 f'{f(s.get("alla3"))}/{f(s.get("lampspr"), 0)} | {f(s.get("lookar"), 0)}/{f(s.get("lookLangstaS"), 0)} s | {f(s.get("morkt"))}')
     km = (out['korpus'] or {}).get('median', {})
     mt = out['mixar'].get('megamix', {}).get('tajt', {})
-    LL = out.get('ljusLag', {}); SL = out.get('sektionLag', {})
+    LL = out.get('ljusLag', {}); SL = out.get('sektionLag', {}); kv = out.get('kvall', {})
     lj = lambda n: f'{f(LL.get(n, {}).get("korskorr"), 0)}/{f(LL.get(n, {}).get("t90"), 0)}'
     row = (f'| {a.datum} | {git} | {a.tag or "-"} | {lj("pop")} | {lj("megamix")} | {lj("lang1021")} | {f(SL.get("uppMed"), 1)}/{f(SL.get("nedMed"), 1)} | {SL.get("korta", "-")} | {f(SL.get("bytenMin"))} | {mix("pop")} | {mix("megamix")} | {f(mt.get("dropsLugna"), 0)}/{f((mt.get("drops") or 0) - (mt.get("dropsLugna") or 0), 0)} | '
            f'{(out["korpus"] or {}).get("n", "-")} | {f(km.get("kickLagMs"), 0)}/{f(km.get("kickTraff"))} | {f(km.get("energiR"))} | {f(km.get("alla3"))}/{f(km.get("matt"))} | {f(km.get("morkt"))} | '
-           f'{len(out["effekter"]["aldrigValda"])} |\n')
+           f'{len(out["effekter"]["aldrigValda"])} | {kv.get("hör ihop", "-")} / {kv.get("återseende", "-")} | {kv.get("unika kvällen", "-")}/{kv.get("effektivt antal", "-")} | {kv.get("byten/min", "-")} |\n')
     io.open(sb, 'a', encoding='utf-8').write(row)
     if out.get('ladan1008', {}).get('levande'):
         dm = os.path.join(d, 'dynamik.md')
