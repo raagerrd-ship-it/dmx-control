@@ -94,6 +94,8 @@ Backa ett prov: `python tools/ladan.py --env <det andra>`; båda: `python tools/
   16 -> 15 %, dropens look kvar +10 s 68 -> 76 %, drops 68 -> 66. (Före kvällens prov: byten 2,79, återseende 67, hör ihop 81.)
 
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
+PROV (natt 10-24 + 10-25, ett paket): `PI_HOST=<ip> python tools/ladan.py --env DMX_MANUS_TOP=2 --env DMX_SWITCH_ON=1` - refrängen släkt med
+  versen (hör ihop 56 -> 71 % hela kvällen) + lookbytet på slaget (2 -> 72 %). Backa ett: kör om med bara det andra; båda: utan --env.
 KLART 2026-10-23 (STANDARD + UTE, se LADAN 2026-10-23): `PI_HOST=<ip> python tools/ladan.py --env DMX_SECTION_EARLY_DB=1.5` - bara
   DMX-profilens ratt (ingen ändring i delade analysatorn, dist = main 5fd4a8e). Tidiga-refrängspärren (första 45 s efter låtgräns kräver
   high +3 dB över låtens median, men medianen räknas på förra låtens bärda block) sänkt till 1,5 dB. 25 lang (latStart.mjs): high i
@@ -135,6 +137,16 @@ FÖRBERETT 2026-10-21 (ägaren: 'förbered båda') - lotus-fixen 19bebf7 + DMX_D
    `python tools/ladan.py`. TITTA: sitter gallop/chase/siren/rulle på slagen nu? Backa: deploya taggen.
 2. /api/perf efter en kväll: `major` nära 0, `forcedGc` efter pauser (Node 24 + heap-flaggan, ute sedan 10-18).
 
+## NATTEN 2026-10-25 (nattagenten, inget deployat)
+KLART 2026-10-25: 'kvällen i ett svep i natt.py' (NÄSTA 10-24) - bank v4 (cf804de): 10-11-kvällen skarvad (kvall-svep.wav, ej i git) genom
+  konsertReplay som live + rodTrad i varje körning, även --snabb (~6 min). Baslinje json-identisk med 10-24; kvällen hör ihop 56 / återseende 73 %.
+PROV REDO (490be1e): DMX_SWITCH_ON=1 - sektionens lookbyte på slaget. konsertReplay --slag: i dag 1-2 % av sektionsbytena på en tick
+  (p50 261 ms efter slaget; phraseOk-reserven nästan alltid sann, secBarOk-fönstret missade ticken -> 2 takter extra). Med =1: kvällen på
+  slaget 72 %, återseende 73 -> 84, hör ihop 56 -> 61, sektion->look >4 s 61 -> 43; 25 lang 1 -> 72 %, återseende 76 -> 78, drops lika;
+  mixarna r -0,01. Ihop med MANUS_TOP=2: hör ihop 71 %, återseende 85 %, unika 61 -> 55. =4 (ettan) förkastat (återseende 58-78).
+  `python tools/ladan.py --env DMX_SWITCH_ON=1 --env DMX_MANUS_TOP=2`. TITTA: byter looken på slaget/smällen i stället för mitt i takten?
+NÄSTA: gallringen av 16 aldrig valda (ägarens öga); ettan-varianten kräver att sektionsstarten följer barShift (analysator) - inte nu.
+
 ## NATTEN 2026-10-24 (nattagenten, inget deployat)
 KLART 2026-10-24: baslinje natt/2026-10-24.json = 10-23 + SECTION_EARLY_DB 1,5 (identisk med provet edb15 10-22): sektion upp 4,1 -> 2,6 s, ljus 1021 40 -> 35 ms.
 MÄTFÄLLA 53: bänken kör varje lang-fil med NY motor -> kvällens minne (lookPlayMs i pickLook, seenLooks, recentLooks, prevSongLook) nollas
@@ -145,7 +157,7 @@ PROV REDO (ce9269e): `python tools/ladan.py --env DMX_MANUS_TOP=2` - med manus v
   hör ihop 56 -> 63 %, återseende 73 -> 76, refrängen effektivt 11,8 -> 11,1, unika 61 -> 56, drops 60 lika; 25 lang fil för fil och mixarna
   oförändrade; av = 25/25 byte-identiska. TITTA: refrängens look släkt med versens även sent på kvällen? Godkänt -> konstant, flaggan bort.
 FÖRKASTAT 2026-10-24: kvällsminne-straff i rankingen (DMX_KVALL_REF) - 0 effekt, rankingen väljer inte när alla ryms i topplistan.
-NÄSTA: lägg kvällen i ett svep i natt.py (röda tråden mäts där); 16/77 effekter aldrig valda på hela kvällen (breathe pulse airglow tide
+NÄSTA: [KLART 2026-10-25: bank v4] lägg kvällen i ett svep i natt.py (röda tråden mäts där); 16/77 effekter aldrig valda på hela kvällen (breathe pulse airglow tide
   stegring andrum sug svall famn startskott droppar dyning blixtnedslag mellanslag pump urladdning) - ägarens öga om gallring.
 
 ## NATTEN 2026-10-23 (nattagenten, inget deployat)
