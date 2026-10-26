@@ -6,6 +6,9 @@ baslinjen först (ny nivå: kvällen hör ihop 71 / återseende 84). Showen (vil
 gör saker snabbare/billigare ska vara bit-identiskt (natt --snabb json-lika + konsertReplay kvällen i ett svep lika). Det som ändrar
 ljuset (uppgången) är opt-in med bevis. Låsta regler gäller: fade-down/uttoningen rörs aldrig, delade analysatorn ändras inte (fynd ->
 analysator-fynd.md, lotus-morgonagenten har samma uppdrag i morgon bitti), strobe <= 3/s.
+PRIORITET EFTER ÄGARENS VIDEOR (punkt 5 nedan, 5 klipp 18:25-18:43): kedjan ljud->ljus är MÄTT live till ~35-45 ms (video 5, drop i
+slowmotion) - jaga inte den vidare. Ordning i natt: (A) gallop-felet (punkt 5: stora steget ~150 ms efter slaget), (B) major GC under musik
+(punkt 3), (C) latensbudgeten (punkt 1) som tabell med videons livevärde som facit, (D) uppgången (punkt 2) bara om tid finns.
 LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-ladan-2026-10-26.json, /api/perf, Node 24, Pi load 0,6, 34 °C):
   render 200 Hz snitt 0,18-0,26 ms, max 3,6-8,4 ms, over5 0-7/min; loop p99 10,3-12,7 ms (10 ms-intervall), max 21-81 ms;
   minor GC 6-28/min (max 4-8 ms); MAJOR GC ~1/min UNDER MUSIK (19-72 ms, 17:08 72 ms = loop max 81 ms); heap 18-30 MB; 1:a minuten
