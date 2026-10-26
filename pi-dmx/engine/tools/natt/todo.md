@@ -32,6 +32,10 @@ LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-l
    REDA UT: vad lyfter grupp B vid +130 (beatFrac-fasen? kickEnv/punch? minsta på-tid? rutnätets fas mot kicken; varv 4 glider +30 -> +163 ms)?
    Är det designat (galoppfigur) eller ett fasfel? Om fasfel: fix (opt-in) så att det STORA steget kommer på slaget. Det är det ögat ser som
    'latens' - kedjans egen latens är liten. Mät också med ljusLag/showTight om 90 %-måttet fångar detta.
+   VIDEO 2 (18:33, PXL_20261026_183344151.mp4, ~135 BPM, look med paren L1+L3 / L2+L4 omlott; ana.py = generell mätning): paret på kicken
+   tar sitt största steg i median +39 ms efter kicken (13 slag, -37..+72, ±17 ms bildruta), första rörelse +48 ms, andra paret en halv takt
+   senare som tänkt. Samma metod på video 1: första rörelse +35 ms men stora steget +189..+222 ms -> kedjan är bra, GALLOP är avvikaren.
+   (Bänken valde en annan look på video 2:s ljud - looken live går inte att återskapa ur 10 s.)
 RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, nattens fix(ar) med före/efter, vad som är redo för ladan
 (`python tools/ladan.py` för bit-identiska fixar, `--env` för uppgångsprovet) och vad som ska mätas live nästa besök (/api/perf).
 
