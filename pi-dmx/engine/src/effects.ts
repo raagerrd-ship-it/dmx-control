@@ -30,6 +30,7 @@ import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "
  *  är bara BUILD_LOOKS, och när en build-look väl börjat bryts den bara av drop/nästan-drop (långinspelningen: upptakt -> eq -> basgang
  *  på 4 s, avbrutet av basgång/fras/sektion); (2) en NÄSTAN-DROP 2..20 s efter att build-looken började räknas som en RIKTIG drop i
  *  showen (drop-look, rök, drop-look-byte) - analysatorns 4 s-break-krav missar dropen efter en trumvirvel-build. */
+const BREAK_CALM = process.env.DMX_BREAK_CALM === '1';   // LUGNT BREAK (prov 10-26): i break tas toggle-tvånget bara ur breakets egna effekter, aldrig ur hela TOGGLE_POOL
 const TAGFIX = process.env.DMX_TAGFIX === '1';   // TAGGRÄTTNING (prov 10-25, se registry.TIER_FIX): build-trion in i BUILD_LOOKS, andrum/tide ur CALM_ONLY
 const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning', 'fyllning', 'pingpong', 'virvel', 'gryning', 'rulle', 'flod', 'siren', 'stjarnor', 'mullra', 'hiss', 'tratt', ...(TAGFIX ? ['pulse', 'stegring', 'sug'] as Mode[] : [])];   // + gryning (lugn) och rulle (full), situationsrutnätet 10-12   // 10-11: tre nya build-effekter (ägaren: fler per gren)
 /** NÄSTAN ENHETLIGA (ägaren i ladan 10-11: "finns någon effekt där alla lampor har samma effekt och bara energi fadas lite svagt, den
@@ -904,7 +905,7 @@ export class EffectEngine {
         if (secKey && this.manusTog === null) this.manusTog = takt || bas;   // ALLA låtar med låst takt/tydlig basgång = stegande/gruppvisa effekter (ägaren 10-13: 'tydlig basgång effekter med stegande lampor'); var varannan låt
         const beatClear = secKey ? !!this.manusTog && takt : takt && this.smartCount % 2 === 1;
         const bassHard = !(secKey === 'build') && (secKey ? !!this.manusTog && !allaBuild : (beatClear || (bas && this.smartCount % 2 === 1)));   // MIX_V2 (1); konsertlaget: aldrig i build
-        const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); const t = cut.length ? cut : enabled(TOGGLE_POOL).filter(req); const full = secKey === 'high' ? t.filter((m) => !SPARSAM.includes(m)) : t; return full.length ? full : t; })() : [];   // refrängen: inga glesa looker via basgången heller (10-12)
+        const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); const t = cut.length ? cut : BREAK_CALM && secKey === 'break' ? [] : enabled(TOGGLE_POOL).filter(req); const full = secKey === 'high' ? t.filter((m) => !SPARSAM.includes(m)) : t; return full.length ? full : t; })() : [];   // refrängen: inga glesa looker via basgången heller (10-12)
         const clearBass = toggles.length > 0;
         if (clearBass) {
           const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) + (!this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) - unitPen(m) + rel(m) })).sort((a, b) => b.s - a.s);
