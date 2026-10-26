@@ -1,5 +1,31 @@
 # Natt-agentens uppdrag
 
+## Från kvällen 2026-10-26 - LATENS OCH OPTIMERING (ägaren: 'natten vill jag att agenterna skall jobba med latensen och optimering'; går före allt annat)
+Ersätter 10-21:s 'INTE NU: mer latensjakt' för i natt. Läget: de fyra proven är STANDARD + ute sedan 18:06 (se LADAN 2026-10-26) -> kör
+baslinjen först (ny nivå: kvällen hör ihop 71 / återseende 84). Showen (vilka looker, när) får INTE ändras av nattens arbete: allt som bara
+gör saker snabbare/billigare ska vara bit-identiskt (natt --snabb json-lika + konsertReplay kvällen i ett svep lika). Det som ändrar
+ljuset (uppgången) är opt-in med bevis. Låsta regler gäller: fade-down/uttoningen rörs aldrig, delade analysatorn ändras inte (fynd ->
+analysator-fynd.md, lotus-morgonagenten har samma uppdrag i morgon bitti), strobe <= 3/s.
+LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-ladan-2026-10-26.json, /api/perf, Node 24, Pi load 0,6, 34 °C):
+  render 200 Hz snitt 0,18-0,26 ms, max 3,6-8,4 ms, over5 0-7/min; loop p99 10,3-12,7 ms (10 ms-intervall), max 21-81 ms;
+  minor GC 6-28/min (max 4-8 ms); MAJOR GC ~1/min UNDER MUSIK (19-72 ms, 17:08 72 ms = loop max 81 ms); heap 18-30 MB; 1:a minuten
+  (uppvärmning) minor 92, loop max 1144 ms. Mörkerstädningen (gc-dark, forcedGc) ska ta de stora i tystnad - här kom de mitt i musiken.
+1. LATENSBUDGETEN ljud -> lampa, hela kedjan i ms (det mesta är omätt sedan 10-21: 'kedjan ljud->DMX ~30 ms kompenseras inte'):
+   arecord/ALSA (period/buffer i audio.ts), analysatorns hop (128 @ 48 kHz) och fönster per fält (faltLatens.mjs), beatFeed, render-
+   steget (200 Hz = upp till 5 ms väntan), DMX-sidovagnen/SPI (dmx.ts setMaxHz, sidovagnens 200 Hz-tak, ramlängd 24..512 slots),
+   lampans egen ramp. Tabell: steg, ms medel/max, källa (mätt i bänk / räknat ur kod / gissat). Peka ut de 2 största som går att korta.
+2. UPPGÅNGEN: ljusLag ger korskorr 5-10 ms men 90 % av toppen först 35-60 ms (pop 45, mega 60, 1021 35) - var sitter de 30-50 ms mellan
+   första rörelse och 90 %? (effektens envelope/attack, FX_FLOOR, tändpunkt, gamma, minsta på-tid, energins uppgång, 25 ms-raster i bänken
+   vs 5 ms live). Prova EN förkortning på uppgången som opt-in, döm med ljusLag (90 %) + natt --snabb (inget annat ner). Aldrig nedgången.
+3. OPTIMERING: få bort major GC under musik och render-toppar > 2 ms. Vad fyller gamla generationen (18-30 MB) i 1-minutstakt? Mät med
+   tools/liveLab.mjs + tools/skrap (winAlloc, andra varvet = stabilt läge, mätfälla 50 och bänkklockan som överskattar). Kandidater att
+   granska: dirigentens Map/arrayer (lookPlayMs, manusHist, recentLooks, LOG-rader), sektions-/palettspår, inspelningens ringbuffert,
+   console-strängar som byggs fast quiet. Kolla också varför gc-dark inte tog dem (villkoren: tystnad >= 1,5 s, släckt ram, gamla >= 60 %).
+   Varje fix: bit-identiskt bevisad, µs/ruta och kB/s före/efter (Node 24 i bänken). Uppvärmningens första minut (1144 ms loop) som egen rad.
+4. Fynd i den delade analysatorn (FFT-kostnad, skräp i process(), fältlatens) -> analysator-fynd.md med siffror.
+RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, nattens fix(ar) med före/efter, vad som är redo för ladan
+(`python tools/ladan.py` för bit-identiska fixar, `--env` för uppgångsprovet) och vad som ska mätas live nästa besök (/api/perf).
+
 ## LADAN 2026-10-26 (ägaren i ladan, Pi 10.54.139.218 via hotspot Pixel_9285, PC 10.54.139.53)
 17:57 UTE: PROV DMX_MANUS_TOP=2 DMX_SWITCH_ON=1 DMX_BREAK_CALM=1 DMX_TAGFIX=1 i ladan.conf (ägaren: 'alla fyra i en körning').
   Bara effects.js + effects/registry.js skilde; md5 lika med dist, NRestarts 0, alla fyra i unit-env. Väntar på ögat.
