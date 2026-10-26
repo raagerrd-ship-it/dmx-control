@@ -6,7 +6,7 @@ import { hsv } from "./color.js";
 // per slag) och en grannlampa blixtrar efter en åttondels slag svagare - blixten grenar sig. Kicken mullrar bara svagt i lampan
 // mittemot. Kickregn går på kicken, startskott räknar takter; blixtnedslag är virveln.
 export const blixtnedslag: EffectDef = {
-  key: "blixtnedslag", label: "Blixtnedslag", tier: "full", modulate: { energy: true, pulse: false }, section: ["intro"],
+  key: "blixtnedslag", label: "Blixtnedslag", tier: "fart", modulate: { energy: true, pulse: false }, section: ["intro"],
   desc: "Intro i full fart: virveln slår ner som en blixt i en lampa, en grannlampa blixtrar efter.",
   render(c) {
     const n = Math.max(1, c.count);

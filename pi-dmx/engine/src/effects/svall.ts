@@ -5,7 +5,7 @@ import { hsv } from "./color.js";
 // eller inre/yttre) sväller i motfas över två slag - som ett andetag som går fram och tillbaka över riggen - och taktens etta
 // lyfter båda lite. Grupperna i närliggande kulörer (palettens, per fras). Aldrig släckt, aldrig alla lika.
 export const svall: EffectDef = {
-  key: "svall", label: "Svall", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["high"],
+  key: "svall", label: "Svall", tier: "fart", modulate: { energy: true, pulse: false }, section: ["high"],
   desc: "Lugn refräng: två lampgrupper sväller i motfas över två slag, taktens etta lyfter båda.",
   render(c) {
     const ph = ((((c.beatIdx % 2) + 2) % 2) + c.beatFrac) / 2;       // 0..1 över två slag

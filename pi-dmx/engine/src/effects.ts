@@ -30,13 +30,11 @@ import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "
  *  är bara BUILD_LOOKS, och när en build-look väl börjat bryts den bara av drop/nästan-drop (långinspelningen: upptakt -> eq -> basgang
  *  på 4 s, avbrutet av basgång/fras/sektion); (2) en NÄSTAN-DROP 2..20 s efter att build-looken började räknas som en RIKTIG drop i
  *  showen (drop-look, rök, drop-look-byte) - analysatorns 4 s-break-krav missar dropen efter en trumvirvel-build. */
-const BREAK_CALM = process.env.DMX_BREAK_CALM === '1';   // LUGNT BREAK (prov 10-26): i break tas toggle-tvånget bara ur breakets egna effekter, aldrig ur hela TOGGLE_POOL
-const TAGFIX = process.env.DMX_TAGFIX === '1';   // TAGGRÄTTNING (prov 10-25, se registry.TIER_FIX): build-trion in i BUILD_LOOKS, andrum/tide ur CALM_ONLY
-const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning', 'fyllning', 'pingpong', 'virvel', 'gryning', 'rulle', 'flod', 'siren', 'stjarnor', 'mullra', 'hiss', 'tratt', ...(TAGFIX ? ['pulse', 'stegring', 'sug'] as Mode[] : [])];   // + gryning (lugn) och rulle (full), situationsrutnätet 10-12   // 10-11: tre nya build-effekter (ägaren: fler per gren)
+const BUILD_LOOKS: Mode[] = ['upptakt', 'nedrakning', 'fyllning', 'pingpong', 'virvel', 'gryning', 'rulle', 'flod', 'siren', 'stjarnor', 'mullra', 'hiss', 'tratt', 'pulse', 'stegring', 'sug'];   // + build-trion (taggrättningen, standard 10-26)   // + gryning (lugn) och rulle (full), situationsrutnätet 10-12   // 10-11: tre nya build-effekter (ägaren: fler per gren)
 /** NÄSTAN ENHETLIGA (ägaren i ladan 10-11: "finns någon effekt där alla lampor har samma effekt och bara energi fadas lite svagt, den
  *  borde ha bpm-spärr, under kanske 80"): spridning < ~0,16 i båda mixarna (tools/effectDyn.mjs). Analysatorn rapporterar 80..160 BPM
  *  (DMX-profilen BPM_MIN 80, långsamma låtar vikes upp) - 'under 80' finns inte, så de får bara väljas under CALM_BPM (90). */
-const CALM_ONLY: Mode[] = TAGFIX ? ['aurora'] : ['tide', 'aurora', 'andrum'];   // andrum föll på 90-spärren 21/24 (break-effekt, analysatorn ger 80..160)
+const CALM_ONLY: Mode[] = ['aurora'];   // tide/andrum ut 10-26 (taggrättningen, standard)   // andrum föll på 90-spärren 21/24 (break-effekt, analysatorn ger 80..160)
 const CALM_BPM = 90;
 /* (LYFT + SPRÅNG = DROP, 10-11 kväll -> 10-12: BORTTAGEN. Ägaren i ladan 10-12 13:13/13:14: 'drop, kunde vart mini', 'fel drop skulle
    vara mini' - båda var lyft+språng-drops (32 dB); 'hellre öka gränsen till riktig drop, bara minidrops kör vidare'. Lyften är minidrops.) */
@@ -251,15 +249,15 @@ const MIX_TOP_FRAC = 0.8;   // 0,5 -> 0,8 (ladan 10-01 godkant)
  *  med 46 effekter och ~50 byten per 10 min blev annars samma 20-25 valda och resten aldrig (effectMix: 18-19 aldrig valda).
  *  Bonusen forsvinner sa fort effekten setts en gang, sa den styr bara FORSTA chansen. 0 = av. */
 const MIX_UNSEEN_BONUS = 0.10;
-/** MANUS-TOPP (prov natt 2026-10-24, DMX_MANUS_TOP=N, 0 = av = bit-identiskt): pickLook tar minst spelade i kvällen bland topp-MIX_TOP_FRAC,
+/** MANUS-TOPP (natt 2026-10-24, standard 2 sedan 2026-10-26 i ladan): pickLook tar minst spelade i kvällen bland topp-MIX_TOP_FRAC,
  *  så när poolen är liten ryms alla och släktskapen med låtens manus (rel) väger noll - 10-11-kvällen körd i ETT svep: 'hör ihop' 56 %
  *  (fil för fil 83 %, där kvällens speltid nollas per fil). Med N: när låten redan har ett manus (anchor) väljs bara bland de N bäst rankade. */
-const MANUS_TOP = Number(process.env.DMX_MANUS_TOP ?? 0);
-/** BYTE PÅ SLAGET (prov natt 2026-10-25, DMX_SWITCH_ON=N, 0 = av = bit-identiskt): sektionens lookbyte släpptes när sektionen var
+const MANUS_TOP = 2;
+/** BYTE PÅ SLAGET (natt 2026-10-25, standard 1 = nästa slag sedan 2026-10-26 i ladan): sektionens lookbyte släpptes när sektionen var
  *  SECTION_UNIT_MIN_MS gammal - phraseOk:s reserv (held > MIN_HOLD + en fras) är nästan alltid sann efter en hållen look, så bytet landade
  *  var som helst i takten (konsertReplay --slag). Med N väntar bytet (wantSwitch/buildEntry, inte drop/build-händelserna) in nästa
  *  taktklocka-tick med beatIdx % N = 0 (1 = nästa slag, 4 = ettan), högst N slag x 1,25. */
-const SWITCH_ON = Number(process.env.DMX_SWITCH_ON ?? 0);
+const SWITCH_ON = 1;
 /** ALLA LOOKER (prov 2026-10-09, STANDARD sedan 2026-10-10 - agaren i ladan; kraven ligger i registry.ts). Tva dirigentregler:
  *  (a) BUILD-INTRADE: analysatorns sektion 'build' kom bara 8 ganger pa 20 min mix, och "byt aldrig mitt i en uppbyggnad" blockerade
  *      allt annat -> build-poolen (pulse/stegring/sug) valdes 1 av 122 byten. Nu raknas en uppbyggnad som hallit i ALLA_BUILD_S
@@ -905,7 +903,7 @@ export class EffectEngine {
         if (secKey && this.manusTog === null) this.manusTog = takt || bas;   // ALLA låtar med låst takt/tydlig basgång = stegande/gruppvisa effekter (ägaren 10-13: 'tydlig basgång effekter med stegande lampor'); var varannan låt
         const beatClear = secKey ? !!this.manusTog && takt : takt && this.smartCount % 2 === 1;
         const bassHard = !(secKey === 'build') && (secKey ? !!this.manusTog && !allaBuild : (beatClear || (bas && this.smartCount % 2 === 1)));   // MIX_V2 (1); konsertlaget: aldrig i build
-        const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); const t = cut.length ? cut : BREAK_CALM && secKey === 'break' ? [] : enabled(TOGGLE_POOL).filter(req); const full = secKey === 'high' ? t.filter((m) => !SPARSAM.includes(m)) : t; return full.length ? full : t; })() : [];   // refrängen: inga glesa looker via basgången heller (10-12)
+        const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); const t = cut.length ? cut : secKey === 'break' ? [] : enabled(TOGGLE_POOL).filter(req); const full = secKey === 'high' ? t.filter((m) => !SPARSAM.includes(m)) : t; return full.length ? full : t; })() : [];   // refrängen: inga glesa looker via basgången heller (10-12); break: toggles bara ur breakets egna (LUGNT BREAK, standard 10-26)
         const clearBass = toggles.length > 0;
         if (clearBass) {
           const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) + (!this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) - unitPen(m) + rel(m) })).sort((a, b) => b.s - a.s);

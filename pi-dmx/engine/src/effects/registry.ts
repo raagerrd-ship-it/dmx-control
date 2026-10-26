@@ -189,11 +189,8 @@ export function modulateOf(key: Mode): { readonly energy: boolean; readonly puls
 /** Alla effekt-nycklar i cykel-ordning (driver MODE_CYCLE + validering). */
 export const EFFECT_KEYS: Mode[] = EFFECTS.map((e) => e.key);
 
-/** TAGGRÄTTNING (prov 2026-10-25, DMX_TAGFIX=1, av = bit-identiskt): situationsrutnätet 10-12 lade sju effekter i rutor som nästan
- *  aldrig inträffar (kvällen 10-11 i ett svep, 217 lookval: refräng var lugn 4/66, intro full 7/42 - alla via toggle-tvånget, vers
- *  full 2/49) -> aldrig valda. Flyttas ett tier-steg mot där sektionen faktiskt ligger (energin skalar ljuset ändå, modulate.energy). */
-const TIER_FIX: Partial<Record<Mode, EffectTier>> = { svall: "fart", famn: "fart", droppar: "fart", startskott: "fart", blixtnedslag: "fart", mellanslag: "fart", pump: "fart" };
-if (process.env.DMX_TAGFIX === "1") for (const e of EFFECTS) e.tier = TIER_FIX[e.key] ?? e.tier;
+/* TAGGRÄTTNINGEN (standard 2026-10-26, ägaren i ladan): svall/famn/droppar (lugn) och startskott/blixtnedslag/mellanslag/pump (full) står
+ *  nu på tier fart i sina filer - de låg i rutor som nästan aldrig inträffar och valdes aldrig. Backup: backup/fore-fyra-prov-2026-10-26. */
 
 /** Smart-lägets pooler, härledda ur tier-taggen. */
 export const TIER: Record<EffectTier, Mode[]> = {

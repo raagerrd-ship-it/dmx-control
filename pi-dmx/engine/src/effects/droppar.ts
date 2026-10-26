@@ -8,7 +8,7 @@ const h = (x: number, n: number) => (Math.imul(x + 11, 2654435761) >>> 0) % n;
 // (c.bassNoteIdx, vid tydlig basgång) faller som en droppe i en ny lampa (hash) och klingar av långsamt; förra droppen syns ännu
 // svagare i grannkulören. Utan tydlig basgång faller en droppe per två slag. Övriga lampor ligger nästan mörka.
 export const droppar: EffectDef = {
-  key: "droppar", label: "Droppar", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["high"],
+  key: "droppar", label: "Droppar", tier: "fart", modulate: { energy: true, pulse: false }, section: ["high"],
   desc: "Lugn refräng: varje basnot faller som en droppe i en ny lampa och klingar av långsamt.",
   render(c) {
     const n = Math.max(1, c.count);

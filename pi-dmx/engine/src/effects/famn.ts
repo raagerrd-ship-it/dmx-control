@@ -5,7 +5,7 @@ import { hsv } from "./color.js";
 // Mittlamporna håller en varm, stilla glöd; ytterlamporna blommar ut på taktens etta och klingar av över hela takten - riggen
 // omfamnar mitten. Svall andas fram och tillbaka på två slag; famn slår en gång per takt.
 export const famn: EffectDef = {
-  key: "famn", label: "Famn", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["high"],
+  key: "famn", label: "Famn", tier: "fart", modulate: { energy: true, pulse: false }, section: ["high"],
   desc: "Lugn refräng: mitten glöder stilla, ytterlamporna blommar ut på taktens etta och klingar av.",
   render(c) {
     const n = Math.max(1, c.count);

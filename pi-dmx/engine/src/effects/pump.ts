@@ -6,7 +6,7 @@ import { hsv } from "./color.js";
 // snabbt, kanterna långsamt - så riggen andas ut ojämnt efter varje kick. En lampa per takt vilar mörk (c.idx-ordningen).
 // Motor, backbeat och gravity tänder på slaget; pump släcker på det.
 export const pump: EffectDef = {
-  key: "pump", label: "Pump", tier: "full", modulate: { energy: true, pulse: false }, section: ["low"],
+  key: "pump", label: "Pump", tier: "fart", modulate: { energy: true, pulse: false }, section: ["low"],
   desc: "Vers i full fart: kicken trycker ner lamporna och de hämtar sig i olika takt - sidechain-pump.",
   render(c) {
     const n = Math.max(1, c.count);

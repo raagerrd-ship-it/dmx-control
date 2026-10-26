@@ -6,7 +6,7 @@ import { hsv } from "./color.js";
 // med basens sustain (c.drum.bass) som extra lyft; kicken själv syns bara som en svag glöd i lampan mittemot. Takten känns i
 // luckan mellan slagen. Gallop delar grupper beat/off-beat; mellanslag vandrar på offbeaten.
 export const mellanslag: EffectDef = {
-  key: "mellanslag", label: "Mellanslag", tier: "full", modulate: { energy: true, pulse: false }, section: ["intro"],
+  key: "mellanslag", label: "Mellanslag", tier: "fart", modulate: { energy: true, pulse: false }, section: ["intro"],
   desc: "Intro i full fart: ljuset slår på offbeaten mellan kickarna och vandrar en lampa per slag.",
   render(c) {
     const n = Math.max(1, c.count);

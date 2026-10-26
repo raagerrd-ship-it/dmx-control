@@ -5,7 +5,7 @@ import { hsv } from "./color.js";
 // etta blixtrar, och för varje takt i frasen blixtrar en lampa till (utifrån och in, c.lamp): 1, 2, 3, alla - sedan om. Mellan ettorna
 // gnistrar de tända lamporna svagt på hi-hatten. Kickregn slår varje slag; startskott räknar takterna.
 export const startskott: EffectDef = {
-  key: "startskott", label: "Startskott", tier: "full", modulate: { energy: true, pulse: false }, section: ["intro"],
+  key: "startskott", label: "Startskott", tier: "fart", modulate: { energy: true, pulse: false }, section: ["intro"],
   desc: "Intro i full fart: taktens etta blixtrar i en lampa till för varje takt - 1, 2, 3, alla.",
   render(c) {
     const n = Math.max(1, c.count);
