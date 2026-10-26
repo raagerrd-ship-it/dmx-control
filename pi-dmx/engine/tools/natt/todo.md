@@ -7,8 +7,15 @@ gör saker snabbare/billigare ska vara bit-identiskt (natt --snabb json-lika + k
 ljuset (uppgången) är opt-in med bevis. Låsta regler gäller: fade-down/uttoningen rörs aldrig, delade analysatorn ändras inte (fynd ->
 analysator-fynd.md, lotus-morgonagenten har samma uppdrag i morgon bitti), strobe <= 3/s.
 PRIORITET EFTER ÄGARENS VIDEOR (punkt 5 nedan, 5 klipp 18:25-18:43): kedjan ljud->ljus är MÄTT live till ~35-45 ms (video 5, drop i
-slowmotion) - jaga inte den vidare. Ordning i natt: (A) gallop-felet (punkt 5: stora steget ~150 ms efter slaget), (B) major GC under musik
-(punkt 3), (C) latensbudgeten (punkt 1) som tabell med videons livevärde som facit, (D) uppgången (punkt 2) bara om tid finns.
+slowmotion; handklappen rättad: ~10-30 ms till första rörelse) - jaga inte den vidare. Ordning i natt: (A) gallop-felet (punkt 5: stora
+steget ~150 ms efter slaget), (B) UPPVÄRMNINGEN efter omstart (punkt 3, rättad nedan), (C) latensbudgeten (punkt 1) som tabell med videons
+livevärde som facit, (D) uppgången (punkt 2) bara om tid finns.
+RÄTTELSE 19:53 (perf-ladan-2026-10-26-kvall.json, 98 min drift): 'major ~1/min under musik' var de första minuterna efter deployens
+omstart, inte stabilt läge. Stabilt läge (18:37-18:51, musik): major 0, minor 8-11/min (max 8,5 ms), render 0,19 ms snitt / max 6 ms,
+loop p99 11,2 / max 20 ms, heap 21-24 MB; totalt sedan start 4 major (max 61 ms), forcedGc 0. Flaggorna på Pi:n: node24 --heap-growing-
+percent=200 --expose-gc --max-old-space-size=96 --min/max-semi-space-size=4, DMX_GC_DARK=0.6, MemoryMax 340M, MALLOC_ARENA_MAX=2.
+=> optimeringen gäller UPPVÄRMNINGEN (1:a minuten: minor 92, major 1-2/min i 5 min, loop max 1144 ms, render max 8 ms) - kan den
+flyttas före musiken (warmup.wav körs redan vid start) eller göras billigare? Och de få render-topparna 2-6 ms i stabilt läge.
 LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-ladan-2026-10-26.json, /api/perf, Node 24, Pi load 0,6, 34 °C):
   render 200 Hz snitt 0,18-0,26 ms, max 3,6-8,4 ms, over5 0-7/min; loop p99 10,3-12,7 ms (10 ms-intervall), max 21-81 ms;
   minor GC 6-28/min (max 4-8 ms); MAJOR GC ~1/min UNDER MUSIK (19-72 ms, 17:08 72 ms = loop max 81 ms); heap 18-30 MB; 1:a minuten
@@ -20,7 +27,7 @@ LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-l
 2. UPPGÅNGEN: ljusLag ger korskorr 5-10 ms men 90 % av toppen först 35-60 ms (pop 45, mega 60, 1021 35) - var sitter de 30-50 ms mellan
    första rörelse och 90 %? (effektens envelope/attack, FX_FLOOR, tändpunkt, gamma, minsta på-tid, energins uppgång, 25 ms-raster i bänken
    vs 5 ms live). Prova EN förkortning på uppgången som opt-in, döm med ljusLag (90 %) + natt --snabb (inget annat ner). Aldrig nedgången.
-3. OPTIMERING: få bort major GC under musik och render-toppar > 2 ms. Vad fyller gamla generationen (18-30 MB) i 1-minutstakt? Mät med
+3. OPTIMERING (se RÄTTELSE ovan: stabilt läge är bra): uppvärmningens major GC/loop-toppar och render-toppar > 2 ms. Vad fyller gamla generationen (18-30 MB) i 1-minutstakt? Mät med
    tools/liveLab.mjs + tools/skrap (winAlloc, andra varvet = stabilt läge, mätfälla 50 och bänkklockan som överskattar). Kandidater att
    granska: dirigentens Map/arrayer (lookPlayMs, manusHist, recentLooks, LOG-rader), sektions-/palettspår, inspelningens ringbuffert,
    console-strängar som byggs fast quiet. Kolla också varför gc-dark inte tog dem (villkoren: tystnad >= 1,5 s, släckt ram, gamla >= 60 %).
