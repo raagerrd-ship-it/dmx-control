@@ -36,13 +36,15 @@ LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-l
    tar sitt största steg i median +39 ms efter kicken (13 slag, -37..+72, ±17 ms bildruta), första rörelse +48 ms, andra paret en halv takt
    senare som tänkt. Samma metod på video 1: första rörelse +35 ms men stora steget +189..+222 ms -> kedjan är bra, GALLOP är avvikaren.
    (Bänken valde en annan look på video 2:s ljud - looken live går inte att återskapa ur 10 s.)
-   VIDEO 3 (18:36, PXL_20261026_183608339.mp4, 12,7 s, allt rött): lugnt parti utan fast kick (basen sväller ~1,5-2 s), lugn look som tänder en
-   lampa i taget L4 -> L3 -> L2 -> L1 var ~0,7 s (600-810 ms, ojämnt) med lång uttoning; riggen mörk 0-5,5 s, sedan +45 % i två steg (5,54 och
-   6,27 s). Ingen kick att mäta latens mot - inget fynd, bara underlag.
-   VIDEO 4 (18:37, PXL_20261026_183735386.mp4, 13,5 s, grönt/rött): lugnt, basen sväller var ~1,9 s till samma höjd (~47 dB) hela klippet. Ljuset
-   lyfter i början av svällningarna (2,2/4,0/5,9/8,3 s) men 9-13,5 s mörknar riggen till ~1/3 (hela 45 -> 15) och svällningarna syns knappt;
-   L3 släcks 4,8 s och L1 7,3 s (färre lampor). Kolla på ljudet (bänken, x4 + norm -17): energifönstret, sektionsbyte eller lamptrappan?
-   Ingen latensfråga.
+   VIDEO 3 + 4 (18:36 / 18:37) ÄR SLOWMOTION: com.android.capture.fps=120, spelas i 30 -> 4x långsammare, LJUDET OCKSÅ (kick ~64 Hz
+   hamnar på ~16 Hz). Verklig tid: 3,2 / 3,4 s, ~126 BPM (bastoppar var ~488 ms), 8,3 ms per bildruta. Mät med slow.py (FAC 4) + rt2.py
+   (basen 25-150 Hz i tidsdomän, 10 ms envelope; kickens start = där basen lämnar golvet +3 dB). Video 4, 7 slag: basen sväller ~145 ms
+   från golv till topp (pumpande bas, inte kort kick); ljuset 10 % +66, 50 % +112, 90 % +160 ms efter basens start = 50 % ~30 ms FÖRE och
+   90 % ~vid basens topp -> ljuset följer basens energi utan synlig fördröjning. Video 3 (5 slag): 10 % +55, 50 % +110, 90 % +126 ms
+   (basens topp +148). Osäkert: slowmotion-ljudets synk mot bilden, och var örat hör slaget (trummans ansats) - en transientmätning
+   (rt3) gav artefakter och är förkastad. Slutsats för uppdraget: kedjan är snabb; där ljuset KÄNNS sent är det för att ljuset följer
+   basens kropp (sub+kick 20-120 Hz) som i pumpande musik toppar 100-150 ms efter ansatsen, och gallop (video 1) som har eget fel.
+   Video 4 mörknar ~2,3-3,4 s verklig tid (hela 45 -> 15, L3/L1 släcks 1,2 / 1,8 s) trots samma bas - inte utrett.
 RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, nattens fix(ar) med före/efter, vad som är redo för ladan
 (`python tools/ladan.py` för bit-identiska fixar, `--env` för uppgångsprovet) och vad som ska mätas live nästa besök (/api/perf).
 
