@@ -39,6 +39,10 @@ LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-l
    VIDEO 3 (18:36, PXL_20261026_183608339.mp4, 12,7 s, allt rött): lugnt parti utan fast kick (basen sväller ~1,5-2 s), lugn look som tänder en
    lampa i taget L4 -> L3 -> L2 -> L1 var ~0,7 s (600-810 ms, ojämnt) med lång uttoning; riggen mörk 0-5,5 s, sedan +45 % i två steg (5,54 och
    6,27 s). Ingen kick att mäta latens mot - inget fynd, bara underlag.
+   VIDEO 4 (18:37, PXL_20261026_183735386.mp4, 13,5 s, grönt/rött): lugnt, basen sväller var ~1,9 s till samma höjd (~47 dB) hela klippet. Ljuset
+   lyfter i början av svällningarna (2,2/4,0/5,9/8,3 s) men 9-13,5 s mörknar riggen till ~1/3 (hela 45 -> 15) och svällningarna syns knappt;
+   L3 släcks 4,8 s och L1 7,3 s (färre lampor). Kolla på ljudet (bänken, x4 + norm -17): energifönstret, sektionsbyte eller lamptrappan?
+   Ingen latensfråga.
 RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, nattens fix(ar) med före/efter, vad som är redo för ladan
 (`python tools/ladan.py` för bit-identiska fixar, `--env` för uppgångsprovet) och vad som ska mätas live nästa besök (/api/perf).
 
