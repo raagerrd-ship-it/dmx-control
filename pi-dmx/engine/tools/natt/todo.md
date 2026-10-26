@@ -45,6 +45,11 @@ LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-l
    (rt3) gav artefakter och är förkastad. Slutsats för uppdraget: kedjan är snabb; där ljuset KÄNNS sent är det för att ljuset följer
    basens kropp (sub+kick 20-120 Hz) som i pumpande musik toppar 100-150 ms efter ansatsen, och gallop (video 1) som har eget fel.
    Video 4 mörknar ~2,3-3,4 s verklig tid (hela 45 -> 15, L3/L1 släcks 1,2 / 1,8 s) trots samma bas - inte utrett.
+   VIDEO 5 (18:43, PXL_20261026_184340254.mp4, slowmotion 4x, 3,3 s verklig) = BÄSTA LATENSMÄTNINGEN: break (basen borta 0,65-1,45 s) och
+   drop. Ljudet lämnar golvet 1,464 s (brett band -46 -> -39 dB), basen halvvägs ~1,490, topp 1,536. Ljuset (8,3 ms rutor): oförändrat t.o.m.
+   1,4933, +12 % vid 1,5016, ~75 % vid 1,5099, 100 % vid 1,535. => ljud -> första ljus ~+33 ms, ~75 % ~+46 ms, fullt ~+71 ms (= basens topp);
+   + ljudets väg till telefonen (~3 ms/m) => ~35-45 ms ljud->ljus. Stämmer med bänken (~40 ms) + kedjan. Dropen är tajt. (Slowmotion-ljudets
+   synk mot bilden overifierad.)
 RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, nattens fix(ar) med före/efter, vad som är redo för ladan
 (`python tools/ladan.py` för bit-identiska fixar, `--env` för uppgångsprovet) och vad som ska mätas live nästa besök (/api/perf).
 
