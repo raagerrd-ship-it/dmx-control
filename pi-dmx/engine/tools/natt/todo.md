@@ -23,6 +23,15 @@ LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-l
    console-strängar som byggs fast quiet. Kolla också varför gc-dark inte tog dem (villkoren: tystnad >= 1,5 s, släckt ram, gamla >= 60 %).
    Varje fix: bit-identiskt bevisad, µs/ruta och kB/s före/efter (Node 24 i bänken). Uppvärmningens första minut (1144 ms loop) som egen rad.
 4. Fynd i den delade analysatorn (FFT-kostnad, skräp i process(), fältlatens) -> analysator-fynd.md med siffror.
+5. ÄGARENS VIDEO 10-26 18:25 (tools/ladan-2026-10-26/: PXL_20261026_182512747.mp4 10 s 30 fps, ljudet ur den som wav, x4 + norm -17 för
+   bänken, skripten lag/ev/sub2/bench.py - inte i git), ägaren: 'vad tror du om latensen?'. Huvudsessionens mätning: musiken 127-128 BPM, look
+   gallop. FÖRSTA ljusrörelsen ~50 ms efter kickens början i videon (inkl. kedja, telefonens A/V och ljudets väg ~10-15 ms) - bänken +5..14 ms.
+   Men det STORA steget (alla 4 lampor/hela bilden +20-30 %) kommer +145..+190 ms efter kicken, slag efter slag (7,69/8,16/8,63/9,10 s).
+   Bänken på samma ljud (konsertReplay --step 5 --delad-cfg --live-kick --trace, varv 3): grupp 2+4 upp +12 ms (0,29 -> 0,85), grupp 1+3 upp
+   i ETT steg vid +130 ms (0,18 -> 0,74), nästa kick +479 ms. gallop.ts säger grupp B på 0,5 och 0,75 av slaget (+234/+352), inte +130 ->
+   REDA UT: vad lyfter grupp B vid +130 (beatFrac-fasen? kickEnv/punch? minsta på-tid? rutnätets fas mot kicken; varv 4 glider +30 -> +163 ms)?
+   Är det designat (galoppfigur) eller ett fasfel? Om fasfel: fix (opt-in) så att det STORA steget kommer på slaget. Det är det ögat ser som
+   'latens' - kedjans egen latens är liten. Mät också med ljusLag/showTight om 90 %-måttet fångar detta.
 RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, nattens fix(ar) med före/efter, vad som är redo för ladan
 (`python tools/ladan.py` för bit-identiska fixar, `--env` för uppgångsprovet) och vad som ska mätas live nästa besök (/api/perf).
 
