@@ -94,6 +94,7 @@ Backa ett prov: `python tools/ladan.py --env <det andra>`; båda: `python tools/
   16 -> 15 %, dropens look kvar +10 s 68 -> 76 %, drops 68 -> 66. (Före kvällens prov: byten 2,79, återseende 67, hör ihop 81.)
 
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
++ PROV (natt 10-26): `--env DMX_BREAK_CALM=1` (lugnt break, se NATTEN 2026-10-26) och `--env DMX_TAGFIX=1` (10-25) kan läggas i samma körning.
 PROV (natt 10-24 + 10-25, ett paket): `PI_HOST=<ip> python tools/ladan.py --env DMX_MANUS_TOP=2 --env DMX_SWITCH_ON=1` - refrängen släkt med
   versen (hör ihop 56 -> 71 % hela kvällen) + lookbytet på slaget (2 -> 72 %). Backa ett: kör om med bara det andra; båda: utan --env.
 KLART 2026-10-23 (STANDARD + UTE, se LADAN 2026-10-23): `PI_HOST=<ip> python tools/ladan.py --env DMX_SECTION_EARLY_DB=1.5` - bara
@@ -149,6 +150,16 @@ PROV REDO: DMX_TAGFIX=1 - build-trion in i BUILD_LOOKS, de sju ett tier-steg til
   drops 60 lika; mixarna json-lika i allt (natt/2026-10-25-tagfix.json). Fortfarande 0: svall/famn/droppar, andrum, tide, airglow, breathe,
   dyning, urladdning - toggle-tvånget (refräng och break) och krav, inte taggar. `python tools/ladan.py --env DMX_TAGFIX=1`.
   TITTA: build-trion under uppbyggnaden, startskott/pump när de dyker upp. Godkänt -> taggarna rättas i effektfilerna, flaggan bort.
+
+## NATTEN 2026-10-26 (nattagenten, inget deployat)
+KLART 2026-10-26: baslinje natt/2026-10-26.json json-identisk med 10-25 (5a12e80). Inga nya kvällsuppdrag, inga nya inspelningar.
+PROV REDO (b8c6553): DMX_BREAK_CALM=1 - i break tas toggle-tvånget bara ur breakets egna effekter (förr ur hela TOGGLE_POOL:
+  'manus break: last takt (15 toggles) -> varannan/bounce/motor'). Kvällen i ett svep: break 9,6 min toggle 62 -> 36 %, breakets egna
+  väljs (glesna, morkerslag, dyning, skuggor, urladdning, fyr), återseende 73 -> 76, unika 61 -> 65, effektivt 25,8 -> 26,6, hör ihop 56,
+  byten 2,57 och drops 60 lika; mixar r -0,01 (pop 0,32 -> 0,31, mega 0,17 -> 0,16); av json-identiskt. `python tools/ladan.py --env DMX_BREAK_CALM=1`
+  (kan tas i samma körning som MANUS_TOP/SWITCH_ON/TAGFIX). TITTA: blir breaket lugnt och glest i stället för stegande lampor?
+ÖPPET: eko-överstyrningen efter valet (bassline >= 0,6) ger eko 22 % av break och 19 % av vers - ägarens val 10-11, rörs inte utan ägaren.
+  Mega lampAntalR 0,14 (pop 0,27). Skript: scratch secLooks.mjs/breakSeg.mjs (look per sektion ur konsertReplay-json) - kopiera till tools/ om de behövs igen.
 
 ## NATTEN 2026-10-25 (nattagenten, inget deployat)
 KLART 2026-10-25: 'kvällen i ett svep i natt.py' (NÄSTA 10-24) - bank v4 (cf804de): 10-11-kvällen skarvad (kvall-svep.wav, ej i git) genom
