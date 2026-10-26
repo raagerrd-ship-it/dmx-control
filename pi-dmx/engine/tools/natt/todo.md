@@ -94,6 +94,9 @@ Backa ett prov: `python tools/ladan.py --env <det andra>`; båda: `python tools/
   16 -> 15 %, dropens look kvar +10 s 68 -> 76 %, drops 68 -> 66. (Före kvällens prov: byten 2,79, återseende 67, hör ihop 81.)
 
 ## NÄSTA LADAN-BESÖK (ägaren 10-19: vänta till dess)
+ÄGAREN 10-26: ALLA FYRA PROV I EN KÖRNING (Pi:n nåddes inte 10-26, PC på hemmanätet): `PI_HOST=<ip> python tools/ladan.py --env DMX_MANUS_TOP=2
+  --env DMX_SWITCH_ON=1 --env DMX_BREAK_CALM=1 --env DMX_TAGFIX=1`. Bänk ihop (natt/2026-10-26-fyra.json): kvällen hör ihop 56 -> 71 %, återseende
+  73 -> 84, unika 61 lika, effektivt 25,8 -> 21,9, byten 2,57 -> 2,66, drops 60 lika; pop r 0,32 -> 0,31, mega r 0,17 -> 0,15, mega 90 % 60 -> 65 ms.
 + PROV (natt 10-26): `--env DMX_BREAK_CALM=1` (lugnt break, se NATTEN 2026-10-26) och `--env DMX_TAGFIX=1` (10-25) kan läggas i samma körning.
 PROV (natt 10-24 + 10-25, ett paket): `PI_HOST=<ip> python tools/ladan.py --env DMX_MANUS_TOP=2 --env DMX_SWITCH_ON=1` - refrängen släkt med
   versen (hör ihop 56 -> 71 % hela kvällen) + lookbytet på slaget (2 -> 72 %). Backa ett: kör om med bara det andra; båda: utan --env.
