@@ -53,6 +53,11 @@ LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-l
    1,4933, +12 % vid 1,5016, ~75 % vid 1,5099, 100 % vid 1,535. => ljud -> första ljus ~+33 ms, ~75 % ~+46 ms, fullt ~+71 ms (= basens topp);
    + ljudets väg till telefonen (~3 ms/m) => ~35-45 ms ljud->ljus. Stämmer med bänken (~40 ms) + kedjan. Dropen är tajt. (Slowmotion-ljudets
    synk mot bilden overifierad.)
+   VIDEO 6 (18:47, PXL_20261026_184737063.mp4) = HANDKLAPP i slowmotion, synktest: ljudets ansats 2,223 s (fil), händerna möts mellan ruta
+   2,302 (sida vid sida, oskärpa) och 2,335 (pressade) -> LJUDSPÅRET LIGGER ~20-28 ms (verklig tid) FÖRE BILDEN i telefonens slowmotion
+   (klapp-montage.jpg). Rättat video 5: ljud -> första ljus +29..+38 - ~24 = ~+5..+14 ms, ~75 % ~+22 ms, fullt ~+47 ms; plus ljudets väg
+   högtalare -> telefon (~3 ms/m, avstånd okänt) => ljud -> ljus ungefär 10-30 ms till första rörelse, ~25-40 ms till 75 %. Samma rättelse
+   (-~24 ms) gäller video 3/4. Kedjan är alltså SNABBARE än bänkens uppskattning 40 ms + 30 ms - latens är inte problemet; gallop är det.
 RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, nattens fix(ar) med före/efter, vad som är redo för ladan
 (`python tools/ladan.py` för bit-identiska fixar, `--env` för uppgångsprovet) och vad som ska mätas live nästa besök (/api/perf).
 
