@@ -5,6 +5,9 @@
   Bara effects.js + effects/registry.js skilde; md5 lika med dist, NRestarts 0, alla fyra i unit-env. Väntar på ögat.
   TITTA: lookbyte på slaget, refrängen släkt med versen, lugnt break, pulse/stegring/sug i uppbyggnaden.
   Backa ett: kör om utan dess --env; alla: `PI_HOST=10.54.139.218 python tools/ladan.py`. Godkänt -> konstant i koden, flaggan bort.
+18:06 GODKÄNT (ägaren: 'Standard') -> alla fyra KOD, flaggorna bort (d3248b5, backup-tagg backup/fore-fyra-prov-2026-10-26): MANUS_TOP 2,
+  SWITCH_ON 1, break tar toggles bara ur sina egna, taggarna rättade i effektfilerna. Bevis: natt --snabb utan env json-identisk med
+  provet (2026-10-26-fyra-std.json == -fyra.json). Deployat utan env, ladan.conf borta, md5 lika (9 filer), NRestarts 0.
 
 ## LADAN 2026-10-23 (ägaren i ladan, Pi 10.153.152.219 via hotspot)
 15:58 UTE: flaggstädningen (DMX + delade analysatorn) + UI-städningen + PROV DMX_SECTION_EARLY_DB=1.5. md5 lika, NRestarts 0.
