@@ -36,6 +36,9 @@ LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-l
    tar sitt största steg i median +39 ms efter kicken (13 slag, -37..+72, ±17 ms bildruta), första rörelse +48 ms, andra paret en halv takt
    senare som tänkt. Samma metod på video 1: första rörelse +35 ms men stora steget +189..+222 ms -> kedjan är bra, GALLOP är avvikaren.
    (Bänken valde en annan look på video 2:s ljud - looken live går inte att återskapa ur 10 s.)
+   VIDEO 3 (18:36, PXL_20261026_183608339.mp4, 12,7 s, allt rött): lugnt parti utan fast kick (basen sväller ~1,5-2 s), lugn look som tänder en
+   lampa i taget L4 -> L3 -> L2 -> L1 var ~0,7 s (600-810 ms, ojämnt) med lång uttoning; riggen mörk 0-5,5 s, sedan +45 % i två steg (5,54 och
+   6,27 s). Ingen kick att mäta latens mot - inget fynd, bara underlag.
 RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, nattens fix(ar) med före/efter, vad som är redo för ladan
 (`python tools/ladan.py` för bit-identiska fixar, `--env` för uppgångsprovet) och vad som ska mätas live nästa besök (/api/perf).
 
