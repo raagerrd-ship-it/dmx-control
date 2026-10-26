@@ -1,5 +1,11 @@
 # Natt-agentens uppdrag
 
+## LADAN 2026-10-26 (ägaren i ladan, Pi 10.54.139.218 via hotspot Pixel_9285, PC 10.54.139.53)
+17:57 UTE: PROV DMX_MANUS_TOP=2 DMX_SWITCH_ON=1 DMX_BREAK_CALM=1 DMX_TAGFIX=1 i ladan.conf (ägaren: 'alla fyra i en körning').
+  Bara effects.js + effects/registry.js skilde; md5 lika med dist, NRestarts 0, alla fyra i unit-env. Väntar på ögat.
+  TITTA: lookbyte på slaget, refrängen släkt med versen, lugnt break, pulse/stegring/sug i uppbyggnaden.
+  Backa ett: kör om utan dess --env; alla: `PI_HOST=10.54.139.218 python tools/ladan.py`. Godkänt -> konstant i koden, flaggan bort.
+
 ## LADAN 2026-10-23 (ägaren i ladan, Pi 10.153.152.219 via hotspot)
 15:58 UTE: flaggstädningen (DMX + delade analysatorn) + UI-städningen + PROV DMX_SECTION_EARLY_DB=1.5. md5 lika, NRestarts 0.
   Ett arecord-läsfel 5 s efter omstarten (pcm_read I/O error), ramar kom ändå; vid omdeployen 16:08 inget fel, arecord kör.
