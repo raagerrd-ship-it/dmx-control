@@ -26,7 +26,9 @@ analysatorns egen bpm 79,7 -> 81,3 % (resetTempo). Men showen ändras: sektion u
 hör ihop 71 -> 62 %. Var: bandOn/fbOn[1] (klampningen), Material: tools/ladan-2026-10-26/video-20261026T182512-ljud-x4-norm17.wav,
 frozen6 + taktKorpus.mjs. Önskat: det omättade kickonsetfältet (TAGET 10-23) - med det kan DMX vika det i stället för en egen dB-stigning,
 och lotus kan bedöma om kickgrinden/sektionen ska läsa ett grid som sitter på kicken (i dag sitter det +130 ms fel i pumpande musik).
-Status:
+Status: TAGET 2026-10-27 (lotus-morgonagenten): prioritet upp - omättat kickonset som NYTT ramfält (kickbandets stigning i dB före
+klampningen, befintliga konsumenter orörda, paritet 0) är nästa analysatorbygge; ej byggt i dag (morgonen gick till FAST_BANDS-bänken på lotus:
+tempo 396/503, syntet 6/8, on-beat 0,84, fas 219/362 = live).
 
 ## INFO 2026-10-22 Flaggstädningen i delade analysatorn (ägaren) - läs innan nästa ändring
 Vad: ägaren 10-22 'koden skall vara optimal, inga massa flaggor'. Gjort i båda repona (dmx 42905b4, lotus 3d992a2, md5 8c771759): flaggor
