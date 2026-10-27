@@ -104,6 +104,11 @@ LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-l
 RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, nattens fix(ar) med före/efter, vad som är redo för ladan
 (`python tools/ladan.py` för bit-identiska fixar, `--env` för uppgångsprovet) och vad som ska mätas live nästa besök (/api/perf).
 
+## LADAN 2026-10-27 (ägaren i ladan, Pi 10.100.168.218 via hotspot, PC 10.100.168.53)
+19:56 UTE: PROV DMX_FEED_RISE=1 i ladan.conf (gallop-rättningen 491f9c7, bänken blandad: grid på kicken + taktklocka 67 -> 83 %, men
+  sektion upp 2,6 -> 4,1 s, hör ihop 71 -> 62 %). beatFeed.js md5 lika (8bb7870a), flaggan i unit-env, NRestarts 0, warmup klar 31 s.
+  TITTA: gallop på slaget? kommer refrängens look i tid? Backa: `PI_HOST=10.100.168.218 python tools/ladan.py`.
+
 ## LADAN 2026-10-26 (ägaren i ladan, Pi 10.54.139.218 via hotspot Pixel_9285, PC 10.54.139.53)
 17:57 UTE: PROV DMX_MANUS_TOP=2 DMX_SWITCH_ON=1 DMX_BREAK_CALM=1 DMX_TAGFIX=1 i ladan.conf (ägaren: 'alla fyra i en körning').
   Bara effects.js + effects/registry.js skilde; md5 lika med dist, NRestarts 0, alla fyra i unit-env. Väntar på ögat.
