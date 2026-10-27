@@ -4,6 +4,10 @@
 Läget: inget nytt live sedan 10-26 18:06. Nattens prov 491f9c7 DMX_FEED_RISE=1 rättade gridet (gallop +134 -> -32 ms, taktKorpus 67,1 ->
 83,2 %) men flyttade showen (sektion upp 2,6 -> 4,1 s, kvällen hör ihop 71 -> 62 %, mega r 0,15 -> 0,03). Lotus bygger det omättade
 kickfältet (fynd 10-27 TAGET). Låsta regler som vanligt; uttoningen och delade analysatorn rörs inte. Inget deployas.
+(20:04 ÄNDRAT: FEED_RISE ÄR NU STANDARD - ägaren godkände i ladan. Punkt 1 gäller fortfarande men vänt: rise-gridet är kod, så målet är
+   att ta tillbaka sektionerna (upp 4,1 -> ~2,6 s, hör ihop 62 -> ~71 %) UTAN att flytta gridet från kicken. Bänkvarianten = analysatorn
+   på en cfg-kopia med den GAMLA vikningen; opt-in-provet = cfg.beat (analysatorn) viks som före 10-27, effektklockan behåller rise-gridet.
+   Gallop-fasen och taktKorpus 83 % får inte gå ner.)
 1. ISOLERA KOPPLINGEN (hypotes: analysatorns kickgrind/sektion läser cfg.beat - --delad-cfg - så ett flyttat grid flyttar sektionerna).
    BEVISA/FÄLL FÖRST: kör FEED_RISE=1 med analysatorn på en egen cfg-kopia vars beat följer den GAMLA vikningen (bänkvariant, ingen
    motorändring). Kommer sektion upp 2,6 s / hör ihop 71 % / mega r 0,15 tillbaka medan gallop-fasen står kvar på ~-32 ms -> hypotesen håller.
@@ -108,6 +112,10 @@ RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, natt
 19:56 UTE: PROV DMX_FEED_RISE=1 i ladan.conf (gallop-rättningen 491f9c7, bänken blandad: grid på kicken + taktklocka 67 -> 83 %, men
   sektion upp 2,6 -> 4,1 s, hör ihop 71 -> 62 %). beatFeed.js md5 lika (8bb7870a), flaggan i unit-env, NRestarts 0, warmup klar 31 s.
   TITTA: gallop på slaget? kommer refrängens look i tid? Backa: `PI_HOST=10.100.168.218 python tools/ladan.py`.
+20:04 GODKÄNT (ägaren: 'Det ser bra ut, behåll FEED_RISE och gör det till standard') -> KOD, flaggan bort (9b92301, backup-tagg
+  backup/fore-feed-rise-2026-10-27). Bevis: natt --snabb utan env json-identisk med provet (2026-10-27-feedrise-std.json == -feedrise.json).
+  Deployat utan env, ladan.conf borta, beatFeed.js md5 lika (b57008bd), NRestarts 0. NY BASLINJE = feedrise-raden (sektion upp 4,1 s,
+  kvällen hör ihop 62 % / återseende 79 %, mega r 0,03) - jämför i natt mot den, inte mot 10-27 00-raden.
 
 ## LADAN 2026-10-26 (ägaren i ladan, Pi 10.54.139.218 via hotspot Pixel_9285, PC 10.54.139.53)
 17:57 UTE: PROV DMX_MANUS_TOP=2 DMX_SWITCH_ON=1 DMX_BREAK_CALM=1 DMX_TAGFIX=1 i ladan.conf (ägaren: 'alla fyra i en körning').
