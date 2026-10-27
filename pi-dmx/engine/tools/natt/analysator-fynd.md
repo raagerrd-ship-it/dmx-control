@@ -15,6 +15,19 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-27 onset.kick-klampningen flyttar taktgridet +130 ms i pumpande bas (gallop-felet i ägarens video 10-26) - höjer prioriteten på fyndet 10-22
+Vad: DMX:s löpande takt (beatFeed.ts) viker onset.kick för att lägga rutnätet. Fältet är 0/1 och står på 1 i spridda hop under hela
+bas-svallet (video 10-26 18:25, 128 BPM: ettor på +0, +45, +85, +120, +165 ms ... efter subbens ansats) - vikningens topp hamnar där
+ettorna är tätast. Mätt (konsertReplay --step 5 --delad-cfg --live-kick, 3 varv): rutnätets slag median +134 ms efter ansatsen
+(p10 35 / p90 197) -> gallop tänder grupp A +130 ms, och grupp B:s 0,75-puls landar på kicken. DMX-provet DMX_FEED_RISE=1 (491f9c7)
+viker i stället basens stigning i dB (20log10(specAbs.sub+specAbs.kick), 6 hop): gridet -32 ms (= showLead 47 före, rått +15 ms),
+taktKorpus (frozen6, 161 klipp med facit) taktklockan 67,1 -> 83,2 % rätt tid, klipp >= 60 % 102 -> 133, tempobyten 243 -> 207,
+analysatorns egen bpm 79,7 -> 81,3 % (resetTempo). Men showen ändras: sektion upp 2,6 -> 4,1 s (kickgrinden läser cfg.beat), kvällen
+hör ihop 71 -> 62 %. Var: bandOn/fbOn[1] (klampningen), Material: tools/ladan-2026-10-26/video-20261026T182512-ljud-x4-norm17.wav,
+frozen6 + taktKorpus.mjs. Önskat: det omättade kickonsetfältet (TAGET 10-23) - med det kan DMX vika det i stället för en egen dB-stigning,
+och lotus kan bedöma om kickgrinden/sektionen ska läsa ett grid som sitter på kicken (i dag sitter det +130 ms fel i pumpande musik).
+Status:
+
 ## INFO 2026-10-22 Flaggstädningen i delade analysatorn (ägaren) - läs innan nästa ändring
 Vad: ägaren 10-22 'koden skall vara optimal, inga massa flaggor'. Gjort i båda repona (dmx 42905b4, lotus 3d992a2, md5 8c771759): flaggor
 med samma effektiva värde i DMX och lotus (profil + repots lotus-drop-ins) är kod, flaggor av i båda är borttagna (HMM/tempoTracker.ts,

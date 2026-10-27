@@ -65,6 +65,18 @@ LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-l
    (klapp-montage.jpg). Rättat video 5: ljud -> första ljus +29..+38 - ~24 = ~+5..+14 ms, ~75 % ~+22 ms, fullt ~+47 ms; plus ljudets väg
    högtalare -> telefon (~3 ms/m, avstånd okänt) => ljud -> ljus ungefär 10-30 ms till första rörelse, ~25-40 ms till 75 %. Samma rättelse
    (-~24 ms) gäller video 3/4. Kedjan är alltså SNABBARE än bänkens uppskattning 40 ms + 30 ms - latens är inte problemet; gallop är det.
+(A) KLART 2026-10-27 (nattagenten): GALLOP = FASFEL I RUTNÄTET, inte i gallop.ts. onset.kick är 0/1 och står på 1 i spridda hop under
+  hela bas-svallet (+0..+165 ms) -> beatFeeds vikning lägger slaget där ettorna är tätast: median +134 ms efter subbens ansats (p10 35 /
+  p90 197). Grupp A (beatPulse) tänds då +130 ms, grupp B:s 0,75-puls hamnar på kicken = videons 'stora steget sent'. PROV 491f9c7
+  DMX_FEED_RISE=1 (viker basens dB-stigning i stället): gridet -32 ms (showLead 47 före, rått +15), taktKorpus 67,1 -> 83,2 % (>= 60 %
+  102 -> 133), ljusLag mega 90 % 65 -> 35, 1021 35 -> 25. MEN sektion upp 2,6 -> 4,1 s, kvällen hör ihop 71 -> 62 %, återseende 84 -> 79,
+  mega r 0,15 -> 0,03 - EJ redo för ladan. Av json-identiskt. NÄSTA: isolera kopplingen (analysatorns kickgrind läser cfg.beat) - t.ex.
+  prova rise-vikningen bara för effektklockan, eller vänta på lotus omättade kickfält (fynd 10-27 i analysator-fynd.md).
+(B) DELVIS 2026-10-27: skrivbordsanalys, ingen Pi att mäta på. warmup.ts värmer bara huvudtrådens analysator (roll 'all') + skrapmotorn;
+  workerns isolat (långsamma sidan) värms inte, och skrapinstanserna blir skräp när uppvärmningen är klar (~1-2 min) = trolig källa till
+  1:a minutens major GC. Förslag (ej byggt): global.gc() direkt när warmUpInBackground är klar (--expose-gc finns) - mät live /api/perf.
+(C) KLART 2026-10-27: budgettabell i artifacten (ALSA period 128 = 2,7 ms + buffer upp till 21 ms, hop/fält ~5 ms med FAST_BANDS, render
+  0-5 ms, DMX-ram ~1-23 ms beroende på slots, live mätt 10-30 ms). Största att korta: ALSA-bufferten och DMX-ramlängden (räknat, ej mätt).
 RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, nattens fix(ar) med före/efter, vad som är redo för ladan
 (`python tools/ladan.py` för bit-identiska fixar, `--env` för uppgångsprovet) och vad som ska mätas live nästa besök (/api/perf).
 
@@ -230,6 +242,10 @@ PROV REDO: DMX_TAGFIX=1 - build-trion in i BUILD_LOOKS, de sju ett tier-steg til
   drops 60 lika; mixarna json-lika i allt (natt/2026-10-25-tagfix.json). Fortfarande 0: svall/famn/droppar, andrum, tide, airglow, breathe,
   dyning, urladdning - toggle-tvånget (refräng och break) och krav, inte taggar. `python tools/ladan.py --env DMX_TAGFIX=1`.
   TITTA: build-trion under uppbyggnaden, startskott/pump när de dyker upp. Godkänt -> taggarna rättas i effektfilerna, flaggan bort.
+
+## NATTEN 2026-10-27 (nattagenten, inget deployat)
+KLART 2026-10-27: baslinje natt/2026-10-27.json json-identisk med 10-26 fyra-std (c62d20d). Kvällens uppdrag A/B/C ovan.
+PROV (EJ REDO) 491f9c7 DMX_FEED_RISE=1 - se (A) ovan. Fynd till lotus: onset.kick-klampningen flyttar gridet +130 ms (analysator-fynd.md 10-27).
 
 ## NATTEN 2026-10-26 (nattagenten, inget deployat)
 KLART 2026-10-26: baslinje natt/2026-10-26.json json-identisk med 10-25 (5a12e80). Inga nya kvällsuppdrag, inga nya inspelningar.
