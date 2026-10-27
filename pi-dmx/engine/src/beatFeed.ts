@@ -31,15 +31,15 @@ const TRUST_REPEAT_BEATS = 2, TRUST_REPEAT_TOL = 0.06;
 /** LÖPANDE TAKT - RUTNÄTET PÅ LJUDETS SLAG (ägaren 10-19: 'allt i bakgrunden så snabbt som möjligt, effekten får info om exakta
  *  takten så snabbt det går'). Mätt i bänken (showTight --step 5, pop): kickbandets anslag (frame.onset.kick) är tydligt periodiskt, men
  *  rutnätets slag låg 40-160 ms fel och gled (tempo 1-1,5 BPM fel) - kick-PLL:en drar 10 % per kick och 'kick' fyrar på kylningens kant.
- *  Här viks de senaste ONSET_WIN_MS av onset.kick var ONSET_EVERY_MS på tempon kring det låsta (+-2,5 %), och rutnätet sätts DIREKT på
+ *  Här viks de senaste ONSET_WIN_MS av kickbandets anslag (sedan 10-27 basens dB-stigning, se nedan) var ONSET_EVERY_MS på tempon kring det låsta (+-2,5 %), och rutnätet sätts DIREKT på
  *  toppen (fas + tempo, slagindex bevaras). Sökningen sker kring rutnätets eget tempo OCH analysatorns (nytt tempo/låt); utan tydlig
  *  topp (< ONSET_MIN_PEAK x medel) rullar rutnätet vidare som det är. Ersatte kick-PLL:en, TEMPO_PERSIST och fasföljaren (enda vägen). */
 const ONSET_WIN_MS = 5000, ONSET_EVERY_MS = 250, ONSET_BINS = 48, ONSET_RING = 1024, ONSET_MIN_PEAK = 1.5;
-/** PROV DMX_FEED_RISE (natt 10-27, gallop-felet i ägarens video 10-26): onset.kick är klampad 0/1 (fynd 10-22) och mättar på hela
- *  bas-svallet i pumpande musik - vikningen lägger då rutnätet där ettorna är tätast, mätt +120..170 ms efter kickens ansats (gallop:
- *  grupp A tänds +130 ms, B:s 0,75-slag på kicken). Provet viker i stället basens (sub+kick, specAbs) STIGNING i dB över FEED_RISE_HOPS
- *  hop (omättad, toppar på ansatsen). Av = onset.kick som förr (bit-identiskt). */
-const FEED_RISE = process.env.DMX_FEED_RISE === '1', FEED_RISE_HOPS = 6;
+/** BASENS STIGNING (STANDARD i ladan 10-27, ägaren: 'ser bra ut'; backup-tagg backup/fore-feed-rise-2026-10-27; gallop-felet i videon 10-26):
+ *  onset.kick är klampad 0/1 (fynd 10-22) och mättar på hela bas-svallet i pumpande musik - vikningen lade då rutnätet där ettorna var
+ *  tätast, mätt +120..170 ms efter kickens ansats (gallop: grupp A tändes +130 ms, B:s 0,75-slag på kicken). Nu viks basens (sub+kick,
+ *  specAbs) STIGNING i dB över FEED_RISE_HOPS hop (omättad, toppar på ansatsen): gridet -32 ms (showLead före), taktKorpus 67,1 -> 83,2 %. */
+const FEED_RISE_HOPS = 6;
 
 /**
  * FAS-PREDIKTIONSTILLIT — landar verkliga trumslag dar rutnatet pastar?
@@ -192,12 +192,10 @@ export class BeatFeed {
       if (frame.kickAtMs > 0 && frame.kickAtMs !== this.kickRingLast) { this.kickRingLast = frame.kickAtMs; this.kickRing[this.kickRingPos] = frame.kickAtMs; this.kickRingPos = (this.kickRingPos + 1) & 63; if (this.kickRingN < 64) this.kickRingN++; }
       {   // ringen + vikningen
         const nowO = Date.now();
-        let ok = frame.onset?.kick ?? 0;   // var 2:a hop in i ringen (max av de två, ~187 Hz) - halva sökkostnaden
-        if (FEED_RISE) {   // basens stigning i dB mot FEED_RISE_HOPS hop sedan (ringen håller de senaste)
-          const sa = frame.specAbs, db = 20 * Math.log10((sa?.sub ?? 0) + (sa?.kick ?? 0) + 1e-7);
-          const old = this.riseDb[this.risePos]; this.riseDb[this.risePos] = db; this.risePos = (this.risePos + 1) % FEED_RISE_HOPS;
-          ok = old !== 0 && db > old ? db - old : 0;
-        }
+        // basens stigning i dB mot FEED_RISE_HOPS hop sedan (ringen håller de senaste); var 2:a hop in i vikningsringen (max av de två, ~187 Hz)
+        const sa = frame.specAbs, db = 20 * Math.log10((sa?.sub ?? 0) + (sa?.kick ?? 0) + 1e-7);
+        const old = this.riseDb[this.risePos]; this.riseDb[this.risePos] = db; this.risePos = (this.risePos + 1) % FEED_RISE_HOPS;
+        const ok = old !== 0 && db > old ? db - old : 0;
         if (this.onHalf) { this.onT[this.onPos] = nowO; this.onV[this.onPos] = ok > this.onPrev ? ok : this.onPrev; this.onPos = (this.onPos + 1) % ONSET_RING; if (this.onN < ONSET_RING) this.onN++; }
         this.onPrev = ok; this.onHalf = !this.onHalf;
         this.onsetStep(cfg, nowO);
