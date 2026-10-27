@@ -35,6 +35,11 @@ const TRUST_REPEAT_BEATS = 2, TRUST_REPEAT_TOL = 0.06;
  *  toppen (fas + tempo, slagindex bevaras). Sökningen sker kring rutnätets eget tempo OCH analysatorns (nytt tempo/låt); utan tydlig
  *  topp (< ONSET_MIN_PEAK x medel) rullar rutnätet vidare som det är. Ersatte kick-PLL:en, TEMPO_PERSIST och fasföljaren (enda vägen). */
 const ONSET_WIN_MS = 5000, ONSET_EVERY_MS = 250, ONSET_BINS = 48, ONSET_RING = 1024, ONSET_MIN_PEAK = 1.5;
+/** PROV DMX_FEED_RISE (natt 10-27, gallop-felet i ägarens video 10-26): onset.kick är klampad 0/1 (fynd 10-22) och mättar på hela
+ *  bas-svallet i pumpande musik - vikningen lägger då rutnätet där ettorna är tätast, mätt +120..170 ms efter kickens ansats (gallop:
+ *  grupp A tänds +130 ms, B:s 0,75-slag på kicken). Provet viker i stället basens (sub+kick, specAbs) STIGNING i dB över FEED_RISE_HOPS
+ *  hop (omättad, toppar på ansatsen). Av = onset.kick som förr (bit-identiskt). */
+const FEED_RISE = process.env.DMX_FEED_RISE === '1', FEED_RISE_HOPS = 6;
 
 /**
  * FAS-PREDIKTIONSTILLIT — landar verkliga trumslag dar rutnatet pastar?
@@ -66,6 +71,7 @@ export class BeatFeed {
   private readonly onT = new Float64Array(ONSET_RING); private readonly onV = new Float32Array(ONSET_RING); private onPos = 0; private onN = 0; private onHalf = false; private onPrev = 0;
   private readonly foldS = new Float64Array(ONSET_BINS); private readonly foldN = new Float64Array(ONSET_BINS); private onNext = 0;
   onsetFixes = 0;
+  private readonly riseDb = new Float64Array(FEED_RISE_HOPS); private risePos = 0;
 
   private foldMean(k: number): number { const q = (k + ONSET_BINS) % ONSET_BINS; return this.foldN[q] ? this.foldS[q] / this.foldN[q] : 0; }
 
@@ -186,7 +192,12 @@ export class BeatFeed {
       if (frame.kickAtMs > 0 && frame.kickAtMs !== this.kickRingLast) { this.kickRingLast = frame.kickAtMs; this.kickRing[this.kickRingPos] = frame.kickAtMs; this.kickRingPos = (this.kickRingPos + 1) & 63; if (this.kickRingN < 64) this.kickRingN++; }
       {   // ringen + vikningen
         const nowO = Date.now();
-        const ok = frame.onset?.kick ?? 0;   // var 2:a hop in i ringen (max av de två, ~187 Hz) - halva sökkostnaden
+        let ok = frame.onset?.kick ?? 0;   // var 2:a hop in i ringen (max av de två, ~187 Hz) - halva sökkostnaden
+        if (FEED_RISE) {   // basens stigning i dB mot FEED_RISE_HOPS hop sedan (ringen håller de senaste)
+          const sa = frame.specAbs, db = 20 * Math.log10((sa?.sub ?? 0) + (sa?.kick ?? 0) + 1e-7);
+          const old = this.riseDb[this.risePos]; this.riseDb[this.risePos] = db; this.risePos = (this.risePos + 1) % FEED_RISE_HOPS;
+          ok = old !== 0 && db > old ? db - old : 0;
+        }
         if (this.onHalf) { this.onT[this.onPos] = nowO; this.onV[this.onPos] = ok > this.onPrev ? ok : this.onPrev; this.onPos = (this.onPos + 1) % ONSET_RING; if (this.onN < ONSET_RING) this.onN++; }
         this.onPrev = ok; this.onHalf = !this.onHalf;
         this.onsetStep(cfg, nowO);
