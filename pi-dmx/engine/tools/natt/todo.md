@@ -1,5 +1,29 @@
 # Natt-agentens uppdrag
 
+## Från kvällen 2026-10-27 - GALLOP/TAKTGRIDET VIDARE + UPPVÄRMNINGEN (ägaren: 'nya test för natten'; går före allt annat)
+Läget: inget nytt live sedan 10-26 18:06. Nattens prov 491f9c7 DMX_FEED_RISE=1 rättade gridet (gallop +134 -> -32 ms, taktKorpus 67,1 ->
+83,2 %) men flyttade showen (sektion upp 2,6 -> 4,1 s, kvällen hör ihop 71 -> 62 %, mega r 0,15 -> 0,03). Lotus bygger det omättade
+kickfältet (fynd 10-27 TAGET). Låsta regler som vanligt; uttoningen och delade analysatorn rörs inte. Inget deployas.
+1. ISOLERA KOPPLINGEN (hypotes: analysatorns kickgrind/sektion läser cfg.beat - --delad-cfg - så ett flyttat grid flyttar sektionerna).
+   BEVISA/FÄLL FÖRST: kör FEED_RISE=1 med analysatorn på en egen cfg-kopia vars beat följer den GAMLA vikningen (bänkvariant, ingen
+   motorändring). Kommer sektion upp 2,6 s / hör ihop 71 % / mega r 0,15 tillbaka medan gallop-fasen står kvar på ~-32 ms -> hypotesen håller.
+   HÅLLER DEN: bygg opt-in DMX_FEED_RISE=2 i beatFeed.ts: två rutnät - cfg.beat (det analysatorn läser) viks som förr, effektklockan
+   (beatFrac/beatIdx/beatPulse) får rise-rutnätet. Döm: gallop-fasen (fas.py-metoden nedan), taktKorpus (effektklockans tempo), natt --snabb:
+   sektion upp <= 2,7 s, hör ihop >= 70 %, återseende >= 83, mega r >= 0,14, drops 60, av json-identiskt. Läs dirigentens rader på gallop-klippet.
+   FALLER DEN: hitta vad som flyttar sektionerna (taktfasen/barShift? resetTempo-anropen? tilliten?) - ett steg i taget, siffror.
+2. GRIDFASEN SOM NATTMÅTT: lägg in gridets fas mot basens ansats i natt.py + scoreboard (ny kolumn), så varje natt mäter om takten sitter
+   på slaget. Nattens skrapskript (konsertReplay-kopia med DBG-rader + fas.py, se NATTEN 2026-10-27) gav R ~0 på hela filer - mät per 10 s-
+   fönster med låst takt och bara starka subansatser (+6 dB, >= 0,6 slag isär), rapportera median fasfel och andel inom +-40 ms. Material:
+   gallop-klippet (ladan-2026-10-26/video-...-x4-norm17.wav, ej i git), pop, megamix, lang1021. MÄTFÄLLA: lang-/mix-wav har nframes=0 i
+   headern - läs rått från offset 44.
+3. UPPVÄRMNINGEN (B från i natt, ej byggd): global.gc() direkt när warmUpInBackground är klar (--expose-gc finns på Pi:n) och släpp
+   skrapinstanserna. Bänk med Node 24 (tools/liveLab.mjs/skrap): första 2 min major/minor GC, heap och loop-max före/efter; showen måste
+   vara bit-identisk (natt --snabb json-lika). Kolla också om workerns isolat (långsamma sidan) behöver egen uppvärmning (worker-tidens
+   p99 första minuten). Bit-identiskt -> 'redo för ladan' (python tools/ladan.py), mät /api/perf första 5 min vid nästa besök.
+4. OM LOTUS HAR LEVERERAT det omättade kickfältet (läs analysator-fynd.md 10-27 + lotus morning-todo): prova att vika det i beatFeed i
+   stället för den egna dB-stigningen (samma domar som punkt 1). Annars hoppa över.
+RAPPORT: avsnitt 'Gallop och uppvärmning' i artifacten; redo för ladan bara om alla domar håller.
+
 ## Från kvällen 2026-10-26 - LATENS OCH OPTIMERING (ägaren: 'natten vill jag att agenterna skall jobba med latensen och optimering'; går före allt annat)
 Ersätter 10-21:s 'INTE NU: mer latensjakt' för i natt. Läget: de fyra proven är STANDARD + ute sedan 18:06 (se LADAN 2026-10-26) -> kör
 baslinjen först (ny nivå: kvällen hör ihop 71 / återseende 84). Showen (vilka looker, när) får INTE ändras av nattens arbete: allt som bara
