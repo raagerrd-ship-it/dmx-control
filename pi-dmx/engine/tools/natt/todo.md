@@ -108,6 +108,12 @@ LIVE-BASLINJE ur ladan 10-26 17:06-17:12 med musik, nya koden (tools/natt/perf-l
 RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, nattens fix(ar) med före/efter, vad som är redo för ladan
 (`python tools/ladan.py` för bit-identiska fixar, `--env` för uppgångsprovet) och vad som ska mätas live nästa besök (/api/perf).
 
+## LADAN 2026-10-28 (ägaren i ladan, Pi 10.100.168.218 via hotspot, PC 10.100.168.53)
+19:05 UTE: PROV DMX_FEED_RISE=2 i ladan.conf (7ea12f8: analysatorn eget rutnät med gamla vikningen, effektklockan rise) + lotus kickRise
+  (analyser.js, nytt fält). md5 lika (beatFeed 7765ec48, index 591c4d4f, analyser b9aa0555), NRestarts 0, warmup klar 27,6 s. arecord
+  pcm_read I/O error 5 s efter omstart (fällan 10-23), arecord startade om själv. Långinspelning 600 + 300 s startad (taket 600 s/fil).
+  TITTA: refrängens look snabbare efter nivåhöjning? gallop kvar på slaget? Backa: `PI_HOST=10.100.168.218 python tools/ladan.py`.
+
 ## LADAN 2026-10-27 (ägaren i ladan, Pi 10.100.168.218 via hotspot, PC 10.100.168.53)
 19:56 UTE: PROV DMX_FEED_RISE=1 i ladan.conf (gallop-rättningen 491f9c7, bänken blandad: grid på kicken + taktklocka 67 -> 83 %, men
   sektion upp 2,6 -> 4,1 s, hör ihop 71 -> 62 %). beatFeed.js md5 lika (8bb7870a), flaggan i unit-env, NRestarts 0, warmup klar 31 s.
