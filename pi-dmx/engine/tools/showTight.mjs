@@ -96,7 +96,7 @@ const lamps = cfg.fixtures.map((fx) => {
 // körs den långsamma sidan synkront (inline, deterministiskt) med en kopia som i workern. --odelad = en analysator i en tråd (förr).
 const { createSplitBuffers } = await import(DIST + "split.js");
 const liveAnalyser = (c) => { if (args.includes("--odelad")) return new Analyser(c); const b = createSplitBuffers(); const fast = new Analyser(c, { role: "fast", split: b }); fast.setInlinePeer(new Analyser(structuredClone(c), { role: "slow", split: b })); return fast; };
-const an = liveAnalyser(flag("--egen-cfg") ? JSON.parse(JSON.stringify(defaultConfig)) : cfg);
+const an = liveAnalyser(flag("--egen-cfg") ? JSON.parse(JSON.stringify(defaultConfig)) : BeatFeed.analyserCfg(cfg));
 const feed = new BeatFeed();
 // GAIN: motorn laser forstarkningen bara pa aux (index.ts: setGainLock(cfg.audioInput !== "mic", 1)).
 // Kor ladan pa mikrofon ar AGC:n aktiv dar men inte har; --agc kor som mikrofoningang.

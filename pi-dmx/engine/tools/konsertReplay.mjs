@@ -36,7 +36,7 @@ const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = 
 // körs den långsamma sidan synkront (inline, deterministiskt) med en kopia som i workern. --odelad = en analysator i en tråd (förr).
 const { createSplitBuffers } = await import(DIST + "split.js");
 const liveAnalyser = (c) => { if (args.includes("--odelad")) return new Analyser(c); const b = createSplitBuffers(); const fast = new Analyser(c, { role: "fast", split: b }); fast.setInlinePeer(new Analyser(structuredClone(c), { role: "slow", split: b })); return fast; };
-const an = liveAnalyser(args.includes("--delad-cfg") ? cfg : JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
+const an = liveAnalyser(args.includes("--delad-cfg") ? BeatFeed.analyserCfg(cfg) : JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
 const feed = new BeatFeed();
 // --feed2048 (natt 10-22, röda trådens tapp): beatFeed viker 2048-vägens onset.kick (som före FAST_BANDS) i stället för ramens snabba.
 const FEED2048 = args.includes("--feed2048");

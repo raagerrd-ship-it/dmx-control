@@ -89,7 +89,7 @@ applyInputRouting(cfg.audioInput === "mic" ? "mic" : "aux");
 // DELAD ANALYSATOR (analyser.ts/split.ts): utan DMX_ANALYSER_SPLIT ar detta exakt `new Analyser(cfg)`.
 // Med DMX_ANALYSER_SPLIT=worker flyttas tempo/gridfas/sektion till en egen trad pa en egen karna —
 // motivet ar matningen 15,6 % av hoppen over budget (0,99 ms snitt, toppar 235 ms mot 2,67 ms).
-const analyser = createAnalyser(cfg);
+const analyser = createAnalyser(BeatFeed.analyserCfg(cfg));   // DMX_FEED_RISE=2: eget rutnät (beatFeed.ts)
 analyser.resetGain(cfg.audioInput === "mic" ? 20 : 1);
 analyser.setGainLock(cfg.audioInput !== "mic", 1);  // aux: fixed 1x
 const effects = new EffectEngine(cfg);

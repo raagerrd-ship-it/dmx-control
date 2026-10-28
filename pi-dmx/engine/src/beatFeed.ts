@@ -40,6 +40,12 @@ const ONSET_WIN_MS = 5000, ONSET_EVERY_MS = 250, ONSET_BINS = 48, ONSET_RING = 1
  *  tätast, mätt +120..170 ms efter kickens ansats (gallop: grupp A tändes +130 ms, B:s 0,75-slag på kicken). Nu viks basens (sub+kick,
  *  specAbs) STIGNING i dB över FEED_RISE_HOPS hop (omättad, toppar på ansatsen): gridet -32 ms (showLead före), taktKorpus 67,1 -> 83,2 %. */
 const FEED_RISE_HOPS = 6;
+/** PROV DMX_FEED_RISE=2 (natt 10-28, sektionerna efter FEED_RISE): analysatorns kickgrind och taktfas läser rutnätet (beatSrc.beat =
+ *  cfg.beat) - rise-rutnätet flyttade därmed kickarna -> sektionerna (upp 2,6 -> 4,1 s). Provet ger analysatorn ett EGET rutnät som viks
+ *  som före 10-27 (onset.kick, en skugg-BeatFeed som också sköter analysatorns resetTempo/resetBar), effektklockan (cfg.beat) behåller
+ *  rise-rutnätet. Analysatorn måste då byggas med analyserCfg(cfg). Av = bit-identiskt. */
+const FEED_SPLIT = process.env.DMX_FEED_RISE === '2';
+const NO_AN = { resetTempo(): void {}, resetBar(): void {} };
 
 /**
  * FAS-PREDIKTIONSTILLIT — landar verkliga trumslag dar rutnatet pastar?
@@ -72,6 +78,11 @@ export class BeatFeed {
   private readonly foldS = new Float64Array(ONSET_BINS); private readonly foldN = new Float64Array(ONSET_BINS); private onNext = 0;
   onsetFixes = 0;
   private readonly riseDb = new Float64Array(FEED_RISE_HOPS); private risePos = 0;
+  /** kickFold = vik onset.kick som före 10-27 (det gamla rutnätet = analysatorns skugga i DMX_FEED_RISE=2). Standard = basens stigning. */
+  private readonly ana: BeatFeed | null; private readonly anaGrid = { beat: null } as unknown as EngineConfig;
+  constructor(private readonly kickFold = false) { this.ana = FEED_SPLIT && !kickFold ? new BeatFeed(true) : null; }
+  /** Det cfg analysatorn ska byggas med: cfg självt, eller (DMX_FEED_RISE=2) en grund kopia med eget rutnät (sätts via setBeatGrid). */
+  static analyserCfg<T extends object>(cfg: T): T { return FEED_SPLIT ? { ...cfg, beat: null } : cfg; }
 
   private foldMean(k: number): number { const q = (k + ONSET_BINS) % ONSET_BINS; return this.foldN[q] ? this.foldS[q] / this.foldN[q] : 0; }
 
@@ -133,7 +144,12 @@ export class BeatFeed {
   }
 
   /** En hop: tilliten (kan skriva frame.bpmConfidence) och taktklockan (cfg.beat). Anropas efter dropraknaren, fore effekterna. */
-  update(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void }): void {
+  update(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void }): void {
+    if (this.ana) {   // DMX_FEED_RISE=2: analysatorns rutnät först (gamla vikningen, analysatorns återställningar), frame.bpmConfidence orörd
+      const bc = frame.bpmConfidence; this.ana.update(frame, this.anaGrid, an); frame.bpmConfidence = bc;
+      an.setBeatGrid?.(this.anaGrid.beat);
+      an = NO_AN;
+    }
     // TILLITEN KOMMER FRAN FASPREDIKTIONEN, inte fran tempogrammets form.
     // Coast: utan kickar finns inga nya bevis, sa tilliten lacker ner over ~4 s i
     // stallet for att falla direkt. Det ar det som far pulsen att dra sig undan i
@@ -193,9 +209,12 @@ export class BeatFeed {
       {   // ringen + vikningen
         const nowO = Date.now();
         // basens stigning i dB mot FEED_RISE_HOPS hop sedan (ringen håller de senaste); var 2:a hop in i vikningsringen (max av de två, ~187 Hz)
-        const sa = frame.specAbs, db = 20 * Math.log10((sa?.sub ?? 0) + (sa?.kick ?? 0) + 1e-7);
-        const old = this.riseDb[this.risePos]; this.riseDb[this.risePos] = db; this.risePos = (this.risePos + 1) % FEED_RISE_HOPS;
-        const ok = old !== 0 && db > old ? db - old : 0;
+        let ok = frame.onset?.kick ?? 0;
+        if (!this.kickFold) {
+          const sa = frame.specAbs, db = 20 * Math.log10((sa?.sub ?? 0) + (sa?.kick ?? 0) + 1e-7);
+          const old = this.riseDb[this.risePos]; this.riseDb[this.risePos] = db; this.risePos = (this.risePos + 1) % FEED_RISE_HOPS;
+          ok = old !== 0 && db > old ? db - old : 0;
+        }
         if (this.onHalf) { this.onT[this.onPos] = nowO; this.onV[this.onPos] = ok > this.onPrev ? ok : this.onPrev; this.onPos = (this.onPos + 1) % ONSET_RING; if (this.onN < ONSET_RING) this.onN++; }
         this.onPrev = ok; this.onHalf = !this.onHalf;
         this.onsetStep(cfg, nowO);
