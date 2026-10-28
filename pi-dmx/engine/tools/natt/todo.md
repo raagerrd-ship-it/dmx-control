@@ -113,6 +113,13 @@ RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, natt
   (analyser.js, nytt fält). md5 lika (beatFeed 7765ec48, index 591c4d4f, analyser b9aa0555), NRestarts 0, warmup klar 27,6 s. arecord
   pcm_read I/O error 5 s efter omstart (fällan 10-23), arecord startade om själv. Långinspelning 600 + 300 s startad (taket 600 s/fil).
   TITTA: refrängens look snabbare efter nivåhöjning? gallop kvar på slaget? Backa: `PI_HOST=10.100.168.218 python tools/ladan.py`.
+19:25 Långinspelningen hämtad: tools/ladan-2026-10-28/lang-20261028T180531.wav (600 s) + T181533 (300 s), ej i git, 0 markeringar.
+  sektionLag på dem utan/med provet: fladder 11/41 -> 6/38, upp 11,6 s båda (bara 3 skiften), gridfas +17 ms båda, MEN p25 -20 -> -115 ms med provet.
+19:43 STANDARD (ägaren: 'känns inte sämre', sedan '1' = gör till standard) -> KOD, flaggan bort (backup-tagg backup/fore-feed-rise2-2026-10-28).
+  Bevis natt --snabb utan env json-identisk med provet. Deployat utan env, ladan.conf borta, md5 lika (beatFeed cdc82149, index 69e9e6ef), NRestarts 0.
+  NÄSTA FÖR NATTAGENTEN: (1) gridfasens p25 -115 ms med två rutnät på kvällens inspelning - vilka fönster, låser effektklockan en halv takt
+  fel (huvudfeeden gör inte längre analysatorns resetTempo)? (2) 'hör ihop' 71 -> 61 sitter i effektklockan - hitta vad i rise-gridet som
+  ändrar dirigentens val. (3) prova lotus frame.kickRise i stället för egna dB-stigningen. (4) minidrop 62 på 10 min i kvällens inspelning.
 
 ## LADAN 2026-10-27 (ägaren i ladan, Pi 10.100.168.218 via hotspot, PC 10.100.168.53)
 19:56 UTE: PROV DMX_FEED_RISE=1 i ladan.conf (gallop-rättningen 491f9c7, bänken blandad: grid på kicken + taktklocka 67 -> 83 %, men
