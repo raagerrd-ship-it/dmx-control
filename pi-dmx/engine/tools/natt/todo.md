@@ -280,6 +280,16 @@ PROV REDO: DMX_TAGFIX=1 - build-trion in i BUILD_LOOKS, de sju ett tier-steg til
   dyning, urladdning - toggle-tvånget (refräng och break) och krav, inte taggar. `python tools/ladan.py --env DMX_TAGFIX=1`.
   TITTA: build-trion under uppbyggnaden, startskott/pump när de dyker upp. Godkänt -> taggarna rättas i effektfilerna, flaggan bort.
 
+## NATTEN 2026-10-28 (nattagenten, körd på kvällen, inget deployat)
+KLART 2026-10-28: baslinje natt/2026-10-28.json json-identisk med 10-27 feedrise-std. Kvällens uppdrag 10-27:
+  1 KLART: kopplingen bevisad (analysatorns kickgrind/taktfas läser cfg.beat). PROV 7ea12f8 DMX_FEED_RISE=2 (skugg-BeatFeed med gamla
+    vikningen till analysatorn via BeatFeed.analyserCfg + setBeatGrid, effektklockan behåller rise): sektion upp 4,1 -> 2,6 s, korta 27/80,
+    återseende 79 -> 83, mega r 0,03 -> 0,17, drops 58 -> 60, gridfas +23 -> +22 ms; MEN hör ihop 62 -> 61 (tappet 71 -> 62 sitter i
+    effektklockan, inte analysatorn), ljusLag 1021 90 % 25 -> 40 ms. Av json-identiskt, liveLab röktest ok. `python tools/ladan.py --env DMX_FEED_RISE=2`.
+  2 KLART: gridfas i sektionLag + natt.py (bank v5, sista kolumnen): median ms slaget efter basens ansats / andel inom +-40 ms.
+  3 EJ GJORT: PC:n har Node 22 (inte 24) - uppvärmningens gc kräver mätning live (/api/perf) eller Node 24.
+  4 Lotus levererade frame.kickRise (493b5ce) under kvällen - ej provat i beatFeed än (nästa).
+
 ## NATTEN 2026-10-27 (nattagenten, inget deployat)
 KLART 2026-10-27: baslinje natt/2026-10-27.json json-identisk med 10-26 fyra-std (c62d20d). Kvällens uppdrag A/B/C ovan.
 PROV (EJ REDO) 491f9c7 DMX_FEED_RISE=1 - se (A) ovan. Fynd till lotus: onset.kick-klampningen flyttar gridet +130 ms (analysator-fynd.md 10-27).
