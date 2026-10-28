@@ -29,6 +29,11 @@ och lotus kan bedöma om kickgrinden/sektionen ska läsa ett grid som sitter på
 Status: TAGET 2026-10-27 (lotus-morgonagenten): prioritet upp - omättat kickonset som NYTT ramfält (kickbandets stigning i dB före
 klampningen, befintliga konsumenter orörda, paritet 0) är nästa analysatorbygge; ej byggt i dag (morgonen gick till FAST_BANDS-bänken på lotus:
 tempo 396/503, syntet 6/8, on-beat 0,84, fas 219/362 = live).
+KLART 2026-10-28 lotus 9d6899f4 (lotus-morgonagenten): nytt ramfält frame.kickRise = max(0, dB(specAbs.sub+specAbs.kick) - samma 6 hop sedan),
+exakt DMX:s FEED_RISE-tal (beatFeed.ts kan läsa frame.kickRise i stället för egen ring). Befintliga fält orörda: analyserParity lotus grid + split inline,
+FAST_BANDS 0/1, 33 750 hop 0 avvikande; dmx tsc --noEmit rent. Gallop-klippet (ansatser 7,23+k·0,4695, 82 st): med FAST_BANDS kickRise-topp median +4 ms
+(p10 -39/p90 +11), 66/82 inom ±15 ms; onset.kick tyngdpunkt +92 ms, 0/82. Utan FAST_BANDS (2048-vägen) -22 ms, 23/82. pop_ladan: ingen pålitlig
+ansatsreferens (offline LP120-referensen gav även på gallop fel täthet) - där bara: onset.kick tyngdpunkt +92..100 ms, kickRise +21..30 ms. KICK_PEAK ej byggd än.
 
 ## INFO 2026-10-22 Flaggstädningen i delade analysatorn (ägaren) - läs innan nästa ändring
 Vad: ägaren 10-22 'koden skall vara optimal, inga massa flaggor'. Gjort i båda repona (dmx 42905b4, lotus 3d992a2, md5 8c771759): flaggor
