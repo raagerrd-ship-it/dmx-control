@@ -42,7 +42,7 @@ const thr = cand.map((h) => rise[h]).sort((a, b) => a - b)[Math.floor(cand.lengt
 const onsets = cand.filter((h) => rise[h] >= thr);
 
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
-const b = createSplitBuffers(); const an = new Analyser(cfg, { role: "fast", split: b }); an.setInlinePeer(new Analyser(structuredClone(cfg), { role: "slow", split: b }));
+const b = createSplitBuffers(); const an = new Analyser(BeatFeed.analyserCfg(cfg), { role: "fast", split: b }); an.setInlinePeer(new Analyser(structuredClone(cfg), { role: "slow", split: b }));
 an.setGainLock(true, 1);
 const feed = new BeatFeed(); const bounds = new BoundaryDetector(() => Date.now());
 an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));

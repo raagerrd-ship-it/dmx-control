@@ -22,7 +22,7 @@ const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = Number(opt("--step
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.mode = opt("--mode", "smart"); cfg.energyDrivesMode = cfg.mode === "smart"; cfg.master = 1;   // --mode <look>: en fast look (skräpmätning per effekt)
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
-const an = new Analyser(cfg); an.setGainLock(true, 1);
+const an = new Analyser(BeatFeed.analyserCfg(cfg)); an.setGainLock(true, 1);
 const feed = new BeatFeed();
 const bounds = new BoundaryDetector(() => Date.now());
 an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));

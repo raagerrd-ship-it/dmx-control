@@ -65,7 +65,7 @@ const pcm = new Float32Array(nSamples); for (let i = 0; i < nSamples; i++) pcm[i
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.master = 1;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
-const b = createSplitBuffers(); const an = new Analyser(cfg, { role: "fast", split: b }); an.setInlinePeer(new Analyser(structuredClone(cfg), { role: "slow", split: b }));
+const b = createSplitBuffers(); const an = new Analyser(BeatFeed.analyserCfg(cfg), { role: "fast", split: b }); an.setInlinePeer(new Analyser(structuredClone(cfg), { role: "slow", split: b }));
 an.setGainLock(true, 1);
 const feed = new BeatFeed();
 const bounds = new BoundaryDetector(() => Date.now());

@@ -40,11 +40,11 @@ const ONSET_WIN_MS = 5000, ONSET_EVERY_MS = 250, ONSET_BINS = 48, ONSET_RING = 1
  *  tätast, mätt +120..170 ms efter kickens ansats (gallop: grupp A tändes +130 ms, B:s 0,75-slag på kicken). Nu viks basens (sub+kick,
  *  specAbs) STIGNING i dB över FEED_RISE_HOPS hop (omättad, toppar på ansatsen): gridet -32 ms (showLead före), taktKorpus 67,1 -> 83,2 %. */
 const FEED_RISE_HOPS = 6;
-/** PROV DMX_FEED_RISE=2 (natt 10-28, sektionerna efter FEED_RISE): analysatorns kickgrind och taktfas läser rutnätet (beatSrc.beat =
- *  cfg.beat) - rise-rutnätet flyttade därmed kickarna -> sektionerna (upp 2,6 -> 4,1 s). Provet ger analysatorn ett EGET rutnät som viks
- *  som före 10-27 (onset.kick, en skugg-BeatFeed som också sköter analysatorns resetTempo/resetBar), effektklockan (cfg.beat) behåller
- *  rise-rutnätet. Analysatorn måste då byggas med analyserCfg(cfg). Av = bit-identiskt. */
-const FEED_SPLIT = process.env.DMX_FEED_RISE === '2';
+/** TVÅ RUTNÄT (STANDARD i ladan 10-28, ägaren; backup-tagg backup/fore-feed-rise2-2026-10-28): analysatorns kickgrind och taktfas läser
+ *  rutnätet (beatSrc.beat) - rise-rutnätet flyttade därmed kickarna -> sektionerna (upp 2,6 -> 4,1 s). Analysatorn har därför ett EGET
+ *  rutnät som viks som före 10-27 (onset.kick, en skugg-BeatFeed som också sköter analysatorns resetTempo/resetBar); effektklockan
+ *  (cfg.beat) har rise-rutnätet. Analysatorn MÅSTE byggas med BeatFeed.analyserCfg(cfg) i alla vägar (motorn och bänkarna) - annars
+ *  skriver setBeatGrid analysatorns rutnät i motorns cfg.beat. natt 10-28: sektion upp 4,1 -> 2,6 s, återseende 79 -> 83, mega r 0,03 -> 0,17. */
 const NO_AN = { resetTempo(): void {}, resetBar(): void {} };
 
 /**
@@ -78,11 +78,11 @@ export class BeatFeed {
   private readonly foldS = new Float64Array(ONSET_BINS); private readonly foldN = new Float64Array(ONSET_BINS); private onNext = 0;
   onsetFixes = 0;
   private readonly riseDb = new Float64Array(FEED_RISE_HOPS); private risePos = 0;
-  /** kickFold = vik onset.kick som före 10-27 (det gamla rutnätet = analysatorns skugga i DMX_FEED_RISE=2). Standard = basens stigning. */
+  /** kickFold = vik onset.kick som före 10-27 (analysatorns skugga, se TVÅ RUTNÄT). Standard = basens stigning. */
   private readonly ana: BeatFeed | null; private readonly anaGrid = { beat: null } as unknown as EngineConfig;
-  constructor(private readonly kickFold = false) { this.ana = FEED_SPLIT && !kickFold ? new BeatFeed(true) : null; }
-  /** Det cfg analysatorn ska byggas med: cfg självt, eller (DMX_FEED_RISE=2) en grund kopia med eget rutnät (sätts via setBeatGrid). */
-  static analyserCfg<T extends object>(cfg: T): T { return FEED_SPLIT ? { ...cfg, beat: null } : cfg; }
+  constructor(private readonly kickFold = false) { this.ana = kickFold ? null : new BeatFeed(true); }
+  /** Det cfg analysatorn ska byggas med: en grund kopia med eget rutnät (sätts via setBeatGrid i update). */
+  static analyserCfg<T extends object>(cfg: T): T { return { ...cfg, beat: null }; }
 
   private foldMean(k: number): number { const q = (k + ONSET_BINS) % ONSET_BINS; return this.foldN[q] ? this.foldS[q] / this.foldN[q] : 0; }
 
@@ -145,7 +145,7 @@ export class BeatFeed {
 
   /** En hop: tilliten (kan skriva frame.bpmConfidence) och taktklockan (cfg.beat). Anropas efter dropraknaren, fore effekterna. */
   update(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void }): void {
-    if (this.ana) {   // DMX_FEED_RISE=2: analysatorns rutnät först (gamla vikningen, analysatorns återställningar), frame.bpmConfidence orörd
+    if (this.ana) {   // TVÅ RUTNÄT: analysatorns rutnät först (gamla vikningen, analysatorns återställningar), frame.bpmConfidence orörd
       const bc = frame.bpmConfidence; this.ana.update(frame, this.anaGrid, an); frame.bpmConfidence = bc;
       an.setBeatGrid?.(this.anaGrid.beat);
       an = NO_AN;

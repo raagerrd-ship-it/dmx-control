@@ -27,7 +27,7 @@ for (const f of readdirSync(DIR).filter((x) => x.endsWith(".wav")).sort()) {
   const rec = lookup(cat, meta.artist, meta.title); if (!rec || rec.variable) continue;
   const d = readFileSync(join(DIR, f)); const n = d.readUInt32LE(40) / 2;
   const cfg = JSON.parse(JSON.stringify(defaultConfig));
-  const an = new Analyser(cfg); an.setGainLock(true, 1);
+  const an = new Analyser(BeatFeed.analyserCfg(cfg)); an.setGainLock(true, 1);
   const feed = new BeatFeed(); const buf = new Float32Array(HOP);
   const tf = [fold(rec.bpm), ...(rec.alt ? [fold(rec.alt)] : [])];
   const ok = (b) => b > 0 && tf.some((t) => Math.abs(fold(b) / t - 1) <= 0.04);
