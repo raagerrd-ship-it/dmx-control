@@ -1,0 +1,153 @@
+<!doctype html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nattrapport ladan</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+:root{--bg:#f6f7f9;--fg:#1b1f27;--mut:#5b6474;--line:#d9dde4;--acc:#b0306a;--ok:#1f7a4d;--bad:#b4442c;--chip:#e9ecf1;
+--sans:"IBM Plex Sans",system-ui,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#13161c;--fg:#e4e7ee;--mut:#98a1b3;--line:#2b313c;--acc:#f07aad;--ok:#5fd19a;--bad:#f08a6e;--chip:#222833;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#13161c;--fg:#e4e7ee;--mut:#98a1b3;--line:#2b313c;--acc:#f07aad;--ok:#5fd19a;--bad:#f08a6e;--chip:#222833;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 var(--sans);margin:0;padding:24px 16px 40px}
+main{max-width:720px;margin:0 auto;display:grid;gap:24px}
+h1{font-size:1.5rem;margin:0;text-wrap:balance}h2{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--acc);margin:0 0 6px;text-wrap:balance}
+h3{font-size:.95rem;margin:4px 0 0}
+section{display:grid;gap:8px;min-width:0}
+p,ul,ol{margin:0}ul,ol{padding-left:20px;display:grid;gap:5px}.mut{color:var(--mut)}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:6px}
+table{border-collapse:collapse;font:13px var(--mono);font-variant-numeric:tabular-nums;width:100%;min-width:480px}
+td,th{padding:6px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}th:first-child,td:first-child{text-align:left}
+th{color:var(--mut);font-weight:600}tr:last-child td{border-bottom:0}.up{color:var(--ok);font-weight:600}.dn{color:var(--bad)}
+code{font:13px var(--mono);background:var(--chip);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.star{color:var(--acc);font-weight:600}
+.hist{border-top:1px solid var(--line);padding-top:16px}
+</style></head><body>
+<main>
+<header><h1>Nattrapport ladan</h1><p class="mut">2026-10-29 (nattagenten) · bänk på PC:n · inget deployat · dmx 7fd8dfc · uppdraget: "NÄSTA FÖR NATTAGENTEN" från ladan 10-28 · äldre avsnitt längre ner är historik</p></header>
+
+<section><h2><span class="star">★</span> Redo för ladan</h2><ul>
+<li><b>Inget nytt i natt.</b> Två rutnät är standard och ute sedan 10-28 19:43. Nattens tre prov höll inte.</li>
+<li><b>Mät live nästa besök:</b> <code>/api/perf</code> under de första 5 minuterna efter omstart (uppvärmningens major GC).</li>
+<li><b>Be om:</b> långinspelningar med markeringarna Drop!, Minidrop! och refrängstart. Kvällen 10-28 hade 0 markeringar.</li></ul></section>
+
+<section><h2>Baslinje 10-29</h2>
+<p>Identisk med raden <code>feedrise2-std</code> från 10-28 i mixarna, ljusLag, sektionLag och kvällen i ett svep. Korpus och ladans 20 klipp är nya i natt, eftersom gårdagen bara körde <code>--snabb</code>.</p>
+<div class="tw"><table>
+<tr><th>mått</th><th>10-29</th></tr>
+<tr><td>ljus pop / mega / 10-21 (korskorr / 90 %)</td><td>10/45 · 5/35 · 10/40 ms</td></tr>
+<tr><td>sektionsetiketten upp / ned · korta delar</td><td>2,6 / 5,4 s · 27/80</td></tr>
+<tr><td>gridfas median / inom ±40 ms</td><td>+22 ms / 62 %</td></tr>
+<tr><td>kvällen: hör ihop / återseende</td><td>61 % / 83 %</td></tr>
+<tr><td>kvällen: unika / effektivt / byten per min / drops</td><td>64 / 25,6 / 2,69 / 60</td></tr>
+<tr><td>r pop / mega</td><td>0,31 / 0,17</td></tr>
+<tr><td>korpus kick → ljus / träff / r</td><td>125 ms / 0,41 / 0,32</td></tr>
+</table></div></section>
+
+<section><h2>Brister</h2><ol>
+<li><b>Analysatorns rutnät står på fel tempo</b> i 13 % av tiden i pop, 32 % i megamixen och 34 respektive 45 % i kvällens två filer. Med fel tempo menas att det saknar harmonisk relation till effektklockan. Exempel: rutnätet står på 127,5 BPM i över 30 s av en låt på 89,7 BPM. Det är rotorsaken till gridfasens p25 på −115 ms.</li>
+<li><b>Hör ihop har sjunkit från 71 till 61 %</b> sedan rise-gridet blev standard. Nattens prov visar att 61 → 67–71 % går att få tillbaka, men bara till priset av sektionerna.</li>
+<li><b>56 av 77 effekter väljs aldrig</b> i mixarna.</li></ol></section>
+
+<section><h2>Kvällens uppdrag (ladan 10-28)</h2>
+<h3>1. Gridfasens p25 på −115 ms: KLART, orsaken hittad</h3>
+<p>Mätt per 10 s-fönster. Felet sitter i en enda låt på 89,7 BPM i kvällens första fil. Fönstren vid 60, 110, 120 och 220 s ligger på +129, −156, −149 och −146 ms, och fasen hoppar ett halvt slag. Låten på 140 BPM ligger stadigt på +15 till +28 ms. Med ett enda rutnät ligger samma fönster på +12 till +29 ms och p25 på −20 ms.</p>
+<p>Mekanismen: analysatorns skuggrutnät (gamla <code>onset.kick</code>-vikningen) hittar ingen topp och fryser på 127,5 BPM. Kickgrinden går då på fel rutnät, och tilliten sjunker:</p>
+<div class="tw"><table>
+<tr><th>effektklockans tillit</th><th>ett rutnät</th><th>två (standard)</th><th>analysatorn fel tempo</th></tr>
+<tr><td>kväll 10 min / 5 min</td><td>0,82 / 0,77</td><td class="dn">0,73 / 0,75</td><td>34 / 45 %</td></tr>
+<tr><td>pop / mega</td><td>0,89 / 0,77</td><td>0,88 / 0,75</td><td>13 / 32 %</td></tr>
+</table></div>
+<h3>2. Hör ihop 71 → 61: tre prov, alla förkastade</h3>
+<p>Proven lät analysatorns rutnät följa när det står på fel tempo.</p>
+<div class="tw"><table>
+<tr><th></th><th>standard</th><th>tempo+fas</th><th>bara tempo</th><th>frame.bpm</th></tr>
+<tr><td>hör ihop</td><td>61 %</td><td class="up">68 %</td><td class="up">71 %</td><td class="up">67 %</td></tr>
+<tr><td>sektion upp</td><td>2,6 s</td><td class="dn">7,4 s</td><td class="dn">4,6 s</td><td class="dn">4,6 s</td></tr>
+<tr><td>drops (kvällen)</td><td>60</td><td class="dn">57</td><td class="dn">55</td><td>59</td></tr>
+<tr><td>r mega</td><td>0,17</td><td class="dn">0,07</td><td class="dn">0,12</td><td>0,17</td></tr>
+<tr><td>effektivt</td><td>25,6</td><td class="dn">23,8</td><td class="dn">22,1</td><td class="dn">20,7</td></tr>
+</table></div>
+<p class="mut">Sektionerna är inställda på det felaktiga rutnätet. Varje rättning flyttar dem. Därför har frågan gått till lotus (fynd 10-29). Koden är återställd.</p>
+<h3>3. Lotus <code>frame.kickRise</code> i stället för egen dB-stigning: inte infört</h3>
+<p>Samma formel, men resultatet är inte bit-identiskt: beatFeeds ring pausar när bpm är 0, analysatorns gör det inte. Gridfas inom ±40 ms 62 → 66 %, men hör ihop 61 → 59 % och effektivt 25,6 → 26,2. Blandat resultat, så det återställdes.</p>
+<h3>4. Minidrop 62 på 10 min: ingen effekt på ljuset</h3>
+<p>Räknaren är analysatorns <code>miniDropCount</code>, och den läses inte av DMX sedan 10-11. I DMX-profilen gäller <code>MINI_SPACING_MS 1</code>, så räknaren slår till en gång per slag i låga partier: medianavståndet är 1,0 respektive 0,5 s, och den andra filen har 120 på 5 min, mest i low och eko. Minidrop-looken kommer från DMX:s egna lyft (<code>fireMini</code>).</p></section>
+
+<section><h2>Tajthet</h2>
+<p>Pop 10/45, megamix 5/35 och 10-21 10/40 ms (korskorrelation / 90 % av toppen). Kick → ljus: pop 96 ms, mega 67 ms. Allt är identiskt med 10-28, och standardvägen har inte ändrats i natt.</p></section>
+
+<section><h2>Analysatorfynd</h2><ul>
+<li><b>Nytt 10-29:</b> analysatorns rutnät står på fel tempo 13–45 % av tiden, och sektionerna är inställda på det. Frågan till lotus är om kickgrinden och sektionen kan läsa <code>kickRise</code> eller <code>frame.bpm</code> direkt. Detaljer finns i <code>analysator-fynd.md</code>.</li>
+<li>Fyndet 10-27 om ett omättat kickfält är KLART hos lotus (9d6899f4). DMX läser inte fältet än, se punkt 3.</li></ul></section>
+
+<section><h2>Öppna förslag (båda agenterna)</h2><ol>
+<li>Lotus: låt kickgrinden och taktfasen läsa ett rutnät som sitter på kicken utan att sektionerna flyttas. Det ger tillbaka hör ihop till cirka 71 %.</li>
+<li>Efter TAGFIX och BREAK_CALM väljs fortfarande aldrig svall, famn, droppar, andrum, tide, airglow och breathe. Gallringen avgörs av ditt öga i <code>/setup</code>.</li>
+<li>Uppvärmningen: <code>global.gc()</code> när <code>warmUpInBackground</code> är klar. Inte byggt, eftersom PC:n har Node 22 och det kräver mätning live.</li>
+<li>Aldrig: snabbare fade-down, strobe över 3 blixtar per sekund.</li></ol></section>
+
+<section class="hist"><h2>Gallop och latens (10-27, historik)</h2>
+<p>Gallop var ett fasfel i gridet: <code>onset.kick</code> mättar under bas-svallet, och slaget hamnade +134 ms efter ansatsen. <code>FEED_RISE</code> (basens dB-stigning) blev standard 10-27 och två rutnät 10-28. Taktklockan mot facit gick från 67,1 till 83,2 %. Latensbudgeten: ALSA 2,7 / ≤ 21 ms, hop och fält ~5 ms, render 0–5 ms, DMX-ram ~1–23 ms. Live, ljud → första ljus: 10–30 ms (video 5 och handklapp). Uppvärmningen är skrivbordsanalys: workern värms inte, och skrapinstanserna blir skräp efter 1–2 min.</p></section>
+
+<section class="hist"><h2>Lugnt break (10-26, standard sedan 10-26)</h2>
+<p><code>DMX_BREAK_CALM=1</code>: i break togs toggle-tvånget bara ur breakets egna effekter. Kvällen: andel toggle-looker i break 62 → 36 %, återseende 73 → 76 %, unika 61 → 65, hör ihop, byten och drops lika, mixarnas r −0,01. Blev kod 10-26 18:06.</p></section>
+
+<section class="hist"><h2>Byte på slaget (10-25)</h2>
+<p><code>DMX_SWITCH_ON=1</code>: när sektionen säger byt väntar looken in nästa slag, högst 1,25 slag. Kvällen: sektionsbyten på slaget 2 → 72 %, återseende 73 → 84 %, hör ihop 56 → 61 %, sektion → look &gt; 4 s 61 → 43. Ihop med MANUS_TOP 2: hör ihop 71 %, återseende 85 %. 25 lang: på slaget 1 → 72 %, drops lika. Mixar r −0,01. Ettan (=4) förkastad. Av byte-identiskt.</p></section>
+
+<section class="hist"><h2>MANUS_TOP (10-24)</h2>
+<p><code>DMX_MANUS_TOP=N</code> begränsar valet till de N bäst rankade när låten redan har ett manus. Kvällen i ett svep: hör ihop 56 → 63 %, återseende 73 → 76 %, refrängens effektiva antal 11,8 → 11,1, unika 61 → 56, drops 60 lika. 25 lang fil för fil och mixarna oförändrade; av byte-identiskt.</p></section>
+
+<section class="hist"><h2>Låtstarten (10-22)</h2>
+<p>Verktyget <code>latStart.mjs</code> mäter från låtgräns till rätt sektion. Underlaget är 25 långinspelningar med 41 låtar. EARLY_DB 1,5 blev standard i ladan 10-23.</p>
+<div class="tw"><table>
+<tr><th></th><th>standard</th><th>EARLY_DB 1,5</th><th>EARLY_S 0</th><th>fri intro</th></tr>
+<tr><td>high i låtens första 20 s</td><td>38 %</td><td class="up">49 %</td><td class="up">65 %</td><td>37 %</td></tr>
+<tr><td>fel de första 20 s</td><td>28 %</td><td class="up">25 %</td><td class="up">23 %</td><td class="dn">40 %</td></tr>
+<tr><td>första look ≥ 8 s</td><td>5,8 s</td><td>5,8 s</td><td>5,9 s</td><td class="dn">8,1 s</td></tr>
+<tr><td>hör ihop</td><td>79 %</td><td>77 %</td><td class="dn">72 %</td><td class="dn">72 %</td></tr>
+<tr><td>etiketten upp, p75</td><td>4,1 s</td><td class="up">3,0 s</td><td class="dn">5,4 s</td><td>4,1 s</td></tr>
+<tr><td>fladder, delar &lt; 8 s</td><td>143</td><td>141</td><td>150</td><td class="dn">192</td></tr>
+</table></div>
+<p>Felet är inte intro. Felet är att <b>låtar som startar starkt inte får high</b>, eftersom tidiga-refrängspärrens median räknas på förra låtens bärda block.</p></section>
+
+<section class="hist"><p class="mut"><b>Notis 10-24:</b> avsnitten nedan är från 10-11. Konsertpaketet blev konsertläget och är enda vägen sedan 10-11. <code>DMX_TIER_OPEN</code> togs bort 10-12. <code>DMX_DROP_STROBE</code> och env-rattarna togs bort i flaggstädningen 10-22 och är nu konstanter. Siffrorna är historik.</p></section>
+
+<section><h2>Konsertpaketet, fyra prov (10-11, live som enda läget sedan 10-11 12:31)</h2>
+<p>Alla fyra är opt-in och bit-identiska med dagens show när de är av. Mätt med konsertbänken på pop- och megamixen.</p>
+<ul>
+<li><code>DMX_SECTION_PALETTE</code>: en palett per sektion. Samma sektion får samma palett igen.</li>
+<li><code>DMX_PHRASE_SWITCH</code>: look-byten väntar in frasens början när takten är låst.</li>
+<li><code>DMX_LAMP_STAIR</code>: i vers och intro tänder effekter som annars tänder alla lampor bara ett lamppar, och paret byts varje fras. Refrängen och drops får hela riggen. Det görs i effektsteget, aldrig i energin.</li>
+<li><code>DMX_HUE_PHRASE</code>: effekterna byter kulör per fras i stället för per takt. Rörelse och puls följer fortfarande takten.</li></ul>
+<div class="tw"><table>
+<tr><th></th><th>pop nu</th><th>pop paketet</th><th>megamix nu</th><th>megamix paketet</th></tr>
+<tr><td>kulörbyten per minut</td><td>17,2</td><td class="up">10,9</td><td>21,3</td><td class="up">14,0</td></tr>
+<tr><td>kulörer per sektion</td><td>4</td><td class="up">3</td><td>4</td><td class="up">3</td></tr>
+<tr><td>paletter per sektion</td><td>2</td><td class="up">1</td><td>2</td><td class="up">1</td></tr>
+<tr><td>samma palett när sektionen kommer tillbaka</td><td>23 %</td><td class="up">100 %</td><td>23 %</td><td class="up">100 %</td></tr>
+<tr><td>look-byten på 4-taktsgräns</td><td>22 %</td><td class="up">45 %</td><td>9 %</td><td class="up">18 %</td></tr>
+<tr><td>alla fyra lampor tända</td><td>81 %</td><td class="up">54 %</td><td>88 %</td><td class="up">76 %</td></tr>
+<tr><td>ljus refräng − vers</td><td>0,06</td><td class="up">0,25</td><td>0,12</td><td class="up">0,28</td></tr>
+<tr><td>effekter som aldrig väljs</td><td>5</td><td class="dn">8</td><td colspan="2" class="mut">samma lista för båda mixarna</td></tr>
+</table></div>
+<p class="mut">Lamptrappan ensam ger 4 effekter som aldrig väljs, alltså färre än i dag. Med frasbundna byten blir det färre byten totalt och därmed 8. Kvar på listan: strobe och rök vid rätt ögonblick.</p></section>
+
+<section><h2>Full blir ljusare än fart (10-11)</h2>
+<p>Nattagentens brist var verklig. Energin är ett följande fönster på 10 s, så i en lång stark refräng glider botten upp och full ger samma energi som fart. <code>DMX_TIER_OPEN=0.6</code> höjer energins golv med hur långt in i full tiern ligger. Det dämpar bara mindre och lyfter aldrig över effektens eget ljus.</p>
+<div class="tw"><table>
+<tr><th>ljus per tier</th><th>fart</th><th>full nu</th><th>full med 0,6</th></tr>
+<tr><td>korpus, 222 klipp</td><td>0,28</td><td>0,29</td><td class="up">0,35</td></tr>
+<tr><td>megamix</td><td>0,63</td><td class="dn">0,61</td><td class="up">0,66</td></tr>
+<tr><td>pop</td><td>0,50</td><td>0,56</td><td class="up">0,63</td></tr>
+</table></div>
+<p class="mut">Ljuset följer energin bättre: korpus r 0,27 → 0,32, pop 0,17 → 0,27, megamix 0,20 → 0,28. Tiden från kick till ljus och andelen mörker är oförändrade.</p></section>
+
+<section><h2>Strobe och rök (10-11)</h2>
+<p>En RGB-strobe går inte att göra, eftersom uttoningen smetar ut varje blixt och snabbare uttoning är förbjuden. <code>DMX_DROP_STROBE=&lt;DMX-värde&gt;</code> använder i stället lampornas egen strobe-kanal, och bara under drop-smällen. I megamixen blir det 9 gånger på 10 minuter. Vilken blixttakt ett värde ger beror på lampmodellen. <b>Kalibrera i ladan med ett lågt värde. Högst 3 blixtar per sekund</b>, eftersom snabbare blinkande kan utlösa epileptiska anfall. Röken var redan rätt: den går vid drops, och efter 5 min utan rök även vid minidrop eller refrängstart.</p></section>
+
+<section><h2>Rattsvepet (10-11)</h2>
+<p>45 numeriska rattar provades på halva och 1,5 gånger standardvärdet i båda mixarna (<code>tools/natt/rattar.md</code>).</p><ul>
+<li><b>Gör ingenting i mixarna:</b> <code>DMX_DWELL_MS</code>, <code>DMX_SECTION_UNIT_RESERVE_MS</code>, <code>DMX_SYNC_ERR_FRAC</code>, <code>DROP_CALM_BUILD</code> och <code>DMX_FOG_HUNGRY_S</code> (som bara styr rök). Nära noll: <code>DROP_LAND_GAIN</code>, <code>DMX_E_RELEASE_MS</code>, <code>DMX_MIX_UNSEEN_BONUS</code>, <code>DMX_NEAR_FULL_DB</code> och <code>DMX_NEAR_MIN</code>. De tas inte bort förrän lugnare material eller långinspelningar visar att de är döda även live.</li>
+<li><b>Dwell:</b> env-standarden 45 s vinner alltid över stämningarnas <code>smartDwellMs</code>, så mätaren "Byter effekt" i UI:t visar ett värde som inte används. Det är ditt beslut vad som ska gälla.</li>
+<li><b>Dubbletter rättade:</b> gamma läses nu på ett ställe, och "Släckgräns" i /setup är enda källan, eftersom env-ratten tog över reglaget.</li></ul></section>
+</main>
+</body></html>

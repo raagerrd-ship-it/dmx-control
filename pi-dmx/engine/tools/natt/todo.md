@@ -117,7 +117,7 @@ RAPPORT: eget avsnitt 'Latens och optimering' i artifacten: budgettabellen, natt
   sektionLag på dem utan/med provet: fladder 11/41 -> 6/38, upp 11,6 s båda (bara 3 skiften), gridfas +17 ms båda, MEN p25 -20 -> -115 ms med provet.
 19:43 STANDARD (ägaren: 'känns inte sämre', sedan '1' = gör till standard) -> KOD, flaggan bort (backup-tagg backup/fore-feed-rise2-2026-10-28).
   Bevis natt --snabb utan env json-identisk med provet. Deployat utan env, ladan.conf borta, md5 lika (beatFeed cdc82149, index 69e9e6ef), NRestarts 0.
-  NÄSTA FÖR NATTAGENTEN: (1) gridfasens p25 -115 ms med två rutnät på kvällens inspelning - vilka fönster, låser effektklockan en halv takt
+  NÄSTA FÖR NATTAGENTEN (KLART 2026-10-29, se NATTEN 10-29: 1+4 förklarade, 2+3 förkastade): (1) gridfasens p25 -115 ms med två rutnät på kvällens inspelning - vilka fönster, låser effektklockan en halv takt
   fel (huvudfeeden gör inte längre analysatorns resetTempo)? (2) 'hör ihop' 71 -> 61 sitter i effektklockan - hitta vad i rise-gridet som
   ändrar dirigentens val. (3) prova lotus frame.kickRise i stället för egna dB-stigningen. (4) minidrop 62 på 10 min i kvällens inspelning.
 
@@ -292,6 +292,16 @@ PROV REDO: DMX_TAGFIX=1 - build-trion in i BUILD_LOOKS, de sju ett tier-steg til
   drops 60 lika; mixarna json-lika i allt (natt/2026-10-25-tagfix.json). Fortfarande 0: svall/famn/droppar, andrum, tide, airglow, breathe,
   dyning, urladdning - toggle-tvånget (refräng och break) och krav, inte taggar. `python tools/ladan.py --env DMX_TAGFIX=1`.
   TITTA: build-trion under uppbyggnaden, startskott/pump när de dyker upp. Godkänt -> taggarna rättas i effektfilerna, flaggan bort.
+
+## NATTEN 2026-10-29 (nattagenten, inget deployat)
+KLART 2026-10-29: baslinje natt/2026-10-29.json = 10-28 feedrise2-std i mixar/ljusLag/sektionLag/kvällen (korpus+ladan1008 nya: korpus 125 ms/0,41/r 0,32).
+  LADAN 10-28 NÄSTA (1) KLART: gridfas p25 -115 = EN låt (89,7 BPM) i 180531: analysatorns skuggrutnät (onset.kick-vikningen) hittar ingen topp och
+    fryser på 127,5 BPM; effektklockans fas hoppar ett halvt slag. Analysatorns rutnät på icke-harmoniskt tempo: pop 13 / mega 32 / kväll 34-45 % av
+    tiden; tilliten kvällen 0,82 (ett rutnät) -> 0,73. Ett rutnät: samma fönster +12..+29 ms. Skript: scratch gridWin.mjs/gm.mjs (sektionLag-kopia, --one).
+  (2) FÖRKASTAT: tre prov där analysatorns rutnät följer vid fel tempo (tempo+fas / bara tempo / frame.bpm): hör ihop 61 -> 68/71/67, MEN sektion upp
+    2,6 -> 7,4/4,6/4,6 s, drops 60 -> 57/55/59, effektivt 25,6 -> 23,8/22,1/20,7 - sektionerna är inställda på det felaktiga rutnätet. Fynd 10-29 till lotus.
+  (3) FÖRKASTAT: beatFeed läser frame.kickRise - inte bit-identiskt (beatFeeds ring pausar vid bpm 0): gridfas 62 -> 66 %, hör ihop 61 -> 59.
+  (4) KLART: minidrop 62/10 min = analysatorns miniDropCount, oläst av DMX sedan 10-11 (MINI_SPACING_MS 1 -> en per slag i low/eko). Ingen ljuseffekt.
 
 ## NATTEN 2026-10-28 (nattagenten, körd på kvällen, inget deployat)
 KLART 2026-10-28: baslinje natt/2026-10-28.json json-identisk med 10-27 feedrise-std. Kvällens uppdrag 10-27:

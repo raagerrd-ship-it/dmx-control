@@ -15,6 +15,19 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-29 Analysatorns rutnät (onset.kick-vikningen) står på fel tempo 13-45 % av tiden - sektionerna är inställda på det
+Vad: sedan TVÅ RUTNÄT (DMX 10-28) läser analysatorns kickgrind/taktfas ett eget rutnät som viks på den klampade onset.kick (BeatFeed.analyserCfg).
+Vikningen hittar ofta ingen topp (>= 1,5 x medel) och rutnätet står kvar på ett tempo utan harmonisk relation (1/2..2, +-3 %) till
+effektklockans: pop 13 %, megamix 32 %, ladan 10-28 lang-...180531 34 %, ...181533 45 % av tiden (t.ex. 127,5 BPM i 30 s av en låt på 89,7 där
+analysatorns egen frame.bpm säger 89-91). Tilliten (frame.kickAtMs mot effektklockan) sjunker: kvällen 0,82 -> 0,73. DMX provade tre sätt
+att låta analysatorns rutnät följa (effektklockans tempo+fas / bara tempo / frame.bpm): hör ihop 61 -> 67..71 %, MEN sektion upp 2,6 -> 4,6..7,4 s,
+drops 60 -> 55..59 - sektionerna (kickgrinden) är inställda på det felaktiga rutnätet. Var: kickgrinden/taktfasen som läser beatSrc.beat.
+Material: tools/ladan-2026-10-28/lang-*.wav (ej i git), pop_ladan, megamix_ladan; DMX nattrapport 10-29. Önskat: kan kickgrinden/sektionen
+läsa frame.kickRise-toppar (eller frame.bpm) direkt i stället för ett DMX-rutnät, så att DMX kan ge analysatorn ett rätt rutnät utan att
+sektionerna flyttas? Info: DMX läser inte frame.kickRise än - bytet i beatFeed var inte bit-identiskt (DMX-ringen pausar vid bpm 0;
+gridfas 62 -> 66 % inom 40 ms, hör ihop 61 -> 59) och togs inte. Fältet behövs ändå.
+Status:
+
 ## ÖPPET 2026-10-27 onset.kick-klampningen flyttar taktgridet +130 ms i pumpande bas (gallop-felet i ägarens video 10-26) - höjer prioriteten på fyndet 10-22
 Vad: DMX:s löpande takt (beatFeed.ts) viker onset.kick för att lägga rutnätet. Fältet är 0/1 och står på 1 i spridda hop under hela
 bas-svallet (video 10-26 18:25, 128 BPM: ettor på +0, +45, +85, +120, +165 ms ... efter subbens ansats) - vikningens topp hamnar där
