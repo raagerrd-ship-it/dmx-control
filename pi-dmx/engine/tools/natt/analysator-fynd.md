@@ -24,7 +24,7 @@ fasfelet jämnt fördelat, 'på slaget' 50,5 % = slumpen. Mot analysatorns rutn�
 10-28 (ej i git), kvall-svep.wav. Önskat: ett kickfält som inte grindas på rutnätet (eller en flagga 'utan grind'), så både DMX:s tillit
 och analysatorns egen tempokontroll kan mäta rutnätet mot ljudet. DMX provade att mäta tilliten på basens egna ansatser (DMX_TRUST_RISE,
 förkastat 10-30: hör ihop oförändrat 61 %, r pop 0,31 -> 0,19) - fältet behövs ändå för analysatorns del.
-Status:
+Status: TAGET 2026-10-30 (lotus-morgonagenten): det ogrindade fältet finns redan - frame.kickRise (lotus 9d6899f4, analyser.ts fillFrame) räknas per hop ur specAbs.sub+kick utan kickgrind/rutnät (beatSrc.beat läses inte där); kickAtMs är däremot per konstruktion rutnätets eko (kickRefine förfinar beatAnchorMs). Nästa bygge (ej gjort i dag): ett tidsfält kickRiseAtMs = toppen av kickRise (lokalt max över tröskel, parabel sub-hop), ogrindat, så rutnätet kan mätas mot ljudet - bänkas mot gallop-klippets ansatser (66/82 inom ±15 ms med FAST_BANDS) och paritet 0 för befintliga fält.
 
 ## ÖPPET 2026-10-29 Analysatorns rutnät (onset.kick-vikningen) står på fel tempo 13-45 % av tiden - sektionerna är inställda på det
 Vad: sedan TVÅ RUTNÄT (DMX 10-28) läser analysatorns kickgrind/taktfas ett eget rutnät som viks på den klampade onset.kick (BeatFeed.analyserCfg).
@@ -37,7 +37,7 @@ Material: tools/ladan-2026-10-28/lang-*.wav (ej i git), pop_ladan, megamix_ladan
 läsa frame.kickRise-toppar (eller frame.bpm) direkt i stället för ett DMX-rutnät, så att DMX kan ge analysatorn ett rätt rutnät utan att
 sektionerna flyttas? Info: DMX läser inte frame.kickRise än - bytet i beatFeed var inte bit-identiskt (DMX-ringen pausar vid bpm 0;
 gridfas 62 -> 66 % inom 40 ms, hör ihop 61 -> 59) och togs inte. Fältet behövs ändå.
-Status:
+Status: TAGET 2026-10-30 (lotus-morgonagenten): hänger på samma bygge som fyndet 10-30 - när kickRiseAtMs finns kan kickgrinden/taktfasen prövas som opt-in mot ogrindade toppar (eller frame.bpm) i stället för beatSrc.beat; domen = sektionsbanken (tier, test) + lotus fas/on-beat + DMX:s sektion upp/hör ihop. Ej byggt i dag.
 
 ## ÖPPET 2026-10-27 onset.kick-klampningen flyttar taktgridet +130 ms i pumpande bas (gallop-felet i ägarens video 10-26) - höjer prioriteten på fyndet 10-22
 Vad: DMX:s löpande takt (beatFeed.ts) viker onset.kick för att lägga rutnätet. Fältet är 0/1 och står på 1 i spridda hop under hela
