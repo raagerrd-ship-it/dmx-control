@@ -2063,7 +2063,8 @@ export class EffectEngine {
       const sec = frame.section ?? '';
       const vc = Math.max(0.3, Math.min(1, this.cfg.verseCeil ?? SEC_CEIL)), bc = Math.max(vc, SEC_CEIL_BUILD);   // "Tak i vers" i /setup
       let tgt = sec === 'high' || sec === '' ? 1 : sec === 'build' ? vc + (bc - vc) * this.buildProg : vc;
-      if (this.dropColEnv > 0.005 || nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) tgt = 1;   // dropen alltid fullt
+      if (nowWall < this.dropBangUntil) { tgt = 1; this.secCeil = 1; }                       // dropen direkt till fullt som minidropen (ladan 10-30: 'lyfter först som en minidrop, sen drop' = taket klättrade 0,3 s)
+      else if (this.dropColEnv > 0.005 || nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) tgt = 1;   // dropen alltid fullt
       else if (nowWall < this.miniBangUntil) { tgt = 1; this.secCeil = 1; }                   // minidrop-looken alltid till 95 % (ägaren 10-12), direkt
       else if (nowWall < this.miniLiftUntil) tgt = Math.min(1, tgt + 0.15);                    // minidropen lyfter taket
       const r = tgt > this.secCeil ? dtNow / 0.3 : dtNow / 2.0;                                  // upp snabbt, ner långsamt
