@@ -45,6 +45,22 @@ def run_ljuslag(wav, env):
     return {'korskorr': int(m1.group(1)) if m1 else None, 't90': int(m2.group(1)) if m2 else None} if m1 else {'fel': (r.stderr or r.stdout)[-300:]}
 
 
+def run_tempomix(env):
+    # TEMPOMIXEN (2026-10-30): korpusklippen skarvade till en mix med katalogfacit - rätt tempo andel av tiden, lås efter låtbyte, hopp inom låt
+    import tempfile
+    fd, js = tempfile.mkstemp(suffix='.json'); os.close(fd)
+    r = subprocess.run(['node', 'tools/tempoMix.mjs', 'tools/frozen6', '--all', '--n', '400', '--json', js], cwd=ENGINE, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=1800)
+    try:
+        t = json.load(io.open(js, encoding='utf-8'))['T']
+    except Exception:
+        return {'fel': (r.stderr or r.stdout)[-300:]}
+    finally:
+        os.remove(js)
+    n = max(1, t['n'])
+    return {'klocka': 100 * t['k'] / n, 'ana': 100 * t['a'] / n, 'agrid': 100 * t['g'] / n, 'annat': 100 * t['other'] / n,
+            'hoppMin': t['hops'] / max(1e-9, t['hopMin']), 'oktav': t['oct'], 'lasMed': t['lockMed'], 'inom5': f"{t['inom5']}/{t['segment']}", 'aldrig': t['aldrig']}
+
+
 def run_sektionlag(wavs, env):
     import tempfile
     fd, js = tempfile.mkstemp(suffix='.json'); os.close(fd)
@@ -150,6 +166,8 @@ def main():
         ll = list(ex.map(lambda nw: run_ljuslag(nw[1], env), arl))
     out['ljusLag'] = {n: r for (n, _w), r in zip(arl, ll)}
     out['sektionLag'] = run_sektionlag([w for _n, w in arl], env)
+    out['tempoMix'] = run_tempomix(env)
+    tm = out['tempoMix']; print(f'  tempo    mix klocka {f(tm.get("klocka"), 1)} % (ana {f(tm.get("ana"), 1)}, agrid {f(tm.get("agrid"), 1)}, icke-harm {f(tm.get("annat"), 1)})  lås {f(tm.get("lasMed"), 1)} s  inom 5 s {tm.get("inom5")}  hopp {f(tm.get("hoppMin"))}/min' if 'fel' not in tm else f'  tempo    FEL {tm["fel"]}')
     print('  ljusLag  ' + '  '.join(f'{n} {f(r.get("korskorr"), 0)}/{f(r.get("t90"), 0)} ms' for n, r in out['ljusLag'].items()) + '  (korskorr/90 %)')
     sl = out['sektionLag']; print(f'  sektion  upp {f(sl.get("uppMed"), 1)} s ({sl.get("uppTraff")})  ned {f(sl.get("nedMed"), 1)} s ({sl.get("nedTraff")})  korta {sl.get("korta")}  {f(sl.get("bytenMin"))}/min  gridfas {f(sl.get("gridMed"), 0)} ms / {f((sl.get("grid40") or 0) * 100, 0)} % inom 40')
 

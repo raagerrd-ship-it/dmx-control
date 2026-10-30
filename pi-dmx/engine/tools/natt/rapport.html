@@ -21,68 +21,114 @@ code{font:13px var(--mono);background:var(--chip);padding:1px 5px;border-radius:
 .hist{border-top:1px solid var(--line);padding-top:16px}
 </style></head><body>
 <main>
-<header><h1>Nattrapport ladan</h1><p class="mut">2026-10-29 (nattagenten) · bänk på PC:n · inget deployat · dmx 7fd8dfc · uppdraget: "NÄSTA FÖR NATTAGENTEN" från ladan 10-28 · äldre avsnitt längre ner är historik</p></header>
+<header><h1>Nattrapport ladan</h1><p class="mut">2026-10-30 förmiddag (ägarens uppdrag: "få rutnätet att ha rätt tempo") · bänk på PC:n · inget deployat · ändringen ligger på grenen <code>tempo-helsok</code>, main orörd · äldre avsnitt längre ner är historik</p></header>
 
 <section><h2><span class="star">★</span> Redo för ladan</h2><ul>
-<li><b>Inget nytt i natt.</b> Två rutnät är standard och ute sedan 10-28 19:43. Nattens tre prov höll inte.</li>
-<li><b>Mät live nästa besök:</b> <code>/api/perf</code> under de första 5 minuterna efter omstart (uppvärmningens major GC).</li>
-<li><b>Be om:</b> långinspelningar med markeringarna Drop!, Minidrop! och refrängstart. Kvällen 10-28 hade 0 markeringar.</li></ul></section>
+<li><b>Helsökningen av tempot i effektklockan</b> (<code>beatFeed.ts</code>, bara DMX:s egen kod, delade analysatorn orörd). Klockan hittar rätt tempo mycket oftare och snabbare efter ett låtbyte. Sektionerna, gridfasen och korpusen är identiska i bänken. Hör ihop 61 → 63 % och återseende 83 → 85 %. <b>Priset:</b> effektivt antal effekter 25,6 → 22,8 och r mega 0,17 → 0,15, eftersom gallop nu väljs i en megamixlåt där backbeat låg förut.</li>
+<li><b>Prova:</b> <code>git checkout tempo-helsok</code> och sedan <code>python tools/ladan.py</code>. <b>Backa:</b> <code>git checkout main</code> och <code>python tools/ladan.py</code>.</li>
+<li><b>TITTA:</b> landar takteffekterna (gallop, chase, duel) på slaget direkt efter ett låtbyte i en mix? Hoppar ljuset mellan halv och hel fart i låtar runt 150–160 BPM? Byter refrängen look som förr?</li></ul></section>
 
-<section><h2>Baslinje 10-29</h2>
-<p>Identisk med raden <code>feedrise2-std</code> från 10-28 i mixarna, ljusLag, sektionLag och kvällen i ett svep. Korpus och ladans 20 klipp är nya i natt, eftersom gårdagen bara körde <code>--snabb</code>.</p>
+<section><h2>Tempot: vad som var fel</h2>
+<p>Ny bänk <code>tools/tempoMix.mjs</code>: korpusens klipp med känt tempo skarvas till en kontinuerlig mix (3 s övertoning, som en DJ-mix) och körs som live. Facit per låt kommer ur katalogen. <code>--all</code> = 161 klipp, 99 min.</p>
+<ul>
+<li>Effektklockan hade rätt tempo bara <b>75,8 %</b> av tiden i mixen, mot 81,7 % när klippen körs ett och ett. Felet sitter i låtbytena.</li>
+<li>Efter ett låtbyte tog det i median <b>5,1 s</b> innan klockan stod rätt. I 9 av 161 låtar hittade den aldrig rätt.</li>
+<li>Orsaken: klockans andra sökcentrum var analysatorns tempo, och det står kvar på förra låten eller på ett harmoniskt syskon (2/3, 4/3) i flera sekunder.</li>
+</ul></section>
+
+<section><h2>Vad som byggdes</h2><ol>
+<li><b>Sökning över hela tempoområdet.</b> Basens anslag de senaste 5 s viks på alla tempon 80–160 BPM i 1 %-steg, ett varv var 0,6:e sekund, utspritt ett tempo per tre hopp. Vinnaren ersätter analysatorns tempo som klockans andra sökcentrum.</li>
+<li><b>Domare mellan syskon.</b> Vinnaren och dess 3/2-, 2/3-, 4/3- och 3/4-syskon jämförs på bas gånger virvel/hi-hat. Det rättar en del av shuffle-låtarnas 2/3-fel.</li>
+<li><b>Aldrig oktavbyte.</b> Utan spärren hoppade en låt på 160 BPM fram och tillbaka till 80.</li>
+<li><b>Hysteres 1,5.</b> Ett nytt tempo måste vara tydligt bättre än det nuvarande. Med 1,0 föll gridfasen på kvällsinspelningen 10-21 från 95 till 27 % inom ±40 ms.</li>
+</ol>
+<p class="mut">Idéerna kommer ur forskningen om beat-tracking (Percival &amp; Tzanetakis pulsprov, Davies &amp; Plumbley, Krebs/madmom). Ingen kod är kopierad; BTrack, aubio och Essentia är GPL/AGPL. Kostnad: beatFeed 12 → 17 µs per hopp på PC:n (analysatorn ~55 µs), högst två vikningar i ett och samma hopp.</p></section>
+
+<section><h2>Tempot: före och efter</h2>
 <div class="tw"><table>
-<tr><th>mått</th><th>10-29</th></tr>
+<tr><th>mått</th><th>före</th><th>efter</th></tr>
+<tr><td>mixen: klockan rätt tempo</td><td>75,8 %</td><td class="up">84,5 %</td></tr>
+<tr><td>mixen: lås efter låtbyte, median</td><td>5,1 s</td><td class="up">2,8 s</td></tr>
+<tr><td>mixen: rätt inom 5 s / aldrig rätt</td><td>78 / 9 av 161</td><td class="up">127 / 2 av 161</td></tr>
+<tr><td>mixen: tempohopp inom låt</td><td>0,90 /min</td><td class="up">0,57 /min</td></tr>
+<tr><td>klipp ett och ett: klockan rätt</td><td>81,7 %</td><td class="up">91,3 %</td></tr>
+<tr><td>klipp ett och ett: rätt ≥ 60 % av tiden</td><td>127 av 161</td><td class="up">145 av 161</td></tr>
+<tr><td>klipp ett och ett: tempobyten per klipp</td><td>1,29</td><td class="up">1,20</td></tr>
+</table></div></section>
+
+<section><h2>Showen i nattbänken</h2>
+<div class="tw"><table>
+<tr><th>mått</th><th>före (10-30)</th><th>efter</th></tr>
+<tr><td>sektionsetiketten upp / ned · gridfas inom ±40 ms</td><td>2,6 / 5,4 s · 62 %</td><td>identiskt</td></tr>
+<tr><td>ljusLag pop / mega / 10-21 (90 %)</td><td>45 / 35 / 40 ms</td><td class="up">45 / 35 / 35 ms</td></tr>
+<tr><td>kvällen: hör ihop / återseende</td><td>61 % / 83 %</td><td class="up">63 % / 85 %</td></tr>
+<tr><td>kvällen: unika / effektivt antal</td><td>64 / 25,6</td><td class="dn">64 / 22,8</td></tr>
+<tr><td>drops i mixarna</td><td>56</td><td>57</td></tr>
+<tr><td>r pop / mega</td><td>0,31 / 0,17</td><td class="dn">0,30 / 0,15</td></tr>
+<tr><td>kick → ljus pop / mega</td><td>96 / 67 ms</td><td class="dn">101 / 91 ms</td></tr>
+<tr><td>korpus kick → ljus / träff / r</td><td>125 ms / 0,41 / 0,32</td><td>identiskt</td></tr>
+</table></div>
+<p class="mut">Kick → ljus mäter tiden till varje lampas topp och flyttar sig med vilka effekter som väljs. Pop: en låt bytte duel mot backbeat (103 s). Megamixen: en låt fick gallop i stället för backbeat (118 s), och gallop kräver rätt tempo. ljusLag mäter riggens ljus mot basens anslag direkt.</p></section>
+
+<section><h2>Provat och förkastat</h2><ul>
+<li><b>Samma tempo till analysatorns rutnät</b> (det sektionerna läser): analysatorns rutnät 60,8 → 67,1 % rätt, men sektion upp 2,6 → 4,1 s. Samma mönster som 10-29: sektionerna är inställda på dagens rutnät.</li>
+<li><b>HMM-utjämning</b> av varvets vinnare (madmom-stil): sämre än rå vinnare (76–79 % mot 79 % i proben).</li>
+<li><b>Bekräftelse två varv</b> och <b>0,5 %-steg</b>: längre tid till lås och sämre träff.</li>
+<li><b>Hysteres 1,0 och 1,25:</b> fler tempohopp (1,23 och 0,95 per min), och gridfasen på kvällen 10-21 föll.</li></ul></section>
+
+<section><h2>Kvar</h2><ul>
+<li>2/3-fel i shuffle-låtar, t.ex. "Är du min kvinna" (130 mot 87). Facit kan själv vara tvetydigt.</li>
+<li>Analysatorns eget tempo (74 % i mixen) är oförändrat. Fyndet ligger hos lotus i <code>analysator-fynd.md</code>.</li>
+<li><code>natt.py</code> kör nu tempomixen varje natt (raden <code>tempo</code>).</li></ul></section>
+
+<section class="hist"><p class="mut"><b>Nedan: nattrapporten 10-30 (nattagenten, historik).</b> Baslinjen där är "före" i tabellerna ovan.</p></section>
+
+<section class="hist"><h2>Baslinje 10-30</h2>
+<p>JSON-identisk med 10-29 i alla delar: mixar, korpus, ljusLag, sektionLag, kvällen och effekter. Ingen kod har ändrat showen sedan dess.</p>
+<div class="tw"><table>
+<tr><th>mått</th><th>10-30</th></tr>
+<tr><td>kick → ljus / träff, pop · mega</td><td>96 ms / 0,47 · 67 ms / 0,38</td></tr>
+<tr><td>r pop / mega · korpus</td><td>0,31 / 0,17 · 0,32</td></tr>
 <tr><td>ljus pop / mega / 10-21 (korskorr / 90 %)</td><td>10/45 · 5/35 · 10/40 ms</td></tr>
-<tr><td>sektionsetiketten upp / ned · korta delar</td><td>2,6 / 5,4 s · 27/80</td></tr>
+<tr><td>sektionen upp / ned · korta delar</td><td>2,6 / 5,4 s · 27/80</td></tr>
 <tr><td>gridfas median / inom ±40 ms</td><td>+22 ms / 62 %</td></tr>
 <tr><td>kvällen: hör ihop / återseende</td><td>61 % / 83 %</td></tr>
 <tr><td>kvällen: unika / effektivt / byten per min / drops</td><td>64 / 25,6 / 2,69 / 60</td></tr>
-<tr><td>r pop / mega</td><td>0,31 / 0,17</td></tr>
-<tr><td>korpus kick → ljus / träff / r</td><td>125 ms / 0,41 / 0,32</td></tr>
 </table></div></section>
 
-<section><h2>Brister</h2><ol>
-<li><b>Analysatorns rutnät står på fel tempo</b> i 13 % av tiden i pop, 32 % i megamixen och 34 respektive 45 % i kvällens två filer. Med fel tempo menas att det saknar harmonisk relation till effektklockan. Exempel: rutnätet står på 127,5 BPM i över 30 s av en låt på 89,7 BPM. Det är rotorsaken till gridfasens p25 på −115 ms.</li>
-<li><b>Hör ihop har sjunkit från 71 till 61 %</b> sedan rise-gridet blev standard. Nattens prov visar att 61 → 67–71 % går att få tillbaka, men bara till priset av sektionerna.</li>
-<li><b>Effektbredden:</b> i hela kvällen (52 låtar, 139 min) väljs 64 av 77 effekter, effektivt antal 25,6. Siffran 56 som aldrig valdes gällde bara de två mixarna och var missvisande som brist (rättat 10-29).</li></ol></section>
+<section class="hist"><h2>Brister (10-30)</h2><ol>
+<li><b>Effektklockans tillit mäts mot fel sak.</b> Analysatorns kickar (<code>frame.kickAtMs</code>) grindas på analysatorns eget rutnät. Mot effektklockan ligger de därför som slumpen. I kvällssvepet (138 min, 24 923 kickar) är fasfelet jämnt fördelat, och 50,5 % hamnar "på slaget", vilket är vad slumpen ger. I lang-10-28 är vektorstyrkan R 0,02–0,15 mot effektklockan, men 1,00 mot analysatorns rutnät på 128 BPM i en låt på 90 BPM. Kickarna är alltså rutnätets eko och inte ljudets.</li>
+<li><b>Hör ihop ligger kvar på 61 %</b> (71 % före rise-gridet). Nattens prov visar att tilliten inte är orsaken.</li>
+<li><b>Mixarnas looker:</b> duel 323 s och backbeat 267 s utgör ~50 % av de 20 minuterna. 20 av 77 effekter väljs i mixarna; i kvällen väljs 64.</li></ol></section>
 
-<section><h2>Kvällens uppdrag (ladan 10-28)</h2>
-<h3>1. Gridfasens p25 på −115 ms: KLART, orsaken hittad</h3>
-<p>Mätt per 10 s-fönster. Felet sitter i en enda låt på 89,7 BPM i kvällens första fil. Fönstren vid 60, 110, 120 och 220 s ligger på +129, −156, −149 och −146 ms, och fasen hoppar ett halvt slag. Låten på 140 BPM ligger stadigt på +15 till +28 ms. Med ett enda rutnät ligger samma fönster på +12 till +29 ms och p25 på −20 ms.</p>
-<p>Mekanismen: analysatorns skuggrutnät (gamla <code>onset.kick</code>-vikningen) hittar ingen topp och fryser på 127,5 BPM. Kickgrinden går då på fel rutnät, och tilliten sjunker:</p>
+<section class="hist"><h2>Idé: tillit på basens ansatser (<code>DMX_TRUST_RISE=1</code>), FÖRKASTAD (10-30)</h2>
+<p>Hypotesen var att tilliten (≥ 0,85 ger "låst takt" och därmed samma gruppering för hela låten) föll när kickarna slutade stämma med effektklockan. Provet mätte i stället tilliten på basens egna ansatser: +6 dB, minst 0,6 slag isär, samma signal som rutnätet viks på.</p>
 <div class="tw"><table>
-<tr><th>effektklockans tillit</th><th>ett rutnät</th><th>två (standard)</th><th>analysatorn fel tempo</th></tr>
-<tr><td>kväll 10 min / 5 min</td><td>0,82 / 0,77</td><td class="dn">0,73 / 0,75</td><td>34 / 45 %</td></tr>
-<tr><td>pop / mega</td><td>0,89 / 0,77</td><td>0,88 / 0,75</td><td>13 / 32 %</td></tr>
+<tr><th></th><th>standard</th><th>prov</th></tr>
+<tr><td>hör ihop (målet)</td><td>61 %</td><td>61 %</td></tr>
+<tr><td>gridfas inom ±40 ms</td><td>62 %</td><td class="up">71 %</td></tr>
+<tr><td>ljus pop, 90 %</td><td>45 ms</td><td class="up">15 ms</td></tr>
+<tr><td>r pop / mega</td><td>0,31 / 0,17</td><td class="dn">0,19 / 0,14</td></tr>
+<tr><td>kick → ljus pop / mega</td><td>96 / 67 ms</td><td class="dn">117 / 93 ms</td></tr>
+<tr><td>kvällen: unika / drops (mixarna)</td><td>64 / 56</td><td>68 / <span class="dn">52</span></td></tr>
 </table></div>
-<h3>2. Hör ihop 71 → 61: tre prov, alla förkastade</h3>
-<p>Proven lät analysatorns rutnät följa när det står på fel tempo.</p>
-<div class="tw"><table>
-<tr><th></th><th>standard</th><th>tempo+fas</th><th>bara tempo</th><th>frame.bpm</th></tr>
-<tr><td>hör ihop</td><td>61 %</td><td class="up">68 %</td><td class="up">71 %</td><td class="up">67 %</td></tr>
-<tr><td>sektion upp</td><td>2,6 s</td><td class="dn">7,4 s</td><td class="dn">4,6 s</td><td class="dn">4,6 s</td></tr>
-<tr><td>drops (kvällen)</td><td>60</td><td class="dn">57</td><td class="dn">55</td><td>59</td></tr>
-<tr><td>r mega</td><td>0,17</td><td class="dn">0,07</td><td class="dn">0,12</td><td>0,17</td></tr>
-<tr><td>effektivt</td><td>25,6</td><td class="dn">23,8</td><td class="dn">22,1</td><td class="dn">20,7</td></tr>
-</table></div>
-<p class="mut">Sektionerna är inställda på det felaktiga rutnätet. Varje rättning flyttar dem. Därför har frågan gått till lotus (fynd 10-29). Koden är återställd.</p>
-<h3>3. Lotus <code>frame.kickRise</code> i stället för egen dB-stigning: inte infört</h3>
-<p>Samma formel, men resultatet är inte bit-identiskt: beatFeeds ring pausar när bpm är 0, analysatorns gör det inte. Gridfas inom ±40 ms 62 → 66 %, men hör ihop 61 → 59 % och effektivt 25,6 → 26,2. Blandat resultat, så det återställdes.</p>
-<h3>4. Minidrop 62 på 10 min: ingen effekt på ljuset</h3>
-<p>Räknaren är analysatorns <code>miniDropCount</code>, och den läses inte av DMX sedan 10-11. I DMX-profilen gäller <code>MINI_SPACING_MS 1</code>, så räknaren slår till en gång per slag i låga partier: medianavståndet är 1,0 respektive 0,5 s, och den andra filen har 120 på 5 min, mest i low och eko. Minidrop-looken kommer från DMX:s egna lyft (<code>fireMini</code>).</p></section>
+<p class="mut">Målmåttet rörde sig inte, och r och drops gick ner. Av-läget var json-identiskt. Koden är återställd. Bifynd: gridfasen 62 → 71 % visar att coastens nollning (som läser tilliten) påverkar rutnätet. Det är värt ett eget prov senare.</p></section>
 
-<section><h2>Tajthet</h2>
-<p>Pop 10/45, megamix 5/35 och 10-21 10/40 ms (korskorrelation / 90 % av toppen). Kick → ljus: pop 96 ms, mega 67 ms. Allt är identiskt med 10-28, och standardvägen har inte ändrats i natt.</p></section>
+<section class="hist"><h2>Tajthet (10-30)</h2>
+<p>Identisk med 10-28 och 10-29: pop 10/45, megamix 5/35 och 10-21 10/40 ms (korskorrelation / 90 % av toppen). Kick → ljus: pop 96 ms, mega 67 ms, korpus 125 ms. Gridfasen ligger på +22 ms och 62 % inom ±40 ms.</p></section>
 
-<section><h2>Analysatorfynd</h2><ul>
-<li><b>Nytt 10-29:</b> analysatorns rutnät står på fel tempo 13–45 % av tiden, och sektionerna är inställda på det. Frågan till lotus är om kickgrinden och sektionen kan läsa <code>kickRise</code> eller <code>frame.bpm</code> direkt. Detaljer finns i <code>analysator-fynd.md</code>.</li>
-<li>Fyndet 10-27 om ett omättat kickfält är KLART hos lotus (9d6899f4). DMX läser inte fältet än, se punkt 3.</li></ul></section>
+<section class="hist"><h2>Analysatorfynd (10-30)</h2><ul>
+<li><b>Nytt 10-30:</b> <code>frame.kickAtMs</code> följer analysatorns rutnät och inte ljudet (R 1,00 på fel tempo). DMX önskar ett kickfält utan grind. Detaljer i <code>analysator-fynd.md</code>.</li>
+<li>10-29 (fel tempo 13–45 % av tiden): ännu ingen status från lotus.</li></ul></section>
 
-<section><h2>Öppna förslag (båda agenterna)</h2><ol>
-<li>Lotus: låt kickgrinden och taktfasen läsa ett rutnät som sitter på kicken utan att sektionerna flyttas. Det ger tillbaka hör ihop till cirka 71 %.</li>
-<li>Efter TAGFIX och BREAK_CALM väljs fortfarande aldrig svall, famn, droppar, andrum, tide, airglow och breathe. Gallringen avgörs av ditt öga i <code>/setup</code>.</li>
-<li>Uppvärmningen: <code>global.gc()</code> när <code>warmUpInBackground</code> är klar. Inte byggt, eftersom PC:n har Node 22 och det kräver mätning live.</li>
+<section class="hist"><h2>Öppna förslag (båda agenterna, 10-30)</h2><ol>
+<li>Lotus: ett ogrindat kickfält, och kickgrinden och taktfasen på ett rutnät som sitter på kicken utan att sektionerna flyttas.</li>
+<li>Coastens nollning gav gridfas 62 → 71 % i provet. Isolera den som ett eget prov.</li>
+<li>Uppvärmningen: <code>global.gc()</code> när <code>warmUpInBackground</code> är klar. Inte byggt, kräver Node 24 eller mätning live.</li>
 <li>Aldrig: snabbare fade-down, strobe över 3 blixtar per sekund.</li></ol></section>
+
+<section class="hist"><h2>Natten 10-29 (historik)</h2>
+<p>Gridfasens p25 på −115 ms satt i en enda låt (89,7 BPM): analysatorns skuggrutnät frös på 127,5 BPM. Tre prov där analysatorns rutnät fick följa gav hör ihop 61 → 67–71 %, men sektionen upp 2,6 → 4,6–7,4 s och drops 60 → 55–59. Alla förkastades. <code>frame.kickRise</code> i beatFeed var inte bit-identiskt och infördes inte. Minidrop-räknaren (62 på 10 min) läses inte av DMX.</p></section>
 
 <section class="hist"><h2>Gallop och latens (10-27, historik)</h2>
 <p>Gallop var ett fasfel i gridet: <code>onset.kick</code> mättar under bas-svallet, och slaget hamnade +134 ms efter ansatsen. <code>FEED_RISE</code> (basens dB-stigning) blev standard 10-27 och två rutnät 10-28. Taktklockan mot facit gick från 67,1 till 83,2 %. Latensbudgeten: ALSA 2,7 / ≤ 21 ms, hop och fält ~5 ms, render 0–5 ms, DMX-ram ~1–23 ms. Live, ljud → första ljus: 10–30 ms (video 5 och handklapp). Uppvärmningen är skrivbordsanalys: workern värms inte, och skrapinstanserna blir skräp efter 1–2 min.</p></section>

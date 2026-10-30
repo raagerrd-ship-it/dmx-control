@@ -15,6 +15,19 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-30 Analysatorns tempo i en mix: rätt 74 % mot 85 % för en enkel vikning över hela tempoområdet - kandidat till tempovalet
+Vad: ny bänk tools/tempoMix.mjs skarvar korpusklippen (frozen6, katalogfacit) till en kontinuerlig mix med 3 s övertoning och kör som live
+(delad analysator inline, låtgränsen, BeatFeed). `--all` = 161 klipp, 99 min. frame.bpm rätt (vikt till 80-160, ±4 %) 74,0 % av tiden;
+analysatorns skuggrutnät (TVÅ RUTNÄT, onset.kick-vikningen) 60,8 %, icke-harmoniskt fel 24 % av tiden. DMX:s effektklocka har sedan 10-30
+egen helsökning (beatFeed.ts HELA TEMPOOMRÅDET): basens dB-stigning (sub+kick specAbs, 6 hop) vikt över ALLA tempon 80-160 i 1 %-steg på
+5 s, toppen/medel, plus domare bland vinnarens 3/2-, 2/3-, 4/3-, 3/4-syskon på basens topp x (onset.highMid + onset.treble)-topp ->
+84,5 % rätt, lås efter låtbyte 2,8 s (analysatorn som sökcentrum: 5,1 s), taktKorpus klipp för klipp 91,3 % (frame.bpm 79,7 %).
+Var: analyser.ts computeBpm (tempogram + evidensval) - dess kandidater missar ofta det tempo vikningen hittar. Material: tempoMix --all,
+taktKorpus. Önskat: pröva vikningen över hela området (basens stigning, kickRise finns redan som fält) som kandidat/domare i evidensvalet.
+OBS: att ge DMX:s skuggrutnät samma tempo provades 10-30 (sektion upp 2,6 -> 4,1 s, som 10-29) - sektionerna är inställda på dagens
+rutnät, så en ändring i analysatorns tempo kräver omkalibrering av sektionerna i båda systemen.
+Status:
+
 ## ÖPPET 2026-10-30 frame.kickAtMs följer analysatorns rutnät, inte ljudet - kan inte användas som bevis för en takt
 Vad: på ladan 10-28 lang-...180531 (konsertReplay --step 5 --delad-cfg --live-kick, fasfelet per kick i 30 s-fönster) ligger kickAtMs med
 vektorstyrka R 1,00 (fas -0,14 slag) mot analysatorns rutnät på 128 BPM i en låt på 90 BPM (0-120 s och 180-240 s) - kickarna sitter alltså

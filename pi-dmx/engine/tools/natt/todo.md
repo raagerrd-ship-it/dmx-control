@@ -293,6 +293,20 @@ PROV REDO: DMX_TAGFIX=1 - build-trion in i BUILD_LOOKS, de sju ett tier-steg til
   dyning, urladdning - toggle-tvånget (refräng och break) och krav, inte taggar. `python tools/ladan.py --env DMX_TAGFIX=1`.
   TITTA: build-trion under uppbyggnaden, startskott/pump när de dyker upp. Godkänt -> taggarna rättas i effektfilerna, flaggan bort.
 
+## FÖRMIDDAGEN 2026-10-30 - TEMPOT (ägaren: 'försöka förbättra takt mm så vi kan få rutnätet att ha rätt tempo'; inget deployat)
+KLART: ny bänk tools/tempoMix.mjs (korpusklippen skarvade till kontinuerlig mix med katalogfacit, --all 161 klipp/99 min) + steg i natt.py
+  (raden 'tempo'). Baslinje: effektklockan rätt 75,8 % (klipp för klipp 81,7 %), lås efter låtbyte median 5,1 s, aldrig rätt 9/161 -
+  andra sökcentrum var analysatorns bpm (frame.bpm 74 % rätt i mixen), som står kvar på förra låten / harmoniskt syskon.
+PROV REDO (gren tempo-helsok, main orörd): beatFeed.ts HELA TEMPOOMRÅDET - basens stigning vikt över alla tempon 80-160 (1 %, ett varv/0,6 s,
+  ett tempo var 3:e hop), domare bland 3/2-, 2/3-, 4/3-, 3/4-syskon på bas x virvel/diskant, aldrig oktavbyte, hysteres 1,5. tempoMix:
+  75,8 -> 84,5 %, lås 5,1 -> 2,8 s, inom 5 s 78 -> 127/161, aldrig 9 -> 2, hopp 0,90 -> 0,57/min; taktKorpus 81,7 -> 91,3 %, byten 1,29 -> 1,20.
+  natt (2026-10-30-helsok4.json): sektion/gridfas/korpus identiska, hör ihop 61 -> 63, återseende 83 -> 85, ljusLag 1021 40 -> 35,
+    drops mixar 56 -> 57; MEN effektivt 25,6 -> 22,8, r mega 0,17 -> 0,15, kick->ljus pop 96 -> 101 / mega 67 -> 91 (looken: mega backbeat -> gallop 118 s).
+  Kostnad beatFeed 12 -> 17 µs/hop (PC). Prova: `git checkout tempo-helsok` + `python tools/ladan.py`; backa: main + ladan.py.
+  TITTA: takteffekterna på slaget direkt efter låtbyte i mix, inga halv/hel-fart-hopp i 150-160-låtar, refrängens look.
+FÖRKASTAT: samma tempo till analysatorns rutnät (agrid 60,8 -> 67,1 % men sektion upp 2,6 -> 4,1 s), HMM-utjämning, bekräftelse två varv,
+  0,5 %-steg, hysteres 1,0 (gridfas 10-21 95 -> 27 %) och 1,25. Fynd till lotus: helsökningen slår frame.bpm (analysator-fynd 10-30).
+
 ## NATTEN 2026-10-30 (nattagenten, inget deployat)
 KLART 2026-10-30: inga nya kvällsuppdrag. Baslinje natt/2026-10-30.json json-identisk med 10-29 i alla delar.
   BRIST: effektklockans tillit mäts mot frame.kickAtMs, som grindas på ANALYSATORNS rutnät - mot effektklockan slump (kvällssvepet: på slaget
