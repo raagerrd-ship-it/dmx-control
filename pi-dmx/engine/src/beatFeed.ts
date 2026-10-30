@@ -46,6 +46,20 @@ const FEED_RISE_HOPS = 6;
  *  (cfg.beat) har rise-rutnätet. Analysatorn MÅSTE byggas med BeatFeed.analyserCfg(cfg) i alla vägar (motorn och bänkarna) - annars
  *  skriver setBeatGrid analysatorns rutnät i motorns cfg.beat. natt 10-28: sektion upp 4,1 -> 2,6 s, återseende 79 -> 83, mega r 0,03 -> 0,17. */
 const NO_AN = { resetTempo(): void {}, resetBar(): void {} };
+/** HELA TEMPOOMRÅDET (2026-10-30, ägaren: 'få rutnätet att ha rätt tempo'): effektklockans andra sökcentrum var analysatorns bpm, som
+ *  i en mix står fel länge efter ett låtbyte (tempoMix: rätt 63 %, icke-harmoniskt fel 20 %, lås median 6 s). Nu viks basens stigning
+ *  över ALLA tempon 80-160 (1 %-steg, ett tempo var FULL_EVERY:e hop = ett varv per 0,6 s, minst FULL_MIN_N värden = 3 s ljud); vinnaren
+ *  och dess harmoniska syskon (FULL_SIBLINGS) döms sedan på basens topp x virvelns/diskantens topp (2/3- och 4/3-felen i shuffle) och
+ *  domarens val blir andra sökcentrum (utan topp: analysatorns bpm som förr). Aldrig oktavbyte (80-160 rymmer både slaget och halvslaget:
+ *  en låt på 160 hoppade annars 160 <-> 80), och ett tempo kring andra centrum måste slå klockans eget med FULL_MARGIN (annars hoppar
+ *  klockan mellan harmoniska tvillingar). tempoMix --all (161 klipp, 99 min): klockan rätt 75,8 -> 84,5 %, lås efter låtbyte median
+ *  5,1 -> 2,8 s, rätt inom 5 s 78 -> 127/161, aldrig rätt 9 -> 2, tempohopp inom låt 0,90 -> 0,57/min. taktKorpus (161 klipp var för
+ *  sig): klockan 81,7 -> 91,3 %, tempobyten 1,29 -> 1,20/klipp. Provat och förkastat: marginal 1 (1,23 hopp/min, gridfasen på kvällen
+ *  10-21 95 -> 27 %) och 1,25 (0,95/min, 72 %), bekräftelse två varv, 0,5 %-steg (längre varv), HMM-utjämning av varvets vinnare
+ *  (sämre), samma tempo till analysatorns rutnät (sektion upp 2,6 -> 4,1 s, som 10-29). Analysatorns rutnät orört. */
+const FULL_MIN = 80, FULL_STEP = 1.01, FULL_N = 70, FULL_EVERY = 3, FULL_MIN_N = 560, FULL_MARGIN = 1.5, FULL_SIBLINGS = [1.5, 2 / 3, 4 / 3, 0.75];
+/** Helsökningen byter aldrig oktav (80..160 rymmer både slaget och halvslaget): vinnare = dubbla/halva klockans tempo -> klockans. */
+const sameOctave = (b: number, ref: number): number => Math.abs(b / ref / 2 - 1) < 0.04 || Math.abs((b / ref) * 2 - 1) < 0.04 ? ref : b;
 
 /**
  * FAS-PREDIKTIONSTILLIT — landar verkliga trumslag dar rutnatet pastar?
@@ -74,10 +88,13 @@ export class BeatFeed {
   private gridWeakSince = 0;       // ms-tidpunkt då konfidensen föll under grinden (0 = stark)
   private gridCoasting = false;
   // LÖPANDE TAKT: ring med (tid, onset.kick) per hop + vikningens arbetsytor (inga allokeringar per hop)
-  private readonly onT = new Float64Array(ONSET_RING); private readonly onV = new Float32Array(ONSET_RING); private onPos = 0; private onN = 0; private onHalf = false; private onPrev = 0;
+  private readonly onT = new Float64Array(ONSET_RING); private readonly onV = new Float32Array(ONSET_RING); private readonly hiV = new Float32Array(ONSET_RING); private hiPrev = 0; private onPos = 0; private onN = 0; private onHalf = false; private onPrev = 0;
   private readonly foldS = new Float64Array(ONSET_BINS); private readonly foldN = new Float64Array(ONSET_BINS); private onNext = 0;
   onsetFixes = 0;
   private readonly riseDb = new Float64Array(FEED_RISE_HOPS); private risePos = 0;
+  // HELA TEMPOOMRÅDET: egna vikningsytor, varvets bästa och förra varvets vinnare (fullBpm = andra sökcentrum, 0 = ingen topp)
+  private readonly fullS = new Float64Array(ONSET_BINS); private readonly fullN = new Float64Array(ONSET_BINS);
+  private fullK = 0; private fullHop = 0; private fullBest = 0; private fullBestBpm = 0; private fullBase = 0; private fullW = 0; private fullWV = 0; fullBpm = 0;
   /** kickFold = vik onset.kick som före 10-27 (analysatorns skugga, se TVÅ RUTNÄT). Standard = basens stigning. */
   private readonly ana: BeatFeed | null; private readonly anaGrid = { beat: null } as unknown as EngineConfig;
   constructor(private readonly kickFold = false) { this.ana = kickFold ? null : new BeatFeed(true); }
@@ -88,7 +105,7 @@ export class BeatFeed {
 
   // Sökningen sprids över hoppen: ETT tempo per hop (Pi Zero: hela sökningen i ett anrop = 2 ms på PC:n, ~20 ms på Pi:n = stopp i slingan).
   private scanC = 99; private scanEnd = 0; private scanRef = 0; private scanNow = 0; private scanC0 = 0; private scanC1 = 0;
-  private bestScore = 0; private bestBpm = 0; private bestPh = 0;
+  private bestScore = 0; private bestBpm = 0; private bestPh = 0; private bestC0 = false;
 
   /** LÖPANDE TAKT: ett hop av sökningen - vik ringen (fönstret före sökningens start) på nästa tempo; sist läggs rutnätet på toppen. */
   private onsetStep(cfg: EngineConfig, now: number): void {
@@ -96,9 +113,9 @@ export class BeatFeed {
     if (this.scanC > this.scanEnd) {   // ingen sökning pågår
       if (now < this.onNext) return;
       this.onNext = now + ONSET_EVERY_MS;
-      this.scanRef = beat.anchorMs; this.scanNow = now; this.scanC0 = beat.bpm; this.scanC1 = this.clockDetBpm;
-      this.scanEnd = this.scanC1 > 0 && Math.abs(this.scanC1 / this.scanC0 - 1) > 0.025 ? 16 : 5;   // analysatorns tempo = andra sökcentrum
-      this.scanC = -5; this.bestScore = 0;
+      this.scanRef = beat.anchorMs; this.scanNow = now; this.scanC0 = beat.bpm; this.scanC1 = this.fullBpm ? sameOctave(this.fullBpm, beat.bpm) : this.clockDetBpm;
+      this.scanEnd = this.scanC1 > 0 && Math.abs(this.scanC1 / this.scanC0 - 1) > 0.025 ? 16 : 5;   // helsökningens vinnare (annars analysatorns tempo) = andra sökcentrum
+      this.scanC = -5; this.bestScore = 0; this.bestC0 = false;
     }
     const c = this.scanC++, ref = this.scanRef;
     const bpm = c <= 5 ? this.scanC0 * (1 + c * 0.005) : this.scanC1 * (1 + (c - 11) * 0.005), bm = 60000 / bpm;
@@ -115,7 +132,8 @@ export class BeatFeed {
       const mean = tot / n; let mx = 0, mb = 0;
       for (let b = 0; b < ONSET_BINS; b++) { const v = this.foldN[b] ? this.foldS[b] / this.foldN[b] : 0; if (v > mx) { mx = v; mb = b; } }
       const score = mx / mean;
-      if (score > this.bestScore) {
+      if (score > this.bestScore * (c > 5 && this.bestC0 && !this.kickFold ? FULL_MARGIN : 1)) {
+        this.bestC0 = c <= 5;
         const a = this.foldMean(mb - 1), cc = this.foldMean(mb), d = this.foldMean(mb + 1), den = a - 2 * cc + d;   // parabel genom toppen
         const off = den < 0 ? 0.5 * (a - d) / den : 0;
         this.bestScore = score; this.bestBpm = bpm; this.bestPh = (mb + 0.5 + off) / ONSET_BINS;
@@ -130,6 +148,44 @@ export class BeatFeed {
     let err = this.bestPh - shift; err -= Math.round(err);
     beat.anchorMs += err * nb;
     this.onsetFixes++;
+  }
+
+  /** HELA TEMPOOMRÅDET: vikningens topp/medel för ringen V på tempot bpm (fönstret ONSET_WIN_MS bakåt från now), 0 = för lite ljud. */
+  private fullScore(V: Float32Array, bpm: number, now: number): number {
+    const bm = 60000 / bpm; this.fullS.fill(0); this.fullN.fill(0);
+    let tot = 0, n = 0;
+    for (let i = 0; i < this.onN; i++) {
+      const j = (this.onPos - 1 - i + ONSET_RING) % ONSET_RING, t = this.onT[j];
+      if (now - t > ONSET_WIN_MS) break;
+      const b = Math.floor(((t % bm) / bm) * ONSET_BINS) % ONSET_BINS;
+      this.fullS[b] += V[j]; this.fullN[b]++; tot += V[j]; n++;
+    }
+    if (n < FULL_MIN_N || tot <= 0) return 0;
+    let mx = 0; for (let b = 0; b < ONSET_BINS; b++) { const v = this.fullN[b] ? this.fullS[b] / this.fullN[b] : 0; if (v > mx) mx = v; }
+    return mx / (tot / n);
+  }
+
+  /** HELA TEMPOOMRÅDET: ett steg per FULL_EVERY:e hop - först varvets FULL_N tempon på basen, sedan domaren bland vinnarens harmoniska
+   *  syskon (basens topp x virvelns/diskantens topp, ett syskon per steg så inget hop bär mer än två vikningar), sist blir domarens
+   *  val andra sökcentrum. */
+  private fullStep(now: number): void {
+    if (++this.fullHop < FULL_EVERY) return;
+    this.fullHop = 0;
+    const k = this.fullK++;
+    if (k < FULL_N) {
+      const bpm = FULL_MIN * Math.pow(FULL_STEP, k), score = this.fullScore(this.onV, bpm, now);
+      if (score > this.fullBest) { this.fullBest = score; this.fullBestBpm = bpm; }
+      if (k === FULL_N - 1) { this.fullW = this.fullBest >= ONSET_MIN_PEAK ? this.fullBestBpm : 0; this.fullWV = this.fullW ? this.fullBest * this.fullScore(this.hiV, this.fullW, now) : 0; this.fullBase = this.fullW; }
+      return;
+    }
+    const r = k - FULL_N;
+    if (r < FULL_SIBLINGS.length && this.fullBase > 0) {
+      let c = this.fullBase * FULL_SIBLINGS[r]; while (c < FULL_MIN) c *= 2; while (c >= 2 * FULL_MIN) c /= 2;
+      const v = this.fullScore(this.onV, c, now) * this.fullScore(this.hiV, c, now);
+      if (v > this.fullWV) { this.fullWV = v; this.fullW = c; }
+    }
+    if (r < FULL_SIBLINGS.length - 1) return;
+    this.fullBpm = this.fullW; this.fullK = 0; this.fullBest = 0;
   }
 
   /** Kom en tidigare kick (ringen, före denna) lag ms före t, inom ±tol? (TRUST_REPEAT) */
@@ -189,7 +245,7 @@ export class BeatFeed {
     // analysatorns bpm ger bara det första låset och ett sökcentrum; sedan sätter onsetStep() fas och tempo direkt ur kickbandets
     // anslag var ONSET_EVERY_MS. Kickarna rör inte längre rutnätet - de mäter bara tilliten (som effekterna läser).
     const effBpm = frame.bpm;
-    if (effBpm === 0) { cfg.beat = null; cfg.beatErr = 0; this.clockDetBpm = 0; this.onN = 0; this.scanC = 99; }   // tyst → stoppa beat-effekter direkt
+    if (effBpm === 0) { cfg.beat = null; cfg.beatErr = 0; this.clockDetBpm = 0; this.onN = 0; this.scanC = 99; this.fullBpm = 0; this.fullK = 0; this.fullBest = 0; }   // tyst → stoppa beat-effekter direkt
     if (effBpm > 0) {
       if (!cfg.beat) cfg.beat = { anchorMs: frame.beatAnchorMs || Date.now(), bpm: effBpm, confidence: frame.bpmConfidence };
       this.clockDetBpm = effBpm;
@@ -215,9 +271,11 @@ export class BeatFeed {
           const old = this.riseDb[this.risePos]; this.riseDb[this.risePos] = db; this.risePos = (this.risePos + 1) % FEED_RISE_HOPS;
           ok = old !== 0 && db > old ? db - old : 0;
         }
-        if (this.onHalf) { this.onT[this.onPos] = nowO; this.onV[this.onPos] = ok > this.onPrev ? ok : this.onPrev; this.onPos = (this.onPos + 1) % ONSET_RING; if (this.onN < ONSET_RING) this.onN++; }
-        this.onPrev = ok; this.onHalf = !this.onHalf;
+        const hi = (frame.onset?.highMid ?? 0) + (frame.onset?.treble ?? 0);   // virvel + diskant (helsökningens domare)
+        if (this.onHalf) { this.onT[this.onPos] = nowO; this.onV[this.onPos] = ok > this.onPrev ? ok : this.onPrev; this.hiV[this.onPos] = hi > this.hiPrev ? hi : this.hiPrev; this.onPos = (this.onPos + 1) % ONSET_RING; if (this.onN < ONSET_RING) this.onN++; }
+        this.onPrev = ok; this.hiPrev = hi; this.onHalf = !this.onHalf;
         this.onsetStep(cfg, nowO);
+        if (!this.kickFold) this.fullStep(nowO);
       }
       // TAKTFAS (ettan): analysatorn har mätt vilken av fyrtaktens platser som bär
       // tyngsta slaget. Flytta ankaret HELA taktslag så takträknaren (beatIdx) börjar
