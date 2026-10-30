@@ -293,6 +293,15 @@ PROV REDO: DMX_TAGFIX=1 - build-trion in i BUILD_LOOKS, de sju ett tier-steg til
   dyning, urladdning - toggle-tvånget (refräng och break) och krav, inte taggar. `python tools/ladan.py --env DMX_TAGFIX=1`.
   TITTA: build-trion under uppbyggnaden, startskott/pump när de dyker upp. Godkänt -> taggarna rättas i effektfilerna, flaggan bort.
 
+## NATTEN 2026-10-30 (nattagenten, inget deployat)
+KLART 2026-10-30: inga nya kvällsuppdrag. Baslinje natt/2026-10-30.json json-identisk med 10-29 i alla delar.
+  BRIST: effektklockans tillit mäts mot frame.kickAtMs, som grindas på ANALYSATORNS rutnät - mot effektklockan slump (kvällssvepet: på slaget
+    50,5 %, fasfelet jämnt; lang-180531 R 0,02-0,15 mot effektklockan, 1,00 mot analysatorns 128 BPM i en låt på 90). Fynd 10-30 till lotus.
+  FÖRKASTAT: DMX_TRUST_RISE=1 (tilliten på basens ansatser +6 dB / 0,6 slag): hör ihop 61 -> 61, r pop 0,31 -> 0,19, mega 0,17 -> 0,14,
+    kick->ljus pop 96 -> 117, drops mixar 56 -> 52; MEN gridfas 62 -> 71 % inom 40, ljusLag pop 90 % 45 -> 15. Av json-identiskt, koden återställd.
+  NÄSTA: isolera vad i provet som gav gridfas 71 % (coastens nollning läser onBeatRate -> clockDetBpm/gridCoasting) - eget prov utan att röra tilliten.
+  Uppvärmningens gc (10-27 punkt 3) fortfarande ej gjord: PC:n Node 22.
+
 ## NATTEN 2026-10-29 (nattagenten, inget deployat)
 KLART 2026-10-29: baslinje natt/2026-10-29.json = 10-28 feedrise2-std i mixar/ljusLag/sektionLag/kvällen (korpus+ladan1008 nya: korpus 125 ms/0,41/r 0,32).
   LADAN 10-28 NÄSTA (1) KLART: gridfas p25 -115 = EN låt (89,7 BPM) i 180531: analysatorns skuggrutnät (onset.kick-vikningen) hittar ingen topp och

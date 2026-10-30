@@ -15,6 +15,17 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-10-30 frame.kickAtMs följer analysatorns rutnät, inte ljudet - kan inte användas som bevis för en takt
+Vad: på ladan 10-28 lang-...180531 (konsertReplay --step 5 --delad-cfg --live-kick, fasfelet per kick i 30 s-fönster) ligger kickAtMs med
+vektorstyrka R 1,00 (fas -0,14 slag) mot analysatorns rutnät på 128 BPM i en låt på 90 BPM (0-120 s och 180-240 s) - kickarna sitter alltså
+på ett tempo som musiken inte har. Mot DMX:s effektklocka (basens ansatser, 89-90 BPM) R 0,02-0,15; hela kvällssvepet (138 min, 24 923 kickar):
+fasfelet jämnt fördelat, 'på slaget' 50,5 % = slumpen. Mot analysatorns rutnät toppar det på 0 och +-0,5 slag (halvslag). Slutsats: kickgrinden
+(beatSrc.beat) bestämmer VAR kickar godtas, så kickAtMs är rutnätets eko. Var: kickRefine/kickgrinden (pendingKickMs). Material: lang-*.wav
+10-28 (ej i git), kvall-svep.wav. Önskat: ett kickfält som inte grindas på rutnätet (eller en flagga 'utan grind'), så både DMX:s tillit
+och analysatorns egen tempokontroll kan mäta rutnätet mot ljudet. DMX provade att mäta tilliten på basens egna ansatser (DMX_TRUST_RISE,
+förkastat 10-30: hör ihop oförändrat 61 %, r pop 0,31 -> 0,19) - fältet behövs ändå för analysatorns del.
+Status:
+
 ## ÖPPET 2026-10-29 Analysatorns rutnät (onset.kick-vikningen) står på fel tempo 13-45 % av tiden - sektionerna är inställda på det
 Vad: sedan TVÅ RUTNÄT (DMX 10-28) läser analysatorns kickgrind/taktfas ett eget rutnät som viks på den klampade onset.kick (BeatFeed.analyserCfg).
 Vikningen hittar ofta ingen topp (>= 1,5 x medel) och rutnätet står kvar på ett tempo utan harmonisk relation (1/2..2, +-3 %) till
