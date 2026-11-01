@@ -50,3 +50,19 @@ export function gcWhenDark(darkMs: number, universe: Uint8Array): void {
     noteForcedGc(dt, "mörk rigg", used / 1048576, limit / 1048576, after / 1048576);
   });
 }
+
+/** STÄDA EFTER UPPVÄRMNINGEN (opt-in DMX_WARMUP_GC=1, natt 2026-11-01, todo 10-27 punkt 3): skrapmotorn i warmup.ts (analysator +
+ *  effektmotor + hela warmup.wav-bufferten) blir skräp när uppvärmningen är klar (~30 s efter start), och live kom 1:a minuterna major GC
+ *  1-2/min mitt i musiken (perf-ladan-2026-10-26: 4 major på 98 min, alla i början). Här tas den storstädningen EN gång direkt när
+ *  uppvärmningen är klar - inte i mörker, eftersom motorn ändå är mitt i sin uppstart. Ljuset rörs inte. Registreras i /api/perf
+ *  (forcedGc, orsak 'uppvärmning'). Kräver --expose-gc (finns i unit-filen). Mät live: major/min och loop max minut 1-5 före/efter. */
+export function gcAfterWarmup(): void {
+  if (process.env.DMX_WARMUP_GC !== "1" || GC_FN === null) return;
+  setImmediate(() => {
+    const used = getHeapStatistics().used_heap_size;
+    const t0 = performance.now(); GC_FN(); const dt = performance.now() - t0;
+    const after = oldUsedBytes(); oldLive = after; lastGc = performance.now();
+    noteForcedGc(dt, "uppvärmning", used / 1048576, getHeapStatistics().heap_size_limit / 1048576, after / 1048576);
+    console.warn(`[warmup] städat: ${dt.toFixed(0)} ms, ${(used / 1048576).toFixed(1)} -> ${(after / 1048576).toFixed(1)} MB`);
+  });
+}

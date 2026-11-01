@@ -29,7 +29,7 @@ import { BeatFeed } from "./beatFeed.js";
 import { LongRecord } from "./longRecord.js";
 import * as health from "./runtimeHealth.js";
 import { renderBegin, renderEnd } from "./perfStats.js";
-import { gcWhenDark } from "./gcDark.js";   // DMX_GC_DARK (opt-in): full GC när riggen är mörk och gamla minnet nära gränsen   // GC/rendering/loop alltid på, GET /api/perf (10-16)
+import { gcWhenDark, gcAfterWarmup } from "./gcDark.js";   // DMX_GC_DARK (opt-in): full GC när riggen är mörk och gamla minnet nära gränsen   // GC/rendering/loop alltid på, GET /api/perf (10-16)
 import { logHealth } from "./healthLog.js";
 
 
@@ -423,6 +423,7 @@ const s80 = await startServer(serverDeps, Number(process.env.PORT ?? 80));
     // I BAKGRUNDEN i sma bitar (22:49: synkron uppvarmning blockerade /health -> pi-dmx-watchdog startade om i loop).
     warmUpInBackground(cfg, wp, (r) => {
       if (r) console.warn(`[warmup] klar: ${r.secs.toFixed(0)} s ljud, ${r.hops} hop pa ${(r.ms / 1000).toFixed(1)} s (i bakgrunden)`);
+      if (r) gcAfterWarmup();   // DMX_WARMUP_GC=1 (opt-in): skrapmotorns skräp städas en gång direkt
       else console.warn(`[warmup] hoppas over: ${wp} saknas eller fel format (mono 16-bit ${cfg.audio.rate} Hz)`);
     });
   }
