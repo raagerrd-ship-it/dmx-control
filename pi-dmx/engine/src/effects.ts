@@ -24,8 +24,8 @@ import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "
  *  kulör per fras, full öppnar 0,6) + dirigenten väljer ALDRIG en enhetlig effekt (UNIFORM: alla fyra lamporna lika, mätt med
  *  tools/effectDyn.mjs - spridning < 0,1 i båda mixarna). Build-effekterna (stegring, sug, forvarning) är enhetliga med avsikt och får vara kvar. */
 /** MINIDROPS SOM SHOW (agaren 10-11: 'mindre drops ... sa att alla lampor da lyser lika'): hogst en per MINI_GAP_MS (bänken: 11-58/min
- *  = brus), och minidropen gör ALLA fyra lamporna lika i en kulör ur paletten en kort stund (miniColEnv, steg 1, som drop-looken men
- *  utan vit kärna). */
+ *  = brus), och minidropen lyfter de TÄNDA lamporna till fullt i sin egen kulör (liftK i effektNiva; släckta förblir släckta - ägaren
+ *  11-01: 'hoppar till och sen tillbaka' när alla fyra gjordes lika, miniColEnv-looken borttagen). */
 /** BUILD SOM HÅLLER OCH LANDAR (ägaren i ladan 10-11: "uppbyggnad och drop missa den precis, den va jättetydlig"): (1) build-poolen
  *  är bara BUILD_LOOKS, och när en build-look väl börjat bryts den bara av drop/nästan-drop (långinspelningen: upptakt -> eq -> basgang
  *  på 4 s, avbrutet av basgång/fras/sektion); (2) en NÄSTAN-DROP 2..20 s efter att build-looken började räknas som en RIKTIG drop i
@@ -525,7 +525,7 @@ export class EffectEngine {
 
   private effektNiva(rgb: [number, number, number], ctx: EffectContext, toggle = false, sparse = false): [number, number, number] {
     // LAMPTRAPPA (DMX_LAMP_STAIR, vers/intro): icke-sparsam effekt -> bara ett lamppar, paret byts varje fras; drop-looken tänder allt.
-    if (sparse && this.dropColEnv <= 0.005 && this.miniColEnv <= 0.005 && ctx.group !== ((Math.floor(ctx.beatIdx / 16) & 1))) { rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; return rgb; }
+    if (sparse && this.dropColEnv <= 0.005 && ctx.group !== ((Math.floor(ctx.beatIdx / 16) & 1))) { rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; return rgb; }
     let m = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
     if (m > this.fxPeakNow) this.fxPeakNow = m;
     if (E_NORM_S > 0) { const n = this.fxNorm; rgb[0] = Math.min(1, rgb[0] * n); rgb[1] = Math.min(1, rgb[1] * n); rgb[2] = Math.min(1, rgb[2] * n); m = Math.min(1, m * n); }
@@ -534,12 +534,9 @@ export class EffectEngine {
     if (FX_FLOOR > 0 && !toggle && m > 0.001 && m < 1) { const k = (m + FX_FLOOR * (1 - m) * Math.min(1, m / 0.1)) / m; rgb[0] *= k; rgb[1] *= k; rgb[2] *= k; m *= k; }
     const liftK = this.dropEnv - this.dropColEnv;   // minidrop/nastan-drop: ljusstyrka mot fullt, kuloren kvar
     if (liftK > 0.005 && m > 0.002 && m < 1) { const g = 1 + (1 / m - 1) * liftK; rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
-    if (this.miniColEnv > 0.005 && this.dropColEnv <= 0.005) {   // MINIDROPS SOM SHOW: alla lampor tänds i den TÄNDA lampans kulör, fullt
-      // (ägaren i ladan 10-13: 'alla tänds och kopierar bara de tända lamporna, sen fadar de mörka ut' - förr en ny kulör ur paletten,
-      // som i refrängen bara blev ett kulörbyte på en redan full rigg; live-sond: refrängens lampor median 195/242)
-      const d = this.miniRgb, k = this.miniColEnv;
-      for (let c = 0; c < 3; c++) rgb[c] += (d[c] - rgb[c]) * k;
-    }
+    // MINIDROPEN TÄNDER BARA DE AKTIVA LAMPORNA TILL FULLT (ägaren i ladan 11-01: 'tänder alla aktiva lampor till fullt istället för att köra
+    // de lika - känns inte naturligt när den hoppar till och sen tillbaka'): liftK ovan lyfter de tända lamporna mot fullt i sin egen kulör,
+    // släckta förblir släckta och mönstret står kvar. (Förr 10-13: alla lampor kopierade den tända lampans kulör, miniColEnv.)
     if (this.dropColEnv > 0.005) {   // full drop: dropfarg per lampa + vit karna i toppen (agaren 10-08), blandas in med dropColEnv
       const d = hsvToRgb(mixedSector(this.dropSector + ctx.idx) / 6, 1, 1), vit = Math.max(0, (this.dropColEnv - 0.6) / 0.4), k = this.dropColEnv;
       for (let c = 0; c < 3; c++) rgb[c] += ((d[c] + (1 - d[c]) * vit) - rgb[c]) * k;
@@ -571,7 +568,6 @@ export class EffectEngine {
   dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;
   private eSm = 0; eSimple = 0; private eBass = 0; private bHi = NaN; private bLo = NaN; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
-  private miniRgb: [number, number, number] = [1, 1, 1];   // minidropens kulör = den tända lampans (se MINIDROPS SOM SHOW)
   private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
   private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
@@ -1800,11 +1796,6 @@ export class EffectEngine {
     const dRate = dTarget > this.dropEnv ? dtNow / 0.03 : dtNow / 1.0;
     this.dropEnv += Math.max(-dRate, Math.min(dRate, dTarget - this.dropEnv));
     { const cT = dropActive ? 1 : 0, cR = cT > this.dropColEnv ? dtNow / 0.03 : dtNow / 1.0; this.dropColEnv += Math.max(-cR, Math.min(cR, cT - this.dropColEnv)); }
-    if (nowWall < this.miniBangUntil && this.miniColEnv <= 0.005) {   // minidropen börjar: kopiera den ljusaste tända lampans kulör (förra rutan)
-      let best = -1, lv = 0; for (let i = 0; i < this.cfg.fixtures.length; i++) if (this.lampLvl[i] > lv) { lv = this.lampLvl[i]; best = i; }
-      if (best >= 0 && lv > 0.002) for (let c = 0; c < 3; c++) this.miniRgb[c] = this.lampRatio[best * 3 + c];
-      else { const d = hsvToRgb(this.miniSector / 6, 1, 1); for (let c = 0; c < 3; c++) this.miniRgb[c] = d[c]; }   // allt släckt: paletten som förr
-    }
     { const mT = nowWall < this.miniBangUntil ? 1 : 0, mR = mT > this.miniColEnv ? dtNow / 0.03 : dtNow / 0.6; this.miniColEnv += Math.max(-mR, Math.min(mR, mT - this.miniColEnv)); }   // MINIDROPS SOM SHOW
 
     // UPPBYGGNAD: analysatorn räknar riser/novelty och ger oss frame.buildUp (0..1).
