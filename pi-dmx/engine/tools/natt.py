@@ -73,7 +73,7 @@ def run_sektionlag(wavs, env):
         os.remove(js)
     return {'uppMed': med(t['upLag']), 'uppTraff': f"{t['upHit']}/{t['up']}", 'nedMed': med(t['downLag']), 'nedTraff': f"{t['downHit']}/{t['down']}",
             'korta': f"{t['short']}/{t['segs']}", 'bytenMin': t['changes'] / max(1e-9, t['min']),
-            'gridMed': med(t.get('grid') or []), 'grid40': (sum(1 for e in t.get('grid') or [] if abs(e) <= 40) / len(t['grid'])) if t.get('grid') else None}
+            'gridMed': med(t.get('grid') or []), 'grid40': (sum(1 for e in t.get('grid') or [] if abs(e) <= 40) / len(t['grid'])) if t.get('grid') else None, 'gridN': len(t.get('grid') or [])}   # gridN: antal ansatser i fonster med last tempo (konfidens >= 0,35) - andelen ar bara jamforbar vid lika n (natt 11-01)
 # KVALLEN I ETT SVEP (natt 10-25, matfalla 53): bankarna kor varje lang-fil med ny motor -> kvallens minne (lookPlayMs, seenLooks,
 # recentLooks, prevSongLook) nollas per fil. Rod trad mats darfor pa 10-11-kvallens 23 lang skarvade till EN wav (141 min, ra PCM
 # efter 44-byteshuvudet, mono 48k) genom konsertReplay som live (--step 5 --delad-cfg --live-kick) + rodTrad.mjs.
@@ -169,7 +169,7 @@ def main():
     out['tempoMix'] = run_tempomix(env)
     tm = out['tempoMix']; print(f'  tempo    mix klocka {f(tm.get("klocka"), 1)} % (ana {f(tm.get("ana"), 1)}, agrid {f(tm.get("agrid"), 1)}, icke-harm {f(tm.get("annat"), 1)})  lås {f(tm.get("lasMed"), 1)} s  inom 5 s {tm.get("inom5")}  hopp {f(tm.get("hoppMin"))}/min' if 'fel' not in tm else f'  tempo    FEL {tm["fel"]}')
     print('  ljusLag  ' + '  '.join(f'{n} {f(r.get("korskorr"), 0)}/{f(r.get("t90"), 0)} ms' for n, r in out['ljusLag'].items()) + '  (korskorr/90 %)')
-    sl = out['sektionLag']; print(f'  sektion  upp {f(sl.get("uppMed"), 1)} s ({sl.get("uppTraff")})  ned {f(sl.get("nedMed"), 1)} s ({sl.get("nedTraff")})  korta {sl.get("korta")}  {f(sl.get("bytenMin"))}/min  gridfas {f(sl.get("gridMed"), 0)} ms / {f((sl.get("grid40") or 0) * 100, 0)} % inom 40')
+    sl = out['sektionLag']; print(f'  sektion  upp {f(sl.get("uppMed"), 1)} s ({sl.get("uppTraff")})  ned {f(sl.get("nedMed"), 1)} s ({sl.get("nedTraff")})  korta {sl.get("korta")}  {f(sl.get("bytenMin"))}/min  gridfas {f(sl.get("gridMed"), 0)} ms / {f((sl.get("grid40") or 0) * 100, 0)} % inom 40 (n {sl.get("gridN")})')
 
     # 1c. ROD TRAD: kvallen 10-11 i ett svep (matfalla 53), aven --snabb
     out['kvall'] = kv = run_kvall(env)
