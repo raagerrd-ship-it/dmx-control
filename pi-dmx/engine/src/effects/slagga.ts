@@ -14,7 +14,7 @@ const soft = (f: number, rise: number, tau: number) => { if (f < rise) { const x
 // ~0,1 slag efter effektens klocka, en kortare topp hann knappt synas.
 export const slagga: EffectDef = {
   key: "slagga", label: "Slägga", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"], toggle: true,
-  desc: "En vit slägga vandrar en lampa per slag över riggen, ettan slår i hela; de andra glöder i kulör.",
+  desc: "Släggan slår fullt i en ny lampa per slag, ettan i hela riggen; de andra glöder svagare.",
   render(c) {
     const f = c.hasBeat ? c.beatFrac : 1 - c.kickEnv;
     const n = Math.max(1, c.count), b = c.beatIdx;
@@ -23,7 +23,8 @@ export const slagga: EffectDef = {
     const hit = all || c.idx === pos;
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((c.group === 0 ? base : base + 3) % 6) / 6;
-    if (hit) return hsv(hue, 1 - soft(f, 0.12, 0.15), 0.15 + 0.85 * soft(f, 0.12, 0.45));   // vit topp som färgas och klingar ut
-    return hsv(hue, 1, 0.08 + 0.5 * soft(f, 0.15, 0.4));
+    // (INGET VITT 11-01 kväll, ägaren i ladan: 'R och G lyser men B bara blinkar till' - vitt i ~100 ms tände den släckta dioden)
+    if (hit) return hsv(hue, 1, 0.15 + 0.85 * soft(f, 0.12, 0.45));   // smällen i full kulör, klingar ut
+    return hsv(hue, 1, 0.08 + 0.4 * soft(f, 0.15, 0.4));
   },
 };

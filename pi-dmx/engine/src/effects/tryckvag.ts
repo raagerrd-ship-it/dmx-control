@@ -20,9 +20,9 @@ export const tryckvag: EffectDef = {
     const n = Math.max(1, c.count), e = Math.min(c.lamp, n - 1 - c.lamp), mid = n > 2 && e >= (n - 1) / 4;   // mittparet / kanterna
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((mid ? base : base + 3) % 6) / 6;
-    const core = ((c.beatIdx & 15) === 0 || (mid && (c.beatIdx & 3) === 0)) ? soft(f, 0.12, 0.15) : 0;   // vit kärna: ettan i mitten, frasens etta överallt
-    if (!mid) return hsv(hue, 1 - core, 0.15 + 0.85 * soft(f, 0.12, 0.3));   // kanterna: mjuk smäll som klingar ut
+    // (vita kärnan borttagen 11-01 kväll: vitt i ~100 ms tände den släckta dioden - 'R och G lyser men B bara blinkar till')
+    if (!mid) return hsv(hue, 1, 0.15 + 0.85 * soft(f, 0.12, 0.3));   // kanterna: mjuk smäll som klingar ut
     c.want.energy = false;                                                    // mitten: basen själv (energin följer kicken)
-    return hsv(hue, 1 - core, Math.max(soft(f, 0.12, 0.5), 0.3 + 0.7 * c.drum.bass));
+    return hsv(hue, 1, Math.max(soft(f, 0.12, 0.5), 0.3 + 0.7 * c.drum.bass));
   },
 };
