@@ -79,6 +79,10 @@ const MINI_GAP_MS = 2000;
  *  backup/fore-kvallens-prov-2026-10-21): när dropen kommer i samma ruta som build-inträdet (allaBuild) valdes looken förr i build-manuset -
  *  dropens basstarka look sparades som låtens build-look och refrängens manus fick den aldrig (10 av 67 drops, 24 lang). Nu räknas
  *  dropen till 'high' som andra drops (se secKey i switchLook). */
+/** LYFTETS GOLV (ägaren i ladan 11-01: 'precis efter en drop ... nästan monoton'): lyftet låste energifaktorn på 1 i 8+ s efter dropen, så
+ *  effekter som lever på basen (pulse av, energy på) slutade pulsa. Nu ett golv på 70 %: energin hålls uppe, bastrycket pulsar ovanför. */
+const DROP_LIFT_FLOOR = 0.7;
+const DROP_BEAT_MIN = 0.8;   // basstark drop-look måste också ha tydlig takt (passform beat, se bassStrong)
 const DROP_LIFT_MS = 8000, DROP_LIFT_FALL_MS = 3000;   // 4000/1500 -> 8000/3000 STANDARD 10-17 (ägaren i ladan: 'energi efter drop dör fort' -> 'känns bra nu')   // 2000 -> 4000 (ladan 22:0x: 'se till så energin efter fortsätter', som minidropens lyft som var 'perfekt')   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
 /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
  *  look-bytena landar på en 4-taktsgräns (slumpen ger 19 %) - gridOk hängde på låtminnets grid som är borttaget. Med takten låst
@@ -808,7 +812,9 @@ export class EffectEngine {
    *  per ruta i stepDirigent - här skapas de bara vid ett byte. Ordagrant flyttat. */
   /** BASSTARK LOOK EFTER DROPEN (se DROP_BASS_LOOK): full-effekter med passform bas >= 0,6 och punch >= 0,75, bäst (bas + punch) först. */
   private static bassDropLooks: Mode[] | null = null;
-  private bassStrong(m: Mode): boolean { const f = FIT[m], e = EFFECT_MAP.get(m); return !!f && !!e && e.tier === 'full' && f.bass >= 0.6 && f.punch >= 0.75; }
+  // + TYDLIG TAKT (ägaren 11-01: 'välj effekter där takten syns tydligt'): passform beat >= DROP_BEAT_MIN - gallop, backbeat, party, kickregn,
+  //   motor; drumkit (0,6), fyrverkeri (0,6) och duel (0,4) föll bort.
+  private bassStrong(m: Mode): boolean { const f = FIT[m], e = EFFECT_MAP.get(m); return !!f && !!e && e.tier === 'full' && f.bass >= 0.6 && f.punch >= 0.75 && f.beat >= DROP_BEAT_MIN; }
   private bassDropLooks(): Mode[] {
     if (!EffectEngine.bassDropLooks) EffectEngine.bassDropLooks = ([...EFFECT_MAP.keys()] as Mode[]).filter((m) => this.bassStrong(m)).sort((a, b) => (FIT[b]!.bass + FIT[b]!.punch) - (FIT[a]!.bass + FIT[a]!.punch));
     return EffectEngine.bassDropLooks;
@@ -1372,7 +1378,7 @@ export class EffectEngine {
       this.eSimple = this.eBass;
       const eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
       let lift = this.dropEnv;   // DROPS OCH MINIDROPS LYFTER (se DROP_LIFT_MS / MINI_LIFT_MS): energin släpper helt och glider tillbaka
-      if (nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) { const left = this.dropLiftUntil - nowWall; lift = Math.max(lift, (left >= 0 ? 1 : 1 + left / DROP_LIFT_FALL_MS) ); }   // LYFTET SOM GOLV (1 = platt som förr)
+      if (nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) { const left = this.dropLiftUntil - nowWall; lift = Math.max(lift, DROP_LIFT_FLOOR * (left >= 0 ? 1 : 1 + left / DROP_LIFT_FALL_MS)); }   // LYFTET SOM GOLV (se DROP_LIFT_FLOOR)
       if (nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) { const left = this.miniLiftUntil - nowWall; lift = Math.max(lift, left >= 0 ? 1 : 1 + left / MINI_LIFT_FALL_MS); }
       md = drive * Math.min(1, Math.max(eFloor + (1 - eFloor) * Math.pow(this.eBass, B_CURVE), lift));   // bara dampning: aldrig over 1
       md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
