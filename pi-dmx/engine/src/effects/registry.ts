@@ -80,6 +80,10 @@ import { dunk } from "./dunk.js";
 import { glesna } from "./glesna.js";
 import { dyning } from "./dyning.js";
 import { blixtnedslag } from "./blixtnedslag.js";
+import { FIT } from "./fit.js";
+import { slagga } from "./slagga.js";
+import { sidokedja } from "./sidokedja.js";
+import { tryckvag } from "./tryckvag.js";
 import { mellanslag } from "./mellanslag.js";
 import { pump } from "./pump.js";
 import { hiss } from "./hiss.js";
@@ -119,6 +123,9 @@ export const EFFECTS: EffectDef[] = [
   flod, famn, spaning, startskott, siren, skuggor,
   // minst 4 per ruta (agaren 10-12: "over 100 effekter"): lugn build/high, fart intro/break, full intro/low/build/break
   stjarnor, mullra, kaskad, droppar, uppvarmning, dunk, glesna, dyning, blixtnedslag, mellanslag, pump, hiss, tratt, morkerslag, urladdning,
+  // REFRÄNG/DROP MED TYDLIG BAS OCH TAKT (ägaren 11-01: 'fler effekter som uppfyller refräng/drop-kriterierna'): basstarka full-effekter
+  // med passform bas >= 0,6, punch >= 0,75, beat >= 0,8 (se bassStrong i effects.ts).
+  slagga, sidokedja, tryckvag,
 ];
 
 /** Specialrolls-mappning: vilka fixture-roller (hazer/uv/blinder/strobe/laser/co2)
@@ -168,7 +175,12 @@ const SPECIALTY_DRIVES: Partial<Record<Mode, ChannelRole[]>> = {
 
 /** SEKTIONSPOOL (2026-09-21): harledd ur varje effekts egen `section`-tagg (ingen oversattningstabell - taggen bor i effektfilen).
  *  Dirigenten (DMX_SECTION_SWITCH) skar tier-poolen med den; build/break tar sina taggade effekter fore tiern. */
-export function sectionPool(sec: string): Mode[] { return EFFECTS.filter((e) => e.section?.includes(sec)).map((e) => e.key); }
+/** REFRÄNGEN HAR TYDLIG BASGÅNG/TAKT (ägaren 11-01: 'alla refräng-effekter vill jag ska vara tydlig basgång/takt'): i 'high' får bara
+ *  effekter med passform beat >= REFRAIN_BEAT_MIN väljas. Föll bort: famn, svall, droppar, duel, split, gravity, drumkit, fyrverkeri, tyngdlyft. */
+const REFRAIN_BEAT_MIN = 0.7;
+export function sectionPool(sec: string): Mode[] {
+  return EFFECTS.filter((e) => e.section?.includes(sec) && (sec !== 'high' || (FIT[e.key]?.beat ?? 0) >= REFRAIN_BEAT_MIN)).map((e) => e.key);
+}
 /** Effekter taggade `toggle: true` (lampor som slar om i grupper/steg) - basgangens pool. */
 export const TOGGLE_POOL: Mode[] = EFFECTS.filter((e) => e.toggle).map((e) => e.key);
 

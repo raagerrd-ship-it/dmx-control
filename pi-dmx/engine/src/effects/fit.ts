@@ -100,6 +100,10 @@ export const FIT: Partial<Record<Mode, Fit>> = {
   tratt:      { punch: 0.75, bass: 0.50, bright: 0.45, beat: 0.80 },   // uppbyggnad, kicken i mitten
   morkerslag: { punch: 0.50, bass: 0.40, bright: 0.40, beat: 0.75 },   // break, hal pa slaget
   urladdning: { punch: 0.55, bass: 0.40, bright: 0.40, beat: 0.70 },   // break, tid
+  // refräng/drop 11-01: tydlig bas och takt
+  slagga:     { punch: 0.90, bass: 0.65, bright: 0.55, beat: 0.90 },   // vit smäll på varje slag, glöd på basen
+  sidokedja:  { punch: 0.80, bass: 0.85, bright: 0.25, beat: 0.95 },   // kicken trycker ner, sväller tillbaka
+  tryckvag:   { punch: 0.85, bass: 0.75, bright: 0.35, beat: 0.85 },   // allt slår, mitten bär basen
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -125,6 +129,7 @@ const SPATIAL: Partial<Record<Mode, number>> = {
   glimt: 0.8, efterskalv: 0.7, skuggor: 0.8, motor: 0.8,
   stjarnor: 0.7, mullra: 0.6, kaskad: 1.0, droppar: 0.9, uppvarmning: 0.8, dunk: 0.8, glesna: 0.8, dyning: 0.8,
   blixtnedslag: 1.0, mellanslag: 1.0, pump: 0.6, hiss: 1.0, tratt: 0.7, morkerslag: 0.8, urladdning: 0.6,
+  slagga: 0.3, sidokedja: 0.5, tryckvag: 0.8,
 };
 /** Hur mycket den spatiala preferensen väger vid full punch (0 = av). */
 const SPATIAL_PREF = 0.5;   // 0,18 -> 0,5 (ladan 10-01 godkant)   // ladan 09-29: "manga effekter lyser bara alla lampor" -> prov 0,5
