@@ -307,6 +307,15 @@ PROV REDO (gren tempo-helsok, main orörd): beatFeed.ts HELA TEMPOOMRÅDET - bas
 FÖRKASTAT: samma tempo till analysatorns rutnät (agrid 60,8 -> 67,1 % men sektion upp 2,6 -> 4,1 s), HMM-utjämning, bekräftelse två varv,
   0,5 %-steg, hysteres 1,0 (gridfas 10-21 95 -> 27 %) och 1,25. Fynd till lotus: helsökningen slår frame.bpm (analysator-fynd 10-30).
 
+## NATTEN 2026-11-01 (nattagenten, inget deployat; checkouten står på tempo-helsok = det som kör i ladan, commits där, ej pushad gren)
+KLART 2026-11-01: inga nya kvällsuppdrag. Baslinje natt/2026-11-01.json (2405334): mot 10-30 hör ihop 61 -> 66, återseende 83 -> 86, effektivt
+  25,6 -> 23,6, r mega 0,17 -> 0,20, kick->ljus mega 67 -> 107 (lookvalet: gallop 112 s), ljusLag 1021 40 -> 35 - helsökningen + drop-fixarna 10-30.
+  NÄSTA 10-30 (gridfas 71 %) KLART: mätfel - provet hade ~235 ansatser mot ~513 (konfidensgrinden 0,35 släppte färre fönster). natt.py visar nu n.
+  10-27 punkt 3 KLART som opt-in 5d0c558 DMX_WARMUP_GC=1 (en full GC när uppvärmningen är klar; PC 12 ms, 34,0 -> 16,6 MB) - mät live /api/perf min 1-5.
+  PROV REDO d12b12e DMX_STAIR_BREAK=1 (lamptrappan även i sektion break): break mega 2,25 -> 1,58 lampor, alla fyra 63 -> 25 %; dropsprång efter
+    lugnt mega 0,366 -> 0,392; drops/kvällen lika; r mega 0,20 -> 0,19. Av json-identiskt. `python tools/ladan.py --env DMX_STAIR_BREAK=1`.
+  Kvar för ladan: FLANK_SILENT_LV (2405334) ej deployad - går före; ett i taget.
+
 ## NATTEN 2026-10-30 (nattagenten, inget deployat)
 KLART 2026-10-30: inga nya kvällsuppdrag. Baslinje natt/2026-10-30.json json-identisk med 10-29 i alla delar.
   BRIST: effektklockans tillit mäts mot frame.kickAtMs, som grindas på ANALYSATORNS rutnät - mot effektklockan slump (kvällssvepet: på slaget
