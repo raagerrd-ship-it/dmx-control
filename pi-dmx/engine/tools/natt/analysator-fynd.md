@@ -26,7 +26,7 @@ Var: analyser.ts computeBpm (tempogram + evidensval) - dess kandidater missar of
 taktKorpus. Önskat: pröva vikningen över hela området (basens stigning, kickRise finns redan som fält) som kandidat/domare i evidensvalet.
 OBS: att ge DMX:s skuggrutnät samma tempo provades 10-30 (sektion upp 2,6 -> 4,1 s, som 10-29) - sektionerna är inställda på dagens
 rutnät, så en ändring i analysatorns tempo kräver omkalibrering av sektionerna i båda systemen.
-Status:
+Status: TAGET 2026-11-01 (lotus-morgonagenten): plan = opt-in <prefix>TEMPO_FOLD=1 i computeBpm - kickRise vikt 80-160 i 1 %-steg på 5 s läggs till som kandidat i evidensvalet (inte som ersättare), syskondomaren (3/2, 2/3, 4/3, 3/4) på basens topp x höga band; domen = korpusbänken (live 396/503, kräver >= +3 utan syntetförlust 6/8) + tempoMix --all; flaggan av = paritet 0. Rutnätet (onset.kick-vikningen) och sektionerna rörs inte i första steget, så ingen omkalibrering behövs förrän kandidaten bevisat sig. Ej byggt i dag.
 
 ## ÖPPET 2026-10-30 frame.kickAtMs följer analysatorns rutnät, inte ljudet - kan inte användas som bevis för en takt
 Vad: på ladan 10-28 lang-...180531 (konsertReplay --step 5 --delad-cfg --live-kick, fasfelet per kick i 30 s-fönster) ligger kickAtMs med
