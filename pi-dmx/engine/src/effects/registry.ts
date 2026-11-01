@@ -238,6 +238,10 @@ const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
   tick:     { needsPunch: 0.35, needsBeat: 0.30 },
   split:    { needsPunch: 0.35, needsBass: 0.35 },
   backbeat: { needsPunch: 0.35, needsBeat: 0.35 },
+  // refräng/drop 11-01 (granskningen: utan krav kunde de väljas fast takten var osäker) - samma som backbeat
+  slagga:   { needsPunch: 0.35, needsBeat: 0.35 },
+  sidokedja:{ needsPunch: 0.35, needsBeat: 0.35 },
+  tryckvag: { needsPunch: 0.35, needsBeat: 0.35 },
   // Bas-effekter → kräver låg-end
   gravity:  { needsBass: 0.20 },   // 0,35 -> 0,20 (ladans profile.bass median 0,23; ALLA LOOKER standard 10-10)
   tide:     { needsBass: 0.30 },

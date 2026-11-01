@@ -1563,7 +1563,7 @@ export class EffectEngine {
     // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
     // jamfors energin (eSm, se E_WIN_S) med energin strax fore; har den inte stigit >= DROP_LAND_GAIN doms dropen falsk:
     // envelope klipps, 20 s-high-fonstret och tiersnappen dras tillbaka. Blixten (0,6 s) hinner synas, inte 20 s fel show.
-    if (dropHitRaw) { this.dropCheckAt = nowWall + 600; this.preDropLevel = this.eSm; this.preDropTier = this.tierEma; }
+    if (dropHitRaw) { this.dropCheckAt = nowWall + 600; this.preDropLevel = this.eSm; this.preDropTier = this.tierEma; this.liftAt = nowWall; this.nearAt = nowWall; }   // liftAt/nearAt: dropens eget energihopp blir inte en minidrop eller nästan-drop 0,7 s senare (granskningen 11-01: minilyftet låste energin på 1 och tog bort DROP_LIFT_FLOOR i 3 av 4 drops)
     if (this.dropCheckAt > 0 && nowWall >= this.dropCheckAt) {
       this.dropCheckAt = 0;
       const lvl = this.eSm;
