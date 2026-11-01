@@ -1,5 +1,24 @@
 # Natt-agentens uppdrag
 
+## Från kvällen 2026-11-01 (sent) - HYRKITET: 8 LAMPOR I TVÅ STATIV (ägaren: 'förbered för det'; efter diodblinken nedan, före allt äldre)
+Ägaren hyr ut kit för bröllop/studentfester utan ljustekniker. Standardkitet blir 2 stativ x 4 PAR (rgb7, samma som ladans), ett på var
+sida om dansgolvet, adresser i ordning VÄNSTER stativ (lampa 1-4) -> HÖGER stativ (lampa 5-8) = en rad på 8 tvärs över rummet, 'mitten'
+= lamporna närmast golvet (c.lamp 3-4). Effekterna är framtagna och trimmade på 4 lampor - inget är bänkat på 8.
+1. BÄNKEN PÅ 8: ge tools/effectDyn.mjs och tools/dynBench.mjs en flagga --lampor N (bygg N rgb7-fixturer med adresser i följd, samma
+   kalibrering som ladans 4; standard = som i dag så 4-lampssiffrorna är oförändrade). Kör session_mono + facit3 med 4 och 8.
+2. GRANSKA ALLA EFFEKTER PÅ 8 (lampa-för-lampa-trace, mall scratchpad fx3/trace.mjs): hitta de som ser fel ut på 8 - hårdkodat 4
+   (beatIdx % 4 som lampindex, 'ett lamppar' i lamptrappan SPARSAM/fxSparse som bara tänder 2 av 8, party-hålet en lampa av 8, slaggans
+   vandring som tar två takter, mittparet i sidokedja/tryckvag = e >= (n-1)/4 -> 4 lampor), c.idx där c.lamp behövs, mönster som blir för
+   glesa/täta. Mått på 8 mot 4: effectDyn sprid/rum/takt/niva + dynBench sidoBlink/fladder. Rätta så att 8 ser lika bra ut - KRAV:
+   4-lampsriggen (ladan) ska vara bit-identisk (natt --snabb json-lika + effectDyn-siffrorna på 4 oförändrade).
+3. SPEGLA ELLER RAD: pröva om speglade stativ (lampa 5-8 = 4-1, båda stativen gör samma sak) ser bättre ut än en rad på 8 för de
+   rumsliga effekterna (chase/bounce/slagga/frasraknare). Rapportera med siffror och en rekommendation; bygg INTE en ny inställning utan
+   ägarens ja (en ratt räknas som lager - ägaren vill ha simpelt).
+4. STROBE-KONTROLL (ägarens video 11-01 18:48: ~2 s strobe på ~10 Hz, var 3:e videoruta svart, under ett lookbyte): enda effekten som ber
+   om lampornas strobe-kanal är fyrverkeri (want.strobe 0,5 vid dropEnv > 0,9). Bekräfta orsaken i bänk/trace; LÅST REGEL strobe <= 3/s -
+   om det är fyrverkeri: ta bort strobe-önskan (blinder får vara kvar). Rapportera om något annat kan ge snabb strobe på rgb7-kanal 7.
+REGLER: inget deployas, ingen opt-in-flagga i motorkoden (verktygsflaggan --lampor i bänkarna är ok), en commit per effekt/steg.
+
 ## Från kvällen 2026-11-01 - DIODBLINK I DE ÄLDRE EFFEKTERNA (ägaren i ladan: 'lägg till nattagent att fixa de äldre, men i övrigt ser det fint ut nu'; går före allt annat)
 LÄGET: LIVE sedan 18:30 = ff83da2 (tempo-helsok; 42ae94a snabbspolad hit från agent-work/warmup-gc + minidropen: bara tända lampor till
 fullt i egen kulör, miniColEnv-looken borttagen - ägaren: 'blev riktigt snyggt', GODKÄND), ladan.conf DMX_WARMUP_GC=1 + DMX_STAIR_BREAK=1.
