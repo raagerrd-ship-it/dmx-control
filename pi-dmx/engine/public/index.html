@@ -324,6 +324,44 @@
     .tab-pane input[type=number], .tab-pane input[type=text], .tab-pane input[type=password] {
       background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; font-size: 16px; }
     #fogAddr { width: 110px !important; }
+    /* LAMPOR (2026-11-01): en rad per lampa, tre steg när den öppnas. */
+    .lamp { border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; background: var(--card); overflow: hidden; }
+    .lamp.err { border-color: var(--hot); }
+    .lamp.identifying { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok); }
+    .lamp-sum { list-style: none; display: flex; align-items: center; gap: 12px; padding: 14px; min-height: 64px; cursor: pointer; }
+    .lamp-sum::-webkit-details-marker { display: none; }
+    .lamp-sum::after { content: "›"; color: var(--dim); font-size: 24px; line-height: 1; transition: transform .15s; }
+    .lamp-d[open] > .lamp-sum::after { transform: rotate(90deg); }
+    .lamp-d[open] > .lamp-sum { border-bottom: 1px solid var(--line); }
+    .lamp-no { flex: 0 0 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--bg); border: 1px solid var(--line); font-weight: 700; font-size: 14px; color: var(--dim); }
+    .lamp-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .lamp-txt b { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lamp-txt small { font-size: 12px; color: var(--dim); margin-top: 3px; }
+    .lamp-pill { font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 999px; white-space: nowrap; }
+    .lamp-pill.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+    .lamp-pill.todo { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, transparent); }
+    .lamp-pill.err { color: var(--hot); background: color-mix(in srgb, var(--hot) 16%, transparent); }
+    .lamp-body { padding: 0 14px 14px; }
+    .lamp-step { padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .lamp-h { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 15px; margin-bottom: 10px; }
+    .lamp-h span { flex: 0 0 24px; height: 24px; border-radius: 50%; background: var(--hot); color: #fff; font-size: 13px; display: grid; place-items: center; }
+    .lamp-p { font-size: 13px; color: var(--dim); margin: 0 0 12px; line-height: 1.45; }
+    .lamp-l { display: block; font-size: 12px; color: var(--dim); margin: 12px 0 6px; }
+    .lamp-step input[type=text], .lamp-step select { width: 100%; }
+    .lamp-step select { background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; font-size: 16px; }
+    .lamp-addr { display: grid; grid-template-columns: 56px 1fr 56px; gap: 8px; }
+    .lamp-addr input { text-align: center; width: 100%; }
+    .lamp-addr .btn { font-size: 22px; padding: 0; }
+    .lamp-step input[type=range] { width: 100%; height: 34px; margin: 10px 0 4px; }
+    .lamp-step .fx-cal-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 12px; }
+    .lamp-step .btn, .lamp-body > .btn, .lamp .fx-adv .btn { width: 100%; flex: none; }
+    .lamp .fx-adv { margin-top: 12px; }
+    .lamp .fx-adv .fx-chan-row { margin: 8px 0 10px; }
+    .lamp-del { margin-top: 14px; color: var(--hot); border-color: color-mix(in srgb, var(--hot) 45%, transparent); background: transparent; }
+    .lamp-add { width: 100%; min-height: 54px; font-size: 16px; margin-top: 4px; }
+    .lamp > .fx-err { padding: 0 14px 12px; font-size: 12px; color: var(--hot); }
+    .lamp-savebar { position: sticky; bottom: calc(env(safe-area-inset-bottom) + 10px); z-index: 44; padding-top: 8px; }
+    .lamp-savebar .btn { width: 100%; min-height: 54px; font-size: 16px; box-shadow: 0 10px 28px rgba(0,0,0,.55); }
   </style>
 </head>
 <body>
@@ -437,19 +475,17 @@
     <button class="btn primary" id="wizDismiss">Klart — dölj guiden</button>
   </div>
 
-  <div class="card">
-    <div class="status" style="margin:0 0 10px">Kalibrera varje lampa: välj <b>Alla</b> (eller R/G/B för en färg i taget), dra reglaget tills lampan <b>precis tänder</b> och tryck <b>Spara</b>. <b>Full</b>: dra tills lampan <b>inte blir ljusare</b> och spara. <b>Hitta</b> blinkar lampan, <b>Identifiera</b> tar reda på kanalerna.</div>
+  <div class="card lamp-card">
+    <div class="status" style="margin:0 0 12px">Tryck på en lampa för att hitta den, ställa in ljuset eller ändra namn och kanal.</div>
     <div id="fixtures"></div>
+    <button class="btn primary lamp-add" id="fxAdd">+ Lägg till lampa</button>
     <div class="fx-actions">
-      <button class="btn" id="fxAdd">+ Lägg till lampa</button>
-      <button class="btn" id="fxAutoPack">Auto-adressera</button>
+      <button class="btn" id="fxIdentifyAll" title="Blinkar varje lampa i tur och ordning">Blinka alla</button>
+      <button class="btn" id="fxAutoPack" title="Lägger lamporna på kanaler i följd från 1, i listans ordning">Kanaler i följd</button>
     </div>
-    <div class="fx-actions">
-      <button class="btn ok" id="fxIdentifyAll" title="Blinkar varje lampa i tur och ordning så du ser vilken som är vilken">Blinka alla</button>
-      <button class="btn primary" id="fxSave" disabled>Spara ändringar</button>
-    </div>
-    <div class="status" id="fxHint">"Blinka alla" visar vilken lampa som är vilken.</div>
+    <div class="status" id="fxHint"></div>
   </div>
+  <div class="lamp-savebar" id="fxSaveBar" hidden><button class="btn primary" id="fxSave" disabled>Spara ändringar</button></div>
 
 
 </div>
@@ -1053,6 +1089,7 @@ function validateAll() {
 // Öppna/stängda delar i lampkorten överlever omritningen (renderFixtures bygger om innerHTML). 2026-11-01
 const fxOpen = new Set();
 fxEl.addEventListener("toggle", (e) => { const d = e.target; if (d && d.dataset && d.dataset.openKey) { if (d.open) fxOpen.add(d.dataset.openKey); else fxOpen.delete(d.dataset.openKey); } }, true);
+const PRESET_LABEL = { rgb: "RGB · 3 kanaler", rgb7: "RGB + dimmer · 7 kanaler", rgbw: "RGBW · 4 kanaler", dimmer: "Dimmer · 1 kanal", custom: "Egen" };
 function renderFixtures() {
   const errs = validateAll();
   const errByIdx = new Map();
@@ -1065,59 +1102,66 @@ function renderFixtures() {
   fxDraft.forEach((fx, i) => {
     const width = rolesOf(fx).length;
     const div = document.createElement("div");
-    div.className = "fx" + (fxDirty ? " dirty" : "")
+    div.className = "lamp" + (fxDirty ? " dirty" : "")
                   + (errByIdx.has(i) ? " err" : "")
                   + (i === identifyingIndex ? " identifying" : "");
     const _c = fx.cal;
     const calBadge = (_c && (_c.on || _c.onR || _c.onG || _c.onB || _c.full))
       ? [_c.on ? `alla ${_c.on}` : "", _c.onR ? `R${_c.onR}` : "", _c.onG ? `G${_c.onG}` : "", _c.onB ? `B${_c.onB}` : "", _c.full ? `full ${_c.full}` : ""].filter(Boolean).join(" · ")
       : "ej satt";
+    const calOk = !!(_c && (_c.on || _c.onR || _c.onG || _c.onB));
+    const pill = errByIdx.has(i) ? '<span class="lamp-pill err">Fel</span>' : calOk ? '<span class="lamp-pill ok">Klar</span>' : '<span class="lamp-pill todo">Ställ in</span>';
     div.innerHTML = `
-      <div class="fx-head">
-        <input class="name" type="text" value="${escapeHtml(fx.name)}" data-i="${i}" data-k="name" />
-        <button class="id" data-walk-open="${i}" title="Stega kanal-för-kanal och gissa preset">Identifiera</button>
-        <button class="id" data-id="${i}" title="Blinka lampan så du hittar den">Hitta</button>
-        <button class="del" data-del="${i}" aria-label="Ta bort">×</button>
-      </div>
-      <div class="fx-chan-row" aria-label="DMX-kanaler">
+      <details class="lamp-d" data-open-key="lamp-${i}"${fxOpen.has("lamp-" + i) ? " open" : ""}>
+        <summary class="lamp-sum">
+          <span class="lamp-no">${i + 1}</span>
+          <span class="lamp-txt"><b data-lamp-title="${i}">${escapeHtml(fx.name || "Namnlös")}</b><small>Kanal ${fx.address}–${fx.address + width - 1} · ${fx.preset === "custom" ? width + " kanaler" : (PRESET_LABEL[fx.preset] || fx.preset.toUpperCase()).split(" · ")[0]}</small></span>
+          ${pill}
+        </summary>
+        <div class="lamp-body">
+          <div class="lamp-step">
+            <div class="lamp-h"><span>1</span>Hitta lampan</div>
+            <button type="button" class="btn" data-id="${i}">Blinka lampan</button>
+          </div>
+          <div class="lamp-step">
+            <div class="lamp-h"><span>2</span>Ställ in ljuset</div>
+            <p class="lamp-p">Dra reglaget tills lampan <b>precis tänds</b> och tryck Spara. Välj sedan <b>Max</b>, dra tills den <b>inte blir ljusare</b> och spara igen. R, G och B ställer in en färg i taget.</p>
+            <div class="fx-cal-chips">
+              ${["all","r","g","b","full"].map((c) => `<button type="button" class="fx-cal-chip${(calSel[i] || "all") === c ? " on" : ""}" data-cal-ch="${c}" data-cal-ch-i="${i}">${({all:"Alla",r:"R",g:"G",b:"B",full:"Max"})[c]}</button>`).join("")}
+            </div>
+            <input type="range" min="0" max="${calSel[i] === "full" ? 255 : 64}" value="0" step="1" data-caltest-i="${i}" />
+            <div class="fx-cal-row">
+              <span class="fx-cal-live" data-caltest-val="${i}">reglaget: av</span>
+              <span class="fx-cal-badge ${calBadge === "ej satt" ? "unset" : ""}" data-cal-badge="${i}">${calBadge}</span>
+            </div>
+            <button type="button" class="btn primary" data-cal-set="on" data-cal-set-i="${i}">Spara</button>
+          </div>
+          <div class="lamp-step">
+            <div class="lamp-h"><span>3</span>Namn och adress</div>
+            <label class="lamp-l">Namn</label>
+            <input type="text" value="${escapeHtml(fx.name)}" data-i="${i}" data-k="name" autocomplete="off" />
+            <label class="lamp-l">Första DMX-kanal (ställ samma på lampan)</label>
+            <div class="lamp-addr">
+              <button type="button" class="btn" data-addr-i="${i}" data-addr-d="-1" aria-label="Minska">−</button>
+              <input type="number" min="1" max="512" value="${fx.address}" data-i="${i}" data-k="address" inputmode="numeric" />
+              <button type="button" class="btn" data-addr-i="${i}" data-addr-d="1" aria-label="Öka">+</button>
+            </div>
+            <label class="lamp-l">Typ av lampa</label>
+            <select data-i="${i}" data-k="preset">
+              ${PRESETS.map((p) => `<option value="${p}" ${p === fx.preset ? "selected" : ""}>${PRESET_LABEL[p] || p.toUpperCase()}</option>`).join("")}
+            </select>
+          </div>
+          <details class="fx-adv" data-open-key="adv-${i}"${fxOpen.has("adv-" + i) ? " open" : ""}>
+            <summary>Mer · kanaler och frekvensband</summary>
+            <div class="fx-chan-row" aria-label="DMX-kanaler">
         ${rolesOf(fx).map((role, k) => {
           const cls = ({ r:"r", g:"g", b:"b", w:"w", a:"a", uv:"uv", dim:"d", strobe:"a", unused:"" })[role] || "";
           const lbl = ({ r:"R", g:"G", b:"B", w:"W", a:"A", uv:"UV", dim:"DIM", strobe:"STR", unused:"—" })[role] || role.toUpperCase();
           return `<span class="fx-chan ${cls}">${fx.address + k}·${lbl}</span>`;
         }).join("")}
       </div>
-      <details class="fx-adv" data-open-key="cal-${i}"${fxOpen.has("cal-" + i) ? " open" : ""}>
-        <summary>Kalibrera · ${calBadge}</summary>
-      <div class="fx-cal">
-        <div class="fx-cal-head">
-          <span class="fx-cal-title">Släckpunkt och fullpunkt</span>
-          <span class="fx-cal-badge ${calBadge === "ej satt" ? "unset" : ""}" data-cal-badge="${i}">${calBadge}</span>
-        </div>
-        <div class="fx-cal-chips">
-          ${["all","r","g","b","full"].map((c) => `<button type="button" class="fx-cal-chip${(calSel[i] || "all") === c ? " on" : ""}" data-cal-ch="${c}" data-cal-ch-i="${i}">${({all:"Alla",r:"R",g:"G",b:"B",full:"Full"})[c]}</button>`).join("")}
-        </div>
-        <input type="range" min="0" max="${calSel[i] === "full" ? 255 : 64}" value="0" step="1" data-caltest-i="${i}" />
-        <div class="fx-cal-row">
-          <span class="fx-cal-live" data-caltest-val="${i}">reglaget: av</span>
-          <button type="button" class="fx-cal-btn" data-cal-set="on" data-cal-set-i="${i}">Spara</button>
-        </div>
-      </div>
-      </details>
-      <details class="fx-adv" data-open-key="adv-${i}"${fxOpen.has("adv-" + i) ? " open" : ""}>
-        <summary>Avancerat · adress, typ, frekvensband</summary>
-        <div class="fx-grid" style="margin-top:8px">
-          <div class="fx-field">
-            <label>DMX-adress</label>
-            <input type="number" min="1" max="512" value="${fx.address}" data-i="${i}" data-k="address" inputmode="numeric" />
-          </div>
-          <div class="fx-field">
-            <label>Typ</label>
-            <select data-i="${i}" data-k="preset">
-              ${PRESETS.map((p) => `<option value="${p}" ${p === fx.preset ? "selected" : ""}>${p.toUpperCase()}</option>`).join("")}
-            </select>
-          </div>
-        </div>
-        <div class="fx-field" style="margin-top:10px">
+            <button type="button" class="btn" data-walk-open="${i}">Vet inte kanalerna? Testa dem en i taget</button>
+            <div class="fx-field" style="margin-top:10px">
           <label>Frekvensband (valfritt)</label>
           <div class="fx-roles">
             ${["bass","mid","treble","kick","low"].map((b) => `<label class="fx-role" style="cursor:pointer"><input type="checkbox" data-band-i="${i}" data-band="${b}" ${(fx.bands ?? []).includes(b) ? "checked" : ""}> ${{bass:"Bas",mid:"Mellan",treble:"Diskant",kick:"Kick",low:"Lågvolym"}[b]}</label>`).join("")}
@@ -1125,7 +1169,10 @@ function renderFixtures() {
           <div class="fx-meta">Vilket ljud lampan helst reagerar på. Inga ikryssade = automatiskt.</div>
         </div>
         ${fx.preset === "custom" ? renderCustomRoles(fx, i) : ""}
-        <div class="fx-meta">Kanal ${fx.address}–${fx.address + width - 1} · ${width} st · ${rolesOf(fx).join(" · ")}</div>
+            <div class="fx-meta">Kanal ${fx.address}–${fx.address + width - 1} · ${width} st · ${rolesOf(fx).join(" · ")}</div>
+          </details>
+          <button type="button" class="btn lamp-del" data-del="${i}">Ta bort lampan</button>
+        </div>
       </details>
       ${errByIdx.has(i) ? `<div class="fx-err">${errByIdx.get(i).join(" · ")}</div>` : ""}
     `;
@@ -1136,6 +1183,7 @@ function renderFixtures() {
     ? (errs.length ? `${errs.length} fel att rätta innan du sparar` : "Redo att spara")
     : "Ändra namn, adress eller kalibrering - kontrolleras innan det sparas.";
   fxSaveBtn.disabled = !fxDirty || errs.length > 0;
+  { const sb = document.getElementById("fxSaveBar"); if (sb) sb.hidden = !fxDirty; }
 
   // Wire up
   fxEl.querySelectorAll("[data-k]").forEach((el) => {
@@ -1203,9 +1251,19 @@ function renderFixtures() {
       else markDirty();   // ogiltig lista (t.ex. adresskrock) -> som forr: "Spara ändringar" kravs
     });
   });
+  fxEl.querySelectorAll("[data-addr-i]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      const i = Number(e.currentTarget.dataset.addrI), d = Number(e.currentTarget.dataset.addrD);
+      fxDraft[i].address = Math.max(1, Math.min(512, (fxDraft[i].address || 1) + d));
+      markDirty();
+    });
+  });
   fxEl.querySelectorAll("[data-del]").forEach((el) => {
     el.addEventListener("click", (e) => {
-      fxDraft.splice(Number(e.target.dataset.del), 1);
+      const di = Number(e.currentTarget.dataset.del);
+      if (!confirm(`Ta bort "${fxDraft[di].name || "lampan"}"?`)) return;
+      fxOpen.delete("lamp-" + di);
+      fxDraft.splice(di, 1);
       markDirty();
     });
   });
@@ -1292,6 +1350,13 @@ function onFieldChange(e) {
   const fx = fxDraft[i];
   if (k === "name")    fx.name = e.target.value;
   if (k === "address") fx.address = parseInt(e.target.value, 10) || 0;
+  // Medan man skriver: rita inte om (då tappades markören efter varje tecken). Omritning när fältet lämnas (change).
+  if ((k === "name" || k === "address") && e.type === "input") {
+    fxDirty = true; fxSaveBtn.disabled = validateAll().length > 0;
+    { const sb = document.getElementById("fxSaveBar"); if (sb) sb.hidden = false; }
+    if (k === "name") { const t = fxEl.querySelector(`[data-lamp-title="${i}"]`); if (t) t.textContent = fx.name || "Namnlös"; }
+    return;
+  }
   if (k === "preset") {
     fx.preset = e.target.value;
     if (fx.preset === "custom" && !fx.roles) fx.roles = ["r","g","b"];
@@ -1323,6 +1388,7 @@ document.getElementById("fxAdd").onclick = () => {
   const addr = nextFreeAddress(3, fxDraft);
   if (addr === 0) { fxHint.textContent = "Alla 512 kanaler är upptagna — ta bort en lampa först"; return; }
   fxDraft.push({ name: `Lampa ${fxDraft.length + 1}`, address: addr, preset: "rgb" });
+  fxOpen.add("lamp-" + (fxDraft.length - 1));   // den nya lampan öppnas direkt
   markDirty();
 };
 
