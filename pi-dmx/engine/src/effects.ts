@@ -1064,13 +1064,10 @@ export class EffectEngine {
         const tierChanged = this.cfg.energyDrivesMode && tierName !== this.lastSmartTier;
         const held = now - this.lastSmartSwitchMs;
         const MIN_HOLD = 8000;    // en effekt lever ALLTID minst 8s
+        const DROP_HOLD = 8000;   // drop byter inte oftare än nagot annat (detektorn fyrar tatt pa pulsande musik)
         // Drop-byte bara när energin får driva → en LUGN stämning (chill,
         // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
-        // DROPEN BEHÅLLER LOOKEN FRÅN FÖRE (ägaren i ladan 11-01: 'precis efter en drop glömmer den takten sedan innan ... nästan monoton'
-        // -> 'bygg förslag A'): en look som hör hemma i refrängen (section high) kör vidare genom dropen i samma takt; bara en build-look
-        // eller en look som inte passar refrängen (break/lugnt) byts. Förr (10-17) bytte varje drop till en basstark full-effekt, även
-        // mitt i en refrängslook (bänken facit3: varannan -> motor). Backup: git-taggen backup/fore-drop-behaller-looken-2026-11-01.
-        const dropSwitch = dropHit && this.cfg.energyDrivesMode && (BUILD_LOOKS.includes(this.smartMode) || !(EFFECT_MAP.get(this.smartMode)?.section?.includes('high')));   // konsertlaget: dropen avslutar builden direkt
+        const dropSwitch = dropHit && this.cfg.energyDrivesMode && (held > DROP_HOLD || (((!this.bassStrong(this.smartMode)) || BUILD_LOOKS.includes(this.smartMode))));   // konsertlaget: dropen avslutar builden direkt
         // (minidrop byter INTE look sedan 2026-10-10, agaren i ladan: 'minidrop maste ju inte orsaka look-byten' - den lyfter bara ljuset)
         // MINNETS STRUKTUR: en tvättad låt vet var karaktären skiftar och var
         // fraserna börjar. Ett byte DÄR känns komponerat; samma byte 1,5 takt fel
