@@ -359,6 +359,16 @@
     .lamp .fx-adv .fx-chan-row { margin: 8px 0 10px; }
     .lamp-del { margin-top: 14px; color: var(--hot); border-color: color-mix(in srgb, var(--hot) 45%, transparent); background: transparent; }
     .lamp-add { width: 100%; min-height: 54px; font-size: 16px; margin-top: 4px; }
+    .owner-tag { display: inline-block; margin: 6px 0 0; padding: 4px 10px; border-radius: 999px; font-size: 11px; letter-spacing: .04em;
+                 color: var(--hot); background: color-mix(in srgb, var(--hot) 12%, transparent); }
+    .fx-count { margin-left: 6px; font-weight: 500; letter-spacing: .02em; text-transform: none; color: var(--dim); }
+    .rotrow > input.tgl { -webkit-appearance: none; appearance: none; flex: none; width: 46px; height: 28px; border-radius: 14px; background: var(--line);
+                          position: relative; cursor: pointer; transition: background .15s; margin-left: 14px; }
+    .rotrow > input.tgl:checked { background: var(--hot); }
+    .rotrow > input.tgl::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: transform .15s; }
+    .rotrow > input.tgl:checked::after { transform: translateX(18px); }
+    .rotrow { padding: 12px 8px; }
+    .rotdesc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .lamp > .fx-err { padding: 0 14px 12px; font-size: 12px; color: var(--hot); }
     .lamp-savebar { position: sticky; bottom: calc(env(safe-area-inset-bottom) + 10px); z-index: 44; padding-top: 8px; }
     .lamp-savebar .btn { width: 100%; min-height: 54px; font-size: 16px; box-shadow: 0 10px 28px rgba(0,0,0,.55); }
@@ -434,7 +444,7 @@
     <div class="audio-bar" id="levelBarWrap">
       <div class="fill" id="levelBar" style="width:0%"></div>
       <div class="ticks" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-      <div class="cal-zone" id="calZone" hidden></div>
+      <div class="cal-zone" id="calZone"></div>
       <div class="cal-mark" id="calMark" hidden></div>
       <div class="cal-peak" id="calPeak" hidden></div>
     </div>
@@ -455,7 +465,7 @@
   <div id="statusFooter" class="status-footer">Ansluten · <span id="sfVer">–</span> · <span id="sfFx">–</span> lampor</div>
 
   <div id="ownerOnly" hidden>
-  <div class="owner-banner">🔧 Ägarläge. Gästerna öppnar adressen utan <b>/setup</b> och ser bara ljusreglaget.</div>
+  <div class="owner-tag">Ägarläge · gästerna ser bara reglaget</div>
   <nav class="tabs" id="ownerTabs" aria-label="Inställningar">
     <button type="button" data-tab="ljus">Ljus</button>
     <button type="button" data-tab="lampor">Lampor</button>
@@ -516,10 +526,10 @@
 
   <h1>Show</h1>
   <div class="card">
-    <label class="tgl"><span>Sceniskt djup<br><small style="opacity:.6">Mittlamporna står som fasta uplights i chase, bounce och wave. Kräver lamporna i rad vänster → höger.</small></span><input type="checkbox" id="tScenicAnchor"></label>
+    <label class="tgl"><span>Mittlamporna står still<br><small style="opacity:.6">I effekter där ljuset springer (jakt, studs, våg) lyser de två mittersta lugnt medan kanterna rör sig. Kräver lamporna i rad.</small></span><input type="checkbox" id="tScenicAnchor"></label>
   </div>
   <details class="more" style="margin-top:10px">
-    <summary>Effekter i showen <span class="fx-active" id="fxActiveBadge" style="display:none"></span></summary>
+    <summary>Effekter i showen <span class="fx-count" id="fxCount"></span> <span class="fx-active" id="fxActiveBadge" style="display:none"></span></summary>
     <div class="status" style="padding:10px 14px 0">Dirigenten väljer själv bland de påslagna effekterna. Stäng av en effekt för att aldrig få den.</div>
     <div class="fx-card">
       <div class="fx-cat">Lugna effekter</div>
@@ -547,9 +557,9 @@
         <button class="btn primary" id="fogNow">💨 Rök nu</button>
       </div>
       <div class="status" id="fogConflict" style="margin-top:8px;display:none"></div>
-      <div class="status" id="fogState" style="margin-top:8px">—</div>
+      <div class="status" id="fogState" style="margin-top:8px"></div>
       <div class="meter" id="fogHeatMeter" style="margin-top:6px"><div id="fogHeatBar" style="width:0%"></div></div>
-      <div class="status" id="fogService" style="margin-top:4px">—</div>
+      <div class="status" id="fogService" style="margin-top:4px"></div>
       <div class="fx-actions" style="margin-top:8px">
         <button class="btn" id="fogServiceReset">Nollställ efter underhåll</button>
       </div>
@@ -569,8 +579,8 @@
       <button class="btn" id="markMini">Minidrop!</button>
       <button class="btn" id="markDrop">Drop!</button>
     </div>
-    <div class="status" id="markState" style="margin-top:4px">Tryck exakt när du hör en minidrop eller drop - blir facit för nattagenten (sparas i inspelningen).</div>
-    <div class="status" id="recState" style="margin-top:6px">Spelar in ingången och showens händelser i ett stycke, till nattagentens bänk. Lamporna påverkas inte.</div>
+    <div class="status" id="markState" style="margin-top:4px">Under inspelning: tryck Minidrop! eller Drop! exakt när du hör den.</div>
+    <div class="status" id="recState" style="margin-top:6px">Spelar in ljudet till bänken. Lamporna påverkas inte.</div>
   </div>
 
   <h1 id="ringHdr" hidden>LED-ring (vred)</h1>
@@ -625,7 +635,6 @@
       <button class="btn" id="btnCfgImport">Importera inställningar</button>
       <input type="file" id="cfgImportFile" accept="application/json,.json" style="display:none">
     </div>
-    <div class="status" style="margin-top:6px">Ny programvara läggs in från datorn (<code>tools/ladan.py</code>).</div>
     <details style="margin-top:10px">
       <summary style="cursor:pointer;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;padding:4px 0">Systemlogg (senaste händelser)</summary>
       <div class="fx-actions" style="margin:8px 0">
@@ -787,13 +796,14 @@ function renderRotList(elId, list) {
     // raden gråas ut och användaren ser vad som saknas (option "visa men gråa ut").
     const drives = MODE_DRIVES[m] || [];
     const missing = drives.filter(r => !hasRoleGlobal(r));
-    if (missing.length) { row.style.opacity = "0.45"; }
-    const req = missing.length ? ` · <span style="opacity:.7">kräver: ${missing.join(", ")}</span>` : "";
+    // (2026-11-01) Ingen gråning: effekten spelas på RGB-lamporna ändå; "drives" styr bara rök/UV/blinder OM de finns.
+    const req = "";
     const info = `<span class="rotinfo"><span class="rotname">${label}</span><span class="rotdesc">${(desc || "") + req}</span></span>`;
     if (smart) {
       const on = curRotation[m] !== false;
       row.innerHTML = info + `<input type="checkbox" class="tgl" ${on ? "checked" : ""}>`;
-      row.querySelector("input").onchange = (e) => { curRotation[m] = e.target.checked; send({ type: "setRotation", mode: m, value: e.target.checked }); };
+      row.querySelector("input").onchange = (e) => { curRotation[m] = e.target.checked; send({ type: "setRotation", mode: m, value: e.target.checked });
+        { const all = [].concat(CALM_MODES, FAST_MODES, FULL_MODES); const c = document.getElementById("fxCount"); if (c) c.textContent = `${all.filter(([k]) => curRotation[k] !== false).length} av ${all.length} på`; } };
     } else {
       const active = curMode === m;
       if (active) row.classList.add("selected");
@@ -807,6 +817,8 @@ function renderCategories() {
   renderRotList("calmList", CALM_MODES);
   renderRotList("fastList", FAST_MODES);
   renderRotList("fullList", FULL_MODES);
+  { const all = [].concat(CALM_MODES, FAST_MODES, FULL_MODES); const on = all.filter(([m]) => curRotation[m] !== false).length;
+    const c = document.getElementById("fxCount"); if (c) c.textContent = all.length ? `${on} av ${all.length} på` : ""; }
   curPlaying = "";   // tvinga om-markering av körande rad efter ombygge
 }
 // Speglar smart/manuellt-läget i UI:t: kryssruta vs kryssknapp, dwell-rad,
@@ -1001,7 +1013,7 @@ function applyFogStatus(s) {
   if (!fogState) return;
   if (!s) {
     fogState.textContent = "Ej ansluten.";
-    fogService.textContent = "—";
+    fogService.textContent = "";
     fogHeatMeter.style.display = "none";
     fogConflict.style.display = "none";
     return;
