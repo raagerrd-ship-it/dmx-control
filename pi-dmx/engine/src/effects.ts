@@ -559,6 +559,7 @@ export class EffectEngine {
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
   private nearB = 0; private nearOn = false;   // nearOn: nearB startad (förr null - ett fält som ibland är null packar in varje nytt tal, GC-jakten 10-16)
    private nearNorm = 0; private nearFloor = 1e9; private liftCalm = 0; private liftLift = 0; private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rFadeK = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
+  private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
   private nearAt = -1e12; private nearLevel = 0; nearCount = 0;   // NASTAN-DROP
   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
   private miniBodyFast = -90; private miniBodySlow = -90; private miniPre = -90; private miniPeak = -200;   // minidrop efter energin
@@ -1084,6 +1085,10 @@ export class EffectEngine {
         // ar ett bytesskal precis som latminnets sektionsgrans, och etiketten ger IDENTITET (samma look nar 'high' kommer tillbaka).
         const liveSec = frame.section || '';   // bara raa sektionen (forvarningens/drop-fonstrets 'high' raknas inte, se SECTION_UNIT_MIN_MS)
         const liveSecChanged = liveSec !== '' && this.lastLiveSection !== '' && liveSec !== this.lastLiveSection;
+        // REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP (ladan 11-01 17:48, inspelning: analysatorns drop 17:48:17,15 med 0,4 s break blev minidrop
+        // (FLANK_SHORT_S), sektionen gick high 0,7 s senare men lookbytet väntade in frasen till 17:48:20,2 = 'dropen blir sen'): går
+        // sektionen in i high inom 2 s efter en sådan drop byts looken direkt, som vid en full drop (ingen MIN_HOLD/fras/slag-väntan).
+        const dropEntry = liveSecChanged && liveSec === 'high' && nowWall - this.anaDropAt < 2000;
         if (liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '') console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; }   // (intro glommer inte lookerna langre - LÅTMANUS glomms bara pa en verklig latgrans)
         if (liveSecChanged) this.pendingSecSwitch = true;
         const secOldEnough = (frame.sectionAgeMs ?? 1e9) >= SECTION_UNIT_MIN_MS;   // SECTION_UNIT: ingen switch pa en sektion yngre an SECTION_UNIT_MIN_MS (detektorflapp)
@@ -1163,7 +1168,7 @@ export class EffectEngine {
           if (ready && hasBeat && bpm > 0 && this.beatTrust >= 0.5 && !(this.tickNow && this.lastBeatIdx % SWITCH_ON === 0))
             slagOk = now - this.slagWaitAt > SWITCH_ON * 1.25 * 60000 / bpm * (this.pulseHalved ? 2 : 1);
         }
-        if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild) && (dropSwitch || allaBuild || concertBuild || buildExit || (ready && slagOk))) {
+        if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild || dropEntry) && (dropSwitch || dropEntry || allaBuild || concertBuild || buildExit || (ready && slagOk))) {
         this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, halvedChanged, liveSec, memSection, secEntry, tierChanged);
       }
       return this.smartMode;
@@ -1545,7 +1550,7 @@ export class EffectEngine {
     {   // FULL DROP PÅ FLANKEN: motorns egen flank är drop-källan; analysatorns drop utan egen flank inom 2 s = minidrop
       const anaHit = dropHitRaw;
       dropHitRaw = this.flankStep(frame);
-      if (anaHit && !dropHitRaw && nowWall - this.fdAt > 2000) this.gapMini(nowWall);
+      if (anaHit && !dropHitRaw && nowWall - this.fdAt > 2000) { this.gapMini(nowWall); this.anaDropAt = nowWall; }
     }
     // INGEN DROP I LATENS INLEDNING (ladan 2026-09-24 23:35, tredje gangen 'fortfarande drop i inledning'): intro-grindarna ovan tittar pa
     // sektionen, men den slar om intro -> build strax FORE smallen (kicken som borjar ar sjalva byggstenen). Med DMX_DROP_SONG_HOLD_S > 0
