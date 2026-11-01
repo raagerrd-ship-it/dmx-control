@@ -2,7 +2,7 @@
 
 ## Från kvällen 2026-11-01 - DIODBLINK I DE ÄLDRE EFFEKTERNA (ägaren i ladan: 'lägg till nattagent att fixa de äldre, men i övrigt ser det fint ut nu'; går före allt annat)
 LÄGET: LIVE sedan 18:30 = ff83da2 (tempo-helsok; 42ae94a snabbspolad hit från agent-work/warmup-gc + minidropen: bara tända lampor till
-fullt i egen kulör, miniColEnv-looken borttagen), ladan.conf DMX_WARMUP_GC=1 + DMX_STAIR_BREAK=1.
+fullt i egen kulör, miniColEnv-looken borttagen - ägaren: 'blev riktigt snyggt', GODKÄND), ladan.conf DMX_WARMUP_GC=1 + DMX_STAIR_BREAK=1.
 Nytt i dag (ägaren: 'ser fint ut nu'): flimmerfixen (rampen sänker taket, 600ac30), nytt mobil-UI med flikar, rökhungern (nästan-drop),
 DROP_LIFT_FLOOR 0,7 + drop sätter liftAt/nearAt, drop-looker kräver beat >= 0,8, tre nya refrängeffekter slagga/sidokedja/tryckvag med
 mjuk puls och UTAN vitt, lookbyte direkt när sektionen går high inom 2 s efter en analysator-drop som blev minidrop (ee8d19b).
