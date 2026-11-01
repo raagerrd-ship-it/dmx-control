@@ -1,5 +1,31 @@
 # Natt-agentens uppdrag
 
+## Från kvällen 2026-11-01 (sist) - BRÖLLOPSLÄGET: MIDDAG I PARETS FÄRGER + KNAPPAR FÖR KVÄLLENS STUNDER (ägaren: 'ja'; EFTER diodblinken och hyrkitet nedan)
+Varför: ett bröllop är ~70 % middag/tal - i dag står showen och väntar på dansmusik. Det här gör kitet till en bröllopsprodukt.
+Det ägaren sagt ja till: en PLAN + byggt bakom knapparna; standardläget (Fest) ska vara BIT-IDENTISKT med i dag (natt --snabb json-lika).
+1. LÄGET 'stund' I MOTORN: nytt cfg.moment: 'fest' | 'middag' | 'tal' | 'forstadans' | 'tartan' (standard 'fest' = dagens show, orörd).
+   - middag: stilla ljus i parets färger (cfg.themeColors, 1-3 av de SEX rena kulörerna - lamporna är RGB-kluster, blandade kulörer blir
+     grumliga, se hsv-snappningen), varje lampa sin färg, långsam andning (~8-12 s) och nivån följer musikens volym MJUKT (ingen takt,
+     inga drops, ingen rök, ingen strobe). Tak ~50 % av mastern.
+   - tal: allt stilla och dämpat (~25 %), en färg, ingen musikkoppling alls (talarens röst får inte pumpa ljuset).
+   - forstadans: varmt (röd+grön = gul/amber om det inte blir grumligt, annars parets första färg), mittlamporna (c.lamp) högre, kanterna
+     svaga, långsam andning på frasen - INTE takt/drops. Rök: en liten puff vid start om röken är på.
+   - tartan: en kort 'ta-da' (alla upp mjukt på ~1 s, håll 20 s, tillbaka till föregående stund).
+   - Övergångar mellan stunder: mjuk korstoning 2-3 s (uppgång får vara snabbare, NEDGÅNG ALDRIG snabbare än dagens fall - låst regel).
+   - Fest -> dirigenten som i dag; när man lämnar fest fryses inte dirigentens minne (manus/låtminne) - tillbaka till fest = som om inget hänt.
+2. EN VÄG IN: ws {type:'setMoment', value} + POST /api/moment, samma kodväg för webbknapp och fysisk knapp (som vredet: applyIntensity).
+   Aktiv stund syns i framen (activeMoment) så alla klienter visar samma.
+3. GÄSTSIDAN (inte /setup): fyra stora knappar under reglaget: Middag / Tal / Första dansen / Fest (+ Tårtan som liten knapp). Aktiv knapp
+   tänd. Inget annat ändras på gästsidan. /setup -> fliken Ljus: välj parets färger (sex färgrutor att trycka på, max 3) + visa samma knappar.
+4. FYSISKA KNAPPAR (koden nu, hårdvaran köper ägaren): cfg.momentButtons: [{chip,line,moment,activeHigh?}] | null (standard null = inget
+   startas). Återanvänd src/button.ts (gpiomon) - lägg till activeHigh (bias pull-down, stigande flank = tryck) för 433 MHz-mottagare
+   (YK04-typ, D0-D3 är höga medan knappen hålls). Kort tryck = den stunden, tryck igen på aktiv stund = tillbaka till Fest.
+   Kolla vilka GPIO som är lediga: Codec Zero äger I2S (18-21), I2C (2/3), SW1 27 och sina lysdioder; vredet (intensityKnob) och DMX-UART
+   (14/15) - lista lediga i rapporten. LED i knapparna: INTE nu (väntar på ägarens hårdvaruval).
+5. BEVIS: bänk som spelar korpusen med moment = middag/tal/forstadans och mäter att det INTE följer takten (kick->ljus-korrelation ~0),
+   att nivån inte faller snabbare än i dag, ingen strobe, ingen lampa under tändpunkten; fest json-identisk. Skärmdump av gästsidan i mobilvy.
+REGLER: inget deployas, en commit per steg, ingen opt-in-flagga (standard fest = dagens kod), rapportera i scoreboard + här.
+
 ## Från kvällen 2026-11-01 (sent) - HYRKITET: 8 LAMPOR I TVÅ STATIV (ägaren: 'förbered för det'; efter diodblinken nedan, före allt äldre)
 Ägaren hyr ut kit för bröllop/studentfester utan ljustekniker. Standardkitet blir 2 stativ x 4 PAR (rgb7, samma som ladans), ett på var
 sida om dansgolvet, adresser i ordning VÄNSTER stativ (lampa 1-4) -> HÖGER stativ (lampa 5-8) = en rad på 8 tvärs över rummet, 'mitten'
