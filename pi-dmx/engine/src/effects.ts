@@ -89,6 +89,10 @@ const DROP_LIFT_MS = 8000, DROP_LIFT_FALL_MS = 3000;   // 4000/1500 -> 8000/3000
  *  SPARSAMMA looks och i refrängen inga sparsamma. Listan är MÄTT (tools/lampCount.mjs, pop+megamix): snitt <= ~2,9 tända lampor av 4.
  *  10-11 ("fler sparsamma effekter, så att lamptrappan inte kostar variation"): vers/intro väljer ur HELA poolen igen, men en effekt som
  *  inte är sparsam tänder bara ETT lamppar (ctx.group, paret byts varje fras) - i steg 1 (effektNiva), aldrig i energin. Drops tänder allt. */
+/** LAMPTRAPPAN I BREAKET (opt-in DMX_STAIR_BREAK=1, natt 2026-11-01): breaket (sektion 'break') räknas som vers - icke-sparsam effekt
+ *  tänder bara ett lamppar. concertBench megamix: breaket 9 % av tiden med 2,25 tända lampor och alla fyra 63 % (versen 1,31 / 27 %) -
+ *  dropen efter breaket fick ingen kontrast. Av = som förut. */
+const STAIR_BREAK = process.env.DMX_STAIR_BREAK === "1";
 /** KULÖR PER FRAS (opt-in DMX_HUE_PHRASE=1, 10-11, KONSERTSHOW): effekternas kulörklocka ctx.hueIdx stegar bara vid frasgräns (16 slag på
  *  effektklockan) i stället för per takt/slag - konsertbänken mätte 17-21 kulörbyten/min. Rörelse och puls följer fortfarande beatIdx. */
 // (FULL OPPNAR RIGGEN / DMX_TIER_OPEN borttagen 10-12: ett golv på energin - sektionstaket och basenergin tar det, se B_CURVE.)
@@ -2039,7 +2043,7 @@ export class EffectEngine {
     this.fxPeakNow = 0;
     const fadeK = Math.exp(-dtSec / (FADE_MIN_S / E_LIN_INV));
     const fxToggle = !!effect?.toggle;   // toggle-effekt: ingen grundniva (se effektNiva)
-    const fxSparse = (frame.section === 'low' || frame.section === 'intro') && !SPARSAM.includes(effMode) && count >= 4;   // LAMPTRAPPA (se SPARSAM)
+    const fxSparse = (frame.section === 'low' || frame.section === 'intro' || (STAIR_BREAK && frame.section === 'break')) && !SPARSAM.includes(effMode) && count >= 4;   // LAMPTRAPPA (se SPARSAM)
     const fastLight = !!effect?.fastLight;   // effekten skippar minsta pa-tid (EffectDef.fastLight)   // STEG 2: uttoningens tidskonstant i DMX-ljus (FADE_MIN_S x gamma fore gamman)
     const modE = modulateOf(effMode).energy;   // samma för alla lampor - en gång per ruta
     this.rT = t; this.rAnchorHue = anchorHue; this.rInputGate = inputGate; this.rMd = md; this.rDrive = drive; this.rFadeK = fadeK;
