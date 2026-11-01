@@ -1,6 +1,9 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
 
+// MJUK PULS (ägaren i ladan 11-01: 'de får gärna köra men med mjuka stigningen och ner igen'): stiger mjukt på `rise` slag, klingar ut på `tau`.
+const soft = (f: number, rise: number, tau: number) => { if (f < rise) { const x = f / rise; return x * x * (3 - 2 * x); } return Math.exp(-(f - rise) / tau); };
+
 // TRYCKVÅG (full x high, 2026-11-01): varje slag tänder hela riggen; kanterna slocknar fort, mitten bär basen längre - tyngden
 // samlas i mitten och slaget ser ut att dra ihop sig mot den. Kanterna i motfärg, vit kärna i mitten på taktens etta.
 // (ripple: slaget slår ner i mitten och rullar UT; tryckvågen: allt slår, sedan dras ljuset IN.)
@@ -17,9 +20,9 @@ export const tryckvag: EffectDef = {
     const n = Math.max(1, c.count), e = Math.min(c.lamp, n - 1 - c.lamp), mid = n > 2 && e >= (n - 1) / 4;   // mittparet / kanterna
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((mid ? base : base + 3) % 6) / 6;
-    const core = f < 0.2 && ((c.beatIdx & 15) === 0 || (mid && (c.beatIdx & 3) === 0));   // vit kärna: ettan i mitten, frasens etta överallt
-    if (!mid) return hsv(hue, core ? 0 : 1, f < 0.2 ? 1 : 0.15 + 0.85 * Math.exp(-(f - 0.2) / 0.25));   // kanterna: smällen, klingar ut (inte av/på - ladan 11-01)
+    const core = ((c.beatIdx & 15) === 0 || (mid && (c.beatIdx & 3) === 0)) ? soft(f, 0.12, 0.15) : 0;   // vit kärna: ettan i mitten, frasens etta överallt
+    if (!mid) return hsv(hue, 1 - core, 0.15 + 0.85 * soft(f, 0.12, 0.3));   // kanterna: mjuk smäll som klingar ut
     c.want.energy = false;                                                    // mitten: basen själv (energin följer kicken)
-    return hsv(hue, core ? 0 : 1, f < 0.2 ? 1 : 0.3 + 0.7 * c.drum.bass);
+    return hsv(hue, 1 - core, Math.max(soft(f, 0.12, 0.5), 0.3 + 0.7 * c.drum.bass));
   },
 };

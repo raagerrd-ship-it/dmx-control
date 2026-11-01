@@ -1,6 +1,9 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
 
+// MJUK PULS (ägaren i ladan 11-01: 'de får gärna köra men med mjuka stigningen och ner igen'): stiger mjukt på `rise` slag, klingar ut på `tau`.
+const soft = (f: number, rise: number, tau: number) => { if (f < rise) { const x = f / rise; return x * x * (3 - 2 * x); } return Math.exp(-(f - rise) / tau); };
+
 // SLÄGGA (full x high, 2026-11-01, ägaren: 'fler effekter som uppfyller refräng/drop-kriterierna - tydlig basgång/takt'): varje slag
 // slår ner i hela riggen; släggan själv - en VIT smäll - träffar en ny lampa per slag (vandrar runt riggen) medan de andra slår i
 // palettens kulör, och allt glöder ut på basen mot nästa slag. Taktens etta: släggan träffar hela riggen. Varannan lampa i motfärg.
@@ -20,7 +23,7 @@ export const slagga: EffectDef = {
     const hit = all || c.idx === pos;
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((c.group === 0 ? base : base + 3) % 6) / 6;
-    if (hit) return hsv(hue, f < 0.22 ? 0 : 1, f < 0.22 ? 1 : 0.15 + 0.85 * Math.exp(-(f - 0.22) / 0.35));
-    return hsv(hue, 1, 0.08 + 0.5 * Math.exp(-f / 0.35));
+    if (hit) return hsv(hue, 1 - soft(f, 0.12, 0.15), 0.15 + 0.85 * soft(f, 0.12, 0.45));   // vit topp som färgas och klingar ut
+    return hsv(hue, 1, 0.08 + 0.5 * soft(f, 0.15, 0.4));
   },
 };
