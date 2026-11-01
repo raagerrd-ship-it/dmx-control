@@ -1,5 +1,31 @@
 # Natt-agentens uppdrag
 
+## Från kvällen 2026-11-01 - DIODBLINK I DE ÄLDRE EFFEKTERNA (ägaren i ladan: 'lägg till nattagent att fixa de äldre, men i övrigt ser det fint ut nu'; går före allt annat)
+LÄGET: LIVE sedan 18:12 = 42ae94a (tempo-helsok, snabbspolad hit från agent-work/warmup-gc), ladan.conf DMX_WARMUP_GC=1 + DMX_STAIR_BREAK=1.
+Nytt i dag (ägaren: 'ser fint ut nu'): flimmerfixen (rampen sänker taket, 600ac30), nytt mobil-UI med flikar, rökhungern (nästan-drop),
+DROP_LIFT_FLOOR 0,7 + drop sätter liftAt/nearAt, drop-looker kräver beat >= 0,8, tre nya refrängeffekter slagga/sidokedja/tryckvag med
+mjuk puls och UTAN vitt, lookbyte direkt när sektionen går high inom 2 s efter en analysator-drop som blev minidrop (ee8d19b).
+Refrängfiltret beat >= 0,7 provades och BACKADES (911fcdd): ägaren vill ha refrängens lugna basslag-effekter (droppar/famn/svall) kvar och
+inga hårda av/på-pulser - 'de får gärna köra men med mjuka stigningen och ner igen'.
+1. DIODBLINKEN (huvuduppdraget): ägaren: 'R och G lyser men B bara blinkar till, vilket inte är snyggt'. dynBench session_mono
+   (rgb.blinkLook, sidoBlink < 300 ms, 15 min, före vit-fixen): vidga 33, siren 19, twin 14, backbeat 10, pendel 7, slagga 7 (vitt - fixat
+   42ae94a), eko 4, gallop 3, tryckvag 3 (fixat), duel 2, droppar 2. Hitta orsaken PER EFFEKT med en lampa-för-lampa-trace (mall:
+   scratchpad fx3/trace.mjs i huvudsessionen, eller tools/dynBench.mjs DYN_HIST): kandidater (a) hsv() snäpper mättnad < 0,5 till VITT
+   -> en kort vit topp tänder den släckta dioden; (b) tvåfärgad kulör (gul/cyan/magenta) nära tändpunkten - diodernas tändpunkter skiljer
+   sig (cal.onR/onG/onB), så ena dioden växlar när ljuset pumpar svagt (output.ts calibrate: alla färgkanaler samma colK); (c) kulörbyte
+   mitt i en puls. Rätta i EFFEKTEN (inte motorn/utgången) så karaktären består; mät blinkLook före/efter + effectDyn --sec high
+   (takt/sprid/rum får inte falla, hopp/kulhopp inte stiga). Blir (b) en generell orsak: rapportera ett förslag för utgången, bygg inte.
+2. MJUK PULS I DE ÄLDRE REFRÄNGEFFEKTERNA som ägaren upplever som av/på (party, snap, rave, gallop, backbeat - fråga inte, mät:
+   'hopp' i effectDyn och antal 0<->full-språng per slag): samma mönster som slagga/sidokedja/tryckvag (soft(f, 0,12 slag smoothstep upp,
+   exp ut)). Takten ska synas lika tydligt (takt-måttet), uppgången bara mjukare. Uttoningen (fade-down) rörs aldrig.
+3. ÖPPET, BARA ANALYS: 'dropen efter minidroppen' - inspelningen corpus/ladan-1101/lang-20261101T165711.wav (start 17:57:11,9): full drop
+   58,8 s (ägaren: 'minidrop'; efterkontrollen dömer den falsk 59,41 s men smällen har gått och SHOW_DROP_GAP_MS 12 s är förbrukad),
+   riktiga dropen ~71 s (ägaren: 'drop') gav INGEN flank-kant och ingen analysator-drop. Förklara med siffror varför (fdC-taket efter
+   58,8? FLANK_GONE_DB? break-längd?) och föreslå minsta ändring; bygg bara som opt-in-bänk, inget i koden.
+REGLER: inget deployas, ingen opt-in-flagga i koden (ägaren: backup-tagg + ersätt), en commit per effekt, låsta regler som vanligt.
+OBS: agent-work/refrain-fx (gren refrain-fx, 5 commits ovanpå 7344384) har förbättrade frasraknare/backbeat/vagbrytare/drops/gallop
+(takt +0,02..+0,15) - EJ live, ej granskade av ägaren. Bygg inte ovanpå dem; nämn i rapporten om dina ändringar krockar.
+
 ## Från kvällen 2026-10-27 - GALLOP/TAKTGRIDET VIDARE + UPPVÄRMNINGEN (ägaren: 'nya test för natten'; går före allt annat)
 Läget: inget nytt live sedan 10-26 18:06. Nattens prov 491f9c7 DMX_FEED_RISE=1 rättade gridet (gallop +134 -> -32 ms, taktKorpus 67,1 ->
 83,2 %) men flyttade showen (sektion upp 2,6 -> 4,1 s, kvällen hör ihop 71 -> 62 %, mega r 0,15 -> 0,03). Lotus bygger det omättade
