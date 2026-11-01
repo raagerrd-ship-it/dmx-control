@@ -2098,7 +2098,9 @@ export class EffectEngine {
       const highEntry = sec === 'high' && this.fogLastSec !== '' && this.fogLastSec !== 'high';
       if (sec) this.fogLastSec = sec;
       const hungry = FOG_HUNGRY_S > 0 && fog.onDrop && nowWall - this.lastFogWall > FOG_HUNGRY_S * 1000;
-      const miniNow = this.lastMiniWall === nowWall;   // fireMini satte looken i denna ruta (10-16: förr analysatorns miniHit, alltid falskt i konsertläget -> minidrop gav aldrig hungrig rök)
+      const miniNow = this.lastMiniWall === nowWall || this.nearAt === nowWall;   // fireMini satte looken i denna ruta (10-16: förr analysatorns miniHit, alltid falskt i konsertläget -> minidrop gav aldrig hungrig rök)
+      // (11-01 ladan, ägaren: 'det har gått flera 5 min, den borde kört' - loggen: 6 nästan-drops på 2,5 min, ingen minidrop -> hungern fick
+      //  aldrig sin signal. Nästan-dropen räknas nu som minidrop för den hungriga röken.)
       const wantBurst = (dropHitRaw && fog.onDrop) || manualFog || wantFogFx || (hungry && (miniNow || highEntry));
       if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;   // engångs-flagga
       this.out.fogNow = nowWall; this.out.fogDt = _dtT * 1000; const spraying = this.out.fogTick(wantBurst, fog, manualFog);
