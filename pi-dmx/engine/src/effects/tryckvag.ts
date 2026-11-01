@@ -18,7 +18,7 @@ export const tryckvag: EffectDef = {
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((mid ? base : base + 3) % 6) / 6;
     const core = f < 0.2 && ((c.beatIdx & 15) === 0 || (mid && (c.beatIdx & 3) === 0));   // vit kärna: ettan i mitten, frasens etta överallt
-    if (!mid) return hsv(hue, core ? 0 : 1, f < 0.2 ? 1 : 0);                 // kanterna: smällen, sedan släckt
+    if (!mid) return hsv(hue, core ? 0 : 1, f < 0.2 ? 1 : 0.15 + 0.85 * Math.exp(-(f - 0.2) / 0.25));   // kanterna: smällen, klingar ut (inte av/på - ladan 11-01)
     c.want.energy = false;                                                    // mitten: basen själv (energin följer kicken)
     return hsv(hue, core ? 0 : 1, f < 0.2 ? 1 : 0.3 + 0.7 * c.drum.bass);
   },

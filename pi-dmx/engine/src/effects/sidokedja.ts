@@ -16,7 +16,7 @@ export const sidokedja: EffectDef = {
     const f = c.hasBeat ? c.beatFrac : 1 - c.kickEnv;
     const n = Math.max(1, c.count), e = Math.min(c.lamp, n - 1 - c.lamp), mid = n > 2 && e >= (n - 1) / 4;
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    if (!mid) return hsv(((base + 3) % 6) / 6, 1, f < 0.25 ? 1 : 0.04);   // kicken
+    if (!mid) return hsv(((base + 3) % 6) / 6, 1, f < 0.25 ? 1 : 0.2 + 0.8 * Math.exp(-(f - 0.25) / 0.3));   // kicken (klingar ut, inte av/på - ladan 11-01)
     c.want.energy = false;                                                // padden: egen dynamik
     const x = Math.max(0, Math.min(1, ((c.beatIdx & 1) + f - 0.3) / 1.6));
     return hsv(base / 6, 1, 0.03 + 0.97 * x * x * (3 - 2 * x));          // trycks ner på 1 och 3, sväller till nästa
