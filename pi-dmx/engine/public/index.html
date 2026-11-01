@@ -301,6 +301,29 @@
     .walk-actions { display:flex; gap:8px; }
     .walk-actions button { flex:1; padding:12px; border-radius:10px; border:1px solid var(--line); background:var(--bg); color:var(--fg); font-size:14px; font-weight:600; cursor:pointer; }
     .walk-actions button.primary { background:var(--hot); border-color:var(--hot); color:#fff; }
+    /* MOBIL-MAKEOVER 2026-11-01: flikar i ägarläget, kompakt huvud, statusraden i flödet, staplade fält. */
+    .brand-logo { height: 60px; }
+    @media (orientation: landscape) { .brand-logo { height: 52px; } }
+    body { padding-bottom: calc(env(safe-area-inset-bottom) + 8px); }
+    .status-footer { position: static; padding: 18px 0 calc(env(safe-area-inset-bottom) + 6px); background: none; }
+    .tabs { position: sticky; top: 0; z-index: 45; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+            margin: 12px -16px 14px; padding: 8px 16px; background: color-mix(in srgb, var(--bg) 92%, transparent);
+            -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+    .tabs button { padding: 11px 2px; min-height: 44px; border: 1px solid var(--line); border-radius: 11px; background: var(--card);
+                   color: var(--dim); font: 600 14px -apple-system, system-ui, sans-serif; cursor: pointer; }
+    .tabs button.on { background: var(--hot); border-color: var(--hot); color: #fff; }
+    .tab-pane { display: none; }
+    .tab-pane.on { display: block; }
+    .tab-pane > h1:first-child { margin-top: 4px; }
+    .owner-banner { font-size: 12px; }
+    .fx-grid.wifi-grid { grid-template-columns: 1fr; }
+    .tab-pane .btn { min-height: 46px; }
+    .fx-actions.stack .btn { flex: 1 1 100%; }
+    .fx-actions.wifi .btn:first-child { flex: 1 1 100%; }
+    .tab-pane .row input[type=range] { height: 32px; }
+    .tab-pane input[type=number], .tab-pane input[type=text], .tab-pane input[type=password] {
+      background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; font-size: 16px; }
+    #fogAddr { width: 110px !important; }
   </style>
 </head>
 <body>
@@ -395,7 +418,14 @@
 
   <div id="ownerOnly" hidden>
   <div class="owner-banner">🔧 Ägarläge. Gästerna öppnar adressen utan <b>/setup</b> och ser bara ljusreglaget.</div>
+  <nav class="tabs" id="ownerTabs" aria-label="Inställningar">
+    <button type="button" data-tab="ljus">Ljus</button>
+    <button type="button" data-tab="lampor">Lampor</button>
+    <button type="button" data-tab="rok">Rök</button>
+    <button type="button" data-tab="mer">Mer</button>
+  </nav>
 
+<div class="tab-pane" data-pane="lampor">
   <div id="setupWizard" class="card" hidden style="border:1px solid var(--warn);background:linear-gradient(180deg,rgba(255,180,60,.08),rgba(255,180,60,.02))">
     <h1 style="margin:0 0 6px;font-size:18px">👋 Kom igång</h1>
     <ol style="margin:0 0 10px 20px;line-height:1.7;font-size:13px">
@@ -407,7 +437,6 @@
     <button class="btn primary" id="wizDismiss">Klart — dölj guiden</button>
   </div>
 
-  <h1>Lampor</h1>
   <div class="card">
     <div class="status" style="margin:0 0 10px">Kalibrera varje lampa: välj <b>Alla</b> (eller R/G/B för en färg i taget), dra reglaget tills lampan <b>precis tänder</b> och tryck <b>Spara</b>. <b>Full</b>: dra tills lampan <b>inte blir ljusare</b> och spara. <b>Hitta</b> blinkar lampan, <b>Identifiera</b> tar reda på kanalerna.</div>
     <div id="fixtures"></div>
@@ -423,6 +452,8 @@
   </div>
 
 
+</div>
+<div class="tab-pane" data-pane="ljus">
   <h1>Ljusnivå</h1>
   <div class="card" id="levelCard">
     <div class="row"><label>Lägsta nivå</label>
@@ -466,7 +497,8 @@
     </div>
   </details>
 
-  <h1>Rökmaskin</h1>
+</div>
+<div class="tab-pane" data-pane="rok">
   <div class="card">
     <label class="tgl"><span>Rökmaskin ansluten</span><input type="checkbox" id="fogEnabled"></label>
     <div id="fogSettings">
@@ -489,6 +521,8 @@
     </div>
   </div>
 
+</div>
+<div class="tab-pane" data-pane="mer">
   <h1>Inspelning</h1>
   <div class="card" id="recCard">
     <div class="fx-actions">
@@ -526,7 +560,7 @@
   <div class="card">
     <div class="row"><label>Aktivt nät</label><span class="val" id="wifiActive">–</span></div>
     <div class="row"><label>Sparad hotspot</label><span class="val" id="wifiSaved">–</span></div>
-    <div class="fx-grid" style="margin-top:10px">
+    <div class="fx-grid wifi-grid" style="margin-top:10px">
       <div class="fx-field">
         <label>Hotspot-namn (SSID)</label>
         <input type="text" id="wifiSsid" autocapitalize="off" autocorrect="off" placeholder="t.ex. Richards iPhone" />
@@ -536,7 +570,7 @@
         <input type="password" id="wifiPass" placeholder="hotspottens lösenord" />
       </div>
     </div>
-    <div class="fx-actions">
+    <div class="fx-actions wifi">
       <button class="btn primary" id="wifiSave">Spara hotspot</button>
       <button class="btn" id="wifiConnect" disabled>Anslut nu</button>
       <button class="btn" id="wifiForget" disabled>Glöm</button>
@@ -550,7 +584,7 @@
   <h1>System</h1>
   <div class="card">
     <div class="row"><label>Motor-version</label><span class="val" id="engVer">–</span></div>
-    <div class="fx-actions" style="margin-top:10px">
+    <div class="fx-actions stack" style="margin-top:10px">
       <button class="btn" id="btnCfgExport">Exportera inställningar</button>
       <button class="btn" id="btnCfgImport">Importera inställningar</button>
       <input type="file" id="cfgImportFile" accept="application/json,.json" style="display:none">
@@ -569,6 +603,7 @@
     </div>
   </div>
 
+</div>
   </div><!-- /ownerOnly -->
 
   <!-- Dold: anslutningsstatus finns redan i sidfoten. Elementet behålls så
@@ -1015,6 +1050,9 @@ function validateAll() {
   return errs;
 }
 
+// Öppna/stängda delar i lampkorten överlever omritningen (renderFixtures bygger om innerHTML). 2026-11-01
+const fxOpen = new Set();
+fxEl.addEventListener("toggle", (e) => { const d = e.target; if (d && d.dataset && d.dataset.openKey) { if (d.open) fxOpen.add(d.dataset.openKey); else fxOpen.delete(d.dataset.openKey); } }, true);
 function renderFixtures() {
   const errs = validateAll();
   const errByIdx = new Map();
@@ -1048,6 +1086,8 @@ function renderFixtures() {
           return `<span class="fx-chan ${cls}">${fx.address + k}·${lbl}</span>`;
         }).join("")}
       </div>
+      <details class="fx-adv" data-open-key="cal-${i}"${fxOpen.has("cal-" + i) ? " open" : ""}>
+        <summary>Kalibrera · ${calBadge}</summary>
       <div class="fx-cal">
         <div class="fx-cal-head">
           <span class="fx-cal-title">Släckpunkt och fullpunkt</span>
@@ -1062,7 +1102,8 @@ function renderFixtures() {
           <button type="button" class="fx-cal-btn" data-cal-set="on" data-cal-set-i="${i}">Spara</button>
         </div>
       </div>
-      <details class="fx-adv">
+      </details>
+      <details class="fx-adv" data-open-key="adv-${i}"${fxOpen.has("adv-" + i) ? " open" : ""}>
         <summary>Avancerat · adress, typ, frekvensband</summary>
         <div class="fx-grid" style="margin-top:8px">
           <div class="fx-field">
@@ -1675,11 +1716,13 @@ if (welcomeOv && welcomeBtn && !OWNER_MODE) {
 let wsOk = false, dmxOk = true;
 let lastAudibleMs = Date.now();
 const healthBanner = document.getElementById("healthBanner");
+let wsDownAt = Date.now();   // 2026-11-01: bannern blinkade "Inte ansluten" vid varje sidladdning innan WS hunnit upp
 function renderHealth() {
   if (!healthBanner) return;
   const msgs = [];
   let sev = "";   // "err" | "warn"
-  if (!wsOk) { msgs.push("<b>Inte ansluten</b> — kontrollera att telefonen är på pi-dmx-nätet."); sev = "err"; }
+  if (wsOk) wsDownAt = 0; else if (!wsDownAt) wsDownAt = Date.now();
+  if (!wsOk) { if (Date.now() - wsDownAt >= 3000) { msgs.push("<b>Inte ansluten</b> — kontrollera att telefonen är på pi-dmx-nätet."); sev = "err"; } }
   else if (!dmxOk) { msgs.push("<b>DMX-utgången är nere</b> — kontrollera USB-DMX-kabeln till lamporna."); sev = "err"; }
   // Mic-tyst: bara relevant om ljuset är på (curMode !== blackout) och det gått
   // >30s sen vi hörde nåt. Låg prio → adderas bara om inget värre är fel.
@@ -1692,12 +1735,28 @@ function renderHealth() {
 }
 // Kör en gång direkt så bannern renderas medan WS ansluter.
 renderHealth();
+setInterval(renderHealth, 1000);
 
 
 
 
 
 
+</script>
+<script>
+// FLIKAR I ÄGARLÄGET (2026-11-01): Ljus / Lampor / Rök / Mer. Senast valda fliken sparas i telefonen.
+(() => {
+  const nav = document.getElementById("ownerTabs"); if (!nav) return;
+  const panes = document.querySelectorAll(".tab-pane");
+  const show = (t) => {
+    nav.querySelectorAll("button[data-tab]").forEach((b) => b.classList.toggle("on", b.dataset.tab === t));
+    panes.forEach((p) => p.classList.toggle("on", p.dataset.pane === t));
+    try { localStorage.setItem("ownerTab", t); } catch {}
+  };
+  nav.addEventListener("click", (e) => { const b = e.target.closest("button[data-tab]"); if (b) show(b.dataset.tab); });
+  let t = "ljus"; try { t = localStorage.getItem("ownerTab") || "ljus"; } catch {}
+  show(nav.querySelector(`button[data-tab="${t}"]`) ? t : "ljus");
+})();
 </script>
 </body>
 </html>
