@@ -121,9 +121,9 @@ export class FixtureOutput {
   /** SISTA STEGET FORE UTGANG - EN mappning (se EN VAG FOR LJUSET). */
   /** KALIBRERINGENS TAL via fält (10-18, skräpjakten på Node 18): decimaltal som argument till calibrate/fogTick packades in vid varje
    *  rendering (32 B/ruta, stegLab). Sätts av motorn direkt före anropet. Startvärdena är decimaltal så fälten har decimalform från början. */
-  calMaster = 0.5; calNow = 0.5; calDrop = 0.5; calCeil = 0.5; fogNow = 0.5; fogDt = 0.5;
+  calMaster = 0.5; calNow = 0.5; calDrop = 0.5; calCeil = 0.5; calRamp = 0.5; fogNow = 0.5; fogDt = 0.5;
   calibrate(universe: Uint8Array, fixtures: FixtureConfig[]): void {
-    const master = this.calMaster, nowMs = this.calNow, dropOpen = this.calDrop, ceil = this.calCeil;
+    const master = this.calMaster, nowMs = this.calNow, dropOpen = this.calDrop, ceil = this.calCeil, ramp = this.calRamp;
     const top = (255 * master + 0.5) | 0;
     // ceil = SEKTIONENS TAK (effects.ts): bara på färgen/ljusstyrkan - dimmern på en färgfixtur står på master (förr fick rgb7-lamporna
     // taket två gånger: master*tak på dimmern OCH på färgen -> 0,65 blev ~0,42).
@@ -136,7 +136,7 @@ export class FixtureOutput {
       const on = c ? (c.on || 0) : 0;
       const dimTop = c && c.full && c.full < 255 ? Math.round(c.full * master) : top;   // FULLPUNKT (cal.full) = dimmerns konstant
       // FARGEN: lampans starkaste kanal 1..255 -> dess tandpunkt+1..colTop, alla fargkanaler med samma faktor (kuloren bevaras).
-      let lampLit = true, colK = 1;
+      let lampLit = true, colK = 1, lampTop = colTop;
       if (c) {
         let mxRaw = 0, mxOn = on;
         for (let i = 0; i < fast.roles.length; i++) {
@@ -145,8 +145,10 @@ export class FixtureOutput {
           if (universe[ch] > mxRaw) { mxRaw = universe[ch]; mxOn = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; }
         }
         lampLit = mxRaw > 0;
-        if (lampLit) colK = (mxOn + 1 + (colTop - mxOn - 1) * (mxRaw - 1) / 254) / mxRaw;
-      }
+        // RAMPEN (effects.ts, RAMPEN OVANFÖR SLÄCKGRÄNSEN): lampans tak glider tändpunkt+1 -> colTop; lägsta steget rörs inte.
+        lampTop = ramp >= 1 || colTop <= mxOn + 1 ? colTop : mxOn + 1 + Math.round((colTop - mxOn - 1) * ramp);
+        if (lampLit) colK = (mxOn + 1 + (lampTop - mxOn - 1) * (mxRaw - 1) / 254) / mxRaw;
+      } else if (ramp < 1) colK = ramp;   // okalibrerad lampa: ingen tändpunkt att skydda, rampen skalar färgen rakt
       for (let i = 0; i < fast.roles.length; i++) {
         const ch = base + i;
         if (ch < 0 || ch >= 512) continue;
@@ -157,12 +159,13 @@ export class FixtureOutput {
         if (role === "r" || role === "g" || role === "b" || role === "w") {   // farg: noll nollar direkt, ingen hallning
           if (!lampLit) { universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
           if (colK !== 1) raw = Math.round(raw * colK);
-          const v1 = raw > colTop ? colTop : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
+          const v1 = raw > lampTop ? lampTop : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
         }
         // Dimmer pa en fixtur UTAN farg (monokrom): samma mappning som fargen, sista vardet halls HOLD_MS over enstaka nollor.
         let out: number;
         if (raw > 0) {
-          out = Math.min(colTop, on + 1 + Math.round((colTop - on - 1) * (raw - 1) / 254));
+          const mTop = ramp >= 1 || colTop <= on + 1 ? colTop : on + 1 + Math.round((colTop - on - 1) * ramp);   // rampen: samma tak-glidning
+          out = Math.min(mTop, on + 1 + Math.round((mTop - on - 1) * (raw - 1) / 254));
           this.holdVal[ch] = out; this.holdUntil[ch] = nowMs + HOLD_MS;
         } else out = nowMs < this.holdUntil[ch] ? this.holdVal[ch] : 0;
         universe[ch] = out;

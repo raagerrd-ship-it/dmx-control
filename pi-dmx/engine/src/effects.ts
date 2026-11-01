@@ -1751,7 +1751,7 @@ export class EffectEngine {
     // HJÄRTSLAGET LIGGER NUMERA SIST, efter ballistiken — se nedan. Låg det här
     // smetades det ut av utgångens decay (0,42 s), som är mycket långsammare än
     // pulsens egen (121 ms): ljuset hölls kvar mellan slagen och slaget kändes knappt.
-    const drive = this.silenceGate * this.levelRamp;   // + RAMPEN OVANFÖR SLÄCKGRÄNSEN (se levelRamp)
+    const drive = this.silenceGate;   // rampen ovanför släckgränsen sänker TAKET i utgången (calRamp), inte pixlarna - se RAMPEN OVANFÖR SLÄCKGRÄNSEN
     // Synlig punch: en hård basstöt (eller drop-flash) BLOOMAR färgen till full
     // styrka — inte bara ljusare master (som är osynligt när effekten redan lyser).
     // DROP: analysatorn AVGÖR om det är en drop (frame.dropCount är MONOTON). Vi
@@ -1859,6 +1859,9 @@ export class EffectEngine {
     // RAMPEN OVANFÖR SLÄCKGRÄNSEN (ägaren 10-12: 'lamporna lyser en hel del även på släckgräns+1'): grinden var av/på, och energin är
     // relativ - knappt hörbar musik gav fullt ljus. Nu: ljuset skalas från 0 vid släckgränsen till fullt vid LEVEL_RAMP x släckgränsen,
     // på en nivå som följer upp direkt och ner mjukt (LEVEL_RAMP_FALL_S) så korta luckor inte dimmar. Ladans musik: level median 0,19.
+    // 11-01 RAMPEN SÄNKER TAKET, INTE PIXLARNA: som pixelfaktor (0,02-0,05 strax över gränsen) avrundades effektens pixlar till 0/1 och
+    // lamporna studsade släckt <-> tändpunkt+1 = flimmer vid tänkläget. Nu går den till utgången (calRamp): lampans tak glider från
+    // tändpunkt+1 vid gränsen till fullt vid LEVEL_RAMP x gränsen; lägsta steget och effektens mönster rörs inte.
     { const lv = frame.level; this.rampLvl = lv > this.rampLvl ? lv : this.rampLvl + (lv - this.rampLvl) * Math.min(1, dtSec / LEVEL_RAMP_FALL_S);
       const x = (this.rampLvl - silenceLevel) / Math.max(1e-4, (LEVEL_RAMP - 1) * silenceLevel); this.levelRamp = x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x); }
     if (frame.level > silenceLevel) { this.silenceGate = 1; this.belowSince = 0; }
@@ -2060,7 +2063,7 @@ export class EffectEngine {
       this.lowLogAt = nowWall;
       if (isLogOn()) console.log(   // strangen byggs bara nar loggen ar pa (DMX_QUIET=0)
         `[lagniva] niva ${frame.level.toFixed(3)} ` +
-        ` drive ${(this.silenceGate * this.levelRamp).toFixed(2)} md ${md.toFixed(2)} e ${this.eSm.toFixed(2)} drop ${this.dropEnv.toFixed(2)}/${this.dropColEnv.toFixed(2)} fonster ${this.eLo.toFixed(1)}..${this.eHi.toFixed(1)} dB` +
+        ` drive ${drive.toFixed(2)} ramp ${this.levelRamp.toFixed(2)} md ${md.toFixed(2)} e ${this.eSm.toFixed(2)} drop ${this.dropEnv.toFixed(2)}/${this.dropColEnv.toFixed(2)} fonster ${this.eLo.toFixed(1)}..${this.eHi.toFixed(1)} dB` +
         ` intensitet ${frame.intensity.toFixed(2)} konf ${frame.bpmConfidence.toFixed(2)}` +
         ` tillit ${this.beatTrust.toFixed(2)} effekt ${this.smartMode}`
       );
@@ -2080,7 +2083,7 @@ export class EffectEngine {
       const r = tgt > this.secCeil ? dtNow / 0.3 : dtNow / 2.0;                                  // upp snabbt, ner långsamt
       this.secCeil += Math.max(-r, Math.min(r, tgt - this.secCeil));
     }
-    { const o = this.out; o.calMaster = this.cfg.master ?? 1; o.calNow = nowP; o.calDrop = this.dropColEnv; o.calCeil = this.secCeil; o.calibrate(this.universe, this.cfg.fixtures); }   // talen via fält (se output.ts)
+    { const o = this.out; o.calMaster = this.cfg.master ?? 1; o.calNow = nowP; o.calDrop = this.dropColEnv; o.calCeil = this.secCeil; o.calRamp = this.levelRamp; o.calibrate(this.universe, this.cfg.fixtures); }   // talen via fält (se output.ts)
 
     // Rök: motorn avgör OM den ska spruta, output-tjänsten var signalen hamnar.
     // RÖK: motorn samlar önskemålen — drop, manuell knapp, eller en effekt som bett om
