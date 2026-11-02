@@ -1,9 +1,7 @@
 import type { EffectDef } from "./types.js";
-import { hsv } from "./color.js";
+import { hsv, soft } from "./color.js";
 import { slotSize } from "./rig.js";
 
-// MJUK PULS (ägaren i ladan 11-01: 'de får gärna köra men med mjuka stigningen och ner igen'): stiger mjukt på `rise` slag, klingar ut på `tau`.
-const soft = (f: number, rise: number, tau: number) => { if (f < rise) { const x = f / rise; return x * x * (3 - 2 * x); } return Math.exp(-(f - rise) / tau); };
 
 // SLÄGGA (full x high, 2026-11-01, ägaren: 'fler effekter som uppfyller refräng/drop-kriterierna - tydlig basgång/takt'): varje slag
 // slår ner i hela riggen; släggan själv - en VIT smäll - träffar en ny lampa per slag (vandrar runt riggen) medan de andra slår i

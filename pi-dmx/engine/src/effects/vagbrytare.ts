@@ -1,5 +1,6 @@
 import type { EffectDef } from "./types.js";
-import { hsv } from "./color.js";
+import { hsv, soft } from "./color.js";
+import { slotSize } from "./rig.js";
 
 // VAGBRYTARE (high, 2026-09-21): en vag per TAKT (4 slag) rullar fran ena kanten till den andra, och pa ettan (barShift
 // fran analysatorn) bryter den med en vit kam over hela riggen. Takten syns som en FORM, inte bara som puls. Riktningen
@@ -13,15 +14,16 @@ export const vagbrytare: EffectDef = {
     const prog = (inBar + c.beatFrac) / 4;                   // 0..1 genom takten
     const dir = barNo % 2 === 0 ? 1 : -1;
     const head = (dir > 0 ? prog : 1 - prog) * (c.count - 1);
-    const d = Math.abs(c.idx - head);
-    const crest = inBar === 0 ? Math.exp(-c.beatFrac / 0.12) : 0;   // ettan: vit kam
+    const d = Math.abs(c.idx - head) / slotSize(c.count);   // hyrkitet: vågen lika bred på 8 som på 4
+    // MJUK PULS (11-02, ägaren i ladan 11-01: refrängeffekterna 'väldigt AV/PÅ'): vågen sväller mjukt på varje slag och kammen på
+    // ettan stiger och klingar (soft) i kulör i stället för att slå på direkt med vitt (diodblinket).
+    const f = c.hasBeat ? c.beatFrac : 1 - c.kickEnv;
+    const crest = inBar === 0 ? 0.6 * soft(f, 0.12, 0.45) : 0;      // ettan: kam över hela riggen
     // EFFEKTGENOMGÅNGEN 10-13 (effectDyn: 29,7 kulörhopp/min - kulören byttes varje takt; c.audio/punch/beatPulse som NIVÅ
     // dubbelmodulerade mot basenergin och 0,08-golvet lyftes av motorns grundnivå): kulören per fras, mörkt framför och bakom vågen.
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;
-    const body = Math.exp(-d * d * 0.9);
-    const v = Math.min(1, (body > 0.1 ? body : 0) + crest * 0.7 + c.sectionEntry * 0.5);
-    // Kammen PA ettan ska vara vitaktig - det ar effektens ide - men 0,9 gjorde varje takts etta nastan helt vit.
-    // 0,45 later den lasas som en ljus kam i latens kulor i stallet for som en vit blixt.
-    return hsv(hue, 1 - crest * 0.45, v);
+    const body = Math.max(0, Math.exp(-d * d * 0.9) - 0.1) / 0.9;
+    const v = Math.min(1, body * (0.55 + 0.45 * soft(f, 0.12, 0.4)) + crest + c.sectionEntry * 0.5);
+    return hsv(hue, 1, v);
   },
 };

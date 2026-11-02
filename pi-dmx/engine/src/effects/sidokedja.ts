@@ -1,8 +1,6 @@
 import type { EffectDef } from "./types.js";
-import { hsv } from "./color.js";
+import { hsv, soft } from "./color.js";
 
-// MJUK PULS (ägaren i ladan 11-01: 'de får gärna köra men med mjuka stigningen och ner igen'): stiger mjukt på `rise` slag, klingar ut på `tau`.
-const soft = (f: number, rise: number, tau: number) => { if (f < rise) { const x = f / rise; return x * x * (3 - 2 * x); } return Math.exp(-(f - rise) / tau); };
 
 // SIDOKEDJA (full x high, 2026-11-01): klubbens pumpande ljud som ljus - riggen lyser fullt i en kulör och KICKEN TRYCKER NER den;
 // ljuset sväller tillbaka under slaget och är fullt igen strax före nästa kick. Ytterparet (motfärg) hämtar sig en kvarts slag efter

@@ -36,6 +36,10 @@ export function hsv(h: number, s: number, v: number): [number, number, number] {
   const o = RING[ringAt]; ringAt = (ringAt + 1) & 31;
   o[0] = VQPT[SEL[j]]; o[1] = VQPT[SEL[j + 1]]; o[2] = VQPT[SEL[j + 2]]; return o;
 }
+/** MJUK PULS (ägaren i ladan 11-01: 'de får gärna köra men med mjuka stigningen och ner igen'): stiger mjukt (smoothstep) på `rise`
+ *  slag, klingar ut exponentiellt på `tau`. f = fasen sedan slaget (0..1). Delas av refrängeffekterna. */
+export const soft = (f: number, rise: number, tau: number) => { if (f < rise) { const x = f / rise; return x * x * (3 - 2 * x); } return Math.exp(-(f - rise) / tau); };
+
 export function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
   s = s >= 0.5 ? 1 : 0;
   const i = Math.floor(h * 6);
