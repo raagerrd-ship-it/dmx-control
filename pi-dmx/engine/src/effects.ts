@@ -115,6 +115,7 @@ const EKO_BASS = 0.85;
 const SEC_CEIL = 0.65, SEC_CEIL_BUILD = 0.85;
 const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
 import { hsvToRgb, hsv as hsvFx } from "./effects/color.js";
+import { slotSize } from "./effects/rig.js";
 const ZERO3: [number, number, number] = [0, 0, 0];
 /** TALFÄLTEN SOM DECIMALTAL FRÅN START (10-16, GC-jakten): ett fält som startar som heltal (`= 0`) och senare får ett decimaltal byter
  *  objektets form (V8 'map') - då kastas all optimerad kod som läser objektet ('wrong map'-deopt) och det hände fält för fält, minut för
@@ -1402,7 +1403,8 @@ export class EffectEngine {
         ctx.lamp = i;
         { const n = count, e = Math.min(i, n - 1 - i), side = i < n - 1 - i ? 0 : 1;   // e = avstånd till närmaste kant
           ctx.idx = ordSel === 0 ? i : ordSel === 1 ? n - 1 - i : ordSel === 2 ? Math.min(n - 1, 2 * e + side) : Math.max(0, n - 1 - (2 * e + side)); }
-        ctx.group = ctx.grouping === 'innerouter' ? ((count < 3 ? i % 2 === 1 : (i === 0 || i === count - 1)) ? 1 : 0) : i % 2;
+        { const sg = slotSize(count), sl = Math.floor(i / sg), ns = Math.ceil(count / sg);   // hyrkitet 11-02: kanten = ytterplatserna (8 lampor: 0,1,6,7 mot 2-5; förr 2 mot 6)
+          ctx.group = ctx.grouping === 'innerouter' ? ((count < 3 ? i % 2 === 1 : (sl === 0 || sl === ns - 1)) ? 1 : 0) : i % 2; }
         ctx.fx = fx;
         ctx.want.strobe = undefined; ctx.want.blinder = undefined;
         ctx.want.uv = undefined; ctx.want.laser = undefined; ctx.want.fog = undefined;

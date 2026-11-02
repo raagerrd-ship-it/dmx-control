@@ -1,5 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
+import { slotSize } from "./rig.js";
 
 // (skräpjakten 10-18: förr en closure/array som skapades i render per lampa och ruta - samma räkning)
 const pairOf = (b: number) => (Math.imul(b + 3, 2654435761) >>> 0) % 6;
@@ -13,12 +14,12 @@ export const snap: EffectDef = {
   render(c) {
     // EFFEKTGENOMGÅNGEN 10-13 (effectDyn: spridning 0,00, rum 0,00 i refrängen - alla fyra fullt hela tiden): kapet flyttar nu ETT
     // lamppar per slag (6 par, aldrig samma två slag i rad), andra paret släckt; taktens etta tänder alla. Kulören per fras (hueIdx/16).
-    const n = Math.max(1, c.count);
+    const n = Math.max(1, c.count), g = slotSize(n), slot = Math.floor(c.lamp / g);   // hyrkitet: paret = två platser om g lampor
     const one = (((c.beatIdx % 4) + 4) % 4) === 0;
     let pr = pairOf(c.beatIdx); if (pr === pairOf(c.beatIdx - 1)) pr = (pr + 1) % 6;
-    const lit = one || n < 4 || PAIRS[pr].includes(c.lamp % 4);
+    const lit = one || n < 4 || PAIRS[pr].includes(slot % 4);
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    const hue = (((c.lamp & 1) ? base + 3 : base) % 6) / 6;
+    const hue = (((slot & 1) ? base + 3 : base) % 6) / 6;
     if (!lit) return hsv(hue, 1, 0);
     // Vit-kap på SLAGET: gnista = grid-flanken (beatHit) ELLER en riktig dunk →
     // varje färgbyte punkteras av en kort vit gnista även när basen är svag, och

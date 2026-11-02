@@ -1,5 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
+import { slotSize } from "./rig.js";
 
 // KASKAD (lugn x refräng, situationsrutnätet 2026-10-12 - rutan hade två effekter, syskon svall/famn): en lugn refräng som fylls
 // och töms i varje takt. Slag 1, 2 och 3 tänder en lampa var (c.idx-ordningen) som LIGGER KVAR och växer sakta, på slag 4 släpper
@@ -9,12 +10,12 @@ export const kaskad: EffectDef = {
   key: "kaskad", label: "Kaskad", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["high"],
   desc: "Lugn refräng: slag 1-3 tänder en lampa var som ligger kvar, på slag 4 släpper alla mjukt.",
   render(c) {
-    const n = Math.max(1, c.count);
+    const g = slotSize(c.count), n = Math.max(1, Math.ceil(c.count / g)), me = Math.floor(c.idx / g), slot = Math.floor(c.lamp / g);   // hyrkitet: platser om g lampor
     const bib = ((c.beatIdx % 4) + 4) % 4;
     const start = ((Math.floor(c.beatIdx / 4) % n) + n) % n;
-    const rank = (c.idx - start + n) % n;                              // 0..2 tänds på slag 1..3, n-1 vilar
+    const rank = (me - start + n) % n;                              // 0..2 tänds på slag 1..3, n-1 vilar
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    const hue = (((c.lamp & 1) ? base + 1 : base) % 6) / 6;   // 10-13: fast kulör per lampa (rangens kulör roterade per takt = 17 kulörhopp/min)
+    const hue = (((slot & 1) ? base + 1 : base) % 6) / 6;   // 10-13: fast kulör per lampa (rangens kulör roterade per takt = 17 kulörhopp/min)
     if (rank >= Math.min(3, n - 1)) return hsv(hue, 1, 0.015);
     let v: number;
     if (bib === 3) v = (0.35 + 0.1 * (2 - rank)) * Math.exp(-c.beatFrac / 0.35);                 // slag 4: alla släpper

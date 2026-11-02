@@ -1,5 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
+import { slotSize } from "./rig.js";
 
 // Full fart: FÄRGKAOS-PUMP — varje lampa egen ren färg (blandas om varje takt)
 // och hela riggen THROBBAR hårt: nästan kolsvart mellan slagen, full på beatet.
@@ -11,10 +12,10 @@ export const party: EffectDef = {
     // EFFEKTGENOMGÅNGEN 10-13 (effectDyn i refrängen: spridning 0,00, rum 0,00 - alla fyra pumpade lika; kickEnv/punch som NIVÅ
     // dubbelmodulerade mot basenergin): pumpen sitter på slaget (taktklockan), och en lampa VILAR per slag - hålet vandrar ett steg
     // per slag runt riggen, så pumpen rör sig. Egen kulör per lampa ur paletten (byts per fras).
-    const n = Math.max(1, c.count);
+    const g = slotSize(c.count), n = Math.max(1, Math.ceil(c.count / g));   // hyrkitet: hålet = en plats om g lampor
     const hole = ((c.beatIdx % n) + n) % n;
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16) + c.idx * 2) / 6;
-    if (n >= 3 && c.idx === hole && c.sectionEntry < 0.05) return hsv(hue, 1, 0);
+    if (n >= 3 && Math.floor(c.idx / g) === hole && c.sectionEntry < 0.05) return hsv(hue, 1, 0);
     const pump = c.hasBeat ? Math.exp(-c.beatFrac / 0.2) : c.beatPulse;
     const v = 0.12 + 0.88 * pump;   // motorns hjartslag dippar redan till 0.30 → hoj eget golv sa det inte blir strobe                                     // djupare throb (mörkare mellan slagen)
     const entry = c.section === 'high' ? c.sectionEntry : 0;   // refrangens forsta slag: stot + blinder
