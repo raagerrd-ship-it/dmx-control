@@ -7,7 +7,7 @@ import { hsv } from "./color.js";
 export const fyrverkeri: EffectDef = {
   key: "fyrverkeri", label: "Fyrverkeri", tier: "full", modulate: { energy: false, pulse: false }, section: ["high"],
   desc: "Dropen exploderar lamporna en i taget i palettfarger, sedan pumpande party.",
-  drives: ["blinder", "strobe"],
+  drives: ["blinder"],
   render(c) {
     const seed = ((c.idx + 1) * 2654435761 + Math.floor(c.now / 8000) * 40503) >>> 0;   // ny slumpordning var 8:e s
     const delay = ((seed % 1000) / 1000) * 1.4;                        // 0..1,4 s efter dropen
@@ -17,7 +17,9 @@ export const fyrverkeri: EffectDef = {
     const age = since - delay;                                          // < 0 = inte tand an
     const burst = age >= 0 ? Math.exp(-age / 0.45) : 0;
     const hue = c.mixedSector((seed >>> 8) % 6) / 6;
-    if (c.dropEnv > 0.8) c.want.blinder = c.dropEnv; if (c.dropEnv > 0.9) c.want.strobe = 0.5;
+    // STROBE-ÖNSKAN BORTTAGEN 11-02 (ägarens video 11-01 18:48: ~10 Hz i ~2 s): want.strobe 0,5 = DMX 127 på lampornas strobe-kanal
+    // så länge dropen hölls (dropEnv 1) - lampans egen blixttakt bröt den låsta regeln (högst 3 blixtar/s). Blindern får vara kvar.
+    if (c.dropEnv > 0.8) c.want.blinder = c.dropEnv;
     // MELLAN SALVORNA (2026-09-27): pumpen gar TVA OCH TVA - en grupp per slag (jamn/udda eller inre/yttre via c.grouping),
     // den andra glimmar bara. Forut pumpade alla fyra unisont = party (rV 0,94-0,96, samma pool high); nu star salvan ut mot
     // en glesare bakgrund och effekten har egen rorelse mellan dropparna.

@@ -162,7 +162,7 @@ const SPECIALTY_DRIVES: Partial<Record<Mode, ChannelRole[]>> = {
   nedrakning: ["hazer", "blinder"],
   upptakt:  ["hazer"],
   rulle:    ["hazer"],
-  fyrverkeri: ["blinder", "strobe"],
+  fyrverkeri: ["blinder"],   // strobe bort 11-02 (lampans egen blixttakt ~10 Hz vid dropen, regeln högst 3/s)
   andrum:   ["hazer"],
   // 2026-09-23
   forvarning: ["uv", "hazer", "blinder"],
