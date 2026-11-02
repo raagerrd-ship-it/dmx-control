@@ -1,5 +1,10 @@
 # Natt-agentens uppdrag
 
+## Från förmiddagen 2026-11-02 - DAGKÖRNING (ägaren på jobbet: 'kan vi inte sätta igång agent nu'; går före allt annat)
+Ordning: (1) HYRKITET 2+3 (startlistan nedan: virvel, upptakt, blixtnedslag, glimt, kickregn, glesna; rum i party/snap/mullra/rulle) - 4 lampor
+bit-identiskt; (2) BRÖLLOPSLÄGET (avsnittet nedan, steg 1-5). Hoppa över steg 3 'en idé' och tajthetsavsnittet i dag - baslinjen räcker med
+--snabb efter varje commit. Väntar på ägaren (rör inte): siren/twin-blinket i motorn, SECTION_DROP_HOLD.
+
 ## Från kvällen 2026-11-01 (sist) - BRÖLLOPSLÄGET: MIDDAG I PARETS FÄRGER + KNAPPAR FÖR KVÄLLENS STUNDER (ägaren: 'ja'; EFTER diodblinken och hyrkitet nedan)
 Varför: ett bröllop är ~70 % middag/tal - i dag står showen och väntar på dansmusik. Det här gör kitet till en bröllopsprodukt.
 Det ägaren sagt ja till: en PLAN + byggt bakom knapparna; standardläget (Fest) ska vara BIT-IDENTISKT med i dag (natt --snabb json-lika).
