@@ -15,6 +15,18 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-02 Sektion 'break' med full baskropp, och ingen drop när den går high (ladan 11-01 17:58:23)
+Vad: corpus/ladan-1101/lang-20261101T165711.wav (start 17:57:11,9). Live-flaggorna (events.json): dropCount 1 hela filen, analysatorn fyrar
+ingen drop vid 58,8 s (DMX:s flank tog den: break 5,7 s, baskropp -10 dB mot taket 30 dB) och ingen vid ägarens 'riktiga drop' ~71 s.
+Sektionen: break 50-66,3, high 66,3-67,3, break 67,3-71,3, high från 71,3. Bänken (dynBench-spår av flankStep, samma fil från 0 s): baskroppen
+(frame.bodyDb) är 33-35 dB = TAKET redan från 66,0 s och står där genom hela 'breaket' 67,3-71,3 (bara en dipp till 24 dB i ~0,5 s vid
+67,6) - basen kom tillbaka vid 65,5-66 (20 -> 34 dB på 0,5 s), inte vid 71. Det som ändras vid 71,3 syns alltså inte i basen.
+Var: sektionsklassningen (vad gör 67,3-71,3 till break när kroppen ligger på taket?) och drop-detektionen vid break -> high utan baslyft.
+Material: lang-20261101T165711.wav 50-80 s (+ lang-20261101T164645.wav, drop 91,5 s). Önskat: (1) förklaring vilket fält som håller sektionen
+i break 67,3-71,3; (2) om det är mellan-/diskantens återkomst som gör dropen vid 71,3 - ett fält för det (t.ex. höga bandens stigning på 0,5 s),
+så DMX kan pröva en drop-väg utan baslyft. DMX:s flank (bas) kan per konstruktion inte se en drop där basen redan är inne.
+Status:
+
 ## ÖPPET 2026-10-30 Analysatorns tempo i en mix: rätt 74 % mot 85 % för en enkel vikning över hela tempoområdet - kandidat till tempovalet
 Vad: ny bänk tools/tempoMix.mjs skarvar korpusklippen (frozen6, katalogfacit) till en kontinuerlig mix med 3 s övertoning och kör som live
 (delad analysator inline, låtgränsen, BeatFeed). `--all` = 161 klipp, 99 min. frame.bpm rätt (vikt till 80-160, ±4 %) 74,0 % av tiden;

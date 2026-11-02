@@ -26,6 +26,8 @@ Det ägaren sagt ja till: en PLAN + byggt bakom knapparna; standardläget (Fest)
    att nivån inte faller snabbare än i dag, ingen strobe, ingen lampa under tändpunkten; fest json-identisk. Skärmdump av gästsidan i mobilvy.
 REGLER: inget deployas, en commit per steg, ingen opt-in-flagga (standard fest = dagens kod), rapportera i scoreboard + här.
 
+BRÖLLOPSLÄGET: EJ PÅBÖRJAT 2026-11-02 (natten gick till diodblinken + hyrkitet 1/4).
+
 ## Från kvällen 2026-11-01 (sent) - HYRKITET: 8 LAMPOR I TVÅ STATIV (ägaren: 'förbered för det'; efter diodblinken nedan, före allt äldre)
 Ägaren hyr ut kit för bröllop/studentfester utan ljustekniker. Standardkitet blir 2 stativ x 4 PAR (rgb7, samma som ladans), ett på var
 sida om dansgolvet, adresser i ordning VÄNSTER stativ (lampa 1-4) -> HÖGER stativ (lampa 5-8) = en rad på 8 tvärs över rummet, 'mitten'
@@ -44,6 +46,8 @@ sida om dansgolvet, adresser i ordning VÄNSTER stativ (lampa 1-4) -> HÖGER sta
    om lampornas strobe-kanal är fyrverkeri (want.strobe 0,5 vid dropEnv > 0,9). Bekräfta orsaken i bänk/trace; LÅST REGEL strobe <= 3/s -
    om det är fyrverkeri: ta bort strobe-önskan (blinder får vara kvar). Rapportera om något annat kan ge snabb strobe på rgb7-kanal 7.
 REGLER: inget deployas, ingen opt-in-flagga i motorkoden (verktygsflaggan --lampor i bänkarna är ok), en commit per effekt/steg.
+
+KLART 2026-11-02 (delvis): 1 = --lampor N i effectDyn/dynBench (b6c0dd5, 4 lampor oförändrat); 4 = strobe BEKRÄFTAD fyrverkeri (want.strobe 0,5 -> DMX 127 så länge dropen hålls ~2 s) och BORTTAGEN d2ee3b4. 2/3 EJ gjorda - startlista ur effectDyn mega 4->8: virvel takt 0,30->0,19 rum 0,64->0,42, upptakt rum 0,62->0,33, glimt, blixtnedslag takt 0,27->0,15, kickregn, glesna; rum halveras i party/snap/mullra/rulle.
 
 ## Från kvällen 2026-11-01 - DIODBLINK I DE ÄLDRE EFFEKTERNA (ägaren i ladan: 'lägg till nattagent att fixa de äldre, men i övrigt ser det fint ut nu'; går före allt annat)
 LÄGET: LIVE sedan 18:30 = ff83da2 (tempo-helsok; 42ae94a snabbspolad hit från agent-work/warmup-gc + minidropen: bara tända lampor till
@@ -71,6 +75,8 @@ inga hårda av/på-pulser - 'de får gärna köra men med mjuka stigningen och n
 REGLER: inget deployas, ingen opt-in-flagga i koden (ägaren: backup-tagg + ersätt), en commit per effekt, låsta regler som vanligt.
 OBS: agent-work/refrain-fx (gren refrain-fx, 5 commits ovanpå 7344384) har förbättrade frasraknare/backbeat/vagbrytare/drops/gallop
 (takt +0,02..+0,15) - EJ live, ej granskade av ägaren. Bygg inte ovanpå dem; nämn i rapporten om dina ändringar krockar.
+
+KLART 2026-11-02 (delvis): 1 = vidga FIXAD d384205 (+0,08 blandkulör -> grannkulör; blinkLook 33 -> 0, sidoBlink 1,8 -> 1,3). twin/pendel/backbeat = kulörtoningens svans + pump (klippt svans 1/48 och 1/16 gav ~0 -> backat, motorn orörd); siren = kulören byts direkt på uttonande lampa (mörk övergång i effekten 16 -> 22, backad; förslag till motorn i rapporten, ej byggt); tryckvag 9 = drop-lookens vita kärna. 2 (mjuk puls äldre) EJ gjord. 3 analys KLAR: basen tillbaka ~66 s med 9-13 dB dipp (ingen break för flanken), vid 71 s ligger basen på taket -> flanken kan inte se den; fynd 11-02 till lotus (sektion break 67,3-71,3 med full bas).
 
 ## Från kvällen 2026-10-27 - GALLOP/TAKTGRIDET VIDARE + UPPVÄRMNINGEN (ägaren: 'nya test för natten'; går före allt annat)
 Läget: inget nytt live sedan 10-26 18:06. Nattens prov 491f9c7 DMX_FEED_RISE=1 rättade gridet (gallop +134 -> -32 ms, taktKorpus 67,1 ->
@@ -378,6 +384,12 @@ PROV REDO (gren tempo-helsok, main orörd): beatFeed.ts HELA TEMPOOMRÅDET - bas
   TITTA: takteffekterna på slaget direkt efter låtbyte i mix, inga halv/hel-fart-hopp i 150-160-låtar, refrängens look.
 FÖRKASTAT: samma tempo till analysatorns rutnät (agrid 60,8 -> 67,1 % men sektion upp 2,6 -> 4,1 s), HMM-utjämning, bekräftelse två varv,
   0,5 %-steg, hysteres 1,0 (gridfas 10-21 95 -> 27 %) och 1,25. Fynd till lotus: helsökningen slår frame.bpm (analysator-fynd 10-30).
+
+## NATTEN 2026-11-02 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
+Baslinje natt/2026-11-02.json (4ee495b = gårdagens kod): hör ihop 66 -> 80, återseende 86 -> 82, kick->ljus pop 104 -> 136 / mega 107 -> 147
+  (sidokedja/tryckvag med mjuk stigning tog duel/rave:s platser; tryckvag 216 s av mega 600), ljusLag 90 % pop 45 -> 15, r mega 0,20 -> 0,16.
+  Snabbkörningen med d384205 + d2ee3b4 json-identisk (vidga/fyrverkeri väljs inte i mixarna). REDO FÖR LADAN: python tools/ladan.py (kodändringar).
+  NÄSTA: hyrkitet 2/3 (startlistan ovan), mjuk puls i äldre refrängeffekter, bröllopsläget; siren/twin-blinket kräver motorbeslut (ägaren).
 
 ## NATTEN 2026-11-01 (nattagenten, inget deployat; checkouten står på tempo-helsok = det som kör i ladan, commits där, ej pushad gren)
 KLART 2026-11-01: inga nya kvällsuppdrag. Baslinje natt/2026-11-01.json (2405334): mot 10-30 hör ihop 61 -> 66, återseende 83 -> 86, effektivt
