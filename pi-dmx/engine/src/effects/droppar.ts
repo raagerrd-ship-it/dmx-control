@@ -23,7 +23,9 @@ export const droppar: EffectDef = {
     // grundnivå lyfte 0,04 till en tredjedel).
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = (((c.lamp & 1) ? base + 1 : base) % 6) / 6;
-    if (c.lamp === cur) return hsv(hue, 0.95, Math.min(1, 0.08 + 0.85 * Math.exp(-age / 1.4)));
+    // EFFEKTSVEPET 11-02 (ägaren: 'fixa direkt de effekterna'; effectDyn alla effekter pop+mega 5 min): droppen slog från vila till fullt på en ruta (hopp 0,033) - nu stiger den på ~80 ms.
+    const x = Math.max(0, Math.min(1, age / 0.08)), up = x * x * (3 - 2 * x);
+    if (c.lamp === cur) return hsv(hue, 0.95, Math.min(1, 0.08 + 0.85 * up * Math.exp(-age / 1.4)));
     if (c.lamp === prev) return hsv(hue, 0.95, 0.06 + 0.45 * Math.exp(-(age + 0.4) / 1.4));
     return hsv(hue, 1, 0.015);
   },

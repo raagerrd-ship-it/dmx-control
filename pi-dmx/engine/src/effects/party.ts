@@ -1,5 +1,5 @@
 import type { EffectDef } from "./types.js";
-import { hsv } from "./color.js";
+import { hsv, soft } from "./color.js";
 import { slotSize } from "./rig.js";
 
 // Full fart: FÄRGKAOS-PUMP — varje lampa egen ren färg (blandas om varje takt)
@@ -16,7 +16,8 @@ export const party: EffectDef = {
     const hole = ((c.beatIdx % n) + n) % n;
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16) + c.idx * 2) / 6;
     if (n >= 3 && Math.floor(c.idx / g) === hole && c.sectionEntry < 0.05) return hsv(hue, 1, 0);
-    const pump = c.hasBeat ? Math.exp(-c.beatFrac / 0.2) : c.beatPulse;
+    // EFFEKTSVEPET 11-02 (ägaren: 'fixa direkt de effekterna'; effectDyn alla effekter pop+mega 5 min): pumpen slog på direkt (hopp 0,032) - nu mjuk stigning, samma klang.
+    const pump = c.hasBeat ? soft(c.beatFrac, 0.12, 0.25) : c.beatPulse;
     const v = 0.12 + 0.88 * pump;   // motorns hjartslag dippar redan till 0.30 → hoj eget golv sa det inte blir strobe                                     // djupare throb (mörkare mellan slagen)
     const entry = c.section === 'high' ? c.sectionEntry : 0;   // refrangens forsta slag: stot + blinder
     if (entry > 0) c.want.blinder = entry;

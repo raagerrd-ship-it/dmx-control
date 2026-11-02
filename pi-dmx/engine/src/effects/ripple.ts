@@ -1,5 +1,5 @@
 import type { EffectDef } from "./types.js";
-import { hsv } from "./color.js";
+import { hsv, soft } from "./color.js";
 
 // Full fart: KRUSNING från MITTEN. v2 (2026-09-23): varje slag slar ner i MITTEN och krusningen VANDRAR utat - de inre
 // lamporna tands pa slaget, de yttre en fjardedels slag senare, och varje ring klingar av som en vag som rullar ut.
@@ -20,11 +20,13 @@ export const ripple: EffectDef = {
     const amp = lv !== 0 || c.section === 'high' ? Math.max(0.35, Math.min(1, 1 + lv / 9)) : 0.8;   // refrangskala
     const delay = ring * 0.25;                               // fjardedels slag ut till kanten
     let age = c.beatFrac - delay; if (age < 0) age += 1;     // slag sedan krusningen nadde DEN HAR ringen
-    const wave = Math.exp(-age / 0.16) * (1 - ring * (1 - amp) * 0.8);   // yttre ringar svagare nar amp ar lag
-    const pairBase = c.mixedSector(Math.floor(c.hueIdx / 4));
+    // EFFEKTSVEPET 11-02 (ägaren: 'fixa direkt de effekterna'; effectDyn alla effekter pop+mega 5 min): vågen slog på en ruta och klingade på 0,16 slag (hopp 0,033), den vita kammen tände
+    // den släckta dioden och kulörparet byttes var 4:e slag. Nu mjuk våg (soft), kammen i kulör (ljusare, inte vit), paret per fras.
+    const wave = soft(age, 0.1, 0.25) * (1 - ring * (1 - amp) * 0.8);   // yttre ringar svagare nar amp ar lag
+    const pairBase = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((isOuter ? pairBase + 3 : pairBase) % 6) / 6;   // motfärg mitt vs ytter
-    const crest = amp > 0.9 && isOuter ? wave * 0.6 : 0;         // vit kam i kanten vid refrangens niva
-    const v = 0.08 + wave * (0.45 + 0.45 * amp) + c.audio * 0.15 + c.punch * 0.3;
-    return hsv(hue, 1 - Math.max(c.punch * 0.35, crest), Math.min(1, v));
+    const crest = amp > 0.9 && isOuter ? wave * 0.25 : 0;        // kammen i kanten vid refrangens niva
+    const v = 0.08 + wave * (0.45 + 0.45 * amp) + crest + c.audio * 0.15 + c.punch * 0.3;
+    return hsv(hue, 1, Math.min(1, v));
   },
 };

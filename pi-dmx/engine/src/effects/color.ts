@@ -40,6 +40,18 @@ export function hsv(h: number, s: number, v: number): [number, number, number] {
  *  slag, klingar ut exponentiellt på `tau`. f = fasen sedan slaget (0..1). Delas av refrängeffekterna. */
 export const soft = (f: number, rise: number, tau: number) => { if (f < rise) { const x = f / rise; return x * x * (3 - 2 * x); } return Math.exp(-(f - rise) / tau); };
 
+/** MJUK UPPGÅNG FÖR RÅA ENVELOPES (11-02): onset/trumenveloper hoppar från 0 till fullt på en ruta (AV/PÅ). En smoother per effekt
+ *  håller ett värde per lampa och låter det STIGA med tidskonstanten `riseS`; nedgången följer direkt (motorns uttoning tar fallet).
+ *  Anropas en gång per lampa och ruta med effektens lampindex och c.now (ms). */
+export function makeRise(riseS: number) {
+  const val: number[] = [], at: number[] = [];
+  return (i: number, now: number, x: number): number => {
+    const prev = val[i] ?? 0, dt = Math.max(0, Math.min(0.2, (now - (at[i] ?? now)) / 1000));
+    const y = x <= prev ? x : prev + (x - prev) * Math.min(1, dt / riseS);
+    val[i] = y; at[i] = now; return y;
+  };
+}
+
 export function hsvToRgb(h: number, s: number, v: number): [number, number, number] {
   s = s >= 0.5 ? 1 : 0;
   const i = Math.floor(h * 6);

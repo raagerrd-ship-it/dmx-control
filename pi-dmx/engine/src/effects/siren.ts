@@ -20,7 +20,8 @@ export const siren: EffectDef = {
     for (let k = 0; k < 2; k++) {
       let d = Math.abs(c.lamp + 0.5 - ((ph + k / 2) % 1) * n); d = Math.min(d, n - d);
       const v = Math.max(0, 1 - d / width);
-      if (v > best) { best = v; hue = ((k ? base + 3 : base) % 6) / 6; }
+      if (v > best) best = v;   // EFFEKTSVEPET 11-02 (ägaren: 'fixa direkt de effekterna'; effectDyn alla effekter pop+mega 5 min): 68 kulörhopp/min - lampan bytte till motfärgen när
+      // nästa stråle kom medan den förra tonade ut (diodblinket); nu samma kulör i båda strålarna, kulören byts per fras
     }
     return hsv(hue, 1, Math.min(1, (0.45 + 0.4 * p) * best * best));
   },

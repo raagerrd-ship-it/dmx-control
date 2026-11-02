@@ -1,5 +1,5 @@
 import type { EffectDef } from "./types.js";
-import { hsv } from "./color.js";
+import { hsv, makeRise } from "./color.js";
 
 // Lugn: LUFT-GLÖD — riggen är nästan mörk med en svag, långsamt driftande blågrön
 // glöd; varje cymbal-splash, shaker och sib-konsonant i sången (air 10–16 kHz)
@@ -7,6 +7,7 @@ import { hsv } from "./color.js";
 // ambient där alla andra lägen är för aggressiva. Utnyttjar air-bandet som gamla
 // grova trebandet knappt såg. Färgtonen glider mot cyan när air är SUSTAINED
 // (stråkar/pads), tillbaka mot grönt på rena transienter. (Lovable-idé.)
+const rise = makeRise(0.08);   // EFFEKTSVEPET 11-02 (ägaren: 'fixa direkt de effekterna'; effectDyn alla effekter pop+mega 5 min): gnistorna ur trebleEnv/airEnv slog på en ruta (hopp 0,032)
 export const airglow: EffectDef = {
   key: "airglow", label: "Luft-glöd", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["intro", "break"],
   desc: "Nästan mörkt; varje cymbal/shaker/väsljud tänder en gnista i kanten.",
@@ -20,7 +21,7 @@ export const airglow: EffectDef = {
     // rorelse mellan lamporna alls, bara ett unisont flimmer.
     const own = c.group === 0 ? c.trebleEnv : c.airEnv;
     const other = c.group === 0 ? c.airEnv : c.trebleEnv;
-    const spark = c.shaped(0, Math.max(own, other * 0.35)) * 0.95;                 // egen rost fullt, den andra svagt
+    const spark = rise(c.idx, c.now, c.shaped(0, Math.max(own, other * 0.35)) * 0.95);   // egen rost fullt, den andra svagt
     const hue = 0.40 + c.frame.spec.air * 0.10;                    // grön → cyan när air sustained
     return hsv(hue, 1, Math.min(1, base * c.heart(0.3) + spark));   // glöden pulsar med hjartat, gnistorna ororda (09-27)
   },

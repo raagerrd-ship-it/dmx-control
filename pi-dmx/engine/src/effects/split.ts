@@ -1,5 +1,5 @@
 import type { EffectDef } from "./types.js";
-import { hsv } from "./color.js";
+import { hsv, makeRise } from "./color.js";
 
 // Full fart: SPEKTRAL KLYVNING — riggen delas i två spektrala världar. De INRE
 // lamporna = tung, andande sub/bas-matta i palettens djupaste färg (ger rummet
@@ -7,6 +7,7 @@ import { hsv } from "./color.js";
 // blixtrar till stenhårt i kontrastfärg. Bara möjlig tack vare band-separationen:
 // den ihållande basen och de rappa transienterna kan äntligen skiljas åt.
 // (Gemini-idé, anpassad för 4 PAR.)
+const rise = makeRise(0.1);   // EFFEKTSVEPET 11-02 (ägaren: 'fixa direkt de effekterna'; effectDyn alla effekter pop+mega 5 min): råa onset-spikar i kvadrat slog AV/PÅ på en ruta (hopp 0,032)
 export const split: EffectDef = {
   key: "split", label: "Klyvning", tier: "full", section: ["high"], toggle: true,
   desc: "Inre lampor tung bas-matta, yttre lampor gnistrande diskant-anslag.",
@@ -16,7 +17,7 @@ export const split: EffectDef = {
       // Yttre: rappa transienter (snare/clap + hi-hats), släckt mellan slagen.
       const transient = Math.max(c.frame.onset.highMid, c.frame.onset.treble);
       const hue = ((c.mixedSector(0) + 3) % 6) / 6;         // kontrastfärg mot bas-mattan
-      return hsv(hue, 1, transient * transient);          // stenhård attack
+      return hsv(hue, 1, rise(c.idx, c.now, transient * transient));   // hård men inte AV/PÅ
     }
     // Inre: tung, andande sub/bas-energi i palettens djupaste färg.
     const bass = Math.max(c.frame.spec.sub, c.frame.spec.bass);
