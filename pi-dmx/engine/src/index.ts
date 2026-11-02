@@ -48,6 +48,8 @@ const MODE_CYCLE: Mode[] = ["smart", ...EFFECT_KEYS];
 
 const cfg = await loadConfig();
 if (migrateFromMoods(cfg)) { scheduleSave(cfg); console.error('[config] stämningarna borttagna 2026-10-11: vredet på max (ljustak 1)'); }
+// BRÖLLOPSLÄGET: starta alltid i fest (ägaren 11-02) - en stund som lämnats på t.ex. 'tal' får inte följa med till nästa uthyrning.
+if (cfg.moment && cfg.moment !== "fest") { cfg.moment = "fest"; scheduleSave(cfg); }
 // Migrate legacy mode names from persisted configs.
 // Migrera BORTTAGNA lägesnamn (strobe/pulse är RIKTIGA nuvarande lägen → ej här).
 const LEGACY_MODES: Record<string, Mode> = { auto: "wave", comet: "wave", spectrum: "eq", vu: "gravity" };
