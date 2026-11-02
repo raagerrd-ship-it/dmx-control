@@ -21,6 +21,7 @@ import { readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { applyIntensity } from "./moods.js";
+import { isMoment, pressMoment, cleanTheme } from "./moment.js";
 import type { FogStatus } from "./effects.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, EFFECT_META } from "./effects/registry.js";
@@ -241,6 +242,13 @@ export async function startServer(
   app.post("/api/mark", async (req) => deps.longRecord?.mark(String(((req.body ?? {}) as Record<string, unknown>).kind ?? 'mini')) ?? { ok: false });
   // GC-stopp per sort, renderingstid och händelseloopens fördröjning per minut - alltid på (perfStats.ts, 10-16)
   app.get("/api/perf", async () => getPerf());
+  // BRÖLLOPSLÄGET (moment.ts): {"moment":"middag"} - samma väg som gästsidans knappar (tryck på aktiv stund = fest).
+  app.get("/api/moment", async () => ({ moment: deps.cfg.moment ?? "fest", themeColors: deps.cfg.themeColors ?? null }));
+  app.post("/api/moment", async (req, reply) => {
+    const m = ((req.body ?? {}) as Record<string, unknown>).moment;
+    if (!isMoment(m)) return reply.code(400).send({ ok: false, error: "moment: fest | middag | tal | forstadans | tartan" });
+    const now = pressMoment(deps.cfg, m); deps.onConfigChanged?.(); broadcast(); return { ok: true, moment: now };
+  });
   app.get("/api/health-log", async () => ({
     version: PKG_VERSION,
     now: Date.now(),
@@ -464,6 +472,7 @@ export async function startServer(
       beatErr: deps.cfg.beatErr ?? 0,
       mode: deps.getActiveMode(),
       activeIntensity: r3(deps.cfg.activeIntensity),   // vred/slider-position (0..1)
+      activeMoment: deps.cfg.moment ?? "fest",   // bröllopsläget: aktiv stund, så alla klienter visar samma
 
       fog: deps.getFogStatus(),     // null när maskinen inte är ansluten
       // Drift-hälsa: UI:t visar en banner om DMX-helpern är nere.
@@ -514,6 +523,11 @@ export async function startServer(
           if (msg.type === "setIntensity" && typeof msg.value === "number") {
             // Vred/slider 0..1 = ljustaket (stämningarna borttagna 10-11) - samma kontrakt för KY-040 och UI.
             applyIntensity(deps.cfg, msg.value);
+          } else if (msg.type === "setMoment" && isMoment(msg.value)) {
+            // BRÖLLOPSLÄGET (moment.ts): samma väg som POST /api/moment och de fysiska knapparna; tryck på aktiv stund = fest.
+            pressMoment(deps.cfg, msg.value);
+          } else if (msg.type === "setThemeColors") {
+            deps.cfg.themeColors = cleanTheme(msg.value);   // parets färger (1-3 av de sex rena), tom = standard
           } else if (msg.type === "setMode" && isMode(msg.mode)) {
             deps.cfg.mode = msg.mode;
           } else if (msg.type === "cycleMode") {

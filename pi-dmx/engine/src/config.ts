@@ -1,3 +1,5 @@
+import type { Moment } from "./moment.js";
+
 /**
  * Runtime config. Kept as a single object so the mobile UI can mutate it
  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
@@ -109,6 +111,13 @@ export interface EngineConfig {
   rotation: Partial<Record<Mode, boolean>>;
   /** Physical push-button that cycles through modes. Set null to disable. */
   modeButton: { chip: string; line: number } | null;
+  /** BRÖLLOPSLÄGET (11-02, se moment.ts): kvällens stund. Saknas = 'fest' (dagens show, orörd). */
+  moment?: Moment;
+  /** Parets färger för stunderna: 1-3 av de sex rena kulörerna (0 röd, 1 gul, 2 grön, 3 cyan, 4 blå, 5 magenta). Saknas = magenta+röd. */
+  themeColors?: number[] | null;
+  /** Fysiska knappar för stunderna (gpiomon, samma kodväg som gästsidans knappar). activeHigh = 433 MHz-mottagare (YK04-typ, D0-D3
+   *  höga medan knappen hålls): pull-down och stigande flank = tryck. Saknas/null = inga knappar startas. */
+  momentButtons?: { chip: string; line: number; moment: Moment; activeHigh?: boolean }[] | null;
   /** Transient identify override — not persisted. index = fixture being lit. */
   identify?: { index: number } | null;
   /** Transient kalibrerings-test — not persisted. Tvingar fixture[index] till ett

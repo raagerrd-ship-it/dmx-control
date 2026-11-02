@@ -116,6 +116,7 @@ const SEC_CEIL = 0.65, SEC_CEIL_BUILD = 0.85;
 const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
 import { hsvToRgb, hsv as hsvFx } from "./effects/color.js";
 import { slotSize } from "./effects/rig.js";
+import { MomentLayer } from "./moment.js";
 const ZERO3: [number, number, number] = [0, 0, 0];
 /** TALFÄLTEN SOM DECIMALTAL FRÅN START (10-16, GC-jakten): ett fält som startar som heltal (`= 0`) och senare får ett decimaltal byter
  *  objektets form (V8 'map') - då kastas all optimerad kod som läser objektet ('wrong map'-deopt) och det hände fält för fält, minut för
@@ -631,6 +632,7 @@ export class EffectEngine {
   /** Silence gate: fade the whole rig to black when no music plays. */
   private inputLowSince = 0;     // väggklocka: sedan när nivån legat under gränsen
   private inputOff = false;      // ingången bedöms avstängd → riggen mörk
+  private moment = new MomentLayer(); private rMw = 0;   // BRÖLLOPSLÄGET (moment.ts): stundens vikt denna ruta, 0 = fest orörd
   private silenceGate = 1;
   /** Hur länge riggen varit mörk av tystnad (ms sedan nivån föll under släckgränsen och grinden stängt), 0 = inte mörk. Läses av
    *  gcDark.ts efter sändningen - påverkar inte ljuset. (10-18) */
@@ -1440,6 +1442,8 @@ export class EffectEngine {
       // (SPOT-regeln, UNIFORM:s ovalda par och taktdippen KICK_E borttagna 10-12 - förbivägar/dubbelmodulering, se B_CURVE)
       const k = inputGate * (useE ? md : drive);
       rgb[0] *= k; rgb[1] *= k; rgb[2] *= k;
+      // STUNDEN (bröllopsläget, moment.ts): festens ljus efter energin * (1 - w) + stundens ljus * w - stunden följer inte släckgränsen/ingången.
+      if (this.rMw > 0) { const ml = this.moment, w = this.rMw, u = 1 - w; rgb[0] = rgb[0] * u + ml.r(i) * w; rgb[1] = rgb[1] * u + ml.g(i) * w; rgb[2] = rgb[2] * u + ml.b(i) * w; }
       // ENERGIN SLACKER ALDRIG (agaren 2026-10-10: "energi skall aldrig slacka om effekten vill ha pa en lampa"): vill effekten ha
       // lampan tand (m0 > 0) och ingangen ar pa (k > 0) halls den pa lagst 1 % (gammans forsta steg -> utgangens tandpunkt+1).
       // Bara effekten sjalv eller slackgransen (tystnad) slacker. Kuloren bevaras (alla kanaler med samma faktor).
@@ -2046,6 +2050,9 @@ export class EffectEngine {
     specialty.laser   = drivesHas(drives, "laser")   ? clamp255(Math.max(180 + audio * 75, wantLaser * 255)) : 0;
     specialty.co2     = drivesHas(drives, "co2")     ? clamp255(Math.max(this.dropEnv > 0.85 ? 255 : 0, wantCo2 * 255)) : 0;
 
+    // BRÖLLOPSLÄGET (moment.ts): middag/tal/första dansen/tårtan blandas in i steg 1 med vikten mw - ingen strobe/blinder/hazer i en stund.
+    const mw = this.moment.step(this.cfg, frame.level, nowWall, dtSec, count) ? this.moment.w : 0; this.rMw = mw;
+    if (mw > 0) { specialty.hazer = 0; specialty.uv = 0; specialty.blinder = 0; specialty.strobe = 0; specialty.laser = 0; specialty.co2 = 0; }
     const inputGate = this.inputOff ? 0 : 1;   // ingangen avstangd -> morkt (del av steg 2)
     this.fxPeakNow = 0;
     const fadeK = Math.exp(-dtSec / (FADE_MIN_S / E_LIN_INV));
@@ -2087,7 +2094,7 @@ export class EffectEngine {
       const r = tgt > this.secCeil ? dtNow / 0.3 : dtNow / 2.0;                                  // upp snabbt, ner långsamt
       this.secCeil += Math.max(-r, Math.min(r, tgt - this.secCeil));
     }
-    { const o = this.out; o.calMaster = this.cfg.master ?? 1; o.calNow = nowP; o.calDrop = this.dropColEnv; o.calCeil = this.secCeil; o.calRamp = this.levelRamp; o.calibrate(this.universe, this.cfg.fixtures); }   // talen via fält (se output.ts)
+    { const o = this.out; o.calMaster = this.cfg.master ?? 1; o.calNow = nowP; o.calDrop = this.dropColEnv * (1 - mw); o.calCeil = this.secCeil + (1 - this.secCeil) * mw; o.calRamp = this.levelRamp + (1 - this.levelRamp) * mw; o.calibrate(this.universe, this.cfg.fixtures); }   // talen via fält (se output.ts)
 
     // Rök: motorn avgör OM den ska spruta, output-tjänsten var signalen hamnar.
     // RÖK: motorn samlar önskemålen — drop, manuell knapp, eller en effekt som bett om
@@ -2096,7 +2103,7 @@ export class EffectEngine {
       // MANUELL puff (Rök nu) kringgår cooldownen: ägaren trycker medvetet. Värmeskyddet (heatOk)
       // och pågående-puff-spärren gäller fortfarande. Utan detta tappades knappen TYST inom 2 min
       // efter varje drop-rök (ladan 2026-09-04: bursts stod still, ingen feedback i UI:t).
-      const manualFog = !!this.cfg.fogTrigger;
+      const manualFog = !!this.cfg.fogTrigger || this.moment.puff;   // + första dansens puff vid start (moment.ts)
       // HUNGER: lange sedan senaste puff -> aven en minidrop eller intrade i high-sektion far bli rok.
       const sec = frame.section ?? '';
       const highEntry = sec === 'high' && this.fogLastSec !== '' && this.fogLastSec !== 'high';
@@ -2105,7 +2112,7 @@ export class EffectEngine {
       const miniNow = this.lastMiniWall === nowWall || this.nearAt === nowWall;   // fireMini satte looken i denna ruta (10-16: förr analysatorns miniHit, alltid falskt i konsertläget -> minidrop gav aldrig hungrig rök)
       // (11-01 ladan, ägaren: 'det har gått flera 5 min, den borde kört' - loggen: 6 nästan-drops på 2,5 min, ingen minidrop -> hungern fick
       //  aldrig sin signal. Nästan-dropen räknas nu som minidrop för den hungriga röken.)
-      const wantBurst = (dropHitRaw && fog.onDrop) || manualFog || wantFogFx || (hungry && (miniNow || highEntry));
+      const wantBurst = mw > 0 ? manualFog : (dropHitRaw && fog.onDrop) || manualFog || wantFogFx || (hungry && (miniNow || highEntry));   // stund: bara manuell puff
       if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;   // engångs-flagga
       this.out.fogNow = nowWall; this.out.fogDt = _dtT * 1000; const spraying = this.out.fogTick(wantBurst, fog, manualFog);
       if (spraying && !this.fogWasSpraying) this.lastFogWall = nowWall;   // puffen startade (vilken orsak som helst)

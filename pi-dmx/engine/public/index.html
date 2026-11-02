@@ -372,6 +372,15 @@
     .lamp > .fx-err { padding: 0 14px 12px; font-size: 12px; color: var(--hot); }
     .lamp-savebar { position: sticky; bottom: calc(env(safe-area-inset-bottom) + 10px); z-index: 44; padding-top: 8px; }
     .lamp-savebar .btn { width: 100%; min-height: 54px; font-size: 16px; box-shadow: 0 10px 28px rgba(0,0,0,.55); }
+    /* BRÖLLOPSLÄGET (11-02): kvällens stunder under reglaget - samma väg som de fysiska knapparna (tryck på aktiv = Fest) */
+    .moments { margin-top: 14px; }
+    .mom-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .moments button { min-height: 56px; padding: 14px 8px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; color: var(--fg); font-size: 16px; font-weight: 600; cursor: pointer; }
+    .moments button.on { background: var(--hot); border-color: var(--hot); color: #fff; }
+    .moments .mom-small { display: block; min-height: 0; margin: 8px auto 0; padding: 8px 20px; font-size: 13px; font-weight: 500; }
+    .theme-sw { display:flex; gap:8px; flex-wrap: wrap; }
+    .theme-sw button { width: 44px; height: 44px; border-radius: 10px; border: 2px solid var(--line); cursor: pointer; }
+    .theme-sw button.on { border-color: var(--fg); box-shadow: 0 0 0 2px var(--bg) inset; }
   </style>
 </head>
 <body>
@@ -432,6 +441,15 @@
       <input type="range" id="moodSlider" class="mood-range" min="0" max="10" step="1" value="5" aria-label="Ljusstyrka från Av till Max" />
     </div>
     <div class="mood-slider-legend"><span id="legAv">AV</span><span id="legFest">Ljus</span><span id="legGalet">MAX</span></div>
+  </section>
+  <section class="moments" id="momentCard" aria-label="Kvällens stunder">
+    <div class="mom-grid">
+      <button type="button" data-m="middag">Middag</button>
+      <button type="button" data-m="tal">Tal</button>
+      <button type="button" data-m="forstadans">Första dansen</button>
+      <button type="button" data-m="fest">Fest</button>
+    </div>
+    <button type="button" class="mom-small" data-m="tartan">Tårtan</button>
   </section>
 
   <section class="audio-section">
@@ -500,6 +518,18 @@
 
 </div>
 <div class="tab-pane" data-pane="ljus">
+  <h1>Parets färger</h1>
+  <div class="card" id="themeCard">
+    <div class="theme-sw" id="themeSw">
+      <button type="button" data-s="0" style="background:#ff2020" aria-label="Röd"></button>
+      <button type="button" data-s="1" style="background:#ffe020" aria-label="Gul"></button>
+      <button type="button" data-s="2" style="background:#20e040" aria-label="Grön"></button>
+      <button type="button" data-s="3" style="background:#20e0f0" aria-label="Cyan"></button>
+      <button type="button" data-s="4" style="background:#2040ff" aria-label="Blå"></button>
+      <button type="button" data-s="5" style="background:#f020f0" aria-label="Magenta"></button>
+    </div>
+    <div class="status" style="margin-top:8px">Välj 1-3 färger för Middag, Tal och Tårtan (knapparna under reglaget). Lamporna är RGB - bara de sex rena färgerna blir klara.</div>
+  </div>
   <h1>Ljusnivå</h1>
   <div class="card" id="levelCard">
     <div class="row"><label>Lägsta nivå</label>
@@ -742,6 +772,35 @@ function connect() {
   };
 }
 function send(obj) { if (ws?.readyState === 1) ws.send(JSON.stringify(obj)); }
+// BRÖLLOPSLÄGET: stunderna (motorn: moment.ts). Aktiv stund kommer i framen (activeMoment) så alla telefoner visar samma.
+const momentCard = document.getElementById("momentCard");
+let curMoment = "fest";
+function setMomentUi(m) {
+  curMoment = m || "fest";
+  momentCard.querySelectorAll("button[data-m]").forEach((b) => b.classList.toggle("on", b.dataset.m === curMoment));
+}
+momentCard.addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-m]"); if (!b) return;
+  const m = b.dataset.m;
+  setMomentUi(m !== "fest" && m === curMoment ? "fest" : m);   // samma regel som motorn: tryck på aktiv = Fest
+  send({ type: "setMoment", value: m });
+});
+setMomentUi("fest");
+const themeSw = document.getElementById("themeSw");
+let curTheme = [5, 0];
+function setThemeUi(t) {
+  curTheme = Array.isArray(t) && t.length ? t.slice(0, 3) : [5, 0];
+  themeSw.querySelectorAll("button[data-s]").forEach((b) => b.classList.toggle("on", curTheme.includes(Number(b.dataset.s))));
+}
+themeSw.addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-s]"); if (!b) return;
+  const s = Number(b.dataset.s);
+  let t = curTheme.includes(s) ? curTheme.filter((x) => x !== s) : [...curTheme, s];
+  if (t.length > 3) t = t.slice(t.length - 3);   // max 3: den äldsta faller bort
+  if (!t.length) return;                          // minst en färg
+  setThemeUi(t);
+  send({ type: "setThemeColors", value: t });
+});
 /* LANGINSPELNING (longRecord.ts, /api/longrec): knappen startar 5 min, statusen pollas medan den spelar in. */
 const recStart = document.getElementById("recStart"), recStop = document.getElementById("recStop"), recState = document.getElementById("recState");
 let recPoll = null;
@@ -841,6 +900,7 @@ function applyConfig(cfg) {
   const x = typeof cfg.activeIntensity === "number" ? cfg.activeIntensity : 0.5;
   lastIntensity = x;
   updateMoodUi(x, cfg.mode !== "blackout", cfg.mode === "blackout");
+  setMomentUi(cfg.moment); setThemeUi(cfg.themeColors);
   const fog = cfg.fog || {};
   if (fogEnabled) { fogEnabled.checked = !!fog.enabled; fogOnDrop.checked = fog.onDrop !== false; fogAddr.value = fog.address ?? 128; }
   const fogSettings = document.getElementById("fogSettings");
@@ -932,6 +992,7 @@ function syncRingUi(r) {
 
 
 function applyFrame(f) {
+  if (f.activeMoment && f.activeMoment !== curMoment) setMomentUi(f.activeMoment);
   const pct = Math.round(f.level * 100);
   levelBar.style.width = pct + "%";
   levelVal.textContent = pct + "%";

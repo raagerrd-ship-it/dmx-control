@@ -24,6 +24,7 @@ import { startServer, applyInputRouting, type Server } from "./server.js";
 import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 import { IntensityKnob } from "./intensityKnob.js";
+import { isMoment, pressMoment } from "./moment.js";
 import { applyIntensity, migrateFromMoods } from "./moods.js";
 import { BeatFeed } from "./beatFeed.js";
 import { LongRecord } from "./longRecord.js";
@@ -479,6 +480,19 @@ if (cfg.modeButton) {
   console.log(`mode-button on ${cfg.modeButton.chip} line ${cfg.modeButton.line} (short=mode, long=AGC)`);
 }
 
+// BRÖLLOPSLÄGET (moment.ts): fysiska knappar för kvällens stunder - samma väg som gästsidans knappar (pressMoment; tryck på aktiv
+// stund = fest). Långt tryck räknas som tryck (toastmastern ska inte behöva tänka). null/saknas = inga knappar.
+const momentButtons: Button[] = [];
+for (const mb of cfg.momentButtons ?? []) {
+  if (!isMoment(mb.moment)) continue;
+  const b = new Button({ chip: mb.chip, line: mb.line, activeHigh: !!mb.activeHigh });
+  const fire = () => { const now = pressMoment(cfg, mb.moment); console.log(`[stund] knapp ${mb.line} -> ${now}`); scheduleSave(cfg); server?.broadcastConfig(); };
+  b.on("press", fire); b.on("longPress", fire);
+  b.on("stderr", (s) => console.error("[gpiomon]", s));
+  b.start(); momentButtons.push(b);
+  console.log(`moment-button on ${mb.chip} line ${mb.line} -> ${mb.moment}${mb.activeHigh ? " (activeHigh)" : ""}`);
+}
+
 // KY-040 stämnings-vred → applyIntensity → samma kod-väg som WS "setIntensity".
 // UI-slidern och vredet är alltså exakt samma "input" — vem som än rör den
 // senast vinner, och båda syns hos alla klienter via `activeIntensity` i frame.
@@ -548,6 +562,7 @@ process.on("SIGTERM", () => {
   button?.stop();
   knob?.stop();
   knobSw?.stop();
+  for (const b of momentButtons) b.stop();
   dmx.close();
   process.exit(0);
 });

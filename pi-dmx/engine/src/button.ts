@@ -18,6 +18,8 @@ export interface ButtonOptions {
   debounceMs?: number;       // edge-level noise filter, default 40
   longPressMs?: number;      // hold threshold for long-press, default 700
   minPressIntervalMs?: number; // rate-limit between emitted "press" events, default 300
+  /** BRÖLLOPSLÄGET (11-02): linjen är HÖG medan knappen hålls (433 MHz-mottagare YK04-typ, D0-D3) -> pull-down, stigande = tryck. */
+  activeHigh?: boolean;
 }
 
 /**
@@ -49,7 +51,7 @@ export class Button extends EventEmitter {
     // libgpiod v1 gpiomon: watch both edges so we can time press-and-hold.
     // Pull-up wired to GND: falling = press (event "2"), rising = release ("1").
     const args = [
-      "--bias=pull-up",
+      this.opts.activeHigh ? "--bias=pull-down" : "--bias=pull-up",
       "--rising-edge",
       "--falling-edge",
       "--format=%e",
@@ -74,10 +76,11 @@ export class Button extends EventEmitter {
         const now = performance.now();
         if (now - this.lastEdge < debounceMs) continue;
         this.lastEdge = now;
-        if (line === "2") {
+        const down = this.opts.activeHigh ? "1" : "2", up = this.opts.activeHigh ? "2" : "1";   // activeHigh: stigande = tryck
+        if (line === down) {
           // Falling → button pressed down.
           this.pressedAt = now;
-        } else if (line === "1") {
+        } else if (line === up) {
           // Rising → released.
           if (this.pressedAt == null) continue;
           const held = now - this.pressedAt;
