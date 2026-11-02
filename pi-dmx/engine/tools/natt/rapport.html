@@ -21,7 +21,62 @@ code{font:13px var(--mono);background:var(--chip);padding:1px 5px;border-radius:
 .hist{border-top:1px solid var(--line);padding-top:16px}
 </style></head><body>
 <main>
-<header><h1>Nattrapport ladan</h1><p class="mut">2026-10-30 förmiddag (ägarens uppdrag: "få rutnätet att ha rätt tempo") · bänk på PC:n · inget deployat · ändringen ligger på grenen <code>tempo-helsok</code>, main orörd · äldre avsnitt längre ner är historik</p></header>
+<header><h1>Nattrapport ladan</h1><p class="mut">Dagkörningen och natten 2026-11-02 (nattagenten) · bänk på PC:n · inget deployat · commits på <code>tempo-helsok</code> (det som kör i ladan), main orörd · avsnitten under strecket är historik och huvudsessionens</p></header>
+
+<section><h2><span class="star">★</span> Dagkörningen 11-02: hyrkitet + bröllopsläget (inget deployat)</h2><ul>
+<li><b>Hyrkitet, 8 lampor</b> (df2e30a): effekterna som tänder en lampa i taget körs på 8 lampor över 4 platser om 2 grannlampor. Takten är tillbaka: virvel 0,23 → 0,35, glimt 0,17 → 0,31, kickregn 0,22 → 0,36, blixtnedslag 0,17 → 0,30 (4 lampor: 0,35 / 0,29 / 0,36 / 0,31). Ladans 4 lampor är bit-identiska: natt --snabb är json-lik.</li>
+<li><b>Spegla eller rad:</b> behåll <b>rad</b>, inget nytt reglage. Ett helt stativ är mörkt 1 % av tiden i median, men i fem glesa build-, intro- och break-effekter är det mer än 30 % (ankomst 61, upptakt 44, virvel 41, bounce 40, glesna 40). Halva tiden ger lampordningen redan speglade svep.</li>
+<li><b>Bröllopsläget</b> (<code>src/moment.ts</code>): Middag, Tal, Första dansen, Fest och Tårtan som knappar under gästreglaget. Parets färger väljs i /setup → Ljus (1–3 av sex). Webben, <code>POST /api/moment</code> och fysiska knappar (<code>cfg.momentButtons</code>, gpiomon, activeHigh för 433 MHz) går samma väg, och tryck på aktiv stund ger Fest. Fest är oförändrad: natt --snabb är json-lik.</li>
+</ul>
+<div class="tw"><table>
+<tr><th>momentBench, pop 60–210 s</th><th>takt</th><th>strobe</th><th>under tändpunkt</th><th>snabbaste fall</th><th>nivå</th></tr>
+<tr><td>fest (dagens show)</td><td>0,17</td><td>0</td><td>0</td><td>3400 DMX/s</td><td>0,49</td></tr>
+<tr><td>middag</td><td class="up">0,01</td><td>0</td><td>0</td><td>600</td><td>0,50</td></tr>
+<tr><td>tal</td><td class="up">0,00</td><td>0</td><td>0</td><td>0</td><td>0,29</td></tr>
+<tr><td>första dansen</td><td class="up">0,02</td><td>0</td><td>0</td><td>600</td><td>0,41</td></tr>
+<tr><td>tårtan</td><td class="up">0,00</td><td>0</td><td>0</td><td>0</td><td>0,95</td></tr>
+</table></div>
+<p class="mut">Övergångarna glider 2,5 s (tårtan upp 1 s) och faller högst 1200 DMX/s, långsammare än festens uttoning. När ingången är helt tyst under talet ligger ljuset kvar på 73/255. Kick-korrelationen är ~0 även för festen, så måttet skiljer inte; takt-måttet är beviset. Gästsidan är verifierad i mobilvy mot en lokal server.</p>
+<p><b>Lediga GPIO (BCM) för knapparna:</b> 5, 6, 13, 26 (i reserv 12, 16, 17). Upptagna är 2/3 (I2C), 14/15 (DMX), 18–21 (I2S), 27 (SW1) och 10 (SPI-ringen). Codec Zeros lysdioder är inte verifierade, så kontrollera 22–25 före användning.</p>
+<p><b>Ägarens öga:</b> nivåerna (middag 50 %, tal 25 %, dans 60 % av mastern), andningen (10 s respektive 8 s), dansens gula och rökpuffen (= fog.burstMs 2,5 s). Deploy: <code>python tools/ladan.py</code> från <code>tempo-helsok</code>.</p></section>
+
+<section><h2><span class="star">★</span> Redo för ladan (natten 11-02)</h2><ul>
+<li><b>Vidga utan diodblink</b> (d384205) och <b>fyrverkeri utan strobe</b> (d2ee3b4). Det är kodändringar, inga flaggor: <code>python tools/ladan.py</code> från <code>tempo-helsok</code>. TITTA: vidga har rena kulörer i mitten, och fyrverkeriets drop blixtrar inte längre ~10 Hz.</li>
+<li>Redan i ladan.conf sedan 11-01: <code>DMX_STAIR_BREAK=1</code> och <code>DMX_WARMUP_GC=1</code>. Mät <code>/api/perf</code> minut 1–5 vid nästa besök.</li></ul></section>
+
+<section><h2>Baslinje 11-02 (4ee495b, gårdagens kod)</h2>
+<div class="tw"><table>
+<tr><th>mått</th><th>11-01</th><th>11-02</th></tr>
+<tr><td>kvällen: hör ihop / återseende</td><td>66 / 86 %</td><td><span class="up">80</span> / <span class="dn">82 %</span></td></tr>
+<tr><td>kick → ljus pop / mega</td><td>104 / 107 ms</td><td class="dn">136 / 147 ms</td></tr>
+<tr><td>ljusLag 90 % pop / mega / 10-21</td><td>45 / 35 / 35</td><td>15 / −5 / 40 ms</td></tr>
+<tr><td>r pop / mega · korpus</td><td>0,31 / 0,20 · –</td><td>0,31 / <span class="dn">0,16</span> · 0,38</td></tr>
+<tr><td>sektion upp/ned · gridfas · drops</td><td>2,6/5,4 s · 62 % · 57</td><td>lika · 59</td></tr>
+</table></div>
+<p class="mut">Hela skillnaden är 11-01-commitarna (refrängeffekterna, minidropen). Snabbkörningen med nattens två ändringar är json-identisk med baslinjen.</p></section>
+
+<section><h2>Brister</h2><ol>
+<li><b>Kick → ljus +32/+40 ms.</b> sidokedja tog duels plats i pop (118 s), och tryckvag tog duel och rave (216 s av megamixens 600). Den mjuka stigningen (0,12 slag) som ägaren bad om flyttar toppen. ljusLag 90 % blev bättre. Det är en avvägning för ögat, inget fel.</li>
+<li><b>Diodblink kvar</b> (session_mono, per 15 min): twin 16, siren 16, backbeat 10, tryckvag 9, pendel 6.</li>
+<li><b>8 lampor:</b> virvel, upptakt, glimt, blixtnedslag och kickregn tappar takt eller rum (virvel takt 0,30 → 0,19, rum 0,64 → 0,42; upptakt rum 0,62 → 0,33).</li></ol></section>
+
+<section><h2>Diodblinken: orsak per effekt</h2><ul>
+<li><b>vidga, FIXAD:</b> innerlamporna fick +0,08 i nyans, en blandkulör där andra dioden låg på ~30 %, och den tändes och släcktes vid tändpunkten. Nu får de grannkulören. Blinket gick från 33 till 0, och totalt från 1,8 till 1,3 per lampa och minut. Spridning, rörelse och takt är oförändrade.</li>
+<li><b>twin, pendel, backbeat:</b> spåret visar kulörtoningens svans. Vid gul → grön ligger R kvar på 15–55 % i ~0,4 s, och pumpen tänder och släcker den. Att klippa svansen gav nästan inget (1/16: twin 16 → 14), så den är inte hela orsaken. Backad, och motorn är orörd.</li>
+<li><b>siren:</b> när strålarna möts byter lampan motfärg. Uttoningen behåller ljuset och byter kulören direkt, så en mörk övergång i effekten hjälper inte (provat: 16 → 22). Backad. Förslag till motorn: på en lampa som tonar ut byts inte kulören förrän den nya kulören har eget ljus över uttoningen. Inte byggt.</li>
+<li><b>tryckvag 9:</b> drop-lookens vita kärna, alltså motorn och inte effekten.</li></ul></section>
+
+<section><h2>Uppdragen</h2><ul>
+<li><b>Strobe (hyrkitet 4), BEKRÄFTAD och FIXAD:</b> enda vägen till strobe-kanalen var fyrverkeriets <code>want.strobe 0,5</code>, som ger DMX 127 så länge dropen hålls (~2 s). Det stämmer med videon. Blindern är kvar.</li>
+<li><b>Bänk på 8 (hyrkitet 1):</b> <code>--lampor N</code> i effectDyn och dynBench. 4-lampssiffrorna är oförändrade. Spegling, mjuk puls, bröllopsläget och åtgärder på 8 är inte gjorda i natt.</li>
+<li><b>Dropen efter minidroppen:</b> basen kom tillbaka vid ~66 s med bara 9–13 dB dipp, så flanken såg ingen break. Vid 71 s ligger basen redan på taket, och flanken kan per konstruktion inte se den dropen. Fynd till lotus om sektion och drop vid 71,3 s.</li></ul></section>
+
+<section><h2>Tajthet och analysatorfynd</h2>
+<p>Kick → ljus pop 136 och mega 147 ms. ljusLag pop 0/15, mega 5/−5 och 10-21 135/40 ms (korskorrelation / 90 %). Gridfas 22 ms och 62 % inom ±40. <b>Nytt fynd:</b> sektionen står i break 67,3–71,3 s med full baskropp, och ingen drop när den går high.</p></section>
+
+<section class="hist"><p class="mut"><b>Natten 11-01 (historik):</b> baslinje 2405334, hör ihop 66 / återseende 86. <code>DMX_STAIR_BREAK=1</code> HÖLL: break mega 2,25 → 1,58 lampor. <code>DMX_WARMUP_GC=1</code> byggdes. Gridfas 71 % var ett mätfel. Båda ligger i ladan.conf sedan 11-01.</p></section>
+
+<section class="hist"><p class="mut"><b>Nedan: förmiddagen 10-30 (huvudsessionen, tempot).</b> Helsökningen är DEPLOYAD i ladan sedan 10-30 16:19 och väntar på ägarens öga.</p></section>
 
 <section><h2><span class="star">★</span> Redo för ladan</h2><ul>
 <li><b>Helsökningen av tempot i effektklockan</b> (<code>beatFeed.ts</code>, bara DMX:s egen kod, delade analysatorn orörd). Klockan hittar rätt tempo mycket oftare och snabbare efter ett låtbyte. Sektionerna, gridfasen och korpusen är identiska i bänken. Hör ihop 61 → 63 % och återseende 83 → 85 %. <b>Priset:</b> effektivt antal effekter 25,6 → 22,8 och r mega 0,17 → 0,15, eftersom gallop nu väljs i en megamixlåt där backbeat låg förut.</li>

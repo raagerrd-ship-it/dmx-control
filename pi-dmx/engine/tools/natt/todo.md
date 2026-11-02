@@ -4,6 +4,7 @@
 Ordning: (1) HYRKITET 2+3 (startlistan nedan: virvel, upptakt, blixtnedslag, glimt, kickregn, glesna; rum i party/snap/mullra/rulle) - 4 lampor
 bit-identiskt; (2) BRÖLLOPSLÄGET (avsnittet nedan, steg 1-5). Hoppa över steg 3 'en idé' och tajthetsavsnittet i dag - baslinjen räcker med
 --snabb efter varje commit. Väntar på ägaren (rör inte): siren/twin-blinket i motorn, SECTION_DROP_HOLD.
+KLART 2026-11-02 (dagkörningen): hyrkitet 2+3 + bröllopsläget 1-5 byggt, ej deployat - se KLART-raderna i de två avsnitten nedan.
 
 ## Från kvällen 2026-11-01 (sist) - BRÖLLOPSLÄGET: MIDDAG I PARETS FÄRGER + KNAPPAR FÖR KVÄLLENS STUNDER (ägaren: 'ja'; EFTER diodblinken och hyrkitet nedan)
 Varför: ett bröllop är ~70 % middag/tal - i dag står showen och väntar på dansmusik. Det här gör kitet till en bröllopsprodukt.
@@ -32,6 +33,19 @@ Det ägaren sagt ja till: en PLAN + byggt bakom knapparna; standardläget (Fest)
 REGLER: inget deployas, en commit per steg, ingen opt-in-flagga (standard fest = dagens kod), rapportera i scoreboard + här.
 
 BRÖLLOPSLÄGET: EJ PÅBÖRJAT 2026-11-02 (natten gick till diodblinken + hyrkitet 1/4).
+KLART 2026-11-02 (dagkörningen, ej deployat): 1-5. src/moment.ts (MomentLayer blandas in i steg 1: fest*(1-w) + stund*w, följer inte
+  släckgränsen/ingången; övergångar linjärt 2,5 s, tårtan upp 1 s; ingen strobe/blinder/hazer, rök bara manuell + dansens puff via
+  fogTrigger-vägen), cfg.moment/themeColors/momentButtons (standard saknas = fest, parets färger magenta+röd), ws setMoment/setThemeColors,
+  GET/POST /api/moment, frame.activeMoment, gästsidan 4 knappar + Tårtan, /setup Ljus: sex färgrutor (max 3), button.ts activeHigh.
+  Bevis tools/momentBench.mjs (pop 60-210 s, render 5 ms): takt fest 0,17 / middag 0,01 / tal 0,00 / dans 0,02 / tårta 0,00; strobe 0,
+  under tändpunkt 0; snabbaste fall fest 3400 DMX/s, stunderna <= 600, övergångar <= 1200; tal med tyst ingång lyser kvar 73/255 (29 %);
+  middag median 128/255. kick-korrelationen är ~0 även för festen (måttet skiljer inte) - takt-måttet är beviset. Fest json-identisk:
+  natt --snabb --tag brollop. Lokal server: knapparna, tryck på aktiv = fest, färgvalet [5,0,2] sparat - verifierat i mobilvy.
+  LEDIGA GPIO för knapparna (BCM): 5, 6, 13, 26 (+ 12, 16, 17, 22-25 i reserv). Upptagna: 2/3 I2C, 14/15 DMX-UART, 18-21 I2S, 27 SW1,
+  10 SPI0 (ringen, avstängd). Codec Zeros lysdioder: kolla kortets dokumentation före 22-25 (ej verifierat här). Exempel i config:
+  momentButtons: [{chip:"gpiochip0",line:5,moment:"middag",activeHigh:true}, ...6 tal, 13 forstadans, 26 fest]. Tårtan via webben.
+  ÖPPET FÖR ÄGAREN: nivåerna (middag 50 %, tal 25 %, dans 60 %), andningens längd, dansens gula (om grumligt: parets första färg),
+  rökpuffens längd = fog.burstMs (2,5 s, inte 'liten').
 
 ## Från kvällen 2026-11-01 (sent) - HYRKITET: 8 LAMPOR I TVÅ STATIV (ägaren: 'förbered för det'; efter diodblinken nedan, före allt äldre)
 Ägaren hyr ut kit för bröllop/studentfester utan ljustekniker. Standardkitet blir 2 stativ x 4 PAR (rgb7, samma som ladans), ett på var
@@ -53,6 +67,18 @@ sida om dansgolvet, adresser i ordning VÄNSTER stativ (lampa 1-4) -> HÖGER sta
 REGLER: inget deployas, ingen opt-in-flagga i motorkoden (verktygsflaggan --lampor i bänkarna är ok), en commit per effekt/steg.
 
 KLART 2026-11-02 (delvis): 1 = --lampor N i effectDyn/dynBench (b6c0dd5, 4 lampor oförändrat); 4 = strobe BEKRÄFTAD fyrverkeri (want.strobe 0,5 -> DMX 127 så länge dropen hålls ~2 s) och BORTTAGEN d2ee3b4. 2/3 EJ gjorda - startlista ur effectDyn mega 4->8: virvel takt 0,30->0,19 rum 0,64->0,42, upptakt rum 0,62->0,33, glimt, blixtnedslag takt 0,27->0,15, kickregn, glesna; rum halveras i party/snap/mullra/rulle.
+
+KLART 2026-11-02 (dagkörningen, ej deployat): 2 = src/effects/rig.ts slotSize(n): på 8+ lampor körs en-lampa-i-taget-effekterna över 4 platser
+  om n/4 grannlampor (virvel, upptakt, glimt, kickregn, blixtnedslag, glesna, party-hålet, snap, mullra, rulle, slagga, ankomst, kaskad,
+  uppvarmning, viska) + c.group inre/yttre = ytterplatserna (8: 0,1,6,7 mot 2-5; förr 2 mot 6). effectDyn mega 60-240 s, takt 4 -> 8 före ->
+  efter: virvel 0,35 -> 0,23 -> 0,35, glimt 0,29 -> 0,17 -> 0,31, kickregn 0,36 -> 0,22 -> 0,36, blixtnedslag 0,31 -> 0,17 -> 0,30,
+  glesna 0,22 -> 0,16 -> 0,22. 4 lampor bit-identiskt (effectDyn-utskriften lika, natt --snabb --tag hyrkit). 'rum' faller ändå på 8
+  (virvel 0,65 -> 0,43): lampordningen utifrån-in/inifrån-ut gör platserna till SPEGLADE par (0+7, 1+6 ...) - tyngdpunkten står i mitten
+  och måttet ser 0, ögat ser ett symmetriskt svep. 3 = SPEGLA ELLER RAD (scratch standDyn, mega på 8): 'ett stativ helt mörkt' median 1 %
+  av tända rutor, men 5 effekter > 30 %: ankomst 61 % (93 före platserna), upptakt 44, virvel 41, bounce 40, glesna 40 - alla glesa
+  build/intro/break-effekter. REKOMMENDATION: behåll RAD (inget nytt reglage): spegling ger samma 4-lampsbild i båda stativen men tar bort
+  det enda som kitet har mer än ladan, svepet tvärs över golvet; ordningsväxlingen ger redan speglade svep halva tiden. Ögat avgör vid
+  första uthyrningen - om ett mörkt stativ i builden stör: spegla bara de fem glesa effekterna (ej byggt).
 
 ## Från kvällen 2026-11-01 - DIODBLINK I DE ÄLDRE EFFEKTERNA (ägaren i ladan: 'lägg till nattagent att fixa de äldre, men i övrigt ser det fint ut nu'; går före allt annat)
 LÄGET: LIVE sedan 18:30 = ff83da2 (tempo-helsok; 42ae94a snabbspolad hit från agent-work/warmup-gc + minidropen: bara tända lampor till
