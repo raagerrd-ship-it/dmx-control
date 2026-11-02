@@ -41,7 +41,7 @@ const CALM_BPM = 90;
 /** MINIDROPEN LYFTER OCH HÅLLER (ägaren i ladan 10-11: "låten ökar energi, kör minidrop men ljuset visar inget"): bänken visade att
  *  blinken kom (0,40 -> 0,95) men bara i 150 ms - sedan föll ljuset tillbaka. Nu släpper energin helt i MINI_LIFT_MS efter minidropen
  *  (effekten lyser med full egen styrka) och glider tillbaka på MINI_LIFT_FALL_MS. Bara mindre dämpning. */
-const MINI_LIFT_MS = 4000, MINI_LIFT_FALL_MS = 1500;   // 400/400 -> 4000/1500 (ladan 10-11 21:50, efter V123 när minidropen bara kommer på riktiga lyft: 'med dessa miss skulle jag önskat minidrop med ökad energi')   // 1000/800 -> 400/400 (ägaren: 'bara allt lyser')   // 500/600 -> 1000/800 (kandes inte)   // ägaren: 'behöver inte vara 2 s' - 2 s bara med felsökning på (synligt kvitto)
+const MINI_LIFT_MS = 2000, MINI_LIFT_FALL_MS = 1500;   // 4000 -> 2000 (ladan 11-02 18:40: 'korta kanske minidrop'; fallet orört)   // 400/400 -> 4000/1500 (ladan 10-11 21:50, efter V123 när minidropen bara kommer på riktiga lyft: 'med dessa miss skulle jag önskat minidrop med ökad energi')   // 1000/800 -> 400/400 (ägaren: 'bara allt lyser')   // 500/600 -> 1000/800 (kandes inte)   // ägaren: 'behöver inte vara 2 s' - 2 s bara med felsökning på (synligt kvitto)
 /** ENERGILYFT (ägaren i ladan 10-11: "jag ser allt från att det varit lugnt till ett tydligt energilyft (även om det är lägre) med
  *  basslag som minidrop"): analysatorns minidrop/nästan-drop jämför mot de senaste sekunderna, som efter ett lugnt parti har anpassat
  *  sig. Här: basens kropp (nearB, 120 ms) medlad över 0,6 s mot medlet för 6..2 s sedan; LIFT_DB över det -> samma minidrop-look
