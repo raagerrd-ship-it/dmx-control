@@ -34,6 +34,7 @@ const say = (...a) => process.stdout.write(a.join(" ") + "\n");
 const args = process.argv.slice(2);
 const flag = (k) => args.includes(k);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
+const LAMPOR = Number(opt("--lampor", 0));   // 0 = standardconfigens 4 (ladan)
 const QUIET = flag("--tyst");
 const ON = Number(opt("--on", 16));
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = 25;
@@ -85,6 +86,7 @@ const { BoundaryDetector } = await import("../dist/boundaryDetector.js");
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.beatPulse = true; cfg.master = 1; cfg.energyCeiling = true;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
+if (LAMPOR > 0) cfg.fixtures = Array.from({ length: LAMPOR }, (_, k) => ({ name: `Par ${k + 1}`, address: 1 + 7 * k, preset: "rgb7" }));   // HYRKITET (11-02): --lampor N rgb7 i följd
 for (const fx of cfg.fixtures) fx.cal = { off: 0, on: ON };   // LADANS tandpunkt (se huvudet)
 const lamps = cfg.fixtures.map((fx) => {
   const roles = fixtureRoles(fx), base = (fx.address ?? 1) - 1;
@@ -189,7 +191,7 @@ for (const [li, L] of CH.entries()) for (let c = 0; c < 3; c++) {
     const lampOn = L[0][i] > ON || L[1][i] > ON || L[2][i] > ON;
     if (!lampOn) { state = null; continue; }
     const s = L[c][i] > ON;
-    if (state !== null && s !== state) { vaxl++; if ((i - since) * STEP_MS < Number(process.env.DYN_BLINK_MS ?? 300)) { blinkLook[LOOK[i]] = (blinkLook[LOOK[i]] ?? 0) + 1; let held = true; for (let q = Math.max(0, since - 1); q <= i; q++) if (!I[q]) { held = false; break; } if (held) ofriv++; if (process.env.DYN_BLINK && blink < 12) process.stderr.write(`blink ${LOOK[i]} k${c} t ${(T[i] / 1000).toFixed(2)} ${[0, 1, 2].map((q) => L[q].slice(i - 6, i + 3).join(',')).join(' | ')}
+    if (state !== null && s !== state) { vaxl++; if ((i - since) * STEP_MS < Number(process.env.DYN_BLINK_MS ?? 300)) { blinkLook[LOOK[i]] = (blinkLook[LOOK[i]] ?? 0) + 1; let held = true; for (let q = Math.max(0, since - 1); q <= i; q++) if (!I[q]) { held = false; break; } if (held) ofriv++; if (process.env.DYN_BLINK && (process.env.DYN_BLINK_LOOK ? (process.env.DYN_BLINK_LOOK === '*' || process.env.DYN_BLINK_LOOK.split(',').includes(LOOK[i])) && (blinkLook[LOOK[i]] ?? 0) <= 12 : blink < 12)) process.stderr.write(`blink ${LOOK[i]} L${li} k${c} t ${(T[i] / 1000).toFixed(2)} ${[0, 1, 2].map((q) => L[q].slice(i - 6, i + 3).join(',')).join(' | ')}
 `); blink++; } since = i; }
     else if (state === null) since = i;
     state = s;

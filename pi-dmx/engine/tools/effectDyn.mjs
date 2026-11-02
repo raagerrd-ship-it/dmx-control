@@ -25,6 +25,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
+const LAMPOR = Number(opt("--lampor", 0));   // 0 = standardconfigens 4 (ladan)
 const path = args.find((a) => a.endsWith(".wav"));
 const startS = Number(opt("--start", 120)), maxS = Number(opt("--sek", 60));
 const SECS = opt("--sec", null) ? new Set(opt("--sec").split(",")) : null;
@@ -64,6 +65,7 @@ const bpmMed = med(BPM) || 120;
 const out = {};
 for (const look of LOOKS) {
   const cfg = JSON.parse(JSON.stringify(defaultConfig)); cfg.mode = look; cfg.master = 1;
+  if (LAMPOR > 0) cfg.fixtures = Array.from({ length: LAMPOR }, (_, k) => ({ name: `Par ${k + 1}`, address: 1 + 7 * k, preset: "rgb7" }));   // HYRKITET (11-02): --lampor N rgb7 i följd
   const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = (fx.address ?? 1) - 1; const at = (r) => { const i = roles.indexOf(r); return i < 0 ? -1 : base + i; }; return [at("r"), at("g"), at("b")]; });
   const N = lamps.length;
   Date.now = () => t00; performance.now = () => t00 - EPOCH;
