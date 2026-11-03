@@ -423,7 +423,9 @@ UTREDT, INGET BYGGT: diodblinket frasraknare 8/pendel 6 (session_mono 15 min). I
   skarpt byte vid svagt ljus (v < 0,35) gav frasraknare 8 -> 4, pendel 6 -> 6 - för lite för ett motoringrepp. Pendels blink sitter vid dropen
   (vit kärna: alla tre dioder -> 255) = ägarens öppna beslut om drop-lookens vita kärna. Lägg ingen natt på detta.
 KLART: dropen håller high är STANDARD i den delade analysatorn (ägaren 11-03 'sätt som standard direkt'), flaggan SECTION_DROP_HOLD
-  borttagen i båda repona (97dc4d0 / lotus 5c7ac6ce, backup/fore-drop-hold-20261103). Ny baslinje i natt innehåller den - jämför sektionsmåtten med det i minnet.
+  borttagen i båda repona (97dc4d0 / lotus 5c7ac6ce, backup/fore-drop-hold-20261103). LIVE i ladan 11-03 19:45 med duel (172a4b2). Kombinerad bänk:
+  megamix t90 -5 -> 35, kick->ljus 152 -> 184, hör ihop 88 -> 84 - ägaren i ladan: 'låt ligga kvar'. Backa INTE drop-hold; vill du vinna tillbaka
+  megamix: titta på vilka refrängeffekter som nu spelas längre efter dropen och deras ansats. Ny baslinje i natt innehåller den - jämför sektionsmåtten med det i minnet.
 
 ## NATTEN 2026-11-03 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
 KLART 2026-11-03: inga nya kvällsuppdrag (11-01/11-02 alla KLART, live 11-02 18:42). Baslinje natt/2026-11-03.json (2fe89b7 = live): mixar/kvällen
