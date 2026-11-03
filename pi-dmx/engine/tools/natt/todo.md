@@ -416,6 +416,13 @@ PROV REDO (gren tempo-helsok, main orörd): beatFeed.ts HELA TEMPOOMRÅDET - bas
 FÖRKASTAT: samma tempo till analysatorns rutnät (agrid 60,8 -> 67,1 % men sektion upp 2,6 -> 4,1 s), HMM-utjämning, bekräftelse två varv,
   0,5 %-steg, hysteres 1,0 (gridfas 10-21 95 -> 27 %) och 1,25. Fynd till lotus: helsökningen slår frame.bpm (analysator-fynd 10-30).
 
+## KVÄLLEN 2026-11-03 (huvudsessionen, ej deployat - läggs in nästa gång ägaren är i ladan)
+KLART: duel tillbaka på trumdetektorns envelopes (ligger på ljudet) med stigning 50 ms och eko-fall tau 0,4 s: ljusLag 10-21 90 % 130 -> 40 ms
+  (som före 428e5d9), hopp pop/mega 0,032/0,025 -> 0,028/0,024, blink 0,31/0,43 -> 0,11/0,28. Rör inte duel i natt.
+UTREDT, INGET BYGGT: diodblinket frasraknare 8/pendel 6 (session_mono 15 min). Inte kulörtoningens svans (0,002 -> 0,02: identiskt);
+  skarpt byte vid svagt ljus (v < 0,35) gav frasraknare 8 -> 4, pendel 6 -> 6 - för lite för ett motoringrepp. Pendels blink sitter vid dropen
+  (vit kärna: alla tre dioder -> 255) = ägarens öppna beslut om drop-lookens vita kärna. Lägg ingen natt på detta.
+
 ## NATTEN 2026-11-03 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
 KLART 2026-11-03: inga nya kvällsuppdrag (11-01/11-02 alla KLART, live 11-02 18:42). Baslinje natt/2026-11-03.json (2fe89b7 = live): mixar/kvällen
   json-lika med 11-02-effektsvep (MINI_LIFT 4 -> 2 s syns inte i mixarna). Mot 11-02-baslinjen (4ee495b): kick->ljus pop 136 -> 123 / mega 147 -> 152,
