@@ -416,6 +416,16 @@ PROV REDO (gren tempo-helsok, main orörd): beatFeed.ts HELA TEMPOOMRÅDET - bas
 FÖRKASTAT: samma tempo till analysatorns rutnät (agrid 60,8 -> 67,1 % men sektion upp 2,6 -> 4,1 s), HMM-utjämning, bekräftelse två varv,
   0,5 %-steg, hysteres 1,0 (gridfas 10-21 95 -> 27 %) och 1,25. Fynd till lotus: helsökningen slår frame.bpm (analysator-fynd 10-30).
 
+## NATTEN 2026-11-03 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
+KLART 2026-11-03: inga nya kvällsuppdrag (11-01/11-02 alla KLART, live 11-02 18:42). Baslinje natt/2026-11-03.json (2fe89b7 = live): mixar/kvällen
+  json-lika med 11-02-effektsvep (MINI_LIFT 4 -> 2 s syns inte i mixarna). Mot 11-02-baslinjen (4ee495b): kick->ljus pop 136 -> 123 / mega 147 -> 152,
+  hör ihop 80 -> 88, ljusLag 90 % pop 15 / mega -5 / 10-21 40 -> 130 ms (effektsvepet 428e5d9: duel på effektklockan med soft i stället för trumenveloper).
+  OBS mätfälla: ljusLag korskorr på 10-21 är platt (0,82-1,00 över -50..200 ms) - 10 <-> 120 ms är brus, döm på t90 + medelkurvan.
+  Diodblink session_mono (dynBench): sidoBlink 1,3 -> 0,6/lampa/min; kvar frasraknare 8, pendel 6, twin 6, eko 4 (siren/tryckvag 0).
+  PROV FÖRKASTAT DMX_SOFT_LEAD=0.12 (soft-effekterna läser klockan 0,12 slag före så toppen landar på slaget): kick->ljus pop 123 -> 120, mega 152 lika,
+  r +0,01, MEN ljusLag 90 % pop 15 -> 30 / mega -5 -> 35 ms. Toppen styrs av energilagret (basen ~0,1 slag efter klockan), inte effektens fas. Koden backad.
+  NÄSTA: diodblinket i frasraknare (ny soft 28fb258) och pendel; ljusLag 10-21 t90 130 ms - pröva duel med trumenvelopen som ansats + soft-utklingning.
+
 ## NATTEN 2026-11-02 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
 Baslinje natt/2026-11-02.json (4ee495b = gårdagens kod): hör ihop 66 -> 80, återseende 86 -> 82, kick->ljus pop 104 -> 136 / mega 107 -> 147
   (sidokedja/tryckvag med mjuk stigning tog duel/rave:s platser; tryckvag 216 s av mega 600), ljusLag 90 % pop 45 -> 15, r mega 0,20 -> 0,16.
