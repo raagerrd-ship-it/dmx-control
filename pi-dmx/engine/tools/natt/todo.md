@@ -1,5 +1,17 @@
 # Natt-agentens uppdrag
 
+## Från eftermiddagen 2026-11-04 - HIGH NR 3+ FÅR NÄSTA LOOK (ägaren: 'ja, låt nattagenten pröva b i natt'; går före allt annat)
+Bakgrund: look-taket förkastat i dag (31ac4a9, se KLART nedan). Diagnosen: tryckvags 36 % i megamix är MANUSETS ÅTERSEENDE - high kommer
+  tillbaka och tar samma look igen (effects.ts manus keep ~rad 830-840, manusHist rad 617/968), inte långa sträckor.
+1. PRÖVA (b): när samma sektionsnyckel kommer tillbaka för 3:e gången (eller fler) i samma låt får den NÄSTA look ur manusHist/pickLook
+   (minst spelad som passar), inte sektionens första. 1:a och 2:a gången oförändrade (återseendet ska bestå - refrängen känns igen).
+   Pröva gärna varianten "från 4:e gången" som andra punkt. Rör inte drop-hold, duel eller look-taket (förkastat).
+2. Döm mot SAMMA baslinje som i dag (looktak-av / json-lik): mega lookTime tryckvag (ner från 36 %), återseende (får sjunka lite, inte rasa),
+   hör ihop, byten/min, korta < 8 s, ljusLag 90 %, dropsprång och lampspr (FÅR INTE FALLA - det var det som fällde taket).
+   Bevisar det sig: in I KODEN som standard (ingen env-flagga), backup-tagg backup/fore-highvarv-20261104. Annars backa + spara patch + siffror.
+   Deploya inte.
+3. Tryckvags kanter först efter detta, mot den nya baslinjen.
+
 ## Från förmiddagen 2026-11-04 - TAK FÖR EN LOOK I STRÄCK (ägaren: 'ja, låt nattagenten pröva det i natt'; går före allt annat)
 Ägaren frågade 'kör den alltid tryckvåg?': megamix 0-600 s tryckvag 218 s (36 %), sidokedja 121, gallop 112 (natt/2026-11-04.json lookTime);
   pop är spridd (backbeat 118, eko 102, drumkit 86, tryckvag 65). Orsak: LÅTMANUS byter bara vid sektionsgräns/build/drop (effects.ts ~rad 309,
