@@ -268,6 +268,11 @@ const MANUS_TOP = 2;
  *  var som helst i takten (konsertReplay --slag). Med N väntar bytet (wantSwitch/buildEntry, inte drop/build-händelserna) in nästa
  *  taktklocka-tick med beatIdx % N = 0 (1 = nästa slag, 4 = ettan), högst N slag x 1,25. */
 const SWITCH_ON = 1;
+/** HIGH-VARV (standard 2026-11-04, ägaren: 'pröva b'; megamix tryckvag 36 % = manusets återseende): när refrängen (high) kommer tillbaka
+ *  för 4:e gången eller fler i samma låt får den NÄSTA look - minst spelad ur sektionens manusHist, annars ny ur poolen - i stället för
+ *  manusets. 1:a-3:e gången oförändrade (refrängen känns igen). Drop-bytet orört. natt --snabb: mega tryckvag 36 -> 21 %, lampspr 83 -> 88,
+ *  dropsprång hög 0,44 -> 0,50, r 0,12 -> 0,17, ljusLag mega 35 -> 15 ms; återseende 78 -> 65 %, hör ihop 84 -> 81. Från 3:e: lampspr 83 -> 74. */
+const HIGH_VARV = 4;
 /** ALLA LOOKER (prov 2026-10-09, STANDARD sedan 2026-10-10 - agaren i ladan; kraven ligger i registry.ts). Tva dirigentregler:
  *  (a) BUILD-INTRADE: analysatorns sektion 'build' kom bara 8 ganger pa 20 min mix, och "byt aldrig mitt i en uppbyggnad" blockerade
  *      allt annat -> build-poolen (pulse/stegring/sug) valdes 1 av 122 byten. Nu raknas en uppbyggnad som hallit i ALLA_BUILD_S
@@ -614,7 +619,7 @@ export class EffectEngine {
    *  standard 0 - ägaren 10-11 'inga timrar på riktig drop'.)
    */
   /** LÅTMANUS: sektionstyp -> låtens look för den (se MANUS_REL). Glöms bara på en verklig låtgräns (softenRange). */
-  private manus = new Map<string, Mode>(); private manusHist = new Map<string, Mode[]>();   // manusHist: MANUS_RETURN, sektionens looker i låten
+  private manus = new Map<string, Mode>(); private manusHist = new Map<string, Mode[]>(); private secVisits = new Map<string, number>(); private visitKey = '';   // manusHist: MANUS_RETURN, sektionens looker i låten
   private songPal = -1;   // LÅTMANUS: låtens kulörfamilj (palettindex), -1 = väljs vid nästa sektion
   private songNo = 0; private manusTog: boolean | null = null;   // LÅTMANUS: låtnummer och om låten är en toggle-låt (null = ej avgjort)
 
@@ -622,6 +627,7 @@ export class EffectEngine {
   softenRange(): void {
     this.songPal = -1; this.songNo++; this.manusTog = null;
     if (this.manus.size) { for (const [k, m] of this.manus) this.prevSongLook.set(k, m); console.log(`[dirigent] latgrans: nytt manus (forra: ${[...this.manus].map(([k, m]) => k + '=' + m).join(' ')})`); this.manus.clear(); this.manusHist.clear(); }
+    this.secVisits.clear(); this.visitKey = '';
   }   // (rullande nivarangen borttagen 10-08 - den matade bara DIM-taket)
 
 
@@ -834,8 +840,13 @@ export class EffectEngine {
         // Manusets look galler om den fortfarande ar pa och passar (krav, och inte tva tiers fran energin just nu - en lugn vers-look i en
         // vers som blivit full far en ny look, som blir manusets nya).
         const fits = (m: Mode) => this.cfg.rotation?.[m] !== false && (calm || secKey === 'build' || Math.abs(tierRank(m) - tierNow) <= 1);
-        let keep = !!kept && fits(kept) && !(dropSwitch && !this.bassStrong(kept));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark
-        if (!keep && secKey && !(dropSwitch)) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m)); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
+        let varv = 0;   // HIGH-VARV: vilken gång sektionstypen kommer i låten (räknas när nyckeln byts)
+        if (secKey && secKey !== this.visitKey) { varv = (this.secVisits.get(secKey) ?? 0) + 1; this.secVisits.set(secKey, varv); this.visitKey = secKey; }
+        const nextLook = HIGH_VARV > 0 && secKey === 'high' && varv >= HIGH_VARV && !dropSwitch && !!kept;
+        let keep = !nextLook && !!kept && fits(kept) && !(dropSwitch && !this.bassStrong(kept));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark
+        const avoid = nextLook ? kept : undefined;
+        if (nextLook) { const h = (this.manusHist.get(secKey) ?? []).filter((m) => m !== kept && m !== this.smartMode && fits(m)); if (h.length) { kept = this.pickLook(h.map((m) => ({ m }))); keep = true; this.manus.set(secKey, kept); console.log(`[dirigent] high-varv ${varv}: nasta look "${kept}"`); } }
+        if (!keep && secKey && !(dropSwitch) && !nextLook) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m)); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
         if (keep && kept === this.smartMode) { this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true; }   // manuset sager samma look - inget byte
         else {
         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
@@ -923,7 +934,7 @@ export class EffectEngine {
         const clearBass = toggles.length > 0;
         if (clearBass) {
           const ranked = toggles.map((m) => ({ m, s: fitScore(m, frame.profile) - (this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0) + (!this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0) - unitPen(m) + rel(m) })).sort((a, b) => b.s - a.s);
-          const cands = ranked.filter((x) => x.m !== this.smartMode);
+          const cands = ranked.filter((x) => x.m !== this.smartMode && x.m !== avoid);
           const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, (anchor && MANUS_TOP > 0 ? MANUS_TOP : Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC)))));
           this.smartMode = this.pickLook(top);
           console.log(`[dirigent] ${secKey ? 'manus ' + secKey + ': ' : ''}${beatClear ? `last takt (tillit ${this.beatTrust.toFixed(2)}` : `tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}`}, ${toggles.length} toggles) -> "${this.smartMode}"`);
@@ -943,7 +954,7 @@ export class EffectEngine {
           const ranked = pool
             .map((m) => ({ m, s: fitScore(m, frame.profile) + fastBoost(m) }))
             .sort((a, b) => b.s - a.s);
-          const cands = ranked.filter((x) => x.m !== this.smartMode);
+          const cands = ranked.filter((x) => x.m !== this.smartMode && x.m !== avoid);
           // MIX_V2 (4): valfonstret var alltid topp-3 av passformen -> samma 3-5 looker per tier for evigt; nu topp-MIX_TOP_FRAC av poolen (minst 3)
           const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, (anchor && MANUS_TOP > 0 ? MANUS_TOP : Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC)))));
           this.smartMode = this.pickLook(top);
