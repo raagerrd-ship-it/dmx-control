@@ -11,6 +11,18 @@ Bakgrund: look-taket förkastat i dag (31ac4a9, se KLART nedan). Diagnosen: tryc
    Bevisar det sig: in I KODEN som standard (ingen env-flagga), backup-tagg backup/fore-highvarv-20261104. Annars backa + spara patch + siffror.
    Deploya inte.
 3. Tryckvags kanter först efter detta, mot den nya baslinjen.
+KLART 2026-11-04 kväll (nattagenten): (b) BEVISAT från 4:e gången -> I KODEN som standard e03a2f4 (HIGH_VARV 4, ingen flagga, tagg
+  backup/fore-highvarv-20261104, EJ deployat). Varv = gången nyckeln 'high' kommer i låten (räknas i switchLook när nyckeln byts, nollas på
+  låtgräns); varv >= 4 och inte drop: minst spelad ur manusHist (utom manusets och nuvarande), annars ny ur poolen. natt --snabb, av json-lik looktak-av:
+  mått              av      3:e+    4:e+ (standard)
+  mega tryckvag     36 %    19 %    21 %
+  mega lampspr      83      74 <-   88
+  mega dropspr L/H  0,37/0,44  0,38/0,50  0,36/0,50
+  mega r · kick     0,12 · 184  0,12 · 160  0,17 · 187
+  ljusLag 90 % p/m/1021  15/35/40  15/15/35  15/15/40
+  kvällen återseende 78 %  59 % <-  65 %;  hör ihop 84/84/81;  korta <8 s 15/16/16 %;  byten/min 2,67/2,72/2,67;  pop oförändrad med 4:e+.
+  Dirigenten megamix: låt 1 high varv 5/6/7 = tryckvag/gallop/tryckvag, låt 2 frasraknare/sidokedja/frasraknare - växlar mellan låtens refränglooks.
+  PRIS: återseende -13 pp (kvällen), dropsprång lugn -0,01. Ägarens öga avgör; backa = git revert e03a2f4.
 
 ## Från förmiddagen 2026-11-04 - TAK FÖR EN LOOK I STRÄCK (ägaren: 'ja, låt nattagenten pröva det i natt'; går före allt annat)
 Ägaren frågade 'kör den alltid tryckvåg?': megamix 0-600 s tryckvag 218 s (36 %), sidokedja 121, gallop 112 (natt/2026-11-04.json lookTime);
@@ -460,6 +472,10 @@ KLART: dropen håller high är STANDARD i den delade analysatorn (ägaren 11-03 
   borttagen i båda repona (97dc4d0 / lotus 5c7ac6ce, backup/fore-drop-hold-20261103). LIVE i ladan 11-03 19:45 med duel (172a4b2). Kombinerad bänk:
   megamix t90 -5 -> 35, kick->ljus 152 -> 184, hör ihop 88 -> 84 - ägaren i ladan: 'låt ligga kvar'. Backa INTE drop-hold; vill du vinna tillbaka
   megamix: titta på vilka refrängeffekter som nu spelas längre efter dropen och deras ansats. Ny baslinje i natt innehåller den - jämför sektionsmåtten med det i minnet.
+
+## KVÄLLEN/NATTEN 2026-11-04 sent (nattagenten, inget deployat; commits på tempo-helsok, pushad)
+KLART: baslinje 21e88dd json-identisk med looktak-av. High-varv 4+ standard e03a2f4 (se KLART under eftermiddagens uppdrag). REDO FÖR LADAN:
+  python tools/ladan.py (kodändring, ingen env). NÄSTA: tryckvags kanter (trumenvelop som ansats, klockans utklingning) mot NY baslinje e03a2f4.
 
 ## NATTEN 2026-11-04 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
 KLART 2026-11-04: inga nya kvällsuppdrag (11-03-kvällens 'rör inte duel', 'ingen natt på diodblink' följda). Baslinje natt/2026-11-04.json (e63993a = live
