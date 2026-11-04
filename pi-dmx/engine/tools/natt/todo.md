@@ -1,5 +1,17 @@
 # Natt-agentens uppdrag
 
+## Från förmiddagen 2026-11-04 - TAK FÖR EN LOOK I STRÄCK (ägaren: 'ja, låt nattagenten pröva det i natt'; går före allt annat)
+Ägaren frågade 'kör den alltid tryckvåg?': megamix 0-600 s tryckvag 218 s (36 %), sidokedja 121, gallop 112 (natt/2026-11-04.json lookTime);
+  pop är spridd (backbeat 118, eko 102, drumkit 86, tryckvag 65). Orsak: LÅTMANUS byter bara vid sektionsgräns/build/drop (effects.ts ~rad 309,
+  860 manus keep) och megamix första 5 min är nästan bara high -> samma look ligger kvar i långa high-sektioner/återseenden.
+1. PRÖVA ETT TAK: en look får spela högst ~60 s i sträck (pröva 45/60/90 s, på slaget/frasgräns så bytet sitter musikaliskt); sedan nästa bästa
+   ur samma pool (pickLook, minst spelad). Återseendet ska bestå: samma refräng som kommer tillbaka får gärna börja i sin look - taket gäller
+   tid i sträck, inte vilken look som väljs. Drop-hold (high efter drop) och duel rör du inte.
+2. DÖM PÅ: megamix lookTime (största andel ned från 36 %), kvällens hör ihop/återseende/byten/min (inga fler korta looks <8 s), ljusLag 90 %
+   och dropsprång/lampspr (får inte falla). Bästa takvärdet byggs in I KODEN som standard (ingen env-flagga, ägarens regel; backup-tagg
+   backup/fore-looktak-20261104) om det bevisar sig - annars backa och rapportera siffrorna. Deploya inte.
+3. Tryckvags kanter (NÄSTA från natten 11-04) först efter detta, och mät dem mot takets nya baslinje.
+
 ## Från förmiddagen 2026-11-02 - DAGKÖRNING (ägaren på jobbet: 'kan vi inte sätta igång agent nu'; går före allt annat)
 Ordning: (1) HYRKITET 2+3 (startlistan nedan: virvel, upptakt, blixtnedslag, glimt, kickregn, glesna; rum i party/snap/mullra/rulle) - 4 lampor
 bit-identiskt; (2) BRÖLLOPSLÄGET (avsnittet nedan, steg 1-5). Hoppa över steg 3 'en idé' och tajthetsavsnittet i dag - baslinjen räcker med
