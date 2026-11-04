@@ -11,6 +11,16 @@
    och dropsprång/lampspr (får inte falla). Bästa takvärdet byggs in I KODEN som standard (ingen env-flagga, ägarens regel; backup-tagg
    backup/fore-looktak-20261104) om det bevisar sig - annars backa och rapportera siffrorna. Deploya inte.
 3. Tryckvags kanter (NÄSTA från natten 11-04) först efter detta, och mät dem mot takets nya baslinje.
+KLART 2026-11-04 kväll (nattagenten, FÖRKASTAT - koden backad, patch tools/natt/prov/looktak-20261104.patch, tagg backup/fore-looktak-20261104):
+  tak i sträck inom sektionen (byte på sektionens taktraster, pickLook minst spelad, manuset behåller sektionens första look). natt --snabb, av json-lik baslinjen:
+  tak       av      90 s    60 s    45 s
+  mega tryckvag 36 %   36 %    34 %    31 %     (mega längsta 73 / 73 / 60 / 46 s, looks 13/13/14/17, tak-byten i mega 0/0/1/5)
+  mega lampspr  83     83      73      75   <- FALLER (kravet 'får inte falla'); mega dropsprång hög 0,44/0,44/0,49/0,51, kick->ljus 184/184/149/152, r 0,12/0,12/0,22/0,21
+  kvällen hör ihop 84/86/84/88 %, återseende 78/77/74/74 %, korta <8 s 15/15/14/14 %, byten/min 2,67/2,80/2,91/3,16; ljusLag 90 % oförändrat 15/35/40 alla.
+  DIAGNOS: tryckvags 36 % är INTE långa sträckor (bara 1 sträcka > 60 s i megamix) utan MANUSETS ÅTERSEENDE - high kommer tillbaka och tar tryckvag igen
+  (och mega 0-300 s är nästan bara high). Ett tak kan därför bara ta ~5 procentenheter. Lampspr faller för att taket/kaskaden byter sidokedja -> motor.
+  NÄSTA (ägarens val): (a) 45 s ändå (målet + hör ihop + drops upp, lampspr mega -8); (b) angrip återseendet: high nr 3+ i samma låt får nästa i manusHist
+  i stället för första looken; (c) låt det vara. Tryckvags kanter (punkt 3) ej påbörjade - baslinjen är oförändrad.
 
 ## Från förmiddagen 2026-11-02 - DAGKÖRNING (ägaren på jobbet: 'kan vi inte sätta igång agent nu'; går före allt annat)
 Ordning: (1) HYRKITET 2+3 (startlistan nedan: virvel, upptakt, blixtnedslag, glimt, kickregn, glesna; rum i party/snap/mullra/rulle) - 4 lampor
