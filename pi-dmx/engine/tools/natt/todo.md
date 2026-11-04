@@ -427,6 +427,24 @@ KLART: dropen håller high är STANDARD i den delade analysatorn (ägaren 11-03 
   megamix t90 -5 -> 35, kick->ljus 152 -> 184, hör ihop 88 -> 84 - ägaren i ladan: 'låt ligga kvar'. Backa INTE drop-hold; vill du vinna tillbaka
   megamix: titta på vilka refrängeffekter som nu spelas längre efter dropen och deras ansats. Ny baslinje i natt innehåller den - jämför sektionsmåtten med det i minnet.
 
+## NATTEN 2026-11-04 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
+KLART 2026-11-04: inga nya kvällsuppdrag (11-03-kvällens 'rör inte duel', 'ingen natt på diodblink' följda). Baslinje natt/2026-11-04.json (e63993a = live
+  duel+drop-hold): json-lik med 11-03-duel-drophold. Mot 11-03-baslinjen: mega kick->ljus 152 -> 184, r 0,16 -> 0,12, ljusLag mega 90 % -5 -> 35,
+  10-21 130 -> 40 (duel), hör ihop 88 -> 84, återseende 82 -> 78, korta 27 -> 23 - allt drop-hold + duel, ingen ny kod.
+  Megamix lookar: motor 128 s -> sidokedja 121 s (drop-holds basstarka drop-look), tryckvag 218 s (0-300 s nästan bara tryckvag i high).
+  DIAGNOS mega t90 35: INTE lyftet som håller i refrängen (rad 1569 av som diagnos: t90 35 kvar). Medelljusets topp ligger 115 ms efter
+  basanslaget = tryckvags kanter på effektklockans soft(0,12 slag).
+  PROV FÖRKASTADE (koden backad, av-läget json-identiskt sido-av):
+  (1) DMX_SIDO_DRUM=1 sidokedjans ytterpar på trumdetektorns kick (duels stigning 50 ms/tau 0,4): mega kick->ljus 184 -> 163, r 0,117 -> 0,107,
+      ljusLag hela megamix 600 s oförändrat (90 % 35 -> 35, lyft 0,44 -> 0,45) - showTight:s frame.kick-mått flyttar sig, ljudmåttet inte.
+  (2) DMX_TRYCK_DRUM=1 tryckvags kanter på trumenvelopen: mega kick->ljus 184 -> 144, r 0,115 -> 0,141, medeltopp 115 -> 35 ms, MEN ljusLag pop
+      90 % 15 -> 30 ms, dropsprång pop hög 0,26 -> 0,22, lyft mega 0,45 -> 0,40.
+  (3) DMX_TRYCK_DRUM=2 max(klockans soft, trumenvelopen): mega r 0,115 -> 0,134, medeltopp 115 -> 50 ms, lyft 0,45 -> 0,47, ljusLag lika (1021 40 -> 35),
+      MEN dropsprång pop hög 0,26 -> 0,23 / mega lugn 0,37 -> 0,36, lampspr mega 83 -> 74, träff mega 0,42 -> 0,39. Kanterna lyser mer mellan
+      slagen -> mindre kontrast mot mitten och mindre drop-språng.
+  NÄSTA: tryckvags kanter - trumenvelopen som ANSATS men samma utklingning/golv som klockans soft (0,15 + 0,85*soft, tau 0,3 slag), så kanterna
+  inte lyser mer mellan slagen; döm på ljusLag-medeltoppen + dropsprång + lampspr. Diodblink/duel: rör inte (ägaren 11-03).
+
 ## NATTEN 2026-11-03 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
 KLART 2026-11-03: inga nya kvällsuppdrag (11-01/11-02 alla KLART, live 11-02 18:42). Baslinje natt/2026-11-03.json (2fe89b7 = live): mixar/kvällen
   json-lika med 11-02-effektsvep (MINI_LIFT 4 -> 2 s syns inte i mixarna). Mot 11-02-baslinjen (4ee495b): kick->ljus pop 136 -> 123 / mega 147 -> 152,
