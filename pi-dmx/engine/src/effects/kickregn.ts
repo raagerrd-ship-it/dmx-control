@@ -8,8 +8,9 @@ const h = (x: number, n: number) => (Math.imul(x, 2654435761) >>> 0) % n;
 // KICKREGN (full x intro, situationsrutnätet 2026-10-12 - rutan var tom): en fullfartslåts intro som redan har kicken. Varje slag
 // tänder EN lampa (hash på slaget, ny plats varje gång) fullt på kicken och på efterslaget en annan lampa till hälften i motfärg -
 // regn av slag över riggen. Övriga släckta.
+// OMTAGGNING 2026-11-05 (ägaren: "fixa" - dynamik.md varför-tabellen, aldrig vald): full-tier men bara intro (introt sällan full) -> även refrängen.
 export const kickregn: EffectDef = {
-  key: "kickregn", label: "Kickregn", tier: "full", modulate: { energy: true, pulse: false }, section: ["intro"],
+  key: "kickregn", label: "Kickregn", tier: "full", modulate: { energy: true, pulse: false }, section: ["intro", "high"],
   desc: "Intro i full fart: varje kick tänder en ny lampa, efterslaget en annan i motfärg.",
   render(c) {
     const g = slotSize(c.count), n = Math.max(1, Math.ceil(c.count / g)), me = Math.floor(c.idx / g);   // hyrkitet: platser om g lampor

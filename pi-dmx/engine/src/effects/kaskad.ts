@@ -6,8 +6,9 @@ import { slotSize } from "./rig.js";
 // och töms i varje takt. Slag 1, 2 och 3 tänder en lampa var (c.idx-ordningen) som LIGGER KVAR och växer sakta, på slag 4 släpper
 // alla tre mjukt - som en bassäng som fylls och rinner över. Den fjärde lampan tänds aldrig och flyttar en plats per takt.
 // Svall andas i två grupper, famn blommar på ettan; kaskad bygger takten lampa för lampa och släpper den.
+// OMTAGGNING 2026-11-05 (ägaren: "fixa" - dynamik.md varför-tabellen, aldrig vald): lugn-tier men bara high (refrängen sällan lugn) -> även vers och break.
 export const kaskad: EffectDef = {
-  key: "kaskad", label: "Kaskad", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["high"],
+  key: "kaskad", label: "Kaskad", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["high", "low", "break"],
   desc: "Lugn refräng: slag 1-3 tänder en lampa var som ligger kvar, på slag 4 släpper alla mjukt.",
   render(c) {
     const g = slotSize(c.count), n = Math.max(1, Math.ceil(c.count / g)), me = Math.floor(c.idx / g), slot = Math.floor(c.lamp / g);   // hyrkitet: platser om g lampor
