@@ -473,6 +473,17 @@ KLART: dropen håller high är STANDARD i den delade analysatorn (ägaren 11-03 
   megamix t90 -5 -> 35, kick->ljus 152 -> 184, hör ihop 88 -> 84 - ägaren i ladan: 'låt ligga kvar'. Backa INTE drop-hold; vill du vinna tillbaka
   megamix: titta på vilka refrängeffekter som nu spelas längre efter dropen och deras ansats. Ny baslinje i natt innehåller den - jämför sektionsmåtten med det i minnet.
 
+## Från morgonen 2026-11-05 - DAGKÖRNING (ägaren borta 6 h: 'kör det direkt'; går före allt annat)
+Baslinje = natt/2026-11-05.json (high-varv standard e03a2f4). Tryckvags kanter är STÄNGDA (tre nätter, se NATTEN 2026-11-05) - rör dem inte.
+Rör inte drop-hold, duel eller high-varv. En ändring i taget mot samma baslinje. Deploya inte (high-varv väntar på ladan när ägaren är där).
+1. 35 EFFEKTER ALDRIG VALDA I MIXARNA (bl.a. duel, ripple, pendel, eko-familjen): ta fram VARFÖR per effekt (pool/tier/section-krav,
+   fitScore, rotation av, toggle-krav, MANUS_TOP/MIX_TOP_FRAC-fönstret, pickLook). Skriv en tabell i dynamik.md: effekt, orsak, åtgärd
+   (släpp in / gallra / låt vara). Pröva högst EN regeländring som släpper in de bästa (döm: hör ihop, återseende, byten/min, korta < 8 s,
+   ljusLag 90 %, dropsprång och lampspr får inte falla). Gallra inget ur koden - lista förslagen för ägaren.
+2. ÅTERSEENDET 65 % efter high-varv: kan det höjas utan att tryckvagen kommer tillbaka (mega lookTime tryckvag ska stanna nära 21 %)?
+   T.ex. att high nr 4+ växlar mellan två looks ur manusHist i stället för en ny. Döm som ovan + mega tryckvag.
+Bevisar något sig: in i koden som standard, backup-tagg backup/fore-<namn>-20261105. Annars backa + patch + siffror.
+
 ## NATTEN 2026-11-05 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
 KLART 2026-11-05: inga nya kvällsuppdrag. Baslinje natt/2026-11-05.json (01ca9c5) json-lik med 11-04-highvarv (ingen ny kod): kick->ljus pop/mega
   123/187, r 0,29/0,17, ljusLag 90 % 15/15/40, lampspr 76/88, dropsprång hög pop/mega 0,26/0,50, återseende 65 %, hör ihop 81 %.
