@@ -4,8 +4,9 @@ import { hsv } from "./color.js";
 // FAMN (lugn x refräng, situationsrutnätet 2026-10-12 - andra effekten i rutan, syskon svall): en lugn refräng som öppnar sig.
 // Mittlamporna håller en varm, stilla glöd; ytterlamporna blommar ut på taktens etta och klingar av över hela takten - riggen
 // omfamnar mitten. Svall andas fram och tillbaka på två slag; famn slår en gång per takt.
+// OMTAGGNING 2026-11-05 (dagkörning 2, dynamik.md): fart-tier men refrängen med full tier har bara full-poolen -> tier full (natt --snabb: kvällen unika 69->70, resten lika).
 export const famn: EffectDef = {
-  key: "famn", label: "Famn", tier: "fart", modulate: { energy: true, pulse: false }, section: ["high"],
+  key: "famn", label: "Famn", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"],
   desc: "Lugn refräng: mitten glöder stilla, ytterlamporna blommar ut på taktens etta och klingar av.",
   render(c) {
     const n = Math.max(1, c.count);

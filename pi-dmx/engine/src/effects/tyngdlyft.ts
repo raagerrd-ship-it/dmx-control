@@ -5,8 +5,9 @@ import { hsv } from "./color.js";
 // ljuset djupt och mattat, bara mittlamporna; ju narmare refrangens niva desto fler lampor kommer med (inifran och ut) och
 // fargen smalnar mot vitt - vid 0 dB ar hela riggen vit, och OVER refrangens niva ber den om blinder. Pulsen pa slaget
 // vaxer med lyftet. Utan refrangreferens (forsta refrangen har inte hants) foljer lyftet nivan. Pool high/low.
+// OMTAGGNING 2026-11-05 (dagkörning 2, dynamik.md): fart-tier men refrängen med full tier har bara full-poolen -> tier full (natt --snabb: kvällen unika 69->70, resten lika).
 export const tyngdlyft: EffectDef = {
-  key: "tyngdlyft", label: "Tyngdlyft", tier: "fart", modulate: { energy: true, pulse: false }, section: ["high", "low"],
+  key: "tyngdlyft", label: "Tyngdlyft", tier: "full", modulate: { energy: true, pulse: false }, section: ["high", "low"],
   desc: "Djup farg 6 dB under refrangen, vitt nar nivan nar refrangens - blinder over den.",
   drives: ["blinder", "uv"],
   render(c) {
