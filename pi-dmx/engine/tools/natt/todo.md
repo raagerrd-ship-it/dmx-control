@@ -473,6 +473,20 @@ KLART: dropen håller high är STANDARD i den delade analysatorn (ägaren 11-03 
   megamix t90 -5 -> 35, kick->ljus 152 -> 184, hör ihop 88 -> 84 - ägaren i ladan: 'låt ligga kvar'. Backa INTE drop-hold; vill du vinna tillbaka
   megamix: titta på vilka refrängeffekter som nu spelas längre efter dropen och deras ansats. Ny baslinje i natt innehåller den - jämför sektionsmåtten med det i minnet.
 
+## NATTEN 2026-11-05 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
+KLART 2026-11-05: inga nya kvällsuppdrag. Baslinje natt/2026-11-05.json (01ca9c5) json-lik med 11-04-highvarv (ingen ny kod): kick->ljus pop/mega
+  123/187, r 0,29/0,17, ljusLag 90 % 15/15/40, lampspr 76/88, dropsprång hög pop/mega 0,26/0,50, återseende 65 %, hör ihop 81 %.
+  PROV FÖRKASTAT (DMX_TRYCK_ANSATS, koden backad, patch tools/natt/prov/tryckansats-20261105.patch, av json-identiskt): tryckvags kanter med
+  trumkickens ANSATS (stigning 50 ms) men klockans utklingning (tau 0,3 slag, räknad i slag):
+    mått                av      1 (bara trum)  2 (max m. klockan)
+    mega kick->ljus / r 187/0,17  149/0,18     173/0,19
+    ljusLag 90 % p/m/1021  15/15/40  30/15/35    15/15/35
+    dropsprång hög pop/mega  0,26/0,50  0,21/0,50  0,24/0,49
+    lampspr pop/mega    76/88   79/87          76/84
+  SLUTSATS efter tre nätter (TRYCK_DRUM 1/2, ANSATS 1/2): varje sätt att flytta kanternas topp mot trumslaget sänker pops dropsprång (kanterna lyser
+  på fel slag/mer före dropen) - kick->ljus-vinsten i megamix kostar alltid drop-kontrast. Lägg INTE fler nätter på tryckvags kanter utan ägarens ord.
+  NÄSTA (förslag): 35 effekter aldrig valda i mixarna (bl.a. duel, ripple, pendel, eko-familjen) - gallring/varför-analys; återseendet 65 % efter high-varv.
+
 ## KVÄLLEN/NATTEN 2026-11-04 sent (nattagenten, inget deployat; commits på tempo-helsok, pushad)
 KLART: baslinje 21e88dd json-identisk med looktak-av. High-varv 4+ standard e03a2f4 (se KLART under eftermiddagens uppdrag). REDO FÖR LADAN:
   python tools/ladan.py (kodändring, ingen env). NÄSTA: tryckvags kanter (trumenvelop som ansats, klockans utklingning) mot NY baslinje e03a2f4.

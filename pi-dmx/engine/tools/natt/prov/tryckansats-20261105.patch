@@ -1,0 +1,37 @@
+diff --git a/pi-dmx/engine/src/effects/tryckvag.ts b/pi-dmx/engine/src/effects/tryckvag.ts
+index 40f955a..ce71b63 100644
+--- a/pi-dmx/engine/src/effects/tryckvag.ts
++++ b/pi-dmx/engine/src/effects/tryckvag.ts
+@@ -10,6 +10,17 @@ import { hsv, soft } from "./color.js";
+ // klocka, så den snabba toppen var redan borta och kanterna slog bara till ~20 %. Mitten går förbi energin (som följer kicken och
+ // släckte mitten lika fort som kanterna) och bär i stället basgången själv (drum.bass) mellan smällarna. Frasens etta: kärnan vit i
+ // hela riggen.
++// PROV 11-05 (DMX_TRYCK_ANSATS, opt-in, av = bit-identiskt): kanternas ANSATS på trumdetektorns kick (ligger på ljudet, stigning 50 ms)
++// men klockans utklingning (tau 0,3 slag, räknad i slag) - natten 11-04 tände trumenvelopens egen svans kanterna mellan slagen.
++// 1 = bara trumansatsen, 2 = max(klockans soft, trumansatsen).
++const ANSATS = Number(process.env.DMX_TRYCK_ANSATS ?? 0);
++const aVal: number[] = [], aAt: number[] = [], aBeat: number[] = [];
++function ansats(i: number, now: number, beat: number, x: number): number {
++  const prev = aVal[i] ?? 0, dt = Math.max(0, Math.min(0.2, (now - (aAt[i] ?? now)) / 1000));
++  const db = Math.max(0, Math.min(4, beat - (aBeat[i] ?? beat)));
++  const y = x > prev ? prev + (x - prev) * Math.min(1, dt / 0.05) : prev * Math.exp(-db / 0.3);
++  aVal[i] = y; aAt[i] = now; aBeat[i] = beat; return y;
++}
+ export const tryckvag: EffectDef = {
+   key: "tryckvag", label: "Tryckvåg", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"], toggle: true,
+   desc: "Varje slag tänder allt, kanterna dör fort och mitten bär basen - ljuset dras ihop mot mitten.",
+@@ -19,7 +30,13 @@ export const tryckvag: EffectDef = {
+     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
+     const hue = ((mid ? base : base + 3) % 6) / 6;
+     // (vita kärnan borttagen 11-01 kväll: vitt i ~100 ms tände den släckta dioden - 'R och G lyser men B bara blinkar till')
+-    if (!mid) return hsv(hue, 1, 0.15 + 0.85 * soft(f, 0.12, 0.3));   // kanterna: mjuk smäll som klingar ut
++    if (!mid) {
++      if (ANSATS && c.hasBeat) {
++        const a = ansats(c.lamp, c.now, c.beatIdx + c.beatFrac, Math.pow(c.drum.kick, 0.8));
++        return hsv(hue, 1, 0.15 + 0.85 * (ANSATS === 2 ? Math.max(a, soft(f, 0.12, 0.3)) : a));
++      }
++      return hsv(hue, 1, 0.15 + 0.85 * soft(f, 0.12, 0.3));   // kanterna: mjuk smäll som klingar ut
++    }
+     c.want.energy = false;                                                    // mitten: basen själv (energin följer kicken)
+     return hsv(hue, 1, Math.max(soft(f, 0.12, 0.5), 0.3 + 0.7 * c.drum.bass));
+   },
