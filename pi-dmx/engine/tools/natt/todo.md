@@ -483,6 +483,18 @@ Rör inte drop-hold, duel eller high-varv. En ändring i taget mot samma baslinj
 2. ÅTERSEENDET 65 % efter high-varv: kan det höjas utan att tryckvagen kommer tillbaka (mega lookTime tryckvag ska stanna nära 21 %)?
    T.ex. att high nr 4+ växlar mellan två looks ur manusHist i stället för en ny. Döm som ovan + mega tryckvag.
 Bevisar något sig: in i koden som standard, backup-tagg backup/fore-<namn>-20261105. Annars backa + patch + siffror.
+KLART 2026-11-05 kväll (nattagenten, inget deployat): 1 = tabellen överst i tools/natt/dynamik.md (instrumenterad dirigent, filtersteg per beslut).
+  Mixarna har bara 34 fria lookval på 80 effekter (41 av 75 beslut = återseende) -> '58 aldrig valda' är mest för få val. Kvällen (238 fria val): 12 aldrig valda.
+  Spärrarna: build MANUS_TOP 2 (pulse/stegring/sug/gryning), toggle-tvånget i refrängen (snap/fyrverkeri/drumkit), tier (svall/famn/tyngdlyft/kickregn/kaskad),
+  SPARSAM i refrängen (bounce/ripple/split - taggade bara high = i praktiken döda), krav (gravity/tide). Inget gallrat - förslagen i tabellen.
+  PROV HÅLLER som opt-in DMX_BUILD_TOPP=1 (5a8e6d5, av json-identiskt): kvällen unika 68->72, effektivt 27,7->28,9, korta 16->15 %, resten lika; builds 12->16 olika,
+  men lugna build-looks 3->15 av 39 (siren/hiss/rulle 17->4) - ägarens öga: blir uppbyggnaden för lugn? `python tools/ladan.py --env DMX_BUILD_TOPP=1`.
+  2 = FÖRKASTAT DMX_VARV_STEG=2 (byt vart 2:a varv från nr 4): återseende 65->67, men mega tryckvag 21->28 %, lampspr 88->85, r 0,17->0,13 (patch prov/varvsteg-20261105.patch).
+
+## NATTEN 2026-11-05 kväll (nattagenten, inget deployat; commits på tempo-helsok, pushad)
+KLART: dagkörningens två uppdrag (se KLART ovan). Baslinje 457c75c json-identisk med 01ca9c5. Tajthet oförändrad: kick->ljus pop/mega/korpus 123/187/136 ms,
+  ljusLag 90 % 15/15/40. Analysatorfynd: inga nya. NÄSTA (förslag): ägaren tittar på BUILD_TOPP i ladan; taggfrågan för bounce/ripple/split (bara high + SPARSAM) och
+  kickregn/kaskad (fel tier för sin enda sektion) - omtaggning eller gallring är ägarens val.
 
 ## NATTEN 2026-11-05 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
 KLART 2026-11-05: inga nya kvällsuppdrag. Baslinje natt/2026-11-05.json (01ca9c5) json-lik med 11-04-highvarv (ingen ny kod): kick->ljus pop/mega
