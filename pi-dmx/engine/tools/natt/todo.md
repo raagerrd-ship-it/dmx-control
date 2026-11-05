@@ -473,6 +473,18 @@ KLART: dropen håller high är STANDARD i den delade analysatorn (ägaren 11-03 
   megamix t90 -5 -> 35, kick->ljus 152 -> 184, hör ihop 88 -> 84 - ägaren i ladan: 'låt ligga kvar'. Backa INTE drop-hold; vill du vinna tillbaka
   megamix: titta på vilka refrängeffekter som nu spelas längre efter dropen och deras ansats. Ny baslinje i natt innehåller den - jämför sektionsmåtten med det i minnet.
 
+## Från eftermiddagen 2026-11-05 - DAGKÖRNING 2 (ägaren borta 2 h: 'kör på'; går före allt annat, var klar inom ~1,5 h)
+Baslinje = 6e448a3 (high-varv + omtaggning kickregn->intro+high, kaskad->high+low+break, standard). Kör först en baslinje-rad (--tag bas).
+Förkastat i dag (rör inte): bounce/ripple/split -> versen/fart (pop lampspr 76 -> 64, patch prov/omtagg-gles-trio-20261105.patch); VARV_STEG; tryckvags kanter.
+Rör inte drop-hold, duel, high-varv, BUILD_TOPP (väntar på ägarens öga). En ändring i taget mot samma baslinje. Deploya inte.
+Fortsätt varför-tabellen i dynamik.md (aldrig valda), en omtaggning per prov:
+1. svall, famn, tyngdlyft (fart-tier men bara high; high med full tier har bara full-poolen och de är inte toggles): pröva tier full.
+2. bounce, ripple, split: annan plats än versen - pröva break (breaket är lugnt, LAMPTRAPPAN I BREAKET gör glesa looker rätt där) ELLER
+   ta bort dem ur SPARSAM i refrängen bara när basen inte är hård. Välj det enklaste, ett prov.
+3. gravity (krav + full-tier i low): om tid finns.
+Döm: hör ihop, återseende, unika/effektivt, byten/min, korta < 8 s, ljusLag 90 % (alla tre), pop/mega lampspr och dropsprång FÅR INTE FALLA.
+Håller det: in i koden som standard, backup-tagg backup/fore-<namn>-20261105. Annars backa + patch + siffror i dynamik.md.
+
 ## Från morgonen 2026-11-05 - DAGKÖRNING (ägaren borta 6 h: 'kör det direkt'; går före allt annat)
 Baslinje = natt/2026-11-05.json (high-varv standard e03a2f4). Tryckvags kanter är STÄNGDA (tre nätter, se NATTEN 2026-11-05) - rör dem inte.
 Rör inte drop-hold, duel eller high-varv. En ändring i taget mot samma baslinje. Deploya inte (high-varv väntar på ladan när ägaren är där).
