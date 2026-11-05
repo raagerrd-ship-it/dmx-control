@@ -1,3 +1,34 @@
+# Aldrig valda effekter - VARFÖR (nattagenten 2026-11-05, dagkörningens uppdrag 1)
+Mätt med instrumenterad dirigent (kopia av dist med logg per filtersteg i switchLook, inte i repot) genom konsertReplay --step 5 --delad-cfg --live-kick.
+Mixarna (pop+mega 2x10 min): 75 lookbeslut, varav 41 manusets återseende och bara 34 fria val på 80 effekter -> 58 'aldrig valda' är mest för FÅ VAL,
+inte spärrar. Kvällen i ett svep (141 min): 435 beslut (high 205, low 99, build 52, intro 48, break 31), 238 fria -> 12 aldrig valda.
+'val' = kvällens beslut som gav effekten (inkl. återseende), 'spärr' = första filtret som tog bort den (antal beslut i effektens sektioner).
+
+| effekt | val kvällen | spärr (kvällen) | orsak | åtgärd |
+|---|---|---|---|---|
+| pulse, stegring, sug, gryning | 0 | topp 39/52 | build: 38 av 39 fria build-val har ett ankare -> MANUS_TOP = 2: bara de 2 bästa i passform av 16 (siren 1,38, hiss 1,25, nedrakning 1,24, rulle 1,24, tratt 1,22; trion ~1,1) | släpp in: prov DMX_BUILD_TOPP (nedan) |
+| flod, mullra, stjarnor, pingpong, virvel | 1-2 | topp 36-37/52 | samma build-fönster | släpp in (samma prov) |
+| snap | 0 | krav 32, toggle-tvång 27 | refrängen med låst takt = bara toggle-effekter (54 av 85 fria high-val); snap är inte toggle | låt vara (ägaren 10-13: stegande lampor vid tydlig takt) |
+| fyrverkeri, drumkit, party, vagbrytare | 2-7 | toggle-tvång 46-48 | samma toggle-tvång i high | låt vara |
+| svall, famn, tyngdlyft | 0 | tier 53-68, toggle 23-42 | fart-tier men bara high: high med full tier (45/85) har bara full-poolen, och de är inte toggles | gallringsförslag (ägaren) - alt. tier full |
+| droppar, vidga | 2 | tier 53-68 | samma | låt vara / gallringsförslag |
+| bounce, ripple, split | 2-3 | sparsam 74-77 (split krav 66) | taggade BARA high, men lamptrappan (SPARSAM) tar bort glesa looker i refrängen -> i praktiken döda | tagga om till low (versen) eller gallra - ägarens val |
+| gravity | 0 | krav 58, tier 55 | krav + full-tier i low | gallringsförslag |
+| tide, aurora, drift, mono | 0-1 | tier 54, krav 15-38 | lugn-tier i intro/low, energin står oftast i fart/full | låt vara (lugna låtar finns inte i korpusen) |
+| kickregn | 0 | tier 40/48 | full-tier men bara intro; introt är sällan full | tagga om (intro -> high) eller gallra |
+| kaskad | 2 | tier 77 | lugn-tier men bara high | tagga om (low/break) eller gallra |
+| intro-familjen (ankomst, blixtnedslag, dunk, spaning, startskott, uppvarmning, mellanslag) | 1-2 | tier 32/48 | 48 intro-val delas på ~15 effekter | låt vara (roterar) |
+| break-familjen (andrum, glimt, skuggor, efterskalv, urladdning, glesna, dyning, morkerslag) | 1-3 | pick | 31 break-val på 12 effekter, pickLook roterar | låt vara |
+| duel 8, pendel 6, eko 41, twin 21 | - | - | VALDA på kvällen (i mixarna för få val) | låt vara |
+
+PROV (en regeländring): DMX_BUILD_TOPP=1 - i builden väljs bland topp-80 % av poolen (MIX_TOP_FRAC) i stället för MANUS_TOP 2. natt --snabb, av json-identiskt:
+kvällen unika 68 -> 72, effektivt 27,7 -> 28,9, korta < 8 s 16 -> 15 %; hör ihop 81 %, återseende 65 %, byten/min 2,67, drops 62, ljusLag 15/15/40, mixarna
+json-lika (ny motor per mix -> ingen speltid -> samma första val). Kvällens 39 fria build-val: förr nedrakning 8, siren 7, hiss 5, rulle 5, upptakt 4, tratt 3 (+6 andra);
+med provet 16 olika, pulse/stegring/sug 3/3/2, gryning 3. PRIS: lugn-looks (flod 5, stjarnor 4, mullra 3, gryning 3) = 15 av 39 builds (förr 3) - uppbyggnaden kan
+kännas lugnare. Redo för ladan: python tools/ladan.py --env DMX_BUILD_TOPP=1. Gallring: inget gallrat; förslagen står i tabellen (ägarens val).
+ÅTERSEENDET (uppdrag 2) FÖRKASTAT: DMX_VARV_STEG=2 (high nr 4+ byter bara vart 2:a varv): återseende 65 -> 67 %, men mega tryckvag 21 -> 28 %, mega lampspr 88 -> 85,
+mega r 0,17 -> 0,13. Patch tools/natt/prov/varvsteg-20261105.patch. high-varv växlar redan mellan två looks (manusHist), så återseendet mäter just bytet.
+
 # Dynamik pa ladans inspelningar 10-08 (tools/dynSet.py, medianer over 20 klipp a 30 s, tandpunkt 16)
 
 | datum | git | tag | mdSteg | ljusSteg | rDb | kontrast | litP50 | fladder/min | R/G/B blink/min | ofrivillig blink/min | alla3 |
@@ -55,3 +86,4 @@
 | 2026-11-04 | 779776a | - | 5.46 | 2.02 | 0.60 | 2.16 | 0.212 | 0 | 0 | 0 | 0 |
 | 2026-11-04 | 21e88dd | - | 5.46 | 2.02 | 0.60 | 2.16 | 0.212 | 0 | 0 | 0 | 0 |
 | 2026-11-05 | 01ca9c5 | - | 5.46 | 2.02 | 0.60 | 2.16 | 0.212 | 0 | 0 | 0 | 0 |
+| 2026-11-05 | 457c75c | - | 5.46 | 2.02 | 0.60 | 2.16 | 0.212 | 0 | 0 | 0 | 0 |

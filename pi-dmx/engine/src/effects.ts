@@ -273,6 +273,9 @@ const SWITCH_ON = 1;
  *  manusets. 1:a-3:e gången oförändrade (refrängen känns igen). Drop-bytet orört. natt --snabb: mega tryckvag 36 -> 21 %, lampspr 83 -> 88,
  *  dropsprång hög 0,44 -> 0,50, r 0,12 -> 0,17, ljusLag mega 35 -> 15 ms; återseende 78 -> 65 %, hör ihop 84 -> 81. Från 3:e: lampspr 83 -> 74. */
 const HIGH_VARV = 4;
+/** PROV 2026-11-05 natt (DMX_BUILD_TOPP=1, standard av = som förr): i builden väljs bland topp-MIX_TOP_FRAC av poolen i stället för MANUS_TOP
+ *  (kvällen: 38 av 39 fria build-val hade ankare -> bara topp-2 av 16, pulse/stegring/sug/gryning valdes aldrig). */
+const BUILD_TOPP = process.env.DMX_BUILD_TOPP === '1';
 /** ALLA LOOKER (prov 2026-10-09, STANDARD sedan 2026-10-10 - agaren i ladan; kraven ligger i registry.ts). Tva dirigentregler:
  *  (a) BUILD-INTRADE: analysatorns sektion 'build' kom bara 8 ganger pa 20 min mix, och "byt aldrig mitt i en uppbyggnad" blockerade
  *      allt annat -> build-poolen (pulse/stegring/sug) valdes 1 av 122 byten. Nu raknas en uppbyggnad som hallit i ALLA_BUILD_S
@@ -956,7 +959,7 @@ export class EffectEngine {
             .sort((a, b) => b.s - a.s);
           const cands = ranked.filter((x) => x.m !== this.smartMode && x.m !== avoid);
           // MIX_V2 (4): valfonstret var alltid topp-3 av passformen -> samma 3-5 looker per tier for evigt; nu topp-MIX_TOP_FRAC av poolen (minst 3)
-          const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, (anchor && MANUS_TOP > 0 ? MANUS_TOP : Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC)))));
+          const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, (anchor && MANUS_TOP > 0 && !(BUILD_TOPP && secKey === 'build') ? MANUS_TOP : Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC)))));
           this.smartMode = this.pickLook(top);
           // LOGGEN AR OVILLKORLIG (2026-09-23): utan DMX_SECTION_SWITCH finns inget `part` och dirigentens val syntes inte alls i
           // journalen (ladan 09-22: "vi korde pa hoga effekter" gick inte att belagga). Nu: del, sektion (data), basgang, tier, pool.
