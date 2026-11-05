@@ -1,0 +1,75 @@
+diff --git a/pi-dmx/engine/src/effects/bounce.ts b/pi-dmx/engine/src/effects/bounce.ts
+index c380085..15411b9 100644
+--- a/pi-dmx/engine/src/effects/bounce.ts
++++ b/pi-dmx/engine/src/effects/bounce.ts
+@@ -4,8 +4,9 @@ import { hsv } from "./color.js";
+ // Full fart: en SKARP ljuspunkt studsar fram och tillbaka, ett steg per takt,
+ // kort efterglöd, mörk rigg emellan. Gles och kinetisk; ny ren färg vid varje
+ // studs-steg.
++// OMTAGGNING 2026-11-05 (ägaren: "fixa" - dynamik.md varför-tabellen, aldrig vald): bara high + SPARSAM = död i refrängen (lamptrappan) -> versen, fart.
+ export const bounce: EffectDef = {
+-  key: "bounce", label: "Studs", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"], toggle: true,
++  key: "bounce", label: "Studs", tier: "fart", modulate: { energy: true, pulse: false }, section: ["low"], toggle: true,
+   desc: "En skarp ljuspunkt studsar fram och tillbaka.",
+   render(c) {
+     const span = Math.max(1, c.count - 1);
+diff --git a/pi-dmx/engine/src/effects/kaskad.ts b/pi-dmx/engine/src/effects/kaskad.ts
+index 6401d27..1c891f6 100644
+--- a/pi-dmx/engine/src/effects/kaskad.ts
++++ b/pi-dmx/engine/src/effects/kaskad.ts
+@@ -6,8 +6,9 @@ import { slotSize } from "./rig.js";
+ // och töms i varje takt. Slag 1, 2 och 3 tänder en lampa var (c.idx-ordningen) som LIGGER KVAR och växer sakta, på slag 4 släpper
+ // alla tre mjukt - som en bassäng som fylls och rinner över. Den fjärde lampan tänds aldrig och flyttar en plats per takt.
+ // Svall andas i två grupper, famn blommar på ettan; kaskad bygger takten lampa för lampa och släpper den.
++// OMTAGGNING 2026-11-05 (ägaren: "fixa" - dynamik.md varför-tabellen, aldrig vald): lugn-tier men bara high (refrängen sällan lugn) -> även vers och break.
+ export const kaskad: EffectDef = {
+-  key: "kaskad", label: "Kaskad", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["high"],
++  key: "kaskad", label: "Kaskad", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["high", "low", "break"],
+   desc: "Lugn refräng: slag 1-3 tänder en lampa var som ligger kvar, på slag 4 släpper alla mjukt.",
+   render(c) {
+     const g = slotSize(c.count), n = Math.max(1, Math.ceil(c.count / g)), me = Math.floor(c.idx / g), slot = Math.floor(c.lamp / g);   // hyrkitet: platser om g lampor
+diff --git a/pi-dmx/engine/src/effects/kickregn.ts b/pi-dmx/engine/src/effects/kickregn.ts
+index 24bae10..35d3f34 100644
+--- a/pi-dmx/engine/src/effects/kickregn.ts
++++ b/pi-dmx/engine/src/effects/kickregn.ts
+@@ -8,8 +8,9 @@ const h = (x: number, n: number) => (Math.imul(x, 2654435761) >>> 0) % n;
+ // KICKREGN (full x intro, situationsrutnätet 2026-10-12 - rutan var tom): en fullfartslåts intro som redan har kicken. Varje slag
+ // tänder EN lampa (hash på slaget, ny plats varje gång) fullt på kicken och på efterslaget en annan lampa till hälften i motfärg -
+ // regn av slag över riggen. Övriga släckta.
++// OMTAGGNING 2026-11-05 (ägaren: "fixa" - dynamik.md varför-tabellen, aldrig vald): full-tier men bara intro (introt sällan full) -> även refrängen.
+ export const kickregn: EffectDef = {
+-  key: "kickregn", label: "Kickregn", tier: "full", modulate: { energy: true, pulse: false }, section: ["intro"],
++  key: "kickregn", label: "Kickregn", tier: "full", modulate: { energy: true, pulse: false }, section: ["intro", "high"],
+   desc: "Intro i full fart: varje kick tänder en ny lampa, efterslaget en annan i motfärg.",
+   render(c) {
+     const g = slotSize(c.count), n = Math.max(1, Math.ceil(c.count / g)), me = Math.floor(c.idx / g);   // hyrkitet: platser om g lampor
+diff --git a/pi-dmx/engine/src/effects/ripple.ts b/pi-dmx/engine/src/effects/ripple.ts
+index 8a862d3..4f37de4 100644
+--- a/pi-dmx/engine/src/effects/ripple.ts
++++ b/pi-dmx/engine/src/effects/ripple.ts
+@@ -7,8 +7,9 @@ import { hsv, soft } from "./color.js";
+ // Nu ar det en RORELSE ut fran mitten, inte en vaxling.) Krusningens HOJD skalas mot latens egen refrang (levelVsHighDb):
+ // 9 dB under refrangen ar den en liten krusning i mitten, vid refrangens niva slar den ut till kanterna med vit kam.
+ // Kontrastfarg pa ytterringen (som forr). <3 lampor: paritet = ring.
++// OMTAGGNING 2026-11-05 (ägaren: "fixa" - dynamik.md varför-tabellen, aldrig vald): bara high + SPARSAM = död i refrängen (lamptrappan) -> versen, fart.
+ export const ripple: EffectDef = {
+-  key: "ripple", label: "Krusning", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"], toggle: true,
++  key: "ripple", label: "Krusning", tier: "fart", modulate: { energy: true, pulse: false }, section: ["low"], toggle: true,
+   desc: "Slaget slar ner i mitten och krusningen rullar utat, hogre ju narmare refrangens niva.",
+   render(c) {
+     const center = (c.count - 1) / 2;
+diff --git a/pi-dmx/engine/src/effects/split.ts b/pi-dmx/engine/src/effects/split.ts
+index 90a43ad..aaeb52f 100644
+--- a/pi-dmx/engine/src/effects/split.ts
++++ b/pi-dmx/engine/src/effects/split.ts
+@@ -8,8 +8,9 @@ import { hsv, makeRise } from "./color.js";
+ // den ihållande basen och de rappa transienterna kan äntligen skiljas åt.
+ // (Gemini-idé, anpassad för 4 PAR.)
+ const rise = makeRise(0.1);   // EFFEKTSVEPET 11-02 (ägaren: 'fixa direkt de effekterna'; effectDyn alla effekter pop+mega 5 min): råa onset-spikar i kvadrat slog AV/PÅ på en ruta (hopp 0,032)
++// OMTAGGNING 2026-11-05 (ägaren: "fixa" - dynamik.md varför-tabellen, aldrig vald): bara high + SPARSAM = död i refrängen (lamptrappan) -> versen, fart.
+ export const split: EffectDef = {
+-  key: "split", label: "Klyvning", tier: "full", section: ["high"], toggle: true,
++  key: "split", label: "Klyvning", tier: "fart", section: ["low"], toggle: true,
+   desc: "Inre lampor tung bas-matta, yttre lampor gnistrande diskant-anslag.",
+   render(c) {
+     const isOuter = c.group === 1;   // inre/yttre eller jamn/udda (c.grouping)
