@@ -484,6 +484,10 @@ Fortsätt varför-tabellen i dynamik.md (aldrig valda), en omtaggning per prov:
 3. gravity (krav + full-tier i low): om tid finns.
 Döm: hör ihop, återseende, unika/effektivt, byten/min, korta < 8 s, ljusLag 90 % (alla tre), pop/mega lampspr och dropsprång FÅR INTE FALLA.
 Håller det: in i koden som standard, backup-tagg backup/fore-<namn>-20261105. Annars backa + patch + siffror i dynamik.md.
+KLART 2026-11-05 (nattagenten, inget deployat): 1 HÅLLER = STANDARD 655cba0 (svall/famn/tyngdlyft tier full; kvällen unika 69->70, effektivt 28,4->28,6,
+  allt annat json-likt, korpus identisk; kvällen svall 170 s/famn 31/tyngdlyft 9, förr 0; tagg backup/fore-tierfull-20261105). 2 FÖRKASTAT (trio även break: unika 70->65,
+  effektivt 28,6->27,5, pop lampspr 77->76; patch prov/omtagg-trio-break-20261105.patch). 3 utan effekt (gravity fart, + krav 0,10: json-identiskt - spärren sitter i passform/pick;
+  patch prov/gravity-fart-krav-20261105.patch). Siffror i dynamik.md.
 
 ## Från morgonen 2026-11-05 - DAGKÖRNING (ägaren borta 6 h: 'kör det direkt'; går före allt annat)
 Baslinje = natt/2026-11-05.json (high-varv standard e03a2f4). Tryckvags kanter är STÄNGDA (tre nätter, se NATTEN 2026-11-05) - rör dem inte.
@@ -502,6 +506,13 @@ KLART 2026-11-05 kväll (nattagenten, inget deployat): 1 = tabellen överst i to
   PROV HÅLLER som opt-in DMX_BUILD_TOPP=1 (5a8e6d5, av json-identiskt): kvällen unika 68->72, effektivt 27,7->28,9, korta 16->15 %, resten lika; builds 12->16 olika,
   men lugna build-looks 3->15 av 39 (siren/hiss/rulle 17->4) - ägarens öga: blir uppbyggnaden för lugn? `python tools/ladan.py --env DMX_BUILD_TOPP=1`.
   2 = FÖRKASTAT DMX_VARV_STEG=2 (byt vart 2:a varv från nr 4): återseende 65->67, men mega tryckvag 21->28 %, lampspr 88->85, r 0,17->0,13 (patch prov/varvsteg-20261105.patch).
+
+## NATTEN 2026-11-05 sent (nattagenten, inget deployat; commits på tempo-helsok, pushad)
+KLART: dagkörning 2 (se KLART ovan). Baslinje 606fef8 (full): mixarna = omtagg-kk; KORPUS r 0,38 -> 0,35 (energiR15 0,335 -> 0,325, nivaR15 0,457 -> 0,453) sedan 457c75c
+  = kickregn/kaskad-omtaggningen 6e448a3 (dagkörningen mätte bara --snabb, korpusen syns inte där). Mest i uppvärmningen; rätt mått faller 0,01 - ägarens öga, inte backat.
+  655cba0 (tierfull) full: korpus identisk med 606fef8. Tajthet oförändrad: kick->ljus pop/mega/korpus 123/187/136, ljusLag 90 % 15/15/40. Analysatorfynd: inga nya.
+  REDO FÖR LADAN: python tools/ladan.py (kod: high-varv, omtaggningarna kickregn/kaskad + svall/famn/tyngdlyft) eller --env DMX_BUILD_TOPP=1.
+  NÄSTA (förslag): gravity och trion bounce/ripple/split kommer inte in med taggar - gallring är ägarens val; korpus-r efter 6e448a3 värd en titt (vilka klipp).
 
 ## NATTEN 2026-11-05 kväll (nattagenten, inget deployat; commits på tempo-helsok, pushad)
 KLART: dagkörningens två uppdrag (se KLART ovan). Baslinje 457c75c json-identisk med 01ca9c5. Tajthet oförändrad: kick->ljus pop/mega/korpus 123/187/136 ms,

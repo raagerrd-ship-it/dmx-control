@@ -1,0 +1,26 @@
+diff --git a/pi-dmx/engine/src/effects/gravity.ts b/pi-dmx/engine/src/effects/gravity.ts
+index 8c1b397..659cd5e 100644
+--- a/pi-dmx/engine/src/effects/gravity.ts
++++ b/pi-dmx/engine/src/effects/gravity.ts
+@@ -7,7 +7,7 @@ import { hsv } from "./color.js";
+ // långsamt (minnet av den hårdaste smällen). Motorn räknar fysiken; effekten
+ // ritar bara stapeln + pricken. (WLED "Gravcenter"-mekaniken, anpassad för 4 PAR.)
+ export const gravity: EffectDef = {
+-  key: "gravity", label: "Gravitation", tier: "full", modulate: { energy: true, pulse: false }, section: ["high", "low"],
++  key: "gravity", label: "Gravitation", tier: "fart", modulate: { energy: true, pulse: false }, section: ["high", "low"],
+   desc: "Ljudet lyfter en nivå som faller med tyngd; en peak-prick hänger kvar.",
+   render(c) {
+     const n = Math.max(1, c.count);
+diff --git a/pi-dmx/engine/src/effects/registry.ts b/pi-dmx/engine/src/effects/registry.ts
+index 35cd009..cc8098d 100644
+--- a/pi-dmx/engine/src/effects/registry.ts
++++ b/pi-dmx/engine/src/effects/registry.ts
+@@ -239,7 +239,7 @@ const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
+   sidokedja:{ needsPunch: 0.35, needsBeat: 0.35 },
+   tryckvag: { needsPunch: 0.35, needsBeat: 0.35 },
+   // Bas-effekter → kräver låg-end
+-  gravity:  { needsBass: 0.20 },   // 0,35 -> 0,20 (ladans profile.bass median 0,23; ALLA LOOKER standard 10-10)
++  gravity:  { needsBass: 0.10 },   // 0,35 -> 0,20 (ladans profile.bass median 0,23; ALLA LOOKER standard 10-10)
+   tide:     { needsBass: 0.30 },
+   // Luft/diskant-effekter → kräver diskant
+   airglow:  { needsBright: 0.40 },

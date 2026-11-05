@@ -29,6 +29,14 @@ kännas lugnare. Redo för ladan: python tools/ladan.py --env DMX_BUILD_TOPP=1. 
 ÅTERSEENDET (uppdrag 2) FÖRKASTAT: DMX_VARV_STEG=2 (high nr 4+ byter bara vart 2:a varv): återseende 65 -> 67 %, men mega tryckvag 21 -> 28 %, mega lampspr 88 -> 85,
 mega r 0,17 -> 0,13. Patch tools/natt/prov/varvsteg-20261105.patch. high-varv växlar redan mellan två looks (manusHist), så återseendet mäter just bytet.
 
+DAGKÖRNING 2 (nattagenten 2026-11-05, natt --snabb mot 606fef8 = efter kickregn/kaskad-omtaggningen):
+- svall/famn/tyngdlyft tier fart -> full: HÅLLER, STANDARD 655cba0 (tagg backup/fore-tierfull-20261105). Mixarna json-lika, kvällen unika 69 -> 70, effektivt 28,4 -> 28,6,
+  resten lika (hör ihop 81, återseende 65, byten 2,67, ljusLag 15/15/40, lampspr 77/88, dropsprång). Kvällssvepet: svall 170 s, famn 31 s, tyngdlyft 9 s (förr 0). Korpus identisk.
+- bounce/ripple/split även break: FÖRKASTAT (patch prov/omtagg-trio-break-20261105.patch): kvällen unika 70 -> 65, effektivt 28,6 -> 27,5, pop lampspr 77 -> 76, pop r 0,294 -> 0,286
+  (hör ihop 81 -> 84). Ripple kommer in i breaket men tränger ut breakets egna (kaskad bort). Trion är fortsatt död -> gallring = ägarens val.
+- gravity tier full -> fart, och + needsBass 0,20 -> 0,10: json-IDENTISKT båda (patch prov/gravity-fart-krav-20261105.patch). Gravity väljs ändå aldrig - spärren sitter längre
+  ner (passform/pickLook), inte i tier eller krav. Gallringsförslag står kvar.
+
 # Dynamik pa ladans inspelningar 10-08 (tools/dynSet.py, medianer over 20 klipp a 30 s, tandpunkt 16)
 
 | datum | git | tag | mdSteg | ljusSteg | rDb | kontrast | litP50 | fladder/min | R/G/B blink/min | ofrivillig blink/min | alla3 |
@@ -87,3 +95,5 @@ mega r 0,17 -> 0,13. Patch tools/natt/prov/varvsteg-20261105.patch. high-varv v�
 | 2026-11-04 | 21e88dd | - | 5.46 | 2.02 | 0.60 | 2.16 | 0.212 | 0 | 0 | 0 | 0 |
 | 2026-11-05 | 01ca9c5 | - | 5.46 | 2.02 | 0.60 | 2.16 | 0.212 | 0 | 0 | 0 | 0 |
 | 2026-11-05 | 457c75c | - | 5.46 | 2.02 | 0.60 | 2.16 | 0.212 | 0 | 0 | 0 | 0 |
+| 2026-11-05 | 606fef8 | - | 5.46 | 2.02 | 0.60 | 2.16 | 0.212 | 0 | 0 | 0 | 0 |
+| 2026-11-05 | 655cba0 | tierfull-full | 5.46 | 2.02 | 0.60 | 2.16 | 0.212 | 0 | 0 | 0 | 0 |

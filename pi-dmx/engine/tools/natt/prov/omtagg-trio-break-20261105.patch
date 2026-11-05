@@ -1,0 +1,39 @@
+diff --git a/pi-dmx/engine/src/effects/bounce.ts b/pi-dmx/engine/src/effects/bounce.ts
+index c380085..9f1a5d2 100644
+--- a/pi-dmx/engine/src/effects/bounce.ts
++++ b/pi-dmx/engine/src/effects/bounce.ts
+@@ -5,7 +5,7 @@ import { hsv } from "./color.js";
+ // kort efterglöd, mörk rigg emellan. Gles och kinetisk; ny ren färg vid varje
+ // studs-steg.
+ export const bounce: EffectDef = {
+-  key: "bounce", label: "Studs", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"], toggle: true,
++  key: "bounce", label: "Studs", tier: "full", modulate: { energy: true, pulse: false }, section: ["high", "break"], toggle: true,
+   desc: "En skarp ljuspunkt studsar fram och tillbaka.",
+   render(c) {
+     const span = Math.max(1, c.count - 1);
+diff --git a/pi-dmx/engine/src/effects/ripple.ts b/pi-dmx/engine/src/effects/ripple.ts
+index 8a862d3..48c3d80 100644
+--- a/pi-dmx/engine/src/effects/ripple.ts
++++ b/pi-dmx/engine/src/effects/ripple.ts
+@@ -8,7 +8,7 @@ import { hsv, soft } from "./color.js";
+ // 9 dB under refrangen ar den en liten krusning i mitten, vid refrangens niva slar den ut till kanterna med vit kam.
+ // Kontrastfarg pa ytterringen (som forr). <3 lampor: paritet = ring.
+ export const ripple: EffectDef = {
+-  key: "ripple", label: "Krusning", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"], toggle: true,
++  key: "ripple", label: "Krusning", tier: "full", modulate: { energy: true, pulse: false }, section: ["high", "break"], toggle: true,
+   desc: "Slaget slar ner i mitten och krusningen rullar utat, hogre ju narmare refrangens niva.",
+   render(c) {
+     const center = (c.count - 1) / 2;
+diff --git a/pi-dmx/engine/src/effects/split.ts b/pi-dmx/engine/src/effects/split.ts
+index 90a43ad..f226ac3 100644
+--- a/pi-dmx/engine/src/effects/split.ts
++++ b/pi-dmx/engine/src/effects/split.ts
+@@ -9,7 +9,7 @@ import { hsv, makeRise } from "./color.js";
+ // (Gemini-idé, anpassad för 4 PAR.)
+ const rise = makeRise(0.1);   // EFFEKTSVEPET 11-02 (ägaren: 'fixa direkt de effekterna'; effectDyn alla effekter pop+mega 5 min): råa onset-spikar i kvadrat slog AV/PÅ på en ruta (hopp 0,032)
+ export const split: EffectDef = {
+-  key: "split", label: "Klyvning", tier: "full", section: ["high"], toggle: true,
++  key: "split", label: "Klyvning", tier: "full", section: ["high", "break"], toggle: true,
+   desc: "Inre lampor tung bas-matta, yttre lampor gnistrande diskant-anslag.",
+   render(c) {
+     const isOuter = c.group === 1;   // inre/yttre eller jamn/udda (c.grouping)
