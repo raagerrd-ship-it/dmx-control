@@ -507,6 +507,15 @@ KLART 2026-11-05 kväll (nattagenten, inget deployat): 1 = tabellen överst i to
   men lugna build-looks 3->15 av 39 (siren/hiss/rulle 17->4) - ägarens öga: blir uppbyggnaden för lugn? `python tools/ladan.py --env DMX_BUILD_TOPP=1`.
   2 = FÖRKASTAT DMX_VARV_STEG=2 (byt vart 2:a varv från nr 4): återseende 65->67, men mega tryckvag 21->28 %, lampspr 88->85, r 0,17->0,13 (patch prov/varvsteg-20261105.patch).
 
+## NATTEN 2026-11-06 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
+KLART: inga nya kvällsuppdrag. Baslinje a6df6a8 (full) json-identisk med 11-05 tierfull-full. Brister: (1) korpus r 0,38 -> 0,35 sitter i 5 klipp där
+  kickregn (en lampa av fyra) tar refrängen efter tryckvag/drops: energiR15 139 0,60 -> -0,18, 176 0,83 -> 0,09, 112 0,62 -> -0,04 (refrängen mörkare än versen);
+  (2) 58 effekter aldrig valda i mixarna (34 fria val, känt); (3) ljusLag 90 % lang1021 40 ms mot 15 i mixarna.
+  PROV HÅLLER som opt-in DMX_KICKREGN_PAR=1 (3bb1b2b, av json-identiskt): i 'high' tänder kicken lampan + den mittemot. Korpus r 0,345 -> 0,374, energiR15 0,325 -> 0,330,
+  de fem klippen +0,55/+0,45/+0,27/+0,11/+0,04 (178 -0,07), korpus lampspr 89,95 -> 89,70; mixarna/kvällen/ljusLag identiska (kickregn väljs inte där).
+  Tajthet oförändrad 123/187/136 ms, ljusLag 90 % 15/15/40. Analysatorfynd: inga nya.
+  REDO FÖR LADAN: python tools/ladan.py --env DMX_KICKREGN_PAR=1 (ögat: ser regnet fortfarande ut som regn med två lampor i refrängen?).
+
 ## NATTEN 2026-11-05 sent (nattagenten, inget deployat; commits på tempo-helsok, pushad)
 KLART: dagkörning 2 (se KLART ovan). Baslinje 606fef8 (full): mixarna = omtagg-kk; KORPUS r 0,38 -> 0,35 (energiR15 0,335 -> 0,325, nivaR15 0,457 -> 0,453) sedan 457c75c
   = kickregn/kaskad-omtaggningen 6e448a3 (dagkörningen mätte bara --snabb, korpusen syns inte där). Mest i uppvärmningen; rätt mått faller 0,01 - ägarens öga, inte backat.
