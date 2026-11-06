@@ -507,6 +507,20 @@ KLART 2026-11-05 kväll (nattagenten, inget deployat): 1 = tabellen överst i to
   men lugna build-looks 3->15 av 39 (siren/hiss/rulle 17->4) - ägarens öga: blir uppbyggnaden för lugn? `python tools/ladan.py --env DMX_BUILD_TOPP=1`.
   2 = FÖRKASTAT DMX_VARV_STEG=2 (byt vart 2:a varv från nr 4): återseende 65->67, men mega tryckvag 21->28 %, lampspr 88->85, r 0,17->0,13 (patch prov/varvsteg-20261105.patch).
 
+## Från ladan 2026-11-06 em - TAKTEN EFTER DROPEN (ägaren i ladan: 'efter drop så tog det kanske 2-3 sekunder innan den tydligt visade takten igen'; går före allt annat)
+LIVE i ladan sedan 11-06 15:11: 9914aab + ögonprov DMX_KICKREGN_PAR=1 och DMX_BUILD_TOPP=1 (ägarens dom väntar - rör dem inte).
+Bevis: tools/natt/ladan-20261106-drops.jsonl (ws-frames 15 min, ~20 Hz, loggare tools/wslog.mjs; fält t, lv, e, k=kick, b=beat, bpm, bc=bpmConfidence,
+  dc=dropCount, m=look, pb=profile.beat). 6 drops. Tydligaste: dc 2->3 vid 184,7 s - analysatorn tappade tempot i breaket (bpm 0 från 174,3 s, 14,6 s)
+  och låste först 4,2 s EFTER dropen (bpm 143, bc 1,0). Dc 6->7 (792 s): bpm 154 -> 146 -> 144 och bc 0,64 vid dropen, full tillit först ~4 s efter.
+  Dessutom: DROP_LIFT_FLOOR 0,7 håller energin >= 70 % i ~8 s efter dropen -> bastrycket pulsar bara 0,7..1 (svagare takt även när tempot finns).
+1. TEMPOT GENOM BREAKET (delade analysatorn, båda repona, analyser_shared.py): när takten tystnar i ett break, behåll senaste låsta tempo + fas i stället
+   för bpm 0, och när dropen kommer: ta upp det gamla rastret direkt; dropträffen är nästan alltid en etta -> förankra fasen på dropen.
+   Bänka mot korpus + syntet + mixarna (tempo/fas får inte bli sämre vid låtbyten - ghost-wait/guard finns, se pi-dmx-tempo-transitions).
+   Mått: tid från drop till låst takt (bc >= 0,8) i mixarna + ladan-loggen (offline-replay om möjligt), mål < 1 s.
+2. LYFTETS GOLV: pröva DROP_LIFT_FLOOR 0,7 -> 0,5 (och 0,6). Döm dropsprång, lampspr, ljusLag 90 %, kick->ljus de första 8 s efter dropen.
+   OBS ägaren 11-01 ville INTE ha monotont efter dropen och 10-17 inte att energin dör - golvet får inte bort lyftet.
+Håller det: in i koden som standard (backup-tagg backup/fore-<namn>-20261106; analysatorn i båda repona + manifest). Deploya inte.
+
 ## NATTEN 2026-11-06 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
 KLART: inga nya kvällsuppdrag. Baslinje a6df6a8 (full) json-identisk med 11-05 tierfull-full. Brister: (1) korpus r 0,38 -> 0,35 sitter i 5 klipp där
   kickregn (en lampa av fyra) tar refrängen efter tryckvag/drops: energiR15 139 0,60 -> -0,18, 176 0,83 -> 0,09, 112 0,62 -> -0,04 (refrängen mörkare än versen);
