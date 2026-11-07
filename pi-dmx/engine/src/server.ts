@@ -246,7 +246,7 @@ export async function startServer(
   app.get("/api/moment", async () => ({ moment: deps.cfg.moment ?? "fest", themeColors: deps.cfg.themeColors ?? null, lab: (deps.cfg as unknown as { labState?: unknown }).labState ?? null }));
   app.post("/api/moment", async (req, reply) => {
     const m = ((req.body ?? {}) as Record<string, unknown>).moment;
-    if (!isMoment(m)) return reply.code(400).send({ ok: false, error: "moment: fest | middag | tal | forstadans | tartan | show | lab | lab2 | lab3 | lab4" });
+    if (!isMoment(m)) return reply.code(400).send({ ok: false, error: "moment: fest | middag | tal | forstadans | tartan | show | lab | lab2 | lab3 | lab4 | lab5" });
     const now = pressMoment(deps.cfg, m); deps.onConfigChanged?.(); broadcast(); return { ok: true, moment: now };
   });
   // LABBET: tvinga en idé ({idea:'manen'}; '' = musiken väljer). Sparas inte (icke-uppräknelig på cfg).
