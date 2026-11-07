@@ -21,6 +21,8 @@ const STEPS = [0, 1, 1, 0, 0, 1, 2, 3];
 export class Lab4 {
   out = new Float32Array(0);
   mode = ''; log: [number, string][] = [];
+  /** Tvinga en idé live (POST /api/labforce {idea}), '' = musiken väljer. */
+  force = '';
   private n = 0; private at = 0; private pend = ''; private pendAt = 0; private bassAt = 0; private lastSec = ''; private buildAt = 0;
   private lastDrop = 0; private dischargeAt = -1e9; private sect = 0; private sectBar = -1;
   private vS = 0; private vFloor = 1;
@@ -46,7 +48,8 @@ export class Lab4 {
     this.vFloor = Math.min(this.vS, this.vFloor + dt * 0.02);
     if (dr.kick > 0.55 || (c.bassBody > 0.6 && presence > 0.6)) this.bassAt = now;
     const quiet = now - this.bassAt >= 1200 && (sec === 'break' || sec === 'intro' || presence < 0.35);
-    const want = FORCE ? FORCE : now - this.dischargeAt < 1200 ? 'urladdning' : quiet || !c.hasBeat ? 'manen' : sec === 'build' ? 'laddning' : sec === 'high' ? 'dansparet' : 'karusellen';
+    const f = FORCE || this.force;
+    const want = f ? f : now - this.dischargeAt < 1200 ? 'urladdning' : quiet || !c.hasBeat ? 'manen' : sec === 'build' ? 'laddning' : sec === 'high' ? 'dansparet' : 'karusellen';
     if (want !== this.pend) { this.pend = want; this.pendAt = now; }
     if (want !== this.mode && (this.mode === '' || want === 'urladdning' || now - this.pendAt >= 2000 || (this.mode === 'manen' && !quiet && c.hasBeat))) {
       this.mode = want; this.log.push([Math.round(now), want]); if (this.log.length > 12) this.log.shift();
@@ -94,7 +97,7 @@ export class Lab4 {
     const span = Math.max(1, n - 1), ph = (now / 30000) % 2, x = (ph < 1 ? ph : 2 - ph) * span;   // fram och tillbaka på ~30 s
     for (let i = 0; i < n; i++) {
       const w = Math.max(0, 1 - Math.abs(i - x));                          // månen delas mjukt mellan två lampor
-      if (w > 0) this.put(i, 3, w * (0.18 + 0.5 * voice) * Math.max(0.5, presence));
+      if (w > 0) this.put(i, 3, w * (0.35 + 0.5 * voice) * Math.max(0.6, presence));   // ljusare (ägaren: 'jag ser ingen måne')
     }
   }
 }

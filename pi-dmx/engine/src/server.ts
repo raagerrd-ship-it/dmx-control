@@ -249,6 +249,12 @@ export async function startServer(
     if (!isMoment(m)) return reply.code(400).send({ ok: false, error: "moment: fest | middag | tal | forstadans | tartan | show | lab | lab2 | lab3 | lab4" });
     const now = pressMoment(deps.cfg, m); deps.onConfigChanged?.(); broadcast(); return { ok: true, moment: now };
   });
+  // LABBET: tvinga en idé ({idea:'manen'}; '' = musiken väljer). Sparas inte (icke-uppräknelig på cfg).
+  app.post("/api/labforce", async (req) => {
+    const idea = String(((req.body ?? {}) as Record<string, unknown>).idea ?? "").replace(/[^a-z]/g, "").slice(0, 20);
+    Object.defineProperty(deps.cfg, "labForce", { value: idea, enumerable: false, configurable: true, writable: true });
+    return { ok: true, idea };
+  });
   app.get("/api/health-log", async () => ({
     version: PKG_VERSION,
     now: Date.now(),

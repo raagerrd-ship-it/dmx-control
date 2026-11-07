@@ -64,6 +64,7 @@ export class MomentLayer {
   /** En gång per ruta. Sant om lagret syns (w > 0). */
   step(cfg: EngineConfig, level: number, nowWall: number, dtSec: number, count: number, beat?: ShowBeat): boolean {
     this.beat = beat;
+    this.labForce = typeof (cfg as unknown as { labForce?: unknown }).labForce === 'string' ? (cfg as unknown as { labForce: string }).labForce : '';
     let m: Moment = isMoment(cfg.moment) ? cfg.moment : "fest";
     if (m === "tartan") {
       if (this.live !== "tartan") { this.beforeTartan = this.live; this.tartanAt = nowWall; }
@@ -114,7 +115,7 @@ export class MomentLayer {
       share = DANS_TOP * (1 - 0.6 * d) * (0.8 + 0.2 * Math.sin((2 * Math.PI * t) / 8));
     } else if (m === "show") return this.show(i, n, nowWall);
     else if (m === "lab4") {   // LABBET 4 (lab4.ts)
-      if (i === 0) { this.lab4.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab4.mode; this.labLog = this.lab4.log; }
+      if (i === 0) { this.lab4.force = this.labForce; this.lab4.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab4.mode; this.labLog = this.lab4.log; }
       const o = this.lab4.out; this.tgt[0] = o[i * 3]; this.tgt[1] = o[i * 3 + 1]; this.tgt[2] = o[i * 3 + 2]; return this.tgt;
     }
     else if (m === "lab3") {   // LABBET 3 (lab3.ts)
@@ -145,6 +146,8 @@ export class MomentLayer {
    *   PIANOT      (refräng annars + övrigt): basgången vandrar över lamporna efter tonhöjd (bandkvoten bas/(sub+kick+bas))
    *  Inget vitt, ingen strobe; nedgången tas av motorns uttoning per lampa (aldrig snabbare). */
   private beat?: ShowBeat;
+  /** POST /api/labforce: tvinga en idé i labbet (sätts av motorn via cfg.labForce). */
+  labForce = '';
   private lab = new Lab(); private lab2 = new Lab2(); private lab3 = new Lab3(); private lab4 = new Lab4(); labMode = ''; labLog: [number, string][] = [];
   private sh = new Float32Array(0); private shAt = 0; private pitchS = 0.5; private lastNote = -1; private lastDrop = 0;
   private lone = -1; private lonePitch = 0.5; private loneHop = 0; private voiceS = 0; private voiceFloor = 1; private voiceQuietAt = 0; private singerSect = 5; private balls = [0, 2, 3, -2]; private ballSect = [5, 0]; private kPrev = 0; private sPrev = 0; private freezeUntil = 0; private dropOrchUntil = 0; private freezeN = 0; private buildAt = 0; private lastSec = ''; private glow = new Float32Array(0); private glowS = new Int8Array(0);
