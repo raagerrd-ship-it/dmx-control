@@ -26,6 +26,8 @@ const PATTERNS = [0b1000, 0b0001, 0b0100, 0b0010, 0b1001, 0b0110, 0b1010, 0b0101
 
 export class Lab {
   out = new Float32Array(0);
+  /** Vilken idé som kör + de senaste bytena [väggklocka ms, idé] (GET /api/moment, ägaren: 'den som kör nu'). */
+  mode = ''; log: [number, string][] = [];
   private n = 0; private at = 0;
   private hist = new Float32Array(HIST); private histT = new Float64Array(HIST); private hi = 0;
   private bal = 0.5;
@@ -47,10 +49,11 @@ export class Lab {
     const sec = c.section ?? '';
     if (sec !== this.lastSec) { if (sec === 'high') { this.highCount++; this.highStartBeat = c.beatIdx; } this.lastSec = sec; }
     const quiet = sec === 'break' || sec === 'intro' || presence < 0.35;
-    if (quiet && this.slowN > 20) this.slowMotion(n, dt);
-    else if (!c.hasBeat) this.tug(sp, n, dt, presence);
-    else if (sec === 'build') this.canon(c, n, now, presence);
-    else if (sec === 'high') this.memory(c, n, presence);
+    const mode = quiet && this.slowN > 20 ? 'slowmotion' : !c.hasBeat ? 'dragkamp' : sec === 'build' ? 'kanon' : sec === 'high' ? 'minnet' : 'dragkamp';
+    if (mode !== this.mode) { this.mode = mode; this.log.push([Math.round(now), mode]); if (this.log.length > 12) this.log.shift(); }
+    if (mode === 'slowmotion') this.slowMotion(n, dt);
+    else if (mode === 'kanon') this.canon(c, n, now, presence);
+    else if (mode === 'minnet') this.memory(c, n, presence);
     else this.tug(sp, n, dt, presence);
     if (now < this.recUntil && this.slowN < SLOW_FRAMES) { this.slow.set(this.out, this.slowN * n * 3); this.slowN++; }
     return this.out;
@@ -100,16 +103,21 @@ export class Lab {
     for (let q = 0; q < w; q++) this.out[q] = this.slow[a * w + q] * (1 - f) + this.slow[b * w + q] * f;
   }
 
-  /** DRAGKAMPEN: bas mot diskant, fronten flyttas efter balansen. */
+  /** DRAGKAMPEN: bas mot diskant, fronten flyttas efter balansen (lugn: 1,5 s glättning, hysteres per lampa, mjuk övergång -
+   *  ägaren 11-07: 'för fladdrig' med 0,15 s och hårda gränser). */
+  private front = -1;
   private tug(sp: NonNullable<LabIn["frame"]>["spec"], n: number, dt: number, presence: number) {
     const low = sp.sub + sp.kick + sp.bass, high = sp.highMid + sp.treble + sp.air + 1e-6;
-    this.bal += (low / (low + high) - this.bal) * Math.min(1, dt / 0.15);
-    const x = this.bal * n, energy = Math.min(1, (low + high) / 3);
+    this.bal += (low / (low + high) - this.bal) * Math.min(1, dt / 1.5);
+    this.eng += (Math.min(1, (low + high) / 3) - this.eng) * Math.min(1, dt / 0.6);
+    const x = this.bal * (n - 1);
+    if (this.front < 0 || Math.abs(x - this.front) > 0.75) this.front = Math.max(0, Math.min(n - 1, Math.round(x)));   // hysteres
     for (let i = 0; i < n; i++) {
-      const d = i + 0.5 - x;
-      if (Math.abs(d) < 0.75) this.put(i, 5, (0.6 + 0.4 * energy) * presence);                  // fronten: magenta
-      else if (d < 0) this.put(i, i % 2 ? 1 : 0, (0.15 + 0.35 * Math.min(1, low / 1.5)) * presence);   // basens sida: röd/gul
-      else this.put(i, i % 2 ? 3 : 4, (0.15 + 0.35 * Math.min(1, high / 1.5)) * presence);           // diskantens sida: blå/cyan
+      const d = i - this.front;
+      if (d === 0) this.put(i, 5, (0.55 + 0.3 * this.eng) * presence);                                     // fronten: magenta
+      else if (d < 0) this.put(i, 0, (0.12 + 0.28 * Math.min(1, low / 1.5)) * (1 - 0.15 * -d) * presence);   // basens sida: röd
+      else this.put(i, 4, (0.12 + 0.28 * Math.min(1, high / 1.5)) * (1 - 0.15 * d) * presence);              // diskantens sida: blå
     }
   }
+  private eng = 0;
 }

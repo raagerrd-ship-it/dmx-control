@@ -243,7 +243,7 @@ export async function startServer(
   // GC-stopp per sort, renderingstid och händelseloopens fördröjning per minut - alltid på (perfStats.ts, 10-16)
   app.get("/api/perf", async () => getPerf());
   // BRÖLLOPSLÄGET (moment.ts): {"moment":"middag"} - samma väg som gästsidans knappar (tryck på aktiv stund = fest).
-  app.get("/api/moment", async () => ({ moment: deps.cfg.moment ?? "fest", themeColors: deps.cfg.themeColors ?? null }));
+  app.get("/api/moment", async () => ({ moment: deps.cfg.moment ?? "fest", themeColors: deps.cfg.themeColors ?? null, lab: (deps.cfg as unknown as { labState?: unknown }).labState ?? null }));
   app.post("/api/moment", async (req, reply) => {
     const m = ((req.body ?? {}) as Record<string, unknown>).moment;
     if (!isMoment(m)) return reply.code(400).send({ ok: false, error: "moment: fest | middag | tal | forstadans | tartan | show | lab" });

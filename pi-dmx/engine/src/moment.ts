@@ -84,6 +84,7 @@ export class MomentLayer {
         }
       }
     }
+    if (m === "lab") Object.defineProperty(cfg, "labState", { value: { now: this.labMode, log: this.labLog }, enumerable: false, configurable: true, writable: true });   // GET /api/moment (sparas inte)
     const tw = m === "fest" ? 0 : 1;
     this.w += Math.max(-down, Math.min(up, tw - this.w));
     if (this.w < 1e-4) this.w = 0;
@@ -110,7 +111,7 @@ export class MomentLayer {
       share = DANS_TOP * (1 - 0.6 * d) * (0.8 + 0.2 * Math.sin((2 * Math.PI * t) / 8));
     } else if (m === "show") return this.show(i, n, nowWall);
     else if (m === "lab") {   // LABBET (lab.ts)
-      if (i === 0) this.lab.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF));
+      if (i === 0) { this.lab.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab.mode; this.labLog = this.lab.log; }
       const o = this.lab.out; this.tgt[0] = o[i * 3]; this.tgt[1] = o[i * 3 + 1]; this.tgt[2] = o[i * 3 + 2]; return this.tgt;
     }
     else share = TARTAN_TOP;
@@ -129,7 +130,7 @@ export class MomentLayer {
    *   PIANOT      (refräng annars + övrigt): basgången vandrar över lamporna efter tonhöjd (bandkvoten bas/(sub+kick+bas))
    *  Inget vitt, ingen strobe; nedgången tas av motorns uttoning per lampa (aldrig snabbare). */
   private beat?: ShowBeat;
-  private lab = new Lab();
+  private lab = new Lab(); labMode = ''; labLog: [number, string][] = [];
   private sh = new Float32Array(0); private shAt = 0; private pitchS = 0.5; private lastNote = -1; private lastDrop = 0;
   private lone = -1; private lonePitch = 0.5; private loneHop = 0; private voiceS = 0; private voiceFloor = 1; private voiceQuietAt = 0; private singerSect = 5; private balls = [0, 2, 3, -2]; private ballSect = [5, 0]; private kPrev = 0; private sPrev = 0; private freezeUntil = 0; private dropOrchUntil = 0; private freezeN = 0; private buildAt = 0; private lastSec = ''; private glow = new Float32Array(0); private glowS = new Int8Array(0);
   private show(i: number, n: number, nowWall: number): [number, number, number] {
