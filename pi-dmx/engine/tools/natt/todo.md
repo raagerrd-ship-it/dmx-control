@@ -1,5 +1,14 @@
 # Natt-agentens uppdrag
 
+## PRIORITET I NATT 2026-11-07 -> 11-08 (ägaren: '3 och 4 har mest prio') - GÅR FÖRE ALLT, I DENNA ORDNING
+A. KONTRAKTET + KALIBRERINGEN PER LAMPA (punkt '4'): GAMMA-läckorna ur effects.ts (E_MIN_LIT, kulörtoningen) till output.ts, sedan gamma och
+   tak per lampa i cal (standard 1,6/0,95) + server.ts-saneringen + UI:ts kalibreringsflik. Json-identiskt bevisat. Se 'MÅLET MED KONTRAKTET' nedan.
+B. EFFEKTERNAS DIODANPASSNINGAR BORT (punkt '3'): provratten DMX_FX_REN, mät med RGB_STRICT. Se 'ÄGAREN IGEN' nedan.
+C. Om tid finns: de tio proven till standard (avsnittet nedan). Görs C inte i natt: nästa natt FÖRST.
+D. ARENAN puls2 FLYTTAD TILL NÄSTA NATT (kräver C KLART). Kör den inte i natt.
+Bänka A/B med de tio rattarna satta som env (KICKREGN_PAR, BUILD_TOPP, BREAK_HOLD_MS=20000, DROP_LAND_CAP=0.9, DROP_LIFT_FLOOR=0, DROP_WIN_S=1,
+B_SUBW=0.25, B_LO_S=0.25, BASGANG=1, RGB_STRICT=1) = det som är live. Deploya aldrig; 'redo för ladan' med hela kommandot (tio + nytt).
+
 ## Från kvällen 2026-11-07 - GODKÄNT I LADAN: FYRA PROV IN I KODEN (ägaren i ladan: 'godkänt' x3 + 'perfekt'; går före allt annat)
 LIVE sedan 15:55-16:10 (Pi 10.171.211.218 via hotspot, PC 10.171.211.53), ladan.conf = KICKREGN_PAR=1, BUILD_TOPP=1, BREAK_HOLD_MS=20000,
 DROP_LAND_CAP=0.9, DROP_LIFT_FLOOR=0, DROP_WIN_S=1, B_SUBW=0.25, B_LO_S=0.25, BASGANG=1. Ägaren godkände i tur och ordning (a) BREAK_HOLD,
