@@ -123,7 +123,7 @@ const LAMP = [];   // per renderruta: varje lampas ljus (starkaste kanalen x dim
 const T = [], LIT = [], INT = [], LVL = [], BPM = [], TE = [], LSPR = [], LOOK = [], WHY = [];   // per renderruta (TE = motorns tierEma)
 const ONS = [], ANC = [];
 const KICK = [], PH = [], PH2 = new Float64Array(40), PH2N = new Float64Array(40);                                      // index i T dar en kick lag
-const DROP = [];                                      // {t, i, sec, lvh}
+const DROP = [], BEATS = [];   // BEATS (ST_BEAT=1): [t, fr.bpm, cfg.beat.bpm, cfg.beat.confidence, dropCount, level] per renderruta                                      // {t, i, sec, lvh}
 const lookRuns = [];                                  // {look, t0, t1}
 const lookTime = new Map();
 const whyCount = new Map();
@@ -186,6 +186,7 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
   LSPR.push(lmax - lmin);
 
   const i = T.length;
+  if (process.env.ST_BEAT) BEATS.push([+tS.toFixed(3), fr.bpm ?? 0, +(cfg.beat?.bpm ?? 0).toFixed(1), +(cfg.beat?.confidence ?? 0).toFixed(3), fr.dropCount ?? 0, +(fr.level ?? 0).toFixed(3), fr.section]);
   T.push(tS); LIT.push(lit); INT.push(fr.intensity ?? 0); LVL.push(fr.level ?? 0); BPM.push(fr.bpm ?? 0); TE.push(eng.tierEma ?? 0);
   if (kickPending) { KICK.push(i); KICKT.set(i, kickAtS); kickPending = false; }
   if (process.env.ST_PHASE && KICKT.get(i) === kickAtS && KICK[KICK.length - 1] === i) PH.push([+(tS - kickAtS).toFixed(4), tS, +(cfg.beat && cfg.beat.bpm > 0 ? ((((ms - cfg.beat.anchorMs) % (60000 / cfg.beat.bpm)) + 60000 / cfg.beat.bpm) % (60000 / cfg.beat.bpm)) / (60000 / cfg.beat.bpm) : -1).toFixed(3), cfg.beat && cfg.beat.bpm > 0 ? 1 : 0, +(cfg.beat?.bpm ?? 0).toFixed(1)]);
@@ -336,7 +337,7 @@ const res = {
 };
 
 const traceOut = opt("--trace", null);
-if (traceOut) writeFileSync(traceOut, JSON.stringify({ T, LIT, INT, LVL, TE, LSPR, LOOK, BPM, KICK, EV, WHY, STEP_MS }));
+if (traceOut) writeFileSync(traceOut, JSON.stringify({ T, LIT, INT, LVL, TE, LSPR, LOOK, BPM, KICK, EV, WHY, STEP_MS, BEATS }));
 if (process.env.ST_DUMP) require_dump(DUMP);
 if (process.env.ST_ONS) writeFileSync(process.env.ST_ONS, JSON.stringify({ ONS, ANC }));
 const jsonOut = opt("--json", null);
