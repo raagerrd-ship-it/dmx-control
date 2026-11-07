@@ -36,7 +36,8 @@ export class Lab3 {
     this.out.fill(0);
     const sp = c?.frame?.spec, dr = c?.drum;
     if (!c || !sp || !dr) return this.out;
-    if (c.dropEnv > 0.6 && this.lastDrop <= 0.6) this.burstAt = now;
+    // explosionen BARA när spänningen (build) landar i en drop - minidropparnas kuvert fyrade den var 4-8 s ('tappar takten väldigt ofta')
+    if (c.dropEnv > 0.6 && this.lastDrop <= 0.6 && (this.mode === 'spanning' || this.lastSec === 'build')) this.burstAt = now;
     this.lastDrop = c.dropEnv;
     const sec = c.section ?? '';
     if (sec !== this.lastSec) {   // MÅLNINGEN: ny sektion -> nästa lampa får sektionens kulör
