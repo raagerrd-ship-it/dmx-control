@@ -87,7 +87,7 @@ const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.beatPulse = true; cfg.master = 1; cfg.energyCeiling = true;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
 if (LAMPOR > 0) cfg.fixtures = Array.from({ length: LAMPOR }, (_, k) => ({ name: `Par ${k + 1}`, address: 1 + 7 * k, preset: "rgb7" }));   // HYRKITET (11-02): --lampor N rgb7 i följd
-for (const fx of cfg.fixtures) fx.cal = { off: 0, on: ON };   // LADANS tandpunkt (se huvudet)
+for (const fx of cfg.fixtures) fx.cal = { off: 0, on: ON };   if (process.env.DYN_MOMENT) cfg.moment = process.env.DYN_MOMENT;   // stund (moment.ts), t.ex. show   // LADANS tandpunkt (se huvudet)
 const lamps = cfg.fixtures.map((fx) => {
   const roles = fixtureRoles(fx), base = (fx.address ?? 1) - 1;
   const at = (r) => { const i = roles.indexOf(r); return i < 0 ? -1 : base + i; };

@@ -19,7 +19,8 @@ import { GAMMA } from "./output.js";
 export const MOMENTS = ["fest", "middag", "tal", "forstadans", "tartan", "show"] as const;
 export type Moment = typeof MOMENTS[number];
 /** Motorns takt till showen (effects.ts ctx, satt före stunden varje ruta). */
-export interface ShowBeat { beatIdx: number; beatFrac: number; hasBeat: boolean; bassBody: number }
+export interface ShowBeat { beatIdx: number; beatFrac: number; hasBeat: boolean; bassBody: number; bassNoteIdx: number; dropEnv: number; section: string;
+  drum: { kick: number; snare: number; hat: number; bass: number } | null; frame: { spec: { sub: number; kick: number; bass: number; mid: number } } | null }
 export const isMoment = (m: unknown): m is Moment => typeof m === "string" && (MOMENTS as readonly string[]).includes(m);
 
 /** Parets färger när inga är valda: magenta + röd (sektor 0 röd, 1 gul, 2 grön, 3 cyan, 4 blå, 5 magenta). */
@@ -113,72 +114,70 @@ export class MomentLayer {
     return this.tgt;
   }
 
-  /** SHOWEN (ägaren i ladan 2026-11-07: 'ett specialläge med en show där du festar till det riktigt fint på dessa 4 lamporna - ej vanliga
-   *  effekterna' + 'tänk helt utanför boxen'): en PROGRAMMERAD koreografi i takt (motorns beatIdx/beatFrac; utan takt en egen 124 BPM-klocka),
-   *  8 akter x 8 takter (64 takter ~2 min, sedan nytt färgpar och om igen):
-   *   1 RÄKNA       lamporna räknar takten: slag 1 = en lampa, slag 4 = alla fyra
-   *   2 KOMETEN     en komet med svans studsar fram och tillbaka, ett varv per två slag
-   *   3 PINGPONG    ytterparet på 1 och 3, innerparet på 2 och 4, motfärger
-   *   4 SOLUPPGÅNG  uppbyggnad: röd -> orange -> gul över 8 takter, starkare för varje takt; sista taktens andra halva MÖRK
-   *   5 DROPEN      smäll på ettan, sedan halvorna växelvis i basens styrka, färgparet byts varannan takt
-   *   6 IMPLOSION   kanterna på 1, mitten på 2, alla svagt på 3, mörkt på 4 - och explosion på nästa etta
-   *   7 REGNBÅGEN   varje lampa en kulör längre fram, hjulet snurrar ett steg per slag, pulsen rinner över raden (en våg)
-   *   8 HJÄRTAT     andhämtning: rött hjärtslag (dubbelslag) i mitten på 1 och 3, kanterna glöder i djupblått
-   *  Bara rena kulörer (inget vitt), ingen strobe, högst en puls per lampa och slag (hjärtat: två slag per halvtakt). Nivån följer musikens
-   *  närvaro (vol); nedgången tas av motorns uttoning per lampa (aldrig snabbare). */
+  /** SHOWEN (ägaren i ladan 2026-11-07: 'ett specialläge med en show ... ej vanliga effekterna' + 'tänk helt utanför boxen' + 'detta är bara
+   *  för att få inspiration'): ljuset följer MUSIKENS DRAMATURGI, inte ett takt-schema och inte effekternas pulser.
+   *   MÖRKRET     (lugnt / intro / break): allt svart; EN lampa glöder upp på varje basnot, på tonens plats (låg vänster, hög höger)
+   *   SOLUPPGÅNG  (build): pulsfritt sken röd -> orange -> gul som stiger med uppbyggnadens ålder
+   *   FRYS        (drop): ljuset STELNAR - en stilla bild i fyra kulörer i 3,5 s medan musiken exploderar (stop-motion utan strobe:
+   *               lampornas strobe är okalibrerad, 127 = ~10 Hz, och uttoningen tar mörkret mellan RGB-blixtar)
+   *   ORKESTERN   (refräng, var 8:e takt): varje lampa en musiker - kick (röd), bas (blå), virvel (gul), röst/synth (magenta)
+   *   PIANOT      (refräng annars + övrigt): basgången vandrar över lamporna efter tonhöjd (bandkvoten bas/(sub+kick+bas))
+   *  Inget vitt, ingen strobe; nedgången tas av motorns uttoning per lampa (aldrig snabbare). */
   private beat?: ShowBeat;
+  private sh = new Float32Array(0); private shAt = 0; private pitchS = 0.5; private lastNote = -1; private lastDrop = 0;
+  private freezeUntil = 0; private freezeN = 0; private buildAt = 0; private lastSec = ''; private glow = new Float32Array(0); private glowS = new Int8Array(0);
   private show(i: number, n: number, nowWall: number): [number, number, number] {
-    const b = this.beat, has = !!b && b.hasBeat;
-    const clockBeats = (nowWall / 1000) * (124 / 60);
-    const bi = has ? b!.beatIdx : Math.floor(clockBeats), f = has ? b!.beatFrac : clockBeats - Math.floor(clockBeats);
-    const mod = (x: number, m: number) => ((x % m) + m) % m;
-    const bar = Math.floor(bi / 4), beat = mod(bi, 4), barIn = mod(bar, 8), act = Math.floor(mod(bar, 64) / 8);
-    const bass = b ? Math.max(0, Math.min(1, b.bassBody)) : 0.7;
-    const pulse = (ff: number) => (ff < 0 ? 0 : Math.exp(-ff * 3.2));          // slaget: upp direkt, klingar över slaget
-    const PAIRS: [number, number][] = [[5, 1], [0, 3], [4, 1], [2, 5]];       // magenta/gul, röd/cyan, blå/gul, grön/magenta
-    const pair = PAIRS[mod(Math.floor(bar / 64), 4)];
-    const pos = n > 1 ? i / (n - 1) : 0;                                         // lampans plats i raden 0..1
-    let sect = pair[0], amp = 0;
-    if (act === 0) {            // RÄKNA
-      sect = mod(bar, 2) === 0 ? pair[0] : pair[1];
-      amp = i <= beat ? (i === beat ? pulse(f) : 0.35 + 0.3 * pulse(f)) : 0;
-    } else if (act === 1) {     // KOMETEN
-      const ph = (mod(bi, 2) + f) / 2, x = ph < 0.5 ? ph * 2 : 2 - ph * 2;      // 0 -> 1 -> 0 över två slag
-      const d = Math.abs(pos - x) * (n - 1);
-      amp = Math.max(0, 1 - d * 0.7) ** 2; sect = d < 0.5 ? pair[0] : pair[1];
-    } else if (act === 2) {     // PINGPONG
-      const outer = i === 0 || i === n - 1;
-      sect = outer ? pair[0] : pair[1];
-      amp = outer === (mod(beat, 2) === 0) ? pulse(f) : 0.08;
-    } else if (act === 3) {     // SOLUPPGÅNG
-      sect = barIn < 3 ? 0 : barIn < 6 ? (pos < 0.5 ? 0 : 1) : 1;             // röd -> orange (halva röd, halva gul) -> gul
-      amp = (0.25 + 0.75 * (barIn + beat / 4) / 8) * (0.4 + 0.6 * pulse(f));
-      if (barIn === 7 && beat >= 2) amp = 0;                                    // andningen före dropen
-    } else if (act === 4) {     // DROPEN
-      const swap = mod(Math.floor(barIn / 2), 2) === 1;
-      if (barIn === 0 && beat === 0) { amp = Math.max(pulse(f), 0.5); sect = pair[0]; }
-      else {
-        const left = i < n / 2, mine = left === (mod(beat, 2) === 0);
-        sect = left !== swap ? pair[0] : pair[1];
-        amp = mine ? (0.45 + 0.55 * bass) * pulse(f) : 0.1 * bass;
-      }
-    } else if (act === 5) {     // IMPLOSION
-      const outer = i === 0 || i === n - 1;
-      if (beat === 0) { amp = outer ? pulse(f) : 0.15; sect = pair[0]; }
-      else if (beat === 1) { amp = outer ? 0.15 : pulse(f); sect = pair[1]; }
-      else if (beat === 2) { amp = 0.3 * pulse(f); sect = pair[0]; }
-      else amp = 0;
-    } else if (act === 6) {     // REGNBÅGEN
-      sect = mod(bi + i, 6);
-      amp = 0.25 + 0.75 * pulse(f - pos * 0.35);                                  // pulsen rinner över raden
-    } else {                    // HJÄRTAT
-      const mid = !(i === 0 || i === n - 1);
-      if (mid) { sect = 0; amp = mod(beat, 2) === 0 ? Math.max(pulse(f), 0.7 * pulse(f - 0.28)) : 0.06; }
-      else { sect = 4; amp = 0.18 + 0.08 * Math.sin(2 * Math.PI * (bar * 4 + beat + f) / 8); }
-    }
-    const presence = Math.min(1, this.vol / VOL_REF);
-    const v = toV(SHOW_TOP * Math.max(0, Math.min(1, amp)) * presence), s = SECT[sect];
-    this.tgt[0] = s[0] * v; this.tgt[1] = s[1] * v; this.tgt[2] = s[2] * v;
+    if (this.sh.length !== n * 3) { this.sh = new Float32Array(n * 3); this.glow = new Float32Array(n); this.glowS = new Int8Array(n); }
+    if (i === 0) this.showTick(n, nowWall);
+    this.tgt[0] = this.sh[i * 3]; this.tgt[1] = this.sh[i * 3 + 1]; this.tgt[2] = this.sh[i * 3 + 2];
     return this.tgt;
+  }
+  private put(i: number, sect: number, share: number, presence: number) {
+    const v = toV(SHOW_TOP * Math.max(0, Math.min(1, share)) * presence), s = SECT[sect];
+    this.sh[i * 3] = s[0] * v; this.sh[i * 3 + 1] = s[1] * v; this.sh[i * 3 + 2] = s[2] * v;
+  }
+  private showTick(n: number, now: number) {
+    const dt = this.shAt > 0 ? Math.min(0.2, (now - this.shAt) / 1000) : 0.025; this.shAt = now;
+    const c = this.beat, fr = c?.frame, sp = fr?.spec, dr = c?.drum;
+    const presence = Math.min(1, this.vol / VOL_REF);
+    this.sh.fill(0);
+    if (!c || !sp || !dr) { for (let i = 0; i < n; i++) this.put(i, 4, 0.15, presence); return; }
+    // tonhöjden i basen: andelen övre bas mot sub + kick (0 = djup ton, 1 = hög), glättad 80 ms
+    const tot = sp.sub + sp.kick + sp.bass + 1e-6, pitch = Math.max(0, Math.min(1, (0.5 * sp.kick + sp.bass) / tot * 1.4 - 0.2));
+    this.pitchS += (pitch - this.pitchS) * Math.min(1, dt / 0.08);
+    const note = c.bassNoteIdx !== this.lastNote; this.lastNote = c.bassNoteIdx;
+    const noteLamp = Math.round(this.pitchS * (n - 1)), noteSect = [0, 5, 4, 3][Math.min(3, Math.floor(this.pitchS * 4))];
+    // dropen: kanten -> FRYS
+    if (c.dropEnv > 0.6 && this.lastDrop <= 0.6) { this.freezeUntil = now + 3500; this.freezeN++; }
+    this.lastDrop = c.dropEnv;
+    const sec = c.section ?? ''; if (sec !== this.lastSec) { if (sec === 'build') this.buildAt = now; this.lastSec = sec; }
+    for (let i = 0; i < n; i++) this.glow[i] *= Math.exp(-dt / 0.45);
+    if (now < this.freezeUntil) {                                   // FRYS
+      const pal = [[5, 1, 3, 0], [0, 3, 1, 4], [4, 1, 5, 2], [2, 5, 0, 3]][this.freezeN % 4];
+      for (let i = 0; i < n; i++) this.put(i, pal[i % 4], 1, 1);
+      return;
+    }
+    const quiet = this.vol < VOL_REF * 0.35 || sec === 'break' || sec === 'intro';
+    if (quiet) {                                                    // MÖRKRET: en lampa per basnot
+      if (note) { this.glow[noteLamp] = Math.max(this.glow[noteLamp], 0.55); this.glowS[noteLamp] = noteSect; }
+      for (let i = 0; i < n; i++) if (this.glow[i] > 0.01) this.put(i, this.glowS[i], this.glow[i], 1);
+      return;
+    }
+    if (sec === 'build') {                                          // SOLUPPGÅNG
+      const age = (now - this.buildAt) / 1000, rise = Math.min(1, age / 14);
+      const sect = rise < 0.4 ? 0 : 1, mixOrange = rise >= 0.4 && rise < 0.75;
+      for (let i = 0; i < n; i++) this.put(i, mixOrange && i % 2 === 0 ? 0 : sect, 0.12 + 0.75 * rise * rise, presence);
+      return;
+    }
+    const orch = sec === 'high' && Math.floor(c.beatIdx / 32) % 2 === 0;
+    if (orch) {                                                     // ORKESTERN
+      const voice = Math.max(0, Math.min(1, (sp.mid - 0.25) * 1.6));
+      const parts: [number, number][] = [[0, dr.kick], [4, Math.pow(sp.bass, 1.5)], [1, dr.snare], [5, voice]];
+      for (let i = 0; i < n; i++) { const [sect, lvl] = parts[i % 4]; this.put(i, sect, lvl, presence); }
+      return;
+    }
+    // PIANOT: basnoten tänder lampan på sin tonhöjd, styrkan ur basen
+    if (note) { this.glow[noteLamp] = Math.max(this.glow[noteLamp], 0.35 + 0.65 * Math.min(1, c.bassBody)); this.glowS[noteLamp] = noteSect; }
+    for (let i = 0; i < n; i++) if (this.glow[i] > 0.01) this.put(i, this.glowS[i], this.glow[i], presence);
   }
 }
