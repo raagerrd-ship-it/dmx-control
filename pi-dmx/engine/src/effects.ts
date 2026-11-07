@@ -379,7 +379,7 @@ const E_RELEASE_MS = 100;
  *  dess TOPP (alla lampor, foljd med direkt upp och avklingning E_NORM_S) blir 100 %: slagpulser och skillnad mellan lampor finns kvar,
  *  kuloren bevaras (alla kanaler lika), och energin ger sedan hela spannet golv+1..95 %. Hogst x E_NORM_MAX. 0 = av.
  *  OBS: detta LYFTER effektens niva (agarens regel 1) - darfor bara som prov, agaren avgor i ladan. */
-const E_NORM_S = 2;   // 0 -> 2 (ladan 10-09, standard 10-10)
+const E_NORM_S = Number(process.env.DMX_E_NORM_S || '2');   // PROV 11-07 DMX_E_NORM_S för bänken   // 0 -> 2 (ladan 10-09, standard 10-10)
 const E_NORM_MAX = 6;
 /** ENERGIN I DMX-PROCENT (ladan 2026-10-09, STANDARD 10-10). Energin multiplicerades FORE utgangens gamma (2,2), sa kurvan blev i
  *  praktiken e^(E_CURVE x 2,2) = e^6,6 med kurva 3: energi 0,9 -> ~50 % ljus, 0,7 -> 10 %. Med E_LIN tas gamman ut ur dampningen
@@ -388,7 +388,7 @@ const E_NORM_MAX = 6;
  *  En TAND lampa (effektens starkaste kanal > 0) lyfts mot golvet: m' = m + FLOOR x (1 - m) x min(1, m / 0,1) - kulorens forhallanden
  *  bevaras, en slackt lampa forblir slackt (agaren: "dom far garna slackas om effekten vill det"), och lyftet rampar in under 10 % sa
  *  en lampa som tonar ut inte hoppar. Lagt efter E_NORM (effektens topp = 1). 0 = av. */
-const FX_FLOOR = Math.max(0, Math.min(0.8, 0.6));   // 0 -> 0,6 (ladan 10-09, standard 10-10)
+const FX_FLOOR = Math.max(0, Math.min(0.8, Number(process.env.DMX_FX_FLOOR || '0.6')));   // PROV 11-07 (ägaren: 'målet är inte mer ljus ... takten skall synas', DMX_FX_FLOOR för bänken)   // 0 -> 0,6 (ladan 10-09, standard 10-10)
 // (DMX_DIM_PULS - dimmern pa fullt - forkastad i ogat 10-09, borttagen 10-10.)
 /** ENERGINS TOPP (DMX_E_TOP 0,5..1, ladan 2026-10-09: "dra upp till 95 % sa energi har nagot att dampa"). Fonstrets tak foljer varje
  *  enskild ljudtopp direkt, sa ett vanligt starkt parti lag pa e ~0,9 - med kurva 7 bara ~50 % ljus. e / E_TOP (klampat till 1): starka
