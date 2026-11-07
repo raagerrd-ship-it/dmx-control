@@ -12,7 +12,7 @@ MÅTT
                    kring varje basanslag över medianen) - rör sig ljuset med basen även mellan slagen; (c2) gapK = ljusets rörelse (|d ljus|
                    bandpassat) utanför fönstren / inuti fönstren per sample - lägre = ljuset rör sig PÅ slagen, inte mellan.
   (d) KONTRAST (runda 2): slagK = (topp 0..150 ms efter - dal 150 ms före) / topp per starkt anslag (median; slagKtop = ljusaste lampan),
-                   slagMod = taktbandets ljusrörelse / medelljus, mörkt (riggens medel < 0,02) delat i slocknat1s (mörka stunder >= 1 s, släckt
+                   slagMod = taktbandets ljusrörelse / medelljus, pulsHz = riggens toppar (prominens >= 15 % av medelljuset, >= 100 ms isär) per s, mörkt (riggens medel < 0,02) delat i slocknat1s (mörka stunder >= 1 s, släckt
                    rigg = dåligt) och mörktKort (< 1 s, mörkt mellan slagen = bra), lampspr = medel (ljusaste - mörkaste lampan) ur tracen.
   per sektion (konsertReplay:s sektion i tracen): rAbest och djup/synl per sektionstyp (intro/low/build/high/break).
   python tools/rytm.py <wav> [--s 300] [--env K=V ...] [--json ut.json] [--trace-in fil.f32 | --trace-ut fil.f32]
@@ -147,6 +147,9 @@ for i in range(start, end + 1):
     elif not d and i0 is not None:
         if i - i0 >= 200: runLong[i0:i] = True
         i0 = None
+from scipy.signal import find_peaks
+pk_, _ = find_peaks(lig[start:end], prominence=0.15 * max(1e-6, lig[start:end].mean()), distance=20)   # PULSER (runda 3): riggens toppar >= 15 % av medelljuset, minst 100 ms isär
+pulsHz = len(pk_) / ((end - start) * 0.005)
 slock = float(runLong[start:end].mean()); morkK = float((dark[start:end] & ~runLong[start:end]).mean())
 
 # ---- per sektion ----
@@ -166,12 +169,12 @@ res = {'wav': os.path.basename(wav), 's': round(len(x) / sr), 'env': [a for i, a
        'rA0': round(r0, 3), 'rAbest': round(rb, 3), 'rAlag': rbl, 'rK': round(rk, 3), 'rKlag': rkl, 'rS': round(rs_, 3), 'rSlag': rsl, 'rTop': round(rt, 3),
        'djup': round(float(np.median(D)), 3), 'djupP25': round(float(np.percentile(D, 25)), 3), 'synl': round(float(np.mean(D >= 0.10)), 3), 'nAnslag': int(len(D)),
        'gapR': round(gapR, 3), 'gapK': round(gapK, 3), 'ljus': round(float(lig[start:end].mean() / 4), 3),
-       'slagK': round(float(np.median(SK)), 3), 'slagKtop': round(float(np.median(SKt)), 3), 'slagMod': round(slagMod, 3),
+       'slagK': round(float(np.median(SK)), 3), 'slagKtop': round(float(np.median(SKt)), 3), 'slagMod': round(slagMod, 3), 'pulsHz': round(pulsHz, 2),
        'mork': round(float(dark[start:end].mean()), 4), 'slocknat1s': round(slock, 4), 'morktKort': round(morkK, 4),
        'lampspr': round(float((lamps.max(axis=1) - lamps.min(axis=1))[3000:].mean()), 4),
        'ljusLag': LL, 'sektion': per}
 print(f"{res['wav']} {res['s']} s  rA {r0:.3f} best {rb:.3f}@{rbl} ms  rK {rk:.3f}@{rkl}  rS {rs_:.3f}@{rsl}  rTop {rt:.3f}  djup {res['djup']:.3f} (p25 {res['djupP25']:.3f}) synl {100*res['synl']:.0f} % av {len(D)}"
       f"  gapR {gapR:.3f} gapK {gapK:.3f}  ljus {res['ljus']:.3f}  ljusLag korskorr {lag} t90 {LL['t90']} lyft {LL['lyft']}\n"
-      f"  KONTRAST slagK {res['slagK']:.3f} (top {res['slagKtop']:.3f}) slagMod {slagMod:.3f}  mörkt {100*res['mork']:.1f} % = slocknat>=1s {100*slock:.1f} % + kort {100*morkK:.1f} %  lampspr {res['lampspr']:.3f}")
+      f"  KONTRAST slagK {res['slagK']:.3f} (top {res['slagKtop']:.3f}) slagMod {slagMod:.3f} puls {pulsHz:.2f}/s  mörkt {100*res['mork']:.1f} % = slocknat>=1s {100*slock:.1f} % + kort {100*morkK:.1f} %  lampspr {res['lampspr']:.3f}")
 for nm, v in per.items(): print(f"  {nm:6s} {v['s']:4d} s  rAbest {v['rAbest']:.3f}  djup {v['djup']}  synl {v['synl']} (n {v['n']})  slagK {v['slagK']}  ljus {v['ljus']}  slocknat {v['slocknat1s']}")
 if opt('--json'): json.dump(res, open(opt('--json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)

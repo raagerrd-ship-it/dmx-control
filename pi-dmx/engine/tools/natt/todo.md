@@ -14,7 +14,11 @@ Provrattar i koden (osatt = json-identiskt, verifierat: dag-baslinje = nattens g
    Alternativ SUBW 0.25 + CURVE 4. FX_FLOOR förkastat (inte orsaken), E_NORM_S förkastat, mer sub sämre (lotus-fyndet gäller inte här).
    HUVUDFYNDET: energin följer basen bra (r 0,69-0,83) men ljuset följer energin svagt (r 0,35-0,54) - EFFEKTERNAS mönster styr ljuset. Ska basgången
    kännas i ögonen på riktigt är nästa steg i effekterna (vilka effekter följer basen, rytm.py per look), inte energilagret.
-ÖGONPROV I LADAN (ägaren, en sak i taget, i denna ordning): (a) BREAK_HOLD, (b) drop-trion, (c) SUBW 0,25 -> + LO_S 0,25. Godkänt = in i koden + ratten bort.
+4. EFFEKTERNAS PULS UR BASEN (runda 3, 69d906c): låst takt gav effekternas puls (c.heart/beatPulse/kickEnv) ur RUTNÄTET och stängde av punchens
+   per-slag-del - basgången nådde aldrig effekterna. DMX_FX_BASS=1 + DMX_FX_BASS_PUNCH=0.5 (ovanpå SUBW 0,25 + LO_S 0,25): lang1021 rA 0,190 -> 0,265,
+   rK 0,206 -> 0,272 (dagens största vinst), dynSet ljusSteg 2,02 -> 2,39, fladder 0, refrängen starkare (1,73 -> 1,82). Pris lampspr pop -8 % / mega -4 %,
+   dropsprång hög -0,02. Bandsvepet: bara sub (~lågpass 60 Hz, lotus-värdet) SÄMST, bara kick (60-120) bäst för takten, 0,25 kompromiss. PUNCH 1 = 'allt lyser'-risk.
+ÖGONPROV I LADAN (ägaren, en sak i taget, i denna ordning): (a) BREAK_HOLD, (b) drop-trion, (c) SUBW 0,25 -> + LO_S 0,25 -> + FX_BASS 1 -> + FX_BASS_PUNCH 0,5. Godkänt = in i koden + ratten bort.
 Fortfarande live och utan dom: DMX_KICKREGN_PAR=1, DMX_BUILD_TOPP=1.
 
 ## Från eftermiddagen 2026-11-04 - HIGH NR 3+ FÅR NÄSTA LOOK (ägaren: 'ja, låt nattagenten pröva b i natt'; går före allt annat)
