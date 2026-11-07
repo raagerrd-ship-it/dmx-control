@@ -47,7 +47,9 @@ else:
     if len(x) < os.path.getsize(wav) // 2 - 100:
         fd, clip = tempfile.mkstemp(suffix='.wav'); os.close(fd)
         wavfile.write(clip, sr, (x * 32767).astype(np.int16))
-    subprocess.run(['node', os.path.join(here, 'konsertReplay.mjs'), clip, '--step', '5', '--delad-cfg', '--json', js, '--trace', tr], env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # --live-kick (arena 11-07, mätfälla 52 igen - deltagaren a2 i puls1): live matar registerKick + KICK-BYPASS på frame.kick, utan flaggan står
+    # lastKickBoost stilla i bänken och c.kickEnv är bara rutnätet. Domarens bänk (tools/arena/bank.py) skickar flaggan från runda 2 i puls1.
+    subprocess.run(['node', os.path.join(here, 'konsertReplay.mjs'), clip, '--step', '5', '--delad-cfg', '--json', js, '--trace', tr] + (['--live-kick'] if '--live-kick' in args else []), env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     os.remove(js)
     if clip != wav: os.remove(clip)
 T = np.fromfile(tr, dtype=np.float32).reshape(-1, 10)
@@ -139,6 +141,16 @@ def kontr(a, i):
     hi = a[i:i + 31].max(); lo = a[i - 30:i].min(); return (hi - lo) / max(hi, 0.02)
 SK = np.array([kontr(lig, i) for i in onsD]); SKt = np.array([kontr(top, i) for i in onsD])
 slagMod = float(lS[start:end].std() / max(1e-6, lig[start:end].mean()))
+# ---- (e) KOREOGRAFI (domaren v3, ägaren 11-07: "mot förinspelad ljuskoreografi vi försöker bli lika bra som, tänk dansgolv - ljuset ska öka känslan av takten man dansar till") ----
+# jitter = spridningen (IQR/1,35, ms) i fördröjningen basanslag -> ljusets topp 0..150 ms efter, över starka anslag med synligt lyft (djup >= 10 %):
+#          programmerat ljus sitter på SAMMA ställe varje slag, lågt = tajt. jitterN = antal anslag.
+# betoning = Spearman r mellan anslagets styrka (basens stigning) och ljusets lyft (djup), över alla anslag över medianen:
+#          en ljusdesigner gör stora slag stora och små slag små - högt = ljuset betonar där musiken betonar.
+from scipy.stats import spearmanr
+_lagv = [int(np.argmax(lig[i:i + 31])) * 5 for i, dd in zip(onsD, D) if dd >= 0.10]
+jitter = float((np.percentile(_lagv, 75) - np.percentile(_lagv, 25)) / 1.35) if len(_lagv) >= 20 else float('nan')
+_onB = [i for i in onsAll if i >= 200 and i + 200 < nb]
+betoning = float(spearmanr([rise[i] for i in _onB], [depth(i) for i in _onB])[0]) if len(_onB) >= 20 else float('nan')
 dark = (lig / 4) < 0.02
 runLong = np.zeros(nb, bool); i0 = None
 for i in range(start, end + 1):
@@ -172,6 +184,7 @@ res = {'wav': os.path.basename(wav), 's': round(len(x) / sr), 'env': [a for i, a
        'slagK': round(float(np.median(SK)), 3), 'slagKtop': round(float(np.median(SKt)), 3), 'slagMod': round(slagMod, 3), 'pulsHz': round(pulsHz, 2),
        'mork': round(float(dark[start:end].mean()), 4), 'slocknat1s': round(slock, 4), 'morktKort': round(morkK, 4),
        'lampspr': round(float((lamps.max(axis=1) - lamps.min(axis=1))[3000:].mean()), 4),
+       'jitter': round(jitter, 1), 'jitterN': len(_lagv), 'betoning': round(betoning, 3),
        'ljusLag': LL, 'sektion': per}
 print(f"{res['wav']} {res['s']} s  rA {r0:.3f} best {rb:.3f}@{rbl} ms  rK {rk:.3f}@{rkl}  rS {rs_:.3f}@{rsl}  rTop {rt:.3f}  djup {res['djup']:.3f} (p25 {res['djupP25']:.3f}) synl {100*res['synl']:.0f} % av {len(D)}"
       f"  gapR {gapR:.3f} gapK {gapK:.3f}  ljus {res['ljus']:.3f}  ljusLag korskorr {lag} t90 {LL['t90']} lyft {LL['lyft']}\n"
