@@ -2108,7 +2108,7 @@ export class EffectEngine {
     specialty.co2     = drivesHas(drives, "co2")     ? clamp255(Math.max(this.dropEnv > 0.85 ? 255 : 0, wantCo2 * 255)) : 0;
 
     // BRÖLLOPSLÄGET (moment.ts): middag/tal/första dansen/tårtan blandas in i steg 1 med vikten mw - ingen strobe/blinder/hazer i en stund.
-    const mw = this.moment.step(this.cfg, frame.level, nowWall, dtSec, count) ? this.moment.w : 0; this.rMw = mw;
+    const mw = this.moment.step(this.cfg, frame.level, nowWall, dtSec, count, this.ctx) ? this.moment.w : 0; this.rMw = mw;
     if (mw > 0) { specialty.hazer = 0; specialty.uv = 0; specialty.blinder = 0; specialty.strobe = 0; specialty.laser = 0; specialty.co2 = 0; }
     const inputGate = this.inputOff ? 0 : 1;   // ingangen avstangd -> morkt (del av steg 2)
     this.fxPeakNow = 0;
