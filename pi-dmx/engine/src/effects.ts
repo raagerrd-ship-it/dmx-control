@@ -81,7 +81,7 @@ const MINI_GAP_MS = 2000;
  *  dropen till 'high' som andra drops (se secKey i switchLook). */
 /** LYFTETS GOLV (ägaren i ladan 11-01: 'precis efter en drop ... nästan monoton'): lyftet låste energifaktorn på 1 i 8+ s efter dropen, så
  *  effekter som lever på basen (pulse av, energy på) slutade pulsa. Nu ett golv på 70 %: energin hålls uppe, bastrycket pulsar ovanför. */
-const DROP_LIFT_FLOOR = 0.7;
+const DROP_LIFT_FLOOR = Number(process.env.DMX_DROP_LIFT_FLOOR ?? '0.7');   // PROV 11-07 (ladan 11-06: takten syns svagt efter dropen): 0,5/0,6 opt-in, standard 0,7
 const DROP_BEAT_MIN = 0.8;   // basstark drop-look måste också ha tydlig takt (passform beat, se bassStrong)
 const DROP_LIFT_MS = 8000, DROP_LIFT_FALL_MS = 3000;   // 4000/1500 -> 8000/3000 STANDARD 10-17 (ägaren i ladan: 'energi efter drop dör fort' -> 'känns bra nu')   // 2000 -> 4000 (ladan 22:0x: 'se till så energin efter fortsätter', som minidropens lyft som var 'perfekt')   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
 /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
