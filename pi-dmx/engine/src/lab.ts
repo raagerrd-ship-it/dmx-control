@@ -27,7 +27,7 @@ const PATTERNS = [0b1000, 0b0001, 0b0100, 0b0010, 0b1001, 0b0110, 0b1010, 0b0101
 export class Lab {
   out = new Float32Array(0);
   /** Vilken idé som kör + de senaste bytena [väggklocka ms, idé] (GET /api/moment, ägaren: 'den som kör nu'). */
-  mode = ''; log: [number, string][] = [];
+  mode = ''; log: [number, string][] = []; private pend = ''; private pendAt = 0;
   private n = 0; private at = 0;
   private hist = new Float32Array(HIST); private histT = new Float64Array(HIST); private hi = 0;
   private bal = 0.5;
@@ -49,8 +49,11 @@ export class Lab {
     const sec = c.section ?? '';
     if (sec !== this.lastSec) { if (sec === 'high') { this.highCount++; this.highStartBeat = c.beatIdx; } this.lastSec = sec; }
     const quiet = sec === 'break' || sec === 'intro' || presence < 0.35;
-    const mode = quiet && this.slowN > 20 ? 'slowmotion' : !c.hasBeat ? 'dragkamp' : sec === 'build' ? 'kanon' : sec === 'high' ? 'minnet' : 'dragkamp';
-    if (mode !== this.mode) { this.mode = mode; this.log.push([Math.round(now), mode]); if (this.log.length > 12) this.log.shift(); }
+    const want = quiet && this.slowN > 20 ? 'slowmotion' : !c.hasBeat ? 'dragkamp' : sec === 'build' ? 'kanon' : sec === 'high' ? 'minnet' : 'dragkamp';
+    // byt idé först när den nya har hållit 2 s (loggen 11-07: minnet <-> slowmotion slog om på 0,1-0,7 s); dropen byter direkt
+    if (want !== this.pend) { this.pend = want; this.pendAt = now; }
+    if (want !== this.mode && (this.mode === '' || now - this.pendAt >= 2000 || c.dropEnv > 0.6)) { this.mode = want; this.log.push([Math.round(now), want]); if (this.log.length > 12) this.log.shift(); }
+    const mode = this.mode;
     if (mode === 'slowmotion') this.slowMotion(n, dt);
     else if (mode === 'kanon') this.canon(c, n, now, presence);
     else if (mode === 'minnet') this.memory(c, n, presence);
@@ -92,7 +95,9 @@ export class Lab {
         this.mem.set(rel, this.curMask | (this.curSect << 8));
       }
     }
-    const pulse = Math.exp(-c.beatFrac * 3) * (0.55 + 0.45 * Math.min(1, c.bassBody));
+    // slagets styrka ur ENERGIN (ägaren 11-07: 'saknade att lamporna körde på energi'): kickens topp + basens kropp, svaga slag svaga
+    const hit = Math.max(c.drum ? c.drum.kick : 0, Math.min(1, c.bassBody));
+    const pulse = Math.exp(-c.beatFrac * 3) * (0.2 + 0.8 * hit);
     for (let i = 0; i < n; i++) if (this.curMask & (1 << (3 - (i % 4)))) this.put(i, this.curSect + (i >= n / 2 ? 3 : 0), pulse * presence);
   }
 
