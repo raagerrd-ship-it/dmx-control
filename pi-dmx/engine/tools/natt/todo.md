@@ -3,13 +3,14 @@
 ## Från kvällen 2026-11-07 - GODKÄNT I LADAN: FYRA PROV IN I KODEN (ägaren i ladan: 'godkänt' x3 + 'perfekt'; går före allt annat)
 LIVE sedan 15:55-16:10 (Pi 10.171.211.218 via hotspot, PC 10.171.211.53), ladan.conf = KICKREGN_PAR=1, BUILD_TOPP=1, BREAK_HOLD_MS=20000,
 DROP_LAND_CAP=0.9, DROP_LIFT_FLOOR=0, DROP_WIN_S=1, B_SUBW=0.25, B_LO_S=0.25, BASGANG=1. Ägaren godkände i tur och ordning (a) BREAK_HOLD,
-(b) drop-trion, (c) SUBW+LO_S, (d) BASGANG (arenans vinnare; 'perfekt'), och (e) KICKREGN_PAR + BUILD_TOPP ('låt båda vara i koden').
-1. Gör (a)-(e) till KODENS STANDARD och ta bort rattarna (feedback-ingen-opt-in / kodstädningen): backup-tagg först, ersätt i koden,
+(b) drop-trion, (c) SUBW+LO_S, (d) BASGANG (arenans vinnare; 'perfekt'), och (e) KICKREGN_PAR + BUILD_TOPP ('låt båda vara i koden'), och (f) RGB_STRICT=1 (f386ddb, live 16:40: 'mycket bättre, har inte sett något ännu';
+   'jag skiter i om en färg blir mer gul eller orange').
+1. Gör (a)-(f) till KODENS STANDARD (RGB_SHARE 0,06 blir en konstant) och ta bort rattarna (feedback-ingen-opt-in / kodstädningen): backup-tagg först, ersätt i koden,
    gamla grenen bort. BASGANG: a8-looksens nya formler blir de enda; a7:s spridning (SPREAD_D/SPREAD_SKIP) blir standard.
 2. Bevis: ny standard UTAN env = json-identiskt mot `tools/arena/bank.py <mapp> --bas` med de nio rattarna satta (dvs. dagens ladan).
 3. tools/ladan.py: kommandot efteråt blir `python tools\ladan.py` UTAN --env (ladan.conf töms; alla nio är standard).
    DEPLOYA INTE - skriv 'redo för ladan' med kommandot; ägaren deployar vid nästa besök (riggen kör redan samma ljus via ladan.conf).
-4. .arena/<nästa körning>/basenv.txt: TOM när (a)-(e) är standard (minnet feedback-arena-domaren-basenv).
+4. .arena/<nästa körning>/basenv.txt: TOM när (a)-(f) är standard (minnet feedback-arena-domaren-basenv).
 5. Markera KLART här.
 
 ARENA: resten av looksen ska bära basgången (ägaren 2026-11-07 kväll: valde detta som nattens arenafråga; EFTER punkt 1-5 ovan)
@@ -26,7 +27,9 @@ ARENA: resten av looksen ska bära basgången (ägaren 2026-11-07 kväll: valde 
 - Vinnaren blir provratt (osatt = json-identiskt, satt = json-identiskt mot vinnarens mapp, båda bevisade med bank.py) + 'redo för ladan'.
   DEPLOYA ALDRIG. Rapport tools/natt/arena-<datum>-puls2.md. Markera KLART med vinnaren och poängen.
 
-DIODFLIMMER KVAR (ägaren i ladan 11-07: 'ibland när en kanal R/G/B lyser så flimmrar fortfarande ibland en av de andra lite'; EFTER arenan,
+DIODFLIMMER - DELVIS LÖST 11-07 kväll av RGB_STRICT (f) ovan (orsaken: bikanalen skalades in i diodens dödzon + kulörtoningens svans 0/1
+av 255); kvar i bänken: siren 4 (kulörbyte på uttonande lampa) + gallop 2 korta blinkar/10 min - ta dem bara om tid finns. Gamla texten:
+(ägaren i ladan 11-07: 'ibland när en kanal R/G/B lyser så flimmrar fortfarande ibland en av de andra lite'; EFTER arenan,
 bara om tid finns): dynBench lang1021 med de nio: sidoBlink 0,1/min (siren 2) utan BASGANG, 0,5/min med (gallop 7 - ALLA vid 221,7-221,9 s:
 kulörbyte mitt i uttoningen, bikanalen glider 30 -> 2 -> 30 kring tändpunkten 16). Samma mekanism som 11-02 (twin/pendel/backbeat-svansen,
 siren-bytet). Gallopps avmättnad (1 - punch*0,3) provad som orsak: ingen effekt, backad. Förslag att BÄNKA (opt-in, standard identiskt):
