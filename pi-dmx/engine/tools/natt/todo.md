@@ -14,6 +14,13 @@ F. STUDSEN I SLUTET AV FADEN (ägaren i ladan 11-07: 'när en effekt fadar en f�
    lyste tonar exakt som i dag; en kanal som tillkommer under uttoningen får effektens egen nivå, inte den hållna. Låst: ingen fade blir
    snabbare för en kanal som lyste. Provratt DMX_FADE_NYKANAL (osatt = identiskt), mät fadeStuds + sidoBlink + takt/sprid, 'redo för ladan'.
    Resten (backbeat/rave) = effektens nästa puls som startar några rutor tidigt - lista, laga inte.
+G. SHOWEN SOM PROVSCEN (ägaren i ladan 11-07: 'det kan vara ett sätt att även testa framtida effekter' + 'nu har det varit svårt när en eller
+   två effekter uppdaterats, men jag vet inte när de spelas'). Stunden 'show' (src/moment.ts, 24db60d, POST /api/moment {moment:'show'})
+   är en programmerad koreografi 8 akter x 8 takter. Bygg AKT 9 'PROVET': efter HJÄRTAT (= signalen) spelar den RIKTIGA effekten
+   cfg.provLook (en effekt-key ur registry.ts) i 8 takter genom motorns vanliga väg (steg 1-3, samma energi/uttoning/kalibrering), sedan
+   börjar showen om. Sätts med POST /api/moment {moment:'show', provLook:'<key>'} (server.ts sanerar mot registret; okänd/tom = ingen akt 9).
+   Nattagenten sätter provLook till den effekt den ändrat (skriv det i rapporten: 'starta showen, akt 9 = <effekt>'). Fest orörd (w = 0),
+   strobe/rök som effekten själv. Efter A/B/E/F.
 MATERIAL 11-07 kväll: tools/ladan-2026-11-07/lang-20261107T154200.wav (10 min, ladan 16:42 med ALLA TIO proven live, ingen ägarmarkering;
    analysatorn 11 drops: 10,4 / 101,7 / 220,2 / 258,7 / 340,7 / 384,1 / 449,5 / 516,6 / 530,6 / 557,5 / 585,3 s). Används i E (flank -> bas)
    och som FJÄRDE fil i arenans kontrollmängd (tools/arena/bank.py HOLDOUT: lang1107) - aldrig som bänkfil för deltagarna.
