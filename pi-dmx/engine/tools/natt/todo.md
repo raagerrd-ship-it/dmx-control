@@ -27,6 +27,24 @@ H. SÅNGAREN SOM RIKTIG EFFEKT (ägaren i ladan 11-07 om showen: 'den som kör n
    två gånger i rad) + ny kulör. Gör den till en effekt i registry.ts som dirigenten väljer när TAKTEN ÄR OKÄND (!hasBeat) och/eller i lugna
    partier (break/intro, låg bassline) - ägarens användningsfall. Effekten ger bara 0-100 % (kontraktet). Provratt DMX_SANGARE (osatt =
    identiskt), mät hur ofta den väljs och att takt-looks inte trängs undan när takten finns. Efter A/B/E/F.
+I. LABBETS FAVORITER IN I FESTSHOWEN (ägaren i ladan 11-07: 'effekter är klart för kvällen. Lägg till de vi tyckte var bra, och kör sen
+   vanliga vägen'). Kvällens experiment ligger som stunder i src/moment.ts ('show') och src/lab.ts-lab5.ts ('lab'..'lab5'), POST /api/moment.
+   Gör varje favorit till en RIKTIG EFFEKT i src/effects/ + registry.ts som dirigenten väljer på sitt läge, enligt kontraktet (effekten ger
+   bara 0-100 %, inget om dioderna) och riktmärket: 'tänk fest, ljuset skall hjälpa dom som dansar att dansa i takt'. En provratt per effekt
+   (osatt = identiskt), bänka (dynBench blink/studs/fladder + domare v3), 'redo för ladan'. Ägarens domar, i ordning:
+   1. SÅNGAREN - 'klockren, vi behåller den' (= uppdrag H, förlaga moment.ts showTick + lab.ts singer): lugnt / okänd takt; avbryts DIREKT
+      när basen kommer (kick > 0,55 eller baskropp + musik på, 1,2 s) - 'avbryt sångaren så fort hög bas aktiveras'.
+   2. DANSPARET - 'denna är bättre' (lab4.ts dansparet): refräng; två ljuspunkter i motfärger, ett steg per slag (STEPS), byter plats varannan takt.
+   3. MINNET - 'jag gillar denna' (lab.ts memory): refräng; improviserat lampmönster per slag i första refrängen, EXAKT samma i nästa;
+      slagens styrka ur kick + baskropp ('saknade att lamporna körde på energi'). Kräver låtgräns-nollställning (ny låt = nytt minne).
+   4. SÖKLJUSET - 'nice' (lab2.ts sokljus): lugnt; en stråle byter lampa varje takt (300 ms glid), virveln blinkar raden kort i strålens färg.
+   5. SÅNGAREN + DROPENS SLOW MOTION varannan sekund i lugna partier - 'nice' (lab.ts, calmSwap): reprisen av dropens 4 s i kvarts fart.
+   6. FRÅGA-SVAR - 'ok, men tror vi har den' (lab2.ts fragasvar): förbättra duel/eko med 'samma rytm två takter senare på andra sidan' i st.f. ny effekt.
+   AVVISAT (bygg inte): månen ('ingen känsla' - drift utan händelse), dragkampen i lugna partier ('passar inte'), polyrytm 3:4 och explosioner
+   på minidrops ('tappar takten'), showens första version ('lik de andra effekterna'). Ej dömt: kanon, klangfärg, glöd, domino, förväntan,
+   spänningen, målningen, karusellen, uppladdningen, lab5 (gunget/danssteget/virveln/hoppet/stjärnfall).
+   KVÄLLENS BÄNKLÄXA: kulörbyte på en TÄND lampa = diodblink (lab2 67 -> 1,7/min när byten flyttades till takt/varv eller mörk lampa).
+   Ordning: efter A/B (ägarens prio). Stunderna show/lab* får ligga kvar som provscen.
 MATERIAL 11-07 kväll: tools/ladan-2026-11-07/lang-20261107T154200.wav (10 min, ladan 16:42 med ALLA TIO proven live, ingen ägarmarkering;
    analysatorn 11 drops: 10,4 / 101,7 / 220,2 / 258,7 / 340,7 / 384,1 / 449,5 / 516,6 / 530,6 / 557,5 / 585,3 s). Används i E (flank -> bas)
    och som FJÄRDE fil i arenans kontrollmängd (tools/arena/bank.py HOLDOUT: lang1107) - aldrig som bänkfil för deltagarna.
