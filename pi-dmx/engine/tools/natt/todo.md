@@ -28,7 +28,11 @@ ARENA: resten av looksen ska bära basgången (ägaren 2026-11-07 kväll: valde 
   DEPLOYA ALDRIG. Rapport tools/natt/arena-<datum>-puls2.md. Markera KLART med vinnaren och poängen.
 
 DIODFLIMMER - DELVIS LÖST 11-07 kväll av RGB_STRICT (f) ovan (orsaken: bikanalen skalades in i diodens dödzon + kulörtoningens svans 0/1
-av 255); kvar i bänken: siren 4 (kulörbyte på uttonande lampa) + gallop 2 korta blinkar/10 min - ta dem bara om tid finns. Gamla texten:
+av 255); kvar i bänken: siren 4 (kulörbyte på uttonande lampa) + gallop 2 korta blinkar/10 min - ta dem bara om tid finns.
+PRINCIP (ägaren 11-07: 'effekterna skall ju inte veta något om hur mina specifika lampor är mappade. Det skall ju göras i output'): allt som
+beror på dioderna (tändpunkt, dödzon, när en kanal syns) lagas i src/output.ts (kalibreringen), ALDRIG i effektfilerna - siren ändras inte för
+flimrets skull. Minsta på-tid per färgkanal (CH_MIN_ON_MS i effects.ts steg 2) räknar på effektens värden, inte diodens - flytta den till
+output.ts som diodens på-tid (json-identiskt bevis) om tid finns. Gamla texten:
 (ägaren i ladan 11-07: 'ibland när en kanal R/G/B lyser så flimmrar fortfarande ibland en av de andra lite'; EFTER arenan,
 bara om tid finns): dynBench lang1021 med de nio: sidoBlink 0,1/min (siren 2) utan BASGANG, 0,5/min med (gallop 7 - ALLA vid 221,7-221,9 s:
 kulörbyte mitt i uttoningen, bikanalen glider 30 -> 2 -> 30 kring tändpunkten 16). Samma mekanism som 11-02 (twin/pendel/backbeat-svansen,
