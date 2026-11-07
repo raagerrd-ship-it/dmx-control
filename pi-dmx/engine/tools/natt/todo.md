@@ -36,9 +36,12 @@ output.ts som diodens på-tid (json-identiskt bevis) om tid finns.
 KONTRAKTET (ägaren 11-07: 'effekt skall bara justera hur mycket 0-100 % kanaler skall lysa och inte veta något annat'): effekterna OCH motorns
 steg 1-2 ger R/G/B 0..1 per lampa; gamma, tändpunkt, tak och dödzon finns BARA i output.ts. Läckor i dag: effects.ts importerar GAMMA för
 E_MIN_LIT (minsta tända nivå = 'gammans första DMX-steg') och kulörtoningen (rad ~564, ljusstyrka efter utgångens gamma). LÅG PRIORITET, sist:
-föreslå (bygg bara som json-identiskt bevisad omflyttning) hur de flyttas till output. Effekternas diod-anpassade val (vidga grannkulör,
-upptakt släckt, kulörbyte per fras i siren/twin/ripple, ingen vit kärna) är nu SHOWENS KÄNSLA - rör dem inte; lista vilka som kanske inte
-behövs längre med RGB_STRICT, så tar ägaren dem i ladan. Gamla texten:
+flytta dem till output (json-identiskt bevisat). ÄGAREN IGEN: 'effekter skall ju inte justera lamporna' - effekternas DIOD-ANPASSNINGAR
+(lista alla: vidga grannkulör i st.f. blandkulör 11-02, upptakt släckt 'för att 6 % syntes som 17 % efter gamma/tändpunkt', kulörbyte bara per
+fras i siren/twin/ripple/drift 'för diodblinket', mm. - grep 'diod'/'tändpunkt'/'gamma' i src/effects/) ska BORT ur effekterna: varje effekt
+gör det den är tänkt att göra i 0-100 %, output (RGB_STRICT) tar dioderna. Bygg som EN provratt DMX_FX_REN=1 (osatt json-identiskt), mät
+dynBench sidoBlink/ofrivBlink med RGB_STRICT (får inte stiga mot RGB_STRICT ensam - stiger den: det som blinkar lagas i output.ts, inte i
+effekten), 'redo för ladan'. UNDANTAG: 'inget vitt' är ägarens smak (vitt blixtrade), inte en diodanpassning - behåll. Gamla texten:
 (ägaren i ladan 11-07: 'ibland när en kanal R/G/B lyser så flimmrar fortfarande ibland en av de andra lite'; EFTER arenan,
 bara om tid finns): dynBench lang1021 med de nio: sidoBlink 0,1/min (siren 2) utan BASGANG, 0,5/min med (gallop 7 - ALLA vid 221,7-221,9 s:
 kulörbyte mitt i uttoningen, bikanalen glider 30 -> 2 -> 30 kring tändpunkten 16). Samma mekanism som 11-02 (twin/pendel/backbeat-svansen,
