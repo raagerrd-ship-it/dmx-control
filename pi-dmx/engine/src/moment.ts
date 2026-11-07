@@ -118,14 +118,14 @@ export class MomentLayer {
    *  för att få inspiration'): ljuset följer MUSIKENS DRAMATURGI, inte ett takt-schema och inte effekternas pulser.
    *   MÖRKRET     (lugnt / intro / break): allt svart; EN lampa glöder upp på varje basnot, på tonens plats (låg vänster, hög höger)
    *   SOLUPPGÅNG  (build): pulsfritt sken röd -> orange -> gul som stiger med uppbyggnadens ålder
-   *   FRYS        (drop): ljuset STELNAR - en stilla bild i fyra kulörer i 3,5 s medan musiken exploderar (stop-motion utan strobe:
+   *   FRYS        (drop): en stilla bild i fyra kulörer i 0,5 s (ägaren: 4 s låste lamporna), sedan ORKESTERN i 8 s (stop-motion utan strobe:
    *               lampornas strobe är okalibrerad, 127 = ~10 Hz, och uttoningen tar mörkret mellan RGB-blixtar)
    *   ORKESTERN   (refräng, var 8:e takt): varje lampa en musiker - kick (röd), bas (blå), virvel (gul), röst/synth (magenta)
    *   PIANOT      (refräng annars + övrigt): basgången vandrar över lamporna efter tonhöjd (bandkvoten bas/(sub+kick+bas))
    *  Inget vitt, ingen strobe; nedgången tas av motorns uttoning per lampa (aldrig snabbare). */
   private beat?: ShowBeat;
   private sh = new Float32Array(0); private shAt = 0; private pitchS = 0.5; private lastNote = -1; private lastDrop = 0;
-  private lone = -1; private lonePitch = 0.5; private loneHop = 0; private voiceS = 0; private voiceFloor = 1; private voiceQuietAt = 0; private singerSect = 5; private freezeUntil = 0; private freezeN = 0; private buildAt = 0; private lastSec = ''; private glow = new Float32Array(0); private glowS = new Int8Array(0);
+  private lone = -1; private lonePitch = 0.5; private loneHop = 0; private voiceS = 0; private voiceFloor = 1; private voiceQuietAt = 0; private singerSect = 5; private freezeUntil = 0; private dropOrchUntil = 0; private freezeN = 0; private buildAt = 0; private lastSec = ''; private glow = new Float32Array(0); private glowS = new Int8Array(0);
   private show(i: number, n: number, nowWall: number): [number, number, number] {
     if (this.sh.length !== n * 3) { this.sh = new Float32Array(n * 3); this.glow = new Float32Array(n); this.glowS = new Int8Array(n); }
     if (i === 0) this.showTick(n, nowWall);
@@ -148,7 +148,7 @@ export class MomentLayer {
     const note = c.bassNoteIdx !== this.lastNote; this.lastNote = c.bassNoteIdx;
     const noteLamp = Math.round(this.pitchS * (n - 1)), noteSect = [0, 5, 4, 3][Math.min(3, Math.floor(this.pitchS * 4))];
     // dropen: kanten -> FRYS
-    if (c.dropEnv > 0.6 && this.lastDrop <= 0.6) { this.freezeUntil = now + 3500; this.freezeN++; }
+    if (c.dropEnv > 0.6 && this.lastDrop <= 0.6) { this.freezeUntil = now + 500; this.dropOrchUntil = now + 8000; this.freezeN++; }
     this.lastDrop = c.dropEnv;
     const sec = c.section ?? ''; if (sec !== this.lastSec) { if (sec === 'build') this.buildAt = now; this.lastSec = sec; }
     for (let i = 0; i < n; i++) this.glow[i] *= Math.exp(-dt / 0.45);
@@ -182,7 +182,7 @@ export class MomentLayer {
       for (let i = 0; i < n; i++) this.put(i, mixOrange && i % 2 === 0 ? 0 : sect, 0.12 + 0.75 * rise * rise, presence);
       return;
     }
-    const orch = sec === 'high' && Math.floor(c.beatIdx / 32) % 2 === 0;
+    const orch = now < this.dropOrchUntil || (sec === 'high' && Math.floor(c.beatIdx / 32) % 2 === 0);   // efter frysen: orkestern tar dropen
     if (orch) {                                                     // ORKESTERN
       const voice = Math.max(0, Math.min(1, (sp.mid - 0.25) * 1.6));
       const parts: [number, number][] = [[0, dr.kick], [4, Math.pow(sp.bass, 1.5)], [1, dr.snare], [5, voice]];
