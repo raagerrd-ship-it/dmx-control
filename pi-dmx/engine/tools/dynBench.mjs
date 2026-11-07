@@ -197,6 +197,25 @@ for (const [li, L] of CH.entries()) for (let c = 0; c < 3; c++) {
     state = s;
   }
 }
+// FADESTUDS (ägaren i ladan 11-07: 'när en effekt fadar en färg så kan den hacka i slutet av fade, snabbt öka ljusstyrka'): diodernas ljus
+// P = summa (kanal - ON) över tända kanaler; en studs = P har fallit >= 200 ms i sträck, stiger sedan >= STUDS_DMX på en ruta, och lampan
+// slocknar (P = 0) inom 500 ms efter studsen. Per lampa och minut + per look.
+let studs = 0; const studsLook = {}; const STUDS_DMX = Number(process.env.DYN_STUDS_DMX ?? 6);
+for (const L of CH) { let fallN = 0;
+  for (let i = 1; i < L[0].length; i++) {
+    const P = (j) => [0, 1, 2].reduce((t, c) => t + (L[c][j] > ON ? L[c][j] - ON : 0), 0);
+    const p0 = P(i - 1), p1 = P(i);
+    if (p1 < p0) { fallN++; continue; }
+    if (p1 - p0 >= STUDS_DMX && fallN * STEP_MS >= 200) {
+      // slutet av en fade (P under STUDS_LOW) och en STUDS, inte en ny puls: inom 150 ms tillbaka under nivån före
+      let off = p0 <= Number(process.env.DYN_STUDS_LOW ?? 60); if (off) { off = false; for (let q = i + 1; q < Math.min(L[0].length, i + 1 + 150 / STEP_MS); q++) if (P(q) <= p0) { off = true; break; } }
+      if (off) { studs++; studsLook[LOOK[i]] = (studsLook[LOOK[i]] ?? 0) + 1;
+        if (process.env.DYN_STUDS && studs <= 10) process.stderr.write(`studs ${LOOK[i]} t ${(T[i] / 1000).toFixed(2)} ${[0, 1, 2].map((c) => L[c].slice(i - 5, i + 5).join(',')).join(' | ')}
+`); }
+    }
+    if (p1 > p0) fallN = 0;
+  }
+}
 // ALLA3 med tandpunkten: andel tanda lamprutor dar alla tre dioderna verkligen lyser (> ON) = vitaktigt
 let a3 = 0, litN = 0;
 for (const L of CH) for (let i = 0; i < L[0].length; i++) { const n = (L[0][i] > ON) + (L[1][i] > ON) + (L[2][i] > ON); if (n) { litN++; if (n === 3) a3++; } }
@@ -251,7 +270,7 @@ const res = {
     dbSpann: +(pctl(DB, 0.9) - pctl(DB, 0.1)).toFixed(1), litP10: +pctl(LIT, .1).toFixed(3), litP50: +pctl(LIT, .5).toFixed(3), litP90: +pctl(LIT, .9).toFixed(3) },
   fladder: { fladderMin: +(fladder / nl / minutes).toFixed(1), pulsPerKick: +(pulsar / nl / Math.max(1, KICKT.length)).toFixed(2), kickarMin: +(KICKT.length / minutes).toFixed(0), perLook: flLook },
   spann, stegUt, mdBins, litOn, litOnFull, tand, aterkomst,
-  rgb: { sidoVaxlMin: +(vaxl / nl / minutes).toFixed(1), sidoBlinkMin: +(blink / nl / minutes).toFixed(1), alla3: +(a3 / Math.max(1, litN)).toFixed(3), ofrivBlinkMin: +(ofriv / nl / minutes).toFixed(1), blinkLook },
+  rgb: { fadeStudsMin: +(studs / nl / minutes).toFixed(2), studsLook, sidoVaxlMin: +(vaxl / nl / minutes).toFixed(1), sidoBlinkMin: +(blink / nl / minutes).toFixed(1), alla3: +(a3 / Math.max(1, litN)).toFixed(3), ofrivBlinkMin: +(ofriv / nl / minutes).toFixed(1), blinkLook },
 };
 if (opt("--kurva", null)) { const [a, b] = opt("--kurva").split("-").map(Number); for (let i = 0; i < T.length; i++) if (T[i] >= a * 1000 && T[i] <= b * 1000 && i % 2 === 0) process.stderr.write(`${(T[i] / 1000).toFixed(2)} in ${DB[i].toFixed(0)} dB  e ${ES[i].toFixed(2)} md ${MD[i].toFixed(2)} dim ${(100 * DIMP[i]).toFixed(0)}  bpm ${BPMS[i].toFixed(0)} konf ${CONF[i].toFixed(2)} rigg ${(100 * LIT[i]).toFixed(0)}% lampor ${LAMP.map((S2) => (100 * S2[i]).toFixed(0)).join('/')} ${LOOK[i]}
 `); }

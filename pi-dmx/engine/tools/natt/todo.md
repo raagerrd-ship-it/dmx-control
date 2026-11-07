@@ -6,6 +6,14 @@ A. KONTRAKTET + KALIBRERINGEN PER LAMPA (punkt '4'): GAMMA-läckorna ur effects.
 B. EFFEKTERNAS DIODANPASSNINGAR BORT (punkt '3'): provratten DMX_FX_REN, mät med RGB_STRICT. Se 'ÄGAREN IGEN' nedan.
 C. Om tid finns: de tio proven till standard (avsnittet nedan). Görs C inte i natt: nästa natt FÖRST.
 D. ARENAN puls2 FLYTTAD TILL NÄSTA NATT (kräver C KLART). Kör den inte i natt.
+F. STUDSEN I SLUTET AV FADEN (ägaren i ladan 11-07: 'när en effekt fadar en färg så kan den hacka i slutet av fade, snabbt öka ljusstyrka'
+   + 'har varit lika innan också'), efter A/B. Mått: dynBench fadeStudsMin/studsLook (ny 11-07, DYN_STUDS=1 skriver exempel) - lang-20261107T154200
+   med de tio: 0,27/lampa/min (eko 3, backbeat 3, slagga, hiss, rave, siren). ORSAK i hälften: effekten byter kulör på en lampa som TONAR UT;
+   uttoningen (effects.ts steg 2, lampLvl * fadeK) lägger den gamla nivån på den NYA kulören -> en ny diod tänds direkt på hela uttoningsnivån
+   (eko 135,8 s: R 42 tonar, B tänds på 40 = röd -> magenta, dubbelt ljus). Lagning i MOTORNS UTTONING (inte i effekterna): kanaler som
+   lyste tonar exakt som i dag; en kanal som tillkommer under uttoningen får effektens egen nivå, inte den hållna. Låst: ingen fade blir
+   snabbare för en kanal som lyste. Provratt DMX_FADE_NYKANAL (osatt = identiskt), mät fadeStuds + sidoBlink + takt/sprid, 'redo för ladan'.
+   Resten (backbeat/rave) = effektens nästa puls som startar några rutor tidigt - lista, laga inte.
 MATERIAL 11-07 kväll: tools/ladan-2026-11-07/lang-20261107T154200.wav (10 min, ladan 16:42 med ALLA TIO proven live, ingen ägarmarkering;
    analysatorn 11 drops: 10,4 / 101,7 / 220,2 / 258,7 / 340,7 / 384,1 / 449,5 / 516,6 / 530,6 / 557,5 / 585,3 s). Används i E (flank -> bas)
    och som FJÄRDE fil i arenans kontrollmängd (tools/arena/bank.py HOLDOUT: lang1107) - aldrig som bänkfil för deltagarna.
