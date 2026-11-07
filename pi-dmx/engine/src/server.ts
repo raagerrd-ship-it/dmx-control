@@ -246,7 +246,7 @@ export async function startServer(
   app.get("/api/moment", async () => ({ moment: deps.cfg.moment ?? "fest", themeColors: deps.cfg.themeColors ?? null, lab: (deps.cfg as unknown as { labState?: unknown }).labState ?? null }));
   app.post("/api/moment", async (req, reply) => {
     const m = ((req.body ?? {}) as Record<string, unknown>).moment;
-    if (!isMoment(m)) return reply.code(400).send({ ok: false, error: "moment: fest | middag | tal | forstadans | tartan | show | lab" });
+    if (!isMoment(m)) return reply.code(400).send({ ok: false, error: "moment: fest | middag | tal | forstadans | tartan | show | lab | lab2" });
     const now = pressMoment(deps.cfg, m); deps.onConfigChanged?.(); broadcast(); return { ok: true, moment: now };
   });
   app.get("/api/health-log", async () => ({
