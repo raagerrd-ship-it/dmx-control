@@ -12,6 +12,20 @@ DROP_LAND_CAP=0.9, DROP_LIFT_FLOOR=0, DROP_WIN_S=1, B_SUBW=0.25, B_LO_S=0.25, BA
 4. .arena/<nästa körning>/basenv.txt: TOM när (a)-(e) är standard (minnet feedback-arena-domaren-basenv).
 5. Markera KLART här.
 
+ARENA: resten av looksen ska bära basgången (ägaren 2026-11-07 kväll: valde detta som nattens arenafråga; EFTER punkt 1-5 ovan)
+- Bakgrund: arenan puls1 (tools/natt/arena-2026-11-07-puls1.md) skrev om de 5 mest spelade looksen (tryckvåg, gallopp, varannan, duell,
+  tvilling: styrkan ur ctx.bassBody, rutnätet bara vem/när, uniforma punch/kickEnv-mattor bort). Övriga looks får bara a7:s spridning
+  (SPREAD_D dämpar alla utom ledaren mellan basslagen). Frågan: ge ÖVRIGA looks basgången på riktigt - styrkan ur basen, olika saker på
+  olika lampor, mörkt mellan slagen - så att hela showen blir mer lik en programmerad dansgolvsshow, utan mer ljus i snitt.
+- Kör skillen dmx-arena: körning `.arena/puls2`, 8 deltagare, basenv TOM (alla nio är standard efter punkt 1; kör inte arenan om punkt 1
+  inte är KLART och json-bevisad - skriv varför). Uppgiften från tools/arena/MALL-uppgift.md, med frågan ovan; tillåtna filer som i puls1.
+  Deltagarna ska först mäta VILKA looks som spelas och hur mycket (a8 i puls1 hade perlook.py/ana.py i .arena/puls1/a8 - får läsas) och
+  rör inte de fem som redan är omskrivna. Strategikorten ska vara olika mekanismer.
+- Efter runda 1: steg 4b (final på kontrollmängden för topp 3 + EN fusionsagent, budget 4 bänkar, med en variant per delkombination).
+  Vinnaren = högst holdout-poäng utan DISK; läs vinnarens diff mot de låsta reglerna själv.
+- Vinnaren blir provratt (osatt = json-identiskt, satt = json-identiskt mot vinnarens mapp, båda bevisade med bank.py) + 'redo för ladan'.
+  DEPLOYA ALDRIG. Rapport tools/natt/arena-<datum>-puls2.md. Markera KLART med vinnaren och poängen.
+
 ## DAGKÖRNINGEN 2026-11-07 MED TRE AGENTER (ägaren: 'kan man få takten att följa själva basrytmen bättre (energilagret)' + 'efter drop ... taket 95 %, men golvet 70 % dödar dynamik' + 'målet är inte mer ljus överlag, utan att takten syns bättre'; INGET deployat, inget standard ännu)
 Provrattar i koden (osatt = json-identiskt, verifierat: dag-baslinje = nattens golv-av/hold-av): 99b1d53, e86932f, 88a3ec7. Rapporter: dag-20261107-rytm.md / -drop.md / -tillit.md.
 1. TAKTEN EFTER DROPEN (dag-20261107-tillit.md): DMX_BREAK_HOLD_MS=20000 - syntetiska break 4/8/16 s (tools/breakSyntet.py) takt85 4,49 -> 0,26 s; nattens
