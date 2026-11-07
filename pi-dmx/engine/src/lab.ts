@@ -48,13 +48,18 @@ export class Lab {
     this.lastDrop = c.dropEnv;
     const sec = c.section ?? '';
     if (sec !== this.lastSec) { if (sec === 'high') { this.highCount++; this.highStartBeat = c.beatIdx; } this.lastSec = sec; }
-    const quiet = sec === 'break' || sec === 'intro' || presence < 0.35;
+    // basen tillbaka = inte lugnt längre, oavsett vad sektionen säger (ägaren 11-07: 'gick inte över när basen började' - sektionen hänger efter)
+    if (dr.kick > 0.55 || (c.bassBody > 0.6 && presence > 0.6)) this.bassAt = now;   // kicken, eller basens kropp när musiken är på (bassBody är relativ)
+    const bassBack = now - this.bassAt < 1200;
+    const quiet = !bassBack && (sec === 'break' || sec === 'intro' || presence < 0.35);
     // lugnt = SÅNGAREN (ägaren 11-07: dragkampen 'passar inte lugnt parti'); slow motion bara om en drop finns inspelad; dragkamp = okänd takt MED energi
-    const want = quiet ? (this.slowN > 20 && Math.floor(now / 2000) % 2 === 1 ? 'slowmotion' : 'sangare') : !c.hasBeat ? 'dragkamp' : sec === 'build' ? 'kanon' : sec === 'high' ? 'minnet' : 'dragkamp';
+    const wantRaw = quiet ? (this.slowN > 20 && Math.floor(now / 2000) % 2 === 1 ? 'slowmotion' : 'sangare') : !c.hasBeat ? 'dragkamp' : sec === 'build' ? 'kanon' : sec === 'high' ? 'minnet' : 'dragkamp';
     // byt idé först när den nya har hållit 2 s (loggen 11-07: minnet <-> slowmotion slog om på 0,1-0,7 s); dropen byter direkt
+    const want = !quiet && bassBack && (wantRaw === 'dragkamp' || wantRaw === 'kanon') && c.hasBeat && (sec === 'break' || sec === 'intro') ? 'minnet' : wantRaw;   // basen i ett 'break' = refrängens minne
     if (want !== this.pend) { this.pend = want; this.pendAt = now; }
     const calmSwap = (want === 'sangare' || want === 'slowmotion') && (this.mode === 'sangare' || this.mode === 'slowmotion');   // ägaren: 'nice' - sångaren och dropens repris varannan sekund
-    if (want !== this.mode && (this.mode === '' || calmSwap || now - this.pendAt >= 2000 || c.dropEnv > 0.6)) { this.mode = want; this.log.push([Math.round(now), want]); if (this.log.length > 12) this.log.shift(); }
+    // basen tillbaka: sångaren/reprisen avbryts DIREKT (ägaren 11-07: 'avbryt sångaren så fort hög bas aktiveras')
+    if (want !== this.mode && (this.mode === '' || calmSwap || now - this.pendAt >= 2000 || c.dropEnv > 0.6 || ((this.mode === 'sangare' || this.mode === 'slowmotion') && !quiet))) { this.mode = want; this.log.push([Math.round(now), want]); if (this.log.length > 12) this.log.shift(); }
     const mode = this.mode;
     if (mode === 'slowmotion') this.slowMotion(n, dt);
     else if (mode === 'kanon') this.canon(c, n, now, presence);
@@ -127,7 +132,7 @@ export class Lab {
       else this.put(i, 4, (0.12 + 0.28 * Math.min(1, high / 1.5)) * (1 - 0.15 * d) * presence);              // diskantens sida: blå
     }
   }
-  private eng = 0;
+  private eng = 0; private bassAt = 0;
   /** SÅNGAREN (från showen, ägaren: 'klockren - vi behåller den'): EN lampa, ljusstyrkan = röstbandet, ny fras = ny lampa + ny kulör.
    *  Varannat lugnt parti får slow motion i stället (om en drop finns inspelad). */
   private slowTurn = false; private vS = 0; private vFloor = 1; private vQuietAt = 0; private lone = -1; private loneHop = 0; private singSect = 5;
