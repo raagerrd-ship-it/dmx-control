@@ -29,6 +29,15 @@ export interface SpecialtyValues {
  *  borta: DMX_FLOOR_CH, DMX_PULSE_ROOM, dimmerns mappning/puls, DMX_DIM_FULL.) */
 const MAP_TOP = Math.max(0.5, Math.min(1, 0.95));
 const HOLD_MS = 120;
+/** VARJE KANAL LIKA STRIKT (PROV 2026-11-07, DMX_RGB_STRICT=1, osatt = som förr; ägaren i ladan: 'det är alltid sekundärfärgen som flimmrar
+ *  runt tändpunkten' + 'varför inte köra varje kanal lika strikt R/G/B?'): förr mappades bara lampans STARKASTE kanal till tändpunkt+1..tak
+ *  och bikanalerna skalades med samma colK - en bikanal kunde landa i diodens dödzon (1..tändpunkten) och tändas/släckas av små svängningar.
+ *  Med provet mappas VARJE färgkanal för sig med samma formel som den starkaste: 0 -> 0, 1..255 -> egen tändpunkt+1..lampans tak. Den
+ *  starkaste blir exakt som förr. PRIS: svaga inslag blir synliga i mörkt ljus (mörk orange R20/G3 -> R17/G17 = gul) - regel 4 ('lyft
+ *  ingen färgkanal') är ägarens att pröva här. */
+const RGB_STRICT = process.env.DMX_RGB_STRICT === '1';
+/** Bikanal under denna andel av lampans starkaste kanal = släckt (kulörtoningens svans 0/1 av 255 avrundades fram och tillbaka). */
+const RGB_SHARE = Number(process.env.DMX_RGB_SHARE ?? 0.06);
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
 
@@ -136,7 +145,7 @@ export class FixtureOutput {
       const on = c ? (c.on || 0) : 0;
       const dimTop = c && c.full && c.full < 255 ? Math.round(c.full * master) : top;   // FULLPUNKT (cal.full) = dimmerns konstant
       // FARGEN: lampans starkaste kanal 1..255 -> dess tandpunkt+1..colTop, alla fargkanaler med samma faktor (kuloren bevaras).
-      let lampLit = true, colK = 1, lampTop = colTop;
+      let lampLit = true, colK = 1, lampTop = colTop, mxL = 0;
       if (c) {
         let mxRaw = 0, mxOn = on;
         for (let i = 0; i < fast.roles.length; i++) {
@@ -144,7 +153,7 @@ export class FixtureOutput {
           const role = fast.roles[i]; if (role !== "r" && role !== "g" && role !== "b" && role !== "w") continue;
           if (universe[ch] > mxRaw) { mxRaw = universe[ch]; mxOn = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; }
         }
-        lampLit = mxRaw > 0;
+        lampLit = mxRaw > 0; mxL = mxRaw;
         // RAMPEN (effects.ts, RAMPEN OVANFÖR SLÄCKGRÄNSEN): lampans tak glider tändpunkt+1 -> colTop; lägsta steget rörs inte.
         lampTop = ramp >= 1 || colTop <= mxOn + 1 ? colTop : mxOn + 1 + Math.round((colTop - mxOn - 1) * ramp);
         if (lampLit) colK = (mxOn + 1 + (lampTop - mxOn - 1) * (mxRaw - 1) / 254) / mxRaw;
@@ -158,7 +167,9 @@ export class FixtureOutput {
         let raw = universe[ch];
         if (role === "r" || role === "g" || role === "b" || role === "w") {   // farg: noll nollar direkt, ingen hallning
           if (!lampLit) { universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
-          if (colK !== 1) raw = Math.round(raw * colK);
+          if (RGB_STRICT && c && raw > 0 && raw < mxL * RGB_SHARE) raw = 0;   // svansen (kulörtoningens rest, 0/1 av 255) -> släckt
+          else if (RGB_STRICT && c && raw > 0) { const onC = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; raw = Math.round(onC + 1 + (lampTop - onC - 1) * (raw - 1) / 254); }   // VARJE KANAL LIKA STRIKT
+          else if (colK !== 1) raw = Math.round(raw * colK);
           const v1 = raw > lampTop ? lampTop : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
         }
         // Dimmer pa en fixtur UTAN farg (monokrom): samma mappning som fargen, sista vardet halls HOLD_MS over enstaka nollor.
