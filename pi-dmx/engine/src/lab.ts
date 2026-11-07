@@ -49,14 +49,16 @@ export class Lab {
     const sec = c.section ?? '';
     if (sec !== this.lastSec) { if (sec === 'high') { this.highCount++; this.highStartBeat = c.beatIdx; } this.lastSec = sec; }
     const quiet = sec === 'break' || sec === 'intro' || presence < 0.35;
-    const want = quiet && this.slowN > 20 ? 'slowmotion' : !c.hasBeat ? 'dragkamp' : sec === 'build' ? 'kanon' : sec === 'high' ? 'minnet' : 'dragkamp';
+    // lugnt = SÅNGAREN (ägaren 11-07: dragkampen 'passar inte lugnt parti'); slow motion bara om en drop finns inspelad; dragkamp = okänd takt MED energi
+    const want = quiet ? (this.slowN > 20 && this.slowTurn ? 'slowmotion' : 'sangare') : !c.hasBeat ? 'dragkamp' : sec === 'build' ? 'kanon' : sec === 'high' ? 'minnet' : 'dragkamp';
     // byt idé först när den nya har hållit 2 s (loggen 11-07: minnet <-> slowmotion slog om på 0,1-0,7 s); dropen byter direkt
     if (want !== this.pend) { this.pend = want; this.pendAt = now; }
-    if (want !== this.mode && (this.mode === '' || now - this.pendAt >= 2000 || c.dropEnv > 0.6)) { this.mode = want; this.log.push([Math.round(now), want]); if (this.log.length > 12) this.log.shift(); }
+    if (want !== this.mode && (this.mode === '' || now - this.pendAt >= 2000 || c.dropEnv > 0.6)) { this.mode = want; if (want === 'sangare' || want === 'slowmotion') this.slowTurn = !this.slowTurn; this.log.push([Math.round(now), want]); if (this.log.length > 12) this.log.shift(); }
     const mode = this.mode;
     if (mode === 'slowmotion') this.slowMotion(n, dt);
     else if (mode === 'kanon') this.canon(c, n, now, presence);
     else if (mode === 'minnet') this.memory(c, n, presence);
+    else if (mode === 'sangare') this.singer(sp, n, dt, now);
     else this.tug(sp, n, dt, presence);
     if (now < this.recUntil && this.slowN < SLOW_FRAMES) { this.slow.set(this.out, this.slowN * n * 3); this.slowN++; }
     return this.out;
@@ -125,4 +127,20 @@ export class Lab {
     }
   }
   private eng = 0;
+  /** SÅNGAREN (från showen, ägaren: 'klockren - vi behåller den'): EN lampa, ljusstyrkan = röstbandet, ny fras = ny lampa + ny kulör.
+   *  Varannat lugnt parti får slow motion i stället (om en drop finns inspelad). */
+  private slowTurn = false; private vS = 0; private vFloor = 1; private vQuietAt = 0; private lone = -1; private loneHop = 0; private singSect = 5;
+  private singer(sp: NonNullable<LabIn["frame"]>["spec"], n: number, dt: number, now: number) {
+    this.vS += (0.25 * sp.lowMid + 0.5 * sp.mid + 0.25 * sp.highMid - this.vS) * Math.min(1, dt / 0.06);
+    this.vFloor = Math.min(this.vS, this.vFloor + dt * 0.02);
+    const voice = Math.max(0, Math.min(1, (this.vS - this.vFloor - 0.04) * 2.2));
+    if (voice > 0.08) {
+      if (now - this.vQuietAt > 350 || this.lone < 0) {
+        let k = this.lone + (this.loneHop++ % 2 ? 1 : 2); if (n > 1) { k = ((k % n) + n) % n; if (k === this.lone) k = (k + 1) % n; } else k = 0;
+        this.lone = k; this.singSect = [5, 0, 3, 1, 4][this.loneHop % 5];
+      }
+      this.vQuietAt = now;
+    }
+    if (this.lone >= 0) this.put(this.lone, this.singSect, voice);
+  }
 }
