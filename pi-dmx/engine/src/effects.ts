@@ -206,6 +206,12 @@ const SUBDIV_MIN_HOLD_MS = 10000;
 // puls: c.heart ger morkare MELLAN slagen, alltsa mer upplevd knyck utan att addera ljus och utan att rora
 // kuloren - och den bor inne i effekterna, dar agarens kontrakt sager att den hor hemma.
 const EFFECT_HEART = Math.max(0, Math.min(2, 1.4));
+/** EFFEKTERNAS PULS UR BASEN (PROV 2026-11-07, ägaren: 'basgång (det man dansar till) skall kännas i ögonen' + 'granskade vi inte lågpassfilter
+ *  för effektfiltret'): låst takt ger effekternas puls (c.heart/heartPulse, c.beatPulse, c.kickEnv) ur RUTNÄTET (beatFrac) och punchens per-slag-del
+ *  stängs av - basgången själv når aldrig effekterna. DMX_FX_BASS 0..1 blandar in basens kropp (eBass = sub/kick-banden i följande fönster, samma
+ *  som energilagret: DMX_B_SUBW väljer band = 'lågpasset', DMX_B_LO_S dalen) upphöjd till DMX_FX_BASS_CURVE i pulsen; DMX_FX_BASS_PUNCH lägger
+ *  den som golv under c.punch. 0 = av (json-identiskt). */
+const FX_BASS = Number(process.env.DMX_FX_BASS || '0'), FX_BASS_PUNCH = Number(process.env.DMX_FX_BASS_PUNCH || '0'), FX_BASS_CURVE = Number(process.env.DMX_FX_BASS_CURVE || '2');
 /** TVAGRUPPERINGEN vaxlar jamn/udda <-> inre/yttre per look och var 32:e slag (av-brytaren DMX_GROUP_ALT borttagen 10-10). */
 /** MINIDROP-REAKTION (agaren 2026-09-12: "minidrops borde markas — effektbyte eller intensitet"): analysatorns
  *  frame.miniDropCount (monoton) ger look-byte (om looken hallits MIN_HOLD) + en kort stot pa MINI_DROP_ENV av
@@ -2027,7 +2033,8 @@ export class EffectEngine {
     // PUNCH MED AVKLINGNING (2026-10-10): bassPunch spikade ruta for ruta och gav fladder rakt in i ljuset (chase 39 -> 4 utan den).
     // Upp direkt, ~120 ms avklingning - dunken behaller sin skarpa uppgang men blir EN puls i stallet for ett flimmer.
     this.punchEnv = Math.max(bassPunch, this.punchEnv * Math.exp(-dtSec / 0.12));
-    ctx.audio = audio; ctx.kickEnv = kickEnv; ctx.punch = this.punchEnv;
+    const bassP = FX_BASS > 0 || FX_BASS_PUNCH > 0 ? Math.pow(this.eBass, FX_BASS_CURVE) : 0;   // PROV DMX_FX_BASS
+    ctx.audio = audio; ctx.kickEnv = FX_BASS > 0 ? kickEnv + (bassP - kickEnv) * FX_BASS : kickEnv; ctx.punch = FX_BASS_PUNCH > 0 ? Math.max(this.punchEnv, bassP * FX_BASS_PUNCH) : this.punchEnv;
     ctx.dropEnv = this.dropEnv; ctx.gravLevel = this.gravLevel;
     ctx.gravPeak = this.gravPeak; ctx.drum = frame.drum;
     {   // GLITTER-ENVELOPER (se types.ts trebleEnv/airEnv): upp direkt, ~120 ms avklingning
@@ -2035,7 +2042,7 @@ export class EffectEngine {
       this.trebleEnv = Math.max(o?.treble ?? 0, this.trebleEnv * gk); this.airEnv = Math.max(o?.air ?? 0, this.airEnv * gk);
       ctx.trebleEnv = this.trebleEnv; ctx.airEnv = this.airEnv;
     }
-    ctx.beatIdx = beatIdx; ctx.hueIdx = Math.floor(beatIdx / 16) * 16; ctx.beatFrac = beatFracFx; ctx.beatPulse = beatPulse; ctx.heartPulse = heartPulse;
+    ctx.beatIdx = beatIdx; ctx.hueIdx = Math.floor(beatIdx / 16) * 16; ctx.beatFrac = beatFracFx; ctx.beatPulse = FX_BASS > 0 ? beatPulse + (bassP - beatPulse) * FX_BASS : beatPulse; ctx.heartPulse = FX_BASS > 0 ? heartPulse + (bassP - heartPulse) * FX_BASS : heartPulse;
     // TVAGRUPPERING: vaxlar per look (smartCount) och var 32:e slag - "skiftar ibland mellan varannan och inre/yttre".
     ctx.grouping = (((this.smartCount + (beatIdx >> 5)) & 1) === 1) ? 'innerouter' : 'varannan';
     // LAMPORDNINGEN VÄXLAR (ägaren i ladan 10-11 21:5x: "effekten som togglar mellan lampor, vore snyggt om den inte alltid kör samma
