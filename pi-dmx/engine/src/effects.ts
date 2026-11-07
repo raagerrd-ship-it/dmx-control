@@ -206,6 +206,17 @@ const SUBDIV_MIN_HOLD_MS = 10000;
 // puls: c.heart ger morkare MELLAN slagen, alltsa mer upplevd knyck utan att addera ljus och utan att rora
 // kuloren - och den bor inne i effekterna, dar agarens kontrakt sager att den hor hemma.
 const EFFECT_HEART = Math.max(0, Math.min(2, 1.4));
+/** BASGÅNGEN I EFFEKTERNA (PROV 2026-11-07, DMX_BASGANG=1, osatt = som förr; vinnaren i dmx-arenan puls1 = a8 + a7, kontrollmängden +14,1 mot
+ *  basenv: takt +29 %, koreografi +11,6 (jitter lang 33 ms), ljus -11,8 %; ägaren: 'basgång (det man dansar till) skall kännas i ögonen' +
+ *  'inte mer ljus överlag'). Två delar:
+ *  (a8) tryckvåg/gallopp/varannan/duell/tvilling tar slagets STYRKA ur basens kropp (ctx.bassBody = eBass), rutnätet bara VEM och NÄR; de
+ *  uniforma punch/kickEnv-mattorna (lika ljus på alla lampor) borta - se effektfilerna.
+ *  (a7) BASEN SPRIDS i övriga looks: EN lampa leder (förra rutans ljusaste; lika ljusa inom 5 % -> den vars tur det är, en lampa per basnot)
+ *  och står kvar; de andra faller tillbaka MELLAN basslagen: k *= 1 - SPREAD_D * (1 - eBass^2) i energisteget - bara dämpning (golv 0,3,
+ *  aldrig över 1, kulören orörd), uttoningen orörd. Gäller inte a8:s looks (dubbeldämpning släckte off-beat-gruppen). */
+const BASGANG = process.env.DMX_BASGANG === '1';
+const SPREAD_D = 0.7;
+const SPREAD_SKIP = new Set(['tryckvag', 'gallop', 'varannan', 'duel', 'twin']);
 /** EFFEKTERNAS PULS UR BASEN (PROV 2026-11-07, ägaren: 'basgång (det man dansar till) skall kännas i ögonen' + 'granskade vi inte lågpassfilter
  *  för effektfiltret'): låst takt ger effekternas puls (c.heart/heartPulse, c.beatPulse, c.kickEnv) ur RUTNÄTET (beatFrac) och punchens per-slag-del
  *  stängs av - basgången själv når aldrig effekterna. DMX_FX_BASS 0..1 blandar in basens kropp (eBass = sub/kick-banden i följande fönster, samma
@@ -598,7 +609,7 @@ export class EffectEngine {
   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
   private lastLiveSection = '';   // DMX_SECTION_SWITCH
   dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;
-  private eSm = 0; eSimple = 0; private eBass = 0; private bHi = NaN; private bLo = NaN; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1;   // ENERGIN (se E_WIN_S)
+  private eSm = 0; eSimple = 0; private eBass = 0; private bHi = NaN; private bLo = NaN; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1; private spreadM0 = new Float64Array(64);   // ENERGIN (se E_WIN_S); spreadM0 = BASGANG
   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
   private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
   private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
@@ -704,7 +715,7 @@ export class EffectEngine {
   // Pre-allokerad kontext för noll-allokering i render-loopen
   private ctx: EffectContext = {
     cfg: null as any, frame: null as any, fx: undefined, t: 0, idx: 0, lamp: 0, count: 0, want: {},
-    audio: 0, kickEnv: 0, trebleEnv: 0, airEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null as any, expectHighInMs: -1, levelVsHighDb: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionEntry: 0, sectionTier: 1, repeatSim: 0,
+    audio: 0, kickEnv: 0, bassBody: 0, trebleEnv: 0, airEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null as any, expectHighInMs: -1, levelVsHighDb: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionEntry: 0, sectionTier: 1, repeatSim: 0,
     sectionBars: 0, bassline: 0, bassNoteIdx: 0, bassNoteAge: 9,
     beatIdx: 0, hueIdx: 0, beatFrac: 0, beatPulse: 0, beatHit: false, hasBeat: false,
     wavePhase: 0, buildUp: 0, phaseSpread: 0, punchFloor: 0, chasePos: 0,
@@ -1435,6 +1446,9 @@ export class EffectEngine {
     const t = this.rT, anchorHue = this.rAnchorHue, nowWall = this.rNowWall, inputGate = this.rInputGate, md = this.rMd, drive = this.rDrive, renderNow = this.rNowP, fadeK = this.rFadeK;
     const ctx = this.ctx, bands = this.bandsBuf, specialty = this.specBuf;
     let wantStrobe = 0, wantBlinder = 0, wantUv = 0, wantLaser = 0, wantHazer = 0, wantCo2 = 0, wantFogFx = false;
+    // BASGANG (a7): ledaren = förra rutans ljusaste lampa (före energin); bland lika ljusa (inom 5 %) den vars tur det är (en lampa per basnot)
+    const bp = this.eBass * this.eBass, sm = this.spreadM0, spreadOn = BASGANG && !(effect && SPREAD_SKIP.has(effect.key)); let lead = -1, leadM = 0;
+    if (spreadOn) for (let j = 0; j < count; j++) { const i = (this.bassNoteIdx + j) % count; if (sm[i] > leadM * 1.05) { leadM = sm[i]; lead = i; } }
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const isAnchor = useAnchor && i > 0 && i < count - 1;   // mittlamporna = ankare
@@ -1480,7 +1494,8 @@ export class EffectEngine {
       // ENERGI PER LAMPA (EffectWants.energy): effekten bestammer; osatt -> modulate.energy.
       const useE = lampWantE ?? modE;
       // (SPOT-regeln, UNIFORM:s ovalda par och taktdippen KICK_E borttagna 10-12 - förbivägar/dubbelmodulering, se B_CURVE)
-      const k = inputGate * (useE ? md : drive);
+      let k = inputGate * (useE ? md : drive);
+      if (BASGANG) { sm[i] = isAnchor ? 0 : m0; if (spreadOn && !isAnchor && useE && i !== lead) k *= 1 - SPREAD_D * (1 - bp); }   // BASEN SPRIDS (se BASGANG)
       rgb[0] *= k; rgb[1] *= k; rgb[2] *= k;
       // STUNDEN (bröllopsläget, moment.ts): festens ljus efter energin * (1 - w) + stundens ljus * w - stunden följer inte släckgränsen/ingången.
       if (this.rMw > 0) { const ml = this.moment, w = this.rMw, u = 1 - w; rgb[0] = rgb[0] * u + ml.r(i) * w; rgb[1] = rgb[1] * u + ml.g(i) * w; rgb[2] = rgb[2] * u + ml.b(i) * w; }
@@ -2035,6 +2050,7 @@ export class EffectEngine {
     this.punchEnv = Math.max(bassPunch, this.punchEnv * Math.exp(-dtSec / 0.12));
     const bassP = FX_BASS > 0 || FX_BASS_PUNCH > 0 ? Math.pow(this.eBass, FX_BASS_CURVE) : 0;   // PROV DMX_FX_BASS
     ctx.audio = audio; ctx.kickEnv = FX_BASS > 0 ? kickEnv + (bassP - kickEnv) * FX_BASS : kickEnv; ctx.punch = FX_BASS_PUNCH > 0 ? Math.max(this.punchEnv, bassP * FX_BASS_PUNCH) : this.punchEnv;
+    ctx.bassBody = this.eBass;   // BASGANG: basgången till effekterna (types.ts bassBody)
     ctx.dropEnv = this.dropEnv; ctx.gravLevel = this.gravLevel;
     ctx.gravPeak = this.gravPeak; ctx.drum = frame.drum;
     {   // GLITTER-ENVELOPER (se types.ts trebleEnv/airEnv): upp direkt, ~120 ms avklingning

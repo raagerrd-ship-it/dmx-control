@@ -1,5 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv, soft } from "./color.js";
+const BASGANG = process.env.DMX_BASGANG === '1';   // PROV 2026-11-07 (arenan puls1, vinnaren a8+a7): styrkan ur basens kropp, se effects.ts BASGANG
 
 // Full fart: GALLOPP — två grupper (varannan lampa) slår OMLOTT: grupp A exakt
 // på taktslaget, grupp B på off-beatet (&) → dubbel upplevd rytm, ett "dun-ka
@@ -21,7 +22,10 @@ export const gallop: EffectDef = {
     const groupPulse = even ? soft(f, 0.12, 0.3) : offPulse;  // A on-beat, B galopp-figuren
     const pairBase = c.mixedSector(Math.floor(c.hueIdx / 4));
     const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;   // motfärger
-    const v = 0.1 + 0.9 * Math.min(1, groupPulse * (0.85 + c.audio * 0.3) + c.kickEnv * 0.2 + c.punch * 0.5);
+    // BASGANG (a8 11-07): figuren (vem som slår när) är rutnätets, styrkan basens kropp - kickEnv/punch-mattan (alla lampor lika) bort
+    const bb = c.bassBody;
+    const v = BASGANG ? 0.06 + 0.94 * Math.min(1, groupPulse * (0.3 + 0.7 * bb) + (even ? 0.25 * bb * bb : 0))
+      : 0.1 + 0.9 * Math.min(1, groupPulse * (0.85 + c.audio * 0.3) + c.kickEnv * 0.2 + c.punch * 0.5);
     return hsv(hue, 1 - c.punch * 0.3, v);   // riktig dunk slår igenom rytmen
   },
 };

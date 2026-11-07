@@ -1,5 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
+const BASGANG = process.env.DMX_BASGANG === '1';   // PROV 2026-11-07 (arenan puls1, vinnaren a8+a7): styrkan ur basens kropp, se effects.ts BASGANG
 
 // Lugn CALL-AND-RESPONSE: två grupper (varannan lampa) andas i MOTFAS — när grupp
 // A stiger sjunker grupp B, som ett stilla anrop-och-svar. Grupp A varm ton,
@@ -26,6 +27,8 @@ export const twin: EffectDef = {
     if (ph !== twinPh || twinSec < 0) { twinPh = ph; twinSec = Math.round(c.frame.centroid * 3); }
     const pairBase = c.mixedSector(ph + twinSec);   // centroid → palett-läge (som breathe/aurora)
     const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;
+    // BASGANG (a8 11-07): vems tur avgör rutnätet, hur starkt basens kropp; annars band + punch-matta på alla
+    if (BASGANG) return hsv(hue, 1, 0.08 + 0.92 * Math.min(1, wash * (0.3 + 0.7 * c.bassBody)));
     const m = Math.min(1, wash * 0.7 + c.band * 0.3 + c.punch * 0.2);   // + dunk-svall
     return hsv(hue, 1, 0.18 + 0.82 * m);   // golv 0.3 nu redundant (md har eget 0.3)
   },

@@ -74,6 +74,9 @@ export interface EffectContext {
   bassline: number; bassNoteIdx: number; bassNoteAge: number;
   /** Kick-/beat-envelope (0..1). */
   kickEnv: number;
+  /** BASGÅNGEN SJÄLV (arenan puls1 2026-11-07): energilagrets baskropp (eBass, sub/kick-banden i följande fönster: 0 = basens senaste dal,
+   *  1 = toppen). Med DMX_BASGANG=1 tar de mest spelade effekterna slagets STYRKA härifrån och rutnätet bara VEM som tänds. */
+  bassBody: number;
   /** GLITTER-ENVELOPER (2026-10-10): diskant- (hi-hat/cymbal) och luftanslaget (frame.onset.treble/air) med direkt uppgang och
    *  ~120 ms avklingning. Rått onset ar en spik per hop (25-50 ms) och gav fladder rakt in i ljuset (wave/chase stod for 145 av 167
    *  fladder i banken) - effekter som vill ha gnistor pa hi-hats ska lasa dessa. */

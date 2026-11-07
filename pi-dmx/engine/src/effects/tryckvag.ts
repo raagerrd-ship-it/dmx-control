@@ -1,5 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv, soft } from "./color.js";
+const BASGANG = process.env.DMX_BASGANG === '1';   // PROV 2026-11-07 (arenan puls1, vinnaren a8+a7): styrkan ur basens kropp, se effects.ts BASGANG
 
 
 // TRYCKVÅG (full x high, 2026-11-01): varje slag tänder hela riggen; kanterna slocknar fort, mitten bär basen längre - tyngden
@@ -19,8 +20,12 @@ export const tryckvag: EffectDef = {
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((mid ? base : base + 3) % 6) / 6;
     // (vita kärnan borttagen 11-01 kväll: vitt i ~100 ms tände den släckta dioden - 'R och G lyser men B bara blinkar till')
+    // BASGANG (a8 11-07): kanterna slår VÄXELVIS (vänster jämna slag, höger udda; den andra klingar ut från sitt förra slag) och mitten bär
+    // basens kropp (bassBody) i stället för drum.bass (som höll mitten tänd nästan jämnt: ljusast av alla looks och sämst mot basen, r -0,12..0,22)
+    if (BASGANG && !mid) { const mySide = (c.lamp < n / 2 ? 0 : 1) === (((c.beatIdx % 2) + 2) % 2); return hsv(hue, 1, 0.05 + 0.95 * soft(mySide ? f : f + 1, 0.12, 0.3)); }
     if (!mid) return hsv(hue, 1, 0.15 + 0.85 * soft(f, 0.12, 0.3));   // kanterna: mjuk smäll som klingar ut
     c.want.energy = false;                                                    // mitten: basen själv (energin följer kicken)
+    if (BASGANG) return hsv(hue, 1, 0.12 + 0.88 * c.bassBody * c.bassBody);
     return hsv(hue, 1, Math.max(soft(f, 0.12, 0.5), 0.3 + 0.7 * c.drum.bass));
   },
 };
