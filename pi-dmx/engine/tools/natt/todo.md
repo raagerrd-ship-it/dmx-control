@@ -41,7 +41,13 @@ flytta dem till output (json-identiskt bevisat). ÄGAREN IGEN: 'effekter skall j
 fras i siren/twin/ripple/drift 'för diodblinket', mm. - grep 'diod'/'tändpunkt'/'gamma' i src/effects/) ska BORT ur effekterna: varje effekt
 gör det den är tänkt att göra i 0-100 %, output (RGB_STRICT) tar dioderna. Bygg som EN provratt DMX_FX_REN=1 (osatt json-identiskt), mät
 dynBench sidoBlink/ofrivBlink med RGB_STRICT (får inte stiga mot RGB_STRICT ensam - stiger den: det som blinkar lagas i output.ts, inte i
-effekten), 'redo för ladan'. UNDANTAG: 'inget vitt' är ägarens smak (vitt blixtrade), inte en diodanpassning - behåll. Gamla texten:
+effekten), 'redo för ladan'. UNDANTAG: 'inget vitt' är ägarens smak (vitt blixtrade), inte en diodanpassning - behåll.
+MÅLET MED KONTRAKTET (ägaren 11-07: 'köper jag andra lampor vill jag bara kalibrera dom, och det skall användas av output'): en ny lampa =
+kalibrera i UI:t, inget annat. Finns per lampa i dag (config.json fixtures[].cal, server.ts sanerar, UI-slider/stegtest/walk-test):
+on, onR/onG/onB/onW, full. GEMENSAMT i dag och ska bli PER LAMPA i cal: gamma (output.ts GAMMA 1,6) och taket (MAP_TOP 0,95) - standard
+1,6/0,95 när fältet saknas = json-identiskt för ladans fyra. Förutsättning: GAMMA-läckorna i effects.ts (E_MIN_LIT, kulörtoningen) bort först,
+annars blir motorns minsta nivå fel för en lampa med annan kurva. server.ts-saneringen + UI:ts kalibreringsflik får fälten. Bevis: json-identiskt
+utan fälten; med cal.gamma 2,2 på EN lampa i bänken ändras bara den lampans DMX. Gamla texten:
 (ägaren i ladan 11-07: 'ibland när en kanal R/G/B lyser så flimmrar fortfarande ibland en av de andra lite'; EFTER arenan,
 bara om tid finns): dynBench lang1021 med de nio: sidoBlink 0,1/min (siren 2) utan BASGANG, 0,5/min med (gallop 7 - ALLA vid 221,7-221,9 s:
 kulörbyte mitt i uttoningen, bikanalen glider 30 -> 2 -> 30 kring tändpunkten 16). Samma mekanism som 11-02 (twin/pendel/backbeat-svansen,
