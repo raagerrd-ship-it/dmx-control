@@ -3,13 +3,13 @@
 ## Från kvällen 2026-11-07 - GODKÄNT I LADAN: FYRA PROV IN I KODEN (ägaren i ladan: 'godkänt' x3 + 'perfekt'; går före allt annat)
 LIVE sedan 15:55-16:10 (Pi 10.171.211.218 via hotspot, PC 10.171.211.53), ladan.conf = KICKREGN_PAR=1, BUILD_TOPP=1, BREAK_HOLD_MS=20000,
 DROP_LAND_CAP=0.9, DROP_LIFT_FLOOR=0, DROP_WIN_S=1, B_SUBW=0.25, B_LO_S=0.25, BASGANG=1. Ägaren godkände i tur och ordning (a) BREAK_HOLD,
-(b) drop-trion, (c) SUBW+LO_S, (d) BASGANG (arenans vinnare; 'perfekt').
-1. Gör (a)-(d) till KODENS STANDARD och ta bort rattarna (feedback-ingen-opt-in / kodstädningen): backup-tagg först, ersätt i koden,
+(b) drop-trion, (c) SUBW+LO_S, (d) BASGANG (arenans vinnare; 'perfekt'), och (e) KICKREGN_PAR + BUILD_TOPP ('låt båda vara i koden').
+1. Gör (a)-(e) till KODENS STANDARD och ta bort rattarna (feedback-ingen-opt-in / kodstädningen): backup-tagg först, ersätt i koden,
    gamla grenen bort. BASGANG: a8-looksens nya formler blir de enda; a7:s spridning (SPREAD_D/SPREAD_SKIP) blir standard.
 2. Bevis: ny standard UTAN env = json-identiskt mot `tools/arena/bank.py <mapp> --bas` med de nio rattarna satta (dvs. dagens ladan).
-3. tools/ladan.py: kommandot efteråt blir bara `--env DMX_KICKREGN_PAR=1 --env DMX_BUILD_TOPP=1` (de två är fortfarande utan dom).
+3. tools/ladan.py: kommandot efteråt blir `python tools\ladan.py` UTAN --env (ladan.conf töms; alla nio är standard).
    DEPLOYA INTE - skriv 'redo för ladan' med kommandot; ägaren deployar vid nästa besök (riggen kör redan samma ljus via ladan.conf).
-4. .arena/<nästa körning>/basenv.txt: bara KICKREGN_PAR + BUILD_TOPP när (a)-(d) är standard (minnet feedback-arena-domaren-basenv).
+4. .arena/<nästa körning>/basenv.txt: TOM när (a)-(e) är standard (minnet feedback-arena-domaren-basenv).
 5. Markera KLART här.
 
 ## DAGKÖRNINGEN 2026-11-07 MED TRE AGENTER (ägaren: 'kan man få takten att följa själva basrytmen bättre (energilagret)' + 'efter drop ... taket 95 %, men golvet 70 % dödar dynamik' + 'målet är inte mer ljus överlag, utan att takten syns bättre'; INGET deployat, inget standard ännu)
