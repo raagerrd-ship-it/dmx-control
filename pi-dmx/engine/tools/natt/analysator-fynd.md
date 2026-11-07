@@ -15,6 +15,17 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-07 Tempot släpps i breaket före dropen (frame.bpm 0 i 14,6 s) och låser först 4,2 s efter dropen
+Vad: ladan 11-06 (ws-logg tools/natt/ladan-20261106-drops.jsonl, ~20 Hz, fält bpm = frame.bpm, bc = bpmConfidence efter DMX:s BeatFeed):
+dc 2->3 vid 184,7 s - frame.bpm 0 från 174,3 s (hela breaket, 10 av 10 s före dropen) och bpm 143/bc 1,0 först 4,2 s EFTER dropen.
+Dc 6->7 (792 s): bpm 154 -> 146 -> 144 kring dropen. Ägaren: 'efter drop tog det 2-3 s innan den tydligt visade takten igen'.
+I bänken (showTight ST_BEAT=1 + tools/dropTakt.mjs) släpps frame.bpm inte i mixarna, men effektklockan saknades före 2 av 24 drops i megamix.
+Var: analysatorns tempoval/coast när kickbandet tystnar (computeBpm / tempo-nollningen) - bpm går till 0 i stället för att hålla senaste låsta tempo.
+Material: ladans ws-logg ovan (ingen wav från 11-06 på PC:n), megamix_ladan.wav drops 127,8 och 560,5 s. Önskat: (1) frame.bpm håller senaste
+låsta tempo (med fallande bpmConfidence) genom ett break på upp till ~20 s, så länge nivån inte är tystnad; (2) vid drop: samma raster direkt.
+DMX gör (2) och klockhållningen själv som opt-in DMX_BREAK_HOLD_MS (beatFeed.ts, natt 11-07) - analysatorns egna fält (sektion/kick-grind) får det inte.
+Status:
+
 ## ÖPPET 2026-11-02 Sektion 'break' med full baskropp, och ingen drop när den går high (ladan 11-01 17:58:23)
 Vad: corpus/ladan-1101/lang-20261101T165711.wav (start 17:57:11,9). Live-flaggorna (events.json): dropCount 1 hela filen, analysatorn fyrar
 ingen drop vid 58,8 s (DMX:s flank tog den: break 5,7 s, baskropp -10 dB mot taket 30 dB) och ingen vid ägarens 'riktiga drop' ~71 s.
