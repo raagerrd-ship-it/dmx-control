@@ -14,6 +14,9 @@ E. DROPEN FYRAR PÅ BASEN (ägaren i ladan 11-07: 'om det är en drop, att det o
    tunga basanslaget (kickband/eBass-anslag, mät vilket) inom ett fönster (~1 s, bestäm med facit); ingen bas i fönstret = minidrop.
    Mät per drop i facit: tid flank -> basanslag (ägaren: ~500 ms), hur många av kvällens 59 som fyrar före basen, och efter ändringen
    fel i ms mot basanslaget (målet ~0 +- 30 ms). Uppvärmningsfällan/break: basen kan ligga högt före (1/11 ~71 s) - då räknas anslaget, inte nivån.
+   ÄGAREN: 'kanske 1 av 8 drops som den fyrar för tidigt' -> de 7 rätta får INTE fördröjas: har flanken redan bas (basanslag inom +-30 ms)
+   fyrar den direkt som i dag; BARA flank utan bas väntar på anslaget (högst ~1 s, sedan minidrop). Bevis: ändrade drops <= ~15 % av alla,
+   ingen drop som redan satt på basen flyttas mer än 0 ms. Mät andelen 'flank före bas > 150 ms' i facit och jämför med ägarens 1/8.
    Provratt DMX_DROP_ON_BASS (osatt = identiskt). Ursprunglig text:
    DROP KRÄVER DJUP BAS, om tid finns efter A/B: i stepDrop
    (effects.ts, DMX:s egen - INTE delade analysatorn) får efterkontrollen ett andra krav: basbandet ska ha stigit mot nivån före dropen,
