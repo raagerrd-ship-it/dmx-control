@@ -28,6 +28,11 @@ const GRID_COAST_MS = 4000;  // så länge håller vi gridet på svag konfidens
 // även där nollades tempot mer sällan och korpusens klocka föll 81,5 -> 76,7 % (fel tidiga lås hölls kvar).
 // DMX_TRUST_REPEAT=0 = gamla måttet (bit-identiskt).
 const TRUST_REPEAT_BEATS = 2, TRUST_REPEAT_TOL = 0.06;
+/** PROVRATTAR 2026-11-07 (dagkörningen; ladan 11-06: 'efter drop tog det 2-3 s innan den tydligt visade takten igen'): bara för bänken,
+ *  osatt = dagens värden (json-identiskt). DMX_TRUST_UP = tillitens steg per kick UPPÅT (0,12 = som i dag, ned alltid 0,12);
+ *  DMX_TRUST_LEAK_MS = hur fort tilliten läcker i ett break utan kickar (4000 = som i dag; längre = tilliten finns kvar när dropen kommer).
+ *  DMX_BREAK_HOLD_MS/DMX_BREAK_RESTORE_MS (nattens förkastade patch prov/breakhold-20261107.patch) är åter inlagda som rattar för proven. */
+const TRUST_UP = Number(process.env.DMX_TRUST_UP || '0.12'), TRUST_LEAK_MS = Number(process.env.DMX_TRUST_LEAK_MS || '4000');
 /** LÖPANDE TAKT - RUTNÄTET PÅ LJUDETS SLAG (ägaren 10-19: 'allt i bakgrunden så snabbt som möjligt, effekten får info om exakta
  *  takten så snabbt det går'). Mätt i bänken (showTight --step 5, pop): kickbandets anslag (frame.onset.kick) är tydligt periodiskt, men
  *  rutnätets slag låg 40-160 ms fel och gled (tempo 1-1,5 BPM fel) - kick-PLL:en drar 10 % per kick och 'kick' fyrar på kylningens kant.
@@ -45,6 +50,14 @@ const FEED_RISE_HOPS = 6;
  *  rutnät som viks som före 10-27 (onset.kick, en skugg-BeatFeed som också sköter analysatorns resetTempo/resetBar); effektklockan
  *  (cfg.beat) har rise-rutnätet. Analysatorn MÅSTE byggas med BeatFeed.analyserCfg(cfg) i alla vägar (motorn och bänkarna) - annars
  *  skriver setBeatGrid analysatorns rutnät i motorns cfg.beat. natt 10-28: sektion upp 4,1 -> 2,6 s, återseende 79 -> 83, mega r 0,03 -> 0,17. */
+/** TAKTEN GENOM BREAKET (opt-in DMX_BREAK_HOLD_MS, natt 2026-11-07; ladan 11-06: 'efter drop tog det 2-3 s innan den tydligt visade
+ *  takten igen' - ws-loggen: analysatorns bpm 0 i 14,6 s av breaket, effektklockan nollades och låste 4,2 s efter dropen). Med > 0:
+ *  (1) när analysatorns bpm blir 0 rullar effektklockans rutnät vidare på sitt tempo i högst så många ms (tilliten läcker som förr, så
+ *  takteffekterna lugnar sig i breaket); kommer bpm tillbaka på ett annat tempo (inte samma oktav +-4 %) tas det nya som förr;
+ *  (2) första kicken efter > 1,5 s utan kickar (dropen) som ligger inom +-0,25 slag: fasen sätts på kicken och tilliten tas upp till
+ *  värdet före tystnaden (rutnätet hade redan rätt tempo). 0 = av (bit-identiskt). Bara effektklockan, inte analysatorns skuggrutnät. */
+const BREAK_HOLD_MS = Number(process.env.DMX_BREAK_HOLD_MS ?? '0');
+const BREAK_RESTORE_MS = Number(process.env.DMX_BREAK_RESTORE_MS ?? String(BREAK_HOLD_MS));   // (2) för sig (prov: hållet av, bara dropens upptag)
 const NO_AN = { resetTempo(): void {}, resetBar(): void {} };
 /** HELA TEMPOOMRÅDET (2026-10-30, ägaren: 'få rutnätet att ha rätt tempo'): effektklockans andra sökcentrum var analysatorns bpm, som
  *  i en mix står fel länge efter ett låtbyte (tempoMix: rätt 63 %, icke-harmoniskt fel 20 %, lås median 6 s). Nu viks basens stigning
@@ -96,6 +109,7 @@ export class BeatFeed {
   private readonly fullS = new Float64Array(ONSET_BINS); private readonly fullN = new Float64Array(ONSET_BINS);
   private fullK = 0; private fullHop = 0; private fullBest = 0; private fullBestBpm = 0; private fullBase = 0; private fullW = 0; private fullWV = 0; fullBpm = 0;
   /** kickFold = vik onset.kick som före 10-27 (analysatorns skugga, se TVÅ RUTNÄT). Standard = basens stigning. */
+  private holdSince = 0; private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
   private readonly ana: BeatFeed | null; private readonly anaGrid = { beat: null } as unknown as EngineConfig;
   constructor(private readonly kickFold = false) { this.ana = kickFold ? null : new BeatFeed(true); }
   /** Det cfg analysatorn ska byggas med: en grund kopia med eget rutnät (sätts via setBeatGrid i update). */
@@ -213,8 +227,8 @@ export class BeatFeed {
     if (cfg.beat && this.lastPllKickMs) {
       const quiet = Date.now() - this.lastPllKickMs;
       if (quiet > 1500) {
-        this.onBeatRate *= Math.max(0, 1 - (quiet - 1500) / 4000);
-        this.repeatRate *= Math.max(0, 1 - (quiet - 1500) / 4000);
+        this.onBeatRate *= Math.max(0, 1 - (quiet - 1500) / TRUST_LEAK_MS);
+        this.repeatRate *= Math.max(0, 1 - (quiet - 1500) / TRUST_LEAK_MS);
         if (quiet > 8000) this.pllKicks = 0;   // bevisen ar gamla — lamna over till tempogrammet
       }
     }
@@ -244,7 +258,14 @@ export class BeatFeed {
     // LÖPANDE TAKT (10-19, ersätter kick-PLL:en, tempospärren och fasföljaren - backup-taggen backup/fore-lopande-takt-2026-10-19):
     // analysatorns bpm ger bara det första låset och ett sökcentrum; sedan sätter onsetStep() fas och tempo direkt ur kickbandets
     // anslag var ONSET_EVERY_MS. Kickarna rör inte längre rutnätet - de mäter bara tilliten (som effekterna läser).
-    const effBpm = frame.bpm;
+    let effBpm = frame.bpm;
+    if (BREAK_HOLD_MS > 0 && !this.kickFold && cfg.beat) {   // TAKTEN GENOM BREAKET (se BREAK_HOLD_MS)
+      if (effBpm === 0) { const now = Date.now(); if (this.holdSince === 0) this.holdSince = now; if (now - this.holdSince < BREAK_HOLD_MS) effBpm = cfg.beat.bpm; }
+      else {
+        if (this.holdSince !== 0 && Math.abs(sameOctave(effBpm, cfg.beat.bpm) / cfg.beat.bpm - 1) > 0.04) { cfg.beat = null; cfg.beatErr = 0; this.clockDetBpm = 0; this.onN = 0; this.scanC = 99; this.fullBpm = 0; this.fullK = 0; this.fullBest = 0; }
+        this.holdSince = 0;
+      }
+    }
     if (effBpm === 0) { cfg.beat = null; cfg.beatErr = 0; this.clockDetBpm = 0; this.onN = 0; this.scanC = 99; this.fullBpm = 0; this.fullK = 0; this.fullBest = 0; }   // tyst → stoppa beat-effekter direkt
     if (effBpm > 0) {
       if (!cfg.beat) cfg.beat = { anchorMs: frame.beatAnchorMs || Date.now(), bpm: effBpm, confidence: frame.bpmConfidence };
@@ -255,11 +276,20 @@ export class BeatFeed {
         const ph = ((((frame.kickAtMs - cfg.beat.anchorMs) % beatMs) + beatMs) % beatMs) / beatMs;
         const err = ph < 0.5 ? ph : ph - 1;   // -0.5..0.5 av ett taktslag
         const onBeat = Math.abs(err) < 0.25;  // off-beat/synkoperade slag räknas ej
+        if (BREAK_RESTORE_MS > 0 && !this.kickFold) {   // TAKTEN GENOM BREAKET (2): dropens kick tar upp rutnätet direkt
+          const nowK = Date.now(), quiet = this.lastPllKickMs ? nowK - this.lastPllKickMs : 0;
+          if (quiet > 1500 && onBeat && this.goodRep > 0 && nowK - this.goodAt < BREAK_RESTORE_MS + 1500) {
+            cfg.beat.anchorMs += err * beatMs;
+            this.onBeatRate = Math.max(this.onBeatRate, this.goodOn); this.repeatRate = Math.max(this.repeatRate, this.goodRep);
+            if (this.pllKicks < 12) this.pllKicks = 12;
+          }
+        }
         if (onBeat) cfg.beatErr = (cfg.beatErr ?? 0) * 0.85 + err * 0.15;   // UI: ihållande fasfel
-        this.onBeatRate += ((onBeat ? 1 : 0) - this.onBeatRate) * 0.12;
-        this.repeatRate += ((onBeat || this.kickRepeats(frame.kickAtMs, TRUST_REPEAT_BEATS * beatMs, TRUST_REPEAT_TOL * beatMs) ? 1 : 0) - this.repeatRate) * 0.12;
+        { const x = onBeat ? 1 : 0; this.onBeatRate += (x - this.onBeatRate) * (x > this.onBeatRate ? TRUST_UP : 0.12); }
+        { const x = onBeat || this.kickRepeats(frame.kickAtMs, TRUST_REPEAT_BEATS * beatMs, TRUST_REPEAT_TOL * beatMs) ? 1 : 0; this.repeatRate += (x - this.repeatRate) * (x > this.repeatRate ? TRUST_UP : 0.12); }
         this.lastPllKickMs = Date.now();
         if (this.pllKicks < 40) this.pllKicks++;
+        if (BREAK_RESTORE_MS > 0 && this.pllKicks >= 12) { this.goodOn = this.onBeatRate; this.goodRep = this.repeatRate; this.goodAt = this.lastPllKickMs; }
       }
       if (frame.kickAtMs > 0 && frame.kickAtMs !== this.kickRingLast) { this.kickRingLast = frame.kickAtMs; this.kickRing[this.kickRingPos] = frame.kickAtMs; this.kickRingPos = (this.kickRingPos + 1) & 63; if (this.kickRingN < 64) this.kickRingN++; }
       {   // ringen + vikningen
