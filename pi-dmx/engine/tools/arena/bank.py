@@ -40,9 +40,10 @@ while True:
         time.sleep(5)
 t0 = time.time()
 try:
+    # --live-kick (från runda 2 i puls1): rytm.py kör som riggen (registerKick + KICK-BYPASS), mätfälla 52
     def rytm(nw):
         n, w = nw; fd, js = tempfile.mkstemp(suffix='.json'); os.close(fd)
-        r = subprocess.run([sys.executable, 'tools/rytm.py', w, '--s', '300', '--json', js, '--live-kick'] + envarg,   # --live-kick från runda 2 i puls1: som riggen (registerKick + KICK-BYPASS) cwd=ENGINE, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=1800)
+        r = subprocess.run([sys.executable, 'tools/rytm.py', w, '--s', '300', '--json', js, '--live-kick'] + envarg, cwd=ENGINE, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=1800)
         try: return n, json.load(io.open(js, encoding='utf-8'))
         except Exception: return n, {'fel': (r.stderr or r.stdout)[-500:]}
         finally: os.remove(js)
