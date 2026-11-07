@@ -1,0 +1,309 @@
+{
+ "datum": "2026-11-07",
+ "tag": "drop-landtak-f3w1",
+ "dist": "tools/natt/prov/dag-drop-dist-landtak",
+ "env": [
+  "DMX_LAND_CAP=0.9",
+  "DMX_DROP_LIFT_FLOOR=0.3",
+  "DMX_DROP_WIN_S=1"
+ ],
+ "mixar": {
+  "pop": {
+   "wav": "tools/pop_ladan.wav",
+   "startS": 0,
+   "gainDb": 0,
+   "totS": 600,
+   "rutor": 22500,
+   "tajt": {
+    "kickLagMs": 123,
+    "kickLagP75": 195,
+    "kickLagRigg90": 125,
+    "lampUpp": 2737,
+    "kickar": 1562,
+    "kickTraff": 0.469910371318822,
+    "kickHojd": 0.16078431372549012,
+    "energiR": 0.3049591937979504,
+    "nivaR": 0.539122699081704,
+    "energiRtopp": 0.31161673445043725,
+    "energiRruta": 0.25471680872452024,
+    "energiR15": 0.31269407906718405,
+    "nivaR15": 0.539573508194944,
+    "bpmMed": 126,
+    "kickFonsterMs": 225,
+    "litLugn": 0.22529411764705873,
+    "litFart": 0.29970588235294116,
+    "litFull": 0.5123529411764706,
+    "toppLugn": 0.3411764705882353,
+    "toppFart": 0.4323529411764706,
+    "toppFull": 0.7588235294117647,
+    "sekLugn": 60,
+    "sekFart": 323,
+    "sekFull": 179,
+    "byten": 26,
+    "bytenPerMin": 2.6001155606915862,
+    "musikByten": 1,
+    "orsaker": {
+     "build": 1,
+     "build-slut": 2,
+     "sektion": 22,
+     "drop": 1
+    },
+    "drops": 3,
+    "minidrops": 111,
+    "granser": 4,
+    "karaktarsskiften": 8,
+    "tempovaxlingar": 1,
+    "dropSprangLugn": 0.6835294117647059,
+    "dropSprangHog": 0.25911764705882356,
+    "dropsLugna": 1
+   },
+   "snygg": {
+    "alla3": 0.04306637660629364,
+    "en": 0.5101563290498836,
+    "matt": 1,
+    "lampspr": 76.05591111111112,
+    "lookar": 17,
+    "lookMedianS": 9.013333333333321,
+    "lookLangstaS": 101.86666666666667,
+    "morkt": 0.013288888888888888,
+    "litP10": 0.10392156862745097,
+    "litP50": 0.3215686274509804,
+    "litP90": 0.7450980392156863
+   },
+   "lookTime": [
+    [
+     "backbeat",
+     118.26666674805715
+    ],
+    [
+     "eko",
+     101.86666674805458
+    ],
+    [
+     "drumkit",
+     85.65333349609894
+    ],
+    [
+     "tryckvag",
+     64.58666674804876
+    ],
+    [
+     "chase",
+     59.65333349609525
+    ],
+    [
+     "siren",
+     31.3866665039059
+    ],
+    [
+     "gallop",
+     30.559999755859042
+    ],
+    [
+     "rulle",
+     19.306666748046784
+    ],
+    [
+     "nedrakning",
+     19.19999999999991
+    ],
+    [
+     "forvarning",
+     16.719999999999963
+    ],
+    [
+     "varannan",
+     13.4133332519531
+    ],
+    [
+     "twin",
+     9.466666503906222
+    ],
+    [
+     "bounce",
+     8.47999999999997
+    ],
+    [
+     "kaskad",
+     8.373333251953095
+    ],
+    [
+     "basgang",
+     6.02666650390624
+    ],
+    [
+     "tratt",
+     4.026666748046885
+    ],
+    [
+     "wave",
+     3.0116667480468795
+    ]
+   ]
+  },
+  "megamix": {
+   "wav": "tools/megamix_ladan.wav",
+   "startS": 0,
+   "gainDb": 0,
+   "totS": 600,
+   "rutor": 22500,
+   "tajt": {
+    "kickLagMs": 187,
+    "kickLagP75": 285,
+    "kickLagRigg90": 175,
+    "lampUpp": 2096,
+    "kickar": 1287,
+    "kickTraff": 0.432012432012432,
+    "kickHojd": 0.2392156862745098,
+    "energiR": 0.21039629455731393,
+    "nivaR": 0.5287955507997983,
+    "energiRtopp": 0.2017262790882373,
+    "energiRruta": 0.180054963783645,
+    "energiR15": 0.21119619942096884,
+    "nivaR15": 0.5267247521183789,
+    "bpmMed": 92,
+    "kickFonsterMs": 300,
+    "litLugn": 0.28468137254901965,
+    "litFart": 0.46210784313725484,
+    "litFull": 0.5004901960784315,
+    "toppLugn": 0.4215686274509804,
+    "toppFart": 0.7470588235294118,
+    "toppFull": 0.8294117647058823,
+    "sekLugn": 63,
+    "sekFart": 307,
+    "sekFull": 192,
+    "byten": 37,
+    "bytenPerMin": 3.700164451753411,
+    "musikByten": 1,
+    "orsaker": {
+     "build": 4,
+     "build-slut": 3,
+     "sektion": 27,
+     "drop": 3
+    },
+    "drops": 21,
+    "minidrops": 582,
+    "granser": 2,
+    "karaktarsskiften": 7,
+    "tempovaxlingar": 7,
+    "dropSprangLugn": 0.370514705882353,
+    "dropSprangHog": 0.4911633986928104,
+    "dropsLugna": 6
+   },
+   "snygg": {
+    "alla3": 0.008614274723472953,
+    "en": 0.5172726928752507,
+    "matt": 1,
+    "lampspr": 89.58448888888888,
+    "lookar": 15,
+    "lookMedianS": 8.319999999999993,
+    "lookLangstaS": 73.22666666666666,
+    "morkt": 0.027644444444444444,
+    "litP10": 0.09215686274509803,
+    "litP50": 0.4235294117647058,
+    "litP90": 0.8372549019607842
+   },
+   "lookTime": [
+    [
+     "tryckvag",
+     123.62666699219861
+    ],
+    [
+     "gallop",
+     94.02666674805336
+    ],
+    [
+     "frasraknare",
+     76.9599997558632
+    ],
+    [
+     "rave",
+     60.45333349609531
+    ],
+    [
+     "sidokedja",
+     59.09333325195459
+    ],
+    [
+     "party",
+     51.30666650390719
+    ],
+    [
+     "siren",
+     29.27999975585907
+    ],
+    [
+     "varannan",
+     28.506666748046587
+    ],
+    [
+     "eko",
+     24.79999999999979
+    ],
+    [
+     "basgang",
+     24.00000024414043
+    ],
+    [
+     "backbeat",
+     10.959999755859348
+    ],
+    [
+     "twin",
+     8.23999999999997
+    ],
+    [
+     "nedrakning",
+     5.599999999999994
+    ],
+    [
+     "wave",
+     3.0116667480468795
+    ],
+    [
+     "rulle",
+     0.133333251953125
+    ]
+   ]
+  }
+ },
+ "ljusLag": {
+  "pop": {
+   "korskorr": 0,
+   "t90": 15
+  },
+  "megamix": {
+   "korskorr": 5,
+   "t90": 15
+  },
+  "lang1021": {
+   "korskorr": 10,
+   "t90": 40
+  }
+ },
+ "kvall": {
+  "minuter": 138.8,
+  "byten/min": 2.67,
+  "unika/låt": 5.2,
+  "låtar": 52,
+  "vid sektion>=8s": "78 %",
+  "återseende": "65 % (124)",
+  "kort look <8s": "16 %",
+  "hör ihop": "81 % (43)",
+  "paletter/låt": 1,
+  "unika kvällen": 70,
+  "effektivt antal": 28.6,
+  "rutor": "15/15",
+  "drops": 62,
+  "minidropLook": 337,
+  "lyft": 337,
+  "aMini": 2590,
+  "orsaker": {
+   "sektion": 326,
+   "drop": 39,
+   "build-slut": 3,
+   "build": 2
+  }
+ },
+ "tidS": 833
+}

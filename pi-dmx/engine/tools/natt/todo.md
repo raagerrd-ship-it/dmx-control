@@ -1,5 +1,22 @@
 # Natt-agentens uppdrag
 
+## DAGKÖRNINGEN 2026-11-07 MED TRE AGENTER (ägaren: 'kan man få takten att följa själva basrytmen bättre (energilagret)' + 'efter drop ... taket 95 %, men golvet 70 % dödar dynamik' + 'målet är inte mer ljus överlag, utan att takten syns bättre'; INGET deployat, inget standard ännu)
+Provrattar i koden (osatt = json-identiskt, verifierat: dag-baslinje = nattens golv-av/hold-av): 99b1d53, e86932f, 88a3ec7. Rapporter: dag-20261107-rytm.md / -drop.md / -tillit.md.
+1. TAKTEN EFTER DROPEN (dag-20261107-tillit.md): DMX_BREAK_HOLD_MS=20000 - syntetiska break 4/8/16 s (tools/breakSyntet.py) takt85 4,49 -> 0,26 s; nattens
+   'kostnad' i dropsprång var brus (hop-förskjutning 0,40-0,50); kvällen unika 70 -> 66 är verkligt men kommer av ANALYSATORNS bpm 0 mitt i full musik
+   (183 s av kvällen, 16 episoder 7-18 s) som hållet täcker. TRUST_UP förkastat (falsk tillit), TRUST_LEAK_MS verkningslös (läckan multipliceras per hop).
+2. EFTER DROPEN (dag-20261107-drop.md): BUGG - efterkontrollen kräver eSm >= 1,15 x före + 0,02 och 'före' >= 0,85 i 53 av 59 drops -> omöjligt, lyftet släpps
+   efter 0,6 s i ~9 av 10 drops. DMX_DROP_LAND_CAP=0.9 + DMX_DROP_LIFT_FLOOR=0 + DMX_DROP_WIN_S=1 (basfönstret ankras om på refrängen i stället för golv):
+   kvällen drops med lyft 6 -> 49/59, ljus mot refrängen 1,04 -> 1,17, monotona 11 -> 3, puls/slag 0,31 -> 0,34, slag som når taket 38 -> 52 %.
+   Pris lampspr pop -1 % (dalarna mörka på alla lampor samtidigt). Taket är redan 1 (= 95 %) under lyftet. Minidropens golv: behåll 1.
+3. TAKTEN I ENERGILAGRET (dag-20261107-rytm.md, mått tools/rytm.py): DMX_B_SUBW=0.25 + DMX_B_LO_S=0.25 (kickbandet väger mer, dalen följer fortare):
+   lang1021 rA +0,025, slagK 0,295 -> 0,312, ljusLag t90 40 -> 25 ms, ej släckt längre (mörkret hamnar mellan slagen). Pris lampspr pop -6 %, mega -2 %.
+   Alternativ SUBW 0.25 + CURVE 4. FX_FLOOR förkastat (inte orsaken), E_NORM_S förkastat, mer sub sämre (lotus-fyndet gäller inte här).
+   HUVUDFYNDET: energin följer basen bra (r 0,69-0,83) men ljuset följer energin svagt (r 0,35-0,54) - EFFEKTERNAS mönster styr ljuset. Ska basgången
+   kännas i ögonen på riktigt är nästa steg i effekterna (vilka effekter följer basen, rytm.py per look), inte energilagret.
+ÖGONPROV I LADAN (ägaren, en sak i taget, i denna ordning): (a) BREAK_HOLD, (b) drop-trion, (c) SUBW 0,25 -> + LO_S 0,25. Godkänt = in i koden + ratten bort.
+Fortfarande live och utan dom: DMX_KICKREGN_PAR=1, DMX_BUILD_TOPP=1.
+
 ## Från eftermiddagen 2026-11-04 - HIGH NR 3+ FÅR NÄSTA LOOK (ägaren: 'ja, låt nattagenten pröva b i natt'; går före allt annat)
 Bakgrund: look-taket förkastat i dag (31ac4a9, se KLART nedan). Diagnosen: tryckvags 36 % i megamix är MANUSETS ÅTERSEENDE - high kommer
   tillbaka och tar samma look igen (effects.ts manus keep ~rad 830-840, manusHist rad 617/968), inte långa sträckor.

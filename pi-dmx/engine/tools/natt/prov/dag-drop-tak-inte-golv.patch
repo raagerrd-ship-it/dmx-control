@@ -1,0 +1,56 @@
+diff --git a/src/effects.ts b/src/effects.ts
+index 4f2ef89..d742c74 100644
+--- a/src/effects.ts
++++ b/src/effects.ts
+@@ -79,9 +79,14 @@ const MINI_GAP_MS = 2000;
+  *  backup/fore-kvallens-prov-2026-10-21): när dropen kommer i samma ruta som build-inträdet (allaBuild) valdes looken förr i build-manuset -
+  *  dropens basstarka look sparades som låtens build-look och refrängens manus fick den aldrig (10 av 67 drops, 24 lang). Nu räknas
+  *  dropen till 'high' som andra drops (se secKey i switchLook). */
+-/** LYFTETS GOLV (ägaren i ladan 11-01: 'precis efter en drop ... nästan monoton'): lyftet låste energifaktorn på 1 i 8+ s efter dropen, så
+- *  effekter som lever på basen (pulse av, energy på) slutade pulsa. Nu ett golv på 70 %: energin hålls uppe, bastrycket pulsar ovanför. */
+-const DROP_LIFT_FLOOR = Number(process.env.DMX_DROP_LIFT_FLOOR ?? '0.7');   // PROV 11-07 (ladan 11-06: takten syns svagt efter dropen): 0,5/0,6 opt-in, standard 0,7
++/** LYFTET SOM TAK, INTE GOLV (dagkörningen 2026-11-07, ägaren: 'efter drop räkna med att det är refräng så taket är 95 %, men jag tror att
++ *  öka golvet till 70 % är fel, då dödar vi ju bara dynamik'). Förr (11-01) ett golv på 70 % i lyftet: bastrycket pulsade bara 0,7..1
++ *  (energifaktorn efter gamma 0,8..1). Nu inget golv - sektionstaket står redan på 1 (95 %) under lyftet (secCeil) - och i stället glider
++ *  basfönstrets topp (bHi) ner på DROP_WIN_S i stället för E_WIN_S (10 s) medan lyftet pågår: dropens bastopp släpper på ~1 s och
++ *  fönstret ankras om på refrängen, så refrängens bastryck når taket igen och dalarna mellan slagen syns (det var dropens topp som
++ *  dämpade refrängen, 10-11 'energin dör'). Bänk tools/efterDrop.py, kvällen 10-11 (59 drops, med efterkontrollens tak): puls per slag
++ *  0,310 -> 0,342, ljuset 0,8-8 s 0,454 -> 0,449, monotona drops 7 -> 3, lampspr 84,8 -> 87,2. */
++const DROP_WIN_S = 1;
+ const DROP_BEAT_MIN = 0.8;   // basstark drop-look måste också ha tydlig takt (passform beat, se bassStrong)
+ const DROP_LIFT_MS = 8000, DROP_LIFT_FALL_MS = 3000;   // 4000/1500 -> 8000/3000 STANDARD 10-17 (ägaren i ladan: 'energi efter drop dör fort' -> 'känns bra nu')   // 2000 -> 4000 (ladan 22:0x: 'se till så energin efter fortsätter', som minidropens lyft som var 'perfekt')   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
+ /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
+@@ -408,13 +413,13 @@ const B_CURVE = 3, B_MIN_DB = 6, B_LO_S = 1;
+  *  'efter drop räkna med att det är refräng så taket är 95 %, men golvet 70 % dödar bara dynamiken'). Bara för bänken: osatt = dagens
+  *  värde och dagens uttryck (json-identiskt). Det som bevisar sig byggs in som standard och ratten tas bort (ägarens regel: inga flaggor).
+  *  DMX_B_LO_S/B_CURVE/B_MIN_DB/B_WIN_S/B_TOP/B_RELEASE_MS = basfönstrets dal/kurva/minsta bredd/toppens fall/topp/uttoning (aldrig under
+- *  E_RELEASE_MS: fade-down låst), DMX_B_SUBW = subbandets vikt mot kickbandet (0,5 = medel som i dag); DMX_DROP_WIN_S/DROP_TOP = toppens
+- *  fall och E_TOP medan dropens lyft pågår (basfönstret ankras om på refrängen i stället för ett golv); DMX_MINI_LIFT_FLOOR = minidropens
++ *  E_RELEASE_MS: fade-down låst), DMX_B_SUBW = subbandets vikt mot kickbandet (0,5 = medel som i dag); DMX_DROP_TOP = E_TOP medan dropens
++ *  lyft pågår (toppens fall är standard DROP_WIN_S sedan 11-07); DMX_MINI_LIFT_FLOOR = minidropens
+  *  lyft som golv (1 = som i dag). */
+ const envN = (k: string, d: number): number => { const v = process.env[k]; return v === undefined || v === '' ? d : Number(v); };
+ const PB_LO_S = envN('DMX_B_LO_S', B_LO_S), PB_CURVE = envN('DMX_B_CURVE', B_CURVE), PB_MIN_DB = envN('DMX_B_MIN_DB', B_MIN_DB);
+ const PB_WIN_S = envN('DMX_B_WIN_S', 0), PB_TOP = envN('DMX_B_TOP', 0), PB_RELEASE_MS = envN('DMX_B_RELEASE_MS', 0), PB_SUBW = envN('DMX_B_SUBW', 0.5);
+-const PD_WIN_S = envN('DMX_DROP_WIN_S', 0), PD_TOP = envN('DMX_DROP_TOP', 0), PM_LIFT_FLOOR = envN('DMX_MINI_LIFT_FLOOR', 1);
++const PD_TOP = envN('DMX_DROP_TOP', 0), PM_LIFT_FLOOR = envN('DMX_MINI_LIFT_FLOOR', 1);
+ /** BASENERGIN BARA SUB+KICK (opt-in DMX_BASS_SUBKICK=1, porterat från lotus 10-15: ägaren i källaren 'känns dock som att den följer inte bara
+  *  bas' med baskroppen 20-250 Hz, 'känns bättre' med sub+kick 20-120 Hz). Basenergins källa = medel av sub- och kickbandets rå dB ur
+  *  frame.specAbs (samma bandmedel som bodyDb, utan bandet 120-250 Hz där röstens grundton och virvelns kropp ligger). Flank-dropen läser
+@@ -1397,7 +1402,7 @@ export class EffectEngine {
+       const bdb = frame.specAbs ? (PB_SUBW === 0.5 ? (20 * Math.log10(frame.specAbs.sub + 1e-7) + 20 * Math.log10(frame.specAbs.kick + 1e-7)) / 2
+         : PB_SUBW * 20 * Math.log10(frame.specAbs.sub + 1e-7) + (1 - PB_SUBW) * 20 * Math.log10(frame.specAbs.kick + 1e-7)) : (frame.bodyDb ?? -90);   // BASS_SUBKICK: bara 20-120 Hz (PROV DMX_B_SUBW)
+       const inDropLift = nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS;   // PROV DMX_DROP_WIN_S/DROP_TOP
+-      const bWin = inDropLift && PD_WIN_S > 0 ? PD_WIN_S : PB_WIN_S, kB = bWin > 0 ? Math.min(1, dtSec / bWin) : k;
++      const bWin = inDropLift ? DROP_WIN_S : PB_WIN_S, kB = bWin > 0 ? Math.min(1, dtSec / bWin) : k;   // LYFTET SOM TAK, INTE GOLV
+       if (Number.isNaN(this.bHi) && frame.level > INPUT_OFF_LEVEL) { this.bHi = bdb; this.bLo = bdb; }
+       if (frame.level > INPUT_OFF_LEVEL) {   // tystnad flyttar inte fönstret
+         this.bHi = bdb > this.bHi ? bdb : this.bHi + (bdb - this.bHi) * kB;
+@@ -1411,7 +1416,6 @@ export class EffectEngine {
+       this.eSimple = this.eBass;
+       const eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
+       let lift = this.dropEnv;   // DROPS OCH MINIDROPS LYFTER (se DROP_LIFT_MS / MINI_LIFT_MS): energin släpper helt och glider tillbaka
+-      if (nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) { const left = this.dropLiftUntil - nowWall; lift = Math.max(lift, DROP_LIFT_FLOOR * (left >= 0 ? 1 : 1 + left / DROP_LIFT_FALL_MS)); }   // LYFTET SOM GOLV (se DROP_LIFT_FLOOR)
+       if (nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) { const left = this.miniLiftUntil - nowWall; lift = Math.max(lift, PM_LIFT_FLOOR === 1 ? (left >= 0 ? 1 : 1 + left / MINI_LIFT_FALL_MS) : PM_LIFT_FLOOR * (left >= 0 ? 1 : 1 + left / MINI_LIFT_FALL_MS)); }
+       md = drive * Math.min(1, Math.max(eFloor + (1 - eFloor) * Math.pow(this.eBass, PB_CURVE), lift));   // bara dampning: aldrig over 1
+       md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
