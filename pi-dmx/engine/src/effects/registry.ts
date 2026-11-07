@@ -89,6 +89,14 @@ import { hiss } from "./hiss.js";
 import { tratt } from "./tratt.js";
 import { morkerslag } from "./morkerslag.js";
 import { urladdning } from "./urladdning.js";
+import { sangare } from "./sangare.js";
+import { dansparet } from "./dansparet.js";
+import { minnet } from "./minnet.js";
+import { sokljus } from "./sokljus.js";
+
+/** LABBETS FAVORITER (PROV 2026-11-07, DMX_LABFX=1, osatt = poolen som förr; ägaren i ladan: 'lägg till de vi tyckte var bra' + 'jag vill
+ *  lägga till dom'): sångaren och sökljuset (lugnt), dansparet och minnet (refräng). */
+const LABFX = process.env.DMX_LABFX === '1';
 
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
@@ -125,6 +133,8 @@ export const EFFECTS: EffectDef[] = [
   // REFRÄNG/DROP MED TYDLIG BAS OCH TAKT (ägaren 11-01: 'fler effekter som uppfyller refräng/drop-kriterierna'): basstarka full-effekter
   // med passform bas >= 0,6, punch >= 0,75, beat >= 0,8 (se bassStrong i effects.ts).
   slagga, sidokedja, tryckvag,
+  // LABBETS FAVORITER (se LABFX)
+  ...(LABFX ? [sangare, dansparet, minnet, sokljus] : []),
 ];
 
 /** Specialrolls-mappning: vilka fixture-roller (hazer/uv/blinder/strobe/laser/co2)

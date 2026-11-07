@@ -104,6 +104,11 @@ export const FIT: Partial<Record<Mode, Fit>> = {
   slagga:     { punch: 0.90, bass: 0.65, bright: 0.55, beat: 0.90 },   // vit smäll på varje slag, glöd på basen
   sidokedja:  { punch: 0.80, bass: 0.85, bright: 0.25, beat: 0.95 },   // kicken trycker ner, sväller tillbaka
   tryckvag:   { punch: 0.85, bass: 0.75, bright: 0.35, beat: 0.85 },   // allt slår, mitten bär basen
+  // labbets favoriter 11-07 (DMX_LABFX)
+  sangare:    { punch: 0.20, bass: 0.20, bright: 0.55, beat: 0.30 },   // lugnt, rösten, lite takt
+  sokljus:    { punch: 0.45, bass: 0.35, bright: 0.45, beat: 0.65 },   // lugnt med takt, virveln
+  dansparet:  { punch: 0.85, bass: 0.75, bright: 0.45, beat: 0.95 },   // refräng, ett steg per slag
+  minnet:     { punch: 0.85, bass: 0.70, bright: 0.50, beat: 0.90 },   // refräng, mönster per slag
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -130,6 +135,7 @@ const SPATIAL: Partial<Record<Mode, number>> = {
   stjarnor: 0.7, mullra: 0.6, kaskad: 1.0, droppar: 0.9, uppvarmning: 0.8, dunk: 0.8, glesna: 0.8, dyning: 0.8,
   blixtnedslag: 1.0, mellanslag: 1.0, pump: 0.6, hiss: 1.0, tratt: 0.7, morkerslag: 0.8, urladdning: 0.6,
   slagga: 0.3, sidokedja: 0.5, tryckvag: 0.8,
+  sangare: 0.9, sokljus: 1.0, dansparet: 1.0, minnet: 1.0,
 };
 /** Hur mycket den spatiala preferensen väger vid full punch (0 = av). */
 const SPATIAL_PREF = 0.5;   // 0,18 -> 0,5 (ladan 10-01 godkant)   // ladan 09-29: "manga effekter lyser bara alla lampor" -> prov 0,5

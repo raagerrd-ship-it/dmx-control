@@ -27,6 +27,11 @@ H. SÅNGAREN SOM RIKTIG EFFEKT (ägaren i ladan 11-07 om showen: 'den som kör n
    två gånger i rad) + ny kulör. Gör den till en effekt i registry.ts som dirigenten väljer när TAKTEN ÄR OKÄND (!hasBeat) och/eller i lugna
    partier (break/intro, låg bassline) - ägarens användningsfall. Effekten ger bara 0-100 % (kontraktet). Provratt DMX_SANGARE (osatt =
    identiskt), mät hur ofta den väljs och att takt-looks inte trängs undan när takten finns. Efter A/B/E/F.
+I-STATUS 11-07 18:55: ägaren 'jag vill lägga till dom' -> 1-4 BYGGDA OCH LIVE som provratt DMX_LABFX=1 (src/effects/sangare.ts,
+   dansparet.ts, minnet.ts, sokljus.ts + registry/fit/Mode/SPREAD_SKIP; ladan.conf har elva rattar). dynBench lang-20261107T154200 med de tio:
+   blink 0,7 -> 0,8/min, dirigenten väljer minnet/dansparet i refrängerna (sångare/sökljus kräver lugna partier - inspelningen har nästan inga).
+   KVAR för natten: (a) bänka sångaren/sökljuset på material MED lugna partier (korpus/ladan-1101) och visa att de väljs; (b) 5 (reprisen) och
+   6 (fråga-svar i duel/eko) enligt nedan; (c) ägarens dom i ladan -> standard (ratten bort, som de tio). Dagens rad i C blir elva rattar.
 I. LABBETS FAVORITER IN I FESTSHOWEN (ägaren i ladan 11-07: 'effekter är klart för kvällen. Lägg till de vi tyckte var bra, och kör sen
    vanliga vägen'). Kvällens experiment ligger som stunder i src/moment.ts ('show') och src/lab.ts-lab5.ts ('lab'..'lab5'), POST /api/moment.
    Gör varje favorit till en RIKTIG EFFEKT i src/effects/ + registry.ts som dirigenten väljer på sitt läge, enligt kontraktet (effekten ger

@@ -216,7 +216,7 @@ const EFFECT_HEART = Math.max(0, Math.min(2, 1.4));
  *  aldrig över 1, kulören orörd), uttoningen orörd. Gäller inte a8:s looks (dubbeldämpning släckte off-beat-gruppen). */
 const BASGANG = process.env.DMX_BASGANG === '1';
 const SPREAD_D = 0.7;
-const SPREAD_SKIP = new Set(['tryckvag', 'gallop', 'varannan', 'duel', 'twin']);
+const SPREAD_SKIP = new Set(['tryckvag', 'gallop', 'varannan', 'duel', 'twin', 'sangare', 'dansparet', 'minnet', 'sokljus']);   // + labbets favoriter: egen rumslig figur
 /** EFFEKTERNAS PULS UR BASEN (PROV 2026-11-07, ägaren: 'basgång (det man dansar till) skall kännas i ögonen' + 'granskade vi inte lågpassfilter
  *  för effektfiltret'): låst takt ger effekternas puls (c.heart/heartPulse, c.beatPulse, c.kickEnv) ur RUTNÄTET (beatFrac) och punchens per-slag-del
  *  stängs av - basgången själv når aldrig effekterna. DMX_FX_BASS 0..1 blandar in basens kropp (eBass = sub/kick-banden i följande fönster, samma
