@@ -19,7 +19,7 @@ import { GAMMA } from "./output.js";
 export const MOMENTS = ["fest", "middag", "tal", "forstadans", "tartan", "show"] as const;
 export type Moment = typeof MOMENTS[number];
 /** Motorns takt till showen (effects.ts ctx, satt före stunden varje ruta). */
-export interface ShowBeat { beatIdx: number; beatFrac: number; hasBeat: boolean; bassBody: number; bassNoteIdx: number; dropEnv: number; section: string;
+export interface ShowBeat { beatIdx: number; beatFrac: number; hasBeat: boolean; bassBody: number; bassline: number; bassNoteIdx: number; dropEnv: number; section: string;
   drum: { kick: number; snare: number; hat: number; bass: number } | null; frame: { spec: { sub: number; kick: number; bass: number; lowMid: number; mid: number; highMid: number } } | null }
 export const isMoment = (m: unknown): m is Moment => typeof m === "string" && (MOMENTS as readonly string[]).includes(m);
 
@@ -125,7 +125,7 @@ export class MomentLayer {
    *  Inget vitt, ingen strobe; nedgången tas av motorns uttoning per lampa (aldrig snabbare). */
   private beat?: ShowBeat;
   private sh = new Float32Array(0); private shAt = 0; private pitchS = 0.5; private lastNote = -1; private lastDrop = 0;
-  private lone = -1; private lonePitch = 0.5; private loneHop = 0; private voiceS = 0; private voiceFloor = 1; private voiceQuietAt = 0; private singerSect = 5; private freezeUntil = 0; private dropOrchUntil = 0; private freezeN = 0; private buildAt = 0; private lastSec = ''; private glow = new Float32Array(0); private glowS = new Int8Array(0);
+  private lone = -1; private lonePitch = 0.5; private loneHop = 0; private voiceS = 0; private voiceFloor = 1; private voiceQuietAt = 0; private singerSect = 5; private balls = [0, 2, 3, -2]; private ballSect = [5, 0]; private kPrev = 0; private sPrev = 0; private freezeUntil = 0; private dropOrchUntil = 0; private freezeN = 0; private buildAt = 0; private lastSec = ''; private glow = new Float32Array(0); private glowS = new Int8Array(0);
   private show(i: number, n: number, nowWall: number): [number, number, number] {
     if (this.sh.length !== n * 3) { this.sh = new Float32Array(n * 3); this.glow = new Float32Array(n); this.glowS = new Int8Array(n); }
     if (i === 0) this.showTick(n, nowWall);
@@ -180,6 +180,28 @@ export class MomentLayer {
       const age = (now - this.buildAt) / 1000, rise = Math.min(1, age / 14);
       const sect = rise < 0.4 ? 0 : 1, mixOrange = rise >= 0.4 && rise < 0.75;
       for (let i = 0; i < n; i++) this.put(i, mixOrange && i % 2 === 0 ? 0 : sect, 0.12 + 0.75 * rise * rise, presence);
+      return;
+    }
+    // BOLLARNA (ägaren 11-07: 'när refräng körs och bra bastakt, hitta på något nytt'): FYSIK i stället för takt. Två ljusbollar med massa
+    // rullar över raden: kicken knuffar kickbollen (hårdare kick = längre), virveln knuffar virvelbollen åt andra hållet; friktion, studs mot
+    // väggarna (ny kulör vid varje studs). Lampan visar den starkaste bollen (ingen blandning -> inget vitt). Basens kropp glöder svagt under.
+    if (sec === 'high' && (c.bassline >= 0.55 || c.bassBody > 0.6) && now >= this.dropOrchUntil) {
+      const kickHit = dr.kick > 0.6 && this.kPrev <= 0.45, snHit = dr.snare > 0.6 && this.sPrev <= 0.45; this.kPrev = dr.kick; this.sPrev = dr.snare;
+      const W = Math.max(1, n - 1), B = this.balls;
+      if (kickHit) B[1] += (B[1] >= 0 ? 1 : -1) * (3 + 5 * dr.kick);
+      if (snHit) B[3] += (B[3] >= 0 ? 1 : -1) * (2.5 + 4 * dr.snare);
+      for (const k of [0, 2]) {
+        B[k + 1] *= Math.exp(-dt * 2.2);                                   // friktion
+        B[k] += B[k + 1] * dt;
+        if (B[k] < 0) { B[k] = -B[k]; B[k + 1] = Math.abs(B[k + 1]) * 0.8; this.ballSect[k / 2] = (this.ballSect[k / 2] + 1) % 6; }
+        if (B[k] > W) { B[k] = 2 * W - B[k]; B[k + 1] = -Math.abs(B[k + 1]) * 0.8; this.ballSect[k / 2] = (this.ballSect[k / 2] + 1) % 6; }
+      }
+      for (let i = 0; i < n; i++) {
+        const a1 = Math.max(0, 1 - Math.abs(i - B[0]) * 0.9) ** 2 * Math.min(1, 0.35 + Math.abs(B[1]) / 4);
+        const a2 = Math.max(0, 1 - Math.abs(i - B[2]) * 0.9) ** 2 * Math.min(1, 0.3 + Math.abs(B[3]) / 4) * 0.85;
+        const glow = 0.08 * Math.min(1, c.bassBody);
+        if (a1 >= a2) this.put(i, this.ballSect[0], Math.max(a1, glow), presence); else this.put(i, (this.ballSect[1] + 3) % 6, Math.max(a2, glow), presence);
+      }
       return;
     }
     const orch = now < this.dropOrchUntil || (sec === 'high' && Math.floor(c.beatIdx / 32) % 2 === 0);   // efter frysen: orkestern tar dropen
