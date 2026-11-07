@@ -18,8 +18,14 @@ Provrattar i koden (osatt = json-identiskt, verifierat: dag-baslinje = nattens g
    per-slag-del - basgången nådde aldrig effekterna. DMX_FX_BASS=1 + DMX_FX_BASS_PUNCH=0.5 (ovanpå SUBW 0,25 + LO_S 0,25): lang1021 rA 0,190 -> 0,265,
    rK 0,206 -> 0,272 (dagens största vinst), dynSet ljusSteg 2,02 -> 2,39, fladder 0, refrängen starkare (1,73 -> 1,82). Pris lampspr pop -8 % / mega -4 %,
    dropsprång hög -0,02. Bandsvepet: bara sub (~lågpass 60 Hz, lotus-värdet) SÄMST, bara kick (60-120) bäst för takten, 0,25 kompromiss. PUNCH 1 = 'allt lyser'-risk.
-ÖGONPROV I LADAN (ägaren, en sak i taget, i denna ordning): (a) BREAK_HOLD, (b) drop-trion, (c) SUBW 0,25 -> + LO_S 0,25 -> + FX_BASS 1 -> + FX_BASS_PUNCH 0,5. Godkänt = in i koden + ratten bort.
+ÖGONPROV I LADAN (ägaren, en sak i taget, i denna ordning): (a) BREAK_HOLD, (b) drop-trion, (c) SUBW 0,25 -> + LO_S 0,25, (d) + BASGANG 1 (arenans vinnare). FX_BASS UTGÅR (DISK i arenan, ljus +4,6 %). Godkänt = in i koden + ratten bort.
 Fortfarande live och utan dom: DMX_KICKREGN_PAR=1, DMX_BUILD_TOPP=1.
+5. DMX-ARENAN puls1 (skillen dmx-arena, tools/arena/, körningen i .arena/puls1 - gitignorerad): runda 1 med 8 agenter, domare v3 + --live-kick:
+   a8 (effekterna själva: styrkan ur c.bassBody) +13,7, a1 (beatFrac på basanslaget, jitter 75 -> 33 ms) +6,2, a7 (ljusaste lampan leder) +4,8,
+   ref FX_BASS DISK (ljus +4,6 %). FINAL på kontrollmängden: a8+a7 (fusion-b) +14,1 vinner, a8 +13,3; allt med a1 föll (överanpassat).
+   VINNAREN = provratt DMX_BASGANG=1 (osatt json-identiskt mot bas, satt json-identiskt mot fusion-b). Rapport: tools/natt/arena-2026-11-07-puls1.md.
+   MÄTFÄLLA 52 IGEN: dynBench.mjs/dynSet.py matar INTE registerKick (kickboosten statisk) - rytm.py har nu --live-kick, dynSet saknar motsvarande.
+   NATTAGENTEN: lägg --live-kick i dynBench (opt, standard oförändrat) och notera skillnaden i dynamik.md.
 
 ## Från eftermiddagen 2026-11-04 - HIGH NR 3+ FÅR NÄSTA LOOK (ägaren: 'ja, låt nattagenten pröva b i natt'; går före allt annat)
 Bakgrund: look-taket förkastat i dag (31ac4a9, se KLART nedan). Diagnosen: tryckvags 36 % i megamix är MANUSETS ÅTERSEENDE - high kommer
