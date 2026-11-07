@@ -26,6 +26,13 @@ ARENA: resten av looksen ska bära basgången (ägaren 2026-11-07 kväll: valde 
 - Vinnaren blir provratt (osatt = json-identiskt, satt = json-identiskt mot vinnarens mapp, båda bevisade med bank.py) + 'redo för ladan'.
   DEPLOYA ALDRIG. Rapport tools/natt/arena-<datum>-puls2.md. Markera KLART med vinnaren och poängen.
 
+DIODFLIMMER KVAR (ägaren i ladan 11-07: 'ibland när en kanal R/G/B lyser så flimmrar fortfarande ibland en av de andra lite'; EFTER arenan,
+bara om tid finns): dynBench lang1021 med de nio: sidoBlink 0,1/min (siren 2) utan BASGANG, 0,5/min med (gallop 7 - ALLA vid 221,7-221,9 s:
+kulörbyte mitt i uttoningen, bikanalen glider 30 -> 2 -> 30 kring tändpunkten 16). Samma mekanism som 11-02 (twin/pendel/backbeat-svansen,
+siren-bytet). Gallopps avmättnad (1 - punch*0,3) provad som orsak: ingen effekt, backad. Förslag att BÄNKA (opt-in, standard identiskt):
+minsta AV-tid 100 ms för en färgkanal medan lampan är tänd (spegling av färgkanalens minsta på-tid), eller hysteres på tändpunkten för
+bikanaler. Får inte röra uttoningen eller fade-down; mät sidoBlink/ofrivBlink + takt/sprid. Redo för ladan om det håller.
+
 ## DAGKÖRNINGEN 2026-11-07 MED TRE AGENTER (ägaren: 'kan man få takten att följa själva basrytmen bättre (energilagret)' + 'efter drop ... taket 95 %, men golvet 70 % dödar dynamik' + 'målet är inte mer ljus överlag, utan att takten syns bättre'; INGET deployat, inget standard ännu)
 Provrattar i koden (osatt = json-identiskt, verifierat: dag-baslinje = nattens golv-av/hold-av): 99b1d53, e86932f, 88a3ec7. Rapporter: dag-20261107-rytm.md / -drop.md / -tillit.md.
 1. TAKTEN EFTER DROPEN (dag-20261107-tillit.md): DMX_BREAK_HOLD_MS=20000 - syntetiska break 4/8/16 s (tools/breakSyntet.py) takt85 4,49 -> 0,26 s; nattens
