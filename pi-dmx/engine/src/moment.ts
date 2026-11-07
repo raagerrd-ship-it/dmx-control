@@ -20,7 +20,7 @@ export const MOMENTS = ["fest", "middag", "tal", "forstadans", "tartan", "show"]
 export type Moment = typeof MOMENTS[number];
 /** Motorns takt till showen (effects.ts ctx, satt före stunden varje ruta). */
 export interface ShowBeat { beatIdx: number; beatFrac: number; hasBeat: boolean; bassBody: number; bassNoteIdx: number; dropEnv: number; section: string;
-  drum: { kick: number; snare: number; hat: number; bass: number } | null; frame: { spec: { sub: number; kick: number; bass: number; mid: number } } | null }
+  drum: { kick: number; snare: number; hat: number; bass: number } | null; frame: { spec: { sub: number; kick: number; bass: number; lowMid: number; mid: number; highMid: number } } | null }
 export const isMoment = (m: unknown): m is Moment => typeof m === "string" && (MOMENTS as readonly string[]).includes(m);
 
 /** Parets färger när inga är valda: magenta + röd (sektor 0 röd, 1 gul, 2 grön, 3 cyan, 4 blå, 5 magenta). */
@@ -125,7 +125,7 @@ export class MomentLayer {
    *  Inget vitt, ingen strobe; nedgången tas av motorns uttoning per lampa (aldrig snabbare). */
   private beat?: ShowBeat;
   private sh = new Float32Array(0); private shAt = 0; private pitchS = 0.5; private lastNote = -1; private lastDrop = 0;
-  private lone = -1; private lonePitch = 0.5; private loneHop = 0; private freezeUntil = 0; private freezeN = 0; private buildAt = 0; private lastSec = ''; private glow = new Float32Array(0); private glowS = new Int8Array(0);
+  private lone = -1; private lonePitch = 0.5; private loneHop = 0; private voiceS = 0; private voiceFloor = 1; private voiceQuietAt = 0; private singerSect = 5; private freezeUntil = 0; private freezeN = 0; private buildAt = 0; private lastSec = ''; private glow = new Float32Array(0); private glowS = new Int8Array(0);
   private show(i: number, n: number, nowWall: number): [number, number, number] {
     if (this.sh.length !== n * 3) { this.sh = new Float32Array(n * 3); this.glow = new Float32Array(n); this.glowS = new Int8Array(n); }
     if (i === 0) this.showTick(n, nowWall);
@@ -159,14 +159,21 @@ export class MomentLayer {
     }
     const quiet = this.vol < VOL_REF * 0.35 || sec === 'break' || sec === 'intro';
     if (quiet) {                                                    // MÖRKRET: en lampa per basnot
-      if (note) {   // den ensamma: ALLTID ny plats (ägaren 11-07) - stiger tonen åt höger, sjunker den åt vänster, samma ton = hopp
-        const dir = this.pitchS > this.lonePitch + 0.04 ? 1 : this.pitchS < this.lonePitch - 0.04 ? -1 : 0;
-        let k = this.lone < 0 ? noteLamp : this.lone + (dir || (this.loneHop++ % 2 ? 2 : -2));
-        if (n > 1) { k = ((k % n) + n) % n; if (k === this.lone) k = (k + 1) % n; }
-        this.lone = k; this.lonePitch = this.pitchS;
-        this.glow[k] = Math.max(this.glow[k], 0.55); this.glowS[k] = noteSect;
+      // SÅNGAREN (ägaren 11-07: 'jag gillade den ensamma, typ som sångaren sjunger själv' + 'följ energin på högre Hz så den följer sången'):
+      // EN lampa, ljusstyrkan = röstbandet (lowMid/mid/highMid, ~250 Hz-3,5 kHz) glättat 60 ms; ny FRAS (rösten tillbaka efter >= 350 ms
+      // tystnad) = ny plats (aldrig samma lampa två gånger i rad) och ny kulör.
+      const vRaw = 0.25 * sp.lowMid + 0.5 * sp.mid + 0.25 * sp.highMid;
+      this.voiceS += (vRaw - this.voiceS) * Math.min(1, dt / 0.06);
+      this.voiceFloor = Math.min(this.voiceS, this.voiceFloor + dt * 0.02);   // golvet kryper upp långsamt, faller direkt
+      const voice = Math.max(0, Math.min(1, (this.voiceS - this.voiceFloor - 0.04) * 2.2));
+      if (voice > 0.08) {
+        if (now - this.voiceQuietAt > 350 || this.lone < 0) {   // ny fras
+          let k = this.lone + (this.loneHop++ % 2 ? 1 : 2); if (n > 1) { k = ((k % n) + n) % n; if (k === this.lone) k = (k + 1) % n; } else k = 0;
+          this.lone = k; this.singerSect = [5, 0, 3, 1, 4][this.loneHop % 5];
+        }
+        this.voiceQuietAt = now;
       }
-      for (let i = 0; i < n; i++) if (this.glow[i] > 0.01) this.put(i, this.glowS[i], this.glow[i], 1);
+      if (this.lone >= 0) this.put(this.lone, this.singerSect, voice, 1);
       return;
     }
     if (sec === 'build') {                                          // SOLUPPGÅNG
