@@ -6,6 +6,12 @@ A. KONTRAKTET + KALIBRERINGEN PER LAMPA (punkt '4'): GAMMA-läckorna ur effects.
 B. EFFEKTERNAS DIODANPASSNINGAR BORT (punkt '3'): provratten DMX_FX_REN, mät med RGB_STRICT. Se 'ÄGAREN IGEN' nedan.
 C. Om tid finns: de tio proven till standard (avsnittet nedan). Görs C inte i natt: nästa natt FÖRST.
 D. ARENAN puls2 FLYTTAD TILL NÄSTA NATT (kräver C KLART). Kör den inte i natt.
+E. DROP KRÄVER DJUP BAS (ägaren i ladan 11-07: 'om det är en drop, att det också måste vara djup bas'), om tid finns efter A/B: i stepDrop
+   (effects.ts, DMX:s egen - INTE delade analysatorn) får efterkontrollen ett andra krav: basbandet ska ha stigit mot nivån före dropen,
+   annars minidrop. Bestäm band (kick 60-120 / sub 20-60 / båda) och tröskel MED FACIT, inte gissning: dropFacit.mjs (19 markerade),
+   kvällens 59 drops (dag-20261107-drop.md), tools/ladan-2026-11-07/lang-*.wav + ägarens markeringar (.events.json). Fälla: basen kan redan
+   ligga högt före (1/11-inspelningen, dropen ~71 s på taket) - mät höjningen relativt, och visa per drop: före/efter i dB, dom gammal/ny,
+   facit. Provratt DMX_DROP_BASS_DB (osatt = identiskt). Mål: färre falska drops, ingen riktig drop tappad. 'Redo för ladan'.
 Bänka A/B med de tio rattarna satta som env (KICKREGN_PAR, BUILD_TOPP, BREAK_HOLD_MS=20000, DROP_LAND_CAP=0.9, DROP_LIFT_FLOOR=0, DROP_WIN_S=1,
 B_SUBW=0.25, B_LO_S=0.25, BASGANG=1, RGB_STRICT=1) = det som är live. Deploya aldrig; 'redo för ladan' med hela kommandot (tio + nytt).
 
