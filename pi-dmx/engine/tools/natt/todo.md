@@ -21,6 +21,12 @@ G. SHOWEN SOM PROVSCEN (ägaren i ladan 11-07: 'det kan vara ett sätt att även
    börjar showen om. Sätts med POST /api/moment {moment:'show', provLook:'<key>'} (server.ts sanerar mot registret; okänd/tom = ingen akt 9).
    Nattagenten sätter provLook till den effekt den ändrat (skriv det i rapporten: 'starta showen, akt 9 = <effekt>'). Fest orörd (w = 0),
    strobe/rök som effekten själv. Efter A/B/E/F.
+H. SÅNGAREN SOM RIKTIG EFFEKT (ägaren i ladan 11-07 om showen: 'den som kör nu är grym' + 'effekten sångare är ju perfekt om takten blev
+   okänd pga inte mycket bas och takt'). Förlaga: src/moment.ts showTick, grenen SÅNGAREN (281086d): EN lampa, ljusstyrkan = röstbandet
+   0,25 lowMid + 0,5 mid + 0,25 highMid glättat 60 ms över ett krypande golv; ny fras (rösten åter efter >= 350 ms) = ny lampa (aldrig samma
+   två gånger i rad) + ny kulör. Gör den till en effekt i registry.ts som dirigenten väljer när TAKTEN ÄR OKÄND (!hasBeat) och/eller i lugna
+   partier (break/intro, låg bassline) - ägarens användningsfall. Effekten ger bara 0-100 % (kontraktet). Provratt DMX_SANGARE (osatt =
+   identiskt), mät hur ofta den väljs och att takt-looks inte trängs undan när takten finns. Efter A/B/E/F.
 MATERIAL 11-07 kväll: tools/ladan-2026-11-07/lang-20261107T154200.wav (10 min, ladan 16:42 med ALLA TIO proven live, ingen ägarmarkering;
    analysatorn 11 drops: 10,4 / 101,7 / 220,2 / 258,7 / 340,7 / 384,1 / 449,5 / 516,6 / 530,6 / 557,5 / 585,3 s). Används i E (flank -> bas)
    och som FJÄRDE fil i arenans kontrollmängd (tools/arena/bank.py HOLDOUT: lang1107) - aldrig som bänkfil för deltagarna.

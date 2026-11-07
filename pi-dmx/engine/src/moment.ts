@@ -157,7 +157,7 @@ export class MomentLayer {
       for (let i = 0; i < n; i++) this.put(i, pal[i % 4], 1, 1);
       return;
     }
-    const quiet = this.vol < VOL_REF * 0.35 || sec === 'break' || sec === 'intro';
+    const quiet = this.vol < VOL_REF * 0.35 || sec === 'break' || sec === 'intro' || !c.hasBeat;   // + okänd takt (ägaren 11-07: sångaren är perfekt då)
     if (quiet) {                                                    // MÖRKRET: en lampa per basnot
       // SÅNGAREN (ägaren 11-07: 'jag gillade den ensamma, typ som sångaren sjunger själv' + 'följ energin på högre Hz så den följer sången'):
       // EN lampa, ljusstyrkan = röstbandet (lowMid/mid/highMid, ~250 Hz-3,5 kHz) glättat 60 ms; ny FRAS (rösten tillbaka efter >= 350 ms
