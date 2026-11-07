@@ -521,6 +521,18 @@ Bevis: tools/natt/ladan-20261106-drops.jsonl (ws-frames 15 min, ~20 Hz, loggare 
    OBS ägaren 11-01 ville INTE ha monotont efter dropen och 10-17 inte att energin dör - golvet får inte bort lyftet.
 Håller det: in i koden som standard (backup-tagg backup/fore-<namn>-20261106; analysatorn i båda repona + manifest). Deploya inte.
 
+KLART 2026-11-07 (nattagenten, inget deployat): 1 tempot genom breaket = FÖRKASTAT i DMX:s effektklocka (DMX_BREAK_HOLD_MS=20000, patch prov/breakhold-20261107.patch):
+  mega lås (tillit >= 0,8 efter drop, tools/dropTakt.mjs) median 1,73 -> 0,67 s, > 1 s 12 -> 10 av 24, klockan borta före drop 2 -> 0, tempoMix 84,5 -> 86,9 %, grid40 62 -> 67 %,
+  MEN mega dropsprång hög 0,50 -> 0,46, kvällen unika 70 -> 66. Bara dropens upptag: lås 4,0 s (sämre). Analysatorns del -> analysator-fynd.md (ÖPPET 2026-11-07).
+  2 golvet = opt-in DMX_DROP_LIFT_FLOOR (737a126, standard 0,7 json-identiskt): 0,5 -> puls p90-p10 0,8-8 s efter drop pop 0,36 -> 0,40, mega 0,60 -> 0,61, medelljus -0,01,
+  lampspr pop 76,8 -> 76,3, dropsprång lika/upp, dirigent lika. REDO: python tools/ladan.py --env DMX_DROP_LIFT_FLOOR=0.5 (ögat: pulsar det efter dropen utan att lyftet dör?).
+
+## NATTEN 2026-11-07 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
+Baslinje 4f81d7b (full) json-identisk med 11-06. Brister: (1) megamix: 12 av 24 drops når tillit >= 0,8 först efter > 1 s (median 1,73 s; 178,9/310/392 s aldrig inom 15 s) -
+  det är tilliten, inte klockan (borta bara före 2 drops); (2) korpus r 0,35 (kickregn-paret väntar på ögat); (3) ljusLag 90 % lang1021 40 ms mot 15.
+  Tajthet oförändrad: kick->ljus pop/mega/korpus 123/187/136 ms, ljusLag 90 % 15/15/40. Uppdragen ovan KLART.
+  NÄSTA (förslag): tillitens uppgång efter drop (0,12 per kick = ~12 kickar till 0,8) utan att hålla rutnätet i breaket - det var hållet som kostade dropsprånget.
+
 ## NATTEN 2026-11-06 (nattagenten, inget deployat; commits på tempo-helsok, pushad)
 KLART: inga nya kvällsuppdrag. Baslinje a6df6a8 (full) json-identisk med 11-05 tierfull-full. Brister: (1) korpus r 0,38 -> 0,35 sitter i 5 klipp där
   kickregn (en lampa av fyra) tar refrängen efter tryckvag/drops: energiR15 139 0,60 -> -0,18, 176 0,83 -> 0,09, 112 0,62 -> -0,04 (refrängen mörkare än versen);
