@@ -6,7 +6,13 @@ A. KONTRAKTET + KALIBRERINGEN PER LAMPA (punkt '4'): GAMMA-läckorna ur effects.
 B. EFFEKTERNAS DIODANPASSNINGAR BORT (punkt '3'): provratten DMX_FX_REN, mät med RGB_STRICT. Se 'ÄGAREN IGEN' nedan.
 C. Om tid finns: de tio proven till standard (avsnittet nedan). Görs C inte i natt: nästa natt FÖRST.
 D. ARENAN puls2 FLYTTAD TILL NÄSTA NATT (kräver C KLART). Kör den inte i natt.
-E. DROP KRÄVER DJUP BAS (ägaren i ladan 11-07: 'om det är en drop, att det också måste vara djup bas'), om tid finns efter A/B: i stepDrop
+E. DROPEN FYRAR PÅ BASEN (ägaren i ladan 11-07: 'om det är en drop, att det också måste vara djup bas' + 'ibland vid drop nu bara energin
+   går upp så lyser den DROP, men själva basdropen är 500 ms senare'). NY FORM (går före texten nedan): flanken ARMERAR, DROP fyrar på första
+   tunga basanslaget (kickband/eBass-anslag, mät vilket) inom ett fönster (~1 s, bestäm med facit); ingen bas i fönstret = minidrop.
+   Mät per drop i facit: tid flank -> basanslag (ägaren: ~500 ms), hur många av kvällens 59 som fyrar före basen, och efter ändringen
+   fel i ms mot basanslaget (målet ~0 +- 30 ms). Uppvärmningsfällan/break: basen kan ligga högt före (1/11 ~71 s) - då räknas anslaget, inte nivån.
+   Provratt DMX_DROP_ON_BASS (osatt = identiskt). Ursprunglig text:
+   DROP KRÄVER DJUP BAS, om tid finns efter A/B: i stepDrop
    (effects.ts, DMX:s egen - INTE delade analysatorn) får efterkontrollen ett andra krav: basbandet ska ha stigit mot nivån före dropen,
    annars minidrop. Bestäm band (kick 60-120 / sub 20-60 / båda) och tröskel MED FACIT, inte gissning: dropFacit.mjs (19 markerade),
    kvällens 59 drops (dag-20261107-drop.md), tools/ladan-2026-11-07/lang-*.wav + ägarens markeringar (.events.json). Fälla: basen kan redan
