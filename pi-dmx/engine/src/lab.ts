@@ -50,10 +50,11 @@ export class Lab {
     if (sec !== this.lastSec) { if (sec === 'high') { this.highCount++; this.highStartBeat = c.beatIdx; } this.lastSec = sec; }
     const quiet = sec === 'break' || sec === 'intro' || presence < 0.35;
     // lugnt = SÅNGAREN (ägaren 11-07: dragkampen 'passar inte lugnt parti'); slow motion bara om en drop finns inspelad; dragkamp = okänd takt MED energi
-    const want = quiet ? (this.slowN > 20 && this.slowTurn ? 'slowmotion' : 'sangare') : !c.hasBeat ? 'dragkamp' : sec === 'build' ? 'kanon' : sec === 'high' ? 'minnet' : 'dragkamp';
+    const want = quiet ? (this.slowN > 20 && Math.floor(now / 2000) % 2 === 1 ? 'slowmotion' : 'sangare') : !c.hasBeat ? 'dragkamp' : sec === 'build' ? 'kanon' : sec === 'high' ? 'minnet' : 'dragkamp';
     // byt idé först när den nya har hållit 2 s (loggen 11-07: minnet <-> slowmotion slog om på 0,1-0,7 s); dropen byter direkt
     if (want !== this.pend) { this.pend = want; this.pendAt = now; }
-    if (want !== this.mode && (this.mode === '' || now - this.pendAt >= 2000 || c.dropEnv > 0.6)) { this.mode = want; if (want === 'sangare' || want === 'slowmotion') this.slowTurn = !this.slowTurn; this.log.push([Math.round(now), want]); if (this.log.length > 12) this.log.shift(); }
+    const calmSwap = (want === 'sangare' || want === 'slowmotion') && (this.mode === 'sangare' || this.mode === 'slowmotion');   // ägaren: 'nice' - sångaren och dropens repris varannan sekund
+    if (want !== this.mode && (this.mode === '' || calmSwap || now - this.pendAt >= 2000 || c.dropEnv > 0.6)) { this.mode = want; this.log.push([Math.round(now), want]); if (this.log.length > 12) this.log.shift(); }
     const mode = this.mode;
     if (mode === 'slowmotion') this.slowMotion(n, dt);
     else if (mode === 'kanon') this.canon(c, n, now, presence);
