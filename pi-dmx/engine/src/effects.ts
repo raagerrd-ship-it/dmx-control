@@ -357,6 +357,11 @@ const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24;   // 1 -> 2 ladan 10-30 (äga
  *  därefter >= 0,007 (riktiga break har kvar resten av musiken). 'Nära släckgränsen' (2 x 0,015) tog bort 43/64 - för grovt. */
 const FLANK_SILENT_LV = 0.005;
 const SHOW_DROP_GAP_MS = 12000;   // spärr mellan riktiga drops från alla källor (10-12; 20 s missade en riktig drop efter en tidig, ägaren 'jag tror det va tiden mellan')
+/** EFTERKONTROLLENS TAK (PROV DMX_DROP_LAND_CAP, dagkörningen 2026-11-07, bänk tools/efterDrop.py): 'före' läses i rutan där flanken fyrar - då
+ *  har volymfönstrets energi (eSm, 0..1) redan stigit; i kvällen 10-11 låg 'före' >= 0,85 i 53 av 59 show-drops och kravet 1,15 x före + 0,02 > 1
+ *  kunde aldrig nås -> lyftet släpptes efter 0,6 s i ~9 av 10 drops. Med t.ex. 0,9 kapas kravet (en drop som landar på >= 90 % har landat högt).
+ *  Osatt = 99 (som i dag, json-identiskt). Hör ihop med golvet: kapa + DMX_DROP_LIFT_FLOOR=0 + DMX_DROP_WIN_S=1 (rapport dag-20261107-drop.md). */
+const DROP_LAND_CAP = Number(process.env.DMX_DROP_LAND_CAP || '99');
 const DROP_LAND_GAIN = 1.15;     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = 0.75, SECTION_LOW_SNAP = 0.35;   // tierEma-snap vid high/break-grans
 /** ENERGIN (agarens modell, STANDARD 2026-10-08 i ladan: "mycket battre nu"): ingangens VOLYM (frame.levelVU, ~200 ms) i dB i ett
@@ -1603,7 +1608,7 @@ export class EffectEngine {
     if (this.dropCheckAt > 0 && nowWall >= this.dropCheckAt) {
       this.dropCheckAt = 0;
       const lvl = this.eSm;
-      if (lvl < this.preDropLevel * DROP_LAND_GAIN + 0.02) { this.dropEnv = 0; this.dropLiftUntil = 0; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
+      if (lvl < (DROP_LAND_CAP < 99 ? Math.min(DROP_LAND_CAP, this.preDropLevel * DROP_LAND_GAIN + 0.02) : this.preDropLevel * DROP_LAND_GAIN + 0.02)) { this.dropEnv = 0; this.dropLiftUntil = 0; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
     }
     // (drop-snapp till takten forkastad 09-12: taktlaset resettas vid drops, slog aldrig till / gjorde drops sena.)
     // (analysatorns minidrop-räknare frame.miniDropCount läses inte: V123 10-11 kväll - 17/min, ingen minidrop i konsertläget; bara
