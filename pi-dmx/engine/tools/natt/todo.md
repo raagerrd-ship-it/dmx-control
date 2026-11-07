@@ -6,6 +6,9 @@ A. KONTRAKTET + KALIBRERINGEN PER LAMPA (punkt '4'): GAMMA-läckorna ur effects.
 B. EFFEKTERNAS DIODANPASSNINGAR BORT (punkt '3'): provratten DMX_FX_REN, mät med RGB_STRICT. Se 'ÄGAREN IGEN' nedan.
 C. Om tid finns: de tio proven till standard (avsnittet nedan). Görs C inte i natt: nästa natt FÖRST.
 D. ARENAN puls2 FLYTTAD TILL NÄSTA NATT (kräver C KLART). Kör den inte i natt.
+MATERIAL 11-07 kväll: tools/ladan-2026-11-07/lang-20261107T154200.wav (10 min, ladan 16:42 med ALLA TIO proven live, ingen ägarmarkering;
+   analysatorn 11 drops: 10,4 / 101,7 / 220,2 / 258,7 / 340,7 / 384,1 / 449,5 / 516,6 / 530,6 / 557,5 / 585,3 s). Används i E (flank -> bas)
+   och som FJÄRDE fil i arenans kontrollmängd (tools/arena/bank.py HOLDOUT: lang1107) - aldrig som bänkfil för deltagarna.
 E. DROPEN FYRAR PÅ BASEN (ägaren i ladan 11-07: 'om det är en drop, att det också måste vara djup bas' + 'ibland vid drop nu bara energin
    går upp så lyser den DROP, men själva basdropen är 500 ms senare'). NY FORM (går före texten nedan): flanken ARMERAR, DROP fyrar på första
    tunga basanslaget (kickband/eBass-anslag, mät vilket) inom ett fönster (~1 s, bestäm med facit); ingen bas i fönstret = minidrop.
