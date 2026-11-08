@@ -65,6 +65,19 @@ i koden (fil:rad i losning.md) före finalen:
 4. EN pulskurva (beatEnv/kickEnv och beatPulse/heartPulse på samma klocka).
 5. Låtgränsen = boundaryCount som enda låtbytessignal, även i taktvägen. Inga egna låtbytesslutsatser i klockan.
 
+### ARKITEKTUREN (ägaren 11-08 23:50) - styr EN TEMPO och alla DUBBLA KÄLLOR-punkter
+"Analysatorn skall ju ge all information om låten till dirigent/effekt. Dirigent skall ju välja rätt effekt och effekten skall
+enbart styra ljuset såsom den effekten vill."
+- EN KÄLLA = ANALYSATORN. Klockan, rutnätet, ettan och tilliten flyttas IN i analysatorns långsamma väg (beatFeed slås ihop med
+  analysatorn) och publiceras i ramen och tillståndsblocket. Skuggtempot försvinner därmed. Lotus: bakom profilen, på ett ställe.
+- effects.ts analyserar inget själv. Detta flyttas till analysatorn:
+  - flankStep (drop-detektorn)
+  - lyft och nästan-drop
+  - basnot-anslag (bassNoteIdx)
+  - tystnadsgränsen INPUT_OFF
+  - kick/punch-envelopperna där de räknas om
+  Dirigenten läser ramen; effekten styr ljuset.
+
 ### TILLÄGG TILL ARENAN EN TEMPO (granskningen DUBBLA KÄLLOR 11-08, tools/natt/granskning-2026-11-08-dubbla/) - ingår i samma klocka
 - `ctx.beatIdx` är en FRI räknare (beatCounter, effects.ts:2013-2016), inte rutnätets index. 17 effekter läser `c.beatIdx % 4` som
   ettan, så barOff/a5:s etta når inte fram till dem; bara hjärtslagets accent (1400) och SWITCH_ON läser rutnätet.
