@@ -1,5 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
+import { slotSize } from "./rig.js";
 
 // MINNET (labbet, ägaren i ladan 2026-11-07: 'jag gillar denna' + 'saknade att lamporna körde på energi'): första refrängen i låten
 // IMPROVISERAR ett lampmönster per slag och spelar in det (nyckel = slag sedan sektionens start, ctx.sectionBars); när refrängen kommer
@@ -30,8 +31,10 @@ export const minnet: EffectDef = {
         }
       }
     }
-    const n = Math.max(1, c.count), i = c.lamp;
-    if (!(st.mask & (1 << (3 - (i % 4))))) return [0, 0, 0];
+    // 8+ LAMPOR (ägaren 11-08): mönstret (4 bitar) läggs på 4 platser om n/4 grannlampor (rig.ts HYRKITET) i stället för att lampa
+    // 5-8 kopierar 1-4 (i % 4). Under 8 lampor: plats = lampa, samma som förr.
+    const n = Math.max(1, c.count), i = c.lamp, slot = Math.floor(i / slotSize(n));
+    if (!(st.mask & (1 << (3 - (slot % 4))))) return [0, 0, 0];
     const hit = Math.max(c.drum.kick, Math.min(1, c.bassBody));
     const v = Math.exp(-c.beatFrac * 3) * (0.2 + 0.8 * hit);
     return hsv(((((st.sect + (i >= n / 2 ? 3 : 0)) % 6) + 6) % 6) / 6, 1, v);

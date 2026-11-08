@@ -1,5 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
+import { slotSize } from "./rig.js";
 
 // EKO: varje taktslag tänder första lampan, och slaget ekar vidare genom riggen
 // med en fjärdedels taktslag mellan lamporna — som ett delay-pedal på ljuset.
@@ -15,11 +16,14 @@ export const eko: EffectDef = {
     const beatS = c.cfg.beat?.bpm ? 60 / c.cfg.beat.bpm : 0.5;
     const src = c.bassline >= 0.6 ? Math.min(1, c.bassNoteAge / beatS) : c.beatFrac;
     // Hur långt sedan DEN HÄR lampans eko slog till (i taktslag, 0..1).
-    let age = src - c.idx * DELAY;
+    // 8+ LAMPOR (ägaren 11-08: 'laga Eko'): ekot går över 4 platser om n/4 grannlampor (rig.ts HYRKITET) - förr fick lampa 5-8 samma
+    // tidpunkt som 1-4 (idx x 0,25 slag slog runt) men 0,72^idx svagare (lampa 8 ~10 %). Under 8 lampor: plats = idx, samma som förr.
+    const slot = Math.floor(c.idx / slotSize(Math.max(1, c.count)));
+    let age = src - slot * DELAY;
     if (age < 0) age += 1;                                // föregående slags eko
     const decay = Math.exp(-age / 0.18);                  // skarp attack, kort svans
-    const damp = Math.pow(0.72, c.idx);                   // varje studs svagare
-    const hue = c.mixedSector(Math.floor(c.hueIdx / 4) + c.idx) / 6;
+    const damp = Math.pow(0.72, slot);                   // varje studs svagare
+    const hue = c.mixedSector(Math.floor(c.hueIdx / 4) + slot) / 6;
     const v = decay * damp * (0.55 + c.audio * 0.45) + c.frame.spec.kick * 0.12;
     return hsv(hue, 1, Math.min(1, 0.04 + v + c.punch * 0.25));
   },
