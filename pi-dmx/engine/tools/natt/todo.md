@@ -1,5 +1,27 @@
 # Natt-agentens uppdrag
 
+## PRIORITET I NATT 2026-11-08 -> 11-09 (ägaren i huvudchatten 11-08) - GÅR FÖRE ALLT
+ARENA: FART (ägaren 11-08: 'lägg till arena till natten enl. ditt förslag. De får ge förslag på ändringar i delade analysatorn').
+   VARFÖR: profilen (node --cpu-prof, dmxDump lang1021 + LABFX, PC) = analyser.js 37 %, fft.js 21 %, beatFeed.js 19 %, effects.js 4 %,
+   output.js 0,6 % (output är redan försumbar - rör den inte, den städas separat). Målet: mindre CPU per hop/ruta på Pi:n, EXAKT samma ljus.
+   FRÅGAN TILL DELTAGARNA: gör motorns ljudkedja (taktmatningen src/beatFeed.ts + allt motor-eget mellan analysatorn och effekterna, inkl.
+   boundaryDetector.ts och effects.ts) snabbare. FÅR ÄNDRAS: allt i src/ UTOM de delade filerna i src/ANALYSER_SHARED.md5 (analyser.ts,
+   split.ts) och fft.js-paketet. DELADE ANALYSATORN + FFT: bara FÖRSLAG - deltagaren får prova i sin egen kopia och mäta, men vinnaren
+   committas inte där; förslaget (diff + mått + bit-identitetsbevis) skrivs i tools/natt/analysator-fynd.md till lotus/ägaren.
+   DOMAREN (byggs FÖRE körningen, inte domare.py - den dömer ljus): tools/arena/fart.mjs (ny) =
+     (1) SPÄRR: DMX-md5 per lampa (tools/dmxDump.mjs) identisk mot bas på lang1021, lang-20261107T154200 och holdout lang1014, utan env
+         OCH med DMX_LABFX=1, och med stundbyten (scratchpad-varianten dumpMoment.mjs från 11-08: byter stund var 15 s - kopiera in den i
+         tools/). Minsta avvikelse = DISK. Ingen avrundning, inga toleranser.
+     (2) POÄNG: CPU-tid för motorn (process.cpuUsage runt analys+takt+effekter, exklusive wav-läsning), median av 5 körningar, i % mot bas;
+         bas mäts i samma körning före och efter (drift på PC:n > 2 % = mät om). Delad-analysator-förslag poängsätts separat (egen lista).
+     (3) Pi-sanning: PC:n är x86 - skriv i rapporten att vinsten ska verifieras på Pi:n (ARM, Node 24) innan den räknas som vunnen; kör
+         INTE på Pi:n i natt (ingen ssh till ladans Pi).
+   REGLER: 8 agenter (skillen dmx-arena, steg och runda 2/final som vanligt, men med fart.mjs som domare), max två bänkar parallellt,
+   budget enligt skillen. Inga worktrees/junctions (kopior i .arena/fart/<id>/ med egen tsconfig som extends - MÄTFÄLLA 11-08: `tsc
+   --rootDir <annan> --outDir` med rootDir-fel emitterar ändå och skrev 126 .js i src/). Vinnaren: bit-identisk = ingen ratt, ren
+   ersättning i koden med backup-tagg (feedback-ingen-opt-in), commit med pathspec, ingen deploy, ingen push av analysatorn.
+   ARENAN puls2 (D) FLYTTAS EN NATT TILL (en arena per natt).
+
 ## PRIORITET I NATT 2026-11-07 -> 11-08 (ägaren: '3 och 4 har mest prio') - GÅR FÖRE ALLT, I DENNA ORDNING
 NATTEN 11-08 (nattagenten, inget deployat) - KOMMANDOT FÖR LADAN NU: `python tools\ladan.py --env DMX_LABFX=1` (de tio är kodens standard;
    ladan.conf blir bara LABFX). Bevisverktyg: tools/dmxDump.mjs <dist> <wav> (DMX-md5 per lampa; bygg gamla koden med tsc --outDir .arena/x/dist och jämför).
