@@ -195,6 +195,8 @@ export const defaultConfig: EngineConfig = {
     { name: "Par 2", address: 8,  preset: "rgb7" },
     { name: "Par 3", address: 15, preset: "rgb7" },
     { name: "Par 4", address: 22, preset: "rgb7" },
+    // Par 5-8 (beställda 11-08, samma modell) läggs INTE här: bänken och arenan kör på dessa
+    // standardlampor, och 8 skulle flytta alla mått. Pi:ns sparade config får dem via tools/atta_lampor.py.
   ],
   mode: "smart",
   audioInput: "aux",
@@ -218,7 +220,8 @@ export const defaultConfig: EngineConfig = {
   // svavtiden gor att man inte kan angra sig. Maskinen orkar dessutom bara
   // 40-50s i strack innan varmeblocket maste hamta igen, sa 1s/60s ar ~1.6%
   // arbetscykel - den hinner alltid vara varm. Oka vid behov, inte tvartom.
-  fog: { enabled: false, address: 13, onDrop: true, burstMs: 1000, cooldownMs: 120000, level: 255, warmupMs: 600000, sprayMs: 0, bursts: 0 },
+  // Adress 57 = första lediga kanal efter Par 8 (50-56). Förr 13, som låg mitt i Par 2 (8-14).
+  fog: { enabled: false, address: 57, onDrop: true, burstMs: 1000, cooldownMs: 120000, level: 255, warmupMs: 600000, sprayMs: 0, bursts: 0 },
   scenicAnchor: false,    // ägar-val: antar lampor i rad vänster→höger
 };
 
