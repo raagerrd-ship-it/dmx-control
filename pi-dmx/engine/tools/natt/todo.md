@@ -1,27 +1,37 @@
 # Natt-agentens uppdrag
 
 ## PRIORITET I NATT 2026-11-08 -> 11-09 (ägaren i huvudchatten 11-08) - GÅR FÖRE ALLT
-ARENA: FART (ägaren 11-08: 'lägg till arena till natten enl. ditt förslag. De får ge förslag på ändringar i delade analysatorn').
-   VARFÖR: profilen (node --cpu-prof, dmxDump lang1021 + LABFX, PC) = analyser.js 37 %, fft.js 21 %, beatFeed.js 19 %, effects.js 4 %,
-   output.js 0,6 % (output är redan försumbar - rör den inte, den städas separat). Målet: mindre CPU per hop/ruta på Pi:n, EXAKT samma ljus.
-   FRÅGAN TILL DELTAGARNA: gör motorns ljudkedja (taktmatningen src/beatFeed.ts + allt motor-eget mellan analysatorn och effekterna, inkl.
-   boundaryDetector.ts och effects.ts) snabbare. FÅR ÄNDRAS: allt i src/, ÄVEN de delade filerna (ANALYSER_SHARED.md5: analyser.ts,
-   split.ts, slowWorker.ts, recorder) - ägaren 11-08: 'jag vill ta bort att analysatorn inte får ändras' - MED lotus OPÅVERKAD: en ren
-   fartändring ska vara bit-identisk i båda profilerna (analyserParity.mjs 0 med LOTUS-profilen + DMX-md5); nytt beteende bara bakom ett
-   DMX-profilvärde. fft.js-paketet byts inte (node_modules), men hur/hur ofta analysatorn anropar det får ändras. Vinnare i delad fil:
-   analyser_shared.py --write i dmx-control + fynd 'DELAD FIL ÄNDRAD' i analysator-fynd.md (lotus morgonagent kopierar till lotus).
-   DOMAREN (byggs FÖRE körningen, inte domare.py - den dömer ljus): tools/arena/fart.mjs (ny) =
-     (1) SPÄRR: DMX-md5 per lampa (tools/dmxDump.mjs) identisk mot bas på lang1021, lang-20261107T154200 och holdout lang1014, utan env
-         OCH med DMX_LABFX=1, och med stundbyten (tools/dmxDumpMoment.mjs MED env DUMP_MOMENTS=1 - utan den byter den ingen stund; var 15 s). MÄTFÄLLA: dmxDump* kör bara 120 s som standard
-         (3:e argumentet = sekunder) - domaren ska köra HELA filerna. Minsta avvikelse = DISK. Ingen avrundning, inga toleranser.
-     (2) POÄNG: CPU-tid för motorn (process.cpuUsage runt analys+takt+effekter, exklusive wav-läsning), median av 5 körningar, i % mot bas;
-         bas mäts i samma körning före och efter (drift på PC:n > 2 % = mät om). Delad-analysator-förslag poängsätts separat (egen lista).
-     (3) Pi-sanning: PC:n är x86 - skriv i rapporten att vinsten ska verifieras på Pi:n (ARM, Node 24) innan den räknas som vunnen; kör
-         INTE på Pi:n i natt (ingen ssh till ladans Pi).
-   REGLER: 8 agenter (skillen dmx-arena, steg och runda 2/final som vanligt, men med fart.mjs som domare), max två bänkar parallellt,
-   budget enligt skillen. Inga worktrees/junctions (kopior i .arena/fart/<id>/ med egen tsconfig som extends - MÄTFÄLLA 11-08: `tsc
-   --rootDir <annan> --outDir` med rootDir-fel emitterar ändå och skrev 126 .js i src/). Vinnaren: bit-identisk = ingen ratt, ren
-   ersättning i koden med backup-tagg (feedback-ingen-opt-in), commit med pathspec, ingen deploy, ingen push av analysatorn.
+ARENA: ANALYSATORNS TVÅ VÄGAR (ägaren 11-08: 'lägg till arena till natten' + 'de får ge förslag på ändringar i delade analysatorn' +
+   'arenan skall tydligt veta att vi vill ha två vägar i analysatorn, de kan gärna flytta mellan/återanvända saker/ta bort/lägga till osv.
+   Målet är inte enbart snabbhet (iaf inte på långsamma, där är det hur bra den analyserar som borde ge högst poäng). Snabba vägen ger högst
+   poäng om den utför samma uppgift eller bättre. Snabbare'). KÖRS EFTER 'TAKTMATNINGEN IN I LÅNGSAMMA VÄGEN' (nedan) - på den nya strukturen.
+   ARKITEKTUREN DELTAGARNA SKA BYGGA MOT (står i varje deltagares brief): EN analysator, TVÅ vägar.
+     SNABBA VÄGEN (huvudtråden, varje hop): det ljuset behöver direkt - nivå, band, kick/anslag, drop-flanken. Mål: SAMMA uppgift eller
+       bättre, på kortare tid och med kortare latens.
+     LÅNGSAMMA VÄGEN (workern, egen kärna): det dirigenten behöver - tempo, rutnätets fas/ettan, taktmatningen, sektioner, build/drop-
+       struktur, låtgräns. Mål: att FÖRSTÅ låten så bra som möjligt; fart räknas bara som en gräns (workern ska hinna med).
+     FRITT: flytta saker mellan vägarna, återanvända (t.ex. en temposökning i stället för två), ta bort dubbelarbete, lägga till nya
+       signaler. Allt i src/ får ändras, även de delade filerna (analyser.ts, split.ts, slowWorker.ts) - MED lotus OPÅVERKAD: nytt
+       beteende bakom DMX-profilvärden i analyserProfile.ts, analyserParity.mjs 0 avvikelser med LOTUS-profilen (spärr). fft.js byts inte,
+       men hur/hur ofta den anropas får ändras.
+   DOMAREN (byggs FÖRE körningen av nattagenten ur befintliga verktyg, tools/arena/tvavagar.py - inte domare.py ensam; skriv vikterna i
+   filhuvudet och ändra dem inte under körningen):
+     LÅNGSAMMA (poäng 0,6): analyskvalitet i % mot bas - tempo (tools/tempoMix.mjs + taktKorpus.mjs, korpus frozen6), ettan/gridfas
+       (testDownbeat.mjs, natt.py:s gridfas), sektioner (sektionMatt.mjs/sektionStat.mjs mot facit), drop (dropFacit.mjs mot de inspelade
+       facit-dropsen: träff, falska, insats->drop ms), låtgräns (boundaryBench.mjs). Gräns: workern ligger efter högst X hop i realtid
+       (mät bas först, sätt X = bas + 1) annars DISK.
+     SNABBA (poäng 0,4): huvudtrådens CPU per hop (node --cpu-prof eller process.cpuUsage, median av 5, % mot bas) + kick->ljus-latens
+       (natt.py/ljusLag). SPÄRR 'samma uppgift eller bättre': antingen DMX-md5 identisk (dmxDump/dmxDumpMoment DUMP_MOMENTS=1, HELA
+       filerna) ELLER ljusdomaren domare.py v3 (dynamik/koreografi/takt) >= bas -0,5 på holdout; sämre = DISK.
+     ALLMÄNNA SPÄRRAR: lotus-paritet 0; fade-down aldrig snabbare, strobe max 3/s, inget mot vitt, inte mer ljus i snitt (domare v3:s regel).
+     Holdout: lang1014 + lang-20261107T154200 i finalen (ingen deltagare ser dem före).
+   REGLER: 8 agenter (skillen dmx-arena: runda 1, runda 2 med attacker, final + fusion, med tvavagar.py som domare), max två bänkar
+   parallellt, budget enligt skillen. Inga worktrees/junctions (kopior i .arena/tvavagar/<id>/ med egen tsconfig som extends - MÄTFÄLLA
+   11-08: `tsc --rootDir <annan> --outDir` med rootDir-fel emitterar ändå och skrev 126 .js i src/). VINNAREN: bit-identisk ljusdel =
+   ren ersättning i koden; ändrat beteende = DMX-profilvärde (lotus av) som ägaren dömer i ladan; backup-tagg, commit med pathspec, ingen
+   deploy, ingen push. Delad fil ändrad: analyser_shared.py --write + fynd 'DELAD FIL ÄNDRAD' i analysator-fynd.md (lotus morgonagent
+   kopierar och kör pariteten). Bra långsam-väg-fynd som lotus kan ha nytta av: skriv dem som ÖPPNA förslag till lotus (lotus egen bänk
+   avgör, de blir inte live på lotus av sig själva).
    PROFILEN PER FUNKTION (11-08, lang1107 + LABFX, hela filen): fft.js _realTransform4 27 %, beatFeed onsetStep 9,8 % + fullStep 5,9 %
    + fullScore 2,4 % + update 2,1 % (= ~20 %), analyser process 9,1 %, fastBandStep 7,7 %, bigStep 7,5 %, scoreEnv 5,8 %, dropStep 3,8 %.
    LEDTRÅD: både analysatorn (scoreEnv/alignScore) och taktmatningen (onsetStep/fullStep, alla tempon per hop) söker tempo - pröva om
