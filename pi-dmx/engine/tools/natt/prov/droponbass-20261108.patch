@@ -1,0 +1,55 @@
+diff --git a/pi-dmx/engine/src/effects.ts b/pi-dmx/engine/src/effects.ts
+index 54f812e..20d795d 100644
+--- a/pi-dmx/engine/src/effects.ts
++++ b/pi-dmx/engine/src/effects.ts
+@@ -376,6 +376,11 @@ const SHOW_DROP_GAP_MS = 12000;   // spärr mellan riktiga drops från alla käl
+  *  har volymfönstrets energi (eSm, 0..1) redan stigit; i kvällen 10-11 låg 'före' >= 0,85 i 53 av 59 show-drops och kravet 1,15 x före + 0,02 > 1
+  *  kunde aldrig nås -> lyftet släpptes efter 0,6 s i ~9 av 10 drops. Med t.ex. 0,9 kapas kravet (en drop som landar på >= 90 % har landat högt).
+  *  Osatt = 99 (som i dag, json-identiskt). Hör ihop med golvet: kapa + DMX_DROP_LIFT_FLOOR=0 + DMX_DROP_WIN_S=1 (rapport dag-20261107-drop.md). */
++/** DROPEN FYRAR PÅ BASEN (PROV 2026-11-08, DMX_DROP_ON_BASS=1, osatt = som förr; ägaren i ladan 11-07: 'ibland vid drop nu bara energin går
++ *  upp så lyser den DROP, men själva basdropen är 500 ms senare' + 'kanske 1 av 8'): flanken (bodyDb 20-250 Hz) armerar, DROP fyrar på
++ *  första tunga basanslaget (sub+kick) - har flanken redan bas fyrar den direkt. Se dropOnBass. */
++const DROP_ON_BASS = process.env.DMX_DROP_ON_BASS === '1';
++const DOB_RISE_DB = Number(process.env.DMX_DOB_RISE_DB || '8'), DOB_RISE_MS = Number(process.env.DMX_DOB_RISE_MS || '80'), DOB_NEAR_MS = Number(process.env.DMX_DOB_NEAR_MS || '100'), DOB_WAIT_MS = Number(process.env.DMX_DOB_WAIT_MS || '1000'), DOB_TOP_DB = Number(process.env.DMX_DOB_TOP_DB || '6');
+ const DROP_LAND_CAP = 0.9;   // STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108); förr PROV DMX_DROP_LAND_CAP (99 = utan tak)
+ const DROP_LAND_GAIN = 1.15;     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
+ const SECTION_HIGH_SNAP = 0.75, SECTION_LOW_SNAP = 0.35;   // tierEma-snap vid high/break-grans
+@@ -1600,6 +1605,30 @@ export class EffectEngine {
+     return null;
+   }
+ 
++  /** DROPEN FYRAR PÅ BASEN (se DROP_ON_BASS): flanken armerar; har basen (sub+kick) redan slagit an inom DOB_NEAR_MS fyrar den direkt som
++   *  förr, annars väntar den på första tunga basanslaget i högst DOB_WAIT_MS - ingen bas = minidrop. Basanslag = sub+kick-banden (dB-summa)
++   *  stiger >= DOB_RISE_DB inom DOB_RISE_MS, eller (under väntan) basen ligger DOB_RISE_DB över nivån vid flanken (mjuk insats). Basen ligger redan inom DOB_TOP_DB från sin
++   *  långsamma topp (0,15 dB/s) = 'basen redan där'. */
++  private dobT = new Float64Array(64); private dobV = new Float32Array(64); private dobN = 0; private dobOnsetAt = -1e12; private dobArmUntil = 0; private dobArmV = 0; private dobTop = -140; private dobAt = 0; private dobS = -140;
++  private dropOnBass(frame: Frame, flank: boolean, now: number): boolean {
++    const sa = frame.specAbs, v = sa ? 10 * Math.log10((sa.sub + 1e-7) * (sa.kick + 1e-7)) : -140;
++    let lo = v; for (let q = 0; q < Math.min(this.dobN, 64); q++) if (now - this.dobT[q] <= DOB_RISE_MS && this.dobV[q] < lo) lo = this.dobV[q];
++    { const w = this.dobN & 63; this.dobT[w] = now; this.dobV[w] = v; this.dobN++; }
++    if (v - lo >= DOB_RISE_DB) this.dobOnsetAt = now;
++    { const dt = this.dobAt > 0 ? Math.min(0.2, (now - this.dobAt) / 1000) : 0; this.dobAt = now; this.dobS = this.dobS < -130 ? v : this.dobS + (v - this.dobS) * Math.min(1, dt / 0.1); this.dobTop = Math.max(this.dobS, this.dobTop - dt * 0.15); }   // basens långsamma topp (som flankens fdC)
++    const atTop = this.dobS >= this.dobTop - DOB_TOP_DB;
++    if (flank) {
++      if (now - this.dobOnsetAt <= DOB_NEAR_MS || atTop) return true;   // basen redan där (anslag eller på sin nivå): som förr
++      this.dobArmUntil = now + DOB_WAIT_MS; this.dobArmV = lo; this.dobHeld++; return false;
++    }
++    if (this.dobArmUntil > 0) {
++      if ((now - this.dobOnsetAt <= DOB_NEAR_MS && this.dobOnsetAt > this.dobArmUntil - DOB_WAIT_MS) || v - this.dobArmV >= DOB_RISE_DB || atTop) { this.dobArmUntil = 0; this.dobLate++; return true; }   // första basanslaget efter flanken
++      if (now > this.dobArmUntil) { this.dobArmUntil = 0; this.dobMini++; this.gapMini(now); }   // ingen bas: minidrop
++    }
++    return false;
++  }
++  dobHeld = 0; dobLate = 0; dobMini = 0;
++
+   /** DROPEN: flanken, spärrarna, efterkontrollen, drop-fönstret och svärtan (utbrutet ur render 10-16, GC-jakten: ordagrant flyttat, samma ordning). */
+   private stepDrop(frame: Frame): boolean {
+     const nowWall = this.rNowWall;
+@@ -1609,6 +1638,7 @@ export class EffectEngine {
+       const anaHit = dropHitRaw;
+       dropHitRaw = this.flankStep(frame);
+       if (anaHit && !dropHitRaw && nowWall - this.fdAt > 2000) { this.gapMini(nowWall); this.anaDropAt = nowWall; }
++      if (DROP_ON_BASS) dropHitRaw = this.dropOnBass(frame, dropHitRaw, nowWall);   // DROPEN FYRAR PÅ BASEN (se DROP_ON_BASS)
+     }
+     // INGEN DROP I LATENS INLEDNING (ladan 2026-09-24 23:35, tredje gangen 'fortfarande drop i inledning'): intro-grindarna ovan tittar pa
+     // sektionen, men den slar om intro -> build strax FORE smallen (kicken som borjar ar sjalva byggstenen). Med DMX_DROP_SONG_HOLD_S > 0

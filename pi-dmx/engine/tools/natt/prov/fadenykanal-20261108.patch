@@ -1,0 +1,52 @@
+diff --git a/pi-dmx/engine/src/effects.ts b/pi-dmx/engine/src/effects.ts
+index 0f9c612..1392d0c 100644
+--- a/pi-dmx/engine/src/effects.ts
++++ b/pi-dmx/engine/src/effects.ts
+@@ -445,6 +445,12 @@ const PD_WIN_S = envN('DMX_DROP_WIN_S', 0), PD_TOP = envN('DMX_DROP_TOP', 0), PM
+  *  per lampa via cal.gamma.) KVAR (riggens gemensamma referensgamma, inte per lampa): energins DMX-procent (md^E_LIN_INV) och uttoningens
+  *  tidskonstant i DMX-ljus - steg 2 räknar i 'det lamporna lyser' för en standardlampa. */
+ const E_LIN_INV = 1 / GAMMA;   // utgangens referensgamma (output.ts ager GAMMA)
++/** NY KANAL UNDER UTTONINGEN (PROV 2026-11-08, DMX_FADE_NYKANAL=1, osatt = som förr; ägaren i ladan 11-07: 'när en effekt fadar en färg så
++ *  kan den hacka i slutet av fade, snabbt öka ljusstyrka'): byter effekten kulör på en lampa som TONAR UT lade uttoningen den hållna nivån
++ *  på den NYA kulören (lampRatio * fall) - en ny diod tändes direkt på hela uttoningsnivån (eko 135,8 s: R 42 tonar, B tänds på 40).
++ *  Med provet: kanaler som lyste tonar exakt som förr; en kanal som tänds medan lampan tonar ut får effektens egen nivå tills uttoningen
++ *  är slut, med egen uttoning därifrån (max(effekten, förra * fadeK)). Ingen fade blir snabbare för en kanal som lyste (låst regel b). */
++const FADE_NYKANAL = process.env.DMX_FADE_NYKANAL === '1';
+ /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
+  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
+ /** TYST LAT = TYST LJUS (ladan 2026-09-24 22:30: 'laten ar ganska tyst och den kor ganska ljust'): ankaret ar relativt, sa en tyst lat blev
+@@ -613,7 +619,7 @@ export class EffectEngine {
+   private eSm = 0; eSimple = 0; private eBass = 0; private bHi = NaN; private bLo = NaN; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1; private spreadM0 = new Float64Array(64);   // ENERGIN (se E_WIN_S); spreadM0 = BASGANG
+   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
+   private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
+-  private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
++  private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private lampRatio = new Float32Array(192); private chNew = new Uint8Array(192); private chNewLvl = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
+   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
+   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
+   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
+@@ -1522,15 +1528,21 @@ export class EffectEngine {
+           // halls tand minst CH_MIN_ON_MS med sin senaste andel av lampans ljus, aven om effekten slacker den direkt.
+           for (let c = 0; c < 3; c++) {
+             const q = o + c, r = rgb[c] / mT;
+-            if (r > 0) { if (this.chOnAt[q] === 0) this.chOnAt[q] = renderNow; this.lampRatio[q] = r; }
++            if (r > 0) { if (this.chOnAt[q] === 0) { this.chOnAt[q] = renderNow; if (FADE_NYKANAL && mT < fall) { this.chNew[q] = 1; this.chNewLvl[q] = 0; } } this.lampRatio[q] = r; }
+             else if (!fastLight && this.chOnAt[q] !== 0 && renderNow - this.chOnAt[q] < CH_MIN_ON_MS) rgb[c] = this.lampRatio[q] * mT;   // hall kvar
+-            else { this.chOnAt[q] = 0; this.lampRatio[q] = 0; }
++            else { this.chOnAt[q] = 0; this.lampRatio[q] = 0; this.chNew[q] = 0; }
+           }
+         }
+-        if (mT >= fall) { if (mT > this.lampLvl[i] + 0.005 || !holding) this.lampPeakAt[i] = renderNow; this.lampLvl[i] = mT; }
++        if (mT >= fall) { if (mT > this.lampLvl[i] + 0.005 || !holding) this.lampPeakAt[i] = renderNow; this.lampLvl[i] = mT; if (FADE_NYKANAL) { this.chNew[o] = 0; this.chNew[o + 1] = 0; this.chNew[o + 2] = 0; } }
+         else {
+           this.lampLvl[i] = fall;
+-          rgb[0] = this.lampRatio[o] * fall; rgb[1] = this.lampRatio[o + 1] * fall; rgb[2] = this.lampRatio[o + 2] * fall;
++          if (FADE_NYKANAL) {   // NY KANAL UNDER UTTONINGEN (se FADE_NYKANAL): kanaler som lyste tonar som förr, en tillkommen får effektens egen nivå
++            for (let c = 0; c < 3; c++) {
++              const q = o + c;
++              if (!this.chNew[q]) rgb[c] = this.lampRatio[q] * fall;
++              else { const v = Math.max(rgb[c], this.chNewLvl[q] * fadeK); this.chNewLvl[q] = v; rgb[c] = v; }   // egen uttoning från effektens nivå
++            }
++          } else { rgb[0] = this.lampRatio[o] * fall; rgb[1] = this.lampRatio[o + 1] * fall; rgb[2] = this.lampRatio[o + 2] * fall; }
+         }
+       }
+       this.out.writeFixture(this.universe, fx, rgb, 1, 0, specialty);

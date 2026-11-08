@@ -1,6 +1,37 @@
 # Natt-agentens uppdrag
 
 ## PRIORITET I NATT 2026-11-07 -> 11-08 (ägaren: '3 och 4 har mest prio') - GÅR FÖRE ALLT, I DENNA ORDNING
+NATTEN 11-08 (nattagenten, inget deployat) - KOMMANDOT FÖR LADAN NU: `python tools\ladan.py --env DMX_LABFX=1` (de tio är kodens standard;
+   ladan.conf blir bara LABFX). Bevisverktyg: tools/dmxDump.mjs <dist> <wav> (DMX-md5 per lampa; bygg gamla koden med tsc --outDir .arena/x/dist och jämför).
+KLART 2026-11-08: A = d539915 (cal.gamma/cal.top per lampa i output.ts + server-sanering + UI 'Kurva'/'Tak %'; minLit/sameLightK i output; DMX-md5
+   identisk; gamma 2,2 på lampa 2 ändrar bara lampa 2). KVAR av kontraktet: energins DMX-procent och uttoningens tidskonstant räknar med riggens
+   referensgamma (GAMMA), och moment.ts/lab*.ts toV() importerar GAMMA - flytta om en lampa med annan kurva ska få exakt rätt energi.
+KLART 2026-11-08: C = e03663c (backup-tagg backup/fore-tio-standard-20261108): alla tio standard, rattarna bort, ny kod utan env = gammal kod
+   + tio env bit-identiskt (DMX-md5, lang1021 + lang1107). Kvar som ratt: DMX_LABFX. Bänkrattarna DMX_B_SUBW/B_LO_S/DROP_WIN_S läses fortfarande
+   (nya standardvärden 0,25/0,25/1) - de hör till energilagrets bänkfamilj.
+DELVIS 2026-11-08: B = PROV DMX_FX_REN=1 (vidga blandkulör, twin vandring var 8:e slag, ripple paret var 4:e slag): dynBench lang1107 sidoBlink
+   0,8 -> 0,9/min, ofriv 0,6 -> 0,6, lang1021 oförändrad -> 'redo för ladan'. Sirenens motfärg = egen ratt DMX_FX_REN_SIREN: 0,8 -> 2,6/min
+   (siren 61 blink) - kulörbyte på uttonande lampa. Behållna med skäl: upptakt släckta (ägarens 'såg likadan ut på alla lampor'), drift 4 s
+   hysteres (32 kulörhopp/min i en lugn effekt - effektens fladder, inte diodens), inget vitt (smak).
+FÖRKASTAT 2026-11-08: F = DMX_FADE_NYKANAL (patch tools/natt/prov/fadenykanal-20261108.patch): (1) ny kanal på effektens nivå utan egen
+   uttoning: studs 0,35 -> 0,35, sidoBlink 0,8 -> 2,2 (rå effekt fladdrar); (2) med egen uttoning från effektens nivå: studs 0,35 -> 0,29 men
+   sidoBlink 0,8 -> 1,5, ofriv 0,6 -> 1,2 (dansparet 7 -> 24): den nya kanalen startar lågt, under utgångens 6 %-grind (RGB_SHARE) mot den
+   hållna gamla kanalen, och tänds/släcks av grinden. Nästa försök: grinden i output.ts ska räkna andelen mot effektens nivå, inte den hållna -
+   eller en kanal som tillkommer under uttoningen får RGB_SHARE-undantag. Lagas i output, inte i effekterna.
+FRÅGA 2026-11-08: G ej byggt - stunden 'show' är omskriven till dramaturgi (c8acda8: mörkret/soluppgång/frys/orkestern/pianot/bollarna), akterna
+   och HJÄRTAT finns inte längre. Förslag: provLook spelas som egen stund 'prov' (8 takter effekten, 8 takter show) eller som akt efter frysen.
+FÖRKASTAT 2026-11-08: E = DMX_DROP_ON_BASS (patch tools/natt/prov/droponbass-20261108.patch, mätare tools/dropBas.mjs). FACIT: i 18 av 22 show-drops
+   (lang1107 14, lang1014 7, lang1021 1) har basen (sub+kick) redan slagit an 20-77 ms FÖRE flanken - flanken är alltså ~50 ms SEN mot basen, inte
+   tidig. Flank före bas > 150 ms: 4 av 22 (lang1107 79,8 s +360 / 315,1 s +181, lang1014 138,7 s +211; 94,3 s +45) ≈ ägarens '1 av 8'.
+   Bästa varianten (anslag 8 dB/80 ms, 'redan där' inom 100 ms, vänta högst 1 s): 315,1 -> på basen (-21 ms), 94,3 -> -8 ms, de 17 rätta orörda,
+   MEN lang1014 138,7 s blev minidrop: där ligger basen jämnt ~25 dB utan anslag (den är redan där) och väntan hittar inget. 'Basen på sin
+   nivå' (inom 6 dB från långsam topp, rå eller 100 ms-glättad) räddade den inte. Nästa: 'basen redan där' = sub+kick över låtens basmedian
+   (inte toppen), och mät om de 18 'sena' flankerna kan fyra på anslaget i stället (tajthet -50 ms på dropen, bara uppgången).
+MÄTT 2026-11-08: I(a) LABFX i natt-bänken (live-labfx): sångaren väljs ALDRIG (korpus 0 %, mixar 0 s, kvällen -), sökljuset 0,6 % av korpus;
+   minnet 189 s + dansparet 75 s av mixarnas 1200 s, korpus 4,9/3,9 %. Pris: korpus r 0,22 -> 0,16 (80 av 222 klipp ändrade), kvällen
+   effektivt 28,3 -> 27,0, unika 70 -> 72, hör ihop 81 -> 84 %. Sångaren tävlar i 'lugn'-poolen utan företräde vid !hasBeat - ägarens
+   användningsfall (okänd takt) är inte byggt i dirigenten. Nästa: dirigenten tar sångaren när takten är okänd (H), bänka på lugnt material.
+D (arenan puls2) KAN KÖRAS NÄSTA NATT: C är KLART och json-bevisad; basenv.txt = DMX_LABFX=1 (det enda som är live utöver koden).
 A. KONTRAKTET + KALIBRERINGEN PER LAMPA (punkt '4'): GAMMA-läckorna ur effects.ts (E_MIN_LIT, kulörtoningen) till output.ts, sedan gamma och
    tak per lampa i cal (standard 1,6/0,95) + server.ts-saneringen + UI:ts kalibreringsflik. Json-identiskt bevisat. Se 'MÅLET MED KONTRAKTET' nedan.
 B. EFFEKTERNAS DIODANPASSNINGAR BORT (punkt '3'): provratten DMX_FX_REN, mät med RGB_STRICT. Se 'ÄGAREN IGEN' nedan.
@@ -83,6 +114,7 @@ DROP_LAND_CAP=0.9, DROP_LIFT_FLOOR=0, DROP_WIN_S=1, B_SUBW=0.25, B_LO_S=0.25, BA
    DEPLOYA INTE - skriv 'redo för ladan' med kommandot; ägaren deployar vid nästa besök (riggen kör redan samma ljus via ladan.conf).
 4. .arena/<nästa körning>/basenv.txt: TOM när (a)-(f) är standard (minnet feedback-arena-domaren-basenv).
 5. Markera KLART här.
+KLART 2026-11-08 (nattagenten): 1-4 = e03663c, json-/DMX-identiskt bevisat; ladan-kommandot `python tools\ladan.py --env DMX_LABFX=1` (LABFX = elfte, utan dom). Ej deployat.
 
 ARENA: resten av looksen ska bära basgången (ägaren 2026-11-07 kväll: valde detta som nattens arenafråga; EFTER punkt 1-5 ovan)
 - Bakgrund: arenan puls1 (tools/natt/arena-2026-11-07-puls1.md) skrev om de 5 mest spelade looksen (tryckvåg, gallopp, varannan, duell,
