@@ -26,7 +26,7 @@ import type { FogStatus } from "./effects.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, EFFECT_META } from "./effects/registry.js";
 import { logHealth, getHealthLog } from "./healthLog.js";
-import { getRuntimeHealth, getAnalyserCost } from "./runtimeHealth.js";
+import { getRuntimeHealth, getAnalyserCost, getSplitStats } from "./runtimeHealth.js";
 import { getPerf } from "./perfStats.js";
 
 
@@ -263,6 +263,7 @@ export async function startServer(
     measuring: isLogOn(),   // runtime/analyserCost mats bara med felsokning pa (PUT /api/debug/verbose, 2026-10-04) - annars star de still
     runtime: getRuntimeHealth(),
     analyserCost: getAnalyserCost(),   // us/hop mot hop-budgeten - underlag for worker-beslutet (2026-09-22)
+    split: getSplitStats(),   // workerns eftersläpning (taktvägen), alltid levande (2026-11-08)
     events: getHealthLog(),
   }));
 

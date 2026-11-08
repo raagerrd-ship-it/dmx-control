@@ -106,6 +106,7 @@ dmx.setMaxHz(cfg.dmxMaxHz);
 // fran analysatorns stora FFT precis som forr - ingen extra transform.
 const bounds = new BoundaryDetector();
 analyser.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
+if (analyser.hopLane) { const lane = analyser.hopLane; health.setSplitStats(() => lane.stats()); }   // /api/health-log split (2026-11-08)
 
 
 

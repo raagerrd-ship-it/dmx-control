@@ -71,6 +71,11 @@ export function noteAnalyser(ms: number): void {
   if (ms > anMsMax) anMsMax = ms;
   if (anBudgetMs > 0 && ms > anBudgetMs) anOver++;
 }
+/** WORKERNS EFTERSLÄPNING (arenan tvavagar 2026-11-08, ladan-provet f1/f2): taktvägens stats() ur delat minne - alltid levande,
+ *  oberoende av felsökningsläget. behind = hop efter just nu, lagMaxMs = sämsta leveransen, skipped = tappade hop. */
+let splitSrc: (() => unknown) | null = null;
+export function setSplitStats(fn: () => unknown): void { splitSrc = fn; }
+export function getSplitStats(): unknown { return splitSrc ? splitSrc() : null; }
 export function getAnalyserCost(): { msEMA: number; msMax: number; hops: number; overBudget: number; budgetMs: number } {
   return { msEMA: +anMsEMA.toFixed(3), msMax: +anMsMax.toFixed(2), hops: anHops, overBudget: anOver, budgetMs: +anBudgetMs.toFixed(2) };
 }
