@@ -1,5 +1,45 @@
 # Natt-agentens uppdrag
 
+## PRIORITET I NATT 2026-11-08 -> 11-09: EN TEMPO I HELA MOTORN (ägaren i ladan 11-08 21:20) - GÅR FÖRE ALLT
+Ägaren: "Ja måste vara en och inte två! Är ju extremt svårt att trimma annars. Lägg det till nattagenten. Hur löser vi en optimal?"
+
+LÄGET (HEAD ea7bb71, live i ladan):
+- Motorn söker tempo på TVÅ ställen:
+  (1) analysatorns eget skuggrutnät (`frame.bpm`/`bpmConfidence`; BeatFeed.analyserCfg, "TVÅ RUTNÄT" beatFeed.ts:49 sedan 10-28);
+  (2) effektklockan (`cfg.beat`: taktvägens tempogram a1r + rise-rutnätet + a5:s taktmodell för ettan).
+- Skälet 10-28 var FASEN, inte tempot: rise-rutnätet flyttade analysatorns kickgrind, och sektionerna kom senare (upp 2,6 -> 4,1 s).
+- Effekterna läser båda: tilliten ur `frame.bpmConfidence` (effects.ts ~1774) och frasräknaren nollas på `frame.bpm === 0` (~1674).
+  Ljuset styrs alltså delvis av ett tempo det inte följer.
+- Live 10 min (ws, analysatorns bpm): låst och stabilt inne i låtarna (tillit 0,80-0,96), men vacklar 30-60 s vid övergångar
+  (97/101/106/148 runt minut 4, 109/113/117 tillit 0,26 runt minut 7).
+
+MÅL (den optimala lösningen):
+- EN temposökning, i långsamma vägen (taktvägen), som ger EN sanning: bpm, tillit och fasankare, publicerat i tillståndsblocket.
+- Analysatorn och ljuset läser samma tempo och samma ankare.
+- Fasen får ha EN fast, mätt offset per konsument (kickfas för analysatorns grind/sektioner, rise-fas för ljuset), men ingen andra sökning.
+- Tilliten och frasräknaren i effects.ts läser effektklockan.
+- Breaket (BREAK_HOLD) och låtgränsen (boundaryDetector -> snabb omlåsning) hanteras på ETT ställe.
+
+HUR (arena enligt dmx-arena-skillen; ägaren vill ha den optimala, så arena och inte en ensam agent):
+- Domaren: tools/arena/tvavagar.py som den är, med två tillägg FÖRE körningen:
+  (a) spärr: upp_s/ned_s inte sämre än bas (10-28-fällan);
+  (b) mått: omlåsning efter låtgräns. mix_las finns redan; lägg till tid tills klockan står stilla inom 1 % efter varje skarv i mixen.
+  Kontrollmängden och basenv som i tvavagar (basenv tom: DMX_LABFX är kod sedan ae16640).
+- Bas = HEAD ea7bb71 (f2 + g1).
+- Remix-rundan (dmx-arena steg 4c): r0 byggs av orkestratorn efter runda 1.
+- Kort (en mekanism per kort):
+  - tempogrammet som enda källa + mätt offset;
+  - analysatorns sökning som enda källa;
+  - ny sökning med flera hypoteser + oktavlogik;
+  - snabb omlåsning vid låtgräns;
+  - breaket som tillstånd i klockan;
+  - tilliten som ett mått;
+  - minsta diff som tar bort dubbelarbetet;
+  - Pi-budget (en workertråd räcker, ARM ~170 us/hop i dag).
+- Ingen deploy. Skriv "redo för ladan" med ladan-raden (`PYTHONIOENCODING=utf-8 PI_HOST=10.171.211.218 python tools/ladan.py`, eller `--fran <dist>`).
+  Lotus: DELAD FIL ÄNDRAD-fynd för morgonagenten (4e).
+- Kostnad ~4-5 M tokens (som tvavagar). Rapport: tools/natt/arena-2026-11-09-entempo/ med idébank (alla diffar).
+
 ## IDÉBANK tvavagar (2026-11-08, se tools/natt/arena-2026-11-08-tvavagar/RAPPORT.md) - prova ensam, en i taget
 - IDÉBANK tvavagar: a8r full tempoföljning - vad ger a8r:s ljusdomare +6,9 / latens 85 ms på kontrollmängden (g1 = -1,3 / 100 ms)?
 - IDÉBANK tvavagar: a1m2 tempogrammet helt (ljusdomaren +8,0 i övningen) mot g1.
@@ -7,7 +47,7 @@
 - IDÉBANK tvavagar (lotus): a4r stora vägens buffertar bara när den kan slås på (-2,3 MB delat minne).
 - DOMAREN: ljusdomaren saknar tajthet (g1 vann i ögat trots -1,3) - lägg in ljusLag/latens med vikt före nästa arena.
 
-## PRIORITET I NATT 2026-11-08 -> 11-09 (ägaren i huvudchatten 11-08) - GÅR FÖRE ALLT
+## KLART 2026-11-08 kväll (arenan tvavagar körd i huvudchatten, f2 + g1 LIVE ea7bb71, rapport tools/natt/arena-2026-11-08-tvavagar/) - KÖR INTE IGEN
 ARENA: ANALYSATORNS TVÅ VÄGAR (ägaren 11-08: 'lägg till arena till natten' + 'de får ge förslag på ändringar i delade analysatorn' +
    'arenan skall tydligt veta att vi vill ha två vägar i analysatorn, de kan gärna flytta mellan/återanvända saker/ta bort/lägga till osv.
    Målet är inte enbart snabbhet (iaf inte på långsamma, där är det hur bra den analyserar som borde ge högst poäng). Snabba vägen ger högst
