@@ -13,7 +13,7 @@ ARENA: ANALYSATORNS TVÅ VÄGAR (ägaren 11-08: 'lägg till arena till natten' +
      FRITT: flytta saker mellan vägarna, återanvända (t.ex. en temposökning i stället för två), ta bort dubbelarbete, lägga till nya
        signaler. Allt i src/ får ändras FRITT, även de delade filerna (analyser.ts, split.ts, slowWorker.ts) - ägaren 11-08: 'men vi
        skall ju få ändra? är väl hela meningen med arenan? sen får vi ju bara porta till lotus'. Ingen lotus-spärr, inga profilvärden
-       krävs; lotus-pariteten rapporteras bara (informativ). Lotus portas EFTER arenan och döms i lotus egen bänk. fft.js byts inte,
+       krävs; domaren tittar inte alls på lotus (ägaren: 'domaren behöver inte kolla på det alls i detta läget'). Lotus portas EFTER arenan och döms i lotus egen bänk. fft.js byts inte,
        men hur/hur ofta den anropas får ändras.
    DOMAREN (byggs FÖRE körningen av nattagenten ur befintliga verktyg, tools/arena/tvavagar.py - inte domare.py ensam; skriv vikterna i
    filhuvudet och ändra dem inte under körningen):
