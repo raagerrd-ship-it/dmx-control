@@ -41,6 +41,40 @@ HUR (arena enligt dmx-arena-skillen; ägaren vill ha den optimala, så arena och
   Lotus: DELAD FIL ÄNDRAD-fynd för morgonagenten (4e).
 - Kostnad ~4-5 M tokens (som tvavagar). Rapport: tools/natt/arena-2026-11-09-entempo/ med idébank (alla diffar).
 
+### TILLÄGG TILL ARENAN EN TEMPO (granskningen DUBBLA KÄLLOR 11-08, tools/natt/granskning-2026-11-08-dubbla/) - ingår i samma klocka
+- `ctx.beatIdx` är en FRI räknare (beatCounter, effects.ts:2013-2016), inte rutnätets index. 17 effekter läser `c.beatIdx % 4` som
+  ettan, så barOff/a5:s etta når inte fram till dem; bara hjärtslagets accent (1400) och SWITCH_ON läser rutnätet.
+  En klocka: ctx.beatIdx = rutnätets index (>> 1 vid halvering), med monoton spärr mot PLL-hopp bakåt.
+- Två hjärtslagskurvor (beatEnv -> kickEnv, 21 effekter; beatPulse/heartPulse, 18 effekter), olika etta och paritet.
+  Bugg: beatEnv fryser på ett golv upp till 0,8 när tilliten är < 0,20 men bpm > 40 (1303/1367). En pulskurva på den enda klockan.
+- Två halveringspariteter (pulseCount % 2 vid 1365, halfTick vid 2013).
+- Lookbytenas taktgrind räknar sectionBars utan fas (analyser.ts:3801, effects.ts:1155); predictHigh har ett eget frasgitter.
+  Ska räkna på cfg.beat + barOff.
+- Låtgränsen når aldrig taktvägen (index.ts:191) och klockan drar egna slutsatser om låtbyte (barReset vid > 3 % tempohopp).
+  boundaryCount blir enda källan, som en flagga i hop-recordet.
+
+## DUBBLA KÄLLOR - NÄSTA NÄTTER (efter EN TEMPO, en i taget, bänka varje; se granskningen)
+1. DROP: två detektorer på samma baskropp. Ljuset kör flankStep (effects.ts:811); sektionen och BÄNKENS drop-mått kör analysatorns
+   dropStep (analyser.ts:3485). En detektor (flank) i analysatorn som dropCount; peka om drop_*-måtten i tvavagar.py först.
+   Drop-tillståndet har fyra lyftled + sju klockor -> två kurvor (lyft, färg). Efterkontrollen ska läsa eBass, inte eSm.
+2. BASEN: tre källor (snabba banden till energin, bodyDb till drop/lyft, frame.energy till punch/registerKick) och fem följare
+   med egna normalnivåer. En bas (snabba banden).
+   OBS: eBass läggs på i tre led (steg 2, SPREAD, ctx.bassBody i sex effekter) och c.audio är kvar som nivå i åtta effekter.
+   a8:s basgång är GODKÄND i ladan - bänka om på kontrollmängden innan något slås ihop.
+3. SEKTIONSENERGI: tierEma matas av intensity men snäpps mot sectionTier; "lugnt" definieras tre gånger (tierEma, subdivEnergy, section).
+4. TYSTNAD: INPUT_OFF_LEVEL 0,02 hårdkodad över Släckgränsen i /setup (0,01) och fryser energifönstren. Brusgrinden finns på fyra
+   ställen; workerns cfg-kopia uppdateras aldrig (split.ts:99). En källa: cfg.silenceLevel.
+5. SLAGDJUPET: FX_FLOOR lyfter nivån mellan slagen, EFFECT_HEART och SPREAD_D sänker den, med olika undantag. En ratt.
+6. Minsta på-tid (MIN_ON_MS, CH_MIN_ON_MS i effects.ts; HOLD_MS i output.ts) -> output.ts (lampfysik).
+7. ctx-hjälpare: ctx.beatMs (tio effekter räknar periodens längd själva förbi hasBeat/halvering), ctx.dt (fem egna), ctx.voice (fyra kopior).
+8. 2048-banden för 8 band (median/MAD) läses bara av profilen och basgången -> profilen på de snabba banden.
+9. DÖD KOD (md5-identiskt, kan tas direkt):
+   - analyser: frame.kickRise, pushNovelty, tempoShiftCount/charShiftCount, oanvänd BeatFeed (index.ts:115), linK/riseDb (samma ring)
+   - effects: upgradeHit, nearLevel, DROP_LIFT_FLOOR-raden, miniSector, mem*
+   - PROV-flaggor: DMX_FX_BASS*, DMX_FX_FLOOR, DMX_E_NORM_S, DMX_FX_REN
+   - moment.ts SHOW_TOP (ett andra tak)
+   - dynBench.mjs räknar eSimple^10 mot motorns eBass^3
+
 ## IDÉBANK tvavagar (2026-11-08, se tools/natt/arena-2026-11-08-tvavagar/RAPPORT.md) - prova ensam, en i taget
 - IDÉBANK tvavagar: a8r full tempoföljning - vad ger a8r:s ljusdomare +6,9 / latens 85 ms på kontrollmängden (g1 = -1,3 / 100 ms)?
 - IDÉBANK tvavagar: a1m2 tempogrammet helt (ljusdomaren +8,0 i övningen) mot g1.
