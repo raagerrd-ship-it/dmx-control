@@ -1,12 +1,24 @@
 # Natt-agentens uppdrag
 
 ## DAGKÖRNING 2026-11-08 21:45 -> 2026-11-09 ca 19:00 (ägaren: "Starta redan nu, så har vi många timmar att köra klart. Till imorgon kväll vid 19 tiden")
-- Startad för hand från huvudchatten. Kör i tur och ordning tills ca 18:30 den 9:e, och skriv sedan rapporten:
-  1. ARENA: EN TEMPO I HELA MOTORN (nedan, med TILLÄGGEN från granskningen).
-  2. DUBBLA KÄLLOR 9 (död kod): md5-identiskt, en commit.
-  3. DUBBLA KÄLLOR 1, 2, 3 ... i den ordning de står, en i taget. Varje punkt bänkas (tvavagar.py + kontrollmängden) och får en egen
-     commit med backup-tagg. Punkter som ändrar ljuset blir "redo för ladan" med ladan-raden. Ingen opt-in-flagga (ägarens regel):
-     det som bänken godkänner blir kod med backup-tagg, ägaren dömer i ladan.
+- Startad för hand från huvudchatten. ÄGAREN 11-08 23:55: "Och det är detta jag vill arenan skall lösa" = ARKITEKTUREN nedan
+  (analysatorn ger ALL låtinfo -> dirigenten väljer effekt -> effekten styr ljuset; motorn analyserar inget själv). Kör ARENOR i tur
+  och ordning tills ca 18:30 den 9:e, och skriv sedan rapporten:
+  1. ARENA: EN TEMPO I HELA MOTORN (pågår): klockan in i analysatorn, KRAV EN KÄLLA.
+  2. Död kod (DUBBLA KÄLLOR 9): md5-identiskt, en commit. Ingen arena.
+  3. ARENA: ANALYS UT UR MOTORN. Allt låtanalytiskt i effects.ts flyttas in i analysatorn och publiceras i ramen:
+     - drop (flankStep -> en detektor; bänkens drop-mått pekar på den)
+     - lyft och nästan-drop
+     - basen (en källa)
+     - basnot-anslag
+     - sektionsenergi ("lugnt" en gång)
+     - tystnad (en tröskel = cfg.silenceLevel)
+     Gränsen ANALYS/REAKTION: analysatorn säger VAD som händer (drop nu, styrka, break, lugnt). Dirigenten/effekten bestämmer HUR
+     ljuset reagerar (dropens längd, uttoning, lyftets form), och det flyttas INTE. Spärr: i finalen granskar orkestratorn i koden
+     att effects.ts inte räknar låtinformation (fil:rad). Basen = vinnaren ur 1. a8:s basgång är godkänd i ladan, kontrollmängden avgör.
+  4. Hinns det: DUBBLA KÄLLOR 5-8 (slagdjupet en ratt, minsta på-tid till output.ts, ctx-hjälpare, 2048-banden) som en sista arena
+     eller som rena commits.
+  Varje arenas vinnare: kod + backup-tagg + "redo för ladan" med ladan-raden. Ingen opt-in-flagga.
 - Om ytterligare en nattagentkörning startar (schemat 02:38) medan den här pågår: avsluta direkt utan att röra något.
   Känns igen på en pågående arena i .arena/ eller på .arena/.banklas.
 - Aldrig deploy, aldrig push, aldrig skriva i lotus-light-link (bara "DELAD FIL ÄNDRAD"-fynd).
