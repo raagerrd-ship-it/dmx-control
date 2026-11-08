@@ -5,9 +5,11 @@ ARENA: FART (ägaren 11-08: 'lägg till arena till natten enl. ditt förslag. De
    VARFÖR: profilen (node --cpu-prof, dmxDump lang1021 + LABFX, PC) = analyser.js 37 %, fft.js 21 %, beatFeed.js 19 %, effects.js 4 %,
    output.js 0,6 % (output är redan försumbar - rör den inte, den städas separat). Målet: mindre CPU per hop/ruta på Pi:n, EXAKT samma ljus.
    FRÅGAN TILL DELTAGARNA: gör motorns ljudkedja (taktmatningen src/beatFeed.ts + allt motor-eget mellan analysatorn och effekterna, inkl.
-   boundaryDetector.ts och effects.ts) snabbare. FÅR ÄNDRAS: allt i src/ UTOM de delade filerna i src/ANALYSER_SHARED.md5 (analyser.ts,
-   split.ts) och fft.js-paketet. DELADE ANALYSATORN + FFT: bara FÖRSLAG - deltagaren får prova i sin egen kopia och mäta, men vinnaren
-   committas inte där; förslaget (diff + mått + bit-identitetsbevis) skrivs i tools/natt/analysator-fynd.md till lotus/ägaren.
+   boundaryDetector.ts och effects.ts) snabbare. FÅR ÄNDRAS: allt i src/, ÄVEN de delade filerna (ANALYSER_SHARED.md5: analyser.ts,
+   split.ts, slowWorker.ts, recorder) - ägaren 11-08: 'jag vill ta bort att analysatorn inte får ändras' - MED lotus OPÅVERKAD: en ren
+   fartändring ska vara bit-identisk i båda profilerna (analyserParity.mjs 0 med LOTUS-profilen + DMX-md5); nytt beteende bara bakom ett
+   DMX-profilvärde. fft.js-paketet byts inte (node_modules), men hur/hur ofta analysatorn anropar det får ändras. Vinnare i delad fil:
+   analyser_shared.py --write i dmx-control + fynd 'DELAD FIL ÄNDRAD' i analysator-fynd.md (lotus morgonagent kopierar till lotus).
    DOMAREN (byggs FÖRE körningen, inte domare.py - den dömer ljus): tools/arena/fart.mjs (ny) =
      (1) SPÄRR: DMX-md5 per lampa (tools/dmxDump.mjs) identisk mot bas på lang1021, lang-20261107T154200 och holdout lang1014, utan env
          OCH med DMX_LABFX=1, och med stundbyten (tools/dmxDumpMoment.mjs MED env DUMP_MOMENTS=1 - utan den byter den ingen stund; var 15 s). MÄTFÄLLA: dmxDump* kör bara 120 s som standard
@@ -25,6 +27,20 @@ ARENA: FART (ägaren 11-08: 'lägg till arena till natten enl. ditt förslag. De
    LEDTRÅD: både analysatorn (scoreEnv/alignScore) och taktmatningen (onsetStep/fullStep, alla tempon per hop) söker tempo - pröva om
    taktmatningen gör om arbete analysatorn redan gjort, eller söker oftare/bredare än ljuset behöver (svaret måste ändå bli bit-identiskt).
    ARENAN puls2 (D) FLYTTAS EN NATT TILL (en arena per natt).
+TAKTMATNINGEN IN I ANALYSATORNS LÅNGSAMMA VÄG (ägaren 11-08: 'är det inte bättre att slå ihop till en analysator, bara att i den finns
+   två olika vägar, den snabba och sen den som ger dirigenten information' + 'vi borde enkelt kunna lägga flagga på långsamma vägen som lotus
+   inte använder'). GÖRS FÖRE ARENAN I NATT (arenan optimerar sedan den nya strukturen; räcker inte natten: arenan nästa natt).
+   I DAG: src/beatFeed.ts (ladans egen löpande temposökning: onsetStep/fullStep/fullScore, ~20 % CPU) körs i HUVUDTRÅDEN varje hop
+   (index.ts:199 beatFeed.update(frame, cfg, analyser)) fast det är långsam-väg-arbete; analysatorn kör redan tempo/gridfas/sektion i
+   workern (DMX-profilen ANALYSER_SPLIT 'worker', split.ts SAB-ring + tillståndsblock, slowWorker.ts).
+   GÖR: flytta taktmatningen in i analysatorns långsamma väg (workern), bakom ett nytt värde i DMX:s analyserProfile.ts (t.ex.
+   BEAT_FEED: 'slow'); lotus profil saknar värdet = som i dag. Resultatet (cfg.beat: ankare, bpm, konfidens, ettan, coast) publiceras via
+   tillståndsblocket och läses in i huvudtråden; nya kommandon motor -> analysator = flagga i recordet (se lotus-analyser-split-regeln),
+   inte postMessage. BEVIS: (1) lotus: analyserParity.mjs 0 avvikelser med LOTUS-profilen; (2) DMX: DMX-md5 identisk mot före på hela
+   lang1021 + lang1107 + lang1014, med och utan DMX_LABFX=1, dmxDumpMoment DUMP_MOMENTS=1 - i bänkens inline/synkrona läge; (3) splitProof-
+   motsvarigheten för taktmatningen (worker mot inline, 0 avvikelser); (4) profil före/efter: huvudtrådens CPU per hop ska sjunka ~20 %.
+   I realtid kan workern ligga ett hop efter: mät lagMs (analyserCost.split) i en realtidskörning på PC:n och skriv det i rapporten -
+   ankaret är en tidpunkt, så ett hops fördröjning ska inte flytta slagen. Backup-tagg, ingen ratt utöver profilvärdet, ingen deploy.
 
 ## PRIORITET I NATT 2026-11-07 -> 11-08 (ägaren: '3 och 4 har mest prio') - GÅR FÖRE ALLT, I DENNA ORDNING
 NATTEN 11-08 (nattagenten, inget deployat) - KOMMANDOT FÖR LADAN NU: `python tools\ladan.py --env DMX_LABFX=1` (de tio är kodens standard;
