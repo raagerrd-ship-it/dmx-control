@@ -51,6 +51,17 @@ TAKTMATNINGEN IN I ANALYSATORNS LÅNGSAMMA VÄG (ägaren 11-08: 'är det inte b�
    motsvarigheten för taktmatningen (worker mot inline, 0 avvikelser); (4) profil före/efter: huvudtrådens CPU per hop ska sjunka ~20 %.
    I realtid kan workern ligga ett hop efter: mät lagMs (analyserCost.split) i en realtidskörning på PC:n och skriv det i rapporten -
    ankaret är en tidpunkt, så ett hops fördröjning ska inte flytta slagen. Backup-tagg, ingen ratt utöver profilvärdet, ingen deploy.
+KLART 2026-11-08 (dagtid, huvudchatten): a9a411b, backup-tagg backup/fore-taktmatning-slow-20261108. DMX-profilen BEAT_FEED 'slow' + slowHopFeedModule
+   './beatFeed.js': split.ts TAKTVÄGEN (hop-ring + eget tillståndsblock), index.ts analyser.hopLane.feed(frame, cfg, analyser) i st f beatFeed.update;
+   beatFeed.update(…, now) tar hoppets klocka (förr Date.now() på 9 ställen). BEVIS: (1) lotus analyserParity 0/562 500 hop x4 varianter + splitProof
+   gammal=ny; (2) DMX-md5 36/36 identiska (3 filer hela x utan env/LABFX x dmxDump/dmxDumpMoment DUMP_MOMENTS=1; odelad gammal=ny, inline gammal=ny,
+   inline gammal = riktiga workern i lås-steg ny; dumparna har nu DUMP_SPLIT=inline|sync|worker); (3) tools/feedProof.mjs worker mot inline 0/562 500 hop
+   (cfg.beat, beatErr, tilliten, analysatorns rutnät, hela ramen), även gammal huvudtråd mot ny worker 0; (4) profil inline gammal: beatFeed.js 21,4 % av
+   huvudtråden -> 0 i nya (16,2 % av workern); realtid PC 300 s lang1107+LABFX (tools/feedRealtid.mjs, analys+takt+effekter): huvudtråden 26,5 -> 22,0
+   us/hop (-17 %); (5) workern efter vid hoppets läsning: 1 hop 67 %, 0 9 %, 2 17 %, >=3 7 %; taktvägens fördröjning p50 0,05 ms, p99 0,44 ms, max 16,7 ms,
+   0 tappade. Slagen flyttas inte (ankaret är en tidpunkt); rutnätets ryck (~235/min, median 23 ms) når effekterna ~1 hop (2,7 ms) senare än förr.
+   KVAR: verifiera på Pi:n (ARM, Node 24) - workerns kostnad 43 us/hop på PC:n (EMA), notify per hop. Lotus-morgonagenten kopierar de tre delade filerna
+   (fynd i analysator-fynd.md); till dess vägrar deployspärren om lotus-kopian ligger bredvid. Ingen deploy.
 
 ## PRIORITET I NATT 2026-11-07 -> 11-08 (ägaren: '3 och 4 har mest prio') - GÅR FÖRE ALLT, I DENNA ORDNING
 NATTEN 11-08 (nattagenten, inget deployat) - KOMMANDOT FÖR LADAN NU: `python tools\ladan.py --env DMX_LABFX=1` (de tio är kodens standard;

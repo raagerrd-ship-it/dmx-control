@@ -15,6 +15,25 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-08 DELAD FIL ÄNDRAD: taktmatningen i långsamma vägen
+Vad: dmx a9a411b (dagtid, ägaren: 'en analysator, två vägar - den snabba och den som ger dirigenten information') ändrar analyser.ts,
+split.ts och slowWorker.ts (recorder.ts orörd); manifestet src/ANALYSER_SHARED.md5 i dmx-control är skrivet (analyser.ts 3c8b7cbb, split.ts
+7613be71, slowWorker.ts 26bf0cf4). Nytt: split.ts TAKTVÄGEN - en hop-ring (HOP_REC_LEN 13, 4096 record) + eget tillståndsblock (seqlock
+C_FEED_SEQ = ctrl[6], väckningsord C_WAKE = ctrl[7]) där systemets taktmatning (DMX: beatFeed.ts) körs i workern; klasserna HopLaneFast/
+HopLaneSlow, syncWait, stateWrite/stateRead med valfritt seqlock-ord (standard C_STATE_SEQ = som förr). analyser.ts: fältet hopLane, SplitInit.sync,
+createAnalyser(cfg, mode?) med bänkläget 'sync' (riktiga workern i lås-steg, workern tas med process.getBuiltinModule), hopFeedFactory().
+slowWorker.ts: egen loop på C_WAKE och dynamisk import av profilens slowHopFeedModule - bara när buffers.hop finns.
+Allt bakom profilvärdena sys.BEAT_FEED 'slow' + slowHopFeedModule/slowHopFeed i DMX:s analyserProfile.ts; lotus profil saknar dem =
+hopLane null, samma buffertar, samma worker-loop, samma flaggor (enda skillnaden i lotus väg: två falska if-grenar i pushSlowRecord).
+Bevis (dmx-control, lotus-profilen kopierad till .arena/bf-lotus-gammal|ny, byggd med lotus tsconfig NodeNext): analyserParity --style lotus
+0 avvikande hop av 562 500 (lang1021 + lang1107 + lang1014 hela) i fyra varianter (rakt, --grid, --split inline, --grid --split inline
+--hint-every 30 --reset-every 45), loggrader 0; splitProof (7 filer i tools/, 180 000 hop) gammal = ny per fil för lotus-profilen och DMX-profilen,
+worker-rökningen ok. Lotus tsc (NodeNext, declaration) bygger utan fel.
+Önskat: lotus-morgonagenten kopierar analyser.ts, split.ts, slowWorker.ts från dmx-control/pi-dmx/engine/src till lotus-light-link/pi/src/audio-analyser
+(analyserProfile.ts i lotus RÖRS INTE), kör analyser_shared.py --write där, lotus paritet (analyserParity lotus + splitProof + korbank) och bygg.
+Tills dess vägrar DMX:s deployspärr om lotus-kopian är utcheckad bredvid (syskonets md5 != manifestet) - väntat.
+Status: (lotus fyller i)
+
 ## ÖPPET 2026-11-07 Tempot släpps i breaket före dropen (frame.bpm 0 i 14,6 s) och låser först 4,2 s efter dropen
 Vad: ladan 11-06 (ws-logg tools/natt/ladan-20261106-drops.jsonl, ~20 Hz, fält bpm = frame.bpm, bc = bpmConfidence efter DMX:s BeatFeed):
 dc 2->3 vid 184,7 s - frame.bpm 0 från 174,3 s (hela breaket, 10 av 10 s före dropen) och bpm 143/bc 1,0 först 4,2 s EFTER dropen.
