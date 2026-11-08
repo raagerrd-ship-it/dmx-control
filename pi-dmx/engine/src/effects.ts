@@ -93,15 +93,11 @@ const DROP_LIFT_MS = 8000, DROP_LIFT_FALL_MS = 3000;   // 4000/1500 -> 8000/3000
  *  look-bytena landar på en 4-taktsgräns (slumpen ger 19 %) - gridOk hängde på låtminnets grid som är borttaget. Med takten låst
  *  (tillit >= 0,5) väntar vanliga byten (inte drop/nästan-drop/uppbyggnad) på frasens första slag (effektklockans beatIdx % 16 = 0),
  *  högst en fras extra. Av = som förr. */
-/** LAMPTRAPPA (opt-in DMX_LAMP_STAIR=1, natt 2026-10-10, KONSERTSHOW idé 3): en ljusdesigner sparar hela riggen till refrängen - här
+/** SPARSAMMA LOOKS (förr LAMPTRAPPA, natt 2026-10-10; motorns tvångssläckning av ett lamppar borttagen 11-08 - bara dirigentens val kvar): en ljusdesigner sparar hela riggen till refrängen - här
  *  var alla fyra lamporna tända 81-88 % av tiden. Dirigenten (inte energin: den släcker aldrig en tänd lampa) väljer i vers/intro bara
  *  SPARSAMMA looks och i refrängen inga sparsamma. Listan är MÄTT (tools/lampCount.mjs, pop+megamix): snitt <= ~2,9 tända lampor av 4.
  *  10-11 ("fler sparsamma effekter, så att lamptrappan inte kostar variation"): vers/intro väljer ur HELA poolen igen, men en effekt som
  *  inte är sparsam tänder bara ETT lamppar (ctx.group, paret byts varje fras) - i steg 1 (effektNiva), aldrig i energin. Drops tänder allt. */
-/** LAMPTRAPPAN I BREAKET (opt-in DMX_STAIR_BREAK=1, natt 2026-11-01): breaket (sektion 'break') räknas som vers - icke-sparsam effekt
- *  tänder bara ett lamppar. concertBench megamix: breaket 9 % av tiden med 2,25 tända lampor och alla fyra 63 % (versen 1,31 / 27 %) -
- *  dropen efter breaket fick ingen kontrast. Av = som förut. */
-const STAIR_BREAK = process.env.DMX_STAIR_BREAK === "1";
 /** KULÖR PER FRAS (opt-in DMX_HUE_PHRASE=1, 10-11, KONSERTSHOW): effekternas kulörklocka ctx.hueIdx stegar bara vid frasgräns (16 slag på
  *  effektklockan) i stället för per takt/slag - konsertbänken mätte 17-21 kulörbyten/min. Rörelse och puls följer fortfarande beatIdx. */
 // (FULL OPPNAR RIGGEN / DMX_TIER_OPEN borttagen 10-12: ett golv på energin - sektionstaket och basenergin tar det, se B_CURVE.)
@@ -569,9 +565,9 @@ export class EffectEngine {
     if (!sameLight(this.cfg.fixtures[i], rgb, hsvToRgb(this.glH[i], 1, v))) this.glH[i] = h;   // samma ljus på lampan (output.ts), annars skarpt
   }
 
-  private effektNiva(rgb: [number, number, number], ctx: EffectContext, toggle = false, sparse = false): [number, number, number] {
-    // LAMPTRAPPA (DMX_LAMP_STAIR, vers/intro): icke-sparsam effekt -> bara ett lamppar, paret byts varje fras; drop-looken tänder allt.
-    if (sparse && this.dropColEnv <= 0.005 && ctx.group !== ((Math.floor(ctx.beatIdx / 16) & 1))) { rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; return rgb; }
+  private effektNiva(rgb: [number, number, number], ctx: EffectContext, toggle = false): [number, number, number] {
+    // (LAMPTRAPPAN borttagen 2026-11-08, ägaren i ladan: 'Bara effekten får som den vill och vi inte gör något annat' - motorn tvingade
+    //  ett lamppar till 0 i low/intro för icke-sparsamma effekter. Dirigentens val av sparsamma looks finns kvar; släcka gör bara effekten.)
     let m = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
     if (m > this.fxPeakNow) this.fxPeakNow = m;
     if (E_NORM_S > 0) { const n = this.fxNorm; rgb[0] = Math.min(1, rgb[0] * n); rgb[1] = Math.min(1, rgb[1] * n); rgb[2] = Math.min(1, rgb[2] * n); m = Math.min(1, m * n); }
@@ -1455,7 +1451,7 @@ export class EffectEngine {
   }
 
   /** LAMPORNA: effekt -> effektNiva -> kulörtoning -> energi -> uttoning -> utgång, per lampa (utbrutet ur render 10-16, GC-jakten: ordagrant flyttat, samma ordning). */
-  private renderLamps(effect: EffectDef | undefined, count: number, ordSel: number, useAnchor: boolean, fxToggle: boolean, fxSparse: boolean, fastLight: boolean, modE: boolean): boolean {
+  private renderLamps(effect: EffectDef | undefined, count: number, ordSel: number, useAnchor: boolean, fxToggle: boolean, fastLight: boolean, modE: boolean): boolean {
     const t = this.rT, anchorHue = this.rAnchorHue, nowWall = this.rNowWall, inputGate = this.rInputGate, md = this.rMd, drive = this.rDrive, renderNow = this.rNowP, dtSec = this.rDt;
     const ctx = this.ctx, bands = this.bandsBuf, specialty = this.specBuf;
     let wantStrobe = 0, wantBlinder = 0, wantUv = 0, wantLaser = 0, wantHazer = 0, wantCo2 = 0, wantFogFx = false;
@@ -1480,7 +1476,7 @@ export class EffectEngine {
         if (fx?.bands?.length) { let mb = -Infinity; for (let k = 0; k < fx.bands.length; k++) mb = Math.max(mb, bands[BAND_IDX[fx.bands[k]]]); ctx.band = mb; }   // = Math.max(...fx.bands.map(...)) utan spread/closure
         else ctx.band = bands[i % bands.length];
         rgb = effect ? this.lampColor(i, effect.render(ctx)) : this.lampColor(i, ZERO3);   // (se lampColor)
-        rgb = this.effektNiva(rgb, ctx, fxToggle, fxSparse);   // STEG 1 forts.: effektens niva och drop-looken (se effektNiva)
+        rgb = this.effektNiva(rgb, ctx, fxToggle);   // STEG 1 forts.: effektens niva och drop-looken (se effektNiva)
         // EFFEKTENS ÖNSKEMÅL. Den vet sin egen dramaturgi bäst; motorn avgör om det
         // blir av (fixturen måste ha rollen, och rök går genom hårdvaruskyddet).
         // Högsta önskemål bland lamporna vinner — en effekt som vill stroba på EN
@@ -2130,11 +2126,10 @@ export class EffectEngine {
     const inputGate = this.inputOff ? 0 : 1;   // ingangen avstangd -> morkt (del av steg 2)
     this.fxPeakNow = 0;
     const fxToggle = !!effect?.toggle;   // toggle-effekt: ingen grundniva (se effektNiva)
-    const fxSparse = (frame.section === 'low' || frame.section === 'intro' || (STAIR_BREAK && frame.section === 'break')) && !SPARSAM.includes(effMode) && count >= 4;   // LAMPTRAPPA (se SPARSAM)
     const fastLight = !!effect?.fastLight;   // effekten skippar minsta pa-tid (EffectDef.fastLight)
     const modE = modulateOf(effMode).energy;   // samma för alla lampor - en gång per ruta
     this.rT = t; this.rAnchorHue = anchorHue; this.rInputGate = inputGate; this.rMd = md; this.rDrive = drive;
-    wantFogFx = this.renderLamps(effect, count, ordSel, useAnchor, fxToggle, fxSparse, fastLight, modE);
+    wantFogFx = this.renderLamps(effect, count, ordSel, useAnchor, fxToggle, fastLight, modE);
 
     if (E_NORM_S > 0) { this.fxPeak = Math.max(this.fxPeakNow, this.fxPeak * Math.exp(-dtSec / E_NORM_S)); this.fxNorm = Math.min(E_NORM_MAX, 1 / Math.max(0.05, this.fxPeak)); }   // STEG 1: effektens topp
     // Bygg strobe-masken bara när fixtures ändras (inte varje frame).
