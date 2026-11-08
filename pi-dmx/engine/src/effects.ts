@@ -4,6 +4,11 @@
  *
  * Each fixture in cfg.fixtures gets rendered based on its index. Fixture
  * channel-layout is honored (RGB / RGBW / dimmer).
+ *
+ * LAMPKONTRAKTET (ägaren 2026-11-07): dirigenten (lookvalet, fit.ts), effekterna och motorns steg 1-2 (effektens nivå, kulörtoning,
+ * energi, uttoning) bestämmer fritt hur ljuset ser ut i 0..1 per kanal och lampa. Ingen lampfysik här: kurva/gamma, tak, tändpunkt,
+ * minsta tända nivå, ljusmatchning mellan kulörer och diodgrind finns bara i output.ts (efter cfg.fixtures[i].cal). Där motorn menar
+ * ljus (energins DMX-procent, uttoningens tidskonstant) frågar den output.ts per lampa: lampLevel, lampFadeK, keepLit, sameLight.
  */
 
 import { isLogOn } from "./quiet.js";

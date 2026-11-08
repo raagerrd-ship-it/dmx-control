@@ -1,6 +1,11 @@
 /**
  * Effekt-modulernas kontrakt.
  *
+ * LAMPKONTRAKTET (ägaren 2026-11-07: 'en effekt skall bara justera hur mycket 0-100 % kanalerna skall lysa och inte veta något annat'):
+ * effekten bestämmer fritt hur den ser ut - render(c) ger R/G/B 0..1 per lampa (kulör, puls, vandring, hur ofta kulören byts). Den vet
+ * inget om lampan: ingen kurva/gamma, tak, tändpunkt, minsta tända nivå eller diodgrind - output.ts gör ljuset rätt på just den lampan
+ * (cfg.fixtures[i].cal). Därför har EffectContext ingen fixtur.
+ *
  * Varje effekt är en ren funktion render(c) → [r,g,b] (0..1) för EN lampa,
  * plus metadata (nyckel/etikett/beskrivning/tier). Motorn (EffectEngine)
  * bygger ett EffectContext per frame och anropar effekten per lampa. All

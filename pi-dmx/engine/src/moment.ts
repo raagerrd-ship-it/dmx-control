@@ -12,6 +12,8 @@
  * långsammare än uttoningen (0,25 s), så nedgången blir aldrig snabbare än i dag (låst regel). Dirigenten kör vidare under, så
  * tillbaka till fest = som om inget hänt.
  * EN VÄG IN: pressMoment (ws setMoment, POST /api/moment, gästsidans knappar och de fysiska knapparna) - tryck på aktiv stund = fest.
+ * LAMPKONTRAKTET: stunderna (och lab*.ts) bestämmer fritt hur ljuset ser ut, uttryckt som ANDEL av lampans ljus per kanal; output.ts
+ * lampLevel gör andelen till rätt nivå på just den lampan (cal.gamma). Ingen gamma, tak eller tändpunkt här.
  */
 import type { EngineConfig, FixtureConfig } from "./config.js";
 import { lampLevel } from "./output.js";

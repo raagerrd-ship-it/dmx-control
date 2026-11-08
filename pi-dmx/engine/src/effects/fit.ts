@@ -11,6 +11,9 @@
  *   bright — klang uppåt: 1 = lyser på hi-hats/luft, 0 = mörk/varm
  *   beat   — taktbundenhet: 1 = kräver tydlig takt (kap/växlingar), 0 = fri-flytande
  *
+ * LAMPKONTRAKTET: dirigenten väljer look efter musiken, aldrig efter lamporna - ingen passform räknar med kurva, tak, tändpunkt eller
+ * dioder (det gör bara output.ts, efter lampans kalibrering).
+ *
  * ▼▼▼ JUSTERA HÄR ▼▼▼ Tweaka fritt — det här är ren smak.
  */
 import type { Mode } from "../config.js";

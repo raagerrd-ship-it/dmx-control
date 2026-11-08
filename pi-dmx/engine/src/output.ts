@@ -1,6 +1,13 @@
 /**
  * OUTPUT-TJÄNSTEN — översätter ljus till inkopplade lampor.
  *
+ * LAMPKONTRAKTET (ägaren 2026-11-07: 'effekterna skall inte veta något om hur mina specifika lampor är mappade - det skall göras i
+ * output' + 'köper jag andra lampor vill jag bara kalibrera dom, och det skall användas av output'): effekterna, dirigenten och stunderna
+ * bestämmer fritt hur ljuset ser ut i 0..1 per kanal och lampa; den här filen gör det rätt på JUST DEN lampan. Allt som är lampfysik
+ * finns BARA här och i lampans kalibrering (cfg.fixtures[i].cal: on/onR..onW = tändpunkt, full, gamma = kurva, top = tak):
+ * kurvan (gamma), taket, tändpunkt/dödzon, minsta tända nivå (keepLit), ljusmatchning mellan kulörer (sameLight), bikanalsgrinden
+ * (RGB_SHARE) och översättningen andel ljus <-> nivå (lampLevel, lampFadeK). En ny lampa = ny kalibrering, ingen annan kod.
+ *
  * Dirigenten, effekterna och sluttrimningen ska INTE behöva veta hur en lampa
  * fungerar. De säger "skala ljusstyrkan ×0.4" eller "kalibrera och lägg på taket";
  * den här modulen vet resten: vilken kanal som bär ljusstyrkan, vilka som är färg,
@@ -51,8 +58,7 @@ for (let i = 0; i < 1024; i++) {
 }
 /** KALIBRERING PER LAMPA (ägaren 11-07: 'köper jag andra lampor vill jag bara kalibrera dom, och det skall användas av output'):
  *  cal.gamma (1..3, standard GAMMA 1,6) och cal.top (taket 0,5..1, standard MAP_TOP 0,95). Saknas fälten = exakt som förr (samma LUT,
- *  samma tak). Motorn frågar output om lampans minsta tända nivå (minLit) och om kulörtoningens ljusmatchning (sameLightK) - effects.ts
- *  vet inget om gamman (KONTRAKTET: effekterna och steg 1-2 ger R/G/B 0..1, gamma/tändpunkt/tak bara här). */
+ *  samma tak). Motorn och stunderna använder lampan bara genom funktionerna under LAMPANS SPRÅK nedan (se LAMPKONTRAKTET överst). */
 const lampGamma = (fx: FixtureConfig | undefined): number => { const g = fx?.cal?.gamma; return g === undefined || !(g >= 1 && g <= 3) ? GAMMA : g; };
 const lampTopOf = (fx: FixtureConfig | undefined): number => { const t = fx?.cal?.top; return t === undefined || !(t >= 0.5 && t <= 1) ? MAP_TOP : t; };
 const LUTS = new Map<number, Uint8Array>([[GAMMA, GAMMA_LUT]]);

@@ -6,13 +6,18 @@ An effect is a **pure function of one lamp**:
 render(c: EffectContext): [number, number, number]   // → [r, g, b], each 0..1
 ```
 
-The engine calls it once per lamp, per frame (~50 Hz), and does *everything else*
-around it — master brightness, the heartbeat pulse, the VU ceiling, ballistics,
-drop bloom, the ambient idle glow, gamma, and the DMX wire. **Your effect decides
-the colour and per-lamp shape of one lamp**, and may *ask* for special fixtures
-(see below). Don't apply master volume, don't cap brightness to the audio level,
-don't gamma-correct — that's all done downstream (see *What the engine does after
-you* below).
+The engine calls it once per lamp, per frame (40 Hz), and does *everything else*
+around it. **Your effect decides freely how it looks: R/G/B 0..1 per channel, per
+lamp** (colour, pulse, movement, how often the colour changes), and may *ask* for
+special fixtures (see below).
+
+**Lamp contract** (owner 2026-11-07: *"en effekt skall bara justera hur mycket
+0-100 % kanalerna skall lysa och inte veta något annat"*): an effect knows nothing
+about the lamps. No gamma/curve, ceiling, on-threshold, minimum lit level, colour
+light-matching or diode gating in an effect, the conductor (`fit.ts`) or the
+moments (`moment.ts`, `lab*.ts`) — all lamp physics lives only in `output.ts`,
+driven by each lamp's calibration `cfg.fixtures[i].cal` (`on`/`onR..onW`, `full`,
+`gamma`, `top`). New lamps = calibrate them, no code change.
 
 ## Asking for special fixtures
 
@@ -165,26 +170,19 @@ a pure-red bass lamp) when you want one physical LED group per lamp.
 
 ## What the engine does *after* you (so you don't)
 
-In order, on top of your `[r,g,b]`. **The order is measured, not arbitrary** — it
-was rebuilt on 2026-08-07 after the heartbeat turned out never to reach the lamps.
+Three steps (`effects.ts` renderLamps, `output.ts`):
 
-1. **Bloom / drop blend** — on a bass punch or drop the colour is pushed to full.
-2. **`× md`** — master · silence-gate · bass-punch · riser/drop boost · micro-strobe.
-   (The heartbeat is *not* here any more; see step 6.)
-3. **Ambient idle glow** added when the music stops (owner toggle).
-4. **Colour → channels** (`output.ts`): RGBW split, `dim` handling, **gamma 2.2 → 0–255**.
-5. **Output ballistics** — soft attack (90 ms) + peak-hold decay. This cleans up the
-   *effects'* own jitter. It runs before the ceiling and the pulse so it can never
-   smear either of them.
-6. **VU ceiling** — the final brightness, taken from the **input level normalised
-   against a rolling p5–p95 window** (not the raw level: a compressed track has a
-   narrow span, so the gain is capped at 2×). A drop bypasses it. *This is why you
-   must NOT scale brightness to the audio level yourself.*
-7. **Heartbeat** — attack/decay per beat, scaled with tempo, applied **last of all**
-   and outside the ballistics. A drop bypasses it too. Put it before the ballistics
-   and its 121 ms decay gets smeared by the output's 0.42 s — measured: the DMX
-   output then showed no periodicity at the beat at all.
-8. **Calibration** — per-channel on-threshold and the master output cap.
+1. **The effect's level** — top normalisation, base level between beats, drop
+   look / minidrop lift, colour glide (same light per lamp via `output.ts`
+   `sameLight`).
+2. **Energy and fade** — the bass energy as a share of the lamp's light
+   (`output.ts` `lampLevel`), the effect may opt out per lamp (`c.want.energy`);
+   the silence gate; a lit lamp is kept at its lowest visible level (`keepLit`);
+   ONE fade-out per lamp (time constant 0.25 s in light, `lampFadeK`; never faster).
+3. **Output** (`output.ts`) — RGBW split, the lamp's curve (`cal.gamma`, default
+   1.6), every colour channel mapped on-threshold+1 .. ceiling (`cal.on*`,
+   `cal.top`, full drop opens the last 5 %), secondary-channel gate, dimmer
+   constant at `cal.full`.
 
 **Rules of thumb**
 - One lamp at a time; key everything off `c.idx` / `c.count` so you scale to any

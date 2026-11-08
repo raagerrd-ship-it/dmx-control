@@ -64,6 +64,9 @@ mörkt, gäller ALLA effekter även de som skippar energin); kalibrering per lam
 hör till lampan (attack/release som kompenserar lampans egen tröghet); kodning och tidsättning mot hårdvaran (BLE-paket i fas med
 radions raster; DMX-universum 40 Hz).
 **Får inte:** välja effekt, tolka musiken, räkna puls eller energi; ändra betydelsen av ett sparat kalibreringsfält.
+**DMX (lampkontraktet 2026-11-08):** `engine/src/output.ts` är ENDA stället med lampfysik - kurva (`cal.gamma`), tak (`cal.top`),
+tändpunkt/dödzon (`cal.on*`), minsta tända nivå, ljusmatchning mellan kulörer, bikanalsgrind. Effekter, dirigent och stunder ger 0..1 per
+kanal och lampa; där motorn menar ljus (energins andel, uttoningens tidskonstant) frågar den output per lampa (`lampLevel`, `lampFadeK`).
 **Mått:** ljud→ljus-latens (klapp + 240 fps-video: 30 ms, accepterad, ej kompenserad), stigtid, paketluckor.
 
 ---

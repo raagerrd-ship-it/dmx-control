@@ -6,6 +6,10 @@ NATTEN 11-08 (nattagenten, inget deployat) - KOMMANDOT FÖR LADAN NU: `python to
 KLART 2026-11-08: A = d539915 (cal.gamma/cal.top per lampa i output.ts + server-sanering + UI 'Kurva'/'Tak %'; minLit/sameLightK i output; DMX-md5
    identisk; gamma 2,2 på lampa 2 ändrar bara lampa 2). KVAR av kontraktet: energins DMX-procent och uttoningens tidskonstant räknar med riggens
    referensgamma (GAMMA), och moment.ts/lab*.ts toV() importerar GAMMA - flytta om en lampa med annan kurva ska få exakt rätt energi.
+KLART 2026-11-08: KVAR-delen av A = b0448b1 (tagg backup/fore-lampkontrakt-20261108): ingen gamma utanför output.ts - motorn/stunderna
+   räknar i andel ljus, output.ts lampLevel/lampFadeK/keepLit/sameLight per lampa; ctx.fx bort. DMX-md5 identisk (lang1021 + lang1107, av/LABFX,
+   med/utan stundcykel fest..lab5); cal.gamma 2,2 på lampa 2 ändrar bara lampa 2. Kontraktskommentarer + effects/README + ARKITEKTUR i nästa commit.
+   Effekternas utseende (kulörbyten, motfärg, hysteres, FX_REN) är INTE lampanpassning (ägaren 11-08) - ligger kvar i effekterna.
 KLART 2026-11-08: C = e03663c (backup-tagg backup/fore-tio-standard-20261108): alla tio standard, rattarna bort, ny kod utan env = gammal kod
    + tio env bit-identiskt (DMX-md5, lang1021 + lang1107). Kvar som ratt: DMX_LABFX. Bänkrattarna DMX_B_SUBW/B_LO_S/DROP_WIN_S läses fortfarande
    (nya standardvärden 0,25/0,25/1) - de hör till energilagrets bänkfamilj.
