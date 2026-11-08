@@ -20,6 +20,10 @@ ARENA: FART (ägaren 11-08: 'lägg till arena till natten enl. ditt förslag. De
    budget enligt skillen. Inga worktrees/junctions (kopior i .arena/fart/<id>/ med egen tsconfig som extends - MÄTFÄLLA 11-08: `tsc
    --rootDir <annan> --outDir` med rootDir-fel emitterar ändå och skrev 126 .js i src/). Vinnaren: bit-identisk = ingen ratt, ren
    ersättning i koden med backup-tagg (feedback-ingen-opt-in), commit med pathspec, ingen deploy, ingen push av analysatorn.
+   PROFILEN PER FUNKTION (11-08, lang1107 + LABFX, hela filen): fft.js _realTransform4 27 %, beatFeed onsetStep 9,8 % + fullStep 5,9 %
+   + fullScore 2,4 % + update 2,1 % (= ~20 %), analyser process 9,1 %, fastBandStep 7,7 %, bigStep 7,5 %, scoreEnv 5,8 %, dropStep 3,8 %.
+   LEDTRÅD: både analysatorn (scoreEnv/alignScore) och taktmatningen (onsetStep/fullStep, alla tempon per hop) söker tempo - pröva om
+   taktmatningen gör om arbete analysatorn redan gjort, eller söker oftare/bredare än ljuset behöver (svaret måste ändå bli bit-identiskt).
    ARENAN puls2 (D) FLYTTAS EN NATT TILL (en arena per natt).
 
 ## PRIORITET I NATT 2026-11-07 -> 11-08 (ägaren: '3 och 4 har mest prio') - GÅR FÖRE ALLT, I DENNA ORDNING
