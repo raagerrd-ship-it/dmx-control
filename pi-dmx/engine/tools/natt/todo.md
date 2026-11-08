@@ -54,6 +54,17 @@ HUR (arena enligt dmx-arena-skillen; ägaren vill ha den optimala, så arena och
   Lotus: DELAD FIL ÄNDRAD-fynd för morgonagenten (4e).
 - Kostnad ~4-5 M tokens (som tvavagar). Rapport: tools/natt/arena-2026-11-09-entempo/ med idébank (alla diffar).
 
+### KRAV EN KÄLLA (ägaren 11-08 23:40: "Men alla får väl bara köra med en källa?") - SPÄRR i remix och final, DISK annars
+I runda 1 får ett kort angripa en del. Remixarna och vinnaren MÅSTE uppfylla alla fem punkterna, och orkestratorn kontrollerar
+i koden (fil:rad i losning.md) före finalen:
+1. EN temposökning: analysatorns skuggrutnät (BeatFeed.analyserCfg/kickFold-skuggan, egen scoreEnv/alignScore-sökning för
+   tempo) är borta. Analysatorn läser klockans bpm och ankare + en fast, mätt fasoffset.
+2. EN tillit: frame.bpmConfidence (om det finns kvar) = klockans tillit. profile.beat, hasBeat, effects trust och frasräknaren
+   läser samma.
+3. EN takträknare: ctx.beatIdx = rutnätets index (>> 1 vid halvering); ingen fri beatCounter, en halveringsparitet.
+4. EN pulskurva (beatEnv/kickEnv och beatPulse/heartPulse på samma klocka).
+5. Låtgränsen = boundaryCount som enda låtbytessignal, även i taktvägen. Inga egna låtbytesslutsatser i klockan.
+
 ### TILLÄGG TILL ARENAN EN TEMPO (granskningen DUBBLA KÄLLOR 11-08, tools/natt/granskning-2026-11-08-dubbla/) - ingår i samma klocka
 - `ctx.beatIdx` är en FRI räknare (beatCounter, effects.ts:2013-2016), inte rutnätets index. 17 effekter läser `c.beatIdx % 4` som
   ettan, så barOff/a5:s etta når inte fram till dem; bara hjärtslagets accent (1400) och SWITCH_ON läser rutnätet.
