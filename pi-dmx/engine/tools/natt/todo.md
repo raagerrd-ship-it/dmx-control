@@ -17,6 +17,12 @@ DELVIS 2026-11-08: B = PROV DMX_FX_REN=1 (vidga blandkulör, twin vandring var 8
    0,8 -> 0,9/min, ofriv 0,6 -> 0,6, lang1021 oförändrad -> 'redo för ladan'. Sirenens motfärg = egen ratt DMX_FX_REN_SIREN: 0,8 -> 2,6/min
    (siren 61 blink) - kulörbyte på uttonande lampa. Behållna med skäl: upptakt släckta (ägarens 'såg likadan ut på alla lampor'), drift 4 s
    hysteres (32 kulörhopp/min i en lugn effekt - effektens fladder, inte diodens), inget vitt (smak).
+KLART 2026-11-08 (huvudchatten, ägaren: 'ta bort gränsen, men spåra direkt'): cb7d841 RGB_SHARE-grinden bort (1-100 % rakt mot kalibreringen;
+   blink 0,8/0,6 -> 0,8/0,5, studs oförändrade - grinden var INTE F:s orsak). F:s orsak spårad (DYN_STUDS): byter effekten kulör på en lampa som
+   tonar ut fick den nya kulören den hållna nivån PER KANAL (röd 40 -> magenta 40+40 = dubbla ljuset; 9 av 17 studsar). Lagat i uttoningen
+   (effects.ts, UTTONINGEN STIGER ALDRIG I LJUS: ny kulör får högst gamla kulörens ljus via output.ts sameLight): studs lang1107 0,35 -> 0,08,
+   lang1021 0,37 -> 0,32, blink/ofriv/dynamik oförändrade. Kvar (lang1021 minnet/gallop): fallande cyan 40 -> 43 och håll = ett svagt nytt slag
+   i effekten + MINSTA PÅ-TID, effektens utseende - inte lagat. EJ DEPLOYAT, ägaren dömer i ladan.
 FÖRKASTAT 2026-11-08: F = DMX_FADE_NYKANAL (patch tools/natt/prov/fadenykanal-20261108.patch): (1) ny kanal på effektens nivå utan egen
    uttoning: studs 0,35 -> 0,35, sidoBlink 0,8 -> 2,2 (rå effekt fladdrar); (2) med egen uttoning från effektens nivå: studs 0,35 -> 0,29 men
    sidoBlink 0,8 -> 1,5, ofriv 0,6 -> 1,2 (dansparet 7 -> 24): den nya kanalen startar lågt, under utgångens 6 %-grind (RGB_SHARE) mot den

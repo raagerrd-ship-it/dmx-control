@@ -615,6 +615,7 @@ export class EffectEngine {
   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
   private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
   private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
+  private lampPrev = new Float32Array(192); private fadeOld: [number, number, number] = [0, 0, 0]; private fadeNew: [number, number, number] = [0, 0, 0];   // UTTONINGENS LJUS: förra rutans färg per lampa
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
@@ -1525,9 +1526,17 @@ export class EffectEngine {
         }
         if (mT >= fall) { if (mT > this.lampLvl[i] + 0.005 || !holding) this.lampPeakAt[i] = renderNow; this.lampLvl[i] = mT; }
         else {
+          // UTTONINGEN STIGER ALDRIG I LJUS (ägaren i ladan 11-07: 'när en effekt fadar en färg så kan den hacka i slutet av fade, snabbt
+          // öka ljusstyrka'; spårat 11-08: byter effekten kulör på en lampa som tonar ut fick den NYA kulören den hållna nivån per kanal -
+          // röd 40 -> magenta 40+40 = dubbla ljuset). Den nya kulören får högst den gamla kulörens ljus på den här nivån (output.ts sameLight).
+          const prevL = this.lampLvl[i], fo = this.fadeOld, fn = this.fadeNew, sc = prevL > 0 ? fall / prevL : 0;
+          fn[0] = this.lampRatio[o] * fall; fn[1] = this.lampRatio[o + 1] * fall; fn[2] = this.lampRatio[o + 2] * fall;
+          fo[0] = this.lampPrev[o] * sc; fo[1] = this.lampPrev[o + 1] * sc; fo[2] = this.lampPrev[o + 2] * sc;
           this.lampLvl[i] = fall;
-          rgb[0] = this.lampRatio[o] * fall; rgb[1] = this.lampRatio[o + 1] * fall; rgb[2] = this.lampRatio[o + 2] * fall;
+          if (sc > 0 && sameLight(fx, fo, fn)) { rgb[0] = fo[0]; rgb[1] = fo[1]; rgb[2] = fo[2]; }   // samma ljus som den gamla kulören
+          else { rgb[0] = fn[0]; rgb[1] = fn[1]; rgb[2] = fn[2]; }                              // den nya har mindre ljus: som förr
         }
+        this.lampPrev[o] = rgb[0]; this.lampPrev[o + 1] = rgb[1]; this.lampPrev[o + 2] = rgb[2];
       }
       this.out.writeFixture(this.universe, fx, rgb, 1, 0, specialty);
     }
