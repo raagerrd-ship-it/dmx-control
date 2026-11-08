@@ -10,8 +10,8 @@ ARENA: FART (ägaren 11-08: 'lägg till arena till natten enl. ditt förslag. De
    committas inte där; förslaget (diff + mått + bit-identitetsbevis) skrivs i tools/natt/analysator-fynd.md till lotus/ägaren.
    DOMAREN (byggs FÖRE körningen, inte domare.py - den dömer ljus): tools/arena/fart.mjs (ny) =
      (1) SPÄRR: DMX-md5 per lampa (tools/dmxDump.mjs) identisk mot bas på lang1021, lang-20261107T154200 och holdout lang1014, utan env
-         OCH med DMX_LABFX=1, och med stundbyten (scratchpad-varianten dumpMoment.mjs från 11-08: byter stund var 15 s - kopiera in den i
-         tools/). Minsta avvikelse = DISK. Ingen avrundning, inga toleranser.
+         OCH med DMX_LABFX=1, och med stundbyten (tools/dmxDumpMoment.mjs, byter stund var 15 s). MÄTFÄLLA: dmxDump* kör bara 120 s som standard
+         (3:e argumentet = sekunder) - domaren ska köra HELA filerna. Minsta avvikelse = DISK. Ingen avrundning, inga toleranser.
      (2) POÄNG: CPU-tid för motorn (process.cpuUsage runt analys+takt+effekter, exklusive wav-läsning), median av 5 körningar, i % mot bas;
          bas mäts i samma körning före och efter (drift på PC:n > 2 % = mät om). Delad-analysator-förslag poängsätts separat (egen lista).
      (3) Pi-sanning: PC:n är x86 - skriv i rapporten att vinsten ska verifieras på Pi:n (ARM, Node 24) innan den räknas som vunnen; kör
