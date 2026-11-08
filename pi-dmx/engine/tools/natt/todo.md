@@ -1,5 +1,12 @@
 # Natt-agentens uppdrag
 
+## IDÉBANK tvavagar (2026-11-08, se tools/natt/arena-2026-11-08-tvavagar/RAPPORT.md) - prova ensam, en i taget
+- IDÉBANK tvavagar: a8r full tempoföljning - vad ger a8r:s ljusdomare +6,9 / latens 85 ms på kontrollmängden (g1 = -1,3 / 100 ms)?
+- IDÉBANK tvavagar: a1m2 tempogrammet helt (ljusdomaren +8,0 i övningen) mot g1.
+- IDÉBANK tvavagar: a2r/a4r tre biquad-band i ett svep (bit-identiskt, ~2 % huvudtråd).
+- IDÉBANK tvavagar (lotus): a4r stora vägens buffertar bara när den kan slås på (-2,3 MB delat minne).
+- DOMAREN: ljusdomaren saknar tajthet (g1 vann i ögat trots -1,3) - lägg in ljusLag/latens med vikt före nästa arena.
+
 ## PRIORITET I NATT 2026-11-08 -> 11-09 (ägaren i huvudchatten 11-08) - GÅR FÖRE ALLT
 ARENA: ANALYSATORNS TVÅ VÄGAR (ägaren 11-08: 'lägg till arena till natten' + 'de får ge förslag på ändringar i delade analysatorn' +
    'arenan skall tydligt veta att vi vill ha två vägar i analysatorn, de kan gärna flytta mellan/återanvända saker/ta bort/lägga till osv.

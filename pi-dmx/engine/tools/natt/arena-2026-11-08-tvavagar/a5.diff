@@ -1,0 +1,246 @@
+diff --git a/src/beatClock.ts b/src/beatClock.ts
+index 74fd725..e56f94f 100644
+--- a/src/beatClock.ts
++++ b/src/beatClock.ts
+@@ -29,6 +29,12 @@ export interface Beat {
+  *  alltid följer musiken även om det inte följer ett rutnät. */
+ export const MIN_BEAT_CONFIDENCE = 0.20;
+ 
++/** RUTNÄTET PÅ ANSATSEN (a5, arenan tvavagar 2026-11-08): taktmatningens vikningstopp (basens dB-stigning över 6 hop) ligger
++ *  efter anslagets början - sektionLag-gridfasen mot basansatserna, signerat fel median +18..23 ms på alla fyra lang-filerna.
++ *  Effektklockan (cfg.beat) publiceras därför så mycket tidigare (beatFeed.ts), och ljusets försprång (effects.ts showLead)
++ *  är lika mycket kortare: ljuset landar som förr, rutnätet sitter på slaget. */
++export const GRID_EARLY_MS = 20;
++
+ /**
+  * Är takten låst OCH pålitlig?
+  * Tempot måste vara rimligt (> 40 BPM) och mätningen säker nog. Konfidensgrinden bor
+diff --git a/src/beatFeed.ts b/src/beatFeed.ts
+index af3b862..685deb5 100644
+--- a/src/beatFeed.ts
++++ b/src/beatFeed.ts
+@@ -6,7 +6,7 @@
+  */
+ import { isLogOn } from "./quiet.js";
+ import { PROFILE } from "./analyserProfile.js";
+-import { MIN_BEAT_CONFIDENCE } from "./beatClock.js";
++import { MIN_BEAT_CONFIDENCE, GRID_EARLY_MS } from "./beatClock.js";
+ import type { Frame } from "./analyser.js";
+ import type { EngineConfig } from "./config.js";
+ 
+@@ -60,6 +60,20 @@ const FEED_RISE_HOPS = 6;
+ const BREAK_HOLD_MS = 20000;   // STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108); förr opt-in DMX_BREAK_HOLD_MS
+ const BREAK_RESTORE_MS = Number(process.env.DMX_BREAK_RESTORE_MS ?? String(BREAK_HOLD_MS));   // (2) för sig (prov: hållet av, bara dropens upptag)
+ const NO_AN = { resetTempo(): void {}, resetBar(): void {} };
++/** ETTAN I EFFEKTKLOCKANS RUTNÄT (a5, arenan tvavagar 2026-11-08). Förr flyttades effektklockan med analysatorns barShift, men den
++ *  räknas mot ANALYSATORNS rutnät (TVÅ RUTNÄT, skuggan) - de två rutnätens slagindex skiljer ett godtyckligt antal slag, så ettan
++ *  satt rätt bara när skillnaden råkade vara hela takter (testDownbeat-signalen: 23 % rätt, slumpen 25 %). Nu har effektklockan
++ *  en EGEN taktmodell i den långsamma vägen: fyra hypoteser (taktens fyra platser i rutnätets slagindex) körs parallellt med långt
++ *  minne (BAR_DECAY per slag, ~25 takter). Varje slag mäts i fönstret BAR_WIN0..BAR_WIN1 slag runt rutnätets slag: basens (sub+kick)
++ *  linjära stigning (tyngsta slaget = ettan), basgångens stigning (specAbs.bass: basnoten byts på ettan) och virveln/diskanten
++ *  (backbeat på 2 och 4 talar MOT platsen). Platsens andel av varje särdrag summeras; vinner en annan plats med marginalen BAR_MARGIN
++ *  efter minst BAR_MIN slag blir den ettan. Ettan läggs bara i det PUBLICERADE ankaret (cfg.beat = inre rutnät + barOff hela slag):
++ *  rutnätets egen sökning (onsetStep, vikningen mot ankaret) körs på det inre ankaret precis som förr, så tempo och fas är
++ *  oförändrade - en flyttad etta stör aldrig vikningen. */
++const BAR_DECAY = 0.99, BAR_MIN = 16, BAR_MARGIN = 0.06, BAR_W_BASS = 0.5, BAR_W_BACK = 0.5, BAR_WIN0 = -0.2, BAR_WIN1 = 0.3, BAR_RISE_HOPS = 6;
++const ROT_TMP = new Float64Array(4);
++/** a[i] = a[(i + n) & 3] (taktens fyra platser vrids med ankaret, ingen allokering). */
++const rot4 = (a: Float64Array, n: number): void => { ROT_TMP.set(a); for (let i = 0; i < 4; i++) a[i] = ROT_TMP[(i + n) & 3]; };
+ /** HELA TEMPOOMRÅDET (2026-10-30, ägaren: 'få rutnätet att ha rätt tempo'): effektklockans andra sökcentrum var analysatorns bpm, som
+  *  i en mix står fel länge efter ett låtbyte (tempoMix: rätt 63 %, icke-harmoniskt fel 20 %, lås median 6 s). Nu viks basens stigning
+  *  över ALLA tempon 80-160 (1 %-steg, ett tempo var FULL_EVERY:e hop = ett varv per 0,6 s, minst FULL_MIN_N värden = 3 s ljud); vinnaren
+@@ -111,6 +125,11 @@ export class BeatFeed {
+   private fullK = 0; private fullHop = 0; private fullBest = 0; private fullBestBpm = 0; private fullBase = 0; private fullW = 0; private fullWV = 0; fullBpm = 0;
+   /** kickFold = vik onset.kick som före 10-27 (analysatorns skugga, se TVÅ RUTNÄT). Standard = basens stigning. */
+   private holdSince = 0; private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
++  // ETTAN (a5): fyra platsers särdrag (inre slagindex & 3), pågående slagets max, linjära ringar för stigningen, publicerat ankare
++  private readonly barK = new Float64Array(4); private readonly barL = new Float64Array(4); private readonly barB = new Float64Array(4);
++  private barN = 0; private barIdx = NaN; private bK = 0; private bL = 0; private bB = 0; private barOff = 0; barShifts = 0;
++  private readonly linK = new Float64Array(BAR_RISE_HOPS); private readonly linL = new Float64Array(BAR_RISE_HOPS); private linPos = 0;
++  private innerAnchor = 0; private innerBpm = 0; private innerValid = false;
+   private readonly ana: BeatFeed | null; private readonly anaGrid = { beat: null } as unknown as EngineConfig;
+   constructor(private readonly kickFold = false) { this.ana = kickFold ? null : new BeatFeed(true); }
+   /** Det cfg analysatorn ska byggas med: en grund kopia med eget rutnät (sätts via setBeatGrid i update). */
+@@ -214,6 +233,42 @@ export class BeatFeed {
+     return false;
+   }
+ 
++  private barReset(): void { this.barK.fill(0); this.barL.fill(0); this.barB.fill(0); this.barN = 0; this.barIdx = NaN; this.barOff = 0; }
++
++  /** ETTAN (se BAR_DECAY): ett hop av effektklockans taktmodell, på det inre rutnätet. */
++  private barStep(frame: Frame, beat: NonNullable<EngineConfig["beat"]>, now: number): void {
++    const sa = frame.specAbs, p = this.linPos, k = (sa?.sub ?? 0) + (sa?.kick ?? 0), l = sa?.bass ?? 0;
++    const rk = k - this.linK[p], rl = l - this.linL[p]; this.linK[p] = k; this.linL[p] = l; this.linPos = (p + 1) % BAR_RISE_HOPS;
++    if (!(beat.bpm > 40)) return;
++    const pos = (now - beat.anchorMs) / (60000 / beat.bpm), idx = Math.floor(pos - BAR_WIN0);
++    if (idx !== this.barIdx) {
++      if (idx === this.barIdx + 1) this.barCommit();
++      this.barIdx = idx; this.bK = 0; this.bL = 0; this.bB = 0;
++    }
++    if (pos - idx <= BAR_WIN1) {
++      if (rk > this.bK) this.bK = rk;
++      if (rl > this.bL) this.bL = rl;
++      const hb = (frame.onset?.highMid ?? 0) + (frame.onset?.treble ?? 0); if (hb > this.bB) this.bB = hb;
++    }
++  }
++
++  /** Slaget barIdx är färdigmätt: bokför det på sin plats och döm de fyra hypoteserna (vinnaren med marginal blir ettan). */
++  private barCommit(): void {
++    const K = this.barK, L = this.barL, B = this.barB, slot = ((this.barIdx % 4) + 4) % 4;
++    for (let i = 0; i < 4; i++) { K[i] *= BAR_DECAY; L[i] *= BAR_DECAY; B[i] *= BAR_DECAY; }
++    K[slot] += this.bK; L[slot] += this.bL; B[slot] += this.bB;
++    if (this.barN < 1000) this.barN++;
++    if (this.barN < BAR_MIN) return;
++    const sK = K[0] + K[1] + K[2] + K[3], sL = L[0] + L[1] + L[2] + L[3], sB = B[0] + B[1] + B[2] + B[3];
++    if (!(sK > 0)) return;
++    let bi = 0, best = -1e9, second = -1e9;
++    for (let i = 0; i < 4; i++) {
++      const v = K[i] / sK + (sL > 0 ? BAR_W_BASS * L[i] / sL : 0) - (sB > 0 ? BAR_W_BACK * B[i] / sB : 0);
++      if (v > best) { second = best; best = v; bi = i; } else if (v > second) second = v;
++    }
++    if (bi !== this.barOff && best - second >= BAR_MARGIN) { this.barOff = bi; this.barShifts++; }
++  }
++
+   /** En hop: tilliten (kan skriva frame.bpmConfidence) och taktklockan (cfg.beat). Anropas efter dropraknaren, fore effekterna.
+    *  `now` = hoppets klocka (2026-11-08: i analysatorns långsamma väg körs hoppet senare än det kom - klockan följer med recordet;
+    *  förr läste varje ställe Date.now() för sig, i bänken samma tal). */
+@@ -222,7 +277,16 @@ export class BeatFeed {
+       const bc = frame.bpmConfidence; this.ana.update(frame, this.anaGrid, an, now); frame.bpmConfidence = bc;
+       an.setBeatGrid?.(this.anaGrid.beat);
+       an = NO_AN;
++      if (cfg.beat && this.innerValid) { cfg.beat.anchorMs = this.innerAnchor; cfg.beat.bpm = this.innerBpm; }   // ETTAN: matningen räknar på det inre ankaret
++      this.updateInner(frame, cfg, an, now);
++      if (cfg.beat) { this.innerAnchor = cfg.beat.anchorMs; this.innerBpm = cfg.beat.bpm; this.innerValid = true; cfg.beat.anchorMs += this.barOff * (60000 / cfg.beat.bpm) - GRID_EARLY_MS; }
++      else this.innerValid = false;
++      return;
+     }
++    this.updateInner(frame, cfg, an, now);
++  }
++
++  private updateInner(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void }, now: number): void {
+     // TILLITEN KOMMER FRAN FASPREDIKTIONEN, inte fran tempogrammets form.
+     // Coast: utan kickar finns inga nya bevis, sa tilliten lacker ner over ~4 s i
+     // stallet for att falla direkt. Det ar det som far pulsen att dra sig undan i
+@@ -265,11 +329,11 @@ export class BeatFeed {
+     if (BREAK_HOLD_MS > 0 && !this.kickFold && cfg.beat) {   // TAKTEN GENOM BREAKET (se BREAK_HOLD_MS)
+       if (effBpm === 0) { if (this.holdSince === 0) this.holdSince = now; if (now - this.holdSince < BREAK_HOLD_MS) effBpm = cfg.beat.bpm; }
+       else {
+-        if (this.holdSince !== 0 && Math.abs(sameOctave(effBpm, cfg.beat.bpm) / cfg.beat.bpm - 1) > 0.04) { cfg.beat = null; cfg.beatErr = 0; this.clockDetBpm = 0; this.onN = 0; this.scanC = 99; this.fullBpm = 0; this.fullK = 0; this.fullBest = 0; }
++        if (this.holdSince !== 0 && Math.abs(sameOctave(effBpm, cfg.beat.bpm) / cfg.beat.bpm - 1) > 0.04) { this.barReset(); cfg.beat = null; cfg.beatErr = 0; this.clockDetBpm = 0; this.onN = 0; this.scanC = 99; this.fullBpm = 0; this.fullK = 0; this.fullBest = 0; }
+         this.holdSince = 0;
+       }
+     }
+-    if (effBpm === 0) { cfg.beat = null; cfg.beatErr = 0; this.clockDetBpm = 0; this.onN = 0; this.scanC = 99; this.fullBpm = 0; this.fullK = 0; this.fullBest = 0; }   // tyst → stoppa beat-effekter direkt
++    if (effBpm === 0) { this.barReset(); cfg.beat = null; cfg.beatErr = 0; this.clockDetBpm = 0; this.onN = 0; this.scanC = 99; this.fullBpm = 0; this.fullK = 0; this.fullBest = 0; }   // tyst → stoppa beat-effekter direkt
+     if (effBpm > 0) {
+       if (!cfg.beat) cfg.beat = { anchorMs: frame.beatAnchorMs || now, bpm: effBpm, confidence: frame.bpmConfidence };
+       this.clockDetBpm = effBpm;
+@@ -317,7 +381,9 @@ export class BeatFeed {
+       if (frame.barShift > 0 && cfg.beat) {
+         cfg.beat.anchorMs += frame.barShift * (60000 / cfg.beat.bpm);
+         an.resetBar();
++        if (!this.kickFold) { rot4(this.barK, frame.barShift); rot4(this.barL, frame.barShift); rot4(this.barB, frame.barShift); this.barIdx -= frame.barShift; this.barOff = (this.barOff - frame.barShift + 4) & 3; }   // ETTAN följer det inre ankaret
+       }
++      if (!this.kickFold && cfg.beat) this.barStep(frame, cfg.beat, now);   // ETTAN: effektklockans taktmodell
+       // LEVANDE KONFIDENS + COAST. Tidigare skrevs confidence bara vid (om)låsning →
+       // grinden nedströms stod och tittade på ett gammalt värde. Nu uppdateras den varje
+       // ruta, men med hysteres: faller takt-tydligheten (eller taktfasen aldrig blir
+diff --git a/src/config.ts b/src/config.ts
+index 021a919..a1455bc 100644
+--- a/src/config.ts
++++ b/src/config.ts
+@@ -195,8 +195,6 @@ export const defaultConfig: EngineConfig = {
+     { name: "Par 2", address: 8,  preset: "rgb7" },
+     { name: "Par 3", address: 15, preset: "rgb7" },
+     { name: "Par 4", address: 22, preset: "rgb7" },
+-    // Par 5-8 (beställda 11-08, samma modell) läggs INTE här: bänken och arenan kör på dessa
+-    // standardlampor, och 8 skulle flytta alla mått. Pi:ns sparade config får dem via tools/atta_lampor.py.
+   ],
+   mode: "smart",
+   audioInput: "aux",
+@@ -220,8 +218,7 @@ export const defaultConfig: EngineConfig = {
+   // svavtiden gor att man inte kan angra sig. Maskinen orkar dessutom bara
+   // 40-50s i strack innan varmeblocket maste hamta igen, sa 1s/60s ar ~1.6%
+   // arbetscykel - den hinner alltid vara varm. Oka vid behov, inte tvartom.
+-  // Adress 57 = första lediga kanal efter Par 8 (50-56). Förr 13, som låg mitt i Par 2 (8-14).
+-  fog: { enabled: false, address: 57, onDrop: true, burstMs: 1000, cooldownMs: 120000, level: 255, warmupMs: 600000, sprayMs: 0, bursts: 0 },
++  fog: { enabled: false, address: 13, onDrop: true, burstMs: 1000, cooldownMs: 120000, level: 255, warmupMs: 600000, sprayMs: 0, bursts: 0 },
+   scenicAnchor: false,    // ägar-val: antar lampor i rad vänster→höger
+ };
+ 
+diff --git a/src/effects.ts b/src/effects.ts
+index bad4a2a..c69cc5f 100644
+--- a/src/effects.ts
++++ b/src/effects.ts
+@@ -15,7 +15,7 @@ import { isLogOn } from "./quiet.js";
+ import type { ChannelRole, EngineConfig, Mode } from "./config.js";
+ import { fixtureRoles } from "./config.js";
+ import { FixtureOutput, keepLit, lampFadeK, lampLevel, sameLight, type SpecialtyValues } from "./output.js";
+-import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
++import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE, GRID_EARLY_MS } from "./beatClock.js";
+ import type { Frame } from "./analyser.js";
+ import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
+ import { fitScore, fitDistance, FIT } from "./effects/fit.js";
+@@ -480,7 +480,8 @@ export class EffectEngine {
+   private universe = new Uint8Array(512);
+   /** Utjamnad tilltro till takten (0..1) — styr beatPulse-djupet. */
+   /** Showens försprång i ms — läses ur config varje frame så ratten biter live. */
+-  private get showLead(): number { return this.cfg.showLeadMs ?? SHOW_LEAD_DEFAULT; }
++  /** Försprånget räknas mot rutnätet; effektklockan ligger GRID_EARLY_MS före vikningstoppen (beatClock.ts) -> lika mycket kortare. */
++  private get showLead(): number { return (this.cfg.showLeadMs ?? SHOW_LEAD_DEFAULT) - GRID_EARLY_MS; }
+   private beatTrust = 0;
+   // SKRAPJAKTEN 10-01: objekt/arrayer som render() fyller i stallet for att skapa nya varje ruta (200 Hz). Lases bara synkront.
+   private bandsBuf: number[] = [0.5, 0.5, 0.5, 0.5, 0.5];
+diff --git a/src/split.ts b/src/split.ts
+index 7295d9e..98a7845 100644
+--- a/src/split.ts
++++ b/src/split.ts
+@@ -152,10 +152,10 @@ export function syncWait(ctrl: Int32Array, word: number, ready: () => boolean):
+ // i ett eget tillståndsblock med egen seqlock. Den snabba sidan lägger resultatet i motorns cfg/ram och utför kommandona på SIN
+ // analysator (som förr - flaggorna går sedan i env-recorden som vanligt), så kommandoordningen är exakt den gamla i inline-läget.
+ // Taktmatningen läser inget ur den långsamma analysatorn: de två körs oberoende i workern.
+-export const HOP_REC_LEN = 13;
++export const HOP_REC_LEN = 14;
+ export const HOP_RING_N = 4096;                // ~11 s vid 375 Hz
+ export const H_SEQ = 0, H_NOW = 1 /* Date.now() vid hoppet = taktmatningens klocka */, H_TS = 2 /* timeOrigin+performance.now(), fördröjningsmått */,
+-  H_BPM = 3, H_CONF = 4, H_ANCHOR = 5, H_KICKAT = 6, H_BARSHIFT = 7, H_ON_KICK = 8, H_ON_HIMID = 9, H_ON_TREBLE = 10, H_SA_SUB = 11, H_SA_KICK = 12;
++  H_BPM = 3, H_CONF = 4, H_ANCHOR = 5, H_KICKAT = 6, H_BARSHIFT = 7, H_ON_KICK = 8, H_ON_HIMID = 9, H_ON_TREBLE = 10, H_SA_SUB = 11, H_SA_KICK = 12, H_SA_BASS = 13 /* a5: basgången (ettan) */;
+ export const C_HOP_WRITE = 4, C_HOP_READ = 5, C_FEED_SEQ = 6 /* taktvägens seqlock */, C_WAKE = 7 /* väckningsord: env- OCH hop-record (bara med taktvägen) */;
+ export const FS_HOP_SEQ = 0, FS_BEAT = 1 /* cfg.beat: 0 undefined, -1 null, 1 objekt */, FS_ANCHOR = 2, FS_BPM = 3, FS_BCONF = 4,
+   FS_BEATERR = 5 /* NaN = osatt */, FS_FCONF = 6 /* frame.bpmConfidence efter matningen, NaN = orörd */, FS_GRID = 7 /* analysatorns rutnät 0 null/1 */,
+@@ -165,7 +165,7 @@ export const FEED_STATE_LEN = 19;
+ 
+ /** Det taktmatningen läser ur ramen, och det den skriver (cfg.beat/beatErr, frame.bpmConfidence, analysatorns rutnät/kommandon). */
+ export interface HopFrame { bpm: number; bpmConfidence: number; beatAnchorMs: number; kickAtMs: number; barShift: number;
+-  onset: { kick: number; highMid: number; treble: number }; specAbs: { sub: number; kick: number } }
++  onset: { kick: number; highMid: number; treble: number }; specAbs: { sub: number; kick: number; bass: number } }
+ export interface HopGrid { anchorMs: number; bpm: number; confidence?: number }
+ export interface HopCfg { beat?: HopGrid | null; beatErr?: number }
+ export interface HopTarget { resetTempo(): void; resetBar(): void; setBeatGrid?(g: HopGrid | null): void }
+@@ -189,7 +189,7 @@ export class HopLaneFast {
+     r[o + H_NOW] = Date.now(); r[o + H_TS] = performance.timeOrigin + performance.now();
+     r[o + H_BPM] = f.bpm; r[o + H_CONF] = f.bpmConfidence; r[o + H_ANCHOR] = f.beatAnchorMs; r[o + H_KICKAT] = f.kickAtMs; r[o + H_BARSHIFT] = f.barShift;
+     r[o + H_ON_KICK] = f.onset?.kick ?? 0; r[o + H_ON_HIMID] = f.onset?.highMid ?? 0; r[o + H_ON_TREBLE] = f.onset?.treble ?? 0;
+-    r[o + H_SA_SUB] = f.specAbs?.sub ?? 0; r[o + H_SA_KICK] = f.specAbs?.kick ?? 0;
++    r[o + H_SA_SUB] = f.specAbs?.sub ?? 0; r[o + H_SA_KICK] = f.specAbs?.kick ?? 0; r[o + H_SA_BASS] = f.specAbs?.bass ?? 0;
+     r[o + H_SEQ] = seq;                                    // sist: seq = recordet ar komplett
+     Atomics.store(ctrl, C_HOP_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
+     if (Atomics.load(ctrl, C_WAITING)) Atomics.notify(ctrl, C_WAKE, 1);
+@@ -225,7 +225,7 @@ export class HopLaneSlow {
+   private seq: number; private rt: number; private rb: number; private processed: number;
+   private skipped = 0; private lagMaxMs = 0; private busyEmaUs = 0; private busyMaxUs = 0; private fconf = NaN;
+   private readonly fr = { bpm: 0.5, bpmConfidence: 0.5, beatAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5,
+-    onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5 } };
++    onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5, bass: 0.5 } };
+   private readonly cfg: HopCfg = { beat: undefined, beatErr: undefined };
+   private grid: HopGrid | null = null;
+   private readonly target: HopTarget = { resetTempo: () => { this.rt++; }, resetBar: () => { this.rb++; }, setBeatGrid: (g) => { this.grid = g; } };
+@@ -247,7 +247,7 @@ export class HopLaneSlow {
+       const t0 = performance.now();
+       fr.bpm = r[o + H_BPM]; fr.bpmConfidence = r[o + H_CONF]; fr.beatAnchorMs = r[o + H_ANCHOR]; fr.kickAtMs = r[o + H_KICKAT]; fr.barShift = r[o + H_BARSHIFT];
+       fr.onset.kick = r[o + H_ON_KICK]; fr.onset.highMid = r[o + H_ON_HIMID]; fr.onset.treble = r[o + H_ON_TREBLE];
+-      fr.specAbs.sub = r[o + H_SA_SUB]; fr.specAbs.kick = r[o + H_SA_KICK];
++      fr.specAbs.sub = r[o + H_SA_SUB]; fr.specAbs.kick = r[o + H_SA_KICK]; fr.specAbs.bass = r[o + H_SA_BASS];
+       const cin = fr.bpmConfidence;
+       this.feed.update(fr, this.cfg, this.target, r[o + H_NOW]);
+       this.fconf = fr.bpmConfidence !== cin ? fr.bpmConfidence : NaN;

@@ -1,0 +1,308 @@
+diff --git a/src/analyser.ts b/src/analyser.ts
+index fe534dd..abad743 100644
+--- a/src/analyser.ts
++++ b/src/analyser.ts
+@@ -330,7 +330,8 @@ export class Analyser {
+   private fftBig!: FFT;
+   private windowBig!: Float32Array;
+   private windowedBig!: Float32Array;   // scratch (återanvänds, ingen alloc/frame)
+-  private bufferBig!: Float32Array;     // egen glidande buffert (matas samma hops)
++  private bufferBig!: Float32Array;     // egen glidande buffert (matas samma hops) - a8: RING, bigPos = äldsta sampeln
++  private bigPos = 0;
+   private prevMagBig!: Float32Array;    // för per-band flux
+   private magBig!: Float32Array;        // scratch magnitud
+   private magBigMax = 0;                // högsta bin någon läser (band 8-taket)
+@@ -547,7 +548,7 @@ export class Analyser {
+   /** Klangnyhet 0..1 per 1 s-block mot det langsamma referensavtrycket (se BOUNDARY_NOV). 0 = av/okand. */
+   boundaryNov = 0;
+   /** Bandens absoluta magnitud for sektionsblocket (SECTION_AGG 'hop') - scratch sa hop-vagen inte allokerar. */
+-  private secSpecHop = new Float64Array(8);
++  private secSpecHop = new Float64Array(8); private secSpecDirty = true;   // a8: bandDbRaw andras bara i bigStep (var BIG_EVERY:e hop) -> magnituden raknas om da, inte varje hop
+   private secBlkRms2 = 0; private secBlkDb: number[] = []; private secBlkDens: number[] = [];
+   /** Korbanks-dump (LOTUS_SECTION_DUMP=1): en rad per 1 s-block [tS, dB, kickar, centroid, bInt, breaking, dropped, spec0..7, tier, label] for offline-simulering av rangloggiken. */
+   secDump: number[][] | null = sysEnv('SECTION_DUMP') === '1' ? [] : null;
+@@ -1690,7 +1691,11 @@ export class Analyser {
+   }
+   /** Hamta tempo/gridfas/sektion ur tillstandsblocket (varje hop, ~20 doubles). Aldre an barrierSeq ignoreras. */
+   private pullSlowState(): void {
++    // a8: tillstandet andras 100 ggr/s (env-recorden), hoppet 375: oforandrat seqlock-ord = samma block som sist (antingen redan
++    // tillampat eller redan avvisat mot barrierSeq, som bara vaxer) -> ingen kopiering. Ordet lases fore kopian (konservativt).
++    const w = Atomics.load(this.splitCtrl!, C_STATE_SEQ); if (w === this.stateWord) return;
+     if (!stateRead(this.splitCtrl!, this.splitState!, this.stateCopy)) return;
++    this.stateWord = w;
+     const s = this.stateCopy; if (s[S_REC_SEQ] < this.barrierSeq) return;
+     this.localBpm = s[S_BPM]; this.localBpmConfidence = s[S_CONF]; this.localBpmF = s[S_BPMF];
+     this.beatPhaseMs = s[S_PHASE_MS]; this.beatPhaseConf = s[S_PHASE_CONF];
+@@ -1698,6 +1703,7 @@ export class Analyser {
+     this.repeatSim = s[S_REP_SIM]; this.repeatAgoMs = s[S_REP_AGO]; this.repeatSection = SECTIONS[s[S_REP_SEC]] || '';
+     this.expectHighMs = s[S_EXPECT_MS]; this.expectSource = s[S_EXPECT_SRC]; this.prevSection = SECTIONS[s[S_PREV_SEC]] || ''; this.levelVsHighDb = s[S_LVL_HIGH];
+   }
++  private stateWord = -1;
+   setInlinePeer(slow: Analyser | null): void { this.inlinePeer = slow; }
+   /** Halsa for /api/live: hur langt efter workern ligger (records och ms), dess kostnad per record, tappade records. */
+   getSplitStats(): { role: string; written: number; processed: number; behind: number; lagMs: number; lagMaxMs: number; busyUs: number; busyMaxUs: number; skipped: number; lostFlags: number; restarts: number } | null {
+@@ -2807,8 +2813,11 @@ export class Analyser {
+     // Egen glidande 2048-buffert, matas samma hop. Ger 23 Hz/bin i botten så
+     // sub/kick/bas separeras. Per-band AGC-nivå + per-band adaptiv onset.
+     // Bufferten matas VARJE hop (glidande fönster måste vara obrutet)...
+-    this.bufferBig.copyWithin(0, hop);   // skjut vänster med en hop
+-    this.bufferBig.set(samples, this.bufferBig.length - hop);
++    // a8 RÄTT TAKT: 2048-bufferten skrivs som RING varje hop och läses i ordning bara när stor-FFT:n körs (var BIG_EVERY:e hop) -
++    // förr sköts alla 2048 sampel ett hop åt vänster varje hop (8 kB memmove x 375/s). Samma sampel i samma ordning in i fönstret.
++    { const B = this.bufferBig, N = B.length, p = this.bigPos;
++      if (p + hop <= N) B.set(samples, p); else { const k = N - p; B.set(samples.subarray(0, k), p); B.set(samples.subarray(k), 0); }
++      this.bigPos = (p + hop) % N; }
+     // ...men själva FFT:n + band-analysen körs bara var BIG_EVERY:e hop. 2048-FFT:n
+     // är analysatorns dyraste steg och spec-NIVÅERNA smoothas ändå ~90ms — de behöver
+     // inte 375Hz. MÄTT: analysen tog 3.8ms/hop mot 2.67ms budget → ljud droppades och
+@@ -3194,7 +3203,9 @@ export class Analyser {
+   private bigStep(): void {
+     const rms = this.hRms;
+     this.bigCounter = 0;
+-    for (let i = 0; i < this.bufferBig.length; i++) this.windowedBig[i] = this.bufferBig[i] * this.windowBig[i];
++    { const B = this.bufferBig, Wb = this.windowedBig, Hw = this.windowBig, N = B.length, p = this.bigPos, n1 = N - p;   // ringen i ordning (a8)
++      for (let i = 0; i < n1; i++) Wb[i] = B[p + i] * Hw[i];
++      for (let i = n1; i < N; i++) Wb[i] = B[i - n1] * Hw[i]; }
+     this.fftBig.realTransform(this.specBig, this.windowedBig);
+     // Bara upp till högsta bin som någon läser (band 8 slutar vid 16 kHz ≈ bin 683,
+     // låtminnet slutar vid 5 kHz ≈ bin 218). Resterande ~340 sqrt per stor-FFT hade
+@@ -3255,6 +3266,7 @@ export class Analyser {
+       // Ingen AGC, inget tak som följer med uppåt → en stigning syns som stigning.
+       const db = 20 * Math.log10(avg + 1e-7);
+       this.bandDbRaw[b] = db;   // RA dB (drop-kropp)
++      this.secSpecDirty = true;
+       this.bandDb[b] = Math.max(0, Math.min(1, (db + 70) / 60));
+       // Per-band AGC: skala mot egen långsamt sjunkande peak → varje band nyttjar
+       // full range oavsett mix (bas dominerar annars alltid rå-magnituden).
+@@ -3570,7 +3582,7 @@ export class Analyser {
+     const dtHop = this.dtHop;
+       if (SECTION_AGG_HOP) {
+         // Aldre vagen: bandens magnitud ur band-dB; odelad analysator kor sectionHop per hop, snabba sidan aggregerar.
+-        const sp = this.secSpecHop; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.bandDbRaw[i] / 20);
++        const sp = this.secSpecHop; if (this.secSpecDirty) { this.secSpecDirty = false; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.bandDbRaw[i] / 20); }
+         if (this.role === 'fast') {
+           const g = this.secAgg; g.n++; g.int += intensity; if (kick) g.kicks++; g.rms2 += rms * rms; g.cent += this.centSmooth; g.dt += this.dtHop * 1000;
+           g.breaking = breaking ? 1 : 0; g.wall = this.wallNow(); g.drops = this.dropCount + this.secBodyRet; g.active = this.activeMs; g.build = this.buildUp;
+diff --git a/src/beatFeed.ts b/src/beatFeed.ts
+index af3b862..af891d1 100644
+--- a/src/beatFeed.ts
++++ b/src/beatFeed.ts
+@@ -59,6 +59,20 @@ const FEED_RISE_HOPS = 6;
+  *  värdet före tystnaden (rutnätet hade redan rätt tempo). 0 = av (bit-identiskt). Bara effektklockan, inte analysatorns skuggrutnät. */
+ const BREAK_HOLD_MS = 20000;   // STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108); förr opt-in DMX_BREAK_HOLD_MS
+ const BREAK_RESTORE_MS = Number(process.env.DMX_BREAK_RESTORE_MS ?? String(BREAK_HOLD_MS));   // (2) för sig (prov: hållet av, bara dropens upptag)
++/** a8 TAKTFASEN UR ANSLAGEN (ettan, arena tvavagar 2026-11-08, strategin 'rätt takt per analys': ettan är en takt-sak, den mäts per
++ *  ANSLAG och beslutas per SLAG). Effektklockan tog förr analysatorns barShift, som är räknad mot ANALYSATORNS rutnät (skuggrutnätet,
++ *  annat ankare och annat slagindex): på effektklockan blev den en slumpvis förskjutning (testDownbeat: ettan rätt 16/69 = slumpen).
++ *  Nu mäter effektklockan sin egen takt: ett BASANSLAG (sub+kick stiger >= 6 dB på 6 hop, högst BAR_PK_RANGE_DB under basens tak -
++ *  annars fyrar bruset mellan slagen -, ansatsen = hoppet efter minimum de 8 hoppen före, minst 0,6 slag isär) väger med basens topp
++ *  de följande BAR_COLLECT hoppen på den plats i fyrtakten där ANSATSEN (+ BAR_EVAL_MS) ligger - det slag som klingar när anslaget
++ *  hörs, hur sent rutnätets slag än sitter. Vikterna glöms per slag (BAR_DECAY, ~10 takter); har en annan plats än 0 tydligt
++ *  (BAR_MARGIN) tyngst efter BAR_MIN_EV anslag blir den ettan (sedan minst 16 nya anslag före nästa byte). Lika tunga slag = inget byte.
++ *  BARA I UTGÅNGEN: matningens inre rutnät (det vikningen, tilliten och coasten räknar på) rörs inte - cfg.beat.anchorMs = inre ankare
++ *  + barOff hela slag, och effekternas takträknare får cfg.beatFxOff = barOff tillbaka (= samma slagindex som förr). Ljuset är alltså
++ *  oförändrat tills ägaren provat den nya ettan i ladan (sätt beatFxOff till 0 i effects.ts). (Provat och förkastat 11-08: ettan som
++ *  ankarflytt i det inre rutnätet - ändrade vikningens avrundningar och därmed hela taktförloppet, gridfel 32 -> 59 ms, ljuset +4 %;
++ *  rutnätet 8 hop tidigare + showLead lika mycket kortare - ljusdomaren -3,4.) */
++const BAR_DECAY = 0.975, BAR_MARGIN = 1.3, BAR_MIN_EV = 32, BAR_COLLECT = 12, BAR_EVAL_MS = 5, BAR_HOP_MS = 128 / 48, BAR_PK_DECAY_DB = 0.02, BAR_PK_RANGE_DB = 15;
+ const NO_AN = { resetTempo(): void {}, resetBar(): void {} };
+ /** HELA TEMPOOMRÅDET (2026-10-30, ägaren: 'få rutnätet att ha rätt tempo'): effektklockans andra sökcentrum var analysatorns bpm, som
+  *  i en mix står fel länge efter ett låtbyte (tempoMix: rätt 63 %, icke-harmoniskt fel 20 %, lås median 6 s). Nu viks basens stigning
+@@ -111,6 +125,10 @@ export class BeatFeed {
+   private fullK = 0; private fullHop = 0; private fullBest = 0; private fullBestBpm = 0; private fullBase = 0; private fullW = 0; private fullWV = 0; fullBpm = 0;
+   /** kickFold = vik onset.kick som före 10-27 (analysatorns skugga, se TVÅ RUTNÄT). Standard = basens stigning. */
+   private holdSince = 0; private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
++  // a8 TAKTFASEN UR ANSLAGEN (se BAR_DECAY): vikterna per plats, anslagsdetektorn, utgångens förskjutning (hela slag) mot det inre rutnätet
++  private readonly barW = new Float64Array(4); private readonly barDb = new Float64Array(16); private barH = 0; private barArmed = true; private barLastOn = -1e9;
++  private barOnT = 0; private barOnW = 0; private barOnLeft = 0; private barPkDb = -140; private barIdx = NaN; private barEv = 0;
++  private barRef: object | null = null; private barInner = 0; private barOff = 0;
+   private readonly ana: BeatFeed | null; private readonly anaGrid = { beat: null } as unknown as EngineConfig;
+   constructor(private readonly kickFold = false) { this.ana = kickFold ? null : new BeatFeed(true); }
+   /** Det cfg analysatorn ska byggas med: en grund kopia med eget rutnät (sätts via setBeatGrid i update). */
+@@ -165,6 +183,46 @@ export class BeatFeed {
+     this.onsetFixes++;
+   }
+ 
++  /** a8 TAKTFASEN UR ANSLAGEN: varje hop (anslagsdetektorn), vikten på ansatsens plats i fyrtakten, beslutet en gång per slag. Räknar på
++   *  det inre ankaret (this.barInner) och utgångens förskjutning barOff - ändrar aldrig beat.anchorMs själv. */
++  private barStep(frame: Frame, beat: NonNullable<EngineConfig["beat"]>, now: number): void {
++    const W = this.barW, inner = this.barInner;
++    if (beat !== this.barRef) { this.barRef = beat; this.barOff = 0; W.fill(0); this.barEv = 0; this.barIdx = NaN; this.barOnLeft = 0; this.barLastOn = -1e9; }
++    const bm = 60000 / beat.bpm, sa = frame.specAbs, v = (sa?.sub ?? 0) + (sa?.kick ?? 0), db = 20 * Math.log10(v + 1e-7);
++    const R = this.barDb, h = this.barH++; R[h & 15] = db;
++    this.barPkDb = db > this.barPkDb ? db : this.barPkDb - BAR_PK_DECAY_DB;   // basens tak (~7,5 dB/s ned)
++    if (this.barOnLeft > 0) {   // anslagets vikt = basens topp strax efter ansatsen
++      if (v > this.barOnW) this.barOnW = v;
++      if (--this.barOnLeft === 0) { const s = (((Math.floor((this.barOnT + BAR_EVAL_MS - inner) / bm) - this.barOff) % 4) + 4) % 4; W[s] += this.barOnW; this.barEv++; }
++    }
++    if (h >= 16) {
++      const rise = db - R[(h - 6) & 15];
++      if (rise < 3) this.barArmed = true;
++      if (this.barArmed && rise >= 6 && db > this.barPkDb - BAR_PK_RANGE_DB) {
++        this.barArmed = false;
++        let mi = 0, mv = 1e9; for (let k = 1; k <= 8; k++) { const x = R[(h - k) & 15]; if (x < mv) { mv = x; mi = k; } }
++        const tOn = now - (mi - 1) * BAR_HOP_MS;   // minimihoppets ljud slutar innan anslaget börjar: ansatsen = hoppet efter
++        if (this.barOnLeft === 0 && tOn - this.barLastOn >= 0.6 * bm) { this.barLastOn = tOn; this.barOnT = tOn; this.barOnW = v; this.barOnLeft = BAR_COLLECT; }
++      }
++    }
++    const idx = Math.floor((now - inner) / bm) - this.barOff;   // utgångens slagindex
++    if (idx === this.barIdx) return;
++    let cur = idx;
++    if (idx > this.barIdx) {   // nytt slag: glöm lite, besluta
++      for (let i = 0; i < 4; i++) W[i] *= BAR_DECAY;
++      if (this.barEv >= BAR_MIN_EV) {
++        let bi = 0; for (let i = 1; i < 4; i++) if (W[i] > W[bi]) bi = i;
++        let second = 0; for (let i = 0; i < 4; i++) if (i !== bi && W[i] > second) second = W[i];
++        if (bi !== 0 && W[bi] > second * BAR_MARGIN) {
++          this.barOff += bi;   // platsen bi blir ettan (i utgången)
++          const o = [W[0], W[1], W[2], W[3]]; for (let k = 0; k < 4; k++) W[k] = o[(k + bi) % 4];
++          cur = idx - bi; this.barEv = BAR_MIN_EV - 16;
++        }
++      }
++    }
++    this.barIdx = cur;
++  }
++
+   /** HELA TEMPOOMRÅDET: vikningens topp/medel för ringen V på tempot bpm (fönstret ONSET_WIN_MS bakåt från now), 0 = för lite ljud. */
+   private fullScore(V: Float32Array, bpm: number, now: number): number {
+     const bm = 60000 / bpm; this.fullS.fill(0); this.fullN.fill(0);
+@@ -218,6 +276,22 @@ export class BeatFeed {
+    *  `now` = hoppets klocka (2026-11-08: i analysatorns långsamma väg körs hoppet senare än det kom - klockan följer med recordet;
+    *  förr läste varje ställe Date.now() för sig, i bänken samma tal). */
+   update(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void }, now = Date.now()): void {
++    if (this.kickFold) { this.step(frame, cfg, an, now); return; }
++    // a8: taktfasen bara i utgången (se BAR_DECAY) - matningen räknar på sitt inre ankare, exakt som förr
++    const b0 = cfg.beat;
++    if (b0 && b0 === this.barRef) b0.anchorMs = this.barInner;
++    this.step(frame, cfg, an, now);
++    const b = cfg.beat;
++    if (!b) { cfg.beatFxOff = 0; return; }
++    if (b === b0 && b === this.barRef && frame.barShift > 0) this.barOff -= frame.barShift;   // förra justeringen flyttade det inre: utgången står kvar
++    this.barInner = b.anchorMs;
++    this.barStep(frame, b, now);
++    b.anchorMs = this.barInner + this.barOff * (60000 / b.bpm);
++    cfg.beatFxOff = this.barOff;
++  }
++
++  /** En hop av matningen (förr update; a8: update lägger taktfasen i utgången runt den). */
++  private step(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void }, now: number): void {
+     if (this.ana) {   // TVÅ RUTNÄT: analysatorns rutnät först (gamla vikningen, analysatorns återställningar), frame.bpmConfidence orörd
+       const bc = frame.bpmConfidence; this.ana.update(frame, this.anaGrid, an, now); frame.bpmConfidence = bc;
+       an.setBeatGrid?.(this.anaGrid.beat);
+diff --git a/src/config.ts b/src/config.ts
+index 021a919..3335fd5 100644
+--- a/src/config.ts
++++ b/src/config.ts
+@@ -141,6 +141,9 @@ export interface EngineConfig {
+   /** Transient PLL-fasfel (-0.25..0.25 av en takt), utjämnat — för UI:ts beat-synk-
+    *  indikator (ser hur mycket fasen justeras). Ej persisterad. */
+   beatErr?: number;
++  /** a8: effekternas takträknare = effektklockans slagindex + beatFxOff (hela slag): ljuset behåller förra taktfasen (analysatorns barShift)
++   *  medan effektklockan (dirigenten) har ettan ur anslagen (beatFeed.ts BAR_DECAY). 0/osatt = samma index. */
++  beatFxOff?: number;
+   /** Upper DMX refresh cap (Hz). Actual rate = min(dmxMaxHz, wire-limit). */
+   /** HELA SHOWENS FÖRSPRÅNG mot musiken (ms) — en ratt för all fördröjning i kedjan:
+    *  DMX-överföring, lampornas svarstid, ljudkortets buffert. Analysatorns eget ankare
+@@ -195,8 +198,6 @@ export const defaultConfig: EngineConfig = {
+     { name: "Par 2", address: 8,  preset: "rgb7" },
+     { name: "Par 3", address: 15, preset: "rgb7" },
+     { name: "Par 4", address: 22, preset: "rgb7" },
+-    // Par 5-8 (beställda 11-08, samma modell) läggs INTE här: bänken och arenan kör på dessa
+-    // standardlampor, och 8 skulle flytta alla mått. Pi:ns sparade config får dem via tools/atta_lampor.py.
+   ],
+   mode: "smart",
+   audioInput: "aux",
+@@ -220,8 +221,7 @@ export const defaultConfig: EngineConfig = {
+   // svavtiden gor att man inte kan angra sig. Maskinen orkar dessutom bara
+   // 40-50s i strack innan varmeblocket maste hamta igen, sa 1s/60s ar ~1.6%
+   // arbetscykel - den hinner alltid vara varm. Oka vid behov, inte tvartom.
+-  // Adress 57 = första lediga kanal efter Par 8 (50-56). Förr 13, som låg mitt i Par 2 (8-14).
+-  fog: { enabled: false, address: 57, onDrop: true, burstMs: 1000, cooldownMs: 120000, level: 255, warmupMs: 600000, sprayMs: 0, bursts: 0 },
++  fog: { enabled: false, address: 13, onDrop: true, burstMs: 1000, cooldownMs: 120000, level: 255, warmupMs: 600000, sprayMs: 0, bursts: 0 },
+   scenicAnchor: false,    // ägar-val: antar lampor i rad vänster→höger
+ };
+ 
+diff --git a/src/effects.ts b/src/effects.ts
+index bad4a2a..b0665b2 100644
+--- a/src/effects.ts
++++ b/src/effects.ts
+@@ -1296,7 +1296,7 @@ export class EffectEngine {
+     let beatEnv = 0, beatTick = false;
+     if (beat && beat.bpm > 40) {
+       const now2 = nowWall;
+-      const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
++      const beatIdx = beatIndex(beat, now2 + this.showLead) + (this.cfg.beatFxOff ?? 0);   // takträknaren stegar lika tidigt (a8: + beatFxOff, se config.ts)
+       // PRESENTATIONSTAKT: över PULSE_HALVE_ABOVE_BPM pulsar hjärtslaget på varannat
+       // slag (hysteres nedåt så gränsen inte flappar). Taktklockan, beatTick och alla
+       // grid-effekter rör vi INTE — bara pulsens form sträcks över två slag.
+@@ -1347,7 +1347,7 @@ export class EffectEngine {
+       // för grid-effekterna) och håll tSince icke-avtagande inom en puls. Nollas när en
+       // NY puls börjar. pulseIdx och fasen delar försprång (atk+showLead), så de wrappar
+       // i samma frame → golvet nollas exakt när fasen är ~0 = frisk attack.
+-      const pulseIdx = beatIndex(beat, now2 + atk + this.showLead);
++      const pulseIdx = beatIndex(beat, now2 + atk + this.showLead) + (this.cfg.beatFxOff ?? 0);
+       if (this.lastPulseIdx === PULSE_IDX_INIT) this.lastPulseIdx = pulseIdx;
+       if (pulseIdx > this.lastPulseIdx) {
+         this.lastPulseIdx = pulseIdx;
+diff --git a/src/split.ts b/src/split.ts
+index 7295d9e..c4dfc5a 100644
+--- a/src/split.ts
++++ b/src/split.ts
+@@ -160,14 +160,14 @@ export const C_HOP_WRITE = 4, C_HOP_READ = 5, C_FEED_SEQ = 6 /* taktvägens seql
+ export const FS_HOP_SEQ = 0, FS_BEAT = 1 /* cfg.beat: 0 undefined, -1 null, 1 objekt */, FS_ANCHOR = 2, FS_BPM = 3, FS_BCONF = 4,
+   FS_BEATERR = 5 /* NaN = osatt */, FS_FCONF = 6 /* frame.bpmConfidence efter matningen, NaN = orörd */, FS_GRID = 7 /* analysatorns rutnät 0 null/1 */,
+   FS_GANCHOR = 8, FS_GBPM = 9, FS_GCONF = 10, FS_RT_CNT = 11 /* resetTempo, räknare */, FS_RB_CNT = 12 /* resetBar, räknare */,
+-  FS_PROCESSED = 13, FS_LAG_MS = 14, FS_LAG_MAX = 15, FS_BUSY_US = 16, FS_BUSY_MAX_US = 17, FS_SKIPPED = 18;
+-export const FEED_STATE_LEN = 19;
++  FS_PROCESSED = 13, FS_LAG_MS = 14, FS_LAG_MAX = 15, FS_BUSY_US = 16, FS_BUSY_MAX_US = 17, FS_SKIPPED = 18, FS_FXOFF = 19 /* a8 cfg.beatFxOff */;
++export const FEED_STATE_LEN = 20;
+ 
+ /** Det taktmatningen läser ur ramen, och det den skriver (cfg.beat/beatErr, frame.bpmConfidence, analysatorns rutnät/kommandon). */
+ export interface HopFrame { bpm: number; bpmConfidence: number; beatAnchorMs: number; kickAtMs: number; barShift: number;
+   onset: { kick: number; highMid: number; treble: number }; specAbs: { sub: number; kick: number } }
+ export interface HopGrid { anchorMs: number; bpm: number; confidence?: number }
+-export interface HopCfg { beat?: HopGrid | null; beatErr?: number }
++export interface HopCfg { beat?: HopGrid | null; beatErr?: number; beatFxOff?: number }
+ export interface HopTarget { resetTempo(): void; resetBar(): void; setBeatGrid?(g: HopGrid | null): void }
+ /** Systemets taktmatning (DMX: BeatFeed). `now` = hoppets klocka (Date.now() när hoppet kom, inte när workern kör det). */
+ export interface HopFeed { update(frame: HopFrame, cfg: HopCfg, an: HopTarget, now: number): void }
+@@ -176,7 +176,7 @@ export interface HopFeed { update(frame: HopFrame, cfg: HopCfg, an: HopTarget, n
+ export class HopLaneFast {
+   private readonly ctrl: Int32Array; private readonly ring: Float64Array; private readonly state: Float64Array;
+   private readonly s = new Float64Array(FEED_STATE_LEN);
+-  private seq = 0; private applied = 0; private rt = 0; private rb = 0;
++  private seq = 0; private applied = 0; private rt = 0; private rb = 0; private word = -1;
+   private readonly grid = { anchorMs: 0.5, bpm: 0.5, confidence: 0.5 };
+   /** inline-läget (bänken): den långsamma sidan körs synkront här. */
+   peer: HopLaneSlow | null = null;
+@@ -196,7 +196,12 @@ export class HopLaneFast {
+     if (this.peer) this.peer.drain();
+     else if (this.sync) syncWait(ctrl, C_FEED_SEQ, () => stateRead(ctrl, this.state, this.s, C_FEED_SEQ) && this.s[FS_HOP_SEQ] >= seq);
+     const s = this.s;
+-    if (!stateRead(ctrl, this.state, s, C_FEED_SEQ) || s[FS_HOP_SEQ] === 0) return;   // inget resultat an (eller mitt i skrivning: behall forra)
++    // a8: oforandrat seqlock-ord = samma resultat som sist -> bara tilliten (ramen skrivs om av analysatorn varje hop), ingen kopiering
++    const word = Atomics.load(ctrl, C_FEED_SEQ);
++    if (word === this.word) { if (s[FS_HOP_SEQ] !== 0) { const fc = s[FS_FCONF]; if (fc === fc) f.bpmConfidence = fc; } return; }
++    if (!stateRead(ctrl, this.state, s, C_FEED_SEQ)) return;   // mitt i skrivning: behall forra
++    this.word = word;
++    if (s[FS_HOP_SEQ] === 0) return;   // inget resultat an
+     const fc = s[FS_FCONF]; if (fc === fc) f.bpmConfidence = fc;   // tilliten (bara om matningen andrade den)
+     if (s[FS_HOP_SEQ] === this.applied) return;
+     this.applied = s[FS_HOP_SEQ];
+@@ -210,6 +215,7 @@ export class HopLaneFast {
+       else { cfg.beat.anchorMs = s[FS_ANCHOR]; cfg.beat.bpm = s[FS_BPM]; cfg.beat.confidence = s[FS_BCONF]; }
+     } else cfg.beat = bc === -1 ? null : undefined;
+     const be = s[FS_BEATERR]; if (be === be) cfg.beatErr = be;
++    cfg.beatFxOff = s[FS_FXOFF];
+   }
+   /** Hälsa: hur långt efter taktvägen ligger (hop och ms), dess kostnad per hop, tappade hop. */
+   stats(): { written: number; processed: number; behind: number; lagMs: number; lagMaxMs: number; busyUs: number; busyMaxUs: number; skipped: number } {
+@@ -264,7 +270,7 @@ export class HopLaneSlow {
+         const b = this.cfg.beat, g = this.grid;
+         s[FS_HOP_SEQ] = this.seq; s[FS_BEAT] = b ? 1 : b === null ? -1 : 0;
+         if (b) { s[FS_ANCHOR] = b.anchorMs; s[FS_BPM] = b.bpm; s[FS_BCONF] = b.confidence ?? 0; }
+-        s[FS_BEATERR] = this.cfg.beatErr ?? NaN; s[FS_FCONF] = this.fconf;
++        s[FS_BEATERR] = this.cfg.beatErr ?? NaN; s[FS_FCONF] = this.fconf; s[FS_FXOFF] = this.cfg.beatFxOff ?? 0;
+         s[FS_GRID] = g ? 1 : 0; if (g) { s[FS_GANCHOR] = g.anchorMs; s[FS_GBPM] = g.bpm; s[FS_GCONF] = g.confidence ?? 0; }
+         s[FS_RT_CNT] = this.rt; s[FS_RB_CNT] = this.rb;
+         s[FS_PROCESSED] = this.processed; s[FS_LAG_MS] = lagMs; s[FS_LAG_MAX] = this.lagMaxMs; s[FS_BUSY_US] = this.busyEmaUs; s[FS_BUSY_MAX_US] = this.busyMaxUs; s[FS_SKIPPED] = this.skipped;
