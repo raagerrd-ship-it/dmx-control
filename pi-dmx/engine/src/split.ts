@@ -90,43 +90,187 @@ export const STATE_LEN = 24;
 export const SECTIONS = ['', 'intro', 'low', 'build', 'high', 'break'];
 export function sectionCode(s: string): number { const i = SECTIONS.indexOf(s); return i < 0 ? 0 : i; }
 
-export interface SplitBuffers { ctrl: SharedArrayBuffer; ring: SharedArrayBuffer; state: SharedArrayBuffer; }
+export interface SplitBuffers { ctrl: SharedArrayBuffer; ring: SharedArrayBuffer; state: SharedArrayBuffer; hop?: SharedArrayBuffer; hopState?: SharedArrayBuffer /* taktvägen */ }
 
 /** Meddelanden main ↔ worker (bara utanför driftvägen). `crash` finns ENBART bakom <prefix>SPLIT_TEST_CRASH=1 (stresstest). */
 export type WorkerMsg = { type: 'stop' } | { type: 'crash' };
 /** cfg ar en KOPIA (structured clone) fran workerns start: den langsamma sidan ser aldrig motorns senare andringar (cfg.beat,
  *  UI-andrade detection-varden). Las darfor aldrig cfg efter start i den langsamma sidan - behovs ett levande varde, skicka det i recorden
  *  (bankens inline-lage ger samma kopia, structuredClone, sedan 10-19). */
-export interface WorkerData { cfg: unknown; buffers: SplitBuffers; resumeSeq: number /* senast lästa record (full seq) — 0 vid första start */ }
+export interface WorkerData { cfg: unknown; buffers: SplitBuffers; resumeSeq: number /* senast lästa record (full seq) — 0 vid första start */; sync?: boolean /* bänkens synk-läge */ }
 
-export function createSplitBuffers(): SplitBuffers {
-  return {
+export function createSplitBuffers(hopLane = false): SplitBuffers {
+  const b: SplitBuffers = {
     ctrl: new SharedArrayBuffer(16 * 4),
     ring: new SharedArrayBuffer(RING_N * REC_LEN * 8),
     state: new SharedArrayBuffer(STATE_LEN * 8),
   };
+  if (hopLane) { b.hop = new SharedArrayBuffer(HOP_RING_N * HOP_REC_LEN * 8); b.hopState = new SharedArrayBuffer(FEED_STATE_LEN * 8); }
+  return b;
 }
 
 export function viewsOf(b: SplitBuffers): { ctrl: Int32Array; ring: Float64Array; state: Float64Array } {
   return { ctrl: new Int32Array(b.ctrl), ring: new Float64Array(b.ring), state: new Float64Array(b.state) };
 }
 
-/** Skriv tillståndsblocket under seqlock (skrivaren är ensam: workern). */
-export function stateWrite(ctrl: Int32Array, state: Float64Array, fill: (s: Float64Array) => void): void {
-  const s = Atomics.load(ctrl, C_STATE_SEQ);
-  Atomics.store(ctrl, C_STATE_SEQ, s + 1);
+/** Skriv tillståndsblocket under seqlock (skrivaren är ensam: workern). `word` = seqlockens kontrollord (taktvägen: C_FEED_SEQ). */
+export function stateWrite(ctrl: Int32Array, state: Float64Array, fill: (s: Float64Array) => void, word = C_STATE_SEQ): void {
+  const s = Atomics.load(ctrl, word);
+  Atomics.store(ctrl, word, s + 1);
   fill(state);
-  Atomics.store(ctrl, C_STATE_SEQ, s + 2);
+  Atomics.store(ctrl, word, s + 2);
 }
 
 /** Läs tillståndsblocket konsistent till `out` (kopia). false = fick ingen konsistent läsning (behåll förra). */
-export function stateRead(ctrl: Int32Array, state: Float64Array, out: Float64Array): boolean {
+export function stateRead(ctrl: Int32Array, state: Float64Array, out: Float64Array, word = C_STATE_SEQ): boolean {
   for (let tries = 0; tries < 4; tries++) {
-    const s1 = Atomics.load(ctrl, C_STATE_SEQ);
+    const s1 = Atomics.load(ctrl, word);
     if (s1 & 1) continue;
     out.set(state);
-    const s2 = Atomics.load(ctrl, C_STATE_SEQ);
+    const s2 = Atomics.load(ctrl, word);
     if (s1 === s2) return true;
   }
   return false;
+}
+
+/** SYNK-LÄGET (bara bänken, createAnalyser(cfg, 'sync')): den snabba sidan väntar tills workern publicerat (workern notify:ar `word`
+ *  efter varje publicering) - den RIKTIGA workern i lås-steg med ljudet, så den kan jämföras hop för hop mot inline-läget. */
+export function syncWait(ctrl: Int32Array, word: number, ready: () => boolean): void {
+  for (let i = 0; i < 300; i++) {
+    const v = Atomics.load(ctrl, word);
+    if (ready()) return;
+    Atomics.wait(ctrl, word, v, 100);
+  }
+  throw new Error('analyser-split sync: workern svarar inte (30 s)');
+}
+
+// ── TAKTVÄGEN (2026-11-08, ägaren: 'en analysator, två vägar - den snabba och den som ger dirigenten information') ─────────────
+// Systemets TAKTMATNING (DMX: src/beatFeed.ts, ~20 % av motorns CPU) körs i den långsamma tråden i stället för i hop-loopen.
+// Bara när systemets profil har BEAT_FEED 'slow' OCH en slowHopFeed-fabrik (DMX); lotus profil saknar båda = inget av detta finns.
+// Den snabba sidan skriver ett RECORD PER HOP (ramens ~10 fält taktmatningen läser + hoppets klocka) i en egen ring; workern kör
+// taktmatningen på recordet och publicerar resultatet (rutnätet, tilliten, analysatorns eget rutnät, kommandona resetTempo/resetBar)
+// i ett eget tillståndsblock med egen seqlock. Den snabba sidan lägger resultatet i motorns cfg/ram och utför kommandona på SIN
+// analysator (som förr - flaggorna går sedan i env-recorden som vanligt), så kommandoordningen är exakt den gamla i inline-läget.
+// Taktmatningen läser inget ur den långsamma analysatorn: de två körs oberoende i workern.
+export const HOP_REC_LEN = 13;
+export const HOP_RING_N = 4096;                // ~11 s vid 375 Hz
+export const H_SEQ = 0, H_NOW = 1 /* Date.now() vid hoppet = taktmatningens klocka */, H_TS = 2 /* timeOrigin+performance.now(), fördröjningsmått */,
+  H_BPM = 3, H_CONF = 4, H_ANCHOR = 5, H_KICKAT = 6, H_BARSHIFT = 7, H_ON_KICK = 8, H_ON_HIMID = 9, H_ON_TREBLE = 10, H_SA_SUB = 11, H_SA_KICK = 12;
+export const C_HOP_WRITE = 4, C_HOP_READ = 5, C_FEED_SEQ = 6 /* taktvägens seqlock */, C_WAKE = 7 /* väckningsord: env- OCH hop-record (bara med taktvägen) */;
+export const FS_HOP_SEQ = 0, FS_BEAT = 1 /* cfg.beat: 0 undefined, -1 null, 1 objekt */, FS_ANCHOR = 2, FS_BPM = 3, FS_BCONF = 4,
+  FS_BEATERR = 5 /* NaN = osatt */, FS_FCONF = 6 /* frame.bpmConfidence efter matningen, NaN = orörd */, FS_GRID = 7 /* analysatorns rutnät 0 null/1 */,
+  FS_GANCHOR = 8, FS_GBPM = 9, FS_GCONF = 10, FS_RT_CNT = 11 /* resetTempo, räknare */, FS_RB_CNT = 12 /* resetBar, räknare */,
+  FS_PROCESSED = 13, FS_LAG_MS = 14, FS_LAG_MAX = 15, FS_BUSY_US = 16, FS_BUSY_MAX_US = 17, FS_SKIPPED = 18;
+export const FEED_STATE_LEN = 19;
+
+/** Det taktmatningen läser ur ramen, och det den skriver (cfg.beat/beatErr, frame.bpmConfidence, analysatorns rutnät/kommandon). */
+export interface HopFrame { bpm: number; bpmConfidence: number; beatAnchorMs: number; kickAtMs: number; barShift: number;
+  onset: { kick: number; highMid: number; treble: number }; specAbs: { sub: number; kick: number } }
+export interface HopGrid { anchorMs: number; bpm: number; confidence?: number }
+export interface HopCfg { beat?: HopGrid | null; beatErr?: number }
+export interface HopTarget { resetTempo(): void; resetBar(): void; setBeatGrid?(g: HopGrid | null): void }
+/** Systemets taktmatning (DMX: BeatFeed). `now` = hoppets klocka (Date.now() när hoppet kom, inte när workern kör det). */
+export interface HopFeed { update(frame: HopFrame, cfg: HopCfg, an: HopTarget, now: number): void }
+
+/** Taktvägen, snabba sidan (motorns tråd): skriv hoppet, hämta senaste resultatet och lägg det i motorns cfg/ram/analysator. */
+export class HopLaneFast {
+  private readonly ctrl: Int32Array; private readonly ring: Float64Array; private readonly state: Float64Array;
+  private readonly s = new Float64Array(FEED_STATE_LEN);
+  private seq = 0; private applied = 0; private rt = 0; private rb = 0;
+  private readonly grid = { anchorMs: 0.5, bpm: 0.5, confidence: 0.5 };
+  /** inline-läget (bänken): den långsamma sidan körs synkront här. */
+  peer: HopLaneSlow | null = null;
+  constructor(b: SplitBuffers, private readonly sync = false) {
+    this.ctrl = new Int32Array(b.ctrl); this.ring = new Float64Array(b.hop!); this.state = new Float64Array(b.hopState!);
+  }
+  /** Ett hop (efter analysatorn, före effekterna - där motorn förr anropade taktmatningen). */
+  feed(f: HopFrame, cfg: HopCfg, an: HopTarget): void {
+    const r = this.ring, ctrl = this.ctrl, seq = ++this.seq, o = (seq % HOP_RING_N) * HOP_REC_LEN;
+    r[o + H_NOW] = Date.now(); r[o + H_TS] = performance.timeOrigin + performance.now();
+    r[o + H_BPM] = f.bpm; r[o + H_CONF] = f.bpmConfidence; r[o + H_ANCHOR] = f.beatAnchorMs; r[o + H_KICKAT] = f.kickAtMs; r[o + H_BARSHIFT] = f.barShift;
+    r[o + H_ON_KICK] = f.onset?.kick ?? 0; r[o + H_ON_HIMID] = f.onset?.highMid ?? 0; r[o + H_ON_TREBLE] = f.onset?.treble ?? 0;
+    r[o + H_SA_SUB] = f.specAbs?.sub ?? 0; r[o + H_SA_KICK] = f.specAbs?.kick ?? 0;
+    r[o + H_SEQ] = seq;                                    // sist: seq = recordet ar komplett
+    Atomics.store(ctrl, C_HOP_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
+    if (Atomics.load(ctrl, C_WAITING)) Atomics.notify(ctrl, C_WAKE, 1);
+    if (this.peer) this.peer.drain();
+    else if (this.sync) syncWait(ctrl, C_FEED_SEQ, () => stateRead(ctrl, this.state, this.s, C_FEED_SEQ) && this.s[FS_HOP_SEQ] >= seq);
+    const s = this.s;
+    if (!stateRead(ctrl, this.state, s, C_FEED_SEQ) || s[FS_HOP_SEQ] === 0) return;   // inget resultat an (eller mitt i skrivning: behall forra)
+    const fc = s[FS_FCONF]; if (fc === fc) f.bpmConfidence = fc;   // tilliten (bara om matningen andrade den)
+    if (s[FS_HOP_SEQ] === this.applied) return;
+    this.applied = s[FS_HOP_SEQ];
+    if (s[FS_RT_CNT] !== this.rt) { this.rt = s[FS_RT_CNT]; an.resetTempo(); }
+    if (s[FS_RB_CNT] !== this.rb) { this.rb = s[FS_RB_CNT]; an.resetBar(); }
+    if (s[FS_GRID] === 1) { const g = this.grid; g.anchorMs = s[FS_GANCHOR]; g.bpm = s[FS_GBPM]; g.confidence = s[FS_GCONF]; an.setBeatGrid?.(g); }
+    else an.setBeatGrid?.(null);
+    const bc = s[FS_BEAT];
+    if (bc === 1) {
+      if (!cfg.beat) cfg.beat = { anchorMs: s[FS_ANCHOR], bpm: s[FS_BPM], confidence: s[FS_BCONF] };
+      else { cfg.beat.anchorMs = s[FS_ANCHOR]; cfg.beat.bpm = s[FS_BPM]; cfg.beat.confidence = s[FS_BCONF]; }
+    } else cfg.beat = bc === -1 ? null : undefined;
+    const be = s[FS_BEATERR]; if (be === be) cfg.beatErr = be;
+  }
+  /** Hälsa: hur långt efter taktvägen ligger (hop och ms), dess kostnad per hop, tappade hop. */
+  stats(): { written: number; processed: number; behind: number; lagMs: number; lagMaxMs: number; busyUs: number; busyMaxUs: number; skipped: number } {
+    const s = this.s;
+    return { written: this.seq, processed: s[FS_PROCESSED], behind: this.seq - s[FS_HOP_SEQ], lagMs: +s[FS_LAG_MS].toFixed(2), lagMaxMs: +s[FS_LAG_MAX].toFixed(2),
+      busyUs: +s[FS_BUSY_US].toFixed(1), busyMaxUs: Math.round(s[FS_BUSY_MAX_US]), skipped: s[FS_SKIPPED] };
+  }
+}
+
+/** Taktvägen, långsamma sidan (workern, eller inline i bänken): kör systemets taktmatning på varje hop-record, publicera resultatet. */
+export class HopLaneSlow {
+  private readonly ctrl: Int32Array; private readonly ring: Float64Array; private readonly state: Float64Array;
+  private seq: number; private rt: number; private rb: number; private processed: number;
+  private skipped = 0; private lagMaxMs = 0; private busyEmaUs = 0; private busyMaxUs = 0; private fconf = NaN;
+  private readonly fr = { bpm: 0.5, bpmConfidence: 0.5, beatAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5,
+    onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5 } };
+  private readonly cfg: HopCfg = { beat: undefined, beatErr: undefined };
+  private grid: HopGrid | null = null;
+  private readonly target: HopTarget = { resetTempo: () => { this.rt++; }, resetBar: () => { this.rb++; }, setBeatGrid: (g) => { this.grid = g; } };
+  constructor(b: SplitBuffers, private readonly feed: HopFeed, private readonly notify = false) {
+    this.ctrl = new Int32Array(b.ctrl); this.ring = new Float64Array(b.hop!); this.state = new Float64Array(b.hopState!);
+    // Omstart av workern: fortsatt i sekvensen och med raknarna (annars ser snabba sidan ett 'nytt' resetTempo); matningen borjar om.
+    const sq = Atomics.load(this.ctrl, C_FEED_SEQ); if (sq & 1) Atomics.store(this.ctrl, C_FEED_SEQ, sq + 1);   // dog mitt i skrivning
+    const st = this.state; this.seq = st[FS_HOP_SEQ]; this.rt = st[FS_RT_CNT]; this.rb = st[FS_RB_CNT]; this.processed = st[FS_PROCESSED];
+  }
+  readSeq(): number { return this.seq; }
+  /** Behandla alla hop-record sedan sist, publicera. Returnerar antal. */
+  drain(): number {
+    const ctrl = this.ctrl, r = this.ring, fr = this.fr;
+    const w = this.seq + seqDelta(Atomics.load(ctrl, C_HOP_WRITE), this.seq); let n = 0, lagMs = 0;
+    if (w - this.seq > HOP_RING_N - RING_MARGIN) { this.skipped += (w - this.seq) - (HOP_RING_N - RING_MARGIN); this.seq = w - (HOP_RING_N - RING_MARGIN); }
+    while (this.seq < w) {
+      const seq = ++this.seq, o = (seq % HOP_RING_N) * HOP_REC_LEN;
+      if (r[o + H_SEQ] !== seq) { this.skipped++; continue; }
+      const t0 = performance.now();
+      fr.bpm = r[o + H_BPM]; fr.bpmConfidence = r[o + H_CONF]; fr.beatAnchorMs = r[o + H_ANCHOR]; fr.kickAtMs = r[o + H_KICKAT]; fr.barShift = r[o + H_BARSHIFT];
+      fr.onset.kick = r[o + H_ON_KICK]; fr.onset.highMid = r[o + H_ON_HIMID]; fr.onset.treble = r[o + H_ON_TREBLE];
+      fr.specAbs.sub = r[o + H_SA_SUB]; fr.specAbs.kick = r[o + H_SA_KICK];
+      const cin = fr.bpmConfidence;
+      this.feed.update(fr, this.cfg, this.target, r[o + H_NOW]);
+      this.fconf = fr.bpmConfidence !== cin ? fr.bpmConfidence : NaN;
+      const t1 = performance.now(), us = (t1 - t0) * 1000;
+      this.busyEmaUs = this.busyEmaUs === 0 ? us : this.busyEmaUs + 0.02 * (us - this.busyEmaUs);
+      if (us > this.busyMaxUs) this.busyMaxUs = us;
+      lagMs = performance.timeOrigin + t1 - r[o + H_TS]; if (lagMs > this.lagMaxMs) this.lagMaxMs = lagMs;
+      n++;
+    }
+    if (n > 0) {
+      this.processed += n;
+      Atomics.store(ctrl, C_HOP_READ, seqLow(this.seq));
+      stateWrite(ctrl, this.state, (s) => {
+        const b = this.cfg.beat, g = this.grid;
+        s[FS_HOP_SEQ] = this.seq; s[FS_BEAT] = b ? 1 : b === null ? -1 : 0;
+        if (b) { s[FS_ANCHOR] = b.anchorMs; s[FS_BPM] = b.bpm; s[FS_BCONF] = b.confidence ?? 0; }
+        s[FS_BEATERR] = this.cfg.beatErr ?? NaN; s[FS_FCONF] = this.fconf;
+        s[FS_GRID] = g ? 1 : 0; if (g) { s[FS_GANCHOR] = g.anchorMs; s[FS_GBPM] = g.bpm; s[FS_GCONF] = g.confidence ?? 0; }
+        s[FS_RT_CNT] = this.rt; s[FS_RB_CNT] = this.rb;
+        s[FS_PROCESSED] = this.processed; s[FS_LAG_MS] = lagMs; s[FS_LAG_MAX] = this.lagMaxMs; s[FS_BUSY_US] = this.busyEmaUs; s[FS_BUSY_MAX_US] = this.busyMaxUs; s[FS_SKIPPED] = this.skipped;
+      }, C_FEED_SEQ);
+      if (this.notify) Atomics.notify(ctrl, C_FEED_SEQ);
+    }
+    return n;
+  }
 }

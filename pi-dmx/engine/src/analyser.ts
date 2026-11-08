@@ -24,6 +24,7 @@ import {
   C_WRITE, C_READ, S_REC_SEQ, S_BPM, S_CONF, S_BPMF, S_PHASE_MS, S_PHASE_CONF, S_SECTION, S_SEC_START, S_SEC_INDEX, S_SEC_TIER,
   S_REP_SIM, S_REP_AGO, S_REP_SEC, S_EXPECT_MS, S_EXPECT_SRC, S_PREV_SEC, S_LVL_HIGH, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
   SECTIONS, sectionCode, viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
+  C_WAKE, syncWait, HopLaneFast, HopLaneSlow, type HopFeed,
 } from './split.js';
 import FFT from "fft.js";
 
@@ -94,6 +95,8 @@ export interface SplitInit {
   role: 'all' | 'fast' | 'slow';
   split?: SplitBuffers;
   resumeSeq?: number;
+  /** Bänkens synk-läge (createAnalyser(cfg, 'sync')): snabba sidan väntar på workern, workern notify:ar efter publicering. */
+  sync?: boolean;
 }
 
 /** Rikt log-spektrum (8 band) från den parallella 2048-FFT:n. Varje band är
@@ -632,6 +635,9 @@ export class Analyser {
   private slowGap = false;         // slow: records tappade sedan senast behandlade -> kontrollera forlorade flaggor
   private slowLostFlags = 0;       // slow: antal flaggor som aterskapats ur raknarna efter tapp (statistik)
   splitRestarts = 0;               // fast: antal omstarter av workern (satts av index.ts)
+  /** TAKTVÄGEN (split.ts): systemets taktmatning i den långsamma tråden. null = ingen (lotus; DMX utan BEAT_FEED 'slow' eller odelad). */
+  hopLane: HopLaneFast | null = null;
+  private syncWorker = false;      // fast: vänta på workern efter varje record; slow: notify efter publicering (bänkens synk-läge)
   /** HOPPETS VÄRDEN (2026-10-17, skräpjakten): decimaltal som skickas som argument till, eller returneras från, en metod som V8 inte
    *  inlinar blir ett nytt HeapNumber per anrop (process 47 -> 6 kB/s skräp när de gick via fält). De heta stegen läser därför hoppets
    *  värden ur fält som process() skriver. Alla initieras som decimaltal (0,5) så fälten har Double-form från start. */
@@ -1678,7 +1684,9 @@ export class Analyser {
     this.pendFlags = 0;
     Atomics.store(ctrl, C_WRITE, seqLow(seq));             // laga 32 bitarna; workern rekonstruerar via seqDelta (wrap-sakert)
     if (Atomics.load(ctrl, C_WAITING)) Atomics.notify(ctrl, C_WRITE, 1);   // Dekker: workern satter C_WAITING fore wait-jamforelsen
+    if (this.hopLane) { Atomics.add(ctrl, C_WAKE, 1); if (Atomics.load(ctrl, C_WAITING)) Atomics.notify(ctrl, C_WAKE, 1); }   // taktvägen: workern väntar på C_WAKE
     if (this.inlinePeer) { this.inlinePeer.drainRecords(); this.pullSlowState(); }   // inline-lage (korbank): synkront har, tillstandet hamtas direkt
+    else if (this.syncWorker) { syncWait(ctrl, C_STATE_SEQ, () => stateRead(ctrl, this.splitState!, this.stateCopy) && this.stateCopy[S_REC_SEQ] >= seq); this.pullSlowState(); }
   }
   /** Hamta tempo/gridfas/sektion ur tillstandsblocket (varje hop, ~20 doubles). Aldre an barrierSeq ignoreras. */
   private pullSlowState(): void {
@@ -1741,6 +1749,7 @@ export class Analyser {
         s[S_EXPECT_MS] = this.expectHighMs; s[S_EXPECT_SRC] = this.expectSource; s[S_PREV_SEC] = sectionCode(this.prevSection); s[S_LVL_HIGH] = this.levelVsHighDb;
         s[S_PROCESSED] = this.slowProcessed; s[S_LAG_MS] = lagMs; s[S_LAG_MAX] = this.slowLagMaxMs; s[S_BUSY_US] = this.slowBusyEmaUs; s[S_BUSY_MAX_US] = this.slowBusyMaxUs; s[S_SKIPPED] = this.slowSkipped; s[S_LOST_FLAGS] = this.slowLostFlags;
       });
+      if (this.syncWorker) Atomics.notify(ctrl, C_STATE_SEQ);
     }
     return n;
   }
@@ -2513,6 +2522,7 @@ export class Analyser {
       // resumeSeq (full JS-seq) fran index.ts: slow = senast lasta record (omstart av workern fortsatter dar den dog,
       // drainRecords klipper backloggen till RING_N-RING_MARGIN); C_READ ar bara 32 laga bitar och duger inte ensamt.
       this.recSeq = splitIn?.resumeSeq ?? cfgIn.resumeSeq ?? 0;
+      this.syncWorker = splitIn?.sync === true;
       if (this.role === 'slow') {
         this.slowGap = true;   // forsta recordet: okand forhistoria -> raknarna tas som utgangspunkt
         // Seqlock-paritet: dog forra workern MITT I stateWrite (terminate/OOM) star C_STATE_SEQ udda for alltid och varje
@@ -3652,20 +3662,34 @@ export const WORKER_RESTART_WINDOW_MS = 10 * 60_000;
  *
  * Testkrokar pa den returnerade analysatorn (bara worker-laget): __worker (aktuell Worker), __stopWorker() (stanger
  * utan omstart), splitRestarts (antal omstarter hittills).
+ *
+ * `mode` (andra argumentet, bara bänken) går före ratten; 'sync' = den RIKTIGA workern i lås-steg (snabba sidan väntar på
+ * varje publicering) - deterministiskt, för att jämföra workern hop för hop mot inline-läget.
+ *
+ * TAKTVÄGEN (split.ts): har systemets profil <prefix>BEAT_FEED 'slow' och en slowHopFeed-fabrik (DMX) körs taktmatningen i den
+ * långsamma vägen; motorn matar den med analyser.hopLane.feed(frame, cfg, analyser). Lotus profil saknar båda: hopLane = null.
  */
-export function createAnalyser(cfg: AnalyserConfig): Analyser {
-  const mode = sysEnv('ANALYSER_SPLIT');
-  if (mode !== 'worker' && mode !== 'inline') return new Analyser(cfg);
-  const buffers = createSplitBuffers();
-  const fast = new Analyser(cfg, { role: 'fast', split: buffers });
-  if (mode === 'inline') { fast.setInlinePeer(new Analyser(cfg, { role: 'slow', split: buffers })); return fast; }
+export function createAnalyser(cfg: AnalyserConfig, modeIn?: 'worker' | 'inline' | 'sync'): Analyser {
+  const mode = modeIn ?? sysEnv('ANALYSER_SPLIT');
+  if (mode !== 'worker' && mode !== 'inline' && mode !== 'sync') return new Analyser(cfg);
+  const sync = mode === 'sync';
+  const feedMk = hopFeedFactory();
+  const buffers = createSplitBuffers(!!feedMk);
+  const fast = new Analyser(cfg, { role: 'fast', split: buffers, sync });
+  if (feedMk) fast.hopLane = new HopLaneFast(buffers, sync);
+  if (mode === 'inline') {
+    fast.setInlinePeer(new Analyser(cfg, { role: 'slow', split: buffers }));
+    if (feedMk) fast.hopLane!.peer = new HopLaneSlow(buffers, feedMk());
+    return fast;
+  }
   // Worker: SAB:arna delas via workerData (structured clone DELAR SharedArrayBuffer). cfg ar ren data och klonas.
-  // Importen ar dynamisk sa modulen fortfarande laddar i miljoer utan worker_threads (bank, webblasare).
-  import('node:worker_threads').then(({ Worker }) => {
+  // Importen ar dynamisk sa modulen fortfarande laddar i miljoer utan worker_threads (bank, webblasare). Synk-läget måste starta
+  // workern innan första process() (den väntar på den) och tar modulen synkront.
+  const withWorker = ({ Worker }: typeof import('node:worker_threads')) => {
     let stopped = false;
     const attempts: number[] = [];   // tidpunkter for omstarter inom fonstret
     const start = (resumeSeq: number, why: string) => {
-      const data: WorkerData = { cfg: { ...cfg }, buffers, resumeSeq };
+      const data: WorkerData = { cfg: { ...cfg }, buffers, resumeSeq, sync };
       // Pekar pa den BYGGDA filen (slowWorker.js bredvid denna).
       const w = new Worker(new URL('./slowWorker.js', import.meta.url), { workerData: data });
       w.on('error', (e) => console.error('[analyser-split] worker FEL:', e?.message ?? e));
@@ -3692,6 +3716,13 @@ export function createAnalyser(cfg: AnalyserConfig): Analyser {
       (fast as unknown as { __worker?: { postMessage: (m: unknown) => void } }).__worker?.postMessage({ type: 'stop' });
     };
     start(0, 'start');
-  }).catch((e) => console.error('[analyser-split] kunde inte starta worker:', e?.message ?? e));
+  };
+  if (sync) withWorker((process as unknown as { getBuiltinModule(id: string): typeof import('node:worker_threads') }).getBuiltinModule('node:worker_threads'));
+  else import('node:worker_threads').then(withWorker).catch((e) => console.error('[analyser-split] kunde inte starta worker:', e?.message ?? e));
   return fast;
+}
+
+/** TAKTVÄGEN: systemets taktmatning för den långsamma vägen, om profilen har <prefix>BEAT_FEED 'slow' och en slowHopFeed-fabrik. */
+export function hopFeedFactory(): (() => HopFeed) | undefined {
+  return sysEnv('BEAT_FEED') === 'slow' ? (PROFILE as { slowHopFeed?: () => HopFeed }).slowHopFeed : undefined;
 }

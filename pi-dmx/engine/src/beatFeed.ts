@@ -5,6 +5,7 @@
  * (halverad effektklocka + ankarhopp) och takteffekternas toppar ritades aldrig i banken. Klockan ar Date.now() (banken byter den per hop).
  */
 import { isLogOn } from "./quiet.js";
+import { PROFILE } from "./analyserProfile.js";
 import { MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import type { Frame } from "./analyser.js";
 import type { EngineConfig } from "./config.js";
@@ -213,10 +214,12 @@ export class BeatFeed {
     return false;
   }
 
-  /** En hop: tilliten (kan skriva frame.bpmConfidence) och taktklockan (cfg.beat). Anropas efter dropraknaren, fore effekterna. */
-  update(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void }): void {
+  /** En hop: tilliten (kan skriva frame.bpmConfidence) och taktklockan (cfg.beat). Anropas efter dropraknaren, fore effekterna.
+   *  `now` = hoppets klocka (2026-11-08: i analysatorns långsamma väg körs hoppet senare än det kom - klockan följer med recordet;
+   *  förr läste varje ställe Date.now() för sig, i bänken samma tal). */
+  update(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void }, now = Date.now()): void {
     if (this.ana) {   // TVÅ RUTNÄT: analysatorns rutnät först (gamla vikningen, analysatorns återställningar), frame.bpmConfidence orörd
-      const bc = frame.bpmConfidence; this.ana.update(frame, this.anaGrid, an); frame.bpmConfidence = bc;
+      const bc = frame.bpmConfidence; this.ana.update(frame, this.anaGrid, an, now); frame.bpmConfidence = bc;
       an.setBeatGrid?.(this.anaGrid.beat);
       an = NO_AN;
     }
@@ -225,7 +228,7 @@ export class BeatFeed {
     // stallet for att falla direkt. Det ar det som far pulsen att dra sig undan i
     // ett lugnt parti utan att slockna vid ett enda missat slag.
     if (cfg.beat && this.lastPllKickMs) {
-      const quiet = Date.now() - this.lastPllKickMs;
+      const quiet = now - this.lastPllKickMs;
       if (quiet > 1500) {
         this.onBeatRate *= Math.max(0, 1 - (quiet - 1500) / TRUST_LEAK_MS);
         this.repeatRate *= Math.max(0, 1 - (quiet - 1500) / TRUST_LEAK_MS);
@@ -235,8 +238,8 @@ export class BeatFeed {
     {   // (forr: bara nar taktklockan inte var last ur latminnet - alltid sant sedan 2026-09-23)
       // DIAGNOSTIK: bada matten loggas sa de gar att jamfora mot varandra och mot
       // vad ogat ser, i stallet for att bytet ska behova tas pa tro.
-      if (frame.bpmConfidence > 0.05 && Date.now() - this.lastTrustLog > 4000) {
-        this.lastTrustLog = Date.now();
+      if (frame.bpmConfidence > 0.05 && now - this.lastTrustLog > 4000) {
+        this.lastTrustLog = now;
         if (isLogOn()) console.log(`[tillit] tempogram ${frame.bpmConfidence.toFixed(2)} · fasprediktion ${this.onBeatRate.toFixed(2)} · bpm ${frame.bpm}`);
       }
       // FASPREDIKTIONEN KRAVER KICKAR — OCH DE KOMMER INTE ALLTID.
@@ -260,7 +263,7 @@ export class BeatFeed {
     // anslag var ONSET_EVERY_MS. Kickarna rör inte längre rutnätet - de mäter bara tilliten (som effekterna läser).
     let effBpm = frame.bpm;
     if (BREAK_HOLD_MS > 0 && !this.kickFold && cfg.beat) {   // TAKTEN GENOM BREAKET (se BREAK_HOLD_MS)
-      if (effBpm === 0) { const now = Date.now(); if (this.holdSince === 0) this.holdSince = now; if (now - this.holdSince < BREAK_HOLD_MS) effBpm = cfg.beat.bpm; }
+      if (effBpm === 0) { if (this.holdSince === 0) this.holdSince = now; if (now - this.holdSince < BREAK_HOLD_MS) effBpm = cfg.beat.bpm; }
       else {
         if (this.holdSince !== 0 && Math.abs(sameOctave(effBpm, cfg.beat.bpm) / cfg.beat.bpm - 1) > 0.04) { cfg.beat = null; cfg.beatErr = 0; this.clockDetBpm = 0; this.onN = 0; this.scanC = 99; this.fullBpm = 0; this.fullK = 0; this.fullBest = 0; }
         this.holdSince = 0;
@@ -268,7 +271,7 @@ export class BeatFeed {
     }
     if (effBpm === 0) { cfg.beat = null; cfg.beatErr = 0; this.clockDetBpm = 0; this.onN = 0; this.scanC = 99; this.fullBpm = 0; this.fullK = 0; this.fullBest = 0; }   // tyst → stoppa beat-effekter direkt
     if (effBpm > 0) {
-      if (!cfg.beat) cfg.beat = { anchorMs: frame.beatAnchorMs || Date.now(), bpm: effBpm, confidence: frame.bpmConfidence };
+      if (!cfg.beat) cfg.beat = { anchorMs: frame.beatAnchorMs || now, bpm: effBpm, confidence: frame.bpmConfidence };
       this.clockDetBpm = effBpm;
       // TILLITEN: landar kickarna på rutnätets slag? (tidsstämpeln är slagets egen, frame.kickAtMs)
       if (frame.kickAtMs > 0) {
@@ -277,7 +280,7 @@ export class BeatFeed {
         const err = ph < 0.5 ? ph : ph - 1;   // -0.5..0.5 av ett taktslag
         const onBeat = Math.abs(err) < 0.25;  // off-beat/synkoperade slag räknas ej
         if (BREAK_RESTORE_MS > 0 && !this.kickFold) {   // TAKTEN GENOM BREAKET (2): dropens kick tar upp rutnätet direkt
-          const nowK = Date.now(), quiet = this.lastPllKickMs ? nowK - this.lastPllKickMs : 0;
+          const nowK = now, quiet = this.lastPllKickMs ? nowK - this.lastPllKickMs : 0;
           if (quiet > 1500 && onBeat && this.goodRep > 0 && nowK - this.goodAt < BREAK_RESTORE_MS + 1500) {
             cfg.beat.anchorMs += err * beatMs;
             this.onBeatRate = Math.max(this.onBeatRate, this.goodOn); this.repeatRate = Math.max(this.repeatRate, this.goodRep);
@@ -287,13 +290,13 @@ export class BeatFeed {
         if (onBeat) cfg.beatErr = (cfg.beatErr ?? 0) * 0.85 + err * 0.15;   // UI: ihållande fasfel
         { const x = onBeat ? 1 : 0; this.onBeatRate += (x - this.onBeatRate) * (x > this.onBeatRate ? TRUST_UP : 0.12); }
         { const x = onBeat || this.kickRepeats(frame.kickAtMs, TRUST_REPEAT_BEATS * beatMs, TRUST_REPEAT_TOL * beatMs) ? 1 : 0; this.repeatRate += (x - this.repeatRate) * (x > this.repeatRate ? TRUST_UP : 0.12); }
-        this.lastPllKickMs = Date.now();
+        this.lastPllKickMs = now;
         if (this.pllKicks < 40) this.pllKicks++;
         if (BREAK_RESTORE_MS > 0 && this.pllKicks >= 12) { this.goodOn = this.onBeatRate; this.goodRep = this.repeatRate; this.goodAt = this.lastPllKickMs; }
       }
       if (frame.kickAtMs > 0 && frame.kickAtMs !== this.kickRingLast) { this.kickRingLast = frame.kickAtMs; this.kickRing[this.kickRingPos] = frame.kickAtMs; this.kickRingPos = (this.kickRingPos + 1) & 63; if (this.kickRingN < 64) this.kickRingN++; }
       {   // ringen + vikningen
-        const nowO = Date.now();
+        const nowO = now;
         // basens stigning i dB mot FEED_RISE_HOPS hop sedan (ringen håller de senaste); var 2:a hop in i vikningsringen (max av de två, ~187 Hz)
         let ok = frame.onset?.kick ?? 0;
         if (!this.kickFold) {
@@ -324,7 +327,7 @@ export class BeatFeed {
       // ~0,5 s i stället för att medianen släpar med gammalt tempo.
       if (cfg.beat) {
         const liveConf = frame.bpmConfidence ?? 0;
-        const nowMs = Date.now();
+        const nowMs = now;
         // coastens släpp/tempo-nollning på fasträffarna som förr (TRUST_REPEAT: färre nollningar höll kvar fel tidiga lås)
         if (pllConf >= GRID_ON_CONF) { this.gridWeakSince = 0; this.gridCoasting = false; }
         else if (pllConf < MIN_BEAT_CONFIDENCE) {
@@ -340,3 +343,6 @@ export class BeatFeed {
     }
   }
 }
+
+// TAKTVÄGEN (2026-11-08): analysatorns långsamma väg skapar taktmatningen via profilen (analyserProfile.ts slowHopFeedModule).
+PROFILE.slowHopFeed = () => new BeatFeed();

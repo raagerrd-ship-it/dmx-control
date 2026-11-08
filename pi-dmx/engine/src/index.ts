@@ -196,7 +196,9 @@ capture.on("chunk", (samples: Float32Array) => {
   if (liveDrop) outDrop++;   // realtidsdetektorn ager dropsen (latminnet borta 2026-09-23)
 
   frame.dropCount = outDrop;
-  beatFeed.update(frame, cfg, analyser);   // tillit + taktklocka (beatFeed.ts; forr inline har)
+  // tillit + taktklocka (beatFeed.ts). TAKTVÄGEN (profilens BEAT_FEED 'slow', 2026-11-08): körs i analysatorns worker - här bara
+  // hoppet in och senaste resultatet ut (cfg.beat, tilliten, analysatorns rutnät/kommandon). Odelad analysator: i huvudtråden som förr.
+  if (analyser.hopLane) analyser.hopLane.feed(frame, cfg, analyser); else beatFeed.update(frame, cfg, analyser);
   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
   // inga slag missas) → show-tiden får en knuff, starkare ju tyngre basen är.
   if (frame.kick) effects.registerKick(0.4 + Math.min(1, frame.energy * 1.4) * 0.6);
