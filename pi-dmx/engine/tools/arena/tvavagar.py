@@ -1,4 +1,8 @@
-"""DOMAREN FÖR ARENAN 'ANALYSATORNS TVÅ VÄGAR' (2026-11-08) - och DELTAGARNAS BRIEF. Vikterna och mängderna ändras inte under körningen.
+"""TILLÄGG EN TEMPO (2026-11-08 kväll, före arenan entempo): (a) SPÄRR upp_s/ned_s får inte bli sämre än bas (+0,1 s tolerans) -> DISK;
+  (b) MÅTT mix_still (tempo, - golv 1 s): median s från övertoningens slut tills effektklockan står inom +-1 % i 5 s i följd (17 mått).
+  (c) 11-09 00:05 ägaren: KRAV EN KÄLLA granskat i koden av orkestratorn (<mapp>/KRAV_EN_KALLA.txt) -> ljusdomarens gräns -3,0.
+
+DOMAREN FÖR ARENAN 'ANALYSATORNS TVÅ VÄGAR' (2026-11-08) - och DELTAGARNAS BRIEF. Vikterna och mängderna ändras inte under körningen.
 
 UPPGIFTEN (tools/natt/todo.md, ARENA: ANALYSATORNS TVÅ VÄGAR): EN analysator, TVÅ vägar.
   SNABBA VÄGEN (huvudtråden, varje hop): det ljuset behöver direkt - nivå, band, kick/anslag, drop-flanken. Mål: SAMMA uppgift eller
@@ -23,7 +27,7 @@ UPPGIFTEN (tools/natt/todo.md, ARENA: ANALYSATORNS TVÅ VÄGAR): EN analysator, 
 
 POÄNG = 0,6 * LÅNGSAMMA + 0,4 * SNABBA + BONUS (bara i finalen, max +3)
   Varje mått räknas i % mot bas (riktningen inräknad: + = bättre), (v - b) / max(|b|, golv), klipps till +-100 %, och varje mått väger LIKA.
-  LÅNGSAMMA = medel av de 16 kvalitetsmåtten (vikt 1/16 vardera). Kedjan = MOTORNS (tools/arena/tvavagarKor.mjs: createAnalyser
+  LÅNGSAMMA = medel av de 17 kvalitetsmåtten (vikt 1/17 vardera). Kedjan = MOTORNS (tools/arena/tvavagarKor.mjs: createAnalyser
   'inline' = workerns kod i samma tråd, deterministiskt; hopLane.feed; låtgränsen + hintTrackChange som index.ts), måtten = verktygens:
     tempo   mix_klocka    + golv 1    tempoMix.mjs: andel tid effektklockans bpm (cfg.beat) = katalogfacit (+-4 %, alt godkänt) i MIXEN (se
                                       MÄNGDERNA: låtar à 4 x 40 s ur frozen6, 3 s övertoning mellan låtarna)
@@ -103,13 +107,13 @@ MANGD = {
 }
 CPU_N, CPU_S, RT_S, BONUS_WAV, BONUS_S, SNABB_S = 5, 120, 60, L1107, 300, 120
 # (nyckel, grupp, riktning, golv) - LIKA VIKT
-MATT = [('mix_klocka', 'tempo', 1, 1), ('mix_las', 'tempo', -1, 1), ('mix_hopp', 'tempo', -1, 0.2), ('klipp_klocka', 'tempo', 1, 1),
+MATT = [('mix_klocka', 'tempo', 1, 1), ('mix_las', 'tempo', -1, 1), ('mix_hopp', 'tempo', -1, 0.2), ('mix_still', 'tempo', -1, 1), ('klipp_klocka', 'tempo', 1, 1),
         ('ettan', 'ettan', 1, 5), ('grid40', 'ettan', 1, 1), ('gridfel', 'ettan', -1, 5),
         ('upp_s', 'sektion', -1, 0.5), ('ned_s', 'sektion', -1, 0.5), ('traff', 'sektion', 1, 1), ('korta', 'sektion', -1, 1),
         ('drop_traff', 'drop', 1, 5), ('drop_falska', 'drop', -1, 0.5), ('drop_ms', 'drop', -1, 20),
         ('gr_ratt', 'latgrans', 1, 5), ('gr_falska', 'latgrans', -1, 0.5)]
 W_LANGSAM, W_SNABB, KLIPP_PCT, SPARR_LJUS, BONUS_TOL = 0.6, 0.4, 100.0, -0.5, 1.35
-SPARR_LJUS_GRANS, GRANS_KRAV = -3.0, 20.0   # ägaren 11-08: lägre ljusspärr för varianter som tydligt förbättrar låtgränsen
+SPARR_LJUS_GRANS, GRANS_KRAV, SEKT_TOL, SPARR_LJUS_ENKALLA = -3.0, 20.0, 0.1, -3.0   # ägaren 11-08: lägre ljusspärr för varianter som tydligt förbättrar låtgränsen
 
 
 def rel(v, b, d, golv):
@@ -277,7 +281,7 @@ def kvalitet(R, hold):
         drop_min += lf['min']
     med = lambda a, d: statistics.median(a) if a else d
     return {
-        'mix_klocka': mix['klocka'], 'mix_las': mix['lasMed'], 'mix_hopp': mix['hoppMin'], 'klipp_klocka': 100 * sum(c['klocka'] for c in kl) / len(kl),
+        'mix_klocka': mix['klocka'], 'mix_las': mix['lasMed'], 'mix_still': mix.get('stillMed', 0.0), 'mix_hopp': mix['hoppMin'], 'klipp_klocka': 100 * sum(c['klocka'] for c in kl) / len(kl),
         'ettan': 100 * sum(e['ok'] for e in et) / max(1, sum(e['tot'] for e in et)), 'grid40': 100 * sum(1 for e in grid if e <= 40) / max(1, len(grid)), 'gridfel': med(grid, 500),
         'upp_s': med(upLag, 20.0), 'ned_s': med(dnLag, 20.0), 'traff': 100 * n_hit / max(1, n_sk), 'korta': 100 * sum(f['short'] for f in L) / max(1, sum(f['segs'] for f in L)),
         'drop_traff': 100 * hits / max(1, n_dr), 'drop_falska': 10 * falska / drop_min, 'drop_ms': med(ms, 1500.0),
@@ -437,15 +441,22 @@ def ranking(a):
         q = {}
         if V.get('kvalitet'):
             for k, _, dr, g in MATT: q[k] = rel(V['kvalitet'][k], B['kvalitet'][k], dr, g)
+            # SEKTIONSSPÄRREN (EN TEMPO 11-08, 10-28-fällan: rise-rutnätet i kickgrinden gjorde sektionerna senare 2,6 -> 4,1 s)
+            for k in ('upp_s', 'ned_s'):
+                if k in V['kvalitet'] and k in B['kvalitet'] and V['kvalitet'][k] > B['kvalitet'][k] + SEKT_TOL:
+                    disk.append(f"{k} {V['kvalitet'][k]:.2f} s > bas {B['kvalitet'][k]:.2f} s")
         if V.get('md5Lika') is False:
             lj = V.get('ljusdomare') or {}
             # LÅTGRÄNSEN (ägaren 11-08: 'sänk för just låtgräns, då den är svår, så de inte blir diskade pga den'): en rätt låtgräns
             # byter look och flyttar ljuset slumpvis mot bas -> ljusdomaren straffar den. Varianter som TYDLIGT förbättrar låtgränsen
             # (gr_ratt >= +20 % och gr_falska inte sämre) får ljusdomarens gräns SPARR_LJUS_GRANS i stället för SPARR_LJUS.
             grans = q.get('gr_ratt', 0) >= GRANS_KRAV and q.get('gr_falska', 0) >= 0
-            sp = SPARR_LJUS_GRANS if grans else SPARR_LJUS
+            # KRAV EN KÄLLA (ägaren 11-09 00:05): orkestratorn har granskat koden (fil:rad) och skrivit <mapp>/KRAV_EN_KALLA.txt ->
+            # kravets ändringar flyttar effekternas mönster, så ljusdomarens gräns blir SPARR_LJUS_ENKALLA. Övriga spärrar oförändrade.
+            enk = os.path.exists(os.path.join(d, 'KRAV_EN_KALLA.txt'))
+            sp = SPARR_LJUS_ENKALLA if enk else SPARR_LJUS_GRANS if grans else SPARR_LJUS
             if 'fel' in lj or lj.get('poang') is None: disk.append('ljusdomaren: ' + str(lj.get('fel', 'saknas'))[:120])
-            elif lj['poang'] < sp: disk.append(f"ljusdomaren {lj['poang']:+.1f} < {sp}" + (' (låtgränsens gräns)' if grans else ''))
+            elif lj['poang'] < sp: disk.append(f"ljusdomaren {lj['poang']:+.1f} < {sp}" + (' (EN KÄLLA-gränsen)' if enk else ' (låtgränsens gräns)' if grans else ''))
             elif lj['disk']: disk.append('ljusdomaren: ' + '; '.join(lj['disk']))
         elif V.get('md5Lika') is None: disk.append('md5 ej jämförd')
         lang = sum(q.values()) / len(MATT) if q else 0.0

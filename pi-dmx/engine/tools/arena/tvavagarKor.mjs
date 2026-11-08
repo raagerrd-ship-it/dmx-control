@@ -145,7 +145,7 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
   for (let h = 0; h < H; h++) { buf.set(mix.subarray(h * HOP, h * HOP + HOP)); const fr = C.step(buf, h * HMS); if (h % STEP === 0) samp.push([h * HMS, fr.bpm, C.cfg.beat?.bpm ?? 0]); }
   const HARM = [1, 2 / 3, 1.5, 0.75, 4 / 3];
   const harm = (bpm, tf) => bpm > 0 && tf.some((t) => HARM.some((k) => Math.abs(fold(bpm) / (t * k) - 1) <= 0.04 || Math.abs(fold(bpm) / (fold(t * k)) - 1) <= 0.04));
-  const T = { n: 0, a: 0, k: 0, other: 0, lock: [], hops: 0, oct: 0, hopMin: 0 }; let si = 0;
+  const T = { n: 0, a: 0, k: 0, other: 0, lock: [], still: [], hops: 0, oct: 0, hopMin: 0 }; let si = 0;
   for (const s of seg) {
     const r = { n: 0, k: 0, lock: NaN }; let run = 0, held = 0, cand = 0, cn = 0;
     while (si < samp.length && samp[si][0] < s.t0) si++;
@@ -162,11 +162,20 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
     }
     if (isNaN(r.lock)) r.lock = (s.t1 - s.t0) / 1000;
     T.lock.push(r.lock);
+    // STILLA (EN TEMPO 11-08): s från övertoningens slut tills klockan (cfg.beat.bpm > 0) står inom +-1 % av sitt värde i 5 s i följd
+    // (50 prov à 100 ms), oavsett om tempot är rätt (det mäter mix_las). Aldrig stilla = segmentets längd.
+    let still = NaN;
+    for (let j = si; j < samp.length && samp[j][0] < s.t1 && isNaN(still); j++) {
+      const k0 = samp[j][2]; if (!(k0 > 0)) continue; let ok = 0;
+      for (let m = j; m < samp.length && samp[m][0] < s.t1 && ok < 50; m++) { if (samp[m][2] > 0 && Math.abs(samp[m][2] / k0 - 1) <= 0.01) ok++; else break; }
+      if (ok >= 50) still = (samp[j][0] - s.t0) / 1000;
+    }
+    T.still.push(isNaN(still) ? (s.t1 - s.t0) / 1000 : still);
   }
   const skarv = starts.slice(1).map((s) => (s + FADE / 2) / SR);   // övertoningens mitt (s)
   const used = new Set(); let ratt = 0, falsk = 0;
   for (const b of C.bounds) { const i = skarv.findIndex((x, k) => !used.has(k) && Math.abs(x - b) <= 15); if (i >= 0) { used.add(i); ratt++; } else falsk++; }
-  out.push({ klipp: clips.length, min: total / SR / 60, klocka: 100 * T.k / T.n, ana: 100 * T.a / T.n, annat: 100 * T.other / T.n, lasMed: med(T.lock),
+  out.push({ klipp: clips.length, min: total / SR / 60, klocka: 100 * T.k / T.n, ana: 100 * T.a / T.n, annat: 100 * T.other / T.n, lasMed: med(T.lock), stillMed: med(T.still), still: T.still,
     hoppMin: T.hopMin ? T.hops / T.hopMin : 0, hopp: T.hops, oktav: T.oct, skarvar: skarv.length, grRatt: ratt, grFalsk: falsk, bounds: C.bounds, drops: C.drops.length });
 } else if (job === 'klipp') {   // ── taktKorpus.mjs (natt 10-13): per klipp kallstart, andel tid efter 5 s (100 ms-raster) ──
   for (const [f, ...tf] of list) {
