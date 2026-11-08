@@ -11,8 +11,9 @@ ARENA: ANALYSATORNS TVÅ VÄGAR (ägaren 11-08: 'lägg till arena till natten' +
      LÅNGSAMMA VÄGEN (workern, egen kärna): det dirigenten behöver - tempo, rutnätets fas/ettan, taktmatningen, sektioner, build/drop-
        struktur, låtgräns. Mål: att FÖRSTÅ låten så bra som möjligt; fart räknas bara som en gräns (workern ska hinna med).
      FRITT: flytta saker mellan vägarna, återanvända (t.ex. en temposökning i stället för två), ta bort dubbelarbete, lägga till nya
-       signaler. Allt i src/ får ändras, även de delade filerna (analyser.ts, split.ts, slowWorker.ts) - MED lotus OPÅVERKAD: nytt
-       beteende bakom DMX-profilvärden i analyserProfile.ts, analyserParity.mjs 0 avvikelser med LOTUS-profilen (spärr). fft.js byts inte,
+       signaler. Allt i src/ får ändras FRITT, även de delade filerna (analyser.ts, split.ts, slowWorker.ts) - ägaren 11-08: 'men vi
+       skall ju få ändra? är väl hela meningen med arenan? sen får vi ju bara porta till lotus'. Ingen lotus-spärr, inga profilvärden
+       krävs; lotus-pariteten rapporteras bara (informativ). Lotus portas EFTER arenan och döms i lotus egen bänk. fft.js byts inte,
        men hur/hur ofta den anropas får ändras.
    DOMAREN (byggs FÖRE körningen av nattagenten ur befintliga verktyg, tools/arena/tvavagar.py - inte domare.py ensam; skriv vikterna i
    filhuvudet och ändra dem inte under körningen):
@@ -30,7 +31,7 @@ ARENA: ANALYSATORNS TVÅ VÄGAR (ägaren 11-08: 'lägg till arena till natten' +
        väckningen halveras (max +3; sämre än bas på något av dem = 0 bonus). Idéer att pröva: Atomics.notify mer sällan / batchade
        record, workern väcks på det den behöver i stället för varje hop, tillståndsblockets layout, att det ljuset behöver från takten
        (ankaret) räknas fram i huvudtråden ur workerns senaste ankare + klockan (då spelar ett hops fördröjning ingen roll).
-     ALLMÄNNA SPÄRRAR: lotus-paritet 0; fade-down aldrig snabbare, strobe max 3/s, inget mot vitt, inte mer ljus i snitt (domare v3:s regel).
+     ALLMÄNNA SPÄRRAR: fade-down aldrig snabbare, strobe max 3/s, inget mot vitt, inte mer ljus i snitt (domare v3:s regel).
      Holdout: lang1014 + lang-20261107T154200 i finalen (ingen deltagare ser dem före).
    REGLER: 8 agenter (skillen dmx-arena: runda 1, runda 2 med attacker, final + fusion, med tvavagar.py som domare), max två bänkar
    parallellt, budget enligt skillen. Inga worktrees/junctions (kopior i .arena/tvavagar/<id>/ med egen tsconfig som extends - MÄTFÄLLA
