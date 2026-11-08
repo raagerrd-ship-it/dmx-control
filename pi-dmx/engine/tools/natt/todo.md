@@ -23,6 +23,13 @@ ARENA: ANALYSATORNS TVÅ VÄGAR (ägaren 11-08: 'lägg till arena till natten' +
      SNABBA (poäng 0,4): huvudtrådens CPU per hop (node --cpu-prof eller process.cpuUsage, median av 5, % mot bas) + kick->ljus-latens
        (natt.py/ljusLag). SPÄRR 'samma uppgift eller bättre': antingen DMX-md5 identisk (dmxDump/dmxDumpMoment DUMP_MOMENTS=1, HELA
        filerna) ELLER ljusdomaren domare.py v3 (dynamik/koreografi/takt) >= bas -0,5 på holdout; sämre = DISK.
+     BONUS I FINALEN (ägaren 11-08: 'lägg till bonus kanske till sista rundan, hur kan vi minska latens till workern?'): upp till +3
+       poäng för kortare väg till och från workern, mätt med tools/feedRealtid.mjs (realtid 300 s, lang1107 + LABFX): hop efter när
+       huvudtråden läser (bas a9a411b: 1 hop 67 %, 2 hop 17 %, >=3 hop 7 %; leveransfördröjning p50 0,05 / p99 0,44 / max 16,7 ms) och
+       väckningskostnaden i huvudtråden (bas ~4 µs per hop). +1 per halvering av andelen >=2 hop efter, +1 om p99 halveras, +1 om
+       väckningen halveras (max +3; sämre än bas på något av dem = 0 bonus). Idéer att pröva: Atomics.notify mer sällan / batchade
+       record, workern väcks på det den behöver i stället för varje hop, tillståndsblockets layout, att det ljuset behöver från takten
+       (ankaret) räknas fram i huvudtråden ur workerns senaste ankare + klockan (då spelar ett hops fördröjning ingen roll).
      ALLMÄNNA SPÄRRAR: lotus-paritet 0; fade-down aldrig snabbare, strobe max 3/s, inget mot vitt, inte mer ljus i snitt (domare v3:s regel).
      Holdout: lang1014 + lang-20261107T154200 i finalen (ingen deltagare ser dem före).
    REGLER: 8 agenter (skillen dmx-arena: runda 1, runda 2 med attacker, final + fusion, med tvavagar.py som domare), max två bänkar
