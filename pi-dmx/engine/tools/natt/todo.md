@@ -17,7 +17,8 @@ MÅL (den optimala lösningen):
 - EN temposökning, i långsamma vägen (taktvägen), som ger EN sanning: bpm, tillit och fasankare, publicerat i tillståndsblocket.
 - Analysatorn och ljuset läser samma tempo och samma ankare.
 - Fasen får ha EN fast, mätt offset per konsument (kickfas för analysatorns grind/sektioner, rise-fas för ljuset), men ingen andra sökning.
-- Tilliten och frasräknaren i effects.ts läser effektklockan.
+- EN tillit också (ägaren: 'varför behöver vi en separat?'): klockans tillit är den enda. `frame.bpm`/`bpmConfidence` blir samma
+  värden som `cfg.beat` (eller tas bort), så ingen läser ett eget tempo eller en egen tillit (effects.ts ~1674/~1774, boundaryDetector).
 - Breaket (BREAK_HOLD) och låtgränsen (boundaryDetector -> snabb omlåsning) hanteras på ETT ställe.
 
 HUR (arena enligt dmx-arena-skillen; ägaren vill ha den optimala, så arena och inte en ensam agent):
