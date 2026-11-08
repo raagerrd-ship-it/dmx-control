@@ -1,5 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv, soft } from "./color.js";
+const FX_REN = process.env.DMX_FX_REN === '1';   // PROV 2026-11-08 (kontraktet B): effektens diodanpassning bort, output (RGB_STRICT) tar dioderna
 
 // Full fart: KRUSNING från MITTEN. v2 (2026-09-23): varje slag slar ner i MITTEN och krusningen VANDRAR utat - de inre
 // lamporna tands pa slaget, de yttre en fjardedels slag senare, och varje ring klingar av som en vag som rullar ut.
@@ -23,7 +24,7 @@ export const ripple: EffectDef = {
     // EFFEKTSVEPET 11-02 (ägaren: 'fixa direkt de effekterna'; effectDyn alla effekter pop+mega 5 min): vågen slog på en ruta och klingade på 0,16 slag (hopp 0,033), den vita kammen tände
     // den släckta dioden och kulörparet byttes var 4:e slag. Nu mjuk våg (soft), kammen i kulör (ljusare, inte vit), paret per fras.
     const wave = soft(age, 0.1, 0.25) * (1 - ring * (1 - amp) * 0.8);   // yttre ringar svagare nar amp ar lag
-    const pairBase = c.mixedSector(Math.floor(c.hueIdx / 16));
+    const pairBase = c.mixedSector(Math.floor(c.hueIdx / (FX_REN ? 4 : 16)));   // FX_REN: paret var 4:e slag (före 11-02)
     const hue = ((isOuter ? pairBase + 3 : pairBase) % 6) / 6;   // motfärg mitt vs ytter
     const crest = amp > 0.9 && isOuter ? wave * 0.25 : 0;        // kammen i kanten vid refrangens niva
     const v = 0.08 + wave * (0.45 + 0.45 * amp) + crest + c.audio * 0.15 + c.punch * 0.3;

@@ -1,5 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
+const FX_REN_SIREN = process.env.DMX_FX_REN_SIREN === '1';   // PROV 2026-11-08 (kontraktet B): sirenens motfärg (före 11-02) - EGEN ratt: blinkar 61/10 min tills motorns uttoning klarar kulörbyte på uttonande lampa
 
 // SIREN (full x uppbyggnad, situationsrutnätet 2026-10-12 - andra effekten i rutan, syskon rulle): båda lampgrupperna (c.group)
 // lyser hela tiden men BYTER KULÖR med varandra som en siren - varannat slag, och varje slag efter halva uppbyggnaden
@@ -20,7 +21,7 @@ export const siren: EffectDef = {
     for (let k = 0; k < 2; k++) {
       let d = Math.abs(c.lamp + 0.5 - ((ph + k / 2) % 1) * n); d = Math.min(d, n - d);
       const v = Math.max(0, 1 - d / width);
-      if (v > best) best = v;   // EFFEKTSVEPET 11-02 (ägaren: 'fixa direkt de effekterna'; effectDyn alla effekter pop+mega 5 min): 68 kulörhopp/min - lampan bytte till motfärgen när
+      if (v > best) { best = v; if (FX_REN_SIREN) hue = ((k ? base + 3 : base) % 6) / 6; }   // FX_REN: strålarna i motfärg (före 11-02) // EFFEKTSVEPET 11-02 (ägaren: 'fixa direkt de effekterna'; effectDyn alla effekter pop+mega 5 min): 68 kulörhopp/min - lampan bytte till motfärgen när
       // nästa stråle kom medan den förra tonade ut (diodblinket); nu samma kulör i båda strålarna, kulören byts per fras
     }
     return hsv(hue, 1, Math.min(1, (0.45 + 0.4 * p) * best * best));

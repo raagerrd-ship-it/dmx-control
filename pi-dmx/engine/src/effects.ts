@@ -81,7 +81,7 @@ const MINI_GAP_MS = 2000;
  *  dropen till 'high' som andra drops (se secKey i switchLook). */
 /** LYFTETS GOLV (ägaren i ladan 11-01: 'precis efter en drop ... nästan monoton'): lyftet låste energifaktorn på 1 i 8+ s efter dropen, så
  *  effekter som lever på basen (pulse av, energy på) slutade pulsa. Nu ett golv på 70 %: energin hålls uppe, bastrycket pulsar ovanför. */
-const DROP_LIFT_FLOOR = Number(process.env.DMX_DROP_LIFT_FLOOR ?? '0.7');   // PROV 11-07 (ladan 11-06: takten syns svagt efter dropen): 0,5/0,6 opt-in, standard 0,7
+const DROP_LIFT_FLOOR = 0;   // inget golv (STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108); drop-trion, förr 0,7 / PROV DMX_DROP_LIFT_FLOOR)
 const DROP_BEAT_MIN = 0.8;   // basstark drop-look måste också ha tydlig takt (passform beat, se bassStrong)
 const DROP_LIFT_MS = 8000, DROP_LIFT_FALL_MS = 3000;   // 4000/1500 -> 8000/3000 STANDARD 10-17 (ägaren i ladan: 'energi efter drop dör fort' -> 'känns bra nu')   // 2000 -> 4000 (ladan 22:0x: 'se till så energin efter fortsätter', som minidropens lyft som var 'perfekt')   // 4000/3000 -> 2000/1500 (ägaren: 'bara allt lyser')
 /** FRASBUNDNA LOOK-BYTEN (opt-in DMX_PHRASE_SWITCH=1, natt 2026-10-10, KONSERTSHOW idé 1): konsertbanken mätte att bara 9-22 % av
@@ -206,7 +206,7 @@ const SUBDIV_MIN_HOLD_MS = 10000;
 // puls: c.heart ger morkare MELLAN slagen, alltsa mer upplevd knyck utan att addera ljus och utan att rora
 // kuloren - och den bor inne i effekterna, dar agarens kontrakt sager att den hor hemma.
 const EFFECT_HEART = Math.max(0, Math.min(2, 1.4));
-/** BASGÅNGEN I EFFEKTERNA (PROV 2026-11-07, DMX_BASGANG=1, osatt = som förr; vinnaren i dmx-arenan puls1 = a8 + a7, kontrollmängden +14,1 mot
+/** BASGÅNGEN I EFFEKTERNA (STANDARD 2026-11-08, ladan 11-07 'perfekt'; förr PROV DMX_BASGANG; vinnaren i dmx-arenan puls1 = a8 + a7, kontrollmängden +14,1 mot
  *  basenv: takt +29 %, koreografi +11,6 (jitter lang 33 ms), ljus -11,8 %; ägaren: 'basgång (det man dansar till) skall kännas i ögonen' +
  *  'inte mer ljus överlag'). Två delar:
  *  (a8) tryckvåg/gallopp/varannan/duell/tvilling tar slagets STYRKA ur basens kropp (ctx.bassBody = eBass), rutnätet bara VEM och NÄR; de
@@ -214,7 +214,6 @@ const EFFECT_HEART = Math.max(0, Math.min(2, 1.4));
  *  (a7) BASEN SPRIDS i övriga looks: EN lampa leder (förra rutans ljusaste; lika ljusa inom 5 % -> den vars tur det är, en lampa per basnot)
  *  och står kvar; de andra faller tillbaka MELLAN basslagen: k *= 1 - SPREAD_D * (1 - eBass^2) i energisteget - bara dämpning (golv 0,3,
  *  aldrig över 1, kulören orörd), uttoningen orörd. Gäller inte a8:s looks (dubbeldämpning släckte off-beat-gruppen). */
-const BASGANG = process.env.DMX_BASGANG === '1';
 const SPREAD_D = 0.7;
 const SPREAD_SKIP = new Set(['tryckvag', 'gallop', 'varannan', 'duel', 'twin', 'sangare', 'dansparet', 'minnet', 'sokljus']);   // + labbets favoriter: egen rumslig figur
 /** EFFEKTERNAS PULS UR BASEN (PROV 2026-11-07, ägaren: 'basgång (det man dansar till) skall kännas i ögonen' + 'granskade vi inte lågpassfilter
@@ -290,9 +289,8 @@ const SWITCH_ON = 1;
  *  manusets. 1:a-3:e gången oförändrade (refrängen känns igen). Drop-bytet orört. natt --snabb: mega tryckvag 36 -> 21 %, lampspr 83 -> 88,
  *  dropsprång hög 0,44 -> 0,50, r 0,12 -> 0,17, ljusLag mega 35 -> 15 ms; återseende 78 -> 65 %, hör ihop 84 -> 81. Från 3:e: lampspr 83 -> 74. */
 const HIGH_VARV = 4;
-/** PROV 2026-11-05 natt (DMX_BUILD_TOPP=1, standard av = som förr): i builden väljs bland topp-MIX_TOP_FRAC av poolen i stället för MANUS_TOP
+/** BUILD_TOPP (STANDARD 2026-11-08, ladan 11-07 godkänt; förr PROV DMX_BUILD_TOPP): i builden väljs bland topp-MIX_TOP_FRAC av poolen i stället för MANUS_TOP
  *  (kvällen: 38 av 39 fria build-val hade ankare -> bara topp-2 av 16, pulse/stegring/sug/gryning valdes aldrig). */
-const BUILD_TOPP = process.env.DMX_BUILD_TOPP === '1';
 /** ALLA LOOKER (prov 2026-10-09, STANDARD sedan 2026-10-10 - agaren i ladan; kraven ligger i registry.ts). Tva dirigentregler:
  *  (a) BUILD-INTRADE: analysatorns sektion 'build' kom bara 8 ganger pa 20 min mix, och "byt aldrig mitt i en uppbyggnad" blockerade
  *      allt annat -> build-poolen (pulse/stegring/sug) valdes 1 av 122 byten. Nu raknas en uppbyggnad som hallit i ALLA_BUILD_S
@@ -378,7 +376,7 @@ const SHOW_DROP_GAP_MS = 12000;   // spärr mellan riktiga drops från alla käl
  *  har volymfönstrets energi (eSm, 0..1) redan stigit; i kvällen 10-11 låg 'före' >= 0,85 i 53 av 59 show-drops och kravet 1,15 x före + 0,02 > 1
  *  kunde aldrig nås -> lyftet släpptes efter 0,6 s i ~9 av 10 drops. Med t.ex. 0,9 kapas kravet (en drop som landar på >= 90 % har landat högt).
  *  Osatt = 99 (som i dag, json-identiskt). Hör ihop med golvet: kapa + DMX_DROP_LIFT_FLOOR=0 + DMX_DROP_WIN_S=1 (rapport dag-20261107-drop.md). */
-const DROP_LAND_CAP = Number(process.env.DMX_DROP_LAND_CAP || '99');
+const DROP_LAND_CAP = 0.9;   // STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108); förr PROV DMX_DROP_LAND_CAP (99 = utan tak)
 const DROP_LAND_GAIN = 1.15;     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = 0.75, SECTION_LOW_SNAP = 0.35;   // tierEma-snap vid high/break-grans
 /** ENERGIN (agarens modell, STANDARD 2026-10-08 i ladan: "mycket battre nu"): ingangens VOLYM (frame.levelVU, ~200 ms) i dB i ett
@@ -425,7 +423,7 @@ const E_TOP = Math.max(0.5, Math.min(1, 0.95));   // 1 -> 0,95 (ladan 10-09, sta
  *  minidrops lyfter. ERSATTE (bänk tools/energiMatt.mjs, 23 ladan-filer): konsertgolvet 0,4, refränggolvet 0,8, buildladdningen och
  *  TIER_OPEN (golv som gjorde energin verkningslös), taktdippen KICK_E/KICK_E_HIGH på kickEnv (dubbel kickmodulering ovanpå effektens
  *  egen c.heart), SPOT-regeln och UNIFORM:s ovalda par (förbivägar runt energin). */
-const B_CURVE = 3, B_MIN_DB = 6, B_LO_S = 1;
+const B_CURVE = 3, B_MIN_DB = 6, B_LO_S = 0.25;   // B_LO_S 1 -> 0,25 (STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108))
 /** PROVRATTAR 2026-11-07 (dagkörningen med flera agenter; ägaren: 'kan man få takten att följa själva basrytmen bättre (energilagret)' och
  *  'efter drop räkna med att det är refräng så taket är 95 %, men golvet 70 % dödar bara dynamiken'). Bara för bänken: osatt = dagens
  *  värde och dagens uttryck (json-identiskt). Det som bevisar sig byggs in som standard och ratten tas bort (ägarens regel: inga flaggor).
@@ -435,8 +433,9 @@ const B_CURVE = 3, B_MIN_DB = 6, B_LO_S = 1;
  *  lyft som golv (1 = som i dag). */
 const envN = (k: string, d: number): number => { const v = process.env[k]; return v === undefined || v === '' ? d : Number(v); };
 const PB_LO_S = envN('DMX_B_LO_S', B_LO_S), PB_CURVE = envN('DMX_B_CURVE', B_CURVE), PB_MIN_DB = envN('DMX_B_MIN_DB', B_MIN_DB);
-const PB_WIN_S = envN('DMX_B_WIN_S', 0), PB_TOP = envN('DMX_B_TOP', 0), PB_RELEASE_MS = envN('DMX_B_RELEASE_MS', 0), PB_SUBW = envN('DMX_B_SUBW', 0.5);
-const PD_WIN_S = envN('DMX_DROP_WIN_S', 0), PD_TOP = envN('DMX_DROP_TOP', 0), PM_LIFT_FLOOR = envN('DMX_MINI_LIFT_FLOOR', 1);
+const PB_WIN_S = envN('DMX_B_WIN_S', 0), PB_TOP = envN('DMX_B_TOP', 0), PB_RELEASE_MS = envN('DMX_B_RELEASE_MS', 0), PB_SUBW = envN('DMX_B_SUBW', 0.25);   // 0,5 -> 0,25 (STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108))
+const PD_WIN_S = envN('DMX_DROP_WIN_S', 1),   // 0 -> 1 (STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108))
+      PD_TOP = envN('DMX_DROP_TOP', 0), PM_LIFT_FLOOR = envN('DMX_MINI_LIFT_FLOOR', 1);
 /** BASENERGIN BARA SUB+KICK (opt-in DMX_BASS_SUBKICK=1, porterat från lotus 10-15: ägaren i källaren 'känns dock som att den följer inte bara
  *  bas' med baskroppen 20-250 Hz, 'känns bättre' med sub+kick 20-120 Hz). Basenergins källa = medel av sub- och kickbandets rå dB ur
  *  frame.specAbs (samma bandmedel som bodyDb, utan bandet 120-250 Hz där röstens grundton och virvelns kropp ligger). Flank-dropen läser
@@ -993,7 +992,7 @@ export class EffectEngine {
             .sort((a, b) => b.s - a.s);
           const cands = ranked.filter((x) => x.m !== this.smartMode && x.m !== avoid);
           // MIX_V2 (4): valfonstret var alltid topp-3 av passformen -> samma 3-5 looker per tier for evigt; nu topp-MIX_TOP_FRAC av poolen (minst 3)
-          const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, (anchor && MANUS_TOP > 0 && !(BUILD_TOPP && secKey === 'build') ? MANUS_TOP : Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC)))));
+          const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, (anchor && MANUS_TOP > 0 && secKey !== 'build' ? MANUS_TOP : Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC)))));
           this.smartMode = this.pickLook(top);
           // LOGGEN AR OVILLKORLIG (2026-09-23): utan DMX_SECTION_SWITCH finns inget `part` och dirigentens val syntes inte alls i
           // journalen (ladan 09-22: "vi korde pa hoga effekter" gick inte att belagga). Nu: del, sektion (data), basgang, tier, pool.
@@ -1448,7 +1447,7 @@ export class EffectEngine {
     const ctx = this.ctx, bands = this.bandsBuf, specialty = this.specBuf;
     let wantStrobe = 0, wantBlinder = 0, wantUv = 0, wantLaser = 0, wantHazer = 0, wantCo2 = 0, wantFogFx = false;
     // BASGANG (a7): ledaren = förra rutans ljusaste lampa (före energin); bland lika ljusa (inom 5 %) den vars tur det är (en lampa per basnot)
-    const bp = this.eBass * this.eBass, sm = this.spreadM0, spreadOn = BASGANG && !(effect && SPREAD_SKIP.has(effect.key)); let lead = -1, leadM = 0;
+    const bp = this.eBass * this.eBass, sm = this.spreadM0, spreadOn = !(effect && SPREAD_SKIP.has(effect.key)); let lead = -1, leadM = 0;
     if (spreadOn) for (let j = 0; j < count; j++) { const i = (this.bassNoteIdx + j) % count; if (sm[i] > leadM * 1.05) { leadM = sm[i]; lead = i; } }
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
@@ -1496,7 +1495,7 @@ export class EffectEngine {
       const useE = lampWantE ?? modE;
       // (SPOT-regeln, UNIFORM:s ovalda par och taktdippen KICK_E borttagna 10-12 - förbivägar/dubbelmodulering, se B_CURVE)
       let k = inputGate * (useE ? md : drive);
-      if (BASGANG) { sm[i] = isAnchor ? 0 : m0; if (spreadOn && !isAnchor && useE && i !== lead) k *= 1 - SPREAD_D * (1 - bp); }   // BASEN SPRIDS (se BASGANG)
+      sm[i] = isAnchor ? 0 : m0; if (spreadOn && !isAnchor && useE && i !== lead) k *= 1 - SPREAD_D * (1 - bp);   // BASEN SPRIDS (se BASGANG)
       rgb[0] *= k; rgb[1] *= k; rgb[2] *= k;
       // STUNDEN (bröllopsläget, moment.ts): festens ljus efter energin * (1 - w) + stundens ljus * w - stunden följer inte släckgränsen/ingången.
       if (this.rMw > 0) { const ml = this.moment, w = this.rMw, u = 1 - w; rgb[0] = rgb[0] * u + ml.r(i) * w; rgb[1] = rgb[1] * u + ml.g(i) * w; rgb[2] = rgb[2] * u + ml.b(i) * w; }
@@ -1631,7 +1630,7 @@ export class EffectEngine {
     if (this.dropCheckAt > 0 && nowWall >= this.dropCheckAt) {
       this.dropCheckAt = 0;
       const lvl = this.eSm;
-      if (lvl < (DROP_LAND_CAP < 99 ? Math.min(DROP_LAND_CAP, this.preDropLevel * DROP_LAND_GAIN + 0.02) : this.preDropLevel * DROP_LAND_GAIN + 0.02)) { this.dropEnv = 0; this.dropLiftUntil = 0; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
+      if (lvl < Math.min(DROP_LAND_CAP, this.preDropLevel * DROP_LAND_GAIN + 0.02)) { this.dropEnv = 0; this.dropLiftUntil = 0; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
     }
     // (drop-snapp till takten forkastad 09-12: taktlaset resettas vid drops, slog aldrig till / gjorde drops sena.)
     // (analysatorns minidrop-räknare frame.miniDropCount läses inte: V123 10-11 kväll - 17/min, ingen minidrop i konsertläget; bara

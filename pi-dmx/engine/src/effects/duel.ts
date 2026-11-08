@@ -1,6 +1,5 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
-const BASGANG = process.env.DMX_BASGANG === '1';   // PROV 2026-11-07 (arenan puls1, vinnaren a8+a7): styrkan ur basens kropp, se effects.ts BASGANG
 
 // DUELL v2 (2026-09-21): call/response mellan kick och virvel med FARGMINNE. Kicken "ropar" i palettens grundfarg pa
 // de inre lamporna, virveln "svarar" i kontrastfargen pa de yttre - och varje anslag lamnar ett avklingande eko sa
@@ -27,9 +26,8 @@ export const duel: EffectDef = {
     const call = env(c.idx * 2, c.now, Math.pow(d.kick, 0.8)), resp = env(c.idx * 2 + 1, c.now, Math.pow(d.snare, 0.7));
     // BASGANG (a8 11-07): de inre bär kicken OCH basens kropp (bassBody), de yttre bara virveln - punch-mattan (+0,3 på alla) och golvet 0,15 bort
     // (duellen hade lägst lampspridning av alla, 0,14, och följde inte basgången)
-    if (BASGANG) { const bb = c.bassBody; if (isOuter) return hsv(hueResp, 1, Math.min(1, 0.06 + resp * 0.85 + call * 0.1)); return hsv(hueCall, 1, Math.min(1, 0.06 + 0.9 * Math.max(call, bb * bb) + resp * 0.05 + d.hat * 0.1)); }
-    if (isOuter) return hsv(hueResp, 1, Math.min(1, 0.15 + resp * 0.85 + call * 0.15 + c.punch * 0.3));
-    const glitter = d.hat * 0.1;
-    return hsv(hueCall, 1, Math.min(1, 0.15 + call * 0.8 + resp * 0.1 + glitter + c.punch * 0.3));
+    const bb = c.bassBody;   // (STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108))
+    if (isOuter) return hsv(hueResp, 1, Math.min(1, 0.06 + resp * 0.85 + call * 0.1));
+    return hsv(hueCall, 1, Math.min(1, 0.06 + 0.9 * Math.max(call, bb * bb) + resp * 0.05 + d.hat * 0.1));
   },
 };

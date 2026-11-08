@@ -1,6 +1,5 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
-const BASGANG = process.env.DMX_BASGANG === '1';   // PROV 2026-11-07 (arenan puls1, vinnaren a8+a7): styrkan ur basens kropp, se effects.ts BASGANG
 // Fart: VARANNAN lampa tar VARANNAN takt — jämna lampor slår på taktslaget, udda på
 // off-beatet (halva takten mellan). Ger en spatial DUBBELTAKT / ping-pong i stället
 // för att hela riggen blinkar dubbelt. De två grupperna har skilda palettfärger.
@@ -13,7 +12,7 @@ export const varannan: EffectDef = {
     const pulse = c.hasBeat ? Math.pow(Math.max(0, 1 - phase * 1.8), 2.2) : c.heartPulse;   // skarp topp vid slaget, snabb decay; utan las: kickarna (09-27)
     // KULOR PER TAKT (ladan 2026-10-09, fladder pa sekundarfargen): forr nytt kulorpar varannat slag; nu per takt (grupperna har kvar var sin).
     const hue = c.mixedSector(Math.floor(c.hueIdx / 4) * 2 + off) / 6;
-    const v = c.shaped(0.08, BASGANG ? pulse * (0.3 + 0.7 * c.bassBody) : pulse * (0.6 + c.audio * 0.4) + c.punch * 0.25);   // BASGANG: styrkan ur basens kropp, punch-mattan bort
+    const v = c.shaped(0.08, pulse * (0.3 + 0.7 * c.bassBody));   // BASGANG: styrkan ur basens kropp, punch-mattan bort (STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108))
     return hsv(hue, 1, Math.min(1, v));
   },
 };

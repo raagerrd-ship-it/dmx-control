@@ -29,15 +29,14 @@ export interface SpecialtyValues {
  *  borta: DMX_FLOOR_CH, DMX_PULSE_ROOM, dimmerns mappning/puls, DMX_DIM_FULL.) */
 const MAP_TOP = Math.max(0.5, Math.min(1, 0.95));
 const HOLD_MS = 120;
-/** VARJE KANAL LIKA STRIKT (PROV 2026-11-07, DMX_RGB_STRICT=1, osatt = som förr; ägaren i ladan: 'det är alltid sekundärfärgen som flimmrar
+/** VARJE KANAL LIKA STRIKT (STANDARD 2026-11-08, ladan 11-07 'mycket bättre'; förr PROV DMX_RGB_STRICT; ägaren i ladan: 'det är alltid sekundärfärgen som flimmrar
  *  runt tändpunkten' + 'varför inte köra varje kanal lika strikt R/G/B?'): förr mappades bara lampans STARKASTE kanal till tändpunkt+1..tak
  *  och bikanalerna skalades med samma colK - en bikanal kunde landa i diodens dödzon (1..tändpunkten) och tändas/släckas av små svängningar.
  *  Med provet mappas VARJE färgkanal för sig med samma formel som den starkaste: 0 -> 0, 1..255 -> egen tändpunkt+1..lampans tak. Den
  *  starkaste blir exakt som förr. PRIS: svaga inslag blir synliga i mörkt ljus (mörk orange R20/G3 -> R17/G17 = gul) - regel 4 ('lyft
  *  ingen färgkanal') är ägarens att pröva här. */
-const RGB_STRICT = process.env.DMX_RGB_STRICT === '1';
 /** Bikanal under denna andel av lampans starkaste kanal = släckt (kulörtoningens svans 0/1 av 255 avrundades fram och tillbaka). */
-const RGB_SHARE = Number(process.env.DMX_RGB_SHARE ?? 0.06);
+const RGB_SHARE = 0.06;   // (VARJE KANAL LIKA STRIKT: STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108); förr PROV DMX_RGB_STRICT/DMX_RGB_SHARE)
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
 
@@ -193,8 +192,8 @@ export class FixtureOutput {
         let raw = universe[ch];
         if (role === "r" || role === "g" || role === "b" || role === "w") {   // farg: noll nollar direkt, ingen hallning
           if (!lampLit) { universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
-          if (RGB_STRICT && c && raw > 0 && raw < mxL * RGB_SHARE) raw = 0;   // svansen (kulörtoningens rest, 0/1 av 255) -> släckt
-          else if (RGB_STRICT && c && raw > 0) { const onC = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; raw = Math.round(onC + 1 + (lampTop - onC - 1) * (raw - 1) / 254); }   // VARJE KANAL LIKA STRIKT
+          if (c && raw > 0 && raw < mxL * RGB_SHARE) raw = 0;   // svansen (kulörtoningens rest, 0/1 av 255) -> släckt
+          else if (c && raw > 0) { const onC = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; raw = Math.round(onC + 1 + (lampTop - onC - 1) * (raw - 1) / 254); }   // VARJE KANAL LIKA STRIKT
           else if (colK !== 1) raw = Math.round(raw * colK);
           const v1 = raw > lampTop ? lampTop : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
         }
