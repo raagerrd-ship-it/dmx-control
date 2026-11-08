@@ -29,6 +29,12 @@ export interface Beat {
  *  alltid följer musiken även om det inte följer ett rutnät. */
 export const MIN_BEAT_CONFIDENCE = 0.20;
 
+/** RUTNÄTET PÅ ANSATSEN (a5, arenan tvavagar 2026-11-08): taktmatningens vikningstopp (basens dB-stigning över 6 hop) ligger
+ *  efter anslagets början - sektionLag-gridfasen mot basansatserna, signerat fel median +18..23 ms på alla fyra lang-filerna.
+ *  Effektklockan (cfg.beat) publiceras därför så mycket tidigare (beatFeed.ts), och ljusets försprång (effects.ts showLead)
+ *  är lika mycket kortare: ljuset landar som förr, rutnätet sitter på slaget. */
+export const GRID_EARLY_MS = 20;
+
 /**
  * Är takten låst OCH pålitlig?
  * Tempot måste vara rimligt (> 40 BPM) och mätningen säker nog. Konfidensgrinden bor

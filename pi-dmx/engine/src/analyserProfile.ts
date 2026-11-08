@@ -46,7 +46,8 @@ export const PROFILE: AnalyserProfile = {
     // fladder 41 -> 22, sektionsbyten 3,12 -> 2,44/min, refrangstart oforandrad). Ur refrang/mellanlage kravs 5 raka block, in i refrangen 3.
     SECTION_RUN: '5',             // var 3
     SECTION_RUN_IN: '3',          // var 0 (= RUN)
-    SECTION_CARRY: '20',          // block som bars over latgransen (lotus 4a008a5); var 0
+    SECTION_CARRY: '40',          // block som bars over latgransen (lotus 4a008a5); var 0. 20 -> 40 (a5r, tvavagar runda 2): latens-form-gransen
+                                  // fyrar ~9 s in i nya laten mitt i en sektion; 20 block gav sena etiketter (upp 2,6 -> 3,8 s), ingen nollning gav lampspr pop -6 %
     // BASEN TILLBAKA = HIGH (agaren i ladan 10-19: 'refrangen haller efter dropen'; 24 lang: high +2 s efter drop 12 -> 33, build
     // 0,5-8 s efter drop 21 -> 14). Backup: git-taggen backup/fore-section-body-high-2026-10-19.
     SECTION_BODY_HIGH: '2000',    // var 0 (av)

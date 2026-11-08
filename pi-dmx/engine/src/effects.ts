@@ -15,7 +15,7 @@ import { isLogOn } from "./quiet.js";
 import type { ChannelRole, EngineConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { FixtureOutput, keepLit, lampFadeK, lampLevel, sameLight, type SpecialtyValues } from "./output.js";
-import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
+import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE, GRID_EARLY_MS } from "./beatClock.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
 import { fitScore, fitDistance, FIT } from "./effects/fit.js";
@@ -480,7 +480,8 @@ export class EffectEngine {
   private universe = new Uint8Array(512);
   /** Utjamnad tilltro till takten (0..1) — styr beatPulse-djupet. */
   /** Showens försprång i ms — läses ur config varje frame så ratten biter live. */
-  private get showLead(): number { return this.cfg.showLeadMs ?? SHOW_LEAD_DEFAULT; }
+  /** Försprånget räknas mot rutnätet; effektklockan ligger GRID_EARLY_MS före vikningstoppen (beatClock.ts) -> lika mycket kortare. */
+  private get showLead(): number { return (this.cfg.showLeadMs ?? SHOW_LEAD_DEFAULT) - GRID_EARLY_MS; }
   private beatTrust = 0;
   // SKRAPJAKTEN 10-01: objekt/arrayer som render() fyller i stallet for att skapa nya varje ruta (200 Hz). Lases bara synkront.
   private bandsBuf: number[] = [0.5, 0.5, 0.5, 0.5, 0.5];
@@ -664,10 +665,17 @@ export class EffectEngine {
 
   /** Misstänkt låtbyte → låt auto-rangen kalibrera om snabbt mot nya nivåer. */
   softenRange(): void {
+    const carryKey = this.visitKey, carryLook = carryKey ? this.manus.get(carryKey) : undefined;
     this.songPal = -1; this.songNo++; this.manusTog = null;
     if (this.manus.size) { for (const [k, m] of this.manus) this.prevSongLook.set(k, m); console.log(`[dirigent] latgrans: nytt manus (forra: ${[...this.manus].map(([k, m]) => k + '=' + m).join(' ')})`); this.manus.clear(); this.manusHist.clear(); }
     this.secVisits.clear(); this.visitKey = '';
+    // LÅTGRÄNS MITT I SEKTIONEN (arena tvavagar a6, 11-08): gränsen kommer ~9 s efter skarven (bakdaterad) och mitt i en sektion. Den
+    // pågående sektionens look bärs tills sektionen byts - då väljer nya låtens manus (förra låtens look straffas som förr). Förr bytte
+    // looken direkt på gränsen: ett bryskt byte mitt i frasen, och med fler (rätta) gränser drog lotteriet ljuset uppåt (megamix +21 %).
+    this.carryKey = carryLook ? carryKey : '';
+    if (carryLook) this.manus.set(carryKey, carryLook);
   }   // (rullande nivarangen borttagen 10-08 - den matade bara DIM-taket)
+  private carryKey = '';   // sektionstypen vars look bärs över låtgränsen (se softenRange)
 
 
 
@@ -880,6 +888,7 @@ export class EffectEngine {
         // vers som blivit full far en ny look, som blir manusets nya).
         const fits = (m: Mode) => this.cfg.rotation?.[m] !== false && (calm || secKey === 'build' || Math.abs(tierRank(m) - tierNow) <= 1);
         let varv = 0;   // HIGH-VARV: vilken gång sektionstypen kommer i låten (räknas när nyckeln byts)
+        if (secKey && this.carryKey && secKey !== this.carryKey) { this.manus.delete(this.carryKey); this.carryKey = ''; }   // burna looken släpps (softenRange)
         if (secKey && secKey !== this.visitKey) { varv = (this.secVisits.get(secKey) ?? 0) + 1; this.secVisits.set(secKey, varv); this.visitKey = secKey; }
         const nextLook = HIGH_VARV > 0 && secKey === 'high' && varv >= HIGH_VARV && !dropSwitch && !!kept;
         let keep = !nextLook && !!kept && fits(kept) && !(dropSwitch && !this.bassStrong(kept));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark
@@ -1241,11 +1250,12 @@ export class EffectEngine {
       if (nowWall - this.histAt >= 25) {
         this.histAt = nowWall; h[this.liftW] = this.nearB; this.liftW = (this.liftW + 1) % 240; if (this.liftN < 240) this.liftN++;
         const n = this.liftN, o0 = this.liftW - n + 240;   // h[(o0 + q) % 240] = q:e äldsta
-        let f = 1e9; for (let q = Math.max(0, n - 60); q < n; q++) { const v = h[(o0 + q) % 240]; if (v < f) f = v; }
+        // Index med omslag i stället för en modulo per varv (a7): samma rutor i samma ordning, så summorna blir bit-identiska.
+        let f = 1e9; for (let q = Math.max(0, n - 60), j = (o0 + q) % 240; q < n; q++) { const v = h[j]; if (v < f) f = v; if (++j === 240) j = 0; }
         this.nearFloor = f;
         if (n >= 240) {
-          let sum = 0; for (let q = 0; q < 160; q++) sum += h[(o0 + q) % 240];
-          let now6 = 0; for (let q = n - 24; q < n; q++) now6 += h[(o0 + q) % 240];
+          let sum = 0; for (let q = 0, j = o0 % 240; q < 160; q++) { sum += h[j]; if (++j === 240) j = 0; }
+          let now6 = 0; for (let q = n - 24, j = (o0 + q) % 240; q < n; q++) { now6 += h[j]; if (++j === 240) j = 0; }
           this.liftCalm = sum / 160; this.liftLift = now6 / 24 - this.liftCalm;   // senaste 0,6 s mot 6..2 s sedan
         }
       }

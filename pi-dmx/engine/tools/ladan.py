@@ -139,6 +139,13 @@ def newest(path, exts):
     return t
 
 
+# --karnor '0 1 2' (ägaren 2026-11-08: 'när vi är i ladan att den får använda en kärna till'): enheten låser motorn till 1 2. f1 (arenan
+# tvavagar) har tre trådar (huvudtråd + taktväg + analysator) och provas med kärna 0 till; f2 (en workertråd) körs på 1 2 som förr.
+# Utan flaggan rörs inte kärnorna. Kärna 0 delas med kernel/WiFi/sshd; kärna 3 = dmx-helper + arecord (isolcpus), aldrig.
+# --fran <mapp> deployar en fryst dist-kopia (t.ex. arenans .arena/tvavagar/f1/dist).
+AFFINITY = ARGS[ARGS.index('--karnor') + 1] if '--karnor' in ARGS else None
+
+
 def main():
     p = None if KEY else pw()
     if KEY: print(f'nyckellage: {KEY}')
@@ -176,6 +183,7 @@ def main():
     if not ONLY_DEPLOY:
         cmd += ['--conf', 'ladan']   # 09-27: EN fil, ladan.conf, for pagaende prov; allt godkant lyfts in i koden
         for e in env_pairs: cmd += ['--env', e]
+        if AFFINITY: cmd += ['--affinity', AFFINITY]   # 11-08 --karnor (se AFFINITY)
     for r in REMOVE: cmd += ['--remove', r]   # alltid, aven med --bara-deploy: rensningen ar en del av koden
     print('\nprov-env som skrivs till ladan.conf:' if not ONLY_DEPLOY else '\n(env orord)')
     for k, v, why in SHOW_ENV:

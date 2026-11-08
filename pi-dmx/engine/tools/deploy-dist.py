@@ -13,10 +13,14 @@ args = sys.argv[1:]
 DRY = '--dry' in args; NORESTART = '--no-restart' in args
 CONF = args[args.index('--conf') + 1] if '--conf' in args else None
 ENVS = [args[i + 1] for i, a in enumerate(args) if a == '--env']
+# --affinity '0 1 2' (2026-11-08, ägaren: 'när vi är i ladan att den får använda en kärna till'): motorns kärnor i samma drop-in.
+# CPUAffinity slås ihop i systemd -> en tom rad först nollställer enhetens 'CPUAffinity=1 2'. Kärna 3 = dmx-helper (realtid), aldrig.
+AFFINITY = args[args.index('--affinity') + 1] if '--affinity' in args else None
+if AFFINITY and '3' in AFFINITY.split(): sys.exit('--affinity: karna 3 ar dmx-helpers realtidskarna')
 # --remove <sokvag|glob> (2026-09-23, rensningen): filer pa Pi:n som inte langre finns i bygget. Flyttas till
 # <fil>.bak-<ts>, aldrig rm - samma angerbarhet som kopieringens backup. Glob expanderas av sh pa Pi:n.
 REMOVES = [args[i + 1] for i, a in enumerate(args) if a == '--remove']
-files_arg = [a for i, a in enumerate(args) if not a.startswith('--') and (i == 0 or args[i - 1] not in ('--conf', '--env', '--remove'))]
+files_arg = [a for i, a in enumerate(args) if not a.startswith('--') and (i == 0 or args[i - 1] not in ('--conf', '--env', '--remove', '--affinity'))]
 EXPLICIT_FILES = bool(files_arg)   # filargument = bara dessa dist-filer; public/index.html foljer bara med i full deploy
 HERE = os.path.dirname(os.path.abspath(__file__)); LOCAL = os.path.normpath(os.path.join(HERE, '..', 'dist'))
 REMOTE = '/opt/audio-dmx-engine/dist'
@@ -84,7 +88,7 @@ for pat in REMOVES:
     print(f"borttaget -> .bak-{ts}: {got or 'inget'}   ({pat})")
 if ENVS:
     name = CONF or 'deploy'
-    body = '[Service]\\n# ' + ts + ' via deploy-dist.py\\n' + ''.join(f'Environment={e}\\n' for e in ENVS)
+    body = '[Service]\\n# ' + ts + ' via deploy-dist.py\\n' + ''.join(f'Environment={e}\\n' for e in ENVS) + (f'CPUAffinity=\\nCPUAffinity={AFFINITY}\\n' if AFFINITY else '')
     rc, out, _ = sudo(f"mkdir -p /etc/systemd/system/audio-dmx-engine.service.d && printf \"{body}\" > /etc/systemd/system/audio-dmx-engine.service.d/{name}.conf && cat /etc/systemd/system/audio-dmx-engine.service.d/{name}.conf && systemctl daemon-reload")
     print(out.strip())
 if removed and not ENVS:   # 09-27: borttagna drop-ins maste laddas om, annars startar systemd med den gamla unit-bilden (env kvar)
