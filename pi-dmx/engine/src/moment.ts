@@ -13,8 +13,8 @@
  * tillbaka till fest = som om inget hänt.
  * EN VÄG IN: pressMoment (ws setMoment, POST /api/moment, gästsidans knappar och de fysiska knapparna) - tryck på aktiv stund = fest.
  */
-import type { EngineConfig } from "./config.js";
-import { GAMMA } from "./output.js";
+import type { EngineConfig, FixtureConfig } from "./config.js";
+import { lampLevel } from "./output.js";
 import { Lab, type LabIn } from "./lab.js";
 import { Lab2 } from "./lab2.js";
 import { Lab3 } from "./lab3.js";
@@ -49,7 +49,7 @@ const SHOW_TOP = 0.95;   // showen: lampans tak (output lägger sina 95 % ovanp�
 const MIDDAG_TOP = 0.5, TAL_TOP = 0.25, DANS_TOP = 0.6, TARTAN_TOP = 1;   // andel DMX-ljus (efter gamman) av mastern
 const VOL_TAU_S = 5, VOL_REF = 0.2;   // middagens volym: följd över 5 s, ladans musik har level-median ~0,19
 const SECT: [number, number, number][] = [[1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 1, 1], [0, 0, 1], [1, 0, 1]];
-const toV = (share: number) => Math.pow(Math.max(0, Math.min(1, share)), 1 / GAMMA);   // DMX-andel -> effektens 0..1
+const toV = (fx: FixtureConfig | undefined, share: number) => lampLevel(fx, Math.max(0, Math.min(1, share)));   // ljusandel -> lampans nivå (output.ts)
 
 export class MomentLayer {
   /** Stundens vikt mot festen 0..1 (0 = festen orörd). */
@@ -64,7 +64,7 @@ export class MomentLayer {
 
   /** En gång per ruta. Sant om lagret syns (w > 0). */
   step(cfg: EngineConfig, level: number, nowWall: number, dtSec: number, count: number, beat?: ShowBeat): boolean {
-    this.beat = beat;
+    this.beat = beat; this.fixtures = cfg.fixtures;
     this.labForce = typeof (cfg as unknown as { labForce?: unknown }).labForce === 'string' ? (cfg as unknown as { labForce: string }).labForce : '';
     let m: Moment = isMoment(cfg.moment) ? cfg.moment : "fest";
     if (m === "tartan") {
@@ -96,6 +96,7 @@ export class MomentLayer {
     return this.w > 0;
   }
 
+  private fixtures: FixtureConfig[] = [];   // lamporna, bara för output.ts lampLevel (stunden vet inget om dem)
   /** Stundens färg för lampa i (efter step). */
   r(i: number) { return this.look[i * 3]; }
   g(i: number) { return this.look[i * 3 + 1]; }
@@ -116,27 +117,27 @@ export class MomentLayer {
       share = DANS_TOP * (1 - 0.6 * d) * (0.8 + 0.2 * Math.sin((2 * Math.PI * t) / 8));
     } else if (m === "show") return this.show(i, n, nowWall);
     else if (m === "lab5") {   // LABBET 5 (lab5.ts)
-      if (i === 0) { this.lab5.force = this.labForce; this.lab5.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab5.mode; this.labLog = this.lab5.log; }
+      if (i === 0) { this.lab5.fx = this.fixtures; this.lab5.force = this.labForce; this.lab5.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab5.mode; this.labLog = this.lab5.log; }
       const o = this.lab5.out; this.tgt[0] = o[i * 3]; this.tgt[1] = o[i * 3 + 1]; this.tgt[2] = o[i * 3 + 2]; return this.tgt;
     }
     else if (m === "lab4") {   // LABBET 4 (lab4.ts)
-      if (i === 0) { this.lab4.force = this.labForce; this.lab4.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab4.mode; this.labLog = this.lab4.log; }
+      if (i === 0) { this.lab4.fx = this.fixtures; this.lab4.force = this.labForce; this.lab4.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab4.mode; this.labLog = this.lab4.log; }
       const o = this.lab4.out; this.tgt[0] = o[i * 3]; this.tgt[1] = o[i * 3 + 1]; this.tgt[2] = o[i * 3 + 2]; return this.tgt;
     }
     else if (m === "lab3") {   // LABBET 3 (lab3.ts)
-      if (i === 0) { this.lab3.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab3.mode; this.labLog = this.lab3.log; }
+      if (i === 0) { this.lab3.fx = this.fixtures; this.lab3.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab3.mode; this.labLog = this.lab3.log; }
       const o = this.lab3.out; this.tgt[0] = o[i * 3]; this.tgt[1] = o[i * 3 + 1]; this.tgt[2] = o[i * 3 + 2]; return this.tgt;
     }
     else if (m === "lab2") {   // LABBET 2 (lab2.ts)
-      if (i === 0) { this.lab2.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab2.mode; this.labLog = this.lab2.log; }
+      if (i === 0) { this.lab2.fx = this.fixtures; this.lab2.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab2.mode; this.labLog = this.lab2.log; }
       const o = this.lab2.out; this.tgt[0] = o[i * 3]; this.tgt[1] = o[i * 3 + 1]; this.tgt[2] = o[i * 3 + 2]; return this.tgt;
     }
     else if (m === "lab") {   // LABBET (lab.ts)
-      if (i === 0) { this.lab.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab.mode; this.labLog = this.lab.log; }
+      if (i === 0) { this.lab.fx = this.fixtures; this.lab.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab.mode; this.labLog = this.lab.log; }
       const o = this.lab.out; this.tgt[0] = o[i * 3]; this.tgt[1] = o[i * 3 + 1]; this.tgt[2] = o[i * 3 + 2]; return this.tgt;
     }
     else share = TARTAN_TOP;
-    const v = toV(share), s = SECT[sect];
+    const v = toV(this.fixtures[i], share), s = SECT[sect];
     this.tgt[0] = s[0] * v; this.tgt[1] = s[1] * v; this.tgt[2] = s[2] * v;
     return this.tgt;
   }
@@ -163,7 +164,7 @@ export class MomentLayer {
     return this.tgt;
   }
   private put(i: number, sect: number, share: number, presence: number) {
-    const v = toV(SHOW_TOP * Math.max(0, Math.min(1, share)) * presence), s = SECT[sect];
+    const v = toV(this.fixtures[i], SHOW_TOP * Math.max(0, Math.min(1, share)) * presence), s = SECT[sect];
     this.sh[i * 3] = s[0] * v; this.sh[i * 3 + 1] = s[1] * v; this.sh[i * 3 + 2] = s[2] * v;
   }
   private showTick(n: number, now: number) {

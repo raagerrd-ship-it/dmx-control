@@ -8,16 +8,18 @@
  * Kvällens läxor: aldrig kulörbyte på tänd lampa (byten bara på taktens/varvets gräns eller när lampan är mörk), ingen snabb flimmer
  * (högst ~2 pulser/lampa/s), basen tillbaka avbryter det lugna direkt. Inget vitt, ingen strobe.
  */
-import { GAMMA } from "./output.js";
+import { lampLevel } from "./output.js";
+import type { FixtureConfig } from "./config.js";
 import type { LabIn } from "./lab.js";
 
 const TOP = 0.95;
 const FORCE = process.env.DMX_LAB3_FORCE ?? '';   // bänk: tvinga en idé
-const toV = (share: number) => Math.pow(Math.max(0, Math.min(1, share)), 1 / GAMMA);
+const toV = (fx: FixtureConfig | undefined, share: number) => lampLevel(fx, Math.max(0, Math.min(1, share)));   // ljusandel -> lampans nivå (output.ts)
 const SECT: [number, number, number][] = [[1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 1, 1], [0, 0, 1], [1, 0, 1]];
 const col = (s: number) => SECT[((Math.round(s) % 6) + 6) % 6];
 
 export class Lab3 {
+  fx: FixtureConfig[] = [];   // lamporna (sätts av moment.ts), bara för output.ts lampLevel
   out = new Float32Array(0);
   mode = ''; log: [number, string][] = [];
   private n = 0; private at = 0; private pend = ''; private pendAt = 0; private bassAt = 0; private lastSec = ''; private buildAt = 0;
@@ -26,7 +28,7 @@ export class Lab3 {
   private phraseSect = 0; private phraseBar = -1;
 
   private put(i: number, s: number, share: number) {
-    const v = toV(TOP * Math.max(0, Math.min(1, share))), o = i * 3, c = col(s);
+    const v = toV(this.fx[i], TOP * Math.max(0, Math.min(1, share))), o = i * 3, c = col(s);
     if (v > Math.max(this.out[o], this.out[o + 1], this.out[o + 2])) { this.out[o] = c[0] * v; this.out[o + 1] = c[1] * v; this.out[o + 2] = c[2] * v; }
   }
 

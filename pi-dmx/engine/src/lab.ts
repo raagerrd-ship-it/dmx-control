@@ -9,7 +9,8 @@
  *                frontlampan starkast
  * Bara rena kulörer (inget vitt), ingen strobe, högst en puls per lampa och slag; nedgången tas av motorns uttoning (aldrig snabbare).
  */
-import { GAMMA } from "./output.js";
+import { lampLevel } from "./output.js";
+import type { FixtureConfig } from "./config.js";
 
 export interface LabIn {
   beatIdx: number; beatFrac: number; hasBeat: boolean; bassBody: number; dropEnv: number; section: string;
@@ -19,12 +20,13 @@ export interface LabIn {
 
 const SECT: [number, number, number][] = [[1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 1, 1], [0, 0, 1], [1, 0, 1]];
 const TOP = 0.95;
-const toV = (share: number) => Math.pow(Math.max(0, Math.min(1, share)), 1 / GAMMA);
+const toV = (fx: FixtureConfig | undefined, share: number) => lampLevel(fx, Math.max(0, Math.min(1, share)));   // ljusandel -> lampans nivå (output.ts)
 const HIST = 256;                       // ruthistorik för kanon (~6 s vid 25 ms)
 const SLOW_FRAMES = 160;                // 4 s efter dropen
 const PATTERNS = [0b1000, 0b0001, 0b0100, 0b0010, 0b1001, 0b0110, 0b1010, 0b0101, 0b1100, 0b0011, 0b1111];
 
 export class Lab {
+  fx: FixtureConfig[] = [];   // lamporna (sätts av moment.ts), bara för output.ts lampLevel
   out = new Float32Array(0);
   /** Vilken idé som kör + de senaste bytena [väggklocka ms, idé] (GET /api/moment, ägaren: 'den som kör nu'). */
   mode = ''; log: [number, string][] = []; private pend = ''; private pendAt = 0;
@@ -71,7 +73,7 @@ export class Lab {
   }
 
   private put(i: number, sect: number, share: number) {
-    const v = toV(TOP * Math.max(0, Math.min(1, share))), s = SECT[((sect % 6) + 6) % 6], o = i * 3;
+    const v = toV(this.fx[i], TOP * Math.max(0, Math.min(1, share))), s = SECT[((sect % 6) + 6) % 6], o = i * 3;
     // starkast vinner per lampa (ingen blandning -> inget vitt)
     if (v > Math.max(this.out[o], this.out[o + 1], this.out[o + 2])) { this.out[o] = s[0] * v; this.out[o + 1] = s[1] * v; this.out[o + 2] = s[2] * v; }
   }

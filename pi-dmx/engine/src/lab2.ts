@@ -7,12 +7,13 @@
  *   KLANGFÄRG  (övrigt): färgen = ljudets klang (spektral tyngdpunkt: mörkt ljud röd -> ljust blått), ljuset rinner som en våg över raden
  * Basen tillbaka avbryter det lugna direkt; annars byter idé först efter 2 s. Inget vitt (en kulör per lampa), ingen strobe.
  */
-import { GAMMA } from "./output.js";
+import { lampLevel } from "./output.js";
+import type { FixtureConfig } from "./config.js";
 import type { LabIn } from "./lab.js";
 
 const TOP = 0.95;
 const FORCE = process.env.DMX_LAB2_FORCE ?? '';   // bänk: tvinga en idé
-const toV = (share: number) => Math.pow(Math.max(0, Math.min(1, share)), 1 / GAMMA);
+const toV = (fx: FixtureConfig | undefined, share: number) => lampLevel(fx, Math.max(0, Math.min(1, share)));   // ljusandel -> lampans nivå (output.ts)
 /** Kulör 0..6 (0 röd, 1 gul, 2 grön, 3 cyan, 4 blå, 5 magenta) -> RGB, mellan sektorerna en ren blandning av TVÅ kanaler (aldrig vitt). */
 function hue6(h: number): [number, number, number] {
   // bara ren kulör eller exakt halv blandning: en glidande bikanal passerade diodens tändpunkt hela tiden (bänken: 40 blink/min)
@@ -21,6 +22,7 @@ function hue6(h: number): [number, number, number] {
 }
 
 export class Lab2 {
+  fx: FixtureConfig[] = [];   // lamporna (sätts av moment.ts), bara för output.ts lampLevel
   out = new Float32Array(0);
   mode = ''; log: [number, string][] = [];
   private n = 0; private at = 0; private pend = ''; private pendAt = 0; private bassAt = 0; private lastSec = ''; private buildAt = 0;
@@ -38,7 +40,7 @@ export class Lab2 {
 
   private rnd() { this.seed = (this.seed * 1103515245 + 12345) & 0x7fffffff; return this.seed / 0x7fffffff; }
   private put(i: number, rgb: [number, number, number], share: number) {
-    const v = toV(TOP * Math.max(0, Math.min(1, share))), o = i * 3;
+    const v = toV(this.fx[i], TOP * Math.max(0, Math.min(1, share))), o = i * 3;
     if (v > Math.max(this.out[o], this.out[o + 1], this.out[o + 2])) { this.out[o] = rgb[0] * v; this.out[o + 1] = rgb[1] * v; this.out[o + 2] = rgb[2] * v; }
   }
 

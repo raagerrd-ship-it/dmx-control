@@ -8,16 +8,18 @@
  *   STJÄRNFALL  (lugnt / okänd takt): ett stjärnfall per takt (2,5 s utan takt) sveper över raden, varannan gång åt andra hållet
  * Kvällens läxor: händelser i takt (inte drift), kulörbyte bara på ettan eller på mörk lampa, inget mot takten, basen avbryter det lugna.
  */
-import { GAMMA } from "./output.js";
+import { lampLevel } from "./output.js";
+import type { FixtureConfig } from "./config.js";
 import type { LabIn } from "./lab.js";
 
 const TOP = 0.95;
 const FORCE = process.env.DMX_LAB5_FORCE ?? '';
-const toV = (share: number) => Math.pow(Math.max(0, Math.min(1, share)), 1 / GAMMA);
+const toV = (fx: FixtureConfig | undefined, share: number) => lampLevel(fx, Math.max(0, Math.min(1, share)));   // ljusandel -> lampans nivå (output.ts)
 const SECT: [number, number, number][] = [[1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 1, 1], [0, 0, 1], [1, 0, 1]];
 const col = (s: number) => SECT[((Math.round(s) % 6) + 6) % 6];
 
 export class Lab5 {
+  fx: FixtureConfig[] = [];   // lamporna (sätts av moment.ts), bara för output.ts lampLevel
   out = new Float32Array(0);
   mode = ''; log: [number, string][] = []; force = '';
   private n = 0; private at = 0; private pend = ''; private pendAt = 0; private bassAt = 0; private lastSec = ''; private buildAt = 0;
@@ -25,7 +27,7 @@ export class Lab5 {
   private roll = new Float32Array(64); private rollNext = 0; private starBar = -1; private starAt = -1e9; private starDir = 1;
 
   private put(i: number, s: number, share: number) {
-    const v = toV(TOP * Math.max(0, Math.min(1, share))), o = i * 3, c = col(s);
+    const v = toV(this.fx[i], TOP * Math.max(0, Math.min(1, share))), o = i * 3, c = col(s);
     if (v > Math.max(this.out[o], this.out[o + 1], this.out[o + 2])) { this.out[o] = c[0] * v; this.out[o + 1] = c[1] * v; this.out[o + 2] = c[2] * v; }
   }
 

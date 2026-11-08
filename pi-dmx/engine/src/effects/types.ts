@@ -8,14 +8,14 @@
  * lampa och de färdiga signalerna.
  */
 
-import type { ChannelRole, EngineConfig, FixtureConfig, Mode } from "../config.js";
+import type { ChannelRole, EngineConfig, Mode } from "../config.js";
 import type { Frame } from "../analyser.js";
 
 /** Smart-lägets energitier som effekten hör hemma i. */
 export type EffectTier = "lugn" | "fart" | "full";
 
 /** Allt en effekt behöver för att rendera EN lampa. Byggs av motorn per frame;
- *  idx/fx/band muteras per lampa (samma objekt återanvänds → ingen allokering). */
+ *  idx/band muteras per lampa (samma objekt återanvänds → ingen allokering). */
 /** En effekts ÖNSKEMÅL om specialenheter. Effekten uttrycker vad den vill; motorn
  *  avgör om det blir av — en fixtur måste ha rollen, och rök går alltid genom
  *  värmebudget och cooldown. Sätts valfritt i render(); nollställs varje ruta.
@@ -40,7 +40,6 @@ export interface EffectContext {
   want: EffectWants;
   cfg: EngineConfig;
   frame: Frame;
-  fx?: FixtureConfig;
 
   /** Fri-rullande show-tid (s), inkl. riser-acceleration + akustisk tröghet. */
   t: number;

@@ -9,7 +9,7 @@
 import { isLogOn } from "./quiet.js";
 import type { ChannelRole, EngineConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
-import { FixtureOutput, GAMMA, minLit, sameLightK, type SpecialtyValues } from "./output.js";
+import { FixtureOutput, keepLit, lampFadeK, lampLevel, sameLight, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
@@ -403,7 +403,7 @@ const E_NORM_S = Number(process.env.DMX_E_NORM_S || '2');   // PROV 11-07 DMX_E_
 const E_NORM_MAX = 6;
 /** ENERGIN I DMX-PROCENT (ladan 2026-10-09, STANDARD 10-10). Energin multiplicerades FORE utgangens gamma (2,2), sa kurvan blev i
  *  praktiken e^(E_CURVE x 2,2) = e^6,6 med kurva 3: energi 0,9 -> ~50 % ljus, 0,7 -> 10 %. Med E_LIN tas gamman ut ur dampningen
- *  (md^(1/gamma) fore gamman) - e^E_CURVE blir rak andel av DMX-utgangen. */
+ *  (output.ts lampLevel: md^(1/lampans gamma) fore gamman) - e^E_CURVE blir rak andel av DMX-utgangen. */
 /** GRUNDNIVA MELLAN SLAGEN (opt-in DMX_FX_FLOOR 0..0,8, ladan 2026-10-09: "hoj grundnivan mellan slagen sa pulsen blir grundare").
  *  En TAND lampa (effektens starkaste kanal > 0) lyfts mot golvet: m' = m + FLOOR x (1 - m) x min(1, m / 0,1) - kulorens forhallanden
  *  bevaras, en slackt lampa forblir slackt (agaren: "dom far garna slackas om effekten vill det"), och lyftet rampar in under 10 % sa
@@ -440,10 +440,9 @@ const PD_WIN_S = envN('DMX_DROP_WIN_S', 1),   // 0 -> 1 (STANDARD 2026-11-08 (la
  *  bas' med baskroppen 20-250 Hz, 'känns bättre' med sub+kick 20-120 Hz). Basenergins källa = medel av sub- och kickbandets rå dB ur
  *  frame.specAbs (samma bandmedel som bodyDb, utan bandet 120-250 Hz där röstens grundton och virvelns kropp ligger). Flank-dropen läser
  *  fortfarande bodyDb. 0 = av (som före). */
-/* (E_MIN_LIT - minsta tända nivå före gamman - och kulörtoningens ljusmatchning ägs av output.ts sedan 2026-11-08: minLit(fx), sameLightK(fx),
- *  per lampa via cal.gamma.) KVAR (riggens gemensamma referensgamma, inte per lampa): energins DMX-procent (md^E_LIN_INV) och uttoningens
- *  tidskonstant i DMX-ljus - steg 2 räknar i 'det lamporna lyser' för en standardlampa. */
-const E_LIN_INV = 1 / GAMMA;   // utgangens referensgamma (output.ts ager GAMMA)
+/* (LAMPKONTRAKTET 2026-11-08: motorn räknar i ANDEL AV LAMPANS LJUS och output.ts översätter per lampa - energins DMX-procent
+ *  lampLevel(fx, md), uttoningens tidskonstant lampFadeK(fx, dt, FADE_MIN_S), minsta tända nivå keepLit(fx), kulörtoningens ljus
+ *  sameLight(fx). Ingen gamma här - se output.ts.) */
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
 /** TYST LAT = TYST LJUS (ladan 2026-09-24 22:30: 'laten ar ganska tyst och den kor ganska ljust'): ankaret ar relativt, sa en tyst lat blev
@@ -561,9 +560,7 @@ export class EffectEngine {
     this.glH[i] = ((this.glH[i] + dh * (1 - Math.exp(-dtSec / (HUE_GLIDE_MS / 3000)))) % 1 + 1) % 1;
     // SAMMA LJUS SOM EFFEKTEN (ägaren 10-14: 'i en effekt påverkade den även energin ... fade är bara när det går'): glidkulören skalas
     // till effektens kanalsumma efter gamman (det lamporna faktiskt lyser); skulle någon kanal då gå över effektens starkaste kanal går det inte -> skarpt byte som förr.
-    const o = hsvToRgb(this.glH[i], 1, v), k = sameLightK(this.cfg.fixtures[i], r, g, b, o[0], o[1], o[2]);   // efter lampans gamma (output.ts)
-    if (k * v > v * 1.0001 || k <= 0) { this.glH[i] = h; return; }
-    rgb[0] = o[0] * k; rgb[1] = o[1] * k; rgb[2] = o[2] * k;
+    if (!sameLight(this.cfg.fixtures[i], rgb, hsvToRgb(this.glH[i], 1, v))) this.glH[i] = h;   // samma ljus på lampan (output.ts), annars skarpt
   }
 
   private effektNiva(rgb: [number, number, number], ctx: EffectContext, toggle = false, sparse = false): [number, number, number] {
@@ -598,7 +595,7 @@ export class EffectEngine {
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
   private nearB = 0; private nearOn = false;   // nearOn: nearB startad (förr null - ett fält som ibland är null packar in varje nytt tal, GC-jakten 10-16)
-   private nearNorm = 0; private nearFloor = 1e9; private liftCalm = 0; private liftLift = 0; private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rFadeK = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
+   private nearNorm = 0; private nearFloor = 1e9; private liftCalm = 0; private liftLift = 0; private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
   private nearAt = -1e12; private nearLevel = 0; nearCount = 0;   // NASTAN-DROP
   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; private upgradeHit = false; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
@@ -714,7 +711,7 @@ export class EffectEngine {
 
   // Pre-allokerad kontext för noll-allokering i render-loopen
   private ctx: EffectContext = {
-    cfg: null as any, frame: null as any, fx: undefined, t: 0, idx: 0, lamp: 0, count: 0, want: {},
+    cfg: null as any, frame: null as any, t: 0, idx: 0, lamp: 0, count: 0, want: {},
     audio: 0, kickEnv: 0, bassBody: 0, trebleEnv: 0, airEnv: 0, punch: 0, dropEnv: 0, band: 0, gravLevel: 0, gravPeak: 0, drum: null as any, expectHighInMs: -1, levelVsHighDb: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionEntry: 0, sectionTier: 1, repeatSim: 0,
     sectionBars: 0, bassline: 0, bassNoteIdx: 0, bassNoteAge: 9,
     beatIdx: 0, hueIdx: 0, beatFrac: 0, beatPulse: 0, beatHit: false, hasBeat: false,
@@ -1436,14 +1433,14 @@ export class EffectEngine {
       if (nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) { const left = this.dropLiftUntil - nowWall; lift = Math.max(lift, DROP_LIFT_FLOOR * (left >= 0 ? 1 : 1 + left / DROP_LIFT_FALL_MS)); }   // LYFTET SOM GOLV (se DROP_LIFT_FLOOR)
       if (nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) { const left = this.miniLiftUntil - nowWall; lift = Math.max(lift, PM_LIFT_FLOOR === 1 ? (left >= 0 ? 1 : 1 + left / MINI_LIFT_FALL_MS) : PM_LIFT_FLOOR * (left >= 0 ? 1 : 1 + left / MINI_LIFT_FALL_MS)); }
       md = drive * Math.min(1, Math.max(eFloor + (1 - eFloor) * Math.pow(this.eBass, PB_CURVE), lift));   // bara dampning: aldrig over 1
-      md = Math.pow(md, E_LIN_INV);   // ENERGIN I DMX-PROCENT (se E_LIN)
+      // ENERGIN I DMX-PROCENT (se E_LIN): md är andelen av lampans ljus - output.ts lampLevel gör den till nivå per lampa (renderLamps)
     }
     this.rMd = md;
   }
 
   /** LAMPORNA: effekt -> effektNiva -> kulörtoning -> energi -> uttoning -> utgång, per lampa (utbrutet ur render 10-16, GC-jakten: ordagrant flyttat, samma ordning). */
   private renderLamps(effect: EffectDef | undefined, count: number, ordSel: number, useAnchor: boolean, fxToggle: boolean, fxSparse: boolean, fastLight: boolean, modE: boolean): boolean {
-    const t = this.rT, anchorHue = this.rAnchorHue, nowWall = this.rNowWall, inputGate = this.rInputGate, md = this.rMd, drive = this.rDrive, renderNow = this.rNowP, fadeK = this.rFadeK;
+    const t = this.rT, anchorHue = this.rAnchorHue, nowWall = this.rNowWall, inputGate = this.rInputGate, md = this.rMd, drive = this.rDrive, renderNow = this.rNowP, dtSec = this.rDt;
     const ctx = this.ctx, bands = this.bandsBuf, specialty = this.specBuf;
     let wantStrobe = 0, wantBlinder = 0, wantUv = 0, wantLaser = 0, wantHazer = 0, wantCo2 = 0, wantFogFx = false;
     // BASGANG (a7): ledaren = förra rutans ljusaste lampa (före energin); bland lika ljusa (inom 5 %) den vars tur det är (en lampa per basnot)
@@ -1461,7 +1458,6 @@ export class EffectEngine {
           ctx.idx = ordSel === 0 ? i : ordSel === 1 ? n - 1 - i : ordSel === 2 ? Math.min(n - 1, 2 * e + side) : Math.max(0, n - 1 - (2 * e + side)); }
         { const sg = slotSize(count), sl = Math.floor(i / sg), ns = Math.ceil(count / sg);   // hyrkitet 11-02: kanten = ytterplatserna (8 lampor: 0,1,6,7 mot 2-5; förr 2 mot 6)
           ctx.group = ctx.grouping === 'innerouter' ? ((count < 3 ? i % 2 === 1 : (sl === 0 || sl === ns - 1)) ? 1 : 0) : i % 2; }
-        ctx.fx = fx;
         ctx.want.strobe = undefined; ctx.want.blinder = undefined;
         ctx.want.uv = undefined; ctx.want.laser = undefined; ctx.want.fog = undefined;
         ctx.want.hazer = undefined; ctx.want.co2 = undefined; ctx.want.energy = undefined;
@@ -1494,19 +1490,15 @@ export class EffectEngine {
       // ENERGI PER LAMPA (EffectWants.energy): effekten bestammer; osatt -> modulate.energy.
       const useE = lampWantE ?? modE;
       // (SPOT-regeln, UNIFORM:s ovalda par och taktdippen KICK_E borttagna 10-12 - förbivägar/dubbelmodulering, se B_CURVE)
-      let k = inputGate * (useE ? md : drive);
+      let k = inputGate * (useE ? lampLevel(fx, md) : drive);   // energin: andel ljus -> lampans nivå (output.ts)
       sm[i] = isAnchor ? 0 : m0; if (spreadOn && !isAnchor && useE && i !== lead) k *= 1 - SPREAD_D * (1 - bp);   // BASEN SPRIDS (se BASGANG)
       rgb[0] *= k; rgb[1] *= k; rgb[2] *= k;
       // STUNDEN (bröllopsläget, moment.ts): festens ljus efter energin * (1 - w) + stundens ljus * w - stunden följer inte släckgränsen/ingången.
       if (this.rMw > 0) { const ml = this.moment, w = this.rMw, u = 1 - w; rgb[0] = rgb[0] * u + ml.r(i) * w; rgb[1] = rgb[1] * u + ml.g(i) * w; rgb[2] = rgb[2] * u + ml.b(i) * w; }
       // ENERGIN SLACKER ALDRIG (agaren 2026-10-10: "energi skall aldrig slacka om effekten vill ha pa en lampa"): vill effekten ha
-      // lampan tand (m0 > 0) och ingangen ar pa (k > 0) halls den pa lagst 1 % (gammans forsta steg -> utgangens tandpunkt+1).
-      // Bara effekten sjalv eller slackgransen (tystnad) slacker. Kuloren bevaras (alla kanaler med samma faktor).
-      if (m0 > 0 && k > 0) {
-        const m = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
-        const mL = minLit(fx);   // lampans 1 % (output.ts, per lampa)
-        if (m < mL) { const g = mL / Math.max(1e-9, m); rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
-      }
+      // lampan tand (m0 > 0) och ingangen ar pa (k > 0) halls den pa lampans lagsta tanda niva (output.ts keepLit: forsta DMX-steget ->
+      // tandpunkt+1). Bara effekten sjalv eller slackgransen (tystnad) slacker. Kuloren bevaras (alla kanaler med samma faktor).
+      if (m0 > 0 && k > 0) keepLit(fx, rgb);
       // STEG 2 forts. - EN UTTONING (DMX_FADE_MIN_S, justerbar): lampans ljusstyrka upp direkt, ner med tidskonstanten; kuloren foljer
       // effekten direkt (slacker effekten lampan tonar den ut i sin sista kulor). Ersatter utgangens toning, sista toningen och
       // lookbytets toning (tre toningar -> en). Snabbare uttoning ar forbjudet (agaren 09-29) - standard 0,25 s som forr.
@@ -1515,7 +1507,7 @@ export class EffectEngine {
         // MINSTA PA-TID (DMX_MIN_ON_MS, agaren i ladan 10-10: "kan man ge effekterna en minsta tankt 'pa' tid? nu blev det lite
         // flimrande igen"): en nivå lampan nått hålls minst MIN_ON_MS innan uttoningen börjar - korta blixtar blir en puls. Upp direkt.
         const holding = !fastLight && renderNow - this.lampPeakAt[i] < MIN_ON_MS;
-        const fall = holding ? this.lampLvl[i] : this.lampLvl[i] * fadeK, o = i * 3;
+        const fall = holding ? this.lampLvl[i] : this.lampLvl[i] * lampFadeK(fx, dtSec, FADE_MIN_S), o = i * 3;   // tidskonstanten i lampans ljus (output.ts)
         if (mT > 0) {
           // MINSTA PA-TID PER FARGKANAL (agaren 10-10: "lyser R sa far inte B bara komma igang under 100 ms"): en kanal som tands
           // halls tand minst CH_MIN_ON_MS med sin senaste andel av lampans ljus, aven om effekten slacker den direkt.
@@ -2102,7 +2094,7 @@ export class EffectEngine {
     // (skrapjakten 10-01: has/exact/clamp255 var tre closures + ett nytt objekt per ruta; nu modulfunktioner + this.specBuf)
     const specialty = this.specBuf;
     specialty.hazer   = drivesHas(drives, "hazer")   ? clamp255(exactHas(effect, "hazer") ? wantHazer * 255 : Math.max(140 + audio * 60, wantHazer * 255)) : 0;
-    specialty.uv      = drivesHas(drives, "uv")      ? clamp255(exactHas(effect, "uv") ? wantUv * 255 : Math.max(180 * md, wantUv * 255)) : 0;
+    specialty.uv      = drivesHas(drives, "uv")      ? clamp255(exactHas(effect, "uv") ? wantUv * 255 : Math.max(180 * lampLevel(undefined, md), wantUv * 255)) : 0;
     specialty.blinder = drivesHas(drives, "blinder") ? clamp255(exactHas(effect, "blinder") ? wantBlinder * 255 : Math.max(kickEnv * 255, this.dropEnv > 0.6 ? 255 : 0, wantBlinder * 255)) : 0;
     specialty.strobe  = drivesHas(drives, "strobe")  ? clamp255(exactHas(effect, "strobe") ? wantStrobe * 255 : wantStrobe * 255) : 0;
     specialty.laser   = drivesHas(drives, "laser")   ? clamp255(Math.max(180 + audio * 75, wantLaser * 255)) : 0;
@@ -2113,12 +2105,11 @@ export class EffectEngine {
     if (mw > 0) { specialty.hazer = 0; specialty.uv = 0; specialty.blinder = 0; specialty.strobe = 0; specialty.laser = 0; specialty.co2 = 0; }
     const inputGate = this.inputOff ? 0 : 1;   // ingangen avstangd -> morkt (del av steg 2)
     this.fxPeakNow = 0;
-    const fadeK = Math.exp(-dtSec / (FADE_MIN_S / E_LIN_INV));
     const fxToggle = !!effect?.toggle;   // toggle-effekt: ingen grundniva (se effektNiva)
     const fxSparse = (frame.section === 'low' || frame.section === 'intro' || (STAIR_BREAK && frame.section === 'break')) && !SPARSAM.includes(effMode) && count >= 4;   // LAMPTRAPPA (se SPARSAM)
-    const fastLight = !!effect?.fastLight;   // effekten skippar minsta pa-tid (EffectDef.fastLight)   // STEG 2: uttoningens tidskonstant i DMX-ljus (FADE_MIN_S x gamma fore gamman)
+    const fastLight = !!effect?.fastLight;   // effekten skippar minsta pa-tid (EffectDef.fastLight)
     const modE = modulateOf(effMode).energy;   // samma för alla lampor - en gång per ruta
-    this.rT = t; this.rAnchorHue = anchorHue; this.rInputGate = inputGate; this.rMd = md; this.rDrive = drive; this.rFadeK = fadeK;
+    this.rT = t; this.rAnchorHue = anchorHue; this.rInputGate = inputGate; this.rMd = md; this.rDrive = drive;
     wantFogFx = this.renderLamps(effect, count, ordSel, useAnchor, fxToggle, fxSparse, fastLight, modE);
 
     if (E_NORM_S > 0) { this.fxPeak = Math.max(this.fxPeakNow, this.fxPeak * Math.exp(-dtSec / E_NORM_S)); this.fxNorm = Math.min(E_NORM_MAX, 1 / Math.max(0.05, this.fxPeak)); }   // STEG 1: effektens topp
@@ -2132,7 +2123,7 @@ export class EffectEngine {
       this.lowLogAt = nowWall;
       if (isLogOn()) console.log(   // strangen byggs bara nar loggen ar pa (DMX_QUIET=0)
         `[lagniva] niva ${frame.level.toFixed(3)} ` +
-        ` drive ${drive.toFixed(2)} ramp ${this.levelRamp.toFixed(2)} md ${md.toFixed(2)} e ${this.eSm.toFixed(2)} drop ${this.dropEnv.toFixed(2)}/${this.dropColEnv.toFixed(2)} fonster ${this.eLo.toFixed(1)}..${this.eHi.toFixed(1)} dB` +
+        ` drive ${drive.toFixed(2)} ramp ${this.levelRamp.toFixed(2)} md ${lampLevel(undefined, md).toFixed(2)} e ${this.eSm.toFixed(2)} drop ${this.dropEnv.toFixed(2)}/${this.dropColEnv.toFixed(2)} fonster ${this.eLo.toFixed(1)}..${this.eHi.toFixed(1)} dB` +
         ` intensitet ${frame.intensity.toFixed(2)} konf ${frame.bpmConfidence.toFixed(2)}` +
         ` tillit ${this.beatTrust.toFixed(2)} effekt ${this.smartMode}`
       );
