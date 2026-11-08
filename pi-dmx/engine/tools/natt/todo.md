@@ -1,5 +1,18 @@
 # Natt-agentens uppdrag
 
+## DAGKÖRNING 2026-11-08 21:45 -> 2026-11-09 ca 19:00 (ägaren: "Starta redan nu, så har vi många timmar att köra klart. Till imorgon kväll vid 19 tiden")
+- Startad för hand från huvudchatten. Kör i tur och ordning tills ca 18:30 den 9:e, och skriv sedan rapporten:
+  1. ARENA: EN TEMPO I HELA MOTORN (nedan, med TILLÄGGEN från granskningen).
+  2. DUBBLA KÄLLOR 9 (död kod): md5-identiskt, en commit.
+  3. DUBBLA KÄLLOR 1, 2, 3 ... i den ordning de står, en i taget. Varje punkt bänkas (tvavagar.py + kontrollmängden) och får en egen
+     commit med backup-tagg. Punkter som ändrar ljuset blir "redo för ladan" med ladan-raden. Ingen opt-in-flagga (ägarens regel):
+     det som bänken godkänner blir kod med backup-tagg, ägaren dömer i ladan.
+- Om ytterligare en nattagentkörning startar (schemat 02:38) medan den här pågår: avsluta direkt utan att röra något.
+  Känns igen på en pågående arena i .arena/ eller på .arena/.banklas.
+- Aldrig deploy, aldrig push, aldrig skriva i lotus-light-link (bara "DELAD FIL ÄNDRAD"-fynd).
+- Basen är HEAD som den är när körningen startar (g1 + lamptrappan bort + labbets favoriter, live i ladan).
+- Rapport: tools/natt/rapport-2026-11-09.md, med en rad per punkt (klart / bänkat / redo för ladan / förkastat + siffror).
+
 ## PRIORITET I NATT 2026-11-08 -> 11-09: ARENA: EN TEMPO I HELA MOTORN (ägaren i ladan 11-08 21:20) - GÅR FÖRE ALLT
 Ägaren: "Ja måste vara en och inte två! Är ju extremt svårt att trimma annars. Lägg det till nattagenten. Hur löser vi en optimal?"
 
