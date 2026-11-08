@@ -5,8 +5,8 @@
  * output' + 'köper jag andra lampor vill jag bara kalibrera dom, och det skall användas av output'): effekterna, dirigenten och stunderna
  * bestämmer fritt hur ljuset ser ut i 0..1 per kanal och lampa; den här filen gör det rätt på JUST DEN lampan. Allt som är lampfysik
  * finns BARA här och i lampans kalibrering (cfg.fixtures[i].cal: on/onR..onW = tändpunkt, full, gamma = kurva, top = tak):
- * kurvan (gamma), taket, tändpunkt/dödzon, minsta tända nivå (keepLit), ljusmatchning mellan kulörer (sameLight), bikanalsgrinden
- * (RGB_SHARE) och översättningen andel ljus <-> nivå (lampLevel, lampFadeK). En ny lampa = ny kalibrering, ingen annan kod.
+ * kurvan (gamma), taket, tändpunkt/dödzon, minsta tända nivå (keepLit), ljusmatchning mellan kulörer (sameLight) och
+ * översättningen andel ljus <-> nivå (lampLevel, lampFadeK). En ny lampa = ny kalibrering, ingen annan kod.
  *
  * Dirigenten, effekterna och sluttrimningen ska INTE behöva veta hur en lampa
  * fungerar. De säger "skala ljusstyrkan ×0.4" eller "kalibrera och lägg på taket";
@@ -42,8 +42,8 @@ const HOLD_MS = 120;
  *  Med provet mappas VARJE färgkanal för sig med samma formel som den starkaste: 0 -> 0, 1..255 -> egen tändpunkt+1..lampans tak. Den
  *  starkaste blir exakt som förr. PRIS: svaga inslag blir synliga i mörkt ljus (mörk orange R20/G3 -> R17/G17 = gul) - regel 4 ('lyft
  *  ingen färgkanal') är ägarens att pröva här. */
-/** Bikanal under denna andel av lampans starkaste kanal = släckt (kulörtoningens svans 0/1 av 255 avrundades fram och tillbaka). */
-const RGB_SHARE = 0.06;   // (VARJE KANAL LIKA STRIKT: STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108); förr PROV DMX_RGB_STRICT/DMX_RGB_SHARE)
+/* (Bikanalsgrinden RGB_SHARE 6 % BORTTAGEN 2026-11-08, ägaren: 'varför har vi en 6 % gräns - skall inte 1-100 % mappas mot lampans
+ *  kalibrering': bänken lang1107/lang1021 + LABFX blink 0,8/0,6 -> 0,8/0,5, studs oförändrade; backup-tagg backup/fore-rgbshare-bort-20261108.) */
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid  // släpp-håll: bryggar mikro-0-dippar så dioden inte strobar
 
@@ -207,7 +207,7 @@ export class FixtureOutput {
       const colTop = fast.mapTop === MAP_TOP ? colTop0 : Math.round(top * ceil * fast.mapTop + (top * ceil - top * ceil * fast.mapTop) * Math.max(0, Math.min(1, dropOpen)));   // lampans tak (cal.top)
       const dimTop = c && c.full && c.full < 255 ? Math.round(c.full * master) : top;   // FULLPUNKT (cal.full) = dimmerns konstant
       // FARGEN: lampans starkaste kanal 1..255 -> dess tandpunkt+1..colTop, alla fargkanaler med samma faktor (kuloren bevaras).
-      let lampLit = true, colK = 1, lampTop = colTop, mxL = 0;
+      let lampLit = true, colK = 1, lampTop = colTop;
       if (c) {
         let mxRaw = 0, mxOn = on;
         for (let i = 0; i < fast.roles.length; i++) {
@@ -215,7 +215,7 @@ export class FixtureOutput {
           const role = fast.roles[i]; if (role !== "r" && role !== "g" && role !== "b" && role !== "w") continue;
           if (universe[ch] > mxRaw) { mxRaw = universe[ch]; mxOn = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; }
         }
-        lampLit = mxRaw > 0; mxL = mxRaw;
+        lampLit = mxRaw > 0;
         // RAMPEN (effects.ts, RAMPEN OVANFÖR SLÄCKGRÄNSEN): lampans tak glider tändpunkt+1 -> colTop; lägsta steget rörs inte.
         lampTop = ramp >= 1 || colTop <= mxOn + 1 ? colTop : mxOn + 1 + Math.round((colTop - mxOn - 1) * ramp);
         if (lampLit) colK = (mxOn + 1 + (lampTop - mxOn - 1) * (mxRaw - 1) / 254) / mxRaw;
@@ -229,8 +229,7 @@ export class FixtureOutput {
         let raw = universe[ch];
         if (role === "r" || role === "g" || role === "b" || role === "w") {   // farg: noll nollar direkt, ingen hallning
           if (!lampLit) { universe[ch] = 0; this.holdUntil[ch] = 0; continue; }
-          if (c && raw > 0 && raw < mxL * RGB_SHARE) raw = 0;   // svansen (kulörtoningens rest, 0/1 av 255) -> släckt
-          else if (c && raw > 0) { const onC = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; raw = Math.round(onC + 1 + (lampTop - onC - 1) * (raw - 1) / 254); }   // VARJE KANAL LIKA STRIKT
+          if (c && raw > 0) { const onC = (role === "r" ? c.onR : role === "g" ? c.onG : role === "b" ? c.onB : c.onW) ?? on; raw = Math.round(onC + 1 + (lampTop - onC - 1) * (raw - 1) / 254); }   // VARJE KANAL LIKA STRIKT
           else if (colK !== 1) raw = Math.round(raw * colK);
           const v1 = raw > lampTop ? lampTop : raw; universe[ch] = v1; this.holdVal[ch] = v1; this.holdUntil[ch] = nowMs + HOLD_MS; continue;
         }
