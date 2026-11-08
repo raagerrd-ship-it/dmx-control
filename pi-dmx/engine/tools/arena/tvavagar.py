@@ -58,7 +58,8 @@ POÄNG = 0,6 * LÅNGSAMMA + 0,4 * SNABBA + BONUS (bara i finalen, max +3)
   SPÄRR 'SAMMA UPPGIFT ELLER BÄTTRE' (annars DISK): DMX-md5 per lampa identisk mot bas på HELA md5-filerna, i två lägen:
     tools/dmxDump.mjs DUMP_SPLIT=sync (den riktiga workern i lås-steg) och tools/dmxDumpMoment.mjs DUMP_MOMENTS=1 DUMP_SPLIT=inline,
     3:e arg 100000. Skiljer md5: ljusdomaren - tools/arena/bank.py <mapp> (--holdout i finalen) + domare.py v3: poäng >= bas - 0,5 och
-    inga av domarens spärrar (ljus > 103 %, lampspr, slocknat, fladder, t90; domarens filspärr gäller inte här). Fade-down, strobe och
+    (LÅTGRÄNSEN, ägaren 11-08: gr_ratt >= +20 % och gr_falska inte sämre -> ljusdomarens gräns -3,0 i stället för -0,5) och
+    inga av domarens spärrar (lampspr < 94 %, slocknat, fladder, t90; domarens filspärr gäller inte här). Fade-down, strobe och
     vitt döms bara genom md5 / ljusdomaren (inget eget mått).
   GRÄNS (annars DISK): workerns taktväg i realtid - hop efter när huvudtråden läser (tools/feedRealtid.mjs <dist> <cpu-wav> 60, efterHop,
     körd SAMTIDIGT med engine/dist = samma last), p99 <= X = bas p99 + 1 hop (bas = basmätningen eller parets bas, den högre).
@@ -108,6 +109,7 @@ MATT = [('mix_klocka', 'tempo', 1, 1), ('mix_las', 'tempo', -1, 1), ('mix_hopp',
         ('drop_traff', 'drop', 1, 5), ('drop_falska', 'drop', -1, 0.5), ('drop_ms', 'drop', -1, 20),
         ('gr_ratt', 'latgrans', 1, 5), ('gr_falska', 'latgrans', -1, 0.5)]
 W_LANGSAM, W_SNABB, KLIPP_PCT, SPARR_LJUS, BONUS_TOL = 0.6, 0.4, 100.0, -0.5, 1.35
+SPARR_LJUS_GRANS, GRANS_KRAV = -3.0, 20.0   # ägaren 11-08: lägre ljusspärr för varianter som tydligt förbättrar låtgränsen
 
 
 def rel(v, b, d, golv):
@@ -432,15 +434,20 @@ def ranking(a):
         rt = V.get('realtid') or {}
         Xv = max(X, (rt.get('basP99Hop') or 0) + 1)   # X = bas p99 + 1 hop (basmätningen eller parets bas, den högre: samma last)
         if rt and rt['p99Hop'] > Xv: disk.append(f"worker p99 {rt['p99Hop']} hop > X {Xv}")
-        if V.get('md5Lika') is False:
-            lj = V.get('ljusdomare') or {}
-            if 'fel' in lj or lj.get('poang') is None: disk.append('ljusdomaren: ' + str(lj.get('fel', 'saknas'))[:120])
-            elif lj['poang'] < SPARR_LJUS: disk.append(f"ljusdomaren {lj['poang']:+.1f} < {SPARR_LJUS}")
-            elif lj['disk']: disk.append('ljusdomaren: ' + '; '.join(lj['disk']))
-        elif V.get('md5Lika') is None: disk.append('md5 ej jämförd')
         q = {}
         if V.get('kvalitet'):
             for k, _, dr, g in MATT: q[k] = rel(V['kvalitet'][k], B['kvalitet'][k], dr, g)
+        if V.get('md5Lika') is False:
+            lj = V.get('ljusdomare') or {}
+            # LÅTGRÄNSEN (ägaren 11-08: 'sänk för just låtgräns, då den är svår, så de inte blir diskade pga den'): en rätt låtgräns
+            # byter look och flyttar ljuset slumpvis mot bas -> ljusdomaren straffar den. Varianter som TYDLIGT förbättrar låtgränsen
+            # (gr_ratt >= +20 % och gr_falska inte sämre) får ljusdomarens gräns SPARR_LJUS_GRANS i stället för SPARR_LJUS.
+            grans = q.get('gr_ratt', 0) >= GRANS_KRAV and q.get('gr_falska', 0) >= 0
+            sp = SPARR_LJUS_GRANS if grans else SPARR_LJUS
+            if 'fel' in lj or lj.get('poang') is None: disk.append('ljusdomaren: ' + str(lj.get('fel', 'saknas'))[:120])
+            elif lj['poang'] < sp: disk.append(f"ljusdomaren {lj['poang']:+.1f} < {sp}" + (' (låtgränsens gräns)' if grans else ''))
+            elif lj['disk']: disk.append('ljusdomaren: ' + '; '.join(lj['disk']))
+        elif V.get('md5Lika') is None: disk.append('md5 ej jämförd')
         lang = sum(q.values()) / len(MATT) if q else 0.0
         cpu = rel(V['cpu']['kvot'], 1.0, -1, 1e-6) if V.get('cpu') else 0.0   # mot engine/dist i samma mätning (ABBA)
         lat = rel(V['latens']['ms'], B['latens']['ms'], -1, 10) if V.get('latens') else 0.0

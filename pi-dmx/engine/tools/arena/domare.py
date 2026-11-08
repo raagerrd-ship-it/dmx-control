@@ -11,7 +11,7 @@ POÄNG (relativt baslinjen, i procent, lang1021 väger dubbelt överallt):
   dynamik  = medel av relativ ändring i: slagK (ljusets topp/dal per starkt basanslag), djup (ljusets lyft per basanslag mot det lokala ljuset),
              dynSets ljusSteg (ljusets steg) och dynSets kontrast (ljus i högsta dB-kvartilen / lägsta) - KÄNSLAN: slaget syns som kontrast, inte som mer ljus
   takt     = medel av relativ ändring i rAbest och rK (ljuset mot basen 40-150 Hz resp. kickbandet)
-  ljus     = medelljusets ändring i procent: AVDRAG 1 poäng per procent över baslinjen, BONUS 0,5 per procent under (högst +3)
+  ljus     = medelljusets ändring i procent: INFO sedan 11-08 (förr avdrag 1/procent över bas, bonus 0,5/procent under) - inget kriterium
   poäng v2 = 0,7 * dynamik + 0,3 * takt - ljusavdrag + ljusbonus - lampspr-avdrag        (python domare.py ... --v2; runda 1 i puls1)
 DOMAREN v3 (STANDARD från runda 2 i puls1, ägaren 11-07: "mot förinspelad ljuskoreografi ... tänk dansgolv"):
   koreografi = medel av (a) jitter: relativ MINSKNING av spridningen (ms) i fördröjningen basanslag -> ljusets topp (programmerat ljus
@@ -20,8 +20,9 @@ DOMAREN v3 (STANDARD från runda 2 i puls1, ägaren 11-07: "mot förinspelad lju
   poäng v3 = 0,45 * dynamik + 0,35 * koreografi + 0,2 * takt - ljusavdrag + ljusbonus - lampspr-avdrag
   Saknar en bänk fälten (bänkad före 2026-11-07 kväll): koreografi räknas som 0 och raden märks 'gammal bänk' - bänka om.
 SPÄRRAR (DISK = ute oavsett poäng):
-  lampspr  någon fil under 94 % av baslinjen (fler lampor lika tända = takten syns inte); avdrag 2 poäng per procent under 98 %
-  ljus     medelljuset över de tre filerna över 103 % av baslinjen (målet är INTE mer ljus)
+  lampspr  någon fil under 94 % av baslinjen (fler lampor lika tända = takten syns inte); (mjuka avdraget under 98 % borttaget 11-08)
+  (ljus: INGEN spärr sedan 11-08 - ägaren: 'mer ljus kan ju vara en bra sak ... det vill jag inte här' [att det som minskar ljuset
+   vinner]. Medelljuset visas som info. Platt ljus straffas ändå av dynamik och koreografi.)
   slocknat andelen släckt rigg >= 1 s mer än +1 procentenhet (medel över filerna)
   fladder  dynSets fladder/min mer än +0,5 över baslinjen
   t90      lang1021:s ljusLag t90 mer än 15 ms senare än baslinjen
@@ -68,10 +69,9 @@ def doma(b, v, d):
     for n in WT:
         q = R[n]['lampspr'] / B[n]['lampspr']
         if q < 0.94: disk.append(f'lampspr {n} {100 * (q - 1):+.1f} %')
-        elif q < 0.98: avdrag += 2 * (0.98 - q) * 100
+        # (mjukt lampspr-avdrag under 98 % borttaget 11-08: 'om 2 lampor lyser i stället för 1 fungerar showen ändå')
     lj = sum(R[n]['ljus'] for n in WT) / sum(B[n]['ljus'] for n in WT)
-    ljp = 100 * (lj - 1); avdrag += max(0.0, ljp); bonus = min(3.0, 0.5 * max(0.0, -ljp))
-    if lj > 1.03: disk.append(f'ljus {100 * (lj - 1):+.1f} %')
+    bonus = 0.0   # ägaren 11-08: ljusmängden är INTE ett kriterium (inget avdrag, ingen bonus, ingen spärr) - visas bara som info
     sl = sum(R[n]['slocknat1s'] - B[n]['slocknat1s'] for n in WT) / len(WT)
     if sl > 0.01: disk.append(f'slocknat {100 * sl:+.1f} pe')
     fl = 0 if HOLD else v['dyn']['fladder']['fladderMin'] - b['dyn']['fladder']['fladderMin']
