@@ -107,7 +107,7 @@ export const FIT: Partial<Record<Mode, Fit>> = {
   slagga:     { punch: 0.90, bass: 0.65, bright: 0.55, beat: 0.90 },   // vit smäll på varje slag, glöd på basen
   sidokedja:  { punch: 0.80, bass: 0.85, bright: 0.25, beat: 0.95 },   // kicken trycker ner, sväller tillbaka
   tryckvag:   { punch: 0.85, bass: 0.75, bright: 0.35, beat: 0.85 },   // allt slår, mitten bär basen
-  // labbets favoriter 11-07 (DMX_LABFX)
+  // labbets favoriter 11-07 (standard sedan 11-08)
   sangare:    { punch: 0.20, bass: 0.20, bright: 0.55, beat: 0.30 },   // lugnt, rösten, lite takt
   sokljus:    { punch: 0.45, bass: 0.35, bright: 0.45, beat: 0.65 },   // lugnt med takt, virveln
   dansparet:  { punch: 0.85, bass: 0.75, bright: 0.45, beat: 0.95 },   // refräng, ett steg per slag
