@@ -690,6 +690,9 @@ function sanitizeFixtures(input: unknown[]): FixtureConfig[] | null {
       const perCol: Record<string, number> = {};
       for (const k of ["onR", "onG", "onB", "onW"] as const) { const v = clampByte(cr[k]); if (v > 0) perCol[k] = v; }
       { const v = clampByte(cr.full); if (v > 0 && v < 255) perCol.full = v; }   // fullpunkt (DIM); 255/0 = standard
+      // KALIBRERING PER LAMPA (11-08): ljuskurva (gamma 1..3) och tak (0,5..1); utanför/ej tal = standard (fältet släpps).
+      { const g = Number(cr.gamma); if (cr.gamma !== undefined && cr.gamma !== null && cr.gamma !== "" && Number.isFinite(g) && g >= 1 && g <= 3) perCol.gamma = Math.round(g * 100) / 100; }
+      { const t = Number(cr.top); if (cr.top !== undefined && cr.top !== null && cr.top !== "" && Number.isFinite(t) && t >= 0.5 && t <= 1) perCol.top = Math.round(t * 1000) / 1000; }
       if (off > 0 || on > 0 || Object.keys(perCol).length) cal = { off, on, ...perCol };
     }
     const fx: FixtureConfig = { name, address, preset, ...(roles ? { roles } : {}), ...(bandsArr?.length ? { bands: bandsArr } : {}), ...(cal ? { cal } : {}) };

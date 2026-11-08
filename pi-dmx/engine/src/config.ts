@@ -36,8 +36,10 @@ export interface FixtureConfig {
    *  onR/onG/onB/onW = valfria PER-FÄRG-trösklar (R/G/B tänder vid olika DMX). En
    *        kanal använder sin egen tröskel om satt, annars gemensamma `on`.
    *  full = FULLPUNKT för DIM (2026-10-08, ägaren: "inte dim utan mappning, lika som vi sätter släckpunkt"): DIM-värdet där
-   *        lampan inte blir ljusare (stegtest 10-01: ~85). Utgångens mappning går golv+1..MAP_TOP × full. Utan = 255. */
-  cal?: { off: number; on: number; onR?: number; onG?: number; onB?: number; onW?: number; full?: number };
+   *        lampan inte blir ljusare (stegtest 10-01: ~85). Utgångens mappning går golv+1..MAP_TOP × full. Utan = 255.
+   *  gamma = lampans ljuskurva (1..3, standard 1,6 = output.ts GAMMA); top = lampans tak (0,5..1, standard 0,95 = MAP_TOP; full drop öppnar
+   *        resten) - 2026-11-08, kalibrering per lampa: en ny lampa = kalibrera i UI:t, inget annat. Saknas = som förr. */
+  cal?: { off: number; on: number; onR?: number; onG?: number; onB?: number; onW?: number; full?: number; gamma?: number; top?: number };
 }
 
 export interface EngineConfig {

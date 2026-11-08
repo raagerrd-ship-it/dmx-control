@@ -9,7 +9,7 @@
 import { isLogOn } from "./quiet.js";
 import type { ChannelRole, EngineConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
-import { FixtureOutput, GAMMA, type SpecialtyValues } from "./output.js";
+import { FixtureOutput, GAMMA, minLit, sameLightK, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE } from "./beatClock.js";
 import type { Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
@@ -441,9 +441,10 @@ const PD_WIN_S = envN('DMX_DROP_WIN_S', 0), PD_TOP = envN('DMX_DROP_TOP', 0), PM
  *  bas' med baskroppen 20-250 Hz, 'känns bättre' med sub+kick 20-120 Hz). Basenergins källa = medel av sub- och kickbandets rå dB ur
  *  frame.specAbs (samma bandmedel som bodyDb, utan bandet 120-250 Hz där röstens grundton och virvelns kropp ligger). Flank-dropen läser
  *  fortfarande bodyDb. 0 = av (som före). */
-const E_LIN_INV = 1 / GAMMA;   // utgangens gamma (output.ts ager DMX_GAMMA - en kalla, 10-11; forr last pa tva stallen med var sin standard)
-/** Minsta tanda niva fore gamman: gammans forsta DMX-steg (1/255 -> tandpunkt+1 i utgangen) = agarens 1 %. */
-const E_MIN_LIT = Math.pow(1 / 255, E_LIN_INV) * 1.02;   // agarens 1 %: gammans forsta DMX-steg (-> tandpunkt+1), se ENERGIN SLACKER ALDRIG
+/* (E_MIN_LIT - minsta tända nivå före gamman - och kulörtoningens ljusmatchning ägs av output.ts sedan 2026-11-08: minLit(fx), sameLightK(fx),
+ *  per lampa via cal.gamma.) KVAR (riggens gemensamma referensgamma, inte per lampa): energins DMX-procent (md^E_LIN_INV) och uttoningens
+ *  tidskonstant i DMX-ljus - steg 2 räknar i 'det lamporna lyser' för en standardlampa. */
+const E_LIN_INV = 1 / GAMMA;   // utgangens referensgamma (output.ts ager GAMMA)
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
 /** TYST LAT = TYST LJUS (ladan 2026-09-24 22:30: 'laten ar ganska tyst och den kor ganska ljust'): ankaret ar relativt, sa en tyst lat blev
@@ -561,7 +562,7 @@ export class EffectEngine {
     this.glH[i] = ((this.glH[i] + dh * (1 - Math.exp(-dtSec / (HUE_GLIDE_MS / 3000)))) % 1 + 1) % 1;
     // SAMMA LJUS SOM EFFEKTEN (ägaren 10-14: 'i en effekt påverkade den även energin ... fade är bara när det går'): glidkulören skalas
     // till effektens kanalsumma efter gamman (det lamporna faktiskt lyser); skulle någon kanal då gå över effektens starkaste kanal går det inte -> skarpt byte som förr.
-    const o = hsvToRgb(this.glH[i], 1, v), G = GAMMA, so = o[0] ** G + o[1] ** G + o[2] ** G, k = so > 0 ? ((r ** G + g ** G + b ** G) / so) ** (1 / G) : 0;   // efter utgångens gamma
+    const o = hsvToRgb(this.glH[i], 1, v), k = sameLightK(this.cfg.fixtures[i], r, g, b, o[0], o[1], o[2]);   // efter lampans gamma (output.ts)
     if (k * v > v * 1.0001 || k <= 0) { this.glH[i] = h; return; }
     rgb[0] = o[0] * k; rgb[1] = o[1] * k; rgb[2] = o[2] * k;
   }
@@ -1504,7 +1505,8 @@ export class EffectEngine {
       // Bara effekten sjalv eller slackgransen (tystnad) slacker. Kuloren bevaras (alla kanaler med samma faktor).
       if (m0 > 0 && k > 0) {
         const m = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
-        if (m < E_MIN_LIT) { const g = E_MIN_LIT / Math.max(1e-9, m); rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
+        const mL = minLit(fx);   // lampans 1 % (output.ts, per lampa)
+        if (m < mL) { const g = mL / Math.max(1e-9, m); rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
       }
       // STEG 2 forts. - EN UTTONING (DMX_FADE_MIN_S, justerbar): lampans ljusstyrka upp direkt, ner med tidskonstanten; kuloren foljer
       // effekten direkt (slacker effekten lampan tonar den ut i sin sista kulor). Ersatter utgangens toning, sista toningen och

@@ -1179,8 +1179,8 @@ function renderFixtures() {
                   + (errByIdx.has(i) ? " err" : "")
                   + (i === identifyingIndex ? " identifying" : "");
     const _c = fx.cal;
-    const calBadge = (_c && (_c.on || _c.onR || _c.onG || _c.onB || _c.full))
-      ? [_c.on ? `alla ${_c.on}` : "", _c.onR ? `R${_c.onR}` : "", _c.onG ? `G${_c.onG}` : "", _c.onB ? `B${_c.onB}` : "", _c.full ? `full ${_c.full}` : ""].filter(Boolean).join(" · ")
+    const calBadge = (_c && (_c.on || _c.onR || _c.onG || _c.onB || _c.full || _c.gamma !== undefined || _c.top !== undefined))
+      ? [_c.on ? `alla ${_c.on}` : "", _c.onR ? `R${_c.onR}` : "", _c.onG ? `G${_c.onG}` : "", _c.onB ? `B${_c.onB}` : "", _c.full ? `full ${_c.full}` : "", _c.gamma !== undefined ? `kurva ${_c.gamma}` : "", _c.top !== undefined ? `tak ${Math.round(_c.top * 100)} %` : ""].filter(Boolean).join(" · ")
       : "ej satt";
     const calOk = !!(_c && (_c.on || _c.onR || _c.onG || _c.onB));
     const pill = errByIdx.has(i) ? '<span class="lamp-pill err">Fel</span>' : calOk ? '<span class="lamp-pill ok">Klar</span>' : '<span class="lamp-pill todo">Ställ in</span>';
@@ -1208,6 +1208,13 @@ function renderFixtures() {
               <span class="fx-cal-badge ${calBadge === "ej satt" ? "unset" : ""}" data-cal-badge="${i}">${calBadge}</span>
             </div>
             <button type="button" class="btn primary" data-cal-set="on" data-cal-set-i="${i}">Spara</button>
+            <p class="lamp-p" style="margin-top:10px">Ny sorts lampa? <b>Kurva</b> (standard 1,6; högre = mörkare mellanläge) och <b>Tak</b> (standard 95 %; full drop ger alltid 100 %). Tomt = standard.</p>
+            <div class="lamp-addr">
+              <label class="lamp-l" style="margin:0">Kurva</label>
+              <input type="number" min="1" max="3" step="0.1" placeholder="1.6" value="${fx.cal && fx.cal.gamma !== undefined ? fx.cal.gamma : ""}" data-calg-i="${i}" inputmode="decimal" />
+              <label class="lamp-l" style="margin:0">Tak %</label>
+              <input type="number" min="50" max="100" step="1" placeholder="95" value="${fx.cal && fx.cal.top !== undefined ? Math.round(fx.cal.top * 100) : ""}" data-calt-i="${i}" inputmode="numeric" />
+            </div>
           </div>
           <div class="lamp-step">
             <div class="lamp-h"><span>3</span>Namn och adress</div>
@@ -1315,13 +1322,25 @@ function renderFixtures() {
       const cal = fxDraft[i].cal ?? { off: 0, on: 0 };
       if (ch === "full") { if (v > 0 && v < 255) cal.full = v; else delete cal.full; }   // fullpunkt (DIM)
       else if (ch === "all") cal.on = v; else cal["on" + ch.toUpperCase()] = v;   // onR/onG/onB
-      if (!cal.on && !cal.onR && !cal.onG && !cal.onB && !cal.onW && !cal.full) delete fxDraft[i].cal; else fxDraft[i].cal = cal;
+      if (!cal.on && !cal.onR && !cal.onG && !cal.onB && !cal.onW && !cal.full && cal.gamma === undefined && cal.top === undefined) delete fxDraft[i].cal; else fxDraft[i].cal = cal;
       calTestActive = false;
       send({ type: "setCalTest", index: -1, value: 0 });   // klar → tillbaka till showen
       // SPARA DIREKT (ladan 2026-10-08: fullpunkterna "sparades" men nadde aldrig motorn - knappen andrade bara utkastet och
       // "Spara ändringar" langst ner kravdes ocksa). Kalibreringen skickas nu direkt om resten av listan ar giltig.
       if (validateAll().length === 0) { send({ type: "setFixtures", fixtures: fxDraft }); fxDirty = false; fxSaveBtn.disabled = true; renderFixtures(); }
       else markDirty();   // ogiltig lista (t.ex. adresskrock) -> som forr: "Spara ändringar" kravs
+    });
+  });
+  // KALIBRERING PER LAMPA (11-08): kurva (gamma) och tak -> fxDraft[i].cal.gamma/top; tomt = standard (fältet bort). Sparas med "Spara ändringar".
+  fxEl.querySelectorAll("[data-calg-i],[data-calt-i]").forEach((el) => {
+    el.addEventListener("change", (e) => {
+      const t = e.target, isG = t.dataset.calgI !== undefined, i = Number(isG ? t.dataset.calgI : t.dataset.caltI);
+      const cal = fxDraft[i].cal ?? { off: 0, on: 0 };
+      const v = parseFloat(String(t.value).replace(",", "."));
+      if (isG) { if (Number.isFinite(v) && v >= 1 && v <= 3) cal.gamma = v; else delete cal.gamma; }
+      else { if (Number.isFinite(v) && v >= 50 && v <= 100) cal.top = v / 100; else delete cal.top; }
+      if (!cal.on && !cal.onR && !cal.onG && !cal.onB && !cal.onW && !cal.full && cal.gamma === undefined && cal.top === undefined) delete fxDraft[i].cal; else fxDraft[i].cal = cal;
+      markDirty();
     });
   });
   fxEl.querySelectorAll("[data-addr-i]").forEach((el) => {

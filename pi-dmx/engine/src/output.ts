@@ -50,6 +50,29 @@ const GAMMA_LUT = new Uint8Array(1024);
 for (let i = 0; i < 1024; i++) {
   GAMMA_LUT[i] = Math.round(Math.pow(i / 1023, GAMMA) * 255);
 }
+/** KALIBRERING PER LAMPA (ägaren 11-07: 'köper jag andra lampor vill jag bara kalibrera dom, och det skall användas av output'):
+ *  cal.gamma (1..3, standard GAMMA 1,6) och cal.top (taket 0,5..1, standard MAP_TOP 0,95). Saknas fälten = exakt som förr (samma LUT,
+ *  samma tak). Motorn frågar output om lampans minsta tända nivå (minLit) och om kulörtoningens ljusmatchning (sameLightK) - effects.ts
+ *  vet inget om gamman (KONTRAKTET: effekterna och steg 1-2 ger R/G/B 0..1, gamma/tändpunkt/tak bara här). */
+const lampGamma = (fx: FixtureConfig | undefined): number => { const g = fx?.cal?.gamma; return g === undefined || !(g >= 1 && g <= 3) ? GAMMA : g; };
+const lampTopOf = (fx: FixtureConfig | undefined): number => { const t = fx?.cal?.top; return t === undefined || !(t >= 0.5 && t <= 1) ? MAP_TOP : t; };
+const LUTS = new Map<number, Uint8Array>([[GAMMA, GAMMA_LUT]]);
+function lutFor(g: number): Uint8Array {
+  let l = LUTS.get(g);
+  if (!l) { l = new Uint8Array(1024); for (let i = 0; i < 1024; i++) l[i] = Math.round(Math.pow(i / 1023, g) * 255); LUTS.set(g, l); }
+  return l;
+}
+/** Minsta tända nivå före gamman: gammans första DMX-steg (1/255 -> tändpunkt+1 i calibrate) = ägarens 1 % (förr E_MIN_LIT i effects.ts). */
+const MIN_LIT = Math.pow(1 / 255, 1 / GAMMA) * 1.02;
+export function minLit(fx: FixtureConfig | undefined): number {
+  const g = lampGamma(fx); return g === GAMMA ? MIN_LIT : Math.pow(1 / 255, 1 / g) * 1.02;
+}
+/** KULÖRTONINGENS LJUSMATCHNING (förr i effects.ts hueGlide): faktor k så att kulören (o0,o1,o2) lyser lika mycket som (r,g,b) EFTER
+ *  lampans gamma (kanalsumman i DMX). 0 = går inte. */
+export function sameLightK(fx: FixtureConfig | undefined, r: number, g: number, b: number, o0: number, o1: number, o2: number): number {
+  const G = lampGamma(fx), so = o0 ** G + o1 ** G + o2 ** G;
+  return so > 0 ? ((r ** G + g ** G + b ** G) / so) ** (1 / G) : 0;
+}
 
 export class FixtureOutput {
   // Publika Array-vyer så postprocess.ts slipper funktionsanrop
@@ -82,6 +105,8 @@ export class FixtureOutput {
     hasColor: boolean;
     hasDim: boolean;
     hasW: boolean;
+    lut: Uint8Array;   // lampans gamma (cal.gamma)
+    mapTop: number;    // lampans tak (cal.top)
   }> = [];
 
   /** Bygg om maskerna när fixture-listan byts (referensjämförelse → gratis per frame). */
@@ -98,7 +123,7 @@ export class FixtureOutput {
       const hasDim = roles.includes("dim");
       const hasW = roles.includes("w");
 
-      this.fastFixtures.push({ base: fx.address - 1, roles, hasColor, hasDim, hasW });
+      this.fastFixtures.push({ base: fx.address - 1, roles, hasColor, hasDim, hasW, lut: lutFor(lampGamma(fx)), mapTop: lampTopOf(fx) });
       const grp: number[] = [];
       for (let r = 0; r < roles.length; r++) { const ch = fx.address - 1 + r; const ro = roles[r]; if (ch >= 0 && ch < 512 && (ro === "r" || ro === "g" || ro === "b" || ro === "w")) grp.push(ch); }
       if (grp.length) { this.colorGroups.push(grp); for (const ch of grp) this.colorMask[ch] = 1; }
@@ -136,13 +161,14 @@ export class FixtureOutput {
     const top = (255 * master + 0.5) | 0;
     // ceil = SEKTIONENS TAK (effects.ts): bara på färgen/ljusstyrkan - dimmern på en färgfixtur står på master (förr fick rgb7-lamporna
     // taket två gånger: master*tak på dimmern OCH på färgen -> 0,65 blev ~0,42).
-    const colTop = Math.round(top * ceil * MAP_TOP + (top * ceil - top * ceil * MAP_TOP) * Math.max(0, Math.min(1, dropOpen)));   // 95 %, full drop -> tak
+    const colTop0 = Math.round(top * ceil * MAP_TOP + (top * ceil - top * ceil * MAP_TOP) * Math.max(0, Math.min(1, dropOpen)));   // 95 %, full drop -> tak
     for (let f = 0; f < fixtures.length; f++) {
       const fx = fixtures[f];
       const fast = this.fastFixtures[f];
       const c = fx.cal;
       const base = fast.base;
       const on = c ? (c.on || 0) : 0;
+      const colTop = fast.mapTop === MAP_TOP ? colTop0 : Math.round(top * ceil * fast.mapTop + (top * ceil - top * ceil * fast.mapTop) * Math.max(0, Math.min(1, dropOpen)));   // lampans tak (cal.top)
       const dimTop = c && c.full && c.full < 255 ? Math.round(c.full * master) : top;   // FULLPUNKT (cal.full) = dimmerns konstant
       // FARGEN: lampans starkaste kanal 1..255 -> dess tandpunkt+1..colTop, alla fargkanaler med samma faktor (kuloren bevaras).
       let lampLit = true, colK = 1, lampTop = colTop, mxL = 0;
@@ -258,6 +284,7 @@ export class FixtureOutput {
     const w = Math.min(r, g, b);
     const dim = Math.max(r, g, b);
     const colorScale = fast.hasDim ? 1 : m;
+    const GAMMA_LUT = fast.lut;   // lampans gamma (cal.gamma; standard = den gemensamma)
 
     for (let i = 0; i < fast.roles.length; i++) {
       const ch = base + i;
