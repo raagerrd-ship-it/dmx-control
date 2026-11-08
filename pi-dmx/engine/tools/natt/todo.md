@@ -29,7 +29,7 @@ ARENA: FART (ägaren 11-08: 'lägg till arena till natten enl. ditt förslag. De
    ARENAN puls2 (D) FLYTTAS EN NATT TILL (en arena per natt).
 TAKTMATNINGEN IN I ANALYSATORNS LÅNGSAMMA VÄG (ägaren 11-08: 'är det inte bättre att slå ihop till en analysator, bara att i den finns
    två olika vägar, den snabba och sen den som ger dirigenten information' + 'vi borde enkelt kunna lägga flagga på långsamma vägen som lotus
-   inte använder'). GÖRS FÖRE ARENAN I NATT (arenan optimerar sedan den nya strukturen; räcker inte natten: arenan nästa natt).
+   inte använder'). TAGET 2026-11-08 DAGTID av huvudchatten (ägaren: 'kör igång direkt') - nattagenten: läs commit-loggen, gör inte om. GÖRS FÖRE ARENAN I NATT (arenan optimerar sedan den nya strukturen; räcker inte natten: arenan nästa natt).
    I DAG: src/beatFeed.ts (ladans egen löpande temposökning: onsetStep/fullStep/fullScore, ~20 % CPU) körs i HUVUDTRÅDEN varje hop
    (index.ts:199 beatFeed.update(frame, cfg, analyser)) fast det är långsam-väg-arbete; analysatorn kör redan tempo/gridfas/sektion i
    workern (DMX-profilen ANALYSER_SPLIT 'worker', split.ts SAB-ring + tillståndsblock, slowWorker.ts).
