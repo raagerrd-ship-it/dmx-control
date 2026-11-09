@@ -32,7 +32,7 @@ worker-rökningen ok. Lotus tsc (NodeNext, declaration) bygger utan fel.
 Önskat: lotus-morgonagenten kopierar analyser.ts, split.ts, slowWorker.ts från dmx-control/pi-dmx/engine/src till lotus-light-link/pi/src/audio-analyser
 (analyserProfile.ts i lotus RÖRS INTE), kör analyser_shared.py --write där, lotus paritet (analyserParity lotus + splitProof + korbank) och bygg.
 Tills dess vägrar DMX:s deployspärr om lotus-kopian är utcheckad bredvid (syskonets md5 != manifestet) - väntat.
-Status: (lotus fyller i)
+Status: KLART 2026-11-09 lotus 56199a28 (synkad 11-08 20:15, paritet lotus-profil 0, md5 analyser/split/slowWorker = dmx; ingen lotus-deploy, Pi-dist äldre än main sedan tidigare)
 
 ## ÖPPET 2026-11-07 Tempot släpps i breaket före dropen (frame.bpm 0 i 14,6 s) och låser först 4,2 s efter dropen
 Vad: ladan 11-06 (ws-logg tools/natt/ladan-20261106-drops.jsonl, ~20 Hz, fält bpm = frame.bpm, bc = bpmConfidence efter DMX:s BeatFeed):
