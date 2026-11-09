@@ -1,6 +1,5 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
-const FX_REN = process.env.DMX_FX_REN === '1';   // PROV 2026-11-08 (kontraktet B): effektens diodanpassning bort, output (RGB_STRICT) tar dioderna
 
 // VIDGA (2026-09-29, agaren i ladan: "effekter som beroende pa energi kanske bara kor pa de yttre och sen om energin gar upp pa
 // alla, men kor t.ex. i takt / heart-beat"). Energin oppnar riggen utifran och in: lag energi = bara ytterlamporna
@@ -24,8 +23,7 @@ export const vidga: EffectDef = {
     // DIODBLINKEN 11-02: +0,08 gav innerlamporna en blandkulör (andra dioden ~30 % av den första) som pulsen tände och släckte vid
     // tändpunkten (33 blink/15 min) - nu grannkulören i paletten, en ren kulör.
     const sec = Math.floor(c.hueIdx / 32);
-    const hue = FX_REN ? (c.mixedSector(sec) / 6 + (edge >= 0.99 ? 0 : 0.08)) % 1   // FX_REN: effektens egen blandkulör (före 11-02)
-      : c.mixedSector(edge >= 0.99 ? sec : sec + 1) / 6;
+    const hue = c.mixedSector(edge >= 0.99 ? sec : sec + 1) / 6;
     return hsv(hue, 0.95, Math.min(1, open * (0.55 + 0.45 * e) * beat));
   },
 };

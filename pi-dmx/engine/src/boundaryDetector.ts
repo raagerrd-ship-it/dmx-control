@@ -21,7 +21,7 @@ const MIN_SEG_MS = 110000;     // MATT: 75 s triggade direkt (tva segment exakt 
 const MAX_SEG_MS = 600000;     // 10 min utan grans -> tvinga fram en
 const NOV_WIN_MS = 1500;       // klangprofil per 1,5 s
 const NOV_LAG_MS = 8000;       // jamfor mot profilen sa langt bakat (facitmatningens fonster)
-const NOV_WEAK = 0.55;
+// (NOV_WEAK + novAt/novPeak - skrevs men lastes aldrig - borttagna 11-09.)
 const CHAR_D = 0.55;   // 10-01 i koden ('mer variation pa effekterna nu');             // karaktarsskifte for dirigenten: 0 = av
 const CHAR_REFRACT_MS = 15000;         // ...racker om nivadipp eller temposkifte ocksa fyrar
 const NOV_Q = 0.97;            // skiftet maste ligga i toppen av de senaste minuterna
@@ -98,8 +98,6 @@ export class BoundaryDetector {
   private novIdx = 0;             // nasta slot i ringen
   private novFilled = 0;          // antal skrivna profiler
   charShiftCount = 0; charShiftD = 0; private charShiftAt = 0;   // KARAKTARSSKIFTE (se nedan)
-  private novAt = 0;              // vaggklocka for senaste klangskiftet
-  private novPeak = 0;            // L1-avstandet vid det skiftet
   private novDist = new Float32Array(NOV_DIST_BUCKETS);   // fordelning over ALLA d
   private novDistTotal = 0;
 
@@ -243,7 +241,6 @@ export class BoundaryDetector {
       if (bk < 0) bk = 0; if (bk >= NOV_DIST_BUCKETS) bk = NOV_DIST_BUCKETS - 1;
       this.novDist[bk] += dt;
       this.novDistTotal += dt;
-      if (d >= NOV_WEAK) { this.novAt = now; this.novPeak = d; }
       // KARAKTARSSKIFTE (ladan 2026-09-29: 'dirigenten ska vaxla om den kanner att laten forandras'): samma klangavstand, men utan
       // krav pa nivadipp/temposkifte - bara att skiftet ar ovanligt for LATEN (>= dess egen NOV_Q-percentil) och >= CHAR_D. Raknaren
       // lases av index.ts -> effects.noteCharShift(). Spärr CHAR_REFRACT_MS mellan skiften. Paverkar inte latgransen.
@@ -265,7 +262,7 @@ export class BoundaryDetector {
   }
 
   private resetNovelty(): void {
-    this.novAt = 0; this.novPeak = 0; this.novAcc.fill(0); this.novN = 0; this.novStart = 0;
+    this.novAcc.fill(0); this.novN = 0; this.novStart = 0;
     this.novDist.fill(0); this.novDistTotal = 0;
     this.novHist = []; this.novIdx = 0; this.novFilled = 0;
   }
