@@ -1,5 +1,20 @@
 # Natt-agentens uppdrag
 
+## HÖGSTA PRIO 2026-11-09 09:00: ARENA: EN KLOCKA FÖR BÅDA (lotus + DMX) - ägaren
+"Kan vi inte samma där. Jämför delarna, och kolla vad som fungerar bäst. Skapa sedan en enda. Känns jättedumt som vi sagt hela
+kvällen att köra två olika funktioner för samma sak som vi försöker förbättra och vet inte vilken som blivit förbättrad."
+- I dag: lotus kör analysatorns egna sökning (OWN_TEMPO bakom sys.BEAT_FEED, 3c5b643), DMX kör analyserClock.ts. Det är två tempovägar
+  i den delade analysatorn.
+- Tempovalet är i stort sett lika (tools/arena/klockjmf.py):
+  - övning klipp 97,7 / 98,3 %, mix 96,4 / 97,2 %
+  - kontroll klipp 84,9 / 84,3 %, mix 83,2 / 82,4 % (lotus / DMX)
+  - båda 0 % på hannes-aitman-hopeless-nights
+- Metoden per dubblett, DEL FÖR DEL (tempoval, låsning/hopp, fas, etta, tillit, break, omlåsning): A / B / sammanslagning.
+  Döms på DMX-bänken (tvavagar.py) OCH på lotus bänk (tempo-facit-pc, bench-manifestet; körs i kopia under .arena,
+  skriv aldrig i lotus-light-link).
+- Vinnaren = EN klocka som båda profilerna kör. Profilerna skiljer sig bara i konsumenterna.
+- Lotus kopia synkas av huvudchatten efter ägarens ja. Lotus kollas i källaren.
+
 ## DAGKÖRNING 2026-11-08 21:45 -> 2026-11-09 ca 19:00 (ägaren: "Starta redan nu, så har vi många timmar att köra klart. Till imorgon kväll vid 19 tiden")
 - Startad för hand från huvudchatten. ÄGAREN 11-08 23:55: "Och det är detta jag vill arenan skall lösa" = ARKITEKTUREN nedan
   (analysatorn ger ALL låtinfo -> dirigenten väljer effekt -> effekten styr ljuset; motorn analyserar inget själv). Kör ARENOR i tur
