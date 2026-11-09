@@ -1,0 +1,544 @@
+diff --git a/src/analyser.ts b/.arena/klocka/a2/src/analyser.ts
+index 870c40a..4a4b595 100644
+--- a/src/analyser.ts
++++ b/.arena/klocka/a2/src/analyser.ts
+@@ -25,7 +25,7 @@ import {
+   S_REP_SIM, S_REP_AGO, S_REP_SEC, S_EXPECT_MS, S_EXPECT_SRC, S_PREV_SEC, S_LVL_HIGH, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
+   SECTIONS, sectionCode, viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
+   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader, type HopFeed,
+-  R_BIGSEQ, R_CLOCK, R_CLOCK_CONF, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N, B_RMS, B_LVL, B_CENT, B_ACTIVE, B_WALL, B_KICK, B_KICKHIT, B_INT, B_BREAK, B_SEC, B_LVH, B_CONF,
++  R_BIGSEQ, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N, B_RMS, B_LVL, B_CENT, B_ACTIVE, B_WALL, B_KICK, B_KICKHIT, B_INT, B_BREAK, B_SEC, B_LVH, B_CONF,
+   B_ENVF, B_ENVBPM, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY, BS_DROPS, BS_MINI, BS_BUILD, BS_RISER, BS_PUNCH, BS_BASS, BS_BRIGHT, BS_BEAT,
+   BS_BASSLINE, BS_SPEC_N, BS_SKIPPED, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
+ } from './split.js';
+@@ -43,10 +43,9 @@ const KICK_CAP_MS = 330;
+ function sysEnv(name: string): string | undefined {
+   return ENV?.[PROFILE.envPrefix + name] ?? ENV?.[ALIAS_PREFIX + name] ?? PROFILE.sys[name];
+ }
+-/** TEMPOKÄLLAN - profilen på ETT ställe (sys.BEAT_FEED, se clockMode): osatt (lotus) = analysatorns EGEN temposökning (computeBpm/
+- *  scoreEnv/alignScore/shiftDetect, skuggan via setBeatGrid) exakt som före EN KLOCKA, ingen klocka; 'slow'/'inline' (DMX) = klockan
+- *  (analyserClock.ts) är analysatorns enda tempo och den egna sökningen körs aldrig. */
+-const OWN_TEMPO = clockMode() === null;
++/** EN KLOCKA FÖR BÅDA (a2 klocka 11-09): den gamla tempokällsväljaren är borta. Tempovalet är ALLTID analysatorns egen sökning
++ *  (computeBpm/scoreEnv/alignScore/shiftDetect med lotus LIVE-värden som kod, nedan), och klockan (analyserClock.ts: rise-rutnätet,
++ *  taktmodellens etta, tilliten, relock vid låtgräns) körs ALLTID ovanpå den - i lotus och DMX. Profilens BEAT_FEED avgör bara VAR. */
+ /** Ratt UTAN prefix (namnet som det star), sedan profilens standard. */
+ function env(name: string): string | undefined {
+   return ENV?.[name] ?? PROFILE.bare[name];
+@@ -60,7 +59,7 @@ const DROP_TRACE = sysOn('DROP_TRACE');
+ /** Tystnad (350 ms) nollar aven en vantande kick-forfining (pendingKickMs). */
+ const SIL_CLEAR_PENDING = sysEnv('SIL_CLEAR_PENDING') === '1';
+ /** Tempots storsta lag: 'half' = hogst halva ringen (N >> 1), 'full' = hela ringen (N - 1). */
+-const TEMPO_LAGMAX = sysEnv('TEMPO_LAGMAX') || 'half';
++const TEMPO_LAGMAX: string = 'half';   // EN KLOCKA: kod (lotus värde; DMX-profilens 'full' borta)
+ /** SEKTIONSBLOCKENS TAKT: 'env' = blocksummor per env-sampel (100 Hz; identiskt i odelad och delad analysator),
+  *  'hop' = sectionHop per hop i odelad analysator, spektrum ur band-dB (aldre vagen). */
+ const SECTION_AGG = sysEnv('SECTION_AGG') || 'env';
+@@ -270,9 +269,9 @@ const BODY_CEIL_DB_S = 0.15;   // taket haller latens loud-referens lange
+ const COMB3 = 0.33;      // comb-filtrets 3:e-harmonik-vikt (ac[3*lag])
+ const PRIOR_W = 0.7;   // log-Gauss-priorns bredd
+ const PRIOR_C = 0;   // prior-centrum (0 = folj fonstret: 1.5 x BPM_MIN)
+-const SUBH_MULT = Number(env('SUBH_MULT') ?? 3);   // subhSuspect: rostmultiplikator pa OCT-DOWN/NEAR (<prefix>SUBH_GUARD)
++const SUBH_MULT = 3;   // EN KLOCKA: kod   // subhSuspect: rostmultiplikator pa OCT-DOWN/NEAR (<prefix>SUBH_GUARD)
+ const NEAR_REACQ = 3; // NEAR-roster i reacq-fonstret
+-const SUBH_GUARD = sysOn('SUBH_GUARD');
++const SUBH_GUARD = false as boolean;   // EN KLOCKA: kod (lotus: av)
+ 
+ // Diagnostik-/provrattar i tempovalet (alla inerta i standard, lases en gang):
+ const HIGH_VOTE = undefined as string | undefined;                          // 'always' | 'cond' | 'sharp'
+@@ -286,7 +285,7 @@ const VETO_WIN = undefined as string | undefined;
+ 
+ const TG_ADAPT_A = 0.35;
+ 
+-const GHOST_WAIT = sysOn('GHOST_WAIT');
++const GHOST_WAIT = false as boolean;   // EN KLOCKA: kod (lotus: av)
+ 
+ const GHOST_MS = 12000;
+ 
+@@ -401,11 +400,11 @@ export class Analyser {
+   private static readonly ENV_HZ = 100;
+   private static readonly ONSET_PEAK_FLOOR = 0.05;
+   /** Onset-ringens langd i sekunder x 100 Hz. Env LOTUS_TEMPO_ENV_S bara for korbanken (bench.mjs) - 5 s ar driftvardet. */
+-  private static readonly ENV_LEN = 100 * Math.max(3, Math.min(20, Number(sysEnv('TEMPO_ENV_S')) || 5));
++  private static readonly ENV_LEN = 100 * Math.max(3, Math.min(20, 10));   // EN KLOCKA: 10 s som kod (lotus LIVE)
+   private envRing = new Float32Array(Analyser.ENV_LEN);
+   private envPos = 0;
+   /** GRIDFAS (09-20): se computeGridPhase. Opt-in - standardbygget ar oforandrat. */
+-  private static readonly GRID_PHASE_ON = sysEnv('GRID_PHASE') === '1';
++  private static readonly GRID_PHASE_ON = false as boolean;   // EN KLOCKA (a2): av i båda - ramens fas är klockans rutnät (analyserClock.ts)
+   /** Fasval: 'sum' = bas+helband (standard), 'bass' = basringen forst, helbandet bara nar basen ar tvetydig (kvot < BASS_MIN). Korbank-A/B. */
+ 
+   /** GRIDFASENS SYSTEMATISKA SLAP (2026-09-23, opt-in LOTUS_GRID_PHASE_TRIM=1). PC-referensen tre dygn i rad:
+@@ -703,7 +702,7 @@ export class Analyser {
+   /** EVIDENSVAL (2026-09-19): tempogrammet som kandidatgenerator, slagpoang pa basonseten avgor. 0 = gamla argmax. */
+   // Korbank 09-19 (med ljuddriven klocka): evidensvalet gav 6/8 syntet = samma som gamla vagen, men 1/6 mot 3/6 pa
+   // bankmaterial - verkliga baslinjer har toner pa manga delslag, sa slagpoangen skiljer inte grannkandidater. OPT-IN.
+-  private static readonly EVIDENCE_ON = sysEnv('TEMPO_EVIDENCE') === '1';
++  private static readonly EVIDENCE_ON = true as boolean;   // EN KLOCKA: kod (lotus LIVE)
+   private static readonly EVIDENCE_K = 5;
+   /** EVIDENSBAND (09-20): kandidatvalets slagpoang mots BASringen (standard). 'both' vager in helbandsringen nar basen ar
+    *  svag - orkestral/akustisk musik (filmmusik, sjomansvisor) har ingen kick, sa baspoangen blir brus och valet slumpartat.
+@@ -716,11 +715,11 @@ export class Analyser {
+    *  171 -> 180 (+11/-2), test 81 -> 86/104 (+6/-1), syntet 6/8 = 6/8, Mio 1/3 -> 2/3. Basringen som domare gav 176 (+11/-6),
+    *  Mio 1/3; helband + poang >= 177, test 84. OBS: traffgransen ar basringens (alignScore cachar percentilen per anrop,
+    *  basen raknas forst) - det ar sa varianten bankades. Standard AV = bit-identiskt. */
+-  private static readonly TEMPO_UP43 = sysEnv('TEMPO_UP43') === '1';
++  private static readonly TEMPO_UP43 = true as boolean;   // EN KLOCKA: kod (lotus LIVE)
+   /** 5/4-FANTOM (opt-in <prefix>TEMPO_FIVE4=1, 10-05): efter evidensvalet (och UP43) provas vinnaren mot 5/4 och 4/5 av tempot pa
+    *  HELBANDSringen; en kandidat tas bara om traffandelen ar minst <prefix>FIVE4_MARGIN hogre (standard 0,15). Mal: 10 av 503
+    *  musiksnuttar dar facit (PC = Beat This!) och analysatorn skiljer 1,25/0,80 (3 Doors Down, Ricky Rose, Wailers). Standard AV. */
+-  private static readonly TEMPO_FIVE4 = sysEnv('TEMPO_FIVE4') === '1';
++  private static readonly TEMPO_FIVE4 = true as boolean;   // EN KLOCKA: kod (lotus LIVE)
+   private static readonly FIVE4_MARGIN = 0.15;
+   /** TIDIG REFRANG KRAVER NIVA (2026-09-24, drejboken i ladan: varje lat fick intro -> build -> high vid 20-28 s): direkt efter 20 s-
+    *  uppvarmningen rangordnas nuet mot bara introt, sa forsta starkare parti blir 'high' aven om det ar en vers. De forsta
+@@ -808,7 +807,7 @@ export class Analyser {
+   private static readonly RELOCK_K = 2;
+   private static readonly WARM_N = 48;
+   private static readonly HOLD_N = 50;
+-  private static readonly OCT_UP = Number(env('OCT_UP') ?? 24);
++  private static readonly OCT_UP = 24;   // EN KLOCKA: kod (lotus värde; DMX-profilens 12 borta)
+ 
+   // HARMONI-VETO (2026-08-31). En AKTA ny lat landar sallan exakt pa en trioldelning
+   // av den forra; en trioltopp i SAMMA lat gor det alltid. Se grann-grenen nedan.
+@@ -1104,8 +1103,8 @@ export class Analyser {
+    *  (Ref: comb/sub-harmonic + fler-frames-röstning, se @audio/beat och
+    *   OBTAIN-realtidsbeat-tracking.)
+    */
+-  // ── ANALYSATORNS EGEN TEMPOSÖKNING (LOTUS VÄG, OWN_TEMPO = profilen utan BEAT_FEED) ── scoreEnv/alignScore/shiftDetect körs bara
+-  //    där; med klockan (BEAT_FEED slow/inline, DMX) anropas de aldrig - tempot kommer då från analyserClock.ts (EN KÄLLA, r0 entempo).
++  // ── ANALYSATORNS EGEN TEMPOSÖKNING (EN KLOCKA: tempovalet i BÅDA profilerna) ── scoreEnv/alignScore/shiftDetect = tempovalet;
++  //    klockan (analyserClock.ts) läser resultatet ur ramen (frame.bpm) och lägger rutnät, etta och tillit på det.
+   /** Autokorrelation + comb + pulse-xcorr + prior för EN onset-envelope.
+    *  Fyller `out[lagMin..lagMax]` med normaliserad score och returnerar bandets
+    *  medelenergi (0 = tyst band → anroparen kan vikta ner det). Scratcharna håller
+@@ -1648,14 +1647,6 @@ export class Analyser {
+ 
+   /** Env-steget (100 Hz): tempo pa stride + gridfas. Kors i 'all' direkt och i 'slow' per record. */
+   private envStep(): void {
+-    if (OWN_TEMPO) { this.envStepOwn(); return; }   // lotus väg: analysatorns egen temposökning
+-    // EN KÄLLA (r0, klockan): ingen egen temposökning (computeBpm bara på lotus väg ovan) - bara den valfria gridfasen (GRID_PHASE, av i DMX) på klockans tempo.
+-    if (this.holdSilent) return;
+-    if (++this.bpmCounter >= Analyser.ENV_HZ / 4) { this.bpmCounter = 0; if (Analyser.GRID_PHASE_ON && this.localBpm > 0) this.computeGridPhase(); }
+-  }
+-
+-  /** Env-steget med analysatorns EGEN temposökning (OWN_TEMPO, lotus väg) - exakt som före EN KLOCKA (e451800). */
+-  private envStepOwn(): void {
+     if (this.holdSilent) return;   // TEMPO_HOLD: tempo/fas beraknas inte pa tystnad (holdSilent satts bara med flaggan)
+     if (this.holdGrace > 0) {   // TEMPO_HOLD: efter pausen halls laset tills onsetringen ar fylld med ny musik; fasen foljer kickarna
+       this.holdGrace--; if (this.localBpm <= 0) this.holdGrace = 0;
+@@ -1720,7 +1711,6 @@ export class Analyser {
+     if (SECTION_AGG_HOP) { r[o + R_DROPS] = g.drops; r[o + R_ACTIVE] = g.active; r[o + R_BUILD] = g.build; }
+     else { r[o + R_DROPS] = this.dropCount + this.secBodyRet; r[o + R_ACTIVE] = this.activeMs; r[o + R_BUILD] = this.buildUp; }
+     r[o + R_FLAGCNT] = packFlagCounts(this.flagCnt);
+-    r[o + R_CLOCK] = this.localBpm; r[o + R_CLOCK_CONF] = this.localBpmConfidence;   // EN KÄLLA (r0): klockans tempo/tillit till långsamma sidan
+     r[o + R_BIGSEQ] = this.bigSeq;                         // stora vägen: hop-record före detta (workern kör dem först)
+     r[o + R_SEQ] = seq;                                    // sist: seq = recordet ar komplett
+     g.n = 0; g.int = 0; g.kicks = 0; g.breaking = 0; g.rms2 = 0; g.cent = 0; g.dt = 0; g.spec.fill(0); g.bon = 0; g.bpk = 0; g.flux = 0; g.rms4 = 0;
+@@ -1739,8 +1729,7 @@ export class Analyser {
+   private pullSlowState(): void {
+     if (!this.stateRd.read(this.splitCtrl!, this.splitState!, this.stateCopy)) return;
+     const s = this.stateCopy; if (s[S_REC_SEQ] < this.barrierSeq) return;
+-    // (EN KÄLLA, r0: med klockan sätts localBpm/localBpmConfidence via setClock - inte av långsamma sidans tillstånd; lotus väg: som förr)
+-    if (OWN_TEMPO) { this.localBpm = s[S_BPM]; this.localBpmConfidence = s[S_CONF]; this.localBpmF = s[S_BPMF]; }
++    this.localBpm = s[S_BPM]; this.localBpmConfidence = s[S_CONF]; this.localBpmF = s[S_BPMF];
+     this.beatPhaseMs = s[S_PHASE_MS]; this.beatPhaseConf = s[S_PHASE_CONF];
+     this.section = SECTIONS[s[S_SECTION]] || 'intro'; this.sectionStartMs = s[S_SEC_START]; this.sectionIndex = s[S_SEC_INDEX]; this.sectionTier = s[S_SEC_TIER];
+     this.repeatSim = s[S_REP_SIM]; this.repeatAgoMs = s[S_REP_AGO]; this.repeatSection = SECTIONS[s[S_REP_SEC]] || '';
+@@ -1917,7 +1906,6 @@ export class Analyser {
+     if (HIGH_ON) this.envHighRing[this.envPos] = r[o + R_HIGH];
+     this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
+     this.envLastWallMs = r[o + R_WALL];
+-    if (!OWN_TEMPO) this.localBpm = r[o + R_CLOCK], this.localBpmConfidence = r[o + R_CLOCK_CONF];   // EN KÄLLA (r0): klockans tempo, inte en egen sökning
+     this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
+     if (this.bigOn) {   // stora vägen: sektionens fakta och blocksummor ur den egna hopvägen (hoppen före recordet är redan körda)
+       const g = this.secAgg;
+@@ -1944,7 +1932,7 @@ export class Analyser {
+   /** Sparets tid (s sedan den virtuella epoken) och VETO_WIN-fonstret (diagnostik, bara med sparflaggor). */
+   private traceT(): number { return (this.wallNow() - 1700000000000) / 1000; }
+   private traceWin(): boolean { if (!VETO_WIN) return false; const [wa, wb] = VETO_WIN.split(',').map(Number); const tt = this.traceT(); return tt >= wa && tt <= wb; }
+-  // ── computeBpm (LOTUS VÄG, OWN_TEMPO): tempogram, röstning, oktav-/grann-/låtbytesvakter. Med klockan (DMX) anropas den aldrig. ──
++  // ── computeBpm (EN KLOCKA: båda profilerna): tempogram, röstning, oktav-/grann-/låtbytesvakter; klockan lägger rutnätet på dess tempo. ──
+   /** TEMPOGRAMMETS LOOP (2026-10-17, skräpjakten): utbruten ur computeBpm. computeBpm körs 4 ggr/s och deoptas på sällsynta grenar;
+    *  V8 optimerar om först efter tusentals anrop, och under tiden boxade looparna här varje flyttal (8,4 kB/anrop). Som egen liten
+    *  metod förblir loopen optimerad. Samma räkning i samma ordning. Resultatet i tg*-fälten. */
+@@ -2517,9 +2505,6 @@ export class Analyser {
+   trackBoundaries = 0;
+   /** Tystnad i ms (klockans tystnadssignal, hop-recordet H_QUIET; > 10 s släpper klockan som förr F_SIL10 släppte tempot). */
+   get quietMs(): number { return this.silentMs; }
+-  /** EN KÄLLA (r0 entempo): analysatorns ENDA tempo och tillit = klockans (taktvägen i analysatorns långsamma väg, efter varje hop).
+-   *  Läses av kickspärren/-grinden (via rutnätet), sectionBars, basgången, sektionernas långsamma sida (env-recordet R_CLOCK) och ramen. */
+-  setClock(bpm: number, conf: number): void { this.localBpm = bpm > 40 ? bpm : 0; this.localBpmConfidence = bpm > 40 ? conf : 0; }
+   hintTrackChange(windowMs = 5000, sections = true): void {
+     if (this.role !== 'slow') this.trackBoundaries++;
+     if (BPM_TRACE) console.log(`[bpmrst] t=${this.traceT().toFixed(1)} HINT bpm=${this.localBpm} conf=${this.localBpmConfidence.toFixed(2)}`);
+@@ -2802,7 +2787,6 @@ export class Analyser {
+ 
+   /** Feed a hop-sized chunk of mono samples, get a frame back. */
+   process(samples: Float32Array): Frame {
+-    if (this.hopLane) this.setClock(this.hopLane.clockBpm, this.hopLane.clockConf);   // EN KÄLLA (a7r): klockans tal ur analysatorns EGEN taktväg (förra hoppets publicering)
+     if (this.role === 'fast') this.pullSlowState();
+     // Slide buffer left by hop, append new samples at end.
+     const hop = samples.length;
+@@ -3124,7 +3108,6 @@ export class Analyser {
+     const gk = this.beatSrc.beat;   // EN KÄLLA (r0): klockans rutnät; null = klockan i coast -> öppen grind och 170 ms (som förr utan tempo)
+     const cb = gk && gk.bpm > 40 ? gk.bpm : 0;
+     const KICK_COOLDOWN = Analyser.KICK_COOLDOWN_MS > 0 ? Analyser.KICK_COOLDOWN_MS
+-      : OWN_TEMPO ? (this.localBpm > 40 ? Math.max(170, (60000 / this.localBpm) * 0.6) : 170)   // lotus väg: egen sökning, inget tak
+       : (cb > 0 ? Math.max(170, Math.min(KICK_CAP_MS, (60000 / cb) * 0.6)) : 170);
+     let above = kickFlux > kickThresh && energy > Analyser.KICK_EFLOOR;
+     // ── TAKT-GRID-GRIND ──────────────────────────────────────────────────────
+@@ -3143,7 +3126,7 @@ export class Analyser {
+     // efter `% gridMs` blev en konstant men helt godtycklig fasförskjutning: grinden
+     // släppte igenom transienter i fel fas och kastade äkta kickar.
+     const grid = this.beatSrc.beat;
+-    if (above && grid && grid.bpm > 40 && (OWN_TEMPO ? this.localBpmConfidence : (grid.confidence ?? 0)) > 0.5) {
++    if (above && grid && grid.bpm > 40 && (grid.confidence ?? 0) > 0.5) {
+       const beatMs = 60000 / grid.bpm;
+       const gridMs = beatMs / 2;                    // attondelar: four-on-the-floor + upptakter
+       const offset = ((this.wallNow() - grid.anchorMs) % gridMs + gridMs) % gridMs;
+@@ -3270,7 +3253,7 @@ export class Analyser {
+       // inte att använda: den är utjämnad över ~100 ms och gav alla fyra platser
+       // samma vikt ⇒ ingen marginal, ingen taktfas (MÄTT 2026-08-23).
+       const g = this.beatSrc.beat;
+-      if (g && g.bpm > 40 && (OWN_TEMPO ? this.localBpmConfidence : (g.confidence ?? 0)) > 0.5) {
++      if (g && g.bpm > 40 && (g.confidence ?? 0) > 0.5) {
+         const bMs = 60000 / g.bpm;
+         const slot = Math.round((kickAtMs - g.anchorMs) / bMs) & 3;
+         this.barAcc[slot] += this.pendingKickW * this.pendingKickW;
+@@ -3894,12 +3877,12 @@ export const WORKER_RESTART_WINDOW_MS = 10 * 60_000;
+ export function createAnalyser(cfg: AnalyserConfig, modeIn?: 'worker' | 'inline' | 'sync'): Analyser {
+   const mode = modeIn ?? sysEnv('ANALYSER_SPLIT');
+   const cm = clockMode();
+-  if (mode !== 'worker' && mode !== 'inline' && mode !== 'sync') { const a = new Analyser(cfg); if (cm) a.clock = new BeatFeed(); return a; }
++  if (mode !== 'worker' && mode !== 'inline' && mode !== 'sync') { const a = new Analyser(cfg); a.clock = new BeatFeed(); return a; }
+   const sync = mode === 'sync';
+   const feedMk = cm === 'slow' ? hopFeedFactory() : undefined;
+   const buffers = createSplitBuffers(!!feedMk);
+   const fast = new Analyser(cfg, { role: 'fast', split: buffers, sync });
+-  if (cm === 'inline') fast.clock = new BeatFeed();
++  if (!feedMk) fast.clock = new BeatFeed();   // EN KLOCKA: alltid en klocka (utan taktväg i process(), lotus)
+   if (feedMk) fast.hopLane = new HopLaneFast(buffers, sync);
+   if (mode === 'inline') {
+     fast.setInlinePeer(new Analyser(cfg, { role: 'slow', split: buffers }));
+@@ -3957,5 +3940,5 @@ export function hopFeedFactory(): (() => HopFeed) | undefined {
+   return sysEnv('BEAT_FEED') === 'slow' ? () => new BeatFeed() : undefined;
+ }
+ /** VAR KLOCKAN KÖRS - profilen på ETT ställe (sys.BEAT_FEED): 'slow' = i taktvägen (analysatorns långsamma väg, workern) när
+- *  analysatorn är delad, annars sist i process(); 'inline' = alltid sist i process() (ingen taktväg); osatt (lotus) = ingen klocka, analysatorns egen temposökning (OWN_TEMPO). */
+-function clockMode(): 'slow' | 'inline' | null { const v = sysEnv('BEAT_FEED'); return v === 'slow' || v === 'inline' ? v : null; }
++ *  analysatorn är delad, annars sist i process(); 'inline' = alltid sist i process() (ingen taktväg); osatt (lotus) = 'inline'. Tempot är alltid analysatorns sökning. */
++function clockMode(): 'slow' | 'inline' { return sysEnv('BEAT_FEED') === 'slow' ? 'slow' : 'inline'; }   // EN KLOCKA: osatt = 'inline'
+diff --git a/src/analyserClock.ts b/.arena/klocka/a2/src/analyserClock.ts
+index 400b3cb..1c657c1 100644
+--- a/src/analyserClock.ts
++++ b/.arena/klocka/a2/src/analyserClock.ts
+@@ -89,36 +89,15 @@ const BAR_DECAY = 0.99, BAR_MIN = 16, BAR_MARGIN = 0.06, BAR_W_BASS = 0.5, BAR_W
+  *  sig): klockan 81,7 -> 91,3 %, tempobyten 1,29 -> 1,20/klipp. Provat och förkastat: marginal 1 (1,23 hopp/min, gridfasen på kvällen
+  *  10-21 95 -> 27 %) och 1,25 (0,95/min, 72 %), bekräftelse två varv, 0,5 %-steg (längre varv), HMM-utjämning av varvets vinnare
+  *  (sämre), samma tempo till analysatorns rutnät (sektion upp 2,6 -> 4,1 s, som 10-29). Analysatorns rutnät orört. */
+-/** EN TEMPOSÖKNING (arena tvavagar a1, 2026-11-08; ersätter HELA TEMPOOMRÅDET 10-30 + andra sökcentrumets skanning + klockans egen
+- *  vandring): ETT ackumulerat tempogram i långsamma vägen som klockan läser. Förr sökte tre saker tempo var för sig - helsökningen
+- *  (70 tempon à 1 %, ett varv utan minne, vinnaren flackade 97/145/84/126 mellan varven), andra sökcentrumet (+-2,5 % kring den) och
+- *  klockans egen skanning (+-2,5 % kring sitt tempo var 250 ms, kunde vandra 122 -> 143 på 5 s). Nu: TG_K hypoteser på ett CIRKULÄRT
+- *  log-rutnät över en oktav (80 * 2^(k/TG_K), 0,5 %-steg, 80 och 160 är grannar), TG_PER_HOP per hop (ett varv per ~0,37 s). Poängen per
+- *  hypotes = BASENS vikning x VIRVELNS/DISKANTENS vikning, var och en (topp + värdet ett halvslag efter toppen) / 2 / medel: halvslaget
+- *  (åttondelarna) är beviset som skiljer slaget från 2/3- och 4/3-fantomerna (en fantom har ingen topp mitt emellan sina slag). Poängen
+- *  EMA:as per hypotes (TG_A per varv), vinnaren = tempogrammets topp (parabel i log-rutnätet), klämd till [80, 160). Klockan skannar
+- *  sedan bara fint kring vinnaren (+-1,25 % i 0,25 %-steg) för fas och fintempo. Offline på basens signaler (a1/ev.mjs, 50 klipp + mixen):
+- *  rätt tempo 88,9 -> 99,0 % (klipp) och 88,5 -> 97,8 % (mix), tempobyten i mixen 66 -> 2 (bara basens vikning: 89 / 88 %). */
+-/** KRONAN (r0): en annan topp måste slå det regerande tempots poäng med så mycket (r0/verktyg: 1,3 och 1,4 gav ned_s 2,80, 1,35 1,90 - kniveggen). */
+-const TG_HOLD = 1.35;
+-const TG_SIB = [Math.round(Math.log2(4 / 3) * 139), Math.round(Math.log2(3 / 2) * 139)];   // 4:3 och 3:2 i rutnätets steg (TG_K = 139 per oktav)
+-const TG_SNAP = 0.03, TG_EDGE = 1.03, TG_OCT_UP = 0.85, TG_OCT_DN = 0.4, TG_OCT_A = 0.1;
++/** EN KLOCKA FÖR BÅDA (a2 klocka 11-09): klockans eget tempogram (a1 tvavagar: TG_K hypoteser, a2f:s två minnen, r0:s krona och
++ *  oktavkant) är borttaget - tempovalet är analysatorns sökning (computeBpm), samma kod och samma värden i lotus och DMX. Klockan
++ *  skannar fint kring analysatorns tempo (fas, fintempo) och publicerar sitt rutnät i ramen (frame.beatPhaseMs). */
++const TG_FINE = 0.0025;
+ /** EN KÄLLA (r0): analysatorns kickgrind på klockans inre rutnät + denna fasta, mätta offset (a1 entempo: analysatorns kickar ligger
+  *  median +30..+65 ms efter rise-rutnätet på 6 fönster ur övningens lång-filer). */
+ const KICK_PHASE_MS = 45;
+ /** a8r (ladan-provet 11-08, punkt 3): rutnätet 5 ms tidigare utöver GRID_EARLY_MS, ljusets försprång orört -> ljuset 5 ms tidigare. */
+-const TG_GRID_EXTRA_MS = 5;   // oktavkanten +-3 %; övre oktaven bara om analysatorns bpm ligger nära den (>= 148); fullt fönster (~4,8 s)
+-/** TEMPOGRAMMETS FÖNSTER OCH MINNE (a2r entempo): 3,5 s och 0,4 per varv (förr 5 s / 0,21 = ONSET_WIN_MS). Efter en låtskarv tog
+- *  toppen ~4 s att byta (förra låten fyllde fönstret och minnet), mätt på 10 låtpar (a2r/verktyg/par.mjs): lås median 4,1 -> 2,4 s;
+- *  M1 (--mat, snabbt läge när fasträffarna < 0,7 = i praktiken alltid i pop): mix_las 3,49 -> 2,10, mix_hopp 0,10 -> 0,03, låtgränsen 9 -> 11 av 15. */
+-/** TVÅ MINNEN I SAMMA SÖKNING (a2f entempo): tempogrammet bär ett LÅNGSAMT minne (5 s / 0,21 = r0: stabil topp -> fasen, gridfel
+- *  r0 15,2 mot a2r 22,1 ms) och ett SNABBT (3,5 s / 0,4 = a2r: låser om på ~2 s efter en skarv). Klockans tempo är alltid det
+- *  långsammas topp; pekar det snabba på ett annat tempo (> TG_SW_STEPS steg, inte ett 4:3/3:2-syskon) TG_SW_N varv i följd ersätter
+- *  det snabba minnet det långsamma, så toppen byter direkt; tills det långsamma fönstret är fullt (kallstart, relock vid låtgräns) styr
+- *  det snabba (a2f M1 utan det: upp_s 1,35 -> 2,85 = lang1021-skiftet 2,3 s efter låtgränsen). Samma hypoteser, samma poäng - två EMA:er. */
+-const TG_WIN_MS = 5000, TG_FULL_N = 900, TG_FWIN_MS = 3500, TG_FFULL_N = 630, TG_FA = 0.4, TG_SW_STEPS = 6, TG_SW_N = 2;
+-const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, TG_MIN_N = 300, TG_FINE = 0.0025, TG_HALF = ONSET_BINS >> 1;
+-
++const TG_GRID_EXTRA_MS = 5;
+ /**
+  * FAS-PREDIKTIONSTILLIT — landar verkliga trumslag dar rutnatet pastar?
+  *
+@@ -150,13 +129,10 @@ export class BeatFeed {
+   private readonly riseDb = new Float64Array(FEED_RISE_HOPS); private risePos = 0;
+   // HELA TEMPOOMRÅDET: egna vikningsytor, varvets bästa och förra varvets vinnare (fullBpm = andra sökcentrum, 0 = ingen topp)
+   private readonly fullS = new Float64Array(ONSET_BINS); private readonly fullN = new Float64Array(ONSET_BINS);
+-  private readonly tgAcc = new Float64Array(TG_K).fill(-1); private readonly tgH = new Float64Array(ONSET_BINS); private tgK = 0; private tgN = 0;
+-  private readonly tgAccF = new Float64Array(TG_K).fill(-1); private tgSw = 0; tgSwitches = 0;   // TVÅ MINNEN (a2f)
+-  /** EN TEMPOSÖKNING: tempogrammets vinnare (0 = ingen topp än) - klockans skanningscentrum. */
++  /** EN KLOCKA: analysatorns tempo (computeBpm, 0 = inget lås) - klockans skanningscentrum. */
+   tempoBpm = 0;
+-  /** TEMPOTS TYDLIGHET 0..1 (t1f): 1 - näst bästa tempohypotesens poäng / vinnarens, x 3, tak 1 (se tgStep). */
++  /** TEMPOTS TYDLIGHET 0..1 (t1f:s plats i tilliten): analysatorns egen tempokonfidens (frame.bpmConfidence före klockan), tak 1. */
+   tgClear = 1;
+-  private tgHalfR = 0; octR = 0; private octN = 0; private octHi = false;   // OKTAVKANTEN (r0): halvslagskvotens EMA och läget
+   private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
+   // ETTAN (a5): fyra platsers särdrag (inre slagindex & 3), pågående slagets max, linjära ringar för stigningen, publicerat ankare
+   private readonly barK = new Float64Array(4); private readonly barL = new Float64Array(4); private readonly barB = new Float64Array(4);
+@@ -182,9 +158,10 @@ export class BeatFeed {
+       if (now < this.onNext) return;
+       this.onNext = now + ONSET_EVERY_MS;
+       this.scanRef = beat.anchorMs; this.scanNow = now;
+-      if (this.tempoBpm > 0 && Math.abs(beat.bpm / this.tempoBpm - 1) > TG_SNAP) { this.scanC0 = this.tempoBpm; this.scanStep = TG_FINE; this.scanEnd = 5; }   // EN TEMPOSÖKNING: klockan utanför tempogrammets topp -> dit
+-      else if (this.tempoBpm > 0) { this.scanC0 = beat.bpm; this.scanStep = 0.005; this.scanEnd = 5; }   // inom: klockans egen skanning som förr (fas, fintempo; a2r M2: kring tempogrammets topp gav ettan 100 -> 93, gridfel 15 -> 26 ms)
+-      else { this.scanC0 = beat.bpm; this.scanStep = 0.005; this.scanEnd = 5; }   // tempogrammet nollat (låtgräns): kring klockans tempo (inget andra sökcentrum - EN KÄLLA)
++      // EN KLOCKA (a2): med analysatorns lås skannas ALLTID kring dess tempo (+-1,25 % i 0,25 %-steg = fintempo + fas) - klockan kan inte
++      // vandra ifrån tempovalet (lotus snabb: +-2,5 %-vandringen tappade en låt på kanten, spannet inom låt växte). Utan lås: kring klockans eget.
++      if (this.tempoBpm > 0) { this.scanC0 = this.tempoBpm; this.scanStep = TG_FINE; this.scanEnd = 5; }
++      else { this.scanC0 = beat.bpm; this.scanStep = 0.005; this.scanEnd = 5; }
+ 
+       this.scanC = -5; this.bestScore = 0;
+     }
+@@ -222,91 +199,9 @@ export class BeatFeed {
+     this.onsetFixes++;
+   }
+ 
+-  /** EN TEMPOSÖKNING: hypotesens poäng = basens x diskantens (topp + halvslaget efter toppen) / 2 / medel, en gemensam vikning av
+-   *  ringen (fönstret ONSET_WIN_MS bakåt från now). 0 = för lite ljud. */
+-  private tgScore(bpm: number, now: number, win = TG_WIN_MS): number {
+-    // Poängen beror inte på fasen: ringens värden ligger med jämn takt (vartannat hop), så fasen stegas fram med en addition per värde
+-    // i stället för t % period på väggklockan (3 x billigare; i realtid är ringens Date.now() dessutom ryckig - hoppens takt är exakt).
+-    const S = this.fullS, N = this.fullN, Hs = this.tgH, oT = this.onT, oV = this.onV, oH = this.hiV; S.fill(0); N.fill(0); Hs.fill(0);
+-    let lo = 0, hi = this.onN;   // n = antal värden inom fönstret (tiderna växer i ringen: binärsökning i st f att räkna)
+-    while (lo < hi) { const m = (lo + hi) >> 1; if (now - oT[(this.onPos - 1 - m + 2 * ONSET_RING) % ONSET_RING] > win) hi = m; else lo = m + 1; }
+-    const n = lo;
+-    if (n < TG_MIN_N) { this.tgN = n; return 0; }
+-    const jo = (this.onPos - n + 2 * ONSET_RING) % ONSET_RING; let j = jo;
+-    const dt = (oT[(this.onPos + ONSET_RING - 1) % ONSET_RING] - oT[jo]) / (n - 1), step = (dt * bpm / 60000) * ONSET_BINS;
+-    let tot = 0, totH = 0, ph = 0;
+-    for (let i = 0; i < n; i++) {
+-      const b = ph | 0, v = oV[j], h = oH[j];
+-      S[b] += v; Hs[b] += h; N[b]++; tot += v; totH += h;
+-      ph += step; if (ph >= ONSET_BINS) ph -= ONSET_BINS;
+-      j = j === ONSET_RING - 1 ? 0 : j + 1;
+-    }
+-    this.tgN = n;
+-    if (tot <= 0 || totH <= 0) return 0;
+-    let mx = 0, mb = 0, hx = 0, hb = 0;
+-    for (let b = 0; b < ONSET_BINS; b++) { if (!N[b]) continue; const v = S[b] / N[b], h = Hs[b] / N[b]; if (v > mx) { mx = v; mb = b; } if (h > hx) { hx = h; hb = b; } }
+-    const q = (mb + TG_HALF) % ONSET_BINS, qh = (hb + TG_HALF) % ONSET_BINS;
+-    this.tgHalfR = mx > 0 && N[q] ? S[q] / N[q] / mx : 0;
+-    const fb = (mx + (N[q] ? S[q] / N[q] : 0)) / 2 / (tot / n), fh = (hx + (N[qh] ? Hs[qh] / N[qh] : 0)) / 2 / (totH / n);
+-    return fb * fh;
+-  }
+-
+-  /** EN TEMPOSÖKNING: TG_PER_HOP hypoteser per hop in i tempogrammet; sist i varvet blir toppen klockans centrum. */
+-  private tgStep(now: number): void {
+-    const acc = this.tgAcc;
+-    for (let r = 0; r < TG_PER_HOP; r++) {
+-      const k = this.tgK, bk0 = 80 * Math.pow(TG_STEP, k), accF = this.tgAccF;
+-      const sf = this.tgScore(bk0, now, TG_FWIN_MS);   // snabba minnet först (tgN/tgHalfR ska vara det långsammas efteråt)
+-      if (sf > 0) accF[k] = accF[k] < 0 || this.tgN < TG_FFULL_N ? sf : accF[k] + TG_FA * (sf - accF[k]);
+-      const s = this.tgScore(bk0, now);
+-      if (s > 0) acc[k] = acc[k] < 0 || this.tgN < TG_FULL_N ? s : acc[k] + TG_A * (s - acc[k]);   // minne först när fönstret är fullt (kort fönster = brusig, långsam-gynnad poäng)
+-      if (++this.tgK < TG_K) continue;
+-      this.tgK = 0;
+-      if (this.tgN < TG_FULL_N) acc.set(accF);   // TVÅ MINNEN: tills det långsamma fönstret är fullt (kallstart, efter relock) styr det snabba
+-      else if (this.tempoBpm > 0) {   // TVÅ MINNEN: det snabba pekar på ett annat tempo -> det ersätter det långsamma
+-        let fk = -1, fv = 0; for (let i = 0; i < TG_K; i++) if (accF[i] > fv) { fv = accF[i]; fk = i; }
+-        const kc0 = ((Math.round(Math.log(this.tempoBpm / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K;
+-        const d0 = fk < 0 ? 0 : ((fk - kc0) % TG_K + TG_K) % TG_K, dd = Math.min(d0, TG_K - d0);
+-        let sib0 = false; for (let i = 0; i < TG_SIB.length; i++) { const q = TG_SIB[i]; if (Math.abs(d0 - q) <= 2 || Math.abs(d0 - (TG_K - q)) <= 2) sib0 = true; }   // utan closure
+-        const fc = Math.max(accF[kc0], accF[(kc0 + 1) % TG_K], accF[(kc0 + TG_K - 1) % TG_K]);   // syskon: bara med kronans marginal i det snabba
+-        if (fk >= 0 && dd > TG_SW_STEPS && (!sib0 || fv >= fc * TG_HOLD)) { if (++this.tgSw >= TG_SW_N) { acc.set(accF); this.tgSw = 0; this.tgSwitches++; } } else this.tgSw = 0;
+-      }
+-      let bk = -1, bv = 0; for (let i = 0; i < TG_K; i++) if (acc[i] > bv) { bv = acc[i]; bk = i; }
+-      if (bk < 0) { this.tempoBpm = 0; return; }
+-      // TEMPOTS TYDLIGHET (t1f): marginalen till NÄST BÄSTA tempohypotes = högsta andra lokala toppen i varvets tempogram (mer än
+-      // 2 steg från vinnaren, så toppens egen flank räknas inte). Ett enda tydligt tempo -> 1; två lika starka (96 <-> 128,
+-      // tempot vandrar) -> 0. Två tredjedelar av vinnarens poäng eller mindre = full tydlighet. Läses av tilliten (updateInner).
+-      // (lang1021/lang1011 i f0: tydliga partier 2:a/bästa 0,24-0,50, låtskarvar och vandrande tempo 0,85-0,99.)
+-      { let sv = 0;
+-        for (let i = 0; i < TG_K; i++) { const v = acc[i], dd = Math.abs(i - bk), d = dd < TG_K - dd ? dd : TG_K - dd;
+-          if (d > 2 && v > sv && v >= acc[(i + 1) % TG_K] && v >= acc[(i + TG_K - 1) % TG_K]) sv = v; }
+-        this.tgClear = Math.min(1, 3 * (1 - sv / bv)); }
+-      // KRONAN (r0): det regerande tempot behåller toppen tills en annan hypotes slår det med TG_HOLD (lang1011 490-570 s: 96 <-> 128 = 4:3
+-      // varannat varv, kickspärren och grinden bytte med -> sektionerna). Bara om det regerande tempots egen poäng finns (> 0).
+-      if (this.tempoBpm > 0) {
+-        const kc = ((Math.round(Math.log(this.tempoBpm / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K, cv = Math.max(acc[kc], acc[(kc + 1) % TG_K], acc[(kc + TG_K - 1) % TG_K]);
+-        // bara mot ett HARMONISKT syskon (4:3, 3:2 åt båda hållen, i det cirkulära oktavrutnätet): ett annat tempo (ny låt utan låtgräns) tas som förr
+-        const d = ((bk - kc) % TG_K + TG_K) % TG_K, sib = TG_SIB.some((q) => Math.abs(d - q) <= 2 || Math.abs(d - (TG_K - q)) <= 2);
+-        if (sib && cv > 0 && bv < cv * TG_HOLD) return;
+-      }
+-      const a = acc[(bk + TG_K - 1) % TG_K], c = acc[(bk + 1) % TG_K], den = a - 2 * bv + c;   // parabel i log-rutnätet (cirkulärt)
+-      const off = a >= 0 && c >= 0 && den < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den)) : 0;
+-      let t = 80 * Math.pow(TG_STEP, bk + off);
+-      // OKTAVKANTEN: 80 och 160 är grannar i det cirkulära rutnätet, och vikningen kan inte skilja dem (halvslagsbeviset gynnar 80).
+-      // Nära kanten avgör analysatorns oktav (lang1021 = 160: rutnätet på 80 missade varannan ansats; Cody Johnson = 80, analysatorn 104-116).
+-      // EN KÄLLA (r0): oktaven avgörs av klockans egen vikning (analysatorns tempo finns inte längre): ligger basens stigning lika starkt
+-      // mitt emellan 80-slagen som på dem är pulsen 160 (lang1021: varannan ansats), annars 80 (backbeat: virveln, inte basen, på 2 och 4).
+-      if (t < 80 * TG_EDGE || t > 160 / TG_EDGE) { const lo = t < 120 ? t : t / 2; this.tgScore(lo, now);
+-        // brusigt per varv (lang1021 0,5-1,0, Cody Johnson 0,1-0,9): EMA ~3,7 s + hysteres (upp >= TG_OCT_UP, ned < TG_OCT_DN), startläget ur första varvet
+-        this.octR = this.octN++ === 0 ? this.tgHalfR : this.octR + TG_OCT_A * (this.tgHalfR - this.octR);
+-        if (this.octN === 1) this.octHi = this.octR >= TG_OCT_UP; else if (this.octHi ? this.octR < TG_OCT_DN : this.octR >= TG_OCT_UP) this.octHi = !this.octHi;
+-        t = this.octHi ? 2 * lo : lo; }
+-      this.tempoBpm = Math.min(159.9, Math.max(80, t));
+-      return;
+-    }
+-  }
+-  private tgReset(): void { this.tgAcc.fill(-1); this.tgAccF.fill(-1); this.tgSw = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; }
+-
++  /** EN KLOCKA FÖR BÅDA (a2 klocka, B-delar in i A): klockans tempogram (tgScore/tgStep, två minnen, kronan, oktavkanten) är BORTA -
++   *  tempovalet är analysatorns egen sökning (computeBpm: evidens, UP43/FIVE4, SHIFT/HOLD, oktav-/grannvakter), samma i båda profilerna.
++   *  Klockan läser analysatorns tempo ur ramen (frame.bpm före klockan) och lägger sitt rutnät, sin etta och sin tillit på det. */
+   /** Kom en tidigare kick (ringen, före denna) lag ms före t, inom ±tol? (TRUST_REPEAT) */
+   private kickRepeats(t: number, lag: number, tol: number): boolean {
+     const want = t - lag;
+@@ -362,17 +257,19 @@ export class BeatFeed {
+     // takträknare) inte backar barOff slag vid låtgränsen. Förr: barOff -> 0 flyttade ankaret 1-3 slag bakåt mitt i skarven och
+     // räknaren stod still lika länge. Nya låtens etta tas sedan av taktmodellen som vanligt.
+     if (this.innerValid && this.innerBpm > 0) this.innerAnchor += this.barOff * (60000 / this.innerBpm);
+-    this.tgReset(); this.barReset(); this.goodRep = 0; this.goodOn = 0; this.onNext = 0;
++    this.barReset(); this.goodRep = 0; this.goodOn = 0; this.onNext = 0;
+   }
+ 
+   /** EN KÄLLA (r0 entempo, ägaren 11-09: "allt skall ju ligga i analysatorn"): ETT hop av analysatorns klocka i dess långsamma väg.
+-   *  Klockan är den ENDA temposökningen: tempogrammet (tgStep) startar och håller tempot själv, rutnätet (onsetStep) sätter fas och
++   *  EN KLOCKA (a2 klocka): tempot är analysatorns sökning (ramens bpm före klockan); rutnätet (onsetStep) sätter fas och
+    *  fintempo, taktmodellen (barStep) ettan, och tilliten = andelen kickar rutnätet förutsäger (repeatRate). Analysatorn har ingen egen
+    *  tempovikning längre: den får klockans tempo/tillit (cfg.beat, se Analyser.setClock) och för kickgrinden klockans INRE rutnät +
+    *  KICK_PHASE_MS - eller null när klockan är i COAST (fasträffarna svaga): då står grinden öppen och kickspärren är 170 ms, som när
+    *  skuggrutnätets återställning förr nollade analysatorns tempo (a1/a8: det var det som höll sektionerna snabba). Låtgränsen
+    *  (an.trackBoundaries) är klockans enda låtbytessignal; tystnad (an.quietMs > 10 s) släpper klockan. `now` = hoppets klocka. */
+-  update(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void; trackBoundaries?: number; quietMs?: number; setClock?(bpm: number, conf: number): void }, now = Date.now()): void {
++  update(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void; trackBoundaries?: number; quietMs?: number }, now = Date.now()): void {
++    // EN KLOCKA (a2): analysatorns sökning är tempovalet - ramen bär dess tempo/konfidens tills klockan skriver sina tal nedan
++    this.tempoBpm = frame.bpm > 40 ? frame.bpm : 0; this.tgClear = frame.bpm > 40 ? Math.min(1, frame.bpmConfidence) : 0;
+     const nb = an.trackBoundaries ?? 0;
+     if (nb !== this.boundSeen) { this.boundSeen = nb; this.relock(); }
+     if (cfg.beat && this.innerValid) { cfg.beat.anchorMs = this.innerAnchor; cfg.beat.bpm = this.innerBpm; }   // ETTAN: matningen räknar på det inre ankaret
+@@ -385,7 +282,9 @@ export class BeatFeed {
+       b.anchorMs += this.barOff * (60000 / b.bpm) - GRID_EARLY_MS - TG_GRID_EXTRA_MS;
+     } else { this.innerValid = false; an.setBeatGrid?.(null); }
+     frame.bpm = b ? b.bpm : 0; frame.bpmConfidence = b ? (b.confidence ?? 0) : 0;   // EN TILLIT: ramen bär klockans tal
+-    an.setClock?.(frame.bpm, frame.bpmConfidence);   // odelad väg: analysatorn direkt (taktvägen: HopLaneFast.feed)
++    // EN KLOCKA (a2): ramens rutnätsfas = klockans publicerade ankare (lotus konsumenter: beatPhaseMs/beatPhaseConf, lotus skala 1 + tillit;
++    // analysatorns egna gridfas (computeGridPhase) är avstängd). lotus snabb: fas 0,87 -> 0,90, motfas 9 -> 6, i fas 60 -> 67.
++    frame.beatPhaseMs = b && b.bpm > 0 ? b.anchorMs : 0; frame.beatPhaseConf = b && b.bpm > 0 ? 1 + (b.confidence ?? 0) : 0;
+   }
+ 
+   private updateInner(frame: Frame, cfg: EngineConfig, now: number, quietMs: number): void {
+@@ -403,7 +302,7 @@ export class BeatFeed {
+     const pllConf = this.pllKicks >= 12 ? this.onBeatRate : 0;
+     // TYSTNAD (förr analysatorns F_SIL10 -> bpm 0): efter 10 s tystnad släpps klockan helt. Pauser < 10 s rullar klockan vidare.
+     if (quietMs > 10000) {
+-      if (cfg.beat || this.onN > 0) { this.barReset(); cfg.beat = null; cfg.beatErr = 0; this.onN = 0; this.scanC = 99; this.tgReset(); }
++      if (cfg.beat || this.onN > 0) { this.barReset(); cfg.beat = null; cfg.beatErr = 0; this.onN = 0; this.scanC = 99; }
+       return;
+     }
+     const beat0 = cfg.beat;
+@@ -436,8 +335,7 @@ export class BeatFeed {
+       const hi = (frame.onset?.highMid ?? 0) + (frame.onset?.treble ?? 0);
+       if (this.onHalf) { this.onT[this.onPos] = now; this.onV[this.onPos] = ok > this.onPrev ? ok : this.onPrev; this.hiV[this.onPos] = hi > this.hiPrev ? hi : this.hiPrev; this.onPos = (this.onPos + 1) % ONSET_RING; if (this.onN < ONSET_RING) this.onN++; }
+       this.onPrev = ok; this.hiPrev = hi; this.onHalf = !this.onHalf;
+-      this.tgStep(now);
+-      // KALLSTART (förr analysatorns första lås): klockan föds på tempogrammets första topp, fasen på senaste kicken; onsetStep lägger
++      // KALLSTART: klockan föds på analysatorns första lås, fasen på senaste kicken; onsetStep lägger
+       // sedan rutnätet på vikningens topp inom 250 ms.
+       if (!cfg.beat && this.tempoBpm > 0) cfg.beat = { anchorMs: frame.beatAnchorMs || now, bpm: this.tempoBpm, confidence: 0 };
+       this.onsetStep(cfg, now);
+diff --git a/src/analyserProfile.ts b/.arena/klocka/a2/src/analyserProfile.ts
+index 9f8fff3..1fd82f1 100644
+--- a/src/analyserProfile.ts
++++ b/.arena/klocka/a2/src/analyserProfile.ts
+@@ -21,7 +21,6 @@ export const PROFILE: AnalyserProfile = {
+   sys: {
+     KICK_COOLDOWN: '0',          // tempoanpassad (0,6 slag, minst 170 ms); lotus: 170
+     KICK_EFLOOR: '0.006',        // lotus: 0.06
+-    TEMPO_LAGMAX: 'full',        // lag upp till N-1; lotus: 'half'
+     SECTION_AGG: 'hop',          // lotus: 'env'
+     SECTION_SCORE_F32: '1',      // lotus: '0'
+     SIL_CLEAR_PENDING: '1',      // lotus: '0'
+@@ -32,9 +31,9 @@ export const PROFILE: AnalyserProfile = {
+     // TAKTMATNINGEN I LÅNGSAMMA VÄGEN (2026-11-08, ägaren: 'en analysator, två vägar - den snabba och den som ger dirigenten
+     // information'; backup-tagg backup/fore-taktmatning-slow-20261108): beatFeed.ts (~20 % av motorns CPU) körs i analysatorns
+     // worker i stället för i hop-loopen (split.ts TAKTVÄGEN). Inline/synk-läget bit-identiskt med huvudtråden (DMX-md5); lotus: saknas.
+-    BEAT_FEED: 'slow',            // a7r: VAR ANALYSATORNS KLOCKA KÖRS (analyser.ts clockMode): 'slow' taktvägen, 'inline' i process(); lotus: 'inline'
+-    GHOST_WAIT: '1',              // 2/3-fantom vid latbyte vantar 12 s (tempo-transitions 09-04)
+-    SUBH_GUARD: '1',              // OCT-DOWN/NEAR x8 mot lastGoodBpm (2/3 only)
++    BEAT_FEED: 'slow',            // a7r: VAR ANALYSATORNS KLOCKA KÖRS (analyser.ts clockMode): 'slow' taktvägen, annars i process() (lotus)
++    // EN KLOCKA (a2 klocka 11-09): tempovalets rattar (TEMPO_LAGMAX, GHOST_WAIT, SUBH_GUARD, OCT_UP, SUBH_MULT) är borta ur profilen -
++    // analysatorns sökning har lotus LIVE-värden som kod i båda systemen
+     SECTION_HINT_LOWCONF: '0',    // taktlost break nollar INTE sektionerna (ladan 09-24 23:10)
+     // SEKTIONER SOM HALLER (agaren i ladan 10-14: 'mycket go kansla nu'; 23 lang-*.wav: intro 17 -> 10 % av tiden, < 8 s 23 -> 15 %,
+     // fladder 41 -> 22, sektionsbyten 3,12 -> 2,44/min, refrangstart oforandrad). Ur refrang/mellanlage kravs 5 raka block, in i refrangen 3.
+@@ -63,7 +62,5 @@ export const PROFILE: AnalyserProfile = {
+     DROP_RISE_LOW_DB: '20',      // SNAVT MAL 10-11: ingen genvag med 12 dB (var 12)
+     MINI_SPACING_MS: '1',        // minidrops UTAN sparr (agaren i ladan 2026-10-08; var 12000). 0 = av helt, darfor 1
+     DROP_UNDERPEAK_MIN: '1.5',   // 09-30 i koden: ingen drop/minidrop vid kroppens topp (agarens 9 markeringar + bank: pop 11->7, megamix 31->29)
+-    OCT_UP: '12',                // oktav upp snabbare (tempo-transitions)
+-    SUBH_MULT: '8',              // subharmonisk guard x8
+   },
+ };
+diff --git a/src/split.ts b/.arena/klocka/a2/src/split.ts
+index ba95bfe..91dccca 100644
+--- a/src/split.ts
++++ b/.arena/klocka/a2/src/split.ts
+@@ -32,7 +32,7 @@ export const R_SEQ = 0, R_PERF = 1, R_WALL = 2, R_ENV = 3, R_BASS = 4, R_FLAGS =
+   R_SEC_FLUX = 31 /* helbandsflux (fluxNorm, summa) */, R_SEC_RMS4 = 32 /* summa rms^4 (dynamik inom blocket) */,
+   R_HIGH = 33 /* diskant-onset-ringens sampel (bara med <prefix>HIGH_DIAG/HIGH_VOTE) */,
+   R_BIGSEQ = 34 /* STORA VÄGEN: antal hop-record (stora ringen) skrivna före detta env-record - workern kör dem först */,
+-  R_CLOCK = 35 /* EN KÄLLA (r0): klockans bpm (analysatorns enda tempo) */, R_CLOCK_CONF = 36 /* klockans tillit */;
++  R_CLOCK = 35 /* oanvänd sedan EN KLOCKA (a2): tempot räknas i långsamma sidan */, R_CLOCK_CONF = 36 /* oanvänd */;
+ 
+ // Flaggor (bitmask i R_FLAGS)
+ export const F_SIL350 = 1, F_SIL10 = 2, F_RESET_TEMPO = 4, F_HINT = 8, F_RESET_BAR = 16, F_VCLOCK_SET = 32, F_VCLOCK_NULL = 64;
+@@ -204,12 +204,12 @@ export const FS_HOP_SEQ = 0, FS_BEAT = 1 /* cfg.beat: 0 undefined, -1 null, 1 ob
+ export const FEED_STATE_LEN = 19;
+ 
+ /** Det taktmatningen läser ur ramen, och det den skriver (cfg.beat/beatErr, frame.bpmConfidence, analysatorns rutnät/kommandon). */
+-export interface HopFrame { bpm: number; bpmConfidence: number; beatAnchorMs: number; kickAtMs: number; barShift: number;
++export interface HopFrame { bpm: number; bpmConfidence: number; beatAnchorMs: number; kickAtMs: number; barShift: number; beatPhaseMs?: number; beatPhaseConf?: number;
+   onset: { kick: number; highMid: number; treble: number }; specAbs: { sub: number; kick: number; bass: number } }
+ export interface HopGrid { anchorMs: number; bpm: number; confidence?: number }
+ export interface HopCfg { beat?: HopGrid | null; beatErr?: number }
+ export interface HopTarget { resetTempo(): void; resetBar(): void; setBeatGrid?(g: HopGrid | null): void; trackBoundaries?: number; quietMs?: number;
+-  /** EN KÄLLA (r0): analysatorns tempo/tillit = klockans (cfg.beat efter matningen). */ setClock?(bpm: number, conf: number): void }
++}
+ /** Systemets taktmatning (DMX: BeatFeed). `now` = hoppets klocka (Date.now() när hoppet kom, inte när workern kör det). */
+ export interface HopFeed { update(frame: HopFrame, cfg: HopCfg, an: HopTarget, now: number): void }
+ 
+@@ -219,8 +219,6 @@ export class HopLaneFast {
+   private readonly s = new Float64Array(FEED_STATE_LEN); private readonly sr = new StateReader();
+   private seq = 0; private applied = 0; private rt = 0; private rb = 0;
+   private readonly grid = { anchorMs: 0.5, bpm: 0.5, confidence: 0.5 };
+-  /** Klockans tempo/tillit efter senaste feed - analysatorn läser dem själv i början av nästa process() (a7r, ingen setClock utifrån). */
+-  clockBpm = 0; clockConf = 0;
+   /** inline-läget (bänken): den långsamma sidan körs synkront här. */
+   peer: HopLaneSlow | null = null;
+   constructor(b: SplitBuffers, private readonly sync = false) {
+@@ -241,7 +239,8 @@ export class HopLaneFast {
+     else if (this.sync) syncWait(ctrl, C_FEED_SEQ, () => this.sr.read(ctrl, this.state, this.s, C_FEED_SEQ) && this.s[FS_HOP_SEQ] >= seq);
+     this.apply(cfg, an);
+     // EN KÄLLA (r0): ramen och analysatorn bär klockans tempo och tillit (0/0 utan klocka) - samma tal för ljuset, låtgränsen och sektionerna
+-    const b = cfg.beat; f.bpm = b ? b.bpm : 0; f.bpmConfidence = b ? (b.confidence ?? 0) : 0; this.clockBpm = f.bpm; this.clockConf = f.bpmConfidence;   // a7r: analysatorn läser dem själv i nästa process()
++    const b = cfg.beat; f.bpm = b ? b.bpm : 0; f.bpmConfidence = b ? (b.confidence ?? 0) : 0;
++    f.beatPhaseMs = b && b.bpm > 0 ? b.anchorMs : 0; f.beatPhaseConf = b && b.bpm > 0 ? 1 + (b.confidence ?? 0) : 0;   // EN KLOCKA (a2): som clock.update
+   }
+   private apply(cfg: HopCfg, an: HopTarget): void {
+     const s = this.s, ctrl = this.ctrl;
+@@ -272,7 +271,7 @@ export class HopLaneSlow {
+   private readonly ctrl: Int32Array; private readonly ring: Float64Array; private readonly state: Float64Array;
+   private seq: number; private rt: number; private rb: number; private processed: number;
+   private skipped = 0; private lagMaxMs = 0; private busyEmaUs = 0; private busyMaxUs = 0; private fconf = NaN;
+-  private readonly fr = { bpm: 0.5, bpmConfidence: 0.5, beatAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5,
++  private readonly fr = { bpm: 0.5, bpmConfidence: 0.5, beatAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5, beatPhaseMs: 0.5, beatPhaseConf: 0.5,
+     onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5, bass: 0.5 } };
+   private readonly cfg: HopCfg = { beat: undefined, beatErr: undefined };
+   private grid: HopGrid | null = null;

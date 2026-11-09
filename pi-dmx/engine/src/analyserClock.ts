@@ -117,6 +117,8 @@ const TG_GRID_EXTRA_MS = 5;   // oktavkanten +-3 %; övre oktaven bara om analys
  *  det snabba minnet det långsamma, så toppen byter direkt; tills det långsamma fönstret är fullt (kallstart, relock vid låtgräns) styr
  *  det snabba (a2f M1 utan det: upp_s 1,35 -> 2,85 = lang1021-skiftet 2,3 s efter låtgränsen). Samma hypoteser, samma poäng - två EMA:er. */
 const TG_WIN_MS = 5000, TG_FULL_N = 900, TG_FWIN_MS = 3500, TG_FFULL_N = 630, TG_FA = 0.4, TG_SW_STEPS = 6, TG_SW_N = 2;
+/** a3 TOPPRÖSTEN (se peakVote): syskonen, faktor, varv i följd; oktaven under kanten (se tgStep). */
+const HV_R = [4 / 3, 3 / 4, 3 / 2, 2 / 3, 5 / 4, 4 / 5], HV_K = 1.25, HV_N = 5, HV_AGE = 30, TG_OCT_LO = 79.6, TG_OCT_LO_N = 8;
 const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, TG_MIN_N = 300, TG_FINE = 0.0025, TG_HALF = ONSET_BINS >> 1;
 
 /**
@@ -134,6 +136,24 @@ const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, 
  * lacker ner och pulsen drar sig undan — samma beteende som forut, men nu med
  * en principiell grund i stallet for som biprodukt av ett tempogram.
  */
+/** EN FAS OCH EN ETTA FÖR BÅDA (klocka r0 = a4:s fas och etta): ramens fasfält är klockans PUBLICERADE rutnät (samma ankare som
+ *  DMX:s cfg.beat), aldrig en egen fasanalys. beatPhaseMs = det publicerade ankaret minus offsetMs (lotus GRID_PHASE_OFFSET_MS, 0 i bänken);
+ *  beatPhaseConf = 1 + tillit (= lotusbank --fas klocka). Mätt i lotusbank r0 mot a8:s 'senaste slaget <= nu' + 1/(1 - tillit):
+ *  följare raw 0,96 (23 ms, n 343) / f1-f3 0,98 mot 0,83 (22 ms, n 403) / 0,85; fasen (0,84/15/257) lika. barShift (a4) = klockans
+ *  etta (taktmodellen, DMX ettan 100 %) i slagindex för systemets EGET rutnät `ref` (lotus: motorns _beat via setBeatGrid;
+ *  (idx + barShift) % 4 === 0 = ettan), räknat på klockans slag närmast nu; -1 innan taktmodellen dömt en etta. Ersätter analysatorns
+ *  kick-taktfas (barAcc). */
+export function publishPhase(f: { beatPhaseMs: number; beatPhaseConf: number; barShift: number }, b: ClockCfg["beat"], barKnown: boolean,
+  ref: { anchorMs: number; bpm: number } | null | undefined, now: number, offsetMs: number): void {
+  if (!b || !(b.bpm > 40)) { f.beatPhaseMs = 0; f.beatPhaseConf = 0; f.barShift = -1; return; }
+  const per = 60000 / b.bpm, j = Math.floor((now - b.anchorMs) / per);
+  f.beatPhaseMs = b.anchorMs - offsetMs; f.beatPhaseConf = 1 / Math.max(0.05, 1 - (b.confidence ?? 0));   // a8f D4: lotus on/anti-skala (1 = ingen information) - halvslagsflytten (PHASE_FLIP_CONF 2,0) nås vid tillit >= 0,5
+  if (!barKnown) { f.barShift = -1; return; }
+  const r = ref && ref.bpm > 40 && Math.abs(ref.bpm / b.bpm - 1) < 0.04 ? ref : b;
+  const ir = Math.round((b.anchorMs + j * per - r.anchorMs) / (60000 / r.bpm));   // klockans senaste slag i ref-rutnätets index
+  f.barShift = (((((j % 4) + 4) % 4) - ir) % 4 + 4) % 4;   // ettan = ir - (j mod 4) i ref-index -> (idx + barShift) % 4 === 0 där
+}
+
 export class BeatFeed {
   onBeatRate = 0;          // andel kickar med |fasfel| < 0.25 (coasten; tilliten utan TRUST_REPEAT)
   repeatRate = 0;          // TRUST_REPEAT: andel kickar på slaget ELLER som upprepar en kick två slag tidigare (tilliten)
@@ -156,6 +176,7 @@ export class BeatFeed {
   tempoBpm = 0;
   /** TEMPOTS TYDLIGHET 0..1 (t1f): 1 - näst bästa tempohypotesens poäng / vinnarens, x 3, tak 1 (se tgStep). */
   tgClear = 1;
+  private hvRun = 0; hvSwitches = 0; private hvAge = 0; private hvVoted = false; private hvKeep = 0; private hvEver = false; private octLoN = 0; private hvT0 = 0; private hvBest = 0;   // a3 TOPPRÖSTEN (hvEver: D1, rösten har bytt sedan låset)
   private tgHalfR = 0; octR = 0; private octN = 0; private octHi = false;   // OKTAVKANTEN (r0): halvslagskvotens EMA och läget
   private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
   // ETTAN (a5): fyra platsers särdrag (inre slagindex & 3), pågående slagets max, linjära ringar för stigningen, publicerat ankare
@@ -166,7 +187,9 @@ export class BeatFeed {
   /** EN KÄLLA (r0 entempo): analysatorns rutnät (kickgrinden) = klockans INRE rutnät + KICK_PHASE_MS; null = grinden öppen (klockan i coast). */
   private readonly anaGrid = { anchorMs: 0, bpm: 0, confidence: 0 };
   private boundSeen = 0;
-  /** Det cfg analysatorn ska byggas med: en grund kopia (analysatorns rutnät sätts via setBeatGrid i update, aldrig i motorns cfg.beat). */
+  /** Det cfg analysatorn ska byggas med: en grund kopia (analysatorns rutnät sätts via setClockGrid i update, aldrig i motorns cfg.beat). */
+  /** EN ETTA (a4): har taktmodellen dömt en etta (minst BAR_MIN slag sedan start/låtgräns)? */
+  barKnown(): boolean { return this.barN >= BAR_MIN; }
   static analyserCfg<T extends object>(cfg: T): T { return { ...cfg, beat: null }; }
 
   private foldMean(k: number): number { const q = (k + ONSET_BINS) % ONSET_BINS; return this.foldN[q] ? this.foldS[q] / this.foldN[q] : 0; }
@@ -296,16 +319,73 @@ export class BeatFeed {
       // Nära kanten avgör analysatorns oktav (lang1021 = 160: rutnätet på 80 missade varannan ansats; Cody Johnson = 80, analysatorn 104-116).
       // EN KÄLLA (r0): oktaven avgörs av klockans egen vikning (analysatorns tempo finns inte längre): ligger basens stigning lika starkt
       // mitt emellan 80-slagen som på dem är pulsen 160 (lang1021: varannan ansats), annars 80 (backbeat: virveln, inte basen, på 2 och 4).
+      if (!(t < 80 * TG_EDGE || t > 160 / TG_EDGE)) this.octLoN = 0;
       if (t < 80 * TG_EDGE || t > 160 / TG_EDGE) { const lo = t < 120 ? t : t / 2; this.tgScore(lo, now);
+        this.octLoN = lo < TG_OCT_LO ? this.octLoN + 1 : 0;   // D2: halvslaget under kanten i TG_OCT_LO_N varv i följd
         // brusigt per varv (lang1021 0,5-1,0, Cody Johnson 0,1-0,9): EMA ~3,7 s + hysteres (upp >= TG_OCT_UP, ned < TG_OCT_DN), startläget ur första varvet
         this.octR = this.octN++ === 0 ? this.tgHalfR : this.octR + TG_OCT_A * (this.tgHalfR - this.octR);
         if (this.octN === 1) this.octHi = this.octR >= TG_OCT_UP; else if (this.octHi ? this.octR < TG_OCT_DN : this.octR >= TG_OCT_UP) this.octHi = !this.octHi;
-        t = this.octHi ? 2 * lo : lo; }
-      this.tempoBpm = Math.min(159.9, Math.max(80, t));
+        // a3 OKTAVEN UNDER KANTEN: båda bänkarnas facit (och lotus BPM_MIN/MAX) bor i [80, 160) - ett slag under 80 finns inte, så ligger
+        // halvslaget tydligt under kanten (< TG_OCT_LO) är pulsen dubbla (lotus 503: 20 'dubbla' 155-159 -> klockan 80,0 = klämd 78,x).
+        t = this.octHi || this.octLoN >= TG_OCT_LO_N ? 2 * lo : lo; }
+      this.tempoBpm = Math.min(159.9, Math.max(80, this.peakVote(t, now)));
       return;
     }
   }
-  private tgReset(): void { this.tgAcc.fill(-1); this.tgAccF.fill(-1); this.tgSw = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; }
+  /** a3 TOPPRÖSTEN (EN KLOCKA FÖR BÅDA, sammanslagningen av tempovalet - båda signalerna röstar). Tempogrammet (B, rise-vikningen) dömer
+   *  varje tempo på (topp + HALVSLAGET) / 2: halvslaget fäller 4/3- och 3/2-fantomerna (ingen topp mitt emellan), men GYNNAR 3/4-fantomen:
+   *  på 3/4 av tempot landar de riktiga slagen på fyra jämnt fördelade faser (0, 1/4, 1/2, 3/4), så både toppen och halvslaget har slag.
+   *  Lotus 503: klockan föll på 3/4 i 21 låtar där A (kickvikningen: alignScore/UP43, slagets topp och träffar) hade rätt - Klaas Cambodia
+   *  130 -> 97,6 (basens topp 5,7-6,4 x medel på 130 mot 4,7-5,0 på 97,5, diskanten 7,7 mot 6,9). KICKVIKNINGENS RÖST = bara TOPPEN:
+   *  basens topp/medel x diskantens topp/medel på samma ring. Uttalad kvotlogik: syskonen 4:3, 3:4, 3:2, 2:3, 5:4, 4:5 (vikta in i
+   *  [80, 160)) är alla icke-heltalskvoter - de riktiga slagen sprids på 3-8 faser där, så toppen späds ut åt BÅDA hållen (oktaven och
+   *  undertoner ingår inte: där späds toppen inte). Ett syskon tar över tempogrammets val om dess topp-poäng är minst HV_K x valets i HV_N
+   *  varv i följd; det regerande tempot har samma faktor (hysteres). Täta ansatser ger lika toppar = tempogrammet står kvar. */
+  private peakVote(t0: number, now: number): number {
+    const open = this.hvAge++ < HV_AGE;   // tempovalet: bara i låsets första HV_AGE varv (kallstart, efter låtgräns/tystnad)
+    if (!open) {   // inne i låten: tempoKLASSEN som valdes i fönstret står kvar mot ett syskon tills syskonets topp är HV_K x högre
+      if (this.hvAge === HV_AGE + 1) this.hvKeep = this.hvEver ? this.tempoBpm : 0;   // D1: klasslåset bara om rösten faktiskt bytt i fönstret
+      const k = this.hvKeep;
+      if (k > 0 && Math.abs(t0 / k - 1) >= 0.02) {
+        let sib = false; for (let i = 0; i < HV_R.length; i++) { let c = t0 * HV_R[i]; while (c >= 160) c /= 2; while (c < 80) c *= 2; if (Math.abs(c / k - 1) < 0.02) sib = true; }
+        if (sib && this.peakScore(k, now) * HV_K >= this.peakScore(t0, now)) return k;
+        this.hvKeep = 0;
+      }
+      if (!this.hvVoted) return t0;
+    }
+    const p0 = this.peakScore(t0, now); if (!(p0 > 0)) { this.hvRun = 0; this.hvVoted = false; return t0; }
+    const cur = this.tempoBpm; let best = t0, bs = p0 * HV_K;
+    for (let i = 0; i < HV_R.length; i++) {
+      let c = t0 * HV_R[i]; while (c >= 160) c /= 2; while (c < 80) c *= 2;
+      const v = this.peakScore(c, now) * (this.hvEver && cur > 0 && Math.abs(c / cur - 1) < 0.02 ? HV_K : 1);   // D1: hysteresen bara efter ett röstbyte
+      if (v > bs) { bs = v; best = c; }
+    }
+    if (best === t0) { this.hvRun = 0; this.hvVoted = false; return t0; }
+    if (this.hvEver && cur > 0 && Math.abs(best / cur - 1) < 0.02) { this.hvRun = 0; return best; }   // redan bytt: står kvar (även efter fönstret)
+    // D3: samma tempogramval OCH samma syskon i alla HV_N varv (övergångar där tempogrammet vandrar röstar inte)
+    if (this.hvRun > 0 && (Math.abs(t0 / this.hvT0 - 1) >= 0.02 || Math.abs(best / this.hvBest - 1) >= 0.02)) this.hvRun = 0;
+    this.hvT0 = t0; this.hvBest = best;
+    if (open && ++this.hvRun >= HV_N) { this.hvRun = 0; this.hvSwitches++; this.hvVoted = true; this.hvEver = true; return best; }
+    if (!open) this.hvVoted = false;
+    return t0;
+  }
+  /** Topp-poängen på bpm: ringens basstigning och diskant (fönstret TG_WIN_MS) viks som i tgScore; basens topp/medel x diskantens
+   *  topp/medel (utan halvslaget). 0 = för lite ljud. */
+  private peakScore(bpm: number, now: number): number {
+    const S = this.fullS, N = this.fullN, Hs = this.tgH, oT = this.onT, oV = this.onV, oH = this.hiV; S.fill(0); N.fill(0); Hs.fill(0);
+    let lo = 0, hi = this.onN;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (now - oT[(this.onPos - 1 - m + 2 * ONSET_RING) % ONSET_RING] > TG_WIN_MS) hi = m; else lo = m + 1; }
+    const n = lo; if (n < TG_MIN_N) return 0;
+    const jo = (this.onPos - n + 2 * ONSET_RING) % ONSET_RING;
+    const dt = (oT[(this.onPos + ONSET_RING - 1) % ONSET_RING] - oT[jo]) / (n - 1), step = (dt * bpm / 60000) * ONSET_BINS;
+    let j = jo, ph = 0, tot = 0, totH = 0;
+    for (let i = 0; i < n; i++) { const b = ph | 0, v = oV[j], h = oH[j]; S[b] += v; Hs[b] += h; N[b]++; tot += v; totH += h; ph += step; if (ph >= ONSET_BINS) ph -= ONSET_BINS; j = j === ONSET_RING - 1 ? 0 : j + 1; }
+    if (tot <= 0 || totH <= 0) return 0;
+    let mx = 0, hx = 0;
+    for (let b = 0; b < ONSET_BINS; b++) { if (!N[b]) continue; const v = S[b] / N[b], h = Hs[b] / N[b]; if (v > mx) mx = v; if (h > hx) hx = h; }
+    return (mx / (tot / n)) * (hx / (totH / n));
+  }
+  private tgReset(): void { this.tgAcc.fill(-1); this.tgAccF.fill(-1); this.tgSw = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; }
 
   /** Kom en tidigare kick (ringen, före denna) lag ms före t, inom ±tol? (TRUST_REPEAT) */
   private kickRepeats(t: number, lag: number, tol: number): boolean {
@@ -372,7 +452,7 @@ export class BeatFeed {
    *  KICK_PHASE_MS - eller null när klockan är i COAST (fasträffarna svaga): då står grinden öppen och kickspärren är 170 ms, som när
    *  skuggrutnätets återställning förr nollade analysatorns tempo (a1/a8: det var det som höll sektionerna snabba). Låtgränsen
    *  (an.trackBoundaries) är klockans enda låtbytessignal; tystnad (an.quietMs > 10 s) släpper klockan. `now` = hoppets klocka. */
-  update(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void; trackBoundaries?: number; quietMs?: number; setClock?(bpm: number, conf: number): void }, now = Date.now()): void {
+  update(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setClockGrid?(g: EngineConfig["beat"]): void; trackBoundaries?: number; quietMs?: number; setClock?(bpm: number, conf: number): void }, now = Date.now()): void {
     const nb = an.trackBoundaries ?? 0;
     if (nb !== this.boundSeen) { this.boundSeen = nb; this.relock(); }
     if (cfg.beat && this.innerValid) { cfg.beat.anchorMs = this.innerAnchor; cfg.beat.bpm = this.innerBpm; }   // ETTAN: matningen räknar på det inre ankaret
@@ -381,9 +461,9 @@ export class BeatFeed {
     if (b) {
       this.innerAnchor = b.anchorMs; this.innerBpm = b.bpm; this.innerValid = true;
       const g = this.anaGrid; g.anchorMs = b.anchorMs + KICK_PHASE_MS; g.bpm = b.bpm; g.confidence = b.confidence ?? 0;
-      an.setBeatGrid?.(this.gridWeakSince === 0 ? g as EngineConfig["beat"] : null);   // COAST/BREAK = öppen grind (skuggans bpm 0 som transform av klockan)   // COAST = öppen grind
+      an.setClockGrid?.(this.gridWeakSince === 0 ? g as EngineConfig["beat"] : null);   // COAST/BREAK = öppen grind (skuggans bpm 0 som transform av klockan)   // COAST = öppen grind
       b.anchorMs += this.barOff * (60000 / b.bpm) - GRID_EARLY_MS - TG_GRID_EXTRA_MS;
-    } else { this.innerValid = false; an.setBeatGrid?.(null); }
+    } else { this.innerValid = false; an.setClockGrid?.(null); }
     frame.bpm = b ? b.bpm : 0; frame.bpmConfidence = b ? (b.confidence ?? 0) : 0;   // EN TILLIT: ramen bär klockans tal
     an.setClock?.(frame.bpm, frame.bpmConfidence);   // odelad väg: analysatorn direkt (taktvägen: HopLaneFast.feed)
   }

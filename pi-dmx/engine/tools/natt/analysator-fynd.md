@@ -15,6 +15,18 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-09 DELAD FIL ÄNDRAD: EN KLOCKA FÖR BÅDA (arenan klocka, ersätter LOTUSPARITET-posten nedan)
+Vad: lotus egen temposökning (OWN_TEMPO, computeBpm m.fl., lotus gridfas, barAcc) BORTTAGEN; båda profilerna kör analyserClock (standard
+'slow' = workern även för lotus utan BEAT_FEED; 'inline' = process()), fasen/ettan i ramen (publishPhase: beatPhaseMs = klockans ankare,
+beatPhaseConf = 1/(1-tillit), barShift = klockans etta i lotus slagnumrering), setBeatGrid inget rutnät längre. Manifest: analyser.ts 887a49b2,
+split.ts c8f493c3, slowWorker.ts ab875f44, analyserClock.ts ca1b41b1, recorder.ts d94c850c.
+LOTUS-bänk (tools/arena/lotusbank.py, 503 fryst + syntet): 396 -> 463/503, syntet 6/8 = 6/8, on-beat 0,84 = 0,84, fas median 0,88 -> 0,84
+(urval: 64 fler låtar i rätt oktav; parat ~0,87-0,88), motfas 33 -> 16, följare 0,90 -> 0,95, spann inom låt 9 -> 33 BPM.
+DMX: md5 identisk med föregående (mta) på övning, kontroll och extra filer.
+Önskat (huvudchatten synkar, ägaren 09:10): kopiera de fyra filerna + manifestet till lotus-light-link/pi/src/audio-analyser, lotus profil
+oförändrad, tsc --noEmit, lotus egen bänk; vid porten: PHASE_FLIP_CONF, fasoffset/lead mot nya rutnätet (öga), piEngine tillitsgränser,
+/api/perf för workern, döda drop-ins. Rapport: tools/natt/arena-2026-11-09-klocka/RAPPORT.md.
+
 ## ÖPPET 2026-11-09 DELAD FIL ÄNDRAD: LOTUSPARITET 0 (ersätter posten nedan om lotus-påverkan)
 Vad: analyser.ts (md5 8e22d6d0) har lotus gamla temposökning och skugga tillbaka ORDAGRANT bakom ETT profilvärde: OWN_TEMPO =
 sys.BEAT_FEED saknas (lotus) -> som förr, klockan av; 'slow'/'inline' (DMX) -> analyserClock.ts är enda tempot. split.ts 4b5312c1,

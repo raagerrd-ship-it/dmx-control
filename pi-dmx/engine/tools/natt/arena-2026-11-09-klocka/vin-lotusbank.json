@@ -1,0 +1,96 @@
+{
+ "mapp": ".arena\\klocka\\vin",
+ "kalla": "<mapp>/src",
+ "beatFeed": null,
+ "fas": {
+  "median": 0.84,
+  "motfas": 16,
+  "ifas": 253,
+  "n": 447
+ },
+ "snabb": false,
+ "manifest": "C:\\Users\\richa\\Desktop\\Claude\\lotus-light-link\\tools\\tempo-facit-pc\\bench-manifest.txt",
+ "korpus": {
+  "ok": 463,
+  "n": 503,
+  "klasser": {
+   "lika": 463,
+   "3/2": 7,
+   "dubbla": 2,
+   "annat": 15,
+   "4/3": 16
+  },
+  "spann": 33.0
+ },
+ "synt": {
+  "ok": 6,
+  "n": 8,
+  "klasser": {
+   "lika": 6,
+   "dubbla": 2
+  },
+  "spann": 1.0
+ },
+ "kick": {
+  "recall": 0.8,
+  "precision": 0.86,
+  "biasMs": -0.0,
+  "n": 503
+ },
+ "onBeat": {
+  "recall": 0.84,
+  "n": 503
+ },
+ "fasBt": {
+  "median": 0.84,
+  "motfas": 14,
+  "ifas": 230,
+  "mellan": 163,
+  "n": 407
+ },
+ "foljare": {
+  "raw": {
+   "onBeat": 0.95,
+   "ifas": 233,
+   "motfas": 16,
+   "iqrMs": 11.0,
+   "offsetMs": 21.0,
+   "absOffsetMs": 22.0,
+   "andel30": 0.63,
+   "n": 335
+  },
+  "f1": {
+   "onBeat": 0.95,
+   "ifas": 238,
+   "motfas": 17,
+   "iqrMs": 12.0,
+   "offsetMs": 21.0,
+   "absOffsetMs": 23.0,
+   "andel30": 0.63,
+   "n": 336
+  },
+  "f2": {
+   "onBeat": 0.95,
+   "ifas": 239,
+   "motfas": 18,
+   "iqrMs": 13.0,
+   "offsetMs": 22.0,
+   "absOffsetMs": 23.0,
+   "andel30": 0.63,
+   "n": 335
+  },
+  "f3": {
+   "onBeat": 0.95,
+   "ifas": 237,
+   "motfas": 18,
+   "iqrMs": 13.0,
+   "offsetMs": 22.0,
+   "absOffsetMs": 23.0,
+   "andel30": 0.62,
+   "n": 337
+  }
+ },
+ "tidS": 497,
+ "byggS": 7,
+ "fel": ""
+}

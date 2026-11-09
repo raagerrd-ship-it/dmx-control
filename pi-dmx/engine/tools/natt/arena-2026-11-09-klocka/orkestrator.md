@@ -1,0 +1,17 @@
+# Orkestratorn klocka (start 09:50 11-09)
+bas DMX = HEAD (0365872/2a164c6, = mta + paritet + dodkod) bas/ kopierad från analys (md5 mega riktig). Lotus A 396/503 6/8 fas 0,88; B inline 441/503 5/8 fas 0,81.
+agent-id: a1 a228cbca9bd9c8eef, a2 abd476ae6aaf88a10, a3 a4b77aec749c76de1, a4 a8c92548fa824145d, a5 ad4cdbf30fc70b9b7, a6 a4fb818e49f9a8f7a, a7 a279a95d28166a190, a8 a75277ba693ff4af2
+plan: runda 1 -> remix från r0 -> final (samma brief) + kombinationsgranskning (DMX kontroll + lotusbank) -> kod -> 'KLAR FÖR SYNK' till huvudchatten. Sikte ladan ~19.
+a7: B för båda (lotus inline), OWN_TEMPO bort (analyser.ts +13/-845), DMX md5 = bas, lotus 441/503 5/8 fas 0,82 (= B --fas klocka); risk lotus-CPU huvudtråd, fasen 25 ms tidigare, PHASE_FLIP_CONF. a3 snabb 121/126 syntet 6/8.
+a8: B för båda, klockan i workern även för lotus (taktväg utan BEAT_FEED), setBeatGrid tar inget; DMX md5 = bas; lotus 441/503 5/8; FYND fas parat på samma 388 låtar 0,88 = A (fallet = urval); per låt 0,74->0,86; ≥150 bpm 0,65->0,53 (halveras); baslinjens följare 0,95 var mätfälla (få pulser), full täckning 0,83 vs 0,90 men |offset| 23 vs 36.
+a4: B för båda + publishPhase (beatPhaseMs = klockans ankare, conf 1+tillit) + barShift från klockans taktmodell (lotus etta); DMX md5 = bas; lotus 441/503 5/8; fas samma 388: 0,88 motfas 32->12; följare 0,95/24 ms; klockan i process() för lotus 53 us/hop PC (~0,5 ms Pi) - flytta till worker via BEAT_FEED slow + hopLane.feed i lotus motor.
+a6: B för båda + en relock-väg (BoundaryDetector + lotus Sonos-byte); DMX md5 = bas; lotus 441/503 5/8; break-spärr hjälpte lotus spann 32->11 men DMX gridfel 21->29 + lampspr DISK -> borttagen. Risk: lotus motor setBeatGrid skriver över kickgrind (a8: setBeatGrid ignoreras).
+a2: A tempo + klockans fas/etta/tillit: lotus 397/503 6/8 fas 0,90 motfas 18 (inget sämre); DMX -15,2 DISK (mix_klocka 89,9, mix_las 7,3, gridfel 88, upp_s 1,90). Tempovalet: B vinner DMX klart; fasen: rise-rutnätet bra för lotus. Lotus alsaMic.ts setBeatGrid skriver över klockan varje hop.
+a3: B + toppröst (bas x diskant, syskon 4:3/3:4/3:2/2:3/5:4/4:5 1,25x i 3 varv, fönster 11 s efter kallstart/låtgräns/tystnad) + oktav under kanten dubblas; lotus 474/503 6/8 fas 0,84 (446 låtar) motfas 15, spann 22; DMX -0,99 OK (mix_still 2,73->3,24, gridfel 23); M1 (röst hela låten) DISK sektioner.
+a1: B + TG_EDGE_HI 3->1 % (övre oktavzonen, 22 av 24 dubbla) + swingSig (3/2-fantom i svängda åttondelar) + publishPhase; DMX md5 = bas (+0,00); lotus 461/503 6/8 motfas 17 fas 0,84 (samma 391: 0,87 vs 0,88); UP43/FIVE4 skiljer ej -> ej lyfta.
+a5: B + clockPhase + setBeatGrid no-op + tillit<0,9 vaktar 3:2/4:3-byte (swing 6/8); lotus 440/503 6/8; DMX -0,10 OK; tillit-AUC 0,657 (A 0,659). 12:00 runda 1 klar -> r0-agent, sedan 3 finalister.
+12:50 r0 klar (DMX -0,99, lotus 474/503 6/8, fas parat 0,87 motfas 11). Finalister a3, a1, a8 -> <id>f (samma brief final.md).
+13:00 r0 DMX-kontroll DISK (upp_s -0,30, ned_s 2,55 vs bas 0,30; -5,22). Tillägg i final.md till finalisterna.
+13:40 a3f: r0-rösten tyst på DMX (D1 håll bara efter verkligt byte, D2 oktavdubbling efter 8 varv, D3 samma val 5 varv); DMX md5 = bas övning; lotus 463/503 6/8 motfas 16; spann 33. Mäter holdout.
+a1f: r0 minus röst + swingSig: DMX md5 = bas (även 3 extra 10-11), lotus 441 6/8 fas samma 388 0,88; D3 TG_EDGE_HI -> 461 men ändrar DMX på 2 extra filer. Lotus svaghet 80-100 bpm (fas 0,59 vs 0,85).
+13:55 a3f DMX-KONTROLL md5 LIKA med bas (+0,00 OK). Ledare.
