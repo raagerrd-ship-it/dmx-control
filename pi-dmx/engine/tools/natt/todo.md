@@ -13,7 +13,9 @@ kvällen att köra två olika funktioner för samma sak som vi försöker förb�
   Döms på DMX-bänken (tvavagar.py) OCH på lotus bänk (tempo-facit-pc, bench-manifestet; körs i kopia under .arena,
   skriv aldrig i lotus-light-link).
 - Vinnaren = EN klocka som båda profilerna kör. Profilerna skiljer sig bara i konsumenterna.
-- Lotus kopia synkas av huvudchatten efter ägarens ja. Lotus kollas i källaren.
+- SYNK TILL LOTUS NÄR ARENAN ÄR KLAR (ägaren 09:10: 'När vi är färdiga så skall vi ju synka till lotus'), inte tidigare:
+  huvudchatten kopierar de delade filerna och manifestet till lotus kopia, kör tsc och committar, men deployar inget. Lotus kollas i källaren.
+  Fram till dess stoppar deployspärren DMX-deployer. Skriv "KLAR FÖR SYNK" + commit-id i rapporten när vinnaren är kod.
 
 ## DAGKÖRNING 2026-11-08 21:45 -> 2026-11-09 ca 19:00 (ägaren: "Starta redan nu, så har vi många timmar att köra klart. Till imorgon kväll vid 19 tiden")
 - Startad för hand från huvudchatten. ÄGAREN 11-08 23:55: "Och det är detta jag vill arenan skall lösa" = ARKITEKTUREN nedan
