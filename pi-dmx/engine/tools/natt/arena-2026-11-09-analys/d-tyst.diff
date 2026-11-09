@@ -1,0 +1,253 @@
+diff --git a/src/analyser.ts b/.arena/analys/d-tyst/src/analyser.ts
+index 4d4b307..2fa21f6 100644
+--- a/src/analyser.ts
++++ b/.arena/analys/d-tyst/src/analyser.ts
+@@ -82,6 +82,8 @@ export interface AnalyserConfig {
+   tauUp?: number;
+   tauDown?: number;
+   noiseFloor?: number;
++  /** Släckgränsen på frame.level (motorns cfg.silenceLevel), standard SILENCE_LEVEL. */
++  silenceLevel?: number;
+   /** Upper clamp for analyser gain. */
+   maxGain?: number;
+   /** Enable log-compressed, adaptively whitened and normalized onset features. */
+@@ -123,7 +125,16 @@ export interface Spectrum {
+   air: number;      // ~10–16 kHz  — luft/glitter
+ }
+ 
++/** Släckgränsens standard (motorns cfg.silenceLevel saknas). */
++export const SILENCE_LEVEL = 0.05;
++let silenceLevelLive = SILENCE_LEVEL;
++/** Samma tystnadsbeslut som frame.silent för den som bara har nivån (BoundaryDetector matad av verktyg utan ramens flagga). */
++export function silentLevel(level: number): boolean { return level <= silenceLevelLive; }
++
+ export interface Frame {
++  /** TYSTNAD (a7): level <= släckgränsen (cfg.silenceLevel, EN tröskel, sätts live via setSilenceLevel). Läses av effekternas
++   *  släck-/ingångsgrind och låtgränsens 3 s-tystnad - ingen konsument har egen nivågräns för "tyst". */
++  silent: boolean;
+   level: number;        // 0..1, auto-gained RMS (15ms attack / 400ms release smoothed)
+   levelRaw: number;     // 0..1, samma auto-gain men OSMOOTHAT (rå per-hop)
+   levelVU: number;      // 0..1, ~200ms symmetriskt smoothat PÅ HOP-TAKT (375Hz) — för VU-taket
+@@ -893,6 +904,10 @@ export class Analyser {
+     }
+     return t;
+   })();
++  private hGated = false;   // brusgrinden för hoppet (process)
++  private silenceLevel = SILENCE_LEVEL;
++  /** Släckgränsen live (index.ts, /setup-ratten cfg.silenceLevel). */
++  setSilenceLevel(v: number | undefined): void { this.silenceLevel = silenceLevelLive = v ?? SILENCE_LEVEL; }
+   private silentMs = -0;   // typstabilt (se lastDropRise)
+   private diagLagMin = 0; private diagLagMax = 0;
+   private _why = "";   // TRACE: vilken gren bytte tempot (<prefix>BPM_TRACE)
+@@ -1886,6 +1901,7 @@ export class Analyser {
+       onset: { enhancements: cfgIn.onsetEnhancements ?? false },
+     };
+     this.beatSrc = cfgIn.detection ? cfgIn : { beat: null };
++    this.setSilenceLevel(cfgIn.silenceLevel);
+     this.fft = new FFT(cfg.fft.size);
+     this.window = hannWindow(cfg.fft.size);
+     this.buffer = new Float32Array(cfg.fft.size);
+@@ -1955,7 +1971,7 @@ export class Analyser {
+     this.aProf = 1 - Math.exp(-dtHop / 8.0);
+     // Ett återanvänt Frame (spec/onset pekar på de pre-allokerade objekten).
+     this.outFrame = {
+-      level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
++      silent: true, level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
+       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
+       dropCount: 0, miniDropCount: 0, bodyDb: 0, midHiDb: -120, kickRise: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
+       kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
+@@ -2103,6 +2119,7 @@ export class Analyser {
+     // (tauDown×0.25) eftersom AGC:n inte kan ta bort redan inbränd klippning.
+     this.dbgRms = rms;
+     this.hRms = rms; this.hNow = now; this.hDt = dt;
++    this.hGated = rms >= this.cfg.detection.noiseFloor * 1.5;   // BRUSGRINDEN (a7): enda jämförelsen, snabba sidan; workern läser activeMs > 0 (B_ACTIVE)
+     if (!this.gainLocked && rms > d.noiseFloor) this.agcStep();
+ 
+     const level = Math.min(1, rms * this.gain);
+@@ -2337,8 +2354,8 @@ export class Analyser {
+ 
+   /** Tystnadsflanken (350 ms / 10 s). Sallan korda grenar: i egen funktion sa att en forsta korning inte deoptimerar hetslingan. */
+   private silenceStep(): void {
+-    const rms = this.hRms, hopMs = this.hHopMs;
+-    if (rms < this.cfg.detection.noiseFloor * 1.5) {
++    const hopMs = this.hHopMs;
++    if (!this.hGated) {
+       this.silentMs += hopMs;
+       // FLANKTRIGGAT: hela reseten kördes förut VARJE tyst hop efter 350 ms —
+       // tempoGram.fill(0) är 500 skrivningar × 375 Hz i tystnad, och localBpm=0
+@@ -2437,7 +2454,6 @@ export class Analyser {
+ 
+   /** Sektionsenergi 0..1 (aktiv tid, EMA, sjalvkalibrerande golv och spann). Returnerar intensity. */
+   private intensityStep(): void {
+-    const rms = this.hRms;
+     const dtHop = this.dtHop;
+     // SEKTIONSENERGI (0..1) — hur energiskt partiet är RELATIVT låtens eget snitt.
+     // Ren analys av nivån över tid → hör hemma här, inte i show-orkestreringen.
+@@ -2447,7 +2463,7 @@ export class Analyser {
+     // Attack något snabbare än release så uppbyggnader syns. WARMUP: baslinjen
+     // konvergerar snabbt (~3s) de första 8s aktiv musik, sen stabil ~25s.
+     // Nollställs vid tystnad → snabb omkalibrering vid låtbyte.
+-    if (rms >= this.cfg.detection.noiseFloor * 1.5) this.activeMs += dtHop * 1000;
++    if (this.hGated) this.activeMs += dtHop * 1000;
+     else this.activeMs = 0;
+     const iUp = this.aIUp;
+     const iDown = this.aIDown;
+@@ -2481,7 +2497,7 @@ export class Analyser {
+    *  i bigStep, med tidskonstanterna per hop i stället för per stor-FFT (nivå 90 ms, peak-decay 0,9993, onset-steg 0,002, uppvärmning
+    *  ONSET_WARM x BIG_EVERY hop). */
+   private fastBandStep(samples: Float32Array): void {
+-    const gated = this.hRms > this.cfg.detection.noiseFloor * 1.5;
++    const gated = this.hGated;
+     if (gated) this.fbWarm++; else this.fbWarm = 0;
+     const warm = gated && this.fbWarm >= Analyser.ONSET_WARM * Analyser.BIG_EVERY;
+     const C = this.fbCoef, S = this.fbState, n = samples.length;
+@@ -2532,7 +2548,6 @@ export class Analyser {
+ 
+   /** Decimerad stor-FFT (var BIG_EVERY:e hop): 2048-magnitud, latminnets spec-sink, basonset-envelope, 8 band (niva/AGC/onset) + swap. */
+   private bigStep(): void {
+-    const rms = this.hRms;
+     this.bigCounter = 0;
+     { const buf = this.bufferBig, w = this.windowBig, out = this.windowedBig, B = buf.length, p = this.bigPos, n1 = B - p;
+       for (let i = 0; i < n1; i++) out[i] = buf[p + i] * w[i];
+@@ -2554,7 +2569,7 @@ export class Analyser {
+     // (0..magBigMax) — svansen räknas inte, så ingen läsare kan tyst få nollor.
+     if (this.bigOn) { const k = ++this.specN, R = this.specRing!, o = (k % SPEC_SLOTS) * SPEC_MAX; R.set(this.magBigView.subarray(0, this.specCopy.length), o); }
+     else this.specSink?.(this.magBigView, this.cfg.audio.rate / this.bufferBig.length);
+-    const gated = rms > this.cfg.detection.noiseFloor * 1.5;
++    const gated = this.activeMs > 0;   // brusgrinden ur snabba sidan (B_ACTIVE) - workerns cfg-kopia läses inte
+ 
+     // Signal i rad? Räknaren driver ONSET_WARM ovan.
+ 
+@@ -2952,7 +2967,7 @@ export class Analyser {
+ 
+     // Mutera det återanvända Frame:t (spec/onset pekar redan på outSpec/outOnset).
+     const f = this.outFrame;
+-    f.level = this.lvlSmooth; f.levelRaw = level; f.levelVU = this.lvlVU;
++    f.silent = this.lvlSmooth <= this.silenceLevel; f.level = this.lvlSmooth; f.levelRaw = level; f.levelVU = this.lvlVU;
+     f.energy = this.engSmooth;
+     f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
+     f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.intensity = intensity; f.beatAnchorMs = this.beatAnchorMs;
+diff --git a/src/boundaryDetector.ts b/.arena/analys/d-tyst/src/boundaryDetector.ts
+index 06da578..ec55209 100644
+--- a/src/boundaryDetector.ts
++++ b/.arena/analys/d-tyst/src/boundaryDetector.ts
+@@ -14,6 +14,7 @@
+  * (pushNovelty) lever kvar bara for karaktarsskiftet. Allt grindas av min/max-langd pa segmentet.
+  */
+ 
++import { silentLevel } from "./analyser.js";
+ const SILENCE_END_MS = 3000;   // tystnad sa lange = laten ar slut
+ const START_LEVEL = 0.15;      // volymgrind: starta bara pa tydlig musik
+ const START_HOLD_MS = 1000;    // ...som hallit i en sekund
+@@ -179,10 +180,10 @@ export class BoundaryDetector {
+   }
+ 
+   /** Matas varje hop med ramens niva/tempo. */
+-  tick(o: { level: number; bpm: number; bpmConfidence: number }): void {
++  tick(o: { level: number; bpm: number; bpmConfidence: number; silent?: boolean }): void {
+     const now = this.clock();
+     this.fLastBpm = o.bpm;
+-    if (o.level > 0.02) this.lastLoud = now;
++    if (!(o.silent ?? silentLevel(o.level))) this.lastLoud = now;   // tystnaden = analysatorns (frame.silent, EN tröskel cfg.silenceLevel)
+     if (!this.playStart) {
+       // Volymgrind: starta bara pa tydlig musik som hallit en sekund, aldrig pa brusgolvet.
+       if (o.level >= START_LEVEL) {
+diff --git a/src/effects.ts b/.arena/analys/d-tyst/src/effects.ts
+index b0c8813..8adc977 100644
+--- a/src/effects.ts
++++ b/.arena/analys/d-tyst/src/effects.ts
+@@ -16,7 +16,7 @@ import type { ChannelRole, EngineConfig, Mode } from "./config.js";
+ import { fixtureRoles } from "./config.js";
+ import { FixtureOutput, keepLit, lampFadeK, lampLevel, sameLight, type SpecialtyValues } from "./output.js";
+ import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE, GRID_EARLY_MS } from "./beatClock.js";
+-import type { Frame } from "./analyser.js";
++import { SILENCE_LEVEL, type Frame } from "./analyser.js";
+ import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
+ import { fitScore, fitDistance, FIT } from "./effects/fit.js";
+ import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
+@@ -149,9 +149,8 @@ export interface FogStatus {
+ // ljuset följer musiken i stället för att gå i sin egen takt.
+ // Attacken har ett golv och ett tak: under ~30 ms läses den som ett steg (blixt),
+ // över ~70 ms tappar den anslaget.
+-/** Under den här nivån räknas ingången som avstängd, inte som ett tyst parti. */
+-const INPUT_OFF_LEVEL = 0.02;
+-const SILENCE_LEVEL = 0.05;   // standard om cfg saknar silenceLevel (env-ratten DMX_SILENCE_LEVEL borttagen 10-11: den gjorde /setup-reglaget verkningslost)
++/** TYSTNAD (a7): EN tröskel i analysatorn (frame.silent = level <= cfg.silenceLevel). INPUT_OFF_LEVEL 0,02 borttagen: ingången räknas
++ *  som avstängd när ramen varit tyst så länge - */
+ /** ...men först när den legat där så länge — ett break i låten ska inte släcka showen. */
+ const INPUT_OFF_MS = 2000;
+ /** HARD INGANGSGRANS (agaren i ladan 2026-10-07: "lagsta input till analysatorn ... dar gor vi hard grans som vi kan justera. Inga
+@@ -1380,9 +1379,9 @@ export class EffectEngine {
+     {   // ENKEL ENERGI (se ENERGY_SIMPLE-dokumentationen). md0/sektionsgas/rang borttagna 10-08.
+       // FOLJANDE FONSTER (se E_WIN_S)
+       const db = 20 * Math.log10(Math.max(1e-5, frame.levelVU ?? frame.level));
+-      if (Number.isNaN(this.eHi) && frame.level > INPUT_OFF_LEVEL) { this.eHi = db; this.eLo = db; }
++      if (Number.isNaN(this.eHi) && !frame.silent) { this.eHi = db; this.eLo = db; }
+       const k = Math.min(1, dtSec / E_WIN_S);
+-      if (frame.level > INPUT_OFF_LEVEL) {   // tystnad flyttar inte fonstret (se TYSTNAD RAKNAS INTE)
++      if (!frame.silent) {   // tystnad flyttar inte fonstret (se TYSTNAD RAKNAS INTE)
+         const dw = db;
+         this.eHi = dw > this.eHi ? dw : this.eHi + (dw - this.eHi) * k;
+         this.eLo = dw < this.eLo ? dw : this.eLo + (dw - this.eLo) * k;
+@@ -1400,8 +1399,8 @@ export class EffectEngine {
+         : PB_SUBW * 20 * Math.log10(frame.specAbs.sub + 1e-7) + (1 - PB_SUBW) * 20 * Math.log10(frame.specAbs.kick + 1e-7)) : (frame.bodyDb ?? -90);   // BASS_SUBKICK: bara 20-120 Hz (PROV DMX_B_SUBW)
+       const inDropLift = nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS;   // PROV DMX_DROP_WIN_S/DROP_TOP
+       const bWin = inDropLift && PD_WIN_S > 0 ? PD_WIN_S : PB_WIN_S, kB = bWin > 0 ? Math.min(1, dtSec / bWin) : k;
+-      if (Number.isNaN(this.bHi) && frame.level > INPUT_OFF_LEVEL) { this.bHi = bdb; this.bLo = bdb; }
+-      if (frame.level > INPUT_OFF_LEVEL) {   // tystnad flyttar inte fönstret
++      if (Number.isNaN(this.bHi) && !frame.silent) { this.bHi = bdb; this.bLo = bdb; }
++      if (!frame.silent) {   // tystnad flyttar inte fönstret
+         this.bHi = bdb > this.bHi ? bdb : this.bHi + (bdb - this.bHi) * kB;
+         this.bLo = bdb < this.bLo ? bdb : this.bLo + (bdb - this.bLo) * Math.min(1, dtSec / PB_LO_S);
+       }
+@@ -1890,11 +1889,11 @@ export class EffectEngine {
+     // Gain-aware threshold: at high AGC gain the amplified noise floor sits well
+     // above 0.05 and reads as flicker — real (even weak) music still lands near
+     // the AGC target and passes.
+-    // INGÅNGEN AVSTÄNGD: ligger nivån stabilt under INPUT_OFF_LEVEL är det inte ett
++    // INGÅNGEN AVSTÄNGD: är ramen stabilt tyst (frame.silent) är det inte ett
+     // tyst parti i musiken utan att källan är av (eller kabeln ur). Då ska riggen vara
+     // MÖRK — inte vila på den varma glöden. Kravet på uthållighet gör att ett verkligt
+     // break i låten (som dippar men kommer tillbaka) aldrig råkar släcka showen.
+-    if (frame.level >= INPUT_OFF_LEVEL) this.inputLowSince = 0;
++    if (!frame.silent) this.inputLowSince = 0;
+     else if (!this.inputLowSince) this.inputLowSince = now;
+     this.inputOff = !!this.inputLowSince && now - this.inputLowSince > INPUT_OFF_MS;
+ 
+@@ -1909,7 +1908,7 @@ export class EffectEngine {
+     // tändpunkt+1 vid gränsen till fullt vid LEVEL_RAMP x gränsen; lägsta steget och effektens mönster rörs inte.
+     { const lv = frame.level; this.rampLvl = lv > this.rampLvl ? lv : this.rampLvl + (lv - this.rampLvl) * Math.min(1, dtSec / LEVEL_RAMP_FALL_S);
+       const x = (this.rampLvl - silenceLevel) / Math.max(1e-4, (LEVEL_RAMP - 1) * silenceLevel); this.levelRamp = x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x); }
+-    if (frame.level > silenceLevel) { this.silenceGate = 1; this.belowSince = 0; }
++    if (!frame.silent) { this.silenceGate = 1; this.belowSince = 0; }   // tystnaden avgörs i analysatorn (frame.silent); gränsen nedan skalar bara rampen
+     else {
+       const holdMs = Math.max(0, Math.min(5, this.cfg.silenceHoldS ?? 0)) * 1000;
+       if (this.belowSince === 0) this.belowSince = nowP;
+diff --git a/src/index.ts b/.arena/analys/d-tyst/src/index.ts
+index 9a0294c..3dfd02f 100644
+--- a/src/index.ts
++++ b/.arena/analys/d-tyst/src/index.ts
+@@ -159,12 +159,13 @@ if (process.env.DMX_RECORDER === "1") {
+   recorder.start();
+ }
+ // Argumentobjekt som fylls per hop i stallet for nya literaler (skrapjakten 10-01: 375 Hz). Mottagarna laser dem synkront.
+-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
++const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0, silent: true };
+ capture.on("chunk", (samples: Float32Array) => {
+   // MATNING BARA VID FELSOKNING (2026-10-04, agaren): runtimeHealth ar ren diagnostik (/api/health-log); watchdogens /health
+   // bygger pa lastChunkAt och paverkas inte. PUT /api/debug/verbose {enabled:true} slar pa tidtagningen.
+   const diag = isLogOn();
+   const t0 = diag ? performance.now() : 0;
++  analyser.setSilenceLevel(cfg.silenceLevel);   // släckgränsen live (/setup) - EN tröskel, i analysatorn
+   const frame = analyser.process(samples);
+   if (diag) {
+     const anMs = performance.now() - t0;
+@@ -183,7 +184,7 @@ capture.on("chunk", (samples: Float32Array) => {
+   // pa nya latens nivaer inom sekunder i stallet for en minut) och latbytes-hint till tempot: medianfonstret
+   // (~5 s) och tempogrammet tillhor forra laten. Mjuk hint i st.f. hard nollstallning (brytaren DMX_BOUNDARY_SOFT borttagen 10-11) -
+   // falska latgranser pa pop kastade tempolaset 5x/5 min (ladan 2026-09-04).
+-  boundsArg.level = frame.level; boundsArg.bpm = frame.bpm; boundsArg.bpmConfidence = frame.bpmConfidence;
++  boundsArg.silent = frame.silent; boundsArg.level = frame.level; boundsArg.bpm = frame.bpm; boundsArg.bpmConfidence = frame.bpmConfidence;
+   bounds.tick(boundsArg);
+   // (KARAKTARSSKIFTE och TEMPOVAXLING som lookbyte borttagna 10-12: LÅTMANUS i effects.ts - looken foljer latens sektioner, inte klangen.)
+   if (bounds.boundaryCount !== lastBoundary) {

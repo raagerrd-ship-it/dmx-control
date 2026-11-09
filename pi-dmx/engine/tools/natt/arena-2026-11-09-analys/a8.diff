@@ -1,0 +1,332 @@
+diff --git a/src/analyser.ts b/.arena/analys/a8/src/analyser.ts
+index 870c40a..8c9a5b7 100644
+--- a/src/analyser.ts
++++ b/.arena/analys/a8/src/analyser.ts
+@@ -124,6 +124,12 @@ export interface Spectrum {
+   air: number;      // ~10–16 kHz  — luft/glitter
+ }
+ 
++// (a8) FULL DROP PÅ FLANKEN - konstanterna flyttade ordagrant ur effects.ts (dokumentationen och mätningarna står kvar där vid stepDrop).
++const FLANK_GONE_DB = 10, FLANK_BREAK_S = 4, FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;
++const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24;
++const FLANK_SILENT_LV = 0.005;   // låtstart är ingen drop: hela ljudet nere på brusgolvet i breaket
++const SILENT_LEVEL = 0.02;       // (a8) EN tystnadsgräns för ingången (förr effects INPUT_OFF_LEVEL)
++
+ export interface Frame {
+   level: number;        // 0..1, auto-gained RMS (15ms attack / 400ms release smoothed)
+   levelRaw: number;     // 0..1, samma auto-gain men OSMOOTHAT (rå per-hop)
+@@ -148,6 +154,13 @@ export interface Frame {
+   dropCount: number;    // monoton räknare — +1 per drop
+   /** MINIDROP: mindre lyft (stigning MINI_RISE_DB efter kort svacka) som inte ar en full drop. Monoton. 0 nar MINI_SPACING_MS=0 (av). */
+   miniDropCount: number;
++  /** (a8) LÅTANALYSEN UR EFFEKTERNA (flyttad ur effects.ts, ordagrant men per hop): dropCount = baskroppens FLANK (förr effects flankStep -
++   *  den enda drop-källan ut); dropDeniedCount = dropStep-kandidat utan egen flank inom 2 s (förr effekternas gapMini-gren, monoton);
++   *  bodyNearDb/bodyNormDb/bodyFloorDb = baskroppen 120 ms / 8 s / botten 1,5 s (nästan-drop, stopp-mini); liftDb/liftCalmDb = senaste 0,6 s
++   *  mot lugnet 6..2 s sedan (energilyftet, -1e9 innan 6 s historik); bassNoteCount/bassNoteAgeS = basnot-anslagen (onset.bass-flank);
++   *  silentMs = hur länge nivån legat under SILENT_LEVEL (0 = ljud). Effekterna avgör bara reaktionen (spärrar, längd, form). */
++  dropDeniedCount: number; bodyNearDb: number; bodyNormDb: number; bodyFloorDb: number; liftDb: number; liftCalmDb: number;
++  bassNoteCount: number; bassNoteAgeS: number; silentMs: number;
+   inZone: boolean;      // nivån är i låtens topp-zon (ihållande tillstånd, hysteres)
+   breaking: boolean;    // nivån är i en svacka/break (ihållande tillstånd)
+   /** UPPBYGGNAD (riser): 0..1 tension som ramsar upp mot en drop. Mjuk signal →
+@@ -991,6 +1004,11 @@ export class Analyser {
+   private barShiftOut = -1;   // kickRefine -> process(): taktfas-forslaget for hopet (Smi -1..3, ingen allokering)
+   private goneEpisodeMs = -1.5;   // (double fran start, se dropArmGoneMs) gone-episodens START (lastBodyGoneMs uppdateras varje hop och duger INTE som id)
+   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
++  // (a8) LÅTANALYSEN UR EFFEKTERNA (se Frame.dropDeniedCount): flanken, nästan-drop/lyft-historiken, basnoterna, tystnaden. Bara huvudtrådens fillFrame.
++  private fdF = 0; private fdOn = false; private fdS = 0; private fdC = -90; private fdGone = 0; private fdSpan = 0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12; private fdQuietAt = -1e12;
++  private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0; private flankCount = 0; private deniedCount = 0; private lastAnaDrops = 0;
++  private nearB = 0; private nearNorm = 0; private nearFloor = 1e9; private liftCalm = -1e9; private liftLift = 0; private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private histAt = -1e12;
++  private bassNotes = 0; private lastBassNoteMs = -1e9; private prevBassOnset = 0; private silentSince = 0; private lastSongMs = -1;
+   private lastDropMs = -1.5e9;   // utanfor Smi-intervallet -> Double fran start (typstabilt)
+   // RISER/UPPBYGGNAD (flyttad från effects)
+   /**
+@@ -2785,7 +2803,7 @@ export class Analyser {
+     this.outFrame = {
+       level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
+       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
+-      dropCount: 0, miniDropCount: 0, bodyDb: 0, midHiDb: -120, kickRise: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
++      dropCount: 0, miniDropCount: 0, dropDeniedCount: 0, bodyNearDb: -90, bodyNormDb: -90, bodyFloorDb: 1e9, liftDb: 0, liftCalmDb: -1e9, bassNoteCount: 0, bassNoteAgeS: 9, silentMs: 0, bodyDb: 0, midHiDb: -120, kickRise: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
+       kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
+       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
+     };
+@@ -3800,6 +3818,62 @@ export class Analyser {
+       }
+   }
+ 
++  /** (a8) FULL DROP PÅ FLANKEN (flyttad ordagrant ur effects.ts flankStep; trösklarna och dokumentationen: FLANK_* överst). Per hop. */
++  private flankStep(x: number, level: number, dt: number, now: number): boolean {
++    if (!this.fdOn) { this.fdOn = true; this.fdF = x; this.fdS = x; this.fdC = x; }
++    this.fdF += (x - this.fdF) * Math.min(1, dt / 0.06);
++    this.fdS += (x - this.fdS) * Math.min(1, dt / 0.35);
++    this.fdC = Math.max(this.fdS, this.fdC - dt * 0.15);
++    const T = this.fdT, V = this.fdV, CAP = 1024;
++    if (this.fdN === CAP) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
++    { const w = (this.fdS0 + this.fdN) & (CAP - 1); T[w] = now; V[w] = this.fdF; this.fdN++; }
++    while (this.fdN > 1 && now - T[this.fdS0] > FLANK_HOLD_S * 1000) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
++    let top = -1e9, low = 1e9; for (let q = 0; q < this.fdN; q++) { const i = (this.fdS0 + q) & (CAP - 1); if (V[i] > top) top = V[i]; if (now - T[i] <= 500 && V[i] < low) low = V[i]; }
++    if (top < this.fdC - FLANK_GONE_DB) this.fdGone += dt; else { if (this.fdGone > 0) { this.fdSpan = this.fdGone; this.fdEnd = now; } this.fdGone = 0; }
++    const above = this.fdF > this.fdC - FLANK_LAND_DB, edge = above && !this.fdAbove; this.fdAbove = above;
++    const span = this.fdGone > 0 ? this.fdGone : now - this.fdEnd < FLANK_GRACE_S * 1000 ? this.fdSpan : 0;
++    if (level <= FLANK_SILENT_LV) this.fdQuietAt = now;
++    if (!edge || this.fdF - low < FLANK_RISE_DB || (span < FLANK_BREAK_S && !(span >= FLANK_SHORT_S && this.fdC - low >= FLANK_SHORT_RISE_DB))) return false;
++    if (now - this.fdQuietAt < span * 1000 + 500) { this.fdGone = 0; this.fdSpan = 0; return false; }
++    this.fdGone = 0; this.fdSpan = 0; this.fdAt = now;
++    return true;
++  }
++  /** (a8) LÅTANALYSEN UR EFFEKTERNA, en gång per hop i fillFrame (se Frame.dropDeniedCount). Bara skalarer, ingen allokering. */
++  private songStep(f: Frame, bassOnset: number, now: number): void {
++    const dt = this.lastSongMs < 0 ? 0 : Math.max(0, (now - this.lastSongMs) / 1000); this.lastSongMs = now;
++    const x = Math.max(-90, f.bodyDb ?? -90);
++    // DROP: flanken är drop-källan; dropStep:s drop utan egen flank (inom 2 s) räknas som nekad kandidat (effekterna gör den till minidrop)
++    const anaHit = this.dropCount !== this.lastAnaDrops; this.lastAnaDrops = this.dropCount;
++    const flank = this.flankStep(x, f.level ?? 0, dt, now);
++    if (flank) this.flankCount++;
++    else if (anaHit && now - this.fdAt > 2000) this.deniedCount++;
++    // NÄSTAN-DROP / STOPP / ENERGILYFT: baskroppen 120 ms, normalnivån 8 s, historik i 25 ms-rutor (botten 1,5 s, lugnet 6..2 s)
++    if (this.histAt < -1e11) { this.nearB = x; this.nearNorm = x; }
++    this.nearB += (x - this.nearB) * Math.min(1, dt / 0.12);
++    this.nearNorm += (this.nearB - this.nearNorm) * Math.min(1, dt / 8);
++    const h = this.liftHist;
++    if (now - this.histAt >= 25) {
++      this.histAt = now; h[this.liftW] = this.nearB; this.liftW = (this.liftW + 1) % 240; if (this.liftN < 240) this.liftN++;
++      const n = this.liftN, o0 = this.liftW - n + 240;
++      let fl = 1e9; for (let q = Math.max(0, n - 60), j = (o0 + q) % 240; q < n; q++) { const v = h[j]; if (v < fl) fl = v; if (++j === 240) j = 0; }
++      this.nearFloor = fl;
++      if (n >= 240) {
++        let sum = 0; for (let q = 0, j = o0 % 240; q < 160; q++) { sum += h[j]; if (++j === 240) j = 0; }
++        let now6 = 0; for (let q = n - 24, j = (o0 + q) % 240; q < n; q++) { now6 += h[j]; if (++j === 240) j = 0; }
++        this.liftCalm = sum / 160; this.liftLift = now6 / 24 - this.liftCalm;
++      }
++    }
++    // BASNOTER: flank på onset.bass med 90 ms cooldown -> ett steg per basnot
++    if (bassOnset >= 0.30 && bassOnset - this.prevBassOnset >= 0.10 && now - this.lastBassNoteMs >= 90) { this.bassNotes++; this.lastBassNoteMs = now; }
++    this.prevBassOnset = bassOnset;
++    // TYSTNAD: EN gräns (SILENT_LEVEL) för "ingen ingång" - effekternas INPUT_OFF och fönstrens "tystnad flyttar inte"
++    if ((f.level ?? 0) > SILENT_LEVEL) this.silentSince = 0; else if (!this.silentSince) this.silentSince = now;
++    f.dropCount = this.flankCount; f.dropDeniedCount = this.deniedCount;
++    f.bodyNearDb = this.nearB; f.bodyNormDb = this.nearNorm; f.bodyFloorDb = this.nearFloor; f.liftDb = this.liftLift; f.liftCalmDb = this.liftN >= 240 ? this.liftCalm : -1e9;
++    f.bassNoteCount = this.bassNotes; f.bassNoteAgeS = Math.min(9, (now - this.lastBassNoteMs) / 1000);
++    f.silentMs = this.silentSince ? now - this.silentSince + 1 : 0;
++  }
++
+   /** Muterar det ateranvanda Frame:t (spec/onset/drum + alla skalarer) och kor sektionsaggregatet. Bara skalarer in: ingen allokering per hop. */
+   private fillFrame(): Frame {
+     const level = this.hLevel, fluxNorm = this.hFlux, kick = this.hKick, intensity = this.hIntensity, bodyNow = this.hBody, inZone = this.hInZone, breaking = this.hBreaking,
+@@ -3825,11 +3899,12 @@ export class Analyser {
+       f.kickRise = old !== 0 && db > old ? db - old : 0;
+     }
+     { let s2 = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, (FB ? this.fbDbRaw : this.bandDbRaw)[b] / 20); s2 += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s2)); }
+-    f.dropCount = this.dropCount; f.miniDropCount = this.miniDropCount; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
++    f.miniDropCount = this.miniDropCount; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
+     f.kickAtMs = kickAtMs; f.barShift = barShift;
+     // Gridfasen ut: konstant offset (detektorns slap) och/eller trim. Bada 0/av som standard => oforandrad fas.
+     f.beatPhaseMs = this.beatPhaseMs > 0 ? this.beatPhaseMs - Analyser.GRID_PHASE_OFFSET_MS : this.beatPhaseMs;
+     f.beatPhaseConf = this.beatPhaseConf;
++    this.songStep(f, O[2], nowWallA);
+     this.sectionAggStep();
+     const nowS = SECTION_AGG_HOP ? this.wallNow() : nowWallA;
+     f.section = this.section; f.sectionAgeMs = this.sectionStartMs > 0 ? nowS - this.sectionStartMs : 0; f.sectionIndex = this.sectionIndex; f.sectionTier = this.sectionTier;
+diff --git a/src/effects.ts b/.arena/analys/a8/src/effects.ts
+index b0c8813..eed20ed 100644
+--- a/src/effects.ts
++++ b/.arena/analys/a8/src/effects.ts
+@@ -150,7 +150,6 @@ export interface FogStatus {
+ // Attacken har ett golv och ett tak: under ~30 ms läses den som ett steg (blixt),
+ // över ~70 ms tappar den anslaget.
+ /** Under den här nivån räknas ingången som avstängd, inte som ett tyst parti. */
+-const INPUT_OFF_LEVEL = 0.02;
+ const SILENCE_LEVEL = 0.05;   // standard om cfg saknar silenceLevel (env-ratten DMX_SILENCE_LEVEL borttagen 10-11: den gjorde /setup-reglaget verkningslost)
+ /** ...men först när den legat där så länge — ett break i låten ska inte släcka showen. */
+ const INPUT_OFF_MS = 2000;
+@@ -358,17 +357,14 @@ const LEVEL_RAMP = 2, LEVEL_RAMP_FALL_S = 2;   // fullt ljus vid 2 x släckgrän
+  *  >= FLANK_GONE_DB under taket i >= FLANK_BREAK_S, och fyrar på FLANKEN: när kroppen (60 ms) går upp till taket - FLANK_LAND_DB med
+  *  >= FLANK_RISE_DB stigning på 0,5 s. Analysatorns drop utan egen flank (inom 2 s) blir minidrop. Bänk: 55 drops (0,39/min), 96 % på
+  *  ihållande baslyft, 43 rätt / 6 sena / 4 tidiga (<= 54 ms) / 2 falska, fördröjning p50 24 ms (var 91). Tidsbaserat (render går 200 Hz live, 40 Hz i bänken). */
+-const FLANK_GONE_DB = 10, FLANK_BREAK_S = 4,   // 4 s godkänt i ladan 10-13 (bänk 0,31/min, rätt 35/44, p50 30 ms); 3 = fler
+-       FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;
++// (a8) konstanterna FLANK_* flyttade till analyser.ts (flankStep, frame.dropCount)
+ /** KORT BREAK MED STOR SMÄLL (opt-in DMX_FLANK_SHORT_S > 0, natt 10-15 ur ägarens 13 markeringar 10-14: 5 av 8 'Drop!' låg på
+  *  analysatorns drop efter bara 1,1-2,0 s basbreak (en takt) med 26-46 dB stigning - 4 s-kravet gjorde dem till minidrop). Ett kortare
+  *  break räcker när breaket är minst FLANK_SHORT_RISE_DB under taket (taket - lägsta kroppen 0,5 s; inte stigningen vid korsningen, som
+  *  beror på renderstegets översläng - live 200 Hz ger mindre än bänkens 40 Hz, mätfälla 46). 0 = av (som före). */
+-const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24;   // 1 -> 2 ladan 10-30 (ägaren: "väldigt känslig för drop ... gärna minidrop"; live 5,5 min: 4 av 7 full drops kom på 1,1-1,8 s break); STANDARD 1 sedan 10-17 (ägaren i ladan 10-16: 'dropparna känns bra'); =0 = av
+ /** LÅTSTART ÄR INGEN DROP (ladan 10-30: 'den gör nästan alltid en drop när ny låt börjar'): har hela ljudet (frame.level) varit nere på
+  *  brusgolvet någon gång i breaket är det en låtlucka/paus, inte ett basbreak - ingen drop. Bänken 10-11 (70 flank-drops): golvet 0,003 i 5,
+  *  därefter >= 0,007 (riktiga break har kvar resten av musiken). 'Nära släckgränsen' (2 x 0,015) tog bort 43/64 - för grovt. */
+-const FLANK_SILENT_LV = 0.005;
+ const SHOW_DROP_GAP_MS = 12000;   // spärr mellan riktiga drops från alla källor (10-12; 20 s missade en riktig drop efter en tidig, ägaren 'jag tror det va tiden mellan')
+ /** EFTERKONTROLLENS TAK (PROV DMX_DROP_LAND_CAP, dagkörningen 2026-11-07, bänk tools/efterDrop.py): 'före' läses i rutan där flanken fyrar - då
+  *  har volymfönstrets energi (eSm, 0..1) redan stigit; i kvällen 10-11 låg 'före' >= 0,85 i 53 av 59 show-drops och kravet 1,15 x före + 0,02 > 1
+@@ -498,8 +494,6 @@ export class EffectEngine {
+   /** BASNOTSRAKNARE (2026-09-23): stegar pa basnots-anslag (frame.onset.bass-flank, 90 ms cooldown) - for effekter som "stegar
+    *  pa basnoter" (chase/eko/stege/basgang) nar profile.bassline ar tydlig. Samma slags motorhjalp som chasePos/gravLevel. */
+   private bassNoteIdx = 0;
+-  private lastBassNoteMs = -1e9;
+-  private prevBassOnset = 0;
+   /** Beat clock: last whole-beat index seen (för beatTick-flanken). */
+   private lastBeatIdx = -1; private slagWaitAt = -1;
+   /** Takt-räknare som effekterna ser (beatIdx): stegar på grid-slaget när BPM är
+@@ -590,15 +584,15 @@ export class EffectEngine {
+   private smartDwellUntil = 0;
+   private warmMs = 0;
+   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
+-  private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
++  private lastDenied = 0; private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
+   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
+   private nearB = 0; private nearOn = false;   // nearOn: nearB startad (förr null - ett fält som ibland är null packar in varje nytt tal, GC-jakten 10-16)
+    private nearNorm = 0; private nearFloor = 1e9; private liftCalm = 0; private liftLift = 0; private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
+   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
+   private nearAt = -1e12; nearCount = 0;   // NASTAN-DROP
+-  private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
++  private secCeil = 1; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+   private miniBodyFast = -90; private miniBodySlow = -90; private miniPre = -90; private miniPeak = -200;   // minidrop efter energin
+-  private miniBangUntil = 0; private lastMiniWall = -1e12; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftAt = -1e12; liftCount = 0; private stopRunS = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
++  private miniBangUntil = 0; private lastMiniWall = -1e12; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftAt = -1e12; liftCount = 0; private stopRunS = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
+   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
+   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
+   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
+@@ -653,7 +647,6 @@ export class EffectEngine {
+   private gravVel = 0;           // dess hastighet
+   private gravPeak = 0;          // peak-håll (sjunker långsamt)
+   /** Silence gate: fade the whole rig to black when no music plays. */
+-  private inputLowSince = 0;     // väggklocka: sedan när nivån legat under gränsen
+   private inputOff = false;      // ingången bedöms avstängd → riggen mörk
+   private moment = new MomentLayer(); private rMw = 0;   // BRÖLLOPSLÄGET (moment.ts): stundens vikt denna ruta, 0 = fest orörd
+   private silenceGate = 1;
+@@ -777,33 +770,6 @@ export class EffectEngine {
+     fog.serviceAtMs = Date.now();
+   }
+   private lastRenderMs = performance.now();
+-  // FULL DROP PÅ FLANKEN (se FLANK_DROP): kropp 60 ms / 350 ms, tak, break-tid, tidsstämplade fönster (topp 0,6 s, min 0,5 s).
+-  private fdF = 0; private fdOn = false;   // fdOn: se nearOn
+-   private fdS = 0; private fdC = -90; private fdGone = 0; private fdSpan = 0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12; private fdQuietAt = -1e12;
+-  // RINGBUFFERT (10-16, GC-jakten; förr push/shift på två listor 200 ggr/s): tid och kropp för toppens fönster (FLANK_HOLD_S), äldst vid fdS0.
+-  private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;
+-  private flankStep(frame: Frame): boolean {   // (ramen in i st f bodyDb: ett decimaltal som argument packas in per ruta - skräpjakten 10-18)
+-    const dt = this.rDt, now = this.rNowWall;
+-    const x = Math.max(-90, frame.bodyDb ?? -90);
+-    if (!this.fdOn) { this.fdOn = true; this.fdF = x; this.fdS = x; this.fdC = x; }
+-    this.fdF += (x - this.fdF) * Math.min(1, dt / 0.06);
+-    this.fdS += (x - this.fdS) * Math.min(1, dt / 0.35);
+-    this.fdC = Math.max(this.fdS, this.fdC - dt * 0.15);
+-    const T = this.fdT, V = this.fdV, CAP = 1024;
+-    if (this.fdN === CAP) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
+-    { const w = (this.fdS0 + this.fdN) & (CAP - 1); T[w] = now; V[w] = this.fdF; this.fdN++; }
+-    while (this.fdN > 1 && now - T[this.fdS0] > FLANK_HOLD_S * 1000) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
+-    let top = -1e9, low = 1e9; for (let q = 0; q < this.fdN; q++) { const i = (this.fdS0 + q) & (CAP - 1); if (V[i] > top) top = V[i]; if (now - T[i] <= 500 && V[i] < low) low = V[i]; }
+-    if (top < this.fdC - FLANK_GONE_DB) this.fdGone += dt; else { if (this.fdGone > 0) { this.fdSpan = this.fdGone; this.fdEnd = now; } this.fdGone = 0; }
+-    const above = this.fdF > this.fdC - FLANK_LAND_DB, edge = above && !this.fdAbove; this.fdAbove = above;
+-    const span = this.fdGone > 0 ? this.fdGone : now - this.fdEnd < FLANK_GRACE_S * 1000 ? this.fdSpan : 0;
+-    if ((frame.level ?? 0) <= FLANK_SILENT_LV) this.fdQuietAt = now;
+-    if (!edge || this.fdF - low < FLANK_RISE_DB || (span < FLANK_BREAK_S && !(span >= FLANK_SHORT_S && this.fdC - low >= FLANK_SHORT_RISE_DB))) return false;
+-    if (now - this.fdQuietAt < span * 1000 + 500) { this.fdGone = 0; this.fdSpan = 0; if (isLogOn()) console.log(`[dirigent] ingen drop: helt tyst i breaket (latstart), break ${span.toFixed(1)} s`); return false; }
+-    this.fdGone = 0; this.fdSpan = 0; this.fdAt = now;
+-    if (isLogOn()) console.log(`[dirigent] full drop pa flanken: break ${span.toFixed(1)} s, stigning ${(this.fdF - low).toFixed(1)} dB`);
+-    return true;
+-  }
+ 
+   constructor(private cfg: EngineConfig) { doubleFields(this); doubleFields(this.ctx); }
+ 
+@@ -1206,28 +1172,13 @@ export class EffectEngine {
+     const nowWall = this.rNowWall, dtNow = this.rDt; let dTarget = this.rDTarget;
+     {   // NASTAN-DROP (standard sedan 10-07; av-brytaren DMX_NEAR_DROP borttagen 10-10)
+       // Baskroppen glattad (120 ms), normalnivan (8 s) och dippens botten (minsta pa 1,5 s, 25 ms-rutor).
+-      const x = Math.max(-90, frame.bodyDb ?? -90);
+-      if (!this.nearOn) { this.nearOn = true; this.nearB = x; this.nearNorm = x; }
+-      this.nearB += (x - this.nearB) * Math.min(1, dtNow / 0.12);
+-      this.nearNorm += (this.nearB - this.nearNorm) * Math.min(1, dtNow / 8);
++      // (a8) kroppen 120 ms / 8 s, botten 1,5 s och lyftet räknas i analysatorn (frame.bodyNearDb/bodyNormDb/bodyFloorDb/liftDb/liftCalmDb)
++      this.nearOn = true; this.nearB = frame.bodyNearDb; this.nearNorm = frame.bodyNormDb; this.nearFloor = frame.bodyFloorDb; this.liftCalm = frame.liftCalmDb; this.liftLift = frame.liftDb;
+       // HISTORIKEN I 25 MS-RUTOR AV TID, inte per rendering (drop-agenten 10-12): live renderar motorn i 200 Hz (index.ts RENDER_MS 5),
+       // bänken i 40 Hz - räknat i rutor blev fönstren 5x kortare i ladan än det som mätts (energilyftet jämförde 0,12 s mot 0,4-1,2 s).
+       // EN HISTORIK (10-16): nästan-dropens botten (senaste 60 rutor = 1,5 s) och energilyftets lugn (6..2 s) läser samma lista (förr två
+       // listor med två klockor); botten och lyftet räknas bara när en ny ruta kommer (var 25:e ms), inte varje rendering.
+       // RINGBUFFERT (10-16, GC-jakten): 240 rutor, h(q) = q:e äldsta (förr push/shift på en lista).
+-      const h = this.liftHist;
+-      if (nowWall - this.histAt >= 25) {
+-        this.histAt = nowWall; h[this.liftW] = this.nearB; this.liftW = (this.liftW + 1) % 240; if (this.liftN < 240) this.liftN++;
+-        const n = this.liftN, o0 = this.liftW - n + 240;   // h[(o0 + q) % 240] = q:e äldsta
+-        // Index med omslag i stället för en modulo per varv (a7): samma rutor i samma ordning, så summorna blir bit-identiska.
+-        let f = 1e9; for (let q = Math.max(0, n - 60), j = (o0 + q) % 240; q < n; q++) { const v = h[j]; if (v < f) f = v; if (++j === 240) j = 0; }
+-        this.nearFloor = f;
+-        if (n >= 240) {
+-          let sum = 0; for (let q = 0, j = o0 % 240; q < 160; q++) { sum += h[j]; if (++j === 240) j = 0; }
+-          let now6 = 0; for (let q = n - 24, j = (o0 + q) % 240; q < n; q++) { now6 += h[j]; if (++j === 240) j = 0; }
+-          this.liftCalm = sum / 160; this.liftLift = now6 / 24 - this.liftCalm;   // senaste 0,6 s mot 6..2 s sedan
+-        }
+-      }
+       const floor = this.nearFloor;
+       const rise = this.nearB - floor, dip = this.nearNorm - floor;
+       if (rise >= NEAR_RISE_DB && dip >= NEAR_DIP_DB && floor > -80 && this.nearB >= this.nearNorm - 1 && nowWall - this.nearAt > NEAR_REFRACT_MS   // floor > -80: inspelningsavbrott (overrun) ar ingen dipp ('sprang 107 dB', ladan 10-08)
+@@ -1259,7 +1210,7 @@ export class EffectEngine {
+     }
+     if (this.nearOn) {   // ENERGILYFT (se LIFT_DB)
+       // 6 s i 25 ms-rutor AV TID (se HISTORIKEN); lugnet och lyftet räknas i nästan-dropens block (se EN HISTORIK)
+-      if (this.liftN >= 240 && nowWall - this.liftAt > LIFT_REFRACT_MS && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && !BUILD_LOOKS.includes(this.smartMode)   // inte under en build (stegringen hör till builden)
++      if (nowWall - this.liftAt > LIFT_REFRACT_MS && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && !BUILD_LOOKS.includes(this.smartMode)   // inte under en build (stegringen hör till builden)
+           && this.liftCalm > -80 && this.liftLift >= LIFT_DB) {
+         this.fireMini(nowWall, true, true);
+         if (isLogOn()) console.log(`[dirigent] energilyft: kropp ${this.liftLift.toFixed(1)} dB over lugnet`);
+@@ -1380,9 +1331,9 @@ export class EffectEngine {
+     {   // ENKEL ENERGI (se ENERGY_SIMPLE-dokumentationen). md0/sektionsgas/rang borttagna 10-08.
+       // FOLJANDE FONSTER (se E_WIN_S)
+       const db = 20 * Math.log10(Math.max(1e-5, frame.levelVU ?? frame.level));
+-      if (Number.isNaN(this.eHi) && frame.level > INPUT_OFF_LEVEL) { this.eHi = db; this.eLo = db; }
++      if (Number.isNaN(this.eHi) && frame.silentMs === 0) { this.eHi = db; this.eLo = db; }
+       const k = Math.min(1, dtSec / E_WIN_S);
+-      if (frame.level > INPUT_OFF_LEVEL) {   // tystnad flyttar inte fonstret (se TYSTNAD RAKNAS INTE)
++      if (frame.silentMs === 0) {   // tystnad flyttar inte fonstret (se TYSTNAD RAKNAS INTE)
+         const dw = db;
+         this.eHi = dw > this.eHi ? dw : this.eHi + (dw - this.eHi) * k;
+         this.eLo = dw < this.eLo ? dw : this.eLo + (dw - this.eLo) * k;
+@@ -1400,8 +1351,8 @@ export class EffectEngine {
+         : PB_SUBW * 20 * Math.log10(frame.specAbs.sub + 1e-7) + (1 - PB_SUBW) * 20 * Math.log10(frame.specAbs.kick + 1e-7)) : (frame.bodyDb ?? -90);   // BASS_SUBKICK: bara 20-120 Hz (PROV DMX_B_SUBW)
+       const inDropLift = nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS;   // PROV DMX_DROP_WIN_S/DROP_TOP
+       const bWin = inDropLift && PD_WIN_S > 0 ? PD_WIN_S : PB_WIN_S, kB = bWin > 0 ? Math.min(1, dtSec / bWin) : k;
+-      if (Number.isNaN(this.bHi) && frame.level > INPUT_OFF_LEVEL) { this.bHi = bdb; this.bLo = bdb; }
+-      if (frame.level > INPUT_OFF_LEVEL) {   // tystnad flyttar inte fönstret
++      if (Number.isNaN(this.bHi) && frame.silentMs === 0) { this.bHi = bdb; this.bLo = bdb; }
++      if (frame.silentMs === 0) {   // tystnad flyttar inte fönstret
+         this.bHi = bdb > this.bHi ? bdb : this.bHi + (bdb - this.bHi) * kB;
+         this.bLo = bdb < this.bLo ? bdb : this.bLo + (bdb - this.bLo) * Math.min(1, dtSec / PB_LO_S);
+       }
+@@ -1587,11 +1538,8 @@ export class EffectEngine {
+     const nowWall = this.rNowWall;
+     let dropHitRaw = frame.dropCount !== this.lastDropCount;
+     this.lastDropCount = frame.dropCount;
+-    {   // FULL DROP PÅ FLANKEN: motorns egen flank är drop-källan; analysatorns drop utan egen flank inom 2 s = minidrop
+-      const anaHit = dropHitRaw;
+-      dropHitRaw = this.flankStep(frame);
+-      if (anaHit && !dropHitRaw && nowWall - this.fdAt > 2000) { this.gapMini(nowWall); this.anaDropAt = nowWall; }
+-    }
++    // (a8) FULL DROP PÅ FLANKEN avgörs i analysatorn (frame.dropCount); nekad kandidat (frame.dropDeniedCount) = minidrop här
++    if (frame.dropDeniedCount !== this.lastDenied) { this.lastDenied = frame.dropDeniedCount; this.gapMini(nowWall); this.anaDropAt = nowWall; }
+     // INGEN DROP I LATENS INLEDNING (ladan 2026-09-24 23:35, tredje gangen 'fortfarande drop i inledning'): intro-grindarna ovan tittar pa
+     // sektionen, men den slar om intro -> build strax FORE smallen (kicken som borjar ar sjalva byggstenen). Med DMX_DROP_SONG_HOLD_S > 0
+     // fyrar ingen drop/minidrop forsta N s av en lat (klockan startar vid motorstart och vid latgrans = softenRange; INTE pa sektionen - tystnaden fore en drop gor den till intro, 23:31: dropen efter pausen nekades).
+@@ -1894,9 +1842,7 @@ export class EffectEngine {
+     // tyst parti i musiken utan att källan är av (eller kabeln ur). Då ska riggen vara
+     // MÖRK — inte vila på den varma glöden. Kravet på uthållighet gör att ett verkligt
+     // break i låten (som dippar men kommer tillbaka) aldrig råkar släcka showen.
+-    if (frame.level >= INPUT_OFF_LEVEL) this.inputLowSince = 0;
+-    else if (!this.inputLowSince) this.inputLowSince = now;
+-    this.inputOff = !!this.inputLowSince && now - this.inputLowSince > INPUT_OFF_MS;
++    this.inputOff = frame.silentMs > INPUT_OFF_MS;   // (a8) tystnaden räknas i analysatorn (SILENT_LEVEL)
+ 
+     // TYSTNADSGRIND = HARD INGANGSGRANS (se konstanten ovan). Slackgransen ar ratten i /setup (cfg.silenceLevel) - enda kallan.
+     const silenceLevel = this.cfg.silenceLevel ?? SILENCE_LEVEL;
+@@ -2073,11 +2019,9 @@ export class EffectEngine {
+     ctx.chasePos = this.chasePos; ctx.dropFired = this.dropFired;
+     ctx.dropHue = this.dropHue; ctx.now = nowP;
+     // BASNOTER: flank pa onset.bass (per-band anslag 0..1, adaptiv baslinje) med 90 ms cooldown -> ett steg per basnot.
+-    { const bo = frame.onset?.bass ?? 0;
+-      if (bo >= 0.30 && bo - this.prevBassOnset >= 0.10 && now - this.lastBassNoteMs >= 90) { this.bassNoteIdx++; this.lastBassNoteMs = now; }
+-      this.prevBassOnset = bo; }
++    this.bassNoteIdx = frame.bassNoteCount;   // (a8) anslagen räknas i analysatorn
+     ctx.sectionBars = frame.sectionBars ?? 0; ctx.bassline = frame.profile?.bassline ?? 0;
+-    ctx.bassNoteIdx = this.bassNoteIdx; ctx.bassNoteAge = Math.min(9, (now - this.lastBassNoteMs) / 1000);
++    ctx.bassNoteIdx = this.bassNoteIdx; ctx.bassNoteAge = frame.bassNoteAgeS;
+     ctx.want.strobe = undefined; ctx.want.blinder = undefined;
+     ctx.want.uv = undefined; ctx.want.laser = undefined; ctx.want.fog = undefined;
+     ctx.want.hazer = undefined; ctx.want.co2 = undefined;

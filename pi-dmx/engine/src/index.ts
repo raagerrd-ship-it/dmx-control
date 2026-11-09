@@ -159,12 +159,13 @@ if (process.env.DMX_RECORDER === "1") {
   recorder.start();
 }
 // Argumentobjekt som fylls per hop i stallet for nya literaler (skrapjakten 10-01: 375 Hz). Mottagarna laser dem synkront.
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
+const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0, silent: true };
 capture.on("chunk", (samples: Float32Array) => {
   // MATNING BARA VID FELSOKNING (2026-10-04, agaren): runtimeHealth ar ren diagnostik (/api/health-log); watchdogens /health
   // bygger pa lastChunkAt och paverkas inte. PUT /api/debug/verbose {enabled:true} slar pa tidtagningen.
   const diag = isLogOn();
   const t0 = diag ? performance.now() : 0;
+  analyser.setSilenceLevel(cfg.silenceLevel);   // släckgränsen live (/setup) - EN tröskel, i analysatorn
   const frame = analyser.process(samples);
   if (diag) {
     const anMs = performance.now() - t0;
@@ -183,7 +184,7 @@ capture.on("chunk", (samples: Float32Array) => {
   // pa nya latens nivaer inom sekunder i stallet for en minut) och latbytes-hint till tempot: medianfonstret
   // (~5 s) och tempogrammet tillhor forra laten. Mjuk hint i st.f. hard nollstallning (brytaren DMX_BOUNDARY_SOFT borttagen 10-11) -
   // falska latgranser pa pop kastade tempolaset 5x/5 min (ladan 2026-09-04).
-  boundsArg.level = frame.level; boundsArg.bpm = frame.bpm; boundsArg.bpmConfidence = frame.bpmConfidence;
+  boundsArg.silent = frame.silent; boundsArg.level = frame.level; boundsArg.bpm = frame.bpm; boundsArg.bpmConfidence = frame.bpmConfidence;
   bounds.tick(boundsArg);
   // (KARAKTARSSKIFTE och TEMPOVAXLING som lookbyte borttagna 10-12: LÅTMANUS i effects.ts - looken foljer latens sektioner, inte klangen.)
   if (bounds.boundaryCount !== lastBoundary) {

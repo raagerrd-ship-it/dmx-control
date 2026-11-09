@@ -15,6 +15,14 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-09 DELAD FIL ÄNDRAD: ANALYS UT UR MOTORN steg 1 (EN dropdetektor + EN tystnad) - ovanpå EN KLOCKA
+Vad: analyser.ts (bc9132e0) + split.ts (ea827e77) ändrade (slowWorker/analyserClock/recorder orörda). Effekternas flank är nu analysatorns
+dropStep (dropCount = flankdrop med 12 s-spärr, gamla dropen = kandidat -> mini; nya fält dropDemoted/dropSpaced/dropRiseDb, nearDropDb/
+nearDipDb, liftDb, stopCount/stopS), frame.silent ur cfg.silenceLevel, brusgrinden en gång (workern läser activeMs).
+LOTUS-paritet mot e047c6f (lotus profil, lang1021 120 s): bara dropCount/miniDropCount avviker (33 317/45 000 hop); lotusbank tempo 463/503
+oförändrat. Lotus drop-ljus ÄNDRAS -> lotus egen bänk (drops) avgör; avvisar lotus: skriv AVVISAT med siffror.
+Rapport: tools/natt/arena-2026-11-09-analys/RAPPORT.md.
+
 ## ÖPPET 2026-11-09 DELAD FIL ÄNDRAD: EN KLOCKA FÖR BÅDA (arenan klocka, ersätter LOTUSPARITET-posten nedan)
 Vad: lotus egen temposökning (OWN_TEMPO, computeBpm m.fl., lotus gridfas, barAcc) BORTTAGEN; båda profilerna kör analyserClock (standard
 'slow' = workern även för lotus utan BEAT_FEED; 'inline' = process()), fasen/ettan i ramen (publishPhase: beatPhaseMs = klockans ankare,

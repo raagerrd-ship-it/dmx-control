@@ -1,0 +1,468 @@
+diff --git a/src/analyser.ts b/.arena/analys/a1/src/analyser.ts
+index 870c40a..cf81f72 100644
+--- a/src/analyser.ts
++++ b/.arena/analys/a1/src/analyser.ts
+@@ -146,7 +146,7 @@ export interface Frame {
+    *  en konsument på lägre takt (render 100Hz) kan jämföra mot sitt eget senaste
+    *  värde och ALDRIG missa en flank (till skillnad från en enframs-boolean). */
+   dropCount: number;    // monoton räknare — +1 per drop
+-  /** MINIDROP: mindre lyft (stigning MINI_RISE_DB efter kort svacka) som inte ar en full drop. Monoton. 0 nar MINI_SPACING_MS=0 (av). */
++  /** MINIDROP: samma flank som dropCount efter ett kortare break (FLANK_MINI_S) - se dropStep. Monoton. */
+   miniDropCount: number;
+   inZone: boolean;      // nivån är i låtens topp-zon (ihållande tillstånd, hysteres)
+   breaking: boolean;    // nivån är i en svacka/break (ihållande tillstånd)
+@@ -217,54 +217,26 @@ export interface Frame {
+   drum: { kick: number; snare: number; hat: number; bass: number };
+ }
+ 
+-// ── DROP-DETEKTOR ──────────────────────────────────────────────────────────────────────────────
+-// Kroppen ar RA dB -> alla grindar ar dB-SKILLNADER (gain-oberoende). underPeak-kvalitetsgrinden skiljer
+-// riktiga slam (landar pa toppen) fran falska partiella aterhamtningar. Alla rattar inerta i standard.
+-const BODY_RISE_DB = Number(env('BODY_RISE_DB') ?? 17);   // 18+ halverar traffarna (matt)
+-const BODY_GONE_DB = 5;
+-const BODY_GONE_MIN_MS = Number(env('BODY_GONE_MIN_MS') ?? 2000);   // breakdown-langd som kravs
+-const BODY_PEAK_DB = 10;   // BRED onset-grind (en ren edge per event)
+-// HARD KVALITETSGRIND vid fyrningen: underPeak (bodyPeak-bodyFast) ar BIMODAL - riktiga drops slar till full
+-// niva (< 3 dB), falska ar partiella aterhamtningar kring 9-10 dB. Att kapa i gapet dodar de falska.
+-const DROP_QUALITY_DB = Number(env('DROP_QUALITY_DB') ?? 3.5);
+-// ARMERAT FONSTER: edgen ARMERAR, fyrningen sker nar fullSlam blir sann inom fonstret (mjuka pop-drops toppar
+-// 50-200 ms efter edgen). 0 = bara edge-ogonblicket.
+-const DROP_ARM_MS = 300;
+-// FYR-LAGG: hela laggen ar bodyFast-filtret (tau 120 ms) som alla tre villkor laser. BODY_FAST_S sveper tau.
+-const BODY_FAST_S = 0.06;
+-// DROP_RISE_MIN: stigningen mats mot MINIMUM av bodyFast senaste 0,5 s, inte mot punkten 0,5 s bakat. Mjuka
+-// pop-drops har ett SUG (dipp 100-200 ms) fore dropen; med punkt-referensen nas kravet forst nar referensen
+-// hamnar i dippen -> fyrningen landar 0,5 s sent = en takt vid 130 BPM ("drop en takt efter").
+-// VILLKORAT STIGNINGSKRAV: landar kandidaten NARA TOPPEN (underPeak < DROP_RISE_LOW_Q) racker DROP_RISE_LOW_DB. 0 = av.
+-const DROP_RISE_LOW_DB = Number(env('DROP_RISE_LOW_DB') ?? 0);
+-const DROP_RISE_LOW_Q = 3;
+-// LUGN-SEKTIONS-GRIND (opt-in <prefix>DROP_CALM_GATE=1): i lugna partier (sektion low/intro, eller >= DROP_CALM_DB under senaste
+-// refrangen) kravs starkare bevis (riser, landning vid toppen eller extra lyft). DROP_CALM_LAND_MS > 0 -> kandidaten halls och fyrar
+-// forst vid verifierad landning; 0 -> nekas.
++// ── DROP-DETEKTOR (EN, se dropStep): flanken på baskroppen, flyttad hit ur effects.ts 11-09 (arenan analys a1) ──
++// Kroppen ar RA dB -> alla grindar ar dB-SKILLNADER (gain-oberoende).
++const BODY_GONE_DB = 5;          // sektionens kropp-borta (SECTION_BODY_HIGH)
++const BODY_FAST_S = 0.06;        // kroppen 60 ms (flanken)
++const BODY_CEIL_DB_S = 0.15;     // taket sjunker 0,15 dB/s
++/** FULL DROP PÅ FLANKEN (effekternas STANDARD sedan 10-13, ägaren i ladan: 'droparna känns bra, på smällen'). Riktig drop = toppen av
++ *  kroppen (FLANK_HOLD_S) har legat >= FLANK_GONE_DB under taket i >= FLANK_BREAK_S och kroppen (60 ms) går upp till taket - FLANK_LAND_DB
++ *  med >= FLANK_RISE_DB stigning på 0,5 s. Kort break med stor smäll: >= FLANK_SHORT_S när breaket är >= FLANK_SHORT_RISE_DB djupt
++ *  (ägaren 10-30: 'väldigt känslig för drop ... gärna minidrop'). FLANK_GRACE_S: breaket räknas 1 s efter att toppen kommit tillbaka, och ett nytt
++ *  break inom den sekunden FORTSÄTTER det förra (a1: en kort förslag-smäll före dropen nollade förr breaket - klipp 0 i ladan 10-10). */
++const FLANK_GONE_DB = 10, FLANK_BREAK_S = 4, FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;
++const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24;
++/** MINIDROP = samma flank efter ett kortare break (>= FLANK_MINI_S) som inte räcker till full drop. */
++const FLANK_MINI_S = 1;
++/** LÅTSTART ÄR INGEN DROP (ladan 10-30): har hela ljudet (level) varit nere på brusgolvet i breaket är det en låtlucka, inte ett basbreak. */
++const FLANK_SILENT_LV = 0.005;
+ /** SEKTIONER OVERLEVER TEMPOTAPP (opt-in <prefix>SECTION_HINT_LOWCONF=0): lassslappet efter 8 s lag taktkonfidens ar ingen latgrans, men
+  *  hintTrackChange nollade sektionerna (SECTION_ON_HINT) -> ett taktlost break mitt i laten gjorde refrangen efter till 'intro' utan historik
+  *  (ladan 2026-09-24 23:00: 'varfor ar den sa seg pa att komma igang i refrangen?'). 0 = lassslappet ror bara tempot. Standard = som forr. */
+ const SECTION_HINT_LOWCONF = sysEnv('SECTION_HINT_LOWCONF') !== '0';
+-const DROP_UNDERPEAK_MIN = Number(env('DROP_UNDERPEAK_MIN') ?? 0);   // se 'INTE I TAKET'
+-/** STRIKT INTRO (opt-in DROP_CALM_INTRO_STRICT=1, kraver <prefix>DROP_CALM_GATE): i 'intro' fyrar en drop bara efter riser (buildUp >= DROP_CALM_BUILD). */
+-const DROP_CALM_DB = 6;
+-const DROP_CALM_BUILD = 0.25;
+-const DROP_CALM_Q = 1.5;
+-const DROP_CALM_RISE_DB = 8;
+-const DROP_CALM_LAND_MS = 0;
+-// KICK-LAS (opt-in DROP_KICK_LOCK_MS > 0): kroppsvillkoret armerar, fyrningen sker pa forsta kicken darefter (tak DROP_KICK_LOCK_MS
+-// eller en halv takt). DROP_KICK_LOCK_GRID=1: nasta rasterslag ar malet om gridfasen ar palitlig.
+-
+-// MINIDROPS: egen losare lyft-detektor med eget avstand MINI_SPACING_MS. 0 = av.
+-const MINI_SPACING_MS = Number(env('MINI_SPACING_MS') ?? 0);
+-const MINI_RISE_DB = 10;
+-const MINI_GONE_DB = 3;
+-const MINI_GONE_MS = 800;
+-const MINI_PEAK_DB = 10;
+-const DROP_SHORT_MS = 4000;    // minsta drop-avstand nar dropen ESKALERAR
+-const DROP_LONG_MS = 20000;    // annars maste sa har lang tid ga (mot falska upprepningar)
+-const DROP_ESCALATE_DB = 3;    // tatare drops maste vara TYDLIGT starkare for att fyra
+-const BODY_CEIL_DB_S = 0.15;   // taket haller latens loud-referens lange
+ 
+ // ── TEMPO-RATTAR (inerta i standard) ──
+ const COMB3 = 0.33;      // comb-filtrets 3:e-harmonik-vikt (ac[3*lag])
+@@ -295,12 +267,12 @@ const GHOST_MS = 12000;
+ const DOUBLE_FROM_START = [
+   'secHiStartMs', 'expectHighMs', 'levelVsHighDb',
+   'sumSq', 'lastT', 'dbgRms', 'lastKick', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum', 'lvlSmooth', 'lvlVU', 'engSmooth', 'activeMs',
+-  'buildUp', 'novSlow', 'kickHit', 'snareHit', 'hatHit', 'bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs',
+-  'lastMiniGoneMs', 'lastMiniMs', 'pendingKickMs', 'pendingKickW', 'kfPrev', 'kfPrev2', 'beatAnchorMs',
++  'buildUp', 'novSlow', 'kickHit', 'snareHit', 'hatHit', 'bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastDropMs',
++  'lastMiniMs', 'pendingKickMs', 'pendingKickW', 'kfPrev', 'kfPrev2', 'beatAnchorMs',
+   'blPrev1', 'blPrev2', 'blTrough', 'profBassline', 'bassOnsetsPerBeat',
+   'lastConfMs', 'lastVoteMs', 'lowConfSinceMs', 'newSongVote', 'lockPeak', 'nearChallenger', 'octaveVote', 'rawBpmLast', 'localBpmConfidence',
+   'secPct', 'secSongStartMs', 'sectionStartMs', 'secBlkMs', 'secBlkInt', 'secBlkCent', 'secBlkRms2', 'secCurDbSum', 'repeatSim', 'repeatAgoMs',
+-  'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt',   // byter forst vid forsta drop-episoden (sags i andra matningen)
++  'bodyGoneMs',   // byter forst vid forsta drop-episoden (sags i andra matningen)
+ ] as const;
+ /** TYPSTABILA TALFALT (2026-09-27, realtidsprincipen): skriv ett icke-heltal och sedan ursprungsvardet, sa V8 ger faltet
+  *  Double-representation fran start. Ett Smi-initierat falt (0, -1 ...) som senare far ett decimaltal deprecerar objektets
+@@ -967,15 +939,9 @@ export class Analyser {
+   private bodyFast = -120;
+   private bodyCeil = -300;   // dB
+   private bodyPeak = -300;   // SEG topp (loud-referens i minuter) for landa-hogt
+-  private lastGoneSpanMs = 0;
+-  private lastDropRise = -0;   // -0 = HeapNumber: Double-falt fran start (typstabilt), beter sig som 0
+-  private wasBodyOnset = false;
+-  /** ANSLAGSDETEKTION. En tröskel som ska NÅS korsas först när basen redan
+-   *  kommit — uppmätt 2.5 s efter anslaget. STIGNINGSTAKTEN fyrar när den
+-   *  börjar: uppmätt 0.1 s. Ringbuffert med 0.5 s historik (förallokerad). */
+-  private bodyHist = new Float32Array(200);
+-  private bodyHistPos = 0;
+-  private bodyHistLen = 1;
++  // FLANKEN (dropStep): break-tid, senaste breakets langd, flankens tillstand, ringbuffert tid/kropp for toppens fonster (FLANK_HOLD_S)
++  private fdOn = false; private fdGone = -0; private fdSpan = -0; private fdEnd = -1e12; private fdAbove = true; private fdQuietAt = -1e12;
++  private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;
+   /** Ihållande bas-FRÅNVARO. Det som gör en drop till en drop är att basen
+    *  varit BORTA. Utan varaktighetskrav räcker en trumfill, och då är villkoret
+    *  uppfyllt nästan jämt — då blir 8-takters-spärren det enda som begränsar
+@@ -983,13 +949,9 @@ export class Analyser {
+    *  var 15:e sekund (= spärren) och användarens riktiga drops låg 9-15 s FEL,
+    *  blockerade av den föregående falska avfyrningen. */
+   private bodyGoneMs = 0;
+-  private lastBodyGoneMs = -1e9;
+-  private miniDropCount = 0; private lastMiniMs = -1e9; private miniGoneMs = 0; private lastMiniGoneMs = -1e9; private wasMiniOnset = false;
+-  private dropArmUntil = 0; private dropArmAt = 0; private dropArmGoneMs = -1.5;   // armerat drop-fonster (DROP_ARM_MS)
+-  private calmHoldStart = -0; private calmHoldRise = -0;   // DROP_CALM_LAND_MS: kandidat som halls for verifierad landning
++  private miniDropCount = 0; private lastMiniMs = -1e9;
+ 
+   private barShiftOut = -1;   // kickRefine -> process(): taktfas-forslaget for hopet (Smi -1..3, ingen allokering)
+-  private goneEpisodeMs = -1.5;   // (double fran start, se dropArmGoneMs) gone-episodens START (lastBodyGoneMs uppdateras varje hop och duger INTE som id)
+   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter)
+   private lastDropMs = -1.5e9;   // utanfor Smi-intervallet -> Double fran start (typstabilt)
+   // RISER/UPPBYGGNAD (flyttad från effects)
+@@ -3519,201 +3481,46 @@ export class Analyser {
+       const v = this.prevMagBigView; this.prevMagBigView = this.magBigView; this.magBigView = v; }
+   }
+ 
+-  /** Drop-detektionen (baskropp, franvaro, stigning, armering, minidrop, lugn-grind, kick-las, fyrning). Manga kalla grenar: egen funktion sa att en deopt bara kostar den har, inte hetslingan. */
++  /** DROPEN - EN DETEKTOR (arenan analys a1, 11-09): effekternas flank (förr EffectEngine.flankStep, det ljuset körde) flyttad hit och
++   *  analysatorns gamla dropStep (20 dB-stigning, tak inom 3 dB, armering, minidrop-flod) borttagen. Samma filter som förr båda hade:
++   *  kropp 60 ms (bodyFast) / 350 ms (bodyEnv), taket sjunker 0,15 dB/s (bodyCeil), toppen över FLANK_HOLD_S (pumpande bas = närvarande),
++   *  lägsta kroppen 0,5 s. FLANKEN = bodyFast korsar upp till taket - FLANK_LAND_DB med >= FLANK_RISE_DB stigning. Graden:
++   *    dropCount++      breaket (toppen >= FLANK_GONE_DB under taket) >= FLANK_BREAK_S, eller >= FLANK_SHORT_S med FLANK_SHORT_RISE_DB djup
++   *    miniDropCount++  samma flank efter ett kortare break (>= FLANK_MINI_S) - förr 'analysatorns drop utan egen flank' i effekterna
++   *  Helt tyst i breaket (level <= FLANK_SILENT_LV) = låtlucka, ingen drop. Analysatorn säger VAD (drop/mini nu); längd, uttoning, lyft och
++   *  spärrar mellan drops är effekternas. Sektionens kropp-tillbaka-regel (SECTION_BODY_HIGH) läser samma filter. */
+   private dropStep(): void {
+-    const nowWallA = this.hNowWall, bodyNow = this.hBody;
+-    const dtHop = this.dtHop;
+-    this.bodyEnv += (bodyNow - this.bodyEnv) * Math.min(1, dtHop / 0.35);
+-    this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / BODY_FAST_S);
+-    const bodyPeek = this.bodyFast;   // (DROP_PEEK forkastad 09-08: ra-min oppnade falska klassen)   // 0.06 testat men gav falsklarm live utan att fixa beat-lagget (det sitter i lamp-vagen/energin, inte har)
+-    // TAKET SJUNKER I dB PER SEKUND, inte i procent. Kroppen ar nu ett dB-tal
+-    // (negativt), och "1,5 % av ett negativt tal" gor taket STORRE, inte mindre —
+-    // den gamla raden var matematiskt omvand sa fort skalan blev logaritmisk.
+-    this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * BODY_CEIL_DB_S);
+-    this.bodyPeak = Math.max(this.bodyEnv, this.bodyPeak - dtHop * 0.04);   // ~0.04 dB/s ≈ haller loud-referensen i minuter
+-
+-    // BAS-FRÅNVARO med VARAKTIGHETSKRAV: under 40 % av taket i ≥2 s i sträck.
+-    // FRANVARO = ETT AVSTAND I dB, inte en kvot. En kvot mellan tva logaritmer
+-    // betyder ingenting fysiskt.
+-    if (this.bodyEnv < this.bodyCeil - BODY_GONE_DB) {
+-      this.bodyGoneMs += dtHop * 1000;
+-      // BODY_GONE_MIN_MS: hur LÄNGE kroppen måste ha varit borta för att räknas
+-      // som en riktig breakdown. En 2s sidechain-dipp i en megamix är inte en
+-      // drop-förberedelse; en riktig breakdown varar flera sekunder. Env-tunbar
+-      // så den kan svepas mot referens offline.
+-      if (this.bodyGoneMs >= BODY_GONE_MIN_MS) {
+-        if (this.bodyGoneMs - dtHop * 1000 < BODY_GONE_MIN_MS) this.goneEpisodeMs = nowWallA;   // NY episod (korsningen), oforandrad tills nasta
+-        this.lastBodyGoneMs = nowWallA;
+-      }
+-    } else {
+-      if (Analyser.BODY_HIGH_MS > 0 && this.bodyGoneMs >= Analyser.BODY_HIGH_MS) this.secBodyArmMs = nowWallA;
+-      if (this.bodyGoneMs > 0) this.lastGoneSpanMs = this.bodyGoneMs; this.bodyGoneMs = 0;
+-      if (this.secBodyArmMs > 0) { if (nowWallA - this.secBodyArmMs > 2000) this.secBodyArmMs = 0; else if (this.bodyEnv >= this.bodyPeak - Analyser.BODY_HIGH_DB) { this.secBodyRet++; this.secBodyArmMs = 0; } }
+-    }
+-    // STIGNINGSTAKT över 0.5 s (ringbuffert, ingen allokering).
+-    const hist = this.bodyHist, HL = hist.length;
+-    const oldest = hist[(this.bodyHistPos + HL - this.bodyHistLen) % HL];
+-    let riseRef = oldest;
+-    // MINIMUM UTAN MODULO (a7): fönstret pos-1 .. pos-len läses som högst två raka bitar (var en heltalsdivision per varv,
+-    // ~188 varv per hop). Samma mängd värden -> samma minimum.
+-    { const pos = this.bodyHistPos, len = this.bodyHistLen; let mn = oldest;
+-      const n1 = len < pos ? len : pos;   // pos-1 .. pos-n1
+-      for (let j = pos - n1; j < pos; j++) { const v = hist[j]; if (v < mn) mn = v; }
+-      for (let j = HL - (len - n1); j < HL; j++) { const v = hist[j]; if (v < mn) mn = v; }   // resten från slutet
+-      riseRef = mn; }
+-    let bodyRise = bodyPeek - riseRef;   // let: CALMLAND/KICKLOCK bar kandidatens lyft vidare till fyrningen
+-    hist[this.bodyHistPos] = this.bodyFast;
+-    this.bodyHistPos = (this.bodyHistPos + 1) % HL;
+-    const want = Math.min(HL - 1, Math.max(1, Math.round(0.5 / dtHop)));
+-    if (this.bodyHistLen < want) this.bodyHistLen++;
+-    // Anslaget: basen stiger snabbt OCH den var nyss borta på riktigt.
+-    // TROSKLARNA ar svepta mot 15 min av agarens musik (20 varianter). Ett
+-    // STORRE stigningskrav vann i tre av fyra franvaro-varianter — riktningen
+-    // ar alltsa robust, aven om decimalerna inte ar det (n=17 referenspunkter).
+-    // 40 %/2 s slar 30 %/3 s: verkliga drops kommer ofta efter en DELVIS
+-    // nedgang, inte total tystnad — 10 av 11 missade drops foll pa just det.
+-    // Precision 46 -> 56 %, recall 35 -> 53 %.
+-    // MÅSTE LANDA HÖGT, inte bara stiga. bodyRise är i dB, så en liten uppgång från
+-    // nära-tystnad (en djup breakdown) ger ett STORT dB-lyft trots att den landar på
+-    // en fortfarande LÅG nivå → falsk drop "där energin knappt gått upp" (ägaren i
+-    // ladan 2026-09-03). Kräv att kroppen landar inom BODY_PEAK_DB av den senaste
+-    // toppen (bodyCeil) — en riktig drop når nästan sitt eget tak; en uppgång i ett
+-    // tyst parti gör det inte.
+-    // Mot SEGA toppen (bodyPeak), inte snabba taket: en falsk drop i ett tyst parti
+-    // landar lagt (fast ~10) medan riktiga landar hogt (fast ~34+); den sega toppen
+-    // haller loud-referensen (~44) sa den laga landningen avvisas aven om taket tillf. sjunkit.
+-    const landsHigh = bodyPeek > this.bodyPeak - BODY_PEAK_DB;
+-    const riseOk = bodyRise > BODY_RISE_DB || (DROP_RISE_LOW_DB > 0 && bodyRise > DROP_RISE_LOW_DB && this.bodyPeak - bodyPeek < DROP_RISE_LOW_Q);
+-    const bodyOnset = riseOk && landsHigh && nowWallA - this.lastBodyGoneMs < 6000;
+-    // EN DROP MASTE LANDA I HOG ENERGI. Villkoren ovan tittar bara pa LOKALA
+-    // nivasprang (svacka -> topp-zon) och vet inget om var i laten vi ar, sa varje
+-    // liten variation i ett tyst parti raknades som en drop.
+-    //   MATT: 4.7 drops/minut, varav 71% vid intensitet under 0.45. Uppmatta
+-    //   drop-intensiteter: 0.39 0.32 0.81 0.34 0.40 0.37 0.51 - bara EN av sju
+-    //   lag i genuint hog energi.
+-    // En drop ar per definition ett sprang IN i hog energi, inte bara ett sprang.
+-    // intensity ar nu en levande signal (se 4392f61) och raknas fram i samma
+-    // funktion, sa gransen kostar ingenting.
+-    // TVA VAGAR IN I EN DROP, inte en. Villkoret krävde tidigare att nivan FALLIT
+-    // (breakAtMs inom 3.5s) fore zonintradet - alltsa breakdown -> drop. Men en
+-    // modern EDM-uppbyggnad STIGER rakt in i dropen utan att forst falla, och da
+-    // blockerades den.
+-    //   MATT vid atta zonintraden: ett hade energi 1.00 OCH aktiv riser - ett
+-    //   solklart drop - men blockerades for att senaste svackan lag 8.0s bort.
+-    // Nu racker antingen en svacka (klassisk breakdown) ELLER en riser (modern
+-    // uppbyggnad) strax innan. Riser-signalen ar bekraftat levande: den fyrar
+-    // 9.8% av tiden och buildUp nar 0.61.
+-    // ENERGIGOLVET (intensity > 0.45) och svacka/riser-fönstren är BORTA som villkor
+-    // sedan flanken flyttades till baskroppen: de mättes fram mot den gamla
+-    // nivå-zon-detektorn och grindade signaler som inte längre bär beslutet.
+-    // Innan något av dem återinförs måste det mätas om mot bodyOnset.
+-
+-    // REFRAKTARPERIOD. Det fanns ingen alls: en drop kunde folja pa en annan
+-    // inom brakdelen av en sekund. MATT i drop-intervall-loggen: tva av tio
+-    // intervall lag pa 0.2 och 0.5 TAKTER, dvs dubbelfyrningar - resten lag pa
+-    // 8-40 takter. En drop ar en sektionsgrans; tva sadana kan inte ligga en
+-    // halv sekund isar. 2s ar valdigt lagt satt mot narmaste akta intervall
+-    // (8 takter = ~13s vid 150 BPM), sa den kan inte kapa nagot verkligt.
+-    // SPARRAS I TAKTER, INTE SEKUNDER. Musik raknas inte i millisekunder: 2s var
+-    // drygt EN takt vid 150 BPM. Uppmatta AKTA drop-intervall lag pa 8-40 takter,
+-    // dar 8 var det kortaste. En drop kan alltsa omojligt folja pa en annan inom
+-    // 8 takter (32 taktslag). Gransen skalar nu med tempot: ~13s vid 150 BPM,
+-    // ~21s vid 90 BPM.
+-    // REFRAKTAR = 32 taktslag (8 takter). MATT: verkliga drop-avstand 8-40 takter.
+-    // TESTAT 2026-09-02 att korta till 16: F1 45 -> 33, +50 falsklarm (modern-spar
+-    // fyrar flera ggr per drop utan spärren). "Kroppen-var-borta"-kravet racker INTE
+-    // som ensamt skydd → spärren behalls. En falsk drop som lasar ute en riktig loses
+-    // med BATTRE PRECISION eller energi-gasen, inte med kortare spärr.
+-    // DROP-REFRAKTÄR 4 s (ägaren i ladan 2026-09-03: vill ha tätare lamp-drops).
+-    // Var 32 taktslag (~15 s). Röken översprutar INTE av detta — den har egen
+-    // cooldown (fog.cooldownMs = 30 s) som gatar den oberoende av lampornas drop.
+-    // OBS: kortare spärr → fler drops (och fler falska); medvetet val, agaren dömer
+-    // live. testDrops-F1 sjunker (spärren gjorde jobb där) men det är sekundärt här.
+-    // ESKALERINGS-REFRAKTÄR (ägaren i ladan 2026-09-03, mot falska drops): en drop
+-    // strax efter en annan får BARA fyra om den är TYDLIGT STARKARE (större bas-lyft)
+-    // än den förra — annars måste 20 s gå. Riktiga drops eskalerar (varje större);
+-    // falska är svagare upprepningar och sållas bort. En eskalerande drop (kvällens
+-    // stora ögonblick) släpps ändå igenom direkt (ned till 4 s).
+-    const sinceDrop = nowWallA - this.lastDropMs;
+-    const stronger = bodyRise > this.lastDropRise + DROP_ESCALATE_DB;
+-    const dropSpacingOk = sinceDrop > DROP_LONG_MS || (sinceDrop > DROP_SHORT_MS && stronger);   // (DROP_UPGRADE_DB matt 09-12, av: risk for dubbelsmall)
+-    // RISER-KRAVET AR AVSTANGT — men INTE for att signalen ar dod. Den gamla
+-    // motiveringen ("inRiser 0% av tiden, buildUp p99=0.31") mattes mot en
+-    // aldre riser-detektor och ar RADERAD som falsk.
+-    //   OMMATT mot novelty-baserad novRiser (tools/testDrops.mjs, 8 seeder):
+-    //   inRiser 8.8% av tiden, buildUp p50=0.00 p90=0.00 p99=0.42 max=0.85.
+-    //   p50/p90=0 ar forvantat — en riser SKA vara sallsynt. I ett brusigt rum
+-    //   fyrar den nastan aldrig (0.6%, max 0.04), sa ett hart riser-krav skulle
+-    //   sla av drop-detektionen just dar mikrofonen sitter.
+-    // Kravet ar fortfarande avstangt tills det matts om mot bodyOnset pa akta
+-    // material (se nedan) — men grunden ar nu grindens kalibrering, inte en dod
+-    // signal.
+-
+-    // FLANKEN TAS PÅ BASKROPPEN, inte på nivån. Nivå-zonen var sann 80 % av tiden
+-    // i ägarens musik → dess flanker låg godtyckligt, och 8-takters-spärren blev
+-    // i praktiken den som VALDE när en drop fyrade (första flanken efter att
+-    // fönstret löpt ut). Uppmätt resultat: 3 träffar av 19, 16 falsklarm.
+-    // STIGANDE FLANK: `bodyOnset` är sann KONTINUERLIGT i höga/pumpande partier (basen
+-    // dippar och återhämtar ~17 dB varje takt via sidechain → bodyRise ligger konstant
+-    // över tröskeln). MÄTT 2026-09-03: många kandidater/sekund. Fyra bara på den FÖRSTA
+-    // framen lyftet passerar tröskeln → ett kandidat-event per verkligt lyft, inte per
+-    // frame. Då blir eskalerings-/spärr-kravet meningsfullt (jämför distinkta lyft).
+-    const bodyOnsetEdge = bodyOnset && !this.wasBodyOnset;
+-    this.wasBodyOnset = bodyOnset;
+-    // Armera bara EN gang per "borta"-episod. Floden vid ARM=300 (36 mot 19 pa referens) kom fran
+-    // UPPREPADE aterhamtnings-edges i samma post-breakdown-fonster. Forsta edgen efter en ny
+-    // gone-episod armerar (fangar en mjuk drops fordrojda topp); senare edges far bara ogonblicket.
+-    if (bodyOnsetEdge && this.goneEpisodeMs !== this.dropArmGoneMs) { this.dropArmUntil = nowWallA + DROP_ARM_MS; this.dropArmAt = nowWallA; this.dropArmGoneMs = this.goneEpisodeMs; }
+-    const armed = bodyOnsetEdge || nowWallA < this.dropArmUntil;
+-    // (KICK-FIRST forkastad 09-04: flod pa megamix; [firstkick]-sparet borttaget 09-27.)
+-    // MINIDROP-lyftet (se MINI_*). Egen svacka-raknare (kortare/grundare an gone) och egen flank.
+-    if (MINI_SPACING_MS > 0) {
+-      if (this.bodyEnv < this.bodyCeil - MINI_GONE_DB) { this.miniGoneMs += dtHop * 1000; if (this.miniGoneMs >= MINI_GONE_MS) this.lastMiniGoneMs = nowWallA; }
+-      else this.miniGoneMs = 0;
+-      // Samma fönster som riseRef plus det nyss skrivna värdet (minus inget: den äldsta platsen ingår via `oldest`) -> en jämförelse
+-      // i stället för en andra genomläsning (a7).
+-      const nv = hist[(this.bodyHistPos + HL - 1) % HL]; const mnRef = nv < riseRef ? nv : riseRef;
+-      const miniOnset = (bodyPeek - mnRef) > MINI_RISE_DB && bodyPeek > this.bodyPeak - MINI_PEAK_DB && nowWallA - this.lastMiniGoneMs < 4000;
+-      const miniEdge = miniOnset && !this.wasMiniOnset; this.wasMiniOnset = miniOnset;
+-      if (miniEdge && this.activeMs > 2000 && nowWallA - this.lastDropMs > MINI_SPACING_MS && nowWallA - this.lastMiniMs > MINI_SPACING_MS
+-          && (DROP_UNDERPEAK_MIN <= 0 || this.bodyPeak - bodyPeek >= DROP_UNDERPEAK_MIN)) {   // INTE I TAKET galler aven minidrops (19:19: 'falsk' = minidrop med underPeak 0,6)
+-        this.miniDropCount++; this.lastMiniMs = nowWallA;
+-        if (DROP_TRACE) console.log(`[minidrop] wall ${this.wallNow()} rise ${(bodyPeek - mnRef).toFixed(1)} underPeak ${(this.bodyPeak - bodyPeek).toFixed(1)} goneAgo ${((nowWallA - this.lastMiniGoneMs)/1000).toFixed(1)}s`);
+-      }
+-    }
+-    const fullSlam = this.bodyPeak - bodyPeek < DROP_QUALITY_DB;
+-    // DMX_DROP_TRACE=1: logga KONSUMERADE edges (kandidat som INTE fyrade) — var ligger kroppen vid
+-    // forsta takten? Matdata for DROP_QUALITY_DB pa mjukare material (pop) dar inget referens finns.
+-    if (DROP_TRACE && bodyOnsetEdge && !(dropSpacingOk && fullSlam)) console.log(`[dropedge] rise ${bodyRise.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s spacingOk ${dropSpacingOk} sinceDrop ${(sinceDrop/1000).toFixed(1)}s`);
+-    // INTE I TAKET (opt-in DROP_UNDERPEAK_MIN, ladan 2026-09-29): en drop som fyrar nar kroppen redan ligger vid sin topp (underPeak
+-    // 0,4/0,8 dB) ar en upprepning av samma small, inte en ny - agarens markeringar: ratta 2,4-6,5 dB, falska 0,4/0,8/2,9. 0 = av.
+-    const notAtCeil = DROP_UNDERPEAK_MIN <= 0 || this.bodyPeak - this.bodyFast >= DROP_UNDERPEAK_MIN;
+-    let fireNow = dropSpacingOk && armed && this.activeMs > 2000 && fullSlam && notAtCeil;
+-    let fireTag = '';
+-    const underNow = this.bodyPeak - bodyPeek;
+-    // LUGN-SEKTIONS-GRINDEN (se DROP_CALM_GATE). Domen tas per kandidat-hop; den hallna kandidaten (DROP_CALM_LAND_MS) foljs nedan.
+-    if (fireNow) {
+-      const calm = (this.dSec === 'low' || this.dSec === 'intro') || this.dLvh <= -DROP_CALM_DB;
+-      let strong = this.buildUp >= DROP_CALM_BUILD || underNow < DROP_CALM_Q || bodyRise >= BODY_RISE_DB + DROP_CALM_RISE_DB;
+-      // STRIKT INTRO (ladan 09-24: 'den gjorde fortfarande drop i intro'): landning vid toppen racker inte i intro - bara en riktig riser.
+-      if (this.dSec === 'intro') strong = this.buildUp >= DROP_CALM_BUILD;
+-      if (calm && !strong) {
+-        fireNow = false;
+-        if (DROP_CALM_LAND_MS > 0 && this.calmHoldStart === 0) { this.calmHoldStart = nowWallA; this.calmHoldRise = bodyRise; }
+-        if (DROP_TRACE && bodyOnsetEdge) console.log(`[dropcalm] wall ${this.wallNow()} ${DROP_CALM_LAND_MS > 0 ? 'HALLS' : 'NEKAD'} sect ${this.dSec} lvh ${this.dLvh.toFixed(1)} build ${this.buildUp.toFixed(2)} underPeak ${underNow.toFixed(1)} rise ${bodyRise.toFixed(1)}`);
+-      }
+-    }
+-    if (this.calmHoldStart > 0) {   // verifierad landning: kroppen maste ligga kvar vid toppen hela DROP_CALM_LAND_MS
+-      if (!fullSlam) { if (DROP_TRACE) console.log(`[dropcalm] wall ${this.wallNow()} SLAPPT efter ${(nowWallA - this.calmHoldStart).toFixed(0)} ms (underPeak ${underNow.toFixed(1)})`); this.calmHoldStart = 0; }
+-      else if (fireNow) this.calmHoldStart = 0;   // fyrar anda (starkare bevis kom)
+-      else if (nowWallA - this.calmHoldStart >= DROP_CALM_LAND_MS && dropSpacingOk) { fireNow = true; fireTag = ` CALMLAND +${(nowWallA - this.calmHoldStart).toFixed(0)}ms`; bodyRise = Math.max(bodyRise, this.calmHoldRise); this.calmHoldStart = 0; }
+-    }
+-    // KICK-LASET (se DROP_KICK_LOCK_MS): kandidaten vantar in forsta kicken, hogst en halv takt / DROP_KICK_LOCK_MS.
+-    if (fireNow) {
+-      this.dropArmUntil = 0; this.calmHoldStart = 0;
+-      this.dropCount++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise;
+-      console.log(`[dropfire] wall ${this.wallNow()}${fireTag} rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} ceil ${this.bodyCeil.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} sinceDrop ${(sinceDrop/1000).toFixed(1)}s goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s goneSpan ${(this.lastGoneSpanMs/1000).toFixed(1)}s edgeAgo ${(nowWallA - this.dropArmAt).toFixed(0)}ms`);
+-    }
++    const now = this.hNowWall, dt = this.dtHop, hb = this.hBody, x = hb > -90 ? hb : -90;
++    if (!this.fdOn) { this.fdOn = true; this.bodyFast = x; this.bodyEnv = x; this.bodyCeil = x; this.bodyPeak = x; }
++    this.bodyFast += (x - this.bodyFast) * Math.min(1, dt / BODY_FAST_S);
++    this.bodyEnv += (x - this.bodyEnv) * Math.min(1, dt / 0.35);
++    this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dt * BODY_CEIL_DB_S);
++    this.bodyPeak = Math.max(this.bodyEnv, this.bodyPeak - dt * 0.04);
++    // SEKTIONENS KROPP TILLBAKA (SECTION_BODY_HIGH): borta (bodyEnv >= BODY_GONE_DB under taket) >= BODY_HIGH_MS och inom 2 s nära toppen.
++    if (this.bodyEnv < this.bodyCeil - BODY_GONE_DB) this.bodyGoneMs += dt * 1000;
++    else {
++      if (Analyser.BODY_HIGH_MS > 0 && this.bodyGoneMs >= Analyser.BODY_HIGH_MS) this.secBodyArmMs = now;
++      this.bodyGoneMs = 0;
++      if (this.secBodyArmMs > 0) { if (now - this.secBodyArmMs > 2000) this.secBodyArmMs = 0; else if (this.bodyEnv >= this.bodyPeak - Analyser.BODY_HIGH_DB) { this.secBodyRet++; this.secBodyArmMs = 0; } }
++    }
++    // FLANKEN (ringbuffert tid/kropp, ingen allokering)
++    const T = this.fdT, V = this.fdV, CAP = 1024, f = this.bodyFast, c = this.bodyCeil;
++    if (this.fdN === CAP) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
++    { const w = (this.fdS0 + this.fdN) & (CAP - 1); T[w] = now; V[w] = f; this.fdN++; }
++    while (this.fdN > 1 && now - T[this.fdS0] > FLANK_HOLD_S * 1000) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
++    let top = -1e9, low = 1e9;
++    for (let q = 0; q < this.fdN; q++) { const i = (this.fdS0 + q) & (CAP - 1), v = V[i]; if (v > top) top = v; if (now - T[i] <= 500 && v < low) low = v; }
++    if (top < c - FLANK_GONE_DB) { if (this.fdGone === 0 && now - this.fdEnd < FLANK_GRACE_S * 1000) this.fdGone = this.fdSpan; this.fdGone += dt; } else { if (this.fdGone > 0) { this.fdSpan = this.fdGone; this.fdEnd = now; } this.fdGone = 0; }
++    const above = f > c - FLANK_LAND_DB, edge = above && !this.fdAbove; this.fdAbove = above;
++    if (this.lvlSmooth <= FLANK_SILENT_LV) this.fdQuietAt = now;
++    if (!edge || f - low < FLANK_RISE_DB) return;
++    const span = this.fdGone > 0 ? this.fdGone : now - this.fdEnd < FLANK_GRACE_S * 1000 ? this.fdSpan : 0;
++    const full = span >= FLANK_BREAK_S || (span >= FLANK_SHORT_S && c - low >= FLANK_SHORT_RISE_DB);
++    if (!full && span < FLANK_MINI_S) return;
++    if (now - this.fdQuietAt < span * 1000 + 500) { this.fdGone = 0; this.fdSpan = 0; if (DROP_TRACE) console.log(`[drop] ingen: helt tyst i breaket (latstart), break ${span.toFixed(1)} s`); return; }
++    this.fdGone = 0; this.fdSpan = 0;
++    if (full) { this.dropCount++; this.lastDropMs = now; } else { this.miniDropCount++; this.lastMiniMs = now; }
++    if (DROP_TRACE) console.log(`[${full ? 'dropfire' : 'minidrop'}] wall ${this.wallNow()} break ${span.toFixed(1)} s rise ${(f - low).toFixed(1)} djup ${(c - low).toFixed(1)}`);
+   }
+ 
+   /** Uppbyggnad/riser (spektral novelty + klang/niva). Returnerar inRiser och uppdaterar buildUp. */
+diff --git a/src/effects.ts b/.arena/analys/a1/src/effects.ts
+index b0c8813..5b2fa53 100644
+--- a/src/effects.ts
++++ b/.arena/analys/a1/src/effects.ts
+@@ -349,26 +349,8 @@ const MANUS_REL = 0.5;
+ // (lang-191741: gallop -> duel -> kaskad -> rave blir gallop/kaskad). Manusets looker prövas utan ögonblickskraven (punch/beat i
+ // rutan vid bytet - looken klarade dem när låten valde den; gallop föll på beat < 0,35 mitt i refrängen). Av = bit-identiskt.
+ const LEVEL_RAMP = 2, LEVEL_RAMP_FALL_S = 2;   // fullt ljus vid 2 x släckgränsen (3 x dämpade versen 40 %, 2 x 19 %, refrängen 3 %); nivån sjunker mjukt på 2 s (se RAMPEN OVANFÖR SLÄCKGRÄNSEN)
+-/** FULL DROP PÅ FLANKEN (STANDARD sedan 10-13 efter ägarens öga i ladan: 'droparna känns bra, på smällen'; DMX_FLANK_DROP=0 = gamla vägen. Infördes 10-12 efter ägarens 'bara var 3:e träffar rätt' och 'hellre öka gränsen till riktig drop,
+- *  bara minidrops kör vidare'). Mätt (tools/dropTiming.mjs + dropTimingStat.mjs, 23 ladan-inspelningar, 141 min): analysatorns drop kräver
+- *  20 dB stigning på 0,5 s och kroppen inom 3 dB från toppen -> den fyrar på DJUPA HACK som återhämtar sig (sidechain-pump, 1 s-avbrott,
+- *  ett pumpslag sekunder efter att takten kommit tillbaka: edgeAgo 13 653 ms), sent på flanken (stigningen når 20 dB först vid toppen) och
+- *  missar drops efter halvtyst break (12-15 dB lyft). Showens drops: 15/46 rätt (33 %), 11 sena, 17 utan baslyft.
+- *  HÄR: motorn själv på frame.bodyDb. Riktig drop = baskroppen (toppen över FLANK_HOLD_S, så pumpande bas räknas som närvarande) har legat
+- *  >= FLANK_GONE_DB under taket i >= FLANK_BREAK_S, och fyrar på FLANKEN: när kroppen (60 ms) går upp till taket - FLANK_LAND_DB med
+- *  >= FLANK_RISE_DB stigning på 0,5 s. Analysatorns drop utan egen flank (inom 2 s) blir minidrop. Bänk: 55 drops (0,39/min), 96 % på
+- *  ihållande baslyft, 43 rätt / 6 sena / 4 tidiga (<= 54 ms) / 2 falska, fördröjning p50 24 ms (var 91). Tidsbaserat (render går 200 Hz live, 40 Hz i bänken). */
+-const FLANK_GONE_DB = 10, FLANK_BREAK_S = 4,   // 4 s godkänt i ladan 10-13 (bänk 0,31/min, rätt 35/44, p50 30 ms); 3 = fler
+-       FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;
+-/** KORT BREAK MED STOR SMÄLL (opt-in DMX_FLANK_SHORT_S > 0, natt 10-15 ur ägarens 13 markeringar 10-14: 5 av 8 'Drop!' låg på
+- *  analysatorns drop efter bara 1,1-2,0 s basbreak (en takt) med 26-46 dB stigning - 4 s-kravet gjorde dem till minidrop). Ett kortare
+- *  break räcker när breaket är minst FLANK_SHORT_RISE_DB under taket (taket - lägsta kroppen 0,5 s; inte stigningen vid korsningen, som
+- *  beror på renderstegets översläng - live 200 Hz ger mindre än bänkens 40 Hz, mätfälla 46). 0 = av (som före). */
+-const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24;   // 1 -> 2 ladan 10-30 (ägaren: "väldigt känslig för drop ... gärna minidrop"; live 5,5 min: 4 av 7 full drops kom på 1,1-1,8 s break); STANDARD 1 sedan 10-17 (ägaren i ladan 10-16: 'dropparna känns bra'); =0 = av
+-/** LÅTSTART ÄR INGEN DROP (ladan 10-30: 'den gör nästan alltid en drop när ny låt börjar'): har hela ljudet (frame.level) varit nere på
+- *  brusgolvet någon gång i breaket är det en låtlucka/paus, inte ett basbreak - ingen drop. Bänken 10-11 (70 flank-drops): golvet 0,003 i 5,
+- *  därefter >= 0,007 (riktiga break har kvar resten av musiken). 'Nära släckgränsen' (2 x 0,015) tog bort 43/64 - för grovt. */
+-const FLANK_SILENT_LV = 0.005;
++/* (FULL DROP PÅ FLANKEN: detektorn flyttad till analysatorn 11-09 (arenan analys a1, analyser.ts dropStep) - frame.dropCount = flankens
++ *  drop, frame.miniDropCount = samma flank efter kortare break. Här bara reaktionen: spärrarna, efterkontrollen, lyftet, smällen.) */
+ const SHOW_DROP_GAP_MS = 12000;   // spärr mellan riktiga drops från alla källor (10-12; 20 s missade en riktig drop efter en tidig, ägaren 'jag tror det va tiden mellan')
+ /** EFTERKONTROLLENS TAK (PROV DMX_DROP_LAND_CAP, dagkörningen 2026-11-07, bänk tools/efterDrop.py): 'före' läses i rutan där flanken fyrar - då
+  *  har volymfönstrets energi (eSm, 0..1) redan stigit; i kvällen 10-11 låg 'före' >= 0,85 i 53 av 59 show-drops och kravet 1,15 x före + 0,02 > 1
+@@ -777,33 +759,7 @@ export class EffectEngine {
+     fog.serviceAtMs = Date.now();
+   }
+   private lastRenderMs = performance.now();
+-  // FULL DROP PÅ FLANKEN (se FLANK_DROP): kropp 60 ms / 350 ms, tak, break-tid, tidsstämplade fönster (topp 0,6 s, min 0,5 s).
+-  private fdF = 0; private fdOn = false;   // fdOn: se nearOn
+-   private fdS = 0; private fdC = -90; private fdGone = 0; private fdSpan = 0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12; private fdQuietAt = -1e12;
+-  // RINGBUFFERT (10-16, GC-jakten; förr push/shift på två listor 200 ggr/s): tid och kropp för toppens fönster (FLANK_HOLD_S), äldst vid fdS0.
+-  private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;
+-  private flankStep(frame: Frame): boolean {   // (ramen in i st f bodyDb: ett decimaltal som argument packas in per ruta - skräpjakten 10-18)
+-    const dt = this.rDt, now = this.rNowWall;
+-    const x = Math.max(-90, frame.bodyDb ?? -90);
+-    if (!this.fdOn) { this.fdOn = true; this.fdF = x; this.fdS = x; this.fdC = x; }
+-    this.fdF += (x - this.fdF) * Math.min(1, dt / 0.06);
+-    this.fdS += (x - this.fdS) * Math.min(1, dt / 0.35);
+-    this.fdC = Math.max(this.fdS, this.fdC - dt * 0.15);
+-    const T = this.fdT, V = this.fdV, CAP = 1024;
+-    if (this.fdN === CAP) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
+-    { const w = (this.fdS0 + this.fdN) & (CAP - 1); T[w] = now; V[w] = this.fdF; this.fdN++; }
+-    while (this.fdN > 1 && now - T[this.fdS0] > FLANK_HOLD_S * 1000) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
+-    let top = -1e9, low = 1e9; for (let q = 0; q < this.fdN; q++) { const i = (this.fdS0 + q) & (CAP - 1); if (V[i] > top) top = V[i]; if (now - T[i] <= 500 && V[i] < low) low = V[i]; }
+-    if (top < this.fdC - FLANK_GONE_DB) this.fdGone += dt; else { if (this.fdGone > 0) { this.fdSpan = this.fdGone; this.fdEnd = now; } this.fdGone = 0; }
+-    const above = this.fdF > this.fdC - FLANK_LAND_DB, edge = above && !this.fdAbove; this.fdAbove = above;
+-    const span = this.fdGone > 0 ? this.fdGone : now - this.fdEnd < FLANK_GRACE_S * 1000 ? this.fdSpan : 0;
+-    if ((frame.level ?? 0) <= FLANK_SILENT_LV) this.fdQuietAt = now;
+-    if (!edge || this.fdF - low < FLANK_RISE_DB || (span < FLANK_BREAK_S && !(span >= FLANK_SHORT_S && this.fdC - low >= FLANK_SHORT_RISE_DB))) return false;
+-    if (now - this.fdQuietAt < span * 1000 + 500) { this.fdGone = 0; this.fdSpan = 0; if (isLogOn()) console.log(`[dirigent] ingen drop: helt tyst i breaket (latstart), break ${span.toFixed(1)} s`); return false; }
+-    this.fdGone = 0; this.fdSpan = 0; this.fdAt = now;
+-    if (isLogOn()) console.log(`[dirigent] full drop pa flanken: break ${span.toFixed(1)} s, stigning ${(this.fdF - low).toFixed(1)} dB`);
+-    return true;
+-  }
++  private lastMiniDropCount = 0;   // senast hanterade frame.miniDropCount (analysatorns flank efter kort break)
+ 
+   constructor(private cfg: EngineConfig) { doubleFields(this); doubleFields(this.ctx); }
+ 
+@@ -1585,13 +1541,9 @@ export class EffectEngine {
+   /** DROPEN: flanken, spärrarna, efterkontrollen, drop-fönstret och svärtan (utbrutet ur render 10-16, GC-jakten: ordagrant flyttat, samma ordning). */
+   private stepDrop(frame: Frame): boolean {
+     const nowWall = this.rNowWall;
+-    let dropHitRaw = frame.dropCount !== this.lastDropCount;
++    let dropHitRaw = frame.dropCount !== this.lastDropCount;   // analysatorns EN detektor (flanken, analyser.ts dropStep)
+     this.lastDropCount = frame.dropCount;
+-    {   // FULL DROP PÅ FLANKEN: motorns egen flank är drop-källan; analysatorns drop utan egen flank inom 2 s = minidrop
+-      const anaHit = dropHitRaw;
+-      dropHitRaw = this.flankStep(frame);
+-      if (anaHit && !dropHitRaw && nowWall - this.fdAt > 2000) { this.gapMini(nowWall); this.anaDropAt = nowWall; }
+-    }
++    if (frame.miniDropCount !== this.lastMiniDropCount) { this.lastMiniDropCount = frame.miniDropCount; if (!dropHitRaw) { this.gapMini(nowWall); this.anaDropAt = nowWall; } }   // flank efter kort break = minidrop
+     // INGEN DROP I LATENS INLEDNING (ladan 2026-09-24 23:35, tredje gangen 'fortfarande drop i inledning'): intro-grindarna ovan tittar pa
+     // sektionen, men den slar om intro -> build strax FORE smallen (kicken som borjar ar sjalva byggstenen). Med DMX_DROP_SONG_HOLD_S > 0
+     // fyrar ingen drop/minidrop forsta N s av en lat (klockan startar vid motorstart och vid latgrans = softenRange; INTE pa sektionen - tystnaden fore en drop gor den till intro, 23:31: dropen efter pausen nekades).
+@@ -1614,7 +1566,7 @@ export class EffectEngine {
+       if (lvl < Math.min(DROP_LAND_CAP, this.preDropLevel * DROP_LAND_GAIN + 0.02)) { this.dropEnv = 0; this.dropLiftUntil = 0; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
+     }
+     // (drop-snapp till takten forkastad 09-12: taktlaset resettas vid drops, slog aldrig till / gjorde drops sena.)
+-    // (analysatorns minidrop-räknare frame.miniDropCount läses inte: V123 10-11 kväll - 17/min, ingen minidrop i konsertläget; bara
++    // (frame.miniDropCount = analysatorns flank efter kort break (se stepDrop ovan); förr minidrop-floden 17/min som inte lästes. Övriga
+     //  energilyftet, sektionslyftet, stopp-minin och spärrad drop ger looken, alla via fireMini)
+     // DROPEN AR EN SMALL, INTE EN PLATA. Hallet var 2s och uttoningen 1s, alltsa
+     // ~3s full blast per drop — och eftersom dropEnv KRINGGAR VU-taket (se

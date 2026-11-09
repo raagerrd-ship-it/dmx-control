@@ -14,6 +14,7 @@
  * (pushNovelty) lever kvar bara for karaktarsskiftet. Allt grindas av min/max-langd pa segmentet.
  */
 
+import { silentLevel } from "./analyser.js";
 const SILENCE_END_MS = 3000;   // tystnad sa lange = laten ar slut
 const START_LEVEL = 0.15;      // volymgrind: starta bara pa tydlig musik
 const START_HOLD_MS = 1000;    // ...som hallit i en sekund
@@ -179,10 +180,10 @@ export class BoundaryDetector {
   }
 
   /** Matas varje hop med ramens niva/tempo. */
-  tick(o: { level: number; bpm: number; bpmConfidence: number }): void {
+  tick(o: { level: number; bpm: number; bpmConfidence: number; silent?: boolean }): void {
     const now = this.clock();
     this.fLastBpm = o.bpm;
-    if (o.level > 0.02) this.lastLoud = now;
+    if (!(o.silent ?? silentLevel(o.level))) this.lastLoud = now;   // tystnaden = analysatorns (frame.silent, EN tröskel cfg.silenceLevel)
     if (!this.playStart) {
       // Volymgrind: starta bara pa tydlig musik som hallit en sekund, aldrig pa brusgolvet.
       if (o.level >= START_LEVEL) {

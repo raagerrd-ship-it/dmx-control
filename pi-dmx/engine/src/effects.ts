@@ -16,7 +16,7 @@ import type { ChannelRole, EngineConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { FixtureOutput, keepLit, lampFadeK, lampLevel, sameLight, type SpecialtyValues } from "./output.js";
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE, GRID_EARLY_MS } from "./beatClock.js";
-import type { Frame } from "./analyser.js";
+import { SILENCE_LEVEL, type Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
 import { fitScore, fitDistance, FIT } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
@@ -54,11 +54,11 @@ const MINI_LIFT_MS = 2000, MINI_LIFT_FALL_MS = 1500;   // 4000 -> 2000 (ladan 11
  *  V123 (analysen 10-11 kväll, tools/natt/konsert/analys-2026-10-11.md, ägaren: "jag vill testa 123"): 0,6 s-medel, 10 dB, 8 s,
  *  inget kick- eller över-toppen-krav. Ensam: 72 % av fyrningarna på ett ihållande baslyft, fångar 85 %, latens 0,11 s; fyrar vid
  *  alla sju av ägarens markeringar. Lyftet (+ sektionslyftet) är nu ENDA källan till minidrop-looken. */
-const LIFT_DB = 10, LIFT_REFRACT_MS = 8000;
+const LIFT_REFRACT_MS = 8000;   // (LIFT_DB och lyftets mätning i analysatorn sedan 11-09, a3: frame.liftDb)
 /** STOPP-MINI (opt-in DMX_STOP_MINI_S, natt 10-16, ägarens mini-markeringar lang-1014 67/181/447 s): basen borta en kort stund mitt i låten
  *  (baskroppen > 12 dB under 8 s-normalnivån i minst STOP_MINI_S s, högst 3 s) och tillbaka till normalnivån i refrängen (sektion high) = ett 'stopp' före nästa fras ->
  *  minidrop-looken (600 ms, utan minidropens energilyft). Nästan-dropen ger inget ljus i konsertläget och energilyftet ser inte en dipp som går tillbaka till samma nivå. 0 = av. */
-const STOP_MINI_S = 0.6;   // STANDARD 0,6 sedan 10-17 (ägaren i ladan 10-16: 'minidropparna känns bra, behåll')
+// (STOP_MINI_S 0,6 och stoppets mätning i analysatorn sedan 11-09, a3: frame.stopCount/stopS)
 /** MINIDROP EFTER ENERGIN (STANDARD ladan 10-21, ägaren 'kör standard'; ägaren: 'inte på fast tid utan beroende på energin, så återhämtar den
  *  sig snabbare, men ändå ett drop som syns'). Minidropens stöt (MINI_BANG_MS) och takets lyft (MINI_LIFT_MS) släpps när baskroppen
  *  (frame.bodyDb, 30 ms) fallit under halva lyftet räknat från nivån före minidropen (1 s-medel) - tidigast efter MINI_E_MIN_MS, senast
@@ -149,9 +149,8 @@ export interface FogStatus {
 // ljuset följer musiken i stället för att gå i sin egen takt.
 // Attacken har ett golv och ett tak: under ~30 ms läses den som ett steg (blixt),
 // över ~70 ms tappar den anslaget.
-/** Under den här nivån räknas ingången som avstängd, inte som ett tyst parti. */
-const INPUT_OFF_LEVEL = 0.02;
-const SILENCE_LEVEL = 0.05;   // standard om cfg saknar silenceLevel (env-ratten DMX_SILENCE_LEVEL borttagen 10-11: den gjorde /setup-reglaget verkningslost)
+/** TYSTNAD (a7): EN tröskel i analysatorn (frame.silent = level <= cfg.silenceLevel). INPUT_OFF_LEVEL 0,02 borttagen: ingången räknas
+ *  som avstängd när ramen varit tyst så länge - */
 /** ...men först när den legat där så länge — ett break i låten ska inte släcka showen. */
 const INPUT_OFF_MS = 2000;
 /** HARD INGANGSGRANS (agaren i ladan 2026-10-07: "lagsta input till analysatorn ... dar gor vi hard grans som vi kan justera. Inga
@@ -235,8 +234,7 @@ const MINI_BANG_MS = 600;   // 350 -> 600 (ladan 10-11 22:14: 'jag såg inte att
  *  Graderad: dropEnv far ett golv NEAR_MIN..NEAR_MAX (50-85 % av en full drop) i MINI_BANG_MS, sedan samma 1 s-utton
  *  som allt annat (fallet rors inte). Inget look-byte, ingen rok. Analysatorn rors inte - bara redan exporterade falt.
  *  Sond pa pop_ladan (10 min): sprang >= 10 dB efter dipp >= 8 dB ~1 per 30 s, de flesta pa minidrops/drops. */
-const NEAR_RISE_DB = 10;    // sprang fran dippens botten
-const NEAR_DIP_DB = 8;       // dippen under latens normalniva (8 s-medel)
+// (NEAR_RISE_DB 10 / NEAR_DIP_DB 8 och nästan-dropens mätning i analysatorn sedan 11-09, a3: frame.nearDropDb/nearDipDb)
 // (NEAR_FULL_DB/NEAR_MIN/NEAR_MAX - nastan-dropens ljusgolv nearLevel - borttagna 11-09: nivan lastes aldrig, nastan-dropen ger inget ljus, bara lookbyte.)
 const NEAR_REFRACT_MS = 4000;
 /** NASTAN-DROP BYTER LOOK (alltid; av-brytaren DMX_NEAR_DROP_SWITCH borttagen 10-10) (agaren i ladan 10-07: "far aven dirigenten denna info och kan byta direkt"): en nastan-drop
@@ -358,18 +356,15 @@ const LEVEL_RAMP = 2, LEVEL_RAMP_FALL_S = 2;   // fullt ljus vid 2 x släckgrän
  *  >= FLANK_GONE_DB under taket i >= FLANK_BREAK_S, och fyrar på FLANKEN: när kroppen (60 ms) går upp till taket - FLANK_LAND_DB med
  *  >= FLANK_RISE_DB stigning på 0,5 s. Analysatorns drop utan egen flank (inom 2 s) blir minidrop. Bänk: 55 drops (0,39/min), 96 % på
  *  ihållande baslyft, 43 rätt / 6 sena / 4 tidiga (<= 54 ms) / 2 falska, fördröjning p50 24 ms (var 91). Tidsbaserat (render går 200 Hz live, 40 Hz i bänken). */
-const FLANK_GONE_DB = 10, FLANK_BREAK_S = 4,   // 4 s godkänt i ladan 10-13 (bänk 0,31/min, rätt 35/44, p50 30 ms); 3 = fler
-       FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;
+// (FLANK_* - flankens trösklar - flyttade till analysatorn 11-09, a3: EN dropdetektor, frame.dropCount; se analyser.ts FLANK_GONE_DB)
 /** KORT BREAK MED STOR SMÄLL (opt-in DMX_FLANK_SHORT_S > 0, natt 10-15 ur ägarens 13 markeringar 10-14: 5 av 8 'Drop!' låg på
  *  analysatorns drop efter bara 1,1-2,0 s basbreak (en takt) med 26-46 dB stigning - 4 s-kravet gjorde dem till minidrop). Ett kortare
  *  break räcker när breaket är minst FLANK_SHORT_RISE_DB under taket (taket - lägsta kroppen 0,5 s; inte stigningen vid korsningen, som
  *  beror på renderstegets översläng - live 200 Hz ger mindre än bänkens 40 Hz, mätfälla 46). 0 = av (som före). */
-const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24;   // 1 -> 2 ladan 10-30 (ägaren: "väldigt känslig för drop ... gärna minidrop"; live 5,5 min: 4 av 7 full drops kom på 1,1-1,8 s break); STANDARD 1 sedan 10-17 (ägaren i ladan 10-16: 'dropparna känns bra'); =0 = av
 /** LÅTSTART ÄR INGEN DROP (ladan 10-30: 'den gör nästan alltid en drop när ny låt börjar'): har hela ljudet (frame.level) varit nere på
  *  brusgolvet någon gång i breaket är det en låtlucka/paus, inte ett basbreak - ingen drop. Bänken 10-11 (70 flank-drops): golvet 0,003 i 5,
  *  därefter >= 0,007 (riktiga break har kvar resten av musiken). 'Nära släckgränsen' (2 x 0,015) tog bort 43/64 - för grovt. */
-const FLANK_SILENT_LV = 0.005;
-const SHOW_DROP_GAP_MS = 12000;   // spärr mellan riktiga drops från alla källor (10-12; 20 s missade en riktig drop efter en tidig, ägaren 'jag tror det va tiden mellan')
+// (SHOW_DROP_GAP_MS 12 s i analysatorn sedan 11-09: flank inom spärren = frame.dropSpaced)
 /** EFTERKONTROLLENS TAK (PROV DMX_DROP_LAND_CAP, dagkörningen 2026-11-07, bänk tools/efterDrop.py): 'före' läses i rutan där flanken fyrar - då
  *  har volymfönstrets energi (eSm, 0..1) redan stigit; i kvällen 10-11 låg 'före' >= 0,85 i 53 av 59 show-drops och kravet 1,15 x före + 0,02 > 1
  *  kunde aldrig nås -> lyftet släpptes efter 0,6 s i ~9 av 10 drops. Med t.ex. 0,9 kapas kravet (en drop som landar på >= 90 % har landat högt).
@@ -592,13 +587,13 @@ export class EffectEngine {
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
   private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
-  private nearB = 0; private nearOn = false;   // nearOn: nearB startad (förr null - ett fält som ibland är null packar in varje nytt tal, GC-jakten 10-16)
-   private nearNorm = 0; private nearFloor = 1e9; private liftCalm = 0; private liftLift = 0; private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
+  private lastDemoted = 0; private lastSpaced = 0; private lastStopCount = 0;   // analysatorns monotona räknare (a3: dropDemoted/dropSpaced/stopCount)
+   private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
   private nearAt = -1e12; nearCount = 0;   // NASTAN-DROP
   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
   private miniBodyFast = -90; private miniBodySlow = -90; private miniPre = -90; private miniPeak = -200;   // minidrop efter energin
-  private miniBangUntil = 0; private lastMiniWall = -1e12; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftAt = -1e12; liftCount = 0; private stopRunS = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
+  private miniBangUntil = 0; private lastMiniWall = -1e12; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftAt = -1e12; liftCount = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
@@ -682,7 +677,7 @@ export class EffectEngine {
    *  det ENDA skalet, alltsa ett byte utan musikalisk grund; alla andra varden ar nagot i laten. */
   switchWhy = '';
   switchCount = 0;
-  private lastShowDropWall = 0;   // DMX_DROP_MIN_GAP_S   // noteCharShift: bytesskal giltigt 6 s               // SECTION_UNIT: sektionsgrans passerad men bytet blockerat (riser/MIN_HOLD) -> gor det sa fort det gar
+  // noteCharShift: bytesskal giltigt 6 s               // SECTION_UNIT: sektionsgrans passerad men bytet blockerat (riser/MIN_HOLD) -> gor det sa fort det gar
   private prevSongLook = new Map<string, Mode>();  // SECTION_UNIT: forra latens look per sektionstyp (straffas sa nasta lat far en annan)
   private lastSmartTier = "";
   private lastSmartSwitchMs = 0;   // tidsstämpel för senaste effektbyte → minsta-intervall
@@ -777,33 +772,7 @@ export class EffectEngine {
     fog.serviceAtMs = Date.now();
   }
   private lastRenderMs = performance.now();
-  // FULL DROP PÅ FLANKEN (se FLANK_DROP): kropp 60 ms / 350 ms, tak, break-tid, tidsstämplade fönster (topp 0,6 s, min 0,5 s).
-  private fdF = 0; private fdOn = false;   // fdOn: se nearOn
-   private fdS = 0; private fdC = -90; private fdGone = 0; private fdSpan = 0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12; private fdQuietAt = -1e12;
-  // RINGBUFFERT (10-16, GC-jakten; förr push/shift på två listor 200 ggr/s): tid och kropp för toppens fönster (FLANK_HOLD_S), äldst vid fdS0.
-  private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;
-  private flankStep(frame: Frame): boolean {   // (ramen in i st f bodyDb: ett decimaltal som argument packas in per ruta - skräpjakten 10-18)
-    const dt = this.rDt, now = this.rNowWall;
-    const x = Math.max(-90, frame.bodyDb ?? -90);
-    if (!this.fdOn) { this.fdOn = true; this.fdF = x; this.fdS = x; this.fdC = x; }
-    this.fdF += (x - this.fdF) * Math.min(1, dt / 0.06);
-    this.fdS += (x - this.fdS) * Math.min(1, dt / 0.35);
-    this.fdC = Math.max(this.fdS, this.fdC - dt * 0.15);
-    const T = this.fdT, V = this.fdV, CAP = 1024;
-    if (this.fdN === CAP) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
-    { const w = (this.fdS0 + this.fdN) & (CAP - 1); T[w] = now; V[w] = this.fdF; this.fdN++; }
-    while (this.fdN > 1 && now - T[this.fdS0] > FLANK_HOLD_S * 1000) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
-    let top = -1e9, low = 1e9; for (let q = 0; q < this.fdN; q++) { const i = (this.fdS0 + q) & (CAP - 1); if (V[i] > top) top = V[i]; if (now - T[i] <= 500 && V[i] < low) low = V[i]; }
-    if (top < this.fdC - FLANK_GONE_DB) this.fdGone += dt; else { if (this.fdGone > 0) { this.fdSpan = this.fdGone; this.fdEnd = now; } this.fdGone = 0; }
-    const above = this.fdF > this.fdC - FLANK_LAND_DB, edge = above && !this.fdAbove; this.fdAbove = above;
-    const span = this.fdGone > 0 ? this.fdGone : now - this.fdEnd < FLANK_GRACE_S * 1000 ? this.fdSpan : 0;
-    if ((frame.level ?? 0) <= FLANK_SILENT_LV) this.fdQuietAt = now;
-    if (!edge || this.fdF - low < FLANK_RISE_DB || (span < FLANK_BREAK_S && !(span >= FLANK_SHORT_S && this.fdC - low >= FLANK_SHORT_RISE_DB))) return false;
-    if (now - this.fdQuietAt < span * 1000 + 500) { this.fdGone = 0; this.fdSpan = 0; if (isLogOn()) console.log(`[dirigent] ingen drop: helt tyst i breaket (latstart), break ${span.toFixed(1)} s`); return false; }
-    this.fdGone = 0; this.fdSpan = 0; this.fdAt = now;
-    if (isLogOn()) console.log(`[dirigent] full drop pa flanken: break ${span.toFixed(1)} s, stigning ${(this.fdF - low).toFixed(1)} dB`);
-    return true;
-  }
+  // (FULL DROP PÅ FLANKEN - flankStep - flyttad till analysatorn 11-09, a3: EN dropdetektor, frame.dropCount/dropDemoted/dropSpaced.)
 
   constructor(private cfg: EngineConfig) { doubleFields(this); doubleFields(this.ctx); }
 
@@ -1204,36 +1173,11 @@ export class EffectEngine {
   /** NÄSTAN-DROP, SEKTIONSLYFT, STOPP-MINI, ENERGILYFT (utbrutet ur render 10-16, GC-jakten: ordagrant flyttat, samma ordning). */
   private stepLifts(frame: Frame, dropActive: boolean): void {
     const nowWall = this.rNowWall, dtNow = this.rDt; let dTarget = this.rDTarget;
-    {   // NASTAN-DROP (standard sedan 10-07; av-brytaren DMX_NEAR_DROP borttagen 10-10)
-      // Baskroppen glattad (120 ms), normalnivan (8 s) och dippens botten (minsta pa 1,5 s, 25 ms-rutor).
-      const x = Math.max(-90, frame.bodyDb ?? -90);
-      if (!this.nearOn) { this.nearOn = true; this.nearB = x; this.nearNorm = x; }
-      this.nearB += (x - this.nearB) * Math.min(1, dtNow / 0.12);
-      this.nearNorm += (this.nearB - this.nearNorm) * Math.min(1, dtNow / 8);
-      // HISTORIKEN I 25 MS-RUTOR AV TID, inte per rendering (drop-agenten 10-12): live renderar motorn i 200 Hz (index.ts RENDER_MS 5),
-      // bänken i 40 Hz - räknat i rutor blev fönstren 5x kortare i ladan än det som mätts (energilyftet jämförde 0,12 s mot 0,4-1,2 s).
-      // EN HISTORIK (10-16): nästan-dropens botten (senaste 60 rutor = 1,5 s) och energilyftets lugn (6..2 s) läser samma lista (förr två
-      // listor med två klockor); botten och lyftet räknas bara när en ny ruta kommer (var 25:e ms), inte varje rendering.
-      // RINGBUFFERT (10-16, GC-jakten): 240 rutor, h(q) = q:e äldsta (förr push/shift på en lista).
-      const h = this.liftHist;
-      if (nowWall - this.histAt >= 25) {
-        this.histAt = nowWall; h[this.liftW] = this.nearB; this.liftW = (this.liftW + 1) % 240; if (this.liftN < 240) this.liftN++;
-        const n = this.liftN, o0 = this.liftW - n + 240;   // h[(o0 + q) % 240] = q:e äldsta
-        // Index med omslag i stället för en modulo per varv (a7): samma rutor i samma ordning, så summorna blir bit-identiska.
-        let f = 1e9; for (let q = Math.max(0, n - 60), j = (o0 + q) % 240; q < n; q++) { const v = h[j]; if (v < f) f = v; if (++j === 240) j = 0; }
-        this.nearFloor = f;
-        if (n >= 240) {
-          let sum = 0; for (let q = 0, j = o0 % 240; q < 160; q++) { sum += h[j]; if (++j === 240) j = 0; }
-          let now6 = 0; for (let q = n - 24, j = (o0 + q) % 240; q < n; q++) { now6 += h[j]; if (++j === 240) j = 0; }
-          this.liftCalm = sum / 160; this.liftLift = now6 / 24 - this.liftCalm;   // senaste 0,6 s mot 6..2 s sedan
-        }
-      }
-      const floor = this.nearFloor;
-      const rise = this.nearB - floor, dip = this.nearNorm - floor;
-      if (rise >= NEAR_RISE_DB && dip >= NEAR_DIP_DB && floor > -80 && this.nearB >= this.nearNorm - 1 && nowWall - this.nearAt > NEAR_REFRACT_MS   // floor > -80: inspelningsavbrott (overrun) ar ingen dipp ('sprang 107 dB', ladan 10-08)
-          && !dropActive) {
+    {   // NASTAN-DROP: analysatorns frame.nearDropDb (VAD + styrka, a3 11-09); här reaktionens refraktärtid och dropgrind
+      const nd = frame.nearDropDb;
+      if (nd > 0 && nowWall - this.nearAt > NEAR_REFRACT_MS && !dropActive) {
         this.nearAt = nowWall; this.nearCount++;
-        console.log(`[dirigent] nastan-drop: sprang ${rise.toFixed(1)} dB efter dipp ${dip.toFixed(1)} dB`);
+        console.log(`[dirigent] nastan-drop: sprang ${nd.toFixed(1)} dB efter dipp ${frame.nearDipDb.toFixed(1)} dB`);
       }
     }
     // SEKTIONSLYFT (ägaren i ladan 10-11 'nu': build -> high, intensitet 0,74 -> 0,88, men varken drop, nästan-drop eller energilyft
@@ -1247,22 +1191,18 @@ export class EffectEngine {
       if (sec === 'high') this.lastHighWall = nowWall;
       if (sec !== '') this.prevRawSec = sec;
     }
-    if (this.nearOn) {   // STOPP-MINI (se STOP_MINI_S)
-      if (this.nearB < this.nearNorm - 12) this.stopRunS += dtNow;
-      else if (this.nearB >= this.nearNorm - 1) {
-        if (this.stopRunS >= STOP_MINI_S && this.stopRunS <= 3 && frame.section === 'high' && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive) {
-          this.fireMini(nowWall, false, false);   // utan MINI_LIFT: basen är redan tillbaka på normalnivån (lyftet tog r_bas_hp i refrängen 0,42 -> 0,38)
-          if (isLogOn()) console.log(`[dirigent] stopp-mini: basen borta ${this.stopRunS.toFixed(2)} s`);
-        }
-        this.stopRunS = 0;
+    if (frame.stopCount !== this.lastStopCount) {   // STOPP-MINI: analysatorns basstopp (frame.stopCount/stopS); refrängen + spärrarna här
+      this.lastStopCount = frame.stopCount;
+      if (frame.section === 'high' && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive) {
+        this.fireMini(nowWall, false, false);   // utan MINI_LIFT: basen är redan tillbaka på normalnivån (lyftet tog r_bas_hp i refrängen 0,42 -> 0,38)
+        if (isLogOn()) console.log(`[dirigent] stopp-mini: basen borta ${frame.stopS.toFixed(2)} s`);
       }
     }
-    if (this.nearOn) {   // ENERGILYFT (se LIFT_DB)
-      // 6 s i 25 ms-rutor AV TID (se HISTORIKEN); lugnet och lyftet räknas i nästan-dropens block (se EN HISTORIK)
-      if (this.liftN >= 240 && nowWall - this.liftAt > LIFT_REFRACT_MS && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && !BUILD_LOOKS.includes(this.smartMode)   // inte under en build (stegringen hör till builden)
-          && this.liftCalm > -80 && this.liftLift >= LIFT_DB) {
+    {   // ENERGILYFT: analysatorns frame.liftDb (VAD + styrka); refraktär, minidrop-spärr, drop och build här
+      const ld = frame.liftDb;
+      if (ld > 0 && nowWall - this.liftAt > LIFT_REFRACT_MS && nowWall - this.lastMiniWall >= MINI_GAP_MS && !dropActive && !BUILD_LOOKS.includes(this.smartMode)) {   // inte under en build (stegringen hör till builden)
         this.fireMini(nowWall, true, true);
-        if (isLogOn()) console.log(`[dirigent] energilyft: kropp ${this.liftLift.toFixed(1)} dB over lugnet`);
+        if (isLogOn()) console.log(`[dirigent] energilyft: kropp ${ld.toFixed(1)} dB over lugnet`);
       }
     }
     this.rDTarget = dTarget;
@@ -1380,9 +1320,9 @@ export class EffectEngine {
     {   // ENKEL ENERGI (se ENERGY_SIMPLE-dokumentationen). md0/sektionsgas/rang borttagna 10-08.
       // FOLJANDE FONSTER (se E_WIN_S)
       const db = 20 * Math.log10(Math.max(1e-5, frame.levelVU ?? frame.level));
-      if (Number.isNaN(this.eHi) && frame.level > INPUT_OFF_LEVEL) { this.eHi = db; this.eLo = db; }
+      if (Number.isNaN(this.eHi) && !frame.silent) { this.eHi = db; this.eLo = db; }
       const k = Math.min(1, dtSec / E_WIN_S);
-      if (frame.level > INPUT_OFF_LEVEL) {   // tystnad flyttar inte fonstret (se TYSTNAD RAKNAS INTE)
+      if (!frame.silent) {   // tystnad flyttar inte fonstret (se TYSTNAD RAKNAS INTE)
         const dw = db;
         this.eHi = dw > this.eHi ? dw : this.eHi + (dw - this.eHi) * k;
         this.eLo = dw < this.eLo ? dw : this.eLo + (dw - this.eLo) * k;
@@ -1400,8 +1340,8 @@ export class EffectEngine {
         : PB_SUBW * 20 * Math.log10(frame.specAbs.sub + 1e-7) + (1 - PB_SUBW) * 20 * Math.log10(frame.specAbs.kick + 1e-7)) : (frame.bodyDb ?? -90);   // BASS_SUBKICK: bara 20-120 Hz (PROV DMX_B_SUBW)
       const inDropLift = nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS;   // PROV DMX_DROP_WIN_S/DROP_TOP
       const bWin = inDropLift && PD_WIN_S > 0 ? PD_WIN_S : PB_WIN_S, kB = bWin > 0 ? Math.min(1, dtSec / bWin) : k;
-      if (Number.isNaN(this.bHi) && frame.level > INPUT_OFF_LEVEL) { this.bHi = bdb; this.bLo = bdb; }
-      if (frame.level > INPUT_OFF_LEVEL) {   // tystnad flyttar inte fönstret
+      if (Number.isNaN(this.bHi) && !frame.silent) { this.bHi = bdb; this.bLo = bdb; }
+      if (!frame.silent) {   // tystnad flyttar inte fönstret
         this.bHi = bdb > this.bHi ? bdb : this.bHi + (bdb - this.bHi) * kB;
         this.bLo = bdb < this.bLo ? bdb : this.bLo + (bdb - this.bLo) * Math.min(1, dtSec / PB_LO_S);
       }
@@ -1585,13 +1525,12 @@ export class EffectEngine {
   /** DROPEN: flanken, spärrarna, efterkontrollen, drop-fönstret och svärtan (utbrutet ur render 10-16, GC-jakten: ordagrant flyttat, samma ordning). */
   private stepDrop(frame: Frame): boolean {
     const nowWall = this.rNowWall;
-    let dropHitRaw = frame.dropCount !== this.lastDropCount;
+    const dropHitRaw = frame.dropCount !== this.lastDropCount;
     this.lastDropCount = frame.dropCount;
-    {   // FULL DROP PÅ FLANKEN: motorns egen flank är drop-källan; analysatorns drop utan egen flank inom 2 s = minidrop
-      const anaHit = dropHitRaw;
-      dropHitRaw = this.flankStep(frame);
-      if (anaHit && !dropHitRaw && nowWall - this.fdAt > 2000) { this.gapMini(nowWall); this.anaDropAt = nowWall; }
-    }
+    // EN DROPDETEKTOR (a3, 11-09): analysatorn klassar - full drop på flanken (dropCount), slam utan flank (dropDemoted) och flank inom
+    // spärren (dropSpaced) är minidrops. Här bara reaktionen: minidrop-looken + lyftet (gapMini).
+    if (frame.dropDemoted !== this.lastDemoted) { this.lastDemoted = frame.dropDemoted; this.gapMini(nowWall); this.anaDropAt = nowWall; }
+    if (frame.dropSpaced !== this.lastSpaced) { this.lastSpaced = frame.dropSpaced; this.dropCalmDenied++; this.gapMini(nowWall); }
     // INGEN DROP I LATENS INLEDNING (ladan 2026-09-24 23:35, tredje gangen 'fortfarande drop i inledning'): intro-grindarna ovan tittar pa
     // sektionen, men den slar om intro -> build strax FORE smallen (kicken som borjar ar sjalva byggstenen). Med DMX_DROP_SONG_HOLD_S > 0
     // fyrar ingen drop/minidrop forsta N s av en lat (klockan startar vid motorstart och vid latgrans = softenRange; INTE pa sektionen - tystnaden fore en drop gor den till intro, 23:31: dropen efter pausen nekades).
@@ -1599,8 +1538,7 @@ export class EffectEngine {
     // den forra - loggen: tre drops pa 10 s (rise 17 -> 20 -> 30). Showen tar hogst en drop per DMX_DROP_MIN_GAP_S. 0 = av.
     // EN SPÄRR FÖR ALLA DROPS (ladan 10-12 12:45 'fel drop': lyft+språng-dropen 12:45:41, sedan analysatorns drop 14 s senare - analysatorns
     // 20 s-spärr (DROP_LONG_MS) räknar bara sina egna). Konsertläget: ingen drop inom SHOW_DROP_GAP_MS från förra, oavsett källa.
-    const dropGapMs = SHOW_DROP_GAP_MS;
-    if (dropGapMs > 0 && dropHitRaw) { if (nowWall - this.lastShowDropWall < dropGapMs) { dropHitRaw = false; this.dropCalmDenied++; this.gapMini(nowWall); } else this.lastShowDropWall = nowWall; }   // spärrad drop -> minidrop (ägaren 10-12: 'tidsspärren skall gälla riktiga bara, så kör den annars som minidrop')
+    // (spärren ligger i analysatorn sedan 11-09: frame.dropSpaced ovan)   // spärrad drop -> minidrop (ägaren 10-12: 'tidsspärren skall gälla riktiga bara, så kör den annars som minidrop')
     let dropHit = dropHitRaw;
     if (dropHit) this.dropLiftUntil = nowWall + DROP_LIFT_MS;   // DROPEN BÄR IN I REFRÄNGEN
     if (nowWall <= this.dropLiftUntil && frame.section === 'high' && this.dropLiftUntil < nowWall + 1000) this.dropLiftUntil = nowWall + 1000;   // LYFTET HÅLLER I REFRÄNGEN
@@ -1890,11 +1828,11 @@ export class EffectEngine {
     // Gain-aware threshold: at high AGC gain the amplified noise floor sits well
     // above 0.05 and reads as flicker — real (even weak) music still lands near
     // the AGC target and passes.
-    // INGÅNGEN AVSTÄNGD: ligger nivån stabilt under INPUT_OFF_LEVEL är det inte ett
+    // INGÅNGEN AVSTÄNGD: är ramen stabilt tyst (frame.silent) är det inte ett
     // tyst parti i musiken utan att källan är av (eller kabeln ur). Då ska riggen vara
     // MÖRK — inte vila på den varma glöden. Kravet på uthållighet gör att ett verkligt
     // break i låten (som dippar men kommer tillbaka) aldrig råkar släcka showen.
-    if (frame.level >= INPUT_OFF_LEVEL) this.inputLowSince = 0;
+    if (!frame.silent) this.inputLowSince = 0;
     else if (!this.inputLowSince) this.inputLowSince = now;
     this.inputOff = !!this.inputLowSince && now - this.inputLowSince > INPUT_OFF_MS;
 
@@ -1909,7 +1847,7 @@ export class EffectEngine {
     // tändpunkt+1 vid gränsen till fullt vid LEVEL_RAMP x gränsen; lägsta steget och effektens mönster rörs inte.
     { const lv = frame.level; this.rampLvl = lv > this.rampLvl ? lv : this.rampLvl + (lv - this.rampLvl) * Math.min(1, dtSec / LEVEL_RAMP_FALL_S);
       const x = (this.rampLvl - silenceLevel) / Math.max(1e-4, (LEVEL_RAMP - 1) * silenceLevel); this.levelRamp = x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x); }
-    if (frame.level > silenceLevel) { this.silenceGate = 1; this.belowSince = 0; }
+    if (!frame.silent) { this.silenceGate = 1; this.belowSince = 0; }   // tystnaden avgörs i analysatorn (frame.silent); gränsen nedan skalar bara rampen
     else {
       const holdMs = Math.max(0, Math.min(5, this.cfg.silenceHoldS ?? 0)) * 1000;
       if (this.belowSince === 0) this.belowSince = nowP;

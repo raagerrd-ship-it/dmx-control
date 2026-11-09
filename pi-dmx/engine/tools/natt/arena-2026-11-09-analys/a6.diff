@@ -1,0 +1,160 @@
+diff --git a/src/analyser.ts b/.arena/analys/a6/src/analyser.ts
+index 870c40a..c823565 100644
+--- a/src/analyser.ts
++++ b/.arena/analys/a6/src/analyser.ts
+@@ -183,6 +183,10 @@ export interface Frame {
+   sectionAgeMs: number;     // ms sedan sektionen borjade
+   sectionIndex: number;     // antal 'high'-partier hittills i laten (refrang nr)
+   sectionTier: number;      // 0 lag / 1 mellan / 2 hog (stabil niva-tier, hysteres 3 s)
++  /** SEKTIONSENERGI EN GÅNG (arena analys a6): DEN hållande energinivån 0..1 som dirigentens tier och pulsens 'lugnt' läser.
++   *  intensity som asymmetrisk EMA (upp 5 s, ned 2 s), snäppt av analysatorns egen drop (>= 0,75) och sektionsgränsen
++   *  (high+tier 2 -> >= 0,75, break/low -> <= 0,35, första 1,5 s). Förr tierEma + subdivEnergy i effects.ts. */
++  sectionEnergy: number;
+   /** UPPREPNING: likhet (cosinus, 0..1) mellan de senaste 4 s och det mest lika partiet >= 16 s tillbaka i laten,
+    *  och hur langt tillbaka det lag samt vilken sektion det hade. repeatSim >= 0,92 mot 'high' = refrangen ar tillbaka.
+    *  Med LOTUS_SECTION_REPEAT (bit 1) ar avtrycket z-normerat och repeatSim typiskt 0,2-0,9 (troskel REPEAT_THR 0,7), se Analyser.REPEAT. */
+@@ -841,6 +845,7 @@ export class Analyser {
+   private bpmSortScratch = new Float64Array(Analyser.BPM_HIST);
+   // Förberäknade EMA-alfor / decay-faktorer (fasta dtHop + fasta tidskonstanter).
+   private dtHop = 0; private hopMs = 0;
++  private secEnergy = 0.5; private secEnergyDrops = 0;   // SEKTIONSENERGI EN GÅNG (se Frame.sectionEnergy)
+ 
+   private aAtt = 0; private aRel = 0; private aVU = 0;
+   private aIUp = 0; private aIDown = 0; private aBandLvl = 0;
+@@ -2786,7 +2791,7 @@ export class Analyser {
+       level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
+       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
+       dropCount: 0, miniDropCount: 0, bodyDb: 0, midHiDb: -120, kickRise: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
+-      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
++      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, sectionEnergy: 0.5, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
+       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
+     };
+     // Ramen och dess delobjekt skrivs varje hop av optimerad kod: ge alla talfalt Double-form redan har (se stabiliseNumbers).
+@@ -3833,6 +3838,16 @@ export class Analyser {
+     this.sectionAggStep();
+     const nowS = SECTION_AGG_HOP ? this.wallNow() : nowWallA;
+     f.section = this.section; f.sectionAgeMs = this.sectionStartMs > 0 ? nowS - this.sectionStartMs : 0; f.sectionIndex = this.sectionIndex; f.sectionTier = this.sectionTier;
++    {   // SEKTIONSENERGI EN GÅNG (a6): ett kontinuerligt mått, dirigenten och pulsen läser det (ingen egen EMA i effects.ts)
++      const tau = intensity > this.secEnergy ? 5.0 : 2.0;
++      this.secEnergy += (intensity - this.secEnergy) * Math.min(1, this.dtHop / tau);
++      if (this.dropCount !== this.secEnergyDrops) { this.secEnergyDrops = this.dropCount; if (this.secEnergy < 0.75) this.secEnergy = 0.75; }   // EN DROP ÄR BEVISET
++      if (f.sectionAgeMs < 1500) {   // SEKTIONEN ÄR BEVISET: high (tier 2) gasar, break/low släpper direkt
++        if (this.section === 'high' && this.sectionTier >= 2) { if (this.secEnergy < 0.75) this.secEnergy = 0.75; }
++        else if ((this.section === 'break' || this.section === 'low') && this.secEnergy > 0.35) this.secEnergy = 0.35;
++      }
++      f.sectionEnergy = this.secEnergy;
++    }
+     f.repeatSim = this.repeatSim; f.repeatAgoMs = this.repeatAgoMs; f.repeatSection = this.repeatSection;
+     f.expectHighInMs = this.section === 'high' ? 0 : this.expectHighMs > 0 ? Math.max(0, this.expectHighMs - nowS) : -1;
+     f.prevSection = this.prevSection; f.levelVsHighDb = this.levelVsHighDb;
+diff --git a/src/effects.ts b/.arena/analys/a6/src/effects.ts
+index b0c8813..a5ef1a8 100644
+--- a/src/effects.ts
++++ b/.arena/analys/a6/src/effects.ts
+@@ -189,7 +189,6 @@ const PULSE_HALVE_HYST_BPM = 15;
+  *  kan inte fungera eftersom materialets nivå vandrar (MÄTT i Lotus: 0.480 →
+  *  0.232 median mellan låtar). Hysteres + min-hold är obligatoriska — utan hold
+  *  gav Lotus en fyrkantsvåg som växlade takt var 12:e sekund. */
+-const SUBDIV_ENERGY_TAU_MS = 8000;
+ const SUBDIV_ENERGY_LO_ON = 0.30;    // under detta: lugnt parti → halvera
+ const SUBDIV_ENERGY_LO_OFF = 0.42;   // över detta: släpp halveringen
+ const SUBDIV_MIN_HOLD_MS = 10000;
+@@ -376,7 +375,6 @@ const SHOW_DROP_GAP_MS = 12000;   // spärr mellan riktiga drops från alla käl
+  *  Osatt = 99 (som i dag, json-identiskt). Hör ihop med golvet: kapa + DMX_DROP_LIFT_FLOOR=0 + DMX_DROP_WIN_S=1 (rapport dag-20261107-drop.md). */
+ const DROP_LAND_CAP = 0.9;   // STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108); förr PROV DMX_DROP_LAND_CAP (99 = utan tak)
+ const DROP_LAND_GAIN = 1.15;     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
+-const SECTION_HIGH_SNAP = 0.75, SECTION_LOW_SNAP = 0.35;   // tierEma-snap vid high/break-grans
+ /** ENERGIN (agarens modell, STANDARD 2026-10-08 i ladan: "mycket battre nu"): ingangens VOLYM (frame.levelVU, ~200 ms) i dB i ett
+  *  FOLJANDE FONSTER - topp: direkt upp, glider ner; botten: direkt ner, glider upp, tidskonstant E_WIN_S, minst E_MIN_DB brett - sa hela
+  *  0..1 anvands oavsett lat och mixerniva. Direkt upp, E_RELEASE_MS ner, upphojd till E_CURVE (ogat ar logaritmiskt), och blir EN
+@@ -518,7 +516,6 @@ export class EffectEngine {
+   private lastPulseIdx = PULSE_IDX_INIT;
+   private pulseFloorMs = 0;
+   /** ~8 s-utjämnad sektionsenergi + när halveringen senast bytte (min-hold). */
+-  private subdivEnergy = 0.5;
+   private subdivChangedAt = 0;
+ 
+   /** Drops mode: per-lamp fire time + hue; advanced on each beat/kick. */
+@@ -586,7 +583,6 @@ export class EffectEngine {
+     let best = top[0].m, bt = Infinity; for (const x of top) { const t = this.lookPlayMs.get(x.m)?.[0] ?? 0; if (t < bt) { bt = t; best = x.m; } } return best;
+   }
+   private buildSince = -1; private buildEntered = false; private lookPlayMs = new Map<Mode, Float64Array>();   // ALLA_LOOKER (speltid per look i en cell: ett decimaltal som Map-värde packades in vid varje set, per ruta - 10-18)
+-  private tierEma = 0.5;   // ihallande intensitet for tier-val (se render)
+   private smartDwellUntil = 0;
+   private warmMs = 0;
+   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
+@@ -603,7 +599,7 @@ export class EffectEngine {
+   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
+   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
+   private lastLiveSection = '';   // DMX_SECTION_SWITCH
+-  dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;
++  dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0;
+   private eSm = 0; eSimple = 0; private eBass = 0; private bHi = NaN; private bLo = NaN; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1; private spreadM0 = new Float64Array(64);   // ENERGIN (se E_WIN_S); spreadM0 = BASGANG
+   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
+   private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
+@@ -1029,30 +1025,9 @@ export class EffectEngine {
+       // sektionen vager redan nar den BORJAR, for tvatten har matt den fardigt
+       // pa hela laten. Det ar precis den skillnaden som gor att showen kan MOTA
+       // en refrang i stallet for att komma efter den.
+-      // Realtidsvagen ar orord for okanda latar och som fallback.
+-      const iNow = this.cfg.energyDrivesMode
+-        ? frame.intensity
+-        : 0.5;
+-      const iTau = iNow > this.tierEma ? 5.0 : 2.0;
+-      this.tierEma += (iNow - this.tierEma) * Math.min(1, _dtT / iTau);
+-      // EN DROP AR BEVISET pa att energin kommit — vanta inte pa medelvardet.
+-      // `intensity` mater den fras som just TAGIT SLUT, alltsa breakdownen. Utan
+-      // det har snappet tror dirigenten att musiken ar LUGN i exakt det ogonblick
+-      // kvallens storsta ogonblick slar till, och valjer en lugn effekt.
+-      // UPPMATT pa agarens material: vid drops lag tierEma pa 0.09-0.47 i sju av
+-      // sjutton fall (dvs "lugn"), och tiern hann ikapp forst efter 3.5 s median
+-      // — plus MIN_HOLD 8 s innan effekten fick bytas. Showen kom alltsa ikapp
+-      // ett tiotal sekunder EFTER dropen.
+-      if (dropHit && this.tierEma < 0.75) this.tierEma = 0.75;
+-      // SEKTIONEN AR BEVISET (DMX_SECTION_SWITCH, 2026-09-21): analysatorns 'high' = topp-tredjedelen av latens EGEN energi
+-      // (rank-lage), sa vid en high-grans vet dirigenten redan att refrangen ar har - gasa direkt (som vid drop), vanta inte
+-      // pa 5 s-medelvardet + hallstid. 'break'/'low' vid gransen: slapp ner direkt (musiken slapper -> showen foljer).
+-      if ((frame.sectionAgeMs ?? 1e9) < 1500) {
+-        // KRASEN (ladan 19:55: 'gasade pa i lugnt parti'): bara nar analysatorns egen energitier ocksa sager topp (sectionTier 2).
+-        if ((frame.section === 'high' && (frame.sectionTier ?? 0) >= 2) && this.tierEma < SECTION_HIGH_SNAP) this.tierEma = SECTION_HIGH_SNAP;
+-        else if ((frame.section === 'break' || frame.section === 'low') && this.tierEma > SECTION_LOW_SNAP) this.tierEma = SECTION_LOW_SNAP;
+-      }
+-      const intensity = this.cfg.energyDrivesMode ? this.tierEma : 0.5;
++      // SEKTIONSENERGI EN GÅNG (arena analys a6): den hållande energin (förr tierEma här: 5 s upp/2 s ned-EMA + drop-snapp +
++      // sektionssnapp vid high/break-gränsen) räknas nu i analysatorn som frame.sectionEnergy - dirigenten läser bara måttet.
++      const intensity = this.cfg.energyDrivesMode ? frame.sectionEnergy : 0.5;
+         // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
+         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.
+         const LUGN = TIER.lugn;
+@@ -1282,14 +1257,13 @@ export class EffectEngine {
+       // (se SUBDIV_*). BPM-REGELN HAR FÖRETRÄDE — i Lotus fick energin skriva över
+       // takt-beslutet och resultatet blev en fyrkantsvåg som växlade var 12:e sekund.
+       const bpmNow = beatMs > 0 ? 60000 / beatMs : 0;
+-      const aE = Math.min(1, (_dtT * 1000) / SUBDIV_ENERGY_TAU_MS);
+-      this.subdivEnergy += (Math.max(0, Math.min(1, frame.intensity)) - this.subdivEnergy) * aE;
++      const secE = frame.sectionEnergy;   // 'lugnt' = analysatorns sektionsenergi (a6: förr en egen 8 s-EMA, subdivEnergy)
+       let wantHalved: boolean | null = null;
+       if (bpmNow > PULSE_HALVE_ABOVE_BPM) wantHalved = true;
+       else if (bpmNow > 0 && bpmNow < PULSE_HALVE_ABOVE_BPM - PULSE_HALVE_HYST_BPM) {
+         // Utanför takt-regelns hysteresband får energin bestämma.
+-        if (!this.pulseHalved && this.subdivEnergy < SUBDIV_ENERGY_LO_ON) wantHalved = true;
+-        else if (this.pulseHalved && this.subdivEnergy > SUBDIV_ENERGY_LO_OFF) wantHalved = false;
++        if (!this.pulseHalved && secE < SUBDIV_ENERGY_LO_ON) wantHalved = true;
++        else if (this.pulseHalved && secE > SUBDIV_ENERGY_LO_OFF) wantHalved = false;
+       }
+       if (wantHalved !== null && wantHalved !== this.pulseHalved
+         && (this.subdivChangedAt === 0 || now2 - this.subdivChangedAt >= SUBDIV_MIN_HOLD_MS)) {
+@@ -1607,11 +1581,11 @@ export class EffectEngine {
+     // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
+     // jamfors energin (eSm, se E_WIN_S) med energin strax fore; har den inte stigit >= DROP_LAND_GAIN doms dropen falsk:
+     // envelope klipps, 20 s-high-fonstret och tiersnappen dras tillbaka. Blixten (0,6 s) hinner synas, inte 20 s fel show.
+-    if (dropHitRaw) { this.dropCheckAt = nowWall + 600; this.preDropLevel = this.eSm; this.preDropTier = this.tierEma; this.liftAt = nowWall; this.nearAt = nowWall; }   // liftAt/nearAt: dropens eget energihopp blir inte en minidrop eller nästan-drop 0,7 s senare (granskningen 11-01: minilyftet låste energin på 1 och tog bort DROP_LIFT_FLOOR i 3 av 4 drops)
++    if (dropHitRaw) { this.dropCheckAt = nowWall + 600; this.preDropLevel = this.eSm; this.liftAt = nowWall; this.nearAt = nowWall; }   // liftAt/nearAt: dropens eget energihopp blir inte en minidrop eller nästan-drop 0,7 s senare (granskningen 11-01: minilyftet låste energin på 1 och tog bort DROP_LIFT_FLOOR i 3 av 4 drops)
+     if (this.dropCheckAt > 0 && nowWall >= this.dropCheckAt) {
+       this.dropCheckAt = 0;
+       const lvl = this.eSm;
+-      if (lvl < Math.min(DROP_LAND_CAP, this.preDropLevel * DROP_LAND_GAIN + 0.02)) { this.dropEnv = 0; this.dropLiftUntil = 0; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
++      if (lvl < Math.min(DROP_LAND_CAP, this.preDropLevel * DROP_LAND_GAIN + 0.02)) { this.dropEnv = 0; this.dropLiftUntil = 0; this.dropFalse++; }
+     }
+     // (drop-snapp till takten forkastad 09-12: taktlaset resettas vid drops, slog aldrig till / gjorde drops sena.)
+     // (analysatorns minidrop-räknare frame.miniDropCount läses inte: V123 10-11 kväll - 17/min, ingen minidrop i konsertläget; bara

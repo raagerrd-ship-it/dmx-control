@@ -1,0 +1,159 @@
+diff --git a/src/analyser.ts b/.arena/analys/a4/src/analyser.ts
+index 870c40a..f542f77 100644
+--- a/src/analyser.ts
++++ b/.arena/analys/a4/src/analyser.ts
+@@ -26,7 +26,7 @@ import {
+   SECTIONS, sectionCode, viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
+   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader, type HopFeed,
+   R_BIGSEQ, R_CLOCK, R_CLOCK_CONF, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N, B_RMS, B_LVL, B_CENT, B_ACTIVE, B_WALL, B_KICK, B_KICKHIT, B_INT, B_BREAK, B_SEC, B_LVH, B_CONF,
+-  B_ENVF, B_ENVBPM, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY, BS_DROPS, BS_MINI, BS_BUILD, BS_RISER, BS_PUNCH, BS_BASS, BS_BRIGHT, BS_BEAT,
++  B_ENVF, B_ENVBPM, B_BODY, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY, BS_DROPS, BS_MINI, BS_BUILD, BS_RISER, BS_PUNCH, BS_BASS, BS_BRIGHT, BS_BEAT,
+   BS_BASSLINE, BS_SPEC_N, BS_SKIPPED, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
+ } from './split.js';
+ import FFT from "fft.js";
+@@ -201,6 +201,8 @@ export interface Frame {
+   specAbs: Spectrum;
+   /** BASKROPPEN I RA dB (negativt tal, medel av sub+kick+bas), utan AGC - drop-detektorns kropp. */
+   bodyDb: number;
++  /** BASEN I dB för ljusets energilager (EN BAS, a4): 0,25 x sub-dB + 0,75 x kick-dB ur snabba banden. */
++  bassDb: number;
+   /** ABSOLUT mid+diskant-niva i dB (band 3-7, >250 Hz), RMS-kombinerad, ingen AGC. */
+   midHiDb: number;
+   /** KICKENS STIGNING, OMÄTTAD (10-28, fynd 10-22/10-27): basens (specAbs sub+kick) stigning i dB mot KICK_RISE_HOPS hop sedan,
+@@ -389,6 +391,12 @@ export class Analyser {
+   private fbAbs = new Float32Array(8); private fbDbRaw = new Float32Array(8); private fbLvl = new Float32Array(8); private fbOn = new Float32Array(8);
+   private fbPeak = new Float32Array(8).fill(1e-4); private fbOnMed = new Float32Array(8); private fbOnMad = new Float32Array(8);
+   private fbAlvl = 0.5; private fbMax = 0; private fbWarm = 0;
++  /** EN BAS (arena analys a4, 11-09): snabba banden 0-2 (fbAbs sub/kick/bas, 3-12 ms, FB_K-kalibrerade mot 2048-dB) är analysatorns
++   *  ENDA bas. Allt annat är transformer av den, räknade här en gång per hop: baseBodyDb = baskroppen (frame.bodyDb, dropdetektorn +
++   *  effekternas flank/lyft/minidrop; effekten utjämnad BODY_TAU_MS som 2048-fönstret), baseDb = sub/kick-dB (frame.bassDb, energilagret),
++   *  energin (frame.energy, punch + registerKick). Förr: 2048-band (bodyDb), snabba banden (energilagret), 512-bin 0-15 (energy). */
++  private static readonly BODY_TAU_MS = 20; private static readonly BASE_SUBW = 0.25; private static readonly BASE_E_K = 0.00115;
++  private basePw = new Float64Array(3); private aBasePw = 0.5; private baseBodyDb = -90; private baseDb = -90;
+   /** Valfri avlyssnare på den stora magnituden (låtminnets fingeravtryck). */
+   private specSink: ((mag: Float32Array, binHz: number) => void) | null = null;
+   setSpectrumSink(fn: ((mag: Float32Array, binHz: number) => void) | null): void { this.specSink = fn; }
+@@ -1813,7 +1821,7 @@ export class Analyser {
+     r[o + B_N] = n; r[o + B_RMS] = this.hRms; r[o + B_LVL] = this.lvlSmooth; r[o + B_CENT] = this.centSmooth; r[o + B_ACTIVE] = this.activeMs;
+     r[o + B_WALL] = this.hNowWall; r[o + B_KICK] = this.hKick ? 1 : 0; r[o + B_KICKHIT] = this.kickHit; r[o + B_INT] = this.hIntensity; r[o + B_BREAK] = this.hBreaking ? 1 : 0;
+     r[o + B_SEC] = sectionCode(this.section); r[o + B_LVH] = this.levelVsHighDb; r[o + B_CONF] = this.localBpmConfidence;
+-    r[o + B_ENVF] = this.bigEnvFlag; r[o + B_ENVBPM] = this.bigEnvBpm; this.bigEnvFlag = 0;
++    r[o + B_ENVF] = this.bigEnvFlag; r[o + B_ENVBPM] = this.bigEnvBpm; this.bigEnvFlag = 0; r[o + B_BODY] = this.baseBodyDb;
+     r[o + B_SEQ] = seq;                                    // sist: recordet ar komplett
+     Atomics.store(ctrl, C_BIG_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
+     // Väckning: taktvägens feed() följer i samma hop och väcker workern - här bara i synk-läget eller utan taktväg.
+@@ -1822,7 +1830,7 @@ export class Analyser {
+     else if (this.syncWorker) syncWait(ctrl, C_BIG_SEQ, () => this.bigRd.read(ctrl, this.bigState!, this.bigCopy, C_BIG_SEQ) && this.bigCopy[BS_SEQ] >= seq);
+     const s = this.bigCopy;
+     if (!this.bigRd.read(ctrl, this.bigState!, s, C_BIG_SEQ) || s[BS_SEQ] === 0) return;
+-    this.hBody = s[BS_BODY]; this.dropCount = s[BS_DROPS]; this.miniDropCount = s[BS_MINI]; this.buildUp = s[BS_BUILD]; this.hInRiser = s[BS_RISER] === 1;
++    this.dropCount = s[BS_DROPS]; this.miniDropCount = s[BS_MINI]; this.buildUp = s[BS_BUILD]; this.hInRiser = s[BS_RISER] === 1;
+     const p = this.outProfile; p.punch = s[BS_PUNCH]; p.bass = s[BS_BASS]; p.bright = s[BS_BRIGHT]; p.beat = s[BS_BEAT]; p.bassline = s[BS_BASSLINE];
+     const sn = s[BS_SPEC_N];
+     if (sn > this.specDelivered) {
+@@ -1851,7 +1859,7 @@ export class Analyser {
+       const wall = r[o + B_WALL];
+       { const po = slot * BIG_HOP_MAX; this.bigRingPush(pcm.subarray(po, po + hn)); }
+       if (++this.bigCounter >= Analyser.BIG_EVERY) this.bigStep();
+-      this.hNowWall = wall; this.hBody = (this.bandDbRaw[0] + this.bandDbRaw[1] + this.bandDbRaw[2]) / 3;
++      this.hNowWall = wall; this.hBody = r[o + B_BODY];   // EN BAS: snabba sidans baskropp
+       this.dSec = SECTIONS[r[o + B_SEC]]; this.dLvh = r[o + B_LVH];
+       this.dropStep();
+       this.hInRiser = this.riserStep();
+@@ -2756,6 +2764,7 @@ export class Analyser {
+         this.fbA[b] = 1 - Math.exp(-dtMs / Analyser.FB_TAU_MS[b]);
+       }
+       this.fbAlvl = 1 - Math.exp(-dtMs / 90);
++      this.aBasePw = 1 - Math.exp(-dtMs / Analyser.BODY_TAU_MS);
+     }
+     this.magBigMax = Math.min(BIG / 2, this.bandHi[7] + 1);
+     this.magBigView = this.magBig.subarray(0, this.magBigMax);
+@@ -2785,7 +2794,7 @@ export class Analyser {
+     this.outFrame = {
+       level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
+       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
+-      dropCount: 0, miniDropCount: 0, bodyDb: 0, midHiDb: -120, kickRise: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
++      dropCount: 0, miniDropCount: 0, bodyDb: 0, bassDb: -90, midHiDb: -120, kickRise: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
+       kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
+       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
+     };
+@@ -2982,7 +2991,7 @@ export class Analyser {
+     // → långt mindre brus än att smootha rå-nivån efter 50Hz-decimering). ≤200 BPM
+     // = ett slag var ≥300ms, så 200ms suddar aldrig ut en äkta beat — bara brus.
+     this.lvlVU += (level - this.lvlVU) * this.aVU;
+-    this.engSmooth = ema(this.engSmooth, energy, aAtt, aRel);
++    if (!Analyser.FAST_BANDS) this.engSmooth = ema(this.engSmooth, energy, aAtt, aRel);   // annars EN BAS (fastBandStep)
+     this.centSmooth = ema(this.centSmooth, centroid, aAtt, aRel);
+ 
+     this.intensityStep();
+@@ -3048,7 +3057,7 @@ export class Analyser {
+       this.pushBig(samples);
+       inRiser = this.hInRiser;
+     } else {
+-      const bodyNow = (this.bandDbRaw[0] + this.bandDbRaw[1] + this.bandDbRaw[2]) / 3;   // ra dB
++      const bodyNow = Analyser.FAST_BANDS ? this.baseBodyDb : (this.bandDbRaw[0] + this.bandDbRaw[1] + this.bandDbRaw[2]) / 3;   // ra dB (EN BAS)
+       this.hBody = bodyNow;
+       this.dSec = this.section; this.dLvh = this.levelVsHighDb;
+       this.dropStep();
+@@ -3390,6 +3399,13 @@ export class Analyser {
+       this.fbOn[b] = warm ? Math.max(0, Math.min(1, (fluxN - oThr) / Math.max(1e-6, this.fbOnMad[b] * 3))) : 0;
+     }
+     { const t = this.fbPrevMag; this.fbPrevMag = this.fbMag; this.fbMag = t; }
++    {   // EN BAS -> dess transformer (se basePw)
++      const A = this.fbAbs, P = this.basePw, a = this.aBasePw, s0 = A[0], s1 = A[1], s2 = A[2];
++      P[0] += (s0 * s0 - P[0]) * a; P[1] += (s1 * s1 - P[1]) * a; P[2] += (s2 * s2 - P[2]) * a;
++      this.baseBodyDb = (10 * Math.log10(P[0] + 1e-14) + 10 * Math.log10(P[1] + 1e-14) + 10 * Math.log10(P[2] + 1e-14)) / 3;
++      this.baseDb = Analyser.BASE_SUBW * 20 * Math.log10(s0 + 1e-7) + (1 - Analyser.BASE_SUBW) * 20 * Math.log10(s1 + 1e-7);
++      this.engSmooth = ema(this.engSmooth, Math.min(1, (s0 + s1 + s2) * Analyser.BASE_E_K * this.gain), this.aAtt, this.aRel);
++    }
+   }
+ 
+   /** Decimerad stor-FFT (var BIG_EVERY:e hop): 2048-magnitud, latminnets spec-sink, basonset-envelope, 8 band (niva/AGC/onset) + swap. */
+@@ -3818,7 +3834,7 @@ export class Analyser {
+     f.energy = this.engSmooth;
+     f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
+     f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.intensity = intensity; f.beatAnchorMs = this.beatAnchorMs;
+-    f.bodyDb = bodyNow;
++    f.bodyDb = Analyser.FAST_BANDS ? this.baseBodyDb : bodyNow; f.bassDb = Analyser.FAST_BANDS ? this.baseDb : bodyNow;   // EN BAS (snabba sidan, ingen workerfördröjning)
+     {   // kickRise: basens dB mot KICK_RISE_HOPS hop sedan (ringen håller de senaste), halvvåg
+       const db = 20 * Math.log10(A[0] + A[1] + 1e-7), old = this.kickRiseDb[this.kickRisePos];
+       this.kickRiseDb[this.kickRisePos] = db; this.kickRisePos = (this.kickRisePos + 1) % Analyser.KICK_RISE_HOPS;
+diff --git a/src/effects.ts b/.arena/analys/a4/src/effects.ts
+index b0c8813..ee607ea 100644
+--- a/src/effects.ts
++++ b/.arena/analys/a4/src/effects.ts
+@@ -431,7 +431,7 @@ const B_CURVE = 3, B_MIN_DB = 6, B_LO_S = 0.25;   // B_LO_S 1 -> 0,25 (STANDARD
+  *  lyft som golv (1 = som i dag). */
+ const envN = (k: string, d: number): number => { const v = process.env[k]; return v === undefined || v === '' ? d : Number(v); };
+ const PB_LO_S = envN('DMX_B_LO_S', B_LO_S), PB_CURVE = envN('DMX_B_CURVE', B_CURVE), PB_MIN_DB = envN('DMX_B_MIN_DB', B_MIN_DB);
+-const PB_WIN_S = envN('DMX_B_WIN_S', 0), PB_TOP = envN('DMX_B_TOP', 0), PB_RELEASE_MS = envN('DMX_B_RELEASE_MS', 0), PB_SUBW = envN('DMX_B_SUBW', 0.25);   // 0,5 -> 0,25 (STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108))
++const PB_WIN_S = envN('DMX_B_WIN_S', 0), PB_TOP = envN('DMX_B_TOP', 0), PB_RELEASE_MS = envN('DMX_B_RELEASE_MS', 0);   // (PB_SUBW flyttad till analysatorn: Analyser.BASE_SUBW, EN BAS a4)   // 0,5 -> 0,25 (STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108))
+ const PD_WIN_S = envN('DMX_DROP_WIN_S', 1),   // 0 -> 1 (STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108))
+       PD_TOP = envN('DMX_DROP_TOP', 0), PM_LIFT_FLOOR = envN('DMX_MINI_LIFT_FLOOR', 1);
+ /** BASENERGIN BARA SUB+KICK (opt-in DMX_BASS_SUBKICK=1, porterat från lotus 10-15: ägaren i källaren 'känns dock som att den följer inte bara
+@@ -1396,8 +1396,7 @@ export class EffectEngine {
+       // (volymfönstret ovan - eSm - styr inte ljuset längre, bara dropens efterkontroll (DROP_LAND_GAIN); orört så dropsen är desamma)
+       // BASENERGIN (se B_CURVE): baskroppen (frame.bodyDb, sub+kick+bas i rå dB) i ett följande fönster - topp direkt upp/E_WIN_S ner,
+       // dal direkt ner/B_LO_S upp - energin mäter hur långt över basens senaste dal vi är: varje bastryck svänger över skalan.
+-      const bdb = frame.specAbs ? (PB_SUBW === 0.5 ? (20 * Math.log10(frame.specAbs.sub + 1e-7) + 20 * Math.log10(frame.specAbs.kick + 1e-7)) / 2
+-        : PB_SUBW * 20 * Math.log10(frame.specAbs.sub + 1e-7) + (1 - PB_SUBW) * 20 * Math.log10(frame.specAbs.kick + 1e-7)) : (frame.bodyDb ?? -90);   // BASS_SUBKICK: bara 20-120 Hz (PROV DMX_B_SUBW)
++      const bdb = frame.bassDb ?? frame.bodyDb ?? -90;   // EN BAS (a4): analysatorns bas i dB (sub/kick-vikten räknas där, Analyser.BASE_SUBW)
+       const inDropLift = nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS;   // PROV DMX_DROP_WIN_S/DROP_TOP
+       const bWin = inDropLift && PD_WIN_S > 0 ? PD_WIN_S : PB_WIN_S, kB = bWin > 0 ? Math.min(1, dtSec / bWin) : k;
+       if (Number.isNaN(this.bHi) && frame.level > INPUT_OFF_LEVEL) { this.bHi = bdb; this.bLo = bdb; }
+diff --git a/src/split.ts b/.arena/analys/a4/src/split.ts
+index ba95bfe..a53129d 100644
+--- a/src/split.ts
++++ b/.arena/analys/a4/src/split.ts
+@@ -174,9 +174,9 @@ export function syncWait(ctrl: Int32Array, word: number, ready: () => boolean):
+ // 2048-spektrumet till låtgränsens sink) går tillbaka i ett eget tillståndsblock. I inline/synk-läget körs recordet inom samma
+ // process() -> bit-identiskt; i realtid ligger de här fälten workerns fördröjning efter (p50 ~1 hop).
+ // Bara med FAST_BANDS + SECTION_AGG 'hop' (DMX); annars kör snabba sidan allt som förr.
+-export const BIG_REC_LEN = 16, BIG_RING_N = 2048, BIG_HOP_MAX = 256;
++export const BIG_REC_LEN = 17, BIG_RING_N = 2048, BIG_HOP_MAX = 256;
+ export const B_SEQ = 0, B_N = 1, B_RMS = 2, B_LVL = 3, B_CENT = 4, B_ACTIVE = 5, B_WALL = 6, B_KICK = 7, B_KICKHIT = 8, B_INT = 9, B_BREAK = 10,
+-  B_SEC = 11, B_LVH = 12, B_CONF = 13, B_ENVF = 14, B_ENVBPM = 15;
++  B_SEC = 11, B_LVH = 12, B_CONF = 13, B_ENVF = 14, B_ENVBPM = 15, B_BODY = 16 /* EN BAS: snabba sidans baskropp (dB) */;
+ export const C_BIG_WRITE = 8, C_BIG_READ = 9, C_BIG_SEQ = 10 /* stora vägens seqlock */, C_WAITING_B = 11 /* analysatortråden väntar (två trådar, se slowWorker) */;
+ export const BS_SEQ = 0, BS_BODY = 1, BS_DROPS = 2, BS_MINI = 3, BS_BUILD = 4, BS_RISER = 5, BS_PUNCH = 6, BS_BASS = 7, BS_BRIGHT = 8, BS_BEAT = 9,
+   BS_BASSLINE = 10, BS_SPEC_N = 11 /* antal 2048-spektra skrivna */, BS_SKIPPED = 12;

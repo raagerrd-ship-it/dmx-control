@@ -1,0 +1,193 @@
+diff --git a/src/analyser.ts b/.arena/analys/a5/src/analyser.ts
+index 870c40a..f9cec25 100644
+--- a/src/analyser.ts
++++ b/.arena/analys/a5/src/analyser.ts
+@@ -26,7 +26,7 @@ import {
+   SECTIONS, sectionCode, viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
+   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader, type HopFeed,
+   R_BIGSEQ, R_CLOCK, R_CLOCK_CONF, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N, B_RMS, B_LVL, B_CENT, B_ACTIVE, B_WALL, B_KICK, B_KICKHIT, B_INT, B_BREAK, B_SEC, B_LVH, B_CONF,
+-  B_ENVF, B_ENVBPM, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY, BS_DROPS, BS_MINI, BS_BUILD, BS_RISER, BS_PUNCH, BS_BASS, BS_BRIGHT, BS_BEAT,
++  B_ENVF, B_ENVBPM, B_BNOTE, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY, BS_DROPS, BS_MINI, BS_BUILD, BS_RISER, BS_PUNCH, BS_BASS, BS_BRIGHT, BS_BEAT,
+   BS_BASSLINE, BS_SPEC_N, BS_SKIPPED, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
+ } from './split.js';
+ import FFT from "fft.js";
+@@ -195,6 +195,9 @@ export interface Frame {
+    *  levelVsHighDb = blockets dB mot senaste refrangens medel-dB (negativt = tystare an refrangen; 0 utan refrang) - latens EGEN
+    *  referens for dynamiken. sectionBars = takter sedan sektionsstart (0 utan tempo). */
+   expectHighInMs: number; prevSection: string; levelVsHighDb: number; sectionBars: number;
++  /** BASNOT-ANSLAG (a5): analysatorns ENDA basnotsräknare (bassNoteStep) - +1 per basnot. Effekterna stegar på den, profile.bassline
++   *  = dess anslag per slag. */
++  bassNoteIdx: number;
+   /** Rikt spektrum + per-band onset (anslag) från dubbel-FFT:n (hög-upplöst). */
+   spec: Spectrum;       // per-band NIVÅ (AGC 0..1)
+   /** Absolut per-band magnitud före AGC, för Lotus ljusväg och bandandelar. */
+@@ -294,10 +297,10 @@ const GHOST_MS = 12000;
+  *  konstruktorn (se slutet av constructor) sa kartan inte deprecerar mitt i driften. Fyra av dem stod har redan sedan 896ab7c. */
+ const DOUBLE_FROM_START = [
+   'secHiStartMs', 'expectHighMs', 'levelVsHighDb',
+-  'sumSq', 'lastT', 'dbgRms', 'lastKick', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum', 'lvlSmooth', 'lvlVU', 'engSmooth', 'activeMs',
++  'sumSq', 'lastT', 'dbgRms', 'lastKick', 'envAccum', 'envAccumT', 'envBassAccum', 'lvlSmooth', 'lvlVU', 'engSmooth', 'activeMs',
+   'buildUp', 'novSlow', 'kickHit', 'snareHit', 'hatHit', 'bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs',
+   'lastMiniGoneMs', 'lastMiniMs', 'pendingKickMs', 'pendingKickW', 'kfPrev', 'kfPrev2', 'beatAnchorMs',
+-  'blPrev1', 'blPrev2', 'blTrough', 'profBassline', 'bassOnsetsPerBeat',
++  'bnPrev', 'bnTrough', 'bnSinceMs', 'profBassline', 'bassOnsetsPerBeat',
+   'lastConfMs', 'lastVoteMs', 'lowConfSinceMs', 'newSongVote', 'lockPeak', 'nearChallenger', 'octaveVote', 'rawBpmLast', 'localBpmConfidence',
+   'secPct', 'secSongStartMs', 'sectionStartMs', 'secBlkMs', 'secBlkInt', 'secBlkCent', 'secBlkRms2', 'secCurDbSum', 'repeatSim', 'repeatAgoMs',
+   'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt',   // byter forst vid forsta drop-episoden (sags i andra matningen)
+@@ -911,11 +914,14 @@ export class Analyser {
+   get tempoGramSnapshot(): Float32Array { return this.tempoGram; }
+   private static readonly TG_KEEP = 0;      // hintTrackChange: 0 = nolla tempogrammet, (0,1) = skala ner
+   private static readonly REFRAC_ATT = 0;   // env-ringens refraktar: 0 = nolla sampel efter stort anslag
+-  /** TYDLIG BASGANG: basNOTER (bandLvl[1]+bandLvl[2], 60-250 Hz) mellan kickarna pa env-rastret; en topp ar en not om den
+-   *  reser sig >= 25 % av senaste topphojd over dalen och inte ligger inom 60 ms efter en kick. Noter per slag (2 s fonster)
+-   *  -> profile.bassline 0..1, glattat ~1 s. */
+-  private blAccum = 0; private blPrev1 = 0; private blPrev2 = 0; private blRef = 0.1; private blLastOnset = -100;
+-  private blOnsets = new Int32Array(32); private blOnsetPos = 0; private envSeq = 0; private profBassline = 0; private blTrough = 1; private blKickSeq = -100;
++  /** BASNOT-ANSLAG (a5, arenan analys 11-09): EN anslagsräknare. Förr tre: stepBassline (egen topp-plockare på bandLvl[1]+[2] i
++   *  env-rastret -> profile.bassline), effekternas bassNoteIdx (flank på onset.bass var 25:e ms) och klockans basgångsstigning.
++   *  Nu: bassNoteStep (snabba vägen, varje hop) = flank på ramens onset.bass (>= BN_ON, stigit >= BN_RISE över dalen, BN_COOL_MS
++   *  mellan noterna) -> frame.bassNoteIdx. Långsamma vägen (stepBassline) räknar SAMMA anslag (recordets B_BNOTE): noter som inte
++   *  ligger inom 60 ms efter en kick, per slag (2 s fönster) -> profile.bassline 0..1, glattat ~1 s. Basgångens tydlighet = takten. */
++  private static readonly BN_ON = 0.30; private static readonly BN_RISE = 0.10; private static readonly BN_COOL_MS = 90; private static readonly BN_LEAK = 0.004;
++  bassNoteIdx = 0; private bnPrev = 0; private bnTrough = 0; private bnSinceMs = 1e9; private bnFired = false; private bnHit = 0;
++  private blOnsets = new Int32Array(32); private blOnsetPos = 0; private envSeq = 0; private profBassline = 0; private blKickSeq = -100;
+   bassOnsetsPerBeat = 0;
+   // DIAGNOSTIK (<prefix>HIGH_DIAG / HIGH_VOTE): diskant-onset-ring (bandOn[6]/[7]) - mater om diskanten bar tempot.
+   private envHighRing = new Float32Array(Analyser.ENV_LEN);
+@@ -1670,19 +1676,24 @@ export class Analyser {
+     if (++this.bpmCounter >= stride) { this.bpmCounter = 0; this.computeBpm(); if (Analyser.GRID_PHASE_ON && this.localBpm > 0) this.computeGridPhase(); }
+   }
+ 
+-  /** TYDLIG BASGANG (env-rastret, 100 Hz): se blAccum. */
++  /** BASNOT-ANSLAG, snabba vägen (varje hop, efter banden): flanken på onset.bass (samma värde som ramen publicerar). */
++  private bassNoteStep(): void {
++    const bo = (Analyser.FAST_BANDS ? this.fbOn : this.bandOn)[2], prev = this.bnPrev; this.bnPrev = bo;
++    this.bnSinceMs += this.hopMs; this.bnHit = 0;
++    if (this.bnFired) { if (bo < prev) { this.bnFired = false; this.bnTrough = bo; } return; }
++    if (bo < this.bnTrough) this.bnTrough = bo; else this.bnTrough += Math.min(bo - this.bnTrough, Analyser.BN_LEAK);
++    if (bo >= Analyser.BN_ON && bo - this.bnTrough >= Analyser.BN_RISE && this.bnSinceMs >= Analyser.BN_COOL_MS) {
++      this.bassNoteIdx++; this.bnSinceMs = 0; this.bnFired = true; this.bnHit = 1;
++    }
++  }
++  /** Ett basnot-anslag i långsamma vägens env-raster (utom inom 60 ms efter en kick: basgången är noterna MELLAN kickarna). */
++  private blNote(): void {
++    const seq = this.envSeq;
++    if (seq - this.blKickSeq >= 6) { this.blOnsets[this.blOnsetPos] = seq; this.blOnsetPos = (this.blOnsetPos + 1) & 31; }
++  }
++  /** TYDLIG BASGANG (env-rastret, 100 Hz): basnot-anslagen per slag (se bassNoteStep). */
+   private stepBassline(): void {
+-    const v = this.blAccum; this.blAccum = 0;
+     const seq = ++this.envSeq;
+-    const p1 = this.blPrev1;
+-    if (v < this.blTrough) this.blTrough = v;
+-    if (p1 >= this.blPrev2 && p1 > v && p1 > 0.05 && p1 - this.blTrough >= 0.25 * this.blRef && seq - 1 - this.blLastOnset >= 6) {
+-      if (seq - 1 - this.blKickSeq >= 6) { this.blOnsets[this.blOnsetPos] = seq - 1; this.blOnsetPos = (this.blOnsetPos + 1) & 31; }
+-      this.blLastOnset = seq - 1;
+-      this.blRef += (p1 - this.blRef) * 0.1;
+-      this.blTrough = p1;
+-    } else if (this.blRef > 0.05) this.blRef *= 0.999;
+-    this.blPrev2 = p1; this.blPrev1 = v;
+     let n = 0; for (let i = 0; i < 32; i++) if (seq - this.blOnsets[i] <= 200 && this.blOnsets[i] > 0) n++;
+     const beats2s = (this.dBpm > 0 ? this.dBpm : 120) / 30;
+     const opb = n / beats2s;
+@@ -1813,7 +1824,7 @@ export class Analyser {
+     r[o + B_N] = n; r[o + B_RMS] = this.hRms; r[o + B_LVL] = this.lvlSmooth; r[o + B_CENT] = this.centSmooth; r[o + B_ACTIVE] = this.activeMs;
+     r[o + B_WALL] = this.hNowWall; r[o + B_KICK] = this.hKick ? 1 : 0; r[o + B_KICKHIT] = this.kickHit; r[o + B_INT] = this.hIntensity; r[o + B_BREAK] = this.hBreaking ? 1 : 0;
+     r[o + B_SEC] = sectionCode(this.section); r[o + B_LVH] = this.levelVsHighDb; r[o + B_CONF] = this.localBpmConfidence;
+-    r[o + B_ENVF] = this.bigEnvFlag; r[o + B_ENVBPM] = this.bigEnvBpm; this.bigEnvFlag = 0;
++    r[o + B_BNOTE] = this.bnHit; r[o + B_ENVF] = this.bigEnvFlag; r[o + B_ENVBPM] = this.bigEnvBpm; this.bigEnvFlag = 0;
+     r[o + B_SEQ] = seq;                                    // sist: recordet ar komplett
+     Atomics.store(ctrl, C_BIG_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
+     // Väckning: taktvägens feed() följer i samma hop och väcker workern - här bara i synk-läget eller utan taktväg.
+@@ -1845,7 +1856,8 @@ export class Analyser {
+       if (r[o + B_SEQ] !== seq) { this.bigSkipped++; continue; }
+       const hn = r[o + B_N];
+       // basgången (process(): ackumulatorn med förra 2048-bandens nivå och förra hoppets kick, sedan env-sampelns steg)
+-      { const bl = this.bandLvl[1] + this.bandLvl[2]; if (bl > this.blAccum) this.blAccum = bl; if (this.kickHit >= 1) this.blKickSeq = this.envSeq; }
++      if (this.kickHit >= 1) this.blKickSeq = this.envSeq;
++      if (r[o + B_BNOTE] === 1) this.blNote();
+       if (r[o + B_ENVF] === 1) { this.dBpm = r[o + B_ENVBPM]; this.stepBassline(); }
+       this.hRms = r[o + B_RMS]; this.lvlSmooth = r[o + B_LVL]; this.centSmooth = r[o + B_CENT]; this.activeMs = r[o + B_ACTIVE]; this.kickHit = r[o + B_KICKHIT];
+       const wall = r[o + B_WALL];
+@@ -2786,7 +2798,7 @@ export class Analyser {
+       level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
+       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
+       dropCount: 0, miniDropCount: 0, bodyDb: 0, midHiDb: -120, kickRise: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
+-      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
++      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0, bassNoteIdx: 0,
+       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
+     };
+     // Ramen och dess delobjekt skrivs varje hop av optimerad kod: ge alla talfalt Double-form redan har (se stabiliseNumbers).
+@@ -2953,7 +2965,7 @@ export class Analyser {
+     if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
+     // TYDLIG BASGANG: basnivans topp per env-sampel + senaste kick (se stepBassline).
+     const big = this.bigOn;   // STORA VÄGEN (fast): basgången, 2048-vägen, drop, riser, profil och sektionsaggregatet körs i långsamma tråden
+-    if (!big) { const bl = this.bandLvl[1] + this.bandLvl[2]; if (bl > this.blAccum) this.blAccum = bl; if (this.kickHit >= 1) this.blKickSeq = this.envSeq; }
++    if (!big && this.kickHit >= 1) this.blKickSeq = this.envSeq;
+     if (HIGH_ON) { const hi = this.bandOn[6] > this.bandOn[7] ? this.bandOn[6] : this.bandOn[7]; if (hi > this.envHighAccum) this.envHighAccum = hi; }
+     this.envAccumT += hopMs;
+     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) this.envSampleStep();
+@@ -3042,6 +3054,7 @@ export class Analyser {
+     // `inZone` lämnas orörd: effektlagret använder den som "musiken ligger högt".
+ 
+     this.hKick = kick; this.hNowWall = nowWallA;
++    this.bassNoteStep(); if (!big && this.bnHit) this.blNote();
+     let inRiser: boolean;
+     if (big) {
+       this.hIntensity = intensity; this.hBreaking = breaking;
+@@ -3825,6 +3838,7 @@ export class Analyser {
+       f.kickRise = old !== 0 && db > old ? db - old : 0;
+     }
+     { let s2 = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, (FB ? this.fbDbRaw : this.bandDbRaw)[b] / 20); s2 += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s2)); }
++    f.bassNoteIdx = this.bassNoteIdx;
+     f.dropCount = this.dropCount; f.miniDropCount = this.miniDropCount; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
+     f.kickAtMs = kickAtMs; f.barShift = barShift;
+     // Gridfasen ut: konstant offset (detektorns slap) och/eller trim. Bada 0/av som standard => oforandrad fas.
+diff --git a/src/effects.ts b/.arena/analys/a5/src/effects.ts
+index b0c8813..362b575 100644
+--- a/src/effects.ts
++++ b/.arena/analys/a5/src/effects.ts
+@@ -495,11 +495,10 @@ export class EffectEngine {
+   private chasePos = 0;
+   private chaseDir = 1;
+   private lastChaseAdvance = 0;
+-  /** BASNOTSRAKNARE (2026-09-23): stegar pa basnots-anslag (frame.onset.bass-flank, 90 ms cooldown) - for effekter som "stegar
++  /** BASNOTSRAKNARE: spegel av analysatorns frame.bassNoteIdx (a5: räknaren flyttad till Analyser.bassNoteStep) - for effekter som "stegar
+    *  pa basnoter" (chase/eko/stege/basgang) nar profile.bassline ar tydlig. Samma slags motorhjalp som chasePos/gravLevel. */
+   private bassNoteIdx = 0;
+   private lastBassNoteMs = -1e9;
+-  private prevBassOnset = 0;
+   /** Beat clock: last whole-beat index seen (för beatTick-flanken). */
+   private lastBeatIdx = -1; private slagWaitAt = -1;
+   /** Takt-räknare som effekterna ser (beatIdx): stegar på grid-slaget när BPM är
+@@ -2072,10 +2071,10 @@ export class EffectEngine {
+     ctx.phaseSpread = 1 + ctx.buildUp * 2.5; ctx.punchFloor = punchFloor;
+     ctx.chasePos = this.chasePos; ctx.dropFired = this.dropFired;
+     ctx.dropHue = this.dropHue; ctx.now = nowP;
+-    // BASNOTER: flank pa onset.bass (per-band anslag 0..1, adaptiv baslinje) med 90 ms cooldown -> ett steg per basnot.
+-    { const bo = frame.onset?.bass ?? 0;
+-      if (bo >= 0.30 && bo - this.prevBassOnset >= 0.10 && now - this.lastBassNoteMs >= 90) { this.bassNoteIdx++; this.lastBassNoteMs = now; }
+-      this.prevBassOnset = bo; }
++    // BASNOTER: analysatorns basnotsräknare (frame.bassNoteIdx, EN anslagsräknare - se Analyser.bassNoteStep); här bara när
++    // effekterna SÅG noten (ålderns klocka = rutans).
++    { const bn = frame.bassNoteIdx ?? 0;
++      if (bn !== this.bassNoteIdx) { this.bassNoteIdx = bn; this.lastBassNoteMs = now; } }
+     ctx.sectionBars = frame.sectionBars ?? 0; ctx.bassline = frame.profile?.bassline ?? 0;
+     ctx.bassNoteIdx = this.bassNoteIdx; ctx.bassNoteAge = Math.min(9, (now - this.lastBassNoteMs) / 1000);
+     ctx.want.strobe = undefined; ctx.want.blinder = undefined;
+diff --git a/src/split.ts b/.arena/analys/a5/src/split.ts
+index ba95bfe..b5761e4 100644
+--- a/src/split.ts
++++ b/.arena/analys/a5/src/split.ts
+@@ -174,9 +174,9 @@ export function syncWait(ctrl: Int32Array, word: number, ready: () => boolean):
+ // 2048-spektrumet till låtgränsens sink) går tillbaka i ett eget tillståndsblock. I inline/synk-läget körs recordet inom samma
+ // process() -> bit-identiskt; i realtid ligger de här fälten workerns fördröjning efter (p50 ~1 hop).
+ // Bara med FAST_BANDS + SECTION_AGG 'hop' (DMX); annars kör snabba sidan allt som förr.
+-export const BIG_REC_LEN = 16, BIG_RING_N = 2048, BIG_HOP_MAX = 256;
++export const BIG_REC_LEN = 17, BIG_RING_N = 2048, BIG_HOP_MAX = 256;
+ export const B_SEQ = 0, B_N = 1, B_RMS = 2, B_LVL = 3, B_CENT = 4, B_ACTIVE = 5, B_WALL = 6, B_KICK = 7, B_KICKHIT = 8, B_INT = 9, B_BREAK = 10,
+-  B_SEC = 11, B_LVH = 12, B_CONF = 13, B_ENVF = 14, B_ENVBPM = 15;
++  B_SEC = 11, B_LVH = 12, B_CONF = 13, B_ENVF = 14, B_ENVBPM = 15, B_BNOTE = 16 /* a5: basnot-anslag i hoppet */;
+ export const C_BIG_WRITE = 8, C_BIG_READ = 9, C_BIG_SEQ = 10 /* stora vägens seqlock */, C_WAITING_B = 11 /* analysatortråden väntar (två trådar, se slowWorker) */;
+ export const BS_SEQ = 0, BS_BODY = 1, BS_DROPS = 2, BS_MINI = 3, BS_BUILD = 4, BS_RISER = 5, BS_PUNCH = 6, BS_BASS = 7, BS_BRIGHT = 8, BS_BEAT = 9,
+   BS_BASSLINE = 10, BS_SPEC_N = 11 /* antal 2048-spektra skrivna */, BS_SKIPPED = 12;
