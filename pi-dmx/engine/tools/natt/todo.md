@@ -5,6 +5,11 @@
   (analysatorn ger ALL låtinfo -> dirigenten väljer effekt -> effekten styr ljuset; motorn analyserar inget själv). Kör ARENOR i tur
   och ordning tills ca 18:30 den 9:e, och skriv sedan rapporten:
   1. ARENA: EN TEMPO I HELA MOTORN (pågår): klockan in i analysatorn, KRAV EN KÄLLA.
+     KLART 2026-11-09 08:20: vinnaren mta = KOD e451800 (backup/fore-entempo-20261109, tagg entempo-mta): f0 + a2f två tempominnen +
+     t1f tillit repeatRate*tgClear + m1f manusTog kräver tydlig basgång; kontrollmängden +8,90 utan DISK (latens 100->90, mix_las 4,28->2,82,
+     ned_s 2,30->0,30); övningen DISK ned_s 3,00. Rapport tools/natt/arena-2026-11-09-entempo/RAPPORT.md. REDO FÖR LADAN:
+     `PYTHONIOENCODING=utf-8 PI_HOST=10.171.211.218 python tools/ladan.py` (OBS deployspärren mot lotus-kopian tills lotus portat).
+     Domaren under körningen: lampspr på MEDLET (domare.py 1cf4d1d), CPU ingen poäng/Pi-budget 130 us/hop, KRAV EN KÄLLA -3,0.
   2. Död kod (DUBBLA KÄLLOR 9): md5-identiskt, en commit. Ingen arena.
   3. ARENA: ANALYS UT UR MOTORN. Allt låtanalytiskt i effects.ts flyttas in i analysatorn och publiceras i ramen:
      - drop (flankStep -> en detektor; bänkens drop-mått pekar på den)
