@@ -15,6 +15,17 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-09 DELAD FIL ÄNDRAD: LOTUSPARITET 0 (ersätter posten nedan om lotus-påverkan)
+Vad: analyser.ts (md5 8e22d6d0) har lotus gamla temposökning och skugga tillbaka ORDAGRANT bakom ETT profilvärde: OWN_TEMPO =
+sys.BEAT_FEED saknas (lotus) -> som förr, klockan av; 'slow'/'inline' (DMX) -> analyserClock.ts är enda tempot. split.ts 4b5312c1,
+slowWorker.ts ab875f44, analyserClock.ts c7525c9a (ny, krävs av analyser.ts även i lotus), recorder.ts orörd. Manifestet skrivet.
+Bevis (tools/natt/arena-2026-11-09-entempo/paritet-losning.md): lotus profil paritet.mjs 120 s all/inline/sync lang1021 17578ad3b8fc =
+gammal, lang1011 05529e96d5bd = gammal; analyserParity --style lotus lang1021 0/45 000 hop med och utan --grid. DMX: dmxDump sync +
+dmxDumpMoment inline hela lang1021 + lang1107 identiska med e451800.
+Önskat: kopiera de FYRA delade filerna + ANALYSER_SHARED.md5 till lotus-light-link/pi/src/audio-analyser (lotus profil oförändrad = lotus ljus
+oförändrat), tsc --noEmit. Huvudchatten tar synken efter ägarens besked (nattagenten skriver inte i lotus). Tills dess säger analyser_shared.check:
+split.ts/slowWorker.ts skiljer, analyserClock.ts saknas i lotus.
+
 ## ÖPPET 2026-11-09 DELAD FIL ÄNDRAD: EN KLOCKA i analysatorn (arenan entempo, vinnaren mta)
 Vad: dmx (dagkörningen 11-09, ägaren: 'måste vara en och inte två' + 'allt skall ju ligga i analysatorn') ändrar analyser.ts, split.ts,
 slowWorker.ts och lägger till en NY delad fil analyserClock.ts (recorder.ts orörd). Manifestet src/ANALYSER_SHARED.md5 är skrivet (analyser.ts
