@@ -1,5 +1,25 @@
 # Natt-agentens uppdrag
 
+## HÖGSTA PRIO NATTEN 2026-11-09 -> 10: FINTEMPOT (ägaren i ladan 18:50: "Ja, lägg in fintempot till nattagenten")
+LÄGET: LIVE i ladan sedan 18:30 = HEAD f01fed9 (8f89cf1 + DUBBLA 6/7). Lotus LIVE 17:37 på samma delade analysator (lotus 1f4b357e, nyckel id_pidmx).
+Ladan-mätning 10 min (websocket, beatErr = kickarnas fasfel mot rutnätet): tillit >= 0,35 91 %, tempohopp bara kring låtbyten, men
+FAST FASFEL PER LÅT 40-60 ms som byter tecken mellan låtarna (-55/-60 ms i en 82 bpm-låt, +28..+51 ms i en 94-96 bpm-låt) =
+tempot ligger lite fel i varje låt -> rutnätet driver. Det är vad p2:s fintempo rättar.
+1. RÄTTA DOMAREN FÖRST (fynd fasjobbet 11-09, verifierat): tools/arena/tvavagarKor.mjs:113 och tools/sektionLag.mjs:91 startar `let hit = -1`,
+   så ett skifte som etiketten aldrig följer inom 20 s räknas som träff på -1 s (bästa möjliga) - `traff` alltid 100 %. HEAD missar 6/14 upp och
+   4/11 ned på kontrollmängden. Räkna missen som miss (traff < 100 %) och dess lag som 20 s i upp_s/ned_s. Bänka om bas, säg det i rapporten.
+2. MÄT gridfel PÅ SAMMA FÖNSTER FÖR ALLA: i dag räknas bara fönster där variantens EGEN tillit >= 0,35, så en variant vinner gridfel genom att
+   sänka tilliten där rutnätet är fel (p2:s tydlighetsdel: megamix 128 ms, lang1011 165 ms föll ur). Använd basens fönster (eller alla låsta
+   fönster) för alla varianter; behåll den gamla siffran bredvid.
+3. FINTEMPOT ENSAM: .arena/fas/p2/losning.diff har två delar - (a) FINTEMPOT: parabel genom skanningens tre bästa tempon (scanS/bestC) + slaget
+   i fönstrets mitt (scanRef), (b) TYDLIGHETEN ur snabba minnet (tgAccF). Bänka (a) ensam på HEAD med den rättade domaren: övning + --holdout +
+   lotusbank (krav >= 463/503, syntet >= 6/8; p2 gav 462 - KISS Love Gun 147,4 på toleranskanten, enligt fasjobbet sitter lotuskostnaden i
+   fintempodelen - undersök den låten). Mål: gridfel <= ladans 15,1 / 7,2 ms, ettan inte sämre, inga sektionsspärrar. Prova också (a)+(b) och (b)
+   ensam mot samma fönster (METODEN: A / B / sammanslagning).
+4. Vinner fintempot: gör det till KOD (ingen flagga, backup-tagg), DMX-md5-skillnad redovisad, skriv "REDO FÖR LADAN" + ladan-raden, och
+   "KLAR FÖR SYNK" (delade analysatorn ändras -> huvudchatten synkar lotus och deployar efter ägarens ja). Ingen deploy, inget i lotus-light-link.
+Rapport: tools/natt/rapport-2026-11-10.md. Fasjobbets underlag: .arena/fas/p2/losning.md, .arena/fas/bas/.
+
 ## HÖGSTA PRIO 2026-11-09 09:00: ARENA: EN KLOCKA FÖR BÅDA (lotus + DMX) - ägaren
 "Kan vi inte samma där. Jämför delarna, och kolla vad som fungerar bäst. Skapa sedan en enda. Känns jättedumt som vi sagt hela
 kvällen att köra två olika funktioner för samma sak som vi försöker förbättra och vet inte vilken som blivit förbättrad."
