@@ -24,7 +24,15 @@ export interface SpecialtyValues {
  *  taket MAP_TOP = 95 % - bara en FULL drop öppnar de sista 5 %. */
 const GAMMA = 1.6;
 const MAP_TOP = 0.95;
-const HOLD_MS = 120;          // monokrom dimmer: sista värdet hålls över enstaka nollor så dioden inte strobar
+/** MINSTA PÅ-TID (lampfysik, EN plats - DUBBLA KÄLLOR 6, 11-09; värdena orörda, DMX-md5-identiskt): tre hålltider mot diodflimmer.
+ *  De är olika för att de håller olika saker - en gemensam tid ändrar ljuset:
+ *   MIN_ON_MS 150: lampans nivå hålls innan uttoningen börjar (effects.ts steg 2, ägaren 10-10) - korta blixtar blir en puls;
+ *   CH_MIN_ON_MS 100: en tänd färgkanal hålls med sin senaste andel av lampans ljus (effects.ts steg 2, ägaren 10-10);
+ *   HOLD_MS 120: monokrom dimmer - sista värdet hålls över enstaka nollor (calibrate nedan).
+ *  fastLight-effekter hoppar över de två första (effects/types.ts fastLight). */
+export const MIN_ON_MS = 150;
+export const CH_MIN_ON_MS = 100;
+const HOLD_MS = 120;
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid
 

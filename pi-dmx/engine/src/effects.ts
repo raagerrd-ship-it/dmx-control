@@ -14,7 +14,7 @@
 import { isLogOn } from "./quiet.js";
 import type { ChannelRole, EngineConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
-import { FixtureOutput, keepLit, lampFadeK, lampLevel, sameLight, type SpecialtyValues } from "./output.js";
+import { FixtureOutput, keepLit, lampFadeK, lampLevel, sameLight, MIN_ON_MS, CH_MIN_ON_MS, type SpecialtyValues } from "./output.js";   // minsta på-tiden = lampfysik (output.ts MINSTA PÅ-TID)
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE, GRID_EARLY_MS } from "./beatClock.js";
 import { SILENCE_LEVEL, type Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
@@ -305,14 +305,12 @@ const HIGH_VARV = 4;
 const SHOW_LEAD_DEFAULT = 50;
 /** STEG 2: den ENDA uttoningen (lampans ljusstyrka, tidskonstant i DMX-ljus). Snabbare ar forbjudet (agaren 09-29). */
 const FADE_MIN_S = 0.25;
-const MIN_ON_MS = 150;
 /** KULÖRTONING (opt-in DMX_HUE_GLIDE_MS > 0, ägaren i ladan 10-14: "fada snyggt mellan färger hela tiden när det inte skall vara skarpt
  *  färgskifte" - "vissa gör det snyggt idag ... oftast inte huvudfärgen"). STEG 1 (effektens färg, före energin): byter en TÄND lampa kulör
  *  glider kulören runt färghjulet (kortaste vägen, aldrig mot vitt) på ~GLIDE_MS; ljusstyrkan är effektens, direkt - attacken och slagen
  *  rörs inte, och glidkulören har alltid effektens totala ljus (kanalsumman) - går det inte blir bytet skarpt. Skarpt som förr: drop- och minidrop-looken, lampa som var släckt (< 8 % av nya ljuset), vitt (mättnad < 0,5, hsvToRgb snäpper
  *  ändå) och fastLight-effekter. DMX_HUE_GLIDE_MS=0 = av (som före 10-14). */
 const HUE_GLIDE_MS = 400;   // STANDARD 400 sedan 10-14 (ägaren i ladan: 'känns mer polerat nu', 'gör det till standard direkt')
-const CH_MIN_ON_MS = 100;   // STEG 2: minsta pa-tid per fargkanal (se MINSTA PA-TID PER FARGKANAL)   // STEG 2: minsta pa-tid innan uttoningen (se MINSTA PA-TID)
 /** Sentinel: pulsklockan ännu inte initierad (första framen sätter den utan tick). */
 const PULSE_IDX_INIT = -2e9;
 // Loudness-portens konstanter = Lotus DEFAULT_CAL (piEngine.js:166-239).
@@ -1426,13 +1424,13 @@ export class EffectEngine {
       // lookbytets toning (tre toningar -> en). Snabbare uttoning ar forbjudet (agaren 09-29) - standard 0,25 s som forr.
       {
         const mT = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
-        // MINSTA PA-TID (DMX_MIN_ON_MS, agaren i ladan 10-10: "kan man ge effekterna en minsta tankt 'pa' tid? nu blev det lite
+        // MINSTA PA-TID (output.ts MIN_ON_MS, agaren i ladan 10-10: "kan man ge effekterna en minsta tankt 'pa' tid? nu blev det lite
         // flimrande igen"): en nivå lampan nått hålls minst MIN_ON_MS innan uttoningen börjar - korta blixtar blir en puls. Upp direkt.
         const holding = !fastLight && renderNow - this.lampPeakAt[i] < MIN_ON_MS;
         const fall = holding ? this.lampLvl[i] : this.lampLvl[i] * lampFadeK(fx, dtSec, FADE_MIN_S), o = i * 3;   // tidskonstanten i lampans ljus (output.ts)
         if (mT > 0) {
           // MINSTA PA-TID PER FARGKANAL (agaren 10-10: "lyser R sa far inte B bara komma igang under 100 ms"): en kanal som tands
-          // halls tand minst CH_MIN_ON_MS med sin senaste andel av lampans ljus, aven om effekten slacker den direkt.
+          // halls tand minst CH_MIN_ON_MS (output.ts) med sin senaste andel av lampans ljus, aven om effekten slacker den direkt.
           for (let c = 0; c < 3; c++) {
             const q = o + c, r = rgb[c] / mT;
             if (r > 0) { if (this.chOnAt[q] === 0) this.chOnAt[q] = renderNow; this.lampRatio[q] = r; }
