@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs"; import { createHash } from "node:crypto"
 const [dist, wav, sekS, gL, gV, tL, tV] = process.argv.slice(2);
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = 25, maxS = Number(sekS || 120);
 const d = readFileSync(wav); let p = 12, dataOff = 44, dataLen = d.length - 44;
-while (p + 8 <= d.length) { const id = d.toString("ascii", p, p + 4), sz = d.readUInt32LE(p + 4); if (id === "data") { dataOff = p + 8; dataLen = Math.min(sz, d.length - p - 8); break; } p += 8 + sz + (sz & 1); }
+while (p + 8 <= d.length) { const id = d.toString("ascii", p, p + 4), sz = d.readUInt32LE(p + 4); if (id === "data") { dataOff = p + 8; dataLen = sz > 0 ? Math.min(sz, d.length - p - 8) : d.length - p - 8; break; } /* sz 0 = strömskriven (pop/megamix): resten av filen (11-09: förr tom md5) */ p += 8 + sz + (sz & 1); }
 const n = dataLen >> 1, samples = new Float32Array(n); for (let i = 0; i < n; i++) samples[i] = d.readInt16LE(dataOff + i * 2) / 32768;
 const imp = (f) => import(pathToFileURL(dist + "/" + f).href);
 const { Analyser, createAnalyser } = await imp("analyser.js"); const { EffectEngine } = await imp("effects.js"); const { BeatFeed } = await imp("beatFeed.js");
