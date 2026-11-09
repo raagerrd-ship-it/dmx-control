@@ -1,7 +1,9 @@
 """TILLÄGG EN TEMPO (2026-11-08 kväll, före arenan entempo): (a) SPÄRR upp_s/ned_s får inte bli sämre än bas (+0,1 s tolerans) -> DISK;
   (b) MÅTT mix_still (tempo, - golv 1 s): median s från övertoningens slut tills effektklockan står inom +-1 % i 5 s i följd (17 mått).
   (c) 11-09 00:05 ägaren: KRAV EN KÄLLA granskat i koden av orkestratorn (<mapp>/KRAV_EN_KALLA.txt) -> ljusdomarens gräns -3,0.
-  (d) 11-09 02:35 ägaren: CPU ger inga poäng - GRÄNS (kvot > 1,25 = DISK); SNABBA = bara latensen. Poäng = 0,6 x långsamma + 0,4 x latens + bonus.
+  (d) 11-09 02:35/02:45 ägaren: CPU ger inga poäng och har ingen kvotgräns; SNABBA = bara latensen. Poäng = 0,6 x långsamma + 0,4 x latens + bonus.
+      Pi-budgeten: worker p99 <= X som förut + workerns kostnad (feedRealtid workerUsPerHop = taktväg + långsam väg busyUs) <= 130 us/hop PC;
+      inga nya objekt per hop i heta loopar (granskas i finalen).
 
 DOMAREN FÖR ARENAN 'ANALYSATORNS TVÅ VÄGAR' (2026-11-08) - och DELTAGARNAS BRIEF. Vikterna och mängderna ändras inte under körningen.
 
@@ -114,7 +116,7 @@ MATT = [('mix_klocka', 'tempo', 1, 1), ('mix_las', 'tempo', -1, 1), ('mix_hopp',
         ('drop_traff', 'drop', 1, 5), ('drop_falska', 'drop', -1, 0.5), ('drop_ms', 'drop', -1, 20),
         ('gr_ratt', 'latgrans', 1, 5), ('gr_falska', 'latgrans', -1, 0.5)]
 W_LANGSAM, W_SNABB, KLIPP_PCT, SPARR_LJUS, BONUS_TOL = 0.6, 0.4, 100.0, -0.5, 1.35
-SPARR_LJUS_GRANS, GRANS_KRAV, SEKT_TOL, SPARR_LJUS_ENKALLA, CPU_GRANS = -3.0, 20.0, 0.1, -3.0, 1.25   # ägaren 11-08: lägre ljusspärr för varianter som tydligt förbättrar låtgränsen
+SPARR_LJUS_GRANS, GRANS_KRAV, SEKT_TOL, SPARR_LJUS_ENKALLA, WORKER_US_GRANS = -3.0, 20.0, 0.1, -3.0, 130.0   # ägaren 11-08: lägre ljusspärr för varianter som tydligt förbättrar låtgränsen
 
 
 def rel(v, b, d, golv):
@@ -223,7 +225,7 @@ def realtid(dist, env, wav, sek):
     finally: os.remove(nf)
     hist = {int(k): float(v.rstrip('%')) for k, v in (x.split(':') for x in (j.get('efterHop') or '').split())}
     return {'cpu': j['huvudtradCpuUsPerHop'], 'hop': j['hop'], 'hist': hist, 'lagP99': j['taktvagLagMs']['p99'], 'lagP50': j['taktvagLagMs']['p50'],
-            'lagMax': j['taktvagLagMs'].get('max'), 'envLagP99': j['envLagMs']['p99'], 'notifyPerHop': nt['n'] / max(1, j['hop']), 'vackUsPerHop': nt['us'] / max(1, j['hop'])}
+            'lagMax': j['taktvagLagMs'].get('max'), 'envLagP99': j['envLagMs']['p99'], 'notifyPerHop': nt['n'] / max(1, j['hop']), 'vackUsPerHop': nt['us'] / max(1, j['hop']), 'workerUs': j.get('workerUsPerHop')}
 
 
 def cpu_batch(dist, env, wav, sek):
@@ -376,7 +378,7 @@ def mat(a):
         if bas: cpu['brusPct'] = round(100 * abs(mv - mb) / mb, 2)   # bas mot bas = bruset i kvoten
     rtb = hist_pool(bruns) if bruns else None
     rt = {**hist_pool(runs), 'basP99Hop': rtb and rtb['p99Hop'], 'lagP99': statistics.median(r['lagP99'] for r in runs), 'vackUsPerHop': statistics.median(r['vackUsPerHop'] for r in runs),
-          'notifyPerHop': statistics.median(r['notifyPerHop'] for r in runs)} if runs else None
+          'notifyPerHop': statistics.median(r['notifyPerHop'] for r in runs), 'workerUs': runs[0].get('workerUs'), 'basWorkerUs': bruns[0].get('workerUs') if bruns else None} if runs else None
     # SPÄRREN: md5 mot bas
     bj = None if bas else load(os.path.join(run_dir, 'bas'), 'tvavagar-holdout.json' if hold else 'tvavagar.json')
     md5lika, ljus = (True, None) if bas else (None, None)
@@ -466,13 +468,15 @@ def ranking(a):
         # CPU = GRÄNS, inte poäng (ägaren 11-09 02:35: 'Bättre att den drar mer cpu om latens kan hållas nere och analysen är bättre'):
         # snabba = bara latensen kick->ljus; kvot > CPU_GRANS mot engine/dist i samma mätning = DISK. cpu % visas fortfarande.
         sn = lat
-        if V.get('cpu') and V['cpu']['kvot'] > CPU_GRANS: disk.append(f"cpu-kvot {V['cpu']['kvot']:.3f} > {CPU_GRANS}")
+        # PI-BUDGETEN (ägaren 11-09 02:45: 'Vi har ju denna pi zero 2w enbart till denna app'): ingen kvotgräns; workerns kostnad
+        # (taktväg + långsam väg, busyUs i realtid) <= WORKER_US_GRANS på PC (x10 ARM ~ 50 % av en kärna). Mäts i nya mätningar.
+        if rt.get('workerUs') and rt['workerUs'] > WORKER_US_GRANS: disk.append(f"worker {rt['workerUs']} us/hop > {WORKER_US_GRANS}")
         bo, btxt = bonus_poang(bb, load(d, 'tvavagar-bonus.json'))
         rows.append((name, {'poang': W_LANGSAM * lang + W_SNABB * sn + bo, 'lang': lang, 'snabb': sn, 'cpu': cpu, 'lat': lat, 'bonus': bo, 'btxt': btxt, 'q': q, 'V': V, 'disk': disk}))
     rows.sort(key=lambda r: (bool(r[1]['disk']), -r[1]['poang']))
     Bc = B['cpu']
     L = [f"# Ranking {os.path.basename(rd)} - analysatorns två vägar{' KONTROLLMÄNGDEN' if hold else ''} (tools/arena/tvavagar.py, mot bas)", '',
-         f"poäng = {W_LANGSAM} x långsamma (medel av {len(MATT)} mått, % mot bas, +-{KLIPP_PCT:.0f} %) + {W_SNABB} x latens (cpu = gräns {CPU_GRANS}, ingen poäng) + bonus. "
+         f"poäng = {W_LANGSAM} x långsamma (medel av {len(MATT)} mått, % mot bas, +-{KLIPP_PCT:.0f} %) + {W_SNABB} x latens (cpu ingen poäng; Pi-budget: worker <= {WORKER_US_GRANS:.0f} us/hop) + bonus. "
          f"bas: cpu {Bc['us']:.2f} us/hop (cpu % = kvoten mot engine/dist i samma mätning, ABBA; bruset bas mot bas {Bc.get('brusPct')} %), latens {B['latens']['ms']} ms, worker p99 {B['realtid']['p99Hop']} hop -> X = {X}", '',
          '| plats | deltagare | poäng | långsamma % | snabba % | cpu % | latens % | bonus | cpu us/hop | latens ms | p99 hop | md5 | ljusdomare | DISK |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|']
     for i, (n, r) in enumerate(rows, 1):

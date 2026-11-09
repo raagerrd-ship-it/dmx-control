@@ -60,13 +60,15 @@ await new Promise((res) => {
 });
 const cpu = process.threadCpuUsage(cpu0);
 const q = (a, f) => { const s = [...a].sort((x, z) => x - z); return s.length ? +s[Math.min(s.length - 1, Math.floor(f * s.length))].toFixed(2) : 0; };
-const st = an.hopLane?.stats() ?? null; an.__stopWorker?.();
+const st = an.hopLane?.stats() ?? null; const sp = an.getSplitStats?.() ?? null; an.__stopWorker?.();
 const hist = [...behindHist.entries()].sort((a, b) => a[0] - b[0]).map(([k, v]) => `${k}:${(100 * v / h).toFixed(2)}%`).join(' ');
 process.stdout.write(JSON.stringify({
   wav: wav.split(/[\\/]/).pop(), sek: +((Date.now() - wall0) / 1000).toFixed(1), hop: h,
   huvudtradCpuUsPerHop: +((cpu.user + cpu.system) / h).toFixed(2),
   efterHop: hist, taktvagLagMs: { p50: q(lagS, 0.5), p99: q(lagS, 0.99), max: st?.lagMaxMs }, taktvag: st,
-  envLagMs: { p50: q(envLag, 0.5), p99: q(envLag, 0.99) },
+  envLagMs: { p50: q(envLag, 0.5), p99: q(envLag, 0.99) }, split: sp,
+  // WORKERNS KOSTNAD (arena entempo 11-09, Pi-budgeten): taktvägens busyUs (EMA per hop) + analysatorns långsamma väg busyUs (EMA per record)
+  workerUsPerHop: +(((st?.busyUs) ?? 0) + ((sp?.busyUs) ?? 0) * ((sp?.processed) ?? 0) / Math.max(1, h)).toFixed(1),   // långsamma vägen: ett record per ~3,75 hop
   ryck: { antal: jumps.length, perMin: +(jumps.length / (h * HOP / SR / 60)).toFixed(1), msP50: q(jumps, 0.5), msP90: q(jumps, 0.9), msMax: q(jumps, 1) },
 }) + '\n');
 process.exit(0);
