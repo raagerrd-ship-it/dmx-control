@@ -33,6 +33,8 @@ kvällen att köra två olika funktioner för samma sak som vi försöker förb�
      lotus egen sökning bort, lotus-bänk 396->463/503 syntet 6/8, DMX md5 oförändrad; KLAR FÖR SYNK skickad till huvudchatten. Rapport
      tools/natt/arena-2026-11-09-klocka/RAPPORT.md; sammanfattning tools/natt/rapport-2026-11-09.md.
   3. ARENA: ANALYS UT UR MOTORN. Allt låtanalytiskt i effects.ts flyttas in i analysatorn och publiceras i ramen:
+     STEG 1 KLART 2026-11-09 15:15: 8f89cf1 (tagg analys-r0, backup/fore-analys-20261109) = EN dropdetektor + EN tystnad; övning +4,32, kontroll +0,15;
+     REDO FÖR LADAN på 8f89cf1. Kvar: basen, basnot, sektionsenergin, sektionens drop-väg (tools/natt/arena-2026-11-09-analys/RAPPORT.md).
      - drop (flankStep -> en detektor; bänkens drop-mått pekar på den)
      - lyft och nästan-drop
      - basen (en källa)
