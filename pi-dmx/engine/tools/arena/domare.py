@@ -20,7 +20,7 @@ DOMAREN v3 (STANDARD från runda 2 i puls1, ägaren 11-07: "mot förinspelad lju
   poäng v3 = 0,45 * dynamik + 0,35 * koreografi + 0,2 * takt - ljusavdrag + ljusbonus - lampspr-avdrag
   Saknar en bänk fälten (bänkad före 2026-11-07 kväll): koreografi räknas som 0 och raden märks 'gammal bänk' - bänka om.
 SPÄRRAR (DISK = ute oavsett poäng):
-  lampspr  någon fil under 94 % av baslinjen (fler lampor lika tända = takten syns inte); (mjuka avdraget under 98 % borttaget 11-08)
+  lampspr  MEDLET över filerna under 94 % av baslinjen, eller någon fil under 80 % (11-09: per fil var brus - ohörbar störning flyttar lookvalet)
   (ljus: INGEN spärr sedan 11-08 - ägaren: 'mer ljus kan ju vara en bra sak ... det vill jag inte här' [att det som minskar ljuset
    vinner]. Medelljuset visas som info. Platt ljus straffas ändå av dynamik och koreografi.)
   slocknat andelen släckt rigg >= 1 s mer än +1 procentenhet (medel över filerna)
@@ -66,10 +66,15 @@ def doma(b, v, d):
     else:
         L, LB = v['dyn']['levande'], b['dyn']['levande']
         kontrast = (slag + djup + rel(L['ljusSteg'], LB['ljusSteg']) + rel(L['kontrast'], LB['kontrast'])) / 4
-    for n in WT:
-        q = R[n]['lampspr'] / B[n]['lampspr']
-        if q < 0.94: disk.append(f'lampspr {n} {100 * (q - 1):+.1f} %')
-        # (mjukt lampspr-avdrag under 98 % borttaget 11-08: 'om 2 lampor lyser i stället för 1 fungerar showen ändå')
+    # LAMPSPRIDNINGEN PÅ MEDLET (ägaren 11-09: 'Fixa lampspridningsspärren'): per fil var den brus - samma kod på pop gav 0,405 eller
+    # 0,267 av en ohörbar skillnad (0,003 %) i hur klippet skrevs, för den flyttar en sektionsgräns och dirigentens lookval flyttar alla
+    # senare. Spärren dömer därför medlet av kvoterna över filerna (< 94 % = DISK); en fil under 80 % fäller fortfarande (riktig kollaps).
+    qs = {n: R[n]['lampspr'] / B[n]['lampspr'] for n in WT}
+    qm = sum(qs.values()) / len(qs)
+    if qm < 0.94: disk.append(f'lampspr medel {100 * (qm - 1):+.1f} % (' + '/'.join(f'{100 * (q - 1):+.1f}' for q in qs.values()) + ')')
+    for n, q in qs.items():
+        if q < 0.80: disk.append(f'lampspr {n} {100 * (q - 1):+.1f} % (< -20 %)')
+    # (mjukt lampspr-avdrag under 98 % borttaget 11-08: 'om 2 lampor lyser i stället för 1 fungerar showen ändå')
     lj = sum(R[n]['ljus'] for n in WT) / sum(B[n]['ljus'] for n in WT)
     bonus = 0.0   # ägaren 11-08: ljusmängden är INTE ett kriterium (inget avdrag, ingen bonus, ingen spärr) - visas bara som info
     sl = sum(R[n]['slocknat1s'] - B[n]['slocknat1s'] for n in WT) / len(WT)
