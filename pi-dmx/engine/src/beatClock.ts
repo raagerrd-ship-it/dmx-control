@@ -27,13 +27,14 @@ export interface Beat {
 /** Under detta räknas takten som opålitlig — bättre ingen takt än en som sitter fel.
  *  Konsumenter som `hasBeat` säger nej till faller tillbaka på VERKLIGA kicks, vilket
  *  alltid följer musiken även om det inte följer ett rutnät. */
-export const MIN_BEAT_CONFIDENCE = 0.20;
+import { MIN_BEAT_CONFIDENCE, GRID_EARLY_MS } from "./analyserClock.js";   // a7r: klockans konstanter bor i analysatorn
+export { MIN_BEAT_CONFIDENCE, GRID_EARLY_MS };
 
 /** RUTNÄTET PÅ ANSATSEN (a5, arenan tvavagar 2026-11-08): taktmatningens vikningstopp (basens dB-stigning över 6 hop) ligger
  *  efter anslagets början - sektionLag-gridfasen mot basansatserna, signerat fel median +18..23 ms på alla fyra lang-filerna.
  *  Effektklockan (cfg.beat) publiceras därför så mycket tidigare (beatFeed.ts), och ljusets försprång (effects.ts showLead)
  *  är lika mycket kortare: ljuset landar som förr, rutnätet sitter på slaget. */
-export const GRID_EARLY_MS = 20;
+
 
 /**
  * Är takten låst OCH pålitlig?

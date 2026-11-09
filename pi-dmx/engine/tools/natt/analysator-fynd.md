@@ -15,6 +15,21 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-09 DELAD FIL ÄNDRAD: EN KLOCKA i analysatorn (arenan entempo, vinnaren mta)
+Vad: dmx (dagkörningen 11-09, ägaren: 'måste vara en och inte två' + 'allt skall ju ligga i analysatorn') ändrar analyser.ts, split.ts,
+slowWorker.ts och lägger till en NY delad fil analyserClock.ts (recorder.ts orörd). Manifestet src/ANALYSER_SHARED.md5 är skrivet (analyser.ts
+864613b1, split.ts 4b5312c1, slowWorker.ts ab875f44, analyserClock.ts c7525c9a) och tools/analyser_shared.py har analyserClock.ts i SHARED.
+Nytt: analysatorns egen temposökning (computeBpm/scoreEnv/alignScore, skuggrutnätet) är BORTTAGEN; klockan (tempogram med två minnen 5 s/0,21
++ 3,5 s/0,4, rutnät, etta, tillit = repeatRate x tgClear) bor i analyserClock.ts och körs av analysatorn själv: profilens sys.BEAT_FEED
+'slow' = i taktvägen (workern, DMX), 'inline' = i process() (lotus). Kickgrinden läser klockans inre rutnät + KICK_PHASE_MS 45, null i coast.
+Låtgränsen (hintTrackChange -> H_BOUND i hop-recordet) är klockans enda låtbytessignal.
+LOTUS-PARITETEN (analyserParity --style lotus, lang1021 120 s, lotus-profilen .arena/lotus-fore mot .arena/lotus-entempo): 44 292 av 45 000
+hop avviker (bpm, sectionBars, profile.bassline, bpmConfidence, profile.beat, repeat*, section*), både utan och med LOTUS_BEAT_FEED=inline -
+lotus TEMPO ÄNDRAS: lotus profil måste få BEAT_FEED 'inline', lotus egen setBeatGrid-matning bort (annars två rutnät), och lotus egen bänk
+avgör (bench-manifest). Detta är inte bit-identiskt för lotus.
+Önskat: lotus-morgonagenten portar de fyra filerna + profilvärdet och bänkar; avvisar lotus bänken: skriv AVVISAT med siffror här.
+Bevis DMX: arenan entempo (tools/natt/arena-2026-11-09-entempo/), kontrollmängden +8,90 utan DISK, motorns dist = mta:s dist (DMX-md5 identisk).
+
 ## ÖPPET 2026-11-08 DELAD FIL ÄNDRAD: taktmatningen i långsamma vägen
 Vad: dmx a9a411b (dagtid, ägaren: 'en analysator, två vägar - den snabba och den som ger dirigenten information') ändrar analyser.ts,
 split.ts och slowWorker.ts (recorder.ts orörd); manifestet src/ANALYSER_SHARED.md5 i dmx-control är skrivet (analyser.ts 3c8b7cbb, split.ts

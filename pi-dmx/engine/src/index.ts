@@ -92,7 +92,7 @@ applyInputRouting(cfg.audioInput === "mic" ? "mic" : "aux");
 // DELAD ANALYSATOR (analyser.ts/split.ts): utan DMX_ANALYSER_SPLIT ar detta exakt `new Analyser(cfg)`.
 // Med DMX_ANALYSER_SPLIT=worker flyttas tempo/gridfas/sektion till en egen trad pa en egen karna —
 // motivet ar matningen 15,6 % av hoppen over budget (0,99 ms snitt, toppar 235 ms mot 2,67 ms).
-const analyser = createAnalyser(BeatFeed.analyserCfg(cfg));   // analysatorns eget rutnät (beatFeed.ts TVÅ RUTNÄT)
+const analyser = createAnalyser(BeatFeed.analyserCfg(cfg));   // EN KÄLLA (r0): analysatorns rutnät sätts av dess klocka (setBeatGrid), aldrig i motorns cfg.beat
 analyser.resetGain(cfg.audioInput === "mic" ? 20 : 1);
 analyser.setGainLock(cfg.audioInput !== "mic", 1);  // aux: fixed 1x
 const effects = new EffectEngine(cfg);
@@ -111,8 +111,7 @@ if (analyser.hopLane) { const lane = analyser.hopLane; health.setSplitStats(() =
 
 
 
-// TAKTMATNINGEN (kick-PLL, tillit, fasfoljare, coast) bor i beatFeed.ts - samma kod som bankerna kor (matfalla 43).
-const beatFeed = new BeatFeed();
+// TAKTMATNINGEN (kick-PLL, tillit, fasfoljare, coast) bor i ANALYSATORN (analyserClock.ts, a7r): taktvägen eller sist i process().
 // LANGINSPELNING (longRecord.ts): samma mapp som inspelarens fangster, sa hamtaren/banken ser dem.
 const longRec = new LongRecord(process.env.DMX_RECORDER_DIR || "/var/lib/audio-dmx-engine/snippets", cfg.audio.rate, {
   latestFrame: () => latestFrame, look: () => effects.getActiveMode(), why: () => effects.switchWhy,
@@ -199,7 +198,7 @@ capture.on("chunk", (samples: Float32Array) => {
   frame.dropCount = outDrop;
   // tillit + taktklocka (beatFeed.ts). TAKTVÄGEN (profilens BEAT_FEED 'slow', 2026-11-08): körs i analysatorns worker - här bara
   // hoppet in och senaste resultatet ut (cfg.beat, tilliten, analysatorns rutnät/kommandon). Odelad analysator: i huvudtråden som förr.
-  if (analyser.hopLane) analyser.hopLane.feed(frame, cfg, analyser); else beatFeed.update(frame, cfg, analyser);
+  if (analyser.hopLane) analyser.hopLane.feed(frame, cfg, analyser); else analyser.publishClock(cfg);   // a7r: utan taktväg körde analysatorn klockan själv i process()
   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
   // inga slag missas) → show-tiden får en knuff, starkare ju tyngre basen är.
   if (frame.kick) effects.registerKick(0.4 + Math.min(1, frame.energy * 1.4) * 0.6);

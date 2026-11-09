@@ -9,17 +9,11 @@
  * Varje rad ar ett MATT beteende (paritetsbanken bevisar att analysatorn med denna profil ger exakt
  * samma ramar som DMX-analysatorn fore sammanslagningen). Att andra en rad ar att andra DMX-motorns beteende.
  */
-import type { HopFeed } from './split.js';
 
 export interface AnalyserProfile {
   envPrefix: 'LOTUS_' | 'DMX_';
   sys: Record<string, string>;
   bare: Record<string, string>;
-  /** TAKTVÄGEN (split.ts, med sys.BEAT_FEED 'slow'): modulen med systemets taktmatning (relativt analyser.js) - workern laddar den
-   *  bara när taktvägen finns. Modulen registrerar själv fabriken i slowHopFeed när den laddas (huvudtråden: motorn/bänken har den
-   *  redan laddad). Analysatorn importerar den aldrig statiskt (beatFeed.ts drar in quiet.ts, som tystar console.log). Lotus: saknas. */
-  slowHopFeedModule?: string;
-  slowHopFeed?: () => HopFeed;
 }
 
 export const PROFILE: AnalyserProfile = {
@@ -38,7 +32,7 @@ export const PROFILE: AnalyserProfile = {
     // TAKTMATNINGEN I LÅNGSAMMA VÄGEN (2026-11-08, ägaren: 'en analysator, två vägar - den snabba och den som ger dirigenten
     // information'; backup-tagg backup/fore-taktmatning-slow-20261108): beatFeed.ts (~20 % av motorns CPU) körs i analysatorns
     // worker i stället för i hop-loopen (split.ts TAKTVÄGEN). Inline/synk-läget bit-identiskt med huvudtråden (DMX-md5); lotus: saknas.
-    BEAT_FEED: 'slow',
+    BEAT_FEED: 'slow',            // a7r: VAR ANALYSATORNS KLOCKA KÖRS (analyser.ts clockMode): 'slow' taktvägen, 'inline' i process(); lotus: 'inline'
     GHOST_WAIT: '1',              // 2/3-fantom vid latbyte vantar 12 s (tempo-transitions 09-04)
     SUBH_GUARD: '1',              // OCT-DOWN/NEAR x8 mot lastGoodBpm (2/3 only)
     SECTION_HINT_LOWCONF: '0',    // taktlost break nollar INTE sektionerna (ladan 09-24 23:10)
@@ -72,5 +66,4 @@ export const PROFILE: AnalyserProfile = {
     OCT_UP: '12',                // oktav upp snabbare (tempo-transitions)
     SUBH_MULT: '8',              // subharmonisk guard x8
   },
-  slowHopFeedModule: './beatFeed.js',
 };

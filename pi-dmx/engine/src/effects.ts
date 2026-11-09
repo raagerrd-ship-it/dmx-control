@@ -507,7 +507,7 @@ export class EffectEngine {
   private lastBeatIdx = -1; private slagWaitAt = -1;
   /** Takt-räknare som effekterna ser (beatIdx): stegar på grid-slaget när BPM är
    *  låst, annars på verkliga kicks → grid-effekter fryser aldrig utan BPM-lås. */
-  private beatCounter = 0;
+  private beatCounter = 0; private gridCounting = false; private gridK = 0; private gridHalved = false;   // EN TAKTRÄKNARE (r0): räknaren följer rutnätets index
   /** Pulsen körs i halva takten (snabb låt ELLER lugnt parti). Se PULSE_HALVE_*
    *  och SUBDIV_*. */
   private pulseHalved = false;
@@ -519,7 +519,6 @@ export class EffectEngine {
    *  får bara gå framåt, och tSince hålls icke-avtagande inom en puls, så PLL:ens
    *  fasrättningar inte kan re-attackera eller flippa pariteten mitt i ett slag. */
   private lastPulseIdx = PULSE_IDX_INIT;
-  private pulseCount = 0;
   private pulseFloorMs = 0;
   /** ~8 s-utjämnad sektionsenergi + när halveringen senast bytte (min-hold). */
   private subdivEnergy = 0.5;
@@ -971,7 +970,10 @@ export class EffectEngine {
         // LÅTMANUS: med manus avgors det per LAT i stallet for vartannat byte - varannan lat med last takt/tydlig basgang blir en
         // toggle-lat (hela laten samma gruppering); annars hade samma sektionstyp alltid hamnat pa samma paritet.
         const takt = !allaBuild && beatLocked(this.cfg.beat) && this.beatTrust >= 0.85, bas = !allaBuild && bassClear && (frame.profile.bassline ?? 0) >= CLEAR_BASS_HARD;
-        if (secKey && this.manusTog === null) this.manusTog = takt || bas;   // ALLA låtar med låst takt/tydlig basgång = stegande/gruppvisa effekter (ägaren 10-13: 'tydlig basgång effekter med stegande lampor'); var varannan låt
+        // EN KLOCKA (entempo m1, 11-09): klockans tillit står på 1,00 vid nästan varje val -> 'låst takt' ensam gjorde VARJE låt till en
+        // toggle-låt (lang1815: 6/6 manusval toggles, bas 5/9 med tillit 0,90-1,00). Toggle-låten kräver nu tydlig basgång (bassClear,
+        // >= CLEAR_BASS med hysteres) utöver låst takt; hård basgång (bas) räcker ensam som förr.
+        if (secKey && this.manusTog === null) this.manusTog = bas || (takt && bassClear);   // ALLA låtar med låst takt/tydlig basgång = stegande/gruppvisa effekter (ägaren 10-13: 'tydlig basgång effekter med stegande lampor'); var varannan låt
         const beatClear = secKey ? !!this.manusTog && takt : takt && this.smartCount % 2 === 1;
         const bassHard = !(secKey === 'build') && (secKey ? !!this.manusTog && !allaBuild : (beatClear || (bas && this.smartCount % 2 === 1)));   // MIX_V2 (1); konsertlaget: aldrig i build
         const toggles = bassHard ? (() => { const cut = pool.filter((m) => TOGGLE_POOL.includes(m)); const t = cut.length ? cut : secKey === 'break' ? [] : enabled(TOGGLE_POOL).filter(req); const full = secKey === 'high' ? t.filter((m) => !SPARSAM.includes(m)) : t; return full.length ? full : t; })() : [];   // refrängen: inga glesa looker via basgången heller (10-12); break: toggles bara ur breakets egna (LUGNT BREAK, standard 10-26)
@@ -981,7 +983,7 @@ export class EffectEngine {
           const cands = ranked.filter((x) => x.m !== this.smartMode && x.m !== avoid);
           const top = (cands.length ? cands : ranked).slice(0, Math.min((cands.length ? cands : ranked).length, (anchor && MANUS_TOP > 0 ? MANUS_TOP : Math.max(3, Math.round((cands.length ? cands : ranked).length * MIX_TOP_FRAC)))));
           this.smartMode = this.pickLook(top);
-          console.log(`[dirigent] ${secKey ? 'manus ' + secKey + ': ' : ''}${beatClear ? `last takt (tillit ${this.beatTrust.toFixed(2)}` : `tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}`}, ${toggles.length} toggles) -> "${this.smartMode}"`);
+          console.log(`[dirigent] ${secKey ? 'manus ' + secKey + ': ' : ''}${beatClear && !bas ? `last takt (tillit ${this.beatTrust.toFixed(2)}` : `tydlig basgang (${(frame.profile.bassline ?? 0).toFixed(2)}`}, ${toggles.length} toggles) -> "${this.smartMode}"`);
         } else {
           // DUBBELTAKT → VARANNAN: på snabbt/dubbeltakt-låst tempo (bpm ≥ 140) boostas
           // `varannan` (spatial dubbeltakt) hårt så dirigenten väljer den i stället för
@@ -1300,7 +1302,7 @@ export class EffectEngine {
   private stepBeatClock(frame: Frame, beat: EngineConfig['beat']): void {
     const beatMs = this.rBeatMs, nowWall = this.rNowWall, _dtT = this.rDtT;
     let beatEnv = 0, beatTick = false;
-    if (beat && beat.bpm > 40) {
+    if (beatLocked(beat)) {   // EN PULSKURVA (r0, a6): samma grind som beatIndex/beatPhase och beatPulse/heartPulse - förr bpm > 40, så vid tillit < 0,20 frös beatEnv på ett golv
       const now2 = nowWall;
       const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
       // PRESENTATIONSTAKT: över PULSE_HALVE_ABOVE_BPM pulsar hjärtslaget på varannat
@@ -1357,12 +1359,11 @@ export class EffectEngine {
       if (this.lastPulseIdx === PULSE_IDX_INIT) this.lastPulseIdx = pulseIdx;
       if (pulseIdx > this.lastPulseIdx) {
         this.lastPulseIdx = pulseIdx;
-        this.pulseCount++;                                                         // monoton → paritet flippar aldrig bakåt
-        if (!this.pulseHalved || this.pulseCount % 2 === 0) this.pulseFloorMs = 0;  // ny puls: frisk attack
+        if (!this.pulseHalved || (pulseIdx & 1) === 0) this.pulseFloorMs = 0;      // ny puls: frisk attack (EN PARITET, r0: rutnätets index)
       } else if (pulseIdx < this.lastPulseIdx) {
         this.lastPulseIdx = pulseIdx;                                              // följ bakåt tyst, rör inte pulsen
       }
-      const halvedOdd = this.pulseHalved && (this.pulseCount % 2 === 1);
+      const halvedOdd = this.pulseHalved && (this.lastPulseIdx & 1) === 1;   // EN PARITET (r0): rutnätets, samma som effektklockans halfTick
       let tSince = beatPhase(beat, now2, atk + this.showLead) * beatMs + (halvedOdd ? beatMs : 0);
       if (tSince < this.pulseFloorMs) tSince = this.pulseFloorMs; else this.pulseFloorMs = tSince;
       const dec = pulseMs * BEAT_DECAY_FRAC;
@@ -2008,11 +2009,25 @@ export class EffectEngine {
     // MODULÄRT (färg/grupp/position) → ren drop-in.
     let beatHit = beatTick || (!hasBeat && kickHit);   // DISKRET flank: takten gick just fram (grid-slag, annars verklig kick)
     let beatFracFx = beatFrac;
-    if (this.pulseHalved && hasBeat) {
-      // HALVERAD EFFEKT-KLOCKA: två riktiga slag = ett effekt-slag. Paritet 0 = "ett", 1 = "två".
-      if (beatHit) { this.halfTick ^= 1; if (this.halfTick === 0) this.beatCounter++; else beatHit = false; }
-      beatFracFx = (this.halfTick + beatFrac) / 2;
-    } else { this.halfTick = 0; if (beatHit) this.beatCounter++; }
+    if (hasBeat) {
+      // EN TAKTRÄKNARE (r0 entempo, a7 + monoton spärr): ctx.beatIdx = RUTNÄTETS index (taktmodellens etta når de 17 `beatIdx % 4`-effekterna),
+      // vid halvering index >> 1 och pariteten = rutnätets (EN halveringsparitet, samma som pulsens). Monoton: backar ankaret håller
+      // räknaren tills rutnätet gått förbi (a7: räknaren som hoppade bakåt med ankaret gav koreografins jitter); vid låsets början tas indexet direkt.
+      // a1r: rutnätets index + en HEL-TAKTS-förskjutning (gridK, multipel av 4 = ettan och pariteten orörda). gridK sätts bara när
+      // räknaren byter skala (halveringen slås på/av: index >> 1 mot index) eller låset kommer tillbaka - då till minsta värdet som går
+      // FRAMÅT. Förr (r0) frös räknaren hela halveringen (index >> 1 < räknaren) och hoppade +44 när den släpptes.
+      const gi = this.lastBeatIdx, want = this.pulseHalved ? gi >> 1 : gi;
+      this.halfTick = this.pulseHalved ? gi & 1 : 0;
+      if (this.pulseHalved && beatHit && this.halfTick === 1) beatHit = false;
+      if (!this.gridCounting || this.pulseHalved !== this.gridHalved) {
+        this.gridK = 4 * Math.ceil((this.beatCounter - want) / 4);
+        if (!this.gridCounting && this.beatCounter === 0) this.gridK = 0;
+        this.gridHalved = this.pulseHalved;
+      }
+      if (!this.gridCounting || want + this.gridK > this.beatCounter) this.beatCounter = want + this.gridK;
+      this.gridCounting = true;
+      if (this.pulseHalved) beatFracFx = (this.halfTick + beatFrac) / 2;
+    } else { this.halfTick = 0; this.gridCounting = false; if (beatHit) this.beatCounter++; }   // ingen takt: reservläget stegar på verkliga kickar
     const beatIdx = this.beatCounter;
     // beatPulse: grid-puls när låst, annars den VERKLIGA kick-envelopen → pulsar
     // ALLTID på musiken. (Utan detta gav beatFrac=0 → beatPulse=1 konstant = ingen
