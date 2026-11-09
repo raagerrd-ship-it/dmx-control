@@ -1,0 +1,120 @@
+diff --git a/.arena/entempo/kopia/src/beatFeed.ts b/.arena/entempo/a8/src/beatFeed.ts
+index 0e20922..f22e857 100644
+--- a/.arena/entempo/kopia/src/beatFeed.ts
++++ b/.arena/entempo/a8/src/beatFeed.ts
+@@ -59,7 +59,6 @@ const FEED_RISE_HOPS = 6;
+  *  värdet före tystnaden (rutnätet hade redan rätt tempo). 0 = av (bit-identiskt). Bara effektklockan, inte analysatorns skuggrutnät. */
+ const BREAK_HOLD_MS = 20000;   // STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108); förr opt-in DMX_BREAK_HOLD_MS
+ const BREAK_RESTORE_MS = Number(process.env.DMX_BREAK_RESTORE_MS ?? String(BREAK_HOLD_MS));   // (2) för sig (prov: hållet av, bara dropens upptag)
+-const NO_AN = { resetTempo(): void {}, resetBar(): void {} };
+ /** ETTAN I EFFEKTKLOCKANS RUTNÄT (a5, arenan tvavagar 2026-11-08). Förr flyttades effektklockan med analysatorns barShift, men den
+  *  räknas mot ANALYSATORNS rutnät (TVÅ RUTNÄT, skuggan) - de två rutnätens slagindex skiljer ett godtyckligt antal slag, så ettan
+  *  satt rätt bara när skillnaden råkade vara hela takter (testDownbeat-signalen: 23 % rätt, slumpen 25 %). Nu har effektklockan
+@@ -146,8 +145,12 @@ export class BeatFeed {
+   private barN = 0; private barIdx = NaN; private bK = 0; private bL = 0; private bB = 0; private barOff = 0; barShifts = 0;
+   private readonly linK = new Float64Array(BAR_RISE_HOPS); private readonly linL = new Float64Array(BAR_RISE_HOPS); private linPos = 0;
+   private innerAnchor = 0; private innerBpm = 0; private innerValid = false;
+-  private readonly ana: BeatFeed | null; private readonly anaGrid = { beat: null } as unknown as EngineConfig;
+-  constructor(private readonly kickFold = false) { this.ana = kickFold ? null : new BeatFeed(true); }
++  // EN TEMPO (arenan entempo a8, 2026-11-08): klockan är den enda tempokällan. Analysatorn får INGET rutnät (förr en skugg-BeatFeed med
++  //  egen 11-16-tempos sökning, egen tillit och egna återställningar, bara för kickgrinden och analysatorns barShift): kickgrinden står
++  //  öppen (som i analysatorns olåsta läge) och ettan är klockans egen taktmodell (barStep). Bänken: sektionerna närmare basen än med
++  //  klockans rutnät + kickfas i grinden (upp_s 2,85 s mot bas 1,35), och taktvägen ~30 % billigare.
++  private anaOffSince = 0;   // EN TEMPO: sedan när analysatorns bpm inte är klockans (oktav +-4 %)
++  constructor(private readonly kickFold = false) {}
+   /** Det cfg analysatorn ska byggas med: en grund kopia med eget rutnät (sätts via setBeatGrid i update). */
+   static analyserCfg<T extends object>(cfg: T): T { return { ...cfg, beat: null }; }
+ 
+@@ -195,7 +198,13 @@ export class BeatFeed {
+         this.bestScore = score; this.bestBpm = bpm; this.bestPh = (mb + 0.5 + off) / ONSET_BINS;
+       }
+     }
+-    if (c < this.scanEnd || this.bestScore < ONSET_MIN_PEAK) return;
++    if (c < this.scanEnd) return;
++    if (this.bestScore >= ONSET_MIN_PEAK) this.commitScan(beat, now);
++  }
++
++  /** Sökningens vinnare blir klockans tempo + fas. */
++  private commitScan(beat: NonNullable<EngineConfig["beat"]>, now: number): void {
++    const ref = this.scanRef;
+     // nytt tempo med bevarat slagindex + fas, sedan fasen direkt på toppen (toppen låg på bestPh räknat från sökningens ankare)
+     if (this.tempoBpm > 0) this.bestBpm = Math.min(159.9, Math.max(80, this.bestBpm));   // samma oktavfönster som tempogrammet
+     const oldMs = 60000 / beat.bpm, idx = Math.floor((now - beat.anchorMs) / oldMs), fr = (now - beat.anchorMs) / oldMs - idx;
+@@ -208,6 +217,7 @@ export class BeatFeed {
+     this.onsetFixes++;
+   }
+ 
++
+   /** EN TEMPOSÖKNING: hypotesens poäng = basens x diskantens (topp + halvslaget efter toppen) / 2 / medel, en gemensam vikning av
+    *  ringen (fönstret ONSET_WIN_MS bakåt från now). 0 = för lite ljud. */
+   private tgScore(bpm: number, now: number): number {
+@@ -309,17 +319,22 @@ export class BeatFeed {
+    *  `now` = hoppets klocka (2026-11-08: i analysatorns långsamma väg körs hoppet senare än det kom - klockan följer med recordet;
+    *  förr läste varje ställe Date.now() för sig, i bänken samma tal). */
+   update(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void }, now = Date.now()): void {
+-    if (this.ana) {   // TVÅ RUTNÄT: analysatorns rutnät först (gamla vikningen, analysatorns återställningar), frame.bpmConfidence orörd
+-      const bc = frame.bpmConfidence; this.ana.update(frame, this.anaGrid, an, now); frame.bpmConfidence = bc;
+-      an.setBeatGrid?.(this.anaGrid.beat);
+-      an = NO_AN;
+-      if (cfg.beat && this.innerValid) { cfg.beat.anchorMs = this.innerAnchor; cfg.beat.bpm = this.innerBpm; }   // ETTAN: matningen räknar på det inre ankaret
+-      this.updateInner(frame, cfg, an, now);
+-      if (cfg.beat) { this.innerAnchor = cfg.beat.anchorMs; this.innerBpm = cfg.beat.bpm; this.innerValid = true; cfg.beat.anchorMs += this.barOff * (60000 / cfg.beat.bpm) - GRID_EARLY_MS - TG_GRID_EXTRA_MS; }
+-      else this.innerValid = false;
+-      return;
+-    }
++    if (this.kickFold) { this.updateInner(frame, cfg, an, now); return; }
++    if (cfg.beat && this.innerValid) { cfg.beat.anchorMs = this.innerAnchor; cfg.beat.bpm = this.innerBpm; }   // ETTAN: matningen räknar på det inre ankaret
+     this.updateInner(frame, cfg, an, now);
++    const b = cfg.beat;
++    // EN TEMPO: klockan är sanningen - säger analysatorns sökning ett annat tempo (inte samma oktav +-4 %) medan klockan är säker (>= 0,5) i
++    // 2 x GRID_COAST_MS, nollas analysatorns tempo (resetTempo) så den låser om. Ersätter skuggrutnätets coast-nollning (förr analysatorns
++    // enda omlåsning utom tystnad: skuggans fasträffar på analysatorns eget tempo föll när tempot var fel).
++    if (b && frame.bpm > 0 && (b.confidence ?? 0) >= 0.5 && Math.abs(sameOctave(frame.bpm, b.bpm) / b.bpm - 1) > 0.04) {
++      if (this.anaOffSince === 0) this.anaOffSince = now;
++      else if (now - this.anaOffSince >= 2 * GRID_COAST_MS) { an.resetTempo(); this.anaOffSince = 0; }
++    } else this.anaOffSince = 0;
++    if (b) {
++      this.innerAnchor = b.anchorMs; this.innerBpm = b.bpm; this.innerValid = true;
++      b.anchorMs += this.barOff * (60000 / b.bpm) - GRID_EARLY_MS - TG_GRID_EXTRA_MS;
++    } else this.innerValid = false;
++    frame.bpmConfidence = b ? b.confidence ?? 0 : 0;   // EN TILLIT: klockans (snabba sidan publicerar den i frame.bpmConfidence)
+   }
+ 
+   private updateInner(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void }, now: number): void {
+diff --git a/.arena/entempo/kopia/src/effects.ts b/.arena/entempo/a8/src/effects.ts
+index 09703c0..077e02e 100644
+--- a/.arena/entempo/kopia/src/effects.ts
++++ b/.arena/entempo/a8/src/effects.ts
+@@ -2010,9 +2010,12 @@ export class EffectEngine {
+     let beatFracFx = beatFrac;
+     if (this.pulseHalved && hasBeat) {
+       // HALVERAD EFFEKT-KLOCKA: två riktiga slag = ett effekt-slag. Paritet 0 = "ett", 1 = "två".
+-      if (beatHit) { this.halfTick ^= 1; if (this.halfTick === 0) this.beatCounter++; else beatHit = false; }
++      this.halfTick = this.lastBeatIdx & 1; if (beatHit && this.halfTick !== 0) beatHit = false;   // EN KLOCKA: pariteten = rutnätets
+       beatFracFx = (this.halfTick + beatFrac) / 2;
+     } else { this.halfTick = 0; if (beatHit) this.beatCounter++; }
++    // EN KLOCKA (arenan entempo a8): med takt är beatIdx RUTNÄTETS index (taktmodellens etta på % 4 === 0), inte en fri räknare;
++    // utan takt stegar räknaren vidare på kickarna därifrån.
++    if (hasBeat) this.beatCounter = this.pulseHalved ? Math.floor(this.lastBeatIdx / 2) : this.lastBeatIdx;
+     const beatIdx = this.beatCounter;
+     // beatPulse: grid-puls när låst, annars den VERKLIGA kick-envelopen → pulsar
+     // ALLTID på musiken. (Utan detta gav beatFrac=0 → beatPulse=1 konstant = ingen
+diff --git a/.arena/entempo/kopia/src/split.ts b/.arena/entempo/a8/src/split.ts
+index 8b22f2b..d8ec7d8 100644
+--- a/.arena/entempo/kopia/src/split.ts
++++ b/.arena/entempo/a8/src/split.ts
+@@ -235,8 +235,12 @@ export class HopLaneFast {
+     else if (this.sync) syncWait(ctrl, C_FEED_SEQ, () => this.sr.read(ctrl, this.state, this.s, C_FEED_SEQ) && this.s[FS_HOP_SEQ] >= seq);
+     const s = this.s;
+     if (!this.sr.read(ctrl, this.state, s, C_FEED_SEQ) || s[FS_HOP_SEQ] === 0) return;   // inget resultat an (eller mitt i skrivning: behall forra)
+-    const fc = s[FS_FCONF]; if (fc === fc) f.bpmConfidence = fc;   // tilliten (bara om matningen andrade den)
+-    if (s[FS_HOP_SEQ] === this.applied) return;
++    if (s[FS_HOP_SEQ] !== this.applied) this.apply(an, cfg);
++    // EN TEMPO / EN TILLIT (arenan entempo a8): ramens bpm och tillit = klockans (cfg.beat), så ingen konsument läser ett eget tempo.
++    const b = cfg.beat; if (b) { f.bpm = b.bpm; f.bpmConfidence = b.confidence ?? 0; } else if (b === null) { f.bpm = 0; f.bpmConfidence = 0; }
++  }
++  private apply(an: HopTarget, cfg: HopCfg): void {
++    const s = this.s;
+     this.applied = s[FS_HOP_SEQ];
+     if (s[FS_RT_CNT] !== this.rt) { this.rt = s[FS_RT_CNT]; an.resetTempo(); }
+     if (s[FS_RB_CNT] !== this.rb) { this.rb = s[FS_RB_CNT]; an.resetBar(); }

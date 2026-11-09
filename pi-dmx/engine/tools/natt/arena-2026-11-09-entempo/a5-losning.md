@@ -1,0 +1,17 @@
+# a5 – Breaket som tillstånd i klockan
+
+**IDÉN.** Effektklockan i taktvägen (beatFeed.ts, workern) har nu ETT uttalat tillstånd per hop, `cfg.beat.state` = LOST / RELOCK / LOCKED / BREAK (beatClock.ts `CLOCK_*`). Det publiceras i tillståndsblocket (split.ts `FS_STATE`), och efter matningen bär ramen klockans bpm och tillit (`frame.bpm`/`frame.bpmConfidence` = `cfg.beat`, 0 utan klocka). Konsumenterna läser tillståndet i stället för egna trösklar: `hasBeat()` = LOCKED|BREAK, frasräknaren nollas på LOST (inte på analysatorns `bpm === 0`, så breaket räknas vidare) och räknar på LOCKED (inte `bpmConfidence > 0,35`), och hjärtslagets kurva körs bara när klockan har takt (beatEnv-golvbuggen). Vinsten är att det finns EN plats som avgör om takten finns. En ratt där räcker för att trimma breaket, i stället för fyra trösklar i två filer.
+
+Tillstånden räknas ur klockans egna befintliga mekanismer: BREAK = takthållet genom breaket (`holdSince`) eller coasten (`gridCoasting`). LOCKED = tillit ≥ MIN_BEAT_CONFIDENCE. RELOCK = klocka men tillit under grinden. LOST = `cfg.beat` null. Tempo, fas och omlåsning är orörda.
+
+**DIFFEN:** `losning.diff` (beatClock.ts, beatFeed.ts, config.ts, split.ts, effects.ts, ~176 rader).
+
+**SIFFRORNA (mätning 1 av 3):** poäng **+0,00**, långsamma +0,00 %, snabba +0,00 % (cpu 38,89 µs/hop, kvot 1,0; latens 85 ms), worker p99 7 hop (gräns 22). md5 är IDENTISK mot bas på hela lang1021 och megamix_ladan, så ljusdomaren behövs inte och inga spärrar slår till. Alla 17 måtten är lika med bas (upp_s 1,35 / ned_s 2,25 orörda). Inget blev sämre. Inget blev heller bättre. Övningsmängdens ljus träffar aldrig de fall där tillståndet skiljer sig från de gamla trösklarna: RELOCK med bpm > 40, ett break med tillit under 0,20, eller frasräknaren utan sektion. Jag lade inte fler mätningar på riskabla ljusändringar, eftersom md5-identiskt betyder att ingen spärr kan slå till.
+
+**DUBBLETTER KVAR:**
+- Analysatorns skuggrutnät och dess temposökning (TVÅ RUTNÄT) finns kvar. Analysatorns kickgrind och sektioner läser fortfarande sitt eget rutnät och `localBpm`. Att byta har tidigare gett upp_s 2,6 -> 4,1 s, och det är DISK-spärren. Det är kort a1:s/a2:s fråga.
+- BoundaryDetector får fortfarande analysatorns bpm (`bounds.tick` körs före matningen i index.ts och i domarens kedja), så `frame.bpm` har två värden inom samma hop. Låtgränsen in i klockan är kort a4:s fråga.
+- `ctx.beatIdx` är fortfarande den fria `beatCounter`. Två pulskurvor och två halveringspariteter finns kvar, liksom sectionBars-grinden utan fas. Var och en flyttar ljusets fas och kräver ljusdomaren, så jag lämnade dem utanför kortet.
+- Analysatorns egna breaklogik (TEMPO_HOLD/holdGrace) finns kvar. Sektionerna läser inte klocktillståndet, av samma spärrskäl.
+
+**RISKEN:** På Pi:n kommer tillståndet ett hop sent, via seqlocken. Om workern ligger efter ser effekterna samma tillstånd lite längre, men det är samma fördröjning som för `cfg.beat`. I realtid (inte bänkens virtuella klocka) kan BREAK utan tillit förekomma oftare, till exempel ett långt break med `holdSince` och läckt tillit. Då håller `hasBeat` nu rutnätet levande genom breaket i stället för att falla tillbaka på kickar, och frasräknaren nollas inte i breaket. Det är avsikten, men det syns först i ladan, inte i bänken. `frame.bpm` är nu ett flyttal (klockans), inte ett heltal. Det påverkar UI:t (server.ts) och lab.ts, inte ljuset.

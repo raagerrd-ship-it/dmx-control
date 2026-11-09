@@ -1,0 +1,176 @@
+diff --git a/.arena/entempo/kopia/src/beatClock.ts b/.arena/entempo/a5/src/beatClock.ts
+index 59855bd..11f3eb7 100644
+--- a/.arena/entempo/kopia/src/beatClock.ts
++++ b/.arena/entempo/a5/src/beatClock.ts
+@@ -22,8 +22,15 @@ export interface Beat {
+   bpm: number;
+   /** 0..1 från tempomätningen. Saknas den antas takten opålitlig. */
+   confidence?: number;
++  /** KLOCKANS TILLSTÅND (arena entempo a5, 2026-11-08): CLOCK_LOST/RELOCK/LOCKED/BREAK, satt av effektklockan (beatFeed.ts) varje hop.
++   *  Konsumenterna läser tillståndet i stället för egna trösklar på bpm = 0 eller tillit. Saknas = gamla regeln (konfidensgrinden). */
++  state?: number;
+ }
+ 
++/** KLOCKANS TILLSTÅND - EN källa för 'finns takten?'. LOST = ingen klocka; RELOCK = klocka utan bevis (tillit under grinden);
++ *  LOCKED = låst; BREAK = rutnätet rullar vidare genom ett break/en svacka (coast: tempo och fas hålls, tilliten läcker). */
++export const CLOCK_LOST = 0, CLOCK_RELOCK = 1, CLOCK_LOCKED = 2, CLOCK_BREAK = 3;
++
+ /** Under detta räknas takten som opålitlig — bättre ingen takt än en som sitter fel.
+  *  Konsumenter som `hasBeat` säger nej till faller tillbaka på VERKLIGA kicks, vilket
+  *  alltid följer musiken även om det inte följer ett rutnät. */
+@@ -42,7 +49,9 @@ export const GRID_EARLY_MS = 20;
+  * gissat rutnät medan hjärtslaget höll tyst — olika delar av riggen i olika takt.
+  */
+ export function hasBeat(beat: Beat | null | undefined): beat is Beat {
+-  return !!beat && beat.bpm > 40 && (beat.confidence ?? 0) >= MIN_BEAT_CONFIDENCE;
++  if (!beat || !(beat.bpm > 40)) return false;
++  const st = beat.state;   // KLOCKANS TILLSTÅND: låst eller break (coast) = takten finns; utan tillstånd den gamla grinden
++  return st === undefined ? (beat.confidence ?? 0) >= MIN_BEAT_CONFIDENCE : st >= CLOCK_LOCKED;
+ }
+ 
+ /** Taktperioden i ms. Faller tillbaka på 500 ms (120 BPM) när ingen takt är låst. */
+diff --git a/.arena/entempo/kopia/src/beatFeed.ts b/.arena/entempo/a5/src/beatFeed.ts
+index 0e20922..1a92f6b 100644
+--- a/.arena/entempo/kopia/src/beatFeed.ts
++++ b/.arena/entempo/a5/src/beatFeed.ts
+@@ -6,7 +6,7 @@
+  */
+ import { isLogOn } from "./quiet.js";
+ import { PROFILE } from "./analyserProfile.js";
+-import { MIN_BEAT_CONFIDENCE, GRID_EARLY_MS } from "./beatClock.js";
++import { MIN_BEAT_CONFIDENCE, GRID_EARLY_MS, CLOCK_RELOCK, CLOCK_LOCKED, CLOCK_BREAK } from "./beatClock.js";
+ import type { Frame } from "./analyser.js";
+ import type { EngineConfig } from "./config.js";
+ 
+@@ -315,7 +315,12 @@ export class BeatFeed {
+       an = NO_AN;
+       if (cfg.beat && this.innerValid) { cfg.beat.anchorMs = this.innerAnchor; cfg.beat.bpm = this.innerBpm; }   // ETTAN: matningen räknar på det inre ankaret
+       this.updateInner(frame, cfg, an, now);
+-      if (cfg.beat) { this.innerAnchor = cfg.beat.anchorMs; this.innerBpm = cfg.beat.bpm; this.innerValid = true; cfg.beat.anchorMs += this.barOff * (60000 / cfg.beat.bpm) - GRID_EARLY_MS - TG_GRID_EXTRA_MS; }
++      if (cfg.beat) {
++        this.innerAnchor = cfg.beat.anchorMs; this.innerBpm = cfg.beat.bpm; this.innerValid = true; cfg.beat.anchorMs += this.barOff * (60000 / cfg.beat.bpm) - GRID_EARLY_MS - TG_GRID_EXTRA_MS;
++        // KLOCKANS TILLSTÅND (a5 entempo): breaket (analysatorns bpm 0 och rutnätet hålls, eller tilliten under grinden i coasten)
++        // är ETT tillstånd i klockan; utan det låst eller omlåsning (tillit under grinden). Ingen klocka = LOST (cfg.beat null).
++        cfg.beat.state = this.holdSince !== 0 || this.gridCoasting ? CLOCK_BREAK : (cfg.beat.confidence ?? 0) >= MIN_BEAT_CONFIDENCE ? CLOCK_LOCKED : CLOCK_RELOCK;
++      }
+       else this.innerValid = false;
+       return;
+     }
+diff --git a/.arena/entempo/kopia/src/config.ts b/.arena/entempo/a5/src/config.ts
+index fb10096..422337d 100644
+--- a/.arena/entempo/kopia/src/config.ts
++++ b/.arena/entempo/a5/src/config.ts
+@@ -137,7 +137,7 @@ export interface EngineConfig {
+   /** Transient beat clock (BPM + wall-clock anchor) — not persisted. */
+   /** Taktklockan. Fasen (anchorMs) knuffas löpande av PLL:en mot faktiska trumslag;
+    *  confidence avgör om takten alls får användas — se beatClock.ts. */
+-  beat?: { anchorMs: number; bpm: number; confidence?: number } | null;
++  beat?: { anchorMs: number; bpm: number; confidence?: number; state?: number } | null;
+   /** Transient PLL-fasfel (-0.25..0.25 av en takt), utjämnat — för UI:ts beat-synk-
+    *  indikator (ser hur mycket fasen justeras). Ej persisterad. */
+   beatErr?: number;
+diff --git a/.arena/entempo/kopia/src/effects.ts b/.arena/entempo/a5/src/effects.ts
+index 09703c0..e27135f 100644
+--- a/.arena/entempo/kopia/src/effects.ts
++++ b/.arena/entempo/a5/src/effects.ts
+@@ -15,7 +15,7 @@ import { isLogOn } from "./quiet.js";
+ import type { ChannelRole, EngineConfig, Mode } from "./config.js";
+ import { fixtureRoles } from "./config.js";
+ import { FixtureOutput, keepLit, lampFadeK, lampLevel, sameLight, type SpecialtyValues } from "./output.js";
+-import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE, GRID_EARLY_MS } from "./beatClock.js";
++import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE, GRID_EARLY_MS, CLOCK_LOCKED } from "./beatClock.js";
+ import type { Frame } from "./analyser.js";
+ import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
+ import { fitScore, fitDistance, FIT } from "./effects/fit.js";
+@@ -1300,7 +1300,7 @@ export class EffectEngine {
+   private stepBeatClock(frame: Frame, beat: EngineConfig['beat']): void {
+     const beatMs = this.rBeatMs, nowWall = this.rNowWall, _dtT = this.rDtT;
+     let beatEnv = 0, beatTick = false;
+-    if (beat && beat.bpm > 40) {
++    if (beatLocked(beat)) {   // KLOCKANS TILLSTÅND låst/break (förr bpm > 40: utan takt frös det monotona golvet beatEnv -> kickEnv-golv upp till 0,8)
+       const now2 = nowWall;
+       const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
+       // PRESENTATIONSTAKT: över PULSE_HALVE_ABOVE_BPM pulsar hjärtslaget på varannat
+@@ -1671,10 +1671,10 @@ export class EffectEngine {
+         // (softenRange). Kuloren roterar inom familjen per fras (HUE_PHRASE). (Sektionspaletten - en palett per sektionstyp - ersatt 10-12.)
+         if (this.songPal < 0) { this.pickPalette(frame.centroid); this.songPal = this.paletteIdx; }
+         this.paletteIdx = this.songPal;
+-      } else if (frame.bpm === 0) this.phraseBeat = 0;            // tyst/ej låst → nollställ frasen
+-      // Räkna bara takter när BPM är PÅLITLIGT (confidence) → palettbytena
++      } else if (!this.cfg.beat) this.phraseBeat = 0;            // KLOCKANS TILLSTÅND LOST (ingen klocka) → nollställ frasen; breaket räknas vidare
++      // Räkna bara takter när klockan är LÅST (klockans tillstånd, inte en egen tillitströskel) → palettbytena
+       // hamnar på riktiga fraser, inte på ett hoppigt/osäkert tempo.
+-      else if (beatTick && frame.bpmConfidence > 0.35 && ++this.phraseBeat >= this.phraseBeats) {
++      else if (beatTick && this.cfg.beat.state === CLOCK_LOCKED && ++this.phraseBeat >= this.phraseBeats) {
+         this.phraseBeat = 0;
+         this.pickPalette(frame.centroid);
+       }
+diff --git a/.arena/entempo/kopia/src/split.ts b/.arena/entempo/a5/src/split.ts
+index 8b22f2b..38c753a 100644
+--- a/.arena/entempo/kopia/src/split.ts
++++ b/.arena/entempo/a5/src/split.ts
+@@ -198,13 +198,14 @@ export const C_HOP_WRITE = 4, C_HOP_READ = 5, C_FEED_SEQ = 6 /* taktvägens seql
+ export const FS_HOP_SEQ = 0, FS_BEAT = 1 /* cfg.beat: 0 undefined, -1 null, 1 objekt */, FS_ANCHOR = 2, FS_BPM = 3, FS_BCONF = 4,
+   FS_BEATERR = 5 /* NaN = osatt */, FS_FCONF = 6 /* frame.bpmConfidence efter matningen, NaN = orörd */, FS_GRID = 7 /* analysatorns rutnät 0 null/1 */,
+   FS_GANCHOR = 8, FS_GBPM = 9, FS_GCONF = 10, FS_RT_CNT = 11 /* resetTempo, räknare */, FS_RB_CNT = 12 /* resetBar, räknare */,
+-  FS_PROCESSED = 13, FS_LAG_MS = 14, FS_LAG_MAX = 15, FS_BUSY_US = 16, FS_BUSY_MAX_US = 17, FS_SKIPPED = 18;
+-export const FEED_STATE_LEN = 19;
++  FS_PROCESSED = 13, FS_LAG_MS = 14, FS_LAG_MAX = 15, FS_BUSY_US = 16, FS_BUSY_MAX_US = 17, FS_SKIPPED = 18,
++  FS_STATE = 19 /* klockans tillstånd (beatClock CLOCK_*), -1 = inget */;
++export const FEED_STATE_LEN = 20;
+ 
+ /** Det taktmatningen läser ur ramen, och det den skriver (cfg.beat/beatErr, frame.bpmConfidence, analysatorns rutnät/kommandon). */
+ export interface HopFrame { bpm: number; bpmConfidence: number; beatAnchorMs: number; kickAtMs: number; barShift: number;
+   onset: { kick: number; highMid: number; treble: number }; specAbs: { sub: number; kick: number; bass: number } }
+-export interface HopGrid { anchorMs: number; bpm: number; confidence?: number }
++export interface HopGrid { anchorMs: number; bpm: number; confidence?: number; state?: number }
+ export interface HopCfg { beat?: HopGrid | null; beatErr?: number }
+ export interface HopTarget { resetTempo(): void; resetBar(): void; setBeatGrid?(g: HopGrid | null): void }
+ /** Systemets taktmatning (DMX: BeatFeed). `now` = hoppets klocka (Date.now() när hoppet kom, inte när workern kör det). */
+@@ -235,19 +236,24 @@ export class HopLaneFast {
+     else if (this.sync) syncWait(ctrl, C_FEED_SEQ, () => this.sr.read(ctrl, this.state, this.s, C_FEED_SEQ) && this.s[FS_HOP_SEQ] >= seq);
+     const s = this.s;
+     if (!this.sr.read(ctrl, this.state, s, C_FEED_SEQ) || s[FS_HOP_SEQ] === 0) return;   // inget resultat an (eller mitt i skrivning: behall forra)
+-    const fc = s[FS_FCONF]; if (fc === fc) f.bpmConfidence = fc;   // tilliten (bara om matningen andrade den)
+-    if (s[FS_HOP_SEQ] === this.applied) return;
+-    this.applied = s[FS_HOP_SEQ];
+-    if (s[FS_RT_CNT] !== this.rt) { this.rt = s[FS_RT_CNT]; an.resetTempo(); }
+-    if (s[FS_RB_CNT] !== this.rb) { this.rb = s[FS_RB_CNT]; an.resetBar(); }
+-    if (s[FS_GRID] === 1) { const g = this.grid; g.anchorMs = s[FS_GANCHOR]; g.bpm = s[FS_GBPM]; g.confidence = s[FS_GCONF]; an.setBeatGrid?.(g); }
+-    else an.setBeatGrid?.(null);
+-    const bc = s[FS_BEAT];
+-    if (bc === 1) {
+-      if (!cfg.beat) cfg.beat = { anchorMs: s[FS_ANCHOR], bpm: s[FS_BPM], confidence: s[FS_BCONF] };
+-      else { cfg.beat.anchorMs = s[FS_ANCHOR]; cfg.beat.bpm = s[FS_BPM]; cfg.beat.confidence = s[FS_BCONF]; }
+-    } else cfg.beat = bc === -1 ? null : undefined;
+-    const be = s[FS_BEATERR]; if (be === be) cfg.beatErr = be;
++    if (s[FS_HOP_SEQ] !== this.applied) {
++      this.applied = s[FS_HOP_SEQ];
++      if (s[FS_RT_CNT] !== this.rt) { this.rt = s[FS_RT_CNT]; an.resetTempo(); }
++      if (s[FS_RB_CNT] !== this.rb) { this.rb = s[FS_RB_CNT]; an.resetBar(); }
++      if (s[FS_GRID] === 1) { const g = this.grid; g.anchorMs = s[FS_GANCHOR]; g.bpm = s[FS_GBPM]; g.confidence = s[FS_GCONF]; an.setBeatGrid?.(g); }
++      else an.setBeatGrid?.(null);
++      const bc = s[FS_BEAT], st = s[FS_STATE] >= 0 ? s[FS_STATE] : undefined;
++      if (bc === 1) {
++        if (!cfg.beat) cfg.beat = { anchorMs: s[FS_ANCHOR], bpm: s[FS_BPM], confidence: s[FS_BCONF], state: st };
++        else { cfg.beat.anchorMs = s[FS_ANCHOR]; cfg.beat.bpm = s[FS_BPM]; cfg.beat.confidence = s[FS_BCONF]; cfg.beat.state = st; }
++      } else cfg.beat = bc === -1 ? null : undefined;
++      const be = s[FS_BEATERR]; if (be === be) cfg.beatErr = be;
++    }
++    // EN TEMPO, EN TILLIT (a5 entempo): efter matningen bär ramen KLOCKANS bpm och tillit (ingen klocka = 0) - effekterna läser
++    // aldrig analysatorns egna. (Förr: tilliten bara om matningen ändrade den, bpm = analysatorns.) Utan klocktillstånd (lotus): som förr.
++    const b = cfg.beat;
++    if (s[FS_STATE] >= 0 || !b) { f.bpm = b ? b.bpm : 0; f.bpmConfidence = b ? (b.confidence ?? 0) : 0; }
++    else { const fc = s[FS_FCONF]; if (fc === fc) f.bpmConfidence = fc; }
+   }
+   /** Hälsa: hur långt efter taktvägen ligger (hop och ms), dess kostnad per hop, tappade hop. */
+   stats(): { written: number; processed: number; behind: number; lagMs: number; lagMaxMs: number; busyUs: number; busyMaxUs: number; skipped: number } {
+@@ -302,7 +308,7 @@ export class HopLaneSlow {
+         const b = this.cfg.beat, g = this.grid;
+         s[FS_HOP_SEQ] = this.seq; s[FS_BEAT] = b ? 1 : b === null ? -1 : 0;
+         if (b) { s[FS_ANCHOR] = b.anchorMs; s[FS_BPM] = b.bpm; s[FS_BCONF] = b.confidence ?? 0; }
+-        s[FS_BEATERR] = this.cfg.beatErr ?? NaN; s[FS_FCONF] = this.fconf;
++        s[FS_BEATERR] = this.cfg.beatErr ?? NaN; s[FS_FCONF] = this.fconf; s[FS_STATE] = b && b.state !== undefined ? b.state : -1;
+         s[FS_GRID] = g ? 1 : 0; if (g) { s[FS_GANCHOR] = g.anchorMs; s[FS_GBPM] = g.bpm; s[FS_GCONF] = g.confidence ?? 0; }
+         s[FS_RT_CNT] = this.rt; s[FS_RB_CNT] = this.rb;
+         s[FS_PROCESSED] = this.processed; s[FS_LAG_MS] = lagMs; s[FS_LAG_MAX] = this.lagMaxMs; s[FS_BUSY_US] = this.busyEmaUs; s[FS_BUSY_MAX_US] = this.busyMaxUs; s[FS_SKIPPED] = this.skipped;

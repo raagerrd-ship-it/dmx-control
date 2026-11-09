@@ -1,0 +1,76 @@
+diff --git a/.arena/entempo/kopia/src/effects.ts b/.arena/entempo/a7/src/effects.ts
+index 09703c0..648efea 100644
+--- a/.arena/entempo/kopia/src/effects.ts
++++ b/.arena/entempo/a7/src/effects.ts
+@@ -2010,9 +2010,12 @@ export class EffectEngine {
+     let beatFracFx = beatFrac;
+     if (this.pulseHalved && hasBeat) {
+       // HALVERAD EFFEKT-KLOCKA: två riktiga slag = ett effekt-slag. Paritet 0 = "ett", 1 = "två".
+-      if (beatHit) { this.halfTick ^= 1; if (this.halfTick === 0) this.beatCounter++; else beatHit = false; }
++      // EN TEMPO (a7): räknaren = rutnätets index (taktmodellens etta når effekterna), paritet = rutnätets
++      this.halfTick = (this.lastBeatIdx + 1024) & 1; if (beatHit && this.halfTick === 1) beatHit = false;
++      this.beatCounter = (this.lastBeatIdx + 1024) >> 1;   // +1024: ankaret kan ligga upp till 3 slag fram (etta), aldrig negativt
+       beatFracFx = (this.halfTick + beatFrac) / 2;
+-    } else { this.halfTick = 0; if (beatHit) this.beatCounter++; }
++    } else if (hasBeat) { this.halfTick = 0; this.beatCounter = this.lastBeatIdx + 1024; }
++    else { this.halfTick = 0; if (beatHit) this.beatCounter++; }
+     const beatIdx = this.beatCounter;
+     // beatPulse: grid-puls när låst, annars den VERKLIGA kick-envelopen → pulsar
+     // ALLTID på musiken. (Utan detta gav beatFrac=0 → beatPulse=1 konstant = ingen
+diff --git a/.arena/entempo/kopia/src/index.ts b/.arena/entempo/a7/src/index.ts
+index d532b8c..a863364 100644
+--- a/.arena/entempo/kopia/src/index.ts
++++ b/.arena/entempo/a7/src/index.ts
+@@ -27,6 +27,7 @@ import { IntensityKnob } from "./intensityKnob.js";
+ import { isMoment, pressMoment } from "./moment.js";
+ import { applyIntensity, migrateFromMoods } from "./moods.js";
+ import { BeatFeed } from "./beatFeed.js";
++import { oneTempo } from "./split.js";
+ import { LongRecord } from "./longRecord.js";
+ import * as health from "./runtimeHealth.js";
+ import { renderBegin, renderEnd } from "./perfStats.js";
+@@ -199,7 +200,7 @@ capture.on("chunk", (samples: Float32Array) => {
+   frame.dropCount = outDrop;
+   // tillit + taktklocka (beatFeed.ts). TAKTVÄGEN (profilens BEAT_FEED 'slow', 2026-11-08): körs i analysatorns worker - här bara
+   // hoppet in och senaste resultatet ut (cfg.beat, tilliten, analysatorns rutnät/kommandon). Odelad analysator: i huvudtråden som förr.
+-  if (analyser.hopLane) analyser.hopLane.feed(frame, cfg, analyser); else beatFeed.update(frame, cfg, analyser);
++  if (analyser.hopLane) analyser.hopLane.feed(frame, cfg, analyser); else { beatFeed.update(frame, cfg, analyser); oneTempo(frame, cfg); }
+   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
+   // inga slag missas) → show-tiden får en knuff, starkare ju tyngre basen är.
+   if (frame.kick) effects.registerKick(0.4 + Math.min(1, frame.energy * 1.4) * 0.6);
+diff --git a/.arena/entempo/kopia/src/split.ts b/.arena/entempo/a7/src/split.ts
+index 8b22f2b..51dcf5c 100644
+--- a/.arena/entempo/kopia/src/split.ts
++++ b/.arena/entempo/a7/src/split.ts
+@@ -202,6 +202,11 @@ export const FS_HOP_SEQ = 0, FS_BEAT = 1 /* cfg.beat: 0 undefined, -1 null, 1 ob
+ export const FEED_STATE_LEN = 19;
+ 
+ /** Det taktmatningen läser ur ramen, och det den skriver (cfg.beat/beatErr, frame.bpmConfidence, analysatorns rutnät/kommandon). */
++/** EN TEMPO (arena entempo a7, 2026-11-08): ramens bpm/tillit = effektklockans (cfg.beat). Analysatorns egen bpm går bara IN i
++ *  taktvägen (hop-recordet skrivs före detta); allt nedströms (effekterna, verktygen) läser klockans tempo och klockans tillit. */
++export function oneTempo(f: { bpm: number; bpmConfidence: number }, cfg: HopCfg): void {
++  const b = cfg.beat; f.bpm = b ? b.bpm : 0; f.bpmConfidence = b ? (b.confidence ?? 0) : 0;
++}
+ export interface HopFrame { bpm: number; bpmConfidence: number; beatAnchorMs: number; kickAtMs: number; barShift: number;
+   onset: { kick: number; highMid: number; treble: number }; specAbs: { sub: number; kick: number; bass: number } }
+ export interface HopGrid { anchorMs: number; bpm: number; confidence?: number }
+@@ -234,9 +239,8 @@ export class HopLaneFast {
+     if (this.peer) this.peer.drain();
+     else if (this.sync) syncWait(ctrl, C_FEED_SEQ, () => this.sr.read(ctrl, this.state, this.s, C_FEED_SEQ) && this.s[FS_HOP_SEQ] >= seq);
+     const s = this.s;
+-    if (!this.sr.read(ctrl, this.state, s, C_FEED_SEQ) || s[FS_HOP_SEQ] === 0) return;   // inget resultat an (eller mitt i skrivning: behall forra)
+-    const fc = s[FS_FCONF]; if (fc === fc) f.bpmConfidence = fc;   // tilliten (bara om matningen andrade den)
+-    if (s[FS_HOP_SEQ] === this.applied) return;
++    if (!this.sr.read(ctrl, this.state, s, C_FEED_SEQ) || s[FS_HOP_SEQ] === 0) { oneTempo(f, cfg); return; }   // inget resultat an (eller mitt i skrivning: behall forra)
++    if (s[FS_HOP_SEQ] === this.applied) { oneTempo(f, cfg); return; }
+     this.applied = s[FS_HOP_SEQ];
+     if (s[FS_RT_CNT] !== this.rt) { this.rt = s[FS_RT_CNT]; an.resetTempo(); }
+     if (s[FS_RB_CNT] !== this.rb) { this.rb = s[FS_RB_CNT]; an.resetBar(); }
+@@ -248,6 +252,7 @@ export class HopLaneFast {
+       else { cfg.beat.anchorMs = s[FS_ANCHOR]; cfg.beat.bpm = s[FS_BPM]; cfg.beat.confidence = s[FS_BCONF]; }
+     } else cfg.beat = bc === -1 ? null : undefined;
+     const be = s[FS_BEATERR]; if (be === be) cfg.beatErr = be;
++    oneTempo(f, cfg);
+   }
+   /** Hälsa: hur långt efter taktvägen ligger (hop och ms), dess kostnad per hop, tappade hop. */
+   stats(): { written: number; processed: number; behind: number; lagMs: number; lagMaxMs: number; busyUs: number; busyMaxUs: number; skipped: number } {

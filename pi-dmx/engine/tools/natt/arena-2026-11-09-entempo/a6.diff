@@ -1,0 +1,77 @@
+diff --git a/.arena/entempo/kopia/src/beatFeed.ts b/.arena/entempo/a6/src/beatFeed.ts
+index 0e20922..5991c4c 100644
+--- a/.arena/entempo/kopia/src/beatFeed.ts
++++ b/.arena/entempo/a6/src/beatFeed.ts
+@@ -317,11 +317,20 @@ export class BeatFeed {
+       this.updateInner(frame, cfg, an, now);
+       if (cfg.beat) { this.innerAnchor = cfg.beat.anchorMs; this.innerBpm = cfg.beat.bpm; this.innerValid = true; cfg.beat.anchorMs += this.barOff * (60000 / cfg.beat.bpm) - GRID_EARLY_MS - TG_GRID_EXTRA_MS; }
+       else this.innerValid = false;
++      BeatFeed.publish(frame, cfg);
+       return;
+     }
+     this.updateInner(frame, cfg, an, now);
+   }
+ 
++  /** EN TILLIT (arena entempo a6, 2026-11-08): klockan är den enda källan. Efter matningen bär ramen KLOCKANS tempo och tillit
++   *  (frame.bpm = cfg.beat.bpm, frame.bpmConfidence = cfg.beat.confidence, ingen klocka = 0/0), så effekterna (frasräknaren,
++   *  tilliten, lab-effekterna), hasBeat, UI:t och inspelaren läser samma tal. Analysatorns eget tempo läses bara FÖRE matningen
++   *  (skuggrutnätet, låtgränsen, klockans första lås/break-hållet). */
++  static publish(frame: { bpm: number; bpmConfidence: number }, cfg: { beat?: { bpm: number; confidence?: number } | null }): void {
++    const b = cfg.beat; frame.bpm = b ? b.bpm : 0; frame.bpmConfidence = b ? (b.confidence ?? 0) : 0;
++  }
++
+   private updateInner(frame: Frame, cfg: EngineConfig, an: { resetTempo(): void; resetBar(): void; setBeatGrid?(g: EngineConfig["beat"]): void }, now: number): void {
+     // TILLITEN KOMMER FRAN FASPREDIKTIONEN, inte fran tempogrammets form.
+     // Coast: utan kickar finns inga nya bevis, sa tilliten lacker ner over ~4 s i
+@@ -355,8 +364,14 @@ export class BeatFeed {
+       }
+     }
+     // Coasten vilar kvar på fasträffarna (pllConf, se TRUST_REPEAT); tilliten som går ut till effekterna är mönstret.
+-    const pllConf = frame.bpmConfidence ?? 0;
++    let pllConf = frame.bpmConfidence ?? 0;
+     if (this.pllKicks >= 12) { frame.bpmConfidence = this.repeatRate; if (cfg.beat) cfg.beat.confidence = this.repeatRate; }
++    // EN TILLIT (arena entempo a6, 2026-11-08): effektklockans tillit är ETT mått = andelen kickar som klockans rutnät förutsäger
++    // (repeatRate: på slaget eller samma plats två slag tidigare), från första kicken. Förr gällde analysatorns tempogramtopp
++    // (frame.bpmConfidence, ett ANNAT tempo) tills 12 kickar samlats och igen 8 s efter sista kicken: vid låtstart stod tilliten
++    // 0,6-1,0 medan klockan ännu sökte (122 -> 87 -> 80 på 5 s) och föll till 0,24 när de 12 kickarna kom (prov/tillit.mjs).
++    // Coasten läser samma mått. Analysatorns skuggrutnät (kickFold) har kvar sitt gamla mått (dess återställningar styr sektionerna).
++    if (!this.kickFold) { pllConf = this.repeatRate; frame.bpmConfidence = this.repeatRate; if (cfg.beat) cfg.beat.confidence = this.repeatRate; }
+ 
+     // LÖPANDE TAKT (10-19, ersätter kick-PLL:en, tempospärren och fasföljaren - backup-taggen backup/fore-lopande-takt-2026-10-19):
+     // analysatorns bpm ger bara det första låset och ett sökcentrum; sedan sätter onsetStep() fas och tempo direkt ur kickbandets
+diff --git a/.arena/entempo/kopia/src/effects.ts b/.arena/entempo/a6/src/effects.ts
+index 09703c0..4765edc 100644
+--- a/.arena/entempo/kopia/src/effects.ts
++++ b/.arena/entempo/a6/src/effects.ts
+@@ -1300,7 +1300,7 @@ export class EffectEngine {
+   private stepBeatClock(frame: Frame, beat: EngineConfig['beat']): void {
+     const beatMs = this.rBeatMs, nowWall = this.rNowWall, _dtT = this.rDtT;
+     let beatEnv = 0, beatTick = false;
+-    if (beat && beat.bpm > 40) {
++    if (beatLocked(beat)) {   // EN TILLIT (entempo a6): samma grind som beatIndex/beatPhase - förr bpm > 40, så vid tillit < 0,20 frös pulsen på golvet
+       const now2 = nowWall;
+       const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
+       // PRESENTATIONSTAKT: över PULSE_HALVE_ABOVE_BPM pulsar hjärtslaget på varannat
+diff --git a/.arena/entempo/kopia/src/split.ts b/.arena/entempo/a6/src/split.ts
+index 8b22f2b..4399c6b 100644
+--- a/.arena/entempo/kopia/src/split.ts
++++ b/.arena/entempo/a6/src/split.ts
+@@ -223,6 +223,10 @@ export class HopLaneFast {
+   }
+   /** Ett hop (efter analysatorn, före effekterna - där motorn förr anropade taktmatningen). */
+   feed(f: HopFrame, cfg: HopCfg, an: HopTarget): void {
++    this.apply(f, cfg, an);
++    const b = cfg.beat; f.bpm = b ? b.bpm : 0; f.bpmConfidence = b ? (b.confidence ?? 0) : 0;   // EN TILLIT (a6): ramen bär klockans tempo/tillit (= BeatFeed.publish)
++  }
++  private apply(f: HopFrame, cfg: HopCfg, an: HopTarget): void {
+     const r = this.ring, ctrl = this.ctrl, seq = ++this.seq, o = (seq % HOP_RING_N) * HOP_REC_LEN;
+     r[o + H_NOW] = Date.now(); r[o + H_TS] = performance.timeOrigin + performance.now();
+     r[o + H_BPM] = f.bpm; r[o + H_CONF] = f.bpmConfidence; r[o + H_ANCHOR] = f.beatAnchorMs; r[o + H_KICKAT] = f.kickAtMs; r[o + H_BARSHIFT] = f.barShift;
+@@ -235,7 +239,6 @@ export class HopLaneFast {
+     else if (this.sync) syncWait(ctrl, C_FEED_SEQ, () => this.sr.read(ctrl, this.state, this.s, C_FEED_SEQ) && this.s[FS_HOP_SEQ] >= seq);
+     const s = this.s;
+     if (!this.sr.read(ctrl, this.state, s, C_FEED_SEQ) || s[FS_HOP_SEQ] === 0) return;   // inget resultat an (eller mitt i skrivning: behall forra)
+-    const fc = s[FS_FCONF]; if (fc === fc) f.bpmConfidence = fc;   // tilliten (bara om matningen andrade den)
+     if (s[FS_HOP_SEQ] === this.applied) return;
+     this.applied = s[FS_HOP_SEQ];
+     if (s[FS_RT_CNT] !== this.rt) { this.rt = s[FS_RT_CNT]; an.resetTempo(); }
