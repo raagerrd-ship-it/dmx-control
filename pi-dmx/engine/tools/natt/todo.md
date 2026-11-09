@@ -18,6 +18,10 @@ tempot ligger lite fel i varje låt -> rutnätet driver. Det är vad p2:s fintem
    ensam mot samma fönster (METODEN: A / B / sammanslagning).
 4. Vinner fintempot: gör det till KOD (ingen flagga, backup-tagg), DMX-md5-skillnad redovisad, skriv "REDO FÖR LADAN" + ladan-raden, och
    "KLAR FÖR SYNK" (delade analysatorn ändras -> huvudchatten synkar lotus och deployar efter ägarens ja). Ingen deploy, inget i lotus-light-link.
+5. NYTT 22:00 (lotus i källaren, ägaren: "känns som den hänger sig då och så"): motorn fryser INTE (loop max ≤ 83 ms, BLE 53/s), men i en
+   128 bpm-klubbmix ("NEW CLUB MIX 2025", Sonos) hoppar analyser.bpm till 80–87 (~2/3) i stretcher om 0,5–5 s, ~10 % av tiden. Lotus fade-tau
+   = fadeIntervalK × slagintervall, så ljuset hänger kvar ~60 % längre i de stretcherna (lindrat i kväll med fadeTauMax 0,8). Ta med 2/3-hoppen
+   inne i en låt som mått i fintempobänken (andel tid med tempo ≈ 2/3 eller 3/2 av facit), och pröva om fintempot/tydligheten tar bort dem.
 Rapport: tools/natt/rapport-2026-11-10.md. Fasjobbets underlag: .arena/fas/p2/losning.md, .arena/fas/bas/.
 
 ## HÖGSTA PRIO 2026-11-09 09:00: ARENA: EN KLOCKA FÖR BÅDA (lotus + DMX) - ägaren
