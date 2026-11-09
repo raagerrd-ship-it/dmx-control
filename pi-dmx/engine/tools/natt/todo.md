@@ -28,6 +28,10 @@ kvällen att köra två olika funktioner för samma sak som vi försöker förb�
      `PYTHONIOENCODING=utf-8 PI_HOST=10.171.211.218 python tools/ladan.py` (OBS deployspärren mot lotus-kopian tills lotus portat).
      Domaren under körningen: lampspr på MEDLET (domare.py 1cf4d1d), CPU ingen poäng/Pi-budget 130 us/hop, KRAV EN KÄLLA -3,0.
   2. Död kod (DUBBLA KÄLLOR 9): md5-identiskt, en commit. Ingen arena.
+     KLART 2026-11-09: 177b98c (10 poster, DMX-md5 identisk); före det LOTUSPARITET 0 3c5b643 (deployspärren); MÄTFÄLLA dmxDump strömskrivna
+     WAV 0365872. HÖGSTA PRIO 09:00 ARENA EN KLOCKA FÖR BÅDA KLART 13:55: e047c6f (tagg enklocka-vin, backup/fore-enklocka-20261109) -
+     lotus egen sökning bort, lotus-bänk 396->463/503 syntet 6/8, DMX md5 oförändrad; KLAR FÖR SYNK skickad till huvudchatten. Rapport
+     tools/natt/arena-2026-11-09-klocka/RAPPORT.md; sammanfattning tools/natt/rapport-2026-11-09.md.
   3. ARENA: ANALYS UT UR MOTORN. Allt låtanalytiskt i effects.ts flyttas in i analysatorn och publiceras i ramen:
      - drop (flankStep -> en detektor; bänkens drop-mått pekar på den)
      - lyft och nästan-drop
