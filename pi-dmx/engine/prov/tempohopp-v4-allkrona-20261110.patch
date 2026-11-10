@@ -1,0 +1,29 @@
+--- a/pi-dmx/engine/src/analyserClock.ts
++++ b/pi-dmx/engine/src/analyserClock.ts
+@@ -171,7 +171,7 @@
+   // HELA TEMPOOMRÅDET: egna vikningsytor, varvets bästa och förra varvets vinnare (fullBpm = andra sökcentrum, 0 = ingen topp)
+   private readonly fullS = new Float64Array(ONSET_BINS); private readonly fullN = new Float64Array(ONSET_BINS);
+   private readonly tgAcc = new Float64Array(TG_K).fill(-1); private readonly tgH = new Float64Array(ONSET_BINS); private tgK = 0; private tgN = 0;
+-  private readonly tgAccF = new Float64Array(TG_K).fill(-1); private tgSw = 0; tgSwitches = 0;   // TVÅ MINNEN (a2f)
++  private readonly tgAccF = new Float64Array(TG_K).fill(-1); private tgSw = 0; private tgSwK = 0; tgSwitches = 0;   // TVÅ MINNEN (a2f)
+   /** EN TEMPOSÖKNING: tempogrammets vinnare (0 = ingen topp än) - klockans skanningscentrum. */
+   tempoBpm = 0;
+   /** TEMPOTS TYDLIGHET 0..1 (t1f): 1 - näst bästa tempohypotesens poäng / vinnarens, x 3, tak 1 (se tgStep). */
+@@ -292,7 +292,7 @@
+         const d0 = fk < 0 ? 0 : ((fk - kc0) % TG_K + TG_K) % TG_K, dd = Math.min(d0, TG_K - d0);
+         let sib0 = false; for (let i = 0; i < TG_SIB.length; i++) { const q = TG_SIB[i]; if (Math.abs(d0 - q) <= 2 || Math.abs(d0 - (TG_K - q)) <= 2) sib0 = true; }   // utan closure
+         const fc = Math.max(accF[kc0], accF[(kc0 + 1) % TG_K], accF[(kc0 + TG_K - 1) % TG_K]);   // syskon: bara med kronans marginal i det snabba
+-        if (fk >= 0 && dd > TG_SW_STEPS && (!sib0 || fv >= fc * TG_HOLD)) { if (++this.tgSw >= TG_SW_N) { acc.set(accF); this.tgSw = 0; this.tgSwitches++; } } else this.tgSw = 0;
++        if (fk >= 0 && dd > TG_SW_STEPS && fv >= fc * TG_HOLD) { const ds = ((fk - this.tgSwK) % TG_K + TG_K) % TG_K; if (this.tgSw > 0 && Math.min(ds, TG_K - ds) > 2) this.tgSw = 0; this.tgSwK = fk; if (++this.tgSw >= TG_SW_N) { acc.set(accF); this.tgSw = 0; this.tgSwitches++; } } else this.tgSw = 0;
+       }
+       let bk = -1, bv = 0; for (let i = 0; i < TG_K; i++) if (acc[i] > bv) { bv = acc[i]; bk = i; }
+       if (bk < 0) { this.tempoBpm = 0; return; }
+@@ -310,7 +310,7 @@
+         const kc = ((Math.round(Math.log(this.tempoBpm / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K, cv = Math.max(acc[kc], acc[(kc + 1) % TG_K], acc[(kc + TG_K - 1) % TG_K]);
+         // bara mot ett HARMONISKT syskon (4:3, 3:2 åt båda hållen, i det cirkulära oktavrutnätet): ett annat tempo (ny låt utan låtgräns) tas som förr
+         const d = ((bk - kc) % TG_K + TG_K) % TG_K, sib = TG_SIB.some((q) => Math.abs(d - q) <= 2 || Math.abs(d - (TG_K - q)) <= 2);
+-        if (sib && cv > 0 && bv < cv * TG_HOLD) return;
++        if (cv > 0 && bv < cv * TG_HOLD) return;
+       }
+       const a = acc[(bk + TG_K - 1) % TG_K], c = acc[(bk + 1) % TG_K], den = a - 2 * bv + c;   // parabel i log-rutnätet (cirkulärt)
+       const off = a >= 0 && c >= 0 && den < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den)) : 0;
