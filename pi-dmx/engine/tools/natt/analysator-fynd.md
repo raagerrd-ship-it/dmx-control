@@ -15,6 +15,23 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-10 Fintempot (parabeln) flyttar fasen rätt men inte gratis - INGEN delad fil ändrad
+Vad: analyserClock.ts skannar tempot i 0,5 %-steg; parabeln genom varvets tre bästa tempon (prov/fintempo-parabel-20261110.patch) ger
+gridfel i BASENS fönster 22,9 -> 21,45 ms (övning) och 8,25 -> 6,40 ms (kontroll), men ned_s 2,65 -> 3,15 / 3,80 -> 5,00 s (ett skifte per
+mängd: lang1011 2,5 -> 3,5 s, lang1107 462 s 1,7 -> 17,5 s), mix_still 2,73 -> 3,24 / 2,91 -> 3,72 s, ettan 100 -> 97 / 96 -> 94 %,
+ljusdomaren övning -0,98, lotusbank 462/503 (KISS Love Gun 147,4: HEAD 140,7, parabel 138,4 - fel i båda, toleranskanten 1,05).
+Tydligheten ur snabba minnet (fasjobbets v1) gav 0 ms i samma fönster - dess gridfelvinst var bara att färre fönster mättes.
+Var: analyserClock.onsetStep. Material: .arena/fintempo/{bas,a,ab,b}/tvavagar*.json. Önskat: inget för lotus nu; lotus ser i 2/3-måttet
+(nedan) om något ändras.
+Status:
+
+## ÖPPET 2026-11-10 2/3-hoppen inne i låten - nytt mått mix_23 i DMX-domaren
+Vad: andel tid (efter 8 s in i låten) med tempot på 2/3 eller 3/2 av facit: övningsmixen 0,26 %, KONTROLLMIXEN 13,5 % (frame.bpm =
+klockan, samma tal). Fintempot ändrar det inte (13,58 %). Lotus 11-09 22:00 såg samma sak i en 128 bpm-klubbmix. Var: analyserClock
+tempovalet (tempogrammets 2/3-hypotes). Material: tools/arena/tvavagar.py --holdout (mix-jobbet, detalj.mix ana23/klocka23).
+Önskat: hitta vilka kontrollåtar som står på 2/3 (troligen hannes-aitman 130/124 och zach-bryan 85/90) - DMX nattagent nästa.
+Status:
+
 ## ÖPPET 2026-11-09 DELAD FIL ÄNDRAD: ANALYS UT UR MOTORN steg 1 (EN dropdetektor + EN tystnad) - ovanpå EN KLOCKA
 Vad: analyser.ts (bc9132e0) + split.ts (ea827e77) ändrade (slowWorker/analyserClock/recorder orörda). Effekternas flank är nu analysatorns
 dropStep (dropCount = flankdrop med 12 s-spärr, gamla dropen = kandidat -> mini; nya fält dropDemoted/dropSpaced/dropRiseDb, nearDropDb/

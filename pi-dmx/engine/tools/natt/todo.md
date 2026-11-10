@@ -23,6 +23,12 @@ tempot ligger lite fel i varje låt -> rutnätet driver. Det är vad p2:s fintem
    = fadeIntervalK × slagintervall, så ljuset hänger kvar ~60 % längre i de stretcherna (lindrat i kväll med fadeTauMax 0,8). Ta med 2/3-hoppen
    inne i en låt som mått i fintempobänken (andel tid med tempo ≈ 2/3 eller 3/2 av facit), och pröva om fintempot/tydligheten tar bort dem.
 Rapport: tools/natt/rapport-2026-11-10.md. Fasjobbets underlag: .arena/fas/p2/losning.md, .arena/fas/bas/.
+KLART 2026-11-10 (nattagenten, 7b0724b): 1 domaren miss = miss (bas upp_s 15,35/14,90, traff 75/60 %); 2 gridfel i BASENS fönster (gamla =
+gridfel_egen); 3 fintempot ensam = riktig fasvinst 22,9->21,45 / 8,25->6,40 ms men DISK ned_s (ett skifte/mängd), ljusdomaren övning -0,98,
+lotus 462 -> EJ KOD (prov/fintempo-parabel-20261110.patch); tydligheten 0 ms i samma fönster = bara fönsterurval, stängd; 5 mix_23: kontroll
+13,5 % av tiden på 2/3|3/2 (övning 0,26), fintempot ändrar inget. ÄGARENS VAL: prova fintempot i ladan på ögat (delad klocka -> lotus följer).
+NÄSTA FÖR NATTAGENTEN: (a) vilka kontrollåtar står på 2/3 (mix_23) och varför; (b) r energi föll sedan e03663c (megamix 0,16 -> -0,04,
+korpus från 15 s -0,06) - hitta commiten med natt.py --snabb per src-commit.
 
 ## HÖGSTA PRIO 2026-11-09 09:00: ARENA: EN KLOCKA FÖR BÅDA (lotus + DMX) - ägaren
 "Kan vi inte samma där. Jämför delarna, och kolla vad som fungerar bäst. Skapa sedan en enda. Känns jättedumt som vi sagt hela
