@@ -67,8 +67,7 @@ BENCHDIR = os.path.join(LOTUS, 'tools', 'tempo-facit-pc')
 TSC = os.path.join(LOTUS, 'pi', 'node_modules', 'typescript', 'bin', 'tsc')
 SHARED = ['analyser.ts', 'split.ts', 'slowWorker.ts', 'analyserClock.ts']
 # nightly.py:12 LIVE (2026-11-09) + GRID. SHIFT/HOLD är kod sedan 10-22 (läses inte), skickas ändå som i nattjobbet.
-LIVE = {'LOTUS_TEMPO_EVIDENCE': '1', 'LOTUS_TEMPO_ENV_S': '10', 'LOTUS_KICK_NOGATE': '1', 'LOTUS_KICK_COOLDOWN': '100', 'LOTUS_GRID_PHASE': '1',
-        'LOTUS_TEMPO_UP43': '1', 'LOTUS_TEMPO_FIVE4': '1', 'LOTUS_TEMPO_SHIFT': '1', 'LOTUS_TEMPO_HOLD': '1', 'BENCH_GRID': '1'}
+LIVE = {'BENCH_GRID': '1', 'LOTUS_ANALYSER_SPLIT': ''}   # 11-10: lotus kör DMX:s profil och Pi:n har inga TEMPO_/KICK_-env; SPLIT '' = inline (worker i bänken ger tempo 0)
 
 ENTRY = r"""// lotusbank.py: bänkklockan. Klockan (analyserClock) anropas med Date.now(); bench.mjs flyttar bara analysatorns virtuella
 // klocka. Här följer Date.now med: 1,7e12 + ljudtiden (= analysatorns wallNow). Neutral för lotus egen väg (OWN_TEMPO).
