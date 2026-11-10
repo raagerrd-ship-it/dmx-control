@@ -289,6 +289,9 @@ def kvalitet(R, hold):
         'upp_s': med(upLag, 20.0), 'ned_s': med(dnLag, 20.0), 'traff': 100 * n_hit / max(1, n_sk), 'korta': 100 * sum(f['short'] for f in L) / max(1, sum(f['segs'] for f in L)),
         'drop_traff': 100 * hits / max(1, n_dr), 'drop_falska': 10 * falska / drop_min, 'drop_ms': med(ms, 1500.0),
         'gr_ratt': 100 * mix['grRatt'] / max(1, mix['skarvar']), 'gr_falska': 10 * mix['grFalsk'] / mix['min'],
+        # informativt (natt 11-10): gridfel i variantens EGNA låsta fönster (gamla måttet; 'gridfel' byts mot basens fönster i mat()) + 2/3-hoppen
+        'gridfel_egen': med(grid, 500), 'grid40_egen': 100 * sum(1 for e in grid if e <= 40) / max(1, len(grid)),
+        'mix_23_ana': mix.get('ana23', 0.0), 'mix_23_klocka': mix.get('klocka23', 0.0),
     }
 
 
@@ -381,6 +384,14 @@ def mat(a):
           'notifyPerHop': statistics.median(r['notifyPerHop'] for r in runs), 'workerUs': runs[0].get('workerUs'), 'basWorkerUs': bruns[0].get('workerUs') if bruns else None} if runs else None
     # SPÄRREN: md5 mot bas
     bj = None if bas else load(os.path.join(run_dir, 'bas'), 'tvavagar-holdout.json' if hold else 'tvavagar.json')
+    # SAMMA FÖNSTER (natt 11-10, todo FINTEMPOT 2): gridfel/grid40 räknas i BASENS låsta fönster för alla varianter (förr i variantens
+    # egna: en variant vann gridfel genom att sänka tilliten där rutnätet låg fel). Basen själv: egna fönster = basens. Gamla talet = *_egen.
+    if q and R.get('lang'):
+        bok = {f['file']: set(f.get('gridOk') or []) for f in ((bj or {}).get('detalj') or {}).get('lang') or []} if not bas else {f['file']: set(f['gridOk']) for f in R['lang']}
+        if bok:
+            g2 = [abs(e) for f in R['lang'] for w, es in (f.get('gridW') or {}).items() if int(w) in bok.get(f['file'], set()) for e in es]
+            q['gridfel'] = statistics.median(g2) if g2 else 500; q['grid40'] = 100 * sum(1 for e in g2 if e <= 40) / max(1, len(g2))
+        else: fel.append('basen saknar gridOk (mät om basen med tvavagarKor 11-10) - gridfel i egna fönster')
     md5lika, ljus = (True, None) if bas else (None, None)
     if not bas:
         if not bj: fel.append('saknar bas-mätningen - domaren kör: --mat <körning>/bas --bas' + (' --holdout' if hold else ''))
@@ -392,7 +403,7 @@ def mat(a):
     out = {'mapp': os.path.relpath(mapp, ENGINE), 'bas': bas, 'holdout': hold, 'basenv': basenv(run_dir),
            'git': subprocess.run(['git', 'rev-parse', '--short', 'HEAD'], cwd=ENGINE, capture_output=True, text=True).stdout.strip(),
            'kvalitet': q, 'cpu': cpu, 'realtid': rt, 'latens': lat, 'md5': R.get('md5'), 'md5snabb': R.get('md5snabb'), 'md5Lika': md5lika, 'ljusdomare': ljus,
-           'detalj': {k: R.get(k) for k in ('mix', 'klipp', 'drop', 'ettan', 'marks')} | {'lang': [{k: v for k, v in f.items() if k != 'grid'} for f in (R.get('lang') or [])]},
+           'detalj': {k: R.get(k) for k in ('mix', 'klipp', 'drop', 'ettan', 'marks')} | {'lang': [{k: v for k, v in f.items() if k not in ('grid', 'gridW')} for f in (R.get('lang') or [])]},
            'fel': fel, 'tider': tider, 'tidS': round(time.time() - t0)}
     io.open(os.path.join(mapp, 'tvavagar-holdout.json' if hold else 'tvavagar.json'), 'w', encoding='utf-8').write(json.dumps(out, ensure_ascii=False, indent=1))
     print(f"MÄTT {out['mapp']}{' KONTROLLMÄNGDEN' if hold else ''} {out['tidS']} s  steg {tider}")

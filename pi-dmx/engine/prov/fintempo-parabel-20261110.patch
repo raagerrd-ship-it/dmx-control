@@ -1,0 +1,51 @@
+--- src/analyserClock.ts	2026-11-09 13:53:13.652083500 +0100
++++ .arena/fintempo/a/src/analyserClock.ts	2026-11-10 02:40:00.725114400 +0100
+@@ -197,6 +197,7 @@
+   // Sökningen sprids över hoppen: ETT tempo per hop (Pi Zero: hela sökningen i ett anrop = 2 ms på PC:n, ~20 ms på Pi:n = stopp i slingan).
+   private scanStep = 0.005; private scanC = 99; private scanEnd = 0; private scanRef = 0; private scanNow = 0; private scanC0 = 0;
+   private bestScore = 0; private bestBpm = 0; private bestPh = 0;
++  private readonly scanS = new Float64Array(11); private bestC = 0;   // FAS (fas 11-09): varvets poäng per tempo (c + 5) för fintempots parabel
+ 
+   /** LÖPANDE TAKT: ett hop av sökningen - vik ringen (fönstret före sökningens start) på nästa tempo; sist läggs rutnätet på toppen. */
+   private onsetStep(cfg: EngineConfig, now: number): void {
+@@ -209,7 +210,7 @@
+       else if (this.tempoBpm > 0) { this.scanC0 = beat.bpm; this.scanStep = 0.005; this.scanEnd = 5; }   // inom: klockans egen skanning som förr (fas, fintempo; a2r M2: kring tempogrammets topp gav ettan 100 -> 93, gridfel 15 -> 26 ms)
+       else { this.scanC0 = beat.bpm; this.scanStep = 0.005; this.scanEnd = 5; }   // tempogrammet nollat (låtgräns): kring klockans tempo (inget andra sökcentrum - EN KÄLLA)
+ 
+-      this.scanC = -5; this.bestScore = 0;
++      this.scanC = -5; this.bestScore = 0; this.scanS.fill(0);
+     }
+     const c = this.scanC++, ref = this.scanRef;
+     const bpm = this.scanC0 * (1 + c * this.scanStep), bm = 60000 / bpm;
+@@ -225,21 +226,28 @@
+     if (n >= 100 && tot > 0) {
+       const mean = tot / n; let mx = 0, mb = 0;
+       for (let b = 0; b < ONSET_BINS; b++) { const v = this.foldN[b] ? this.foldS[b] / this.foldN[b] : 0; if (v > mx) { mx = v; mb = b; } }
+-      const score = mx / mean;
++      const score = mx / mean; this.scanS[c + 5] = score;
+       if (score > this.bestScore) {
+         const a = this.foldMean(mb - 1), cc = this.foldMean(mb), d = this.foldMean(mb + 1), den = a - 2 * cc + d;   // parabel genom toppen
+         const off = den < 0 ? 0.5 * (a - d) / den : 0;
+-        this.bestScore = score; this.bestBpm = bpm; this.bestPh = (mb + 0.5 + off) / ONSET_BINS;
++        this.bestScore = score; this.bestBpm = bpm; this.bestPh = (mb + 0.5 + off) / ONSET_BINS; this.bestC = c;
+       }
+     }
+     if (c < this.scanEnd || this.bestScore < ONSET_MIN_PEAK) return;
+     // nytt tempo med bevarat slagindex + fas, sedan fasen direkt på toppen (toppen låg på bestPh räknat från sökningens ankare)
++    // FAS (fas 11-09): FINTEMPOT MELLAN STEGEN. Skanningen går i 0,5 %-steg; vikningen sätter fasen i fönstrets mitt (~2,5 s bakåt), så ett
++    // tempo 0,25 % fel ger ~6 ms fasfel vid 'nu' (lang1107: rutnätet 3-4 ms tidigt i hela 132-låten). Tempot läggs på parabeln genom
++    // toppens grannar (som fasen i vikningen redan gör), och fasen hålls på samma slag i fönstrets mitt.
++    { const bm0 = 60000 / this.bestBpm, tc = this.scanNow - ONSET_WIN_MS / 2, k = Math.round((tc - ref) / bm0 - this.bestPh);
++      this.scanRef = ref + (this.bestPh + k) * bm0; this.bestPh = 0;   // ett slag i fönstrets mitt (sökningens ankare flyttat dit)
++      const cb = this.bestC, sl = cb > -5 ? this.scanS[cb + 4] : 0, sc = this.scanS[cb + 5], sr = cb < 5 ? this.scanS[cb + 6] : 0, den = sl - 2 * sc + sr;
++      if (sl > 0 && sr > 0 && den < 0) this.bestBpm = this.scanC0 * (1 + (cb + Math.max(-0.5, Math.min(0.5, 0.5 * (sl - sr) / den))) * this.scanStep); }
+     if (this.tempoBpm > 0) this.bestBpm = Math.min(159.9, Math.max(80, this.bestBpm));   // samma oktavfönster som tempogrammet
+     const oldMs = 60000 / beat.bpm, idx = Math.floor((now - beat.anchorMs) / oldMs), fr = (now - beat.anchorMs) / oldMs - idx;
+     const nb = 60000 / this.bestBpm;
+     beat.bpm = this.bestBpm; beat.anchorMs = now - (idx + fr) * nb;
+     // (a8r:s barReset vid > 3 % tempohopp borttagen, a4 entempo: klockan drar inga egna slutsatser om låtbyte - det gör låtgränsen)
+-    const shift = ((((beat.anchorMs - ref) % nb) + nb) % nb) / nb;   // nya ankarets fas mot sökningens ankare
++    const shift = ((((beat.anchorMs - this.scanRef) % nb) + nb) % nb) / nb;   // nya ankarets fas mot sökningens ankare (FAS: slaget i fönstrets mitt)
+     let err = this.bestPh - shift; err -= Math.round(err);
+     beat.anchorMs += err * nb;
+     this.onsetFixes++;

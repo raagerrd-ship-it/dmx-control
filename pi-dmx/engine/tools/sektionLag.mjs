@@ -88,7 +88,7 @@ for (const path of files) {
   for (const [t, dir] of shifts) {
     const ok = (s) => dir > 0 ? s === "high" : s !== "high" && s !== "build";
     if (ok(lab(t - 0.5))) continue;   // stod redan rätt
-    let hit = -1; for (let u = t - 2; u <= t + 20; u += 0.1) if (ok(lab(u))) { hit = u - t; break; }
+    let hit = -99; for (let u = t - 2; u <= t + 20; u += 0.1) if (ok(lab(u))) { hit = u - t; break; }
     if (dir > 0) { f.up++; if (hit > -9) { f.upHit++; f.upLag.push(hit); } } else { f.down++; if (hit > -9) { f.downHit++; f.downLag.push(hit); } }
   }
   // fladder

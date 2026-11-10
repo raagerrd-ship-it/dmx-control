@@ -74,6 +74,8 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
     const secAt = [], lvl = []; let acc = 0, accN = 0;
     const dbR = new Float64Array(16); let armed = true, lastOn = -1e9;
     const winErr = []; let winStart = -1, winBpm = 0, winOk = false; const gridErr = [];
+    // SAMMA FÖNSTER (natt 11-10): alla fönsters fasfel (gridW[w]) + de egna låsta fönstren (gridOk) -> tvavagar.py mäter varianten i BASENS fönster
+    const gridW = {}, gridOk = [];
     for (let h = 0; h < H; h++) {
       for (let i = 0; i < HOP; i++) { const v = y[h * HOP + i]; buf[i] = v; acc += v * v; }
       accN += HOP; if (accN >= SR / 2) { lvl.push(10 * Math.log10(acc / accN + 1e-10)); acc = 0; accN = 0; }
@@ -82,7 +84,7 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
         const sa = fr.specAbs, db = 20 * Math.log10((sa?.sub ?? 0) + (sa?.kick ?? 0) + 1e-7), tMs = h * HMS;
         dbR[h & 15] = db;
         const g = cfg.beat, wNo = Math.floor(tMs / 10000);
-        if (wNo !== winStart) { if (winOk && winStart >= 3) gridErr.push(...winErr); winErr.length = 0; winStart = wNo; winBpm = g?.bpm ?? 0; winOk = !!g; }
+        if (wNo !== winStart) { if (winStart >= 3) { gridW[winStart] = winErr.map((e) => +e.toFixed(1)); if (winOk) { gridErr.push(...winErr); gridOk.push(winStart); } } winErr.length = 0; winStart = wNo; winBpm = g?.bpm ?? 0; winOk = !!g; }
         if (!g || (g.confidence ?? 0) < 0.35 || Math.abs(g.bpm / (winBpm || 1) - 1) > 0.01) winOk = false;
         if (h >= 16) {
           const rise = db - dbR[(h - 6) & 15];
@@ -110,13 +112,14 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
     for (const [t, dir] of shifts) {
       const ok = (s) => dir > 0 ? s === 'high' : s !== 'high' && s !== 'build';
       if (ok(lab(t - 0.5))) continue;
-      let hit = -1; for (let u = t - 2; u <= t + 20; u += 0.1) if (ok(lab(u))) { hit = u - t; break; }
+      // MISS = MISS (natt 11-10, fasjobbets fynd): förr startade hit på -1, så ett skifte som etiketten aldrig följde räknades som träff -1 s
+      let hit = -99; for (let u = t - 2; u <= t + 20; u += 0.1) if (ok(lab(u))) { hit = u - t; break; }
       if (dir > 0) { f.up++; if (hit > -9) { f.upHit++; f.upLag.push(+hit.toFixed(2)); } } else { f.down++; if (hit > -9) { f.downHit++; f.downLag.push(+hit.toFixed(2)); } }
     }
     let segs = 0, short = 0, changes = 0, st = 0;
     for (let i = 1; i <= secAt.length; i++) if (i === secAt.length || secAt[i] !== secAt[i - 1]) { segs++; if ((i - st) / 10 < 8) short++; if (i < secAt.length) changes++; st = i; }
-    if (winOk && winStart >= 3) gridErr.push(...winErr);
-    Object.assign(f, { segs, short, changes, grid: gridErr.map((e) => +e.toFixed(1)), drops: C.drops, minis: C.minis, bounds: C.bounds });
+    if (winStart >= 3) { gridW[winStart] = winErr.map((e) => +e.toFixed(1)); if (winOk) { gridErr.push(...winErr); gridOk.push(winStart); } }
+    Object.assign(f, { segs, short, changes, grid: gridErr.map((e) => +e.toFixed(1)), gridW, gridOk, drops: C.drops, minis: C.minis, bounds: C.bounds });
     out.push(f);
   }
 } else if (job === 'mix') {   // ── tempoMix.mjs (2026-10-30), skarven och måtten ordagrant; låtgränsen döms mot skarvarna (sektionStat: inom 15 s) ──
@@ -145,7 +148,10 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
   for (let h = 0; h < H; h++) { buf.set(mix.subarray(h * HOP, h * HOP + HOP)); const fr = C.step(buf, h * HMS); if (h % STEP === 0) samp.push([h * HMS, fr.bpm, C.cfg.beat?.bpm ?? 0]); }
   const HARM = [1, 2 / 3, 1.5, 0.75, 4 / 3];
   const harm = (bpm, tf) => bpm > 0 && tf.some((t) => HARM.some((k) => Math.abs(fold(bpm) / (t * k) - 1) <= 0.04 || Math.abs(fold(bpm) / (fold(t * k)) - 1) <= 0.04));
-  const T = { n: 0, a: 0, k: 0, other: 0, lock: [], still: [], hops: 0, oct: 0, hopMin: 0 }; let si = 0;
+  // 2/3-HOPPEN (natt 11-10, lotus 11-09 22:00: 128 bpm-klubbmix, analyser.bpm 80-87 i stretcher): andel tid efter 8 s in i låten då tempot
+  // står på 2/3 eller 3/2 av facit (vikt 80-160) utan att vara rätt - ana (frame.bpm) och klocka (cfg.beat) var för sig. Informativt.
+  const h23 = (bpm, tf) => bpm > 0 && !okBpm(bpm, tf) && tf.some((t) => [2 / 3, 1.5].some((q) => Math.abs(fold(bpm) / fold(t * q) - 1) <= 0.04));
+  const T = { n: 0, a: 0, k: 0, other: 0, lock: [], still: [], hops: 0, oct: 0, hopMin: 0, n8: 0, a23: 0, k23: 0 }; let si = 0;
   for (const s of seg) {
     const r = { n: 0, k: 0, lock: NaN }; let run = 0, held = 0, cand = 0, cn = 0;
     while (si < samp.length && samp[si][0] < s.t0) si++;
@@ -153,6 +159,7 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
       const [t, a, k] = samp[j]; T.n++; r.n++;
       if (okBpm(a, s.tf)) T.a++;
       if (okBpm(k, s.tf)) { r.k++; T.k++; if (++run === 20 && isNaN(r.lock)) r.lock = (t - 1900 - s.t0) / 1000; } else { run = 0; if (k > 0 && !harm(k, s.tf)) T.other++; }
+      if (t - s.t0 >= 8000) { T.n8++; if (h23(a, s.tf)) T.a23++; if (h23(k, s.tf)) T.k23++; }
       if (t - s.t0 >= 8000 && k > 0) {
         T.hopMin += 0.1 / 60;
         if (!held) held = k; else if (Math.abs(k / held - 1) <= 0.04) cand = 0;
@@ -176,7 +183,7 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
   const used = new Set(); let ratt = 0, falsk = 0;
   for (const b of C.bounds) { const i = skarv.findIndex((x, k) => !used.has(k) && Math.abs(x - b) <= 15); if (i >= 0) { used.add(i); ratt++; } else falsk++; }
   out.push({ klipp: clips.length, min: total / SR / 60, klocka: 100 * T.k / T.n, ana: 100 * T.a / T.n, annat: 100 * T.other / T.n, lasMed: med(T.lock), stillMed: med(T.still), still: T.still,
-    hoppMin: T.hopMin ? T.hops / T.hopMin : 0, hopp: T.hops, oktav: T.oct, skarvar: skarv.length, grRatt: ratt, grFalsk: falsk, bounds: C.bounds, drops: C.drops.length });
+    ana23: 100 * T.a23 / Math.max(1, T.n8), klocka23: 100 * T.k23 / Math.max(1, T.n8), hoppMin: T.hopMin ? T.hops / T.hopMin : 0, hopp: T.hops, oktav: T.oct, skarvar: skarv.length, grRatt: ratt, grFalsk: falsk, bounds: C.bounds, drops: C.drops.length });
 } else if (job === 'klipp') {   // ── taktKorpus.mjs (natt 10-13): per klipp kallstart, andel tid efter 5 s (100 ms-raster) ──
   for (const [f, ...tf] of list) {
     const y = readClip(f); const C = chain(); const H = Math.floor(y.length / HOP); const buf = new Float32Array(HOP);
