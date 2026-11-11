@@ -27,6 +27,9 @@ SPÄRRAR (DISK = ute oavsett poäng):
   fladder  dynSets fladder/min mer än +0,5 över baslinjen
   t90      lang1021:s ljusLag t90 mer än 15 ms senare än baslinjen
   filer    ändrad fil utanför src/effects.ts och src/effects/*.ts (analysatorn, utgången, uttoningen, kalibreringen, tempot = förbjudet)
+           (körningens egna undantag: <körning>/tillatna.txt, ett mönster per rad - arenan basenergi 11-11 tillåter de delade analysatorfilerna)
+  basenergi  (bara när <körning>/bas/basenergi.json finns) frame.bassEnergy saknas, gainDiff > 0,05 eller befintliga ramfält ändrade
+             (tools/arena/basenergi.mjs: analysatorn ska MÄTA musiken, oberoende av ingångsnivån, och inte röra andra fält)
   fel      en bänk som inte gick igenom
 """
 import io, json, os, sys, filecmp
@@ -83,8 +86,22 @@ def doma(b, v, d):
     if fl > 0.5: disk.append(f'fladder {fl:+.1f}/min')
     t9v, t9b = R[LANG]['ljusLag'].get('t90'), B[LANG]['ljusLag'].get('t90')
     if t9v is not None and t9b is not None and t9v - t9b > 15: disk.append(f't90 {t9b}->{t9v} ms')
-    bad = [f for f in changed_files(d) if not (f == 'effects.ts' or (f.startswith('effects/') and f.endswith('.ts')))]
+    # KÖRNINGENS EGNA TILLÅTNA FILER (11-11, arenan basenergi): <körning>/tillatna.txt, ett fnmatch-mönster per rad, utöver effekterna.
+    tf = os.path.join(os.path.dirname(d), 'tillatna.txt'); extra = [l.strip() for l in io.open(tf, encoding='utf-8') if l.strip() and not l.startswith('#')] if os.path.exists(tf) else []
+    import fnmatch
+    bad = [f for f in changed_files(d) if not (f == 'effects.ts' or (f.startswith('effects/') and f.endswith('.ts')) or any(fnmatch.fnmatch(f, m) for m in extra))]
     if bad: disk.append('förbjudna filer: ' + ', '.join(bad[:4]))
+    # ANALYSMÅTTET (11-11, arenan basenergi): finns <körning>/bas/basenergi.json krävs <mapp>/basenergi.json (tools/arena/basenergi.mjs):
+    # fältet frame.bassEnergy finns, är nivåoberoende (gainDiff <= 0,05) och de befintliga ramfälten är orörda (falt = bas).
+    bb = os.path.join(os.path.dirname(d), 'bas', 'basenergi.json')
+    if os.path.exists(bb) and os.path.basename(d) not in ('bas', 'kopia', 'ref'):
+        try: be = json.load(io.open(os.path.join(d, 'basenergi.json'), encoding='utf-8')); bf = json.load(io.open(bb, encoding='utf-8'))
+        except Exception: be = None
+        if not be: disk.append('basenergi.json saknas')
+        else:
+            if not be.get('finns'): disk.append('frame.bassEnergy saknas eller utanför 0..1')
+            if (be.get('gainDiff') or 0) > 0.05: disk.append(f"nivåberoende: gainDiff {be.get('gainDiff')}")
+            if be.get('falt') != bf.get('falt'): disk.append('befintliga ramfält ändrade')
     gammal = not all('jitter' in R[n] and 'jitter' in B[n] for n in WT)
     if gammal: kor = 0.0
     else:

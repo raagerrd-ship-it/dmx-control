@@ -78,7 +78,7 @@ export interface EffectContext {
   bassline: number; bassNoteIdx: number; bassNoteAge: number;
   /** Kick-/beat-envelope (0..1). */
   kickEnv: number;
-  /** BASGÅNGEN SJÄLV (arenan puls1 2026-11-07): energilagrets baskropp (eBass, sub/kick-banden i följande fönster: 0 = basens senaste dal,
+  /** BASGÅNGEN SJÄLV (arenan puls1 2026-11-07): energilagrets baskropp (eBass = analysatorns frame.bassEnergy, i dropläget bassEnergyShort, efter E_TOP och uttoning: 0 = basens senaste dal,
    *  1 = toppen). Med DMX_BASGANG=1 tar de mest spelade effekterna slagets STYRKA härifrån och rutnätet bara VEM som tänds. */
   bassBody: number;
   /** GLITTER-ENVELOPER (2026-10-10): diskant- (hi-hat/cymbal) och luftanslaget (frame.onset.treble/air) med direkt uppgang och
