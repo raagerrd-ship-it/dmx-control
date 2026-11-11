@@ -15,7 +15,7 @@ import { isLogOn } from "./quiet.js";
 import type { ChannelRole, EngineConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { FixtureOutput, keepLit, lampFadeK, lampLevel, sameLight, MIN_ON_MS, CH_MIN_ON_MS, type SpecialtyValues } from "./output.js";   // minsta på-tiden = lampfysik (output.ts MINSTA PÅ-TID)
-import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, MIN_BEAT_CONFIDENCE, GRID_EARLY_MS } from "./beatClock.js";
+import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, GRID_EARLY_MS } from "./beatClock.js";
 import { SILENCE_LEVEL, type Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
 import { fitScore, fitDistance, FIT } from "./effects/fit.js";
@@ -449,9 +449,6 @@ const PD_WIN_S = envN('DMX_DROP_WIN_S', 1),   // 0 -> 1 (STANDARD 2026-11-08 (la
  * Röken påverkas INTE — den har egen dropHit-trigger med 1-min cooldown.
  * Slå på igen = true, så återvänder bloomen och drop-look-bytet.
  */
-/** FASFEL SANKER TAKTENS TILLIT (lotus-porten 09-23): ihallande fasfel > SYNC_ERR_FRAC drar ner tilliten som dirigentens grindar laser.
- *  (Av-brytaren DMX_ENERGY_FALLBACK borttagen 10-10 - alltid pa.) */
-const SYNC_ERR_FRAC = 0.2;
 // LOGGEN: index.ts tystar console.log nar DMX_QUIET != '0' (standard). Periodiska diagnosrader byggs da inte alls (skrapjakten 10-01).
 // (brytaren under drift: quiet.ts / PUT /api/debug/verbose)
 const TIER_LO = 0.22, TIER_HI = 0.55;   // se DMX_TIER_LO/HI i render
@@ -1676,14 +1673,9 @@ export class EffectEngine {
         // dem var tilliten nollskild medan rutnatet var DOTT (hasBeat falskt), sa
         // pulsen var avstangd samtidigt som diagnostiken visade tillit. Ett
         // dodband som bara gick att felsoka genom att lasa bada filerna.
-        const trustRaw = Math.max(0, Math.min(1, (frame.bpmConfidence - MIN_BEAT_CONFIDENCE) / 0.37));
-        // (5) FASFEL = OSAKER (lotus-porten): ihallande fasfel drar ner den raa tilliten; tappad tillit > 1,5 s nollar slagraknaren.
-        let trustRawEff = trustRaw;
-        {
-          const se = Math.abs(this.cfg.beatErr ?? 0), lim = Math.max(0.02, SYNC_ERR_FRAC);
-          trustRawEff *= se <= lim ? 1 : Math.max(0, 1 - (se - lim) / lim);
-        }
-        this.beatTrust += (trustRawEff - this.beatTrust) * 0.06;   // 0.03 -> 0.06: nar fullt slag efter en overgang pa ~0.7 s i st f ~1.5 s
+        // TILLITEN ÄR ANALYSATORNS (11-11, frame.beatTrust: rampen över grinden, fasfelet och utjämningen bor i analyserClock.ts trustStep).
+        // Förr räknad här med 0,06 per renderruta = bildfrekvensberoende (81 ms vid 200 Hz, 0,65 s vid 25 Hz).
+        this.beatTrust = frame.beatTrust ?? 0;
         // TILLITSGOLV (portat från Lotus beatTrustFloor 2026-08-31). Rampen börjar exakt
         // där klockans grind släpper igenom (MIN_BEAT_CONFIDENCE), så vid conf ≈ 0.20 är
         // rutnätet LEVANDE men tilliten 0 → depth ≈ 0 och hjärtslaget är avstängt fast
