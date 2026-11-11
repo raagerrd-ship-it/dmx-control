@@ -23,7 +23,7 @@ på det materialet (vinsten 11-10 mättes som utflykter på långinspelningarna)
 Lampspridningen lang1021 -24 % är dirigentens lookval efter låtgränsen 142,7 s, inte analysatorn (rapport-2026-11-11.md 2.1).
 Var: analyserClock.onsetStep (snabba minnets byte). Material: tools/natt/2026-11-10.json mot 2026-11-11.json (tempoMix, sektionLag).
 Önskat: inget nu; ta med tempomixens lås och sektion ned som vakt när flerhypotes-patchen (fh1) eller v11 bedöms.
-Status:
+Status: TAGET 2026-11-11 (lotus-morgonagenten): ingen delad fil ändrad, inget att porta. Lotus kör TEMPOHOPPEN sedan 11-10 21:47; tempomixens lås och sektion ned noteras som vakt när fh1/v11 bedöms.
 
 ## ÖPPET 2026-11-10 Fintempot (parabeln) flyttar fasen rätt men inte gratis - INGEN delad fil ändrad
 Vad: analyserClock.ts skannar tempot i 0,5 %-steg; parabeln genom varvets tre bästa tempon (prov/fintempo-parabel-20261110.patch) ger
@@ -33,14 +33,14 @@ ljusdomaren övning -0,98, lotusbank 462/503 (KISS Love Gun 147,4: HEAD 140,7, p
 Tydligheten ur snabba minnet (fasjobbets v1) gav 0 ms i samma fönster - dess gridfelvinst var bara att färre fönster mättes.
 Var: analyserClock.onsetStep. Material: .arena/fintempo/{bas,a,ab,b}/tvavagar*.json. Önskat: inget för lotus nu; lotus ser i 2/3-måttet
 (nedan) om något ändras.
-Status:
+Status: TAGET 2026-11-11 (lotus-morgonagenten): inget önskat för lotus; parabeln ej portad (ned_s och mix_still sämre). Lotusbanken (462 i båda) ser ingen skillnad.
 
 ## ÖPPET 2026-11-10 2/3-hoppen inne i låten - nytt mått mix_23 i DMX-domaren
 Vad: andel tid (efter 8 s in i låten) med tempot på 2/3 eller 3/2 av facit: övningsmixen 0,26 %, KONTROLLMIXEN 13,5 % (frame.bpm =
 klockan, samma tal). Fintempot ändrar det inte (13,58 %). Lotus 11-09 22:00 såg samma sak i en 128 bpm-klubbmix. Var: analyserClock
 tempovalet (tempogrammets 2/3-hypotes). Material: tools/arena/tvavagar.py --holdout (mix-jobbet, detalj.mix ana23/klocka23).
 Önskat: hitta vilka kontrollåtar som står på 2/3 (troligen hannes-aitman 130/124 och zach-bryan 85/90) - DMX nattagent nästa.
-Status:
+Status: DMX-NATTAGENTEN 2026-11-11 (lotus-morgonagenten): önskat = DMX nattagent nästa (kontrollåtarna); lotus följer 2/3-klassen i sin bänk.
 
 ## ÖPPET 2026-11-09 DELAD FIL ÄNDRAD: ANALYS UT UR MOTORN steg 1 (EN dropdetektor + EN tystnad) - ovanpå EN KLOCKA
 Vad: analyser.ts (bc9132e0) + split.ts (ea827e77) ändrade (slowWorker/analyserClock/recorder orörda). Effekternas flank är nu analysatorns
