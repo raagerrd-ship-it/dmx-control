@@ -1,0 +1,25 @@
+diff --git a/pi-dmx/engine/src/effects/sokljus.ts b/pi-dmx/engine/src/effects/sokljus.ts
+index bb32dbc..dab76c7 100644
+--- a/pi-dmx/engine/src/effects/sokljus.ts
++++ b/pi-dmx/engine/src/effects/sokljus.ts
+@@ -4,7 +4,10 @@ import { hsv } from "./color.js";
+ // SÖKLJUSET (labbet 2, ägaren i ladan 2026-11-07: 'Sökljus är nice'): EN stråle glider till en ny lampa varje takt (300 ms), och på
+ // virveln HITTAR den något - hela raden blinkar kort i strålens färg (tonar 0,4 s). Utan takt byter strålen plats var 2,5 s. Kulören
+ // (blå/cyan) byts var 8:e steg, när strålen flyttar.
+-const st = { at: 0, from: 0, to: 0, moveAt: 0, step: -1, sect: 4, reveal: 0, sPrev: 0, seed: 3 };
++// PROV DMX_SOK_TAKT=1 (natt 11-11): radblinken högst EN gång per takt. lang1021 (160 bpm, 'low'): virvelbandet slår 3-5 ggr/s, hela
++// raden står på blinkens nivå och strålen syns inte (spridning mellan lamporna 0,05 mot kickregn 0,39). Osatt = som förut.
++const SOK_TAKT = process.env.DMX_SOK_TAKT === '1';
++const st = { at: 0, from: 0, to: 0, moveAt: 0, step: -1, sect: 4, reveal: 0, sPrev: 0, seed: 3, revStep: -1 };
+ export const sokljus: EffectDef = {
+   key: "sokljus", label: "Sökljuset", tier: "lugn", modulate: { energy: true, pulse: false }, section: ["break", "intro", "low"],
+   desc: "En stråle byter lampa varje takt; på virveln blinkar hela raden kort i strålens färg.",
+@@ -19,7 +22,7 @@ export const sokljus: EffectDef = {
+         let k = Math.floor((st.seed / 0x7fffffff) * n); if (n > 1 && k === st.to) k = (k + 1) % n;
+         st.to = k; st.moveAt = c.now; if (step % 8 === 0) st.sect = st.sect === 4 ? 3 : 4;
+       }
+-      if (c.drum.snare > 0.55 && st.sPrev <= 0.4) st.reveal = 0.55;
++      if (c.drum.snare > 0.55 && st.sPrev <= 0.4 && (!SOK_TAKT || st.revStep !== step)) { st.reveal = 0.55; st.revStep = step; }
+       st.sPrev = c.drum.snare;
+       st.reveal *= Math.exp(-dt / 0.4);
+     }

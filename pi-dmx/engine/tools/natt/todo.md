@@ -1,5 +1,14 @@
 # Natt-agentens uppdrag
 
+## LÄGET 2026-11-11 (nattagenten)
+- LIVE i ladan: f01fed9 (11-09 18:30). I koden men EJ deployat i ladan: TEMPOHOPPEN f757d7d (live i lotus 11-10 21:47). Inga env-rattar.
+- Väntar på ägaren: fintempot (prov/fintempo-parabel-20261110.patch), flerhypotes fh1 (prov/flerhypotes-fh1-20261110.patch) - båda ändrar delade klockan.
+- Natten 11-11 (tools/natt/rapport-2026-11-11.md): lampspridningsfrågan besvarad (lookvalet efter låtgränsen, inte effekterna);
+  sökljusets radblink en gång per takt FÖRKASTAD av domaren (-0,8 / -0,5, tools/natt/prov/sokljus-takt-20261111.patch), src orörd.
+- NÄSTA FÖR NATTAGENTEN: (a) sökljuset väljs i 157 bpm 'low' där virveln slår 3-5 ggr/s och strålen inte syns (5 % av rutorna) -
+  pröva att dirigenten inte väljer det där (FIT/tempo) och se vad som väljs i stället; (b) backbeat i refräng: spridning 0,18 med
+  alla fyra tända - läs effekten, mät per slag; (c) natt.py: måtträttningen r energi mot rå WAV-RMS (renergi-matt-2026-11-10.md avsnitt 7).
+
 ## HÖGSTA PRIO NATTEN 2026-11-09 -> 10: FINTEMPOT (ägaren i ladan 18:50: "Ja, lägg in fintempot till nattagenten")
 LÄGET: LIVE i ladan sedan 18:30 = HEAD f01fed9 (8f89cf1 + DUBBLA 6/7). Lotus LIVE 17:37 på samma delade analysator (lotus 1f4b357e, nyckel id_pidmx).
 Ladan-mätning 10 min (websocket, beatErr = kickarnas fasfel mot rutnätet): tillit >= 0,35 91 %, tempohopp bara kring låtbyten, men
@@ -29,6 +38,8 @@ lotus 462 -> EJ KOD (prov/fintempo-parabel-20261110.patch); tydligheten 0 ms i s
 13,5 % av tiden på 2/3|3/2 (övning 0,26), fintempot ändrar inget. ÄGARENS VAL: prova fintempot i ladan på ögat (delad klocka -> lotus följer).
 NÄSTA FÖR NATTAGENTEN: (a) vilka kontrollåtar står på 2/3 (mix_23) och varför; (b) r energi föll sedan e03663c (megamix 0,16 -> -0,04,
 korpus från 15 s -0,06) - hitta commiten med natt.py --snabb per src-commit.
+KLART 2026-11-10: (a) EN låt - Hannes Aitman Hopeless Nights står på ~100 (3/4 av 130) hela låten, låser aldrig i någon variant
+(tempohopp-2026-11-10.md); (b) måttfel, inte ljuset: energiR korrelerar mot frame.intensity, mot rå WAV-RMS oförändrat (36a5bb6, d9fec01).
 
 ## HÖGSTA PRIO 2026-11-09 09:00: ARENA: EN KLOCKA FÖR BÅDA (lotus + DMX) - ägaren
 "Kan vi inte samma där. Jämför delarna, och kolla vad som fungerar bäst. Skapa sedan en enda. Känns jättedumt som vi sagt hela

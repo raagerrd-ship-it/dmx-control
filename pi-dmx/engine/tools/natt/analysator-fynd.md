@@ -15,6 +15,16 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-11 TEMPOHOPPEN (f757d7d) på nattbänkens mått: låsningen +0,3 s, sektion ned 5,7 -> 11,5 s - INGEN delad fil ändrad i natt
+Vad: natt.py före/efter f757d7d (enda src-commit mellan 7b0724b och a9fb87a). Tempomixen (tempoMix.mjs, 161 korpusklipp skarvade, katalogfacit):
+rätt tempo 89,5 -> 89,3 %, lås efter låtbyte 1,93 -> 2,23 s, hopp inom låt 0,57 -> 0,61 /min, inom 5 s 144 -> 146/161 - alltså ingen vinst
+på det materialet (vinsten 11-10 mättes som utflykter på långinspelningarna). sektionLag (pop + megamix + lang1021): ned 5,7 -> 11,5 s
+(4/5 träffar i båda = ett skifte flyttat), korta sektioner 21/67 -> 24/69, upp oförändrat 7,6 s (8/11). Megamixens ljus-t90 30 -> 15 ms (bättre).
+Lampspridningen lang1021 -24 % är dirigentens lookval efter låtgränsen 142,7 s, inte analysatorn (rapport-2026-11-11.md 2.1).
+Var: analyserClock.onsetStep (snabba minnets byte). Material: tools/natt/2026-11-10.json mot 2026-11-11.json (tempoMix, sektionLag).
+Önskat: inget nu; ta med tempomixens lås och sektion ned som vakt när flerhypotes-patchen (fh1) eller v11 bedöms.
+Status:
+
 ## ÖPPET 2026-11-10 Fintempot (parabeln) flyttar fasen rätt men inte gratis - INGEN delad fil ändrad
 Vad: analyserClock.ts skannar tempot i 0,5 %-steg; parabeln genom varvets tre bästa tempon (prov/fintempo-parabel-20261110.patch) ger
 gridfel i BASENS fönster 22,9 -> 21,45 ms (övning) och 8,25 -> 6,40 ms (kontroll), men ned_s 2,65 -> 3,15 / 3,80 -> 5,00 s (ett skifte per
