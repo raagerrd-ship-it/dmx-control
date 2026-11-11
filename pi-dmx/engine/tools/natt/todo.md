@@ -1,5 +1,12 @@
 # Natt-agentens uppdrag
 
+## SKIPPA NATTEN 2026-11-11 -> 11-12 (ägaren 23:3x: "Skriv till nattagenten att skippa inatt istället")
+NATTAGENTEN: gör INGENTING i natt. Ingen bänk, inga ändringar i src/ eller tools/, ingen arena, ingen commit, ingen deploy.
+Skäl: arenan bygg (uppbyggnad + sektion) körs i huvudchatten och äger bänklåset och analysatorn i natt.
+Skriv bara en rad i nattens rapportfil (tools/natt/rapport-2026-11-12.md: "Natten 11-11 -> 11-12 skippad på ägarens begäran, se todo.md")
+och avsluta. Den här rutan gäller BARA denna natt - nästa natt läser du LÄGET nedan som vanligt (huvudchatten tar bort rutan när arenan är klar).
+
+
 ## LÄGET 2026-11-11 KVÄLL (huvudchatten, ägaren: "klockan, basenergin och tilliten ... i analysatorn" + arenan basenergi) - LÄS FÖRST
 - KODEN ÄNDRAD I KVÄLL, INGET DEPLOYAT I LADAN: (1) TILLITEN i analysatorn (frame.beatTrust, trustStep i analyserClock.ts; 5b2c6de + 17e9760).
   (2) BASENERGIN i analysatorn (frame.bassEnergy / bassEnergyShort = basens nivå under frasens / taktens tak över 36 dB, taket i SLAG ur
@@ -16,11 +23,8 @@
   a3 snabb dal på ett kvarts slag SOM EFFEKTVAL (slagK +3,7 % - men bryter mot fade-down om den går under 250 ms: får inte);
   a4 dropläget läser taktens skala (bassNow). Kvar utanför analysatorn: volymfönstret eHi/eLo/eSm i effects.ts (bara dropens
   efterkontroll) - flytta efterkontrollen till analysatorns dropdom. Verktyg: tools/arena/basenergi.mjs (nivåoberoende + orörda ramfält).
-- ARENAN BYGG PÅGÅR I HUVUDCHATTEN (start 23:25, 4 deltagare, .arena/bygg, domare tools/arena/tvavagar.py med nytt mått 'bygg' = 18 mått):
-  uppbyggnaden (frame.buildUp är död: bygg 1,38) + sektionen (upp_s 15,35 s, ned_s 2,65, traff 75 %, korta 34 %). NATTAGENTEN: finns inte
-  tools/natt/arena-2026-11-11-bygg/RAPPORT.md när du startar pågår arenan fortfarande - bänka då INTE (låset .arena/.banklas delas),
-  rör inte .arena/bygg, och ändra inte analyser.ts/effects.ts i engine/src förrän rapporten finns. Arbeta under tiden med det som inte
-  kräver bänken (läsa, mäta offline med egna sonder utanför låset).
+- ARENAN BYGG (start 23:25, 4 deltagare, .arena/bygg, domare tools/arena/tvavagar.py med nytt mått 'bygg' = 18 mått): uppbyggnaden
+  (frame.buildUp är död: bygg 1,38) + sektionen (upp_s 15,35 s, ned_s 2,65, traff 75 %, korta 34 %). Rapporten hamnar i tools/natt/arena-2026-11-11-bygg/.
 - MÄTFÄLLA: domarens kedja (konsertReplay) matar klockan med BeatFeed.update, inte hopLane.feed - det som ska stegas per hop för ramen
   måste ligga i BeatFeed.update (tillitens första bänk mätte med tillit 0).
 
