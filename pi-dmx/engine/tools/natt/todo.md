@@ -1,5 +1,24 @@
 # Natt-agentens uppdrag
 
+## LÄGET 2026-11-11 KVÄLL (huvudchatten, ägaren: "klockan, basenergin och tilliten ... i analysatorn" + arenan basenergi) - LÄS FÖRST
+- KODEN ÄNDRAD I KVÄLL, INGET DEPLOYAT I LADAN: (1) TILLITEN i analysatorn (frame.beatTrust, trustStep i analyserClock.ts; 5b2c6de + 17e9760).
+  (2) BASENERGIN i analysatorn (frame.bassEnergy / bassEnergyShort = basens nivå under frasens / taktens tak över 36 dB, taket i SLAG ur
+  klockan; frame.bassLevel = partiets bastak mot refrängens). effects.ts mäter inte längre basen: pulsens dal (B_LO_S 0,25 s), ljusets spann
+  (B_SPAN_DB 24, provratt DMX_B_SPAN_DB), versens dämpning (B_PART_DIM 0,7) och dropläget ligger på effektsidan.
+- ÄGARENS REGEL (11-11): analysatorn ANALYSERAR bara. Inget som formar ljuset (dal som återhämtar sig inom slaget, kurva, topp, uttoning,
+  "lyft i 8 s efter drop") får ligga i analysatorn - det är effekt. Gäller alla kommande arenor och nattprov.
+- NY BASLINJE: engine/dist = denna kod. Arenan basenergi (tools/natt/arena-2026-11-11-basenergi/, .arena/basenergi): mot koden före
+  (backup/fore-basenergi-i-analysatorn-20261111) +3,4 i bänken och +3,3 på kontrollmängden (takt -0,6, dynamik +5,8, koreografi +2,3).
+  Kör ALDRIG bank.py --bas i .arena/basenergi (bas där = gamla koden, redan bänkad).
+- VÄNTAR PÅ ÄGARENS ÖGA I LADAN (i denna ordning): tempohoppen f757d7d; basenergin (spann 24 mot DMX_B_SPAN_DB=36 om riggen mörknar i
+  baslösa partier: megamix släckt +1,6 pe; versen på ~65 % vid 6 dB under refrängen = B_PART_DIM).
+- IDÉBANK basenergi (prova ensam, en i taget): a2 percentiltak (takt +4,4: rA 0,349, t90 10 ms - men jitter 33 ms, plattare ljus);
+  a3 snabb dal på ett kvarts slag SOM EFFEKTVAL (slagK +3,7 % - men bryter mot fade-down om den går under 250 ms: får inte);
+  a4 dropläget läser taktens skala (bassNow). Kvar utanför analysatorn: volymfönstret eHi/eLo/eSm i effects.ts (bara dropens
+  efterkontroll) - flytta efterkontrollen till analysatorns dropdom. Verktyg: tools/arena/basenergi.mjs (nivåoberoende + orörda ramfält).
+- MÄTFÄLLA: domarens kedja (konsertReplay) matar klockan med BeatFeed.update, inte hopLane.feed - det som ska stegas per hop för ramen
+  måste ligga i BeatFeed.update (tillitens första bänk mätte med tillit 0).
+
 ## LÄGET 2026-11-11 (nattagenten)
 - LIVE i ladan: f01fed9 (11-09 18:30). I koden men EJ deployat i ladan: TEMPOHOPPEN f757d7d (live i lotus 11-10 21:47). Inga env-rattar.
 - Väntar på ägaren: fintempot (prov/fintempo-parabel-20261110.patch), flerhypotes fh1 (prov/flerhypotes-fh1-20261110.patch) - båda ändrar delade klockan.

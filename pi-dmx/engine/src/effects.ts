@@ -16,7 +16,7 @@ import type { ChannelRole, EngineConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { FixtureOutput, keepLit, lampFadeK, lampLevel, sameLight, MIN_ON_MS, CH_MIN_ON_MS, type SpecialtyValues } from "./output.js";   // minsta på-tiden = lampfysik (output.ts MINSTA PÅ-TID)
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, GRID_EARLY_MS } from "./beatClock.js";
-import { SILENCE_LEVEL, type Frame } from "./analyser.js";
+import { SILENCE_LEVEL, BASS_SPAN_DB, type Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
 import { fitScore, fitDistance, FIT } from "./effects/fit.js";
 import { PALETTES, ALL_SECTORS, setPalette, currentPalette, mixedSector } from "./effects/palette.js";
@@ -408,14 +408,21 @@ const E_TOP = Math.max(0.5, Math.min(1, 0.95));   // 1 -> 0,95 (ladan 10-09, sta
 /** BASENERGIN (ägaren 10-12: "följa basgången mer än diskant. Samma känsla som man får i magen av en sub vill jag ha i ögonen av ljuset.
  *  De får gärna svänga mycket, bara att sänka taket beroende på var i låten man är" + "kör inte energilagret på två ställen - då dämpas
  *  allt bara"). MÄTNINGEN LIGGER I ANALYSATORN sedan arenan basenergi 11-11 (frame.bassEnergy/bassEnergyShort: bastrycket med slaget som tidsenhet;
- *  analyser.ts bassEnergyStep) - här bara E_TOP, uttoningen och kurvan. Förr ett eget fönster här: topp direkt upp, glider ner på E_WIN_S; dal
+ *  analyser.ts bassEnergyStep = basens nivå mot frasens/taktens tak över ett fast dB-spann) - här LJUSETS FORM: pulsens dal (B_LO_S,
+ *  B_MIN_SPAN: följer FÄLTET direkt ner och är tillbaka på B_LO_S, så varje bastryck svänger från sin egen dal - hur fort ljuset släpper
+ *  efter ett slag; fade-down låst: aldrig under 0,25 s), E_TOP, uttoningen och kurvan. Förr ett eget fönster här: topp direkt upp, glider ner på E_WIN_S; dal
  *  direkt ner, glider upp på B_LO_S (1 s) - energin följer bastrycken och basgången över hela skalan i stället för att parkera högt i en
  *  tät refräng. Minst B_MIN_DB brett, E_TOP, upp direkt / ner E_RELEASE_MS (uttoningen som förr), upphöjd till B_CURVE (3; förr E_CURVE
  *  10 = nästan av/på). Golvet = "Lägsta nivå" (cfg.energyFloor). Sektionen sätter bara TAKET (secCeil), effekten mönstret, drops och
  *  minidrops lyfter. ERSATTE (bänk tools/energiMatt.mjs, 23 ladan-filer): konsertgolvet 0,4, refränggolvet 0,8, buildladdningen och
  *  TIER_OPEN (golv som gjorde energin verkningslös), taktdippen KICK_E/KICK_E_HIGH på kickEnv (dubbel kickmodulering ovanpå effektens
  *  egen c.heart), SPOT-regeln och UNIFORM:s ovalda par (förbivägar runt energin). */
-const B_CURVE = 3;   // (fönstret - B_MIN_DB, B_LO_S, sub/kick-vikten - ligger i analysatorn sedan arenan basenergi 11-11: frame.bassEnergy)
+const B_CURVE = 3, B_LO_S = 0.25, B_MIN_SPAN = 0.25;   // pulsens dal på fältet: tillbaka på 0,25 s (ladan 11-07: godkänt; aldrig kortare), minst en fjärdedel av fältets skala (= förr 6 dB)
+/** PARTIET DÄMPAR NIVÅN (arenan basenergi 11-11, a4:s del i fusionen; ägaren 10-12: "sänka taket beroende på var i låten man är"):
+ *  analysatorn mäter frame.bassLevel = partiets bastak mot refrängens (1 i refrängen, 0,5 = 6 dB under). Ljuset x (1 - B_PART_DIM x
+ *  (1 - bassLevel)): en vers med svagare bas lyser svagare med samma relativa slag. 0 = varje parti fyller skalan (som förr). Nivån
+ *  byts bara MELLAN pulserna (eBass under B_PART_AT) - ett byte mitt i en puls flyttar ljusets topp. Dropläget dämpar inte. */
+const B_PART_DIM = 0.7, B_PART_AT = 0.5;
 /** PROVRATTAR 2026-11-07 (dagkörningen med flera agenter; ägaren: 'kan man få takten att följa själva basrytmen bättre (energilagret)' och
  *  'efter drop räkna med att det är refräng så taket är 95 %, men golvet 70 % dödar bara dynamiken'). Bara för bänken: osatt = dagens
  *  värde och dagens uttryck (json-identiskt). Det som bevisar sig byggs in som standard och ratten tas bort (ägarens regel: inga flaggor).
@@ -424,6 +431,10 @@ const B_CURVE = 3;   // (fönstret - B_MIN_DB, B_LO_S, sub/kick-vikten - ligger 
  *  (DMX_B_LO_S/B_MIN_DB/B_WIN_S/B_SUBW/DROP_WIN_S) är borta: mätningen ligger i analysatorn (frame.bassEnergy). */
 const envN = (k: string, d: number): number => { const v = process.env[k]; return v === undefined || v === '' ? d : Number(v); };
 const PB_CURVE = envN('DMX_B_CURVE', B_CURVE);
+/** LJUSETS SPANN (arenan basenergi 11-11, fusionen): analysatorn mäter basens nivå över BASS_SPAN_DB (36 dB) under taket; ljuset använder
+ *  de översta B_SPAN_DB. 24 = bäst i bänken och på kontrollmängden (+3,4 / +3,3) men riggen mörknar i baslösa partier (megamix släckt
+ *  +1,6 pe); 36 = robustare (+1,9 / +1,5). PROVRATT för ladan: DMX_B_SPAN_DB. */
+const B_SPAN_K = BASS_SPAN_DB / envN('DMX_B_SPAN_DB', 24);
 const PB_TOP = envN('DMX_B_TOP', 0), PB_RELEASE_MS = envN('DMX_B_RELEASE_MS', 0);
 const PD_TOP = envN('DMX_DROP_TOP', 0), PM_LIFT_FLOOR = envN('DMX_MINI_LIFT_FLOOR', 1);
 /** BASENERGIN BARA SUB+KICK (opt-in DMX_BASS_SUBKICK=1, porterat från lotus 10-15: ägaren i källaren 'känns dock som att den följer inte bara
@@ -593,7 +604,7 @@ export class EffectEngine {
   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
   private lastLiveSection = '';   // DMX_SECTION_SWITCH
   dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;
-  private eSm = 0; eSimple = 0; private eBass = 0; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1; private spreadM0 = new Float64Array(64);   // ENERGIN (se E_WIN_S); spreadM0 = BASGANG
+  private eSm = 0; eSimple = 0; private eBass = 0; private bLo = 0; private bPart = 1; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1; private spreadM0 = new Float64Array(64);   // ENERGIN (se E_WIN_S); spreadM0 = BASGANG
   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
   private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
   private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
@@ -1329,20 +1340,27 @@ export class EffectEngine {
       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
       // (volymfönstret ovan - eSm - styr inte ljuset längre, bara dropens efterkontroll (DROP_LAND_GAIN); orört så dropsen är desamma)
       // BASENERGIN (se B_CURVE): analysatorn MÄTER (frame.bassEnergy mot frasen, frame.bassEnergyShort mot takten) - här bara vilken skala
-      // ljuset följer och ljusets form (topp, uttoning, kurva, lyft). DROPLÄGET (se DROP_LIFT_MS): medan dropens lyft bär följer ljuset
+      // ljuset följer och ljusets form (pulsens dal, topp, uttoning, kurva, lyft). DROPLÄGET (se DROP_LIFT_MS): medan dropens lyft bär följer ljuset
       // TAKTENS skala (varje slag fullt mot sina grannar; ladan 11-07: "energin efter drop dör fort" -> "känns bra nu") och glider
       // tillbaka till frasens på DROP_LIFT_FALL_MS. Förr bytte dropen mätfönstrets längd här (10 s -> 1 s).
       const dropLeft = this.dropLiftUntil - nowWall, inDropLift = dropLeft > -DROP_LIFT_FALL_MS;   // PROV DMX_DROP_TOP
-      let eb = frame.bassEnergy ?? 0;
-      if (inDropLift) eb += ((frame.bassEnergyShort ?? eb) - eb) * (dropLeft >= 0 ? 1 : 1 + dropLeft / DROP_LIFT_FALL_MS);
+      const dropW = !inDropLift ? 0 : dropLeft >= 0 ? 1 : 1 + dropLeft / DROP_LIFT_FALL_MS;   // DROPLÄGET: 1 medan lyftet bär, tonar ut med fallet
+      let eb = 1 - (1 - (frame.bassEnergy ?? 0)) * B_SPAN_K; if (!(eb > 0)) eb = 0;   // ljusets spann ur mätningens (se B_SPAN_DB)
+      if (inDropLift) { let es = 1 - (1 - (frame.bassEnergyShort ?? 0)) * B_SPAN_K; if (!(es > 0)) es = 0; eb += (es - eb) * dropW; }
+      // PULSENS DAL (ljusform, se B_LO_S): dalen följer fältet direkt ner och är tillbaka på B_LO_S - ljuset visar hur långt över sin
+      // senaste dal basen är, så varje bastryck svänger över skalan och släpper när basen ligger kvar.
+      this.bLo = eb < this.bLo ? eb : this.bLo + (eb - this.bLo) * Math.min(1, dtSec / B_LO_S);
+      { const sp = 1 - this.bLo > B_MIN_SPAN ? 1 - this.bLo : B_MIN_SPAN; eb = 1 - (1 - eb) / sp; if (!(eb > 0)) eb = 0; }
       const bTop = inDropLift && PD_TOP > 0 ? PD_TOP : PB_TOP > 0 ? PB_TOP : E_TOP, bRel = PB_RELEASE_MS > E_RELEASE_MS ? PB_RELEASE_MS : E_RELEASE_MS;
       if (bTop < 1) eb = eb >= bTop ? 1 : eb / bTop;   // ENERGINS TOPP (se E_TOP)
       this.eBass = eb > this.eBass ? eb : this.eBass + (eb - this.eBass) * (1 - Math.exp(-dtSec * 1000 / bRel));   // upp direkt, ner E_RELEASE_MS (som förr)
       this.eSimple = this.eBass;
+      if (this.eBass < B_PART_AT) this.bPart = frame.bassLevel ?? 1;   // PARTIET (se B_PART_DIM): byts bara mellan pulserna
+      const part = 1 - B_PART_DIM * (1 - this.bPart) * (1 - dropW);
       const eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
       let lift = this.dropEnv;   // DROPS OCH MINIDROPS LYFTER (se DROP_LIFT_MS / MINI_LIFT_MS): energin släpper helt och glider tillbaka
       if (nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) { const left = this.miniLiftUntil - nowWall; lift = Math.max(lift, PM_LIFT_FLOOR === 1 ? (left >= 0 ? 1 : 1 + left / MINI_LIFT_FALL_MS) : PM_LIFT_FLOOR * (left >= 0 ? 1 : 1 + left / MINI_LIFT_FALL_MS)); }
-      md = drive * Math.min(1, Math.max(eFloor + (1 - eFloor) * Math.pow(this.eBass, PB_CURVE), lift));   // bara dampning: aldrig over 1
+      md = drive * Math.min(1, Math.max(part * (eFloor + (1 - eFloor) * Math.pow(this.eBass, PB_CURVE)), lift));   // bara dampning: aldrig over 1
       // ENERGIN I DMX-PROCENT (se E_LIN): md är andelen av lampans ljus - output.ts lampLevel gör den till nivå per lampa (renderLamps)
     }
     this.rMd = md;

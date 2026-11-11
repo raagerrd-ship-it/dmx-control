@@ -1,0 +1,180 @@
+--- a/src/analyser.ts
++++ b/src/analyser.ts
+@@ -222,6 +222,19 @@
+   specAbs: Spectrum;
+   /** BASKROPPEN I RA dB (negativt tal, medel av sub+kick+bas), utan AGC - drop-detektorns kropp. */
+   bodyDb: number;
++  /** BASENERGIN 0..1 (arenan basenergi 2026-11-11, EN mätning för båda systemen; förr DMX effects.ts bHi/bLo/eBass): basens NIVÅ
++   *  (sub+kick i rå dB, vikt 0,25/0,75) mot ett TAK, som dB-skillnad över ett fast spann: 1 = vid taket, 0 = BE_SPAN_DB eller mer
++   *  under det. Taket räknas med SLAGET SOM TIDSENHET (klockans tempo; utan klocka 500 ms). TVÅ SKALOR:
++   *  bassEnergy = mot FRASEN (taket = de starkaste slagen, glöms på BE_TOP_BEATS slag: starka och svaga partier skiljs åt),
++   *  bassEnergyShort = mot TAKTEN (glöms på BE_FAST_BEATS slag: varje slag mot sina närmaste grannar, ikapp två slag efter ett
++   *  nivåbyte). bassEnergyShort >= bassEnergy. Bara dB-skillnader: oberoende av ingångsnivån; 0 när ramen är tyst. Ren mätning:
++   *  ingen dal, ingen uttoning, ingen kurva - hur fort ljuset släpper efter ett slag (pulsens bredd), vilken skala det följer och
++   *  dropläget ligger i effekterna. Se bassEnergyStep.
++   *  bassLevel (0..1) = PARTIETS BASNIVÅ MOT LÅTENS REFERENS: frasens tak mot refrängens tak som amplitudkvot (6 dB under = 0,5),
++   *  så som levelVsHighDb mäter hela nivån mot refrängen. I refrängen (section 'high') ÄR frasens tak referensen (1); i vers, break
++   *  och uppbyggnad står referensen kvar som låtens minne (följer ett starkare tak direkt upp, glöms på BE_MEM_BEATS slag). Före
++   *  låtens första refräng är referensen det starkaste partiet hittills. Hur mycket ett svagare parti ska dämpas väljer konsumenten. */
++  bassEnergy: number; bassEnergyShort: number; bassLevel: number;
+   /** ABSOLUT mid+diskant-niva i dB (band 3-7, >250 Hz), RMS-kombinerad, ingen AGC. */
+   midHiDb: number;
+   /** KICKENS STIGNING, OMÄTTAD (10-28, fynd 10-22/10-27): basens (specAbs sub+kick) stigning i dB mot KICK_RISE_HOPS hop sedan,
+@@ -399,6 +412,31 @@
+   private bandOn = new Float32Array(8);    // scratch: per-band onset denna frame
+   private static readonly KICK_RISE_HOPS = 6;   // kickRise-fönstret (16 ms), = DMX:s FEED_RISE_HOPS
+   private kickRiseDb = new Float64Array(Analyser.KICK_RISE_HOPS); private kickRisePos = 0;
++  /** BASENERGIN MED SLAGET SOM TIDSENHET (frame.bassEnergy / bassEnergyShort). Alla tider räknas i SLAG ur klockans tempo (60000 / bpm,
++   *  hållet inom BE_BEAT_MIN_MS..BE_BEAT_MAX_MS så ett halv-/dubbeltempo inte flyttar skalan långt; utan klocka BE_FALLBACK_MS):
++   *  TAKET följer basen direkt upp och glöms mot den på BE_TOP_BEATS slag (frasens skala) resp. BE_FAST_BEATS slag (taktens skala) -
++   *  hur fort skalan hinner ikapp ett nivåbyte följer musikens tempo i stället för en klocka i sekunder. Fältet = basens läge i ett
++   *  FAST spann BE_SPAN_DB under taket. Bara dB-SKILLNADER: ingen tystnadsgrind och ingen absolut nivå i mätningen (oberoende av
++   *  ingångsnivån). Fyra tal i tillstånd (beRef = låtens referens för frame.bassLevel), inga objekt per hop. INGEN DAL HÄR (ägaren 11-11: en dal som återhämtar sig inom slaget
++   *  bestämmer pulsens bredd = ljusstyrning) - den ligger i effects.ts stepEnergy och följer fältet, inte ljudet.
++   *  (Provat och förkastat i arenan: toppen som kvantil/median av de 32 senaste slagtopparna - plattare ljus, sämre takt i bänken.) */
++  private static readonly BE_TOP_BEATS = 16; private static readonly BE_FAST_BEATS = 2; private static readonly BE_SPAN_DB = 24; private static readonly BE_MEM_BEATS = 240;
++  private static readonly BE_BEAT_MIN_MS = 300; private static readonly BE_BEAT_MAX_MS = 600; private static readonly BE_FALLBACK_MS = 500;
++  private beHi = NaN; private beHiShort = NaN; private beRef = NaN; private beShort = 0;
++  /** Stegar skalorna ett hop; returnerar frasens värde, taktens ligger i beShort. */
++  private bassEnergyStep(sub: number, kick: number): number {
++    const x = 5 * Math.log10(sub + 1e-7) + 15 * Math.log10(kick + 1e-7), hopMs = this.dtHop * 1000;   // 0,25 x sub dB + 0,75 x kick dB
++    let per = this.localBpm > 40 ? 60000 / this.localBpm : Analyser.BE_FALLBACK_MS;   // slagets längd ur klockan
++    per = per < Analyser.BE_BEAT_MIN_MS ? Analyser.BE_BEAT_MIN_MS : per > Analyser.BE_BEAT_MAX_MS ? Analyser.BE_BEAT_MAX_MS : per;
++    this.beHi = !(x <= this.beHi) ? x : this.beHi + (x - this.beHi) * (hopMs / (Analyser.BE_TOP_BEATS * per));
++    this.beHiShort = !(x <= this.beHiShort) ? x : this.beHiShort + (x - this.beHiShort) * (hopMs / (Analyser.BE_FAST_BEATS * per));
++    this.beRef = this.section === 'high' || !(this.beHi <= this.beRef) ? this.beHi : this.beRef + (this.beHi - this.beRef) * (hopMs / (Analyser.BE_MEM_BEATS * per));   // låtens referens = refrängens tak
++    let e = 1 - (this.beHiShort - x) / Analyser.BE_SPAN_DB;
++    this.beShort = e > 0 ? e : 0;
++    e = 1 - (this.beHi - x) / Analyser.BE_SPAN_DB;
++    return e > 0 ? e : 0;
++  }
++
+   private bigCounter = 0;                  // decimering av 2048-FFT:n (se BIG_EVERY)
+   private static readonly BIG_EVERY = 3;   // kor stor-FFT var N:e hop → analysen ryms i realtid
+   /** bandPeak-decay per stor-FFT (τ ≈ 3.8 s oavsett BIG_EVERY). */
+@@ -2006,7 +2044,7 @@
+     this.outFrame = {
+       silent: true, level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
+       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
+-      dropCount: 0, miniDropCount: 0, dropDemoted: 0, dropSpaced: 0, dropRiseDb: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, bodyDb: 0, midHiDb: -120, kickRise: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
++      dropCount: 0, miniDropCount: 0, dropDemoted: 0, dropSpaced: 0, dropRiseDb: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, bodyDb: 0, bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1, midHiDb: -120, kickRise: 0, inZone: false, breaking: false, buildUp: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
+       kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
+       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
+     };
+@@ -3062,7 +3100,7 @@
+     f.energy = this.engSmooth;
+     f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
+     f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.intensity = intensity; f.beatAnchorMs = this.beatAnchorMs;
+-    f.bodyDb = bodyNow;
++    f.bodyDb = bodyNow; { const be = this.bassEnergyStep(A[0], A[1]); f.bassEnergy = f.silent ? 0 : be; f.bassEnergyShort = f.silent ? 0 : this.beShort; f.bassLevel = Math.pow(10, (this.beHi - this.beRef) / 20); }
+     {   // kickRise: basens dB mot KICK_RISE_HOPS hop sedan (ringen håller de senaste), halvvåg
+       const db = 20 * Math.log10(A[0] + A[1] + 1e-7), old = this.kickRiseDb[this.kickRisePos];
+       this.kickRiseDb[this.kickRisePos] = db; this.kickRisePos = (this.kickRisePos + 1) % Analyser.KICK_RISE_HOPS;
+--- a/src/effects.ts
++++ b/src/effects.ts
+@@ -407,26 +407,32 @@
+ const E_TOP = Math.max(0.5, Math.min(1, 0.95));   // 1 -> 0,95 (ladan 10-09, standard 10-10)
+ /** BASENERGIN (ägaren 10-12: "följa basgången mer än diskant. Samma känsla som man får i magen av en sub vill jag ha i ögonen av ljuset.
+  *  De får gärna svänga mycket, bara att sänka taket beroende på var i låten man är" + "kör inte energilagret på två ställen - då dämpas
+- *  allt bara"). EN energi ur baskroppen (frame.bodyDb) i stället för volymen (levelVU): topp direkt upp, glider ner på E_WIN_S; dal
++ *  allt bara"). MÄTNINGEN LIGGER I ANALYSATORN sedan arenan basenergi 11-11 (frame.bassEnergy/bassEnergyShort: bastrycket med slaget som tidsenhet;
++ *  analyser.ts bassEnergyStep = basens nivå mot frasens/taktens tak över ett fast dB-spann) - här LJUSETS FORM: pulsens dal (B_LO_S,
++ *  B_MIN_SPAN: följer FÄLTET direkt ner och är tillbaka på B_LO_S, så varje bastryck svänger från sin egen dal - hur fort ljuset släpper
++ *  efter ett slag; fade-down låst: aldrig under 0,25 s), E_TOP, uttoningen och kurvan. Förr ett eget fönster här: topp direkt upp, glider ner på E_WIN_S; dal
+  *  direkt ner, glider upp på B_LO_S (1 s) - energin följer bastrycken och basgången över hela skalan i stället för att parkera högt i en
+  *  tät refräng. Minst B_MIN_DB brett, E_TOP, upp direkt / ner E_RELEASE_MS (uttoningen som förr), upphöjd till B_CURVE (3; förr E_CURVE
+  *  10 = nästan av/på). Golvet = "Lägsta nivå" (cfg.energyFloor). Sektionen sätter bara TAKET (secCeil), effekten mönstret, drops och
+  *  minidrops lyfter. ERSATTE (bänk tools/energiMatt.mjs, 23 ladan-filer): konsertgolvet 0,4, refränggolvet 0,8, buildladdningen och
+  *  TIER_OPEN (golv som gjorde energin verkningslös), taktdippen KICK_E/KICK_E_HIGH på kickEnv (dubbel kickmodulering ovanpå effektens
+  *  egen c.heart), SPOT-regeln och UNIFORM:s ovalda par (förbivägar runt energin). */
+-const B_CURVE = 3, B_MIN_DB = 6, B_LO_S = 0.25;   // B_LO_S 1 -> 0,25 (STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108))
++const B_CURVE = 3, B_LO_S = 0.25, B_MIN_SPAN = 0.25;   // pulsens dal på fältet: tillbaka på 0,25 s (ladan 11-07: godkänt; aldrig kortare), minst en fjärdedel av fältets skala (= förr 6 dB)
++/** PARTIET DÄMPAR NIVÅN (arenan basenergi 11-11, a4:s del i fusionen; ägaren 10-12: "sänka taket beroende på var i låten man är"):
++ *  analysatorn mäter frame.bassLevel = partiets bastak mot refrängens (1 i refrängen, 0,5 = 6 dB under). Ljuset x (1 - B_PART_DIM x
++ *  (1 - bassLevel)): en vers med svagare bas lyser svagare med samma relativa slag. 0 = varje parti fyller skalan (som förr). Nivån
++ *  byts bara MELLAN pulserna (eBass under B_PART_AT) - ett byte mitt i en puls flyttar ljusets topp. Dropläget dämpar inte. */
++const B_PART_DIM = 0.7, B_PART_AT = 0.5;
+ /** PROVRATTAR 2026-11-07 (dagkörningen med flera agenter; ägaren: 'kan man få takten att följa själva basrytmen bättre (energilagret)' och
+  *  'efter drop räkna med att det är refräng så taket är 95 %, men golvet 70 % dödar bara dynamiken'). Bara för bänken: osatt = dagens
+  *  värde och dagens uttryck (json-identiskt). Det som bevisar sig byggs in som standard och ratten tas bort (ägarens regel: inga flaggor).
+- *  DMX_B_LO_S/B_CURVE/B_MIN_DB/B_WIN_S/B_TOP/B_RELEASE_MS = basfönstrets dal/kurva/minsta bredd/toppens fall/topp/uttoning (aldrig under
+- *  E_RELEASE_MS: fade-down låst), DMX_B_SUBW = subbandets vikt mot kickbandet (0,5 = medel som i dag); DMX_DROP_WIN_S/DROP_TOP = toppens
+- *  fall och E_TOP medan dropens lyft pågår (basfönstret ankras om på refrängen i stället för ett golv); DMX_MINI_LIFT_FLOOR = minidropens
+- *  lyft som golv (1 = som i dag). */
++ *  DMX_B_CURVE/B_TOP/B_RELEASE_MS = basenergins kurva/topp/uttoning (aldrig under E_RELEASE_MS: fade-down låst); DMX_DROP_TOP = energins
++ *  topp medan dropens lyft pågår; DMX_MINI_LIFT_FLOOR = minidropens lyft som golv (1 = som i dag). Fönstrets rattar
++ *  (DMX_B_LO_S/B_MIN_DB/B_WIN_S/B_SUBW/DROP_WIN_S) är borta: mätningen ligger i analysatorn (frame.bassEnergy). */
+ const envN = (k: string, d: number): number => { const v = process.env[k]; return v === undefined || v === '' ? d : Number(v); };
+-const PB_LO_S = envN('DMX_B_LO_S', B_LO_S), PB_CURVE = envN('DMX_B_CURVE', B_CURVE), PB_MIN_DB = envN('DMX_B_MIN_DB', B_MIN_DB);
+-const PB_WIN_S = envN('DMX_B_WIN_S', 0), PB_TOP = envN('DMX_B_TOP', 0), PB_RELEASE_MS = envN('DMX_B_RELEASE_MS', 0), PB_SUBW = envN('DMX_B_SUBW', 0.25);   // 0,5 -> 0,25 (STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108))
+-const PD_WIN_S = envN('DMX_DROP_WIN_S', 1),   // 0 -> 1 (STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108))
+-      PD_TOP = envN('DMX_DROP_TOP', 0), PM_LIFT_FLOOR = envN('DMX_MINI_LIFT_FLOOR', 1);
++const PB_CURVE = envN('DMX_B_CURVE', B_CURVE);
++const PB_TOP = envN('DMX_B_TOP', 0), PB_RELEASE_MS = envN('DMX_B_RELEASE_MS', 0);
++const PD_TOP = envN('DMX_DROP_TOP', 0), PM_LIFT_FLOOR = envN('DMX_MINI_LIFT_FLOOR', 1);
+ /** BASENERGIN BARA SUB+KICK (opt-in DMX_BASS_SUBKICK=1, porterat från lotus 10-15: ägaren i källaren 'känns dock som att den följer inte bara
+  *  bas' med baskroppen 20-250 Hz, 'känns bättre' med sub+kick 20-120 Hz). Basenergins källa = medel av sub- och kickbandets rå dB ur
+  *  frame.specAbs (samma bandmedel som bodyDb, utan bandet 120-250 Hz där röstens grundton och virvelns kropp ligger). Flank-dropen läser
+@@ -594,7 +600,7 @@
+   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
+   private lastLiveSection = '';   // DMX_SECTION_SWITCH
+   dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;
+-  private eSm = 0; eSimple = 0; private eBass = 0; private bHi = NaN; private bLo = NaN; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1; private spreadM0 = new Float64Array(64);   // ENERGIN (se E_WIN_S); spreadM0 = BASGANG
++  private eSm = 0; eSimple = 0; private eBass = 0; private bLo = 0; private bPart = 1; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1; private spreadM0 = new Float64Array(64);   // ENERGIN (se E_WIN_S); spreadM0 = BASGANG
+   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
+   private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
+   private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
+@@ -1329,27 +1335,28 @@
+       if (E_TOP < 1) e = e >= E_TOP ? 1 : e / E_TOP;   // ENERGINS TOPP (se E_TOP)
+       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
+       // (volymfönstret ovan - eSm - styr inte ljuset längre, bara dropens efterkontroll (DROP_LAND_GAIN); orört så dropsen är desamma)
+-      // BASENERGIN (se B_CURVE): baskroppen (frame.bodyDb, sub+kick+bas i rå dB) i ett följande fönster - topp direkt upp/E_WIN_S ner,
+-      // dal direkt ner/B_LO_S upp - energin mäter hur långt över basens senaste dal vi är: varje bastryck svänger över skalan.
+-      const bdb = frame.specAbs ? (PB_SUBW === 0.5 ? (20 * Math.log10(frame.specAbs.sub + 1e-7) + 20 * Math.log10(frame.specAbs.kick + 1e-7)) / 2
+-        : PB_SUBW * 20 * Math.log10(frame.specAbs.sub + 1e-7) + (1 - PB_SUBW) * 20 * Math.log10(frame.specAbs.kick + 1e-7)) : (frame.bodyDb ?? -90);   // BASS_SUBKICK: bara 20-120 Hz (PROV DMX_B_SUBW)
+-      const inDropLift = nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS;   // PROV DMX_DROP_WIN_S/DROP_TOP
+-      const bWin = inDropLift && PD_WIN_S > 0 ? PD_WIN_S : PB_WIN_S, kB = bWin > 0 ? Math.min(1, dtSec / bWin) : k;
+-      if (Number.isNaN(this.bHi) && !frame.silent) { this.bHi = bdb; this.bLo = bdb; }
+-      if (!frame.silent) {   // tystnad flyttar inte fönstret
+-        this.bHi = bdb > this.bHi ? bdb : this.bHi + (bdb - this.bHi) * kB;
+-        this.bLo = bdb < this.bLo ? bdb : this.bLo + (bdb - this.bLo) * Math.min(1, dtSec / PB_LO_S);
+-      }
+-      const bSpan = Math.max(PB_MIN_DB, this.bHi - this.bLo);
+-      let eb = (bdb - (this.bHi - bSpan)) / bSpan; eb = eb < 0 ? 0 : eb > 1 ? 1 : eb; if (eb !== eb) eb = 0;
++      // BASENERGIN (se B_CURVE): analysatorn MÄTER (frame.bassEnergy mot frasen, frame.bassEnergyShort mot takten) - här bara vilken skala
++      // ljuset följer och ljusets form (pulsens dal, topp, uttoning, kurva, lyft). DROPLÄGET (se DROP_LIFT_MS): medan dropens lyft bär följer ljuset
++      // TAKTENS skala (varje slag fullt mot sina grannar; ladan 11-07: "energin efter drop dör fort" -> "känns bra nu") och glider
++      // tillbaka till frasens på DROP_LIFT_FALL_MS. Förr bytte dropen mätfönstrets längd här (10 s -> 1 s).
++      const dropLeft = this.dropLiftUntil - nowWall, inDropLift = dropLeft > -DROP_LIFT_FALL_MS;   // PROV DMX_DROP_TOP
++      const dropW = !inDropLift ? 0 : dropLeft >= 0 ? 1 : 1 + dropLeft / DROP_LIFT_FALL_MS;   // DROPLÄGET: 1 medan lyftet bär, tonar ut med fallet
++      let eb = frame.bassEnergy ?? 0;
++      if (inDropLift) eb += ((frame.bassEnergyShort ?? eb) - eb) * dropW;
++      // PULSENS DAL (ljusform, se B_LO_S): dalen följer fältet direkt ner och är tillbaka på B_LO_S - ljuset visar hur långt över sin
++      // senaste dal basen är, så varje bastryck svänger över skalan och släpper när basen ligger kvar.
++      this.bLo = eb < this.bLo ? eb : this.bLo + (eb - this.bLo) * Math.min(1, dtSec / B_LO_S);
++      { const sp = 1 - this.bLo > B_MIN_SPAN ? 1 - this.bLo : B_MIN_SPAN; eb = 1 - (1 - eb) / sp; if (!(eb > 0)) eb = 0; }
+       const bTop = inDropLift && PD_TOP > 0 ? PD_TOP : PB_TOP > 0 ? PB_TOP : E_TOP, bRel = PB_RELEASE_MS > E_RELEASE_MS ? PB_RELEASE_MS : E_RELEASE_MS;
+       if (bTop < 1) eb = eb >= bTop ? 1 : eb / bTop;   // ENERGINS TOPP (se E_TOP)
+       this.eBass = eb > this.eBass ? eb : this.eBass + (eb - this.eBass) * (1 - Math.exp(-dtSec * 1000 / bRel));   // upp direkt, ner E_RELEASE_MS (som förr)
+       this.eSimple = this.eBass;
++      if (this.eBass < B_PART_AT) this.bPart = frame.bassLevel ?? 1;   // PARTIET (se B_PART_DIM): byts bara mellan pulserna
++      const part = 1 - B_PART_DIM * (1 - this.bPart) * (1 - dropW);
+       const eFloor = Math.max(0, Math.min(0.5, this.cfg.energyFloor ?? 0.2));   // "Lägsta nivå" i /setup
+       let lift = this.dropEnv;   // DROPS OCH MINIDROPS LYFTER (se DROP_LIFT_MS / MINI_LIFT_MS): energin släpper helt och glider tillbaka
+       if (nowWall < this.miniLiftUntil + MINI_LIFT_FALL_MS) { const left = this.miniLiftUntil - nowWall; lift = Math.max(lift, PM_LIFT_FLOOR === 1 ? (left >= 0 ? 1 : 1 + left / MINI_LIFT_FALL_MS) : PM_LIFT_FLOOR * (left >= 0 ? 1 : 1 + left / MINI_LIFT_FALL_MS)); }
+-      md = drive * Math.min(1, Math.max(eFloor + (1 - eFloor) * Math.pow(this.eBass, PB_CURVE), lift));   // bara dampning: aldrig over 1
++      md = drive * Math.min(1, Math.max(part * (eFloor + (1 - eFloor) * Math.pow(this.eBass, PB_CURVE)), lift));   // bara dampning: aldrig over 1
+       // ENERGIN I DMX-PROCENT (se E_LIN): md är andelen av lampans ljus - output.ts lampLevel gör den till nivå per lampa (renderLamps)
+     }
+     this.rMd = md;
+--- a/src/effects/types.ts
++++ b/src/effects/types.ts
+@@ -78,7 +78,7 @@
+   bassline: number; bassNoteIdx: number; bassNoteAge: number;
+   /** Kick-/beat-envelope (0..1). */
+   kickEnv: number;
+-  /** BASGÅNGEN SJÄLV (arenan puls1 2026-11-07): energilagrets baskropp (eBass, sub/kick-banden i följande fönster: 0 = basens senaste dal,
++  /** BASGÅNGEN SJÄLV (arenan puls1 2026-11-07): energilagrets baskropp (eBass = analysatorns frame.bassEnergy, i dropläget bassEnergyShort, mätt från pulsens dal, efter E_TOP och uttoning: 0 = basens senaste dal,
+    *  1 = toppen). Med DMX_BASGANG=1 tar de mest spelade effekterna slagets STYRKA härifrån och rutnätet bara VEM som tänds. */
+   bassBody: number;
+   /** GLITTER-ENVELOPER (2026-10-10): diskant- (hi-hat/cymbal) och luftanslaget (frame.onset.treble/air) med direkt uppgang och
