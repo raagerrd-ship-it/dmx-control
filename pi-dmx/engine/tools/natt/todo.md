@@ -16,6 +16,11 @@
   a3 snabb dal på ett kvarts slag SOM EFFEKTVAL (slagK +3,7 % - men bryter mot fade-down om den går under 250 ms: får inte);
   a4 dropläget läser taktens skala (bassNow). Kvar utanför analysatorn: volymfönstret eHi/eLo/eSm i effects.ts (bara dropens
   efterkontroll) - flytta efterkontrollen till analysatorns dropdom. Verktyg: tools/arena/basenergi.mjs (nivåoberoende + orörda ramfält).
+- ARENAN BYGG PÅGÅR I HUVUDCHATTEN (start 23:25, 4 deltagare, .arena/bygg, domare tools/arena/tvavagar.py med nytt mått 'bygg' = 18 mått):
+  uppbyggnaden (frame.buildUp är död: bygg 1,38) + sektionen (upp_s 15,35 s, ned_s 2,65, traff 75 %, korta 34 %). NATTAGENTEN: finns inte
+  tools/natt/arena-2026-11-11-bygg/RAPPORT.md när du startar pågår arenan fortfarande - bänka då INTE (låset .arena/.banklas delas),
+  rör inte .arena/bygg, och ändra inte analyser.ts/effects.ts i engine/src förrän rapporten finns. Arbeta under tiden med det som inte
+  kräver bänken (läsa, mäta offline med egna sonder utanför låset).
 - MÄTFÄLLA: domarens kedja (konsertReplay) matar klockan med BeatFeed.update, inte hopLane.feed - det som ska stegas per hop för ramen
   måste ligga i BeatFeed.update (tillitens första bänk mätte med tillit 0).
 

@@ -44,6 +44,8 @@ POÄNG = 0,6 * LÅNGSAMMA + 0,4 * SNABBA + BONUS (bara i finalen, max +3)
             ned_s         - golv 0,5  sektionLag: etiketten lämnar high efter skifte nedåt, median s (miss = 20 s)
             traff         + golv 1    sektionLag: andel skiften (upp+ned) där etiketten följer inom 20 s, %
             korta         - golv 1    sektionLag/sektionStat: andel sektionsdelar < 8 s, %
+            bygg          + golv 10   (arenan bygg 2026-11-11, 18 mått) frame.buildUp x 100: medel de 4 s FÖRE ljudets nivåskiften uppåt minus
+                                      medel över resten av filerna (utom -6..+2 s kring skiftena) - uppbyggnaden ska synas före höjningen och bara där
     drop    drop_traff    + golv 5    dropFacit.mjs: dropklippen (ladan 10-10, riktig drop vid 15,0 s) - drop ELLER minidrop inom +-1,5 s, %
                                       (bas: 0/10 hela drops vid 15 s sedan 'SNÄVT MÅL' 10-11, minin fångar dem - ägarens val); holdout + ägarens
                                       8 drop-markeringar i lang1014 (marks.jsonl mot events.json captureStartWallMs): drop/mini inom [-4, +1] s
@@ -112,7 +114,7 @@ CPU_N, CPU_S, RT_S, BONUS_WAV, BONUS_S, SNABB_S = 5, 120, 60, L1107, 300, 120
 # (nyckel, grupp, riktning, golv) - LIKA VIKT
 MATT = [('mix_klocka', 'tempo', 1, 1), ('mix_las', 'tempo', -1, 1), ('mix_hopp', 'tempo', -1, 0.2), ('mix_still', 'tempo', -1, 1), ('klipp_klocka', 'tempo', 1, 1),
         ('ettan', 'ettan', 1, 5), ('grid40', 'ettan', 1, 1), ('gridfel', 'ettan', -1, 5),
-        ('upp_s', 'sektion', -1, 0.5), ('ned_s', 'sektion', -1, 0.5), ('traff', 'sektion', 1, 1), ('korta', 'sektion', -1, 1),
+        ('upp_s', 'sektion', -1, 0.5), ('ned_s', 'sektion', -1, 0.5), ('traff', 'sektion', 1, 1), ('korta', 'sektion', -1, 1), ('bygg', 'sektion', 1, 10),
         ('drop_traff', 'drop', 1, 5), ('drop_falska', 'drop', -1, 0.5), ('drop_ms', 'drop', -1, 20),
         ('gr_ratt', 'latgrans', 1, 5), ('gr_falska', 'latgrans', -1, 0.5)]
 W_LANGSAM, W_SNABB, KLIPP_PCT, SPARR_LJUS, BONUS_TOL = 0.6, 0.4, 100.0, -0.5, 1.35
@@ -287,6 +289,8 @@ def kvalitet(R, hold):
         'mix_klocka': mix['klocka'], 'mix_las': mix['lasMed'], 'mix_still': mix.get('stillMed', 0.0), 'mix_hopp': mix['hoppMin'], 'klipp_klocka': 100 * sum(c['klocka'] for c in kl) / len(kl),
         'ettan': 100 * sum(e['ok'] for e in et) / max(1, sum(e['tot'] for e in et)), 'grid40': 100 * sum(1 for e in grid if e <= 40) / max(1, len(grid)), 'gridfel': med(grid, 500),
         'upp_s': med(upLag, 20.0), 'ned_s': med(dnLag, 20.0), 'traff': 100 * n_hit / max(1, n_sk), 'korta': 100 * sum(f['short'] for f in L) / max(1, sum(f['segs'] for f in L)),
+        # UPPBYGGNADEN (arenan bygg 11-11): frame.buildUp (x100) de 4 s före ljudets nivåskiften uppåt minus resten av filerna - lever fältet, och bara där?
+        'bygg': 100 * ((sum(x for f in L for x in f.get('byggFore', [])) / max(1, sum(len(f.get('byggFore', [])) for f in L))) - (sum(f.get('byggAnnars', 0) * f.get('byggN', 0) for f in L) / max(1, sum(f.get('byggN', 0) for f in L)))),
         'drop_traff': 100 * hits / max(1, n_dr), 'drop_falska': 10 * falska / drop_min, 'drop_ms': med(ms, 1500.0),
         'gr_ratt': 100 * mix['grRatt'] / max(1, mix['skarvar']), 'gr_falska': 10 * mix['grFalsk'] / mix['min'],
         # informativt (natt 11-10): gridfel i variantens EGNA låsta fönster (gamla måttet; 'gridfel' byts mot basens fönster i mat()) + 2/3-hoppen

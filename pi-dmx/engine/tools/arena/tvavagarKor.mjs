@@ -71,7 +71,7 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
   const GRID_RISE_DB = 6, SKIFT_DB = 5;
   for (const path of list) {
     const y = readWav(path); const C = chain(); const H = Math.floor(y.length / HOP); const buf = new Float32Array(HOP);
-    const secAt = [], lvl = []; let acc = 0, accN = 0;
+    const secAt = [], buAt = [], lvl = []; let acc = 0, accN = 0;
     const dbR = new Float64Array(16); let armed = true, lastOn = -1e9;
     const winErr = []; let winStart = -1, winBpm = 0, winOk = false; const gridErr = [];
     // SAMMA FÖNSTER (natt 11-10): alla fönsters fasfel (gridW[w]) + de egna låsta fönstren (gridOk) -> tvavagar.py mäter varianten i BASENS fönster
@@ -97,7 +97,7 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
           }
         }
       }
-      if (h % Math.round(100 / HMS) === 0) secAt.push(fr.section);
+      if (h % Math.round(100 / HMS) === 0) { secAt.push(fr.section); buAt.push(fr.buildUp ?? 0); }
     }
     const W = 12, L = lvl.length; const diff = new Float64Array(L);
     for (let i = W; i < L - W; i++) { let a = 0, c = 0; for (let k = 1; k <= W; k++) { a += lvl[i - k]; c += lvl[i + k - 1]; } diff[i] = (c - a) / W; }
@@ -119,6 +119,9 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
     let segs = 0, short = 0, changes = 0, st = 0;
     for (let i = 1; i <= secAt.length; i++) if (i === secAt.length || secAt[i] !== secAt[i - 1]) { segs++; if ((i - st) / 10 < 8) short++; if (i < secAt.length) changes++; st = i; }
     if (winStart >= 3) { gridW[winStart] = winErr.map((e) => +e.toFixed(1)); if (winOk) { gridErr.push(...winErr); gridOk.push(winStart); } }
+    // UPPBYGGNADEN (arenan bygg 11-11): frame.buildUp de 4 s FÖRE varje nivåskifte uppåt mot resten av filen (utom -6..+2 s kring dem)
+    { const ups = shifts.filter((s) => s[1] > 0).map((s) => s[0]); f.byggFore = ups.map((t) => { let a = 0, c = 0; for (let i = Math.max(0, Math.round((t - 4) * 10)); i < Math.min(buAt.length, Math.round(t * 10)); i++) { a += buAt[i]; c++; } return c ? +(a / c).toFixed(4) : 0; });
+      let a = 0, c = 0; for (let i = 0; i < buAt.length; i++) { const t = i / 10; if (!ups.some((u) => t >= u - 6 && t <= u + 2)) { a += buAt[i]; c++; } } f.byggAnnars = c ? +(a / c).toFixed(4) : 0; f.byggN = c; }
     Object.assign(f, { segs, short, changes, grid: gridErr.map((e) => +e.toFixed(1)), gridW, gridOk, drops: C.drops, minis: C.minis, bounds: C.bounds });
     out.push(f);
   }
