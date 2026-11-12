@@ -58,6 +58,7 @@ def sparr(m, b):
     for k, typ, tol, *golv in SPEC['sparrar']:   # golv = minsta tolerans i absoluta tal (i fas/motfas: 1 pe, som domaren)
         if not (isinstance(m.get(k), (int, float)) and isinstance(b.get(k), (int, float))): continue
         if typ.endswith('rel'): tol = max(abs(b[k]) * tol, golv[0] if golv else 0)
+        if typ.endswith('abs'): tol = max(tol, b[k] + (golv[0] if golv else 0)) - b[k] if typ[:3] == 'max' else b[k] - min(tol, b[k] - (golv[0] if golv else 0))   # 'maxabs'/'minabs': tol = FAST gräns (t.ex. 4,0 s), golv = aldrig strängare än bas +- golv
         if (typ[:3] == 'max' and m[k] > b[k] + tol) or (typ[:3] == 'min' and m[k] < b[k] - tol): f.add(k)
     return f
 
