@@ -1,5 +1,72 @@
 # Natt-agentens uppdrag
 
+## ARENA I NATT 2026-11-12 -> 11-13: KLOCKAN HÅLLER EN TOLKNING (ägaren 11-12 em: "Det borde gå till en arena i natt. Hur förbättrar vi analysatorns klocka") - GÅR FÖRE ALLT UTOM HÄLSAN
+Kör skillen dmx-arena (körning `.arena/klocka2`). EN arena, inget annat tungt i natt. Ingen deploy, ingen push, inget skrivs i lotus-light-link.
+
+VARFÖR NU: i lotus väljs sedan i dag fade in, lead och fall ur klockans tempo (onsetRiseK, effektFallMs). Mätt i källaren 11-12 ~13:30:
+på en låt växlade klockan 94 <-> 126 BPM (förhållandet 4:3) ungefär var 10:e sekund med låsningen av/på -> leaden hoppade 128 <-> 96 ms och
+falltiden ~2200 <-> ~1540 ms. Tidigare samma dag: tempot hoppade 81-150 med låsning ~35 % på en lugn låt. Tempovalen blir aldrig
+stadigare än tempot.
+
+VAD SOM ÄR MÄTT (bas = engine/src i dag, 4d45a07 + todo):
+- lotusbank 463/503 rätt. De 40 felen: 4/3 = 16, annat = 14, 3/2 = 7, dubbla = 2, halva = 1. Syskontempon (4:3 och 3:2) är alltså
+  23 av 40 fel - samma familj som växlingen i källaren. Syntet 6/8 (2 dubbla).
+- DMX: utflykter 1,00/min, tid i utflykt 2,93 % (127,6 min, tools/tempoHoppDiag.mjs + tempoHoppUtflykt.mjs, mängderna i
+  tools/natt/flerhypotes-2026-11-10.md). Analysdomaren: mix_klocka 97,9 / 83,4 % (övning / kontroll), mix_hopp 0 / 0,67 per min,
+  mix_las 2,78 / 3,02 s, mix_still 2,93 / 3,72 s, klipp_klocka 98,3 / 85,8 %.
+- Förra försöket fh1 (139 hypoteser med bevissumma, prov/flerhypotes-fh1-20261110.patch, rapporten ovan): utflykter 1,00 -> 0,26/min,
+  lotusbank 468, men FÖLL på svaga låtstarter (kallstart kontroll 6,5 -> 10,8 s), mix_still kontroll 3,72 -> 8,51, ned_s sämre.
+  Lärdom: flaskhalsen är BEVIS vid svaga låtstarter; varje regel som sänker ribban när regenten ser död ut släpper in utflykterna igen.
+- INGEN INSPELNING AV KÄLLARLÅTEN: lotus inspelare är avstängd (LOTUS_RECORDER, ägarens brytare 10-04) och låten hann ta slut.
+  Fallet får i stället sökas i korpusen: lotus bench.mjs ger per fil klockans tempo (min/max/q25/q75 över klippet). Filer där
+  spannet rymmer ett syskontempo är samma fel som i källaren - lista dem ur basens körning innan arenan startar.
+
+UPPGIFTEN (uppgift.md, ägarens ord överst ordagrant): klockan i den delade analysatorn ska hålla EN tempotolkning genom en låt.
+(1) Färre växlingar mellan syskontempon (4:3, 3:4, 3:2, 2:3, dubbla, halva) inom en låt. (2) Rätt tolkning oftare (lotusbankens
+4/3- och 3/2-fel). (3) Utan att låsningen efter låtbyte eller vid svaga låtstarter blir långsammare. Analysatorn MÄTER bara: ingen
+utjämning som finns till för ljusets skull; en hållregel ska kunna motiveras som musikanalys (takter/fraser ur klockan, bevis över tid).
+
+DOMAREN (bygg FÖRE körningen som `tools/arena/klockdom.py`, analysmått enbart - ägarens regel 11-10; ljusmått diskar inte):
+- Sätt ihop den av det som finns, bygg inga nya mätmetoder där en finns: tvavagar.py:s tempojobb (mix_klocka, mix_las, mix_hopp,
+  mix_still, klipp_klocka via tvavagarKor.mjs), tempoHoppDiag.mjs + tempoHoppUtflykt.mjs på de långa inspelningarna (utfl_min,
+  utfl_tid), lotusbank.py (lotus_ratt = korpus ok; lotus_syskon = antal i klasserna 4/3 + 3/2 + dubbla + halva).
+- NYTT MÅTT syskon_tid: andel av tiden (långa inspelningar + mixen) då klockan står på ett syskontempo till filens facit/dominerande
+  tempo (±4 %). Fångar både växling och att sitta fel.
+- NYTT MÅTT lotus_vaxling: antal korpusfiler (lotusbankens körning, per fil ur bench.mjs) där klockans tempo inom klippet
+  spänner över ett syskontempo (q25..q75 eller min..max efter uppvärmningen, välj det som skiljer bäst hos bas och skriv vilket).
+  Det är källarfelet mätt på inspelat material. lotus-light-link LÄSES bara.
+- Poäng: varje mått i % mot bas (riktningen inräknad, golv som i tvavagar.py), lika vikt. Rundornas lotusbank körs med --snabb
+  (126 filer); finalen med hela 503 + kontrollmängden.
+- SPÄRRAR (DISK): lotus_ratt < bas; syntet < bas; lotusbanks egen spärr (on-beat-recall, fas); mix_las eller mix_still sämre än
+  bas + 0,3 s; klipp_klocka sämre än bas - 1 procentenhet; upp_s/ned_s sämre än bas + 0,1 s och andelen 'high' > bas + 10 pe
+  (tvavagar.py, körs på finalisterna); workerns taktväg p99 och kostnad som i tvavagar.py; nya objekt per hop i heta loopar.
+- Kontrollera före start: kopia = bas +0,0 på alla mått, och att bas mot bas är stabilt (kör basen två gånger).
+- Säg domarens sammansättning på en rad i rapporten. Ändra den inte under körningen.
+
+TILLÅTNA FILER i deltagarens kopia: src/analyserClock.ts, src/analyser.ts (tempodelen: tempogram, kandidater, taktmatning),
+src/split.ts, src/slowWorker.ts. Inte effects.ts, inte output.ts, inte profilen, inte tools/. Övriga fält i ramen orörda
+(sektion, drop, kick, nivåer: tvavagar.py:s övriga mått ska stå på +0,0 hos finalisterna). Kodens standard, inga flaggor.
+
+DELTAGARE: 5 (k1..k5), högst 3 mätningar var (klockdom.py --mat; egna sonder som bara kör klockan på övningsfilerna är fria).
+Kontrollmängden får ingen mäta mot. STRATEGIKORTEN (olika MEKANISMER, inte olika värden):
+- k1 SYSKONFAMILJEN SOM EN HYPOTES: tempon i förhållandena 4:3, 3:2 och 2:1 behandlas som EN familj. Familjen följs som i dag;
+  vilken medlem som regerar avgörs för sig, med bevis över takter (inte sekunder), och byts bara när en annan medlem vunnit en hel fras.
+- k2 TVÅ TIDSSKALOR: ett långt fönster (8-16 s) väljer TOLKNING, det korta följer tempot inom ±3 % av den. Låtgränsen
+  (hintTrackChange) öppnar valet på nytt; annars ligger tolkningen fast.
+- k3 SLAGENS PASSFORM: tolkningen väljs av hur basanslagen faller mot rutnätet. Med fel 4:3-tolkning hamnar anslagen i ett
+  återkommande mönster mellan slagen; mät andelen anslag på slaget och mönstrets period för varje syskon och välj den som bär slagen.
+- k4 FH1 MED LÅTSTARTEN LÖST: utgå från prov/flerhypotes-fh1-20261110.patch. Före första säkra låsningen i en låt gäller dagens
+  snabba väg; flerhypotesläget styr bara BYTEN efter låsning. Målet är fh1:s utflykter utan fh1:s långsamma starter.
+- k5 UNDERDELNINGEN: 4:3 och 3:2 uppstår vid trioler och punkterade rytmer. Mät var anslagen faller INOM slaget (tredjedelar mot
+  fjärdedelar) och använd det för att avgöra vilket syskon som är taktens puls.
+Runda 2 = fusion av topp 3 om de angriper olika delar (skillens steg 4b), annars attackrundan. Final på kontrollmängden.
+
+EFTER FINALEN: vinnaren läggs i src/ BARA om den klarar alla spärrar på båda mängderna. Annars: ingen vinnare, patchar + mått i
+idébanken (tools/natt/arena-2026-11-12-klocka2/, ALLA deltagares diff + vunna mått), "prova ensam" för måttvinnare. Vid vinnare:
+commit med pathspec, manifestet (python tools/analyser_shared.py --write src), bygg dist, skriv "redo för huvudchatten att porta
+till lotus" - huvudchatten portar och lägger ut i källaren. Rapport: tools/natt/arena-2026-11-12-klocka2/RAPPORT.md, siffror före ord,
+tokenåtgång och tid. Skriv också vad som INTE gick och varför.
+
 ## LÄGET 2026-11-12 (huvudchatten, ägaren: 'vi måste väl lösa det som arenan försökte lösa också?' + fade-planen) - LÄS FÖRST
 - INLAGT I DAG, INGET DEPLOYAT I LADAN (kodens standard, inga flaggor):
   (1) SEKTIONENS SNABBA KANTER i analysatorn (272aac7): rangen väljer VILKA partier som är 'high', en nivåkant på SEC_EDGE_DB = 4 dB
