@@ -15,6 +15,20 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-12 ARENAN KLOCKA2: två kandidater för klockan (k4b, k2c) - INGEN delad fil ändrad, ägarens val väntar
+Vad: arenan 'klockan håller en tolkning' (tools/natt/arena-2026-11-12-klocka2/RAPPORT.md). Två varianter av analyserClock.ts klarar alla
+spärrar på båda mängderna men är INTE inlagda (kom till via lagningsomgångar; ägaren/huvudchatten väljer): k4b (fel tempo/min 1,39 -> 0,78,
+tempobyten i mixen 0,67 -> 0,36, lotusbanken 463 -> 468 med 4/3-felen 16 -> 13; lotus fas median 0,89 -> 0,88, motfas 20 -> 23, i fas
+266 -> 273) och k2c (tid i utflykt 4,66 -> 3,88 %, källarklippens tempobyten 3,97 -> 2,98 /min, lotus_vaxling 82 -> 74 filer; lotusbanken
+463, fas som bas). Källarens 94 <-> 126-växling är INTE löst med marginal: växlingarna är inte exakta syskon och går till ohörda tempon,
+så de ser ut som en svag låtstart; varje håll som tar dem (k2/k2b: 3,97 -> 1,56) fördröjer låtbytet (mix_still 3,72 -> 8,20 / 4,22 s).
+FYND OM KLOCKAN: fintempot i onsetStep går mellan 0,5 %-grannar (93,4/93,9/94,4 = 1,06 % isär) kring ett stillastående tempogram, i
+basen också - det är det som avgör mix_still, inte låsningen. k4b:s hysteres (granntempo måste passa 6 % bättre) dämpar det.
+Var: analyserClock.ts (tgStep, onsetStep). Material: tools/natt/arena-2026-11-12-klocka2/{k4b,k2c,samrad-1}.diff, kallaren-urval.json
+(12 källarklipp, 7 återskapar växlingen), lotus-syskonspann-final.md (82 korpusfiler där klockan spänner över ett syskontempo).
+Önskat: inget för lotus förrän ägaren valt; då portar huvudchatten. Lotus-morgonagenten: lägg inte in någon av dem på eget initiativ.
+Status:
+
 ## ÖPPET 2026-11-11 TEMPOHOPPEN (f757d7d) på nattbänkens mått: låsningen +0,3 s, sektion ned 5,7 -> 11,5 s - INGEN delad fil ändrad i natt
 Vad: natt.py före/efter f757d7d (enda src-commit mellan 7b0724b och a9fb87a). Tempomixen (tempoMix.mjs, 161 korpusklipp skarvade, katalogfacit):
 rätt tempo 89,5 -> 89,3 %, lås efter låtbyte 1,93 -> 2,23 s, hopp inom låt 0,57 -> 0,61 /min, inom 5 s 144 -> 146/161 - alltså ingen vinst

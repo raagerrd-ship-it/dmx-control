@@ -8,7 +8,25 @@ STARTAD I FÖRVÄG AV ÄGAREN 2026-11-12 ~16:50 ('Kör igång nattagenten nu'). 
 - Den schemalagda körningen 02:38: står här PÅGÅR eller finns låsfilen .arena/.banklas -> kör INGA bänkar och ingen arena, vänta inte,
   skriv bara en rad i nattrapporten och avsluta. Står här KLAR -> kör INTE arenan igen; gör bara en ny baslinje på HEAD om arenan lade
   in en vinnare (annars ingenting tungt) och sammanfatta arenans rapport i nattrapporten.
-ARENAN KLOCKA2 PÅGÅR sedan 2026-11-12 16:50
+ARENAN KLOCKA2 KLAR 2026-11-12 23:40: INGEN VARIANT INLAGD I src/ (ägarens/huvudchattens val). Två klarar alla spärrar på båda
+mängderna: k4b +8,25 och k2c +7,72 på kontrollmängden (övning +8,51 / +9,24) - men via lagningsomgångar där kontrollmängden använts som
+återkoppling, och med lotus-marginalerna som ändrades under körningen (ägaren 22:12/22:16/22:22). Rapport + idébank (alla diffar,
+samrådets förslag/svar): tools/natt/arena-2026-11-12-klocka2/RAPPORT.md. Domaren: tools/arena/klockdom.py.
+- VAL FÖR ÄGAREN: k4b (DMX-måtten kontroll +10,2 i medel: fel tempo/min -44 %, tempobyten i mixen -46 %, lotusbanken 463 -> 468; kostar
+  tid i utflykt +8 %, lotus motfas 20 -> 23) eller k2c (DMX +6,8: tid i utflykt -17 %, källarens byten -25 %, mix_still bättre än bas,
+  inget mått klart under bas). `git apply` k4b.diff / k2c.diff mot 97ac0bf; sedan ljusdomaren med fast look (KR_MODE; lampspridningen
+  -6 % i tvavagar är lookföljden), `analyser_shared.py --write src`, och huvudchatten portar till lotus.
+- IDÉBANK klocka2: samrad-1 (k2c + k4b:s två ändringar i onsetStep: blippspärr + fintempots hysteres) - utfl_min 0,82 -> 0,24,
+  utfl_tid 2,11 -> 1,21, syskon_tid 2,67 -> 1,01 på övningen, DISK bara på mix_still 3,95 - prova ensam NÄR MIX_STILL MÄTS ROBUST.
+- IDÉBANK klocka2: MIX_STILL ÄR ETT LOTTERI VID GRÄNSEN (samrådets fynd): tempoBpm identiskt med bas, men klockans fintempo går mellan
+  0,5 %-grannar (93,4/93,9/94,4 = 1,06 % isär) och kravet +-1 % i 5 s spricker på ETT prov; basen klarar övningen med exakt 9 av 16
+  låtar. Gör måttet robust (andel låtar under gränsen, eller tåla en grannstegsväxling) FÖRE nästa klockarena.
+- IDÉBANK klocka2: k3 slagens passform som veto - lotusbanken 116 -> 121, syskonfel 5 -> 3 (övning), föll på mix_still + lotus i fas -
+  prova ensam mot lotusbanken. k2:s riktade krona (k2s1/src, en rad i onsetStep): låt 9 8,3 -> 2,5 s - prova med nytt mått.
+- KÄLLARFELET ÄR INTE LÖST MED MARGINAL: källarens växlingar är inte exakta syskon och går till ohörda tempon = ser ut som en svag
+  låtstart; samma håll som ger källarvinsten (k2/k2b/fusion 3,97 -> 1,56) fördröjer låtbytet (mix_still 8,20 / 4,22). Behöver
+  låtgränsen eller en annan signal än klockans egen.
+- Den schemalagda 02:38-körningen: kör INTE arenan igen, ingen ny baslinje behövs (src orörd = 97ac0bf).
 
 
 FÖRE BASMÄTNINGEN: bygg om engine/dist (`npx tsc -p tsconfig.json`) och kontrollera `git status --short src` = tomt. Ägaren var i
