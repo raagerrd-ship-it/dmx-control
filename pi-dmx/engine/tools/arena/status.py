@@ -113,6 +113,18 @@ print('|---|' + '---|' * len(kol))
 print('| Läge | ' + ' | '.join(c[1] for c in kol) + ' |')
 for k, rubrik, n, _r in SPEC['rader']: print('| %s | ' % rubrik + ' | '.join(v(c, k, n) for c in kol) + ' |')
 print('| Spärr | ' + ' | '.join('–' if c[3] is None else ('Ja' if c[3] else 'Nej') for c in kol) + ' |')
+# RANKINGRADEN (ägaren 11-12): domarens plats och poäng längst ner, ur ranking*.md (kontrollmängdens ranking för KONTROLL-kolumnerna)
+rank = {False: {}, True: {}}
+for f in sorted(glob.glob(os.path.join(K, 'ranking*.md')), key=os.path.getmtime):
+    hold = 'holdout' in os.path.basename(f) or 'kontroll' in os.path.basename(f)
+    for l in io.open(f, encoding='utf-8'):
+        m = re.match(r'\|\s*(\d+)\s*\|\s*([^|]+?)\s*\|\s*([+-]?[\d.,]+)\s*\|', l)
+        if m: rank[hold][m.group(2)] = (m.group(1), m.group(3).replace('.', ','))
+def rk(c):
+    hold = 'KONTROLL' in c[0]; n = c[0].replace(' KONTROLL', ''); n = 'fusion' + n[5:] if n.startswith('joker') else n
+    r = rank[hold].get(n)
+    return '%s (%s)' % r if r else '–'
+print('| Ranking (poäng) | ' + ' | '.join(rk(c) for c in kol) + ' |')
 print()
 for f in sorted(glob.glob(os.path.join(K, 'ranking*.md'))):
     rows = [l for l in io.open(f, encoding='utf-8') if re.match(r'\| \d+ \|', l)]
