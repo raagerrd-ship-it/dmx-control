@@ -48,6 +48,15 @@ VAD SOM ÄR MÄTT (bas = engine/src i dag, 4d45a07 + todo):
 - KORPUSEN har samma fel: lotus bench.mjs ger per fil klockans tempo (min/max/q25/q75 över klippet). Filer där spannet rymmer ett
   syskontempo är källarfelet på inspelat material - lista dem ur basens körning innan arenan startar.
 
+STÄDAT FÖRE ARENAN 11-12 16:45 (ägaren: 'Är det bättre att rensa först och sen starta arenan?'): död tempokod bort ur analysatorn
+(dmx 97ac0bf, lotus b65b8105 + utlagt på lotus-Pi:n md5 analyser.js 0b057e87): analyser.ts 3295 -> 2971 rader (163 kod, 147 kommentar),
+frame.kickRise borta, sex olästa profilflaggor borta i båda profilerna (TEMPO_LAGMAX, GHOST_WAIT, SUBH_GUARD, SECTION_HINT_LOWCONF,
+OCT_UP, SUBH_MULT). analyserClock.ts ORÖRD. Bevis: DMX-md5 identiskt hela filer (sync/inline/moments), tvavagar --snabb IDENTISK,
+lotusbank 463/503 alla fält lika (agentens körning + min egen på slutläget). KARTANS RADNUMMER I analyser.ts ÄR FÖRSKJUTNA efter
+städningen (klockfilens stämmer). Kvar efter arenan: kartans 4.5-4.9 (verktygslästa fält, resetTempo/resetBar, env-ringarna,
+trådkoden, F_SIL-kedjan). FYND: SIL_CLEAR_PENDING saknar läsare (nollning av väntande kickar vid tystnad gäller inte) - ägarbeslut.
+LADAN ligger en commit efter HEAD (städningen, identiskt beteende); nästa besök: `ladan.py --bara-deploy`.
+
 KARTAN ÖVER LEVANDE TEMPOKOD (läs den och ge den till deltagarna i uppgift.md): tools/natt/arena-2026-11-12-klocka2/KARTA.md (11-12 em).
 - ALL temposökning bor i analyserClock.ts (tgStep, tgScore, peakVote, peakScore, onsetStep, ca rad 219-405). analyser.ts har INGEN levande
   temposökning: det som där heter tempoGram, bpmHist, octaveVote, cand, evidence, shift, OCT_UP, SUBH, GHOST, UP43, FIVE4 är dött
