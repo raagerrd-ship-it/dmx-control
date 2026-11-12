@@ -1,0 +1,423 @@
+--- a/src/analyser.ts
++++ b/src/analyser.ts
+@@ -21,15 +21,15 @@
+ export const BASS_SPAN_DB = 36;
+ import {
+   REC_LEN, RING_N, R_SEQ, R_PERF, R_WALL, R_ENV, R_BASS, R_HIGH, R_FLAGS, R_HINT_MS, R_VCLOCK, R_SEC_N, R_SEC_INT, R_SEC_KICKS, R_SEC_BREAK,
+-  R_SEC_RMS2, R_SEC_CENT, R_SEC_DT, R_DROPS, R_ACTIVE, R_BUILD, R_SEC_SPEC0, R_SEC_WALL, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, R_SEC_BON, R_SEC_BPK, R_SEC_FLUX, R_SEC_RMS4,
++  R_SEC_RMS2, R_SEC_CENT, R_SEC_DT, R_DROPS, R_ACTIVE, R_SEC_SPEC0, R_SEC_WALL, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, R_SEC_BON, R_SEC_BPK, R_SEC_FLUX, R_SEC_RMS4,
+   packFlagCounts, lostFlags, seqLow, seqDelta, C_WAITING, C_STATE_SEQ, S_LOST_FLAGS,
+   F_SIL350, F_SIL10, F_RESET_TEMPO, F_HINT, F_RESET_BAR, F_VCLOCK_SET, F_VCLOCK_NULL,
+   C_WRITE, C_READ, S_REC_SEQ, S_BPM, S_CONF, S_BPMF, S_PHASE_MS, S_PHASE_CONF, S_SECTION, S_SEC_START, S_SEC_INDEX, S_SEC_TIER,
+-  S_REP_SIM, S_REP_AGO, S_REP_SEC, S_EXPECT_MS, S_EXPECT_SRC, S_PREV_SEC, S_LVL_HIGH, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
++  S_REP_SIM, S_REP_AGO, S_REP_SEC, S_EXPECT_MS, S_EXPECT_SRC, S_PREV_SEC, S_LVL_HIGH, S_BUILD, S_RISER, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
+   SECTIONS, sectionCode, viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
+   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader, type HopFeed,
+   R_BIGSEQ, R_CLOCK, R_CLOCK_CONF, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N, B_RMS, B_LVL, B_CENT, B_ACTIVE, B_WALL, B_KICK, B_KICKHIT, B_INT, B_BREAK, B_SEC, B_LVH, B_CONF,
+-  B_ENVF, B_ENVBPM, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY, BS_DROPS, BS_MINI, BS_BUILD, BS_RISER, BS_PUNCH, BS_BASS, BS_BRIGHT, BS_BEAT,
++  B_ENVF, B_ENVBPM, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY, BS_DROPS, BS_MINI, BS_PUNCH, BS_BASS, BS_BRIGHT, BS_BEAT,
+   BS_BASSLINE, BS_SPEC_N, BS_SKIPPED, BS_CAND, BS_DEMOTED, BS_SPACED, BS_DROPRISE, BS_NEAR, BS_NEARDIP, BS_LIFT, BS_STOPS, BS_STOPSEC, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
+ } from './split.js';
+ import FFT from "fft.js";
+@@ -283,9 +283,8 @@
+  *  (ladan 2026-09-24 23:00: 'varfor ar den sa seg pa att komma igang i refrangen?'). 0 = lassslappet ror bara tempot. Standard = som forr. */
+ const SECTION_HINT_LOWCONF = sysEnv('SECTION_HINT_LOWCONF') !== '0';
+ const DROP_UNDERPEAK_MIN = Number(env('DROP_UNDERPEAK_MIN') ?? 0);   // se 'INTE I TAKET'
+-/** STRIKT INTRO (opt-in DROP_CALM_INTRO_STRICT=1, kraver <prefix>DROP_CALM_GATE): i 'intro' fyrar en drop bara efter riser (buildUp >= DROP_CALM_BUILD). */
++/** STRIKT INTRO (opt-in DROP_CALM_INTRO_STRICT=1, kraver <prefix>DROP_CALM_GATE): i 'intro' fyrar ingen drop i lugnt läge (riser-undantaget buildUp >= 0,25 nåddes aldrig vid en kandidat; borta 11-11). */
+ const DROP_CALM_DB = 6;
+-const DROP_CALM_BUILD = 0.25;
+ const DROP_CALM_Q = 1.5;
+ const DROP_CALM_RISE_DB = 8;
+ const DROP_CALM_LAND_MS = 0;
+@@ -342,7 +341,7 @@
+ const DOUBLE_FROM_START = [
+   'secHiStartMs', 'expectHighMs', 'levelVsHighDb',
+   'sumSq', 'lastT', 'dbgRms', 'lastKick', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum', 'lvlSmooth', 'lvlVU', 'engSmooth', 'activeMs',
+-  'buildUp', 'novSlow', 'kickHit', 'snareHit', 'hatHit', 'bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs',
++  'buildUp', 'slMs', 'slRms2', 'slHi', 'slCent', 'slRamp', 'kickHit', 'snareHit', 'hatHit', 'bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs',
+   'lastMiniGoneMs', 'lastMiniMs', 'pendingKickMs', 'pendingKickW', 'kfPrev', 'kfPrev2', 'beatAnchorMs',
+   'blPrev1', 'blPrev2', 'blTrough', 'profBassline', 'bassOnsetsPerBeat',
+   'lastConfMs', 'lastVoteMs', 'lowConfSinceMs', 'newSongVote', 'lockPeak', 'nearChallenger', 'octaveVote', 'rawBpmLast', 'localBpmConfidence',
+@@ -643,7 +642,7 @@
+   private secLog: Array<{ label: string; startMs: number; endMs: number; db: number; dens: number }> = [];
+   private secCurDbSum = 0; private secCurDbN = 0; private secCurDens = 0; private lastHighDb = NaN;
+   private secBlkMs = 0; private secBlkN = 0; private secBlkInt = 0; private secBlkKicks = 0; private secBlkCent = 0; private secBlkSpec = new Float32Array(8);
+-  private secTierRun = 0; private secTierCand = 1; private secRiseRun = 0; private secSongStartMs = 0; private secDropSeen = 0; private secSilentBlocks = 0; private secDropHoldUntil = 0;
++  private secTierRun = 0; private secTierCand = 1; private secRiseRun = 0; private secSongStartMs = 0; private secDropSeen = 0; private secSilentBlocks = 0; private secDropHoldUntil = 0; private secLifted = false; private secFallen = false;
+   private secHist = new Float32Array(16); private secHistPos = 0; private secHistN = 0;
+   private static readonly FP_DIM = 11; private static readonly FP_MAX = 96;
+   private secFp = new Float32Array(Analyser.FP_MAX * Analyser.FP_DIM); private secFpT = new Float64Array(Analyser.FP_MAX); private secFpLab: string[] = [];
+@@ -734,7 +733,7 @@
+   private hInZone = false; private hBreaking = false; private hInRiser = false; private hKickAt = 0.5;
+   /** sectionHop:s summor (samma skäl): anroparen fyller, sectionHop läser. */
+   private shIn = { hops: 0.5, intSum: 0.5, kicks: 0.5, breaking: false, nowMs: 0.5, dtMs: 0.5, rms2Sum: 0.5, centSum: 0.5, specOff: 0.5, bonSum: 0.5, bpk: 0.5, fluxSum: 0.5, rms4Sum: 0.5 };
+-  private secAgg = { n: 0, int: 0, kicks: 0, breaking: 0, rms2: 0, cent: 0, dt: 0, wall: 0, drops: 0, active: 0, build: 0, spec: new Float64Array(8), bon: 0, bpk: 0, flux: 0, rms4: 0 };
++  private secAgg = { n: 0, int: 0, kicks: 0, breaking: 0, rms2: 0, cent: 0, dt: 0, wall: 0, drops: 0, active: 0, spec: new Float64Array(8), bon: 0, bpk: 0, flux: 0, rms4: 0 };
+   private inlinePeer: Analyser | null = null;
+   /** STORA VÄGEN (split.ts, a3): 2048-FFT, drop, riser, profil, basgång och sektionsaggregat i långsamma tråden, ett record per hop.
+    *  fast: skriver recordet och läser tillbaka; slow: kör stegen. Bara med FAST_BANDS + SECTION_AGG 'hop' och split-buffertarna. */
+@@ -920,7 +919,7 @@
+   private aAtt = 0; private aRel = 0; private aVU = 0;
+   private aIUp = 0; private aIDown = 0; private aBandLvl = 0;
+   private dHat = 0; private dSnare = 0; private dKick = 0;
+-  private aSpecSlow = 0; private aNovSlow = 0; private aProf = 0;
++  private aProf = 0;
+   // Pre-allokerade scratchpads för computeBpm (GC-skydd; annars 4× Float32Array/anrop).
+   private envScratch = new Float32Array(Analyser.ENV_LEN);
+   private envPosScratch = new Float32Array(Analyser.ENV_LEN);
+@@ -1097,12 +1096,16 @@
+   /** ~1,5 s vid 125 Hz. MAD startar i noll efter tystnad och byggs upp med
+    *  `mad ← 1.006·mad + 6e-5`, vilket tar ≈183 rutor att nå ett användbart värde. */
+   private static readonly ONSET_WARM = 183;
+-  private specSlow = new Float32Array(8);
+-  private novSlow = 0;           // ihållande spektral novelty (~1.5s)
+-  private novBaseline = 0.2;     // ~8s baslinje → riser = novelty STIGER över den
+-  private centSlow = 0.3;
+-  private lvlSlowR = 0.3;
+-  private buildUp = 0;           // 0..1 uppbyggnads-envelope
++  /** LUTNINGEN (arenan bygg 2026-11-11): nivå (dB), diskant (dB, treble+air) och centroid per SLAG (klockans slag som tidsenhet),
++   *  de SLOPE_N senaste slagen = två takter. Stigningen över fönstret = Theil-Sen-lutningen (medianen av alla parlutningar: ett
++   *  par avvikande slag - ett stopp, ett fill - flyttar den inte) gånger fönstret. Mäts en gång per slag på sektionssidan
++   *  (sectionHop -> slopeBeat) och läses av uppbyggnaden (buildUp/inRiser) och av sektionen (höjning/fall). */
++  private static readonly SLOPE_N = 8;
++  private slL = new Float64Array(Analyser.SLOPE_N); private slH = new Float64Array(Analyser.SLOPE_N); private slC = new Float64Array(Analyser.SLOPE_N);
++  private slTmp = new Float64Array(Analyser.SLOPE_N); private slPair = new Float64Array(Analyser.SLOPE_N * (Analyser.SLOPE_N - 1) / 2);
++  private slN = 0; private slPos = 0; private slMs = 0; private slHops = 0; private slRms2 = 0; private slHi = 0; private slCent = 0;
++  private slRamp = 0; private slRun = 0; private slUpRun = 0; private slDnRun = 0; private slRaised = false; private slFell = false;
++  private buildUp = 0;           // 0..1: hur tydligt och hur länge klang och nivå stigit (slopeBeat)
+   // KARAKTÄRSPROFIL (långsam, ~8s)
+   private profPunch = 0.4;
+   private profBass = 0.5;
+@@ -1188,7 +1191,7 @@
+     this.section = 'intro'; this.sectionStartMs = 0; this.sectionIndex = 0; this.sectionTier = 1; this.repeatSim = 0; this.repeatAgoMs = 0; this.repeatSection = '';
+     this.secBlkMs = 0; this.secBlkN = 0; this.secBlkInt = 0; this.secBlkKicks = 0; this.secBlkCent = 0; this.secBlkSpec.fill(0);
+     this.secBlkBon = 0; this.secBlkBpk = 0; this.secBlkFlux = 0; this.secBlkRms4 = 0; const H = this.secBlkH; H.bon.length = 0; H.bpk.length = 0; H.high.length = 0; H.flat.length = 0; H.flux.length = 0; H.dyn.length = 0;
+-    this.secTierRun = 0; this.secTierCand = 1; this.secRiseRun = 0; this.secSongStartMs = 0; this.secBlkRms2 = 0; this.secBlkDb.length = 0; this.secBlkDens.length = 0; this.secBlkCentH.length = 0; this.secDropSeen = this.secDropsNow(); this.secSilentBlocks = 0; this.secDropHoldUntil = 0;
++    this.secTierRun = 0; this.secTierCand = 1; this.secRiseRun = 0; this.secSongStartMs = 0; this.secBlkRms2 = 0; this.secBlkDb.length = 0; this.secBlkDens.length = 0; this.secBlkCentH.length = 0; this.secDropSeen = this.secDropsNow(); this.secSilentBlocks = 0; this.secDropHoldUntil = 0; this.secLifted = false; this.secFallen = false;
+     this.secHistN = 0; this.secHistPos = 0; this.secFpN = 0; this.secFpPos = 0; this.secFpLab.length = 0; this.secFpAcc.fill(0); this.secFpAccN = 0;
+     this.secLog.length = 0; this.secCurDbSum = 0; this.secCurDbN = 0; this.secCurDens = 0; this.lastHighDb = NaN; this.expectHighMs = 0; this.expectSource = 0; this.prevSection = ''; this.levelVsHighDb = 0;
+     
+@@ -1209,6 +1212,7 @@
+     this.secBlkMs += dtMs; this.secBlkN += hops; this.secBlkInt += intSum; this.secBlkKicks += kicks; this.secBlkCent += centSum; this.secBlkRms2 += rms2Sum;
+     this.secBlkBon += bonSum; this.secBlkBpk += bpk; this.secBlkFlux += fluxSum; this.secBlkRms4 += rms4Sum;
+     for (let i = 0; i < 8; i++) this.secBlkSpec[i] += spec[specOff + i];
++    this.slopeHop(hops, dtMs, rms2Sum, centSum, spec[specOff + 6] + spec[specOff + 7]);
+     if (this.secBlkMs < 1000) return;
+     this.sectionBlock(nowMs, breaking);
+   }
+@@ -1247,16 +1251,29 @@
+     const rise = this.secHistN >= 9 ? bInt - this.secHist[(this.secHistPos - 9 + 16) & 15] : 0;
+     this.secRiseRun = rise >= 0.10 ? this.secRiseRun + 1 : 0;
+     const sinceStart = nowMs - this.secSongStartMs; const dropEv = this.secDropsNow(); const dropped = dropEv !== this.secDropSeen; this.secDropSeen = dropEv;
++    // HÖJNING / FALL (arenan bygg 11-11, slopeBeat): nivån har stigit/fallit >= SLOPE_STEP_DB över två takter sedan förra blocket.
++    // En höjning är samma bevis som basens återkomst (dropped): 'high' direkt. Partiet ÄR sedan höjt (secLifted) tills musiken
++    // faller eller rangen lägger det i låtens lägsta tredjedel; efter ett fall ÄR det fallet (secFallen) tills en ny höjning
++    // eller tills nivån är tillbaka vid refrängens (halva steget under dess medel) - rangens fönster bär annars refrängens block
++    // kvar och tog tillbaka 'high' efter några sekunder.
++    const raised = this.slRaised, fell = this.slFell && !raised; this.slRaised = false; this.slFell = false;
++    const lift = dropped || raised;
++    if (lift) { this.secLifted = true; this.secFallen = false; }
++    else if (fell) { this.secLifted = false; this.secFallen = this.section === 'high'; }
++    else {
++      if (this.secLifted && st === 0 && nowMs >= this.secDropHoldUntil) this.secLifted = false;
++      if (this.secFallen && blkDb >= this.lastHighDb - Analyser.SLOPE_STEP_DB / 2) this.secFallen = false;
++    }
+     const prev = this.section; let label: string;
+     {
+       // rang-lage: tier 2 = high, tier 0 = low, mitten = 'break' pa vag ner fran high, 'build' pa vag upp fran low/intro, annars kvar
+       // SECTION_BODY_HIGH aven i intro (DMX-fyndet 10-20: latgransen 0,1-7 s fore dropen nollade till intro, smallen nadde aldrig high):
+       // basen tillbaka = 'high' direkt och kvar tills rangen har 20 block.
+-      if (this.secBlkDb.length < 20) label = Analyser.BODY_HIGH_MS > 0 && (dropped || prev === 'high') ? 'high' : 'intro';
+-      else if (dropped || st === 2) label = 'high';
++      if (this.secBlkDb.length < 20) label = Analyser.BODY_HIGH_MS > 0 && (lift || prev === 'high') ? 'high' : 'intro';
++      else if (lift || (st === 2 && !this.secFallen)) label = 'high';
+       else if (st === 0) label = 'low';
+       else label = prev === 'high' || prev === 'break' ? 'break' : (prev === 'low' || prev === 'intro' || prev === 'build') ? 'build' : prev;
+-      if (label === 'high' && !dropped && prev !== 'high' && sinceStart < Analyser.SECTION_EARLY_S * 1000 && this.secBlkDb.length >= 4) {
++      if (label === 'high' && !lift && prev !== 'high' && sinceStart < Analyser.SECTION_EARLY_S * 1000 && this.secBlkDb.length >= 4) {
+         const D = this.secBlkDb, nb = D.length; const srt = D.slice().sort((a, b) => a - b); const med = srt[nb >> 1];
+         const m4 = (D[nb - 1] + D[nb - 2] + D[nb - 3] + D[nb - 4]) / 4;
+         if (m4 < med + Analyser.SECTION_EARLY_DB) label = prev === 'intro' || prev === 'low' || prev === 'build' ? 'build' : prev;
+@@ -1280,8 +1297,10 @@
+       // DROPEN HALLER HIGH (2026-11-03, DMX-fyndet 11-02: break med full bas efter dropen, high 66,2 -> break -> high 71,3 i ladan):
+       // dropped ger high i ett block, men rangens 4 s-fonster bar breakets block i RANK_WIN + RANK_RUN block till - sa lange halls
+       // 'high' efter en drop om tier >= 1; tier 0 slapper. Standard i koden sedan 11-03 (agaren; backup/fore-drop-hold-20261103).
+-      if (dropped && label === 'high') this.secDropHoldUntil = nowMs + (Analyser.RANK_WIN + Analyser.RANK_RUN) * 1000;
+-      else if (prev === 'high' && label !== 'high' && st >= 1 && nowMs < this.secDropHoldUntil) label = 'high';
++      if (lift && label === 'high') this.secDropHoldUntil = nowMs + (Analyser.RANK_WIN + Analyser.RANK_RUN) * 1000;
++      else if (prev === 'high' && label !== 'high' && st >= 1 && (nowMs < this.secDropHoldUntil || this.secLifted)) label = 'high';
++      // FALLET LÄMNAR HIGH (11-11; lotus samma dag: 12 s 'high' genom ett tyst parti).
++      if (fell && prev === 'high') { label = 'break'; this.secDropHoldUntil = 0; }
+       // UTGANG VIA LAG (bit 128): det forflutnas high-SLUT + lag. Sa lange det forflutna fortfarande ar high halls high (st 1);
+       // nar slutet ar NU (-1,5..+1,5 s) och rangen inte langre sager high -> 'break' direkt (minnets grans i stallet for uppehallets slut).
+       // NIVAMINNE (LEVELREF, se flaggan): absolut referens fran refrang 1 i stallet for den troga percentilrangen. Drop vinner alltid.
+@@ -1291,7 +1310,7 @@
+     // sektion, utom in i 'high' (drop/topp ska synas direkt) och ur 'high' till 'break' (svackan ar en flank).
+     // uppehallstid 8 s (var 4: build/low/high bytte var 4 s pa pop 14:30), utom in i 'high' (4 s) och high -> break (direkt)
+     const dwellMs = label === 'high' ? 4000 : 8000;
+-    const dwellOk = nowMs - this.sectionStartMs >= dwellMs || (prev === 'high' && label === 'break') || (Analyser.BODY_HIGH_MS > 0 && dropped && label === 'high');
++    const dwellOk = nowMs - this.sectionStartMs >= dwellMs || (prev === 'high' && label === 'break') || (Analyser.BODY_HIGH_MS > 0 && lift && label === 'high');
+     if (label !== prev && dwellOk) {
+       // MINNE: avslutad sektion till loggen (medel-dB, kickar/s); refrangens dB blir referensen for levelVsHighDb.
+       const dbMean = this.secCurDbN ? this.secCurDbSum / this.secCurDbN : blkDb;
+@@ -1518,8 +1537,8 @@
+     for (let i = 0; i < 8; i++) r[o + R_SEC_SPEC0 + i] = g.spec[i];
+     r[o + R_SEC_BON] = g.bon; r[o + R_SEC_BPK] = g.bpk; r[o + R_SEC_FLUX] = g.flux; r[o + R_SEC_RMS4] = g.rms4;
+     // SECTION_AGG 'hop': fakta fran sista aggregerade hoppet (som sectionHop sag dem i odelat lage); 'env': vid skrivningen.
+-    if (SECTION_AGG_HOP) { r[o + R_DROPS] = g.drops; r[o + R_ACTIVE] = g.active; r[o + R_BUILD] = g.build; }
+-    else { r[o + R_DROPS] = this.dropCand + this.secBodyRet; r[o + R_ACTIVE] = this.activeMs; r[o + R_BUILD] = this.buildUp; }
++    if (SECTION_AGG_HOP) { r[o + R_DROPS] = g.drops; r[o + R_ACTIVE] = g.active; }
++    else { r[o + R_DROPS] = this.dropCand + this.secBodyRet; r[o + R_ACTIVE] = this.activeMs; }
+     r[o + R_FLAGCNT] = packFlagCounts(this.flagCnt);
+     r[o + R_CLOCK] = this.localBpm; r[o + R_CLOCK_CONF] = this.localBpmConfidence;   // EN KÄLLA (r0): klockans tempo/tillit till långsamma sidan
+     r[o + R_BIGSEQ] = this.bigSeq;                         // stora vägen: hop-record före detta (workern kör dem först)
+@@ -1545,6 +1564,7 @@
+     this.section = SECTIONS[s[S_SECTION]] || 'intro'; this.sectionStartMs = s[S_SEC_START]; this.sectionIndex = s[S_SEC_INDEX]; this.sectionTier = s[S_SEC_TIER];
+     this.repeatSim = s[S_REP_SIM]; this.repeatAgoMs = s[S_REP_AGO]; this.repeatSection = SECTIONS[s[S_REP_SEC]] || '';
+     this.expectHighMs = s[S_EXPECT_MS]; this.expectSource = s[S_EXPECT_SRC]; this.prevSection = SECTIONS[s[S_PREV_SEC]] || ''; this.levelVsHighDb = s[S_LVL_HIGH];
++    this.buildUp = s[S_BUILD]; this.hInRiser = s[S_RISER] === 1;
+   }
+   setInlinePeer(slow: Analyser | null): void { this.inlinePeer = slow; }
+   /** Halsa for /api/live: hur langt efter workern ligger (records och ms), dess kostnad per record, tappade records. */
+@@ -1597,6 +1617,7 @@
+         s[S_SECTION] = sectionCode(this.section); s[S_SEC_START] = this.sectionStartMs; s[S_SEC_INDEX] = this.sectionIndex; s[S_SEC_TIER] = this.sectionTier;
+         s[S_REP_SIM] = this.repeatSim; s[S_REP_AGO] = this.repeatAgoMs; s[S_REP_SEC] = sectionCode(this.repeatSection);
+         s[S_EXPECT_MS] = this.expectHighMs; s[S_EXPECT_SRC] = this.expectSource; s[S_PREV_SEC] = sectionCode(this.prevSection); s[S_LVL_HIGH] = this.levelVsHighDb;
++        s[S_BUILD] = this.buildUp; s[S_RISER] = this.hInRiser ? 1 : 0;
+         s[S_PROCESSED] = this.slowProcessed; s[S_LAG_MS] = lagMs; s[S_LAG_MAX] = this.slowLagMaxMs; s[S_BUSY_US] = this.slowBusyEmaUs; s[S_BUSY_MAX_US] = this.slowBusyMaxUs; s[S_SKIPPED] = this.slowSkipped; s[S_LOST_FLAGS] = this.slowLostFlags;
+       });
+       if (this.syncWorker) Atomics.notify(ctrl, C_STATE_SEQ);
+@@ -1623,7 +1644,7 @@
+     const s = this.bigCopy;
+     if (!this.bigRd.read(ctrl, this.bigState!, s, C_BIG_SEQ) || s[BS_SEQ] === 0) return;
+     this.hBody = s[BS_BODY]; this.dropCount = s[BS_DROPS]; this.miniDropCount = s[BS_MINI];
+-    this.dropDemoted = s[BS_DEMOTED]; this.dropSpaced = s[BS_SPACED]; this.dropRiseDb = s[BS_DROPRISE]; this.nearDropDb = s[BS_NEAR]; this.nearDipDb = s[BS_NEARDIP]; this.liftDb = s[BS_LIFT]; this.stopCount = s[BS_STOPS]; this.stopS = s[BS_STOPSEC]; this.buildUp = s[BS_BUILD]; this.hInRiser = s[BS_RISER] === 1;
++    this.dropDemoted = s[BS_DEMOTED]; this.dropSpaced = s[BS_SPACED]; this.dropRiseDb = s[BS_DROPRISE]; this.nearDropDb = s[BS_NEAR]; this.nearDipDb = s[BS_NEARDIP]; this.liftDb = s[BS_LIFT]; this.stopCount = s[BS_STOPS]; this.stopS = s[BS_STOPSEC];
+     const p = this.outProfile; p.punch = s[BS_PUNCH]; p.bass = s[BS_BASS]; p.bright = s[BS_BRIGHT]; p.beat = s[BS_BEAT]; p.bassline = s[BS_BASSLINE];
+     const sn = s[BS_SPEC_N];
+     if (sn > this.specDelivered) {
+@@ -1655,7 +1676,6 @@
+       this.hNowWall = wall; this.hBody = (this.bandDbRaw[0] + this.bandDbRaw[1] + this.bandDbRaw[2]) / 3;
+       this.dSec = SECTIONS[r[o + B_SEC]]; this.dLvh = r[o + B_LVH];
+       this.dropStep();
+-      this.hInRiser = this.riserStep();
+       this.dConf = r[o + B_CONF];
+       this.profileStep();
+       this.bigAgg(r[o + B_INT], r[o + B_KICK] === 1, r[o + B_BREAK] === 1, wall);
+@@ -1667,7 +1687,7 @@
+       const p = this.outProfile;
+       stateWrite(ctrl, this.bigState!, (s) => {
+         s[BS_SEQ] = this.bigSeq; s[BS_BODY] = this.hBody; s[BS_DROPS] = this.dropCount; s[BS_MINI] = this.miniDropCount; s[BS_CAND] = this.dropCand;
+-        s[BS_DEMOTED] = this.dropDemoted; s[BS_SPACED] = this.dropSpaced; s[BS_DROPRISE] = this.dropRiseDb; s[BS_NEAR] = this.nearDropDb; s[BS_NEARDIP] = this.nearDipDb; s[BS_LIFT] = this.liftDb; s[BS_STOPS] = this.stopCount; s[BS_STOPSEC] = this.stopS; s[BS_BUILD] = this.buildUp; s[BS_RISER] = this.hInRiser ? 1 : 0;
++        s[BS_DEMOTED] = this.dropDemoted; s[BS_SPACED] = this.dropSpaced; s[BS_DROPRISE] = this.dropRiseDb; s[BS_NEAR] = this.nearDropDb; s[BS_NEARDIP] = this.nearDipDb; s[BS_LIFT] = this.liftDb; s[BS_STOPS] = this.stopCount; s[BS_STOPSEC] = this.stopS;
+         s[BS_PUNCH] = p.punch; s[BS_BASS] = p.bass; s[BS_BRIGHT] = p.bright; s[BS_BEAT] = p.beat; s[BS_BASSLINE] = p.bassline; s[BS_SPEC_N] = this.specN; s[BS_SKIPPED] = this.bigSkipped;
+       }, C_BIG_SEQ);
+       if (this.syncWorker) Atomics.notify(ctrl, C_BIG_SEQ);
+@@ -1690,7 +1710,7 @@
+     const sp = this.secSpecHop;   // bandDbRaw ändras bara i bigStep (var 3:e hop): räkna om då, samma värden
+     if (this.secSpecDirty) { this.secSpecDirty = false; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.bandDbRaw[i] / 20); }
+     const g = this.secAgg; g.n++; g.int += intensity; if (kick) g.kicks++; g.rms2 += rms * rms; g.cent += this.centSmooth; g.dt += this.dtHop * 1000;
+-    g.breaking = breaking ? 1 : 0; g.wall = wall; g.drops = this.dropCand + this.secBodyRet; g.active = this.activeMs; g.build = this.buildUp;
++    g.breaking = breaking ? 1 : 0; g.wall = wall; g.drops = this.dropCand + this.secBodyRet; g.active = this.activeMs;
+     for (let i = 0; i < 8; i++) g.spec[i] += sp[i];
+   }
+   /** Snabba sidans kommandon i exakt den ordning de restes (virtuell klocka forst: den nollar ankare som resten skriver). */
+@@ -1733,7 +1753,7 @@
+       return;
+     }
+     const secN = r[o + R_SEC_N] > 0;
+-    if (!SECTION_AGG_HOP || secN) { this.dropCand = r[o + R_DROPS]; this.activeMs = r[o + R_ACTIVE]; this.buildUp = r[o + R_BUILD]; }
++    if (!SECTION_AGG_HOP || secN) { this.dropCand = r[o + R_DROPS]; this.activeMs = r[o + R_ACTIVE]; }
+     this.envStep();
+     if (secN)
+     { const I = this.shIn; I.hops = r[o + R_SEC_N]; I.intSum = r[o + R_SEC_INT]; I.kicks = r[o + R_SEC_KICKS]; I.breaking = r[o + R_SEC_BREAK] > 0; I.nowMs = r[o + R_SEC_WALL];
+@@ -2040,8 +2060,6 @@
+     this.dHat = Math.exp(-dtHop / 0.06);
+     this.dSnare = Math.exp(-dtHop / 0.11);
+     this.dKick = Math.exp(-dtHop / 0.15);
+-    this.aSpecSlow = 1 - Math.exp(-dtHop / 2.0);
+-    this.aNovSlow = 1 - Math.exp(-dtHop / 1.5);
+     this.aProf = 1 - Math.exp(-dtHop / 8.0);
+     // Ett återanvänt Frame (spec/onset pekar på de pre-allokerade objekten).
+     this.outFrame = {
+@@ -2314,7 +2332,7 @@
+       this.hBody = bodyNow;
+       this.dSec = this.section; this.dLvh = this.levelVsHighDb;
+       this.dropStep();
+-      inRiser = this.riserStep();
++      inRiser = this.hInRiser;
+       this.dConf = this.localBpmConfidence;
+       this.profileStep();
+     }
+@@ -2923,9 +2941,9 @@
+     // LUGN-SEKTIONS-GRINDEN (se DROP_CALM_GATE). Domen tas per kandidat-hop; den hallna kandidaten (DROP_CALM_LAND_MS) foljs nedan.
+     if (fireNow) {
+       const calm = (this.dSec === 'low' || this.dSec === 'intro') || this.dLvh <= -DROP_CALM_DB;
+-      let strong = this.buildUp >= DROP_CALM_BUILD || underNow < DROP_CALM_Q || bodyRise >= BODY_RISE_DB + DROP_CALM_RISE_DB;
++      let strong = underNow < DROP_CALM_Q || bodyRise >= BODY_RISE_DB + DROP_CALM_RISE_DB;
+       // STRIKT INTRO (ladan 09-24: 'den gjorde fortfarande drop i intro'): landning vid toppen racker inte i intro - bara en riktig riser.
+-      if (this.dSec === 'intro') strong = this.buildUp >= DROP_CALM_BUILD;
++      if (this.dSec === 'intro') strong = false;
+       if (calm && !strong) {
+         fireNow = false;
+         if (DROP_CALM_LAND_MS > 0 && this.calmHoldStart === 0) { this.calmHoldStart = nowWallA; this.calmHoldRise = bodyRise; }
+@@ -3001,39 +3019,56 @@
+     }
+   }
+ 
+-  /** Uppbyggnad/riser (spektral novelty + klang/niva). Returnerar inRiser och uppdaterar buildUp. */
+-  private riserStep(): boolean {
+-    const nowWallA = this.hNowWall;
+-    const dtHop = this.dtHop;
+-    // ── UPPBYGGNAD / RISER (flyttad hit) ──
+-    // Spektral NOVELTY = summan av bandens POSITIVA avvikelse från en ~2s baslinje,
+-    // ihållande ~1.5s. Mätt validerad: ramsar 0.25→0.78 in i en drop. Relativt en
+-    // ~8s baslinje → RISER = novelty STIGER över den (filter-sweep/snare-roll),
+-    // skilt från bara-busy (ihållande → baslinjen kommer ikapp). Gammal väg
+-    // (klang+nivå stiger) ligger kvar som OR. Inte direkt efter en drop.
+-    let nov = 0; const sr = this.aSpecSlow;
+-    // NOVELTY PÅ `bandDb`, INTE `bandLvl` — se fältets dokumentation. Med den
+-    // AGC-normaliserade nivån var det här uttrycket matematiskt tvunget att gå
+-    // mot noll under exakt de förlopp det skulle upptäcka.
+-    for (let b = 0; b < 8; b++) { this.specSlow[b] += (this.bandDb[b] - this.specSlow[b]) * sr; nov += Math.max(0, this.bandDb[b] - this.specSlow[b]); }
+-    this.novSlow += (nov - this.novSlow) * this.aNovSlow;
+-    this.novBaseline += (this.novSlow - this.novBaseline) * (dtHop / 8);
+-    const novRiser = this.novSlow > this.novBaseline + 0.15 && this.novSlow > 0.45;
+-    this.centSlow += (this.centSmooth - this.centSlow) * (dtHop / 2.5);
+-    this.lvlSlowR += (this.lvlSmooth - this.lvlSlowR) * (dtHop / 2.5);
+-    const inRiser = this.activeMs > 2500 && this.lvlSmooth > 0.3 && nowWallA - this.lastDropMs > 1500 && (
+-        novRiser
+-        || (this.centSmooth > this.centSlow + 0.06 && this.lvlSmooth > this.lvlSlowR + 0.04 && this.lvlSmooth > 0.4)
+-      );
+-    // Stampla uppbyggnaden. OBS: drop-villkoret ovan kraver INTE en riser — det
+-    // kravet ar avstangt (se dar). Stampeln halls uppdaterad for att kravet ska
+-    // kunna aterinforas nu nar riser-signalen faktiskt lever (se `bandDb`).
+-    // Nagot "4000 ms-fonster" finns inte i filen; den formuleringen var kvar
+-    // fran en tidigare version av villkoret.
+-    const bTarget = inRiser ? 1 : 0;
+-    const bRate = bTarget > this.buildUp ? dtHop / 3.5 : dtHop / 1.0;   // bygg ~3.5s, klinga ~1s
+-    this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
+-    return inRiser;
++  /** LUTNINGENS SLAGFACK (sektionssidan, per sectionHop-anrop): summorna samlas tills ett slag gått (klockans tempo; utan tempo
++   *  500 ms, under 90 bpm räknas halva slaget så att facket aldrig är längre än 2/3 s). */
++  private slopeHop(hops: number, dtMs: number, rms2Sum: number, centSum: number, hiSum: number): void {
++    this.slMs += dtMs; this.slHops += hops; this.slRms2 += rms2Sum; this.slCent += centSum; this.slHi += hiSum;
++    let beatMs = this.localBpm > 0 ? 60000 / this.localBpm : 500; while (beatMs > 667) beatMs *= 0.5;
++    if (this.slMs < beatMs) return;
++    const N = Analyser.SLOPE_N, n = this.slHops || 1, p = this.slPos;
++    this.slL[p] = 10 * Math.log10(this.slRms2 / n + 1e-10); this.slH[p] = 20 * Math.log10(this.slHi / n + 1e-7); this.slC[p] = this.slCent / n;
++    this.slPos = (p + 1) % N; if (this.slN < N) this.slN++;
++    this.slMs = this.slMs - beatMs < beatMs ? this.slMs - beatMs : 0; this.slHops = 0; this.slRms2 = 0; this.slHi = 0; this.slCent = 0;
++    if (this.slN < N) return;
++    this.slopeBeat();
++  }
++
++  /** Stigningen över fönstret (enhet per SLOPE_N slag): Theil-Sen. Slag mer än `span` under fönstrets topp räknas som toppen - span
++   *  (tystnad har ingen nivå att mäta: -100 dB eller -60 dB är samma 'inget'). Äldsta slaget ligger på slPos. */
++  private slopeRise(X: Float64Array, span: number): number {
++    const N = Analyser.SLOPE_N, v = this.slTmp, q = this.slPair; let top = -Infinity;
++    for (let i = 0; i < N; i++) { const x = X[(this.slPos + i) % N]; v[i] = x; if (x > top) top = x; }
++    let k = 0; for (let i = 0; i < N; i++) { if (v[i] < top - span) v[i] = top - span; }
++    for (let i = 0; i < N; i++) for (let j = i + 1; j < N; j++) q[k++] = (v[j] - v[i]) / (j - i);
++    q.sort();
++    const rise = N * 0.5 * (q[(k >> 1) - 1] + q[k >> 1]);
++    // RAMP ELLER HOPP: en uppbyggnad stiger i BÅDA takterna (slag 3-4 över 1-2 och slag 7-8 över 5-6); ett hopp (höjningen som
++    // landar) står stilla före och efter. slRamp = stigningen om den är en ramp, annars 0.
++    const h1 = 0.5 * (v[2] + v[3] - v[0] - v[1]), h2 = 0.5 * (v[6] + v[7] - v[4] - v[5]);
++    this.slRamp = rise > 0 && h1 > 0 && h2 > 0 ? rise : 0;
++    return rise;
++  }
++
++  /** ETT SLAG TILL (arenan bygg 2026-11-11). Tre stigningar över de två senaste takterna: nivån (dB), diskanten (dB), centroiden.
++   *  UPPBYGGNADEN: tydligheten = stigningarna i sina egna mått (nivån fördubblad = 6 dB, diskanten +10 dB, centroiden +0,2 räknas
++   *    var för sig som 1) summerade; under 0,6 är det låtens vanliga rörelse. buildUp = tydligheten över den gränsen (0..1) gånger
++   *    hur länge den hållit (slag i rad / fönstret: full först när hela fönstret stigit). inRiser = den har hållit en takt.
++   *    Ett hopp (en höjning som landar) är ingen uppbyggnad: bara stigningar som finns i båda takterna räknas (slopeRise, slRamp).
++   *  SEKTIONEN: nivån har stigit/fallit >= SLOPE_STEP_DB över fönstret i två slag i rad = musiken har höjts/fallit (ett hopp syns
++   *    tre slag efter att det skett och står kvar i tre; ett stopp eller ett fill på upp till tre slag ger ingen händelse). */
++  private static readonly SLOPE_STEP_DB = 5;
++  private slopeBeat(): void {
++    const N = Analyser.SLOPE_N;
++    const rL = this.slopeRise(this.slL, 20); let ev = this.slRamp / 6;
++    this.slopeRise(this.slH, 20); ev += this.slRamp / 10;
++    this.slopeRise(this.slC, 1); ev += this.slRamp / 0.2;
++    this.slRun = ev > 0.6 && this.activeMs > 0 ? this.slRun + 1 : 0;
++    this.buildUp = this.slRun > 0 ? Math.min(1, (ev - 0.6) / 0.6) * Math.min(1, this.slRun / N) : 0;
++    this.hInRiser = this.slRun >= 4;
++    this.slUpRun = rL >= Analyser.SLOPE_STEP_DB && this.activeMs > 0 ? this.slUpRun + 1 : 0;
++    this.slDnRun = rL <= -Analyser.SLOPE_STEP_DB ? this.slDnRun + 1 : 0;
++    if (this.slUpRun === 2) this.slRaised = true;
++    if (this.slDnRun === 2) this.slFell = true;
+   }
+ 
+   /** Karaktarsprofilen (~8 s) → outProfile. */
+@@ -3074,7 +3109,7 @@
+         if (this.secSpecDirty) { this.secSpecDirty = false; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.bandDbRaw[i] / 20); }
+         if (this.role === 'fast') {
+           const g = this.secAgg; g.n++; g.int += intensity; if (kick) g.kicks++; g.rms2 += rms * rms; g.cent += this.centSmooth; g.dt += this.dtHop * 1000;
+-          g.breaking = breaking ? 1 : 0; g.wall = this.wallNow(); g.drops = this.dropCand + this.secBodyRet; g.active = this.activeMs; g.build = this.buildUp;
++          g.breaking = breaking ? 1 : 0; g.wall = this.wallNow(); g.drops = this.dropCand + this.secBodyRet; g.active = this.activeMs;
+           for (let i = 0; i < 8; i++) g.spec[i] += sp[i];
+         } else { const I = this.shIn; I.hops = 1; I.intSum = intensity; I.kicks = kick ? 1 : 0; I.breaking = breaking; I.nowMs = this.wallNow(); I.dtMs = this.dtHop * 1000;
+           I.rms2Sum = rms * rms; I.centSum = this.centSmooth; I.specOff = 0; I.bonSum = 0; I.bpk = 0; I.fluxSum = 0; I.rms4Sum = 0; this.sectionHop(sp); }
+--- a/src/split.ts
++++ b/src/split.ts
+@@ -87,8 +87,9 @@
+ export const S_REC_SEQ = 0, S_BPM = 1, S_CONF = 2, S_BPMF = 3, S_PHASE_MS = 4, S_PHASE_CONF = 5, S_SECTION = 6, S_SEC_START = 7,
+   S_SEC_INDEX = 8, S_SEC_TIER = 9, S_REP_SIM = 10, S_REP_AGO = 11, S_REP_SEC = 12, S_PROCESSED = 13, S_LAG_MS = 14, S_LAG_MAX = 15,
+   S_BUSY_US = 16, S_BUSY_MAX_US = 17, S_SKIPPED = 18, S_EXPECT_MS = 19, S_EXPECT_SRC = 20, S_PREV_SEC = 21, S_LVL_HIGH = 22,
+-  S_LOST_FLAGS = 23 /* flaggor aterskapade ur raknarna efter tapp */;
+-export const STATE_LEN = 24;
++  S_LOST_FLAGS = 23 /* flaggor aterskapade ur raknarna efter tapp */,
++  S_BUILD = 24 /* uppbyggnaden (arenan bygg 11-11): mäts på sektionssidan */, S_RISER = 25;
++export const STATE_LEN = 26;
+ 
+ export const SECTIONS = ['', 'intro', 'low', 'build', 'high', 'break'];
+ export function sectionCode(s: string): number { const i = SECTIONS.indexOf(s); return i < 0 ? 0 : i; }
+--- a/src/effects.ts
++++ b/src/effects.ts
+@@ -596,7 +596,7 @@
+    private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
+   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
+   private nearAt = -1e12; nearCount = 0;   // NASTAN-DROP
+-  private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; private buildSecAt = 0; private buildSecSeen = 0; buildProg = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
++  private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+   private miniBodyFast = -90; private miniBodySlow = -90; private miniPre = -90; private miniPeak = -200;   // minidrop efter energin
+   private miniBangUntil = 0; private lastMiniWall = -1e12; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftAt = -1e12; liftCount = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
+   private dropBangUntil = 0;     // drop-fönster (max-håll upp till ~8s efter träff)
+@@ -1622,7 +1622,7 @@
+     this.showVel = Math.min(5, this.showVel * friction + this.pendingKick * 2.0);
+     this.pendingKick = 0;
+     // upp till 2.5× snabbare vid full uppbyggnad + kick-ryck ovanpå
+-    this.showTime += _dtT * (1 + Math.max(frame.buildUp, this.buildProg) * 1.5 + this.showVel);
++    this.showTime += _dtT * (1 + frame.buildUp * 1.5 + this.showVel);
+     const t = this.showTime;
+     if (kickHit) this.lastKickBoost = nowP;
+ 
+@@ -2000,14 +2000,8 @@
+     // 32:a slag som grupperingen. Svep, pendlar och ekon går då åt olika håll; c.group (två grupper) är oförändrad.
+     const ordSel = (this.smartCount * 3 + (beatIdx >> 5)) & 3;
+     ctx.beatHit = beatHit; ctx.hasBeat = hasBeat;
+-    // UPPBYGGNADENS FÖRLOPP (ladan 10-11 22:05: "kändes inte som den laddade för en drop"): analysatorns buildUp är död på ladans
+-    // material (max 0,17 på 115 min), så build-effekterna trappade aldrig upp. buildProg = slag sedan sektionen blev build / 32
+-    // (0..1), räknat från uppbyggnadens START (inte lookens - looken kan bytas mitt i), håller över < 2 s sektionsfladder.
+-    { const nw = nowWall;
+-      if (frame.section === 'build') { if (this.buildSecAt === 0 || nw - this.buildSecSeen > 2000) this.buildSecAt = nw; this.buildSecSeen = nw; }
+-      const beatMs = rawBeatMs > 0 ? rawBeatMs : 500;
+-      this.buildProg = this.buildSecAt > 0 && nw - this.buildSecSeen <= 2000 ? Math.min(1, (nw - this.buildSecAt) / (32 * beatMs)) : 0; }
+-    ctx.wavePhase = this.wavePhase; ctx.buildUp = Math.max(frame.buildUp, this.buildProg);
++    // UPPBYGGNADENS FÖRLOPP mäts av analysatorn (frame.buildUp: hur tydligt och hur länge klang och nivå stigit); här bara läst.
++    ctx.wavePhase = this.wavePhase; ctx.buildUp = frame.buildUp;
+     ctx.phaseSpread = 1 + ctx.buildUp * 2.5; ctx.punchFloor = punchFloor;
+     ctx.chasePos = this.chasePos; ctx.dropFired = this.dropFired;
+     ctx.dropHue = this.dropHue; ctx.now = nowP;
+@@ -2075,7 +2069,7 @@
+     {
+       const sec = frame.section ?? '';
+       const vc = Math.max(0.3, Math.min(1, this.cfg.verseCeil ?? SEC_CEIL)), bc = Math.max(vc, SEC_CEIL_BUILD);   // "Tak i vers" i /setup
+-      let tgt = sec === 'high' || sec === '' ? 1 : sec === 'build' ? vc + (bc - vc) * this.buildProg : vc;
++      let tgt = sec === 'high' || sec === '' ? 1 : sec === 'build' ? vc + (bc - vc) * frame.buildUp : vc;
+       if (nowWall < this.dropBangUntil) { tgt = 1; this.secCeil = 1; }                       // dropen direkt till fullt som minidropen (ladan 10-30: 'lyfter först som en minidrop, sen drop' = taket klättrade 0,3 s)
+       else if (this.dropColEnv > 0.005 || nowWall < this.dropLiftUntil + DROP_LIFT_FALL_MS) tgt = 1;   // dropen alltid fullt
+       else if (nowWall < this.miniBangUntil) { tgt = 1; this.secCeil = 1; }                   // minidrop-looken alltid till 95 % (ägaren 10-12), direkt

@@ -72,6 +72,10 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
   for (const path of list) {
     const y = readWav(path); const C = chain(); const H = Math.floor(y.length / HOP); const buf = new Float32Array(HOP);
     const secAt = [], buAt = [], lvl = []; let acc = 0, accN = 0;
+    // SANNA TIDSAXLAR (arenan bygg 2026-11-12, fynd av b1/b2/b3): etiketten provtas var 38:e hop = 101,33 ms och nivåblocken är 188 hop = 501,33 ms,
+    // men räknades som 100 / 500 ms -> etiketten lästes 1,07 % x t för sent mot nivåskiftena (5 s i slutet av en 10-minutersfil): sena skiften
+    // föll bort som 'redan rätt' och 'före skiftet' låg delvis efter det. Nu räknas båda i sin verkliga tid.
+    const SEC_DT = Math.round(100 / HMS) * HMS / 1000, LVL_DT = Math.ceil(SR / 2 / HOP) * HOP / SR;
     const dbR = new Float64Array(16); let armed = true, lastOn = -1e9;
     const winErr = []; let winStart = -1, winBpm = 0, winOk = false; const gridErr = [];
     // SAMMA FÖNSTER (natt 11-10): alla fönsters fasfel (gridW[w]) + de egna låsta fönstren (gridOk) -> tvavagar.py mäter varianten i BASENS fönster
@@ -103,11 +107,11 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
     for (let i = W; i < L - W; i++) { let a = 0, c = 0; for (let k = 1; k <= W; k++) { a += lvl[i - k]; c += lvl[i + k - 1]; } diff[i] = (c - a) / W; }
     const shifts = [];
     for (let i = W; i < L - W; i++) {
-      if (Math.abs(diff[i]) < SKIFT_DB || i * 0.5 < 25) continue;
+      if (Math.abs(diff[i]) < SKIFT_DB || i * LVL_DT < 25) continue;
       let mx = true; for (let k = -8; k <= 8 && mx; k++) if (k && Math.abs(diff[i + k] || 0) > Math.abs(diff[i])) mx = false;
-      if (mx && lvl.slice(i, i + W).every((v) => v > -45)) shifts.push([i * 0.5, diff[i] > 0 ? 1 : -1]);
+      if (mx && lvl.slice(i, i + W).every((v) => v > -45)) shifts.push([i * LVL_DT, diff[i] > 0 ? 1 : -1]);
     }
-    const lab = (t) => secAt[Math.min(secAt.length - 1, Math.max(0, Math.round(t * 10)))];
+    const lab = (t) => secAt[Math.min(secAt.length - 1, Math.max(0, Math.round(t / SEC_DT)))];
     const f = { file: path.split(/[\\/]/).pop(), min: H * HMS / 60000, up: 0, upHit: 0, upLag: [], down: 0, downHit: 0, downLag: [] };
     for (const [t, dir] of shifts) {
       const ok = (s) => dir > 0 ? s === 'high' : s !== 'high' && s !== 'build';
@@ -117,11 +121,12 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
       if (dir > 0) { f.up++; if (hit > -9) { f.upHit++; f.upLag.push(+hit.toFixed(2)); } } else { f.down++; if (hit > -9) { f.downHit++; f.downLag.push(+hit.toFixed(2)); } }
     }
     let segs = 0, short = 0, changes = 0, st = 0;
-    for (let i = 1; i <= secAt.length; i++) if (i === secAt.length || secAt[i] !== secAt[i - 1]) { segs++; if ((i - st) / 10 < 8) short++; if (i < secAt.length) changes++; st = i; }
+    for (let i = 1; i <= secAt.length; i++) if (i === secAt.length || secAt[i] !== secAt[i - 1]) { segs++; if ((i - st) * SEC_DT < 8) short++; if (i < secAt.length) changes++; st = i; }
     if (winStart >= 3) { gridW[winStart] = winErr.map((e) => +e.toFixed(1)); if (winOk) { gridErr.push(...winErr); gridOk.push(winStart); } }
     // UPPBYGGNADEN (arenan bygg 11-11): frame.buildUp de 4 s FÖRE varje nivåskifte uppåt mot resten av filen (utom -6..+2 s kring dem)
-    { const ups = shifts.filter((s) => s[1] > 0).map((s) => s[0]); f.byggFore = ups.map((t) => { let a = 0, c = 0; for (let i = Math.max(0, Math.round((t - 4) * 10)); i < Math.min(buAt.length, Math.round(t * 10)); i++) { a += buAt[i]; c++; } return c ? +(a / c).toFixed(4) : 0; });
-      let a = 0, c = 0; for (let i = 0; i < buAt.length; i++) { const t = i / 10; if (!ups.some((u) => t >= u - 6 && t <= u + 2)) { a += buAt[i]; c++; } } f.byggAnnars = c ? +(a / c).toFixed(4) : 0; f.byggN = c; }
+    { const ups = shifts.filter((s) => s[1] > 0).map((s) => s[0]); f.byggFore = ups.map((t) => { let a = 0, c = 0; for (let i = Math.max(0, Math.round((t - 4) / SEC_DT)); i < Math.min(buAt.length, Math.round(t / SEC_DT)); i++) { a += buAt[i]; c++; } return c ? +(a / c).toFixed(4) : 0; });
+      let a = 0, c = 0; for (let i = 0; i < buAt.length; i++) { const t = i * SEC_DT; if (!ups.some((u) => t >= u - 6 && t <= u + 2)) { a += buAt[i]; c++; } } f.byggAnnars = c ? +(a / c).toFixed(4) : 0; f.byggN = c; }
+    f.highAndel = +(secAt.filter((x) => x === 'high').length / Math.max(1, secAt.length)).toFixed(3);   // information: andel av tiden i 'high'
     Object.assign(f, { segs, short, changes, grid: gridErr.map((e) => +e.toFixed(1)), gridW, gridOk, drops: C.drops, minis: C.minis, bounds: C.bounds });
     out.push(f);
   }

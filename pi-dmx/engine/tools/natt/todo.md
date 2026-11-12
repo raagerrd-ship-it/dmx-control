@@ -23,8 +23,11 @@ och avsluta. Den här rutan gäller BARA denna natt - nästa natt läser du LÄG
   a3 snabb dal på ett kvarts slag SOM EFFEKTVAL (slagK +3,7 % - men bryter mot fade-down om den går under 250 ms: får inte);
   a4 dropläget läser taktens skala (bassNow). Kvar utanför analysatorn: volymfönstret eHi/eLo/eSm i effects.ts (bara dropens
   efterkontroll) - flytta efterkontrollen till analysatorns dropdom. Verktyg: tools/arena/basenergi.mjs (nivåoberoende + orörda ramfält).
-- ARENAN BYGG (start 23:25, 4 deltagare, .arena/bygg, domare tools/arena/tvavagar.py med nytt mått 'bygg' = 18 mått): uppbyggnaden
-  (frame.buildUp är död: bygg 1,38) + sektionen (upp_s 15,35 s, ned_s 2,65, traff 75 %, korta 34 %). Rapporten hamnar i tools/natt/arena-2026-11-11-bygg/.
+- ARENAN BYGG KLAR 02:05 (tools/natt/arena-2026-11-11-bygg/RAPPORT.md): INGEN VINNARE, inget inlagt. b4/b3 gjorde etiketten snabb (upp_s 12,75 -> 1,4,
+  ned_s 6,0 -> 1,15) och väckte buildUp (0,2 -> 20) men kallar mycket mer 'high' (kontrollmängden 41/55 % -> 65/74 %) -> lampspridningen
+  -20 % = DISK i ljusdomaren. Idébank i rapporten (b4:s buildUp med dagens etikett orörd = första provet).
+- DOMARENS TIDSAXEL RÄTTAD (tvavagarKor.mjs + sektionLag.mjs: etiketten 101,33 ms räknades som 100): NY BASLINJE för sektionsmåtten -
+  upp_s 12,75 / ned_s 6,0 / traff 75,9 / korta 30,9 / bygg 0,2 på övningen (förr 15,35 / 2,65 / 75 / 34). Jämför aldrig med äldre siffror.
 - MÄTFÄLLA: domarens kedja (konsertReplay) matar klockan med BeatFeed.update, inte hopLane.feed - det som ska stegas per hop för ramen
   måste ligga i BeatFeed.update (tillitens första bänk mätte med tillit 0).
 

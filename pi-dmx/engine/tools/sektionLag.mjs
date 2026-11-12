@@ -27,6 +27,10 @@ const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
 const { createSplitBuffers } = await import(DIST + "split.js");
 console.log = () => {};
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, HMS = HOP / SR * 1000;
+// SANNA TIDSAXLAR (arenan bygg 2026-11-12, fynd av b1/b2/b3): etiketten provtas var 38:e hop = 101,33 ms och nivåblocken är 188 hop = 501,33 ms,
+// men räknades som 100 / 500 ms -> etiketten lästes 1,07 % x t för sent mot nivåskiftena (5 s i slutet av en 10-minutersfil): sena skiften
+// föll bort som 'redan rätt' och 'före skiftet' låg delvis efter det. Nu räknas båda i sin verkliga tid.
+const SEC_DT = Math.round(100 / HMS) * HMS / 1000, LVL_DT = Math.ceil(SR / 2 / HOP) * HOP / SR;
 const tot = { up: 0, upHit: 0, upLag: [], down: 0, downHit: 0, downLag: [], short: 0, segs: 0, min: 0, changes: 0, grid: [] };
 const GRID_RISE_DB = 6;
 const per = [];
@@ -79,11 +83,11 @@ for (const path of files) {
   for (let i = W; i < L - W; i++) { let a = 0, c = 0; for (let k = 1; k <= W; k++) { a += lvl[i - k]; c += lvl[i + k - 1]; } diff[i] = (c - a) / W; }
   const shifts = [];
   for (let i = W; i < L - W; i++) {
-    if (Math.abs(diff[i]) < SKIFT_DB || i * 0.5 < 25) continue;   // första 25 s: analysatorns uppvärmning + låtstartens intro
+    if (Math.abs(diff[i]) < SKIFT_DB || i * LVL_DT < 25) continue;   // första 25 s: analysatorns uppvärmning + låtstartens intro
     let mx = true; for (let k = -8; k <= 8 && mx; k++) if (k && Math.abs(diff[i + k] || 0) > Math.abs(diff[i])) mx = false;
-    if (mx && lvl.slice(i, i + W).every((v) => v > -45)) shifts.push([i * 0.5, diff[i] > 0 ? 1 : -1]);   // inte tystnad/låtbyte
+    if (mx && lvl.slice(i, i + W).every((v) => v > -45)) shifts.push([i * LVL_DT, diff[i] > 0 ? 1 : -1]);   // inte tystnad/låtbyte
   }
-  const lab = (t) => secAt[Math.min(secAt.length - 1, Math.max(0, Math.round(t * 10)))];
+  const lab = (t) => secAt[Math.min(secAt.length - 1, Math.max(0, Math.round(t / SEC_DT)))];
   const f = { file: path.split(/[\\/]/).pop(), up: 0, upHit: 0, upLag: [], down: 0, downHit: 0, downLag: [] };
   for (const [t, dir] of shifts) {
     const ok = (s) => dir > 0 ? s === "high" : s !== "high" && s !== "build";
@@ -93,7 +97,7 @@ for (const path of files) {
   }
   // fladder
   let segs = 0, short = 0, changes = 0, st = 0;
-  for (let i = 1; i <= secAt.length; i++) if (i === secAt.length || secAt[i] !== secAt[i - 1]) { segs++; if ((i - st) / 10 < 8) short++; if (i < secAt.length) changes++; st = i; }
+  for (let i = 1; i <= secAt.length; i++) if (i === secAt.length || secAt[i] !== secAt[i - 1]) { segs++; if ((i - st) * SEC_DT < 8) short++; if (i < secAt.length) changes++; st = i; }
   if (winOk && winStart >= 3) gridErr.push(...winErr);
   f.gridMed = med(gridErr); f.gridN = gridErr.length; f.grid40 = gridErr.filter((e) => Math.abs(e) <= 40).length / Math.max(1, gridErr.length);
   tot.grid.push(...gridErr);
