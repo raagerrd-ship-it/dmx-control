@@ -23,16 +23,27 @@ SPEC = {'dom': 'klockdom', 'statusrad': 'ARENAN ' + os.path.basename(K).upper(),
                   ['kallaren', 'Källarklipp, byten per min', 2, 'lagre'], ['lotus_ratt', 'Lotus rätt', 0, 'hogre'], ['lotus_syskon', 'Lotus släktfel', 0, 'lagre'],
                   ['lotus_vaxling', 'Lotus-låtar som växlar', 0, 'lagre'], ['mix_klocka', 'Rätt tempo i mixen %', 1, 'hogre'],
                   ['mix_las', 'Låsning efter låtbyte s', 2, 'lagre'], ['mix_still', 'Tills klockan står still s', 2, 'lagre'],
-                  ['klipp_klocka', 'Rätt tempo i klipp %', 1, 'hogre']],
-        'sparrar': [['lotus_ratt', 'min', 0], ['mix_las', 'max', 0.3], ['mix_still', 'max', 0.3], ['klipp_klocka', 'min', 1]]}
+                  ['klipp_klocka', 'Rätt tempo i klipp %', 1, 'hogre'], ['fas_median', 'Lotus fas, median', 2, 'hogre'], ['fas_ifas', 'Lotus i fas %', 1, 'hogre'],
+                  ['fas_motfas', 'Lotus motfas %', 1, 'lagre'], ['lotus_onbeat', 'Lotus on-beat', 2, 'hogre'], ['syntet', 'Syntet rätt', 0, 'hogre']],
+        'sparrar': [['lotus_ratt', 'min', 0], ['mix_las', 'max', 0.3], ['mix_still', 'max', 0.3], ['klipp_klocka', 'min', 1], ['fas_median', 'min', 0],
+                    ['fas_ifas', 'min', 1], ['fas_motfas', 'max', 1], ['lotus_onbeat', 'min', 0], ['syntet', 'min', 0]]}   # = klockdom.py:s spärrar
 sp = os.path.join(K, 'status.json')
 if os.path.exists(sp): SPEC.update(json.load(io.open(sp, encoding='utf-8')))
 if '--dom' in args: SPEC['dom'] = args[args.index('--dom') + 1]
 DOM = SPEC['dom']; LAGRE = {r[0] for r in SPEC['rader'] if r[3] == 'lagre'}
 
 def las(p):
+    """domarens mått + spärrvärdena ur 'sparr' (syntet, lotus on-beat, lotus fas) som egna nycklar, så ALLA domarens spärrar syns i tabellen"""
     try:
-        d = json.load(io.open(p, encoding='utf-8')); return d.get('matt') or d
+        d = json.load(io.open(p, encoding='utf-8')); m = dict(d.get('matt') or d); sp = d.get('sparr') or {}
+        if isinstance(sp.get('syntet'), (int, float)): m['syntet'] = sp['syntet']
+        if isinstance(sp.get('lotusOnBeat'), (int, float)): m['lotus_onbeat'] = sp['lotusOnBeat']
+        f = sp.get('lotusFas') or {}
+        if f.get('n'):
+            if isinstance(f.get('median'), (int, float)): m['fas_median'] = f['median']
+            m['fas_ifas'] = 100.0 * f.get('ifas', 0) / f['n']; m['fas_motfas'] = 100.0 * f.get('motfas', 0) / f['n']
+        if sp.get('andradeFiler') is not None: m['_filer'] = sp['andradeFiler']
+        return m
     except Exception:
         return None
 def hm(t): return time.strftime('%H:%M', time.localtime(t))
