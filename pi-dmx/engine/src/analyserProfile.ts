@@ -21,10 +21,9 @@ export const PROFILE: AnalyserProfile = {
   sys: {
     KICK_COOLDOWN: '0',          // tempoanpassad (0,6 slag, minst 170 ms); lotus: 170
     KICK_EFLOOR: '0.006',        // lotus: 0.06
-    TEMPO_LAGMAX: 'full',        // lag upp till N-1; lotus: 'half'
     SECTION_AGG: 'hop',          // lotus: 'env'
     SECTION_SCORE_F32: '1',      // lotus: '0'
-    SIL_CLEAR_PENDING: '1',      // lotus: '0'
+    SIL_CLEAR_PENDING: '1',      // lotus: '0'. SAKNAR LÄSARE (städningen 11-12): flaggans enda läsare låg i en onåbar gren i silenceStep och är borttagen; raden står kvar tills ägaren valt om nollningen ska gälla
     // LADANS LIVE-VARDEN SOM STANDARD (2026-09-27, rensningen): allt nedan stod i drop-ins pa Pi:n (drop/tempo/lotus.conf)
     // och ar nu kodens sanning. Env vinner fortfarande (DMX_X=... slar profilen). Sparen (BPM_TRACE/DROP_TRACE/LIVE_TRACE)
     // ar INTE standard - de var inte live 09-27 (Pi:ns env lastes fore deployen); sla pa med ladan.py --env vid felsokning.
@@ -32,10 +31,7 @@ export const PROFILE: AnalyserProfile = {
     // TAKTMATNINGEN I LÅNGSAMMA VÄGEN (2026-11-08, ägaren: 'en analysator, två vägar - den snabba och den som ger dirigenten
     // information'; backup-tagg backup/fore-taktmatning-slow-20261108): beatFeed.ts (~20 % av motorns CPU) körs i analysatorns
     // worker i stället för i hop-loopen (split.ts TAKTVÄGEN). Inline/synk-läget bit-identiskt med huvudtråden (DMX-md5); lotus: saknas.
-    BEAT_FEED: 'slow',            // a7r: VAR ANALYSATORNS KLOCKA KÖRS (analyser.ts clockMode): 'slow' taktvägen, 'inline' i process(); lotus: 'inline'
-    GHOST_WAIT: '1',              // 2/3-fantom vid latbyte vantar 12 s (tempo-transitions 09-04)
-    SUBH_GUARD: '1',              // OCT-DOWN/NEAR x8 mot lastGoodBpm (2/3 only)
-    SECTION_HINT_LOWCONF: '0',    // taktlost break nollar INTE sektionerna (ladan 09-24 23:10)
+    BEAT_FEED: 'slow',            // a7r: VAR ANALYSATORNS KLOCKA KÖRS (analyser.ts clockMode): 'slow' taktvägen, 'inline' i process(); lotus: osatt (analysatorn matar taktvägen själv, hopSelf)
     // SEKTIONER SOM HALLER (agaren i ladan 10-14: 'mycket go kansla nu'; 23 lang-*.wav: intro 17 -> 10 % av tiden, < 8 s 23 -> 15 %,
     // fladder 41 -> 22, sektionsbyten 3,12 -> 2,44/min, refrangstart oforandrad). Ur refrang/mellanlage kravs 5 raka block, in i refrangen 3.
     SECTION_RUN: '5',             // var 3
@@ -63,7 +59,5 @@ export const PROFILE: AnalyserProfile = {
     DROP_RISE_LOW_DB: '20',      // SNAVT MAL 10-11: ingen genvag med 12 dB (var 12)
     MINI_SPACING_MS: '1',        // minidrops UTAN sparr (agaren i ladan 2026-10-08; var 12000). 0 = av helt, darfor 1
     DROP_UNDERPEAK_MIN: '1.5',   // 09-30 i koden: ingen drop/minidrop vid kroppens topp (agarens 9 markeringar + bank: pop 11->7, megamix 31->29)
-    OCT_UP: '12',                // oktav upp snabbare (tempo-transitions)
-    SUBH_MULT: '8',              // subharmonisk guard x8
   },
 };
