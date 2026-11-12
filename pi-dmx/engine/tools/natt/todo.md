@@ -8,6 +8,11 @@ ladan 11-12 kväll och huvudchatten lade ut frysta kopior med `ladan.py --fran` 
 och --fran SKRIVER ÖVER engine/dist med den frysta kopian. Bas = dagens src, inget annat. Läs också raden LADAN 11-12 nedan
 om den finns (vad ägaren godkände/underkände i ögat).
 
+KODEN ÄNDRAD 11-12 EM (efter att uppdraget skrevs, ingår i bas): 4d8e9d7 uttoningen ligger i effekterna (src/effects/toning.ts), output
+har bara golvet mot strobe (LampGuard) - DMX-md5 identiskt; 0fd4d75 uppbyggnadens förlopp mäts i analysatorn (frame.buildProg,
+tillståndsblocket STATE_LEN 26) - ljusdomaren -0,0. Pulshalveringen jämförs av en agent (.arena/pulshalv/RAPPORT.md): läggs den in
+före natten står det i git-loggen. Bas = HEAD.
+
 VARFÖR NU: i lotus väljs sedan i dag fade in, lead och fall ur klockans tempo (onsetRiseK, effektFallMs). Mätt i källaren 11-12 ~13:30:
 på en låt växlade klockan 94 <-> 126 BPM (förhållandet 4:3) ungefär var 10:e sekund med låsningen av/på -> leaden hoppade 128 <-> 96 ms och
 falltiden ~2200 <-> ~1540 ms. Tidigare samma dag: tempot hoppade 81-150 med låsning ~35 % på en lugn låt. Tempovalen blir aldrig
