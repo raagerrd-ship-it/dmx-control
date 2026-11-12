@@ -2,6 +2,13 @@
 
 ## ARENA I NATT 2026-11-12 -> 11-13: KLOCKAN HÅLLER EN TOLKNING (ägaren 11-12 em: "Det borde gå till en arena i natt. Hur förbättrar vi analysatorns klocka") - GÅR FÖRE ALLT UTOM HÄLSAN
 Kör skillen dmx-arena (körning `.arena/klocka2`). EN arena, inget annat tungt i natt. Ingen deploy, ingen push, inget skrivs i lotus-light-link.
+STARTAD I FÖRVÄG AV ÄGAREN 2026-11-12 ~16:50 ('Kör igång nattagenten nu'). Två körningar kan alltså läsa detta:
+- Körningen som startas nu: kör arenan enligt nedan. Skriv 'ARENAN KLOCKA2 PÅGÅR sedan <tid>' på raden under denna punktlista när du
+  börjar och byt till 'ARENAN KLOCKA2 KLAR <tid>: <utfall på en rad>' när rapporten är skriven (commit med pathspec).
+- Den schemalagda körningen 02:38: står här PÅGÅR eller finns låsfilen .arena/.banklas -> kör INGA bänkar och ingen arena, vänta inte,
+  skriv bara en rad i nattrapporten och avsluta. Står här KLAR -> kör INTE arenan igen; gör bara en ny baslinje på HEAD om arenan lade
+  in en vinnare (annars ingenting tungt) och sammanfatta arenans rapport i nattrapporten.
+
 
 FÖRE BASMÄTNINGEN: bygg om engine/dist (`npx tsc -p tsconfig.json`) och kontrollera `git status --short src` = tomt. Ägaren var i
 ladan 11-12 kväll och huvudchatten lade ut frysta kopior med `ladan.py --fran` (stegen i .arena/ladan1112/ + .arena/tempohopp/),
