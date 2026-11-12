@@ -8,6 +8,7 @@ STARTAD I FÖRVÄG AV ÄGAREN 2026-11-12 ~16:50 ('Kör igång nattagenten nu'). 
 - Den schemalagda körningen 02:38: står här PÅGÅR eller finns låsfilen .arena/.banklas -> kör INGA bänkar och ingen arena, vänta inte,
   skriv bara en rad i nattrapporten och avsluta. Står här KLAR -> kör INTE arenan igen; gör bara en ny baslinje på HEAD om arenan lade
   in en vinnare (annars ingenting tungt) och sammanfatta arenans rapport i nattrapporten.
+ARENAN KLOCKA2 PÅGÅR sedan 2026-11-12 16:50
 
 
 FÖRE BASMÄTNINGEN: bygg om engine/dist (`npx tsc -p tsconfig.json`) och kontrollera `git status --short src` = tomt. Ägaren var i
