@@ -26,11 +26,11 @@ const GAMMA = 1.6;
 const MAP_TOP = 0.95;
 /** MINSTA PÅ-TID (lampfysik, EN plats - DUBBLA KÄLLOR 6, 11-09; värdena orörda, DMX-md5-identiskt): tre hålltider mot diodflimmer.
  *  De är olika för att de håller olika saker - en gemensam tid ändrar ljuset:
- *   MIN_ON_MS 150: lampans nivå hålls innan uttoningen börjar (LampFade nedan, ägaren 10-10) - korta blixtar blir en puls;
- *   CH_MIN_ON_MS 100: en tänd färgkanal hålls med sin senaste andel av lampans ljus (LampFade nedan, ägaren 10-10);
+ *   MIN_ON_MS 150: lampans nivå hålls innan uttoningen börjar (effects/toning.ts, ägaren 10-10) - korta blixtar blir en puls;
+ *   CH_MIN_ON_MS 100: en tänd färgkanal hålls med sin senaste andel av lampans ljus (effects/toning.ts, ägaren 10-10);
  *   HOLD_MS 120: monokrom dimmer - sista värdet hålls över enstaka nollor (calibrate nedan).
  *  fastLight-effekter hoppar över de två första (effects/types.ts fastLight). */
-export const FADE_MIN_S = 0.25, MIN_ON_MS = 150, CH_MIN_ON_MS = 100;   // standardvärdena; inställningarna cfg.fadeMinS/minOnMs/chMinOnMs (LampFade nedan)
+export const FADE_MIN_S = 0.25, MIN_ON_MS = 150, CH_MIN_ON_MS = 100;   // FADE_MIN_S = outputs golv mot strobe (LampGuard nedan) och effekternas snabbaste uttoning; de två hålltiderna är standardvärden för effects/toning.ts
 const HOLD_MS = 120;
 const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
 const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid
@@ -93,50 +93,24 @@ interface Lamp {
   kinds: number[];
 }
 
-/** LAMPANS UTTONING OCH MINSTA PÅ-TID (fade-planen steg 1, 2026-11-12: flyttad ordagrant från effects.ts steg 2, DMX-md5-identiskt).
- *  Kontraktet mot effekterna: lampans ljus går upp direkt och faller aldrig snabbare än tidskonstanten fadeMinS (i lampans LJUS);
- *  en nivå lampan nått hålls minOnMs innan uttoningen börjar; en tänd färgkanal hålls chMinOnMs med sin senaste andel av ljuset.
- *  fast (effekter byggda på korta blixtar, effects/types.ts fastLight) hoppar över de två hålltiderna. Tiderna är INSTÄLLNINGAR
- *  (cfg.fadeMinS / minOnMs / chMinOnMs, live i /setup; ägaren 11-12: 'justerbara, så vi kan trimma in dom'). Snabbare uttoning än
- *  FADE_MIN_S är förbjudet (ägaren 09-29): ratten går bara mot långsammare. Tillstånd per lampa (64 lampor). */
-const tal = (v: unknown, d: number, lo: number, hi: number): number => (typeof v === 'number' && v === v ? Math.max(lo, Math.min(hi, v)) : d);
-export class LampFade {
-  private lvl = new Float32Array(64); private peakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private ratio = new Float32Array(192);   // ljusstyrka + senaste kulör
-  private prev = new Float32Array(192); private fo: [number, number, number] = [0, 0, 0]; private fn: [number, number, number] = [0, 0, 0];   // förra rutans färg per lampa
-  private fadeS = FADE_MIN_S; private minOn = MIN_ON_MS; private chMinOn = CH_MIN_ON_MS;
-  /** Läs inställningarna (en gång per ruta). */
-  tune(cfg: { fadeMinS?: number; minOnMs?: number; chMinOnMs?: number }): void {
-    this.fadeS = tal(cfg.fadeMinS, FADE_MIN_S, FADE_MIN_S, 2); this.minOn = tal(cfg.minOnMs, MIN_ON_MS, 0, 500); this.chMinOn = tal(cfg.chMinOnMs, CH_MIN_ON_MS, 0, 500);
-  }
-  /** En lampa, en ruta: rgb (effektens färg x energin, 0..1) skrivs om på plats. now = rutans klocka (ms), dtSec = rutans längd. */
-  step(i: number, fx: FixtureConfig | undefined, rgb: [number, number, number], now: number, dtSec: number, fast: boolean): void {
-    const mT = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
-    // MINSTA PA-TID (output.ts MIN_ON_MS, agaren i ladan 10-10: "kan man ge effekterna en minsta tankt 'pa' tid? nu blev det lite
-    // flimrande igen"): en nivå lampan nått hålls minst MIN_ON_MS innan uttoningen börjar - korta blixtar blir en puls. Upp direkt.
-    const holding = !fast && now - this.peakAt[i] < this.minOn;
-    const fall = holding ? this.lvl[i] : this.lvl[i] * lampFadeK(fx, dtSec, this.fadeS), o = i * 3;   // tidskonstanten i lampans ljus (output.ts)
-    if (mT > 0) {
-      // MINSTA PA-TID PER FARGKANAL (agaren 10-10: "lyser R sa far inte B bara komma igang under 100 ms"): en kanal som tands
-      // halls tand minst CH_MIN_ON_MS (output.ts) med sin senaste andel av lampans ljus, aven om effekten slacker den direkt.
-      for (let c = 0; c < 3; c++) {
-        const q = o + c, r = rgb[c] / mT;
-        if (r > 0) { if (this.chOnAt[q] === 0) this.chOnAt[q] = now; this.ratio[q] = r; }
-        else if (!fast && this.chOnAt[q] !== 0 && now - this.chOnAt[q] < this.chMinOn) rgb[c] = this.ratio[q] * mT;   // hall kvar
-        else { this.chOnAt[q] = 0; this.ratio[q] = 0; }
-      }
+/** OUTPUTS GOLV MOT STROBE (ägaren 11-12: 'på lotus la vi bara in ett golv för toning som gör att det inte skall bli strobe. jag
+ *  tänker samma i dmx output. Sen skall det ju ligga i effekterna'): lampan får inte slockna snabbare än FADE_MIN_S (ägaren 09-29:
+ *  snabbare är förbjudet), vad effekten än gör. Ett rent golv, ingen toning. Golvet är brutet först när BÅDE lampans nivå (starkaste
+ *  kanalen) OCH lampans ljus (kanalsumman efter lampans kurva) fallit snabbare än tidskonstanten: effekternas uttoning
+ *  (effects/toning.ts) håller alltid minst ett av dem (nivån vid skarpt kulörbyte, ljuset vid kulörtoning), så golvet griper bara in
+ *  om en effekt bryter kontraktet. Då lyfts rutans kulör till golvets nivå (svart ruta: förra rutans kulör). */
+export class LampGuard {
+  private lvl = new Float32Array(64); private light = new Float32Array(64); private prev = new Float32Array(192);
+  step(i: number, fx: FixtureConfig | undefined, rgb: [number, number, number], dtSec: number): void {
+    const G = lampGamma(fx), o = i * 3, l = this.lvl[i];
+    let mT = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]), L = rgb[0] ** G + rgb[1] ** G + rgb[2] ** G;
+    const fl = l * lampFadeK(fx, dtSec, FADE_MIN_S);
+    if (l > 0 && mT < fl * 0.999 && L < this.light[i] * Math.exp(-dtSec / FADE_MIN_S) * 0.999) {
+      if (mT > 0) { const k = fl / mT; rgb[0] *= k; rgb[1] *= k; rgb[2] *= k; }
+      else { const k = fl / l; rgb[0] = this.prev[o] * k; rgb[1] = this.prev[o + 1] * k; rgb[2] = this.prev[o + 2] * k; }
+      mT = fl; L = rgb[0] ** G + rgb[1] ** G + rgb[2] ** G;
     }
-    if (mT >= fall) { if (mT > this.lvl[i] + 0.005 || !holding) this.peakAt[i] = now; this.lvl[i] = mT; }
-    else {
-      // UTTONINGEN STIGER ALDRIG I LJUS (ägaren i ladan 11-07: 'när en effekt fadar en färg så kan den hacka i slutet av fade, snabbt
-      // öka ljusstyrka'; spårat 11-08: byter effekten kulör på en lampa som tonar ut fick den NYA kulören den hållna nivån per kanal -
-      // röd 40 -> magenta 40+40 = dubbla ljuset). Den nya kulören får högst den gamla kulörens ljus på den här nivån (output.ts sameLight).
-      const prevL = this.lvl[i], fo = this.fo, fn = this.fn, sc = prevL > 0 ? fall / prevL : 0;
-      fn[0] = this.ratio[o] * fall; fn[1] = this.ratio[o + 1] * fall; fn[2] = this.ratio[o + 2] * fall;
-      fo[0] = this.prev[o] * sc; fo[1] = this.prev[o + 1] * sc; fo[2] = this.prev[o + 2] * sc;
-      this.lvl[i] = fall;
-      if (sc > 0 && sameLight(fx, fo, fn)) { rgb[0] = fo[0]; rgb[1] = fo[1]; rgb[2] = fo[2]; }   // samma ljus som den gamla kulören
-      else { rgb[0] = fn[0]; rgb[1] = fn[1]; rgb[2] = fn[2]; }                              // den nya har mindre ljus: som förr
-    }
+    this.lvl[i] = mT; this.light[i] = L;
     this.prev[o] = rgb[0]; this.prev[o + 1] = rgb[1]; this.prev[o + 2] = rgb[2];
   }
 }

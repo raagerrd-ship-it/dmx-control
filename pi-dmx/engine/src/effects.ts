@@ -14,7 +14,8 @@
 import { isLogOn } from "./quiet.js";
 import type { ChannelRole, EngineConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
-import { FixtureOutput, keepLit, lampLevel, sameLight, LampFade, type SpecialtyValues } from "./output.js";   // minsta på-tiden = lampfysik (output.ts MINSTA PÅ-TID)
+import { FixtureOutput, keepLit, lampLevel, sameLight, LampGuard, type SpecialtyValues } from "./output.js";
+import { EffectFade } from "./effects/toning.js";   // minsta på-tiden = lampfysik (output.ts MINSTA PÅ-TID)
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, GRID_EARLY_MS } from "./beatClock.js";
 import { SILENCE_LEVEL, BASS_SPAN_DB, type Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
@@ -440,7 +441,7 @@ const PD_TOP = envN('DMX_DROP_TOP', 0), PM_LIFT_FLOOR = envN('DMX_MINI_LIFT_FLOO
  *  frame.specAbs (samma bandmedel som bodyDb, utan bandet 120-250 Hz där röstens grundton och virvelns kropp ligger). Flank-dropen läser
  *  fortfarande bodyDb. 0 = av (som före). */
 /* (LAMPKONTRAKTET 2026-11-08: motorn räknar i ANDEL AV LAMPANS LJUS och output.ts översätter per lampa - energins DMX-procent
- *  lampLevel(fx, md), uttoningen och minsta på-tiden LampFade (cfg.fadeMinS m.fl.), minsta tända nivå keepLit(fx), kulörtoningens ljus
+ *  lampLevel(fx, md), golvet mot strobe LampGuard (uttoningen och minsta på-tiden är effekternas: effects/toning.ts), minsta tända nivå keepLit(fx), kulörtoningens ljus
  *  sameLight(fx). Ingen gamma här - se output.ts.) */
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
@@ -606,7 +607,8 @@ export class EffectEngine {
   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
   private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
   private xfMode: Mode | '' = ''; private xfFrom: EffectDef | undefined; private xfAt = 0; private rXw = 1;   // ÖVERTONING MELLAN EFFEKTER (se stegets kommentar vid EFFECT_MAP.get)
-  private lampFade = new LampFade();   // STEG 2: uttoningen + minsta pa-tiden per lampa (lampans kontrakt, output.ts)
+  private lampFade = new EffectFade();   // STEG 2: effekternas uttoning + minsta pa-tid per lampa (effects/toning.ts)
+  private lampGuard = new LampGuard();   // outputs golv mot strobe (output.ts): griper bara in om en effekt faller snabbare an FADE_MIN_S
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
@@ -1427,9 +1429,10 @@ export class EffectEngine {
       // lampan tand (m0 > 0) och ingangen ar pa (k > 0) halls den pa lampans lagsta tanda niva (output.ts keepLit: forsta DMX-steget ->
       // tandpunkt+1). Bara effekten sjalv eller slackgransen (tystnad) slacker. Kuloren bevaras (alla kanaler med samma faktor).
       if (m0 > 0 && k > 0) keepLit(fx, rgb);
-      // STEG 2 forts. - EN UTTONING + MINSTA PA-TID = LAMPANS KONTRAKT (output.ts LampFade, fade-planen 11-12): lampans ljusstyrka upp
-      // direkt, ner med tidskonstanten cfg.fadeMinS; kuloren foljer effekten direkt. Tiderna ar installningar i /setup.
+      // STEG 2 forts. - EFFEKTERNAS UTTONING + MINSTA PA-TID (effects/toning.ts): lampans ljusstyrka upp direkt, ner med tidskonstanten
+      // cfg.fadeMinS; kuloren foljer effekten direkt. Tiderna ar installningar i /setup. Darefter OUTPUTS GOLV MOT STROBE (output.ts LampGuard).
       this.lampFade.step(i, fx, rgb, renderNow, dtSec, fastLight);
+      this.lampGuard.step(i, fx, rgb, dtSec);
       this.out.writeFixture(this.universe, fx, rgb, 1, 0, specialty);
     }
     return wantFogFx;
@@ -1948,7 +1951,7 @@ export class EffectEngine {
     const effect = EFFECT_MAP.get(effMode);
     // ÖVERTONING MELLAN EFFEKTER (dirigenten, fade-planen steg 4, ägaren 11-12: 'Lägg även till den'): när dirigenten byter effekt tonas
     // den gamla ut och den nya in i STEG 1 (effektens färg, före energin) över cfg.lookFadeMs. 0 = direkt byte som förr (standard,
-    // DMX-md5-identiskt). Drop/minidrop slår direkt: en smäll avbryter övertoningen. Uttoningens golv (output.ts LampFade) gäller efteråt.
+    // DMX-md5-identiskt). Drop/minidrop slår direkt: en smäll avbryter övertoningen. Effekternas uttoning (effects/toning.ts) gäller efteråt.
     { const ms = this.cfg.mode === "smart" ? Math.max(0, Math.min(3000, this.cfg.lookFadeMs ?? 0)) : 0;
       if (effMode !== this.xfMode) { this.xfFrom = ms > 0 && this.xfMode !== '' ? EFFECT_MAP.get(this.xfMode) : undefined; this.xfAt = nowWall; this.xfMode = effMode; }
       if (this.xfFrom && (ms <= 0 || dropHit || this.dropColEnv > 0.005 || this.miniColEnv > 0.005 || nowWall < this.miniBangUntil || nowWall < this.dropBangUntil || nowWall - this.xfAt >= ms)) this.xfFrom = undefined;
