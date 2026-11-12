@@ -111,7 +111,7 @@ except Exception:
 print()
 # RANKINGRADEN (ägaren 11-12): domarens plats och poäng längst ner, ur ranking*.md (kontrollmängdens ranking för KONTROLL-kolumnerna)
 rank = {False: {}, True: {}}
-for f in sorted(glob.glob(os.path.join(K, 'ranking*.md')), key=os.path.getmtime):
+for f in sorted(glob.glob(os.path.join(K, 'ranking-' + DOM + '*.md')), key=os.path.getmtime):
     hold = 'holdout' in os.path.basename(f) or 'kontroll' in os.path.basename(f)
     for l in io.open(f, encoding='utf-8'):
         m = re.match(r'\|\s*(\d+)\s*\|\s*([^|]+?)\s*\|\s*([+-]?[\d.,]+)\s*\|', l)
