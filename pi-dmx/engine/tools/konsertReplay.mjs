@@ -26,7 +26,7 @@ const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
 const d = readFileSync(path); const nSamples = (d.length - 44) >> 1;
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = Number(opt("--step", 25));   // --step 5 = som live (200 Hz)
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
-cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.master = 1;
+cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.master = 1;   if (process.env.KR_MODE) cfg.mode = process.env.KR_MODE;   // KR_MODE=<look> (11-12): en fast look i stället för dirigenten - etikettens verkan på ljuset utan lookföljdens slump
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
 const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = (fx.address ?? 1) - 1; const at = (r) => { const i = roles.indexOf(r); return i < 0 ? -1 : base + i; }; return { r: at("r"), g: at("g"), b: at("b"), dim: at("dim") }; });
 // --delad-cfg (MÄTFÄLLA 47, 10-13): live får analysatorn MOTORNS cfg (index.ts createAnalyser(cfg)), så kickgrinden mot taktgridet
@@ -47,6 +47,12 @@ an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
 const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
 Date.now = () => EPOCH; performance.now = () => 0;
 const eng = new EffectEngine(cfg);
+// KR_SEED (11-12, ljusdomarens spridning): dirigenten drar den MINST SPELADE av de bäst passande lookerna (pickLook), så ett annat
+// 'tidigare i kväll' ger en annan lookföljd på SAMMA analys. Seed n > 0 ger var tredje look 60 s förspelad tid. Osatt/0 = som förr.
+// KR_TOG=0|1 (11-12): lås dirigentens toggle-låt-beslut (manusTog, avgörs annars vid låtens FÖRSTA lookval) - skiljer ljusets kvalitet
+// från slumpen i när det valet råkar tas. Osatt = som förr.
+if (process.env.KR_TOG === '0' || process.env.KR_TOG === '1') { const v = process.env.KR_TOG === '1'; Object.defineProperty(eng, 'manusTog', { get: () => v, set: () => {} }); }
+{ const sd = Number(process.env.KR_SEED || 0); if (sd > 0) EFFECT_KEYS.forEach((k, i) => { if ((i + sd) % 3 === 0) eng.lookPlayMs.set(k, Float64Array.of(60000)); }); }
 let tNow = 0; const LOG = [];
 console.log = (...a) => { const s = a.join(" "); if (/^\[dirigent\]/.test(s)) LOG.push([+tNow.toFixed(2), s.slice(11, 140)]); };
 const buf = new Float32Array(HOP);
