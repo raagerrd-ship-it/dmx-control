@@ -552,6 +552,26 @@
       <span class="val" id="lvlHoldV">–</span>
     </div>
     <div class="status" style="margin-top:2px">Så länge det ska vara tyst innan lamporna släcks. De tänds direkt när ljudet kommer tillbaka.</div>
+    <div class="row" style="margin-top:10px"><label>Uttoning</label>
+      <input type="range" min="25" max="200" step="5" id="lvlFade" style="flex:1;margin:0 10px">
+      <span class="val" id="lvlFadeV">–</span>
+    </div>
+    <div class="status" style="margin-top:2px;margin-bottom:8px">Hur långsamt en lampa tonar ut när effekten släcker den (tidskonstant i lampans ljus). Upp går alltid direkt. Kortare än 0,25 s går inte att välja.</div>
+    <div class="row"><label>Minsta på-tid</label>
+      <input type="range" min="0" max="500" step="10" id="lvlMinOn" style="flex:1;margin:0 10px">
+      <span class="val" id="lvlMinOnV">–</span>
+    </div>
+    <div class="status" style="margin-top:2px;margin-bottom:8px">Så länge en lampa håller nivån den nått innan uttoningen börjar. Korta blixtar blir en puls i stället för flimmer.</div>
+    <div class="row"><label>På-tid per färg</label>
+      <input type="range" min="0" max="500" step="10" id="lvlChMinOn" style="flex:1;margin:0 10px">
+      <span class="val" id="lvlChMinOnV">–</span>
+    </div>
+    <div class="status" style="margin-top:2px;margin-bottom:8px">Så länge en tänd färgkanal (R, G eller B) hålls kvar även om effekten släcker den direkt.</div>
+    <div class="row"><label>Övertoning</label>
+      <input type="range" min="0" max="2000" step="50" id="lvlLookFade" style="flex:1;margin:0 10px">
+      <span class="val" id="lvlLookFadeV">–</span>
+    </div>
+    <div class="status" style="margin-top:2px">Hur länge den gamla effekten tonas ut och den nya in när dirigenten byter effekt. 0 = direkt byte. Drop och minidrop slår alltid direkt.</div>
   </div>
 
   <h1>Show</h1>
@@ -927,6 +947,10 @@ function syncLevelUi(cfg) {
   { const vc = Math.round((cfg.verseCeil ?? 0.65) * 100); setR("lvlVerse", vc); setV("lvlVerseV", vc + " %"); }
   const hold = Math.round((cfg.silenceHoldS ?? 0) * 10); setR("lvlHold", hold); setV("lvlHoldV", (hold / 10).toFixed(1) + " s");
   setR("lvlSil", sil); setV("lvlSilV", sil + " %");
+  { const f = Math.round((cfg.fadeMinS ?? 0.25) * 100); setR("lvlFade", f); setV("lvlFadeV", (f / 100).toFixed(2) + " s"); }
+  { const m = Math.round(cfg.minOnMs ?? 150); setR("lvlMinOn", m); setV("lvlMinOnV", m + " ms"); }
+  { const m = Math.round(cfg.chMinOnMs ?? 100); setR("lvlChMinOn", m); setV("lvlChMinOnV", m + " ms"); }
+  { const m = Math.round(cfg.lookFadeMs ?? 0); setR("lvlLookFade", m); setV("lvlLookFadeV", m + " ms"); }
 }
 (function wireLevel() {
   let t = null;
@@ -944,6 +968,10 @@ function syncLevelUi(cfg) {
   bind("lvlFloor", "lvlFloorV", (v) => v + " %", (v) => ({ type: "setEnergyFloor", value: v / 100 }));
   bind("lvlVerse", "lvlVerseV", (v) => v + " %", (v) => ({ type: "setVerseCeil", value: v / 100 }));
   bind("lvlSil", "lvlSilV", (v) => v + " %",  (v) => ({ type: "setSilenceLevel",  value: v / 100 }));
+  bind("lvlFade", "lvlFadeV", (v) => (v / 100).toFixed(2) + " s", (v) => ({ type: "setFadeMin", value: v / 100 }));
+  bind("lvlMinOn", "lvlMinOnV", (v) => v + " ms", (v) => ({ type: "setMinOn", value: v }));
+  bind("lvlChMinOn", "lvlChMinOnV", (v) => v + " ms", (v) => ({ type: "setChMinOn", value: v }));
+  bind("lvlLookFade", "lvlLookFadeV", (v) => v + " ms", (v) => ({ type: "setLookFade", value: v }));
 })();
 
 /* LED-ring (WS2812 på vredet) — visas bara om hårdvaran är konfigurerad. */

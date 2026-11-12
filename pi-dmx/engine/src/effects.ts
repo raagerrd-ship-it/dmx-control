@@ -605,6 +605,7 @@ export class EffectEngine {
   private eSm = 0; eSimple = 0; private eBass = 0; private bLo = 0; private bPart = 1; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1; private spreadM0 = new Float64Array(64);   // ENERGIN (se E_WIN_S); spreadM0 = BASGANG
   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
   private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
+  private xfMode: Mode | '' = ''; private xfFrom: EffectDef | undefined; private xfAt = 0; private rXw = 1;   // ÖVERTONING MELLAN EFFEKTER (se stegets kommentar vid EFFECT_MAP.get)
   private lampFade = new LampFade();   // STEG 2: uttoningen + minsta pa-tiden per lampa (lampans kontrakt, output.ts)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
@@ -1366,7 +1367,7 @@ export class EffectEngine {
   /** LAMPORNA: effekt -> effektNiva -> kulörtoning -> energi -> uttoning -> utgång, per lampa (utbrutet ur render 10-16, GC-jakten: ordagrant flyttat, samma ordning). */
   private renderLamps(effect: EffectDef | undefined, count: number, ordSel: number, useAnchor: boolean, fxToggle: boolean, fastLight: boolean, modE: boolean): boolean {
     const t = this.rT, anchorHue = this.rAnchorHue, nowWall = this.rNowWall, inputGate = this.rInputGate, md = this.rMd, drive = this.rDrive, renderNow = this.rNowP, dtSec = this.rDt;
-    const ctx = this.ctx, bands = this.bandsBuf, specialty = this.specBuf; this.lampFade.tune(this.cfg);
+    const ctx = this.ctx, bands = this.bandsBuf, specialty = this.specBuf, xFrom = this.xfFrom, xw = this.rXw, xu = 1 - xw; this.lampFade.tune(this.cfg);
     let wantStrobe = 0, wantBlinder = 0, wantUv = 0, wantLaser = 0, wantHazer = 0, wantCo2 = 0, wantFogFx = false;
     // BASGANG (a7): ledaren = förra rutans ljusaste lampa (före energin); bland lika ljusa (inom 5 %) den vars tur det är (en lampa per basnot)
     const bp = this.eBass * this.eBass, sm = this.spreadM0, spreadOn = !(effect && SPREAD_SKIP.has(effect.key)); let lead = -1, leadM = 0;
@@ -1383,12 +1384,14 @@ export class EffectEngine {
           ctx.idx = ordSel === 0 ? i : ordSel === 1 ? n - 1 - i : ordSel === 2 ? Math.min(n - 1, 2 * e + side) : Math.max(0, n - 1 - (2 * e + side)); }
         { const sg = slotSize(count), sl = Math.floor(i / sg), ns = Math.ceil(count / sg);   // hyrkitet 11-02: kanten = ytterplatserna (8 lampor: 0,1,6,7 mot 2-5; förr 2 mot 6)
           ctx.group = ctx.grouping === 'innerouter' ? ((count < 3 ? i % 2 === 1 : (sl === 0 || sl === ns - 1)) ? 1 : 0) : i % 2; }
+        if (fx?.bands?.length) { let mb = -Infinity; for (let k = 0; k < fx.bands.length; k++) mb = Math.max(mb, bands[BAND_IDX[fx.bands[k]]]); ctx.band = mb; }   // = Math.max(...fx.bands.map(...)) utan spread/closure
+        else ctx.band = bands[i % bands.length];
+        let xo0 = 0, xo1 = 0, xo2 = 0; if (xFrom) { const xo = xFrom.render(ctx); xo0 = xo[0]; xo1 = xo[1]; xo2 = xo[2]; }   // ÖVERTONING: den gamla effektens färg (dess önskemål nollas nedan)
         ctx.want.strobe = undefined; ctx.want.blinder = undefined;
         ctx.want.uv = undefined; ctx.want.laser = undefined; ctx.want.fog = undefined;
         ctx.want.hazer = undefined; ctx.want.co2 = undefined; ctx.want.energy = undefined;
-        if (fx?.bands?.length) { let mb = -Infinity; for (let k = 0; k < fx.bands.length; k++) mb = Math.max(mb, bands[BAND_IDX[fx.bands[k]]]); ctx.band = mb; }   // = Math.max(...fx.bands.map(...)) utan spread/closure
-        else ctx.band = bands[i % bands.length];
         rgb = effect ? this.lampColor(i, effect.render(ctx)) : this.lampColor(i, ZERO3);   // (se lampColor)
+        if (xFrom) { rgb[0] = rgb[0] * xw + xo0 * xu; rgb[1] = rgb[1] * xw + xo1 * xu; rgb[2] = rgb[2] * xw + xo2 * xu; }
         rgb = this.effektNiva(rgb, ctx, fxToggle);   // STEG 1 forts.: effektens niva och drop-looken (se effektNiva)
         // EFFEKTENS ÖNSKEMÅL. Den vet sin egen dramaturgi bäst; motorn avgör om det
         // blir av (fixturen måste ha rollen, och rök går genom hårdvaruskyddet).
@@ -1943,6 +1946,13 @@ export class EffectEngine {
     // Effekternas önskemål om specialenheter, samlade över lamporna.
     let wantStrobe = 0, wantBlinder = 0, wantUv = 0, wantLaser = 0, wantHazer = 0, wantCo2 = 0, wantFogFx = false;
     const effect = EFFECT_MAP.get(effMode);
+    // ÖVERTONING MELLAN EFFEKTER (dirigenten, fade-planen steg 4, ägaren 11-12: 'Lägg även till den'): när dirigenten byter effekt tonas
+    // den gamla ut och den nya in i STEG 1 (effektens färg, före energin) över cfg.lookFadeMs. 0 = direkt byte som förr (standard,
+    // DMX-md5-identiskt). Drop/minidrop slår direkt: en smäll avbryter övertoningen. Uttoningens golv (output.ts LampFade) gäller efteråt.
+    { const ms = this.cfg.mode === "smart" ? Math.max(0, Math.min(3000, this.cfg.lookFadeMs ?? 0)) : 0;
+      if (effMode !== this.xfMode) { this.xfFrom = ms > 0 && this.xfMode !== '' ? EFFECT_MAP.get(this.xfMode) : undefined; this.xfAt = nowWall; this.xfMode = effMode; }
+      if (this.xfFrom && (ms <= 0 || dropHit || this.dropColEnv > 0.005 || this.miniColEnv > 0.005 || nowWall < this.miniBangUntil || nowWall < this.dropBangUntil || nowWall - this.xfAt >= ms)) this.xfFrom = undefined;
+      this.rXw = this.xfFrom ? (nowWall - this.xfAt) / ms : 1; }
     const ctx = this.ctx;
     ctx.cfg = this.cfg; ctx.frame = frame; ctx.t = t; ctx.count = count;
     ctx.section = frame.section || 'intro'; ctx.sectionAgeMs = frame.sectionAgeMs || 0; ctx.sectionIndex = frame.sectionIndex || 0;

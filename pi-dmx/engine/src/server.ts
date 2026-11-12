@@ -547,6 +547,8 @@ export async function startServer(
           } else if (msg.type === "setSilenceHold" && Number.isFinite(msg.value)) {
             // "Släcktid": sekunder under släckgränsen innan riggen släcks (0..5).
             deps.cfg.silenceHoldS = Math.max(0, Math.min(5, Number(msg.value)));
+          } else if (msg.type === "setLookFade" && Number.isFinite(msg.value)) {
+            deps.cfg.lookFadeMs = Math.max(0, Math.min(3000, Number(msg.value)));   // "Övertoning": dirigentens effektbyte tonas över så många ms (0 = direkt)
           } else if (msg.type === "setFadeMin" && Number.isFinite(msg.value)) {
             // "Uttoning": lampans uttoning, tidskonstant i ljus (0,25..2 s; snabbare än 0,25 är förbjudet). output.ts LampFade.
             deps.cfg.fadeMinS = Math.max(0.25, Math.min(2, Number(msg.value)));
