@@ -159,7 +159,7 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
   // 2/3-HOPPEN (natt 11-10, lotus 11-09 22:00: 128 bpm-klubbmix, analyser.bpm 80-87 i stretcher): andel tid efter 8 s in i låten då tempot
   // står på 2/3 eller 3/2 av facit (vikt 80-160) utan att vara rätt - ana (frame.bpm) och klocka (cfg.beat) var för sig. Informativt.
   const h23 = (bpm, tf) => bpm > 0 && !okBpm(bpm, tf) && tf.some((t) => [2 / 3, 1.5].some((q) => Math.abs(fold(bpm) / fold(t * q) - 1) <= 0.04));
-  const T = { n: 0, a: 0, k: 0, other: 0, lock: [], still: [], hops: 0, oct: 0, hopMin: 0, n8: 0, a23: 0, k23: 0 }; let si = 0;
+  const T = { n: 0, a: 0, k: 0, other: 0, lock: [], still: [], still3: [], hops: 0, oct: 0, hopMin: 0, n8: 0, a23: 0, k23: 0 }; let si = 0;
   for (const s of seg) {
     const r = { n: 0, k: 0, lock: NaN }; let run = 0, held = 0, cand = 0, cn = 0;
     while (si < samp.length && samp[si][0] < s.t0) si++;
@@ -186,11 +186,20 @@ if (job === 'lang') {   // ── sektionLag.mjs (ladan 10-21 + gridfas natt 10-
       if (ok >= 50) still = (samp[j][0] - s.t0) / 1000;
     }
     T.still.push(isNaN(still) ? (s.t1 - s.t0) / 1000 : still);
+    // STILLA, ROBUST (klockdom.py DMX-läget 11-13): samma fönster och startpunkt, men gränsen är domarens tempobyte (> 3 %) i stället för
+    // +-1 %, så fintempots grannsteg inte startar om räkningen. TILLÄGG: 'still'/'stillMed' ovan är orörda (tvavagar.py läser dem).
+    let still3 = NaN;
+    for (let j = si; j < samp.length && samp[j][0] < s.t1 && isNaN(still3); j++) {
+      const k0 = samp[j][2]; if (!(k0 > 0)) continue; let ok = 0;
+      for (let m = j; m < samp.length && samp[m][0] < s.t1 && ok < 50; m++) { if (samp[m][2] > 0 && Math.abs(samp[m][2] / k0 - 1) <= 0.03) ok++; else break; }
+      if (ok >= 50) still3 = (samp[j][0] - s.t0) / 1000;
+    }
+    T.still3.push(isNaN(still3) ? (s.t1 - s.t0) / 1000 : still3);
   }
   const skarv = starts.slice(1).map((s) => (s + FADE / 2) / SR);   // övertoningens mitt (s)
   const used = new Set(); let ratt = 0, falsk = 0;
   for (const b of C.bounds) { const i = skarv.findIndex((x, k) => !used.has(k) && Math.abs(x - b) <= 15); if (i >= 0) { used.add(i); ratt++; } else falsk++; }
-  out.push({ klipp: clips.length, min: total / SR / 60, klocka: 100 * T.k / T.n, ana: 100 * T.a / T.n, annat: 100 * T.other / T.n, lasMed: med(T.lock), stillMed: med(T.still), still: T.still,
+  out.push({ klipp: clips.length, min: total / SR / 60, klocka: 100 * T.k / T.n, ana: 100 * T.a / T.n, annat: 100 * T.other / T.n, lasMed: med(T.lock), stillMed: med(T.still), still: T.still, stillMed3: med(T.still3), still3: T.still3, las: T.lock,
     ana23: 100 * T.a23 / Math.max(1, T.n8), klocka23: 100 * T.k23 / Math.max(1, T.n8), hoppMin: T.hopMin ? T.hops / T.hopMin : 0, hopp: T.hops, oktav: T.oct, skarvar: skarv.length, grRatt: ratt, grFalsk: falsk, bounds: C.bounds, drops: C.drops.length });
 } else if (job === 'klipp') {   // ── taktKorpus.mjs (natt 10-13): per klipp kallstart, andel tid efter 5 s (100 ms-raster) ──
   for (const [f, ...tf] of list) {
