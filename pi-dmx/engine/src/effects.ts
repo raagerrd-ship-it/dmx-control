@@ -174,30 +174,9 @@ const BEAT_PREDIP_DEPTH = 0.35;
 /** Ettan i varje fyrtakt pulserar så här mycket starkare än övriga slag.
  *  25 % är tydligt men inte ett eget effektläge. */
 const BEAT_DOWNBEAT_ACCENT = 0.25;
-/** TAKT-BASERAD HALVERING av PRESENTATIONSTAKTEN (portad från Lotus 2026-08-30).
- *  Analysatorn ger korrekt tempo; dirigenten väljer takten publiken ser. En låt på
- *  157 BPM pulsar annars i 2,6 Hz och känns hackig. Över tröskeln pulsar hjärtslaget
- *  på varannat slag. HYSTERESEN är obligatorisk: en fast gräns utan den flappade
- *  ("dubblade i lugna partier kring tröskeln") i Lotus. */
-const PULSE_HALVE_ABOVE_BPM = 170;   // 135 -> 170 (2026-09-23, samma som lotus: "Gamle Astrid" 148 BPM kandes som halvtakt)
-const PULSE_HALVE_HYST_BPM = 15;
-/** ENERGISTYRD HALVERING (portad från Lotus energySubdiv 2026-08-31).
- *  BPM-regeln ovan fångar bara snabba låtar. En lugn vers på 118 BPM pulsar ändå
- *  i full takt, vilket ingen ljustekniker hade gjort — där halverar man för att
- *  släppa ner luften. Signalen är `frame.intensity` (sektionsenergi relativt
- *  låtens EGET snitt, 0.5 = snittet), utjämnad över ~8 s: en FAST nivå-tröskel
- *  kan inte fungera eftersom materialets nivå vandrar (MÄTT i Lotus: 0.480 →
- *  0.232 median mellan låtar). Hysteres + min-hold är obligatoriska — utan hold
- *  gav Lotus en fyrkantsvåg som växlade takt var 12:e sekund. */
-const SUBDIV_ENERGY_TAU_MS = 8000;
-const SUBDIV_ENERGY_LO_ON = 0.30;    // under detta: lugnt parti → halvera
-const SUBDIV_ENERGY_LO_OFF = 0.42;   // över detta: släpp halveringen
-const SUBDIV_MIN_HOLD_MS = 10000;
-/** HALVERAD SHOW (alltid sedan 10-11, brytaren DMX_HALVE_SHOW borttagen): halveringen når hela showen, inte bara hjärtslagets form. Effekt-klockan
- *  (beatIdx/beatFrac/beatHit) går i halvtakt när pulsen är halverad, så `varannan`/`innerouter`
- *  ger jämna|inre lampor på slag 1 och udda|yttre på slag 2, och `hjarta` slår varannan takt.
- *  Dirigenten boostar de delade lookerna vid halvering (dubbeltakt ELLER lugnt) och hjärta i
- *  lugna partier, och får byta look när halveringen slår om. Ägaren 2026-09-12. */
+/** PULSHALVERINGEN ÄR BORTTAGEN (ägaren i ladan 2026-11-12: 'av'): pulsen och effektklockan går på varje slag, alltid. Förr halverades
+ *  de i lugna partier (frame.intensity under 0,30 i 8 s) och över 170 BPM (kunde aldrig inträffa: klockan ligger i 80-160). Utredningen
+ *  (.arena/pulshalv/RAPPORT.md) visade att regeln hittade lugna partier, inte halvtakt. */
 /** DMX_EFFECT_HEART: skalar effekternas EGNA hjartpuls (c.heart). 1 = som effektfilerna sager, 0 = av (A/B i ladan 09-27). */
 // STANDARD 1,4 sedan 2026-10-06 (live-prov i ladan 22:41, agaren: "mycket battre knyck, satt det som standard").
 // Bakgrund: nar det additiva hjartslagslyftet togs bort samma kvall foll riggens topp 5-9 % (matt med
@@ -503,12 +482,7 @@ export class EffectEngine {
   private lastBeatIdx = -1; private slagWaitAt = -1;
   /** Takt-räknare som effekterna ser (beatIdx): stegar på grid-slaget när BPM är
    *  låst, annars på verkliga kicks → grid-effekter fryser aldrig utan BPM-lås. */
-  private beatCounter = 0; private gridCounting = false; private gridK = 0; private gridHalved = false;   // EN TAKTRÄKNARE (r0): räknaren följer rutnätets index
-  /** Pulsen körs i halva takten (snabb låt ELLER lugnt parti). Se PULSE_HALVE_*
-   *  och SUBDIV_*. */
-  private pulseHalved = false;
-  private halfTick = 0;                 // DMX_HALVE_SHOW: paritet inom det halverade slaget
-  private lastHalvedForSwitch = false;  // DMX_HALVE_SHOW: halvering vid senaste look-bytet
+  private beatCounter = 0; private gridCounting = false; private gridK = 0;   // EN TAKTRÄKNARE (r0): räknaren följer rutnätets index
   private lastBassClearForSwitch = false;  // tydlig basgang vid senaste look-bytet (CLEAR_BASS)
   private seenLooks = new Set<Mode>();     // MIX_V2 (6): effekter som valts sedan start
   /** Monoton pulsklocka (rotfix mot hjärtslags-fladder): pulsens index och paritet
@@ -516,9 +490,6 @@ export class EffectEngine {
    *  fasrättningar inte kan re-attackera eller flippa pariteten mitt i ett slag. */
   private lastPulseIdx = PULSE_IDX_INIT;
   private pulseFloorMs = 0;
-  /** ~8 s-utjämnad sektionsenergi + när halveringen senast bytte (min-hold). */
-  private subdivEnergy = 0.5;
-  private subdivChangedAt = 0;
 
   /** Drops mode: per-lamp fire time + hue; advanced on each beat/kick. */
   private dropPos = 0;
@@ -816,7 +787,7 @@ export class EffectEngine {
     if (!EffectEngine.bassDropLooks) EffectEngine.bassDropLooks = ([...EFFECT_MAP.keys()] as Mode[]).filter((m) => this.bassStrong(m)).sort((a, b) => (FIT[b]!.bass + FIT[b]!.punch) - (FIT[a]!.bass + FIT[a]!.punch));
     return EffectEngine.bassDropLooks;
   }
-  private switchLook(frame: Frame, bpm: number, tierS: Mode[], tierName: string, bassClear: boolean, allaBuild: boolean, buildEntry: boolean, buildExit: boolean, dropSwitch: boolean, halvedChanged: boolean, liveSec: string, memSection: boolean, secEntry: boolean, tierChanged: boolean): void {
+  private switchLook(frame: Frame, bpm: number, tierS: Mode[], tierName: string, bassClear: boolean, allaBuild: boolean, buildEntry: boolean, buildExit: boolean, dropSwitch: boolean, liveSec: string, memSection: boolean, secEntry: boolean, tierChanged: boolean): void {
     const now = this.rNowP, nowWall = this.rNowWall, LUGN = TIER.lugn, FART = TIER.fart, FULLFART = TIER.full;
         // (skrapjakten 10-01: enabled/req skapades forr pa varje ruta men anvands bara har, i bytet)
         const enabled = (list: Mode[]) => list.filter((m) => this.cfg.rotation?.[m] !== false);
@@ -845,10 +816,9 @@ export class EffectEngine {
         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
         this.switchWhy = dropSwitch ? 'drop'
           : (memSection || secEntry) ? 'sektion'
-          : (buildEntry || allaBuild) ? 'build' : buildExit ? 'build-slut' : halvedChanged ? 'halvering' : tierChanged ? 'tier' : 'dwell';
+          : (buildEntry || allaBuild) ? 'build' : buildExit ? 'build-slut' : tierChanged ? 'tier' : 'dwell';
         this.switchCount++;
         this.lastSmartTier = tierName;
-        this.lastHalvedForSwitch = this.pulseHalved;
         this.lastBassClearForSwitch = bassClear;
         // DWELL 45 s (agaren 2026-09-12 "dirigenten behover inte byta hela tiden, bara vid andringar i laten"): en nodfallback - bytena
         // sker pa sektionsgrans, drop, basgang och halvering. 10-11: env-ratten DMX_DWELL_MS och stamningarnas/UI:ts smartDwellMs bort
@@ -879,7 +849,6 @@ export class EffectEngine {
         if (pool.length === 0) pool = ["breathe"];                                   // sista fallback
         // HALVERAT: de delade lookerna (och hjärtat) ska finnas i poolen oavsett tier.
         // (innerouter borttagen 2026-09-23: rPerm 1,00 mot varannan - samma effekt upp till lampordning.)
-        if (this.pulseHalved) for (const m of ["varannan", "basgang", "hjarta"] as Mode[]) if (!pool.includes(m) && this.cfg.rotation?.[m] !== false && req(m)) pool.push(m);
         { const show = pool.filter((m) => !(CALM_ONLY.includes(m) && !(bpm > 0 && bpm < CALM_BPM))); if (show.length) pool = show; }   // UNIFORM tillbaka 10-11 (energi pa utvalda lampor)
         if (secKey === 'build') { const b = pool.filter((m) => BUILD_LOOKS.includes(m)); pool = b.length ? b : enabled(BUILD_LOOKS); }   // BUILD SOM HÅLLER   // KONSERTLÄGET: ingen enhetlig look
         if (secKey === 'high') {                                   // LAMPTRAPPA: refrängen -> hela riggen
@@ -937,15 +906,13 @@ export class EffectEngine {
           // DUBBELTAKT → VARANNAN: på snabbt/dubbeltakt-låst tempo (bpm ≥ 140) boostas
           // `varannan` (spatial dubbeltakt) hårt så dirigenten väljer den i stället för
           // att hela riggen blinkar dubbelt uniformt (ägaren i ladan 2026-09-03).
-          const halvedNow = this.pulseHalved;
           const fastBoost = (m: Mode) => (m === "varannan" && bpm >= 140 ? 0.30 : 0)
             + (bassClear && TOGGLE_POOL.includes(m) ? CLEAR_BASS_BOOST : 0)                    // MIX_V2 (1): boost, inte pool-byte
             - (this.recentLooks.includes(m) ? MIX_RECENT_PENALTY : 0)                          // MIX_V2 (3): nyhetsstraff
             + (!this.seenLooks.has(m) ? MIX_UNSEEN_BONUS : 0)                                 // MIX_V2 (6): osedd-bonus
             - unitPen(m)                                                                                  // forra latens look
             + rel(m)                                                                                      // LÅTMANUS: slakt med latens look
-            + (halvedNow && (m === "varannan" || m === "basgang") ? 0.30 : 0)
-            + (m === "hjarta" ? (halvedNow ? 0.30 : (calm || tierS === LUGN) ? 0.20 : 0) : 0);   // halverat: trion varannan/innerouter/hjarta = hela topp-3
+            + (m === "hjarta" && (calm || tierS === LUGN) ? 0.20 : 0);
           const ranked = pool
             .map((m) => ({ m, s: fitScore(m, frame.profile) + fastBoost(m) }))
             .sort((a, b) => b.s - a.s);
@@ -1098,7 +1065,7 @@ export class EffectEngine {
         if (liveSecChanged) this.pendingSecSwitch = true;
         const secOldEnough = (frame.sectionAgeMs ?? 1e9) >= SECTION_UNIT_MIN_MS;   // SECTION_UNIT: ingen switch pa en sektion yngre an SECTION_UNIT_MIN_MS (detektorflapp)
         const memSection = liveSecChanged;   // (latminnets sektionsgrans mem* borttagen 11-09 - sattes aldrig)
-        const phraseMs = this.cfg.beat && this.cfg.beat.bpm > 0 ? 16 * 60000 / this.cfg.beat.bpm * (this.pulseHalved ? 2 : 1) : 0;
+        const phraseMs = this.cfg.beat && this.cfg.beat.bpm > 0 ? 16 * 60000 / this.cfg.beat.bpm : 0;
         // LÅTMANUS: sektionsbytet landar på sektionens EGET taktraster (början av takt 2, 4, 6 ... sedan sektionsstart) i stället för
         // effektklockans 16-slagsfras, vars fas är godtycklig mot låten (bänken: bytet väntade upp till 24 s efter en hållen sektion).
         const secBars = frame.sectionBars ?? 0, secBarOk = secBars > 0 && (SWITCH_ON > 0 || (Math.floor(secBars) % 2 === 0 && secBars % 1 < 0.25));   // SWITCH_ON: slaggrinden nedan tar tajmningen (fönstret missade ticken -> 2 takter extra)
@@ -1110,14 +1077,13 @@ export class EffectEngine {
         //   MATT 2026-08-08 i en och samma refrang: "ny look chase (tier fart)"
         //   foljt 11 s senare av "ny look ripple (tier full)" — tre looker i en
         //   refrang, driven av att tiern flaxade mellan fart och full.
-        const halvedChanged = this.pulseHalved !== this.lastHalvedForSwitch;   // dubbeltakt/lugn slog om → delad look
         // BASGANG: tydlig basgang styr VALET av look (toggle-poolen), men byter inte look (LÅTMANUS).
         const bassClear = (frame.profile.bassline ?? 0) >= (this.lastBassClearForSwitch ? CLEAR_BASS - 0.2 : CLEAR_BASS);
         // LÅTMANUS: med sektioner byts looken bara pa sektionsgrans (+ build/drop nedan); fras, basgang, karaktar, tempo och
         // reservklockan byter inte langre. Utan sektion (ingen analys an) galler tier/halvering/dwell som forut.
         const wantSwitch = liveSec
             ? ((memSection || this.pendingSecSwitch) && secOldEnough)
-            : (tierChanged || memSection || halvedChanged || now > this.smartDwellUntil);
+            : (tierChanged || memSection || now > this.smartDwellUntil);
 
         // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
         // det, inte bara på energinivån. Två regler, båda dramaturgiska:
@@ -1167,10 +1133,10 @@ export class EffectEngine {
         if (SWITCH_ON > 0) {
           if (!ready) this.slagWaitAt = -1; else if (this.slagWaitAt < 0) this.slagWaitAt = now;
           if (ready && hasBeat && bpm > 0 && this.beatTrust >= 0.5 && !(this.tickNow && this.lastBeatIdx % SWITCH_ON === 0))
-            slagOk = now - this.slagWaitAt > SWITCH_ON * 1.25 * 60000 / bpm * (this.pulseHalved ? 2 : 1);
+            slagOk = now - this.slagWaitAt > SWITCH_ON * 1.25 * 60000 / bpm;
         }
         if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild || dropEntry) && (dropSwitch || dropEntry || allaBuild || concertBuild || buildExit || (ready && slagOk))) {
-        this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, halvedChanged, liveSec, memSection, secEntry, tierChanged);
+        this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, liveSec, memSection, secEntry, tierChanged);
       }
       return this.smartMode;
   }
@@ -1220,29 +1186,7 @@ export class EffectEngine {
     if (beatLocked(beat)) {   // EN PULSKURVA (r0, a6): samma grind som beatIndex/beatPhase och beatPulse/heartPulse - förr bpm > 40, så vid tillit < 0,20 frös beatEnv på ett golv
       const now2 = nowWall;
       const beatIdx = beatIndex(beat, now2 + this.showLead);   // takträknaren stegar lika tidigt
-      // PRESENTATIONSTAKT: över PULSE_HALVE_ABOVE_BPM pulsar hjärtslaget på varannat
-      // slag (hysteres nedåt så gränsen inte flappar). Taktklockan, beatTick och alla
-      // grid-effekter rör vi INTE — bara pulsens form sträcks över två slag.
-      // Dessutom: i ett genuint LUGNT parti halveras pulsen även i måttligt tempo
-      // (se SUBDIV_*). BPM-REGELN HAR FÖRETRÄDE — i Lotus fick energin skriva över
-      // takt-beslutet och resultatet blev en fyrkantsvåg som växlade var 12:e sekund.
-      const bpmNow = beatMs > 0 ? 60000 / beatMs : 0;
-      const aE = Math.min(1, (_dtT * 1000) / SUBDIV_ENERGY_TAU_MS);
-      this.subdivEnergy += (Math.max(0, Math.min(1, frame.intensity)) - this.subdivEnergy) * aE;
-      let wantHalved: boolean | null = null;
-      if (bpmNow > PULSE_HALVE_ABOVE_BPM) wantHalved = true;
-      else if (bpmNow > 0 && bpmNow < PULSE_HALVE_ABOVE_BPM - PULSE_HALVE_HYST_BPM) {
-        // Utanför takt-regelns hysteresband får energin bestämma.
-        if (!this.pulseHalved && this.subdivEnergy < SUBDIV_ENERGY_LO_ON) wantHalved = true;
-        else if (this.pulseHalved && this.subdivEnergy > SUBDIV_ENERGY_LO_OFF) wantHalved = false;
-      }
-      if (wantHalved !== null && wantHalved !== this.pulseHalved
-        && (this.subdivChangedAt === 0 || now2 - this.subdivChangedAt >= SUBDIV_MIN_HOLD_MS)) {
-        this.pulseHalved = wantHalved;
-        this.subdivChangedAt = now2;
-      }
-
-      const pulseMs = this.pulseHalved ? beatMs * 2 : beatMs;
+      const pulseMs = beatMs;
       // HJÄRTSLAG: ATTACK → FADEOUT → VILA.
       // Förr: Math.pow(1 - phase, 2) — ljuset hoppade till fullt på NOLL ms vid varje
       // slag och sjönk sedan hela takten igenom. Ett steg utan attack läses som blixt,
@@ -1274,12 +1218,11 @@ export class EffectEngine {
       if (this.lastPulseIdx === PULSE_IDX_INIT) this.lastPulseIdx = pulseIdx;
       if (pulseIdx > this.lastPulseIdx) {
         this.lastPulseIdx = pulseIdx;
-        if (!this.pulseHalved || (pulseIdx & 1) === 0) this.pulseFloorMs = 0;      // ny puls: frisk attack (EN PARITET, r0: rutnätets index)
+        this.pulseFloorMs = 0;      // ny puls: frisk attack
       } else if (pulseIdx < this.lastPulseIdx) {
         this.lastPulseIdx = pulseIdx;                                              // följ bakåt tyst, rör inte pulsen
       }
-      const halvedOdd = this.pulseHalved && (this.lastPulseIdx & 1) === 1;   // EN PARITET (r0): rutnätets, samma som effektklockans halfTick
-      let tSince = beatPhase(beat, now2, atk + this.showLead) * beatMs + (halvedOdd ? beatMs : 0);
+      let tSince = beatPhase(beat, now2, atk + this.showLead) * beatMs;
       if (tSince < this.pulseFloorMs) tSince = this.pulseFloorMs; else this.pulseFloorMs = tSince;
       const dec = pulseMs * BEAT_DECAY_FRAC;
       beatEnv = tSince < atk ? tSince / atk : Math.exp(-(tSince - atk) / dec);
@@ -1896,18 +1839,11 @@ export class EffectEngine {
       // a1r: rutnätets index + en HEL-TAKTS-förskjutning (gridK, multipel av 4 = ettan och pariteten orörda). gridK sätts bara när
       // räknaren byter skala (halveringen slås på/av: index >> 1 mot index) eller låset kommer tillbaka - då till minsta värdet som går
       // FRAMÅT. Förr (r0) frös räknaren hela halveringen (index >> 1 < räknaren) och hoppade +44 när den släpptes.
-      const gi = this.lastBeatIdx, want = this.pulseHalved ? gi >> 1 : gi;
-      this.halfTick = this.pulseHalved ? gi & 1 : 0;
-      if (this.pulseHalved && beatHit && this.halfTick === 1) beatHit = false;
-      if (!this.gridCounting || this.pulseHalved !== this.gridHalved) {
-        this.gridK = 4 * Math.ceil((this.beatCounter - want) / 4);
-        if (!this.gridCounting && this.beatCounter === 0) this.gridK = 0;
-        this.gridHalved = this.pulseHalved;
-      }
+      const want = this.lastBeatIdx;
+      if (!this.gridCounting) this.gridK = this.beatCounter === 0 ? 0 : 4 * Math.ceil((this.beatCounter - want) / 4);
       if (!this.gridCounting || want + this.gridK > this.beatCounter) this.beatCounter = want + this.gridK;
       this.gridCounting = true;
-      if (this.pulseHalved) beatFracFx = (this.halfTick + beatFrac) / 2;
-    } else { this.halfTick = 0; this.gridCounting = false; if (beatHit) this.beatCounter++; }   // ingen takt: reservläget stegar på verkliga kickar
+    } else { this.gridCounting = false; if (beatHit) this.beatCounter++; }   // ingen takt: reservläget stegar på verkliga kickar
     const beatIdx = this.beatCounter;
     // beatPulse: grid-puls när låst, annars den VERKLIGA kick-envelopen → pulsar
     // ALLTID på musiken. (Utan detta gav beatFrac=0 → beatPulse=1 konstant = ingen
