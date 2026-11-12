@@ -8,6 +8,15 @@ ladan 11-12 kväll och huvudchatten lade ut frysta kopior med `ladan.py --fran` 
 och --fran SKRIVER ÖVER engine/dist med den frysta kopian. Bas = dagens src, inget annat. Läs också raden LADAN 11-12 nedan
 om den finns (vad ägaren godkände/underkände i ögat).
 
+LADAN 2026-11-12 14:54-15:25 (ägaren på plats, huvudchatten lade ut ett steg i taget med `ladan.py --bara-deploy [--fran <fryst dist>]`,
+env orörd): 1 tempohoppen, 2 basenergin + tilliten, 3 snabba kanterna, 4 dagens bygge (fade-reglagen i /setup, toningen i effekterna,
+frame.buildProg) - ägaren sa 'nästa' efter vart och ett (inga invändningar, inget uttalat godkännande). 5 pulshalveringen: ägaren
+'jag vet inte om halveringen passar på dmx' -> jämförde med halveringen helt av -> 'av, kan nog köra samma i lotus sen'.
+PULSHALVERINGEN ÄR BORTTAGEN UR DMX (5d680ff, -64 rader, md5 identiskt med varianten han såg). Inget frame.pulseDiv i analysatorn
+(ingen läser det). LADAN KÖR NU HEAD 5d680ff (md5 analyser 3cc1a7a3, effects 32700d6a). Övertoning m.fl. reglage: standardvärden.
+Fällor: ladan.py hittar inte alltid Pi:n -> PI_HOST=<adressen ssh når>; spärren nekar fryst kopia som är äldre än src -> `touch` på
+kopians .js före `--fran`; `--fran` skriver över engine/dist -> `npx tsc` efteråt (gjort, dist = HEAD).
+
 KODEN ÄNDRAD 11-12 EM (efter att uppdraget skrevs, ingår i bas): 4d8e9d7 uttoningen ligger i effekterna (src/effects/toning.ts), output
 har bara golvet mot strobe (LampGuard) - DMX-md5 identiskt; 0fd4d75 uppbyggnadens förlopp mäts i analysatorn (frame.buildProg,
 tillståndsblocket STATE_LEN 26) - ljusdomaren -0,0. Pulshalveringen jämförs av en agent (.arena/pulshalv/RAPPORT.md): läggs den in
