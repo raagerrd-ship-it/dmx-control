@@ -1,10 +1,29 @@
 # Natt-agentens uppdrag
 
-## SKIPPA NATTEN 2026-11-11 -> 11-12 (ägaren 23:3x: "Skriv till nattagenten att skippa inatt istället")
-NATTAGENTEN: gör INGENTING i natt. Ingen bänk, inga ändringar i src/ eller tools/, ingen arena, ingen commit, ingen deploy.
-Skäl: arenan bygg (uppbyggnad + sektion) körs i huvudchatten och äger bänklåset och analysatorn i natt.
-Skriv bara en rad i nattens rapportfil (tools/natt/rapport-2026-11-12.md: "Natten 11-11 -> 11-12 skippad på ägarens begäran, se todo.md")
-och avsluta. Den här rutan gäller BARA denna natt - nästa natt läser du LÄGET nedan som vanligt (huvudchatten tar bort rutan när arenan är klar).
+## LÄGET 2026-11-12 (huvudchatten, ägaren: 'vi måste väl lösa det som arenan försökte lösa också?' + fade-planen) - LÄS FÖRST
+- INLAGT I DAG, INGET DEPLOYAT I LADAN (kodens standard, inga flaggor):
+  (1) SEKTIONENS SNABBA KANTER i analysatorn (272aac7): rangen väljer VILKA partier som är 'high', en nivåkant på SEC_EDGE_DB = 4 dB
+      mot referensen (lastHighDb) avgör NÄR. upp_s 12,75 -> 1,7 (kontroll 3,3 -> 1,2), ned_s 6,0 -> 2,1 (6,8 -> 1,7), traff 76 -> 93
+      (71 -> 87), korta 31 -> 34 (19 -> 40, sämre), andel 'high' inom spärren. Uppbyggnaden (frame.buildUp) är INTE löst: h1:s
+      frasförlopp gav bygg 13,7 på övningen men -1,3 på kontrollmängden - buildProg ligger kvar i effects.ts.
+  (2) FADE-PLANEN steg 1 (15d2d99): uttoningen + minsta på-tiden = output.ts LampFade, konfigfält fadeMinS / minOnMs / chMinOnMs.
+  (3) FADE-PLANEN steg 4 (4d45a07): övertoning mellan effekter i dirigenten, cfg.lookFadeMs (0 = direkt byte = standard). Reglage i /setup.
+- NY BASLINJE: engine/dist = 4d45a07. `.arena/bygg/bas` och `.arena/fade/bas` är mätta mot 50e0f4a och gäller INTE längre - mät en ny
+  bas (bank.py + tvavagar.py --mat ... --bas, även --holdout) innan något jämförs. Sektionsmåttens nya baslinje står i (1).
+- LJUSDOMAREN OCH SEKTIONSETIKETTEN (mätfälla, läs innan du dömer en etikettändring): en ändrad etikett kastar om dirigentens hela
+  lookföljd, och lookerna skiljer mer i ljusdomarens mått än etiketten (samma ljud: svall rAbest 0,37-0,52, kickregn 0,31-0,45,
+  minnet 0,17-0,29; lampspridningen ±40 % mellan looker). Snabba kanterna fick -18,6 i ljusdomaren men är lika eller bättre med EN
+  FAST LOOK (sex jämförelser). Döm etikettändringar med `KR_MODE=<look>` (fast look) + lookbyten/min ur konsertReplay, inte med
+  bank.py rakt av. Rattar i tools/konsertReplay.mjs: KR_MODE, KR_SEED (annan lookdragning), KR_TOG (lås toggle-låt-beslutet).
+  Analysdomaren har ny spärr: andelen 'high' per fil högst bas + 10 procentenheter (tvavagar.py HIGH_TOL).
+- ÖGONPROV I LADAN (ägaren, i den här ordningen, en i taget): tempohoppen f757d7d; basenergin (spann 24 mot DMX_B_SPAN_DB=36,
+  B_PART_DIM 0,7); snabba kanterna (kommer refrängen direkt, släpper den när musiken faller, byter dirigenten för ofta?);
+  Övertoning 300 ms i /setup; Uttoning/Minsta på-tid vid behov.
+- ÖPPET FÖR NATTEN (bänk, ingen deploy): (a) UPPBYGGNADEN - en mätning som håller på BÅDA mängderna (b1: det som syns före en
+  höjning i ladans material är centroiden; de flesta höjningar är hopp). (b) LOOKERNAS EGEN TAKTFÖLJNING: 'minnet' följer basen
+  hälften så bra som 'svall' med fast look (rAbest 0,17-0,29 mot 0,37-0,52) - mät alla looker med KR_MODE och lista de svagaste.
+  (c) toggle-låt-beslutet tas vid låtens FÖRSTA lookval, ofta i introt innan basgången hörs (lang1021 144,7 s: basgång 0,00 ->
+  inte toggle; 6 s senare 0,99) - ett känsligt val, värt en egen fråga till ägaren.
 
 
 ## LÄGET 2026-11-11 KVÄLL (huvudchatten, ägaren: "klockan, basenergin och tilliten ... i analysatorn" + arenan basenergi) - LÄS FÖRST
