@@ -56,6 +56,8 @@ MÅTTEN (nyckel, riktning, golv; mängden står under MÄNGDERNA)
 
 SPÄRRAR (DISK med skäl)
   lotus_ratt < bas;  syntet (lotusbänkens 8 syntfiler, antal rätt) < bas;
+  ÄGARBESLUT 2026-11-12 22:12 (under körningen klocka2, gäller alla lika): "Lotus fas borde ju få bli kanske 5% sämre utan att bli
+  diskad. Kan ju vara mätfel osv." -> fas-MEDIANEN diskar först under bas x 0,95 (FAS_TOL). Övriga spärrar orörda.
   lotusbankens egen spärr: on-beat-recall < bas, fas-medianen < bas (båda som bänken skriver dem, två decimaler), andelen i motfas
     (motfas/n) > bas + 1 procentenhet, andelen i fas (i fas/n) < bas - 1 procentenhet (andelar: n ändras när fler filer hamnar i rätt oktav);
   mix_las > bas + 0,3 s;  mix_still > bas + 0,3 s;  klipp_klocka < bas - 1 procentenhet;
@@ -124,6 +126,7 @@ SPANN_KVOT = 4 / 3 * (1 - TOL)     # spannet rymmer ett syskontempo: övre/nedre
 # ett enda prov under inlåsningen räcker). q skiljer bäst.
 VAXLING_SPANN = 'q'
 KALLAR_BYTE, KALLAR_MIN_BYTEN, KALLAR_OVERLAPP = 0.12, 2, 0.5
+FAS_TOL = 0.95   # ägaren 11-12 22:12: lotus fas-median får vara 5 % (relativt) under bas
 L1011, L1028 = 'tools/ladan-2026-10-11/lang-20261011T191741.wav', 'tools/ladan-2026-10-28/lang-20261028T180531.wav'
 LANG = {False: [('pop', T.POP), ('mega', T.MEGA), ('l1021', T.L1021), ('l1011', L1011), ('l1028', L1028)],
         True: [('l1014', T.L1014), ('l1107', T.L1107)]}
@@ -432,7 +435,7 @@ def doma(B, V):
         if sv.get('lotusOnBeat') is not None and sb.get('lotusOnBeat') is not None and sv['lotusOnBeat'] < sb['lotusOnBeat']: disk.append(f"lotus on-beat-recall {sv['lotusOnBeat']} < bas {sb['lotusOnBeat']}")
         fb, fv = sb.get('lotusFas'), sv.get('lotusFas')
         if fb and fv and fb.get('n') and fv.get('n'):
-            if fv['median'] is not None and fb['median'] is not None and fv['median'] < fb['median']: disk.append(f"lotus fas median {fv['median']} < bas {fb['median']}")
+            if fv['median'] is not None and fb['median'] is not None and fv['median'] < fb['median'] * FAS_TOL: disk.append(f"lotus fas median {fv['median']} < bas {fb['median']} x {FAS_TOL}")
             if fv['motfas'] / fv['n'] > fb['motfas'] / fb['n'] + FAS_TOL: disk.append(f"lotus motfas {fv['motfas']}/{fv['n']} > bas {fb['motfas']}/{fb['n']} + 1 pe")
             if fv['ifas'] / fv['n'] < fb['ifas'] / fb['n'] - FAS_TOL: disk.append(f"lotus i fas {fv['ifas']}/{fv['n']} < bas {fb['ifas']}/{fb['n']} - 1 pe")
     else: disk.append('lotusbanken saknas')
