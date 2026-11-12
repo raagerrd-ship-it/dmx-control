@@ -1,4 +1,5 @@
-"""ARENANS LÖPANDE TABELL (ägaren 2026-11-12, arenan klocka2).  python tools/arena/status.py <körning> [--dom klockdom]
+"""ARENANS LÖPANDE TABELL (ägaren 2026-11-12, arenan klocka2).  python tools/arena/status.py <körning> [--dom klockdom] [--slut]
+(--slut = bara slutvarianterna, inga tidigare mätningar som egna kolumner - när runda 1 är dömd)
 
 Läsande: skriver en markdown-tabell över arenans läge och ändrar ingenting. Ägarens form:
   - deltagarna som KOLUMNER (bas, k1.., joker; tidigare mätningar och kontrollmängden som egna kolumner), måtten som rader;
@@ -77,7 +78,7 @@ for n in ovriga:
         b = os.path.basename(p)
         if b != DOM + '.json' and 'holdout' not in b:
             m = las(p)
-            if m and sig(m) != sig(senaste): kol.append((namn + ' ' + b.replace(DOM + '-', '').replace('.json', ''), hm(os.path.getmtime(p)), m, sparr(m, bas)))
+            if m and sig(m) != sig(senaste) and '--slut' not in args: kol.append((namn + ' ' + b.replace(DOM + '-', '').replace('.json', ''), hm(os.path.getmtime(p)), m, sparr(m, bas)))
     kol.append((namn, lage, senaste, sparr(senaste, bas)))
     h = las(os.path.join(d, DOM + '-holdout.json'))
     if h: kol.append((namn + ' KONTROLL', hm(os.path.getmtime(os.path.join(d, DOM + '-holdout.json'))), h, sparr(h, bash)))
