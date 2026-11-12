@@ -108,11 +108,6 @@ try:
 except Exception:
     pass
 print()
-print('| | ' + ' | '.join(c[0] for c in kol) + ' |')
-print('|---|' + '---|' * len(kol))
-print('| Läge | ' + ' | '.join(c[1] for c in kol) + ' |')
-for k, rubrik, n, _r in SPEC['rader']: print('| %s | ' % rubrik + ' | '.join(v(c, k, n) for c in kol) + ' |')
-print('| Spärr | ' + ' | '.join('–' if c[3] is None else ('Ja' if c[3] else 'Nej') for c in kol) + ' |')
 # RANKINGRADEN (ägaren 11-12): domarens plats och poäng längst ner, ur ranking*.md (kontrollmängdens ranking för KONTROLL-kolumnerna)
 rank = {False: {}, True: {}}
 for f in sorted(glob.glob(os.path.join(K, 'ranking*.md')), key=os.path.getmtime):
@@ -124,8 +119,19 @@ def rk(c):
     hold = 'KONTROLL' in c[0]; n = c[0].replace(' KONTROLL', ''); n = 'fusion' + n[5:] if n.startswith('joker') else n
     r = rank[hold].get(n)
     return '%s (%s)' % r if r else '–'
-print('| Ranking (poäng) | ' + ' | '.join(rk(c) for c in kol) + ' |')
-print()
+def tabell(kol, rubrik):
+    if rubrik: print(rubrik); print()
+    print('| | ' + ' | '.join(c[0].replace(' KONTROLL', '') for c in kol) + ' |')
+    print('|---|' + '---|' * len(kol))
+    print('| Läge | ' + ' | '.join(c[1] for c in kol) + ' |')
+    for k, rub, n, _r in SPEC['rader']:
+        if any(c[2] and isinstance(c[2].get(k), (int, float)) for c in kol): print('| %s | ' % rub + ' | '.join(v(c, k, n) for c in kol) + ' |')
+    print('| Spärr | ' + ' | '.join('–' if c[3] is None else ('Ja' if c[3] else 'Nej') for c in kol) + ' |')
+    print('| Ranking (poäng) | ' + ' | '.join(rk(c) for c in kol) + ' |')
+    print()
+ovn = [c for c in kol if 'KONTROLL' not in c[0]]; kon = [c for c in kol if 'KONTROLL' in c[0]]
+tabell(ovn, 'ÖVNINGSMÄNGDEN' if kon else '')
+if kon: tabell(kon, 'KONTROLLMÄNGDEN (finalen)')
 for f in sorted(glob.glob(os.path.join(K, 'ranking*.md'))):
     rows = [l for l in io.open(f, encoding='utf-8') if re.match(r'\| \d+ \|', l)]
     print(os.path.basename(f), hm(os.path.getmtime(f)), '|', '; '.join('%s %s %s' % (r.split('|')[1].strip(), r.split('|')[2].strip(), r.split('|')[3].strip()) for r in rows[:8]))
