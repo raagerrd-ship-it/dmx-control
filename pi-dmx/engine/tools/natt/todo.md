@@ -24,6 +24,10 @@
   hälften så bra som 'svall' med fast look (rAbest 0,17-0,29 mot 0,37-0,52) - mät alla looker med KR_MODE och lista de svagaste.
   (c) toggle-låt-beslutet tas vid låtens FÖRSTA lookval, ofta i introt innan basgången hörs (lang1021 144,7 s: basgång 0,00 ->
   inte toggle; 6 s senare 0,99) - ett känsligt val, värt en egen fråga till ägaren.
+  (d) ETIKETTEN EFTER LÅTGRÄNS (mätt i lotus 11-12 12:20 med musik, analysatorn 272aac7): efter ett låtbyte stod etiketten 'low' i
+  20 s fast levelVsHighDb låg på +0,7..+2,2 (nya låten gick in på full nivå; uppkanten kräver 4 dB höjning mot förra frasen
+  och den kom före gränsen). Mät på inspelade låtbyten (megamix) hur länge 'low' står vid nivå >= referensen efter
+  hintTrackChange, och pröva: buren referens + nivå på referensen i en hel fras = 'high' utan kant. Döm med tvavagar.py.
 
 
 ## LÄGET 2026-11-11 KVÄLL (huvudchatten, ägaren: "klockan, basenergin och tilliten ... i analysatorn" + arenan basenergi) - LÄS FÖRST
