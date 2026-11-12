@@ -27,7 +27,7 @@ SPEC = {'dom': 'klockdom', 'statusrad': 'ARENAN ' + os.path.basename(K).upper(),
                   ['klipp_klocka', 'Rätt tempo i klipp %', 1, 'hogre'], ['fas_median', 'Lotus fas, median', 2, 'hogre'], ['fas_ifas', 'Lotus i fas %', 1, 'hogre'],
                   ['fas_motfas', 'Lotus motfas %', 1, 'lagre'], ['lotus_onbeat', 'Lotus on-beat', 2, 'hogre'], ['syntet', 'Syntet rätt', 0, 'hogre']],
         'sparrar': [['lotus_ratt', 'minrel', 0.01], ['mix_las', 'max', 0.3], ['mix_still', 'max', 0.3], ['klipp_klocka', 'min', 1], ['fas_median', 'minrel', 0.05],
-                    ['fas_ifas', 'minrel', 0.05], ['fas_motfas', 'maxrel', 0.05], ['lotus_onbeat', 'minrel', 0.05], ['syntet', 'min', 0]]}   # = klockdom.py:s spärrar
+                    ['fas_ifas', 'minrel', 0.05, 1], ['fas_motfas', 'maxrel', 0.05, 1], ['lotus_onbeat', 'minrel', 0.05], ['syntet', 'min', 0]]}   # = klockdom.py:s spärrar
 sp = os.path.join(K, 'status.json')
 if os.path.exists(sp): SPEC.update(json.load(io.open(sp, encoding='utf-8')))
 if '--dom' in args: SPEC['dom'] = args[args.index('--dom') + 1]
@@ -55,9 +55,9 @@ bash = las(os.path.join(K, 'bas', DOM + '-holdout.json')) or {}
 def sparr(m, b):
     if not m: return None
     f = set()
-    for k, typ, tol in SPEC['sparrar']:
+    for k, typ, tol, *golv in SPEC['sparrar']:   # golv = minsta tolerans i absoluta tal (i fas/motfas: 1 pe, som domaren)
         if not (isinstance(m.get(k), (int, float)) and isinstance(b.get(k), (int, float))): continue
-        if typ.endswith('rel'): tol = abs(b[k]) * tol
+        if typ.endswith('rel'): tol = max(abs(b[k]) * tol, golv[0] if golv else 0)
         if (typ[:3] == 'max' and m[k] > b[k] + tol) or (typ[:3] == 'min' and m[k] < b[k] - tol): f.add(k)
     return f
 
