@@ -3,6 +3,11 @@
 ## ARENA I NATT 2026-11-12 -> 11-13: KLOCKAN HÅLLER EN TOLKNING (ägaren 11-12 em: "Det borde gå till en arena i natt. Hur förbättrar vi analysatorns klocka") - GÅR FÖRE ALLT UTOM HÄLSAN
 Kör skillen dmx-arena (körning `.arena/klocka2`). EN arena, inget annat tungt i natt. Ingen deploy, ingen push, inget skrivs i lotus-light-link.
 
+FÖRE BASMÄTNINGEN: bygg om engine/dist (`npx tsc -p tsconfig.json`) och kontrollera `git status --short src` = tomt. Ägaren var i
+ladan 11-12 kväll och huvudchatten lade ut frysta kopior med `ladan.py --fran` (stegen i .arena/ladan1112/ + .arena/tempohopp/),
+och --fran SKRIVER ÖVER engine/dist med den frysta kopian. Bas = dagens src, inget annat. Läs också raden LADAN 11-12 nedan
+om den finns (vad ägaren godkände/underkände i ögat).
+
 VARFÖR NU: i lotus väljs sedan i dag fade in, lead och fall ur klockans tempo (onsetRiseK, effektFallMs). Mätt i källaren 11-12 ~13:30:
 på en låt växlade klockan 94 <-> 126 BPM (förhållandet 4:3) ungefär var 10:e sekund med låsningen av/på -> leaden hoppade 128 <-> 96 ms och
 falltiden ~2200 <-> ~1540 ms. Tidigare samma dag: tempot hoppade 81-150 med låsning ~35 % på en lugn låt. Tempovalen blir aldrig
