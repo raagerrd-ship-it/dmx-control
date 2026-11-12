@@ -1,5 +1,9 @@
 # Natt-agentens uppdrag
 
+ARENAN KLOCKA2-DMX PÅGÅR sedan 2026-11-13 00:10 (ägarens beställning 00:02: en DMX-runda med k2, k4 och jokern, körning .arena/klocka2dmx/,
+domaren utan lotus). TILL 02:38-KÖRNINGEN AV dmx-nattagent: starta INGET eget i bänken (ingen baslinje, ingen arena, inga sonder) så länge
+den här raden står kvar - läs och sammanfatta bara, och avsluta.
+
 ## ARENA I NATT 2026-11-12 -> 11-13: KLOCKAN HÅLLER EN TOLKNING (ägaren 11-12 em: "Det borde gå till en arena i natt. Hur förbättrar vi analysatorns klocka") - GÅR FÖRE ALLT UTOM HÄLSAN
 Kör skillen dmx-arena (körning `.arena/klocka2`). EN arena, inget annat tungt i natt. Ingen deploy, ingen push, inget skrivs i lotus-light-link.
 STARTAD I FÖRVÄG AV ÄGAREN 2026-11-12 ~16:50 ('Kör igång nattagenten nu'). Två körningar kan alltså läsa detta:
