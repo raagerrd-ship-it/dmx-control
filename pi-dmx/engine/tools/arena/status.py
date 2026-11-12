@@ -12,7 +12,7 @@ Domarens json läses ur <körning>/<mapp>/<dom>.json (nycklarna direkt eller und
 
 RADER OCH SPÄRRAR: inbyggda för 'klockdom'. För en annan domare: lägg <körning>/status.json bredvid uppgiften:
   {"dom": "tvavagar", "statusrad": "ARENAN X", "rader": [["nyckel", "Rubrik", decimaler, "lagre"|"hogre"], ...],
-   "sparrar": [["nyckel", "max"|"min", tolerans], ...]}      max = får inte överstiga bas + tolerans, min = får inte understiga bas - tolerans
+   "sparrar": [["nyckel", "max"|"min", tolerans], ...]}      max = får inte överstiga bas + tolerans, min = får inte understiga bas - tolerans; "maxrel"/"minrel" = toleransen är en ANDEL av bas (0.05 = 5 %)
 """
 import glob, io, json, os, re, sys, time
 
@@ -26,8 +26,8 @@ SPEC = {'dom': 'klockdom', 'statusrad': 'ARENAN ' + os.path.basename(K).upper(),
                   ['mix_las', 'Låsning efter låtbyte s', 2, 'lagre'], ['mix_still', 'Tills klockan står still s', 2, 'lagre'],
                   ['klipp_klocka', 'Rätt tempo i klipp %', 1, 'hogre'], ['fas_median', 'Lotus fas, median', 2, 'hogre'], ['fas_ifas', 'Lotus i fas %', 1, 'hogre'],
                   ['fas_motfas', 'Lotus motfas %', 1, 'lagre'], ['lotus_onbeat', 'Lotus on-beat', 2, 'hogre'], ['syntet', 'Syntet rätt', 0, 'hogre']],
-        'sparrar': [['lotus_ratt', 'min', 0], ['mix_las', 'max', 0.3], ['mix_still', 'max', 0.3], ['klipp_klocka', 'min', 1], ['fas_median', 'min', 0],
-                    ['fas_ifas', 'min', 1], ['fas_motfas', 'max', 1], ['lotus_onbeat', 'min', 0], ['syntet', 'min', 0]]}   # = klockdom.py:s spärrar
+        'sparrar': [['lotus_ratt', 'min', 0], ['mix_las', 'max', 0.3], ['mix_still', 'max', 0.3], ['klipp_klocka', 'min', 1], ['fas_median', 'minrel', 0.05],
+                    ['fas_ifas', 'minrel', 0.05], ['fas_motfas', 'maxrel', 0.05], ['lotus_onbeat', 'minrel', 0.05], ['syntet', 'min', 0]]}   # = klockdom.py:s spärrar
 sp = os.path.join(K, 'status.json')
 if os.path.exists(sp): SPEC.update(json.load(io.open(sp, encoding='utf-8')))
 if '--dom' in args: SPEC['dom'] = args[args.index('--dom') + 1]
@@ -57,7 +57,8 @@ def sparr(m, b):
     f = set()
     for k, typ, tol in SPEC['sparrar']:
         if not (isinstance(m.get(k), (int, float)) and isinstance(b.get(k), (int, float))): continue
-        if (typ == 'max' and m[k] > b[k] + tol) or (typ == 'min' and m[k] < b[k] - tol): f.add(k)
+        if typ.endswith('rel'): tol = abs(b[k]) * tol
+        if (typ[:3] == 'max' and m[k] > b[k] + tol) or (typ[:3] == 'min' and m[k] < b[k] - tol): f.add(k)
     return f
 
 kol = [('bas', 'mätt', bas, None)]   # (namn, läge, mått, fällande mått)
