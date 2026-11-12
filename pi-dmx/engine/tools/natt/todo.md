@@ -48,6 +48,17 @@ VAD SOM ÄR MÄTT (bas = engine/src i dag, 4d45a07 + todo):
 - KORPUSEN har samma fel: lotus bench.mjs ger per fil klockans tempo (min/max/q25/q75 över klippet). Filer där spannet rymmer ett
   syskontempo är källarfelet på inspelat material - lista dem ur basens körning innan arenan startar.
 
+KARTAN ÖVER LEVANDE TEMPOKOD (läs den och ge den till deltagarna i uppgift.md): tools/natt/arena-2026-11-12-klocka2/KARTA.md (11-12 em).
+- ALL temposökning bor i analyserClock.ts (tgStep, tgScore, peakVote, peakScore, onsetStep, ca rad 219-405). analyser.ts har INGEN levande
+  temposökning: det som där heter tempoGram, bpmHist, octaveVote, cand, evidence, shift, OCT_UP, SUBH, GHOST, UP43, FIVE4 är dött
+  (städas ev. bort före natten - se git-loggen). Flaggorna TEMPO_UP43, TEMPO_FIVE4, TEMPO_EVIDENCE, TEMPO_LAGMAX, GHOST_WAIT, SUBH_GUARD,
+  SUBH_MULT, OCT_UP läses aldrig, fast profilerna sätter fem av dem.
+- Tempovalet läser basens dB-stigning och diskantens onset, INTE kickarna. Kickarna styr tilliten, utrullningen och upptaget efter break;
+  klockans rutnät styr i sin tur kickgrinden och kickspärren i analyser.ts (ca rad 2430, 2449).
+- Båda systemen kör samma klocka i workern via taktvägen; det som skiljer är vem som matar (DMX index.ts, lotus analyser.ts + publishPhase).
+  lotusbank.py mäter den ODELADE vägen (klockan i process()) - den koden får inte tas bort.
+- Fynd att känna till (inte arenans sak att laga): SIL_CLEAR_PENDING står som 1 i båda profilerna men enda läsaren ligger i en onåbar gren.
+
 UPPGIFTEN (uppgift.md, ägarens ord överst ordagrant): klockan i den delade analysatorn ska hålla EN tempotolkning genom en låt.
 (1) Färre växlingar mellan syskontempon (4:3, 3:4, 3:2, 2:3, dubbla, halva) inom en låt. (2) Rätt tolkning oftare (lotusbankens
 4/3- och 3/2-fel). (3) Utan att låsningen efter låtbyte eller vid svaga låtstarter blir långsammare. Analysatorn MÄTER bara: ingen
