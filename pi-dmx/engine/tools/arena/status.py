@@ -26,7 +26,7 @@ SPEC = {'dom': 'klockdom', 'statusrad': 'ARENAN ' + os.path.basename(K).upper(),
                   ['mix_las', 'Låsning efter låtbyte s', 2, 'lagre'], ['mix_still', 'Tills klockan står still s', 2, 'lagre'],
                   ['klipp_klocka', 'Rätt tempo i klipp %', 1, 'hogre'], ['fas_median', 'Lotus fas, median', 2, 'hogre'], ['fas_ifas', 'Lotus i fas %', 1, 'hogre'],
                   ['fas_motfas', 'Lotus motfas %', 1, 'lagre'], ['lotus_onbeat', 'Lotus on-beat', 2, 'hogre'], ['syntet', 'Syntet rätt', 0, 'hogre']],
-        'sparrar': [['lotus_ratt', 'min', 0], ['mix_las', 'max', 0.3], ['mix_still', 'max', 0.3], ['klipp_klocka', 'min', 1], ['fas_median', 'minrel', 0.05],
+        'sparrar': [['lotus_ratt', 'minrel', 0.01], ['mix_las', 'max', 0.3], ['mix_still', 'max', 0.3], ['klipp_klocka', 'min', 1], ['fas_median', 'minrel', 0.05],
                     ['fas_ifas', 'minrel', 0.05], ['fas_motfas', 'maxrel', 0.05], ['lotus_onbeat', 'minrel', 0.05], ['syntet', 'min', 0]]}   # = klockdom.py:s spärrar
 sp = os.path.join(K, 'status.json')
 if os.path.exists(sp): SPEC.update(json.load(io.open(sp, encoding='utf-8')))
