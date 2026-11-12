@@ -1,4 +1,5 @@
-"""TILLÄGG EN TEMPO (2026-11-08 kväll, före arenan entempo): (a) SPÄRR upp_s/ned_s får inte bli sämre än bas (+0,1 s tolerans) -> DISK;
+"""TILLÄGG 2026-11-12 (efter arenan bygg): SPÄRR andelen 'high' per fil högst bas + 10 procentenheter (HIGH_TOL) -> DISK.
+TILLÄGG EN TEMPO (2026-11-08 kväll, före arenan entempo): (a) SPÄRR upp_s/ned_s får inte bli sämre än bas (+0,1 s tolerans) -> DISK;
   (b) MÅTT mix_still (tempo, - golv 1 s): median s från övertoningens slut tills effektklockan står inom +-1 % i 5 s i följd (17 mått).
   (c) 11-09 00:05 ägaren: KRAV EN KÄLLA granskat i koden av orkestratorn (<mapp>/KRAV_EN_KALLA.txt) -> ljusdomarens gräns -3,0.
   (d) 11-09 02:35/02:45 ägaren: CPU ger inga poäng och har ingen kvotgräns; SNABBA = bara latensen. Poäng = 0,6 x långsamma + 0,4 x latens + bonus.
@@ -118,6 +119,7 @@ MATT = [('mix_klocka', 'tempo', 1, 1), ('mix_las', 'tempo', -1, 1), ('mix_hopp',
         ('drop_traff', 'drop', 1, 5), ('drop_falska', 'drop', -1, 0.5), ('drop_ms', 'drop', -1, 20),
         ('gr_ratt', 'latgrans', 1, 5), ('gr_falska', 'latgrans', -1, 0.5)]
 W_LANGSAM, W_SNABB, KLIPP_PCT, SPARR_LJUS, BONUS_TOL = 0.6, 0.4, 100.0, -0.5, 1.35
+HIGH_TOL = 0.10   # andelen high per fil: högst bas + 10 procentenheter (11-12)
 SPARR_LJUS_GRANS, GRANS_KRAV, SEKT_TOL, SPARR_LJUS_ENKALLA, WORKER_US_GRANS = -3.0, 20.0, 0.1, -3.0, 130.0   # ägaren 11-08: lägre ljusspärr för varianter som tydligt förbättrar låtgränsen
 
 
@@ -463,6 +465,13 @@ def ranking(a):
             for k in ('upp_s', 'ned_s'):
                 if k in V['kvalitet'] and k in B['kvalitet'] and V['kvalitet'][k] > B['kvalitet'][k] + SEKT_TOL:
                     disk.append(f"{k} {V['kvalitet'][k]:.2f} s > bas {B['kvalitet'][k]:.2f} s")
+            # ANDELEN 'HIGH' (efter arenan bygg 11-12: b3/b4 fick snabb etikett genom att kalla 41/55 % -> 65/74 % av musiken 'high';
+            # dirigenten väljer då refränglookar oftare och lampspridningen föll 20 %): per fil högst bas + HIGH_TOL av tiden.
+            bh = {f['file']: f.get('highAndel') for f in ((B.get('detalj') or {}).get('lang') or [])}
+            for f in ((V.get('detalj') or {}).get('lang') or []):
+                b0 = bh.get(f['file'])
+                if b0 is not None and f.get('highAndel') is not None and f['highAndel'] > b0 + HIGH_TOL:
+                    disk.append(f"high {100 * f['highAndel']:.0f} % > bas {100 * b0:.0f} % + {100 * HIGH_TOL:.0f} ({os.path.basename(f['file'])[:14]})")
         if V.get('md5Lika') is False:
             lj = V.get('ljusdomare') or {}
             # LÅTGRÄNSEN (ägaren 11-08: 'sänk för just låtgräns, då den är svår, så de inte blir diskade pga den'): en rätt låtgräns
