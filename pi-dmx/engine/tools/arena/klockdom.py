@@ -57,7 +57,9 @@ MÅTTEN (nyckel, riktning, golv; mängden står under MÄNGDERNA)
 SPÄRRAR (DISK med skäl)
   lotus_ratt < bas;  syntet (lotusbänkens 8 syntfiler, antal rätt) < bas;
   ÄGARBESLUT 2026-11-12 22:12 (under körningen klocka2, gäller alla lika): "Lotus fas borde ju få bli kanske 5% sämre utan att bli
-  diskad. Kan ju vara mätfel osv." -> fas-MEDIANEN diskar först under bas x 0,95 (FAS_TOL). Övriga spärrar orörda.
+  diskad. Kan ju vara mätfel osv." + 22:16: "Samt för mig är det allra viktigaste DMX, lotus inte lika." -> de lotus-specifika
+  fas-spärrarna (fas-median, on-beat, andel i fas, andel i motfas) diskar först vid mer än 5 % (relativt) sämre än bas (LOTUS_REL;
+  de tre sista är huvudchattens tolkning av 22:16). lotus_ratt >= bas och DMX-spärrarna (mix_still, mix_las, klipp_klocka, syntet) orörda.
   lotusbankens egen spärr: on-beat-recall < bas, fas-medianen < bas (båda som bänken skriver dem, två decimaler), andelen i motfas
     (motfas/n) > bas + 1 procentenhet, andelen i fas (i fas/n) < bas - 1 procentenhet (andelar: n ändras när fler filer hamnar i rätt oktav);
   mix_las > bas + 0,3 s;  mix_still > bas + 0,3 s;  klipp_klocka < bas - 1 procentenhet;
@@ -126,7 +128,7 @@ SPANN_KVOT = 4 / 3 * (1 - TOL)     # spannet rymmer ett syskontempo: övre/nedre
 # ett enda prov under inlåsningen räcker). q skiljer bäst.
 VAXLING_SPANN = 'q'
 KALLAR_BYTE, KALLAR_MIN_BYTEN, KALLAR_OVERLAPP = 0.12, 2, 0.5
-FAS_TOL = 0.95   # ägaren 11-12 22:12: lotus fas-median får vara 5 % (relativt) under bas
+LOTUS_REL = 0.05   # ägaren 11-12 22:12 + 22:16: lotus fas-spärrarna (median, on-beat, i fas, motfas) diskar först vid > 5 % relativt sämre än bas
 L1011, L1028 = 'tools/ladan-2026-10-11/lang-20261011T191741.wav', 'tools/ladan-2026-10-28/lang-20261028T180531.wav'
 LANG = {False: [('pop', T.POP), ('mega', T.MEGA), ('l1021', T.L1021), ('l1011', L1011), ('l1028', L1028)],
         True: [('l1014', T.L1014), ('l1107', T.L1107)]}
@@ -432,12 +434,12 @@ def doma(B, V):
     sb, sv = B.get('sparr') or {}, V.get('sparr') or {}
     if sv.get('syntet') is not None and sb.get('syntet') is not None:
         if sv['syntet'] < sb['syntet']: disk.append(f"syntet {sv['syntet']} < bas {sb['syntet']}")
-        if sv.get('lotusOnBeat') is not None and sb.get('lotusOnBeat') is not None and sv['lotusOnBeat'] < sb['lotusOnBeat']: disk.append(f"lotus on-beat-recall {sv['lotusOnBeat']} < bas {sb['lotusOnBeat']}")
+        if sv.get('lotusOnBeat') is not None and sb.get('lotusOnBeat') is not None and sv['lotusOnBeat'] < sb['lotusOnBeat'] * (1 - LOTUS_REL): disk.append(f"lotus on-beat-recall {sv['lotusOnBeat']} < bas {sb['lotusOnBeat']} - 5 %")
         fb, fv = sb.get('lotusFas'), sv.get('lotusFas')
         if fb and fv and fb.get('n') and fv.get('n'):
-            if fv['median'] is not None and fb['median'] is not None and fv['median'] < fb['median'] * FAS_TOL: disk.append(f"lotus fas median {fv['median']} < bas {fb['median']} x {FAS_TOL}")
-            if fv['motfas'] / fv['n'] > fb['motfas'] / fb['n'] + FAS_TOL: disk.append(f"lotus motfas {fv['motfas']}/{fv['n']} > bas {fb['motfas']}/{fb['n']} + 1 pe")
-            if fv['ifas'] / fv['n'] < fb['ifas'] / fb['n'] - FAS_TOL: disk.append(f"lotus i fas {fv['ifas']}/{fv['n']} < bas {fb['ifas']}/{fb['n']} - 1 pe")
+            if fv['median'] is not None and fb['median'] is not None and fv['median'] < fb['median'] * (1 - LOTUS_REL): disk.append(f"lotus fas median {fv['median']} < bas {fb['median']} - 5 %")
+            if fv['motfas'] / fv['n'] > fb['motfas'] / fb['n'] * (1 + LOTUS_REL): disk.append(f"lotus motfas {fv['motfas']}/{fv['n']} > bas {fb['motfas']}/{fb['n']} + 5 %")
+            if fv['ifas'] / fv['n'] < fb['ifas'] / fb['n'] * (1 - LOTUS_REL): disk.append(f"lotus i fas {fv['ifas']}/{fv['n']} < bas {fb['ifas']}/{fb['n']} - 5 %")
     else: disk.append('lotusbanken saknas')
     if has('mix_las') and v['mix_las'] > b['mix_las'] + LAS_TOL: disk.append(f"mix_las {v['mix_las']:.2f} s > bas {b['mix_las']:.2f} + {LAS_TOL}")
     if has('mix_still') and v['mix_still'] > b['mix_still'] + STILL_TOL: disk.append(f"mix_still {v['mix_still']:.2f} s > bas {b['mix_still']:.2f} + {STILL_TOL}")
