@@ -17,9 +17,17 @@ VAD SOM ÄR MÄTT (bas = engine/src i dag, 4d45a07 + todo):
 - Förra försöket fh1 (139 hypoteser med bevissumma, prov/flerhypotes-fh1-20261110.patch, rapporten ovan): utflykter 1,00 -> 0,26/min,
   lotusbank 468, men FÖLL på svaga låtstarter (kallstart kontroll 6,5 -> 10,8 s), mix_still kontroll 3,72 -> 8,51, ned_s sämre.
   Lärdom: flaskhalsen är BEVIS vid svaga låtstarter; varje regel som sänker ribban när regenten ser död ut släpper in utflykterna igen.
-- INGEN INSPELNING AV KÄLLARLÅTEN: lotus inspelare är avstängd (LOTUS_RECORDER, ägarens brytare 10-04) och låten hann ta slut.
-  Fallet får i stället sökas i korpusen: lotus bench.mjs ger per fil klockans tempo (min/max/q25/q75 över klippet). Filer där
-  spannet rymmer ett syskontempo är samma fel som i källaren - lista dem ur basens körning innan arenan startar.
+- KÄLLARINSPELNINGARNA (ägaren 11-12 em: 'kör så vi ger bra underlag till arenan'): en vakt på lotus-Pi:n spelar under kvällen in
+  150 s i full takt (48 kHz mono) varje gång klockan växlar tempo (>= 3 hopp > 12 % inom 60 s), högst 12 klipp, och loggar
+  motorns tempo varje sekund bredvid (v-<HHMMSS>.wav + .csv, loggen vakt.log). Vakten slutar 01:45 och inspelaren stängs av 01:50.
+  HÄMTA DEM FÖRST (läs bara, rör inget på Pi:n):
+    mkdir -p .arena/klocka2/kallaren && scp -i ~/.ssh/id_pidmx 'pi@192.168.1.174:/home/pi/vaxling/*' .arena/klocka2/kallaren/
+  Spela dem med `node tools/arena/kallarspel.mjs <lotusbygge>/dist/audio-analyser/index.js <wav> [ut.csv]` (matar som lotus bench.mjs:
+  hop 128, bänkklockan; skriver tempobyten/min och tid per tempo; lotusbygget = det lotusbank.py bygger i <mapp>/lotus/dist).
+  Jämför basens uppspelning mot klippets .csv: växlar bas på samma sätt som motorn gjorde live? Bara de klipp som återskapar
+  växlingen räknas. Finns inga klipp (ingen växling fångad, eller Pi:n onåbar): fallet utgår, skriv det i rapporten.
+- KORPUSEN har samma fel: lotus bench.mjs ger per fil klockans tempo (min/max/q25/q75 över klippet). Filer där spannet rymmer ett
+  syskontempo är källarfelet på inspelat material - lista dem ur basens körning innan arenan startar.
 
 UPPGIFTEN (uppgift.md, ägarens ord överst ordagrant): klockan i den delade analysatorn ska hålla EN tempotolkning genom en låt.
 (1) Färre växlingar mellan syskontempon (4:3, 3:4, 3:2, 2:3, dubbla, halva) inom en låt. (2) Rätt tolkning oftare (lotusbankens
@@ -32,6 +40,8 @@ DOMAREN (bygg FÖRE körningen som `tools/arena/klockdom.py`, analysmått enbart
   utfl_tid), lotusbank.py (lotus_ratt = korpus ok; lotus_syskon = antal i klasserna 4/3 + 3/2 + dubbla + halva).
 - NYTT MÅTT syskon_tid: andel av tiden (långa inspelningar + mixen) då klockan står på ett syskontempo till filens facit/dominerande
   tempo (±4 %). Fångar både växling och att sitta fel.
+- NYTT FALL kallaren: tempobyten/min (> 12 %) på de källarklipp som återskapar växlingen hos bas (kallarspel.mjs mot deltagarens
+  lotusbygge). Hälften av klippen (varannat i tidsordning) är övning, resten kontroll som ingen deltagare får se.
 - NYTT MÅTT lotus_vaxling: antal korpusfiler (lotusbankens körning, per fil ur bench.mjs) där klockans tempo inom klippet
   spänner över ett syskontempo (q25..q75 eller min..max efter uppvärmningen, välj det som skiljer bäst hos bas och skriv vilket).
   Det är källarfelet mätt på inspelat material. lotus-light-link LÄSES bara.
