@@ -107,6 +107,9 @@ export interface EngineConfig {
   /** "Släcktid" (2026-10-10, ägaren i ladan): sekunder ingången måste ligga under släckgränsen innan riggen släcks (0..5).
    *  Tänds direkt när ljudet är tillbaka. 0 = som förr (direkt). */
   silenceHoldS?: number;
+  /** LAMPANS KONTRAKT (fade-planen 11-12, output.ts LampFade): uttoningens tidskonstant i lampans ljus (s, 0,25..2 - snabbare än 0,25 är
+   *  förbjudet), minsta på-tid för lampans nivå (ms, 0..500) och per färgkanal (ms, 0..500). Rattar i /setup. */
+  fadeMinS?: number; minOnMs?: number; chMinOnMs?: number;
   /** "chase" sub-pattern: sweep (L→R loop) or ping-pong (bounce). */
   chaseStyle: "sweep" | "pingpong";
   /** Which modes are included in the physical button / WS cycle. */
@@ -206,6 +209,7 @@ export const defaultConfig: EngineConfig = {
   master: 1.0,
   verseCeil: 0.65,     // "Tak i vers" i /setup (10-12)
   energyFloor: 0,       // energins golv (ratt i /setup: "Lägsta nivå"); 0 sedan 10-12 (ägaren: "sätt till 0 %" - basenergin, slagdjup refräng 52 -> 58 %); var 0,2
+  fadeMinS: 0.25, minOnMs: 150, chMinOnMs: 100,   // lampans kontrakt (output.ts LampFade; rattar i /setup)
   silenceHoldS: 3,      // släcktid (ratt i /setup: "Släcktid"); 3 s = ägarens val i ladan 10-10
   silenceLevel: 0.05,     // släckgräns på frame.level (ratt i /setup: "Släckgräns")
   chaseStyle: "pingpong",

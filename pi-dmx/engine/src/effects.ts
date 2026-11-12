@@ -14,7 +14,7 @@
 import { isLogOn } from "./quiet.js";
 import type { ChannelRole, EngineConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
-import { FixtureOutput, keepLit, lampFadeK, lampLevel, sameLight, MIN_ON_MS, CH_MIN_ON_MS, type SpecialtyValues } from "./output.js";   // minsta på-tiden = lampfysik (output.ts MINSTA PÅ-TID)
+import { FixtureOutput, keepLit, lampLevel, sameLight, LampFade, type SpecialtyValues } from "./output.js";   // minsta på-tiden = lampfysik (output.ts MINSTA PÅ-TID)
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, GRID_EARLY_MS } from "./beatClock.js";
 import { SILENCE_LEVEL, BASS_SPAN_DB, type Frame } from "./analyser.js";
 import { EFFECT_MAP, TIER, sectionPool, meetsRequirements, TOGGLE_POOL, modulateOf } from "./effects/registry.js";
@@ -303,8 +303,6 @@ const HIGH_VARV = 4;
  *  0 = allt exakt på slaget. 50 = hela showen 50 ms före.
  *  Hjärtslaget lägger dessutom till sin egen attacktid, så dess TOPP landar rätt. */
 const SHOW_LEAD_DEFAULT = 50;
-/** STEG 2: den ENDA uttoningen (lampans ljusstyrka, tidskonstant i DMX-ljus). Snabbare ar forbjudet (agaren 09-29). */
-const FADE_MIN_S = 0.25;
 /** KULÖRTONING (opt-in DMX_HUE_GLIDE_MS > 0, ägaren i ladan 10-14: "fada snyggt mellan färger hela tiden när det inte skall vara skarpt
  *  färgskifte" - "vissa gör det snyggt idag ... oftast inte huvudfärgen"). STEG 1 (effektens färg, före energin): byter en TÄND lampa kulör
  *  glider kulören runt färghjulet (kortaste vägen, aldrig mot vitt) på ~GLIDE_MS; ljusstyrkan är effektens, direkt - attacken och slagen
@@ -442,7 +440,7 @@ const PD_TOP = envN('DMX_DROP_TOP', 0), PM_LIFT_FLOOR = envN('DMX_MINI_LIFT_FLOO
  *  frame.specAbs (samma bandmedel som bodyDb, utan bandet 120-250 Hz där röstens grundton och virvelns kropp ligger). Flank-dropen läser
  *  fortfarande bodyDb. 0 = av (som före). */
 /* (LAMPKONTRAKTET 2026-11-08: motorn räknar i ANDEL AV LAMPANS LJUS och output.ts översätter per lampa - energins DMX-procent
- *  lampLevel(fx, md), uttoningens tidskonstant lampFadeK(fx, dt, FADE_MIN_S), minsta tända nivå keepLit(fx), kulörtoningens ljus
+ *  lampLevel(fx, md), uttoningen och minsta på-tiden LampFade (cfg.fadeMinS m.fl.), minsta tända nivå keepLit(fx), kulörtoningens ljus
  *  sameLight(fx). Ingen gamma här - se output.ts.) */
 /** INLARNING EFTER START (ladan 09-24 23:05: 'de lyser nastan max nu' efter omstart - ankaret borjade i tystnad 13 dB och kröp mot musikens
  *  45 dB med tau 360 s uppat): forsta LIVE_START_FAST_S foljer ankaret uppat med tau/10. Forr 20 s. */
@@ -607,8 +605,7 @@ export class EffectEngine {
   private eSm = 0; eSimple = 0; private eBass = 0; private bLo = 0; private bPart = 1; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1; private spreadM0 = new Float64Array(64);   // ENERGIN (se E_WIN_S); spreadM0 = BASGANG
   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
   private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
-  private lampLvl = new Float32Array(64); private lampPeakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private lampRatio = new Float32Array(192);   // STEG 2: uttoningen per lampa (ljusstyrka + senaste kulor)
-  private lampPrev = new Float32Array(192); private fadeOld: [number, number, number] = [0, 0, 0]; private fadeNew: [number, number, number] = [0, 0, 0];   // UTTONINGENS LJUS: förra rutans färg per lampa
+  private lampFade = new LampFade();   // STEG 2: uttoningen + minsta pa-tiden per lampa (lampans kontrakt, output.ts)
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
   // 40–50 s sammanhängande rök innan värmeblocket måste hämta igen, så vi för
@@ -1369,7 +1366,7 @@ export class EffectEngine {
   /** LAMPORNA: effekt -> effektNiva -> kulörtoning -> energi -> uttoning -> utgång, per lampa (utbrutet ur render 10-16, GC-jakten: ordagrant flyttat, samma ordning). */
   private renderLamps(effect: EffectDef | undefined, count: number, ordSel: number, useAnchor: boolean, fxToggle: boolean, fastLight: boolean, modE: boolean): boolean {
     const t = this.rT, anchorHue = this.rAnchorHue, nowWall = this.rNowWall, inputGate = this.rInputGate, md = this.rMd, drive = this.rDrive, renderNow = this.rNowP, dtSec = this.rDt;
-    const ctx = this.ctx, bands = this.bandsBuf, specialty = this.specBuf;
+    const ctx = this.ctx, bands = this.bandsBuf, specialty = this.specBuf; this.lampFade.tune(this.cfg);
     let wantStrobe = 0, wantBlinder = 0, wantUv = 0, wantLaser = 0, wantHazer = 0, wantCo2 = 0, wantFogFx = false;
     // BASGANG (a7): ledaren = förra rutans ljusaste lampa (före energin); bland lika ljusa (inom 5 %) den vars tur det är (en lampa per basnot)
     const bp = this.eBass * this.eBass, sm = this.spreadM0, spreadOn = !(effect && SPREAD_SKIP.has(effect.key)); let lead = -1, leadM = 0;
@@ -1427,39 +1424,9 @@ export class EffectEngine {
       // lampan tand (m0 > 0) och ingangen ar pa (k > 0) halls den pa lampans lagsta tanda niva (output.ts keepLit: forsta DMX-steget ->
       // tandpunkt+1). Bara effekten sjalv eller slackgransen (tystnad) slacker. Kuloren bevaras (alla kanaler med samma faktor).
       if (m0 > 0 && k > 0) keepLit(fx, rgb);
-      // STEG 2 forts. - EN UTTONING (DMX_FADE_MIN_S, justerbar): lampans ljusstyrka upp direkt, ner med tidskonstanten; kuloren foljer
-      // effekten direkt (slacker effekten lampan tonar den ut i sin sista kulor). Ersatter utgangens toning, sista toningen och
-      // lookbytets toning (tre toningar -> en). Snabbare uttoning ar forbjudet (agaren 09-29) - standard 0,25 s som forr.
-      {
-        const mT = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
-        // MINSTA PA-TID (output.ts MIN_ON_MS, agaren i ladan 10-10: "kan man ge effekterna en minsta tankt 'pa' tid? nu blev det lite
-        // flimrande igen"): en nivå lampan nått hålls minst MIN_ON_MS innan uttoningen börjar - korta blixtar blir en puls. Upp direkt.
-        const holding = !fastLight && renderNow - this.lampPeakAt[i] < MIN_ON_MS;
-        const fall = holding ? this.lampLvl[i] : this.lampLvl[i] * lampFadeK(fx, dtSec, FADE_MIN_S), o = i * 3;   // tidskonstanten i lampans ljus (output.ts)
-        if (mT > 0) {
-          // MINSTA PA-TID PER FARGKANAL (agaren 10-10: "lyser R sa far inte B bara komma igang under 100 ms"): en kanal som tands
-          // halls tand minst CH_MIN_ON_MS (output.ts) med sin senaste andel av lampans ljus, aven om effekten slacker den direkt.
-          for (let c = 0; c < 3; c++) {
-            const q = o + c, r = rgb[c] / mT;
-            if (r > 0) { if (this.chOnAt[q] === 0) this.chOnAt[q] = renderNow; this.lampRatio[q] = r; }
-            else if (!fastLight && this.chOnAt[q] !== 0 && renderNow - this.chOnAt[q] < CH_MIN_ON_MS) rgb[c] = this.lampRatio[q] * mT;   // hall kvar
-            else { this.chOnAt[q] = 0; this.lampRatio[q] = 0; }
-          }
-        }
-        if (mT >= fall) { if (mT > this.lampLvl[i] + 0.005 || !holding) this.lampPeakAt[i] = renderNow; this.lampLvl[i] = mT; }
-        else {
-          // UTTONINGEN STIGER ALDRIG I LJUS (ägaren i ladan 11-07: 'när en effekt fadar en färg så kan den hacka i slutet av fade, snabbt
-          // öka ljusstyrka'; spårat 11-08: byter effekten kulör på en lampa som tonar ut fick den NYA kulören den hållna nivån per kanal -
-          // röd 40 -> magenta 40+40 = dubbla ljuset). Den nya kulören får högst den gamla kulörens ljus på den här nivån (output.ts sameLight).
-          const prevL = this.lampLvl[i], fo = this.fadeOld, fn = this.fadeNew, sc = prevL > 0 ? fall / prevL : 0;
-          fn[0] = this.lampRatio[o] * fall; fn[1] = this.lampRatio[o + 1] * fall; fn[2] = this.lampRatio[o + 2] * fall;
-          fo[0] = this.lampPrev[o] * sc; fo[1] = this.lampPrev[o + 1] * sc; fo[2] = this.lampPrev[o + 2] * sc;
-          this.lampLvl[i] = fall;
-          if (sc > 0 && sameLight(fx, fo, fn)) { rgb[0] = fo[0]; rgb[1] = fo[1]; rgb[2] = fo[2]; }   // samma ljus som den gamla kulören
-          else { rgb[0] = fn[0]; rgb[1] = fn[1]; rgb[2] = fn[2]; }                              // den nya har mindre ljus: som förr
-        }
-        this.lampPrev[o] = rgb[0]; this.lampPrev[o + 1] = rgb[1]; this.lampPrev[o + 2] = rgb[2];
-      }
+      // STEG 2 forts. - EN UTTONING + MINSTA PA-TID = LAMPANS KONTRAKT (output.ts LampFade, fade-planen 11-12): lampans ljusstyrka upp
+      // direkt, ner med tidskonstanten cfg.fadeMinS; kuloren foljer effekten direkt. Tiderna ar installningar i /setup.
+      this.lampFade.step(i, fx, rgb, renderNow, dtSec, fastLight);
       this.out.writeFixture(this.universe, fx, rgb, 1, 0, specialty);
     }
     return wantFogFx;
