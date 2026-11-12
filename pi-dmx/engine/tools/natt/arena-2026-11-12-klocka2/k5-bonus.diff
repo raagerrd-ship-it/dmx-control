@@ -1,0 +1,114 @@
+diff --git a/src/analyserClock.ts b/src/analyserClock.ts
+index 791182d..c9d1431 100644
+--- a/src/analyserClock.ts
++++ b/src/analyserClock.ts
+@@ -135,6 +135,22 @@ const TG_GRID_EXTRA_MS = 5;   // oktavkanten +-3 %; övre oktaven bara om analys
+ const TG_WIN_MS = 5000, TG_FULL_N = 900, TG_FWIN_MS = 3500, TG_FFULL_N = 630, TG_FA = 0.4, TG_SW_STEPS = 6, TG_SW_N = 2;
+ /** a3 TOPPRÖSTEN (se peakVote): syskonen, faktor, varv i följd; oktaven under kanten (se tgStep). */
+ const HV_R = [4 / 3, 3 / 4, 3 / 2, 2 / 3, 5 / 4, 4 / 5], HV_K = 1.25, HV_N = 5, HV_AGE = 30, TG_OCT_LO = 79.6, TG_OCT_LO_N = 8;
++/** SYSKONFAMILJEN SOM EN HYPOTES (arena klocka2 k1, 2026-11-12; källaren: klockan växlade 94 <-> 126 = 4:3 var 10:e sekund). Tempon i
++ *  EXAKTA förhållanden 4:3, 3:2 och 2:1 (åt båda hållen i oktaven 80-160, +-FAM_TOL) är SAMMA rytm läst på olika sätt (5:4 provat
++ *  och struket: en ny låt i 5:4 utan låtgräns, mixen 104 -> 129, låste 7,5 -> 9,4 s, och hållen i de långa inspelningarna var desamma). Tempogrammet följer FAMILJEN precis som förr, men vilken MEDLEM som är klockans tempo
++ *  avgörs för sig, med bevis räknat i SLAG i klockans eget rutnät (takter, inte sekunder: en långsam låt får lika många takter som en snabb):
++ *  - familjens slag (famReign) räknas från det att låsets tempoval är över (toppröstens fönster HV_AGE) och så länge varvets val är
++ *    regenten (+-FAM_SAME, fintempot följer som förr) eller en annan medlem; efter FAM_CROWN slag (4 takter) är familjen KRÖNT;
++ *  - i en krönt familj byter klockan medlem först när den medlemmen vunnit varven (tempogrammets val, med kronan/topprösten som förr)
++ *    FAM_PHRASE slag NETTO - varje varv regenten vinner räknas av, en ny utmanare börjar om;
++ *  - före kröningen (kallstart, efter låtgräns/tystnad) och för ett tempo UTANFÖR familjen (ny låt utan låtgräns) gäller dagens regler
++ *    orörda - låsningen blir inte långsammare.
++ *  REGENTEN MÅSTE LEVA: en medlem räknas bara till familjen medan regentens egen rytm finns kvar i det snabba minnet (dess poäng >=
++ *  FAM_ALIVE x minnets topp). Mätt (k1 sond, hållets varv): växling inom låten (lang1011 96 <-> 128, kvot 1,330-1,335 och 1,500) median
++ *  0,61-0,77, lägst 0,48; ny låt i syskonförhållande utan låtgräns (mixen 104 -> 129, 83 -> 102, 102 -> 80, 152 -> 102: kvot 0,9-1,8 % från
++ *  syskonet) median 0,23-0,38 - det är en annan rytm, inte en annan läsning, och tas som förr. */
++const FAM_R = [4 / 3, 3 / 2, 2], FAM_SAME = 0.06, FAM_TOL = 0.01, FAM_CROWN = 16, FAM_PHRASE = 16, FAM_ALIVE = 0.45;
++const SUB_TH = 0.3, SUB_MODE = Number(process.env.K5_MODE ?? 1);
+ const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, TG_MIN_N = 300, TG_FINE = 0.0025, TG_HALF = ONSET_BINS >> 1;
+ 
+ /**
+@@ -194,6 +210,7 @@ export class BeatFeed {
+   /** TEMPOTS TYDLIGHET 0..1 (t1f): 1 - näst bästa tempohypotesens poäng / vinnarens, x 3, tak 1 (se tgStep). */
+   tgClear = 1;
+   private hvRun = 0; hvSwitches = 0; private hvAge = 0; private hvVoted = false; private hvKeep = 0; private hvEver = false; private octLoN = 0; private hvT0 = 0; private hvBest = 0;   // a3 TOPPRÖSTEN (hvEver: D1, rösten har bytt sedan låset)
++  private famReign = 0; private famWin = 0; private famCh = 0; private famAt = 0; famHolds = 0;   // SYSKONFAMILJEN: regentens slag, utmanarens nettoslag, utmanaren, förra varvets tid
+   private tgHalfR = 0; octR = 0; private octN = 0; private octHi = false;   // OKTAVKANTEN (r0): halvslagskvotens EMA och läget
+   private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
+   // ETTAN (a5): fyra platsers särdrag (inre slagindex & 3), pågående slagets max, linjära ringar för stigningen, publicerat ankare
+@@ -327,7 +344,7 @@ export class BeatFeed {
+         const kc = ((Math.round(Math.log(this.tempoBpm / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K, cv = Math.max(acc[kc], acc[(kc + 1) % TG_K], acc[(kc + TG_K - 1) % TG_K]);
+         // bara mot ett HARMONISKT syskon (4:3, 3:2 åt båda hållen, i det cirkulära oktavrutnätet): ett annat tempo (ny låt utan låtgräns) tas som förr
+         const d = ((bk - kc) % TG_K + TG_K) % TG_K, sib = TG_SIB.some((q) => Math.abs(d - q) <= 2 || Math.abs(d - (TG_K - q)) <= 2);
+-        if (sib && cv > 0 && bv < cv * TG_HOLD) return;
++        if (sib && cv > 0 && bv < cv * TG_HOLD) { this.famStep(this.tempoBpm, now); return; }
+       }
+       const a = acc[(bk + TG_K - 1) % TG_K], c = acc[(bk + 1) % TG_K], den = a - 2 * bv + c;   // parabel i log-rutnätet (cirkulärt)
+       const off = a >= 0 && c >= 0 && den < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den)) : 0;
+@@ -345,10 +362,39 @@ export class BeatFeed {
+         // a3 OKTAVEN UNDER KANTEN: båda bänkarnas facit (och lotus BPM_MIN/MAX) bor i [80, 160) - ett slag under 80 finns inte, så ligger
+         // halvslaget tydligt under kanten (< TG_OCT_LO) är pulsen dubbla (lotus 503: 20 'dubbla' 155-159 -> klockan 80,0 = klämd 78,x).
+         t = this.octHi || this.octLoN >= TG_OCT_LO_N ? 2 * lo : lo; }
+-      this.tempoBpm = Math.min(159.9, Math.max(80, this.peakVote(t, now)));
++      this.famStep(Math.min(159.9, Math.max(80, this.peakVote(t, now))), now);
+       return;
+     }
+   }
++  /** SYSKONFAMILJEN (se FAM_R): varvets val `cand` blir klockans tempo, utom när regenten är krönt och valet är en annan medlem av
++   *  samma familj - då står regenten kvar tills medlemmen vunnit FAM_PHRASE slag netto. */
++  private famStep(cand: number, now: number): void {
++    const reg = this.tempoBpm, dt = this.famAt > 0 ? now - this.famAt : 0; this.famAt = now;
++    if (!(reg > 0)) { this.tempoBpm = cand; this.famReign = 0; this.famWin = 0; this.famCh = 0; return; }
++    const db = (dt > 1000 ? 1000 : dt) * reg / 60000, r = cand > reg ? cand / reg : reg / cand;
++    if (r - 1 < FAM_SAME) {   // regenten vann varvet (fintempot följer tempogrammet som förr)
++      this.tempoBpm = cand; if (this.famReign < FAM_CROWN && this.hvAge > HV_AGE) this.famReign += db;   // familjens slag räknas först när låsets tempoval (toppröstens fönster) är över
++      this.famWin = this.famWin > db ? this.famWin - db : 0; return;
++    }
++    let fam = false; for (let i = 0; i < FAM_R.length; i++) if (Math.abs(r / FAM_R[i] - 1) < FAM_TOL) fam = true;
++    if (fam) {   // lever regenten? dess poäng i det snabba minnet mot minnets topp (ny låt utan låtgräns: regentens rytm finns inte kvar)
++      const aF = this.tgAccF, kc = ((Math.round(Math.log(reg / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K;
++      const rv = Math.max(aF[kc], aF[(kc + 1) % TG_K], aF[(kc + TG_K - 1) % TG_K]); let fv = 0; for (let i = 0; i < TG_K; i++) if (aF[i] > fv) fv = aF[i];
++      fam = rv >= fv * FAM_ALIVE;
++    }
++    if (!fam) { this.tempoBpm = cand; this.famReign = 0; this.famWin = 0; this.famCh = 0; return; }   // tempo utanför familjen (eller regentens rytm borta): nytt, som förr
++    if (this.famReign < FAM_CROWN) { this.tempoBpm = cand; if (this.hvAge > HV_AGE) this.famReign += db; this.famWin = 0; this.famCh = 0; return; }   // familjen okrönt: medlemmen byts som förr, familjens slag räknas vidare
++    if (!(this.famCh > 0) || Math.abs(cand / this.famCh - 1) >= FAM_SAME) { this.famCh = cand; this.famWin = 0; }   // ny utmanare börjar om
++    // UNDERDELNINGEN (k5): utmanaren 4/3 (eller 2/3) upp vars egna tredjedelar är fulla är regentens triolfantom - varvet räknas inte;
++    // utmanaren 3/4 (eller 3/2) ned mot en regent med fulla tredjedelar: regenten är fantomen - varvet räknas dubbelt (SUB_MODE 2)
++    const q = cand / reg, up = Math.abs(q / (4 / 3) - 1) < FAM_TOL || Math.abs(q / (2 / 3) - 1) < FAM_TOL, dn = Math.abs(q / (3 / 4) - 1) < FAM_TOL || Math.abs(q / (3 / 2) - 1) < FAM_TOL;
++    let w = 1;
++    if ((up && (SUB_MODE & 1)) || (dn && (SUB_MODE & 2))) { if (this.subFold(up ? cand : reg, now)) { const B = this.subB, g = (B[1] + B[2] + B[5] + B[7] + B[10] + B[11]) / 6;
++      if ((B[4] < B[8] ? B[4] : B[8]) - g >= SUB_TH * (B[0] - g)) w = up ? 0 : 2; } }
++    this.famWin += db * w;
++    if (this.famWin < FAM_PHRASE) { this.famHolds++; return; }   // regenten står kvar
++    this.tempoBpm = cand; this.famWin = 0; this.famCh = 0;   // medlemmen har vunnit en hel fras
++  }
+   /** a3 TOPPRÖSTEN (EN KLOCKA FÖR BÅDA, sammanslagningen av tempovalet - båda signalerna röstar). Tempogrammet (B, rise-vikningen) dömer
+    *  varje tempo på (topp + HALVSLAGET) / 2: halvslaget fäller 4/3- och 3/2-fantomerna (ingen topp mitt emellan), men GYNNAR 3/4-fantomen:
+    *  på 3/4 av tempot landar de riktiga slagen på fyra jämnt fördelade faser (0, 1/4, 1/2, 3/4), så både toppen och halvslaget har slag.
+@@ -402,7 +448,27 @@ export class BeatFeed {
+     for (let b = 0; b < ONSET_BINS; b++) { if (!N[b]) continue; const v = S[b] / N[b], h = Hs[b] / N[b]; if (v > mx) mx = v; if (h > hx) hx = h; }
+     return (mx / (tot / n)) * (hx / (totH / n));
+   }
+-  private tgReset(): void { this.tgAcc.fill(-1); this.tgAccF.fill(-1); this.tgSw = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; }
++  /** UNDERDELNINGEN (k5): var faller anslagen INOM slaget? Ringen (TG_WIN_MS) viks på bpm; basens stigning och diskanten summeras i
++   *  tolftedelar av slaget räknat från basens topp (12 = minsta gemensamma för tredjedelar och fjärdedelar): plats 0 = slaget, 6 = halvslaget,
++   *  3/9 = fjärdedelarna, 4/8 = tredjedelarna. Andelar (summa 1) i subB/subH. false = för lite ljud. */
++  private readonly subB = new Float64Array(12); private readonly subH = new Float64Array(12);
++  private subFold(bpm: number, now: number): boolean {
++    const S = this.fullS, N = this.fullN, Hs = this.tgH, oT = this.onT, oV = this.onV, oH = this.hiV; S.fill(0); N.fill(0); Hs.fill(0);
++    let lo = 0, hi = this.onN;
++    while (lo < hi) { const m = (lo + hi) >> 1; if (now - oT[(this.onPos - 1 - m + 2 * ONSET_RING) % ONSET_RING] > TG_WIN_MS) hi = m; else lo = m + 1; }
++    const n = lo; if (n < TG_MIN_N) return false;
++    const jo = (this.onPos - n + 2 * ONSET_RING) % ONSET_RING;
++    const dt = (oT[(this.onPos + ONSET_RING - 1) % ONSET_RING] - oT[jo]) / (n - 1), step = (dt * bpm / 60000) * ONSET_BINS;
++    let j = jo, ph = 0;
++    for (let i = 0; i < n; i++) { const b = ph | 0; S[b] += oV[j]; Hs[b] += oH[j]; N[b]++; ph += step; if (ph >= ONSET_BINS) ph -= ONSET_BINS; j = j === ONSET_RING - 1 ? 0 : j + 1; }
++    let mx = 0, mb = 0, tot = 0, totH = 0;
++    for (let b = 0; b < ONSET_BINS; b++) { if (!N[b]) continue; const v = S[b] / N[b]; S[b] = v; Hs[b] /= N[b]; tot += v; totH += Hs[b]; if (v > mx) { mx = v; mb = b; } }
++    if (tot <= 0 || totH <= 0) return false;
++    const B = this.subB, H = this.subH;
++    for (let s = 0; s < 12; s++) { let a = 0, h = 0; for (let q = -2; q < 2; q++) { const b = (mb + 4 * s + q + ONSET_BINS) % ONSET_BINS; if (N[b]) { a += S[b]; h += Hs[b]; } } B[s] = a / tot; H[s] = h / totH; }
++    return true;
++  }
++  private tgReset(): void { this.tgAcc.fill(-1); this.tgAccF.fill(-1); this.tgSw = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; this.famReign = 0; this.famWin = 0; this.famCh = 0; this.famAt = 0; }
+ 
+   /** Kom en tidigare kick (ringen, före denna) lag ms före t, inom ±tol? (TRUST_REPEAT) */
+   private kickRepeats(t: number, lag: number, tol: number): boolean {

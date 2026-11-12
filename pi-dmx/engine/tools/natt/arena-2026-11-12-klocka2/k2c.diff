@@ -1,0 +1,162 @@
+diff --git a/src/analyserClock.ts b/src/analyserClock.ts
+index 791182d..0f93e11 100644
+--- a/src/analyserClock.ts
++++ b/src/analyserClock.ts
+@@ -135,6 +135,30 @@ const TG_GRID_EXTRA_MS = 5;   // oktavkanten +-3 %; övre oktaven bara om analys
+ const TG_WIN_MS = 5000, TG_FULL_N = 900, TG_FWIN_MS = 3500, TG_FFULL_N = 630, TG_FA = 0.4, TG_SW_STEPS = 6, TG_SW_N = 2;
+ /** a3 TOPPRÖSTEN (se peakVote): syskonen, faktor, varv i följd; oktaven under kanten (se tgStep). */
+ const HV_R = [4 / 3, 3 / 4, 3 / 2, 2 / 3, 5 / 4, 4 / 5], HV_K = 1.25, HV_N = 5, HV_AGE = 30, TG_OCT_LO = 79.6, TG_OCT_LO_N = 8;
++/** TVÅ TIDSSKALOR (arena klocka2 k2): tempogrammets två minnen (3,5 s och 5 s) följer fills, break och fantomer - klockan växlade
++ *  94 <-> 126 var 10:e sekund på en och samma låt. Nu VÄLJER ett långt fönster TOLKNINGEN (tolkBpm) och det korta följer tempot inom den:
++ *  (1) VALET: tolkningen sätts när tempogrammets val stått inom TL_BAND i TL_OPEN varv i följd (~15 s). Dessförinnan (kallstart, efter
++ *      låtgräns/tystnad) gäller den snabba vägen orörd - en svag låtstart låser lika fort som förr. (31 varv = 12 s satte tolkningen mitt i
++ *      inlåsningen på lotusbankens 30 s-klipp: i fas 70 -> 69, on-beat 0,41 -> 0,40.)
++ *  (2) FÖLJA: ett val inom TL_BAND av tolkningen tas direkt (tolkningen glider med TL_GLIDE per varv: en trummis som drar). Oktaven hör
++ *      till tolkningen (80 och 160 är samma hypotes).
++ *  (3) UTMANAREN (ett val utanför bandet). Frågan är om den är en annan LÄSNING AV SAMMA LÅT eller NYTT MATERIAL (k2b; lånat av k1:
++ *      'syskonfamiljen är samma rytm läst på olika sätt' och 'regenten måste leva' - här avgör det långa minnet i stället för exakta kvoter):
++ *      - OKÄND: utmanarens poäng i det LÅNGA minnet (tgAccL: samma hypotesers poäng, TL_A per varv = ~10 s) < TL_KNOWN x tolkningens.
++ *        Tempot har inte hörts i låten = ny låt/nytt parti: allt går som förr (snabba minnets byte, TG_HOLD i TG_SW_N varv), valet öppnas (4).
++ *        Övningsmixens 15 låtbyten: 0,14-0,43 (ett 0,55-0,68) - låtbytet sätter sig på samma varv som förr.
++ *      - KÄND (>= TL_KNOWN): tempot har stått starkt i samma låt (lang1011 96 <-> 128: 0,8-1,35). Det tas bara på bevis över fraser
++ *        (långa minnet x TL_HOLD), eller när regenten är DÖD i det snabba minnet (kvot >= TL_ESC) och utmanaren ändå inte är jämstark
++ *        i det långa (< TL_SAME). Det långsamma minnets topp flyttar aldrig tolkningen till en känd läsning på egen hand.
++ *  (5) k2c (lagning efter kontrollmängden, mix_still): tolkningen rör ALDRIG rutnätet - hållet är bara att tempot står (k2/k2b: rutnätet
++ *      sökte +-0,5 % och kickgrinden stod öppen i hållet; borttaget). Det snabba minnets byte (låtbytets väg) hålls bara mot ett tempo som
++ *      är känt ÖVER det långa minnets golv (tolkKnown: övningsmixens låtbyten -0,03..0,23, ett 0,37; läsningar i samma låt 0,6-1,4) -
++ *      med en svag regent var annars allt 'känt'. Den vandrande toppen i det långsamma minnet hålls som i k2b (rå kvot), men bara medan
++ *      regenten lever i det snabba minnet (k1:s FAM_ALIVE).
++ *  (4) Efter ett sådant snabbt byte är valet öppet igen i TL_REOPEN stadiga varv (nya låtens första gissning får rättas som förr); kommer
++ *      valet tillbaka till den förra tolkningen under tiden var det en utflykt och den gäller igen. Låtgränsen (relock) öppnar valet helt. */
++const FAM_R = [4 / 3, 3 / 2, 2], FAM_SAME = 0.06, FAM_TOL = 0.01, FAM_CROWN = 16, FAM_PHRASE = 16, FAM_ALIVE = 0.45;
++const TL_A = 0.04, TL_OPEN = 38, TL_REOPEN = 8, TL_BAND = 0.03, TL_HOLD = 1.2, TL_ESC = 1.7, TL_KNOWN = 0.5, TL_SAME = 0.85, TL_GLIDE = 0.1;
+ const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, TG_MIN_N = 300, TG_FINE = 0.0025, TG_HALF = ONSET_BINS >> 1;
+ 
+ /**
+@@ -189,6 +213,7 @@ export class BeatFeed {
+   private readonly fullS = new Float64Array(ONSET_BINS); private readonly fullN = new Float64Array(ONSET_BINS);
+   private readonly tgAcc = new Float64Array(TG_K).fill(-1); private readonly tgH = new Float64Array(ONSET_BINS); private tgK = 0; private tgN = 0;
+   private readonly tgAccF = new Float64Array(TG_K).fill(-1); private tgSw = 0; tgSwitches = 0;   // TVÅ MINNEN (a2f)
++  private readonly tgAccL = new Float64Array(TG_K).fill(-1); private tlN = 0; tolkBpm = 0; private tolkPrev = 0; private tolkRun = 0; private tolkRunBpm = 0; private tolkNeed = TL_OPEN; tolkSwitches = 0; private famReign = 0; private famWin = 0; private famCh = 0; private famAt = 0;   // TVÅ TIDSSKALOR (k2): långa minnet, tolkningen
+   /** EN TEMPOSÖKNING: tempogrammets vinnare (0 = ingen topp än) - klockans skanningscentrum. */
+   tempoBpm = 0;
+   /** TEMPOTS TYDLIGHET 0..1 (t1f): 1 - näst bästa tempohypotesens poäng / vinnarens, x 3, tak 1 (se tgStep). */
+@@ -300,6 +325,8 @@ export class BeatFeed {
+       if (sf > 0) accF[k] = accF[k] < 0 || this.tgN < TG_FFULL_N ? sf : accF[k] + TG_FA * (sf - accF[k]);
+       const s = this.tgScore(bk0, now);
+       if (s > 0) acc[k] = acc[k] < 0 || this.tgN < TG_FULL_N ? s : acc[k] + TG_A * (s - acc[k]);   // minne först när fönstret är fullt (kort fönster = brusig, långsam-gynnad poäng)
++      if (s > 0) { const L = this.tgAccL; L[k] = L[k] < 0 ? s : L[k] + (this.tlN * TL_A < 1 ? 1 / (this.tlN + 1) : TL_A) * (s - L[k]); }   // TVÅ TIDSSKALOR: långa minnet (löpande medel tills fullt)
++      if (this.tgK === TG_K - 1 && s > 0) this.tlN++;
+       if (++this.tgK < TG_K) continue;
+       this.tgK = 0;
+       if (this.tgN < TG_FULL_N) acc.set(accF);   // TVÅ MINNEN: tills det långsamma fönstret är fullt (kallstart, efter relock) styr det snabba
+@@ -309,7 +336,8 @@ export class BeatFeed {
+         const d0 = fk < 0 ? 0 : ((fk - kc0) % TG_K + TG_K) % TG_K, dd = Math.min(d0, TG_K - d0);
+         const fc = Math.max(accF[kc0], accF[(kc0 + 1) % TG_K], accF[(kc0 + TG_K - 1) % TG_K]);   // det regerande tempots poäng i det snabba
+         // TEMPOHOPPEN (11-10): kronans marginal mot ALLA tempon, inte bara syskonen
+-        if (fk >= 0 && dd > TG_SW_STEPS && fv >= fc * TG_HOLD) { if (++this.tgSw >= TG_SW_N) { acc.set(accF); this.tgSw = 0; this.tgSwitches++; } } else this.tgSw = 0;
++        if (fk >= 0 && dd > TG_SW_STEPS && fv >= fc * TG_HOLD) { if (++this.tgSw >= TG_SW_N && (!(this.tolkBpm > 0) || this.tolkEscape(fv / fc, 80 * Math.pow(TG_STEP, fk)))) { acc.set(accF); this.tgSw = 0; this.tgSwitches++;
++          if (this.tolkBpm > 0) { this.tolkPrev = this.tolkBpm; this.tolkBpm = 0; this.tolkRun = 0; this.tolkRunBpm = 0; this.tolkNeed = TL_REOPEN; } } } else this.tgSw = 0;   // TVÅ TIDSSKALOR (3)/(4)
+       }
+       let bk = -1, bv = 0; for (let i = 0; i < TG_K; i++) if (acc[i] > bv) { bv = acc[i]; bk = i; }
+       if (bk < 0) { this.tempoBpm = 0; return; }
+@@ -327,7 +355,7 @@ export class BeatFeed {
+         const kc = ((Math.round(Math.log(this.tempoBpm / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K, cv = Math.max(acc[kc], acc[(kc + 1) % TG_K], acc[(kc + TG_K - 1) % TG_K]);
+         // bara mot ett HARMONISKT syskon (4:3, 3:2 åt båda hållen, i det cirkulära oktavrutnätet): ett annat tempo (ny låt utan låtgräns) tas som förr
+         const d = ((bk - kc) % TG_K + TG_K) % TG_K, sib = TG_SIB.some((q) => Math.abs(d - q) <= 2 || Math.abs(d - (TG_K - q)) <= 2);
+-        if (sib && cv > 0 && bv < cv * TG_HOLD) return;
++        if (sib && cv > 0 && bv < cv * TG_HOLD) { this.famStep(this.tempoBpm, now); return; }
+       }
+       const a = acc[(bk + TG_K - 1) % TG_K], c = acc[(bk + 1) % TG_K], den = a - 2 * bv + c;   // parabel i log-rutnätet (cirkulärt)
+       const off = a >= 0 && c >= 0 && den < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den)) : 0;
+@@ -345,10 +373,80 @@ export class BeatFeed {
+         // a3 OKTAVEN UNDER KANTEN: båda bänkarnas facit (och lotus BPM_MIN/MAX) bor i [80, 160) - ett slag under 80 finns inte, så ligger
+         // halvslaget tydligt under kanten (< TG_OCT_LO) är pulsen dubbla (lotus 503: 20 'dubbla' 155-159 -> klockan 80,0 = klämd 78,x).
+         t = this.octHi || this.octLoN >= TG_OCT_LO_N ? 2 * lo : lo; }
+-      this.tempoBpm = Math.min(159.9, Math.max(80, this.peakVote(t, now)));
++      this.tempoBpm = this.tolkStep(this.famStep(Math.min(159.9, Math.max(80, this.peakVote(t, now))), now));
+       return;
+     }
+   }
++  /** SYSKONFAMILJEN (lånad av k1, arena klocka2): tempon i EXAKTA förhållanden 4:3, 3:2 och 2:1 (+-FAM_TOL) är samma rytm läst på olika
++   *  sätt. När familjen följts FAM_CROWN slag efter låsets tempoval (toppröstens fönster) byter klockan medlem först när den andra
++   *  medlemmen vunnit varven FAM_PHRASE slag NETTO (bevis i klockans egna takter). REGENTEN MÅSTE LEVA: hållet gäller bara medan regentens
++   *  rytm finns kvar i det snabba minnet (poäng >= FAM_ALIVE x toppen; k1 mätt: växling i låten 0,48-0,77, ny låt 0,23-0,38) - en ny låt i
++   *  syskonförhållande går som förr. Ger varvets val eller, i hållet, regenten; tolkStep dömer sedan valet mot tolkningen. */
++  private famStep(cand: number, now: number): number {
++    const reg = this.tempoBpm, dt = this.famAt > 0 ? now - this.famAt : 0; this.famAt = now;
++    if (!(reg > 0)) { this.famReign = 0; this.famWin = 0; this.famCh = 0; return cand; }
++    const db = (dt > 1000 ? 1000 : dt) * reg / 60000, r = cand > reg ? cand / reg : reg / cand;
++    if (r - 1 < FAM_SAME) {   // regenten vann varvet (fintempot följer som förr)
++      if (this.famReign < FAM_CROWN && this.hvAge > HV_AGE) this.famReign += db;
++      this.famWin = this.famWin > db ? this.famWin - db : 0; return cand;
++    }
++    let fam = false; for (let i = 0; i < FAM_R.length; i++) if (Math.abs(r / FAM_R[i] - 1) < FAM_TOL) fam = true;
++    if (fam) {   // lever regenten? dess poäng i det snabba minnet mot minnets topp
++      const aF = this.tgAccF, kc = ((Math.round(Math.log(reg / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K;
++      const rv = Math.max(aF[kc], aF[(kc + 1) % TG_K], aF[(kc + TG_K - 1) % TG_K]); let fv = 0; for (let i = 0; i < TG_K; i++) if (aF[i] > fv) fv = aF[i];
++      fam = rv >= fv * FAM_ALIVE;
++    }
++    if (!fam) { this.famReign = 0; this.famWin = 0; this.famCh = 0; return cand; }   // utanför familjen (eller regentens rytm borta): nytt, som förr
++    if (this.famReign < FAM_CROWN) { if (this.hvAge > HV_AGE) this.famReign += db; this.famWin = 0; this.famCh = 0; return cand; }   // okrönt: medlemmen byts som förr
++    if (!(this.famCh > 0) || Math.abs(cand / this.famCh - 1) >= FAM_SAME) { this.famCh = cand; this.famWin = 0; }   // ny utmanare börjar om
++    this.famWin += db;
++    if (this.famWin < FAM_PHRASE) return reg;   // regenten står kvar
++    this.famWin = 0; this.famCh = 0; return cand;   // medlemmen har vunnit en hel fras
++  }
++  /** Långa minnets poäng kring bpm (+-2 steg = 1 %, cirkulärt). */
++  private tlScore(bpm: number): number {
++    const L = this.tgAccL, k = ((Math.round(Math.log(bpm / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K; let v = 0;
++    for (let i = -2; i <= 2; i++) { const x = L[(k + i + TG_K) % TG_K]; if (x > v) v = x; }
++    return v;
++  }
++  /** KÄNNER det långa minnet tempot (dess poäng mot tolkningens)? Känt = en annan läsning av SAMMA låt; okänt = nytt material. */
++  private tolkKnown(bpm: number): number {   // k2c: mätt ÖVER det långa minnets golv (medel över alla hypoteser) - med en svag regent var annars allt 'känt'
++    const L = this.tgAccL; let m = 0, n = 0; for (let i = 0; i < TG_K; i++) if (L[i] > 0) { m += L[i]; n++; }
++    const f = n ? m / n : 0, vi = this.tlScore(this.tolkBpm) - f;
++    return vi > 0 ? (this.tlScore(bpm) - f) / vi : 0;   // regenten själv inte över golvet: inget är känt, allt går som förr
++  }
++  /** (3) Snabba vägen ut ur en satt tolkning: ett okänt tempo går som förr; ett känt bara om regenten är död i det snabba minnet. */
++  private tolkEscape(q: number, bpm: number): boolean {
++    const lr = this.tolkKnown(bpm);
++    return lr < TL_KNOWN || (q >= TL_ESC && lr < TL_SAME);
++  }
++  /** Ligger a inom TL_BAND av b (oktaven bortvikt)? */
++  private tolkNear(a: number, b: number): boolean { let r = a / b; if (r < 0.75) r *= 2; else if (r > 1.5) r /= 2; return Math.abs(r - 1) <= TL_BAND; }
++  /** TVÅ TIDSSKALOR (se TL_A): varvets val `cand` mot tolkningen -> klockans tempo. */
++  private tolkStep(cand: number): number {
++    const I = this.tolkBpm;
++    if (!(I > 0)) {   // (1)/(4) öppet val: snabba vägen som förr
++      if (this.tolkPrev > 0 && this.tolkNear(cand, this.tolkPrev)) { this.tolkBpm = cand; this.tolkPrev = 0; return cand; }   // utflykten är över
++      if (this.tolkRunBpm > 0 && this.tolkNear(cand, this.tolkRunBpm)) this.tolkRun++; else { this.tolkRun = 0; this.tolkRunBpm = cand; }
++      if (this.tolkRun >= this.tolkNeed) { this.tolkBpm = cand; this.tolkPrev = 0; }
++      return cand;
++    }
++    let r = cand / I; if (r < 0.75) r *= 2; else if (r > 1.5) r /= 2;   // oktaven hör till tolkningen
++    if (Math.abs(r - 1) <= TL_BAND) {   // (2) det korta följer tempot inom bandet
++      this.tolkBpm = Math.min(159.9, Math.max(80, I * (1 + TL_GLIDE * (r - 1))));
++      return Math.min(159.9, Math.max(80, I * r));
++    }
++    const lr = this.tlScore(cand) / Math.max(1e-9, this.tlScore(I));   // (3) utmanaren utan det snabba minnets krona (toppen i det långsamma minnet vandrar): rå kvot i det långa minnet
++    // k2c (lånat av k1, 'regenten måste leva'): hållet gäller bara medan tolkningens rytm finns kvar i det SNABBA minnet (>= FAM_ALIVE x
++    // toppen). Är den borta är det en ny låt/ett nytt parti, hur 'känt' tempot än ser ut mot en svag regent - då går allt som förr.
++    const aF = this.tgAccF, kc = ((Math.round(Math.log(I / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K;
++    let fv = 0; for (let i = 0; i < TG_K; i++) if (aF[i] > fv) fv = aF[i];
++    const alive = Math.max(aF[kc], aF[(kc + 1) % TG_K], aF[(kc + TG_K - 1) % TG_K]) >= fv * FAM_ALIVE;
++    if (lr < TL_KNOWN || !alive) { this.tolkPrev = I; this.tolkBpm = 0; this.tolkRun = 0; this.tolkRunBpm = cand; this.tolkNeed = TL_REOPEN; return cand; }   // okänt för det långa minnet = nytt material: som förr, valet öppet (4)
++    if (lr < TL_HOLD) return this.tempoBpm > 0 ? this.tempoBpm : I;   // känd läsning av samma låt utan bevis över fraser: tolkningen står
++    this.tolkBpm = cand; this.tolkSwitches++;
++    return cand;
++  }
+   /** a3 TOPPRÖSTEN (EN KLOCKA FÖR BÅDA, sammanslagningen av tempovalet - båda signalerna röstar). Tempogrammet (B, rise-vikningen) dömer
+    *  varje tempo på (topp + HALVSLAGET) / 2: halvslaget fäller 4/3- och 3/2-fantomerna (ingen topp mitt emellan), men GYNNAR 3/4-fantomen:
+    *  på 3/4 av tempot landar de riktiga slagen på fyra jämnt fördelade faser (0, 1/4, 1/2, 3/4), så både toppen och halvslaget har slag.
+@@ -402,7 +500,7 @@ export class BeatFeed {
+     for (let b = 0; b < ONSET_BINS; b++) { if (!N[b]) continue; const v = S[b] / N[b], h = Hs[b] / N[b]; if (v > mx) mx = v; if (h > hx) hx = h; }
+     return (mx / (tot / n)) * (hx / (totH / n));
+   }
+-  private tgReset(): void { this.tgAcc.fill(-1); this.tgAccF.fill(-1); this.tgSw = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; }
++  private tgReset(): void { this.tgAcc.fill(-1); this.tgAccF.fill(-1); this.tgAccL.fill(-1); this.tlN = 0; this.tolkBpm = 0; this.tolkPrev = 0; this.tolkRun = 0; this.tolkRunBpm = 0; this.tolkNeed = TL_OPEN; this.famReign = 0; this.famWin = 0; this.famCh = 0; this.famAt = 0; this.tgSw = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; }
+ 
+   /** Kom en tidigare kick (ringen, före denna) lag ms före t, inom ±tol? (TRUST_REPEAT) */
+   private kickRepeats(t: number, lag: number, tol: number): boolean {

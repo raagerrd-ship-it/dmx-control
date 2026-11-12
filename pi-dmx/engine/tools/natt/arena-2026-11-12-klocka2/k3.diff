@@ -1,0 +1,129 @@
+diff --git a/src/analyserClock.ts b/src/analyserClock.ts
+index 791182d..57bd545 100644
+--- a/src/analyserClock.ts
++++ b/src/analyserClock.ts
+@@ -135,6 +135,17 @@ const TG_GRID_EXTRA_MS = 5;   // oktavkanten +-3 %; övre oktaven bara om analys
+ const TG_WIN_MS = 5000, TG_FULL_N = 900, TG_FWIN_MS = 3500, TG_FFULL_N = 630, TG_FA = 0.4, TG_SW_STEPS = 6, TG_SW_N = 2;
+ /** a3 TOPPRÖSTEN (se peakVote): syskonen, faktor, varv i följd; oktaven under kanten (se tgStep). */
+ const HV_R = [4 / 3, 3 / 4, 3 / 2, 2 / 3, 5 / 4, 4 / 5], HV_K = 1.25, HV_N = 5, HV_AGE = 30, TG_OCT_LO = 79.6, TG_OCT_LO_N = 8;
++/** SLAGENS PASSFORM (arena klocka2 k3): ett tolkningsbyte måste bäras av BASANSLAGEN. Ur ringen (basens dB-stigning, fönstret
++ *  TG_WIN_MS) plockas anslagen (lokala toppar >= PF_THR x medel och >= PF_REL x fönstrets största, minst PF_GAP_MS isär). För ett
++ *  tempo mäts, på bästa fas: P = andelen av anslagens vikt som ligger på slaget (+-PF_TOL_MS) och C = andelen av rutnätets slag i
++ *  fönstret som BÄR ett anslag. Passformen = P x C. Rätt tempo: 1 x 1. 4:3-fantomen: anslagen på tre faser i ett mönster som
++ *  återkommer vart fjärde slag (1/3 x 1/4); 3:4: (1/4 x 1/3); 3:2: (1/2 x 1/3); 2:3: (1/3 x 1/2).
++ *  Varje varv döms tempogrammets förslag mot regenten (klockans tempo) när förslaget är en ANNAN tolkning (> PF_SAME ifrån, inte
++ *  oktaven): bytet sker bara om förslaget bär slagen bättre än regenten (PF_KC x regentens + PF_DC; regenten mätt på hela fönstret
++ *  och på dess senare halva, det lägsta gäller) - eller om regenten inte längre bär sina egna slag (passformen < PF_DEAD x sitt
++ *  minne över takter, PF_A per varv = ny låt). Annars står regenten kvar. För få anslag (< PF_MIN_ON) eller de första PF_N0 varven
++ *  efter kallstart/låtgräns: tempogrammets val som förr. Inga nya tempon skapas här - domen säger bara ja eller nej. */
++const PF_MAX = 128, PF_THR = 2, PF_GAP_MS = 60, PF_TOL_MS = 32, PF_MIN_ON = 6, PF_A = 0.15, PF_N0 = 6, PF_SAME = 0.03, PF_REL = 0.3, PF_KC = 1.1, PF_DC = 0.03, PF_DEAD = 0.6;
+ const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, TG_MIN_N = 300, TG_FINE = 0.0025, TG_HALF = ONSET_BINS >> 1;
+ 
+ /**
+@@ -194,6 +205,9 @@ export class BeatFeed {
+   /** TEMPOTS TYDLIGHET 0..1 (t1f): 1 - näst bästa tempohypotesens poäng / vinnarens, x 3, tak 1 (se tgStep). */
+   tgClear = 1;
+   private hvRun = 0; hvSwitches = 0; private hvAge = 0; private hvVoted = false; private hvKeep = 0; private hvEver = false; private octLoN = 0; private hvT0 = 0; private hvBest = 0;   // a3 TOPPRÖSTEN (hvEver: D1, rösten har bytt sedan låset)
++  // SLAGENS PASSFORM (k3): anslagen (plats i ringfönstret, vikt), regentens/syskonens/utmanarens minne
++  private readonly pfI = new Float32Array(PF_MAX); private readonly pfW = new Float32Array(PF_MAX); private pfN = 0; private pfDt = 0; private pfSpan = 0; private pfBpm = 0; private pfBpm0 = 0;
++  pfCur = -1; private pfAge = 0; pfSwitches = 0; pfHolds = 0; pfF0 = 0; pfFc = 0; pfProp = 0;   // pfF0/pfFc/pfProp/pfSwitches/pfHolds: bara diagnos
+   private tgHalfR = 0; octR = 0; private octN = 0; private octHi = false;   // OKTAVKANTEN (r0): halvslagskvotens EMA och läget
+   private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
+   // ETTAN (a5): fyra platsers särdrag (inre slagindex & 3), pågående slagets max, linjära ringar för stigningen, publicerat ankare
+@@ -312,7 +326,7 @@ export class BeatFeed {
+         if (fk >= 0 && dd > TG_SW_STEPS && fv >= fc * TG_HOLD) { if (++this.tgSw >= TG_SW_N) { acc.set(accF); this.tgSw = 0; this.tgSwitches++; } } else this.tgSw = 0;
+       }
+       let bk = -1, bv = 0; for (let i = 0; i < TG_K; i++) if (acc[i] > bv) { bv = acc[i]; bk = i; }
+-      if (bk < 0) { this.tempoBpm = 0; return; }
++      if (bk < 0) { this.tempoBpm = 0; this.pfReset(); return; }
+       // TEMPOTS TYDLIGHET (t1f): marginalen till NÄST BÄSTA tempohypotes = högsta andra lokala toppen i varvets tempogram (mer än
+       // 2 steg från vinnaren, så toppens egen flank räknas inte). Ett enda tydligt tempo -> 1; två lika starka (96 <-> 128,
+       // tempot vandrar) -> 0. Två tredjedelar av vinnarens poäng eller mindre = full tydlighet. Läses av tilliten (updateInner).
+@@ -327,7 +341,7 @@ export class BeatFeed {
+         const kc = ((Math.round(Math.log(this.tempoBpm / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K, cv = Math.max(acc[kc], acc[(kc + 1) % TG_K], acc[(kc + TG_K - 1) % TG_K]);
+         // bara mot ett HARMONISKT syskon (4:3, 3:2 åt båda hållen, i det cirkulära oktavrutnätet): ett annat tempo (ny låt utan låtgräns) tas som förr
+         const d = ((bk - kc) % TG_K + TG_K) % TG_K, sib = TG_SIB.some((q) => Math.abs(d - q) <= 2 || Math.abs(d - (TG_K - q)) <= 2);
+-        if (sib && cv > 0 && bv < cv * TG_HOLD) return;
++        if (sib && cv > 0 && bv < cv * TG_HOLD) { this.tempoBpm = this.pfJudge(this.tempoBpm, now); return; }
+       }
+       const a = acc[(bk + TG_K - 1) % TG_K], c = acc[(bk + 1) % TG_K], den = a - 2 * bv + c;   // parabel i log-rutnätet (cirkulärt)
+       const off = a >= 0 && c >= 0 && den < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den)) : 0;
+@@ -345,7 +359,7 @@ export class BeatFeed {
+         // a3 OKTAVEN UNDER KANTEN: båda bänkarnas facit (och lotus BPM_MIN/MAX) bor i [80, 160) - ett slag under 80 finns inte, så ligger
+         // halvslaget tydligt under kanten (< TG_OCT_LO) är pulsen dubbla (lotus 503: 20 'dubbla' 155-159 -> klockan 80,0 = klämd 78,x).
+         t = this.octHi || this.octLoN >= TG_OCT_LO_N ? 2 * lo : lo; }
+-      this.tempoBpm = Math.min(159.9, Math.max(80, this.peakVote(t, now)));
++      this.tempoBpm = this.pfJudge(Math.min(159.9, Math.max(80, this.peakVote(t, now))), now);
+       return;
+     }
+   }
+@@ -402,7 +416,68 @@ export class BeatFeed {
+     for (let b = 0; b < ONSET_BINS; b++) { if (!N[b]) continue; const v = S[b] / N[b], h = Hs[b] / N[b]; if (v > mx) mx = v; if (h > hx) hx = h; }
+     return (mx / (tot / n)) * (hx / (totH / n));
+   }
+-  private tgReset(): void { this.tgAcc.fill(-1); this.tgAccF.fill(-1); this.tgSw = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; }
++  /** SLAGENS PASSFORM: plocka basanslagen ur ringens fönster (en gång per varv). */
++  private pfExtract(now: number): void {
++    const oT = this.onT, oV = this.onV, I = this.pfI, W = this.pfW; this.pfN = 0;
++    let lo = 0, hi = this.onN;
++    while (lo < hi) { const m = (lo + hi) >> 1; if (now - oT[(this.onPos - 1 - m + 2 * ONSET_RING) % ONSET_RING] > TG_WIN_MS) hi = m; else lo = m + 1; }
++    const n = lo; if (n < TG_MIN_N) return;
++    const jo = (this.onPos - n + 2 * ONSET_RING) % ONSET_RING;
++    const dt = (oT[(this.onPos + ONSET_RING - 1) % ONSET_RING] - oT[jo]) / (n - 1); if (!(dt > 0)) return;
++    let tot = 0, mx = 0, j = jo; for (let i = 0; i < n; i++) { const v = oV[j]; tot += v; if (v > mx) mx = v; j = j === ONSET_RING - 1 ? 0 : j + 1; }
++    if (!(tot > 0)) return;
++    const thr = Math.max(PF_THR * tot / n, PF_REL * mx), gap = PF_GAP_MS / dt; let c = 0, a = 0, b = oV[jo]; j = jo;
++    for (let i = 0; i < n - 1; i++) {
++      j = j === ONSET_RING - 1 ? 0 : j + 1; const d = oV[j];   // a = förra, b = detta (plats i), d = nästa
++      if (b >= thr && b > a && b >= d) {
++        if (c > 0 && i - I[c - 1] < gap) { if (b > W[c - 1]) { I[c - 1] = i; W[c - 1] = b; } }
++        else if (c < PF_MAX) { I[c] = i; W[c] = b; c++; }
++      }
++      a = b; b = d;
++    }
++    this.pfN = c; this.pfDt = dt; this.pfSpan = n;
++  }
++  /** Passformen P x C på bpm (bästa fas), se PF_MAX. */
++  private pfFit(bpm: number, from = 0): number {
++    const c = this.pfN, I = this.pfI, W = this.pfW, S = this.fullS, sb = this.pfDt * bpm / 60000, tol = PF_TOL_MS * bpm / 60000;
++    S.fill(0); let tot = 0;
++    for (let i = 0; i < c; i++) { if (I[i] < from) continue; const p = I[i] * sb; S[((p - Math.floor(p)) * ONSET_BINS) | 0] += W[i]; tot += W[i]; }
++    if (!(tot > 0)) return 0;
++    const w = Math.max(1, Math.round(tol * ONSET_BINS)); let mx = -1, mb = 0;
++    for (let b = 0; b < ONSET_BINS; b++) { let s = 0; for (let q = -w; q <= w; q++) s += S[(b + q + ONSET_BINS) % ONSET_BINS]; if (s > mx) { mx = s; mb = b; } }
++    const ph = (mb + 0.5) / ONSET_BINS, tb = tol + 0.5 / ONSET_BINS; let on = 0, cov = 0, last = -1e9;
++    for (let i = 0; i < c; i++) { if (I[i] < from) continue; const r = I[i] * sb - ph, k = Math.round(r); if (Math.abs(r - k) <= tb) { on += W[i]; if (k !== last) { cov++; last = k; } } }
++    const C = cov / ((this.pfSpan - from) * sb);
++    return (on / tot) * (C > 1 ? 1 : C);
++  }
++  /** Bästa passformen kring bpm (+-1 % i 0,5 %-steg); tempot i pfBpm. */
++  private pfAt(bpm: number): number {
++    let best = this.pfFit(bpm), bb = bpm;
++    for (let q = -2; q <= 2; q++) { if (q === 0) continue; const t = bpm * (1 + q * 0.005), v = this.pfFit(t); if (v > best + 1e-9) { best = v; bb = t; } }
++    this.pfBpm = bb; return best;
++  }
++  private pfReset(): void { this.pfCur = -1; this.pfAge = 0; }
++  /** SLAGENS PASSFORM: domen över varvets förslag `prop` (tempogrammet + topprösten) mot regenten. Ger klockans tempo. */
++  private pfJudge(prop: number, now: number): number {
++    const cur = this.tempoBpm;
++    if (!(cur > 0)) { this.pfReset(); return prop; }
++    this.pfExtract(now);
++    if (this.pfN < PF_MIN_ON) return prop;   // för få anslag att döma på: tempogrammets val som förr
++    const r = prop / cur, same = Math.abs(r - 1) <= PF_SAME || Math.abs(r - 2) <= 0.08 || Math.abs(r - 0.5) <= 0.02;   // samma tolkning (drift, oktavkanten)
++    const f0 = this.pfAt(cur), e0 = this.pfCur < 0 ? f0 : this.pfCur; this.pfBpm0 = this.pfBpm; this.pfF0 = f0; this.pfProp = prop; this.pfFc = -1;
++    const open = this.pfAge++ < PF_N0;
++    if (same) { this.pfCur = e0 + PF_A * (f0 - e0); return prop; }
++    const fc = this.pfAt(prop); this.pfFc = fc;
++    const fr = this.pfFit(this.pfBpm0, this.pfSpan >> 1), fl = fr < f0 ? fr : f0;   // regenten på fönstrets senare halva: bär den slagen NU?
++    // byte: kallstart/låtgräns (öppet), regenten bär inte längre sina slag (ny låt), eller förslaget bär slagen bättre
++    if (!open && !(f0 < PF_DEAD * e0)) {
++      this.pfCur = e0 + PF_A * (f0 - e0);
++      if (!(fc > PF_KC * fl + PF_DC)) { this.pfHolds++; return cur; }
++    }
++    this.pfCur = fc; this.pfSwitches++;
++    return prop;
++  }
++  private tgReset(): void { this.pfReset(); this.tgAcc.fill(-1); this.tgAccF.fill(-1); this.tgSw = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; }
+ 
+   /** Kom en tidigare kick (ringen, före denna) lag ms före t, inom ±tol? (TRUST_REPEAT) */
+   private kickRepeats(t: number, lag: number, tol: number): boolean {
