@@ -60,6 +60,8 @@ SPÄRRAR (DISK med skäl)
   diskad. Kan ju vara mätfel osv." + 22:16: "Samt för mig är det allra viktigaste DMX, lotus inte lika." -> de lotus-specifika
   fas-spärrarna (fas-median, on-beat, andel i fas, andel i motfas) diskar först vid mer än 5 % (relativt) sämre än bas (LOTUS_REL;
   de tre sista är huvudchattens tolkning av 22:16). DMX-spärrarna (mix_still, mix_las, klipp_klocka, syntet) orörda.
+  RÄTTAT 23:1x (orkestratorn): 5 % relativt på andelen i motfas (bas 6/114) blev STRÄNGARE än den gamla gränsen ± 1 procentenhet
+  (k4b föll på 7/114). Marginalen skulle vidga, aldrig snäva: i fas/motfas diskar nu först när BÅDE 5 % relativt och 1 pe är passerade.
   ÄGARBESLUT 22:22 (huvudchatten frågade om även lotus_ratt ska få marginal): "Ja om det bara påverkar lotus." -> lotus_ratt diskar
   först under bas x 0,99 (RATT_REL). 1 % och inte 5 % är huvudchattens val: 5 % vore 23 låtar på kontrollmängden = en riktig försämring.
   lotusbankens egen spärr: on-beat-recall < bas, fas-medianen < bas (båda som bänken skriver dem, två decimaler), andelen i motfas
@@ -441,8 +443,8 @@ def doma(B, V):
         fb, fv = sb.get('lotusFas'), sv.get('lotusFas')
         if fb and fv and fb.get('n') and fv.get('n'):
             if fv['median'] is not None and fb['median'] is not None and fv['median'] < fb['median'] * (1 - LOTUS_REL): disk.append(f"lotus fas median {fv['median']} < bas {fb['median']} - 5 %")
-            if fv['motfas'] / fv['n'] > fb['motfas'] / fb['n'] * (1 + LOTUS_REL): disk.append(f"lotus motfas {fv['motfas']}/{fv['n']} > bas {fb['motfas']}/{fb['n']} + 5 %")
-            if fv['ifas'] / fv['n'] < fb['ifas'] / fb['n'] * (1 - LOTUS_REL): disk.append(f"lotus i fas {fv['ifas']}/{fv['n']} < bas {fb['ifas']}/{fb['n']} - 5 %")
+            if fv['motfas'] / fv['n'] > max(fb['motfas'] / fb['n'] * (1 + LOTUS_REL), fb['motfas'] / fb['n'] + FAS_TOL): disk.append(f"lotus motfas {fv['motfas']}/{fv['n']} > bas {fb['motfas']}/{fb['n']} + 5 %")
+            if fv['ifas'] / fv['n'] < min(fb['ifas'] / fb['n'] * (1 - LOTUS_REL), fb['ifas'] / fb['n'] - FAS_TOL): disk.append(f"lotus i fas {fv['ifas']}/{fv['n']} < bas {fb['ifas']}/{fb['n']} - 5 %")
     else: disk.append('lotusbanken saknas')
     if has('mix_las') and v['mix_las'] > b['mix_las'] + LAS_TOL: disk.append(f"mix_las {v['mix_las']:.2f} s > bas {b['mix_las']:.2f} + {LAS_TOL}")
     if has('mix_still') and v['mix_still'] > b['mix_still'] + STILL_TOL: disk.append(f"mix_still {v['mix_still']:.2f} s > bas {b['mix_still']:.2f} + {STILL_TOL}")
