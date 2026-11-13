@@ -1,5 +1,13 @@
 # Natt-agentens uppdrag
 
+INGEN ARENA I NATT 2026-11-13 -> 11-14 (huvudchatten 15:30): uppbyggnaden är INTE redo för arena - det saknas facit. Kör natten som vanligt
+(baslinje på HEAD c08e1cb + egna fynd), ingen arena förrän ett ARENA-uppdrag med facit står här.
+VARFÖR: ägarens regel 11-13 är "ingen uppbyggnad = troligen bara minidrop". Ägarens egna markeringar i lang1014 (tools/ladan-2026-10-14/marks.jsonl:
+8 drop + 5 mini) är det enda facit som skiljer de två. Mätt mot dem (.arena/bygg2/l1014.json, konsertReplay HEAD): basens lyft skiljer INTE ensamt -
+två drops har bara 6-7 dB lyft (172,6 s och 209,0 s: etiketten build före) och en mini har 17 dB lyft efter 15 s break (303,7 s). 13 markeringar räcker
+inte till både övning och kontroll (arenan bygg 11-11 föll just på överanpassning mot ett ersättningsmått). NÄSTA STEG = FLER MARKERINGAR AV ÄGAREN
+(drop / mini / uppbyggnad börjar) på ladans inspelningar; därefter domare + arena.
+
 KICKEN = BASANSLAGET: BYGGD OCH MÄTT 2026-11-13 15:00, INTE INLAGD - VÄNTAR PÅ ÄGARENS ÖGA I LADAN (huvudchatten, triagens fynd 2).
 Prov: prov/kick-basanslag-20261113.patch (bara analyser.ts, ovanpå c08e1cb), fryst bygge .arena/kick1/k6/dist. frame.kick fyrar när basens
 snabba nivå (fbAbs sub + kick, samma storhet som klockan viker) stiger >= 6 dB på 6 hop, återarmeras under 3 dB, minst 100 ms emellan.
