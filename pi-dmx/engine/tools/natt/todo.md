@@ -1,8 +1,20 @@
 # Natt-agentens uppdrag
 
-ARENAN KLOCKA2-DMX PÅGÅR sedan 2026-11-13 00:10 (ägarens beställning 00:02: en DMX-runda med k2, k4 och jokern, körning .arena/klocka2dmx/,
-domaren utan lotus). TILL 02:38-KÖRNINGEN AV dmx-nattagent: starta INGET eget i bänken (ingen baslinje, ingen arena, inga sonder) så länge
-den här raden står kvar - läs och sammanfatta bara, och avsluta.
+ARENAN KLOCKA2-DMX KLAR 2026-11-13 01:55: INGET INLAGT I src/. DMX-domaren (klockdom.py med <körning>/dmx.json: lotus ur, dubbel vikt
+på rätt tempo och omlåsning). Ledare efter alla spärrar: dmx-1b = k4b + taktens självlikhet som vittne, +8,44 på kontrollmängden
+(k4b +7,59; fel tempo/min 1,39 -> 0,76, tempobyten 0,67 -> 0,36, omlåsning 3,02 = bas), ren i tvavagar. dmx-2 (+ parabel i fintempot)
+fick +10,99 men är DISK i tvavagar: rutnätet förstört (ettan 100 -> 62 %). Rapport: tools/natt/arena-2026-11-12-klocka2/RAPPORT-DMX.md,
+idébank i dmx/. Bänken är fri igen.
+- VAL FÖR ÄGAREN: dmx-1b (dmx/dmx-1b.diff mot 97ac0bf) eller k4b ensam, eller inget. Före utläggning: ljusdomaren med fast look,
+  analyser_shared.py --write src, lotusbanken som vakt (vittnet omätt mot lotus).
+- OMLÅSNINGEN GÅR INTE ATT KÖPA I KLOCKANS BESLUT (7 regler + 3 signaler prövade): tempogrammet behöver ~2,7 s, rå vikning 1,9 s i
+  motorn, 0,8 s vinst kostar 1,0 falska byten/min. Nästa fråga = en signal utifrån (låtgränsen tidigare/säkrare).
+- IDÉBANK klocka2dmx: LÄGG RUTNÄTETS FAS I KLOCKDOMAREN (ettan, grid40, gridfel) - domaren såg inte att parabeln förstörde rutnätet.
+- IDÉBANK klocka2dmx: parabeln i fintempot gav fel tempo/min 0,76 -> 0,59 och tid 4,77 -> 4,00 % på kontrollen - prova en form där
+  rutnätets fas flyttas med tempot. k2:s riktade krona = reserv.
+- IDÉBANK klocka2dmx: kontrollmixens stora fel är troligen EN låt som står stadigt fel hela låten (12,5 % av mixen) - lyssna/peka ut
+  med facit (tretakt/6-8 eller ren 2/3-läsning?). Bygg en svår övningsmängd (låtar där basen står stadigt fel).
+- IDÉBANK klocka2dmx: robust mix_still (+-3 %) föll (fäller inte en klocka som står kvar på förra låtens tempo) - kräv RÄTT tempo i fönstret.
 
 ## ARENA I NATT 2026-11-12 -> 11-13: KLOCKAN HÅLLER EN TOLKNING (ägaren 11-12 em: "Det borde gå till en arena i natt. Hur förbättrar vi analysatorns klocka") - GÅR FÖRE ALLT UTOM HÄLSAN
 Kör skillen dmx-arena (körning `.arena/klocka2`). EN arena, inget annat tungt i natt. Ingen deploy, ingen push, inget skrivs i lotus-light-link.
