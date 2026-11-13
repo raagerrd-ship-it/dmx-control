@@ -36,7 +36,7 @@ def koll(p):
     for i in range(0, len(seg) - N, N // 2): P += np.abs(np.fft.rfft(seg[i:i + N] * w)) ** 2
     fr = np.fft.rfftfreq(N, 1 / sr); d = lambda a, b_: 10 * np.log10(P[(fr >= a) & (fr < b_)].mean() + 1e-18)
     ljus = float(d(6000, min(12000, sr / 2 - 1)) - d(800, 1600)) if sr >= 16000 else float('nan')
-    dom = 'TRASIG' if klippt > 1 or plat >= 8 or crest < 6 else ('MISSTÄNKT' if ljus > -8 or golv > -60 or klippt > 0 else 'OK')
+    dom = 'TRASIG' if klippt > 1 or plat >= 8 or crest < 6 else ('MISSTÄNKT' if ljus > -8 or (golv > -60 and float(rms.min()) < 0.05 * float(np.median(rms))) or klippt > 0 else 'OK')   # brusgolvet döms bara om filen HAR en tyst stund (11-13: musik utan paus gav -41 = falskt larm)
     return dict(fil=p, s=n, topp=float(mx.max()), klippt=klippt, plat=plat, crest=crest, golv=golv, ljus=ljus, dom=dom)
 
 if __name__ == '__main__':
