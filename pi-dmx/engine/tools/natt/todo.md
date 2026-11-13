@@ -1,5 +1,12 @@
 # Natt-agentens uppdrag
 
+FACIT FÖR UPPBYGGNADEN SAMLAS IN (huvudchatten 11-13 16:10): ägaren märker 98 ljudklipp (22 s, -15..+7 s kring kandidaten) på en privat sida:
+drop / drop utan uppbyggnad / minidrop / inget + valfritt "uppbyggnaden börjar nu". Kandidaterna: tools/natt/bygg-facit/kandidater-20261113.json
+(56 av analysatorns hela drops i ladans 23 inspelningar 10-11, 30 baslyft >= 8 dB utan drop, ägarens 12 gamla markeringar i lang1014 för ommärkning;
+id k001..k098 i slumpordning, källan visas inte för ägaren). Skript: tools/natt/bygg-facit/klipp.py (lotus-venv:ens python, soundfile med mp3).
+Märkningen läses av huvudchatten ur sidans databas (collection marks, fält v och b = uppbyggnadens start i s relativt kandidaten). RÖR INTE.
+När märkningen finns: bygg domaren (drop/mini/inget mot facit, uppbyggnadens start) och skriv ARENA-uppdraget. Ingen arena före det.
+
 INGEN ARENA I NATT 2026-11-13 -> 11-14 (huvudchatten 15:30): uppbyggnaden är INTE redo för arena - det saknas facit. Kör natten som vanligt
 (baslinje på HEAD c08e1cb + egna fynd), ingen arena förrän ett ARENA-uppdrag med facit står här.
 VARFÖR: ägarens regel 11-13 är "ingen uppbyggnad = troligen bara minidrop". Ägarens egna markeringar i lang1014 (tools/ladan-2026-10-14/marks.jsonl:
