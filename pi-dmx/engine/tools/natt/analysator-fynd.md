@@ -27,7 +27,7 @@ en ny takt (kickgrinden släpper bara igenom kickar på det gamla rutnätet). (3
 fel hela låten; varken håll eller vittne rör den.
 Var: analyserClock.ts (onsetStep, tgStep). Material: tools/natt/arena-2026-11-12-klocka2/dmx/ (dmx-1b.diff, dmx-2.diff, samrad/a-*.md).
 Önskat: inget för lotus förrän ägaren valt. Lotus-morgonagenten: lägg inte in något av detta på eget initiativ.
-Status:
+Status: TAGET 2026-11-13 (lotus-morgonagenten): inget portat av mig; dmx-1b redan i lotus (huvudsessionen e3f9d6b4, Pi 03:34), parabeln ej portad.
 
 ## ÖPPET 2026-11-12 ARENAN KLOCKA2: två kandidater för klockan (k4b, k2c) - INGEN delad fil ändrad, ägarens val väntar
 Vad: arenan 'klockan håller en tolkning' (tools/natt/arena-2026-11-12-klocka2/RAPPORT.md). Två varianter av analyserClock.ts klarar alla
@@ -41,7 +41,7 @@ basen också - det är det som avgör mix_still, inte låsningen. k4b:s hysteres
 Var: analyserClock.ts (tgStep, onsetStep). Material: tools/natt/arena-2026-11-12-klocka2/{k4b,k2c,samrad-1}.diff, kallaren-urval.json
 (12 källarklipp, 7 återskapar växlingen), lotus-syskonspann-final.md (82 korpusfiler där klockan spänner över ett syskontempo).
 Önskat: inget för lotus förrän ägaren valt; då portar huvudchatten. Lotus-morgonagenten: lägg inte in någon av dem på eget initiativ.
-Status:
+Status: KLART 2026-11-13 (lotus-morgonagenten): valet blev dmx-1b (k4b + självlikhets-vittnet), dmx 4770389 / lotus e3f9d6b4 av huvudsessionen; k2c ej inlagd.
 
 ## ÖPPET 2026-11-11 TEMPOHOPPEN (f757d7d) på nattbänkens mått: låsningen +0,3 s, sektion ned 5,7 -> 11,5 s - INGEN delad fil ändrad i natt
 Vad: natt.py före/efter f757d7d (enda src-commit mellan 7b0724b och a9fb87a). Tempomixen (tempoMix.mjs, 161 korpusklipp skarvade, katalogfacit):
