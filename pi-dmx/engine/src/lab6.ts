@@ -25,7 +25,7 @@ export class Lab6 {
   mode = ''; log: [number, string][] = []; force = '';
   private n = 0; private at = 0; private pend = ''; private pendAt = 0; private bassAt = 0; private lastSec = ''; private buildAt = 0;
   private lastDrop = 0; private answerUntilBeat = -1; private sect = 0; private sectBar = -1; private sPrev = 0;
-  private flash = 0; private choirSect = [0, 3]; private choirDark = [false, false];
+  private flash = 0; private eSm = 0; private choirSect = [0, 3]; private choirDark = [false, false];
 
   private put(i: number, s: number, share: number) {
     const v = toV(this.fx[i], TOP * Math.max(0, Math.min(1, share))), o = i * 3, c = col(s);
@@ -64,7 +64,10 @@ export class Lab6 {
       const rev = ((Math.floor(c.beatIdx / 8) % 2) + 2) % 2 === 1;                          // hållet byter efter varje varv (två takter)
       const at = (kk: number) => { const x = Math.min(n - 1, Math.floor(kk * n / 8)); return rev ? n - 1 - x : x; };
       const lv = (kk: number, f2: number) => Math.exp(-f2 * 2.4) * (kk % 4 === 0 ? 1 : 0.8) * energy * presence;   // ettan störst
-      for (let x = 0; x < n; x++) this.put(x, this.sect, 0.16 * presence);                  // alla i samma kulör, svagt
+      // Ägaren 11-13: "de andra lamporna vill jag skall följa energin fast inte fullt, bara så de inte ser döda ut": grunden andas med
+      // basen/kicken (snabbt upp, mjukt ner), 0,10..0,28 - löparen (0,8..1) sticker fortfarande ut.
+      const eNow = Math.min(1, Math.max(dr.kick, c.bassBody)); this.eSm += (eNow - this.eSm) * (eNow > this.eSm ? Math.min(1, dt / 0.03) : Math.min(1, dt / 0.3));
+      for (let x = 0; x < n; x++) this.put(x, this.sect, (0.10 + 0.18 * this.eSm) * presence);   // alla i samma kulör
       const i = at(k); this.put(i, this.sect + 3, lv(k, fr));
       if (k > 0) { const j = at(k - 1); if (j !== i) this.put(j, this.sect + 3, lv(k - 1, fr + 1)); }   // svansen: förra lampan tonar ut hela nästa åttondel - alltid huvud + svans, aldrig ett hårt släck
     } else if (this.mode === 'vagen') {
