@@ -10,7 +10,9 @@ Måtten, vikterna, golven och mängderna ändras inte under körningen. Bara ANA
     SYNTET-spärren utgår också: syntfilerna kommer bara ur lotusbänken.
   POÄNG = VIKTAT medel av 8 DMX-mått i % mot bas (samma riktning, golv och klipp +-100 % som förut):
     vikt 2: mix_klocka, klipp_klocka, mix_las (rätt tempo och LÅSNINGEN)     vikt 1: mix_hopp, mix_still, utfl_min, utfl_tid, syskon_tid
-  SPÄRRAR (DISK): mix_las > bas + 0,3 s;  mix_still > bas + 0,3 s;  klipp_klocka < bas - 1 procentenhet;  ändrade filer utanför de fyra
+  ÄGARBESLUT 2026-11-13 01:00 (under körningen klocka2dmx, gäller alla lika): "Öka gränsen för att få den diskad på tills klockan
+  är still till 4 sek." -> mix_still (+-1 %) diskar först över max(4,0 s, bas + 0,3 s). Måttet är kvar i poängen (vikt 1).
+  SPÄRRAR (DISK): mix_las > bas + 0,3 s;  mix_still > max(4,0 s, bas + 0,3 s);  klipp_klocka < bas - 1 procentenhet;  ändrade filer utanför de fyra
     tillåtna;  mätfel. (tvavagar.py:s analysspärrar och workerns p99 kör orkestratorn på finalisterna, som förut.)
   MIX_STILL: beställningen var att byta +-1 % mot domarens tempobytesgräns (+-3 %, samma 5 s-fönster och startpunkt) så att fintempots
     grannsteg inte startar om räkningen. KONTROLLEN FÖRE START FÖLL: på kontrollmängden ger +-3 %-måttet bas 1,80 / k2 1,80 / fusion 2,43 s
@@ -146,6 +148,7 @@ MATT = [('mix_klocka', 1, 1), ('mix_las', -1, 1), ('mix_hopp', -1, 0.2), ('mix_s
         ('utfl_min', -1, 0.2), ('utfl_tid', -1, 1), ('syskon_tid', -1, 1),
         ('lotus_ratt', 1, 1), ('lotus_syskon', -1, 5), ('lotus_vaxling', -1, 5), ('kallaren', -1, 0.5)]
 LAS_TOL, STILL_TOL, KLIPP_TOL, FAS_TOL = 0.3, 0.3, 1.0, 0.01
+STILL_ABS_DMX = 4.0   # ägaren 11-13 01:00: i DMX-läget diskar mix_still först över 4,0 s (aldrig strängare än bas + 0,3)
 # DMX-LÄGET (ägaren 11-13, se filhuvudet): slås på av filen <körning>/dmx.json. (nyckel, riktning, golv, VIKT). Lotus ur poäng, disk och bänk.
 MATT_DMX = [('mix_klocka', 1, 1, 2), ('klipp_klocka', 1, 1, 2), ('mix_las', -1, 1, 2), ('mix_hopp', -1, 0.2, 1), ('mix_still', -1, 1, 1),
             ('utfl_min', -1, 0.2, 1), ('utfl_tid', -1, 1, 1), ('syskon_tid', -1, 1, 1)]
@@ -464,7 +467,8 @@ def doma_dmx(B, V):
         q[k] = T.rel(v[k], b[k], d, g); sp += w * q[k]; sw += w
     has = lambda k: v.get(k) is not None and b.get(k) is not None
     if has('mix_las') and v['mix_las'] > b['mix_las'] + LAS_TOL: disk.append(f"mix_las {v['mix_las']:.2f} s > bas {b['mix_las']:.2f} + {LAS_TOL}")
-    if has('mix_still') and v['mix_still'] > b['mix_still'] + STILL_TOL: disk.append(f"mix_still {v['mix_still']:.2f} s > bas {b['mix_still']:.2f} + {STILL_TOL}")
+    gr = max(STILL_ABS_DMX, b['mix_still'] + STILL_TOL) if has('mix_still') else None
+    if has('mix_still') and v['mix_still'] > gr: disk.append(f"mix_still {v['mix_still']:.2f} s > {gr:.2f} (max(4,0 s, bas {b['mix_still']:.2f} + {STILL_TOL}))")
     if has('klipp_klocka') and v['klipp_klocka'] < b['klipp_klocka'] - KLIPP_TOL: disk.append(f"klipp_klocka {v['klipp_klocka']:.2f} % < bas {b['klipp_klocka']:.2f} - {KLIPP_TOL:.0f} pe")
     otill = [f for f in ((V.get('sparr') or {}).get('andradeFiler') or []) if f not in TILLATNA]
     if otill: disk.append('förbjudna filer: ' + ', '.join(otill[:6]))
@@ -481,7 +485,7 @@ def ranking_dmx(a, rd, hold, fn, B):
     bm = B['matt']; ks = [k for k, *_ in MATT_DMX]; W = {k: w for k, _, _, w in MATT_DMX}; visa = ks + ['mix_still_ny']
     L = [f"# Ranking {os.path.basename(rd)} - DMX-läget: låsningen först{' KONTROLLMÄNGDEN' if hold else ''} (tools/arena/klockdom.py, mot bas)", '',
          f"poäng = viktat medel av {len(ks)} DMX-mått i % mot bas (riktningen inräknad, + = bättre, +-100 %): mix_klocka, klipp_klocka, mix_las vikt 2, övriga vikt 1. "
-         "Lotusbanken och källaren ingår inte. Spärrar: mix_las och mix_still <= bas + 0,3 s, klipp_klocka >= bas - 1 pe, bara tillåtna filer. mix_still = +-1 % (gamla); mix_still_ny (+-3 %) redovisas bara.", '',
+         "Lotusbanken och källaren ingår inte. Spärrar: mix_las <= bas + 0,3 s, mix_still <= max(4,0 s, bas + 0,3 s) (ägaren 11-13 01:00), klipp_klocka >= bas - 1 pe, bara tillåtna filer. mix_still = +-1 % (gamla); mix_still_ny (+-3 %) redovisas bara.", '',
          '| plats | deltagare | poäng | ' + ' | '.join(f'{k} x{W[k]} ({bm[k]:.2f})' for k in ks) + ' | DISK |', '|---|---|---|' + '---|' * len(ks) + '---|']
     for i, (n, p, q, disk, V) in enumerate(rows, 1):
         L.append(f'| {i} | {n} | {p:+.2f} | ' + ' | '.join(f'{q[k]:+.1f}' if k in q else '-' for k in ks) + f" | {'; '.join(disk) or '-'} |")
