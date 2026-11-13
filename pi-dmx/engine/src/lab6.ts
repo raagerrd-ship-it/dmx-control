@@ -1,8 +1,8 @@
 /**
  * LABBET 6 (stunden 'lab6', ägaren i ladan 2026-11-13: "köra igång effektlabbet igen och testa lite nya effekter nu när vi har 8
  * lampor"). Idéer som BEHÖVER åtta lampor - en takt har åtta åttondelar, och åtta lampor är två körer om fyra:
- *   LINJALEN   (vers/övrigt): takten ritad över raden - varje åttondel tänder nästa lampa, fjärdedelarna (där kicken slår) störst;
- *              alla lampor lyser svagt i en kulör och löparen i motkulören; hållet byter var fjärde takt
+ *   LINJALEN   (vers/övrigt): takten ritad över raden - varje SLAG (bastakten) flyttar löparen en lampa, ettan störst;
+ *              alla lampor lyser svagt i en kulör och löparen i motkulören; hållet byter efter varje varv (två takter)
  *   VÅGEN      (refräng): en vågkam rullar över raden en gång per takt, kammen står på lampa 1 på ettan; kicken lyfter alla lite
  *   TRAPPAN    (build): raden fylls lampa för lampa under uppbyggnaden, varje virvelslag blinkar i den översta - full rad när det landar
  *   SVARET     (8 takter efter en build som landar): alla på 1 och 3, vänster kör svarar på 2, höger kör på 4
@@ -56,13 +56,14 @@ export class Lab6 {
     const energy = 0.4 + 0.6 * Math.min(1, Math.max(dr.kick, c.bassBody));
     const beat = ((c.beatIdx % 4) + 4) % 4, half = n / 2;
     if (this.mode === 'linjalen') {
-      const e = (beat + c.beatFrac) * 2, k = Math.floor(e) % 8, fr = e - Math.floor(e);     // åttondelen i takten (0..7) och hur långt in i den
+      // Ägaren 11-13: "den borde ju flytta sig till bastakten" -> ETT STEG PER SLAG (där basen slår), åtta slag = två takter över raden.
+      const k = ((c.beatIdx % 8) + 8) % 8, fr = c.beatFrac;                                 // slaget i tvåtaktsfrasen (0..7) och hur långt in i det
       // Ägaren 11-13: "snyggt om linjalen ibland körde samma färg på alla och då en färg på den som åker, och inte alltid från samma
       // håll"; sedan: "när den kör med annan färg ser det nice ut, men när den istället skall släcka samma lampa så ser det inte snyggt
       // ut" -> ALLTID alla i en kulör + löparen i motkulören; hållet byter var fjärde takt, på ettan.
-      const rev = ((Math.floor(bar / 4) % 2) + 2) % 2 === 1;
+      const rev = ((Math.floor(c.beatIdx / 8) % 2) + 2) % 2 === 1;                          // hållet byter efter varje varv (två takter)
       const at = (kk: number) => { const x = Math.min(n - 1, Math.floor(kk * n / 8)); return rev ? n - 1 - x : x; };
-      const lv = (kk: number, f2: number) => Math.exp(-f2 * 2.4) * (kk === 0 ? 1 : kk % 2 === 0 ? 0.8 : 0.55) * energy * presence;   // fjärdedelarna (kicken) störst, ettan allra störst; SAMMA uttoning för alla (ägaren 11-13: "släcker ibland lite konstigt två lampor och ibland bara en" - de svaga åttondelarna dog fortare än de starka)
+      const lv = (kk: number, f2: number) => Math.exp(-f2 * 2.4) * (kk % 4 === 0 ? 1 : 0.8) * energy * presence;   // ettan störst
       for (let x = 0; x < n; x++) this.put(x, this.sect, 0.16 * presence);                  // alla i samma kulör, svagt
       const i = at(k); this.put(i, this.sect + 3, lv(k, fr));
       if (k > 0) { const j = at(k - 1); if (j !== i) this.put(j, this.sect + 3, lv(k - 1, fr + 1)); }   // svansen: förra lampan tonar ut hela nästa åttondel - alltid huvud + svans, aldrig ett hårt släck
