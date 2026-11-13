@@ -1,5 +1,17 @@
 # Natt-agentens uppdrag
 
+BREAK-HÅLLET INLAGT 2026-11-13 14:10 (huvudchatten, ägaren "KÖR"): c08e1cb, klockan väljer inget nytt tempo medan baskroppen ligger >= 24 dB
+under sitt tak och 5 s efteråt, högst 30 s (analyserClock TG_BRK_DB / TG_BRK_MAX_MS; analyser bodyUnderDb; split H_UNDER, BS_UNDER; manifestet skrivet).
+Mätt: 36 drops i ladans 21 inspelningar: klockan fel >= 2 s 13 -> 3, tid på fel tempo runt dropen 10,8 -> 2,7 %; övningsmixen identisk; megamix i
+ljusbänken rAbest 0,32 -> 0,43, jitter 63 -> 33 ms. KONTROLL 2: allt bättre utom mix_still 4,65 -> 5,98 s (DISK enligt regeln) - ÄGAREN BESLÖT ATT
+LÄGGA IN ÄNDÅ. ANVÄNDNINGAR AV KONTROLL 2: 1 variant (brk). Lotus portad (e0d14b74) och utlagd 14:12. LADAN EJ utlagd: nästa besök `ladan.py --bara-deploy`.
+BAS FÖR NÄSTA KLOCKARENA = HEAD c08e1cb: mät om bas i en NY körning (dmx.json {"v": 2}); .arena/klocka3/bas är FÖRE break-hållet.
+PRÖVAT OCH FÖRKASTAT I DAG: låtens minne i ladan med gränsdetektorn som låtgräns (.arena/klocka3/lm: utflykter 0,24 -> 0,09/min men mixens lås
+2,78 -> 9,70 s, upp till 97 s per missad gräns) - väntar på en säkrare låtgräns. Break-håll på dropdetektorns 5 dB-frånvaro (fryser vid låtbyten).
+KVAR UR TRIAGEN I ÄGARENS ORDNING: (2) frame.kick på kickbandets anslagstopp i stället för första transienten efter kylningen; (5) uppbyggnaden:
+känn igen den, och ingen uppbyggnad = minidrop (ägaren 11-13) - nattens arena. (4) sektionsfladdret lämnas tills vidare. MÄTFÄLLA: gridfel
+(medianen) tippar 30 <-> 330 ms på en enda ansats i låtar med bas på både slag och mellanslag - läs grid40, inte gridfel.
+
 MÄTNINGEN LAGAD 2026-11-13 12:00 (huvudchatten, ägaren: "kör nu"): tre saker klara inför nästa arena.
 (1) KONTROLLMÄNGD 2: tools/arena/kontroll2.json (mk_kontroll2.py; 20 låtar/50 min mix + 60 klipp ur lotus korpus med dubbelt bekräftat facit,
     tre oanvända ladinspelningar). Slås på med <körning>/dmx.json = {"v": 2}; mätningen heter klockdom-k2.json. Den gamla kontrollmängden är PENSIONERAD
