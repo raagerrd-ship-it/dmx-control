@@ -42,7 +42,7 @@ const mata = (m, y) => { for (let i = 0; i + HOP <= y.length; i += HOP) m.push(y
   const a = createHash("md5").update(Buffer.from(facit.buffer, 0, n * 2)).digest("hex"), b = createHash("md5").update(w.subarray(44)).digest("hex"); ok("ljudet är bit för bit det som matades", a === b, b);
   const ev = JSON.parse(readFileSync(join(dir, st.file.replace(".wav", ".events.json")), "utf8"));
   ok("markeringarna sparade i ordning", ev.marks.map((m) => m.kind).join(",") === "latbyte,uppbyggnad,drop,mini,intedrop" && Math.abs(ev.seconds - n / SR) < 1e-6, ev.marks.map((m) => m.kind).join(","));
-  ok("index-filen och marks.jsonl finns", existsSync(join(dir, st.file.replace(".wav", ".json"))) && readFileSync(join(dir, "marks.jsonl"), "utf8").trim().split("\n").length === 4);
+  ok("index-filen och marks.jsonl finns", existsSync(join(dir, st.file.replace(".wav", ".json"))) && readFileSync(join(dir, "marks.jsonl"), "utf8").trim().split("\n").length === 8, "6 markeringar + 1 struken + 1 ändrad");
   // för kort inspelning kastas
   r.start(3600); mata(r, y.subarray(0, SR * 2)); const k = r.stop(); await new Promise((f) => setTimeout(f, 400));
   ok("under 10 s kastas och filen tas bort", /kort/.test(k.error) && readFileSync(join(dir, "marks.jsonl"), "utf8").length > 0 && !existsSync(join(dir, (k.file || "saknas.wav"))), k.error);
