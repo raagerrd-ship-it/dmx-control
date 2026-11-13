@@ -1,5 +1,10 @@
 # Natt-agentens uppdrag
 
+ARENAN DROP1 PÅGÅR sedan 2026-11-13 19:15 (huvudchatten orkestrerar, ägaren: "kör arena och använd de två inspelningarna").
+Frågan: drop eller minidrop - känn igen uppbyggnaden. Domare tools/arena/dropdom.py (övning lang-20261113T160345, kontroll
+lang-20261113T151659; bas 22,8 / 22,2 poäng). Körning .arena/drop1 (uppgift.md, kort.md, status.json). NATTAGENTEN: starta ingen egen
+arena och rör inte .arena/drop1; bänkarna på det nya ljudet får köras när .arena/.droplas är fri.
+
 NYTT RENT MATERIAL + GRUNDMÄTNING 2026-11-13 kväll (ladan, ägaren på plats) - LÄS tools/natt/grund-2026-11-13.md FÖRST.
 tools/ladan-2026-11-13/: tre rena inspelningar (24 min) + en lång som startades 18:24; två har ägarens markeringar (14 drop, 20 mini,
 11 uppbyggnad, 4 "inte drop"; .marks-fin.json, skip = feltryck). Bänkar som går på det nya ljudet: tools/natt/bygg-facit/dropMotFacit.mjs,
