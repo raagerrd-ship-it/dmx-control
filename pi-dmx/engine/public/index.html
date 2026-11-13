@@ -689,8 +689,8 @@
       <button class="btn mark" id="markMini">Minidrop</button>
       <button class="btn mark" id="markDrop">Drop</button>
       <button class="btn mark" id="markNot">Inte drop</button>
-      <button class="btn" id="markUndo">Ångra senaste</button>
     </div>
+    <div id="markList" style="margin-top:8px"></div>
     <div class="status" id="markState" style="margin-top:6px">Under inspelning: tryck när du hör det. Låtbyte när nästa låt börjar, Uppbyggnad när laddningen startar, Drop och Minidrop när det slår till.</div>
   </div>
 
@@ -895,20 +895,41 @@ const recShow = (st) => {
   if (on) recState.textContent = `Spelar in: ${Math.floor(st.seconds / 60)}:${String(Math.floor(st.seconds % 60)).padStart(2, "0")} · ${st.marks ?? 0} markeringar · stoppar själv efter ${Math.round(st.target / 60)} min`;
   else if (st.error) recState.textContent = "Inspelningen: " + st.error;
   else if (st.file) recState.textContent = "Klar: " + st.file;
+  markListShow(on ? (st.recent || []) : []);
   if (on && !recPoll) recPoll = setInterval(recFetch, 2000);
   if (!on && recPoll) { clearInterval(recPoll); recPoll = null; }
 };
+/* DE SENASTE MARKERINGARNA (ägaren 11-13: "om de senaste listas så jag enkelt kan ändra/ta bort"): nyast överst, byt sort i listan
+   eller ta bort med krysset. Ritas bara om när listan ändrats, så en öppen rullista inte stängs av pollningen. */
+let markListKey = "";
+const markEdit = (body) => fetch("/api/mark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json()).then(recShow).catch(() => {});
+const markListShow = (rec) => {
+  const el = document.getElementById("markList"); if (!el) return;
+  const key = rec.map((m) => m.i + m.kind + Math.round(m.s)).join("|"); if (key === markListKey) return; markListKey = key;
+  el.textContent = "";
+  rec.slice().reverse().forEach((m) => {
+    const row = document.createElement("div"); row.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:6px";
+    const t = document.createElement("span"); t.style.cssText = "min-width:48px;font-variant-numeric:tabular-nums"; t.textContent = Math.floor(m.s / 60) + ":" + String(Math.floor(m.s % 60)).padStart(2, "0");
+    const sel = document.createElement("select"); sel.className = "btn"; sel.style.cssText = "flex:1;padding:10px";
+    Object.keys(MARK_NAMN).forEach((k) => { const o = document.createElement("option"); o.value = k; o.textContent = MARK_NAMN[k]; if (k === m.kind) o.selected = true; sel.appendChild(o); });
+    if (!MARK_NAMN[m.kind]) { const o = document.createElement("option"); o.value = m.kind; o.textContent = m.kind; o.selected = true; sel.appendChild(o); }
+    sel.onchange = () => markEdit({ index: m.i, kind: sel.value });
+    const del = document.createElement("button"); del.className = "btn"; del.style.cssText = "padding:10px 14px"; del.textContent = "✕ Ta bort"; del.onclick = () => markEdit({ index: m.i, remove: true });
+    row.append(t, sel, del); el.appendChild(row);
+  });
+};
 const recFetch = () => fetch("/api/longrec").then((r) => r.json()).then(recShow).catch(() => {});
 const recPost = (body) => fetch("/api/longrec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json()).then(recShow).catch(() => {});
-const MARK_NAMN = { latbyte: "Låtbyte", uppbyggnad: "Uppbyggnad", mini: "Minidrop", drop: "Drop", intedrop: "Inte drop", angra: "Ångra senaste (förra markeringen stryks)" };
+const MARK_NAMN = { latbyte: "Låtbyte", uppbyggnad: "Uppbyggnad", mini: "Minidrop", drop: "Drop", intedrop: "Inte drop" };
 const markPost = (kind, btn) => {
   if (btn) { btn.classList.add("hit"); setTimeout(() => btn.classList.remove("hit"), 600); }
   return fetch("/api/mark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind }) }).then((r) => r.json()).then((st) => {
     const el = document.getElementById("markState");
     if (el) el.textContent = MARK_NAMN[kind] + " markerad " + new Date().toLocaleTimeString() + (st.recording ? ` (nr ${st.marks} i inspelningen)` : " (ingen inspelning igång - sparad i marks.jsonl)");
+    if (st.recording) recFetch();
   }).catch(() => { const el = document.getElementById("markState"); if (el) el.textContent = "Markeringen gick inte fram - försök igen."; });
 };
-[["markSong", "latbyte"], ["markBuild", "uppbyggnad"], ["markMini", "mini"], ["markDrop", "drop"], ["markNot", "intedrop"], ["markUndo", "angra"]].forEach(([id, kind]) => { const b = document.getElementById(id); if (b) b.onclick = () => markPost(kind, b); });
+[["markSong", "latbyte"], ["markBuild", "uppbyggnad"], ["markMini", "mini"], ["markDrop", "drop"], ["markNot", "intedrop"]].forEach(([id, kind]) => { const b = document.getElementById(id); if (b) b.onclick = () => markPost(kind, b); });
 if (recStart) { recStart.onclick = () => recPost({ seconds: 3600 }); recStop.onclick = () => recPost({ stop: true }); recFetch(); }
 { const rt = document.getElementById("recTest"), rp = document.getElementById("recPlay"), ra = document.getElementById("recAudio");
   if (rt) rt.onclick = () => recPost({ seconds: 60 });

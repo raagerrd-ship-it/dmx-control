@@ -32,8 +32,8 @@ const mata = (m, y) => { for (let i = 0; i + HOP <= y.length; i += HOP) m.push(y
   const facit = new Int16Array(y.length); for (let i = 0; i < y.length; i++) facit[i] = Math.round(y[i] * 32767);
   ok("startar", r.start(3600).active === true);
   // mata i realtidslik takt: 1 s ljud, sedan släpp fram skrivningarna (poolen ska räcka)
-  for (let s = 0; s < 23; s++) { mata(r, y.subarray(s * SR, (s + 1) * SR)); if (s === 5) r.mark("latbyte"); if (s === 9) r.mark("uppbyggnad"); if (s === 12) r.mark("drop"); if (s === 15) r.mark("mini"); await new Promise((f) => setTimeout(f, 15)); }
-  const st0 = r.status(); ok("räknar tid och markeringar under inspelning", Math.abs(st0.seconds - 22.99) < 0.02 && st0.marks === 4, JSON.stringify(st0));
+  for (let s = 0; s < 23; s++) { mata(r, y.subarray(s * SR, (s + 1) * SR)); if (s === 5) r.mark("latbyte"); if (s === 9) r.mark("uppbyggnad"); if (s === 12) r.mark("drop"); if (s === 15) r.mark("mini"); if (s === 16) { r.mark("drop"); r.mark("drop"); } if (s === 17) { const st = r.status(); r.editMark(st.recent.at(-1).i, null); r.editMark(st.recent.at(-2).i, "intedrop"); } await new Promise((f) => setTimeout(f, 15)); }
+  const st0 = r.status(); ok("räknar tid och markeringar under inspelning", Math.abs(st0.seconds - 22.99) < 0.02 && st0.marks === 5 && st0.recent.length === 5, JSON.stringify(st0));
   const st = r.stop(); ok("stoppar och namnger filen", !st.active && /^lang-\d{8}T\d{6}\.wav$/.test(st.file), st.file);
   await new Promise((f) => setTimeout(f, 800));
   const p = join(dir, st.file), w = readFileSync(p), n = (w.length - 44) / 2;
@@ -41,7 +41,7 @@ const mata = (m, y) => { for (let i = 0; i + HOP <= y.length; i += HOP) m.push(y
   const hop = Math.floor(y.length / HOP) * HOP; ok("alla matade sampel finns med", n === hop, `${n} av ${hop}`);
   const a = createHash("md5").update(Buffer.from(facit.buffer, 0, n * 2)).digest("hex"), b = createHash("md5").update(w.subarray(44)).digest("hex"); ok("ljudet är bit för bit det som matades", a === b, b);
   const ev = JSON.parse(readFileSync(join(dir, st.file.replace(".wav", ".events.json")), "utf8"));
-  ok("markeringarna sparade i ordning", ev.marks.map((m) => m.kind).join(",") === "latbyte,uppbyggnad,drop,mini" && Math.abs(ev.seconds - n / SR) < 1e-6, ev.marks.map((m) => m.kind).join(","));
+  ok("markeringarna sparade i ordning", ev.marks.map((m) => m.kind).join(",") === "latbyte,uppbyggnad,drop,mini,intedrop" && Math.abs(ev.seconds - n / SR) < 1e-6, ev.marks.map((m) => m.kind).join(","));
   ok("index-filen och marks.jsonl finns", existsSync(join(dir, st.file.replace(".wav", ".json"))) && readFileSync(join(dir, "marks.jsonl"), "utf8").trim().split("\n").length === 4);
   // för kort inspelning kastas
   r.start(3600); mata(r, y.subarray(0, SR * 2)); const k = r.stop(); await new Promise((f) => setTimeout(f, 400));

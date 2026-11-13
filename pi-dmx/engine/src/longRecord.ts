@@ -14,7 +14,9 @@ import { createWriteStream, mkdirSync, type WriteStream } from "node:fs";
 import { mkdir, open, unlink, writeFile, appendFile } from "node:fs/promises";
 import type { Frame } from "./analyser.js";
 
-export interface LongRecordStatus { active: boolean; seconds: number; target: number; file: string; error: string; marks: number }
+export interface LongRecordStatus { active: boolean; seconds: number; target: number; file: string; error: string; marks: number;
+  /** De senaste markeringarna i den pågående inspelningen (i = plats i listan, s = sekunder in) - /setup listar dem så de kan ändras/tas bort. */
+  recent?: { i: number; s: number; kind: string }[] }
 export interface LongRecordHooks {
   latestFrame: () => Frame | null;
   look: () => string;
@@ -31,7 +33,21 @@ export class LongRecord {
   private events: unknown[][] = []; private marks: { wallMs: number; kind: string }[] = []; private tick: ReturnType<typeof setInterval> | null = null; private lastKey = '';
   constructor(private readonly dir: string, private readonly sr: number, private readonly hooks: LongRecordHooks) {}
 
-  status(): LongRecordStatus { return { active: !!this.out, seconds: this.len / this.sr, target: this.target / this.sr, file: this.file, error: this.error, marks: this.marks.length }; }
+  status(): LongRecordStatus {
+    const st: LongRecordStatus = { active: !!this.out, seconds: this.len / this.sr, target: this.target / this.sr, file: this.file, error: this.error, marks: this.marks.length };
+    if (this.out) { const n = this.marks.length, a = Math.max(0, n - 6); st.recent = this.marks.slice(a).map((m, k) => ({ i: a + k, s: (m.wallMs - this.startWall) / 1000, kind: m.kind })); }
+    return st;
+  }
+
+  /** ÄNDRA ELLER TA BORT en markering i den pågående inspelningen (ägaren 11-13: "om de senaste listas så jag enkelt kan ändra/ta
+   *  bort"). kind = null tar bort. Ändringen loggas i marks.jsonl (ref = markeringens tid); events.json får listan som den slutar. */
+  editMark(i: number, kind: string | null): LongRecordStatus {
+    const m = this.out ? this.marks[i] : undefined; if (!m) return this.status();
+    const rad = { wallMs: Date.now(), kind: kind === null ? 'struken' : 'andrad', ref: m.wallMs, from: m.kind, to: kind };
+    if (kind === null) this.marks.splice(i, 1); else m.kind = String(kind).slice(0, 20);
+    appendFile(`${this.dir}/marks.jsonl`, JSON.stringify(rad) + '\n').catch(() => {});
+    return this.status();
+  }
 
   /** Starta (sekunder 10..3600; /setup startar med taket och ägaren stoppar själv). Pagaende inspelning startas inte om. */
   start(seconds: number): LongRecordStatus {

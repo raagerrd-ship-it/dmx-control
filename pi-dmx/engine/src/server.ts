@@ -66,7 +66,7 @@ export interface ServerDeps {
   /** Effekten som renderas just nu (smart-läget roterar). */
   getActiveMode: () => Mode;
   /** Langinspelningen (knappen "Spela in 5 min" i /setup). */
-  longRecord?: { start(seconds: number): unknown; stop(): unknown; status(): unknown; mark(kind: string): unknown; lastPath?(): string };
+  longRecord?: { start(seconds: number): unknown; stop(): unknown; status(): unknown; mark(kind: string): unknown; editMark?(i: number, kind: string | null): unknown; lastPath?(): string };
   /** Ingångsmätaren (inputMeter.ts): nivån de senaste 3 s och ett WAV-klipp av det råa ljudet. */
   inputMeter?: { status(): { state: string; peakDb: number; rmsDb: number; crestDb: number; nowDb: number }; wav(seconds: number): Buffer };
   /** True om ljud-pipelinen bearbetat en frame nyligen (för watchdog /health). */
@@ -267,7 +267,12 @@ export async function startServer(
     return reply.header("Content-Type", "audio/wav").header("Cache-Control", "no-store").send(createReadStream(p));
   });
   // ÄGARENS MARKERING (facit): POST {kind:'latbyte'|'drop'|'mini'|'uppbyggnad'|'intedrop'} - se LongRecord.mark.
-  app.post("/api/mark", async (req) => deps.longRecord?.mark(String(((req.body ?? {}) as Record<string, unknown>).kind ?? 'mini')) ?? { ok: false });
+  // Med index: ändra ({index, kind}) eller ta bort ({index, remove:true}) en markering i den pågående inspelningen.
+  app.post("/api/mark", async (req) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (typeof b.index === "number") return deps.longRecord?.editMark?.(Math.floor(b.index), b.remove === true ? null : String(b.kind ?? "mini")) ?? { ok: false };
+    return deps.longRecord?.mark(String(b.kind ?? 'mini')) ?? { ok: false };
+  });
   // GC-stopp per sort, renderingstid och händelseloopens fördröjning per minut - alltid på (perfStats.ts, 10-16)
   app.get("/api/perf", async () => getPerf());
   // BRÖLLOPSLÄGET (moment.ts): {"moment":"middag"} - samma väg som gästsidans knappar (tryck på aktiv stund = fest).
