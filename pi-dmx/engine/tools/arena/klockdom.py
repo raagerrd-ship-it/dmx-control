@@ -26,6 +26,21 @@ Måtten, vikterna, golven och mängderna ändras inte under körningen. Bara ANA
     Inte fritt: tvavagarKor.mjs, kontrollmängden. kallarspel/lotusbygget behövs inte i DMX-läget.
   STATUS: python tools/arena/status.py .arena/klocka2dmx (rader, vikter och spärrar i .arena/klocka2dmx/status.json).
 
+══ DMX-LÄGE 2 (2026-11-13 em, ägaren: "kör nu" på huvudchattens förslag) ══ SLÅS PÅ per körning av <körning>/dmx.json med innehållet {"v": 2}.
+  Allt i DMX-läget ovan gäller, plus två saker:
+  (1) KONTROLLMÄNGD 2 (--holdout): den gamla (kon, l1014, l1107, KORPUS_HOLDOUT) var använd 16 gånger. Den nya står i tools/arena/kontroll2.json
+      (skriven av mk_kontroll2.py, urvalet står i dess filhuvud): mix 20 låtar = 50 min ('kon2'), 60 klipp, tre ladinspelningar som ingen domare
+      använt (l1028b, l1011b, l1012), ettan vid 92 108 118 126 138 150. Mätningen hamnar i klockdom-k2.json / klockdom-k2/ så den gamla står kvar.
+      RÄKNA domarna: varje --mat --holdout på en variant är EN användning av mängden - skriv antalet i körningens rapport.
+  (2) RUTNÄTETS FAS som SPÄRR (dmx-2 fick +10,99 här i natt och föll först i tvavagar: ettan 100 -> 62 %, grid40 53 -> 27 %). Mäts i både
+      övning och kontroll med tvavagarKor.mjs jobb 'ettan' och 'lang', räknat som tvavagar.py (rutnätsfelet i BASENS låsta fönster):
+        ettan    testsignalen (ettan dubbelt så tung) vid mängdens tempon: ettan rätt 70-90 s, %
+        grid40   basansatser inom +-40 ms från rutnätets slag, %, på mängdens långa inspelningar
+        gridfel  median |fasfel| ms (redovisas, ingen spärr)
+      DISK: ettan < bas - 10 procentenheter;  grid40 < bas - 5 procentenheter. Ingen poäng - spärrarna vaktar, poängen är klockans.
+      (Gränserna är huvudchattens val: dmx-1b låg -1,4 / -1,5 mot bas, dmx-2 -38 / -26.)
+  KÖRTID: övning ~5 min, kontroll ~4 min (lang-jobbet och den längre mixen).
+
 UPPGIFTEN (tools/natt/todo.md, <körning>/uppgift.md): klockan i den delade analysatorn ska hålla EN tempotolkning genom en låt:
   (1) färre växlingar mellan syskontempon (4:3, 3:4, 3:2, 2:3, dubbla, halva) inom en låt, (2) rätt tolkning oftare,
   (3) utan att låsningen efter låtbyte eller vid svaga låtstarter blir långsammare.
@@ -136,7 +151,7 @@ MÄTFÄLLOR: bänkarna flyttar Date.now med ljudtiden (virtuell klocka) - två k
   mot bas är din ändring. megamix_ladan.wav har trasigt huvud (läsarna här klarar det). lotus-light-link LÄSES bara. Inga länkar/junctions.
   tempoHoppDiag lindar BeatFeed.update/tgStep/peakVote/relock om de finns; byter du namn på dem försvinner bara diagnoskolumnerna, inte måtten.
 """
-import argparse, io, json, math, os, re, subprocess, sys, time
+import argparse, hashlib, io, json, math, os, re, statistics, subprocess, sys, time
 from concurrent.futures import ThreadPoolExecutor
 HERE = os.path.dirname(os.path.abspath(__file__)); ENGINE = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE)
@@ -153,6 +168,18 @@ STILL_ABS_DMX = 4.0   # ägaren 11-13 01:00: i DMX-läget diskar mix_still förs
 MATT_DMX = [('mix_klocka', 1, 1, 2), ('klipp_klocka', 1, 1, 2), ('mix_las', -1, 1, 2), ('mix_hopp', -1, 0.2, 1), ('mix_still', -1, 1, 1),
             ('utfl_min', -1, 0.2, 1), ('utfl_tid', -1, 1, 1), ('syskon_tid', -1, 1, 1)]
 dmx_lage = lambda run_dir: os.path.exists(os.path.join(run_dir, 'dmx.json'))
+def dmx_v(run_dir):
+    """DMX-lägets version: 0 = av, 1 = dmx.json finns (innehållet läses inte), 2 = {"v": 2} (kontrollmängd 2 + fasspärrarna)."""
+    try: return max(1, int(json.load(io.open(os.path.join(run_dir, 'dmx.json'), encoding='utf-8')).get('v', 1)))
+    except FileNotFoundError: return 0
+    except Exception: return 1
+ETTAN_TOL, GRID40_TOL = 10.0, 5.0   # DMX-läge 2: fasspärrarna i procentenheter mot bas
+def kontroll2():
+    K = json.load(io.open(os.path.join(HERE, 'kontroll2.json'), encoding='utf-8'))
+    for k in K['latar']['mix'] + K['latar']['klipp']:
+        if hashlib.md5(open(os.path.join(ENGINE, k['wav']), 'rb').read()).hexdigest() != k['md5']: sys.exit('kontroll2: klippet har ändrats sedan urvalet: ' + k['wav'])
+    return K
+def hold_fn(run_dir, hold): return ('klockdom-k2' if dmx_v(run_dir) >= 2 else 'klockdom-holdout') if hold else 'klockdom'
 TILLATNA = {'analyserClock.ts', 'analyser.ts', 'split.ts', 'slowWorker.ts'}
 SYSKON = [4 / 3, 3 / 4, 3 / 2, 2 / 3, 2.0, 0.5]; TOL = 0.04
 SYSKONKLASSER = ['4/3', '3/2', 'dubbla', 'halva', '3/4', '2/3']
@@ -380,8 +407,8 @@ def mat(a):
     assert os.path.isdir(src), 'saknar src/'
     if max(os.path.getmtime(os.path.join(r, f)) for r, _, fs in os.walk(src) for f in fs) > os.path.getmtime(os.path.join(dist, 'analyser.js')) + 1:
         sys.exit('dist är äldre än src - bygg om: ' + ('npx tsc -p tsconfig.json' if bas else 'python tools/arena/bygg.py ' + a.mal))
-    ut = os.path.join(mapp, 'klockdom-holdout' if hold else 'klockdom'); os.makedirs(ut, exist_ok=True)
-    dmx = dmx_lage(run_dir)
+    ut = os.path.join(mapp, hold_fn(run_dir, hold)); os.makedirs(ut, exist_ok=True)
+    dmx = dmx_lage(run_dir); v2 = dmx_v(run_dir) >= 2; K2 = kontroll2() if v2 and hold else None
     env = T.mkenv(run_dir, mapp, bas); M = T.MANGD[hold]; kdir = os.path.join(run_dir, 'kallaren'); uf = os.path.join(kdir, 'urval.json')
     t0 = time.time(); tider = {}; fel = []; R = {}
     T.las()
@@ -395,23 +422,35 @@ def mat(a):
             try: R[namn] = fn()
             except Exception as e: fel.append(f'{namn}: {e}')
             finally: tider[namn] = round(time.time() - s)
-        mixl = T.latar(M['korpus'], M['annan']); mn = MIXNAMN[hold]
+        mixl = K2['mix'] if K2 else T.latar(M['korpus'], M['annan']); mn = 'kon2' if K2 else MIXNAMN[hold]
+        klippl = K2['klipp'] if K2 else [[T.F6(c[0])] + list(c[1:]) for c in M['korpus']]; lang = [tuple(x) for x in K2['lang']] if K2 else LANG[hold]
         jobb = [('lotus', lambda: lotus(mapp, entry, ut, final)),
                 ('diag_' + mn, lambda: diag(dist, env, ut, mn, mixl)),
                 ('mix', lambda: T.kor(dist, env, 'mix', mixl)[0]),
-                ('klipp', lambda: T.kor(dist, env, 'klipp', [[T.F6(c[0])] + list(c[1:]) for c in M['korpus']]))]
-        jobb += [('diag_' + n, (lambda n=n, w=w: diag(dist, env, ut, n, {'wav': w, 'facit': [120]}))) for n, w in LANG[hold]]
+                ('klipp', lambda: T.kor(dist, env, 'klipp', klippl))]
+        jobb += [('diag_' + n, (lambda n=n, w=w: diag(dist, env, ut, n, {'wav': w, 'facit': [120]}))) for n, w in lang]
+        if v2: jobb += [('ettan', lambda: T.kor(dist, env, 'ettan', K2['ettan'] if K2 else M['ettan'])), ('lang', lambda: T.kor(dist, env, 'lang', [w for _, w in lang]))]   # RUTNÄTETS FAS
         jobb += [('kallaren', lambda: kallar_spela(mapp, ut, klipp, kdir))]
         if dmx: jobb = [j for j in jobb if j[0] not in ('lotus', 'kallaren')]     # DMX-läget: lotusbanken och källarklippen körs inte
         with ThreadPoolExecutor(max_workers=2) as ex:     # högst två jobb parallellt (varje jobb = en node-process)
             for f in [ex.submit(steg, n, fn) for n, fn in jobb]: f.result()
-        namn = [mn] + [n for n, _ in LANG[hold]]
+        namn = [mn] + [n for n, _ in lang]
         if not any(f.startswith('diag_') for f in fel): steg('utflykt', lambda: utflykter(ut, namn, env))
     finally: T.slapp()
     q = {}; sysk = {}; mixLatar = None
     if R.get('mix'): mix = R['mix']; q.update(mix_klocka=mix['klocka'], mix_las=mix['lasMed'], mix_hopp=mix['hoppMin'], mix_still=mix.get('stillMed', 0.0))
     if dmx and R.get('mix'): q['mix_still_ny'] = R['mix'].get('stillMed3')      # +-3 %-måttet: redovisas, varken poäng eller spärr (föll i kontrollen 11-13)
     if R.get('klipp'): q['klipp_klocka'] = 100 * sum(c['klocka'] for c in R['klipp']) / len(R['klipp'])
+    fas = None
+    if v2 and R.get('ettan') and R.get('lang'):   # RUTNÄTETS FAS, räknat som tvavagar.py: felet i BASENS låsta fönster (basen själv: egna)
+        q['ettan'] = 100 * sum(e['ok'] for e in R['ettan']) / max(1, sum(e['tot'] for e in R['ettan']))
+        bj = None if bas else T.load(os.path.join(run_dir, 'bas'), hold_fn(run_dir, hold) + '.json')
+        bok = {f['file']: set(f['gridOk']) for f in R['lang']} if bas else {k: set(v) for k, v in (((bj or {}).get('fas') or {}).get('gridOk') or {}).items()}
+        if bok:
+            g2 = [abs(e) for f in R['lang'] for w, es in (f.get('gridW') or {}).items() if int(w) in bok.get(f['file'], set()) for e in es]
+            q['gridfel'] = statistics.median(g2) if g2 else 500; q['grid40'] = 100 * sum(1 for e in g2 if e <= 40) / max(1, len(g2))
+        else: fel.append('basen saknar fas.gridOk - mät basen först')
+        fas = {'gridOk': {f['file']: f['gridOk'] for f in R['lang']}, 'ettan': R['ettan'], 'n': {f['file']: len(f.get('grid') or []) for f in R['lang']}}
     if R.get('utflykt'):
         tot, per = R['utflykt']; q.update(utfl_min=tot['perMin'], utfl_tid=tot['tidPct'])
         try:
@@ -438,10 +477,10 @@ def mat(a):
            'sparr': {'syntet': lo and lo['synt']['ok'], 'syntN': lo and lo['synt']['n'], 'lotusOnBeat': lo and (lo.get('onBeat') or {}).get('recall'), 'lotusFas': lo and lo.get('fas'),
                      'andradeFiler': [] if bas else andrade(mapp)},
            'mix': R.get('mix'), 'mixLatar': mixLatar, 'klipp': R.get('klipp'), 'utflykt': R['utflykt'][1] if R.get('utflykt') else None, 'utflyktTotalt': R['utflykt'][0] if R.get('utflykt') else None,
-           'syskon': sysk, 'lotus': lo, 'kallaren': ka, 'kallarklipp': klipp, 'fel': fel, 'tider': tider, 'tidS': round(time.time() - t0)}
-    skriv(os.path.join(mapp, 'klockdom-holdout.json' if hold else 'klockdom.json'), out)
+           'fas': fas, 'kontroll2': bool(K2), 'syskon': sysk, 'lotus': lo, 'kallaren': ka, 'kallarklipp': klipp, 'fel': fel, 'tider': tider, 'tidS': round(time.time() - t0)}
+    skriv(os.path.join(mapp, hold_fn(run_dir, hold) + '.json'), out)
     print(f"MÄTT {out['mapp']}{' KONTROLLMÄNGDEN' if hold else ''}{' FINAL (lotus 503)' if final else ''} {out['tidS']} s  steg {tider}")
-    print('  ' + '  '.join(f'{k} {q[k]:.2f}' if q.get(k) is not None else f'{k} -' for k, *_ in (MATT_DMX + [('mix_still_ny',)] if dmx else MATT)))
+    print('  ' + '  '.join(f'{k} {q[k]:.2f}' if q.get(k) is not None else f'{k} -' for k, *_ in (MATT_DMX + [('mix_still_ny',)] + ([('ettan',), ('grid40',), ('gridfel',)] if v2 else []) if dmx else MATT)))
     if lo: print(f"  lotus {lo['korpus']['ok']}/{lo['korpus']['n']} klasser {lo['korpus']['klasser']}  syntet {lo['synt']['ok']}/{lo['synt']['n']}  on-beat {(lo.get('onBeat') or {}).get('recall')}  fas {lo.get('fas')}  växling q {lo['vaxling_q']} / minmax {lo['vaxling_minmax']}")
     if fel: print('  FEL: ' + '; '.join(fel))
     if bas and lo: syskonlista(mapp, out, hold)
@@ -470,6 +509,11 @@ def doma_dmx(B, V):
     gr = max(STILL_ABS_DMX, b['mix_still'] + STILL_TOL) if has('mix_still') else None
     if has('mix_still') and v['mix_still'] > gr: disk.append(f"mix_still {v['mix_still']:.2f} s > {gr:.2f} (max(4,0 s, bas {b['mix_still']:.2f} + {STILL_TOL}))")
     if has('klipp_klocka') and v['klipp_klocka'] < b['klipp_klocka'] - KLIPP_TOL: disk.append(f"klipp_klocka {v['klipp_klocka']:.2f} % < bas {b['klipp_klocka']:.2f} - {KLIPP_TOL:.0f} pe")
+    if b.get('ettan') is not None:   # DMX-läge 2: rutnätets fas
+        if not has('ettan') or not has('grid40'): disk.append('rutnätets fas saknas')
+        else:
+            if v['ettan'] < b['ettan'] - ETTAN_TOL: disk.append(f"ettan {v['ettan']:.1f} % < bas {b['ettan']:.1f} - {ETTAN_TOL:.0f} pe")
+            if v['grid40'] < b['grid40'] - GRID40_TOL: disk.append(f"grid40 {v['grid40']:.1f} % < bas {b['grid40']:.1f} - {GRID40_TOL:.0f} pe")
     otill = [f for f in ((V.get('sparr') or {}).get('andradeFiler') or []) if f not in TILLATNA]
     if otill: disk.append('förbjudna filer: ' + ', '.join(otill[:6]))
     return (sp / sw if sw else 0.0), q, disk
@@ -482,7 +526,7 @@ def ranking_dmx(a, rd, hold, fn, B):
         if name == 'bas' or not V or 'matt' not in V: continue
         p, q, disk = doma_dmx(B, V); rows.append((name, p, q, disk, V))
     rows.sort(key=lambda r: (bool(r[3]), -r[1]))
-    bm = B['matt']; ks = [k for k, *_ in MATT_DMX]; W = {k: w for k, _, _, w in MATT_DMX}; visa = ks + ['mix_still_ny']
+    bm = B['matt']; ks = [k for k, *_ in MATT_DMX]; W = {k: w for k, _, _, w in MATT_DMX}; visa = ks + ['mix_still_ny'] + (['ettan', 'grid40', 'gridfel'] if bm.get('ettan') is not None else [])
     L = [f"# Ranking {os.path.basename(rd)} - DMX-läget: låsningen först{' KONTROLLMÄNGDEN' if hold else ''} (tools/arena/klockdom.py, mot bas)", '',
          f"poäng = viktat medel av {len(ks)} DMX-mått i % mot bas (riktningen inräknad, + = bättre, +-100 %): mix_klocka, klipp_klocka, mix_las vikt 2, övriga vikt 1. "
          "Lotusbanken och källaren ingår inte. Spärrar: mix_las <= bas + 0,3 s, mix_still <= max(4,0 s, bas + 0,3 s) (ägaren 11-13 01:00), klipp_klocka >= bas - 1 pe, bara tillåtna filer. mix_still = +-1 % (gamla); mix_still_ny (+-3 %) redovisas bara.", '',
@@ -493,7 +537,7 @@ def ranking_dmx(a, rd, hold, fn, B):
     for n, V in [('bas', B)] + [(r[0], r[4]) for r in rows]:
         L.append(f'| {n} | ' + ' | '.join(f"{V['matt'][k]:.2f}" if V['matt'].get(k) is not None else '-' for k in visa) + f" | {V.get('tidS')} |")
     txt = '\n'.join(L) + '\n'; print(txt)
-    if a.md: io.open(os.path.join(rd, 'ranking-klockdom-holdout.md' if hold else 'ranking-klockdom.md'), 'w', encoding='utf-8').write(txt)
+    if a.md: io.open(os.path.join(rd, 'ranking-' + hold_fn(rd, hold) + '.md'), 'w', encoding='utf-8').write(txt)
 
 
 def doma(B, V):
@@ -525,7 +569,7 @@ def doma(B, V):
 
 
 def ranking(a):
-    rd = os.path.abspath(a.mal); hold = a.holdout; fn = 'klockdom-holdout.json' if hold else 'klockdom.json'
+    rd = os.path.abspath(a.mal); hold = a.holdout; fn = hold_fn(rd, hold) + '.json'
     B = T.load(os.path.join(rd, 'bas'), fn)
     if not B: sys.exit(f'saknar bas/{fn} - mät baslinjen först: python tools/arena/klockdom.py {a.mal}/bas --mat --bas' + (' --holdout --final' if hold else ''))
     if dmx_lage(rd): return ranking_dmx(a, rd, hold, fn, B)

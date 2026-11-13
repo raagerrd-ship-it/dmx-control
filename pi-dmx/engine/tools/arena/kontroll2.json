@@ -1,0 +1,1124 @@
+{
+ "skapad": "2026-11-13",
+ "urval": "URVALET görs UTAN att titta på hur någon klocka klarar filerna - bara på facit och på vad som redan är använt:\n  källa      lotus korpus (lotus-light-link/tools/tempo-facit-pc/corpus, 30 s-klipp från lotus-micen, samma sorts ljud som frozen6),\n             bara filer i bench-manifest.txt (503) som har wav\n  facit      result.bpm där två oberoende mätningar är överens (facitVotes 'pc+bt' och voteClass 'lika'), vikt till [80, 160)\n  bort       var 4:e manifestfil (lotusbankens --snabb, 126 st: deltagarna har sett dem per fil), alla låtar i tools/frozen6/manifest.tsv\n             (övning + gamla kontrollen + natt-korpusen), fler tagningar av samma låt (bara den första i filordning)\n  ordning    md5 av låtnyckeln (fast, oberoende av allt annat); de 20 första = MIXEN (varje låt = klippet 5 gånger, 150 s; låtgräns-\n             detektorn kräver >= 110 s), de 60 nästa = KLIPPEN (kallstart)\n  långa      tre ladinspelningar som ingen domare använt (utflykter, syskontid, rutnätets fas)\n  ettan      sex tempon som varken övningen eller gamla kontrollen har\nFilen bär md5 per klipp så att en ändrad korpus syns. Skriv aldrig om filen efter första mätningen på en variant.",
+ "kandidater": 148,
+ "bort": {
+  "snabb": 126,
+  "frozen6": 0,
+  "facit": 56,
+  "dubblett": 173,
+  "wav": 0
+ },
+ "mix": [
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/velvetsky22__nolimitedm.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/velvetsky22__nolimitedm.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/velvetsky22__nolimitedm.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/velvetsky22__nolimitedm.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/velvetsky22__nolimitedm.wav"
+   ],
+   132.2
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/thinlizzy__jailbreak.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/thinlizzy__jailbreak.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/thinlizzy__jailbreak.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/thinlizzy__jailbreak.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/thinlizzy__jailbreak.wav"
+   ],
+   145.4
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/gabryponte__tarantella_dmuobjohz.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/gabryponte__tarantella_dmuobjohz.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/gabryponte__tarantella_dmuobjohz.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/gabryponte__tarantella_dmuobjohz.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/gabryponte__tarantella_dmuobjohz.wav"
+   ],
+   140.0
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/europe__dangeronthetrack.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/europe__dangeronthetrack.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/europe__dangeronthetrack.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/europe__dangeronthetrack.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/europe__dangeronthetrack.wav"
+   ],
+   96.8
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/mikemana__nofearoftomorrow_dmumzq9n0.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/mikemana__nofearoftomorrow_dmumzq9n0.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/mikemana__nofearoftomorrow_dmumzq9n0.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/mikemana__nofearoftomorrow_dmumzq9n0.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/mikemana__nofearoftomorrow_dmumzq9n0.wav"
+   ],
+   126.2
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/poison__nothinbutagoodtime.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/poison__nothinbutagoodtime.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/poison__nothinbutagoodtime.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/poison__nothinbutagoodtime.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/poison__nothinbutagoodtime.wav"
+   ],
+   129.0
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/blacksabbath__paranoid.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/blacksabbath__paranoid.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/blacksabbath__paranoid.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/blacksabbath__paranoid.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/blacksabbath__paranoid.wav"
+   ],
+   87.9
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/alexwarren__feverdream_dmuoc1epn.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/alexwarren__feverdream_dmuoc1epn.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/alexwarren__feverdream_dmuoc1epn.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/alexwarren__feverdream_dmuoc1epn.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/alexwarren__feverdream_dmuoc1epn.wav"
+   ],
+   108.2
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__beamerboy_dmutxuqzo.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__beamerboy_dmutxuqzo.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__beamerboy_dmutxuqzo.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__beamerboy_dmutxuqzo.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__beamerboy_dmutxuqzo.wav"
+   ],
+   124.0
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/motleycrue__tooyoungtofallinloveinternational.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/motleycrue__tooyoungtofallinloveinternational.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/motleycrue__tooyoungtofallinloveinternational.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/motleycrue__tooyoungtofallinloveinternational.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/motleycrue__tooyoungtofallinloveinternational.wav"
+   ],
+   100.4
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/skidrow__forever.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/skidrow__forever.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/skidrow__forever.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/skidrow__forever.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/skidrow__forever.wav"
+   ],
+   101.3
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/micky__thisisthelifevizeremix.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/micky__thisisthelifevizeremix.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/micky__thisisthelifevizeremix.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/micky__thisisthelifevizeremix.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/micky__thisisthelifevizeremix.wav"
+   ],
+   110.0
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__benztruck_dmutylahu.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__benztruck_dmutylahu.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__benztruck_dmutylahu.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__benztruck_dmutylahu.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__benztruck_dmutylahu.wav"
+   ],
+   91.9
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/yunglean__volt_dmutxa7os.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/yunglean__volt_dmutxa7os.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/yunglean__volt_dmutxa7os.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/yunglean__volt_dmutxa7os.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/yunglean__volt_dmutxa7os.wav"
+   ],
+   144.0
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/cascada__everytimewetouch_dmuob58l7.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/cascada__everytimewetouch_dmuob58l7.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/cascada__everytimewetouch_dmuob58l7.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/cascada__everytimewetouch_dmuob58l7.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/cascada__everytimewetouch_dmuob58l7.wav"
+   ],
+   142.0
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/europe__rockthenight.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/europe__rockthenight.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/europe__rockthenight.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/europe__rockthenight.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/europe__rockthenight.wav"
+   ],
+   105.5
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__jamming_dmurfd2v2.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__jamming_dmurfd2v2.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__jamming_dmurfd2v2.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__jamming_dmurfd2v2.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__jamming_dmurfd2v2.wav"
+   ],
+   124.2
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/enriqueiglesias__ilikehowitfeels.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/enriqueiglesias__ilikehowitfeels.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/enriqueiglesias__ilikehowitfeels.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/enriqueiglesias__ilikehowitfeels.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/enriqueiglesias__ilikehowitfeels.wav"
+   ],
+   128.0
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/rickyrose__vadgordumedmigremix_dmulfuw7c.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/rickyrose__vadgordumedmigremix_dmulfuw7c.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/rickyrose__vadgordumedmigremix_dmulfuw7c.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/rickyrose__vadgordumedmigremix_dmulfuw7c.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/rickyrose__vadgordumedmigremix_dmulfuw7c.wav"
+   ],
+   140.0
+  ],
+  [
+   [
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/kiss__lovegun.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/kiss__lovegun.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/kiss__lovegun.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/kiss__lovegun.wav",
+    "../../../lotus-light-link/tools/tempo-facit-pc/corpus/kiss__lovegun.wav"
+   ],
+   147.4
+  ]
+ ],
+ "klipp": [
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/nakd__baladaxdanzakuduro_dmuobf8g8.wav",
+   128.6
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__lilkennedy.wav",
+   110.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__theroadimon.wav",
+   87.9
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/misfitsmeetthenutleybrass__skulls.wav",
+   150.8
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vyrma__orvaknar.wav",
+   104.2
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__letmebemyself.wav",
+   154.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/motleycrue__shoutatthedevilinternational.wav",
+   95.4
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/jamesjohnston__countryboys_smuc7274t.wav",
+   120.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/poison__yourmamadontdance2006.wav",
+   150.2
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__livefortoday.wav",
+   102.1
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vyrma__dottirnorrs.wav",
+   123.4
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__sarahyellin.wav",
+   124.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__herebyme.wav",
+   118.2
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__ironlionzion.wav",
+   142.2
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__giveittome.wav",
+   155.8
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__itsnotmytime.wav",
+   128.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/klaas__cambodia_dmumzfnk0.wav",
+   130.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/velvetsky22__footlooseedm.wav",
+   96.2
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/skidrow__psycholove.wav",
+   114.6
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/velvetsky22__thehampsterdancesongedm_dmuof0zim.wav",
+   131.6
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/poison__iwantaction.wav",
+   146.8
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/coversidemusic__abarsongirishfolk_dmumynrt6.wav",
+   149.4
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/ryanjesse__deerinheadlights_smuc4t58d.wav",
+   122.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/mindblow__dontletmego.wav",
+   105.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/brinkenstjarna__scratchmyasslikeadog_dmuptt5rt.wav",
+   128.1
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/undressd__foreveryoung_dmuoc43m4.wav",
+   123.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bassvictim__foreversalty_dmutwi88m.wav",
+   115.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/brinkenstjarna__thelastpartyhero.wav",
+   130.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/89ers__wilderthanahurricane.wav",
+   150.4
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/alfons__stillalittledrunk_dmuocskxo.wav",
+   121.4
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__stirituporiginalalbumversion.wav",
+   151.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/nathanevans__arabella_dmuoc680d.wav",
+   135.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__mrchatterbox.wav",
+   113.2
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/journey__begoodtoyourself.wav",
+   148.6
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__thereallife.wav",
+   143.4
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/thehellbenders__agringolikeme.wav",
+   134.4
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/nathanevans__cottoneyejoe_dmumyzjq5.wav",
+   95.1
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/velvetsky22__doctorjonesdance_dmuoe92tr.wav",
+   151.4
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/nomy__noctorius.wav",
+   105.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vyrma__noregrris.wav",
+   148.6
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__runaway.wav",
+   130.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__isthislove.wav",
+   123.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vyrma__heiminott.wav",
+   106.7
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/rickyrose__drickervin.wav",
+   123.8
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/klaas__joligarcon.wav",
+   138.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/thomasmac__aintno_smuc4i5ox.wav",
+   98.1
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__tickettoheaven.wav",
+   108.2
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/johnfarnham__yourethevoice.wav",
+   85.2
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vigiland__pongdance_dmushg5g6.wav",
+   128.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/avamax__sweetbutpsychomorganpagedanceremix.wav",
+   128.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/staceyq__twoofhearts.wav",
+   130.8
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vigiland__fridaynight.wav",
+   128.4
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/charlixcx__360featuringrobynampyunglean_dmutw9wux.wav",
+   120.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__myworld.wav",
+   94.2
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__africaunite.wav",
+   127.2
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/maaps__pickingupthepieces_dmumzuvjl.wav",
+   128.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vyrma__heimkoma_dmuputlzf.wav",
+   136.2
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__whenimgone.wav",
+   148.0
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vyrma__vargnott.wav",
+   108.8
+  ],
+  [
+   "../../../lotus-light-link/tools/tempo-facit-pc/corpus/rickyrose__marylou_dmulfxijl.wav",
+   125.0
+  ]
+ ],
+ "lang": [
+  [
+   "l1028b",
+   "tools/ladan-2026-10-28/lang-20261028T181533.wav"
+  ],
+  [
+   "l1011b",
+   "tools/ladan-2026-10-11/lang-20261011T193430.wav"
+  ],
+  [
+   "l1012",
+   "tools/ladan-2026-10-11/lang-20261012T110658.wav"
+  ]
+ ],
+ "ettan": [
+  92,
+  108,
+  118,
+  126,
+  138,
+  150
+ ],
+ "latar": {
+  "mix": [
+   {
+    "key": "velvetsky22|nolimitedm",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/velvetsky22__nolimitedm.wav",
+    "facit": 132.2,
+    "artist": "Velvet Sky22",
+    "title": "No Limit - EDM",
+    "md5": "b054527339e15e31733d81708602959a"
+   },
+   {
+    "key": "thinlizzy|jailbreak",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/thinlizzy__jailbreak.wav",
+    "facit": 145.4,
+    "artist": "Thin Lizzy",
+    "title": "Jailbreak",
+    "md5": "8412af96499f896e354324fd2f9b32ec"
+   },
+   {
+    "key": "gabryponte|tarantella",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/gabryponte__tarantella_dmuobjohz.wav",
+    "facit": 140.0,
+    "artist": "Gabry Ponte",
+    "title": "Tarantella",
+    "md5": "3356ed23c17a6c57f1cfa4c98d452bda"
+   },
+   {
+    "key": "europe|dangeronthetrack",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/europe__dangeronthetrack.wav",
+    "facit": 96.8,
+    "artist": "Europe",
+    "title": "Danger On the Track",
+    "md5": "071037e64c3c11327e4bc0a6b62e524b"
+   },
+   {
+    "key": "mikemana|nofearoftomorrow",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/mikemana__nofearoftomorrow_dmumzq9n0.wav",
+    "facit": 126.2,
+    "artist": "Mike Mana",
+    "title": "No Fear Of Tomorrow",
+    "md5": "bda4b3eacdcdb1a9a68287d2f357489d"
+   },
+   {
+    "key": "poison|nothinbutagoodtimeremastered2006",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/poison__nothinbutagoodtime.wav",
+    "facit": 129.0,
+    "artist": "Poison",
+    "title": "Nothin' But A Good Time - Remastered 2006",
+    "md5": "58cacffc2e85f9ce7b763ada65178dcd"
+   },
+   {
+    "key": "blacksabbath|paranoidliveatthenecbirminghamukdecember1997",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/blacksabbath__paranoid.wav",
+    "facit": 87.9,
+    "artist": "Black Sabbath",
+    "title": "Paranoid - Live at the NEC, Birmingham, UK - December 1997",
+    "md5": "1fa2f3f780ae0448321fa93829e173c5"
+   },
+   {
+    "key": "alexwarren|feverdream",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/alexwarren__feverdream_dmuoc1epn.wav",
+    "facit": 108.2,
+    "artist": "Alex Warren",
+    "title": "FEVER DREAM",
+    "md5": "f5f47112fd1d5a0ecfb4d7ac2372e311"
+   },
+   {
+    "key": "lilpeep|beamerboy",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__beamerboy_dmutxuqzo.wav",
+    "facit": 124.0,
+    "artist": "Lil Peep",
+    "title": "beamer boy",
+    "md5": "32049385e1e84846cfdf5d93f0420b33"
+   },
+   {
+    "key": "motleycre|tooyoungtofallinloveinternational",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/motleycrue__tooyoungtofallinloveinternational.wav",
+    "facit": 100.4,
+    "artist": "Mötley Crüe",
+    "title": "Too Young To Fall In Love - International",
+    "md5": "6d3876c464c6a81bf118ba553ee633c4"
+   },
+   {
+    "key": "skidrow|forever",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/skidrow__forever.wav",
+    "facit": 101.3,
+    "artist": "Skid Row",
+    "title": "Forever",
+    "md5": "a95d62666591a3c89811bf32340508ad"
+   },
+   {
+    "key": "micky|thisisthelifevizeremix",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/micky__thisisthelifevizeremix.wav",
+    "facit": 110.0,
+    "artist": "Micky",
+    "title": "This Is The Life - VIZE Remix",
+    "md5": "621217a5f1857d2ef3ca7d3e9f0ffbb4"
+   },
+   {
+    "key": "lilpeep|benztruck",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__benztruck_dmutylahu.wav",
+    "facit": 91.9,
+    "artist": "Lil Peep",
+    "title": "Benz Truck (гелик)",
+    "md5": "9d62f867d8d62a3d51ac49c0e38052af"
+   },
+   {
+    "key": "yunglean|volt",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/yunglean__volt_dmutxa7os.wav",
+    "facit": 144.0,
+    "artist": "Yung Lean",
+    "title": "Volt",
+    "md5": "bb45226a8c746fb9a6b1b1fe5e25ac19"
+   },
+   {
+    "key": "cascada|everytimewetouch",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/cascada__everytimewetouch_dmuob58l7.wav",
+    "facit": 142.0,
+    "artist": "Cascada",
+    "title": "Everytime We Touch",
+    "md5": "03865b2ee1e6b960b7b824ea0923480d"
+   },
+   {
+    "key": "europe|rockthenight",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/europe__rockthenight.wav",
+    "facit": 105.5,
+    "artist": "Europe",
+    "title": "Rock the Night",
+    "md5": "264f709dfac705a715c50223e8d2ddb7"
+   },
+   {
+    "key": "bobmarleyampthewailers|jamming",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__jamming_dmurfd2v2.wav",
+    "facit": 124.2,
+    "artist": "Bob Marley &amp; The Wailers",
+    "title": "Jamming",
+    "md5": "50e583c664fa837f2ed541f4865eb1f9"
+   },
+   {
+    "key": "enriqueiglesias|ilikehowitfeels",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/enriqueiglesias__ilikehowitfeels.wav",
+    "facit": 128.0,
+    "artist": "Enrique Iglesias",
+    "title": "I Like How It Feels",
+    "md5": "18874272d607af903621ae3361f585ce"
+   },
+   {
+    "key": "rickyrose|vadgordumedmigremix",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/rickyrose__vadgordumedmigremix_dmulfuw7c.wav",
+    "facit": 140.0,
+    "artist": "Ricky Rose",
+    "title": "Vad gör du med mig - Remix",
+    "md5": "a7a330e87459f23a0199e7fda2ce4f35"
+   },
+   {
+    "key": "kiss|lovegun",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/kiss__lovegun.wav",
+    "facit": 147.4,
+    "artist": "KISS",
+    "title": "Love Gun",
+    "md5": "cebea3cc6b7043613b16087595f1c51c"
+   }
+  ],
+  "klipp": [
+   {
+    "key": "nakd|baladaxdanzakuduro",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/nakd__baladaxdanzakuduro_dmuobf8g8.wav",
+    "facit": 128.6,
+    "artist": "NA-KD",
+    "title": "BALADA X DANZA KUDURO",
+    "md5": "ea5f009beb472c5f8aa9f80a8f080e6c"
+   },
+   {
+    "key": "lilpeep|lilkennedy",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/lilpeep__lilkennedy.wav",
+    "facit": 110.0,
+    "artist": "Lil Peep",
+    "title": "lil kennedy",
+    "md5": "e409c4632acb8e528172f7a623e85fe5"
+   },
+   {
+    "key": "3doorsdown|theroadimon",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__theroadimon.wav",
+    "facit": 87.9,
+    "artist": "3 Doors Down",
+    "title": "The Road I'm On",
+    "md5": "a2069348ea0c820d58838dd7568872ec"
+   },
+   {
+    "key": "misfitsmeetthenutleybrass|skulls",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/misfitsmeetthenutleybrass__skulls.wav",
+    "facit": 150.8,
+    "artist": "Misfits meet The Nutley Brass",
+    "title": "Skulls",
+    "md5": "303f641170a6be17f37f4c19e18d75d3"
+   },
+   {
+    "key": "vyrma|rvaknar",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vyrma__orvaknar.wav",
+    "facit": 104.2,
+    "artist": "VYRMA",
+    "title": "Þór Vaknar",
+    "md5": "6f9857f7bc06e59ca190932a9ad86041"
+   },
+   {
+    "key": "3doorsdown|letmebemyself",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__letmebemyself.wav",
+    "facit": 154.0,
+    "artist": "3 Doors Down",
+    "title": "Let Me Be Myself",
+    "md5": "d90afcc5ea0ba9451615c4c7f000d93f"
+   },
+   {
+    "key": "motleycre|shoutatthedevilinternational",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/motleycrue__shoutatthedevilinternational.wav",
+    "facit": 95.4,
+    "artist": "Mötley Crüe",
+    "title": "Shout At The Devil - International",
+    "md5": "8eb6ca01101babc33ccaca4e3acea418"
+   },
+   {
+    "key": "jamesjohnston|countryboys",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/jamesjohnston__countryboys_smuc7274t.wav",
+    "facit": 120.0,
+    "artist": "James Johnston",
+    "title": "COUNTRY BOYS",
+    "md5": "f1f02c90020e79d0de22a20a4fef9faf"
+   },
+   {
+    "key": "poison|yourmamadontdance2006remaster",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/poison__yourmamadontdance2006.wav",
+    "facit": 150.2,
+    "artist": "Poison",
+    "title": "Your Mama Don't Dance - 2006 - Remaster",
+    "md5": "52b64fda2bc7ef6d5525ec3be1e8de06"
+   },
+   {
+    "key": "3doorsdown|livefortoday",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__livefortoday.wav",
+    "facit": 102.1,
+    "artist": "3 Doors Down",
+    "title": "Live For Today",
+    "md5": "9ba8c9ea7885590cbf9010677ef776bc"
+   },
+   {
+    "key": "vyrma|dttirnorrs",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vyrma__dottirnorrs.wav",
+    "facit": 123.4,
+    "artist": "VYRMA",
+    "title": "Dóttir Norðrs",
+    "md5": "bc89ee7ebd0c65e2ec79b526281343e2"
+   },
+   {
+    "key": "3doorsdown|sarahyellin",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__sarahyellin.wav",
+    "facit": 124.0,
+    "artist": "3 Doors Down",
+    "title": "Sarah Yellin'",
+    "md5": "28275bbb20ebf6b53643a5ad210f602c"
+   },
+   {
+    "key": "3doorsdown|herebyme",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__herebyme.wav",
+    "facit": 118.2,
+    "artist": "3 Doors Down",
+    "title": "Here By Me",
+    "md5": "df29c8e0ef3e562a1e7cfa21724de7ab"
+   },
+   {
+    "key": "bobmarleyampthewailers|ironlionzion",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__ironlionzion.wav",
+    "facit": 142.2,
+    "artist": "Bob Marley &amp; The Wailers",
+    "title": "Iron Lion Zion",
+    "md5": "f1ea6fabee312c9f6ed7c52096286692"
+   },
+   {
+    "key": "3doorsdown|giveittome",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__giveittome.wav",
+    "facit": 155.8,
+    "artist": "3 Doors Down",
+    "title": "Give It To Me",
+    "md5": "500b4dbfd22387f67907ec9a81ba36ef"
+   },
+   {
+    "key": "3doorsdown|itsnotmytime",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__itsnotmytime.wav",
+    "facit": 128.0,
+    "artist": "3 Doors Down",
+    "title": "It's Not My Time",
+    "md5": "fb741234641e9d0a058457041fdd02b0"
+   },
+   {
+    "key": "klaas|cambodia",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/klaas__cambodia_dmumzfnk0.wav",
+    "facit": 130.0,
+    "artist": "Klaas",
+    "title": "Cambodia",
+    "md5": "c8981dae0fd2c6e9ef251600ec5c8ca6"
+   },
+   {
+    "key": "velvetsky22|footlooseedm",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/velvetsky22__footlooseedm.wav",
+    "facit": 96.2,
+    "artist": "Velvet Sky22",
+    "title": "Footloose - EDM",
+    "md5": "0e0508731f68818ebac36f51d05e466c"
+   },
+   {
+    "key": "skidrow|psycholove",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/skidrow__psycholove.wav",
+    "facit": 114.6,
+    "artist": "Skid Row",
+    "title": "Psycho Love",
+    "md5": "1194950d0254bb0734012d9c2ff071fa"
+   },
+   {
+    "key": "velvetsky22|thehampsterdancesongedm",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/velvetsky22__thehampsterdancesongedm_dmuof0zim.wav",
+    "facit": 131.6,
+    "artist": "Velvet Sky22",
+    "title": "The HampsterDance Song - EDM",
+    "md5": "46a9682a5697a8b8c072be9a973ab3ff"
+   },
+   {
+    "key": "poison|iwantaction",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/poison__iwantaction.wav",
+    "facit": 146.8,
+    "artist": "Poison",
+    "title": "I Want Action",
+    "md5": "1e27b0a3302002c1d6e35259b27b93ba"
+   },
+   {
+    "key": "coversidemusic|abarsongirishfolk",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/coversidemusic__abarsongirishfolk_dmumynrt6.wav",
+    "facit": 149.4,
+    "artist": "CoverSideMusic",
+    "title": "A Bar Song (Irish Folk)",
+    "md5": "35f42e1110e8f58df76d27c87db3192d"
+   },
+   {
+    "key": "ryanjesse|deerinheadlights",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/ryanjesse__deerinheadlights_smuc4t58d.wav",
+    "facit": 122.0,
+    "artist": "Ryan Jesse",
+    "title": "DEER IN HEADLIGHTS",
+    "md5": "cab138dcea5566353604daa683aef60a"
+   },
+   {
+    "key": "mindblow|dontletmego",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/mindblow__dontletmego.wav",
+    "facit": 105.0,
+    "artist": "Mindblow",
+    "title": "Don't Let Me Go",
+    "md5": "9e346151a36e997e00dcbb2d4f555c99"
+   },
+   {
+    "key": "brinkenstjarna|scratchmyasslikeadog",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/brinkenstjarna__scratchmyasslikeadog_dmuptt5rt.wav",
+    "facit": 128.1,
+    "artist": "Brinkenstjärna",
+    "title": "Scratch My Ass Like A Dog",
+    "md5": "b31b0dfcebb1adb1bae275bf51c3212e"
+   },
+   {
+    "key": "undressd|foreveryoung",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/undressd__foreveryoung_dmuoc43m4.wav",
+    "facit": 123.0,
+    "artist": "UNDRESSD",
+    "title": "Forever Young",
+    "md5": "fbba29b9e1fd9602434711f095e60994"
+   },
+   {
+    "key": "bassvictim|foreversalty",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bassvictim__foreversalty_dmutwi88m.wav",
+    "facit": 115.0,
+    "artist": "Bassvictim",
+    "title": "Forever salty",
+    "md5": "c28126e53c7889d4f4b4ac2bba945078"
+   },
+   {
+    "key": "brinkenstjarna|thelastpartyhero",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/brinkenstjarna__thelastpartyhero.wav",
+    "facit": 130.0,
+    "artist": "Brinkenstjärna",
+    "title": "The Last Party Hero",
+    "md5": "b20c0441292245776ec6cf9857141366"
+   },
+   {
+    "key": "89ers|wilderthanahurricane",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/89ers__wilderthanahurricane.wav",
+    "facit": 150.4,
+    "artist": "89ers",
+    "title": "Wilder Than a Hurricane",
+    "md5": "4f4a427a53281b649879d6a9c798a73a"
+   },
+   {
+    "key": "alfons|stillalittledrunk",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/alfons__stillalittledrunk_dmuocskxo.wav",
+    "facit": 121.4,
+    "artist": "Alfons",
+    "title": "Still A Little Drunk",
+    "md5": "a1df60d00beabf6a3dd8da6efe75e81b"
+   },
+   {
+    "key": "bobmarleyampthewailers|stirituporiginalalbumversion",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__stirituporiginalalbumversion.wav",
+    "facit": 151.0,
+    "artist": "Bob Marley &amp; The Wailers",
+    "title": "Stir It Up - Original Album Version",
+    "md5": "86dda19fd0668ca41fe0296cd02896c6"
+   },
+   {
+    "key": "nathanevans|arabella",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/nathanevans__arabella_dmuoc680d.wav",
+    "facit": 135.0,
+    "artist": "Nathan Evans",
+    "title": "Arabella",
+    "md5": "cdaa330c0a09e8ffffaa0f799ca62392"
+   },
+   {
+    "key": "bobmarleyampthewailers|mrchatterbox",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__mrchatterbox.wav",
+    "facit": 113.2,
+    "artist": "Bob Marley &amp; The Wailers",
+    "title": "Mr Chatterbox",
+    "md5": "b3b063ea98a12ebfdb8c6af0348f1fab"
+   },
+   {
+    "key": "journey|begoodtoyourself",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/journey__begoodtoyourself.wav",
+    "facit": 148.6,
+    "artist": "Journey",
+    "title": "Be Good To Yourself",
+    "md5": "f00d25e62a62d3a361dd0c977c47314a"
+   },
+   {
+    "key": "3doorsdown|thereallife",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__thereallife.wav",
+    "facit": 143.4,
+    "artist": "3 Doors Down",
+    "title": "The Real Life",
+    "md5": "616c3c127860e25995f61031c7879b5b"
+   },
+   {
+    "key": "thehellbenders|agringolikeme",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/thehellbenders__agringolikeme.wav",
+    "facit": 134.4,
+    "artist": "The Hellbenders",
+    "title": "A Gringo Like Me",
+    "md5": "66a04d531dbbcd4bfbd13a5a1a22bee6"
+   },
+   {
+    "key": "nathanevans|cottoneyejoe",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/nathanevans__cottoneyejoe_dmumyzjq5.wav",
+    "facit": 95.1,
+    "artist": "Nathan Evans",
+    "title": "Cotton Eye Joe",
+    "md5": "a319fe4ecb3ecc26376f024977439729"
+   },
+   {
+    "key": "velvetsky22|doctorjonesdance",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/velvetsky22__doctorjonesdance_dmuoe92tr.wav",
+    "facit": 151.4,
+    "artist": "Velvet Sky22",
+    "title": "Doctor Jones - Dance",
+    "md5": "3d55f111bc768e2850f29c15d33cc193"
+   },
+   {
+    "key": "nomy|noctorius",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/nomy__noctorius.wav",
+    "facit": 105.0,
+    "artist": "Nomy",
+    "title": "Noctorius",
+    "md5": "4089f9c0fedf5b610c3a2dd4f0fdd5ae"
+   },
+   {
+    "key": "vyrma|noregrrs",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vyrma__noregrris.wav",
+    "facit": 148.6,
+    "artist": "VYRMA",
+    "title": "Noregr Rís",
+    "md5": "4b583518955decd88e0234aed3fc9eb0"
+   },
+   {
+    "key": "3doorsdown|runaway",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__runaway.wav",
+    "facit": 130.0,
+    "artist": "3 Doors Down",
+    "title": "Runaway",
+    "md5": "f8653209ea58611308dd66cff7f4b9f9"
+   },
+   {
+    "key": "bobmarleyampthewailers|isthislove",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__isthislove.wav",
+    "facit": 123.0,
+    "artist": "Bob Marley &amp; The Wailers",
+    "title": "Is This Love",
+    "md5": "2f09c39925e0b9d29ae4bb6aeff9d7b1"
+   },
+   {
+    "key": "vyrma|heimntt",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vyrma__heiminott.wav",
+    "facit": 106.7,
+    "artist": "VYRMA",
+    "title": "Heim í Nótt",
+    "md5": "ca7252141900a0451a99e85b61451863"
+   },
+   {
+    "key": "rickyrose|drickervin",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/rickyrose__drickervin.wav",
+    "facit": 123.8,
+    "artist": "Ricky Rose",
+    "title": "Dricker Vin",
+    "md5": "963e674a37f43726f418bc880105a7c4"
+   },
+   {
+    "key": "klaas|joligarcon",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/klaas__joligarcon.wav",
+    "facit": 138.0,
+    "artist": "Klaas",
+    "title": "Joli Garcon",
+    "md5": "0fa0f0f861e4fd0222c510de94e5b37e"
+   },
+   {
+    "key": "thomasmac|aintno",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/thomasmac__aintno_smuc4i5ox.wav",
+    "facit": 98.1,
+    "artist": "Thomas Mac",
+    "title": "Ain't No",
+    "md5": "7c98c0071a81a2d1a6129c51a7548d4f"
+   },
+   {
+    "key": "3doorsdown|tickettoheaven",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__tickettoheaven.wav",
+    "facit": 108.2,
+    "artist": "3 Doors Down",
+    "title": "Ticket To Heaven",
+    "md5": "82740297debebe178fec722d9610fae5"
+   },
+   {
+    "key": "johnfarnham|yourethevoice",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/johnfarnham__yourethevoice.wav",
+    "facit": 85.2,
+    "artist": "John Farnham",
+    "title": "You're the Voice",
+    "md5": "fa440507d83dc0242efdcc8fb532a7b2"
+   },
+   {
+    "key": "vigiland|pongdance",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vigiland__pongdance_dmushg5g6.wav",
+    "facit": 128.0,
+    "artist": "Vigiland",
+    "title": "Pong Dance",
+    "md5": "1156967603416b561985ff1acb649cdd"
+   },
+   {
+    "key": "avamax|sweetbutpsychomorganpagedanceremix",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/avamax__sweetbutpsychomorganpagedanceremix.wav",
+    "facit": 128.0,
+    "artist": "Ava Max",
+    "title": "Sweet but Psycho - Morgan Page Dance Remix",
+    "md5": "d7cc1f6ad641d59b92d030fd1ad255fa"
+   },
+   {
+    "key": "staceyq|twoofhearts",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/staceyq__twoofhearts.wav",
+    "facit": 130.8,
+    "artist": "Stacey Q",
+    "title": "Two of Hearts",
+    "md5": "e41f0d3556ebc7ac3c2c76bd4e9355a0"
+   },
+   {
+    "key": "vigiland|fridaynight",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vigiland__fridaynight.wav",
+    "facit": 128.4,
+    "artist": "Vigiland",
+    "title": "Friday Night‬‬‬",
+    "md5": "6b27d0b118a73c85e32d12b07183fb38"
+   },
+   {
+    "key": "charlixcx|360featuringrobynampyunglean",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/charlixcx__360featuringrobynampyunglean_dmutw9wux.wav",
+    "facit": 120.0,
+    "artist": "Charli xcx",
+    "title": "360 featuring robyn &amp; yung lean",
+    "md5": "3085148c90e8a0be7b846137b784f5e5"
+   },
+   {
+    "key": "3doorsdown|myworld",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__myworld.wav",
+    "facit": 94.2,
+    "artist": "3 Doors Down",
+    "title": "My World",
+    "md5": "8e8c81567e7c9c2115383e58ee0728c9"
+   },
+   {
+    "key": "bobmarleyampthewailers|africaunite",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/bobmarleyampthewailers__africaunite.wav",
+    "facit": 127.2,
+    "artist": "Bob Marley &amp; The Wailers",
+    "title": "Africa Unite",
+    "md5": "5d1bfcaad26f5dad4279e76ca31deba2"
+   },
+   {
+    "key": "maaps|pickingupthepieces",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/maaps__pickingupthepieces_dmumzuvjl.wav",
+    "facit": 128.0,
+    "artist": "MAAPS",
+    "title": "Picking Up The Pieces",
+    "md5": "4d8be21bed98897c4a0e9744907512ac"
+   },
+   {
+    "key": "vyrma|heimkoma",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vyrma__heimkoma_dmuputlzf.wav",
+    "facit": 136.2,
+    "artist": "VYRMA",
+    "title": "Heimkoma",
+    "md5": "696953a4f5fafaa410af1b6f6579605e"
+   },
+   {
+    "key": "3doorsdown|whenimgone",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/3doorsdown__whenimgone.wav",
+    "facit": 148.0,
+    "artist": "3 Doors Down",
+    "title": "When I'm Gone",
+    "md5": "4611d022deae118f61a80bd24984015a"
+   },
+   {
+    "key": "vyrma|vargntt",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/vyrma__vargnott.wav",
+    "facit": 108.8,
+    "artist": "VYRMA",
+    "title": "Vargnótt",
+    "md5": "9e5b45e866d6ac04e896161affe622a3"
+   },
+   {
+    "key": "rickyrose|marylou",
+    "wav": "../../../lotus-light-link/tools/tempo-facit-pc/corpus/rickyrose__marylou_dmulfxijl.wav",
+    "facit": 125.0,
+    "artist": "Ricky Rose",
+    "title": "Mary Lou",
+    "md5": "a3d01093ff48529368dbc9eb288b99b4"
+   }
+  ]
+ }
+}

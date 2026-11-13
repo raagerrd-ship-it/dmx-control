@@ -1,5 +1,21 @@
 # Natt-agentens uppdrag
 
+MÄTNINGEN LAGAD 2026-11-13 12:00 (huvudchatten, ägaren: "kör nu"): tre saker klara inför nästa arena.
+(1) KONTROLLMÄNGD 2: tools/arena/kontroll2.json (mk_kontroll2.py; 20 låtar/50 min mix + 60 klipp ur lotus korpus med dubbelt bekräftat facit,
+    tre oanvända ladinspelningar). Slås på med <körning>/dmx.json = {"v": 2}; mätningen heter klockdom-k2.json. Den gamla kontrollmängden är PENSIONERAD
+    för klockan (16 domar). ANVÄNDNINGAR AV KONTROLL 2 HITTILLS: 0 varianter (bara basen). Räkna varje --holdout på en variant här.
+    BAS (HEAD c56ade9) på kontroll 2: rätt tempo mix 91,10 % / klipp 84,05 %, lås 3,04 s, still 4,65 s, hopp 1,07/min, utflykter 0,89/min 6,00 %,
+    syskontid 6,74 %, ettan 100 %, grid40 54,95 %, gridfel 18,9 ms. Felen sprids: 2 av 20 låtar under 75 % (förr EN låt = 12,5 % av mixen).
+    Ge ALDRIG deltagare per-låt-tal ur kontroll 2 (bas/klockdom-k2.json mixLatar/klipp) - bara totalerna.
+(2) RUTNÄTETS FAS I KLOCKDOMAREN (DMX-läge 2): ettan < bas - 10 pe eller grid40 < bas - 5 pe = DISK. Kontrollen före start: nattens dmx-2 (parabeln)
+    fälls på övningen (ettan 98,6 -> 62,3, grid40 49,6 -> 22,6) fast klockpoängen är -0,17. Körning: .arena/klocka3 (bas + dmx-2 mätta).
+(3) FYNDLISTAN GENOMGÅNGEN: tools/natt/fynd-triage-2026-11-13.md. Av 14 ÖPPET (oktober): LÖST 3, INAKTUELLT 2, KVAR 9. Störst kvar: tempot runt
+    drops (klockan fel >= 2 s vid 40 % av dropsen), frame.kick fyrar på kylningens kant (3,2/s i slumpfas), tempohopp inom låt (0,67/min på ladans
+    23 inspelningar), sektionsfladdret (delar < 8 s 23 -> 34 % efter snabba kanterna), ingen build före drop (12 av 55).
+    NYTT ATT VAKTA: analysatorn allokerar 428 kB/s mot 79 för bygget 11-08 (tgScore, onsetStep, updateInner, tgStep) - mest i workerns heap.
+    Lotus-Pi:n 11-13 11:53 efter 2 h: bara de planerade låtbytes-GC:erna (96-145 ms), minor max 32 ms, inga omstarter - inte akut, men mät i ladan.
+NÄSTA ARENA (ägarens ordning): UPPBYGGNADEN före drop. Därefter klockans sammanslagning (åtta mekanismer -> en bevismodell), dömd på kontroll 2.
+
 LÅTENS MINNE INLAGT 2026-11-13 10:55 (huvudchatten, ägaren: "lös källarväxlingen med Sonos låtgräns"): c56ade9, delade filer analyserClock.ts +
 analyser.ts (boundSure) + split.ts (H_SURE, HOP_REC_LEN 17), manifestet skrivet. DMX SÄTTER ALDRIG FLAGGAN = oförändrat beteende (bank.py rytm + dyn
 identiska före/efter). Lotus (4cbb2e3b) sätter den för Sonos-spår <= 10 min och är utlagd 09:45: live 22 låtar, stora tempobyten 2,75 -> 0,62 /min.
