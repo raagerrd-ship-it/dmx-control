@@ -71,10 +71,11 @@ export class Lab6 {
       const x0 = Math.min(1, Math.max(dr.kick, c.bassBody)); this.eHi = Math.max(x0, this.eHi - dt * 0.15); this.eLo = Math.min(x0, this.eLo + dt * 0.15);
       const eNow = this.eHi - this.eLo > 0.08 ? (x0 - this.eLo) / (this.eHi - this.eLo) : 0; this.eSm += (eNow - this.eSm) * (eNow > this.eSm ? Math.min(1, dt / 0.03) : Math.min(1, dt / 0.25));
       // Sedan: "försök få till den inverterade att istället för annan färg så blir den lampan släckt" -> fyra takter färglöpare, fyra takter
-      // HÅLET: löparen är en SLÄCKT lampa som vandrar genom de tända (mörk första halvan av slaget, tänds mjukt igen när hålet gått vidare).
+      // HÅLET: löparen är en SLÄCKT lampa som vandrar genom de tända (mörk hela slaget, tänds igen när hålet gått vidare).
       // I hålvarianten ligger grundens golv högre (0,22) så hålet syns även när basen andas ut.
-      const hole = ((Math.floor(c.beatIdx / 16) % 2) + 2) % 2 === 1, i = at(k), j = k > 0 ? at(k - 1) : -1;
-      const dark = (f2: number) => f2 < 0.45 ? 1 : Math.exp(-(f2 - 0.45) * 5);
+      const hole = ((Math.floor(c.beatIdx / 16) % 2) + 2) % 2 === 1, i = at(k);
+      // (11-13 kväll: ägaren såg aldrig hålet - det var mörkt bara 0,45 slag (~210 ms), och lampans uttoning (cfg.fadeMinS 0,25 s) hann
+      // då bara ner till ~43 %. Nu är lampan släckt hela slaget: nere på ~15 % innan hålet går vidare.)
       // "hoppande färgen kanske bara får vara Röd, Grön, Blå eller Svart": löparen är alltid en REN grundfärg som inte är grundens -
       // motkulören när grunden är en blandfärg (gul -> blå), nästa grundfärg när grunden själv är ren (röd -> grön). Svart = hålet.
       // "färgen måste alltid vara en annan än vad alla lampor kör": löparens lampa bär BARA löparens färg hela slaget, aldrig svagare än
@@ -96,7 +97,7 @@ export class Lab6 {
         const g = ((hole ? 0.22 : 0.05) + (hole ? 0.46 : 0.63) * this.eSm * presence) / TOP * 0.95;        // alla i samma kulör: golv .. 65 %
         const r = this.runLv[x], back = r < 0.12 ? 1 - r / 0.12 : 0;                                         // grunden tillbaka när löparens färg slocknat
         if (r > 0.01) this.put(x, run, r);
-        this.put(x, this.sect, g * back * (hole ? 1 - (x === i ? dark(fr) : x === j ? dark(fr + 1) : 0) : 1));
+        this.put(x, this.sect, hole && x === i ? 0 : g * back);                                             // hålet: lampan släckt HELA slaget
       }
     } else if (this.mode === 'vagen') {
       const p = (beat + c.beatFrac) / 4, kick = Math.exp(-c.beatFrac * 4) * 0.25;           // 0..1 över takten
