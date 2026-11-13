@@ -688,6 +688,7 @@
     <div class="fx-actions" style="margin-top:8px">
       <button class="btn mark" id="markMini">Minidrop</button>
       <button class="btn mark" id="markDrop">Drop</button>
+      <button class="btn mark" id="markNot">Inte drop</button>
     </div>
     <div class="status" id="markState" style="margin-top:6px">Under inspelning: tryck när du hör det. Låtbyte när nästa låt börjar, Uppbyggnad när laddningen startar, Drop och Minidrop när det slår till.</div>
   </div>
@@ -898,7 +899,7 @@ const recShow = (st) => {
 };
 const recFetch = () => fetch("/api/longrec").then((r) => r.json()).then(recShow).catch(() => {});
 const recPost = (body) => fetch("/api/longrec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json()).then(recShow).catch(() => {});
-const MARK_NAMN = { latbyte: "Låtbyte", uppbyggnad: "Uppbyggnad", mini: "Minidrop", drop: "Drop" };
+const MARK_NAMN = { latbyte: "Låtbyte", uppbyggnad: "Uppbyggnad", mini: "Minidrop", drop: "Drop", intedrop: "Inte drop" };
 const markPost = (kind, btn) => {
   if (btn) { btn.classList.add("hit"); setTimeout(() => btn.classList.remove("hit"), 600); }
   return fetch("/api/mark", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind }) }).then((r) => r.json()).then((st) => {
@@ -906,7 +907,7 @@ const markPost = (kind, btn) => {
     if (el) el.textContent = MARK_NAMN[kind] + " markerad " + new Date().toLocaleTimeString() + (st.recording ? ` (nr ${st.marks} i inspelningen)` : " (ingen inspelning igång - sparad i marks.jsonl)");
   }).catch(() => { const el = document.getElementById("markState"); if (el) el.textContent = "Markeringen gick inte fram - försök igen."; });
 };
-[["markSong", "latbyte"], ["markBuild", "uppbyggnad"], ["markMini", "mini"], ["markDrop", "drop"]].forEach(([id, kind]) => { const b = document.getElementById(id); if (b) b.onclick = () => markPost(kind, b); });
+[["markSong", "latbyte"], ["markBuild", "uppbyggnad"], ["markMini", "mini"], ["markDrop", "drop"], ["markNot", "intedrop"]].forEach(([id, kind]) => { const b = document.getElementById(id); if (b) b.onclick = () => markPost(kind, b); });
 if (recStart) { recStart.onclick = () => recPost({ seconds: 3600 }); recStop.onclick = () => recPost({ stop: true }); recFetch(); }
 { const rt = document.getElementById("recTest"), rp = document.getElementById("recPlay"), ra = document.getElementById("recAudio");
   if (rt) rt.onclick = () => recPost({ seconds: 60 });

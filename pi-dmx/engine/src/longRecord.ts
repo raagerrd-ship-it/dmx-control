@@ -53,7 +53,7 @@ export class LongRecord {
     return this.status();
   }
 
-  /** ÄGARENS MARKERING (knapparna i /setup: latbyte / drop / mini / uppbyggnad): facit. Sparas i .events.json (marks) om en inspelning
+  /** ÄGARENS MARKERING (knapparna i /setup: latbyte / drop / mini / uppbyggnad / intedrop): facit. Sparas i .events.json (marks) om en inspelning
    *  pågår, och alltid i marks.jsonl i snippets-mappen. Tiden är knapptryckets - räkna med ~0,5-1 s reaktionstid när facit används. */
   mark(kind: string): { ok: boolean; recording: boolean; kind: string; marks: number } {
     const m = { wallMs: Date.now(), kind: String(kind).slice(0, 20) };

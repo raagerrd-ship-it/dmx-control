@@ -266,7 +266,7 @@ export async function startServer(
     if (!p || !existsSync(p)) return reply.code(404).send({ ok: false, error: "ingen inspelning sparad sedan motorn startade" });
     return reply.header("Content-Type", "audio/wav").header("Cache-Control", "no-store").send(createReadStream(p));
   });
-  // ÄGARENS MARKERING (facit): POST {kind:'latbyte'|'drop'|'mini'|'uppbyggnad'} - se LongRecord.mark.
+  // ÄGARENS MARKERING (facit): POST {kind:'latbyte'|'drop'|'mini'|'uppbyggnad'|'intedrop'} - se LongRecord.mark.
   app.post("/api/mark", async (req) => deps.longRecord?.mark(String(((req.body ?? {}) as Record<string, unknown>).kind ?? 'mini')) ?? { ok: false });
   // GC-stopp per sort, renderingstid och händelseloopens fördröjning per minut - alltid på (perfStats.ts, 10-16)
   app.get("/api/perf", async () => getPerf());
