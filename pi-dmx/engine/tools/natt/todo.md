@@ -5,6 +5,8 @@ på rätt tempo och omlåsning). Ledare efter alla spärrar: dmx-1b = k4b + takt
 (k4b +7,59; fel tempo/min 1,39 -> 0,76, tempobyten 0,67 -> 0,36, omlåsning 3,02 = bas), ren i tvavagar. dmx-2 (+ parabel i fintempot)
 fick +10,99 men är DISK i tvavagar: rutnätet förstört (ettan 100 -> 62 %). Rapport: tools/natt/arena-2026-11-12-klocka2/RAPPORT-DMX.md,
 idébank i dmx/. Bänken är fri igen.
+LOTUS-KÖRNINGEN KLAR 02:10: dmx-1b mot lotus (bara redovisat, sist i RAPPORT-DMX.md): 469/503 rätt (bas 463, k4b 468), syskonfel 21
+(k4b 22), låtar som växlar 80 (k4b 84), källaren 2,23 / 3,83 = exakt k4b (vittnet lägger inget på källarens växling), fas 0,88 / 23 / 270.
 - VAL FÖR ÄGAREN: dmx-1b (dmx/dmx-1b.diff mot 97ac0bf) eller k4b ensam, eller inget. Före utläggning: ljusdomaren med fast look,
   analyser_shared.py --write src, lotusbanken som vakt (vittnet omätt mot lotus).
 - OMLÅSNINGEN GÅR INTE ATT KÖPA I KLOCKANS BESLUT (7 regler + 3 signaler prövade): tempogrammet behöver ~2,7 s, rå vikning 1,9 s i

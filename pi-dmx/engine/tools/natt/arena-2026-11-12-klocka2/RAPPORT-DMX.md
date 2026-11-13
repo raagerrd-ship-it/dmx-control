@@ -141,3 +141,34 @@ jokern +0,15, domaren +0,07, resten orkestratorn). Mätningar i domaren: 14 på 
 
 (% mot bas, + = bättre. Sektion träff, drop, låtgräns +0,0 hos båda. Ljusdomaren är inte körd i den här körningen – bas/bank.json
 saknas i klocka2dmx; för k4b gav den i går +5,8 poäng och lampspridning −6,7 %.)
+
+## dmx-1b mot lotus – bara redovisat (ägaren 01:31: "Vore spännande att köra vinnaren mot lotus.")
+
+Gårdagens fulla domare och körsätt (arenan klocka2: lotusbanken + källarklippen), så talen går att jämföra rakt av. Inget av det
+fäller eller ändrar DMX-rankingen. dmx-2 står med som extra kolumn eftersom dess mätning redan låg i kön – den är INGEN kandidat
+(rutnätet förstört i tvavagar).
+
+| lotus | bas | k4b | k2c | **dmx-1b** | dmx-2 (ingen kandidat) |
+|---|---|---|---|---|---|
+| rätt av 503 | 463 | 468 | 463 | **469** | 470 |
+| – varav 4/3-fel | 16 | 13 | 16 | 12 | 12 |
+| syskonfel (503) | 26 | 22 | 25 | **21** | 22 |
+| låtar som växlar (503, q25..q75) | 82 | 84 | 74 | 80 | 79 |
+| rätt av 126 (övningsdelen) | 116 | 117 | 115 | 117 | 118 |
+| källarens byten/min, övning | 2,98 | 2,23 | 2,98 | 2,23 | 2,23 |
+| källarens byten/min, kontroll | 3,97 | 3,83 | 2,98 | 3,83 | 3,83 |
+| fas median / motfas / i fas (503) | 0,89 / 20 / 266 (442) | 0,88 / 23 / 273 (443) | 0,89 / 20 / 264 (442) | 0,88 / 23 / 270 (444) | 0,88 / 19 / 273 (445) |
+| on-beat (503) | 0,40 | 0,40 | 0,40 | 0,40 | 0,40 |
+| fas / on-beat (126) | 0,91 / 6 / 70 · 0,41 | 0,89 / 7 / 69 · 0,40 | 0,91 / 6 / 70 · 0,40 | 0,89 / 7 / 68 · 0,40 | 0,87 / 6 / 73 · 0,39 |
+| syntet | 6/8 | 6/8 | 6/8 | 6/8 | 6/8 |
+| poäng med gårdagens domare, kontroll (12 mått) | 0 | +8,25 | +7,72 | **+9,78** | +11,92 |
+
+- **Vinsten håller på micljud och vittnet stjälper inte:** dmx-1b har flest rätt bland kandidaterna i lotusbanken (469 mot k4b 468,
+  bas 463), ett syskonfel färre än k4b (21 mot 22; 4/3-felen 12 mot 13) och fyra färre låtar som växlar (80 mot 84). Det är små tal
+  åt rätt håll – vittnet lägger lite ovanpå k4b, inte mycket. Fasen är k4b:s (median 0,88, motfas 23 mot bas 20): inom ägarens
+  5 %-marginal, men den kostnaden kommer från k4b-delen och finns kvar.
+- **På växlingen i källarklippen lägger vittnet INGENTING:** 2,23 / 3,83 byten per minut, exakt som k4b. Källarens växlingar är inte
+  syskonväxlingar som mönstret kan döma (gårdagens fynd); där är k2c fortfarande ensam om en vinst på kontrollklippen (2,98).
+- Parabeln (dmx-2) gör inget dåligt med tempot på lotusljud (470 rätt, motfas 19) – dess fel är rutnätet i DMX-kedjan, inte tempovalet.
+- Med gårdagens domare utan 4-sekundersgränsen är dmx-1b DISK på övningen (mix_still 3,24 mot 3,233, de sju tusendelarna); på
+  kontrollmängden klarar den alla gårdagens spärrar.
