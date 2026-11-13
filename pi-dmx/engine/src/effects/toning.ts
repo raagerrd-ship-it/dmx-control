@@ -17,6 +17,8 @@ export class EffectFade {
   tune(cfg: { fadeMinS?: number; minOnMs?: number; chMinOnMs?: number }): void {
     this.fadeS = tal(cfg.fadeMinS, FADE_MIN_S, FADE_MIN_S, 2); this.minOn = tal(cfg.minOnMs, MIN_ON_MS, 0, 500); this.chMinOn = tal(cfg.chMinOnMs, CH_MIN_ON_MS, 0, 500);
   }
+  /** UTTRYCKLIGT SVART (effects.ts, ägaren 11-13 'svart är avstängd'): lampan släcks nu - ingen uttoning, inga hålltider kvar. */
+  cut(i: number): void { const o = i * 3; this.lvl[i] = 0; this.peakAt[i] = 0; for (let c = 0; c < 3; c++) { this.chOnAt[o + c] = 0; this.ratio[o + c] = 0; this.prev[o + c] = 0; } }
   /** En lampa, en ruta: rgb (effektens färg x energin, 0..1) skrivs om på plats. now = rutans klocka (ms), dtSec = rutans längd. */
   step(i: number, fx: FixtureConfig | undefined, rgb: [number, number, number], now: number, dtSec: number, fast: boolean): void {
     const mT = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);

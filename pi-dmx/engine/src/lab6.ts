@@ -73,9 +73,8 @@ export class Lab6 {
       // Sedan: "försök få till den inverterade att istället för annan färg så blir den lampan släckt" -> fyra takter färglöpare, fyra takter
       // HÅLET: löparen är en SLÄCKT lampa som vandrar genom de tända (mörk hela slaget, tänds igen när hålet gått vidare).
       // I hålvarianten ligger grundens golv högre (0,22) så hålet syns även när basen andas ut.
-      // Ägaren: "tänk att svart är avstängd" -> lampan som hålet ska till NÄSTA slag börjar tona ner redan nu (uttoningen 0,25 s får inte
-      // brytas), så den är nere på ~15 % när hålet kommer och ~2 % när det går vidare: svart är släckt, inte bara dämpad.
-      const hole = ((Math.floor(c.beatIdx / 16) % 2) + 2) % 2 === 1, i = at(k), nx = k < 7 ? at(k + 1) : -1;
+      // Ägaren: "tänk att svart är avstängd" -> hålets lampa får exakt 0/0/0; motorn släcker den direkt (effects.ts SVART = SLÄCKT).
+      const hole = ((Math.floor(c.beatIdx / 16) % 2) + 2) % 2 === 1, i = at(k);
       // (11-13 kväll: ägaren såg aldrig hålet - det var mörkt bara 0,45 slag (~210 ms), och lampans uttoning (cfg.fadeMinS 0,25 s) hann
       // då bara ner till ~43 %. Nu är lampan släckt hela slaget: nere på ~15 % innan hålet går vidare.)
       // "hoppande färgen kanske bara får vara Röd, Grön, Blå eller Svart": löparen är alltid en REN grundfärg som inte är grundens -
@@ -99,7 +98,7 @@ export class Lab6 {
         const g = ((hole ? 0.22 : 0.05) + (hole ? 0.46 : 0.63) * this.eSm * presence) / TOP * 0.95;        // alla i samma kulör: golv .. 65 %
         const r = this.runLv[x], back = r < 0.12 ? 1 - r / 0.12 : 0;                                         // grunden tillbaka när löparens färg slocknat
         if (r > 0.01) this.put(x, run, r);
-        this.put(x, this.sect, hole && (x === i || x === nx) ? 0 : g * back);                               // hålet: släckt hela slaget + lampan före börjar tona ner
+        this.put(x, this.sect, hole && x === i ? 0 : g * back);                                             // hålet: lampan får 0/0/0 hela slaget (motorn släcker direkt)
       }
     } else if (this.mode === 'vagen') {
       const p = (beat + c.beatFrac) / 4, kick = Math.exp(-c.beatFrac * 4) * 0.25;           // 0..1 över takten

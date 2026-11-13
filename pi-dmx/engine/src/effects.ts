@@ -579,6 +579,7 @@ export class EffectEngine {
   private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
   private xfMode: Mode | '' = ''; private xfFrom: EffectDef | undefined; private xfAt = 0; private rXw = 1;   // ÖVERTONING MELLAN EFFEKTER (se stegets kommentar vid EFFECT_MAP.get)
   private lampFade = new EffectFade();   // STEG 2: effekternas uttoning + minsta pa-tid per lampa (effects/toning.ts)
+  private blackOn = new Uint8Array(64); private blackAt = new Float64Array(64);   // uttryckligt svart per lampa (se SVART = SLÄCKT)
   private lampGuard = new LampGuard();   // outputs golv mot strobe (output.ts): griper bara in om en effekt faller snabbare an FADE_MIN_S
   // TERMISK BUDGET. En fast cooldown vet inte skillnad på en 0.5s-puff och en
   // 3s-puff — den räknar TIDEN MELLAN, inte ARBETET. Ibiza LSM1500PRO orkar
@@ -1373,11 +1374,22 @@ export class EffectEngine {
       // tandpunkt+1). Bara effekten sjalv eller slackgransen (tystnad) slacker. Kuloren bevaras (alla kanaler med samma faktor).
       // (11-13: gäller inte när en STUND äger ljuset helt (w = 1, t.ex. labbet): ägaren "svart är avstängd ... lampan skall du ge 0% R,
       // 0% G, 0% B" - annars höll festens effekt under stunden kvar lampan på lägsta tända nivån.)
-      if (m0 > 0 && k > 0 && this.rMw < 1) keepLit(fx, rgb);
+      if (m0 > 0 && k > 0 && this.rMw < 0.999) keepLit(fx, rgb);
       // STEG 2 forts. - EFFEKTERNAS UTTONING + MINSTA PA-TID (effects/toning.ts): lampans ljusstyrka upp direkt, ner med tidskonstanten
       // cfg.fadeMinS; kuloren foljer effekten direkt. Tiderna ar installningar i /setup. Darefter OUTPUTS GOLV MOT STROBE (output.ts LampGuard).
-      this.lampFade.step(i, fx, rgb, renderNow, dtSec, fastLight);
-      this.lampGuard.step(i, fx, rgb, dtSec);
+      // SVART = SLÄCKT (ägaren i ladan 11-13: "Effekten ber ju om en släckt lampa så motorn borde bara göra det?!", "lampan skall du ge
+      // 0% R, 0% G, 0% B"). Mätt: uttoningen (0,25 s i lampans LJUS = ~0,6 s i DMX-värde) lät lampan ligga kvar på DMX 20 av 108 två slag
+      // efter att labbet bett om svart - tänd för ögat. När en STUND äger ljuset helt och ber om exakt 0/0/0 släcks lampan direkt.
+      // Skyddet mot strobe står kvar på annat sätt: samma lampa får klippas högst var 333:e ms (3 ggr/s), annars tonar den som vanligt.
+      const ask0 = this.rMw >= 0.999 && this.moment.r(i) === 0 && this.moment.g(i) === 0 && this.moment.b(i) === 0;
+      if (ask0 && (this.blackOn[i] === 1 || renderNow - this.blackAt[i] > 333)) {
+        if (this.blackOn[i] === 0) { this.blackOn[i] = 1; this.blackAt[i] = renderNow; }
+        rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; this.lampFade.cut(i); this.lampGuard.cut(i);
+      } else {
+        if (!ask0) this.blackOn[i] = 0;
+        this.lampFade.step(i, fx, rgb, renderNow, dtSec, fastLight);
+        this.lampGuard.step(i, fx, rgb, dtSec);
+      }
       this.out.writeFixture(this.universe, fx, rgb, 1, 0, specialty);
     }
     return wantFogFx;
