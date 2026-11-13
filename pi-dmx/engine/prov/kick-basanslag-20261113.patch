@@ -1,0 +1,51 @@
+--- /dev/fd/63	2026-11-13 14:52:53.000000000 +0100
++++ /dev/fd/62	2026-11-13 14:52:53.000000000 +0100
+@@ -43,6 +43,8 @@
+  *  lang1011 141-300 s): klockan står på 87 där analysatorns egen sökning stod på 110-131; utan tak tog 414 ms-spärren var tredje kick
+  *  (44 kickar/20 s, platt = sektionernas kicktäthet utan kontrast, upp_s 1,35 -> 2,85 s), med taket 148 mot basens 140 per minut. */
+ const KICK_CAP_MS = 330;
++const KICK_NY: boolean = process.env.PROV_KICK_GAMMAL !== "1";
++const KICK_RISE_HOPS = 6, KICK_RISE_DB = +(process.env.PROV_KICK_DB ?? 6), KICK_GAP_MS = 100;
+ function sysEnv(name: string): string | undefined {
+   return ENV?.[PROFILE.envPrefix + name] ?? ENV?.[ALIAS_PREFIX + name] ?? PROFILE.sys[name];
+ }
+@@ -437,7 +439,8 @@
+   private kickMad = 0.05;            // robust MAD (median absolut avvikelse) → tröskel-spridning
+   private kickSeed = 0;              // warmup-räknare: snabb EMA-seed av skalan innan sign-baserad tar över
+   private kickWasAbove = false;      // stigande-flank-detektion
+-  private kickPrimed = false;        // false på första framen (skräp-flux) → ingen falsk kick
++  private kickPrimed = false;
++  private readonly krDb = new Float64Array(KICK_RISE_HOPS); private krPos = 0; private krN = 0; private kickArmed = true;        // false på första framen (skräp-flux) → ingen falsk kick
+   private static readonly ENV_HZ = 100;
+   private static readonly ONSET_PEAK_FLOOR = 0.05;
+   /** Onset-ringens langd i sekunder x 100 Hz. Env LOTUS_TEMPO_ENV_S bara for korbanken (bench.mjs) - 5 s ar driftvardet. */
+@@ -1954,6 +1957,7 @@
+ 
+     const level = Math.min(1, rms * this.gain);
+ 
++    if (Analyser.FAST_BANDS) this.fastBandStep(samples);   // före kicken: kicken läser basens snabba nivå
+     this.hKickFlux = kickFlux; this.hEnergy = energy;
+     const kick = this.kickStep();
+ 
+@@ -2018,7 +2022,6 @@
+     // Tidssteget skalas (bigDt) så smoothing-tidskonstanterna blir oförändrade.
+     if (++this.bigCounter >= Analyser.BIG_EVERY) this.bigStep();
+     }
+-    if (Analyser.FAST_BANDS) this.fastBandStep(samples);
+     // TRUM-KIT peak-hold-envelopes PÅ HOP-TAKT (var 2.7ms) → fångar varje anslag,
+     // aldrig missat mellan två render-frames (100Hz). tau bevarade från effects.ts:
+     // hat 60ms (treble+air-onset O[6]/O[7]) / snare 110ms (highMid-onset O[5]) / kick 150ms
+@@ -2097,6 +2100,13 @@
+   /** Kick-detektorn (median/MAD-troskel, taktgrind, flank + cooldown). Het varje hop; egen funktion sa att process() ar kompakt. */
+   private kickStep(): boolean {
+     const kickFlux = this.hKickFlux, energy = this.hEnergy, now = this.hNow;
++    if (KICK_NY) {   // KICKEN = BASANSLAGET (prov)
++      const A = Analyser.FAST_BANDS ? this.fbAbs : this.bandAbs, db = 20 * Math.log10(A[0] + A[1] + 1e-7), q = this.krPos, rise = this.krN >= KICK_RISE_HOPS ? db - this.krDb[q] : 0;
++      this.krDb[q] = db; this.krPos = q + 1 === KICK_RISE_HOPS ? 0 : q + 1; if (this.krN < KICK_RISE_HOPS) this.krN++;
++      if (rise < KICK_RISE_DB / 2) this.kickArmed = true;
++      if (this.kickArmed && rise >= KICK_RISE_DB && now - this.lastKick > KICK_GAP_MS && energy > Analyser.KICK_EFLOOR && this.hGated) { this.kickArmed = false; this.lastKick = now; return true; }
++      return false;
++    }
+     // KICK-DETEKTION v2: onset i kick-bandet (sub-bas ~0–280 Hz) mot en ADAPTIV
+     // baslinje (långsam EMA av kick-fluxen). En kick = flux tydligt över
+     // baslinjen; tröskeln skalar med signalen → fyrar pålitligt även på

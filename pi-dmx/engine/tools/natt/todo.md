@@ -1,5 +1,21 @@
 # Natt-agentens uppdrag
 
+KICKEN = BASANSLAGET: BYGGD OCH MÄTT 2026-11-13 15:00, INTE INLAGD - VÄNTAR PÅ ÄGARENS ÖGA I LADAN (huvudchatten, triagens fynd 2).
+Prov: prov/kick-basanslag-20261113.patch (bara analyser.ts, ovanpå c08e1cb), fryst bygge .arena/kick1/k6/dist. frame.kick fyrar när basens
+snabba nivå (fbAbs sub + kick, samma storhet som klockan viker) stiger >= 6 dB på 6 hop, återarmeras under 3 dB, minst 100 ms emellan.
+De snabba banden räknas före kicken (flytten ensam är bank-identisk). Gamla detektorn (flux-median/MAD, 0,6-slags kylning, åttondelsgrind) ligger
+kvar död bakom provflaggan i patchen - städas bort om den läggs in.
+MÄTT (pop / megamix / lang1021, tools-prov .arena/kick1/kickprov.mjs): kickar/s 3,25/3,03/3,69 -> 1,38/2,28/1,93; på åttondelsrutnätet +-40 ms
+35/42/37 -> 73/65/82 %; på slaget 23/22/25 -> 52/26/61 %; intervall = kylningens kant 74/29/67 -> 6/4/3 %; R mot rutnätet 0,04/0,02/0,02 -> 0,25/0,09/0,37.
+LJUSDOMAREN MED FAST LOOK (.arena/kick1/look-*): svall +1,0, kickregn +3,9 (jitter pop 33 -> 19 ms), minnet -6,0 och DISK t90 80 -> 100 ms
+(minnet läser max(drum.kick, bassBody): färre kickar = långsammare stigning). KLOCKDOMAREN övning (.arena/klocka4, bas = c08e1cb): -0,07, neutral.
+LOTUS 126: rätt 117 = 117, kickprecision 0,87 -> 1,00, recall 0,32 -> 0,29, slag med kick 0,40 -> 0,50, fas 0,89 -> 0,88.
+DELAD DOM = ÖGONPROV: i ladan, efter att HEAD lagts ut och setts: `python tools/ladan.py --bara-deploy --fran .arena/kick1/k6/dist` (kicken ovanpå),
+titta på kickregn/svall (ska bli tajtare) och minnet (kan bli segare). Godkänt -> lägg in patchen städad + porta lotus. Nekat -> ta bort patchen.
+PRÖVAT: fast gräns 3/4/5/8 dB och följsam gräns (0,5-0,8 x senaste toppstigningen): ingen ger "en kick per slag" - basgångens toner stiger också;
+recall begränsas av att en kick ovanpå ihållande bas inte lyfter bandnivån 6 dB. En riktig trumdetektor (klick + sub) är en egen arenafråga.
+klocka4/bas (c08e1cb, övning): mix 98,26 klipp 98,64 lås 2,78 still 3,15 utfl 0,27/1,23 syskon 0,89 ettan 98,55 grid40 50,25 = BAS FÖR NÄSTA KLOCKARENA.
+
 BREAK-HÅLLET INLAGT 2026-11-13 14:10 (huvudchatten, ägaren "KÖR"): c08e1cb, klockan väljer inget nytt tempo medan baskroppen ligger >= 24 dB
 under sitt tak och 5 s efteråt, högst 30 s (analyserClock TG_BRK_DB / TG_BRK_MAX_MS; analyser bodyUnderDb; split H_UNDER, BS_UNDER; manifestet skrivet).
 Mätt: 36 drops i ladans 21 inspelningar: klockan fel >= 2 s 13 -> 3, tid på fel tempo runt dropen 10,8 -> 2,7 %; övningsmixen identisk; megamix i
