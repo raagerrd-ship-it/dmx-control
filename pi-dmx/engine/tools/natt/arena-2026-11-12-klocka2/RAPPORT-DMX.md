@@ -1,4 +1,4 @@
-# DMX-rundan (klocka2dmx) – 2026-11-13 00:10–01:55
+# DMX-rundan (klocka2dmx) – 2026-11-13 00:10–01:40
 
 Ägarens ord: "Så lås är det viktigaste. Den borde väl låsa om om den hör ny takt?" / "Om vi struntar i lotus i bänken och bara kör
 mot ladan/dmx där signalen är renare mm. Lotus får ju ändå info från sonos." / "Kan inte de tre agenterna få informationen att de
@@ -128,7 +128,7 @@ syntet-spärren utgår (bara lotusbänken). Bas mätt två gånger identiskt, ko
 
 ## Kostnad
 
-Tid 00:10–01:55. Samma tre agenter + domarbyggaren, ca 0,6 M tokens till (agenternas egna slutsiffror: k2 +0,08, k4 +0,11,
+Tid 00:10–01:40. Samma tre agenter + domarbyggaren, ca 0,6 M tokens till (agenternas egna slutsiffror: k2 +0,08, k4 +0,11,
 jokern +0,15, domaren +0,07, resten orkestratorn). Mätningar i domaren: 14 på övningen, 8 på kontrollmängden (bas + de 7 ovan), 2 tvavagar.
 
 ## Tvavagar (analysspärrarna, övning) på de två bästa

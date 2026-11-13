@@ -1,6 +1,6 @@
 # Natt-agentens uppdrag
 
-ARENAN KLOCKA2-DMX KLAR 2026-11-13 01:55: INGET INLAGT I src/. DMX-domaren (klockdom.py med <körning>/dmx.json: lotus ur, dubbel vikt
+ARENAN KLOCKA2-DMX KLAR 2026-11-13 01:40: INGET INLAGT I src/. DMX-domaren (klockdom.py med <körning>/dmx.json: lotus ur, dubbel vikt
 på rätt tempo och omlåsning). Ledare efter alla spärrar: dmx-1b = k4b + taktens självlikhet som vittne, +8,44 på kontrollmängden
 (k4b +7,59; fel tempo/min 1,39 -> 0,76, tempobyten 0,67 -> 0,36, omlåsning 3,02 = bas), ren i tvavagar. dmx-2 (+ parabel i fintempot)
 fick +10,99 men är DISK i tvavagar: rutnätet förstört (ettan 100 -> 62 %). Rapport: tools/natt/arena-2026-11-12-klocka2/RAPPORT-DMX.md,

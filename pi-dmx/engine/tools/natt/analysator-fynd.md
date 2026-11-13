@@ -15,6 +15,20 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-13 DMX-RUNDAN (klocka2dmx): ledare dmx-1b, parabeln i fintempot förstör rutnätet - INGEN delad fil ändrad
+Vad: tillägg till fyndet 11-12 nedan (tools/natt/arena-2026-11-12-klocka2/RAPPORT-DMX.md). Med DMX-domaren (lotus ur, dubbel vikt på
+rätt tempo och omlåsning) leder dmx-1b = k4b + taktens självlikhet som vittne (ansatsmönstret upprepas 2 och 4 slag senare; dömer bara
+mellan klockans tempo och dess syskon): kontroll +8,44 mot k4b +7,59, ren i tvavagar. OMÄTT MOT LOTUSBANKEN. Tre fynd om klockan:
+(1) PARABEL I FINTEMPOT (onsetStep, tempot mellan 0,5 %-stegen) ger färre fel tempo (0,76 -> 0,59 /min på kontrollen) men förstör
+rutnätet: ettan 100 -> 62 %, grid40 53,4 -> 26,9 %, gridfel minst x2, upp_s 1,70 -> 1,95 - samma fall som parabelprovet 11-10; fasen
+måste flyttas med tempot. (2) OMLÅSNINGEN sitter i tempogrammet: rätt nytt tempo 2,7 s efter övertoningen, rå vikning utan minne 1,9 s
+i motorn; 0,8 s vinst kostar 1,0 falska byten/min, och sju beslutsregler på samma signal är lika långsamma. Kickarnas tillit är döv för
+en ny takt (kickgrinden släpper bara igenom kickar på det gamla rutnätet). (3) Kontrollmixens fel är troligen EN låt som står stadigt
+fel hela låten; varken håll eller vittne rör den.
+Var: analyserClock.ts (onsetStep, tgStep). Material: tools/natt/arena-2026-11-12-klocka2/dmx/ (dmx-1b.diff, dmx-2.diff, samrad/a-*.md).
+Önskat: inget för lotus förrän ägaren valt. Lotus-morgonagenten: lägg inte in något av detta på eget initiativ.
+Status:
+
 ## ÖPPET 2026-11-12 ARENAN KLOCKA2: två kandidater för klockan (k4b, k2c) - INGEN delad fil ändrad, ägarens val väntar
 Vad: arenan 'klockan håller en tolkning' (tools/natt/arena-2026-11-12-klocka2/RAPPORT.md). Två varianter av analyserClock.ts klarar alla
 spärrar på båda mängderna men är INTE inlagda (kom till via lagningsomgångar; ägaren/huvudchatten väljer): k4b (fel tempo/min 1,39 -> 0,78,
