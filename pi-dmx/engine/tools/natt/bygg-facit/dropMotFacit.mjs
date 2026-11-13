@@ -47,6 +47,6 @@ for (const k of skalor) {
 }
 Date.now = origNow; performance.now = origPerf; console.log = log;
 console.log(`${wav}  (${(n / SR).toFixed(0)} s, ägaren: ${fin.filter((m) => m.kind === "drop").length} drop, ${fin.filter((m) => m.kind === "mini").length} mini)`);
-console.log("skala  nivå med/p95   motorn drop/mini   ägarens DROP blev drop/mini/missad   ägarens MINI blev mini/drop/missad   omarkerade drop/mini   träff på "inte drop"");
+console.log("skala  nivå med/p95   motorn drop/mini   ägarens DROP blev drop/mini/missad   ägarens MINI blev mini/drop/missad   omarkerade drop/mini   händelser vid 'inte drop'");
 for (const u of ut) console.log(`${String(u.k).padEnd(5)}  ${u.median.toFixed(2)}/${u.p95.toFixed(2)}      ${String(u.nD).padStart(3)} /${String(u.nM).padStart(4)}        ${u.rad.drop.drop} / ${u.rad.drop.mini} / ${u.rad.drop.missad}                             ${u.rad.mini.mini} / ${u.rad.mini.drop} / ${u.rad.mini.missad}                             ${u.fD} / ${u.fM}                  ${u.inte}`);
 if (process.env.DETALJ) for (const u of ut) console.log(`\nskala ${u.k}: ${u.det.join("  ")}`);
