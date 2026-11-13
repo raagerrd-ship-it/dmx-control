@@ -26,7 +26,7 @@ export class Lab6 {
   mode = ''; log: [number, string][] = []; force = '';
   private n = 0; private at = 0; private pend = ''; private pendAt = 0; private bassAt = 0; private lastSec = ''; private buildAt = 0;
   private lastDrop = 0; private answerUntilBeat = -1; private sect = 0; private sectBar = -1; private sPrev = 0;
-  private flash = 0; private eSm = 0; private eHi = 0; private eLo = 1; private choirSect = [0, 3]; private choirDark = [false, false];
+  private flash = 0; private eSm = 0; private eHi = 0; private eLo = 1; private runLv = new Float32Array(64); private runK = -1; private runPeak = 0; private choirSect = [0, 3]; private choirDark = [false, false];
 
   private put(i: number, s: number, share: number) {
     const v = toV(this.fx[i], TOP * Math.max(0, Math.min(1, share))), o = i * 3, c = col(s);
@@ -64,7 +64,6 @@ export class Lab6 {
       // ut" -> ALLTID alla i en kulör + löparen i motkulören; hållet byter var fjärde takt, på ettan.
       const rev = ((Math.floor(c.beatIdx / 8) % 2) + 2) % 2 === 1;                          // hållet byter efter varje varv (två takter)
       const at = (kk: number) => { const x = Math.min(n - 1, Math.floor(kk * n / 8)); return rev ? n - 1 - x : x; };
-      const lv = (kk: number, f2: number) => Math.exp(-f2 * 2.4) * (kk % 4 === 0 ? 1 : 0.9) * energy * presence;   // löparen upp till 95 %, ettan störst
       // Ägaren 11-13: "de andra lamporna vill jag skall följa energin fast inte fullt, bara så de inte ser döda ut": grunden andas med
       // basen/kicken (snabbt upp, mjukt ner).
       // Sedan: "övriga lampor andas inte med musiken. säg att de andra går mellan floor och säg 65%, så får löparen köra upp till 95%".
@@ -81,10 +80,23 @@ export class Lab6 {
       // "färgen måste alltid vara en annan än vad alla lampor kör": löparens lampa bär BARA löparens färg hela slaget, aldrig svagare än
       // grunden (förr tog grundfärgen över lampan så fort löparen tonat under grundens nivå, ~15 % in i slaget).
       const run = this.sect % 2 === 1 ? this.sect + 3 : this.sect + 2;
+      // "justera fade in out, lägg på en lång fade out på löparen, gör inget om två lampor smetas": varje lampa minns löparens färg
+      // (runLv) och tonar ut den över ~2 slag (tidskonstant 0,8 slag) - två-tre lampor bär löparens färg samtidigt. Intoningen är kort
+      // (~40 ms, slaget ska fortfarande slå). Grundfärgen kommer tillbaka på lampan först när löparens färg nästan slocknat (under
+      // 0,12): kulörbytet sker på mörk lampa, och färgerna blandas aldrig (gul grund + blå löpare skulle annars gå mot vitt).
+      const bpmNow = c.frame && c.frame.bpm > 40 ? c.frame.bpm : 120, dec = Math.exp(-(dt * bpmNow / 60) / 0.8);
+      for (let x = 0; x < n; x++) this.runLv[x] *= dec;
+      if (k !== this.runK) { this.runK = k; this.runPeak = 0; }
+      if (!hole) {
+        if (fr < 0.25) this.runPeak = Math.max(this.runPeak, (k % 4 === 0 ? 1 : 0.9) * energy * presence);   // löparen upp till 95 %, ettan störst
+        const up = 40 * bpmNow / 60000;                                                              // intoningen 40 ms, räknat i slag
+        this.runLv[i] = Math.max(this.runLv[i], this.runPeak * (fr < up ? fr / up : Math.exp(-(fr - up) / 0.8)));
+      }
       for (let x = 0; x < n; x++) {
         const g = ((hole ? 0.22 : 0.05) + (hole ? 0.46 : 0.63) * this.eSm * presence) / TOP * 0.95;        // alla i samma kulör: golv .. 65 %
-        if (!hole && x === i) this.put(x, run, Math.max(lv(k, fr), g));
-        else this.put(x, this.sect, hole ? g * (1 - (x === i ? dark(fr) : x === j ? dark(fr + 1) : 0)) : g);
+        const r = this.runLv[x], back = r < 0.12 ? 1 - r / 0.12 : 0;                                         // grunden tillbaka när löparens färg slocknat
+        if (r > 0.01) this.put(x, run, r);
+        this.put(x, this.sect, g * back * (hole ? 1 - (x === i ? dark(fr) : x === j ? dark(fr + 1) : 0) : 1));
       }
     } else if (this.mode === 'vagen') {
       const p = (beat + c.beatFrac) / 4, kick = Math.exp(-c.beatFrac * 4) * 0.25;           // 0..1 över takten
