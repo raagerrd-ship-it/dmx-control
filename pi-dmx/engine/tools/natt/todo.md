@@ -1,6 +1,6 @@
 # Natt-agentens uppdrag
 
-ARENAN DROP1 PÅGÅR sedan 2026-11-13 19:15 (huvudchatten orkestrerar, ägaren: "kör arena och använd de två inspelningarna").
+ARENAN DROP1 PÅGÅR sedan 2026-11-13 19:15 (huvudchatten orkestrerar, ägaren: "kör arena och använd de två inspelningarna"). LÄGE 20:40: runda 1 dömd (8 av 8 godkända, a1 82,6, jokern 90,7 på övningen), FINALEN PÅ KONTROLLEN: ALLA 0 AV 5 DROP = överanpassat, ingen vinnare. Runda 2 (allmängiltighet, korsprov inom övningen) pågår med a1r a3r a4r a5r fusionr; kontrollen använd 1 gång per variant (6 varianter).
 Frågan: drop eller minidrop - känn igen uppbyggnaden. Domare tools/arena/dropdom.py (övning lang-20261113T160345, kontroll
 lang-20261113T151659; bas 22,8 / 22,2 poäng). Körning .arena/drop1 (uppgift.md, kort.md, status.json). NATTAGENTEN: starta ingen egen
 arena och rör inte .arena/drop1; bänkarna på det nya ljudet får köras när .arena/.droplas är fri.
