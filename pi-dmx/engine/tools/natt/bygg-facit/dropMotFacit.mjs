@@ -4,7 +4,10 @@
  * (tools/natt/bygg-facit/finjustera.py).
  *   node tools/natt/bygg-facit/dropMotFacit.mjs <lang-*.wav> [skala ...]      (standard: 1)
  * Träff = motorns händelse inom -0,5 .. +1,5 s från markeringens ljudtid. Per skala: ägarens drop -> drop/mini/missad, ägarens mini ->
- * mini/drop/missad, och motorns händelser utan markering (falska), per sort.
+ * mini/drop/missad, och motorns händelser utan markering, per sort.
+ * FACIT ÄR INTE HELTÄCKANDE FÖR MINIDROP (ägaren 11-13: "mina minidrop kan vara på fler ställen än vad jag hinner markera"): en
+ * omarkerad minidrop från motorn är INTE bevisat falsk. Döm på träffarna (hittar motorn det ägaren markerat, och som rätt sort) och
+ * på ägarens uttryckliga "Inte drop"; antalet omarkerade är bara en upplysning (rimligt antal eller en per taktslag).
  */
 import { readFileSync } from "node:fs";
 const [wav, ...sk] = process.argv.slice(2); const skalor = sk.length ? sk.map(Number) : [1];
@@ -39,10 +42,11 @@ for (const k of skalor) {
     else { rad[m.kind].missad++; det.push(`${m.kind}@${m.fineS.toFixed(1)}->MISSAD`); }
   }
   const falsk = ev.filter((_, j) => !used.has(j));
-  ut.push({ k, median: lv[lv.length >> 1], p95: lv[Math.floor(lv.length * 0.95)], nD: ev.filter((e) => e[1] === "drop").length, nM: ev.filter((e) => e[1] === "mini").length, rad, fD: falsk.filter((e) => e[1] === "drop").length, fM: falsk.filter((e) => e[1] === "mini").length, det });
+  ut.push({ k, median: lv[lv.length >> 1], p95: lv[Math.floor(lv.length * 0.95)], nD: ev.filter((e) => e[1] === "drop").length, nM: ev.filter((e) => e[1] === "mini").length, rad, fD: falsk.filter((e) => e[1] === "drop").length, fM: falsk.filter((e) => e[1] === "mini").length, det,
+            inte: fin.filter((m) => m.kind === "intedrop").map((m) => ev.filter(([t]) => t >= m.pressS - 3 && t <= m.pressS + 0.3).length).join(",") || "-" });
 }
 Date.now = origNow; performance.now = origPerf; console.log = log;
 console.log(`${wav}  (${(n / SR).toFixed(0)} s, ägaren: ${fin.filter((m) => m.kind === "drop").length} drop, ${fin.filter((m) => m.kind === "mini").length} mini)`);
-console.log("skala  nivå med/p95   motorn drop/mini   ägarens DROP blev drop/mini/missad   ägarens MINI blev mini/drop/missad   falska drop/mini");
-for (const u of ut) console.log(`${String(u.k).padEnd(5)}  ${u.median.toFixed(2)}/${u.p95.toFixed(2)}      ${String(u.nD).padStart(3)} /${String(u.nM).padStart(4)}        ${u.rad.drop.drop} / ${u.rad.drop.mini} / ${u.rad.drop.missad}                             ${u.rad.mini.mini} / ${u.rad.mini.drop} / ${u.rad.mini.missad}                             ${u.fD} / ${u.fM}`);
+console.log("skala  nivå med/p95   motorn drop/mini   ägarens DROP blev drop/mini/missad   ägarens MINI blev mini/drop/missad   omarkerade drop/mini   träff på "inte drop"");
+for (const u of ut) console.log(`${String(u.k).padEnd(5)}  ${u.median.toFixed(2)}/${u.p95.toFixed(2)}      ${String(u.nD).padStart(3)} /${String(u.nM).padStart(4)}        ${u.rad.drop.drop} / ${u.rad.drop.mini} / ${u.rad.drop.missad}                             ${u.rad.mini.mini} / ${u.rad.mini.drop} / ${u.rad.mini.missad}                             ${u.fD} / ${u.fM}                  ${u.inte}`);
 if (process.env.DETALJ) for (const u of ut) console.log(`\nskala ${u.k}: ${u.det.join("  ")}`);
