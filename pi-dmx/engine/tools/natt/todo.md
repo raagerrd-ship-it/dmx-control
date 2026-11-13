@@ -1,5 +1,11 @@
 # Natt-agentens uppdrag
 
+LÅTENS MINNE INLAGT 2026-11-13 10:55 (huvudchatten, ägaren: "lös källarväxlingen med Sonos låtgräns"): c56ade9, delade filer analyserClock.ts +
+analyser.ts (boundSure) + split.ts (H_SURE, HOP_REC_LEN 17), manifestet skrivet. DMX SÄTTER ALDRIG FLAGGAN = oförändrat beteende (bank.py rytm + dyn
+identiska före/efter). Lotus (4cbb2e3b) sätter den för Sonos-spår <= 10 min och är utlagd 09:45: live 22 låtar, stora tempobyten 2,75 -> 0,62 /min.
+Provbänk: .arena/sonos1/ (sonosspel.mjs = kallarspel med låtbyten, kor.py, lotus.py --sure). IDÉ FÖR DMX: ladan har ingen säker låtgräns, men
+samma minne kunde slås på av gränsdetektorn om den blir säker (i dag 11 av 15 byten) - ingen uppgift, bara noterat.
+
 KLOCKAN dmx-1b INLAGD 2026-11-13 03:35 (huvudchatten, ägarens ja): src/analyserClock.ts = arenans dmx-1b (4770389, bygget byte-identiskt
 med .arena/klocka2dmx/dmx-1b/dist), manifestet skrivet, tagg backup/fore-dmx-1b-20261113. LOTUS: portad (lotus e3f9d6b4) och UTLAGD på
 lotus-Pi:n 03:34 (bara analyserClock.js, md5 lika, ingen musik vid utläggningen = inte sedd live än). LADAN: EJ utlagd - nästa besök
