@@ -1371,7 +1371,9 @@ export class EffectEngine {
       // ENERGIN SLACKER ALDRIG (agaren 2026-10-10: "energi skall aldrig slacka om effekten vill ha pa en lampa"): vill effekten ha
       // lampan tand (m0 > 0) och ingangen ar pa (k > 0) halls den pa lampans lagsta tanda niva (output.ts keepLit: forsta DMX-steget ->
       // tandpunkt+1). Bara effekten sjalv eller slackgransen (tystnad) slacker. Kuloren bevaras (alla kanaler med samma faktor).
-      if (m0 > 0 && k > 0) keepLit(fx, rgb);
+      // (11-13: gäller inte när en STUND äger ljuset helt (w = 1, t.ex. labbet): ägaren "svart är avstängd ... lampan skall du ge 0% R,
+      // 0% G, 0% B" - annars höll festens effekt under stunden kvar lampan på lägsta tända nivån.)
+      if (m0 > 0 && k > 0 && this.rMw < 1) keepLit(fx, rgb);
       // STEG 2 forts. - EFFEKTERNAS UTTONING + MINSTA PA-TID (effects/toning.ts): lampans ljusstyrka upp direkt, ner med tidskonstanten
       // cfg.fadeMinS; kuloren foljer effekten direkt. Tiderna ar installningar i /setup. Darefter OUTPUTS GOLV MOT STROBE (output.ts LampGuard).
       this.lampFade.step(i, fx, rgb, renderNow, dtSec, fastLight);
