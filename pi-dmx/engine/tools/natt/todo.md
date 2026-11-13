@@ -1,5 +1,11 @@
 # Natt-agentens uppdrag
 
+ÄVEN LOTUS INSPELNINGAR ARKIVERADE 2026-11-13 17:10 (ägaren: "arkivera även lotus inspelningar"): tools/frozen* (alla nio, frozen6 = klockdomarens
+och tvavagars korpus), lotus korpus (corpus + corpus-mix) och källarklippen ligger i Desktop/Claude/lotus-arkiv/lotus-inspelningar-fore-20261113/.
+FÖLJD: INGEN ljud-bänk i dmx-control går längre (klockdom, tvavagar, bank, lotusbank, taktKorpus, kontroll 2). Bara syntetiska prov (testDownbeat,
+tools/inputProv.mjs) och bygget går. NATTAGENTEN: ingen bänk, ingen arena, en rad i rapporten. Ägarens riktning: ETT material för båda systemen =
+ladans nya rena inspelningar; lotus skillnad läggs i ingångsmodulen (mic -> analysator), inte i en egen mic-korpus.
+
 LADANS INSPELNINGAR ARKIVERADE 2026-11-13 16:45 (ägaren: "arkivera/ta bort dom som finns idag så vi inte råkar använda dom") - LÄS FÖRST.
 Allt i tools/ladan-2026-*/ och tools/*.wav (pop_ladan, megamix_ladan m.fl.) ligger nu i Desktop/Claude/dmx-arkiv/ladan-inspelningar-fore-20261113/
 (LASMIG.md där). HÄMTA DEM INTE TILLBAKA. Följd: bank.py, domare.py, tvavagar.py, klockdom.py (övningens långa filer + kontroll 2:s tre långa),
