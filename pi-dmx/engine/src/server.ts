@@ -68,7 +68,7 @@ export interface ServerDeps {
   /** Langinspelningen (knappen "Spela in 5 min" i /setup). */
   longRecord?: { start(seconds: number): unknown; stop(): unknown; status(): unknown; mark(kind: string): unknown; lastPath?(): string };
   /** Ingångsmätaren (inputMeter.ts): nivån de senaste 3 s och ett WAV-klipp av det råa ljudet. */
-  inputMeter?: { status(): { state: string; peakDb: number; rmsDb: number; crestDb: number }; wav(seconds: number): Buffer };
+  inputMeter?: { status(): { state: string; peakDb: number; rmsDb: number; crestDb: number; nowDb: number }; wav(seconds: number): Buffer };
   /** True om ljud-pipelinen bearbetat en frame nyligen (för watchdog /health). */
   getHealthy: () => boolean;
   /** Diagnos när getHealthy() är false: "audio" | "audio-safe" | "dmx" | "". */
@@ -484,9 +484,13 @@ export async function startServer(
       return;
     }
     const p = frame.profile;
+    // INGÅNGENS TOPPNIVÅ till sidans övre mätare (ägaren 11-13: "mätarna visar olika ... lika släpande som nedre så det är enkelt för
+    // gästerna att justera"): SAMMA mätare som Ingångsnivå-kortet. Den hålls vaken bara medan någon har sidan öppen.
+    const il = deps.inputMeter?.status();
     const s = JSON.stringify({
       type: "frame",
       level: r3(pkLevel),
+      inNow: il ? Math.round(il.nowDb * 10) / 10 : null, inPeak: il ? Math.round(il.peakDb * 10) / 10 : null, inState: il ? il.state : "saknas",
       energy: r3(pkEnergy),
       kick: pkKick,
       gain: r3(frame.gain),

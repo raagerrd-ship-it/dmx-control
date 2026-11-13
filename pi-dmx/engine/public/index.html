@@ -203,7 +203,7 @@
     .audio-pct { font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; color:var(--fg); transition:color .2s; }
     .audio-pct.hot { color:var(--hot); }
     .audio-bar { position:relative; margin-top:8px; height:10px; border-radius:999px; background:color-mix(in srgb, var(--fg) 8%, transparent); overflow:hidden; }
-    .audio-bar > .fill { position:absolute; inset:0 auto 0 0; border-radius:999px; background: linear-gradient(90deg, color-mix(in srgb, var(--hot) 0%, transparent), var(--hot)); transition: width 60ms linear, box-shadow .2s; }
+    .audio-bar > .fill { position:absolute; inset:0 auto 0 0; border-radius:999px; background: linear-gradient(90deg, color-mix(in srgb, var(--hot) 0%, transparent), var(--hot)); transition: width 250ms linear, box-shadow .2s; }
     .audio-bar.hot > .fill { box-shadow:0 0 14px color-mix(in srgb, var(--hot) 55%, transparent); }
     .audio-bar > .ticks { position:absolute; inset:0 14px; display:flex; align-items:center; justify-content:space-between; pointer-events:none; }
     .audio-bar > .ticks span { width:2px; height:4px; border-radius:1px; background:color-mix(in srgb, var(--fg) 12%, transparent); }
@@ -778,7 +778,9 @@ const calZone = document.getElementById("calZone");
 const calMark = document.getElementById("calMark");
 const calPeak = document.getElementById("calPeak");
 const calHint = document.getElementById("calHint");
-let auxPeak = 0;   // löpande max (peak-hold) av insignalen — AUX-kalibrering
+let topCal = null;   // den låsta ingångsnivån ({peakDb, mixer, ...}); sätts av Ingångsnivå-kortet
+function setTopCal(c) { topCal = c || null; }
+const dbPos = (db) => Math.max(0, Math.min(100, (db + 40) / 40 * 100));   // samma skala som Ingångsnivå-kortet: -40..0 dBFS
 
 // STÄMNING: 0..10-slider speglar det fysiska KY-040-vredet. 0 = släckt (blackout),
 // 1..10 = aktiv stämning. Skickar setIntensity (0..1) → motorn. lastIntensity håller
@@ -925,7 +927,7 @@ if (recStart) { recStart.onclick = () => recPost({ seconds: 3600 }); recStop.onc
     $("inHold").style.left = `calc(${pos(live ? st.peakDb : -40)}% - 3px)`;
     $("inState").textContent = TEXT[st.state] ?? st.state; $("inState").className = "in-state " + st.state;
     $("inPeak").textContent = live ? f1(st.peakDb) : "–"; $("inRms").textContent = live ? f1(st.rmsDb) : "–"; $("inCrest").textContent = live ? f1(st.crestDb) : "–"; $("inBright").textContent = live ? f1(st.brightDb) : "–";
-    const c = st.cal; $("inCal").textContent = calText(c);
+    const c = st.cal; $("inCal").textContent = calText(c); setTopCal(c);
     if (c) { $("inRef").hidden = false; $("inRef").style.left = pos(c.peakDb) + "%"; } else $("inRef").hidden = true;
     if (c && live) $("inHint").textContent = `Mot den låsta nivån: ${st.peakDb - c.peakDb >= 0 ? "+" : "−"}${f1(Math.abs(st.peakDb - c.peakDb)).replace("−", "")} dB på toppen. Den streckade linjen är den låsta toppen.`;
     $("inListen").disabled = !live; $("inLock").disabled = !live || st.state === "klipper";
@@ -937,9 +939,9 @@ if (recStart) { recStart.onclick = () => recPost({ seconds: 3600 }); recStop.onc
   };
   $("inListen").onclick = () => { const a = $("inAudio"); a.hidden = false; a.src = "/api/input/klipp.wav?s=4&t=" + Date.now(); a.play().catch(() => {}); };
   $("inLock").onclick = () => fetch("/api/input/las", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mixer: $("inMixer").value }) })
-    .then((r) => r.json()).then((x) => { $("inCal").textContent = x.ok ? calText(x.cal) : "Kunde inte låsa: " + x.error; }).catch(() => { $("inCal").textContent = "Kunde inte låsa - ingen kontakt med motorn."; });
-  $("inClear").onclick = () => fetch("/api/input/las", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clear: true }) }).then(() => { $("inCal").textContent = calText(null); $("inRef").hidden = true; }).catch(() => {});
-  fetch("/api/input/level").then((r) => r.json()).then((st) => { $("inCal").textContent = calText(st.cal); if (st.cal && st.cal.mixer) $("inMixer").value = st.cal.mixer; }).catch(() => {});
+    .then((r) => r.json()).then((x) => { $("inCal").textContent = x.ok ? calText(x.cal) : "Kunde inte låsa: " + x.error; if (x.ok) setTopCal(x.cal); }).catch(() => { $("inCal").textContent = "Kunde inte låsa - ingen kontakt med motorn."; });
+  $("inClear").onclick = () => fetch("/api/input/las", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clear: true }) }).then(() => { $("inCal").textContent = calText(null); $("inRef").hidden = true; setTopCal(null); }).catch(() => {});
+  fetch("/api/input/level").then((r) => r.json()).then((st) => { $("inCal").textContent = calText(st.cal); setTopCal(st.cal); if (st.cal && st.cal.mixer) $("inMixer").value = st.cal.mixer; }).catch(() => {});
 })();
 
 // Effekt-listorna kommer från servern (type:"effects", grupperade på tier) →
@@ -1122,22 +1124,26 @@ function syncRingUi(r) {
 
 function applyFrame(f) {
   if (f.activeMoment && f.activeMoment !== curMoment) setMomentUi(f.activeMoment);
-  const pct = Math.round(f.level * 100);
-  levelBar.style.width = pct + "%";
-  levelVal.textContent = pct + "%";
-  const hot = f.level > 0.85;
+  // LJUDNIVÅ = INGÅNGENS TOPPNIVÅ, samma mätare och skala som Ingångsnivå-kortet (ägaren 11-13: "mätarna visar olika ... lika släpande
+  // som nedre så det är enkelt för gästerna att justera"). Stapeln = senaste kvartssekundens topp, ljusa strecket = högsta toppen de
+  // senaste 3 s, gröna zonen = ±3 dB runt den LÅSTA nivån (gröna strecket). Utan låsning: den allmänna zonen -14..-3 dBFS.
+  // Den gamla zonen (motorns medelnivå 45-67 %) gick bara att nå med klippt ljud - så spelades pop_ladan och megamix_ladan in sönder.
+  const live = f.inPeak != null && f.inState !== "vilar" && f.inState !== "tyst" && f.inState !== "saknas";
+  const hot = f.inState === "klipper" || f.inState === "hog";
+  levelBar.style.width = dbPos(live ? f.inNow : -40) + "%";
+  levelVal.textContent = live ? (Math.round(f.inPeak * 10) / 10).toFixed(1).replace(".", ",").replace("-", "−") + " dB" : "–";
   levelVal.classList.toggle("hot", hot);
-  // VOLYMHJÄLP: löpande max (peak-hold, ~decay) mot målzonen. Skruva källvolymen så toppen (ljusa strecket)
-  // hamnar i det gröna - AUX-ingången har fast förstärkning.
-  auxPeak = Math.max(f.level, auxPeak - 0.006);
   {
-    const peakPct = Math.min(100, Math.max(0, auxPeak * 100));
-    calPeak.style.left = peakPct + "%";
-    calZone.hidden = calMark.hidden = calPeak.hidden = calHint.hidden = false;
-    const LO = 45, HI = 67;
-    if (peakPct < LO) { calHint.textContent = "▲ Skruva UPP volymen på musiken"; calHint.className = "cal-hint under"; }
-    else if (peakPct > HI) { calHint.textContent = "▼ Skruva NER volymen på musiken"; calHint.className = "cal-hint over"; }
-    else { calHint.textContent = "✓ Bra nivå — topparna i det gröna"; calHint.className = "cal-hint good"; }
+    const c = topCal, lo = c ? c.peakDb - 3 : -14, hi = c ? Math.min(-1, c.peakDb + 3) : -3, m = c && c.mixer ? " (" + c.mixer + ")" : "";
+    calZone.style.left = dbPos(lo) + "%"; calZone.style.width = (dbPos(hi) - dbPos(lo)) + "%";
+    calMark.hidden = !c; if (c) calMark.style.left = dbPos(c.peakDb) + "%";
+    calPeak.hidden = !live; if (live) calPeak.style.left = dbPos(f.inPeak) + "%";
+    calZone.hidden = calHint.hidden = false;
+    if (!live) { calHint.textContent = f.inState === "saknas" ? "Mätaren saknas i den här versionen" : "Inget ljud på ingången"; calHint.className = "cal-hint under"; }
+    else if (f.inState === "klipper") { calHint.textContent = "▼ Klipper — skruva NER volymen"; calHint.className = "cal-hint over"; }
+    else if (f.inPeak < lo) { calHint.textContent = "▲ Skruva UPP volymen tills strecket står i det gröna" + m; calHint.className = "cal-hint under"; }
+    else if (f.inPeak > hi) { calHint.textContent = "▼ Skruva NER volymen tills strecket står i det gröna" + m; calHint.className = "cal-hint over"; }
+    else { calHint.textContent = "✓ Bra nivå" + m; calHint.className = "cal-hint good"; }
   }
   const barWrap = document.getElementById("levelBarWrap");
   if (barWrap) barWrap.classList.toggle("hot", hot);
