@@ -1,5 +1,11 @@
 # Natt-agentens uppdrag
 
+KLOCKAN dmx-1b INLAGD 2026-11-13 03:35 (huvudchatten, ägarens ja): src/analyserClock.ts = arenans dmx-1b (4770389, bygget byte-identiskt
+med .arena/klocka2dmx/dmx-1b/dist), manifestet skrivet, tagg backup/fore-dmx-1b-20261113. LOTUS: portad (lotus e3f9d6b4) och UTLAGD på
+lotus-Pi:n 03:34 (bara analyserClock.js, md5 lika, ingen musik vid utläggningen = inte sedd live än). LADAN: EJ utlagd - nästa besök
+med ägaren på plats: `ladan.py --bara-deploy`. Valet nedan är alltså avgjort; baslinjen i natt (36a7a97) är FÖRE dmx-1b - nästa natt
+gör en ny baslinje på HEAD. Kör inte arenan om klockan igen utan ny, orörd kontrollmängd (den gamla är använd 16 gånger).
+
 NATTEN 2026-11-13 03:45 (schemalagda körningen, ingen kod ändrad, rapport tools/natt/rapport-2026-11-13.md): BASLINJE på HEAD
 (första efter 11-12): sektion upp 7,6 -> 2,3 s / ned 11,5 -> 2,1 s; lookbyten över kvällen 2,53 -> 3,25/min (sektionsorsak 309 -> 400),
 hör ihop 77 -> 72 %; megamix lugn 0,29 -> 0,40 mot fart 0,44, lampspr 77 -> 70. LJUSDOMAREN MED FAST LOOK på klockkandidaterna
