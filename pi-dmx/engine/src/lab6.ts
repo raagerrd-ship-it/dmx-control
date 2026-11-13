@@ -61,11 +61,11 @@ export class Lab6 {
       // håll". Fyra takter per variant, byte på ettan: bara löparen -> | alla i en kulör + löparen i motkulören <- | bara löparen <- | alla + löparen ->
       const vr = ((Math.floor(bar / 4) % 4) + 4) % 4, rev = vr === 1 || vr === 2, base = vr % 2 === 1;
       const at = (kk: number) => { const x = Math.min(n - 1, Math.floor(kk * n / 8)); return rev ? n - 1 - x : x; };
-      const lv = (kk: number, f2: number) => Math.exp(-f2 * (kk % 2 === 0 ? 2.2 : 3.2)) * (kk === 0 ? 1 : kk % 2 === 0 ? 0.8 : 0.4) * energy * presence;   // fjärdedelarna (kicken) störst, ettan allra störst
+      const lv = (kk: number, f2: number) => Math.exp(-f2 * 2.4) * (kk === 0 ? 1 : kk % 2 === 0 ? 0.8 : 0.55) * energy * presence;   // fjärdedelarna (kicken) störst, ettan allra störst; SAMMA uttoning för alla (ägaren 11-13: "släcker ibland lite konstigt två lampor och ibland bara en" - de svaga åttondelarna dog fortare än de starka)
       const hue = (x: number) => base ? this.sect + 3 : x < half ? this.sect : this.sect + 3;
       if (base) for (let x = 0; x < n; x++) this.put(x, this.sect, 0.16 * presence);        // alla i samma kulör, svagt
       const i = at(k); this.put(i, hue(i), lv(k, fr));
-      if (fr < 0.5 && k > 0) { const j = at(k - 1); if (j !== i) this.put(j, hue(j), lv(k - 1, fr + 1)); }   // svansen: förra lampan tonar ut (aldrig ett hårt släck)
+      if (k > 0) { const j = at(k - 1); if (j !== i) this.put(j, hue(j), lv(k - 1, fr + 1)); }   // svansen: förra lampan tonar ut hela nästa åttondel - alltid huvud + svans, aldrig ett hårt släck
     } else if (this.mode === 'vagen') {
       const p = (beat + c.beatFrac) / 4, kick = Math.exp(-c.beatFrac * 4) * 0.25;           // 0..1 över takten
       for (let i = 0; i < n; i++) {
