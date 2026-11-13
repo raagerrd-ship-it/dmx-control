@@ -76,14 +76,16 @@ export class Lab6 {
       // I hålvarianten ligger grundens golv högre (0,22) så hålet syns även när basen andas ut.
       const hole = ((Math.floor(c.beatIdx / 16) % 2) + 2) % 2 === 1, i = at(k), j = k > 0 ? at(k - 1) : -1;
       const dark = (f2: number) => f2 < 0.45 ? 1 : Math.exp(-(f2 - 0.45) * 5);
-      for (let x = 0; x < n; x++) {
-        const g = ((hole ? 0.22 : 0.05) + (hole ? 0.46 : 0.63) * this.eSm * presence) / TOP * 0.95;        // alla i samma kulör: golv .. 65 %
-        this.put(x, this.sect, hole ? g * (1 - (x === i ? dark(fr) : x === j ? dark(fr + 1) : 0)) : g);
-      }
       // "hoppande färgen kanske bara får vara Röd, Grön, Blå eller Svart": löparen är alltid en REN grundfärg som inte är grundens -
       // motkulören när grunden är en blandfärg (gul -> blå), nästa grundfärg när grunden själv är ren (röd -> grön). Svart = hålet.
+      // "färgen måste alltid vara en annan än vad alla lampor kör": löparens lampa bär BARA löparens färg hela slaget, aldrig svagare än
+      // grunden (förr tog grundfärgen över lampan så fort löparen tonat under grundens nivå, ~15 % in i slaget).
       const run = this.sect % 2 === 1 ? this.sect + 3 : this.sect + 2;
-      if (!hole) { this.put(i, run, lv(k, fr)); if (j >= 0 && j !== i) this.put(j, run, lv(k - 1, fr + 1)); }   // färglöparen: huvud + svans som tonar ut
+      for (let x = 0; x < n; x++) {
+        const g = ((hole ? 0.22 : 0.05) + (hole ? 0.46 : 0.63) * this.eSm * presence) / TOP * 0.95;        // alla i samma kulör: golv .. 65 %
+        if (!hole && x === i) this.put(x, run, Math.max(lv(k, fr), g));
+        else this.put(x, this.sect, hole ? g * (1 - (x === i ? dark(fr) : x === j ? dark(fr + 1) : 0)) : g);
+      }
     } else if (this.mode === 'vagen') {
       const p = (beat + c.beatFrac) / 4, kick = Math.exp(-c.beatFrac * 4) * 0.25;           // 0..1 över takten
       for (let i = 0; i < n; i++) {
