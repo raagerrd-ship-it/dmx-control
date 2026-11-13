@@ -9,7 +9,8 @@ const imp = (f) => import(pathToFileURL(dist + "/" + f).href);
 const { Analyser, createAnalyser } = await imp("analyser.js"); const { EffectEngine } = await imp("effects.js"); const { BeatFeed } = await imp("beatFeed.js");
 const { defaultConfig, fixtureRoles } = await imp("config.js"); const { EFFECT_KEYS } = await imp("effects/registry.js"); const { BoundaryDetector } = await imp("boundaryDetector.js");
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
-cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.beatPulse = true; cfg.master = 1; cfg.energyCeiling = true;
+cfg.mode = process.env.DUMP_MODE || "smart"; cfg.energyDrivesMode = true;   // DUMP_MODE=<effekt> låser en effekt (11-13)
+ cfg.beatPulse = true; cfg.master = 1; cfg.energyCeiling = true;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
 for (const fx of cfg.fixtures) fx.cal = { off: 0, on: 16 };
 if (gL !== undefined && gL !== "-") cfg.fixtures[Number(gL)].cal.gamma = Number(gV);
