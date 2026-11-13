@@ -22,8 +22,9 @@ import { Lab2 } from "./lab2.js";
 import { Lab3 } from "./lab3.js";
 import { Lab4 } from "./lab4.js";
 import { Lab5 } from "./lab5.js";
+import { Lab6 } from "./lab6.js";
 
-export const MOMENTS = ["fest", "middag", "tal", "forstadans", "tartan", "show", "lab", "lab2", "lab3", "lab4", "lab5"] as const;
+export const MOMENTS = ["fest", "middag", "tal", "forstadans", "tartan", "show", "lab", "lab2", "lab3", "lab4", "lab5", "lab6"] as const;
 export type Moment = typeof MOMENTS[number];
 /** Motorns takt till showen (effects.ts ctx, satt före stunden varje ruta). */
 export interface ShowBeat { beatIdx: number; beatFrac: number; hasBeat: boolean; bassBody: number; bassline: number; bassNoteIdx: number; dropEnv: number; section: string;
@@ -86,12 +87,12 @@ export class MomentLayer {
         const t = this.target(m, i, count, theme, nowWall);
         for (let c = 0; c < 3; c++) {
           const q = i * 3 + c, tv = t[c];
-          if (entering || m === "show" || m === "lab" || m === "lab2" || m === "lab3" || m === "lab4" || m === "lab5") this.look[q] = tv;   // showen: direkt (uttoningen per lampa i motorn tar nedgången)
+          if (entering || m === "show" || m === "lab" || m === "lab2" || m === "lab3" || m === "lab4" || m === "lab5" || m === "lab6") this.look[q] = tv;   // showen: direkt (uttoningen per lampa i motorn tar nedgången)
           else this.look[q] += Math.max(-down, Math.min(up, tv - this.look[q]));
         }
       }
     }
-    if (m === "lab" || m === "lab2" || m === "lab3" || m === "lab4" || m === "lab5") Object.defineProperty(cfg, "labState", { value: { now: this.labMode, log: this.labLog }, enumerable: false, configurable: true, writable: true });   // GET /api/moment (sparas inte)
+    if (m === "lab" || m === "lab2" || m === "lab3" || m === "lab4" || m === "lab5" || m === "lab6") Object.defineProperty(cfg, "labState", { value: { now: this.labMode, log: this.labLog }, enumerable: false, configurable: true, writable: true });   // GET /api/moment (sparas inte)
     const tw = m === "fest" ? 0 : 1;
     this.w += Math.max(-down, Math.min(up, tw - this.w));
     if (this.w < 1e-4) this.w = 0;
@@ -118,6 +119,10 @@ export class MomentLayer {
       const d = n > 1 ? Math.abs(i - (n - 1) / 2) / ((n - 1) / 2) : 0;   // 0 i mitten, 1 i kanten (lampans plats i raden)
       share = DANS_TOP * (1 - 0.6 * d) * (0.8 + 0.2 * Math.sin((2 * Math.PI * t) / 8));
     } else if (m === "show") return this.show(i, n, nowWall);
+    else if (m === "lab6") {   // LABBET 6 (lab6.ts): åtta lampor
+      if (i === 0) { this.lab6.fx = this.fixtures; this.lab6.force = this.labForce; this.lab6.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab6.mode; this.labLog = this.lab6.log; }
+      const o = this.lab6.out; this.tgt[0] = o[i * 3]; this.tgt[1] = o[i * 3 + 1]; this.tgt[2] = o[i * 3 + 2]; return this.tgt;
+    }
     else if (m === "lab5") {   // LABBET 5 (lab5.ts)
       if (i === 0) { this.lab5.fx = this.fixtures; this.lab5.force = this.labForce; this.lab5.tick(this.beat as unknown as LabIn, n, nowWall, Math.min(1, this.vol / VOL_REF)); this.labMode = this.lab5.mode; this.labLog = this.lab5.log; }
       const o = this.lab5.out; this.tgt[0] = o[i * 3]; this.tgt[1] = o[i * 3 + 1]; this.tgt[2] = o[i * 3 + 2]; return this.tgt;
@@ -156,7 +161,7 @@ export class MomentLayer {
   private beat?: ShowBeat;
   /** POST /api/labforce: tvinga en idé i labbet (sätts av motorn via cfg.labForce). */
   labForce = '';
-  private lab = new Lab(); private lab2 = new Lab2(); private lab3 = new Lab3(); private lab4 = new Lab4(); private lab5 = new Lab5(); labMode = ''; labLog: [number, string][] = [];
+  private lab = new Lab(); private lab2 = new Lab2(); private lab3 = new Lab3(); private lab4 = new Lab4(); private lab5 = new Lab5(); private lab6 = new Lab6(); labMode = ''; labLog: [number, string][] = [];
   private sh = new Float32Array(0); private shAt = 0; private pitchS = 0.5; private lastNote = -1; private lastDrop = 0;
   private lone = -1; private lonePitch = 0.5; private loneHop = 0; private voiceS = 0; private voiceFloor = 1; private voiceQuietAt = 0; private singerSect = 5; private balls = [0, 2, 3, -2]; private ballSect = [5, 0]; private kPrev = 0; private sPrev = 0; private freezeUntil = 0; private dropOrchUntil = 0; private freezeN = 0; private buildAt = 0; private lastSec = ''; private glow = new Float32Array(0); private glowS = new Int8Array(0);
   private show(i: number, n: number, nowWall: number): [number, number, number] {
