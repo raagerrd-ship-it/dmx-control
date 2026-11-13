@@ -25,7 +25,7 @@ export class Lab6 {
   mode = ''; log: [number, string][] = []; force = '';
   private n = 0; private at = 0; private pend = ''; private pendAt = 0; private bassAt = 0; private lastSec = ''; private buildAt = 0;
   private lastDrop = 0; private answerUntilBeat = -1; private sect = 0; private sectBar = -1; private sPrev = 0;
-  private flash = 0; private eSm = 0; private choirSect = [0, 3]; private choirDark = [false, false];
+  private flash = 0; private eSm = 0; private eHi = 0; private eLo = 1; private choirSect = [0, 3]; private choirDark = [false, false];
 
   private put(i: number, s: number, share: number) {
     const v = toV(this.fx[i], TOP * Math.max(0, Math.min(1, share))), o = i * 3, c = col(s);
@@ -63,11 +63,14 @@ export class Lab6 {
       // ut" -> ALLTID alla i en kulör + löparen i motkulören; hållet byter var fjärde takt, på ettan.
       const rev = ((Math.floor(c.beatIdx / 8) % 2) + 2) % 2 === 1;                          // hållet byter efter varje varv (två takter)
       const at = (kk: number) => { const x = Math.min(n - 1, Math.floor(kk * n / 8)); return rev ? n - 1 - x : x; };
-      const lv = (kk: number, f2: number) => Math.exp(-f2 * 2.4) * (kk % 4 === 0 ? 1 : 0.8) * energy * presence;   // ettan störst
+      const lv = (kk: number, f2: number) => Math.exp(-f2 * 2.4) * (kk % 4 === 0 ? 1 : 0.9) * energy * presence;   // löparen upp till 95 %, ettan störst
       // Ägaren 11-13: "de andra lamporna vill jag skall följa energin fast inte fullt, bara så de inte ser döda ut": grunden andas med
-      // basen/kicken (snabbt upp, mjukt ner), 0,10..0,28 - löparen (0,8..1) sticker fortfarande ut.
-      const eNow = Math.min(1, Math.max(dr.kick, c.bassBody)); this.eSm += (eNow - this.eSm) * (eNow > this.eSm ? Math.min(1, dt / 0.03) : Math.min(1, dt / 0.3));
-      for (let x = 0; x < n; x++) this.put(x, this.sect, (0.10 + 0.18 * this.eSm) * presence);   // alla i samma kulör
+      // basen/kicken (snabbt upp, mjukt ner).
+      // Sedan: "övriga lampor andas inte med musiken. säg att de andra går mellan floor och säg 65%, så får löparen köra upp till 95%".
+      // Basens/kickens nivå räknas mot sitt EGET spann de senaste sekunderna (lägst..högst), så andningen syns oavsett hur stark basen är.
+      const x0 = Math.min(1, Math.max(dr.kick, c.bassBody)); this.eHi = Math.max(x0, this.eHi - dt * 0.15); this.eLo = Math.min(x0, this.eLo + dt * 0.15);
+      const eNow = this.eHi - this.eLo > 0.08 ? (x0 - this.eLo) / (this.eHi - this.eLo) : 0; this.eSm += (eNow - this.eSm) * (eNow > this.eSm ? Math.min(1, dt / 0.03) : Math.min(1, dt / 0.25));
+      for (let x = 0; x < n; x++) this.put(x, this.sect, (0.05 + 0.63 * this.eSm * presence) / TOP * 0.95);   // alla i samma kulör: golv .. 65 %
       const i = at(k); this.put(i, this.sect + 3, lv(k, fr));
       if (k > 0) { const j = at(k - 1); if (j !== i) this.put(j, this.sect + 3, lv(k - 1, fr + 1)); }   // svansen: förra lampan tonar ut hela nästa åttondel - alltid huvud + svans, aldrig ett hårt släck
     } else if (this.mode === 'vagen') {
