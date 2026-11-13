@@ -1,5 +1,16 @@
 # Natt-agentens uppdrag
 
+NYTT RENT MATERIAL + GRUNDMÄTNING 2026-11-13 kväll (ladan, ägaren på plats) - LÄS tools/natt/grund-2026-11-13.md FÖRST.
+tools/ladan-2026-11-13/: tre rena inspelningar (24 min) + en lång som startades 18:24; två har ägarens markeringar (14 drop, 20 mini,
+11 uppbyggnad, 4 "inte drop"; .marks-fin.json, skip = feltryck). Bänkar som går på det nya ljudet: tools/natt/bygg-facit/dropMotFacit.mjs,
+finjustera.py, konsertReplay.mjs, liveMotBank.py, dmxDump.mjs (DUMP_MODE=<effekt>), inspelningskoll.py, lab6Prov/linjalenProv/inputProv.
+De GAMLA domarnas fillistor (bank.py, tvavagar, klockdom, kontroll2.json) pekar på arkiverat ljud och får inte köras förrän de byggts om.
+Det arkiverade hämtas ALDRIG tillbaka. Raderna nedan om "inga bänkar" gäller alltså de gamla listorna, inte det nya materialet.
+Fynd: motorn kallar 1 av 14 markerade drop för drop (12 blir minidrop) - alla ägarens drop har uppbyggnad före; buildUp/inRiser/inZone är 0 %
+vid ren nivå (absoluta nivågränser 0,3/0,4/0,65 mot level-median 0,16); analysatorn är densamma live och offline (drop inom 0,1 s).
+Ladans Pi kör 4c84b1b: åtta lampor, rök 64, linjalen (första effekten som äger ljuset, EffectDef.own), "svart = släckt" för stunder/own.
+ARENA I NATT: ägaren vill starta en dmx-arena i natt - frågan bestäms i huvudchatten; ingen arena utan ARENA-uppdrag här.
+
 ÄVEN LOTUS INSPELNINGAR ARKIVERADE 2026-11-13 17:10 (ägaren: "arkivera även lotus inspelningar"): tools/frozen* (alla nio, frozen6 = klockdomarens
 och tvavagars korpus), lotus korpus (corpus + corpus-mix) och källarklippen ligger i Desktop/Claude/lotus-arkiv/lotus-inspelningar-fore-20261113/.
 FÖLJD: INGEN ljud-bänk i dmx-control går längre (klockdom, tvavagar, bank, lotusbank, taktKorpus, kontroll 2). Bara syntetiska prov (testDownbeat,
