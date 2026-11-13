@@ -1,5 +1,29 @@
 # Natt-agentens uppdrag
 
+LADANS INSPELNINGAR ARKIVERADE 2026-11-13 16:45 (ägaren: "arkivera/ta bort dom som finns idag så vi inte råkar använda dom") - LÄS FÖRST.
+Allt i tools/ladan-2026-*/ och tools/*.wav (pop_ladan, megamix_ladan m.fl.) ligger nu i Desktop/Claude/dmx-arkiv/ladan-inspelningar-fore-20261113/
+(LASMIG.md där). HÄMTA DEM INTE TILLBAKA. Följd: bank.py, domare.py, tvavagar.py, klockdom.py (övningens långa filer + kontroll 2:s tre långa),
+natt.py:s baslinje, dynSet, dropFacit, konsertReplay på lang-filer GÅR INTE förrän nya inspelningar finns. NATTAGENTEN: KÖR INGA BÄNKAR OCH INGEN
+ARENA; skriv en rad i nattrapporten och avsluta (hälsokontroll av det som går utan ljud är tillåten). frozen6 och lotus korpus (källarens mic)
+är orörda - klockdomarens mix och klipp på dem går, men inte hela --mat.
+VARFÖR: pop_ladan och megamix_ladan är klippta i 98-100 % av sekunderna (tools/inspelningskoll.py: toppfaktor 2,9 / 4,0 dB) - två av ljusdomarens
+tre filer. Alla ljusdomar på dem (rA, rK, jitter, lampspridning sedan oktober) är mätta på sönderklippt ljud. De långa inspelningarna klipper inte
+(brusgolv -88 dBFS, mp3-kontroll 40-53 dB SNR) men ägaren hör att de låter illa; diskanten är ovanligt stark i starka partier. Orsak ej funnen.
+NYTT I KODEN (fd48b96, ej utlagt): /setup > Mer > INGÅNGSNIVÅ (mät topp/medel/toppfaktor/ljushet, lyssna 4 s på det Pi:n hör, lås nivån + ägarens
+anteckning om mixern -> cfg.inputCal) och INSPELNING tills stopp (tak 60 min, skrivs löpande, 2 MB minne) med knapparna Låtbyte / Uppbyggnad /
+Minidrop / Drop, provinspelning 1 min och "Lyssna på senaste". Prov: node tools/inputProv.mjs.
+NÄSTA BESÖK I LADAN (huvudchatten med ägaren på plats, i den här ordningen):
+  1. `python tools/ladan.py --bara-deploy` (HEAD: break-hållet, låtens minne, nya /setup).
+  2. Flytta Pi:ns gamla fångster undan (/var/lib/audio-dmx-engine/snippets -> snippets-fore-20261113) så hämtaren inte tar hem dem igen.
+  3. Ingångsnivå: en låt med fart, börja lågt på mixern, öka sakta, lyssna på klippet vid varje steg, lås + skriv av mixern.
+  4. Provinspelning 1 min -> Lyssna på senaste. Låter den ren? Annars felsök kedjan (kabel, mixerns utgång, Codec Zero) innan något spelas in.
+  5. Inspelningar tills stopp, med markeringar. Hämta hem, kör tools/inspelningskoll.py på varje fil INNAN den används.
+  6. Bygg om domarnas fillistor (bank.py WAVS/HOLDOUT, tvavagar MANGD, klockdom LANG, kontroll2.json lang) på de nya filerna; mät nya baslinjer.
+  7. Markeringarna kommer ~0,5-1 s efter händelsen (reaktionstid): justera i efterhand mot ljudet (drop/mini -> basens återkomst närmast före,
+     låtbyte -> spektrumskiftet) innan de används som facit (ägaren 11-13).
+Väntar på nytt ljud: ögonprovet av kicken (k6), uppbyggnadens facit och arena (märksidan med 98 klipp är överspelad - klippen var ur de arkiverade),
+ny baslinje för ljusdomaren.
+
 FACIT FÖR UPPBYGGNADEN SAMLAS IN (huvudchatten 11-13 16:10): ägaren märker 98 ljudklipp (22 s, -15..+7 s kring kandidaten) på en privat sida:
 drop / drop utan uppbyggnad / minidrop / inget + valfritt "uppbyggnaden börjar nu". Kandidaterna: tools/natt/bygg-facit/kandidater-20261113.json
 (56 av analysatorns hela drops i ladans 23 inspelningar 10-11, 30 baslyft >= 8 dB utan drop, ägarens 12 gamla markeringar i lang1014 för ommärkning;
