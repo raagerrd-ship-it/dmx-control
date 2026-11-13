@@ -1,0 +1,78 @@
+{
+ "dom": "klockdom",
+ "statusrad": "ARENAN KLOCKA2-DMX",
+ "rader": [
+  [
+   "mix_klocka",
+   "Rätt tempo i mixen % (vikt 2)",
+   1,
+   "hogre"
+  ],
+  [
+   "klipp_klocka",
+   "Rätt tempo i klipp % (vikt 2)",
+   1,
+   "hogre"
+  ],
+  [
+   "mix_las",
+   "Låsning efter låtbyte s (vikt 2)",
+   2,
+   "lagre"
+  ],
+  [
+   "mix_hopp",
+   "Tempobyten i mixen per min (vikt 1)",
+   2,
+   "lagre"
+  ],
+  [
+   "mix_still",
+   "Tills klockan står still s, ±1 % (vikt 1)",
+   2,
+   "lagre"
+  ],
+  [
+   "mix_still_ny",
+   "Står still, ±3 % (bara redovisad)",
+   2,
+   "lagre"
+  ],
+  [
+   "utfl_min",
+   "Fel tempo per min (vikt 1)",
+   2,
+   "lagre"
+  ],
+  [
+   "utfl_tid",
+   "Tid i fel tempo % (vikt 1)",
+   2,
+   "lagre"
+  ],
+  [
+   "syskon_tid",
+   "Släkttempo % (vikt 1)",
+   2,
+   "lagre"
+  ]
+ ],
+ "sparrar": [
+  [
+   "mix_las",
+   "max",
+   0.3
+  ],
+  [
+   "mix_still",
+   "maxabs",
+   4.0,
+   0.3
+  ],
+  [
+   "klipp_klocka",
+   "min",
+   1
+  ]
+ ]
+}

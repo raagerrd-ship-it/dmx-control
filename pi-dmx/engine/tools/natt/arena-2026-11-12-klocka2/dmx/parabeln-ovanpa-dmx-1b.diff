@@ -1,0 +1,42 @@
+diff --git a/.arena/klocka2dmx/dmx-1b/src/analyserClock.ts b/.arena/klocka2dmx/dmx-2/src/analyserClock.ts
+index 646968b..c502cd0 100644
+--- a/.arena/klocka2dmx/dmx-1b/src/analyserClock.ts
++++ b/.arena/klocka2dmx/dmx-2/src/analyserClock.ts
+@@ -242,7 +242,7 @@ export class BeatFeed {
+ 
+   // Sökningen sprids över hoppen: ETT tempo per hop (Pi Zero: hela sökningen i ett anrop = 2 ms på PC:n, ~20 ms på Pi:n = stopp i slingan).
+   private scanStep = 0.005; private scanC = 99; private scanEnd = 0; private scanRef = 0; private scanNow = 0; private scanC0 = 0;
+-  private bestScore = 0; private bestBpm = 0; private bestPh = 0; private scanFar = 0;
++  private bestScore = 0; private bestBpm = 0; private bestPh = 0; private scanFar = 0; private readonly scanS = new Float64Array(11); private bestC = 0;
+ 
+   /** LÖPANDE TAKT: ett hop av sökningen - vik ringen (fönstret före sökningens start) på nästa tempo; sist läggs rutnätet på toppen. */
+   private onsetStep(cfg: EngineConfig, now: number): void {
+@@ -258,7 +258,7 @@ export class BeatFeed {
+       else if (this.tempoBpm > 0) { this.scanC0 = cb; this.scanStep = 0.005; this.scanEnd = 5; }   // inom: klockans egen skanning som förr (fas, fintempo; a2r M2: kring tempogrammets topp gav ettan 100 -> 93, gridfel 15 -> 26 ms)
+       else { this.scanC0 = beat.bpm; this.scanStep = 0.005; this.scanEnd = 5; }   // tempogrammet nollat (låtgräns): kring klockans tempo (inget andra sökcentrum - EN KÄLLA)
+ 
+-      this.scanC = -5; this.bestScore = 0;
++      this.scanC = -5; this.bestScore = 0; this.scanS.fill(0);
+     }
+     const c = this.scanC++, ref = this.scanRef;
+     const bpm = this.scanC0 * (1 + c * this.scanStep), bm = 60000 / bpm;
+@@ -276,14 +276,18 @@ export class BeatFeed {
+       for (let b = 0; b < ONSET_BINS; b++) { const v = this.foldN[b] ? this.foldS[b] / this.foldN[b] : 0; if (v > mx) { mx = v; mb = b; } }
+       // k4b FINTEMPOTS KRONA: i klockans egen sökning (0,5 %-steg kring sitt tempo) måste ett granntempo passa ansatserna SCAN_HOLD bättre än det
+       // tempo klockan har - annars växlar två lika bra grannar varannan sökning (114,0 <-> 114,6) utan att musiken ändrats. Samma princip som KRONAN.
++      this.scanS[c + 5] = mx / mean;
+       const score = (mx / mean) * (c === 0 && this.scanStep === 0.005 ? SCAN_HOLD : 1);
+       if (score > this.bestScore) {
+         const a = this.foldMean(mb - 1), cc = this.foldMean(mb), d = this.foldMean(mb + 1), den = a - 2 * cc + d;   // parabel genom toppen
+         const off = den < 0 ? 0.5 * (a - d) / den : 0;
+-        this.bestScore = score; this.bestBpm = bpm; this.bestPh = (mb + 0.5 + off) / ONSET_BINS;
++        this.bestScore = score; this.bestBpm = bpm; this.bestC = c; this.bestPh = (mb + 0.5 + off) / ONSET_BINS;
+       }
+     }
+     if (c < this.scanEnd || this.bestScore < ONSET_MIN_PEAK) return;
++    // FINTEMPOT MELLAN STEGEN: sökningens topp läggs med parabel genom vinnaren och dess två grannar (som tempogrammets topp i tgStep)
++    { const i = this.bestC + 5; if (i > 0 && i < 10) { const a = this.scanS[i - 1], b = this.scanS[i], d = this.scanS[i + 1], den = a - 2 * b + d;
++        if (a > 0 && d > 0 && den < 0) this.bestBpm = this.scanC0 * (1 + (this.bestC + Math.max(-0.5, Math.min(0.5, 0.5 * (a - d) / den))) * this.scanStep); } }
+     // nytt tempo med bevarat slagindex + fas, sedan fasen direkt på toppen (toppen låg på bestPh räknat från sökningens ankare)
+     if (this.tempoBpm > 0) this.bestBpm = Math.min(159.9, Math.max(80, this.bestBpm));   // samma oktavfönster som tempogrammet
+     // k4b BLIPPEN ÖVERHOPPAD (k4:s skanningsspärr i ny form; jokern mätte 45 av 59 utflykter som sådana): klockans egen sökning (+-2,5 % kring
