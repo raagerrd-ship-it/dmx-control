@@ -32,7 +32,8 @@ SPÄRRAR (DISK):
   tid          median |motorns drop - fineS| över 0,5 s bland träffarna (ljuset ska slå NÄR det händer)
   flod         motorns drop över 2,0 per minut (ägaren markerar ~0,75/min; dagens ljus är godkänt - ingen dropblixt var 20:e sekund)
   bygg_falsk   över 15 % (uppbyggnaden styr dirigentens val av looks; den får inte ligga på jämt)
-  kostnad      analysatorns tid per hopp över 1,5 x bas
+  kostnad      analysatorns tid per hopp över 1,5 x bas. Mätningen störs när flera mäter samtidigt: i rankingen diskar först 2,5 x, och
+               orkestratorn mäter om finalisterna ENSAMMA mot 1,5 x.
   filer        ändrat annat än src/analyser.ts, src/split.ts, src/slowWorker.ts (+ src/ANALYSER_SHARED.md5). effects*, output, dirigenten
                och klockan (analyserClock.ts) är låsta: ljuset är godkänt och klockan har egen domare.
   mätfel       bänken kraschar eller ger tom mätning
@@ -43,7 +44,7 @@ REGLER FÖR LÖSNINGEN (står även i uppgiften): inga env-rattar i slutlösning
 KOMMANDON (från engine/, PYTHONIOENCODING=utf-8):
   python tools/arena/dropdom.py .arena/<körning>/<id> --mat            mät deltagarens dist på ÖVNINGEN -> <id>/dropdom.json  (~25 s)
   python tools/arena/dropdom.py .arena/<körning>/bas --mat --bas       mät engine/dist som den är
-  python tools/arena/dropdom.py .arena/<körning>/<id> --mat --holdout  KONTROLLEN -> <id>/dropdom-k.json  (bara orkestratorn)
+  python tools/arena/dropdom.py .arena/<körning>/<id> --mat --holdout  KONTROLLEN -> <id>/dropdom-holdout.json  (bara orkestratorn)
   python tools/arena/dropdom.py .arena/<körning> [--holdout] [--md]    ranking mot bas
   Fri sond för deltagare: node tools/natt/bygg-facit/dropMotFacit.mjs <övningsfilen> med egen dist via
     DMX_DIST=<id>/dist NODE_OPTIONS=--import=file:///<engine>/tools/arena/distHook.mjs  (DETALJ=1 ger varje händelse); DMX_DROP_TRACE=1 ger
@@ -57,8 +58,27 @@ KONTROLL = 'tools/ladan-2026-11-13/lang-20261113T151659.wav'
 TILLATNA = {'analyser.ts', 'split.ts', 'slowWorker.ts', 'ANALYSER_SHARED.md5'}
 VARM_S, FORE, EFTER = 20.0, 0.5, 1.0
 
+def las_ko():
+    """En mätning åt gången (tidsmåttet): låsfil i .arena, väntar högst 20 min."""
+    import time
+    p = os.path.join(ENGINE, '.arena', '.droplas'); t0 = time.time()
+    while True:
+        try: fd = os.open(p, os.O_CREAT | os.O_EXCL | os.O_WRONLY); os.write(fd, str(os.getpid()).encode()); os.close(fd); return p
+        except FileExistsError:
+            if time.time() - os.path.getmtime(p) > 300 or time.time() - t0 > 1200:
+                try: os.remove(p)
+                except OSError: pass
+            time.sleep(2)
+
 def mat(mapp, bas, holdout):
-    wav = KONTROLL if holdout else OVNING; ut = os.path.join(mapp, 'dropdom-k.raw.json' if holdout else 'dropdom.raw.json'); os.makedirs(mapp, exist_ok=True)
+    las = las_ko()
+    try: _mat(mapp, bas, holdout)
+    finally:
+        try: os.remove(las)
+        except OSError: pass
+
+def _mat(mapp, bas, holdout):
+    wav = KONTROLL if holdout else OVNING; ut = os.path.join(mapp, 'dropdom-holdout.raw.json' if holdout else 'dropdom.raw.json'); os.makedirs(mapp, exist_ok=True)
     env = dict(os.environ)
     if not bas:
         dist = os.path.abspath(os.path.join(mapp, 'dist'))
@@ -91,12 +111,16 @@ def mat(mapp, bas, holdout):
     m = dict(drop_ratt=len(ratt) / max(1, len(agD)), mini_ratt=1 - miniFel / max(1, len(agM)), inte_ratt=(1 - inteFel / len(agI)) if agI else None,
              precision=(len(ratt) / len(D)) if D else 0.0, bygg=(sum(bygg) / len(bygg)) if bygg else 0.0, bygg_falsk=byggFalsk,
              tid=(sorted(abs(x) for x in ratt)[len(ratt) // 2] if ratt else 0.0), flod=len(D) / ((raw['seconds'] - VARM_S) / 60), kostnad=raw['cpuUsPerHop'])
+    bp = os.path.join(os.path.dirname(os.path.abspath(mapp)), 'bas', 'dropdom-holdout.json' if holdout else 'dropdom.json')   # tempot mot bas (spärr), även i statustabellen
+    if not bas and os.path.exists(bp):
+        bb = json.load(open(bp, encoding='utf-8'))['bpm']; m['tempo'] = sum(1 for a, b in zip(raw['bpm'], bb) if (a == 0 and b == 0) or (a > 0 and b > 0 and abs(a / b - 1) < 0.04)) / max(1, len(bb))
+    else: m['tempo'] = 1.0
     vikt = dict(drop_ratt=40, mini_ratt=20, inte_ratt=10, precision=20, bygg=10)
     if m['inte_ratt'] is None: s = 100 / 90; vikt = {k: v * s for k, v in vikt.items() if k != 'inte_ratt'}
-    poang = sum(v * m[k] for k, v in vikt.items())
+    poang = sum(v * m[k] for k, v in vikt.items()); m['poang'] = poang
     ut2 = dict(wav=wav, n=dict(drop=len(agD), mini=len(agM), inte=len(agI), bygg=len(spann), motorDrop=len(D)), matt=m, poang=poang,
                detalj=dict(dropDt=dt, motorDrop=D, miniSomDrop=miniFel, inteMedDrop=inteFel, byggPerSpann=bygg), bpm=raw['bpm'], sek=raw['sek'])
-    json.dump(ut2, open(os.path.join(mapp, 'dropdom-k.json' if holdout else 'dropdom.json'), 'w', encoding='utf-8'), ensure_ascii=False)
+    json.dump(ut2, open(os.path.join(mapp, 'dropdom-holdout.json' if holdout else 'dropdom.json'), 'w', encoding='utf-8'), ensure_ascii=False)
     print('%s  poäng %.1f  drop %d/%d  mini rätt %.0f %%  inte %s  precision %.0f %% (%d motordrop)  bygg %.0f %% (falsk %.1f %%)  tid %.2f s' % (
         os.path.basename(mapp), poang, len(ratt), len(agD), 100 * m['mini_ratt'], '-' if m['inte_ratt'] is None else '%.0f %%' % (100 * m['inte_ratt']),
         100 * m['precision'], len(D), 100 * m['bygg'], 100 * m['bygg_falsk'], m['tid']))
@@ -113,7 +137,7 @@ def filer(mapp):
     return ut
 
 def ranking(korning, holdout, md):
-    namn = 'dropdom-k.json' if holdout else 'dropdom.json'; bas = json.load(open(os.path.join(korning, 'bas', namn), encoding='utf-8')); rader = []
+    namn = 'dropdom-holdout.json' if holdout else 'dropdom.json'; bas = json.load(open(os.path.join(korning, 'bas', namn), encoding='utf-8')); rader = []
     for d in sorted(os.listdir(korning)):
         p = os.path.join(korning, d, namn)
         if not os.path.exists(p): continue
@@ -123,7 +147,7 @@ def ranking(korning, holdout, md):
         if m['tid'] > 0.5: disk.append('tid %.2f s' % m['tid'])
         if m['flod'] > 2.0: disk.append('flod %.1f/min' % m['flod'])
         if m['bygg_falsk'] > 0.15: disk.append('bygg_falsk %.0f %%' % (100 * m['bygg_falsk']))
-        if m['kostnad'] > 1.5 * bas['matt']['kostnad']: disk.append('kostnad x%.2f' % (m['kostnad'] / bas['matt']['kostnad']))
+        if m['kostnad'] > 2.5 * bas['matt']['kostnad']: disk.append('kostnad x%.2f' % (m['kostnad'] / bas['matt']['kostnad']))
         fel = [f for f in filer(os.path.join(korning, d)) if f not in TILLATNA]
         if fel: disk.append('filer: ' + ', '.join(fel[:4]))
         sek = sum(1 for a, b in zip(r['sek'], bas['sek']) if a == b) / max(1, len(bas['sek']))
