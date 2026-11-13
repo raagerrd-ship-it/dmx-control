@@ -1,5 +1,13 @@
 # Natt-agentens uppdrag
 
+NATTEN 2026-11-13 03:45 (schemalagda körningen, ingen kod ändrad, rapport tools/natt/rapport-2026-11-13.md): BASLINJE på HEAD
+(första efter 11-12): sektion upp 7,6 -> 2,3 s / ned 11,5 -> 2,1 s; lookbyten över kvällen 2,53 -> 3,25/min (sektionsorsak 309 -> 400),
+hör ihop 77 -> 72 %; megamix lugn 0,29 -> 0,40 mot fart 0,44, lampspr 77 -> 70. LJUSDOMAREN MED FAST LOOK på klockkandidaterna
+(kravet före utläggning): dmx-1b svall -2,1 / kickregn -0,2 / minnet +2,1, k4b -2,0 / +0,1 / +2,0, ingen DISK = neutrala för ljuset,
+går inte att skilja; fria +5,4 och lampspr -6,4 % är lookföljden (.arena/natt1113/). Kvar före utläggning: manifestet + lotusporten.
+FYND: kickregn sidoblink 0 -> 1,1/min på ladans 20 klipp sedan pulshalveringen togs bort (5d680ff; frysta byggen: halvering på 0, av 1,1;
+ett klipp 17,6 -> 37,9/min; ofrivillig blink 0 = effektens eget byte på varje slag) - ögonpunkt i ladan, inget ändrat.
+
 ARENAN KLOCKA2-DMX KLAR 2026-11-13 01:40: INGET INLAGT I src/. DMX-domaren (klockdom.py med <körning>/dmx.json: lotus ur, dubbel vikt
 på rätt tempo och omlåsning). Ledare efter alla spärrar: dmx-1b = k4b + taktens självlikhet som vittne, +8,44 på kontrollmängden
 (k4b +7,59; fel tempo/min 1,39 -> 0,76, tempobyten 0,67 -> 0,36, omlåsning 3,02 = bas), ren i tvavagar. dmx-2 (+ parabel i fintempot)
