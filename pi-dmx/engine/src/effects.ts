@@ -195,7 +195,7 @@ const EFFECT_HEART = Math.max(0, Math.min(2, 1.4));
  *  och står kvar; de andra faller tillbaka MELLAN basslagen: k *= 1 - SPREAD_D * (1 - eBass^2) i energisteget - bara dämpning (golv 0,3,
  *  aldrig över 1, kulören orörd), uttoningen orörd. Gäller inte a8:s looks (dubbeldämpning släckte off-beat-gruppen). */
 const SPREAD_D = 0.7;
-const SPREAD_SKIP = new Set(['tryckvag', 'gallop', 'varannan', 'duel', 'twin', 'sangare', 'dansparet', 'minnet', 'sokljus']);   // + labbets favoriter: egen rumslig figur
+const SPREAD_SKIP = new Set(['tryckvag', 'gallop', 'varannan', 'duel', 'twin', 'sangare', 'dansparet', 'minnet', 'sokljus', 'linjalen']);   // + labbets favoriter: egen rumslig figur
 /** EFFEKTERNAS PULS UR BASEN (PROV 2026-11-07, ägaren: 'basgång (det man dansar till) skall kännas i ögonen' + 'granskade vi inte lågpassfilter
  *  för effektfiltret'): låst takt ger effekternas puls (c.heart/heartPulse, c.beatPulse, c.kickEnv) ur RUTNÄTET (beatFrac) och punchens per-slag-del
  *  stängs av - basgången själv når aldrig effekterna. (PROV DMX_FX_BASS/_PUNCH/_CURVE - basens kropp in i pulsen -
@@ -1318,6 +1318,7 @@ export class EffectEngine {
     // BASGANG (a7): ledaren = förra rutans ljusaste lampa (före energin); bland lika ljusa (inom 5 %) den vars tur det är (en lampa per basnot)
     const bp = this.eBass * this.eBass, sm = this.spreadM0, spreadOn = !(effect && SPREAD_SKIP.has(effect.key)); let lead = -1, leadM = 0;
     if (spreadOn) for (let j = 0; j < count; j++) { const i = (this.bassNoteIdx + j) % count; if (sm[i] > leadM * 1.05) { leadM = sm[i]; lead = i; } }
+    const own = !!effect?.own && !xFrom;   // effekten äger ljuset (types.ts own); under en övertoning från en annan effekt gäller vanliga kedjan
     for (let i = 0; i < count; i++) {
       const fx = this.cfg.fixtures[i];
       const isAnchor = useAnchor && i > 0 && i < count - 1;   // mittlamporna = ankare
@@ -1338,7 +1339,7 @@ export class EffectEngine {
         ctx.want.hazer = undefined; ctx.want.co2 = undefined; ctx.want.energy = undefined;
         rgb = effect ? this.lampColor(i, effect.render(ctx)) : this.lampColor(i, ZERO3);   // (se lampColor)
         if (xFrom) { rgb[0] = rgb[0] * xw + xo0 * xu; rgb[1] = rgb[1] * xw + xo1 * xu; rgb[2] = rgb[2] * xw + xo2 * xu; }
-        rgb = this.effektNiva(rgb, ctx, fxToggle);   // STEG 1 forts.: effektens niva och drop-looken (se effektNiva)
+        if (!own) rgb = this.effektNiva(rgb, ctx, fxToggle);   // STEG 1 forts.: effektens niva och drop-looken (se effektNiva)
         // EFFEKTENS ÖNSKEMÅL. Den vet sin egen dramaturgi bäst; motorn avgör om det
         // blir av (fixturen måste ha rollen, och rök går genom hårdvaruskyddet).
         // Högsta önskemål bland lamporna vinner — en effekt som vill stroba på EN
@@ -1352,7 +1353,7 @@ export class EffectEngine {
         if (ctx.want.fog) wantFogFx = true;
         lampWantE = ctx.want.energy;
       }
-      if (HUE_GLIDE_MS > 0) this.hueGlide(i, rgb, fastLight || this.dropColEnv > 0.005 || this.miniColEnv > 0.005 || nowWall < this.miniBangUntil);   // KULÖRTONING (steg 1)
+      if (HUE_GLIDE_MS > 0 && !own) this.hueGlide(i, rgb, fastLight || this.dropColEnv > 0.005 || this.miniColEnv > 0.005 || nowWall < this.miniBangUntil);   // KULÖRTONING (steg 1)
       // TRE STEG FOR LJUSET (agaren 2026-10-10: "jag vill bara ha 3 stallen dar ljuset styrs"):
       //   1. EFFEKTEN satter ljusstyrka per lampa och per R/G/B - och om ljuset far andras efter (modulate.energy, standard ja).
       //   2. ENERGIN (om effekten tillater): en faktor 0..1 ur basen (BASENERGIN, se B_CURVE) med justerbar uttoning (DMX_E_RELEASE_MS); ingangsgransen
@@ -1362,9 +1363,10 @@ export class EffectEngine {
       //   utgangstoning (backup fore: git-taggen backup/fore-tre-steg-2026-10-10).
       const m0 = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
       // ENERGI PER LAMPA (EffectWants.energy): effekten bestammer; osatt -> modulate.energy.
-      const useE = lampWantE ?? modE;
+      const useE = own ? false : lampWantE ?? modE;
       // (SPOT-regeln, UNIFORM:s ovalda par och taktdippen KICK_E borttagna 10-12 - förbivägar/dubbelmodulering, se B_CURVE)
-      let k = inputGate * (useE ? lampLevel(fx, md) : drive);   // energin: andel ljus -> lampans nivå (output.ts)
+      // EFFEKTEN ÄGER LJUSET (types.ts own): värdet är andel av lampans ljus -> lampans nivå, kulören bevarad; inget annat läggs på.
+      let k = inputGate * (useE ? lampLevel(fx, md) : own ? (m0 > 0 ? lampLevel(fx, m0) / m0 : 0) : drive);   // energin: andel ljus -> lampans nivå (output.ts)
       sm[i] = isAnchor ? 0 : m0; if (spreadOn && !isAnchor && useE && i !== lead) k *= 1 - SPREAD_D * (1 - bp);   // BASEN SPRIDS (se BASGANG)
       rgb[0] *= k; rgb[1] *= k; rgb[2] *= k;
       // STUNDEN (bröllopsläget, moment.ts): festens ljus efter energin * (1 - w) + stundens ljus * w - stunden följer inte släckgränsen/ingången.
@@ -1374,14 +1376,14 @@ export class EffectEngine {
       // tandpunkt+1). Bara effekten sjalv eller slackgransen (tystnad) slacker. Kuloren bevaras (alla kanaler med samma faktor).
       // (11-13: gäller inte när en STUND äger ljuset helt (w = 1, t.ex. labbet): ägaren "svart är avstängd ... lampan skall du ge 0% R,
       // 0% G, 0% B" - annars höll festens effekt under stunden kvar lampan på lägsta tända nivån.)
-      if (m0 > 0 && k > 0 && this.rMw < 0.999) keepLit(fx, rgb);
+      if (m0 > 0 && k > 0 && this.rMw < 0.999 && !own) keepLit(fx, rgb);
       // STEG 2 forts. - EFFEKTERNAS UTTONING + MINSTA PA-TID (effects/toning.ts): lampans ljusstyrka upp direkt, ner med tidskonstanten
       // cfg.fadeMinS; kuloren foljer effekten direkt. Tiderna ar installningar i /setup. Darefter OUTPUTS GOLV MOT STROBE (output.ts LampGuard).
       // SVART = SLÄCKT (ägaren i ladan 11-13: "Effekten ber ju om en släckt lampa så motorn borde bara göra det?!", "lampan skall du ge
       // 0% R, 0% G, 0% B"). Mätt: uttoningen (0,25 s i lampans LJUS = ~0,6 s i DMX-värde) lät lampan ligga kvar på DMX 20 av 108 två slag
       // efter att labbet bett om svart - tänd för ögat. När en STUND äger ljuset helt och ber om exakt 0/0/0 släcks lampan direkt.
       // Skyddet mot strobe står kvar på annat sätt: samma lampa får klippas högst var 333:e ms (3 ggr/s), annars tonar den som vanligt.
-      const ask0 = this.rMw >= 0.999 && this.moment.r(i) === 0 && this.moment.g(i) === 0 && this.moment.b(i) === 0;
+      const ask0 = this.rMw >= 0.999 ? this.moment.r(i) === 0 && this.moment.g(i) === 0 && this.moment.b(i) === 0 : own && this.rMw === 0 && m0 === 0 && !isAnchor;
       if (ask0 && (this.blackOn[i] === 1 || renderNow - this.blackAt[i] > 333)) {
         if (this.blackOn[i] === 0) { this.blackOn[i] = 1; this.blackAt[i] = renderNow; }
         rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; this.lampFade.cut(i); this.lampGuard.cut(i);

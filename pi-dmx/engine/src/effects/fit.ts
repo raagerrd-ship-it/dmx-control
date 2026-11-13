@@ -112,6 +112,7 @@ export const FIT: Partial<Record<Mode, Fit>> = {
   sokljus:    { punch: 0.45, bass: 0.35, bright: 0.45, beat: 0.65 },   // lugnt med takt, virveln
   dansparet:  { punch: 0.85, bass: 0.75, bright: 0.45, beat: 0.95 },   // refräng, ett steg per slag
   minnet:     { punch: 0.85, bass: 0.70, bright: 0.50, beat: 0.90 },   // refräng, mönster per slag
+  linjalen:   { punch: 0.60, bass: 0.70, bright: 0.40, beat: 0.90 },   // vers, löparen ett steg per slag (labb 6, 11-13)
 };
 /** ▲▲▲ JUSTERA HÄR ▲▲▲ */
 
@@ -138,7 +139,7 @@ const SPATIAL: Partial<Record<Mode, number>> = {
   stjarnor: 0.7, mullra: 0.6, kaskad: 1.0, droppar: 0.9, uppvarmning: 0.8, dunk: 0.8, glesna: 0.8, dyning: 0.8,
   blixtnedslag: 1.0, mellanslag: 1.0, pump: 0.6, hiss: 1.0, tratt: 0.7, morkerslag: 0.8, urladdning: 0.6,
   slagga: 0.3, sidokedja: 0.5, tryckvag: 0.8,
-  sangare: 0.9, sokljus: 1.0, dansparet: 1.0, minnet: 1.0,
+  sangare: 0.9, sokljus: 1.0, dansparet: 1.0, minnet: 1.0, linjalen: 1.0,
 };
 /** Hur mycket den spatiala preferensen väger vid full punch (0 = av). */
 const SPATIAL_PREF = 0.5;   // 0,18 -> 0,5 (ladan 10-01 godkant)   // ladan 09-29: "manga effekter lyser bara alla lampor" -> prov 0,5

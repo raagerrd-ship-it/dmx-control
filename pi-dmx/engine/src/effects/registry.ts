@@ -93,6 +93,7 @@ import { sangare } from "./sangare.js";
 import { dansparet } from "./dansparet.js";
 import { minnet } from "./minnet.js";
 import { sokljus } from "./sokljus.js";
+import { linjalen } from "./linjalen.js";
 
 /** LABBETS FAVORITER (ägaren i ladan 2026-11-07: 'lägg till de vi tyckte var bra' + 'jag vill lägga till dom'): sångaren och sökljuset
  *  (lugnt), dansparet och minnet (refräng). KODENS STANDARD sedan 11-08 (förr opt-in DMX_LABFX=1, ingen opt-in). */
@@ -134,6 +135,8 @@ export const EFFECTS: EffectDef[] = [
   slagga, sidokedja, tryckvag,
   // LABBETS FAVORITER (se ovan)
   sangare, dansparet, minnet, sokljus,
+  // LABB 6 (åtta lampor, ägaren i ladan 11-13: "vers effekt ... den är snygg")
+  linjalen,
 ];
 
 /** Specialrolls-mappning: vilka fixture-roller (hazer/uv/blinder/strobe/laser/co2)

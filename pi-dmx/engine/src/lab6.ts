@@ -89,6 +89,7 @@ export class Lab6 {
       const bpmNow = c.frame && c.frame.bpm > 40 ? c.frame.bpm : 120, dec = Math.exp(-(dt * bpmNow / 60) / 0.8);
       for (let x = 0; x < n; x++) this.runLv[x] *= dec;
       if (k !== this.runK) { this.runK = k; this.runPeak = 0; }
+      if (hole) this.runLv[i] = 0;                                      // hålets lampa är svart även om löparens färg nyss stod där
       if (!hole) {
         if (fr < 0.25) this.runPeak = Math.max(this.runPeak, (k % 4 === 0 ? 1 : 0.9) * energy * presence);   // löparen upp till 95 %, ettan störst
         const up = 40 * bpmNow / 60000;                                                              // intoningen 40 ms, räknat i slag

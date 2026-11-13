@@ -170,6 +170,11 @@ export interface EffectDef {
   /** SNABBT LJUS (2026-10-10, agaren: "ge effekter mojlighet att aktivt skippa den, da ar det ju uttankt att kora sa"): true = effekten
    *  hoppar over minsta pa-tiden (output.ts MIN_ON_MS och CH_MIN_ON_MS) - for effekter byggda pa korta blixtar. */
   fastLight?: boolean;
+  /** EFFEKTEN ÄGER LJUSET (2026-11-13, linjalen; ägaren: "Vill effekten släcka så gäller släck och inte fade" + effekten styr ljuset,
+   *  output är bara golv mot strobe): render ger ANDEL AV LAMPANS LJUS per kanal (0..1). Motorn lägger inget på - ingen normering,
+   *  grundnivå, droplyft/dropfärg, kulörtoning, energi, basspridning eller minsta tända nivå - bara ingångsgränsen, uttoningen
+   *  (effects/toning.ts), strobegolvet och kalibreringen. Exakt 0/0/0 = lampan släcks direkt (högst 3 ggr/s per lampa). */
+  own?: boolean;
   /** TOGGLAR lampor: diskreta grupper/steg som slar om per slag (inre/yttre, varannan, lopare, studs...). Dirigenten valjer bara
    *  bland dessa nar analysatorn ser en tydlig basgang (profile.bassline, effects.ts CLEAR_BASS). Taggen bor i effektfilen. */
   toggle?: boolean;
