@@ -13,7 +13,7 @@ import { readFileSync } from "node:fs";
 const [wav, ...sk] = process.argv.slice(2); const skalor = sk.length ? sk.map(Number) : [1];
 const { Analyser } = await import("../../../dist/analyser.js");
 const { defaultConfig } = await import("../../../dist/config.js");
-const fin = JSON.parse(readFileSync(wav.replace(/\.wav$/, ".marks-fin.json"), "utf8")).marks;
+const fin = JSON.parse(readFileSync(wav.replace(/\.wav$/, ".marks-fin.json"), "utf8")).marks.filter((m) => !m.skip);   // feltryck (inget i ljudet) är inte facit
 const d = readFileSync(wav); let o = 12, start = 44, len = d.length - 44;
 while (o + 8 <= d.length) { const id = d.toString("latin1", o, o + 4), ln = d.readUInt32LE(o + 4); if (id === "data") { start = o + 8; len = Math.min(ln || d.length - start, d.length - start); break; } o += 8 + ln + (ln & 1); }
 const ch = d.readUInt16LE(22), SR = d.readUInt32LE(24), n = Math.floor(len / 2 / ch), HOP = 128, EPOCH = 1700000000000;

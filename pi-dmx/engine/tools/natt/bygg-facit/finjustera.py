@@ -8,6 +8,10 @@ Per markering letas händelsen i LJUDET i ett fönster kring trycket:
   uppbyggnad    basens bortfall: största fallet i basnivån, 1,5 s efter mot 2 s före; fönster tryck -12 .. +1 s
   latbyte       spektrumskiftet: största avståndet mellan medelspektrum 4 s före och 4 s efter; fönster tryck -8 .. +2 s
   intedrop      ingen justering (trycket gäller det ljuset just gjorde)
+  angra         "Ångra senaste": stryker markeringen närmast före (ägaren 11-13: "måste ha knapp om jag råkar trycka")
+FELTRYCK (ägaren 11-13: "ser du inget i ljudet så är det feltryck"): drop/mini utan basåterkomst (< 6 dB) OCH utan lyft i hela
+ljudet (< 4 dB) OCH utan spektrumskifte; låtbyte utan skifte; uppbyggnad utan giltig drop inom 45 s efter. De får skip=true i
+marks-fin.json och används inte som facit.
 "säker" = händelsen sticker ut i fönstret (lyft/fall >= 6 dB, skifte >= 1,5 x fönstrets median). Skriver <namn>.marks-fin.json och
 jämför med motorns egna drop/minidrop (dropCount/miniDropCount i events.json)."""
 import sys, os, json
@@ -24,6 +28,7 @@ ix = lambda s: int(np.clip(round((s - t[0]) / 0.01), 0, len(t) - 1))
 def medel(v, a, b):
     i, j = ix(a), ix(b); return float(np.mean(v[i:max(i + 1, j)]))
 def lyft(s): return medel(B, s, s + 0.4) - medel(B, s - 1.0, s - 0.1)
+def lyftAlla(s): return medel(ALL, s, s + 0.4) - medel(ALL, s - 1.0, s - 0.1)
 def fall(s): return medel(B, s - 2.0, s) - medel(B, s, s + 1.5)
 def skifte(s):
     a = S[:, ix(s - 4):ix(s - 0.3)].mean(axis=1); b = S[:, ix(s + 0.3):ix(s + 4)].mean(axis=1); a = a - a.mean(); b = b - b.mean(); return float(np.sqrt(np.mean((a - b) ** 2)))
@@ -33,7 +38,12 @@ def basta(fn, a, b, steg=0.02):
 t0 = ev['captureStartWallMs']; ut = []
 print('%-8s %-11s %8s %8s %7s  %s' % ('klocka', 'sort', 'tryck s', 'ljud s', 'flytt', 'mått'))
 import time
-for m in ev['marks']:
+marks = []
+for m in ev['marks']:                                              # "Ångra senaste" stryker markeringen närmast före
+    if m['kind'] == 'angra':
+        if marks: print('ångrad: %s vid %.1f s' % (marks[-1]['kind'], (marks[-1]['wallMs'] - t0) / 1000)); marks.pop()
+    else: marks.append(m)
+for m in marks:
     s = (m['wallMs'] - t0) / 1000; k = m['kind']; fin, sak, matt = s, False, ''
     if k in ('drop', 'mini'):
         fin, v, md = basta(lyft, s - 3.0, s + 0.3); sak = v >= 6; matt = 'baslyft %+.1f dB' % v
@@ -41,13 +51,25 @@ for m in ev['marks']:
             lo = medel(B, fin - 1.0, fin - 0.1); i = ix(fin - 0.3)
             while i < ix(fin + 0.4) and B[i] < lo + v / 2: i += 1
             fin = float(t[i])
+        else:                                                      # ingen basåterkomst: finns något annat i ljudet? (lyft i hela ljudet / skifte)
+            f2, v2, _ = basta(lyftAlla, s - 3.0, s + 0.3); f3, v3, md3 = basta(skifte, s - 3.0, s + 0.3, 0.05)
+            if v2 >= 4: fin, sak, matt = f2, True, matt + ', hela ljudet %+.1f dB' % v2
+            elif v3 >= 1.5 * md3 and v3 >= 3: fin, sak, matt = f3, True, matt + ', skifte %.1f dB' % v3
+            else: matt += ', hela ljudet %+.1f dB, skifte %.1f dB' % (v2, v3)
     elif k == 'uppbyggnad':
         fin, v, md = basta(fall, s - 12, s + 1); sak = v >= 6; matt = 'basfall %+.1f dB' % v
     elif k == 'latbyte':
         fin, v, md = basta(skifte, s - 8, s + 2, 0.05); sak = v >= 1.5 * md and v >= 3; matt = 'skifte %.1f dB (median %.1f)' % (v, md)
-    ut.append(dict(kind=k, pressS=round(s, 2), fineS=round(fin, 2), sure=bool(sak), measure=matt))
-    print('%-8s %-11s %8.2f %8.2f %+7.2f  %s%s' % (time.strftime('%H:%M:%S', time.localtime(m['wallMs'] / 1000)), k, s, fin, fin - s, matt, '' if sak or k == 'intedrop' else '   OSÄKER'))
-json.dump(dict(file=os.path.basename(p), note='fineS = händelsen i ljudet (s från filens början); sure=false -> lyssna innan den används', marks=ut), open(bas + '.marks-fin.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    ut.append(dict(kind=k, pressS=round(s, 2), fineS=round(fin, 2), sure=bool(sak), measure=matt, klocka=time.strftime('%H:%M:%S', time.localtime(m['wallMs'] / 1000))))
+for u in ut:                                                       # FELTRYCK
+    if u['kind'] in ('drop', 'mini', 'latbyte'): u['skip'] = not u['sure']
+for u in ut:
+    if u['kind'] == 'uppbyggnad':
+        u['skip'] = not any(d['kind'] == 'drop' and not d.get('skip') and -3 <= d['fineS'] - u['pressS'] <= 45 for d in ut)   # -3: även uppbyggnad trycks sent
+        if u['skip'] is False and not u['sure']: u['fineS'] = u['pressS']          # starten osäker: behåll trycket som "här pågår den"
+for u in ut:
+    print('%-8s %-11s %8.2f %8.2f %+7.2f  %s%s' % (u.pop('klocka'), u['kind'], u['pressS'], u['fineS'], u['fineS'] - u['pressS'], u['measure'], '   FELTRYCK (inget i ljudet)' if u.get('skip') else ''))
+json.dump(dict(file=os.path.basename(p), note='fineS = händelsen i ljudet (s från filens början); skip=true = feltryck (inget i ljudet), används inte', marks=ut), open(bas + '.marks-fin.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
 
 # MOTORNS EGNA HÄNDELSER
 C = ev['columns']; iD, iM, iB = C.index('dropCount'), C.index('miniDropCount'), C.index('buildUp')
@@ -58,7 +80,7 @@ for r in ev['flags']:
     if r[iM] > pm: mot.append((s, 'mini'))
     pd, pm = r[iD], r[iM]
 print('\nmotorn: %d drop, %d minidrop under inspelningen' % (sum(1 for _, k in mot if k == 'drop'), sum(1 for _, k in mot if k == 'mini')))
-agare = [u for u in ut if u['kind'] in ('drop', 'mini')]; tagna = set()
+agare = [u for u in ut if u['kind'] in ('drop', 'mini') and not u.get('skip')]; tagna = set()
 print('%-6s %8s   %-28s' % ('ägaren', 'ljud s', 'motorn närmast (inom 3 s)'))
 for u in agare:
     kand = [(abs(s - u['fineS']), j) for j, (s, k) in enumerate(mot) if abs(s - u['fineS']) <= 3 and j not in tagna]
