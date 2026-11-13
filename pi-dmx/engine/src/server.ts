@@ -17,7 +17,7 @@ import { isLogOn, setLogOn } from "./quiet.js";
 // 2026-10-04 (som lotus): git/nmcli asynkront - den synkrona varianten holl showens huvudtrad tills kommandot var klart nar
 // nagon oppnade uppdaterings- eller wifi-panelen. Utan skal (nmcli far SSID/losenord fran anvandaren).
 const execFileP = promisify(execFile);
-import { readFileSync, writeFileSync, copyFileSync } from "node:fs";
+import { readFileSync, writeFileSync, copyFileSync, existsSync, createReadStream } from "node:fs";
 import type { EngineConfig, FixtureConfig, Mode, FixturePreset, ChannelRole } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { applyIntensity } from "./moods.js";
@@ -66,7 +66,9 @@ export interface ServerDeps {
   /** Effekten som renderas just nu (smart-läget roterar). */
   getActiveMode: () => Mode;
   /** Langinspelningen (knappen "Spela in 5 min" i /setup). */
-  longRecord?: { start(seconds: number): unknown; stop(): unknown; status(): unknown; mark(kind: string): unknown };
+  longRecord?: { start(seconds: number): unknown; stop(): unknown; status(): unknown; mark(kind: string): unknown; lastPath?(): string };
+  /** Ingångsmätaren (inputMeter.ts): nivån de senaste 3 s och ett WAV-klipp av det råa ljudet. */
+  inputMeter?: { status(): { state: string; peakDb: number; rmsDb: number; crestDb: number }; wav(seconds: number): Buffer };
   /** True om ljud-pipelinen bearbetat en frame nyligen (för watchdog /health). */
   getHealthy: () => boolean;
   /** Diagnos när getHealthy() är false: "audio" | "audio-safe" | "dmx" | "". */
@@ -231,14 +233,40 @@ export async function startServer(
     setLogOn(on); console.warn(`[debug] felsokningslogg ${on ? "PA" : "AV"}`);
     return { enabled: isLogOn(), record: false };
   });
-  // LANGINSPELNING (longRecord.ts): POST {seconds} startar (10..600), POST {stop:true} sparar det som finns, GET = status.
+  // INGÅNGSNIVÅN (inputMeter.ts, /setup "Ingångsnivå"): GET level = nivån de senaste 3 s + den låsta referensen; GET klipp.wav?s=4 =
+  // det råa ljudet Pi:n hör just nu (spelas i webbläsaren); POST las {mixer} låser nuvarande nivå med ägarens anteckning om mixern,
+  // POST las {clear:true} tar bort låsningen.
+  app.get("/api/input/level", async () => ({ ...(deps.inputMeter?.status() ?? { state: "saknas" }), input: deps.cfg.audioInput, cal: deps.cfg.inputCal ?? null }));
+  app.get("/api/input/klipp.wav", async (req, reply) => {
+    if (!deps.inputMeter) return reply.code(404).send({ ok: false });
+    const s = Math.max(1, Math.min(8, Number((req.query as Record<string, unknown>)?.s ?? 4) || 4));
+    return reply.header("Content-Type", "audio/wav").header("Cache-Control", "no-store").send(deps.inputMeter.wav(s));
+  });
+  app.post("/api/input/las", async (req, reply) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    if (b.clear === true) { deps.cfg.inputCal = null; deps.onConfigChanged?.(); broadcast(); return { ok: true, cal: null }; }
+    const st = deps.inputMeter?.status();
+    if (!st || st.state === "vilar" || st.state === "tyst" || st.state === "saknas") return reply.code(409).send({ ok: false, error: "inget ljud att låsa mot - spela musik och vänta ett par sekunder" });
+    if (st.state === "klipper") return reply.code(409).send({ ok: false, error: "ingången klipper - sänk på mixern först" });
+    const r = (v: number) => Math.round(v * 10) / 10;
+    deps.cfg.inputCal = { peakDb: r(st.peakDb), rmsDb: r(st.rmsDb), crestDb: r(st.crestDb), mixer: String(b.mixer ?? "").slice(0, 120), at: new Date().toISOString() };
+    deps.onConfigChanged?.(); broadcast(); return { ok: true, cal: deps.cfg.inputCal };
+  });
+  // LANGINSPELNING (longRecord.ts): POST {seconds} startar (10..3600), POST {stop:true} sparar det som finns, GET = status.
   app.get("/api/longrec", async () => deps.longRecord?.status() ?? { active: false, error: "saknas" });
   app.post("/api/longrec", async (req) => {
     const b = (req.body ?? {}) as Record<string, unknown>;
     if (!deps.longRecord) return { active: false, error: "saknas" };
     return b.stop === true ? deps.longRecord.stop() : deps.longRecord.start(Number(b.seconds ?? 300));
   });
-  // ÄGARENS MARKERING (facit): POST {kind:'mini'|'drop'} - se LongRecord.mark.
+  // LYSSNA PÅ SENASTE INSPELNINGEN (ägaren 11-13: "först göra 1 min inspelning för att se så det inte är något annat i kedjan som sabbar
+  // ljudet"): filen som den ligger på kortet, rakt till webbläsarens spelare.
+  app.get("/api/longrec/senaste.wav", async (_req, reply) => {
+    const p = deps.longRecord?.lastPath?.() ?? "";
+    if (!p || !existsSync(p)) return reply.code(404).send({ ok: false, error: "ingen inspelning sparad sedan motorn startade" });
+    return reply.header("Content-Type", "audio/wav").header("Cache-Control", "no-store").send(createReadStream(p));
+  });
+  // ÄGARENS MARKERING (facit): POST {kind:'latbyte'|'drop'|'mini'|'uppbyggnad'} - se LongRecord.mark.
   app.post("/api/mark", async (req) => deps.longRecord?.mark(String(((req.body ?? {}) as Record<string, unknown>).kind ?? 'mini')) ?? { ok: false });
   // GC-stopp per sort, renderingstid och händelseloopens fördröjning per minut - alltid på (perfStats.ts, 10-16)
   app.get("/api/perf", async () => getPerf());

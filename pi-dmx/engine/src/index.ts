@@ -28,6 +28,7 @@ import { isMoment, pressMoment } from "./moment.js";
 import { applyIntensity, migrateFromMoods } from "./moods.js";
 import { BeatFeed } from "./beatFeed.js";
 import { LongRecord } from "./longRecord.js";
+import { InputMeter } from "./inputMeter.js";
 import * as health from "./runtimeHealth.js";
 import { renderBegin, renderEnd } from "./perfStats.js";
 import { gcWhenDark, gcAfterWarmup } from "./gcDark.js";   // DMX_GC_DARK (opt-in): full GC när riggen är mörk och gamla minnet nära gränsen   // GC/rendering/loop alltid på, GET /api/perf (10-16)
@@ -112,6 +113,8 @@ if (analyser.hopLane) { const lane = analyser.hopLane; health.setSplitStats(() =
 
 
 // TAKTMATNINGEN (kick-PLL, tillit, fasfoljare, coast) bor i ANALYSATORN (analyserClock.ts, a7r): taktvägen eller sist i process().
+// INGÅNGSMÄTAREN (inputMeter.ts): nivån och ett klipp av det råa ljudet till /setup; vilar när ingen tittar.
+const inputMeter = new InputMeter(cfg.audio.rate);
 // LANGINSPELNING (longRecord.ts): samma mapp som inspelarens fangster, sa hamtaren/banken ser dem.
 const longRec = new LongRecord(process.env.DMX_RECORDER_DIR || "/var/lib/audio-dmx-engine/snippets", cfg.audio.rate, {
   latestFrame: () => latestFrame, look: () => effects.getActiveMode(), why: () => effects.switchWhy,
@@ -175,6 +178,7 @@ capture.on("chunk", (samples: Float32Array) => {
   }
   recorder?.push(samples);   // inspelaren (AV utan DMX_RECORDER=1): samma hop som analysatorn
   longRec.push(samples);     // langinspelningen (knappen i /setup; en null-koll i vila, se longRecord.ts)
+  inputMeter.push(samples);  // ingångsmätaren (/setup; en jämförelse i vila)
   latestFrame = frame;
   lastChunkAt = Date.now();
 
@@ -392,6 +396,7 @@ const serverDeps = {
   getLatestFrame: () => latestFrame,
   getActiveMode: () => effects.getActiveMode(),
   longRecord: longRec,
+  inputMeter,
   // Frisk = en ljud-chunk bearbetad senaste 10 s (arecord + event-loop lever).
   getHealthy: () => Date.now() - lastChunkAt < 10000,
   // DIAGNOS för watchdogen: är felet ljud eller DMX? Ett ljudfel går att laga

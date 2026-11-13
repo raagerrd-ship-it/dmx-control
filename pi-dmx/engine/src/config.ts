@@ -85,6 +85,9 @@ export interface EngineConfig {
    */
   audioChannel?: "mix" | "left" | "right" | "auto";
   audioInput: "aux" | "mic";
+  /** LÅST INGÅNGSNIVÅ (inputMeter.ts, /setup "Ingångsnivå"): nivån ägaren fann bra med en låt med fart, och mixerns inställning i ägarens
+   *  egna ord. Bara en anteckning + referens för mätaren - ändrar ingen förstärkning. */
+  inputCal?: { peakDb: number; rmsDb: number; crestDb: number; mixer: string; at: string } | null;
   sensitivity: number;    // 0..1 user knob
   /** 0..1 kontrast: 0 = jämnt ljus, 1 = dovt i tystnad + smäll i beats. */
   dynamics: number;
