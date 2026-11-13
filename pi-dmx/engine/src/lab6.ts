@@ -2,7 +2,8 @@
  * LABBET 6 (stunden 'lab6', ägaren i ladan 2026-11-13: "köra igång effektlabbet igen och testa lite nya effekter nu när vi har 8
  * lampor"). Idéer som BEHÖVER åtta lampor - en takt har åtta åttondelar, och åtta lampor är två körer om fyra:
  *   LINJALEN   (vers/övrigt): takten ritad över raden - varje SLAG (bastakten) flyttar löparen en lampa, ettan störst;
- *              alla lampor lyser svagt i en kulör och löparen i motkulören; hållet byter efter varje varv (två takter)
+ *              alla lampor andas med basen i en kulör (golv..65 %); löparen är fyra takter en lampa i motkulören (95 %) och fyra takter ett HÅL
+ *              (en släckt lampa); hållet byter efter varje varv (två takter)
  *   VÅGEN      (refräng): en vågkam rullar över raden en gång per takt, kammen står på lampa 1 på ettan; kicken lyfter alla lite
  *   TRAPPAN    (build): raden fylls lampa för lampa under uppbyggnaden, varje virvelslag blinkar i den översta - full rad när det landar
  *   SVARET     (8 takter efter en build som landar): alla på 1 och 3, vänster kör svarar på 2, höger kör på 4
@@ -70,9 +71,19 @@ export class Lab6 {
       // Basens/kickens nivå räknas mot sitt EGET spann de senaste sekunderna (lägst..högst), så andningen syns oavsett hur stark basen är.
       const x0 = Math.min(1, Math.max(dr.kick, c.bassBody)); this.eHi = Math.max(x0, this.eHi - dt * 0.15); this.eLo = Math.min(x0, this.eLo + dt * 0.15);
       const eNow = this.eHi - this.eLo > 0.08 ? (x0 - this.eLo) / (this.eHi - this.eLo) : 0; this.eSm += (eNow - this.eSm) * (eNow > this.eSm ? Math.min(1, dt / 0.03) : Math.min(1, dt / 0.25));
-      for (let x = 0; x < n; x++) this.put(x, this.sect, (0.05 + 0.63 * this.eSm * presence) / TOP * 0.95);   // alla i samma kulör: golv .. 65 %
-      const i = at(k); this.put(i, this.sect + 3, lv(k, fr));
-      if (k > 0) { const j = at(k - 1); if (j !== i) this.put(j, this.sect + 3, lv(k - 1, fr + 1)); }   // svansen: förra lampan tonar ut hela nästa åttondel - alltid huvud + svans, aldrig ett hårt släck
+      // Sedan: "försök få till den inverterade att istället för annan färg så blir den lampan släckt" -> fyra takter färglöpare, fyra takter
+      // HÅLET: löparen är en SLÄCKT lampa som vandrar genom de tända (mörk första halvan av slaget, tänds mjukt igen när hålet gått vidare).
+      // I hålvarianten ligger grundens golv högre (0,22) så hålet syns även när basen andas ut.
+      const hole = ((Math.floor(c.beatIdx / 16) % 2) + 2) % 2 === 1, i = at(k), j = k > 0 ? at(k - 1) : -1;
+      const dark = (f2: number) => f2 < 0.45 ? 1 : Math.exp(-(f2 - 0.45) * 5);
+      for (let x = 0; x < n; x++) {
+        const g = ((hole ? 0.22 : 0.05) + (hole ? 0.46 : 0.63) * this.eSm * presence) / TOP * 0.95;        // alla i samma kulör: golv .. 65 %
+        this.put(x, this.sect, hole ? g * (1 - (x === i ? dark(fr) : x === j ? dark(fr + 1) : 0)) : g);
+      }
+      // "hoppande färgen kanske bara får vara Röd, Grön, Blå eller Svart": löparen är alltid en REN grundfärg som inte är grundens -
+      // motkulören när grunden är en blandfärg (gul -> blå), nästa grundfärg när grunden själv är ren (röd -> grön). Svart = hålet.
+      const run = this.sect % 2 === 1 ? this.sect + 3 : this.sect + 2;
+      if (!hole) { this.put(i, run, lv(k, fr)); if (j >= 0 && j !== i) this.put(j, run, lv(k - 1, fr + 1)); }   // färglöparen: huvud + svans som tonar ut
     } else if (this.mode === 'vagen') {
       const p = (beat + c.beatFrac) / 4, kick = Math.exp(-c.beatFrac * 4) * 0.25;           // 0..1 över takten
       for (let i = 0; i < n; i++) {
