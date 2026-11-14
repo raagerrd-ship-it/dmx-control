@@ -1,5 +1,7 @@
 # Natt-agentens uppdrag
 
+ARENAN LAT1 PÅGÅR (huvudsessionen 2026-11-14 ~16:15, ägaren: "bygg ut verktyget för takt och låtbyte också sen kör igång en arena där vi är sämst idag"): TAKTEN genom låtbytet. Drop är sämst i tal (2 av 14) men saknar material; låtbytet är näst sämst och står för hälften av klockans fel. Domare tools/arena/latdom.py (hela analysatorn, tempo mot Beat This!), övning 160345 + 171840, kontroll 151659 (osedd för klockan). Bas 93,06 p / kontroll 90,16 p. Tillåtna filer: boundaryDetector.ts, analyserClock.ts. .arena/lat1/ (uppgift.md, kort.md). RÖR INTE .arena/lat1 eller src under körningen.
+
 LATENSTEST PÅ LOTUS-PI:N 2026-11-14 15:15-15:40 (huvudsessionen, ägaren: "kör nu ett latenstest för att se om det är lika, du får gärna köra igång
 på lotus direkt"): LIKA. Pi Zero 2 W (samma som ladans), musik via Sonos vol 13, ingen felsökning på. Två fönster om 3 min före och efter:
   huvudtråden 39,8 / 39,0 % -> 38,1 / 37,6 % CPU; arbetstråden (långsamma analysatorn) 16,3 / 16,5 -> 16,1 / 16,2 %; hopp över 2,67 ms-budgeten 0 -> 0;
