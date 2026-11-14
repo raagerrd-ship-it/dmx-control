@@ -1,9 +1,11 @@
 /** EN ANALYS FÖR SIG (2026-11-14, efter uppdelningen av analysatorn). Två steg:
  *
  *  1. TAPPA: kör hela analysatorn över en inspelning EN gång och spara vad en del får in vid varje steg.
- *       node tools/ensam.mjs tappa <del> <metod> <wav> <ut.tap> [--ut fält,fält]
+ *       node tools/ensam.mjs tappa <del> <metod> <wav> <ut.tap> [--ut fält,fält] [--extra signal,signal]
  *       t.ex.  node tools/ensam.mjs tappa drop dropStep tools/ladan-2026-11-13/lang-20261113T160345.wav .arena/tap/drop-160345.tap --ut dropCount,miniDropCount
  *     <del> = fältet på analysatorn (drop, sections, riser, kicks, bass, levels, character), <metod> = dess stegmetod.
+ *     --extra = signaler på analysatorn som delen INTE läser i dag men som ska finnas att tillgå i uppspelningen (inför en arena:
+ *     t.ex. --extra bandDbRaw,centSmooth,levelCeil). De tappas med och nås som this.a.<signal> av den som ändrar delen.
  *     Insignalerna är allt delen läser via this.a (hämtas ur källkoden, så listan är komplett även för grenar som inte gick).
  *
  *  2. KÖR: spela upp bara den delen på tappen - bråkdelen av en sekund i stället för en hel körning.
@@ -39,7 +41,7 @@ if (cmd === "tappa") {
   if (!Cls) { console.error(`hittar inte ${metod} i ${FILES[del]}.js`); process.exit(1); }
   const cfg = ladanCfg(defaultConfig), an = createAnalyser(ladanCfg(defaultConfig), undefined), feed = new BeatFeed(); an.setGainLock(true, 1);
   // vilka kedjor är värden (tal/bool/sträng/litet fält), klockläsare eller handlingar? Avgörs på den riktiga analysatorn vid första steget.
-  const chains = inputsOf(del); let plan = null; const rows = [], strs = [""], S = s => { let i = strs.indexOf(s); if (i < 0) { i = strs.length; strs.push(s); } return i; };
+  const chains = [...inputsOf(del), ...(opt("--extra", "") || "").split(",").filter(Boolean)]; let plan = null; const rows = [], strs = [""], S = s => { let i = strs.indexOf(s); if (i < 0) { i = strs.length; strs.push(s); } return i; };
   const get = (o, ch) => { let v = o; for (const k of ch.split(".")) { if (v == null) return undefined; v = v[k]; } return v; };
   const mkPlan = a => { const p = [], acts = [], skipped = []; const seen = new Set();
     for (const ch of chains) { const parts = ch.split("."); let v = a, i = 0, pathSoFar = [];
