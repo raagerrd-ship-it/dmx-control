@@ -1,5 +1,19 @@
 # Natt-agentens uppdrag
 
+INFÖR LADAN (förberett 2026-11-14 ~16:40, ägaren: "Förbered för ladan"). Ladan kör 4c84b1b; bygget här = HEAD (deployspärren OK, hela motorn
+provkörd på 160345 med ladans config: drop-look 214 368 507 591, låtgränser 200 264 401, mörka rutor 1,2 % mot 1,0 % i går). ORDNING NÄR PI:N NÅS:
+  1. FÖRE (gamla koden, musik på): scp tools/refaktor/latens-ladan.sh pi@<ip>:/tmp/ ; ssh pi@<ip> 'bash /tmp/latens-ladan.sh 12'  -> spara som före.
+  2. HÄMTA den långa inspelningen från 11-13 18:24 (/var/lib/audio-dmx-engine/snippets/lang-20261113T18*) till tools/ladan-2026-11-13/.
+  3. LÄGG UT (aldrig under pågående inspelning): PI_HOST=<ip> PYTHONIOENCODING=utf-8 python tools/ladan.py --bara-deploy ; momentet faller till fest.
+  4. EFTER: md5 Pi = bygget, journalen utan fel, /api/health, sedan samma latens-ladan.sh 18 med musik. Väntat (lotus-Pi:n, samma modell): lika.
+     Gårdagens värden: huvudtråd 30-55 %, arbetstråd 18 %, render medel 0,27-0,31 ms, loop p99 11,2 ms, eftersläp < 1 ms, 135 MB.
+  5. ÖGAT (ägaren): dropblixten mer sällan och på hans drop; nya looker vid låtbyte; risk = falsk låtgräns i lång uppbyggnad; takten efter låtbyte.
+  6. BACKA om något ser fel ut: PI_HOST=<ip> python tools/ladan.py --bara-deploy --fran .arena/ladan/fore-4c84b1b/dist  (fryst bygge av 4c84b1b,
+     ger gårdagens ljus identiskt i uppspelningen) - OBS skriver över engine/dist lokalt: kör `npx tsc -p tsconfig.json` efteråt.
+  7. Efter besöket: uppdatera tools/ladanCfg.json om /setup ändrats; nya inspelningar till tools/ladan-<datum>/ + finjustera.py; Beat This!-facit
+     (lotus .venv-ml beatthis_facit.py --batch) och latbyten.json för de nya filerna -> de blir kontroll för nästa arena.
+ARENAN LAT1 går samtidigt på den här datorn (.arena/lat1) - håll datorn vaken; ladan.py bygger bara om dist när källan är nyare.
+
 ARENAN LAT1 PÅGÅR (huvudsessionen 2026-11-14 ~16:15, ägaren: "bygg ut verktyget för takt och låtbyte också sen kör igång en arena där vi är sämst idag"): TAKTEN genom låtbytet. Drop är sämst i tal (2 av 14) men saknar material; låtbytet är näst sämst och står för hälften av klockans fel. Domare tools/arena/latdom.py (hela analysatorn, tempo mot Beat This!), övning 160345 + 171840, kontroll 151659 (osedd för klockan). Bas 93,06 p / kontroll 90,16 p. Tillåtna filer: boundaryDetector.ts, analyserClock.ts. .arena/lat1/ (uppgift.md, kort.md). RÖR INTE .arena/lat1 eller src under körningen.
 
 LATENSTEST PÅ LOTUS-PI:N 2026-11-14 15:15-15:40 (huvudsessionen, ägaren: "kör nu ett latenstest för att se om det är lika, du får gärna köra igång
