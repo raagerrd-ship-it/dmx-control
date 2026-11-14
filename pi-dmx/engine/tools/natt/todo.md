@@ -1,5 +1,24 @@
 # Natt-agentens uppdrag
 
+TRE IDÉER UR DROP1 (huvudsessionen 2026-11-14 em, ägaren: "Börja med dom 3 idéerna och lägg in dom. Sen kan jag spela in mer"): TVÅ INLAGDA, EN INTE.
+(1) RELATIVA NIVÅGRÄNSER inlagd (27b34a9): riserns fönster under bandets egen topp, nivågrindarna x levelCeil, inZone utan golvet 0,65.
+    a6:s kedja i drop-klassningen (drop kräver uppbyggnad + zon) är INTE med: risern ser bara svep (1 av ägarens 6 uppbyggnader).
+    Mätt (dropdom, 160345 / 151659): drop, tempo, sektion oförändrade; uppbyggnad under ägarens uppbyggnader 0 -> 6 / 3 %, utanför 2,4 / 3,5 %.
+(2) BREAK-TAKET inlagd (1f3d5bb): basen borta >= 8 slag (2 takter, klockans tempo) = ny sektion, ingen drop (FLANK_ROOF_BEATS). Svept 4-32 slag:
+    ägarens drop har basen borta <= 6 slag, de han inte kallar drop >= drygt 8; samma dom för 6-9. 160345: motorns drop 10 -> 4, ägarens 1/9 -> 2/9
+    (214, 367), "inte drop" 0/3 -> 2/3, precision 10 -> 50 %, dropdom 22,8 -> 42,6. 151659: motorns drop 2 -> 1, ägarens 0/5. 171840: 4 -> 1.
+    Kostnad per hopp lika (163 us). Ljuset (konsertReplay, ladans config): lookvalet ändras (samma look 55-79 % av tiden - lookföljden är kaotisk).
+(3) KLOCKAN STILLA MEDAN BASEN ÄR BORTA: INTE INLAGD. Fyndet stämmer (131 -> 80 bpm vid 136,4 s, basen 19 dB under taket; hållet kräver 24), men
+    lägre hålldjup ger inget netto mot tempofacit (Beat This!, 1375 s på tre filer): fel tempo 140 s i dag, 20 dB 145, 16 dB 138, 12 dB 151 -
+    hoppen före drop rättas (136-142, 43-49, 218-229) men klockan blir lika mycket senare vid låtbyten (410-428, 135-142, 476-480).
+FYND: (a) LÅTGRÄNSDETEKTORN ÄR DÖD PÅ RENT LJUD: 0 av 4 markerade låtbyten (START_LEVEL 0,15 absolut, boundaryDetector.ts). Med 0,03 hittar den
+    3 av 4 men ger falska gränser vid break/drop (48, 196, 222 s i 160345) -> ej rörd; eget arbete. (b) klockans största fel är EFTER LÅTBYTEN:
+    265-295 s (160345) och 388-423 s (151659) = 65 av 140 s. (c) TEMPOFACIT finns nu för de tre rena filerna: tools/ladan-2026-11-13/beatthis.jsonl
+    + tools/natt/arena-2026-11-13-drop1/{sond.mjs,tempofacit.py,hopp.mjs,ljus.mjs}. Dagens klocka: rätt 90,7 / 89,5 / 87,8 %.
+LOTUS: filen portad (lotus 1c1bdd2c, manifesten lika, deployspärren ok) men EJ UTLAGD på lotus-Pi:n (inga lotus-bänkar går; buildUp och antalet
+    drop ändras där - ägaren ska se först). LADAN: ej utlagt (ägaren inte där): `PI_HOST=<ip> python tools/ladan.py --bara-deploy`.
+    Backup: tagg backup/fore-tre-ideer-20261114. NATTAGENTEN: baslinjen på rent ljud (ren-2026-11-14) och dropdom-basen gäller koden FÖRE detta - mät om.
+
 NATTEN 2026-11-14 03:20 (schemalagda körningen, ingen motorkod ändrad): MÄTFÄLLA 55 - BÄNKARNA KÖRDE INTE LADANS CONFIG. defaultConfig =
 4 lampor, släckgräns 0,05, lead 50 ms; ladan = 8 lampor, 0,015, 90 ms. På det rena ljudet (nivå-median 0,16) släckte bänken riggen 22-27 % av
 tiden (längst 21 s) där ladan lyser. RÄTTAT: tools/ladanCfg.json (bild av Pi:ns config 11-13, bara nycklar som skiljer) + tools/benchCfg.mjs
