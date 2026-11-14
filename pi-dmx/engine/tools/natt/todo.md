@@ -1,5 +1,17 @@
 # Natt-agentens uppdrag
 
+LÅTBYTEN (huvudsessionen 2026-11-14 kväll, ägaren: "Något mer nu? Tex låtbyten?"): STARTGRINDEN INLAGD, formvägen orörd.
+Låtgränsdetektorn startade aldrig på rent ljud (START_LEVEL 0,15 absolut; nivån når dit 5-6 % av tiden) -> 0 låtgränser, klockan fick aldrig
+låtbytet, manuset glömdes aldrig (nattens brist 1: en look i 2,5-3 min). Nu startar segmentet på musik över släckgränsen i 1 s (boundaryDetector.ts).
+FACIT låtbyten (Beat This!-tempo + ägarens tryck): 160345 ~265 och ~406 s, 151659 ~225 och ~387 s, 171840 ~130 och ~272 s.
+MÄTT (sond.mjs med ladans config): gränser 0 -> 5: 264 (tystnad 3,5 s mellan låtarna, RÄTT), 394 (form, rätt), 401 (form, 5 s FÖRE skarven),
+151 (form, 20 s efter), 200 (form, FALSK: uppbyggnaden före ägarens trippeldrop). Missade: 225, 272. Klockan fel tempo 140 -> 109 s (54/54/32 ->
+39/47/23); i 160345 är tempot rätt från 278 s i stället för 295 (ägarens drop 282). Drop oförändrade. Ljuset: nytt manus per låtgräns.
+FORMVÄGEN (F_*, trimmad på de arkiverade mixarna) håller inte på rent ljud: poäng vid riktiga skarvar 1,12-1,44, vid den falska 1,47 (högst av alla).
+Utan basbanden (F_BLO 40 -> 150/250 Hz) hamnar skarvarna rätt (227: 1,36, 406: 1,35, 388: 1,33) men den falska ligger kvar på 1,31 mot tröskeln 1,3.
+EJ RÖRT - behöver fler låtbyten (ägaren spelar in mer). Kvar i klockan: 388-423 s i 151659 (tyst intro, klockan 85 i st f 97 tills takten kommer).
+Backup: backup/fore-latgrans-grind-20261114. EJ utlagt i ladan.
+
 TRE IDÉER UR DROP1 (huvudsessionen 2026-11-14 em, ägaren: "Börja med dom 3 idéerna och lägg in dom. Sen kan jag spela in mer"): TVÅ INLAGDA, EN INTE.
 (1) RELATIVA NIVÅGRÄNSER inlagd (27b34a9): riserns fönster under bandets egen topp, nivågrindarna x levelCeil, inZone utan golvet 0,65.
     a6:s kedja i drop-klassningen (drop kräver uppbyggnad + zon) är INTE med: risern ser bara svep (1 av ägarens 6 uppbyggnader).
