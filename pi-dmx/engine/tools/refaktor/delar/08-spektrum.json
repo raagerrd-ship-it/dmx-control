@@ -1,0 +1,8 @@
+{
+  "file": "analyserSpectrum.ts",
+  "cls": "SpectrumBands",
+  "prop": "bands",
+  "short": "SPEKTRUM: snabba banden per hopp och stor-FFT:ns band, flöde och onsets",
+  "header": "SPEKTRUM (utbruten ur analyser.ts 2026-11-14). Snabba banden per hopp (liten FFT) och stor-FFT:ns åtta band, spektralflöde, klang och bandens onsets. Läser ljudbufferten ur analysatorn (this.a).",
+  "methods": ["fastBandStep", "bigStep", "bigRingPush"]
+}
