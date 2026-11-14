@@ -39,6 +39,7 @@
  * som gav 0 i alla effektbankar i tre dygn). Och den virtuella klockan maste sta FORE motorn skapas, annars blir
  * forsta dt negativ och tystnadsgrinden oppnar aldrig.
  */
+import { ladanCfg } from "./benchCfg.mjs";   // bänkens config = ladans (8 lampor, släckgräns, lead) - natt 11-14
 import { readFileSync, writeFileSync } from "node:fs";
 
 // Motorn stanger av console.log i tyst lage - bankens utskrift maste ga direkt till stdout.
@@ -78,7 +79,7 @@ if (opt("--norm", null) !== null) {   // median 100 ms-RMS -> malniva (se huvude
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = Number(opt("--step", 25));   // 25 ms = bänkens standard; --step 5 = som live (200 Hz)
 
 // LADANS CONFIG: smart-lage, alla lookar pa, master 1. Annars matas en annan rigg an den som star i ladan.
-const cfg = JSON.parse(JSON.stringify(defaultConfig));
+const cfg = ladanCfg(defaultConfig);
 cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.beatPulse = true; cfg.master = 1; cfg.energyCeiling = true;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
 
@@ -96,7 +97,7 @@ const lamps = cfg.fixtures.map((fx) => {
 // körs den långsamma sidan synkront (inline, deterministiskt) med en kopia som i workern. --odelad = en analysator i en tråd (förr).
 const { createSplitBuffers } = await import(DIST + "split.js");
 const liveAnalyser = (c) => { if (args.includes("--odelad")) return new Analyser(c); const b = createSplitBuffers(); const fast = new Analyser(c, { role: "fast", split: b }); fast.setInlinePeer(new Analyser(structuredClone(c), { role: "slow", split: b })); return fast; };
-const an = liveAnalyser(flag("--egen-cfg") ? JSON.parse(JSON.stringify(defaultConfig)) : BeatFeed.analyserCfg(cfg));
+const an = liveAnalyser(flag("--egen-cfg") ? ladanCfg(defaultConfig) : BeatFeed.analyserCfg(cfg));
 const feed = new BeatFeed();
 // GAIN: motorn laser forstarkningen bara pa aux (index.ts: setGainLock(cfg.audioInput !== "mic", 1)).
 // Kor ladan pa mikrofon ar AGC:n aktiv dar men inte har; --agc kor som mikrofoningang.

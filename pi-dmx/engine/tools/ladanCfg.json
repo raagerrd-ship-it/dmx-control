@@ -1,0 +1,161 @@
+{
+ "_": "LADANS CONFIG SOM BÄNKEN KÖR (ögonblicksbild 2026-11-13 kväll, Pi 4c84b1b, tools/ladan-2026-11-13/system/config.json): bara de nycklar som finns i defaultConfig och skiljer sig. Läses av tools/benchCfg.mjs. Uppdatera efter varje besök där /setup ändrats.",
+ "detection": {
+  "autoGainTarget": 0.5,
+  "tauUp": 34.655101661265604,
+  "tauDown": 8.6336042052845,
+  "noiseFloor": 0.003,
+  "kickThreshold": 1.6,
+  "kickCooldownMs": 90
+ },
+ "fixtures": [
+  {
+   "name": "Lampa 1",
+   "address": 1,
+   "preset": "custom",
+   "roles": [
+    "dim",
+    "r",
+    "g",
+    "b",
+    "strobe",
+    "unused",
+    "unused"
+   ],
+   "cal": {
+    "off": 0,
+    "on": 16
+   }
+  },
+  {
+   "name": "Lampa 2",
+   "address": 8,
+   "preset": "custom",
+   "roles": [
+    "dim",
+    "r",
+    "g",
+    "b",
+    "strobe",
+    "unused",
+    "unused"
+   ],
+   "cal": {
+    "off": 0,
+    "on": 16
+   }
+  },
+  {
+   "name": "Lampa 3",
+   "address": 15,
+   "preset": "custom",
+   "roles": [
+    "dim",
+    "r",
+    "g",
+    "b",
+    "strobe",
+    "unused",
+    "unused"
+   ],
+   "cal": {
+    "off": 0,
+    "on": 16
+   }
+  },
+  {
+   "name": "Lampa 4",
+   "address": 22,
+   "preset": "custom",
+   "roles": [
+    "dim",
+    "r",
+    "g",
+    "b",
+    "strobe",
+    "unused",
+    "unused"
+   ],
+   "cal": {
+    "off": 0,
+    "on": 16
+   }
+  },
+  {
+   "name": "Lampa 5",
+   "address": 29,
+   "preset": "custom",
+   "roles": [
+    "dim",
+    "r",
+    "g",
+    "b",
+    "strobe",
+    "unused",
+    "unused"
+   ],
+   "cal": {
+    "off": 0,
+    "on": 16
+   }
+  },
+  {
+   "name": "Lampa 6",
+   "address": 36,
+   "preset": "custom",
+   "roles": [
+    "dim",
+    "r",
+    "g",
+    "b",
+    "strobe",
+    "unused",
+    "unused"
+   ],
+   "cal": {
+    "off": 0,
+    "on": 16
+   }
+  },
+  {
+   "name": "Lampa 7",
+   "address": 43,
+   "preset": "custom",
+   "roles": [
+    "dim",
+    "r",
+    "g",
+    "b",
+    "strobe",
+    "unused",
+    "unused"
+   ],
+   "cal": {
+    "off": 0,
+    "on": 16
+   }
+  },
+  {
+   "name": "Lampa 8",
+   "address": 50,
+   "preset": "custom",
+   "roles": [
+    "dim",
+    "r",
+    "g",
+    "b",
+    "strobe",
+    "unused",
+    "unused"
+   ],
+   "cal": {
+    "off": 0,
+    "on": 16
+   }
+  }
+ ],
+ "sensitivity": 0.611111111111111,
+ "dynamics": 0.6277777777777778,
+ "silenceLevel": 0.015,
+ "showLeadMs": 90
+}

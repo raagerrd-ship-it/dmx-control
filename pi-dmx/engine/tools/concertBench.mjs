@@ -13,6 +13,7 @@
  *   aterseende         andel aterkommande sektioner (samma etikett i samma lat) som far SAMMA palett  - konsert: hog (igenkanning)
  *   node tools/concertBench.mjs <wav> [--json ut.json] [--sek S] [--start S] [--norm DBFS]
  */
+import { ladanCfg } from "./benchCfg.mjs";   // bänkens config = ladans (8 lampor, släckgräns, lead) - natt 11-14
 import { readFileSync, writeFileSync } from "node:fs";
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
@@ -28,11 +29,11 @@ const d = readFileSync(path); const nSamples = (d.length - 44) >> 1;
 let GAIN = 1;
 if (opt("--norm", null) !== null) { const blk = 4800, rms = []; for (let o = 0; o + blk <= nSamples; o += blk) { let q = 0; for (let i = 0; i < blk; i++) { const x = d.readInt16LE(44 + (o + i) * 2) / 32768; q += x * x; } const r = Math.sqrt(q / blk); if (r > 1e-4) rms.push(r); } rms.sort((a, b) => a - b); if (rms.length) GAIN = Math.pow(10, Number(opt("--norm")) / 20) / rms[rms.length >> 1]; }
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = 25;
-const cfg = JSON.parse(JSON.stringify(defaultConfig));
+const cfg = ladanCfg(defaultConfig);
 cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.master = 1;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
 const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = (fx.address ?? 1) - 1; const at = (r) => { const i = roles.indexOf(r); return i < 0 ? -1 : base + i; }; return { r: at("r"), g: at("g"), b: at("b") }; });
-const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
+const an = new Analyser(ladanCfg(defaultConfig)); an.setGainLock(true, 1);
 const feed = new BeatFeed();
 const bounds = new BoundaryDetector(() => Date.now());
 an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
