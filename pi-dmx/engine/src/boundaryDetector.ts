@@ -16,8 +16,7 @@
 
 import { silentLevel } from "./analyser.js";
 const SILENCE_END_MS = 3000;   // tystnad sa lange = laten ar slut
-const START_LEVEL = 0.15;      // volymgrind: starta bara pa tydlig musik
-const START_HOLD_MS = 1000;    // ...som hallit i en sekund
+const START_HOLD_MS = 1000;    // ett segment startar nar musiken hallit sig over slackgransen sa lange (se tick)
 const MIN_SEG_MS = 110000;     // MATT: 75 s triggade direkt (tva segment exakt 75 s) -> hojt
 const MAX_SEG_MS = 600000;     // 10 min utan grans -> tvinga fram en
 const NOV_WIN_MS = 1500;       // klangprofil per 1,5 s
@@ -183,10 +182,13 @@ export class BoundaryDetector {
   tick(o: { level: number; bpm: number; bpmConfidence: number; silent?: boolean }): void {
     const now = this.clock();
     this.fLastBpm = o.bpm;
-    if (!(o.silent ?? silentLevel(o.level))) this.lastLoud = now;   // tystnaden = analysatorns (frame.silent, EN tröskel cfg.silenceLevel)
+    const loud = !(o.silent ?? silentLevel(o.level));   // tystnaden = analysatorns (frame.silent, EN tröskel cfg.silenceLevel)
+    if (loud) this.lastLoud = now;
     if (!this.playStart) {
-      // Volymgrind: starta bara pa tydlig musik som hallit en sekund, aldrig pa brusgolvet.
-      if (o.level >= START_LEVEL) {
+      // STARTGRINDEN = SLÄCKGRÄNSEN (2026-11-14): musik som hållit en sekund, aldrig tystnad. Förr en egen absolut nivå (0,15): ladans
+      // rena ljud ligger på nivå 0,07-0,15 i median och höll sig aldrig över den i en sekund - inget segment startade, alltså ingen
+      // låtgräns alls (0 av 6 låtbyten på tre inspelningar 11-13), klockan fick aldrig veta att låten bytts och manuset glömdes aldrig.
+      if (loud) {
         if (!this.loudSince) this.loudSince = now;
         else if (now - this.loudSince >= START_HOLD_MS) { this.playStart = now; this.lastLoud = now; this.loudSince = 0; }
       } else this.loudSince = 0;
