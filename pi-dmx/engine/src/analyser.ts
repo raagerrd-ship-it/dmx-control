@@ -301,6 +301,11 @@ const BODY_CEIL_DB_S = 0.15;   // taket haller latens loud-referens lange
 // (bodyFast 60 ms, bodyEnv 350 ms, bodyCeil -0,15 dB/s) - förr en egen kopia i effekterna.
 const FLANK_GONE_DB = 10, FLANK_BREAK_S = 4, FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;
 const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24, FLANK_SILENT_LV = 0.005;
+// BREAK-TAKET (2026-11-14, ur arenan drop1 a7; ägarens facit i ladan 11-13): har basen varit borta i FLANK_ROOF_BEATS slag eller mer
+// (2 takter, räknat i klockans tempo) är återkomsten en ny sektion som börjar, inte en drop. Mätt på ägarens två markerade inspelningar:
+// hans egna drop har basen borta högst 6 slag, återkomsterna han INTE kallar drop (omarkerade, "inte drop", låtbyte) minst drygt 8.
+// Samma dom för tak 6-9 slag. Slam-kandidaten kan fortfarande göra återkomsten till minidrop.
+const FLANK_ROOF_BEATS = 8;
 const SHOW_DROP_GAP_MS = 12000;   // spärr mellan full drops (ägaren 10-12): flank inom spärren = minidrop (dropSpaced)
 // RISERNS FÖNSTER: bandets nivå räknas 0..1 över så här många dB under bandets egen topp (förr absolut -70..-10 dB, samma spann).
 const RISER_SPAN_DB = 60;
@@ -2714,6 +2719,7 @@ export class Analyser {
     const span = this.fdGone > 0 ? this.fdGone : now - this.fdEnd < FLANK_GRACE_S * 1000 ? this.fdSpan : 0;
     if (this.lvlSmooth <= FLANK_SILENT_LV) this.fdQuietAt = now;
     if (!edge || f - low < FLANK_RISE_DB || (span < FLANK_BREAK_S && !(span >= FLANK_SHORT_S && ceil - low >= FLANK_SHORT_RISE_DB))) return false;
+    if (span * (this.dBpm > 40 ? this.dBpm : 60000 / Analyser.BE_FALLBACK_MS) >= FLANK_ROOF_BEATS * 60) return false;   // BREAK-TAKET: ny sektion, ingen drop
     if (now - this.fdQuietAt < span * 1000 + 500) { this.fdGone = 0; this.fdSpan = 0; if (DROP_TRACE) console.log(`[flank] ingen drop: helt tyst i breaket (latstart), break ${span.toFixed(1)} s`); return false; }
     this.fdGone = 0; this.fdSpan = 0; this.fdAt = now; this.dropRiseDb = f - low;
     if (DROP_TRACE) console.log(`[flank] full drop pa flanken: break ${span.toFixed(1)} s, stigning ${(f - low).toFixed(1)} dB`);
