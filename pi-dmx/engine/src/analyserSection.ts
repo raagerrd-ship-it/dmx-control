@@ -52,7 +52,7 @@ export class SectionTracker {
   private static readonly RANK_W_FLAT = 0;
   private static readonly RANK_W_FLUX = 0;
   private static readonly RANK_W_DYN = 0;
-  private secBlkBon = 0;private secBlkBpk = 0;private secBlkFlux = 0;private secBlkRms4 = 0;
+  private secBlkBon = 0; private secBlkBpk = 0; private secBlkFlux = 0; private secBlkRms4 = 0;
   secBlkH: { bon: number[]; bpk: number[]; high: number[]; flat: number[]; flux: number[]; dyn: number[] } = { bon: [], bpk: [], high: [], flat: [], flux: [], dyn: [] };
   private static readonly RANK_HYST = 0.15;
  
@@ -77,7 +77,7 @@ export class SectionTracker {
    *  refrang-recall 0,58 -> 0,69; med 2 block 6/14, 8/14, 5,4 s men vers 2 0,39. TEST (2 block): 0/13 -> 1/13, 3 -> 4, 30 -> 25 s,
    *  vers 2 0,26 -> 0,21, high==high 0,54 -> 0,49 - vinsten overfors svagt. Standard = 0 (av). */
 
-  secBlkCentH: number[] = [];private secScoreBuf: Float64Array | Float32Array = SECTION_SCORE_F32 ? new Float32Array(600) : new Float64Array(600);
+  secBlkCentH: number[] = []; private secScoreBuf: Float64Array | Float32Array = SECTION_SCORE_F32 ? new Float32Array(600) : new Float64Array(600);
   secBlkHighH: number[] = [];
   /** levelVsHighDb-referens: 'section' = senaste refrangens medel-dB (standard), 'rank' = HIGH_REF_P-percentilen av latens block-dB. */
 
@@ -88,7 +88,7 @@ export class SectionTracker {
   private secBlkRms2 = 0;secBlkDb: number[] = [];secBlkDens: number[] = [];
   private secHiStartMs = 0;   // frasgittrets ankare (senaste high-start), sug-regelns mal + flank
   private secLog: Array<{ label: string; startMs: number; endMs: number; db: number; dens: number }> = [];
-  private secCurDbSum = 0;private secCurDbN = 0;private secCurDens = 0;lastHighDb = NaN;
+  private secCurDbSum = 0; private secCurDbN = 0; private secCurDens = 0; lastHighDb = NaN;
   /** SNABBA KANTER (2026-11-12, uppföljningen av arenan bygg): rangen avgör VILKA partier som är 'high', nivåns kant avgör NÄR.
    *  SEC_EDGE_DB = så stort ska ett nivåskifte vara för att räknas som kant (dB; samma tal åt båda håll och för 'når referensen').
    *  UPP: blocket ligger SEC_EDGE_DB över medianen av frasen före (4 takter ur klockan - medianen ser varken ett hål eller en smäll på
@@ -100,22 +100,22 @@ export class SectionTracker {
    *  topp 'build' (på väg upp), inte 'high' - annars tar rangen tillbaka ett tyst parti några sekunder efter kanten.
    *  secCarryHighDb = förra låtens referens, buren över låtgränsen som blocken (SECTION_CARRY) tills nya låten har en egen (bara UPP). */
   private static readonly SEC_EDGE_DB = 4;
-  secCarryHighDb = NaN;private secHiEndMs = 0;private secEdgeBuf = new Float64Array(16);
-  private secBlkMs = 0;private secBlkN = 0;private secBlkInt = 0;private secBlkKicks = 0;private secBlkCent = 0;private secBlkSpec = new Float32Array(8);
-  private secTierRun = 0;private secTierCand = 1;private secRiseRun = 0;private secSongStartMs = 0;private secDropSeen = 0;private secSilentBlocks = 0;private secDropHoldUntil = 0;
-  private secHist = new Float32Array(16);private secHistPos = 0;private secHistN = 0;
-  private static readonly FP_DIM = 11;private static readonly FP_MAX = 96;
-  private secFp = new Float32Array(SectionTracker.FP_MAX * SectionTracker.FP_DIM);private secFpT = new Float64Array(SectionTracker.FP_MAX);private secFpLab: string[] = [];
-  private secFpN = 0;private secFpPos = 0;private secFpAcc = new Float32Array(SectionTracker.FP_DIM);private secFpAccN = 0;
+  secCarryHighDb = NaN; private secHiEndMs = 0; private secEdgeBuf = new Float64Array(16);
+  private secBlkMs = 0; private secBlkN = 0; private secBlkInt = 0; private secBlkKicks = 0; private secBlkCent = 0; private secBlkSpec = new Float32Array(8);
+  private secTierRun = 0; private secTierCand = 1; private secRiseRun = 0; private secSongStartMs = 0; private secDropSeen = 0; private secSilentBlocks = 0; private secDropHoldUntil = 0;
+  private secHist = new Float32Array(16); private secHistPos = 0; private secHistN = 0;
+  private static readonly FP_DIM = 11; private static readonly FP_MAX = 96;
+  private secFp = new Float32Array(SectionTracker.FP_MAX * SectionTracker.FP_DIM); private secFpT = new Float64Array(SectionTracker.FP_MAX); private secFpLab: string[] = [];
+  private secFpN = 0; private secFpPos = 0; private secFpAcc = new Float32Array(SectionTracker.FP_DIM); private secFpAccN = 0;
   private static readonly REPEAT_THR = 0.7;
   private static readonly REPEAT_STEP = 2;
   private static readonly REPEAT_W = 2;
-  private static readonly FP2_DIM = 12;private static readonly FP2_MAX = 128;
-  private secFp2 = new Float32Array(SectionTracker.FP2_MAX * SectionTracker.FP2_DIM);private secFp2Z = new Float32Array(SectionTracker.FP2_MAX * SectionTracker.FP2_DIM);
-  private secFp2T = new Float64Array(SectionTracker.FP2_MAX);private secFp2Db = new Float32Array(SectionTracker.FP2_MAX);private secFp2Dens = new Float32Array(SectionTracker.FP2_MAX);private secFp2Lab: string[] = [];
-  private secFp2N = 0;private secFp2Pos = 0;private secFp2Acc = new Float32Array(SectionTracker.FP2_DIM);private secFp2AccN = 0;private secFp2AccDb = 0;private secFp2AccDens = 0;
-  private secFp2Mu = new Float32Array(SectionTracker.FP2_DIM);private secFp2Sd = new Float32Array(SectionTracker.FP2_DIM);
-  secBlkT: number[] = [];secRank = { md: 0, sd: 1, mk: 0, sk: 1 };private secScoreSorted = new Float64Array(601);   // 2026-10-17: typad scratch, sorteras på plats (var number[] + sort((a, b) => a - b): ~10 kB skräp per block)
+  private static readonly FP2_DIM = 12; private static readonly FP2_MAX = 128;
+  private secFp2 = new Float32Array(SectionTracker.FP2_MAX * SectionTracker.FP2_DIM); private secFp2Z = new Float32Array(SectionTracker.FP2_MAX * SectionTracker.FP2_DIM);
+  private secFp2T = new Float64Array(SectionTracker.FP2_MAX); private secFp2Db = new Float32Array(SectionTracker.FP2_MAX); private secFp2Dens = new Float32Array(SectionTracker.FP2_MAX); private secFp2Lab: string[] = [];
+  private secFp2N = 0; private secFp2Pos = 0; private secFp2Acc = new Float32Array(SectionTracker.FP2_DIM); private secFp2AccN = 0; private secFp2AccDb = 0; private secFp2AccDens = 0;
+  private secFp2Mu = new Float32Array(SectionTracker.FP2_DIM); private secFp2Sd = new Float32Array(SectionTracker.FP2_DIM);
+  secBlkT: number[] = []; secRank = { md: 0, sd: 1, mk: 0, sk: 1 }; private secScoreSorted = new Float64Array(601);   // 2026-10-17: typad scratch, sorteras på plats (var number[] + sort((a, b) => a - b): ~10 kB skräp per block)
   /** KLANGMALL (09-22, REPEAT bit 256/512; bank agent 'refrang 2'): refrang 2 later som refrang 1. I stallet for W rutor mot EN punkt
    *  (bit 2: avtryck var 2 s, sekvens 2 rutor = nuet syns forst 4-6 s in i refrangen, och st >= 1 kravde rangens 3-blocks-hysteres) matchas
    *  VARJE 1 s-block (glidande medel TEMPL_SM block) mot MEDELAVTRYCKET av alla block som hittills varit refrang (TEMPL_SRC 'lab' = egna
@@ -132,8 +132,8 @@ export class SectionTracker {
    *  1-2 s nar refrangen ar tillbaka, sa uppehallet behovs inte. Bit 512 (utgang pa klang) ar INTE bankad: offline ar klangen per block
    *  inte separerbar (vers 2 liknar refrangmallen lika ofta som refrang 2; nyhet vid gransen = nyhet inne i sektionen), sa den ar av. */
 
-  secBlkFeat: Float32Array[] = [];secBlkHi: number[] = [];private secPct = 0;
-private repeatHighRun = 0;private secHighRunMs = 0;
+  secBlkFeat: Float32Array[] = [];secBlkHi: number[] = []; private secPct = 0;
+  private repeatHighRun = 0; private secHighRunMs = 0;
   /** sectionHop:s summor (samma skäl): anroparen fyller, sectionHop läser. */
   shIn = { hops: 0.5, intSum: 0.5, kicks: 0.5, breaking: false, nowMs: 0.5, dtMs: 0.5, rms2Sum: 0.5, centSum: 0.5, specOff: 0.5, bonSum: 0.5, bpk: 0.5, fluxSum: 0.5, rms4Sum: 0.5 };
   /** slow + stora vägen: sektionens syn på drop-räknaren (som R_DROPS förr: värdet vid förra env-recordet). */

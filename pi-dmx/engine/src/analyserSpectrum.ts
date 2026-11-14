@@ -35,18 +35,18 @@ export class SpectrumBands {
   private onsetMad = new Float32Array(8);  // robust MAD -> troskelspridning per band
   private static readonly ONSET_K = 3.0;   // troskel = median + K*MAD
   private static readonly FB_K = [385, 475, 313, 1.46, 1.62, 1.8, 2.03, 2.12];   // 2048-medel / snabbt medel, median över 4 ladan-inspelningar (+-2 dB mellan filerna)
-  fbMag = new Float32Array(256);fbPrevMag = new Float32Array(256);
-  fbLo = new Int32Array(8);fbHi = new Int32Array(8);
+  fbMag = new Float32Array(256); fbPrevMag = new Float32Array(256);
+  fbLo = new Int32Array(8); fbHi = new Int32Array(8);
   fbCoef = new Float64Array(3 * 2 * 5);   // per lågband: HP-biquad + LP-biquad (b0 b1 b2 a1 a2)
   private fbState = new Float64Array(3 * 2 * 4); // x1 x2 y1 y2 per biquad
-  private fbPow = new Float64Array(3);private fbPrevAmp = new Float64Array(3);fbA = new Float64Array(3);
-  fbAbs = new Float32Array(8);fbDbRaw = new Float32Array(8);fbLvl = new Float32Array(8);  private fbPeak = new Float32Array(8).fill(1e-4);private fbOnMed = new Float32Array(8);private fbOnMad = new Float32Array(8);
-  fbAlvl = 0.5;private fbWarm = 0;
+  private fbPow = new Float64Array(3); private fbPrevAmp = new Float64Array(3); fbA = new Float64Array(3);
+  fbAbs = new Float32Array(8); fbDbRaw = new Float32Array(8); fbLvl = new Float32Array(8);  private fbPeak = new Float32Array(8).fill(1e-4); private fbOnMed = new Float32Array(8); private fbOnMad = new Float32Array(8);
+  fbAlvl = 0.5; private fbWarm = 0;
   /** Basonset-toppplockning (snabba sidan, var BIG_EVERY:e hop = 8 ms): librosa onset_detect-lika parametrar i sampel a 8 ms:
    *  pre_max 4 (30 ms), pre/post_avg 12 (100 ms), wait 4 (30 ms), delta i dB (librosas 0,07 pa ett dB-envelope). */
   private static readonly BASSON_DELTA = 0.07;
-private static readonly BASSON_AVG = 12;private static readonly BASSON_MAX = 4;private static readonly BASSON_WAIT = 4;
-private bassOnLastPk = -1e9;specRing: Float32Array | null = null;
+  private static readonly BASSON_AVG = 12; private static readonly BASSON_MAX = 4; private static readonly BASSON_WAIT = 4;
+  private bassOnLastPk = -1e9;specRing: Float32Array | null = null;
 specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
   /** Stor-FFT-rutor med signal i rad. Onsets hålls tysta tills MAD hunnit byggas
    *  upp — se `ONSET_WARM` och kommentaren vid bandOn. */

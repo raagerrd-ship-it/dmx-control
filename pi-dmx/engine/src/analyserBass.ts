@@ -19,7 +19,7 @@ export class BassTracker {
    *  ingångsnivån). Fyra tal i tillstånd (beRef = låtens referens för frame.bassLevel), inga objekt per hop. INGEN DAL HÄR (ägaren 11-11: en dal som återhämtar sig inom slaget
    *  bestämmer pulsens bredd = ljusstyrning) - den ligger i effects.ts stepEnergy och följer fältet, inte ljudet.
    *  (Provat och förkastat i arenan: toppen som kvantil/median av de 32 senaste slagtopparna - plattare ljus, sämre takt i bänken.) */
-  private static readonly BE_TOP_BEATS = 16;private static readonly BE_FAST_BEATS = 2;  private static readonly BE_BEAT_MIN_MS = 300;private static readonly BE_BEAT_MAX_MS = 600;  beHi = NaN;private beHiShort = NaN;beRef = NaN;beShort = 0;
+  private static readonly BE_TOP_BEATS = 16; private static readonly BE_FAST_BEATS = 2;  private static readonly BE_BEAT_MIN_MS = 300; private static readonly BE_BEAT_MAX_MS = 600;  beHi = NaN; private beHiShort = NaN; beRef = NaN; beShort = 0;
   /** Stegar skalorna ett hop; returnerar frasens värde, taktens ligger i beShort. */
   bassEnergyStep(sub: number, kick: number): number {
     const x = 5 * Math.log10(sub + 1e-7) + 15 * Math.log10(kick + 1e-7), hopMs = this.a.dtHop * 1000;   // 0,25 x sub dB + 0,75 x kick dB
@@ -33,8 +33,8 @@ export class BassTracker {
     e = 1 - (this.beHi - x) / Analyser.BE_SPAN_DB;
     return e > 0 ? e : 0;
   }
-private blPrev1 = 0;private blPrev2 = 0;private blRef = 0.1;private blLastOnset = -100;
-  private blOnsets = new Int32Array(32);private blOnsetPos = 0;envSeq = 0;private blTrough = 1;
+  private blPrev1 = 0; private blPrev2 = 0; private blRef = 0.1; private blLastOnset = -100;
+  private blOnsets = new Int32Array(32); private blOnsetPos = 0; envSeq = 0; private blTrough = 1;
   /** TYDLIG BASGANG (env-rastret, 100 Hz): se blAccum. */
   stepBassline(): void {
     const v = this.a.blAccum; this.a.blAccum = 0;

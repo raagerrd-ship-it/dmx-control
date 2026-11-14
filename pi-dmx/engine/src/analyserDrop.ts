@@ -47,7 +47,7 @@ export class DropDetector {
     this.a = a;
     for (const k of DOUBLE_FROM_START) { const v = (this as unknown as Record<string, number>)[k]; if (typeof v === 'number') { (this as unknown as Record<string, number>)[k] = 0.5; (this as unknown as Record<string, number>)[k] = v; } }
   }
-  secBodyRet = 0;private secBodyArmMs = 0;
+  secBodyRet = 0; private secBodyArmMs = 0;
   /** BASKROPPEN — (sub+kick+bas)/3, utjämnad. Det är HÄR en drop syns.
    *  MÄTT över 15 min av ägarens egen musik: `level` ligger i sin övre tredjedel
    *  67 % av tiden (dynamik p90/p10 = 2.1) — den kan omöjligt peka ut ett särskilt
@@ -80,19 +80,19 @@ export class DropDetector {
    *  blockerade av den föregående falska avfyrningen. */
   private bodyGoneMs = 0;
   private lastBodyGoneMs = -1e9;
-  miniDropCount = 0;private lastMiniMs = -1e9;private miniGoneMs = 0;private lastMiniGoneMs = -1e9;private wasMiniOnset = false;
-  private dropArmUntil = 0;private dropArmAt = 0;private dropArmGoneMs = -1.5;   // armerat drop-fonster (DROP_ARM_MS)
-  private calmHoldStart = -0;private calmHoldRise = -0;   // DROP_CALM_LAND_MS: kandidat som halls for verifierad landning
+  miniDropCount = 0; private lastMiniMs = -1e9; private miniGoneMs = 0; private lastMiniGoneMs = -1e9; private wasMiniOnset = false;
+  private dropArmUntil = 0; private dropArmAt = 0; private dropArmGoneMs = -1.5;   // armerat drop-fonster (DROP_ARM_MS)
+  private calmHoldStart = -0; private calmHoldRise = -0;   // DROP_CALM_LAND_MS: kandidat som halls for verifierad landning
 
   private goneEpisodeMs = -1.5;   // (double fran start, se dropArmGoneMs) gone-episodens START (lastBodyGoneMs uppdateras varje hop och duger INTE som id)
   dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter) - full drop på flanken
   dropCand = 0;          // slam-kandidaterna (förr dropCount): sektionens drop-evidens och minidrop utan flank
-  dropDemoted = 0;dropSpaced = 0;dropRiseDb = -0;
-  private fdGone = -0;private fdSpan = -0;private fdEnd = -1e12;private fdAbove = true;private fdAt = -1e12;private fdQuietAt = -1e12;private lastShowDropMs = -1e12;
-  private fdT = new Float64Array(1024);private fdV = new Float64Array(1024);private fdS0 = 0;private fdN = 0;   // (tid, bodyFast) för toppens fönster
-  private nearOn = false;private nearB = -0;private nearNorm = -0;private nearFloor = 1e9;private liftCalm = -0;private liftLift = -0;
-  private liftHist = new Float64Array(240);private liftW = 0;private liftN = 0;private liftHistAt = -1e12;private stopRunS = -0;
-  nearDropDb = -0;nearDipDb = -0;liftDb = -0;stopCount = 0;stopS = -0;
+  dropDemoted = 0; dropSpaced = 0; dropRiseDb = -0;
+  private fdGone = -0; private fdSpan = -0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12; private fdQuietAt = -1e12; private lastShowDropMs = -1e12;
+  private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;   // (tid, bodyFast) för toppens fönster
+  private nearOn = false; private nearB = -0; private nearNorm = -0; private nearFloor = 1e9; private liftCalm = -0; private liftLift = -0;
+  private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftHistAt = -1e12; private stopRunS = -0;
+  nearDropDb = -0; nearDipDb = -0; liftDb = -0; stopCount = 0; stopS = -0;
   lastDropMs = -1.5e9;   // utanfor Smi-intervallet -> Double fran start (typstabilt)
 
   /** Drop-detektionen (baskropp, franvaro, stigning, armering, minidrop, lugn-grind, kick-las, fyrning). Manga kalla grenar: egen funktion sa att en deopt bara kostar den har, inte hetslingan. */

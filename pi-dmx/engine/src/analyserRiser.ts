@@ -18,7 +18,7 @@ export class RiserDetector {
     this.a = a;
     for (const k of DOUBLE_FROM_START) { const v = (this as unknown as Record<string, number>)[k]; if (typeof v === 'number') { (this as unknown as Record<string, number>)[k] = 0.5; (this as unknown as Record<string, number>)[k] = v; } }
   }
-  aSpecSlow = 0;aNovSlow = 0;                                 // RISER/UPPBYGGNAD (flyttad från effects)
+  aSpecSlow = 0; aNovSlow = 0;                                 // RISER/UPPBYGGNAD (flyttad från effects)
   /**
    * OBEHANDLAD LOGBANDNIVÅ — riserdetektorns egen ingång.
    *

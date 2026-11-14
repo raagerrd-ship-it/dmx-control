@@ -179,7 +179,8 @@ let mod = `/** ${cfg.header} */\n${impLines.join("\n")}\n\n${tordered.map(piece)
 if (dbl.length) mod += `/** Talfält som ska vara flyttal från start (se stabiliseringen i analyser.ts). */\nconst DOUBLE_FROM_START = [${dbl.map(d => `'${d}'`).join(", ")}] as const;\n`;
 mod += `\nexport class ${cfg.cls} {\n  /** analysatorn som äger den här delen (delade signaler läses via den) */\n  a: Analyser;\n  constructor(a: Analyser) {\n    this.a = a;\n`;
 if (dbl.length) mod += `    for (const k of DOUBLE_FROM_START) { const v = ${STAB}[k]; if (typeof v === 'number') { ${STAB}[k] = 0.5; ${STAB}[k] = v; } }\n`;
-mod += `  }\n${ordered.map(piece).join("")}}\n`;
+const LF = String.fromCharCode(10), own = t => (/^\s/.test(t) ? t : "  " + t) + (t.endsWith(LF) ? "" : LF);   // en medlem per rad även när den delade rad med en som blev kvar
+mod += `  }\n${ordered.map(piece).map(own).join("")}}\n`;
 // ── analyser.ts: ta bort det flyttade, lägg till fältet och importen ──
 const del = [...ordered, ...tordered].map(n => range(n));
 let rest = fe.filter(e => !del.some(([a, b]) => within(e, a, b)));

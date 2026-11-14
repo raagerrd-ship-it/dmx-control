@@ -9,7 +9,7 @@ export class LevelTracker {
   constructor(a: Analyser) {
     this.a = a;
   }
-  aIUp = 0;aIDown = 0;  silentMs = -0;   // typstabilt (se lastDropRise)
+  aIUp = 0; aIDown = 0;  silentMs = -0;   // typstabilt (se lastDropRise)
   /** true = tystnadssläppningen redan gjord för denna tystnad (flanktriggad). */
   private silenceArmed = false;
   private intensityEma = 0.5;    // sektionsenergi: utjämnad nivå
