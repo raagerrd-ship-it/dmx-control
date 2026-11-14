@@ -1,0 +1,8 @@
+{
+  "file": "analyserSection.ts",
+  "cls": "SectionTracker",
+  "prop": "sections",
+  "short": "SEKTIONER: block, rang (intro/low/build/high/break), upprepning, förutsägelse",
+  "header": "SEKTIONSFÖLJAREN (utbruten ur analyser.ts 2026-11-14). Samlar låtens block (nivå, täthet, klang), rangordnar dem till sektionsetiketter, känner igen upprepning och förutsäger nästa refräng. Körs i långsamma vägen; läser nivå, klang, drop-räknare och klockans tempo ur analysatorn (this.a).",
+  "methods": ["secDropsNow", "sectionReset", "sectionHop", "sectionBlock", "rankTier", "rankTerm", "repeatStep", "predictHigh", "sectionFlushAgg", "sectionAggStep"]
+}

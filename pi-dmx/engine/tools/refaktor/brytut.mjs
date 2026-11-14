@@ -28,6 +28,7 @@ const mname = m => ts.isConstructorDeclaration(m) ? "constructor" : m.name && ts
 const memBySym = new Map(), members = [];
 for (const m of A.members) { const n = mname(m); if (!n) continue; members.push(m); if (m.name) { const s = checker.getSymbolAtLocation(m.name); if (s) memBySym.set(s, m); } }
 for (const g of G) if (!members.some(m => mname(m) === g)) fail(`metoden ${g} finns inte i Analyser`);
+if (members.some(m => mname(m) === cfg.prop)) fail(`Analyser har redan en medlem som heter ${cfg.prop} - välj ett annat prop`);
 const topBySym = new Map(), topStmts = [];
 for (const s of sf.statements) {
   if (ts.isVariableStatement(s)) { topStmts.push(s); for (const d of s.declarationList.declarations) if (ts.isIdentifier(d.name)) topBySym.set(checker.getSymbolAtLocation(d.name), s); }
