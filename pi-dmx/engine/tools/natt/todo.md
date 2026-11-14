@@ -1,5 +1,20 @@
 # Natt-agentens uppdrag
 
+NATTEN 2026-11-14 03:20 (schemalagda körningen, ingen motorkod ändrad): MÄTFÄLLA 55 - BÄNKARNA KÖRDE INTE LADANS CONFIG. defaultConfig =
+4 lampor, släckgräns 0,05, lead 50 ms; ladan = 8 lampor, 0,015, 90 ms. På det rena ljudet (nivå-median 0,16) släckte bänken riggen 22-27 % av
+tiden (längst 21 s) där ladan lyser. RÄTTAT: tools/ladanCfg.json (bild av Pi:ns config 11-13, bara nycklar som skiljer) + tools/benchCfg.mjs
+(ladanCfg(defaultConfig)); showTight, concertBench, konsertReplay läser den. DMX_BENCH_CFG=standard = gamla läget (json-identiskt bevisat på
+alla tre filerna). EJ BYTTA: dmxDump (md5-bevis), arena/dropdomKor.mjs, lampCount, dynBench, bank.py-kedjan - byt när fillistorna byggs om.
+UPPDATERA tools/ladanCfg.json efter varje besök där /setup ändrats (.arena/natt1114/mkcfg.mjs gör den ur system/config.json).
+BASLINJE PÅ RENT LJUD (HEAD abe69c3, ladans config, tools/natt/ren-2026-11-14/; 151659 / 160345 / 171840): släckt 0,5 / 1,6 / 0,2 %,
+kick->ljus 136 / 141 / 85 ms på 32 / 34 / 31 % av kickarna, ljus mot nivå r 0,50 / 0,63 / 0,31, lookbyten 1,7 / 3,2 / 2,8 per min,
+längsta stund i en look 175 s (gallop) / 151 s (kickregn) / 47 s, byte på frasgräns 24 / 19 / 13 %, vers mot refräng 0,30 / 0,20 / 0,27,
+lampspridning 63 / 64 / 56. natt.py går inte (arkiverat ljud); samma kommandon nästa natt = bit-jämförbart.
+BRISTER (ej åtgärdade, ingen ljusdomare på nytt ljud): (1) en look i 2,5-3 min - manuset ger samma look vid varje refräng och ingen låtgräns
+bryter; (2) lookbyten på frasgräns 13-24 %; (3) kvarvarande mörker 4-6,5 s = kickregn/sökljus när basen är borta.
+NÄSTA FÖR NATTAGENTEN: bygg om ljusdomarens fillistor (bank.py WAVS/HOLDOUT, domare.py) på de tre 11-13-filerna med benchCfg och mät bas;
+mät om dropdom-basen med ladans config (analysatorn får släckgränsen: kickar 1525 -> 1532 i 151659) innan nästa drop-arena.
+
 ARENAN DROP1 KLAR 2026-11-14 03:30: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-13-drop1.md, idébank i mappen bredvid.
 Övningen: jokern 90,7 poäng (8/9 drop), a1 82,6. KONTROLLEN: alla 0 av 5 drop i finalen; efter runda 2 (allmängiltighet) bäst a4r 1 av 5.
 Orsak: i övningen hålls basen tillbaka före drop (66 % av 8 s), i kontrollen spelar basen vidare (33 %, längsta lucka 1,1 s) - de två

@@ -1,0 +1,35 @@
+[quiet] console.log avstangd (DMX_QUIET=1) - PUT /api/debug/verbose {"enabled":true} slar pa
+
+=== tools/ladan-2026-11-13/lang-20261113T160345.wav  0-603 s, 22603 rutor a 25 ms ===
+
+TAJT MOT LATEN
+  kick -> lampan pa mal 141 ms (median, p75 189, 3968 lampuppgangar; gamla riggmedel 90 %: 150 ms, fonster 200 ms vid 131 BPM) pa 599/1755 kickar = 34.1 %
+  uppgangens storlek 0.16 av riggens 0-1 skala
+  ljus mot energi    r 0.42 pa 1 s-MEDEL, 0.33 pa 1 s-TOPP (ruta-mot-ruta 0.35), ljus mot niva r 0.63
+  ljus per tier      lugn 0.13/0.24  fart 0.23/0.44  full 0.35/0.52  (medel/topp, 96/319/150 s)
+  look-byten         32 st = 3.19/min, musikalisk orsak 100.0 %
+                     sektion 25  drop 7
+  drops              10 st, sprang lugna 0.84 (8 st) / hoga 0.43
+
+SNYGG LJUSSHOW
+  alla tre dioderna  2.1 % av tanda lamprutor   exakt en kanal 40.4 %
+  mattnad (median)   1.00      spridning mellan lampor 64 DMX-steg
+  lookar             7 distinkta, median 8 s, langsta stund 151 s
+  riggens ljus       p10 0.07  p50 0.22  p90 0.52   slackt 1.6 % av tiden
+
+-- dirigenten (119 rader, 12 forsta) --
+   [dirigent] nastan-drop: sprang 28.5 dB efter dipp 8.0 dB
+   [dirigent] sektion intro -> build (nr 0, tier 1)
+   [dirigent] manus build: ny look "rulle" (tier fart, pool 16, sektion build, basgang 0.13)
+   [dirigent] nastan-drop: sprang 10.1 dB efter dipp 11.0 dB
+   [dirigent] sektion build -> high (nr 1, tier 2)
+   [dirigent] manus high: ny look "kickregn" (tier full, pool 13, sektion high, basgang 0.58)
+   [dirigent] nastan-drop: sprang 14.9 dB efter dipp 15.8 dB
+   [dirigent] nastan-drop: sprang 36.0 dB efter dipp 21.1 dB
+   [dirigent] nastan-drop: sprang 21.9 dB efter dipp 15.6 dB
+   [dirigent] nastan-drop: sprang 17.8 dB efter dipp 16.6 dB
+   [dirigent] nastan-drop: sprang 15.8 dB efter dipp 15.8 dB
+   [dirigent] nastan-drop: sprang 10.2 dB efter dipp 8.1 dB
+
+TAJT = kick->ljus lagt, kickTraff hogt, r hogt, musikByten hogt. SNYGGT = alla3 lagt, mattnad och lampspr hoga,
+flera lookar utan langa stillastaende stunder, och ett ljusspann som anvands. Jamfor natt mot natt, aldrig i absoluta tal.
