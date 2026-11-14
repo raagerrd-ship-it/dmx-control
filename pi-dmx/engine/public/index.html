@@ -104,6 +104,7 @@
     .btn:disabled { opacity: .45; cursor: default; }
     .btn.mark { padding: 18px 12px; font-size: 16px; font-weight: 600; }
     .btn.mark.hit { border-color: var(--ok); color: var(--ok); }
+    .btn.mark kbd { display: inline-block; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 13px; font-weight: 500; opacity: .75; }
     .in-bar { position: relative; height: 34px; margin-top: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
     .in-zone { position: absolute; top: 0; bottom: 0; left: 65%; width: 27.5%; background: rgba(64,224,160,.16); border-left: 1px solid var(--ok); border-right: 1px solid var(--ok); }
     .in-fill { position: absolute; top: 0; bottom: 0; left: 0; width: 0; background: var(--ok); opacity: .85; transition: width 120ms linear; }
@@ -682,16 +683,15 @@
     </div>
     <audio id="recAudio" controls style="width:100%;margin-top:8px" hidden></audio>
     <div class="fx-actions" style="margin-top:10px">
-      <button class="btn mark" id="markSong">Låtbyte</button>
-      <button class="btn mark" id="markBuild">Uppbyggnad</button>
+      <button class="btn mark" id="markDrop">Drop <kbd>D</kbd></button>
+      <button class="btn mark" id="markMini">Minidrop <kbd>M</kbd></button>
     </div>
     <div class="fx-actions" style="margin-top:8px">
-      <button class="btn mark" id="markMini">Minidrop</button>
-      <button class="btn mark" id="markDrop">Drop</button>
-      <button class="btn mark" id="markNot">Inte drop</button>
+      <button class="btn mark" id="markNot">Inte drop <kbd>I</kbd></button>
+      <button class="btn mark" id="markSong">Låtbyte <kbd>L</kbd></button>
     </div>
     <div id="markList" style="margin-top:8px"></div>
-    <div class="status" id="markState" style="margin-top:6px">Under inspelning: tryck när du hör det. Låtbyte när nästa låt börjar, Uppbyggnad när laddningen startar, Drop och Minidrop när det slår till.</div>
+    <div class="status" id="markState" style="margin-top:6px">Under inspelning: tryck på knappen eller tangenten när du hör det. Drop och Minidrop när det slår till, Inte drop när ljuset slog fel, Låtbyte när nästa låt börjar.</div>
   </div>
 
   <h1 id="ringHdr" hidden>LED-ring (vred)</h1>
@@ -929,7 +929,16 @@ const markPost = (kind, btn) => {
     if (st.recording) recFetch();
   }).catch(() => { const el = document.getElementById("markState"); if (el) el.textContent = "Markeringen gick inte fram - försök igen."; });
 };
-[["markSong", "latbyte"], ["markBuild", "uppbyggnad"], ["markMini", "mini"], ["markDrop", "drop"], ["markNot", "intedrop"]].forEach(([id, kind]) => { const b = document.getElementById(id); if (b) b.onclick = () => markPost(kind, b); });
+/* FYRA KNAPPAR, FYRA TANGENTER (ägaren 11-14: "förenkla knappar ... markera även vilken tangent"): D drop, M minidrop, I inte drop, L låtbyte.
+   Uppbyggnad är borta som knapp (låg prio); äldre markeringar av den sorten visas fortfarande i listan. Tangenterna gäller inte i ett textfält. */
+const MARK_KNAPP = [["markDrop", "drop", "d"], ["markMini", "mini", "m"], ["markNot", "intedrop", "i"], ["markSong", "latbyte", "l"]];
+MARK_KNAPP.forEach(([id, kind]) => { const b = document.getElementById(id); if (b) b.onclick = () => markPost(kind, b); });
+document.addEventListener("keydown", (e) => {
+  if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target, tag = t && t.tagName; if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (t && t.isContentEditable)) return;
+  const k = MARK_KNAPP.find((x) => x[2] === e.key.toLowerCase()); if (!k) return;
+  e.preventDefault(); markPost(k[1], document.getElementById(k[0]));
+});
 if (recStart) { recStart.onclick = () => recPost({ seconds: 3600 }); recStop.onclick = () => recPost({ stop: true }); recFetch(); }
 { const rt = document.getElementById("recTest"), rp = document.getElementById("recPlay"), ra = document.getElementById("recAudio");
   if (rt) rt.onclick = () => recPost({ seconds: 60 });
