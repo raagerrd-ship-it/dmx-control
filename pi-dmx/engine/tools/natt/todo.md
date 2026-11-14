@@ -1,5 +1,16 @@
 # Natt-agentens uppdrag
 
+ANALYSATORN UPPDELAD 2026-11-14 natt (huvudsessionen, ägaren: "Kör igång med allt. Flytta ut alla kommentarer, och bryt ut del för del").
+analyser.ts 3000 -> 1057 rader + åtta delar (analyserDrop/Section/Spectrum/Level/Kick/Riser/Bass/Character.ts); 1302 kommentarer ordagrant i
+docs/analysator/<fil>.md (kartan: docs/analysator/README.md). INGET BETEENDE ÄNDRAT: 537 981 hopp x 2 lägen, varje fält i varje ruta lika mot det
+frysta bygget (taggen backup/fore-uppdelning-20261114), DMX-md5 lika på tre inspelningar, kommentarflytten byte-identisk JS. Lotus portad (22a2055c),
+13 gemensamma filer i manifestet, EJ utlagd. Tid per hopp på PC oförändrad; EJ MÄTT PÅ PI:N - jämför /api/health process-tiden mot 11-13 vid nästa utläggning.
+NYA VERKTYG: tools/ensam.mjs (en del för sig: tappa insignalerna en gång, spela upp på ~1,4 s, --set för svep; drop-delen ensam = hela analysatorn,
+och break-takets svep 12/32 slag ger samma droplistor som de hela körningarna), tools/livstecken.mjs (varje ramfält: andel av tiden, ändringar/min;
+exit 1 vid oväntat död signal - KÖR I NATTMÄTNINGEN på de tre rena filerna; baslinje tools/natt/livstecken-2026-11-14.txt: 0 oväntat döda),
+tools/refaktor/ (brytut.mjs, kommentarer.mjs, bevis.sh, kommentarbevis.sh). SKRIV ALDRIG långa kommentarer i analysatorns kod igen - anteckningarna.
+MÄTFÄLLA 56: analyserParity --style lotus --split inline är obestämd (samma bygge mot sig självt skiljer: väggklockan i beatPhaseMs) - använd odelad där.
+
 ÄGARENS PRIORITET 2026-11-14 kväll: "Uppbyggnad ser jag som låg prio. Kan tas i framtiden, takt, låtbyte och drop är viktigare." -> inget arbete på inRiser/buildUp/build-looker oombett; nästa drop-arena dömer TRÄFFAR på ägarens drop (ta bort bygg-poängen ur tools/arena/dropdom.py när den sätts upp, inte under en körning); vid inspelning räcker Drop, Minidrop, Inte drop, Låtbyte. Ordning: klockan och låtgränsen först.
 
 LÅTBYTEN (huvudsessionen 2026-11-14 kväll, ägaren: "Något mer nu? Tex låtbyten?"): STARTGRINDEN INLAGD, formvägen orörd.
