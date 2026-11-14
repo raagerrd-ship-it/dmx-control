@@ -1,0 +1,221 @@
+# a2 - SVEPET (stigande tyngdpunkt) - drop1
+
+## IDÉN
+Analysatorn följer spektrats TYNGDPUNKT (bandindex 0..7 viktat med bandens magnitud - en kvot, oberoende av nivån) och räknar
+sekunder av ihållande stigning: en uppbyggnad är att låtens groove sveps bort uppåt i minst ~4 s. DROP = basens återkomst medan
+svepet pågår; samma återkomst utan svep (tvärt baskapp, break, stutter) är en minidrop - ägarens "ingen uppbyggnad = minidrop".
+
+## DELAR
+1. **Svepmätaren** (`riserStep`: swC, swRun) bär **bygg** (inRiser = stigning >= 2,5 s; 0 -> 40 %). Ersätter den döda
+   novelty-risern med absoluta nivåer; kostnadsneutralt.
+2. **Drop = återkomst under svep** (`dropClassify`, `ret` ur MINI-kanten, SWEEP_MIN_S 3,5) bär **drop_ratt** (1 -> 4 av 9) och
+   **inte_ratt** (0 -> 100 %: halva återkomster kommer efter att tyngdpunkten planat ut).
+3. **Flanken ensam är minidrop** bär **precision** (10 -> 50 %).
+4. **Svepet måste utgå från grooven** (m2: swGroove, 5 s bas vid taket, rasar 2 s/s) bär **precision** (50 -> 80 %) och
+   **mini_ratt** (73 -> 91 %): tar bort svep i introt (36 s) och efter halv återkomst mitt i ett break (507, 536).
+5. Svepet förbrukas vid drop + befintlig 12 s-spärr: flod 0,51/min.
+
+## SIFFRORNA (domaren, övningen)
+| mätning | poäng | drop | mini rätt | inte | precision | bygg | falsk | tid |
+|---|---|---|---|---|---|---|---|---|
+| bas | 22,8 | 1/9 | 82 % | 0 % | 10 % (10) | 0 % | 0 % | 0,31 |
+| m1 svepet rått | 56,3 | 4/9 | 73 % | 100 % | 50 % (8) | 40 % | 4,7 % | 0,31 |
+| m2 + grooven | 65,9 | 4/9 | 91 % | 100 % | 80 % (5) | 40 % | 3,7 % | 0,31 |
+
+Träffar: 137, 302, 367, 441. Kvar fel: 463 (mini med 4 s-svep från groove, samma form som 367). Sämre: m1 hade mini rätt under bas
+(lagat i m2); bygg_falsk 0 -> 3,7 %. Svepet kan INTE ta 51, 281 (låtstart: basen kommer första gången) eller 210/214/218 (13 s
+break + stutter) - där finns inget svep i ljudet; de hör till "basen länge borta" (a1), jokern bör kombinera. Kostnad rygg mot
+rygg: 69 us/hopp mot bas 74-80 (domarens 76-81 är trängsel). Fria sonder: 5 av 6. Tempo = bas 100 %, sektion = bas 96 %
+(uppbyggnaden lever nu och når sektionslogiken) - ingen spärr, men ljuset får fler build-val än i dag.
+
+## RISKEN
+- Smala marginaler: 367 och 441 har stigning 3,6-3,9 s mot gränsen 3,5; minin 463 har 3,6. I låt 3 kallar ägaren även riktiga
+  svep (506, 534 - han tryckte Uppbyggnad) för mini; svepets längd skiljer dem inte.
+- Groove-regeln avvisar den klassiska risern som börjar MITT I ett break (basen redan borta): droppen blir minidrop.
+- Lugna låtar / utan bas: tyngdpunkten vandrar med sång och pads -> uppbyggnad kan sägas, men ingen drop utan baskant.
+- Långa mixar: bas-EQ som vrids ner i 4 s och nästa låts bas in = "drop". Tal mellan låtar: bara brusgrinden (activeMs) skyddar.
+- Lotus: kanten räknas nu även när minidrops är av, och flank-droppen är borta - bänka lotus före port. `bandDb` är nu bara skriven.
+
+## DIFFEN (`git diff --no-index src .arena/drop1/a2/src`, även a2.diff)
+```diff
+diff --git a/src/ANALYSER_SHARED.md5 b/.arena/drop1/a2/src/ANALYSER_SHARED.md5
+index a35bdb2..44ea985 100644
+--- a/src/ANALYSER_SHARED.md5
++++ b/.arena/drop1/a2/src/ANALYSER_SHARED.md5
+@@ -1,5 +1,5 @@
+ # md5 (CRLF->LF) av de gemensamma filerna - samma i lotus-light-link och dmx-control. Skrivs av analyser_shared.py --write
+-f93bc245699cc547f8b1926d5cba6219 analyser.ts
++c402624f994243e7ff953645932ce693 analyser.ts
+ bd23979ae9882d48c6fc8924f137dd09 split.ts
+ ab875f44c6cdc8a687c9ed8805d7501e slowWorker.ts
+ b78ab7295bb4303a9976b57b329586e3 analyserClock.ts
+diff --git a/src/analyser.ts b/.arena/drop1/a2/src/analyser.ts
+index 1529918..337f9f5 100644
+--- a/src/analyser.ts
++++ b/.arena/drop1/a2/src/analyser.ts
+@@ -304,13 +304,32 @@ const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24, FLANK_SILENT_LV = 0.005;
+ const SHOW_DROP_GAP_MS = 12000;   // spärr mellan full drops (ägaren 10-12): flank inom spärren = minidrop (dropSpaced)
+ // LYFT/NÄSTAN-DROP/STOPP (flyttade ur effects.ts stepLifts 11-09): kroppen 120 ms (nearB), normalnivån 8 s, historik i 25 ms-rutor.
+ const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;
++// SVEPET = UPPBYGGNADEN (arena drop1 a2, ladan 2026-11-13). En uppbyggnad hörs som ett svep: spektrats TYNGDPUNKT stiger stadigt i
++// flera sekunder (basen filtreras bort, diskanten/bruset tar över). Tyngdpunkten = bandindex 0..7 viktat med bandens magnitud
++// (bandAbs) - en KVOT mellan banden, alltså oberoende av ingångsnivån: inga absoluta nivågränser (de gamla, lvlSmooth > 0,3/0,4,
++// var döda på rent ljud). DROP = basens återkomst (MINI_*-kanten) MEDAN svepet pågår; samma återkomst utan svep är en minidrop
++// (ägaren: "Är det ingen uppbyggnad, så är det troligen bara minidrop"). Räknas i långsamma vägen (riserStep), 8 ggr/s.
++const SWEEP_TAU_S = 0.7;       // glättning: längre än ett taktslag (kickens hack i tyngdpunkten), kortare än det kortaste svepet
++const SWEEP_TICK_MS = 125;     // svepet är sekunder långt: läses i 125 ms-rutor (ring 32 rutor = 4 s)
++const SWEEP_LAG = 16;          // rutor = 2 s: "stiger" = högre än för en takt sedan
++const SWEEP_RISE = 0.15;       // band per 2 s: långsammaste svepet som räknas (16 s över drygt ett band); under det är det låtens eget vaggande
++const SWEEP_MIN_S = 3.5;       // IHÅLLANDE: mer än ett tvärt baskapp kan ge (ett steg "stiger" i LAG + 2 x TAU = 3,4 s) -> en ramp på >= ~4 s
++const SWEEP_BUILD_S = 2.5;     // uppbyggnad (inRiser) sägs när stigningen hållit i sig så här länge (kortare = fill/taktvariation)
++const SWEEP_CAP_S = 8;         // minnet av ett långt svep: en basblinkning på ett par sekunder mitt i uppbyggnaden nollar det inte
++const SWEEP_AFTER_MS = 1000;   // återkomstens kant kommer upp till ett par taktslag efter att tyngdpunkten vänt (kantens egen fördröjning)
++// SVEPET UTGÅR FRÅN LÅTENS EGEN GROOVE: stigningen börjar bara räknas när baskroppen legat vid sitt tak (inom BODY_GONE_DB) i minst
++// SWEEP_GROOVE_S - en uppbyggnad sveper bort en bas som FANNS. Grooven byggs 1 s/s (tak SWEEP_GROOVE_CAP_S) och rasar 2 s/s när basen
++// är borta: en bas som kommer och går (intro, halv återkomst mitt i ett långt break) är ingen groove, och svepet därifrån hör till
++// samma break -> återkomsten är en minidrop. Ett påbörjat svep (swRun > 0) fortsätter utan grooven (den sveps ju bort).
++const SWEEP_GROOVE_S = 5;      // två-tre takter etablerad bas
++const SWEEP_GROOVE_CAP_S = 8;  // minnet räcker (8 - 5) / 2 = 1,5 s in i svepet: stigningen syns inom en sekund från att basen börjar tona
+ 
+ /** Instansfalt som MATT (--trace-generalization, 240 s pop-facit, 2026-09-27) byter Smi->Double efter start. Ges Double-form i
+  *  konstruktorn (se slutet av constructor) sa kartan inte deprecerar mitt i driften. Fyra av dem stod har redan sedan 896ab7c. */
+ const DOUBLE_FROM_START = [
+   'secHiStartMs', 'secHiEndMs', 'expectHighMs', 'levelVsHighDb',
+   'sumSq', 'lastT', 'dbgRms', 'lastKick', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum', 'lvlSmooth', 'lvlVU', 'engSmooth', 'activeMs',
+-  'buildUp', 'novSlow', 'kickHit', 'snareHit', 'hatHit', 'bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs',
++  'buildUp', 'kickHit', 'snareHit', 'hatHit', 'bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs',
+   'lastMiniGoneMs', 'lastMiniMs', 'pendingKickMs', 'kfPrev', 'kfPrev2', 'beatAnchorMs',
+   'blPrev1', 'blPrev2', 'blTrough', 'profBassline', 'bassOnsetsPerBeat',
+   'rawBpmLast', 'localBpmConfidence',
+@@ -767,7 +786,7 @@ export class Analyser {
+   private aAtt = 0; private aRel = 0; private aVU = 0;
+   private aIUp = 0; private aIDown = 0; private aBandLvl = 0;
+   private dHat = 0; private dSnare = 0; private dKick = 0;
+-  private aSpecSlow = 0; private aNovSlow = 0; private aProf = 0;
++  private aProf = 0;
+   /** BASBANDETS onset-envelope (kick-flux), samma raster och position som envRing. */
+   private envBassRing = new Float32Array(Analyser.ENV_LEN);
+   private envBassAccum = 0;
+@@ -883,11 +902,8 @@ export class Analyser {
+   /** ~1,5 s vid 125 Hz. MAD startar i noll efter tystnad och byggs upp med
+    *  `mad ← 1.006·mad + 6e-5`, vilket tar ≈183 rutor att nå ett användbart värde. */
+   private static readonly ONSET_WARM = 183;
+-  private specSlow = new Float32Array(8);
+-  private novSlow = 0;           // ihållande spektral novelty (~1.5s)
+-  private novBaseline = 0.2;     // ~8s baslinje → riser = novelty STIGER över den
+-  private centSlow = 0.3;
+-  private lvlSlowR = 0.3;
++  // SVEPET (se SWEEP_*): glättad tyngdpunkt, dess 4 s-ring i 125 ms-rutor, sekunder av ihållande stigning, senaste fulla svep.
++  private swC = 1.5; private swRing = new Float32Array(32); private swW = 0; private swN = 0; private swTickAt = -1e12; private swRun = -0; private swGroove = -0; private lastSweepMs = -1e12;
+   private buildUp = 0;           // 0..1 uppbyggnads-envelope
+   // KARAKTÄRSPROFIL (långsam, ~8s)
+   private profPunch = 0.4;
+@@ -1796,8 +1812,6 @@ export class Analyser {
+     this.dHat = Math.exp(-dtHop / 0.06);
+     this.dSnare = Math.exp(-dtHop / 0.11);
+     this.dKick = Math.exp(-dtHop / 0.15);
+-    this.aSpecSlow = 1 - Math.exp(-dtHop / 2.0);
+-    this.aNovSlow = 1 - Math.exp(-dtHop / 1.5);
+     this.aProf = 1 - Math.exp(-dtHop / 8.0);
+     // Ett återanvänt Frame (spec/onset pekar på de pre-allokerade objekten).
+     this.outFrame = {
+@@ -2632,7 +2646,8 @@ export class Analyser {
+     const armed = bodyOnsetEdge || nowWallA < this.dropArmUntil;
+     // (KICK-FIRST forkastad 09-04: flod pa megamix; [firstkick]-sparet borttaget 09-27.)
+     // MINIDROP-lyftet (se MINI_*). Egen svacka-raknare (kortare/grundare an gone) och egen flank.
+-    if (MINI_SPACING_MS > 0) {
++    let ret = false;   // BASENS ÅTERKOMST (kort svacka + lyft): med svep = drop (dropClassify), annars minidrop som förut
++    {
+       if (this.bodyEnv < this.bodyCeil - MINI_GONE_DB) { this.miniGoneMs += dtHop * 1000; if (this.miniGoneMs >= MINI_GONE_MS) this.lastMiniGoneMs = nowWallA; }
+       else this.miniGoneMs = 0;
+       // Samma fönster som riseRef plus det nyss skrivna värdet (minus inget: den äldsta platsen ingår via `oldest`) -> en jämförelse
+@@ -2640,8 +2655,8 @@ export class Analyser {
+       const nv = hist[(this.bodyHistPos + HL - 1) % HL]; const mnRef = nv < riseRef ? nv : riseRef;
+       const miniOnset = (bodyPeek - mnRef) > MINI_RISE_DB && bodyPeek > this.bodyPeak - MINI_PEAK_DB && nowWallA - this.lastMiniGoneMs < 4000;
+       const miniEdge = miniOnset && !this.wasMiniOnset; this.wasMiniOnset = miniOnset;
+-      if (miniEdge && this.activeMs > 2000 && nowWallA - this.lastDropMs > MINI_SPACING_MS && nowWallA - this.lastMiniMs > MINI_SPACING_MS
+-          && (DROP_UNDERPEAK_MIN <= 0 || this.bodyPeak - bodyPeek >= DROP_UNDERPEAK_MIN)) {   // INTE I TAKET galler aven minidrops (19:19: 'falsk' = minidrop med underPeak 0,6)
++      ret = miniEdge && this.activeMs > 2000 && (DROP_UNDERPEAK_MIN <= 0 || this.bodyPeak - bodyPeek >= DROP_UNDERPEAK_MIN);   // INTE I TAKET galler aven minidrops (19:19: 'falsk' = minidrop med underPeak 0,6)
++      if (ret && MINI_SPACING_MS > 0 && nowWallA - this.lastDropMs > MINI_SPACING_MS && nowWallA - this.lastMiniMs > MINI_SPACING_MS) {
+         this.miniDropCount++; this.lastMiniMs = nowWallA;
+         if (DROP_TRACE) console.log(`[minidrop] wall ${this.wallNow()} rise ${(bodyPeek - mnRef).toFixed(1)} underPeak ${(this.bodyPeak - bodyPeek).toFixed(1)} goneAgo ${((nowWallA - this.lastMiniGoneMs)/1000).toFixed(1)}s`);
+       }
+@@ -2679,15 +2694,19 @@ export class Analyser {
+       this.dropCand++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise;
+       console.log(`[dropfire] wall ${this.wallNow()}${fireTag} rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} ceil ${this.bodyCeil.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} sinceDrop ${(sinceDrop/1000).toFixed(1)}s goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s goneSpan ${(this.lastGoneSpanMs/1000).toFixed(1)}s edgeAgo ${(nowWallA - this.dropArmAt).toFixed(0)}ms`);
+     }
+-    this.dropClassify(flank, fireNow, nowWallA);
++    this.dropClassify(flank, fireNow, ret, nowWallA);
+   }
+ 
+-  /** EN DROPDETEKTOR - klassningen (a3): flanken är full drop (efter spärren), slam-kandidaten utan egen flank inom 2 s är minidrop. */
+-  private dropClassify(flank: boolean, cand: boolean, nowWallA: number): void {
+-    if (flank) {
++  /** EN DROPDETEKTOR - klassningen. DROP = basens återkomst medan svepet pågår (SWEEP_*, drop1 a2), efter spärren; svepet är då
++   *  förbrukat (en drop per uppbyggnad). Flanken och slam-kandidaten UTAN svep är minidrop (förr var flanken full drop). */
++  private dropClassify(flank: boolean, cand: boolean, ret: boolean, nowWallA: number): void {
++    if (ret && nowWallA - this.lastSweepMs <= SWEEP_AFTER_MS) {
+       if (nowWallA - this.lastShowDropMs < SHOW_DROP_GAP_MS) { this.dropSpaced++; this.miniDropCount++; }
+-      else { this.lastShowDropMs = nowWallA; this.dropCount++; }
+-    } else if (cand && nowWallA - this.fdAt > 2000) { this.dropDemoted++; this.miniDropCount++; }
++      else {
++        if (DROP_TRACE) console.log(`[svep] drop wall ${this.wallNow()} stigning ${this.swRun.toFixed(2)} s tyngdpunkt ${this.swC.toFixed(2)}`);
++        this.lastShowDropMs = nowWallA; this.dropCount++; this.swRun = 0; this.lastSweepMs = -1e12;
++      }
++    } else if (flank || (cand && nowWallA - this.fdAt > 2000)) { this.dropDemoted++; this.miniDropCount++; }
+   }
+ 
+   /** FULL DROP PÅ FLANKEN (se FLANK_GONE_DB): på dropStep:s egna filter (bodyFast/bodyEnv/bodyCeil), per hop. */
+@@ -2737,35 +2756,25 @@ export class Analyser {
+     }
+   }
+ 
+-  /** Uppbyggnad/riser (spektral novelty + klang/niva). Returnerar inRiser och uppdaterar buildUp. */
++  /** Uppbyggnad = SVEPET (se SWEEP_*): tyngdpunkten stiger ihållande. Returnerar inRiser och uppdaterar buildUp. */
+   private riserStep(): boolean {
+     const nowWallA = this.hNowWall;
+     const dtHop = this.dtHop;
+-    // ── UPPBYGGNAD / RISER (flyttad hit) ──
+-    // Spektral NOVELTY = summan av bandens POSITIVA avvikelse från en ~2s baslinje,
+-    // ihållande ~1.5s. Mätt validerad: ramsar 0.25→0.78 in i en drop. Relativt en
+-    // ~8s baslinje → RISER = novelty STIGER över den (filter-sweep/snare-roll),
+-    // skilt från bara-busy (ihållande → baslinjen kommer ikapp). Gammal väg
+-    // (klang+nivå stiger) ligger kvar som OR. Inte direkt efter en drop.
+-    let nov = 0; const sr = this.aSpecSlow;
+-    // NOVELTY PÅ `bandDb`, INTE `bandLvl` — se fältets dokumentation. Med den
+-    // AGC-normaliserade nivån var det här uttrycket matematiskt tvunget att gå
+-    // mot noll under exakt de förlopp det skulle upptäcka.
+-    for (let b = 0; b < 8; b++) { this.specSlow[b] += (this.bandDb[b] - this.specSlow[b]) * sr; nov += Math.max(0, this.bandDb[b] - this.specSlow[b]); }
+-    this.novSlow += (nov - this.novSlow) * this.aNovSlow;
+-    this.novBaseline += (this.novSlow - this.novBaseline) * (dtHop / 8);
+-    const novRiser = this.novSlow > this.novBaseline + 0.15 && this.novSlow > 0.45;
+-    this.centSlow += (this.centSmooth - this.centSlow) * (dtHop / 2.5);
+-    this.lvlSlowR += (this.lvlSmooth - this.lvlSlowR) * (dtHop / 2.5);
+-    const inRiser = this.activeMs > 2500 && this.lvlSmooth > 0.3 && nowWallA - this.lastDropMs > 1500 && (
+-        novRiser
+-        || (this.centSmooth > this.centSlow + 0.06 && this.lvlSmooth > this.lvlSlowR + 0.04 && this.lvlSmooth > 0.4)
+-      );
+-    // Stampla uppbyggnaden. OBS: drop-villkoret ovan kraver INTE en riser — det
+-    // kravet ar avstangt (se dar). Stampeln halls uppdaterad for att kravet ska
+-    // kunna aterinforas nu nar riser-signalen faktiskt lever (se `bandDb`).
+-    // Nagot "4000 ms-fonster" finns inte i filen; den formuleringen var kvar
+-    // fran en tidigare version av villkoret.
++    { const A = this.bandAbs; let m = 1e-9, w = 0; for (let b = 0; b < 8; b++) { const a = A[b]; m += a; w += a * b; }
++      this.swC += (w / m - this.swC) * Math.min(1, dtHop / SWEEP_TAU_S); }
++    if (nowWallA - this.swTickAt >= SWEEP_TICK_MS) {
++      this.swTickAt = nowWallA;
++      const R = this.swRing, c = this.swC, T = SWEEP_TICK_MS / 1000, d = this.swN > SWEEP_LAG ? c - R[(this.swW - SWEEP_LAG) & 31] : 0;
++      R[this.swW] = c; this.swW = (this.swW + 1) & 31; if (this.swN < 32) this.swN++;
++      // Sekunder av ihållande stigning: +1 s/s medan tyngdpunkten ligger över den för 2 s sedan, -1 s/s när den står still,
++      // -2 s/s när den faller (basen är tillbaka). Bara med musik (brusgrinden, som förr) och bara från grooven (SWEEP_GROOVE_S).
++      if (this.bodyEnv > this.bodyCeil - BODY_GONE_DB && this.activeMs > 2500) { if (this.swGroove < SWEEP_GROOVE_CAP_S) this.swGroove += T; }
++      else this.swGroove = Math.max(0, this.swGroove - 2 * T);
++      if (d > SWEEP_RISE && this.activeMs > 2500 && (this.swRun > 0 || this.swGroove >= SWEEP_GROOVE_S)) { if (this.swRun < SWEEP_CAP_S) this.swRun += T; }
++      else this.swRun = Math.max(0, this.swRun - (d < -SWEEP_RISE ? 2 * T : T));
++      if (this.swRun >= SWEEP_MIN_S) this.lastSweepMs = nowWallA;
++    }
++    const inRiser = this.swRun >= SWEEP_BUILD_S;
+     const bTarget = inRiser ? 1 : 0;
+     const bRate = bTarget > this.buildUp ? dtHop / 3.5 : dtHop / 1.0;   // bygg ~3.5s, klinga ~1s
+     this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
+```

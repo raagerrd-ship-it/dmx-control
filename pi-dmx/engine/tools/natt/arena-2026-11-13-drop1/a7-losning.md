@@ -1,0 +1,251 @@
+# a7 – FRASEN OCH TAKTEN
+
+## IDÉN
+Analysatorn för basens läge i HALVSLAG (klockans tempo, bara läst) över frasen = de 16 senaste slagen; ett halvslag är hållet när
+baskroppen aldrig nådde taket − 6 dB. DROP = basen landar när minst 2/3 av frasen varit hållen och sista luckan är ett inpass
+(2–12 slag): basen har tagits bort, retats tillbaka och tagits bort igen – en ensam lucka i en full fras är minidrop, och
+återkomsten efter ett break på tre takter eller mer är en ny sektion, inte droppen.
+
+## DELAR
+- **Halvslagsregistret** (`phBits/phHalves/phRun` i `flankStep`, fem tal, inget allokerat): grunden för allt nedan.
+- **Break-taket `PH_BREAK_HALVES`** (ersätter flankens "≥ 4 s borta"): bär **precision** (10 → 100 %), **inte_ratt** (0/3 → 3/3),
+  **mini_ratt** (9/11 → 11/11). Sju av basens nio falska drop var första återkomsten efter ett långt break.
+- **Frasvillkoret `PH_DROP_HALVES`** (≥ 2/3 hållet): bär **drop_ratt** (51, 218, 441 s – de retade uppbyggnaderna).
+- **`riserStep`** (inRiser = hålls nu + halva frasen hållen + inget break): bär **bygg** (0 → 21 %, falsk 7,2 %). Den döda
+  novelty-risern med absoluta nivåer är ersatt, inte påbyggd.
+
+## SIFFRORNA (övningen, bas 22,8)
+| mätning | poäng | drop | mini | inte | precision | bygg (falsk) | drop/min | tid |
+|---|---|---|---|---|---|---|---|---|
+| m1: 2/3 avrundat uppåt (22 halvslag) | 54,3 | 2/9 | 100 % | 100 % | 67 % (3) | 21 % (7,2 %) | 0,31 | 0,20 |
+| m2: 2/3 närmaste (21) | 65,4 | 3/9 | 100 % | 100 % | 100 % (3) | 21 % (7,2 %) | 0,31 | 0,16 |
+
+Tempo och sektion = bas 100 %. Kostnad i samma process: kvot 1,00 mot bas (domarens 120,8 µs i m2 togs under andras last; m1
+72,5 med samma kod). **Sämre:** basens enda träff (367 s, ensam 8-slagslucka) är nu minidrop. Missade: 137, 214, 367 (ensamma
+luckor), 282 (låtstart efter 56 slag), 302 (ingen flank), 211 (inget i basen).
+
+## FYND
+- **Domaren kör utan klocka**: `dropdomKor.mjs` skapar `new Analyser` utan taktmatning, bpm = 0 i alla 603 s. Mekanismen döms på
+  reservslaget 500 ms. Med klockans tempo inmatat (sond) ger samma kod 3/9 och 100 % precision med större marginal (ensam lucka
+  ≤ 9,5 slag, retad uppbyggnad ≥ 11,5; utan klocka 10,0 mot 10,5 – där föll m1).
+- **Idébanken:** luckans längd i slag skiljer INTE drop från minidrop (8 slag: drop 137/367, mini 463/507/536/591), och alla
+  återkomster landar på frasgräns – kortets andra halva bär inget. Kicken flödar utan klocka och går inte att räkna.
+
+## RISKEN
+- Tröskeln är tunn: ett halvslag avgjorde en träff och bara tre drop bär regeln; kontrollen kan ge 0–1.
+- Gles bas (ett basslag per takt, halvtempo): frasen ser hållen ut jämt → drop var 12:e sekund och uppbyggnad jämt (flod).
+- Klassisk EDM, långt break rakt in i droppen: blir aldrig drop – valt efter ägarens facit, fel på annan musik.
+- Tystare låt efter stark: allt är "hållet" tills taket sjunkit (0,15 dB/s), inga drop under tiden (som i dag).
+- Lugna låtar, tal: inget basfall = varken drop eller uppbyggnad (ofarligt).
+- Lotus delar filen: novelty-risern som lever där försvinner vid portning. buildUp lever nu 8 % av tiden – ljuset ändras där.
+
+## DIFFEN
+`git diff --no-index src .arena/drop1/a7/src` (även `diff.patch`):
+
+```diff
+diff --git a/src/ANALYSER_SHARED.md5 b/.arena/drop1/a7/src/ANALYSER_SHARED.md5
+index a35bdb2..6850361 100644
+--- a/src/ANALYSER_SHARED.md5
++++ b/.arena/drop1/a7/src/ANALYSER_SHARED.md5
+@@ -1,5 +1,5 @@
+ # md5 (CRLF->LF) av de gemensamma filerna - samma i lotus-light-link och dmx-control. Skrivs av analyser_shared.py --write
+-f93bc245699cc547f8b1926d5cba6219 analyser.ts
++2aaf50c1130046dcee77d3c3d1f8a435 analyser.ts
+ bd23979ae9882d48c6fc8924f137dd09 split.ts
+ ab875f44c6cdc8a687c9ed8805d7501e slowWorker.ts
+ b78ab7295bb4303a9976b57b329586e3 analyserClock.ts
+diff --git a/src/analyser.ts b/.arena/drop1/a7/src/analyser.ts
+index 1529918..207dc6a 100644
+--- a/src/analyser.ts
++++ b/.arena/drop1/a7/src/analyser.ts
+@@ -295,12 +295,25 @@ const DROP_LONG_MS = 20000;    // annars maste sa har lang tid ga (mot falska up
+ const DROP_ESCALATE_DB = 3;    // tatare drops maste vara TYDLIGT starkare for att fyra
+ const BODY_CEIL_DB_S = 0.15;   // taket haller latens loud-referens lange
+ // FULL DROP PÅ FLANKEN (flyttad ur effects.ts 11-09, a3 - historiken: ägarens ladan 10-12..10-30, se git-historiken för effects.ts):
+-// baskroppens topp (bodyFast över FLANK_HOLD_S) har legat >= FLANK_GONE_DB under taket (bodyCeil) i >= FLANK_BREAK_S (eller
+-// >= FLANK_SHORT_S med >= FLANK_SHORT_RISE_DB djup), och fyrar när bodyFast går upp till taket - FLANK_LAND_DB med >= FLANK_RISE_DB
+-// stigning på 0,5 s. Helt tyst (lvlSmooth <= FLANK_SILENT_LV) i breaket = låtlucka, ingen drop. Samma filter som slam-kandidaten
+-// (bodyFast 60 ms, bodyEnv 350 ms, bodyCeil -0,15 dB/s) - förr en egen kopia i effekterna.
+-const FLANK_GONE_DB = 10, FLANK_BREAK_S = 4, FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;
+-const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24, FLANK_SILENT_LV = 0.005;
++// fyrar när bodyFast går upp till taket (bodyCeil) - FLANK_LAND_DB med >= FLANK_RISE_DB stigning på 0,5 s OCH frasen före bär en
++// uppbyggnad (FRASEN OCH TAKTEN nedan). Helt tyst (lvlSmooth <= FLANK_SILENT_LV) i luckan = låtlucka, ingen drop. Samma filter som
++// slam-kandidaten (bodyFast 60 ms, bodyCeil -0,15 dB/s) - förr en egen kopia i effekterna.
++const FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_SILENT_LV = 0.005;
++// FRASEN OCH TAKTEN (arena drop1 a7, 2026-11-13; ersätter flankens break i SEKUNDER: >= 4 s under taket, eller 2 s med 24 dB djup).
++// Ägarens facit i ladan 11-13: återkomsten efter ett långt break var drop i 1 fall av 8 ("inte drop", minidrop eller omarkerad i de
++// andra), och luckans längd skilde inte drop från minidrop. Musik räknas i slag: basens läge förs i HALVSLAG ur klockans tempo
++// (utan klocka BE_FALLBACK_MS, samma håll som bassEnergyStep), ett halvslag är HÅLLET när bodyFast aldrig nådde taket - FLANK_LAND_DB
++// (samma gräns som landningen: ett halvslag är antingen landat eller hållet). Frasen = de 16 senaste slagen (4 takter).
++//   UPPBYGGNAD (inRiser -> buildUp): basen hålls just nu (>= PH_GAP_MIN_HALVES i sträck), frasen är hållen till minst hälften
++//     (PH_BUILD_HALVES) och den pågående luckan är kortare än ett break (PH_BREAK_HALVES).
++//   DROP: basen landar efter en lucka på PH_GAP_MIN_HALVES..PH_BREAK_HALVES och frasen är hållen till minst två tredjedelar
++//     (PH_DROP_HALVES) - mer än EN tvåtaktslucka: basen har tagits bort, retats tillbaka och tagits bort igen. En ensam lucka i en
++//     annars full fras (hur djup den än är) är minidrop; återkomsten efter ett break på >= 3 takter är en ny sektion som börjar.
++// Bara antal halvslag och dB under låtens eget tak: oberoende av ingångsnivån. Inget tal är valt för ljusets utseende.
++const PH_DROP_HALVES = 21;      // 2/3 av frasens 32 halvslag (21,3 -> närmaste) = 10,5 slag hållna. Mätt med klockans tempo (övningen 11-13): ensam lucka eller glest mönster <= 9,5 slag, retad uppbyggnad >= 11,5
++const PH_BUILD_HALVES = 16;     // halva frasen = 8 slag hållna
++const PH_BREAK_HALVES = 24;     // 12 slag = 3 takter i sträck: ett break (egen sektion), inte ett inpass före droppen
++const PH_GAP_MIN_HALVES = 4;    // 2 slag: en kortare lucka är basens egen rytm (bas på vartannat slag), inte tillbakahållen bas
+ const SHOW_DROP_GAP_MS = 12000;   // spärr mellan full drops (ägaren 10-12): flank inom spärren = minidrop (dropSpaced)
+ // LYFT/NÄSTAN-DROP/STOPP (flyttade ur effects.ts stepLifts 11-09): kroppen 120 ms (nearB), normalnivån 8 s, historik i 25 ms-rutor.
+ const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;
+@@ -310,13 +323,13 @@ const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;
+ const DOUBLE_FROM_START = [
+   'secHiStartMs', 'secHiEndMs', 'expectHighMs', 'levelVsHighDb',
+   'sumSq', 'lastT', 'dbgRms', 'lastKick', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum', 'lvlSmooth', 'lvlVU', 'engSmooth', 'activeMs',
+-  'buildUp', 'novSlow', 'kickHit', 'snareHit', 'hatHit', 'bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs',
++  'buildUp', 'kickHit', 'snareHit', 'hatHit', 'bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs',
+   'lastMiniGoneMs', 'lastMiniMs', 'pendingKickMs', 'kfPrev', 'kfPrev2', 'beatAnchorMs',
+   'blPrev1', 'blPrev2', 'blTrough', 'profBassline', 'bassOnsetsPerBeat',
+   'rawBpmLast', 'localBpmConfidence',
+   'secPct', 'secSongStartMs', 'sectionStartMs', 'secBuildAt', 'secBuildSeen', 'secBlkMs', 'secBlkInt', 'secBlkCent', 'secBlkRms2', 'secCurDbSum', 'repeatSim', 'repeatAgoMs',
+   'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt',
+-  'fdGone', 'fdSpan', 'fdEnd', 'fdAt', 'fdQuietAt', 'lastShowDropMs', 'dropRiseDb', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS',
++  'fdAt', 'fdQuietAt', 'lastShowDropMs', 'dropRiseDb', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS',
+   'nearDropDb', 'nearDipDb', 'liftDb', 'stopS',   // byter forst vid forsta drop-episoden (sags i andra matningen)
+ ] as const;
+ /** TYPSTABILA TALFALT (2026-09-27, realtidsprincipen): skriv ett icke-heltal och sedan ursprungsvardet, sa V8 ger faltet
+@@ -767,7 +780,7 @@ export class Analyser {
+   private aAtt = 0; private aRel = 0; private aVU = 0;
+   private aIUp = 0; private aIDown = 0; private aBandLvl = 0;
+   private dHat = 0; private dSnare = 0; private dKick = 0;
+-  private aSpecSlow = 0; private aNovSlow = 0; private aProf = 0;
++  private aProf = 0;
+   /** BASBANDETS onset-envelope (kick-flux), samma raster och position som envRing. */
+   private envBassRing = new Float32Array(Analyser.ENV_LEN);
+   private envBassAccum = 0;
+@@ -855,8 +868,11 @@ export class Analyser {
+   private dropCount = 0;         // monoton drop-räknare (edge-säker för konsumenter) - full drop på flanken
+   private dropCand = 0;          // slam-kandidaterna (förr dropCount): sektionens drop-evidens och minidrop utan flank
+   private dropDemoted = 0; private dropSpaced = 0; private dropRiseDb = -0;
+-  private fdGone = -0; private fdSpan = -0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12; private fdQuietAt = -1e12; private lastShowDropMs = -1e12;
+-  private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;   // (tid, bodyFast) för toppens fönster
++  private fdAbove = true; private fdAt = -1e12; private fdQuietAt = -1e12; private lastShowDropMs = -1e12;
++  private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;   // (tid, bodyFast) 0,5 s: stigningens botten
++  /** FRASEN I HALVSLAG (se PH_*): phBits = de 32 senaste halvslagen (bit 0 = senaste, 1 = hållet), phHalves = antal hållna,
++   *  phRun = hållna i sträck fram till nu; phT/phTop = det pågående halvslagets tid (ms) och bodyFast-topp. Fem tal, inget allokerat per hop. */
++  private phBits = -0; private phHalves = 0; private phRun = 0; private phT = -0; private phTop = -1e12;
+   private nearOn = false; private nearB = -0; private nearNorm = -0; private nearFloor = 1e9; private liftCalm = -0; private liftLift = -0;
+   private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftHistAt = -1e12; private stopRunS = -0;
+   private nearDropDb = -0; private nearDipDb = -0; private liftDb = -0; private stopCount = 0; private stopS = -0;
+@@ -883,11 +899,6 @@ export class Analyser {
+   /** ~1,5 s vid 125 Hz. MAD startar i noll efter tystnad och byggs upp med
+    *  `mad ← 1.006·mad + 6e-5`, vilket tar ≈183 rutor att nå ett användbart värde. */
+   private static readonly ONSET_WARM = 183;
+-  private specSlow = new Float32Array(8);
+-  private novSlow = 0;           // ihållande spektral novelty (~1.5s)
+-  private novBaseline = 0.2;     // ~8s baslinje → riser = novelty STIGER över den
+-  private centSlow = 0.3;
+-  private lvlSlowR = 0.3;
+   private buildUp = 0;           // 0..1 uppbyggnads-envelope
+   // KARAKTÄRSPROFIL (långsam, ~8s)
+   private profPunch = 0.4;
+@@ -1796,8 +1807,6 @@ export class Analyser {
+     this.dHat = Math.exp(-dtHop / 0.06);
+     this.dSnare = Math.exp(-dtHop / 0.11);
+     this.dKick = Math.exp(-dtHop / 0.15);
+-    this.aSpecSlow = 1 - Math.exp(-dtHop / 2.0);
+-    this.aNovSlow = 1 - Math.exp(-dtHop / 1.5);
+     this.aProf = 1 - Math.exp(-dtHop / 8.0);
+     // Ett återanvänt Frame (spec/onset pekar på de pre-allokerade objekten).
+     this.outFrame = {
+@@ -2494,7 +2503,7 @@ export class Analyser {
+     this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * BODY_CEIL_DB_S);
+     this.bodyPeak = Math.max(this.bodyEnv, this.bodyPeak - dtHop * 0.04);   // ~0.04 dB/s ≈ haller loud-referensen i minuter
+     this.bodyUnderDb = this.bodyCeil - this.bodyEnv;
+-    const flank = this.flankStep(nowWallA, dtHop);   // EN DROPDETEKTOR: flanken på samma filter (se FLANK_GONE_DB)
++    const flank = this.flankStep(nowWallA, dtHop);   // EN DROPDETEKTOR: flanken på samma filter (se FRASEN OCH TAKTEN, PH_*)
+     this.liftStep(nowWallA, dtHop, bodyNow);
+ 
+     // BAS-FRÅNVARO med VARAKTIGHETSKRAV: under 40 % av taket i ≥2 s i sträck.
+@@ -2690,21 +2699,38 @@ export class Analyser {
+     } else if (cand && nowWallA - this.fdAt > 2000) { this.dropDemoted++; this.miniDropCount++; }
+   }
+ 
+-  /** FULL DROP PÅ FLANKEN (se FLANK_GONE_DB): på dropStep:s egna filter (bodyFast/bodyEnv/bodyCeil), per hop. */
++  /** FULL DROP PÅ FLANKEN (se FRASEN OCH TAKTEN, PH_*): landningen på dropStep:s egna filter (bodyFast/bodyCeil) + frasens halvslag, per hop. */
+   private flankStep(now: number, dt: number): boolean {
+     const CAP = 1024, T = this.fdT, V = this.fdV, f = this.bodyFast, ceil = this.bodyCeil;
+     if (this.fdN === CAP) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
+     { const w = (this.fdS0 + this.fdN) & (CAP - 1); T[w] = now; V[w] = f; this.fdN++; }
+-    while (this.fdN > 1 && now - T[this.fdS0] > FLANK_HOLD_S * 1000) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
+-    let top = -1e9, low = 1e9; for (let q = 0; q < this.fdN; q++) { const i = (this.fdS0 + q) & (CAP - 1); if (V[i] > top) top = V[i]; if (now - T[i] <= 500 && V[i] < low) low = V[i]; }
+-    if (top < ceil - FLANK_GONE_DB) this.fdGone += dt; else { if (this.fdGone > 0) { this.fdSpan = this.fdGone; this.fdEnd = now; } this.fdGone = 0; }
++    while (this.fdN > 1 && now - T[this.fdS0] > 500) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
++    // FRASEN I HALVSLAG: slagets längd ur klockan (dBpm = klockans tempo vid senaste env-sampel, samma tal i båda trådlägena)
++    let per = this.dBpm > 40 ? 60000 / this.dBpm : Analyser.BE_FALLBACK_MS;
++    per = per < Analyser.BE_BEAT_MIN_MS ? Analyser.BE_BEAT_MIN_MS : per > Analyser.BE_BEAT_MAX_MS ? Analyser.BE_BEAT_MAX_MS : per;
++    const half = per / 2;
++    this.phT += dt * 1000; if (f > this.phTop) this.phTop = f;
++    if (this.phT >= half) {
++      const held = this.phTop < ceil - FLANK_LAND_DB ? 1 : 0;
++      this.phHalves += held - (this.phBits >= 2147483648 ? 1 : 0);   // halvslaget som lämnar frasen (bit 31)
++      this.phBits = ((this.phBits << 1) | held) >>> 0;
++      this.phRun = held ? this.phRun + 1 : 0;
++      this.phT -= half; this.phTop = -1e12;
++    }
+     const above = f > ceil - FLANK_LAND_DB, edge = above && !this.fdAbove; this.fdAbove = above;
+-    const span = this.fdGone > 0 ? this.fdGone : now - this.fdEnd < FLANK_GRACE_S * 1000 ? this.fdSpan : 0;
+     if (this.lvlSmooth <= FLANK_SILENT_LV) this.fdQuietAt = now;
+-    if (!edge || f - low < FLANK_RISE_DB || (span < FLANK_BREAK_S && !(span >= FLANK_SHORT_S && ceil - low >= FLANK_SHORT_RISE_DB))) return false;
+-    if (now - this.fdQuietAt < span * 1000 + 500) { this.fdGone = 0; this.fdSpan = 0; if (DROP_TRACE) console.log(`[flank] ingen drop: helt tyst i breaket (latstart), break ${span.toFixed(1)} s`); return false; }
+-    this.fdGone = 0; this.fdSpan = 0; this.fdAt = now; this.dropRiseDb = f - low;
+-    if (DROP_TRACE) console.log(`[flank] full drop pa flanken: break ${span.toFixed(1)} s, stigning ${(f - low).toFixed(1)} dB`);
++    if (!edge) return false;
++    // Landningen: luckan = hållna halvslag i sträck före den (landningen själv kan redan ha stängt ett eller två halvslag som landade)
++    let b = this.phBits, gap = 0;
++    if ((b & 1) === 0) b >>>= 1;
++    if ((b & 1) === 0) b >>>= 1;
++    while (b & 1) { gap++; b >>>= 1; }
++    let low = 1e9; for (let q = 0; q < this.fdN; q++) { const v = V[(this.fdS0 + q) & (CAP - 1)]; if (v < low) low = v; }
++    const phrase = this.phHalves >= PH_DROP_HALVES && gap >= PH_GAP_MIN_HALVES && gap < PH_BREAK_HALVES;
++    if (DROP_TRACE && f - low >= FLANK_RISE_DB && gap >= 2) console.log(`[fras] wall ${this.wallNow()} ${phrase ? 'DROP' : 'mini'}: lucka ${gap / 2} slag, hallet ${this.phHalves / 2} av 16 slag, stigning ${(f - low).toFixed(1)} dB, slag ${per.toFixed(0)} ms`);
++    if (f - low < FLANK_RISE_DB || !phrase) return false;
++    if (now - this.fdQuietAt < gap * half + 500) { if (DROP_TRACE) console.log(`[flank] ingen drop: helt tyst i luckan (latstart), lucka ${gap / 2} slag`); return false; }
++    this.fdAt = now; this.dropRiseDb = f - low;
+     return true;
+   }
+ 
+@@ -2737,35 +2763,13 @@ export class Analyser {
+     }
+   }
+ 
+-  /** Uppbyggnad/riser (spektral novelty + klang/niva). Returnerar inRiser och uppdaterar buildUp. */
++  /** Uppbyggnad (FRASEN OCH TAKTEN, se PH_*): basen hålls tillbaka just nu och frasen är hållen till minst hälften. Returnerar
++   *  inRiser och uppdaterar buildUp. (Förr spektral novelty + klang/nivå bakom absoluta nivågränser, lvlSmooth > 0,3/0,4: död vid ren
++   *  ingångsnivå - ladan 11-13 buildUp max 0,00.) Inte direkt efter en drop. */
+   private riserStep(): boolean {
+-    const nowWallA = this.hNowWall;
+     const dtHop = this.dtHop;
+-    // ── UPPBYGGNAD / RISER (flyttad hit) ──
+-    // Spektral NOVELTY = summan av bandens POSITIVA avvikelse från en ~2s baslinje,
+-    // ihållande ~1.5s. Mätt validerad: ramsar 0.25→0.78 in i en drop. Relativt en
+-    // ~8s baslinje → RISER = novelty STIGER över den (filter-sweep/snare-roll),
+-    // skilt från bara-busy (ihållande → baslinjen kommer ikapp). Gammal väg
+-    // (klang+nivå stiger) ligger kvar som OR. Inte direkt efter en drop.
+-    let nov = 0; const sr = this.aSpecSlow;
+-    // NOVELTY PÅ `bandDb`, INTE `bandLvl` — se fältets dokumentation. Med den
+-    // AGC-normaliserade nivån var det här uttrycket matematiskt tvunget att gå
+-    // mot noll under exakt de förlopp det skulle upptäcka.
+-    for (let b = 0; b < 8; b++) { this.specSlow[b] += (this.bandDb[b] - this.specSlow[b]) * sr; nov += Math.max(0, this.bandDb[b] - this.specSlow[b]); }
+-    this.novSlow += (nov - this.novSlow) * this.aNovSlow;
+-    this.novBaseline += (this.novSlow - this.novBaseline) * (dtHop / 8);
+-    const novRiser = this.novSlow > this.novBaseline + 0.15 && this.novSlow > 0.45;
+-    this.centSlow += (this.centSmooth - this.centSlow) * (dtHop / 2.5);
+-    this.lvlSlowR += (this.lvlSmooth - this.lvlSlowR) * (dtHop / 2.5);
+-    const inRiser = this.activeMs > 2500 && this.lvlSmooth > 0.3 && nowWallA - this.lastDropMs > 1500 && (
+-        novRiser
+-        || (this.centSmooth > this.centSlow + 0.06 && this.lvlSmooth > this.lvlSlowR + 0.04 && this.lvlSmooth > 0.4)
+-      );
+-    // Stampla uppbyggnaden. OBS: drop-villkoret ovan kraver INTE en riser — det
+-    // kravet ar avstangt (se dar). Stampeln halls uppdaterad for att kravet ska
+-    // kunna aterinforas nu nar riser-signalen faktiskt lever (se `bandDb`).
+-    // Nagot "4000 ms-fonster" finns inte i filen; den formuleringen var kvar
+-    // fran en tidigare version av villkoret.
++    const inRiser = this.activeMs > 2500 && this.hNowWall - this.lastDropMs > 1500
++      && this.phRun >= PH_GAP_MIN_HALVES && this.phRun < PH_BREAK_HALVES && this.phHalves >= PH_BUILD_HALVES;
+     const bTarget = inRiser ? 1 : 0;
+     const bRate = bTarget > this.buildUp ? dtHop / 3.5 : dtHop / 1.0;   // bygg ~3.5s, klinga ~1s
+     this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
+```

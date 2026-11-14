@@ -1,0 +1,261 @@
+diff --git a/src/ANALYSER_SHARED.md5 b/.arena/drop1/a3r/src/ANALYSER_SHARED.md5
+index a35bdb2..f237251 100644
+--- a/src/ANALYSER_SHARED.md5
++++ b/.arena/drop1/a3r/src/ANALYSER_SHARED.md5
+@@ -1,5 +1,5 @@
+ # md5 (CRLF->LF) av de gemensamma filerna - samma i lotus-light-link och dmx-control. Skrivs av analyser_shared.py --write
+-f93bc245699cc547f8b1926d5cba6219 analyser.ts
++72d4027cf7ab13408439b74e2b0a3090 analyser.ts
+ bd23979ae9882d48c6fc8924f137dd09 split.ts
+ ab875f44c6cdc8a687c9ed8805d7501e slowWorker.ts
+ b78ab7295bb4303a9976b57b329586e3 analyserClock.ts
+diff --git a/src/analyser.ts b/.arena/drop1/a3r/src/analyser.ts
+index 1529918..1849d70 100644
+--- a/src/analyser.ts
++++ b/.arena/drop1/a3r/src/analyser.ts
+@@ -302,6 +302,23 @@ const BODY_CEIL_DB_S = 0.15;   // taket haller latens loud-referens lange
+ const FLANK_GONE_DB = 10, FLANK_BREAK_S = 4, FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;
+ const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24, FLANK_SILENT_LV = 0.005;
+ const SHOW_DROP_GAP_MS = 12000;   // spärr mellan full drops (ägaren 10-12): flank inom spärren = minidrop (dropSpaced)
++// VIRVELRULLEN -> FULL DROP (drop1 a3r, runda 2; ägaren: "är det ingen uppbyggnad, så är det troligen bara minidrop"). Tre påståenden,
++// inget av dem mätt mot ett långsamt tak (kontrollinspelningen föll på det: en per taktslag när taket står kvar från en starkare låt):
++// 1. ÅTERKOMSTEN: basen (bodyFast) slår RET_RISE_DB starkare än allt den gjort under RET_HOLD_N rutor (1 s; de sista RET_ATTACK_N =
++//    själva anslaget räknas inte) och landar inom RET_LAND_DB av sitt starkaste de senaste RET_REF_S sekunderna. En bas som går i
++//    taktslag ger ingen återkomst; en lucka på mer än ett slag gör det. Måttstocken följer med inom en halv minut vid låtbyte.
++// 2. RULLEN: minst ROLL_RUN jämna anslag i följd i mellan/diskant (band 4-7; intervallet inom ROLL_TOL av följdens, ett missat slag
++//    per 8 tillåts) medan anslagen de senaste 2 s är minst ROLL_TIGHT x det glesaste 2 s-fönstret de senaste 8 s (ett notvärde upp
++//    = 2,0; ett mönster som bara pågår = 1,0). Basen får spela vidare under rullen (pop, schlager) eller vara borta (dans).
++//    Rullen gör uppbyggnaden HET (frame.inRiser/buildUp) i ROLL_MEM_MS efter sitt sista slag (rulle -> andningspaus -> drop).
++// 3. FRASEN: full drop = en återkomst medan uppbyggnaden är het OCH basen inte kommit tillbaka på SHOW_DROP_GAP_MS (ägarens 12 s
++//    mellan full drops, nu räknade från varje återkomst): en lucka fyra takter efter förra återkomsten är gångens eget inpass.
++//    Av samma skäl värmer ingen rulle inom ROLL_MEM_MS efter en återkomst (anslagen som tätnar där är den nya sektionens gång).
++// All annan återkomst - även flanken efter ett långt break - är minidrop. Alla mått är relativa låtens egna (flux mot bandets eget
++// 4 s-medel, täthet mot egen nyss, bas mot egen nyss); inga nivåer i absoluta tal. Rutor = stor-FFT:ns takt (3 hopp = 8 ms).
++const ROLL_RUN = 16, ROLL_TOL = 0.25, ROLL_TIGHT = 1.5, ROLL_MEM_MS = 8000;
++const ROLL_PICK_K = 1.3, ROLL_PICK_ADD = 0.3, ROLL_PICK_GAP = 5, ROLL_MEAN_S = 4;
++const RET_RISE_DB = 4.5, RET_HOLD_N = 125, RET_ATTACK_N = 25, RET_LAND_DB = 6.5, RET_REF_S = 32;
+ // LYFT/NÄSTAN-DROP/STOPP (flyttade ur effects.ts stepLifts 11-09): kroppen 120 ms (nearB), normalnivån 8 s, historik i 25 ms-rutor.
+ const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;
+ 
+@@ -310,7 +327,7 @@ const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;
+ const DOUBLE_FROM_START = [
+   'secHiStartMs', 'secHiEndMs', 'expectHighMs', 'levelVsHighDb',
+   'sumSq', 'lastT', 'dbgRms', 'lastKick', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum', 'lvlSmooth', 'lvlVU', 'engSmooth', 'activeMs',
+-  'buildUp', 'novSlow', 'kickHit', 'snareHit', 'hatHit', 'bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs',
++  'buildUp', 'kickHit', 'snareHit', 'hatHit', 'bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs',
+   'lastMiniGoneMs', 'lastMiniMs', 'pendingKickMs', 'kfPrev', 'kfPrev2', 'beatAnchorMs',
+   'blPrev1', 'blPrev2', 'blTrough', 'profBassline', 'bassOnsetsPerBeat',
+   'rawBpmLast', 'localBpmConfidence',
+@@ -318,6 +335,7 @@ const DOUBLE_FROM_START = [
+   'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt',
+   'fdGone', 'fdSpan', 'fdEnd', 'fdAt', 'fdQuietAt', 'lastShowDropMs', 'dropRiseDb', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS',
+   'nearDropDb', 'nearDipDb', 'liftDb', 'stopS',   // byter forst vid forsta drop-episoden (sags i andra matningen)
++  'rollRunIoi', 'rollAtMs', 'retAtMs', 'retBoxMax', 'retRefMax',
+ ] as const;
+ /** TYPSTABILA TALFALT (2026-09-27, realtidsprincipen): skriv ett icke-heltal och sedan ursprungsvardet, sa V8 ger faltet
+  *  Double-representation fran start. Ett Smi-initierat falt (0, -1 ...) som senare far ett decimaltal deprecerar objektets
+@@ -767,7 +785,7 @@ export class Analyser {
+   private aAtt = 0; private aRel = 0; private aVU = 0;
+   private aIUp = 0; private aIDown = 0; private aBandLvl = 0;
+   private dHat = 0; private dSnare = 0; private dKick = 0;
+-  private aSpecSlow = 0; private aNovSlow = 0; private aProf = 0;
++  private aProf = 0;
+   /** BASBANDETS onset-envelope (kick-flux), samma raster och position som envRing. */
+   private envBassRing = new Float32Array(Analyser.ENV_LEN);
+   private envBassAccum = 0;
+@@ -857,6 +875,14 @@ export class Analyser {
+   private dropDemoted = 0; private dropSpaced = 0; private dropRiseDb = -0;
+   private fdGone = -0; private fdSpan = -0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12; private fdQuietAt = -1e12; private lastShowDropMs = -1e12;
+   private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;   // (tid, bodyFast) för toppens fönster
++  // VIRVELRULLEN (se ROLL_RUN): anslagsplockaren i stor-FFT:ns takt, följden av jämna slag, tätheten i kvartssekunder, het uppbyggnad.
++  private aRoll = 0; private rollMean = new Float64Array(4); private rollEnv = new Float32Array(16); private rollN = 0; private rollPkAt = -1000;
++  private rollRunLen = 0; private rollRunIoi = -0; private rollMissAt = -99;
++  private rollBins = new Uint8Array(8); private rollHist = new Uint8Array(32).fill(255); private rollBinI = 0; private rollHistI = 0; private rollCnt = 0; private rollTight = false;
++  private rollHot = false; private rollAtMs = -1e12;
++  // ÅTERKOMSTEN (se RET_RISE_DB): bodyFast i 8 ms-rutor (ring 128), sekundrutornas toppar (ring RET_REF_S), senaste återkomsten.
++  private retV = new Float32Array(128); private retN = 0; private retTick = 0; private retOn = false; private retAtMs = -1e12;
++  private retBox = new Float32Array(RET_REF_S).fill(-200); private retBoxMax = -200.5; private retRefMax = -200.5;
+   private nearOn = false; private nearB = -0; private nearNorm = -0; private nearFloor = 1e9; private liftCalm = -0; private liftLift = -0;
+   private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftHistAt = -1e12; private stopRunS = -0;
+   private nearDropDb = -0; private nearDipDb = -0; private liftDb = -0; private stopCount = 0; private stopS = -0;
+@@ -883,11 +909,6 @@ export class Analyser {
+   /** ~1,5 s vid 125 Hz. MAD startar i noll efter tystnad och byggs upp med
+    *  `mad ← 1.006·mad + 6e-5`, vilket tar ≈183 rutor att nå ett användbart värde. */
+   private static readonly ONSET_WARM = 183;
+-  private specSlow = new Float32Array(8);
+-  private novSlow = 0;           // ihållande spektral novelty (~1.5s)
+-  private novBaseline = 0.2;     // ~8s baslinje → riser = novelty STIGER över den
+-  private centSlow = 0.3;
+-  private lvlSlowR = 0.3;
+   private buildUp = 0;           // 0..1 uppbyggnads-envelope
+   // KARAKTÄRSPROFIL (långsam, ~8s)
+   private profPunch = 0.4;
+@@ -1793,11 +1814,10 @@ export class Analyser {
+     this.aIUp = 1 - Math.exp(-dtHop / 1.5);
+     this.aIDown = 1 - Math.exp(-dtHop / 3.0);
+     this.aBandLvl = 1 - Math.exp(-bigDt / 0.09);
++    this.aRoll = 1 - Math.exp(-bigDt / ROLL_MEAN_S);
+     this.dHat = Math.exp(-dtHop / 0.06);
+     this.dSnare = Math.exp(-dtHop / 0.11);
+     this.dKick = Math.exp(-dtHop / 0.15);
+-    this.aSpecSlow = 1 - Math.exp(-dtHop / 2.0);
+-    this.aNovSlow = 1 - Math.exp(-dtHop / 1.5);
+     this.aProf = 1 - Math.exp(-dtHop / 8.0);
+     // Ett återanvänt Frame (spec/onset pekar på de pre-allokerade objekten).
+     this.outFrame = {
+@@ -2404,6 +2424,7 @@ export class Analyser {
+         if (ok && c - this.bassOnLastPk > Analyser.BASSON_WAIT) { this.bassOnLastPk = c; this.bassOnPeak = true; }
+       }
+     }
++    let rollE = 0;   // VIRVELRULLEN: mellan/diskantens flux (band 4-7), varje band normerat mot sitt eget 4 s-medel
+     for (let b = 0; b < 8; b++) {
+       const lo = bandLo[b], hi = bandHi[b];
+       const nb = Math.max(1, hi - lo);
+@@ -2445,6 +2466,7 @@ export class Analyser {
+       // Per-band onset: halvvågs-flux mot adaptiv baslinje (som kick-detektorn) →
+       // rena anslag oberoende av bandets absoluta energi.
+       const fluxN = fl / nb;
++      if (b >= 4 && gated) { const rm = this.rollMean, m = rm[b - 4] + (fluxN - rm[b - 4]) * this.aRoll; rm[b - 4] = m; rollE += fluxN / (m + 1e-9); }
+       // ROBUST PROMINENS-GRIND (samma som kick-detektorn anvander, banden fick den
+       // aldrig). Den gamla grinden var "1.3x en EMA-baslinje x6", vilket slapper
+       // igenom varje transient i bandet i stallet for verkliga trumslag.
+@@ -2477,10 +2499,53 @@ export class Analyser {
+         ? Math.max(0, Math.min(1, (fluxN - oThr) / Math.max(1e-6, this.onsetMad[b] * 3)))
+         : 0;
+     }
++    this.rollStep(rollE * 0.25);
+     { const t = this.prevMagBig; this.prevMagBig = this.magBig; this.magBig = t;
+       const v = this.prevMagBigView; this.prevMagBigView = this.magBigView; this.magBigView = v; }
+   }
+ 
++  /** VIRVELRULLEN (se ROLL_RUN), per stor-FFT (8 ms): plocka anslag ur mellan/diskant-fluxen, räkna jämna slag i följd och anslagens
++   *  täthet (2 s mot det glesaste 2 s-fönstret de senaste 8 s). Inga allokeringar: en ring om 16 rutor och 8 + 32 kvartssekunder. */
++  private rollStep(e: number): void {
++    const E = this.rollEnv, n = this.rollN++; E[n & 15] = e;
++    // Anslag = lokal topp (3 rutor före och efter, domen kommer 24 ms efter toppen) tydligt över sitt närmedel (ringens 16 rutor).
++    const c = E[(n - 3) & 15], since = n - 3 - this.rollPkAt;
++    let pick = since >= ROLL_PICK_GAP && n >= 16;
++    if (pick) { let sum = 0; for (let j = 0; j < 16; j++) sum += E[j]; pick = c > ROLL_PICK_K * sum * 0.0625 + ROLL_PICK_ADD; }
++    if (pick) for (let j = n - 6; j <= n; j++) if (E[j & 15] > c) { pick = false; break; }
++    if (pick) {
++      this.rollPkAt = n - 3; this.rollCnt++;
++      const run = this.rollRunIoi, tol = Math.max(1, ROLL_TOL * run);
++      if (this.rollRunLen > 0 && Math.abs(since - run) <= tol) { this.rollRunLen++; this.rollRunIoi = run + (since - run) * 0.25; }   // jämnt slag: följden växer
++      else if (this.rollRunLen >= 4 && Math.abs(since - 2 * run) <= 2 * tol && this.rollRunLen - this.rollMissAt >= 8) { this.rollMissAt = this.rollRunLen; this.rollRunLen += 2; }   // ett missat slag (dubbelt intervall), högst ett per 8 - annars vore åttondel + två sextondelar en "rulle"
++      else { this.rollRunLen = 1; this.rollRunIoi = since; this.rollMissAt = -99; }
++    } else if (since > 2.5 * Math.max(this.rollRunIoi, 1) + 2) this.rollRunLen = 0;   // rullen har tystnat
++    if (n % 31 === 30) {   // kvartssekund (31 x 8 ms)
++      const b = this.rollBins, h = this.rollHist; b[this.rollBinI] = this.rollCnt; this.rollCnt = 0; this.rollBinI = (this.rollBinI + 1) & 7;
++      let r2 = 0, mn = 255; for (let j = 0; j < 8; j++) r2 += b[j]; for (let j = 0; j < 32; j++) if (h[j] < mn) mn = h[j];
++      h[this.rollHistI] = r2; this.rollHistI = (this.rollHistI + 1) & 31;
++      // TÄTNAR: mot det glesaste fönstret nyss - som måste ha haft en puls (>= 1 anslag/s): ur tystnad är det en entré, ingen rulle.
++      this.rollTight = mn >= 2 && mn < 255 && r2 >= ROLL_TIGHT * mn;
++    }
++  }
++
++  /** ÅTERKOMSTEN (se RET_RISE_DB), var tredje hopp (8 ms): sann på flanken där basen slår starkare än allt den gjort den senaste
++   *  sekunden och landar nära sitt starkaste den senaste halvminuten. Två små ringar, inget mot bodyCeil/bodyPeak. */
++  private retStep(f: number): boolean {
++    const V = this.retV, n = this.retN++; V[n & 127] = f;
++    if (n % RET_HOLD_N === 0 && n > 0) {   // en sekundruta är full: dess topp in i ringen, måttstocken = ringens högsta
++      const B = this.retBox; B[(n / RET_HOLD_N - 1) % RET_REF_S] = this.retBoxMax; this.retBoxMax = -200;
++      let m = -200; for (let j = 0; j < RET_REF_S; j++) if (B[j] > m) m = B[j];
++      this.retRefMax = m;
++    }
++    if (f > this.retBoxMax) this.retBoxMax = f;
++    if (n < RET_HOLD_N) return false;
++    let top = -1e9; for (let j = n - RET_HOLD_N; j <= n - RET_ATTACK_N; j++) { const v = V[j & 127]; if (v > top) top = v; }
++    const on = f - top >= RET_RISE_DB && f > this.retRefMax - RET_LAND_DB, edge = on && !this.retOn;
++    this.retOn = on;
++    return edge;
++  }
++
+   /** Drop-detektionen (baskropp, franvaro, stigning, armering, minidrop, lugn-grind, kick-las, fyrning). Manga kalla grenar: egen funktion sa att en deopt bara kostar den har, inte hetslingan. */
+   private dropStep(): void {
+     const nowWallA = this.hNowWall, bodyNow = this.hBody;
+@@ -2631,6 +2696,22 @@ export class Analyser {
+     if (bodyOnsetEdge && this.goneEpisodeMs !== this.dropArmGoneMs) { this.dropArmUntil = nowWallA + DROP_ARM_MS; this.dropArmAt = nowWallA; this.dropArmGoneMs = this.goneEpisodeMs; }
+     const armed = bodyOnsetEdge || nowWallA < this.dropArmUntil;
+     // (KICK-FIRST forkastad 09-04: flod pa megamix; [firstkick]-sparet borttaget 09-27.)
++    // VIRVELRULLEN -> FULL DROP (se ROLL_RUN): rullen värmer uppbyggnaden; en återkomst släpper den, och är den första på
++    // SHOW_DROP_GAP_MS blir den full drop.
++    let rollDrop = false;
++    if (this.rollTight && this.rollRunLen >= ROLL_RUN && nowWallA - this.retAtMs > ROLL_MEM_MS) { this.rollHot = true; this.rollAtMs = nowWallA; }
++    else if (this.rollHot && nowWallA - this.rollAtMs > ROLL_MEM_MS) this.rollHot = false;
++    if (++this.retTick >= Analyser.BIG_EVERY) {
++      this.retTick = 0;
++      if (this.retStep(this.bodyFast)) {
++        if (this.rollHot) {
++          rollDrop = nowWallA - this.retAtMs > SHOW_DROP_GAP_MS;   // (ingen brusgrind här: andningspausen före droppen får vara tyst - rullen bevisar att musiken går)
++          if (DROP_TRACE) console.log(`[rolldrop] wall ${this.wallNow()} ${rollDrop ? 'FULL DROP' : 'nekad (frasen)'} sedan rullen ${((nowWallA - this.rollAtMs) / 1000).toFixed(1)} s, sedan förra återkomsten ${((nowWallA - this.retAtMs) / 1000).toFixed(1)} s`);
++          this.rollHot = false; this.rollRunLen = 0;   // rullen är förbrukad
++        }
++        this.retAtMs = nowWallA;
++      }
++    }
+     // MINIDROP-lyftet (se MINI_*). Egen svacka-raknare (kortare/grundare an gone) och egen flank.
+     if (MINI_SPACING_MS > 0) {
+       if (this.bodyEnv < this.bodyCeil - MINI_GONE_DB) { this.miniGoneMs += dtHop * 1000; if (this.miniGoneMs >= MINI_GONE_MS) this.lastMiniGoneMs = nowWallA; }
+@@ -2679,15 +2760,15 @@ export class Analyser {
+       this.dropCand++; this.lastDropMs = nowWallA; this.lastDropRise = bodyRise;
+       console.log(`[dropfire] wall ${this.wallNow()}${fireTag} rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} ceil ${this.bodyCeil.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} sinceDrop ${(sinceDrop/1000).toFixed(1)}s goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s goneSpan ${(this.lastGoneSpanMs/1000).toFixed(1)}s edgeAgo ${(nowWallA - this.dropArmAt).toFixed(0)}ms`);
+     }
+-    this.dropClassify(flank, fireNow, nowWallA);
++    this.dropClassify(flank, fireNow, rollDrop, nowWallA);
+   }
+ 
+-  /** EN DROPDETEKTOR - klassningen (a3): flanken är full drop (efter spärren), slam-kandidaten utan egen flank inom 2 s är minidrop. */
+-  private dropClassify(flank: boolean, cand: boolean, nowWallA: number): void {
+-    if (flank) {
+-      if (nowWallA - this.lastShowDropMs < SHOW_DROP_GAP_MS) { this.dropSpaced++; this.miniDropCount++; }
+-      else { this.lastShowDropMs = nowWallA; this.dropCount++; }
+-    } else if (cand && nowWallA - this.fdAt > 2000) { this.dropDemoted++; this.miniDropCount++; }
++  /** EN DROPDETEKTOR - klassningen (drop1 a3r): full drop = återkomsten efter en rulle (se ROLL_RUN; spärren SHOW_DROP_GAP_MS ligger
++   *  i frasregeln, varje drop är själv en återkomst). Flanken (långt break) och slam-kandidaten utan rulle är minidrop - 11 av motorns
++   *  12 flank-drop saknade markering och 3 fick "inte drop". Inom 2 s efter en full drop räknas de inte (samma smäll). */
++  private dropClassify(flank: boolean, cand: boolean, roll: boolean, nowWallA: number): void {
++    if (roll) { this.lastShowDropMs = nowWallA; this.dropCount++; }
++    else if ((flank || (cand && nowWallA - this.fdAt > 2000)) && nowWallA - this.lastShowDropMs > 2000) { this.dropDemoted++; this.miniDropCount++; }
+   }
+ 
+   /** FULL DROP PÅ FLANKEN (se FLANK_GONE_DB): på dropStep:s egna filter (bodyFast/bodyEnv/bodyCeil), per hop. */
+@@ -2737,35 +2818,12 @@ export class Analyser {
+     }
+   }
+ 
+-  /** Uppbyggnad/riser (spektral novelty + klang/niva). Returnerar inRiser och uppdaterar buildUp. */
++  /** UPPBYGGNADEN = VIRVELRULLEN (drop1 a3r, se ROLL_RUN): het från rullen tills basen kommer tillbaka (högst ROLL_MEM_MS efter rullens
++   *  sista slag). Returnerar inRiser och uppdaterar buildUp. Ersätter novelty-risern, vars grindar var absoluta nivåer
++   *  (lvlSmooth > 0,3/0,4) och därför döda på rent ljud (nivå median 0,16): buildUp max 0,00 och inRiser 0 % av tiden i ladan 11-13. */
+   private riserStep(): boolean {
+-    const nowWallA = this.hNowWall;
+     const dtHop = this.dtHop;
+-    // ── UPPBYGGNAD / RISER (flyttad hit) ──
+-    // Spektral NOVELTY = summan av bandens POSITIVA avvikelse från en ~2s baslinje,
+-    // ihållande ~1.5s. Mätt validerad: ramsar 0.25→0.78 in i en drop. Relativt en
+-    // ~8s baslinje → RISER = novelty STIGER över den (filter-sweep/snare-roll),
+-    // skilt från bara-busy (ihållande → baslinjen kommer ikapp). Gammal väg
+-    // (klang+nivå stiger) ligger kvar som OR. Inte direkt efter en drop.
+-    let nov = 0; const sr = this.aSpecSlow;
+-    // NOVELTY PÅ `bandDb`, INTE `bandLvl` — se fältets dokumentation. Med den
+-    // AGC-normaliserade nivån var det här uttrycket matematiskt tvunget att gå
+-    // mot noll under exakt de förlopp det skulle upptäcka.
+-    for (let b = 0; b < 8; b++) { this.specSlow[b] += (this.bandDb[b] - this.specSlow[b]) * sr; nov += Math.max(0, this.bandDb[b] - this.specSlow[b]); }
+-    this.novSlow += (nov - this.novSlow) * this.aNovSlow;
+-    this.novBaseline += (this.novSlow - this.novBaseline) * (dtHop / 8);
+-    const novRiser = this.novSlow > this.novBaseline + 0.15 && this.novSlow > 0.45;
+-    this.centSlow += (this.centSmooth - this.centSlow) * (dtHop / 2.5);
+-    this.lvlSlowR += (this.lvlSmooth - this.lvlSlowR) * (dtHop / 2.5);
+-    const inRiser = this.activeMs > 2500 && this.lvlSmooth > 0.3 && nowWallA - this.lastDropMs > 1500 && (
+-        novRiser
+-        || (this.centSmooth > this.centSlow + 0.06 && this.lvlSmooth > this.lvlSlowR + 0.04 && this.lvlSmooth > 0.4)
+-      );
+-    // Stampla uppbyggnaden. OBS: drop-villkoret ovan kraver INTE en riser — det
+-    // kravet ar avstangt (se dar). Stampeln halls uppdaterad for att kravet ska
+-    // kunna aterinforas nu nar riser-signalen faktiskt lever (se `bandDb`).
+-    // Nagot "4000 ms-fonster" finns inte i filen; den formuleringen var kvar
+-    // fran en tidigare version av villkoret.
++    const inRiser = this.rollHot;
+     const bTarget = inRiser ? 1 : 0;
+     const bRate = bTarget > this.buildUp ? dtHop / 3.5 : dtHop / 1.0;   // bygg ~3.5s, klinga ~1s
+     this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));

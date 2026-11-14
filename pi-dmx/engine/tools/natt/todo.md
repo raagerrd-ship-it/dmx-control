@@ -1,9 +1,15 @@
 # Natt-agentens uppdrag
 
-ARENAN DROP1 PÅGÅR sedan 2026-11-13 19:15 (huvudchatten orkestrerar, ägaren: "kör arena och använd de två inspelningarna"). LÄGE 20:40: runda 1 dömd (8 av 8 godkända, a1 82,6, jokern 90,7 på övningen), FINALEN PÅ KONTROLLEN: ALLA 0 AV 5 DROP = överanpassat, ingen vinnare. Runda 2 (allmängiltighet, korsprov inom övningen) pågår med a1r a3r a4r a5r fusionr; kontrollen använd 1 gång per variant (6 varianter).
-Frågan: drop eller minidrop - känn igen uppbyggnaden. Domare tools/arena/dropdom.py (övning lang-20261113T160345, kontroll
-lang-20261113T151659; bas 22,8 / 22,2 poäng). Körning .arena/drop1 (uppgift.md, kort.md, status.json). NATTAGENTEN: starta ingen egen
-arena och rör inte .arena/drop1; bänkarna på det nya ljudet får köras när .arena/.droplas är fri.
+ARENAN DROP1 KLAR 2026-11-14 03:30: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-13-drop1.md, idébank i mappen bredvid.
+Övningen: jokern 90,7 poäng (8/9 drop), a1 82,6. KONTROLLEN: alla 0 av 5 drop i finalen; efter runda 2 (allmängiltighet) bäst a4r 1 av 5.
+Orsak: i övningen hålls basen tillbaka före drop (66 % av 8 s), i kontrollen spelar basen vidare (33 %, längsta lucka 1,1 s) - de två
+inspelningarna innehåller olika sorters uppbyggnad och 14 drop räcker inte. Kontrollen (151659) är använd 2 gånger och inte längre osedd.
+NÄSTA ARENA om drop: båda 11-13-filerna som övning, NYA markerade inspelningar som kontroll; fråga ägaren vad han hör som uppbyggnad när
+basen spelar vidare. Domaren dropdom.py kör nu med klockan (705e515) och har kö.
+IDÉBANK drop1: a6 relativa nivågränser (inRiser/inZone mot levelCeil, riserns fönster relativt bandets topp) - prova ensam, ägarens ja krävs.
+IDÉBANK drop1: a4r lokalt tak (30 s) i stället för tak som glömmer på minuter - tål nivåbyten ±8-12 dB; a7 break-taket (tog 7 av basens 9
+falska drop); a1r tempot fryses medan basen hålls (klockan visade 80 i st f 130 bpm före ett drop); a5r ny-topp-måttet.
+NATTAGENTEN: ingen ny arena utan ARENA-uppdrag; bänkarna på det nya ljudet är fria (.arena/.droplas).
 
 NYTT RENT MATERIAL + GRUNDMÄTNING 2026-11-13 kväll (ladan, ägaren på plats) - LÄS tools/natt/grund-2026-11-13.md FÖRST.
 tools/ladan-2026-11-13/: tre rena inspelningar (24 min) + en lång som startades 18:24; två har ägarens markeringar (14 drop, 20 mini,
