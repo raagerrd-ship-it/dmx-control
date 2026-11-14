@@ -5,10 +5,10 @@
 # Jämför med 2026-11-13 (tools/natt/grund-2026-11-13.md): huvudtråd 30-55 %, arbetstråd 18 %, loop p99 11 ms, eftersläp < 1 ms, 135 MB.
 N=${1:-18}; P=$(systemctl show audio-dmx-engine -p MainPID --value)
 echo "START $(date +%H:%M:%S) pid $P"
-curl -s -m 5 http://127.0.0.1/api/health > /tmp/lat-h0.json
-top -H -b -d 10 -n $((N+1)) -p $P -w 200 2>/dev/null | awk '/^top -/{w++} w>1 && $9+0 > 0.2 {print w-1, $1, $9, $NF}' > /tmp/lat-top.txt
-curl -s -m 5 http://127.0.0.1/api/health > /tmp/lat-h1.json
-curl -s -m 5 http://127.0.0.1/api/perf > /tmp/lat-perf.json
+curl -skL -m 6 http://127.0.0.1/api/health-log > /tmp/lat-h0.json
+top -H -b -d 10 -n $((N+1)) -p $P -w 200 2>/dev/null | awk '/^top -/{w++} w>1 && $1 ~ /^[0-9]+$/ && $9+0 > 0.2 {print w-1, $1, $9, $NF}' > /tmp/lat-top.txt
+curl -skL -m 6 http://127.0.0.1/api/health-log > /tmp/lat-h1.json
+curl -skL -m 6 http://127.0.0.1/api/perf > /tmp/lat-perf.json
 echo "SLUT $(date +%H:%M:%S)  NRestarts $(systemctl show audio-dmx-engine -p NRestarts --value)  minne $(( $(ps -o rss= -p $P) / 1024 )) MB  temp $(vcgencmd measure_temp 2>/dev/null)"
 python3 - <<'PY'
 import json, statistics as st

@@ -380,3 +380,30 @@ Vid `this.boundaryCount++;`:
 grans passerad -> motorns auto-range far kalibrera om
 ```
 
+
+## Arenan lat1: RYTMEN SOM VITTNE (inlagd 2026-11-14 kväll)
+
+Jokerns låtgränsdel (a2, filen orörd från a2), inlagd efter ägarens ögonprov i ladan. Rapport: `tools/natt/arena-2026-11-14-lat1.md`.
+
+### P_N, P_ML, P_RING, P_LO, P_HI, P_CLEAR, P_SAME, P_GONE, P_EST, P_HOLD, P_FINE, P_FOLLOW
+
+```text
+En ny låt har en ny puls. Detektorn mäter pulsens period SJÄLV ur spektrum (pushPulse: summan av bandens positiva logökning per
+stor-FFT = anslagsstyrka; löpande självlikhet över P_N spektrum, avstånd upp till P_ML) - inte ur klockans tempo, som släpar och
+är det gränsen ska rätta. pulseDecide per formblock: starkaste perioden inom en oktav (P_LO..P_HI bpm, kammen pComb = perioden och
+dess 2, 3, 4 slag). P_CLEAR = så stark självlikhet räknas som en puls. P_EST block i rad på samma period (inom P_SAME) etablerar
+låtens puls (pRef); den följer låtens egen drift (P_FOLLOW). Hörs en ANNAN tydlig period medan den gamla är svagare än P_GONE av
+den nya, i P_HOLD block i rad -> låtgräns ("ny puls a->b" i lastEvidence). P_FINE: punkterad puls - hörs även den 1,5 gånger
+snabbare perioden är DET pulsen.
+FORMEN TIGER medan låten har en puls (`!this.pRef` i formDecide): formvägen gav den falska gränsen i uppbyggnaden vid 200 s
+(formpoäng 1,47 mot riktiga skarvars 1,12-1,44) och på ny musik 11-14 två falska mitt i låtar (145 och 312 s). Formen är kvar som
+väg bara innan en puls är etablerad. Tystnadsvägen (3 s under släckgränsen) är orörd.
+```
+
+Mätt (medel av fem starter): övning 4 av 4 låtbyten och 0 falska (förr 3 av 4 och 1 falsk), kontroll 2 av 2 och 0 falska (förr 1
+av 2), ny inspelning 11-14 (193040) 2 av 2 (förr 0 av 2 med gårdagens kod, 2 falska med startgrinden 8ab0778). Marginaler ±25 % på
+alla sju talen: 4/4 och 0 falska i alla fjorton. Gränsen 1 s tidigare/senare (P_HOLD 4/8): 96,94 / 96,91.
+
+Gränser som mekanismen INTE ser: låtbyte utan tempobyte (under 1 % ändring 0 av 4, 1-4 % 6 av 8, över 5 % 11 av 12 i tolv
+konstgjorda skarvar) - en taktmixad mix får inga gränser, klockan behöver ingen men manuset byts inte. 2:1 syns inte (viks till
+samma oktav). Tempobyte mitt i en låt, eller en sektion som lämnar rutnätet i över 3 s, blir en gräns.

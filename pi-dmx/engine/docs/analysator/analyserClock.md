@@ -902,3 +902,48 @@ EN TILLIT SOM MÅTT (t1f): andelen kickar rutnätet förutsäger (repeatRate) x 
 repeatRate, som mättade på 1,00 även när tempogrammet hade två nästan lika starka tempon (konsertReplay: 1,00 vid VARJE manusval).
 ```
 
+
+## Arenan lat1 (inlagd 2026-11-14 kväll)
+
+Jokerns klockdel (a6 + a7 + a8), inlagd efter ägarens ögonprov i ladan ("ser bra ut"). Rapporten med alla siffror:
+`tools/natt/arena-2026-11-14-lat1.md`; hela diffen: `tools/natt/arena-2026-11-14-lat1/fusion.diff`. Dömd som medel av fem
+starter (`tools/arena/latskak.py`): övning 92,03 -> 97,00, kontroll 90,15 -> 92,32 (bättre i 5 av 5).
+
+### TG_Q_SIM, TG_Q_LEAD, pwReal()
+
+```text
+BEVISETS KVALITET (a6): klockan byter hållet tempo bara när utmanarens mönster faktiskt upprepar sig i självlikhets-vittnets
+senare halva (pwSim >= TG_Q_SIM, samma tal som PW_MIN), eller - utan mönster - när bevissumman leder med ett helt golv
+(TG_Q_LEAD, samma tal som TG_SW_P). Skälet: alla tre break-felen på övningen (t.ex. 131 -> 80 bpm en sekund före ett drop)
+gick genom det snabba bytet på svagt bevis. Ett fast djup i dB (TG_BRK_DB 24 -> 20/16/12) gav inget netto; kvaliteten gör det.
+Utan pwReal: 94,07 (takt 91,7 %). Utan ledningskravet: 95,62. Under 1000 hopp i vittnet svarar pwReal ja (ingen dom utan bevis).
+```
+
+### first, TG_FINE_MAX
+
+```text
+FÖRSTA VALET (a7): efter start, tystnad eller låtgräns valde klockan ibland en släkting till rätt tempo (105 i st f 141, 85 i st f
+97: 3:4 och 3:2) och stod kvar 10-30 s; det hände efter var tredje omlåsning. Medan `first` gäller (tills första säkra låsningen
+eller låtens minne tar över) jämför pwJudge kandidaten med sina släktingar (PW_Q) på vittnets senare halva och tar den släkting
+vars mönster finns (>= PW_MIN) och är tydligt starkare (TG_HOLD). Utan: 96,49 (låstid 7,7 s).
+FINTEMPOTS BAND TG_FINE_MAX = 1,25 % (förr TG_SNAP 3 %): finsökningen får bara flytta tempot så långt från registrets val;
+utan: 96,50 (takten utanför låtbytena 96,1 %).
+```
+
+### BND_QUIET_BEATS, quietAt, pend, sameSong(), relock(soft), tgReset(soft)
+
+```text
+MINNET VID GRÄNSEN (a7 C + a8): när låtgränsen sägs är skarven redan flera sekunder gammal.
+- MJUK GRÄNS: sägs gränsen medan det låter (inte tyst, inte en säker Sonos-gräns `sure`) behålls de korta minnena (pwN, tgAcc,
+  tgAccF) - de är redan fulla av den nya låten. Utan: 96,72 (låstid 7,5 s). `!this.sure` är jokerns enda egna term: en exakt
+  Sonos-gräns ligger PÅ skarven, då är de korta minnena förra låtens (lotus).
+- GRÄNS I ETT HÅLLET BREAK (sameSong): håller break-hållet tempot just nu, har låten inte tystnat (BND_QUIET_BEATS slag tyst =
+  låten tog slut) och säger breakets rytm inte emot det hållna tempot, låses inget om; gränsen väntar (`pend`). Tystnar låten i
+  breaket var gränsen sann och omlåsningen görs då; kommer basen tillbaka (TG_WIN_MS utan break) släpps den.
+  Skakprovet lika med och utan; massprovet (79 + 77 konstgjorda gränser) 45 -> 37 s och 37 -> 27 s fel.
+```
+
+Marginaler ±25 % (klockan ensam, fel s på övningen, valt 39): TG_Q_SIM 39/39, TG_Q_LEAD 39/38, första valets golv 39/41, dess
+marginal 40/40, senare halvans golv 39/39, TG_FINE_MAX 40/39, BND_QUIET_BEATS 39/39.
+
+Olöst: ~37 s att låsa efter ett låtbyte till en låt med tyst intro (tempot syns inte i signalerna förrän takten kommer in).

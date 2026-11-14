@@ -27,6 +27,14 @@ const F_WC = 6, F_WB = 1;   // vikter kroma, tempo
 const F_THR = 1.3;   // MATT (med F_TMIN)
 const F_TMIN = 0.3;   // en falsk grans nollar tempolaset och byter manus, en missad kostar bara...
 const F_RING = 256;
+const P_N = 768, P_ML = 384, P_RING = 2048;   // RYTMEN SOM VITTNE: anslagsfonster och langsta avstand i spektrum (6 s, 3 s)
+const P_LO = 80, P_HI = 2 * P_LO;   // pulsens omfang: en oktav (bpm)
+const P_CLEAR = 0.12;   // sa stark sjalvlikhet = en puls hors
+const P_SAME = 0.03;   // inom sa mycket ar det samma period
+const P_GONE = 0.5;   // gamla pulsen ar borta nar den ar svagare an sa mot den nya
+const P_EST = 6, P_HOLD = 6;   // block: sa lange for att etablera en puls, sa lange maste bytet sta
+const P_FINE = 2 / 3;   // punkterad puls: hors aven den 1,5 ganger snabbare ar DET pulsen
+const P_FOLLOW = 0.1;   // referensen foljer latens egen drift
 
 /** Median. */
 function median(a: Float64Array): number {
@@ -80,6 +88,59 @@ export class BoundaryDetector {
     this.pushForm(mag, binHz);
   }
 
+  private pX = new Float32Array(P_RING); private pR = new Float64Array(P_ML + 1); private pA = new Float64Array(P_ML + 2);   // RYTMEN SOM VITTNE
+  private pB = new Float64Array(F_NB); private pL = new Float64Array(F_NB); private pS = 0; private pCnt = 0; private pPos = 0; private pT0 = 0;
+  private pRef = 0; private pCand = 0; private pRun = 0; private pNew = 0; private pNewRun = 0; private pRefS = 0; private pBestS = 0; private pMs = 8;   // perioder i spektrum
+  private pPend = 0;
+
+  /** Anslagsstyrkan i ett spektrum och dess lopande sjalvlikhet. */
+  private pushPulse(now: number): void {
+    const B = this.pB, L = this.pL; let o = 0;
+    for (let b = 0; b < F_NB; b++) { const l = Math.log(B[b] + 1e-6), d = l - L[b]; if (d > 0) o += d; L[b] = l; }
+    if (this.pCnt === 0) { this.pT0 = now; o = 0; }
+    const M = P_RING - 1, p = this.pPos, X = this.pX, R = this.pR;
+    X[p] = o; const x = X[p];
+    if (this.pCnt >= P_N) {
+      const q = (p - P_N) & M, y = X[q]; this.pS += x - y;
+      for (let l = 0; l <= P_ML; l++) R[l] += x * X[(p - l) & M] - y * X[(q - l) & M];
+    } else { this.pS += x; for (let l = 0; l <= P_ML; l++) R[l] += x * X[(p - l) & M]; }
+    this.pPos = (p + 1) & M; this.pCnt++;
+  }
+
+  /** Sjalvlikheten pa perioden lag (spektrum) och dess 2, 3 och 4 slag. */
+  private pComb(lag: number): number {
+    const A = this.pA; let s = 0, n = 0;
+    for (let m = 1; m <= 4; m++) { const x = lag * m; if (x >= P_ML) break; const k = x | 0; s += A[k] + (A[k + 1] - A[k]) * (x - k); n++; }
+    return n ? s / n : 0;
+  }
+
+  /** Pulsens period i de senaste sekunderna mot latens etablerade; ett ihallande byte = ny lat. */
+  private pulseDecide(now: number): void {
+    this.pBestS = 0; this.pRefS = 0;
+    if (this.pCnt < P_N + P_ML) return;
+    const dt = (now - this.pT0) / (this.pCnt - 1), R = this.pR, A = this.pA, m2 = this.pS * this.pS / P_N, v0 = R[0] - m2;
+    if (!(v0 > 0) || !(dt > 0)) { this.pRun = 0; this.pNewRun = 0; return; }
+    for (let l = 0; l <= P_ML; l++) A[l] = (R[l] - m2) / v0;
+    const l0 = 60000 / P_HI / dt, l1 = 60000 / P_LO / dt; let bs = 0, bl = 0;
+    for (let lag = l0; lag < l1; lag += 0.25) { const s = this.pComb(lag); if (s > bs) { bs = s; bl = lag; } }
+    if (bl * P_FINE >= l0) {
+      let fs = 0, fl = 0; for (let lag = bl * P_FINE * (1 - P_SAME), e = bl * P_FINE * (1 + P_SAME); lag <= e; lag += 0.25) { const s = this.pComb(lag); if (s > fs) { fs = s; fl = lag; } }
+      if (fs >= P_GONE * bs) bl = fl;
+    }
+    const clear = bs >= P_CLEAR; this.pBestS = bs; this.pMs = dt;
+    if (!this.pRef) {
+      if (clear && this.pCand > 0 && Math.abs(bl / this.pCand - 1) <= P_SAME) { if (++this.pRun >= P_EST) { this.pRef = bl; this.pRun = 0; } }
+      else { this.pCand = clear ? bl : 0; this.pRun = clear ? 1 : 0; }
+      return;
+    }
+    const rs = this.pComb(this.pRef); this.pRefS = rs;
+    if (clear && Math.abs(bl / this.pRef - 1) <= P_SAME) { this.pRef += P_FOLLOW * (bl - this.pRef); this.pNewRun = 0; return; }
+    if (clear && rs <= P_GONE * bs) {
+      if (this.pNewRun > 0 && Math.abs(bl / this.pNew - 1) <= P_SAME) this.pNewRun++; else { this.pNew = bl; this.pNewRun = 1; }
+      if (this.pNewRun >= P_HOLD) { this.pPend = bl; this.pNewRun = 0; }
+    } else this.pNewRun = 0;
+  }
+
   private fBand: Int8Array | null = null; private fPc: Int8Array | null = null; private fHz = 0;   // LATENS FORM
   private fAcc = new Float64Array(F_NB); private fCh = new Float64Array(12); private fN = 0; private fStart = 0;
   private fLb = new Float32Array(F_RING * F_NB); private fC = new Float32Array(F_RING * 12);
@@ -99,9 +160,12 @@ export class BoundaryDetector {
       }
     }
     const band = this.fBand, pc = this.fPc!, acc = this.fAcc, ch = this.fCh;
-    for (let i = 1; i < mag.length; i++) { const m = mag[i], b = band[i], p = pc[i]; if (b >= 0) acc[b] += m; if (p >= 0) ch[p] += m * m; }
+    const pb = this.pB; pb.fill(0);
+    for (let i = 1; i < mag.length; i++) { const m = mag[i], b = band[i], p = pc[i]; if (b >= 0) pb[b] += m; if (p >= 0) ch[p] += m * m; }
+    for (let b = 0; b < F_NB; b++) acc[b] += pb[b];
     this.fN++;
     const now = this.clock();
+    this.pushPulse(now);
     if (!this.fStart) this.fStart = now;
     if (now - this.fStart < F_BLK_MS) return;
     this.fStart = now;
@@ -113,6 +177,7 @@ export class BoundaryDetector {
     for (let p = 0; p < 12; p++) this.fC[oc + p] = (ch[p] / n) / (cs + 1e-12);
     this.fT[k] = now; this.fBpm[k] = this.fLastBpm; this.fCount++;
     acc.fill(0); ch.fill(0); this.fN = 0;
+    this.pulseDecide(now);
     this.formDecide();
   }
 
@@ -140,7 +205,7 @@ export class BoundaryDetector {
     const dC = 1 - dot / (Math.sqrt(na) * Math.sqrt(nb) || 1);
     const dB = foldBpm(median(this.fMedA), median(this.fMedB));
     const sc = dT + F_WC * dC + F_WB * dB;
-    if (sc >= F_THR && dT >= F_TMIN) { this.fPendAt = sAt; this.fPendScore = sc; }
+    if (sc >= F_THR && dT >= F_TMIN && !this.pRef) { this.fPendAt = sAt; this.fPendScore = sc; }
   }
 
   /** Matas varje hop med ramens niva/tempo. */
@@ -152,7 +217,7 @@ export class BoundaryDetector {
     if (!this.playStart) {
       if (loud) {
         if (!this.loudSince) this.loudSince = now;
-        else if (now - this.loudSince >= START_HOLD_MS) { this.playStart = now; this.lastLoud = now; this.loudSince = 0; }
+        else if (now - this.loudSince >= START_HOLD_MS) { this.playStart = now; this.lastLoud = now; this.loudSince = 0; this.pulseReset(); }
       } else this.loudSince = 0;
       return;
     }
@@ -253,7 +318,9 @@ export class BoundaryDetector {
 
     let why = "";
     let back = 0;
-    if (this.fPendAt) { why = `latform ${this.fPendScore.toFixed(2)}`; back = Math.max(0, now - this.fPendAt); this.fPendAt = 0; }
+    const np = this.pPend;
+    if (np) { why = `ny puls ${(60000 / this.pRef / this.pMs).toFixed(0)}->${(60000 / np / this.pMs).toFixed(0)}`; this.pPend = 0; }
+    else if (this.fPendAt) { why = `latform ${this.fPendScore.toFixed(2)}`; back = Math.max(0, now - this.fPendAt); this.fPendAt = 0; }
     else if (tLive > MAX_SEG_MS) why = "maxlängd";
     if (!why) return false;
 
@@ -264,6 +331,7 @@ export class BoundaryDetector {
     this.commit();
     this.playStart = bAt;
     this.lastLoud = now;
+    this.pRef = np;
     return true;
   }
 
@@ -272,5 +340,9 @@ export class BoundaryDetector {
     this.boundaryCount++;
     this.playStart = 0;
     this.resetNovelty(); this.fPendAt = 0; this.loudSince = 0;
+    this.pRef = 0; this.pCand = 0; this.pRun = 0; this.pNewRun = 0; this.pPend = 0; this.pRefS = 0;
   }
+
+  /** Nytt segment efter tystnad: anslagsringen borjar om. */
+  private pulseReset(): void { this.pX.fill(0); this.pR.fill(0); this.pS = 0; this.pCnt = 0; this.pPos = 0; }
 }

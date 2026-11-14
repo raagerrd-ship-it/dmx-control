@@ -60,7 +60,7 @@ stigning på 0,5 s. Helt tyst (lvlSmooth <= FLANK_SILENT_LV) i breaket = låtluc
 (bodyFast 60 ms, bodyEnv 350 ms, bodyCeil -0,15 dB/s) - förr en egen kopia i effekterna.
 ```
 
-### FLANK_ROOF_BEATS
+### FLANK_ROOF_BEATS (BORTTAGEN 2026-11-14 kväll)
 
 ```text
 BREAK-TAKET (2026-11-14, ur arenan drop1 a7; ägarens facit i ladan 11-13): har basen varit borta i FLANK_ROOF_BEATS slag eller mer
@@ -68,6 +68,13 @@ BREAK-TAKET (2026-11-14, ur arenan drop1 a7; ägarens facit i ladan 11-13): har 
 hans egna drop har basen borta högst 6 slag, återkomsterna han INTE kallar drop (omarkerade, "inte drop", låtbyte) minst drygt 8.
 Samma dom för tak 6-9 slag. Slam-kandidaten kan fortfarande göra återkomsten till minidrop.
 ```
+
+BORTTAGEN samma kväll, efter ny musik i ladan (lang-20261114T193040, 4 markerade drop): ägarens drop där kommer efter break på
+20-48 slag. Med taket 8 slag: 1 av 4 drop kvar; 24 slag: 2 av 4; 32: 3 av 4; först vid 48 eller mer 4 av 4. Gårdagens falska drop
+har break på 12-32 slag, så inget tak går mellan dem. Breakets längd skiljer alltså INTE drop från icke-drop; taket var trimmat på
+två inspelningar av samma sorts musik. Utan taket: 4 av 4 på den nya inspelningen (plus två omarkerade, 245 och 316 s), och på
+160345 tillbaka till de 10 drop motorn gav före taket (ägarens 1 av 9 där). Vad som skiljer hans drop från andra basåterkomster
+är fortfarande olöst; nästa försök döms på fler inspelningar än två.
 
 ### SHOW_DROP_GAP_MS
 
@@ -429,11 +436,6 @@ KICK-LASET (se DROP_KICK_LOCK_MS): kandidaten vantar in forsta kicken, hogst en 
 
 ```text
  FULL DROP PÅ FLANKEN (se FLANK_GONE_DB): på dropStep:s egna filter (bodyFast/bodyEnv/bodyCeil), per hop.
-```
-Vid `if (span * (this.a.dBpm > 40 ? this.a.dBpm : 60000 / Analyser.BE_FALLBACK_MS) >= FLANK_...`:
-
-```text
-BREAK-TAKET: ny sektion, ingen drop
 ```
 
 ### liftStep()
