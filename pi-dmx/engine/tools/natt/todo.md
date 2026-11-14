@@ -1,5 +1,16 @@
 # Natt-agentens uppdrag
 
+LATENSTEST PÅ LOTUS-PI:N 2026-11-14 15:15-15:40 (huvudsessionen, ägaren: "kör nu ett latenstest för att se om det är lika, du får gärna köra igång
+på lotus direkt"): LIKA. Pi Zero 2 W (samma som ladans), musik via Sonos vol 13, ingen felsökning på. Två fönster om 3 min före och efter:
+  huvudtråden 39,8 / 39,0 % -> 38,1 / 37,6 % CPU; arbetstråden (långsamma analysatorn) 16,3 / 16,5 -> 16,1 / 16,2 %; hopp över 2,67 ms-budgeten 0 -> 0;
+  arbetstrådens eftersläp 1 ms -> 1 ms; tick medel 0,08-0,18 -> 0,08-0,12 ms; loop p99 11,0-11,8 -> 11,0-11,2 ms; BLE-skrivning 0,3-0,5 -> 0,2 ms, 0 fel.
+Samma ljud genom gammalt och nytt bygge PÅ Pi:n utanför tjänsten (tools/refaktor/piBench.mjs, 90 s, en tråd, varv 3-4 efter uppvärmning):
+  medel 605 / 616 -> 595 / 615 us per hopp, median 437 / 439 -> 424 / 436, p90 950 / 955 -> 937 / 957, p99 ~1450-1500 båda.
+LOTUS KÖR NU DEN NYA ANALYSATORN (utlagd 15:27, lotus 22a2055c = uppdelningen + relativa nivågränser + break-taket; md5 Pi = bygget, 16 filer,
+NRestarts 0, Pi-backup *.bak-20261114-1527). Live 200 s: inZone 29 %, inRiser 4 %, buildUp max 0,04, 0 drop, tempo låst 93 %. Lotus-ljuset läser
+varken buildUp (buildUpGain 0) eller drop (dropEnabled false), så de ändrade signalerna syns inte i taklisten.
+Mätskripten: tools/refaktor/latens-pi.sh (körs på Pi:n: trådarnas CPU + status + perf) och piBench.mjs - kör samma vid nästa utläggning i ladan.
+
 ANALYSATORN UPPDELAD 2026-11-14 natt (huvudsessionen, ägaren: "Kör igång med allt. Flytta ut alla kommentarer, och bryt ut del för del").
 analyser.ts 3000 -> 1057 rader + åtta delar (analyserDrop/Section/Spectrum/Level/Kick/Riser/Bass/Character.ts); 1302 kommentarer ordagrant i
 docs/analysator/<fil>.md (kartan: docs/analysator/README.md). INGET BETEENDE ÄNDRAT: 537 981 hopp x 2 lägen, varje fält i varje ruta lika mot det
