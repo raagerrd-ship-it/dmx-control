@@ -1,0 +1,8 @@
+{
+  "file": "analyserCharacter.ts",
+  "cls": "CharacterProfile",
+  "prop": "character",
+  "short": "KARAKTÄR: låtens långsamma profil (punch, bas, ljushet, täthet)",
+  "header": "KARAKTÄRSPROFILEN (utbruten ur analyser.ts 2026-11-14). Långsam profil (~8 s) av låtens karaktär som dirigenten väljer effekt efter. Läser trummor, band och basgång ur analysatorn (this.a).",
+  "methods": ["profileStep"]
+}

@@ -1,0 +1,8 @@
+{
+  "file": "analyserBass.ts",
+  "cls": "BassTracker",
+  "prop": "bass",
+  "short": "BAS: basenergin per slag och basgången",
+  "header": "BASEN (utbruten ur analyser.ts 2026-11-14). Basenergin i slagets skala och basgångens anslag per slag. Läser banden och klockans tempo ur analysatorn (this.a).",
+  "methods": ["bassEnergyStep", "stepBassline"]
+}

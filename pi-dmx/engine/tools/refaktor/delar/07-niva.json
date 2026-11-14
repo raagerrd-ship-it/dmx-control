@@ -1,0 +1,8 @@
+{
+  "file": "analyserLevel.ts",
+  "cls": "LevelTracker",
+  "prop": "levels",
+  "short": "NIVÅ: förstärkning/AGC, tystnad, intensitet, nivåtak och topp-zon",
+  "header": "NIVÅN (utbruten ur analyser.ts 2026-11-14). Förstärkningens envelope (AGC), tystnaden, intensiteten och låtens nivåtak med topp-zonen. Läser hoppets rms ur analysatorn (this.a).",
+  "methods": ["resetAgcBlocks", "agcEnvelope", "agcStep", "silenceStep", "intensityStep", "zoneStep"]
+}

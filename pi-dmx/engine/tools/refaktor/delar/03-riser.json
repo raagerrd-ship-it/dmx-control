@@ -1,0 +1,8 @@
+{
+  "file": "analyserRiser.ts",
+  "cls": "RiserDetector",
+  "prop": "riser",
+  "short": "UPPBYGGNAD: riser (spektral nyhet + klang/nivå) och buildUp",
+  "header": "UPPBYGGNADEN (utbruten ur analyser.ts 2026-11-14). Riser = spektral nyhet över baskroppen eller stigande klang och nivå; buildUp = dess envelope 0..1. Gränserna är relativa mot låtens eget tak och bandens egna toppar. Läser banden, nivån och senaste drop ur analysatorn (this.a).",
+  "methods": ["riserStep"]
+}

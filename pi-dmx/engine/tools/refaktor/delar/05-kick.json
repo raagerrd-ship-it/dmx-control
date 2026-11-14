@@ -1,0 +1,8 @@
+{
+  "file": "analyserKick.ts",
+  "cls": "KickDetector",
+  "prop": "kicks",
+  "short": "KICK: anslag i snabba vägen (kick, virvel, hi-hat) och förfiningen",
+  "header": "KICKDETEKTORN (utbruten ur analyser.ts 2026-11-14). Anslagen i snabba vägen per hopp: kick, virvel, hi-hat, och förfiningen av kickens tidpunkt. Läser snabba banden och nivån ur analysatorn (this.a).",
+  "methods": ["kickStep", "kickRefine"]
+}

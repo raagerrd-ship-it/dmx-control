@@ -36,15 +36,15 @@ import FFT from "fft.js";
 import { BeatFeed, publishPhase, type ClockCfg } from "./analyserClock.js";   // ANALYSATORNS KLOCKA (a7r): tempogram, rutnät, etta, tillit
 import { DropDetector } from "./analyserDrop.js";
 import { SectionTracker } from "./analyserSection.js";
+import { RiserDetector } from "./analyserRiser.js";
+import { CharacterProfile } from "./analyserCharacter.js";
+import { KickDetector } from "./analyserKick.js";
+import { BassTracker } from "./analyserBass.js";
+import { LevelTracker } from "./analyserLevel.js";
 
 // ── RATTAR ─────────────────────────────────────────────────────────────────────────────────────
 const ENV: Record<string, string | undefined> | undefined = typeof process !== 'undefined' ? process.env : undefined;
 const ALIAS_PREFIX = PROFILE.envPrefix === 'LOTUS_' ? 'DMX_' : 'LOTUS_';
-/** Ratt MED systemprefix: <eget prefix><name>, sedan <andra prefixet><name> (alias), sedan profilens standard. */
-/** KICKSPÄRRENS TAK (r0 entempo): spärren är 0,6 slag på klockans tempo men högst 330 ms (= 0,6 slag vid 109 BPM). Mätt (r0/verktyg/kick.mjs,
- *  lang1011 141-300 s): klockan står på 87 där analysatorns egen sökning stod på 110-131; utan tak tog 414 ms-spärren var tredje kick
- *  (44 kickar/20 s, platt = sektionernas kicktäthet utan kontrast, upp_s 1,35 -> 2,85 s), med taket 148 mot basens 140 per minut. */
-const KICK_CAP_MS = 330;
 function sysEnv(name: string): string | undefined {
   return ENV?.[PROFILE.envPrefix + name] ?? ENV?.[ALIAS_PREFIX + name] ?? PROFILE.sys[name];
 }
@@ -275,21 +275,13 @@ export const DROP_UNDERPEAK_MIN = Number(env('DROP_UNDERPEAK_MIN') ?? 0);   // s
 // MINIDROPS: egen losare lyft-detektor med eget avstand MINI_SPACING_MS. 0 = av.
 export const MINI_SPACING_MS = Number(env('MINI_SPACING_MS') ?? 0);
 export const BODY_CEIL_DB_S = 0.15;   // taket haller latens loud-referens lange
-// RISERNS FÖNSTER: bandets nivå räknas 0..1 över så här många dB under bandets egen topp (förr absolut -70..-10 dB, samma spann).
-const RISER_SPAN_DB = 60;
-// RISERN LYSSNAR OVANFÖR BASKROPPEN (band 3-7, >= 250 Hz; kroppen = band 0-2 är drop-detektorns signal). Med alla åtta band blev
-// basens ÅTERKOMST den största "nyheten": mätt (övningen, m1) låg 13 av 16 uppbyggnadsepisoder 0-4 s EFTER ett lyft, alltså efter
-// droppen. Ett svep eller en virvelrulle stiger ovanför basen; basens återkomst är droppen själv. (I det absoluta fönstret var
-// basbanden mättade och bidrog aldrig - så här var novelty-talen 0,15 / 0,45 en gång satta.)
-const RISER_BAND0 = 3;
 
 /** Instansfalt som MATT (--trace-generalization, 240 s pop-facit, 2026-09-27) byter Smi->Double efter start. Ges Double-form i
  *  konstruktorn (se slutet av constructor) sa kartan inte deprecerar mitt i driften. Fyra av dem stod har redan sedan 896ab7c. */
 const DOUBLE_FROM_START = [
-  'expectHighMs', 'levelVsHighDb', 'sumSq', 'lastT', 'dbgRms', 'lastKick', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum',
-  'lvlSmooth', 'lvlVU', 'engSmooth', 'activeMs', 'buildUp', 'novSlow', 'kickHit', 'snareHit', 'hatHit', 'pendingKickMs',
-  'kfPrev', 'kfPrev2', 'beatAnchorMs', 'blPrev1', 'blPrev2', 'blTrough', 'profBassline', 'bassOnsetsPerBeat', 'rawBpmLast', 'localBpmConfidence',
-  'sectionStartMs', 'secBuildAt', 'secBuildSeen', 'repeatSim', 'repeatAgoMs',
+  'expectHighMs', 'levelVsHighDb', 'sumSq', 'lastT', 'dbgRms', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum', 'lvlSmooth',
+  'lvlVU', 'engSmooth', 'activeMs', 'buildUp', 'kickHit', 'snareHit', 'hatHit', 'pendingKickMs', 'kfPrev', 'kfPrev2',
+  'beatAnchorMs', 'profBassline', 'bassOnsetsPerBeat', 'rawBpmLast', 'localBpmConfidence', 'sectionStartMs', 'secBuildAt', 'secBuildSeen', 'repeatSim', 'repeatAgoMs',
 ] as const;
 /** TYPSTABILA TALFALT (2026-09-27, realtidsprincipen): skriv ett icke-heltal och sedan ursprungsvardet, sa V8 ger faltet
  *  Double-representation fran start. Ett Smi-initierat falt (0, -1 ...) som senare far ett decimaltal deprecerar objektets
@@ -317,14 +309,13 @@ export class Analyser {
   private outSpec: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
   private outOnset: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
   private outDrum = { kick: 0, snare: 0, hat: 0, bass: 0 };   // trum-envelopes (återanvänt)
-  private outProfile = { punch: 0.4, bass: 0.5, bright: 0.3, beat: 0.5, bassline: 0 };   // karaktärsprofil (återanvänt)
   private outFrame!: Frame;             // ETT återanvänt Frame (muteras/hop; säkert — main-tråden läser synkront)
   // TRUM-KIT peak-hold-envelopes (håll mellan hops). Flyttade FRÅN effects.ts render
   // (100Hz) hit (375Hz) → fångar varje onset-topp. tau bevarade: hat 60ms / snare
   // 110ms / kick 150ms. (Block 3 av arkitektur-refaktoreringen.)
   private hatHit = 0;
   private snareHit = 0;
-  private kickHit = 0;
+  kickHit = 0;
   // --- DUBBEL-FFT: en parallell 2048-FFT enbart för effekternas ljudbild.
   //     512:an ovan sköter RMS/kick/BPM/onset ORÖRT (all tightad timing intakt);
   //     denna ger 23 Hz/bin (4× uppl. i botten) → kick och bas kan äntligen skiljas. ---
@@ -351,33 +342,11 @@ export class Analyser {
   private onsetMed = new Float32Array(8);  // robust glidande median av per-band-fluxen
   private onsetMad = new Float32Array(8);  // robust MAD -> troskelspridning per band
   private static readonly ONSET_K = 3.0;   // troskel = median + K*MAD
-  private bandLvl = new Float32Array(8);   // scratch: per-band nivå denna frame (~90ms smoothad)
-  private bandOn = new Float32Array(8);    // scratch: per-band onset denna frame
-  /** BASENERGIN MED SLAGET SOM TIDSENHET (frame.bassEnergy / bassEnergyShort). Alla tider räknas i SLAG ur klockans tempo (60000 / bpm,
-   *  hållet inom BE_BEAT_MIN_MS..BE_BEAT_MAX_MS så ett halv-/dubbeltempo inte flyttar skalan långt; utan klocka BE_FALLBACK_MS):
-   *  TAKET följer basen direkt upp och glöms mot den på BE_TOP_BEATS slag (frasens skala) resp. BE_FAST_BEATS slag (taktens skala) -
-   *  hur fort skalan hinner ikapp ett nivåbyte följer musikens tempo i stället för en klocka i sekunder. Fältet = basens läge i ett
-   *  FAST spann BE_SPAN_DB under taket. Bara dB-SKILLNADER: ingen tystnadsgrind och ingen absolut nivå i mätningen (oberoende av
-   *  ingångsnivån). Fyra tal i tillstånd (beRef = låtens referens för frame.bassLevel), inga objekt per hop. INGEN DAL HÄR (ägaren 11-11: en dal som återhämtar sig inom slaget
-   *  bestämmer pulsens bredd = ljusstyrning) - den ligger i effects.ts stepEnergy och följer fältet, inte ljudet.
-   *  (Provat och förkastat i arenan: toppen som kvantil/median av de 32 senaste slagtopparna - plattare ljus, sämre takt i bänken.) */
-  private static readonly BE_TOP_BEATS = 16; private static readonly BE_FAST_BEATS = 2; private static readonly BE_SPAN_DB = BASS_SPAN_DB; static readonly BE_MEM_BEATS = 240;
-  private static readonly BE_BEAT_MIN_MS = 300; private static readonly BE_BEAT_MAX_MS = 600; static readonly BE_FALLBACK_MS = 500;
-  private beHi = NaN; private beHiShort = NaN; private beRef = NaN; private beShort = 0;
-  /** Stegar skalorna ett hop; returnerar frasens värde, taktens ligger i beShort. */
-  private bassEnergyStep(sub: number, kick: number): number {
-    const x = 5 * Math.log10(sub + 1e-7) + 15 * Math.log10(kick + 1e-7), hopMs = this.dtHop * 1000;   // 0,25 x sub dB + 0,75 x kick dB
-    let per = this.localBpm > 40 ? 60000 / this.localBpm : Analyser.BE_FALLBACK_MS;   // slagets längd ur klockan
-    per = per < Analyser.BE_BEAT_MIN_MS ? Analyser.BE_BEAT_MIN_MS : per > Analyser.BE_BEAT_MAX_MS ? Analyser.BE_BEAT_MAX_MS : per;
-    this.beHi = !(x <= this.beHi) ? x : this.beHi + (x - this.beHi) * (hopMs / (Analyser.BE_TOP_BEATS * per));
-    this.beHiShort = !(x <= this.beHiShort) ? x : this.beHiShort + (x - this.beHiShort) * (hopMs / (Analyser.BE_FAST_BEATS * per));
-    this.beRef = this.section === 'high' || !(this.beHi <= this.beRef) ? this.beHi : this.beRef + (this.beHi - this.beRef) * (hopMs / (Analyser.BE_MEM_BEATS * per));   // låtens referens = refrängens tak
-    let e = 1 - (this.beHiShort - x) / Analyser.BE_SPAN_DB;
-    this.beShort = e > 0 ? e : 0;
-    e = 1 - (this.beHi - x) / Analyser.BE_SPAN_DB;
-    return e > 0 ? e : 0;
-  }
-
+  bandLvl = new Float32Array(8);   // scratch: per-band nivå denna frame (~90ms smoothad)
+  bandOn = new Float32Array(8);    // scratch: per-band onset denna frame
+  static readonly BE_SPAN_DB = BASS_SPAN_DB; static readonly BE_MEM_BEATS = 240;
+  static readonly BE_FALLBACK_MS = 500;
+   
   private bigCounter = 0;                  // decimering av 2048-FFT:n (se BIG_EVERY)
   private static readonly BIG_EVERY = 3;   // kor stor-FFT var N:e hop → analysen ryms i realtid
   /** bandPeak-decay per stor-FFT (τ ≈ 3.8 s oavsett BIG_EVERY). */
@@ -404,12 +373,6 @@ export class Analyser {
   /** Valfri avlyssnare på den stora magnituden (låtminnets fingeravtryck). */
   private specSink: ((mag: Float32Array, binHz: number) => void) | null = null;
   setSpectrumSink(fn: ((mag: Float32Array, binHz: number) => void) | null): void { this.specSink = fn; }
-
-  private kickMed = 0.1;             // robust glidande MEDIAN av kick-fluxen (sign-baserad)
-  private kickMad = 0.05;            // robust MAD (median absolut avvikelse) → tröskel-spridning
-  private kickSeed = 0;              // warmup-räknare: snabb EMA-seed av skalan innan sign-baserad tar över
-  private kickWasAbove = false;      // stigande-flank-detektion
-  private kickPrimed = false;        // false på första framen (skräp-flux) → ingen falsk kick
   private static readonly ENV_HZ = 100;
   private static readonly ONSET_PEAK_FLOOR = 0.05;
   /** Onset-ringens langd i sekunder x 100 Hz. Env LOTUS_TEMPO_ENV_S bara for korbanken (bench.mjs) - 5 s ar driftvardet. */
@@ -547,9 +510,9 @@ export class Analyser {
   /** HOPPETS VÄRDEN (2026-10-17, skräpjakten): decimaltal som skickas som argument till, eller returneras från, en metod som V8 inte
    *  inlinar blir ett nytt HeapNumber per anrop (process 47 -> 6 kB/s skräp när de gick via fält). De heta stegen läser därför hoppets
    *  värden ur fält som process() skriver. Alla initieras som decimaltal (0,5) så fälten har Double-form från start. */
-  hRms = 0.5; private hNow = 0.5; private hDt = 0.5; private hKickFlux = 0.5; private hEnergy = 0.5; private hHopMs = 0.5;
+  hRms = 0.5; hNow = 0.5; hDt = 0.5; hKickFlux = 0.5; hEnergy = 0.5; hHopMs = 0.5;
   hIntensity = 0.5; hNowWall = 0.5; hBody = 0.5; hKick = false; private hLevel = 0.5; hFlux = 0.5;
-  private hInZone = false; hBreaking = false; private hInRiser = false; private hKickAt = 0.5;
+  private hInZone = false; hBreaking = false; private hInRiser = false; hKickAt = 0.5;
   secAgg = { n: 0, int: 0, kicks: 0, breaking: 0, rms2: 0, cent: 0, dt: 0, wall: 0, drops: 0, active: 0, build: 0, spec: new Float64Array(8), bon: 0, bpk: 0, flux: 0, rms4: 0 };
   private inlinePeer: Analyser | null = null;
   /** STORA VÄGEN (split.ts, a3): 2048-FFT, drop, riser, profil, basgång och sektionsaggregat i långsamma tråden, ett record per hop.
@@ -559,7 +522,7 @@ export class Analyser {
   private bigSeq = 0; private bigCopy = new Float64Array(BIG_STATE_LEN); private bigRd = new StateReader(); private specCopy = new Float32Array(0); private specDelivered = 0; private specN = 0; private bigSkipped = 0;
   private bigEnvFlag = 0; private bigEnvBpm = 0.5;
   /** Snabba sidans syn på långsamma värden vid hoppet (drop/profil/basgång läser dessa i stället för de levande fälten). */
-  dSec = 'intro'; dLvh = 0.5; private dConf = 0.5; dBpm = 0.5;
+  dSec = 'intro'; dLvh = 0.5; dConf = 0.5; dBpm = 0.5;
   /** PI:NS VERKLIGHET (a3r): EN worker-tråd (motorn är låst till 2 kärnor). Anropas efter varje behandlat env- och hop-record, så
    *  taktvägen (det motorn läser varje hop) körs mellan dem och aldrig köar bakom en hel 2048-backlog. null i bänkens inline/synk-läge
    *  (taktvägen är oberoende av analysatorn, så ordningen påverkar inga värden). */
@@ -569,17 +532,10 @@ export class Analyser {
   localBpm = 0;
   private localBpmConfidence = 0;
   static readonly SECTION_EARLY_DB = Number(sysEnv('SECTION_EARLY_DB')) || 3;
-  /** KICKDETEKTOR-RATTAR (09-20, korbank banken (bench.mjs), BENCH_GRID=1, 107 latar med PC-basonsets/slag):
-   *  troskelfaktor mot MAD (4,5), grinden mot eget grid (pa), cooldown (170 ms) och energigolv (0,06). Env for A/B.
-   *  Svep 2026-09-20 (tempot orort i alla): baslinje kick-recall 0,48 / precision 0,84 / on-beat-recall 0,63;
-   *  grind av 0,52/0,85/0,68; grind av + cooldown 120 -> 0,70/0,84/0,89; cooldown 100 -> 0,82/0,84/0,95 (LIVE sedan
-   *  10:23 via tempo-variant.conf); cooldown 80 -> 0,89/0,83/0,96. Orsak: en baston strax fore slaget skuggade slagets
-   *  kick i 170 ms, och grinden forkastade slagets kick nar gridet lag fel. K 3,0-3,5 gav inget (0,53/0,85). */
-  private static readonly KICK_K = 4.5;
-  private static readonly KICK_NOGATE = sysEnv('KICK_NOGATE') === '1';
+  static readonly KICK_NOGATE = sysEnv('KICK_NOGATE') === '1';
   /** 0 = tempoanpassad: max(170, 0,6 slag) nar tempot ar kant, annars 170 ms. */
-  private static readonly KICK_COOLDOWN_MS = Number(sysEnv('KICK_COOLDOWN')) || 0;
-  private static readonly KICK_EFLOOR = Number(sysEnv('KICK_EFLOOR')) || 0.06;
+  static readonly KICK_COOLDOWN_MS = Number(sysEnv('KICK_COOLDOWN')) || 0;
+  static readonly KICK_EFLOOR = Number(sysEnv('KICK_EFLOOR')) || 0.06;
   /** Korbank: tempogrammets argmax-lag och sokfonster i senaste anropet. */
   dbgKick: { flux: number; thresh: number; med: number; mad: number; energy: number; gain: number; rms: number; env: number; locked: boolean } | null = null; dbgRms = 0;
   dbgBestLag = 0; dbgLagMin = 0; dbgLagMax = 0; dbgTgAt = (lag: number): number => this.tempoGram[lag] ?? 0;
@@ -604,19 +560,17 @@ export class Analyser {
   dtHop = 0; private hopMs = 0;
 
   private aAtt = 0; private aRel = 0; private aVU = 0;
-  private aIUp = 0; private aIDown = 0; private aBandLvl = 0;
+  private aBandLvl = 0;
   private dHat = 0; private dSnare = 0; private dKick = 0;
-  private aSpecSlow = 0; private aNovSlow = 0; private aProf = 0;
   /** BASBANDETS onset-envelope (kick-flux), samma raster och position som envRing. */
   private envBassRing = new Float32Array(Analyser.ENV_LEN);
   private envBassAccum = 0;
   /** Ackumulerat tempogram (EMA av hela lag-kurvan mellan anrop). */
   private tempoGram = new Float32Array(Analyser.ENV_LEN);
-  private hGated = false;   // brusgrinden för hoppet (process)
+  hGated = false;   // brusgrinden för hoppet (process)
   private silenceLevel = SILENCE_LEVEL;
   /** Släckgränsen live (index.ts, /setup-ratten cfg.silenceLevel). */
   setSilenceLevel(v: number | undefined): void { this.silenceLevel = silenceLevelLive = v ?? SILENCE_LEVEL; }
-  private silentMs = -0;   // typstabilt (se lastDropRise)
   private diagLagMin = 0; private diagLagMax = 0;
   /** Tempogrammets lagfonster i senaste anropet (diagnostik). */
   get lagBounds(): [number, number] { return [this.diagLagMin, this.diagLagMax]; }
@@ -625,53 +579,27 @@ export class Analyser {
   /** TYDLIG BASGANG: basNOTER (bandLvl[1]+bandLvl[2], 60-250 Hz) mellan kickarna pa env-rastret; en topp ar en not om den
    *  reser sig >= 25 % av senaste topphojd over dalen och inte ligger inom 60 ms efter en kick. Noter per slag (2 s fonster)
    *  -> profile.bassline 0..1, glattat ~1 s. */
-  private blAccum = 0; private blPrev1 = 0; private blPrev2 = 0; private blRef = 0.1; private blLastOnset = -100;
-  private blOnsets = new Int32Array(32); private blOnsetPos = 0; private envSeq = 0; private profBassline = 0; private blTrough = 1; private blKickSeq = -100;
+  blAccum = 0;       profBassline = 0;  blKickSeq = -100;
   bassOnsetsPerBeat = 0;
   // DIAGNOSTIK (<prefix>HIGH_DIAG / HIGH_VOTE): diskant-onset-ring (bandOn[6]/[7]) - mater om diskanten bar tempot.
   private envHighRing = new Float32Array(Analyser.ENV_LEN);
   private envHighAccum = 0;
-  /** true = tystnadssläppningen redan gjord för denna tystnad (flanktriggad). */
-  private silenceArmed = false;
-  private beatAnchorMs = 0;
+  beatAnchorMs = 0;
   // #2 sub-hop fas: kick-flankens flux-topp ligger sällan exakt på en hop. Vi
   // sparar de två föregående kick-flux-värdena och gör parabolisk interpolation
   // hoppet EFTER en kick → förfinar beatAnchorMs med ±0.5 hop (~1.3ms). Ren
   // fas-korrektion; själva kick-blixten fyrar oförändrat direkt.
-  private kfPrev = 0;
-  private kfPrev2 = 0;
-  private pendingKickMs = 0;   // >0 = kick väntar på fas-förfining nästa hop
-  private gain = 1;
+  kfPrev = 0;
+  kfPrev2 = 0;
+  pendingKickMs = 0;   // >0 = kick väntar på fas-förfining nästa hop
+  gain = 1;
   // Attack/release-smoothed outputs — raw per-hop values update ~370x/s and
   // read as flicker on the lamps. Fast attack keeps hits punchy; the slower
   // release lets light glide down instead of sputtering.
   lvlSmooth = 0;
-  private intensityEma = 0.5;    // sektionsenergi: utjämnad nivå
-  private intensityFloor = 0.5;  // dess robusta P50-baslinje (låtens snitt)
-  private intensitySpread = 0.05;  // glidande medelabsolutavvikelse (EJ median-MAD) → sjalvkalibrerande skala
   activeMs = 0;          // hur länge musik spelat (warmup för baslinjen)
   // DROP-DETEKTION (flyttad från effects: analys hör hemma här; show-reaktionen stannar där)
-  private levelCeil = 0.5;       // långsamt nivå-tak (låtens loud-topp)
-
-  private inZoneState = false;   // hysteres för topp-zonen
-                                 // RISER/UPPBYGGNAD (flyttad från effects)
-  /**
-   * OBEHANDLAD LOGBANDNIVÅ — riserdetektorns egen ingång.
-   *
-   * `bandLvl` går genom per-band-AGC:n, och den har NOLL attacktid: så fort
-   * `avg > bandPeak` sätts taket till `avg`, och kvoten blir avg/avg ≈ 1. En
-   * STIGANDE bandnivå är därmed per konstruktion konstant 1,0 — och en riser ÄR
-   * definitionsmässigt en monoton stigning i flera band samtidigt. Alla band
-   * pinnar på 1, tvåsekundersmedelvärdet hinner ikapp, och novelty går mot noll.
-   *   DET är förklaringen till den uppmätta `buildUp` p50 = p90 = 0.00. Signalen
-   *   var inte feljusterad, den var BORTKALIBRERAD av sin egen normalisering.
-   * `bandLvl` lämnas orörd — hela effektlagret är kalibrerat mot den. Riser och
-   * novelty läser i stället rå dB (`bandDbRaw`), där en ramp är en ramp oavsett nivå.
-   * RELATIVT FÖNSTER (drop1 a6, 2026-11-13): förr låg dB-talet i ett ABSOLUT fönster (-70..-10 dB -> 0..1). Ladans rena ljud
-   * ligger över -10 dB i sex av åtta band (mätt: mättat i 88-100 % av tiden) -> novelty var noll och risern död. Fönstret hänger
-   * nu under BANDETS EGEN TOPP (`bandTop`, sjunker som bodyCeil): 1 = vid toppen, 0 = RISER_SPAN_DB under den. Se riserStep.
-   */
-  private bandTop = new Float32Array(8).fill(-140);
+  levelCeil = 0.5;       // långsamt nivå-tak (låtens loud-topp)
   bandDbRaw = new Float32Array(8);   // RA dB per band (drop-detektorns kropp) — synk fran DMX-master 2026-09-03
   /** Stor-FFT-rutor med signal i rad. Onsets hålls tysta tills MAD hunnit byggas
    *  upp — se `ONSET_WARM` och kommentaren vid bandOn. */
@@ -679,22 +607,12 @@ export class Analyser {
   /** ~1,5 s vid 125 Hz. MAD startar i noll efter tystnad och byggs upp med
    *  `mad ← 1.006·mad + 6e-5`, vilket tar ≈183 rutor att nå ett användbart värde. */
   private static readonly ONSET_WARM = 183;
-  private specSlow = new Float32Array(8);
-  private novSlow = 0;           // ihållande spektral novelty (~1.5s)
-  private novBaseline = 0.2;     // ~8s baslinje → riser = novelty STIGER över den
-  private centSlow = 0.3;
-  private lvlSlowR = 0.3;
   buildUp = 0;           // 0..1 uppbyggnads-envelope
-  // KARAKTÄRSPROFIL (långsam, ~8s)
-  private profPunch = 0.4;
-  private profBass = 0.5;
-  private profBright = 0.3;
-  private profBeat = 0.5;
   private lvlVU = 0;      // ~200ms hop-takt-smooth av levelRaw → VU-taket (låg jitter)
   private engSmooth = 0;
   centSmooth = 0.5;
 
-  private gainLocked = false;
+  gainLocked = false;
 
   /** Called when the input routing changes — the old gain is meaningless for
    *  the new source's signal level, so re-converge from neutral. */
@@ -706,80 +624,17 @@ export class Analyser {
     // så env = 0 ger ett enormt tal som slår gainen i 20x-taket innan envelopen
     // konvergerat — en hörbar ljuspump vid varje ingångsbyte.
     this.envelope = this.cfg.detection.autoGainTarget;
-    this.resetAgcBlocks();
+    this.levels.resetAgcBlocks();
   }
 
   /** Lock the AGC (aux: fixed 1x, level tracks the mixer directly) or let it run. */
   setGainLock(locked: boolean, fixed = 1) {
     this.gainLocked = locked;
-    if (locked) { this.gain = fixed; this.envelope = this.cfg.detection.autoGainTarget; this.resetAgcBlocks(); }
-  }
-
-  /** PERCENTIL-AGC: 16 blockmaxima à 128 ms (~2 s historik) av RÅ rms. Envelopen är
-   *  näst största blockmaximum ≈ 95:e percentilen — en enstaka transient kan alltså
-   *  inte dra ner gainen, men en ihållande het ingång kan.
-   *  MÄTT I LOTUS: momentan-nivå som AGC-mål pinnade level ≥0.95 i ~55 % av tiden
-   *  med upp till 21 % klipp; uppbyggnader blev osynliga eftersom nivån redan låg i
-   *  taket. Percentilen tar bort inbränningen — därför är målet ett TAK för topparna,
-   *  aldrig ett medelvärde att sikta på. */
-  private static readonly AGC_BLOCKS = 16;
-  private static readonly AGC_BLOCK_MS = 128;
-  private agcBlocks = new Float32Array(Analyser.AGC_BLOCKS);
-  private agcBlockIdx = 0;
-  private agcBlockMax = 0;
-  private agcBlockStartMs = 0;
-  private agcBlocksFilled = 0;
-
-  private resetAgcBlocks(): void {
-    this.agcBlocks.fill(0);
-    this.agcBlockIdx = 0; this.agcBlockMax = 0; this.agcBlockStartMs = 0; this.agcBlocksFilled = 0;
-  }
-
-  /** Mata in rå rms; returnerar näst största av de senaste 16 blockmaxima (0 = ej varm). */
-  private agcEnvelope(rawRms: number, nowMs: number): number {
-    if (rawRms > this.agcBlockMax) this.agcBlockMax = rawRms;
-    if (this.agcBlockStartMs === 0) this.agcBlockStartMs = nowMs;
-    if (nowMs - this.agcBlockStartMs >= Analyser.AGC_BLOCK_MS) {
-      this.agcBlocks[this.agcBlockIdx] = this.agcBlockMax;
-      this.agcBlockIdx = (this.agcBlockIdx + 1) % Analyser.AGC_BLOCKS;
-      if (this.agcBlocksFilled < Analyser.AGC_BLOCKS) this.agcBlocksFilled++;
-      this.agcBlockMax = 0;
-      this.agcBlockStartMs = nowMs;
-    }
-    // Näst största över de fyllda blocken (16 tal → linjär skanning är billigast).
-    if (this.agcBlocksFilled < 2) return 0;
-    let top = 0, second = 0;
-    for (let i = 0; i < this.agcBlocksFilled; i++) {
-      const v = this.agcBlocks[i];
-      if (v > top) { second = top; top = v; }
-      else if (v > second) { second = v; }
-    }
-    return second;
-  }
-
-  /** TYDLIG BASGANG (env-rastret, 100 Hz): se blAccum. */
-  private stepBassline(): void {
-    const v = this.blAccum; this.blAccum = 0;
-    const seq = ++this.envSeq;
-    const p1 = this.blPrev1;
-    if (v < this.blTrough) this.blTrough = v;
-    if (p1 >= this.blPrev2 && p1 > v && p1 > 0.05 && p1 - this.blTrough >= 0.25 * this.blRef && seq - 1 - this.blLastOnset >= 6) {
-      if (seq - 1 - this.blKickSeq >= 6) { this.blOnsets[this.blOnsetPos] = seq - 1; this.blOnsetPos = (this.blOnsetPos + 1) & 31; }
-      this.blLastOnset = seq - 1;
-      this.blRef += (p1 - this.blRef) * 0.1;
-      this.blTrough = p1;
-    } else if (this.blRef > 0.05) this.blRef *= 0.999;
-    this.blPrev2 = p1; this.blPrev1 = v;
-    let n = 0; for (let i = 0; i < 32; i++) if (seq - this.blOnsets[i] <= 200 && this.blOnsets[i] > 0) n++;
-    const beats2s = (this.dBpm > 0 ? this.dBpm : 120) / 30;
-    const opb = n / beats2s;
-    this.bassOnsetsPerBeat = opb;
-    const raw = Math.max(0, Math.min(1, (opb - 0.4) / 0.8));
-    this.profBassline += (raw - this.profBassline) * 0.01;
+    if (locked) { this.gain = fixed; this.envelope = this.cfg.detection.autoGainTarget; this.levels.resetAgcBlocks(); }
   }
 
   // ── DELAD ANALYSATOR: snabba sidan ────────────────────────────────────────────────────────────
-  private flagSlow(f: number): void {
+  flagSlow(f: number): void {
     if (this.role !== 'fast') return;
     this.pendFlags |= f; this.barrierSeq = this.recSeq + 1;
     for (let k = 0; k < FLAG_BITS; k++) if (f & (1 << k)) this.flagCnt[k]++;
@@ -901,7 +756,7 @@ export class Analyser {
     if (!this.bigRd.read(ctrl, this.bigState!, s, C_BIG_SEQ) || s[BS_SEQ] === 0) return;
     this.hBody = s[BS_BODY]; this.drop.dropCount = s[BS_DROPS]; this.drop.miniDropCount = s[BS_MINI]; this.bodyUnderDb = s[BS_UNDER];
     this.drop.dropDemoted = s[BS_DEMOTED]; this.drop.dropSpaced = s[BS_SPACED]; this.drop.dropRiseDb = s[BS_DROPRISE]; this.drop.nearDropDb = s[BS_NEAR]; this.drop.nearDipDb = s[BS_NEARDIP]; this.drop.liftDb = s[BS_LIFT]; this.drop.stopCount = s[BS_STOPS]; this.drop.stopS = s[BS_STOPSEC]; this.buildUp = s[BS_BUILD]; this.hInRiser = s[BS_RISER] === 1;
-    const p = this.outProfile; p.punch = s[BS_PUNCH]; p.bass = s[BS_BASS]; p.bright = s[BS_BRIGHT]; p.beat = s[BS_BEAT]; p.bassline = s[BS_BASSLINE];
+    const p = this.character.outProfile; p.punch = s[BS_PUNCH]; p.bass = s[BS_BASS]; p.bright = s[BS_BRIGHT]; p.beat = s[BS_BEAT]; p.bassline = s[BS_BASSLINE];
     const sn = s[BS_SPEC_N];
     if (sn > this.specDelivered) {
       const sink = this.specSink, binHz = this.cfg.audio.rate / this.bufferBig.length, R = this.specRing!, c = this.specCopy;
@@ -923,26 +778,26 @@ export class Analyser {
       if (r[o + B_SEQ] !== seq) { this.bigSkipped++; continue; }
       const hn = r[o + B_N];
       // basgången (process(): ackumulatorn med förra 2048-bandens nivå och förra hoppets kick, sedan env-sampelns steg)
-      { const bl = this.bandLvl[1] + this.bandLvl[2]; if (bl > this.blAccum) this.blAccum = bl; if (this.kickHit >= 1) this.blKickSeq = this.envSeq; }
-      if (r[o + B_ENVF] === 1) { this.dBpm = r[o + B_ENVBPM]; this.stepBassline(); }
+      { const bl = this.bandLvl[1] + this.bandLvl[2]; if (bl > this.blAccum) this.blAccum = bl; if (this.kickHit >= 1) this.blKickSeq = this.bass.envSeq; }
+      if (r[o + B_ENVF] === 1) { this.dBpm = r[o + B_ENVBPM]; this.bass.stepBassline(); }
       this.hRms = r[o + B_RMS]; this.lvlSmooth = r[o + B_LVL]; this.centSmooth = r[o + B_CENT]; this.activeMs = r[o + B_ACTIVE]; this.kickHit = r[o + B_KICKHIT];
-      this.zoneStep();
+      this.levels.zoneStep();
       const wall = r[o + B_WALL];
       { const po = slot * BIG_HOP_MAX; this.bigRingPush(pcm.subarray(po, po + hn)); }
       if (++this.bigCounter >= Analyser.BIG_EVERY) this.bigStep();
       this.hNowWall = wall; this.hBody = (this.bandDbRaw[0] + this.bandDbRaw[1] + this.bandDbRaw[2]) / 3;
       this.dSec = SECTIONS[r[o + B_SEC]]; this.dLvh = r[o + B_LVH];
       this.drop.dropStep();
-      this.hInRiser = this.riserStep();
+      this.hInRiser = this.riser.riserStep();
       this.dConf = r[o + B_CONF];
-      this.profileStep();
+      this.character.profileStep();
       this.bigAgg(r[o + B_INT], r[o + B_KICK] === 1, r[o + B_BREAK] === 1, wall);
       n++;
       if (this.bigYield) this.bigYield();
     }
     if (n > 0) {
       Atomics.store(ctrl, C_BIG_READ, seqLow(this.bigSeq));
-      const p = this.outProfile;
+      const p = this.character.outProfile;
       stateWrite(ctrl, this.bigState!, (s) => {
         s[BS_SEQ] = this.bigSeq; s[BS_BODY] = this.hBody; s[BS_DROPS] = this.drop.dropCount; s[BS_MINI] = this.drop.miniDropCount; s[BS_CAND] = this.drop.dropCand; s[BS_UNDER] = this.bodyUnderDb;
         s[BS_DEMOTED] = this.drop.dropDemoted; s[BS_SPACED] = this.drop.dropSpaced; s[BS_DROPRISE] = this.drop.dropRiseDb; s[BS_NEAR] = this.drop.nearDropDb; s[BS_NEARDIP] = this.drop.nearDipDb; s[BS_LIFT] = this.drop.liftDb; s[BS_STOPS] = this.drop.stopCount; s[BS_STOPSEC] = this.drop.stopS; s[BS_BUILD] = this.buildUp; s[BS_RISER] = this.hInRiser ? 1 : 0;
@@ -1028,7 +883,7 @@ export class Analyser {
    *  0 = på taket; ett riktigt break tar bort basen nästan helt, ett låtbyte några dB. Hop-recordet H_UNDER. */
   bodyUnderDb = 0;
   /** Tystnad i ms (klockans tystnadssignal, hop-recordet H_QUIET; > 10 s släpper klockan som förr F_SIL10 släppte tempot). */
-  get quietMs(): number { return this.silentMs; }
+  get quietMs(): number { return this.levels.silentMs; }
   /** EN KÄLLA (r0 entempo): analysatorns ENDA tempo och tillit = klockans (taktvägen i analysatorns långsamma väg, efter varje hop).
    *  Läses av kickspärren/-grinden (via rutnätet), sectionBars, basgången, sektionernas långsamma sida (env-recordet R_CLOCK) och ramen. */
   setClock(bpm: number, conf: number): void { this.localBpm = bpm > 40 ? bpm : 0; this.localBpmConfidence = bpm > 40 ? conf : 0; }
@@ -1056,8 +911,7 @@ export class Analyser {
   /** Taktfasen är applicerad av motorn (ankaret flyttat) → börja om räkningen. */
   resetBar(): void { this.flagSlow(F_RESET_BAR); }
 
-  private envelope: number;
-  private lastKick = 0;
+  envelope: number;
   // 0 = "ej satt". Får INTE seedas med performance.now(): vid virtuell klocka
   // (perfNow → virtualMs, startar nära 0) blir första dt negativ → exp(+stort)
   // → NaN i envelope/gain, och NaN passerar båda clamparna nedan.
@@ -1098,7 +952,7 @@ export class Analyser {
     const jump = ms === null || !this.virtualOn || ms < prev || ms - prev > 1000;
     if (ms === null) { this.virtualOn = false; this.virtualMs = NaN; } else { this.virtualOn = true; this.virtualMs = ms; }
     if (!jump) return;
-    this.lastKick = 0;
+    this.kicks.lastKick = 0;
     this.pendingKickMs = 0;
     this.beatAnchorMs = 0; this.beatPhaseMs = 0; this.beatPhaseConf = 0; this.sections.sectionReset();
     this.lastT = 0;
@@ -1147,14 +1001,14 @@ export class Analyser {
   }
   private virtualEpoch = 1700000000000;
 
-  private cfg: {
+  cfg: {
     audio: { rate: number };
     fft: { size: number; hop: number };
     detection: AnalyserDetection;
     onset: { enhancements: boolean };
   };
   /** Taktrastret (kick-grind + taktfas). Nastlad konfig: motorns eget objekt (lases lopande); platt: internt, via setBeatGrid. */
-  private beatSrc: { beat?: BeatGrid | null };
+  beatSrc: { beat?: BeatGrid | null };
 
   /** EN KLOCKA: rutnätet utifrån (lotus PLL via setAnalyserBeatGrid, bänkens BENCH_GRID) är INGEN rutnätskälla - kickgrinden läser
    *  klockans inre rutnät (setClockGrid). Det sparas bara som REFERENS för slagindexet i frame.barShift (EN ETTA, publishPhase):
@@ -1264,25 +1118,25 @@ export class Analyser {
     this.aAtt = 1 - Math.exp(-dtHop / 0.015);
     this.aRel = 1 - Math.exp(-dtHop / 0.4);
     this.aVU = 1 - Math.exp(-dtHop / 0.20);
-    this.aIUp = 1 - Math.exp(-dtHop / 1.5);
-    this.aIDown = 1 - Math.exp(-dtHop / 3.0);
+    this.levels.aIUp = 1 - Math.exp(-dtHop / 1.5);
+    this.levels.aIDown = 1 - Math.exp(-dtHop / 3.0);
     this.aBandLvl = 1 - Math.exp(-bigDt / 0.09);
     this.dHat = Math.exp(-dtHop / 0.06);
     this.dSnare = Math.exp(-dtHop / 0.11);
     this.dKick = Math.exp(-dtHop / 0.15);
-    this.aSpecSlow = 1 - Math.exp(-dtHop / 2.0);
-    this.aNovSlow = 1 - Math.exp(-dtHop / 1.5);
-    this.aProf = 1 - Math.exp(-dtHop / 8.0);
+    this.riser.aSpecSlow = 1 - Math.exp(-dtHop / 2.0);
+    this.riser.aNovSlow = 1 - Math.exp(-dtHop / 1.5);
+    this.character.aProf = 1 - Math.exp(-dtHop / 8.0);
     // Ett återanvänt Frame (spec/onset pekar på de pre-allokerade objekten).
     this.outFrame = {
       silent: true, level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
-      dropCount: 0, miniDropCount: 0, dropDemoted: 0, dropSpaced: 0, dropRiseDb: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, bodyDb: 0, bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1, midHiDb: -120, inZone: false, breaking: false, buildUp: 0, buildProg: 0, inRiser: false, profile: this.outProfile, beatAnchorMs: 0,
+      dropCount: 0, miniDropCount: 0, dropDemoted: 0, dropSpaced: 0, dropRiseDb: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, bodyDb: 0, bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1, midHiDb: -120, inZone: false, breaking: false, buildUp: 0, buildProg: 0, inRiser: false, profile: this.character.outProfile, beatAnchorMs: 0,
       kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
     };
     // Ramen och dess delobjekt skrivs varje hop av optimerad kod: ge alla talfalt Double-form redan har (se stabiliseNumbers).
-    for (const o of [this.outFrame, this.outProfile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum]) stabiliseNumbers(o);
+    for (const o of [this.outFrame, this.character.outProfile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum]) stabiliseNumbers(o);
     // Instansfalt som i stabilt lage bytte Smi->Double forst vid sallsynta handelser (V8 --trace-generalization, 540 s).
     // FORSLAG 2026-09-27 (minnesgranskningen, tools/mem/): --trace-generalization over 240 s pop-facit visade att 60 instansfalt
     // byter Smi->Double EFTER start (var och en deprecerar Analyser-kartan: +10..+369 kartor per falt) -> scoreEnv deoptades 41 ggr,
@@ -1424,12 +1278,12 @@ export class Analyser {
     this.dbgRms = rms;
     this.hRms = rms; this.hNow = now; this.hDt = dt;
     this.hGated = rms >= this.cfg.detection.noiseFloor * 1.5;   // BRUSGRINDEN (a7): enda jämförelsen, snabba sidan; workern läser activeMs > 0 (B_ACTIVE)
-    if (!this.gainLocked && rms > d.noiseFloor) this.agcStep();
+    if (!this.gainLocked && rms > d.noiseFloor) this.levels.agcStep();
 
     const level = Math.min(1, rms * this.gain);
 
     this.hKickFlux = kickFlux; this.hEnergy = energy;
-    const kick = this.kickStep();
+    const kick = this.kicks.kickStep();
 
     // Hoppets längd i ms. (Tva stallen nedan raknar fortfarande `dtHop * 1000`
     // for hand i stallet for att lasa den har — numeriskt identiskt, men
@@ -1437,7 +1291,7 @@ export class Analyser {
     const hopMs = this.hopMs;
     // Tystnad → nollställ BPM-klockan så beat-effekter inte fortsätter i fantom-takt.
     this.hHopMs = hopMs;
-    this.silenceStep();
+    this.levels.silenceStep();
     // --- Onset-envelope → lokal BPM (nedsamplad till 100 Hz) ---
 
     this.envAccum = Math.max(this.envAccum, fluxNorm);
@@ -1446,7 +1300,7 @@ export class Analyser {
     if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
     // TYDLIG BASGANG: basnivans topp per env-sampel + senaste kick (se stepBassline).
     const big = this.bigOn;   // STORA VÄGEN (fast): basgången, 2048-vägen, drop, riser, profil och sektionsaggregatet körs i långsamma tråden
-    if (!big) { const bl = this.bandLvl[1] + this.bandLvl[2]; if (bl > this.blAccum) this.blAccum = bl; if (this.kickHit >= 1) this.blKickSeq = this.envSeq; }
+    if (!big) { const bl = this.bandLvl[1] + this.bandLvl[2]; if (bl > this.blAccum) this.blAccum = bl; if (this.kickHit >= 1) this.blKickSeq = this.bass.envSeq; }
     if (HIGH_ON) { const hi = this.bandOn[6] > this.bandOn[7] ? this.bandOn[6] : this.bandOn[7]; if (hi > this.envHighAccum) this.envHighAccum = hi; }
     this.envAccumT += hopMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) this.envSampleStep();
@@ -1454,7 +1308,7 @@ export class Analyser {
     // runt kick-hopet. Parabelns topp ger sub-hop-offset δ ∈ [-0.5,0.5] hop.
     let kickAtMs = 0;
 
-    if (this.pendingKickMs > 0) { this.kickRefine(); kickAtMs = this.hKickAt; }
+    if (this.pendingKickMs > 0) { this.kicks.kickRefine(); kickAtMs = this.hKickAt; }
     if (kick) {
       this.beatAnchorMs = this.wallNow();
       this.pendingKickMs = this.beatAnchorMs;
@@ -1476,7 +1330,7 @@ export class Analyser {
     this.engSmooth = ema(this.engSmooth, energy, aAtt, aRel);
     this.centSmooth = ema(this.centSmooth, centroid, aAtt, aRel);
 
-    this.intensityStep();
+    this.levels.intensityStep();
     const intensity = this.hIntensity;
 
     // --- DUBBEL-FFT: hög-upplöst log-spektrum för effekterna ---
@@ -1517,12 +1371,12 @@ export class Analyser {
     // läses som en drop. Resultatet exponeras som en MONOTON räknare → en konsument
     // på lägre takt kan aldrig missa flanken.
     const nowWallA = this.wallNow();
-    this.zoneStep();
+    this.levels.zoneStep();
     // `breaking` = nivån ligger i en svacka. Exponeras till effektlagret (lugnt läge).
     // Den GAMLA svack-stämpeln (breakAtMs, 400 ms ihållande) grindade drop-villkoret
     // innan flanken flyttades till baskroppen; den är borttagen med sitt villkor.
     const breaking = this.lvlSmooth < this.levelCeil * 0.65;
-    const inZone = this.inZoneState;
+    const inZone = this.levels.inZoneState;
     // BASKROPPEN — drop-detektionens egen signal (tak + frånvaro + stigningstakt).
     // `inZone` lämnas orörd: effektlagret använder den som "musiken ligger högt".
 
@@ -1537,136 +1391,13 @@ export class Analyser {
       this.hBody = bodyNow;
       this.dSec = this.section; this.dLvh = this.levelVsHighDb;
       this.drop.dropStep();
-      inRiser = this.riserStep();
+      inRiser = this.riser.riserStep();
       this.dConf = this.localBpmConfidence;
-      this.profileStep();
+      this.character.profileStep();
     }
     this.hLevel = level; this.hFlux = fluxNorm; this.hIntensity = intensity; this.hInZone = inZone; this.hBreaking = breaking; this.hInRiser = inRiser;
     this.hKickAt = kickAtMs;
     return this.fillFrame();
-  }
-
-  /** AGC (bara mic): utbruten ur process() 2026-09-27 — anropas nar gainen ar olast och signalen over golvet. */
-  private agcStep(): void {
-    const rms = this.hRms, now = this.hNow, dt = this.hDt;
-    const d = this.cfg.detection;
-      const env = this.agcEnvelope(rms, now);
-      if (env > 0) {
-        this.envelope = env;
-        const desired = d.autoGainTarget / Math.max(1e-4, env);
-        const gTau = desired > this.gain ? d.tauUp * 2 : d.tauDown * 0.25;
-        const ga = 1 - Math.exp(-dt / gTau);
-        this.gain += (desired - this.gain) * ga;
-        if (this.gain < 0.5) this.gain = 0.5;
-        else if (this.gain > 20) this.gain = 20;
-      }
-  }
-
-  /** Kick-detektorn (median/MAD-troskel, taktgrind, flank + cooldown). Het varje hop; egen funktion sa att process() ar kompakt. */
-  private kickStep(): boolean {
-    const kickFlux = this.hKickFlux, energy = this.hEnergy, now = this.hNow;
-    // KICK-DETEKTION v2: onset i kick-bandet (sub-bas ~0–280 Hz) mot en ADAPTIV
-    // baslinje (långsam EMA av kick-fluxen). En kick = flux tydligt över
-    // baslinjen; tröskeln skalar med signalen → fyrar pålitligt även på
-    // komprimerat material där en fast tröskel missade nästan alla slag.
-    // Stigande flank + cooldown = exakt ett slag per träff.
-    // ROBUST kick-tröskel (Lovable/Gemini): sign-baserad glidande MEDIAN + MAD i
-    // st.f. EMA-medel × fast faktor. En kick är en OUTLIER → flyttar medianen bara
-    // ett litet steg, så tröskeln self-inflatear INTE (EMA-medlet drogs upp av
-    // kickarna själva → missade efterföljande). Steget skalar med signalen. Tröskel
-    // = median + 4.5·MAD → robust z-score, okänslig för outliers.
-    // Warmup ~1s: snabb EMA för att hitta signalens SKALA direkt (annars klättrar
-    // median från init i 20s med falska kickar). Sen sign-baserad = robust steady-state.
-    if (this.kickSeed < 400) {
-      this.kickSeed++;
-      this.kickMed += (kickFlux - this.kickMed) * 0.05;
-      this.kickMad += (Math.abs(kickFlux - this.kickMed) - this.kickMad) * 0.05;
-    } else {
-      const kStep = 0.002;
-      const dMed = kickFlux - this.kickMed;
-      this.kickMed += (dMed > 0 ? 1 : dMed < 0 ? -1 : 0) * kStep * (this.kickMed + 0.01);
-      const dMad = Math.abs(kickFlux - this.kickMed) - this.kickMad;
-      this.kickMad += (dMad > 0 ? 1 : dMad < 0 ? -1 : 0) * kStep * (this.kickMad + 0.01);
-      // KLAMP MOT NOLL — UTAN DEN PARKERAR SPÅRAREN PÅ -0.01 OCH DÖR DÄR.
-      // Steget skalas med (x + 0.01), så -0.01 är en ATTRAHERANDE fixpunkt: steget
-      // kollapsar geometriskt och efter ~16 s digital tystnad är det under en halv
-      // ulp. Återhämtningen går då från sekunder till ~10^5 s, dvs permanent tills
-      // processen startas om. Följden är inte "sämre detektion" utan att kicken
-      // TYSTNAR HELT: kickThresh = med + 4.5*mad blir negativ, `above` blir alltid
-      // sann, och flankvillkoret (above && !kickWasAbove) kan då aldrig bli sant.
-      // Utlösaren är exakta nollor — mutad codec, ALSA-loopback utan skrivare,
-      // eller en WAV med digital tystnad i offline-bänken.
-      if (this.kickMed < 0) this.kickMed = 0;
-      if (this.kickMad < 0) this.kickMad = 0;
-    }
-    const kickThresh = this.kickMed + Analyser.KICK_K * this.kickMad;
-    // korbank-telemetri. Objektet skapas EN gang och skrivs sedan i stallet (skrapjakten 09-30: ett nytt objekt per hop
-    // med boxade flyttal = ~220 B/hop = ~85 kB/s skrap i huvudtraden; ingen laser en gammal referens).
-    const dk = this.dbgKick;
-    if (dk === null) this.dbgKick = { flux: kickFlux, thresh: kickThresh, med: this.kickMed, mad: this.kickMad, energy, gain: this.gain, rms: this.dbgRms, env: this.envelope, locked: this.gainLocked };
-    else { dk.flux = kickFlux; dk.thresh = kickThresh; dk.med = this.kickMed; dk.mad = this.kickMad; dk.energy = energy; dk.gain = this.gain; dk.rms = this.dbgRms; dk.env = this.envelope; dk.locked = this.gainLocked; }
-    // ms → hindrar sub-beat-dubbelfyr. 0 i ratten = tempoanpassad (0,6 slag, minst 170 ms, nar tempot ar kant).
-    const gk = this.beatSrc.beat;   // EN KÄLLA (r0): klockans rutnät; null = klockan i coast -> öppen grind och 170 ms (som förr utan tempo)
-    const cb = gk && gk.bpm > 40 ? gk.bpm : 0;
-    const KICK_COOLDOWN = Analyser.KICK_COOLDOWN_MS > 0 ? Analyser.KICK_COOLDOWN_MS
-      : (cb > 0 ? Math.max(170, Math.min(KICK_CAP_MS, (60000 / cb) * 0.6)) : 170);
-    let above = kickFlux > kickThresh && energy > Analyser.KICK_EFLOOR;
-    // ── TAKT-GRID-GRIND ──────────────────────────────────────────────────────
-    // Morfologiska filter kan INTE skilja en synth-stot fran en bastrumma - matt
-    // och forkastat tre ganger: SuperFlux (191->222 falska), relativ flux
-    // (190->193) och stigtid (p50 = 2 hops, ingen svans att filtrera). De falska
-    // kickarna ar ocksa skarpa transienter, bara inte fran trumman.
-    // Kvar ar KRONOLOGIN: hor transienten hemma pa taktgridet?
-    //
-    // VIKTIGT: referensen ar cfg.beat.anchorMs (PLL:ens stabila fas), INTE
-    // this.beatAnchorMs - den senare sätts av varje detekterad kick och vore
-    // cirkulär: en falsk kick skulle flytta gridet den doms mot.
-    //
-    // TIDSBAS: anchorMs är VÄGGKLOCKA (PLL:en mäter mot frame.kickAtMs = wallNow()).
-    // Här användes `now` = perfNow() (ms sedan processtart) — 1,7·10¹² ms fel, vilket
-    // efter `% gridMs` blev en konstant men helt godtycklig fasförskjutning: grinden
-    // släppte igenom transienter i fel fas och kastade äkta kickar.
-    const grid = this.beatSrc.beat;
-    if (above && grid && grid.bpm > 40 && (grid.confidence ?? 0) > 0.5) {
-      const beatMs = 60000 / grid.bpm;
-      const gridMs = beatMs / 2;                    // attondelar: four-on-the-floor + upptakter
-      const offset = ((this.wallNow() - grid.anchorMs) % gridMs + gridMs) % gridMs;
-
-      const distToGrid = Math.min(offset, gridMs - offset);
-      const tolerance = Math.max(30, beatMs * 0.15);   // 60 ms vid 150 BPM (0.15*400)
-      if (distToGrid > tolerance && !Analyser.KICK_NOGATE) above = false;    // skarp transient, men felplacerad
-    }
-    // ─────────────────────────────────────────────────────────────────────────
-    let kick = false;
-    // Första framen: prevMag är noll → flux = hela spektrumet → falsk kick som
-    // annars sätter beat-ankaret / triggar drop-blixt vid start-in-i-musik. Hoppa.
-    if (above && !this.kickWasAbove && now - this.lastKick > KICK_COOLDOWN && this.kickPrimed) {
-      kick = true;
-      this.lastKick = now;
-    }
-    this.kickWasAbove = above;
-    this.kickPrimed = true;
-    return kick;
-  }
-
-  /** Tystnadsflanken (350 ms / 10 s). Sallan korda grenar: i egen funktion sa att en forsta korning inte deoptimerar hetslingan. */
-  private silenceStep(): void {
-    const hopMs = this.hHopMs;
-    if (!this.hGated) {
-      this.silentMs += hopMs;
-      // FLANKTRIGGAT: en gång på 350 ms-flanken (tempot rörs inte: de flesta tystnader är en paus i samma låt).
-      // Full släppning först efter 10 s tystnad — då är det en ny låt/nytt set.
-      if (this.silentMs > 350 && !this.silenceArmed) {
-        this.silenceArmed = true;
-        if (this.role === 'fast') this.flagSlow(F_SIL350);
-      } else if (this.silenceArmed && this.silentMs > 10000 && this.localBpm !== 0) {
-        this.localBpm = 0;
-        this.flagSlow(F_SIL10);
-      }
-    } else {
-      this.silentMs = 0;
-      this.silenceArmed = false;
-    }
   }
 
   /** Ett onset-envelope-sampel (ENV_HZ): dubbelslagsdampning, ringar, basgang, sektionsflush/record till workern. */
@@ -1698,7 +1429,7 @@ export class Analyser {
       const _b = this.envBassAccum, _h = this.envHighAccum;
       this.envRing[this.envPos] = _e;
       this.envBassRing[this.envPos] = _b;
-      if (this.bigOn) { this.bigEnvFlag = 1; this.bigEnvBpm = this.localBpm; } else { this.dBpm = this.localBpm; this.stepBassline(); }
+      if (this.bigOn) { this.bigEnvFlag = 1; this.bigEnvBpm = this.localBpm; } else { this.dBpm = this.localBpm; this.bass.stepBassline(); }
       if (HIGH_ON) this.envHighRing[this.envPos] = _h;
       this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
       this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
@@ -1708,66 +1439,6 @@ export class Analyser {
       // Sektionens blocksummor levereras per ENV-SAMPEL i bada rollerna (SECTION_AGG 'env': samma kodvag -> delad och odelad
       // analysator ar bit-identiska). SECTION_AGG 'hop': odelad analysator kor sectionHop per hop sist i process().
       if (this.role === 'fast') { this.pushSlowRecord(_e, _b, _h); } else if (!SECTION_AGG_HOP) this.sections.sectionFlushAgg();
-  }
-
-  /** Forfinar forra kickens fas (parabel). Returnerar kickAtMs (i hKickAt). */
-  private kickRefine(): void {
-    const kickFlux = this.hKickFlux, hopMs = this.hHopMs;
-    let kickAtMs = 0;
-      const ym1 = this.kfPrev2, y0 = this.kfPrev, yp1 = kickFlux;
-      const denom = ym1 - 2 * y0 + yp1;
-      if (denom < 0) {                                   // konkav → äkta topp
-        let delta = 0.5 * (ym1 - yp1) / denom;
-        if (delta > 0.5) delta = 0.5; else if (delta < -0.5) delta = -0.5;
-        this.beatAnchorMs = this.pendingKickMs + delta * hopMs;
-
-      }
-      this.pendingKickMs = 0;
-      // Slaget är färdigmätt → lämna över dess EXAKTA tid till PLL:en.
-      kickAtMs = this.beatAnchorMs;
-      // (EN ETTA, klocka r0: analysatorns kick-taktfas (barAcc) är borta - frame.barShift = klockans taktmodell, se analyserClock publishPhase.)
-    this.hKickAt = kickAtMs;
-  }
-
-  /** Sektionsenergi 0..1 (aktiv tid, EMA, sjalvkalibrerande golv och spann). Returnerar intensity. */
-  private intensityStep(): void {
-    const dtHop = this.dtHop;
-    // SEKTIONSENERGI (0..1) — hur energiskt partiet är RELATIVT låtens eget snitt.
-    // Ren analys av nivån över tid → hör hemma här, inte i show-orkestreringen.
-    // En komprimerad signal ligger jämnt högt, så absolut nivå säger inget; jämför
-    // mot en robust baslinje (P50-median, ej EMA-medel som pinnas upp av loud
-    // sections). Mitten = snittet, tydligt över = drop/topp, under = breakdown.
-    // Attack något snabbare än release så uppbyggnader syns. WARMUP: baslinjen
-    // konvergerar snabbt (~3s) de första 8s aktiv musik, sen stabil ~25s.
-    // Nollställs vid tystnad → snabb omkalibrering vid låtbyte.
-    if (this.hGated) this.activeMs += dtHop * 1000;
-    else this.activeMs = 0;
-    const iUp = this.aIUp;
-    const iDown = this.aIDown;
-    this.intensityEma += (this.lvlSmooth - this.intensityEma) * (this.lvlSmooth > this.intensityEma ? iUp : iDown);
-    const iWarm = this.activeMs < 8000;
-    // REFERENSEN MASTE VARA MYCKET LANGSAMMARE AN DET DEN MATER. Golvet gick
-    // forut pa 25s (~0.022/s), men musikens sektioner andrar sig over tiotals
-    // sekunder OCH auto-gainen plattar ut nivaskillnaderna — sa golvet hann
-    // ikapp EMA:n och gapet oppnade sig aldrig.
-    //   MATT: intensity p10=0.50 p50=0.50 p90=0.51 p99=0.63.
-    // Tiern kraver <0.34 for lugn och >0.78 for full, sa BADA ytterlagena var
-    // oatkomliga: full-tiern (11 effekter) spelades 1 gang av 13 pa en kvart.
-    // 150s referens = flera latar, alltsa ett aftonsnitt i stallet for ett
-    // glidande just-nu-varde.
-    const floorRate = iWarm ? dtHop / 3 : dtHop / 150;
-    if (iWarm) this.intensityFloor += (this.intensityEma - this.intensityFloor) * floorRate;   // seed snabbt
-    else this.intensityFloor += (this.intensityEma > this.intensityFloor ? 1 : this.intensityEma < this.intensityFloor ? -1 : 0) * floorRate * (this.intensityFloor + 0.05);
-    // SJALVKALIBRERANDE SKALA: den fasta namnaren 0.30 var en GISSNING om hur
-    // stor dynamiken ar. Mat den i stallet — ett glidande medelavvikelse-matt
-    // (MAD) over avvikelsen fran golvet. Da nyttjar intensity hela 0..1 oavsett
-    // om baren spelar dynamisk rock eller platt komprimerad house. +-2 MAD
-    // spanner hela skalan; minsta 0.015 hindrar att tyst brus blir blaser upp.
-    const dev = this.intensityEma - this.intensityFloor;
-    this.intensitySpread += (Math.abs(dev) - this.intensitySpread) * (iWarm ? dtHop / 3 : dtHop / 60);
-    const scale = Math.max(0.015, this.intensitySpread) * 4;
-    const intensity = Math.max(0, Math.min(1, 0.5 + dev / scale));
-    this.hIntensity = intensity;
   }
 
   /** SNABBA BANDEN (FAST_BANDS, se fältet): varje hop, till fb*-uppsättningen. Samma nivå/AGC/onset-räkning som 2048-vägens bandloop
@@ -1947,82 +1618,6 @@ export class Analyser {
       const v = this.prevMagBigView; this.prevMagBigView = this.magBigView; this.magBigView = v; }
   }
 
-  /** NIVÅTAKET OCH TOPP-ZONEN (drop1 a6): låtens eget tak (sjunker 1,5 %/s, ~65 s) och zonen med hysteres (in vid 85 % av taket, ut vid
-   *  70 %). Det ABSOLUTA golvet 0,65 är borta: ren musik i ladan når nivå 0,25 som mest, så zonen var falsk 100 % av tiden. EN formel,
-   *  körd där nivån finns: snabba sidan i process(), långsamma tråden i drainBig på samma lvlSmooth-följd (riserns
-   *  nivågrindar läser taket där). */
-  private zoneStep(): void {
-    this.levelCeil = Math.max(this.lvlSmooth, this.levelCeil - this.dtHop * 0.015 * this.levelCeil);
-    if (this.lvlSmooth > this.levelCeil * 0.85) this.inZoneState = true;
-    else if (this.lvlSmooth < this.levelCeil * 0.70) this.inZoneState = false;
-  }
-
-  /** Uppbyggnad/riser (spektral novelty + klang/niva). Returnerar inRiser och uppdaterar buildUp. */
-  private riserStep(): boolean {
-    const nowWallA = this.hNowWall;
-    const dtHop = this.dtHop;
-    // ── UPPBYGGNAD / RISER (flyttad hit) ──
-    // Spektral NOVELTY = summan av bandens POSITIVA avvikelse från en ~2s baslinje,
-    // ihållande ~1.5s. Mätt validerad: ramsar 0.25→0.78 in i en drop. Relativt en
-    // ~8s baslinje → RISER = novelty STIGER över den (filter-sweep/snare-roll),
-    // skilt från bara-busy (ihållande → baslinjen kommer ikapp). Gammal väg
-    // (klang+nivå stiger) ligger kvar som OR. Inte direkt efter en drop.
-    let nov = 0; const sr = this.aSpecSlow;
-    // NOVELTY PÅ RÅ dB (`bandDbRaw`), INTE `bandLvl` — se `bandTop`. Med den
-    // AGC-normaliserade nivån var det här uttrycket matematiskt tvunget att gå
-    // mot noll under exakt de förlopp det skulle upptäcka.
-    // Fönstret är RELATIVT bandets egen topp (0..1 över RISER_SPAN_DB under den), inte absoluta dB: oberoende av ingångsnivån.
-    // BARA BANDEN OVANFÖR BASKROPPEN (RISER_BAND0..7): se RISER_BAND0.
-    for (let b = RISER_BAND0; b < 8; b++) {
-      const raw = this.bandDbRaw[b], top = this.bandTop[b] = Math.max(raw, this.bandTop[b] - dtHop * BODY_CEIL_DB_S);
-      const x = Math.max(0, 1 + (raw - top) * (1 / RISER_SPAN_DB));
-      this.specSlow[b] += (x - this.specSlow[b]) * sr; nov += Math.max(0, x - this.specSlow[b]);
-    }
-    this.novSlow += (nov - this.novSlow) * this.aNovSlow;
-    this.novBaseline += (this.novSlow - this.novBaseline) * (dtHop / 8);
-    const novRiser = this.novSlow > this.novBaseline + 0.15 && this.novSlow > 0.45;
-    this.centSlow += (this.centSmooth - this.centSlow) * (dtHop / 2.5);
-    this.lvlSlowR += (this.lvlSmooth - this.lvlSlowR) * (dtHop / 2.5);
-    // NIVÅGRINDARNA ÄR ANDELAR AV LÅTENS EGET TAK (levelCeil), inte absoluta nivåer: 0,3 / 0,4 / +0,04 trimmades när taket låg vid 1
-    // (sönderklippt ljud); rent ljud i ladan har taket vid 0,1-0,25 och nådde aldrig dit (inRiser 0 % av tiden). Samma tal, nu x taket.
-    const lc = this.levelCeil;
-    const inRiser = this.activeMs > 2500 && this.lvlSmooth > 0.3 * lc && nowWallA - this.drop.lastDropMs > 1500 && (
-        novRiser
-        || (this.centSmooth > this.centSlow + 0.06 && this.lvlSmooth > this.lvlSlowR + 0.04 * lc && this.lvlSmooth > 0.4 * lc)
-      );
-    const bTarget = inRiser ? 1 : 0;
-    const bRate = bTarget > this.buildUp ? dtHop / 3.5 : dtHop / 1.0;   // bygg ~3.5s, klinga ~1s
-    this.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.buildUp));
-    return inRiser;
-  }
-
-  /** Karaktarsprofilen (~8 s) → outProfile. */
-  private profileStep(): void {
-    // ── KARAKTÄRSPROFIL (~8s) — musikens KARAKTÄR, inte dess energinivå ──
-    // Banden är redan per-band AGC:ade (0..1 var), så vi jobbar med RELATIONER:
-    // hur stor del av ljudbilden som är låg-end resp. luft, och hur transientrikt
-    // det är. Långsam (8s) → stabil nog att styra effektval utan att fladdra.
-    let bSum = 1e-6; for (let b = 0; b < 8; b++) bSum += this.bandLvl[b];
-    const bassW = (this.bandLvl[0] + this.bandLvl[1] + this.bandLvl[2]) / bSum;   // sub+kick+bas
-    const brightW = (this.bandLvl[6] + this.bandLvl[7]) / bSum;                    // diskant+luft
-    // punch drivs av den dedikerade kick-detektorn (renare transient än bandOn[1],
-    // som ligger i 60–120 Hz och drunknar i rullande bas) plus snare/hat-anslag.
-    const punchNow = Math.min(1, (this.kickHit + this.bandOn[5] + this.bandOn[6]) * 0.6);  // kick+snare+hat
-    const pr = this.aProf;
-    this.profPunch += (punchNow - this.profPunch) * pr;
-    this.profBass += (bassW - this.profBass) * pr;
-    this.profBright += (brightW - this.profBright) * pr;
-    this.profBeat += (this.dConf - this.profBeat) * pr;
-    // Skala råvärdena till användbara 0..1-spann (typiska musikvärden → full range).
-    // Skalningen är KALIBRERAD mot uppmätta råvärden på riktig musik (annars
-    // mättar punch på 1.00 och bright ligger konstant högt → ingen diskriminering).
-    this.outProfile.punch = cl01((this.profPunch - 0.05) / 0.40);
-    this.outProfile.bass = cl01((this.profBass - 0.28) / 0.30);
-    this.outProfile.bright = cl01((this.profBright - 0.14) / 0.19);
-    this.outProfile.beat = cl01(this.profBeat);
-    this.outProfile.bassline = this.profBassline;
-  }
-
   /** Muterar det ateranvanda Frame:t (spec/onset/drum + alla skalarer) och kor sektionsaggregatet. Bara skalarer in: ingen allokering per hop. */
   private fillFrame(): Frame {
     const level = this.hLevel, fluxNorm = this.hFlux, kick = this.hKick, intensity = this.hIntensity, bodyNow = this.hBody, inZone = this.hInZone, breaking = this.hBreaking,
@@ -2041,7 +1636,7 @@ export class Analyser {
     f.energy = this.engSmooth;
     f.centroid = this.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = this.gain;
     f.bpm = this.localBpm; f.bpmConfidence = this.localBpmConfidence; f.intensity = intensity; f.beatAnchorMs = this.beatAnchorMs;
-    f.bodyDb = bodyNow; { const be = this.bassEnergyStep(A[0], A[1]); f.bassEnergy = f.silent ? 0 : be; f.bassEnergyShort = f.silent ? 0 : this.beShort; f.bassLevel = Math.pow(10, (this.beHi - this.beRef) / 20); }
+    f.bodyDb = bodyNow; { const be = this.bass.bassEnergyStep(A[0], A[1]); f.bassEnergy = f.silent ? 0 : be; f.bassEnergyShort = f.silent ? 0 : this.bass.beShort; f.bassLevel = Math.pow(10, (this.bass.beHi - this.bass.beRef) / 20); }
     { let s2 = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, (FB ? this.fbDbRaw : this.bandDbRaw)[b] / 20); s2 += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s2)); }
     f.dropCount = this.drop.dropCount; f.miniDropCount = this.drop.miniDropCount; f.dropDemoted = this.drop.dropDemoted; f.dropSpaced = this.drop.dropSpaced; f.dropRiseDb = this.drop.dropRiseDb;
     f.nearDropDb = this.drop.nearDropDb; f.nearDipDb = this.drop.nearDipDb; f.liftDb = this.drop.liftDb; f.stopCount = this.drop.stopCount; f.stopS = this.drop.stopS; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
@@ -2074,6 +1669,16 @@ export class Analyser {
   readonly drop = new DropDetector(this);
   /** SEKTIONER: block, rang (intro/low/build/high/break), upprepning, förutsägelse (analyserSection.ts) */
   readonly sections = new SectionTracker(this);
+  /** UPPBYGGNAD: riser (spektral nyhet + klang/nivå) och buildUp (analyserRiser.ts) */
+  readonly riser = new RiserDetector(this);
+  /** KARAKTÄR: låtens långsamma profil (punch, bas, ljushet, täthet) (analyserCharacter.ts) */
+  readonly character = new CharacterProfile(this);
+  /** KICK: anslag i snabba vägen (kick, virvel, hi-hat) och förfiningen (analyserKick.ts) */
+  readonly kicks = new KickDetector(this);
+  /** BAS: basenergin per slag och basgången (analyserBass.ts) */
+  readonly bass = new BassTracker(this);
+  /** NIVÅ: förstärkning/AGC, tystnad, intensitet, nivåtak och topp-zon (analyserLevel.ts) */
+  readonly levels = new LevelTracker(this);
 }
 
 /** Asymmetrisk EMA (snabb attack, långsam release) — modulnivå så tick-vägen
@@ -2081,8 +1686,6 @@ export class Analyser {
 function ema(prev: number, x: number, aUp: number, aDown: number): number {
   return prev + (x - prev) * (x > prev ? aUp : aDown);
 }
-
-function cl01(x: number): number { return x < 0 ? 0 : x > 1 ? 1 : x; }
 
 function hannWindow(n: number): Float32Array {
   const w = new Float32Array(n);
