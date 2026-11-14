@@ -1,0 +1,8 @@
+{
+  "file": "analyserDrop.ts",
+  "cls": "DropDetector",
+  "prop": "drop",
+  "short": "DROP: flanken, slam-kandidaten, minidrop, lyft/nästan-drop/stopp",
+  "header": "DROP-DETEKTORN (utbruten ur analyser.ts 2026-11-14). Baskroppens tak och frånvaro, flanken (full drop), slam-kandidaten, minidrop, klassningen och lyft/nästan-drop/stopp. Körs i långsamma vägen per stor-FFT; läser baskroppen, nivån och klockans tempo ur analysatorn (this.a) och skriver dropCount/miniDropCount m.m.",
+  "methods": ["dropStep", "dropClassify", "flankStep", "liftStep"]
+}
