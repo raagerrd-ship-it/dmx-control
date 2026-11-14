@@ -7,6 +7,17 @@ Frågan: ägarens drop ska bli drop i BÅDA sorternas musik (motorn kallar 10 av
 Övning 160345 + 151659 + 193818, kontroll 193040 + 200719 (kontrollens bas-mätning ligger utanför körningens mapp tills finalen).
 Uppgift/kort: .arena/drop2/uppgift.md, kort.md. Förkollen: tools/natt/arena-2026-11-14-drop2/fore_drop5.py (två sorters drop; inget mått håller i alla fem).
 
+LAT1 PÅ NY MUSIK (natten 11-14/15, skakprovet, inlagd kod mot dagens förra bygge .arena/ladan/dist-head): 193818 (29 min) 96,46 mot 93,38, takt
+95,3 mot 93,4 %, låtbyten 6/8 mot 4/8 (den "falska" vid 597 s ligger 4 s efter ett Låtbyte-tryck som finjusteringen strök - troligen riktig).
+200719 (17 min) 76,49 mot 76,05, takt 80,9 mot 79,3 % (SVÅRASTE filen för klockan hittills), låtbyten 6/7 mot 0/7, MEN falska gränser 6,4 mot 2:
+i uppbyggnaderna före ägarens drop vid 653 och 1015 s vandrar pulsen stegvis (146->137->144->150 och 128->100->108->120->128 bpm, accelererande
+rytm) och varje steg som står 3 s blir en låtgräns (630 646 652, 988 1003 1010 1016 s) = manuset byts 3-4 gånger på en halv minut.
+KANDIDAT, EJ INLAGD (.arena/inlagt/gap, en rad i boundaryDetector.ts: pulsbyte inom P_GAP_MS 30 s från förra gränsen = samma låt, referensen
+följer utan gräns): falska i 200719 7 -> 2, skakprovet 76,49 -> 80,32, övning 97,00 / kontroll 92,32 / 193818 96,46 oförändrade. SMAL MARGINAL:
+37,5 s lika, men 22,5 s tappar ett låtbyte (5/7) och 60 s två (4/7) - den första falska gränsen (630, 988) står kvar och spärrar sedan den riktiga.
+Bättre lösning = säg inte den första heller (en puls som vandrar/accelererar är en uppbyggnad). Tappar för alla sex filer: .arena/inlagt/tap/
+(node tools/ensamTakt.mjs latgrans <tap> --dist <dist> --facit tools/ladan-2026-11-13/latbyten.json). Väntar på ägarens ord.
+
 LADAN 2026-11-14 KVÄLL: LAT1 INLAGD + BREAK-TAKET BORTA (ägaren i ladan efter ögonprov: "ser bra ut, lägg in det i koden"). DMX cad739b,
 backup-tagg backup/fore-lat1-20261114; lotus portad a7c52f0c (EJ utlagd på lotus-Pi:n, som fortfarande kör 22a2055c med break-taket - osynligt där,
 drop är avstängt; lotus är inte mätt med nya klockan). Ladans Pi kör sedan 21:28 exakt bygget ur src (md5 lika, NRestarts 0, eftersläp 0,2 ms).
