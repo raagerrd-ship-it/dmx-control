@@ -1,5 +1,7 @@
 # Natt-agentens uppdrag
 
+ÄGARENS PRIORITET 2026-11-14 kväll: "Uppbyggnad ser jag som låg prio. Kan tas i framtiden, takt, låtbyte och drop är viktigare." -> inget arbete på inRiser/buildUp/build-looker oombett; nästa drop-arena dömer TRÄFFAR på ägarens drop (ta bort bygg-poängen ur tools/arena/dropdom.py när den sätts upp, inte under en körning); vid inspelning räcker Drop, Minidrop, Inte drop, Låtbyte. Ordning: klockan och låtgränsen först.
+
 LÅTBYTEN (huvudsessionen 2026-11-14 kväll, ägaren: "Något mer nu? Tex låtbyten?"): STARTGRINDEN INLAGD, formvägen orörd.
 Låtgränsdetektorn startade aldrig på rent ljud (START_LEVEL 0,15 absolut; nivån når dit 5-6 % av tiden) -> 0 låtgränser, klockan fick aldrig
 låtbytet, manuset glömdes aldrig (nattens brist 1: en look i 2,5-3 min). Nu startar segmentet på musik över släckgränsen i 1 s (boundaryDetector.ts).
