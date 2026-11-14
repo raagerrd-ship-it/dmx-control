@@ -40,7 +40,8 @@ for (const file of filer) {
   const notes = new Map();   // ägare -> { lead: [], trail: [], body: [] }
   const N = o => notes.get(o) ?? notes.set(o, { lead: [], trail: [], body: [] }).get(o);
   const loose = [], edits = [], labelFor = new Map(), headLines = [];
-  let first = true;
+  let first = true, last = null;   // last: förra kommentaren (ägare, sort, sista rad, radlistan) - intilliggande rader slås ihop till ett block
+  const lineNo = p => sf.getLineAndCharacterOfPosition(p).line;
   for (const c of comments) {
     const raw = text.slice(c.pos, c.end), lines = clean(raw), ls = lineStart(c.pos), before = text.slice(ls, c.pos), after = text.slice(c.end, lineEnd(c.end));
     const ownLine = /^\s*$/.test(before) && /^\s*$/.test(after);
@@ -55,8 +56,14 @@ for (const file of filer) {
     else if (kind === "body") {
       let anchor = before.trim(); if (!anchor) { let p = lineEnd(c.end) + 1; while (p < text.length) { const l = text.slice(p, lineEnd(p)).trim(); if (l && !l.startsWith("//") && !l.startsWith("*") && !l.startsWith("/*")) { anchor = l; break; } p = lineEnd(p) + 1; } }
       anchor = anchor.replace(/\s*\/\/.*$/, ""); if (anchor.length > 90) anchor = anchor.slice(0, 87) + "...";
-      N(o).body.push({ anchor, lines });
-    } else N(o)[kind].push(lines);
+      if (last && last.o === o && last.kind === "body" && ownLine && lineNo(c.pos) === last.end + 1) last.arr.push(...lines);
+      else { N(o).body.push({ anchor, lines }); last = { o, kind, arr: lines }; }
+      last.end = lineNo(c.end);
+    } else {
+      if (last && last.o === o && last.kind === kind && kind === "lead" && ownLine && lineNo(c.pos) === last.end + 1) last.arr.push(...lines);
+      else { N(o)[kind].push(lines); last = { o, kind, arr: lines }; }
+      last.end = lineNo(c.end);
+    }
     if (o && kind !== "body" && !labelFor.has(o)) { const l = label(lines); if (l) labelFor.set(o, l); }
     // ta bort ur koden
     if (ownLine) edits.push({ pos: ls, end: Math.min(text.length, lineEnd(c.end) + 1), text: "" });

@@ -1,68 +1,39 @@
-/**
- * LATGRANS UR LJUDET — utbruten ur songMemory.ts 2026-09-23 nar latminnet togs bort fran driften.
- *
- * Det har ar det ENDA av latminnet som realtidsshowen faktiskt hangde pa: `boundaryCount` (index.ts) driver
- * dynamikens omkalibrering (effects.softenRange) och tempots latbytes-hint (analyser.hintTrackChange /
- * resetTempo). Allt annat i songMemory - fingeravtryck, igenkanning, replay, inlarning - var offline-arbete
- * som ska ske pa PC:n, och kostade i drift synkron disk-I/O + en BigInt-indexombyggnad (matt 196 ms pa PC,
- * dvs sekunder pa Pi:n) vid varje latcommit.
- *
- * Grenarna for igenkand lat / manuell inlarning / karantan ar borta - de kunde aldrig sla till utan bibliotek.
- *
- * Signalen (2026-11-08, arena tvavagar a6): LATENS FORM - 80 s fore mot 8 s efter i spektralform, tonart (kroma) och
- * tempo, se F_*. Ersatte klangskiftet 8 s mot 8 s + nivadipp/temposkifte (2/15 ratt i mixen). Klangskiftet
- * (pushNovelty) lever kvar bara for karaktarsskiftet. Allt grindas av min/max-langd pa segmentet.
- */
+/** LATGRANS UR LJUDET — utbruten ur songMemory.ts 2026-09-23 nar latminnet togs bort fran driften. Anteckningar (kommentarerna som stod i koden): docs/analysator/boundaryDetector.md */
 
 import { silentLevel } from "./analyser.js";
-const SILENCE_END_MS = 3000;   // tystnad sa lange = laten ar slut
-const START_HOLD_MS = 1000;    // ett segment startar nar musiken hallit sig over slackgransen sa lange (se tick)
-const MIN_SEG_MS = 110000;     // MATT: 75 s triggade direkt (tva segment exakt 75 s) -> hojt
-const MAX_SEG_MS = 600000;     // 10 min utan grans -> tvinga fram en
-const NOV_WIN_MS = 1500;       // klangprofil per 1,5 s
-const NOV_LAG_MS = 8000;       // jamfor mot profilen sa langt bakat (facitmatningens fonster)
-// (NOV_WEAK + novAt/novPeak - skrevs men lastes aldrig - borttagna 11-09.)
-const CHAR_D = 0.55;   // 10-01 i koden ('mer variation pa effekterna nu');             // karaktarsskifte for dirigenten: 0 = av
-const CHAR_REFRACT_MS = 15000;         // ...racker om nivadipp eller temposkifte ocksa fyrar
-const NOV_Q = 0.97;            // skiftet maste ligga i toppen av de senaste minuterna
-const NOV_TAU_S = 45;          // glomska pa fordelningen (~90 s effektivt fonster)
-const NOV_DIST_MIN_S = 20;     // innan sa mycket data samlats galler bara absoluta kravet
-const NOV_DIST_BUCKETS = 48;   // d ar ett L1-avstand i 0..2
+const SILENCE_END_MS = 3000;   // tystnad sa lange
+const START_HOLD_MS = 1000;   // ett segment startar nar musiken hallit sig over slackgransen sa lange
+const MIN_SEG_MS = 110000;   // MATT: 75 s triggade direkt
+const MAX_SEG_MS = 600000;   // 10 min utan grans
+const NOV_WIN_MS = 1500;   // klangprofil per 1,5 s
+const NOV_LAG_MS = 8000;   // jamfor mot profilen sa langt bakat
+const CHAR_D = 0.55;   // 10-01 i koden
+const CHAR_REFRACT_MS = 15000;
+const NOV_Q = 0.97;   // skiftet maste ligga i toppen av de senaste minuterna
+const NOV_TAU_S = 45;   // glomska pa fordelningen
+const NOV_DIST_MIN_S = 20;   // innan sa mycket data samlats galler bara absoluta kravet
+const NOV_DIST_BUCKETS = 48;   // d ar ett L1-avstand i 0..2
 const NOV_BANDS = [40, 80, 160, 320, 640, 1280, 2560, 5120, 11000];
-// TEMPOVAXLING UPPAT (agaren i ladan 2026-10-06: "nar laten okar tempo sa kanske dirigenten direkt skall byta
-// effekt. nu syns det knappt nar latar kor som mini drop/tempovaxling"). Egen raknare, skild fran latgransen:
-// gransen kraver 7 % i 4 s OCH anvands bara som evidens; det har ar ett BYTESSKAL och maste ga snabbt.
-// Bara UPPAT - en tempookning ar ett energilyft; att sakta ner ar nagot annat och ska inte byta look.
-// Octav-vaktet ar viktigt: analysatorn kan hoppa 2x eller 1,5x (halv-/dubbeltakt) utan att musiken andrats,
-// sa bara okningar i intervallet [PCT, MAX] raknas - 2x (100 %) och 1,5x (50 %) faller utanfor.
-const TEMPO_SHIFT_PCT = 0.06;      // minst sa mycket snabbare
-const TEMPO_SHIFT_MAX = 0.40;      // mer = troligen oktavhopp, inte musik
-const TEMPO_SHIFT_HOLD_MS = 900;   // sa lange maste okningen sta
+const TEMPO_SHIFT_PCT = 0.06;   // TEMPOVAXLING UPPAT
+const TEMPO_SHIFT_MAX = 0.40;   // mer = troligen oktavhopp, inte musik
+const TEMPO_SHIFT_HOLD_MS = 900;   // sa lange maste okningen sta
 const TEMPO_SHIFT_REFRACT_MS = 12000;
-const TEMPO_REF_S = 20;   // latens etablerade tempo: langsamt medel
-// LATENS FORM (arena tvavagar a6, 2026-11-08) - ERSATTER klangskiftet som gransbeslut. Gammal regel: 8 s-profil mot 8 s-profil +
-// nivadipp/temposkifte -> traffade 2 av 15 skarvar i ovningsmixen (6 falska). En lat ar ett LANGT stycke med samma tonart, klang och
-// tempo; en vers->refrang byter klang en stund men inte tonart och ateranvander latens egna klanger. Beslutet jamfor darfor de
-// SENASTE 8 s mot hela 80 s INNAN (inte 8 s): spektralform (24 log-band, volymfri), kromagram (12 tonklasser 250-5000 Hz = tonarten)
-// och tempo (oktav-/1,5x-vikt). Poang = form + 4 x kroma + tempo >= troskel -> grans, bakdaterad till skarven (9 s).
-// MATT offline (a6/sim*.py, egen inspelning av motorns spektrum): ovningsmixen 2/15 -> 11-12/15 ratt, 6 -> 0 falska; extra mix
-// (de 8 oanvanda + omkastade klipp) 12-13/17, 0 falska. Kostnad: ~500 bin-adderingar per stor-FFT (var 3:e hop) + 1 beslut per 0,5 s.
-const F_NB = 24, F_BLO = 40, F_BHI = 12000;   // spektralformens log-band (Hz)
-const F_CLO = 250, F_CHI = 5000;              // kromagrammets omfang (Hz; 23 Hz/bin racker for halvtoner hit)
-const F_BLK_MS = 500;                         // ett sarlagsblock
-const F_LB = 160, F_LA = 16, F_G = 2;         // block: 80 s fore, 8 s efter, 1 s glapp runt skarven
-const F_WC = 6, F_WB = 1;                     // vikter kroma, tempo (formen vikt 1)
-const F_THR = 1.3;                            // MATT (med F_TMIN): 0 falska i bada mixarna (platan 1,2-1,3), 10/15 + 10/17 ratt; snalt med flit -
-                                              // en falsk grans nollar tempolaset och byter manus, en missad kostar bara omkalibreringen
-const F_TMIN = 0.3;                           // formen maste ocksa ha andrats: ensam tonartsglidning (lang1021 245 s) ar ingen ny lat
-const F_RING = 256;                           // >= F_LB + F_LA + 2 F_G + 1
+const TEMPO_REF_S = 20;   // latens etablerade tempo
+const F_NB = 24, F_BLO = 40, F_BHI = 12000;   // LATENS FORM
+const F_CLO = 250, F_CHI = 5000;   // kromagrammets omfang
+const F_BLK_MS = 500;   // ett sarlagsblock
+const F_LB = 160, F_LA = 16, F_G = 2;   // block: 80 s fore, 8 s efter, 1 s glapp runt skarven
+const F_WC = 6, F_WB = 1;   // vikter kroma, tempo
+const F_THR = 1.3;   // MATT (med F_TMIN)
+const F_TMIN = 0.3;   // en falsk grans nollar tempolaset och byter manus, en missad kostar bara...
+const F_RING = 256;
 
-/** Median (sorterar arbetsarrayen pa plats); jamnt antal = medel av de tva mittersta. */
+/** Median. */
 function median(a: Float64Array): number {
   a.sort(); const n = a.length, h = n >> 1;
   return n & 1 ? a[h] : (a[h - 1] + a[h]) / 2;
 }
-/** Tempoavstand i oktaver med oktav- och 1,5x-fel bortvikta (analysatorn kan hoppa dit utan att laten bytts). 0 = okant. */
+/** Tempoavstand i oktaver med oktav- och 1,5x-fel bortvikta. */
 function foldBpm(a: number, b: number): number {
   if (a < 40 || b < 40) return 0;
   const x = Math.abs(Math.log2(b / a)) % 1;
@@ -72,49 +43,44 @@ function foldBpm(a: number, b: number): number {
 export class BoundaryDetector {
   constructor(private readonly clock: () => number = Date.now) {}
 
-  /** Stiger vid varje passerad latgrans. Det ar den har motorn laser. */
-  boundaryCount = 0;
-  /** Varfor senaste gransen sattes (diagnostik). */
-  lastBoundary = "";
-  /** Stiger vid varje tempoVAXLING uppat (se TEMPO_SHIFT_*). Lases av index.ts som bytesskal. */
-  tempoShiftCount = 0;
-  /** Tempot vaxlingen gick fran -> till (diagnostik). */
-  tempoShiftFrom = 0; tempoShiftTo = 0;
+  boundaryCount = 0;   // Stiger vid varje passerad latgrans
+  lastBoundary = "";   // Varfor senaste gransen sattes
+  tempoShiftCount = 0;   // Stiger vid varje tempoVAXLING uppat
+  tempoShiftFrom = 0; tempoShiftTo = 0;   // Tempot vaxlingen gick fran
   private tempoUpSince = 0;
   private tempoUpFrom = 0;
   private tempoRef = 0;
   private tempoRefAt = 0;
   private tempoShiftAt = -1e9;
-  /** Gransignalen vid senaste beslutet (diagnostik; forr klang/tempo/nivadipp, nu latens form). */
+  /** Gransignalen vid senaste beslutet. */
   get lastEvidence(): string[] { return this.lastBoundary ? [this.lastBoundary] : []; }
 
-  private playStart = 0;          // vaggklocka da segmentet borjade
+  private playStart = 0;   // vaggklocka da segmentet borjade
   private lastLoud = 0;
   private loudSince = 0;
   private novAcc = new Float32Array(NOV_BANDS.length - 1);
   private novN = 0;
   private novStart = 0;
   private novHist: Float32Array[] = [];
-  private novIdx = 0;             // nasta slot i ringen
-  private novFilled = 0;          // antal skrivna profiler
-  charShiftCount = 0; charShiftD = 0; private charShiftAt = 0;   // KARAKTARSSKIFTE (se nedan)
-  private novDist = new Float32Array(NOV_DIST_BUCKETS);   // fordelning over ALLA d
+  private novIdx = 0;   // nasta slot i ringen
+  private novFilled = 0;   // antal skrivna profiler
+  charShiftCount = 0; charShiftD = 0; private charShiftAt = 0;   // KARAKTARSSKIFTE
+  private novDist = new Float32Array(NOV_DIST_BUCKETS);   // fordelning over ALLA d
   private novDistTotal = 0;
 
-  /** Ett segment (en lat) ar igang. */
+  /** Ett segment. */
   get active(): boolean { return this.playStart > 0; }
-  /** Sa lange nuvarande segment varat (ms), 0 utanfor segment. */
+  /** Sa lange nuvarande segment varat. */
   get segmentMs(): number { return this.playStart ? this.clock() - this.playStart : 0; }
 
-  /** Matas fran analysatorns spektrum-sink (2048-magnitud, var 3:e hop). Ingen extra FFT. */
+  /** Matas fran analysatorns spektrum-sink. */
   pushSpectrum(mag: Float32Array, binHz: number): void {
     if (!this.playStart) return;
     this.pushNovelty(mag, binHz);
     this.pushForm(mag, binHz);
   }
 
-  // ── LATENS FORM (se F_*) ──
-  private fBand: Int8Array | null = null; private fPc: Int8Array | null = null; private fHz = 0;
+  private fBand: Int8Array | null = null; private fPc: Int8Array | null = null; private fHz = 0;   // LATENS FORM
   private fAcc = new Float64Array(F_NB); private fCh = new Float64Array(12); private fN = 0; private fStart = 0;
   private fLb = new Float32Array(F_RING * F_NB); private fC = new Float32Array(F_RING * 12);
   private fT = new Float64Array(F_RING); private fBpm = new Float64Array(F_RING); private fCount = 0;
@@ -139,7 +105,6 @@ export class BoundaryDetector {
     if (!this.fStart) this.fStart = now;
     if (now - this.fStart < F_BLK_MS) return;
     this.fStart = now;
-    // blocket: log-form minus medel (volymfri), kroma normerad till summa 1
     const k = this.fCount % F_RING, o = k * F_NB, oc = k * 12, n = this.fN;
     let mean = 0;
     for (let b = 0; b < F_NB; b++) { const v = Math.log(acc[b] / n + 1e-6); this.fLb[o + b] = v; mean += v; }
@@ -151,7 +116,7 @@ export class BoundaryDetector {
     this.formDecide();
   }
 
-  /** Skarven provas F_G + F_LA block bakat: 80 s fore mot 8 s efter. */
+  /** Skarven provas F_G + F_LA block bakat. */
   private formDecide(): void {
     if (this.fPendAt) return;
     const j = this.fCount - 1 - F_G - F_LA, a0 = j - F_G - F_LB, b0 = j + F_G;
@@ -182,12 +147,9 @@ export class BoundaryDetector {
   tick(o: { level: number; bpm: number; bpmConfidence: number; silent?: boolean }): void {
     const now = this.clock();
     this.fLastBpm = o.bpm;
-    const loud = !(o.silent ?? silentLevel(o.level));   // tystnaden = analysatorns (frame.silent, EN tröskel cfg.silenceLevel)
+    const loud = !(o.silent ?? silentLevel(o.level));
     if (loud) this.lastLoud = now;
     if (!this.playStart) {
-      // STARTGRINDEN = SLÄCKGRÄNSEN (2026-11-14): musik som hållit en sekund, aldrig tystnad. Förr en egen absolut nivå (0,15): ladans
-      // rena ljud ligger på nivå 0,07-0,15 i median och höll sig aldrig över den i en sekund - inget segment startade, alltså ingen
-      // låtgräns alls (0 av 6 låtbyten på tre inspelningar 11-13), klockan fick aldrig veta att låten bytts och manuset glömdes aldrig.
       if (loud) {
         if (!this.loudSince) this.loudSince = now;
         else if (now - this.loudSince >= START_HOLD_MS) { this.playStart = now; this.lastLoud = now; this.loudSince = 0; }
@@ -198,10 +160,7 @@ export class BoundaryDetector {
     this.boundary(now, now - this.playStart, o);
   }
 
-  /** KLANGSKIFTE. Energin samlas i oktavband, normaliseras (form, inte volym) och jamfors var 1,5 s med
-   *  profilen NOV_LAG_MS bakat - exakt mattet som mattes mot facit (percentil 88 och 92 vid de verkliga
-   *  granserna). Troskeln ar ABSOLUT: den adaptiva varianten drog upp ribban i just de partier dar en gaplos
-   *  overgang sker, och missade bada facitgranserna. */
+  /** KLANGSKIFTE. */
   private pushNovelty(mag: Float32Array, binHz: number): void {
     const now = this.clock();
     if (!this.novStart) this.novStart = now;
@@ -232,10 +191,9 @@ export class BoundaryDetector {
     this.novIdx = (this.novIdx + 1) % size;
     this.novFilled++;
     if (this.novFilled > lag) {
-      const past = this.novHist[this.novIdx];   // efter framflyttningen pekar idx pa aldsta = lag fonster bakat
+      const past = this.novHist[this.novIdx];
       let d = 0;
       for (let b = 0; b < prof.length; b++) d += Math.abs(prof[b] - past[b]);
-      // Fordelningen matas med VARJE d - aven de sma. Det ar dem som avgor vad "ovanligt" betyder i just den har laten.
       const dt = NOV_WIN_MS / 1000;
       const decay = Math.exp(-dt / NOV_TAU_S);
       for (let i = 0; i < NOV_DIST_BUCKETS; i++) this.novDist[i] *= decay;
@@ -244,15 +202,11 @@ export class BoundaryDetector {
       if (bk < 0) bk = 0; if (bk >= NOV_DIST_BUCKETS) bk = NOV_DIST_BUCKETS - 1;
       this.novDist[bk] += dt;
       this.novDistTotal += dt;
-      // KARAKTARSSKIFTE (ladan 2026-09-29: 'dirigenten ska vaxla om den kanner att laten forandras'): samma klangavstand, men utan
-      // krav pa nivadipp/temposkifte - bara att skiftet ar ovanligt for LATEN (>= dess egen NOV_Q-percentil) och >= CHAR_D. Raknaren
-      // lases av index.ts -> effects.noteCharShift(). Spärr CHAR_REFRACT_MS mellan skiften. Paverkar inte latgransen.
       if (CHAR_D > 0 && d >= CHAR_D && d >= this.novRelThreshold() && now - this.charShiftAt >= CHAR_REFRACT_MS) { this.charShiftAt = now; this.charShiftCount++; this.charShiftD = d; }
     }
   }
 
-  /** Troskeln som laten sjalv satter: NOV_Q-percentilen av de senaste minuternas klangskiften.
-   *  Returnerar 0 innan tillrackligt med data samlats - da galler bara det absoluta kravet. */
+  /** Troskeln som laten sjalv satter. */
   private novRelThreshold(): number {
     if (this.novDistTotal < NOV_DIST_MIN_S) return 0;
     const target = this.novDistTotal * NOV_Q;
@@ -270,13 +224,8 @@ export class BoundaryDetector {
     this.novHist = []; this.novIdx = 0; this.novFilled = 0;
   }
 
-  /** LATGRANS I EN GAPLOS STROM. Returnerar true om vi delade. */
+  /** LATGRANS I EN GAPLOS STROM. */
   private boundary(now: number, tLive: number, o: { bpm: number; bpmConfidence: number; level: number }): boolean {
-    // TEMPOVAXLING UPPAT (se TEMPO_SHIFT_*). EGEN LANGSAM REFERENS, inte det forna segBpm: det jagade tempot med
-    // tidskonstant ~50 ms (0,95/0,05 per HOP) och var till for gransens 7 %-grind. Mot det matte jag bara
-    // "bpm 6 % over ett ogonblickligt medel av sig sjalv", dvs brus - MATT pa megamix_ladan: 563 s och 575 s
-    // fyrade tva ganger pa samma 92->110, och ett 1,5x-oktavhopp (87->130) smog igenom som 33 %.
-    // tempoRef ar ett langsamt medel (TEMPO_REF_S) sa en akta vaxling star ut mot latens etablerade tempo.
     if (o.bpmConfidence > 0.5 && o.bpm > 40) {
       if (!this.tempoRef) this.tempoRef = o.bpm;
       const up = (o.bpm - this.tempoRef) / this.tempoRef;
@@ -284,30 +233,28 @@ export class BoundaryDetector {
         if (!this.tempoUpSince) { this.tempoUpSince = now; this.tempoUpFrom = this.tempoRef; }
         else if (now - this.tempoUpSince >= TEMPO_SHIFT_HOLD_MS && now - this.tempoShiftAt >= TEMPO_SHIFT_REFRACT_MS) {
           const trueUp = (o.bpm - this.tempoUpFrom) / this.tempoUpFrom;
-          // Oktavvakt: 1,5x (halv-/dubbeltakt) och allt over MAX ar analysatorns hopp, inte musikens tempo.
           const octave = Math.abs(trueUp - 0.5) < 0.07 || trueUp > TEMPO_SHIFT_MAX;
           this.tempoUpSince = 0;
           if (!octave) {
             this.tempoShiftAt = now;
             this.tempoShiftFrom = Math.round(this.tempoUpFrom); this.tempoShiftTo = Math.round(o.bpm);
             this.tempoShiftCount++;
-            this.tempoRef = o.bpm; this.tempoRefAt = now;   // nya tempot ar nu det etablerade
+            this.tempoRef = o.bpm; this.tempoRefAt = now;
           }
         }
       } else {
         this.tempoUpSince = 0;
         const dtS = this.tempoRefAt ? Math.min(0.5, (now - this.tempoRefAt) / 1000) : 0;
         const a = TEMPO_REF_S > 0 ? Math.min(1, dtS / TEMPO_REF_S) : 1;
-        this.tempoRef += (o.bpm - this.tempoRef) * a;   // glider bara nar tempot INTE sticker upp
+        this.tempoRef += (o.bpm - this.tempoRef) * a;
         this.tempoRefAt = now;
       }
     }
 
-    // GRANSBESLUTET = LATENS FORM (formDecide, se F_*): skarven har redan provats i pushSpectrum, bakdaterad till sin tid.
     let why = "";
     let back = 0;
     if (this.fPendAt) { why = `latform ${this.fPendScore.toFixed(2)}`; back = Math.max(0, now - this.fPendAt); this.fPendAt = 0; }
-    else if (tLive > MAX_SEG_MS) why = "maxlängd";   // aldrig en 22-minuters grot igen
+    else if (tLive > MAX_SEG_MS) why = "maxlängd";
     if (!why) return false;
 
     const bAt = now - back;
@@ -315,15 +262,14 @@ export class BoundaryDetector {
     this.lastBoundary = why;
     this.lastLoud = bAt;
     this.commit();
-    // Starta nasta sekvens direkt - strommen tystnar aldrig.
     this.playStart = bAt;
     this.lastLoud = now;
     return true;
   }
 
-  /** Segmentet ar slut: rakna gransen och nollstall for nasta. Samma aterstallningar som songMemory.commit. */
+  /** Segmentet ar slut. */
   private commit(): void {
-    this.boundaryCount++;   // grans passerad -> motorns auto-range far kalibrera om
+    this.boundaryCount++;
     this.playStart = 0;
     this.resetNovelty(); this.fPendAt = 0; this.loudSince = 0;
   }
