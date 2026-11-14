@@ -1,5 +1,29 @@
 # Natt-agentens uppdrag
 
+ARENAN DROP2 PÅGÅR i HUVUDSESSIONEN sedan 2026-11-14 ~23:45 (ägaren: "kör de tester du vill med nattens arena"). NATTAGENTEN: starta INGEN egen
+arena i natt, rör inte .arena/drop2, mät ingen kostnad per hopp (datorn är lastad) och ändra inte src/analyser*.ts - gör bara nattmätningen och rapporten.
+Frågan: ägarens drop ska bli drop i BÅDA sorternas musik (motorn kallar 10 av hans 31 drop för drop). Domare tools/arena/dropdom2.py
+(poäng = 0,5 x medel + 0,5 x sämsta filen; 50 drop + 20 precision + 20 mini + 10 inte drop per fil; hela analysatorn med ladans config).
+Övning 160345 + 151659 + 193818, kontroll 193040 + 200719 (kontrollens bas-mätning ligger utanför körningens mapp tills finalen).
+Uppgift/kort: .arena/drop2/uppgift.md, kort.md. Förkollen: tools/natt/arena-2026-11-14-drop2/fore_drop5.py (två sorters drop; inget mått håller i alla fem).
+
+LADAN 2026-11-14 KVÄLL: LAT1 INLAGD + BREAK-TAKET BORTA (ägaren i ladan efter ögonprov: "ser bra ut, lägg in det i koden"). DMX cad739b,
+backup-tagg backup/fore-lat1-20261114; lotus portad a7c52f0c (EJ utlagd på lotus-Pi:n, som fortfarande kör 22a2055c med break-taket - osynligt där,
+drop är avstängt; lotus är inte mätt med nya klockan). Ladans Pi kör sedan 21:28 exakt bygget ur src (md5 lika, NRestarts 0, eftersläp 0,2 ms).
+Skakprovet på inlagd kod (.arena/inlagt): övning 97,00, kontroll 92,32, ny inspelning 193040 91,85 med 2/2 låtbyten (+ tystnaden vid filens slut).
+BREAK-TAKET (1f3d5bb) togs bort: på kväll 2:s musik tog det 3 av ägarens 4 drop (hans drop följer där på break om 20-48 slag; gårdagens falska
+har 12-32). Startgrinden 8ab0778 ensam gav två falska formgränser mitt i låtar på ny musik; lat1 (formen tiger medan låten har en puls) tog bort dem.
+NYA INSPELNINGAR (tools/ladan-2026-11-14/, alla rena enligt inspelningskoll; 193818 "misstänkt" bara för ljus klang): 193040 (389 s), 193818 (1725 s),
+200719 (1038 s); marks-fin.json gjorda (finjustera.py); Beat This!-facit i tools/ladan-2026-11-13/beatthis.jsonl (6 filer) och ägarens låtbyten i
+latbyten.json (193818: 8 st, 200719: 7 st - bara hans tryck, ej granskade mot tempot). ATT GÖRA:
+  - lang-20261113T172432.wav (30,7 min, omarkerad) har NOLLAT HUVUD (inspelningen stängdes aldrig); ljudet finns (mono 48 kHz 16 bit från byte 44).
+    Laga en KOPIA med rätt huvud innan den används; originalet rörs inte.
+  - Ägaren: "vi kan ha missat några" markeringar -> ta fram motorns drop utan markering som kandidater åt honom (i 193818: 365, 437, 1226, 1319,
+    1475, 1642, 1673 s; i 193040: 245, 316 s; i 200719: 689, 793, 808, 865, 880 s) när arenan är klar.
+  - Kör skakprovet (latskak.py --wav) på 193818 och 200719: inlagd kod mot .arena/ladan/dist-head (15 nya låtbyten = första stora provet av lat1).
+  - Minidrop-räknaren går 20-27 per minut på alla inspelningar (ljuset läser den inte); städa eller ta bort när drop är löst.
+  - tools/ladanCfg.json: kontrollera mot /setup vid nästa besök (inget ändrat i kväll såvitt känt).
+
 INFÖR LADAN (förberett 2026-11-14 ~16:40, ägaren: "Förbered för ladan"). Ladan kör 4c84b1b; bygget här = HEAD (deployspärren OK, hela motorn
 provkörd på 160345 med ladans config: drop-look 214 368 507 591, låtgränser 200 264 401, mörka rutor 1,2 % mot 1,0 % i går). ORDNING NÄR PI:N NÅS:
   1. FÖRE (gamla koden, musik på): scp tools/refaktor/latens-ladan.sh pi@<ip>:/tmp/ ; ssh pi@<ip> 'bash /tmp/latens-ladan.sh 12'  -> spara som före.
