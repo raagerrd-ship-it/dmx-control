@@ -1,0 +1,68 @@
+diff --git a/src/ANALYSER_SHARED.md5 b/.arena/drop2/a8/src/ANALYSER_SHARED.md5
+index be5b2ff..8e12b32 100644
+--- a/src/ANALYSER_SHARED.md5
++++ b/.arena/drop2/a8/src/ANALYSER_SHARED.md5
+@@ -1,6 +1,6 @@
+ # md5 (CRLF->LF) av de gemensamma filerna - samma i lotus-light-link och dmx-control. Skrivs av analyser_shared.py --write
+ 28fc97e76fe696e3c2716ee86eb03585 analyser.ts
+-36803a2cf2affe308e43456b313b4dad analyserDrop.ts
++dcc26a5ef30e369e45f835c3a8db3589 analyserDrop.ts
+ 692befa55e7fd906cdc3652af3f27baa analyserSection.ts
+ 879ba2122d2a1d3e0eea4082adfd2355 analyserSpectrum.ts
+ e92d0d6b4f8dc36abfb8135004260806 analyserLevel.ts
+diff --git a/src/analyserDrop.ts b/.arena/drop2/a8/src/analyserDrop.ts
+index f582cb3..af893a6 100644
+--- a/src/analyserDrop.ts
++++ b/.arena/drop2/a8/src/analyserDrop.ts
+@@ -18,11 +18,13 @@ const MINI_PEAK_DB = 10;
+ const DROP_SHORT_MS = 4000;   // minsta drop-avstand nar dropen ESKALERAR
+ const DROP_LONG_MS = 20000;   // annars maste sa har lang tid ga
+ const DROP_ESCALATE_DB = 3;   // tatare drops maste vara TYDLIGT starkare for att fyra
+-const FLANK_GONE_DB = 10, FLANK_BREAK_S = 4, FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;   // FULL DROP PÅ FLANKEN
+-const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24, FLANK_SILENT_LV = 0.005;
++const FLANK_GONE_DB = 10, FLANK_BREAK_S = 0.8, FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;   // FULL DROP PÅ FLANKEN
++const FLANK_SILENT_LV = 0.005;
++const VETO_FULL = 0.84, VETO_BOTTOM_DB = 4.5, VETO_LAND_MS = 300;   // VETO: landar under låtens nivåtak (lvCeil, 1,5 %/s som levelCeil) / utan hela botten (band 0-3 mot egna tak) = inte drop
++const VETO_HELD_DB = 3, VETO_FILL_S = 4.2;   // VETO: basen hållen tillbaka kortare än så = fill, inte uppbyggnad
+ const SHOW_DROP_GAP_MS = 12000;   // spärr mellan full drops
+ const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;   // LYFT/NÄSTAN-DROP/STOPP
+-const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdGone', 'fdSpan', 'fdEnd', 'fdAt', 'fdQuietAt', 'lastShowDropMs', 'dropRiseDb', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'nearDropDb', 'nearDipDb', 'liftDb', 'stopS'] as const;   // Talfält som ska vara flyttal från start
++const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdGone', 'fdSpan', 'fdEnd', 'fdAt', 'fdQuietAt', 'heldS', 'lvCeil', 'landUntil', 'landCeil', 'landLv', 'landRise', 'lastShowDropMs', 'dropRiseDb', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'nearDropDb', 'nearDipDb', 'liftDb', 'stopS'] as const;   // Talfält som ska vara flyttal från start
+ 
+ export class DropDetector {
+   a: Analyser;   // analysatorn som äger den här delen
+@@ -52,6 +54,8 @@ export class DropDetector {
+   dropCand = 0;   // slam-kandidaterna
+   dropDemoted = 0; dropSpaced = 0; dropRiseDb = -0;
+   private fdGone = -0; private fdSpan = -0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12; private fdQuietAt = -1e12; private lastShowDropMs = -1e12;
++  private heldS = -0; private lvCeil = -0; private landUntil = -1e12; private landCeil = -0; private landLv = -0; private landRise = -0;   // vetots tillstånd
++  private btEnv = new Float64Array(4).fill(-120); private btFast = new Float64Array(4).fill(-120); private btCeil = new Float64Array(4).fill(-300); private landTop = new Float64Array(4); private landBt = new Float64Array(4);
+   private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;
+   private nearOn = false; private nearB = -0; private nearNorm = -0; private nearFloor = 1e9; private liftCalm = -0; private liftLift = -0;
+   private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftHistAt = -1e12; private stopRunS = -0;
+@@ -167,10 +171,21 @@ export class DropDetector {
+     const above = f > ceil - FLANK_LAND_DB, edge = above && !this.fdAbove; this.fdAbove = above;
+     const span = this.fdGone > 0 ? this.fdGone : now - this.fdEnd < FLANK_GRACE_S * 1000 ? this.fdSpan : 0;
+     if (this.a.lvlSmooth <= FLANK_SILENT_LV) this.fdQuietAt = now;
+-    if (!edge || f - low < FLANK_RISE_DB || (span < FLANK_BREAK_S && !(span >= FLANK_SHORT_S && ceil - low >= FLANK_SHORT_RISE_DB))) return false;
+-    if (now - this.fdQuietAt < span * 1000 + 500) { this.fdGone = 0; this.fdSpan = 0; if (DROP_TRACE) console.log(`[flank] ingen drop: helt tyst i breaket (latstart), break ${span.toFixed(1)} s`); return false; }
+-    this.fdGone = 0; this.fdSpan = 0; this.fdAt = now; this.dropRiseDb = f - low;
+-    if (DROP_TRACE) console.log(`[flank] full drop pa flanken: break ${span.toFixed(1)} s, stigning ${(f - low).toFixed(1)} dB`);
++    const raw = this.a.bandDbRaw, bE = this.btEnv, bF = this.btFast, bC = this.btCeil, lT = this.landTop, kE = Math.min(1, dt / 0.35), kF = Math.min(1, dt / BODY_FAST_S);
++    for (let b = 0; b < 4; b++) { const x = raw[b]; bE[b] += (x - bE[b]) * kE; bF[b] += (x - bF[b]) * kF; bC[b] = Math.max(bE[b], bC[b] - dt * BODY_CEIL_DB_S); if (bF[b] > lT[b]) lT[b] = bF[b]; }
++    const lv = this.a.lvlSmooth; this.lvCeil = Math.max(lv, this.lvCeil - dt * 0.015 * this.lvCeil); if (lv > this.landLv) this.landLv = lv;
++    const held = this.heldS; if (this.bodyEnv < ceil - VETO_HELD_DB) this.heldS += dt; else this.heldS = 0;
++    if (edge && f - low >= FLANK_RISE_DB && span >= FLANK_BREAK_S) {
++      this.fdGone = 0; this.fdSpan = 0;
++      if (now - this.fdQuietAt < span * 1000 + 500) { if (DROP_TRACE) console.log(`[flank] ingen drop: helt tyst i breaket (latstart), break ${span.toFixed(1)} s`); return false; }
++      if (held < VETO_FILL_S) { if (DROP_TRACE) console.log(`[flank] ingen drop: fill, basen hallen tillbaka ${held.toFixed(1)} s`); return false; }
++      this.landUntil = now + VETO_LAND_MS; this.landCeil = this.lvCeil; this.landLv = lv; this.landRise = f - low;
++      for (let b = 0; b < 4; b++) { this.landBt[b] = bC[b] - VETO_BOTTOM_DB; lT[b] = bF[b]; }
++    }
++    if (now > this.landUntil || this.landLv < this.landCeil * VETO_FULL) return false;
++    for (let b = 0; b < 4; b++) if (lT[b] < this.landBt[b]) return false;
++    this.landUntil = -1e12; this.fdAt = now; this.dropRiseDb = this.landRise;
++    if (DROP_TRACE) console.log(`[flank] full drop pa flanken: stigning ${this.landRise.toFixed(1)} dB`);
+     return true;
+   }
+ 

@@ -1,0 +1,18 @@
+bas  POÄNG 36.0  (medel 54.8, sämsta filen 17.1)  [skakprov, medel av fem]
+  lang-20261114T193040        92.6  drop 4.0/4  motordrop 6.0  mini som drop 0.0/2  inte-drop med drop 0.0/0  tid 0.15 s  0.98 drop/min
+  lang-20261114T200719        17.1  drop 0.0/4  motordrop 5.4  mini som drop 3.0/13  inte-drop med drop 0.0/0  tid 0.00 s  0.35 drop/min
+fusion  POÄNG 22.2  (medel 22.2, sämsta filen 22.2)  [skakprov, medel av fem]
+  lang-20261114T193040        22.2  drop 0.0/4  motordrop 1.0  mini som drop 0.0/2  inte-drop med drop 0.0/0  tid 0.00 s  0.16 drop/min
+  lang-20261114T200719        22.2  drop 0.0/4  motordrop 4.0  mini som drop 0.0/13  inte-drop med drop 0.0/0  tid 0.00 s  0.24 drop/min
+a6  POÄNG 22.2  (medel 22.2, sämsta filen 22.2)  [skakprov, medel av fem]
+  lang-20261114T193040        22.2  drop 0.0/4  motordrop 0.0  mini som drop 0.0/2  inte-drop med drop 0.0/0  tid 0.00 s  0.00 drop/min
+  lang-20261114T200719        22.2  drop 0.0/4  motordrop 1.0  mini som drop 0.0/13  inte-drop med drop 0.0/0  tid 0.00 s  0.06 drop/min
+a2  POÄNG 22.0  (medel 28.5, sämsta filen 15.4)  [skakprov, medel av fem]
+  lang-20261114T193040        41.7  drop 1.0/4  motordrop 4.0  mini som drop 0.0/2  inte-drop med drop 0.0/0  tid 0.12 s  0.65 drop/min
+  lang-20261114T200719        15.4  drop 0.0/4  motordrop 12.0  mini som drop 4.0/13  inte-drop med drop 0.0/0  tid 0.00 s  0.71 drop/min
+a5  POÄNG 20.0  (medel 26.3, sämsta filen 13.7)  [skakprov, medel av fem]
+  lang-20261114T193040        38.9  drop 1.0/4  motordrop 8.0  mini som drop 0.0/2  inte-drop med drop 0.0/0  tid 0.22 s  1.30 drop/min
+  lang-20261114T200719        13.7  drop 0.0/4  motordrop 25.8  mini som drop 5.0/13  inte-drop med drop 0.0/0  tid 0.00 s  1.59 drop/min
+a1  POÄNG 22.1  (medel 28.8, sämsta filen 15.4)  [skakprov, medel av fem]
+  lang-20261114T193040        42.2  drop 0.8/4  motordrop 2.0  mini som drop 0.0/2  inte-drop med drop 0.0/0  tid 0.42 s  0.33 drop/min
+  lang-20261114T200719        15.4  drop 0.0/4  motordrop 10.0  mini som drop 4.0/13  inte-drop med drop 0.0/0  tid 0.00 s  0.59 drop/min

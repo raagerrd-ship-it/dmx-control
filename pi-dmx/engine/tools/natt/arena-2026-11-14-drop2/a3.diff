@@ -1,0 +1,104 @@
+diff --git a/src/ANALYSER_SHARED.md5 b/.arena/drop2/a3/src/ANALYSER_SHARED.md5
+index be5b2ff..fc36db5 100644
+--- a/src/ANALYSER_SHARED.md5
++++ b/.arena/drop2/a3/src/ANALYSER_SHARED.md5
+@@ -1,6 +1,6 @@
+ # md5 (CRLF->LF) av de gemensamma filerna - samma i lotus-light-link och dmx-control. Skrivs av analyser_shared.py --write
+ 28fc97e76fe696e3c2716ee86eb03585 analyser.ts
+-36803a2cf2affe308e43456b313b4dad analyserDrop.ts
++f1c21797b0fce5b3cf7681b516b7b65f analyserDrop.ts
+ 692befa55e7fd906cdc3652af3f27baa analyserSection.ts
+ 879ba2122d2a1d3e0eea4082adfd2355 analyserSpectrum.ts
+ e92d0d6b4f8dc36abfb8135004260806 analyserLevel.ts
+diff --git a/src/analyserDrop.ts b/.arena/drop2/a3/src/analyserDrop.ts
+index f582cb3..5ad13e7 100644
+--- a/src/analyserDrop.ts
++++ b/.arena/drop2/a3/src/analyserDrop.ts
+@@ -18,11 +18,10 @@ const MINI_PEAK_DB = 10;
+ const DROP_SHORT_MS = 4000;   // minsta drop-avstand nar dropen ESKALERAR
+ const DROP_LONG_MS = 20000;   // annars maste sa har lang tid ga
+ const DROP_ESCALATE_DB = 3;   // tatare drops maste vara TYDLIGT starkare for att fyra
+-const FLANK_GONE_DB = 10, FLANK_BREAK_S = 4, FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;   // FULL DROP PÅ FLANKEN
+-const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24, FLANK_SILENT_LV = 0.005;
++const PHRASE_BEATS = 32, PHRASE_MEM_BEATS = 128, PHRASE_SUB = 4, PHRASE_HELD_DB = 5, PHRASE_HELD_MIN = 10, PHRASE_LAND_DB = 3, PHRASE_FLOOR_DB = 12, PHRASE_FADE_DB = 1.5;   // FRASEN
+ const SHOW_DROP_GAP_MS = 12000;   // spärr mellan full drops
+ const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;   // LYFT/NÄSTAN-DROP/STOPP
+-const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdGone', 'fdSpan', 'fdEnd', 'fdAt', 'fdQuietAt', 'lastShowDropMs', 'dropRiseDb', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'nearDropDb', 'nearDipDb', 'liftDb', 'stopS'] as const;   // Talfält som ska vara flyttal från start
++const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdAt', 'lastShowDropMs', 'phSum', 'phSum2', 'phAcc', 'phBpm', 'phCeil', 'dropRiseDb', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'nearDropDb', 'nearDipDb', 'liftDb', 'stopS'] as const;   // Talfält som ska vara flyttal från start
+ 
+ export class DropDetector {
+   a: Analyser;   // analysatorn som äger den här delen
+@@ -51,8 +50,9 @@ export class DropDetector {
+   dropCount = 0;   // monoton drop-räknare
+   dropCand = 0;   // slam-kandidaterna
+   dropDemoted = 0; dropSpaced = 0; dropRiseDb = -0;
+-  private fdGone = -0; private fdSpan = -0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12; private fdQuietAt = -1e12; private lastShowDropMs = -1e12;
+-  private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;
++  private fdAt = -1e12; private lastShowDropMs = -1e12;
++  private phHop = new Float32Array(512); private phW = 0; private phN = 1; private phSum = 0; private phSum2 = 0; private phAcc = 0; private phBpm = 120;   // FRASEN: glidande slag
++  private phBeat = new Float32Array(PHRASE_MEM_BEATS * PHRASE_SUB); private phBW = 0; private phBN = 0; private phCeil = -300; private phHeld = 0; private phArmed = false;   // slagens minne
+   private nearOn = false; private nearB = -0; private nearNorm = -0; private nearFloor = 1e9; private liftCalm = -0; private liftLift = -0;
+   private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftHistAt = -1e12; private stopRunS = -0;
+   nearDropDb = -0; nearDipDb = -0; liftDb = -0; stopCount = 0; stopS = -0;
+@@ -68,7 +68,7 @@ export class DropDetector {
+     this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * BODY_CEIL_DB_S);
+     this.bodyPeak = Math.max(this.bodyEnv, this.bodyPeak - dtHop * 0.04);
+     this.a.bodyUnderDb = this.bodyCeil - this.bodyEnv;
+-    const flank = this.flankStep(nowWallA, dtHop);
++    const flank = this.phraseStep(nowWallA, dtHop, bodyNow);
+     this.liftStep(nowWallA, dtHop, bodyNow);
+ 
+     if (this.bodyEnv < this.bodyCeil - BODY_GONE_DB) {
+@@ -156,21 +156,37 @@ export class DropDetector {
+     } else if (cand && nowWallA - this.fdAt > 2000) { this.dropDemoted++; this.miniDropCount++; }
+   }
+ 
+-  /** FULL DROP PÅ FLANKEN. */
+-  private flankStep(now: number, dt: number): boolean {
+-    const CAP = 1024, T = this.fdT, V = this.fdV, f = this.bodyFast, ceil = this.bodyCeil;
+-    if (this.fdN === CAP) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
+-    { const w = (this.fdS0 + this.fdN) & (CAP - 1); T[w] = now; V[w] = f; this.fdN++; }
+-    while (this.fdN > 1 && now - T[this.fdS0] > FLANK_HOLD_S * 1000) { this.fdS0 = (this.fdS0 + 1) & (CAP - 1); this.fdN--; }
+-    let top = -1e9, low = 1e9; for (let q = 0; q < this.fdN; q++) { const i = (this.fdS0 + q) & (CAP - 1); if (V[i] > top) top = V[i]; if (now - T[i] <= 500 && V[i] < low) low = V[i]; }
+-    if (top < ceil - FLANK_GONE_DB) this.fdGone += dt; else { if (this.fdGone > 0) { this.fdSpan = this.fdGone; this.fdEnd = now; } this.fdGone = 0; }
+-    const above = f > ceil - FLANK_LAND_DB, edge = above && !this.fdAbove; this.fdAbove = above;
+-    const span = this.fdGone > 0 ? this.fdGone : now - this.fdEnd < FLANK_GRACE_S * 1000 ? this.fdSpan : 0;
+-    if (this.a.lvlSmooth <= FLANK_SILENT_LV) this.fdQuietAt = now;
+-    if (!edge || f - low < FLANK_RISE_DB || (span < FLANK_BREAK_S && !(span >= FLANK_SHORT_S && ceil - low >= FLANK_SHORT_RISE_DB))) return false;
+-    if (now - this.fdQuietAt < span * 1000 + 500) { this.fdGone = 0; this.fdSpan = 0; if (DROP_TRACE) console.log(`[flank] ingen drop: helt tyst i breaket (latstart), break ${span.toFixed(1)} s`); return false; }
+-    this.fdGone = 0; this.fdSpan = 0; this.fdAt = now; this.dropRiseDb = f - low;
+-    if (DROP_TRACE) console.log(`[flank] full drop pa flanken: break ${span.toFixed(1)} s, stigning ${(f - low).toFixed(1)} dB`);
++  /** FRASEN: full drop när basen landar på frasens tak efter en hållen fras. */
++  private phraseStep(now: number, dt: number, body: number): boolean {
++    const H = this.phHop, B = this.phBeat, bpm = this.a.dBpm;
++    if (bpm > 40) this.phBpm = bpm < 60 ? 60 : bpm > 200 ? 200 : bpm;
++    const n = Math.min(511, Math.max(8, Math.round(60 / this.phBpm / dt))), floor = this.phCeil - PHRASE_FLOOR_DB, x = body > floor ? body : floor;
++    H[this.phW] = x; this.phW = (this.phW + 1) & 511;
++    const n2 = n >> 1;
++    if (n !== this.phN) { let s = 0, s2 = 0; for (let q = 1; q <= n; q++) { s += H[(this.phW - q) & 511]; if (q === n2) s2 = s; } this.phSum = s; this.phSum2 = s2; this.phN = n; }
++    else { this.phSum += x - H[(this.phW - 1 - n) & 511]; this.phSum2 += x - H[(this.phW - 1 - n2) & 511]; }
++    const mean = this.phSum / n, half = this.phSum2 / n2;
++    this.phAcc += dt * this.phBpm / 60 * PHRASE_SUB;
++    if (this.phAcc >= 1) {
++      const M = PHRASE_MEM_BEATS * PHRASE_SUB, fade = PHRASE_FADE_DB / (PHRASE_BEATS * PHRASE_SUB);
++      this.phAcc -= 1; B[this.phBW] = mean; this.phBW = (this.phBW + 1) % M; if (this.phBN < M) this.phBN++;
++      const N = this.phBN; let c = -300, held = 0;
++      for (let a = 0, j = this.phBW; a < N - 3 * PHRASE_SUB; a++) {
++        if (--j < 0) j = M - 1;
++        let bar = B[j]; for (let k = 1, i = j; k < 4; k++) { i -= PHRASE_SUB; if (i < 0) i += M; if (B[i] < bar) bar = B[i]; }
++        bar -= a * fade; if (bar > c) c = bar;
++      }
++      if (N > 3 * PHRASE_SUB) this.phCeil = c;
++      for (let a = Math.min(N, PHRASE_BEATS * PHRASE_SUB), j = this.phBW; a > 0; a--) { if (--j < 0) j = M - 1; if (B[j] < c - PHRASE_HELD_DB) held++; }
++      this.phHeld = held / PHRASE_SUB;
++    }
++    if (mean < this.phCeil - PHRASE_HELD_DB) { this.phArmed = true; return false; }
++    if (!this.phArmed || half < this.phCeil || mean < this.phCeil - PHRASE_LAND_DB) return false;
++    this.phArmed = false;
++    if (this.phHeld < PHRASE_HELD_MIN || this.phBN < PHRASE_BEATS * PHRASE_SUB || this.a.activeMs <= 2000) return false;
++    { let lo = this.bodyFast, hi = lo; const h = this.bodyHist, HL = h.length; for (let q = 1; q <= this.bodyHistLen; q++) { const v = h[(this.bodyHistPos - q + HL) % HL]; if (v < lo) lo = v; else if (v > hi) hi = v; } this.dropRiseDb = hi - lo; }
++    this.fdAt = now;
++    if (DROP_TRACE) console.log(`[fras] full drop: ${this.phHeld} hållna slag av ${PHRASE_BEATS}, tak ${this.phCeil.toFixed(1)}`);
+     return true;
+   }
+ 

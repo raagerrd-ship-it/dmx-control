@@ -1,11 +1,13 @@
 # Natt-agentens uppdrag
 
-ARENAN DROP2 PÅGÅR i HUVUDSESSIONEN sedan 2026-11-14 ~23:45 (ägaren: "kör de tester du vill med nattens arena"). NATTAGENTEN: starta INGEN egen
-arena i natt, rör inte .arena/drop2, mät ingen kostnad per hopp (datorn är lastad) och ändra inte src/analyser*.ts - gör bara nattmätningen och rapporten.
-Frågan: ägarens drop ska bli drop i BÅDA sorternas musik (motorn kallar 10 av hans 31 drop för drop). Domare tools/arena/dropdom2.py
-(poäng = 0,5 x medel + 0,5 x sämsta filen; 50 drop + 20 precision + 20 mini + 10 inte drop per fil; hela analysatorn med ladans config).
-Övning 160345 + 151659 + 193818, kontroll 193040 + 200719 (kontrollens bas-mätning ligger utanför körningens mapp tills finalen).
-Uppgift/kort: .arena/drop2/uppgift.md, kort.md. Förkollen: tools/natt/arena-2026-11-14-drop2/fore_drop5.py (två sorters drop; inget mått håller i alla fem).
+ARENAN DROP2 KLAR 2026-11-15 02:35: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-14-drop2.md (+ mappen med alla lösningar och diffar).
+Övning (160345 + 151659 + 193818): bas 29,2 -> deltagarna 39-59, jokern 68,7 (identisk i fem starter). KONTROLL (193040 + 200719, medel av fem
+starter): bas 36,0 (4/4 + 0/4 drop) mot jokern 22,2 (0/4 + 0/4), a6 22,2, a1 22,1, a2 22,0, a5 20,0. Alla bytte ut dagens flank och tappade dess
+4 av 4 på 193040; ingen (inte heller bas) tar något drop i 200719. Lämna-en-fil-ute på 21 mått (lofo.py): AUC 0,75-1,00 på fyra filer, slump på 200719.
+NÄSTA DROP-FÖRSÖK (ej startat): dagens flank LÅST, bara veton/tillägg ovanpå (a8:s tre veton, a6:s "stannar"), dömt på alla fem filerna med
+--skak; målet = färre falska drop. Fråga ägaren vad som gjorde 518/653/763/1015 s i 200719 till drop och 793/865/914 s till minidrop.
+Domaren: tools/arena/dropdom2.py (--skak = medel av fem starter, ska vara standard). Kontrollen 193040 + 200719 är nu använd en gång.
+Kostnad ~3,9 M tokens. NATTAGENTEN: ingen arena i natt; .arena/drop2 får ligga kvar.
 
 LAT1 PÅ NY MUSIK (natten 11-14/15, skakprovet, inlagd kod mot dagens förra bygge .arena/ladan/dist-head): 193818 (29 min) 96,46 mot 93,38, takt
 95,3 mot 93,4 %, låtbyten 6/8 mot 4/8 (den "falska" vid 597 s ligger 4 s efter ett Låtbyte-tryck som finjusteringen strök - troligen riktig).

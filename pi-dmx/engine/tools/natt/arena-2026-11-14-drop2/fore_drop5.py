@@ -129,3 +129,4 @@ for k in nycklar:
     h = (all(x > 0 for x in sida) or all(x < 0 for x in sida)) and min(abs(x) for x in sida) >= 0.15
     rader.append((abs(al - 0.5), "%-40s | %s | %5.2f | %s" % (k, " ".join("%6.2f" % a for a in A), al, "JA" if h else "")))
 for _, r in sorted(rader, reverse=True): print(r)
+json.dump({n: {k: [{q: float(v) for q, v in m.items()} for m in r] for k, r in ut[n].items()} for n in FILER}, open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fore5.json'), 'w'))

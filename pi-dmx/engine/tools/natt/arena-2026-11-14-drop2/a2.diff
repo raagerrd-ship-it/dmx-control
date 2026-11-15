@@ -1,0 +1,90 @@
+diff --git a/src/ANALYSER_SHARED.md5 b/.arena/drop2/a2/src/ANALYSER_SHARED.md5
+index be5b2ff..fd2f9d4 100644
+--- a/src/ANALYSER_SHARED.md5
++++ b/.arena/drop2/a2/src/ANALYSER_SHARED.md5
+@@ -1,6 +1,6 @@
+ # md5 (CRLF->LF) av de gemensamma filerna - samma i lotus-light-link och dmx-control. Skrivs av analyser_shared.py --write
+ 28fc97e76fe696e3c2716ee86eb03585 analyser.ts
+-36803a2cf2affe308e43456b313b4dad analyserDrop.ts
++d1b32a296c5462c041311905976377f5 analyserDrop.ts
+ 692befa55e7fd906cdc3652af3f27baa analyserSection.ts
+ 879ba2122d2a1d3e0eea4082adfd2355 analyserSpectrum.ts
+ e92d0d6b4f8dc36abfb8135004260806 analyserLevel.ts
+diff --git a/src/analyserDrop.ts b/.arena/drop2/a2/src/analyserDrop.ts
+index f582cb3..f7cc8a9 100644
+--- a/src/analyserDrop.ts
++++ b/.arena/drop2/a2/src/analyserDrop.ts
+@@ -20,9 +20,13 @@ const DROP_LONG_MS = 20000;   // annars maste sa har lang tid ga
+ const DROP_ESCALATE_DB = 3;   // tatare drops maste vara TYDLIGT starkare for att fyra
+ const FLANK_GONE_DB = 10, FLANK_BREAK_S = 4, FLANK_LAND_DB = 6, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6, FLANK_GRACE_S = 1;   // FULL DROP PÅ FLANKEN
+ const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24, FLANK_SILENT_LV = 0.005;
++const LAND_UNDER_DB = 2, LAND_WAIT_S = 0.25;   // LANDNINGEN: hela nivån högst så långt under sitt tak, väntan på det efter basens flank
++const SWEEP_OCT = [0.5, 1.63, 3.04, 4.56, 5.66], SWEEP_S = 8, SWEEP_N = 64;   // SVEPET: bandens lägen i oktaver över 250 Hz, fönstret och dess rutor
++const LAND_FULL = Math.pow(10, -LAND_UNDER_DB / 20), SWEEP_BLOCK_S = SWEEP_S / SWEEP_N;
++const SWEEP_ON = 0.15, SWEEP_OFF = -0.2;   // LADDNINGEN: oktaver stigning över fönstret som gör en kort lucka till drop / sjunkande som tar droppet från ett långt break
+ const SHOW_DROP_GAP_MS = 12000;   // spärr mellan full drops
+ const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;   // LYFT/NÄSTAN-DROP/STOPP
+-const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdGone', 'fdSpan', 'fdEnd', 'fdAt', 'fdQuietAt', 'lastShowDropMs', 'dropRiseDb', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'nearDropDb', 'nearDipDb', 'liftDb', 'stopS'] as const;   // Talfält som ska vara flyttal från start
++const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastDropMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdGone', 'fdSpan', 'fdEnd', 'fdAt', 'lastShowDropMs', 'dropRiseDb', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'nearDropDb', 'nearDipDb', 'liftDb', 'stopS', 'ldAt', 'ldSpan', 'ldDeep', 'ldRise', 'swAcc', 'swT', 'sweepOct'] as const;   // Talfält som ska vara flyttal från start
+ 
+ export class DropDetector {
+   a: Analyser;   // analysatorn som äger den här delen
+@@ -51,7 +55,10 @@ export class DropDetector {
+   dropCount = 0;   // monoton drop-räknare
+   dropCand = 0;   // slam-kandidaterna
+   dropDemoted = 0; dropSpaced = 0; dropRiseDb = -0;
+-  private fdGone = -0; private fdSpan = -0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12; private fdQuietAt = -1e12; private lastShowDropMs = -1e12;
++  private fdGone = -0; private fdSpan = -0; private fdEnd = -1e12; private fdAbove = true; private fdAt = -1e12; private lastShowDropMs = -1e12;
++  private ldAt = -0; private ldSpan = -0; private ldDeep = -0; private ldRise = -0;   // landningen som väntar på full nivå
++  private swRing = new Float64Array(SWEEP_N); private swW = 0; private swN = 0; private swAcc = -0; private swT = -0;
++  sweepOct = -0;   // laddningen: tyngdpunktens stigning ovanför basen, oktaver på 8 s
+   private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;
+   private nearOn = false; private nearB = -0; private nearNorm = -0; private nearFloor = 1e9; private liftCalm = -0; private liftLift = -0;
+   private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftHistAt = -1e12; private stopRunS = -0;
+@@ -68,6 +75,7 @@ export class DropDetector {
+     this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * BODY_CEIL_DB_S);
+     this.bodyPeak = Math.max(this.bodyEnv, this.bodyPeak - dtHop * 0.04);
+     this.a.bodyUnderDb = this.bodyCeil - this.bodyEnv;
++    this.sweepStep(dtHop);
+     const flank = this.flankStep(nowWallA, dtHop);
+     this.liftStep(nowWallA, dtHop, bodyNow);
+ 
+@@ -166,14 +174,33 @@ export class DropDetector {
+     if (top < ceil - FLANK_GONE_DB) this.fdGone += dt; else { if (this.fdGone > 0) { this.fdSpan = this.fdGone; this.fdEnd = now; } this.fdGone = 0; }
+     const above = f > ceil - FLANK_LAND_DB, edge = above && !this.fdAbove; this.fdAbove = above;
+     const span = this.fdGone > 0 ? this.fdGone : now - this.fdEnd < FLANK_GRACE_S * 1000 ? this.fdSpan : 0;
+-    if (this.a.lvlSmooth <= FLANK_SILENT_LV) this.fdQuietAt = now;
+-    if (!edge || f - low < FLANK_RISE_DB || (span < FLANK_BREAK_S && !(span >= FLANK_SHORT_S && ceil - low >= FLANK_SHORT_RISE_DB))) return false;
+-    if (now - this.fdQuietAt < span * 1000 + 500) { this.fdGone = 0; this.fdSpan = 0; if (DROP_TRACE) console.log(`[flank] ingen drop: helt tyst i breaket (latstart), break ${span.toFixed(1)} s`); return false; }
+-    this.fdGone = 0; this.fdSpan = 0; this.fdAt = now; this.dropRiseDb = f - low;
+-    if (DROP_TRACE) console.log(`[flank] full drop pa flanken: break ${span.toFixed(1)} s, stigning ${(f - low).toFixed(1)} dB`);
++    if (this.a.lvlSmooth <= FLANK_SILENT_LV) { this.fdGone = 0; this.fdSpan = 0; }
++    if (edge && f - low >= FLANK_RISE_DB && span > 0) { this.fdGone = 0; this.fdSpan = 0; this.ldAt = now; this.ldSpan = span; this.ldDeep = ceil - low; this.ldRise = f - low; }
++    if (this.ldAt === 0) return false;
++    if (now - this.ldAt > LAND_WAIT_S * 1000) { this.ldAt = 0; return false; }
++    if (this.a.lvlSmooth < LAND_FULL * this.a.levelCeil) return false;
++    const long = this.ldSpan >= FLANK_BREAK_S || (this.ldSpan >= FLANK_SHORT_S && this.ldDeep >= FLANK_SHORT_RISE_DB);
++    this.ldAt = 0;
++    if (DROP_TRACE) console.log(`[flank] landning: break ${this.ldSpan.toFixed(2)} s, stigning ${this.ldRise.toFixed(1)} dB, laddning ${this.sweepOct.toFixed(2)} okt`);
++    if (this.sweepOct < (long ? SWEEP_OFF : SWEEP_ON)) return false;
++    this.fdAt = now; this.dropRiseDb = this.ldRise;
+     return true;
+   }
+ 
++  /** SVEPET: laddningen ur tyngdpunktens stigning ovanför baskroppen. */
++  private sweepStep(dt: number): void {
++    if (this.a.lvlSmooth <= FLANK_SILENT_LV) { this.swN = 0; this.swAcc = 0; this.swT = 0; this.sweepOct = 0; return; }
++    const B = this.a.bandDbRaw; let sw = 0, so = 0;
++    for (let b = 0; b < 5; b++) { const w = Math.exp(B[b + 3] * 0.115129); sw += w; so += w * SWEEP_OCT[b]; }
++    this.swAcc += so / sw * dt; this.swT += dt;
++    if (this.swT < SWEEP_BLOCK_S) return;
++    const R = this.swRing; R[this.swW] = this.swAcc / this.swT; this.swW = (this.swW + 1) % SWEEP_N; this.swAcc = 0; this.swT = 0;
++    if (this.swN < SWEEP_N) { this.swN++; if (this.swN < SWEEP_N) return; }
++    let num = 0; const mid = (SWEEP_N - 1) / 2;
++    for (let k = 0, j = this.swW; k < SWEEP_N; k++) { num += (k - mid) * R[j]; if (++j === SWEEP_N) j = 0; }
++    this.sweepOct = num * 12 / (SWEEP_N * SWEEP_N - 1);
++  }
++
+   /** NÄSTAN-DROP, ENERGILYFT, STOPP. */
+   private liftStep(now: number, dt: number, body: number): void {
+     const x = Math.max(-90, body);
