@@ -50,7 +50,9 @@
   <label>Hastighet <select id="fart"><option value="0.5">0,5×</option><option value="0.75">0,75×</option><option value="1" selected>1×</option></select></label>
   <label>Zoom <button id="zut" title="Zooma ut (−)">−</button><button id="zin" title="Zooma in (+)">+</button><button id="zhel" title="Visa hela inspelningen">Hela</button></label>
   <button id="folj" class="pa" title="Bilden följer uppspelningen (F)">Följ</button>
-  <label>Ljusstyrka <input type="range" id="ljus" min="-40" max="40" value="0" style="width:110px"></label>
+  <label>Ljusstyrka <input type="range" id="ljus" min="-40" max="40" value="0" style="width:90px"></label>
+  <label>Kontrast <input type="range" id="kontrast" min="60" max="260" value="125" style="width:90px"></label>
+  <label title="Varje frekvensband får sin egen ljusskala, så att svaga band (diskanten) syns lika tydligt som starka"><input type="checkbox" id="jamna" checked> Utjämna band</label>
   <button id="nasta" title="Hoppa till nästa ställe där motorn slog utan markering (N)">Nästa omarkerade</button>
   <label><input type="checkbox" id="klar"> Genomgången klar</label>
   <span id="status"></span>
@@ -76,40 +78,42 @@ const KEY = Object.fromEntries(Object.entries(SORT).map(([k, v]) => [v[2], k]));
 const $ = id => document.getElementById(id), ljud = $("ljud"), vy = $("vy"), over = $("over"), cx = vy.getContext("2d"), ox = over.getContext("2d");
 const RULER = 20, FLAG = 22, LSEK = 18, LUPP = 14, LMOT = 16, TOP = RULER + FLAG + LSEK + LUPP + LMOT;   // lanernas höjder över spektrum
 let F = null, dur = 0, spec = null, marks = [], kand = { drop: [], latgrans: [] }, sel = null, v0 = 0, vd = 30, follow = true, nid = 1, klar = false;
-let undo = [], redo = [], dirty = true, saveT = 0, osparat = false, lut = new Uint32Array(256), img = null, off = document.createElement("canvas"), drag = null, lastT = -1;
+let undo = [], redo = [], dirty = true, saveT = 0, osparat = false, lutB = null, img = null, off = document.createElement("canvas"), drag = null, lastT = -1;
 const fmt = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, "0") + ":" + s.toFixed(2).padStart(5, "0"); };
 const nu = () => ljud.currentTime || 0, W = () => vy.clientWidth, H = () => vy.clientHeight, tx = t => (t - v0) / vd * W(), xt = x => v0 + x / W() * vd;
 const sorterade = () => marks.slice().sort((a, b) => a.fineS - b.fineS), status = (s, fel) => { $("status").textContent = s; $("status").className = fel ? "fel" : ""; };
 
 /* ---------- spektrum ---------- */
-function byggLut() {
-  if (!spec) return; const g = +$("ljus").value, lo = spec.lo - g, hi = Math.max(lo + 20, spec.hi - g * 0.5);
-  const S = [[0, 0, 4], [30, 12, 70], [86, 20, 110], [140, 36, 104], [196, 60, 74], [240, 112, 30], [250, 186, 40], [252, 252, 170]];
-  for (let v = 0; v < 256; v++) { const q = Math.pow(Math.max(0, Math.min(1, (v - lo) / (hi - lo))), 0.9) * (S.length - 1), i = Math.min(S.length - 2, Math.floor(q)), f = q - i;
-    const r = S[i][0] + (S[i + 1][0] - S[i][0]) * f, gg = S[i][1] + (S[i + 1][1] - S[i][1]) * f, b = S[i][2] + (S[i + 1][2] - S[i][2]) * f; lut[v] = (255 << 24) | (b << 16) | (gg << 8) | r; }
+function byggLut() {   // en färgskala per band: bandets egen botten och topp (utjämning) blandad med hela bildens
+  if (!spec) return; const g = +$("ljus").value, gam = +$("kontrast").value / 100, mix = $("jamna").checked ? 0.85 : 0, nb = spec.nb;
+  const S = [[0, 0, 4], [22, 11, 58], [70, 16, 110], [128, 31, 108], [188, 55, 80], [236, 104, 36], [250, 180, 36], [252, 252, 176]];
+  if (!lutB || lutB.length !== nb * 256) lutB = new Uint32Array(nb * 256);
+  for (let k = 0; k < nb; k++) { const lo = spec.lo + (spec.blo[k] - spec.lo) * mix - g, hi = Math.max(lo + 12, spec.hi + (spec.bhi[k] - spec.hi) * mix - g * 0.5);
+    for (let v = 0; v < 256; v++) { const q = Math.pow(Math.max(0, Math.min(1, (v - lo) / (hi - lo))), gam) * (S.length - 1), i = Math.min(S.length - 2, Math.floor(q)), f = q - i;
+      const r = S[i][0] + (S[i + 1][0] - S[i][0]) * f, gg = S[i][1] + (S[i + 1][1] - S[i][1]) * f, b = S[i][2] + (S[i + 1][2] - S[i][2]) * f; lutB[(k << 8) | v] = (255 << 24) | (b << 16) | (gg << 8) | r; } }
   dirty = true;
 }
 function tolka(buf) {
-  const dv = new DataView(buf), cols = dv.getUint32(0, true), nb = dv.getUint32(4, true), cps = dv.getFloat32(8, true), t0 = dv.getFloat32(12, true), flo = dv.getFloat32(16, true), fhi = dv.getFloat32(20, true);
-  const lv = [new Uint8Array(buf, 24, cols * nb)], n = [cols];
-  while (n[n.length - 1] > 1500) { const a = lv[lv.length - 1], m = n[n.length - 1] >> 1, b = new Uint8Array(m * nb);
-    for (let c = 0; c < m; c++) for (let k = 0; k < nb; k++) { const x = a[2 * c * nb + k], y = a[(2 * c + 1) * nb + k]; b[c * nb + k] = x > y ? x : y; } lv.push(b); n.push(m); }
-  const hist = new Uint32Array(256); let tot = 0; for (let c = 0; c < cols; c += 37) for (let k = 0; k < nb; k++) { hist[lv[0][c * nb + k]]++; tot++; }
-  let lo = 0, hi = 255, s = 0; for (let v = 0; v < 256; v++) { s += hist[v]; if (s < tot * 0.10) lo = v; if (s < tot * 0.998) hi = v; }
-  const fb = k => flo * Math.pow(fhi / flo, (k + 0.5) / nb), kb = []; for (let k = 0; k < nb; k++) if (fb(k) >= 30 && fb(k) <= 150) kb.push(k);
-  const K = Math.max(1, Math.round(cps / 20)), nk = Math.floor(cols / K), bas = new Float32Array(nk), niv = new Float32Array(nk);   // kurvor i 20 Hz: bas 30-150 Hz och hela nivån
-  for (let i = 0; i < nk; i++) { let sb = 0, sa = 0; for (let c = i * K; c < (i + 1) * K; c++) { for (const k of kb) sb += lv[0][c * nb + k]; for (let k = 0; k < nb; k++) sa += lv[0][c * nb + k]; } bas[i] = sb / (K * kb.length); niv[i] = sa / (K * nb); }
-  return { cols, nb, cps, t0, flo, fhi, lv, n, lo, hi, bas, niv, kps: cps / K, fb };
+  const dv = new DataView(buf), cols = dv.getUint32(0, true), nb = dv.getUint32(4, true), cps = dv.getFloat32(8, true), t0 = dv.getFloat32(12, true), flo = dv.getFloat32(16, true), fhi = dv.getFloat32(20, true), R = nb + dv.getUint32(24, true);
+  const lv = [new Uint8Array(buf, 28, cols * R)], n = [cols];
+  while (n[n.length - 1] > 1500) { const a = lv[lv.length - 1], m = n[n.length - 1] >> 1, b = new Uint8Array(m * R);
+    for (let c = 0; c < m; c++) for (let k = 0; k < R; k++) { const x = a[2 * c * R + k], y = a[(2 * c + 1) * R + k]; b[c * R + k] = x > y ? x : y; } lv.push(b); n.push(m); }
+  const hist = new Uint32Array(R * 256), steg = Math.max(1, Math.floor(cols / 4000)); let antal = 0; for (let c = 0; c < cols; c += steg) { for (let k = 0; k < R; k++) hist[(k << 8) | lv[0][c * R + k]]++; antal++; }
+  const pct = (k, p) => { let s = 0; for (let v = 0; v < 256; v++) { s += hist[(k << 8) | v]; if (s >= antal * p) return v; } return 255; };
+  const blo = new Float32Array(nb), bhi = new Float32Array(nb); let lo = 0, hi = 0; for (let k = 0; k < nb; k++) { blo[k] = pct(k, 0.30); bhi[k] = pct(k, 0.998); lo += blo[k] / nb; hi += bhi[k] / nb; }
+  const K = Math.max(1, Math.round(cps / 50)), nk = Math.floor(cols / K), bas = new Float32Array(nk), niv = new Float32Array(nk);   // kurvor i 50 Hz: basen 30-150 Hz och hela nivån
+  for (let i = 0; i < nk; i++) { let sb = 0, sa = 0; for (let c = i * K; c < (i + 1) * K; c++) { const x = lv[0][c * R + nb], y = lv[0][c * R + nb + 1]; if (x > sb) sb = x; if (y > sa) sa = y; } bas[i] = sb; niv[i] = sa; }
+  return { cols, nb, R, cps, t0, flo, fhi, lv, n, lo, hi, blo, bhi, bas, niv, kps: cps / K, klo: pct(nb, 0.05), khi: pct(nb, 0.9995), nlo: pct(nb + 1, 0.05), nhi: pct(nb + 1, 0.9995) };
 }
 function ritaSpektrum(x0, y0, w, h) {
   if (!spec || w < 2 || h < 2) return; const nb = spec.nb;
   let L = 0; while (L + 1 < spec.lv.length && vd * spec.cps / w > (2 << L)) L++;
-  const a = spec.lv[L], n = spec.n[L], cps = spec.cps / (1 << L);
+  const a = spec.lv[L], n = spec.n[L], cps = spec.cps / (1 << L), R = spec.R;
   if (!img || img.width !== w) { off.width = w; off.height = nb; img = new ImageData(w, nb); }
-  const px = new Uint32Array(img.data.buffer), k0 = (v0 - spec.t0) * cps, kd = vd / w * cps, tom = lut[0];
+  const px = new Uint32Array(img.data.buffer), k0 = (v0 - spec.t0) * cps, kd = vd / w * cps, tom = lutB[0];
   for (let x = 0; x < w; x++) { const c = Math.floor(k0 + x * kd), c1 = Math.min(n, Math.max(c + 1, Math.floor(k0 + (x + 1) * kd)));
     if (c < 0 || c >= n) { for (let k = 0; k < nb; k++) px[k * w + x] = tom; continue; }
-    for (let k = 0; k < nb; k++) { let v = a[c * nb + k]; for (let q = c + 1; q < c1; q++) { const y = a[q * nb + k]; if (y > v) v = y; } px[(nb - 1 - k) * w + x] = lut[v]; } }
+    for (let k = 0; k < nb; k++) { let v = a[c * R + k]; for (let q = c + 1; q < c1; q++) { const y = a[q * R + k]; if (y > v) v = y; } px[(nb - 1 - k) * w + x] = lutB[(k << 8) | v]; } }
   off.getContext("2d").putImageData(img, 0, 0); cx.imageSmoothingEnabled = true; cx.drawImage(off, 0, 0, w, nb, x0, y0, w, h);
 }
 
@@ -132,7 +136,7 @@ function rita() {
     cx.fillStyle = "rgba(255,255,255,.75)"; cx.textAlign = "left";
     for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) { const y = TOP + sh * (1 - Math.log(f / spec.flo) / Math.log(spec.fhi / spec.flo)); cx.fillRect(0, y, 5, 1); cx.fillText(f >= 1000 ? f / 1000 + " k" : f, 8, y); }
     cx.beginPath(); cx.strokeStyle = "rgba(120,220,255,.9)"; cx.lineWidth = 1.3; let forst = true;
-    for (let x = 0; x < w; x += 2) { const i = Math.round((xt(x) - spec.t0) * spec.kps); if (i < 0 || i >= spec.bas.length) continue; const y = TOP + sh - 4 - (spec.bas[i] - spec.lo) / (spec.hi - spec.lo) * sh * 0.3; if (forst) { cx.moveTo(x, y); forst = false; } else cx.lineTo(x, y); }
+    for (let x = 0; x < w; x += 2) { const i = Math.round((xt(x) - spec.t0) * spec.kps); if (i < 0 || i >= spec.bas.length) continue; const y = TOP + sh - 4 - Math.max(0, Math.min(1, (spec.bas[i] - spec.klo) / (spec.khi - spec.klo))) * sh * 0.3; if (forst) { cx.moveTo(x, y); forst = false; } else cx.lineTo(x, y); }
     cx.stroke();
   }
   // tidslinjal
@@ -161,9 +165,9 @@ function ritaOver() {
   const dpr = window.devicePixelRatio || 1, w = over.clientWidth, h = over.clientHeight;
   if (over.width !== Math.round(w * dpr) || over.height !== Math.round(h * dpr)) { over.width = Math.round(w * dpr); over.height = Math.round(h * dpr); }
   ox.setTransform(dpr, 0, 0, dpr, 0, 0); ox.fillStyle = "#101216"; ox.fillRect(0, 0, w, h); if (!spec || !dur) return;
-  const kurva = (a, farg) => { ox.fillStyle = farg; for (let x = 0; x < w; x++) { const i0 = Math.floor(x / w * a.length), i1 = Math.max(i0 + 1, Math.floor((x + 1) / w * a.length)); let v = 0; for (let i = i0; i < i1 && i < a.length; i++) if (a[i] > v) v = a[i];
-    const y = Math.max(0, Math.min(1, (v - spec.lo) / (spec.hi - spec.lo))) * (h - 4); ox.fillRect(x, h - y, 1, y); } };
-  kurva(spec.niv, "#3a4150"); kurva(spec.bas, "rgba(255,150,40,.55)");
+  const kurva = (a, farg, lo, hi) => { ox.fillStyle = farg; for (let x = 0; x < w; x++) { const i0 = Math.floor(x / w * a.length), i1 = Math.max(i0 + 1, Math.floor((x + 1) / w * a.length)); let v = 0; for (let i = i0; i < i1 && i < a.length; i++) if (a[i] > v) v = a[i];
+    const y = Math.max(0, Math.min(1, (v - lo) / (hi - lo))) * (h - 4); ox.fillRect(x, h - y, 1, y); } };
+  kurva(spec.niv, "#3a4150", spec.nlo, spec.nhi); kurva(spec.bas, "rgba(255,150,40,.55)", spec.klo, spec.khi);
   for (const m of marks) { if (m.skip) continue; const s = SORT[m.kind]; ox.fillStyle = s[3]; ox.fillRect(m.fineS / dur * w - 1, s[4] === "p" ? 0 : h - 10, 2, s[4] === "p" ? h : 10); }
   for (const t of kand.drop || []) if (!traffad(t)) { ox.fillStyle = "#ff8c1a"; ox.fillRect(t / dur * w - 1, 0, 2, 6); }
   ox.strokeStyle = "#fff"; ox.lineWidth = 1.5; ox.strokeRect(v0 / dur * w + 0.5, 0.75, Math.max(3, vd / dur * w - 1), h - 1.5);
@@ -245,7 +249,8 @@ ljud.onplay = () => { $("spela").textContent = "⏸ Pausa"; valj(null); }; ljud.
 $("fart").onchange = e => { ljud.playbackRate = +e.target.value; e.target.blur(); };
 $("zin").onclick = () => zoom(1 / 1.6); $("zut").onclick = () => zoom(1.6); $("zhel").onclick = () => vyn(0, dur);
 $("folj").onclick = () => { follow = !follow; $("folj").classList.toggle("pa", follow); $("folj").blur(); };
-$("ljus").oninput = byggLut; $("ljus").onchange = e => e.target.blur();
+for (const id of ["ljus", "kontrast"]) { $(id).oninput = byggLut; $(id).onchange = e => e.target.blur(); }
+$("jamna").onchange = e => { byggLut(); e.target.blur(); };
 $("nasta").onclick = () => { nastaOmarkerad(); $("nasta").blur(); };
 $("klar").onchange = e => { klar = e.target.checked; efter(); e.target.blur(); };
 
