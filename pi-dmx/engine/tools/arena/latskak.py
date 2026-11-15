@@ -18,7 +18,7 @@ def kor(arg):
     return (mapp, wav, off, json.load(open(ut, encoding='utf-8')), '')
 if __name__ == '__main__':
     a = [x for i, x in enumerate(sys.argv[1:]) if not x.startswith('--') and sys.argv[i] != '--wav']; hold = '--holdout' in sys.argv or '--wav' in sys.argv; korn = os.path.abspath(a[0]); ids = a[1:]
-    wavs = [sys.argv[sys.argv.index('--wav') + 1]] if '--wav' in sys.argv else latdom.KONTROLL if hold else latdom.OVNING; beats = latdom.facit_beats(); skarv = json.load(open(os.path.join(E, latdom.W, 'latbyten.json'), encoding='utf-8'))
+    wavs = [sys.argv[sys.argv.index('--wav') + 1]] if '--wav' in sys.argv else latdom.KONTROLL if hold else latdom.OVNING; beats = latdom.facit_beats(); skarv = latdom.skarvar()
     jobb = [(os.path.join(korn, i), w, o) for i in ids for w in wavs for o in OFFS]
     with ThreadPoolExecutor(max_workers=4) as ex: res = list(ex.map(kor, jobb))
     ut = {}

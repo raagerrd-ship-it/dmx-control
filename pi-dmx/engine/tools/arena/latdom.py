@@ -7,7 +7,8 @@ Måtten, vikterna, spärrarna och mängderna ändras inte under körningen. Bara
 FACIT
   TEMPO  tools/ladan-2026-11-13/beatthis.jsonl - slagen ur Beat This! (lokal slagföljare, körd på hela inspelningen i efterhand).
          Facit vid tiden t = 60 / medianen av slagintervallen inom +-4 s (minst 6 slag). Varje halv sekund döms.
-  LÅTBYTEN  tools/ladan-2026-11-13/latbyten.json - skarvarna (s) ur tempots hopp i facit + ägarens Låtbyte-tryck.
+  LÅTBYTEN  tools/ladan-2026-11-13/latbyten.json - skarvarna (s) ur tempots hopp i facit + ägarens Låtbyte-tryck; ägarens genomgång
+            (marks-hand.json, klar) går före (skarvar(), 2026-11-15).
 MÄNGDER
   ÖVNING   lang-20261113T160345.wav (603 s, låtbyten ~265 och ~406 s)  +  lang-20261113T171840.wav (300 s, ~130 och ~272 s)
   KONTROLL lang-20261113T151659.wav (532 s, två låtbyten) - körs bara av orkestratorn (--holdout). Deltagare får varken spela, läsa,
@@ -65,6 +66,17 @@ def las_ko():
                 except OSError: pass
             time.sleep(2)
 
+def skarvar():
+    """låtbytena per fil: latbyten.json, men ägarens genomgång (<fil>.marks-hand.json med klar: true) går före (2026-11-15)"""
+    sk = json.load(open(os.path.join(ENGINE, W, 'latbyten.json'), encoding='utf-8'))
+    for d in sorted(os.listdir(os.path.join(ENGINE, 'tools'))):
+        if not d.startswith('ladan-'): continue
+        for f in os.listdir(os.path.join(ENGINE, 'tools', d)):
+            if not f.endswith('.marks-hand.json'): continue
+            h = json.load(open(os.path.join(ENGINE, 'tools', d, f), encoding='utf-8'))
+            if h.get('klar'): sk[f.replace('.marks-hand.json', '.wav')] = sorted(round(m['fineS'], 2) for m in h['marks'] if m['kind'] == 'latbyte' and not m.get('skip') and not m.get('forslag'))
+    return sk
+
 def facit_beats():
     ut = {}
     for rad in open(os.path.join(ENGINE, W, 'beatthis.jsonl'), encoding='utf-8'):
@@ -112,7 +124,7 @@ def _mat(mapp, bas, holdout):
         dist = os.path.abspath(os.path.join(mapp, 'dist'))
         if not os.path.isdir(dist): raise SystemExit('saknar ' + dist + ' (kör tools/arena/bygg.py först)')
         env['DMX_DIST'] = dist; env['NODE_OPTIONS'] = '--import=file:///' + os.path.join(ENGINE, 'tools', 'arena', 'distHook.mjs').replace('\\', '/')
-    beats = facit_beats(); skarv = json.load(open(os.path.join(ENGINE, W, 'latbyten.json'), encoding='utf-8')); per = []
+    beats = facit_beats(); skarv = skarvar(); per = []
     for wav in (KONTROLL if holdout else OVNING):
         ut = os.path.join(mapp, 'latraw-' + os.path.basename(wav)[:-4] + '.json')
         r = subprocess.run(['node', 'tools/arena/latdomKor.mjs', wav, ut], cwd=ENGINE, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace')
