@@ -54,6 +54,9 @@ dropdom2 --skak på övning + kontroll (193040 måste behålla 4/4). Genomgångn
 VETO1 KLAR -> s2:s DISKANTVETO INLAGT 3478368 (ägaren "ja kör på det"): övning 27,7 -> 31,2, kontroll 36,0 -> 38,5 (193040 4/4 kvar), ägarens
 tre genomgångna: falska drop 9 -> 1, mini som drop 6 -> 1, rätt 3 -> 3 av 20. s1 (uppbyggnadsveto) tappade 1 i 193040, s4 sämre på de genomgångna.
 Lotus portad 7d532a4a EJ utlagd. LADAN kör cad739b: nästa ladanbesök = lägg ut HEAD (minidrop per lucka + diskantvetot), ägaren ser det.
+ARENAN UPP1 PÅGÅR (startad 11-15 kväll, ägaren "kör den arenan!"): uppbyggnad -> drop i motorn, flank + diskantveto låsta. Domare
+tools/arena/dropdom3.py (bas 24,4), övning 151659 + 172432 + 160345, kontroll 171840 + 193040 (+193818/200719 om ägaren blir klar).
+4 agenter u1 spektrum / u2 spänning / u3 rytm / u4 fritt. NATTAGENTEN: rör inte .arena/upp1, kör inte dropdom3.py.
 NÄSTA DROP-FRÅGA: flanken hittar bara 3 av ägarens 20 drop i de genomgångna filerna (breaken 8-12 dB under taket, flanken kräver 10 dB i 4 s).
 
 ARENAN DROP2 KLAR 2026-11-15 02:35: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-14-drop2.md (+ mappen med alla lösningar och diffar).
