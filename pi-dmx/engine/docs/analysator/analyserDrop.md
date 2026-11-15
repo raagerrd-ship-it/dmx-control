@@ -59,6 +59,11 @@ baskroppens topp (bodyFast över FLANK_HOLD_S) har legat >= FLANK_GONE_DB under 
 stigning på 0,5 s. Helt tyst (lvlSmooth <= FLANK_SILENT_LV) i breaket = låtlucka, ingen drop. Samma filter som slam-kandidaten
 (bodyFast 60 ms, bodyEnv 350 ms, bodyCeil -0,15 dB/s) - förr en egen kopia i effekterna.
 ```
+2026-11-15 kväll, FLANK_LAND_DB 6 -> 1,5 (ägaren: "Lägg in"). Flanken fyrade på basens UPPGÅNG (ofta två slag före taktettan, når -5 dB)
+i stället för på den fulla landningen där ägaren hör droppet: i hans genomgång av 193040 kom motorn 0,48-0,79 s för tidigt på 4 av 6 drop
+(171840: 0,64 s). Svep på de fem drop-filerna (ägarens fyra genomgångna + 160345), tre starter: 6/4/3 dB -> 6 av 34 rätt, 2 och 1 dB -> 10 av
+34, 0 dB -> 7. 1,5 = mitten av platån, fem starter: rätt 6 -> 10 av 34, falska 6 -> 2, minidrop som drop 3 -> 3; 193040 1 -> 4 av 6, 160345
+2 -> 3 av 9, inget sämre. Säkerhetstagg: fore-flank-land-1-5.
 
 ### FLANK_ROOF_BEATS (BORTTAGEN 2026-11-14 kväll)
 
