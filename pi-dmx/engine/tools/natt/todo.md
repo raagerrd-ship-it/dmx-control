@@ -1,5 +1,31 @@
 # Natt-agentens uppdrag
 
+NATTEN 2026-11-15 03:00 (schemalagda körningen, ingen motorkod ändrad, ingen arena):
+KLART 2026-11-15: "bygg om ljusdomarens fillistor ... och mät bas" (NÄSTA FÖR NATTAGENTEN 11-14) - LJUSDOMAREN GÅR IGEN PÅ RENT LJUD.
+  tools/arena/bank.py: ÖVNING = l160345, l151659, l171840 (11-13), KONTROLL (--holdout) = l193818, l193040, l200719 (11-14), 300 s var, lika vikt;
+  dynSet (arkiverade klipp) hoppas över - domaren dömer då dynamiken på slagK + djup. En bänk 47 s. En oförändrad kopia = exakt 0,0 på båda.
+  MÄTFÄLLA 57: konsertReplays spår bar bara lampa 1-4 av ladans åtta -> rytm.py (domarens mått) såg halva riggen. Rättat: --trace-alla lägger
+  lampa 5.. i kolumn 10 och uppåt (rytm.py skickar flaggan, summan skalas till fyra lampor så golven gäller); ljusLag.py och efterDrop.py läser
+  fortfarande 10 kolumner = lampa 1-4 (ej bytta). konsertReplays kolumn light delas nu med antalet lampor (var fast 4).
+  BAS (HEAD a05c539, .arena/natt1115/bas): övning rA 0,51 / 0,45 / 0,38, rK 0,44 / 0,33 / 0,34, slagK 0,50 / 0,54 / 0,43, t90 10 / 15 / 10 ms;
+  kontroll rA 0,28 / 0,39 / 0,24, rK 0,22 / 0,17 / 0,22, slagK 0,33 / 0,49 / 0,47, t90 40 / 40 / 20 ms (ljuset följer basen sämre på 11-14-musiken).
+  Körning: mkdir .arena/<namn>/bas; python tools/arena/bank.py .arena/<namn>/bas --bas [--holdout]; deltagare: src-kopia + bygg.py + bank.py; domare.py <körning> [--holdout].
+BASLINJE (tools/natt/ren-2026-11-15/, showTight + concertBench med ladans config; 151659 / 160345 / 171840 mot 11-14, sedan 193040 / 193818 / 200719):
+  looker 6->13 / 7->12 / 4->8 / 12 / 33 / 27 (låtgränserna ger nytt manus), längsta stund i en look 175->129 / 151->151 / 47->47 / 44 / 104 / 126 s,
+  byte på frasgräns 24->17 / 19->16 / 13->11 / 8 / 23 / 17 %, kick->ljus 136->139 / 141->123 / 85->144 / 155 / 93 / 133 ms (17:18: lookvalet minnet ->
+  kickregn), släckt 0,0 / 1,5 / 0,1 / 1,8 / 0,4 / 1,0 %, låtgränser 2 / 2 / 2 / 3 / 7 / 13 (200719: 7 markerade - de kända falska i uppbyggnaderna).
+  Livstecken på de tre 11-13-filerna: 83 fält, 0 oväntat döda (tools/natt/livstecken-2026-11-15.txt).
+BRISTER: (1) byte på frasgräns 8-23 % = slumpnivå (12-19 %); (2) en look >= 2 min i tre filer (kickregn 151 s, gallop 129 s, tryckvag 126 s);
+  (3) 200719 13 låtgränser mot 7 (kandidaten P_GAP_MS väntar på ägaren).
+IDÉ, FÖRKASTAD: SWITCH_ON 1 -> 4 (sektionens lookbyte väntar in takt-ettan, högst 5 slag). Domaren -0,7 övning / -2,0 kontroll (koreografi -3,2 / -6,9),
+  frasträffen 17/16/11/8/23/17 -> 10/12/12/13/24/20 % (medel 15 -> 15). Föll också 10-25 med gamla klockan; nya klockan räddar den inte. Pröva inte igen
+  utan att först mäta VILKA byten som går genom slaggrinden (drop-, build- och låtgränsbyten går förbi den).
+KLART 2026-11-15: lang-20261113T172432.wav lagad som KOPIA: tools/ladan-2026-11-13/lang-20261113T172432-lagad.wav (1840 s, inspelningskoll OK:
+  topp 0,47, klippt 0 %, toppfaktor 11,8 dB). Originalet orört. Omarkerad - kan användas för klocka/låtgräns utan facit.
+NÄSTA FÖR NATTAGENTEN: (a) mät vilka lookbyten som passerar slaggrinden och var de hamnar i frasen (konsertReplay --slag) innan något nytt prov
+  om frasbundna byten; (b) byt ljusLag.py/efterDrop.py till --trace-alla om de ska användas; (c) ingen arena utan ARENA-uppdrag.
+
+
 ARENAN DROP2 KLAR 2026-11-15 02:35: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-14-drop2.md (+ mappen med alla lösningar och diffar).
 Övning (160345 + 151659 + 193818): bas 29,2 -> deltagarna 39-59, jokern 68,7 (identisk i fem starter). KONTROLL (193040 + 200719, medel av fem
 starter): bas 36,0 (4/4 + 0/4 drop) mot jokern 22,2 (0/4 + 0/4), a6 22,2, a1 22,1, a2 22,0, a5 20,0. Alla bytte ut dagens flank och tappade dess

@@ -1,0 +1,35 @@
+[quiet] console.log avstangd (DMX_QUIET=1) - PUT /api/debug/verbose {"enabled":true} slar pa
+
+=== tools/ladan-2026-11-13/lang-20261113T171840.wav  0-300 s, 11250 rutor a 25 ms ===
+
+TAJT MOT LATEN
+  kick -> lampan pa mal 144 ms (median, p75 195, 2212 lampuppgangar; gamla riggmedel 90 %: 150 ms, fonster 200 ms vid 135 BPM) pa 338/891 kickar = 37.9 %
+  uppgangens storlek 0.13 av riggens 0-1 skala
+  ljus mot energi    r 0.55 pa 1 s-MEDEL, 0.49 pa 1 s-TOPP (ruta-mot-ruta 0.43), ljus mot niva r 0.50
+  ljus per tier      lugn 0.13/0.20  fart 0.26/0.44  full 0.34/0.49  (medel/topp, 96/109/76 s)
+  look-byten         16 st = 3.20/min, musikalisk orsak 100.0 %
+                     sektion 13  drop 3
+  drops              4 st, sprang lugna 0.75 (4 st) / hoga   -
+
+SNYGG LJUSSHOW
+  alla tre dioderna  1.6 % av tanda lamprutor   exakt en kanal 40.5 %
+  mattnad (median)   1.00      spridning mellan lampor 61 DMX-steg
+  lookar             8 distinkta, median 12 s, langsta stund 47 s
+  riggens ljus       p10 0.08  p50 0.22  p90 0.46   slackt 0.1 % av tiden
+
+-- dirigenten (65 rader, 12 forsta) --
+   [dirigent] nastan-drop: sprang 26.9 dB efter dipp 27.5 dB
+   [dirigent] sektion intro -> high (nr 1, tier 1)
+   [dirigent] manus high: tydlig basgang (0.90, 3 toggles) -> "minnet"
+   [dirigent] sektion high -> low (nr 1, tier 0)
+   [dirigent] manus low: last takt (tillit 0.93, 3 toggles) -> "basgang"
+   [dirigent] nastan-drop: sprang 32.4 dB efter dipp 33.0 dB
+   [dirigent] manus high: "minnet" igen
+   [dirigent] sektion low -> high (nr 2, tier 2)
+   [dirigent] nastan-drop: sprang 40.2 dB efter dipp 27.9 dB
+   [dirigent] nastan-drop: sprang 22.5 dB efter dipp 10.2 dB
+   [dirigent] nastan-drop: sprang 20.9 dB efter dipp 12.8 dB
+   [dirigent] nastan-drop: sprang 10.8 dB efter dipp 11.6 dB
+
+TAJT = kick->ljus lagt, kickTraff hogt, r hogt, musikByten hogt. SNYGGT = alla3 lagt, mattnad och lampspr hoga,
+flera lookar utan langa stillastaende stunder, och ett ljusspann som anvands. Jamfor natt mot natt, aldrig i absoluta tal.
