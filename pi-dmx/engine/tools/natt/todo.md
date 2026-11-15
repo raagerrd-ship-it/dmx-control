@@ -67,6 +67,8 @@ FLANKEN LANDAR PÅ FULL BAS, INLAGT 90ba633 (ägaren "Lägg in", 11-15 kväll): 
 (på basens uppgång). Fem drop-filer, fem starter: rätt 6 -> 10 av 34, falska 6 -> 2. Lotus portad 128f7882 EJ utlagd. Ägaren gick igenom
 193040 (6 drop, 3 mini, klar) - filen KLIPPT vid 06:05.50 (original -oklippt.wav). Förslag (forslag_full.py) ligger i 200719, ogenomgånget.
 LADAN nästa besök: lägg ut HEAD = minidrop per lucka + diskantvetot + flanken 1,5 dB (ladan kör cad739b).
+SVEP efter 1,5 dB (fem filer, tre starter): diskantvetot -1/-2/-3 dB och FLANK_BREAK_S 3/2,5/2 s gav INGET bättre (veto -2: +1 rätt men
++2 falska, +1 mini som drop; break kortare: oförändrat - 00:43.70 i 151659 stoppas av annat). HEAD står kvar. .arena/landa/svep.py.
 NÄSTA DROP-FRÅGA: flanken hittar bara 3 av ägarens 20 drop i de genomgångna filerna (breaken 8-12 dB under taket, flanken kräver 10 dB i 4 s).
 
 ARENAN DROP2 KLAR 2026-11-15 02:35: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-14-drop2.md (+ mappen med alla lösningar och diffar).
