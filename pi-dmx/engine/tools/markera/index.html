@@ -52,9 +52,12 @@
   <label>Hastighet <select id="fart"><option value="0.5">0,5×</option><option value="0.75">0,75×</option><option value="1" selected>1×</option></select></label>
   <label>Zoom <button id="zut" title="Zooma ut (−)">−</button><button id="zin" title="Zooma in (+)">+</button><button id="zhel" title="Visa hela inspelningen">Hela</button></label>
   <button id="folj" class="pa" title="Bilden följer uppspelningen (F)">Följ</button>
+  <label>Visa <select id="visa" title="Energi = hela nivån, basen, mellanregistret och diskanten som kurvor. Spektrum = alla frekvenser (V växlar)"><option value="energi">Energi</option><option value="spektrum">Spektrum</option></select></label>
+  <span id="spk" style="display:contents">
   <label>Ljusstyrka <input type="range" id="ljus" min="-40" max="40" value="0" style="width:90px"></label>
   <label>Kontrast <input type="range" id="kontrast" min="60" max="260" value="125" style="width:90px"></label>
   <label title="Varje frekvensband får sin egen ljusskala, så att svaga band (diskanten) syns lika tydligt som starka"><input type="checkbox" id="jamna" checked> Utjämna band</label>
+  </span>
   <button id="nasta" title="Hoppa till nästa ställe där motorn slog utan markering (N; med ett förslag valt: nästa i den raden)">Nästa omarkerade</button>
   <label><input type="checkbox" id="klar"> Genomgången klar</label>
   <span id="status"></span>
@@ -80,6 +83,7 @@ const KEY = Object.fromEntries(Object.entries(SORT).map(([k, v]) => [v[2], k]));
 const $ = id => document.getElementById(id), ljud = $("ljud"), vy = $("vy"), over = $("over"), cx = vy.getContext("2d"), ox = over.getContext("2d");
 const RULER = 20, FLAG = 22, LSEK = 18, LUPP = 14, ROWH = 19, EGNA = RULER + FLAG + LSEK + LUPP; let TOP = EGNA;   // höjder över spektrum: linjal, ägarens flaggor/sektioner/uppbyggnader, sedan en rad per analys
 let F = null, dur = 0, spec = null, marks = [], kand = { drop: [], latgrans: [] }, rader = [], asel = null, sel = null, v0 = 0, vd = 30, follow = true, nid = 1, klar = false;
+let vyLage = localStorage.getItem("markera.vy") || "energi";
 let undo = [], redo = [], dirty = true, saveT = 0, osparat = false, lutB = null, img = null, off = document.createElement("canvas"), drag = null, lastT = -1;
 const fmt = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, "0") + ":" + s.toFixed(2).padStart(5, "0"); };
 const nu = () => ljud.currentTime || 0, W = () => vy.clientWidth, H = () => vy.clientHeight, tx = t => (t - v0) / vd * W(), xt = x => v0 + x / W() * vd;
@@ -103,9 +107,23 @@ function tolka(buf) {
   const hist = new Uint32Array(R * 256), steg = Math.max(1, Math.floor(cols / 4000)); let antal = 0; for (let c = 0; c < cols; c += steg) { for (let k = 0; k < R; k++) hist[(k << 8) | lv[0][c * R + k]]++; antal++; }
   const pct = (k, p) => { let s = 0; for (let v = 0; v < 256; v++) { s += hist[(k << 8) | v]; if (s >= antal * p) return v; } return 255; };
   const blo = new Float32Array(nb), bhi = new Float32Array(nb); let lo = 0, hi = 0; for (let k = 0; k < nb; k++) { blo[k] = pct(k, 0.30); bhi[k] = pct(k, 0.998); lo += blo[k] / nb; hi += bhi[k] / nb; }
-  const K = Math.max(1, Math.round(cps / 50)), nk = Math.floor(cols / K), bas = new Float32Array(nk), niv = new Float32Array(nk);   // kurvor i 50 Hz: basen 30-150 Hz och hela nivån
-  for (let i = 0; i < nk; i++) { let sb = 0, sa = 0; for (let c = i * K; c < (i + 1) * K; c++) { const x = lv[0][c * R + nb], y = lv[0][c * R + nb + 1]; if (x > sb) sb = x; if (y > sa) sa = y; } bas[i] = sb; niv[i] = sa; }
-  return { cols, nb, R, cps, t0, flo, fhi, lv, n, lo, hi, blo, bhi, bas, niv, kps: cps / K, klo: pct(nb, 0.05), khi: pct(nb, 0.9995), nlo: pct(nb + 1, 0.05), nhi: pct(nb + 1, 0.9995) };
+  const fb = k => flo * Math.pow(fhi / flo, (k + 0.5) / nb), km = [], kd = []; for (let k = 0; k < nb; k++) { const f = fb(k); if (f >= 600 && f < 3000) km.push(k); else if (f >= 3000) kd.push(k); }
+  const bas = new Float32Array(cols), niv = new Float32Array(cols), mel = new Float32Array(cols), dis = new Float32Array(cols);   // energikurvor, en punkt per kolumn: basen 30-150 Hz, hela nivån, mellan 600 Hz-3 kHz, diskant 3-16 kHz
+  for (let c = 0; c < cols; c++) { const o = c * R; bas[c] = lv[0][o + nb]; niv[c] = lv[0][o + nb + 1]; let a = 0, b = 0; for (const k of km) a += lv[0][o + k]; for (const k of kd) b += lv[0][o + k]; mel[c] = a / km.length; dis[c] = b / kd.length; }
+  const gr = a => { const q = Float32Array.from({ length: Math.min(a.length, 5000) }, (_, i) => a[Math.floor(i * a.length / Math.min(a.length, 5000))]).sort(); return [q[Math.floor(q.length * 0.05)], q[Math.floor(q.length * 0.999)]]; };
+  const [mlo, mhi] = gr(mel), [dlo, dhi] = gr(dis);
+  return { cols, nb, R, cps, t0, flo, fhi, lv, n, lo, hi, blo, bhi, bas, niv, mel, dis, mlo, mhi, dlo, dhi, kps: cps, klo: pct(nb, 0.05), khi: pct(nb, 0.9995), nlo: pct(nb + 1, 0.05), nhi: pct(nb + 1, 0.9995) };
+}
+function ritaEnergi(y0, w, h) {   // den förenklade huvudvyn: samma kurvor som översikten, stora och zoombara
+  const L = [[0.56, "Hela nivån (grå) och basen 30–150 Hz (orange)", [[spec.niv, spec.nlo, spec.nhi, "#56606f"], [spec.bas, spec.klo, spec.khi, "rgba(255,150,40,.88)"]]],
+    [0.22, "Mellanregistret 600 Hz–3 kHz", [[spec.mel, spec.mlo, spec.mhi, "#d65fa8"]]], [0.22, "Diskanten 3–16 kHz", [[spec.dis, spec.dlo, spec.dhi, "#4fc3e8"]]]];
+  const k0 = (v0 - spec.t0) * spec.kps, kd = vd / w * spec.kps; let y = y0;
+  for (const [andel, namn, kurvor] of L) { const hh = Math.round(h * andel); cx.fillStyle = "#0d0f12"; cx.fillRect(0, y, w, hh - 3);
+    for (const [a, lo, hi, farg] of kurvor) { cx.fillStyle = farg;
+      for (let x = 0; x < w; x++) { const p = k0 + x * kd, i0 = Math.floor(p); if (i0 < 0 || i0 >= a.length - 1) continue; let v;
+        if (kd < 1) v = a[i0] + (a[i0 + 1] - a[i0]) * (p - i0); else { v = 0; const i1 = Math.min(a.length, Math.max(i0 + 1, Math.floor(p + kd))); for (let i = i0; i < i1; i++) if (a[i] > v) v = a[i]; }
+        const yy = Math.max(0, Math.min(1, (v - lo) / (hi - lo))) * (hh - 10); cx.fillRect(x, y + hh - 3 - yy, 1, yy); } }
+    cx.fillStyle = "rgba(255,255,255,.72)"; cx.textAlign = "left"; cx.fillText(namn, 8, y + 9); y += hh; }
 }
 function ritaSpektrum(x0, y0, w, h) {
   if (!spec || w < 2 || h < 2) return; const nb = spec.nb;
@@ -159,8 +177,9 @@ function rita() {
   const dpr = window.devicePixelRatio || 1, w = W(), h = H();
   if (vy.width !== Math.round(w * dpr) || vy.height !== Math.round(h * dpr)) { vy.width = Math.round(w * dpr); vy.height = Math.round(h * dpr); }
   cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.fillStyle = "#14161a"; cx.fillRect(0, 0, w, h); cx.textBaseline = "middle"; cx.font = "11px system-ui, sans-serif";
-  const sh = h - TOP; ritaSpektrum(0, TOP, w, sh);
-  if (spec) {   // frekvensskala + baskurva
+  const sh = h - TOP;
+  if (spec && vyLage === "energi") ritaEnergi(TOP, w, sh);
+  else if (spec) { ritaSpektrum(0, TOP, w, sh);   // frekvensskala + baskurva
     cx.fillStyle = "rgba(255,255,255,.75)"; cx.textAlign = "left";
     for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) { const y = TOP + sh * (1 - Math.log(f / spec.flo) / Math.log(spec.fhi / spec.flo)); cx.fillRect(0, y, 5, 1); cx.fillText(f >= 1000 ? f / 1000 + " k" : f, 8, y); }
     cx.beginPath(); cx.strokeStyle = "rgba(120,220,255,.9)"; cx.lineWidth = 1.3; let forst = true;
@@ -247,7 +266,7 @@ function hjalp() {
   if (asel) { const m = asel.m; $("hjalp").innerHTML = `<b>${sakra(asel.R.namn)}: ${sakra(m.etikett || SORT[m.kind][0])} ${fmt(m.fineS)}</b>${m.why ? " (" + sakra(m.why) + ")" : ""} — ${m.tagen ? "finns redan bland dina" : "<kbd>G</kbd> eller dubbelklick tar in den bland dina"} · <kbd>Skift</kbd>+<kbd>G</kbd> tar in allt i raden · <kbd>N</kbd> nästa i raden · <kbd>Enter</kbd> spelar från 2 s före · <kbd>Esc</kbd> släpper`; return; }
   $("hjalp").innerHTML = sel
     ? `<b>Vald: ${SORT[sel.kind][0]} ${fmt(sel.fineS)}${sel.forslag ? " (förslag" + (sel.why ? ": " + sel.why.replace(/[<>&]/g, "") : "") + ")" : ""}</b> — ${sel.forslag ? "<kbd>G</kbd> godtar · " : ""}dra flaggan eller <kbd>←</kbd> <kbd>→</kbd> flyttar 10 ms (<kbd>Skift</kbd> 100 ms) · sorttangent byter sort · <kbd>Delete</kbd> tar bort · <kbd>Enter</kbd> spelar från 2 s före · <kbd>Esc</kbd> släpper · <kbd>Tab</kbd> nästa`
-    : `<kbd>Mellanslag</kbd> spela/pausa · sorttangent sätter markering vid den vita markören · klick i en analysrad väljer ett förslag (<kbd>G</kbd> tar in det) · klick i spektrum flyttar markören, dra = panorera, hjul = zooma · <kbd>←</kbd> <kbd>→</kbd> 1 s (<kbd>Skift</kbd> 5 s) · <kbd>,</kbd> <kbd>.</kbd> 20 ms · <kbd>Tab</kbd> nästa markering · <kbd>N</kbd> nästa omarkerade · <kbd>Ctrl</kbd>+<kbd>Z</kbd> ångra`;
+    : `<kbd>Mellanslag</kbd> spela/pausa · sorttangent sätter markering vid den vita markören · klick i en analysrad väljer ett förslag (<kbd>G</kbd> tar in det) · klick i bilden flyttar markören, dra = panorera, hjul = zooma · <kbd>V</kbd> energi/spektrum · <kbd>←</kbd> <kbd>→</kbd> 1 s (<kbd>Skift</kbd> 5 s) · <kbd>,</kbd> <kbd>.</kbd> 20 ms · <kbd>Tab</kbd> nästa markering · <kbd>N</kbd> nästa omarkerade · <kbd>Ctrl</kbd>+<kbd>Z</kbd> ångra`;
 }
 
 /* ---------- laddning ---------- */
@@ -286,6 +305,8 @@ $("zin").onclick = () => zoom(1 / 1.6); $("zut").onclick = () => zoom(1.6); $("z
 $("folj").onclick = () => { follow = !follow; $("folj").classList.toggle("pa", follow); $("folj").blur(); };
 for (const id of ["ljus", "kontrast"]) { $(id).oninput = byggLut; $(id).onchange = e => e.target.blur(); }
 $("jamna").onchange = e => { byggLut(); e.target.blur(); };
+function sattVy(v) { vyLage = v; localStorage.setItem("markera.vy", v); $("visa").value = v; $("spk").style.display = v === "spektrum" ? "contents" : "none"; dirty = true; }
+$("visa").onchange = e => { sattVy(e.target.value); e.target.blur(); }; sattVy(vyLage === "spektrum" ? "spektrum" : "energi");
 $("nasta").onclick = () => { nastaOmarkerad(); $("nasta").blur(); };
 $("klar").onchange = e => { klar = e.target.checked; efter(); e.target.blur(); };
 
@@ -337,6 +358,7 @@ document.addEventListener("keydown", e => {
   if (k === "+" || k === "=") return zoom(1 / 1.6);
   if (k === "-") return zoom(1.6);
   if (lk === "f") return $("folj").click();
+  if (lk === "v") return sattVy(vyLage === "energi" ? "spektrum" : "energi");
   if (lk === "n") return nastaIRad();
   if (lk === "g") return taIn(e.shiftKey);
   if (k === "Home") return ga(0);
