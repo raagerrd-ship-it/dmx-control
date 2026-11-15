@@ -4,6 +4,7 @@
  *  Läser inspelningarna i tools/ladan-<datum>/lang-*.wav. Första gången en fil öppnas räknas spektrum (10-30 s) och sparas i
  *  .arena/markera-cache/. Markeringarna sparas löpande i <namn>.marks-hand.json bredvid ljudfilen (samma form som marks-fin.json:
  *  kind, fineS, pressS, skip). Finns ingen hand-fil visas knapptrycken från inspelningen (marks-fin.json) som utgångsläge.
+ *  SVEPET (tools/markera/svep.py, lokalt) skriver <namn>.forslag.json; sidan lägger in förslagen som streckade markeringar att godta/flytta/ta bort.
  *  Äldre versioner av hand-filen kopieras till .arena/markera-backup/ (högst var tionde minut). Inga beroenden; lyssnar bara på 127.0.0.1. */
 import http from "node:http"; import fs from "node:fs"; import path from "node:path"; import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENGINE = path.resolve(HERE, "..", ".."), PORT = +(process.env.MARKERA_PORT || 3777);
@@ -85,20 +86,20 @@ function spektrum(p) {
 
 function marks(p) {
   const hand = bredvid(p, ".marks-hand.json"), fin = bredvid(p, ".marks-fin.json"), kand = bredvid(p, ".kandidater.json");
-  const k = fs.existsSync(kand) ? las(kand) : { drop: [], latgrans: [] };
-  if (fs.existsSync(hand)) { const h = las(hand); return { kalla: "hand", klar: !!h.klar, marks: h.marks || [], kandidater: k }; }
-  if (fs.existsSync(fin)) return { kalla: "tryck", klar: false, kandidater: k, marks: (las(fin).marks || []).filter(m => KINDS.has(m.kind)).map(m => ({ kind: m.kind, fineS: m.fineS, pressS: m.pressS, skip: !!m.skip, hand: false })) };
-  return { kalla: "tom", klar: false, marks: [], kandidater: k };
+  const k = fs.existsSync(kand) ? las(kand) : { drop: [], latgrans: [] }, fp = bredvid(p, ".forslag.json"), forslag = fs.existsSync(fp) ? (las(fp).marks || []).filter(m => KINDS.has(m.kind)) : [];
+  if (fs.existsSync(hand)) { const h = las(hand); return { kalla: "hand", klar: !!h.klar, marks: h.marks || [], kandidater: k, forslag }; }
+  if (fs.existsSync(fin)) return { kalla: "tryck", klar: false, kandidater: k, forslag, marks: (las(fin).marks || []).filter(m => KINDS.has(m.kind)).map(m => ({ kind: m.kind, fineS: m.fineS, pressS: m.pressS, skip: !!m.skip, hand: false })) };
+  return { kalla: "tom", klar: false, marks: [], kandidater: k, forslag };
 }
 
 const senastBackup = new Map();
 function spara(p, body) {
   const d = JSON.parse(body); if (!Array.isArray(d.marks)) throw new Error("marks saknas");
-  const ms = d.marks.filter(m => KINDS.has(m.kind) && Number.isFinite(m.fineS)).map(m => ({ kind: m.kind, fineS: +(+m.fineS).toFixed(3), pressS: +(+(Number.isFinite(m.pressS) ? m.pressS : m.fineS)).toFixed(3), sure: true, skip: !!m.skip, hand: !!m.hand })).sort((a, b) => a.fineS - b.fineS);
+  const ms = d.marks.filter(m => KINDS.has(m.kind) && Number.isFinite(m.fineS)).map(m => ({ kind: m.kind, fineS: +(+m.fineS).toFixed(3), pressS: +(+(Number.isFinite(m.pressS) ? m.pressS : m.fineS)).toFixed(3), sure: true, skip: !!m.skip, hand: !!m.hand, ...(m.forslag ? { forslag: true } : {}) })).sort((a, b) => a.fineS - b.fineS);
   const hand = bredvid(p, ".marks-hand.json");
   if (fs.existsSync(hand) && Date.now() - (senastBackup.get(hand) || 0) > 600000) { fs.mkdirSync(BACKUP, { recursive: true }); const t = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15);
     fs.copyFileSync(hand, path.join(BACKUP, `${path.basename(hand, ".json")}.${t}.json`)); senastBackup.set(hand, Date.now()); }
-  const ut = { file: path.basename(p), note: "Ägarens genomgång i tools/markera (fineS = händelsen i ljudet, s från filens början; hand = flyttad/satt i verktyget; skip = feltryck). uppbyggnad/intro/vers/refrang/outro = börjar här.", savedAt: new Date().toISOString(), klar: !!d.klar, marks: ms };
+  const ut = { file: path.basename(p), note: "Ägarens genomgång i tools/markera (fineS = händelsen i ljudet, s från filens början; hand = flyttad/satt i verktyget; skip = feltryck; forslag = osett förslag från svepet, räknas inte som facit). uppbyggnad/intro/vers/refrang/outro = börjar här.", savedAt: new Date().toISOString(), klar: !!d.klar, marks: ms };
   fs.writeFileSync(hand + ".tmp", JSON.stringify(ut, null, 1)); fs.renameSync(hand + ".tmp", hand); return { ok: true, n: ms.length };
 }
 
@@ -106,7 +107,7 @@ function filer() {
   const ut = []; const T = path.join(ENGINE, "tools");
   for (const d of fs.readdirSync(T).filter(x => /^ladan-/.test(x)).sort()) for (const f of fs.readdirSync(path.join(T, d)).filter(x => /^lang-\w+\.wav$/.test(x)).sort()) {
     const p = path.join(T, d, f); let w; try { w = wavInfo(p); } catch { continue; }
-    let n = 0, kalla = "tom", klar = false; try { const m = marks(p); n = m.marks.filter(x => !x.skip).length; kalla = m.kalla; klar = m.klar; } catch { /* trasig markeringsfil: visas som tom */ }
+    let n = 0, kalla = "tom", klar = false; try { const m = marks(p); n = m.marks.filter(x => !x.skip && !x.forslag).length; kalla = m.kalla; klar = m.klar; } catch { /* trasig markeringsfil: visas som tom */ }
     ut.push({ f: `tools/${d}/${f}`, namn: f.replace(/^lang-|\.wav$/g, ""), seconds: w.seconds, n, kalla, klar, lagad: w.lagad });
   }
   return ut;
