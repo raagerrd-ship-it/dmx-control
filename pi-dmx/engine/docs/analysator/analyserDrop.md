@@ -473,3 +473,13 @@ Vid `const near = rise >= NEAR_RISE_DB && dip >= NEAR_DIP_DB && floor > -80 && t
 floor > -80: inspelningsavbrott
 ```
 
+
+### BUILD_SPACING_MS, buildStartCount (2026-11-15 kväll)
+
+```text
+UPPBYGGNADEN som signal (ägaren: "Kör på nästa"; u2:s kod ur arenan UPP1, tre av fyra deltagare rekommenderade den): frame.buildStartCount
+stiger när en kick-lucka börjar (samma lucka som minidroppen, miniEp) om förra luckan började minst BUILD_SPACING_MS före. En källa med
+minidroppen. Ändrar inga drop eller minidrop (identiska på fem filer). Ägarens genomgångna filer: 151659 4/5 (34 skickade), 172432 13/16
+(54), 171840 4/4 (8), 193040 4/4 (13) - slår vid nästan varje fill, så den är en SIGNAL, inte ett villkor för drop. Ingen effekt läser den
+ännu. Delstaten: BS_BUILDSTART (split.ts). Säkerhetstagg: fore-uppbyggnad-signal.
+```
