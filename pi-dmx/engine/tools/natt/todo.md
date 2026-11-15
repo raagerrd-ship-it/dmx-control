@@ -66,7 +66,9 @@ Diskantvetot fäller 3 av hans 23 övningsdrop (107, 672, 441) - avvägt mot 8 a
 FLANKEN LANDAR PÅ FULL BAS, INLAGT 90ba633 (ägaren "Lägg in", 11-15 kväll): FLANK_LAND_DB 6 -> 1,5. Motorn slog 0,5-0,8 s FÖRE ägarens drop
 (på basens uppgång). Fem drop-filer, fem starter: rätt 6 -> 10 av 34, falska 6 -> 2. Lotus portad 128f7882 EJ utlagd. Ägaren gick igenom
 193040 (6 drop, 3 mini, klar) - filen KLIPPT vid 06:05.50 (original -oklippt.wav). Förslag (forslag_full.py) ligger i 200719, ogenomgånget.
-LADAN nästa besök: lägg ut HEAD = minidrop per lucka + diskantvetot + flanken 1,5 dB (ladan kör cad739b).
+UPPBYGGNADEN SOM SIGNAL INLAGD 3aa8ac1 (ägaren "Kör på nästa"): frame.buildStartCount (u2 ur UPP1), drop/mini identiska; ingen effekt läser
+den ännu. Lotus 3169cb1f EJ utlagd.
+LADAN nästa besök: lägg ut HEAD = minidrop per lucka + diskantvetot + flanken 1,5 dB + uppbyggnadssignalen (ladan kör cad739b).
 SVEP efter 1,5 dB (fem filer, tre starter): diskantvetot -1/-2/-3 dB och FLANK_BREAK_S 3/2,5/2 s gav INGET bättre (veto -2: +1 rätt men
 +2 falska, +1 mini som drop; break kortare: oförändrat - 00:43.70 i 151659 stoppas av annat). HEAD står kvar. .arena/landa/svep.py.
 NÄSTA DROP-FRÅGA: flanken hittar bara 3 av ägarens 20 drop i de genomgångna filerna (breaken 8-12 dB under taket, flanken kräver 10 dB i 4 s).
