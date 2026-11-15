@@ -40,7 +40,9 @@ FÖRSTA GENOMGÅNGNA FILEN 151659 (11-15 em, dropdom2.py läser den, 6346439): 3
 (3) uppbyggnaderna låter olika (allt stiger / inget mätbart / trumvirvel / basen kommer in / anslagen glesnar) - inget enskilt mått hittar dem;
 (4) 13 omarkerade ställen där basen kommer tillbaka efter >= 1 s lucka: 8 ligger på en sektionsgräns, uppbyggnad eller upptakt han markerat som
 annat. Basens återkomst = sektionsgräns, inte drop. Drop = landning EFTER uppbyggnad -> nästa försök behöver uppbyggnaden, inte en bättre flank.
-Mätskript: scratchpad (koll_hand.py, larde.py) - bygg om ur fore_drop5.py vid behov. Ingen arena förrän minst tre filer är genomgångna.
+Mätskript: tools/markera/koll/ (koll_hand.py, larde.py). Ingen arena förrän minst tre filer är genomgångna.
+ÄGAREN 11-15: "har jag markerat klar, så är det det jag markerat som jag anser är rätt" -> i en KLAR fil är allt omarkerat säkert varken drop
+eller mini: en omarkerad motordrop är bevisat falsk (precisionen kan väga tyngre i nästa domare), och "Inte drop" behöver inte tryckas.
 
 ARENAN DROP2 KLAR 2026-11-15 02:35: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-14-drop2.md (+ mappen med alla lösningar och diffar).
 Övning (160345 + 151659 + 193818): bas 29,2 -> deltagarna 39-59, jokern 68,7 (identisk i fem starter). KONTROLL (193040 + 200719, medel av fem
