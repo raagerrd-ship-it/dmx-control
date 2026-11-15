@@ -51,6 +51,10 @@ FINALEN (171840 ägarens genomgång + 160345 + 193040): motorn 51,4 > s2 42,6, s
 INLAGT 8d7cd37 (ägaren "kör på det"): en minidrop per kick-lucka (s3:s kod), droppen orörda; lotus portad d8ec216e EJ utlagd. dist/ byggs
 när .arena/veto1 är klar (den mäter bas ur dist/). VETO1 pågår: dagens flank + s1 uppbyggnadsveto / s2 diskantveto / s4 mellanregisterveto,
 dropdom2 --skak på övning + kontroll (193040 måste behålla 4/4). Genomgångna filer nu: 151659, 171840, 172432 (lägg in i dropdom2/latdom).
+VETO1 KLAR -> s2:s DISKANTVETO INLAGT 3478368 (ägaren "ja kör på det"): övning 27,7 -> 31,2, kontroll 36,0 -> 38,5 (193040 4/4 kvar), ägarens
+tre genomgångna: falska drop 9 -> 1, mini som drop 6 -> 1, rätt 3 -> 3 av 20. s1 (uppbyggnadsveto) tappade 1 i 193040, s4 sämre på de genomgångna.
+Lotus portad 7d532a4a EJ utlagd. LADAN kör cad739b: nästa ladanbesök = lägg ut HEAD (minidrop per lucka + diskantvetot), ägaren ser det.
+NÄSTA DROP-FRÅGA: flanken hittar bara 3 av ägarens 20 drop i de genomgångna filerna (breaken 8-12 dB under taket, flanken kräver 10 dB i 4 s).
 
 ARENAN DROP2 KLAR 2026-11-15 02:35: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-14-drop2.md (+ mappen med alla lösningar och diffar).
 Övning (160345 + 151659 + 193818): bas 29,2 -> deltagarna 39-59, jokern 68,7 (identisk i fem starter). KONTROLL (193040 + 200719, medel av fem
