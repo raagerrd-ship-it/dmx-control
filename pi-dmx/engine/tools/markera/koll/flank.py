@@ -25,7 +25,7 @@ def lucka(top, tak, i, d):
     for q in u: run = run + 1 if q else 0; best = max(best, run)
     return best / 100
 rad = []
-for hp in sorted(glob.glob(os.path.join(E, 'tools', 'ladan-*', 'lang-*.marks-hand.json'))):
+for hp in ([os.path.abspath(w[:-4] + '.marks-hand.json') for w in sys.argv[1:]] or sorted(glob.glob(os.path.join(E, 'tools', 'ladan-*', 'lang-*.marks-hand.json')))):
     d = json.load(io.open(hp, encoding='utf-8'))
     if not d.get('klar'): continue
     wav = hp.replace('.marks-hand.json', '.wav'); y, sr = svep.las_wav(wav); env, top, tak, hd = kurvor(y, sr)
