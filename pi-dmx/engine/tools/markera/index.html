@@ -291,7 +291,7 @@ async function start() {
     const b = document.createElement("button"); b.style.borderLeftColor = s[3]; b.innerHTML = `<kbd>${s[2].toUpperCase()}</kbd> ${s[0]}`; b.onclick = () => { sortKey(k); b.blur(); }; $("sorter").append(b); }
   const d = document.createElement("span"); d.className = "delare"; const t = document.createElement("button"); t.innerHTML = "<kbd>Del</kbd> Ta bort vald"; t.onclick = () => { taBort(); t.blur(); }; const a = document.createElement("button"); a.innerHTML = "<kbd>Ctrl</kbd>+<kbd>Z</kbd> Ångra"; a.onclick = () => { angra(undo, redo); a.blur(); }; $("sorter").append(d, t, a);
   FILER = await fetch("/api/filer").then(r => r.json());
-  for (const x of FILER) { const o = document.createElement("option"); o.value = x.f; o.textContent = `${x.namn.slice(0, 8)} ${x.namn.slice(9, 11)}:${x.namn.slice(11, 13)} · ${Math.round(x.seconds / 60)} min · ${x.n} mark.${x.klar ? " · klar" : x.kalla === "hand" ? " · påbörjad" : ""}`; $("fil").append(o); }
+  for (const x of FILER) { const o = document.createElement("option"); o.value = x.f; o.textContent = `${x.namn.slice(0, 8)} ${x.namn.slice(9)} · ${Math.round(x.seconds / 60)} min · ${x.n} mark.${x.nf ? ` + ${x.nf} förslag` : ""}${x.klar ? " · klar" : x.kalla === "hand" ? " · påbörjad" : ""}`; $("fil").append(o); }
   const sist = localStorage.getItem("markera.fil"), f = FILER.find(x => x.f === sist) || FILER[FILER.length - 1]; if (!f) { status("Hittar inga inspelningar i tools/ladan-*/", true); return; }
   $("fil").value = f.f; oppna(f.f); hjalp();
 }

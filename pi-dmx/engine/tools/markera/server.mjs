@@ -114,8 +114,8 @@ function filer() {
   const ut = []; const T = path.join(ENGINE, "tools");
   for (const d of fs.readdirSync(T).filter(x => /^ladan-/.test(x)).sort()) for (const f of fs.readdirSync(path.join(T, d)).filter(x => /^lang-\w+\.wav$/.test(x)).sort()) {
     const p = path.join(T, d, f); let w; try { w = wavInfo(p); } catch { continue; }
-    let n = 0, kalla = "tom", klar = false; try { const m = marks(p); n = m.marks.filter(x => !x.skip && !x.forslag).length; kalla = m.kalla; klar = m.klar; } catch { /* trasig markeringsfil: visas som tom */ }
-    ut.push({ f: `tools/${d}/${f}`, namn: f.replace(/^lang-|\.wav$/g, ""), seconds: w.seconds, n, kalla, klar, lagad: w.lagad });
+    let n = 0, nf = 0, kalla = "tom", klar = false; try { const m = marks(p); n = m.marks.filter(x => !x.skip && !x.forslag).length; nf = m.marks.filter(x => x.forslag).length; kalla = m.kalla; klar = m.klar; } catch { /* trasig markeringsfil: visas som tom */ }
+    ut.push({ f: `tools/${d}/${f}`, namn: f.replace(/^lang-|\.wav$/g, ""), seconds: w.seconds, n, nf, kalla, klar, lagad: w.lagad });
   }
   return ut;
 }
