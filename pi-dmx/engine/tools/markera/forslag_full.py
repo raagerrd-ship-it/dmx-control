@@ -10,7 +10,7 @@ REGLERNA (tagna ur ägarens tre genomgångna filer 151659, 171840, 172432):
   drop       landning med en uppbyggnad 1-12 s före OCH ny sektion (molnets gräns) inom 2 s OCH full nivå efter (låtens 70:e percentil);
              högst ett drop per 12 s. Annars minidrop ("låt det vara minidrop").  (ägaren: 15 av 19 drop har uppbyggnad, 12 av 42 mini)
   uppbyggnad senaste uppbyggnadsstarten 1-12 s före ett drop eller minidrop, ur detektorerna (u4/u2 i arenan UPP1: 4 av 4 på osedd fil).
-  låtbyte    ägarens egna Låtbyte-tryck (latbyten.json), flyttade till största spektrumskiftet inom +-10 s och närmaste taktetta.
+  låtbyte    motorns låtgränser flyttade till största spektrumskiftet inom 20 s före (täta = en). Inga knapptryck används.
   sektion    molnets gränser per låt; etikett efter energi i låten (molnets etiketter är fel på den här musiken): första lugna = intro,
              översta tredjedelen = refräng, sista korta lugna = outro, bridge/break = break, annars vers. Varje drop börjar en refräng."""
 import sys, os, json, io
@@ -28,13 +28,19 @@ def main(wav, motor, uppbs):
     R = json.load(open(motor)); U = sorted(set(round(t, 2) for f in uppbs for t in json.load(open(f)).get('uppb', [])))
     F = json.load(io.open(bas + '.forslag.json', encoding='utf-8'))['marks'] if os.path.exists(bas + '.forslag.json') else []
     M = json.load(io.open(bas + '.forslag-moln.json', encoding='utf-8'))['marks'] if os.path.exists(bas + '.forslag-moln.json') else []
-    lb = json.load(io.open(os.path.join(E, 'tools', 'ladan-2026-11-13', 'latbyten.json'), encoding='utf-8')).get(namn, [])
     ut = []
-    # låtbyten
+    # låtbyten: motorns låtgränser (inga knapptryck - ägaren 11-15: "väg inte in hur han tryckte"), flyttade till största spektrumskiftet
+    # inom 20 s före; gränser tätare än 30 s = en (den med störst skifte)
     L = []
-    for t in lb:
-        a, b = int(max(5, t - 10) * 10), int(min(dur - 5, t + 10) * 10); tt = (a + int(np.argmax(S[a:b]))) / 10 if b > a else t
-        L.append(svep.narmast(downs, tt, 1.5)); ut.append(dict(kind='latbyte', fineS=L[-1], why='ditt Låtbyte-tryck %.0f s, flyttat till spektrumskiftet' % t))
+    for g in sorted(R.get('grans') or []):
+        a, b = int(max(5, g - 20) * 10), int(min(dur - 8, g + 3) * 10)
+        if b <= a: continue
+        tt = (a + int(np.argmax(S[a:b]))) / 10; st = float(S[int(tt * 10)])
+        if L and tt - L[-1][0] < 30:
+            if st > L[-1][1]: L[-1] = (tt, st, g)
+        else: L.append((tt, st, g))
+    for tt, st, g in L: ut.append(dict(kind='latbyte', fineS=svep.narmast(downs, tt, 1.5), why='motorns låtgräns %.0f s, flyttad till spektrumskiftet (%.1f)' % (g, st)))
+    L = [m['fineS'] for m in ut]
     kant = sorted([0.0] + L + [dur])
     # landningar
     kand = [(t, 'motorn minidrop') for t in R['minis']] + [(t, 'motorn drop') for t in R['drops']] + [(m['fineS'], 'svepet: ' + m.get('why', '')) for m in F if m['kind'] in ('drop', 'mini')]
@@ -67,12 +73,6 @@ def main(wav, motor, uppbs):
                        ('; ' + ', '.join(x for x, ok in (('uppbyggnad', bool(up)), ('ny sektion', nysek), ('full nivå', full)) if not ok) + ' saknas') if not (up and nysek and full) else '; 12 s efter förra droppet')))
         if up and not any(m['kind'] == 'uppbyggnad' and abs(m['fineS'] - svep.narmast(downs, up[-1], 1.0)) < 0.5 for m in ut):
             ut.append(dict(kind='uppbyggnad', fineS=svep.narmast(downs, up[-1], 1.0), why='uppbyggnadsdetektorn (%.1f s före %s)' % (t - up[-1], 'droppet' if drop else 'minidroppet')))
-    # knapptrycken (osäkra: kompisen 11-14) där förslaget inget har: med som förslag så att ägaren lyssnar ("basen spelar vidare"-sorten)
-    if os.path.exists(bas + '.marks-fin.json'):
-        for m in json.load(io.open(bas + '.marks-fin.json', encoding='utf-8'))['marks']:
-            if m.get('skip') or m['kind'] not in ('drop', 'mini') or any(x['kind'] in ('drop', 'mini') and abs(x['fineS'] - m['fineS']) < 2 for x in ut): continue
-            t = svep.narmast(beats, m['fineS'], 0.15); ly = med(B, t + 0.2, t + 3) - med(B, t - 3, t - 0.3)
-            ut.append(dict(kind=m['kind'], fineS=t, why='knapptryck %s (osäkert), basen %+.0f dB' % (m['kind'], ly)))
     # sektioner: molnets gränser, etikett efter energi
     drops = [m['fineS'] for m in ut if m['kind'] == 'drop']
     for a, b in zip(kant, kant[1:]):
