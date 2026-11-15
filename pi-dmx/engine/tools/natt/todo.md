@@ -26,6 +26,14 @@ NÄSTA FÖR NATTAGENTEN: (a) mät vilka lookbyten som passerar slaggrinden och v
   om frasbundna byten; (b) byt ljusLag.py/efterDrop.py till --trace-alla om de ska användas; (c) ingen arena utan ARENA-uppdrag.
 
 
+MARKERA-VERKTYGET (2026-11-15 fm, ägaren: "en kompis försökte hjälpa mig" med knapparna 11-14 -> trycken i 193818 och 200719 är osäkra; "en
+version som jag kör på datorn"): tools/markera (starta.cmd / node tools/markera/server.mjs -> http://localhost:3777). Spektrum med zoom, spela/pausa,
+dra och finjustera, uppbyggnad före drop, intro/vers/refräng/outro/break. Analyserna som egna rader: lokalt svep (svep.py), molnet (svep_moln.py,
+Replicate, 38 låtar körda, 1362 s gpu), motorn (kandidater.mjs). ÄGARENS FACIT = <namn>.marks-hand.json (klar: true när han gått igenom filen).
+ATT GÖRA NÄR HAN ÄR KLAR MED EN FIL: låt dropdom2.py/latdom.py/finjustera-kedjan läsa marks-hand.json före marks-fin.json, mät om baslinjen, och
+döm nästa drop-försök (veton ovanpå dagens flank) på hans facit. NATTAGENTEN: rör inte tools/ladan-*/*.marks-hand.json, *.forslag*.json eller
+tools/markera; trycken från 11-14 (marks-fin för 193818 och 200719) ska inte användas som facit för nya slutsatser förrän ägaren gått igenom dem.
+
 ARENAN DROP2 KLAR 2026-11-15 02:35: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-14-drop2.md (+ mappen med alla lösningar och diffar).
 Övning (160345 + 151659 + 193818): bas 29,2 -> deltagarna 39-59, jokern 68,7 (identisk i fem starter). KONTROLL (193040 + 200719, medel av fem
 starter): bas 36,0 (4/4 + 0/4 drop) mot jokern 22,2 (0/4 + 0/4), a6 22,2, a1 22,1, a2 22,0, a5 20,0. Alla bytte ut dagens flank och tappade dess
