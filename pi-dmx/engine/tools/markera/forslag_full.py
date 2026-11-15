@@ -67,9 +67,11 @@ def main(wav, motor, uppbs):
     for t, lyft, kalla in land:
         song = max(k for k in kant if k <= t); slut = min(k for k in kant if k > t); p70 = np.percentile(A[int(song * 100):int(slut * 100)], 70)
         up = [u for u in U if 1.0 <= t - u <= 12]; nysek = any(abs(s - t) <= 2 for s in sek); full = med(A, t + 0.2, t + 4) >= p70 - 1
-        drop = bool(up) and nysek and full and t - sista >= 12
+        flank = 'motorn drop' in kalla   # flankens drop (basen borta >= 4 s + diskantvetot) räcker som belägg; uppbyggnaden sökes då 1-30 s före
+        if flank and not up: up = [u for u in U if 1.0 <= t - u <= 30]
+        drop = (flank or (bool(up) and nysek)) and full and t - sista >= 12
         if drop: sista = t
-        ut.append(dict(kind='drop' if drop else 'mini', fineS=t, why='basen +%.0f dB (%s)%s' % (lyft, kalla, '; uppbyggnad + ny sektion + full nivå' if drop else
+        ut.append(dict(kind='drop' if drop else 'mini', fineS=t, why='basen +%.0f dB (%s)%s' % (lyft, kalla, ('; flankens drop' if flank else '; uppbyggnad + ny sektion') + ' + full nivå' if drop else
                        ('; ' + ', '.join(x for x, ok in (('uppbyggnad', bool(up)), ('ny sektion', nysek), ('full nivå', full)) if not ok) + ' saknas') if not (up and nysek and full) else '; 12 s efter förra droppet')))
         if up and not any(m['kind'] == 'uppbyggnad' and abs(m['fineS'] - svep.narmast(downs, up[-1], 1.0)) < 0.5 for m in ut):
             ut.append(dict(kind='uppbyggnad', fineS=svep.narmast(downs, up[-1], 1.0), why='uppbyggnadsdetektorn (%.1f s före %s)' % (t - up[-1], 'droppet' if drop else 'minidroppet')))
