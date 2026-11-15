@@ -6,9 +6,11 @@
  *  kind, fineS, pressS, skip). Finns ingen hand-fil visas knapptrycken från inspelningen (marks-fin.json) som utgångsläge.
  *  ANALYSERNA visas som egna rader under ägarens markeringar: lokalt svep (svep.py -> <namn>.forslag.json), molnet (svep_moln.py ->
  *  <namn>.forslag-moln.json) och motorn (kandidater.mjs -> <namn>.kandidater.json). Ägaren tar in det som stämmer (G) eller sätter eget.
- *  Äldre versioner av hand-filen kopieras till .arena/markera-backup/ (högst var tionde minut). Inga beroenden; lyssnar bara på 127.0.0.1. */
-import http from "node:http"; import fs from "node:fs"; import path from "node:path"; import { fileURLToPath } from "node:url";
-const HERE = path.dirname(fileURLToPath(import.meta.url)), ENGINE = path.resolve(HERE, "..", ".."), PORT = +(process.env.MARKERA_PORT || 3777);
+ *  Äldre versioner av hand-filen kopieras till .arena/markera-backup/ (högst var tionde minut). Inga beroenden; lyssnar bara på 127.0.0.1.
+ *  FRÅN EN ANNAN DATOR i hemmanätet (ägaren 11-15: den här har dåligt batteri): starta-lan.cmd (MARKERA_LAN=1) lyssnar på alla
+ *  nätkort och skriver ut adressen. Ingen inloggning - bara i ett nät du litar på. Ha sidan öppen på EN dator åt gången. */
+import http from "node:http"; import fs from "node:fs"; import path from "node:path"; import os from "node:os"; import { fileURLToPath } from "node:url";
+const HERE = path.dirname(fileURLToPath(import.meta.url)), ENGINE = path.resolve(HERE, "..", ".."), PORT = +(process.env.MARKERA_PORT || 3777), LAN = process.env.MARKERA_LAN === "1";
 const CACHE = path.join(ENGINE, ".arena", "markera-cache"), BACKUP = path.join(ENGINE, ".arena", "markera-backup");
 const OKF = /^tools\/ladan-[\w-]+\/lang-\w+\.wav$/, KINDS = new Set(["drop", "mini", "intedrop", "latbyte", "uppbyggnad", "intro", "vers", "refrang", "outro", "break"]);
 const NFFT = 2048, HOP = 480, NB = 144, F_LO = 30, F_HI = 16000, DB_LO = -110, DB_HI = 0;
@@ -131,4 +133,5 @@ http.createServer((req, res) => {
     json({ fel: "finns inte" }, 404);
   } catch (e) { json({ fel: String(e.message || e) }, 400); }
 }).on("error", e => { console.log(e.code === "EADDRINUSE" ? `Verktyget är redan igång - öppna http://localhost:${PORT}` : String(e)); process.exit(e.code === "EADDRINUSE" ? 0 : 1); })
-  .listen(PORT, "127.0.0.1", () => console.log(`Markera: http://localhost:${PORT}   (Ctrl+C stänger)`));
+  .listen(PORT, LAN ? "0.0.0.0" : "127.0.0.1", () => { console.log(`Markera: http://localhost:${PORT}   (Ctrl+C stänger)`);
+    if (LAN) for (const a of Object.values(os.networkInterfaces()).flat()) if (a && a.family === "IPv4" && !a.internal) console.log(`  från en annan dator i samma nät: http://${a.address}:${PORT}`); });
