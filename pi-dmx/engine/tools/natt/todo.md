@@ -43,6 +43,14 @@ annat. Basens återkomst = sektionsgräns, inte drop. Drop = landning EFTER uppb
 Mätskript: tools/markera/koll/ (koll_hand.py, larde.py). Ingen arena förrän minst tre filer är genomgångna.
 ÄGAREN 11-15: "har jag markerat klar, så är det det jag markerat som jag anser är rätt" -> i en KLAR fil är allt omarkerat säkert varken drop
 eller mini: en omarkerad motordrop är bevisat falsk (precisionen kan väga tyngre i nästa domare), och "Inte drop" behöver inte tryckas.
+MINIARENAN SE1 PÅGÅR (startad 11-15 em, ägarens begäran): 4 agenter (s1 formen, s2 spänningen, s3 rytmen, s4 fritt) bygger egna realtidsdetektorer ur
+ENBART ljudet + marks-hand i 151659 (utan vår motor), domare tools/arena/sedom.py (motorn 22,2, exemplet 22,9), kontroll 160345 + 193040.
+Fas 2: samma agenter får se motorn och föreslår förbättringar. NATTAGENTEN: rör inte .arena/se1 och kör inte sedom.py.
+FINALEN (171840 ägarens genomgång + 160345 + 193040): motorn 51,4 > s2 42,6, s1 39,1, s4 38,3, exemplet 28,1, s3 17,9 - alla överanpassade
+(73-82 på övningen). Höll: s1:s uppbyggnad 4/4 i 171840. Kontrollen använd en gång. .arena/se1/ranking-final.md. Fas 2 KLAR (forslag.md x4).
+INLAGT 8d7cd37 (ägaren "kör på det"): en minidrop per kick-lucka (s3:s kod), droppen orörda; lotus portad d8ec216e EJ utlagd. dist/ byggs
+när .arena/veto1 är klar (den mäter bas ur dist/). VETO1 pågår: dagens flank + s1 uppbyggnadsveto / s2 diskantveto / s4 mellanregisterveto,
+dropdom2 --skak på övning + kontroll (193040 måste behålla 4/4). Genomgångna filer nu: 151659, 171840, 172432 (lägg in i dropdom2/latdom).
 
 ARENAN DROP2 KLAR 2026-11-15 02:35: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-14-drop2.md (+ mappen med alla lösningar och diffar).
 Övning (160345 + 151659 + 193818): bas 29,2 -> deltagarna 39-59, jokern 68,7 (identisk i fem starter). KONTROLL (193040 + 200719, medel av fem
