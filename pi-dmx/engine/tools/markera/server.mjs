@@ -9,7 +9,7 @@
 import http from "node:http"; import fs from "node:fs"; import path from "node:path"; import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENGINE = path.resolve(HERE, "..", ".."), PORT = +(process.env.MARKERA_PORT || 3777);
 const CACHE = path.join(ENGINE, ".arena", "markera-cache"), BACKUP = path.join(ENGINE, ".arena", "markera-backup");
-const OKF = /^tools\/ladan-[\w-]+\/lang-\w+\.wav$/, KINDS = new Set(["drop", "mini", "intedrop", "latbyte", "uppbyggnad", "intro", "vers", "refrang", "outro"]);
+const OKF = /^tools\/ladan-[\w-]+\/lang-\w+\.wav$/, KINDS = new Set(["drop", "mini", "intedrop", "latbyte", "uppbyggnad", "intro", "vers", "refrang", "outro", "break"]);
 const NFFT = 2048, HOP = 480, NB = 144, F_LO = 30, F_HI = 16000, DB_LO = -110, DB_HI = 0;
 const LOW_HZ = 300, DEC = 8, LFFT = 1024, LTAPS = 64, LCUT = 1500, EXTRA = 2, VER = 2;   // basen för sig: ljudet nedsamplat 8 ggr -> 5,9 Hz per bin under LOW_HZ
 const abs = f => { if (!OKF.test(f || "")) throw new Error("ogiltig fil"); return path.join(ENGINE, f); };
@@ -95,11 +95,11 @@ function marks(p) {
 const senastBackup = new Map();
 function spara(p, body) {
   const d = JSON.parse(body); if (!Array.isArray(d.marks)) throw new Error("marks saknas");
-  const ms = d.marks.filter(m => KINDS.has(m.kind) && Number.isFinite(m.fineS)).map(m => ({ kind: m.kind, fineS: +(+m.fineS).toFixed(3), pressS: +(+(Number.isFinite(m.pressS) ? m.pressS : m.fineS)).toFixed(3), sure: true, skip: !!m.skip, hand: !!m.hand, ...(m.forslag ? { forslag: true } : {}) })).sort((a, b) => a.fineS - b.fineS);
+  const ms = d.marks.filter(m => KINDS.has(m.kind) && Number.isFinite(m.fineS)).map(m => ({ kind: m.kind, fineS: +(+m.fineS).toFixed(3), pressS: +(+(Number.isFinite(m.pressS) ? m.pressS : m.fineS)).toFixed(3), sure: true, skip: !!m.skip, hand: !!m.hand, ...(m.forslag ? { forslag: true } : {}), ...(m.why ? { why: String(m.why).slice(0, 120) } : {}) })).sort((a, b) => a.fineS - b.fineS);
   const hand = bredvid(p, ".marks-hand.json");
   if (fs.existsSync(hand) && Date.now() - (senastBackup.get(hand) || 0) > 600000) { fs.mkdirSync(BACKUP, { recursive: true }); const t = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15);
     fs.copyFileSync(hand, path.join(BACKUP, `${path.basename(hand, ".json")}.${t}.json`)); senastBackup.set(hand, Date.now()); }
-  const ut = { file: path.basename(p), note: "Ägarens genomgång i tools/markera (fineS = händelsen i ljudet, s från filens början; hand = flyttad/satt i verktyget; skip = feltryck; forslag = osett förslag från svepet, räknas inte som facit). uppbyggnad/intro/vers/refrang/outro = börjar här.", savedAt: new Date().toISOString(), klar: !!d.klar, marks: ms };
+  const ut = { file: path.basename(p), note: "Ägarens genomgång i tools/markera (fineS = händelsen i ljudet, s från filens början; hand = flyttad/satt i verktyget; skip = feltryck; forslag = osett förslag från svepet, räknas inte som facit). uppbyggnad/intro/vers/refrang/outro/break = börjar här.", savedAt: new Date().toISOString(), klar: !!d.klar, marks: ms };
   fs.writeFileSync(hand + ".tmp", JSON.stringify(ut, null, 1)); fs.renameSync(hand + ".tmp", hand); return { ok: true, n: ms.length };
 }
 

@@ -119,5 +119,5 @@ def svep(p):
     print('%s: %d förslag (%s), %d togs bort nära egna markeringar, slag %s, %.0f s' % (os.path.basename(p), len(kvar), ', '.join('%d %s' % (v, k) for k, v in c.items()), len(ut) - len(kvar), 'Beat This!' if beats is not None else 'saknas', time.time() - t0))
 
 if __name__ == '__main__':
-    W = sys.argv[1:] or sorted(glob.glob(os.path.join(E, 'tools', 'ladan-*', 'lang-*.wav')))
+    W = sys.argv[1:] or [w for w in sorted(glob.glob(os.path.join(E, 'tools', 'ladan-*', 'lang-*.wav'))) if '-lagad' not in w]
     for w in W: svep(os.path.abspath(w))

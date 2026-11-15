@@ -76,7 +76,7 @@
 const SORT = {   // sort: [namn, kort etikett, tangent, färg, slag: p = punkt, u = uppbyggnad (till nästa drop), s = sektion (till nästa sektion/låtbyte)]
   drop: ["Drop", "Drop", "d", "#ff4d4d", "p"], mini: ["Minidrop", "Mini", "m", "#ffb020", "p"], intedrop: ["Inte drop", "Inte", "i", "#aab1bd", "p"], latbyte: ["Låtbyte", "Låt", "l", "#3ec9f0", "p"],
   uppbyggnad: ["Uppbyggnad börjar", "Upp", "u", "#b07cff", "u"],
-  intro: ["Intro", "Intro", "1", "#2fb8a0", "s"], vers: ["Vers", "Vers", "2", "#5fbf4a", "s"], refrang: ["Refräng", "Refr", "3", "#ff6fb5", "s"], outro: ["Outro", "Outro", "4", "#8291a8", "s"],
+  intro: ["Intro", "Intro", "1", "#2fb8a0", "s"], vers: ["Vers", "Vers", "2", "#5fbf4a", "s"], refrang: ["Refräng", "Refr", "3", "#ff6fb5", "s"], outro: ["Outro", "Outro", "4", "#8291a8", "s"], break: ["Break", "Break", "5", "#c9b458", "s"],
 };
 const KEY = Object.fromEntries(Object.entries(SORT).map(([k, v]) => [v[2], k]));
 const $ = id => document.getElementById(id), ljud = $("ljud"), vy = $("vy"), over = $("over"), cx = vy.getContext("2d"), ox = over.getContext("2d");
@@ -194,7 +194,7 @@ function andra(f) { undo.push(JSON.stringify(marks)); if (undo.length > 200) und
 function efter() { dirty = true; osparat = true; ritaLista(); hjalp(); clearTimeout(saveT); status("Sparar …"); saveT = setTimeout(spara, 400); }
 async function spara() {
   if (!F) return; osparat = false;
-  try { const r = await fetch("/api/marks?f=" + encodeURIComponent(F), { method: "POST", keepalive: true, body: JSON.stringify({ klar, marks: marks.map(({ kind, fineS, pressS, skip, hand, forslag }) => ({ kind, fineS, pressS, skip, hand, forslag })) }) }), j = await r.json();
+  try { const r = await fetch("/api/marks?f=" + encodeURIComponent(F), { method: "POST", keepalive: true, body: JSON.stringify({ klar, marks: marks.map(({ kind, fineS, pressS, skip, hand, forslag, why }) => ({ kind, fineS, pressS, skip, hand, forslag, why })) }) }), j = await r.json();
     if (!j.ok) throw new Error(j.fel || "fel"); status("Sparat " + new Date().toLocaleTimeString("sv-SE") + " · " + j.n + " markeringar"); }
   catch (e) { osparat = true; status("KUNDE INTE SPARA: " + e.message, true); }
 }
@@ -211,7 +211,7 @@ function godtaAlla() { if (!marks.some(m => m.forslag)) return; andra(() => { fo
 function laggIn() {   // svepets förslag som streckade markeringar; hoppar över dem som redan ligger där
   const klass = k => SORT[k][4] === "p" && k !== "latbyte" ? "p" : k; let n = 0;
   andra(() => { for (const f of forslag) { if (marks.some(m => klass(m.kind) === klass(f.kind) && Math.abs(m.fineS - f.fineS) < (klass(f.kind) === "p" ? 2.5 : 4))) continue;
-    marks.push({ id: nid++, kind: f.kind, fineS: f.fineS, pressS: f.fineS, skip: false, hand: false, forslag: true }); n++; } });
+    marks.push({ id: nid++, kind: f.kind, fineS: f.fineS, pressS: f.fineS, skip: false, hand: false, forslag: true, why: f.why }); n++; } });
   status(n ? n + " förslag inlagda - gå igenom dem med Tab, godta med G" : forslag.length ? "Alla förslag ligger redan inne" : "Inga förslag för den här inspelningen (kör svepet)");
 }
 function angra(fran, till) { if (!fran.length) return; till.push(JSON.stringify(marks)); const id = sel && sel.id; marks = JSON.parse(fran.pop()); sel = marks.find(m => m.id === id) || null; efter(); }
@@ -230,7 +230,7 @@ function ritaLista() {
 }
 function hjalp() {
   $("hjalp").innerHTML = sel
-    ? `<b>Vald: ${SORT[sel.kind][0]} ${fmt(sel.fineS)}${sel.forslag ? " (förslag)" : ""}</b> — ${sel.forslag ? "<kbd>G</kbd> godtar · " : ""}dra flaggan eller <kbd>←</kbd> <kbd>→</kbd> flyttar 10 ms (<kbd>Skift</kbd> 100 ms) · sorttangent byter sort · <kbd>Delete</kbd> tar bort · <kbd>Enter</kbd> spelar från 2 s före · <kbd>Esc</kbd> släpper · <kbd>Tab</kbd> nästa`
+    ? `<b>Vald: ${SORT[sel.kind][0]} ${fmt(sel.fineS)}${sel.forslag ? " (förslag" + (sel.why ? ": " + sel.why.replace(/[<>&]/g, "") : "") + ")" : ""}</b> — ${sel.forslag ? "<kbd>G</kbd> godtar · " : ""}dra flaggan eller <kbd>←</kbd> <kbd>→</kbd> flyttar 10 ms (<kbd>Skift</kbd> 100 ms) · sorttangent byter sort · <kbd>Delete</kbd> tar bort · <kbd>Enter</kbd> spelar från 2 s före · <kbd>Esc</kbd> släpper · <kbd>Tab</kbd> nästa`
     : `<kbd>Mellanslag</kbd> spela/pausa · sorttangent sätter markering vid den vita markören · klick i spektrum flyttar markören, dra = panorera, hjul = zooma · <kbd>←</kbd> <kbd>→</kbd> 1 s (<kbd>Skift</kbd> 5 s) · <kbd>,</kbd> <kbd>.</kbd> 20 ms · <kbd>Tab</kbd> nästa markering · <kbd>N</kbd> nästa omarkerade · <kbd>Ctrl</kbd>+<kbd>Z</kbd> ångra`;
 }
 
@@ -242,7 +242,7 @@ async function oppna(f) {
   try {
     const [mk, sp] = await Promise.all([fetch("/api/marks?f=" + encodeURIComponent(f)).then(r => r.json()), fetch("/api/spektrum?f=" + encodeURIComponent(f)).then(r => { if (!r.ok) throw new Error("spektrum " + r.status); return r.arrayBuffer(); })]);
     if (mk.fel) throw new Error(mk.fel);
-    spec = tolka(sp); dur = info.seconds; marks = mk.marks.map(m => ({ id: nid++, kind: m.kind, fineS: m.fineS, pressS: m.pressS ?? m.fineS, skip: !!m.skip, hand: !!m.hand, forslag: !!m.forslag })); forslag = mk.forslag || []; kand = mk.kandidater || { drop: [], latgrans: [] }; klar = !!mk.klar; $("klar").checked = klar;
+    spec = tolka(sp); dur = info.seconds; marks = mk.marks.map(m => ({ id: nid++, kind: m.kind, fineS: m.fineS, pressS: m.pressS ?? m.fineS, skip: !!m.skip, hand: !!m.hand, forslag: !!m.forslag, why: m.why })); forslag = mk.forslag || []; kand = mk.kandidater || { drop: [], latgrans: [] }; klar = !!mk.klar; $("klar").checked = klar;
     F = f; ljud.src = "/ljud?f=" + encodeURIComponent(f); ljud.playbackRate = +$("fart").value; byggLut(); localStorage.setItem("markera.fil", f);
     vyn(0, Math.min(dur, 40)); lastT = -1; ritaLista(); hjalp(); ld.style.display = "none";
     status(mk.kalla === "hand" ? "Din sparade genomgång" : mk.kalla === "tryck" ? "Utgångsläge: knapptrycken från inspelningen (inget sparat än)" : "Inga markeringar än");
