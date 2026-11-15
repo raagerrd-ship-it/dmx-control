@@ -384,6 +384,13 @@ minst FLANK_GONE_DB under taket i MINI_TOPGONE_MS = 250 ms (~2 slag utan kick), 
 (miniEp/miniEpUsed). Droppen orörda. Mätt på ägarens tre genomgångna filer: 151659 26,4 -> 4,9/min, 171840 36,0 -> 1,3/min,
 172432 13,9 -> 2,0/min; träffsäkerheten 5/4/8 -> 19/50/41 %, sedda landningar 11/7/34 -> 8/4/26. Ljuset läser inte räknaren
 (DMX effects.ts, lotus) - bara inspelningsloggen och domarna. Säkerhetstagg: fore-mini-per-lucka.
+
+2026-11-15, DISKANTVETOT (HI_VETO_DB, hiFast/hiNorm, i dropClassify; ägaren: "ja kör på det diskantveto"; s2:s idé och kod i SE1 fas 2).
+En flank som landar medan diskanten (bandDbRaw[6], 2 s-medel) ligger under sitt eget 30 s-medel blir minidrop (dropDemoted). Skälet ur
+ägarens 151659: in i en vers ligger diskanten 1,3-3,2 dB lågt, in i hans drop högst 0,4 dB lågt. Flanken själv är orörd - vetot tar bara
+bort drop. Mätt (dropdom2 --skak, fem starter): övning 27,7 -> 31,2, kontroll 36,0 -> 38,5, 193040 behåller 4/4. Ägarens tre genomgångna
+filer (151659, 171840, 172432): drop rätt 3 -> 3 av 20, falska 9 -> 1, minidrop kallade drop 6 -> 1. Kostnad x1,00. Kvar: flanken hittar
+bara 3 av hans 20 drop (breaken i den här musiken ligger 8-12 dB under taket, flanken kräver 10 dB i 4 s).
 Vid `const nv = hist[(this.bodyHistPos + HL - 1) % HL]; const mnRef = nv < riseRef ? nv : ri...`:
 
 ```text
