@@ -60,6 +60,9 @@ tools/arena/dropdom3.py (bas 24,4), övning 151659 + 172432 + 160345, kontroll 1
 UPP1 FINALEN: u4 56,3 / u2 54,4 / u1 53,2 / bas 48,1 / u3 46,0 - INGEN fann ett drop till på kontrollen (alla 1/5 i 171840); det som höll
 var UPPBYGGNADEN (u4 = s1:s regel 4/4 med 7 skickade, u2 4/4). .arena/upp1/ranking-final.md. BONUSRUNDAN pågår (bonus.md): de fyra läser
 varandras lösningar, väljer uppbyggnadsdetektor och EN drop-regel; döms på övningen, sedan av orkestratorn på en NY genomgången fil.
+UPP1 KLAR (rapport tools/natt/arena-2026-11-15-upp1.md): inget inlagt. Förslag till ägaren: u2:s uppbyggnad som signal (3 rader); drop-
+kandidaterna u4 "breaket håller" och u1 "nästa lucka" (båda +455/+515 i 172432) döms på hans NÄSTA genomgångna fil (200719/193818).
+Diskantvetot fäller 3 av hans 23 övningsdrop (107, 672, 441) - avvägt mot 8 av 9 falska borta.
 NÄSTA DROP-FRÅGA: flanken hittar bara 3 av ägarens 20 drop i de genomgångna filerna (breaken 8-12 dB under taket, flanken kräver 10 dB i 4 s).
 
 ARENAN DROP2 KLAR 2026-11-15 02:35: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-14-drop2.md (+ mappen med alla lösningar och diffar).
