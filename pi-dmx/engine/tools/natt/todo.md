@@ -63,6 +63,10 @@ varandras lösningar, väljer uppbyggnadsdetektor och EN drop-regel; döms på �
 UPP1 KLAR (rapport tools/natt/arena-2026-11-15-upp1.md): inget inlagt. Förslag till ägaren: u2:s uppbyggnad som signal (3 rader); drop-
 kandidaterna u4 "breaket håller" och u1 "nästa lucka" (båda +455/+515 i 172432) döms på hans NÄSTA genomgångna fil (200719/193818).
 Diskantvetot fäller 3 av hans 23 övningsdrop (107, 672, 441) - avvägt mot 8 av 9 falska borta.
+FLANKEN LANDAR PÅ FULL BAS, INLAGT 90ba633 (ägaren "Lägg in", 11-15 kväll): FLANK_LAND_DB 6 -> 1,5. Motorn slog 0,5-0,8 s FÖRE ägarens drop
+(på basens uppgång). Fem drop-filer, fem starter: rätt 6 -> 10 av 34, falska 6 -> 2. Lotus portad 128f7882 EJ utlagd. Ägaren gick igenom
+193040 (6 drop, 3 mini, klar) - filen KLIPPT vid 06:05.50 (original -oklippt.wav). Förslag (forslag_full.py) ligger i 200719, ogenomgånget.
+LADAN nästa besök: lägg ut HEAD = minidrop per lucka + diskantvetot + flanken 1,5 dB (ladan kör cad739b).
 NÄSTA DROP-FRÅGA: flanken hittar bara 3 av ägarens 20 drop i de genomgångna filerna (breaken 8-12 dB under taket, flanken kräver 10 dB i 4 s).
 
 ARENAN DROP2 KLAR 2026-11-15 02:35: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-14-drop2.md (+ mappen med alla lösningar och diffar).
