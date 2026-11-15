@@ -377,6 +377,13 @@ Vid `if (MINI_SPACING_MS > 0) {`:
 (KICK-FIRST forkastad 09-04: flod pa megamix; [firstkick]-sparet borttaget 09-27.)
 MINIDROP-lyftet (se MINI_*). Egen svacka-raknare (kortare/grundare an gone) och egen flank.
 ```
+2026-11-15, EN MINIDROP PER KICK-LUCKA (ägaren: "kör på det", efter miniarenan SE1 där s1, s2, s3 och s4 föreslog det var för sig;
+koden är s3:s). Förut räknade svackan "bodyEnv 3 dB under taket i 800 ms" (MINI_GONE_DB/MINI_GONE_MS, borttagna) och uppdaterades
+varje hopp, så sidokedjepumpen på varje slag blev en minidrop (26/min i 151659, 231 st). Nu: luckan = flankens 0,6 s-topp (fdTop)
+minst FLANK_GONE_DB under taket i MINI_TOPGONE_MS = 250 ms (~2 slag utan kick), och bara första landningen per lucka räknas
+(miniEp/miniEpUsed). Droppen orörda. Mätt på ägarens tre genomgångna filer: 151659 26,4 -> 4,9/min, 171840 36,0 -> 1,3/min,
+172432 13,9 -> 2,0/min; träffsäkerheten 5/4/8 -> 19/50/41 %, sedda landningar 11/7/34 -> 8/4/26. Ljuset läser inte räknaren
+(DMX effects.ts, lotus) - bara inspelningsloggen och domarna. Säkerhetstagg: fore-mini-per-lucka.
 Vid `const nv = hist[(this.bodyHistPos + HL - 1) % HL]; const mnRef = nv < riseRef ? nv : ri...`:
 
 ```text
