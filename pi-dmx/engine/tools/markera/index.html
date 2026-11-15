@@ -55,9 +55,7 @@
   <label>Ljusstyrka <input type="range" id="ljus" min="-40" max="40" value="0" style="width:90px"></label>
   <label>Kontrast <input type="range" id="kontrast" min="60" max="260" value="125" style="width:90px"></label>
   <label title="Varje frekvensband får sin egen ljusskala, så att svaga band (diskanten) syns lika tydligt som starka"><input type="checkbox" id="jamna" checked> Utjämna band</label>
-  <button id="nasta" title="Hoppa till nästa ställe där motorn slog utan markering (N)">Nästa omarkerade</button>
-  <button id="laggin" title="Lägger in svepets förslag som streckade markeringar. Godta med G, flytta eller ta bort.">Lägg in förslag</button>
-  <button id="godtaalla" title="Gör alla kvarvarande förslag till riktiga markeringar">Godta alla</button>
+  <button id="nasta" title="Hoppa till nästa ställe där motorn slog utan markering (N; med ett förslag valt: nästa i den raden)">Nästa omarkerade</button>
   <label><input type="checkbox" id="klar"> Genomgången klar</label>
   <span id="status"></span>
 </header>
@@ -80,8 +78,8 @@ const SORT = {   // sort: [namn, kort etikett, tangent, färg, slag: p = punkt, 
 };
 const KEY = Object.fromEntries(Object.entries(SORT).map(([k, v]) => [v[2], k]));
 const $ = id => document.getElementById(id), ljud = $("ljud"), vy = $("vy"), over = $("over"), cx = vy.getContext("2d"), ox = over.getContext("2d");
-const RULER = 20, FLAG = 22, LSEK = 18, LUPP = 14, LMOT = 16, TOP = RULER + FLAG + LSEK + LUPP + LMOT;   // lanernas höjder över spektrum
-let F = null, dur = 0, spec = null, marks = [], kand = { drop: [], latgrans: [] }, forslag = [], sel = null, v0 = 0, vd = 30, follow = true, nid = 1, klar = false;
+const RULER = 20, FLAG = 22, LSEK = 18, LUPP = 14, ROWH = 19, EGNA = RULER + FLAG + LSEK + LUPP; let TOP = EGNA;   // höjder över spektrum: linjal, ägarens flaggor/sektioner/uppbyggnader, sedan en rad per analys
+let F = null, dur = 0, spec = null, marks = [], kand = { drop: [], latgrans: [] }, rader = [], asel = null, sel = null, v0 = 0, vd = 30, follow = true, nid = 1, klar = false;
 let undo = [], redo = [], dirty = true, saveT = 0, osparat = false, lutB = null, img = null, off = document.createElement("canvas"), drag = null, lastT = -1;
 const fmt = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, "0") + ":" + s.toFixed(2).padStart(5, "0"); };
 const nu = () => ljud.currentTime || 0, W = () => vy.clientWidth, H = () => vy.clientHeight, tx = t => (t - v0) / vd * W(), xt = x => v0 + x / W() * vd;
@@ -131,6 +129,32 @@ function band(kind) {   // [start, slut, sort] för uppbyggnad (till nästa drop
   return ut;
 }
 const traffad = t => marks.some(m => !m.skip && !m.forslag && (m.kind === "drop" || m.kind === "mini" || m.kind === "intedrop") && t - m.fineS >= -0.8 && t - m.fineS <= 1.8);
+const KL = k => k === "drop" || k === "mini" || k === "intedrop" ? "p" : k;
+function markTagna() {   // vilka av analysernas förslag finns redan bland ägarens markeringar (samma slag, nära i tid)
+  for (const R of rader) for (const f of R.marks) f.tagen = marks.some(m => !m.skip && !m.forslag && KL(m.kind) === KL(f.kind) && Math.abs(m.fineS - f.fineS) < (KL(f.kind) === "p" ? 2 : f.kind === "latbyte" ? 6 : 3.5));
+}
+function ritaRader(w) {
+  rader.forEach((R, r) => { const y = EGNA + r * ROWH; cx.fillStyle = r % 2 ? "#191c21" : "#20242b"; cx.fillRect(0, y, w, ROWH);
+    for (const [m, e] of R.band) { const x = Math.max(0, tx(m.fineS)), x2 = Math.min(w, tx(e)); if (x2 < 0 || x > w) continue; const v = asel && asel.m === m;
+      cx.fillStyle = SORT[m.kind][3]; cx.globalAlpha = m.tagen ? 0.25 : 0.62; cx.fillRect(x, y + 2, Math.max(1, x2 - x - 1), ROWH - 4); cx.globalAlpha = 1;
+      if (v) { cx.strokeStyle = "#fff"; cx.lineWidth = 2; cx.strokeRect(x + 1, y + 2, Math.max(2, x2 - x - 2), ROWH - 4); }
+      if (x2 - x > 34) { cx.fillStyle = "#fff"; cx.fillText((m.etikett || SORT[m.kind][0]) + (m.tagen ? " ✓" : ""), x + 5, y + ROWH / 2 + 0.5); } }
+    for (const m of R.marks) { if (SORT[m.kind][4] === "s") continue; const x = tx(m.fineS); if (x < -8 || x > w + 8) continue; const v = asel && asel.m === m;
+      cx.fillStyle = SORT[m.kind][3]; cx.globalAlpha = m.tagen ? 0.35 : 1;
+      if (m.kind === "uppbyggnad") { const d = R.marks.find(q => (q.kind === "drop" || q.kind === "mini") && q.fineS > m.fineS && q.fineS - m.fineS <= 120); cx.fillRect(x, y + ROWH - 6, Math.max(4, (d ? tx(d.fineS) : x + 20) - x), 4); cx.fillRect(x - 1, y + 2, 2, ROWH - 4); }
+      else if (m.kind === "latbyte") cx.fillRect(x - 1.5, y + 1, 3, ROWH - 2);
+      else { cx.beginPath(); cx.moveTo(x - 6, y + 3); cx.lineTo(x + 6, y + 3); cx.lineTo(x, y + ROWH - 3); cx.closePath(); cx.fill(); }
+      cx.globalAlpha = 1; if (v) { cx.strokeStyle = "#fff"; cx.lineWidth = 2; cx.strokeRect(x - 8, y + 1, 16, ROWH - 2); } }
+    const tw = cx.measureText(R.namn).width + 12; cx.fillStyle = "rgba(20,22,26,.88)"; cx.fillRect(w - tw, y + 1, tw, ROWH - 2); cx.fillStyle = "#c5cad3"; cx.textAlign = "right"; cx.fillText(R.namn, w - 6, y + ROWH / 2 + 0.5); cx.textAlign = "left"; });
+}
+function taIn(alla) {   // G: analysens förslag blir en av ägarens markeringar (Skift+G: allt i raden som inte redan finns)
+  if (!asel) return; const R = asel.R, L = alla ? R.marks.filter(m => !m.tagen) : [asel.m]; let ny = null;
+  if (!alla && asel.m.tagen) { status("Den finns redan bland dina markeringar"); return; } if (!L.length) { status("Allt i raden finns redan bland dina"); return; }
+  andra(() => { for (const f of L) { ny = { id: nid++, kind: f.kind, fineS: f.fineS, pressS: f.fineS, skip: false, hand: true, forslag: false, why: R.namn + (f.etikett ? ": " + f.etikett : "") }; marks.push(ny); } });
+  if (alla) status(L.length + " inlagda från " + R.namn); else valj(ny);
+}
+function nastaIRad() { if (!asel) return nastaOmarkerad(); const R = asel.R, k = R.marks.filter(m => !m.tagen), n = k.find(m => m.fineS > asel.m.fineS + 0.01) ?? k[0];
+  if (!n) { status("Allt i raden finns redan bland dina"); return; } ljud.pause(); asel = { R, m: n }; ljud.currentTime = n.fineS; vyn(n.fineS - vd * 0.4, vd); dirty = true; hjalp(); }
 function rita() {
   const dpr = window.devicePixelRatio || 1, w = W(), h = H();
   if (vy.width !== Math.round(w * dpr) || vy.height !== Math.round(h * dpr)) { vy.width = Math.round(w * dpr); vy.height = Math.round(h * dpr); }
@@ -148,12 +172,11 @@ function rita() {
   const steg = [0.1, 0.2, 0.5, 1, 2, 5, 10, 30, 60, 120, 300].find(s => s / vd * w >= 70) || 600;
   for (let t = Math.ceil(v0 / steg) * steg; t < v0 + vd; t += steg) { const x = tx(t); cx.fillRect(x, 0, 1, RULER); cx.fillText(steg < 1 ? fmt(t) : fmt(t).slice(0, 5) + (steg < 1 ? "" : ""), x + 4, RULER / 2); }
   // laner
-  const yF = RULER, yS = yF + FLAG, yU = yS + LSEK, yM = yU + LUPP;
-  cx.fillStyle = "#6b7280"; cx.textAlign = "right"; cx.fillText("sektion", w - 4, yS + LSEK / 2); cx.fillText("uppbyggnad", w - 4, yU + LUPP / 2); cx.fillText("motorn", w - 4, yM + LMOT / 2); cx.textAlign = "left";
+  const yF = RULER, yS = yF + FLAG, yU = yS + LSEK;
+  cx.fillStyle = "#6b7280"; cx.textAlign = "right"; cx.fillText("dina sektioner", w - 4, yS + LSEK / 2); cx.fillText("dina uppbyggnader", w - 4, yU + LUPP / 2); cx.textAlign = "left";
   for (const [a, e, k, , fo] of band("s")) { const x = Math.max(0, tx(a)), x2 = Math.min(w, tx(e)); if (x2 < 0 || x > w) continue; cx.fillStyle = SORT[k][3]; cx.globalAlpha = fo ? 0.22 : 0.55; cx.fillRect(x, yS + 2, x2 - x, LSEK - 4); cx.globalAlpha = 1; cx.fillStyle = "#fff"; if (x2 - x > 40) cx.fillText(SORT[k][0], x + 5, yS + LSEK / 2); }
   for (const [a, e, k, oviss, fo] of band("u")) { const x = Math.max(0, tx(a)), x2 = Math.min(w, tx(e)); if (x2 < 0 || x > w) continue; cx.fillStyle = SORT[k][3]; cx.globalAlpha = oviss || fo ? 0.3 : 0.7; cx.fillRect(x, yU + 2, x2 - x, LUPP - 4); cx.globalAlpha = 1; if (oviss) { cx.fillStyle = "#fff"; cx.fillText("inget drop efter", x + 4, yU + LUPP / 2); } }
-  for (const t of kand.latgrans || []) { const x = tx(t); if (x < 0 || x > w) continue; cx.fillStyle = "#3ec9f0"; cx.fillRect(x - 1, yM + 2, 2, LMOT - 4); }
-  for (const t of kand.drop || []) { const x = tx(t); if (x < -8 || x > w + 8) continue; const ok = traffad(t); cx.fillStyle = ok ? "#6b7280" : "#ff8c1a"; cx.beginPath(); cx.moveTo(x - 6, yM + 2); cx.lineTo(x + 6, yM + 2); cx.lineTo(x, yM + LMOT - 2); cx.closePath(); cx.fill(); }
+  ritaRader(w);
   // markeringar
   for (const m of sorterade()) { const x = tx(m.fineS); if (x < -60 || x > w + 5) continue; const s = SORT[m.kind], v = m === sel, punkt = s[4] === "p";
     const al = m.skip ? 0.4 : 1, et = s[1] + (m.forslag ? "?" : ""); cx.globalAlpha = al; cx.fillStyle = s[3];
@@ -186,12 +209,12 @@ function ritaOver() {
 function vyn(nv0, nvd) { vd = Math.max(1.5, Math.min(Math.max(dur, 2), nvd)); v0 = Math.max(-0.02 * vd, Math.min(Math.max(0, dur - vd * 0.9), nv0)); dirty = true; }
 function zoom(k, kring) { const t = kring ?? nu(), a = (t - v0) / vd; const nvd = Math.max(1.5, Math.min(Math.max(dur, 2), vd * k)); vyn(t - a * nvd, nvd); }
 function visa(t) { const x = tx(t); if (x < 0 || x > W() * 0.85) vyn(t - vd * 0.2, vd); }
-function ga(t, behallVal) { t = Math.max(0, Math.min(dur - 0.02, t)); ljud.currentTime = t; if (!behallVal) valj(null); visa(t); dirty = true; }
-function valj(m) { sel = m; dirty = true; ritaLista(); hjalp(); }
+function ga(t, behallVal) { t = Math.max(0, Math.min(dur - 0.02, t)); ljud.currentTime = t; if (!behallVal) { asel = null; valj(null); } visa(t); dirty = true; }
+function valj(m) { sel = m; if (m) asel = null; dirty = true; ritaLista(); hjalp(); }
 
 /* ---------- markeringar ---------- */
 function andra(f) { undo.push(JSON.stringify(marks)); if (undo.length > 200) undo.shift(); redo = []; f(); efter(); }
-function efter() { dirty = true; osparat = true; ritaLista(); hjalp(); clearTimeout(saveT); status("Sparar …"); saveT = setTimeout(spara, 400); }
+function efter() { markTagna(); dirty = true; osparat = true; ritaLista(); hjalp(); clearTimeout(saveT); status("Sparar …"); saveT = setTimeout(spara, 400); }
 async function spara() {
   if (!F) return; osparat = false;
   try { const r = await fetch("/api/marks?f=" + encodeURIComponent(F), { method: "POST", keepalive: true, body: JSON.stringify({ klar, marks: marks.map(({ kind, fineS, pressS, skip, hand, forslag, why }) => ({ kind, fineS, pressS, skip, hand, forslag, why })) }) }), j = await r.json();
@@ -206,14 +229,6 @@ function sortKey(kind) {   // tangenten/knappen: byter sort på den valda marker
 }
 function taBort() { if (!sel) return; const m = sel; andra(() => { marks = marks.filter(x => x !== m); sel = null; }); }
 function flytta(d) { if (!sel) return; const m = sel; andra(() => { m.fineS = +Math.max(0, Math.min(dur, m.fineS + d)).toFixed(3); m.hand = true; m.forslag = false; }); visa(m.fineS); }
-function godta() { if (!sel || !sel.forslag) return; const m = sel; andra(() => { m.forslag = false; m.hand = true; }); hopp(1); }
-function godtaAlla() { if (!marks.some(m => m.forslag)) return; andra(() => { for (const m of marks) if (m.forslag) { m.forslag = false; m.hand = true; } }); }
-function laggIn() {   // svepets förslag som streckade markeringar; hoppar över dem som redan ligger där
-  const klass = k => SORT[k][4] === "p" && k !== "latbyte" ? "p" : k; let n = 0;
-  andra(() => { for (const f of forslag) { if (marks.some(m => klass(m.kind) === klass(f.kind) && Math.abs(m.fineS - f.fineS) < (klass(f.kind) === "p" ? 2.5 : 4))) continue;
-    marks.push({ id: nid++, kind: f.kind, fineS: f.fineS, pressS: f.fineS, skip: false, hand: false, forslag: true, why: f.why }); n++; } });
-  status(n ? n + " förslag inlagda - gå igenom dem med Tab, godta med G" : forslag.length ? "Alla förslag ligger redan inne" : "Inga förslag för den här inspelningen (kör svepet)");
-}
 function angra(fran, till) { if (!fran.length) return; till.push(JSON.stringify(marks)); const id = sel && sel.id; marks = JSON.parse(fran.pop()); sel = marks.find(m => m.id === id) || null; efter(); }
 function hopp(rikt) { const S = sorterade(), t = sel ? sel.fineS : nu(); const m = rikt > 0 ? S.find(x => x.fineS > t + (sel ? 0.001 : -0.001)) : S.slice().reverse().find(x => x.fineS < t - 0.001); if (m) { ljud.pause(); ga(m.fineS, true); valj(m); vyn(m.fineS - vd * 0.4, vd); } }
 function nastaOmarkerad() { const t = nu() + 0.3, k = (kand.drop || []).filter(x => !traffad(x)), n = k.find(x => x > t) ?? k[0]; if (n == null) { status("Inga omarkerade ställen kvar"); return; } ljud.pause(); ga(n - 0.15); vyn(n - vd * 0.4, vd); }
@@ -226,12 +241,13 @@ function ritaLista() {
     d.append(i, b, n, sp); d.onclick = () => { ljud.pause(); ga(m.fineS, true); valj(m); vyn(m.fineS - vd * 0.4, vd); }; L.append(d); if (m === sel) d.scrollIntoView({ block: "nearest" }); }
   const c = k => marks.filter(m => m.kind === k && !m.skip && !m.forslag).length, nf = marks.filter(m => m.forslag).length, om = (kand.drop || []).filter(t => !traffad(t)).length;
   $("summa").textContent = `${c("drop")} drop · ${c("mini")} minidrop · ${c("intedrop")} inte drop · ${c("latbyte")} låtbyten · ${c("uppbyggnad")} uppbyggnader` + ((kand.drop || []).length ? ` · motorn slog på ${om} omarkerade ställen` : "") + (nf ? ` · ${nf} förslag kvar att gå igenom` : "");
-  $("laggin").textContent = "Lägg in förslag" + (forslag.length ? " (" + forslag.length + ")" : ""); $("godtaalla").style.display = nf ? "" : "none";
 }
 function hjalp() {
+  const sakra = t => String(t || "").replace(/[<>&]/g, "");
+  if (asel) { const m = asel.m; $("hjalp").innerHTML = `<b>${sakra(asel.R.namn)}: ${sakra(m.etikett || SORT[m.kind][0])} ${fmt(m.fineS)}</b>${m.why ? " (" + sakra(m.why) + ")" : ""} — ${m.tagen ? "finns redan bland dina" : "<kbd>G</kbd> eller dubbelklick tar in den bland dina"} · <kbd>Skift</kbd>+<kbd>G</kbd> tar in allt i raden · <kbd>N</kbd> nästa i raden · <kbd>Enter</kbd> spelar från 2 s före · <kbd>Esc</kbd> släpper`; return; }
   $("hjalp").innerHTML = sel
     ? `<b>Vald: ${SORT[sel.kind][0]} ${fmt(sel.fineS)}${sel.forslag ? " (förslag" + (sel.why ? ": " + sel.why.replace(/[<>&]/g, "") : "") + ")" : ""}</b> — ${sel.forslag ? "<kbd>G</kbd> godtar · " : ""}dra flaggan eller <kbd>←</kbd> <kbd>→</kbd> flyttar 10 ms (<kbd>Skift</kbd> 100 ms) · sorttangent byter sort · <kbd>Delete</kbd> tar bort · <kbd>Enter</kbd> spelar från 2 s före · <kbd>Esc</kbd> släpper · <kbd>Tab</kbd> nästa`
-    : `<kbd>Mellanslag</kbd> spela/pausa · sorttangent sätter markering vid den vita markören · klick i spektrum flyttar markören, dra = panorera, hjul = zooma · <kbd>←</kbd> <kbd>→</kbd> 1 s (<kbd>Skift</kbd> 5 s) · <kbd>,</kbd> <kbd>.</kbd> 20 ms · <kbd>Tab</kbd> nästa markering · <kbd>N</kbd> nästa omarkerade · <kbd>Ctrl</kbd>+<kbd>Z</kbd> ångra`;
+    : `<kbd>Mellanslag</kbd> spela/pausa · sorttangent sätter markering vid den vita markören · klick i en analysrad väljer ett förslag (<kbd>G</kbd> tar in det) · klick i spektrum flyttar markören, dra = panorera, hjul = zooma · <kbd>←</kbd> <kbd>→</kbd> 1 s (<kbd>Skift</kbd> 5 s) · <kbd>,</kbd> <kbd>.</kbd> 20 ms · <kbd>Tab</kbd> nästa markering · <kbd>N</kbd> nästa omarkerade · <kbd>Ctrl</kbd>+<kbd>Z</kbd> ångra`;
 }
 
 /* ---------- laddning ---------- */
@@ -242,9 +258,11 @@ async function oppna(f) {
   try {
     const [mk, sp] = await Promise.all([fetch("/api/marks?f=" + encodeURIComponent(f)).then(r => r.json()), fetch("/api/spektrum?f=" + encodeURIComponent(f)).then(r => { if (!r.ok) throw new Error("spektrum " + r.status); return r.arrayBuffer(); })]);
     if (mk.fel) throw new Error(mk.fel);
-    spec = tolka(sp); dur = info.seconds; marks = mk.marks.map(m => ({ id: nid++, kind: m.kind, fineS: m.fineS, pressS: m.pressS ?? m.fineS, skip: !!m.skip, hand: !!m.hand, forslag: !!m.forslag, why: m.why })); forslag = mk.forslag || []; kand = mk.kandidater || { drop: [], latgrans: [] }; klar = !!mk.klar; $("klar").checked = klar;
+    spec = tolka(sp); dur = info.seconds; marks = mk.marks.map(m => ({ id: nid++, kind: m.kind, fineS: m.fineS, pressS: m.pressS ?? m.fineS, skip: !!m.skip, hand: !!m.hand, forslag: !!m.forslag, why: m.why }));
+    rader = (mk.rader || []).map(R => { const S = R.marks; return { ...R, band: S.map((m, i) => { if (SORT[m.kind][4] !== "s") return null; const d = S.slice(i + 1).find(x => SORT[x.kind][4] === "s" || x.kind === "latbyte"); return [m, d ? d.fineS : info.seconds]; }).filter(Boolean) }; });
+    TOP = EGNA + rader.length * ROWH; asel = null; kand = mk.kandidater || { drop: [], latgrans: [] }; klar = !!mk.klar; $("klar").checked = klar;
     F = f; ljud.src = "/ljud?f=" + encodeURIComponent(f); ljud.playbackRate = +$("fart").value; byggLut(); localStorage.setItem("markera.fil", f);
-    vyn(0, Math.min(dur, 40)); lastT = -1; ritaLista(); hjalp(); ld.style.display = "none";
+    markTagna(); vyn(0, Math.min(dur, 40)); lastT = -1; ritaLista(); hjalp(); ld.style.display = "none";
     status(mk.kalla === "hand" ? "Din sparade genomgång" : mk.kalla === "tryck" ? "Utgångsläge: knapptrycken från inspelningen (inget sparat än)" : "Inga markeringar än");
   } catch (e) { ld.textContent = "Kunde inte läsa in: " + e.message; }
 }
@@ -269,17 +287,22 @@ $("folj").onclick = () => { follow = !follow; $("folj").classList.toggle("pa", f
 for (const id of ["ljus", "kontrast"]) { $(id).oninput = byggLut; $(id).onchange = e => e.target.blur(); }
 $("jamna").onchange = e => { byggLut(); e.target.blur(); };
 $("nasta").onclick = () => { nastaOmarkerad(); $("nasta").blur(); };
-$("laggin").onclick = () => { laggIn(); $("laggin").blur(); }; $("godtaalla").onclick = () => { godtaAlla(); $("godtaalla").blur(); };
 $("klar").onchange = e => { klar = e.target.checked; efter(); e.target.blur(); };
 
 vy.addEventListener("wheel", e => { e.preventDefault(); const r = vy.getBoundingClientRect(), t = xt(e.clientX - r.left);
   if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) vyn(v0 + (e.deltaX || e.deltaY) / W() * vd, vd); else zoom(e.deltaY > 0 ? 1.25 : 0.8, t); }, { passive: false });
 vy.addEventListener("mousedown", e => {
   const r = vy.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-  if (y < TOP) {   // lanerna: ta tag i en markering, eller klicka på motorns kandidat
+  if (y < EGNA) {   // ägarens egna rader: ta tag i en markering
     let b = null, bd = 9; for (const m of marks) { const mx = tx(m.fineS), tw = cx.measureText(SORT[m.kind][1] + (m.forslag ? "?" : "")).width + 10, d = x >= mx - 4 && x <= mx + tw ? (m === sel ? -1 : Math.abs(x - mx) / 10) : 99; if (d < bd) { bd = d; b = m; } }
     if (b && y >= RULER) { ljud.pause(); valj(b); drag = { slag: "mark", m: b, dx: x - tx(b.fineS), fore: JSON.stringify(marks), rort: false }; return; }
-    if (y >= TOP - LMOT) { const k = (kand.drop || []).find(t => Math.abs(tx(t) - x) < 8); if (k != null) { ga(k - 0.15); return; } }
+    ga(xt(x)); return;
+  }
+  if (y < TOP) {   // analysraderna: välj ett förslag (dubbelklick tar in det)
+    const R = rader[Math.floor((y - EGNA) / ROWH)]; let b = null, bd = 9;
+    if (R) { for (const m of R.marks) { if (SORT[m.kind][4] === "s") continue; const d = Math.abs(tx(m.fineS) - x); if (d < bd) { bd = d; b = m; } }
+      if (!b) { const q = R.band.find(([m, e2]) => x >= tx(m.fineS) && x < tx(e2)); if (q) b = q[0]; } }
+    if (b) { ljud.pause(); valj(null); asel = { R, m: b }; ljud.currentTime = b.fineS; visa(b.fineS); dirty = true; hjalp(); if (e.detail >= 2) taIn(false); return; }
     ga(xt(x)); return;
   }
   drag = { slag: "pan", x, v0, rort: false };
@@ -310,12 +333,12 @@ document.addEventListener("keydown", e => {
   if (k === "," || k === ".") { e.preventDefault(); return ga(nu() + (k === "," ? -0.02 : 0.02), true); }
   if (k === "Tab") { e.preventDefault(); return hopp(e.shiftKey ? -1 : 1); }
   if (k === "Enter") { e.preventDefault(); const t = sel ? sel.fineS : nu(); ljud.currentTime = Math.max(0, t - 2); visa(Math.max(0, t - 2)); ljud.play(); return; }
-  if (k === "Escape") return valj(null);
+  if (k === "Escape") { asel = null; return valj(null); }
   if (k === "+" || k === "=") return zoom(1 / 1.6);
   if (k === "-") return zoom(1.6);
   if (lk === "f") return $("folj").click();
-  if (lk === "n") return nastaOmarkerad();
-  if (lk === "g") return godta();
+  if (lk === "n") return nastaIRad();
+  if (lk === "g") return taIn(e.shiftKey);
   if (k === "Home") return ga(0);
   if (k === "End") return ga(dur - 1);
 });

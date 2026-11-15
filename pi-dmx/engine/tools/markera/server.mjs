@@ -4,7 +4,8 @@
  *  Läser inspelningarna i tools/ladan-<datum>/lang-*.wav. Första gången en fil öppnas räknas spektrum (10-30 s) och sparas i
  *  .arena/markera-cache/. Markeringarna sparas löpande i <namn>.marks-hand.json bredvid ljudfilen (samma form som marks-fin.json:
  *  kind, fineS, pressS, skip). Finns ingen hand-fil visas knapptrycken från inspelningen (marks-fin.json) som utgångsläge.
- *  SVEPET (tools/markera/svep.py, lokalt) skriver <namn>.forslag.json; sidan lägger in förslagen som streckade markeringar att godta/flytta/ta bort.
+ *  ANALYSERNA visas som egna rader under ägarens markeringar: lokalt svep (svep.py -> <namn>.forslag.json), molnet (svep_moln.py ->
+ *  <namn>.forslag-moln.json) och motorn (kandidater.mjs -> <namn>.kandidater.json). Ägaren tar in det som stämmer (G) eller sätter eget.
  *  Äldre versioner av hand-filen kopieras till .arena/markera-backup/ (högst var tionde minut). Inga beroenden; lyssnar bara på 127.0.0.1. */
 import http from "node:http"; import fs from "node:fs"; import path from "node:path"; import { fileURLToPath } from "node:url";
 const HERE = path.dirname(fileURLToPath(import.meta.url)), ENGINE = path.resolve(HERE, "..", ".."), PORT = +(process.env.MARKERA_PORT || 3777);
@@ -86,10 +87,14 @@ function spektrum(p) {
 
 function marks(p) {
   const hand = bredvid(p, ".marks-hand.json"), fin = bredvid(p, ".marks-fin.json"), kand = bredvid(p, ".kandidater.json");
-  const k = fs.existsSync(kand) ? las(kand) : { drop: [], latgrans: [] }, fp = bredvid(p, ".forslag.json"), forslag = fs.existsSync(fp) ? (las(fp).marks || []).filter(m => KINDS.has(m.kind)) : [];
-  if (fs.existsSync(hand)) { const h = las(hand); return { kalla: "hand", klar: !!h.klar, marks: h.marks || [], kandidater: k, forslag }; }
-  if (fs.existsSync(fin)) return { kalla: "tryck", klar: false, kandidater: k, forslag, marks: (las(fin).marks || []).filter(m => KINDS.has(m.kind)).map(m => ({ kind: m.kind, fineS: m.fineS, pressS: m.pressS, skip: !!m.skip, hand: false })) };
-  return { kalla: "tom", klar: false, marks: [], kandidater: k, forslag };
+  const k = fs.existsSync(kand) ? las(kand) : { drop: [], latgrans: [] };
+  const rad = (id, namn, sv, fn) => { const fp = bredvid(p, sv); if (!fs.existsSync(fp)) return null;   // en rad per analys: sidan visar dem under ägarens egna markeringar
+    try { return { id, namn, marks: fn(las(fp)).filter(m => KINDS.has(m.kind) && Number.isFinite(m.fineS)).sort((a, b) => a.fineS - b.fineS) }; } catch { return null; } };
+  const rader = [rad("lokal", "Lokalt svep", ".forslag.json", d => d.marks || []), rad("moln", "Molnet (Replicate)", ".forslag-moln.json", d => d.marks || []),
+    rad("motor", "Motorn", ".kandidater.json", d => [...(d.drop || []).map(t => ({ kind: "drop", fineS: t, why: "motorn slog här" })), ...(d.latgrans || []).map(t => ({ kind: "latbyte", fineS: t, why: "motorns låtgräns" }))])].filter(Boolean);
+  if (fs.existsSync(hand)) { const h = las(hand); return { kalla: "hand", klar: !!h.klar, marks: h.marks || [], kandidater: k, rader }; }
+  if (fs.existsSync(fin)) return { kalla: "tryck", klar: false, kandidater: k, rader, marks: (las(fin).marks || []).filter(m => KINDS.has(m.kind)).map(m => ({ kind: m.kind, fineS: m.fineS, pressS: m.pressS, skip: !!m.skip, hand: false })) };
+  return { kalla: "tom", klar: false, marks: [], kandidater: k, rader };
 }
 
 const senastBackup = new Map();

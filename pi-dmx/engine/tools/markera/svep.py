@@ -1,7 +1,7 @@
 """SVEPET: ett första förslag till markeringar som ägaren sedan finjusterar i tools/markera (ägaren 2026-11-15: "först köra ett svep och
 sen går jag in och finjusterar"). Allt räknas lokalt ur ljudet - inget skickas någonstans.
   <lotus>/tools/tempo-facit-pc/.venv/Scripts/python.exe tools/markera/svep.py [wav ...]     (från engine/; utan argument: alla inspelningar)
-  -> <namn>.forslag.json bredvid ljudfilen: { marks: [{ kind, fineS, why }] }.  Sidan lägger in dem med knappen "Lägg in förslag".
+  -> <namn>.forslag.json bredvid ljudfilen: { marks: [{ kind, fineS, why }] }.  Sidan visar dem som raden "Lokalt svep".
 
 Vad svepet föreslår (med facit i efterhand - det får titta FRAMÅT, till skillnad från motorn):
   latbyte      motorns låtgränser (kandidater.json), flyttade till det största spektrumskiftet inom 20 s före; täta gränser (< 30 s) = en.
@@ -11,7 +11,7 @@ Vad svepet föreslår (med facit i efterhand - det får titta FRAMÅT, till skil
                KVAR där i 6 s. Borta minst 3,5 s och full nivå efteråt = drop, annars minidrop. Plus motorns egna drop.
   uppbyggnad   där basen försvann före ett föreslaget drop.
   Drop/minidrop flyttas till närmaste slag (Beat This!), uppbyggnad/sektion/låtbyte till närmaste taktetta, om slagen finns.
-Förslag nära något ägaren redan markerat (marks-hand.json, annars marks-fin.json) tas inte med."""
+Allt svepet hittar skrivs; sidan visar det som en egen rad och markerar vad som redan finns bland ägarens markeringar."""
 import sys, os, json, io, glob, time
 import numpy as np, scipy.signal
 E = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
@@ -110,13 +110,13 @@ def svep(p):
         if not any(m['kind'] in ('drop', 'mini') and -1.0 <= t - m['fineS'] <= 2.0 for m in ut): ut.append(dict(kind='drop', fineS=narmast(beats, t - 0.15, 0.2), why='motorn slog här'))
     # inte nära det ägaren redan markerat
     klass = lambda k: 'p' if k in ('drop', 'mini', 'intedrop') else k
-    kvar = [m for m in ut if not any(klass(m['kind']) == klass(x['kind']) and abs(m['fineS'] - x['fineS']) < (2.5 if klass(m['kind']) == 'p' else 6) for x in egna)]
-    kvar.sort(key=lambda m: m['fineS'])
+    nara = sum(1 for m in ut if any(klass(m['kind']) == klass(x['kind']) and abs(m['fineS'] - x['fineS']) < (2.5 if klass(m['kind']) == 'p' else 6) for x in egna))
+    kvar = sorted(ut, key=lambda m: m['fineS'])   # ALLT svepet hittar skrivs (en egen rad i sidan, som visar vad som redan finns bland ägarens)
     for m in kvar: m['fineS'] = round(float(m['fineS']), 3)
     json.dump(dict(file=os.path.basename(p), skapad=time.strftime('%Y-%m-%d %H:%M'), marks=kvar), io.open(bas + '.forslag.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     from collections import Counter
     c = Counter(m['kind'] for m in kvar)
-    print('%s: %d förslag (%s), %d togs bort nära egna markeringar, slag %s, %.0f s' % (os.path.basename(p), len(kvar), ', '.join('%d %s' % (v, k) for k, v in c.items()), len(ut) - len(kvar), 'Beat This!' if beats is not None else 'saknas', time.time() - t0))
+    print('%s: %d förslag (%s), %d ligger nära egna markeringar, slag %s, %.0f s' % (os.path.basename(p), len(kvar), ', '.join('%d %s' % (v, k) for k, v in c.items()), nara, 'Beat This!' if beats is not None else 'saknas', time.time() - t0))
 
 if __name__ == '__main__':
     W = sys.argv[1:] or [w for w in sorted(glob.glob(os.path.join(E, 'tools', 'ladan-*', 'lang-*.wav'))) if '-lagad' not in w]
