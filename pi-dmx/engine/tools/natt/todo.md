@@ -33,6 +33,14 @@ Replicate, 38 låtar körda, 1362 s gpu), motorn (kandidater.mjs). ÄGARENS FACI
 ATT GÖRA NÄR HAN ÄR KLAR MED EN FIL: låt dropdom2.py/latdom.py/finjustera-kedjan läsa marks-hand.json före marks-fin.json, mät om baslinjen, och
 döm nästa drop-försök (veton ovanpå dagens flank) på hans facit. NATTAGENTEN: rör inte tools/ladan-*/*.marks-hand.json, *.forslag*.json eller
 tools/markera; trycken från 11-14 (marks-fin för 193818 och 200719) ska inte användas som facit för nya slutsatser förrän ägaren gått igenom dem.
+FÖRSTA GENOMGÅNGNA FILEN 151659 (11-15 em, dropdom2.py läser den, 6346439): 3 drop + 10 mini + 5 uppbyggnad + sektioner. LÄRDOM (en fil, 3 drop):
+(1) motorn slår MINIDROP inom -0,4..+0,1 s vid 11 av ägarens 13 landningar - den hör dem, men slår 231 minidrop (26/min) och kallar 0 av 3 drop;
+(2) inget av de 21 ljudmåtten skiljer hans drop från hans mini (bästa AUC 0,77) - det som skiljer är HANS uppbyggnad-markering (alla 3 drop har
+3,7-9,9 s uppbyggnad och börjar en refräng; 2 av 10 mini har uppbyggnad: 3,7 s utan nivåsteg, 1,8 s trumvirvel);
+(3) uppbyggnaderna låter olika (allt stiger / inget mätbart / trumvirvel / basen kommer in / anslagen glesnar) - inget enskilt mått hittar dem;
+(4) 13 omarkerade ställen där basen kommer tillbaka efter >= 1 s lucka: 8 ligger på en sektionsgräns, uppbyggnad eller upptakt han markerat som
+annat. Basens återkomst = sektionsgräns, inte drop. Drop = landning EFTER uppbyggnad -> nästa försök behöver uppbyggnaden, inte en bättre flank.
+Mätskript: scratchpad (koll_hand.py, larde.py) - bygg om ur fore_drop5.py vid behov. Ingen arena förrän minst tre filer är genomgångna.
 
 ARENAN DROP2 KLAR 2026-11-15 02:35: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-14-drop2.md (+ mappen med alla lösningar och diffar).
 Övning (160345 + 151659 + 193818): bas 29,2 -> deltagarna 39-59, jokern 68,7 (identisk i fem starter). KONTROLL (193040 + 200719, medel av fem
