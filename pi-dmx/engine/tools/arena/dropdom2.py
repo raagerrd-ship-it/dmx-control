@@ -6,7 +6,8 @@ Måtten, vikterna, spärrarna och mängderna ändras inte under körningen. Bara
   "inspelningen är stoppad, men vi kan ha missat några" (11-14) -> en omarkerad motordrop är inte BEVISAT falsk; precisionen väger lätt.
 
 FACIT = ägarens knapptryck under inspelningen, finjusterade mot ljudet (<fil>.marks-fin.json; fineS = händelsen i ljudet, pressS =
-  trycket, skip = feltryck och räknas inte). Sorter som döms: drop, mini, intedrop. (uppbyggnad och latbyte döms INTE här.)
+  trycket, skip = feltryck och räknas inte). Har ägaren gått igenom filen i tools/markera (<fil>.marks-hand.json med klar: true)
+  gäller den i stället (2026-11-15). Sorter som döms: drop, mini, intedrop. (uppbyggnad och latbyte döms INTE här.)
   ÖVNING   tools/ladan-2026-11-13/lang-20261113T160345.wav   602 s   (kväll 1; basen hålls tillbaka före droppen)
            tools/ladan-2026-11-13/lang-20261113T151659.wav   532 s   (kväll 1; basen SPELAR VIDARE före droppen)
            tools/ladan-2026-11-14/lang-20261114T193818.wav  1725 s   (kväll 2; mest tillbakahållen bas)
@@ -72,8 +73,16 @@ def kor(arg):
     if r.returncode != 0 or not os.path.exists(ut): raise SystemExit('MÄTFEL: ' + (r.stderr or r.stdout)[-800:])
     return json.load(open(ut, encoding='utf-8'))
 
+def las_marks(wav):
+    """ägarens genomgång i tools/markera (marks-hand.json med klar: true) går före knapptrycken (marks-fin.json)"""
+    hand = os.path.join(ENGINE, wav[:-4] + '.marks-hand.json')
+    if os.path.exists(hand):
+        d = json.load(open(hand, encoding='utf-8'))
+        if d.get('klar'): return [m for m in d['marks'] if not m.get('skip') and not m.get('forslag')]
+    return [m for m in json.load(open(os.path.join(ENGINE, wav[:-4] + '.marks-fin.json'), encoding='utf-8'))['marks'] if not m.get('skip')]
+
 def dom_fil(raw, wav):
-    fin = [m for m in json.load(open(os.path.join(ENGINE, wav[:-4] + '.marks-fin.json'), encoding='utf-8'))['marks'] if not m.get('skip')]
+    fin = las_marks(wav)
     D = [t for t in raw['drops'] if t >= VARM_S]; used = set()
     agD = [m for m in fin if m['kind'] == 'drop' and m['fineS'] >= VARM_S]; agM = [m for m in fin if m['kind'] == 'mini' and m['fineS'] >= VARM_S]
     agI = [m for m in fin if m['kind'] == 'intedrop' and m['pressS'] >= VARM_S]
