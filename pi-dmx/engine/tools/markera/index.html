@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<title>Markera</title>
+<style>
+  :root { --bg: #14161a; --panel: #1d2026; --kant: #30343c; --text: #e6e8ec; --svag: #9aa1ad; --vald: #ffffff; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, "Segoe UI", sans-serif; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--kant); }
+  header label { color: var(--svag); display: flex; align-items: center; gap: 6px; }
+  select, button, input[type=range] { font: inherit; color: var(--text); }
+  select, button { background: #2a2e36; border: 1px solid var(--kant); border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  button:hover, select:hover { background: #353a44; }
+  button.pa { background: #2f5d3a; border-color: #3f7a4d; }
+  #spela { min-width: 96px; font-weight: 600; }
+  #tid { font-variant-numeric: tabular-nums; font-size: 16px; min-width: 150px; }
+  #status { margin-left: auto; color: var(--svag); font-variant-numeric: tabular-nums; }
+  #status.fel { color: #ff7b72; font-weight: 600; }
+  kbd { display: inline-block; min-width: 20px; text-align: center; padding: 0 5px; border: 1px solid #555b66; border-bottom-width: 2px; border-radius: 4px; background: #111317; font: 12px ui-monospace, Consolas, monospace; color: #fff; }
+  main { flex: 1; display: flex; min-height: 0; }
+  #vanster { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #over { height: 54px; width: 100%; display: block; border-bottom: 1px solid var(--kant); cursor: pointer; }
+  #yta { flex: 1; min-height: 120px; position: relative; }
+  #vy { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  #laddar { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(20, 22, 26, .85); font-size: 16px; text-align: center; padding: 20px; }
+  #sorter { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; background: var(--panel); border-top: 1px solid var(--kant); align-items: center; }
+  #sorter button { display: flex; align-items: center; gap: 6px; border-left-width: 5px; }
+  #sorter .delare { width: 1px; align-self: stretch; background: var(--kant); margin: 0 4px; }
+  #hjalp { padding: 6px 12px; color: var(--svag); font-size: 12.5px; background: var(--panel); border-top: 1px solid var(--kant); min-height: 30px; }
+  #hjalp b { color: var(--text); font-weight: 600; }
+  aside { width: 250px; display: flex; flex-direction: column; border-left: 1px solid var(--kant); background: var(--panel); }
+  aside h2 { margin: 0; padding: 8px 12px; font-size: 13px; font-weight: 600; color: var(--svag); border-bottom: 1px solid var(--kant); }
+  #lista { flex: 1; overflow-y: auto; }
+  #lista div { display: flex; gap: 8px; align-items: center; padding: 4px 12px; cursor: pointer; font-variant-numeric: tabular-nums; border-left: 4px solid transparent; }
+  #lista div:hover { background: #262a31; }
+  #lista div.vald { background: #323743; border-left-color: #fff; }
+  #lista div.skip { opacity: .45; text-decoration: line-through; }
+  #lista i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+  #lista span { color: var(--svag); margin-left: auto; font-size: 12px; }
+  #summa { padding: 8px 12px; border-top: 1px solid var(--kant); color: var(--svag); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<header>
+  <label>Inspelning <select id="fil"></select></label>
+  <button id="spela">▶ Spela</button>
+  <span id="tid">00:00.00</span>
+  <label>Hastighet <select id="fart"><option value="0.5">0,5×</option><option value="0.75">0,75×</option><option value="1" selected>1×</option></select></label>
+  <label>Zoom <button id="zut" title="Zooma ut (−)">−</button><button id="zin" title="Zooma in (+)">+</button><button id="zhel" title="Visa hela inspelningen">Hela</button></label>
+  <button id="folj" class="pa" title="Bilden följer uppspelningen (F)">Följ</button>
+  <label>Ljusstyrka <input type="range" id="ljus" min="-40" max="40" value="0" style="width:110px"></label>
+  <button id="nasta" title="Hoppa till nästa ställe där motorn slog utan markering (N)">Nästa omarkerade</button>
+  <label><input type="checkbox" id="klar"> Genomgången klar</label>
+  <span id="status"></span>
+</header>
+<main>
+  <div id="vanster">
+    <canvas id="over"></canvas>
+    <div id="yta"><canvas id="vy"></canvas><div id="laddar"></div></div>
+    <div id="sorter"></div>
+    <div id="hjalp"></div>
+  </div>
+  <aside><h2>Markeringar</h2><div id="lista"></div><div id="summa"></div></aside>
+</main>
+<audio id="ljud" preload="auto"></audio>
+<script>
+"use strict";
+const SORT = {   // sort: [namn, kort etikett, tangent, färg, slag: p = punkt, u = uppbyggnad (till nästa drop), s = sektion (till nästa sektion/låtbyte)]
+  drop: ["Drop", "Drop", "d", "#ff4d4d", "p"], mini: ["Minidrop", "Mini", "m", "#ffb020", "p"], intedrop: ["Inte drop", "Inte", "i", "#aab1bd", "p"], latbyte: ["Låtbyte", "Låt", "l", "#3ec9f0", "p"],
+  uppbyggnad: ["Uppbyggnad börjar", "Upp", "u", "#b07cff", "u"],
+  intro: ["Intro", "Intro", "1", "#2fb8a0", "s"], vers: ["Vers", "Vers", "2", "#5fbf4a", "s"], refrang: ["Refräng", "Refr", "3", "#ff6fb5", "s"], outro: ["Outro", "Outro", "4", "#8291a8", "s"],
+};
+const KEY = Object.fromEntries(Object.entries(SORT).map(([k, v]) => [v[2], k]));
+const $ = id => document.getElementById(id), ljud = $("ljud"), vy = $("vy"), over = $("over"), cx = vy.getContext("2d"), ox = over.getContext("2d");
+const RULER = 20, FLAG = 22, LSEK = 18, LUPP = 14, LMOT = 16, TOP = RULER + FLAG + LSEK + LUPP + LMOT;   // lanernas höjder över spektrum
+let F = null, dur = 0, spec = null, marks = [], kand = { drop: [], latgrans: [] }, sel = null, v0 = 0, vd = 30, follow = true, nid = 1, klar = false;
+let undo = [], redo = [], dirty = true, saveT = 0, osparat = false, lut = new Uint32Array(256), img = null, off = document.createElement("canvas"), drag = null, lastT = -1;
+const fmt = t => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, "0") + ":" + s.toFixed(2).padStart(5, "0"); };
+const nu = () => ljud.currentTime || 0, W = () => vy.clientWidth, H = () => vy.clientHeight, tx = t => (t - v0) / vd * W(), xt = x => v0 + x / W() * vd;
+const sorterade = () => marks.slice().sort((a, b) => a.fineS - b.fineS), status = (s, fel) => { $("status").textContent = s; $("status").className = fel ? "fel" : ""; };
+
+/* ---------- spektrum ---------- */
+function byggLut() {
+  if (!spec) return; const g = +$("ljus").value, lo = spec.lo - g, hi = Math.max(lo + 20, spec.hi - g * 0.5);
+  const S = [[0, 0, 4], [30, 12, 70], [86, 20, 110], [140, 36, 104], [196, 60, 74], [240, 112, 30], [250, 186, 40], [252, 252, 170]];
+  for (let v = 0; v < 256; v++) { const q = Math.pow(Math.max(0, Math.min(1, (v - lo) / (hi - lo))), 0.9) * (S.length - 1), i = Math.min(S.length - 2, Math.floor(q)), f = q - i;
+    const r = S[i][0] + (S[i + 1][0] - S[i][0]) * f, gg = S[i][1] + (S[i + 1][1] - S[i][1]) * f, b = S[i][2] + (S[i + 1][2] - S[i][2]) * f; lut[v] = (255 << 24) | (b << 16) | (gg << 8) | r; }
+  dirty = true;
+}
+function tolka(buf) {
+  const dv = new DataView(buf), cols = dv.getUint32(0, true), nb = dv.getUint32(4, true), cps = dv.getFloat32(8, true), t0 = dv.getFloat32(12, true), flo = dv.getFloat32(16, true), fhi = dv.getFloat32(20, true);
+  const lv = [new Uint8Array(buf, 24, cols * nb)], n = [cols];
+  while (n[n.length - 1] > 1500) { const a = lv[lv.length - 1], m = n[n.length - 1] >> 1, b = new Uint8Array(m * nb);
+    for (let c = 0; c < m; c++) for (let k = 0; k < nb; k++) { const x = a[2 * c * nb + k], y = a[(2 * c + 1) * nb + k]; b[c * nb + k] = x > y ? x : y; } lv.push(b); n.push(m); }
+  const hist = new Uint32Array(256); let tot = 0; for (let c = 0; c < cols; c += 37) for (let k = 0; k < nb; k++) { hist[lv[0][c * nb + k]]++; tot++; }
+  let lo = 0, hi = 255, s = 0; for (let v = 0; v < 256; v++) { s += hist[v]; if (s < tot * 0.10) lo = v; if (s < tot * 0.998) hi = v; }
+  const fb = k => flo * Math.pow(fhi / flo, (k + 0.5) / nb), kb = []; for (let k = 0; k < nb; k++) if (fb(k) >= 30 && fb(k) <= 150) kb.push(k);
+  const K = Math.max(1, Math.round(cps / 20)), nk = Math.floor(cols / K), bas = new Float32Array(nk), niv = new Float32Array(nk);   // kurvor i 20 Hz: bas 30-150 Hz och hela nivån
+  for (let i = 0; i < nk; i++) { let sb = 0, sa = 0; for (let c = i * K; c < (i + 1) * K; c++) { for (const k of kb) sb += lv[0][c * nb + k]; for (let k = 0; k < nb; k++) sa += lv[0][c * nb + k]; } bas[i] = sb / (K * kb.length); niv[i] = sa / (K * nb); }
+  return { cols, nb, cps, t0, flo, fhi, lv, n, lo, hi, bas, niv, kps: cps / K, fb };
+}
+function ritaSpektrum(x0, y0, w, h) {
+  if (!spec || w < 2 || h < 2) return; const nb = spec.nb;
+  let L = 0; while (L + 1 < spec.lv.length && vd * spec.cps / w > (2 << L)) L++;
+  const a = spec.lv[L], n = spec.n[L], cps = spec.cps / (1 << L);
+  if (!img || img.width !== w) { off.width = w; off.height = nb; img = new ImageData(w, nb); }
+  const px = new Uint32Array(img.data.buffer), k0 = (v0 - spec.t0) * cps, kd = vd / w * cps, tom = lut[0];
+  for (let x = 0; x < w; x++) { const c = Math.floor(k0 + x * kd), c1 = Math.min(n, Math.max(c + 1, Math.floor(k0 + (x + 1) * kd)));
+    if (c < 0 || c >= n) { for (let k = 0; k < nb; k++) px[k * w + x] = tom; continue; }
+    for (let k = 0; k < nb; k++) { let v = a[c * nb + k]; for (let q = c + 1; q < c1; q++) { const y = a[q * nb + k]; if (y > v) v = y; } px[(nb - 1 - k) * w + x] = lut[v]; } }
+  off.getContext("2d").putImageData(img, 0, 0); cx.imageSmoothingEnabled = true; cx.drawImage(off, 0, 0, w, nb, x0, y0, w, h);
+}
+
+/* ---------- ritning ---------- */
+function band(kind) {   // [start, slut, sort] för uppbyggnad (till nästa drop/minidrop) och sektioner (till nästa sektion eller låtbyte)
+  const S = sorterade().filter(m => !m.skip), ut = [];
+  S.forEach((m, i) => { const sl = SORT[m.kind][4]; if (sl !== kind) return; let e = dur, oviss = false;
+    if (kind === "u") { const d = S.slice(i + 1).find(x => x.kind === "drop" || x.kind === "mini"); if (d && d.fineS - m.fineS <= 120) e = d.fineS; else { e = Math.min(dur, m.fineS + 8); oviss = true; } }
+    else { const d = S.slice(i + 1).find(x => SORT[x.kind][4] === "s" || x.kind === "latbyte"); if (d) e = d.fineS; }
+    ut.push([m.fineS, e, m.kind, oviss]); });
+  return ut;
+}
+const traffad = t => marks.some(m => !m.skip && (m.kind === "drop" || m.kind === "mini" || m.kind === "intedrop") && t - m.fineS >= -0.8 && t - m.fineS <= 1.8);
+function rita() {
+  const dpr = window.devicePixelRatio || 1, w = W(), h = H();
+  if (vy.width !== Math.round(w * dpr) || vy.height !== Math.round(h * dpr)) { vy.width = Math.round(w * dpr); vy.height = Math.round(h * dpr); }
+  cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.fillStyle = "#14161a"; cx.fillRect(0, 0, w, h); cx.textBaseline = "middle"; cx.font = "11px system-ui, sans-serif";
+  const sh = h - TOP; ritaSpektrum(0, TOP, w, sh);
+  if (spec) {   // frekvensskala + baskurva
+    cx.fillStyle = "rgba(255,255,255,.75)"; cx.textAlign = "left";
+    for (const f of [50, 100, 200, 500, 1000, 2000, 5000, 10000]) { const y = TOP + sh * (1 - Math.log(f / spec.flo) / Math.log(spec.fhi / spec.flo)); cx.fillRect(0, y, 5, 1); cx.fillText(f >= 1000 ? f / 1000 + " k" : f, 8, y); }
+    cx.beginPath(); cx.strokeStyle = "rgba(120,220,255,.9)"; cx.lineWidth = 1.3; let forst = true;
+    for (let x = 0; x < w; x += 2) { const i = Math.round((xt(x) - spec.t0) * spec.kps); if (i < 0 || i >= spec.bas.length) continue; const y = TOP + sh - 4 - (spec.bas[i] - spec.lo) / (spec.hi - spec.lo) * sh * 0.3; if (forst) { cx.moveTo(x, y); forst = false; } else cx.lineTo(x, y); }
+    cx.stroke();
+  }
+  // tidslinjal
+  cx.fillStyle = "#1d2026"; cx.fillRect(0, 0, w, TOP); cx.fillStyle = "#9aa1ad"; cx.textAlign = "left";
+  const steg = [0.1, 0.2, 0.5, 1, 2, 5, 10, 30, 60, 120, 300].find(s => s / vd * w >= 70) || 600;
+  for (let t = Math.ceil(v0 / steg) * steg; t < v0 + vd; t += steg) { const x = tx(t); cx.fillRect(x, 0, 1, RULER); cx.fillText(steg < 1 ? fmt(t) : fmt(t).slice(0, 5) + (steg < 1 ? "" : ""), x + 4, RULER / 2); }
+  // laner
+  const yF = RULER, yS = yF + FLAG, yU = yS + LSEK, yM = yU + LUPP;
+  cx.fillStyle = "#6b7280"; cx.textAlign = "right"; cx.fillText("sektion", w - 4, yS + LSEK / 2); cx.fillText("uppbyggnad", w - 4, yU + LUPP / 2); cx.fillText("motorn", w - 4, yM + LMOT / 2); cx.textAlign = "left";
+  for (const [a, e, k] of band("s")) { const x = Math.max(0, tx(a)), x2 = Math.min(w, tx(e)); if (x2 < 0 || x > w) continue; cx.fillStyle = SORT[k][3]; cx.globalAlpha = 0.55; cx.fillRect(x, yS + 2, x2 - x, LSEK - 4); cx.globalAlpha = 1; cx.fillStyle = "#fff"; if (x2 - x > 40) cx.fillText(SORT[k][0], x + 5, yS + LSEK / 2); }
+  for (const [a, e, k, oviss] of band("u")) { const x = Math.max(0, tx(a)), x2 = Math.min(w, tx(e)); if (x2 < 0 || x > w) continue; cx.fillStyle = SORT[k][3]; cx.globalAlpha = oviss ? 0.3 : 0.7; cx.fillRect(x, yU + 2, x2 - x, LUPP - 4); cx.globalAlpha = 1; if (oviss) { cx.fillStyle = "#fff"; cx.fillText("inget drop efter", x + 4, yU + LUPP / 2); } }
+  for (const t of kand.latgrans || []) { const x = tx(t); if (x < 0 || x > w) continue; cx.fillStyle = "#3ec9f0"; cx.fillRect(x - 1, yM + 2, 2, LMOT - 4); }
+  for (const t of kand.drop || []) { const x = tx(t); if (x < -8 || x > w + 8) continue; const ok = traffad(t); cx.fillStyle = ok ? "#6b7280" : "#ff8c1a"; cx.beginPath(); cx.moveTo(x - 6, yM + 2); cx.lineTo(x + 6, yM + 2); cx.lineTo(x, yM + LMOT - 2); cx.closePath(); cx.fill(); }
+  // markeringar
+  for (const m of sorterade()) { const x = tx(m.fineS); if (x < -60 || x > w + 5) continue; const s = SORT[m.kind], v = m === sel, punkt = s[4] === "p";
+    cx.globalAlpha = m.skip ? 0.4 : 1; cx.fillStyle = s[3]; cx.fillRect(x - (v ? 1.5 : 0.75), yF, v ? 3 : 1.5, (punkt ? h : TOP + 6) - yF);
+    if (!punkt) { cx.globalAlpha = (m.skip ? 0.4 : 1) * 0.45; cx.fillRect(x - 0.5, TOP, 1, sh); cx.globalAlpha = m.skip ? 0.4 : 1; }
+    const tw = cx.measureText(s[1]).width + 10; cx.fillRect(x, yF + 2, tw, FLAG - 5); if (v) { cx.strokeStyle = "#fff"; cx.lineWidth = 2; cx.strokeRect(x, yF + 2, tw, FLAG - 5); }
+    cx.fillStyle = "#101216"; cx.fillText(s[1], x + 5, yF + FLAG / 2); cx.globalAlpha = 1;
+    if (v) { cx.fillStyle = "#fff"; cx.fillText(fmt(m.fineS), x + tw + 6, yF + FLAG / 2); } }
+  // markören
+  const xc = tx(nu()); if (xc >= 0 && xc <= w) { cx.fillStyle = "#fff"; cx.fillRect(xc - 0.5, 0, 1, h); cx.beginPath(); cx.moveTo(xc - 5, 0); cx.lineTo(xc + 5, 0); cx.lineTo(xc, 7); cx.closePath(); cx.fill(); }
+  ritaOver(); dirty = false;
+}
+function ritaOver() {
+  const dpr = window.devicePixelRatio || 1, w = over.clientWidth, h = over.clientHeight;
+  if (over.width !== Math.round(w * dpr) || over.height !== Math.round(h * dpr)) { over.width = Math.round(w * dpr); over.height = Math.round(h * dpr); }
+  ox.setTransform(dpr, 0, 0, dpr, 0, 0); ox.fillStyle = "#101216"; ox.fillRect(0, 0, w, h); if (!spec || !dur) return;
+  const kurva = (a, farg) => { ox.fillStyle = farg; for (let x = 0; x < w; x++) { const i0 = Math.floor(x / w * a.length), i1 = Math.max(i0 + 1, Math.floor((x + 1) / w * a.length)); let v = 0; for (let i = i0; i < i1 && i < a.length; i++) if (a[i] > v) v = a[i];
+    const y = Math.max(0, Math.min(1, (v - spec.lo) / (spec.hi - spec.lo))) * (h - 4); ox.fillRect(x, h - y, 1, y); } };
+  kurva(spec.niv, "#3a4150"); kurva(spec.bas, "rgba(255,150,40,.55)");
+  for (const m of marks) { if (m.skip) continue; const s = SORT[m.kind]; ox.fillStyle = s[3]; ox.fillRect(m.fineS / dur * w - 1, s[4] === "p" ? 0 : h - 10, 2, s[4] === "p" ? h : 10); }
+  for (const t of kand.drop || []) if (!traffad(t)) { ox.fillStyle = "#ff8c1a"; ox.fillRect(t / dur * w - 1, 0, 2, 6); }
+  ox.strokeStyle = "#fff"; ox.lineWidth = 1.5; ox.strokeRect(v0 / dur * w + 0.5, 0.75, Math.max(3, vd / dur * w - 1), h - 1.5);
+  ox.fillStyle = "#fff"; ox.fillRect(nu() / dur * w - 0.5, 0, 1, h);
+}
+
+/* ---------- vyn ---------- */
+function vyn(nv0, nvd) { vd = Math.max(1.5, Math.min(Math.max(dur, 2), nvd)); v0 = Math.max(-0.02 * vd, Math.min(Math.max(0, dur - vd * 0.9), nv0)); dirty = true; }
+function zoom(k, kring) { const t = kring ?? nu(), a = (t - v0) / vd; const nvd = Math.max(1.5, Math.min(Math.max(dur, 2), vd * k)); vyn(t - a * nvd, nvd); }
+function visa(t) { const x = tx(t); if (x < 0 || x > W() * 0.85) vyn(t - vd * 0.2, vd); }
+function ga(t, behallVal) { t = Math.max(0, Math.min(dur - 0.02, t)); ljud.currentTime = t; if (!behallVal) valj(null); visa(t); dirty = true; }
+function valj(m) { sel = m; dirty = true; ritaLista(); hjalp(); }
+
+/* ---------- markeringar ---------- */
+function andra(f) { undo.push(JSON.stringify(marks)); if (undo.length > 200) undo.shift(); redo = []; f(); efter(); }
+function efter() { dirty = true; osparat = true; ritaLista(); hjalp(); clearTimeout(saveT); status("Sparar …"); saveT = setTimeout(spara, 400); }
+async function spara() {
+  if (!F) return; osparat = false;
+  try { const r = await fetch("/api/marks?f=" + encodeURIComponent(F), { method: "POST", keepalive: true, body: JSON.stringify({ klar, marks: marks.map(({ kind, fineS, pressS, skip, hand }) => ({ kind, fineS, pressS, skip, hand })) }) }), j = await r.json();
+    if (!j.ok) throw new Error(j.fel || "fel"); status("Sparat " + new Date().toLocaleTimeString("sv-SE") + " · " + j.n + " markeringar"); }
+  catch (e) { osparat = true; status("KUNDE INTE SPARA: " + e.message, true); }
+}
+function sortKey(kind) {   // tangenten/knappen: byter sort på den valda markeringen, annars ny markering vid markören
+  if (!F) return;
+  if (sel) { const m = sel; andra(() => { m.kind = kind; m.skip = false; m.hand = true; }); return; }
+  const t = +nu().toFixed(3), m = { id: nid++, kind, fineS: t, pressS: t, skip: false, hand: true };
+  andra(() => marks.push(m)); if (ljud.paused) valj(m);
+}
+function taBort() { if (!sel) return; const m = sel; andra(() => { marks = marks.filter(x => x !== m); sel = null; }); }
+function flytta(d) { if (!sel) return; const m = sel; andra(() => { m.fineS = +Math.max(0, Math.min(dur, m.fineS + d)).toFixed(3); m.hand = true; }); visa(m.fineS); }
+function angra(fran, till) { if (!fran.length) return; till.push(JSON.stringify(marks)); const id = sel && sel.id; marks = JSON.parse(fran.pop()); sel = marks.find(m => m.id === id) || null; efter(); }
+function hopp(rikt) { const S = sorterade(), t = sel ? sel.fineS : nu(); const m = rikt > 0 ? S.find(x => x.fineS > t + 0.001) : S.slice().reverse().find(x => x.fineS < t - 0.001); if (m) { ljud.pause(); ga(m.fineS, true); valj(m); vyn(m.fineS - vd * 0.4, vd); } }
+function nastaOmarkerad() { const t = nu() + 0.3, k = (kand.drop || []).filter(x => !traffad(x)), n = k.find(x => x > t) ?? k[0]; if (n == null) { status("Inga omarkerade ställen kvar"); return; } ljud.pause(); ga(n - 0.15); vyn(n - vd * 0.4, vd); }
+
+function ritaLista() {
+  const L = $("lista"), S = sorterade(); L.textContent = "";
+  for (const m of S) { const d = document.createElement("div"), s = SORT[m.kind]; d.className = (m === sel ? "vald " : "") + (m.skip ? "skip" : "");
+    const i = document.createElement("i"); i.style.background = s[3]; const b = document.createElement("b"); b.textContent = fmt(m.fineS); b.style.fontWeight = "500";
+    const n = document.createElement("em"); n.textContent = s[0].replace(" börjar", ""); n.style.fontStyle = "normal"; const sp = document.createElement("span"); sp.textContent = m.skip ? "feltryck?" : m.hand ? "✓" : "tryck";
+    d.append(i, b, n, sp); d.onclick = () => { ljud.pause(); ga(m.fineS, true); valj(m); vyn(m.fineS - vd * 0.4, vd); }; L.append(d); if (m === sel) d.scrollIntoView({ block: "nearest" }); }
+  const c = k => marks.filter(m => m.kind === k && !m.skip).length, om = (kand.drop || []).filter(t => !traffad(t)).length;
+  $("summa").textContent = `${c("drop")} drop · ${c("mini")} minidrop · ${c("intedrop")} inte drop · ${c("latbyte")} låtbyten · ${c("uppbyggnad")} uppbyggnader` + ((kand.drop || []).length ? ` · motorn slog på ${om} omarkerade ställen` : "");
+}
+function hjalp() {
+  $("hjalp").innerHTML = sel
+    ? `<b>Vald: ${SORT[sel.kind][0]} ${fmt(sel.fineS)}</b> — dra flaggan eller <kbd>←</kbd> <kbd>→</kbd> flyttar 10 ms (<kbd>Skift</kbd> 100 ms) · sorttangent byter sort · <kbd>Delete</kbd> tar bort · <kbd>Enter</kbd> spelar från 2 s före · <kbd>Esc</kbd> släpper · <kbd>Tab</kbd> nästa`
+    : `<kbd>Mellanslag</kbd> spela/pausa · sorttangent sätter markering vid den vita markören · klick i spektrum flyttar markören, dra = panorera, hjul = zooma · <kbd>←</kbd> <kbd>→</kbd> 1 s (<kbd>Skift</kbd> 5 s) · <kbd>,</kbd> <kbd>.</kbd> 20 ms · <kbd>Tab</kbd> nästa markering · <kbd>N</kbd> nästa omarkerade · <kbd>Ctrl</kbd>+<kbd>Z</kbd> ångra`;
+}
+
+/* ---------- laddning ---------- */
+async function oppna(f) {
+  if (osparat) { clearTimeout(saveT); await spara(); }
+  ljud.pause(); F = null; spec = null; marks = []; sel = null; undo = []; redo = []; dirty = true; const info = FILER.find(x => x.f === f);
+  const ld = $("laddar"); ld.style.display = "flex"; ld.textContent = "Läser in " + info.namn + " … Första gången räknas spektrum fram, det kan ta upp till en minut för en lång inspelning.";
+  try {
+    const [mk, sp] = await Promise.all([fetch("/api/marks?f=" + encodeURIComponent(f)).then(r => r.json()), fetch("/api/spektrum?f=" + encodeURIComponent(f)).then(r => { if (!r.ok) throw new Error("spektrum " + r.status); return r.arrayBuffer(); })]);
+    if (mk.fel) throw new Error(mk.fel);
+    spec = tolka(sp); dur = info.seconds; marks = mk.marks.map(m => ({ id: nid++, kind: m.kind, fineS: m.fineS, pressS: m.pressS ?? m.fineS, skip: !!m.skip, hand: !!m.hand })); kand = mk.kandidater || { drop: [], latgrans: [] }; klar = !!mk.klar; $("klar").checked = klar;
+    F = f; ljud.src = "/ljud?f=" + encodeURIComponent(f); ljud.playbackRate = +$("fart").value; byggLut(); localStorage.setItem("markera.fil", f);
+    vyn(0, Math.min(dur, 40)); lastT = -1; ritaLista(); hjalp(); ld.style.display = "none";
+    status(mk.kalla === "hand" ? "Din sparade genomgång" : mk.kalla === "tryck" ? "Utgångsläge: knapptrycken från inspelningen (inget sparat än)" : "Inga markeringar än");
+  } catch (e) { ld.textContent = "Kunde inte läsa in: " + e.message; }
+}
+let FILER = [];
+async function start() {
+  for (const [k, s] of Object.entries(SORT)) { if (k === "uppbyggnad" || k === "intro") { const d = document.createElement("span"); d.className = "delare"; $("sorter").append(d); }
+    const b = document.createElement("button"); b.style.borderLeftColor = s[3]; b.innerHTML = `<kbd>${s[2].toUpperCase()}</kbd> ${s[0]}`; b.onclick = () => { sortKey(k); b.blur(); }; $("sorter").append(b); }
+  const d = document.createElement("span"); d.className = "delare"; const t = document.createElement("button"); t.innerHTML = "<kbd>Del</kbd> Ta bort vald"; t.onclick = () => { taBort(); t.blur(); }; const a = document.createElement("button"); a.innerHTML = "<kbd>Ctrl</kbd>+<kbd>Z</kbd> Ångra"; a.onclick = () => { angra(undo, redo); a.blur(); }; $("sorter").append(d, t, a);
+  FILER = await fetch("/api/filer").then(r => r.json());
+  for (const x of FILER) { const o = document.createElement("option"); o.value = x.f; o.textContent = `${x.namn.slice(0, 8)} ${x.namn.slice(9, 11)}:${x.namn.slice(11, 13)} · ${Math.round(x.seconds / 60)} min · ${x.n} mark.${x.klar ? " · klar" : x.kalla === "hand" ? " · påbörjad" : ""}`; $("fil").append(o); }
+  const sist = localStorage.getItem("markera.fil"), f = FILER.find(x => x.f === sist) || FILER[FILER.length - 1]; if (!f) { status("Hittar inga inspelningar i tools/ladan-*/", true); return; }
+  $("fil").value = f.f; oppna(f.f); hjalp();
+}
+
+/* ---------- styrning ---------- */
+$("fil").onchange = e => { oppna(e.target.value); e.target.blur(); };
+$("spela").onclick = () => { ljud.paused ? ljud.play() : ljud.pause(); $("spela").blur(); };
+ljud.onplay = () => { $("spela").textContent = "⏸ Pausa"; valj(null); }; ljud.onpause = () => { $("spela").textContent = "▶ Spela"; dirty = true; };
+$("fart").onchange = e => { ljud.playbackRate = +e.target.value; e.target.blur(); };
+$("zin").onclick = () => zoom(1 / 1.6); $("zut").onclick = () => zoom(1.6); $("zhel").onclick = () => vyn(0, dur);
+$("folj").onclick = () => { follow = !follow; $("folj").classList.toggle("pa", follow); $("folj").blur(); };
+$("ljus").oninput = byggLut; $("ljus").onchange = e => e.target.blur();
+$("nasta").onclick = () => { nastaOmarkerad(); $("nasta").blur(); };
+$("klar").onchange = e => { klar = e.target.checked; efter(); e.target.blur(); };
+
+vy.addEventListener("wheel", e => { e.preventDefault(); const r = vy.getBoundingClientRect(), t = xt(e.clientX - r.left);
+  if (e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY)) vyn(v0 + (e.deltaX || e.deltaY) / W() * vd, vd); else zoom(e.deltaY > 0 ? 1.25 : 0.8, t); }, { passive: false });
+vy.addEventListener("mousedown", e => {
+  const r = vy.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (y < TOP) {   // lanerna: ta tag i en markering, eller klicka på motorns kandidat
+    let b = null, bd = 9; for (const m of marks) { const mx = tx(m.fineS), tw = cx.measureText(SORT[m.kind][1]).width + 10, d = x >= mx - 4 && x <= mx + tw ? (m === sel ? -1 : Math.abs(x - mx) / 10) : 99; if (d < bd) { bd = d; b = m; } }
+    if (b && y >= RULER) { ljud.pause(); valj(b); drag = { slag: "mark", m: b, dx: x - tx(b.fineS), fore: JSON.stringify(marks), rort: false }; return; }
+    if (y >= TOP - LMOT) { const k = (kand.drop || []).find(t => Math.abs(tx(t) - x) < 8); if (k != null) { ga(k - 0.15); return; } }
+    ga(xt(x)); return;
+  }
+  drag = { slag: "pan", x, v0, rort: false };
+});
+window.addEventListener("mousemove", e => {
+  if (!drag) return; const r = vy.getBoundingClientRect(), x = e.clientX - r.left;
+  if (drag.slag === "mark") { drag.rort = true; drag.m.fineS = +Math.max(0, Math.min(dur, xt(x - drag.dx))).toFixed(3); dirty = true; }
+  else if (drag.slag === "pan") { if (Math.abs(x - drag.x) > 4) drag.rort = true; if (drag.rort) { vyn(drag.v0 - (x - drag.x) / W() * vd, vd); if (!ljud.paused && follow) { follow = false; $("folj").classList.remove("pa"); } } }
+  else if (drag.slag === "over") { const o = over.getBoundingClientRect(); vyn((e.clientX - o.left) / o.width * dur - vd / 2, vd); }
+});
+window.addEventListener("mouseup", e => {
+  if (!drag) return; const d = drag; drag = null;
+  if (d.slag === "mark" && d.rort) { undo.push(d.fore); redo = []; d.m.hand = true; efter(); }
+  else if (d.slag === "pan" && !d.rort) { const r = vy.getBoundingClientRect(); ga(xt(e.clientX - r.left)); }
+  else if (d.slag === "over") { const o = over.getBoundingClientRect(); ga(Math.max(0, (e.clientX - o.left) / o.width * dur)); vyn(nu() - vd / 2, vd); }
+});
+over.addEventListener("mousedown", e => { const o = over.getBoundingClientRect(); drag = { slag: "over" }; vyn((e.clientX - o.left) / o.width * dur - vd / 2, vd); });
+document.addEventListener("keydown", e => {
+  if (!F || e.target.tagName === "SELECT" || (e.target.tagName === "INPUT" && e.target.type !== "checkbox")) return;
+  const k = e.key, lk = k.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && lk === "z") { e.preventDefault(); return e.shiftKey ? angra(redo, undo) : angra(undo, redo); }
+  if ((e.ctrlKey || e.metaKey) && lk === "y") { e.preventDefault(); return angra(redo, undo); }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (k === " ") { e.preventDefault(); if (!e.repeat) ljud.paused ? ljud.play() : ljud.pause(); return; }
+  if (KEY[lk] && !e.repeat) { e.preventDefault(); return sortKey(KEY[lk]); }
+  if (k === "Delete" || k === "Backspace") { e.preventDefault(); return taBort(); }
+  if (k === "ArrowLeft" || k === "ArrowRight") { e.preventDefault(); const r = k === "ArrowLeft" ? -1 : 1; return sel ? flytta(r * (e.shiftKey ? 0.1 : 0.01)) : ga(nu() + r * (e.shiftKey ? 5 : 1)); }
+  if (k === "," || k === ".") { e.preventDefault(); return ga(nu() + (k === "," ? -0.02 : 0.02), true); }
+  if (k === "Tab") { e.preventDefault(); return hopp(e.shiftKey ? -1 : 1); }
+  if (k === "Enter") { e.preventDefault(); const t = sel ? sel.fineS : nu(); ljud.currentTime = Math.max(0, t - 2); visa(Math.max(0, t - 2)); ljud.play(); return; }
+  if (k === "Escape") return valj(null);
+  if (k === "+" || k === "=") return zoom(1 / 1.6);
+  if (k === "-") return zoom(1.6);
+  if (lk === "f") return $("folj").click();
+  if (lk === "n") return nastaOmarkerad();
+  if (k === "Home") return ga(0);
+  if (k === "End") return ga(dur - 1);
+});
+window.addEventListener("resize", () => { dirty = true; });
+window.addEventListener("beforeunload", () => { if (osparat) { clearTimeout(saveT); spara(); } });
+(function slinga() {
+  const t = nu();
+  if (t !== lastT) { lastT = t; $("tid").textContent = fmt(t) + " / " + fmt(dur).slice(0, 5); if (!ljud.paused && follow && !drag) { const x = tx(t); if (x > W() * 0.85 || x < 0) vyn(t - vd * 0.15, vd); } dirty = true; }
+  if (dirty) rita(); requestAnimationFrame(slinga);
+})();
+start();
+</script>
+</body>
+</html>
