@@ -6,8 +6,12 @@ import argparse, io, json, os, subprocess, sys, tempfile, time
 from concurrent.futures import ThreadPoolExecutor
 HERE = os.path.dirname(os.path.abspath(__file__)); ENGINE = os.path.dirname(os.path.dirname(HERE))
 # KONTROLLMÄNGDEN (--holdout): tre andra ladan-inspelningar med rätt aux-nivå som deltagarna ALDRIG bänkar mot - finalen döms på dem (mot överanpassning)
-HOLDOUT = [('lang1028', 'tools/ladan-2026-10-28/lang-20261028T180531.wav'), ('lang1014', 'tools/ladan-2026-10-14/lang-20261014T161434.wav'), ('lang1011', 'tools/ladan-2026-10-11/lang-20261011T130600.wav')]
-WAVS = [('lang1021', 'tools/ladan-2026-10-21/lang-20261021T203952.wav'), ('pop', 'tools/pop_ladan.wav'), ('megamix', 'tools/megamix_ladan.wav')]
+# 11-15: fillistorna ombyggda på det rena ljudet (allt äldre är arkiverat 11-13). ÖVNING = de tre från 11-13, KONTROLL = de tre från 11-14.
+# Inspelningarnas första 300 s (rytm.py --s 300). dynSet (ladans 20 klipp 10-08, arkiverade) körs bara om klippen finns - annars dömer
+# domaren dynamiken på slagK + djup som i kontrollen.
+HOLDOUT = [('l193818', 'tools/ladan-2026-11-14/lang-20261114T193818.wav'), ('l193040', 'tools/ladan-2026-11-14/lang-20261114T193040.wav'), ('l200719', 'tools/ladan-2026-11-14/lang-20261114T200719.wav')]
+WAVS = [('l160345', 'tools/ladan-2026-11-13/lang-20261113T160345.wav'), ('l151659', 'tools/ladan-2026-11-13/lang-20261113T151659.wav'), ('l171840', 'tools/ladan-2026-11-13/lang-20261113T171840.wav')]
+DYN = bool(__import__('glob').glob(os.path.join(ENGINE, 'tools', 'ladan-2026-10-08', '*.wav')))
 ap = argparse.ArgumentParser(); ap.add_argument('mapp'); ap.add_argument('--env', action='append', default=[]); ap.add_argument('--bas', action='store_true'); ap.add_argument('--holdout', action='store_true')
 a = ap.parse_args(); d = os.path.abspath(a.mapp); os.makedirs(d, exist_ok=True)
 env = dict(os.environ)
@@ -48,9 +52,9 @@ try:
         except Exception: return n, {'fel': (r.stderr or r.stdout)[-500:]}
         finally: os.remove(js)
     with ThreadPoolExecutor(max_workers=2) as ex: ry = dict(ex.map(rytm, HOLDOUT if a.holdout else WAVS))
-    r = None if a.holdout else subprocess.run([sys.executable, 'tools/dynSet.py'] + envarg, cwd=ENGINE, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=1800)
+    r = None if a.holdout or not DYN else subprocess.run([sys.executable, 'tools/dynSet.py'] + envarg, cwd=ENGINE, env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=1800)
     line = next((l for l in reversed(r.stdout.splitlines()) if l.startswith('{')), None) if r else None
-    dyn = {} if a.holdout else (json.loads(line) if line else {'fel': (r.stderr or '')[-500:]})
+    dyn = {} if a.holdout or not DYN else (json.loads(line) if line else {'fel': (r.stderr or '')[-500:]})
 finally:
     import shutil; shutil.rmtree(lock, ignore_errors=True)
 out = {'mapp': os.path.relpath(d, ENGINE), 'basenv': basenv, 'env': a.env, 'bas': a.bas, 'rytm': ry, 'dyn': dyn, 'tidS': round(time.time() - t0)}

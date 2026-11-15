@@ -38,6 +38,7 @@ sr = 48000
 x = np.fromfile(wav, dtype='<i2', offset=44).astype(np.float64) / 32768.0
 x = x[: int(S * sr)]
 tin = opt('--trace-in')
+NL = int(opt('--lampor', 4))   # bara för --trace-in: antal lampor i det sparade spåret
 if tin:
     tr = tin
 else:
@@ -49,14 +50,16 @@ else:
         wavfile.write(clip, sr, (x * 32767).astype(np.int16))
     # --live-kick (arena 11-07, mätfälla 52 igen - deltagaren a2 i puls1): live matar registerKick + KICK-BYPASS på frame.kick, utan flaggan står
     # lastKickBoost stilla i bänken och c.kickEnv är bara rutnätet. Domarens bänk (tools/arena/bank.py) skickar flaggan från runda 2 i puls1.
-    subprocess.run(['node', os.path.join(here, 'konsertReplay.mjs'), clip, '--step', '5', '--delad-cfg', '--json', js, '--trace', tr] + (['--live-kick'] if '--live-kick' in args else []), env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.run(['node', os.path.join(here, 'konsertReplay.mjs'), clip, '--step', '5', '--delad-cfg', '--json', js, '--trace', tr, '--trace-alla'] + (['--live-kick'] if '--live-kick' in args else []), env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    NL = json.load(open(js, encoding='utf-8')).get('nLamps', 4)   # 11-15: spåret bär alla lampor (ladan har åtta), lampa 4.. i kolumn 10 och uppåt
     os.remove(js)
     if clip != wav: os.remove(clip)
-T = np.fromfile(tr, dtype=np.float32).reshape(-1, 10)
+T = np.fromfile(tr, dtype=np.float32).reshape(-1, 10 + max(0, NL - 4))
 if opt('--trace-ut'):
     import shutil; shutil.copy(tr, opt('--trace-ut'))
 if not tin: os.remove(tr)
-t = T[:, 0].astype(np.float64); lamps = T[:, 2:6].astype(np.float64); Lsum = lamps.sum(axis=1); Ltop = lamps.max(axis=1); secT = T[:, 1]
+t = T[:, 0].astype(np.float64); lamps = np.hstack([T[:, 2:6], T[:, 10:]]).astype(np.float64); Lsum = lamps.sum(axis=1) * 4 / lamps.shape[1];   # skalad till fyra lampor: golven 0,02 och /4 nedan gäller oavsett antal
+Ltop = lamps.max(axis=1); secT = T[:, 1]
 step = int(sr * 0.005)
 def band_pw(lo, hi):
     b = sosfiltfilt(butter(2, [lo, hi], btype='band', fs=sr, output='sos'), x)

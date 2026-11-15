@@ -35,9 +35,10 @@ SPÄRRAR (DISK = ute oavsett poäng):
 import io, json, os, sys, filecmp
 HERE = os.path.dirname(os.path.abspath(__file__)); ENGINE = os.path.dirname(os.path.dirname(HERE))
 HOLD = '--holdout' in sys.argv; V2 = '--v2' in sys.argv
-WT = {'lang1028': 1, 'lang1014': 1, 'lang1011': 1} if HOLD else {'lang1021': 2, 'pop': 1, 'megamix': 1}
+# 11-15: det rena ljudet (bank.py). Lika vikt: ingen av de tre är längre eller renare än de andra.
+WT = {'l193818': 1, 'l193040': 1, 'l200719': 1} if HOLD else {'l160345': 1, 'l151659': 1, 'l171840': 1}
 BANK = 'bank-holdout.json' if HOLD else 'bank.json'
-LANG = 'lang1028' if HOLD else 'lang1021'
+LANG = 'l193818' if HOLD else 'l160345'
 
 def load(p):
     try: return json.load(io.open(os.path.join(p, BANK), encoding='utf-8'))
@@ -60,12 +61,13 @@ def rel(v, b): return (v - b) / abs(b) * 100 if b else 0.0
 
 def doma(b, v, d):
     R, B = v.get('rytm', {}), b['rytm']; disk = []; avdrag = 0.0
-    if any('fel' in R.get(n, {'fel': 1}) for n in WT) or (not HOLD and 'fel' in v.get('dyn', {'fel': 1})): return {'disk': ['fel: bänken gick inte igenom'], 'poang': None}
+    if any('fel' in R.get(n, {'fel': 1}) for n in WT) or ('fel' in v.get('dyn', {})): return {'disk': ['fel: bänken gick inte igenom'], 'poang': None}
     wsum = sum(WT.values())
     takt = sum(WT[n] * (rel(R[n]['rAbest'], B[n]['rAbest']) + rel(R[n]['rK'], B[n]['rK'])) / 2 for n in WT) / wsum
     slag = sum(WT[n] * rel(R[n]['slagK'], B[n]['slagK']) for n in WT) / wsum
     djup = sum(WT[n] * rel(R[n]['djup'], B[n]['djup']) for n in WT) / wsum
-    if HOLD: kontrast = (slag + djup) / 2
+    DYN = not HOLD and 'levande' in v.get('dyn', {}) and 'levande' in b.get('dyn', {})   # 11-15: dynSets klipp är arkiverade - utan dem slagK + djup
+    if not DYN: kontrast = (slag + djup) / 2
     else:
         L, LB = v['dyn']['levande'], b['dyn']['levande']
         kontrast = (slag + djup + rel(L['ljusSteg'], LB['ljusSteg']) + rel(L['kontrast'], LB['kontrast'])) / 4
@@ -82,7 +84,7 @@ def doma(b, v, d):
     bonus = 0.0   # ägaren 11-08: ljusmängden är INTE ett kriterium (inget avdrag, ingen bonus, ingen spärr) - visas bara som info
     sl = sum(R[n]['slocknat1s'] - B[n]['slocknat1s'] for n in WT) / len(WT)
     if sl > 0.01: disk.append(f'slocknat {100 * sl:+.1f} pe')
-    fl = 0 if HOLD else v['dyn']['fladder']['fladderMin'] - b['dyn']['fladder']['fladderMin']
+    fl = 0 if not DYN else v['dyn']['fladder']['fladderMin'] - b['dyn']['fladder']['fladderMin']
     if fl > 0.5: disk.append(f'fladder {fl:+.1f}/min')
     t9v, t9b = R[LANG]['ljusLag'].get('t90'), B[LANG]['ljusLag'].get('t90')
     if t9v is not None and t9b is not None and t9v - t9b > 15: disk.append(f't90 {t9b}->{t9v} ms')
@@ -112,7 +114,7 @@ def doma(b, v, d):
     if gammal and not V2: disk.append('gammal bänk (saknar jitter/betoning) - bänka om')
     return {'takt': takt, 'kontrast': kontrast, 'kor': kor, 'jitter': R[LANG].get('jitter'), 'betoning': R[LANG].get('betoning'), 'avdrag': avdrag, 'poang': poang, 'ljus': 100 * (lj - 1),
             'lampspr': {n: 100 * (R[n]['lampspr'] / B[n]['lampspr'] - 1) for n in WT}, 'rA_lang': R[LANG]['rAbest'], 'rK_lang': R[LANG]['rK'],
-            'slagK_lang': R[LANG]['slagK'], 'ljusSteg': None if HOLD else v['dyn']['levande']['ljusSteg'], 't90': t9v, 'disk': disk}
+            'slagK_lang': R[LANG]['slagK'], 'ljusSteg': v['dyn']['levande']['ljusSteg'] if DYN else None, 't90': t9v, 'disk': disk}
 
 def main():
     run = os.path.abspath(sys.argv[1]); b = load(os.path.join(run, 'bas'))
@@ -126,7 +128,7 @@ def main():
     rows.sort(key=lambda r: (bool(r[1]['disk']), -(r[1]['poang'] if r[1]['poang'] is not None else -1e9)))
     B = b['rytm'][LANG]
     lines = [f"# Ranking {os.path.basename(run)}{' KONTROLLMÄNGDEN' if HOLD else ''} (domaren {'v2' if V2 else 'v3'}: tools/arena/domare.py, mot bas)", '',
-             f"bas ({LANG}): rA {B['rAbest']:.3f}  rK {B['rK']:.3f}  slagK {B['slagK']:.3f}  ljusSteg {None if HOLD else b['dyn']['levande']['ljusSteg']}  t90 {B['ljusLag'].get('t90')}", '',
+             f"bas ({LANG}): rA {B['rAbest']:.3f}  rK {B['rK']:.3f}  slagK {B['slagK']:.3f}  ljusSteg {b['dyn'].get('levande', {}).get('ljusSteg')}  t90 {B['ljusLag'].get('t90')}", '',
              '| plats | deltagare | poäng | takt % | dynamik % | koreografi | jitter lang ms | betoning lang | avdrag | rA lang | rK lang | slagK lang | ljusSteg | ljus % | lampspr ' + '/'.join(WT) + ' % | t90 | DISK |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|']
     for i, (n, r) in enumerate(rows, 1):
         if r['poang'] is None: lines.append(f"| {i} | {n} | - | | | | | | | | | | | | | | {'; '.join(r['disk'])} |"); continue

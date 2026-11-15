@@ -58,7 +58,7 @@ let tNow = 0; const LOG = [];
 console.log = (...a) => { const s = a.join(" "); if (/^\[dirigent\]/.test(s)) LOG.push([+tNow.toFixed(2), s.slice(11, 140)]); };
 const buf = new Float32Array(HOP);
 let lastRender = -1, lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0, lastRow = -1;
-const TRACE = opt("--trace", null) ? [] : null; const REF_SK = opt("--bas-ref", "body") === "subkick"; const SEC = { intro: 0, low: 1, build: 2, high: 3, break: 4 };
+const TRACE = opt("--trace", null) ? [] : null; const TRACE_ALLA = args.includes("--trace-alla"); /* 11-15: lampa 4.. sist i varje rad (kolumn 10 och uppåt) - rytm.py läser alla åtta */ const REF_SK = opt("--bas-ref", "body") === "subkick"; const SEC = { intro: 0, low: 1, build: 2, high: 3, break: 4 };
 // --slag (natt 10-25): var i takten landar varje lookbyte - på en taktklocka-tick (slaget), på ettan (beatIdx % 4 = 0, analysatorns
 // barShift), och ms sedan senaste tick - per orsak (switchWhy). Skrivs till stdout, json:en ändras inte.
 const SLAG = args.includes("--slag") ? new Map() : null; let slagTick = -1e12, slagLook = null;
@@ -91,8 +91,8 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   if (SLAG) { if (eng.tickNow) slagTick = ms; const lk = eng.getActiveMode(); if (lk !== slagLook) { if (slagLook !== null) { const w = eng.switchWhy || '-'; const k = SLAG.get(w) ?? { n: 0, tick: 0, one: 0, after: [] }; k.n++; if (eng.tickNow) { k.tick++; if (eng.lastBeatIdx % 4 === 0) k.one++; } k.after.push(ms - slagTick); SLAG.set(w, k); } slagLook = lk; } }
   const lv = lamps.map((L) => Math.max(u[L.r] ?? 0, u[L.g] ?? 0, u[L.b] ?? 0) * (L.dim >= 0 ? u[L.dim] / 255 : 1));   // verkligt ljus = färg x dimmer
   if (TRACE) { const sa = fr.specAbs ?? {}; TRACE.push(tS, SEC[fr.section] ?? 5, lv[0] / 255, lv[1] / 255, lv[2] / 255, lv[3] / 255, REF_SK && sa.sub != null ? (20 * Math.log10(sa.sub + 1e-7) + 20 * Math.log10(sa.kick + 1e-7)) / 2 : fr.bodyDb ?? -90,
-    20 * Math.log10((sa.treble ?? 0) + (sa.air ?? 0) + 1e-7), (eng.dropColEnv ?? 0) > 0.005 || ms < eng.miniBangUntil ? 1 : 0, eng.eBass ?? eng.eSm ?? 0); }
-  { const L = lv.reduce((a, b) => a + b, 0) / (4 * 255), T = Math.max(...lv) / 255; acc.light += L; acc.top = (acc.top ?? 0) + T; if (T > acc.hi) acc.hi = T; if (T < acc.lo) acc.lo = T; }
+    20 * Math.log10((sa.treble ?? 0) + (sa.air ?? 0) + 1e-7), (eng.dropColEnv ?? 0) > 0.005 || ms < eng.miniBangUntil ? 1 : 0, eng.eBass ?? eng.eSm ?? 0); if (TRACE_ALLA) for (let i = 4; i < lv.length; i++) TRACE.push(lv[i] / 255); }
+  { const L = lv.reduce((a, b) => a + b, 0) / (lv.length * 255), T = Math.max(...lv) / 255; acc.light += L; acc.top = (acc.top ?? 0) + T; if (T > acc.hi) acc.hi = T; if (T < acc.lo) acc.lo = T; }
   acc.nLit += lv.filter((x) => x > 0.3 * 255).length; acc.n++;   // hi/lo/top = ljusaste lampan
   if (ms < eng.miniBangUntil) acc.mini = 1;
   if (ms - lastRow >= 100) {
@@ -103,7 +103,7 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
     acc = { light: 0, nLit: 0, n: 0, mini: 0, hi: 0, lo: 9, top: 0 };
   }
 }
-const out = { wav: path, columns: ['t', 'look', 'why', 'sec', 'int', 'light', 'nLit', 'drops', 'near', 'lift', 'miniLook', 'upgrades', 'bpm', 'bodyDb', 'aMini', 'bass', 'hi', 'lo', 'top', 'pal', 'conf', 'trust', 'cbpm', 'lock'], rows: ROWS, log: LOG };
+const out = { wav: path, nLamps: lamps.length, columns: ['t', 'look', 'why', 'sec', 'int', 'light', 'nLit', 'drops', 'near', 'lift', 'miniLook', 'upgrades', 'bpm', 'bodyDb', 'aMini', 'bass', 'hi', 'lo', 'top', 'pal', 'conf', 'trust', 'cbpm', 'lock'], rows: ROWS, log: LOG };
 writeFileSync(opt("--json", "replay.json"), JSON.stringify(out));
 if (TRACE) writeFileSync(opt("--trace"), Buffer.from(new Float32Array(TRACE).buffer));
 if (SLAG) for (const [w, k] of [...SLAG].sort((x, y) => y[1].n - x[1].n)) { const af = [...k.after].sort((x, y) => x - y); process.stdout.write(`slag ${w}: ${k.n} byten, på slaget ${(100 * k.tick / k.n).toFixed(0)} %, på ettan ${(100 * k.one / k.n).toFixed(0)} %, ms efter slaget p50 ${af[af.length >> 1]?.toFixed(0)} p90 ${af[Math.floor(af.length * 0.9)]?.toFixed(0)}\n`); }
