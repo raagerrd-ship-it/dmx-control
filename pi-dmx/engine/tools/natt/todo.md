@@ -57,6 +57,9 @@ Lotus portad 7d532a4a EJ utlagd. LADAN kör cad739b: nästa ladanbesök = lägg 
 ARENAN UPP1 PÅGÅR (startad 11-15 kväll, ägaren "kör den arenan!"): uppbyggnad -> drop i motorn, flank + diskantveto låsta. Domare
 tools/arena/dropdom3.py (bas 24,4), övning 151659 + 172432 + 160345, kontroll 171840 + 193040 (+193818/200719 om ägaren blir klar).
 4 agenter u1 spektrum / u2 spänning / u3 rytm / u4 fritt. NATTAGENTEN: rör inte .arena/upp1, kör inte dropdom3.py.
+UPP1 FINALEN: u4 56,3 / u2 54,4 / u1 53,2 / bas 48,1 / u3 46,0 - INGEN fann ett drop till på kontrollen (alla 1/5 i 171840); det som höll
+var UPPBYGGNADEN (u4 = s1:s regel 4/4 med 7 skickade, u2 4/4). .arena/upp1/ranking-final.md. BONUSRUNDAN pågår (bonus.md): de fyra läser
+varandras lösningar, väljer uppbyggnadsdetektor och EN drop-regel; döms på övningen, sedan av orkestratorn på en NY genomgången fil.
 NÄSTA DROP-FRÅGA: flanken hittar bara 3 av ägarens 20 drop i de genomgångna filerna (breaken 8-12 dB under taket, flanken kräver 10 dB i 4 s).
 
 ARENAN DROP2 KLAR 2026-11-15 02:35: INGEN VINNARE, inget inlagt. Rapport tools/natt/arena-2026-11-14-drop2.md (+ mappen med alla lösningar och diffar).
