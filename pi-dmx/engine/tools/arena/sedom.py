@@ -16,7 +16,8 @@ DETEKTORN  <mapp>/detektor.py med
 FACIT  ägarens genomgång (<fil>.marks-hand.json, klar: true): fineS = händelsen i ljudet. drop/mini = där landningen kommer,
   uppbyggnad = där uppbyggnaden börjar. Efter 20 s insvängning räknat från där ljudet börjar.
   ÖVNING   tools/ladan-2026-11-13/lang-20261113T151659.wav   532 s   3 drop, 10 minidrop, 5 uppbyggnader
-  KONTROLL två andra inspelningar som bara orkestratorn kör (--holdout). Där finns bara knapptryck: uppbyggnad döms inte och falska är inte bevisade.
+  KONTROLL tre andra inspelningar som bara orkestratorn kör (--holdout): 171840 (ägarens genomgång, klar 11-15 för finalen: 5 drop, 4 mini,
+           4 uppbyggnader) döms fullt; 160345 och 193040 har bara knapptryck (uppbyggnad döms inte, falska är inte bevisade).
 
 MÅTTEN (fönster runt fineS: -0,5 .. +1,0 s; en detektordrop räknas en gång)
   drop_ratt       ägarens DROP som detektorn kallar 'drop'                                                              vikt 30
@@ -43,7 +44,7 @@ import sys, os, json, time, subprocess, importlib.util
 import numpy as np
 ENGINE = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
 OVNING = ['tools/ladan-2026-11-13/lang-20261113T151659.wav']
-KONTROLL = ['tools/ladan-2026-11-13/lang-20261113T160345.wav', 'tools/ladan-2026-11-14/lang-20261114T193040.wav']
+KONTROLL = ['tools/ladan-2026-11-13/lang-20261113T171840.wav', 'tools/ladan-2026-11-13/lang-20261113T160345.wav', 'tools/ladan-2026-11-14/lang-20261114T193040.wav']
 OFFS = [0.0, 7.3, 13.1]; VARM = 20.0; FORE, EFTER = 0.5, 1.0; BLOCK = 480
 VIKT = dict(drop_ratt=30, drop_precision=20, mini_ratt=10, landning_sedd=15, mini_precision=10, uppbyggnad=15)
 SORTER = ('drop', 'mini', 'uppbyggnad', 'sektion', 'latbyte'); SEK = ('intro', 'vers', 'refrang', 'outro', 'break')
