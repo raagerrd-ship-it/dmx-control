@@ -84,7 +84,12 @@ FLANKEN LANDAR PÅ FULL BAS, INLAGT 90ba633 (ägaren "Lägg in", 11-15 kväll): 
 193040 (6 drop, 3 mini, klar) - filen KLIPPT vid 06:05.50 (original -oklippt.wav). Förslag (forslag_full.py) ligger i 200719, ogenomgånget.
 UPPBYGGNADEN SOM SIGNAL INLAGD 3aa8ac1 (ägaren "Kör på nästa"): frame.buildStartCount (u2 ur UPP1), drop/mini identiska; ingen effekt läser
 den ännu. Lotus 3169cb1f EJ utlagd.
-LADAN nästa besök: lägg ut HEAD = minidrop per lucka + diskantvetot + flanken 1,5 dB + uppbyggnadssignalen (ladan kör cad739b).
+I LUCKAN (11-16, ägaren "kör på"): dirigentens spärr "byt aldrig mitt i en uppbyggnad" följer nu signalen (inGap, GAP_HOLD_MS 4 s, släpper på
+drop/minidrop; i luckan får bara dropen byta, även sektionsbyten väntar). Gamla riser/build-regeln träffade 0 av ägarens 29 uppbyggnader, signalen
+25; gamla regeln styr bara build-poolens inträde (allaBuild). Bänk +1,6 (takt +1,7, dynamik +1,6, jitter 51,9 -> 48,1 ms, ljus +1,6 %, lampspr
+160345 -7 %, medlet inom spärren). Replay av ägarens fyra filer: 35 av 150 byten flyttade 0,2-3 s senare, byten i hans uppbyggnader 9 -> 8,
+på hans landningar 14 -> 15. Tagg fore-lucka-sparr. Ögonprov: hamnar de flyttade bytena ur takt/fras?
+LADAN nästa besök: lägg ut HEAD = minidrop per lucka + diskantvetot + flanken 1,5 dB + uppbyggnadssignalen + I LUCKAN (ladan kör cad739b).
 SVEP efter 1,5 dB (fem filer, tre starter): diskantvetot -1/-2/-3 dB och FLANK_BREAK_S 3/2,5/2 s gav INGET bättre (veto -2: +1 rätt men
 +2 falska, +1 mini som drop; break kortare: oförändrat - 00:43.70 i 151659 stoppas av annat). HEAD står kvar. .arena/landa/svep.py.
 NÄSTA DROP-FRÅGA: flanken hittar bara 3 av ägarens 20 drop i de genomgångna filerna (breaken 8-12 dB under taket, flanken kräver 10 dB i 4 s).

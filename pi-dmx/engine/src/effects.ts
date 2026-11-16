@@ -307,6 +307,7 @@ const PULSE_IDX_INIT = -2e9;
  *      detektorn da satt fast pa high; rotorsaken (ingen nollning vid latbyte) ar rattad 09-23. Sedan 10-12: LÅTMANUS. */
 /** SECTION_UNIT (ladan 16:45): forvarningens 'high' 600 ms fore en forutsedd refrang och drop-fonstrets 'high' raknas INTE som sektionsgrans
  *  (de gav high<->low-hopp pa 1-2 s nar refrangen uteblev). Bara den raa sektionen, och den maste vara minst DMX_SECTION_UNIT_MIN_MS gammal. */
+const GAP_HOLD_MS = 4000;   // I LUCKAN: spärren efter uppbyggnadssignalen släpper senast efter 4 s (signal -> landning median 1,8 s)
 const SECTION_UNIT_MIN_MS = 2000;   // 4000 -> 2000 (ladan 10-21: ny look 4-6 s efter sektionsbytet; replay 4,0 -> 2,0 s, korta looker 3 -> 2)
 /** LÅTMANUS (10-12 kväll, ägaren: "olika effekter hoppar hela tiden ... mer som att den är förprogrammerad" + "allt mer känns anpassat
  *  efter låten och som att de hänger ihop"). ERSÄTTER frasväxlingen (A/B-look var 8:e takt), basgångs-, karaktärs- och tempobytet,
@@ -565,6 +566,7 @@ export class EffectEngine {
   private lastDemoted = 0; private lastSpaced = 0; private lastStopCount = 0;   // analysatorns monotona räknare (a3: dropDemoted/dropSpaced/stopCount)
    private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
+  private lastBuildStart = 0; private lastMiniSeen = 0; private gapUntil = -1;   // I LUCKAN (11-16): inget lookbyte från uppbyggnadssignalen tills basen är tillbaka
   private nearAt = -1e12; nearCount = 0;   // NASTAN-DROP
   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; buildProg = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
   private miniBodyFast = -90; private miniBodySlow = -90; private miniPre = -90; private miniPeak = -200;   // minidrop efter energin
@@ -1093,7 +1095,12 @@ export class EffectEngine {
         //    effektbyte där släpper spänningen precis när den ska byggas. Håll
         //    kvar genom hela risern — då landar bytet i stället PÅ dropen, vilket
         //    är det enda ögonblick där ett byte förstärker musiken.
-        const inBuild = frame.inRiser || frame.buildUp > 0.35 || (frame.section === 'build');
+        // I LUCKAN (11-16): spärren följer analysatorns uppbyggnadssignal (25 av ägarens 29, den gamla riser/build-regeln 0 av 29) och släpper på drop/minidrop
+        if (frame.buildStartCount !== this.lastBuildStart) { this.lastBuildStart = frame.buildStartCount; this.gapUntil = nowWall + GAP_HOLD_MS; }
+        if (dropHit || frame.miniDropCount !== this.lastMiniSeen) this.gapUntil = -1;
+        this.lastMiniSeen = frame.miniDropCount;
+        const inGap = nowWall < this.gapUntil;
+        const inBuild = frame.inRiser || frame.buildUp > 0.35 || (frame.section === 'build');   // bara build-poolens inträde (allaBuild)
         // ALLA_LOOKER (a): en uppbyggnad som hallit ALLA_BUILD_S = intrade -> ETT byte till build-poolen
         let allaBuild = false;
         if (!inBuild) { this.buildSince = -1; this.buildEntered = false; }
@@ -1136,7 +1143,7 @@ export class EffectEngine {
           if (ready && hasBeat && bpm > 0 && this.beatTrust >= 0.5 && !(this.tickNow && this.lastBeatIdx % SWITCH_ON === 0))
             slagOk = now - this.slagWaitAt > SWITCH_ON * 1.25 * 60000 / bpm;
         }
-        if (!buildLock && (!inBuild || buildEntry || secEntry || allaBuild || dropEntry) && (dropSwitch || dropEntry || allaBuild || concertBuild || buildExit || (ready && slagOk))) {
+        if (!buildLock && (!inGap || dropEntry) && (dropSwitch || dropEntry || allaBuild || concertBuild || buildExit || (ready && slagOk))) {
         this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, liveSec, memSection, secEntry, tierChanged);
       }
       return this.smartMode;
