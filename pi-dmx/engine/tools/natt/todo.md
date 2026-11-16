@@ -1,6 +1,8 @@
 ARENAN ETTA KLAR 2026-11-16 15:55: VINNARE f0 (a6r glidräkning per slag + relock utan ankarflytt + barOff bara ökar + a2 kickåterstart
   med tak + a8r backbeat; analyserClock.ts + split.ts). Rätt etta bas -> f0: övning 33,5 -> 86,5 %, mellan 34,6 -> 68,9 %, KONTROLL 29,9 -> 63,9 %;
-  drop/mini/uppbyggnad identiska (dropdom3), takt/låtbyten identiska (latskak). EJ inlagd i src, EJ utlagd - väntar på ägarens ord.
+  drop/mini/uppbyggnad identiska (dropdom3), takt/låtbyten identiska (latskak). INLAGD i src 2026-11-16 efter ägarens ja (backup-tagg
+  fore-etta-f0), EJ utlagd i ladan - nästa besök ihop med dagens fem andra ändringar; ögonprov: sitter fras och lookbyten på ettan?
+  Lotus EJ portad (fynd DELAD FIL ÄNDRAD i analysator-fynd.md, lotus-deploy kräver ägarens ord).
   Rapport tools/natt/arena-2026-11-16-etta.md (+ idébanken i mappen bredvid). Klockdomaren kunde inte köras (arkiverat material).
   RÖR INTE .arena/etta.
 NATTEN 2026-11-16 (schemalagda körningen, ingen motorkod ändrad, ingen arena):

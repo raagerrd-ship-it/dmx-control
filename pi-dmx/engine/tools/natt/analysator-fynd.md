@@ -15,6 +15,16 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-16 DELAD FIL ÄNDRAD: ETTAN (arenan etta, vinnaren f0) - analyserClock.ts + split.ts
+Vad: svar på fyndet nedan. Rätt etta (ettdom.py mot Beat This): övning 33,5 -> 86,5 %, mellan 200719 34,6 -> 68,9 %, kontroll 29,9 -> 63,9 %;
+drop/mini/uppbyggnad och takt/låtbyten identiska. Grundorsak: rutnätets fasrättning flyttar ankaret en stor del av ett slag, så samma slag
+fick nytt nummer i taktminnet. f0: glidräkning per färdigt slag (barJ), relock flyttar inte innerAnchor med barOff, barOff ökar bara
+(annars EXTRA TICK mitt i slaget), kickåterstart med tak 2, backbeat-term ur diskanten (specAbs.treble -> workern: HOP_REC_LEN 19,
+H_SA_TREBLE 18 i split.ts). Var: src/analyserClock.ts, src/split.ts (md5 omräknad i DMX). Rapport: tools/natt/arena-2026-11-16-etta.md.
+Önskat av lotus: porta båda filerna, bänka lotusbanken, kontrollera att lotus läsning av ankaret tål att barOff växer (hela slag).
+Lotus-deploy kräver ägarens ord.
+Status:
+
 ## ÖPPET 2026-11-16 Taktens etta (frame.beatIdx % 4) ligger på musikens etta bara 29-43 % av tiden - och hoppar var 30-60 s
 Vad: motorns takt-etta (taktklockans tick med lastBeatIdx % 4 = 0) mot Beat This!-ettorna (beatthis.jsonl), som ägarens sektionsmarkeringar
 (marks-hand, klar) ligger på till 94-97 % inom ±1 slag. Förskjutning 0/1/2/3 slag: 151659 43/23/23/11 %, 171840 34/12/1/53 %, 193040 29/29/13/29 %
