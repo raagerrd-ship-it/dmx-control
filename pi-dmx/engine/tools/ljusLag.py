@@ -29,9 +29,10 @@ clip = wav
 if len(x) < os.path.getsize(wav) // 2 - 100:
     fd, clip = tempfile.mkstemp(suffix='.wav'); os.close(fd)
     wavfile.write(clip, sr, (x * 32767).astype(np.int16))
-subprocess.run(['node', os.path.join(here, 'konsertReplay.mjs'), clip, '--step', '5', '--delad-cfg', '--json', js, '--trace', tr] + os.environ.get('LJUSLAG_REPLAY_ARGS', '').split(), env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-T = np.fromfile(tr, dtype=np.float32).reshape(-1, 10)
-t = T[:, 0].astype(np.float64); L = T[:, 2:6].astype(np.float64).sum(axis=1)
+subprocess.run(['node', os.path.join(here, 'konsertReplay.mjs'), clip, '--step', '5', '--delad-cfg', '--json', js, '--trace', tr, '--trace-alla'] + os.environ.get('LJUSLAG_REPLAY_ARGS', '').split(), env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+import json; NL = json.load(open(js, encoding='utf-8')).get('nLamps', 4)   # 11-16: spåret bär alla lampor (ladan har åtta, mätfälla 57), lampa 4.. i kolumn 10 och uppåt
+T = np.fromfile(tr, dtype=np.float32).reshape(-1, 10 + max(0, NL - 4))
+t = T[:, 0].astype(np.float64); L = np.hstack([T[:, 2:6], T[:, 10:]]).astype(np.float64).sum(axis=1) * 4 / max(4, NL)   # skalad till fyra lampor (som rytm.py): lyftet jämförbart bakåt
 # ljud på 5 ms-rastret (renderrutornas tider)
 sos = butter(2, [40, 150], btype='band', fs=sr, output='sos')
 b = sosfiltfilt(sos, x)
