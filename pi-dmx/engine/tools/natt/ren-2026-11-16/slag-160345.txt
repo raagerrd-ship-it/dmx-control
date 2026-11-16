@@ -1,0 +1,3 @@
+slag sektion: 23 byten, på slaget 52 %, på ettan 9 %, ms efter slaget p50 0 p90 427, frasgräns ±1 slag 9 % (slump 19), slag i frasen 1 0 4 2 2 2 1 1 2 0 2 3 0 1 1 1
+slag drop: 3 byten, på slaget 0 %, på ettan 0 %, ms efter slaget p50 213 p90 240, frasgräns ±1 slag 33 % (slump 19), slag i frasen 0 0 0 0 0 0 0 2 0 0 0 0 0 0 0 1
+slag build: 1 byten, på slaget 0 %, på ettan 0 %, ms efter slaget p50 133 p90 133, frasgräns ±1 slag 0 % (slump 19), slag i frasen 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0

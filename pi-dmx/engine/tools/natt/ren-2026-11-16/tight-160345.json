@@ -1,0 +1,116 @@
+{
+ "wav": "tools/ladan-2026-11-13/lang-20261113T160345.wav",
+ "startS": 0,
+ "gainDb": 0,
+ "totS": 603,
+ "rutor": 22603,
+ "tajt": {
+  "kickLagMs": 120,
+  "kickLagP75": 189,
+  "kickLagRigg90": 150,
+  "lampUpp": 4624,
+  "kickar": 1665,
+  "kickTraff": 0.3219219219219219,
+  "kickHojd": 0.18333333333333338,
+  "energiR": 0.3533674181866924,
+  "nivaR": 0.5891381486969083,
+  "energiRtopp": 0.3423036599016845,
+  "energiRruta": 0.2974141247344754,
+  "energiR15": 0.3366577415697715,
+  "nivaR15": 0.578540619064752,
+  "bpmMed": 131.474188140989,
+  "kickFonsterMs": 200,
+  "litLugn": 0.15810049019607836,
+  "litFart": 0.24506127450980392,
+  "litFull": 0.39797794117647045,
+  "toppLugn": 0.22843137254901963,
+  "toppFart": 0.4480392156862745,
+  "toppFull": 0.6274509803921569,
+  "sekLugn": 97,
+  "sekFart": 329,
+  "sekFull": 139,
+  "byten": 27,
+  "bytenPerMin": 2.687815237589594,
+  "musikByten": 1,
+  "orsaker": {
+   "sektion": 23,
+   "build": 1,
+   "drop": 3
+  },
+  "drops": 5,
+  "minidrops": 40,
+  "granser": 2,
+  "karaktarsskiften": 10,
+  "tempovaxlingar": 1,
+  "dropSprangLugn": 0.7603370098039216,
+  "dropSprangHog": 0.8671568627450981,
+  "dropsLugna": 4
+ },
+ "snygg": {
+  "alla3": 0.010594330286978287,
+  "en": 0.3752313871587403,
+  "matt": 1,
+  "lampspr": 53.29447418484272,
+  "lookar": 13,
+  "lookMedianS": 10.453333333333319,
+  "lookLangstaS": 150.74666666666667,
+  "morkt": 0.014732557625094013,
+  "litP10": 0.06862745098039216,
+  "litP50": 0.24117647058823533,
+  "litP90": 0.6200980392156862
+ },
+ "lookTime": [
+  [
+   "kickregn",
+   173.30666650390904
+  ],
+  [
+   "tick",
+   85.7600000000052
+  ],
+  [
+   "sidokedja",
+   78.34666674805092
+  ],
+  [
+   "backbeat",
+   75.94666674805055
+  ],
+  [
+   "linjalen",
+   38.5333332519532
+  ],
+  [
+   "sokljus",
+   34.05333374023415
+  ],
+  [
+   "droppar",
+   28.50666650390596
+  ],
+  [
+   "tyngdlyft",
+   25.919999999999767
+  ],
+  [
+   "wave",
+   20.211666748046763
+  ],
+  [
+   "vagbrytare",
+   13.5733332519531
+  ],
+  [
+   "rulle",
+   12.47999975585935
+  ],
+  [
+   "pendel",
+   8.07999999999997
+  ],
+  [
+   "uppvarmning",
+   8.026666748046845
+  ]
+ ]
+}

@@ -15,6 +15,21 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-16 Taktens etta (frame.beatIdx % 4) ligger på musikens etta bara 29-43 % av tiden - och hoppar var 30-60 s
+Vad: motorns takt-etta (taktklockans tick med lastBeatIdx % 4 = 0) mot Beat This!-ettorna (beatthis.jsonl), som ägarens sektionsmarkeringar
+(marks-hand, klar) ligger på till 94-97 % inom ±1 slag. Förskjutning 0/1/2/3 slag: 151659 43/23/23/11 %, 171840 34/12/1/53 %, 193040 29/29/13/29 %
+(rätt = 100/0/0/0). I 30 s-bitar är fasen LÅST (oftast 95-100 % samma förskjutning) men på fel slag, och den byter: 151659 2,0,3,3,2,1,1,0,...,2;
+193040 0,0,0,1,1,1,3,3,2,2,0. Tempot är alltså rätt, ettan felvald och den väljs om. Följd i DMX: lookbyten kan inte läggas på takt-ettan
+eller frasgränsen (SWITCH_ON 4 föll 10-25 och 11-15: frasträffen oförändrad 15 %); sektionsbytet kommer dessutom 4-7 s (10-14 slag, spridning
+1-41) efter ägarens gräns, så det landar slumpvis i frasen (20 %, slump 19 %).
+Var: ETTAN i analyserClock.ts (barK/barL/barB, BAR_DECAY 0,99, BAR_MARGIN 0,06, BAR_W_BASS/BACK - a5) -> ankaret i cfg.beat -> beatIndex (beatClock.ts). Material: tools/ladan-2026-11-13/lang-20261113T151659.wav, -171840.wav,
+tools/ladan-2026-11-14/lang-20261114T193040.wav + beatthis.jsonl + *.marks-hand.json. Mätning: node tools/konsertReplay.mjs <wav> --slag --delad-cfg
+--json kr.json; python tools/natt/sektionLagHand.py kr.json <wav> (sista raden = ettan).
+Önskat: en etta som följer musikens etta (t.ex. ettan där basanslaget/kicken är starkast över 4 slag, eller där sektionsbyten/drop landar) och som
+inte byts mitt i en låt utan skäl. Mål: förskjutning 0 >= 80 % på de tre filerna. Först därefter är frasbundna lookbyten värda ett nytt prov.
+Status:
+
+
 ## ÖPPET 2026-11-13 DMX-RUNDAN (klocka2dmx): ledare dmx-1b, parabeln i fintempot förstör rutnätet - INGEN delad fil ändrad
 Vad: tillägg till fyndet 11-12 nedan (tools/natt/arena-2026-11-12-klocka2/RAPPORT-DMX.md). Med DMX-domaren (lotus ur, dubbel vikt på
 rätt tempo och omlåsning) leder dmx-1b = k4b + taktens självlikhet som vittne (ansatsmönstret upprepas 2 och 4 slag senare; dömer bara

@@ -1,3 +1,19 @@
+NATTEN 2026-11-16 (schemalagda körningen, ingen motorkod ändrad, ingen arena):
+KLART 2026-11-16: (a) "mät vilka lookbyten som passerar slaggrinden och var de hamnar i frasen" - 204 sektionsbyten i sex filer: på slaget 52-71 %
+  (p50 0 ms, grinden fungerar), på frasgränsen ±1 slag 20 % (slump 19), på takt-ettan 17 % (slump 25). Drop/build/build-slut går förbi grinden,
+  200-500 ms efter slaget. ORSAK mot ägarens marks-hand (151659, 171840, 193040): hans sektionsgränser ligger på Beat This-ettan (94-97 % inom ±1
+  slag), motorns sektionsbyte kommer 4-7 s (10-14 slag, spridning 1-41) efter, och MOTORNS ETTA ligger på musikens etta bara 43 / 34 / 29 % -
+  låst i 30 s-bitar men på fel slag, och väljs om. -> analysatorfynd 2026-11-16 (ETTAN i analyserClock.ts). Frasbundna byten är inte värda ett
+  prov förrän ettan ligger rätt. Verktyg: konsertReplay --slag (nu + frasläge och 'ticks' i json), tools/natt/sektionLagHand.py.
+KLART 2026-11-16: (b) ljusLag.py läser alla åtta lampor (--trace-alla, skalat till fyra): 151659 lyft 0,721 (fyra lampor 0,731), 90 % vid 30 ms (25).
+  efterDrop.py EJ bytt: efterDropTrace.mjs kör defaultConfig (fyra lampor), alltså självkonsistent men inte ladans rigg.
+BASLINJE tools/natt/ren-2026-11-16/ (HEAD 478b8e8; natt.py går inte - mixarna och frozen6 är arkiverade): frasträff 21/19/11/9/20/20 %, drop-looker
+  2/10/4/6/12/5 -> 1/5/2/5/7/3 (diskantvetot + flanken 11-15 kväll), kick->ljus 139/120/144/160/91/144 ms; 193040 klippt sedan förra natten.
+IDÉ: ingen prövad - frasbristen sitter i analysatorns etta, inget i dirigenten rättar den.
+NÄSTA FÖR NATTAGENTEN: (a) när lotus/huvudchatten rört ETTAN: kör sektionLagHand.py på de tre filerna (mål förskjutning 0 >= 80 %), sedan
+  SWITCH_ON 4 igen; (b) ingen arena utan ARENA-uppdrag. Förslag till ARENA-fråga åt ägaren: "ettan i takten" (domare = sektionLagHand mot Beat This
+  + ägarens gränser, kontroll 193818/200719 när de är genomgångna).
+
 # Natt-agentens uppdrag
 
 NATTEN 2026-11-15 03:00 (schemalagda körningen, ingen motorkod ändrad, ingen arena):
@@ -22,7 +38,7 @@ IDÉ, FÖRKASTAD: SWITCH_ON 1 -> 4 (sektionens lookbyte väntar in takt-ettan, h
   utan att först mäta VILKA byten som går genom slaggrinden (drop-, build- och låtgränsbyten går förbi den).
 KLART 2026-11-15: lang-20261113T172432.wav lagad som KOPIA: tools/ladan-2026-11-13/lang-20261113T172432-lagad.wav (1840 s, inspelningskoll OK:
   topp 0,47, klippt 0 %, toppfaktor 11,8 dB). Originalet orört. Omarkerad - kan användas för klocka/låtgräns utan facit.
-NÄSTA FÖR NATTAGENTEN: (a) mät vilka lookbyten som passerar slaggrinden och var de hamnar i frasen (konsertReplay --slag) innan något nytt prov
+NÄSTA FÖR NATTAGENTEN (KLART 2026-11-16 a+b, se ovan): (a) mät vilka lookbyten som passerar slaggrinden och var de hamnar i frasen (konsertReplay --slag) innan något nytt prov
   om frasbundna byten; (b) byt ljusLag.py/efterDrop.py till --trace-alla om de ska användas; (c) ingen arena utan ARENA-uppdrag.
 
 

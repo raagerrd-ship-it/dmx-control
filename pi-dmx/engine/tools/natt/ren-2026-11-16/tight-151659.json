@@ -1,0 +1,117 @@
+{
+ "wav": "tools/ladan-2026-11-13/lang-20261113T151659.wav",
+ "startS": 0,
+ "gainDb": 0,
+ "totS": 532,
+ "rutor": 19946,
+ "tajt": {
+  "kickLagMs": 139,
+  "kickLagP75": 200,
+  "kickLagRigg90": 150,
+  "lampUpp": 3419,
+  "kickar": 1548,
+  "kickTraff": 0.3178294573643411,
+  "kickHojd": 0.16176470588235292,
+  "energiR": 0.3529650006533269,
+  "nivaR": 0.6009403107524156,
+  "energiRtopp": 0.31102041785633244,
+  "energiRruta": 0.2928999802264369,
+  "energiR15": 0.37841426676014256,
+  "nivaR15": 0.6012818651903512,
+  "bpmMed": 129.90953945362526,
+  "kickFonsterMs": 200,
+  "litLugn": 0.151875,
+  "litFart": 0.3084803921568625,
+  "litFull": 0.29839460784313726,
+  "toppLugn": 0.2745098039215686,
+  "toppFart": 0.503921568627451,
+  "toppFull": 0.4372549019607843,
+  "sekLugn": 98,
+  "sekFart": 317,
+  "sekFull": 83,
+  "byten": 29,
+  "bytenPerMin": 3.271496615693156,
+  "musikByten": 1,
+  "orsaker": {
+   "sektion": 22,
+   "build": 4,
+   "build-slut": 2,
+   "drop": 1
+  },
+  "drops": 1,
+  "minidrops": 43,
+  "granser": 2,
+  "karaktarsskiften": 10,
+  "tempovaxlingar": 1,
+  "dropSprangLugn": 0.8455637254901961,
+  "dropSprangHog": null,
+  "dropsLugna": 1
+ },
+ "snygg": {
+  "alla3": 0.0022209847444896267,
+  "en": 0.5355746069569272,
+  "matt": 1,
+  "lampspr": 64.0562518800762,
+  "lookar": 13,
+  "lookMedianS": 9.733333333333292,
+  "lookLangstaS": 128.79999999999998,
+  "morkt": 0.00030081219292088637,
+  "litP10": 0.07009803921568626,
+  "litP50": 0.22696078431372552,
+  "litP90": 0.5
+ },
+ "lookTime": [
+  [
+   "gallop",
+   184.07999975586003
+  ],
+  [
+   "kickregn",
+   110.56000000000907
+  ],
+  [
+   "kaskad",
+   35.94666650390615
+  ],
+  [
+   "flod",
+   35.013333251952965
+  ],
+  [
+   "eko",
+   34.133333251952905
+  ],
+  [
+   "dansparet",
+   30.053333740234056
+  ],
+  [
+   "sopa",
+   26.18666650390601
+  ],
+  [
+   "hiss",
+   20.213333251953014
+  ],
+  [
+   "wave",
+   20.211666748046763
+  ],
+  [
+   "varannan",
+   16.48000024414059
+  ],
+  [
+   "sokljus",
+   8.266666748046845
+  ],
+  [
+   "pendel",
+   8.026666748046845
+  ],
+  [
+   "svall",
+   2.720000000000003
+  ]
+ ]
+}
