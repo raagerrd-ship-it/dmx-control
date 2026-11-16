@@ -1,3 +1,5 @@
+ARENAN FRAS PÅGÅR 2026-11-16 kväll (ägaren: "Frasen, stor"): lookbytet på musikens fras. Domare tools/arena/frasdom.py, bas HEAD 720be60,
+  orkestreras från huvudchatten. RÖR INTE .arena/fras; nattagenten kör INGA bänkar medan raden säger PÅGÅR (kön .arena/.banklas är full).
 ARENAN ETTA KLAR 2026-11-16 15:55: VINNARE f0 (a6r glidräkning per slag + relock utan ankarflytt + barOff bara ökar + a2 kickåterstart
   med tak + a8r backbeat; analyserClock.ts + split.ts). Rätt etta bas -> f0: övning 33,5 -> 86,5 %, mellan 34,6 -> 68,9 %, KONTROLL 29,9 -> 63,9 %;
   drop/mini/uppbyggnad identiska (dropdom3), takt/låtbyten identiska (latskak). INLAGD i src 2026-11-16 efter ägarens ja (backup-tagg

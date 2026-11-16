@@ -61,7 +61,7 @@ let lastRender = -1, lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0, la
 const TRACE = opt("--trace", null) ? [] : null; const TRACE_ALLA = args.includes("--trace-alla"); /* 11-15: lampa 4.. sist i varje rad (kolumn 10 och uppåt) - rytm.py läser alla åtta */ const REF_SK = opt("--bas-ref", "body") === "subkick"; const SEC = { intro: 0, low: 1, build: 2, high: 3, break: 4 };
 // --slag (natt 10-25; 11-16: + frasläget lastBeatIdx % 16 per orsak, samma frasgräns som concertBench bytePaFras): var i takten landar varje lookbyte - på en taktklocka-tick (slaget), på ettan (beatIdx % 4 = 0, analysatorns
 // barShift), och ms sedan senaste tick - per orsak (switchWhy). Skrivs till stdout, json:en ändras inte.
-const SLAG = args.includes("--slag") ? new Map() : null; const SLAG_T = [];   /* 11-16: taktklockans tick (t, beatIdx) -> json 'ticks' - jämförs med Beat This-ettorna (sektionLagHand.py) */ let slagTick = -1e12, slagLook = null;
+const SLAG = args.includes("--slag") ? new Map() : null; const SLAG_T = []; const SLAG_SW = [];   /* 11-16 kväll: varje lookbyte (t, orsak) exakt -> json 'switches' (frasdom.py) */   /* 11-16: taktklockans tick (t, beatIdx) -> json 'ticks' - jämförs med Beat This-ettorna (sektionLagHand.py) */ let slagTick = -1e12, slagLook = null;
 const ROWS = [];   // [t, look, why, sec, int, light, nLit, drops, near, lift, miniLook, upgrades, bpm]
 let acc = { light: 0, nLit: 0, n: 0, mini: 0, hi: 0, lo: 9, top: 0 };
 for (let off = 0; off + HOP <= nSamples; off += HOP) {
@@ -88,7 +88,7 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   }
   if (!kickEv && ms - lastRender < STEP_MS && lastRender >= 0) continue;
   lastRender = ms; eng.render(fr); const u = eng.universe; if (!u) continue;
-  if (SLAG) { if (eng.tickNow) { slagTick = ms; SLAG_T.push(+tS.toFixed(3), eng.lastBeatIdx); } const lk = eng.getActiveMode(); if (lk !== slagLook) { if (slagLook !== null) { const w = eng.switchWhy || '-'; const k = SLAG.get(w) ?? { n: 0, tick: 0, one: 0, after: [], fras: new Array(16).fill(0) }; k.n++; k.fras[((eng.lastBeatIdx % 16) + 16) % 16]++; if (eng.tickNow) { k.tick++; if (eng.lastBeatIdx % 4 === 0) k.one++; } k.after.push(ms - slagTick); SLAG.set(w, k); } slagLook = lk; } }
+  if (SLAG) { if (eng.tickNow) { slagTick = ms; SLAG_T.push(+tS.toFixed(3), eng.lastBeatIdx); } const lk = eng.getActiveMode(); if (lk !== slagLook) { if (slagLook !== null) { const w = eng.switchWhy || '-'; SLAG_SW.push(+tS.toFixed(3), w); const k = SLAG.get(w) ?? { n: 0, tick: 0, one: 0, after: [], fras: new Array(16).fill(0) }; k.n++; k.fras[((eng.lastBeatIdx % 16) + 16) % 16]++; if (eng.tickNow) { k.tick++; if (eng.lastBeatIdx % 4 === 0) k.one++; } k.after.push(ms - slagTick); SLAG.set(w, k); } slagLook = lk; } }
   const lv = lamps.map((L) => Math.max(u[L.r] ?? 0, u[L.g] ?? 0, u[L.b] ?? 0) * (L.dim >= 0 ? u[L.dim] / 255 : 1));   // verkligt ljus = färg x dimmer
   if (TRACE) { const sa = fr.specAbs ?? {}; TRACE.push(tS, SEC[fr.section] ?? 5, lv[0] / 255, lv[1] / 255, lv[2] / 255, lv[3] / 255, REF_SK && sa.sub != null ? (20 * Math.log10(sa.sub + 1e-7) + 20 * Math.log10(sa.kick + 1e-7)) / 2 : fr.bodyDb ?? -90,
     20 * Math.log10((sa.treble ?? 0) + (sa.air ?? 0) + 1e-7), (eng.dropColEnv ?? 0) > 0.005 || ms < eng.miniBangUntil ? 1 : 0, eng.eBass ?? eng.eSm ?? 0); if (TRACE_ALLA) for (let i = 4; i < lv.length; i++) TRACE.push(lv[i] / 255); }
@@ -103,7 +103,7 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
     acc = { light: 0, nLit: 0, n: 0, mini: 0, hi: 0, lo: 9, top: 0 };
   }
 }
-const out = { wav: path, nLamps: lamps.length, columns: ['t', 'look', 'why', 'sec', 'int', 'light', 'nLit', 'drops', 'near', 'lift', 'miniLook', 'upgrades', 'bpm', 'bodyDb', 'aMini', 'bass', 'hi', 'lo', 'top', 'pal', 'conf', 'trust', 'cbpm', 'lock'], rows: ROWS, log: LOG, ...(SLAG ? { ticks: SLAG_T } : {}) };
+const out = { wav: path, nLamps: lamps.length, columns: ['t', 'look', 'why', 'sec', 'int', 'light', 'nLit', 'drops', 'near', 'lift', 'miniLook', 'upgrades', 'bpm', 'bodyDb', 'aMini', 'bass', 'hi', 'lo', 'top', 'pal', 'conf', 'trust', 'cbpm', 'lock'], rows: ROWS, log: LOG, ...(SLAG ? { ticks: SLAG_T, switches: SLAG_SW } : {}) };
 writeFileSync(opt("--json", "replay.json"), JSON.stringify(out));
 if (TRACE) writeFileSync(opt("--trace"), Buffer.from(new Float32Array(TRACE).buffer));
 if (SLAG) for (const [w, k] of [...SLAG].sort((x, y) => y[1].n - x[1].n)) { const af = [...k.after].sort((x, y) => x - y); process.stdout.write(`slag ${w}: ${k.n} byten, på slaget ${(100 * k.tick / k.n).toFixed(0)} %, på ettan ${(100 * k.one / k.n).toFixed(0)} %, ms efter slaget p50 ${af[af.length >> 1]?.toFixed(0)} p90 ${af[Math.floor(af.length * 0.9)]?.toFixed(0)}, frasgräns ±1 slag ${(100 * (k.fras[15] + k.fras[0] + k.fras[1]) / k.n).toFixed(0)} % (slump 19), slag i frasen ${k.fras.join(' ')}\n`); }
