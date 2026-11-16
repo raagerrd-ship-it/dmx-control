@@ -1,0 +1,57 @@
+diff --git a/src/effects.ts b/.arena/fras/a7/src/effects.ts
+index ff4645c..acda18c 100644
+--- a/src/effects.ts
++++ b/.arena/fras/a7/src/effects.ts
+@@ -307,6 +307,7 @@ const PULSE_IDX_INIT = -2e9;
+  *      detektorn da satt fast pa high; rotorsaken (ingen nollning vid latbyte) ar rattad 09-23. Sedan 10-12: LÅTMANUS. */
+ /** SECTION_UNIT (ladan 16:45): forvarningens 'high' 600 ms fore en forutsedd refrang och drop-fonstrets 'high' raknas INTE som sektionsgrans
+  *  (de gav high<->low-hopp pa 1-2 s nar refrangen uteblev). Bara den raa sektionen, och den maste vara minst DMX_SECTION_UNIT_MIN_MS gammal. */
++const LAND_HOLD_MS = 6000;   // LANDNINGEN (a7): minsta hålltid före landningsbytet
+ const GAP_HOLD_MS = 4000;   // I LUCKAN: spärren efter uppbyggnadssignalen släpper senast efter 4 s (signal -> landning median 1,8 s)
+ const SECTION_UNIT_MIN_MS = 2000;   // 4000 -> 2000 (ladan 10-21: ny look 4-6 s efter sektionsbytet; replay 4,0 -> 2,0 s, korta looker 3 -> 2)
+ /** LÅTMANUS (10-12 kväll, ägaren: "olika effekter hoppar hela tiden ... mer som att den är förprogrammerad" + "allt mer känns anpassat
+@@ -566,6 +567,7 @@ export class EffectEngine {
+   private lastDemoted = 0; private lastSpaced = 0; private lastStopCount = 0;   // analysatorns monotona räknare (a3: dropDemoted/dropSpaced/stopCount)
+    private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
+   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
++  private landForce = false;   // LANDNINGEN (a7)
+   private lastBuildStart = 0; private lastMiniSeen = 0; private gapUntil = -1;   // I LUCKAN (11-16): inget lookbyte från uppbyggnadssignalen tills basen är tillbaka
+   private nearAt = -1e12; nearCount = 0;   // NASTAN-DROP
+   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; buildProg = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+@@ -797,7 +799,7 @@ export class EffectEngine {
+         const req = (m: Mode) => meetsRequirements(m, bpm, frame.profile);
+         // LÅTMANUS: vilken del av manuset bytet galler. Builden (aven ALLA_LOOKER-builden) -> build; drop och build som slutar ->
+         // refrangens look (dropen landar i refrangen); annars sektionen. Utan sektion (ingen analys an) finns inget manus.
+-        const secKey = allaBuild && !(dropSwitch && liveSec !== 'break') ? 'build' : (dropSwitch || buildExit) && liveSec !== 'break' ? 'high' : liveSec;
++        const secKey = this.landForce ? 'high' : allaBuild && !(dropSwitch && liveSec !== 'break') ? 'build' : (dropSwitch || buildExit) && liveSec !== 'break' ? 'high' : liveSec;
+         const calm = secKey === 'break';   // breakdown -> lugna poolen (var wantCalm)
+         const tierRank = (m: Mode) => { const t = EFFECT_MAP.get(m)?.tier; return t === 'lugn' ? 0 : t === 'full' ? 2 : 1; };
+         const tierNow = tierS === LUGN ? 0 : tierS === FART ? 1 : 2;
+@@ -817,7 +819,7 @@ export class EffectEngine {
+         else {
+         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
+         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
+-        this.switchWhy = dropSwitch ? 'drop'
++        this.switchWhy = dropSwitch ? 'drop' : this.landForce ? 'landning'
+           : (memSection || secEntry) ? 'sektion'
+           : (buildEntry || allaBuild) ? 'build' : buildExit ? 'build-slut' : tierChanged ? 'tier' : 'dwell';
+         this.switchCount++;
+@@ -1096,6 +1098,7 @@ export class EffectEngine {
+         //    kvar genom hela risern — då landar bytet i stället PÅ dropen, vilket
+         //    är det enda ögonblick där ett byte förstärker musiken.
+         // I LUCKAN (11-16): spärren följer analysatorns uppbyggnadssignal (25 av ägarens 29, den gamla riser/build-regeln 0 av 29) och släpper på drop/minidrop
++        const landHit = frame.miniDropCount !== this.lastMiniSeen && !dropHit;   // LANDNINGEN (a7): basen tillbaka efter luckan = ny del, på ettan
+         if (frame.buildStartCount !== this.lastBuildStart) { this.lastBuildStart = frame.buildStartCount; this.gapUntil = nowWall + GAP_HOLD_MS; }
+         if (dropHit || frame.miniDropCount !== this.lastMiniSeen) this.gapUntil = -1;
+         this.lastMiniSeen = frame.miniDropCount;
+@@ -1145,6 +1148,10 @@ export class EffectEngine {
+         }
+         if (!buildLock && (!inGap || dropEntry) && (dropSwitch || dropEntry || allaBuild || concertBuild || buildExit || (ready && slagOk))) {
+         this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, liveSec, memSection, secEntry, tierChanged);
++      } else if (landHit && held > LAND_HOLD_MS && tier !== LUGN && liveSec === 'low' && this.manus.get('high') !== this.smartMode) {
++        this.landForce = true;   // landningen i low = detektorns sena high: refrängens manuslook nu, detektorns byte blir samma look
++        this.switchLook(frame, bpm, tierS, tierName, bassClear, false, false, false, false, liveSec, false, false, tierChanged);
++        this.landForce = false;
+       }
+       return this.smartMode;
+   }

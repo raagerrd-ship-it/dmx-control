@@ -1,0 +1,22 @@
+diff --git a/src/effects.ts b/.arena/fras/a1/src/effects.ts
+index ff4645c..53728dc 100644
+--- a/src/effects.ts
++++ b/.arena/fras/a1/src/effects.ts
+@@ -259,7 +259,7 @@ const MANUS_TOP = 2;
+  *  SECTION_UNIT_MIN_MS gammal - phraseOk:s reserv (held > MIN_HOLD + en fras) är nästan alltid sann efter en hållen look, så bytet landade
+  *  var som helst i takten (konsertReplay --slag). Med N väntar bytet (wantSwitch/buildEntry, inte drop/build-händelserna) in nästa
+  *  taktklocka-tick med beatIdx % N = 0 (1 = nästa slag, 4 = ettan), högst N slag x 1,25. */
+-const SWITCH_ON = 1;
++const SWITCH_ON = 4;
+ /** HIGH-VARV (standard 2026-11-04, ägaren: 'pröva b'; megamix tryckvag 36 % = manusets återseende): när refrängen (high) kommer tillbaka
+  *  för 4:e gången eller fler i samma låt får den NÄSTA look - minst spelad ur sektionens manusHist, annars ny ur poolen - i stället för
+  *  manusets. 1:a-3:e gången oförändrade (refrängen känns igen). Drop-bytet orört. natt --snabb: mega tryckvag 36 -> 21 %, lampspr 83 -> 88,
+@@ -1139,7 +1139,7 @@ export class EffectEngine {
+         const ready = (wantSwitch || buildEntry) && held > MIN_HOLD && phraseOk;
+         let slagOk = true;   // BYTE PÅ SLAGET (SWITCH_ON)
+         if (SWITCH_ON > 0) {
+-          if (!ready) this.slagWaitAt = -1; else if (this.slagWaitAt < 0) this.slagWaitAt = now;
++          if (!ready || buildLock || (inGap && !dropEntry)) this.slagWaitAt = -1; else if (this.slagWaitAt < 0) this.slagWaitAt = now;
+           if (ready && hasBeat && bpm > 0 && this.beatTrust >= 0.5 && !(this.tickNow && this.lastBeatIdx % SWITCH_ON === 0))
+             slagOk = now - this.slagWaitAt > SWITCH_ON * 1.25 * 60000 / bpm;
+         }

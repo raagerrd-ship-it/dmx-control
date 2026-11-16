@@ -1,0 +1,182 @@
+# a5 TAKT-FÖR-TAKT-NYHET
+
+## Idén
+Analysatorn mäter i snabba vägen, i kvartsslag på klockans tempo, hur mycket den senaste taktens 8-bandsklang (dB) skiljer sig från de två takterna före, som z mot låtens senaste 32 takter (`frame.barNovZ`). Dirigenten läser värdet på sin etta: z >= 1,7 betyder ny del, och då byts looken direkt på ettan (ny look, inte manusets). Vanliga sektionsbyten väntar in nästa etta (SWITCH_ON 4), så bytet sitter på musikens taktstart i stället för på ett godtyckligt slag.
+
+## Var fördröjningen satt (bas, 57 gränser med sektionsbyte inom 40 slag)
+Detektorn byter etikett median 4,2 slag (medel 7,4) efter ägarens gräns. Dirigenten byter look median 4,6 slag (medel 7,6) efter etiketten (MIN_HOLD, SECTION_UNIT, slaggrinden). Båda bidrar ungefär lika mycket.
+
+## Delarna
+| del | vad den gör | mått den bär |
+|---|---|---|
+| A SWITCH_ON 1->4 (effects.ts) | sektionsbytet väntar in klockans etta, högst 5 slag | etta: 151659 7->25 % (sond, A ensam), grans 3->7 % |
+| B barNovZ (analyser.ts) + nyhetsbytet på ettan (effects.ts, NOV_Z) | en tydlig klangtopp på ettan ger ett lookbyte direkt där (inte i bygget/luckan, inte inom MIN_HOLD) | 151659 med A+B: grans 7->10 %, etta 25->33 %; nyhetsbytena träffar 0,1-0,2 slag från gränsen (195,1 s; 171840 128,8 s) |
+| C uppslukning (effects.ts, novAbsorb) | ett sektionsbyte inom 16 slag efter ett nyhetsbyte ger inget nytt lookbyte (sektionen får den looken i manuset) | håller byten nere: 3,44/min mot bas 3,52 |
+| D NOV_Z 2,0->1,7 (m1->m2) | fler nyhetsbyten (151659: 1->5) | poäng +13,31 -> +13,93, ljus +1,7 -> +4,1 |
+
+## Siffrorna (m2, mot bas)
+| fil | grans % | lag slag | etta % | lösa /min | byten /min |
+|---|---|---|---|---|---|
+| 151659 | 10,0 (3,3) | 10,8 (11,6) | 35,5 (7,1) | 1,40 (1,39) | 3,6 (3,25) |
+| 171840 | 13,6 (9,1) | 10,3 (10,0) | 28,6 (25,0) | 1,30 (1,05) | 2,9 (3,37) |
+| 193040 | 29,0 (25,8) | 7,4 (8,4) | 39,1 (20,8) | 1,00 (0,98) | 3,8 (3,93) |
+| medel | 17,6 (12,7) | 9,5 (10,0) | 34,4 (17,7) | 1,21 (1,14) | 3,44 (3,52) |
+
+Domaren: poäng **+13,93**, ljusdomaren **+4,1**, ingen DISK. Sämre: lag i 171840 +0,3 slag, lösa i 171840 +0,25/min.
+
+## Risken
+- Klockans etta: bytet hamnar på ettan bara där analysatorns etta stämmer (45-79 % per fil). Ligger ettan fel hamnar alla sektionsbyten konsekvent på fel slag.
+- Nyheten räknas på `bandDbRaw`/`fbDbRaw` i snabba vägen och på `localBpm` (setClock). Inget nytt fält bärs i split.ts, men om ladan kör utan FAST_BANDS och med stora vägen i workern kan `bandDbRaw` i snabba tråden stå still. Då blir barNovZ 0 och bara del A verkar. Kontrollera det i ladan.
+- Live-mic: rumsljud och prat ger klangtoppar. z-normaliseringen och MIN_HOLD dämpar det, men det kan bli enstaka lösa byten.
+- Låtbyten: historiken (128 slag) nollställs inte vid låtgräns, så första takterna efter ett tempo-/klangbyte ger hög z och ett byte. Det är oftast rätt (ny låt), men 8 s MIN_HOLD gäller.
+- Breaks och långa uppbyggnader: nyhetsbytet är spärrat i inBuild och i luckan, så dropvägen är orörd. Ett break som börjar utan uppbyggnadssignal kan få ett nyhetsbyte, och sedan uppslukas sektionsbytet till break, så break-looken kan bli en vanlig look.
+- Minne: 2,7 kB förallokerat, ingen allokering per hop. CPU: ~400 additioner per kvartsslag.
+
+## Diffen
+```diff
+diff --git a/src/ANALYSER_SHARED.md5 b/.arena/fras/a5/src/ANALYSER_SHARED.md5
+index f6ba712..1dcb093 100644
+--- a/src/ANALYSER_SHARED.md5
++++ b/.arena/fras/a5/src/ANALYSER_SHARED.md5
+@@ -1,5 +1,5 @@
+ # md5 (CRLF->LF) av de gemensamma filerna - samma i lotus-light-link och dmx-control. Skrivs av analyser_shared.py --write
+-1e5942108e88af6bfe857ef56a7429b8 analyser.ts
++78365ffcdf98428bdca76e989a3ee7fd analyser.ts
+ b5485714f88c45ec0f55f21b9d5ab20e analyserDrop.ts
+ 692befa55e7fd906cdc3652af3f27baa analyserSection.ts
+ 879ba2122d2a1d3e0eea4082adfd2355 analyserSpectrum.ts
+diff --git a/src/analyser.ts b/.arena/fras/a5/src/analyser.ts
+index 5dcd901..d4ee7e0 100644
+--- a/src/analyser.ts
++++ b/.arena/fras/a5/src/analyser.ts
+@@ -131,6 +131,7 @@ export interface Frame {
+   sectionTier: number;   // 0 lag / 1 mellan / 2 hog
+   repeatSim: number; repeatAgoMs: number; repeatSection: string;   // UPPREPNING
+   expectHighInMs: number; prevSection: string; levelVsHighDb: number; sectionBars: number;   // SEKTIONSMINNE + FORUTSAGELSE
++  barNovZ: number;   // TAKT-FÖR-TAKT-NYHET: senaste taktens klangavstånd till de två före, z mot låtens senaste 32 takter
+   spec: Spectrum;   // Rikt spektrum + per-band onset
+   specAbs: Spectrum;   // Absolut per-band magnitud före AGC, för Lotus ljusväg och bandandelar
+   bodyDb: number;   // BASKROPPEN I RA dB
+@@ -735,7 +736,7 @@ export class Analyser {
+       silent: true, level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
+       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
+       dropCount: 0, miniDropCount: 0, buildStartCount: 0, dropDemoted: 0, dropSpaced: 0, dropRiseDb: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, bodyDb: 0, bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1, midHiDb: -120, inZone: false, breaking: false, buildUp: 0, buildProg: 0, inRiser: false, profile: this.character.outProfile, beatAnchorMs: 0,
+-      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
++      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0, barNovZ: 0,
+       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
+     };
+     for (const o of [this.outFrame, this.character.outProfile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum]) stabiliseNumbers(o);
+@@ -965,8 +966,42 @@ export class Analyser {
+       else this.hopLane!.feed(f, this.clockOut, this);
+       publishPhase(f, this.clockOut.beat, this.clock ? this.clock.barKnown() : this.hopLane!.barKnown, this.extGrid, Date.now(), Analyser.GRID_PHASE_OFFSET_MS);
+     }
++    this.barNovStep(); f.barNovZ = this.barNovZ;
+     return f;
+   }
++  barNovZ = 0;   // TAKT-FÖR-TAKT-NYHET (arenan fras a5)
++  private bnAcc = new Float32Array(8); private bnN = 0; private bnT0 = 0; private bnV = new Float32Array(384); private bnK = 0; private bnSc = new Float32Array(8).fill(3);
++  private bnHist = new Float32Array(128); private bnHN = 0; private bnHP = 0; private bnMu = 0; private bnSd = 1;
++  /** Kvartsslagets banddB; nyheten = senaste takten (16 kvartar) mot de två före (32). */
++  private barNovStep(): void {
++    const bpm = this.localBpm;
++    if (!(bpm > 40) || this.lvlSmooth <= this.silenceLevel) { this.bnN = 0; this.bnK = 0; this.barNovZ = 0; return; }
++    const now = this.wallNow(), q = 15000 / bpm, D = Analyser.FAST_BANDS ? this.bands.fbDbRaw : this.bandDbRaw, A = this.bnAcc;
++    if (this.bnN === 0 && this.bnK === 0) this.bnT0 = now;
++    for (let i = 0; i < 8; i++) A[i] += D[i];
++    this.bnN++;
++    if (now - this.bnT0 < q) return;
++    this.bnT0 = now - this.bnT0 < 2 * q ? this.bnT0 + q : now;
++    const V = this.bnV, k = this.bnK, o = (k % 48) * 8, p = ((k + 44) % 48) * 8, S = this.bnSc;
++    for (let i = 0; i < 8; i++) { V[o + i] = A[i] / this.bnN; A[i] = 0; }
++    this.bnN = 0; this.bnK = k + 1;
++    if (k >= 4) for (let i = 0; i < 8; i++) S[i] += (Math.abs(V[o + i] - V[p + i]) - S[i]) * 0.005;
++    if (k < 47) return;
++    let d = 0;
++    for (let i = 0; i < 8; i++) {
++      let c = 0, r = 0;
++      for (let j = 0; j < 16; j++) c += V[((k - j) % 48) * 8 + i];
++      for (let j = 16; j < 48; j++) r += V[((k - j + 48) % 48) * 8 + i];
++      const x = (c / 16 - r / 32) / Math.max(0.1, S[i]); d += x * x;
++    }
++    d = Math.sqrt(d / 8);
++    this.barNovZ = this.bnHN >= 32 ? (d - this.bnMu) / this.bnSd : 0;
++    if (k % 4 !== 0) return;
++    const H = this.bnHist; H[this.bnHP] = d; this.bnHP = (this.bnHP + 1) & 127; if (this.bnHN < 128) this.bnHN++;
++    const n = this.bnHN; let m = 0; for (let i = 0; i < n; i++) m += H[i]; m /= n;
++    let s = 0; for (let i = 0; i < n; i++) s += (H[i] - m) * (H[i] - m);
++    this.bnMu = m; this.bnSd = Math.sqrt(s / n) + 1e-6;
++  }
+   clock: BeatFeed | null = null;   // ANALYSATORNS KLOCKA utan taktväg
+   readonly clockOut: ClockCfg = { beat: undefined, beatErr: undefined };
+   /** Klockans utfall till motorn. */
+diff --git a/src/effects.ts b/.arena/fras/a5/src/effects.ts
+index ff4645c..62256d9 100644
+--- a/src/effects.ts
++++ b/.arena/fras/a5/src/effects.ts
+@@ -259,7 +259,8 @@ const MANUS_TOP = 2;
+  *  SECTION_UNIT_MIN_MS gammal - phraseOk:s reserv (held > MIN_HOLD + en fras) är nästan alltid sann efter en hållen look, så bytet landade
+  *  var som helst i takten (konsertReplay --slag). Med N väntar bytet (wantSwitch/buildEntry, inte drop/build-händelserna) in nästa
+  *  taktklocka-tick med beatIdx % N = 0 (1 = nästa slag, 4 = ettan), högst N slag x 1,25. */
+-const SWITCH_ON = 1;
++const SWITCH_ON = 4;
++const NOV_Z = 1.7;   // TAKT-FÖR-TAKT-NYHET: analysatorns barNovZ på ettan -> ny del, byt där (arenan fras a5)
+ /** HIGH-VARV (standard 2026-11-04, ägaren: 'pröva b'; megamix tryckvag 36 % = manusets återseende): när refrängen (high) kommer tillbaka
+  *  för 4:e gången eller fler i samma låt får den NÄSTA look - minst spelad ur sektionens manusHist, annars ny ur poolen - i stället för
+  *  manusets. 1:a-3:e gången oförändrade (refrängen känns igen). Drop-bytet orört. natt --snabb: mega tryckvag 36 -> 21 %, lampspr 83 -> 88,
+@@ -566,6 +567,7 @@ export class EffectEngine {
+   private lastDemoted = 0; private lastSpaced = 0; private lastStopCount = 0;   // analysatorns monotona räknare (a3: dropDemoted/dropSpaced/stopCount)
+    private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
+   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
++  private novAt = -1e12; private novForce = false;   // TAKT-FÖR-TAKT-NYHET (arenan fras a5)
+   private lastBuildStart = 0; private lastMiniSeen = 0; private gapUntil = -1;   // I LUCKAN (11-16): inget lookbyte från uppbyggnadssignalen tills basen är tillbaka
+   private nearAt = -1e12; nearCount = 0;   // NASTAN-DROP
+   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; buildProg = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+@@ -809,15 +811,15 @@ export class EffectEngine {
+         if (secKey && this.carryKey && secKey !== this.carryKey) { this.manus.delete(this.carryKey); this.carryKey = ''; }   // burna looken släpps (softenRange)
+         if (secKey && secKey !== this.visitKey) { varv = (this.secVisits.get(secKey) ?? 0) + 1; this.secVisits.set(secKey, varv); this.visitKey = secKey; }
+         const nextLook = HIGH_VARV > 0 && secKey === 'high' && varv >= HIGH_VARV && !dropSwitch && !!kept;
+-        let keep = !nextLook && !!kept && fits(kept) && !(dropSwitch && !this.bassStrong(kept));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark
++        let keep = !this.novForce && !nextLook && !!kept && fits(kept) && !(dropSwitch && !this.bassStrong(kept));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark
+         const avoid = nextLook ? kept : undefined;
+         if (nextLook) { const h = (this.manusHist.get(secKey) ?? []).filter((m) => m !== kept && m !== this.smartMode && fits(m)); if (h.length) { kept = this.pickLook(h.map((m) => ({ m }))); keep = true; this.manus.set(secKey, kept); console.log(`[dirigent] high-varv ${varv}: nasta look "${kept}"`); } }
+-        if (!keep && secKey && !(dropSwitch) && !nextLook) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m)); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
++        if (!keep && secKey && !(dropSwitch) && !nextLook && !this.novForce) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m)); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
+         if (keep && kept === this.smartMode) { this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true; }   // manuset sager samma look - inget byte
+         else {
+         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
+         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
+-        this.switchWhy = dropSwitch ? 'drop'
++        this.switchWhy = dropSwitch ? 'drop' : this.novForce ? 'nyhet'
+           : (memSection || secEntry) ? 'sektion'
+           : (buildEntry || allaBuild) ? 'build' : buildExit ? 'build-slut' : tierChanged ? 'tier' : 'dwell';
+         this.switchCount++;
+@@ -1065,9 +1067,11 @@ export class EffectEngine {
+         // sektionen in i high inom 2 s efter en sådan drop byts looken direkt, som vid en full drop (ingen MIN_HOLD/fras/slag-väntan).
+         const dropEntry = liveSecChanged && liveSec === 'high' && nowWall - this.anaDropAt < 2000;
+         if (liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '') console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; }   // (intro glommer inte lookerna langre - LÅTMANUS glomms bara pa en verklig latgrans)
+-        if (liveSecChanged) this.pendingSecSwitch = true;
++        const novAbsorb = liveSecChanged && liveSec !== 'build' && bpm > 0 && now - this.novAt < 16 * 60000 / bpm;
++        if (novAbsorb) { if (!this.manus.has(liveSec)) this.manus.set(liveSec, this.smartMode); }
++        else if (liveSecChanged) this.pendingSecSwitch = true;
+         const secOldEnough = (frame.sectionAgeMs ?? 1e9) >= SECTION_UNIT_MIN_MS;   // SECTION_UNIT: ingen switch pa en sektion yngre an SECTION_UNIT_MIN_MS (detektorflapp)
+-        const memSection = liveSecChanged;   // (latminnets sektionsgrans mem* borttagen 11-09 - sattes aldrig)
++        const memSection = liveSecChanged && !novAbsorb;   // (latminnets sektionsgrans mem* borttagen 11-09 - sattes aldrig)
+         const phraseMs = this.cfg.beat && this.cfg.beat.bpm > 0 ? 16 * 60000 / this.cfg.beat.bpm : 0;
+         // LÅTMANUS: sektionsbytet landar på sektionens EGET taktraster (början av takt 2, 4, 6 ... sedan sektionsstart) i stället för
+         // effektklockans 16-slagsfras, vars fas är godtycklig mot låten (bänken: bytet väntade upp till 24 s efter en hållen sektion).
+@@ -1143,7 +1147,13 @@ export class EffectEngine {
+           if (ready && hasBeat && bpm > 0 && this.beatTrust >= 0.5 && !(this.tickNow && this.lastBeatIdx % SWITCH_ON === 0))
+             slagOk = now - this.slagWaitAt > SWITCH_ON * 1.25 * 60000 / bpm;
+         }
+-        if (!buildLock && (!inGap || dropEntry) && (dropSwitch || dropEntry || allaBuild || concertBuild || buildExit || (ready && slagOk))) {
++        const novNow = this.tickNow && this.lastBeatIdx % 4 === 0 && frame.barNovZ >= NOV_Z;
++        const novSwitch = novNow && !!liveSec && !inBuild && !inGap && hasBeat && this.beatTrust >= 0.5 && held > MIN_HOLD;
++        if (novSwitch && !(dropSwitch || dropEntry || allaBuild || concertBuild || buildExit)) {
++          this.novForce = !this.pendingSecSwitch; const was = this.smartMode;
++          this.switchLook(frame, bpm, tierS, tierName, bassClear, false, false, false, false, liveSec, memSection, secEntry, tierChanged);
++          this.novForce = false; if (this.smartMode !== was) this.novAt = now;
++        } else if (!buildLock && (!inGap || dropEntry) && (dropSwitch || dropEntry || allaBuild || concertBuild || buildExit || (ready && slagOk))) {
+         this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, liveSec, memSection, secEntry, tierChanged);
+       }
+       return this.smartMode;
+```

@@ -1,0 +1,217 @@
+# a2r: snabbare detektor ovanpå r0, utan korta 'low' i refrängen (inlämnad = m1)
+
+**IDÉN.** Sektionsdetektorn bekräftar en ny del på 4 raka block i stället för 5, och in i refrängen på 2 i stället för 3. Ut ur refrängen krävs fortfarande 5 block (ny ratt SECTION_RUN_OUT). Där kom a2:s korta 'low'-dippar ifrån, och de är nu borta. Låg-, mellan- och break-delar och refrängens början bekräftas alltså en takt tidigare. Ihop med r0:s väntan på ettan hamnar bytet då på musikens fras, medan refrängen hålls som förut.
+
+**VAR FÖRDRÖJNINGEN SATT** (r0:s mätning av bas): detektorn låg median 3,2 slag efter gränsen och dirigenten lade på 4,6. I r0 är dirigentens del 2,5. a2r tar ett block (~2 slag) av detektorns del på de gränser där den byter alls.
+
+**DELARNA** (mätt mot r0 m3 eller mellan m1 och m2)
+| del | vad den gör | mått |
+|---|---|---|
+| D1 SECTION_RUN 5->4 (analyserProfile.ts) | låg/mellan/break bekräftas på 4 block | 193040 46,95 lag 11,9->0,0 (träff), 56,80 9,8->7,9; 151659 256,42 16->3,7 |
+| D2 SECTION_RUN_OUT 5 (analyser.ts + analyserSection.ts runNeed; profilen) | ut ur tier 2 krävs fortfarande 5 block, standard 0 = RUN (lotus orört) | tar bort r0+B:s dippar i 151659 (72/130/164/196 s). Landningarna 167,59/213,26/239,77 behålls; 151659 lag 9,03 (r0+B) -> 7,6, lösa 1,51 -> 1,2 |
+| D3 SECTION_RUN_IN 3->2 | in i refrängen på 2 block | m2 (utan D3): +27,31 mot m1 +30,85. Bär 151659 465-496 s (9,6/7,9/7,9/12 -> 4,0/0,1/0,1/6,4), men kostar 171840 102,38 (high 3 slag före dropen: 6,4 -> 16 x2, +1 löst byte) |
+| D4 dropens high-håll | secDropHoldUntil använder max(RUN, RUN_OUT), alltså 7 s som förut | gör att D1 inte ändrar hållet efter en drop |
+
+**SIFFRORNA** (poäng / gräns / lag / etta / lösa / byten / ljus)
+- r0 m3: +24,21 / 22,7 / 8,48 / 41,7 / 0,98 / 3,39 / +1,5
+- **m1 (D1-D4, inlämnad): +30,85 / 26,0 / 8,19 / 47,5 / 0,96 / 3,34 / +2,1** (takt +1,1, kontrast -0,6, koreografi +6,2)
+- m2 (D1+D2+D4, RUN_IN kvar på 3): +27,31 / 23,8 / 8,2 / 44,8 / 0,96 / 3,42 / +1,5
+
+Per fil m1 (gräns/lag/etta/lösa/byten): 151659 36,7/7,6/67,9/1,2/3,3 · 171840 9,1/9,8/20,0/1,1/3,2 · 193040 32,3/7,2/54,5/0,7/3,6.
+Sämre än r0: i 171840 går lag 8,9 -> 9,8 och lösa 0,84 -> 1,05 (D3 för tidigt in i refrängen vid dropen 102 s). Lösa totalt är oförändrade (0,96).
+
+**RISKEN.** D3 kan ge 'high' en takt före en drop i långa uppbyggnader (171840 102 s). Lookbytet hamnar då före dropen, och dropbytet tas ändå av dropvägen. Med live-mic flackar rangpoängen mer, och 4 block kan släppa igenom fler korta låg/mellan-byten. Detektorns dwell (8 s) och MIN_HOLD är taket. D1 ändrar inte hållet efter en drop (D4), men drop-detektorn bör ändå köras genom dropdom3. Workern påverkas inte: inget nytt ramfält och ingen allokering, ratten läses statiskt som de andra. Lotus påverkas inte: SECTION_RUN_OUT är 0 som standard.
+
+**DIFFEN** (`git diff --no-index src .arena/fras/a2r/src`: r0:s effects.ts-diff, se .arena/fras/r0/losning.md, plus följande)
+```diff
+diff --git a/src/analyser.ts b/.arena/fras/a2r/src/analyser.ts
+index 5dcd901..d031bfb 100644
+--- a/src/analyser.ts
++++ b/.arena/fras/a2r/src/analyser.ts
+@@ -213,6 +213,7 @@ export class Analyser {
+   static readonly BASSON_LEN = 32;     bassOnRing = new Float32Array(Analyser.BASSON_LEN); bassOnN = 0;  bassOnPeak = false;
+      static readonly RANK_RUN = Analyser.secEnv('SECTION_RUN', 3);
+   static readonly RANK_RUN_IN = Analyser.secEnv('SECTION_RUN_IN', 0);   // SNABB ATTACK
++  static readonly RANK_RUN_OUT = Analyser.secEnv('SECTION_RUN_OUT', 0);   // UR REFRÄNGEN (0 = RUN)
+   static readonly BODY_HIGH_MS = Analyser.secEnv('SECTION_BODY_HIGH', 0);   // BASEN TILLBAKA
+   static readonly BODY_HIGH_DB = Analyser.secEnv('SECTION_BODY_HIGH_DB', 3);
+   boundaryNov = 0;   // Klangnyhet 0..1 per 1 s-block mot det langsamma referensavtrycket
+diff --git a/src/analyserSection.ts b/.arena/fras/a2r/src/analyserSection.ts
+index d86d2b9..7558d04 100644
+--- a/src/analyserSection.ts
++++ b/.arena/fras/a2r/src/analyserSection.ts
+@@ -117,7 +117,7 @@ export class SectionTracker {
+       } else { tier = 1; this.secPct = 0; }
+     }
+     if (tier === this.secTierCand) this.secTierRun++; else { this.secTierCand = tier; this.secTierRun = 1; }
+-    const runNeed = (Analyser.RANK_RUN_IN > 0 && this.secTierCand === 2 && this.a.sectionTier < 2) ? Analyser.RANK_RUN_IN : Analyser.RANK_RUN;
++    const runNeed = (Analyser.RANK_RUN_IN > 0 && this.secTierCand === 2 && this.a.sectionTier < 2) ? Analyser.RANK_RUN_IN : (Analyser.RANK_RUN_OUT > 0 && this.a.sectionTier === 2 && this.secTierCand < 2) ? Analyser.RANK_RUN_OUT : Analyser.RANK_RUN;
+     if (this.secTierRun >= runNeed) this.a.sectionTier = this.secTierCand;
+     let edgeUp = false, edgeDown = false, fallen = false;
+     {
+@@ -160,7 +160,7 @@ export class SectionTracker {
+           if (nowMs - this.a.sectionStartMs < hold) label = 'high';
+         }
+       }
+-      if (dropped && label === 'high') this.secDropHoldUntil = nowMs + (Analyser.RANK_WIN + Analyser.RANK_RUN) * 1000;
++      if (dropped && label === 'high') this.secDropHoldUntil = nowMs + (Analyser.RANK_WIN + Math.max(Analyser.RANK_RUN, Analyser.RANK_RUN_OUT)) * 1000;
+       else if (prev === 'high' && label !== 'high' && st >= 1 && nowMs < this.secDropHoldUntil) label = 'high';
+     }
+     if (label === 'high' && prev !== 'high' && !dropped && !edgeUp && fallen && nowMs - this.secHiEndMs < Analyser.BE_MEM_BEATS * (this.a.localBpm > 40 ? 60000 / this.a.localBpm : Analyser.BE_FALLBACK_MS)) {
+diff --git a/src/analyserProfile.ts b/.arena/fras/a2r/src/analyserProfile.ts
+index 7814195..c91e24e 100644
+--- a/src/analyserProfile.ts
++++ b/.arena/fras/a2r/src/analyserProfile.ts
+@@ -34,8 +34,9 @@ export const PROFILE: AnalyserProfile = {
+     BEAT_FEED: 'slow',            // a7r: VAR ANALYSATORNS KLOCKA KÖRS (analyser.ts clockMode): 'slow' taktvägen, 'inline' i process(); lotus: osatt (analysatorn matar taktvägen själv, hopSelf)
+     // SEKTIONER SOM HALLER (agaren i ladan 10-14: 'mycket go kansla nu'; 23 lang-*.wav: intro 17 -> 10 % av tiden, < 8 s 23 -> 15 %,
+     // fladder 41 -> 22, sektionsbyten 3,12 -> 2,44/min, refrangstart oforandrad). Ur refrang/mellanlage kravs 5 raka block, in i refrangen 3.
+-    SECTION_RUN: '5',             // var 3
+-    SECTION_RUN_IN: '3',          // var 0 (= RUN)
++    SECTION_RUN: '4',             // var 5 (fras a2r); 3 fore 10-14
++    SECTION_RUN_IN: '2',          // var 3 (fras a2r)
++    SECTION_RUN_OUT: '5',         // fras a2r: ur refrangen som forut (inga korta 'low' i refrangen)
+     SECTION_CARRY: '40',          // block som bars over latgransen (lotus 4a008a5); var 0. 20 -> 40 (a5r, tvavagar runda 2): latens-form-gransen
+                                   // fyrar ~9 s in i nya laten mitt i en sektion; 20 block gav sena etiketter (upp 2,6 -> 3,8 s), ingen nollning gav lampspr pop -6 %
+     // BASEN TILLBAKA = HIGH (agaren i ladan 10-19: 'refrangen haller efter dropen'; 24 lang: high +2 s efter drop 12 -> 33, build
+diff --git a/src/ANALYSER_SHARED.md5 b/.arena/fras/a2r/src/ANALYSER_SHARED.md5
+index f6ba712..0f6a3dc 100644
+--- a/src/ANALYSER_SHARED.md5
++++ b/.arena/fras/a2r/src/ANALYSER_SHARED.md5
+@@ -1,7 +1,7 @@
+ # md5 (CRLF->LF) av de gemensamma filerna - samma i lotus-light-link och dmx-control. Skrivs av analyser_shared.py --write
+-1e5942108e88af6bfe857ef56a7429b8 analyser.ts
++079a7b26439904d9eedf5ef0777dc71b analyser.ts
+ b5485714f88c45ec0f55f21b9d5ab20e analyserDrop.ts
+-692befa55e7fd906cdc3652af3f27baa analyserSection.ts
++d7ed9af97750db9f451009cdd1222f4f analyserSection.ts
+ 879ba2122d2a1d3e0eea4082adfd2355 analyserSpectrum.ts
+ e92d0d6b4f8dc36abfb8135004260806 analyserLevel.ts
+ 3b5c715739b3ce3b8668a3a2f0576a6a analyserKick.ts
+```
+
+effects.ts (oförändrad från r0):
+```diff
+diff --git a/src/effects.ts b/.arena/fras/a2r/src/effects.ts
+index ff4645c..8957bb7 100644
+--- a/src/effects.ts
++++ b/.arena/fras/a2r/src/effects.ts
+@@ -259,7 +259,7 @@ const MANUS_TOP = 2;
+  *  SECTION_UNIT_MIN_MS gammal - phraseOk:s reserv (held > MIN_HOLD + en fras) är nästan alltid sann efter en hållen look, så bytet landade
+  *  var som helst i takten (konsertReplay --slag). Med N väntar bytet (wantSwitch/buildEntry, inte drop/build-händelserna) in nästa
+  *  taktklocka-tick med beatIdx % N = 0 (1 = nästa slag, 4 = ettan), högst N slag x 1,25. */
+-const SWITCH_ON = 1;
++const SWITCH_ON = 4;   // fras r0: ettan
+ /** HIGH-VARV (standard 2026-11-04, ägaren: 'pröva b'; megamix tryckvag 36 % = manusets återseende): när refrängen (high) kommer tillbaka
+  *  för 4:e gången eller fler i samma låt får den NÄSTA look - minst spelad ur sektionens manusHist, annars ny ur poolen - i stället för
+  *  manusets. 1:a-3:e gången oförändrade (refrängen känns igen). Drop-bytet orört. natt --snabb: mega tryckvag 36 -> 21 %, lampspr 83 -> 88,
+@@ -307,8 +307,8 @@ const PULSE_IDX_INIT = -2e9;
+  *      detektorn da satt fast pa high; rotorsaken (ingen nollning vid latbyte) ar rattad 09-23. Sedan 10-12: LÅTMANUS. */
+ /** SECTION_UNIT (ladan 16:45): forvarningens 'high' 600 ms fore en forutsedd refrang och drop-fonstrets 'high' raknas INTE som sektionsgrans
+  *  (de gav high<->low-hopp pa 1-2 s nar refrangen uteblev). Bara den raa sektionen, och den maste vara minst DMX_SECTION_UNIT_MIN_MS gammal. */
++const LAND_HOLD_MS = 6000, LAND_ABSORB_MS = 24000;   // LANDNINGEN (a7): minsta hålltid före landningsbytet; sektionsbyten inom fönstret efter tas inte
+ const GAP_HOLD_MS = 4000;   // I LUCKAN: spärren efter uppbyggnadssignalen släpper senast efter 4 s (signal -> landning median 1,8 s)
+-const SECTION_UNIT_MIN_MS = 2000;   // 4000 -> 2000 (ladan 10-21: ny look 4-6 s efter sektionsbytet; replay 4,0 -> 2,0 s, korta looker 3 -> 2)
+ /** LÅTMANUS (10-12 kväll, ägaren: "olika effekter hoppar hela tiden ... mer som att den är förprogrammerad" + "allt mer känns anpassat
+  *  efter låten och som att de hänger ihop"). ERSÄTTER frasväxlingen (A/B-look var 8:e takt), basgångs-, karaktärs- och tempobytet,
+  *  reservklockan och 'ny låt' på sektionen intro. Låten får ETT manus: första gången en sektionstyp (intro/low/build/high/break) kommer
+@@ -566,6 +566,7 @@ export class EffectEngine {
+   private lastDemoted = 0; private lastSpaced = 0; private lastStopCount = 0;   // analysatorns monotona räknare (a3: dropDemoted/dropSpaced/stopCount)
+    private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
+   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
++  private landForce = false; private landAbsorbUntil = -1;   // LANDNINGEN (a7)
+   private lastBuildStart = 0; private lastMiniSeen = 0; private gapUntil = -1;   // I LUCKAN (11-16): inget lookbyte från uppbyggnadssignalen tills basen är tillbaka
+   private nearAt = -1e12; nearCount = 0;   // NASTAN-DROP
+   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; buildProg = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+@@ -797,7 +798,7 @@ export class EffectEngine {
+         const req = (m: Mode) => meetsRequirements(m, bpm, frame.profile);
+         // LÅTMANUS: vilken del av manuset bytet galler. Builden (aven ALLA_LOOKER-builden) -> build; drop och build som slutar ->
+         // refrangens look (dropen landar i refrangen); annars sektionen. Utan sektion (ingen analys an) finns inget manus.
+-        const secKey = allaBuild && !(dropSwitch && liveSec !== 'break') ? 'build' : (dropSwitch || buildExit) && liveSec !== 'break' ? 'high' : liveSec;
++        const secKey = this.landForce ? liveSec : allaBuild && !(dropSwitch && liveSec !== 'break') ? 'build' : (dropSwitch || buildExit) && liveSec !== 'break' ? 'high' : liveSec;
+         const calm = secKey === 'break';   // breakdown -> lugna poolen (var wantCalm)
+         const tierRank = (m: Mode) => { const t = EFFECT_MAP.get(m)?.tier; return t === 'lugn' ? 0 : t === 'full' ? 2 : 1; };
+         const tierNow = tierS === LUGN ? 0 : tierS === FART ? 1 : 2;
+@@ -809,15 +810,15 @@ export class EffectEngine {
+         if (secKey && this.carryKey && secKey !== this.carryKey) { this.manus.delete(this.carryKey); this.carryKey = ''; }   // burna looken släpps (softenRange)
+         if (secKey && secKey !== this.visitKey) { varv = (this.secVisits.get(secKey) ?? 0) + 1; this.secVisits.set(secKey, varv); this.visitKey = secKey; }
+         const nextLook = HIGH_VARV > 0 && secKey === 'high' && varv >= HIGH_VARV && !dropSwitch && !!kept;
+-        let keep = !nextLook && !!kept && fits(kept) && !(dropSwitch && !this.bassStrong(kept));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark
++        let keep = !nextLook && !!kept && fits(kept) && !(dropSwitch && !this.bassStrong(kept)) && !(this.landForce && (kept === this.smartMode || tierRank(kept) === 0));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark; landningen byter alltid
+         const avoid = nextLook ? kept : undefined;
+         if (nextLook) { const h = (this.manusHist.get(secKey) ?? []).filter((m) => m !== kept && m !== this.smartMode && fits(m)); if (h.length) { kept = this.pickLook(h.map((m) => ({ m }))); keep = true; this.manus.set(secKey, kept); console.log(`[dirigent] high-varv ${varv}: nasta look "${kept}"`); } }
+-        if (!keep && secKey && !(dropSwitch) && !nextLook) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m)); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
++        if (!keep && secKey && !(dropSwitch) && !nextLook) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m) && !(this.landForce && (m === this.smartMode || tierRank(m) === 0))); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
+         if (keep && kept === this.smartMode) { this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true; }   // manuset sager samma look - inget byte
+         else {
+         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
+         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
+-        this.switchWhy = dropSwitch ? 'drop'
++        this.switchWhy = dropSwitch ? 'drop' : this.landForce ? 'landning'
+           : (memSection || secEntry) ? 'sektion'
+           : (buildEntry || allaBuild) ? 'build' : buildExit ? 'build-slut' : tierChanged ? 'tier' : 'dwell';
+         this.switchCount++;
+@@ -1065,9 +1066,8 @@ export class EffectEngine {
+         // sektionen in i high inom 2 s efter en sådan drop byts looken direkt, som vid en full drop (ingen MIN_HOLD/fras/slag-väntan).
+         const dropEntry = liveSecChanged && liveSec === 'high' && nowWall - this.anaDropAt < 2000;
+         if (liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '') console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; }   // (intro glommer inte lookerna langre - LÅTMANUS glomms bara pa en verklig latgrans)
+-        if (liveSecChanged) this.pendingSecSwitch = true;
+-        const secOldEnough = (frame.sectionAgeMs ?? 1e9) >= SECTION_UNIT_MIN_MS;   // SECTION_UNIT: ingen switch pa en sektion yngre an SECTION_UNIT_MIN_MS (detektorflapp)
+-        const memSection = liveSecChanged;   // (latminnets sektionsgrans mem* borttagen 11-09 - sattes aldrig)
++        if (liveSecChanged) this.pendingSecSwitch = nowWall >= this.landAbsorbUntil;   // LANDNINGEN: detektorns sena byte efter landningen är redan gjort
++        const memSection = liveSecChanged && nowWall >= this.landAbsorbUntil;   // (latminnets sektionsgrans mem* borttagen 11-09 - sattes aldrig)
+         const phraseMs = this.cfg.beat && this.cfg.beat.bpm > 0 ? 16 * 60000 / this.cfg.beat.bpm : 0;
+         // LÅTMANUS: sektionsbytet landar på sektionens EGET taktraster (början av takt 2, 4, 6 ... sedan sektionsstart) i stället för
+         // effektklockans 16-slagsfras, vars fas är godtycklig mot låten (bänken: bytet väntade upp till 24 s efter en hållen sektion).
+@@ -1085,7 +1085,7 @@ export class EffectEngine {
+         // LÅTMANUS: med sektioner byts looken bara pa sektionsgrans (+ build/drop nedan); fras, basgang, karaktar, tempo och
+         // reservklockan byter inte langre. Utan sektion (ingen analys an) galler tier/halvering/dwell som forut.
+         const wantSwitch = liveSec
+-            ? ((memSection || this.pendingSecSwitch) && secOldEnough)
++            ? (memSection || this.pendingSecSwitch)
+             : (tierChanged || memSection || now > this.smartDwellUntil);
+ 
+         // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
+@@ -1096,6 +1096,7 @@ export class EffectEngine {
+         //    kvar genom hela risern — då landar bytet i stället PÅ dropen, vilket
+         //    är det enda ögonblick där ett byte förstärker musiken.
+         // I LUCKAN (11-16): spärren följer analysatorns uppbyggnadssignal (25 av ägarens 29, den gamla riser/build-regeln 0 av 29) och släpper på drop/minidrop
++        const landHit = frame.miniDropCount !== this.lastMiniSeen && !dropHit;   // LANDNINGEN (a7): basen tillbaka efter luckan = ny del, på ettan
+         if (frame.buildStartCount !== this.lastBuildStart) { this.lastBuildStart = frame.buildStartCount; this.gapUntil = nowWall + GAP_HOLD_MS; }
+         if (dropHit || frame.miniDropCount !== this.lastMiniSeen) this.gapUntil = -1;
+         this.lastMiniSeen = frame.miniDropCount;
+@@ -1127,8 +1128,8 @@ export class EffectEngine {
+         //      hållen. Etiketten far darfor styra IDENTITET (samma look aterkommer)
+         //      och NAR bytet sker (sektionsgransen), men inte hur starkt det lyser.
+         const tierS = tier;
+-        const buildEntry = liveSecChanged && liveSec === 'build';   // MIX_V2 (2): ett byte IN i build-poolen tillats
+-        const secEntry = this.pendingSecSwitch && secOldEnough && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
++        const buildEntry = this.pendingSecSwitch && liveSec === 'build';   // MIX_V2 (2): ett byte IN i build-poolen tillats (hålls tills ettan)
++        const secEntry = this.pendingSecSwitch && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
+         const concertBuild = buildEntry && held > 2000;   // konsertläget: in i build direkt
+         // refrängen kom utan drop -> lämna builden direkt; även ett energilyft/sektionslyft (ladan 16:05: virvel hängde kvar i 'low' efter lyftet)
+         // + intensiteten på topp (ladan 17:09 'miss': upptakt låg kvar 10 s i int 0,9-1,0 - sektionen gick low -> build -> intro, aldrig high)
+@@ -1136,15 +1137,19 @@ export class EffectEngine {
+         const buildExit = BUILD_LOOKS.includes(this.smartMode) && (frame.section === 'high' || (this.buildLookAt > 0 && nowWall - this.buildLookAt > 2000 && (frame.intensity ?? 0) >= 0.95));
+         // (BUILDEN LANDAR I REFRÄNGEN - sektionen high efter >= 4 s build = drop - borttagen 10-11 kväll: 'falsk' 21:42:39, 17 % på baslyft; se DROP_JUMP_DB)
+         const buildLock = frame.section === 'build' && this.buildLookAt > 0 && BUILD_LOOKS.includes(this.smartMode) && nowWall - this.buildLookAt < 30000 && !dropSwitch && !buildExit;   // BUILD SOM HÅLLER - V123: bara så länge sektionen ÄR build
+-        const ready = (wantSwitch || buildEntry) && held > MIN_HOLD && phraseOk;
++        const ready = ((wantSwitch || buildEntry) && held > MIN_HOLD && phraseOk) || allaBuild || concertBuild || buildExit;
+         let slagOk = true;   // BYTE PÅ SLAGET (SWITCH_ON)
+         if (SWITCH_ON > 0) {
+-          if (!ready) this.slagWaitAt = -1; else if (this.slagWaitAt < 0) this.slagWaitAt = now;
++          if (!ready || buildLock || (inGap && !dropEntry)) this.slagWaitAt = -1; else if (this.slagWaitAt < 0) this.slagWaitAt = now;
+           if (ready && hasBeat && bpm > 0 && this.beatTrust >= 0.5 && !(this.tickNow && this.lastBeatIdx % SWITCH_ON === 0))
+             slagOk = now - this.slagWaitAt > SWITCH_ON * 1.25 * 60000 / bpm;
+         }
+-        if (!buildLock && (!inGap || dropEntry) && (dropSwitch || dropEntry || allaBuild || concertBuild || buildExit || (ready && slagOk))) {
++        if (!buildLock && (!inGap || dropEntry) && (dropSwitch || dropEntry || (ready && slagOk))) {
+         this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, liveSec, memSection, secEntry, tierChanged);
++      } else if (landHit && held > LAND_HOLD_MS && (liveSec === 'high' || liveSec === 'intro')) {
++        this.landForce = true;   // basen är tillbaka: aldrig lugna poolen (tierEma bär fortfarande luckan)
++        this.switchLook(frame, bpm, tier === LUGN ? FART : tier, tier === LUGN ? 'fart' : tierName, bassClear, false, false, false, false, liveSec, false, false, tierChanged);
++        this.landForce = false; this.landAbsorbUntil = nowWall + LAND_ABSORB_MS;
+       }
+       return this.smartMode;
+   }
+```
