@@ -1,0 +1,75 @@
+diff --git a/.arena/etta/bas/src/analyserClock.ts b/.arena/etta/a6/src/analyserClock.ts
+index 384c61c..438d868 100644
+--- a/.arena/etta/bas/src/analyserClock.ts
++++ b/.arena/etta/a6/src/analyserClock.ts
+@@ -25,7 +25,7 @@ const ONSET_WIN_MS = 5000, ONSET_EVERY_MS = 250, ONSET_BINS = 48, ONSET_RING = 1
+ const FEED_RISE_HOPS = 6;   // BASENS STIGNING
+ const BREAK_HOLD_MS = 20000;   // TVÅ RUTNÄT
+ const BREAK_RESTORE_MS = Number(process.env.DMX_BREAK_RESTORE_MS ?? String(BREAK_HOLD_MS));
+-const BAR_DECAY = 0.99, BAR_MIN = 16, BAR_MARGIN = 0.06, BAR_W_BASS = 0.5, BAR_W_BACK = 0.5, BAR_WIN0 = -0.2, BAR_WIN1 = 0.3, BAR_RISE_HOPS = 6;   // ETTAN I EFFEKTKLOCKANS RUTNÄT
++const BAR_P = 16, BAR_MEAN_A = 0.02, BAR_MIN = 16, BAR_W_BASS = 0.5, BAR_W_BACK = 0.5, BAR_WIN0 = -0.2, BAR_WIN1 = 0.3, BAR_RISE_HOPS = 6;   // ETTAN I EFFEKTKLOCKANS RUTNÄT (a6)
+ const TG_HOLD = 1.35;   // HELA TEMPOOMRÅDET
+ const TG_SIB = [Math.round(Math.log2(4 / 3) * 139), Math.round(Math.log2(3 / 2) * 139)];   // 4:3 och 3:2 i rutnätets steg
+ const TG_SNAP = 0.03, TG_EDGE = 1.03, TG_OCT_UP = 0.85, TG_OCT_DN = 0.4, TG_OCT_A = 0.1;
+@@ -83,7 +83,7 @@ export class BeatFeed {
+   private pwWn = 0; private pwDt = 0; private pwCand = 0; private pwRun = 0; private pwQuietAt = 0; pwVetos = 0; pwFixes = 0;
+   private tgHalfR = 0; octR = 0; private octN = 0; private octHi = false;   // OKTAVKANTEN
+   private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
+-  private readonly barK = new Float64Array(4); private readonly barL = new Float64Array(4); private readonly barB = new Float64Array(4);   // ETTAN (a5)
++  private readonly barS = new Float64Array(4); private mK = 0; private mL = 0; private mB = 0; private barH = 0; private barC = 0; private barPT = 0; private barPI = NaN;   // ETTAN (a6)
+   private barN = 0; private barIdx = NaN; private bK = 0; private bL = 0; private bB = 0; private barOff = 0; barShifts = 0;
+   private readonly linK = new Float64Array(BAR_RISE_HOPS); private readonly linL = new Float64Array(BAR_RISE_HOPS); private linPos = 0;
+   private innerAnchor = 0; private innerBpm = 0; private innerValid = false;
+@@ -386,16 +386,16 @@ export class BeatFeed {
+     return false;
+   }
+ 
+-  private barReset(): void { this.barK.fill(0); this.barL.fill(0); this.barB.fill(0); this.barN = 0; this.barIdx = NaN; this.barOff = 0; }
++  private barReset(): void { this.barS.fill(0); this.mK = 0; this.mL = 0; this.mB = 0; this.barH = 0; this.barC = 0; this.barPI = NaN; this.barN = 0; this.barIdx = NaN; this.barOff = 0; }
+ 
+-  /** ETTAN (se BAR_DECAY). */
++  /** ETTAN (se BAR_P). */
+   private barStep(frame: Frame, beat: NonNullable<EngineConfig["beat"]>, now: number): void {
+     const sa = frame.specAbs, p = this.linPos, k = (sa?.sub ?? 0) + (sa?.kick ?? 0), l = sa?.bass ?? 0;
+     const rk = k - this.linK[p], rl = l - this.linL[p]; this.linK[p] = k; this.linL[p] = l; this.linPos = (p + 1) % BAR_RISE_HOPS;
+     if (!(beat.bpm > 40)) return;
+     const pos = (now - beat.anchorMs) / (60000 / beat.bpm), idx = Math.floor(pos - BAR_WIN0);
+     if (idx !== this.barIdx) {
+-      if (idx === this.barIdx + 1) this.barCommit();
++      if (idx === this.barIdx + 1) this.barCommit(beat);
+       this.barIdx = idx; this.bK = 0; this.bL = 0; this.bB = 0;
+     }
+     if (pos - idx <= BAR_WIN1) {
+@@ -406,20 +406,19 @@ export class BeatFeed {
+   }
+ 
+   /** Slaget barIdx är färdigmätt. */
+-  private barCommit(): void {
+-    const K = this.barK, L = this.barL, B = this.barB, slot = ((this.barIdx % 4) + 4) % 4;
+-    for (let i = 0; i < 4; i++) { K[i] *= BAR_DECAY; L[i] *= BAR_DECAY; B[i] *= BAR_DECAY; }
+-    K[slot] += this.bK; L[slot] += this.bL; B[slot] += this.bB;
++  private barCommit(beat: NonNullable<EngineConfig["beat"]>): void {
++    const per = 60000 / beat.bpm, tb = beat.anchorMs + this.barIdx * per;
++    if (this.barPI === this.barPI) { const c = this.barC + (tb - this.barPT) / per - (this.barIdx - this.barPI); this.barC = c - 4 * Math.floor(c / 4); }
++    this.barPT = tb; this.barPI = this.barIdx;
++    const o = Math.round(this.barC) % 4, slot = (((this.barIdx + o) % 4) + 4) % 4, S = this.barS, a = this.barN > 0 ? BAR_MEAN_A : 1;
++    this.mK += a * (this.bK - this.mK); this.mL += a * (this.bL - this.mL); this.mB += a * (this.bB - this.mB);
++    S[slot] += (this.mK > 0 ? this.bK / this.mK : 0) + (this.mL > 0 ? BAR_W_BASS * this.bL / this.mL : 0) - (this.mB > 0 ? BAR_W_BACK * this.bB / this.mB : 0);
++    let bi = 0; for (let i = 1; i < 4; i++) if (S[i] > S[bi]) bi = i;
++    const mx = S[bi]; for (let i = 0; i < 4; i++) S[i] = S[i] - mx > -BAR_P ? S[i] - mx : -BAR_P;
+     if (this.barN < 1000) this.barN++;
+-    if (this.barN < BAR_MIN) return;
+-    const sK = K[0] + K[1] + K[2] + K[3], sL = L[0] + L[1] + L[2] + L[3], sB = B[0] + B[1] + B[2] + B[3];
+-    if (!(sK > 0)) return;
+-    let bi = 0, best = -1e9, second = -1e9;
+-    for (let i = 0; i < 4; i++) {
+-      const v = K[i] / sK + (sL > 0 ? BAR_W_BASS * L[i] / sL : 0) - (sB > 0 ? BAR_W_BACK * B[i] / sB : 0);
+-      if (v > best) { second = best; best = v; bi = i; } else if (v > second) second = v;
+-    }
+-    if (bi !== this.barOff && best - second >= BAR_MARGIN) { this.barOff = bi; this.barShifts++; }
++    if (this.barN >= BAR_MIN && S[this.barH] < 0) this.barH = bi;
++    const off = (((this.barH - o) % 4) + 4) % 4;
++    if (off !== this.barOff) { this.barOff = off; this.barShifts++; }
+   }
+ 
+   /** LÅTGRÄNSEN. */

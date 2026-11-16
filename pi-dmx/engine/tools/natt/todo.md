@@ -1,3 +1,8 @@
+ARENAN ETTA KLAR 2026-11-16 15:55: VINNARE f0 (a6r glidräkning per slag + relock utan ankarflytt + barOff bara ökar + a2 kickåterstart
+  med tak + a8r backbeat; analyserClock.ts + split.ts). Rätt etta bas -> f0: övning 33,5 -> 86,5 %, mellan 34,6 -> 68,9 %, KONTROLL 29,9 -> 63,9 %;
+  drop/mini/uppbyggnad identiska (dropdom3), takt/låtbyten identiska (latskak). EJ inlagd i src, EJ utlagd - väntar på ägarens ord.
+  Rapport tools/natt/arena-2026-11-16-etta.md (+ idébanken i mappen bredvid). Klockdomaren kunde inte köras (arkiverat material).
+  RÖR INTE .arena/etta.
 NATTEN 2026-11-16 (schemalagda körningen, ingen motorkod ändrad, ingen arena):
 KLART 2026-11-16: (a) "mät vilka lookbyten som passerar slaggrinden och var de hamnar i frasen" - 204 sektionsbyten i sex filer: på slaget 52-71 %
   (p50 0 ms, grinden fungerar), på frasgränsen ±1 slag 20 % (slump 19), på takt-ettan 17 % (slump 25). Drop/build/build-slut går förbi grinden,
@@ -70,7 +75,7 @@ dropdom2 --skak på övning + kontroll (193040 måste behålla 4/4). Genomgångn
 VETO1 KLAR -> s2:s DISKANTVETO INLAGT 3478368 (ägaren "ja kör på det"): övning 27,7 -> 31,2, kontroll 36,0 -> 38,5 (193040 4/4 kvar), ägarens
 tre genomgångna: falska drop 9 -> 1, mini som drop 6 -> 1, rätt 3 -> 3 av 20. s1 (uppbyggnadsveto) tappade 1 i 193040, s4 sämre på de genomgångna.
 Lotus portad 7d532a4a EJ utlagd. LADAN kör cad739b: nästa ladanbesök = lägg ut HEAD (minidrop per lucka + diskantvetot), ägaren ser det.
-ARENAN UPP1 PÅGÅR (startad 11-15 kväll, ägaren "kör den arenan!"): uppbyggnad -> drop i motorn, flank + diskantveto låsta. Domare
+ARENAN UPP1 KLAR 11-15 (rapport tools/natt/arena-2026-11-15-upp1.md; u2:s signal inlagd 3aa8ac1) (startad 11-15 kväll, ägaren "kör den arenan!"): uppbyggnad -> drop i motorn, flank + diskantveto låsta. Domare
 tools/arena/dropdom3.py (bas 24,4), övning 151659 + 172432 + 160345, kontroll 171840 + 193040 (+193818/200719 om ägaren blir klar).
 4 agenter u1 spektrum / u2 spänning / u3 rytm / u4 fritt. NATTAGENTEN: rör inte .arena/upp1, kör inte dropdom3.py.
 UPP1 FINALEN: u4 56,3 / u2 54,4 / u1 53,2 / bas 48,1 / u3 46,0 - INGEN fann ett drop till på kontrollen (alla 1/5 i 171840); det som höll

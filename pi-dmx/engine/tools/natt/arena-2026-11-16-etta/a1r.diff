@@ -1,0 +1,86 @@
+diff --git a/.arena/etta/bas/src/analyserClock.ts b/.arena/etta/a1r/src/analyserClock.ts
+index 384c61c..3413ecd 100644
+--- a/.arena/etta/bas/src/analyserClock.ts
++++ b/.arena/etta/a1r/src/analyserClock.ts
+@@ -25,7 +25,7 @@ const ONSET_WIN_MS = 5000, ONSET_EVERY_MS = 250, ONSET_BINS = 48, ONSET_RING = 1
+ const FEED_RISE_HOPS = 6;   // BASENS STIGNING
+ const BREAK_HOLD_MS = 20000;   // TVÅ RUTNÄT
+ const BREAK_RESTORE_MS = Number(process.env.DMX_BREAK_RESTORE_MS ?? String(BREAK_HOLD_MS));
+-const BAR_DECAY = 0.99, BAR_MIN = 16, BAR_MARGIN = 0.06, BAR_W_BASS = 0.5, BAR_W_BACK = 0.5, BAR_WIN0 = -0.2, BAR_WIN1 = 0.3, BAR_RISE_HOPS = 6;   // ETTAN I EFFEKTKLOCKANS RUTNÄT
++const BAR_DECAY = 0.99, BAR_MIN = 16, BAR_MARGIN = 0.06, BAR_W_BASS = 0.5, BAR_W_BACK = 0.5, BAR_WIN0 = -0.2, BAR_WIN1 = 0.3, BAR_RISE_HOPS = 6, BAR_R_MAX = 2, BAR_R_PEAK = 0.8, BAR_W_R = 0.5;   // ETTAN I EFFEKTKLOCKANS RUTNÄT
+ const TG_HOLD = 1.35;   // HELA TEMPOOMRÅDET
+ const TG_SIB = [Math.round(Math.log2(4 / 3) * 139), Math.round(Math.log2(3 / 2) * 139)];   // 4:3 och 3:2 i rutnätets steg
+ const TG_SNAP = 0.03, TG_EDGE = 1.03, TG_OCT_UP = 0.85, TG_OCT_DN = 0.4, TG_OCT_A = 0.1;
+@@ -85,6 +85,8 @@ export class BeatFeed {
+   private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
+   private readonly barK = new Float64Array(4); private readonly barL = new Float64Array(4); private readonly barB = new Float64Array(4);   // ETTAN (a5)
+   private barN = 0; private barIdx = NaN; private bK = 0; private bL = 0; private bB = 0; private barOff = 0; barShifts = 0;
++  private barM = 0; private barJ = 0; private barPos = NaN; private barAt = 0;   // ettan räknas i musikens slag (a1)
++  private readonly barR = new Float64Array(4); private bE = 0; private bE1 = 0; private bE2 = 0; private bE3 = 0; private bEm = 0;   // kickens återstart (a2), toppen (a1r)
+   private readonly linK = new Float64Array(BAR_RISE_HOPS); private readonly linL = new Float64Array(BAR_RISE_HOPS); private linPos = 0;
+   private innerAnchor = 0; private innerBpm = 0; private innerValid = false;
+   private readonly anaGrid = { anchorMs: 0, bpm: 0, confidence: 0 };   // EN KÄLLA
+@@ -386,45 +388,52 @@ export class BeatFeed {
+     return false;
+   }
+ 
+-  private barReset(): void { this.barK.fill(0); this.barL.fill(0); this.barB.fill(0); this.barN = 0; this.barIdx = NaN; this.barOff = 0; }
++  private barReset(): void { this.barK.fill(0); this.barL.fill(0); this.barB.fill(0); this.barR.fill(0); this.bE1 = 0; this.bE2 = 0; this.bE3 = 0; this.bEm = 0; this.barN = 0; this.barIdx = NaN; this.barOff -= this.barOff & 3; this.barM = 0; this.barJ = 0; this.barPos = NaN; }
+ 
+   /** ETTAN (se BAR_DECAY). */
+   private barStep(frame: Frame, beat: NonNullable<EngineConfig["beat"]>, now: number): void {
+     const sa = frame.specAbs, p = this.linPos, k = (sa?.sub ?? 0) + (sa?.kick ?? 0), l = sa?.bass ?? 0;
+     const rk = k - this.linK[p], rl = l - this.linL[p]; this.linK[p] = k; this.linL[p] = l; this.linPos = (p + 1) % BAR_RISE_HOPS;
+     if (!(beat.bpm > 40)) return;
+-    const pos = (now - beat.anchorMs) / (60000 / beat.bpm), idx = Math.floor(pos - BAR_WIN0);
++    const per = 60000 / beat.bpm, pos = (now - beat.anchorMs) / per, idx = Math.floor(pos - BAR_WIN0);
++    if (this.barPos === this.barPos) this.barJ += pos - this.barPos - (now - this.barAt) / per;
++    this.barPos = pos; this.barAt = now; const jr = Math.floor(this.barJ + 0.5);
+     if (idx !== this.barIdx) {
+-      if (idx === this.barIdx + 1) this.barCommit();
+-      this.barIdx = idx; this.bK = 0; this.bL = 0; this.bB = 0;
++      if (idx === this.barIdx + 1) this.barCommit(jr);
++      this.barIdx = idx; this.bK = 0; this.bL = 0; this.bB = 0; this.bE = 0;
+     }
+     if (pos - idx <= BAR_WIN1) {
+       if (rk > this.bK) this.bK = rk;
++      if (k > this.bE) this.bE = k;
+       if (rl > this.bL) this.bL = rl;
+       const hb = (frame.onset?.highMid ?? 0) + (frame.onset?.treble ?? 0); if (hb > this.bB) this.bB = hb;
+     }
++    { const d = ((((this.barM + jr - this.barOff) % 4) + 4) % 4); if (d) this.barOff += d; }
+   }
+ 
+   /** Slaget barIdx är färdigmätt. */
+-  private barCommit(): void {
+-    const K = this.barK, L = this.barL, B = this.barB, slot = ((this.barIdx % 4) + 4) % 4;
+-    for (let i = 0; i < 4; i++) { K[i] *= BAR_DECAY; L[i] *= BAR_DECAY; B[i] *= BAR_DECAY; }
++  private barCommit(jr: number): void {
++    const K = this.barK, L = this.barL, B = this.barB, R = this.barR, slot = (((this.barIdx - jr) % 4) + 4) % 4;
++    for (let i = 0; i < 4; i++) { K[i] *= BAR_DECAY; L[i] *= BAR_DECAY; B[i] *= BAR_DECAY; R[i] *= BAR_DECAY; }
+     K[slot] += this.bK; L[slot] += this.bL; B[slot] += this.bB;
++    { const e = this.bE, e1 = this.bE1, pm = this.bE2 > this.bE3 ? this.bE2 : this.bE3;
++      if (this.bEm > 0 && e1 > pm && e1 >= BAR_R_PEAK * e) R[(slot + 3) & 3] += Math.min(BAR_R_MAX, (e1 - pm) / this.bEm);
++      this.bE3 = this.bE2; this.bE2 = e1; this.bE1 = e; this.bEm += (e - this.bEm) / 16; }
+     if (this.barN < 1000) this.barN++;
+     if (this.barN < BAR_MIN) return;
+-    const sK = K[0] + K[1] + K[2] + K[3], sL = L[0] + L[1] + L[2] + L[3], sB = B[0] + B[1] + B[2] + B[3];
++    const sK = K[0] + K[1] + K[2] + K[3], sL = L[0] + L[1] + L[2] + L[3], sB = B[0] + B[1] + B[2] + B[3], sR = R[0] + R[1] + R[2] + R[3];
+     if (!(sK > 0)) return;
+     let bi = 0, best = -1e9, second = -1e9;
+     for (let i = 0; i < 4; i++) {
+-      const v = K[i] / sK + (sL > 0 ? BAR_W_BASS * L[i] / sL : 0) - (sB > 0 ? BAR_W_BACK * B[i] / sB : 0);
++      const v = K[i] / sK + (sR > 0 ? BAR_W_R * R[i] / sR : 0) + (sL > 0 ? BAR_W_BASS * L[i] / sL : 0) - (sB > 0 ? BAR_W_BACK * B[i] / sB : 0);
+       if (v > best) { second = best; best = v; bi = i; } else if (v > second) second = v;
+     }
+-    if (bi !== this.barOff && best - second >= BAR_MARGIN) { this.barOff = bi; this.barShifts++; }
++    if (bi !== this.barM && best - second >= BAR_MARGIN) { this.barM = bi; this.barShifts++; }
+   }
+ 
+   /** LÅTGRÄNSEN. */
+   private relock(soft: boolean): void {
+-    if (this.innerValid && this.innerBpm > 0) this.innerAnchor += this.barOff * (60000 / this.innerBpm);
++    if (this.innerValid && this.innerBpm > 0) this.innerAnchor += (this.barOff & 3) * (60000 / this.innerBpm);
+     this.tgReset(soft); this.barReset(); this.goodRep = 0; this.goodOn = 0; this.onNext = 0;
+   }
+ 

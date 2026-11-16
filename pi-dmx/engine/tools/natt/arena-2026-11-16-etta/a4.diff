@@ -1,0 +1,155 @@
+diff --git a/.arena/etta/bas/src/analyserClock.ts b/.arena/etta/a4/src/analyserClock.ts
+index 384c61c..93e2922 100644
+--- a/.arena/etta/bas/src/analyserClock.ts
++++ b/.arena/etta/a4/src/analyserClock.ts
+@@ -26,6 +26,7 @@ const FEED_RISE_HOPS = 6;   // BASENS STIGNING
+ const BREAK_HOLD_MS = 20000;   // TVÅ RUTNÄT
+ const BREAK_RESTORE_MS = Number(process.env.DMX_BREAK_RESTORE_MS ?? String(BREAK_HOLD_MS));
+ const BAR_DECAY = 0.99, BAR_MIN = 16, BAR_MARGIN = 0.06, BAR_W_BASS = 0.5, BAR_W_BACK = 0.5, BAR_WIN0 = -0.2, BAR_WIN1 = 0.3, BAR_RISE_HOPS = 6;   // ETTAN I EFFEKTKLOCKANS RUTNÄT
++const EV_LAG = 0.25, EV_W = 1, EV_GAP_MS = 1000, EV_JUMP = 0.15;
+ const TG_HOLD = 1.35;   // HELA TEMPOOMRÅDET
+ const TG_SIB = [Math.round(Math.log2(4 / 3) * 139), Math.round(Math.log2(3 / 2) * 139)];   // 4:3 och 3:2 i rutnätets steg
+ const TG_SNAP = 0.03, TG_EDGE = 1.03, TG_OCT_UP = 0.85, TG_OCT_DN = 0.4, TG_OCT_A = 0.1;
+@@ -54,6 +55,11 @@ export function publishPhase(f: { beatPhaseMs: number; beatPhaseConf: number; ba
+   f.barShift = (((((j % 4) + 4) % 4) - ir) % 4 + 4) % 4;
+ }
+ 
++function rot4(X: Float64Array, m: number): void {
++  if (m === 0) return; const a = X[0], b = X[1], c = X[2], d = X[3];
++  X[0] = m === 1 ? b : m === 2 ? c : d; X[1] = m === 1 ? c : m === 2 ? d : a; X[2] = m === 1 ? d : m === 2 ? a : b; X[3] = m === 1 ? a : m === 2 ? b : c;
++}
++
+ export class BeatFeed {
+   private trustSm = 0; private trustAt = 0;   // dirigenternas tillit
+   onBeatRate = 0;   // andel kickar med |fasfel| < 0.25
+@@ -85,6 +91,7 @@ export class BeatFeed {
+   private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
+   private readonly barK = new Float64Array(4); private readonly barL = new Float64Array(4); private readonly barB = new Float64Array(4);   // ETTAN (a5)
+   private barN = 0; private barIdx = NaN; private bK = 0; private bL = 0; private bB = 0; private barOff = 0; barShifts = 0;
++  private readonly barE = new Float64Array(4); private evDrops = -1; private evMini = -1; private evAt = -1e12; private evD = 0;
+   private readonly linK = new Float64Array(BAR_RISE_HOPS); private readonly linL = new Float64Array(BAR_RISE_HOPS); private linPos = 0;
+   private innerAnchor = 0; private innerBpm = 0; private innerValid = false;
+   private readonly anaGrid = { anchorMs: 0, bpm: 0, confidence: 0 };   // EN KÄLLA
+@@ -142,7 +149,7 @@ export class BeatFeed {
+     beat.bpm = this.bestBpm; beat.anchorMs = now - (idx + fr) * nb;
+     const shift = ((((beat.anchorMs - ref) % nb) + nb) % nb) / nb;
+     let err = this.bestPh - shift; err -= Math.round(err);
+-    beat.anchorMs += err * nb;
++    beat.anchorMs += err * nb; if (err > EV_JUMP || err < -EV_JUMP) this.barSlip(err);
+     this.onsetFixes++;
+   }
+ 
+@@ -386,14 +393,23 @@ export class BeatFeed {
+     return false;
+   }
+ 
+-  private barReset(): void { this.barK.fill(0); this.barL.fill(0); this.barB.fill(0); this.barN = 0; this.barIdx = NaN; this.barOff = 0; }
++  private barReset(): void { this.evD = 0; this.barE.fill(0); this.barK.fill(0); this.barL.fill(0); this.barB.fill(0); this.barN = 0; this.barIdx = NaN; this.barOff = 0; }
++
++  /** Rutnätet hoppade err slag: ettans plats i slagindex följer med. */
++  private barSlip(err: number): void {
++    this.evD += err; const s = Math.round(this.evD); if (s === 0) return;
++    this.evD -= s; const m = ((s % 4) + 4) % 4; rot4(this.barK, m); rot4(this.barL, m); rot4(this.barB, m); rot4(this.barE, m);
++    this.barOff = (((this.barOff - s) % 4) + 4) % 4; this.barIdx -= s;
++  }
+ 
+   /** ETTAN (se BAR_DECAY). */
+   private barStep(frame: Frame, beat: NonNullable<EngineConfig["beat"]>, now: number): void {
+     const sa = frame.specAbs, p = this.linPos, k = (sa?.sub ?? 0) + (sa?.kick ?? 0), l = sa?.bass ?? 0;
+     const rk = k - this.linK[p], rl = l - this.linL[p]; this.linK[p] = k; this.linL[p] = l; this.linPos = (p + 1) % BAR_RISE_HOPS;
++    const dc = frame.dropCount ?? 0, mc = frame.miniDropCount ?? 0, ev = this.evDrops >= 0 && (dc !== this.evDrops || mc !== this.evMini); this.evDrops = dc; this.evMini = mc;
+     if (!(beat.bpm > 40)) return;
+     const pos = (now - beat.anchorMs) / (60000 / beat.bpm), idx = Math.floor(pos - BAR_WIN0);
++    if (ev && now - this.evAt >= EV_GAP_MS) { this.evAt = now; this.barE[((Math.round(pos - EV_LAG) % 4) + 4) % 4] += 1; this.barDecide(); }
+     if (idx !== this.barIdx) {
+       if (idx === this.barIdx + 1) this.barCommit();
+       this.barIdx = idx; this.bK = 0; this.bL = 0; this.bB = 0;
+@@ -409,14 +425,20 @@ export class BeatFeed {
+   private barCommit(): void {
+     const K = this.barK, L = this.barL, B = this.barB, slot = ((this.barIdx % 4) + 4) % 4;
+     for (let i = 0; i < 4; i++) { K[i] *= BAR_DECAY; L[i] *= BAR_DECAY; B[i] *= BAR_DECAY; }
+-    K[slot] += this.bK; L[slot] += this.bL; B[slot] += this.bB;
++    K[slot] += this.bK; L[slot] += this.bL; B[slot] += this.bB; this.barE[0] *= BAR_DECAY; this.barE[1] *= BAR_DECAY; this.barE[2] *= BAR_DECAY; this.barE[3] *= BAR_DECAY;
+     if (this.barN < 1000) this.barN++;
+-    if (this.barN < BAR_MIN) return;
++    this.barDecide();
++  }
++
++  /** De fyra hypoteserna döms. */
++  private barDecide(): void {
++    const K = this.barK, L = this.barL, B = this.barB, E = this.barE, sE = E[0] + E[1] + E[2] + E[3];
++    if (this.barN < BAR_MIN && !(sE > 0)) return;
+     const sK = K[0] + K[1] + K[2] + K[3], sL = L[0] + L[1] + L[2] + L[3], sB = B[0] + B[1] + B[2] + B[3];
+-    if (!(sK > 0)) return;
++    if (!(sK > 0) && !(sE > 0)) return;
+     let bi = 0, best = -1e9, second = -1e9;
+     for (let i = 0; i < 4; i++) {
+-      const v = K[i] / sK + (sL > 0 ? BAR_W_BASS * L[i] / sL : 0) - (sB > 0 ? BAR_W_BACK * B[i] / sB : 0);
++      const v = (sK > 0 ? K[i] / sK : 0) + (sE > 0 ? EV_W * E[i] / sE : 0) + (sL > 0 ? BAR_W_BASS * L[i] / sL : 0) - (sB > 0 ? BAR_W_BACK * B[i] / sB : 0);
+       if (v > best) { second = best; best = v; bi = i; } else if (v > second) second = v;
+     }
+     if (bi !== this.barOff && best - second >= BAR_MARGIN) { this.barOff = bi; this.barShifts++; }
+@@ -482,7 +504,7 @@ export class BeatFeed {
+       if (BREAK_RESTORE_MS > 0) {
+         const quiet = this.lastPllKickMs ? now - this.lastPllKickMs : 0;
+         if (quiet > 1500 && onBeat && this.goodRep > 0 && now - this.goodAt < BREAK_RESTORE_MS + 1500) {
+-          beat0.anchorMs += err * beatMs;
++          beat0.anchorMs += err * beatMs; if (err > EV_JUMP || err < -EV_JUMP) this.barSlip(err);
+           this.onBeatRate = Math.max(this.onBeatRate, this.goodOn); this.repeatRate = Math.max(this.repeatRate, this.goodRep);
+           if (this.pllKicks < 12) this.pllKicks = 12;
+         }
+diff --git a/.arena/etta/bas/src/split.ts b/.arena/etta/a4/src/split.ts
+index 1a44e95..c634fe2 100644
+--- a/.arena/etta/bas/src/split.ts
++++ b/.arena/etta/a4/src/split.ts
+@@ -137,12 +137,12 @@ export const BS_SEQ = 0, BS_BODY = 1, BS_DROPS = 2, BS_MINI = 3, BS_BUILD = 4, B
+ export const BIG_STATE_LEN = 24;
+ export const SPEC_SLOTS = 16, SPEC_MAX = 1024;   // 16 spektra
+ 
+-export const HOP_REC_LEN = 18;   // TAKTVÄGEN
++export const HOP_REC_LEN = 20;   // TAKTVÄGEN
+ export const HOP_RING_N = 4096;
+ export const H_SEQ = 0, H_NOW = 1 , H_TS = 2 ,
+   H_BPM = 3, H_CONF = 4, H_ANCHOR = 5, H_KICKAT = 6, H_BARSHIFT = 7, H_ON_KICK = 8, H_ON_HIMID = 9, H_ON_TREBLE = 10, H_SA_SUB = 11, H_SA_KICK = 12, H_SA_BASS = 13 ,
+   H_BOUND = 14 , H_QUIET = 15 ,
+-  H_SURE = 16 , H_UNDER = 17 ;
++  H_SURE = 16 , H_UNDER = 17 , H_DROPS = 18, H_MINI = 19 ;
+ export const C_HOP_WRITE = 4, C_HOP_READ = 5, C_FEED_SEQ = 6 , C_WAKE = 7 ;
+ export const FS_HOP_SEQ = 0, FS_BEAT = 1 , FS_ANCHOR = 2, FS_BPM = 3, FS_BCONF = 4,
+   FS_BEATERR = 5 , FS_FCONF = 6 , FS_GRID = 7 ,
+@@ -152,7 +152,7 @@ export const FS_HOP_SEQ = 0, FS_BEAT = 1 , FS_ANCHOR = 2, FS_BPM = 3, FS_BCONF =
+ export const FEED_STATE_LEN = 20;
+ 
+ /** Det taktmatningen läser ur ramen, och det den skriver. */
+-export interface HopFrame { bpm: number; bpmConfidence: number; beatAnchorMs: number; kickAtMs: number; barShift: number; beatTrust?: number;
++export interface HopFrame { bpm: number; bpmConfidence: number; beatAnchorMs: number; kickAtMs: number; barShift: number; beatTrust?: number; dropCount?: number; miniDropCount?: number;
+   onset: { kick: number; highMid: number; treble: number }; specAbs: { sub: number; kick: number; bass: number } }
+ export interface HopGrid { anchorMs: number; bpm: number; confidence?: number }
+ export interface HopCfg { beat?: HopGrid | null; beatErr?: number }
+@@ -181,7 +181,7 @@ export class HopLaneFast {
+     r[o + H_BPM] = f.bpm; r[o + H_CONF] = f.bpmConfidence; r[o + H_ANCHOR] = f.beatAnchorMs; r[o + H_KICKAT] = f.kickAtMs; r[o + H_BARSHIFT] = f.barShift;
+     r[o + H_ON_KICK] = f.onset?.kick ?? 0; r[o + H_ON_HIMID] = f.onset?.highMid ?? 0; r[o + H_ON_TREBLE] = f.onset?.treble ?? 0;
+     r[o + H_SA_SUB] = f.specAbs?.sub ?? 0; r[o + H_SA_KICK] = f.specAbs?.kick ?? 0; r[o + H_SA_BASS] = f.specAbs?.bass ?? 0;
+-    r[o + H_BOUND] = an.trackBoundaries ?? 0; r[o + H_QUIET] = an.quietMs ?? 0; r[o + H_SURE] = an.boundSure ? 1 : 0; r[o + H_UNDER] = an.bodyUnderDb ?? 0;
++    r[o + H_BOUND] = an.trackBoundaries ?? 0; r[o + H_QUIET] = an.quietMs ?? 0; r[o + H_SURE] = an.boundSure ? 1 : 0; r[o + H_UNDER] = an.bodyUnderDb ?? 0; r[o + H_DROPS] = f.dropCount ?? 0; r[o + H_MINI] = f.miniDropCount ?? 0;
+     r[o + H_SEQ] = seq;
+     Atomics.store(ctrl, C_HOP_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
+     if (Atomics.load(ctrl, C_WAITING) || Atomics.load(ctrl, C_WAITING_B)) Atomics.notify(ctrl, C_WAKE);
+@@ -221,7 +221,7 @@ export class HopLaneSlow {
+   private readonly ctrl: Int32Array; private readonly ring: Float64Array; private readonly state: Float64Array;
+   private seq: number; private rt: number; private rb: number; private processed: number;
+   private skipped = 0; private lagMaxMs = 0; private busyEmaUs = 0; private busyMaxUs = 0; private fconf = NaN;
+-  private readonly fr = { bpm: 0.5, bpmConfidence: 0.5, beatAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5,
++  private readonly fr = { bpm: 0.5, bpmConfidence: 0.5, beatAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5, dropCount: 0.5, miniDropCount: 0.5,
+     onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5, bass: 0.5 } };
+   private readonly cfg: HopCfg = { beat: undefined, beatErr: undefined };
+   private grid: HopGrid | null = null;
+@@ -242,7 +242,7 @@ export class HopLaneSlow {
+       if (r[o + H_SEQ] !== seq) { this.skipped++; continue; }
+       const t0 = performance.now();
+       this.target.trackBoundaries = r[o + H_BOUND]; this.target.quietMs = r[o + H_QUIET]; this.target.boundSure = r[o + H_SURE] === 1; this.target.bodyUnderDb = r[o + H_UNDER];
+-      fr.bpm = r[o + H_BPM]; fr.bpmConfidence = r[o + H_CONF]; fr.beatAnchorMs = r[o + H_ANCHOR]; fr.kickAtMs = r[o + H_KICKAT]; fr.barShift = r[o + H_BARSHIFT];
++      fr.bpm = r[o + H_BPM]; fr.bpmConfidence = r[o + H_CONF]; fr.beatAnchorMs = r[o + H_ANCHOR]; fr.kickAtMs = r[o + H_KICKAT]; fr.barShift = r[o + H_BARSHIFT]; fr.dropCount = r[o + H_DROPS]; fr.miniDropCount = r[o + H_MINI];
+       fr.onset.kick = r[o + H_ON_KICK]; fr.onset.highMid = r[o + H_ON_HIMID]; fr.onset.treble = r[o + H_ON_TREBLE];
+       fr.specAbs.sub = r[o + H_SA_SUB]; fr.specAbs.kick = r[o + H_SA_KICK]; fr.specAbs.bass = r[o + H_SA_BASS];
+       const cin = fr.bpmConfidence;
