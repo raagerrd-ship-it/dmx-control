@@ -1,6 +1,7 @@
 ARENAN FRAS KLAR 2026-11-17 00:55: VINNARE r0 (jokern: SWITCH_ON 4 + 2 s-åldern bort + väntklockan + build genom grinden + a7:s
   landning på minidropen i high/intro med 24 s uppslukning; bara effects.ts). KONTROLL: byte på ägarens gräns 15,7 -> 23,5 %, lag 10,5 -> 8,7
-  slag, byte på ettan 17,1 -> 38,9 %; ljus +1,5; drop/takt/låtbyten/ettan identiska. EJ inlagd i src, EJ utlagd - väntar på ägarens ord.
+  slag, byte på ettan 17,1 -> 38,9 %; ljus +1,5; drop/takt/låtbyten/ettan identiska. INLAGD i src 2026-11-17 efter ägarens ja (backup-tagg
+  fore-fras-r0), EJ utlagd - ladan nästa besök ihop med f0 + dagens fem; ögonprov: ny look på ettan när en ny del börjar? fladder? sent?
   Rapport tools/natt/arena-2026-11-16-fras.md (+ idébanken bredvid). RÖR INTE .arena/fras.
 ARENAN ETTA KLAR 2026-11-16 15:55: VINNARE f0 (a6r glidräkning per slag + relock utan ankarflytt + barOff bara ökar + a2 kickåterstart
   med tak + a8r backbeat; analyserClock.ts + split.ts). Rätt etta bas -> f0: övning 33,5 -> 86,5 %, mellan 34,6 -> 68,9 %, KONTROLL 29,9 -> 63,9 %;
