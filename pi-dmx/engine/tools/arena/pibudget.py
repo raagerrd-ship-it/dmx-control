@@ -6,9 +6,13 @@ LADAN 2026-11-17 22:00 (HEAD 78346df, Zero 2 W, motorn på kärna 0 1 2, kärna 
   huvudtråden 45-65 % av en kärna (snabba vägen, dirigent, effekter, DMX ut, http), worker 18-22 % (tempo, rutnät, ettan, sektion).
   minnet: RSS 129 MB, topp 143 MB; heapen --max-old-space-size=96, tjänsten MemoryMax 340M, swap av. 190 MB ledigt.
 
+BELASTNINGSPROVET I LADAN 2026-11-17 22:31 (ägaren tittade): konstgjord last nice -10 på kärna 0-2 i steg om 0,5 kärna. Inget hack
+  i ögat och 0 överhoppade hopp ända till +2,5 kärnor (kärnorna 82-83 %). Huvudtrådens svarstid p99 11 -> 19-22 ms vid +1,0-2,0,
+  39 ms (max 51) vid +2,5 = där den börjar vänta. Minne/GC provades inte (lasten låg i egna processer).
+
 SPÄRRAR (DISK), medel över filerna:
   huvudtråd  huvudtradCpuUsPerHop <= bas x 1,10    huvudtråden bär ljuset; den får inte bli tyngre (10 % = PC:ns mätbrus)
-  worker     workerUsPerHop      <= bas x 3,5     70 % av en kärna på Pi:n / 20 % i dag; resten är marginal för toppar och GC
+  worker     workerUsPerHop      <= bas x 4,0     80 % av en kärna på Pi:n / 20 % i dag (höjt från 3,5 efter belastningsprovet)
   minne      rssMaxMB            <= bas + 15 MB   minnet är det trånga på Pi:n
   hinner     split.skipped = 0 och taktvag.skipped = 0 (workern får aldrig hoppa över)
 
@@ -25,7 +29,7 @@ import shutil
 NODE = 'C:/Users/richa/node24dl/win/node-v24.18.0-win-x64/node.exe'
 FILER = ['tools/ladan-2026-11-13/lang-20261113T151659.wav', 'tools/ladan-2026-11-13/lang-20261113T171840.wav']
 SEK, VARV = 60, 3   # varje fil 3 varv à 60 s, snabbaste varvet räknas (brus 25-30 % med ett varv, 11-17)
-HUVUD_TAK, WORKER_TAK, MINNE_MB = 1.10, 3.5, 15.0
+HUVUD_TAK, WORKER_TAK, MINNE_MB = 1.10, 4.0, 15.0
 
 
 def mat(mapp, bas):
