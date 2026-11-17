@@ -36,7 +36,7 @@ const bounds = new BoundaryDetector(() => Date.now()); an.setSpectrumSink((mag, 
 const ba = { level: 0, bpm: 0, bpmConfidence: 0 }; let lb = 0;
 await new Promise((r) => setTimeout(r, 1000));   // workern startar (dynamisk import, som i motorn)
 
-const behindHist = new Map(); const lagS = []; const envLag = []; const jumps = []; let prevA = 0, prevB = 0, h = 0;
+const behindHist = new Map(); const lagS = []; const envLag = []; const jumps = []; let prevA = 0, prevB = 0, h = 0, rssMax = 0;
 const buf = new Float32Array(HOP); const t0 = performance.now(); const wall0 = Date.now();
 const cpu0 = process.threadCpuUsage();
 await new Promise((res) => {
@@ -51,6 +51,7 @@ await new Promise((res) => {
       h++;
       if (an.hopLane) { const st = an.hopLane.stats(); behindHist.set(st.behind, (behindHist.get(st.behind) || 0) + 1); if (h % 37 === 0) lagS.push(st.lagMs); }
       if (h % 37 === 0) { const ss = an.getSplitStats(); if (ss) envLag.push(ss.lagMs); }
+      if (h % 375 === 0) rssMax = Math.max(rssMax, process.memoryUsage.rss());
       const b = cfg.beat;
       if (b && prevB) { if (b.bpm !== prevB || b.anchorMs !== prevA) { const bm = 60000 / b.bpm, now = Date.now(); const ph = (x, bpm) => ((now - x) % (60000 / bpm) + 60000 / bpm) % (60000 / bpm); let dms = ph(b.anchorMs, b.bpm) - ph(prevA, prevB); dms -= Math.round(dms / bm) * bm; jumps.push(Math.abs(dms)); } }
       prevA = b?.anchorMs ?? 0; prevB = b?.bpm ?? 0;
@@ -64,6 +65,7 @@ const st = an.hopLane?.stats() ?? null; const sp = an.getSplitStats?.() ?? null;
 const hist = [...behindHist.entries()].sort((a, b) => a[0] - b[0]).map(([k, v]) => `${k}:${(100 * v / h).toFixed(2)}%`).join(' ');
 process.stdout.write(JSON.stringify({
   wav: wav.split(/[\\/]/).pop(), sek: +((Date.now() - wall0) / 1000).toFixed(1), hop: h,
+  rssMaxMB: +(rssMax / 1048576).toFixed(1),   // Pi-budgeten 11-17: hela processens minne (huvudtråd + worker)
   huvudtradCpuUsPerHop: +((cpu.user + cpu.system) / h).toFixed(2),
   efterHop: hist, taktvagLagMs: { p50: q(lagS, 0.5), p99: q(lagS, 0.99), max: st?.lagMaxMs }, taktvag: st,
   envLagMs: { p50: q(envLag, 0.5), p99: q(envLag, 0.99) }, split: sp,
