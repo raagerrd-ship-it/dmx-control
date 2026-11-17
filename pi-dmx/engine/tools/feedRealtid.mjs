@@ -38,7 +38,7 @@ await new Promise((r) => setTimeout(r, 1000));   // workern startar (dynamisk im
 
 const behindHist = new Map(); const lagS = []; const envLag = []; const jumps = []; let prevA = 0, prevB = 0, h = 0, rssMax = 0;
 const buf = new Float32Array(HOP); const t0 = performance.now(); const wall0 = Date.now();
-const cpu0 = process.threadCpuUsage();
+const cpu0 = process.threadCpuUsage(); const pcpu0 = process.cpuUsage();
 await new Promise((res) => {
   const iv = setInterval(() => {
     const want = Math.floor((performance.now() - t0) / 1000 * SR / HOP);
@@ -59,7 +59,7 @@ await new Promise((res) => {
     if ((h + 1) * HOP > n) { clearInterval(iv); res(); }
   }, 2);
 });
-const cpu = process.threadCpuUsage(cpu0);
+const cpu = process.threadCpuUsage(cpu0); const pcpu = process.cpuUsage(pcpu0);
 const q = (a, f) => { const s = [...a].sort((x, z) => x - z); return s.length ? +s[Math.min(s.length - 1, Math.floor(f * s.length))].toFixed(2) : 0; };
 const st = an.hopLane?.stats() ?? null; const sp = an.getSplitStats?.() ?? null; an.__stopWorker?.();
 const hist = [...behindHist.entries()].sort((a, b) => a[0] - b[0]).map(([k, v]) => `${k}:${(100 * v / h).toFixed(2)}%`).join(' ');
@@ -67,6 +67,7 @@ process.stdout.write(JSON.stringify({
   wav: wav.split(/[\\/]/).pop(), sek: +((Date.now() - wall0) / 1000).toFixed(1), hop: h,
   rssMaxMB: +(rssMax / 1048576).toFixed(1),   // Pi-budgeten 11-17: hela processens minne (huvudtråd + worker)
   huvudtradCpuUsPerHop: +((cpu.user + cpu.system) / h).toFixed(2),
+  ovrigaCpuUsPerHop: +((pcpu.user + pcpu.system - cpu.user - cpu.system) / h).toFixed(2),   // alla andra trådar (workers + V8:s GC), 11-17
   efterHop: hist, taktvagLagMs: { p50: q(lagS, 0.5), p99: q(lagS, 0.99), max: st?.lagMaxMs }, taktvag: st,
   envLagMs: { p50: q(envLag, 0.5), p99: q(envLag, 0.99) }, split: sp,
   // WORKERNS KOSTNAD (arena entempo 11-09, Pi-budgeten): taktvägens busyUs (EMA per hop) + analysatorns långsamma väg busyUs (EMA per record)

@@ -13,6 +13,7 @@ BELASTNINGSPROVET I LADAN 2026-11-17 22:31 (ägaren tittade): konstgjord last ni
 SPÄRRAR (DISK), medel över filerna:
   huvudtråd  huvudtradCpuUsPerHop <= bas x 1,10    huvudtråden bär ljuset; den får inte bli tyngre (10 % = PC:ns mätbrus)
   worker     workerUsPerHop      <= bas x 4,0     80 % av en kärna på Pi:n / 20 % i dag (höjt från 3,5 efter belastningsprovet)
+  övriga     ovrigaCpuUsPerHop   <= bas x 8,0     alla trådar utom huvudtråden (workers + GC); en andra worker får ta ~1 kärna
   minne      rssMaxMB            <= bas + 15 MB   minnet är det trånga på Pi:n
   hinner     split.skipped = 0 och taktvag.skipped = 0 (workern får aldrig hoppa över)
 
@@ -29,7 +30,7 @@ import shutil
 NODE = 'C:/Users/richa/node24dl/win/node-v24.18.0-win-x64/node.exe'
 FILER = ['tools/ladan-2026-11-13/lang-20261113T151659.wav', 'tools/ladan-2026-11-13/lang-20261113T171840.wav']
 SEK, VARV = 60, 3   # varje fil 3 varv à 60 s, snabbaste varvet räknas (brus 25-30 % med ett varv, 11-17)
-HUVUD_TAK, WORKER_TAK, MINNE_MB = 1.10, 4.0, 15.0
+HUVUD_TAK, WORKER_TAK, OVRIGA_TAK, MINNE_MB = 1.10, 4.0, 8.0, 15.0   # övriga = alla trådar utom huvudtråden (workers + GC), en andra worker ryms
 
 
 def mat(mapp, bas):
@@ -44,8 +45,9 @@ def mat(mapp, bas):
                 last = [l for l in r.stdout.splitlines() if l.startswith('{')]
                 if not last: sys.exit(f'mätfel {w}: {r.stderr[-400:]}')
                 varv.append(json.loads(last[-1]))
-            x = dict(varv[0]); x['varv'] = [{k: v[k] for k in ('huvudtradCpuUsPerHop', 'workerUsPerHop')} for v in varv]
-            for k in ('huvudtradCpuUsPerHop', 'workerUsPerHop'): x[k] = min(v[k] for v in varv)
+            K = ('huvudtradCpuUsPerHop', 'workerUsPerHop', 'ovrigaCpuUsPerHop')
+            x = dict(varv[0]); x['varv'] = [{k: v.get(k, 0) for k in K} for v in varv]
+            for k in K: x[k] = min(v.get(k, 0) for v in varv)
             x['rssMaxMB'] = max(v.get('rssMaxMB', 0) for v in varv)
             x['split'] = {'skipped': sum(((v.get('split') or {}).get('skipped') or 0) for v in varv)}
             x['taktvag'] = {'skipped': sum(((v.get('taktvag') or {}).get('skipped') or 0) for v in varv)}
@@ -54,23 +56,25 @@ def mat(mapp, bas):
         shutil.rmtree(lock, ignore_errors=True)
     n = len(rader); v = list(rader.values())
     ut = {'huvud': sum(x['huvudtradCpuUsPerHop'] for x in v) / n, 'worker': sum(x['workerUsPerHop'] for x in v) / n,
-          'rss': max(x.get('rssMaxMB', 0) for x in v),
+          'ovriga': sum(x['ovrigaCpuUsPerHop'] for x in v) / n, 'rss': max(x.get('rssMaxMB', 0) for x in v),
           'skipped': sum(((x.get('split') or {}).get('skipped') or 0) + ((x.get('taktvag') or {}).get('skipped') or 0) for x in v),
           'filer': rader}
     json.dump(ut, io.open(os.path.join(mapp, 'pibudget.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
-    print(f"{os.path.basename(mapp)}: huvudtråd {ut['huvud']:.1f} us/hop  worker {ut['worker']:.1f} us/hop  minne {ut['rss']:.0f} MB  överhoppade {ut['skipped']}")
+    print(f"{os.path.basename(mapp)}: huvudtråd {ut['huvud']:.1f} us/hop  worker {ut['worker']:.1f} us/hop  övriga {ut['ovriga']:.1f} us/hop  minne {ut['rss']:.0f} MB  överhoppade {ut['skipped']}")
 
 
 def dom(korning):
     b = json.load(io.open(os.path.join(korning, 'bas', 'pibudget.json'), encoding='utf-8'))
     print(f"bas: huvudtråd {b['huvud']:.1f} us/hop  worker {b['worker']:.1f}  minne {b['rss']:.0f} MB\n")
-    print('| mapp | huvudtråd x bas | worker x bas (Pi-andel) | minne +MB | överhoppade | DISK |\n|---|---|---|---|---|---|')
+    print('| mapp | huvudtråd x bas | worker x bas (Pi-andel) | övriga trådar x bas | minne +MB | överhoppade | DISK |\n|---|---|---|---|---|---|---|')
     for m in sorted(os.listdir(korning)):
         p = os.path.join(korning, m, 'pibudget.json')
         if m == 'bas' or not os.path.exists(p): continue
         x = json.load(io.open(p, encoding='utf-8')); hk, wk, dm = x['huvud'] / b['huvud'], x['worker'] / b['worker'], x['rss'] - b['rss']
-        disk = [s for s, f in (('huvudtråd', hk > HUVUD_TAK), ('worker', wk > WORKER_TAK), ('minne', dm > MINNE_MB), ('hinner inte', x['skipped'] > 0)) if f]
-        print(f"| {m} | {hk:.2f} | {wk:.2f} (~{20 * wk:.0f} %) | {dm:+.0f} | {x['skipped']} | {', '.join(disk) or '-'} |")
+        ok_ = x.get('ovriga', 0) / max(1e-9, b.get('ovriga', 0))
+        disk = [s for s, f in (('huvudtråd', hk > HUVUD_TAK), ('worker', wk > WORKER_TAK), ('övriga trådar', ok_ > OVRIGA_TAK), ('minne', dm > MINNE_MB),
+                                ('hinner inte', x['skipped'] > 0)) if f]
+        print(f"| {m} | {hk:.2f} | {wk:.2f} (~{20 * wk:.0f} %) | {ok_:.2f} | {dm:+.0f} | {x['skipped']} | {', '.join(disk) or '-'} |")
 
 
 if __name__ == '__main__':
