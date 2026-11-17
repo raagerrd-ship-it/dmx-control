@@ -16,11 +16,14 @@ MÅTTEN (per fil, sedan medel över mängdens filer, lika vikt)
   etta   + %     andel av ALLA lookbyten som sitter på en Beat This-etta (inom 0,15 s)
   losa     /min  lookbyten som inte ligger g-1 .. g+16 slag från någon ägargräns (spärr)
   byten    /min  alla lookbyten (spärr)
+  miss     (info) %  andel ägargränser utan något byte inom g+16 slag (11-17, arenan grans)
 POÄNG = medel(grans - bas) + 0,5 x medel(etta - bas) - 1,5 x medel(lag - bas). + = bättre. DISK = sist oavsett poäng.
 SPÄRRAR (DISK):
   losa     medlet > bas + 0,5/min
   byten    någon fil > 1,3 x bas + 0,3/min (inga byten var fjärde takt "på chans")
   ljus     ljusdomaren (tools/arena/bank.py + domare.py v3 på dess övning) DISK, eller dess poäng < -1,5
+           (<körning>/ljusgrans.txt ersätter -1,5 och gör lampspr till info; sätts bara mellan körningar. 11-17: en ensam bänks lookvalsbrus
+            är std 2,8-4,2 poäng (tools/natt/ljusbrus-2026-11-17.md) -> rundorna -5,6, finalen döms med ljusskak.py på medel av 4 frön, -3,0)
   filer    ändrade filer utanför TILLATNA (jämfört med .arena/<körning>/bas/src = HEAD vid start)
   mätfel   en fil som inte går att mäta
 FINALISTERNAS KONTROLLER (orkestratorn): dropdom3.py --mat (drop/minidrop/uppbyggnad oförändrade mot bas), latskak.py (takt + låtbyten,
@@ -96,7 +99,7 @@ def dom_fil(rp, wav, t0, t1):
         if not np.any((o >= -FORE) & (o <= EFTER)): losa += 1
         if len(D) and np.min(abs(D - t)) <= ETTA_S: etta += 1
     minuter = (hi - lo) / 60
-    return dict(grans=100.0 * pa / len(G), lag=float(np.mean(lag)), etta=100.0 * etta / max(1, len(Si)), losa=losa / minuter, byten=len(Si) / minuter,
+    return dict(miss=100.0 * sum(1 for x in lag if x >= EFTER) / len(G), grans=100.0 * pa / len(G), lag=float(np.mean(lag)), etta=100.0 * etta / max(1, len(Si)), losa=losa / minuter, byten=len(Si) / minuter,
                 n_grans=len(G), n_byten=int(len(Si)), lagslag=[round(x, 1) for x in lag])
 
 def mat(mapp, mangd, utnamn, sond=False, bank=True):
@@ -115,7 +118,7 @@ def mat(mapp, mangd, utnamn, sond=False, bank=True):
         with ThreadPoolExecutor(max_workers=2) as ex: JS = dict(ex.map(kor, sorted({w for w, _, _ in mangd})))
     finally: shutil.rmtree(lock, ignore_errors=True)
     F = {kort(w): dom_fil(JS[w], w, a, b) for w, a, b in mangd}
-    m = {k: float(np.mean([F[f][k] for f in F])) for k in ('grans', 'lag', 'etta', 'losa', 'byten')}
+    m = {k: float(np.mean([F[f][k] for f in F])) for k in ('grans', 'lag', 'etta', 'losa', 'byten', 'miss')}
     if bank and not sond:
         args = [sys.executable, 'tools/arena/bank.py', mapp] + (['--bas'] if os.path.basename(mapp) == 'bas' else [])
         r = subprocess.run(args, cwd=ENGINE, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=3600)
@@ -132,7 +135,7 @@ def mat(mapp, mangd, utnamn, sond=False, bank=True):
                 if not os.path.exists(os.path.join(mapp, 'src', os.path.relpath(q, bas_src))): andr.append(os.path.relpath(q, bas_src).replace('\\', '/') + ' (borttagen)')
     out = dict(mapp=os.path.relpath(mapp, ENGINE), matt=m, filer=F, sparr=dict(andradeFiler=sorted(andr)), tidS=round(time.time() - t0))
     if not sond: io.open(os.path.join(mapp, utnamn), 'w', encoding='utf-8').write(json.dumps(out, ensure_ascii=False, indent=1))
-    print(json.dumps(dict(matt={k: round(v, 2) for k, v in m.items()}, filer={f: {k: round(v[k], 1) for k in ('grans', 'lag', 'etta', 'losa', 'byten')} for f, v in F.items()},
+    print(json.dumps(dict(matt={k: round(v, 2) for k, v in m.items()}, filer={f: {k: round(v[k], 1) for k in ('grans', 'lag', 'etta', 'losa', 'byten', 'miss')} for f, v in F.items()},
                           andradeFiler=out['sparr']['andradeFiler'], tidS=out['tidS']), ensure_ascii=False))
     return out
 
@@ -154,6 +157,7 @@ def rangordna(k, suffix, md):
     bas = las(os.path.join(k, 'bas', 'frasdom%s.json' % suffix))
     if not bas: raise SystemExit('bas saknar frasdom%s.json' % suffix)
     LJ = ljusdom(k); B = bas['matt']; rad = []
+    lg = os.path.join(k, 'ljusgrans.txt'); LJG = float(io.open(lg).read().strip()) if os.path.exists(lg) else -1.5   # körningens egen ljusspärr (mellan körningar)
     for n in sorted(os.listdir(k)):
         d = las(os.path.join(k, n, 'frasdom%s.json' % suffix))
         if not d or n == 'bas': continue
@@ -164,8 +168,9 @@ def rangordna(k, suffix, md):
         lj = LJ.get(n)
         if lj is None: disk.append('ljusdomaren saknas (bank.json)')
         else:
-            if lj[1]: disk.append('ljus: ' + '; '.join(lj[1]))
-            if lj[0] is not None and lj[0] < -1.5: disk.append('ljus %.1f < -1,5' % lj[0])
+            ld = [x for x in lj[1] if not (os.path.exists(lg) and x.startswith('lampspr'))]   # med ljusgrans.txt: lampspr döms bara på frömedlet (ljusskak.py) i finalen
+            if ld: disk.append('ljus: ' + '; '.join(ld))
+            if lj[0] is not None and lj[0] < LJG: disk.append('ljus %.1f < %.1f' % (lj[0], LJG))
         fel = [x for x in d['sparr']['andradeFiler'] if not tillaten(x)]
         if fel: disk.append('filer utanför tillåtna: ' + ', '.join(fel))
         fs = [f for f in d['filer'] if f in bas['filer']]
@@ -177,9 +182,9 @@ def rangordna(k, suffix, md):
     L = ['# Ranking %s, %s (tools/arena/frasdom.py, mot bas)' % (os.path.basename(k), rub), '',
          'bas: gräns %.1f %%  lag %.1f slag  etta %.1f %%  lösa %.2f/min  byten %.2f/min  | %s' % (B['grans'], B['lag'], B['etta'], B['losa'], B['byten'],
              '  '.join('%s %.0f%%/%.1f' % (f, v['grans'], v['lag']) for f, v in bas['filer'].items())), '',
-         '| plats | deltagare | poäng | gräns % | lag slag | etta % | lösa /min | byten /min | ljus | per fil gräns %/lag | DISK |', '|---|---|---|---|---|---|---|---|---|---|---|']
+         '| plats | deltagare | poäng | gräns % | lag slag | missade % | etta % | lösa /min | byten /min | ljus | per fil gräns %/lag | DISK |', '|---|---|---|---|---|---|---|---|---|---|---|---|']
     for i, (n, p, M, disk, d, lj) in enumerate(rad, 1):
-        L.append('| %d | %s | %+.2f | %.1f | %.1f | %.1f | %.2f | %.2f | %s | %s | %s |' % (i, n, p, M['grans'], M['lag'], M['etta'], M['losa'], M['byten'],
+        L.append('| %d | %s | %+.2f | %.1f | %.1f | %s | %.1f | %.2f | %.2f | %s | %s | %s |' % (i, n, p, M['grans'], M['lag'], '%.1f' % M['miss'] if 'miss' in M else '-', M['etta'], M['losa'], M['byten'],
                  '-' if not lj or lj[0] is None else '%+.1f' % lj[0], '  '.join('%s %.0f/%.1f' % (f, v['grans'], v['lag']) for f, v in d['filer'].items()), '; '.join(disk) or '-'))
     txt = '\n'.join(L) + '\n'; print(txt)
     if md: io.open(os.path.join(k, 'ranking-fras%s.md' % suffix), 'w', encoding='utf-8').write(txt)
