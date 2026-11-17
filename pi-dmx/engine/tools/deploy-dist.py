@@ -86,14 +86,14 @@ for pat in REMOVES:
     rc, out, _ = sudo(f'for f in {pat}; do [ -e "$f" ] && mv "$f" "$f.bak-{ts}" && echo "$f"; done; true')
     got = [l for l in out.split() if l]; removed += got
     print(f"borttaget -> .bak-{ts}: {got or 'inget'}   ({pat})")
-if ENVS:
+if ENVS or AFFINITY:
     name = CONF or 'deploy'
     body = '[Service]\\n# ' + ts + ' via deploy-dist.py\\n' + ''.join(f'Environment={e}\\n' for e in ENVS) + (f'CPUAffinity=\\nCPUAffinity={AFFINITY}\\n' if AFFINITY else '')
     rc, out, _ = sudo(f"mkdir -p /etc/systemd/system/audio-dmx-engine.service.d && printf \"{body}\" > /etc/systemd/system/audio-dmx-engine.service.d/{name}.conf && cat /etc/systemd/system/audio-dmx-engine.service.d/{name}.conf && systemctl daemon-reload")
     print(out.strip())
-if removed and not ENVS:   # 09-27: borttagna drop-ins maste laddas om, annars startar systemd med den gamla unit-bilden (env kvar)
+if removed and not ENVS and not AFFINITY:   # 09-27: borttagna drop-ins maste laddas om, annars startar systemd med den gamla unit-bilden (env kvar)
     sudo('systemctl daemon-reload')
-if not todo and not ENVS and not removed: sys.exit(0)
+if not todo and not ENVS and not AFFINITY and not removed: sys.exit(0)
 if NORESTART: print('ingen omstart begard'); sys.exit(0)
 rc, out, _ = sudo("systemctl restart audio-dmx-engine")
 for i in range(45):
