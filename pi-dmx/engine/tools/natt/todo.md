@@ -1,3 +1,6 @@
+LADAN UTLAGD 2026-11-17 21:45 (ägaren på plats, "lägg ut"): HEAD 78346df = f0 + r0 + g6 + minidrop/lucka + diskantveto + flank 1,5 +
+  uppbyggnadssignal + I LUCKAN. Alla "EJ utlagd i ladan" nedan för dessa gäller inte längre. Lotus portad fec31f98 (f0), EJ utlagd på lotus-Pi:n.
+  Ögonprovet pågår; backa per tagg fore-grans-g6 / fore-fras-r0 / fore-etta-f0.
 ARENAN ETTA2 KLAR 2026-11-17 dag: INGEN VINNARE. Bäst a8 (basgångens tonhöjd): övning +6,8, mellan +5,2, KONTROLL −0,7. Fynd: Beat This har
   udda takter i ~hälften av tiden på 193040/200719/172432/193818, i ren 4/4 är a8 ±0 på osedd musik (tools/arena/ren44.py); 2/3-tempofel
   i 200719 100-180 s (89 mot 130-176 bpm). Rapport tools/natt/arena-2026-11-17-etta2.md. RÖR INTE .arena/etta2.
