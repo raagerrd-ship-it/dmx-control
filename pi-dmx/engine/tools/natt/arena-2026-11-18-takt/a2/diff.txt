@@ -1,0 +1,68 @@
+diff --git a/src/analyserClock.ts b/.arena/takt/a2/src/analyserClock.ts
+index 0bbcb78..281f75e 100644
+--- a/src/analyserClock.ts
++++ b/.arena/takt/a2/src/analyserClock.ts
+@@ -41,6 +41,7 @@ const HV_R = [4 / 3, 3 / 4, 3 / 2, 2 / 3, 5 / 4, 4 / 5], HV_K = 1.25, HV_N = 5,
+ const PW_RING = 4096, PW_WIN_MS = 10000, PW_MIN = 0.5, PW_Q = [4 / 3, 3 / 4, 3 / 2, 2 / 3];   // TAKTENS SJÄLVLIKHET
+ const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, TG_MIN_N = 300, TG_FINE = 0.0025, TG_HALF = ONSET_BINS >> 1;
+ const TG_FINE_MAX = 0.0125;   // FINTEMPOTS BAND
++const PH_CAP = 5, PH_HOLD = 1.3, PH_N = 8, PH_KS = 0.25, PH_KMAX = 0.7, PH_JUMP = 0.03;   // FASVAKTEN (a2 takt)
+ 
+ /** FAS-PREDIKTIONSTILLIT. */
+ export function publishPhase(f: { beatPhaseMs: number; beatPhaseConf: number; barShift: number }, b: ClockCfg["beat"], barKnown: boolean,
+@@ -101,6 +102,7 @@ export class BeatFeed {
+ 
+   private scanStep = 0.005; private scanC = 99; private scanEnd = 0; private scanRef = 0; private scanNow = 0; private scanC0 = 0;   // Sökningen sprids över hoppen
+   private bestScore = 0; private bestBpm = 0; private bestPh = 0; private scanFar = 0;
++  private readonly foldB = new Float64Array(ONSET_BINS); private bestMean = 0; private bestPk = 0; private phAcq = true; private phFar = 0; private phFarE = 0;   // FASVAKTEN
+ 
+   /** LÖPANDE TAKT. */
+   private onsetStep(cfg: EngineConfig, now: number): void {
+@@ -135,16 +137,28 @@ export class BeatFeed {
+         const a = this.foldMean(mb - 1), cc = this.foldMean(mb), d = this.foldMean(mb + 1), den = a - 2 * cc + d;
+         const off = den < 0 ? 0.5 * (a - d) / den : 0;
+         this.bestScore = score; this.bestBpm = bpm; this.bestPh = (mb + 0.5 + off) / ONSET_BINS;
++        this.bestMean = mean; this.bestPk = mx; for (let b = 0; b < ONSET_BINS; b++) this.foldB[b] = this.foldN[b] ? this.foldS[b] / this.foldN[b] : 0;
+       }
+     }
+     if (c < this.scanEnd || this.bestScore < ONSET_MIN_PEAK) return;
+     if (this.tempoBpm > 0) this.bestBpm = Math.min(159.9, Math.max(80, this.bestBpm));
+     if (this.tempoBpm > 0 && Math.abs(this.bestBpm / this.tempoBpm - 1) > TG_FINE_MAX) { this.scanFar = this.bestBpm; return; }
+     const oldMs = 60000 / beat.bpm, idx = Math.floor((now - beat.anchorMs) / oldMs), fr = (now - beat.anchorMs) / oldMs - idx;
+-    const nb = 60000 / this.bestBpm;
++    const nb = 60000 / this.bestBpm, jump = Math.abs(this.bestBpm / beat.bpm - 1) > PH_JUMP;
+     beat.bpm = this.bestBpm; beat.anchorMs = now - (idx + fr) * nb;
+     const shift = ((((beat.anchorMs - ref) % nb) + nb) % nb) / nb;
+     let err = this.bestPh - shift; err -= Math.round(err);
++    if (this.phAcq || jump) { this.phAcq = false; this.phFar = 0; }
++    else {
++      const F = this.foldB, c0 = Math.floor(shift * ONSET_BINS); let lb = c0, lv = -1;
++      for (let d = -PH_CAP; d <= PH_CAP; d++) { const q = (c0 + d + ONSET_BINS) % ONSET_BINS; if (F[q] > lv) { lv = F[q]; lb = c0 + d; } }
++      const a = F[(lb - 1 + ONSET_BINS) % ONSET_BINS], cc = F[(lb + ONSET_BINS) % ONSET_BINS], d2 = F[(lb + 1 + ONSET_BINS) % ONSET_BINS], den = a - 2 * cc + d2;
++      let le = (lb + 0.5 + (den < 0 ? 0.5 * (a - d2) / den : 0)) / ONSET_BINS - shift; le -= Math.round(le);
++      const far = Math.abs(err) * ONSET_BINS > PH_CAP + 0.5 && this.bestPk >= lv * PH_HOLD;
++      if (far) { this.phFar = this.phFar > 0 && Math.abs(err - this.phFarE) * ONSET_BINS <= PH_CAP ? this.phFar + 1 : 1; this.phFarE = err; } else this.phFar = 0;
++      if (far && this.phFar >= PH_N) this.phFar = 0;
++      else { const k = (lv / this.bestMean - ONSET_MIN_PEAK) * PH_KS; err = le * (k > PH_KMAX ? PH_KMAX : k > 0 ? k : 0); }
++    }
+     beat.anchorMs += err * nb;
+     this.onsetFixes++;
+   }
+@@ -450,7 +464,7 @@ export class BeatFeed {
+ 
+   /** LÅTGRÄNSEN. */
+   private relock(soft: boolean): void {
+-    this.tgReset(soft); this.barReset(); this.goodRep = 0; this.goodOn = 0; this.onNext = 0;
++    this.tgReset(soft); this.barReset(); this.goodRep = 0; this.goodOn = 0; this.onNext = 0; this.phAcq = true;
+   }
+ 
+   /** MINNET VID GRÄNSEN. */
+@@ -529,7 +543,7 @@ export class BeatFeed {
+         this.onPos = (this.onPos + 1) % ONSET_RING; if (this.onN < ONSET_RING) this.onN++; }
+       this.onPrev = ok; this.hiPrev = hi; this.onHalf = !this.onHalf;
+       this.tgStep(now);
+-      if (!cfg.beat && this.tempoBpm > 0) cfg.beat = { anchorMs: frame.beatAnchorMs || now, bpm: this.tempoBpm, confidence: 0 };
++      if (!cfg.beat && this.tempoBpm > 0) { cfg.beat = { anchorMs: frame.beatAnchorMs || now, bpm: this.tempoBpm, confidence: 0 }; this.phAcq = true; }
+       this.onsetStep(cfg, now);
+     }
+     if (cfg.beat) this.barStep(frame, cfg.beat, now);

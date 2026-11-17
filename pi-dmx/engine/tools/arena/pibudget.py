@@ -17,6 +17,9 @@ SPÄRRAR (DISK), medel över filerna:
   minne      rssMaxMB            <= bas + 15 MB   minnet är det trånga på Pi:n
   hinner     split.skipped = 0 och taktvag.skipped = 0 (workern får aldrig hoppa över)
 
+MÄTFÄLLA (arenan takt 11-17): PC:ns fart drev 2x på en timme (bas huvudtråd 16,7 kl 22:50, 8,3 kl 00:15). Mät ALLTID bas i samma
+  sittning som varianterna (direkt före eller efter), aldrig mot en gammal bas-json.
+
 KOMMANDON (från engine/, PYTHONIOENCODING=utf-8):
   python tools/arena/pibudget.py .arena/<körning>/<mapp> --mat [--bas]   mät -> <mapp>/pibudget.json (--bas = engine/dist)
   python tools/arena/pibudget.py .arena/<körning>                        alla mappar mot <körning>/bas

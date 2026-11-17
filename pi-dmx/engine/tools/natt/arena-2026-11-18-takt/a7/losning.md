@@ -1,0 +1,234 @@
+# a7 DYNAMISK PROGRAMMERING (arenan takt)
+
+## Idén
+Var 0,5 s kör workern en Ellis-beat-tracker (dynamisk programmering) över de senaste 10 s av en ny ansatskurva (dB-stigningen i alla
+åtta banden, inte bara basen) på klockans eget tempo, och klockans fas och fintempo sätts på lösningens senaste 12 slag. Den globala
+vägen kräver jämna slag genom hela fönstret, så en enstaka synkoperad bastopp eller ett tempo 0,5 % fel kan inte dra fasen: glidningen
+rättas varje halvsekund, och vikningens fasflytt (onsetStep) vilar medan DP:n har en giltig lösning.
+
+## Delarna
+| del | vad den gör | mått (m1, övningen) |
+|---|---|---|
+| A åttabandskurvan (dpPush + split.ts 4 fält) | summan av positiv dB-stigning över 6 hop i sub..air, var 2:a hop i egen ring (2048) | bär det mesta: i offline-simuleringen gav bara basens kurva FEL 34, åtta band 16 |
+| B DP-lösaren (dpStep) | Gauss-utjämning P/32, DP med straff 400·log(τ/P)², τ 0,8-1,25 P, bakåtspårning 12 slag | glider 14,2 -> 6,4 |
+| C rättningen | fintempo = minsta kvadrat över 12 slag (inom 2 % och inom TG_FINE_MAX från tempogrammet), fas = median; bevarat slagindex (ettan orörd) | etta 85,7 -> 86,3 |
+| D hoppvakten | fasfel <= 0,2 slag tas direkt; större (motslag) först efter 8 lösningar i följd (4 s) som säger samma | motslag 6,3 -> 3,7 |
+| E kvalitetsgrinden | lösningens slag måste ligga på >= 1,3 x kurvans medel, annars ingen lösning (break, brus) -> vikningen tar fasen efter 1,5 s | skydd, ~0,7 i sim |
+| F DP_PHASE_MS = 20 | DP-slagen ligger 20 ms före det gamla rutnätet (motor mot motor på 160345, median 26/medel 15 ms, inget facit) | lead -53/-60/-53 mot bas -53/-60/-60 |
+
+## Kostnaden
+Allt nytt räknande i workern (taktvägen): var 0,5 s ~1 875 sampel x ~40 τ (DP) + ~1 875 x ~20 (utjämning) ≈ 0,1 M operationer, plus
+8 log10 per hop. Grovt +10-20 % av workerns tid i dag. Huvudtråden: 4 extra skrivningar per hop i hop-recordet. Minne: ringarna ~70 kB
++ hop-ringen 4096 x 4 x 8 B = 131 kB, totalt ~0,2 MB. Ingen allokering per hop.
+
+## Siffrorna (taktdom m1) - poäng +11,3
+| fil | FEL bas -> a7 | motslag | fel tempo | glider | stökigt | oktav | etta |
+|---|---|---|---|---|---|---|---|
+| 151659 | 32,7 -> 16,3 | 12,2 -> 2,0 | 6,1 -> 4,1 | 10,2 -> 6,1 | 4,1 -> 4,1 | 4,1 -> 0 | 97,8 -> 96,7 |
+| 160345 | 33,9 -> 12,5 | 3,6 -> 0 | 7,1 -> 3,6 | 21,4 -> 7,1 | 1,8 -> 1,8 | 7,1 -> 0 | 90,4 -> 94,0 |
+| 200719 | 23,0 -> 27,0 | 3,0 -> 9,0 | 7,0 -> 9,0 | 11,0 -> 6,0 | 2,0 -> 3,0 | 20,0 -> 12,0 | 68,9 -> 68,3 |
+Medel FEL 29,9 -> 18,6, oktav 10,4 -> 4,0, etta 85,7 -> 86,3.
+SÄMRE: 200719. 25-75 s (93 bpm, hiphop-aktigt) väljer DP:n åttondelens motslag (hihat/virvel på "och" väger mer än basen i
+åttabandskurvan) och hoppvakten släpper hoppet efter 4 s. Provat offline: basveto på hoppen (lagar 200719 27 -> 21 men sänker 151659
+14 -> 22, där basen själv ligger på motslaget) och bas inblandad i kurvan (sämre överallt): inte inlagt. Fel tempo-fönstren är mest
+tempogrammets (samma fönster som i bas).
+
+## Risken
+- Musik där hihat/virvel på åttondelens "och" är starkare än slaget (hiphop, halvtempo): klockan kan låsa på motslaget (200719).
+- Breaks: grinden E gör att DP:n tiger; första 10 s efter dropen innehåller breakets svaga ansatser, men lösningens SENASTE slag
+  styr, och den följer dropens slag inom ett par sekunder.
+- Live-mic: kurvan bygger på specAbs (före AGC), dB-skillnader är nivåoberoende, men rumsbrus i diskanten sänker kontrasten (grinden).
+- Låtbyten: DP:n bryr sig inte om gränsen (10 s ljud), tempot kommer från tempogrammet som förut; hoppvakten nollas vid relock.
+- DP_PHASE_MS är mätt på en fil (motor mot motor); ligger leadet fel på okänd musik är det en konstant att mäta om.
+- Delad fil med lotus: analyserClock.ts och split.ts ändrade (ANALYSER_SHARED.md5 / lotus-porten ej gjord).
+
+## Diffen (`git diff --no-index src .arena/takt/a7/src`)
+```diff
+diff --git a/src/analyserClock.ts b/.arena/takt/a7/src/analyserClock.ts
+index 0bbcb78..1dcee25 100644
+--- a/src/analyserClock.ts
++++ b/.arena/takt/a7/src/analyserClock.ts
+@@ -41,6 +41,7 @@ const HV_R = [4 / 3, 3 / 4, 3 / 2, 2 / 3, 5 / 4, 4 / 5], HV_K = 1.25, HV_N = 5,
+ const PW_RING = 4096, PW_WIN_MS = 10000, PW_MIN = 0.5, PW_Q = [4 / 3, 3 / 4, 3 / 2, 2 / 3];   // TAKTENS SJÄLVLIKHET
+ const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, TG_MIN_N = 300, TG_FINE = 0.0025, TG_HALF = ONSET_BINS >> 1;
+ const TG_FINE_MAX = 0.0125;   // FINTEMPOTS BAND
++const DP_RING = 2048, DP_WIN_MS = 10000, DP_EVERY_MS = 500, DP_MIN_N = 750, DP_ALPHA = 400, DP_FIT = 12, DP_TF = 0.02, DP_BIG = 0.2, DP_CONFIRM = 8, DP_Q = 1.3, DP_HOLD_MS = 1500, DP_PHASE_MS = 20;   // a7 DP-SLAGEN
+ 
+ /** FAS-PREDIKTIONSTILLIT. */
+ export function publishPhase(f: { beatPhaseMs: number; beatPhaseConf: number; barShift: number }, b: ClockCfg["beat"], barKnown: boolean,
+@@ -93,6 +94,11 @@ export class BeatFeed {
+   private readonly anaGrid = { anchorMs: 0, bpm: 0, confidence: 0 };   // EN KÄLLA
+   private boundSeen = 0;
+   private quietAt = -1e12; private pend = false;   // MINNET VID GRÄNSEN
++  private readonly dpDb = new Float64Array(8 * FEED_RISE_HOPS); private dpHp = 0; private dpPrev = 0;   // a7 DP-SLAGEN
++  private readonly dpE = new Float32Array(DP_RING); private readonly dpT = new Float64Array(DP_RING); private dpPos = 0; private dpN = 0;
++  private readonly dpX = new Float64Array(DP_RING); private readonly dpC = new Float64Array(DP_RING); private readonly dpB = new Int32Array(DP_RING);
++  private readonly dpPen = new Float64Array(512); private readonly dpK = new Float64Array(128); private readonly dpBt = new Float64Array(DP_FIT); private readonly dpS = new Float64Array(DP_FIT);
++  private dpNext = 0; private dpPend = 0; private dpPErr = 0; private dpAt = -1e12; dpFixes = 0; dpJumps = 0;
+   /** Det cfg analysatorn ska byggas med. */
+   barKnown(): boolean { return this.barN >= BAR_MIN; }
+   static analyserCfg<T extends object>(cfg: T): T { return { ...cfg, beat: null }; }
+@@ -143,12 +149,71 @@ export class BeatFeed {
+     const oldMs = 60000 / beat.bpm, idx = Math.floor((now - beat.anchorMs) / oldMs), fr = (now - beat.anchorMs) / oldMs - idx;
+     const nb = 60000 / this.bestBpm;
+     beat.bpm = this.bestBpm; beat.anchorMs = now - (idx + fr) * nb;
++    if (now - this.dpAt < DP_HOLD_MS) { this.onsetFixes++; return; }
+     const shift = ((((beat.anchorMs - ref) % nb) + nb) % nb) / nb;
+     let err = this.bestPh - shift; err -= Math.round(err);
+     beat.anchorMs += err * nb;
+     this.onsetFixes++;
+   }
+ 
++  /** a7 DP-SLAGEN: alla åtta bandens dB-stigning in i ringen (var 2:a hop, max av de två). */
++  private dpPush(frame: Frame, now: number): void {
++    const sa = frame.specAbs, D = this.dpDb, o = this.dpHp * 8; let v = 0;
++    for (let k = 0; k < 8; k++) {
++      const a = k === 0 ? sa?.sub : k === 1 ? sa?.kick : k === 2 ? sa?.bass : k === 3 ? sa?.lowMid : k === 4 ? sa?.mid : k === 5 ? sa?.highMid : k === 6 ? sa?.treble : sa?.air;
++      const db = 20 * Math.log10((a ?? 0) + 1e-7), old = D[o + k]; D[o + k] = db;
++      if (old !== 0 && db > old) v += db - old;
++    }
++    this.dpHp = (this.dpHp + 1) % FEED_RISE_HOPS;
++    if (this.onHalf) {
++      const p = this.dpPos; this.dpE[p] = v > this.dpPrev ? v : this.dpPrev; this.dpT[p] = now;
++      this.dpPos = (p + 1) % DP_RING; if (this.dpN < DP_RING) this.dpN++;
++    }
++    this.dpPrev = v;
++  }
++
++  /** a7 DP-SLAGEN: Ellis-DP över ringens senaste DP_WIN_MS på klockans tempo; klockans fas/tempo rättas mot lösningens senaste slag. */
++  private dpStep(cfg: EngineConfig, now: number): void {
++    const beat = cfg.beat; if (!beat || !(beat.bpm > 40) || now < this.dpNext) return;
++    this.dpNext = now + DP_EVERY_MS;
++    const R = DP_RING, E = this.dpE, T = this.dpT;
++    let lo = 0, hi = this.dpN;
++    while (lo < hi) { const m = (lo + hi) >> 1; if (now - T[(this.dpPos - 1 - m + 2 * R) % R] > DP_WIN_MS) hi = m; else lo = m + 1; }
++    const n = lo; if (n < DP_MIN_N) return;
++    const j0 = (this.dpPos - n + 2 * R) % R, dt = (T[(this.dpPos - 1 + R) % R] - T[j0]) / (n - 1); if (!(dt > 0)) return;
++    const per = 60000 / beat.bpm, P = per / dt;
++    let s = 0, ss = 0; for (let i = 0; i < n; i++) { const v = E[(j0 + i) % R]; s += v; ss += v * v; }
++    const sd = Math.sqrt(ss / n - (s / n) * (s / n)); if (!(sd > 1e-9)) return;
++    const g = Math.max(1, P / 32), G = Math.min(63, Math.ceil(3 * g)), K = this.dpK, X = this.dpX, C = this.dpC, B = this.dpB, pen = this.dpPen;
++    for (let k = -G; k <= G; k++) K[k + G] = Math.exp(-0.5 * (k / g) * (k / g)) / sd;
++    let xm = 0;
++    for (let i = 0; i < n; i++) { let a = 0; const k0 = i - G < 0 ? -i : -G, k1 = i + G >= n ? n - 1 - i : G; for (let k = k0; k <= k1; k++) a += E[(j0 + i + k) % R] * K[k + G]; X[i] = a; xm += a; }
++    xm /= n;
++    const tlo = Math.max(1, Math.floor(P * 0.8)), thi = Math.ceil(P * 1.25); if (thi - tlo + 1 > pen.length) return;
++    for (let tau = tlo; tau <= thi; tau++) { const l = Math.log(tau / P); pen[tau - tlo] = DP_ALPHA * l * l; }
++    for (let i = 0; i < n; i++) {
++      let best = -1e300, bj = -1;
++      for (let tau = tlo; tau <= thi && i - tau >= 0; tau++) { const v = C[i - tau] - pen[tau - tlo]; if (v > best) { best = v; bj = i - tau; } }
++      if (bj >= 0 && best > 0) { C[i] = X[i] + best; B[i] = bj; } else { C[i] = X[i]; B[i] = -1; }
++    }
++    let e = n - 1, ev = -1e300; for (let i = n - 1, i1 = n - Math.round(P); i >= i1 && i >= 0; i--) if (C[i] > ev) { ev = C[i]; e = i; }
++    const bt = this.dpBt; let m = 0, q = 0;
++    for (let k = e; k >= 0 && m < DP_FIT; k = B[k]) { bt[m++] = k; q += X[k]; }
++    if (m < 4 || q / m < DP_Q * xm) return;
++    let sx = 0, sy = 0, sxx = 0, sxy = 0;
++    for (let i = 0; i < m; i++) { const x = -i, y = T[(j0 + bt[i]) % R]; sx += x; sy += y; sxx += x * x; sxy += x * y; }
++    let p = (m * sxy - sx * sy) / (m * sxx - sx * sx); if (!(Math.abs(p / per - 1) <= DP_TF) || (this.tempoBpm > 0 && Math.abs(60000 / p / this.tempoBpm - 1) > TG_FINE_MAX)) p = per;
++    const S = this.dpS;
++    for (let i = 0; i < m; i++) { const v = T[(j0 + bt[i]) % R] + i * p; let j = i; while (j > 0 && S[j - 1] > v) { S[j] = S[j - 1]; j--; } S[j] = v; }
++    const last = S[m >> 1] + DP_PHASE_MS, k = Math.floor((now - beat.anchorMs) / per), La = beat.anchorMs + k * per;
++    let err = (last - La) / p; err -= Math.round(err);
++    let take = Math.abs(err) <= DP_BIG;
++    if (take) this.dpPend = 0;
++    else { if (this.dpPend > 0 && Math.abs(err - this.dpPErr) < 0.1) this.dpPend++; else { this.dpPend = 1; this.dpPErr = err; } if (this.dpPend >= DP_CONFIRM) { take = true; this.dpPend = 0; this.dpJumps++; } }
++    beat.bpm = 60000 / p; beat.anchorMs = La + (take ? err * p : 0) - k * p;
++    this.dpAt = now; if (take) this.dpFixes++;
++  }
++
+   /** EN TEMPOSÖKNING. */
+   private tgScore(bpm: number, now: number, win = TG_WIN_MS): number {
+     const S = this.fullS, N = this.fullN, Hs = this.tgH, oT = this.onT, oV = this.onV, oH = this.hiV; S.fill(0); N.fill(0); Hs.fill(0);
+@@ -450,7 +515,7 @@ export class BeatFeed {
+ 
+   /** LÅTGRÄNSEN. */
+   private relock(soft: boolean): void {
+-    this.tgReset(soft); this.barReset(); this.goodRep = 0; this.goodOn = 0; this.onNext = 0;
++    this.tgReset(soft); this.barReset(); this.dpPend = 0; this.goodRep = 0; this.goodOn = 0; this.onNext = 0;
+   }
+ 
+   /** MINNET VID GRÄNSEN. */
+@@ -495,7 +560,7 @@ export class BeatFeed {
+     if (now - this.lastTrustLog > 4000) { this.lastTrustLog = now; if (isLogOn()) console.log(`[tillit] mönster ${this.repeatRate.toFixed(2)} · fasträff ${this.onBeatRate.toFixed(2)} · bpm ${cfg.beat ? cfg.beat.bpm.toFixed(1) : 0}`); }
+     const pllConf = this.pllKicks >= 12 ? this.onBeatRate : 0;
+     if (quietMs > 10000) {
+-      if (cfg.beat || this.onN > 0) { this.barReset(); cfg.beat = null; cfg.beatErr = 0; this.onN = 0; this.scanC = 99; this.tgReset(); }
++      if (cfg.beat || this.onN > 0) { this.barReset(); cfg.beat = null; cfg.beatErr = 0; this.onN = 0; this.scanC = 99; this.tgReset(); this.dpN = 0; this.dpPend = 0; this.dpAt = -1e12; }
+       return;
+     }
+     const beat0 = cfg.beat;
+@@ -521,6 +586,7 @@ export class BeatFeed {
+     }
+     if (frame.kickAtMs > 0 && frame.kickAtMs !== this.kickRingLast) { this.kickRingLast = frame.kickAtMs; this.kickRing[this.kickRingPos] = frame.kickAtMs; this.kickRingPos = (this.kickRingPos + 1) & 63; if (this.kickRingN < 64) this.kickRingN++; }
+     {
++      this.dpPush(frame, now);
+       const sa = frame.specAbs, db = 20 * Math.log10((sa?.sub ?? 0) + (sa?.kick ?? 0) + 1e-7);
+       const old = this.riseDb[this.risePos]; this.riseDb[this.risePos] = db; this.risePos = (this.risePos + 1) % FEED_RISE_HOPS;
+       const ok = old !== 0 && db > old ? db - old : 0;
+@@ -531,6 +597,7 @@ export class BeatFeed {
+       this.tgStep(now);
+       if (!cfg.beat && this.tempoBpm > 0) cfg.beat = { anchorMs: frame.beatAnchorMs || now, bpm: this.tempoBpm, confidence: 0 };
+       this.onsetStep(cfg, now);
++      this.dpStep(cfg, now);
+     }
+     if (cfg.beat) this.barStep(frame, cfg.beat, now);
+     if (cfg.beat) {
+diff --git a/src/split.ts b/.arena/takt/a7/src/split.ts
+index 3997f13..c875f7e 100644
+--- a/src/split.ts
++++ b/.arena/takt/a7/src/split.ts
+@@ -137,12 +137,12 @@ export const BS_SEQ = 0, BS_BODY = 1, BS_DROPS = 2, BS_MINI = 3, BS_BUILD = 4, B
+ export const BIG_STATE_LEN = 24;
+ export const SPEC_SLOTS = 16, SPEC_MAX = 1024;   // 16 spektra
+ 
+-export const HOP_REC_LEN = 19;   // TAKTVÄGEN
++export const HOP_REC_LEN = 23;   // TAKTVÄGEN
+ export const HOP_RING_N = 4096;
+ export const H_SEQ = 0, H_NOW = 1 , H_TS = 2 ,
+   H_BPM = 3, H_CONF = 4, H_ANCHOR = 5, H_KICKAT = 6, H_BARSHIFT = 7, H_ON_KICK = 8, H_ON_HIMID = 9, H_ON_TREBLE = 10, H_SA_SUB = 11, H_SA_KICK = 12, H_SA_BASS = 13 ,
+   H_BOUND = 14 , H_QUIET = 15 ,
+-  H_SURE = 16 , H_UNDER = 17 , H_SA_TREBLE = 18;
++  H_SURE = 16 , H_UNDER = 17 , H_SA_TREBLE = 18, H_SA_LOWMID = 19, H_SA_MID = 20, H_SA_HIMID = 21, H_SA_AIR = 22;
+ export const C_HOP_WRITE = 4, C_HOP_READ = 5, C_FEED_SEQ = 6 , C_WAKE = 7 ;
+ export const FS_HOP_SEQ = 0, FS_BEAT = 1 , FS_ANCHOR = 2, FS_BPM = 3, FS_BCONF = 4,
+   FS_BEATERR = 5 , FS_FCONF = 6 , FS_GRID = 7 ,
+@@ -153,7 +153,7 @@ export const FEED_STATE_LEN = 20;
+ 
+ /** Det taktmatningen läser ur ramen, och det den skriver. */
+ export interface HopFrame { bpm: number; bpmConfidence: number; beatAnchorMs: number; kickAtMs: number; barShift: number; beatTrust?: number;
+-  onset: { kick: number; highMid: number; treble: number }; specAbs: { sub: number; kick: number; bass: number; treble: number } }
++  onset: { kick: number; highMid: number; treble: number }; specAbs: { sub: number; kick: number; bass: number; treble: number; lowMid?: number; mid?: number; highMid?: number; air?: number } }
+ export interface HopGrid { anchorMs: number; bpm: number; confidence?: number }
+ export interface HopCfg { beat?: HopGrid | null; beatErr?: number }
+ export interface HopTarget { resetTempo(): void; resetBar(): void; setClockGrid?(g: HopGrid | null): void; trackBoundaries?: number; quietMs?: number; boundSure?: boolean; bodyUnderDb?: number;
+@@ -180,7 +180,8 @@ export class HopLaneFast {
+     r[o + H_NOW] = now; r[o + H_TS] = performance.timeOrigin + performance.now();
+     r[o + H_BPM] = f.bpm; r[o + H_CONF] = f.bpmConfidence; r[o + H_ANCHOR] = f.beatAnchorMs; r[o + H_KICKAT] = f.kickAtMs; r[o + H_BARSHIFT] = f.barShift;
+     r[o + H_ON_KICK] = f.onset?.kick ?? 0; r[o + H_ON_HIMID] = f.onset?.highMid ?? 0; r[o + H_ON_TREBLE] = f.onset?.treble ?? 0;
+-    r[o + H_SA_SUB] = f.specAbs?.sub ?? 0; r[o + H_SA_KICK] = f.specAbs?.kick ?? 0; r[o + H_SA_BASS] = f.specAbs?.bass ?? 0; r[o + H_SA_TREBLE] = f.specAbs?.treble ?? 0;
++    r[o + H_SA_SUB] = f.specAbs?.sub ?? 0; r[o + H_SA_KICK] = f.specAbs?.kick ?? 0; r[o + H_SA_BASS] = f.specAbs?.bass ?? 0; r[o + H_SA_TREBLE] = f.specAbs?.treble ?? 0;
++    r[o + H_SA_LOWMID] = f.specAbs?.lowMid ?? 0; r[o + H_SA_MID] = f.specAbs?.mid ?? 0; r[o + H_SA_HIMID] = f.specAbs?.highMid ?? 0; r[o + H_SA_AIR] = f.specAbs?.air ?? 0;
+     r[o + H_BOUND] = an.trackBoundaries ?? 0; r[o + H_QUIET] = an.quietMs ?? 0; r[o + H_SURE] = an.boundSure ? 1 : 0; r[o + H_UNDER] = an.bodyUnderDb ?? 0;
+     r[o + H_SEQ] = seq;
+     Atomics.store(ctrl, C_HOP_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
+@@ -222,7 +223,7 @@ export class HopLaneSlow {
+   private seq: number; private rt: number; private rb: number; private processed: number;
+   private skipped = 0; private lagMaxMs = 0; private busyEmaUs = 0; private busyMaxUs = 0; private fconf = NaN;
+   private readonly fr = { bpm: 0.5, bpmConfidence: 0.5, beatAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5,
+-    onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5, bass: 0.5, treble: 0.5 } };
++    onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5, bass: 0.5, treble: 0.5, lowMid: 0.5, mid: 0.5, highMid: 0.5, air: 0.5 } };
+   private readonly cfg: HopCfg = { beat: undefined, beatErr: undefined };
+   private grid: HopGrid | null = null;
+   private readonly target: HopTarget = { trackBoundaries: 0, quietMs: 0, resetTempo: () => { this.rt++; }, resetBar: () => { this.rb++; }, setClockGrid: (g) => { this.grid = g; } };
+@@ -244,7 +245,8 @@ export class HopLaneSlow {
+       this.target.trackBoundaries = r[o + H_BOUND]; this.target.quietMs = r[o + H_QUIET]; this.target.boundSure = r[o + H_SURE] === 1; this.target.bodyUnderDb = r[o + H_UNDER];
+       fr.bpm = r[o + H_BPM]; fr.bpmConfidence = r[o + H_CONF]; fr.beatAnchorMs = r[o + H_ANCHOR]; fr.kickAtMs = r[o + H_KICKAT]; fr.barShift = r[o + H_BARSHIFT];
+       fr.onset.kick = r[o + H_ON_KICK]; fr.onset.highMid = r[o + H_ON_HIMID]; fr.onset.treble = r[o + H_ON_TREBLE];
+-      fr.specAbs.sub = r[o + H_SA_SUB]; fr.specAbs.kick = r[o + H_SA_KICK]; fr.specAbs.bass = r[o + H_SA_BASS]; fr.specAbs.treble = r[o + H_SA_TREBLE];
++      fr.specAbs.sub = r[o + H_SA_SUB]; fr.specAbs.kick = r[o + H_SA_KICK]; fr.specAbs.bass = r[o + H_SA_BASS]; fr.specAbs.treble = r[o + H_SA_TREBLE];
++      fr.specAbs.lowMid = r[o + H_SA_LOWMID]; fr.specAbs.mid = r[o + H_SA_MID]; fr.specAbs.highMid = r[o + H_SA_HIMID]; fr.specAbs.air = r[o + H_SA_AIR];
+       const cin = fr.bpmConfidence;
+       this.feed.update(fr, this.cfg, this.target, r[o + H_NOW]);
+       this.fconf = fr.bpmConfidence !== cin ? fr.bpmConfidence : NaN;
+```

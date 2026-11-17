@@ -1,0 +1,107 @@
+{
+ "huvud": 5.555,
+ "worker": 41.099999999999994,
+ "ovriga": 31.93,
+ "rss": 146.8,
+ "skipped": 0,
+ "filer": {
+  "lang-20261113T151659.wav": {
+   "wav": "lang-20261113T151659.wav",
+   "sek": 60,
+   "hop": 22500,
+   "rssMaxMB": 146.8,
+   "huvudtradCpuUsPerHop": 4.84,
+   "ovrigaCpuUsPerHop": 36.13,
+   "efterHop": "0:4.32% 1:36.77% 2:24.94% 3:16.48% 4:9.21% 5:4.56% 6:1.83% 7:1.00% 8:0.60% 9:0.17% 10:0.08% 11:0.02%",
+   "taktvagLagMs": {
+    "p50": 0.07,
+    "p99": 0.47,
+    "max": 7.22
+   },
+   "taktvag": {
+    "skipped": 0
+   },
+   "envLagMs": {
+    "p50": 0,
+    "p99": 1
+   },
+   "split": {
+    "skipped": 0
+   },
+   "workerUsPerHop": 41.9,
+   "ryck": {
+    "antal": 207,
+    "perMin": 207,
+    "msP50": 3.16,
+    "msP90": 37.33,
+    "msMax": 228.31
+   },
+   "varv": [
+    {
+     "huvudtradCpuUsPerHop": 4.84,
+     "workerUsPerHop": 43.6,
+     "ovrigaCpuUsPerHop": 36.13
+    },
+    {
+     "huvudtradCpuUsPerHop": 6.93,
+     "workerUsPerHop": 50.4,
+     "ovrigaCpuUsPerHop": 38.93
+    },
+    {
+     "huvudtradCpuUsPerHop": 9.02,
+     "workerUsPerHop": 41.9,
+     "ovrigaCpuUsPerHop": 36.76
+    }
+   ]
+  },
+  "lang-20261113T171840.wav": {
+   "wav": "lang-20261113T171840.wav",
+   "sek": 60,
+   "hop": 22500,
+   "rssMaxMB": 126.9,
+   "huvudtradCpuUsPerHop": 6.27,
+   "ovrigaCpuUsPerHop": 27.73,
+   "efterHop": "0:9.36% 1:37.14% 2:24.18% 3:14.31% 4:8.00% 5:3.90% 6:1.60% 7:0.77% 8:0.44% 9:0.19% 10:0.08% 11:0.01% 12:0.00%",
+   "taktvagLagMs": {
+    "p50": 0.06,
+    "p99": 0.45,
+    "max": 11.12
+   },
+   "taktvag": {
+    "skipped": 0
+   },
+   "envLagMs": {
+    "p50": 0,
+    "p99": 2
+   },
+   "split": {
+    "skipped": 0
+   },
+   "workerUsPerHop": 40.3,
+   "ryck": {
+    "antal": 185,
+    "perMin": 185,
+    "msP50": 5.1,
+    "msP90": 188.31,
+    "msMax": 277.55
+   },
+   "varv": [
+    {
+     "huvudtradCpuUsPerHop": 13.2,
+     "workerUsPerHop": 42.4,
+     "ovrigaCpuUsPerHop": 47.2
+    },
+    {
+     "huvudtradCpuUsPerHop": 16,
+     "workerUsPerHop": 45.9,
+     "ovrigaCpuUsPerHop": 35.42
+    },
+    {
+     "huvudtradCpuUsPerHop": 6.27,
+     "workerUsPerHop": 40.3,
+     "ovrigaCpuUsPerHop": 27.73
+    }
+   ]
+  }
+ }
+}

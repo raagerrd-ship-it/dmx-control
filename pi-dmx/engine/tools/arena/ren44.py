@@ -1,6 +1,6 @@
 """REN 4/4 (etta2 11-17): rätt etta skild på tick nära (16 s) en Beat This-takt som inte har 4 slag mot rena partier.
 Kör från engine/: python tools/arena/ren44.py bas,a8 193040 193818 ... (läser .arena/etta2/<m>/ettdom/kr-<fil>.json)."""
-import json,io,sys,numpy as np
+import os, json,io,sys,numpy as np
 BT={}
 for l in io.open('tools/ladan-2026-11-13/beatthis.jsonl',encoding='utf-8'):
     d=json.loads(l); BT[d['path'].replace(chr(92),'/').split('/')[-1].replace('-oklippt','')]=d
@@ -23,5 +23,5 @@ def ana(rp,f):
     return len(odd),len(nb),ren,smut
 for f in sys.argv[2:]:
     for m in sys.argv[1].split(','):
-        o,nb,r,s=ana('.arena/etta2/%s/ettdom/kr-%s.json'%(m,f),f)
+        o,nb,r,s=ana((os.environ.get('REN44_DIR','.arena/etta2')+'/%s/ettdom/kr-%s.json')%(m,f),f)
         print(f,m,'udda takter %d/%d'%(o,nb),'REN 4/4: rätt %.1f %% av %d'%(100*r[1]/max(1,r[0]),r[0]),' NÄRA UDDA: rätt %.1f %% av %d'%(100*s[1]/max(1,s[0]),s[0]))

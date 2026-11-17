@@ -1,0 +1,122 @@
+diff --git a/src/analyserClock.ts b/.arena/takt/a1/src/analyserClock.ts
+index 0bbcb78..c4f4780 100644
+--- a/src/analyserClock.ts
++++ b/.arena/takt/a1/src/analyserClock.ts
+@@ -41,6 +41,7 @@ const HV_R = [4 / 3, 3 / 4, 3 / 2, 2 / 3, 5 / 4, 4 / 5], HV_K = 1.25, HV_N = 5,
+ const PW_RING = 4096, PW_WIN_MS = 10000, PW_MIN = 0.5, PW_Q = [4 / 3, 3 / 4, 3 / 2, 2 / 3];   // TAKTENS SJÄLVLIKHET
+ const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, TG_MIN_N = 300, TG_FINE = 0.0025, TG_HALF = ONSET_BINS >> 1;
+ const TG_FINE_MAX = 0.0125;   // FINTEMPOTS BAND
++const PB_M = 1.3, PB_N = 8, PB_A = 0.05, PB_L = 6, PB_W = 2, PB_HI = 0.5;   // FASBANKEN (arena takt a1)
+ 
+ /** FAS-PREDIKTIONSTILLIT. */
+ export function publishPhase(f: { beatPhaseMs: number; beatPhaseConf: number; barShift: number }, b: ClockCfg["beat"], barKnown: boolean,
+@@ -68,6 +69,7 @@ export class BeatFeed {
+   private readonly foldS = new Float64Array(ONSET_BINS); private readonly foldN = new Float64Array(ONSET_BINS); private onNext = 0;
+   onsetFixes = 0;
+   private readonly riseDb = new Float64Array(FEED_RISE_HOPS); private risePos = 0;
++  private readonly riseM = new Float64Array(FEED_RISE_HOPS); private readonly hmV = new Float32Array(ONSET_RING); private hmPrev = 0;   // FASBANKEN: mellandiskantens stigning
+   private readonly fullS = new Float64Array(ONSET_BINS); private readonly fullN = new Float64Array(ONSET_BINS);   // HELA TEMPOOMRÅDET
+   private readonly tgAcc = new Float64Array(TG_K).fill(-1); private readonly tgH = new Float64Array(ONSET_BINS); private tgK = 0; private tgN = 0;
+   private readonly tgAccF = new Float64Array(TG_K).fill(-1); private tgSw = 0; tgSwitches = 0;   // TVÅ MINNEN
+@@ -101,6 +103,40 @@ export class BeatFeed {
+ 
+   private scanStep = 0.005; private scanC = 99; private scanEnd = 0; private scanRef = 0; private scanNow = 0; private scanC0 = 0;   // Sökningen sprids över hoppen
+   private bestScore = 0; private bestBpm = 0; private bestPh = 0; private scanFar = 0;
++  private readonly pbP = new Float64Array(ONSET_BINS); private readonly pbT = new Float64Array(ONSET_BINS); private readonly pbS = new Float64Array(ONSET_BINS);
++  private readonly pbH = new Float64Array(ONSET_BINS); private readonly pbC = new Float64Array(ONSET_BINS); private pbOk = false; private pbRun = 0; private pbLast = -99; pbJumps = 0;   // FASBANKEN
++
++  private static cdist(a: number, b: number): number { const d = Math.abs(a - b) % ONSET_BINS; return d < ONSET_BINS - d ? d : ONSET_BINS - d; }
++  private pbReg(q: number): number { let v = -1e9; for (let d = -PB_W; d <= PB_W; d++) { const x = this.pbP[(q + d + 2 * ONSET_BINS) % ONSET_BINS]; if (x > v) v = x; } return v; }
++  /** FASBANKEN: rutnätet flyttas e slag -> bankens minne följer med (bin x -> x - e*BINS). */
++  private pbShift(e: number): void {
++    if (!this.pbOk || e === 0) return;
++    const P = this.pbP, T = this.pbT, s = e * ONSET_BINS;
++    for (let b = 0; b < ONSET_BINS; b++) { let x = b + s; x -= Math.floor(x / ONSET_BINS) * ONSET_BINS; const i = Math.floor(x), f = x - i; T[b] = P[i % ONSET_BINS] * (1 - f) + P[(i + 1) % ONSET_BINS] * f; }
++    P.set(T);
++  }
++  /** FASBANKEN: kort vikning (ONSET_WIN_MS) på rutnätet: basens stigning -> pbS, bas + PB_HI x mellandiskantens stigning -> pbT. */
++  private pbFold(anchor: number, ms: number, now: number): boolean {
++    const S = this.pbS, H = this.pbH, C = this.pbC; S.fill(0); H.fill(0); C.fill(0);
++    let tot = 0, totH = 0, n = 0;
++    for (let i = 0; i < this.onN; i++) {
++      const j = (this.onPos - 1 - i + ONSET_RING) % ONSET_RING, t = this.onT[j];
++      if (now - t > ONSET_WIN_MS) break;
++      const r = (t - anchor) % ms, b = Math.floor(((r < 0 ? r + ms : r) / ms) * ONSET_BINS) % ONSET_BINS;
++      S[b] += this.onV[j]; H[b] += this.hmV[j]; C[b]++; tot += this.onV[j]; totH += this.hmV[j]; n++;
++    }
++    if (n < 100 || !(tot > 0)) return false;
++    const ms_ = tot / n, mh = totH / n, T = this.pbT;
++    for (let b = 0; b < ONSET_BINS; b++) { const c = C[b]; S[b] = c ? S[b] / c : 0; T[b] = S[b] / ms_ + (mh > 0 && c ? PB_HI * (H[b] / c) / mh : 0); }
++    return true;
++  }
++  /** FASBANKEN: lokala toppen i basens korta vikning inom +-PB_L bins från q, parabel -> slag (-0,5..0,5). */
++  private pbLocal(q: number): number {
++    const S = this.pbS; let bb = q, bv = -1;
++    for (let d = -PB_L; d <= PB_L; d++) { const k = (q + d + 2 * ONSET_BINS) % ONSET_BINS; if (S[k] > bv) { bv = S[k]; bb = k; } }
++    const a = S[(bb + ONSET_BINS - 1) % ONSET_BINS], c = S[(bb + 1) % ONSET_BINS], den = a - 2 * bv + c;
++    let e = (bb + 0.5 + (den < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (a - c) / den)) : 0)) / ONSET_BINS; e -= Math.round(e); return e;
++  }
+ 
+   /** LÖPANDE TAKT. */
+   private onsetStep(cfg: EngineConfig, now: number): void {
+@@ -142,10 +178,23 @@ export class BeatFeed {
+     if (this.tempoBpm > 0 && Math.abs(this.bestBpm / this.tempoBpm - 1) > TG_FINE_MAX) { this.scanFar = this.bestBpm; return; }
+     const oldMs = 60000 / beat.bpm, idx = Math.floor((now - beat.anchorMs) / oldMs), fr = (now - beat.anchorMs) / oldMs - idx;
+     const nb = 60000 / this.bestBpm;
++    if (Math.abs(this.bestBpm / beat.bpm - 1) > TG_FINE_MAX) this.pbOk = false;
+     beat.bpm = this.bestBpm; beat.anchorMs = now - (idx + fr) * nb;
+     const shift = ((((beat.anchorMs - ref) % nb) + nb) % nb) / nb;
+     let err = this.bestPh - shift; err -= Math.round(err);
+-    beat.anchorMs += err * nb;
++    if (this.pbFold(beat.anchorMs, nb, now)) {
++      const P = this.pbP, M = this.pbT;
++      if (!this.pbOk) { P.set(M); this.pbOk = true; this.pbRun = 0; this.pbLast = -99; }
++      else {
++        for (let b = 0; b < ONSET_BINS; b++) P[b] += PB_A * (M[b] - P[b]);
++        let j = 0, jv = -1e9; for (let b = 0; b < ONSET_BINS; b++) if (P[b] > jv) { jv = P[b]; j = b; }
++        if (BeatFeed.cdist(j, 0) > PB_L && this.pbReg(j) >= PB_M * this.pbReg(0)) this.pbRun = BeatFeed.cdist(j, this.pbLast) <= 3 ? this.pbRun + 1 : 1; else this.pbRun = 0;
++        this.pbLast = j;
++        if (this.pbRun >= PB_N) { err = this.pbLocal(j); this.pbRun = 0; this.pbJumps++; }
++        else if (BeatFeed.cdist(Math.floor((err + 1) * ONSET_BINS) % ONSET_BINS, 0) > PB_L) err = this.pbLocal(0);
++      }
++    }
++    beat.anchorMs += err * nb; this.pbShift(err);
+     this.onsetFixes++;
+   }
+ 
+@@ -376,7 +425,7 @@ export class BeatFeed {
+     this.pwDt = (this.pwT[(this.pwPos - 1 + PW_RING) & M] - this.pwT[(this.pwPos - lo + 2 * PW_RING) & M]) / (lo - 1); if (!(this.pwDt > 0)) return true;
+     this.pwWn = lo >> 1; return this.pwSim(80 * Math.pow(TG_STEP, k)) >= TG_Q_SIM;
+   }
+-  private tgReset(soft = false): void { if (!soft) { this.pwN = 0; this.tgAcc.fill(-1); this.tgAccF.fill(-1); } this.pwRun = 0; this.tgSw = 0; this.tgR = -1; this.brkArm = false; this.brkFrom = 0; this.tgLk = 0; this.tgLkK = -1; this.tgHl = 0; this.tgAccL.fill(-1); this.tgLN = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; this.first = true; }
++  private tgReset(soft = false): void { this.pbOk = false; if (!soft) { this.pwN = 0; this.tgAcc.fill(-1); this.tgAccF.fill(-1); } this.pwRun = 0; this.tgSw = 0; this.tgR = -1; this.brkArm = false; this.brkFrom = 0; this.tgLk = 0; this.tgLkK = -1; this.tgHl = 0; this.tgAccL.fill(-1); this.tgLN = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; this.first = true; }
+ 
+   /** Kom en tidigare kick. */
+   private kickRepeats(t: number, lag: number, tol: number): boolean {
+@@ -507,7 +556,7 @@ export class BeatFeed {
+       if (BREAK_RESTORE_MS > 0) {
+         const quiet = this.lastPllKickMs ? now - this.lastPllKickMs : 0;
+         if (quiet > 1500 && onBeat && this.goodRep > 0 && now - this.goodAt < BREAK_RESTORE_MS + 1500) {
+-          beat0.anchorMs += err * beatMs;
++          beat0.anchorMs += err * beatMs; this.pbShift(err);
+           this.onBeatRate = Math.max(this.onBeatRate, this.goodOn); this.repeatRate = Math.max(this.repeatRate, this.goodRep);
+           if (this.pllKicks < 12) this.pllKicks = 12;
+         }
+@@ -522,12 +571,13 @@ export class BeatFeed {
+     if (frame.kickAtMs > 0 && frame.kickAtMs !== this.kickRingLast) { this.kickRingLast = frame.kickAtMs; this.kickRing[this.kickRingPos] = frame.kickAtMs; this.kickRingPos = (this.kickRingPos + 1) & 63; if (this.kickRingN < 64) this.kickRingN++; }
+     {
+       const sa = frame.specAbs, db = 20 * Math.log10((sa?.sub ?? 0) + (sa?.kick ?? 0) + 1e-7);
+-      const old = this.riseDb[this.risePos]; this.riseDb[this.risePos] = db; this.risePos = (this.risePos + 1) % FEED_RISE_HOPS;
+-      const ok = old !== 0 && db > old ? db - old : 0;
++      const old = this.riseDb[this.risePos], dm = 20 * Math.log10((sa?.highMid ?? 0) + 1e-7), om = this.riseM[this.risePos];
++      this.riseDb[this.risePos] = db; this.riseM[this.risePos] = dm; this.risePos = (this.risePos + 1) % FEED_RISE_HOPS;
++      const ok = old !== 0 && db > old ? db - old : 0, okm = om !== 0 && dm > om ? dm - om : 0;
+       const hi = (frame.onset?.highMid ?? 0) + (frame.onset?.treble ?? 0);
+-      if (this.onHalf) { this.onT[this.onPos] = now; this.onV[this.onPos] = ok > this.onPrev ? ok : this.onPrev; this.hiV[this.onPos] = hi > this.hiPrev ? hi : this.hiPrev; this.pwT[this.pwPos] = now; this.pwE[this.pwPos] = this.onV[this.onPos]; this.pwH[this.pwPos] = this.hiV[this.onPos]; this.pwPos = (this.pwPos + 1) & (PW_RING - 1); if (this.pwN < PW_RING) this.pwN++;
++      if (this.onHalf) { this.onT[this.onPos] = now; this.onV[this.onPos] = ok > this.onPrev ? ok : this.onPrev; this.hiV[this.onPos] = hi > this.hiPrev ? hi : this.hiPrev; this.hmV[this.onPos] = okm > this.hmPrev ? okm : this.hmPrev; this.pwT[this.pwPos] = now; this.pwE[this.pwPos] = this.onV[this.onPos]; this.pwH[this.pwPos] = this.hiV[this.onPos]; this.pwPos = (this.pwPos + 1) & (PW_RING - 1); if (this.pwN < PW_RING) this.pwN++;
+         this.onPos = (this.onPos + 1) % ONSET_RING; if (this.onN < ONSET_RING) this.onN++; }
+-      this.onPrev = ok; this.hiPrev = hi; this.onHalf = !this.onHalf;
++      this.onPrev = ok; this.hiPrev = hi; this.hmPrev = okm; this.onHalf = !this.onHalf;
+       this.tgStep(now);
+       if (!cfg.beat && this.tempoBpm > 0) cfg.beat = { anchorMs: frame.beatAnchorMs || now, bpm: this.tempoBpm, confidence: 0 };
+       this.onsetStep(cfg, now);
