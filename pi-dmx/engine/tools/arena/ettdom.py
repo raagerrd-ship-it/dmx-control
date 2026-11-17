@@ -25,6 +25,7 @@ MÄNGDERNA
   ÖVNING   151659 (532 s), 172432 (1160 s, spelas som -lagad.wav), 160345 (602 s)       deltagarna mäter här (--mat)
   MELLAN   200719                                                                       bara orkestratorn (--mat --mellan), runda 2
   KONTROLL 171840, 193040, 193818                                                       bara orkestratorn (--mat --holdout), finalen
+  <körning>/mangder.json {"ovning": [...], "mellan": [...], "kontroll": [...]} ersätter mängderna för den körningen (etta2: övningen var mättad).
 
 KOMMANDON (från engine/, PYTHONIOENCODING=utf-8)
   python tools/arena/bygg.py .arena/<körning>/<mapp>                 bygg <mapp>/src -> <mapp>/dist (krävs före --mat)
@@ -154,6 +155,9 @@ if __name__ == '__main__':
     a = sys.argv[1:]
     if not a: sys.exit(__doc__)
     p = os.path.abspath(a[0]); os.chdir(ENGINE)
+    for k in (p, os.path.dirname(p)):
+        if os.path.exists(os.path.join(k, 'mangder.json')):
+            m = json.load(io.open(os.path.join(k, 'mangder.json'), encoding='utf-8')); OVNING, MELLAN, KONTROLL = m['ovning'], m['mellan'], m['kontroll']; break
     if '--sond' in a:
         w = a[a.index('--sond') + 1].replace('\\', '/'); w = next((x for x in OVNING if kort(x) in w), None)
         if not w: sys.exit('sonden får bara köra övningens filer: ' + ', '.join(OVNING))
