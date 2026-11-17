@@ -1,0 +1,41 @@
+diff --git a/bas/src/analyserClock.ts b/a7/src/analyserClock.ts
+index 0bbcb78..787ee6b 100644
+--- a/bas/src/analyserClock.ts
++++ b/a7/src/analyserClock.ts
+@@ -25,7 +25,7 @@ const ONSET_WIN_MS = 5000, ONSET_EVERY_MS = 250, ONSET_BINS = 48, ONSET_RING = 1
+ const FEED_RISE_HOPS = 6;   // BASENS STIGNING
+ const BREAK_HOLD_MS = 20000;   // TVÅ RUTNÄT
+ const BREAK_RESTORE_MS = Number(process.env.DMX_BREAK_RESTORE_MS ?? String(BREAK_HOLD_MS));
+-const BAR_DECAY = 0.99, BAR_MIN = 16, BAR_MARGIN = 0.06, BAR_W_BASS = 0.5, BAR_WIN0 = -0.2, BAR_WIN1 = 0.3, BAR_RISE_HOPS = 6, BAR_R_MAX = 2, BAR_W_BEAT = 0.25, BAR_Q = 8, BAR_BEAT_Q = 2;   // ETTAN I EFFEKTKLOCKANS RUTNÄT
++const BAR_DECAY = 0.99, BAR_MIN = 16, BAR_MARGIN = 0.06, BAR_W_BASS = 0.5, BAR_WIN0 = -0.2, BAR_WIN1 = 0.3, BAR_RISE_HOPS = 6, BAR_R_MAX = 2, BAR_W_BEAT = 0.25, BAR_Q = 8, BAR_BEAT_Q = 2, BAR_KEEP = 0.1;   // ETTAN I EFFEKTKLOCKANS RUTNÄT
+ const TG_HOLD = 1.35;   // HELA TEMPOOMRÅDET
+ const TG_SIB = [Math.round(Math.log2(4 / 3) * 139), Math.round(Math.log2(3 / 2) * 139)];   // 4:3 och 3:2 i rutnätets steg
+ const TG_SNAP = 0.03, TG_EDGE = 1.03, TG_OCT_UP = 0.85, TG_OCT_DN = 0.4, TG_OCT_A = 0.1;
+@@ -85,7 +85,7 @@ export class BeatFeed {
+   private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
+   private readonly barK = new Float64Array(4); private readonly barL = new Float64Array(4);   // ETTAN (a5)
+   private barN = 0; private barIdx = NaN; private bK = 0; private bL = 0; private barOff = 0; barShifts = 0;
+-  private barM = 0; private barJ = 0; private barJr = 0; private barPT = 0; private barPI = NaN;   // ettan räknas i musikens slag (a1, per slag a6)
++  private barM = 0; private readonly barTmp = new Float64Array(4); private barJ = 0; private barJr = 0; private barPT = 0; private barPI = NaN;   // ettan räknas i musikens slag (a1, per slag a6)
+   private readonly barR = new Float64Array(4); private bE = 0; private bE1 = 0; private bE2 = 0; private bEm = 0;   // kickens återstart (a2)
+   private readonly barX = new Float64Array(4); private readonly barV = new Float64Array(BAR_Q); private readonly barVc = new Float64Array(BAR_Q); private barTi = NaN; private barTe = 0;   // backbeaten (a8r)
+   private readonly linK = new Float64Array(BAR_RISE_HOPS); private readonly linL = new Float64Array(BAR_RISE_HOPS); private linPos = 0;
+@@ -389,7 +389,8 @@ export class BeatFeed {
+     return false;
+   }
+ 
+-  private barReset(): void { this.barK.fill(0); this.barL.fill(0); this.barR.fill(0); this.barX.fill(0); this.barTi = NaN; this.bE1 = 0; this.bE2 = 0; this.bEm = 0; this.barN = 0; this.barIdx = NaN; this.barM = this.barOff & 3; this.barJ = 0; this.barJr = 0; this.barPI = NaN; }
++  private barRot(A: Float64Array, r: number, f: number): void { const T = this.barTmp; T.set(A); for (let c = 0; c < 4; c++) A[c] = f * T[(c - r) & 3]; }
++  private barReset(keep = false): void { const r = this.barJr & 3, f = keep ? BAR_KEEP : 0; this.barRot(this.barK, r, f); this.barRot(this.barL, r, f); this.barRot(this.barR, r, f); this.barRot(this.barX, r, f); this.barTi = NaN; this.bE1 = 0; this.bE2 = 0; this.bEm = 0; this.barN = 0; this.barIdx = NaN; this.barM = this.barOff & 3; this.barJ = 0; this.barJr = 0; this.barPI = NaN; }
+ 
+   /** ETTAN (se BAR_DECAY). */
+   private barStep(frame: Frame, beat: NonNullable<EngineConfig["beat"]>, now: number): void {
+@@ -450,7 +451,7 @@ export class BeatFeed {
+ 
+   /** LÅTGRÄNSEN. */
+   private relock(soft: boolean): void {
+-    this.tgReset(soft); this.barReset(); this.goodRep = 0; this.goodOn = 0; this.onNext = 0;
++    this.tgReset(soft); this.barReset(soft); this.goodRep = 0; this.goodOn = 0; this.onNext = 0;
+   }
+ 
+   /** MINNET VID GRÄNSEN. */

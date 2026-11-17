@@ -1,0 +1,32 @@
+{
+ "mapp": ".arena\\etta2\\j0b",
+ "matt": {
+  "etta": 68.13460739509763,
+  "omval": 1.2637491223964428,
+  "paslag": 74.26720148102437,
+  "etta_193818": 68.13460739509763
+ },
+ "filer": {
+  "193818": {
+   "etta": 68.13460739509763,
+   "omval": 1.2637491223964428,
+   "paslag": 74.26720148102437,
+   "forskj": [
+    68.1,
+    5.9,
+    10.5,
+    15.5
+   ],
+   "n": 2407
+  }
+ },
+ "sparr": {
+  "andradeFiler": [
+   "analyser.ts",
+   "analyserClock.ts",
+   "analyserSpectrum.ts",
+   "split.ts"
+  ]
+ },
+ "tidS": 63
+}

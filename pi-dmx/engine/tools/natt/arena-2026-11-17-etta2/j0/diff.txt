@@ -1,0 +1,251 @@
+diff --git a/bas/src/analyser.ts b/j0/src/analyser.ts
+index 5dcd901..0054caf 100644
+--- a/bas/src/analyser.ts
++++ b/j0/src/analyser.ts
+@@ -13,7 +13,7 @@ import {
+   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader, type HopFeed,
+   R_BIGSEQ, R_CLOCK, R_CLOCK_CONF, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N, B_RMS, B_LVL, B_CENT, B_ACTIVE, B_WALL, B_KICK, B_KICKHIT, B_INT, B_BREAK, B_SEC, B_LVH, B_CONF,
+   B_ENVF, B_ENVBPM, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY, BS_DROPS, BS_MINI, BS_BUILD, BS_RISER, BS_PUNCH, BS_BASS, BS_BRIGHT, BS_BEAT,
+-  BS_BASSLINE, BS_SPEC_N, BS_SKIPPED, BS_CAND, BS_DEMOTED, BS_SPACED, BS_DROPRISE, BS_NEAR, BS_NEARDIP, BS_LIFT, BS_STOPS, BS_STOPSEC, BS_UNDER, BS_BUILDSTART, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
++  BS_BASSLINE, BS_SPEC_N, BS_SKIPPED, BS_CAND, BS_DEMOTED, BS_SPACED, BS_DROPRISE, BS_NEAR, BS_NEARDIP, BS_LIFT, BS_STOPS, BS_STOPSEC, BS_UNDER, BS_BUILDSTART, BS_BNOV, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
+ } from './split.js';
+ import FFT from "fft.js";
+ import { BeatFeed, publishPhase, type ClockCfg } from "./analyserClock.js";   // ANALYSATORNS KLOCKA
+@@ -121,6 +121,7 @@ export interface Frame {
+   profile: { punch: number; bass: number; bright: number; beat: number; bassline: number };   // KARAKTÄRSPROFIL
+   beatAnchorMs: number;   // wall-clock ms för ett taktslag
+   kickAtMs: number;
++  bassNov?: number;
+   barShift: number;   // TAKTFAS
+   beatPhaseMs: number;   // GRIDFAS
+   beatPhaseConf: number;   // Gridfasens on/half-kvot
+@@ -152,7 +153,7 @@ export const BODY_CEIL_DB_S = 0.15;   // taket haller latens loud-referens lang
+ const DOUBLE_FROM_START = [
+   'expectHighMs', 'levelVsHighDb', 'sumSq', 'lastT', 'dbgRms', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum', 'lvlSmooth',
+   'lvlVU', 'engSmooth', 'activeMs', 'buildUp', 'kickHit', 'snareHit', 'hatHit', 'pendingKickMs', 'kfPrev', 'kfPrev2',
+-  'beatAnchorMs', 'profBassline', 'bassOnsetsPerBeat', 'rawBpmLast', 'localBpmConfidence', 'sectionStartMs', 'secBuildAt', 'secBuildSeen', 'repeatSim', 'repeatAgoMs',
++  'beatAnchorMs', 'profBassline', 'bassOnsetsPerBeat', 'rawBpmLast', 'localBpmConfidence', 'sectionStartMs', 'secBuildAt', 'secBuildSeen', 'repeatSim', 'repeatAgoMs', 'bassNov',
+ ] as const;   // Instansfalt som MATT
+ /** TYPSTABILA TALFALT. */
+ function stabiliseNumbers(o: object): void {
+@@ -294,6 +295,7 @@ export class Analyser {
+   private static readonly REFRAC_ATT = 0;   // env-ringens refraktar
+   blAccum = 0;       profBassline = 0;  blKickSeq = -100;   // TYDLIG BASGANG
+   bassOnsetsPerBeat = 0;
++  bassNov = 0;   // BASGÅNGENS BYTE
+   private envHighRing = new Float32Array(Analyser.ENV_LEN);   // DIAGNOSTIK
+   private envHighAccum = 0;
+   beatAnchorMs = 0;
+@@ -442,7 +444,7 @@ export class Analyser {
+     if (!this.bigRd.read(ctrl, this.bigState!, s, C_BIG_SEQ) || s[BS_SEQ] === 0) return;
+     this.hBody = s[BS_BODY]; this.drop.dropCount = s[BS_DROPS]; this.drop.miniDropCount = s[BS_MINI]; this.drop.buildStartCount = s[BS_BUILDSTART]; this.bodyUnderDb = s[BS_UNDER];
+     this.drop.dropDemoted = s[BS_DEMOTED]; this.drop.dropSpaced = s[BS_SPACED]; this.drop.dropRiseDb = s[BS_DROPRISE]; this.drop.nearDropDb = s[BS_NEAR]; this.drop.nearDipDb = s[BS_NEARDIP]; this.drop.liftDb = s[BS_LIFT]; this.drop.stopCount = s[BS_STOPS]; this.drop.stopS = s[BS_STOPSEC]; this.buildUp = s[BS_BUILD]; this.hInRiser = s[BS_RISER] === 1;
+-    const p = this.character.outProfile; p.punch = s[BS_PUNCH]; p.bass = s[BS_BASS]; p.bright = s[BS_BRIGHT]; p.beat = s[BS_BEAT]; p.bassline = s[BS_BASSLINE];
++    const p = this.character.outProfile; p.punch = s[BS_PUNCH]; p.bass = s[BS_BASS]; p.bright = s[BS_BRIGHT]; p.beat = s[BS_BEAT]; p.bassline = s[BS_BASSLINE]; this.bassNov = s[BS_BNOV];
+     const sn = s[BS_SPEC_N];
+     if (sn > this.specDelivered) {
+       const sink = this.specSink, binHz = this.cfg.audio.rate / this.bands.bufferBig.length, R = this.bands.specRing!, c = this.bands.specCopy;
+@@ -486,7 +488,7 @@ export class Analyser {
+       stateWrite(ctrl, this.bigState!, (s) => {
+         s[BS_SEQ] = this.bigSeq; s[BS_BODY] = this.hBody; s[BS_DROPS] = this.drop.dropCount; s[BS_MINI] = this.drop.miniDropCount; s[BS_BUILDSTART] = this.drop.buildStartCount; s[BS_CAND] = this.drop.dropCand; s[BS_UNDER] = this.bodyUnderDb;
+         s[BS_DEMOTED] = this.drop.dropDemoted; s[BS_SPACED] = this.drop.dropSpaced; s[BS_DROPRISE] = this.drop.dropRiseDb; s[BS_NEAR] = this.drop.nearDropDb; s[BS_NEARDIP] = this.drop.nearDipDb; s[BS_LIFT] = this.drop.liftDb; s[BS_STOPS] = this.drop.stopCount; s[BS_STOPSEC] = this.drop.stopS; s[BS_BUILD] = this.buildUp; s[BS_RISER] = this.hInRiser ? 1 : 0;
+-        s[BS_PUNCH] = p.punch; s[BS_BASS] = p.bass; s[BS_BRIGHT] = p.bright; s[BS_BEAT] = p.beat; s[BS_BASSLINE] = p.bassline; s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped;
++        s[BS_PUNCH] = p.punch; s[BS_BASS] = p.bass; s[BS_BRIGHT] = p.bright; s[BS_BEAT] = p.beat; s[BS_BASSLINE] = p.bassline; s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped; s[BS_BNOV] = this.bassNov;
+       }, C_BIG_SEQ);
+       if (this.syncWorker) Atomics.notify(ctrl, C_BIG_SEQ);
+     }
+@@ -735,7 +737,7 @@ export class Analyser {
+       silent: true, level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
+       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
+       dropCount: 0, miniDropCount: 0, buildStartCount: 0, dropDemoted: 0, dropSpaced: 0, dropRiseDb: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, bodyDb: 0, bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1, midHiDb: -120, inZone: false, breaking: false, buildUp: 0, buildProg: 0, inRiser: false, profile: this.character.outProfile, beatAnchorMs: 0,
+-      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
++      kickAtMs: 0, barShift: -1, bassNov: 0, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
+       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
+     };
+     for (const o of [this.outFrame, this.character.outProfile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum]) stabiliseNumbers(o);
+@@ -949,7 +951,7 @@ export class Analyser {
+     { let s2 = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, (FB ? this.bands.fbDbRaw : this.bandDbRaw)[b] / 20); s2 += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s2)); }
+     f.dropCount = this.drop.dropCount; f.miniDropCount = this.drop.miniDropCount; f.buildStartCount = this.drop.buildStartCount; f.dropDemoted = this.drop.dropDemoted; f.dropSpaced = this.drop.dropSpaced; f.dropRiseDb = this.drop.dropRiseDb;
+     f.nearDropDb = this.drop.nearDropDb; f.nearDipDb = this.drop.nearDipDb; f.liftDb = this.drop.liftDb; f.stopCount = this.drop.stopCount; f.stopS = this.drop.stopS; f.inZone = inZone; f.breaking = breaking; f.buildUp = this.buildUp; f.inRiser = inRiser;
+-    f.kickAtMs = kickAtMs; f.barShift = -1;
++    f.kickAtMs = kickAtMs; f.barShift = -1; f.bassNov = this.bassNov;
+     f.beatPhaseMs = this.beatPhaseMs > 0 ? this.beatPhaseMs - Analyser.GRID_PHASE_OFFSET_MS : this.beatPhaseMs;
+     f.beatPhaseConf = this.beatPhaseConf;
+     this.sections.sectionAggStep();
+diff --git a/bas/src/analyserClock.ts b/j0/src/analyserClock.ts
+index 0bbcb78..f14fce1 100644
+--- a/bas/src/analyserClock.ts
++++ b/j0/src/analyserClock.ts
+@@ -25,7 +25,7 @@ const ONSET_WIN_MS = 5000, ONSET_EVERY_MS = 250, ONSET_BINS = 48, ONSET_RING = 1
+ const FEED_RISE_HOPS = 6;   // BASENS STIGNING
+ const BREAK_HOLD_MS = 20000;   // TVÅ RUTNÄT
+ const BREAK_RESTORE_MS = Number(process.env.DMX_BREAK_RESTORE_MS ?? String(BREAK_HOLD_MS));
+-const BAR_DECAY = 0.99, BAR_MIN = 16, BAR_MARGIN = 0.06, BAR_W_BASS = 0.5, BAR_WIN0 = -0.2, BAR_WIN1 = 0.3, BAR_RISE_HOPS = 6, BAR_R_MAX = 2, BAR_W_BEAT = 0.25, BAR_Q = 8, BAR_BEAT_Q = 2;   // ETTAN I EFFEKTKLOCKANS RUTNÄT
++const BAR_DECAY = 0.99, BAR_MIN = 16, BAR_MARGIN = 0.06, BAR_W_BASS = 0.5, BAR_WIN0 = -0.2, BAR_WIN1 = 0.3, BAR_RISE_HOPS = 6, BAR_R_MAX = 2, BAR_W_BEAT = 0.25, BAR_Q = 8, BAR_BEAT_Q = 2, BAR_W_PITCH = 1;   // ETTAN I EFFEKTKLOCKANS RUTNÄT
+ const TG_HOLD = 1.35;   // HELA TEMPOOMRÅDET
+ const TG_SIB = [Math.round(Math.log2(4 / 3) * 139), Math.round(Math.log2(3 / 2) * 139)];   // 4:3 och 3:2 i rutnätets steg
+ const TG_SNAP = 0.03, TG_EDGE = 1.03, TG_OCT_UP = 0.85, TG_OCT_DN = 0.4, TG_OCT_A = 0.1;
+@@ -88,6 +88,7 @@ export class BeatFeed {
+   private barM = 0; private barJ = 0; private barJr = 0; private barPT = 0; private barPI = NaN;   // ettan räknas i musikens slag (a1, per slag a6)
+   private readonly barR = new Float64Array(4); private bE = 0; private bE1 = 0; private bE2 = 0; private bEm = 0;   // kickens återstart (a2)
+   private readonly barX = new Float64Array(4); private readonly barV = new Float64Array(BAR_Q); private readonly barVc = new Float64Array(BAR_Q); private barTi = NaN; private barTe = 0;   // backbeaten (a8r)
++  private readonly barP = new Float64Array(4); private bN = 0; private bNc = 0; private bPm = NaN;   // basgångens landning (etta2 a8)
+   private readonly linK = new Float64Array(BAR_RISE_HOPS); private readonly linL = new Float64Array(BAR_RISE_HOPS); private linPos = 0;
+   private innerAnchor = 0; private innerBpm = 0; private innerValid = false;
+   private readonly anaGrid = { anchorMs: 0, bpm: 0, confidence: 0 };   // EN KÄLLA
+@@ -389,7 +390,7 @@ export class BeatFeed {
+     return false;
+   }
+ 
+-  private barReset(): void { this.barK.fill(0); this.barL.fill(0); this.barR.fill(0); this.barX.fill(0); this.barTi = NaN; this.bE1 = 0; this.bE2 = 0; this.bEm = 0; this.barN = 0; this.barIdx = NaN; this.barM = this.barOff & 3; this.barJ = 0; this.barJr = 0; this.barPI = NaN; }
++  private barReset(): void { this.barK.fill(0); this.barL.fill(0); this.barR.fill(0); this.barX.fill(0); this.barP.fill(0); this.bPm = NaN; this.bN = 0; this.bNc = 0; this.barTi = NaN; this.bE1 = 0; this.bE2 = 0; this.bEm = 0; this.barN = 0; this.barIdx = NaN; this.barM = this.barOff & 3; this.barJ = 0; this.barJr = 0; this.barPI = NaN; }
+ 
+   /** ETTAN (se BAR_DECAY). */
+   private barStep(frame: Frame, beat: NonNullable<EngineConfig["beat"]>, now: number): void {
+@@ -398,9 +399,10 @@ export class BeatFeed {
+     if (!(beat.bpm > 40)) return;
+     const per = 60000 / beat.bpm, pos = (now - beat.anchorMs) / per, idx = Math.floor(pos - BAR_WIN0);
+     if (idx !== this.barIdx) {
+-      if (idx === this.barIdx + 1) this.barCommit(beat.anchorMs + this.barIdx * per, per);
+-      this.barIdx = idx; this.bK = 0; this.bL = 0; this.bE = 0;
++      if (idx === this.barIdx + 1) this.barCommit(beat.anchorMs + this.barIdx * per, per); else this.bPm = NaN;
++      this.barIdx = idx; this.bK = 0; this.bL = 0; this.bE = 0; this.bN = 0; this.bNc = 0;
+     }
++    this.bN += frame.bassNov ?? 0; this.bNc++;
+     if (pos - idx <= BAR_WIN1) {
+       if (rk > this.bK) this.bK = rk;
+       if (k > this.bE) this.bE = k;
+@@ -429,20 +431,21 @@ export class BeatFeed {
+     if (this.barPI === this.barPI) { const j = this.barJ + (this.barIdx - this.barPI) - (tb - this.barPT) / per; this.barJ = j - 4 * Math.floor(j / 4); }
+     this.barPT = tb; this.barPI = this.barIdx; const jr = this.barJr = Math.floor(this.barJ + 0.5);
+     const K = this.barK, L = this.barL, R = this.barR, slot = (((this.barIdx - jr) % 4) + 4) % 4;
+-    for (let i = 0; i < 4; i++) { K[i] *= BAR_DECAY; L[i] *= BAR_DECAY; R[i] *= BAR_DECAY; this.barX[i] *= BAR_DECAY; }
++    for (let i = 0; i < 4; i++) { K[i] *= BAR_DECAY; L[i] *= BAR_DECAY; R[i] *= BAR_DECAY; this.barX[i] *= BAR_DECAY; this.barP[i] *= BAR_DECAY; }
+     K[slot] += this.bK; L[slot] += this.bL;
++    { const m = this.bNc > 0 ? this.bN / this.bNc : 0; if (this.bPm > m) this.barP[(slot + 3) & 3] += this.bPm - m; this.bPm = m; }
+     { const e = this.bE, pm = this.bE1 > this.bE2 ? this.bE1 : this.bE2;
+       if (this.bEm > 0 && e > pm) R[slot] += Math.min(BAR_R_MAX, (e - pm) / this.bEm);
+       this.bE2 = this.bE1; this.bE1 = e; this.bEm += (e - this.bEm) / 16; }
+     if (this.barN < 1000) this.barN++;
+     if (this.barN < BAR_MIN) return;
+     const sK = K[0] + K[1] + K[2] + K[3], sL = L[0] + L[1] + L[2] + L[3], sR = R[0] + R[1] + R[2] + R[3], X = this.barX;
+-    const sX = Math.abs(X[0]) + Math.abs(X[1]) + Math.abs(X[2]) + Math.abs(X[3]);
++    const sX = Math.abs(X[0]) + Math.abs(X[1]) + Math.abs(X[2]) + Math.abs(X[3]), P = this.barP, sP = P[0] + P[1] + P[2] + P[3];
+     if (!(sK > 0)) return;
+     let bi = 0, best = -1e9, second = -1e9;
+     for (let i = 0; i < 4; i++) {
+       const v = K[i] / sK + (sR > 0 ? R[i] / sR : 0) + (sL > 0 ? BAR_W_BASS * L[i] / sL : 0)
+-        + (sX > 0 ? BAR_W_BEAT * (X[(i + 1) & 3] + X[(i + 3) & 3] - X[i] - X[(i + 2) & 3]) / sX : 0);
++        + (sX > 0 ? BAR_W_BEAT * (X[(i + 1) & 3] + X[(i + 3) & 3] - X[i] - X[(i + 2) & 3]) / sX : 0) + (sP > 0 ? BAR_W_PITCH * P[i] / sP : 0);
+       if (v > best) { second = best; best = v; bi = i; } else if (v > second) second = v;
+     }
+     if (bi !== this.barM && best - second >= BAR_MARGIN) { this.barM = bi; this.barShifts++; }
+diff --git a/bas/src/analyserSpectrum.ts b/j0/src/analyserSpectrum.ts
+index c8cf16a..24c27ba 100644
+--- a/bas/src/analyserSpectrum.ts
++++ b/j0/src/analyserSpectrum.ts
+@@ -41,6 +41,9 @@ export class SpectrumBands {
+ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
+   private onsetWarm = 0;   // Stor-FFT-rutor med signal i rad
+   private static readonly ONSET_WARM = 183;
++  private static readonly BP_S = 36; private static readonly BP_H = 6; private static readonly BP_RING = 128; private static readonly BP_F0 = 30.87;   // BASGÅNGENS BYTE
++  private bpI: Int32Array | null = null; private bpW0 = new Float32Array(0); private bpW1 = new Float32Array(0); private bpC = new Float32Array(12);
++  private bpR = new Float32Array(SpectrumBands.BP_RING * 12); private bpOk = new Uint8Array(SpectrumBands.BP_RING); private bpPos = 0;
+   /** 2048-bufferten som RING. */
+   bigRingPush(samples: Float32Array): void {
+     const B = this.bufferBig, N = B.length, p = this.bigPos, hop = samples.length, first = N - p;
+@@ -99,6 +102,25 @@ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
+     { const t = this.fbPrevMag; this.fbPrevMag = this.fbMag; this.fbMag = t; }
+   }
+ 
++  /** BASGÅNGENS BYTE: basens tonklasser (harmonisk summa) mot dem ett slag tidigare. */
++  private bassPitchStep(m: Float32Array): void {
++    const S = SpectrumBands.BP_S, H = SpectrumBands.BP_H, RN = SpectrumBands.BP_RING;
++    if (!this.bpI) {
++      const binHz = this.a.cfg.audio.rate / this.bufferBig.length, n = S * H; this.bpI = new Int32Array(n); this.bpW0 = new Float32Array(n); this.bpW1 = new Float32Array(n);
++      for (let s = 0; s < S; s++) for (let k = 1; k <= H; k++) { const fb = SpectrumBands.BP_F0 * 2 ** (s / 12) * k / binHz, i = Math.floor(fb), j = s * H + k - 1; this.bpI[j] = Math.min(i, this.magBigMax - 2); this.bpW0[j] = (1 - (fb - i)) / Math.sqrt(k); this.bpW1[j] = (fb - i) / Math.sqrt(k); }
++    }
++    const I = this.bpI, W0 = this.bpW0, W1 = this.bpW1, c = this.bpC; c.fill(0);
++    for (let s = 0; s < S; s++) { let v = 0; for (let j = s * H; j < s * H + H; j++) v += m[I[j]] * W0[j] + m[I[j] + 1] * W1[j]; c[s % 12] += v; }
++    let nn = 0; for (let q = 0; q < 12; q++) nn += c[q] * c[q];
++    const ok = this.a.activeMs > 0 && nn > 0, p = this.bpPos, o = p * 12, R = this.bpR; nn = ok ? 1 / Math.sqrt(nn) : 0;
++    for (let q = 0; q < 12; q++) R[o + q] = c[q] * nn;
++    this.bpOk[p] = ok ? 1 : 0; this.bpPos = (p + 1) % RN;
++    const bpm = this.a.dBpm, lag = bpm > 40 ? Math.round(60000 / bpm / (this.a.dtHop * 1000 * Analyser.BIG_EVERY)) : 0;
++    let nov = 0;
++    if (ok && lag > 0 && lag < RN) { const pp = (p - lag + RN) % RN; if (this.bpOk[pp]) { let d = 0; const o2 = pp * 12; for (let q = 0; q < 12; q++) d += R[o + q] * R[o2 + q]; nov = 1 - d; } }
++    this.a.bassNov = nov;
++  }
++
+   /** Decimerad stor-FFT. */
+   bigStep(): void {
+     this.a.bigCounter = 0;
+@@ -111,6 +133,7 @@ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
+       const re = specBig[2 * i], im = specBig[2 * i + 1];
+       magBig[i] = Math.sqrt(re * re + im * im);
+     }
++    this.bassPitchStep(magBig);
+ 
+     if (this.a.bigOn) { const k = ++this.specN, R = this.specRing!, o = (k % SPEC_SLOTS) * SPEC_MAX; R.set(this.magBigView.subarray(0, this.specCopy.length), o); }
+     else this.a.specSink?.(this.magBigView, this.a.cfg.audio.rate / this.bufferBig.length);
+diff --git a/bas/src/split.ts b/j0/src/split.ts
+index 3997f13..0b43b14 100644
+--- a/bas/src/split.ts
++++ b/j0/src/split.ts
+@@ -133,16 +133,16 @@ export const C_BIG_WRITE = 8, C_BIG_READ = 9, C_BIG_SEQ = 10 , C_WAITING_B = 11
+ export const BS_SEQ = 0, BS_BODY = 1, BS_DROPS = 2, BS_MINI = 3, BS_BUILD = 4, BS_RISER = 5, BS_PUNCH = 6, BS_BASS = 7, BS_BRIGHT = 8, BS_BEAT = 9,
+   BS_BASSLINE = 10, BS_SPEC_N = 11 , BS_SKIPPED = 12,
+   BS_CAND = 13, BS_DEMOTED = 14, BS_SPACED = 15, BS_DROPRISE = 16, BS_NEAR = 17, BS_NEARDIP = 18, BS_LIFT = 19, BS_STOPS = 20, BS_STOPSEC = 21,
+-  BS_UNDER = 22, BS_BUILDSTART = 23 ;
+-export const BIG_STATE_LEN = 24;
++  BS_UNDER = 22, BS_BUILDSTART = 23 , BS_BNOV = 24;
++export const BIG_STATE_LEN = 25;
+ export const SPEC_SLOTS = 16, SPEC_MAX = 1024;   // 16 spektra
+ 
+-export const HOP_REC_LEN = 19;   // TAKTVÄGEN
++export const HOP_REC_LEN = 20;   // TAKTVÄGEN
+ export const HOP_RING_N = 4096;
+ export const H_SEQ = 0, H_NOW = 1 , H_TS = 2 ,
+   H_BPM = 3, H_CONF = 4, H_ANCHOR = 5, H_KICKAT = 6, H_BARSHIFT = 7, H_ON_KICK = 8, H_ON_HIMID = 9, H_ON_TREBLE = 10, H_SA_SUB = 11, H_SA_KICK = 12, H_SA_BASS = 13 ,
+   H_BOUND = 14 , H_QUIET = 15 ,
+-  H_SURE = 16 , H_UNDER = 17 , H_SA_TREBLE = 18;
++  H_SURE = 16 , H_UNDER = 17 , H_SA_TREBLE = 18, H_BNOV = 19;
+ export const C_HOP_WRITE = 4, C_HOP_READ = 5, C_FEED_SEQ = 6 , C_WAKE = 7 ;
+ export const FS_HOP_SEQ = 0, FS_BEAT = 1 , FS_ANCHOR = 2, FS_BPM = 3, FS_BCONF = 4,
+   FS_BEATERR = 5 , FS_FCONF = 6 , FS_GRID = 7 ,
+@@ -152,7 +152,7 @@ export const FS_HOP_SEQ = 0, FS_BEAT = 1 , FS_ANCHOR = 2, FS_BPM = 3, FS_BCONF =
+ export const FEED_STATE_LEN = 20;
+ 
+ /** Det taktmatningen läser ur ramen, och det den skriver. */
+-export interface HopFrame { bpm: number; bpmConfidence: number; beatAnchorMs: number; kickAtMs: number; barShift: number; beatTrust?: number;
++export interface HopFrame { bpm: number; bpmConfidence: number; beatAnchorMs: number; kickAtMs: number; barShift: number; beatTrust?: number; bassNov?: number;
+   onset: { kick: number; highMid: number; treble: number }; specAbs: { sub: number; kick: number; bass: number; treble: number } }
+ export interface HopGrid { anchorMs: number; bpm: number; confidence?: number }
+ export interface HopCfg { beat?: HopGrid | null; beatErr?: number }
+@@ -180,7 +180,7 @@ export class HopLaneFast {
+     r[o + H_NOW] = now; r[o + H_TS] = performance.timeOrigin + performance.now();
+     r[o + H_BPM] = f.bpm; r[o + H_CONF] = f.bpmConfidence; r[o + H_ANCHOR] = f.beatAnchorMs; r[o + H_KICKAT] = f.kickAtMs; r[o + H_BARSHIFT] = f.barShift;
+     r[o + H_ON_KICK] = f.onset?.kick ?? 0; r[o + H_ON_HIMID] = f.onset?.highMid ?? 0; r[o + H_ON_TREBLE] = f.onset?.treble ?? 0;
+-    r[o + H_SA_SUB] = f.specAbs?.sub ?? 0; r[o + H_SA_KICK] = f.specAbs?.kick ?? 0; r[o + H_SA_BASS] = f.specAbs?.bass ?? 0; r[o + H_SA_TREBLE] = f.specAbs?.treble ?? 0;
++    r[o + H_SA_SUB] = f.specAbs?.sub ?? 0; r[o + H_SA_KICK] = f.specAbs?.kick ?? 0; r[o + H_SA_BASS] = f.specAbs?.bass ?? 0; r[o + H_SA_TREBLE] = f.specAbs?.treble ?? 0; r[o + H_BNOV] = f.bassNov ?? 0;
+     r[o + H_BOUND] = an.trackBoundaries ?? 0; r[o + H_QUIET] = an.quietMs ?? 0; r[o + H_SURE] = an.boundSure ? 1 : 0; r[o + H_UNDER] = an.bodyUnderDb ?? 0;
+     r[o + H_SEQ] = seq;
+     Atomics.store(ctrl, C_HOP_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
+@@ -221,7 +221,7 @@ export class HopLaneSlow {
+   private readonly ctrl: Int32Array; private readonly ring: Float64Array; private readonly state: Float64Array;
+   private seq: number; private rt: number; private rb: number; private processed: number;
+   private skipped = 0; private lagMaxMs = 0; private busyEmaUs = 0; private busyMaxUs = 0; private fconf = NaN;
+-  private readonly fr = { bpm: 0.5, bpmConfidence: 0.5, beatAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5,
++  private readonly fr = { bpm: 0.5, bpmConfidence: 0.5, beatAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5, bassNov: 0.5,
+     onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5, bass: 0.5, treble: 0.5 } };
+   private readonly cfg: HopCfg = { beat: undefined, beatErr: undefined };
+   private grid: HopGrid | null = null;
+@@ -244,7 +244,7 @@ export class HopLaneSlow {
+       this.target.trackBoundaries = r[o + H_BOUND]; this.target.quietMs = r[o + H_QUIET]; this.target.boundSure = r[o + H_SURE] === 1; this.target.bodyUnderDb = r[o + H_UNDER];
+       fr.bpm = r[o + H_BPM]; fr.bpmConfidence = r[o + H_CONF]; fr.beatAnchorMs = r[o + H_ANCHOR]; fr.kickAtMs = r[o + H_KICKAT]; fr.barShift = r[o + H_BARSHIFT];
+       fr.onset.kick = r[o + H_ON_KICK]; fr.onset.highMid = r[o + H_ON_HIMID]; fr.onset.treble = r[o + H_ON_TREBLE];
+-      fr.specAbs.sub = r[o + H_SA_SUB]; fr.specAbs.kick = r[o + H_SA_KICK]; fr.specAbs.bass = r[o + H_SA_BASS]; fr.specAbs.treble = r[o + H_SA_TREBLE];
++      fr.specAbs.sub = r[o + H_SA_SUB]; fr.specAbs.kick = r[o + H_SA_KICK]; fr.specAbs.bass = r[o + H_SA_BASS]; fr.specAbs.treble = r[o + H_SA_TREBLE]; fr.bassNov = r[o + H_BNOV];
+       const cin = fr.bpmConfidence;
+       this.feed.update(fr, this.cfg, this.target, r[o + H_NOW]);
+       this.fconf = fr.bpmConfidence !== cin ? fr.bpmConfidence : NaN;

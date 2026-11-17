@@ -1,3 +1,6 @@
+ARENAN ETTA2 KLAR 2026-11-17 dag: INGEN VINNARE. Bäst a8 (basgångens tonhöjd): övning +6,8, mellan +5,2, KONTROLL −0,7. Fynd: Beat This har
+  udda takter i ~hälften av tiden på 193040/200719/172432/193818, i ren 4/4 är a8 ±0 på osedd musik (tools/arena/ren44.py); 2/3-tempofel
+  i 200719 100-180 s (89 mot 130-176 bpm). Rapport tools/natt/arena-2026-11-17-etta2.md. RÖR INTE .arena/etta2.
 NATTEN 2026-11-17 (ägaren: "Kör 1 först sen 2. Utan att fråga mig så jag sover"), orkestreras från huvudchatten:
   (1) LJUSDOMARENS BRUS KLAR: lookvalet ensamt = std 2,8-4,2 poäng, lampspr ±15 % -> döm på medel av 4 frön (tools/arena/ljusskak.py).
   (2) ARENAN GRANS KLAR 08:40: INGEN VINNARE enligt reglerna. Bäst g6 (nästan-drop >= 20 dB som landning, bara effects.ts): KONTROLL
