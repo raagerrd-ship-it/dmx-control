@@ -2,7 +2,8 @@ NATTEN 2026-11-17 (ägaren: "Kör 1 först sen 2. Utan att fråga mig så jag so
   (1) LJUSDOMARENS BRUS KLAR: lookvalet ensamt = std 2,8-4,2 poäng, lampspr ±15 % -> döm på medel av 4 frön (tools/arena/ljusskak.py).
   (2) ARENAN GRANS KLAR 08:40: INGEN VINNARE enligt reglerna. Bäst g6 (nästan-drop >= 20 dB som landning, bara effects.ts): KONTROLL
   gräns 23,5 -> 29,4 %, lag 8,7 -> 8,1; drop/takt identiska; ljus 4 frön +1,85 men lampspr -8,9 % (spärr 94 %, inom bruset - alla tre
-  föll där). EJ inlagd. Ägaren avgör om g6 blir ögonprov. Rapport tools/natt/arena-2026-11-17-grans.md. RÖR INTE .arena/grans.
+  föll där). INLAGD i src 2026-11-17 efter ägarens ja (560a98f, backup-tagg fore-grans-g6), EJ utlagd. Ögonprov i ladan
+  tillsammans med f0 + r0: syns ett nytt lookbyte på ettan när basen kommer tillbaka stort, utan att ljuset blir sämre? Rapport tools/natt/arena-2026-11-17-grans.md. RÖR INTE .arena/grans.
 ARENAN FRAS KLAR 2026-11-17 00:55: VINNARE r0 (jokern: SWITCH_ON 4 + 2 s-åldern bort + väntklockan + build genom grinden + a7:s
   landning på minidropen i high/intro med 24 s uppslukning; bara effects.ts). KONTROLL: byte på ägarens gräns 15,7 -> 23,5 %, lag 10,5 -> 8,7
   slag, byte på ettan 17,1 -> 38,9 %; ljus +1,5; drop/takt/låtbyten/ettan identiska. INLAGD i src 2026-11-17 efter ägarens ja (backup-tagg
