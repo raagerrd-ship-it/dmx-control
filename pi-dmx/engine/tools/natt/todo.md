@@ -1,3 +1,6 @@
+ARENAN TAKT KLAR 2026-11-18 ~01:05: INGEN VINNARE. a6 (fasen ur sex band) tar takten FEL kontroll 27,8 -> 13,9 % (motslag + glidning nästan
+  borta) men ettan faller (kontroll 64,1 -> 60,4, ren 4/4 -5 pe) => DISK; 'helt rätt' netto lika. Rapport tools/natt/arena-2026-11-18-takt.md.
+  Nästa: runda 2 'a6 + skydda ettan' dömd på ren 4/4 / ägarens markeringar, eller a6 som ögonprov med ägarens ord. RÖR INTE .arena/takt.
 LADAN UTLAGD 2026-11-17 21:45 (ägaren på plats, "lägg ut"): HEAD 78346df = f0 + r0 + g6 + minidrop/lucka + diskantveto + flank 1,5 +
   uppbyggnadssignal + I LUCKAN. Alla "EJ utlagd i ladan" nedan för dessa gäller inte längre. Lotus portad fec31f98 (f0), EJ utlagd på lotus-Pi:n.
   Ögonprovet pågår; backa per tagg fore-grans-g6 / fore-fras-r0 / fore-etta-f0.
