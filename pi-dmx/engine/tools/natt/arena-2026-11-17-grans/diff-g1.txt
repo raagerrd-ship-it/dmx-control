@@ -1,0 +1,122 @@
+diff --git a/src/ANALYSER_SHARED.md5 b/.arena/grans/g1/src/ANALYSER_SHARED.md5
+index f6ba712..2280c74 100644
+--- a/src/ANALYSER_SHARED.md5
++++ b/.arena/grans/g1/src/ANALYSER_SHARED.md5
+@@ -1,7 +1,7 @@
+ # md5 (CRLF->LF) av de gemensamma filerna - samma i lotus-light-link och dmx-control. Skrivs av analyser_shared.py --write
+ 1e5942108e88af6bfe857ef56a7429b8 analyser.ts
+ b5485714f88c45ec0f55f21b9d5ab20e analyserDrop.ts
+-692befa55e7fd906cdc3652af3f27baa analyserSection.ts
++76fd695e8afad5cbe30758750544b972 analyserSection.ts
+ 879ba2122d2a1d3e0eea4082adfd2355 analyserSpectrum.ts
+ e92d0d6b4f8dc36abfb8135004260806 analyserLevel.ts
+ 3b5c715739b3ce3b8668a3a2f0576a6a analyserKick.ts
+diff --git a/src/analyserSection.ts b/.arena/grans/g1/src/analyserSection.ts
+index d86d2b9..d254fed 100644
+--- a/src/analyserSection.ts
++++ b/.arena/grans/g1/src/analyserSection.ts
+@@ -82,6 +82,7 @@ export class SectionTracker {
+     this.secBlkFeat.length = 0; this.secBlkHi.length = 0; this.secPct = 0;
+ 
+     this.secBlkHighH.length = 0; this.bndRef.fill(0); this.a.boundaryNov = 0;
++    this.partFN = 0; this.partAt = 0;
+   }
+ 
+   /** Tar BLOCKSUMMOR. */
+@@ -178,6 +179,7 @@ export class SectionTracker {
+     }
+     if (prev === 'build' || this.a.section === 'build') { if (this.a.section === 'build' && (this.a.secBuildAt === 0 || nowMs - this.a.secBuildSeen > 2000)) this.a.secBuildAt = nowMs; this.a.secBuildSeen = nowMs; }
+     this.secCurDbSum += blkDb; this.secCurDbN++; this.secCurDens += bKicks;
++    this.partStep(nowMs, n);
+     if (this.a.secDump) { const row = [(nowMs - this.secSongStartMs) / 1000, blkDb, bKicks, bCent, bInt, breaking ? 1 : 0, dropped ? 1 : 0]; for (let i = 0; i < 8; i++) row.push(this.secBlkSpec[i] / n); row.push(st, ['intro', 'low', 'build', 'high', 'break'].indexOf(this.a.section)); this.a.secDump.push(row); }
+     if (this.a.section === 'high') { this.lastHighDb = this.secCurDbSum / this.secCurDbN; }
+     this.a.levelVsHighDb = Number.isFinite(this.lastHighDb) ? blkDb - this.lastHighDb : 0;
+@@ -205,6 +207,29 @@ export class SectionTracker {
+     this.secBlkMs = 0; this.secBlkN = 0; this.secBlkInt = 0; this.secBlkKicks = 0; this.secBlkCent = 0; this.secBlkSpec.fill(0); this.secBlkRms2 = 0; this.secBlkBon = 0; this.secBlkBpk = 0; this.secBlkFlux = 0; this.secBlkRms4 = 0;
+   }
+ 
++  /** NY DEL I 'high' (arenan grans g1). */
++  private static readonly PART_NEW = 2; private static readonly PART_OLD = 12; private static readonly PART_Z = 2; private static readonly PART_AGE_MS = 8000;
++  private partF = new Float32Array(14 * 8); private partFN = 0; private partH = new Float32Array(256); private partHN = 0; private partHP = 0; private partAt = 0;
++  private partStep(nowMs: number, n: number): void {
++    const F = this.partF, NW = SectionTracker.PART_NEW, L = NW + SectionTracker.PART_OLD, o = (this.partFN % L) * 8;
++    for (let i = 0; i < 8; i++) F[o + i] = 20 * Math.log10(this.secBlkSpec[i] / n + 1e-7);
++    if (++this.partFN < L || this.a.section !== 'high') return;
++    let d = 0;
++    for (let i = 0; i < 8; i++) {
++      let c = 0, m = 0, s = 0;
++      for (let j = 0; j < L; j++) { const v = F[((this.partFN - 1 - j) % L) * 8 + i]; if (j < NW) c += v; else { m += v; s += v * v; } }
++      c /= NW; m /= L - NW; s = Math.sqrt(Math.max(0, s / (L - NW) - m * m));
++      const x = (c - m) / (s + 1); d += x * x;
++    }
++    d = Math.sqrt(d / 8);
++    const H = this.partH, hn = this.partHN;
++    if (hn >= 30 && nowMs - Math.max(this.a.sectionStartMs, this.partAt) >= SectionTracker.PART_AGE_MS) {
++      let mu = 0, v2 = 0; for (let i = 0; i < hn; i++) { mu += H[i]; v2 += H[i] * H[i]; } mu /= hn;
++      if (d >= mu + SectionTracker.PART_Z * Math.sqrt(Math.max(0, v2 / hn - mu * mu))) { this.a.sectionIndex++; this.partAt = nowMs; }
++    }
++    H[this.partHP] = d; this.partHP = (this.partHP + 1) & 255; if (hn < 256) this.partHN++;
++  }
++
+   /** RANGBERÄKNINGEN. */
+   private rankTier(nb: number): number {
+     const D = this.secBlkDb, K = this.secBlkDens, C = this.secBlkCentH, wk = SectionTracker.RANK_W_DENS, wc = SectionTracker.RANK_W_CENT;
+diff --git a/src/effects.ts b/.arena/grans/g1/src/effects.ts
+index 8957bb7..1d70a46 100644
+--- a/src/effects.ts
++++ b/.arena/grans/g1/src/effects.ts
+@@ -567,6 +567,7 @@ export class EffectEngine {
+    private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
+   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
+   private landForce = false; private landAbsorbUntil = -1;   // LANDNINGEN (a7)
++  private partForce = false; private partPending = false; private lastSecIdx = -1;   // NY DEL I REFRÄNGEN (grans g1): analysatorns sectionIndex i 'high'
+   private lastBuildStart = 0; private lastMiniSeen = 0; private gapUntil = -1;   // I LUCKAN (11-16): inget lookbyte från uppbyggnadssignalen tills basen är tillbaka
+   private nearAt = -1e12; nearCount = 0;   // NASTAN-DROP
+   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; buildProg = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+@@ -810,15 +811,16 @@ export class EffectEngine {
+         if (secKey && this.carryKey && secKey !== this.carryKey) { this.manus.delete(this.carryKey); this.carryKey = ''; }   // burna looken släpps (softenRange)
+         if (secKey && secKey !== this.visitKey) { varv = (this.secVisits.get(secKey) ?? 0) + 1; this.secVisits.set(secKey, varv); this.visitKey = secKey; }
+         const nextLook = HIGH_VARV > 0 && secKey === 'high' && varv >= HIGH_VARV && !dropSwitch && !!kept;
+-        let keep = !nextLook && !!kept && fits(kept) && !(dropSwitch && !this.bassStrong(kept)) && !(this.landForce && (kept === this.smartMode || tierRank(kept) === 0));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark; landningen byter alltid
++        const force = this.landForce || this.partForce;
++        let keep = !nextLook && !!kept && fits(kept) && !(dropSwitch && !this.bassStrong(kept)) && !(force && (kept === this.smartMode || tierRank(kept) === 0));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark; landningen byter alltid
+         const avoid = nextLook ? kept : undefined;
+         if (nextLook) { const h = (this.manusHist.get(secKey) ?? []).filter((m) => m !== kept && m !== this.smartMode && fits(m)); if (h.length) { kept = this.pickLook(h.map((m) => ({ m }))); keep = true; this.manus.set(secKey, kept); console.log(`[dirigent] high-varv ${varv}: nasta look "${kept}"`); } }
+-        if (!keep && secKey && !(dropSwitch) && !nextLook) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m) && !(this.landForce && (m === this.smartMode || tierRank(m) === 0))); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
++        if (!keep && secKey && !(dropSwitch) && !nextLook) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m) && !(force && (m === this.smartMode || tierRank(m) === 0))); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
+         if (keep && kept === this.smartMode) { this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true; }   // manuset sager samma look - inget byte
+         else {
+         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
+         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
+-        this.switchWhy = dropSwitch ? 'drop' : this.landForce ? 'landning'
++        this.switchWhy = dropSwitch ? 'drop' : this.landForce ? 'landning' : this.partForce ? 'del'
+           : (memSection || secEntry) ? 'sektion'
+           : (buildEntry || allaBuild) ? 'build' : buildExit ? 'build-slut' : tierChanged ? 'tier' : 'dwell';
+         this.switchCount++;
+@@ -1067,6 +1069,10 @@ export class EffectEngine {
+         const dropEntry = liveSecChanged && liveSec === 'high' && nowWall - this.anaDropAt < 2000;
+         if (liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '') console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; }   // (intro glommer inte lookerna langre - LÅTMANUS glomms bara pa en verklig latgrans)
+         if (liveSecChanged) this.pendingSecSwitch = nowWall >= this.landAbsorbUntil;   // LANDNINGEN: detektorns sena byte efter landningen är redan gjort
++        const secIdx = frame.sectionIndex ?? 0;
++        if (liveSec !== 'high' || liveSecChanged) this.partPending = false;
++        else if (this.lastSecIdx >= 0 && secIdx !== this.lastSecIdx && nowWall >= this.landAbsorbUntil) { this.partPending = true; this.pendingSecSwitch = true; }
++        this.lastSecIdx = secIdx;
+         const memSection = liveSecChanged && nowWall >= this.landAbsorbUntil;   // (latminnets sektionsgrans mem* borttagen 11-09 - sattes aldrig)
+         const phraseMs = this.cfg.beat && this.cfg.beat.bpm > 0 ? 16 * 60000 / this.cfg.beat.bpm : 0;
+         // LÅTMANUS: sektionsbytet landar på sektionens EGET taktraster (början av takt 2, 4, 6 ... sedan sektionsstart) i stället för
+@@ -1145,11 +1151,13 @@ export class EffectEngine {
+             slagOk = now - this.slagWaitAt > SWITCH_ON * 1.25 * 60000 / bpm;
+         }
+         if (!buildLock && (!inGap || dropEntry) && (dropSwitch || dropEntry || (ready && slagOk))) {
+-        this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, liveSec, memSection, secEntry, tierChanged);
++        this.partForce = this.partPending && !dropSwitch && !dropEntry; const lift = this.partForce && tierS === LUGN;
++        this.switchLook(frame, bpm, lift ? FART : tierS, lift ? 'fart' : tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, liveSec, memSection, secEntry, tierChanged);
++        this.partForce = false; this.partPending = false;
+       } else if (landHit && held > LAND_HOLD_MS && (liveSec === 'high' || liveSec === 'intro')) {
+         this.landForce = true;   // basen är tillbaka: aldrig lugna poolen (tierEma bär fortfarande luckan)
+         this.switchLook(frame, bpm, tier === LUGN ? FART : tier, tier === LUGN ? 'fart' : tierName, bassClear, false, false, false, false, liveSec, false, false, tierChanged);
+-        this.landForce = false; this.landAbsorbUntil = nowWall + LAND_ABSORB_MS;
++        this.landForce = false; this.landAbsorbUntil = nowWall + LAND_ABSORB_MS; this.partPending = false;
+       }
+       return this.smartMode;
+   }

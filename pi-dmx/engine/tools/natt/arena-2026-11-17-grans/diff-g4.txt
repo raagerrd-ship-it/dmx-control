@@ -1,0 +1,133 @@
+diff --git a/src/ANALYSER_SHARED.md5 b/.arena/grans/g4/src/ANALYSER_SHARED.md5
+index f6ba712..f8e4640 100644
+--- a/src/ANALYSER_SHARED.md5
++++ b/.arena/grans/g4/src/ANALYSER_SHARED.md5
+@@ -1,5 +1,5 @@
+ # md5 (CRLF->LF) av de gemensamma filerna - samma i lotus-light-link och dmx-control. Skrivs av analyser_shared.py --write
+-1e5942108e88af6bfe857ef56a7429b8 analyser.ts
++65d80236e4d215167766d0fb879d22a4 analyser.ts
+ b5485714f88c45ec0f55f21b9d5ab20e analyserDrop.ts
+ 692befa55e7fd906cdc3652af3f27baa analyserSection.ts
+ 879ba2122d2a1d3e0eea4082adfd2355 analyserSpectrum.ts
+diff --git a/src/analyser.ts b/.arena/grans/g4/src/analyser.ts
+index 5dcd901..122089a 100644
+--- a/src/analyser.ts
++++ b/.arena/grans/g4/src/analyser.ts
+@@ -131,6 +131,7 @@ export interface Frame {
+   sectionTier: number;   // 0 lag / 1 mellan / 2 hog
+   repeatSim: number; repeatAgoMs: number; repeatSection: string;   // UPPREPNING
+   expectHighInMs: number; prevSection: string; levelVsHighDb: number; sectionBars: number;   // SEKTIONSMINNE + FORUTSAGELSE
++  phraseNovZ: number;   // FRASEN: senaste taktens band-dB mot frasen före (4 takter), z mot låtens senaste 64 takter
+   spec: Spectrum;   // Rikt spektrum + per-band onset
+   specAbs: Spectrum;   // Absolut per-band magnitud före AGC, för Lotus ljusväg och bandandelar
+   bodyDb: number;   // BASKROPPEN I RA dB
+@@ -735,7 +736,7 @@ export class Analyser {
+       silent: true, level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
+       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
+       dropCount: 0, miniDropCount: 0, buildStartCount: 0, dropDemoted: 0, dropSpaced: 0, dropRiseDb: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, bodyDb: 0, bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1, midHiDb: -120, inZone: false, breaking: false, buildUp: 0, buildProg: 0, inRiser: false, profile: this.character.outProfile, beatAnchorMs: 0,
+-      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
++      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0, phraseNovZ: 0,
+       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
+     };
+     for (const o of [this.outFrame, this.character.outProfile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum]) stabiliseNumbers(o);
+@@ -965,8 +966,42 @@ export class Analyser {
+       else this.hopLane!.feed(f, this.clockOut, this);
+       publishPhase(f, this.clockOut.beat, this.clock ? this.clock.barKnown() : this.hopLane!.barKnown, this.extGrid, Date.now(), Analyser.GRID_PHASE_OFFSET_MS);
+     }
++    this.phraseStep(); f.phraseNovZ = this.phraseNovZ;
+     return f;
+   }
++  phraseNovZ = 0;   // FRASEN (arenan grans g4)
++  private phAcc = new Float64Array(8); private phN = 0; private phT0 = 0; private phV = new Float64Array(640); private phK = 0; private phS = new Float64Array(8).fill(3);
++  private phX = new Float64Array(8); private phHist = new Float64Array(64); private phHN = 0; private phHP = 0; private phMu = 0; private phSd = 1;
++  /** Sextondelens band-dB; nyheten = senaste takten (16) mot frasen före (64 = 4 takter). */
++  private phraseStep(): void {
++    const bpm = this.localBpm;
++    if (!(bpm > 40) || this.lvlSmooth <= this.silenceLevel) { this.phN = 0; this.phK = 0; this.phraseNovZ = 0; return; }
++    const now = this.wallNow(), q = 15000 / bpm, A = Analyser.FAST_BANDS ? this.bands.fbAbs : this.bandAbs, acc = this.phAcc;
++    if (this.phN === 0 && this.phK === 0) this.phT0 = now;
++    for (let i = 0; i < 8; i++) acc[i] += 20 * Math.log10(A[i] + 1e-7);
++    this.phN++;
++    if (now - this.phT0 < q) return;
++    this.phT0 = now - this.phT0 < 2 * q ? this.phT0 + q : now;
++    const V = this.phV, k = this.phK, o = (k % 80) * 8;
++    for (let i = 0; i < 8; i++) { V[o + i] = acc[i] / this.phN; acc[i] = 0; }
++    this.phN = 0; this.phK = k + 1;
++    if (k < 79) return;
++    const X = this.phX, S = this.phS; let d = 0;
++    for (let i = 0; i < 8; i++) {
++      let c = 0, r = 0;
++      for (let j = 0; j < 16; j++) c += V[((k - j) % 80) * 8 + i];
++      for (let j = 16; j < 80; j++) r += V[((k - j) % 80) * 8 + i];
++      X[i] = Math.abs(c / 16 - r / 64); const x = X[i] / Math.max(0.5, S[i]); d += x * x;
++    }
++    d = Math.sqrt(d / 8);
++    this.phraseNovZ = this.phHN >= 16 ? (d - this.phMu) / this.phSd : 0;
++    if (k % 16 !== 0) return;
++    for (let i = 0; i < 8; i++) S[i] += (X[i] - S[i]) * 0.02;
++    const H = this.phHist; H[this.phHP] = d; this.phHP = (this.phHP + 1) & 63; if (this.phHN < 64) this.phHN++;
++    const n = this.phHN; let m = 0; for (let i = 0; i < n; i++) m += H[i]; m /= n;
++    let s = 0; for (let i = 0; i < n; i++) s += (H[i] - m) * (H[i] - m);
++    this.phMu = m; this.phSd = Math.sqrt(s / n) + 1e-6;
++  }
+   clock: BeatFeed | null = null;   // ANALYSATORNS KLOCKA utan taktväg
+   readonly clockOut: ClockCfg = { beat: undefined, beatErr: undefined };
+   /** Klockans utfall till motorn. */
+diff --git a/src/effects.ts b/.arena/grans/g4/src/effects.ts
+index 8957bb7..6e7a30c 100644
+--- a/src/effects.ts
++++ b/.arena/grans/g4/src/effects.ts
+@@ -260,6 +260,7 @@ const MANUS_TOP = 2;
+  *  var som helst i takten (konsertReplay --slag). Med N väntar bytet (wantSwitch/buildEntry, inte drop/build-händelserna) in nästa
+  *  taktklocka-tick med beatIdx % N = 0 (1 = nästa slag, 4 = ettan), högst N slag x 1,25. */
+ const SWITCH_ON = 4;   // fras r0: ettan
++const PHRASE_Z = 1.65;   // FRASEN (grans g4): analysatorns phraseNovZ på ettan = taktens klang skiljer sig från frasen före (övre 5 % av låtens egna takter)
+ /** HIGH-VARV (standard 2026-11-04, ägaren: 'pröva b'; megamix tryckvag 36 % = manusets återseende): när refrängen (high) kommer tillbaka
+  *  för 4:e gången eller fler i samma låt får den NÄSTA look - minst spelad ur sektionens manusHist, annars ny ur poolen - i stället för
+  *  manusets. 1:a-3:e gången oförändrade (refrängen känns igen). Drop-bytet orört. natt --snabb: mega tryckvag 36 -> 21 %, lampspr 83 -> 88,
+@@ -566,7 +567,7 @@ export class EffectEngine {
+   private lastDemoted = 0; private lastSpaced = 0; private lastStopCount = 0;   // analysatorns monotona räknare (a3: dropDemoted/dropSpaced/stopCount)
+    private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
+   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
+-  private landForce = false; private landAbsorbUntil = -1;   // LANDNINGEN (a7)
++  private landForce = false; private landAbsorbUntil = -1; private novForce = false;   // LANDNINGEN (a7), FRASEN (g4)
+   private lastBuildStart = 0; private lastMiniSeen = 0; private gapUntil = -1;   // I LUCKAN (11-16): inget lookbyte från uppbyggnadssignalen tills basen är tillbaka
+   private nearAt = -1e12; nearCount = 0;   // NASTAN-DROP
+   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; buildProg = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+@@ -810,15 +811,15 @@ export class EffectEngine {
+         if (secKey && this.carryKey && secKey !== this.carryKey) { this.manus.delete(this.carryKey); this.carryKey = ''; }   // burna looken släpps (softenRange)
+         if (secKey && secKey !== this.visitKey) { varv = (this.secVisits.get(secKey) ?? 0) + 1; this.secVisits.set(secKey, varv); this.visitKey = secKey; }
+         const nextLook = HIGH_VARV > 0 && secKey === 'high' && varv >= HIGH_VARV && !dropSwitch && !!kept;
+-        let keep = !nextLook && !!kept && fits(kept) && !(dropSwitch && !this.bassStrong(kept)) && !(this.landForce && (kept === this.smartMode || tierRank(kept) === 0));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark; landningen byter alltid
++        let keep = !this.novForce && !nextLook && !!kept && fits(kept) && !(dropSwitch && !this.bassStrong(kept)) && !(this.landForce && (kept === this.smartMode || tierRank(kept) === 0));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark; landningen byter alltid
+         const avoid = nextLook ? kept : undefined;
+         if (nextLook) { const h = (this.manusHist.get(secKey) ?? []).filter((m) => m !== kept && m !== this.smartMode && fits(m)); if (h.length) { kept = this.pickLook(h.map((m) => ({ m }))); keep = true; this.manus.set(secKey, kept); console.log(`[dirigent] high-varv ${varv}: nasta look "${kept}"`); } }
+-        if (!keep && secKey && !(dropSwitch) && !nextLook) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m) && !(this.landForce && (m === this.smartMode || tierRank(m) === 0))); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
++        if (!keep && secKey && !(dropSwitch) && !nextLook && !this.novForce) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m) && !(this.landForce && (m === this.smartMode || tierRank(m) === 0))); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
+         if (keep && kept === this.smartMode) { this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true; }   // manuset sager samma look - inget byte
+         else {
+         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
+         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
+-        this.switchWhy = dropSwitch ? 'drop' : this.landForce ? 'landning'
++        this.switchWhy = dropSwitch ? 'drop' : this.landForce ? 'landning' : this.novForce ? 'fras'
+           : (memSection || secEntry) ? 'sektion'
+           : (buildEntry || allaBuild) ? 'build' : buildExit ? 'build-slut' : tierChanged ? 'tier' : 'dwell';
+         this.switchCount++;
+@@ -1144,12 +1145,16 @@ export class EffectEngine {
+           if (ready && hasBeat && bpm > 0 && this.beatTrust >= 0.5 && !(this.tickNow && this.lastBeatIdx % SWITCH_ON === 0))
+             slagOk = now - this.slagWaitAt > SWITCH_ON * 1.25 * 60000 / bpm;
+         }
+-        if (!buildLock && (!inGap || dropEntry) && (dropSwitch || dropEntry || (ready && slagOk))) {
++        const novHit = this.tickNow && this.lastBeatIdx % 4 === 0 && frame.phraseNovZ >= PHRASE_Z && !inBuild && hasBeat && bpm > 0 && this.beatTrust >= 0.5 && held > MIN_HOLD && liveSec !== '' && liveSec !== 'break';
++        if (!buildLock && (!inGap || dropEntry) && (dropSwitch || dropEntry || (ready && slagOk) || (novHit && this.pendingSecSwitch))) {
+         this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, liveSec, memSection, secEntry, tierChanged);
+       } else if (landHit && held > LAND_HOLD_MS && (liveSec === 'high' || liveSec === 'intro')) {
+         this.landForce = true;   // basen är tillbaka: aldrig lugna poolen (tierEma bär fortfarande luckan)
+         this.switchLook(frame, bpm, tier === LUGN ? FART : tier, tier === LUGN ? 'fart' : tierName, bassClear, false, false, false, false, liveSec, false, false, tierChanged);
+         this.landForce = false; this.landAbsorbUntil = nowWall + LAND_ABSORB_MS;
++      } else if (novHit) {
++        this.novForce = true; this.switchLook(frame, bpm, tierS, tierName, bassClear, false, false, false, false, liveSec, false, false, tierChanged);
++        this.novForce = false; this.landAbsorbUntil = Math.max(this.landAbsorbUntil, nowWall + 16 * 60000 / bpm);
+       }
+       return this.smartMode;
+   }

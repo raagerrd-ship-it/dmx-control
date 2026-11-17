@@ -1,0 +1,196 @@
+diff --git a/src/ANALYSER_SHARED.md5 b/.arena/grans/g7/src/ANALYSER_SHARED.md5
+index f6ba712..37513ee 100644
+--- a/src/ANALYSER_SHARED.md5
++++ b/.arena/grans/g7/src/ANALYSER_SHARED.md5
+@@ -1,14 +1,14 @@
+ # md5 (CRLF->LF) av de gemensamma filerna - samma i lotus-light-link och dmx-control. Skrivs av analyser_shared.py --write
+-1e5942108e88af6bfe857ef56a7429b8 analyser.ts
++893e2e36cea55414ba62dc7d176ed8e5 analyser.ts
+ b5485714f88c45ec0f55f21b9d5ab20e analyserDrop.ts
+-692befa55e7fd906cdc3652af3f27baa analyserSection.ts
++7a155ca8207a664ea840f97e293f6776 analyserSection.ts
+ 879ba2122d2a1d3e0eea4082adfd2355 analyserSpectrum.ts
+ e92d0d6b4f8dc36abfb8135004260806 analyserLevel.ts
+ 3b5c715739b3ce3b8668a3a2f0576a6a analyserKick.ts
+ 5df88304c8c1a18eb7d0ba60f20b0dba analyserRiser.ts
+ 9fce7e5efedd8fa4c773e2487da1c3e1 analyserBass.ts
+ dbb860c7483c4e7e938d610712337b96 analyserCharacter.ts
+-c091aa771b1d34b880f3e855fdaafd85 split.ts
++63ff65b5238bdacba290b773e9ac7879 split.ts
+ c7a59a6760df39770f3aca2332dac5c2 slowWorker.ts
+ 3b3d27c56178c07dffba81f4b20417c5 analyserClock.ts
+ d94c850c565827c9075e63127132213f recorder.ts
+diff --git a/src/analyser.ts b/.arena/grans/g7/src/analyser.ts
+index 5dcd901..31f2c3a 100644
+--- a/src/analyser.ts
++++ b/.arena/grans/g7/src/analyser.ts
+@@ -7,7 +7,7 @@ import {
+   R_SEC_RMS2, R_SEC_CENT, R_SEC_DT, R_DROPS, R_ACTIVE, R_BUILD, R_SEC_SPEC0, R_SEC_WALL, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, R_SEC_BON, R_SEC_BPK, R_SEC_FLUX, R_SEC_RMS4,
+   packFlagCounts, lostFlags, seqLow, seqDelta, C_WAITING, C_STATE_SEQ, S_LOST_FLAGS,
+   F_SIL350, F_SIL10, F_RESET_TEMPO, F_HINT, F_RESET_BAR, F_VCLOCK_SET, F_VCLOCK_NULL,
+-  C_WRITE, C_READ, S_REC_SEQ, S_BPM, S_CONF, S_BPMF, S_PHASE_MS, S_PHASE_CONF, S_SECTION, S_SEC_START, S_SEC_INDEX, S_SEC_TIER, S_BUILD_AT, S_BUILD_SEEN,
++  C_WRITE, C_READ, S_REC_SEQ, S_BPM, S_CONF, S_BPMF, S_PHASE_MS, S_PHASE_CONF, S_SECTION, S_SEC_START, S_SEC_INDEX, S_SEC_TIER, S_BUILD_AT, S_BUILD_SEEN, S_KLANG,
+   S_REP_SIM, S_REP_AGO, S_REP_SEC, S_EXPECT_MS, S_EXPECT_SRC, S_PREV_SEC, S_LVL_HIGH, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
+   SECTIONS, sectionCode, viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
+   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader, type HopFeed,
+@@ -131,6 +131,7 @@ export interface Frame {
+   sectionTier: number;   // 0 lag / 1 mellan / 2 hog
+   repeatSim: number; repeatAgoMs: number; repeatSection: string;   // UPPREPNING
+   expectHighInMs: number; prevSection: string; levelVsHighDb: number; sectionBars: number;   // SEKTIONSMINNE + FORUTSAGELSE
++  klangCount: number;   // KLANGFLYTTEN: +1 när klangfärgen flyttat sig inne i 'high' (analyserSection klangStep)
+   spec: Spectrum;   // Rikt spektrum + per-band onset
+   specAbs: Spectrum;   // Absolut per-band magnitud före AGC, för Lotus ljusväg och bandandelar
+   bodyDb: number;   // BASKROPPEN I RA dB
+@@ -219,6 +220,7 @@ export class Analyser {
+   secSpecHop = new Float64Array(8);   // Bandens absoluta magnitud for sektionsblocket
+   secDump: number[][] | null = sysEnv('SECTION_DUMP') === '1' ? [] : null;   // Korbanks-dump
+   secBuildAt = 0; secBuildSeen = 0;   // uppbyggnadens start och senast sedd
++  klangCount = 0;   // KLANGFLYTTEN
+   section = 'intro'; sectionStartMs = 0; sectionIndex = 0; sectionTier = 1; repeatSim = 0; repeatAgoMs = 0; repeatSection = '';
+   expectHighMs = 0; expectSource = 0; prevSection = ''; levelVsHighDb = 0;   // Sektionsminne
+   static readonly REPEAT = Number(sysEnv('SECTION_REPEAT')) || 0;   // UPPREPNINGSMINNE v2
+@@ -364,7 +366,7 @@ export class Analyser {
+     if (!this.stateRd.read(this.splitCtrl!, this.splitState!, this.stateCopy)) return;
+     const s = this.stateCopy; if (s[S_REC_SEQ] < this.barrierSeq) return;
+     this.beatPhaseMs = s[S_PHASE_MS]; this.beatPhaseConf = s[S_PHASE_CONF];
+-    this.section = SECTIONS[s[S_SECTION]] || 'intro'; this.sectionStartMs = s[S_SEC_START]; this.sectionIndex = s[S_SEC_INDEX]; this.sectionTier = s[S_SEC_TIER]; this.secBuildAt = s[S_BUILD_AT]; this.secBuildSeen = s[S_BUILD_SEEN];
++    this.section = SECTIONS[s[S_SECTION]] || 'intro'; this.sectionStartMs = s[S_SEC_START]; this.sectionIndex = s[S_SEC_INDEX]; this.sectionTier = s[S_SEC_TIER]; this.secBuildAt = s[S_BUILD_AT]; this.secBuildSeen = s[S_BUILD_SEEN]; this.klangCount = s[S_KLANG];
+     this.repeatSim = s[S_REP_SIM]; this.repeatAgoMs = s[S_REP_AGO]; this.repeatSection = SECTIONS[s[S_REP_SEC]] || '';
+     this.expectHighMs = s[S_EXPECT_MS]; this.expectSource = s[S_EXPECT_SRC]; this.prevSection = SECTIONS[s[S_PREV_SEC]] || ''; this.levelVsHighDb = s[S_LVL_HIGH];
+   }
+@@ -414,7 +416,7 @@ export class Analyser {
+       stateWrite(ctrl, this.splitState!, (s) => {
+         s[S_REC_SEQ] = this.recSeq; s[S_BPM] = this.localBpm; s[S_CONF] = this.localBpmConfidence; s[S_BPMF] = this.localBpmF;
+         s[S_PHASE_MS] = this.beatPhaseMs; s[S_PHASE_CONF] = this.beatPhaseConf;
+-        s[S_SECTION] = sectionCode(this.section); s[S_SEC_START] = this.sectionStartMs; s[S_SEC_INDEX] = this.sectionIndex; s[S_SEC_TIER] = this.sectionTier; s[S_BUILD_AT] = this.secBuildAt; s[S_BUILD_SEEN] = this.secBuildSeen;
++        s[S_SECTION] = sectionCode(this.section); s[S_SEC_START] = this.sectionStartMs; s[S_SEC_INDEX] = this.sectionIndex; s[S_SEC_TIER] = this.sectionTier; s[S_BUILD_AT] = this.secBuildAt; s[S_BUILD_SEEN] = this.secBuildSeen; s[S_KLANG] = this.klangCount;
+         s[S_REP_SIM] = this.repeatSim; s[S_REP_AGO] = this.repeatAgoMs; s[S_REP_SEC] = sectionCode(this.repeatSection);
+         s[S_EXPECT_MS] = this.expectHighMs; s[S_EXPECT_SRC] = this.expectSource; s[S_PREV_SEC] = sectionCode(this.prevSection); s[S_LVL_HIGH] = this.levelVsHighDb;
+         s[S_PROCESSED] = this.slowProcessed; s[S_LAG_MS] = lagMs; s[S_LAG_MAX] = this.slowLagMaxMs; s[S_BUSY_US] = this.slowBusyEmaUs; s[S_BUSY_MAX_US] = this.slowBusyMaxUs; s[S_SKIPPED] = this.slowSkipped; s[S_LOST_FLAGS] = this.slowLostFlags;
+@@ -735,7 +737,7 @@ export class Analyser {
+       silent: true, level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
+       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
+       dropCount: 0, miniDropCount: 0, buildStartCount: 0, dropDemoted: 0, dropSpaced: 0, dropRiseDb: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, bodyDb: 0, bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1, midHiDb: -120, inZone: false, breaking: false, buildUp: 0, buildProg: 0, inRiser: false, profile: this.character.outProfile, beatAnchorMs: 0,
+-      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
++      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0, klangCount: 0,
+       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
+     };
+     for (const o of [this.outFrame, this.character.outProfile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum]) stabiliseNumbers(o);
+@@ -958,7 +960,7 @@ export class Analyser {
+     f.section = this.section; f.sectionAgeMs = this.sectionStartMs > 0 ? nowS - this.sectionStartMs : 0; f.sectionIndex = this.sectionIndex; f.sectionTier = this.sectionTier;
+     f.repeatSim = this.repeatSim; f.repeatAgoMs = this.repeatAgoMs; f.repeatSection = this.repeatSection;
+     f.expectHighInMs = this.section === 'high' ? 0 : this.expectHighMs > 0 ? Math.max(0, this.expectHighMs - nowS) : -1;
+-    f.prevSection = this.prevSection; f.levelVsHighDb = this.levelVsHighDb;
++    f.prevSection = this.prevSection; f.levelVsHighDb = this.levelVsHighDb; f.klangCount = this.klangCount;
+     f.sectionBars = this.localBpm > 0 && this.sectionStartMs > 0 ? (nowS - this.sectionStartMs) / (240000 / this.localBpm) : 0;
+     if (this.clock || this.hopSelf) {
+       if (this.clock) this.clock.update(f, this.clockOut, this, Date.now());
+diff --git a/src/analyserSection.ts b/.arena/grans/g7/src/analyserSection.ts
+index d86d2b9..a7ecadc 100644
+--- a/src/analyserSection.ts
++++ b/.arena/grans/g7/src/analyserSection.ts
+@@ -81,7 +81,7 @@ export class SectionTracker {
+     this.secBlkT.length = 0; this.secRank.md = 0; this.secRank.sd = 1; this.secRank.mk = 0; this.secRank.sk = 1; this.a.repeatTier = -1; this.a.repeatHighAtMs = 0; this.a.repeatHighEndAtMs = 0; this.repeatHighRun = 0; this.secHighRunMs = 0;
+     this.secBlkFeat.length = 0; this.secBlkHi.length = 0; this.secPct = 0;
+ 
+-    this.secBlkHighH.length = 0; this.bndRef.fill(0); this.a.boundaryNov = 0;
++    this.secBlkHighH.length = 0; this.bndRef.fill(0); this.a.boundaryNov = 0; this.klN = 0; this.klPos = 0; this.klAt = 0;
+   }
+ 
+   /** Tar BLOCKSUMMOR. */
+@@ -178,6 +178,7 @@ export class SectionTracker {
+     }
+     if (prev === 'build' || this.a.section === 'build') { if (this.a.section === 'build' && (this.a.secBuildAt === 0 || nowMs - this.a.secBuildSeen > 2000)) this.a.secBuildAt = nowMs; this.a.secBuildSeen = nowMs; }
+     this.secCurDbSum += blkDb; this.secCurDbN++; this.secCurDens += bKicks;
++    this.klangStep(nowMs, bCent, bFlat);
+     if (this.a.secDump) { const row = [(nowMs - this.secSongStartMs) / 1000, blkDb, bKicks, bCent, bInt, breaking ? 1 : 0, dropped ? 1 : 0]; for (let i = 0; i < 8; i++) row.push(this.secBlkSpec[i] / n); row.push(st, ['intro', 'low', 'build', 'high', 'break'].indexOf(this.a.section)); this.a.secDump.push(row); }
+     if (this.a.section === 'high') { this.lastHighDb = this.secCurDbSum / this.secCurDbN; }
+     this.a.levelVsHighDb = Number.isFinite(this.lastHighDb) ? blkDb - this.lastHighDb : 0;
+@@ -205,6 +206,26 @@ export class SectionTracker {
+     this.secBlkMs = 0; this.secBlkN = 0; this.secBlkInt = 0; this.secBlkKicks = 0; this.secBlkCent = 0; this.secBlkSpec.fill(0); this.secBlkRms2 = 0; this.secBlkBon = 0; this.secBlkBpk = 0; this.secBlkFlux = 0; this.secBlkRms4 = 0;
+   }
+ 
++  /** KLANGFLYTTEN (arenan grans g7): senaste 2 blocken mot de 4 före i tyngdpunkt, flathet och diskantlutning, i låtens egen spridning (96 block). */
++  private klX = new Float32Array(96 * 3); private klN = 0; private klPos = 0; private klAt = 0;
++  private klangStep(nowMs: number, bCent: number, bFlat: number): void {
++    const S = this.secBlkSpec, X = this.klX, H = 96, W = 2, R = 4, o = this.klPos * 3;
++    X[o] = bCent; X[o + 1] = bFlat; X[o + 2] = 20 * Math.log10((S[6] + S[7] + 1e-7) / (S[3] + S[4] + S[5] + 1e-7));
++    this.klPos = (this.klPos + 1) % H; if (this.klN < H) this.klN++;
++    const bpm = this.a.localBpm, n = this.klN;
++    if (n < W + R + 8 || this.a.section !== 'high' || nowMs - this.a.sectionStartMs < (W + R) * 1000 || !(bpm > 40) || nowMs - this.klAt < 8 * 240000 / bpm) return;
++    let z = 0;
++    for (let d = 0; d < 3; d++) {
++      let m = 0, s = 0, a = 0, b = 0;
++      for (let k = 0; k < n; k++) m += X[k * 3 + d];
++      m /= n;
++      for (let k = 0; k < n; k++) { const v = X[k * 3 + d] - m; s += v * v; }
++      for (let j = 0; j < W + R; j++) { const v = X[((this.klPos - 1 - j + H) % H) * 3 + d]; if (j < W) a += v; else b += v; }
++      const x = (a / W - b / R) / Math.max(1e-4, Math.sqrt(s / n)); z += x * x;
++    }
++    if (z >= 3) { this.klAt = nowMs; this.a.klangCount++; }
++  }
++
+   /** RANGBERÄKNINGEN. */
+   private rankTier(nb: number): number {
+     const D = this.secBlkDb, K = this.secBlkDens, C = this.secBlkCentH, wk = SectionTracker.RANK_W_DENS, wc = SectionTracker.RANK_W_CENT;
+diff --git a/src/effects.ts b/.arena/grans/g7/src/effects.ts
+index 8957bb7..9c0eed8 100644
+--- a/src/effects.ts
++++ b/.arena/grans/g7/src/effects.ts
+@@ -567,6 +567,7 @@ export class EffectEngine {
+    private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
+   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
+   private landForce = false; private landAbsorbUntil = -1;   // LANDNINGEN (a7)
++  private klangForce = false; private lastKlangSeen = 0; private klangAt = -1e12;   // KLANGFLYTTEN (arenan grans g7)
+   private lastBuildStart = 0; private lastMiniSeen = 0; private gapUntil = -1;   // I LUCKAN (11-16): inget lookbyte från uppbyggnadssignalen tills basen är tillbaka
+   private nearAt = -1e12; nearCount = 0;   // NASTAN-DROP
+   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; buildProg = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+@@ -818,7 +819,7 @@ export class EffectEngine {
+         else {
+         this.lastSmartSwitchMs = now; this.pendingSecSwitch = false; if (allaBuild) this.buildEntered = true;
+         // DIAGNOSTIK (se switchWhy): starkaste orsaken forst. 'dwell' sist = klockan var det enda skalet.
+-        this.switchWhy = dropSwitch ? 'drop' : this.landForce ? 'landning'
++        this.switchWhy = dropSwitch ? 'drop' : this.klangForce ? 'klang' : this.landForce ? 'landning'
+           : (memSection || secEntry) ? 'sektion'
+           : (buildEntry || allaBuild) ? 'build' : buildExit ? 'build-slut' : tierChanged ? 'tier' : 'dwell';
+         this.switchCount++;
+@@ -1100,6 +1101,7 @@ export class EffectEngine {
+         if (frame.buildStartCount !== this.lastBuildStart) { this.lastBuildStart = frame.buildStartCount; this.gapUntil = nowWall + GAP_HOLD_MS; }
+         if (dropHit || frame.miniDropCount !== this.lastMiniSeen) this.gapUntil = -1;
+         this.lastMiniSeen = frame.miniDropCount;
++        if (frame.klangCount !== this.lastKlangSeen) { this.lastKlangSeen = frame.klangCount; this.klangAt = now; console.log(`[dirigent] klangflytt ${frame.klangCount} (sektion ${liveSec}, hållen ${(held / 1000).toFixed(1)} s)`); }
+         const inGap = nowWall < this.gapUntil;
+         const inBuild = frame.inRiser || frame.buildUp > 0.35 || (frame.section === 'build');   // bara build-poolens inträde (allaBuild)
+         // ALLA_LOOKER (a): en uppbyggnad som hallit ALLA_BUILD_S = intrade -> ETT byte till build-poolen
+@@ -1146,10 +1148,15 @@ export class EffectEngine {
+         }
+         if (!buildLock && (!inGap || dropEntry) && (dropSwitch || dropEntry || (ready && slagOk))) {
+         this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, liveSec, memSection, secEntry, tierChanged);
+-      } else if (landHit && held > LAND_HOLD_MS && (liveSec === 'high' || liveSec === 'intro')) {
++      } else if (landHit && (held > LAND_HOLD_MS || this.switchWhy === 'klang') &&(liveSec === 'high' || liveSec === 'intro')) {
+         this.landForce = true;   // basen är tillbaka: aldrig lugna poolen (tierEma bär fortfarande luckan)
+         this.switchLook(frame, bpm, tier === LUGN ? FART : tier, tier === LUGN ? 'fart' : tierName, bassClear, false, false, false, false, liveSec, false, false, tierChanged);
+         this.landForce = false; this.landAbsorbUntil = nowWall + LAND_ABSORB_MS;
++      } else if (bpm > 0 && now - this.klangAt < 5 * 60000 / bpm && this.tickNow && this.lastBeatIdx % 4 === 0 && hasBeat && this.beatTrust >= 0.5
++          && liveSec === 'high' && !inBuild && !inGap && held > Math.max(MIN_HOLD, 32 * 60000 / bpm)) {
++        this.klangAt = -1e12; this.landForce = true; this.klangForce = true;   // KLANGFLYTTEN: ny del inne i high, på ettan, som landningen
++        this.switchLook(frame, bpm, tier === LUGN ? FART : tier, tier === LUGN ? 'fart' : tierName, bassClear, false, false, false, false, liveSec, false, false, tierChanged);
++        this.landForce = false; this.klangForce = false; this.landAbsorbUntil = nowWall + LAND_ABSORB_MS;
+       }
+       return this.smartMode;
+   }
+diff --git a/src/split.ts b/.arena/grans/g7/src/split.ts
+index 3997f13..54ed284 100644
+--- a/src/split.ts
++++ b/.arena/grans/g7/src/split.ts
+@@ -49,8 +49,8 @@ export function seqDelta(ctrlLow: number, mySeq: number): number { return (ctrlL
+ export const S_REC_SEQ = 0, S_BPM = 1, S_CONF = 2, S_BPMF = 3, S_PHASE_MS = 4, S_PHASE_CONF = 5, S_SECTION = 6, S_SEC_START = 7,
+   S_SEC_INDEX = 8, S_SEC_TIER = 9, S_REP_SIM = 10, S_REP_AGO = 11, S_REP_SEC = 12, S_PROCESSED = 13, S_LAG_MS = 14, S_LAG_MAX = 15,
+   S_BUSY_US = 16, S_BUSY_MAX_US = 17, S_SKIPPED = 18, S_EXPECT_MS = 19, S_EXPECT_SRC = 20, S_PREV_SEC = 21, S_LVL_HIGH = 22,
+-  S_LOST_FLAGS = 23 , S_BUILD_AT = 24, S_BUILD_SEEN = 25 ;   // Tillståndsblock
+-export const STATE_LEN = 26;
++  S_LOST_FLAGS = 23 , S_BUILD_AT = 24, S_BUILD_SEEN = 25, S_KLANG = 26;   // Tillståndsblock
++export const STATE_LEN = 27;
+ 
+ export const SECTIONS = ['', 'intro', 'low', 'build', 'high', 'break'];
+ export function sectionCode(s: string): number { const i = SECTIONS.indexOf(s); return i < 0 ? 0 : i; }

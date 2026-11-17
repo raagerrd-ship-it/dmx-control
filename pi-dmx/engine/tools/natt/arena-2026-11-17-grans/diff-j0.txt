@@ -1,0 +1,57 @@
+diff --git a/src/effects.ts b/.arena/grans/j0/src/effects.ts
+index 8957bb7..982d4ff 100644
+--- a/src/effects.ts
++++ b/.arena/grans/j0/src/effects.ts
+@@ -217,6 +217,7 @@ const MINI_BANG_MS = 600;   // 350 -> 600 (ladan 10-11 22:14: 'jag såg inte att
+ // (NEAR_RISE_DB 10 / NEAR_DIP_DB 8 och nästan-dropens mätning i analysatorn sedan 11-09, a3: frame.nearDropDb/nearDipDb)
+ // (NEAR_FULL_DB/NEAR_MIN/NEAR_MAX - nastan-dropens ljusgolv nearLevel - borttagna 11-09: nivan lastes aldrig, nastan-dropen ger inget ljus, bara lookbyte.)
+ const NEAR_REFRACT_MS = 4000;
++const NEAR_LAND_DB = 20, NEAR_LAND_HOLD_MS = 2000;   // STOR NÄSTAN-DROP = LANDNING (grans g6)
+ /** NASTAN-DROP BYTER LOOK (alltid; av-brytaren DMX_NEAR_DROP_SWITCH borttagen 10-10) (agaren i ladan 10-07: "far aven dirigenten denna info och kan byta direkt"): en nastan-drop
+  *  ar ocksa ett bytesskal - looken byts direkt, med samma regel som minidropen (looken maste ha hallits MIN_HOLD 8 s). */
+ /** (MINI_DELAY_MS borttagen 2026-10-08, agaren: 'varfor, bara vaxla till full annars?' - minidropen lyfter direkt; kommer en riktig
+@@ -307,7 +308,7 @@ const PULSE_IDX_INIT = -2e9;
+  *      detektorn da satt fast pa high; rotorsaken (ingen nollning vid latbyte) ar rattad 09-23. Sedan 10-12: LÅTMANUS. */
+ /** SECTION_UNIT (ladan 16:45): forvarningens 'high' 600 ms fore en forutsedd refrang och drop-fonstrets 'high' raknas INTE som sektionsgrans
+  *  (de gav high<->low-hopp pa 1-2 s nar refrangen uteblev). Bara den raa sektionen, och den maste vara minst DMX_SECTION_UNIT_MIN_MS gammal. */
+-const LAND_HOLD_MS = 6000, LAND_ABSORB_MS = 24000;   // LANDNINGEN (a7): minsta hålltid före landningsbytet; sektionsbyten inom fönstret efter tas inte
++const LAND_HOLD_MS = 6000, LAND_ABSORB_MS = 8000;   // LANDNINGEN (a7): minsta hålltid före landningsbytet; sektionsbyten inom fönstret efter tas inte
+ const GAP_HOLD_MS = 4000;   // I LUCKAN: spärren efter uppbyggnadssignalen släpper senast efter 4 s (signal -> landning median 1,8 s)
+ /** LÅTMANUS (10-12 kväll, ägaren: "olika effekter hoppar hela tiden ... mer som att den är förprogrammerad" + "allt mer känns anpassat
+  *  efter låten och som att de hänger ihop"). ERSÄTTER frasväxlingen (A/B-look var 8:e takt), basgångs-, karaktärs- och tempobytet,
+@@ -568,7 +569,7 @@ export class EffectEngine {
+   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
+   private landForce = false; private landAbsorbUntil = -1;   // LANDNINGEN (a7)
+   private lastBuildStart = 0; private lastMiniSeen = 0; private gapUntil = -1;   // I LUCKAN (11-16): inget lookbyte från uppbyggnadssignalen tills basen är tillbaka
+-  private nearAt = -1e12; nearCount = 0;   // NASTAN-DROP
++  private nearAt = -1e12; nearCount = 0; private nearBigAt = -1;   // NASTAN-DROP
+   private secCeil = 1; private histAt = -1e12; private rampLvl = 0; private levelRamp = 1; private buildLookAt = 0; buildProg = 0; buildUpgrades = 0;   // BUILD SOM HÅLLER OCH LANDAR
+   private miniBodyFast = -90; private miniBodySlow = -90; private miniPre = -90; private miniPeak = -200;   // minidrop efter energin
+   private miniBangUntil = 0; private lastMiniWall = -1e12; private miniColEnv = 0; private miniLiftUntil = 0; private dropLiftUntil = 0; private liftAt = -1e12; liftCount = 0; private prevRawSec = ''; private lastHighWall = -1e12;   // ENERGILYFT + SEKTIONSLYFT   // minidrop-flank + kort stot
+@@ -1096,6 +1097,8 @@ export class EffectEngine {
+         //    kvar genom hela risern — då landar bytet i stället PÅ dropen, vilket
+         //    är det enda ögonblick där ett byte förstärker musiken.
+         // I LUCKAN (11-16): spärren följer analysatorns uppbyggnadssignal (25 av ägarens 29, den gamla riser/build-regeln 0 av 29) och släpper på drop/minidrop
++        const guessed = this.switchWhy !== 'drop' && this.switchWhy !== 'landning' && held > NEAR_LAND_HOLD_MS;   // förra bytet var en gissning: landningen rättar den efter 2 s (grans j0)
++        const nearLand = this.nearBigAt === nowWall && !dropHit && liveSec !== 'build' && liveSec !== 'break' && (guessed || (held > LAND_HOLD_MS && liveSec !== 'high'));
+         const landHit = frame.miniDropCount !== this.lastMiniSeen && !dropHit;   // LANDNINGEN (a7): basen tillbaka efter luckan = ny del, på ettan
+         if (frame.buildStartCount !== this.lastBuildStart) { this.lastBuildStart = frame.buildStartCount; this.gapUntil = nowWall + GAP_HOLD_MS; }
+         if (dropHit || frame.miniDropCount !== this.lastMiniSeen) this.gapUntil = -1;
+@@ -1146,7 +1149,7 @@ export class EffectEngine {
+         }
+         if (!buildLock && (!inGap || dropEntry) && (dropSwitch || dropEntry || (ready && slagOk))) {
+         this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, liveSec, memSection, secEntry, tierChanged);
+-      } else if (landHit && held > LAND_HOLD_MS && (liveSec === 'high' || liveSec === 'intro')) {
++      } else if ((landHit && (held > LAND_HOLD_MS || guessed) && (liveSec === 'high' || liveSec === 'intro')) || nearLand) {
+         this.landForce = true;   // basen är tillbaka: aldrig lugna poolen (tierEma bär fortfarande luckan)
+         this.switchLook(frame, bpm, tier === LUGN ? FART : tier, tier === LUGN ? 'fart' : tierName, bassClear, false, false, false, false, liveSec, false, false, tierChanged);
+         this.landForce = false; this.landAbsorbUntil = nowWall + LAND_ABSORB_MS;
+@@ -1160,7 +1163,7 @@ export class EffectEngine {
+     {   // NASTAN-DROP: analysatorns frame.nearDropDb (VAD + styrka, a3 11-09); här reaktionens refraktärtid och dropgrind
+       const nd = frame.nearDropDb;
+       if (nd > 0 && nowWall - this.nearAt > NEAR_REFRACT_MS && !dropActive) {
+-        this.nearAt = nowWall; this.nearCount++;
++        this.nearAt = nowWall; this.nearCount++; if (nd >= NEAR_LAND_DB) this.nearBigAt = nowWall;
+         console.log(`[dirigent] nastan-drop: sprang ${nd.toFixed(1)} dB efter dipp ${frame.nearDipDb.toFixed(1)} dB`);
+       }
+     }
