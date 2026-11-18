@@ -1,0 +1,37 @@
+diff --git a/.arena/etta3/bas/src/analyserClock.ts b/.arena/etta3/a1/src/analyserClock.ts
+index 0832641..e254e78 100644
+--- a/.arena/etta3/bas/src/analyserClock.ts
++++ b/.arena/etta3/a1/src/analyserClock.ts
+@@ -86,7 +86,7 @@ export class BeatFeed {
+   private pwWn = 0; private pwDt = 0; private pwCand = 0; private pwRun = 0; private pwQuietAt = 0; pwVetos = 0; pwFixes = 0;
+   private tgHalfR = 0; octR = 0; private octN = 0; private octHi = false;   // OKTAVKANTEN
+   private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
+-  private readonly barK = new Float64Array(4); private readonly barL = new Float64Array(4);   // ETTAN (a5)
++  private readonly barK = new Float64Array(4); private readonly barL = new Float64Array(4); private readonly barC = new Float64Array(4);   // ETTAN (a5)
+   private barN = 0; private barIdx = NaN; private bK = 0; private bL = 0; private barOff = 0; barShifts = 0;
+   private barM = 0; private barJ = 0; private barJr = 0; private barPT = 0; private barPI = NaN;   // ettan räknas i musikens slag (a1, per slag a6)
+   private readonly barR = new Float64Array(4); private bE = 0; private bE1 = 0; private bE2 = 0; private bEm = 0;   // kickens återstart (a2)
+@@ -412,7 +412,7 @@ export class BeatFeed {
+     return false;
+   }
+ 
+-  private barReset(): void { this.barK.fill(0); this.barL.fill(0); this.barR.fill(0); this.barX.fill(0); this.barTi = NaN; this.bE1 = 0; this.bE2 = 0; this.bEm = 0; this.barN = 0; this.barIdx = NaN; this.barM = this.barOff & 3; this.barJ = 0; this.barJr = 0; this.barPI = NaN; }
++  private barReset(): void { this.barC.fill(0); this.barK.fill(0); this.barL.fill(0); this.barR.fill(0); this.barX.fill(0); this.barTi = NaN; this.bE1 = 0; this.bE2 = 0; this.bEm = 0; this.barN = 0; this.barIdx = NaN; this.barM = this.barOff & 3; this.barJ = 0; this.barJr = 0; this.barPI = NaN; }
+ 
+   /** ETTAN (se BAR_DECAY). */
+   private barStep(frame: Frame, beat: NonNullable<EngineConfig["beat"]>, now: number): void {
+@@ -453,12 +453,13 @@ export class BeatFeed {
+     this.barPT = tb; this.barPI = this.barIdx; const jr = this.barJr = Math.floor(this.barJ + 0.5);
+     const K = this.barK, L = this.barL, R = this.barR, slot = (((this.barIdx - jr) % 4) + 4) % 4;
+     for (let i = 0; i < 4; i++) { K[i] *= BAR_DECAY; L[i] *= BAR_DECAY; R[i] *= BAR_DECAY; this.barX[i] *= BAR_DECAY; }
+-    K[slot] += this.bK; L[slot] += this.bL;
++    K[slot] += this.bK; L[slot] += this.bL; this.barC[slot]++;
+     { const e = this.bE, pm = this.bE1 > this.bE2 ? this.bE1 : this.bE2;
+       if (this.bEm > 0 && e > pm) R[slot] += Math.min(BAR_R_MAX, (e - pm) / this.bEm);
+       this.bE2 = this.bE1; this.bE1 = e; this.bEm += (e - this.bEm) / 16; }
+     if (this.barN < 1000) this.barN++;
+     if (this.barN < BAR_MIN) return;
++    { const C = this.barC; if (C[0] < BAR_MIN >> 2 || C[1] < BAR_MIN >> 2 || C[2] < BAR_MIN >> 2 || C[3] < BAR_MIN >> 2) return; }   // varje slag mätt (a1)
+     const sK = K[0] + K[1] + K[2] + K[3], sL = L[0] + L[1] + L[2] + L[3], sR = R[0] + R[1] + R[2] + R[3], X = this.barX;
+     const sX = Math.abs(X[0]) + Math.abs(X[1]) + Math.abs(X[2]) + Math.abs(X[3]);
+     if (!(sK > 0)) return;

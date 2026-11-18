@@ -1,4 +1,4 @@
-ARENAN ETTA3 PÅGÅR sedan 2026-11-18 18:15 (ägaren: "arena på att hitta 1an, tidigare arenors idéer som källa", bas = a6 ur .arena/takt, domare tools/arena/etta3dom.py = ettan i ren 4/4 + taktspärr). RÖR INTE .arena/etta3.
+ARENAN ETTA3 KLAR 2026-11-18 ~20:25: INGEN VERKLIG VINNARE. Övning a4 +6,4 / j0 +6,7 (171840 75 -> 94), men KONTROLL a4 +0,7 (inom bruset), a3 -2,2, j0 -4,9, a7 DISK. 193040 trean 32 % orörd av alla; ägarens märken bekräftar att BT-ettan är rätt där. Nästa: förstå 193040 offline innan en fjärde ettarena; mängderna är slut (nya inspelningar behövs). Rapport tools/natt/arena-2026-11-18-etta3.md. RÖR INTE .arena/etta3.
 NATTEN 2026-11-18 (schemalagda körningen, ingen motorkod ändrad, ingen arena):
 KLART 2026-11-18: NÄSTA 11-16 (a) "när ETTAN rörts: kör sektionLagHand.py på de tre filerna (mål förskjutning 0 >= 80 %)" - efter f0: 151659 98 %,
   171840 63 %, 193040 66 % (före 43/34/29). Kvar: förskjutning 2 slag 17 / 29 % (ettan på trean). SWITCH_ON 4 ligger redan i r0 (inlagt).

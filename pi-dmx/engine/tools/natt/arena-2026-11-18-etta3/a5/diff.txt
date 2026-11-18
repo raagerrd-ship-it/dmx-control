@@ -1,0 +1,80 @@
+diff --git a/.arena/etta3/bas/src/analyserClock.ts b/.arena/etta3/a5/src/analyserClock.ts
+index 0832641..790562f 100644
+--- a/.arena/etta3/bas/src/analyserClock.ts
++++ b/.arena/etta3/a5/src/analyserClock.ts
+@@ -30,6 +30,7 @@ const BAR_DECAY = 0.99, BAR_MIN = 16, BAR_MARGIN = 0.06, BAR_W_BASS = 0.5, BAR_W
+ const TG_HOLD = 1.35;   // HELA TEMPOOMRÅDET
+ const TG_SIB = [Math.round(Math.log2(4 / 3) * 139), Math.round(Math.log2(3 / 2) * 139)];   // 4:3 och 3:2 i rutnätets steg
+ const TG_SNAP = 0.03, TG_EDGE = 1.03, TG_OCT_UP = 0.85, TG_OCT_DN = 0.4, TG_OCT_A = 0.1;
++const BAR_M2 = 3, BAR_P2 = 8, BAR_FIRM = 64, BAR_BND_KEEP = 0.5;   // ASYMMETRISK TRÖGHET (a5 etta3)
+ const KICK_PHASE_MS = 45;   // EN KÄLLA
+ const TG_GRID_EXTRA_MS = 5;   // a8r (ladan-provet 11-08, punkt 3)
+ const TG_WIN_MS = 5000, TG_FULL_N = 900, TG_FWIN_MS = 3500, TG_FFULL_N = 630, TG_FA = 0.4, TG_SW_STEPS = 6, TG_SW_N = 2;   // TEMPOGRAMMETS FÖNSTER OCH MINNE
+@@ -91,6 +92,7 @@ export class BeatFeed {
+   private barM = 0; private barJ = 0; private barJr = 0; private barPT = 0; private barPI = NaN;   // ettan räknas i musikens slag (a1, per slag a6)
+   private readonly barR = new Float64Array(4); private bE = 0; private bE1 = 0; private bE2 = 0; private bEm = 0;   // kickens återstart (a2)
+   private readonly barX = new Float64Array(4); private readonly barV = new Float64Array(BAR_Q); private readonly barVc = new Float64Array(BAR_Q); private barTi = NaN; private barTe = 0;   // backbeaten (a8r)
++  private readonly barS = new Float64Array(4); private barFirm = 0; private barC2 = -1; private barC2n = 0;   // tröghet
+   private readonly linK = new Float64Array(BAR_RISE_HOPS); private readonly linL = new Float64Array(BAR_RISE_HOPS); private linPos = 0;
+   private innerAnchor = 0; private innerBpm = 0; private innerValid = false;
+   private readonly anaGrid = { anchorMs: 0, bpm: 0, confidence: 0 };   // EN KÄLLA
+@@ -412,7 +414,7 @@ export class BeatFeed {
+     return false;
+   }
+ 
+-  private barReset(): void { this.barK.fill(0); this.barL.fill(0); this.barR.fill(0); this.barX.fill(0); this.barTi = NaN; this.bE1 = 0; this.bE2 = 0; this.bEm = 0; this.barN = 0; this.barIdx = NaN; this.barM = this.barOff & 3; this.barJ = 0; this.barJr = 0; this.barPI = NaN; }
++  private barReset(): void { this.barK.fill(0); this.barL.fill(0); this.barR.fill(0); this.barX.fill(0); this.barTi = NaN; this.bE1 = 0; this.bE2 = 0; this.bEm = 0; this.barN = 0; this.barIdx = NaN; this.barM = this.barOff & 3; this.barJ = 0; this.barJr = 0; this.barPI = NaN; this.barC2 = -1; this.barC2n = 0; }
+ 
+   /** ETTAN (se BAR_DECAY). */
+   private barStep(frame: Frame, beat: NonNullable<EngineConfig["beat"]>, now: number): void {
+@@ -459,21 +461,27 @@ export class BeatFeed {
+       this.bE2 = this.bE1; this.bE1 = e; this.bEm += (e - this.bEm) / 16; }
+     if (this.barN < 1000) this.barN++;
+     if (this.barN < BAR_MIN) return;
+-    const sK = K[0] + K[1] + K[2] + K[3], sL = L[0] + L[1] + L[2] + L[3], sR = R[0] + R[1] + R[2] + R[3], X = this.barX;
++    const sK = K[0] + K[1] + K[2] + K[3], sL = L[0] + L[1] + L[2] + L[3], sR = R[0] + R[1] + R[2] + R[3], X = this.barX, S = this.barS;
+     const sX = Math.abs(X[0]) + Math.abs(X[1]) + Math.abs(X[2]) + Math.abs(X[3]);
+     if (!(sK > 0)) return;
+     let bi = 0, best = -1e9, second = -1e9;
+     for (let i = 0; i < 4; i++) {
+-      const v = K[i] / sK + (sR > 0 ? R[i] / sR : 0) + (sL > 0 ? BAR_W_BASS * L[i] / sL : 0)
++      const v = S[i] = K[i] / sK + (sR > 0 ? R[i] / sR : 0) + (sL > 0 ? BAR_W_BASS * L[i] / sL : 0)
+         + (sX > 0 ? BAR_W_BEAT * (X[(i + 1) & 3] + X[(i + 3) & 3] - X[i] - X[(i + 2) & 3]) / sX : 0);
+       if (v > best) { second = best; best = v; bi = i; } else if (v > second) second = v;
+     }
+-    if (bi !== this.barM && best - second >= BAR_MARGIN) { this.barM = bi; this.barShifts++; }
++    if (bi === this.barM) { this.barC2n = 0; if (best - second >= BAR_MARGIN && this.barFirm < BAR_FIRM) this.barFirm++; return; }
++    if (((bi - this.barM) & 3) !== 2 || this.barFirm < BAR_FIRM) { this.barC2n = 0; if (best - second >= BAR_MARGIN) { this.barM = bi; this.barShifts++; } return; }
++    if (best - S[this.barM] >= BAR_MARGIN * BAR_M2) { if (bi === this.barC2) this.barC2n++; else { this.barC2 = bi; this.barC2n = 1; } }
++    else this.barC2n = 0;
++    if (this.barC2n >= BAR_P2) { this.barM = bi; this.barShifts++; this.barC2n = 0; }
+   }
+ 
+   /** LÅTGRÄNSEN. */
+-  private relock(soft: boolean): void {
+-    this.tgReset(soft); this.barReset(); this.goodRep = 0; this.goodOn = 0; this.onNext = 0;
++  private relock(soft: boolean, keep = false): void {
++    this.tgReset(soft);
++    if (keep) { for (let i = 0; i < 4; i++) { this.barK[i] *= BAR_BND_KEEP; this.barL[i] *= BAR_BND_KEEP; this.barR[i] *= BAR_BND_KEEP; this.barX[i] *= BAR_BND_KEEP; } this.barC2n = 0; }
++    else { this.barReset(); this.barFirm = 0; } this.goodRep = 0; this.goodOn = 0; this.onNext = 0;
+   }
+ 
+   /** MINNET VID GRÄNSEN. */
+@@ -490,7 +498,7 @@ export class BeatFeed {
+     this.sure = !!an.boundSure; if ((an.bodyUnderDb ?? 0) >= TG_BRK_DB) this.brkAt = now;
+     const nb = an.trackBoundaries ?? 0;
+     const q = (an.quietMs ?? 0) >= BND_QUIET_BEATS * 60000 / (this.innerBpm > 80 ? this.innerBpm : 80); if (q) this.quietAt = now;
+-    if (nb !== this.boundSeen) { this.boundSeen = nb; this.pend = this.sameSong(now); if (!this.pend) this.relock(!this.sure && !((an.quietMs ?? 0) > 0)); }
++    if (nb !== this.boundSeen) { this.boundSeen = nb; this.pend = this.sameSong(now); if (!this.pend) this.relock(!this.sure && !((an.quietMs ?? 0) > 0), !((an.quietMs ?? 0) > 0)); }
+     else if (this.pend && (q || now - this.brkAt >= TG_WIN_MS)) { this.pend = false; if (q) this.relock(false); }   // tystnar låten i breaket var gränsen sann
+     if (cfg.beat && this.innerValid) { cfg.beat.anchorMs = this.innerAnchor; cfg.beat.bpm = this.innerBpm; }
+     this.updateInner(frame, cfg, now, an.quietMs ?? 0);
+@@ -518,7 +526,7 @@ export class BeatFeed {
+     if (now - this.lastTrustLog > 4000) { this.lastTrustLog = now; if (isLogOn()) console.log(`[tillit] mönster ${this.repeatRate.toFixed(2)} · fasträff ${this.onBeatRate.toFixed(2)} · bpm ${cfg.beat ? cfg.beat.bpm.toFixed(1) : 0}`); }
+     const pllConf = this.pllKicks >= 12 ? this.onBeatRate : 0;
+     if (quietMs > 10000) {
+-      if (cfg.beat || this.onN > 0) { this.barReset(); cfg.beat = null; cfg.beatErr = 0; this.onN = 0; this.scanC = 99; this.tgReset(); }
++      if (cfg.beat || this.onN > 0) { this.barReset(); this.barFirm = 0; cfg.beat = null; cfg.beatErr = 0; this.onN = 0; this.scanC = 99; this.tgReset(); }
+       return;
+     }
+     const beat0 = cfg.beat;
