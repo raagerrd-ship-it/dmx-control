@@ -24,7 +24,7 @@ spärr in i refrängen) ändrar nästan inget (frasdom-poäng -0,1 / 0, 193040 i
 inte i RUN-spärren. Var: ettan i analyserClock.ts (barK/barL, 1 mot 3), sektionspoängen i analyserSection.ts. Material: de tre filerna ovan +
 beatthis.jsonl + marks-hand.json; utdata tools/natt/ren-2026-11-18/lagHand-*.txt. Önskat: ettan skiljer 1 från 3 (förskjutning 2 -> 0); sektionens
 gräns inom ~2 s från ägarens. Ingen delad fil ändrad.
-Status:
+Status: VÄNTAR 2026-11-18 (lotus-morgonagenten): ej taget - huvudsessionens besked i lotus morning-todo (bara hälsan, inga portar, lotus korpus arkiverad). Ingen delad fil ändrad; DMX:s uppdrag.
 
 ## ÖPPET 2026-11-16 DELAD FIL ÄNDRAD: ETTAN (arenan etta, vinnaren f0) - analyserClock.ts + split.ts
 Vad: svar på fyndet nedan. Rätt etta (ettdom.py mot Beat This): övning 33,5 -> 86,5 %, mellan 200719 34,6 -> 68,9 %, kontroll 29,9 -> 63,9 %;
