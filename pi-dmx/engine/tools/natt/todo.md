@@ -1,3 +1,17 @@
+NATTEN 2026-11-18 (schemalagda körningen, ingen motorkod ändrad, ingen arena):
+KLART 2026-11-18: NÄSTA 11-16 (a) "när ETTAN rörts: kör sektionLagHand.py på de tre filerna (mål förskjutning 0 >= 80 %)" - efter f0: 151659 98 %,
+  171840 63 %, 193040 66 % (före 43/34/29). Kvar: förskjutning 2 slag 17 / 29 % (ettan på trean). SWITCH_ON 4 ligger redan i r0 (inlagt).
+  Sektionsbytet fortfarande 6,1 / 9,8 / 5,2 s efter ägarens gräns. -> analysatorfynd 2026-11-18.
+BASLINJE tools/natt/ren-2026-11-18/ (HEAD 3f7916d = ladan 78346df; 151659/160345/171840/193040/193818/200719): kick->ljus 139/117/141/157/112/117 ms
+  (11-16: 139/120/144/160/91/144), frasträff 19/42/18/30/22/17 % (21/19/11/9/20/20), längsta look 59/86/44/36/105/117 s (129/151/46/44/104/126),
+  looker 13/14/12/15/35/26, energiR15 0,29/0,38/0,54/0,19/0,32/0,25 (0,38/0,34/0,57/0,42/0,24/0,25), drop/mini identiska utom 200719 mini 50 -> 49.
+  frasdom-mått på övningen (--delad-cfg): gräns 31,2 %, lag 7,3 slag, etta 43,5 %, byten 3,8/min.
+IDÉ, FÖRKASTAD: DMX_SECTION_RUN_IN 3 -> 2 / 1 (sektionen in i refrängen snabbare). frasdom gräns 31,2 -> 30,4 / 30,4, lag 7,3 -> 7,3 / 7,7,
+  etta 43,5 -> 44,9 / 46,3 = poäng -0,1 / 0; 193040 identisk. Eftersläpet sitter i detektorn, inte i spärren. Pröva inte RUN-rattarna igen.
+NÄSTA FÖR NATTAGENTEN: (a) energiR15 föll i 151659 (0,38 -> 0,29) och 193040 (0,42 -> 0,19) mellan 478b8e8 och 78346df (f0/r0/g6/lucka) -
+  mät om på medel av 4 frön (ljusskak.py) innan det kallas fel, lookvalet ensamt flyttar mycket; (b) ingen arena utan ARENA-uppdrag. Förslag till
+  ARENA-fråga åt ägaren: "sektionens gräns i tid" (domare frasdom.py, lag-måttet, sektionsdetektorn i analyserSection.ts).
+
 ARENAN TAKT KLAR 2026-11-18 ~01:05: INGEN VINNARE. a6 (fasen ur sex band) tar takten FEL kontroll 27,8 -> 13,9 % (motslag + glidning nästan
   borta) men ettan faller (kontroll 64,1 -> 60,4, ren 4/4 -5 pe) => DISK; 'helt rätt' netto lika. Rapport tools/natt/arena-2026-11-18-takt.md.
   Nästa: runda 2 'a6 + skydda ettan' dömd på ren 4/4 / ägarens markeringar, eller a6 som ögonprov med ägarens ord. RÖR INTE .arena/takt.

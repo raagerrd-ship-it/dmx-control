@@ -1,0 +1,119 @@
+{
+ "wav": "tools/ladan-2026-11-13/lang-20261113T151659.wav",
+ "startS": 0,
+ "gainDb": 0,
+ "totS": 532,
+ "rutor": 19946,
+ "tajt": {
+  "kickLagMs": 139,
+  "kickLagP75": 200,
+  "kickLagRigg90": 150,
+  "lampUpp": 3149,
+  "kickar": 1561,
+  "kickTraff": 0.31390134529147984,
+  "kickHojd": 0.12450980392156863,
+  "energiR": 0.2550232493056982,
+  "nivaR": 0.41848772813201296,
+  "energiRtopp": 0.25482845480844196,
+  "energiRruta": 0.20954471152371298,
+  "energiR15": 0.28882276219976366,
+  "nivaR15": 0.41881764258131987,
+  "bpmMed": 129.90953945362526,
+  "kickFonsterMs": 200,
+  "litLugn": 0.11107843137254896,
+  "litFart": 0.2534926470588236,
+  "litFull": 0.17330882352941174,
+  "toppLugn": 0.18970588235294117,
+  "toppFart": 0.4323529411764706,
+  "toppFull": 0.27647058823529413,
+  "sekLugn": 98,
+  "sekFart": 317,
+  "sekFull": 83,
+  "byten": 32,
+  "bytenPerMin": 3.609927300075207,
+  "musikByten": 1,
+  "orsaker": {
+   "build": 4,
+   "sektion": 8,
+   "landning": 17,
+   "tier": 1,
+   "drop": 1,
+   "build-slut": 1
+  },
+  "drops": 1,
+  "minidrops": 43,
+  "granser": 2,
+  "karaktarsskiften": 10,
+  "tempovaxlingar": 1,
+  "dropSprangLugn": 0.6537254901960784,
+  "dropSprangHog": null,
+  "dropsLugna": 1
+ },
+ "snygg": {
+  "alla3": 0.004793619819284775,
+  "en": 0.4665436445651098,
+  "matt": 1,
+  "lampspr": 62.77649654065978,
+  "lookar": 13,
+  "lookMedianS": 15.039999999999964,
+  "lookLangstaS": 59.30666666666666,
+  "morkt": 0.007169357264614459,
+  "litP10": 0.055882352941176466,
+  "litP50": 0.18823529411764706,
+  "litP90": 0.4583333333333334
+ },
+ "lookTime": [
+  [
+   "kickregn",
+   102.00000000000773
+  ],
+  [
+   "gallop",
+   96.13333325195994
+  ],
+  [
+   "dansparet",
+   83.4933334960986
+  ],
+  [
+   "minnet",
+   47.73333325195382
+  ],
+  [
+   "party",
+   34.106666748046656
+  ],
+  [
+   "sokljus",
+   33.439999999999735
+  ],
+  [
+   "rulle",
+   31.306666748046528
+  ],
+  [
+   "stege",
+   27.066666503905992
+  ],
+  [
+   "wave",
+   21.144999999999868
+  ],
+  [
+   "hiss",
+   20.586666748046756
+  ],
+  [
+   "varannan",
+   15.653333251953102
+  ],
+  [
+   "blixtnedslag",
+   14.74666674804685
+  ],
+  [
+   "drumkit",
+   4.480000000000006
+  ]
+ ]
+}

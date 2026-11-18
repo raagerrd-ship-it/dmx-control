@@ -1,0 +1,5 @@
+lang-20261113T171840.wav: 10 sektionsbyten, 10 inom 20 s efter en ägarmarkering (24 markeringar)
+  eftersläp s p25/p50/p75 2.6/9.6/14.5, slag p50 18, på frasen (slag mod 16 i 15/0/1) 20 %, på takten (mod 4 = 0) 60 %
+  slag efter markeringen: 39 20 4 24 5 8 39 1 16 28
+  ägarens markeringar på ettan (0 slag) 42 %, inom ±1 slag 96 %  (24 st)
+  motorns etta mot Beat This-ettan: förskjutning 0/1/2/3 slag 63 / 13 / 17 / 6 %  (426 tick på ett Beat This-slag av 572)

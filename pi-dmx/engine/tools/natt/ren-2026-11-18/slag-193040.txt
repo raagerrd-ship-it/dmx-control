@@ -1,0 +1,7 @@
+[quiet] console.log avstangd (DMX_QUIET=1) - PUT /api/debug/verbose {"enabled":true} slar pa
+slag sektion: 11 byten, på slaget 73 %, på ettan 73 %, ms efter slaget p50 0 p90 427, frasgräns ±1 slag 27 % (slump 19), slag i frasen 2 0 0 0 3 1 0 0 2 0 0 0 1 0 1 1
+slag landning: 9 byten, på slaget 0 %, på ettan 0 %, ms efter slaget p50 187 p90 720, frasgräns ±1 slag 11 % (slump 19), slag i frasen 0 1 1 1 2 0 0 1 2 1 0 0 0 0 0 0
+slag build: 4 byten, på slaget 25 %, på ettan 25 %, ms efter slaget p50 480 p90 560, frasgräns ±1 slag 50 % (slump 19), slag i frasen 0 2 0 0 0 0 0 1 1 0 0 0 0 0 0 0
+slag drop: 3 byten, på slaget 0 %, på ettan 0 %, ms efter slaget p50 213 p90 240, frasgräns ±1 slag 0 % (slump 19), slag i frasen 0 0 1 0 0 0 0 0 0 0 1 0 0 0 1 0
+slag dwell: 1 byten, på slaget 0 %, på ettan 0 %, ms efter slaget p50 400 p90 400, frasgräns ±1 slag 0 % (slump 19), slag i frasen 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0
+tools/ladan-2026-11-14/lang-20261114T193040.wav: 3427 rader, 91 loggrader

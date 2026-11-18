@@ -15,6 +15,17 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-18 Ettan efter f0 på ladans HEAD: 98 / 63 / 66 % - kvar är 2-slagsfelet (1 mot 3), och sektionen kommer 5-10 s sent
+Vad: sektionLagHand.py (konsertReplay --slag --delad-cfg, HEAD 3f7916d = ladan 78346df + verktyg) - motorns etta mot Beat This-ettan, förskjutning
+0/1/2/3 slag: 151659 98/1/0/1 %, 171840 63/13/17/6 %, 193040 66/1/29/4 % (11-16 före f0: 43/34/29 % på 0). Målet >= 80 % nås bara i 151659.
+Det som är kvar är mest FÖRSKJUTNING 2 (ettan på trean: 17 / 29 %), samma 1-mot-3-svaghet som arenan takt 11-18 såg. Sektionsbytet efter
+ägarens gräns: median 6,1 / 9,8 / 5,2 s (9 / 18 / 12 slag), på frasen 0 / 25 / 10 %. Prov i natt: DMX_SECTION_RUN_IN 3 -> 2 / 1 (profilens
+spärr in i refrängen) ändrar nästan inget (frasdom-poäng -0,1 / 0, 193040 identisk) -> eftersläpet sitter i sektionsdetektorn (poängen/fönstret),
+inte i RUN-spärren. Var: ettan i analyserClock.ts (barK/barL, 1 mot 3), sektionspoängen i analyserSection.ts. Material: de tre filerna ovan +
+beatthis.jsonl + marks-hand.json; utdata tools/natt/ren-2026-11-18/lagHand-*.txt. Önskat: ettan skiljer 1 från 3 (förskjutning 2 -> 0); sektionens
+gräns inom ~2 s från ägarens. Ingen delad fil ändrad.
+Status:
+
 ## ÖPPET 2026-11-16 DELAD FIL ÄNDRAD: ETTAN (arenan etta, vinnaren f0) - analyserClock.ts + split.ts
 Vad: svar på fyndet nedan. Rätt etta (ettdom.py mot Beat This): övning 33,5 -> 86,5 %, mellan 200719 34,6 -> 68,9 %, kontroll 29,9 -> 63,9 %;
 drop/mini/uppbyggnad och takt/låtbyten identiska. Grundorsak: rutnätets fasrättning flyttar ankaret en stor del av ett slag, så samma slag
