@@ -1,5 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
+import { ettaTrea, halva } from "./rig.js";
 
 // SVALL (lugn x refräng, situationsrutnätet 2026-10-12 - rutan var tom): en lugn låts refräng. De två grupperna (c.group: jämn/udda
 // eller inre/yttre) sväller i motfas över två slag - som ett andetag som går fram och tillbaka över riggen - och taktens etta
@@ -7,12 +8,12 @@ import { hsv } from "./color.js";
 // OMTAGGNING 2026-11-05 (dagkörning 2, dynamik.md): fart-tier men refrängen med full tier har bara full-poolen -> tier full (natt --snabb: kvällen unika 69->70, resten lika).
 export const svall: EffectDef = {
   key: "svall", label: "Svall", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"],
-  desc: "Lugn refräng: två lampgrupper sväller i motfas över två slag, taktens etta lyfter båda.",
+  desc: "Lugn refräng: två lampgrupper sväller i motfas över två slag, ettan lyfter ena halvan, trean den andra.",
   render(c) {
     const ph = ((((c.beatIdx % 2) + 2) % 2) + c.beatFrac) / 2;       // 0..1 över två slag
     const s = 0.5 - 0.5 * Math.cos(2 * Math.PI * ph);
     const mine = c.group ? s : 1 - s;
-    const one = (((c.beatIdx % 4) + 4) % 4) === 0 ? Math.exp(-c.beatFrac / 0.35) : 0;   // taktens etta
+    const one = ettaTrea(c.beatIdx, halva(c.lamp, c.count)) ? Math.exp(-c.beatFrac / 0.35) : 0;   // ettan ena halvan, trean andra
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     const hue = ((c.group ? base + 1 : base) % 6) / 6;
     // 10-13 (effectDyn): motorns grundnivå (FX_FLOOR 0,6) lyfter allt över ~0,1 till minst 64 % - "låg glöd" måste ligga på ~0,01-0,03.

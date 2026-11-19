@@ -1,6 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
-import { slotSize } from "./rig.js";
+import { ettaTrea, halva, slotSize } from "./rig.js";
 
 // (skräpjakten 10-18: förr en closure/array som skapades i render per lampa och ruta - samma räkning)
 const pairOf = (b: number) => (Math.imul(b + 3, 2654435761) >>> 0) % 6;
@@ -10,12 +10,12 @@ const PAIRS = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
 // färgslag i alla fyra = spridning 0). Motsats till party (throb med vandrande hål) och rave (fast jämn/udda-växling).
 export const snap: EffectDef = {
   key: "snap", label: "Snap", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"],
-  desc: "Hårt kap på varje slag: ett nytt lamppar tänds, taktens etta tänder alla.",
+  desc: "Hårt kap på varje slag: ett nytt lamppar tänds, taktens etta tänder ena halvan, trean den andra.",
   render(c) {
     // EFFEKTGENOMGÅNGEN 10-13 (effectDyn: spridning 0,00, rum 0,00 i refrängen - alla fyra fullt hela tiden): kapet flyttar nu ETT
     // lamppar per slag (6 par, aldrig samma två slag i rad), andra paret släckt; taktens etta tänder alla. Kulören per fras (hueIdx/16).
     const n = Math.max(1, c.count), g = slotSize(n), slot = Math.floor(c.lamp / g);   // hyrkitet: paret = två platser om g lampor
-    const one = (((c.beatIdx % 4) + 4) % 4) === 0;
+    const one = ettaTrea(c.beatIdx, halva(c.lamp, n));
     let pr = pairOf(c.beatIdx); if (pr === pairOf(c.beatIdx - 1)) pr = (pr + 1) % 6;
     const lit = one || n < 4 || PAIRS[pr].includes(slot % 4);
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));

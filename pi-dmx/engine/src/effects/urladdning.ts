@@ -7,13 +7,14 @@ import { hsv } from "./color.js";
 // Ingen takt i urladdningen; tiden i breaket styr.
 export const urladdning: EffectDef = {
   key: "urladdning", label: "Urladdning", tier: "full", modulate: { energy: true, pulse: false }, section: ["break"],
-  desc: "Break i full fart: lamporna laddas ur var för sig efter dropen, kvar blir en svag puls på ettan.",
+  desc: "Break i full fart: lamporna laddas ur var för sig efter dropen, kvar blir en svag puls på ettan och trean i olika lampor.",
   render(c) {
     const n = Math.max(1, c.count);
     const age = c.sectionAgeMs / 1000;
     const charge = Math.max(0, 0.9 - 0.3 * c.idx) * Math.exp(-age / (3 + 3 * c.idx));   // sista lampan börjar mörk
     const bar = ((Math.floor(c.beatIdx / 4) % n) + n) % n;
-    const one = c.idx === bar && (((c.beatIdx % 4) + 4) % 4) === 0 ? 0.35 * Math.exp(-c.beatFrac / 0.4) : 0;
+    const bib = ((c.beatIdx % 4) + 4) % 4;
+    const one = (bib === 0 && c.idx === bar) || (bib === 2 && c.idx === (bar + (n >> 1)) % n) ? 0.35 * Math.exp(-c.beatFrac / 0.4) : 0;
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     return hsv(((base + (c.idx & 1)) % 6) / 6, 1, Math.min(1, 0.03 + charge + one));
   },

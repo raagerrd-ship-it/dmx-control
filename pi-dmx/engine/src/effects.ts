@@ -1271,7 +1271,7 @@ export class EffectEngine {
       // samma puls loopar länge. Analysatorns barShift har redan lagt detekterade
       // ettor på beatIdx % 4 === 0; innan någon etta hittats är valet godtyckligt
       // men konsekvent (accenten vandrar inte).
-      if (beatIdx % 4 === 0) beatEnv *= 1 + BEAT_DOWNBEAT_ACCENT;
+      if (beatIdx % 2 === 0) beatEnv *= 1 + BEAT_DOWNBEAT_ACCENT;   // 1an-3an-stilen (11-19): accenten på 1 och 3
     }
     this.tickNow = beatTick; this.rBeatEnv = beatEnv;
   }
