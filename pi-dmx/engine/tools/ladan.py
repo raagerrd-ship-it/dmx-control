@@ -184,7 +184,9 @@ def main():
         cmd += ['--conf', 'ladan']   # 09-27: EN fil, ladan.conf, for pagaende prov; allt godkant lyfts in i koden
         for e in env_pairs: cmd += ['--env', e]
         if AFFINITY: cmd += ['--affinity', AFFINITY]   # 11-08 --karnor (se AFFINITY)
-    for r in REMOVE: cmd += ['--remove', r]   # alltid, aven med --bara-deploy: rensningen ar en del av koden
+    for r in REMOVE:   # alltid, aven med --bara-deploy: rensningen ar en del av koden
+        if ONLY_DEPLOY and r.endswith('/ladan.conf'): continue   # 11-19: --bara-deploy skriver ingen ny ladan.conf -> ta inte bort den (karnorna 0 1 2 tappades)
+        cmd += ['--remove', r]
     print('\nprov-env som skrivs till ladan.conf:' if not ONLY_DEPLOY else '\n(env orord)')
     for k, v, why in SHOW_ENV:
         if not ONLY_DEPLOY: print(f'  {k}={v:<6} {why}')
