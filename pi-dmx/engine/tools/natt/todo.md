@@ -1,3 +1,12 @@
+LADAN UTLAGD 2026-11-19 21:04-21:21 (ägaren på plats): a6 (a68026c + manifest 3e03067) + 1AN-3AN-STILEN (ägaren: 'så länge effekterna kör på både 1
+  och 3 med olika lampor ser det bara levande ut'): 7c81aca pulse/snap/startskott/svall/urladdning + pulsaccent på 1 och 3, 1ca4d08 kaskad, 555336c famn,
+  f3f3031 fyllning, 39a0b5a frasraknare (kaskad + famn godkända i ögat). spaning/blixtnedslag följer redan stilen. KVAR: vagbrytare, minnet, linjalen
+  (en i taget med ägarens öga, ingen nattändring). Backa: taggar fore-takt-a6 / fore-etta-trea. Dirigenten fri (mode smart) när ägaren gick.
+  ladan.py --bara-deploy tog bort ladan.conf (kärnorna 0 1 2) - lagat 554944a. Deploy kräver ANALYSER_SIBLING=/c/finns-inte tills lotus portat a6.
+  Ägaren 11-19: takten före ettan; ett-arbete framåt = bara PAREN (1/3 mot 2/4). Inspelning lang-20261119T193418.wav (30 min, Pi:n) + dirigentens
+  logg .arena/dirigent/logg-2026-11-19.jsonl och ägarens tryck tryck.jsonl = facit till kommande DIRIGENT-arena (ägarens önskan: 'ibland dåligt
+  anpassade effekter'); hämta wav:en till tools/ladan-2026-11-19/ (ingen arena utan ARENA-uppdrag).
+
 A6 INLAGD I SRC 2026-11-19 (a68026c, ägaren 'Ja förbered a6'), EJ UTLAGD: fasen ur sex band (analyserClock.ts + split.ts), dist byte-identisk med .arena/takt/a6.
   Kontroll takt FEL 27,8 -> 13,9 %, ettan 64,1 -> 60,4, lead 7 ms tidigare; worker x1,09, +1,8 MB. REDO FÖR LADAN (ägaren på plats, ingen inspelning):
   `PI_HOST=<ip> python tools/ladan.py --bara-deploy` (hotspot 10.50.220.218). Backa = tagg fore-takt-a6. Ögat avgör; lotus portas först efter hans ja.
