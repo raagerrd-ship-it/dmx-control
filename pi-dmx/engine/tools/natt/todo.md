@@ -1,3 +1,8 @@
+A6 INLAGD I SRC 2026-11-19 (a68026c, ägaren 'Ja förbered a6'), EJ UTLAGD: fasen ur sex band (analyserClock.ts + split.ts), dist byte-identisk med .arena/takt/a6.
+  Kontroll takt FEL 27,8 -> 13,9 %, ettan 64,1 -> 60,4, lead 7 ms tidigare; worker x1,09, +1,8 MB. REDO FÖR LADAN (ägaren på plats, ingen inspelning):
+  `PI_HOST=<ip> python tools/ladan.py --bara-deploy` (hotspot 10.50.220.218). Backa = tagg fore-takt-a6. Ögat avgör; lotus portas först efter hans ja.
+  NATTAGENTEN: ny baslinje på a68026c (ren-2026-11-20 blir INTE bit-identisk med 11-19 - väntat).
+
 NATTEN 2026-11-19 (schemalagda körningen, ingen motorkod ändrad, ingen arena):
 KLART 2026-11-19: NÄSTA 11-18 (a) "energiR15 på medel av 4 frön" - showTight tar nu KR_SEED/KR_TOG (osatt = bit-identiskt). Före 478b8e8 -> nu
   78346df (4 frön): 151659 0,41 -> 0,37 (brus, frön 0,22-0,55), 160345 0,36 -> 0,36, 171840 0,57 -> 0,47, 193040 0,40 -> 0,22 (VERKLIGT, frön
