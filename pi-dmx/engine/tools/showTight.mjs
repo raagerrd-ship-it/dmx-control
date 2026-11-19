@@ -113,6 +113,10 @@ const EV = [];   // {t, typ, txt}
 const t00 = EPOCH + startS * 1000;
 Date.now = () => t00; performance.now = () => t00 - EPOCH;
 const eng = new EffectEngine(cfg);
+// KR_SEED / KR_TOG (2026-11-19, samma krok som konsertReplay.mjs): annan lookfoljd pa SAMMA analys, sa ett matt kan domas som medel
+// av flera fron (lookvalet ensamt flyttar energiR15 mycket). Osatt = bit-identiskt.
+if (process.env.KR_TOG === '0' || process.env.KR_TOG === '1') { const v = process.env.KR_TOG === '1'; Object.defineProperty(eng, 'manusTog', { get: () => v, set: () => {} }); }
+{ const sd = Number(process.env.KR_SEED || 0); if (sd > 0) EFFECT_KEYS.forEach((k, i) => { if ((i + sd) % 3 === 0) eng.lookPlayMs.set(k, Float64Array.of(60000)); }); }
 
 // Motorns rader fangas sa de inte sloar ner korningen; [dirigent] ar enda raden som sager nagot om VARFOR.
 const dirigent = [];

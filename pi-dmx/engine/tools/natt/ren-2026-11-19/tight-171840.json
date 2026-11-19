@@ -1,0 +1,113 @@
+{
+ "wav": "tools/ladan-2026-11-13/lang-20261113T171840.wav",
+ "startS": 0,
+ "gainDb": 0,
+ "totS": 300,
+ "rutor": 11250,
+ "tajt": {
+  "kickLagMs": 141,
+  "kickLagP75": 195,
+  "kickLagRigg90": 150,
+  "lampUpp": 2259,
+  "kickar": 898,
+  "kickTraff": 0.3530066815144766,
+  "kickHojd": 0.13431372549019605,
+  "energiR": 0.5324304376698972,
+  "nivaR": 0.578841818955883,
+  "energiRtopp": 0.4751258567654459,
+  "energiRruta": 0.4199938076172119,
+  "energiR15": 0.5429495580032502,
+  "nivaR15": 0.6044657993652071,
+  "bpmMed": 135.27265836583317,
+  "kickFonsterMs": 200,
+  "litLugn": 0.15811274509803924,
+  "litFart": 0.2579901960784313,
+  "litFull": 0.3401102941176469,
+  "toppLugn": 0.2333333333333333,
+  "toppFart": 0.4431372549019609,
+  "toppFull": 0.4916666666666666,
+  "sekLugn": 99,
+  "sekFart": 108,
+  "sekFull": 74,
+  "byten": 16,
+  "bytenPerMin": 3.2002844697306423,
+  "musikByten": 1,
+  "orsaker": {
+   "landning": 5,
+   "tier": 1,
+   "sektion": 8,
+   "drop": 2
+  },
+  "drops": 2,
+  "minidrops": 8,
+  "granser": 2,
+  "karaktarsskiften": 4,
+  "tempovaxlingar": 0,
+  "dropSprangLugn": 0.8676225490196079,
+  "dropSprangHog": null,
+  "dropsLugna": 2
+ },
+ "snygg": {
+  "alla3": 0.007773246513304644,
+  "en": 0.40820809769506344,
+  "matt": 1,
+  "lampspr": 65.12577777777778,
+  "lookar": 12,
+  "lookMedianS": 13.786666666666662,
+  "lookLangstaS": 44.21333333333333,
+  "morkt": 0.0002666666666666667,
+  "litP10": 0.07990196078431372,
+  "litP50": 0.22205882352941175,
+  "litP90": 0.4735294117647059
+ },
+ "lookTime": [
+  [
+   "kickregn",
+   53.52000024414172
+  ],
+  [
+   "mellanslag",
+   44.213333251953586
+  ],
+  [
+   "vagbrytare",
+   41.973333251953434
+  ],
+  [
+   "pump",
+   40.213333007812686
+  ],
+  [
+   "basgang",
+   35.65333325195301
+  ],
+  [
+   "minnet",
+   30.95999999999966
+  ],
+  [
+   "varannan",
+   18.71999999999992
+  ],
+  [
+   "sokljus",
+   10.853333496093722
+  ],
+  [
+   "eko",
+   8.31999999999997
+  ],
+  [
+   "linjalen",
+   7.4399999999999755
+  ],
+  [
+   "gallop",
+   5.946666748046866
+  ],
+  [
+   "wave",
+   2.184999999999999
+  ]
+ ]
+}

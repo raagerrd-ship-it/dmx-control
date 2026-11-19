@@ -1,3 +1,15 @@
+NATTEN 2026-11-19 (schemalagda körningen, ingen motorkod ändrad, ingen arena):
+KLART 2026-11-19: NÄSTA 11-18 (a) "energiR15 på medel av 4 frön" - showTight tar nu KR_SEED/KR_TOG (osatt = bit-identiskt). Före 478b8e8 -> nu
+  78346df (4 frön): 151659 0,41 -> 0,37 (brus, frön 0,22-0,55), 160345 0,36 -> 0,36, 171840 0,57 -> 0,47, 193040 0,40 -> 0,22 (VERKLIGT, frön
+  0,18-0,31 mot 0,28-0,45), 193818 0,26 -> 0,31, 200719 0,26 -> 0,28; medel 0,38 -> 0,34. Bisektering 193040: före 0,40 / I LUCKAN 0,40 / f0 0,31 /
+  r0 0,36 / g6 0,22 -> g6 (landningar 4 -> 9; backbeat 33 -> 16 s, ankomst + tick in; nivåerna lugn/fart/full oförändrade). Ägarens öga på g6 avgör.
+  Data .arena/er15/resultat.txt.
+BASLINJE tools/natt/ren-2026-11-19/: alla 12 json bit-identiska med ren-2026-11-18.
+IDÉ, FÖRKASTAD: g6-landningen behåller lugna nivån (opt-in DMX_NEAR_LAND_TIER=1, aldrig committad): 193040 0,220 -> 0,218, 171840 0,465 -> 0,477,
+  151659 identisk. Kostnaden är VILKA looker landningen drar, inte nivålyftet. Pröva inte nivån igen.
+NÄSTA FÖR NATTAGENTEN: (a) om ägaren behåller g6: mät vilken look g6-landningarna i 193040 drar och vid vilken energi (konsertReplay --dist .json,
+  kolumnerna look/why), och om landningen ska följa sektionens manus i stället för att alltid byta; (b) ingen arena utan ARENA-uppdrag.
+
 ARENAN ETTA3 KLAR 2026-11-18 19:20: INGEN VERKLIG VINNARE. Övning a4 +6,4 / j0 +6,7 (171840 75 -> 94), men KONTROLL a4 +0,7 (inom bruset), a3 -2,2, j0 -4,9, a7 DISK. 193040 trean 32 % orörd av alla; ägarens märken bekräftar att BT-ettan är rätt där. Nästa: förstå 193040 offline innan en fjärde ettarena; mängderna är slut (nya inspelningar behövs). Rapport tools/natt/arena-2026-11-18-etta3.md. RÖR INTE .arena/etta3.
 NATTEN 2026-11-18 (schemalagda körningen, ingen motorkod ändrad, ingen arena):
 KLART 2026-11-18: NÄSTA 11-16 (a) "när ETTAN rörts: kör sektionLagHand.py på de tre filerna (mål förskjutning 0 >= 80 %)" - efter f0: 151659 98 %,

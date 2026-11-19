@@ -1,0 +1,35 @@
+[quiet] console.log avstangd (DMX_QUIET=1) - PUT /api/debug/verbose {"enabled":true} slar pa
+
+=== tools/ladan-2026-11-14/lang-20261114T193040.wav  0-365 s, 13707 rutor a 25 ms ===
+
+TAJT MOT LATEN
+  kick -> lampan pa mal 157 ms (median, p75 229, 2290 lampuppgangar; gamla riggmedel 90 %: 175 ms, fonster 250 ms vid 113 BPM) pa 398/964 kickar = 41.3 %
+  uppgangens storlek 0.12 av riggens 0-1 skala
+  ljus mot energi    r 0.20 pa 1 s-MEDEL, 0.22 pa 1 s-TOPP (ruta-mot-ruta 0.16), ljus mot niva r 0.26
+  ljus per tier      lugn 0.11/0.15  fart 0.22/0.41  full 0.32/0.50  (medel/topp, 84/177/81 s)
+  look-byten         28 st = 4.60/min, musikalisk orsak 96.4 %
+                     sektion 11  landning 9  build 4  drop 3  dwell 1
+  drops              5 st, sprang lugna 0.31 (2 st) / hoga 0.52
+
+SNYGG LJUSSHOW
+  alla tre dioderna  2.0 % av tanda lamprutor   exakt en kanal 35.4 %
+  mattnad (median)   1.00      spridning mellan lampor 68 DMX-steg
+  lookar             15 distinkta, median 10 s, langsta stund 36 s
+  riggens ljus       p10 0.07  p50 0.19  p90 0.49   slackt 0.9 % av tiden
+
+-- dirigenten (89 rader, 12 forsta) --
+   [dirigent] manus build: ny look "siren" (tier lugn, pool 16, sektion intro, basgang 0.81)
+   [dirigent] nastan-drop: sprang 10.3 dB efter dipp 8.0 dB
+   [dirigent] sektion intro -> build (nr 0, tier 1)
+   [dirigent] sektion build -> high (nr 1, tier 1)
+   [dirigent] manus high: ny look "kaskad" (tier lugn, pool 1, sektion high, basgang 0.74)
+   [dirigent] sektion high -> break (nr 1, tier 1)
+   [dirigent] manus break: ny look "sokljus" (tier fart, pool 18, sektion break, basgang 0.92, lugn)
+   [dirigent] nastan-drop: sprang 13.6 dB efter dipp 14.3 dB
+   [dirigent] sektion break -> high (nr 2, tier 0)
+   [dirigent] manus high: "kaskad" igen
+   [dirigent] nastan-drop: sprang 12.0 dB efter dipp 12.2 dB
+   [dirigent] nastan-drop: sprang 11.8 dB efter dipp 9.3 dB
+
+TAJT = kick->ljus lagt, kickTraff hogt, r hogt, musikByten hogt. SNYGGT = alla3 lagt, mattnad och lampspr hoga,
+flera lookar utan langa stillastaende stunder, och ett ljusspann som anvands. Jamfor natt mot natt, aldrig i absoluta tal.
