@@ -1,0 +1,66 @@
+diff --git a/.arena/takt13/bas/src/analyserClock.ts b/.arena/takt13/a7/src/analyserClock.ts
+index 0832641..65ed351 100644
+--- a/.arena/takt13/bas/src/analyserClock.ts
++++ b/.arena/takt13/a7/src/analyserClock.ts
+@@ -42,6 +42,7 @@ const HV_R = [4 / 3, 3 / 4, 3 / 2, 2 / 3, 5 / 4, 4 / 5], HV_K = 1.25, HV_N = 5,
+ const PW_RING = 4096, PW_WIN_MS = 10000, PW_MIN = 0.5, PW_Q = [4 / 3, 3 / 4, 3 / 2, 2 / 3];   // TAKTENS SJÄLVLIKHET
+ const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, TG_MIN_N = 300, TG_FINE = 0.0025, TG_HALF = ONSET_BINS >> 1;
+ const TG_FINE_MAX = 0.0125;   // FINTEMPOTS BAND
++const SH_TAU_MS = 30000, SH_MIN_MS = 10000, SH_SHARE = 0.5, SH_DT_MAX = 1000, SH_SIB = 4;   // LÅTENS TEMPO (a7 takt13)
+ 
+ /** FAS-PREDIKTIONSTILLIT. */
+ export function publishPhase(f: { beatPhaseMs: number; beatPhaseConf: number; barShift: number }, b: ClockCfg["beat"], barKnown: boolean,
+@@ -95,6 +96,7 @@ export class BeatFeed {
+   private innerAnchor = 0; private innerBpm = 0; private innerValid = false;
+   private readonly anaGrid = { anchorMs: 0, bpm: 0, confidence: 0 };   // EN KÄLLA
+   private boundSeen = 0;
++  private readonly shH = new Float64Array(TG_K); private shM = 0; private shAt = 0; shPulls = 0;   // LÅTENS TEMPO
+   private quietAt = -1e12; private pend = false;   // MINNET VID GRÄNSEN
+   /** Det cfg analysatorn ska byggas med. */
+   barKnown(): boolean { return this.barN >= BAR_MIN; }
+@@ -271,7 +273,7 @@ export class BeatFeed {
+       if (!held && !song && this.tempoBpm > 0) {
+         const kc = ((Math.round(Math.log(this.tempoBpm / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K, cv = Math.max(acc[kc], acc[(kc + 1) % TG_K], acc[(kc + TG_K - 1) % TG_K]);
+         const d = ((bk - kc) % TG_K + TG_K) % TG_K, sib = TG_SIB.some((q) => Math.abs(d - q) <= 2 || Math.abs(d - (TG_K - q)) <= 2);
+-        if (sib && cv > 0 && bv < cv * TG_HOLD) { this.tgLk = 0; this.tempoBpm = this.pwJudge(this.tempoBpm, now); return; }
++        if (sib && cv > 0 && bv < cv * TG_HOLD) { this.tgLk = 0; const r0 = this.tempoBpm; this.tempoBpm = this.shPull(r0, this.pwJudge(r0, now), now); return; }
+       }
+       if (!held && !song) {
+         const dl = Math.abs(bk - this.tgLkK), same = this.tgLkK >= 0 && Math.min(dl, TG_K - dl) <= 2;
+@@ -288,12 +290,26 @@ export class BeatFeed {
+         this.octR = this.octN++ === 0 ? this.tgHalfR : this.octR + TG_OCT_A * (this.tgHalfR - this.octR);
+         if (this.octN === 1) this.octHi = this.octR >= TG_OCT_UP; else if (this.octHi ? this.octR < TG_OCT_DN : this.octR >= TG_OCT_UP) this.octHi = !this.octHi;
+         t = this.octHi || this.octLoN >= TG_OCT_LO_N ? 2 * lo : lo; }
+-      { const r0 = this.tempoBpm, pc = Math.min(159.9, Math.max(80, this.peakVote(t, now))), pj = this.pwJudge(pc, now); this.tempoBpm = pj;
++      { const r0 = this.tempoBpm, pc = Math.min(159.9, Math.max(80, this.peakVote(t, now))), pj = this.pwJudge(pc, now); this.tempoBpm = this.shPull(r0, pj, now);
+         if (pj !== pc && this.first) this.tgLk = 0;
+         if (pj !== pc && pj !== r0 && this.tgR >= 0) { this.tgR = ((Math.round(Math.log(pj / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K; this.tgD.fill(0); } }
+       return;
+     }
+   }
++  /** LÅTENS TEMPO. */
++  private shPull(r0: number, want: number, now: number): number {
++    const H = this.shH, dt = this.shAt > 0 ? Math.min(now - this.shAt, SH_DT_MAX) : 0; this.shAt = now;
++    if (!(want > 0)) return want;
++    const dec = Math.exp(-dt / SH_TAU_MS); for (let i = 0; i < TG_K; i++) H[i] *= dec;
++    const kw = ((Math.round(Math.log(want / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K; H[kw] += dt; this.shM = this.shM * dec + dt;
++    let pk = -1, pv = 0;
++    for (let i = 0; i < TG_K; i++) { const v = H[(i + TG_K - 2) % TG_K] + H[(i + TG_K - 1) % TG_K] + H[i] + H[(i + 1) % TG_K] + H[(i + 2) % TG_K]; if (v > pv) { pv = v; pk = i; } }
++    if (pk < 0 || this.shM < SH_MIN_MS || pv < SH_SHARE * this.shM) return want;
++    const dw = ((kw - pk) % TG_K + TG_K) % TG_K; if (!TG_SIB.some((q) => Math.abs(dw - q) <= SH_SIB || Math.abs(dw - (TG_K - q)) <= SH_SIB) || !this.pwReal(pk, now)) return want;
++    this.shPulls++;
++    const kr = r0 > 0 ? ((Math.round(Math.log(r0 / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K : -1, dr = Math.abs(kr - pk);
++    return kr >= 0 && Math.min(dr, TG_K - dr) <= TG_SW_STEPS ? r0 : 80 * Math.pow(TG_STEP, pk);
++  }
+   /** a3 TOPPRÖSTEN. */
+   private peakVote(t0: number, now: number): number {
+     const open = this.hvAge++ < HV_AGE;
+@@ -399,7 +415,7 @@ export class BeatFeed {
+     this.pwDt = (this.pwT[(this.pwPos - 1 + PW_RING) & M] - this.pwT[(this.pwPos - lo + 2 * PW_RING) & M]) / (lo - 1); if (!(this.pwDt > 0)) return true;
+     this.pwWn = lo >> 1; return this.pwSim(80 * Math.pow(TG_STEP, k)) >= TG_Q_SIM;
+   }
+-  private tgReset(soft = false): void { if (!soft) { this.pwN = 0; this.tgAcc.fill(-1); this.tgAccF.fill(-1); } this.pwRun = 0; this.tgSw = 0; this.tgR = -1; this.brkArm = false; this.brkFrom = 0; this.tgLk = 0; this.tgLkK = -1; this.tgHl = 0; this.tgAccL.fill(-1); this.tgLN = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; this.first = true; }
++  private tgReset(soft = false): void { if (!soft) { this.pwN = 0; this.tgAcc.fill(-1); this.tgAccF.fill(-1); } this.shH.fill(0); this.shM = 0; this.shAt = 0; this.pwRun = 0; this.tgSw = 0; this.tgR = -1; this.brkArm = false; this.brkFrom = 0; this.tgLk = 0; this.tgLkK = -1; this.tgHl = 0; this.tgAccL.fill(-1); this.tgLN = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; this.first = true; }
+ 
+   /** Kom en tidigare kick. */
+   private kickRepeats(t: number, lag: number, tol: number): boolean {

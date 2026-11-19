@@ -1,0 +1,64 @@
+diff --git a/.arena/takt13/bas/src/analyserClock.ts b/.arena/takt13/a5/src/analyserClock.ts
+index 0832641..4d256b0 100644
+--- a/.arena/takt13/bas/src/analyserClock.ts
++++ b/.arena/takt13/a5/src/analyserClock.ts
+@@ -42,6 +42,7 @@ const HV_R = [4 / 3, 3 / 4, 3 / 2, 2 / 3, 5 / 4, 4 / 5], HV_K = 1.25, HV_N = 5,
+ const PW_RING = 4096, PW_WIN_MS = 10000, PW_MIN = 0.5, PW_Q = [4 / 3, 3 / 4, 3 / 2, 2 / 3];   // TAKTENS SJÄLVLIKHET
+ const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, TG_MIN_N = 300, TG_FINE = 0.0025, TG_HALF = ONSET_BINS >> 1;
+ const TG_FINE_MAX = 0.0125;   // FINTEMPOTS BAND
++const MC_WIN_MS = PW_WIN_MS / 2, MC_MIN_N = 600, MC_MIN = PW_MIN / 2;   // METRISK KONSEKVENS: senaste halvan av vittnets fönster, samma golv per term som PW_MIN
+ 
+ /** FAS-PREDIKTIONSTILLIT. */
+ export function publishPhase(f: { beatPhaseMs: number; beatPhaseConf: number; barShift: number }, b: ClockCfg["beat"], barKnown: boolean,
+@@ -83,7 +84,7 @@ export class BeatFeed {
+   tgClear = 1;   // TEMPOTS TYDLIGHET 0..1
+   private hvRun = 0; hvSwitches = 0; private hvAge = 0; private hvVoted = false; private hvKeep = 0; private hvEver = false; private octLoN = 0; private hvT0 = 0; private hvBest = 0;   // a3 TOPPRÖSTEN
+   private readonly pwE = new Float32Array(PW_RING); private readonly pwH = new Float32Array(PW_RING); private readonly pwT = new Float64Array(PW_RING); private pwPos = 0; private pwN = 0;   // TAKTENS SJÄLVLIKHET
+-  private pwWn = 0; private pwDt = 0; private pwCand = 0; private pwRun = 0; private pwQuietAt = 0; pwVetos = 0; pwFixes = 0;
++  mcPicks = 0; private pwWn = 0; private pwDt = 0; private pwCand = 0; private pwRun = 0; private pwQuietAt = 0; pwVetos = 0; pwFixes = 0;
+   private tgHalfR = 0; octR = 0; private octN = 0; private octHi = false;   // OKTAVKANTEN
+   private goodOn = 0; private goodRep = 0; private goodAt = 0;   // TAKTEN GENOM BREAKET
+   private readonly barK = new Float64Array(4); private readonly barL = new Float64Array(4);   // ETTAN (a5)
+@@ -268,6 +269,7 @@ export class BeatFeed {
+         for (let i = 0; i < TG_K; i++) { const v = A[i], dd = Math.abs(i - bk), d = dd < TG_K - dd ? dd : TG_K - dd;
+           if (d > 2 && v > sv && v >= A[(i + 1) % TG_K] && v >= A[(i + TG_K - 1) % TG_K]) sv = v; }
+         this.tgClear = Math.max(0, Math.min(1, 3 * (1 - sv / bv))); }
++      if (!held && !song) { const mk = this.mcPick(A, bk, bv, now); if (mk !== bk) { bk = mk; bv = A[mk]; this.mcPicks++; } }
+       if (!held && !song && this.tempoBpm > 0) {
+         const kc = ((Math.round(Math.log(this.tempoBpm / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K, cv = Math.max(acc[kc], acc[(kc + 1) % TG_K], acc[(kc + TG_K - 1) % TG_K]);
+         const d = ((bk - kc) % TG_K + TG_K) % TG_K, sib = TG_SIB.some((q) => Math.abs(d - q) <= 2 || Math.abs(d - (TG_K - q)) <= 2);
+@@ -391,6 +393,34 @@ export class BeatFeed {
+     } else this.pwRun = 0;
+     return cand;
+   }
++  /** METRISK KONSEKVENS: mönstrets likhet 1 och 2 slag bort (min av de två, bas + diskant); NaN = för lite ljud. */
++  private mcAt(bpm: number, now: number): number {
++    const M = PW_RING - 1; let lo = 0, hi = this.pwN;
++    while (lo < hi) { const m = (lo + hi) >> 1; if (now - this.pwT[(this.pwPos - 1 - m + 2 * PW_RING) & M] > MC_WIN_MS) hi = m; else lo = m + 1; }
++    if (lo < MC_MIN_N) return NaN;
++    this.pwDt = (this.pwT[(this.pwPos - 1 + PW_RING) & M] - this.pwT[(this.pwPos - lo + 2 * PW_RING) & M]) / (lo - 1); if (!(this.pwDt > 0)) return NaN;
++    this.pwWn = lo; const l1 = 60000 / bpm / this.pwDt;
++    let c1 = -9, c2 = -9;
++    for (let d = -1; d <= 1; d++) {
++      const a = Math.round(l1) + d, b = Math.round(2 * l1) + d;
++      const x = this.pwCorr(this.pwE, a) + this.pwCorr(this.pwH, a), y = this.pwCorr(this.pwE, b) + this.pwCorr(this.pwH, b);
++      if (x > c1) c1 = x; if (y > c2) c2 = y;
++    }
++    return c1 < c2 ? c1 : c2;
++  }
++  /** METRISK KONSEKVENS: förklarar inte vinnaren slaget OCH halvtakten tas den starkaste topp (inom kronan) som gör det. */
++  private mcPick(A: Float64Array, bk: number, bv: number, now: number): number {
++    if (!(bv > 0)) return bk;
++    const m0 = this.mcAt(80 * Math.pow(TG_STEP, bk), now);
++    if (!(m0 < MC_MIN)) return bk;
++    let ck = bk, cv = 0;
++    for (let i = 0; i < TG_K; i++) {
++      const v = A[i], dd = Math.abs(i - bk), d = dd < TG_K - dd ? dd : TG_K - dd;
++      if (d <= TG_NB || !(v * TG_HOLD >= bv) || v <= cv || v < A[(i + 1) % TG_K] || v < A[(i + TG_K - 1) % TG_K]) continue;
++      if (this.mcAt(80 * Math.pow(TG_STEP, i), now) >= MC_MIN) { ck = i; cv = v; }
++    }
++    return ck;
++  }
+   /** BEVISETS KVALITET: upprepar sig mönstret på hypotesen k i vittnets senare halva? */
+   private pwReal(k: number, now: number): boolean {
+     const M = PW_RING - 1; let lo = 0, hi = this.pwN;

@@ -1,3 +1,9 @@
+ARENAN TAKT13 KLAR 2026-11-20 ~00:15: INGEN SÄKER VINNARE, inget inlagt. Domare tools/arena/pardom.py (ettan på 1 eller 3 lika rätt, parfelet spärrat).
+  r0 (a3 trötta låset + a7 syskonveto): övning +1,33, MELLAN -5,75 DISK (par), KONTROLL +4,68 (193818 par 72 -> 86). a3 ensam: +1,32 / -0,41 / +2,66
+  = enda stadiga. Klockdom kontroll 2 gick inte (ljudet arkiverat i lotus-arkiv, ägarens ja krävs). Rapport tools/natt/arena-2026-11-19-takt13.md.
+  IDÉBANK takt13: a7 syskonveto - laga mot 160345 (bär parfelet i långsam musik); a4 basringen - 171840 FEL 7,4 -> 3,7, prova med strängare armering.
+  RÖR INTE .arena/takt13.
+
 LADAN UTLAGD 2026-11-19 21:04-21:21 (ägaren på plats): a6 (a68026c + manifest 3e03067) + 1AN-3AN-STILEN (ägaren: 'så länge effekterna kör på både 1
   och 3 med olika lampor ser det bara levande ut'): 7c81aca pulse/snap/startskott/svall/urladdning + pulsaccent på 1 och 3, 1ca4d08 kaskad, 555336c famn,
   f3f3031 fyllning, 39a0b5a frasraknare (kaskad + famn godkända i ögat). spaning/blixtnedslag följer redan stilen. KVAR: vagbrytare, minnet, linjalen

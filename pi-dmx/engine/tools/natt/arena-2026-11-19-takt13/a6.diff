@@ -1,0 +1,168 @@
+diff --git a/.arena/takt13/bas/src/analyserClock.ts b/.arena/takt13/a6/src/analyserClock.ts
+index 0832641..20396cb 100644
+--- a/.arena/takt13/bas/src/analyserClock.ts
++++ b/.arena/takt13/a6/src/analyserClock.ts
+@@ -42,6 +42,8 @@ const HV_R = [4 / 3, 3 / 4, 3 / 2, 2 / 3, 5 / 4, 4 / 5], HV_K = 1.25, HV_N = 5,
+ const PW_RING = 4096, PW_WIN_MS = 10000, PW_MIN = 0.5, PW_Q = [4 / 3, 3 / 4, 3 / 2, 2 / 3];   // TAKTENS SJÄLVLIKHET
+ const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, TG_MIN_N = 300, TG_FINE = 0.0025, TG_HALF = ONSET_BINS >> 1;
+ const TG_FINE_MAX = 0.0125;   // FINTEMPOTS BAND
++const HM_V = 24, HM_NMAX = 320, HM_K = 8, HM_KW = 2 * HM_K + 1, HM_RANGE = 0.025, HM_TAU_MS = 6000, HM_PEN = 0.05, HM_KAPPA = 0.5, HM_SIG = 1 / 40;   // VITERBI ÖVER TEMPO x FAS x PAR (takt13 a6)
++const HM_WARM = 640, HM_RECENTER = 0.015, HM_MARG = 0.05, HM_LOC = 3, HM_W = 6, HM_MEAN_MS = 4000;
+ 
+ /** FAS-PREDIKTIONSTILLIT. */
+ export function publishPhase(f: { beatPhaseMs: number; beatPhaseConf: number; barShift: number }, b: ClockCfg["beat"], barKnown: boolean,
+@@ -95,6 +97,11 @@ export class BeatFeed {
+   private innerAnchor = 0; private innerBpm = 0; private innerValid = false;
+   private readonly anaGrid = { anchorMs: 0, bpm: 0, confidence: 0 };   // EN KÄLLA
+   private boundSeen = 0;
++  private readonly hmD = new Float64Array(HM_V * HM_NMAX); private readonly hmN = new Int32Array(HM_V); private readonly hmO = new Int32Array(HM_V); private readonly hmL = new Float64Array(HM_V);   // VITERBI
++  private readonly hmG0 = new Float64Array(HM_V * HM_KW); private readonly hmG1 = new Float64Array(HM_V * HM_KW); private readonly hmKv = new Int32Array(HM_V); private readonly hmH = new Float64Array(HM_V);
++  private readonly hmW = new Float64Array(PH_B); private readonly phWk = new Float64Array(PH_B); private readonly bestW = new Float64Array(PH_B);
++  private hmNv = 0; private hmBpm = 0; private hmCnt = 0; private hmLam = 1; private hmDt = 0; private hmPrevT = 0; private hmMg = 0; private hmMl = 0; private hmMh = 0; private hmMc = 0;
++  private hmTrOk = false; private hmTrTb = 0; private hmTrPer = 0; private hmTrN = 0; private hmOk = false; private hmTb = 0; hmSwitches = 0; hmPar = 0;
+   private quietAt = -1e12; private pend = false;   // MINNET VID GRÄNSEN
+   /** Det cfg analysatorn ska byggas med. */
+   barKnown(): boolean { return this.barN >= BAR_MIN; }
+@@ -105,10 +112,10 @@ export class BeatFeed {
+   private phFold(): number {
+     const F = this.phF, N = this.foldN, C = this.phC; C.fill(0); let any = false;
+     for (let k = 0; k < PH_B; k++) {
+-      let mu = 0, mx = 0;
++      let mu = 0, mx = 0; this.phWk[k] = 0;
+       for (let b = 0; b < ONSET_BINS; b++) { const v = N[b] ? F[b * PH_B + k] / N[b] : 0; mu += v; if (v > mx) mx = v; }
+       mu /= ONSET_BINS; if (!(mu > 0)) continue;
+-      const w = (mx / mu - 1) / mu; any = true;
++      const w = (mx / mu - 1) / mu; any = true; this.phWk[k] = w;
+       for (let b = 0; b < ONSET_BINS; b++) if (N[b]) C[b] += w * F[b * PH_B + k] / N[b];
+     }
+     if (!any) return 0;
+@@ -131,7 +138,7 @@ export class BeatFeed {
+       else if (this.tempoBpm > 0) { this.scanC0 = cb; this.scanStep = 0.005; this.scanEnd = 5; }
+       else { this.scanC0 = beat.bpm; this.scanStep = 0.005; this.scanEnd = 5; }
+ 
+-      this.scanC = -5; this.bestScore = 0;
++      this.scanC = -5; this.bestScore = 0; this.hmQuery();
+     }
+     const c = this.scanC++, ref = this.scanRef;
+     const bpm = this.scanC0 * (1 + c * this.scanStep), bm = 60000 / bpm;
+@@ -146,10 +153,15 @@ export class BeatFeed {
+       const o = b * PH_B, q = j * PH_B; for (let k = 0; k < PH_B; k++) PF[o + k] += PV[q + k];
+     }
+     if (n >= 100 && tot > 0) {
+-      const mean = this.phFold(), C = this.phC; let mx = 0, mb = 0;
+-      for (let b = 0; b < ONSET_BINS; b++) { const v = C[b]; if (v > mx) { mx = v; mb = b; } }
++      const mean = this.phFold(), C = this.phC; let mx = 0, mb = 0, rx = 0, rb = -1;
++      const hb = this.hmOk ? ((((this.hmTb - ref) % bm) + bm) % bm) / bm * ONSET_BINS - 0.5 : NaN;
++      for (let b = 0; b < ONSET_BINS; b++) {
++        const v = C[b]; if (v > mx) { mx = v; mb = b; }
++        if (hb === hb) { let dd = Math.abs(b - hb); if (dd > TG_HALF) dd = ONSET_BINS - dd; if (dd <= HM_W && v > rx) { rx = v; rb = b; } } }
++      if (rb >= 0) mb = rb;
+       const score = mean > 0 ? (mx / mean) * (c === 0 && this.scanStep === 0.005 ? SCAN_HOLD : 1) : 0;
+       if (score > this.bestScore) {
++        this.bestW.set(this.phWk);
+         const a = C[(mb + ONSET_BINS - 1) % ONSET_BINS], cc = C[mb], d = C[(mb + 1) % ONSET_BINS], den = a - 2 * cc + d;
+         const off = den < 0 ? 0.5 * (a - d) / den : 0;
+         this.bestScore = score; this.bestBpm = bpm; this.bestPh = (mb + 0.5 + off) / ONSET_BINS;
+@@ -160,6 +172,7 @@ export class BeatFeed {
+       }
+     }
+     if (c < this.scanEnd || this.bestScore < ONSET_MIN_PEAK) return;
++    this.hmW.set(this.bestW);
+     if (this.tempoBpm > 0) this.bestBpm = Math.min(159.9, Math.max(80, this.bestBpm));
+     if (this.tempoBpm > 0 && Math.abs(this.bestBpm / this.tempoBpm - 1) > TG_FINE_MAX) { this.scanFar = this.bestBpm; return; }
+     const oldMs = 60000 / beat.bpm, idx = Math.floor((now - beat.anchorMs) / oldMs), fr = (now - beat.anchorMs) / oldMs - idx;
+@@ -172,6 +185,75 @@ export class BeatFeed {
+     this.onsetFixes++;
+   }
+ 
++  /** VITERBI: tillstånden (cykellängd N över två slag, position) kring klockans tempo. */
++  private hmInit(bpm: number): void {
++    const dt = this.hmDt; this.hmNv = 0; this.hmCnt = 0; this.hmTrOk = false; this.hmOk = false; this.hmBpm = bpm;
++    if (!(dt > 0) || !(bpm > 40)) return;
++    const p2 = 120000 / (bpm * dt), n0 = Math.floor(p2 * (1 - HM_RANGE)), n1 = Math.ceil(p2 * (1 + HM_RANGE));
++    if (n1 > HM_NMAX || n1 - n0 + 1 > HM_V || n0 < 40) return;
++    this.hmLam = Math.exp(-dt / HM_TAU_MS);
++    for (let v = 0; v <= n1 - n0; v++) {
++      const N = n0 + v, h = N / 2, hr = Math.round(h), sg = Math.max(1.5, h * HM_SIG), K = Math.min(HM_K, Math.ceil(2 * sg)), o = v * HM_KW + HM_K;
++      this.hmN[v] = N; this.hmO[v] = 0; this.hmH[v] = h; this.hmKv[v] = K;
++      let s0 = 0, s1 = 0;
++      for (let d = -K; d <= K; d++) { const a = Math.exp(-d * d / (2 * sg * sg)), e = hr + d - h, b = Math.exp(-e * e / (2 * sg * sg)); this.hmG0[o + d] = a; this.hmG1[o + d] = b; s0 += a; s1 += b; }
++      for (let d = -K; d <= K; d++) { this.hmG0[o + d] /= s0; this.hmG1[o + d] /= s1; }
++    }
++    this.hmD.fill(0); this.hmNv = n1 - n0 + 1;
++  }
++  /** VITERBI: ett anslagsprov (index j i ringen). */
++  private hmStep(beat: EngineConfig["beat"], now: number, j: number): void {
++    if (this.hmPrevT > 0) { const d = now - this.hmPrevT; if (d > 0 && d < 50) this.hmDt = this.hmDt > 0 ? this.hmDt + 0.01 * (d - this.hmDt) : d; }
++    this.hmPrevT = now;
++    const V = this.phV, q = j * PH_B, W = this.hmW; let og = 0, sw = 0;
++    for (let k = 0; k < PH_B; k++) { og += W[k] * V[q + k]; sw += W[k]; }
++    const ol = V[q] + V[q + 1], oh = V[q + 4] + V[q + 5], a = Math.max(this.hmDt / HM_MEAN_MS, 1 / ++this.hmMc);
++    if (sw > 0) this.hmMg += a * (og - this.hmMg);
++    this.hmMl += a * (ol - this.hmMl); this.hmMh += a * (oh - this.hmMh);
++    if (!beat || !(beat.bpm > 40)) { this.hmNv = 0; this.hmOk = false; return; }
++    if (this.hmNv === 0 || Math.abs(beat.bpm / this.hmBpm - 1) > HM_RECENTER) { this.hmInit(beat.bpm); if (this.hmNv === 0) return; }
++    const D = this.hmD, L = this.hmL, nv = this.hmNv, lam = this.hmLam;
++    for (let v = 0; v < nv; v++) { const N = this.hmN[v], o = this.hmO[v] = (this.hmO[v] + N - 1) % N; L[v] = D[v * HM_NMAX + o]; }
++    for (let v = 0; v < nv; v++) {
++      let m = L[v]; if (v > 0 && L[v - 1] - HM_PEN > m) m = L[v - 1] - HM_PEN; if (v < nv - 1 && L[v + 1] - HM_PEN > m) m = L[v + 1] - HM_PEN;
++      D[v * HM_NMAX + this.hmO[v]] = m;
++    }
++    for (let v = 0; v < nv; v++) { const b = v * HM_NMAX, e = b + this.hmN[v]; for (let i = b; i < e; i++) D[i] *= lam; }
++    if (sw > 0 && this.hmMg > 0 && this.hmMl > 0 && this.hmMh > 0) {
++      const g = og / this.hmMg, c = HM_KAPPA * (ol / this.hmMl - oh / this.hmMh), x0 = g + c, x1 = g - c, G0 = this.hmG0, G1 = this.hmG1;
++      for (let v = 0; v < nv; v++) {
++        const N = this.hmN[v], b = v * HM_NMAX, o = this.hmO[v], K = this.hmKv[v], go = v * HM_KW + HM_K, oh2 = o + Math.round(this.hmH[v]);
++        for (let d = -K; d <= K; d++) {
++          let p = o + d; p = p < 0 ? p + N : p >= N ? p - N : p; D[b + p] += G0[go + d] * x0;
++          let r = oh2 + d; r = r >= N ? r - N : r; D[b + r] += G1[go + d] * x1;
++        }
++      }
++    }
++    this.hmCnt++;
++  }
++  /** VITERBI: bästa vägen (med hysteres mot den följda) -> senaste slagets tid hmTb. */
++  private hmQuery(): void {
++    this.hmOk = false;
++    if (this.hmNv === 0 || this.hmCnt < HM_WARM) { this.hmTrOk = false; return; }
++    const D = this.hmD, dt = this.hmDt, ts = this.hmPrevT, tr = this.hmTrOk, tb0 = this.hmTrTb, pr = this.hmTrPer;
++    let gs = -1e300, gt = 0, gN = 0, gh = 0, gp = 0, ls = -1e300, lt = 0, lN = 0, lh = 0, lp = 0;
++    for (let v = 0; v < this.hmNv; v++) {
++      const N = this.hmN[v], h = this.hmH[v], b = v * HM_NMAX, o = this.hmO[v], near = tr && Math.abs(N - this.hmTrN) <= 2;
++      for (let n = 0; n < N; n++) {
++        let i = o + n; if (i >= N) i -= N;
++        const s = D[b + i]; if (!(s > gs) && !(near && s > ls)) continue;
++        const up = n >= h, t = ts - (up ? n - h : n) * dt;
++        if (s > gs) { gs = s; gt = t; gN = N; gh = h; gp = up ? 1 : 0; }
++        if (near && s > ls) { let x = (t - tb0) / pr; x -= Math.round(x); if (Math.abs(x) * pr <= HM_LOC * dt) { ls = s; lt = t; lN = N; lh = h; lp = up ? 1 : 0; } }
++      }
++    }
++    if (!(gs > -1e300)) { this.hmTrOk = false; return; }
++    if (ls > -1e300 && gs - ls <= HM_MARG * Math.abs(gs)) { gt = lt; gN = lN; gh = lh; gp = lp; }
++    else if (tr) this.hmSwitches++;
++    this.hmTrOk = true; this.hmTrTb = gt; this.hmTrPer = gh * dt; this.hmTrN = gN; this.hmPar = gp;
++    this.hmTb = gt; this.hmOk = true;
++  }
++
+   /** EN TEMPOSÖKNING. */
+   private tgScore(bpm: number, now: number, win = TG_WIN_MS): number {
+     const S = this.fullS, N = this.fullN, Hs = this.tgH, oT = this.onT, oV = this.onV, oH = this.hiV; S.fill(0); N.fill(0); Hs.fill(0);
+@@ -399,7 +481,7 @@ export class BeatFeed {
+     this.pwDt = (this.pwT[(this.pwPos - 1 + PW_RING) & M] - this.pwT[(this.pwPos - lo + 2 * PW_RING) & M]) / (lo - 1); if (!(this.pwDt > 0)) return true;
+     this.pwWn = lo >> 1; return this.pwSim(80 * Math.pow(TG_STEP, k)) >= TG_Q_SIM;
+   }
+-  private tgReset(soft = false): void { if (!soft) { this.pwN = 0; this.tgAcc.fill(-1); this.tgAccF.fill(-1); } this.pwRun = 0; this.tgSw = 0; this.tgR = -1; this.brkArm = false; this.brkFrom = 0; this.tgLk = 0; this.tgLkK = -1; this.tgHl = 0; this.tgAccL.fill(-1); this.tgLN = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; this.first = true; }
++  private tgReset(soft = false): void { if (!soft) { this.pwN = 0; this.tgAcc.fill(-1); this.tgAccF.fill(-1); } this.pwRun = 0; this.tgSw = 0; this.tgR = -1; this.brkArm = false; this.brkFrom = 0; this.tgLk = 0; this.tgLkK = -1; this.tgHl = 0; this.tgAccL.fill(-1); this.tgLN = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; this.first = true; this.hmNv = 0; this.hmOk = false; this.hmTrOk = false; }
+ 
+   /** Kom en tidigare kick. */
+   private kickRepeats(t: number, lag: number, tol: number): boolean {
+@@ -557,7 +639,8 @@ export class BeatFeed {
+       const hi = (frame.onset?.highMid ?? 0) + (frame.onset?.treble ?? 0);
+       if (this.onHalf) { this.onT[this.onPos] = now; this.onV[this.onPos] = ok > this.onPrev ? ok : this.onPrev; this.hiV[this.onPos] = hi > this.hiPrev ? hi : this.hiPrev; this.pwT[this.pwPos] = now; this.pwE[this.pwPos] = this.onV[this.onPos]; this.pwH[this.pwPos] = this.hiV[this.onPos]; this.pwPos = (this.pwPos + 1) & (PW_RING - 1); if (this.pwN < PW_RING) this.pwN++;
+         this.onPos = (this.onPos + 1) % ONSET_RING; if (this.onN < ONSET_RING) this.onN++; }
+-      this.onPrev = ok; this.hiPrev = hi; this.onHalf = !this.onHalf;
++      const half = this.onHalf; this.onPrev = ok; this.hiPrev = hi; this.onHalf = !this.onHalf;
++      if (half) this.hmStep(cfg.beat, now, (this.onPos + ONSET_RING - 1) % ONSET_RING);
+       this.tgStep(now);
+       if (!cfg.beat && this.tempoBpm > 0) cfg.beat = { anchorMs: frame.beatAnchorMs || now, bpm: this.tempoBpm, confidence: 0 };
+       this.onsetStep(cfg, now);

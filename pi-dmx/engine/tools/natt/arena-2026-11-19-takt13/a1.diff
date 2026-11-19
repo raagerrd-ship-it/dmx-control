@@ -1,0 +1,22 @@
+diff --git a/.arena/takt13/bas/src/analyserClock.ts b/.arena/takt13/a1/src/analyserClock.ts
+index 0832641..fa65eda 100644
+--- a/.arena/takt13/bas/src/analyserClock.ts
++++ b/.arena/takt13/a1/src/analyserClock.ts
+@@ -432,7 +432,7 @@ export class BeatFeed {
+     { const ti = Math.floor(pos);
+       if (ti !== this.barTi) { if (ti === this.barTi + 1) this.barBack(); this.barTi = ti; this.barV.fill(0); this.barVc.fill(0); }
+       const q = Math.min(BAR_Q - 1, Math.floor((pos - ti) * BAR_Q)); this.barV[q] += sa?.treble ?? 0; this.barVc[q]++; }
+-    { const d = ((((this.barM + this.barJr - this.barOff) % 4) + 4) % 4); if (d) this.barOff += d; }
++    { const d = ((((this.barM + this.barJr - this.barOff) % 4) + 4) % 4); if (d & 1) { this.barOff++; this.barM = (this.barM + 1 - d + 4) & 3; } else if (d) this.barM = (this.barM + 2) & 3; }
+   }
+ 
+   /** Backbeaten: diskantens anslag i slagets första fjärdedel mot resten av slaget, bokfört på slagets plats (virvel/clap på 2 och 4). */
+@@ -468,7 +468,7 @@ export class BeatFeed {
+         + (sX > 0 ? BAR_W_BEAT * (X[(i + 1) & 3] + X[(i + 3) & 3] - X[i] - X[(i + 2) & 3]) / sX : 0);
+       if (v > best) { second = best; best = v; bi = i; } else if (v > second) second = v;
+     }
+-    if (bi !== this.barM && best - second >= BAR_MARGIN) { this.barM = bi; this.barShifts++; }
++    if (((bi - this.barM) & 1) && best - second >= BAR_MARGIN) { this.barM = bi; this.barShifts++; }
+   }
+ 
+   /** LÅTGRÄNSEN. */
