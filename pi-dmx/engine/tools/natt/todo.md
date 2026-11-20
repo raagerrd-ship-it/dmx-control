@@ -34,7 +34,9 @@ LADAN UTLAGD 2026-11-19 21:04-21:21 (ägaren på plats): a6 (a68026c + manifest 
   genom att ändra tillbaka raden i tryckvag.ts, INTE git revert - andra effekter använder vaxel), d43d32e rave, 2afa53d fyrverkeri, 8997303 sidokedja
   (vänster padd ner på 1, höger på 3, sväller över 4 slag, snitt 0,45 som förr), 834b0be andrum, e21389b skuggor, fdbb0e3 mullra, 6fb2896 stegring
   (bara varje-slag-läget). Tagg fore-<namn>-trea per commit. Replay 151659/200719: samma look/byten, ljus +0,00 % (bara tryckvag valdes, 292 rader).
-  sug orörd (EN puls i mitten som tätnar 4 -> 2 -> 1, ingen halva att flytta). 1an-3an därmed genomgånget i alla effekter med slagmönster. Backa: taggar fore-takt-a6 / fore-etta-trea. Dirigenten fri (mode smart) när ägaren gick.
+  sug orörd (EN puls i mitten som tätnar 4 -> 2 -> 1, ingen halva att flytta). 1an-3an därmed genomgånget i alla effekter med slagmönster.
+  ÖGONPROVSLISTAN: tools/natt/ladan-2026-11-20-ogonprov.md (ordning, vad man ser, backa per rad).
+  (11-19) Backa: taggar fore-takt-a6 / fore-etta-trea. Dirigenten fri (mode smart) när ägaren gick.
   ladan.py --bara-deploy tog bort ladan.conf (kärnorna 0 1 2) - lagat 554944a. Deploy kräver ANALYSER_SIBLING=/c/finns-inte tills lotus portat a6.
   Ägaren 11-19: takten före ettan; ett-arbete framåt = bara PAREN (1/3 mot 2/4). Inspelning lang-20261119T193418.wav (30 min, Pi:n) + dirigentens
   logg .arena/dirigent/logg-2026-11-19.jsonl och ägarens tryck tryck.jsonl = facit till kommande DIRIGENT-arena (ägarens önskan: 'ibland dåligt
