@@ -309,6 +309,7 @@ const PULSE_IDX_INIT = -2e9;
 /** SECTION_UNIT (ladan 16:45): forvarningens 'high' 600 ms fore en forutsedd refrang och drop-fonstrets 'high' raknas INTE som sektionsgrans
  *  (de gav high<->low-hopp pa 1-2 s nar refrangen uteblev). Bara den raa sektionen, och den maste vara minst DMX_SECTION_UNIT_MIN_MS gammal. */
 const LAND_HOLD_MS = 6000, LAND_ABSORB_MS = 24000;   // LANDNINGEN (a7): minsta hålltid före landningsbytet; sektionsbyten inom fönstret efter tas inte
+const LAND_ENTRY = process.env.DMX_LAND_ENTRY === '1';   // PROV 11-20 (opt-in, osatt = bit-identiskt): refrängsinträdet efter minidropen (dropEntry) väntar ut landningens uppslukning - landningen har redan bytt för samma händelse
 const GAP_HOLD_MS = 4000;   // I LUCKAN: spärren efter uppbyggnadssignalen släpper senast efter 4 s (signal -> landning median 1,8 s)
 /** LÅTMANUS (10-12 kväll, ägaren: "olika effekter hoppar hela tiden ... mer som att den är förprogrammerad" + "allt mer känns anpassat
  *  efter låten och som att de hänger ihop"). ERSÄTTER frasväxlingen (A/B-look var 8:e takt), basgångs-, karaktärs- och tempobytet,
@@ -1065,7 +1066,7 @@ export class EffectEngine {
         // REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP (ladan 11-01 17:48, inspelning: analysatorns drop 17:48:17,15 med 0,4 s break blev minidrop
         // (FLANK_SHORT_S), sektionen gick high 0,7 s senare men lookbytet väntade in frasen till 17:48:20,2 = 'dropen blir sen'): går
         // sektionen in i high inom 2 s efter en sådan drop byts looken direkt, som vid en full drop (ingen MIN_HOLD/fras/slag-väntan).
-        const dropEntry = liveSecChanged && liveSec === 'high' && nowWall - this.anaDropAt < 2000;
+        const dropEntry = liveSecChanged && liveSec === 'high' && nowWall - this.anaDropAt < 2000 && !(LAND_ENTRY && nowWall < this.landAbsorbUntil);
         if (liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '') console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; }   // (intro glommer inte lookerna langre - LÅTMANUS glomms bara pa en verklig latgrans)
         if (liveSecChanged) this.pendingSecSwitch = nowWall >= this.landAbsorbUntil;   // LANDNINGEN: detektorns sena byte efter landningen är redan gjort
         const memSection = liveSecChanged && nowWall >= this.landAbsorbUntil;   // (latminnets sektionsgrans mem* borttagen 11-09 - sattes aldrig)
