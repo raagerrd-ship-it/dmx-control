@@ -18,6 +18,10 @@ NÄSTA FÖR NATTAGENTEN: (a) landningen är dirigentens största bytesorsak (39 
 ARENAN TAKT13 KLAR 2026-11-20 ~00:15: INGEN SÄKER VINNARE, inget inlagt. Domare tools/arena/pardom.py (ettan på 1 eller 3 lika rätt, parfelet spärrat).
   r0 (a3 trötta låset + a7 syskonveto): övning +1,33, MELLAN -5,75 DISK (par), KONTROLL +4,68 (193818 par 72 -> 86). a3 ensam: +1,32 / -0,41 / +2,66
   = enda stadiga. Klockdom kontroll 2 gick inte (ljudet arkiverat i lotus-arkiv, ägarens ja krävs). Rapport tools/natt/arena-2026-11-19-takt13.md.
+  A3 SPÄRRARNA 2026-11-20 (.arena/a3prov, a3:s analyserClock.ts på dagens src): dropdom3 IDENTISK med bas (övning 29,3, kontroll 50,8, varje drop
+  lika). pibudget: minnet lika (148/148 MB; första sittningens +23 MB = brus), huvudtråden a3 4,5/4,9 mot bas 3,8 us/hopp = x1,18-1,29 > 1,10 (DISK,
+  ~+1 us/hopp, troligen lmAdd som dämpar hela tabellen varje anrop - lat dämpning vore billigare). lotusbank GICK INTE: lotus korpus arkiverad
+  (ägarens ja krävs). a3 alltså inte redo för ladan.
   IDÉBANK takt13: a7 syskonveto - laga mot 160345 (bär parfelet i långsam musik); a4 basringen - 171840 FEL 7,4 -> 3,7, prova med strängare armering.
   RÖR INTE .arena/takt13.
 
