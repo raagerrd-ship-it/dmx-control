@@ -10,6 +10,7 @@ Vänster = Par 1–4, höger = Par 5–8. "Växeln" = grupp A på 1 och 4, grupp
 | # | Välj | Sektion att spela | Titta efter (nu) | Förut | Backa |
 |---|---|---|---|---|---|
 | 0 | Smart | drop → refräng | refrängen byter INTE look direkt efter landningen | kunde blinka förbi | tagg backup-fore-land-entry-2026-11-20 |
+| 0b | Smart | hela låtar, särskilt DJ-övergångar/breaks | takten släpper inte slaget på korta felaktiga toppar (a3c, det trötta låset); en verklig fasändring utan låtbyte kan ta 5-8 s | fasen följde varje topp | `git revert d0de317` |
 | 1 | Varannan | vers/refräng | slag 1–2: ena gruppen på slaget; 3–4: den andra | samma grupp på alla slag | `git revert fea59bc` |
 | 2 | Vagbrytare | refräng | kammen: ettan vänster, trean höger | ettan, hela riggen | `git revert 9ef1af4` |
 | 3 | Minnet | refräng | blinket: ettan vänster, trean höger | ettan, hela riggen | `git revert 6385257` |
