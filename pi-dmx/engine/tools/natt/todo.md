@@ -22,6 +22,12 @@ ARENAN TAKT13 KLAR 2026-11-20 ~00:15: INGEN SÄKER VINNARE, inget inlagt. Domare
   lika). pibudget: minnet lika (148/148 MB; första sittningens +23 MB = brus), huvudtråden a3 4,5/4,9 mot bas 3,8 us/hopp = x1,18-1,29 > 1,10 (DISK,
   ~+1 us/hopp, troligen lmAdd som dämpar hela tabellen varje anrop - lat dämpning vore billigare). lotusbank GICK INTE: lotus korpus arkiverad
   (ägarens ja krävs). a3 alltså inte redo för ladan.
+  OMMÄTT 2026-11-20 kväll (ägaren: "gör a3 billigare och mät om" + "hämta lotus korpus också"): a3c = a3 med lat dämpning i lmAdd
+  (.arena/a3prov/a3c, replay BYTE-IDENTISK med a3 på 160345/193818/171840/200719). pibudget varvat bas/a3c/bas/a3c/a3: huvudtråd 38,6/36,8/
+  30,2/30,9/29,2 = x0,95-1,02 (första DISK:en var brus, även a3 klarar), worker x1,04-1,10, minne +2 MB mot grannen. lotusbank (korpus
+  KOPIERAD tillbaka ur lotus-arkiv till lotus-light-link/tools/tempo-facit-pc/corpus, arkivet orört): bas 476/503, syntet 6/8, on-beat 0,41,
+  fas 0,96, motfas 15, i fas 305, följare 0,97 -> a3c 476, 6/8, 0,41, 1,0, motfas 17 (+2), i fas 319 (+14), följare 1,0. Motfas +2 = enda
+  sämre (spärren: ägaren godkänner). ALLA TRE SPÄRRAR KÖRDA. In i src kräver ägarens ord (backup-tagg + ersätt analyserClock.ts med a3c).
   IDÉBANK takt13: a7 syskonveto - laga mot 160345 (bär parfelet i långsam musik); a4 basringen - 171840 FEL 7,4 -> 3,7, prova med strängare armering.
   RÖR INTE .arena/takt13.
 
