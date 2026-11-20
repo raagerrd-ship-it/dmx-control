@@ -18,12 +18,13 @@ export const gallop: EffectDef = {
     const f = c.hasBeat ? c.beatFrac : 1 - c.kickEnv;
     const p1 = (f + 0.5) % 1, p2 = (f + 0.25) % 1;           // faser sedan 0,5 resp. 0,75
     const offPulse = Math.max(soft(p1, 0.12, 0.18) * 0.75, soft(p2, 0.1, 0.15));
-    const groupPulse = even ? soft(f, 0.12, 0.3) : offPulse;  // A on-beat, B galopp-figuren
+    const lead = even !== (((c.beatIdx >> 1) & 1) === 1);       // 1an-3an-stilen (11-20): A slår 1-2, B slår 3-4 (var: A alla slag)
+    const groupPulse = lead ? soft(f, 0.12, 0.3) : offPulse;  // slagets grupp on-beat, den andra galopp-figuren
     const pairBase = c.mixedSector(Math.floor(c.hueIdx / 4));
     const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;   // motfärger
     // BASGANG (a8 11-07): figuren (vem som slår när) är rutnätets, styrkan basens kropp - kickEnv/punch-mattan (alla lampor lika) bort
     const bb = c.bassBody;
-    const v = 0.06 + 0.94 * Math.min(1, groupPulse * (0.3 + 0.7 * bb) + (even ? 0.25 * bb * bb : 0));   // STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108)
+    const v = 0.06 + 0.94 * Math.min(1, groupPulse * (0.3 + 0.7 * bb) + (lead ? 0.25 * bb * bb : 0));   // STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108)
     return hsv(hue, 1 - c.punch * 0.3, v);   // riktig dunk slår igenom rytmen
   },
 };
