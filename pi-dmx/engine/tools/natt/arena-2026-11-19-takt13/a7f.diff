@@ -1,0 +1,45 @@
+--- /dev/fd/63	2026-11-20 02:45:42.000000000 +0100
++++ /dev/fd/62	2026-11-20 02:45:42.000000000 +0100
+@@ -42,7 +42,7 @@
+ const PW_RING = 4096, PW_WIN_MS = 10000, PW_MIN = 0.5, PW_Q = [4 / 3, 3 / 4, 3 / 2, 2 / 3];   // TAKTENS SJÄLVLIKHET
+ const TG_K = 139, TG_STEP = Math.pow(2, 1 / TG_K), TG_PER_HOP = 1, TG_A = 0.21, TG_MIN_N = 300, TG_FINE = 0.0025, TG_HALF = ONSET_BINS >> 1;
+ const TG_FINE_MAX = 0.0125;   // FINTEMPOTS BAND
+-const SH_TAU_MS = 30000, SH_MIN_MS = 10000, SH_SHARE = 0.5, SH_DT_MAX = 1000, SH_SIB = 4;   // LÅTENS TEMPO (a7 takt13)
++const SH_TAU_MS = 30000, SH_MIN_MS = 10000, SH_SHARE = 0.5, SH_DT_MAX = 1000, SH_SIB = 4, SH_FRESH = 2;   // LÅTENS TEMPO (a7 takt13)
+ 
+ /** FAS-PREDIKTIONSTILLIT. */
+ export function publishPhase(f: { beatPhaseMs: number; beatPhaseConf: number; barShift: number }, b: ClockCfg["beat"], barKnown: boolean,
+@@ -96,7 +96,7 @@
+   private innerAnchor = 0; private innerBpm = 0; private innerValid = false;
+   private readonly anaGrid = { anchorMs: 0, bpm: 0, confidence: 0 };   // EN KÄLLA
+   private boundSeen = 0;
+-  private readonly shH = new Float64Array(TG_K); private shM = 0; private shAt = 0; shPulls = 0;   // LÅTENS TEMPO
++  private readonly shH = new Float64Array(TG_K); private shM = 0; private shAt = 0; private shK = -1; private shRun = 0; private shHold = false; shPulls = 0;   // LÅTENS TEMPO
+   private quietAt = -1e12; private pend = false;   // MINNET VID GRÄNSEN
+   /** Det cfg analysatorn ska byggas med. */
+   barKnown(): boolean { return this.barN >= BAR_MIN; }
+@@ -302,11 +302,13 @@
+     if (!(want > 0)) return want;
+     const dec = Math.exp(-dt / SH_TAU_MS); for (let i = 0; i < TG_K; i++) H[i] *= dec;
+     const kw = ((Math.round(Math.log(want / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K; H[kw] += dt; this.shM = this.shM * dec + dt;
++    const dk = Math.abs(kw - this.shK); this.shRun = this.shK >= 0 && Math.min(dk, TG_K - dk) <= 2 ? this.shRun + 1 : 0; this.shK = kw;
++    const hold = this.shHold; this.shHold = false;
+     let pk = -1, pv = 0;
+     for (let i = 0; i < TG_K; i++) { const v = H[(i + TG_K - 2) % TG_K] + H[(i + TG_K - 1) % TG_K] + H[i] + H[(i + 1) % TG_K] + H[(i + 2) % TG_K]; if (v > pv) { pv = v; pk = i; } }
+     if (pk < 0 || this.shM < SH_MIN_MS || pv < SH_SHARE * this.shM) return want;
+-    const dw = ((kw - pk) % TG_K + TG_K) % TG_K; if (!TG_SIB.some((q) => Math.abs(dw - q) <= SH_SIB || Math.abs(dw - (TG_K - q)) <= SH_SIB) || !this.pwReal(pk, now)) return want;
+-    this.shPulls++;
++    const dw = ((kw - pk) % TG_K + TG_K) % TG_K; if (!TG_SIB.some((q) => Math.abs(dw - q) <= SH_SIB || Math.abs(dw - (TG_K - q)) <= SH_SIB) || (this.shRun >= SH_FRESH && !hold) || !this.pwReal(pk, now)) return want;
++    this.shPulls++; this.shHold = true;
+     const kr = r0 > 0 ? ((Math.round(Math.log(r0 / 80) / Math.log(TG_STEP)) % TG_K) + TG_K) % TG_K : -1, dr = Math.abs(kr - pk);
+     return kr >= 0 && Math.min(dr, TG_K - dr) <= TG_SW_STEPS ? r0 : 80 * Math.pow(TG_STEP, pk);
+   }
+@@ -415,7 +417,7 @@
+     this.pwDt = (this.pwT[(this.pwPos - 1 + PW_RING) & M] - this.pwT[(this.pwPos - lo + 2 * PW_RING) & M]) / (lo - 1); if (!(this.pwDt > 0)) return true;
+     this.pwWn = lo >> 1; return this.pwSim(80 * Math.pow(TG_STEP, k)) >= TG_Q_SIM;
+   }
+-  private tgReset(soft = false): void { if (!soft) { this.pwN = 0; this.tgAcc.fill(-1); this.tgAccF.fill(-1); } this.shH.fill(0); this.shM = 0; this.shAt = 0; this.pwRun = 0; this.tgSw = 0; this.tgR = -1; this.brkArm = false; this.brkFrom = 0; this.tgLk = 0; this.tgLkK = -1; this.tgHl = 0; this.tgAccL.fill(-1); this.tgLN = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; this.first = true; }
++  private tgReset(soft = false): void { if (!soft) { this.pwN = 0; this.tgAcc.fill(-1); this.tgAccF.fill(-1); } this.shH.fill(0); this.shM = 0; this.shAt = 0; this.shK = -1; this.shRun = 0; this.shHold = false; this.pwRun = 0; this.tgSw = 0; this.tgR = -1; this.brkArm = false; this.brkFrom = 0; this.tgLk = 0; this.tgLkK = -1; this.tgHl = 0; this.tgAccL.fill(-1); this.tgLN = 0; this.tgK = 0; this.tempoBpm = 0; this.octN = 0; this.hvRun = 0; this.hvAge = 0; this.hvVoted = false; this.hvKeep = 0; this.hvEver = false; this.first = true; }
+ 
+   /** Kom en tidigare kick. */
+   private kickRepeats(t: number, lag: number, tol: number): boolean {
