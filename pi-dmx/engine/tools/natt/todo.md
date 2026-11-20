@@ -1,3 +1,17 @@
+NATTEN 2026-11-20 (schemalagda körningen, ingen arena; motorkod: bara opt-in-provet nedan):
+KLART 2026-11-20: NÄSTA 11-19 (a) "vilken look g6-landningarna drar" - landning = 97 av 246 lookbyten (39 %) i sex filer (151659 20 av 29,
+  160345 17/34, 193818 27/79), i high 53 / low 32 / intro 12. 7 landningar byts inom 3 s, 5 av dem av ett andra byte för SAMMA händelse:
+  dropEntry (sektion -> high inom 2 s efter minidrop) går förbi landningens uppslukning (märks 'dwell'/'tier'). 193040: tick 279,0 -> kickregn 279,8.
+BASLINJE tools/natt/ren-2026-11-20/ (HEAD 4d23357 = ladan a6 + 1an-3an): kick->ljus 123/112/109/163/104/101 ms (11-19: 139/117/141/157/112/117),
+  energiR15 0,53/0,30/0,49/0,22/0,32/0,31, byte på fras 25/19/12/19/16/31 %, drop identiska 1/5/2/5/7/3, lampspr 61/57/48/60/63/43 (63/58/65/68/65/56 -
+  1an-3an-halvorna). Inte bit-identisk med 11-19 (väntat: a6 + effekterna).
+IDÉ, PROV (d6ca81e, opt-in DMX_LAND_ENTRY=1, osatt = json-identiskt): dropEntry väntar ut landAbsorbUntil. Looker < 3 s 18 -> 12, avbrutna landningar
+  7 -> 2, 'dwell'+'tier' 8 -> 0, drop 17 -> 18. Domaren v3 övning +0,0 / kontroll +0,4 utan DISK (inom bruset). REDO FÖR LADAN:
+  `ANALYSER_SIBLING=/c/finns-inte PI_HOST=<ip> python tools/ladan.py --env DMX_LAND_ENTRY=1` - ögat: blinkar looken förbi när basen kommer tillbaka?
+FYND: a6 DELAD FIL ÄNDRAD skrivet i analysator-fynd.md (analyserParity 0 hop, men verktyget ser inte taktvägen).
+NÄSTA FÖR NATTAGENTEN: (a) landningen är dirigentens största bytesorsak (39 %) - om ägaren tycker det byter för ofta: räkna landningar per minut mot
+  ägarens gränser (frasdom.py) innan något ändras; (b) ingen arena utan ARENA-uppdrag.
+
 ARENAN TAKT13 KLAR 2026-11-20 ~00:15: INGEN SÄKER VINNARE, inget inlagt. Domare tools/arena/pardom.py (ettan på 1 eller 3 lika rätt, parfelet spärrat).
   r0 (a3 trötta låset + a7 syskonveto): övning +1,33, MELLAN -5,75 DISK (par), KONTROLL +4,68 (193818 par 72 -> 86). a3 ensam: +1,32 / -0,41 / +2,66
   = enda stadiga. Klockdom kontroll 2 gick inte (ljudet arkiverat i lotus-arkiv, ägarens ja krävs). Rapport tools/natt/arena-2026-11-19-takt13.md.

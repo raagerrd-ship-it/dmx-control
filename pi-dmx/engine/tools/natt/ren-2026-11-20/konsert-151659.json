@@ -1,0 +1,22 @@
+{
+ "wav": "tools/ladan-2026-11-13/lang-20261113T151659.wav",
+ "min": 8.3,
+ "kulorbytenPerMin": 8.3,
+ "kulorerPerSektion": 2,
+ "paletterPerSektion": 1,
+ "sektioner": 24,
+ "palettbytenPerMin": 0.24,
+ "palettPaGrans": 1,
+ "lookbytenPerMin": 3.9,
+ "bytePaFras": 0.25,
+ "allaTanda": 0.54,
+ "lampAntalR": 0.39,
+ "versRefrang": 0.29,
+ "aterseende": 1,
+ "aterkommande": 12,
+ "buildForeDrop": 1,
+ "buildLedS": 16.2,
+ "drops": 1,
+ "buildByten": 3,
+ "buildDrops": 0
+}

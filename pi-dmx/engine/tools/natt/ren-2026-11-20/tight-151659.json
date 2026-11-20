@@ -1,0 +1,118 @@
+{
+ "wav": "tools/ladan-2026-11-13/lang-20261113T151659.wav",
+ "startS": 0,
+ "gainDb": 0,
+ "totS": 532,
+ "rutor": 19946,
+ "tajt": {
+  "kickLagMs": 123,
+  "kickLagP75": 189,
+  "kickLagRigg90": 150,
+  "lampUpp": 3794,
+  "kickar": 1529,
+  "kickTraff": 0.3322432962720733,
+  "kickHojd": 0.16176470588235292,
+  "energiR": 0.5041902234269668,
+  "nivaR": 0.7391604258671005,
+  "energiRtopp": 0.44438815110429486,
+  "energiRruta": 0.40291343201814556,
+  "energiR15": 0.526026947503142,
+  "nivaR15": 0.7375964533332362,
+  "bpmMed": 130.07348355582675,
+  "kickFonsterMs": 200,
+  "litLugn": 0.14999999999999988,
+  "litFart": 0.26903186274509805,
+  "litFull": 0.42928921568627443,
+  "toppLugn": 0.2406862745098039,
+  "toppFart": 0.46274509803921576,
+  "toppFull": 0.668627450980392,
+  "sekLugn": 99,
+  "sekFart": 315,
+  "sekFull": 84,
+  "byten": 28,
+  "bytenPerMin": 3.158686387565806,
+  "musikByten": 1,
+  "orsaker": {
+   "sektion": 4,
+   "landning": 20,
+   "tier": 1,
+   "build": 2,
+   "drop": 1
+  },
+  "drops": 1,
+  "minidrops": 43,
+  "granser": 2,
+  "karaktarsskiften": 10,
+  "tempovaxlingar": 1,
+  "dropSprangLugn": 0.9011519607843137,
+  "dropSprangHog": null,
+  "dropsLugna": 1
+ },
+ "snygg": {
+  "alla3": 0.02566554242116638,
+  "en": 0.428586397720947,
+  "matt": 1,
+  "lampspr": 60.72987065075704,
+  "lookar": 13,
+  "lookMedianS": 16.72,
+  "lookLangstaS": 59.30666666666666,
+  "morkt": 0.0016043316955780607,
+  "litP10": 0.06813725490196078,
+  "litP50": 0.228921568627451,
+  "litP90": 0.5392156862745099
+ },
+ "lookTime": [
+  [
+   "gallop",
+   96.32000000000686
+  ],
+  [
+   "vagbrytare",
+   83.4933334960986
+  ],
+  [
+   "kickregn",
+   74.80000000000348
+  ],
+  [
+   "drumkit",
+   47.73333325195382
+  ],
+  [
+   "minnet",
+   44.34666674804735
+  ],
+  [
+   "duel",
+   42.56000000000035
+  ],
+  [
+   "siren",
+   31.279999999999653
+  ],
+  [
+   "varannan",
+   26.98666674804662
+  ],
+  [
+   "hiss",
+   21.54666650390611
+  ],
+  [
+   "wave",
+   20.211666748046763
+  ],
+  [
+   "tick",
+   15.653333251953102
+  ],
+  [
+   "blixtnedslag",
+   14.74666674804685
+  ],
+  [
+   "basgang",
+   12.213333251953099
+  ]
+ ]
+}

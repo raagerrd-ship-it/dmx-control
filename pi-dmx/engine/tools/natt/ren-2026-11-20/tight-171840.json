@@ -1,0 +1,104 @@
+{
+ "wav": "tools/ladan-2026-11-13/lang-20261113T171840.wav",
+ "startS": 0,
+ "gainDb": 0,
+ "totS": 300,
+ "rutor": 11250,
+ "tajt": {
+  "kickLagMs": 109,
+  "kickLagP75": 187,
+  "kickLagRigg90": 125,
+  "lampUpp": 2520,
+  "kickar": 922,
+  "kickTraff": 0.403470715835141,
+  "kickHojd": 0.1352941176470588,
+  "energiR": 0.4820016610899808,
+  "nivaR": 0.6245792745691229,
+  "energiRtopp": 0.44772678254278303,
+  "energiRruta": 0.40685206673819646,
+  "energiR15": 0.4871375500358034,
+  "nivaR15": 0.6513163317938763,
+  "bpmMed": 135.24665555563098,
+  "kickFonsterMs": 200,
+  "litLugn": 0.15781862745098035,
+  "litFart": 0.2559926470588235,
+  "litFull": 0.3662867647058824,
+  "toppLugn": 0.24509803921568624,
+  "toppFart": 0.38578431372549016,
+  "toppFull": 0.5377450980392157,
+  "sekLugn": 96,
+  "sekFart": 108,
+  "sekFull": 77,
+  "byten": 14,
+  "bytenPerMin": 2.800248911014312,
+  "musikByten": 1,
+  "orsaker": {
+   "landning": 4,
+   "sektion": 8,
+   "drop": 2
+  },
+  "drops": 2,
+  "minidrops": 8,
+  "granser": 2,
+  "karaktarsskiften": 4,
+  "tempovaxlingar": 0,
+  "dropSprangLugn": 0.8797426470588235,
+  "dropSprangHog": null,
+  "dropsLugna": 2
+ },
+ "snygg": {
+  "alla3": 0.00881983294591318,
+  "en": 0.3799646316913392,
+  "matt": 1,
+  "lampspr": 47.79768888888889,
+  "lookar": 10,
+  "lookMedianS": 15.120000000000005,
+  "lookLangstaS": 55.62666666666667,
+  "morkt": 0.0002666666666666667,
+  "litP10": 0.08186274509803922,
+  "litP50": 0.23333333333333336,
+  "litP90": 0.5392156862745098
+ },
+ "lookTime": [
+  [
+   "varannan",
+   55.62666674804811
+  ],
+  [
+   "kickregn",
+   52.45333349609477
+  ],
+  [
+   "mellanslag",
+   44.213333251953586
+  ],
+  [
+   "svall",
+   42.133333251953445
+  ],
+  [
+   "kaskad",
+   41.17333325195338
+  ],
+  [
+   "forvarning",
+   35.65333325195301
+  ],
+  [
+   "sokljus",
+   10.799999999999972
+  ],
+  [
+   "eko",
+   9.33333349609372
+  ],
+  [
+   "linjalen",
+   6.426666503906236
+  ],
+  [
+   "wave",
+   2.184999999999999
+  ]
+ ]
+}
