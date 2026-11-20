@@ -8,7 +8,8 @@ export const varannan: EffectDef = {
   desc: "Varannan lampa tar varannan takt — spatial dubbeltakt.",
   render(c) {
     const off = c.group;                                         // 0 = grupp A (på slaget), 1 = grupp B (off-beat); jamn/udda eller inre/yttre (c.grouping)
-    const phase = off === 0 ? c.beatFrac : (c.beatFrac + 0.5) % 1;
+    const onBeat = (off === 0) !== (((c.beatIdx >> 1) & 1) === 1);   // 1an-3an-stilen (11-20): A på 1-2, B på 3-4 (var: A på alla slag)
+    const phase = onBeat ? c.beatFrac : (c.beatFrac + 0.5) % 1;
     const pulse = c.hasBeat ? Math.pow(Math.max(0, 1 - phase * 1.8), 2.2) : c.heartPulse;   // skarp topp vid slaget, snabb decay; utan las: kickarna (09-27)
     // KULOR PER TAKT (ladan 2026-10-09, fladder pa sekundarfargen): forr nytt kulorpar varannat slag; nu per takt (grupperna har kvar var sin).
     const hue = c.mixedSector(Math.floor(c.hueIdx / 4) * 2 + off) / 6;
