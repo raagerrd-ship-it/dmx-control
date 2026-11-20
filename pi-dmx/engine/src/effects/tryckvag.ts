@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { vaxel } from "./rig.js";
 import { hsv, soft } from "./color.js";
 
 
@@ -21,7 +22,7 @@ export const tryckvag: EffectDef = {
     // (vita kärnan borttagen 11-01 kväll: vitt i ~100 ms tände den släckta dioden - 'R och G lyser men B bara blinkar till')
     // BASGANG (a8 11-07): kanterna slår VÄXELVIS (vänster jämna slag, höger udda; den andra klingar ut från sitt förra slag) och mitten bär
     // basens kropp (bassBody) i stället för drum.bass (som höll mitten tänd nästan jämnt: ljusast av alla looks och sämst mot basen, r -0,12..0,22)
-    if (!mid) { const mySide = (c.lamp < n / 2 ? 0 : 1) === (((c.beatIdx % 2) + 2) % 2); return hsv(hue, 1, 0.05 + 0.95 * soft(mySide ? f : f + 1, 0.12, 0.3)); }   // STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108)
+    if (!mid) { const mySide = (c.lamp < n / 2 ? 0 : 1) === vaxel(c.beatIdx);   /* 1an-3an 11-20: vänster kant 1 och 4, höger 2 och 3 */ return hsv(hue, 1, 0.05 + 0.95 * soft(mySide ? f : f + 1, 0.12, 0.3)); }   // STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108)
     c.want.energy = false;                                                    // mitten: basen själv (energin följer kicken)
     return hsv(hue, 1, 0.12 + 0.88 * c.bassBody * c.bassBody);
   },
