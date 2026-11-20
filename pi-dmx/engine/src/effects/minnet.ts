@@ -24,8 +24,8 @@ export const minnet: EffectDef = {
         if (known !== undefined) { st.mask = known & 0xff; st.sect = known >> 8; }
         else {
           st.seed = (st.seed * 1103515245 + 12345) & 0x7fffffff;
-          const r = st.seed / 0x7fffffff, one = ((rel % 4) + 4) % 4 === 0, fyra = ((rel % 16) + 16) % 16 === 0;   // kulör var 4:e takt (blinket)
-          st.mask = one && r < 0.5 ? 0b1111 : PATTERNS[Math.floor(r * (PATTERNS.length - 1))];
+          const r = st.seed / 0x7fffffff, bib = ((rel % 4) + 4) % 4, fyra = ((rel % 16) + 16) % 16 === 0;   // kulör var 4:e takt (blinket)
+          st.mask = bib % 2 === 0 && r < 0.5 ? (bib === 0 ? 0b1100 : 0b0011) : PATTERNS[Math.floor(r * (PATTERNS.length - 1))];   // 1an-3an-stilen (11-20): ettan vänster halva, trean höger (var: ettan hela riggen)
           if (fyra) st.sect = c.mixedSector(Math.floor(rel / 16) + Math.floor(r * 3));
           if (recording) st.mem.set(rel, st.mask | (st.sect << 8));
         }
