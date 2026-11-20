@@ -91,7 +91,7 @@ export class Lab6 {
       if (k !== this.runK) { this.runK = k; this.runPeak = 0; }
       if (hole) this.runLv[i] = 0;                                      // hålets lampa är svart även om löparens färg nyss stod där
       if (!hole) {
-        if (fr < 0.25) this.runPeak = Math.max(this.runPeak, (k % 4 === 0 ? 1 : 0.9) * energy * presence);   // löparen upp till 95 %, ettan störst
+        if (fr < 0.25) this.runPeak = Math.max(this.runPeak, (k % 2 === 0 ? 1 : 0.9) * energy * presence);   // löparen upp till 95 %, ettan och trean störst (1an-3an 11-20)
         const up = 40 * bpmNow / 60000;                                                              // intoningen 40 ms, räknat i slag
         this.runLv[i] = Math.max(this.runLv[i], this.runPeak * (fr < up ? fr / up : Math.exp(-(fr - up) / 0.8)));
       }

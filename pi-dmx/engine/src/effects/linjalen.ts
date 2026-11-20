@@ -43,7 +43,7 @@ export const linjalen: EffectDef = {
       if (k !== st.runK) { st.runK = k; st.runPeak = 0; }
       if (hole && c.hasBeat) st.runLv[i] = 0;                           // hålets lampa är svart även om löparens färg nyss stod där
       if (!hole && c.hasBeat) {
-        if (fr < 0.25) st.runPeak = Math.max(st.runPeak, (k % 4 === 0 ? 1 : 0.9) * energy * presence);
+        if (fr < 0.25) st.runPeak = Math.max(st.runPeak, (k % 2 === 0 ? 1 : 0.9) * energy * presence);   // 1an-3an-stilen (11-20): ettan och trean störst (var: ettan)
         const up = 40 * bpm / 60000;
         st.runLv[i] = Math.max(st.runLv[i], st.runPeak * (fr < up ? fr / up : Math.exp(-(fr - up) / 0.8)));
       }
