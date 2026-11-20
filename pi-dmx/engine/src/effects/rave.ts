@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { vaxel } from "./rig.js";
 import { hsv } from "./color.js";
 
 // Full fart: TVÅFÄRGS-VÄXELSPEL — riggen delas varannan lampa i två grupper med
@@ -11,7 +12,7 @@ export const rave: EffectDef = {
   desc: "Varannan lampa blinkar i motfärger – hård växling.",
   render(c) {
     const even = c.group === 0;   // jamn/udda eller inre/yttre (c.grouping)
-    const flip = c.beatIdx % 2 === 0;
+    const flip = vaxel(c.beatIdx) === 0;   // 1an-3an-stilen (11-20): växeln, grupp 0 på 1 och 4, grupp 1 på 2 och 3 (var: varannat slag)
     const lit = even === flip;
     const pairBase = c.mixedSector(Math.floor(c.hueIdx / 4));
     const hue = ((even ? pairBase : pairBase + 3) % 6) / 6;
