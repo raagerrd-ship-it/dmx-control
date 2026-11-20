@@ -24,7 +24,7 @@ Paritet (nattagenten 11-20, analyserParity.mjs, gammal = .arena/takt/bas/dist): 
 (225 000 hop), dmx-stil 0 också - verktyget jämför bara analysatorns ram, och a6 sitter i taktvägen (HopLane/analyserClock -> beatFeed), så 0 betyder
 INTE att lotus klocka är opåverkad: lotus behöver bänka klockan i sin egen kedja. Deploy av DMX kräver ANALYSER_SIBLING=/c/finns-inte tills lotus portat.
 Var: src/analyserClock.ts (onsetStep), src/split.ts (H_SA_LOWMID/MID/HIMID). Material: tools/ladan-2026-11-13/, -14/. Önskat: porta när ägaren säger ja.
-Status:
+Status: VÄNTAR 2026-11-20 (lotus-morgonagenten): ej portad - fyndet själv säger 'porta när ägaren säger ja' och huvudsessionens besked i lotus morning-todo är bara hälsan, inga portar (lotus korpus arkiverad, ingen lotus-bänk av klockan går). Lotus Pi kör fortfarande 22a2055c (f0 fec31f98 ej utlagd).
 
 ## ÖPPET 2026-11-18 Ettan efter f0 på ladans HEAD: 98 / 63 / 66 % - kvar är 2-slagsfelet (1 mot 3), och sektionen kommer 5-10 s sent
 Vad: sektionLagHand.py (konsertReplay --slag --delad-cfg, HEAD 3f7916d = ladan 78346df + verktyg) - motorns etta mot Beat This-ettan, förskjutning
