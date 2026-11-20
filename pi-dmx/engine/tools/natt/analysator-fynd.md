@@ -15,6 +15,17 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-20 DELAD FIL ÄNDRAD: TAKTEN a6 (fasen ur sex band) - analyserClock.ts + split.ts
+Vad: huvudsessionen lade in arenan takts a6 i dmx 2026-11-19 (a68026c, manifest 3e03067, tagg fore-takt-a6), LIVE i ladan sedan 11-19 21:04
+(ägaren på plats, ihop med 1an-3an-stilen). Klockans fas viks nu ur sex band (sub, kick, bas, lågmid, mid, diskant) som linjär amplitudstigning,
+vägda efter regelbundenhet; HopLane-posten 19 -> 22 fält (specAbs.lowMid/mid/highMid). DMX kontroll: takt FEL 27,8 -> 13,9 %, ettan 64,1 -> 60,4;
+nattens baslinje (sex rena filer) kick->ljus 139/117/141/157/112/117 -> 123/112/109/163/104/101 ms. Pi: worker x1,09, +1,8 MB.
+Paritet (nattagenten 11-20, analyserParity.mjs, gammal = .arena/takt/bas/dist): LOTUS-stil --split inline 151659 + 193040 300 s = 0 avvikande hop
+(225 000 hop), dmx-stil 0 också - verktyget jämför bara analysatorns ram, och a6 sitter i taktvägen (HopLane/analyserClock -> beatFeed), så 0 betyder
+INTE att lotus klocka är opåverkad: lotus behöver bänka klockan i sin egen kedja. Deploy av DMX kräver ANALYSER_SIBLING=/c/finns-inte tills lotus portat.
+Var: src/analyserClock.ts (onsetStep), src/split.ts (H_SA_LOWMID/MID/HIMID). Material: tools/ladan-2026-11-13/, -14/. Önskat: porta när ägaren säger ja.
+Status:
+
 ## ÖPPET 2026-11-18 Ettan efter f0 på ladans HEAD: 98 / 63 / 66 % - kvar är 2-slagsfelet (1 mot 3), och sektionen kommer 5-10 s sent
 Vad: sektionLagHand.py (konsertReplay --slag --delad-cfg, HEAD 3f7916d = ladan 78346df + verktyg) - motorns etta mot Beat This-ettan, förskjutning
 0/1/2/3 slag: 151659 98/1/0/1 %, 171840 63/13/17/6 %, 193040 66/1/29/4 % (11-16 före f0: 43/34/29 % på 0). Målet >= 80 % nås bara i 151659.
