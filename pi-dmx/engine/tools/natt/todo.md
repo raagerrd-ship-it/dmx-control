@@ -23,8 +23,12 @@ ARENAN TAKT13 KLAR 2026-11-20 ~00:15: INGEN SÄKER VINNARE, inget inlagt. Domare
 
 LADAN UTLAGD 2026-11-19 21:04-21:21 (ägaren på plats): a6 (a68026c + manifest 3e03067) + 1AN-3AN-STILEN (ägaren: 'så länge effekterna kör på både 1
   och 3 med olika lampor ser det bara levande ut'): 7c81aca pulse/snap/startskott/svall/urladdning + pulsaccent på 1 och 3, 1ca4d08 kaskad, 555336c famn,
-  f3f3031 fyllning, 39a0b5a frasraknare (kaskad + famn godkända i ögat). spaning/blixtnedslag följer redan stilen. KVAR: vagbrytare, minnet, linjalen
-  (en i taget med ägarens öga, ingen nattändring). Backa: taggar fore-takt-a6 / fore-etta-trea. Dirigenten fri (mode smart) när ägaren gick.
+  f3f3031 fyllning, 39a0b5a frasraknare (kaskad + famn godkända i ögat). spaning/blixtnedslag följer redan stilen.
+  1AN-3AN RESTEN 2026-11-20 (ägaren: 'Bygg vagbrytare först' + 'fritt att köra på'), EJ UTLAGD, en commit + backup-tagg var, ögonprov i denna ordning:
+  9ef1af4 vagbrytare (kammen ettan ena halvan/trean andra; tagg fore-vagbrytare-trea), 6385257 minnet (blinket ettan vänster/trean höger, var hela
+  riggen; fore-minnet-trea), 2a12946 linjalen (löparen 100 % på 1 och 3, var bara 1; fore-linjalen-trea), 99b6632 hjärtpulsen (1 och 3 = 100 %,
+  2/4 85 %, 21 effekter; fore-hjartpuls-trea). Replay 171840/193040: samma look och byten rad för rad, medelljus +0,0 / -1,1 % (minnet -4,4 %).
+  Förkastas en: git revert <commit> (bara den). Minnet räknar takten från sektionens start, inte analysatorns etta (oförändrat). Backa: taggar fore-takt-a6 / fore-etta-trea. Dirigenten fri (mode smart) när ägaren gick.
   ladan.py --bara-deploy tog bort ladan.conf (kärnorna 0 1 2) - lagat 554944a. Deploy kräver ANALYSER_SIBLING=/c/finns-inte tills lotus portat a6.
   Ägaren 11-19: takten före ettan; ett-arbete framåt = bara PAREN (1/3 mot 2/4). Inspelning lang-20261119T193418.wav (30 min, Pi:n) + dirigentens
   logg .arena/dirigent/logg-2026-11-19.jsonl och ägarens tryck tryck.jsonl = facit till kommande DIRIGENT-arena (ägarens önskan: 'ibland dåligt
