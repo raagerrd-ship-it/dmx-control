@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { vaxel } from "./rig.js";
 import { hsv } from "./color.js";
 
 // STEGRING (build, 2026-09-21): spanningen stiger med sektionens alder. Borjar morkt och mattat i en farg, smalnar
@@ -28,7 +29,7 @@ export const stegring: EffectDef = {
     // kant varannan puls - när pulsen tätnar studsar den allt fortare mellan kanterna (högst en blixt per slag och lampa).
     const e = Math.abs((c.lamp + 0.5) / c.count - 0.5) * 2;                        // 0 mitten .. 1 kanten
     const side = c.lamp < c.count / 2 ? 0 : 1;
-    const edgeHit = onBeat && (Math.floor(c.beatIdx / every) & 1) === side;
+    const edgeHit = onBeat && (every === 1 ? vaxel(c.beatIdx) : Math.floor(c.beatIdx / every) & 1) === side;   // 1an-3an-stilen (11-20): varje slag = växeln (vänster 1 och 4, höger 2 och 3)
     c.want.uv = u; c.want.hazer = 0.3 + 0.7 * u;
     if (c.dropEnv > 0.7) c.want.blinder = c.dropEnv;
     const v = e < 0.5 || c.count < 3 ? base + pulse * (0.3 + 0.5 * u) : (edgeHit ? pulse * (0.5 + 0.5 * u) : 0.02);
