@@ -1,13 +1,13 @@
 import type { EffectDef } from "./types.js";
 import { hsv, soft } from "./color.js";
-import { slotSize } from "./rig.js";
+import { ettaTrea, halva, slotSize } from "./rig.js";
 
 // VAGBRYTARE (high, 2026-09-21): en vag per TAKT (4 slag) rullar fran ena kanten till den andra, och pa ettan (barShift
 // fran analysatorn) bryter den med en vit kam over hela riggen. Takten syns som en FORM, inte bara som puls. Riktningen
 // vaxlar varannan takt. Utan taktfas: ettan = slag 0 i fyrgruppen.
 export const vagbrytare: EffectDef = {
   key: "vagbrytare", label: "Vagbrytare", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"],
-  desc: "En vag per takt over riggen, vit kam pa ettan.",
+  desc: "En vag per takt over riggen, kam pa ettan ena halvan och pa trean andra.",
   render(c) {
     const inBar = ((c.beatIdx % 4) + 4) % 4;                 // slagets plats i takten (ankaret flyttas till ettan av motorn)
     const barNo = Math.floor(c.beatIdx / 4);
@@ -18,7 +18,7 @@ export const vagbrytare: EffectDef = {
     // MJUK PULS (11-02, ägaren i ladan 11-01: refrängeffekterna 'väldigt AV/PÅ'): vågen sväller mjukt på varje slag och kammen på
     // ettan stiger och klingar (soft) i kulör i stället för att slå på direkt med vitt (diodblinket).
     const f = c.hasBeat ? c.beatFrac : 1 - c.kickEnv;
-    const crest = inBar === 0 ? 0.6 * soft(f, 0.12, 0.45) : 0;      // ettan: kam över hela riggen
+    const crest = ettaTrea(c.beatIdx, halva(c.lamp, c.count)) ? 0.6 * soft(f, 0.12, 0.45) : 0;   // 1an-3an-stilen (11-20): kammen på ettan ena halvan, trean andra
     // EFFEKTGENOMGÅNGEN 10-13 (effectDyn: 29,7 kulörhopp/min - kulören byttes varje takt; c.audio/punch/beatPulse som NIVÅ
     // dubbelmodulerade mot basenergin och 0,08-golvet lyftes av motorns grundnivå): kulören per fras, mörkt framför och bakom vågen.
     const hue = c.mixedSector(Math.floor(c.hueIdx / 16)) / 6;
