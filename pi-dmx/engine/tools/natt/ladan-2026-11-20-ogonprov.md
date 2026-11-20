@@ -27,3 +27,8 @@ Vänster = Par 1–4, höger = Par 5–8. "Växeln" = grupp A på 1 och 4, grupp
 
 Ordningen = mest speltid först (replay: varannan 11 %, minnet 13 %, linjalen 1 %, resten valdes sällan).
 Förkastas något: säg numret, så backar jag just den och lägger ut igen.
+
+## Hämta 11-19-inspelningen (när Pi:n nås, ingen inspelning igång)
+Ny kontrollmängd = det som saknas för takt-arbetet (a7-vetot, a3) och dirigent-arenan. Ligger i snippets/, som deployen inte rör.
+
+    mkdir -p tools/ladan-2026-11-19 && scp -i ~/.ssh/id_pidmx pi@<ip>:/var/lib/audio-dmx-engine/snippets/lang-20261119T193418.* tools/ladan-2026-11-19/
