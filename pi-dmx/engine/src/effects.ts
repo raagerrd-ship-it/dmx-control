@@ -1880,12 +1880,12 @@ export class EffectEngine {
     // puls när BPM ej låst → party/pulse/bounce lyste bara jämnt högt.)
     const _bf = 1 - beatFracFx;
     const beatPulse = hasBeat ? _bf * _bf : kickEnv;
-    // EFFEKT-EGEN HJARTPULS (kontraktet i types.ts): hjartats form (hjarta.ts) pa effekt-klockan, ettan lite starkare.
+    // EFFEKT-EGEN HJARTPULS (kontraktet i types.ts): hjartats form (hjarta.ts) pa effekt-klockan, ettan och trean lite starkare (1an-3an 11-20).
     let heartPulse = kickEnv;
     if (hasBeat) {
       const f = beatFracFx;
       const lub = Math.exp(-f / 0.10), dub = f > 0.22 ? Math.exp(-(f - 0.22) / 0.09) * 0.55 : 0;
-      heartPulse = Math.max(lub, dub) * ((beatIdx & 3) === 0 ? 1 : 0.85);
+      heartPulse = Math.max(lub, dub) * ((beatIdx & 1) === 0 ? 1 : 0.85);
     }
     const tempoDeep = Math.max(0, Math.min(1, (beatMs - 340) / 260));   // 0 snabbt .. 1 långsamt
     const punchFloor = 0.5 - tempoDeep * 0.42;                            // 0.5 (snabbt) .. 0.08 (långsamt)
