@@ -1,6 +1,6 @@
 import type { EffectDef } from "./types.js";
 import { hsv } from "./color.js";
-import { slotSize } from "./rig.js";
+import { slotSize, vaxel } from "./rig.js";
 
 // MULLRA (lugn x uppbyggnad, situationsrutnätet 2026-10-12 - syskon gryning/flod/stjärnor): uppbyggnaden i en lugn låt bärs av
 // basen. Mittlamporna mullrar med basens sustain (c.drum.bass) i paletten, ytterlamporna står i motfärg och ljusnar med uppbyggnaden
@@ -16,7 +16,7 @@ export const mullra: EffectDef = {
     //   Spridningen var 0,24: kanternas botten 0,04 + 0,28p syntes som nästan fullt. Nu släckta mellan tickarna. Mittens mullrande
     //   bärs av basenergin (drum.bass som NIVÅ dubbelmodulerade mot den) - mitten glöder jämnt med hjärtat.
     if (!outer) return hsv(base / 6, 1, Math.min(1, 0.5 * c.heart(0.3)));
-    const mine = ((c.beatIdx & 1) === 0) === (slot === 0);
+    const mine = (vaxel(c.beatIdx) === 0) === (slot === 0);   // 1an-3an-stilen (11-20): vänster på 1 och 4, höger på 2 och 3
     const tickV = mine ? Math.exp(-c.beatFrac / 0.3) : 0;
     return hsv(((base + 3) % 6) / 6, 0.95, Math.min(1, 0.01 + (0.15 + 0.5 * p) * tickV));
   },
