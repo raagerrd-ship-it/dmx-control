@@ -19,7 +19,8 @@ export const sidokedja: EffectDef = {
     const base = c.mixedSector(Math.floor(c.hueIdx / 16));
     if (!mid) return hsv(((base + 3) % 6) / 6, 1, 0.2 + 0.8 * soft(f, 0.12, 0.35));   // kicken: mjuk upp, klingar ut
     c.want.energy = false;                                                // padden: egen dynamik
-    const x = Math.max(0, Math.min(1, ((c.beatIdx & 1) + f - 0.3) / 1.6));
-    return hsv(base / 6, 1, 0.03 + 0.97 * x * x * (3 - 2 * x));          // trycks ner på 1 och 3, sväller till nästa
+    const k = (((c.beatIdx - 2 * (c.lamp < n / 2 ? 0 : 1)) % 4) + 4) % 4;   // 1an-3an-stilen (11-20): vänstra padden trycks ner på ettan, högra på trean
+    const x = Math.max(0, Math.min(1, (k + f - 0.6) / 3.2));          // sväller över fyra slag (samma ljus i snitt; var: hela padden på 1 och 3, två slag)
+    return hsv(base / 6, 1, 0.03 + 0.97 * x * x * (3 - 2 * x));          // vänster trycks ner på 1, höger på 3, sväller till nästa
   },
 };
