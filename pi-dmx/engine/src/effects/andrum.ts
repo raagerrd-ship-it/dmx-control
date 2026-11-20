@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { vaxel } from "./rig.js";
 import { hsv } from "./color.js";
 
 // ANDRUM (break, 2026-09-21): breakdownen ar en paus - riggen dimmar till en djup ton, ror sig langsamt och behaller bara
@@ -19,7 +20,7 @@ export const andrum: EffectDef = {
     const drift = 0.5 + 0.5 * Math.sin(c.t * 0.4 + c.idx * 1.6);
     // HJARTSLAGET VANDRAR (2026-09-27): slaget landar pa en grupp i taget (jamn/udda eller inre/yttre via c.grouping) sa aven
     // breaket har rorelse mellan lamporna - forut var pulsen uniform och andrum lastes som hjarta/subbreath (rV-familjen).
-    const mine = c.group === (c.beatIdx & 1);
+    const mine = c.group === vaxel(c.beatIdx);   // 1an-3an-stilen (11-20): växeln, grupp 0 på 1 och 4, grupp 1 på 2 och 3 (var: varannat slag)
     const beat = mine ? (c.hasBeat ? Math.exp(-c.beatFrac / 0.12) * 0.3 : c.heartPulse * 0.25) : 0;
     c.want.hazer = 0.5;
     return hsv(hue, 0.9, Math.min(1, 0.01 + 0.45 * drift * drift * deep + beat));
