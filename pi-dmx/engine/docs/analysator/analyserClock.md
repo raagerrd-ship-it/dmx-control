@@ -947,3 +947,17 @@ Marginaler ±25 % (klockan ensam, fel s på övningen, valt 39): TG_Q_SIM 39/39,
 marginal 40/40, senare halvans golv 39/39, TG_FINE_MAX 40/39, BND_QUIET_BEATS 39/39.
 
 Olöst: ~37 s att låsa efter ett låtbyte till en låt med tyst intro (tempot syns inte i signalerna förrän takten kommer in).
+
+### FRESH_MS, FRESH_TEMPO, JUMP_FRAC, LM_TAU_MS, LM_K, lmAt/lmAdd/lmTurn, freshTo, phWt/phWb/phWc - DET TRÖTTA LÅSET (a3c, inlagt 2026-11-20 d0de317)
+
+Ägaren 11-20: "lägg in a3c". Arenan takt13 a3 (a5:s trötta lås ovanpå a6) med lat dämpning i lmAdd. Fasrättningen var 250:e ms tar ett hopp
+på >= JUMP_FRAC (0,12 slag) bara om fasminnet håller med: lm(hoppets fas) x LM_K (1,2) >= lm(nuvarande). Minnet (lm, 48 fack) är a6:s viktade
+bandstigning per anslag (vikterna phWc = bästa sökningens bandvikter), vikt mot klockans fas, tau LM_TAU_MS 10 s; tas ett hopp vrids minnet
+med (lmTurn). Färskt (FRESH_MS 8 s, freshTo): efter relock, nytt cfg.beat eller tempohopp > FRESH_TEMPO 4 % nollas minnet och alla hopp
+passerar. jumpVetos räknar nekade hopp.
+Lat dämpning (lmS): tabellen är L x lmS; dämpningen ändrar bara lmS, och lmAt jämförs bara mot lmAt, så skalan tar ut sig. Renormering under
+1e-200. Replay byte-identisk med a3 (160345, 193818, 171840, 200719).
+Mått: pardom övning +1,32 / mellan -0,41 / kontroll +2,66 (takt FEL 10,3 -> 9,3 %, 193818 par 72 -> 79); dropdom3 identisk; pibudget x0,95-1,02
+(körs i workern); lotusbank korpus 476 = 476, syntet 6 = 6, i fas 305 -> 319, motfas 15 -> 17.
+Risk: en verklig fasändring utan låtgräns och utan tempohopp > 4 % (beatmatchad övergång med fasförskjutning) tar ~5-8 s att följa i stället
+för 0,25 s. Backa: tagg fore-a3c.
