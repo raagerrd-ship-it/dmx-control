@@ -1,4 +1,5 @@
 import type { EffectDef } from "./types.js";
+import { vaxel } from "./rig.js";
 import { hsv } from "./color.js";
 
 // FYRVERKERI (high, 2026-09-21): dropen ar festen. Nar dropEnv slar till exploderar lamporna i slumpad ordning under ~2 s -
@@ -23,7 +24,7 @@ export const fyrverkeri: EffectDef = {
     // MELLAN SALVORNA (2026-09-27): pumpen gar TVA OCH TVA - en grupp per slag (jamn/udda eller inre/yttre via c.grouping),
     // den andra glimmar bara. Forut pumpade alla fyra unisont = party (rV 0,94-0,96, samma pool high); nu star salvan ut mot
     // en glesare bakgrund och effekten har egen rorelse mellan dropparna.
-    const mine = c.group === (c.beatIdx & 1);
+    const mine = c.group === vaxel(c.beatIdx);   // 1an-3an-stilen (11-20): växeln, grupp 0 på 1 och 4, grupp 1 på 2 och 3 (var: varannat slag)
     const pump = Math.min(1, c.beatPulse * 0.9 + c.kickEnv * 0.6 + c.punch * 0.6);
     const party = 0.10 + 0.9 * pump * (mine ? 1 : 0.25);
     const v = Math.max(party * (1 - burst * 0.5), burst);
