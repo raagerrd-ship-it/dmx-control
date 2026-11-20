@@ -30,8 +30,11 @@ LADAN UTLAGD 2026-11-19 21:04-21:21 (ägaren på plats): a6 (a68026c + manifest 
   2/4 85 %, 21 effekter; fore-hjartpuls-trea). Replay 171840/193040: samma look och byten rad för rad, medelljus +0,0 / -1,1 % (minnet -4,4 %).
   Förkastas en: git revert <commit> (bara den). Minnet räknar takten från sektionens start, inte analysatorns etta (oförändrat).
   + fea59bc varannan (11 % av speltiden i replay; A slår 1-2, B 3-4, var A alla slag; fore-varannan-trea), 23971e5 gallop (samma; fore-gallop-trea).
-  KVAR (sällan valda i replay 171840/193040, 0 %): fyrverkeri/rave/tryckvag/sidokedja (refräng), andrum/skuggor (break), mullra (build) växlar
-  varje slag = 1 och 3 samma lampor; stegring/sug slår bara ettan tidigt i uppbyggnaden (låg prio). Backa: taggar fore-takt-a6 / fore-etta-trea. Dirigenten fri (mode smart) när ägaren gick.
+  + RESTEN (ägaren 'ta resten också'), VÄXELN vaxel() i rig.ts (grupp 0 på 1 och 4, grupp 1 på 2 och 3): 12cf797 tryckvag (+ rig.ts; backa tryckvag
+  genom att ändra tillbaka raden i tryckvag.ts, INTE git revert - andra effekter använder vaxel), d43d32e rave, 2afa53d fyrverkeri, 8997303 sidokedja
+  (vänster padd ner på 1, höger på 3, sväller över 4 slag, snitt 0,45 som förr), 834b0be andrum, e21389b skuggor, fdbb0e3 mullra, 6fb2896 stegring
+  (bara varje-slag-läget). Tagg fore-<namn>-trea per commit. Replay 151659/200719: samma look/byten, ljus +0,00 % (bara tryckvag valdes, 292 rader).
+  sug orörd (EN puls i mitten som tätnar 4 -> 2 -> 1, ingen halva att flytta). 1an-3an därmed genomgånget i alla effekter med slagmönster. Backa: taggar fore-takt-a6 / fore-etta-trea. Dirigenten fri (mode smart) när ägaren gick.
   ladan.py --bara-deploy tog bort ladan.conf (kärnorna 0 1 2) - lagat 554944a. Deploy kräver ANALYSER_SIBLING=/c/finns-inte tills lotus portat a6.
   Ägaren 11-19: takten före ettan; ett-arbete framåt = bara PAREN (1/3 mot 2/4). Inspelning lang-20261119T193418.wav (30 min, Pi:n) + dirigentens
   logg .arena/dirigent/logg-2026-11-19.jsonl och ägarens tryck tryck.jsonl = facit till kommande DIRIGENT-arena (ägarens önskan: 'ibland dåligt
