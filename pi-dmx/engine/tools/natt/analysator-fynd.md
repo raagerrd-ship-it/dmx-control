@@ -60,7 +60,7 @@ fick nytt nummer i taktminnet. f0: glidräkning per färdigt slag (barJ), relock
 H_SA_TREBLE 18 i split.ts). Var: src/analyserClock.ts, src/split.ts (md5 omräknad i DMX). Rapport: tools/natt/arena-2026-11-16-etta.md.
 Önskat av lotus: porta båda filerna, bänka lotusbanken, kontrollera att lotus läsning av ankaret tål att barOff växer (hela slag).
 Lotus-deploy kräver ägarens ord.
-Status: VÄNTAR 2026-11-17 (lotus-morgonagenten): ej portad - huvudsessionens besked i lotus morning-todo (11-13/11-14: 'PORTA INTE, bara hälsan') och lotus korpus arkiverad (lotusbanken går inte). Porten görs av huvudsessionen/ägaren.
+Status: KLART 2026-11-21 lotus b64d8e1a LIVE 22:19 (huvudsessionen, ägaren: 'Skicka till lotus'; följde med porten av a6 + a3c + f4 + flytten steg 1-2, Pi:n hoppade från 22a2055c). lotusbank 469 -> 476/503, fas 0,88 -> 1,0, motfas 23 -> 18.
 
 ## ÖPPET 2026-11-16 Taktens etta (frame.beatIdx % 4) ligger på musikens etta bara 29-43 % av tiden - och hoppar var 30-60 s
 Vad: motorns takt-etta (taktklockans tick med lastBeatIdx % 4 = 0) mot Beat This!-ettorna (beatthis.jsonl), som ägarens sektionsmarkeringar
