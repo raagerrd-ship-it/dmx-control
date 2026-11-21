@@ -75,7 +75,7 @@ facken överst i `process`, `fillFrame`, `pushBig`, `drainBig`, `bigAgg` och `en
 
 Startvärdena är dagens, ordagrant (`envelope` och `src` saknar startvärde som förut och sätts i konstruktorn). `DOUBLE_FROM_START`-namnen
 flyttade till facken: `activeMs` (nivå), `pendingKickMs`, `kfPrev`, `kfPrev2`, `beatAnchorMs`, `lastKick` (kick; kickens egen lista togs bort),
-`conf` (klockan). Kvar på `Analyser` tills sina steg: `secSpecDirty`, `bassOnPeak` (blir räknare i spektrums steg 12), `dbgRms` (kickens steg 10).
+`conf` (klockan). Kvar på `Analyser` tills sina steg: `secSpecDirty`, `bassOnPeak` (blir räknare i spektrums steg 12), `dbgRms` (kickens steg 10, se nedan).
 Getters för verktygen: `Analyser.bandOn` (`konsertReplay.mjs`), `Analyser.beatSrc` (`feedProof.mjs`).
 
 ## De små stenarnas fack (steg 4): BassOut, RiserOut, DropOut, CharacterOut
@@ -111,3 +111,14 @@ Bara data. De 17 publicerade fälten flyttade ur `Analyser` till `f.section` med
 Dropens transport (`pack`/`unpack`/`resume`) ligger i stenen, ordagrant de gamla raderna i `drainBig`, `pushBig` och konstruktorns omstart.
 Rattarna `BODY_RISE_DB`, `BODY_GONE_MIN_MS`, `DROP_QUALITY_DB`, `DROP_RISE_LOW_DB`, `DROP_UNDERPEAK_MIN`, `MINI_SPACING_MS`, `DROP_TRACE` står i `analyserDrop.ts`
 (bara drop läser dem; anteckningarna om dem står kvar i `analyser.md`).
+
+## Kicken efter kontraktet (steg 10)
+
+`KickReads` (hop: `kickFlux`, `energy`, `now`, `hopMs`, `rms`, `wallNow`; level: `gain`, `envelope`, `gainLocked`; clock: `src`), eget fack `f.kick`.
+`kickStep()` returnerar `void` och skriver `f.kick.kick` (förr kärnans `kk.kick = kick` senare i hoppet; ingen läser fältet däremellan).
+`anchorStep()` står där kärnans rader stod (efter `envSampleStep`, före utjämningen), samma satser i samma ordning: `kickAt = 0`, förfiningen om
+`pendingKickMs > 0`, ankaret om `kick`, sist `kfPrev2`/`kfPrev`. Kärnans sista skrivning `kk.kickAt = kickAtMs` är borta (samma värde).
+`setVirtualClock` vid hopp: `kicks.reset()` (`lastKick`, `pendingKickMs`, `beatAnchorMs`), `f.clock.resetPhase()` (ny metod i `ClockOut`), `sections.sectionReset()`,
+samma plats och ordning som förut. `dbgRms` borta: kicken läser `f.hop.rms` (samma värde, skrevs på raden före). `KICK_NOGATE`, `KICK_COOLDOWN_MS`, `KICK_EFLOOR`
+är modulkonstanter i `analyserKick.ts` (förr statiska på `Analyser`; bara kicken läser dem).
+`tools/ensam.mjs tappa kicks kickStep` går inte att spela upp (gick inte före steget heller): rutnätet `f.clock.src.beat` är ett objekt som dyker upp under körningen och tappas inte.

@@ -126,7 +126,7 @@ export interface Frame {
 }
 
 const DOUBLE_FROM_START = [
-  'sumSq', 'lastT', 'dbgRms', 'envAccum', 'envAccumT', 'envBassAccum',
+  'sumSq', 'lastT', 'envAccum', 'envAccumT', 'envBassAccum',
   'lvlVU', 'engSmooth', 'snareHit', 'hatHit',
   'rawBpmLast',
 ] as const;   // Instansfalt som MATT
@@ -220,10 +220,6 @@ export class Analyser {
   secSpecDirty = true;
   private slowBusyEmaUs = 0; private slowBusyMaxUs = 0; private slowLagMaxMs = 0; private slowSkipped = 0; private slowProcessed = 0;
   static readonly SECTION_EARLY_DB = Number(sysEnv('SECTION_EARLY_DB')) || 3;
-  static readonly KICK_NOGATE = sysEnv('KICK_NOGATE') === '1';
-  static readonly KICK_COOLDOWN_MS = Number(sysEnv('KICK_COOLDOWN')) || 0;   // 0 = tempoanpassad
-  static readonly KICK_EFLOOR = Number(sysEnv('KICK_EFLOOR')) || 0.06;
-  dbgRms = 0;   // Korbank
   dbgBestLag = 0; dbgLagMin = 0; dbgLagMax = 0; dbgTgAt = (lag: number): number => this.tempoGram[lag] ?? 0;
   evidRelockVotes = 0;
   tempoShifts = 0;   // Telemetri
@@ -539,9 +535,7 @@ export class Analyser {
     const jump = ms === null || !this.virtualOn || ms < prev || ms - prev > 1000;
     if (ms === null) { this.virtualOn = false; this.virtualMs = NaN; } else { this.virtualOn = true; this.virtualMs = ms; }
     if (!jump) return;
-    this.f.kick.lastKick = 0;
-    this.f.kick.pendingKickMs = 0;
-    this.f.kick.beatAnchorMs = 0; this.f.clock.phaseMs = 0; this.f.clock.phaseConf = 0; this.sections.sectionReset();
+    this.kicks.reset(); this.f.clock.resetPhase(); this.sections.sectionReset();
     this.lastT = 0;
   }
   /** KORBANK. */
@@ -765,7 +759,6 @@ export class Analyser {
     const dt = this.lastT === 0 ? 0 : Math.max(0, Math.min(0.1, (now - this.lastT) / 1000));
     this.lastT = now;
     const d = h.cfg.detection;
-    this.dbgRms = rms;
     h.rms = rms; h.now = now; h.dt = dt;
     h.gated = rms >= h.cfg.detection.noiseFloor * 1.5;
     if (!lv.gainLocked && rms > d.noiseFloor) this.levels.agcStep();
@@ -773,7 +766,7 @@ export class Analyser {
     const level = Math.min(1, rms * lv.gain);
 
     h.kickFlux = kickFlux; h.energy = energy;
-    const kick = this.kicks.kickStep();
+    this.kicks.kickStep();
 
     const hopMs = h.hopMs;
     this.levels.silenceStep();
@@ -786,16 +779,7 @@ export class Analyser {
     if (HIGH_ON) { const hi = sp.bandOn[6] > sp.bandOn[7] ? sp.bandOn[6] : sp.bandOn[7]; if (hi > this.envHighAccum) this.envHighAccum = hi; }
     this.envAccumT += hopMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) this.envSampleStep();
-    let kickAtMs = 0;
-
-    if (kk.pendingKickMs > 0) { this.kicks.kickRefine(); kickAtMs = kk.kickAt; }
-    if (kick) {
-      kk.beatAnchorMs = this.wallNow();
-      kk.pendingKickMs = kk.beatAnchorMs;
-    }
-
-    kk.kfPrev2 = kk.kfPrev;
-    kk.kfPrev = kickFlux;
+    this.kicks.anchorStep();
 
     const dtHop = h.dtHop;
     const aAtt = this.aAtt;
@@ -817,14 +801,14 @@ export class Analyser {
     const hatOnset = ON[6] > ON[7] ? ON[6] : ON[7];
     this.hatHit = Math.max(this.hatHit * this.dHat, hatOnset);
     this.snareHit = Math.max(this.snareHit * this.dSnare, ON[5]);
-    if (kick) h.kickHit = 1;
+    if (kk.kick) h.kickHit = 1;
     else h.kickHit = h.kickHit * this.dKick;
     const nowWallA = this.wallNow();
     this.levels.zoneStep();
     const breaking = h.lvlSmooth < lv.levelCeil * 0.65;
     const inZone = lv.inZone;
 
-    kk.kick = kick; h.nowWall = nowWallA;
+    h.nowWall = nowWallA;
     if (big) {
       lv.intensity = intensity; h.breaking = breaking;
       this.pushBig(samples);
@@ -838,7 +822,6 @@ export class Analyser {
       this.character.profileStep();
     }
     h.level = level; h.flux = fluxNorm; lv.intensity = intensity; this.hInZone = inZone; h.breaking = breaking;
-    kk.kickAt = kickAtMs;
     return this.fillFrame();
   }
 
@@ -921,7 +904,7 @@ export class Analyser {
   readonly sections = new SectionTracker(this);   // SEKTIONER
   readonly riser = new RiserDetector(this.f, this.f.riser);   // UPPBYGGNAD
   readonly character = new CharacterProfile(this.f, this.f.character);   // KARAKTÄR
-  readonly kicks = new KickDetector(this);   // KICK: anslag i snabba vägen
+  readonly kicks = new KickDetector(this.f, this.f.kick);   // KICK: anslag i snabba vägen
   readonly bass = new BassTracker(this.f, this.f.bass);   // BAS: basenergin per slag och basgången
   readonly levels = new LevelTracker(this);   // NIVÅ: förstärkning/AGC, tystnad, intensitet, nivåtak och topp-zon
   readonly bands = new SpectrumBands(this);   // SPEKTRUM
