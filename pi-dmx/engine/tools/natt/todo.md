@@ -51,6 +51,10 @@ ARENAN TAKT13 KLAR 2026-11-20 ~00:15: INGEN SÄKER VINNARE, inget inlagt. Domare
   sämre (spärren: ägaren godkänner). ALLA TRE SPÄRRAR KÖRDA.
   A3C INLAGD I SRC 2026-11-20 (ägaren: "lägg in a3c"): d0de317 (analyserClock.ts + ANALYSER_SHARED.md5), backup-tagg fore-a3c, dist byte-identisk
   med a3c i replay. EJ UTLAGD (följer med ladan-raden). Lotus EJ portad - väntar på ägarens ja (som a6).
+  F4 INLAGD I SRC 2026-11-21 (ägaren: "lägg in f4", arenan fas1, rapport tools/natt/arena-2026-11-21-fas1.md): "samma mönster, flyttat"
+  ovanpå a3c (analyserClock.ts + ANALYSER_SHARED.md5), backup-tagg fore-fas1, dist + replay 193040 byte-identisk med .arena/fas1/f4.
+  Kontroll inom 3 s 9 -> 60 %, median 6,48 -> 2,61 s (ladan i dag = a6: 40 %, 3,07 s). EJ UTLAGD (följer med ladan-raden, ANALYSER_SIBLING=
+  /c/finns-inte). Lotus EJ portad (a6 + a3c + f4 väntar på ägarens ja). klockdom ej körd (oktoberinspelningarna arkiverade, ägarens ja krävs).
   IDÉBANK takt13: a7 syskonveto - laga mot 160345 (bär parfelet i långsam musik); a4 basringen - 171840 FEL 7,4 -> 3,7, prova med strängare armering.
   RÖR INTE .arena/takt13.
 

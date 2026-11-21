@@ -961,3 +961,21 @@ Mått: pardom övning +1,32 / mellan -0,41 / kontroll +2,66 (takt FEL 10,3 -> 9,
 (körs i workern); lotusbank korpus 476 = 476, syntet 6 = 6, i fas 305 -> 319, motfas 15 -> 17.
 Risk: en verklig fasändring utan låtgräns och utan tempohopp > 4 % (beatmatchad övergång med fasförskjutning) tar ~5-8 s att följa i stället
 för 0,25 s. Backa: tagg fore-a3c.
+
+### PM_WIN_MS, PM_MIN, PM_GAP, PM_PRE, PM_RAT, PM_JUMP, PM_PRE0/1, PM_HOLD_MS, pmM/pmS/pmJump, pmTo - SAMMA MÖNSTER, FLYTTAT (fas1 f4, inlagt 2026-11-21)
+
+Ägaren 11-21: "lägg in f4". Arenan fas1 (skarvprovet, tools/arena/fasdom.py) mot frågan "något vi kan göra för att minska fasförskjutning".
+Ett verkligt fashopp skiljs från en kort falsk topp genom att HELA anslagsmönstret (bandstigningarna per fack, viktade per band) de senaste
+PM_WIN_MS 2 s är samma mönster som minnet pmM, bara förskjutet. pmJump korskorrelerar per band mot pmM (vikt = bandets tydlighet) och tar
+hoppet direkt om: förskjutning >= PM_JUMP 0,2 slag, bästa korrelation/vikt >= PM_MIN 0,55, marginal mot andra toppen >= PM_GAP 0,2, mönstret
+höll i läget 0 för 1-3,5 s sedan (PM_PRE1/PM_PRE0, >= PM_PRE 0,7) och nya toppen >= PM_RAT 0,75 x det, och två fix i rad är överens inom 2 fack.
+Efter ett mönsterhopp hålls fasrättningen och phLag stilla i PM_HOLD_MS (= ONSET_WIN_MS, pmTo). Annars gäller a3c:s trötta lås oförändrat.
+pmM fylls i lmAdd med samma lata skala som lm, nollas i lmClear (relock, nytt cfg.beat) och vrids i lmTurn. Under freshTo (8 s efter
+låtgräns/tempohopp) är pmJump av - den färska vägen gäller där.
+Obs: lm och pmM vrids inte vid ett mönsterhopp, så detektorn är i praktiken av ~10 s efter ett hopp.
+Mått (fasdom, följtid = första tick efter vilken alla tick inom 4 s ligger inom 0,1 slag): kontroll 193040/193818 inom 3 s 9 -> 60 %,
+median 6,48 -> 2,61 s, i fas 84,7 -> 83,6, pardom FEL 13,28 -> 13,57, par 89,0 -> 87,2 (före a3c: 40 %, 3,07 s, 81,7, 13,87, 84,8).
+Övning: inom 3 s 8 -> 34 %, median 7,98 -> 4,95 s, pardom identisk (FEL 9,27). dropdom3 identisk, lotusbank lika (motfas 17 -> 18),
+pibudget inom bruset. klockdom ej körd (oktoberinspelningarna arkiverade). Replay byte-identisk med .arena/fas1/f4 (193040).
+Risk: en DJ-övergång till ANNAN låt har inte samma mönster -> faller tillbaka på a3c (~8 s); halva slag blir inte snabbare; par-marginalen
+på kontrollen tunn (87,2 mot spärren 87,0). Backa: tagg fore-fas1.
