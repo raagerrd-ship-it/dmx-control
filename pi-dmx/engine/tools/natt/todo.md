@@ -1,3 +1,24 @@
+NATTEN 2026-11-21 (schemalagda körningen, ingen arena, ingen motorkod ändrad):
+UPPDRAG: inga nya från kvällen. NÄSTA 11-20 (a) gällde bara om ägaren tycker landningen byter för ofta - inget sådant besked, inte gjort.
+BASLINJE tools/natt/ren-2026-11-21/ (HEAD 04ebd3c = a6 + 1an-3an + landningens inträde + 1an-3an-resten + a3c; inget av det sista utlagt):
+  kick->ljus 147/107/128/163/109/104 ms (11-20: 123/112/109/163/104/101), energiR15 0,57/0,28/0,56/0,31/0,39/0,28 (0,53/0,30/0,49/0,22/0,32/0,31),
+  byte på fras 25/26/27/21/17/16 % (25/19/12/19/16/31), drop identiska 1/5/2/5/7/3, lampspr 58/56/62/60/57/53, längsta look 59/86/58/28/104/118 s.
+  Ordning 151659/160345/171840/193040/193818/200719. 151659 +24 ms och 171840 +19 ms kick->ljus = lookmixen (samma ljusväg), ej bisekterat.
+  Domarens bas för natten: .arena/natt1121/bas (bank + holdout, basenv tom = SHOW_ENV tom, allt godkänt ligger i koden).
+BRIST: 42 av 85 sektionstaggade effekter valdes ALDRIG på sex filer (76 min, 236 lookbyten; 11 build, 7 bara-break, 24 övriga): nya verktyget tools/natt/lookvalHook.mjs +
+  lookval.py (bevisat läsande: tight-json identisk på alla sex). Refrängen (95 byten): fyrverkeri och droppar klarade kraven 95/95, rave/snap
+  spärras av bpm < 120/115 i 42/95, ripple/sidokedja/slagga av beat < 0,35 i 14/95, gravity/split av profile.bass (median 0,12!) i 123/85.
+  Det som avgör refrängens topp 2 är rumsbonusen SPATIAL x 0,5 x punch (~+0,37 vid punch 0,74); rave, snap, fyrverkeri saknar post.
+  Uppbyggnaden: 17 byten, 10 av 16 build-looker aldrig (låg prio enligt ägaren). Break: bara 3 byten på 76 min - break-effekterna syns knappt.
+IDÉ, FÖRKASTAD: SPATIAL IKAPP (rave 1,0 / snap 1,0 / fyrverkeri 0,7 / slagga 0,3 -> 1,0, opt-in, aldrig committad): domaren v3 övning -2,7,
+  KONTROLL -16,3 DISK (lampspr 193818 -26,6 %, koreografi -38,8, ljus +10-15 %). De osedda refrängeffekterna lyser mer och mer lika över
+  riggen än favoriterna - rumsbonusen gör sitt jobb. Pröva inte att lyfta dem i rankningen igen; vill ägaren se dem: setMode i ladan,
+  och gallra de han inte vill ha (förslag: fyrverkeri, rave, snap, slagga, ripple, sidokedja, droppar, gravity, split - ägarens öga avgör).
+FYND: a3c DELAD FIL ÄNDRAD skrivet i analysator-fynd.md (lotusbank-siffrorna från 11-20; analyserParity ser inte taktvägen).
+NÄSTA FÖR NATTAGENTEN: (a) om ägaren vill gallra: ta hans lista ur ögonprovet (setMode), lägg Pi-filerna i REMOVE i ladan.py med datum och
+  skäl; (b) profile.bass median 0,12 på ladans aux gör att gravity/split/tide nästan aldrig klarar kraven - mät om kraven (needsBass) ska följa
+  profilens verkliga spridning (percentil) innan något ändras; (c) ingen arena utan ARENA-uppdrag.
+
 NATTEN 2026-11-20 (schemalagda körningen, ingen arena; motorkod: bara opt-in-provet nedan):
 KLART 2026-11-20: NÄSTA 11-19 (a) "vilken look g6-landningarna drar" - landning = 97 av 246 lookbyten (39 %) i sex filer (151659 20 av 29,
   160345 17/34, 193818 27/79), i high 53 / low 32 / intro 12. 7 landningar byts inom 3 s, 5 av dem av ett andra byte för SAMMA händelse:
