@@ -23,7 +23,11 @@ DMX takt13 pardom: övning +1,32 / mellan -0,41 / kontroll +2,66. analyserParity
 (0 hop betyder inget här) - lotusbank ovan är det relevanta lotus-måttet. Nattens DMX-baslinje på HEAD 04ebd3c: tools/natt/ren-2026-11-21/.
 Var: src/analyserClock.ts (lmAdd, låsets trötthet). Material: tools/ladan-2026-11-13/, -14/, lotus korpus (tools/tempo-facit-pc/corpus, kopierad
 tillbaka 11-20). Önskat: porta ihop med a6 när ägaren säger ja (motfas +2 är ägarens beslut).
-Status: VÄNTAR 2026-11-21 (lotus-morgonagenten): ej portad - fyndet säger 'porta ihop med a6 när ägaren säger ja' och huvudsessionens besked är bara hälsan, inga portar. Lotus Pi kör fortfarande 22a2055c.
+Status: KLART 2026-11-21 lotus b64d8e1a LIVE 22:19 (ägaren 'Skicka till lotus'): portad ihop med a6, f4 (486198f) och FLYTTEN steg 1-2 ur dmx 7699297e
+(14 delade filer, manifestet identiskt, ny analyserFack.ts). lotusbank --ref: Pi:n 22a2055c 469/503, 6/8, on-beat 0,40, fas 0,88, motfas 23, i fas 271,
+följare 0,93 -> efter 476/503, 6/8, 0,41, fas 1,0, motfas 18, i fas 319, följare 1,0 (lotus HEAD fec31f98 före: 476, 6/8, 0,41, 0,89, 21, 268, 0,93).
+Pi: md5 = lokalt (18 filer), NRestarts 0, workern startad; Sonos i vila vid utläggningen = ej sedd med musik. Backup: tagg backup/fore-port-kedjan-20261121,
+/home/pi/lotus-dist-backup-20261121-fore-kedjan.tgz (+ kopia i Desktop/Claude/lotus-backups/), filernas .bak-20261121-2219.
 
 ## ÖPPET 2026-11-20 DELAD FIL ÄNDRAD: TAKTEN a6 (fasen ur sex band) - analyserClock.ts + split.ts
 Vad: huvudsessionen lade in arenan takts a6 i dmx 2026-11-19 (a68026c, manifest 3e03067, tagg fore-takt-a6), LIVE i ladan sedan 11-19 21:04
@@ -34,7 +38,8 @@ Paritet (nattagenten 11-20, analyserParity.mjs, gammal = .arena/takt/bas/dist): 
 (225 000 hop), dmx-stil 0 också - verktyget jämför bara analysatorns ram, och a6 sitter i taktvägen (HopLane/analyserClock -> beatFeed), så 0 betyder
 INTE att lotus klocka är opåverkad: lotus behöver bänka klockan i sin egen kedja. Deploy av DMX kräver ANALYSER_SIBLING=/c/finns-inte tills lotus portat.
 Var: src/analyserClock.ts (onsetStep), src/split.ts (H_SA_LOWMID/MID/HIMID). Material: tools/ladan-2026-11-13/, -14/. Önskat: porta när ägaren säger ja.
-Status: VÄNTAR 2026-11-20 (lotus-morgonagenten): ej portad - fyndet själv säger 'porta när ägaren säger ja' och huvudsessionens besked i lotus morning-todo är bara hälsan, inga portar (lotus korpus arkiverad, ingen lotus-bänk av klockan går). Lotus Pi kör fortfarande 22a2055c (f0 fec31f98 ej utlagd).
+Status: KLART 2026-11-21 lotus b64d8e1a LIVE 22:19 - ihop med a3c, f4 och flytten steg 1-2 (dmx 7699297e), se a3c ovan för bänken: korpus 469 -> 476/503,
+syntet 6/8, fas 0,88 -> 1,0, motfas 23 -> 18, i fas 271 -> 319, följare 0,93 -> 1,0. Utläggningen tog också med lotus ej utlagda portar sedan 22a2055c (lat1, dropportarna, f0).
 
 ## ÖPPET 2026-11-18 Ettan efter f0 på ladans HEAD: 98 / 63 / 66 % - kvar är 2-slagsfelet (1 mot 3), och sektionen kommer 5-10 s sent
 Vad: sektionLagHand.py (konsertReplay --slag --delad-cfg, HEAD 3f7916d = ladan 78346df + verktyg) - motorns etta mot Beat This-ettan, förskjutning
