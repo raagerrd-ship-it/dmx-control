@@ -1,3 +1,5 @@
+FLYTTEN PÅGÅR (start 2026-11-21 kväll, ägaren: 'du får fritt, ta backup sen bygg'): analysatorn byggs om till 'varje sten får ett eget fack' (arenan kedjan a014 + täpp hålet), ett steg per commit, byte-identiskt (bevis.sh med REF=.arena/ref/dist-kedja0). Backup-tagg backup/fore-kedjan-20261121. NATTAGENTEN: rör INTE src/analyser*.ts, src/split.ts, src/slowWorker.ts eller ANALYSER_SHARED.md5, ingen arena på analysatorn; effekter/dirigent går bra. Ingen deploy.
+
 NATTEN 2026-11-21 (schemalagda körningen, ingen arena, ingen motorkod ändrad):
 UPPDRAG: inga nya från kvällen. NÄSTA 11-20 (a) gällde bara om ägaren tycker landningen byter för ofta - inget sådant besked, inte gjort.
 BASLINJE tools/natt/ren-2026-11-21/ (HEAD 04ebd3c = a6 + 1an-3an + landningens inträde + 1an-3an-resten + a3c; inget av det sista utlagt):
