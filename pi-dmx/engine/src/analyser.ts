@@ -1,7 +1,9 @@
 /** ENAD ANALYSATOR (2026-09-24) — en fil, samma byte i lotus-light-link (pi/src/audio-analyser/) och dmx-control (pi-dmx/engine/src/). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyser.md */
 
-import { PROFILE } from './analyserProfile.js';
-export const BASS_SPAN_DB = 36;   // frame.bassEnergy / bassEnergyShort
+import { sysEnv, env, numEnv, stabilise, BODY_CEIL_DB_S, BE_FALLBACK_MS, BE_MEM_BEATS, BASS_SPAN_DB, BASSON_LEN, BIG_EVERY, SECTION_AGG_HOP, BODY_HIGH_MS, BODY_HIGH_DB,
+  type BeatGrid, type AnalyserDetection, type Cfg, type Role } from './analyserFack.js';
+export { BASS_SPAN_DB, SECTION_AGG_HOP, BODY_CEIL_DB_S };
+export type { BeatGrid, AnalyserDetection, Cfg, Role };
 import {
   REC_LEN, RING_N, R_SEQ, R_PERF, R_WALL, R_ENV, R_BASS, R_HIGH, R_FLAGS, R_HINT_MS, R_VCLOCK, R_SEC_N, R_SEC_INT, R_SEC_KICKS, R_SEC_BREAK,
   R_SEC_RMS2, R_SEC_CENT, R_SEC_DT, R_DROPS, R_ACTIVE, R_BUILD, R_SEC_SPEC0, R_SEC_WALL, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, R_SEC_BON, R_SEC_BPK, R_SEC_FLUX, R_SEC_RMS4,
@@ -26,28 +28,12 @@ import { BassTracker } from "./analyserBass.js";
 import { LevelTracker } from "./analyserLevel.js";
 import { SpectrumBands } from "./analyserSpectrum.js";
 
-const ENV: Record<string, string | undefined> | undefined = typeof process !== 'undefined' ? process.env : undefined;   // RATTAR
-const ALIAS_PREFIX = PROFILE.envPrefix === 'LOTUS_' ? 'DMX_' : 'LOTUS_';
-function sysEnv(name: string): string | undefined {
-  return ENV?.[PROFILE.envPrefix + name] ?? ENV?.[ALIAS_PREFIX + name] ?? PROFILE.sys[name];
-}
-/** TEMPOKÄLLAN. */
-function env(name: string): string | undefined {
-  return ENV?.[name] ?? PROFILE.bare[name];
-}
 /** Sann om ratten ar satt till nagot icke-tomt. */
 function sysOn(name: string): boolean { return !!sysEnv(name); }
 const HIGH_ON = sysOn('HIGH_DIAG') || false;   // Rattar som lases i tatslingan
 const BPM_TRACE = sysOn('BPM_TRACE');
 export const DROP_TRACE = sysOn('DROP_TRACE');
-const SECTION_AGG = sysEnv('SECTION_AGG') || 'env';   // SEKTIONSBLOCKENS TAKT
-export const SECTION_AGG_HOP = SECTION_AGG === 'hop';
 export const SECTION_SCORE_F32 = sysEnv('SECTION_SCORE_F32') === '1';   // Rangpoangens buffert i 32-bitars flyttal
-
-export interface BeatGrid { bpm: number; anchorMs: number; confidence?: number; }
-
-/** Detektionsparametrar. */
-export interface AnalyserDetection { autoGainTarget: number; tauUp: number; tauDown: number; noiseFloor: number; maxGain?: number }
 
 export interface AnalyserConfig {
   sampleRate?: number;   // Platt form
@@ -64,14 +50,14 @@ export interface AnalyserConfig {
   fft?: { size: number; hop: number };
   detection?: AnalyserDetection;
   beat?: BeatGrid | null;
-  role?: 'all' | 'fast' | 'slow';   // DELAD ANALYSATOR
+  role?: Role;   // DELAD ANALYSATOR
   split?: SplitBuffers;
   resumeSeq?: number;   // Seq att fortsatta fran
 }
 
 /** DELAD ANALYSATOR. */
 export interface SplitInit {
-  role: 'all' | 'fast' | 'slow';
+  role: Role;
   split?: SplitBuffers;
   resumeSeq?: number;
   sync?: boolean;   // Bänkens synk-läge
@@ -147,7 +133,6 @@ export const DROP_RISE_LOW_DB = Number(env('DROP_RISE_LOW_DB') ?? 0);   // DROP
 export const DROP_UNDERPEAK_MIN = Number(env('DROP_UNDERPEAK_MIN') ?? 0);   // LUGN-SEKTIONS-GRIND
 
 export const MINI_SPACING_MS = Number(env('MINI_SPACING_MS') ?? 0);   // KICK-LAS
-export const BODY_CEIL_DB_S = 0.15;   // taket haller latens loud-referens lange
 
 const DOUBLE_FROM_START = [
   'expectHighMs', 'levelVsHighDb', 'sumSq', 'lastT', 'dbgRms', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum', 'lvlSmooth',
@@ -184,11 +169,11 @@ export class Analyser {
   bandAbs = new Float32Array(8);   // absolut per-band magnitud före AGC
   bandLvl = new Float32Array(8);   // scratch
   bandOn = new Float32Array(8);   // scratch
-  static readonly BE_SPAN_DB = BASS_SPAN_DB; static readonly BE_MEM_BEATS = 240;
-  static readonly BE_FALLBACK_MS = 500;
+  static readonly BE_SPAN_DB = BASS_SPAN_DB; static readonly BE_MEM_BEATS = BE_MEM_BEATS;
+  static readonly BE_FALLBACK_MS = BE_FALLBACK_MS;
 
   bigCounter = 0;   // decimering av 2048-FFT:n
-  static readonly BIG_EVERY = 3;   // kor stor-FFT var N:e hop → analysen ryms i realtid
+  static readonly BIG_EVERY = BIG_EVERY;
   static readonly PEAK_DECAY = Math.pow(0.9993, Analyser.BIG_EVERY);   // bandPeak-decay per stor-FFT
   private static readonly FAST_BANDS = sysEnv('FAST_BANDS') === '1';   // SNABBA BANDEN FÖR LJUSET
   private static readonly FB_TAU_MS = [12, 6, 3];
@@ -206,15 +191,14 @@ export class Analyser {
   private static readonly GRID_PHASE_OFFSET_MS = Number(sysEnv('GRID_PHASE_OFFSET_MS')) || 0;   // Fasval
 
 
-  private static readonly SECTION_CARRY = Analyser.secEnv('SECTION_CARRY', 0);   // SEKTION
-  private static secEnv(name: string, def: number): number { const v = sysEnv(name); const x = Number(v); return v !== undefined && v !== '' && Number.isFinite(x) ? x : def; }
+  private static readonly SECTION_CARRY = numEnv('SECTION_CARRY', 0);   // SEKTION
 
-  static readonly RANK_WIN = Analyser.secEnv('SECTION_WIN', 4);   // RANG-RATTAR
-  static readonly BASSON_LEN = 32;     bassOnRing = new Float32Array(Analyser.BASSON_LEN); bassOnN = 0;  bassOnPeak = false;
-     static readonly RANK_RUN = Analyser.secEnv('SECTION_RUN', 3);
-  static readonly RANK_RUN_IN = Analyser.secEnv('SECTION_RUN_IN', 0);   // SNABB ATTACK
-  static readonly BODY_HIGH_MS = Analyser.secEnv('SECTION_BODY_HIGH', 0);   // BASEN TILLBAKA
-  static readonly BODY_HIGH_DB = Analyser.secEnv('SECTION_BODY_HIGH_DB', 3);
+  static readonly RANK_WIN = numEnv('SECTION_WIN', 4);   // RANG-RATTAR
+  static readonly BASSON_LEN = BASSON_LEN;     bassOnRing = new Float32Array(Analyser.BASSON_LEN); bassOnN = 0;  bassOnPeak = false;
+     static readonly RANK_RUN = numEnv('SECTION_RUN', 3);
+  static readonly RANK_RUN_IN = numEnv('SECTION_RUN_IN', 0);   // SNABB ATTACK
+  static readonly BODY_HIGH_MS = BODY_HIGH_MS;   // BASEN TILLBAKA
+  static readonly BODY_HIGH_DB = BODY_HIGH_DB;
   boundaryNov = 0;   // Klangnyhet 0..1 per 1 s-block mot det langsamma referensavtrycket
   secSpecHop = new Float64Array(8);   // Bandens absoluta magnitud for sektionsblocket
   secDump: number[][] | null = sysEnv('SECTION_DUMP') === '1' ? [] : null;   // Korbanks-dump
@@ -229,7 +213,7 @@ export class Analyser {
   private envFilled = 0;
   private envAccum = 0;
   private envAccumT = 0;
-  readonly role: 'all' | 'fast' | 'slow';   // DELAD ANALYSATOR
+  readonly role: Role;   // DELAD ANALYSATOR
   private splitCtrl: Int32Array | null = null; private splitRing: Float64Array | null = null; private splitState: Float64Array | null = null;
   private stateCopy = new Float64Array(STATE_LEN); private stateRd = new StateReader();   // a7: kopian bara när blocket ändrats
   private recSeq = 0;   // fast: senast skrivna record
@@ -617,12 +601,7 @@ export class Analyser {
   }
   private virtualEpoch = 1700000000000;
 
-  cfg: {
-    audio: { rate: number };
-    fft: { size: number; hop: number };
-    detection: AnalyserDetection;
-    onset: { enhancements: boolean };
-  };
+  cfg: Cfg;
   beatSrc: { beat?: BeatGrid | null };   // Taktrastret
 
   /** EN KLOCKA. */
@@ -739,7 +718,7 @@ export class Analyser {
       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
     };
     for (const o of [this.outFrame, this.character.outProfile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum]) stabiliseNumbers(o);
-    for (const k of DOUBLE_FROM_START) { const v = (this as unknown as Record<string, number>)[k]; if (typeof v === 'number') { (this as unknown as Record<string, number>)[k] = 0.5; (this as unknown as Record<string, number>)[k] = v; } }
+    stabilise(this, DOUBLE_FROM_START);
     stabiliseNumbers(this.sections.secRank as unknown as Record<string, unknown>);
   }
 
