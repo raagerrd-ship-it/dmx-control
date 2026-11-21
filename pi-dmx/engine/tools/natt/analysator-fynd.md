@@ -15,6 +15,16 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-21 DELAD FIL ÄNDRAD: TAKTEN a3c ('det trötta låset' + lat dämpning) - analyserClock.ts
+Vad: huvudsessionen lade in arenan takt13:s a3 i billigare form a3c i dmx 2026-11-20 21:05 (d0de317, manifest uppdaterat, tagg fore-a3c), EJ utlagd
+i ladan. Spärrarna (.arena/a3prov): lotusbank på lotus korpus 476 = 476, syntet 6 = 6, on-beat 0,41 = 0,41, fas 0,96 -> 1,0, i fas 305 -> 319,
+MOTFAS 15 -> 17 (enda sämre), följare 0,97 -> 1,0; pibudget huvudtråd x0,95-1,02 (varvat), worker x1,04-1,10, minne +2 MB; dropdom3 identisk.
+DMX takt13 pardom: övning +1,32 / mellan -0,41 / kontroll +2,66. analyserParity körs inte om: som för a6 ser den bara ramen, inte taktvägen
+(0 hop betyder inget här) - lotusbank ovan är det relevanta lotus-måttet. Nattens DMX-baslinje på HEAD 04ebd3c: tools/natt/ren-2026-11-21/.
+Var: src/analyserClock.ts (lmAdd, låsets trötthet). Material: tools/ladan-2026-11-13/, -14/, lotus korpus (tools/tempo-facit-pc/corpus, kopierad
+tillbaka 11-20). Önskat: porta ihop med a6 när ägaren säger ja (motfas +2 är ägarens beslut).
+Status:
+
 ## ÖPPET 2026-11-20 DELAD FIL ÄNDRAD: TAKTEN a6 (fasen ur sex band) - analyserClock.ts + split.ts
 Vad: huvudsessionen lade in arenan takts a6 i dmx 2026-11-19 (a68026c, manifest 3e03067, tagg fore-takt-a6), LIVE i ladan sedan 11-19 21:04
 (ägaren på plats, ihop med 1an-3an-stilen). Klockans fas viks nu ur sex band (sub, kick, bas, lågmid, mid, diskant) som linjär amplitudstigning,
