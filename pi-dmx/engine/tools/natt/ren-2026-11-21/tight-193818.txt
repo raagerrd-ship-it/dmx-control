@@ -1,0 +1,35 @@
+[quiet] console.log avstangd (DMX_QUIET=1) - PUT /api/debug/verbose {"enabled":true} slar pa
+
+=== tools/ladan-2026-11-14/lang-20261114T193818.wav  0-1725 s, 64674 rutor a 25 ms ===
+
+TAJT MOT LATEN
+  kick -> lampan pa mal 109 ms (median, p75 197, 12196 lampuppgangar; gamla riggmedel 90 %: 150 ms, fonster 200 ms vid 128 BPM) pa 1666/4729 kickar = 35.2 %
+  uppgangens storlek 0.14 av riggens 0-1 skala
+  ljus mot energi    r 0.39 pa 1 s-MEDEL, 0.35 pa 1 s-TOPP (ruta-mot-ruta 0.32), ljus mot niva r 0.60
+  ljus per tier      lugn 0.15/0.26  fart 0.22/0.37  full 0.35/0.56  (medel/topp, 370/921/325 s)
+  look-byten         73 st = 2.54/min, musikalisk orsak 100.0 %
+                     sektion 35  landning 25  drop 6  build 5  build-slut 2
+  drops              7 st, sprang lugna 0.74 (3 st) / hoga 0.82
+
+SNYGG LJUSSHOW
+  alla tre dioderna  1.5 % av tanda lamprutor   exakt en kanal 35.0 %
+  mattnad (median)   1.00      spridning mellan lampor 57 DMX-steg
+  lookar             35 distinkta, median 16 s, langsta stund 104 s
+  riggens ljus       p10 0.08  p50 0.20  p90 0.50   slackt 1.3 % av tiden
+
+-- dirigenten (361 rader, 12 forsta) --
+   [dirigent] nastan-drop: sprang 22.7 dB efter dipp 8.0 dB
+   [dirigent] manus intro: tydlig basgang (0.90, 22 toggles) -> "bounce"
+   [dirigent] nastan-drop: sprang 12.1 dB efter dipp 11.1 dB
+   [dirigent] sektion intro -> high (nr 1, tier 1)
+   [dirigent] nastan-drop: sprang 11.1 dB efter dipp 9.6 dB
+   [dirigent] sektion high -> break (nr 1, tier 1)
+   [dirigent] nastan-drop: sprang 10.3 dB efter dipp 8.0 dB
+   [dirigent] nastan-drop: sprang 10.6 dB efter dipp 9.8 dB
+   [dirigent] sektion break -> high (nr 2, tier 2)
+   [dirigent] manus high: tydlig basgang (1.00, 7 toggles) -> "minnet"
+   [dirigent] nastan-drop: sprang 10.9 dB efter dipp 9.3 dB
+   [dirigent] nastan-drop: sprang 12.3 dB efter dipp 9.2 dB
+
+TAJT = kick->ljus lagt, kickTraff hogt, r hogt, musikByten hogt. SNYGGT = alla3 lagt, mattnad och lampspr hoga,
+flera lookar utan langa stillastaende stunder, och ett ljusspann som anvands. Jamfor natt mot natt, aldrig i absoluta tal.

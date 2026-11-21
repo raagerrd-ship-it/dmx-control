@@ -1,0 +1,109 @@
+{
+ "wav": "tools/ladan-2026-11-13/lang-20261113T171840.wav",
+ "startS": 0,
+ "gainDb": 0,
+ "totS": 300,
+ "rutor": 11250,
+ "tajt": {
+  "kickLagMs": 128,
+  "kickLagP75": 181,
+  "kickLagRigg90": 125,
+  "lampUpp": 2398,
+  "kickar": 925,
+  "kickTraff": 0.40540540540540543,
+  "kickHojd": 0.14117647058823535,
+  "energiR": 0.5513209485547551,
+  "nivaR": 0.5891428675853976,
+  "energiRtopp": 0.5102912163559935,
+  "energiRruta": 0.4534511501669531,
+  "energiR15": 0.5614455029027859,
+  "nivaR15": 0.6201991837809049,
+  "bpmMed": 135.1806057436858,
+  "kickFonsterMs": 200,
+  "litLugn": 0.14068627450980392,
+  "litFart": 0.3028676470588235,
+  "litFull": 0.3484191176470588,
+  "toppLugn": 0.2058823529411765,
+  "toppFart": 0.4299019607843137,
+  "toppFull": 0.5215686274509803,
+  "sekLugn": 98,
+  "sekFart": 109,
+  "sekFull": 74,
+  "byten": 15,
+  "bytenPerMin": 3.0002666903724773,
+  "musikByten": 1,
+  "orsaker": {
+   "landning": 3,
+   "build": 1,
+   "sektion": 9,
+   "drop": 2
+  },
+  "drops": 2,
+  "minidrops": 8,
+  "granser": 2,
+  "karaktarsskiften": 4,
+  "tempovaxlingar": 0,
+  "dropSprangLugn": 0.8661642156862746,
+  "dropSprangHog": null,
+  "dropsLugna": 2
+ },
+ "snygg": {
+  "alla3": 0.007870489582516989,
+  "en": 0.39524859775416754,
+  "matt": 1,
+  "lampspr": 62.074133333333336,
+  "lookar": 11,
+  "lookMedianS": 9.626666666666665,
+  "lookLangstaS": 58.10666666666666,
+  "morkt": 0.0012444444444444445,
+  "litP10": 0.0784313725490196,
+  "litP50": 0.2191176470588235,
+  "litP90": 0.49607843137254903
+ },
+ "lookTime": [
+  [
+   "varannan",
+   67.14666674804917
+  ],
+  [
+   "kickregn",
+   57.04000024414196
+  ],
+  [
+   "mellanslag",
+   44.213333251953586
+  ],
+  [
+   "vagbrytare",
+   42.133333251953445
+  ],
+  [
+   "pump",
+   36.50666650390619
+  ],
+  [
+   "gallop",
+   24.373333251952925
+  ],
+  [
+   "eko",
+   9.359999999999971
+  ],
+  [
+   "sokljus",
+   9.066666748046845
+  ],
+  [
+   "linjalen",
+   6.426666503906236
+  ],
+  [
+   "wave",
+   2.184999999999999
+  ],
+  [
+   "siren",
+   1.5466667480468739
+  ]
+ ]
+}
