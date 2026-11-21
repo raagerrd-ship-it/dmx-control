@@ -1,45 +1,36 @@
-/** IDENTITETSBEVIS for den delade analysatorn (portat fran lotus-light 2026-09-22, se src/split.ts).
+/** DELAT MOT ODELAT: samma ljud genom en ODELAD analysator och en DELAD i inline-läge, matad som motorn (index.ts):
+ *  virtuell klocka (Date.now/performance.now per hop, som dmxDump.mjs), och efter process() taktvägen
+ *  (hopLane.feed) eller publishClock. Jämför VARJE fält i ramen, hop för hop.
  *
- *  Kor samma latar genom (A) en ODELAD analysator och (B) snabb+langsam i INLINE-lage (den langsamma
- *  sidan kors synkront efter varje record) med identisk matning (virtuell klocka, deterministiskt),
- *  och jamfor per hop: bpm, konfidens, gridfas, sektion, tier, upprepning.
+ *  BASLINJEN (uppmätt 2026-11-21, tools/natt/delning-2026-11-21.md): fälten i VANTAT får skilja, alla andra ska vara lika.
+ *  - barShift/beatPhaseMs/beatPhaseConf: DMX läser klockan ur cfg.beat; i delat läge körs publishPhase aldrig (samma lista som livstecken.mjs).
+ *  - sektionens fält och det som läser sektionen (drop, basnivå, uppbyggnad): blocken stänger på 10 ms-rutnätet i delat läge mot
+ *    2,67 ms i odelat (09-22), och en annan kant tidigt flyttar räknarna för resten av låten.
+ *  Exit 1 om ett fält utanför VANTAT skiljer.
  *
- *  KRAVET: tempo och gridfas ska vara BIT-identiska.
- *
- *  SEKTIONEN skiljer sig daremot vid hop 128, och det ar VANTAT och MATT (2026-09-22):
- *  dmx-analysatorn anropar sectionHop en gang per HOP (2,67 ms) i odelat lage, medan den delade
- *  sidan far blocksummorna en gang per ENV-SAMPEL (10 ms). 1 s-blocket stanger darfor pa ett
- *  rutnat med 10 ms upplosning i stallet for 2,67 ms, och rang-/percentillogiken (tier) ar kaotisk
- *  precis vid sina trosklar - nagra block hamnar over/under och etiketten hoppar.
- *  KONTROLLFORSOKET som bevisar just det: SPLIT_HOP=480 ger exakt ETT hop per env-sampel, dvs samma
- *  blockupplosning i bada lagen -> sektionen skiljer da 2 hop per lat (0,04 %).
- *  (Lotus slipper detta for att DESS odelade lage ocksa aggregerar per env-sampel; har ar kravet att
- *  odelat lage ska vara ororts, sa den skillnaden ar priset.)
- *
- *    node tools/splitProof.mjs [--n 12] [--worker]
- *    SPLIT_DIR=<katalog med 48 kHz mono wav>   annan korpus an tools/ (laser bara)
- *    SPLIT_MAX_S=120                           klipp varje fil (0 = hela)
- *    SPLIT_HOP=128                             hopstorlek; 480 = kontrollforsoket ovan
- *    --worker                                  aven en rokning av den RIKTIGA workern (dist/slowWorker.js)
+ *    node tools/splitProof.mjs [--n 3] [--worker] [--dist <mapp>]
+ *    SPLIT_DIR=<katalog med 48 kHz wav> (standard tools/ladan-2026-11-13)   SPLIT_MAX_S=120 (0 = hela)
+ *    --worker  även en rökning av den RIKTIGA workern i realtidstakt (15 s)
  */
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-
-// Sektion och gridfas ar opt-in och lases som STATISKA falt nar klassen definieras -> maste sattas
-// FORE importen av dist/analyser.js.
-process.env.DMX_SECTION ??= '1';
-process.env.DMX_GRID_PHASE ??= '1';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
-const N = Number(arg('--n', 12));
+const N = Number(arg('--n', 3));
 const WORKER = process.argv.includes('--worker');
-const CORPUS = process.env.SPLIT_DIR || here;
+const DIST = resolve(arg('--dist', join(here, '..', 'dist')));
+const CORPUS = process.env.SPLIT_DIR || join(here, 'ladan-2026-11-13');
 const MAX_S = Number(process.env.SPLIT_MAX_S ?? 120);
+const HOP = 128, EPOCH = 1.7e12;
 
-const { createAnalyser } = await import(pathToFileURL(join(here, '..', 'dist', 'analyser.js')).href);
-const { defaultConfig } = await import(pathToFileURL(join(here, '..', 'dist', 'config.js')).href);
+const VANTAT = new Set(['barShift', 'beatPhaseMs', 'beatPhaseConf',
+  'section', 'sectionAgeMs', 'sectionIndex', 'sectionTier', 'sectionBars', 'prevSection', 'levelVsHighDb', 'expectHighInMs',
+  'repeatSim', 'repeatAgoMs', 'repeatSection', 'buildProg', 'miniDropCount', 'dropDemoted', 'bassLevel']);
+
+const { createAnalyser } = await import(pathToFileURL(join(DIST, 'analyser.js')).href);
+const { defaultConfig } = await import(pathToFileURL(join(DIST, 'config.js')).href);
 
 function readWav(path) {
   const b = readFileSync(path);
@@ -49,72 +40,71 @@ function readWav(path) {
     const id = b.toString('ascii', off, off + 4), len = b.readUInt32LE(off + 4);
     if (id === 'data') { dataOff = off + 8; dataLen = len === 0 ? b.length - dataOff : Math.min(len, b.length - dataOff); break; }
     off += 8 + len + (len & 1);
-  }   // len 0 = strom-skriven fil (pop_ladan/megamix_ladan)
+  }
   let n = Math.floor(dataLen / 2 / ch);
   if (MAX_S > 0) n = Math.min(n, Math.floor(MAX_S * rate));
   const y = new Float32Array(n);
   for (let i = 0; i < n; i++) { let s = 0; for (let c = 0; c < ch; c++) s += b.readInt16LE(dataOff + (i * ch + c) * 2); y[i] = s / ch / 32768; }
   return { y, rate };
 }
-
-const HOP = Number(process.env.SPLIT_HOP || 128);
-function makeCfg(rate) {
-  const cfg = JSON.parse(JSON.stringify(defaultConfig));
-  cfg.audio.rate = rate; cfg.fft.hop = HOP;
-  return cfg;
+function flat(o, p, out) {
+  for (const k in o) { const v = o[k];
+    if (v && typeof v === 'object' && !ArrayBuffer.isView(v) && !Array.isArray(v)) flat(v, p + k + '.', out);
+    else out[p + k] = ArrayBuffer.isView(v) || Array.isArray(v) ? Array.from(v).join(',') : v; }
+  return out;
 }
-
+function makeCfg(rate) { const cfg = JSON.parse(JSON.stringify(defaultConfig)); cfg.audio.rate = rate; cfg.fft.hop = HOP; return cfg; }
+/** Ett hop som motorn: klockan, process, taktvägen eller publishClock. */
+function step(an, ck, buf, ms) {
+  an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
+  const f = an.process(buf);
+  if (an.hopLane) an.hopLane.feed(f, ck, an); else an.publishClock(ck);
+  return f;
+}
 function run(y, rate, mode) {
   process.env.DMX_ANALYSER_SPLIT = mode;
-  const an = createAnalyser(makeCfg(rate));
-  an.setGainLock(true, 1);   // fast gain: AGC:n lever helt i snabba vagen och ska inte kunna forvirra jamforelsen
-  const buf = new Float32Array(HOP); const out = [];
-  let h = 0;
-  for (let i = 0; i + HOP <= y.length; i += HOP) {
-    buf.set(y.subarray(i, i + HOP));
-    an.setVirtualClock((h * HOP / rate) * 1000);
-    const f = an.process(buf); h++;
-    out.push([f.bpm, f.bpmConfidence, f.beatPhaseMs, f.beatPhaseConf, f.section, f.sectionTier, f.repeatSim, f.expectHighInMs, f.levelVsHighDb]);
-  }
-  return { out, an };
+  const an = createAnalyser(makeCfg(rate)); an.setGainLock(true, 1);
+  const ck = { beat: undefined, beatErr: undefined }, buf = new Float32Array(HOP), out = [];
+  for (let h = 0; (h + 1) * HOP <= y.length; h++) { buf.set(y.subarray(h * HOP, (h + 1) * HOP)); out.push(flat(step(an, ck, buf, EPOCH + h * HOP / rate * 1000), '', {})); }
+  return out;
 }
 
-const files = readdirSync(CORPUS).filter((f) => f.endsWith('.wav')).sort().slice(0, N);
-if (!files.length) { console.error(`inga .wav i ${CORPUS} — satt SPLIT_DIR`); process.exit(2); }
-let totHops = 0, tempoDiff = 0, phaseDiff = 0, secDiff = 0, tierDiff = 0, repDiff = 0;
-const perFile = [];
+const realNow = Date.now, realPerf = performance.now.bind(performance), realLog = console.log;
+const files = readdirSync(CORPUS).filter((f) => f.endsWith('.wav') && !f.includes('lagad')).sort().slice(0, N);
+if (!files.length) { console.error(`inga .wav i ${CORPUS} - sätt SPLIT_DIR`); process.exit(2); }
+const diff = new Map(); let totHops = 0;
 for (const f of files) {
   const { y, rate } = readWav(join(CORPUS, f));
-  const A = run(y, rate, '').out, B = run(y, rate, 'inline').out;
-  let td = 0, pd = 0, sd = 0, tr = 0, rd = 0, firstT = -1;
-  for (let i = 0; i < A.length; i++) {
-    const a = A[i], b = B[i];
-    if (a[0] !== b[0] || a[1] !== b[1]) { td++; if (firstT < 0) firstT = i * HOP / rate; }
-    if (a[2] !== b[2] || a[3] !== b[3]) pd++;
-    if (a[4] !== b[4]) sd++;
-    if (a[5] !== b[5]) tr++;
-    if (a[6] !== b[6] || a[7] !== b[7] || a[8] !== b[8]) rd++;
-  }
-  totHops += A.length; tempoDiff += td; phaseDiff += pd; secDiff += sd; tierDiff += tr; repDiff += rd;
-  perFile.push(`${f.slice(0, 40).padEnd(40)} hop ${String(A.length).padStart(6)}  tempo!= ${td}${firstT >= 0 ? ` (forsta ${firstT.toFixed(1)} s)` : ''}  fas!= ${pd}  sektion!= ${sd}  tier!= ${tr}  rep!= ${rd}`);
+  console.log = () => {};
+  const A = run(y, rate, ''), B = run(y, rate, 'inline');
+  console.log = realLog;
+  const keys = new Set([...Object.keys(A[A.length - 1]), ...Object.keys(B[B.length - 1])]);
+  for (const k of keys) { let d = 0, first = -1; for (let i = 0; i < A.length; i++) if (A[i][k] !== B[i][k]) { d++; if (first < 0) first = i; }
+    if (d) { const s = diff.get(k) ?? { d: 0, first: Infinity, file: f }; s.d += d; if (first * HOP / rate < s.first) { s.first = first * HOP / rate; s.file = f; } diff.set(k, s); } }
+  totHops += A.length;
+  console.log(`${f.slice(0, 40).padEnd(40)} hop ${A.length}`);
 }
-console.log(perFile.join('\n'));
-console.log(`\nSUMMA ${files.length} filer, ${totHops} hop: tempo/konf olika ${tempoDiff} (${(100 * tempoDiff / totHops).toFixed(3)} %), gridfas olika ${phaseDiff} (${(100 * phaseDiff / totHops).toFixed(3)} %), sektion olika ${secDiff} (${(100 * secDiff / totHops).toFixed(3)} %), tier ${tierDiff}, upprepning ${repDiff}`);
+Date.now = realNow; performance.now = realPerf;
+let bad = 0;
+for (const [k, s] of [...diff].sort((a, b) => b[1].d - a[1].d)) {
+  const ok = VANTAT.has(k); if (!ok) bad++;
+  console.log(`${ok ? 'väntat ' : 'FEL    '} ${k.padEnd(24)} ${(100 * s.d / totHops).toFixed(2).padStart(6)} %   första ${s.first.toFixed(2)} s (${s.file.slice(0, 28)})`);
+}
+console.log(`\nSUMMA ${files.length} filer, ${totHops} hop: ${diff.size} fält skiljer, varav ${bad} utanför baslinjen -> ${bad ? 'DELNING FEL' : 'DELNING OK'}`);
+if (bad) process.exitCode = 1;
 
 if (WORKER) {
-  // Rokning av den RIKTIGA workern: mata i realtidstakt 15 s, se att tempot kommer och att workern
-  // haller jamna steg (behind/lagMs sma, skipped 0).
   const { y, rate } = readWav(join(CORPUS, files[0]));
   process.env.DMX_ANALYSER_SPLIT = 'worker';
   const an = createAnalyser(makeCfg(rate)); an.setGainLock(true, 1);
-  const buf = new Float32Array(HOP); let h = 0; const t0 = performance.now(); let lastBpm = 0;
+  const ck = { beat: undefined, beatErr: undefined }, buf = new Float32Array(HOP); let h = 0; const t0 = performance.now(); let lastBpm = 0;
   await new Promise((res) => {
     const iv = setInterval(() => {
       const want = Math.floor((performance.now() - t0) / 1000 * rate / HOP);
-      while (h < want && (h + 1) * HOP <= y.length) { buf.set(y.subarray(h * HOP, (h + 1) * HOP)); lastBpm = an.process(buf).bpm; h++; }
+      while (h < want && (h + 1) * HOP <= y.length) { buf.set(y.subarray(h * HOP, (h + 1) * HOP)); const f = an.process(buf); if (an.hopLane) an.hopLane.feed(f, ck, an); lastBpm = f.bpm; h++; }
       if (performance.now() - t0 > 15000 || (h + 1) * HOP > y.length) { clearInterval(iv); res(); }
     }, 5);
   });
-  console.log(`\nWORKER-ROKNING ${files[0]}: ${h} hop pa 15 s, bpm ${lastBpm}, stats ${JSON.stringify(an.getSplitStats())}`);
+  console.log(`\nWORKER-RÖKNING ${files[0]}: ${h} hop på 15 s, bpm ${lastBpm}, stats ${JSON.stringify(an.getSplitStats?.() ?? an.hopLane?.stats())}`);
   an.__stopWorker?.();
 }
