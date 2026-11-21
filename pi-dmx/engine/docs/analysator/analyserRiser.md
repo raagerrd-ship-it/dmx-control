@@ -110,3 +110,12 @@ Vid `const bRate = bTarget > this.a.buildUp ? dtHop / 3.5 : dtHop / 1.0;`:
 bygg ~3.5s, klinga ~1s
 ```
 
+
+## Efter kontraktet (flytten steg 8, 2026-11-21)
+
+Stenen läser bara det `RiserReads` nämner (`f.hop.nowWall`, `dtHop`, `centSmooth`, `lvlSmooth`, `f.spectrum.bandDbRaw`, `f.level.levelCeil`,
+`f.level.activeMs`, `f.drop.lastDropMs`) via referenser som sparas i konstruktorn (`h`, `sp`, `lv`, `dp`), och skriver bara sitt eget fack
+`f.riser` (`o`). Inget `this.a` kvar. `riserStep` returnerar inget utan skriver `f.riser.inRiser` sist (förr returvärdet, som kärnan
+lade i en lokal `inRiser` och skrev i facket sist i `process`; den kopian är borta, ramen läser facket). `rates(dtHop)` sätter
+`aSpecSlow`/`aNovSlow` (förr i Analysers konstruktor). `pack(s)`/`unpack(s)` är transporten av `buildUp` och `inRiser` i `BS_`-blocket
+(`BS_BUILD`, `BS_RISER`), anropade på samma ställen i `drainBig` resp. `pushBig`. Satserna i `riserStep` är ordagranna.
