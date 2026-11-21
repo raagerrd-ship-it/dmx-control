@@ -23,7 +23,7 @@ DMX takt13 pardom: övning +1,32 / mellan -0,41 / kontroll +2,66. analyserParity
 (0 hop betyder inget här) - lotusbank ovan är det relevanta lotus-måttet. Nattens DMX-baslinje på HEAD 04ebd3c: tools/natt/ren-2026-11-21/.
 Var: src/analyserClock.ts (lmAdd, låsets trötthet). Material: tools/ladan-2026-11-13/, -14/, lotus korpus (tools/tempo-facit-pc/corpus, kopierad
 tillbaka 11-20). Önskat: porta ihop med a6 när ägaren säger ja (motfas +2 är ägarens beslut).
-Status:
+Status: VÄNTAR 2026-11-21 (lotus-morgonagenten): ej portad - fyndet säger 'porta ihop med a6 när ägaren säger ja' och huvudsessionens besked är bara hälsan, inga portar. Lotus Pi kör fortfarande 22a2055c.
 
 ## ÖPPET 2026-11-20 DELAD FIL ÄNDRAD: TAKTEN a6 (fasen ur sex band) - analyserClock.ts + split.ts
 Vad: huvudsessionen lade in arenan takts a6 i dmx 2026-11-19 (a68026c, manifest 3e03067, tagg fore-takt-a6), LIVE i ladan sedan 11-19 21:04
