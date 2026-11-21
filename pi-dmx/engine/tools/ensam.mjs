@@ -61,12 +61,13 @@ if (cmd === "tappa") {
     let a = this.a; if (a === undefined && !(a = AF.get(this))) AF.set(this, a = facksOf(this));   // omskriven sten: facken ur dess referenser
     if (!plan) { plan = mkPlan(a); nArgs = args.length;
       utP = utF.map(f => f.split(".")[0] in this ? null : `f.${Object.keys(a.f).find(k => get(a.f[k], f) !== undefined)}.${f}`);   // --ut: på delen, annars i facken
-      if (this.a === undefined) own = { key: Object.keys(a.f).find(k => a.f[k] === this.o), cls: this.o.constructor.name };
+      if (this.a === undefined) { own = { key: Object.keys(a.f).find(k => a.f[k] === this.o), cls: this.o.constructor.name };
+        for (const [k, v] of Object.entries(this)) if (["number", "boolean", "string"].includes(typeof v)) plan.p.push({ key: k, self: 1, kind: typeof v === "string" ? "str" : typeof v === "boolean" ? "bool" : "num", n: 1 }); }   // stenens egna fält (som andra metoder i stenen kan ändra mellan stegen)
       for (const [k, v] of Object.entries(this)) if (["number", "boolean", "string"].includes(typeof v)) init[k] = typeof v === "number" && !Number.isFinite(v) ? { n: String(v) } : v; }
     const r = [curT, ...args.map(x => typeof x === "number" ? x : typeof x === "boolean" ? +x : NaN)];
-    for (const f of plan.p) { const v = f.kind === "fn" ? a[f.key]() : get(a, f.key); if (SCAL(f) && after.has(f.key) && !Object.is(after.get(f.key), v)) ext.add(f.key); if (f.kind === "arr") for (let i = 0; i < f.n; i++) r.push(v[i]); else r.push(f.kind === "str" ? S(v ?? "") : f.kind === "bool" ? +!!v : (v ?? NaN)); }
+    for (const f of plan.p) { const v = f.kind === "fn" ? a[f.key]() : f.self ? this[f.key] : get(a, f.key); if (SCAL(f) && after.has(f.key) && !Object.is(after.get(f.key), v)) ext.add(f.key); if (f.kind === "arr") for (let i = 0; i < f.n; i++) r.push(v[i]); else r.push(f.kind === "str" ? S(v ?? "") : f.kind === "bool" ? +!!v : (v ?? NaN)); }
     const ret = orig.apply(this, args);
-    for (const f of plan.p) if (SCAL(f)) after.set(f.key, get(a, f.key));
+    for (const f of plan.p) if (SCAL(f)) after.set(f.key, f.self ? this[f.key] : get(a, f.key));
     utF.forEach((f, i) => { const v = utP[i] ? get(a, utP[i]) : get(this, f); r.push(typeof v === "string" ? S(v) : +v); });
     r.push(typeof ret === "boolean" ? +ret : typeof ret === "number" ? ret : NaN);
     rows.push(r); return ret;
@@ -104,14 +105,14 @@ if (cmd === "kor") {
   for (const act of head.acts) put(act, () => {});
   const arrs = {}; for (const f of head.in) if (f.kind === "arr") { arrs[f.key] = new (globalThis[f.ctor] ?? Float64Array)(f.n); put(f.key, arrs[f.key]); }
   const fnVal = {}; for (const f of head.in) if (f.kind === "fn") put(f.key, () => fnVal[f.key]);
-  for (const f of head.in) if (SCAL(f)) put(f.key, undefined);   // mellanobjekten (facken) finns före konstruktorn
+  for (const f of head.in) if (SCAL(f) && !f.self) put(f.key, undefined);   // mellanobjekten (facken) finns före konstruktorn
   if (head.own) put("f." + head.own.key, new (await import(U("analyserFack.js")))[head.own.cls]());
   const det = head.own ? new Cls(a.f, a.f[head.own.key]) : new Cls(a);
   for (const [k, v] of Object.entries(head.init ?? {})) det[k] = v !== null && typeof v === "object" ? Number(v.n) : v;   // delens startvärden (t.ex. takter som Analysers konstruktor satte)
   const t0 = performance.now(); let diff = 0, firstDiff = ""; const ev = Object.fromEntries(head.ut.map(f => [f, []])), prev = {};
   for (let i = 0, o = 0; i < head.rows; i++, o += W) {
     let c = o + 1; const args = []; for (let k = 0; k < head.nArgs; k++) args.push(m[c++]);
-    for (const f of head.in) { if (f.kind === "arr") { const x = arrs[f.key]; for (let k = 0; k < f.n; k++) x[k] = m[c++]; } else { const v = m[c++]; if (f.st && i > 0) continue; if (f.kind === "fn") fnVal[f.key] = v; else put(f.key, f.kind === "str" ? head.strs[v] : f.kind === "bool" ? !!v : v); } }
+    for (const f of head.in) { if (f.kind === "arr") { const x = arrs[f.key]; for (let k = 0; k < f.n; k++) x[k] = m[c++]; } else { const v = m[c++]; if (f.st && i > 0) continue; if (f.kind === "fn") fnVal[f.key] = v; else { const x = f.kind === "str" ? head.strs[v] : f.kind === "bool" ? !!v : v; if (f.self) det[f.key] = x; else put(f.key, x); } } }
     det[head.metod](...args);
     for (const [k, f] of head.ut.entries()) { const want = m[c++], v = head.utP?.[k] ? get(a, head.utP[k]) : get(det, f), got = typeof v === "string" ? head.strs.indexOf(v) : +v; if (!sets.length && !(got === want || (got !== got && want !== want))) { diff++; if (!firstDiff) firstDiff = `${f} vid ${m[o].toFixed(2)} s: ensam ${got}, hela ${want}`; }
       if (prev[f] !== undefined && got !== prev[f]) ev[f].push(+m[o].toFixed(2)); prev[f] = got; }

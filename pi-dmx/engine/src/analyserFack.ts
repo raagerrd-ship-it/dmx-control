@@ -84,7 +84,7 @@ export class SectionOut {
 }
 /** BASEN. bassline/onsetsPerBeat = förr profBassline/bassOnsetsPerBeat. */
 export class BassOut {
-  beHi = NaN; beRef = NaN; beShort = 0; bassline = 0; onsetsPerBeat = 0;
+  beHi = NaN; beRef = NaN; beShort = 0; energy = 0; bassline = 0; onsetsPerBeat = 0;
   constructor() { stabilise(this, ['bassline', 'onsetsPerBeat']); }
 }
 /** UPPBYGGNADEN. inRiser = förr hInRiser. */

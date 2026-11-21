@@ -135,7 +135,7 @@ export const DROP_UNDERPEAK_MIN = Number(env('DROP_UNDERPEAK_MIN') ?? 0);   // 
 export const MINI_SPACING_MS = Number(env('MINI_SPACING_MS') ?? 0);   // KICK-LAS
 
 const DOUBLE_FROM_START = [
-  'sumSq', 'lastT', 'dbgRms', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum',
+  'sumSq', 'lastT', 'dbgRms', 'envAccum', 'envAccumT', 'envBassAccum',
   'lvlVU', 'engSmooth', 'snareHit', 'hatHit',
   'rawBpmLast',
 ] as const;   // Instansfalt som MATT
@@ -261,7 +261,6 @@ export class Analyser {
   get lagBounds(): [number, number] { return [this.diagLagMin, this.diagLagMax]; }
   get tempoGramSnapshot(): Float32Array { return this.tempoGram; }
   private static readonly REFRAC_ATT = 0;   // env-ringens refraktar
-  blAccum = 0;       blKickSeq = -100;   // TYDLIG BASGANG
   private envHighRing = new Float32Array(Analyser.ENV_LEN);   // DIAGNOSTIK
   private envHighAccum = 0;
   private lvlVU = 0;
@@ -427,7 +426,7 @@ export class Analyser {
       const seq = ++this.bigSeq, slot = seq % BIG_RING_N, o = slot * BIG_REC_LEN;
       if (r[o + B_SEQ] !== seq) { this.bigSkipped++; continue; }
       const hn = r[o + B_N];
-      { const bl = sp.bandLvl[1] + sp.bandLvl[2]; if (bl > this.blAccum) this.blAccum = bl; if (h.kickHit >= 1) this.blKickSeq = this.bass.envSeq; }
+      this.bass.accumulate();
       if (r[o + B_ENVF] === 1) { h.bpm = r[o + B_ENVBPM]; this.bass.stepBassline(); }
       h.rms = r[o + B_RMS]; h.lvlSmooth = r[o + B_LVL]; h.centSmooth = r[o + B_CENT]; lv.activeMs = r[o + B_ACTIVE]; h.kickHit = r[o + B_KICKHIT];
       this.levels.zoneStep();
@@ -801,7 +800,7 @@ export class Analyser {
     const bassFluxNorm = Math.min(1, kickFlux * (h.cfg.onset.enhancements ? 0.5 : 0.02));
     if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
     const big = h.bigOn;
-    if (!big) { const bl = sp.bandLvl[1] + sp.bandLvl[2]; if (bl > this.blAccum) this.blAccum = bl; if (h.kickHit >= 1) this.blKickSeq = this.bass.envSeq; }
+    if (!big) this.bass.accumulate();
     if (HIGH_ON) { const hi = sp.bandOn[6] > sp.bandOn[7] ? sp.bandOn[6] : sp.bandOn[7]; if (hi > this.envHighAccum) this.envHighAccum = hi; }
     this.envAccumT += hopMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) this.envSampleStep();
@@ -912,7 +911,7 @@ export class Analyser {
     f.energy = this.engSmooth;
     f.centroid = h.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = lv.gain;
     f.bpm = ck.bpm; f.bpmConfidence = ck.conf; f.intensity = intensity; f.beatAnchorMs = kk.beatAnchorMs;
-    f.bodyDb = bodyNow; { const be = this.bass.bassEnergyStep(A[0], A[1]); f.bassEnergy = f.silent ? 0 : be; f.bassEnergyShort = f.silent ? 0 : bo.beShort; f.bassLevel = Math.pow(10, (bo.beHi - bo.beRef) / 20); }
+    f.bodyDb = bodyNow; this.bass.bassEnergyStep(A[0], A[1]); f.bassEnergy = f.silent ? 0 : bo.energy; f.bassEnergyShort = f.silent ? 0 : bo.beShort; f.bassLevel = Math.pow(10, (bo.beHi - bo.beRef) / 20);
     { let s2 = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, (FB ? this.bands.fbDbRaw : sp.bandDbRaw)[b] / 20); s2 += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s2)); }
     f.dropCount = dp.dropCount; f.miniDropCount = dp.miniDropCount; f.buildStartCount = dp.buildStartCount; f.dropDemoted = dp.dropDemoted; f.dropSpaced = dp.dropSpaced; f.dropRiseDb = dp.dropRiseDb;
     f.nearDropDb = dp.nearDropDb; f.nearDipDb = dp.nearDipDb; f.liftDb = dp.liftDb; f.stopCount = dp.stopCount; f.stopS = dp.stopS; f.inZone = inZone; f.breaking = breaking; f.buildUp = ri.buildUp; f.inRiser = inRiser;
@@ -943,7 +942,7 @@ export class Analyser {
   readonly riser = new RiserDetector(this);   // UPPBYGGNAD
   readonly character = new CharacterProfile(this.f, this.f.character);   // KARAKTÄR
   readonly kicks = new KickDetector(this);   // KICK: anslag i snabba vägen
-  readonly bass = new BassTracker(this);   // BAS: basenergin per slag och basgången
+  readonly bass = new BassTracker(this.f, this.f.bass);   // BAS: basenergin per slag och basgången
   readonly levels = new LevelTracker(this);   // NIVÅ: förstärkning/AGC, tystnad, intensitet, nivåtak och topp-zon
   readonly bands = new SpectrumBands(this);   // SPEKTRUM
 }

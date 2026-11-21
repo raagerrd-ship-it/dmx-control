@@ -65,3 +65,13 @@ låtens referens = refrängens tak
  TYDLIG BASGANG (env-rastret, 100 Hz): se blAccum.
 ```
 
+
+## Efter kontraktet (flytten steg 7, 2026-11-21)
+
+Stenen läser bara det `BassReads` nämner (`f.hop.dtHop`, `f.hop.bpm`, `f.hop.kickHit`, `f.clock.bpm`, `f.section.section`, `f.spectrum.bandLvl`)
+via referenser som sparas i konstruktorn (`hop`, `clock`, `sec`, `sp`), och skriver bara sitt eget fack `f.bass` (`o`). Inget `this.a` kvar.
+Ackumulatorn `blAccum`/`blKickSeq` (förr på `Analyser`) och `envSeq` är stenens egna privata fält; `blAccum` står i stenens `DOUBLE_FROM_START`.
+`accumulate()` ersätter de två likadana raderna i `analyser.ts` (`drainBig` och grenen `!big` i `process`), på samma platser: i workern läses
+alltså fortfarande förra hoppets `kickHit` (anropet står före transporten av `B_KICKHIT`). `bassEnergyStep` returnerar inget utan skriver
+`f.bass.energy`, som ramen läser (`frame.bassEnergy`). Rattarna `BE_TOP_BEATS` … är modulkonstanter; `BE_FALLBACK_MS`, `BE_MEM_BEATS`
+och `BASS_SPAN_DB` kommer ur `analyserFack.ts` (samma värden som `Analyser.BE_*`). Satserna i `stepBassline` är ordagranna.
