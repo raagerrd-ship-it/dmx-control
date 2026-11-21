@@ -75,6 +75,13 @@ export class ClockOut {
   constructor() { stabilise(this, ['conf']); }
 }
 
+/** SEKTIONEN: de 17 publicerade fälten (förr på Analyser). */
+export class SectionOut {
+  section = 'intro'; sectionStartMs = 0; sectionIndex = 0; sectionTier = 1; prevSection = ''; levelVsHighDb = 0;
+  repeatSim = 0; repeatAgoMs = 0; repeatSection = ''; repeatTier = -1; repeatHighAtMs = 0; repeatHighEndAtMs = 0;
+  expectHighMs = 0; expectSource = 0; secBuildAt = 0; secBuildSeen = 0; boundaryNov = 0;
+  constructor() { stabilise(this, ['expectHighMs', 'levelVsHighDb', 'sectionStartMs', 'secBuildAt', 'secBuildSeen', 'repeatSim', 'repeatAgoMs']); }
+}
 /** BASEN. bassline/onsetsPerBeat = förr profBassline/bassOnsetsPerBeat. */
 export class BassOut {
   beHi = NaN; beRef = NaN; beShort = 0; bassline = 0; onsetsPerBeat = 0;
@@ -93,8 +100,8 @@ export class DropOut {
 export class CharacterOut { readonly profile = { punch: 0.4, bass: 0.5, bright: 0.3, beat: 0.5, bassline: 0 }; }
 
 export interface Fack { hop: HopOut; level: LevelOut; spectrum: SpectrumOut; kick: KickOut; clock: ClockOut;
-  bass: BassOut; riser: RiserOut; drop: DropOut; character: CharacterOut }
+  section: SectionOut; bass: BassOut; riser: RiserOut; drop: DropOut; character: CharacterOut }
 export function makeFack(): Fack {
   return { hop: new HopOut(), level: new LevelOut(), spectrum: new SpectrumOut(), kick: new KickOut(), clock: new ClockOut(),
-    bass: new BassOut(), riser: new RiserOut(), drop: new DropOut(), character: new CharacterOut() };
+    section: new SectionOut(), bass: new BassOut(), riser: new RiserOut(), drop: new DropOut(), character: new CharacterOut() };
 }

@@ -17,7 +17,7 @@ export class BassTracker {
     per = per < BassTracker.BE_BEAT_MIN_MS ? BassTracker.BE_BEAT_MIN_MS : per > BassTracker.BE_BEAT_MAX_MS ? BassTracker.BE_BEAT_MAX_MS : per;
     this.a.f.bass.beHi = !(x <= this.a.f.bass.beHi) ? x : this.a.f.bass.beHi + (x - this.a.f.bass.beHi) * (hopMs / (BassTracker.BE_TOP_BEATS * per));
     this.beHiShort = !(x <= this.beHiShort) ? x : this.beHiShort + (x - this.beHiShort) * (hopMs / (BassTracker.BE_FAST_BEATS * per));
-    this.a.f.bass.beRef = this.a.section === 'high' || !(this.a.f.bass.beHi <= this.a.f.bass.beRef) ? this.a.f.bass.beHi : this.a.f.bass.beRef + (this.a.f.bass.beHi - this.a.f.bass.beRef) * (hopMs / (Analyser.BE_MEM_BEATS * per));
+    this.a.f.bass.beRef = this.a.f.section.section === 'high' || !(this.a.f.bass.beHi <= this.a.f.bass.beRef) ? this.a.f.bass.beHi : this.a.f.bass.beRef + (this.a.f.bass.beHi - this.a.f.bass.beRef) * (hopMs / (Analyser.BE_MEM_BEATS * per));
     let e = 1 - (this.beHiShort - x) / Analyser.BE_SPAN_DB;
     this.a.f.bass.beShort = e > 0 ? e : 0;
     e = 1 - (this.a.f.bass.beHi - x) / Analyser.BE_SPAN_DB;

@@ -94,3 +94,12 @@ Bara data, som steg 3. Hissade i `analyser.ts` som `bo`, `ri`, `dp`, `cp`; stena
 Getters: `Analyser.bodyUnderDb` (klockan via `HopTarget`, `ensamTakt.mjs`), `Analyser.bassOnsetsPerBeat` (`basslineProbe.mjs`).
 `tools/ensam.mjs --ut` läser fält på stenen (`this[f]`); dropens räknare ligger nu i facket, så `--ut dropCount` fungerar inte förrän
 verktyget läser facken (steg 6).
+
+## Sektionens fack (steg 5): SectionOut
+
+Bara data. De 17 publicerade fälten flyttade ur `Analyser` till `f.section` med samma namn och dagens startvärden: `section`, `sectionStartMs`,
+`sectionIndex`, `sectionTier`, `prevSection`, `levelVsHighDb`, `repeatSim`, `repeatAgoMs`, `repeatSection`, `repeatTier`, `repeatHighAtMs`,
+`repeatHighEndAtMs`, `expectHighMs`, `expectSource`, `secBuildAt`, `secBuildSeen`, `boundaryNov`. `DOUBLE_FROM_START`-namnen som flyttade:
+`expectHighMs`, `levelVsHighDb`, `sectionStartMs`, `secBuildAt`, `secBuildSeen`, `repeatSim`, `repeatAgoMs`. Hissat som `sc` i `process`,
+`fillFrame`, `pushBig` och `pullSlowState`; sektionen och basen skriver/läser `this.a.f.section.x` tills sitt steg. Sektionens privata delar
+(`secAgg`, `secSpecHop`, `secDump`, `dbgSecBlock`) står kvar på `Analyser` till steg 13. Getter: `Analyser.boundaryNov` (`boundaryBench.mjs`).

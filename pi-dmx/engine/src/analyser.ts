@@ -135,9 +135,9 @@ export const DROP_UNDERPEAK_MIN = Number(env('DROP_UNDERPEAK_MIN') ?? 0);   // 
 export const MINI_SPACING_MS = Number(env('MINI_SPACING_MS') ?? 0);   // KICK-LAS
 
 const DOUBLE_FROM_START = [
-  'expectHighMs', 'levelVsHighDb', 'sumSq', 'lastT', 'dbgRms', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum',
+  'sumSq', 'lastT', 'dbgRms', 'envAccum', 'envAccumT', 'envBassAccum', 'blAccum',
   'lvlVU', 'engSmooth', 'snareHit', 'hatHit',
-  'rawBpmLast', 'sectionStartMs', 'secBuildAt', 'secBuildSeen', 'repeatSim', 'repeatAgoMs',
+  'rawBpmLast',
 ] as const;   // Instansfalt som MATT
 /** TYPSTABILA TALFALT. */
 function stabiliseNumbers(o: object): void {
@@ -150,6 +150,7 @@ export class Analyser {
   get role(): Role { return this.f.hop.role; }   get bigOn(): boolean { return this.f.hop.bigOn; }   get cfg(): Cfg { return this.f.hop.cfg; }
   get bandOn(): Float32Array { return this.f.spectrum.bandOn; }   get beatSrc(): { beat?: BeatGrid | null } { return this.f.clock.src; }   // verktygen
   get bodyUnderDb(): number { return this.f.drop.bodyUnderDb; }   get bassOnsetsPerBeat(): number { return this.f.bass.onsetsPerBeat; }   // klockan (HopTarget), verktygen
+  get boundaryNov(): number { return this.f.section.boundaryNov; }   // boundaryBench.mjs
   private fft: FFT;
   private window: Float32Array;
   private buffer: Float32Array;   // sliding FFT window
@@ -197,15 +198,10 @@ export class Analyser {
   static readonly RANK_RUN_IN = numEnv('SECTION_RUN_IN', 0);   // SNABB ATTACK
   static readonly BODY_HIGH_MS = BODY_HIGH_MS;   // BASEN TILLBAKA
   static readonly BODY_HIGH_DB = BODY_HIGH_DB;
-  boundaryNov = 0;   // Klangnyhet 0..1 per 1 s-block mot det langsamma referensavtrycket
   secSpecHop = new Float64Array(8);   // Bandens absoluta magnitud for sektionsblocket
   secDump: number[][] | null = sysEnv('SECTION_DUMP') === '1' ? [] : null;   // Korbanks-dump
-  secBuildAt = 0; secBuildSeen = 0;   // uppbyggnadens start och senast sedd
-  section = 'intro'; sectionStartMs = 0; sectionIndex = 0; sectionTier = 1; repeatSim = 0; repeatAgoMs = 0; repeatSection = '';
-  expectHighMs = 0; expectSource = 0; prevSection = ''; levelVsHighDb = 0;   // Sektionsminne
   static readonly REPEAT = Number(sysEnv('SECTION_REPEAT')) || 0;   // UPPREPNINGSMINNE v2
 
-  repeatTier = -1; repeatHighAtMs = 0; repeatHighEndAtMs = 0;   // Klangmallens likhet for senaste blocket
   dbgPhase = { conf: 0, bassOn: 0, bassAnti: 0, fullOn: 0, fullAnti: 0, bestPh: 0, nPh: 0, pending: 0 };   // Korbanks-telemetri for gridfasen
   dbgSecBlock: ((b: Record<string, unknown>) => void) | null = null;   // Korbanks-krok
   private envFilled = 0;
@@ -323,10 +319,11 @@ export class Analyser {
   private pullSlowState(): void {
     if (!this.stateRd.read(this.splitCtrl!, this.splitState!, this.stateCopy)) return;
     const s = this.stateCopy; if (s[S_REC_SEQ] < this.barrierSeq) return;
+    const sc = this.f.section;
     this.f.clock.phaseMs = s[S_PHASE_MS]; this.f.clock.phaseConf = s[S_PHASE_CONF];
-    this.section = SECTIONS[s[S_SECTION]] || 'intro'; this.sectionStartMs = s[S_SEC_START]; this.sectionIndex = s[S_SEC_INDEX]; this.sectionTier = s[S_SEC_TIER]; this.secBuildAt = s[S_BUILD_AT]; this.secBuildSeen = s[S_BUILD_SEEN];
-    this.repeatSim = s[S_REP_SIM]; this.repeatAgoMs = s[S_REP_AGO]; this.repeatSection = SECTIONS[s[S_REP_SEC]] || '';
-    this.expectHighMs = s[S_EXPECT_MS]; this.expectSource = s[S_EXPECT_SRC]; this.prevSection = SECTIONS[s[S_PREV_SEC]] || ''; this.levelVsHighDb = s[S_LVL_HIGH];
+    sc.section = SECTIONS[s[S_SECTION]] || 'intro'; sc.sectionStartMs = s[S_SEC_START]; sc.sectionIndex = s[S_SEC_INDEX]; sc.sectionTier = s[S_SEC_TIER]; sc.secBuildAt = s[S_BUILD_AT]; sc.secBuildSeen = s[S_BUILD_SEEN];
+    sc.repeatSim = s[S_REP_SIM]; sc.repeatAgoMs = s[S_REP_AGO]; sc.repeatSection = SECTIONS[s[S_REP_SEC]] || '';
+    sc.expectHighMs = s[S_EXPECT_MS]; sc.expectSource = s[S_EXPECT_SRC]; sc.prevSection = SECTIONS[s[S_PREV_SEC]] || ''; sc.levelVsHighDb = s[S_LVL_HIGH];
   }
   setInlinePeer(slow: Analyser | null): void { this.inlinePeer = slow; }
   /** Halsa for /api/live. */
@@ -374,9 +371,9 @@ export class Analyser {
       stateWrite(ctrl, this.splitState!, (s) => {
         s[S_REC_SEQ] = this.recSeq; s[S_BPM] = this.f.clock.bpm; s[S_CONF] = this.f.clock.conf; s[S_BPMF] = this.localBpmF;
         s[S_PHASE_MS] = this.f.clock.phaseMs; s[S_PHASE_CONF] = this.f.clock.phaseConf;
-        s[S_SECTION] = sectionCode(this.section); s[S_SEC_START] = this.sectionStartMs; s[S_SEC_INDEX] = this.sectionIndex; s[S_SEC_TIER] = this.sectionTier; s[S_BUILD_AT] = this.secBuildAt; s[S_BUILD_SEEN] = this.secBuildSeen;
-        s[S_REP_SIM] = this.repeatSim; s[S_REP_AGO] = this.repeatAgoMs; s[S_REP_SEC] = sectionCode(this.repeatSection);
-        s[S_EXPECT_MS] = this.expectHighMs; s[S_EXPECT_SRC] = this.expectSource; s[S_PREV_SEC] = sectionCode(this.prevSection); s[S_LVL_HIGH] = this.levelVsHighDb;
+        s[S_SECTION] = sectionCode(this.f.section.section); s[S_SEC_START] = this.f.section.sectionStartMs; s[S_SEC_INDEX] = this.f.section.sectionIndex; s[S_SEC_TIER] = this.f.section.sectionTier; s[S_BUILD_AT] = this.f.section.secBuildAt; s[S_BUILD_SEEN] = this.f.section.secBuildSeen;
+        s[S_REP_SIM] = this.f.section.repeatSim; s[S_REP_AGO] = this.f.section.repeatAgoMs; s[S_REP_SEC] = sectionCode(this.f.section.repeatSection);
+        s[S_EXPECT_MS] = this.f.section.expectHighMs; s[S_EXPECT_SRC] = this.f.section.expectSource; s[S_PREV_SEC] = sectionCode(this.f.section.prevSection); s[S_LVL_HIGH] = this.f.section.levelVsHighDb;
         s[S_PROCESSED] = this.slowProcessed; s[S_LAG_MS] = lagMs; s[S_LAG_MAX] = this.slowLagMaxMs; s[S_BUSY_US] = this.slowBusyEmaUs; s[S_BUSY_MAX_US] = this.slowBusyMaxUs; s[S_SKIPPED] = this.slowSkipped; s[S_LOST_FLAGS] = this.slowLostFlags;
       });
       if (this.syncWorker) Atomics.notify(ctrl, C_STATE_SEQ);
@@ -388,13 +385,14 @@ export class Analyser {
   /** STORA VÄGEN. */
   private pushBig(samples: Float32Array): void {
     const h = this.f.hop;
+    const sc = this.f.section;
     const ri = this.f.riser, dp = this.f.drop, cp = this.f.character;
     const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock;
     const r = this.bigRing!, ctrl = this.splitCtrl!, seq = ++this.bigSeq, slot = seq % BIG_RING_N, o = slot * BIG_REC_LEN, n = samples.length;
     this.bigPcm!.set(samples, slot * BIG_HOP_MAX);
     r[o + B_N] = n; r[o + B_RMS] = h.rms; r[o + B_LVL] = h.lvlSmooth; r[o + B_CENT] = h.centSmooth; r[o + B_ACTIVE] = lv.activeMs;
     r[o + B_WALL] = h.nowWall; r[o + B_KICK] = kk.kick ? 1 : 0; r[o + B_KICKHIT] = h.kickHit; r[o + B_INT] = lv.intensity; r[o + B_BREAK] = h.breaking ? 1 : 0;
-    r[o + B_SEC] = sectionCode(this.section); r[o + B_LVH] = this.levelVsHighDb; r[o + B_CONF] = ck.conf;
+    r[o + B_SEC] = sectionCode(sc.section); r[o + B_LVH] = sc.levelVsHighDb; r[o + B_CONF] = ck.conf;
     r[o + B_ENVF] = this.bigEnvFlag; r[o + B_ENVBPM] = this.bigEnvBpm; this.bigEnvFlag = 0;
     r[o + B_SEQ] = seq;
     Atomics.store(ctrl, C_BIG_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
@@ -707,6 +705,7 @@ export class Analyser {
   /** Feed a hop-sized chunk of mono samples, get a frame back. */
   process(samples: Float32Array): Frame {
     const h = this.f.hop;
+    const sc = this.f.section;
     const ri = this.f.riser;
     const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock;
     if (this.hopLane) this.setClock(this.hopLane.clockBpm, this.hopLane.clockConf);
@@ -854,7 +853,7 @@ export class Analyser {
     } else {
       const bodyNow = (sp.bandDbRaw[0] + sp.bandDbRaw[1] + sp.bandDbRaw[2]) / 3;
       h.body = bodyNow;
-      h.sec = this.section; h.lvh = this.levelVsHighDb;
+      h.sec = sc.section; h.lvh = sc.levelVsHighDb;
       this.drop.dropStep();
       inRiser = this.riser.riserStep();
       h.conf = ck.conf;
@@ -896,6 +895,7 @@ export class Analyser {
   /** Muterar det ateranvanda Frame:t. */
   private fillFrame(): Frame {
     const h = this.f.hop;
+    const sc = this.f.section;
     const bo = this.f.bass, ri = this.f.riser, dp = this.f.drop;
     const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock;
     const level = h.level, fluxNorm = h.flux, kick = kk.kick, intensity = lv.intensity, bodyNow = h.body, inZone = this.hInZone, breaking = h.breaking,
@@ -922,12 +922,12 @@ export class Analyser {
     f.beatPhaseConf = ck.phaseConf;
     this.sections.sectionAggStep();
     const nowS = SECTION_AGG_HOP ? this.wallNow() : nowWallA;
-    f.buildProg = this.secBuildAt > 0 && nowS - this.secBuildSeen <= 2000 ? Math.min(1, (nowS - this.secBuildAt) / (32 * (ck.bpm > 0 ? 60000 / ck.bpm : Analyser.BE_FALLBACK_MS))) : 0;
-    f.section = this.section; f.sectionAgeMs = this.sectionStartMs > 0 ? nowS - this.sectionStartMs : 0; f.sectionIndex = this.sectionIndex; f.sectionTier = this.sectionTier;
-    f.repeatSim = this.repeatSim; f.repeatAgoMs = this.repeatAgoMs; f.repeatSection = this.repeatSection;
-    f.expectHighInMs = this.section === 'high' ? 0 : this.expectHighMs > 0 ? Math.max(0, this.expectHighMs - nowS) : -1;
-    f.prevSection = this.prevSection; f.levelVsHighDb = this.levelVsHighDb;
-    f.sectionBars = ck.bpm > 0 && this.sectionStartMs > 0 ? (nowS - this.sectionStartMs) / (240000 / ck.bpm) : 0;
+    f.buildProg = sc.secBuildAt > 0 && nowS - sc.secBuildSeen <= 2000 ? Math.min(1, (nowS - sc.secBuildAt) / (32 * (ck.bpm > 0 ? 60000 / ck.bpm : Analyser.BE_FALLBACK_MS))) : 0;
+    f.section = sc.section; f.sectionAgeMs = sc.sectionStartMs > 0 ? nowS - sc.sectionStartMs : 0; f.sectionIndex = sc.sectionIndex; f.sectionTier = sc.sectionTier;
+    f.repeatSim = sc.repeatSim; f.repeatAgoMs = sc.repeatAgoMs; f.repeatSection = sc.repeatSection;
+    f.expectHighInMs = sc.section === 'high' ? 0 : sc.expectHighMs > 0 ? Math.max(0, sc.expectHighMs - nowS) : -1;
+    f.prevSection = sc.prevSection; f.levelVsHighDb = sc.levelVsHighDb;
+    f.sectionBars = ck.bpm > 0 && sc.sectionStartMs > 0 ? (nowS - sc.sectionStartMs) / (240000 / ck.bpm) : 0;
     if (this.clock || this.hopSelf) {
       if (this.clock) this.clock.update(f, this.clockOut, this, Date.now());
       else this.hopLane!.feed(f, this.clockOut, this);

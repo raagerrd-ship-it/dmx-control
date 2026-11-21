@@ -68,27 +68,27 @@ export class SectionTracker {
   /** SEKTION. */
   private secDropsNow(): number { return this.a.f.hop.role === 'slow' && this.a.f.hop.bigOn ? this.secVDrops : this.a.f.drop.dropCand + this.a.f.drop.secBodyRet; }
   sectionReset(): void {
-    this.a.secBuildAt = 0; this.a.secBuildSeen = 0;
-    this.a.section = 'intro'; this.a.sectionStartMs = 0; this.a.sectionIndex = 0; this.a.sectionTier = 1; this.a.repeatSim = 0; this.a.repeatAgoMs = 0; this.a.repeatSection = '';
+    this.a.f.section.secBuildAt = 0; this.a.f.section.secBuildSeen = 0;
+    this.a.f.section.section = 'intro'; this.a.f.section.sectionStartMs = 0; this.a.f.section.sectionIndex = 0; this.a.f.section.sectionTier = 1; this.a.f.section.repeatSim = 0; this.a.f.section.repeatAgoMs = 0; this.a.f.section.repeatSection = '';
     this.secBlkMs = 0; this.secBlkN = 0; this.secBlkInt = 0; this.secBlkKicks = 0; this.secBlkCent = 0; this.secBlkSpec.fill(0);
     this.secBlkBon = 0; this.secBlkBpk = 0; this.secBlkFlux = 0; this.secBlkRms4 = 0; const H = this.secBlkH; H.bon.length = 0; H.bpk.length = 0; H.high.length = 0; H.flat.length = 0; H.flux.length = 0; H.dyn.length = 0;
     this.secTierRun = 0; this.secTierCand = 1; this.secRiseRun = 0; this.secSongStartMs = 0; this.secBlkRms2 = 0; this.secBlkDb.length = 0; this.secBlkDens.length = 0; this.secBlkCentH.length = 0; this.secDropSeen = this.secDropsNow(); this.secSilentBlocks = 0; this.secDropHoldUntil = 0;
     this.secHistN = 0; this.secHistPos = 0; this.secFpN = 0; this.secFpPos = 0; this.secFpLab.length = 0; this.secFpAcc.fill(0); this.secFpAccN = 0;
-    this.secLog.length = 0; this.secCurDbSum = 0; this.secCurDbN = 0; this.secCurDens = 0; this.lastHighDb = NaN; this.secCarryHighDb = NaN; this.secHiEndMs = 0; this.a.expectHighMs = 0; this.a.expectSource = 0; this.a.prevSection = ''; this.a.levelVsHighDb = 0;
+    this.secLog.length = 0; this.secCurDbSum = 0; this.secCurDbN = 0; this.secCurDens = 0; this.lastHighDb = NaN; this.secCarryHighDb = NaN; this.secHiEndMs = 0; this.a.f.section.expectHighMs = 0; this.a.f.section.expectSource = 0; this.a.f.section.prevSection = ''; this.a.f.section.levelVsHighDb = 0;
 
     this.secHiStartMs = 0; this.secPct = 0;
     this.secFp2N = 0; this.secFp2Pos = 0; this.secFp2Lab.length = 0; this.secFp2Acc.fill(0); this.secFp2AccN = 0; this.secFp2AccDb = 0; this.secFp2AccDens = 0;
-    this.secBlkT.length = 0; this.secRank.md = 0; this.secRank.sd = 1; this.secRank.mk = 0; this.secRank.sk = 1; this.a.repeatTier = -1; this.a.repeatHighAtMs = 0; this.a.repeatHighEndAtMs = 0; this.repeatHighRun = 0; this.secHighRunMs = 0;
+    this.secBlkT.length = 0; this.secRank.md = 0; this.secRank.sd = 1; this.secRank.mk = 0; this.secRank.sk = 1; this.a.f.section.repeatTier = -1; this.a.f.section.repeatHighAtMs = 0; this.a.f.section.repeatHighEndAtMs = 0; this.repeatHighRun = 0; this.secHighRunMs = 0;
     this.secBlkFeat.length = 0; this.secBlkHi.length = 0; this.secPct = 0;
 
-    this.secBlkHighH.length = 0; this.bndRef.fill(0); this.a.boundaryNov = 0;
+    this.secBlkHighH.length = 0; this.bndRef.fill(0); this.a.f.section.boundaryNov = 0;
   }
 
   /** Tar BLOCKSUMMOR. */
   sectionHop(spec: ArrayLike<number>): void {
     const I = this.shIn, hops = I.hops, intSum = I.intSum, kicks = I.kicks, breaking = I.breaking, nowMs = I.nowMs, dtMs = I.dtMs, rms2Sum = I.rms2Sum, centSum = I.centSum,
       specOff = I.specOff, bonSum = I.bonSum, bpk = I.bpk, fluxSum = I.fluxSum, rms4Sum = I.rms4Sum;
-    if (this.secSongStartMs === 0) { this.secSongStartMs = nowMs; this.a.sectionStartMs = nowMs; this.secDropSeen = this.secDropsNow(); }
+    if (this.secSongStartMs === 0) { this.secSongStartMs = nowMs; this.a.f.section.sectionStartMs = nowMs; this.secDropSeen = this.secDropsNow(); }
     this.secBlkMs += dtMs; this.secBlkN += hops; this.secBlkInt += intSum; this.secBlkKicks += kicks; this.secBlkCent += centSum; this.secBlkRms2 += rms2Sum;
     this.secBlkBon += bonSum; this.secBlkBpk += bpk; this.secBlkFlux += fluxSum; this.secBlkRms4 += rms4Sum;
     for (let i = 0; i < 8; i++) this.secBlkSpec[i] += spec[specOff + i];
@@ -117,13 +117,13 @@ export class SectionTracker {
       } else { tier = 1; this.secPct = 0; }
     }
     if (tier === this.secTierCand) this.secTierRun++; else { this.secTierCand = tier; this.secTierRun = 1; }
-    const runNeed = (Analyser.RANK_RUN_IN > 0 && this.secTierCand === 2 && this.a.sectionTier < 2) ? Analyser.RANK_RUN_IN : Analyser.RANK_RUN;
-    if (this.secTierRun >= runNeed) this.a.sectionTier = this.secTierCand;
+    const runNeed = (Analyser.RANK_RUN_IN > 0 && this.secTierCand === 2 && this.a.f.section.sectionTier < 2) ? Analyser.RANK_RUN_IN : Analyser.RANK_RUN;
+    if (this.secTierRun >= runNeed) this.a.f.section.sectionTier = this.secTierCand;
     let edgeUp = false, edgeDown = false, fallen = false;
     {
       const D = this.secBlkDb, nb = D.length, E = SectionTracker.SEC_EDGE_DB, ref = this.lastHighDb === this.lastHighDb ? this.lastHighDb : this.secCarryHighDb;
       fallen = nb >= 2 && blkDb <= this.lastHighDb - E && D[nb - 2] <= this.lastHighDb - E / 2;
-      if (this.a.section === 'high') edgeDown = fallen;
+      if (this.a.f.section.section === 'high') edgeDown = fallen;
       else if (blkDb >= ref - E) {
         const barMs = this.a.f.clock.bpm > 40 ? 240000 / this.a.f.clock.bpm : 4 * Analyser.BE_FALLBACK_MS;
         const m = Math.min(nb - 1, 4 * Math.max(2, Math.min(4, Math.round(barMs / 1000)))), w = this.secEdgeBuf;
@@ -132,14 +132,14 @@ export class SectionTracker {
           edgeUp = blkDb - w[m >> 1] >= E;
         }
       }
-      if (edgeUp || edgeDown) { this.a.sectionTier = edgeUp ? 2 : 0; this.secTierCand = this.a.sectionTier; this.secTierRun = 0; }
+      if (edgeUp || edgeDown) { this.a.f.section.sectionTier = edgeUp ? 2 : 0; this.secTierCand = this.a.f.section.sectionTier; this.secTierRun = 0; }
     }
-    const st = this.a.sectionTier;
+    const st = this.a.f.section.sectionTier;
     this.secHist[this.secHistPos] = bInt; this.secHistPos = (this.secHistPos + 1) & 15; if (this.secHistN < 16) this.secHistN++;
     const rise = this.secHistN >= 9 ? bInt - this.secHist[(this.secHistPos - 9 + 16) & 15] : 0;
     this.secRiseRun = rise >= 0.10 ? this.secRiseRun + 1 : 0;
     const sinceStart = nowMs - this.secSongStartMs; const dropEv = this.secDropsNow(); const dropped = dropEv !== this.secDropSeen; this.secDropSeen = dropEv;
-    const prev = this.a.section; let label: string;
+    const prev = this.a.f.section.section; let label: string;
     {
       if (this.secBlkDb.length < 20) label = edgeDown ? 'low' : edgeUp || (Analyser.BODY_HIGH_MS > 0 && (dropped || prev === 'high')) ? 'high' : 'intro';
       else if (dropped || st === 2) label = 'high';
@@ -150,39 +150,39 @@ export class SectionTracker {
         const m4 = (D[nb - 1] + D[nb - 2] + D[nb - 3] + D[nb - 4]) / 4;
         if (m4 < med + Analyser.SECTION_EARLY_DB) label = prev === 'intro' || prev === 'low' || prev === 'build' ? 'build' : prev;
       }
-      if ((Analyser.REPEAT & 64) && this.a.repeatSim >= SectionTracker.REPEAT_THR && this.a.repeatHighAtMs > 0 && st >= 1 && label !== 'high' && !dropped) {
-        const d = this.a.repeatHighAtMs - nowMs; if (d >= -1500 && d <= 1000) label = 'high';
+      if ((Analyser.REPEAT & 64) && this.a.f.section.repeatSim >= SectionTracker.REPEAT_THR && this.a.f.section.repeatHighAtMs > 0 && st >= 1 && label !== 'high' && !dropped) {
+        const d = this.a.f.section.repeatHighAtMs - nowMs; if (d >= -1500 && d <= 1000) label = 'high';
       }
       if ((Analyser.REPEAT & 48) && prev === 'high' && label === 'break' && st === 1) {
         {
           let hold = (Analyser.REPEAT & 16) ? Math.min(40000, this.secHighRunMs) : 0;
           if ((Analyser.REPEAT & 32) && this.a.f.clock.bpm > 0) hold = Math.max(hold, 8 * 240000 / this.a.f.clock.bpm);
-          if (nowMs - this.a.sectionStartMs < hold) label = 'high';
+          if (nowMs - this.a.f.section.sectionStartMs < hold) label = 'high';
         }
       }
       if (dropped && label === 'high') this.secDropHoldUntil = nowMs + (Analyser.RANK_WIN + Analyser.RANK_RUN) * 1000;
       else if (prev === 'high' && label !== 'high' && st >= 1 && nowMs < this.secDropHoldUntil) label = 'high';
     }
     if (label === 'high' && prev !== 'high' && !dropped && !edgeUp && fallen && nowMs - this.secHiEndMs < Analyser.BE_MEM_BEATS * (this.a.f.clock.bpm > 40 ? 60000 / this.a.f.clock.bpm : Analyser.BE_FALLBACK_MS)) {
-      label = prev === 'break' ? 'break' : 'build'; this.a.sectionTier = 1;
+      label = prev === 'break' ? 'break' : 'build'; this.a.f.section.sectionTier = 1;
     }
     const dwellMs = label === 'high' ? 4000 : 8000;
-    const dwellOk = nowMs - this.a.sectionStartMs >= dwellMs || (prev === 'high' && label === 'break') || (Analyser.BODY_HIGH_MS > 0 && dropped && label === 'high') || edgeUp || edgeDown;
+    const dwellOk = nowMs - this.a.f.section.sectionStartMs >= dwellMs || (prev === 'high' && label === 'break') || (Analyser.BODY_HIGH_MS > 0 && dropped && label === 'high') || edgeUp || edgeDown;
     if (label !== prev && dwellOk) {
       const dbMean = this.secCurDbN ? this.secCurDbSum / this.secCurDbN : blkDb;
-      this.secLog.push({ label: prev, startMs: this.a.sectionStartMs, endMs: nowMs, db: dbMean, dens: this.secCurDbN ? this.secCurDens / this.secCurDbN : 0 });
+      this.secLog.push({ label: prev, startMs: this.a.f.section.sectionStartMs, endMs: nowMs, db: dbMean, dens: this.secCurDbN ? this.secCurDens / this.secCurDbN : 0 });
       if (this.secLog.length > 48) this.secLog.shift();
       if (prev === 'high') { this.lastHighDb = dbMean; this.secHiEndMs = nowMs; }
-      this.a.prevSection = prev; this.secCurDbSum = 0; this.secCurDbN = 0; this.secCurDens = 0;
-      this.a.sectionStartMs = nowMs; if (label === 'high') { this.a.sectionIndex++; this.secHiStartMs = nowMs; } this.a.section = label;
+      this.a.f.section.prevSection = prev; this.secCurDbSum = 0; this.secCurDbN = 0; this.secCurDens = 0;
+      this.a.f.section.sectionStartMs = nowMs; if (label === 'high') { this.a.f.section.sectionIndex++; this.secHiStartMs = nowMs; } this.a.f.section.section = label;
     }
-    if (prev === 'build' || this.a.section === 'build') { if (this.a.section === 'build' && (this.a.secBuildAt === 0 || nowMs - this.a.secBuildSeen > 2000)) this.a.secBuildAt = nowMs; this.a.secBuildSeen = nowMs; }
+    if (prev === 'build' || this.a.f.section.section === 'build') { if (this.a.f.section.section === 'build' && (this.a.f.section.secBuildAt === 0 || nowMs - this.a.f.section.secBuildSeen > 2000)) this.a.f.section.secBuildAt = nowMs; this.a.f.section.secBuildSeen = nowMs; }
     this.secCurDbSum += blkDb; this.secCurDbN++; this.secCurDens += bKicks;
-    if (this.a.secDump) { const row = [(nowMs - this.secSongStartMs) / 1000, blkDb, bKicks, bCent, bInt, breaking ? 1 : 0, dropped ? 1 : 0]; for (let i = 0; i < 8; i++) row.push(this.secBlkSpec[i] / n); row.push(st, ['intro', 'low', 'build', 'high', 'break'].indexOf(this.a.section)); this.a.secDump.push(row); }
-    if (this.a.section === 'high') { this.lastHighDb = this.secCurDbSum / this.secCurDbN; }
-    this.a.levelVsHighDb = Number.isFinite(this.lastHighDb) ? blkDb - this.lastHighDb : 0;
+    if (this.a.secDump) { const row = [(nowMs - this.secSongStartMs) / 1000, blkDb, bKicks, bCent, bInt, breaking ? 1 : 0, dropped ? 1 : 0]; for (let i = 0; i < 8; i++) row.push(this.secBlkSpec[i] / n); row.push(st, ['intro', 'low', 'build', 'high', 'break'].indexOf(this.a.f.section.section)); this.a.secDump.push(row); }
+    if (this.a.f.section.section === 'high') { this.lastHighDb = this.secCurDbSum / this.secCurDbN; }
+    this.a.f.section.levelVsHighDb = Number.isFinite(this.lastHighDb) ? blkDb - this.lastHighDb : 0;
     this.predictHigh(nowMs, bInt);
-    if (this.a.dbgSecBlock) this.a.dbgSecBlock({ nowMs, section: this.a.section, sectionStartMs: this.a.sectionStartMs, prev, label, bpm: this.a.f.clock.bpm, bInt, bKicks, bCent, blkDb, buildUp: this.a.f.riser.buildUp, riseRun: this.secRiseRun, rise, dropped, breaking, tier: this.a.sectionTier, repeatSim: this.a.repeatSim, repeatAgoMs: this.a.repeatAgoMs, repeatSection: this.a.repeatSection, spec: Array.from(this.secBlkSpec, (v) => v / n), lastHighDb: this.lastHighDb, expectHighMs: this.a.expectHighMs, expectSource: this.a.expectSource, beatPhaseMs: this.a.f.clock.phaseMs, secLogN: this.secLog.length, secLogLast: this.secLog[this.secLog.length - 1] ?? null, bBon, bBpk, bFlux, bDyn, bHigh, bFlat, pct: this.secPct });
+    if (this.a.dbgSecBlock) this.a.dbgSecBlock({ nowMs, section: this.a.f.section.section, sectionStartMs: this.a.f.section.sectionStartMs, prev, label, bpm: this.a.f.clock.bpm, bInt, bKicks, bCent, blkDb, buildUp: this.a.f.riser.buildUp, riseRun: this.secRiseRun, rise, dropped, breaking, tier: this.a.f.section.sectionTier, repeatSim: this.a.f.section.repeatSim, repeatAgoMs: this.a.f.section.repeatAgoMs, repeatSection: this.a.f.section.repeatSection, spec: Array.from(this.secBlkSpec, (v) => v / n), lastHighDb: this.lastHighDb, expectHighMs: this.a.f.section.expectHighMs, expectSource: this.a.f.section.expectSource, beatPhaseMs: this.a.f.clock.phaseMs, secLogN: this.secLog.length, secLogLast: this.secLog[this.secLog.length - 1] ?? null, bBon, bBpk, bFlux, bDyn, bHigh, bFlat, pct: this.secPct });
     if (Analyser.REPEAT & 1) { this.repeatStep(nowMs, blkDb, bKicks, bCent, bInt); this.secBlkMs = 0; this.secBlkN = 0; this.secBlkInt = 0; this.secBlkKicks = 0; this.secBlkCent = 0; this.secBlkSpec.fill(0); this.secBlkRms2 = 0; this.secBlkBon = 0; this.secBlkBpk = 0; this.secBlkFlux = 0; this.secBlkRms4 = 0; return; }
     let sum = 0; for (let i = 0; i < 8; i++) sum += this.secBlkSpec[i];
     const acc = this.secFpAcc; for (let i = 0; i < 8; i++) acc[i] += sum > 0 ? this.secBlkSpec[i] / sum : 0;
@@ -196,9 +196,9 @@ export class SectionTracker {
         let dot = 0; const o = k * D; for (let i = 0; i < D; i++) dot += acc[i] * this.secFp[o + i];
         if (dot > best) { best = dot; bestAt = this.secFpT[k]; bestLab = this.secFpLab[k]; }
       }
-      this.a.repeatSim = best; this.a.repeatAgoMs = best > 0 ? nowMs - bestAt : 0; this.a.repeatSection = bestLab;
+      this.a.f.section.repeatSim = best; this.a.f.section.repeatAgoMs = best > 0 ? nowMs - bestAt : 0; this.a.f.section.repeatSection = bestLab;
       const o = this.secFpPos * D; for (let i = 0; i < D; i++) this.secFp[o + i] = acc[i];
-      this.secFpT[this.secFpPos] = nowMs; this.secFpLab[this.secFpPos] = this.a.section;
+      this.secFpT[this.secFpPos] = nowMs; this.secFpLab[this.secFpPos] = this.a.f.section.section;
       this.secFpPos = (this.secFpPos + 1) % SectionTracker.FP_MAX; if (this.secFpN < SectionTracker.FP_MAX) this.secFpN++;
       acc.fill(0); this.secFpAccN = 0;
     }
@@ -227,7 +227,7 @@ export class SectionTracker {
     let win = 0; const W = Math.min(Analyser.RANK_WIN, nb); for (let i = nb - W; i < nb; i++) win += S[i]; win /= W;
     let below = 0, cnt = 0;
     { let acc = 0; for (let e = 1; e <= nb; e++) { acc += S[e - 1]; if (e > W) acc -= S[e - 1 - W]; if (e >= W) { cnt++; if (acc / W < win) below++; } } }
-    const pct = below / cnt; const cur = this.a.sectionTier, h = SectionTracker.RANK_HYST; this.secPct = pct;
+    const pct = below / cnt; const cur = this.a.f.section.sectionTier, h = SectionTracker.RANK_HYST; this.secPct = pct;
     return pct >= SectionTracker.RANK_HI - (cur === 2 ? h : 0) ? 2 : pct <= SectionTracker.RANK_LO + (cur === 0 ? h : 0) ? 0 : 1;
   }
 
@@ -247,7 +247,7 @@ export class SectionTracker {
     acc[8] += bCent; acc[9] += Math.min(1, bKicks / 4); acc[10] += bInt; acc[11] += blkDb / 10; this.secFp2AccDb += blkDb; this.secFp2AccDens += bKicks; this.secFp2AccN++;
     if (this.secFp2AccN < SectionTracker.REPEAT_STEP) return;
     const pos = this.secFp2Pos, o = pos * D; for (let i = 0; i < D; i++) this.secFp2[o + i] = acc[i] / this.secFp2AccN;
-    this.secFp2T[pos] = nowMs; this.secFp2Db[pos] = this.secFp2AccDb / this.secFp2AccN; this.secFp2Dens[pos] = this.secFp2AccDens / this.secFp2AccN; this.secFp2Lab[pos] = this.a.section;
+    this.secFp2T[pos] = nowMs; this.secFp2Db[pos] = this.secFp2AccDb / this.secFp2AccN; this.secFp2Dens[pos] = this.secFp2AccDens / this.secFp2AccN; this.secFp2Lab[pos] = this.a.f.section.section;
     this.secFp2Pos = (pos + 1) % MAX; if (this.secFp2N < MAX) this.secFp2N++;
     acc.fill(0); this.secFp2AccN = 0; this.secFp2AccDb = 0; this.secFp2AccDens = 0;
     const N = this.secFp2N; const idx = (m: number) => (pos - m + MAX) % MAX;
@@ -264,26 +264,26 @@ export class SectionTracker {
       let s = 0; for (let j = 0; j < W; j++) { const a = idx(j) * D, b = idx(m + j) * D; for (let i = 0; i < D; i++) s += z[a + i] * z[b + i]; }
       s /= W; if (s > best) { best = s; bestM = m; }
     }
-    const prevAt = this.a.repeatHighAtMs;
-    this.a.repeatSim = best; this.a.repeatTier = -1; this.a.repeatHighAtMs = 0; this.a.repeatHighEndAtMs = 0;
-    const nb = this.secBlkDb.length; if (nb < 20) { this.a.repeatAgoMs = 0; this.a.repeatSection = ''; return; }
+    const prevAt = this.a.f.section.repeatHighAtMs;
+    this.a.f.section.repeatSim = best; this.a.f.section.repeatTier = -1; this.a.f.section.repeatHighAtMs = 0; this.a.f.section.repeatHighEndAtMs = 0;
+    const nb = this.secBlkDb.length; if (nb < 20) { this.a.f.section.repeatAgoMs = 0; this.a.f.section.repeatSection = ''; return; }
     const R = this.secRank; const score = (db: number, dens: number) => (db - R.md) / R.sd + (dens - R.mk) / R.sk;
     const ss = this.secScoreSorted; for (let i = 0; i < nb; i++) ss[i] = score(this.secBlkDb[i], this.secBlkDens[i]); ss.subarray(0, nb).sort();
     const pct = (v: number) => { let lo = 0, hi = nb; while (lo < hi) { const mid = (lo + hi) >> 1; if (ss[mid] < v) lo = mid + 1; else hi = mid; } return lo / nb; };
     if (Analyser.REPEAT & 16) {
       let run = 0, gap = 0, bestRun = 0;
       for (let i = 0; i < nb; i++) {
-        if (this.secBlkT[i] >= this.a.sectionStartMs) break;
+        if (this.secBlkT[i] >= this.a.f.section.sectionStartMs) break;
         if (pct(score(this.secBlkDb[i], this.secBlkDens[i])) >= SectionTracker.RANK_HI) { run += 1 + gap; gap = 0; if (run > bestRun) bestRun = run; }
         else if (run > 0 && ++gap > 2) { run = 0; gap = 0; }
       }
       this.secHighRunMs = bestRun * 1000;
     }
-    if (bestM < 0) { this.a.repeatAgoMs = 0; this.a.repeatSection = ''; return; }
+    if (bestM < 0) { this.a.f.section.repeatAgoMs = 0; this.a.f.section.repeatSection = ''; return; }
     const kEnd = idx(bestM); const lagMs = nowMs - this.secFp2T[kEnd];
-    this.a.repeatAgoMs = lagMs; this.a.repeatSection = this.secFp2Lab[kEnd];
+    this.a.f.section.repeatAgoMs = lagMs; this.a.f.section.repeatSection = this.secFp2Lab[kEnd];
     let ps = 0; for (let j = 0; j < W; j++) { const k = idx(bestM + j); ps += score(this.secFp2Db[k], this.secFp2Dens[k]); } ps /= W;
-    const p = pct(ps); this.a.repeatTier = p >= SectionTracker.RANK_HI ? 2 : p <= SectionTracker.RANK_LO ? 0 : 1;
+    const p = pct(ps); this.a.f.section.repeatTier = p >= SectionTracker.RANK_HI ? 2 : p <= SectionTracker.RANK_LO ? 0 : 1;
     const tEnd = this.secFp2T[kEnd]; let run = 0, at = 0, endAt = 0, lowRun = 0;
     for (let i = 0; i < nb; i++) {
       if (this.secBlkT[i] <= tEnd) continue;
@@ -291,37 +291,37 @@ export class SectionTracker {
       if (at === 0) { if (hi) { if (++run >= 2) at = this.secBlkT[i - 1] + lagMs; } else run = 0; }
       else if (!hi) { if (++lowRun >= 3) { endAt = this.secBlkT[i - 2] + lagMs; break; } } else lowRun = 0;
     }
-    this.a.repeatHighEndAtMs = at > 0 ? endAt : 0;
+    this.a.f.section.repeatHighEndAtMs = at > 0 ? endAt : 0;
     if (at > 0 && prevAt > nowMs && Math.abs(at - prevAt) <= 4000) { at = prevAt; this.repeatHighRun++; }
     else this.repeatHighRun = at > 0 ? 1 : 0;
-    this.a.repeatHighAtMs = at;
+    this.a.f.section.repeatHighAtMs = at;
   }
 
   /** FORUTSAGELSE av nasta 'high'. */
   private predictHigh(nowMs: number, bInt: number): void {
     const bpm = this.a.f.clock.bpm; const barMs = bpm > 0 ? 240000 / bpm : 0;
     let exp = 0, src = 0;
-    if ((Analyser.REPEAT & 4) && this.a.section !== 'high' && this.a.repeatSim >= SectionTracker.REPEAT_THR && this.repeatHighRun >= 2 && this.a.repeatHighAtMs > nowMs + 500 && this.a.repeatHighAtMs - nowMs <= 32000) { exp = this.a.repeatHighAtMs; src = 4; }
-    if (!exp && this.a.section !== 'high' && barMs > 0) {
+    if ((Analyser.REPEAT & 4) && this.a.f.section.section !== 'high' && this.a.f.section.repeatSim >= SectionTracker.REPEAT_THR && this.repeatHighRun >= 2 && this.a.f.section.repeatHighAtMs > nowMs + 500 && this.a.f.section.repeatHighAtMs - nowMs <= 32000) { exp = this.a.f.section.repeatHighAtMs; src = 4; }
+    if (!exp && this.a.f.section.section !== 'high' && barMs > 0) {
       if (SectionTracker.PREDICT_SRC & 1) for (let i = this.secLog.length - 2; i >= 0; i--) {
         const a = this.secLog[i], b = this.secLog[i + 1];
-        if (a.label !== this.a.section || b.label !== 'high') continue;
+        if (a.label !== this.a.f.section.section || b.label !== 'high') continue;
         const bars = Math.max(4, Math.round((a.endMs - a.startMs) / barMs / 4) * 4);
-        const cand = this.a.sectionStartMs + bars * barMs;
+        const cand = this.a.f.section.sectionStartMs + bars * barMs;
         if (cand > nowMs + 500) { exp = cand; src = 1; }
         break;
       }
       const rising = this.secRiseRun >= SectionTracker.PREDICT_RISE;
       if (!exp && (SectionTracker.PREDICT_SRC & 2) && rising) {
-        const anchor = this.secHiStartMs > 0 ? this.secHiStartMs : this.a.sectionStartMs;
+        const anchor = this.secHiStartMs > 0 ? this.secHiStartMs : this.a.f.section.sectionStartMs;
         const L = SectionTracker.PREDICT_LAT * barMs;
         const elapsed = nowMs - anchor; const k = Math.ceil((elapsed + barMs) / L);
         const cand = anchor + k * L;
         if (cand - nowMs <= 16 * barMs) { exp = cand; src = 2; }
       }
     }
-    if (exp === 0 && this.a.expectHighMs > 0 && this.a.section !== 'high' && this.a.expectHighMs > nowMs - 2000) { exp = this.a.expectHighMs; src = this.a.expectSource; }
-    this.a.expectHighMs = exp; this.a.expectSource = src;
+    if (exp === 0 && this.a.f.section.expectHighMs > 0 && this.a.f.section.section !== 'high' && this.a.f.section.expectHighMs > nowMs - 2000) { exp = this.a.f.section.expectHighMs; src = this.a.f.section.expectSource; }
+    this.a.f.section.expectHighMs = exp; this.a.f.section.expectSource = src;
   }
 
   /** Roll 'all'. */
