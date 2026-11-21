@@ -49,5 +49,31 @@ export class HopOut {
   constructor() { stabilise(this, ['lvlSmooth', 'kickHit']); }
 }
 
-export interface Fack { hop: HopOut }
-export function makeFack(): Fack { return { hop: new HopOut() }; }
+/** NIVÅN. intensity = förr hIntensity, inZone = förr levels.inZoneState. */
+export class LevelOut {
+  gain = 1; envelope!: number; activeMs = 0; silentMs = -0; intensity = 0.5; levelCeil = 0.5; inZone = false; gainLocked = false;
+  constructor() { stabilise(this, ['activeMs']); }
+}
+/** SPEKTRUMET. Banden förblir Float32Array. sink = förr specSink. */
+export class SpectrumOut {
+  readonly bandAbs = new Float32Array(8); readonly bandDbRaw = new Float32Array(8);   // absolut magnitud före AGC, rå dB
+  readonly bandLvl = new Float32Array(8); readonly bandOn = new Float32Array(8); readonly fbOn = new Float32Array(8);
+  readonly bassOnRing = new Float32Array(BASSON_LEN); bassOnN = 0;
+  sink: ((mag: Float32Array, binHz: number) => void) | null = null;
+}
+/** KICKEN. kick = förr hKick, kickAt = förr hKickAt. */
+export class KickOut {
+  kick = false; kickAt = 0.5;
+  beatAnchorMs = 0; pendingKickMs = 0; lastKick = 0; kfPrev = 0; kfPrev2 = 0;
+  dbgKick: { flux: number; thresh: number; med: number; mad: number; energy: number; gain: number; rms: number; env: number; locked: boolean } | null = null;
+  constructor() { stabilise(this, ['pendingKickMs', 'kfPrev', 'kfPrev2', 'beatAnchorMs', 'lastKick']); }
+}
+/** KLOCKAN sedd av analysatorn: bpm/conf = förr localBpm/localBpmConfidence, phaseMs/phaseConf = gridfasen, src = förr beatSrc (samma objekt). */
+export class ClockOut {
+  bpm = 0; conf = 0; phaseMs = 0; phaseConf = 0;
+  src!: { beat?: BeatGrid | null };
+  constructor() { stabilise(this, ['conf']); }
+}
+
+export interface Fack { hop: HopOut; level: LevelOut; spectrum: SpectrumOut; kick: KickOut; clock: ClockOut }
+export function makeFack(): Fack { return { hop: new HopOut(), level: new LevelOut(), spectrum: new SpectrumOut(), kick: new KickOut(), clock: new ClockOut() }; }

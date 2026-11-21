@@ -18,10 +18,10 @@ export class CharacterProfile {
 
   /** Karaktarsprofilen. */
   profileStep(): void {
-    let bSum = 1e-6; for (let b = 0; b < 8; b++) bSum += this.a.bandLvl[b];
-    const bassW = (this.a.bandLvl[0] + this.a.bandLvl[1] + this.a.bandLvl[2]) / bSum;
-    const brightW = (this.a.bandLvl[6] + this.a.bandLvl[7]) / bSum;
-    const punchNow = Math.min(1, (this.a.f.hop.kickHit + this.a.bandOn[5] + this.a.bandOn[6]) * 0.6);
+    let bSum = 1e-6; for (let b = 0; b < 8; b++) bSum += this.a.f.spectrum.bandLvl[b];
+    const bassW = (this.a.f.spectrum.bandLvl[0] + this.a.f.spectrum.bandLvl[1] + this.a.f.spectrum.bandLvl[2]) / bSum;
+    const brightW = (this.a.f.spectrum.bandLvl[6] + this.a.f.spectrum.bandLvl[7]) / bSum;
+    const punchNow = Math.min(1, (this.a.f.hop.kickHit + this.a.f.spectrum.bandOn[5] + this.a.f.spectrum.bandOn[6]) * 0.6);
     const pr = this.aProf;
     this.profPunch += (punchNow - this.profPunch) * pr;
     this.profBass += (bassW - this.profBass) * pr;

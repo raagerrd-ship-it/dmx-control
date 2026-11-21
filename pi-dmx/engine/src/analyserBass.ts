@@ -13,7 +13,7 @@ export class BassTracker {
   /** Stegar skalorna ett hop. */
   bassEnergyStep(sub: number, kick: number): number {
     const x = 5 * Math.log10(sub + 1e-7) + 15 * Math.log10(kick + 1e-7), hopMs = this.a.f.hop.dtHop * 1000;
-    let per = this.a.localBpm > 40 ? 60000 / this.a.localBpm : Analyser.BE_FALLBACK_MS;
+    let per = this.a.f.clock.bpm > 40 ? 60000 / this.a.f.clock.bpm : Analyser.BE_FALLBACK_MS;
     per = per < BassTracker.BE_BEAT_MIN_MS ? BassTracker.BE_BEAT_MIN_MS : per > BassTracker.BE_BEAT_MAX_MS ? BassTracker.BE_BEAT_MAX_MS : per;
     this.beHi = !(x <= this.beHi) ? x : this.beHi + (x - this.beHi) * (hopMs / (BassTracker.BE_TOP_BEATS * per));
     this.beHiShort = !(x <= this.beHiShort) ? x : this.beHiShort + (x - this.beHiShort) * (hopMs / (BassTracker.BE_FAST_BEATS * per));

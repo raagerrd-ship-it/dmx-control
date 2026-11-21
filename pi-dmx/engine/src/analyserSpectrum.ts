@@ -94,7 +94,7 @@ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
       if (this.fbOnMed[b] < 0) this.fbOnMed[b] = 0;
       if (this.fbOnMad[b] < 0) this.fbOnMad[b] = 0;
       const oThr = this.fbOnMed[b] + SpectrumBands.ONSET_K * this.fbOnMad[b];
-      this.a.fbOn[b] = warm ? Math.max(0, Math.min(1, (fluxN - oThr) / Math.max(1e-6, this.fbOnMad[b] * 3))) : 0;
+      this.a.f.spectrum.fbOn[b] = warm ? Math.max(0, Math.min(1, (fluxN - oThr) / Math.max(1e-6, this.fbOnMad[b] * 3))) : 0;
     }
     { const t = this.fbPrevMag; this.fbPrevMag = this.fbMag; this.fbMag = t; }
   }
@@ -113,8 +113,8 @@ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
     }
 
     if (this.a.f.hop.bigOn) { const k = ++this.specN, R = this.specRing!, o = (k % SPEC_SLOTS) * SPEC_MAX; R.set(this.magBigView.subarray(0, this.specCopy.length), o); }
-    else this.a.specSink?.(this.magBigView, this.a.f.hop.cfg.audio.rate / this.bufferBig.length);
-    const gated = this.a.activeMs > 0;
+    else this.a.f.spectrum.sink?.(this.magBigView, this.a.f.hop.cfg.audio.rate / this.bufferBig.length);
+    const gated = this.a.f.level.activeMs > 0;
 
 
     if (gated) this.onsetWarm++; else this.onsetWarm = 0;
@@ -125,8 +125,8 @@ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
       const lo = bandLo[0], hi = bandHi[2]; let o = 0;
       for (let i = lo; i < hi; i++) { const d = 20 * Math.log10((magBig[i] + 1e-6) / (prevMagBig[i] + 1e-6)); if (d > 0) o += d; }
       o /= Math.max(1, hi - lo);
-      const L = Analyser.BASSON_LEN, R = this.a.bassOnRing, n = this.a.bassOnN, A = SpectrumBands.BASSON_AVG;
-      R[n % L] = o; this.a.bassOnN = n + 1;
+      const L = Analyser.BASSON_LEN, R = this.a.f.spectrum.bassOnRing, n = this.a.f.spectrum.bassOnN, A = SpectrumBands.BASSON_AVG;
+      R[n % L] = o; this.a.f.spectrum.bassOnN = n + 1;
       if (n >= 2 * A) {
         const c = n - A; const xc = R[c % L]; let ok = true;
         for (let k = 1; k <= SpectrumBands.BASSON_MAX && ok; k++) if (R[(c - k) % L] > xc) ok = false;
@@ -145,15 +145,15 @@ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
         if (d > 0) fl += d;
       }
       const avg = sum / nb;
-      this.a.bandAbs[b] = avg;
+      this.a.f.spectrum.bandAbs[b] = avg;
       const db = 20 * Math.log10(avg + 1e-7);
-      this.a.bandDbRaw[b] = db;
+      this.a.f.spectrum.bandDbRaw[b] = db;
       this.a.secSpecDirty = true;
       const minPeak = this.a.f.hop.lvlSmooth * 0.15;
       if (gated && avg > this.bandPeak[b]) this.bandPeak[b] = Math.max(avg, minPeak);
       else this.bandPeak[b] = Math.max(this.bandPeak[b] * Analyser.PEAK_DECAY, minPeak);
       const lvlRawB = gated ? Math.min(1, avg / (this.bandPeak[b] + 1e-6)) : 0;
-      this.a.bandLvl[b] += (lvlRawB - this.a.bandLvl[b]) * this.aBandLvl;
+      this.a.f.spectrum.bandLvl[b] += (lvlRawB - this.a.f.spectrum.bandLvl[b]) * this.aBandLvl;
       const fluxN = fl / nb;
       const oStep = 0.002 * Analyser.BIG_EVERY;
       const dOMed = fluxN - this.onsetMed[b];
@@ -163,7 +163,7 @@ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
       if (this.onsetMed[b] < 0) this.onsetMed[b] = 0;
       if (this.onsetMad[b] < 0) this.onsetMad[b] = 0;
       const oThr = this.onsetMed[b] + SpectrumBands.ONSET_K * this.onsetMad[b];
-      this.a.bandOn[b] = (gated && this.onsetWarm >= SpectrumBands.ONSET_WARM)
+      this.a.f.spectrum.bandOn[b] = (gated && this.onsetWarm >= SpectrumBands.ONSET_WARM)
         ? Math.max(0, Math.min(1, (fluxN - oThr) / Math.max(1e-6, this.onsetMad[b] * 3)))
         : 0;
     }

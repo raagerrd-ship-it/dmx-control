@@ -5,5 +5,14 @@
   "kickHit": "f.hop.kickHit", "dSec": "f.hop.sec", "dLvh": "f.hop.lvh", "dConf": "f.hop.conf", "dBpm": "f.hop.bpm",
   "role": "f.hop.role", "bigOn": "f.hop.bigOn",
   "cfg.audio.rate": "f.hop.cfg.audio.rate", "cfg.fft.size": "cfg.fft.size", "cfg.fft.hop": "f.hop.cfg.fft.hop",
-  "cfg.detection.autoGainTarget": "f.hop.cfg.detection.autoGainTarget", "cfg.detection.noiseFloor": "cfg.detection.noiseFloor", "cfg.onset.enhancements": "f.hop.cfg.onset.enhancements"
+  "cfg.detection.autoGainTarget": "f.hop.cfg.detection.autoGainTarget", "cfg.detection.noiseFloor": "cfg.detection.noiseFloor", "cfg.onset.enhancements": "f.hop.cfg.onset.enhancements",
+  "gain": "f.level.gain", "envelope": "f.level.envelope", "activeMs": "f.level.activeMs", "levels.silentMs": "f.level.silentMs", "hIntensity": "f.level.intensity",
+  "levelCeil": "f.level.levelCeil", "levels.inZoneState": "f.level.inZone", "gainLocked": "f.level.gainLocked",
+  "bandAbs.constructor": "f.spectrum.bandAbs.constructor", "bandAbs.length": "f.spectrum.bandAbs.length", "bandDbRaw.constructor": "f.spectrum.bandDbRaw.constructor", "bandDbRaw.length": "f.spectrum.bandDbRaw.length",
+  "bandLvl.constructor": "f.spectrum.bandLvl.constructor", "bandLvl.length": "f.spectrum.bandLvl.length", "bandOn.constructor": "f.spectrum.bandOn.constructor", "bandOn.length": "f.spectrum.bandOn.length",
+  "fbOn.constructor": "f.spectrum.fbOn.constructor", "fbOn.length": "f.spectrum.fbOn.length", "bassOnRing.constructor": "f.spectrum.bassOnRing.constructor", "bassOnRing.length": "f.spectrum.bassOnRing.length",
+  "bassOnN": "f.spectrum.bassOnN", "specSink": "f.spectrum.sink",
+  "hKick": "f.kick.kick", "hKickAt": "f.kick.kickAt", "beatAnchorMs": "f.kick.beatAnchorMs", "pendingKickMs": "f.kick.pendingKickMs", "kicks.lastKick": "f.kick.lastKick",
+  "kfPrev": "f.kick.kfPrev", "kfPrev2": "f.kick.kfPrev2", "dbgKick": "f.kick.dbgKick",
+  "localBpm": "f.clock.bpm", "localBpmConfidence": "f.clock.conf", "beatPhaseMs": "f.clock.phaseMs", "beatPhaseConf": "f.clock.phaseConf", "beatSrc.constructor": "f.clock.src.constructor"
 }

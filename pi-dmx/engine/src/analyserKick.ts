@@ -2,13 +2,11 @@
 import { Analyser } from "./analyser.js";
 
 const KICK_CAP_MS = 330;   // Ratt MED systemprefix
-const DOUBLE_FROM_START = ['lastKick'] as const;   // Talfält som ska vara flyttal från start
 
 export class KickDetector {
   a: Analyser;   // analysatorn som äger den här delen
   constructor(a: Analyser) {
     this.a = a;
-    for (const k of DOUBLE_FROM_START) { const v = (this as unknown as Record<string, number>)[k]; if (typeof v === 'number') { (this as unknown as Record<string, number>)[k] = 0.5; (this as unknown as Record<string, number>)[k] = v; } }
   }
 
   private kickMed = 0.1;   // robust glidande MEDIAN av kick-fluxen
@@ -17,7 +15,6 @@ export class KickDetector {
   private kickWasAbove = false;   // stigande-flank-detektion
   private kickPrimed = false;   // false på första framen
   private static readonly KICK_K = 4.5;   // KICKDETEKTOR-RATTAR
-  lastKick = 0;
 
   /** Kick-detektorn. */
   kickStep(): boolean {
@@ -36,15 +33,15 @@ export class KickDetector {
       if (this.kickMad < 0) this.kickMad = 0;
     }
     const kickThresh = this.kickMed + KickDetector.KICK_K * this.kickMad;
-    const dk = this.a.dbgKick;
-    if (dk === null) this.a.dbgKick = { flux: kickFlux, thresh: kickThresh, med: this.kickMed, mad: this.kickMad, energy, gain: this.a.gain, rms: this.a.dbgRms, env: this.a.envelope, locked: this.a.gainLocked };
-    else { dk.flux = kickFlux; dk.thresh = kickThresh; dk.med = this.kickMed; dk.mad = this.kickMad; dk.energy = energy; dk.gain = this.a.gain; dk.rms = this.a.dbgRms; dk.env = this.a.envelope; dk.locked = this.a.gainLocked; }
-    const gk = this.a.beatSrc.beat;
+    const dk = this.a.f.kick.dbgKick;
+    if (dk === null) this.a.f.kick.dbgKick = { flux: kickFlux, thresh: kickThresh, med: this.kickMed, mad: this.kickMad, energy, gain: this.a.f.level.gain, rms: this.a.dbgRms, env: this.a.f.level.envelope, locked: this.a.f.level.gainLocked };
+    else { dk.flux = kickFlux; dk.thresh = kickThresh; dk.med = this.kickMed; dk.mad = this.kickMad; dk.energy = energy; dk.gain = this.a.f.level.gain; dk.rms = this.a.dbgRms; dk.env = this.a.f.level.envelope; dk.locked = this.a.f.level.gainLocked; }
+    const gk = this.a.f.clock.src.beat;
     const cb = gk && gk.bpm > 40 ? gk.bpm : 0;
     const KICK_COOLDOWN = Analyser.KICK_COOLDOWN_MS > 0 ? Analyser.KICK_COOLDOWN_MS
       : (cb > 0 ? Math.max(170, Math.min(KICK_CAP_MS, (60000 / cb) * 0.6)) : 170);
     let above = kickFlux > kickThresh && energy > Analyser.KICK_EFLOOR;
-    const grid = this.a.beatSrc.beat;
+    const grid = this.a.f.clock.src.beat;
     if (above && grid && grid.bpm > 40 && (grid.confidence ?? 0) > 0.5) {
       const beatMs = 60000 / grid.bpm;
       const gridMs = beatMs / 2;
@@ -55,9 +52,9 @@ export class KickDetector {
       if (distToGrid > tolerance && !Analyser.KICK_NOGATE) above = false;
     }
     let kick = false;
-    if (above && !this.kickWasAbove && now - this.lastKick > KICK_COOLDOWN && this.kickPrimed) {
+    if (above && !this.kickWasAbove && now - this.a.f.kick.lastKick > KICK_COOLDOWN && this.kickPrimed) {
       kick = true;
-      this.lastKick = now;
+      this.a.f.kick.lastKick = now;
     }
     this.kickWasAbove = above;
     this.kickPrimed = true;
@@ -68,16 +65,16 @@ export class KickDetector {
   kickRefine(): void {
     const kickFlux = this.a.f.hop.kickFlux, hopMs = this.a.f.hop.hopMs;
     let kickAtMs = 0;
-      const ym1 = this.a.kfPrev2, y0 = this.a.kfPrev, yp1 = kickFlux;
+      const ym1 = this.a.f.kick.kfPrev2, y0 = this.a.f.kick.kfPrev, yp1 = kickFlux;
       const denom = ym1 - 2 * y0 + yp1;
       if (denom < 0) {
         let delta = 0.5 * (ym1 - yp1) / denom;
         if (delta > 0.5) delta = 0.5; else if (delta < -0.5) delta = -0.5;
-        this.a.beatAnchorMs = this.a.pendingKickMs + delta * hopMs;
+        this.a.f.kick.beatAnchorMs = this.a.f.kick.pendingKickMs + delta * hopMs;
 
       }
-      this.a.pendingKickMs = 0;
-      kickAtMs = this.a.beatAnchorMs;
-    this.a.hKickAt = kickAtMs;
+      this.a.f.kick.pendingKickMs = 0;
+      kickAtMs = this.a.f.kick.beatAnchorMs;
+    this.a.f.kick.kickAt = kickAtMs;
   }
 }

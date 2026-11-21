@@ -104,7 +104,7 @@ export class SectionTracker {
     const m2 = this.secBlkRms2 / n, v2 = this.secBlkRms4 / n - m2 * m2; const bDyn = m2 > 1e-12 ? Math.sqrt(Math.max(0, v2)) / m2 : 0;
     let sAr = 0, sGe = 0; for (let i = 0; i < 8; i++) { const v = this.secBlkSpec[i] / n + 1e-7; sAr += v; sGe += Math.log(v); }
     const bFlat = Math.exp(sGe / 8) / (sAr / 8); const bHigh = 20 * Math.log10((this.secBlkSpec[6] + this.secBlkSpec[7]) / n + 1e-7);
-    if (this.a.activeMs === 0) { if (++this.secSilentBlocks >= 10) { this.sectionReset(); return; } }
+    if (this.a.f.level.activeMs === 0) { if (++this.secSilentBlocks >= 10) { this.sectionReset(); return; } }
     else this.secSilentBlocks = 0;
     let tier = bInt >= 0.62 ? 2 : bInt <= 0.40 ? 0 : 1;
     {
@@ -125,7 +125,7 @@ export class SectionTracker {
       fallen = nb >= 2 && blkDb <= this.lastHighDb - E && D[nb - 2] <= this.lastHighDb - E / 2;
       if (this.a.section === 'high') edgeDown = fallen;
       else if (blkDb >= ref - E) {
-        const barMs = this.a.localBpm > 40 ? 240000 / this.a.localBpm : 4 * Analyser.BE_FALLBACK_MS;
+        const barMs = this.a.f.clock.bpm > 40 ? 240000 / this.a.f.clock.bpm : 4 * Analyser.BE_FALLBACK_MS;
         const m = Math.min(nb - 1, 4 * Math.max(2, Math.min(4, Math.round(barMs / 1000)))), w = this.secEdgeBuf;
         if (m >= 4) {
           for (let i = 0; i < m; i++) { const v = D[nb - 2 - i]; let k = i; while (k > 0 && w[k - 1] > v) { w[k] = w[k - 1]; k--; } w[k] = v; }
@@ -156,14 +156,14 @@ export class SectionTracker {
       if ((Analyser.REPEAT & 48) && prev === 'high' && label === 'break' && st === 1) {
         {
           let hold = (Analyser.REPEAT & 16) ? Math.min(40000, this.secHighRunMs) : 0;
-          if ((Analyser.REPEAT & 32) && this.a.localBpm > 0) hold = Math.max(hold, 8 * 240000 / this.a.localBpm);
+          if ((Analyser.REPEAT & 32) && this.a.f.clock.bpm > 0) hold = Math.max(hold, 8 * 240000 / this.a.f.clock.bpm);
           if (nowMs - this.a.sectionStartMs < hold) label = 'high';
         }
       }
       if (dropped && label === 'high') this.secDropHoldUntil = nowMs + (Analyser.RANK_WIN + Analyser.RANK_RUN) * 1000;
       else if (prev === 'high' && label !== 'high' && st >= 1 && nowMs < this.secDropHoldUntil) label = 'high';
     }
-    if (label === 'high' && prev !== 'high' && !dropped && !edgeUp && fallen && nowMs - this.secHiEndMs < Analyser.BE_MEM_BEATS * (this.a.localBpm > 40 ? 60000 / this.a.localBpm : Analyser.BE_FALLBACK_MS)) {
+    if (label === 'high' && prev !== 'high' && !dropped && !edgeUp && fallen && nowMs - this.secHiEndMs < Analyser.BE_MEM_BEATS * (this.a.f.clock.bpm > 40 ? 60000 / this.a.f.clock.bpm : Analyser.BE_FALLBACK_MS)) {
       label = prev === 'break' ? 'break' : 'build'; this.a.sectionTier = 1;
     }
     const dwellMs = label === 'high' ? 4000 : 8000;
@@ -182,7 +182,7 @@ export class SectionTracker {
     if (this.a.section === 'high') { this.lastHighDb = this.secCurDbSum / this.secCurDbN; }
     this.a.levelVsHighDb = Number.isFinite(this.lastHighDb) ? blkDb - this.lastHighDb : 0;
     this.predictHigh(nowMs, bInt);
-    if (this.a.dbgSecBlock) this.a.dbgSecBlock({ nowMs, section: this.a.section, sectionStartMs: this.a.sectionStartMs, prev, label, bpm: this.a.localBpm, bInt, bKicks, bCent, blkDb, buildUp: this.a.buildUp, riseRun: this.secRiseRun, rise, dropped, breaking, tier: this.a.sectionTier, repeatSim: this.a.repeatSim, repeatAgoMs: this.a.repeatAgoMs, repeatSection: this.a.repeatSection, spec: Array.from(this.secBlkSpec, (v) => v / n), lastHighDb: this.lastHighDb, expectHighMs: this.a.expectHighMs, expectSource: this.a.expectSource, beatPhaseMs: this.a.beatPhaseMs, secLogN: this.secLog.length, secLogLast: this.secLog[this.secLog.length - 1] ?? null, bBon, bBpk, bFlux, bDyn, bHigh, bFlat, pct: this.secPct });
+    if (this.a.dbgSecBlock) this.a.dbgSecBlock({ nowMs, section: this.a.section, sectionStartMs: this.a.sectionStartMs, prev, label, bpm: this.a.f.clock.bpm, bInt, bKicks, bCent, blkDb, buildUp: this.a.buildUp, riseRun: this.secRiseRun, rise, dropped, breaking, tier: this.a.sectionTier, repeatSim: this.a.repeatSim, repeatAgoMs: this.a.repeatAgoMs, repeatSection: this.a.repeatSection, spec: Array.from(this.secBlkSpec, (v) => v / n), lastHighDb: this.lastHighDb, expectHighMs: this.a.expectHighMs, expectSource: this.a.expectSource, beatPhaseMs: this.a.f.clock.phaseMs, secLogN: this.secLog.length, secLogLast: this.secLog[this.secLog.length - 1] ?? null, bBon, bBpk, bFlux, bDyn, bHigh, bFlat, pct: this.secPct });
     if (Analyser.REPEAT & 1) { this.repeatStep(nowMs, blkDb, bKicks, bCent, bInt); this.secBlkMs = 0; this.secBlkN = 0; this.secBlkInt = 0; this.secBlkKicks = 0; this.secBlkCent = 0; this.secBlkSpec.fill(0); this.secBlkRms2 = 0; this.secBlkBon = 0; this.secBlkBpk = 0; this.secBlkFlux = 0; this.secBlkRms4 = 0; return; }
     let sum = 0; for (let i = 0; i < 8; i++) sum += this.secBlkSpec[i];
     const acc = this.secFpAcc; for (let i = 0; i < 8; i++) acc[i] += sum > 0 ? this.secBlkSpec[i] / sum : 0;
@@ -299,7 +299,7 @@ export class SectionTracker {
 
   /** FORUTSAGELSE av nasta 'high'. */
   private predictHigh(nowMs: number, bInt: number): void {
-    const bpm = this.a.localBpm; const barMs = bpm > 0 ? 240000 / bpm : 0;
+    const bpm = this.a.f.clock.bpm; const barMs = bpm > 0 ? 240000 / bpm : 0;
     let exp = 0, src = 0;
     if ((Analyser.REPEAT & 4) && this.a.section !== 'high' && this.a.repeatSim >= SectionTracker.REPEAT_THR && this.repeatHighRun >= 2 && this.a.repeatHighAtMs > nowMs + 500 && this.a.repeatHighAtMs - nowMs <= 32000) { exp = this.a.repeatHighAtMs; src = 4; }
     if (!exp && this.a.section !== 'high' && barMs > 0) {
@@ -335,22 +335,22 @@ export class SectionTracker {
 
   /** Sektionens blocksummor per hop. */
   sectionAggStep(): void {
-    const intensity = this.a.hIntensity, kick = this.a.hKick, breaking = this.a.f.hop.breaking, rms = this.a.f.hop.rms, fluxNorm = this.a.f.hop.flux, nowWallA = this.a.f.hop.nowWall;
+    const intensity = this.a.f.level.intensity, kick = this.a.f.kick.kick, breaking = this.a.f.hop.breaking, rms = this.a.f.hop.rms, fluxNorm = this.a.f.hop.flux, nowWallA = this.a.f.hop.nowWall;
     const dtHop = this.a.f.hop.dtHop;
       if (this.a.f.hop.bigOn) return;
       if (SECTION_AGG_HOP) {
         const sp = this.a.secSpecHop;
-        if (this.a.secSpecDirty) { this.a.secSpecDirty = false; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.a.bandDbRaw[i] / 20); }
+        if (this.a.secSpecDirty) { this.a.secSpecDirty = false; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.a.f.spectrum.bandDbRaw[i] / 20); }
         if (this.a.f.hop.role === 'fast') {
           const g = this.a.secAgg; g.n++; g.int += intensity; if (kick) g.kicks++; g.rms2 += rms * rms; g.cent += this.a.f.hop.centSmooth; g.dt += this.a.f.hop.dtHop * 1000;
-          g.breaking = breaking ? 1 : 0; g.wall = this.a.wallNow(); g.drops = this.a.drop.dropCand + this.a.drop.secBodyRet; g.active = this.a.activeMs; g.build = this.a.buildUp;
+          g.breaking = breaking ? 1 : 0; g.wall = this.a.wallNow(); g.drops = this.a.drop.dropCand + this.a.drop.secBodyRet; g.active = this.a.f.level.activeMs; g.build = this.a.buildUp;
           for (let i = 0; i < 8; i++) g.spec[i] += sp[i];
         } else { const I = this.shIn; I.hops = 1; I.intSum = intensity; I.kicks = kick ? 1 : 0; I.breaking = breaking; I.nowMs = this.a.wallNow(); I.dtMs = this.a.f.hop.dtHop * 1000;
           I.rms2Sum = rms * rms; I.centSum = this.a.f.hop.centSmooth; I.specOff = 0; I.bonSum = 0; I.bpk = 0; I.fluxSum = 0; I.rms4Sum = 0; this.sectionHop(sp); }
       } else {
         const g = this.a.secAgg; g.n++; g.int += intensity; if (kick) g.kicks++; if (breaking) g.breaking = 1; g.rms2 += rms * rms; g.cent += this.a.f.hop.centSmooth; g.dt += dtHop * 1000; g.wall = nowWallA;
-        for (let i = 0; i < 8; i++) g.spec[i] += this.a.bandAbs[i];
-        g.bon += this.a.bassOnRing[(this.a.bassOnN - 1 + Analyser.BASSON_LEN) % Analyser.BASSON_LEN]; if (this.a.bassOnPeak) { g.bpk++; this.a.bassOnPeak = false; } g.flux += fluxNorm; g.rms4 += rms * rms * rms * rms;
+        for (let i = 0; i < 8; i++) g.spec[i] += this.a.f.spectrum.bandAbs[i];
+        g.bon += this.a.f.spectrum.bassOnRing[(this.a.f.spectrum.bassOnN - 1 + Analyser.BASSON_LEN) % Analyser.BASSON_LEN]; if (this.a.bassOnPeak) { g.bpk++; this.a.bassOnPeak = false; } g.flux += fluxNorm; g.rms4 += rms * rms * rms * rms;
       }
   }
 }

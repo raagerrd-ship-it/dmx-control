@@ -25,7 +25,7 @@ export class RiserDetector {
     const dtHop = this.a.f.hop.dtHop;
     let nov = 0; const sr = this.aSpecSlow;
     for (let b = RISER_BAND0; b < 8; b++) {
-      const raw = this.a.bandDbRaw[b], top = this.bandTop[b] = Math.max(raw, this.bandTop[b] - dtHop * BODY_CEIL_DB_S);
+      const raw = this.a.f.spectrum.bandDbRaw[b], top = this.bandTop[b] = Math.max(raw, this.bandTop[b] - dtHop * BODY_CEIL_DB_S);
       const x = Math.max(0, 1 + (raw - top) * (1 / RISER_SPAN_DB));
       this.specSlow[b] += (x - this.specSlow[b]) * sr; nov += Math.max(0, x - this.specSlow[b]);
     }
@@ -34,8 +34,8 @@ export class RiserDetector {
     const novRiser = this.novSlow > this.novBaseline + 0.15 && this.novSlow > 0.45;
     this.centSlow += (this.a.f.hop.centSmooth - this.centSlow) * (dtHop / 2.5);
     this.lvlSlowR += (this.a.f.hop.lvlSmooth - this.lvlSlowR) * (dtHop / 2.5);
-    const lc = this.a.levelCeil;
-    const inRiser = this.a.activeMs > 2500 && this.a.f.hop.lvlSmooth > 0.3 * lc && nowWallA - this.a.drop.lastDropMs > 1500 && (
+    const lc = this.a.f.level.levelCeil;
+    const inRiser = this.a.f.level.activeMs > 2500 && this.a.f.hop.lvlSmooth > 0.3 * lc && nowWallA - this.a.drop.lastDropMs > 1500 && (
         novRiser
         || (this.a.f.hop.centSmooth > this.centSlow + 0.06 && this.a.f.hop.lvlSmooth > this.lvlSlowR + 0.04 * lc && this.a.f.hop.lvlSmooth > 0.4 * lc)
       );

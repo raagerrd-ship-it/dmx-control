@@ -37,7 +37,7 @@ startvärdet 0,5 (det heta fältets), konstruktorn skriver `dtHop * 1000` innan 
 `kickRefine`, kör efter den gamla skrivningen i `process`, och aldrig i workern). Startvärdena är dagens, ordagrant (0,5-knepet);
 `lvlSmooth` och `kickHit` står i `HopOut`s `stabilise`-lista i stället för i `DOUBLE_FROM_START`.
 
-Kvar på `Analyser` tills sin stens steg: `hKick`, `hKickAt` (kick, steg 10), `hIntensity`, `hInZone` (nivå, steg 11), `hInRiser` (uppbyggnad, steg 8).
+Kvar på `Analyser` tills sin stens steg: `hInZone` (nivå, steg 11), `hInRiser` (flyttar till `RiserOut` i steg 4).
 
 ### Skrivkartan: vem skriver varje fält, per tråd (DMX och lotus lika)
 
@@ -59,3 +59,21 @@ Kvar på `Analyser` tills sin stens steg: `hKick`, `hKickAt` (kick, steg 10), `h
 
 Ett streck = fältet har sitt startvärde i den tråden för alltid. Det är rätt så länge ingen sten i den tråden läser fältet; byter en sten
 tråd måste kartan gås igenom (a014 b5, giftprovet).
+
+## Grundfacken (steg 3): LevelOut, SpectrumOut, KickOut, ClockOut
+
+Bara data: fälten flyttade ur `Analyser` (och tre ur stenarna) in i facken, läsarna ändrade, logiken orörd. I `analyser.ts` hissas
+facken överst i `process`, `fillFrame`, `pushBig`, `drainBig`, `bigAgg` och `envSampleStep` (`lv`, `sp`, `kk`, `ck`); i stenarna
+`this.a.f.<fack>.x` tills stenens eget steg.
+
+| fack | fält (förr) |
+|---|---|
+| `f.level` | `gain`, `envelope`, `activeMs`, `silentMs` (förr `levels.silentMs`), `intensity` (`hIntensity`), `levelCeil`, `inZone` (`levels.inZoneState`), `gainLocked` |
+| `f.spectrum` | `bandAbs`, `bandDbRaw`, `bandLvl`, `bandOn`, `fbOn`, `bassOnRing`, `bassOnN` (Float32Array som förut), `sink` (`specSink`, `setSpectrumSink` skriver hit) |
+| `f.kick` | `kick` (`hKick`), `kickAt` (`hKickAt`, startvärdet 0,5), `beatAnchorMs`, `pendingKickMs`, `lastKick` (förr `kicks.lastKick`), `kfPrev`, `kfPrev2`, `dbgKick` |
+| `f.clock` | `bpm` (`localBpm`), `conf` (`localBpmConfidence`), `phaseMs`/`phaseConf` (`beatPhaseMs`/`beatPhaseConf`), `src` (`beatSrc`: samma objekt, motorns cfg eller ett eget `{ beat }`) |
+
+Startvärdena är dagens, ordagrant (`envelope` och `src` saknar startvärde som förut och sätts i konstruktorn). `DOUBLE_FROM_START`-namnen
+flyttade till facken: `activeMs` (nivå), `pendingKickMs`, `kfPrev`, `kfPrev2`, `beatAnchorMs`, `lastKick` (kick; kickens egen lista togs bort),
+`conf` (klockan). Kvar på `Analyser` tills sina steg: `secSpecDirty`, `bassOnPeak` (blir räknare i spektrums steg 12), `dbgRms` (kickens steg 10).
+Getters för verktygen: `Analyser.bandOn` (`konsertReplay.mjs`), `Analyser.beatSrc` (`feedProof.mjs`).
