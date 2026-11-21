@@ -8,7 +8,7 @@ ruta för ruta. Koden har bara korta etiketter; allt som stod i kommentarerna li
 | fil | klass, fält på analysatorn | vad den gör | steg | rader |
 |---|---|---|---|---|
 | `analyser.ts` | `Analyser` | ordningen: vilka steg som körs, i vilken tråd, ramen ut, delningen snabb/långsam | `process`, `fillFrame` | 1 057 |
-| `analyserFack.ts` | | facken: rattarna, de delade konstanterna, `stabilise` och typerna (flytten 2026-11-21) | | 37 |
+| `analyserFack.ts` | | facken: rattarna, de delade konstanterna, `stabilise`, typerna och facken (`HopOut`; flytten 2026-11-21) | | 53 |
 | `analyserClock.ts` | `BeatFeed` | TAKT: tempo, rutnät, etta, tillit | `update` | 493 |
 | `boundaryDetector.ts` | `BoundaryDetector` | LÅTBYTE: tystnad och låtens form (bara DMX) | `tick`, `pushSpectrum` | 276 |
 | `analyserDrop.ts` | `DropDetector`, `drop` | DROP: flanken, slam-kandidaten, minidrop, lyft/nästan-drop/stopp | `dropStep` | 208 |

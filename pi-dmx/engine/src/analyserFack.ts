@@ -35,3 +35,19 @@ export interface BeatGrid { bpm: number; anchorMs: number; confidence?: number; 
 export interface AnalyserDetection { autoGainTarget: number; tauUp: number; tauDown: number; noiseFloor: number; maxGain?: number }
 export interface Cfg { audio: { rate: number }; fft: { size: number; hop: number }; detection: AnalyserDetection; onset: { enhancements: boolean } }
 export type Role = 'all' | 'fast' | 'slow';
+
+// FACKEN. Startvärde = dagens startvärde (byte för byte).
+
+/** HOPPET: kärnans fält per hopp. Skrivkartan per tråd: docs/analysator/analyserFack.md. */
+export class HopOut {
+  role: Role = 'all'; bigOn = false; cfg!: Cfg;   // skrivs en gång i Analysers konstruktor
+  dtHop = 0; hopMs = 0.5;
+  rms = 0.5; now = 0.5; dt = 0.5; nowWall = 0.5; gated = false;
+  kickFlux = 0.5; energy = 0.5; flux = 0.5; level = 0.5; lvlSmooth = 0; centSmooth = 0.5; body = 0.5; breaking = false;
+  kickHit = 0;   // trumkittet
+  sec = 'intro'; lvh = 0.5; conf = 0.5; bpm = 0.5;   // långsamma värden sedda vid hoppet
+  constructor() { stabilise(this, ['lvlSmooth', 'kickHit']); }
+}
+
+export interface Fack { hop: HopOut }
+export function makeFack(): Fack { return { hop: new HopOut() }; }

@@ -23,3 +23,39 @@ startvärdena flyttar ordagrant (också 0,5-startvärdena). `tools/refaktor/star
 ## Typerna
 
 `BeatGrid`, `AnalyserDetection`, `Cfg` (analysatorns färdiga konfiguration) och `Role`. `analyser.ts` re-exporterar dem.
+
+## HopOut, hoppfacket (steg 2)
+
+Kärnans fält per hopp, nås som `this.f.hop` (i `analyser.ts` hissat till `const h = this.f.hop` överst i `process`, `fillFrame`,
+`pushBig`, `drainBig`, `bigAgg`, `envSampleStep` och konstruktorn) och som `this.a.f.hop.x` i stenarna tills stenens eget steg.
+`Analyser.role`, `.bigOn` och `.cfg` är getters hit (för motorn, lotus och verktygen; inte i heta vägen).
+
+Namnbyten: `hRms`→`rms`, `hNow`→`now`, `hDt`→`dt`, `hKickFlux`→`kickFlux`, `hEnergy`→`energy`, `hNowWall`→`nowWall`, `hBody`→`body`,
+`hLevel`→`level`, `hFlux`→`flux`, `hBreaking`→`breaking`, `hGated`→`gated`, `dSec`→`sec`, `dLvh`→`lvh`, `dConf`→`conf`, `dBpm`→`bpm`;
+`dtHop`, `lvlSmooth`, `centSmooth`, `kickHit`, `role`, `bigOn`, `cfg` behåller namnet. `hopMs` och kopian `hHopMs` är ett fält:
+startvärdet 0,5 (det heta fältets), konstruktorn skriver `dtHop * 1000` innan något läser det (enda läsarna, `silenceStep` och
+`kickRefine`, kör efter den gamla skrivningen i `process`, och aldrig i workern). Startvärdena är dagens, ordagrant (0,5-knepet);
+`lvlSmooth` och `kickHit` står i `HopOut`s `stabilise`-lista i stället för i `DOUBLE_FROM_START`.
+
+Kvar på `Analyser` tills sin stens steg: `hKick`, `hKickAt` (kick, steg 10), `hIntensity`, `hInZone` (nivå, steg 11), `hInRiser` (uppbyggnad, steg 8).
+
+### Skrivkartan: vem skriver varje fält, per tråd (DMX och lotus lika)
+
+| fält | huvudtråden (`fast`, `bigOn`) | workern (`slow`, `bigOn`) | odelat (`all`) |
+|---|---|---|---|
+| `rms` | `process` | `drainBig` (`B_RMS`) | `process` |
+| `now`, `dt` | `process` | – | `process` |
+| `gated`, `kickFlux`, `energy` | `process` | – | `process` |
+| `hopMs`, `dtHop` | konstruktorn | konstruktorn | konstruktorn |
+| `lvlSmooth`, `centSmooth` | `process` | `drainBig` (`B_LVL`, `B_CENT`) | `process` |
+| `kickHit` | `process` (trumkittet) | `drainBig` (`B_KICKHIT`) | `process` |
+| `nowWall` | `process` | `drainBig` (`B_WALL`) | `process` |
+| `breaking`, `level`, `flux` | `process` | – (`breaking` går som parameter till `bigAgg`) | `process` |
+| `body` | `pushBig` (`BS_BODY`, workerns värde ett varv sent) | `drainBig` | `process` |
+| `sec`, `lvh` | – | `drainBig` (`B_SEC`, `B_LVH`) | `process` före `dropStep` |
+| `conf` | – | `drainBig` (`B_CONF`) | `process` före `profileStep` |
+| `bpm` | – | `drainBig` (`B_ENVBPM`) | `envSampleStep` |
+| `role`, `bigOn`, `cfg` | konstruktorn | konstruktorn | konstruktorn |
+
+Ett streck = fältet har sitt startvärde i den tråden för alltid. Det är rätt så länge ingen sten i den tråden läser fältet; byter en sten
+tråd måste kartan gås igenom (a014 b5, giftprovet).
