@@ -5,7 +5,7 @@ import type { Moment } from "./moment.js";
  * over WebSocket and we can persist to /var/lib/audio-dmx-engine/config.json.
  */
 
-export type Mode = "smart" | "linjalen" | "stegring" | "andrum" | "sug" | "vagbrytare" | "nedrakning" | "upptakt" | "fyllning" | "pingpong" | "virvel" | "fyr" | "rullandning" | "fyrverkeri" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "rave" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "duel" | "airglow" | "tide" | "drift" | "pendel" | "viska" | "backbeat" | "tick" | "stege" | "eko" | "hjarta" | "konfetti" | "sopa" | "varannan" | "forvarning" | "basgang" | "tyngdlyft" | "frasraknare" | "vidga" | "svall" | "gryning" | "ankomst" | "glimt" | "rulle" | "kickregn" | "efterskalv" | "motor" | "flod" | "famn" | "spaning" | "startskott" | "siren" | "skuggor" | "stjarnor" | "mullra" | "kaskad" | "droppar" | "uppvarmning" | "dunk" | "glesna" | "dyning" | "blixtnedslag" | "mellanslag" | "pump" | "hiss" | "tratt" | "morkerslag" | "urladdning" | "slagga" | "sidokedja" | "tryckvag" | "sangare" | "dansparet" | "minnet" | "sokljus" | "blackout";
+export type Mode = "smart" | "linjalen" | "stegring" | "andrum" | "sug" | "vagbrytare" | "nedrakning" | "upptakt" | "fyllning" | "pingpong" | "virvel" | "fyr" | "rullandning" | "fyrverkeri" | "drops" | "party" | "chase" | "wave" | "breathe" | "snap" | "bounce" | "mono" | "aurora" | "pulse" | "eq" | "gallop" | "twin" | "ripple" | "gravity" | "drumkit" | "split" | "duel" | "airglow" | "tide" | "drift" | "pendel" | "viska" | "backbeat" | "tick" | "stege" | "eko" | "hjarta" | "konfetti" | "sopa" | "varannan" | "forvarning" | "basgang" | "tyngdlyft" | "frasraknare" | "vidga" | "svall" | "gryning" | "ankomst" | "glimt" | "rulle" | "kickregn" | "efterskalv" | "motor" | "flod" | "famn" | "spaning" | "startskott" | "siren" | "skuggor" | "stjarnor" | "mullra" | "kaskad" | "droppar" | "uppvarmning" | "dunk" | "glesna" | "dyning" | "blixtnedslag" | "mellanslag" | "pump" | "hiss" | "tratt" | "morkerslag" | "urladdning" | "slagga" | "tryckvag" | "sangare" | "dansparet" | "minnet" | "sokljus" | "blackout";
 
 /** Hyresgäst-stämning: ETT val ställer in hela riggens känsla (se moods.ts). */
 
@@ -220,7 +220,7 @@ export const defaultConfig: EngineConfig = {
   silenceHoldS: 3,      // släcktid (ratt i /setup: "Släcktid"); 3 s = ägarens val i ladan 10-10
   silenceLevel: 0.05,     // släckgräns på frame.level (ratt i /setup: "Släckgräns")
   chaseStyle: "pingpong",
-  rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true, rave: true },
+  rotation: { breathe: true, mono: false, aurora: true, wave: true, chase: true, drops: true, pulse: true, party: true, snap: true, bounce: true },
   modeButton: { chip: "gpiochip0", line: 27 },   // GPIO27 = Codec Zero onboard button (SW1)
   intensityRing: null,   // avstängd tillsvidare 2026-10-18 (förr { bus: 0, device: 0, maxBright: 0.40, pulseBoost: 0.18, blackoutFadeMs: 400 })  // WS2812 12-LED på SPI0 MOSI (GPIO10, pin 19)
   showLeadMs: 50,

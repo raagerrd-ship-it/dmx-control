@@ -19,7 +19,6 @@ import { bounce } from "./bounce.js";
 import { mono } from "./mono.js";
 import { aurora } from "./aurora.js";
 import { pulse } from "./pulse.js";
-import { rave } from "./rave.js";
 import { eq } from "./eq.js";
 import { gallop } from "./gallop.js";
 import { twin } from "./twin.js";
@@ -81,7 +80,6 @@ import { glesna } from "./glesna.js";
 import { dyning } from "./dyning.js";
 import { blixtnedslag } from "./blixtnedslag.js";
 import { slagga } from "./slagga.js";
-import { sidokedja } from "./sidokedja.js";
 import { tryckvag } from "./tryckvag.js";
 import { mellanslag } from "./mellanslag.js";
 import { pump } from "./pump.js";
@@ -101,7 +99,7 @@ import { linjalen } from "./linjalen.js";
 // ORDNING = fysiska knappens/WS-cykelns ordning (MODE_CYCLE efter "smart").
 export const EFFECTS: EffectDef[] = [
   drops, party, chase, wave, breathe, snap, bounce, mono, aurora, pulse,
-  rave, eq, gallop, twin, ripple, gravity, drumkit, split,
+  eq, gallop, twin, ripple, gravity, drumkit, split,
   duel, airglow,
   // Nya (2026-07): fyller lugn- och fart-poolerna till 10+ vardera.
   tide, drift, pendel, viska, backbeat, tick, stege, eko, hjarta,
@@ -132,7 +130,7 @@ export const EFFECTS: EffectDef[] = [
   stjarnor, mullra, kaskad, droppar, uppvarmning, dunk, glesna, dyning, blixtnedslag, mellanslag, pump, hiss, tratt, morkerslag, urladdning,
   // REFRÄNG/DROP MED TYDLIG BAS OCH TAKT (ägaren 11-01: 'fler effekter som uppfyller refräng/drop-kriterierna'): basstarka full-effekter
   // med passform bas >= 0,6, punch >= 0,75, beat >= 0,8 (se bassStrong i effects.ts).
-  slagga, sidokedja, tryckvag,
+  slagga, tryckvag,
   // LABBETS FAVORITER (se ovan)
   sangare, dansparet, minnet, sokljus,
   // LABB 6 (åtta lampor, ägaren i ladan 11-13: "vers effekt ... den är snygg")
@@ -155,7 +153,6 @@ export const EFFECTS: EffectDef[] = [
 const SPECIALTY_DRIVES: Partial<Record<Mode, ChannelRole[]>> = {
   drops:    ["blinder", "strobe", "laser", "co2", "hazer"],
   party:    ["blinder", "laser", "co2", "hazer", "uv"],
-  rave:     ["strobe", "laser", "blinder", "hazer", "co2", "uv"],
   snap:     ["blinder", "uv"],
   bounce:   ["laser"],
   backbeat: ["blinder"],
@@ -237,7 +234,6 @@ export type EffectReq = { minBpm?: number; needsPunch?: number; needsBass?: numb
 const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
   // Snabb/aggressiv → kräver tempo (+ karaktär där det stärker)
   // ALLA LOOKER (standard 10-10): i high var tempot >= 130 bara 3/55 ganger och aldrig >= 140 -> snap/rave valdes aldrig
-  rave:     { minBpm: 120, needsPunch: 0.40 },   // 140 -> 120
   snap:     { minBpm: 115, needsPunch: 0.40 },   // 130 -> 115
   gallop:   { minBpm: 125, needsBeat: 0.35 },
   // Transient-effekter → kräver anslag (trummor)
@@ -248,7 +244,6 @@ const REQUIREMENTS: Partial<Record<Mode, EffectReq>> = {
   backbeat: { needsPunch: 0.35, needsBeat: 0.35 },
   // refräng/drop 11-01 (granskningen: utan krav kunde de väljas fast takten var osäker) - samma som backbeat
   slagga:   { needsPunch: 0.35, needsBeat: 0.35 },
-  sidokedja:{ needsPunch: 0.35, needsBeat: 0.35 },
   tryckvag: { needsPunch: 0.35, needsBeat: 0.35 },
   // Bas-effekter → kräver låg-end
   gravity:  { needsBass: 0.20 },   // 0,35 -> 0,20 (ladans profile.bass median 0,23; ALLA LOOKER standard 10-10)

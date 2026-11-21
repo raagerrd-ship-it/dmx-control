@@ -13,17 +13,12 @@ import { hsv, soft } from "./color.js";
 // hela riggen.
 export const tryckvag: EffectDef = {
   key: "tryckvag", label: "Tryckvåg", tier: "full", modulate: { energy: true, pulse: false }, section: ["high"], toggle: true,
-  desc: "Varje slag tänder allt, kanterna dör fort och mitten bär basen - ljuset dras ihop mot mitten.",
+  desc: "Varje slag sveper ett tryck lampa för lampa över riggen, åt höger på 1 och 4, åt vänster på 2 och 3.",
   render(c) {
+    // ÄGAREN 11-22 "alla 8 egna": trycket sveper lampa för lampa över riggen på varje slag, Par 1 -> 8 på slag 1 och 4, 8 -> 1 på 2 och 3 (växeln)
     const f = c.hasBeat ? c.beatFrac : 1 - c.kickEnv;
-    const n = Math.max(1, c.count), e = Math.min(c.lamp, n - 1 - c.lamp), mid = n > 2 && e >= (n - 1) / 4;   // mittparet / kanterna
-    const base = c.mixedSector(Math.floor(c.hueIdx / 16));
-    const hue = ((mid ? base : base + 3) % 6) / 6;
-    // (vita kärnan borttagen 11-01 kväll: vitt i ~100 ms tände den släckta dioden - 'R och G lyser men B bara blinkar till')
-    // BASGANG (a8 11-07): kanterna slår VÄXELVIS (vänster jämna slag, höger udda; den andra klingar ut från sitt förra slag) och mitten bär
-    // basens kropp (bassBody) i stället för drum.bass (som höll mitten tänd nästan jämnt: ljusast av alla looks och sämst mot basen, r -0,12..0,22)
-    if (!mid) { const mySide = (c.lamp < n / 2 ? 0 : 1) === vaxel(c.beatIdx);   /* 1an-3an 11-20: vänster kant 1 och 4, höger 2 och 3 */ return hsv(hue, 1, 0.05 + 0.95 * soft(mySide ? f : f + 1, 0.12, 0.3)); }   // STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108)
-    c.want.energy = false;                                                    // mitten: basen själv (energin följer kicken)
-    return hsv(hue, 1, 0.12 + 0.88 * c.bassBody * c.bassBody);
+    const n = Math.max(1, c.count), p = vaxel(c.beatIdx) === 0 ? c.lamp : n - 1 - c.lamp, at = n > 1 ? 0.5 * p / (n - 1) : 0;   // fronten når lampan efter halva slaget som mest
+    const hue = ((c.mixedSector(Math.floor(c.hueIdx / 16)) + (p === 0 ? 0 : 3)) % 6) / 6;   // första lampan i grundfärg, resten i motfärg
+    return hsv(hue, 1, 0.05 + 0.95 * soft(f >= at ? f - at : f + 1 - at, 0.06, 0.18));
   },
 };

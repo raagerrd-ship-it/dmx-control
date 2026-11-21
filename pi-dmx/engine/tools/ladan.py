@@ -61,6 +61,10 @@ SHOW_ENV: list = [
 # som lag kvar pa Pi:n skulle ligga kvar for alltid. Allt har flyttas till <namn>.bak-<ts> (aldrig rm) sa det gar att
 # angra. Datafilerna ar inlarningens rester: songs.bin, structure.json, temp-WAV:ar och koade analyser.
 REMOVE = [
+    # ÄGAREN I LADAN 2026-11-22: Rave bort - samma rytm och motfärger som Tryckvåg (8 egna); två lag går emot 'alla 8 egna'
+    '/opt/audio-dmx-engine/dist/effects/rave.js',
+    # ÄGAREN I LADAN 2026-11-22: Sidokedja bort - såg ut som Fyrverkeri
+    '/opt/audio-dmx-engine/dist/effects/sidokedja.js',
     # TRE STEG FOR LJUSET 2026-10-10: efterbehandlingen (ballistik/puls/toning) borttagen - effekt -> energi -> kalibrering.
     '/opt/audio-dmx-engine/dist/postprocess.js',
     # FLAGGSTADNINGEN 2026-10-22: tempoTracker.js (HMM-tempofoljaren, opt-in som aldrig kordes i nagot system) borttagen ur delade analysatorn
@@ -143,7 +147,7 @@ def newest(path, exts):
 # tvavagar) har tre trådar (huvudtråd + taktväg + analysator) och provas med kärna 0 till; f2 (en workertråd) körs på 1 2 som förr.
 # Utan flaggan rörs inte kärnorna. Kärna 0 delas med kernel/WiFi/sshd; kärna 3 = dmx-helper + arecord (isolcpus), aldrig.
 # --fran <mapp> deployar en fryst dist-kopia (t.ex. arenans .arena/tvavagar/f1/dist).
-AFFINITY = ARGS[ARGS.index('--karnor') + 1] if '--karnor' in ARGS else None
+AFFINITY = ARGS[ARGS.index('--karnor') + 1] if '--karnor' in ARGS else '0 1 2'   # 11-22: standard 0 1 2 (ägarens 11-08), annars tappar en full körning kärnorna med ladan.conf
 
 
 def main():
