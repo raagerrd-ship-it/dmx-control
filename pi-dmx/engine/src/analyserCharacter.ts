@@ -1,35 +1,50 @@
 /**  KARAKTÄRSPROFILEN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserCharacter.md */
-import { type Analyser } from "./analyser.js";
+import type { HopOut, SpectrumOut, BassOut, CharacterOut } from "./analyserFack.js";
+import { BS_PUNCH, BS_BASS, BS_BRIGHT, BS_BEAT, BS_BASSLINE } from "./split.js";
 
 
 function cl01(x: number): number { return x < 0 ? 0 : x > 1 ? 1 : x; }
 
+/** DET KARAKTÄREN LÄSER. Inget annat går att nå. */
+export interface CharacterReads {
+  hop:      Readonly<Pick<HopOut, 'kickHit' | 'conf'>>;
+  spectrum: Readonly<Pick<SpectrumOut, 'bandLvl' | 'bandOn'>>;
+  bass:     Readonly<Pick<BassOut, 'bassline'>>;
+}
+
 export class CharacterProfile {
-  a: Analyser;   // analysatorn som äger den här delen
-  constructor(a: Analyser) {
-    this.a = a;
+  private readonly h: CharacterReads['hop']; private readonly sp: CharacterReads['spectrum']; private readonly bo: CharacterReads['bass'];
+  constructor(r: CharacterReads, private readonly o: CharacterOut) {   // läser: r, lämnar ut: o
+    this.h = r.hop; this.sp = r.spectrum; this.bo = r.bass;
   }
-  aProf = 0;
-  private profPunch = 0.4;   // KARAKTÄRSPROFIL
+  private aProf = 0;
+  private profPunch = 0.4;   // KARAKTÄRSPROFIL
   private profBass = 0.5;
   private profBright = 0.3;
   private profBeat = 0.5;
 
+  /** Utjämningens takt per hopp. */
+  rates(dtHop: number): void { this.aProf = 1 - Math.exp(-dtHop / 8.0); }
+
   /** Karaktarsprofilen. */
   profileStep(): void {
-    let bSum = 1e-6; for (let b = 0; b < 8; b++) bSum += this.a.f.spectrum.bandLvl[b];
-    const bassW = (this.a.f.spectrum.bandLvl[0] + this.a.f.spectrum.bandLvl[1] + this.a.f.spectrum.bandLvl[2]) / bSum;
-    const brightW = (this.a.f.spectrum.bandLvl[6] + this.a.f.spectrum.bandLvl[7]) / bSum;
-    const punchNow = Math.min(1, (this.a.f.hop.kickHit + this.a.f.spectrum.bandOn[5] + this.a.f.spectrum.bandOn[6]) * 0.6);
+    let bSum = 1e-6; for (let b = 0; b < 8; b++) bSum += this.sp.bandLvl[b];
+    const bassW = (this.sp.bandLvl[0] + this.sp.bandLvl[1] + this.sp.bandLvl[2]) / bSum;
+    const brightW = (this.sp.bandLvl[6] + this.sp.bandLvl[7]) / bSum;
+    const punchNow = Math.min(1, (this.h.kickHit + this.sp.bandOn[5] + this.sp.bandOn[6]) * 0.6);
     const pr = this.aProf;
     this.profPunch += (punchNow - this.profPunch) * pr;
     this.profBass += (bassW - this.profBass) * pr;
     this.profBright += (brightW - this.profBright) * pr;
-    this.profBeat += (this.a.f.hop.conf - this.profBeat) * pr;
-    this.a.f.character.profile.punch = cl01((this.profPunch - 0.05) / 0.40);
-    this.a.f.character.profile.bass = cl01((this.profBass - 0.28) / 0.30);
-    this.a.f.character.profile.bright = cl01((this.profBright - 0.14) / 0.19);
-    this.a.f.character.profile.beat = cl01(this.profBeat);
-    this.a.f.character.profile.bassline = this.a.f.bass.bassline;
+    this.profBeat += (this.h.conf - this.profBeat) * pr;
+    this.o.profile.punch = cl01((this.profPunch - 0.05) / 0.40);
+    this.o.profile.bass = cl01((this.profBass - 0.28) / 0.30);
+    this.o.profile.bright = cl01((this.profBright - 0.14) / 0.19);
+    this.o.profile.beat = cl01(this.profBeat);
+    this.o.profile.bassline = this.bo.bassline;
   }
+
+  /** Transporten: workern packar profilen i BS_-blocket, huvudtråden packar upp. */
+  pack(s: Float64Array): void { const p = this.o.profile; s[BS_PUNCH] = p.punch; s[BS_BASS] = p.bass; s[BS_BRIGHT] = p.bright; s[BS_BEAT] = p.beat; s[BS_BASSLINE] = p.bassline; }
+  unpack(s: Float64Array): void { const p = this.o.profile; p.punch = s[BS_PUNCH]; p.bass = s[BS_BASS]; p.bright = s[BS_BRIGHT]; p.beat = s[BS_BEAT]; p.bassline = s[BS_BASSLINE]; }
 }

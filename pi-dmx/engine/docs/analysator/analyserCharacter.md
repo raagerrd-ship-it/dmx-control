@@ -66,3 +66,11 @@ Skalningen är KALIBRERAD mot uppmätta råvärden på riktig musik (annars
 mättar punch på 1.00 och bright ligger konstant högt → ingen diskriminering).
 ```
 
+
+## Efter kontraktet (flytten steg 6, 2026-11-21)
+
+Stenen läser bara det `CharacterReads` nämner (`f.hop.kickHit`, `f.hop.conf`, `f.spectrum.bandLvl`, `f.spectrum.bandOn`, `f.bass.bassline`)
+via referenser som sparas i konstruktorn (`h`, `sp`, `bo`), och skriver bara sitt eget fack `f.character.profile` (`o`). Inget `this.a` kvar.
+`rates(dtHop)` sätter utjämningens takt (förr `this.character.aProf = …` i Analysers konstruktor). `pack(s)`/`unpack(s)` är profilens
+transport i `BS_`-blocket (förr raderna i `drainBig` resp. `pushBig`), anropade på samma ställen. Satserna i `profileStep` är ordagranna
+(`this.a.f.spectrum.` → `this.sp.`, `this.a.f.hop.` → `this.h.`, `this.a.f.character.` → `this.o.`, `this.a.f.bass.` → `this.bo.`).

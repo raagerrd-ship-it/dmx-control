@@ -14,8 +14,8 @@ import {
   SECTIONS, sectionCode, viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader, type HopFeed,
   R_BIGSEQ, R_CLOCK, R_CLOCK_CONF, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N, B_RMS, B_LVL, B_CENT, B_ACTIVE, B_WALL, B_KICK, B_KICKHIT, B_INT, B_BREAK, B_SEC, B_LVH, B_CONF,
-  B_ENVF, B_ENVBPM, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY, BS_DROPS, BS_MINI, BS_BUILD, BS_RISER, BS_PUNCH, BS_BASS, BS_BRIGHT, BS_BEAT,
-  BS_BASSLINE, BS_SPEC_N, BS_SKIPPED, BS_CAND, BS_DEMOTED, BS_SPACED, BS_DROPRISE, BS_NEAR, BS_NEARDIP, BS_LIFT, BS_STOPS, BS_STOPSEC, BS_UNDER, BS_BUILDSTART, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
+  B_ENVF, B_ENVBPM, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY, BS_DROPS, BS_MINI, BS_BUILD, BS_RISER,
+  BS_SPEC_N, BS_SKIPPED, BS_CAND, BS_DEMOTED, BS_SPACED, BS_DROPRISE, BS_NEAR, BS_NEARDIP, BS_LIFT, BS_STOPS, BS_STOPSEC, BS_UNDER, BS_BUILDSTART, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
 } from './split.js';
 import FFT from "fft.js";
 import { BeatFeed, publishPhase, type ClockCfg } from "./analyserClock.js";   // ANALYSATORNS KLOCKA
@@ -386,7 +386,7 @@ export class Analyser {
   private pushBig(samples: Float32Array): void {
     const h = this.f.hop;
     const sc = this.f.section;
-    const ri = this.f.riser, dp = this.f.drop, cp = this.f.character;
+    const ri = this.f.riser, dp = this.f.drop;
     const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock;
     const r = this.bigRing!, ctrl = this.splitCtrl!, seq = ++this.bigSeq, slot = seq % BIG_RING_N, o = slot * BIG_REC_LEN, n = samples.length;
     this.bigPcm!.set(samples, slot * BIG_HOP_MAX);
@@ -403,7 +403,7 @@ export class Analyser {
     if (!this.bigRd.read(ctrl, this.bigState!, s, C_BIG_SEQ) || s[BS_SEQ] === 0) return;
     h.body = s[BS_BODY]; dp.dropCount = s[BS_DROPS]; dp.miniDropCount = s[BS_MINI]; dp.buildStartCount = s[BS_BUILDSTART]; dp.bodyUnderDb = s[BS_UNDER];
     dp.dropDemoted = s[BS_DEMOTED]; dp.dropSpaced = s[BS_SPACED]; dp.dropRiseDb = s[BS_DROPRISE]; dp.nearDropDb = s[BS_NEAR]; dp.nearDipDb = s[BS_NEARDIP]; dp.liftDb = s[BS_LIFT]; dp.stopCount = s[BS_STOPS]; dp.stopS = s[BS_STOPSEC]; ri.buildUp = s[BS_BUILD]; ri.inRiser = s[BS_RISER] === 1;
-    const p = cp.profile; p.punch = s[BS_PUNCH]; p.bass = s[BS_BASS]; p.bright = s[BS_BRIGHT]; p.beat = s[BS_BEAT]; p.bassline = s[BS_BASSLINE];
+    this.character.unpack(s);
     const sn = s[BS_SPEC_N];
     if (sn > this.specDelivered) {
       const sink = sp.sink, binHz = h.cfg.audio.rate / this.bands.bufferBig.length, R = this.bands.specRing!, c = this.bands.specCopy;
@@ -417,7 +417,7 @@ export class Analyser {
   /** slow: behandla hop-recorden t.o.m. */
   drainBig(limit: number): number {
     const h = this.f.hop;
-    const ri = this.f.riser, dp = this.f.drop, cp = this.f.character;
+    const ri = this.f.riser, dp = this.f.drop;
     const lv = this.f.level, sp = this.f.spectrum;
     const ctrl = this.splitCtrl!, r = this.bigRing!, pcm = this.bigPcm!;
     let w = this.bigSeq + seqDelta(Atomics.load(ctrl, C_BIG_WRITE), this.bigSeq); if (limit < w) w = limit;
@@ -446,11 +446,10 @@ export class Analyser {
     }
     if (n > 0) {
       Atomics.store(ctrl, C_BIG_READ, seqLow(this.bigSeq));
-      const p = cp.profile;
       stateWrite(ctrl, this.bigState!, (s) => {
         s[BS_SEQ] = this.bigSeq; s[BS_BODY] = h.body; s[BS_DROPS] = dp.dropCount; s[BS_MINI] = dp.miniDropCount; s[BS_BUILDSTART] = dp.buildStartCount; s[BS_CAND] = dp.dropCand; s[BS_UNDER] = dp.bodyUnderDb;
         s[BS_DEMOTED] = dp.dropDemoted; s[BS_SPACED] = dp.dropSpaced; s[BS_DROPRISE] = dp.dropRiseDb; s[BS_NEAR] = dp.nearDropDb; s[BS_NEARDIP] = dp.nearDipDb; s[BS_LIFT] = dp.liftDb; s[BS_STOPS] = dp.stopCount; s[BS_STOPSEC] = dp.stopS; s[BS_BUILD] = ri.buildUp; s[BS_RISER] = ri.inRiser ? 1 : 0;
-        s[BS_PUNCH] = p.punch; s[BS_BASS] = p.bass; s[BS_BRIGHT] = p.bright; s[BS_BEAT] = p.beat; s[BS_BASSLINE] = p.bassline; s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped;
+        this.character.pack(s); s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped;
       }, C_BIG_SEQ);
       if (this.syncWorker) Atomics.notify(ctrl, C_BIG_SEQ);
     }
@@ -689,7 +688,7 @@ export class Analyser {
     this.dKick = Math.exp(-dtHop / 0.15);
     this.riser.aSpecSlow = 1 - Math.exp(-dtHop / 2.0);
     this.riser.aNovSlow = 1 - Math.exp(-dtHop / 1.5);
-    this.character.aProf = 1 - Math.exp(-dtHop / 8.0);
+    this.character.rates(dtHop);
     this.outFrame = {
       silent: true, level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
@@ -942,7 +941,7 @@ export class Analyser {
   readonly drop = new DropDetector(this);   // DROP: flanken, slam-kandidaten, minidrop, lyft/nästan-drop/stopp
   readonly sections = new SectionTracker(this);   // SEKTIONER
   readonly riser = new RiserDetector(this);   // UPPBYGGNAD
-  readonly character = new CharacterProfile(this);   // KARAKTÄR
+  readonly character = new CharacterProfile(this.f, this.f.character);   // KARAKTÄR
   readonly kicks = new KickDetector(this);   // KICK: anslag i snabba vägen
   readonly bass = new BassTracker(this);   // BAS: basenergin per slag och basgången
   readonly levels = new LevelTracker(this);   // NIVÅ: förstärkning/AGC, tystnad, intensitet, nivåtak och topp-zon
