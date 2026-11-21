@@ -1275,3 +1275,117 @@ Inget stående prov fångar felet. Paritetsverktyget ser inte nya fält, och 0 g
 5. **"Källan saknas" ska synas.** En borttagen sten ger sina fält `NaN`, eller en flagga `bass.alive = 0` som läsarna ärver. Ett härlett utvärde som `sectionBassTrend` blir då "okänt" i stället för "basen jämn", och livstecken/startloggen säger vilken sten som saknas.
 
 DOM oavgjort Totalen ligger inom brus och skillnaderna är avvägningar som tar ut varandra: p1 håller producenten orörd och borttagningen billig, p2 håller huvudfilen smal och tar transporten med stenen ut. Båda lämnar samma hål, där en läsare i workern av ett värde från huvudtråden kompilerar och tyst läser 0.
+
+
+---
+
+# TÄPP HÅLET (2026-11-21, ägaren "Täpp hålet"): tre tillägg till a014, ändringsprovet blint, en domare
+
+Nyckel: q1 = h3 (färre korsningar + tagg per fält + skuggprov), q2 = h1 (transportlistan), q3 = h2 (tråden i typen).
+Resultat ändringsprovet: q1 31 rader/5 filer, q2 45/5, q3 42/5 (a014 utan tillägg: 55/6, tyst 0 i workern).
+
+## Domen
+
+# Dom: hålet mellan trådarna (q1 / q2 / q3)
+
+## Siffrorna först
+
+| punkt (vikt) | q1 | q2 | q3 |
+|---|---|---|---|
+| A rader/filer för ny insignal (25) | **7** | 6 | 4 |
+| B fel tråd stoppas (25) | **9** | 8 | 7 |
+| C delat = odelat / deklarerat (15) | 8 | **9** | 6 |
+| D ärlig borttagning (10) | **8** | 6 | 5 |
+| Enkelhet, minst ny mekanism (15) | 5 | 6 | **7** |
+| Cpu i huvudtråden + allokering (10) | 8 | 7 | **9** |
+| **Viktad summa (av 100)** | **75,5** | 70,5 | 61,0 |
+| Fatalt brott | nej | nej | nej |
+| Nya luckor som provet hittade (verkliga / listade) | 6 / 10 | 6 / 10 | 7 / 11, varav 1 tyst fel och 1 regelkrock |
+
+**Vinnare: q1.** Den bästa helheten är ändå en kombination: q1:s stomme med q2:s flytt av producenten i stället för q1:s dubbelräkning (`BÅDA`). Se sist.
+
+## Det jag själv körde (kopior i `hal/domare/`, inget annat ändrat)
+
+| prov | utfall |
+|---|---|
+| q1 `tsc --strict` + `visa-fel.mjs` | 0 fel med `@ts-expect-error`. Utan dem blir det 7 fel, plus 2 för hålets fall och 2 för dagens `a.section`. **Stämmer.** |
+| q1 `alloc.mjs` | 0 GC på 2 M hopp, kontrollen ger 111. **Stämmer.** |
+| q2 `kor.mjs` | tsc stoppar A, B och C, laddningen stoppar D och E. TAKT fäller hål 3 (19 999 hopp), GIFT fäller hål 1. Transporten kostar 132 ns för fack mot 31 ns för raka rader, 0 GC. Nycklar ger 986 GC. **Stämmer.** |
+| q3 `tsc` efter/före/fel | efter ger 0 fel. Före ger TS2344 med texten "bass.energy skrivs inte i slow: bär det". fel ger 6 fel. `hopp.js`: rätt 0, sen 199 981, av ger NaN i 199 991. 0 GC. **Stämmer.** |
+| Flytten av `bassEnergyStep` ovanför `pushBig` (q2 och q3) | Jag läste koden: `localBpm` skrivs vid :837 (`silenceStep`, före) och :964 (`setClock`, efter), och `section` vid :367 (före) och :955 (efter). Ingen läser `bass.*` mellan :873 och :948. Det betyder att flytten kommuterar. q2:s tillägg har mätt den på riktig `src` med 0 av 537 981 hopp. q3:s har bara argumenterat för den, men flytten är densamma. |
+
+Alla tre förprov håller vad de lovar. Ingen deltagare överdrev tsc- eller GC-utfallen. Alla tre **underskattade däremot raderna** (se A).
+
+## A. Rader och filer för en ny insignal (rättat ur proven)
+
+| | totalt i fallet (profilernas vägar) | utanför sektionsfilen och dirigenten (hålets mått 16–29) | utanför läsare, producent och dirigent, utom de 3 ramraderna | nästa fält ur samma producent | tilläggets eget påstående |
+|---|---|---|---|---|---|
+| referens p2 | 46 (55 med grenen utan `bigOn`) | 14 (16) | 6 i 2 filer (`split.ts`, `analyser.ts`) | ≈4 | – |
+| q1 | 31 enligt provet. **Rättat 33**: anropet i `drainBig` och basens `BÅDA`-tagg hör till fallet. Med engångsraderna från 15b (`bpmNu` 4, `lowAbsStep` 2) blir det 39 | 7, rättat 9 (15 med engångsraderna) | 2 (`drainBig`, skuggprovets rad) + 6 engångsrader, i 2–3 filer | **0–1** | "1 rad" |
+| q2 | 37 (45 med grenen utan `bigOn`). Flytten i flyttplanen ger +1 | 12 (+1 för flytten) | **0–1** (+2 i `split.ts` för grenen utan `bigOn`) | 2 | "0 + 2 för ramen" |
+| q3 | 42 (grenen utan `bigOn` är inte gjord, ≈+8) | **16**, alltså samma som referensen | 5 i `analyser.ts` (flytten 2, `A` 1, anropen 2) | 3 | "7" |
+
+Domen för A: q1 har lägst kostnad per fält efter det första fältet och lägst total. Men q1:s "1 rad" gäller bara när producenten är billig och bara läser `IN`/`BÅDA`. Sex rader engångsarbete ligger dolda i flyttsteg 15b, och de är skrivna för just basen. q2 nästan når idealet utanför läsare och producent, men betalar 5 rader mallkod i `BassOut` första gången. q3 sparar `split.ts` men flyttar i stället arbetet till `analyser.ts`. Mätt med hålets eget mått är q3 inte bättre än referensen.
+
+## B. Stoppas läsning från fel tråd?
+
+- **q1 (9):** tsc stoppar alla 7 fall och hålets fall (verifierat). Skuggprovet går **i varje hopp, för varje taggat fält** (`IN`, `BÅDA`, `UT`), och för ramen med en deklarerad baslinje. Förprov F på **dagens riktiga kod**, 44 fält, är grönt. Provet kan alltså bli grind direkt. Svaghet: grenen utan `bigOn` ger tyst 0 (q1 d8).
+- **q2 (8):** tsc stoppar (verifierat). Laddningskontrollen är unik: den fångar att pack och uppack gäller olika fält. TAKT och GIFT är provade **bara på en modell**. Svagheter: hemmet `'B'` går igenom tsc i grenen utan `bigOn`, där det inte finns någon B-ring (q2 d1). `'K'` får inget gift.
+- **q3 (7):** tsc stoppar och har de tydligaste felmeddelandena. Den kräver också `on`. Bärprovet ser bara räknade fält, och `'MS'` kontrolleras bara som rapport. Grenarna utan `bigOn` ger **tyst fel**: `shIn.bassSum` står kvar på 0,5 med `on = true` (q3 d6). Det är just hål 1, i en gren.
+
+## C. Delat mot odelat, och fyndet
+
+**Fyndet: delat och odelat skiljer redan i dagens kod.** Tre agenter mätte det oberoende av varandra:
+
+| mätt av | längd | hopp som skiljer |
+|---|---|---|
+| q2:s tillägg | 120 s | 44 999 av 45 000 |
+| q3:s tillägg | 60 s | 22 499 av 22 500 |
+| q1:s tillägg | 150 s | 56 249 av 56 250, i 14 ramfält (`sectionAgeMs` 100 %, `repeatSim` 87 %, `sectionIndex` 75 %, `miniDropCount` 73 % … `bassLevel` 1,5 %) |
+
+**Vad det betyder för C:**
+1. Mål C som det är skrivet ("delat = odelat för nya värden") går inte att uppfylla för ett värde som byggs på sektionen. `sectionBassTrend` ärver sektionens gränser, och de skiljer redan.
+2. Målet måste formuleras om till: **transporten får inte lägga till någon skillnad.** Läsaren ska se exakt samma insignal i samma hopp i båda trådarna. Det som skiljer utöver det ska stå i en deklarerad baslinje.
+3. `bevis.sh` jämför ref mot ny **i samma läge**. Byte-identitet gäller alltså per läge och har aldrig gällt mellan lägena. Ett prov som jämför delat mot odelat utan baslinje skulle bli rött på dagens kod.
+4. Referensens recept (`B_BASSE` i `pushBig`) är värre än "ett hopp sent": energin skiljer i 98,5 % av hoppen (406 455 av 412 500, q1:s förprov D).
+
+Poängen för C:
+- **q2 (9):** flytten av `bassEnergyStep` är bevisad byte-identisk på riktig `src` (0 av 537 981, odelat och inline, plus lotusstil). TAKT jämför B- och K-fält i varje hopp. Skillnaden för S-kanalen är deklarerad i hemmet, och grenen utan `bigOn` är hanterad.
+- **q1 (8):** insignalen är lika i 0 av 412 500 hopp på riktig `dist` och 3 inspelningar. Skuggprovet har en deklarerad baslinje för ramen. Två avdrag: (1) Efter en omstart av workern glider `BÅDA`-kopian i upp till 9,47 s (deklarerat, gräns 120 s). (2) Engångsflytten ändrar befintlig kod i den heta vägen: `lowAbsStep` bryts ut ur `fastBandStep`, och `h.sec`/`h.lvh` skrivs nu i alla roller. Bara `fbAbs[0..1]` och basfälten är jämförda, inte resten av `fastBandStep`. `bevis.sh` måste bära det.
+- **q3 (6):** samma flytt som q2, men den är bara argumenterad och inte körd på riktig kod. Bärprovet finns bara i en modell. Grenarna utan `bigOn` blir tyst fel. Hur S-barriären i `pullSlowState` ska behandlas av bärprovet är ouppklarat (q3 d7).
+
+## D. Ärlig borttagning
+
+- **q1 (8):** `finns`, ramens `stenarAv` och en startrad som listar varje läsning utan källa (också i `/api/health`). Inget NaN. Luckor: taggen `'AV'` finns inte i `Tag`/`Synlig` (+2 rader första gången), det står inte var `finns = false` sätts, och `lowAbsStep` blir död räkning (≈3 µs per hopp) när basen är borta.
+- **q2 (6):** `on` ('K') och `f.stones`, och `Wire` hoppar själv över avstängda fack. Men transporten bor i facket, så efter radering står `b()`, `energy: 'B'` och B-platsen kvar. Att städa bort dem kräver ≈15 rader i sektionen. Konstanterna för `f.stones` saknas, och ingen loggrad syns vid radering.
+- **q3 (5):** NaN betyder "ingen bas-sten". Det **krockar med a014:s regel** "inget ramfält får ha NaN" (steg 14). I JSON blir det `null`, och första rutan är 0 innan värdet blir NaN. tsc **tvingar** den döda taggen `'M>B'` och platsen att stå kvar efter raderingen. Raden i `neutral()` som sätter `on` visas aldrig.
+
+## Enkelhet och cpu
+
+| | ny mekanism | huvudtråden per hopp | workern | GC |
+|---|---|---|---|---|
+| q1 | 5 taggar, `Läser`/`Ur`/`Vy`, `platser`, `falt`, `utanKalla`, `finns`, `stenarAv`, skuggprovet (≈60 rader), dubbelräkningsbegreppet `BÅDA` med en tröskel på 5 µs, och regeln att importerade tal binds om lokalt | ≈0,01 µs | **+3 µs** (tillåtet enligt "all cpu på Pi:n", men det växer med varje `BÅDA`-producent) | 0 |
+| q2 | `HOME` per fack, radmetoder i facket, `layout()` med provinstans (reflektion vid laddning, ≈40 rader), `Wire` (megamorft), TAKT och GIFT. **Ersätter** ≈12 pack-metoder och ≈33 konstanter, och `analyser.ts` blir −15 rader | **+0,10–0,12 µs PC** (≈+0,2 % av 57,8 µs), uppskattat +0,4–0,5 µs på Pi:n | ±0 | 0 |
+| q3 | tabellen `TRÅD` (en rad per fack), en typmall på 39 rader, `platser()` en gång, handskrivna rader på räknade platser, bärprovet (≈30 rader). Ersätter skrivkartan och giftprovet | ≈4 ns per fält, alltså samma maskinkod som handskrivet | ±0 | 0 |
+
+q1 bryter mot ägarens "en källa per storhet": `BÅDA` ger två tillståndskopior av samma storhet. De är bevisat lika, men det är en kopia. Det är det största avdraget för enkelhet.
+
+## Kombinationen (rekommendation)
+
+Uppskattad summa ≈81. Den är inte provad som helhet.
+
+| ta | ur | varför |
+|---|---|---|
+| tagg per fält bredvid fältet, `LÄSER … satisfies Läser<T>` → `Ur`/`Vy` (ersätter `XReads`) | q1 | bäst tsc-täckning, verifierad |
+| `platser('IN'/'UT', …)` för B/BS/S, med handskrivna pack- och uppackrader på räknade platser i producenten | q1 = q3 | 0 rader i `split.ts`, samma maskinkod som i dag |
+| skuggprovet: varje taggat fält i varje hopp, plus ramens union med deklarerad baslinje (de 14 fälten) | q1 | grönt på dagens kod, löser hål 4 och det omformulerade C |
+| `finns`, `stenarAv`, startraden från `utanKalla` | q1 | bästa D, inget NaN |
+| **flytten av `bassEnergyStep` ovanför `pushBig`** (`flytt.patch`) och regeln "ett IN-fält skrivs före `pushBig`" | q2 | bevisad 0 av 537 981. Gör `BÅDA` onödig för fallet |
+| laddningskontrollen (pack och uppack gäller samma fält) | q2, som valfri del av skuggprovet | billig, fångar en felklass som tsc inte ser |
+| allokeringsprovet och regeln att importerade tal binds om lokalt (boxningsfällan, 62 GC) | q1 | gäller a014 oavsett |
+| **stryk:** `BÅDA`, utbrytningen av `lowAbsStep`, `bpmNu`, `Wire`/`layout()`, NaN-regeln, `'M>R'` | – | ersätt, lägg inte till lager. En källa per storhet. Ingen ändring av `fastBandStep` |
+| **radera grenarna utan `bigOn`** (`SECTION_AGG=env`, `FAST_BANDS=0`) i första steget efter flytten | alla tre prov | alla tre fann tyst 0, tyst fel eller handskriven R-plats just där |
+
+Fallet i kombinationen blir: taggen `energy: 'S'` → `'IN'` (1 rad), 2 rader i basen (pack och uppack på `B.bass.energy`), 2 anrop i `pushBig`/`drainBig` första gången, och 0 rader i `split.ts`. Nästa fält ur basen kostar 3 rader. Det är 2 rader mer än q1 per insignal, men i gengäld blir det ingen dubbelräkning, ingen glidning vid omstart och ingen ändring i spektrumets heta väg.
+
+DOM q1 75,5 / 70,5 / 61,0: q1 vinner på tsc, skuggprov och ärlig borttagning, men det bästa är q1:s stomme med q2:s bevisade flytt i stället för dubbelräkningen BÅDA, och grenarna utan bigOn raderas.
