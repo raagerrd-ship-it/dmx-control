@@ -37,7 +37,7 @@ startvärdet 0,5 (det heta fältets), konstruktorn skriver `dtHop * 1000` innan 
 `kickRefine`, kör efter den gamla skrivningen i `process`, och aldrig i workern). Startvärdena är dagens, ordagrant (0,5-knepet);
 `lvlSmooth` och `kickHit` står i `HopOut`s `stabilise`-lista i stället för i `DOUBLE_FROM_START`.
 
-Kvar på `Analyser` tills sin stens steg: `hInZone` (nivå, steg 11), `hInRiser` (flyttar till `RiserOut` i steg 4).
+Kvar på `Analyser` tills sin stens steg: `hInZone` (nivå, steg 11).
 
 ### Skrivkartan: vem skriver varje fält, per tråd (DMX och lotus lika)
 
@@ -77,3 +77,20 @@ Startvärdena är dagens, ordagrant (`envelope` och `src` saknar startvärde som
 flyttade till facken: `activeMs` (nivå), `pendingKickMs`, `kfPrev`, `kfPrev2`, `beatAnchorMs`, `lastKick` (kick; kickens egen lista togs bort),
 `conf` (klockan). Kvar på `Analyser` tills sina steg: `secSpecDirty`, `bassOnPeak` (blir räknare i spektrums steg 12), `dbgRms` (kickens steg 10).
 Getters för verktygen: `Analyser.bandOn` (`konsertReplay.mjs`), `Analyser.beatSrc` (`feedProof.mjs`).
+
+## De små stenarnas fack (steg 4): BassOut, RiserOut, DropOut, CharacterOut
+
+Bara data, som steg 3. Hissade i `analyser.ts` som `bo`, `ri`, `dp`, `cp`; stenarna skriver sitt eget fack som `this.a.f.<fack>.x` tills sitt steg.
+
+| fack | fält (förr) |
+|---|---|
+| `f.bass` | `beHi`, `beRef`, `beShort` (förr `bass.*`), `bassline` (`profBassline`), `onsetsPerBeat` (`bassOnsetsPerBeat`) |
+| `f.riser` | `buildUp`, `inRiser` (`hInRiser`) |
+| `f.drop` | `dropCount`, `miniDropCount`, `buildStartCount`, `dropCand`, `secBodyRet`, `dropDemoted`, `dropSpaced`, `dropRiseDb`, `nearDropDb`, `nearDipDb`, `liftDb`, `stopCount`, `stopS`, `lastDropMs` (förr `drop.*`), `bodyUnderDb` (förr på `Analyser`) |
+| `f.character` | `profile` (förr `character.outProfile`); ramens `profile` är samma objekt |
+
+`DOUBLE_FROM_START`-namn som flyttade: `bassline`, `onsetsPerBeat` (bas), `buildUp` (uppbyggnad), och ur dropens lista `lastDropMs`, `dropRiseDb`,
+`nearDropDb`, `nearDipDb`, `liftDb`, `stopS`. Kvar privat i stenen/kärnan: `beHiShort`, `blAccum`, `blKickSeq` (basens steg 7), dropens arbetsminne.
+Getters: `Analyser.bodyUnderDb` (klockan via `HopTarget`, `ensamTakt.mjs`), `Analyser.bassOnsetsPerBeat` (`basslineProbe.mjs`).
+`tools/ensam.mjs --ut` läser fält på stenen (`this[f]`); dropens räknare ligger nu i facket, så `--ut dropCount` fungerar inte förrän
+verktyget läser facken (steg 6).

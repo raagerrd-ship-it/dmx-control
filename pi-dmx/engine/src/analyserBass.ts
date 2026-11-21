@@ -9,18 +9,18 @@ export class BassTracker {
     this.a = a;
     for (const k of DOUBLE_FROM_START) { const v = (this as unknown as Record<string, number>)[k]; if (typeof v === 'number') { (this as unknown as Record<string, number>)[k] = 0.5; (this as unknown as Record<string, number>)[k] = v; } }
   }
-  private static readonly BE_TOP_BEATS = 16; private static readonly BE_FAST_BEATS = 2;  private static readonly BE_BEAT_MIN_MS = 300; private static readonly BE_BEAT_MAX_MS = 600;  beHi = NaN; private beHiShort = NaN; beRef = NaN; beShort = 0;   // BASENERGIN MED SLAGET SOM TIDSENHET
+  private static readonly BE_TOP_BEATS = 16; private static readonly BE_FAST_BEATS = 2;  private static readonly BE_BEAT_MIN_MS = 300; private static readonly BE_BEAT_MAX_MS = 600;  private beHiShort = NaN;   // BASENERGIN MED SLAGET SOM TIDSENHET
   /** Stegar skalorna ett hop. */
   bassEnergyStep(sub: number, kick: number): number {
     const x = 5 * Math.log10(sub + 1e-7) + 15 * Math.log10(kick + 1e-7), hopMs = this.a.f.hop.dtHop * 1000;
     let per = this.a.f.clock.bpm > 40 ? 60000 / this.a.f.clock.bpm : Analyser.BE_FALLBACK_MS;
     per = per < BassTracker.BE_BEAT_MIN_MS ? BassTracker.BE_BEAT_MIN_MS : per > BassTracker.BE_BEAT_MAX_MS ? BassTracker.BE_BEAT_MAX_MS : per;
-    this.beHi = !(x <= this.beHi) ? x : this.beHi + (x - this.beHi) * (hopMs / (BassTracker.BE_TOP_BEATS * per));
+    this.a.f.bass.beHi = !(x <= this.a.f.bass.beHi) ? x : this.a.f.bass.beHi + (x - this.a.f.bass.beHi) * (hopMs / (BassTracker.BE_TOP_BEATS * per));
     this.beHiShort = !(x <= this.beHiShort) ? x : this.beHiShort + (x - this.beHiShort) * (hopMs / (BassTracker.BE_FAST_BEATS * per));
-    this.beRef = this.a.section === 'high' || !(this.beHi <= this.beRef) ? this.beHi : this.beRef + (this.beHi - this.beRef) * (hopMs / (Analyser.BE_MEM_BEATS * per));
+    this.a.f.bass.beRef = this.a.section === 'high' || !(this.a.f.bass.beHi <= this.a.f.bass.beRef) ? this.a.f.bass.beHi : this.a.f.bass.beRef + (this.a.f.bass.beHi - this.a.f.bass.beRef) * (hopMs / (Analyser.BE_MEM_BEATS * per));
     let e = 1 - (this.beHiShort - x) / Analyser.BE_SPAN_DB;
-    this.beShort = e > 0 ? e : 0;
-    e = 1 - (this.beHi - x) / Analyser.BE_SPAN_DB;
+    this.a.f.bass.beShort = e > 0 ? e : 0;
+    e = 1 - (this.a.f.bass.beHi - x) / Analyser.BE_SPAN_DB;
     return e > 0 ? e : 0;
   }
   private blPrev1 = 0; private blPrev2 = 0; private blRef = 0.1; private blLastOnset = -100;
@@ -41,8 +41,8 @@ export class BassTracker {
     let n = 0; for (let i = 0; i < 32; i++) if (seq - this.blOnsets[i] <= 200 && this.blOnsets[i] > 0) n++;
     const beats2s = (this.a.f.hop.bpm > 0 ? this.a.f.hop.bpm : 120) / 30;
     const opb = n / beats2s;
-    this.a.bassOnsetsPerBeat = opb;
+    this.a.f.bass.onsetsPerBeat = opb;
     const raw = Math.max(0, Math.min(1, (opb - 0.4) / 0.8));
-    this.a.profBassline += (raw - this.a.profBassline) * 0.01;
+    this.a.f.bass.bassline += (raw - this.a.f.bass.bassline) * 0.01;
   }
 }

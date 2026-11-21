@@ -9,7 +9,6 @@ export class CharacterProfile {
   constructor(a: Analyser) {
     this.a = a;
   }
-  outProfile = { punch: 0.4, bass: 0.5, bright: 0.3, beat: 0.5, bassline: 0 };   // karaktärsprofil
   aProf = 0;
   private profPunch = 0.4;   // KARAKTÄRSPROFIL
   private profBass = 0.5;
@@ -27,10 +26,10 @@ export class CharacterProfile {
     this.profBass += (bassW - this.profBass) * pr;
     this.profBright += (brightW - this.profBright) * pr;
     this.profBeat += (this.a.f.hop.conf - this.profBeat) * pr;
-    this.outProfile.punch = cl01((this.profPunch - 0.05) / 0.40);
-    this.outProfile.bass = cl01((this.profBass - 0.28) / 0.30);
-    this.outProfile.bright = cl01((this.profBright - 0.14) / 0.19);
-    this.outProfile.beat = cl01(this.profBeat);
-    this.outProfile.bassline = this.a.profBassline;
+    this.a.f.character.profile.punch = cl01((this.profPunch - 0.05) / 0.40);
+    this.a.f.character.profile.bass = cl01((this.profBass - 0.28) / 0.30);
+    this.a.f.character.profile.bright = cl01((this.profBright - 0.14) / 0.19);
+    this.a.f.character.profile.beat = cl01(this.profBeat);
+    this.a.f.character.profile.bassline = this.a.f.bass.bassline;
   }
 }

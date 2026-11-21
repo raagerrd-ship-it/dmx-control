@@ -66,7 +66,7 @@ export class SectionTracker {
 
 
   /** SEKTION. */
-  private secDropsNow(): number { return this.a.f.hop.role === 'slow' && this.a.f.hop.bigOn ? this.secVDrops : this.a.drop.dropCand + this.a.drop.secBodyRet; }
+  private secDropsNow(): number { return this.a.f.hop.role === 'slow' && this.a.f.hop.bigOn ? this.secVDrops : this.a.f.drop.dropCand + this.a.f.drop.secBodyRet; }
   sectionReset(): void {
     this.a.secBuildAt = 0; this.a.secBuildSeen = 0;
     this.a.section = 'intro'; this.a.sectionStartMs = 0; this.a.sectionIndex = 0; this.a.sectionTier = 1; this.a.repeatSim = 0; this.a.repeatAgoMs = 0; this.a.repeatSection = '';
@@ -182,7 +182,7 @@ export class SectionTracker {
     if (this.a.section === 'high') { this.lastHighDb = this.secCurDbSum / this.secCurDbN; }
     this.a.levelVsHighDb = Number.isFinite(this.lastHighDb) ? blkDb - this.lastHighDb : 0;
     this.predictHigh(nowMs, bInt);
-    if (this.a.dbgSecBlock) this.a.dbgSecBlock({ nowMs, section: this.a.section, sectionStartMs: this.a.sectionStartMs, prev, label, bpm: this.a.f.clock.bpm, bInt, bKicks, bCent, blkDb, buildUp: this.a.buildUp, riseRun: this.secRiseRun, rise, dropped, breaking, tier: this.a.sectionTier, repeatSim: this.a.repeatSim, repeatAgoMs: this.a.repeatAgoMs, repeatSection: this.a.repeatSection, spec: Array.from(this.secBlkSpec, (v) => v / n), lastHighDb: this.lastHighDb, expectHighMs: this.a.expectHighMs, expectSource: this.a.expectSource, beatPhaseMs: this.a.f.clock.phaseMs, secLogN: this.secLog.length, secLogLast: this.secLog[this.secLog.length - 1] ?? null, bBon, bBpk, bFlux, bDyn, bHigh, bFlat, pct: this.secPct });
+    if (this.a.dbgSecBlock) this.a.dbgSecBlock({ nowMs, section: this.a.section, sectionStartMs: this.a.sectionStartMs, prev, label, bpm: this.a.f.clock.bpm, bInt, bKicks, bCent, blkDb, buildUp: this.a.f.riser.buildUp, riseRun: this.secRiseRun, rise, dropped, breaking, tier: this.a.sectionTier, repeatSim: this.a.repeatSim, repeatAgoMs: this.a.repeatAgoMs, repeatSection: this.a.repeatSection, spec: Array.from(this.secBlkSpec, (v) => v / n), lastHighDb: this.lastHighDb, expectHighMs: this.a.expectHighMs, expectSource: this.a.expectSource, beatPhaseMs: this.a.f.clock.phaseMs, secLogN: this.secLog.length, secLogLast: this.secLog[this.secLog.length - 1] ?? null, bBon, bBpk, bFlux, bDyn, bHigh, bFlat, pct: this.secPct });
     if (Analyser.REPEAT & 1) { this.repeatStep(nowMs, blkDb, bKicks, bCent, bInt); this.secBlkMs = 0; this.secBlkN = 0; this.secBlkInt = 0; this.secBlkKicks = 0; this.secBlkCent = 0; this.secBlkSpec.fill(0); this.secBlkRms2 = 0; this.secBlkBon = 0; this.secBlkBpk = 0; this.secBlkFlux = 0; this.secBlkRms4 = 0; return; }
     let sum = 0; for (let i = 0; i < 8; i++) sum += this.secBlkSpec[i];
     const acc = this.secFpAcc; for (let i = 0; i < 8; i++) acc[i] += sum > 0 ? this.secBlkSpec[i] / sum : 0;
@@ -343,7 +343,7 @@ export class SectionTracker {
         if (this.a.secSpecDirty) { this.a.secSpecDirty = false; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.a.f.spectrum.bandDbRaw[i] / 20); }
         if (this.a.f.hop.role === 'fast') {
           const g = this.a.secAgg; g.n++; g.int += intensity; if (kick) g.kicks++; g.rms2 += rms * rms; g.cent += this.a.f.hop.centSmooth; g.dt += this.a.f.hop.dtHop * 1000;
-          g.breaking = breaking ? 1 : 0; g.wall = this.a.wallNow(); g.drops = this.a.drop.dropCand + this.a.drop.secBodyRet; g.active = this.a.f.level.activeMs; g.build = this.a.buildUp;
+          g.breaking = breaking ? 1 : 0; g.wall = this.a.wallNow(); g.drops = this.a.f.drop.dropCand + this.a.f.drop.secBodyRet; g.active = this.a.f.level.activeMs; g.build = this.a.f.riser.buildUp;
           for (let i = 0; i < 8; i++) g.spec[i] += sp[i];
         } else { const I = this.shIn; I.hops = 1; I.intSum = intensity; I.kicks = kick ? 1 : 0; I.breaking = breaking; I.nowMs = this.a.wallNow(); I.dtMs = this.a.f.hop.dtHop * 1000;
           I.rms2Sum = rms * rms; I.centSum = this.a.f.hop.centSmooth; I.specOff = 0; I.bonSum = 0; I.bpk = 0; I.fluxSum = 0; I.rms4Sum = 0; this.sectionHop(sp); }

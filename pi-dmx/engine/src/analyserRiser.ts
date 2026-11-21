@@ -35,13 +35,13 @@ export class RiserDetector {
     this.centSlow += (this.a.f.hop.centSmooth - this.centSlow) * (dtHop / 2.5);
     this.lvlSlowR += (this.a.f.hop.lvlSmooth - this.lvlSlowR) * (dtHop / 2.5);
     const lc = this.a.f.level.levelCeil;
-    const inRiser = this.a.f.level.activeMs > 2500 && this.a.f.hop.lvlSmooth > 0.3 * lc && nowWallA - this.a.drop.lastDropMs > 1500 && (
+    const inRiser = this.a.f.level.activeMs > 2500 && this.a.f.hop.lvlSmooth > 0.3 * lc && nowWallA - this.a.f.drop.lastDropMs > 1500 && (
         novRiser
         || (this.a.f.hop.centSmooth > this.centSlow + 0.06 && this.a.f.hop.lvlSmooth > this.lvlSlowR + 0.04 * lc && this.a.f.hop.lvlSmooth > 0.4 * lc)
       );
     const bTarget = inRiser ? 1 : 0;
-    const bRate = bTarget > this.a.buildUp ? dtHop / 3.5 : dtHop / 1.0;
-    this.a.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.a.buildUp));
+    const bRate = bTarget > this.a.f.riser.buildUp ? dtHop / 3.5 : dtHop / 1.0;
+    this.a.f.riser.buildUp += Math.max(-bRate, Math.min(bRate, bTarget - this.a.f.riser.buildUp));
     return inRiser;
   }
 }

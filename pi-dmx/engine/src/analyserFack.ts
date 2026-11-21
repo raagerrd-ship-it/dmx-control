@@ -75,5 +75,26 @@ export class ClockOut {
   constructor() { stabilise(this, ['conf']); }
 }
 
-export interface Fack { hop: HopOut; level: LevelOut; spectrum: SpectrumOut; kick: KickOut; clock: ClockOut }
-export function makeFack(): Fack { return { hop: new HopOut(), level: new LevelOut(), spectrum: new SpectrumOut(), kick: new KickOut(), clock: new ClockOut() }; }
+/** BASEN. bassline/onsetsPerBeat = förr profBassline/bassOnsetsPerBeat. */
+export class BassOut {
+  beHi = NaN; beRef = NaN; beShort = 0; bassline = 0; onsetsPerBeat = 0;
+  constructor() { stabilise(this, ['bassline', 'onsetsPerBeat']); }
+}
+/** UPPBYGGNADEN. inRiser = förr hInRiser. */
+export class RiserOut { buildUp = 0; inRiser = false; constructor() { stabilise(this, ['buildUp']); } }
+/** DROP. */
+export class DropOut {
+  dropCount = 0; miniDropCount = 0; buildStartCount = 0; dropCand = 0; secBodyRet = 0;
+  dropDemoted = 0; dropSpaced = 0; dropRiseDb = -0; nearDropDb = -0; nearDipDb = -0; liftDb = -0; stopCount = 0; stopS = -0;
+  lastDropMs = -1.5e9; bodyUnderDb = 0;   // lastDropMs utanför Smi-intervallet
+  constructor() { stabilise(this, ['lastDropMs', 'dropRiseDb', 'nearDropDb', 'nearDipDb', 'liftDb', 'stopS']); }
+}
+/** KARAKTÄREN. profile = förr character.outProfile, ramens profile pekar hit. */
+export class CharacterOut { readonly profile = { punch: 0.4, bass: 0.5, bright: 0.3, beat: 0.5, bassline: 0 }; }
+
+export interface Fack { hop: HopOut; level: LevelOut; spectrum: SpectrumOut; kick: KickOut; clock: ClockOut;
+  bass: BassOut; riser: RiserOut; drop: DropOut; character: CharacterOut }
+export function makeFack(): Fack {
+  return { hop: new HopOut(), level: new LevelOut(), spectrum: new SpectrumOut(), kick: new KickOut(), clock: new ClockOut(),
+    bass: new BassOut(), riser: new RiserOut(), drop: new DropOut(), character: new CharacterOut() };
+}
