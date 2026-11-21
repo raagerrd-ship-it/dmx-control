@@ -24,6 +24,7 @@ const [cmd, ...rest] = process.argv.slice(2); const opt = (k, d) => { const i = 
 const DIST = path.resolve(opt("--dist", "dist")), U = f => pathToFileURL(path.join(DIST, f)).href;
 const FILES = { drop: "analyserDrop", sections: "analyserSection", riser: "analyserRiser", kicks: "analyserKick", bass: "analyserBass", levels: "analyserLevel", character: "analyserCharacter", bands: "analyserSpectrum" };
 const get = (o, ch) => { let v = o; for (const k of ch.split(".")) { if (v == null) return undefined; v = v[k]; } return v; };
+const call = (o, ch) => { const i = ch.lastIndexOf("."); return (i < 0 ? o : get(o, ch.slice(0, i)))[ch.slice(i + 1)](); };   // klockläsare, också i ett fack (f.hop.wallNow)
 const SCAL = f => f.kind !== "arr" && f.kind !== "fn";   // värde som kan vara delens eget tillstånd (skrivs bara av delen själv)
 const READERS = new Set(["wallNow", "perfNow"]);   // metoder som bara läser en klocka (allt annat anrop räknas som en handling)
 
@@ -50,7 +51,7 @@ if (cmd === "tappa") {
   const mkPlan = a => { const p = [], acts = [], skipped = []; const seen = new Set();
     for (const ch of chains) { const parts = ch.split("."); let v = a, i = 0, pathSoFar = [];
       for (; i < parts.length; i++) { const nx = v?.[parts[i]]; pathSoFar.push(parts[i]);
-        if (typeof nx === "function") { const key = pathSoFar.join("."); if (!seen.has(key)) { seen.add(key); if (READERS.has(parts[i]) && pathSoFar.length === 1) p.push({ key, kind: "fn", n: 1 }); else acts.push(key); } break; }
+        if (typeof nx === "function") { const key = pathSoFar.join("."); if (!seen.has(key)) { seen.add(key); if (READERS.has(parts[i])) p.push({ key, kind: "fn", n: 1 }); else acts.push(key); } break; }
         if (nx == null || typeof nx === "number" || typeof nx === "boolean" || typeof nx === "string") { const key = pathSoFar.join("."); if (!seen.has(key)) { seen.add(key); p.push({ key, kind: typeof nx === "string" ? "str" : typeof nx === "boolean" ? "bool" : "num", n: 1 }); } break; }
         if (ArrayBuffer.isView(nx) || Array.isArray(nx)) { const key = pathSoFar.join("."); if (!seen.has(key)) { seen.add(key); if (nx.length <= 64) p.push({ key, kind: "arr", n: nx.length, ctor: nx.constructor.name }); else skipped.push(`${key}[${nx.length}]`); } break; }
         v = nx; } }
@@ -65,7 +66,7 @@ if (cmd === "tappa") {
         for (const [k, v] of Object.entries(this)) if (["number", "boolean", "string"].includes(typeof v)) plan.p.push({ key: k, self: 1, kind: typeof v === "string" ? "str" : typeof v === "boolean" ? "bool" : "num", n: 1 }); }   // stenens egna fält (som andra metoder i stenen kan ändra mellan stegen)
       for (const [k, v] of Object.entries(this)) if (["number", "boolean", "string"].includes(typeof v)) init[k] = typeof v === "number" && !Number.isFinite(v) ? { n: String(v) } : v; }
     const r = [curT, ...args.map(x => typeof x === "number" ? x : typeof x === "boolean" ? +x : NaN)];
-    for (const f of plan.p) { const v = f.kind === "fn" ? a[f.key]() : f.self ? this[f.key] : get(a, f.key); if (SCAL(f) && after.has(f.key) && !Object.is(after.get(f.key), v)) ext.add(f.key); if (f.kind === "arr") for (let i = 0; i < f.n; i++) r.push(v[i]); else r.push(f.kind === "str" ? S(v ?? "") : f.kind === "bool" ? +!!v : (v ?? NaN)); }
+    for (const f of plan.p) { const v = f.kind === "fn" ? call(a, f.key) : f.self ? this[f.key] : get(a, f.key); if (SCAL(f) && after.has(f.key) && !Object.is(after.get(f.key), v)) ext.add(f.key); if (f.kind === "arr") for (let i = 0; i < f.n; i++) r.push(v[i]); else r.push(f.kind === "str" ? S(v ?? "") : f.kind === "bool" ? +!!v : (v ?? NaN)); }
     const ret = orig.apply(this, args);
     for (const f of plan.p) if (SCAL(f)) after.set(f.key, f.self ? this[f.key] : get(a, f.key));
     utF.forEach((f, i) => { const v = utP[i] ? get(a, utP[i]) : get(this, f); r.push(typeof v === "string" ? S(v) : +v); });

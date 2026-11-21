@@ -1,6 +1,6 @@
 /** ENAD ANALYSATOR (2026-09-24) — en fil, samma byte i lotus-light-link (pi/src/audio-analyser/) och dmx-control (pi-dmx/engine/src/). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyser.md */
 
-import { sysEnv, env, numEnv, stabilise, makeFack, type Fack, BODY_CEIL_DB_S, BE_FALLBACK_MS, BE_MEM_BEATS, BASS_SPAN_DB, BASSON_LEN, BIG_EVERY, SECTION_AGG_HOP, BODY_HIGH_MS, BODY_HIGH_DB,
+import { sysEnv, numEnv, stabilise, makeFack, type Fack, BODY_CEIL_DB_S, BE_FALLBACK_MS, BE_MEM_BEATS, BASS_SPAN_DB, BASSON_LEN, BIG_EVERY, SECTION_AGG_HOP, BODY_HIGH_MS, BODY_HIGH_DB,
   type BeatGrid, type AnalyserDetection, type Cfg, type Role } from './analyserFack.js';
 export { BASS_SPAN_DB, SECTION_AGG_HOP, BODY_CEIL_DB_S };
 export type { BeatGrid, AnalyserDetection, Cfg, Role };
@@ -14,8 +14,8 @@ import {
   SECTIONS, sectionCode, viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader, type HopFeed,
   R_BIGSEQ, R_CLOCK, R_CLOCK_CONF, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N, B_RMS, B_LVL, B_CENT, B_ACTIVE, B_WALL, B_KICK, B_KICKHIT, B_INT, B_BREAK, B_SEC, B_LVH, B_CONF,
-  B_ENVF, B_ENVBPM, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY, BS_DROPS, BS_MINI,
-  BS_SPEC_N, BS_SKIPPED, BS_CAND, BS_DEMOTED, BS_SPACED, BS_DROPRISE, BS_NEAR, BS_NEARDIP, BS_LIFT, BS_STOPS, BS_STOPSEC, BS_UNDER, BS_BUILDSTART, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
+  B_ENVF, B_ENVBPM, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY,
+  BS_SPEC_N, BS_SKIPPED, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
 } from './split.js';
 import FFT from "fft.js";
 import { BeatFeed, publishPhase, type ClockCfg } from "./analyserClock.js";   // ANALYSATORNS KLOCKA
@@ -32,7 +32,6 @@ import { SpectrumBands } from "./analyserSpectrum.js";
 function sysOn(name: string): boolean { return !!sysEnv(name); }
 const HIGH_ON = sysOn('HIGH_DIAG') || false;   // Rattar som lases i tatslingan
 const BPM_TRACE = sysOn('BPM_TRACE');
-export const DROP_TRACE = sysOn('DROP_TRACE');
 export const SECTION_SCORE_F32 = sysEnv('SECTION_SCORE_F32') === '1';   // Rangpoangens buffert i 32-bitars flyttal
 
 export interface AnalyserConfig {
@@ -126,14 +125,6 @@ export interface Frame {
   drum: { kick: number; snare: number; hat: number; bass: number };   // TRUM-KIT-envelopes
 }
 
-export const BODY_RISE_DB = Number(env('BODY_RISE_DB') ?? 17);   // DROP-DETEKTOR
-export const BODY_GONE_MIN_MS = Number(env('BODY_GONE_MIN_MS') ?? 2000);   // breakdown-langd som kravs
-export const DROP_QUALITY_DB = Number(env('DROP_QUALITY_DB') ?? 3.5);   // HARD KVALITETSGRIND vid fyrningen
-export const DROP_RISE_LOW_DB = Number(env('DROP_RISE_LOW_DB') ?? 0);   // DROP_RISE_MIN
-export const DROP_UNDERPEAK_MIN = Number(env('DROP_UNDERPEAK_MIN') ?? 0);   // LUGN-SEKTIONS-GRIND
-
-export const MINI_SPACING_MS = Number(env('MINI_SPACING_MS') ?? 0);   // KICK-LAS
-
 const DOUBLE_FROM_START = [
   'sumSq', 'lastT', 'dbgRms', 'envAccum', 'envAccumT', 'envBassAccum',
   'lvlVU', 'engSmooth', 'snareHit', 'hatHit',
@@ -146,7 +137,7 @@ function stabiliseNumbers(o: object): void {
 }
 
 export class Analyser {
-  readonly f: Fack = makeFack();   // FACKEN
+  readonly f: Fack = makeFack(() => this.wallNow());   // FACKEN
   get role(): Role { return this.f.hop.role; }   get bigOn(): boolean { return this.f.hop.bigOn; }   get cfg(): Cfg { return this.f.hop.cfg; }
   get bandOn(): Float32Array { return this.f.spectrum.bandOn; }   get beatSrc(): { beat?: BeatGrid | null } { return this.f.clock.src; }   // verktygen
   get bodyUnderDb(): number { return this.f.drop.bodyUnderDb; }   get bassOnsetsPerBeat(): number { return this.f.bass.onsetsPerBeat; }   // klockan (HopTarget), verktygen
@@ -385,7 +376,6 @@ export class Analyser {
   private pushBig(samples: Float32Array): void {
     const h = this.f.hop;
     const sc = this.f.section;
-    const dp = this.f.drop;
     const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock;
     const r = this.bigRing!, ctrl = this.splitCtrl!, seq = ++this.bigSeq, slot = seq % BIG_RING_N, o = slot * BIG_REC_LEN, n = samples.length;
     this.bigPcm!.set(samples, slot * BIG_HOP_MAX);
@@ -400,9 +390,7 @@ export class Analyser {
     else if (this.syncWorker) syncWait(ctrl, C_BIG_SEQ, () => this.bigRd.read(ctrl, this.bigState!, this.bigCopy, C_BIG_SEQ) && this.bigCopy[BS_SEQ] >= seq);
     const s = this.bigCopy;
     if (!this.bigRd.read(ctrl, this.bigState!, s, C_BIG_SEQ) || s[BS_SEQ] === 0) return;
-    h.body = s[BS_BODY]; dp.dropCount = s[BS_DROPS]; dp.miniDropCount = s[BS_MINI]; dp.buildStartCount = s[BS_BUILDSTART]; dp.bodyUnderDb = s[BS_UNDER];
-    dp.dropDemoted = s[BS_DEMOTED]; dp.dropSpaced = s[BS_SPACED]; dp.dropRiseDb = s[BS_DROPRISE]; dp.nearDropDb = s[BS_NEAR]; dp.nearDipDb = s[BS_NEARDIP]; dp.liftDb = s[BS_LIFT]; dp.stopCount = s[BS_STOPS]; dp.stopS = s[BS_STOPSEC];
-    this.riser.unpack(s); this.character.unpack(s);
+    h.body = s[BS_BODY]; this.drop.unpack(s); this.riser.unpack(s); this.character.unpack(s);
     const sn = s[BS_SPEC_N];
     if (sn > this.specDelivered) {
       const sink = sp.sink, binHz = h.cfg.audio.rate / this.bands.bufferBig.length, R = this.bands.specRing!, c = this.bands.specCopy;
@@ -416,7 +404,6 @@ export class Analyser {
   /** slow: behandla hop-recorden t.o.m. */
   drainBig(limit: number): number {
     const h = this.f.hop;
-    const dp = this.f.drop;
     const lv = this.f.level, sp = this.f.spectrum;
     const ctrl = this.splitCtrl!, r = this.bigRing!, pcm = this.bigPcm!;
     let w = this.bigSeq + seqDelta(Atomics.load(ctrl, C_BIG_WRITE), this.bigSeq); if (limit < w) w = limit;
@@ -446,9 +433,7 @@ export class Analyser {
     if (n > 0) {
       Atomics.store(ctrl, C_BIG_READ, seqLow(this.bigSeq));
       stateWrite(ctrl, this.bigState!, (s) => {
-        s[BS_SEQ] = this.bigSeq; s[BS_BODY] = h.body; s[BS_DROPS] = dp.dropCount; s[BS_MINI] = dp.miniDropCount; s[BS_BUILDSTART] = dp.buildStartCount; s[BS_CAND] = dp.dropCand; s[BS_UNDER] = dp.bodyUnderDb;
-        s[BS_DEMOTED] = dp.dropDemoted; s[BS_SPACED] = dp.dropSpaced; s[BS_DROPRISE] = dp.dropRiseDb; s[BS_NEAR] = dp.nearDropDb; s[BS_NEARDIP] = dp.nearDipDb; s[BS_LIFT] = dp.liftDb; s[BS_STOPS] = dp.stopCount; s[BS_STOPSEC] = dp.stopS;
-        this.riser.pack(s); this.character.pack(s); s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped;
+        s[BS_SEQ] = this.bigSeq; s[BS_BODY] = h.body; this.drop.pack(s); this.riser.pack(s); this.character.pack(s); s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped;
       }, C_BIG_SEQ);
       if (this.syncWorker) Atomics.notify(ctrl, C_BIG_SEQ);
     }
@@ -605,8 +590,7 @@ export class Analyser {
         this.bigRing = new Float64Array(splitBuf.big); this.bigPcm = new Float32Array(splitBuf.bigPcm); this.bigState = new Float64Array(splitBuf.bigState); this.bands.specRing = new Float32Array(splitBuf.spec);
         if (h.role === 'slow') {
           const sq = Atomics.load(v.ctrl, C_BIG_SEQ); if (sq & 1) Atomics.store(v.ctrl, C_BIG_SEQ, sq + 1);
-          const st = this.bigState; this.bigSeq = st[BS_SEQ]; this.f.drop.dropCount = st[BS_DROPS]; this.f.drop.miniDropCount = st[BS_MINI]; this.f.drop.buildStartCount = st[BS_BUILDSTART]; this.bands.specN = st[BS_SPEC_N]; this.f.drop.dropCand = st[BS_CAND]; this.sections.secVDrops = this.f.drop.dropCand;
-          this.f.drop.dropDemoted = st[BS_DEMOTED]; this.f.drop.dropSpaced = st[BS_SPACED]; this.f.drop.stopCount = st[BS_STOPS];
+          const st = this.bigState; this.bigSeq = st[BS_SEQ]; this.bands.specN = st[BS_SPEC_N]; this.drop.resume(st); this.sections.secVDrops = this.f.drop.dropCand;
         }
       }
     }
@@ -933,7 +917,7 @@ export class Analyser {
   readonly clockOut: ClockCfg = { beat: undefined, beatErr: undefined };
   /** Klockans utfall till motorn. */
   publishClock(cfg: ClockCfg): void { cfg.beat = this.clockOut.beat; cfg.beatErr = this.clockOut.beatErr; }
-  readonly drop = new DropDetector(this);   // DROP: flanken, slam-kandidaten, minidrop, lyft/nästan-drop/stopp
+  readonly drop = new DropDetector(this.f, this.f.drop);   // DROP: flanken, slam-kandidaten, minidrop, lyft/nästan-drop/stopp
   readonly sections = new SectionTracker(this);   // SEKTIONER
   readonly riser = new RiserDetector(this.f, this.f.riser);   // UPPBYGGNAD
   readonly character = new CharacterProfile(this.f, this.f.character);   // KARAKTÄR

@@ -103,3 +103,11 @@ Bara data. De 17 publicerade fälten flyttade ur `Analyser` till `f.section` med
 `expectHighMs`, `levelVsHighDb`, `sectionStartMs`, `secBuildAt`, `secBuildSeen`, `repeatSim`, `repeatAgoMs`. Hissat som `sc` i `process`,
 `fillFrame`, `pushBig` och `pullSlowState`; sektionen och basen skriver/läser `this.a.f.section.x` tills sitt steg. Sektionens privata delar
 (`secAgg`, `secSpecHop`, `secDump`, `dbgSecBlock`) står kvar på `Analyser` till steg 13. Getter: `Analyser.boundaryNov` (`boundaryBench.mjs`).
+
+## Drop efter kontraktet (steg 9)
+
+`DropReads` (hop: `dtHop`, `nowWall`, `body`, `lvlSmooth`, `sec`, `lvh`, `wallNow`; spectrum: `bandDbRaw`; level: `activeMs`; riser: `buildUp`), eget fack `f.drop`.
+`HopOut` fick `wallNow` (analysatorns väggklocka, `makeFack(() => this.wallNow())`): stenarna loggar med den (`[dropfire] wall …`) utan att nå `Analyser`.
+Dropens transport (`pack`/`unpack`/`resume`) ligger i stenen, ordagrant de gamla raderna i `drainBig`, `pushBig` och konstruktorns omstart.
+Rattarna `BODY_RISE_DB`, `BODY_GONE_MIN_MS`, `DROP_QUALITY_DB`, `DROP_RISE_LOW_DB`, `DROP_UNDERPEAK_MIN`, `MINI_SPACING_MS`, `DROP_TRACE` står i `analyserDrop.ts`
+(bara drop läser dem; anteckningarna om dem står kvar i `analyser.md`).

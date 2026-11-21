@@ -46,7 +46,7 @@ export class HopOut {
   kickFlux = 0.5; energy = 0.5; flux = 0.5; level = 0.5; lvlSmooth = 0; centSmooth = 0.5; body = 0.5; breaking = false;
   kickHit = 0;   // trumkittet
   sec = 'intro'; lvh = 0.5; conf = 0.5; bpm = 0.5;   // långsamma värden sedda vid hoppet
-  constructor() { stabilise(this, ['lvlSmooth', 'kickHit']); }
+  constructor(readonly wallNow: () => number) { stabilise(this, ['lvlSmooth', 'kickHit']); }   // wallNow = analysatorns väggklocka
 }
 
 /** NIVÅN. intensity = förr hIntensity, inZone = förr levels.inZoneState. */
@@ -101,7 +101,7 @@ export class CharacterOut { readonly profile = { punch: 0.4, bass: 0.5, bright: 
 
 export interface Fack { hop: HopOut; level: LevelOut; spectrum: SpectrumOut; kick: KickOut; clock: ClockOut;
   section: SectionOut; bass: BassOut; riser: RiserOut; drop: DropOut; character: CharacterOut }
-export function makeFack(): Fack {
-  return { hop: new HopOut(), level: new LevelOut(), spectrum: new SpectrumOut(), kick: new KickOut(), clock: new ClockOut(),
+export function makeFack(wallNow: () => number): Fack {
+  return { hop: new HopOut(wallNow), level: new LevelOut(), spectrum: new SpectrumOut(), kick: new KickOut(), clock: new ClockOut(),
     section: new SectionOut(), bass: new BassOut(), riser: new RiserOut(), drop: new DropOut(), character: new CharacterOut() };
 }
