@@ -25,7 +25,7 @@ import { loadConfig, scheduleSave } from "./persist.js";
 import { Button } from "./button.js";
 import { IntensityKnob } from "./intensityKnob.js";
 import { isMoment, pressMoment } from "./moment.js";
-import { applyIntensity, migrateFromMoods } from "./moods.js";
+import { applyIntensity, migrateFromMoods, maxOnColdBoot } from "./moods.js";
 import { BeatFeed } from "./beatFeed.js";
 import { LongRecord } from "./longRecord.js";
 import { InputMeter } from "./inputMeter.js";
@@ -49,6 +49,7 @@ const MODE_CYCLE: Mode[] = ["smart", ...EFFECT_KEYS];
 
 const cfg = await loadConfig();
 if (migrateFromMoods(cfg)) { scheduleSave(cfg); console.error('[config] stämningarna borttagna 2026-10-11: vredet på max (ljustak 1)'); }
+if (maxOnColdBoot(cfg)) scheduleSave(cfg);   // kallstart -> reglaget på max (moods.ts)
 // BRÖLLOPSLÄGET: starta alltid i fest (ägaren 11-02) - en stund som lämnats på t.ex. 'tal' får inte följa med till nästa uthyrning.
 if (cfg.moment && cfg.moment !== "fest") { cfg.moment = "fest"; scheduleSave(cfg); }
 // Migrate legacy mode names from persisted configs.

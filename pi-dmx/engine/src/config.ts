@@ -62,6 +62,8 @@ export interface EngineConfig {
   mode: Mode;
   /** Vredets/sliderns läge 0..1 = ljustaket (moods.ts applyIntensity; stämningarna borttagna 2026-10-11). */
   activeIntensity?: number;
+  /** Senaste uppstartens boot_id (moods.ts maxOnColdBoot): ny boot_id = kallstart -> reglaget till max. */
+  lastBootId?: string;
   /** Fysiskt vred (KY-040) för stämnings-intensitet. Null = inget vred anslutet. */
   intensityKnob?: { chip: string; clk: number; dt: number; sw?: number } | null;
   /** WS2812B LED-ring runt vredet (Electrokit 12-LED, 40 mm). Kopplas på SPI0 MOSI
