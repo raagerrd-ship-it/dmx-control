@@ -86,7 +86,7 @@ Bara data, som steg 3. Hissade i `analyser.ts` som `bo`, `ri`, `dp`, `cp`; stena
 |---|---|
 | `f.bass` | `beHi`, `beRef`, `beShort` (förr `bass.*`), `bassline` (`profBassline`), `onsetsPerBeat` (`bassOnsetsPerBeat`) |
 | `f.riser` | `buildUp`, `inRiser` (`hInRiser`) |
-| `f.drop` | `dropCount`, `miniDropCount`, `buildStartCount`, `dropCand`, `secBodyRet`, `dropDemoted`, `dropSpaced`, `dropRiseDb`, `nearDropDb`, `nearDipDb`, `liftDb`, `stopCount`, `stopS`, `lastDropMs` (förr `drop.*`), `bodyUnderDb` (förr på `Analyser`) |
+| `f.drop` | `dropCount`, `miniDropCount`, `buildStartCount`, `dropCand`, `secBodyRet`, `dropDemoted`, `dropSpaced`, `nearDropDb`, `nearDipDb`, `liftDb`, `stopCount`, `stopS`, `lastDropMs` (förr `drop.*`), `bodyUnderDb` (förr på `Analyser`) |
 | `f.character` | `profile` (förr `character.outProfile`); ramens `profile` är samma objekt |
 
 `DOUBLE_FROM_START`-namn som flyttade: `bassline`, `onsetsPerBeat` (bas), `buildUp` (uppbyggnad), och ur dropens lista `lastDropMs`, `dropRiseDb`,
@@ -98,7 +98,7 @@ verktyget läser facken (steg 6).
 ## Sektionens fack (steg 5): SectionOut
 
 Bara data. De 17 publicerade fälten flyttade ur `Analyser` till `f.section` med samma namn och dagens startvärden: `section`, `sectionStartMs`,
-`sectionIndex`, `sectionTier`, `prevSection`, `levelVsHighDb`, `repeatSim`, `repeatAgoMs`, `repeatSection`, `repeatTier`, `repeatHighAtMs`,
+`sectionIndex`, `sectionTier`, `prevSection`, `levelVsHighDb`, `repeatSim`, `repeatAgoMs`, `repeatTier`, `repeatHighAtMs`,
 `repeatHighEndAtMs`, `expectHighMs`, `expectSource`, `secBuildAt`, `secBuildSeen`, `boundaryNov`. `DOUBLE_FROM_START`-namnen som flyttade:
 `expectHighMs`, `levelVsHighDb`, `sectionStartMs`, `secBuildAt`, `secBuildSeen`, `repeatSim`, `repeatAgoMs`. Hissat som `sc` i `process`,
 `fillFrame`, `pushBig` och `pullSlowState`; sektionen och basen skriver/läser `this.a.f.section.x` tills sitt steg. Sektionens privata delar
@@ -337,3 +337,11 @@ Bara ramens (`Frame`) namn; fackens fält heter som förut, där visar facket re
 som förut (de är inte ramen). Inspelningarnas format är oförändrat: `longRecord` skriver kolumnen `breaking`, inspelarens flaggor är positionella.
 Proven mot äldre byggen döper om referensens toppfält med `tools/refaktor/namnkarta.mjs` (`analyserParity.mjs`, därmed `fakenow.mjs`, och `omstart.mjs`);
 verktyg som kan köra äldre byggen läser det nya namnet med det gamla som reserv.
+
+## Tre döda ramfält bort (steg 24, ägaren 11-22: "Om det är gammalt för test så ta bort")
+
+`levelRaw` (nivå), `dropRiseDb` (drop), `repeatSection` (sektion): ingen läste dem (varken ljuset, UI:t, servern eller lotus), bara proven.
+Borta ur `Frame`, startramen och `fillFrame`. Räkningen som bara fanns för dem är också borta: dropens `dropRiseDb` (fack, tagg `UT`, `stabilise`,
+långsamma tillståndets plats), sektionens `repeatSection` (fack, tagg `UT`, plats) med etikettlistorna `secFpLab`/`secFp2Lab` och `bestLab`, och
+`repeatSection` i korbank-kroken `dbgSecBlock`. Nivåns `level.level` står kvar (VU-mätaren och spektrumet läser den). Proven hoppar över fälten
+när referensen har dem (`BORT` i `tools/refaktor/namnkarta.mjs`), och `flyttkarta.json` har tappat de två fackfälten.

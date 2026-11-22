@@ -178,7 +178,7 @@ På raden: 2026-10-17: typad scratch, sorteras på plats (var number[] + sort((a
  (slutlaget: bada Pi-systemen kor allt i realtid). Bygger pa intensity (niva relativt latens robusta baslinje),
  buildUp/breaking/drop-detektorn och en 1 s-blockstatistik. Tier (lag/mellan/hog) med 3 s hysteres; trend = skillnad
  mot 8 s tidigare. Upprepning: ett klangavtryck per 4 s (8 band normerade + centroid + kicktathet + intensitet, L2)
- jamfors med alla avtryck >= 16 s tillbaka (max 96 = 6,4 min); bast cosinus -> repeatSim/repeatAgoMs/repeatSection.
+ jamfors med alla avtryck >= 16 s tillbaka (max 96 = 6,4 min); bast cosinus -> repeatSim/repeatAgoMs (repeatSection, avtryckets etikett, borttaget steg 24).
  Kostnad: nagra adds per hop, ~100 punktprodukter a 11 var fjarde sekund. Referens for bansken: all-in-one pa hela latar.
  Sektionens drop-evidens: levande i roll 'all'/'fast'; i workern med stora vägen värdet vid förra env-recordet (som R_DROPS förr).
 ```

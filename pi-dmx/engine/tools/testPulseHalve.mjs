@@ -5,7 +5,7 @@ const { EffectEngine } = await import("../dist/effects.js");
 const { defaultConfig } = await import("../dist/config.js");
 
 const frame = {
-  level: 0.6, levelRaw: 0.6, levelVU: 0.6, energy: 0.5, centroid: 0.4, flux: 0.1,
+  level: 0.6, levelVU: 0.6, energy: 0.5, centroid: 0.4, flux: 0.1,
   kick: false, gain: 1, bpm: 0, bpmConfidence: 0.9, intensity: 0.5,
   dropCount: 0, levelInZone: false, levelBreaking: false, buildUp: 0, inRiser: false,
   punch: 0.5, glide: 0.5, warmth: 0.5, busy: 0.5,

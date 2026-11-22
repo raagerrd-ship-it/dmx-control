@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { NAMN } from './namnkarta.mjs';
+import { NAMN, BORT } from './namnkarta.mjs';
 const [RA, RB, ...rest] = process.argv.slice(2);
 const SECS = /^\d+$/.test(rest[0]) ? Number(rest.shift()) : 700, wavs = rest;
 const SR = 48000, HOP = 128, EPOCH = 1.7e12, EVERY = 60 * SR / HOP, HINT = 97 * SR / HOP, RESET = 211 * SR / HOP;
@@ -23,7 +23,7 @@ const build = (m) => {
   fast.setInlinePeer(new m.Analyser(acfg, { role: 'slow', split: buffers }));
   return { m, fast, cfg, acfg, buffers };
 };
-const flat = (f, out = {}, pre = '') => { for (const k of Object.keys(f)) { const v = f[k]; if (v && typeof v === 'object') flat(v, out, pre + k + '.'); else out[pre + (pre ? k : NAMN.get(k) ?? k)] = v; } return out; };
+const flat = (f, out = {}, pre = '') => { for (const k of Object.keys(f)) { const v = f[k]; if (!pre && BORT.has(k)) continue; if (v && typeof v === 'object') flat(v, out, pre + k + '.'); else out[pre + (pre ? k : NAMN.get(k) ?? k)] = v; } return out; };
 let side = 0; const logs = [[], []]; const log = console.log; console.log = (...a) => logs[side].push(a.join(' '));
 let tillat = 0, tot = 0, totBad = 0, totDown = 0, restarts = 0, logBad = 0;
 for (const w of wavs) {

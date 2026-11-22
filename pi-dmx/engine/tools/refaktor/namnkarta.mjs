@@ -3,3 +3,5 @@ export const NAMN = new Map([
   ['beatAnchorMs', 'kickAnchorMs'], ['buildStartCount', 'dropBuildCount'], ['buildProg', 'sectionBuildProg'],
   ['levelVsHighDb', 'sectionLevelVsHighDb'], ['inZone', 'levelInZone'], ['breaking', 'levelBreaking'],
 ]);
+// Ramfält som togs bort (steg 24, ägaren 11-22: "Om det är gammalt för test så ta bort"): proven hoppar över dem när referensen har dem.
+export const BORT = new Set(['levelRaw', 'dropRiseDb', 'repeatSection']);

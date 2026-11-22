@@ -17,7 +17,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { NAMN } from './refaktor/namnkarta.mjs';
+import { NAMN, BORT } from './refaktor/namnkarta.mjs';
 
 const argv = process.argv.slice(2);
 const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
@@ -72,6 +72,7 @@ function make(mod) {
 function flat(f, out, pre = '') {
   for (const k of Object.keys(f)) {
     const v = f[k];
+    if (!pre && BORT.has(k)) continue;   // borttagna fält (steg 24)
     if (v && typeof v === 'object') flat(v, out, pre + k + '.');
     else out[pre + (pre ? k : NAMN.get(k) ?? k)] = v;   // referensens gamla namn -> nya (steg 23)
   }

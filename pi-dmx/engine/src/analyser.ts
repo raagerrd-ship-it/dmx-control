@@ -80,7 +80,6 @@ export function silentLevel(level: number): boolean { return level <= silenceLev
 export interface Frame {
   silent: boolean;   // TYSTNAD
   level: number;   // 0..1, auto-gained RMS
-  levelRaw: number;   // 0..1, samma auto-gain men OSMOOTHAT
   levelVU: number;   // 0..1, ~200ms symmetriskt smoothat PÅ HOP-TAKT
   energy: number;   // 0..1, bass-band spectral energy
 
@@ -94,7 +93,7 @@ export interface Frame {
   dropCount: number;   // DROP-DETEKTION
   miniDropCount: number;   // MINIDROP
   dropBuildCount: number;   // UPPBYGGNAD: stiger när en uppbyggnad börjar (basen dras ur, högst var 3:e s)
-  dropDemoted: number; dropSpaced: number; dropRiseDb: number;   // EN DROPDETEKTOR
+  dropDemoted: number; dropSpaced: number;   // EN DROPDETEKTOR
   nearDropDb: number; nearDipDb: number; liftDb: number; stopCount: number; stopS: number;   // LYFT/NÄSTAN-DROP/STOPP
   levelInZone: boolean;   // nivån är i låtens topp-zon
   levelBreaking: boolean;   // nivån är i en svacka/break
@@ -112,7 +111,7 @@ export interface Frame {
   sectionAgeMs: number;   // ms sedan sektionen borjade
   sectionIndex: number;   // antal 'high'-partier hittills i laten
   sectionTier: number;   // 0 lag / 1 mellan / 2 hog
-  repeatSim: number; repeatAgoMs: number; repeatSection: string;   // UPPREPNING
+  repeatSim: number; repeatAgoMs: number;   // UPPREPNING
   expectHighInMs: number; prevSection: string; sectionLevelVsHighDb: number; sectionBars: number;   // SEKTIONSMINNE + FORUTSAGELSE
   spec: Spectrum;   // Rikt spektrum + per-band onset
   specAbs: Spectrum;   // Absolut per-band magnitud före AGC, för Lotus ljusväg och bandandelar
@@ -582,10 +581,10 @@ export class Analyser {
     this.riser?.rates(dtHop);
     this.character?.rates(dtHop);
     this.outFrame = {
-      silent: true, level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
+      silent: true, level: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
-      dropCount: 0, miniDropCount: 0, dropBuildCount: 0, dropDemoted: 0, dropSpaced: 0, dropRiseDb: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, bodyDb: 0, bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1, midHiDb: -120, levelInZone: false, levelBreaking: false, buildUp: 0, sectionBuildProg: 0, inRiser: false, profile: this.f.character.profile, kickAnchorMs: 0,
-      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', sectionLevelVsHighDb: 0, sectionBars: 0,
+      dropCount: 0, miniDropCount: 0, dropBuildCount: 0, dropDemoted: 0, dropSpaced: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, bodyDb: 0, bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1, midHiDb: -120, levelInZone: false, levelBreaking: false, buildUp: 0, sectionBuildProg: 0, inRiser: false, profile: this.f.character.profile, kickAnchorMs: 0,
+      kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, expectHighInMs: -1, prevSection: '', sectionLevelVsHighDb: 0, sectionBars: 0,
       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum, stenarAv: stenarAv(this.f),
     };
     for (const o of [this.outFrame, this.f.character.profile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum]) stabiliseNumbers(o);
@@ -768,7 +767,7 @@ export class Analyser {
     const sc = this.f.section;
     const bo = this.f.bass, ri = this.f.riser, dp = this.f.drop;
     const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock;
-    const level = lv.level, fluxNorm = h.flux, kick = kk.kick, intensity = lv.intensity, bodyNow = h.body, inZone = lv.inZone, breaking = h.breaking,
+    const fluxNorm = h.flux, kick = kk.kick, intensity = lv.intensity, bodyNow = h.body, inZone = lv.inZone, breaking = h.breaking,
       inRiser = ri.inRiser, kickAtMs = kk.kickAt;
     const L = this.bands.fbLvl, A = this.bands.fbAbs, O = sp.fbOn;
     const spec = this.outSpec, specAbs = this.outSpecAbs, onset = this.outOnset;
@@ -779,13 +778,13 @@ export class Analyser {
     dr.kick = h.kickHit; dr.snare = this.snareHit; dr.hat = this.hatHit; dr.bass = L[2];
 
     const f = this.outFrame;
-    f.silent = lv.lvlSmooth <= this.silenceLevel; f.level = lv.lvlSmooth; f.levelRaw = level; f.levelVU = this.lvlVU;
+    f.silent = lv.lvlSmooth <= this.silenceLevel; f.level = lv.lvlSmooth; f.levelVU = this.lvlVU;
     f.energy = this.engSmooth;
     f.centroid = h.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = lv.gain;
     f.bpm = ck.bpm; f.bpmConfidence = ck.conf; f.intensity = intensity; f.kickAnchorMs = kk.beatAnchorMs;
     f.bodyDb = bodyNow; f.bassEnergy = f.silent ? 0 : bo.energy; f.bassEnergyShort = f.silent ? 0 : bo.beShort; f.bassLevel = Math.pow(10, (bo.beHi - bo.beRef) / 20);
     { let s2 = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, this.bands.fbDbRaw[b] / 20); s2 += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s2)); }
-    f.dropCount = dp.dropCount; f.miniDropCount = dp.miniDropCount; f.dropBuildCount = dp.buildStartCount; f.dropDemoted = dp.dropDemoted; f.dropSpaced = dp.dropSpaced; f.dropRiseDb = dp.dropRiseDb;
+    f.dropCount = dp.dropCount; f.miniDropCount = dp.miniDropCount; f.dropBuildCount = dp.buildStartCount; f.dropDemoted = dp.dropDemoted; f.dropSpaced = dp.dropSpaced;
     f.nearDropDb = dp.nearDropDb; f.nearDipDb = dp.nearDipDb; f.liftDb = dp.liftDb; f.stopCount = dp.stopCount; f.stopS = dp.stopS; f.levelInZone = inZone; f.levelBreaking = breaking; f.buildUp = ri.buildUp; f.inRiser = inRiser;
     f.kickAtMs = kickAtMs; f.barShift = -1;
     f.beatPhaseMs = ck.phaseMs > 0 ? ck.phaseMs - Analyser.GRID_PHASE_OFFSET_MS : ck.phaseMs;
@@ -794,7 +793,7 @@ export class Analyser {
     const nowS = this.wallNow();
     f.sectionBuildProg = sc.secBuildAt > 0 && nowS - sc.secBuildSeen <= 2000 ? Math.min(1, (nowS - sc.secBuildAt) / (32 * (ck.bpm > 0 ? 60000 / ck.bpm : Analyser.BE_FALLBACK_MS))) : 0;
     f.section = sc.section; f.sectionAgeMs = sc.sectionStartMs > 0 ? nowS - sc.sectionStartMs : 0; f.sectionIndex = sc.sectionIndex; f.sectionTier = sc.sectionTier;
-    f.repeatSim = sc.repeatSim; f.repeatAgoMs = sc.repeatAgoMs; f.repeatSection = sc.repeatSection;
+    f.repeatSim = sc.repeatSim; f.repeatAgoMs = sc.repeatAgoMs;
     f.expectHighInMs = sc.section === 'high' ? 0 : sc.expectHighMs > 0 ? Math.max(0, sc.expectHighMs - nowS) : -1;
     f.prevSection = sc.prevSection; f.sectionLevelVsHighDb = sc.levelVsHighDb;
     f.sectionBars = ck.bpm > 0 && sc.sectionStartMs > 0 ? (nowS - sc.sectionStartMs) / (240000 / ck.bpm) : 0;

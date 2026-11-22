@@ -230,9 +230,9 @@ På raden: ~10–16 kHz  — luft/glitter
 På raden: 0..1, auto-gained RMS (15ms attack / 400ms release smoothed)
 
 
-### levelRaw
+### levelRaw (borttaget steg 24)
 
-På raden: 0..1, samma auto-gain men OSMOOTHAT (rå per-hop)
+Var: 0..1, samma auto-gain men OSMOOTHAT (rå per-hop). Ingen läste ramfältet; nivåns `level.level` finns kvar (VU, spektrum).
 
 
 ### levelVU
@@ -310,7 +310,7 @@ På raden: monoton räknare — +1 per drop
 ```text
  EN DROPDETEKTOR (a3, 11-09: förr effects.ts flankStep bredvid dropStep). dropCount = full drop på FLANKEN (break + smäll, efter
  spärren SHOW_DROP_GAP_MS). Detektorns lägre steg är minidrops: dropDemoted = slam-kandidat utan egen flank (inom 2 s),
- dropSpaced = flank inom spärren. Båda räknas också i miniDropCount. dropRiseDb = senaste flankens stigning (styrka).
+ dropSpaced = flank inom spärren. Båda räknas också i miniDropCount. (dropRiseDb = senaste flankens stigning: borttaget steg 24, ingen läste det.)
 ```
 
 ### nearDropDb
