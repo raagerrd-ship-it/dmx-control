@@ -675,18 +675,16 @@ export class Analyser {
     const now = this.perfNow();
     const dt = this.lastT === 0 ? 0 : Math.max(0, Math.min(0.1, (now - this.lastT) / 1000));
     this.lastT = now;
-    const d = h.cfg.detection;
     h.rms = rms; h.now = now; h.dt = dt;
     h.gated = rms >= h.cfg.detection.noiseFloor * 1.5;
-    if (!lv.gainLocked && rms > d.noiseFloor) this.levels.agcStep();
+    this.levels.rawStep();
 
     const level = Math.min(1, rms * lv.gain);
 
     h.kickFlux = kickFlux; h.energy = energy;
-    this.kicks?.kickStep();
+    this.kicks?.hopStep();
 
     const hopMs = h.hopMs;
-    this.levels.silenceStep();
 
     this.envAccum = Math.max(this.envAccum, fluxNorm);
     const bassFluxNorm = Math.min(1, kickFlux * (h.cfg.onset.enhancements ? 0.5 : 0.02));
@@ -696,7 +694,6 @@ export class Analyser {
     if (HIGH_ON) { const hi = sp.bandOn[6] > sp.bandOn[7] ? sp.bandOn[6] : sp.bandOn[7]; if (hi > this.envHighAccum) this.envHighAccum = hi; }
     this.envAccumT += hopMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) this.envSampleStep();
-    this.kicks?.anchorStep();
 
     const dtHop = h.dtHop;
     const aAtt = this.aAtt;
@@ -706,7 +703,7 @@ export class Analyser {
     this.engSmooth = ema(this.engSmooth, energy, aAtt, aRel);
     h.centSmooth = ema(h.centSmooth, centroid, aAtt, aRel);
 
-    this.levels.intensityStep();
+    this.levels.smoothStep();
 
     if (!big) {
     this.bands.bigRingPush(samples);
@@ -720,7 +717,6 @@ export class Analyser {
     if (kk.kick) h.kickHit = 1;
     else h.kickHit = h.kickHit * this.dKick;
     const nowWallA = this.wallNow();
-    this.levels.zoneStep();
     const breaking = h.lvlSmooth < lv.levelCeil * 0.65;
 
     h.nowWall = nowWallA; h.sec = sc.section; h.lvh = sc.levelVsHighDb; h.conf = ck.conf;   // IN: färdiga före pushBig

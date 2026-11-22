@@ -71,6 +71,14 @@ Vid `if (this.agcBlocksFilled < 2) return 0;`:
 Näst största över de fyllda blocken (16 tal → linjär skanning är billigast).
 ```
 
+### rawStep() och smoothStep() (steg 20)
+
+```text
+ rawStep: hoppets början ur rå rms, AGC (om olåst och över brusgolvet) och sedan tystnadsflanken.
+ smoothStep: efter kärnans utjämning ur lvlSmooth, intensiteten och sedan nivåtaket (zoneStep).
+```
+Varför två anrop och inte ett: se `analyserFack.md`, "Ett anrop per sten (steg 20)".
+
 ### agcStep()
 
 ```text

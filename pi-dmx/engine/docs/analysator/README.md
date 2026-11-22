@@ -14,8 +14,8 @@ ruta för ruta. Koden har bara korta etiketter; allt som stod i kommentarerna li
 | `analyserDrop.ts` | `DropDetector`, `drop` | DROP: flanken, slam-kandidaten, minidrop, lyft/nästan-drop/stopp | `dropStep` | 208 |
 | `analyserSection.ts` | `SectionTracker`, `sections` | sektioner: block, rang, upprepning, förutsägelse | `sectionHop`, `sectionAggStep` | 357 |
 | `analyserSpectrum.ts` | `SpectrumBands`, `bands` | snabba banden per hopp, stor-FFT:ns band, flöde, onsets | `fastBandStep`, `bigStep` | 174 |
-| `analyserLevel.ts` | `LevelTracker`, `levels` | nivå: AGC, tystnad, intensitet, nivåtak och topp-zon | `agcStep`, `silenceStep`, `intensityStep`, `zoneStep` | 113 |
-| `analyserKick.ts` | `KickDetector`, `kicks` | anslag i snabba vägen och kickens förfining | `kickStep`, `kickRefine` | 84 |
+| `analyserLevel.ts` | `LevelTracker`, `levels` | nivå: AGC, tystnad, intensitet, nivåtak och topp-zon | `rawStep`, `smoothStep`, `zoneStep` (workern) | 118 |
+| `analyserKick.ts` | `KickDetector`, `kicks` | anslag i snabba vägen och kickens förfining | `hopStep` | 106 |
 | `analyserRiser.ts` | `RiserDetector`, `riser` | uppbyggnad: riser och buildUp (låg prio, ägaren 11-14) | `riserStep` | 48 |
 | `analyserBass.ts` | `BassTracker`, `bass` | basenergin per slag, basgången | `bassEnergyStep`, `stepBassline` | 49 |
 | `analyserCharacter.ts` | `CharacterProfile`, `character` | låtens långsamma karaktärsprofil | `profileStep` | 37 |

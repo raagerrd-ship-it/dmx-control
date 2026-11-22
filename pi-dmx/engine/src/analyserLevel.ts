@@ -56,8 +56,16 @@ export class LevelTracker {
     return second;
   }
 
+  /** Hoppets början, ur rå rms: AGC (bara mic, över brusgolvet) och tystnadsflanken. */
+  rawStep(): void {
+    if (!this.o.gainLocked && this.h.rms > this.h.cfg.detection.noiseFloor) this.agcStep();
+    this.silenceStep();
+  }
+  /** Efter utjämningen, ur lvlSmooth: intensiteten och nivåtaket. */
+  smoothStep(): void { this.intensityStep(); this.zoneStep(); }
+
   /** AGC (bara mic). */
-  agcStep(): void {
+  private agcStep(): void {
     const rms = this.h.rms, now = this.h.now, dt = this.h.dt;
     const d = this.h.cfg.detection;
       const env = this.agcEnvelope(rms, now);
@@ -73,7 +81,7 @@ export class LevelTracker {
   }
 
   /** Tystnadsflanken. */
-  silenceStep(): void {
+  private silenceStep(): void {
     const hopMs = this.h.hopMs;
     if (!this.h.gated) {
       this.o.silentMs += hopMs;
@@ -91,7 +99,7 @@ export class LevelTracker {
   }
 
   /** Sektionsenergi 0..1. */
-  intensityStep(): void {
+  private intensityStep(): void {
     const dtHop = this.h.dtHop;
     if (this.h.gated) this.o.activeMs += dtHop * 1000;
     else this.o.activeMs = 0;

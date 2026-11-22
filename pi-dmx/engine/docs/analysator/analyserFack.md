@@ -279,3 +279,20 @@ hittade fel just där. Nu gäller:
 - `slowWorker.ts`: en vänteslinga (den utan stora vägen är borta).
 - Profilraderna `SECTION_AGG` och `FAST_BANDS` saknar läsare (står kvar, som `SIL_CLEAR_PENDING`). `DMX_SECTION_AGG=env`/`DMX_FAST_BANDS=0` gör inget längre;
   röktestet med dem utgår.
+
+## Ett anrop per sten (steg 20)
+
+Kicken: `kicks.hopStep()` = `kickStep()` + `anchorStep()`, där `kickStep` stod. `anchorStep` flyttade förbi `silenceStep`, env-ackumuleringen, basens
+`accumulate` (odelat) och `envSampleStep` (med `pushSlowRecord`, som inline/sync kör workern och `pullSlowState`: skriver `clock.phaseMs`/`phaseConf` och sektionen).
+Ankaret läser `kick`, `pendingKickMs`, `kfPrev`/`kfPrev2`, `hop.kickFlux`, `hop.hopMs`, `wallNow`; inget av det skrivs däremellan, och ingen läser ankarets fält
+däremellan (recordet packar bara klockan). `wallNow` är samma hopp: i proven samma virtuella tid, live några µs tidigare, aldrig ett hopp senare.
+
+Nivån: två anrop, `levels.rawStep()` (AGC om olåst och över brusgolvet, sedan tystnaden) där AGC:n stod, `levels.smoothStep()` (intensiteten, sedan nivåtaket)
+där intensiteten stod. Tystnaden flyttade förbi `level = rms * gain` och `kicks.hopStep()` (läser inte `silentMs`; zeroBpm skriver `clock.bpm`, kicken läser `clock.src`)
+och står kvar före `envSampleStep` (flaggan F_SIL350/F_SIL10 hamnar i samma hopps record, `zeroBpm` före `h.bpm = ck.bpm`). `zoneStep` flyttade förbi
+stora ringen (odelat), `fastBandStep`, trumkittet och `wallNow`: inget av dem läser `levelCeil`/`inZone` (spektrumet läser bara `activeMs`), och `lvlSmooth`/`dtHop`
+ändras inte efter utjämningen. `agcStep`, `silenceStep`, `intensityStep`, `kickStep`, `anchorStep` är privata; `zoneStep` är kvar publik (workern, `drainBig`).
+
+Det som stoppar ett enda nivåanrop: `const level = Math.min(1, rms * lv.gain)` (`process`, rad 682) läser `level.gain` som AGC:n just skrev, och
+`h.lvlSmooth = ema(h.lvlSmooth, level, aAtt, aRel)` (rad 701) är det `intensityStep` och `zoneStep` läser. AGC:n måste alltså före och intensitet/tak efter
+kärnans två rader. Ett anrop kräver att utjämningen av `lvlSmooth` (hoppfackets fält, `IN` till workern) flyttar in i nivå-stenen: ett ägarbyte, inte en omflyttning.

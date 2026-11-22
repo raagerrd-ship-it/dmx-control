@@ -70,6 +70,12 @@ På raden: false på första framen (skräp-flux) → ingen falsk kick
  kick i 170 ms, och grinden forkastade slagets kick nar gridet lag fel. K 3,0-3,5 gav inget (0,53/0,85).
 ```
 
+### hopStep() (steg 20)
+
+```text
+ Hoppets enda anrop: kickStep, sedan anchorStep (båda privata).
+```
+
 ### kickStep()
 
 ```text
