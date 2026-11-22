@@ -23,5 +23,5 @@
   "section": "f.section.section", "sectionStartMs": "f.section.sectionStartMs", "sectionIndex": "f.section.sectionIndex", "sectionTier": "f.section.sectionTier", "prevSection": "f.section.prevSection", "levelVsHighDb": "f.section.levelVsHighDb", "repeatSim": "f.section.repeatSim", "repeatAgoMs": "f.section.repeatAgoMs", "repeatSection": "f.section.repeatSection",
   "repeatTier": "f.section.repeatTier", "repeatHighAtMs": "f.section.repeatHighAtMs", "repeatHighEndAtMs": "f.section.repeatHighEndAtMs", "expectHighMs": "f.section.expectHighMs", "expectSource": "f.section.expectSource", "secBuildAt": "f.section.secBuildAt", "secBuildSeen": "f.section.secBuildSeen", "boundaryNov": "f.section.boundaryNov",
   "blAccum": "bass.blAccum", "blKickSeq": "bass.blKickSeq",
-  "hInZone": "f.level.inZone"
+  "hInZone": "f.level.inZone", "bigCounter": "bands.bigCounter"
 }

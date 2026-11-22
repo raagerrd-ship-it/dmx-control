@@ -61,6 +61,7 @@ export class SectionTracker {
   secBlkFeat: Float32Array[] = [];secBlkHi: number[] = []; private secPct = 0;   // KLANGMALL
   private repeatHighRun = 0; private secHighRunMs = 0;
   shIn = { hops: 0.5, intSum: 0.5, kicks: 0.5, breaking: false, nowMs: 0.5, dtMs: 0.5, rms2Sum: 0.5, centSum: 0.5, specOff: 0.5, bonSum: 0.5, bpk: 0.5, fluxSum: 0.5, rms4Sum: 0.5 };   // sectionHop:s summor
+  specSeen = -1; bpkSeen = 0;   // senast sedda bigN/bassOnPeaks; -1 = smutsigt från start
   secVDrops = 0;   // slow + stora vägen
   private static readonly SECTION_EARLY_S = 45;   // TIDIG REFRANG KRAVER NIVA
 
@@ -340,7 +341,7 @@ export class SectionTracker {
       if (this.a.f.hop.bigOn) return;
       if (SECTION_AGG_HOP) {
         const sp = this.a.secSpecHop;
-        if (this.a.secSpecDirty) { this.a.secSpecDirty = false; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.a.f.spectrum.bandDbRaw[i] / 20); }
+        if (this.a.f.spectrum.bigN !== this.specSeen) { this.specSeen = this.a.f.spectrum.bigN; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.a.f.spectrum.bandDbRaw[i] / 20); }
         if (this.a.f.hop.role === 'fast') {
           const g = this.a.secAgg; g.n++; g.int += intensity; if (kick) g.kicks++; g.rms2 += rms * rms; g.cent += this.a.f.hop.centSmooth; g.dt += this.a.f.hop.dtHop * 1000;
           g.breaking = breaking ? 1 : 0; g.wall = this.a.wallNow(); g.drops = this.a.f.drop.dropCand + this.a.f.drop.secBodyRet; g.active = this.a.f.level.activeMs; g.build = this.a.f.riser.buildUp;
@@ -350,7 +351,7 @@ export class SectionTracker {
       } else {
         const g = this.a.secAgg; g.n++; g.int += intensity; if (kick) g.kicks++; if (breaking) g.breaking = 1; g.rms2 += rms * rms; g.cent += this.a.f.hop.centSmooth; g.dt += dtHop * 1000; g.wall = nowWallA;
         for (let i = 0; i < 8; i++) g.spec[i] += this.a.f.spectrum.bandAbs[i];
-        g.bon += this.a.f.spectrum.bassOnRing[(this.a.f.spectrum.bassOnN - 1 + Analyser.BASSON_LEN) % Analyser.BASSON_LEN]; if (this.a.bassOnPeak) { g.bpk++; this.a.bassOnPeak = false; } g.flux += fluxNorm; g.rms4 += rms * rms * rms * rms;
+        g.bon += this.a.f.spectrum.bassOnRing[(this.a.f.spectrum.bassOnN - 1 + Analyser.BASSON_LEN) % Analyser.BASSON_LEN]; if (this.a.f.spectrum.bassOnPeaks !== this.bpkSeen) { g.bpk++; this.bpkSeen = this.a.f.spectrum.bassOnPeaks; } g.flux += fluxNorm; g.rms4 += rms * rms * rms * rms;
       }
   }
 }

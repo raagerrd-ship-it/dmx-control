@@ -129,3 +129,13 @@ samma plats och ordning som förut. `dbgRms` borta: kicken läser `f.hop.rms` (s
 (Analysers `cmd = { flagSlow }`, bundet en gång). Tystnad 10 s nollar tempot med kommandot `f.clock.zeroBpm()` (ny metod i `ClockOut`), likaså `F_SIL10` i workern.
 Kärnans kopior borta: `lv.intensity = intensity` (två rader i `process`, samma värde som `intensityStep` skrev) och `hInZone` (ramen läser `f.level.inZone`;
 ingen skriver fältet mellan `zoneStep` och ramen i samma instans).
+
+## Spektrumet efter kontraktet (steg 12)
+
+`SpectrumReads` (hop: `lvlSmooth`, `gated`, `cfg`, `bigOn`; level: `activeMs`), eget fack `f.spectrum`. `bigCounter` är stenens privata fält:
+`bands.bigTick()` (`if (++bigCounter >= BIG_EVERY) bigStep()`) står på kärnans två gamla platser (`process` utan `bigOn`, `drainBig`).
+`PEAK_DECAY` är modulkonstant i stenen (förr statisk på `Analyser`; bara spektrumet läser den). Omstarten läser `specN` med `bands.resume(st)`.
+Flaggorna blev räknare i `SpectrumOut`: `bigN` (ett steg per stor-FFT, sist i `bigStep`; förr `secSpecDirty = true` per band) och `bassOnPeaks`
+(förr `bassOnPeak = true`). Läsaren minns senast sedda: `sections.specSeen` (start −1 = smutsigt, som förr `secSpecDirty = true`) och `sections.bpkSeen`
+(start 0, som förr `false`). Smutsigt ⇔ `bigN !== specSeen`; flera toppar mellan två läsningar ger ett `bpk`, som förr. `specSeen` läses också av kärnans
+`bigAgg` (samma fält, som förr den delade flaggan) tills sektionens steg flyttar `bigAgg` in i stenen.

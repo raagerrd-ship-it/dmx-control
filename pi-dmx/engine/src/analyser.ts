@@ -164,9 +164,7 @@ export class Analyser {
   static readonly BE_SPAN_DB = BASS_SPAN_DB; static readonly BE_MEM_BEATS = BE_MEM_BEATS;
   static readonly BE_FALLBACK_MS = BE_FALLBACK_MS;
 
-  bigCounter = 0;   // decimering av 2048-FFT:n
   static readonly BIG_EVERY = BIG_EVERY;
-  static readonly PEAK_DECAY = Math.pow(0.9993, Analyser.BIG_EVERY);   // bandPeak-decay per stor-FFT
   private static readonly FAST_BANDS = sysEnv('FAST_BANDS') === '1';   // SNABBA BANDEN FÖR LJUSET
   private static readonly FB_TAU_MS = [12, 6, 3];
    private fbMax = 0;   // Valfri avlyssnare på den stora magnituden
@@ -184,7 +182,7 @@ export class Analyser {
   private static readonly SECTION_CARRY = numEnv('SECTION_CARRY', 0);   // SEKTION
 
   static readonly RANK_WIN = numEnv('SECTION_WIN', 4);   // RANG-RATTAR
-  static readonly BASSON_LEN = BASSON_LEN;     bassOnPeak = false;
+  static readonly BASSON_LEN = BASSON_LEN;
      static readonly RANK_RUN = numEnv('SECTION_RUN', 3);
   static readonly RANK_RUN_IN = numEnv('SECTION_RUN_IN', 0);   // SNABB ATTACK
   static readonly BODY_HIGH_MS = BODY_HIGH_MS;   // BASEN TILLBAKA
@@ -216,7 +214,6 @@ export class Analyser {
   private bigRing: Float64Array | null = null; private bigPcm: Float32Array | null = null; private bigState: Float64Array | null = null;   private bigSeq = 0; private bigCopy = new Float64Array(BIG_STATE_LEN); private bigRd = new StateReader();  private specDelivered = 0;  private bigSkipped = 0;
   private bigEnvFlag = 0; private bigEnvBpm = 0.5;
   bigYield: (() => void) | null = null;   // PI:NS VERKLIGHET
-  secSpecDirty = true;
   private slowBusyEmaUs = 0; private slowBusyMaxUs = 0; private slowLagMaxMs = 0; private slowSkipped = 0; private slowProcessed = 0;
   static readonly SECTION_EARLY_DB = Number(sysEnv('SECTION_EARLY_DB')) || 3;
   dbgBestLag = 0; dbgLagMin = 0; dbgLagMax = 0; dbgTgAt = (lag: number): number => this.tempoGram[lag] ?? 0;
@@ -414,7 +411,7 @@ export class Analyser {
       this.levels.zoneStep();
       const wall = r[o + B_WALL];
       { const po = slot * BIG_HOP_MAX; this.bands.bigRingPush(pcm.subarray(po, po + hn)); }
-      if (++this.bigCounter >= Analyser.BIG_EVERY) this.bands.bigStep();
+      this.bands.bigTick();
       h.nowWall = wall; h.body = (sp.bandDbRaw[0] + sp.bandDbRaw[1] + sp.bandDbRaw[2]) / 3;
       h.sec = SECTIONS[r[o + B_SEC]]; h.lvh = r[o + B_LVH];
       this.drop.dropStep();
@@ -443,7 +440,7 @@ export class Analyser {
     const lv = this.f.level;
     const rms = h.rms;
     const sp = this.secSpecHop;
-    if (this.secSpecDirty) { this.secSpecDirty = false; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.f.spectrum.bandDbRaw[i] / 20); }
+    if (this.f.spectrum.bigN !== this.sections.specSeen) { this.sections.specSeen = this.f.spectrum.bigN; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.f.spectrum.bandDbRaw[i] / 20); }
     const g = this.secAgg; g.n++; g.int += intensity; if (kick) g.kicks++; g.rms2 += rms * rms; g.cent += h.centSmooth; g.dt += h.dtHop * 1000;
     g.breaking = breaking ? 1 : 0; g.wall = wall; g.drops = dp.dropCand + dp.secBodyRet; g.active = lv.activeMs; g.build = ri.buildUp;
     for (let i = 0; i < 8; i++) g.spec[i] += sp[i];
@@ -583,7 +580,7 @@ export class Analyser {
         this.bigRing = new Float64Array(splitBuf.big); this.bigPcm = new Float32Array(splitBuf.bigPcm); this.bigState = new Float64Array(splitBuf.bigState); this.bands.specRing = new Float32Array(splitBuf.spec);
         if (h.role === 'slow') {
           const sq = Atomics.load(v.ctrl, C_BIG_SEQ); if (sq & 1) Atomics.store(v.ctrl, C_BIG_SEQ, sq + 1);
-          const st = this.bigState; this.bigSeq = st[BS_SEQ]; this.bands.specN = st[BS_SPEC_N]; this.drop.resume(st); this.sections.secVDrops = this.f.drop.dropCand;
+          const st = this.bigState; this.bigSeq = st[BS_SEQ]; this.bands.resume(st); this.drop.resume(st); this.sections.secVDrops = this.f.drop.dropCand;
         }
       }
     }
@@ -792,7 +789,7 @@ export class Analyser {
 
     if (!big) {
     this.bands.bigRingPush(samples);
-    if (++this.bigCounter >= Analyser.BIG_EVERY) this.bands.bigStep();
+    this.bands.bigTick();
     }
     if (Analyser.FAST_BANDS) this.bands.fastBandStep(samples);
     const ON = Analyser.FAST_BANDS ? sp.fbOn : sp.bandOn;
@@ -905,7 +902,7 @@ export class Analyser {
   readonly bass = new BassTracker(this.f, this.f.bass);   // BAS: basenergin per slag och basgången
   private readonly cmd = { flagSlow: (fl: number) => this.flagSlow(fl) };   // bunden en gång: nivån flaggar tystnad till workern
   readonly levels = new LevelTracker(this.f, this.f.level, this.cmd);   // NIVÅ: förstärkning/AGC, tystnad, intensitet, nivåtak och topp-zon
-  readonly bands = new SpectrumBands(this);   // SPEKTRUM
+  readonly bands = new SpectrumBands(this.f, this.f.spectrum);   // SPEKTRUM
 }
 
 /** Asymmetrisk EMA. */

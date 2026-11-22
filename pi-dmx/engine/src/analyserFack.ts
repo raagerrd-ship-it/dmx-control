@@ -59,6 +59,7 @@ export class SpectrumOut {
   readonly bandAbs = new Float32Array(8); readonly bandDbRaw = new Float32Array(8);   // absolut magnitud före AGC, rå dB
   readonly bandLvl = new Float32Array(8); readonly bandOn = new Float32Array(8); readonly fbOn = new Float32Array(8);
   readonly bassOnRing = new Float32Array(BASSON_LEN); bassOnN = 0;
+  bigN = 0; bassOnPeaks = 0;   // räknare: stor-FFT:er och bastoppar (förr flaggorna secSpecDirty, bassOnPeak)
   sink: ((mag: Float32Array, binHz: number) => void) | null = null;
 }
 /** KICKEN. kick = förr hKick, kickAt = förr hKickAt. */
