@@ -19,7 +19,7 @@ const STENAR = {   // namn i off(): [fält i Analyser, klass, fack, har neutral(
 const NEUTRAL = {   // ramfält som stenen äger -> neutralt värde
   kick: { kick: false, kickAtMs: 0, kickAnchorMs: 0, 'drum.kick': 0 },
   bas: { bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1 },
-  drop: { dropCount: 0, miniDropCount: 0, dropBuildCount: 0, dropDemoted: 0, dropSpaced: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, dropMiniBack: 0 },
+  drop: { dropCount: 0, miniDropCount: 0, dropBuildCount: 0, dropDemoted: 0, dropSpaced: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, dropMiniBack: 0, dropKeys: 0, dropNear: 0 },
   uppbyggnad: { buildUp: 0, inRiser: false },
   'karaktär': { 'profile.punch': 0.4, 'profile.bass': 0.5, 'profile.bright': 0.3, 'profile.beat': 0.5, 'profile.bassline': 0 },
   sektion: { section: '', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, expectHighInMs: -1, prevSection: '', sectionLevelVsHighDb: 0, sectionBars: 0, sectionBuildProg: 0 },

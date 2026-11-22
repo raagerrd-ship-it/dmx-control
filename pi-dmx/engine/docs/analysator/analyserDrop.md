@@ -493,3 +493,32 @@ när kroppen är under `pre + 0,5 × (topp − pre)`, tidigast `MINI_BACK_MIN_MS
 släpper stöten och lyftet när räknaren ändras. Skillnad mot förr: fönstret räknas från analysatorns händelse, inte från effektens avfyrning
 (effektens spärrar ser analysatorn inte), och i hoppets takt i stället för renderns. Mätt mot dagens kod: ljusdomaren −0,4 övning / −0,0 kontroll,
 dropdomaren 29,3 = 29,3. Omstart: `resume` tar räknaren och händelseräknarna ur storblocket (inget falskt fönster).
+
+## Nyckelknipporna (steg 34, ägaren 11-22: "kör på enligt ditt tycke")
+
+Drop och minidrop är två DÖRRAR med var sin knippa NYCKLAR. En nyckel = ett villkor + en hålltid (nyckeln hålls så länge efter att villkoret
+senast gällde), en rad var i `HOLD_MS`; villkoren står i `keysStep`. En dörr öppnas när ALLA dess nycklar hålls (ingen räkning), högst en gång
+per händelse: minidroppen per kick-lucka, droppen per break (svackan förbrukas). Öppnas båda samma hopp vinner droppen och stänger minidroppen
+för luckan; en minidrop tidigare i samma lucka följs av droppen (uppgradering). Saknas bara en veto-nyckel (LJUD, DISKANT, SPARR) när resten
+hålls är händelsen avgjord som förut: DISKANT -> `dropDemoted`, SPARR -> `dropSpaced`, LJUD (tyst break = låtlucka) -> inget.
+
+| nyckel | villkor | hålltid | knippa |
+|---|---|---|---|
+| LUCKA | flankens 0,6 s-topp >= 10 dB under taket i >= 250 ms | 4 s | mini + drop |
+| LYFT | baskroppen (60 ms) >= 10 dB över sitt 0,5 s-minimum | 0 | mini + drop |
+| HOGT | baskroppen inom 10 dB från sega toppen | 0 | mini + drop |
+| AKTIV | musik i > 2 s | 30 s (tystnaden i breaket nollar activeMs) | mini + drop |
+| UNDER | >= 1,5 dB under sega toppen (DROP_UNDERPEAK_MIN) | 0 | mini + drop |
+| SVACKA | toppen >= 6 dB under taket i >= 2 s | 3 s (fillet före landningen) | drop |
+| LANDNING | baskroppen inom 1,5 dB från taket | 0 | drop |
+| STIGNING | >= 12 dB över 0,5 s-minimum | 0 | bara i ramen |
+| LJUD | breaket inte helt tyst | 0 | drop (veto) |
+| DISKANT | diskanten (2 s) >= sitt 30 s-medel | 0 | drop (veto) |
+| SPARR | >= 12 s sedan förra drop | 0 | drop (veto) |
+
+Ramen: `dropKeys` = bit per hållen nyckel (bitarna i `K`), `dropNear` bit 1 = minidropens förutsättningar (LUCKA+AKTIV) hålls, bit 2 = dropens
+(+SVACKA LJUD DISKANT SPARR): knippan väntar bara på landningen. Dirigenten kan förbereda; analysatorn väljer inget åt den.
+Slam-kandidaten (`dropCand`, sektionens drop-evidens) räknas som förut men är ingen dörr längre. Förr: tre minidrop-källor (kick-luckan, flank med
+veto, slam utan flank) och flanken 10 dB/4 s (+ 24 dB-undantaget vid 2 s). Mätt (`.arena/nycklar`, ägarens facit, tre starter): drop rätt
+10 -> 14 av 34, falska 5 -> 10, tidsfel median övning +350 -> +187 ms, minidrop rätt 32 = 32 av 56 (minidrop totalt 173 -> 139);
+ljusdomaren v3 övning +0,0, kontroll +5,2.
