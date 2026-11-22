@@ -175,3 +175,13 @@ Sektionens privata delar och ledningen mellan trådarna ligger i stenen (förr p
 - Provet: `node tools/refaktor/avstangning.mjs [sek] [wav]` bygger en kopia per sten under `.arena/flytten/s14/av/` (DMX och lotus profil) och kör
   odelad, inline och inline med omstart. Krav per ruta: stenens ramfält neutrala, inget NaN, samma `typeof` som påslaget, inget undantag, loggraden syns,
   för sektionen 0 `[dropcalm]` med DROP_TRACE. Samma prov på påslaget bygge ska fälla (kontrollkolumnen).
+
+## Den långsamma delen (steg 15): `slowPart()`
+
+- `slowPart()` i `analyser.ts` = `h.body` ur banden 0–2, `drop?.dropStep()`, `riser?.riserStep()`, `character?.profileStep()`. Anropas på två ställen:
+  `drainBig` (workern med `bigOn`, värdena ur hop-recordet) och `process` utan `bigOn` (odelat). En ny sten i den långsamma vägen läggs till här, på ett ställe.
+- Anroparen sätter först `h.sec`, `h.lvh` och `h.conf` (ur recordet resp. sektionens/klockans fack). `h.conf` sattes förr mellan uppbyggnaden och karaktären;
+  drop och uppbyggnad läser inte `conf` (`DropReads`/`RiserReads`), så tidigare är samma sak (bevis.sh).
+- `bigRingPush` + `bigTick` står kvar hos anroparen, före `slowPart`. I `process` kör de före `fastBandStep`, trumkittet och `zoneStep`, i `drainBig` efter `zoneStep`.
+  Att flytta in dem i `slowPart` (planens skiss) är byte-identiskt i båda profilerna men inte med `FAST_BANDS=0`: där läser trumkittet `bandOn`, som `bigStep` skriver
+  (prov: 53 933 av 56 250 hopp avvek i `drum.snare`/`drum.hat`, `.arena/flytten/s15/B`).

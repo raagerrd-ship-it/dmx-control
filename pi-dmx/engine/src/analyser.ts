@@ -381,12 +381,8 @@ export class Analyser {
       const wall = r[o + B_WALL];
       { const po = slot * BIG_HOP_MAX; this.bands.bigRingPush(pcm.subarray(po, po + hn)); }
       this.bands.bigTick();
-      h.nowWall = wall; h.body = (sp.bandDbRaw[0] + sp.bandDbRaw[1] + sp.bandDbRaw[2]) / 3;
-      h.sec = SECTIONS[r[o + B_SEC]]; h.lvh = r[o + B_LVH];
-      this.drop?.dropStep();
-      this.riser?.riserStep();
-      h.conf = r[o + B_CONF];
-      this.character?.profileStep();
+      h.nowWall = wall; h.sec = SECTIONS[r[o + B_SEC]]; h.lvh = r[o + B_LVH]; h.conf = r[o + B_CONF];
+      this.slowPart();
       this.sections?.bigAgg(r[o + B_INT], r[o + B_KICK] === 1, r[o + B_BREAK] === 1, wall);
       n++;
       if (this.bigYield) this.bigYield();
@@ -735,16 +731,20 @@ export class Analyser {
       h.breaking = breaking;
       this.pushBig(samples);
     } else {
-      const bodyNow = (sp.bandDbRaw[0] + sp.bandDbRaw[1] + sp.bandDbRaw[2]) / 3;
-      h.body = bodyNow;
-      h.sec = sc.section; h.lvh = sc.levelVsHighDb;
-      this.drop?.dropStep();
-      this.riser?.riserStep();
-      h.conf = ck.conf;
-      this.character?.profileStep();
+      h.sec = sc.section; h.lvh = sc.levelVsHighDb; h.conf = ck.conf;
+      this.slowPart();
     }
     h.level = level; h.flux = fluxNorm; h.breaking = breaking;
     return this.fillFrame();
+  }
+
+  /** DEN LÅNGSAMMA DELEN: stenarna efter stor-FFT:n, i workern (drainBig) eller odelat (process). En ny sten här. */
+  private slowPart(): void {
+    const h = this.f.hop, sp = this.f.spectrum;
+    h.body = (sp.bandDbRaw[0] + sp.bandDbRaw[1] + sp.bandDbRaw[2]) / 3;
+    this.drop?.dropStep();
+    this.riser?.riserStep();
+    this.character?.profileStep();
   }
 
   /** Ett onset-envelope-sampel. */
