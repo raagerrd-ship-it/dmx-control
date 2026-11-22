@@ -71,13 +71,14 @@ Vid `if (this.agcBlocksFilled < 2) return 0;`:
 Näst största över de fyllda blocken (16 tal → linjär skanning är billigast).
 ```
 
-### rawStep() och smoothStep() (steg 20)
+### hopStep() och rates() (steg 22)
 
 ```text
- rawStep: hoppets början ur rå rms, AGC (om olåst och över brusgolvet) och sedan tystnadsflanken.
- smoothStep: efter kärnans utjämning ur lvlSmooth, intensiteten och sedan nivåtaket (zoneStep, sedan steg 21 bara i huvudtråden).
+ hopStep: hoppets enda anrop (bara huvudtråden). AGC (om olåst och över brusgolvet), tystnadsflanken, rå nivå
+ level = min(1, rms * gain), utjämningen lvlSmooth (asymmetrisk EMA, aAtt/aRel), intensiteten, nivåtaket (zoneStep).
+ rates: takterna ur hoppets längd, en gång i Analysers konstruktor: aAtt 15 ms, aRel 400 ms (utjämningen), aIUp 1,5 s, aIDown 3 s (intensiteten).
 ```
-Varför två anrop och inte ett: se `analyserFack.md`, "Ett anrop per sten (steg 20)".
+Historik: steg 20 hade två anrop (`rawStep`, `smoothStep`), steg 22 flyttade utjämningen in i stenen (se `analyserFack.md`).
 
 ### agcStep()
 

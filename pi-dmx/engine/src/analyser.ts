@@ -336,9 +336,9 @@ export class Analyser {
     const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick;
     const r = this.bigRing!, ctrl = this.splitCtrl!, seq = ++this.bigSeq, slot = seq % BIG_RING_N, o = slot * BIG_REC_LEN, n = samples.length;
     this.bigPcm!.set(samples, slot * BIG_HOP_MAX);
-    r[o + B_N] = n; r[o + Bh.rms] = h.rms; r[o + Bh.nowWall] = h.nowWall; r[o + Bh.lvlSmooth] = h.lvlSmooth; r[o + Bh.centSmooth] = h.centSmooth; r[o + Bh.breaking] = h.breaking ? 1 : 0;
+    r[o + B_N] = n; r[o + Bh.rms] = h.rms; r[o + Bh.nowWall] = h.nowWall; r[o + Bh.centSmooth] = h.centSmooth; r[o + Bh.breaking] = h.breaking ? 1 : 0;
     r[o + Bh.kickHit] = h.kickHit; r[o + Bh.sec] = sectionCode(h.sec); r[o + Bh.lvh] = h.lvh; r[o + Bh.conf] = h.conf; r[o + Bh.bpm] = h.bpm;
-    r[o + Bl.activeMs] = lv.activeMs; r[o + Bl.intensity] = lv.intensity; r[o + Bl.levelCeil] = lv.levelCeil; r[o + Bk.kick] = kk.kick ? 1 : 0;
+    r[o + Bl.lvlSmooth] = lv.lvlSmooth; r[o + Bl.activeMs] = lv.activeMs; r[o + Bl.intensity] = lv.intensity; r[o + Bl.levelCeil] = lv.levelCeil; r[o + Bk.kick] = kk.kick ? 1 : 0;
     r[o + B_ENVF] = this.bigEnvFlag; this.bigEnvFlag = 0;
     r[o + B_SEQ] = seq;
     Atomics.store(ctrl, C_BIG_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
@@ -371,9 +371,9 @@ export class Analyser {
       if (r[o + B_SEQ] !== seq) { this.bigSkipped++; continue; }
       const hn = r[o + B_N];
       this.bass?.accumulate();
-      h.rms = r[o + Bh.rms]; h.nowWall = r[o + Bh.nowWall]; h.lvlSmooth = r[o + Bh.lvlSmooth]; h.centSmooth = r[o + Bh.centSmooth]; h.breaking = r[o + Bh.breaking] === 1;
+      h.rms = r[o + Bh.rms]; h.nowWall = r[o + Bh.nowWall]; h.centSmooth = r[o + Bh.centSmooth]; h.breaking = r[o + Bh.breaking] === 1;
       h.kickHit = r[o + Bh.kickHit]; h.sec = SECTIONS[r[o + Bh.sec]]; h.lvh = r[o + Bh.lvh]; h.conf = r[o + Bh.conf]; h.bpm = r[o + Bh.bpm];
-      lv.activeMs = r[o + Bl.activeMs]; lv.intensity = r[o + Bl.intensity]; lv.levelCeil = r[o + Bl.levelCeil]; kk.kick = r[o + Bk.kick] === 1;
+      lv.lvlSmooth = r[o + Bl.lvlSmooth]; lv.activeMs = r[o + Bl.activeMs]; lv.intensity = r[o + Bl.intensity]; lv.levelCeil = r[o + Bl.levelCeil]; kk.kick = r[o + Bk.kick] === 1;
       if (r[o + B_ENVF] === 1) this.bass?.stepBassline();
       { const po = slot * BIG_HOP_MAX; this.bands.bigRingPush(pcm.subarray(po, po + hn)); }
       this.bands.bigTick();
@@ -574,8 +574,7 @@ export class Analyser {
     this.aAtt = 1 - Math.exp(-dtHop / 0.015);
     this.aRel = 1 - Math.exp(-dtHop / 0.4);
     this.aVU = 1 - Math.exp(-dtHop / 0.20);
-    this.levels.aIUp = 1 - Math.exp(-dtHop / 1.5);
-    this.levels.aIDown = 1 - Math.exp(-dtHop / 3.0);
+    this.levels.rates(dtHop);
     this.bands.aBandLvl = 1 - Math.exp(-bigDt / 0.09);
     this.dHat = Math.exp(-dtHop / 0.06);
     this.dSnare = Math.exp(-dtHop / 0.11);
@@ -676,9 +675,8 @@ export class Analyser {
     this.lastT = now;
     h.rms = rms; h.now = now; h.dt = dt;
     h.gated = rms >= h.cfg.detection.noiseFloor * 1.5;
-    this.levels.rawStep();
-
-    const level = Math.min(1, rms * lv.gain);
+    this.levels.hopStep();
+    const level = lv.level;
 
     h.kickFlux = kickFlux; h.energy = energy;
     this.kicks?.hopStep();
@@ -697,12 +695,9 @@ export class Analyser {
     const dtHop = h.dtHop;
     const aAtt = this.aAtt;
     const aRel = this.aRel;
-    h.lvlSmooth = ema(h.lvlSmooth, level, aAtt, aRel);
     this.lvlVU += (level - this.lvlVU) * this.aVU;
     this.engSmooth = ema(this.engSmooth, energy, aAtt, aRel);
     h.centSmooth = ema(h.centSmooth, centroid, aAtt, aRel);
-
-    this.levels.smoothStep();
 
     if (!big) {
     this.bands.bigRingPush(samples);
@@ -716,7 +711,7 @@ export class Analyser {
     if (kk.kick) h.kickHit = 1;
     else h.kickHit = h.kickHit * this.dKick;
     const nowWallA = this.wallNow();
-    const breaking = h.lvlSmooth < lv.levelCeil * 0.65;
+    const breaking = lv.lvlSmooth < lv.levelCeil * 0.65;
 
     h.nowWall = nowWallA; h.sec = sc.section; h.lvh = sc.levelVsHighDb; h.conf = ck.conf;   // IN: färdiga före pushBig
     this.bass?.bassEnergyStep(this.bands.fbAbs[0], this.bands.fbAbs[1]);   // basen före pushBig: workern kan få värdet samma hopp
@@ -726,7 +721,7 @@ export class Analyser {
     } else {
       this.slowPart();
     }
-    h.level = level; h.flux = fluxNorm; h.breaking = breaking;
+    h.flux = fluxNorm; h.breaking = breaking;
     return this.fillFrame();
   }
 
@@ -773,7 +768,7 @@ export class Analyser {
     const sc = this.f.section;
     const bo = this.f.bass, ri = this.f.riser, dp = this.f.drop;
     const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock;
-    const level = h.level, fluxNorm = h.flux, kick = kk.kick, intensity = lv.intensity, bodyNow = h.body, inZone = lv.inZone, breaking = h.breaking,
+    const level = lv.level, fluxNorm = h.flux, kick = kk.kick, intensity = lv.intensity, bodyNow = h.body, inZone = lv.inZone, breaking = h.breaking,
       inRiser = ri.inRiser, kickAtMs = kk.kickAt;
     const L = this.bands.fbLvl, A = this.bands.fbAbs, O = sp.fbOn;
     const spec = this.outSpec, specAbs = this.outSpecAbs, onset = this.outOnset;
@@ -784,7 +779,7 @@ export class Analyser {
     dr.kick = h.kickHit; dr.snare = this.snareHit; dr.hat = this.hatHit; dr.bass = L[2];
 
     const f = this.outFrame;
-    f.silent = h.lvlSmooth <= this.silenceLevel; f.level = h.lvlSmooth; f.levelRaw = level; f.levelVU = this.lvlVU;
+    f.silent = lv.lvlSmooth <= this.silenceLevel; f.level = lv.lvlSmooth; f.levelRaw = level; f.levelVU = this.lvlVU;
     f.energy = this.engSmooth;
     f.centroid = h.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = lv.gain;
     f.bpm = ck.bpm; f.bpmConfidence = ck.conf; f.intensity = intensity; f.beatAnchorMs = kk.beatAnchorMs;

@@ -306,3 +306,16 @@ Utan omstart är allt byte-identiskt. Den andra vägen (bara workern räknar, `U
 
 `tools/refaktor/omstart.mjs` har därför `TILLATET = {buildUp, inRiser}`: de två ramfälten får skilja mot referensen, bara i hopp efter den första omstarten,
 och räknas för sig (`tillåtna … hop`). Allt annat (andra fält, räknarna, loggraderna) prövas som förut mot `dist-kedja1`.
+
+## Nivån ett anrop: stenen äger utjämningen (steg 22, ägaren 11-22)
+
+`levels.hopStep()` står där AGC:n stod och gör i ordning: AGC, tystnaden, rå nivå `level = min(1, rms * gain)`, utjämningen `lvlSmooth` (samma
+asymmetriska EMA som kärnans `ema`, skriven ut i stenen), intensiteten, nivåtaket. Fälten bytte fack (en källa): `hop.level` -> `level.level` (`S`),
+`hop.lvlSmooth` -> `level.lvlSmooth` (`IN`, hopprecordets plats `Bl.lvlSmooth` i stället för `Bh.lvlSmooth`; längden 17 som förut). Läsarna: kärnan
+(`breaking`, `lvlVU`, ramens `level`/`levelRaw`/`silent`), spektrumet (`S` och `L`), dropen och uppbyggnaden (`L`) läser nu `level.lvlSmooth`.
+Takterna `aAtt`/`aRel` (utjämningen) och `aIUp`/`aIDown` (intensiteten) sätts av stenens `rates(dtHop)` i konstruktorn. Kärnan behåller egna `aAtt`/`aRel`
+för `engSmooth` och `centSmooth` (samma tal i dag, men de hör till energin och centroiden, inte nivån: nivåns takt kan ändras utan att röra dem).
+
+Ordningen: utjämningen och intensitet/tak körs nu före `kicks.hopStep()`, env-ackumuleringen och `envSampleStep` i stället för efter. Inget där emellan läser
+`lvlSmooth`, `level`, `activeMs`, `intensity`, `levelCeil` eller `inZone` (kicken läser `gain`/`envelope`/`gainLocked`, recordet bara klockan), och inget där
+skriver det nivån läser (`rms`, `now`, `dt`, `gated`, `dtHop`). Alla värden kommer alltså samma hopp, tidigare i hoppet.

@@ -38,9 +38,9 @@ const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastG
 
 /** DET DROP LÄSER (workern). Inget annat går att nå. */
 export interface DropReads {
-  hop:      Ser<'L', 'hop', 'dtHop' | 'nowWall' | 'body' | 'lvlSmooth' | 'sec' | 'lvh' | 'wallNow'>;
+  hop:      Ser<'L', 'hop', 'dtHop' | 'nowWall' | 'body' | 'sec' | 'lvh' | 'wallNow'>;
   spectrum: Ser<'L', 'spectrum', 'bandDbRaw'>;
-  level:    Ser<'L', 'level', 'activeMs'>;
+  level:    Ser<'L', 'level', 'activeMs' | 'lvlSmooth'>;
   riser:    Ser<'L', 'riser', 'buildUp'>;
 }
 
@@ -186,7 +186,7 @@ export class DropDetector {
     if (top < ceil - FLANK_GONE_DB) this.fdGone += dt; else { if (this.fdGone > 0) { this.fdSpan = this.fdGone; this.fdEnd = now; } this.fdGone = 0; }
     const above = f > ceil - FLANK_LAND_DB, edge = above && !this.fdAbove; this.fdAbove = above;
     const span = this.fdGone > 0 ? this.fdGone : now - this.fdEnd < FLANK_GRACE_S * 1000 ? this.fdSpan : 0;
-    if (this.h.lvlSmooth <= FLANK_SILENT_LV) this.fdQuietAt = now;
+    if (this.lv.lvlSmooth <= FLANK_SILENT_LV) this.fdQuietAt = now;
     if (!edge || f - low < FLANK_RISE_DB || (span < FLANK_BREAK_S && !(span >= FLANK_SHORT_S && ceil - low >= FLANK_SHORT_RISE_DB))) return false;
     if (now - this.fdQuietAt < span * 1000 + 500) { this.fdGone = 0; this.fdSpan = 0; if (DROP_TRACE) console.log(`[flank] ingen drop: helt tyst i breaket (latstart), break ${span.toFixed(1)} s`); return false; }
     this.fdGone = 0; this.fdSpan = 0; this.fdAt = now; this.o.dropRiseDb = f - low;

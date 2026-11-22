@@ -48,22 +48,22 @@ type Taggat<O> = { readonly [K in Exclude<keyof O, Fn<O>>]: Tag | { readonly [k:
 /** HOPPET: kärnans fält per hopp. Skrivkartan per tråd: docs/analysator/analyserFack.md. */
 export class HopOut {
   static readonly TRAD = { role: 'K', bigOn: 'K', cfg: 'K', dtHop: 'K', hopMs: 'K', rms: 'IN', now: 'S', dt: 'S', nowWall: 'IN', gated: 'S',
-    kickFlux: 'S', energy: 'S', flux: 'S', level: 'S', lvlSmooth: 'IN', centSmooth: 'IN', body: 'UT', breaking: 'IN', kickHit: 'IN',
+    kickFlux: 'S', energy: 'S', flux: 'S', centSmooth: 'IN', body: 'UT', breaking: 'IN', kickHit: 'IN',
     sec: 'IN', lvh: 'IN', conf: 'IN', bpm: 'IN' } as const satisfies Taggat<HopOut>;
   role: Role = 'all'; bigOn = false; cfg!: Cfg;   // skrivs en gång i Analysers konstruktor
   dtHop = 0; hopMs = 0.5;
   rms = 0.5; now = 0.5; dt = 0.5; nowWall = 0.5; gated = false;
-  kickFlux = 0.5; energy = 0.5; flux = 0.5; level = 0.5; lvlSmooth = 0; centSmooth = 0.5; body = 0.5; breaking = false;
+  kickFlux = 0.5; energy = 0.5; flux = 0.5; centSmooth = 0.5; body = 0.5; breaking = false;
   kickHit = 0;   // trumkittet
   sec = 'intro'; lvh = 0.5; conf = 0.5; bpm = 0.5;   // långsamma värden sedda vid hoppet
-  constructor(readonly wallNow: () => number) { stabilise(this, ['lvlSmooth', 'kickHit']); }   // wallNow = analysatorns väggklocka
+  constructor(readonly wallNow: () => number) { stabilise(this, ['kickHit']); }   // wallNow = analysatorns väggklocka
 }
 
-/** NIVÅN. intensity = förr hIntensity, inZone = förr levels.inZoneState. */
+/** NIVÅN. intensity = förr hIntensity, inZone = förr levels.inZoneState, level/lvlSmooth = förr hop.level/hop.lvlSmooth (steg 22). */
 export class LevelOut {
-  static readonly TRAD = { gain: 'S', envelope: 'S', activeMs: 'IN', silentMs: 'S', intensity: 'IN', levelCeil: 'IN', inZone: 'S', gainLocked: 'S' } as const satisfies Taggat<LevelOut>;   // levelCeil: räknas bara i huvudtråden, workern får den i hopprecordet
-  gain = 1; envelope!: number; activeMs = 0; silentMs = -0; intensity = 0.5; levelCeil = 0.5; inZone = false; gainLocked = false;
-  constructor() { stabilise(this, ['activeMs']); }
+  static readonly TRAD = { gain: 'S', envelope: 'S', level: 'S', lvlSmooth: 'IN', activeMs: 'IN', silentMs: 'S', intensity: 'IN', levelCeil: 'IN', inZone: 'S', gainLocked: 'S' } as const satisfies Taggat<LevelOut>;   // levelCeil: räknas bara i huvudtråden, workern får den i hopprecordet
+  gain = 1; envelope!: number; level = 0.5; lvlSmooth = 0; activeMs = 0; silentMs = -0; intensity = 0.5; levelCeil = 0.5; inZone = false; gainLocked = false;
+  constructor() { stabilise(this, ['activeMs', 'lvlSmooth']); }
 }
 /** SPEKTRUMET. Banden förblir Float32Array. sink = förr specSink. */
 export class SpectrumOut {
