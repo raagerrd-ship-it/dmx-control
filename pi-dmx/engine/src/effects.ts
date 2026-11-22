@@ -343,19 +343,13 @@ const LEVEL_RAMP = 2, LEVEL_RAMP_FALL_S = 2;   // fullt ljus vid 2 x släckgrän
  *  brusgolvet någon gång i breaket är det en låtlucka/paus, inte ett basbreak - ingen drop. Bänken 10-11 (70 flank-drops): golvet 0,003 i 5,
  *  därefter >= 0,007 (riktiga break har kvar resten av musiken). 'Nära släckgränsen' (2 x 0,015) tog bort 43/64 - för grovt. */
 // (SHOW_DROP_GAP_MS 12 s i analysatorn sedan 11-09: flank inom spärren = frame.dropSpaced)
-/** EFTERKONTROLLENS TAK (PROV DMX_DROP_LAND_CAP, dagkörningen 2026-11-07, bänk tools/efterDrop.py): 'före' läses i rutan där flanken fyrar - då
- *  har volymfönstrets energi (eSm, 0..1) redan stigit; i kvällen 10-11 låg 'före' >= 0,85 i 53 av 59 show-drops och kravet 1,15 x före + 0,02 > 1
- *  kunde aldrig nås -> lyftet släpptes efter 0,6 s i ~9 av 10 drops. Med t.ex. 0,9 kapas kravet (en drop som landar på >= 90 % har landat högt).
- *  Osatt = 99 (som i dag, json-identiskt). Hör ihop med golvet: kapa + DMX_DROP_LIFT_FLOOR=0 + DMX_DROP_WIN_S=1 (rapport dag-20261107-drop.md). */
-const DROP_LAND_CAP = 0.9;   // STANDARD 2026-11-08 (ladan 11-07: godkänt; backup-tagg backup/fore-tio-standard-20261108); förr PROV DMX_DROP_LAND_CAP (99 = utan tak)
-const DROP_LAND_GAIN = 1.15;     // efterkontroll: nivan 600 ms efter dropen maste vara >= fore x detta   // lampgolv efter mastern (PAR-tandtroskel)
 const SECTION_HIGH_SNAP = 0.75, SECTION_LOW_SNAP = 0.35;   // tierEma-snap vid high/break-grans
 /** ENERGIN (agarens modell, STANDARD 2026-10-08 i ladan: "mycket battre nu"): ingangens VOLYM (frame.levelVU, ~200 ms) i dB i ett
  *  FOLJANDE FONSTER - topp: direkt upp, glider ner; botten: direkt ner, glider upp, tidskonstant E_WIN_S, minst E_MIN_DB brett - sa hela
  *  0..1 anvands oavsett lat och mixerniva. Direkt upp, E_RELEASE_MS ner, upphojd till E_CURVE (ogat ar logaritmiskt), och blir EN
  *  dampningsfaktor 0..1 pa effektens RGB - aldrig over 1 (effekten styr max). Drop slapper dampningen. Slackgransen galler for tystnad.
  *  Ersatte 10-08: sektionsenergin (frame.intensity, for trog: "svanger lite och ratt morkt") och en fast fullniva (passade aldrig).
- *  10-12: ljuset drivs av BASENERGIN (se B_CURVE); volymfonstret (eSm) finns kvar bara for dropens efterkontroll. */
+ *  10-12: ljuset drivs av BASENERGIN (se B_CURVE); volymfonstret (eSm) finns kvar bara i felsokningsloggen (efterkontrollen borttagen 11-22). */
 const E_WIN_S = 10,   // 20 -> 10 (ladan 10-09, standard 10-10)
       E_MIN_DB = 4;
 const E_RELEASE_MS = 100;
@@ -577,7 +571,7 @@ export class EffectEngine {
   private dropEnv = 0;           // drop-envelope: full attack → håll → mjuk fade
   private dropColEnv = 0;        // BARA full drop: dropfarg + vit karna (minidrop/nastan-drop lyfter bara ljusstyrkan)
   private lastLiveSection = '';   // DMX_SECTION_SWITCH
-  dropCalmDenied = 0; dropFalse = 0; private dropCheckAt = 0; private preDropLevel = 0; private preDropTier = 0;
+  dropCalmDenied = 0;
   private eSm = 0; eSimple = 0; private eBass = 0; private bLo = 0; private bPart = 1; private eHi = NaN; private eLo = NaN; private fxPeak = 0; private fxPeakNow = 0; private fxNorm = 1; private spreadM0 = new Float64Array(64);   // ENERGIN (se E_WIN_S); spreadM0 = BASGANG
   private trebleEnv = 0; private airEnv = 0; private punchEnv = 0; private belowSince = 0;   // glitter-enveloper (ctx.trebleEnv/airEnv)
   private glH = new Float32Array(64); private glV = new Float32Array(64); private glOn = new Uint8Array(64);   // KULÖRTONING per lampa (visad kulör, förra ljuset)
@@ -1295,7 +1289,7 @@ export class EffectEngine {
       if (e !== e) e = 0;   // inget fonster an (bara tystnad sedan start)
       if (E_TOP < 1) e = e >= E_TOP ? 1 : e / E_TOP;   // ENERGINS TOPP (se E_TOP)
       this.eSm = e > this.eSm ? e : this.eSm + (e - this.eSm) * (1 - Math.exp(-dtSec * 1000 / E_RELEASE_MS));
-      // (volymfönstret ovan - eSm - styr inte ljuset längre, bara dropens efterkontroll (DROP_LAND_GAIN); orört så dropsen är desamma)
+      // (volymfönstret ovan - eSm - styr inte ljuset längre, bara felsökningsloggen)
       // BASENERGIN (se B_CURVE): analysatorn MÄTER (frame.bassEnergy mot frasen, frame.bassEnergyShort mot takten) - här bara vilken skala
       // ljuset följer och ljusets form (pulsens dal, topp, uttoning, kurva, lyft). DROPLÄGET (se DROP_LIFT_MS): medan dropens lyft bär följer ljuset
       // TAKTENS skala (varje slag fullt mot sina grannar; ladan 11-07: "energin efter drop dör fort" -> "känns bra nu") och glider
@@ -1493,15 +1487,9 @@ export class EffectEngine {
     let dropHit = dropHitRaw;
     if (dropHit) this.dropLiftUntil = nowWall + DROP_LIFT_MS;   // DROPEN BÄR IN I REFRÄNGEN
     if (nowWall <= this.dropLiftUntil && frame.section === 'high' && this.dropLiftUntil < nowWall + 1000) this.dropLiftUntil = nowWall + 1000;   // LYFTET HÅLLER I REFRÄNGEN
-    // EFTERKONTROLL (ladan 20:20: falsk drop 'liten uppbyggnad -> lugnt parti'): en riktig drop LANDAR HOGT. 600 ms efter dropen
-    // jamfors energin (eSm, se E_WIN_S) med energin strax fore; har den inte stigit >= DROP_LAND_GAIN doms dropen falsk:
-    // envelope klipps, 20 s-high-fonstret och tiersnappen dras tillbaka. Blixten (0,6 s) hinner synas, inte 20 s fel show.
-    if (dropHitRaw) { this.dropCheckAt = nowWall + 600; this.preDropLevel = this.eSm; this.preDropTier = this.tierEma; this.liftAt = nowWall; this.nearAt = nowWall; }   // liftAt/nearAt: dropens eget energihopp blir inte en minidrop eller nästan-drop 0,7 s senare (granskningen 11-01: minilyftet låste energin på 1 och tog bort DROP_LIFT_FLOOR i 3 av 4 drops)
-    if (this.dropCheckAt > 0 && nowWall >= this.dropCheckAt) {
-      this.dropCheckAt = 0;
-      const lvl = this.eSm;
-      if (lvl < Math.min(DROP_LAND_CAP, this.preDropLevel * DROP_LAND_GAIN + 0.02)) { this.dropEnv = 0; this.dropLiftUntil = 0; if (this.tierEma > this.preDropTier) this.tierEma = this.preDropTier; this.dropFalse++; }
-    }
+    // (EFTERKONTROLLEN - 600 ms efter dropen dömdes den falsk om volymen inte stigit 15 % - borttagen 11-22, ägaren: analysatorn avgör, effekten ritar;
+    //  den underkände 3 av ägarens 17 riktiga drop, .arena/dropdod/RAPPORT.md)
+    if (dropHitRaw) { this.liftAt = nowWall; this.nearAt = nowWall; }   // liftAt/nearAt: dropens eget energihopp blir inte en minidrop eller nästan-drop 0,7 s senare (granskningen 11-01: minilyftet låste energin på 1 och tog bort DROP_LIFT_FLOOR i 3 av 4 drops)
     // (drop-snapp till takten forkastad 09-12: taktlaset resettas vid drops, slog aldrig till / gjorde drops sena.)
     // (analysatorns minidrop-räknare frame.miniDropCount läses inte: V123 10-11 kväll - 17/min, ingen minidrop i konsertläget; bara
     //  energilyftet, sektionslyftet, stopp-minin och spärrad drop ger looken, alla via fireMini)
