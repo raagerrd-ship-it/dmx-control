@@ -7,14 +7,15 @@
  */
 import type { EngineConfig } from "./config.js";
 
-/** Lägsta ljustak när vredet står längst ner men inte på av (slidern 1 av 10). */
-const MASTER_MIN = 0.2;
+/** Ljustakets spann för vredet/slidern (ägaren 11-22: 30-95 %, hyraren ser inga värden). */
+const MASTER_MIN = 0.3;
+const MASTER_MAX = 0.95;
 
-/** Vred/slider 0..1 -> ljustak MASTER_MIN..1. Ändrar inget annat än läget (smart) och ljustaket. */
+/** Vred/slider 0..1 -> ljustak MASTER_MIN..MASTER_MAX. Ändrar inget annat än läget (smart) och ljustaket. */
 export function applyIntensity(cfg: EngineConfig, xRaw: number): void {
   const x = Math.max(0, Math.min(1, xRaw));
   cfg.mode = "smart";
-  cfg.master = MASTER_MIN + (1 - MASTER_MIN) * x;
+  cfg.master = MASTER_MIN + (MASTER_MAX - MASTER_MIN) * x;
   cfg.activeIntensity = x;
 }
 

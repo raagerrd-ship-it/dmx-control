@@ -797,7 +797,7 @@ const legFest = document.getElementById("legFest");
 const legGalet = document.getElementById("legGalet");
 function moodInfoFor(v) {
   if (v <= 0) return { name: "Av", desc: "Ljuset är släckt — dra åt höger för att tända" };
-  return { name: "Ljus " + Math.round(20 + 80 * (v - 1) / 9) + " %", desc: "Ljuset följer musiken — reglaget styr bara ljusstyrkan" };
+  return { name: "Ljus", desc: "Ljuset följer musiken — reglaget styr bara ljusstyrkan" };   // ägaren 11-22: hyraren ser inga värden
 }
 // Visning: v=0 → 0/10 (av). v≥1 → mappar på (v-1)/9 → 0..1.
 function updateMoodUi(v01, active, forceZero) {
