@@ -15,6 +15,14 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-22 profile.bass är en bandandel och är lägst i refrängen - INGEN delad fil ändrad
+Vad: profile.bass vid dirigentens lookbyten (lookvalHook, sex ladan-inspelningar 76 min, 240 byten) median intro 0,14 / low 0,15 / high 0,09, p90
+0,48 / 0,41 / 0,33 - andelen band 0-2 av alla åtta faller när hela mixen spelar. Effekter som ska bära basen (gravity FIT.bass 0,90, needsBass) får
+därför lägst värde just i refrängen. Var: analyserCharacter.ts profileStep (bassW = band0-2 / bSum, (profBass - 0,28) / 0,30). Material:
+tools/ladan-2026-11-13/, -14/. Önskat: inget brådskande - DMX läser profile.bassline för basgången; om ett absolut basmått (basbandens nivå mot
+dB-fönstret i stället för andel) finns billigt vore det rätt fält för "basen bär". Låg prio, ändra bara om lotus också vill.
+Status:
+
 ## ÖPPET 2026-11-21 DELAD FIL ÄNDRAD: TAKTEN a3c ('det trötta låset' + lat dämpning) - analyserClock.ts
 Vad: huvudsessionen lade in arenan takt13:s a3 i billigare form a3c i dmx 2026-11-20 21:05 (d0de317, manifest uppdaterat, tagg fore-a3c), EJ utlagd
 i ladan. Spärrarna (.arena/a3prov): lotusbank på lotus korpus 476 = 476, syntet 6 = 6, on-beat 0,41 = 0,41, fas 0,96 -> 1,0, i fas 305 -> 319,

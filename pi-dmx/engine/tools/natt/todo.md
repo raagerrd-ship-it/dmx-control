@@ -1,5 +1,23 @@
 FLYTTEN PÅGÅR (start 2026-11-21 kväll, ägaren: 'du får fritt, ta backup sen bygg'): analysatorn byggs om till 'varje sten får ett eget fack' (arenan kedjan a014 + täpp hålet), ett steg per commit, byte-identiskt (bevis.sh med REF=.arena/ref/dist-kedja0). Backup-tagg backup/fore-kedjan-20261121. NATTAGENTEN: rör INTE src/analyser*.ts, src/split.ts, src/slowWorker.ts eller ANALYSER_SHARED.md5, ingen arena på analysatorn; effekter/dirigent går bra. Ingen deploy.
 
+NATTEN 2026-11-22 (schemalagda körningen, ingen arena, ingen motorkod ändrad; FLYTTEN pågick i arbetskopian -> allt bänkat mot frysta byggen .arena/natt1122/<namn>/dist via distHook, dist/ orörd):
+UPPDRAG: inga nya. KLART 2026-11-22: NÄSTA 11-21 (a) gallringen - ägaren tog själv Rave + Sidokedja i ladan 11-22 (cc4310d5, REMOVE i ladan.py).
+  KLART 2026-11-22: NÄSTA 11-21 (b) needsBass mätt (lookvalHook på HEAD, 240 byten): profile.bass vid byten median intro 0,14 / low 0,15 / HIGH 0,09
+  (p90 0,48/0,41/0,33) - en bandANDEL (band 0-2 / alla), lägst i refrängen där allt spelar. gravity klarar kraven 70 gånger och väljs ändå 0 (rankningen,
+  inte spärren); split 9 ok / 87 spärrade, tide 31 / 93. Slutsats: sänk INTE needsBass - percentilen följer andelen, inte "basen bär". Fynd skrivet.
+BASLINJE tools/natt/ren-2026-11-22/ (HEAD 224b6e02 = flytten 13 + cc4310d5 8 egna; byggt ur git, inte arbetskopian):
+  kick->ljus 144/109/131/163/107/107 ms (11-21: 147/107/128/163/109/104 = lika), energiR15 0,51/0,29/0,40/0,21/0,32/0,18 (0,57/0,28/0,56/0,31/0,39/0,28),
+  byte på fras 25/26/27/21/18/7 % (200719 16 -> 7), drop 1/5/2/5/7/3 lika, lampspr 60/60/68/62/59/54 (58/56/62/60/57/53), kulörbyten/min 12,8/8,5/11,5/
+  7,9/7,7/9,2 (13,2/10,2/13,4/11/10,5/10,3), lookbyten och längsta look identiska. Ordning 151659/160345/171840/193040/193818/200719.
+BISEKT: allt fall i energiR15/kulörer = cc4310d5 (ägarens 8 egna + Rave/Sidokedja bort): 1e2b26d7 ger 171840 0,56, 200719 0,25 (f4/flytten -0,03).
+  DOMAREN v3 8 egna mot före (.arena/natt8): övning -4,9 (takt -5,4, dynamik -5,6, koreografi -3,8, ljus -12,3 %, lampspr +9..+13 %),
+  KONTROLL -4,4 (takt -11,3, dynamik -0,3, koreografi -5,8, ljus -5,6 %, lampspr +2..+4 %). DISK-raden = flyttens filer (byte-identiska), inte riktig.
+  Orsak: slot-effekterna (39 % av speltiden: kickregn 8,3, minnet 6,2, vagbrytare 5,8, kaskad 3,4, eko 3,3 %) tänder nu 1-2 av 8 i stället för 2-4.
+  Ägarens öga valde detta i ladan - inget ändrat. Bänken kan inte se upplevd ljusstyrka.
+NÄSTA FÖR NATTAGENTEN: (a) OM ägaren vill ha tillbaka taktkänslan i refrängen inom "8 egna": prov (opt-in) att slot-effekterna i high tänder lampan
+  mittemot också (kickregn gör det redan) - FRÅGA först, det kan läsas som par; (b) gravity: kraven är inte problemet utan FIT.bass 0,90 mot
+  profile.bass (andel) - pröva inte att lyfta i rankningen (se 11-21 SPATIAL-DISK); (c) ingen arena utan ARENA-uppdrag.
+
 NATTEN 2026-11-21 (schemalagda körningen, ingen arena, ingen motorkod ändrad):
 UPPDRAG: inga nya från kvällen. NÄSTA 11-20 (a) gällde bara om ägaren tycker landningen byter för ofta - inget sådant besked, inte gjort.
 BASLINJE tools/natt/ren-2026-11-21/ (HEAD 04ebd3c = a6 + 1an-3an + landningens inträde + 1an-3an-resten + a3c; inget av det sista utlagt):
