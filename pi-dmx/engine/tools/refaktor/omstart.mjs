@@ -11,7 +11,7 @@ const SECS = /^\d+$/.test(rest[0]) ? Number(rest.shift()) : 700, wavs = rest;
 const SR = 48000, HOP = 128, EPOCH = 1.7e12, EVERY = 60 * SR / HOP, HINT = 97 * SR / HOP, RESET = 211 * SR / HOP;
 // Steg 21 (ägaren 11-22: lägg in): workern får nivåtaket ur huvudtråden i stället för att börja om på 0,5, så uppbyggnaden skiljer efter en omstart. Bara de här två, bara efter en omstart.
 const TILLATET = new Set(['buildUp', 'inRiser']);
-const RAKNARE = ['dropCount', 'miniDropCount', 'dropBuildCount', 'dropDemoted', 'dropSpaced', 'stopCount'];
+const RAKNARE = ['dropCount', 'miniDropCount', 'dropBuildCount', 'dropDemoted', 'dropSpaced', 'stopCount', 'dropMiniBack'];
 const load = async (d) => { const i = (f) => import(pathToFileURL(resolve(d, f)).href);
   return { ...(await i('analyser.js')), ...(await i('split.js')), ...(await i('analyserClock.js')), defaultConfig: (await i('config.js')).defaultConfig }; };
 const mods = [await load(RA), await load(RB)];

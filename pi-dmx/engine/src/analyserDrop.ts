@@ -33,6 +33,7 @@ const FLANK_GONE_DB = 10, FLANK_BREAK_S = 4, FLANK_LAND_DB = 1.5, FLANK_RISE_DB 
 const FLANK_SHORT_S = 2, FLANK_SHORT_RISE_DB = 24, FLANK_SILENT_LV = 0.005;
 const BUILD_SPACING_MS = 3000;   // UPPBYGGNADEN börjar när basen dras ur (kick-luckan), högst en gång per 3 s
 const SHOW_DROP_GAP_MS = 12000;   // spärr mellan full drops
+const MINI_BACK_MIN_MS = 250, MINI_BACK_MAX_MS = 2000;   // MINIDROP EFTER ENERGIN: tidigast/senast efter lyftet
 const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;   // LYFT/NÄSTAN-DROP/STOPP
 const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdGone', 'fdSpan', 'fdEnd', 'fdAt', 'fdQuietAt', 'lastShowDropMs', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'hiFast', 'hiNorm'] as const;   // Talfält som ska vara flyttal från start
 
@@ -74,6 +75,8 @@ export class DropDetector {
   private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftHistAt = -1e12; private stopRunS = -0;
   private fdTop = -0; private miniEp = -1.5; private miniEpUsed = -2.5; private hiFast = -120.5; private hiNorm = -120.5;
   private lastEpAt = -1.5e12;
+  private mbFast = -90.5; private mbSlow = -90.5; private mbPre = -90.5; private mbPeak = -200.5; private mbAt = -1e12;
+  private mbDem = 0; private mbSpaced = 0; private mbStop = 0; private mbLift = false; private mbSec = '';
 
   /** Drop-detektionen. */
   dropStep(): void {
@@ -164,6 +167,20 @@ export class DropDetector {
       console.log(`[dropfire] wall ${this.h.wallNow()}${fireTag} rise ${bodyRise.toFixed(1)} fast ${this.bodyFast.toFixed(1)} peak ${this.bodyPeak.toFixed(1)} ceil ${this.bodyCeil.toFixed(1)} underPeak ${(this.bodyPeak - this.bodyFast).toFixed(1)} sinceDrop ${(sinceDrop/1000).toFixed(1)}s goneAgo ${((nowWallA - this.lastBodyGoneMs)/1000).toFixed(1)}s goneSpan ${(this.lastGoneSpanMs/1000).toFixed(1)}s edgeAgo ${(nowWallA - this.dropArmAt).toFixed(0)}ms`);
     }
     this.dropClassify(flank, fireNow, nowWallA);
+    this.miniBackStep(nowWallA, dtHop, bodyNow);
+  }
+
+  /** MINIDROP EFTER ENERGIN: ett lyft (spärrad/nedgraderad drop, stopp, energilyft, sektion -> high) öppnar ett fönster; dropMiniBack++ när
+   *  baskroppen (30 ms) fallit under halva lyftet från nivån före (1 s-medel, fryst i fönstret). */
+  private miniBackStep(now: number, dt: number, body: number): void {
+    const o = this.o, x = Math.max(-90, body), sec = this.h.sec, lift = o.liftDb > 0;
+    this.mbFast += (x - this.mbFast) * Math.min(1, dt / 0.03);
+    const ev = o.dropDemoted !== this.mbDem || o.dropSpaced !== this.mbSpaced || o.stopCount !== this.mbStop || (lift && !this.mbLift) || (sec === 'high' && this.mbSec !== '' && this.mbSec !== 'high');
+    this.mbDem = o.dropDemoted; this.mbSpaced = o.dropSpaced; this.mbStop = o.stopCount; this.mbLift = lift; if (sec !== '') this.mbSec = sec;
+    if (ev) { this.mbAt = now; this.mbPre = this.mbSlow; this.mbPeak = -200; }
+    if (now - this.mbAt >= MINI_BACK_MAX_MS) { this.mbSlow += (x - this.mbSlow) * Math.min(1, dt / 1.0); return; }
+    if (this.mbFast > this.mbPeak) this.mbPeak = this.mbFast;
+    if (now - this.mbAt >= MINI_BACK_MIN_MS && this.mbFast < this.mbPre + 0.5 * (this.mbPeak - this.mbPre)) { o.dropMiniBack++; this.mbAt = -1e12; }
   }
 
   /** EN DROPDETEKTOR. */
@@ -227,17 +244,18 @@ export class DropDetector {
   pack(s: Float64Array): void {
     const o = this.o;
     s[P.dropCount] = o.dropCount; s[P.miniDropCount] = o.miniDropCount; s[P.buildStartCount] = o.buildStartCount; s[P.dropCand] = o.dropCand; s[P.bodyUnderDb] = o.bodyUnderDb;
-    s[P.dropDemoted] = o.dropDemoted; s[P.dropSpaced] = o.dropSpaced; s[P.nearDropDb] = o.nearDropDb; s[P.nearDipDb] = o.nearDipDb; s[P.liftDb] = o.liftDb; s[P.stopCount] = o.stopCount; s[P.stopS] = o.stopS;
+    s[P.dropDemoted] = o.dropDemoted; s[P.dropSpaced] = o.dropSpaced; s[P.nearDropDb] = o.nearDropDb; s[P.nearDipDb] = o.nearDipDb; s[P.liftDb] = o.liftDb; s[P.stopCount] = o.stopCount; s[P.stopS] = o.stopS; s[P.dropMiniBack] = o.dropMiniBack;
   }
   unpack(s: Float64Array): void {
     const o = this.o;
     o.dropCount = s[P.dropCount]; o.miniDropCount = s[P.miniDropCount]; o.buildStartCount = s[P.buildStartCount]; o.dropCand = s[P.dropCand]; o.bodyUnderDb = s[P.bodyUnderDb];
-    o.dropDemoted = s[P.dropDemoted]; o.dropSpaced = s[P.dropSpaced]; o.nearDropDb = s[P.nearDropDb]; o.nearDipDb = s[P.nearDipDb]; o.liftDb = s[P.liftDb]; o.stopCount = s[P.stopCount]; o.stopS = s[P.stopS];
+    o.dropDemoted = s[P.dropDemoted]; o.dropSpaced = s[P.dropSpaced]; o.nearDropDb = s[P.nearDropDb]; o.nearDipDb = s[P.nearDipDb]; o.liftDb = s[P.liftDb]; o.stopCount = s[P.stopCount]; o.stopS = s[P.stopS]; o.dropMiniBack = s[P.dropMiniBack];
   }
   /** Workern startar om: räknarna ur senaste storblocket (fem fält saknas som förut). */
   resume(s: Float64Array): void {
     const o = this.o;
     o.dropCount = s[P.dropCount]; o.miniDropCount = s[P.miniDropCount]; o.buildStartCount = s[P.buildStartCount]; o.dropCand = s[P.dropCand];
-    o.dropDemoted = s[P.dropDemoted]; o.dropSpaced = s[P.dropSpaced]; o.stopCount = s[P.stopCount];
+    o.dropDemoted = s[P.dropDemoted]; o.dropSpaced = s[P.dropSpaced]; o.stopCount = s[P.stopCount]; o.dropMiniBack = s[P.dropMiniBack];
+    this.mbDem = o.dropDemoted; this.mbSpaced = o.dropSpaced; this.mbStop = o.stopCount;
   }
 }

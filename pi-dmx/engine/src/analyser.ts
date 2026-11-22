@@ -94,7 +94,7 @@ export interface Frame {
   miniDropCount: number;   // MINIDROP
   dropBuildCount: number;   // UPPBYGGNAD: stiger när en uppbyggnad börjar (basen dras ur, högst var 3:e s)
   dropDemoted: number; dropSpaced: number;   // EN DROPDETEKTOR
-  nearDropDb: number; nearDipDb: number; liftDb: number; stopCount: number; stopS: number;   // LYFT/NÄSTAN-DROP/STOPP
+  nearDropDb: number; nearDipDb: number; liftDb: number; stopCount: number; stopS: number; dropMiniBack: number;   // LYFT/NÄSTAN-DROP/STOPP; dropMiniBack: minidropens baskropp föll tillbaka
   levelInZone: boolean;   // nivån är i låtens topp-zon
   levelBreaking: boolean;   // nivån är i en svacka/break
   buildUp: number;   // UPPBYGGNAD
@@ -515,7 +515,7 @@ export class Analyser {
     this.outFrame = {
       silent: true, level: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
-      dropCount: 0, miniDropCount: 0, dropBuildCount: 0, dropDemoted: 0, dropSpaced: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, bodyDb: 0, bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1, midHiDb: -120, levelInZone: false, levelBreaking: false, buildUp: 0, sectionBuildProg: 0, inRiser: false, profile: this.f.character.profile, kickAnchorMs: 0,
+      dropCount: 0, miniDropCount: 0, dropBuildCount: 0, dropDemoted: 0, dropSpaced: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, dropMiniBack: 0, bodyDb: 0, bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1, midHiDb: -120, levelInZone: false, levelBreaking: false, buildUp: 0, sectionBuildProg: 0, inRiser: false, profile: this.f.character.profile, kickAnchorMs: 0,
       kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, expectHighInMs: -1, prevSection: '', sectionLevelVsHighDb: 0, sectionBars: 0,
       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum, stenarAv: stenarAv(this.f),
     };
@@ -612,7 +612,7 @@ export class Analyser {
     f.bodyDb = bodyNow; f.bassEnergy = f.silent ? 0 : bo.energy; f.bassEnergyShort = f.silent ? 0 : bo.beShort; f.bassLevel = Math.pow(10, (bo.beHi - bo.beRef) / 20);
     { let s2 = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, this.bands.fbDbRaw[b] / 20); s2 += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s2)); }
     f.dropCount = dp.dropCount; f.miniDropCount = dp.miniDropCount; f.dropBuildCount = dp.buildStartCount; f.dropDemoted = dp.dropDemoted; f.dropSpaced = dp.dropSpaced;
-    f.nearDropDb = dp.nearDropDb; f.nearDipDb = dp.nearDipDb; f.liftDb = dp.liftDb; f.stopCount = dp.stopCount; f.stopS = dp.stopS; f.levelInZone = inZone; f.levelBreaking = breaking; f.buildUp = ri.buildUp; f.inRiser = inRiser;
+    f.nearDropDb = dp.nearDropDb; f.nearDipDb = dp.nearDipDb; f.liftDb = dp.liftDb; f.stopCount = dp.stopCount; f.stopS = dp.stopS; f.dropMiniBack = dp.dropMiniBack; f.levelInZone = inZone; f.levelBreaking = breaking; f.buildUp = ri.buildUp; f.inRiser = inRiser;
     f.kickAtMs = kickAtMs; f.barShift = -1;
     f.beatPhaseMs = ck.phaseMs > 0 ? ck.phaseMs - Analyser.GRID_PHASE_OFFSET_MS : ck.phaseMs;
     f.beatPhaseConf = ck.phaseConf;

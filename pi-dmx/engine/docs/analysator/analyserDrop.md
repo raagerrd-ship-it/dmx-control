@@ -483,3 +483,13 @@ minidroppen. Ändrar inga drop eller minidrop (identiska på fem filer). Ägaren
 (54), 171840 4/4 (8), 193040 4/4 (13) - slår vid nästan varje fill, så den är en SIGNAL, inte ett villkor för drop. Ingen effekt läser den
 ännu. Delstaten: BS_BUILDSTART (split.ts). Säkerhetstagg: fore-uppbyggnad-signal.
 ```
+
+## Minidropen efter energin: dropMiniBack (steg 30, ägaren 11-22: "Lägg in")
+
+Förr räknade effektlagret (`effects.ts`, MINIDROP EFTER ENERGIN) själv på `frame.bodyDb` när baskroppen fallit tillbaka efter en minidrop.
+Nu gör Drop det (`miniBackStep`, sist i `dropStep`): ett lyft öppnar ett fönster (ny `dropDemoted`/`dropSpaced`/`stopCount`, `liftDb` > 0 på
+stigande flank, sektionen -> `high`); `pre` = baskroppens 1 s-medel (fryst i fönstret), toppen på 30 ms-kroppen; `dropMiniBack++` (`UT`, monoton)
+när kroppen är under `pre + 0,5 × (topp − pre)`, tidigast `MINI_BACK_MIN_MS` 250, fönstret stängs senast efter `MINI_BACK_MAX_MS` 2000. Effekten
+släpper stöten och lyftet när räknaren ändras. Skillnad mot förr: fönstret räknas från analysatorns händelse, inte från effektens avfyrning
+(effektens spärrar ser analysatorn inte), och i hoppets takt i stället för renderns. Mätt mot dagens kod: ljusdomaren −0,4 övning / −0,0 kontroll,
+dropdomaren 29,3 = 29,3. Omstart: `resume` tar räknaren och händelseräknarna ur storblocket (inget falskt fönster).

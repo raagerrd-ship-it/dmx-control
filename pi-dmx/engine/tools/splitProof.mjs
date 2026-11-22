@@ -30,7 +30,8 @@ const HOP = 128, EPOCH = 1.7e12;
 
 const VANTAT = new Set(['barShift', 'beatPhaseMs', 'beatPhaseConf',
   'section', 'sectionAgeMs', 'sectionIndex', 'sectionTier', 'sectionBars', 'prevSection', 'sectionLevelVsHighDb', 'expectHighInMs',
-  'repeatSim', 'repeatAgoMs', 'sectionBuildProg', 'miniDropCount', 'dropDemoted', 'bassLevel']);
+  'repeatSim', 'repeatAgoMs', 'sectionBuildProg', 'miniDropCount', 'dropDemoted', 'bassLevel',
+  'dropMiniBack']);   // steg 30: räknare som ärver sektionens och dropDemoted:s skillnad (öppnar fönstret på dem)
 
 const { createAnalyser } = await import(pathToFileURL(join(DIST, 'analyser.js')).href);
 const { defaultConfig } = await import(pathToFileURL(join(DIST, 'config.js')).href);
