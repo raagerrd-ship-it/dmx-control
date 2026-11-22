@@ -15,7 +15,7 @@ import {
   B_ENVF, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ,
   BS_SPEC_N, BS_SKIPPED, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
 } from './split.js';
-const Bh = B.hop, Bl = B.level, Bk = B.kick, Rc = R.clock, BSh = BS.hop, Sc = S.clock;   // kärnans platser ur taggarna
+const Bh = B.hop, Bf = B.fft, Bl = B.level, Bk = B.kick, Rc = R.clock, BSh = BS.hop, Sc = S.clock;   // kärnans platser ur taggarna
 import FFT from "fft.js";
 import { BeatFeed, publishPhase, type ClockCfg } from "./analyserClock.js";   // ANALYSATORNS KLOCKA
 import { DropDetector } from "./analyserDrop.js";
@@ -26,6 +26,7 @@ import { KickDetector } from "./analyserKick.js";
 import { BassTracker } from "./analyserBass.js";
 import { LevelTracker } from "./analyserLevel.js";
 import { SpectrumBands } from "./analyserSpectrum.js";
+import { SmallFft, hannWindow } from "./analyserFft.js";
 
 /** Sann om ratten ar satt till nagot icke-tomt. */
 function sysOn(name: string): boolean { return !!sysEnv(name); }
@@ -124,8 +125,8 @@ export interface Frame {
 }
 
 const DOUBLE_FROM_START = [
-  'sumSq', 'lastT', 'envAccum', 'envAccumT', 'envBassAccum',
-  'lvlVU', 'engSmooth',
+  'lastT', 'envAccum', 'envAccumT', 'envBassAccum',
+  'lvlVU',
   'rawBpmLast',
 ] as const;   // Instansfalt som MATT
 /** TYPSTABILA TALFALT. */
@@ -140,17 +141,6 @@ export class Analyser {
   get bandOn(): Float32Array { return this.f.spectrum.bandOn; }   get beatSrc(): { beat?: BeatGrid | null } { return this.f.clock.src; }   // verktygen
   get bodyUnderDb(): number { return this.f.drop.bodyUnderDb; }   get bassOnsetsPerBeat(): number { return this.f.bass.onsetsPerBeat; }   // klockan (HopTarget), verktygen
   get boundaryNov(): number { return this.f.section.boundaryNov; }   // boundaryBench.mjs
-  private fft: FFT;
-  private window: Float32Array;
-  private buffer: Float32Array;   // sliding FFT window
-  private prevMag: Float32Array;   // transformed magnitude from the previous hop
-  private onsetPeak!: Float32Array;   // per-bin whitening peak history
-  private onsetPrev!: Float32Array;   // previous raw magnitude for onset differencing
-  private onsetPeakReady = false;
-  private onsetPeakDecay = 0;
-  private windowed512!: Float32Array;   // Pre-allokerade scratchpads för 512-FFT + utdata
-  private spectrum512!: number[];   // fft.js komplex-spektrum
-  private mag512!: Float32Array;   // magnitud denna hop
   private outSpecAbs: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
   private outSpec: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
   private outOnset: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
@@ -161,10 +151,8 @@ export class Analyser {
 
   static readonly BIG_EVERY = BIG_EVERY;
   private static readonly FB_TAU_MS = [12, 6, 3];
-   private fbMax = 0;   // Valfri avlyssnare på den stora magnituden
   setSpectrumSink(fn: ((mag: Float32Array, binHz: number) => void) | null): void { this.f.spectrum.sink = fn; }
   private static readonly ENV_HZ = 100;
-  private static readonly ONSET_PEAK_FLOOR = 0.05;
   private static readonly ENV_LEN = 100 * Math.max(3, Math.min(20, Number(sysEnv('TEMPO_ENV_S')) || 5));   // Onset-ringens langd i sekunder x 100 Hz
   private envRing = new Float32Array(Analyser.ENV_LEN);
   private envPos = 0;
@@ -209,7 +197,7 @@ export class Analyser {
   }
   private static readonly REFRAC_N = 20;   // 200 ms @ ENV_HZ 100
 
-  private aAtt = 0; private aRel = 0; private aVU = 0;
+  private aVU = 0;
   private dKick = 0;
   private envBassRing = new Float32Array(Analyser.ENV_LEN);   // BASBANDETS onset-envelope
   private envBassAccum = 0;
@@ -225,7 +213,6 @@ export class Analyser {
   private envHighRing = new Float32Array(Analyser.ENV_LEN);   // DIAGNOSTIK
   private envHighAccum = 0;
   private lvlVU = 0;
-  private engSmooth = 0;
 
 
 
@@ -330,10 +317,10 @@ export class Analyser {
   /** STORA VÄGEN. */
   private pushBig(samples: Float32Array): void {
     const h = this.f.hop;
-    const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick;
+    const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ff = this.f.fft;
     const r = this.bigRing!, ctrl = this.splitCtrl!, seq = ++this.bigSeq, slot = seq % BIG_RING_N, o = slot * BIG_REC_LEN, n = samples.length;
     this.bigPcm!.set(samples, slot * BIG_HOP_MAX);
-    r[o + B_N] = n; r[o + Bh.rms] = h.rms; r[o + Bh.nowWall] = h.nowWall; r[o + Bh.centSmooth] = h.centSmooth; r[o + Bh.breaking] = h.breaking ? 1 : 0;
+    r[o + B_N] = n; r[o + Bf.rms] = ff.rms; r[o + Bh.nowWall] = h.nowWall; r[o + Bf.centSmooth] = ff.centSmooth; r[o + Bh.breaking] = h.breaking ? 1 : 0;
     r[o + Bh.kickHit] = h.kickHit; r[o + Bh.sec] = sectionCode(h.sec); r[o + Bh.lvh] = h.lvh; r[o + Bh.conf] = h.conf; r[o + Bh.bpm] = h.bpm;
     r[o + Bl.lvlSmooth] = lv.lvlSmooth; r[o + Bl.activeMs] = lv.activeMs; r[o + Bl.intensity] = lv.intensity; r[o + Bl.levelCeil] = lv.levelCeil; r[o + Bk.kick] = kk.kick ? 1 : 0;
     r[o + B_ENVF] = this.bigEnvFlag; this.bigEnvFlag = 0;
@@ -358,7 +345,7 @@ export class Analyser {
   /** slow: behandla hop-recorden t.o.m. */
   drainBig(limit: number): number {
     const h = this.f.hop;
-    const lv = this.f.level, kk = this.f.kick;
+    const lv = this.f.level, kk = this.f.kick, ff = this.f.fft;
     const ctrl = this.splitCtrl!, r = this.bigRing!, pcm = this.bigPcm!;
     let w = this.bigSeq + seqDelta(Atomics.load(ctrl, C_BIG_WRITE), this.bigSeq); if (limit < w) w = limit;
     if (w - this.bigSeq > BIG_RING_N - RING_MARGIN) { this.bigSkipped += (w - this.bigSeq) - (BIG_RING_N - RING_MARGIN); this.bigSeq = w - (BIG_RING_N - RING_MARGIN); }
@@ -368,7 +355,7 @@ export class Analyser {
       if (r[o + B_SEQ] !== seq) { this.bigSkipped++; continue; }
       const hn = r[o + B_N];
       this.bass?.accumulate();
-      h.rms = r[o + Bh.rms]; h.nowWall = r[o + Bh.nowWall]; h.centSmooth = r[o + Bh.centSmooth]; h.breaking = r[o + Bh.breaking] === 1;
+      ff.rms = r[o + Bf.rms]; h.nowWall = r[o + Bh.nowWall]; ff.centSmooth = r[o + Bf.centSmooth]; h.breaking = r[o + Bh.breaking] === 1;
       h.kickHit = r[o + Bh.kickHit]; h.sec = SECTIONS[r[o + Bh.sec]]; h.lvh = r[o + Bh.lvh]; h.conf = r[o + Bh.conf]; h.bpm = r[o + Bh.bpm];
       lv.lvlSmooth = r[o + Bl.lvlSmooth]; lv.activeMs = r[o + Bl.activeMs]; lv.intensity = r[o + Bl.intensity]; lv.levelCeil = r[o + Bl.levelCeil]; kk.kick = r[o + Bk.kick] === 1;
       if (r[o + B_ENVF] === 1) this.bass?.stepBassline();
@@ -437,8 +424,6 @@ export class Analyser {
   resetBar(): void { this.flagSlow(F_RESET_BAR); }
 
   private lastT = 0;   // 0 = "ej satt"
-  private sumSq = 0;   // Löpande kvadratsumma över `buffer`
-  private rmsRecalc = 0;
 
   private virtualMs = NaN; private virtualOn = false;   // VIRTUELL KLOCKA
   /** Driv analysatorn på en virtuell klocka. */
@@ -516,15 +501,6 @@ export class Analyser {
     };
     this.f.clock.src = cfgIn.detection ? cfgIn : { beat: null };
     this.setSilenceLevel(cfgIn.silenceLevel);
-    this.fft = new FFT(cfg.fft.size);
-    this.window = hannWindow(cfg.fft.size);
-    this.buffer = new Float32Array(cfg.fft.size);
-    this.prevMag = new Float32Array(cfg.fft.size / 2);
-    this.onsetPeak = new Float32Array(cfg.fft.size / 2);
-    this.onsetPrev = new Float32Array(cfg.fft.size / 2);
-    this.windowed512 = new Float32Array(cfg.fft.size);
-    this.spectrum512 = this.fft.createComplexArray();
-    this.mag512 = new Float32Array(cfg.fft.size / 2);
     this.f.level.envelope = cfg.detection.autoGainTarget;
     const BIG = 2048;
     this.bands.fftBig = new FFT(BIG);
@@ -543,8 +519,6 @@ export class Analyser {
     {
       const binHz = cfg.audio.rate / cfg.fft.size, half = cfg.fft.size / 2;
       for (let b = 3; b < 8; b++) { this.bands.fbLo[b] = Math.max(1, Math.round(Analyser.BAND_HZ[b] / binHz)); this.bands.fbHi[b] = Math.min(half, Math.max(this.bands.fbLo[b] + 1, Math.round(Analyser.BAND_HZ[b + 1] / binHz))); }
-      this.fbMax = Math.min(half, this.bands.fbHi[7] + 1);
-      if (this.bands.fbMag.length < half) { this.bands.fbMag = new Float32Array(half); this.bands.fbPrevMag = new Float32Array(half); }
       const dtMs = cfg.fft.hop / cfg.audio.rate * 1000;
       for (let b = 0; b < 3; b++) {
         for (let s = 0; s < 2; s++) {
@@ -567,8 +541,7 @@ export class Analyser {
     h.dtHop = dtHop;
     h.hopMs = dtHop * 1000;
 
-    this.aAtt = 1 - Math.exp(-dtHop / 0.015);
-    this.aRel = 1 - Math.exp(-dtHop / 0.4);
+    this.fft.init(this.bands.fbHi[7] + 1);
     this.aVU = 1 - Math.exp(-dtHop / 0.20);
     this.levels.rates(dtHop);
     this.bands.rates(dtHop);
@@ -590,95 +563,25 @@ export class Analyser {
   process(samples: Float32Array): Frame {
     const h = this.f.hop;
     const sc = this.f.section;
-    const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock;
+    const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock, ff = this.f.fft;
     if (this.hopLane) this.setClock(this.hopLane.clockBpm, this.hopLane.clockConf);
     if (h.role === 'fast') this.pullSlowState();
-    const hop = samples.length;
-    let ss = this.sumSq;
-    for (let i = 0; i < hop; i++) { const v = this.buffer[i]; ss -= v * v; }
-    this.buffer.copyWithin(0, hop);
-    this.buffer.set(samples, this.buffer.length - hop);
-    for (let i = this.buffer.length - hop; i < this.buffer.length; i++) { const v = this.buffer[i]; ss += v * v; }
-    if (++this.rmsRecalc >= 400 || ss < 0) {
-      this.rmsRecalc = 0; ss = 0;
-      for (let i = 0; i < this.buffer.length; i++) { const v = this.buffer[i]; ss += v * v; }
-    }
-    this.sumSq = ss;
-    const rms = Math.sqrt(ss / this.buffer.length);
-
-    const windowed = this.windowed512;
-    { const buf = this.buffer, win = this.window; for (let i = 0; i < windowed.length; i++) windowed[i] = buf[i] * win[i]; }
-    const spectrum = this.spectrum512;
-    this.fft.realTransform(spectrum, windowed);
-
-    const half = h.cfg.fft.size / 2;
-    const mag = this.mag512;
-    let bassEnergy = 0;
-    let flux = 0;
-    let kickFlux = 0;
-    let powSum = 0, powW = 0;
-    const bassBins = Math.min(16, half);
-    const kickBins = Math.min(1, half);
-    const enhancedOnset = h.cfg.onset.enhancements;
-
-    const fbMax = this.fbMax, fbMag = this.bands.fbMag;
-    const onsetPeak = this.onsetPeak, onsetPrev = this.onsetPrev, peakDecay = this.onsetPeakDecay, peakReady = this.onsetPeakReady, PFLOOR = Analyser.ONSET_PEAK_FLOOR;
-    for (let i = 0; i < bassBins; i++) {
-      const re = spectrum[2 * i];
-      const im = spectrum[2 * i + 1];
-      const p = re * re + im * im;
-      const m = Math.sqrt(p);
-      bassEnergy += m;
-      let onsetMag = m;
-      if (enhancedOnset) {
-        const compressed = Math.log1p(m);
-        let peak = onsetPeak[i] * peakDecay;
-        if (compressed > peak) peak = compressed;
-        onsetPeak[i] = peak;
-        onsetMag = peakReady ? compressed / Math.max(PFLOOR, peak) : 0;
-      }
-      mag[i] = m;
-      const dd = onsetMag - onsetPrev[i];
-      onsetPrev[i] = onsetMag;
-      if (dd > 0) { flux += dd; if (i < kickBins) kickFlux += dd; }
-      powSum += p; powW += i * p;
-      if (i < fbMax) fbMag[i] = m;
-    }
-    const fbEnd = Math.max(bassBins, Math.min(fbMax, half));
-    for (let i = bassBins; i < fbEnd; i++) {
-      const re = spectrum[2 * i], im = spectrum[2 * i + 1], p = re * re + im * im;
-      powSum += p; powW += i * p;
-      fbMag[i] = Math.sqrt(p);
-    }
-    for (let i = fbEnd; i < half; i++) {
-      const re = spectrum[2 * i], im = spectrum[2 * i + 1], p = re * re + im * im;
-      powSum += p; powW += i * p;
-    }
-    this.onsetPeakReady = true;
-    if (enhancedOnset) {
-      for (let i = 0; i < bassBins; i++) this.prevMag[i] = this.onsetPrev[i];
-    }
-
-    { const t = this.prevMag; this.prevMag = this.mag512; this.mag512 = t; }
-    const energy = Math.min(1, (bassEnergy / bassBins) * 0.02 * lv.gain);
-    const centroid = powSum > 1e-12 ? Math.min(1, Math.sqrt(1.47 * (powW / powSum) / half)) : 0;
-    const fluxNorm = Math.min(1, flux * (enhancedOnset ? 0.08 : 0.005));
+    this.fft.hopStep(samples);
 
     const now = this.perfNow();
     const dt = this.lastT === 0 ? 0 : Math.max(0, Math.min(0.1, (now - this.lastT) / 1000));
     this.lastT = now;
-    h.rms = rms; h.now = now; h.dt = dt;
-    h.gated = rms >= h.cfg.detection.noiseFloor * 1.5;
+    h.now = now; h.dt = dt;
+    h.gated = ff.rms >= h.cfg.detection.noiseFloor * 1.5;
     this.levels.hopStep();
     const level = lv.level;
 
-    h.kickFlux = kickFlux; h.energy = energy;
     this.kicks?.hopStep();
 
     const hopMs = h.hopMs;
 
-    this.envAccum = Math.max(this.envAccum, fluxNorm);
-    const bassFluxNorm = Math.min(1, kickFlux * (h.cfg.onset.enhancements ? 0.5 : 0.02));
+    this.envAccum = Math.max(this.envAccum, ff.flux);
+    const bassFluxNorm = Math.min(1, ff.kickFlux * (h.cfg.onset.enhancements ? 0.5 : 0.02));
     if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
     const big = h.bigOn;
     if (!big) this.bass?.accumulate();
@@ -686,12 +589,7 @@ export class Analyser {
     this.envAccumT += hopMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) this.envSampleStep();
 
-    const dtHop = h.dtHop;
-    const aAtt = this.aAtt;
-    const aRel = this.aRel;
     this.lvlVU += (level - this.lvlVU) * this.aVU;
-    this.engSmooth = ema(this.engSmooth, energy, aAtt, aRel);
-    h.centSmooth = ema(h.centSmooth, centroid, aAtt, aRel);
 
     if (!big) {
     this.bands.bigRingPush(samples);
@@ -711,7 +609,7 @@ export class Analyser {
     } else {
       this.slowPart();
     }
-    h.flux = fluxNorm; h.breaking = breaking;
+    h.breaking = breaking;
     return this.fillFrame();
   }
 
@@ -757,8 +655,8 @@ export class Analyser {
     const h = this.f.hop;
     const sc = this.f.section;
     const bo = this.f.bass, ri = this.f.riser, dp = this.f.drop;
-    const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock;
-    const fluxNorm = h.flux, kick = kk.kick, intensity = lv.intensity, bodyNow = h.body, inZone = lv.inZone, breaking = h.breaking,
+    const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock, ff = this.f.fft;
+    const fluxNorm = ff.flux, kick = kk.kick, intensity = lv.intensity, bodyNow = h.body, inZone = lv.inZone, breaking = h.breaking,
       inRiser = ri.inRiser, kickAtMs = kk.kickAt;
     const L = this.bands.fbLvl, A = this.bands.fbAbs, O = sp.fbOn;
     const spec = this.outSpec, specAbs = this.outSpecAbs, onset = this.outOnset;
@@ -770,8 +668,8 @@ export class Analyser {
 
     const f = this.outFrame;
     f.silent = lv.lvlSmooth <= this.silenceLevel; f.level = lv.lvlSmooth; f.levelVU = this.lvlVU;
-    f.energy = this.engSmooth;
-    f.centroid = h.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = lv.gain;
+    f.energy = ff.engSmooth;
+    f.centroid = ff.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = lv.gain;
     f.bpm = ck.bpm; f.bpmConfidence = ck.conf; f.intensity = intensity; f.kickAnchorMs = kk.beatAnchorMs;
     f.bodyDb = bodyNow; f.bassEnergy = f.silent ? 0 : bo.energy; f.bassEnergyShort = f.silent ? 0 : bo.beShort; f.bassLevel = Math.pow(10, (bo.beHi - bo.beRef) / 20);
     { let s2 = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, this.bands.fbDbRaw[b] / 20); s2 += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s2)); }
@@ -809,17 +707,7 @@ export class Analyser {
   private readonly cmd = { flagSlow: (fl: number) => this.flagSlow(fl) };   // bunden en gång: nivån flaggar tystnad till workern
   readonly levels = new LevelTracker(this.f, this.f.level, this.cmd);   // NIVÅ: förstärkning/AGC, tystnad, intensitet, nivåtak och topp-zon
   readonly bands = new SpectrumBands(this.f, this.f.spectrum);   // SPEKTRUM
-}
-
-/** Asymmetrisk EMA. */
-function ema(prev: number, x: number, aUp: number, aDown: number): number {
-  return prev + (x - prev) * (x > prev ? aUp : aDown);
-}
-
-function hannWindow(n: number): Float32Array {
-  const w = new Float32Array(n);
-  for (let i = 0; i < n; i++) w[i] = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1));
-  return w;
+  readonly fft = new SmallFft(this.f, this.f.fft);   // LILLA FFT:N: fönstrets rms, energi, flöde, kickflöde, centroid
 }
 
 export const WORKER_RESTART_BACKOFF_MS = [1000, 2000, 5000, 5000, 5000];   // DELAD ANALYSATOR

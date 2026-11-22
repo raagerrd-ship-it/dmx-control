@@ -14,6 +14,7 @@ ruta för ruta. Koden har bara korta etiketter; allt som stod i kommentarerna li
 | `analyserDrop.ts` | `DropDetector`, `drop` | DROP: flanken, slam-kandidaten, minidrop, lyft/nästan-drop/stopp | `dropStep` | 208 |
 | `analyserSection.ts` | `SectionTracker`, `sections` | sektioner: block, rang, upprepning, förutsägelse | `sectionHop`, `sectionAggStep` | 357 |
 | `analyserSpectrum.ts` | `SpectrumBands`, `bands` | snabba banden per hopp, stor-FFT:ns band, flöde, onsets, trumkittets hi-hat och virvel | `fastBandStep`, `bigStep`, `rates` | 174 |
+| `analyserFft.ts` | `SmallFft`, `fft` | lilla FFT:n: fönstrets rms, energi, flöde, kickflöde, centroid (utjämnade), snabba bandens magnitud | `hopStep`, `init` | 136 |
 | `analyserLevel.ts` | `LevelTracker`, `levels` | nivå: AGC, tystnad, intensitet, nivåtak och topp-zon | `hopStep`, `rates` | 137 |
 | `analyserKick.ts` | `KickDetector`, `kicks` | anslag i snabba vägen och kickens förfining | `hopStep` | 106 |
 | `analyserRiser.ts` | `RiserDetector`, `riser` | uppbyggnad: riser och buildUp (låg prio, ägaren 11-14) | `riserStep` | 48 |

@@ -352,3 +352,18 @@ när referensen har dem (`BORT` i `tools/refaktor/namnkarta.mjs`), och `flyttkar
 från kärnan till slutet av `fastBandStep` (samma satser, samma plats i hoppet: direkt efter banden). Takterna `dHat`/`dSnare` och `aBandLvl` i
 spektrumets `rates(dtHop)` (konstruktorn). Ramens `drum.hat`/`drum.snare` läser facket. Inget annat läser fälten; workern rör dem inte.
 `flyttkarta.json`: `hatHit`, `snareHit`.
+
+## Lilla FFT:n en egen sten (steg 26)
+
+Ny delad fil `analyserFft.ts` (`SmallFft`, `Analyser.fft`), nytt fack `FftOut` (registret `FACK.fft`, hopprecordets platser `B.fft`). Ett anrop per
+hopp, `fft.hopStep(samples)`, först i `process`: fönstret och `rms`, 512-FFT:n, `flux`/`kickFlux`/`energy`, centroiden, snabba bandens
+magnitud och utjämningen `engSmooth`/`centSmooth`. Fälten bytte fack: `hop.rms` -> `fft.rms` (`IN`), `hop.kickFlux`/`energy`/`flux` -> `fft.*` (`S`),
+`hop.centSmooth` -> `fft.centSmooth` (`IN`), `Analyser.engSmooth` -> `fft.engSmooth` (`S`), spektrumets `fbMag`/`fbPrevMag` -> `fft.*` (`S`; FFT:n byter plats
+på dem först i hoppet, spektrumet läser båda). Läsarna: nivån och kicken (`Ser<'S','fft',…>`), sektionen och uppbyggnaden (`Ser<'L','fft',…>`),
+spektrumet, kärnan (`gated`, pack/unpack, ramen). Takterna `aAtt`/`aRel` och fönstret i stenens `init(fbTop)` (konstruktorn); kärnans `ema()` och
+`hannWindow` borta (`hannWindow` exporteras ur `analyserFft.ts`, stor-FFT:n använder den).
+
+Ordningen: `engSmooth`/`centSmooth` räknas nu först i hoppet i stället för efter kicken och 100 Hz-steget. Däremellan läser ingen dem (kicken läser
+`kickFlux`/`energy`/`rms`, nivån `rms`; inline-workern läser hopprecord från tidigare hopp), och `pushBig` packar samma hopps värde som förr.
+`energy` läser nivåns `gain` före `levels.hopStep()`, som förr. `flyttkarta.json`: `hRms`, `hKickFlux`, `hEnergy`, `hFlux`, `centSmooth` pekar på
+`f.fft.*`, nya: `engSmooth`, `sumSq`, `rmsRecalc`, `fbMax`, `onsetPeakReady`, `onsetPeakDecay`, `aAtt`, `aRel`, `buffer.length/.constructor`.

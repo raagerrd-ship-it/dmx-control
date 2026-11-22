@@ -9,12 +9,13 @@ const PEAK_DECAY = Math.pow(0.9993, BIG_EVERY);   // bandPeak-decay per stor-FFT
 export interface SpectrumReads {
   hop:   Ser<'S', 'hop', 'gated'> & Ser<'L', 'hop', 'cfg' | 'bigOn'>;   // S = fastBandStep, L = bigStep
   level: Ser<'S', 'level', 'lvlSmooth'> & Ser<'L', 'level', 'lvlSmooth' | 'activeMs'>;
+  fft:   Ser<'S', 'fft', 'fbMag' | 'fbPrevMag'>;   // lilla FFT:ns magnitud, nu och förra hoppet
 }
 
 export class SpectrumBands {
-  private readonly h: SpectrumReads['hop']; private readonly lv: SpectrumReads['level'];
+  private readonly h: SpectrumReads['hop']; private readonly lv: SpectrumReads['level']; private readonly ff: SpectrumReads['fft'];
   constructor(r: SpectrumReads, private readonly o: SpectrumOut) {   // läser: r, lämnar ut: o
-    this.h = r.hop; this.lv = r.level;
+    this.h = r.hop; this.lv = r.level; this.ff = r.fft;
   }
   private bigCounter = 0;   // decimering av 2048-FFT:n
   fftBig!: FFT;   // DUBBEL-FFT
@@ -36,7 +37,6 @@ export class SpectrumBands {
   private onsetMad = new Float32Array(8);   // robust MAD
   private static readonly ONSET_K = 3.0;   // troskel
   private static readonly FB_K = [385, 475, 313, 1.46, 1.62, 1.8, 2.03, 2.12];   // 2048-medel / snabbt medel, median över 4 ladan-inspelningar
-  fbMag = new Float32Array(256); fbPrevMag = new Float32Array(256);
   fbLo = new Int32Array(8); fbHi = new Int32Array(8);
   fbCoef = new Float64Array(3 * 2 * 5);   // per lågband
   private fbState = new Float64Array(3 * 2 * 4);   // x1 x2 y1 y2 per biquad
@@ -87,7 +87,7 @@ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
         avg = Math.sqrt(this.fbPow[b]) * SpectrumBands.FB_K[b];
         const d = avg - this.fbPrevAmp[b]; fluxN = d > 0 ? d : 0; this.fbPrevAmp[b] = avg;
       } else {
-        const lo = this.fbLo[b], hi = this.fbHi[b], m = this.fbMag, pm = this.fbPrevMag;
+        const lo = this.fbLo[b], hi = this.fbHi[b], m = this.ff.fbMag, pm = this.ff.fbPrevMag;
         let sum = 0, fl = 0;
         for (let i = lo; i < hi; i++) { const v = m[i]; sum += v; const d = v - pm[i]; if (d > 0) fl += d; }
         const nb = hi - lo;
@@ -110,7 +110,6 @@ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
       const oThr = this.fbOnMed[b] + SpectrumBands.ONSET_K * this.fbOnMad[b];
       this.o.fbOn[b] = warm ? Math.max(0, Math.min(1, (fluxN - oThr) / Math.max(1e-6, this.fbOnMad[b] * 3))) : 0;
     }
-    { const t = this.fbPrevMag; this.fbPrevMag = this.fbMag; this.fbMag = t; }
     const ON = this.o.fbOn, hat = ON[6] > ON[7] ? ON[6] : ON[7];   // trumkittet: hi-hat och virvel
     this.o.hatHit = Math.max(this.o.hatHit * this.dHat, hat);
     this.o.snareHit = Math.max(this.o.snareHit * this.dSnare, ON[5]);

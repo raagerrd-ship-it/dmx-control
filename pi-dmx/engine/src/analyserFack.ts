@@ -47,18 +47,25 @@ type Taggat<O> = { readonly [K in Exclude<keyof O, Fn<O>>]: Tag | { readonly [k:
 
 /** HOPPET: kärnans fält per hopp. Skrivkartan per tråd: docs/analysator/analyserFack.md. */
 export class HopOut {
-  static readonly TRAD = { role: 'K', bigOn: 'K', cfg: 'K', dtHop: 'K', hopMs: 'K', rms: 'IN', now: 'S', dt: 'S', nowWall: 'IN', gated: 'S',
-    kickFlux: 'S', energy: 'S', flux: 'S', centSmooth: 'IN', body: 'UT', breaking: 'IN', kickHit: 'IN',
+  static readonly TRAD = { role: 'K', bigOn: 'K', cfg: 'K', dtHop: 'K', hopMs: 'K', now: 'S', dt: 'S', nowWall: 'IN', gated: 'S',
+    body: 'UT', breaking: 'IN', kickHit: 'IN',
     sec: 'IN', lvh: 'IN', conf: 'IN', bpm: 'IN' } as const satisfies Taggat<HopOut>;
   role: Role = 'all'; bigOn = false; cfg!: Cfg;   // skrivs en gång i Analysers konstruktor
   dtHop = 0; hopMs = 0.5;
-  rms = 0.5; now = 0.5; dt = 0.5; nowWall = 0.5; gated = false;
-  kickFlux = 0.5; energy = 0.5; flux = 0.5; centSmooth = 0.5; body = 0.5; breaking = false;
+  now = 0.5; dt = 0.5; nowWall = 0.5; gated = false;
+  body = 0.5; breaking = false;
   kickHit = 0;   // trumkittet
   sec = 'intro'; lvh = 0.5; conf = 0.5; bpm = 0.5;   // långsamma värden sedda vid hoppet
   constructor(readonly wallNow: () => number) { stabilise(this, ['kickHit']); }   // wallNow = analysatorns väggklocka
 }
 
+/** LILLA FFT:N (steg 26): fönstrets rms, 512-FFT:ns flöde/kickflöde/energi, utjämnad energi och centroid, snabba bandens magnitud (spektrumet läser). */
+export class FftOut {
+  static readonly TRAD = { rms: 'IN', energy: 'S', engSmooth: 'S', flux: 'S', kickFlux: 'S', centSmooth: 'IN', fbMag: 'S', fbPrevMag: 'S' } as const satisfies Taggat<FftOut>;
+  rms = 0.5; energy = 0.5; engSmooth = 0; flux = 0.5; kickFlux = 0.5; centSmooth = 0.5;   // rms..centSmooth förr hop.*, engSmooth förr på Analyser
+  fbMag = new Float32Array(256); fbPrevMag = new Float32Array(256);   // förr spektrumets
+  constructor() { stabilise(this, ['engSmooth']); }
+}
 /** NIVÅN. intensity = förr hIntensity, inZone = förr levels.inZoneState, level/lvlSmooth = förr hop.level/hop.lvlSmooth (steg 22). */
 export class LevelOut {
   static readonly TRAD = { gain: 'S', envelope: 'S', level: 'S', lvlSmooth: 'IN', activeMs: 'IN', silentMs: 'S', intensity: 'IN', levelCeil: 'IN', inZone: 'S', gainLocked: 'S' } as const satisfies Taggat<LevelOut>;   // levelCeil: räknas bara i huvudtråden, workern får den i hopprecordet
@@ -133,12 +140,12 @@ export class CharacterOut {
 }
 
 /** Registret: ett fack per sten. */
-export const FACK = { hop: HopOut, level: LevelOut, spectrum: SpectrumOut, kick: KickOut, clock: ClockOut,
+export const FACK = { hop: HopOut, fft: FftOut, level: LevelOut, spectrum: SpectrumOut, kick: KickOut, clock: ClockOut,
   section: SectionOut, bass: BassOut, riser: RiserOut, drop: DropOut, character: CharacterOut } as const;
 export type FackNamn = keyof typeof FACK;
 export type Fack = { [N in FackNamn]: InstanceType<(typeof FACK)[N]> };
 export function makeFack(wallNow: () => number): Fack {
-  return { hop: new HopOut(wallNow), level: new LevelOut(), spectrum: new SpectrumOut(), kick: new KickOut(), clock: new ClockOut(),
+  return { hop: new HopOut(wallNow), fft: new FftOut(), level: new LevelOut(), spectrum: new SpectrumOut(), kick: new KickOut(), clock: new ClockOut(),
     section: new SectionOut(), bass: new BassOut(), riser: new RiserOut(), drop: new DropOut(), character: new CharacterOut() };
 }
 

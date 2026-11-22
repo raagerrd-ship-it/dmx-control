@@ -15,7 +15,8 @@ const DOUBLE_FROM_START = ['secHiStartMs', 'secHiEndMs', 'secPct', 'secSongStart
 
 /** DET SEKTIONEN LÄSER (workern: bigAgg och blocken; odelat sectionAggStep). Inget annat går att nå. */
 export interface SectionReads {
-  hop:      Ser<'L', 'hop', 'role' | 'bigOn' | 'rms' | 'nowWall' | 'dtHop' | 'centSmooth' | 'wallNow' | 'breaking'>;
+  hop:      Ser<'L', 'hop', 'role' | 'bigOn' | 'nowWall' | 'dtHop' | 'wallNow' | 'breaking'>;
+  fft:      Ser<'L', 'fft', 'rms' | 'centSmooth'>;
   level:    Ser<'L', 'level', 'activeMs' | 'intensity'>;
   kick:     Ser<'L', 'kick', 'kick'>;
   clock:    Ser<'L', 'clock', 'bpm' | 'phaseMs'>;
@@ -25,10 +26,10 @@ export interface SectionReads {
 }
 
 export class SectionTracker {
-  private readonly h: SectionReads['hop']; private readonly lv: SectionReads['level']; private readonly kk: SectionReads['kick']; private readonly ck: SectionReads['clock'];
+  private readonly h: SectionReads['hop']; private readonly ff: SectionReads['fft']; private readonly lv: SectionReads['level']; private readonly kk: SectionReads['kick']; private readonly ck: SectionReads['clock'];
   private readonly dr: SectionReads['drop']; private readonly ri: SectionReads['riser']; private readonly sp: SectionReads['spectrum'];
   constructor(r: SectionReads, private readonly o: SectionOut) {   // läser: r, lämnar ut: o
-    this.h = r.hop; this.lv = r.level; this.kk = r.kick; this.ck = r.clock; this.dr = r.drop; this.ri = r.riser; this.sp = r.spectrum;
+    this.h = r.hop; this.ff = r.fft; this.lv = r.level; this.kk = r.kick; this.ck = r.clock; this.dr = r.drop; this.ri = r.riser; this.sp = r.spectrum;
     stabilise(this, DOUBLE_FROM_START);
     stabilise(this.secRank, ['md', 'sd', 'mk', 'sk']);   // förr sist i Analysers konstruktor
   }
@@ -354,22 +355,22 @@ export class SectionTracker {
 
   /** Odelat: sektionens block per hop (delat gör workern det i bigAgg/fromRecord). */
   sectionAggStep(): void {
-    const intensity = this.lv.intensity, kick = this.kk.kick, breaking = this.h.breaking, rms = this.h.rms;
+    const intensity = this.lv.intensity, kick = this.kk.kick, breaking = this.h.breaking, rms = this.ff.rms;
       if (this.h.bigOn) return;
       const sp = this.secSpecHop;
       if (this.sp.bigN !== this.specSeen) { this.specSeen = this.sp.bigN; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.sp.bandDbRaw[i] / 20); }
       const I = this.shIn; I.hops = 1; I.intSum = intensity; I.kicks = kick ? 1 : 0; I.breaking = breaking; I.nowMs = this.h.wallNow(); I.dtMs = this.h.dtHop * 1000;
-      I.rms2Sum = rms * rms; I.centSum = this.h.centSmooth; I.specOff = 0; I.bonSum = 0; I.bpk = 0; I.fluxSum = 0; I.rms4Sum = 0; this.sectionHop(sp);
+      I.rms2Sum = rms * rms; I.centSum = this.ff.centSmooth; I.specOff = 0; I.bonSum = 0; I.bpk = 0; I.fluxSum = 0; I.rms4Sum = 0; this.sectionHop(sp);
   }
 
   /** slow + stora vägen: sektionens hopaggregat (förr Analyser.bigAgg); hoppets värden ur facken (hopprecordet). */
   bigAgg(): void {
     const h = this.h, intensity = this.lv.intensity, kick = this.kk.kick, breaking = h.breaking, wall = h.nowWall;
     const dp = this.dr;
-    const rms = h.rms;
+    const rms = this.ff.rms;
     const sp = this.secSpecHop;
     if (this.sp.bigN !== this.specSeen) { this.specSeen = this.sp.bigN; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.sp.bandDbRaw[i] / 20); }
-    const g = this.agg; g.n++; g.int += intensity; if (kick) g.kicks++; g.rms2 += rms * rms; g.cent += h.centSmooth; g.dt += h.dtHop * 1000;
+    const g = this.agg; g.n++; g.int += intensity; if (kick) g.kicks++; g.rms2 += rms * rms; g.cent += this.ff.centSmooth; g.dt += h.dtHop * 1000;
     g.breaking = breaking ? 1 : 0; g.wall = wall; g.drops = dp.dropCand + dp.secBodyRet;
     for (let i = 0; i < 8; i++) g.spec[i] += sp[i];
   }

@@ -9,16 +9,17 @@ const DOUBLE_FROM_START = ['novSlow'] as const;   // Talfält som ska vara flytt
 
 /** DET UPPBYGGNADEN LÄSER (workern). Inget annat går att nå. */
 export interface RiserReads {
-  hop:      Ser<'L', 'hop', 'nowWall' | 'dtHop' | 'centSmooth'>;
+  hop:      Ser<'L', 'hop', 'nowWall' | 'dtHop'>;
+  fft:      Ser<'L', 'fft', 'centSmooth'>;
   spectrum: Ser<'L', 'spectrum', 'bandDbRaw'>;
   level:    Ser<'L', 'level', 'levelCeil' | 'activeMs' | 'lvlSmooth'>;
   drop:     Ser<'L', 'drop', 'lastDropMs'>;
 }
 
 export class RiserDetector {
-  private readonly h: RiserReads['hop']; private readonly sp: RiserReads['spectrum']; private readonly lv: RiserReads['level']; private readonly dp: RiserReads['drop'];
+  private readonly h: RiserReads['hop']; private readonly ff: RiserReads['fft']; private readonly sp: RiserReads['spectrum']; private readonly lv: RiserReads['level']; private readonly dp: RiserReads['drop'];
   constructor(r: RiserReads, private readonly o: RiserOut) {   // läser: r, lämnar ut: o
-    this.h = r.hop; this.sp = r.spectrum; this.lv = r.level; this.dp = r.drop;
+    this.h = r.hop; this.ff = r.fft; this.sp = r.spectrum; this.lv = r.level; this.dp = r.drop;
     stabilise(this, DOUBLE_FROM_START);
   }
   private aSpecSlow = 0; private aNovSlow = 0;   // RISER/UPPBYGGNAD
@@ -45,12 +46,12 @@ export class RiserDetector {
     this.novSlow += (nov - this.novSlow) * this.aNovSlow;
     this.novBaseline += (this.novSlow - this.novBaseline) * (dtHop / 8);
     const novRiser = this.novSlow > this.novBaseline + 0.15 && this.novSlow > 0.45;
-    this.centSlow += (this.h.centSmooth - this.centSlow) * (dtHop / 2.5);
+    this.centSlow += (this.ff.centSmooth - this.centSlow) * (dtHop / 2.5);
     this.lvlSlowR += (this.lv.lvlSmooth - this.lvlSlowR) * (dtHop / 2.5);
     const lc = this.lv.levelCeil;
     const inRiser = this.lv.activeMs > 2500 && this.lv.lvlSmooth > 0.3 * lc && nowWallA - this.dp.lastDropMs > 1500 && (
         novRiser
-        || (this.h.centSmooth > this.centSlow + 0.06 && this.lv.lvlSmooth > this.lvlSlowR + 0.04 * lc && this.lv.lvlSmooth > 0.4 * lc)
+        || (this.ff.centSmooth > this.centSlow + 0.06 && this.lv.lvlSmooth > this.lvlSlowR + 0.04 * lc && this.lv.lvlSmooth > 0.4 * lc)
       );
     const bTarget = inRiser ? 1 : 0;
     const bRate = bTarget > this.o.buildUp ? dtHop / 3.5 : dtHop / 1.0;
