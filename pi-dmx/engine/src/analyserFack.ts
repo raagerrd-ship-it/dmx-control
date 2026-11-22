@@ -74,6 +74,7 @@ export class ClockOut {
   src!: { beat?: BeatGrid | null };
   constructor() { stabilise(this, ['conf']); }
   resetPhase(): void { this.phaseMs = 0; this.phaseConf = 0; }   // hopp i klockan (setVirtualClock)
+  zeroBpm(): void { this.bpm = 0; }   // tystnad 10 s (nivån, F_SIL10)
 }
 
 /** SEKTIONEN: de 17 publicerade fälten (förr på Analyser). */

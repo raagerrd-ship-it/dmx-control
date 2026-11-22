@@ -122,3 +122,10 @@ Rattarna `BODY_RISE_DB`, `BODY_GONE_MIN_MS`, `DROP_QUALITY_DB`, `DROP_RISE_LOW_D
 samma plats och ordning som förut. `dbgRms` borta: kicken läser `f.hop.rms` (samma värde, skrevs på raden före). `KICK_NOGATE`, `KICK_COOLDOWN_MS`, `KICK_EFLOOR`
 är modulkonstanter i `analyserKick.ts` (förr statiska på `Analyser`; bara kicken läser dem).
 `tools/ensam.mjs tappa kicks kickStep` går inte att spela upp (gick inte före steget heller): rutnätet `f.clock.src.beat` är ett objekt som dyker upp under körningen och tappas inte.
+
+## Nivån efter kontraktet (steg 11)
+
+`LevelReads` (hop: `rms`, `now`, `dt`, `hopMs`, `dtHop`, `gated`, `lvlSmooth`, `role`, `cfg`; clock: `bpm`, `zeroBpm`), eget fack `f.level`, kommandot `LevelCmd.flagSlow`
+(Analysers `cmd = { flagSlow }`, bundet en gång). Tystnad 10 s nollar tempot med kommandot `f.clock.zeroBpm()` (ny metod i `ClockOut`), likaså `F_SIL10` i workern.
+Kärnans kopior borta: `lv.intensity = intensity` (två rader i `process`, samma värde som `intensityStep` skrev) och `hInZone` (ramen läser `f.level.inZone`;
+ingen skriver fältet mellan `zoneStep` och ramen i samma instans).

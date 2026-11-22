@@ -1,21 +1,28 @@
 /**  NIVÅN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserLevel.md */
-import { Analyser } from "./analyser.js";
+import { type HopOut, type ClockOut, type LevelOut } from "./analyserFack.js";
 import { F_SIL350, F_SIL10 } from './split.js';
 
+/** DET NIVÅN LÄSER. Inget annat går att nå. zeroBpm = kommando till klockan. */
+export interface LevelReads {
+  hop:   Readonly<Pick<HopOut, 'rms' | 'now' | 'dt' | 'hopMs' | 'dtHop' | 'gated' | 'lvlSmooth' | 'role' | 'cfg'>>;
+  clock: Readonly<Pick<ClockOut, 'bpm' | 'zeroBpm'>>;
+}
+/** Nivåns kommando till kärnan: flagga tystnad till workern. */
+export interface LevelCmd { flagSlow(f: number): void }
 
 export class LevelTracker {
-  a: Analyser;   // analysatorn som äger den här delen
-  constructor(a: Analyser) {
-    this.a = a;
+  private readonly h: LevelReads['hop']; private readonly ck: LevelReads['clock'];
+  constructor(r: LevelReads, private readonly o: LevelOut, private readonly cmd: LevelCmd) {   // läser: r, lämnar ut: o
+    this.h = r.hop; this.ck = r.clock;
   }
   aIUp = 0; aIDown = 0;
-  private silenceArmed = false;   // true = tystnadssläppningen redan gjord för denna tystnad
-  private intensityEma = 0.5;   // sektionsenergi
-  private intensityFloor = 0.5;   // dess robusta P50-baslinje
-  private intensitySpread = 0.05;   // glidande medelabsolutavvikelse
+  private silenceArmed = false;   // true = tystnadssläppningen redan gjord för denna tystnad
+  private intensityEma = 0.5;   // sektionsenergi
+  private intensityFloor = 0.5;   // dess robusta P50-baslinje
+  private intensitySpread = 0.05;   // glidande medelabsolutavvikelse
 
 
-  private static readonly AGC_BLOCKS = 16;   // PERCENTIL-AGC
+  private static readonly AGC_BLOCKS = 16;   // PERCENTIL-AGC
   private static readonly AGC_BLOCK_MS = 128;
   private agcBlocks = new Float32Array(LevelTracker.AGC_BLOCKS);
   private agcBlockIdx = 0;
@@ -51,47 +58,47 @@ export class LevelTracker {
 
   /** AGC (bara mic). */
   agcStep(): void {
-    const rms = this.a.f.hop.rms, now = this.a.f.hop.now, dt = this.a.f.hop.dt;
-    const d = this.a.f.hop.cfg.detection;
+    const rms = this.h.rms, now = this.h.now, dt = this.h.dt;
+    const d = this.h.cfg.detection;
       const env = this.agcEnvelope(rms, now);
       if (env > 0) {
-        this.a.f.level.envelope = env;
+        this.o.envelope = env;
         const desired = d.autoGainTarget / Math.max(1e-4, env);
-        const gTau = desired > this.a.f.level.gain ? d.tauUp * 2 : d.tauDown * 0.25;
+        const gTau = desired > this.o.gain ? d.tauUp * 2 : d.tauDown * 0.25;
         const ga = 1 - Math.exp(-dt / gTau);
-        this.a.f.level.gain += (desired - this.a.f.level.gain) * ga;
-        if (this.a.f.level.gain < 0.5) this.a.f.level.gain = 0.5;
-        else if (this.a.f.level.gain > 20) this.a.f.level.gain = 20;
+        this.o.gain += (desired - this.o.gain) * ga;
+        if (this.o.gain < 0.5) this.o.gain = 0.5;
+        else if (this.o.gain > 20) this.o.gain = 20;
       }
   }
 
   /** Tystnadsflanken. */
   silenceStep(): void {
-    const hopMs = this.a.f.hop.hopMs;
-    if (!this.a.f.hop.gated) {
-      this.a.f.level.silentMs += hopMs;
-      if (this.a.f.level.silentMs > 350 && !this.silenceArmed) {
+    const hopMs = this.h.hopMs;
+    if (!this.h.gated) {
+      this.o.silentMs += hopMs;
+      if (this.o.silentMs > 350 && !this.silenceArmed) {
         this.silenceArmed = true;
-        if (this.a.f.hop.role === 'fast') this.a.flagSlow(F_SIL350);
-      } else if (this.silenceArmed && this.a.f.level.silentMs > 10000 && this.a.f.clock.bpm !== 0) {
-        this.a.f.clock.bpm = 0;
-        this.a.flagSlow(F_SIL10);
+        if (this.h.role === 'fast') this.cmd.flagSlow(F_SIL350);
+      } else if (this.silenceArmed && this.o.silentMs > 10000 && this.ck.bpm !== 0) {
+        this.ck.zeroBpm();
+        this.cmd.flagSlow(F_SIL10);
       }
     } else {
-      this.a.f.level.silentMs = 0;
+      this.o.silentMs = 0;
       this.silenceArmed = false;
     }
   }
 
   /** Sektionsenergi 0..1. */
   intensityStep(): void {
-    const dtHop = this.a.f.hop.dtHop;
-    if (this.a.f.hop.gated) this.a.f.level.activeMs += dtHop * 1000;
-    else this.a.f.level.activeMs = 0;
+    const dtHop = this.h.dtHop;
+    if (this.h.gated) this.o.activeMs += dtHop * 1000;
+    else this.o.activeMs = 0;
     const iUp = this.aIUp;
     const iDown = this.aIDown;
-    this.intensityEma += (this.a.f.hop.lvlSmooth - this.intensityEma) * (this.a.f.hop.lvlSmooth > this.intensityEma ? iUp : iDown);
-    const iWarm = this.a.f.level.activeMs < 8000;
+    this.intensityEma += (this.h.lvlSmooth - this.intensityEma) * (this.h.lvlSmooth > this.intensityEma ? iUp : iDown);
+    const iWarm = this.o.activeMs < 8000;
     const floorRate = iWarm ? dtHop / 3 : dtHop / 150;
     if (iWarm) this.intensityFloor += (this.intensityEma - this.intensityFloor) * floorRate;
     else this.intensityFloor += (this.intensityEma > this.intensityFloor ? 1 : this.intensityEma < this.intensityFloor ? -1 : 0) * floorRate * (this.intensityFloor + 0.05);
@@ -99,13 +106,13 @@ export class LevelTracker {
     this.intensitySpread += (Math.abs(dev) - this.intensitySpread) * (iWarm ? dtHop / 3 : dtHop / 60);
     const scale = Math.max(0.015, this.intensitySpread) * 4;
     const intensity = Math.max(0, Math.min(1, 0.5 + dev / scale));
-    this.a.f.level.intensity = intensity;
+    this.o.intensity = intensity;
   }
 
   /** NIVÅTAKET OCH TOPP-ZONEN. */
   zoneStep(): void {
-    this.a.f.level.levelCeil = Math.max(this.a.f.hop.lvlSmooth, this.a.f.level.levelCeil - this.a.f.hop.dtHop * 0.015 * this.a.f.level.levelCeil);
-    if (this.a.f.hop.lvlSmooth > this.a.f.level.levelCeil * 0.85) this.a.f.level.inZone = true;
-    else if (this.a.f.hop.lvlSmooth < this.a.f.level.levelCeil * 0.70) this.a.f.level.inZone = false;
+    this.o.levelCeil = Math.max(this.h.lvlSmooth, this.o.levelCeil - this.h.dtHop * 0.015 * this.o.levelCeil);
+    if (this.h.lvlSmooth > this.o.levelCeil * 0.85) this.o.inZone = true;
+    else if (this.h.lvlSmooth < this.o.levelCeil * 0.70) this.o.inZone = false;
   }
 }

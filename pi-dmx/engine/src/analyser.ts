@@ -211,7 +211,6 @@ export class Analyser {
   hopLane: HopLaneFast | null = null;   // TAKTVÄGEN
   hopSelf = false;   // EN KLOCKA
   private syncWorker = false;   // fast: vänta på workern efter varje record
-  private hInZone = false;   // HOPPETS VÄRDEN
   secAgg = { n: 0, int: 0, kicks: 0, breaking: 0, rms2: 0, cent: 0, dt: 0, wall: 0, drops: 0, active: 0, build: 0, spec: new Float64Array(8), bon: 0, bpk: 0, flux: 0, rms4: 0 };
   private inlinePeer: Analyser | null = null;
   private bigRing: Float64Array | null = null; private bigPcm: Float32Array | null = null; private bigState: Float64Array | null = null;   private bigSeq = 0; private bigCopy = new Float64Array(BIG_STATE_LEN); private bigRd = new StateReader();  private specDelivered = 0;  private bigSkipped = 0;
@@ -455,7 +454,7 @@ export class Analyser {
     if (flags & F_RESET_TEMPO) this.resetTempo();
     if (flags & F_HINT) this.hintTrackChange(hintMs);
     if (flags & F_RESET_BAR) this.resetBar();
-    if (flags & F_SIL10) this.f.clock.bpm = 0;
+    if (flags & F_SIL10) this.f.clock.zeroBpm();
   }
   /** Ett record. */
   private slowStep(o: number): void {
@@ -790,7 +789,6 @@ export class Analyser {
     h.centSmooth = ema(h.centSmooth, centroid, aAtt, aRel);
 
     this.levels.intensityStep();
-    const intensity = lv.intensity;
 
     if (!big) {
     this.bands.bigRingPush(samples);
@@ -806,11 +804,10 @@ export class Analyser {
     const nowWallA = this.wallNow();
     this.levels.zoneStep();
     const breaking = h.lvlSmooth < lv.levelCeil * 0.65;
-    const inZone = lv.inZone;
 
     h.nowWall = nowWallA;
     if (big) {
-      lv.intensity = intensity; h.breaking = breaking;
+      h.breaking = breaking;
       this.pushBig(samples);
     } else {
       const bodyNow = (sp.bandDbRaw[0] + sp.bandDbRaw[1] + sp.bandDbRaw[2]) / 3;
@@ -821,7 +818,7 @@ export class Analyser {
       h.conf = ck.conf;
       this.character.profileStep();
     }
-    h.level = level; h.flux = fluxNorm; lv.intensity = intensity; this.hInZone = inZone; h.breaking = breaking;
+    h.level = level; h.flux = fluxNorm; h.breaking = breaking;
     return this.fillFrame();
   }
 
@@ -859,7 +856,7 @@ export class Analyser {
     const sc = this.f.section;
     const bo = this.f.bass, ri = this.f.riser, dp = this.f.drop;
     const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock;
-    const level = h.level, fluxNorm = h.flux, kick = kk.kick, intensity = lv.intensity, bodyNow = h.body, inZone = this.hInZone, breaking = h.breaking,
+    const level = h.level, fluxNorm = h.flux, kick = kk.kick, intensity = lv.intensity, bodyNow = h.body, inZone = lv.inZone, breaking = h.breaking,
       inRiser = ri.inRiser, kickAtMs = kk.kickAt, nowWallA = h.nowWall;
     const FB = Analyser.FAST_BANDS, L = FB ? this.bands.fbLvl : sp.bandLvl, A = FB ? this.bands.fbAbs : sp.bandAbs, O = FB ? sp.fbOn : sp.bandOn;
     const spec = this.outSpec, specAbs = this.outSpecAbs, onset = this.outOnset;
@@ -906,7 +903,8 @@ export class Analyser {
   readonly character = new CharacterProfile(this.f, this.f.character);   // KARAKTÄR
   readonly kicks = new KickDetector(this.f, this.f.kick);   // KICK: anslag i snabba vägen
   readonly bass = new BassTracker(this.f, this.f.bass);   // BAS: basenergin per slag och basgången
-  readonly levels = new LevelTracker(this);   // NIVÅ: förstärkning/AGC, tystnad, intensitet, nivåtak och topp-zon
+  private readonly cmd = { flagSlow: (fl: number) => this.flagSlow(fl) };   // bunden en gång: nivån flaggar tystnad till workern
+  readonly levels = new LevelTracker(this.f, this.f.level, this.cmd);   // NIVÅ: förstärkning/AGC, tystnad, intensitet, nivåtak och topp-zon
   readonly bands = new SpectrumBands(this);   // SPEKTRUM
 }
 
