@@ -1,6 +1,6 @@
 /** ENAD ANALYSATOR (2026-09-24) — en fil, samma byte i lotus-light-link (pi/src/audio-analyser/) och dmx-control (pi-dmx/engine/src/). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyser.md */
 
-import { sysEnv, stabilise, makeFack, type Fack, BODY_CEIL_DB_S, BE_FALLBACK_MS, BASS_SPAN_DB, BIG_EVERY, SECTION_AGG_HOP,
+import { sysEnv, stabilise, makeFack, off, type Fack, BODY_CEIL_DB_S, BE_FALLBACK_MS, BASS_SPAN_DB, BIG_EVERY, SECTION_AGG_HOP,
   type BeatGrid, type AnalyserDetection, type Cfg, type Role } from './analyserFack.js';
 export { BASS_SPAN_DB, SECTION_AGG_HOP, BODY_CEIL_DB_S };
 export type { BeatGrid, AnalyserDetection, Cfg, Role };
@@ -256,7 +256,7 @@ export class Analyser {
     const seq = ++this.recSeq; const o = (seq % RING_N) * REC_LEN;
     r[o + R_PERF] = this.perfNow(); r[o + R_WALL] = this.wallNow(); r[o + R_TS] = Date.now();
     r[o + R_ENV] = e; r[o + R_BASS] = b; r[o + R_HIGH] = h; r[o + R_FLAGS] = this.pendFlags; r[o + R_HINT_MS] = this.pendHintMs; r[o + R_VCLOCK] = this.pendVclock;
-    this.sections.toRecord(r, o);
+    this.sections?.toRecord(r, o);
     r[o + R_FLAGCNT] = packFlagCounts(this.flagCnt);
     r[o + R_CLOCK] = this.f.clock.bpm; r[o + R_CLOCK_CONF] = this.f.clock.conf;
     r[o + R_BIGSEQ] = this.bigSeq;
@@ -276,7 +276,7 @@ export class Analyser {
     if (!this.stateRd.read(this.splitCtrl!, this.splitState!, this.stateCopy)) return;
     const s = this.stateCopy; if (s[S_REC_SEQ] < this.barrierSeq) return;
     this.f.clock.phaseMs = s[S_PHASE_MS]; this.f.clock.phaseConf = s[S_PHASE_CONF];
-    this.sections.unpack(s);
+    this.sections?.unpack(s);
   }
   setInlinePeer(slow: Analyser | null): void { this.inlinePeer = slow; }
   /** Halsa for /api/live. */
@@ -324,7 +324,7 @@ export class Analyser {
       stateWrite(ctrl, this.splitState!, (s) => {
         s[S_REC_SEQ] = this.recSeq; s[S_BPM] = this.f.clock.bpm; s[S_CONF] = this.f.clock.conf; s[S_BPMF] = this.localBpmF;
         s[S_PHASE_MS] = this.f.clock.phaseMs; s[S_PHASE_CONF] = this.f.clock.phaseConf;
-        this.sections.pack(s);
+        this.sections?.pack(s);
         s[S_PROCESSED] = this.slowProcessed; s[S_LAG_MS] = lagMs; s[S_LAG_MAX] = this.slowLagMaxMs; s[S_BUSY_US] = this.slowBusyEmaUs; s[S_BUSY_MAX_US] = this.slowBusyMaxUs; s[S_SKIPPED] = this.slowSkipped; s[S_LOST_FLAGS] = this.slowLostFlags;
       });
       if (this.syncWorker) Atomics.notify(ctrl, C_STATE_SEQ);
@@ -351,7 +351,7 @@ export class Analyser {
     else if (this.syncWorker) syncWait(ctrl, C_BIG_SEQ, () => this.bigRd.read(ctrl, this.bigState!, this.bigCopy, C_BIG_SEQ) && this.bigCopy[BS_SEQ] >= seq);
     const s = this.bigCopy;
     if (!this.bigRd.read(ctrl, this.bigState!, s, C_BIG_SEQ) || s[BS_SEQ] === 0) return;
-    h.body = s[BS_BODY]; this.drop.unpack(s); this.riser.unpack(s); this.character.unpack(s);
+    h.body = s[BS_BODY]; this.drop?.unpack(s); this.riser?.unpack(s); this.character?.unpack(s);
     const sn = s[BS_SPEC_N];
     if (sn > this.specDelivered) {
       const sink = sp.sink, binHz = h.cfg.audio.rate / this.bands.bufferBig.length, R = this.bands.specRing!, c = this.bands.specCopy;
@@ -374,8 +374,8 @@ export class Analyser {
       const seq = ++this.bigSeq, slot = seq % BIG_RING_N, o = slot * BIG_REC_LEN;
       if (r[o + B_SEQ] !== seq) { this.bigSkipped++; continue; }
       const hn = r[o + B_N];
-      this.bass.accumulate();
-      if (r[o + B_ENVF] === 1) { h.bpm = r[o + B_ENVBPM]; this.bass.stepBassline(); }
+      this.bass?.accumulate();
+      if (r[o + B_ENVF] === 1) { h.bpm = r[o + B_ENVBPM]; this.bass?.stepBassline(); }
       h.rms = r[o + B_RMS]; h.lvlSmooth = r[o + B_LVL]; h.centSmooth = r[o + B_CENT]; lv.activeMs = r[o + B_ACTIVE]; h.kickHit = r[o + B_KICKHIT];
       this.levels.zoneStep();
       const wall = r[o + B_WALL];
@@ -383,18 +383,18 @@ export class Analyser {
       this.bands.bigTick();
       h.nowWall = wall; h.body = (sp.bandDbRaw[0] + sp.bandDbRaw[1] + sp.bandDbRaw[2]) / 3;
       h.sec = SECTIONS[r[o + B_SEC]]; h.lvh = r[o + B_LVH];
-      this.drop.dropStep();
-      this.riser.riserStep();
+      this.drop?.dropStep();
+      this.riser?.riserStep();
       h.conf = r[o + B_CONF];
-      this.character.profileStep();
-      this.sections.bigAgg(r[o + B_INT], r[o + B_KICK] === 1, r[o + B_BREAK] === 1, wall);
+      this.character?.profileStep();
+      this.sections?.bigAgg(r[o + B_INT], r[o + B_KICK] === 1, r[o + B_BREAK] === 1, wall);
       n++;
       if (this.bigYield) this.bigYield();
     }
     if (n > 0) {
       Atomics.store(ctrl, C_BIG_READ, seqLow(this.bigSeq));
       stateWrite(ctrl, this.bigState!, (s) => {
-        s[BS_SEQ] = this.bigSeq; s[BS_BODY] = h.body; this.drop.pack(s); this.riser.pack(s); this.character.pack(s); s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped;
+        s[BS_SEQ] = this.bigSeq; s[BS_BODY] = h.body; this.drop?.pack(s); this.riser?.pack(s); this.character?.pack(s); s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped;
       }, C_BIG_SEQ);
       if (this.syncWorker) Atomics.notify(ctrl, C_BIG_SEQ);
     }
@@ -420,7 +420,7 @@ export class Analyser {
     this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
     this.f.clock.bpm = r[o + R_CLOCK], this.f.clock.conf = r[o + R_CLOCK_CONF];
     this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
-    this.sections.fromRecord(r, o);
+    this.sections?.fromRecord(r, o);
   }
 
   /** Sparets tid. */
@@ -442,7 +442,7 @@ export class Analyser {
     if (this.f.hop.role !== 'slow') this.trackBoundaries++;
     if (BPM_TRACE) console.log(`[bpmrst] t=${this.traceT().toFixed(1)} HINT bpm=${this.f.clock.bpm} conf=${this.f.clock.conf.toFixed(2)}`);
     if (this.f.hop.role === 'fast') { this.pendHintMs = windowMs; this.flagSlow(F_HINT); }
-    if (sections) this.sections.carry();
+    if (sections) this.sections?.carry();
   }
 
   /** Taktfasen är applicerad av motorn. */
@@ -460,7 +460,7 @@ export class Analyser {
     const jump = ms === null || !this.virtualOn || ms < prev || ms - prev > 1000;
     if (ms === null) { this.virtualOn = false; this.virtualMs = NaN; } else { this.virtualOn = true; this.virtualMs = ms; }
     if (!jump) return;
-    this.kicks.reset(); this.f.clock.resetPhase(); this.sections.sectionReset();
+    this.kicks?.reset(); this.f.clock.resetPhase(); this.sections?.sectionReset();
     this.lastT = 0;
   }
   /** KORBANK. */
@@ -509,7 +509,7 @@ export class Analyser {
         this.bigRing = new Float64Array(splitBuf.big); this.bigPcm = new Float32Array(splitBuf.bigPcm); this.bigState = new Float64Array(splitBuf.bigState); this.bands.specRing = new Float32Array(splitBuf.spec);
         if (h.role === 'slow') {
           const sq = Atomics.load(v.ctrl, C_BIG_SEQ); if (sq & 1) Atomics.store(v.ctrl, C_BIG_SEQ, sq + 1);
-          const st = this.bigState; this.bigSeq = st[BS_SEQ]; this.bands.resume(st); this.drop.resume(st); this.sections.resume(st);
+          const st = this.bigState; this.bigSeq = st[BS_SEQ]; this.bands.resume(st); this.drop?.resume(st); this.sections?.resume(st);
         }
       }
     }
@@ -588,8 +588,8 @@ export class Analyser {
     this.dHat = Math.exp(-dtHop / 0.06);
     this.dSnare = Math.exp(-dtHop / 0.11);
     this.dKick = Math.exp(-dtHop / 0.15);
-    this.riser.rates(dtHop);
-    this.character.rates(dtHop);
+    this.riser?.rates(dtHop);
+    this.character?.rates(dtHop);
     this.outFrame = {
       silent: true, level: 0, levelRaw: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
@@ -690,7 +690,7 @@ export class Analyser {
     const level = Math.min(1, rms * lv.gain);
 
     h.kickFlux = kickFlux; h.energy = energy;
-    this.kicks.kickStep();
+    this.kicks?.kickStep();
 
     const hopMs = h.hopMs;
     this.levels.silenceStep();
@@ -699,11 +699,11 @@ export class Analyser {
     const bassFluxNorm = Math.min(1, kickFlux * (h.cfg.onset.enhancements ? 0.5 : 0.02));
     if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
     const big = h.bigOn;
-    if (!big) this.bass.accumulate();
+    if (!big) this.bass?.accumulate();
     if (HIGH_ON) { const hi = sp.bandOn[6] > sp.bandOn[7] ? sp.bandOn[6] : sp.bandOn[7]; if (hi > this.envHighAccum) this.envHighAccum = hi; }
     this.envAccumT += hopMs;
     if (this.envAccumT >= 1000 / Analyser.ENV_HZ) this.envSampleStep();
-    this.kicks.anchorStep();
+    this.kicks?.anchorStep();
 
     const dtHop = h.dtHop;
     const aAtt = this.aAtt;
@@ -738,10 +738,10 @@ export class Analyser {
       const bodyNow = (sp.bandDbRaw[0] + sp.bandDbRaw[1] + sp.bandDbRaw[2]) / 3;
       h.body = bodyNow;
       h.sec = sc.section; h.lvh = sc.levelVsHighDb;
-      this.drop.dropStep();
-      this.riser.riserStep();
+      this.drop?.dropStep();
+      this.riser?.riserStep();
       h.conf = ck.conf;
-      this.character.profileStep();
+      this.character?.profileStep();
     }
     h.level = level; h.flux = fluxNorm; h.breaking = breaking;
     return this.fillFrame();
@@ -765,14 +765,14 @@ export class Analyser {
       const _b = this.envBassAccum, _h = this.envHighAccum;
       this.envRing[this.envPos] = _e;
       this.envBassRing[this.envPos] = _b;
-      if (h.bigOn) { this.bigEnvFlag = 1; this.bigEnvBpm = ck.bpm; } else { h.bpm = ck.bpm; this.bass.stepBassline(); }
+      if (h.bigOn) { this.bigEnvFlag = 1; this.bigEnvBpm = ck.bpm; } else { h.bpm = ck.bpm; this.bass?.stepBassline(); }
       if (HIGH_ON) this.envHighRing[this.envPos] = _h;
       this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
       this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
       this.envAccum = 0;
       this.envBassAccum = 0;
       if (HIGH_ON) this.envHighAccum = 0;
-      if (h.role === 'fast') { this.pushSlowRecord(_e, _b, _h); } else if (!SECTION_AGG_HOP) this.sections.sectionFlushAgg();
+      if (h.role === 'fast') { this.pushSlowRecord(_e, _b, _h); } else if (!SECTION_AGG_HOP) this.sections?.sectionFlushAgg();
   }
 
   /** Muterar det ateranvanda Frame:t. */
@@ -796,14 +796,14 @@ export class Analyser {
     f.energy = this.engSmooth;
     f.centroid = h.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = lv.gain;
     f.bpm = ck.bpm; f.bpmConfidence = ck.conf; f.intensity = intensity; f.beatAnchorMs = kk.beatAnchorMs;
-    f.bodyDb = bodyNow; this.bass.bassEnergyStep(A[0], A[1]); f.bassEnergy = f.silent ? 0 : bo.energy; f.bassEnergyShort = f.silent ? 0 : bo.beShort; f.bassLevel = Math.pow(10, (bo.beHi - bo.beRef) / 20);
+    f.bodyDb = bodyNow; this.bass?.bassEnergyStep(A[0], A[1]); f.bassEnergy = f.silent ? 0 : bo.energy; f.bassEnergyShort = f.silent ? 0 : bo.beShort; f.bassLevel = Math.pow(10, (bo.beHi - bo.beRef) / 20);
     { let s2 = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, (FB ? this.bands.fbDbRaw : sp.bandDbRaw)[b] / 20); s2 += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s2)); }
     f.dropCount = dp.dropCount; f.miniDropCount = dp.miniDropCount; f.buildStartCount = dp.buildStartCount; f.dropDemoted = dp.dropDemoted; f.dropSpaced = dp.dropSpaced; f.dropRiseDb = dp.dropRiseDb;
     f.nearDropDb = dp.nearDropDb; f.nearDipDb = dp.nearDipDb; f.liftDb = dp.liftDb; f.stopCount = dp.stopCount; f.stopS = dp.stopS; f.inZone = inZone; f.breaking = breaking; f.buildUp = ri.buildUp; f.inRiser = inRiser;
     f.kickAtMs = kickAtMs; f.barShift = -1;
     f.beatPhaseMs = ck.phaseMs > 0 ? ck.phaseMs - Analyser.GRID_PHASE_OFFSET_MS : ck.phaseMs;
     f.beatPhaseConf = ck.phaseConf;
-    this.sections.sectionAggStep();
+    this.sections?.sectionAggStep();
     const nowS = SECTION_AGG_HOP ? this.wallNow() : nowWallA;
     f.buildProg = sc.secBuildAt > 0 && nowS - sc.secBuildSeen <= 2000 ? Math.min(1, (nowS - sc.secBuildAt) / (32 * (ck.bpm > 0 ? 60000 / ck.bpm : Analyser.BE_FALLBACK_MS))) : 0;
     f.section = sc.section; f.sectionAgeMs = sc.sectionStartMs > 0 ? nowS - sc.sectionStartMs : 0; f.sectionIndex = sc.sectionIndex; f.sectionTier = sc.sectionTier;
@@ -822,12 +822,13 @@ export class Analyser {
   readonly clockOut: ClockCfg = { beat: undefined, beatErr: undefined };
   /** Klockans utfall till motorn. */
   publishClock(cfg: ClockCfg): void { cfg.beat = this.clockOut.beat; cfg.beatErr = this.clockOut.beatErr; }
-  readonly drop = new DropDetector(this.f, this.f.drop);   // DROP: flanken, slam-kandidaten, minidrop, lyft/nästan-drop/stopp
-  readonly sections = new SectionTracker(this.f, this.f.section);   // SEKTIONER
-  readonly riser = new RiserDetector(this.f, this.f.riser);   // UPPBYGGNAD
-  readonly character = new CharacterProfile(this.f, this.f.character);   // KARAKTÄR
-  readonly kicks = new KickDetector(this.f, this.f.kick);   // KICK: anslag i snabba vägen
-  readonly bass = new BassTracker(this.f, this.f.bass);   // BAS: basenergin per slag och basgången
+  // KEDJAN. Stäng av en sten = byt dess rad mot off('namn') (facket med neutral(): off('sektion', this.f.section)).
+  readonly drop: DropDetector | null = new DropDetector(this.f, this.f.drop);   // DROP: flanken, slam-kandidaten, minidrop, lyft/nästan-drop/stopp
+  readonly sections: SectionTracker | null = new SectionTracker(this.f, this.f.section);   // SEKTIONER
+  readonly riser: RiserDetector | null = new RiserDetector(this.f, this.f.riser);   // UPPBYGGNAD
+  readonly character: CharacterProfile | null = new CharacterProfile(this.f, this.f.character);   // KARAKTÄR
+  readonly kicks: KickDetector | null = new KickDetector(this.f, this.f.kick);   // KICK: anslag i snabba vägen
+  readonly bass: BassTracker | null = new BassTracker(this.f, this.f.bass);   // BAS: basenergin per slag och basgången
   private readonly cmd = { flagSlow: (fl: number) => this.flagSlow(fl) };   // bunden en gång: nivån flaggar tystnad till workern
   readonly levels = new LevelTracker(this.f, this.f.level, this.cmd);   // NIVÅ: förstärkning/AGC, tystnad, intensitet, nivåtak och topp-zon
   readonly bands = new SpectrumBands(this.f, this.f.spectrum);   // SPEKTRUM

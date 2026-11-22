@@ -68,6 +68,7 @@ export class KickOut {
   beatAnchorMs = 0; pendingKickMs = 0; lastKick = 0; kfPrev = 0; kfPrev2 = 0;
   dbgKick: { flux: number; thresh: number; med: number; mad: number; energy: number; gain: number; rms: number; env: number; locked: boolean } | null = null;
   constructor() { stabilise(this, ['pendingKickMs', 'kfPrev', 'kfPrev2', 'beatAnchorMs', 'lastKick']); }
+  neutral(): void { this.kickAt = 0; }   // kicken av: ingen förfinad kick (0,5 vore en kick vid 0,5 ms för klockan)
 }
 /** KLOCKAN sedd av analysatorn: bpm/conf = förr localBpm/localBpmConfidence, phaseMs/phaseConf = gridfasen, src = förr beatSrc (samma objekt). */
 export class ClockOut {
@@ -84,11 +85,13 @@ export class SectionOut {
   repeatSim = 0; repeatAgoMs = 0; repeatSection = ''; repeatTier = -1; repeatHighAtMs = 0; repeatHighEndAtMs = 0;
   expectHighMs = 0; expectSource = 0; secBuildAt = 0; secBuildSeen = 0; boundaryNov = 0;
   constructor() { stabilise(this, ['expectHighMs', 'levelVsHighDb', 'sectionStartMs', 'secBuildAt', 'secBuildSeen', 'repeatSim', 'repeatAgoMs']); }
+  neutral(): void { this.section = ''; }   // sektionen av: '' = okänd (sectionCode 0); 'intro' skulle ge drops lugn-veto
 }
 /** BASEN. bassline/onsetsPerBeat = förr profBassline/bassOnsetsPerBeat. */
 export class BassOut {
   beHi = NaN; beRef = NaN; beShort = 0; energy = 0; bassline = 0; onsetsPerBeat = 0;
   constructor() { stabilise(this, ['bassline', 'onsetsPerBeat']); }
+  neutral(): void { this.beHi = 0; this.beRef = 0; }   // basen av: bassLevel 1 i stället för NaN
 }
 /** UPPBYGGNADEN. inRiser = förr hInRiser. */
 export class RiserOut { buildUp = 0; inRiser = false; constructor() { stabilise(this, ['buildUp']); } }
@@ -107,4 +110,11 @@ export interface Fack { hop: HopOut; level: LevelOut; spectrum: SpectrumOut; kic
 export function makeFack(wallNow: () => number): Fack {
   return { hop: new HopOut(wallNow), level: new LevelOut(), spectrum: new SpectrumOut(), kick: new KickOut(), clock: new ClockOut(),
     section: new SectionOut(), bass: new BassOut(), riser: new RiserOut(), drop: new DropOut(), character: new CharacterOut() };
+}
+
+/** EN AVSTÄNGD STEN: facket får sitt neutrala värde, och det syns i loggen. */
+export function off(name: string, fack?: { neutral(): void }): null {
+  fack?.neutral();
+  console.log(`[analysator] sten av: ${name}`);
+  return null;
 }

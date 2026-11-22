@@ -160,3 +160,18 @@ Sektionens privata delar och ledningen mellan trådarna ligger i stenen (förr p
   `BODY_HIGH_MS/DB` borta (ingen läser dem längre; värdena i facket). `stabilise(secRank)` sist i stenens konstruktor (förr sist i Analysers).
 
 `tools/ensam.mjs tappa sections sectionHop` gick inte att spela upp före steget (AVVIKER i 162 337 steg) och provas inte här.
+
+## Kedjan (steg 14): `| null`, `off()`, `neutral()`
+
+- De avstängbara stenarna (`kicks`, `bass`, `drop`, `riser`, `character`, `sections`) är `X | null` i `Analyser` och anropas med `?.` överallt,
+  också deras transport (`pack`/`unpack`/`resume`, `toRecord`/`fromRecord`, `rates`, `reset`, `carry`). Är stenen av är transporten av, i båda trådarna.
+  Grundstenarna `levels` och `bands` saknar `| null`. Vakt: `grep -nE "this\.(kicks|bass|drop|riser|character|sections)\.[A-Za-z]" src/analyser.ts` = 0.
+- Prova utan en sten (på en backup-gren, döm på bänken): byt kedjeraden mot `off('namn')`, eller `off('namn', this.f.<fack>)` där facket har `neutral()`.
+  `off()` kör `neutral()` och loggar `[analysator] sten av: <namn>` (en rad per `Analyser`, alltså en per tråd).
+- `neutral()` finns där startvärdet inte är det neutrala:
+  `SectionOut` (`section = ''`: okänd, `sectionCode('') = 0`; med `'intro'` skulle drops lugn-veto alltid gälla),
+  `BassOut` (`beHi = beRef = 0`: `bassLevel = 1` i stället för NaN),
+  `KickOut` (`kickAt = 0`: startvärdet 0,5 skulle klockan läsa som en kick vid 0,5 ms, `analyserClock.ts` `frame.kickAtMs > 0`).
+- Provet: `node tools/refaktor/avstangning.mjs [sek] [wav]` bygger en kopia per sten under `.arena/flytten/s14/av/` (DMX och lotus profil) och kör
+  odelad, inline och inline med omstart. Krav per ruta: stenens ramfält neutrala, inget NaN, samma `typeof` som påslaget, inget undantag, loggraden syns,
+  för sektionen 0 `[dropcalm]` med DROP_TRACE. Samma prov på påslaget bygge ska fälla (kontrollkolumnen).
