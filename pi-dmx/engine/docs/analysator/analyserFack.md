@@ -217,9 +217,7 @@ skrivs när analysatorn är delad (huvudtråden `fast` + workern `slow`, med `bi
 - Kärnan (`analyser.ts`) läser facken direkt och kontrolleras inte av taggarna.
 
 Kända avvikelser i dagens kod (inte ändrade):
-- `level.levelCeil` och `level.inZone` räknas av `zoneStep` i båda trådarna ur `lvlSmooth` (IN). Taggen säger var en sten läser dem: `levelCeil` `L`
-  (uppbyggnaden i workern), `inZone` `S` (ramen). Att i stället bära taggen `IN` med transport vore samma tal men ett annat omstartsbeteende (workerns kopia
-  börjar om vid omstart), så det är inte byte-identiskt mot `omstart.mjs`.
+- (Rättat i steg 21: `level.levelCeil` räknades förr av `zoneStep` i båda trådarna; nu bara i huvudtråden, taggen `IN`.)
 - Grenarna utan `bigOn` (`SECTION_AGG=env`, `FAST_BANDS=0`) följer inte taggarna (där kör stor-FFT:n i huvudtråden). De tas bort i steg 19.
 
 ## Borttagen sten syns (steg 18a): `finns` och `stenarAv`
@@ -296,3 +294,15 @@ stora ringen (odelat), `fastBandStep`, trumkittet och `wallNow`: inget av dem l�
 Det som stoppar ett enda nivåanrop: `const level = Math.min(1, rms * lv.gain)` (`process`, rad 682) läser `level.gain` som AGC:n just skrev, och
 `h.lvlSmooth = ema(h.lvlSmooth, level, aAtt, aRel)` (rad 701) är det `intensityStep` och `zoneStep` läser. AGC:n måste alltså före och intensitet/tak efter
 kärnans två rader. Ett anrop kräver att utjämningen av `lvlSmooth` (hoppfackets fält, `IN` till workern) flyttar in i nivå-stenen: ett ägarbyte, inte en omflyttning.
+
+## Nivåtaket bara i huvudtråden (steg 21, ägaren 11-22: "Lägg in.")
+
+`zoneStep` körs bara i huvudtråden (i `smoothStep`, privat). `level.levelCeil` har taggen `IN`: `pushBig` packar den, `drainBig` packar upp den med de andra
+IN-fälten (hopprecordet 16 -> 17 platser). Workerns enda läsare är uppbyggnaden (`lc` i `riserStep`). `inZone` är `S` (bara ramen). `LevelReads` har ingen `L`-del längre.
+
+Det här ändrar bara beteendet efter en omstart av workern. Förr började en ny worker om på fackets startvärde 0,5, medan låtens tak i proven ligger på 0,08–0,24
+och bara sjunker 1,5 %/s; uppbyggnaden (`lvlSmooth > 0.3 * lc` m.fl.) var då i praktiken död i upp till 1–2 min. Nu får den nya workern huvudtrådens tak från första hoppet.
+Utan omstart är allt byte-identiskt. Den andra vägen (bara workern räknar, `UT`) går inte: huvudtråden behöver taket samma hopp för `breaking` och `inZone`.
+
+`tools/refaktor/omstart.mjs` har därför `TILLATET = {buildUp, inRiser}`: de två ramfälten får skilja mot referensen, bara i hopp efter den första omstarten,
+och räknas för sig (`tillåtna … hop`). Allt annat (andra fält, räknarna, loggraderna) prövas som förut mot `dist-kedja1`.

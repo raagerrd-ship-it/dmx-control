@@ -2,9 +2,9 @@
 import { type Ser, type LevelOut } from "./analyserFack.js";
 import { F_SIL350, F_SIL10 } from './split.js';
 
-/** DET NIVÅN LÄSER. Inget annat går att nå. zeroBpm = kommando till klockan. L = zoneStep (också i workern). */
+/** DET NIVÅN LÄSER. Inget annat går att nå. zeroBpm = kommando till klockan. Bara huvudtråden. */
 export interface LevelReads {
-  hop:   Ser<'S', 'hop', 'rms' | 'now' | 'dt' | 'hopMs' | 'dtHop' | 'gated' | 'lvlSmooth' | 'role' | 'cfg'> & Ser<'L', 'hop', 'lvlSmooth' | 'dtHop'>;
+  hop:   Ser<'S', 'hop', 'rms' | 'now' | 'dt' | 'hopMs' | 'dtHop' | 'gated' | 'lvlSmooth' | 'role' | 'cfg'>;
   clock: Ser<'S', 'clock', 'bpm' | 'zeroBpm'>;
 }
 /** Nivåns kommando till kärnan: flagga tystnad till workern. */
@@ -118,7 +118,7 @@ export class LevelTracker {
   }
 
   /** NIVÅTAKET OCH TOPP-ZONEN. */
-  zoneStep(): void {
+  private zoneStep(): void {
     this.o.levelCeil = Math.max(this.h.lvlSmooth, this.o.levelCeil - this.h.dtHop * 0.015 * this.o.levelCeil);
     if (this.h.lvlSmooth > this.o.levelCeil * 0.85) this.o.inZone = true;
     else if (this.h.lvlSmooth < this.o.levelCeil * 0.70) this.o.inZone = false;

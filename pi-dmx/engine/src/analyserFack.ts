@@ -61,7 +61,7 @@ export class HopOut {
 
 /** NIVÅN. intensity = förr hIntensity, inZone = förr levels.inZoneState. */
 export class LevelOut {
-  static readonly TRAD = { gain: 'S', envelope: 'S', activeMs: 'IN', silentMs: 'S', intensity: 'IN', levelCeil: 'L', inZone: 'S', gainLocked: 'S' } as const satisfies Taggat<LevelOut>;   // levelCeil/inZone: zoneStep i båda trådarna
+  static readonly TRAD = { gain: 'S', envelope: 'S', activeMs: 'IN', silentMs: 'S', intensity: 'IN', levelCeil: 'IN', inZone: 'S', gainLocked: 'S' } as const satisfies Taggat<LevelOut>;   // levelCeil: räknas bara i huvudtråden, workern får den i hopprecordet
   gain = 1; envelope!: number; activeMs = 0; silentMs = -0; intensity = 0.5; levelCeil = 0.5; inZone = false; gainLocked = false;
   constructor() { stabilise(this, ['activeMs']); }
 }

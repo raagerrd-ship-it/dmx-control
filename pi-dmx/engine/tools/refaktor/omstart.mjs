@@ -8,6 +8,8 @@ import { pathToFileURL } from 'node:url';
 const [RA, RB, ...rest] = process.argv.slice(2);
 const SECS = /^\d+$/.test(rest[0]) ? Number(rest.shift()) : 700, wavs = rest;
 const SR = 48000, HOP = 128, EPOCH = 1.7e12, EVERY = 60 * SR / HOP, HINT = 97 * SR / HOP, RESET = 211 * SR / HOP;
+// Steg 21 (ägaren 11-22: lägg in): workern får nivåtaket ur huvudtråden i stället för att börja om på 0,5, så uppbyggnaden skiljer efter en omstart. Bara de här två, bara efter en omstart.
+const TILLATET = new Set(['buildUp', 'inRiser']);
 const RAKNARE = ['dropCount', 'miniDropCount', 'buildStartCount', 'dropDemoted', 'dropSpaced', 'stopCount'];
 const load = async (d) => { const i = (f) => import(pathToFileURL(resolve(d, f)).href);
   return { ...(await i('analyser.js')), ...(await i('split.js')), ...(await i('analyserClock.js')), defaultConfig: (await i('config.js')).defaultConfig }; };
@@ -22,7 +24,7 @@ const build = (m) => {
 };
 const flat = (f, out = {}, pre = '') => { for (const k of Object.keys(f)) { const v = f[k]; if (v && typeof v === 'object') flat(v, out, pre + k + '.'); else out[pre + k] = v; } return out; };
 let side = 0; const logs = [[], []]; const log = console.log; console.log = (...a) => logs[side].push(a.join(' '));
-let tot = 0, totBad = 0, totDown = 0, restarts = 0, logBad = 0;
+let tillat = 0, tot = 0, totBad = 0, totDown = 0, restarts = 0, logBad = 0;
 for (const w of wavs) {
   const d = readFileSync(w); let p = 12, off0 = 44, len = d.length - 44;
   while (p + 8 <= d.length) { const id = d.toString('ascii', p, p + 4), sz = d.readUInt32LE(p + 4); if (id === 'data') { off0 = p + 8; len = sz > 0 ? Math.min(sz, d.length - off0) : d.length - off0; break; } p += 8 + sz + (sz & 1); }
@@ -41,13 +43,14 @@ for (const w of wavs) {
       return flat(f); });
     if (hops > 0 && hops % EVERY === 0) restarts++;
     prev = fr[1]; let b = false;
-    for (const k of Object.keys(fr[0])) if (!Object.is(fr[0][k], fr[1][k])) { b = true; if (firsts.length < 5) firsts.push(`t=${(off / SR).toFixed(3)} ${k}: ref ${fr[0][k]} ny ${fr[1][k]}`); }
-    if (b) bad++;
+    let t = false;
+    for (const k of Object.keys(fr[0])) if (!Object.is(fr[0][k], fr[1][k])) { if (hops >= EVERY && TILLATET.has(k)) { t = true; continue; } b = true; if (firsts.length < 5) firsts.push(`t=${(off / SR).toFixed(3)} ${k}: ref ${fr[0][k]} ny ${fr[1][k]}`); }
+    if (b) bad++; else if (t) tillat++;
     if (before) for (const k of RAKNARE) if (fr[1][k] < before[k]) { down++; if (firsts.length < 5) firsts.push(`t=${(off / SR).toFixed(3)} ${k} ${before[k]} -> ${fr[1][k]} efter omstart`); }
   }
   for (let i = 0; i < Math.max(logs[0].length, logs[1].length); i++) if (logs[0][i] !== logs[1][i]) logBad++;
   tot += hops; totBad += bad; totDown += down;
   log(`${w.split(/[\\/]/).pop()}: ${hops} hop, avvikande hop ${bad}, räknare lägre efter omstart ${down}, loggrader ${logs[0].length}/${logs[1].length}${firsts.length ? '\n  ' + firsts.join('\n  ') : ''}`);
 }
-log(`SUMMA omstart: ${wavs.length} filer, ${restarts} omstarter, ${tot} hop, avvikande hop ${totBad}, räknare lägre ${totDown}, avvikande loggrader ${logBad}`);
+log(`SUMMA omstart: ${wavs.length} filer, ${restarts} omstarter, ${tot} hop, avvikande hop ${totBad}, räknare lägre ${totDown}, avvikande loggrader ${logBad}, tillåtna (buildUp/inRiser efter omstart) ${tillat} hop`);
 process.exit(totBad || totDown || logBad ? 1 : 0);

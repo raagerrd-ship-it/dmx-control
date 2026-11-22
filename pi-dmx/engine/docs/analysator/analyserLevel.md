@@ -75,7 +75,7 @@ Näst största över de fyllda blocken (16 tal → linjär skanning är billigas
 
 ```text
  rawStep: hoppets början ur rå rms, AGC (om olåst och över brusgolvet) och sedan tystnadsflanken.
- smoothStep: efter kärnans utjämning ur lvlSmooth, intensiteten och sedan nivåtaket (zoneStep).
+ smoothStep: efter kärnans utjämning ur lvlSmooth, intensiteten och sedan nivåtaket (zoneStep, sedan steg 21 bara i huvudtråden).
 ```
 Varför två anrop och inte ett: se `analyserFack.md`, "Ett anrop per sten (steg 20)".
 

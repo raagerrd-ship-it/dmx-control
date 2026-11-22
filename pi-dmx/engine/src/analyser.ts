@@ -338,7 +338,7 @@ export class Analyser {
     this.bigPcm!.set(samples, slot * BIG_HOP_MAX);
     r[o + B_N] = n; r[o + Bh.rms] = h.rms; r[o + Bh.nowWall] = h.nowWall; r[o + Bh.lvlSmooth] = h.lvlSmooth; r[o + Bh.centSmooth] = h.centSmooth; r[o + Bh.breaking] = h.breaking ? 1 : 0;
     r[o + Bh.kickHit] = h.kickHit; r[o + Bh.sec] = sectionCode(h.sec); r[o + Bh.lvh] = h.lvh; r[o + Bh.conf] = h.conf; r[o + Bh.bpm] = h.bpm;
-    r[o + Bl.activeMs] = lv.activeMs; r[o + Bl.intensity] = lv.intensity; r[o + Bk.kick] = kk.kick ? 1 : 0;
+    r[o + Bl.activeMs] = lv.activeMs; r[o + Bl.intensity] = lv.intensity; r[o + Bl.levelCeil] = lv.levelCeil; r[o + Bk.kick] = kk.kick ? 1 : 0;
     r[o + B_ENVF] = this.bigEnvFlag; this.bigEnvFlag = 0;
     r[o + B_SEQ] = seq;
     Atomics.store(ctrl, C_BIG_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
@@ -373,9 +373,8 @@ export class Analyser {
       this.bass?.accumulate();
       h.rms = r[o + Bh.rms]; h.nowWall = r[o + Bh.nowWall]; h.lvlSmooth = r[o + Bh.lvlSmooth]; h.centSmooth = r[o + Bh.centSmooth]; h.breaking = r[o + Bh.breaking] === 1;
       h.kickHit = r[o + Bh.kickHit]; h.sec = SECTIONS[r[o + Bh.sec]]; h.lvh = r[o + Bh.lvh]; h.conf = r[o + Bh.conf]; h.bpm = r[o + Bh.bpm];
-      lv.activeMs = r[o + Bl.activeMs]; lv.intensity = r[o + Bl.intensity]; kk.kick = r[o + Bk.kick] === 1;
+      lv.activeMs = r[o + Bl.activeMs]; lv.intensity = r[o + Bl.intensity]; lv.levelCeil = r[o + Bl.levelCeil]; kk.kick = r[o + Bk.kick] === 1;
       if (r[o + B_ENVF] === 1) this.bass?.stepBassline();
-      this.levels.zoneStep();
       { const po = slot * BIG_HOP_MAX; this.bands.bigRingPush(pcm.subarray(po, po + hn)); }
       this.bands.bigTick();
       this.slowPart();
