@@ -115,6 +115,7 @@ const EKO_BASS = 0.85;
  *  slagdjup refräng 68 % (djupast), tända lampor oförändrade (2,4). Grundton på mörka lampor och kickblixt på alla förkastade. */
 const SEC_CEIL = 0.65, SEC_CEIL_BUILD = 0.85;
 const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
+const DROP_GLES: Mode[] = ['dansparet', 'minnet'];   // droppen landar inte här (ägaren 11-22, .arena/dropdod: 1,3 / 2,5 av 8 lampor efter smällen)
 import { hsvToRgb, hsv as hsvFx } from "./effects/color.js";
 import { slotSize } from "./effects/rig.js";
 import { MomentLayer } from "./moment.js";
@@ -809,7 +810,7 @@ export class EffectEngine {
         if (secKey && this.carryKey && secKey !== this.carryKey) { this.manus.delete(this.carryKey); this.carryKey = ''; }   // burna looken släpps (softenRange)
         if (secKey && secKey !== this.visitKey) { varv = (this.secVisits.get(secKey) ?? 0) + 1; this.secVisits.set(secKey, varv); this.visitKey = secKey; }
         const nextLook = HIGH_VARV > 0 && secKey === 'high' && varv >= HIGH_VARV && !dropSwitch && !!kept;
-        let keep = !nextLook && !!kept && fits(kept) && !(dropSwitch && !this.bassStrong(kept)) && !(this.landForce && (kept === this.smartMode || tierRank(kept) === 0));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark; landningen byter alltid
+        let keep = !nextLook && !!kept && fits(kept) && !(dropSwitch && (!this.bassStrong(kept) || DROP_GLES.includes(kept))) && !(this.landForce && (kept === this.smartMode || tierRank(kept) === 0));   // DROP_BASS_LOOK: refrängslooken bara om den är basstark; landningen byter alltid
         const avoid = nextLook ? kept : undefined;
         if (nextLook) { const h = (this.manusHist.get(secKey) ?? []).filter((m) => m !== kept && m !== this.smartMode && fits(m)); if (h.length) { kept = this.pickLook(h.map((m) => ({ m }))); keep = true; this.manus.set(secKey, kept); console.log(`[dirigent] high-varv ${varv}: nasta look "${kept}"`); } }
         if (!keep && secKey && !(dropSwitch) && !nextLook) { const back = this.manusHist.get(secKey)?.find((m) => m !== kept && fits(m) && !(this.landForce && (m === this.smartMode || tierRank(m) === 0))); if (back) { kept = back; keep = true; this.manus.set(secKey, back); } }
@@ -855,7 +856,7 @@ export class EffectEngine {
         { const show = pool.filter((m) => !(CALM_ONLY.includes(m) && !(bpm > 0 && bpm < CALM_BPM))); if (show.length) pool = show; }   // UNIFORM tillbaka 10-11 (energi pa utvalda lampor)
         if (secKey === 'build') { const b = pool.filter((m) => BUILD_LOOKS.includes(m)); pool = b.length ? b : enabled(BUILD_LOOKS); }   // BUILD SOM HÅLLER   // KONSERTLÄGET: ingen enhetlig look
         if (secKey === 'high') {                                   // LAMPTRAPPA: refrängen -> hela riggen
-          const full = pool.filter((m) => !SPARSAM.includes(m)); if (full.length) pool = full;
+          const full = pool.filter((m) => !SPARSAM.includes(m) && !(dropSwitch && DROP_GLES.includes(m))); if (full.length) pool = full;
         }
         this.smartCount++;
         // DIRIGENTEN VÄLJER: poängsätt poolen mot musikens KARAKTÄR (frame.profile)
