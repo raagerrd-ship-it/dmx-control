@@ -514,7 +514,7 @@ hålls är händelsen avgjord som förut: DISKANT -> `dropDemoted`, SPARR -> `dr
 | STIGNING | >= 12 dB över 0,5 s-minimum | 0 | bara i ramen |
 | LJUD | breaket inte helt tyst | 0 | drop (veto) |
 | DISKANT | diskanten (2 s) >= sitt 30 s-medel | 0 | drop (veto) |
-| SPARR | >= 12 s sedan förra drop | 0 | drop (veto) |
+| SPARR | >= 3 s sedan förra drop (steg 36; var 12 s) | 0 | drop (veto) |
 | TOPP | taket högst 5 dB under sega toppen (basen har nyss varit full) | 0 | drop (steg 35) |
 
 Ramen: `dropKeys` = bit per hållen nyckel (bitarna i `K`), `dropNear` bit 1 = minidropens förutsättningar (LUCKA+AKTIV) hålls, bit 2 = dropens
@@ -531,3 +531,9 @@ ljusdomaren v3 övning +0,0, kontroll +5,2.
 - Varv 2, steg 35 INLAGT: TOPP = taket (sjunker 0,15 dB/s) högst 5 dB under sega toppen (0,04 dB/s). Fångar ett lugnare parti där basen inte
   varit full på länge (taket har hunnit sjunka): 151659 430 och 445 s (taket 5,7 / 7,4 dB under toppen; ägarens riktiga drop högst 3,9).
   Övning falska 8 -> 6, rätt 9 = 9, kontrollen orörd, tidsfel lika.
+- Varv 3 FÖRKASTAT: KORT (sista luckan <= 8 s) tog bort 2 falska men gav ljusdomarens latensspärr (t90 30 -> 50 ms, kontrollen); ägaren: falska ner bara om gratis.
+- Varv 4 FÖRKASTAT (analys): de riktiga drop som DISKANT stoppar (151659 44, 172432 107, 160345 441, 171840 49, 193040 91) går inte att skilja från de 11
+  andra vetade händelserna på diskanten (2 s eller 0,25 s, vid landningen och 1 s efter), underPeak eller sektionen.
+- Varv 5, steg 36 INLAGT (ägaren i ladan 19:45: "kanske skall minska avståndet nu dock, då den kan göra en å annan predrop"): SPARR 12 -> 3 s.
+  Svep 2/3/4/6 s: 2 och 3 s lika (160345 218 s, 3,6 s efter 214 s, blir drop; 225 s minidrop blir falsk). Övning rätt 9 -> 10, falska 6 -> 7, kontroll lika,
+  tidsfel lika. Ljusdomaren övning −2,4 (koreografi −4,5, lampspridning 160345 +8,4 %), ingen spärr; kontroll 0.

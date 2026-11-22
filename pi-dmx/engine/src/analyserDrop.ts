@@ -33,7 +33,7 @@ const FLANK_GONE_DB = 10, FLANK_LAND_DB = 1.5, FLANK_RISE_DB = 12, FLANK_HOLD_S 
 const FLANK_SILENT_LV = 0.005, SVACKA_DB = 6, SVACKA_S = 2;   // SVACKAN: toppen >= SVACKA_DB under taket i >= SVACKA_S
 const BUILD_SPACING_MS = 3000;   // UPPBYGGNADEN börjar när basen dras ur (kick-luckan), högst en gång per 3 s
 const TOPP_DB = 5;   // taket (0,15 dB/s) högst så här under sega toppen (0,04 dB/s)
-const SHOW_DROP_GAP_MS = 12000;   // spärr mellan full drops
+const SHOW_DROP_GAP_MS = 3000;   // spärr mellan full drops
 const MINI_BACK_MIN_MS = 250, MINI_BACK_MAX_MS = 2000;   // MINIDROP EFTER ENERGIN: tidigast/senast efter lyftet
 const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;   // LYFT/NÄSTAN-DROP/STOPP
 
