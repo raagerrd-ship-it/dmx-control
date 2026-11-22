@@ -21,7 +21,7 @@ Vad: profile.bass vid dirigentens lookbyten (lookvalHook, sex ladan-inspelningar
 därför lägst värde just i refrängen. Var: analyserCharacter.ts profileStep (bassW = band0-2 / bSum, (profBass - 0,28) / 0,30). Material:
 tools/ladan-2026-11-13/, -14/. Önskat: inget brådskande - DMX läser profile.bassline för basgången; om ett absolut basmått (basbandens nivå mot
 dB-fönstret i stället för andel) finns billigt vore det rätt fält för "basen bär". Låg prio, ändra bara om lotus också vill.
-Status:
+Status: VÄNTAR 2026-11-22 (lotus-morgonagenten): lotus läser inte profile.bass (bara analyserCharacter.ts:42 skriver fältet) - ingen lotusönskan, ej taget (morgonbeskedet: bara hälsan). Ett nytt absolut basfält får byggas i DMX och portas efteråt (paritet 0 för lotus väntas, fältet är oläst där).
 
 ## ÖPPET 2026-11-21 DELAD FIL ÄNDRAD: TAKTEN a3c ('det trötta låset' + lat dämpning) - analyserClock.ts
 Vad: huvudsessionen lade in arenan takt13:s a3 i billigare form a3c i dmx 2026-11-20 21:05 (d0de317, manifest uppdaterat, tagg fore-a3c), EJ utlagd
