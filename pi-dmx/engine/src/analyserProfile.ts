@@ -21,7 +21,7 @@ export const PROFILE: AnalyserProfile = {
   sys: {
     KICK_COOLDOWN: '0',          // tempoanpassad (0,6 slag, minst 170 ms); lotus: 170
     KICK_EFLOOR: '0.006',        // lotus: 0.06
-    SECTION_AGG: 'hop',          // lotus: 'env'
+    SECTION_AGG: 'hop',          // SAKNAR LÄSARE (flytten steg 19, 11-22): grenen utan ('env') är raderad, sektionen går alltid per hopp
     SECTION_SCORE_F32: '1',      // lotus: '0'
     SIL_CLEAR_PENDING: '1',      // lotus: '0'. SAKNAR LÄSARE (städningen 11-12): flaggans enda läsare låg i en onåbar gren i silenceStep och är borttagen; raden står kvar tills ägaren valt om nollningen ska gälla
     // LADANS LIVE-VARDEN SOM STANDARD (2026-09-27, rensningen): allt nedan stod i drop-ins pa Pi:n (drop/tempo/lotus.conf)
@@ -43,7 +43,7 @@ export const PROFILE: AnalyserProfile = {
     SECTION_BODY_HIGH: '2000',    // var 0 (av)
     SECTION_BODY_HIGH_DB: '2',    // var 3 (koden)
     // LADAN 10-21 KVÄLL, ägaren 'kör standard' (backup-tagg backup/fore-kvallens-prov-2026-10-21):
-    FAST_BANDS: '1',              // ljusets bandfält ur snabb väg (IIR + 512-FFT): 21-27 -> 3-5 ms efter ljudet, drops identiska; lotus: av
+    FAST_BANDS: '1',              // SAKNAR LÄSARE (flytten steg 19, 11-22): de snabba banden gäller alltid. Ljusets bandfält ur snabb väg (IIR + 512-FFT): 21-27 -> 3-5 ms efter ljudet
     SECTION_WIN: '2',             // sektionspoängen över 2 s i st f 4: etiketten ned ur refrängen 2,9 -> 1,3 s, korta delar 165 -> 143 (25 inspelningar)
     // LÅTSTARTEN (ladan 10-23, ägaren: 'ser bra ut' / 'ser effekterna mer när ljuset har mer dynamik'; backup-tagg
     // backup/fore-early-db-2026-10-23): första 45 s kräver refrängen +1,5 dB över medianen i st f +3 - starka låtstarter får high

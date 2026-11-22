@@ -1,5 +1,5 @@
 /**  SPEKTRUM (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserSpectrum.md */
-import { BIG_EVERY, BASSON_LEN, SECTION_AGG_HOP, type Ser, type SpectrumOut } from "./analyserFack.js";
+import { BIG_EVERY, type Ser, type SpectrumOut } from "./analyserFack.js";
 import { SPEC_SLOTS, SPEC_MAX, BS_SPEC_N } from './split.js';
 import FFT from "fft.js";
 
@@ -43,9 +43,7 @@ export class SpectrumBands {
   private fbPow = new Float64Array(3); private fbPrevAmp = new Float64Array(3); fbA = new Float64Array(3);
   fbAbs = new Float32Array(8); fbDbRaw = new Float32Array(8); fbLvl = new Float32Array(8);  private fbPeak = new Float32Array(8).fill(1e-4); private fbOnMed = new Float32Array(8); private fbOnMad = new Float32Array(8);
   fbAlvl = 0.5; private fbWarm = 0;
-  private static readonly BASSON_DELTA = 0.07;   // Basonset-toppplockning
-  private static readonly BASSON_AVG = 12; private static readonly BASSON_MAX = 4; private static readonly BASSON_WAIT = 4;
-  private bassOnLastPk = -1e9;specRing: Float32Array | null = null;
+  specRing: Float32Array | null = null;
 specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
   private onsetWarm = 0;   // Stor-FFT-rutor med signal i rad
   private static readonly ONSET_WARM = 183;
@@ -135,19 +133,6 @@ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
 
     const bandLo = this.bandLo, bandHi = this.bandHi;
     const prevMagBig = this.prevMagBig;
-    if (!SECTION_AGG_HOP) {
-      const lo = bandLo[0], hi = bandHi[2]; let o = 0;
-      for (let i = lo; i < hi; i++) { const d = 20 * Math.log10((magBig[i] + 1e-6) / (prevMagBig[i] + 1e-6)); if (d > 0) o += d; }
-      o /= Math.max(1, hi - lo);
-      const L = BASSON_LEN, R = this.o.bassOnRing, n = this.o.bassOnN, A = SpectrumBands.BASSON_AVG;
-      R[n % L] = o; this.o.bassOnN = n + 1;
-      if (n >= 2 * A) {
-        const c = n - A; const xc = R[c % L]; let ok = true;
-        for (let k = 1; k <= SpectrumBands.BASSON_MAX && ok; k++) if (R[(c - k) % L] > xc) ok = false;
-        if (ok) { let s = 0; for (let k = c - A; k <= n; k++) s += R[k % L]; if (xc < s / (2 * A + 1) + SpectrumBands.BASSON_DELTA) ok = false; }
-        if (ok && c - this.bassOnLastPk > SpectrumBands.BASSON_WAIT) { this.bassOnLastPk = c; this.o.bassOnPeaks++; }
-      }
-    }
     for (let b = 0; b < 8; b++) {
       const lo = bandLo[b], hi = bandHi[b];
       const nb = Math.max(1, hi - lo);

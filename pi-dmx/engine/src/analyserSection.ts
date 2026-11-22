@@ -1,8 +1,7 @@
 /**  SEKTIONSFÖLJAREN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserSection.md */
-import { sysEnv, numEnv, stabilise, SECTION_AGG_HOP, BE_FALLBACK_MS, BE_MEM_BEATS, BODY_HIGH_MS, BASSON_LEN,
+import { sysEnv, numEnv, stabilise, BE_FALLBACK_MS, BE_MEM_BEATS, BODY_HIGH_MS,
   type Ser, type SectionOut } from "./analyserFack.js";
-import { R_SEC_N, R_SEC_INT, R_SEC_KICKS, R_SEC_BREAK, R_SEC_RMS2, R_SEC_CENT, R_SEC_DT, R_SEC_WALL, R_SEC_SPEC0, R_SEC_BON, R_SEC_BPK, R_SEC_FLUX, R_SEC_RMS4,
-  R_DROPS, R_ACTIVE, R_BUILD, S, BS, SECTIONS, sectionCode } from "./split.js";
+import { S, BS, SECTIONS, sectionCode } from "./split.js";
 const P = S.section;   // platserna i tillståndsblocket
 
 const SECTION_SCORE_F32 = sysEnv('SECTION_SCORE_F32') === '1';   // Rangpoangens buffert i 32-bitars flyttal
@@ -14,15 +13,15 @@ const REPEAT = Number(sysEnv('SECTION_REPEAT')) || 0;   // UPPREPNINGSMINNE v2
 const SECTION_EARLY_DB = Number(sysEnv('SECTION_EARLY_DB')) || 3;
 const DOUBLE_FROM_START = ['secHiStartMs', 'secHiEndMs', 'secPct', 'secSongStartMs', 'secBlkMs', 'secBlkInt', 'secBlkCent', 'secBlkRms2', 'secCurDbSum'] as const;   // Talfält som ska vara flyttal från start
 
-/** DET SEKTIONEN LÄSER. Inget annat går att nå. L = workern (bigAgg, blocken), S = sectionAggStep (huvudtråden, bara odelat). */
+/** DET SEKTIONEN LÄSER (workern: bigAgg och blocken; odelat sectionAggStep). Inget annat går att nå. */
 export interface SectionReads {
-  hop:      Ser<'L', 'hop', 'role' | 'bigOn' | 'rms' | 'nowWall' | 'dtHop' | 'centSmooth' | 'wallNow' | 'breaking'> & Ser<'S', 'hop', 'flux'>;
+  hop:      Ser<'L', 'hop', 'role' | 'bigOn' | 'rms' | 'nowWall' | 'dtHop' | 'centSmooth' | 'wallNow' | 'breaking'>;
   level:    Ser<'L', 'level', 'activeMs' | 'intensity'>;
   kick:     Ser<'L', 'kick', 'kick'>;
   clock:    Ser<'L', 'clock', 'bpm' | 'phaseMs'>;
   drop:     Ser<'L', 'drop', 'dropCand' | 'secBodyRet'>;
   riser:    Ser<'L', 'riser', 'buildUp'>;
-  spectrum: Ser<'L', 'spectrum', 'bigN' | 'bandDbRaw' | 'bandAbs' | 'bassOnRing' | 'bassOnN' | 'bassOnPeaks'>;
+  spectrum: Ser<'L', 'spectrum', 'bigN' | 'bandDbRaw'>;
 }
 
 export class SectionTracker {
@@ -85,9 +84,9 @@ export class SectionTracker {
   private secBlkFeat: Float32Array[] = []; private secBlkHi: number[] = []; private secPct = 0;   // KLANGMALL
   private repeatHighRun = 0; private secHighRunMs = 0;
   private shIn = { hops: 0.5, intSum: 0.5, kicks: 0.5, breaking: false, nowMs: 0.5, dtMs: 0.5, rms2Sum: 0.5, centSum: 0.5, specOff: 0.5, bonSum: 0.5, bpk: 0.5, fluxSum: 0.5, rms4Sum: 0.5 };   // sectionHop:s summor
-  private specSeen = -1; private bpkSeen = 0;   // senast sedda bigN/bassOnPeaks; -1 = smutsigt från start
-  private readonly agg = { n: 0, int: 0, kicks: 0, breaking: 0, rms2: 0, cent: 0, dt: 0, wall: 0, drops: 0, active: 0, build: 0, spec: new Float64Array(8), bon: 0, bpk: 0, flux: 0, rms4: 0 };   // insamlarens summor (förr Analyser.secAgg)
-  private readonly wire = { drops: 0, active: 0, build: 0 };   // workerns indata (förr secVDrops; active/build skrevs i nivåns och uppbyggnadens fack)
+  private specSeen = -1;   // senast sedda bigN; -1 = smutsigt från start
+  private readonly agg = { n: 0, int: 0, kicks: 0, breaking: 0, rms2: 0, cent: 0, dt: 0, wall: 0, drops: 0, spec: new Float64Array(8), bon: 0, bpk: 0, flux: 0, rms4: 0 };   // insamlarens summor (förr Analyser.secAgg)
+  private readonly wire = { drops: 0 };   // workerns indata (förr secVDrops)
   private readonly secSpecHop = new Float64Array(8);   // Bandens absoluta magnitud for sektionsblocket
   secDump: number[][] | null = sysEnv('SECTION_DUMP') === '1' ? [] : null;   // Korbanks-dump
   dbgSecBlock: ((b: Record<string, unknown>) => void) | null = null;   // Korbanks-krok
@@ -96,8 +95,6 @@ export class SectionTracker {
 
   /** SEKTION. */
   private dropsNow(): number { return this.h.role === 'slow' ? this.wire.drops : this.dr.dropCand + this.dr.secBodyRet; }
-  private activeNow(): number { return this.h.role === 'slow' && !this.h.bigOn ? this.wire.active : this.lv.activeMs; }
-  private buildNow(): number { return this.h.role === 'slow' && !this.h.bigOn ? this.wire.build : this.ri.buildUp; }
   sectionReset(): void {
     this.o.secBuildAt = 0; this.o.secBuildSeen = 0;
     this.o.section = 'intro'; this.o.sectionStartMs = 0; this.o.sectionIndex = 0; this.o.sectionTier = 1; this.o.repeatSim = 0; this.o.repeatAgoMs = 0; this.o.repeatSection = '';
@@ -135,7 +132,7 @@ export class SectionTracker {
     const m2 = this.secBlkRms2 / n, v2 = this.secBlkRms4 / n - m2 * m2; const bDyn = m2 > 1e-12 ? Math.sqrt(Math.max(0, v2)) / m2 : 0;
     let sAr = 0, sGe = 0; for (let i = 0; i < 8; i++) { const v = this.secBlkSpec[i] / n + 1e-7; sAr += v; sGe += Math.log(v); }
     const bFlat = Math.exp(sGe / 8) / (sAr / 8); const bHigh = 20 * Math.log10((this.secBlkSpec[6] + this.secBlkSpec[7]) / n + 1e-7);
-    if (this.activeNow() === 0) { if (++this.secSilentBlocks >= 10) { this.sectionReset(); return; } }
+    if (this.lv.activeMs === 0) { if (++this.secSilentBlocks >= 10) { this.sectionReset(); return; } }
     else this.secSilentBlocks = 0;
     let tier = bInt >= 0.62 ? 2 : bInt <= 0.40 ? 0 : 1;
     {
@@ -213,7 +210,7 @@ export class SectionTracker {
     if (this.o.section === 'high') { this.lastHighDb = this.secCurDbSum / this.secCurDbN; }
     this.o.levelVsHighDb = Number.isFinite(this.lastHighDb) ? blkDb - this.lastHighDb : 0;
     this.predictHigh(nowMs, bInt);
-    if (this.dbgSecBlock) this.dbgSecBlock({ nowMs, section: this.o.section, sectionStartMs: this.o.sectionStartMs, prev, label, bpm: this.ck.bpm, bInt, bKicks, bCent, blkDb, buildUp: this.buildNow(), riseRun: this.secRiseRun, rise, dropped, breaking, tier: this.o.sectionTier, repeatSim: this.o.repeatSim, repeatAgoMs: this.o.repeatAgoMs, repeatSection: this.o.repeatSection, spec: Array.from(this.secBlkSpec, (v) => v / n), lastHighDb: this.lastHighDb, expectHighMs: this.o.expectHighMs, expectSource: this.o.expectSource, beatPhaseMs: this.ck.phaseMs, secLogN: this.secLog.length, secLogLast: this.secLog[this.secLog.length - 1] ?? null, bBon, bBpk, bFlux, bDyn, bHigh, bFlat, pct: this.secPct });
+    if (this.dbgSecBlock) this.dbgSecBlock({ nowMs, section: this.o.section, sectionStartMs: this.o.sectionStartMs, prev, label, bpm: this.ck.bpm, bInt, bKicks, bCent, blkDb, buildUp: this.ri.buildUp, riseRun: this.secRiseRun, rise, dropped, breaking, tier: this.o.sectionTier, repeatSim: this.o.repeatSim, repeatAgoMs: this.o.repeatAgoMs, repeatSection: this.o.repeatSection, spec: Array.from(this.secBlkSpec, (v) => v / n), lastHighDb: this.lastHighDb, expectHighMs: this.o.expectHighMs, expectSource: this.o.expectSource, beatPhaseMs: this.ck.phaseMs, secLogN: this.secLog.length, secLogLast: this.secLog[this.secLog.length - 1] ?? null, bBon, bBpk, bFlux, bDyn, bHigh, bFlat, pct: this.secPct });
     if (REPEAT & 1) { this.repeatStep(nowMs, blkDb, bKicks, bCent, bInt); this.secBlkMs = 0; this.secBlkN = 0; this.secBlkInt = 0; this.secBlkKicks = 0; this.secBlkCent = 0; this.secBlkSpec.fill(0); this.secBlkRms2 = 0; this.secBlkBon = 0; this.secBlkBpk = 0; this.secBlkFlux = 0; this.secBlkRms4 = 0; return; }
     let sum = 0; for (let i = 0; i < 8; i++) sum += this.secBlkSpec[i];
     const acc = this.secFpAcc; for (let i = 0; i < 8; i++) acc[i] += sum > 0 ? this.secBlkSpec[i] / sum : 0;
@@ -355,64 +352,30 @@ export class SectionTracker {
     this.o.expectHighMs = exp; this.o.expectSource = src;
   }
 
-  /** Roll 'all'. */
-  sectionFlushAgg(): void {
-    const g = this.agg; if (g.n === 0) return;
-    { const I = this.shIn; I.hops = g.n; I.intSum = g.int; I.kicks = g.kicks; I.breaking = g.breaking > 0; I.nowMs = g.wall; I.dtMs = g.dt; I.rms2Sum = g.rms2; I.centSum = g.cent;
-      I.specOff = 0; I.bonSum = g.bon; I.bpk = g.bpk; I.fluxSum = g.flux; I.rms4Sum = g.rms4; }
-    this.sectionHop(g.spec);
-    g.n = 0; g.int = 0; g.kicks = 0; g.breaking = 0; g.rms2 = 0; g.cent = 0; g.dt = 0; g.spec.fill(0); g.bon = 0; g.bpk = 0; g.flux = 0; g.rms4 = 0;
-  }
-
-  /** Sektionens blocksummor per hop. */
+  /** Odelat: sektionens block per hop (delat gör workern det i bigAgg/fromRecord). */
   sectionAggStep(): void {
-    const intensity = this.lv.intensity, kick = this.kk.kick, breaking = this.h.breaking, rms = this.h.rms, fluxNorm = this.h.flux, nowWallA = this.h.nowWall;
-    const dtHop = this.h.dtHop;
+    const intensity = this.lv.intensity, kick = this.kk.kick, breaking = this.h.breaking, rms = this.h.rms;
       if (this.h.bigOn) return;
-      if (SECTION_AGG_HOP) {
-        const sp = this.secSpecHop;
-        if (this.sp.bigN !== this.specSeen) { this.specSeen = this.sp.bigN; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.sp.bandDbRaw[i] / 20); }
-        if (this.h.role === 'fast') {
-          const g = this.agg; g.n++; g.int += intensity; if (kick) g.kicks++; g.rms2 += rms * rms; g.cent += this.h.centSmooth; g.dt += this.h.dtHop * 1000;
-          g.breaking = breaking ? 1 : 0; g.wall = this.h.wallNow(); g.drops = this.dr.dropCand + this.dr.secBodyRet; g.active = this.lv.activeMs; g.build = this.ri.buildUp;
-          for (let i = 0; i < 8; i++) g.spec[i] += sp[i];
-        } else { const I = this.shIn; I.hops = 1; I.intSum = intensity; I.kicks = kick ? 1 : 0; I.breaking = breaking; I.nowMs = this.h.wallNow(); I.dtMs = this.h.dtHop * 1000;
-          I.rms2Sum = rms * rms; I.centSum = this.h.centSmooth; I.specOff = 0; I.bonSum = 0; I.bpk = 0; I.fluxSum = 0; I.rms4Sum = 0; this.sectionHop(sp); }
-      } else {
-        const g = this.agg; g.n++; g.int += intensity; if (kick) g.kicks++; if (breaking) g.breaking = 1; g.rms2 += rms * rms; g.cent += this.h.centSmooth; g.dt += dtHop * 1000; g.wall = nowWallA;
-        for (let i = 0; i < 8; i++) g.spec[i] += this.sp.bandAbs[i];
-        g.bon += this.sp.bassOnRing[(this.sp.bassOnN - 1 + BASSON_LEN) % BASSON_LEN]; if (this.sp.bassOnPeaks !== this.bpkSeen) { g.bpk++; this.bpkSeen = this.sp.bassOnPeaks; } g.flux += fluxNorm; g.rms4 += rms * rms * rms * rms;
-      }
+      const sp = this.secSpecHop;
+      if (this.sp.bigN !== this.specSeen) { this.specSeen = this.sp.bigN; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.sp.bandDbRaw[i] / 20); }
+      const I = this.shIn; I.hops = 1; I.intSum = intensity; I.kicks = kick ? 1 : 0; I.breaking = breaking; I.nowMs = this.h.wallNow(); I.dtMs = this.h.dtHop * 1000;
+      I.rms2Sum = rms * rms; I.centSum = this.h.centSmooth; I.specOff = 0; I.bonSum = 0; I.bpk = 0; I.fluxSum = 0; I.rms4Sum = 0; this.sectionHop(sp);
   }
 
   /** slow + stora vägen: sektionens hopaggregat (förr Analyser.bigAgg); hoppets värden ur facken (hopprecordet). */
   bigAgg(): void {
     const h = this.h, intensity = this.lv.intensity, kick = this.kk.kick, breaking = h.breaking, wall = h.nowWall;
-    const ri = this.ri, dp = this.dr;
-    const lv = this.lv;
+    const dp = this.dr;
     const rms = h.rms;
     const sp = this.secSpecHop;
     if (this.sp.bigN !== this.specSeen) { this.specSeen = this.sp.bigN; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.sp.bandDbRaw[i] / 20); }
     const g = this.agg; g.n++; g.int += intensity; if (kick) g.kicks++; g.rms2 += rms * rms; g.cent += h.centSmooth; g.dt += h.dtHop * 1000;
-    g.breaking = breaking ? 1 : 0; g.wall = wall; g.drops = dp.dropCand + dp.secBodyRet; g.active = lv.activeMs; g.build = ri.buildUp;
+    g.breaking = breaking ? 1 : 0; g.wall = wall; g.drops = dp.dropCand + dp.secBodyRet;
     for (let i = 0; i < 8; i++) g.spec[i] += sp[i];
   }
 
-  /** Huvudtråden: sektionens del av recordet (förr i pushSlowRecord), summorna nollas. */
-  toRecord(r: Float64Array, o: number): void {
-    const g = this.agg;
-    r[o + R_SEC_N] = g.n; r[o + R_SEC_INT] = g.int; r[o + R_SEC_KICKS] = g.kicks; r[o + R_SEC_BREAK] = g.breaking; r[o + R_SEC_RMS2] = g.rms2;
-    r[o + R_SEC_CENT] = g.cent; r[o + R_SEC_DT] = g.dt; r[o + R_SEC_WALL] = g.wall;
-    for (let i = 0; i < 8; i++) r[o + R_SEC_SPEC0 + i] = g.spec[i];
-    r[o + R_SEC_BON] = g.bon; r[o + R_SEC_BPK] = g.bpk; r[o + R_SEC_FLUX] = g.flux; r[o + R_SEC_RMS4] = g.rms4;
-    if (SECTION_AGG_HOP) { r[o + R_DROPS] = g.drops; r[o + R_ACTIVE] = g.active; r[o + R_BUILD] = g.build; }
-    else { r[o + R_DROPS] = this.dr.dropCand + this.dr.secBodyRet; r[o + R_ACTIVE] = this.lv.activeMs; r[o + R_BUILD] = this.ri.buildUp; }
-    g.n = 0; g.int = 0; g.kicks = 0; g.breaking = 0; g.rms2 = 0; g.cent = 0; g.dt = 0; g.spec.fill(0); g.bon = 0; g.bpk = 0; g.flux = 0; g.rms4 = 0;
-  }
-
-  /** Workern: sektionens del av ett record (förr sist i slowStep). */
-  fromRecord(r: Float64Array, o: number): void {
-    if (this.h.bigOn) {
+  /** Workern: ett record stänger blocket ur hoppens summor (förr sist i slowStep). */
+  fromRecord(): void {
       const g = this.agg;
       if (g.n > 0) this.wire.drops = g.drops;
       if (g.n > 0) {
@@ -421,15 +384,6 @@ export class SectionTracker {
         this.sectionHop(g.spec);
         g.n = 0; g.int = 0; g.kicks = 0; g.breaking = 0; g.rms2 = 0; g.cent = 0; g.dt = 0; g.spec.fill(0); g.bon = 0; g.bpk = 0; g.flux = 0; g.rms4 = 0;
       }
-      return;
-    }
-    const secN = r[o + R_SEC_N] > 0;
-    if (!SECTION_AGG_HOP || secN) { const w = this.wire; w.drops = r[o + R_DROPS]; w.active = r[o + R_ACTIVE]; w.build = r[o + R_BUILD]; }
-    if (secN)
-    { const I = this.shIn; I.hops = r[o + R_SEC_N]; I.intSum = r[o + R_SEC_INT]; I.kicks = r[o + R_SEC_KICKS]; I.breaking = r[o + R_SEC_BREAK] > 0; I.nowMs = r[o + R_SEC_WALL];
-      I.dtMs = r[o + R_SEC_DT]; I.rms2Sum = r[o + R_SEC_RMS2]; I.centSum = r[o + R_SEC_CENT]; I.specOff = o + R_SEC_SPEC0; I.bonSum = r[o + R_SEC_BON]; I.bpk = r[o + R_SEC_BPK];
-      I.fluxSum = r[o + R_SEC_FLUX]; I.rms4Sum = r[o + R_SEC_RMS4];
-      this.sectionHop(r); }
   }
 
   /** Workern startar om: dropkandidaterna ur senaste BS_-blocket. */

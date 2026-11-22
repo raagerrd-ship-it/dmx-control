@@ -1,15 +1,15 @@
 # md5 (CRLF->LF) av de gemensamma filerna - samma i lotus-light-link och dmx-control. Skrivs av analyser_shared.py --write
-065e8338af1e1167842a0d974ea2bb44 analyser.ts
-bacc150250a1949913e227e7f3dc3936 analyserFack.ts
+94117abf1c0faa4432be93bc43525b02 analyser.ts
+05e352fad211d97ff5b2e956188929eb analyserFack.ts
 5c82b029c6f397892ab0690372e9eb43 analyserDrop.ts
-5f86f348ab4b42a6e40355be5a75204a analyserSection.ts
-26fd2335dc10e0383187d475f191233e analyserSpectrum.ts
+e49af56398b28613be6fb5571a6786e3 analyserSection.ts
+569732278dccf49aec68163680033f5b analyserSpectrum.ts
 e4d2d8cd898abd6d7450a8c08413b8fd analyserLevel.ts
 57282c59e2d548e3745ea42199f3ba04 analyserKick.ts
 a11572a57e5e6243fba91f30f14f4d39 analyserRiser.ts
 f0d79a705393683ea3a5afed95d7c1fb analyserBass.ts
 44be48a04b43c98f315437521c4e44de analyserCharacter.ts
-84ff003cbfecf900daf35b7b93286609 split.ts
-c7a59a6760df39770f3aca2332dac5c2 slowWorker.ts
+b20214530d89eff1ac8185c81fb26681 split.ts
+5161595f7f7937ccfc7aac24abc31447 slowWorker.ts
 444346e29afbd2c774baadda04b62928 analyserClock.ts
 d94c850c565827c9075e63127132213f recorder.ts

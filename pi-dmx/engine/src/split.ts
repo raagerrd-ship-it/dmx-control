@@ -6,13 +6,7 @@ export const RING_N = 1024;
 export const RING_MARGIN = 8;   // records workern lämnar orörda mot skrivaren
 
 export const R_SEQ = 0, R_PERF = 1, R_WALL = 2, R_ENV = 3, R_BASS = 4, R_FLAGS = 5, R_HINT_MS = 6, R_VCLOCK = 7,
-  R_SEC_N = 8, R_SEC_INT = 9, R_SEC_KICKS = 10, R_SEC_BREAK = 11, R_SEC_RMS2 = 12, R_SEC_CENT = 13, R_SEC_DT = 14,
-  R_DROPS = 15, R_ACTIVE = 16, R_BUILD = 17, R_SEC_SPEC0 = 18 , R_SEC_WALL = 26, R_TS = 27 ,
-  R_FLAGCNT = 28 ,
-  R_SEC_BON = 29 , R_SEC_BPK = 30 ,
-  R_SEC_FLUX = 31 , R_SEC_RMS4 = 32 ,
-  R_HIGH = 33 ,
-  R_BIGSEQ = 34 ;   // Record-fält (kärnan)
+  R_TS = 8, R_FLAGCNT = 9, R_HIGH = 10, R_BIGSEQ = 11;   // Record-fält (kärnan)
 
 export const F_SIL350 = 1, F_SIL10 = 2, F_RESET_TEMPO = 4, F_HINT = 8, F_RESET_BAR = 16, F_VCLOCK_SET = 32, F_VCLOCK_NULL = 64;   // Flaggor
 export const FLAG_BITS = 7;

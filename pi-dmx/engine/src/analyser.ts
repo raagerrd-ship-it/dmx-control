@@ -1,8 +1,8 @@
 /** ENAD ANALYSATOR (2026-09-24) — en fil, samma byte i lotus-light-link (pi/src/audio-analyser/) och dmx-control (pi-dmx/engine/src/). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyser.md */
 
-import { sysEnv, stabilise, makeFack, off, stenarAv, type Fack, BODY_CEIL_DB_S, BE_FALLBACK_MS, BASS_SPAN_DB, BIG_EVERY, SECTION_AGG_HOP,
+import { sysEnv, stabilise, makeFack, off, stenarAv, type Fack, BODY_CEIL_DB_S, BE_FALLBACK_MS, BASS_SPAN_DB, BIG_EVERY,
   type BeatGrid, type AnalyserDetection, type Cfg, type Role } from './analyserFack.js';
-export { BASS_SPAN_DB, SECTION_AGG_HOP, BODY_CEIL_DB_S };
+export { BASS_SPAN_DB, BODY_CEIL_DB_S };
 export type { BeatGrid, AnalyserDetection, Cfg, Role };
 import {
   REC_LEN, RING_N, R_SEQ, R_PERF, R_WALL, R_ENV, R_BASS, R_HIGH, R_FLAGS, R_HINT_MS, R_VCLOCK, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, B, BS, S, R,
@@ -163,7 +163,6 @@ export class Analyser {
   static readonly BE_FALLBACK_MS = BE_FALLBACK_MS;
 
   static readonly BIG_EVERY = BIG_EVERY;
-  private static readonly FAST_BANDS = sysEnv('FAST_BANDS') === '1';   // SNABBA BANDEN FÖR LJUSET
   private static readonly FB_TAU_MS = [12, 6, 3];
    private fbMax = 0;   // Valfri avlyssnare på den stora magnituden
   setSpectrumSink(fn: ((mag: Float32Array, binHz: number) => void) | null): void { this.f.spectrum.sink = fn; }
@@ -258,18 +257,14 @@ export class Analyser {
     const seq = ++this.recSeq; const o = (seq % RING_N) * REC_LEN;
     r[o + R_PERF] = this.perfNow(); r[o + R_WALL] = this.wallNow(); r[o + R_TS] = Date.now();
     r[o + R_ENV] = e; r[o + R_BASS] = b; r[o + R_HIGH] = h; r[o + R_FLAGS] = this.pendFlags; r[o + R_HINT_MS] = this.pendHintMs; r[o + R_VCLOCK] = this.pendVclock;
-    this.sections?.toRecord(r, o);
     r[o + R_FLAGCNT] = packFlagCounts(this.flagCnt);
     r[o + Rc.bpm] = this.f.clock.bpm; r[o + Rc.conf] = this.f.clock.conf;
     r[o + R_BIGSEQ] = this.bigSeq;
     r[o + R_SEQ] = seq;
     this.pendFlags = 0;
     Atomics.store(ctrl, C_WRITE, seqLow(seq));
-    if (this.f.hop.bigOn) {
-      Atomics.add(ctrl, C_WAKE, 1);
-      if ((this.syncWorker || !this.hopLane) && (Atomics.load(ctrl, C_WAITING) || Atomics.load(ctrl, C_WAITING_B))) Atomics.notify(ctrl, C_WAKE);
-    } else if (!this.hopLane) { if (Atomics.load(ctrl, C_WAITING)) Atomics.notify(ctrl, C_WRITE, 1); }
-    else { Atomics.add(ctrl, C_WAKE, 1); if (Atomics.load(ctrl, C_WAITING)) Atomics.notify(ctrl, C_WAKE, 1); }
+    Atomics.add(ctrl, C_WAKE, 1);
+    if ((this.syncWorker || !this.hopLane) && (Atomics.load(ctrl, C_WAITING) || Atomics.load(ctrl, C_WAITING_B))) Atomics.notify(ctrl, C_WAKE);
     if (this.inlinePeer) { this.inlinePeer.drainRecords(); this.pullSlowState(); }
     else if (this.syncWorker) { syncWait(ctrl, C_STATE_SEQ, () => this.stateRd.read(ctrl, this.splitState!, this.stateCopy) && this.stateCopy[S_REC_SEQ] >= seq); this.pullSlowState(); }
   }
@@ -311,7 +306,7 @@ export class Analyser {
         }
         this.slowGap = false;
       }
-      if (this.f.hop.bigOn) this.drainBig(r[o + R_BIGSEQ]);
+      this.drainBig(r[o + R_BIGSEQ]);
       this.slowStep(o); this.slowLastCnt = r[o + R_FLAGCNT];
       if (this.bigYield) this.bigYield();
       const us = (performance.now() - t0) * 1000;
@@ -331,7 +326,7 @@ export class Analyser {
       });
       if (this.syncWorker) Atomics.notify(ctrl, C_STATE_SEQ);
     }
-    if (this.f.hop.bigOn) this.drainBig(Infinity);
+    this.drainBig(Infinity);
     return n;
   }
 
@@ -417,7 +412,7 @@ export class Analyser {
     this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
     this.f.clock.bpm = r[o + Rc.bpm], this.f.clock.conf = r[o + Rc.conf];
     this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
-    this.sections?.fromRecord(r, o);
+    this.sections?.fromRecord();
   }
 
   /** Sparets tid. */
@@ -501,7 +496,8 @@ export class Analyser {
         this.slowGap = true;
         const sq = Atomics.load(v.ctrl, C_STATE_SEQ); if (sq & 1) Atomics.store(v.ctrl, C_STATE_SEQ, sq + 1);
       }
-      if (Analyser.FAST_BANDS && SECTION_AGG_HOP && splitBuf.big && splitBuf.bigPcm && splitBuf.bigState && splitBuf.spec) {
+      if (!splitBuf.big || !splitBuf.bigPcm || !splitBuf.bigState || !splitBuf.spec) throw new Error('Analyser: delat läge kräver stora vägens buffertar (createSplitBuffers)');
+      {
         h.bigOn = true;
         this.bigRing = new Float64Array(splitBuf.big); this.bigPcm = new Float32Array(splitBuf.bigPcm); this.bigState = new Float64Array(splitBuf.bigState); this.bands.specRing = new Float32Array(splitBuf.spec);
         if (h.role === 'slow') {
@@ -548,7 +544,7 @@ export class Analyser {
       this.bands.bandHi[b] = Math.min(BIG / 2, Math.round(Analyser.BAND_HZ[b + 1] / binHzBig));
       this.bands.bandPeak[b] = 1e-4;
     }
-    if (Analyser.FAST_BANDS) {
+    {
       const binHz = cfg.audio.rate / cfg.fft.size, half = cfg.fft.size / 2;
       for (let b = 3; b < 8; b++) { this.bands.fbLo[b] = Math.max(1, Math.round(Analyser.BAND_HZ[b] / binHz)); this.bands.fbHi[b] = Math.min(half, Math.max(this.bands.fbLo[b] + 1, Math.round(Analyser.BAND_HZ[b + 1] / binHz))); }
       this.fbMax = Math.min(half, this.bands.fbHi[7] + 1);
@@ -633,7 +629,7 @@ export class Analyser {
     const kickBins = Math.min(1, half);
     const enhancedOnset = h.cfg.onset.enhancements;
 
-    const fbMax = Analyser.FAST_BANDS ? this.fbMax : 0, fbMag = this.bands.fbMag;
+    const fbMax = this.fbMax, fbMag = this.bands.fbMag;
     const onsetPeak = this.onsetPeak, onsetPrev = this.onsetPrev, peakDecay = this.onsetPeakDecay, peakReady = this.onsetPeakReady, PFLOOR = Analyser.ONSET_PEAK_FLOOR;
     for (let i = 0; i < bassBins; i++) {
       const re = spectrum[2 * i];
@@ -716,8 +712,8 @@ export class Analyser {
     this.bands.bigRingPush(samples);
     this.bands.bigTick();
     }
-    if (Analyser.FAST_BANDS) this.bands.fastBandStep(samples);
-    const ON = Analyser.FAST_BANDS ? sp.fbOn : sp.bandOn;
+    this.bands.fastBandStep(samples);
+    const ON = sp.fbOn;
     const hatOnset = ON[6] > ON[7] ? ON[6] : ON[7];
     this.hatHit = Math.max(this.hatHit * this.dHat, hatOnset);
     this.snareHit = Math.max(this.snareHit * this.dSnare, ON[5]);
@@ -728,7 +724,7 @@ export class Analyser {
     const breaking = h.lvlSmooth < lv.levelCeil * 0.65;
 
     h.nowWall = nowWallA; h.sec = sc.section; h.lvh = sc.levelVsHighDb; h.conf = ck.conf;   // IN: färdiga före pushBig
-    { const A = Analyser.FAST_BANDS ? this.bands.fbAbs : sp.bandAbs; this.bass?.bassEnergyStep(A[0], A[1]); }   // basen före pushBig: workern kan få värdet samma hopp
+    this.bass?.bassEnergyStep(this.bands.fbAbs[0], this.bands.fbAbs[1]);   // basen före pushBig: workern kan få värdet samma hopp
     if (big) {
       h.breaking = breaking;
       this.pushBig(samples);
@@ -773,7 +769,7 @@ export class Analyser {
       this.envAccum = 0;
       this.envBassAccum = 0;
       if (HIGH_ON) this.envHighAccum = 0;
-      if (h.role === 'fast') { this.pushSlowRecord(_e, _b, _h); } else if (!SECTION_AGG_HOP) this.sections?.sectionFlushAgg();
+      if (h.role === 'fast') this.pushSlowRecord(_e, _b, _h);
   }
 
   /** Muterar det ateranvanda Frame:t. */
@@ -783,8 +779,8 @@ export class Analyser {
     const bo = this.f.bass, ri = this.f.riser, dp = this.f.drop;
     const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock;
     const level = h.level, fluxNorm = h.flux, kick = kk.kick, intensity = lv.intensity, bodyNow = h.body, inZone = lv.inZone, breaking = h.breaking,
-      inRiser = ri.inRiser, kickAtMs = kk.kickAt, nowWallA = h.nowWall;
-    const FB = Analyser.FAST_BANDS, L = FB ? this.bands.fbLvl : sp.bandLvl, A = FB ? this.bands.fbAbs : sp.bandAbs, O = FB ? sp.fbOn : sp.bandOn;
+      inRiser = ri.inRiser, kickAtMs = kk.kickAt;
+    const L = this.bands.fbLvl, A = this.bands.fbAbs, O = sp.fbOn;
     const spec = this.outSpec, specAbs = this.outSpecAbs, onset = this.outOnset;
     spec.sub = L[0]; spec.kick = L[1]; spec.bass = L[2]; spec.lowMid = L[3]; spec.mid = L[4]; spec.highMid = L[5]; spec.treble = L[6]; spec.air = L[7];
     specAbs.sub = A[0]; specAbs.kick = A[1]; specAbs.bass = A[2]; specAbs.lowMid = A[3]; specAbs.mid = A[4]; specAbs.highMid = A[5]; specAbs.treble = A[6]; specAbs.air = A[7];
@@ -798,14 +794,14 @@ export class Analyser {
     f.centroid = h.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = lv.gain;
     f.bpm = ck.bpm; f.bpmConfidence = ck.conf; f.intensity = intensity; f.beatAnchorMs = kk.beatAnchorMs;
     f.bodyDb = bodyNow; f.bassEnergy = f.silent ? 0 : bo.energy; f.bassEnergyShort = f.silent ? 0 : bo.beShort; f.bassLevel = Math.pow(10, (bo.beHi - bo.beRef) / 20);
-    { let s2 = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, (FB ? this.bands.fbDbRaw : sp.bandDbRaw)[b] / 20); s2 += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s2)); }
+    { let s2 = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, this.bands.fbDbRaw[b] / 20); s2 += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s2)); }
     f.dropCount = dp.dropCount; f.miniDropCount = dp.miniDropCount; f.buildStartCount = dp.buildStartCount; f.dropDemoted = dp.dropDemoted; f.dropSpaced = dp.dropSpaced; f.dropRiseDb = dp.dropRiseDb;
     f.nearDropDb = dp.nearDropDb; f.nearDipDb = dp.nearDipDb; f.liftDb = dp.liftDb; f.stopCount = dp.stopCount; f.stopS = dp.stopS; f.inZone = inZone; f.breaking = breaking; f.buildUp = ri.buildUp; f.inRiser = inRiser;
     f.kickAtMs = kickAtMs; f.barShift = -1;
     f.beatPhaseMs = ck.phaseMs > 0 ? ck.phaseMs - Analyser.GRID_PHASE_OFFSET_MS : ck.phaseMs;
     f.beatPhaseConf = ck.phaseConf;
     this.sections?.sectionAggStep();
-    const nowS = SECTION_AGG_HOP ? this.wallNow() : nowWallA;
+    const nowS = this.wallNow();
     f.buildProg = sc.secBuildAt > 0 && nowS - sc.secBuildSeen <= 2000 ? Math.min(1, (nowS - sc.secBuildAt) / (32 * (ck.bpm > 0 ? 60000 / ck.bpm : Analyser.BE_FALLBACK_MS))) : 0;
     f.section = sc.section; f.sectionAgeMs = sc.sectionStartMs > 0 ? nowS - sc.sectionStartMs : 0; f.sectionIndex = sc.sectionIndex; f.sectionTier = sc.sectionTier;
     f.repeatSim = sc.repeatSim; f.repeatAgoMs = sc.repeatAgoMs; f.repeatSection = sc.repeatSection;

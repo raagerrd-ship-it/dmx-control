@@ -18,9 +18,7 @@ export const BODY_CEIL_DB_S = 0.15;   // taket haller latens loud-referens lange
 export const BE_FALLBACK_MS = 500;
 export const BE_MEM_BEATS = 240;
 export const BASS_SPAN_DB = 36;   // frame.bassEnergy / bassEnergyShort
-export const BASSON_LEN = 32;
 export const BIG_EVERY = 3;   // kor stor-FFT var N:e hop
-export const SECTION_AGG_HOP = (sysEnv('SECTION_AGG') || 'env') === 'hop';   // SEKTIONSBLOCKENS TAKT
 export const BODY_HIGH_MS = numEnv('SECTION_BODY_HIGH', 0), BODY_HIGH_DB = numEnv('SECTION_BODY_HIGH_DB', 3);   // BASEN TILLBAKA
 
 /** Flyttal från start: skriv 0,5 och sedan värdet. */
@@ -69,11 +67,10 @@ export class LevelOut {
 }
 /** SPEKTRUMET. Banden förblir Float32Array. sink = förr specSink. */
 export class SpectrumOut {
-  static readonly TRAD = { bandAbs: 'L', bandDbRaw: 'L', bandLvl: 'L', bandOn: 'L', fbOn: 'S', bassOnRing: 'L', bassOnN: 'L', bigN: 'L', bassOnPeaks: 'L', sink: 'S' } as const satisfies Taggat<SpectrumOut>;
+  static readonly TRAD = { bandAbs: 'L', bandDbRaw: 'L', bandLvl: 'L', bandOn: 'L', fbOn: 'S', bigN: 'L', sink: 'S' } as const satisfies Taggat<SpectrumOut>;
   readonly bandAbs = new Float32Array(8); readonly bandDbRaw = new Float32Array(8);   // absolut magnitud före AGC, rå dB
   readonly bandLvl = new Float32Array(8); readonly bandOn = new Float32Array(8); readonly fbOn = new Float32Array(8);
-  readonly bassOnRing = new Float32Array(BASSON_LEN); bassOnN = 0;
-  bigN = 0; bassOnPeaks = 0;   // räknare: stor-FFT:er och bastoppar (förr flaggorna secSpecDirty, bassOnPeak)
+  bigN = 0;   // räknare: stor-FFT:er (förr flaggan secSpecDirty)
   sink: ((mag: Float32Array, binHz: number) => void) | null = null;
 }
 /** KICKEN. kick = förr hKick, kickAt = förr hKickAt. */

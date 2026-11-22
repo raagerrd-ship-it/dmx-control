@@ -263,3 +263,19 @@ Nytt: i det delade läget (inline) jämförs dessutom varje fackfält med taggen
 efter `process()` i varje hopp, med `Object.is`; tempots `R`-fält bara i hopp då ett record skrevs. Listan läses ur `FACK[n].TRAD` i bygget, så ett nytt fält
 eller en ny tagg provas utan att någon skriver provet. Skiljer ett fält ljuger taggen (eller transportraden saknas, eller fältet skrivs efter `pushBig`),
 och provet säger `FEL tråd IN bass.energy …` och `DELNING FEL`.
+
+## Grenarna utan bigOn borta (steg 19)
+
+Backup-tagg `backup/fore-bigon-bort-20261122`. Ingen profil körde dem (båda profilerna har `SECTION_AGG=hop`, `FAST_BANDS=1`), och alla tre ändringsproven
+hittade fel just där. Nu gäller:
+
+- Delat läge har alltid stora vägen: `fast`/`slow` utan stora vägens buffertar kastar i konstruktorn (`createSplitBuffers` skapar dem alltid), så `bigOn` = delat.
+  Odelat (`all`) är kvar som förut: hela kedjan i `process`, sektionen per hopp i `sectionAggStep`.
+- De snabba banden (`fastBandStep`, `fbLvl`/`fbAbs`/`fbOn`/`fbDbRaw`) gäller alltid i ramen och trumkittet; `Analyser.FAST_BANDS` borta.
+- Sektionen går alltid per hopp: `SECTION_AGG_HOP` borta (också re-exporten ur `analyser.ts`), `sectionFlushAgg`, `toRecord`, recordets `R_SEC_*`/`R_DROPS`/`R_ACTIVE`/`R_BUILD`
+  (recordet 37 -> 14 platser, ringen 296 -> 112 kB), `wire.active`/`wire.build`, `activeNow`/`buildNow` (nu `lv.activeMs`/`ri.buildUp`), `fromRecord()` utan argument.
+- Spektrumets basonset (`bassOnRing`, `bassOnN`, `bassOnPeaks`, `BASSON_*`) fanns bara för den grenen och är borta, likså sektionens `bpkSeen` och läsningarna
+  `flux`, `bandAbs`, `bassOn*` i `SectionReads`. Kvar (alltid 0 i dag, inte städat): sektionens `bon`/`bpk`/`flux`/`rms4`-summor och rangtermerna med vikt 0.
+- `slowWorker.ts`: en vänteslinga (den utan stora vägen är borta).
+- Profilraderna `SECTION_AGG` och `FAST_BANDS` saknar läsare (står kvar, som `SIL_CLEAR_PENDING`). `DMX_SECTION_AGG=env`/`DMX_FAST_BANDS=0` gör inget längre;
+  röktestet med dem utgår.
