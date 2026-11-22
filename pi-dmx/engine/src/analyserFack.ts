@@ -67,11 +67,13 @@ export class LevelOut {
 }
 /** SPEKTRUMET. Banden förblir Float32Array. sink = förr specSink. */
 export class SpectrumOut {
-  static readonly TRAD = { bandAbs: 'L', bandDbRaw: 'L', bandLvl: 'L', bandOn: 'L', fbOn: 'S', bigN: 'L', sink: 'S' } as const satisfies Taggat<SpectrumOut>;
+  static readonly TRAD = { bandAbs: 'L', bandDbRaw: 'L', bandLvl: 'L', bandOn: 'L', fbOn: 'S', bigN: 'L', sink: 'S', hatHit: 'S', snareHit: 'S' } as const satisfies Taggat<SpectrumOut>;
   readonly bandAbs = new Float32Array(8); readonly bandDbRaw = new Float32Array(8);   // absolut magnitud före AGC, rå dB
   readonly bandLvl = new Float32Array(8); readonly bandOn = new Float32Array(8); readonly fbOn = new Float32Array(8);
   bigN = 0;   // räknare: stor-FFT:er (förr flaggan secSpecDirty)
   sink: ((mag: Float32Array, binHz: number) => void) | null = null;
+  hatHit = 0; snareHit = 0;   // trumkittet: hi-hat och virvel (förr på Analyser)
+  constructor() { stabilise(this, ['hatHit', 'snareHit']); }
 }
 /** KICKEN. kick = förr hKick, kickAt = förr hKickAt. */
 export class KickOut {

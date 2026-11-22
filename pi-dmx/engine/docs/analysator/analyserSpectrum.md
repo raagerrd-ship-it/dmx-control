@@ -297,3 +297,21 @@ Vi väntar in MAD i stället för att gissa en amplitudtröskel: räknaren mäte
 exakt den uppbyggnadstid nämnaren behöver.
 ```
 
+
+## Trumkittet: hi-hat och virvel (steg 25, 2026-11-22)
+
+`hatHit` och `snareHit` (spektrumets fack, tagg `S`) räknas sist i `fastBandStep`, ur hoppets egna `fbOn`: hi-hat = max(treble, air) = `fbOn[6]`/`fbOn[7]`,
+virvel = highMid = `fbOn[5]`. Peak-hold: `max(förra × d, onset)`, `d = exp(-dtHop / tau)`, tau hat 60 ms, virvel 110 ms (`rates(dtHop)`, där också
+stor-FFT:ns bandnivåtakt `aBandLvl` sätts). Ramen läser `drum.hat`/`drum.snare` ur facket. Förr stod raderna i `analyser.ts` direkt efter
+`fastBandStep`, samma satser; anteckningarna som stod i koden:
+
+```text
+TRUM-KIT peak-hold-envelopes PÅ HOP-TAKT (var 2.7ms) → fångar varje anslag,
+aldrig missat mellan två render-frames (100Hz). tau bevarade från effects.ts:
+hat 60ms (treble+air-onset O[6]/O[7]) / snare 110ms (highMid-onset O[5]) / kick 150ms
+(ENBART diskret kick — se nedan). bass = spec.bass-NIVÅ (L[2], ingen envelope).
+Hi-hats/sizzle i modern EDM/trap ligger ofta >10 kHz, så hat får lyssna på både
+treble (3,5–10 kHz) och air (10–16 kHz) och ta den starkaste transienten.
+```
+
+`drum.kick` (`hop.kickHit`, tau 150 ms) står kvar i kärnan: den drivs av kicken och går till workern (karaktärens punch, basen).

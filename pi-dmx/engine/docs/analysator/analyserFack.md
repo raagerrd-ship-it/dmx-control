@@ -345,3 +345,10 @@ Borta ur `Frame`, startramen och `fillFrame`. Räkningen som bara fanns för dem
 långsamma tillståndets plats), sektionens `repeatSection` (fack, tagg `UT`, plats) med etikettlistorna `secFpLab`/`secFp2Lab` och `bestLab`, och
 `repeatSection` i korbank-kroken `dbgSecBlock`. Nivåns `level.level` står kvar (VU-mätaren och spektrumet läser den). Proven hoppar över fälten
 när referensen har dem (`BORT` i `tools/refaktor/namnkarta.mjs`), och `flyttkarta.json` har tappat de två fackfälten.
+
+## Virvel och hi-hat i spektrum-stenen (steg 25)
+
+`hatHit`/`snareHit` flyttade från `Analyser` till spektrumets fack (`SpectrumOut`, tagg `S`, `stabilise` som förr i `DOUBLE_FROM_START`), räkningen
+från kärnan till slutet av `fastBandStep` (samma satser, samma plats i hoppet: direkt efter banden). Takterna `dHat`/`dSnare` och `aBandLvl` i
+spektrumets `rates(dtHop)` (konstruktorn). Ramens `drum.hat`/`drum.snare` läser facket. Inget annat läser fälten; workern rör dem inte.
+`flyttkarta.json`: `hatHit`, `snareHit`.

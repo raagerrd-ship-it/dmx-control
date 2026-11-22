@@ -46,6 +46,14 @@ export class SpectrumBands {
   specRing: Float32Array | null = null;
 specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
   private onsetWarm = 0;   // Stor-FFT-rutor med signal i rad
+  private dHat = 0; private dSnare = 0;
+  /** Takterna ur hoppets längd (konstruktorn): bandnivån i stor-FFT:n, hi-hat och virvel. */
+  rates(dtHop: number): void {
+    const bigDt = dtHop * BIG_EVERY;
+    this.aBandLvl = 1 - Math.exp(-bigDt / 0.09);
+    this.dHat = Math.exp(-dtHop / 0.06);
+    this.dSnare = Math.exp(-dtHop / 0.11);
+  }
   private static readonly ONSET_WARM = 183;
   /** 2048-bufferten som RING. */
   bigRingPush(samples: Float32Array): void {
@@ -103,6 +111,9 @@ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
       this.o.fbOn[b] = warm ? Math.max(0, Math.min(1, (fluxN - oThr) / Math.max(1e-6, this.fbOnMad[b] * 3))) : 0;
     }
     { const t = this.fbPrevMag; this.fbPrevMag = this.fbMag; this.fbMag = t; }
+    const ON = this.o.fbOn, hat = ON[6] > ON[7] ? ON[6] : ON[7];   // trumkittet: hi-hat och virvel
+    this.o.hatHit = Math.max(this.o.hatHit * this.dHat, hat);
+    this.o.snareHit = Math.max(this.o.snareHit * this.dSnare, ON[5]);
   }
 
   /** Var BIG_EVERY:e hopp: stor-FFT:n. */

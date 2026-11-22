@@ -125,7 +125,7 @@ export interface Frame {
 
 const DOUBLE_FROM_START = [
   'sumSq', 'lastT', 'envAccum', 'envAccumT', 'envBassAccum',
-  'lvlVU', 'engSmooth', 'snareHit', 'hatHit',
+  'lvlVU', 'engSmooth',
   'rawBpmLast',
 ] as const;   // Instansfalt som MATT
 /** TYPSTABILA TALFALT. */
@@ -156,8 +156,6 @@ export class Analyser {
   private outOnset: Spectrum = { sub: 0, kick: 0, bass: 0, lowMid: 0, mid: 0, highMid: 0, treble: 0, air: 0 };
   private outDrum = { kick: 0, snare: 0, hat: 0, bass: 0 };   // trum-envelopes
   private outFrame!: Frame;   // ETT återanvänt Frame
-  private hatHit = 0;   // TRUM-KIT peak-hold-envelopes
-  private snareHit = 0;
   private static readonly BAND_HZ = [20, 60, 120, 250, 500, 1200, 3500, 10000, 16000];
   static readonly BE_FALLBACK_MS = BE_FALLBACK_MS;
 
@@ -212,7 +210,7 @@ export class Analyser {
   private static readonly REFRAC_N = 20;   // 200 ms @ ENV_HZ 100
 
   private aAtt = 0; private aRel = 0; private aVU = 0;
-  private dHat = 0; private dSnare = 0; private dKick = 0;
+  private dKick = 0;
   private envBassRing = new Float32Array(Analyser.ENV_LEN);   // BASBANDETS onset-envelope
   private envBassAccum = 0;
   private tempoGram = new Float32Array(Analyser.ENV_LEN);   // Ackumulerat tempogram
@@ -568,15 +566,12 @@ export class Analyser {
     const dtHop = cfg.fft.hop / cfg.audio.rate;
     h.dtHop = dtHop;
     h.hopMs = dtHop * 1000;
-    const bigDt = dtHop * Analyser.BIG_EVERY;
 
     this.aAtt = 1 - Math.exp(-dtHop / 0.015);
     this.aRel = 1 - Math.exp(-dtHop / 0.4);
     this.aVU = 1 - Math.exp(-dtHop / 0.20);
     this.levels.rates(dtHop);
-    this.bands.aBandLvl = 1 - Math.exp(-bigDt / 0.09);
-    this.dHat = Math.exp(-dtHop / 0.06);
-    this.dSnare = Math.exp(-dtHop / 0.11);
+    this.bands.rates(dtHop);
     this.dKick = Math.exp(-dtHop / 0.15);
     this.riser?.rates(dtHop);
     this.character?.rates(dtHop);
@@ -703,10 +698,6 @@ export class Analyser {
     this.bands.bigTick();
     }
     this.bands.fastBandStep(samples);
-    const ON = sp.fbOn;
-    const hatOnset = ON[6] > ON[7] ? ON[6] : ON[7];
-    this.hatHit = Math.max(this.hatHit * this.dHat, hatOnset);
-    this.snareHit = Math.max(this.snareHit * this.dSnare, ON[5]);
     if (kk.kick) h.kickHit = 1;
     else h.kickHit = h.kickHit * this.dKick;
     const nowWallA = this.wallNow();
@@ -775,7 +766,7 @@ export class Analyser {
     specAbs.sub = A[0]; specAbs.kick = A[1]; specAbs.bass = A[2]; specAbs.lowMid = A[3]; specAbs.mid = A[4]; specAbs.highMid = A[5]; specAbs.treble = A[6]; specAbs.air = A[7];
     onset.sub = O[0]; onset.kick = O[1]; onset.bass = O[2]; onset.lowMid = O[3]; onset.mid = O[4]; onset.highMid = O[5]; onset.treble = O[6]; onset.air = O[7];
     const dr = this.outDrum;
-    dr.kick = h.kickHit; dr.snare = this.snareHit; dr.hat = this.hatHit; dr.bass = L[2];
+    dr.kick = h.kickHit; dr.snare = sp.snareHit; dr.hat = sp.hatHit; dr.bass = L[2];
 
     const f = this.outFrame;
     f.silent = lv.lvlSmooth <= this.silenceLevel; f.level = lv.lvlSmooth; f.levelVU = this.lvlVU;

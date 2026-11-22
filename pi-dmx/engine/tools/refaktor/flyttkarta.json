@@ -10,7 +10,7 @@
   "levelCeil": "f.level.levelCeil", "levels.inZoneState": "f.level.inZone", "gainLocked": "f.level.gainLocked",
   "bandAbs.constructor": "f.spectrum.bandAbs.constructor", "bandAbs.length": "f.spectrum.bandAbs.length", "bandDbRaw.constructor": "f.spectrum.bandDbRaw.constructor", "bandDbRaw.length": "f.spectrum.bandDbRaw.length",
   "bandLvl.constructor": "f.spectrum.bandLvl.constructor", "bandLvl.length": "f.spectrum.bandLvl.length", "bandOn.constructor": "f.spectrum.bandOn.constructor", "bandOn.length": "f.spectrum.bandOn.length",
-  "fbOn.constructor": "f.spectrum.fbOn.constructor", "fbOn.length": "f.spectrum.fbOn.length", "specSink": "f.spectrum.sink",
+  "fbOn.constructor": "f.spectrum.fbOn.constructor", "fbOn.length": "f.spectrum.fbOn.length", "specSink": "f.spectrum.sink", "hatHit": "f.spectrum.hatHit", "snareHit": "f.spectrum.snareHit",
   "hKick": "f.kick.kick", "hKickAt": "f.kick.kickAt", "beatAnchorMs": "f.kick.beatAnchorMs", "pendingKickMs": "f.kick.pendingKickMs", "kicks.lastKick": "f.kick.lastKick",
   "kfPrev": "f.kick.kfPrev", "kfPrev2": "f.kick.kfPrev2", "dbgKick": "f.kick.dbgKick",
   "localBpm": "f.clock.bpm", "localBpmConfidence": "f.clock.conf", "beatPhaseMs": "f.clock.phaseMs", "beatPhaseConf": "f.clock.phaseConf", "beatSrc.constructor": "f.clock.src.constructor",
