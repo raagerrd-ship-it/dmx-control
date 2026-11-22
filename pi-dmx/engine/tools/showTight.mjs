@@ -196,7 +196,7 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
   if (kickPending) { KICK.push(i); KICKT.set(i, kickAtS); kickPending = false; }
   if (process.env.ST_PHASE && KICKT.get(i) === kickAtS && KICK[KICK.length - 1] === i) PH.push([+(tS - kickAtS).toFixed(4), tS, +(cfg.beat && cfg.beat.bpm > 0 ? ((((ms - cfg.beat.anchorMs) % (60000 / cfg.beat.bpm)) + 60000 / cfg.beat.bpm) % (60000 / cfg.beat.bpm)) / (60000 / cfg.beat.bpm) : -1).toFixed(3), cfg.beat && cfg.beat.bpm > 0 ? 1 : 0, +(cfg.beat?.bpm ?? 0).toFixed(1)]);
   if ((fr.miniDropCount ?? 0) !== lastMini) { lastMini = fr.miniDropCount ?? 0; MINIS++; }
-  if ((fr.dropCount ?? 0) !== lastDrop) { lastDrop = fr.dropCount ?? 0; DROP.push({ t: tS, i, sec: fr.section, lvh: fr.levelVsHighDb ?? 0 }); }
+  if ((fr.dropCount ?? 0) !== lastDrop) { lastDrop = fr.dropCount ?? 0; DROP.push({ t: tS, i, sec: fr.section, lvh: fr.sectionLevelVsHighDb ?? fr.levelVsHighDb ?? 0 }); }
 
   const look = eng.smartMode;
   if (look !== lastLook) {

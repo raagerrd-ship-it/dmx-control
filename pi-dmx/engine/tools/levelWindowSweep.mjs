@@ -41,7 +41,7 @@ for (const win of wins) {
     const ms = EPOCH + (off / SR) * 1000; an.setVirtualClock(ms);
     Date.now = () => ms; performance.now = () => ms - EPOCH;
     const fr = an.process(buf);
-    if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
+    if (fr.bpm > 0) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
     if (ms - lastRender >= 25) {
       lastRender = ms; eng.render(fr);
       const sh = eng.liveShapeRaw; frames++; if (sh > 0) on++; if (sh >= 1) clip++; sum += sh; h.update(sh.toFixed(6));

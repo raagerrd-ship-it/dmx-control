@@ -879,7 +879,7 @@ Vid `{`:
 ```text
 ringen + vikningen (basens stigning i dB mot FEED_RISE_HOPS hop sedan; var 2:a hop in i ringen, max av de två)
 ```
-Vid `if (!cfg.beat && this.tempoBpm > 0) cfg.beat = { anchorMs: frame.beatAnchorMs || now, b...`:
+Vid `if (!cfg.beat && this.tempoBpm > 0) cfg.beat = { anchorMs: frame.kickAnchorMs || now, b...`:
 
 ```text
 KALLSTART (förr analysatorns första lås): klockan föds på tempogrammets första topp, fasen på senaste kicken; onsetStep lägger

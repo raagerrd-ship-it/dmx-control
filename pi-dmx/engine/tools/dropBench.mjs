@@ -61,7 +61,7 @@ for (let k = 0; k < nHops; k++) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
   an.setVirtualClock((off / 48000) * 1000);
   const f = an.process(buf);
-  body[k] = f.bodyDb; if (f.kick) kickT.push(k * dtHop); sect[k] = f.section; build[k] = f.buildUp; lvh[k] = f.levelVsHighDb; phase[k] = f.beatPhaseMs; bpmA[k] = f.bpm;
+  body[k] = f.bodyDb; if (f.kick) kickT.push(k * dtHop); sect[k] = f.section; build[k] = f.buildUp; lvh[k] = f.sectionLevelVsHighDb ?? f.levelVsHighDb; phase[k] = f.beatPhaseMs; bpmA[k] = f.bpm;
   if (f.miniDropCount !== lastMini) { lastMini = f.miniDropCount; minis.push(k * dtHop); }
   if (f.dropCount !== lastDrop) { lastDrop = f.dropCount; if (fires.length === 0 || Math.abs(fires[fires.length - 1].t - k * dtHop) > 0.02) fires.push({ t: k * dtHop, rise: NaN, peak: NaN, fast: NaN, underPeak: NaN, edgeAgo: NaN, kind: "unlogged" }); }
 }

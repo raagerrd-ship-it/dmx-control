@@ -41,7 +41,7 @@ for (let sec = 0; sec < SECS; sec++) {
     const ms = EPOCH + (SKIP + sec) * 1000 + (off / SR) * 1000;
     an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
     const fr = an.process(buf); hops++;
-    if (eng) { if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence }; if (ms - lastRender >= 10) { lastRender = ms; eng.render(fr); } }
+    if (eng) { if (fr.bpm > 0) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence }; if (ms - lastRender >= 10) { lastRender = ms; eng.render(fr); } }
   }
 }
 process.stderr.write(`=== CHURN END ===\n`);

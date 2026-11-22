@@ -88,7 +88,7 @@ for (let sec = 0; sec < SECS; sec++) {
     const tS = sec + off / SR, ms = EPOCH + tS * 1000;
     an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
     const fr = an.process(buf); hops++;
-    if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
+    if (fr.bpm > 0) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
     if (ms - lastRender >= RENDER_MS) { lastRender = ms; eng.render(fr); }
   }
   rssPeak = Math.max(rssPeak, process.memoryUsage.rss());

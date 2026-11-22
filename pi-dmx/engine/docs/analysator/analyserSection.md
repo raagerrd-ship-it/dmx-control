@@ -298,7 +298,7 @@ MINNE: avslutad sektion till loggen (medel-dB, kickar/s); refrangens dB blir ref
 Vid `if (prev === 'build' || this.a.section === 'build') { if (this.a.section === 'build' &&...`:
 
 ```text
-UPPBYGGNADENS START (frame.buildProg): 'build' som återkommer inom 2 s räknas som samma uppbyggnad (sektionsfladder).
+UPPBYGGNADENS START (frame.sectionBuildProg): 'build' som återkommer inom 2 s räknas som samma uppbyggnad (sektionsfladder).
 ```
 Vid `if (this.a.section === 'high') { this.lastHighDb = this.secCurDbSum / this.secCurDbN; }`:
 

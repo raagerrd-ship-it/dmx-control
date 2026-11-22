@@ -29,8 +29,8 @@ const MAX_S = Number(process.env.SPLIT_MAX_S ?? 120);
 const HOP = 128, EPOCH = 1.7e12;
 
 const VANTAT = new Set(['barShift', 'beatPhaseMs', 'beatPhaseConf',
-  'section', 'sectionAgeMs', 'sectionIndex', 'sectionTier', 'sectionBars', 'prevSection', 'levelVsHighDb', 'expectHighInMs',
-  'repeatSim', 'repeatAgoMs', 'repeatSection', 'buildProg', 'miniDropCount', 'dropDemoted', 'bassLevel']);
+  'section', 'sectionAgeMs', 'sectionIndex', 'sectionTier', 'sectionBars', 'prevSection', 'sectionLevelVsHighDb', 'expectHighInMs',
+  'repeatSim', 'repeatAgoMs', 'repeatSection', 'sectionBuildProg', 'miniDropCount', 'dropDemoted', 'bassLevel']);
 
 const { createAnalyser } = await import(pathToFileURL(join(DIST, 'analyser.js')).href);
 const { defaultConfig } = await import(pathToFileURL(join(DIST, 'config.js')).href);

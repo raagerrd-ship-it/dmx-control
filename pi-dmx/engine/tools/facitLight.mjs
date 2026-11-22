@@ -20,7 +20,7 @@ for (const f of files) {
     for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
     const t = off / SR, ms = ms0 + t * 1000; an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - ms0;
     const fr = an.process(buf); if (fr.kick) eng.registerKick(0.4 + Math.min(1, fr.energy * 1.4) * 0.6);
-    if (fr.bpm > 0) { if (!cfg.beat || Math.abs(cfg.beat.bpm / fr.bpm - 1) > 0.03) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence }; else cfg.beat.confidence = fr.bpmConfidence; }
+    if (fr.bpm > 0) { if (!cfg.beat || Math.abs(cfg.beat.bpm / fr.bpm - 1) > 0.03) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence }; else cfg.beat.confidence = fr.bpmConfidence; }
     if (ms - last >= 25) { last = ms; const o = eng.render(fr); if (t < 20) continue; const seg = der.find((s) => t >= s.start && t < s.end); if (!seg || !(seg.tier in acc)) continue;
       let v = 0; for (let k = 0; k < 4; k++) v += Math.max(o[k * 7], o[k * 7 + 1], o[k * 7 + 2]); acc[seg.tier][0] += v / 4 / 2.55; acc[seg.tier][1]++; }
   }

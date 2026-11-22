@@ -17,12 +17,12 @@ const STENAR = {   // namn i off(): [fält i Analyser, klass, fack, har neutral(
   sektion: ['sections', 'SectionTracker', 'section', true],
 };
 const NEUTRAL = {   // ramfält som stenen äger -> neutralt värde
-  kick: { kick: false, kickAtMs: 0, beatAnchorMs: 0, 'drum.kick': 0 },
+  kick: { kick: false, kickAtMs: 0, kickAnchorMs: 0, 'drum.kick': 0 },
   bas: { bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1 },
-  drop: { dropCount: 0, miniDropCount: 0, buildStartCount: 0, dropDemoted: 0, dropSpaced: 0, dropRiseDb: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0 },
+  drop: { dropCount: 0, miniDropCount: 0, dropBuildCount: 0, dropDemoted: 0, dropSpaced: 0, dropRiseDb: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0 },
   uppbyggnad: { buildUp: 0, inRiser: false },
   'karaktär': { 'profile.punch': 0.4, 'profile.bass': 0.5, 'profile.bright': 0.3, 'profile.beat': 0.5, 'profile.bassline': 0 },
-  sektion: { section: '', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0, buildProg: 0 },
+  sektion: { section: '', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', sectionLevelVsHighDb: 0, sectionBars: 0, sectionBuildProg: 0 },
 };
 const argv = process.argv.slice(2);
 
@@ -141,7 +141,7 @@ async function kor(DIST, MALL, NAMN, PROF, SECS, WAV) {
           if (hops > 0 && hops % HINT === 0) X.a.hintTrackChange(5000);
           if (hops > 0 && hops % RESET === 0) X.a.resetTempo();
           fr = X.a.process(buf);
-          if (fr.bpm > 0 && fr.beatAnchorMs > 0) X.a.setBeatGrid({ bpm: fr.bpm, anchorMs: fr.beatAnchorMs });
+          if (fr.bpm > 0 && fr.kickAnchorMs > 0) X.a.setBeatGrid({ bpm: fr.bpm, anchorMs: fr.kickAnchorMs });
         }
         const f = flat(fr), t = (off / SR).toFixed(3);
         for (const k of Object.keys(NEU)) if (f[k] !== NEU[k]) { r.bad[k] = (r.bad[k] || 0) + 1; if (r.first.length < 4) r.first.push(`t=${t} ${k} = ${f[k]} (neutralt ${JSON.stringify(NEU[k])})`); }

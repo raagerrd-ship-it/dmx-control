@@ -39,7 +39,7 @@ function runSecs(n) {
       vms = EPOCH + (pos - 44 - chunk.length) / (SR * 2) * 1000 + (off / SR) * 1000;
       an.setVirtualClock(vms);
       const fr = an.process(buf); hops++;
-      if (eng) { if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || vms, bpm: fr.bpm, confidence: fr.bpmConfidence }; if (vms - lastRender >= 10) { lastRender = vms; eng.render(fr); } }
+      if (eng) { if (fr.bpm > 0) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || vms, bpm: fr.bpm, confidence: fr.bpmConfidence }; if (vms - lastRender >= 10) { lastRender = vms; eng.render(fr); } }
     }
   }
   return true;

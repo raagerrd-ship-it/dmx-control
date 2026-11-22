@@ -46,8 +46,8 @@ export function replay(path, tweak = {}) {
     a.setVirtualClock((k * hop / w.rate) * 1000);
     const f = a.process(out);
     frames.push({ t: k * hop / w.rate, level: f.level, energy: f.energy, intensity: f.intensity,
-                  inZone: f.inZone ? 1 : 0, inRiser: f.inRiser ? 1 : 0, buildUp: f.buildUp,
-                  dropCount: f.dropCount, bpm: f.bpm, breaking: f.breaking ? 1 : 0,
+                  inZone: (f.levelInZone ?? f.inZone) ? 1 : 0, inRiser: f.inRiser ? 1 : 0, buildUp: f.buildUp,
+                  dropCount: f.dropCount, bpm: f.bpm, breaking: (f.levelBreaking ?? f.breaking) ? 1 : 0,
                   sub: f.spec.sub, kickB: f.spec.kick, bass: f.spec.bass, mid: f.spec.mid,
                   treble: f.spec.treble, centroid: f.centroid, flux: f.flux,
                   onKick: f.onset.kick, onSub: f.onset.sub, onBass: f.onset.bass });

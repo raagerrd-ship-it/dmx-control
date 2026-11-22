@@ -41,7 +41,7 @@ for (const e of EFFECTS) {
   let spread = 0, nn = 0, onOff = 0, lit = 0;
   for (const { fr, ms } of frames) {
     Date.now = () => ms; performance.now = () => ms - EPOCH;
-    if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
+    if (fr.bpm > 0) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
     const u = eng.render(fr);
     // Lampans ljus = storsta ljusbarande kanalen i dess kanalblock. Max tacker bade rgb7 (R,G,B,DIM) och ladans
     // custom-ordning (DIM,R,G,B) utan att behova veta vilken preset som galler.

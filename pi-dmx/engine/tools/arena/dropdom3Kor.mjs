@@ -1,4 +1,4 @@
-/** MÄTNINGEN TILL DROP-DOMAREN 3 (tools/arena/dropdom3.py; som dropdom2Kor + uppbyggnad = frame.buildStartCount stiger): spelar en inspelning genom HELA analysatorn som motorn kör den (delad inline,
+/** MÄTNINGEN TILL DROP-DOMAREN 3 (tools/arena/dropdom3.py; som dropdom2Kor + uppbyggnad = frame.dropBuildCount stiger): spelar en inspelning genom HELA analysatorn som motorn kör den (delad inline,
  *  ladans config delad med klockan, låtgränsdetektorn inkopplad -> hintTrackChange) ur dist/ eller deltagarens bygge (DMX_DIST + distHook)
  *  och skriver drop, minidrop, låtgränser, klockans tempo i 1 Hz och kostnaden per hopp. Tiderna är sekunder från FILENS början.
  *    node tools/arena/dropdom3Kor.mjs <wav> <ut.json> [start s]      (körs av dropdom3.py; start s = skakprovet, ljudet börjar så långt in) */
@@ -25,7 +25,7 @@ for (let off = SKIP; off + HOP <= n; off += HOP) {
   cpu += realNow() - a; hops++;
   if (fr.dropCount !== lastD) { lastD = fr.dropCount; drops.push(+t.toFixed(2)); }
   if ((fr.miniDropCount ?? 0) !== lastM) { lastM = fr.miniDropCount ?? 0; minis.push(+t.toFixed(2)); }
-  if ((fr.buildStartCount ?? 0) !== lastU) { lastU = fr.buildStartCount ?? 0; uppb.push(+t.toFixed(2)); }
+  if ((fr.dropBuildCount ?? fr.buildStartCount ?? 0) !== lastU) { lastU = fr.dropBuildCount ?? fr.buildStartCount ?? 0; uppb.push(+t.toFixed(2)); }
   if (((off - SKIP) / HOP) % 375 === 0) bpm.push(+(fr.bpm || 0).toFixed(1));
 }
 console.log = log;

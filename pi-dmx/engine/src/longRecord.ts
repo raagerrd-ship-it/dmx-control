@@ -108,7 +108,7 @@ export class LongRecord {
       const f = this.hooks.latestFrame(); if (!f) return;
       const bt = this.hooks.beat();
       const row = [Date.now(), f.dropCount, f.miniDropCount ?? 0, f.section ?? '', f.sectionIndex ?? 0, Math.round((f.buildUp ?? 0) * 100) / 100,
-        f.breaking ? 1 : 0, Math.round(f.bpm ?? 0), bt ? Math.round(bt.confidence * 100) / 100 : 0, this.hooks.look(), this.hooks.why()];
+        f.levelBreaking ? 1 : 0, Math.round(f.bpm ?? 0), bt ? Math.round(bt.confidence * 100) / 100 : 0, this.hooks.look(), this.hooks.why()];
       const key = row.slice(1).join('|');
       if (key !== this.lastKey) { this.lastKey = key; this.events.push(row); }
     } catch { /* loggen far aldrig falla motorn */ }

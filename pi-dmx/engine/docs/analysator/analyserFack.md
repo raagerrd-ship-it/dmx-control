@@ -319,3 +319,21 @@ för `engSmooth` och `centSmooth` (samma tal i dag, men de hör till energin och
 Ordningen: utjämningen och intensitet/tak körs nu före `kicks.hopStep()`, env-ackumuleringen och `envSampleStep` i stället för efter. Inget där emellan läser
 `lvlSmooth`, `level`, `activeMs`, `intensity`, `levelCeil` eller `inZone` (kicken läser `gain`/`envelope`/`gainLocked`, recordet bara klockan), och inget där
 skriver det nivån läser (`rms`, `now`, `dt`, `gated`, `dtHop`). Alla värden kommer alltså samma hopp, tidigare i hoppet.
+
+## Ramfälten heter efter delen som skapar dem (steg 23, ägaren 11-22: "Byt")
+
+Bara ramens (`Frame`) namn; fackens fält heter som förut, där visar facket redan delen.
+
+| förr | nu | del (fackets fält) |
+|---|---|---|
+| `beatAnchorMs` | `kickAnchorMs` | kick (`f.kick.beatAnchorMs`) |
+| `buildStartCount` | `dropBuildCount` | drop (`f.drop.buildStartCount`) |
+| `buildProg` | `sectionBuildProg` | sektion (`secBuildAt`/`secBuildSeen`, räknas i `fillFrame`) |
+| `levelVsHighDb` | `sectionLevelVsHighDb` | sektion (`f.section.levelVsHighDb`) |
+| `inZone` | `levelInZone` | nivå (`f.level.inZone`) |
+| `breaking` | `levelBreaking` | nivå (räknas i kärnan ur nivåns `lvlSmooth`/`levelCeil`, går som `hop.breaking`) |
+
+`HopFrame` (split.ts, taktmatningen) följer med: `kickAnchorMs`. Effekternas `ctx.levelVsHighDb` och servern/websocketens nyckel `inZone` heter
+som förut (de är inte ramen). Inspelningarnas format är oförändrat: `longRecord` skriver kolumnen `breaking`, inspelarens flaggor är positionella.
+Proven mot äldre byggen döper om referensens toppfält med `tools/refaktor/namnkarta.mjs` (`analyserParity.mjs`, därmed `fakenow.mjs`, och `omstart.mjs`);
+verktyg som kan köra äldre byggen läser det nya namnet med det gamla som reserv.

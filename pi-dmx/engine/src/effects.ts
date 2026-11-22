@@ -1099,7 +1099,7 @@ export class EffectEngine {
         // I LUCKAN (11-16): spärren följer analysatorns uppbyggnadssignal (25 av ägarens 29, den gamla riser/build-regeln 0 av 29) och släpper på drop/minidrop
         const nearLand = this.nearBigAt === nowWall && !dropHit && liveSec !== 'build' && liveSec !== 'break' && (this.switchWhy !== 'drop' && this.switchWhy !== 'landning' ? held > NEAR_LAND_HOLD_MS : held > LAND_HOLD_MS && liveSec !== 'high');
         const landHit = frame.miniDropCount !== this.lastMiniSeen && !dropHit;   // LANDNINGEN (a7): basen tillbaka efter luckan = ny del, på ettan
-        if (frame.buildStartCount !== this.lastBuildStart) { this.lastBuildStart = frame.buildStartCount; this.gapUntil = nowWall + GAP_HOLD_MS; }
+        if (frame.dropBuildCount !== this.lastBuildStart) { this.lastBuildStart = frame.dropBuildCount; this.gapUntil = nowWall + GAP_HOLD_MS; }
         if (dropHit || frame.miniDropCount !== this.lastMiniSeen) this.gapUntil = -1;
         this.lastMiniSeen = frame.miniDropCount;
         const inGap = nowWall < this.gapUntil;
@@ -1112,7 +1112,7 @@ export class EffectEngine {
         // 2) I ett breakdown: gå till den lugna poolen oavsett vad energitiern
         //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
         //    så utan detta fortsätter riggen köra fullfart genom en svacka.
-        // LUGN-POOLEN BARA FRAN SEKTIONEN (2026-09-27, ladan): frame.breaking ar 'nivan < 65 % av taket' och var sann sa ofta
+        // LUGN-POOLEN BARA FRAN SEKTIONEN (2026-09-27, ladan): frame.levelBreaking ar 'nivan < 65 % av taket' och var sann sa ofta
         // pa partypop att 27 av 40 look-val blev lugn-looker (viska/airglow/twin = nastan morka) mitt i sektion high med tier
         // full -> "ser inte vad effekterna gor", "en lampa lyser konstant". Med sektionsstyrning pa ar 'break' den
         // genomtankta signalen (av-brytaren DMX_CALM_FROM_BREAKING borttagen 10-10).
@@ -1696,7 +1696,7 @@ export class EffectEngine {
     const dtNow = dtSec;   // (se EN KLOCKA PER RUTA)
     const dropHitRaw = this.stepDrop(frame), dropHit = dropHitRaw;
     const fog = this.cfg.fog;   // rök beslutas EFTER effekterna (de får önska) — se nedan
-    // `frame.inZone`-KRAVET BORTTAGET (ägaren i ladan 2026-09-03: bra fångst). Det var
+    // `frame.levelInZone`-KRAVET BORTTAGET (ägaren i ladan 2026-09-03: bra fångst). Det var
     // orsaken till att lamp-blixten kom "upp till en takt efter, varierande" medan
     // RÖKEN (samma dropHit, inget inZone-krav) alltid var i tid: på en drop fyrar
     // dropHit direkt men inZone (nivå-ballistiken) släpar en takt → blixten väntade in
@@ -1925,7 +1925,7 @@ export class EffectEngine {
     const ctx = this.ctx;
     ctx.cfg = this.cfg; ctx.frame = frame; ctx.t = t; ctx.count = count;
     ctx.section = frame.section || 'intro'; ctx.sectionAgeMs = frame.sectionAgeMs || 0; ctx.sectionIndex = frame.sectionIndex || 0;
-    ctx.sectionEntry = Math.max(0, 1 - (frame.sectionAgeMs || 1e9) / 400); ctx.sectionTier = frame.sectionTier ?? 1; ctx.expectHighInMs = frame.expectHighInMs ?? -1; ctx.levelVsHighDb = frame.levelVsHighDb ?? 0; ctx.repeatSim = frame.repeatSim || 0;
+    ctx.sectionEntry = Math.max(0, 1 - (frame.sectionAgeMs || 1e9) / 400); ctx.sectionTier = frame.sectionTier ?? 1; ctx.expectHighInMs = frame.expectHighInMs ?? -1; ctx.levelVsHighDb = frame.sectionLevelVsHighDb ?? 0; ctx.repeatSim = frame.repeatSim || 0;
     // PUNCH MED AVKLINGNING (2026-10-10): bassPunch spikade ruta for ruta och gav fladder rakt in i ljuset (chase 39 -> 4 utan den).
     // Upp direkt, ~120 ms avklingning - dunken behaller sin skarpa uppgang men blir EN puls i stallet for ett flimmer.
     this.punchEnv = Math.max(bassPunch, this.punchEnv * Math.exp(-dtSec / 0.12));
@@ -1947,9 +1947,9 @@ export class EffectEngine {
     const ordSel = (this.smartCount * 3 + (beatIdx >> 5)) & 3;
     ctx.beatHit = beatHit; ctx.hasBeat = hasBeat;
     // UPPBYGGNADENS FÖRLOPP (ladan 10-11 22:05: "kändes inte som den laddade för en drop"): analysatorns riser (frame.buildUp) är död
-    // på ladans material, så build-effekterna trappar upp på frame.buildProg = slag sedan sektionen blev build / 32 (0..1). Mätningen
+    // på ladans material, så build-effekterna trappar upp på frame.sectionBuildProg = slag sedan sektionen blev build / 32 (0..1). Mätningen
     // ligger i analysatorns långsamma väg sedan 11-12; här väljs bara vilken av de två som bär ljuset (den större).
-    this.buildProg = frame.buildProg;
+    this.buildProg = frame.sectionBuildProg;
     ctx.wavePhase = this.wavePhase; ctx.buildUp = Math.max(frame.buildUp, this.buildProg);
     ctx.phaseSpread = 1 + ctx.buildUp * 2.5; ctx.punchFloor = punchFloor;
     ctx.chasePos = this.chasePos; ctx.dropFired = this.dropFired;

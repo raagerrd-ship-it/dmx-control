@@ -75,8 +75,8 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   Date.now = () => ms;
   performance.now = () => ms - EPOCH;
   const fr = an.process(buf);
-  if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
-  if (fr.dropCount !== lastDropCount) { lastDropCount = fr.dropCount; dropAt.push({ t: tS, sec: fr.section, lvh: fr.levelVsHighDb, tier: fr.sectionTier }); }
+  if (fr.bpm > 0) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
+  if (fr.dropCount !== lastDropCount) { lastDropCount = fr.dropCount; dropAt.push({ t: tS, sec: fr.section, lvh: fr.sectionLevelVsHighDb ?? fr.levelVsHighDb, tier: fr.sectionTier }); }
 
   // SEKTION: samla segment på hop-upplösning (etiketten byter bara när ett 1 s-block stänger).
   if (fr.section !== lastSec) { if (lastSec !== null) secRuns.push({ sec: lastSec, t0: lastT, t1: tS }); lastSec = fr.section; lastT = tS; }
@@ -87,7 +87,7 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
     lastRender = ms;
     eng.render(fr);
     const look = eng.smartMode, te = eng.tierEma ?? 0;
-    lvhHist.push(fr.levelVsHighDb); intHist.push(fr.intensity); tierEmaHist.push(te);
+    lvhHist.push(fr.sectionLevelVsHighDb ?? fr.levelVsHighDb); intHist.push(fr.intensity); tierEmaHist.push(te);
     const tier = te < 0.30 ? "lugn" : te < 0.63 ? "fart" : "full";   // bara för tidsandelen; motorn har hysteres
     tierTime[tier] += dt;
     if (look !== lastLook) { if (lastLook !== null) lookRuns.push({ look: lastLook, t0: lookRuns.length ? lookRuns[lookRuns.length - 1].t1 : 0, t1: tS }); lastLook = look; }

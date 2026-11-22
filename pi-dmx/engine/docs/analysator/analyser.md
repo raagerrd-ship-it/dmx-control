@@ -321,12 +321,16 @@ På raden: monoton räknare — +1 per drop
  stopCount = basstopp 0,6-3 s som kom tillbaka (monoton), stopS = dess längd. Reaktionen (refraktär, look, lyft) ligger i effekterna.
 ```
 
-### inZone
+### levelInZone
+
+(förr `inZone`, steg 23)
 
 På raden: nivån är i låtens topp-zon (ihållande tillstånd, hysteres)
 
 
-### breaking
+### levelBreaking
+
+(förr `breaking`, steg 23)
 
 På raden: nivån är i en svacka/break (ihållande tillstånd)
 
@@ -338,7 +342,9 @@ På raden: nivån är i en svacka/break (ihållande tillstånd)
  sampling-säker. Show-REAKTIONERNA (strobe, swell) ligger i effekt-motorn.
 ```
 
-### buildProg
+### sectionBuildProg
+
+(förr `buildProg`, steg 23)
 
 ```text
  UPPBYGGNADENS FÖRLOPP 0..1 (ägaren 11-12: 'Uppbyggnaden borde flyttas till långsamma analysatorn'; förr effects.ts buildProg):
@@ -359,7 +365,9 @@ På raden: nivån är i en svacka/break (ihållande tillstånd)
 På raden: bassline: TYDLIG BASGANG 0..1 (basnot-anslag per slag, ~1 s)
 
 
-### beatAnchorMs
+### kickAnchorMs
+
+(förr `beatAnchorMs`, steg 23: kickens senaste slag, inte klockans rutnät)
 
 På raden: wall-clock ms för ett taktslag (fas)
 
@@ -440,7 +448,7 @@ På raden: 0 lag / 1 mellan / 2 hog (stabil niva-tier, hysteres 3 s)
  sektion med samma etikett foljdes av 'high' efter N takter (avrundat till 4) -> samma langd nu; (2) FRAS - energin stiger
  (secRiseRun >= 4 raka stigande block, LOTUS_PREDICT_RISE) -> nasta 4-taktsgrans i ett frasgitter forankrat i senaste high-starten
  (LOTUS_PREDICT_GRID/LAT); (3) SUG (opt-in LOTUS_PREDICT_DIP) - dyk i dB strax fore smallen -> high om 2 s. prevSection = forra sektionens etikett.
- levelVsHighDb = blockets dB mot senaste refrangens medel-dB (negativt = tystare an refrangen; 0 utan refrang) - latens EGEN
+ sectionLevelVsHighDb (förr levelVsHighDb) = blockets dB mot senaste refrangens medel-dB (negativt = tystare an refrangen; 0 utan refrang) - latens EGEN
  referens for dynamiken. sectionBars = takter sedan sektionsstart (0 utan tempo).
 ```
 
@@ -793,7 +801,7 @@ På raden:  Valfri avlyssnare på den stora magnituden (låtminnets fingeravtryc
 
 ### secBuildSeen
 
-På raden: uppbyggnadens start och senast sedd (ms, sektionens klocka) -> frame.buildProg
+På raden: uppbyggnadens start och senast sedd (ms, sektionens klocka) -> frame.sectionBuildProg
 
 
 ### expectHighMs

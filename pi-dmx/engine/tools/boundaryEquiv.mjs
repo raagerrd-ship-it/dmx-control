@@ -50,7 +50,7 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   const tS = off / SR; nowMs = EPOCH + tS * 1000;
   an.setVirtualClock(nowMs);
   const fr = an.process(buf);
-  oldM.tick({ level: fr.level, dropped: false, bpm: fr.bpm, bpmConfidence: fr.bpmConfidence, intensity: fr.intensity, beatAnchorMs: fr.beatAnchorMs, learn: false });
+  oldM.tick({ level: fr.level, dropped: false, bpm: fr.bpm, bpmConfidence: fr.bpmConfidence, intensity: fr.intensity, beatAnchorMs: fr.kickAnchorMs ?? fr.beatAnchorMs, learn: false });
   neu.tick({ level: fr.level, bpm: fr.bpm, bpmConfidence: fr.bpmConfidence });
   if (oldM.boundaryCount !== oc) { oc = oldM.boundaryCount; oldT.push(+tS.toFixed(3)); }
   if (neu.boundaryCount !== nc) { nc = neu.boundaryCount; newT.push(+tS.toFixed(3)); }

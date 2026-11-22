@@ -17,8 +17,8 @@ for (let off = 0; off + HOP <= n && off < SECS * SR; off += HOP) {
   if (bounds.charShiftCount !== lastC) { lastC = bounds.charShiftCount; eng.noteCharShift?.(); }
   if (bounds.boundaryCount !== lastB) { lastB = bounds.boundaryCount; eng.softenRange(); if (process.env.DMX_BOUNDARY_SOFT) an.hintTrackChange(5000); else { an.resetTempo(); if (process.env.DMX_SECTION_HINT_LOWCONF === '0') an.hintTrackChange(5000); } }
   if (fr.kick) eng.registerKick(0.4 + Math.min(1, fr.energy * 1.4) * 0.6);
-  if (fr.bpm > 0) { if (!cfg.beat || Math.abs(cfg.beat.bpm / fr.bpm - 1) > 0.03) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence }; else cfg.beat.confidence = fr.bpmConfidence; }
-  if (ms - last >= 25) { last = ms; const o = eng.render(fr); let v = 0; for (let f = 0; f < 4; f++) v += Math.max(o[f * 7], o[f * 7 + 1], o[f * 7 + 2]); rows.push({ t: tNow, look: eng.activeMode || eng.smartMode, sec: fr.section, lvl: 100 * v / 4 / 255, bw: eng.beatW ?? 1, bpm: fr.bpm, lvh: fr.levelVsHighDb ?? 0 }); }
+  if (fr.bpm > 0) { if (!cfg.beat || Math.abs(cfg.beat.bpm / fr.bpm - 1) > 0.03) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence }; else cfg.beat.confidence = fr.bpmConfidence; }
+  if (ms - last >= 25) { last = ms; const o = eng.render(fr); let v = 0; for (let f = 0; f < 4; f++) v += Math.max(o[f * 7], o[f * 7 + 1], o[f * 7 + 2]); rows.push({ t: tNow, look: eng.activeMode || eng.smartMode, sec: fr.section, lvl: 100 * v / 4 / 255, bw: eng.beatW ?? 1, bpm: fr.bpm, lvh: fr.sectionLevelVsHighDb ?? fr.levelVsHighDb ?? 0 }); }
 }
 console.log = origLog;
 // latgranser ur loggen

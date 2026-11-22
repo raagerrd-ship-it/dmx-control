@@ -22,7 +22,7 @@ for (let i = 0; i + HOP <= y.length; i += HOP) {
   an.setAudioClockMs?.(ms); Date.now = () => EPOCH + ms;
   if (hop === 0) an.setVirtualClock?.(0); else an.advanceVirtualClock?.(ms);
   const f = an.process(buf); hop++;
-  if (f && f.bpm > 0 && f.beatAnchorMs > 0) an.setBeatGrid?.({ bpm: f.bpm, anchorMs: f.beatAnchorMs });
+  if (f && f.bpm > 0 && (f.kickAnchorMs ?? f.beatAnchorMs) > 0) an.setBeatGrid?.({ bpm: f.bpm, anchorMs: f.kickAnchorMs ?? f.beatAnchorMs });
   if (hop % 375 === 0) rows.push(`${(ms / 1000).toFixed(0)},${(f?.bpm ?? 0).toFixed(1)},${(f?.bpmConfidence ?? 0).toFixed(2)},${(f?.beatTrust ?? 0).toFixed(2)},${f?.section ?? ''}`);
 }
 Date.now = realNow;

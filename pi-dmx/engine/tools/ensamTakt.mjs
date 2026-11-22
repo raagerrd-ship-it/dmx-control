@@ -42,7 +42,7 @@ if (cmd === "tappa") {
   const KW = 22, K = new Float64Array((hops + 8) * KW); let kn = 0, curT = 0;
   const orig = BeatFeed.prototype.update;
   BeatFeed.prototype.update = function (f, cfg, an, now) {
-    const r = kn * KW; K[r] = curT; K[r + 1] = now; K[r + 2] = f.bpm; K[r + 3] = f.bpmConfidence; K[r + 4] = f.beatAnchorMs; K[r + 5] = f.kickAtMs; K[r + 6] = f.barShift;
+    const r = kn * KW; K[r] = curT; K[r + 1] = now; K[r + 2] = f.bpm; K[r + 3] = f.bpmConfidence; K[r + 4] = f.kickAnchorMs ?? f.beatAnchorMs; K[r + 5] = f.kickAtMs; K[r + 6] = f.barShift;
     K[r + 7] = f.onset?.kick ?? 0; K[r + 8] = f.onset?.highMid ?? 0; K[r + 9] = f.onset?.treble ?? 0; K[r + 10] = f.specAbs?.sub ?? 0; K[r + 11] = f.specAbs?.kick ?? 0; K[r + 12] = f.specAbs?.bass ?? 0;
     K[r + 13] = an.trackBoundaries ?? 0; K[r + 14] = an.quietMs ?? 0; K[r + 15] = an.boundSure ? 1 : 0; K[r + 16] = an.bodyUnderDb ?? 0;
     const ret = orig.call(this, f, cfg, an, now); const b = cfg.beat;
@@ -76,15 +76,15 @@ if (cmd === "klocka") {
   console.log = () => {};
   const { BeatFeed } = await patched("analyserClock", sets);
   const feed = new BeatFeed(), cfg = { beat: undefined, beatErr: undefined }; let rt = 0, rb = 0;
-  const fr = { bpm: 0.5, bpmConfidence: 0.5, beatAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5, onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5, bass: 0.5 } };
+  const fr = { bpm: 0.5, bpmConfidence: 0.5, kickAnchorMs: 0.5, beatAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5, onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5, bass: 0.5 } };
   const target = { trackBoundaries: 0, quietMs: 0, boundSure: false, bodyUnderDb: 0, resetTempo: () => { rt++; }, resetBar: () => { rb++; }, setClockGrid: () => {} };
   const t0 = performance.now.bind(performance)(), realNow = performance.now.bind(performance); let diff = 0, first = "", ob = 0, oc = 0; const tl = [];
   for (let i = 0, o = 0; i < h.rows; i++, o += W) {
     const now = M[o + 1]; Date.now = () => now; performance.now = () => now - EPOCH;
-    fr.bpm = LOOP && i > 0 ? ob : M[o + 2]; fr.bpmConfidence = LOOP && i > 0 ? oc : M[o + 3]; fr.beatAnchorMs = M[o + 4]; fr.kickAtMs = M[o + 5]; fr.barShift = M[o + 6];
+    fr.bpm = LOOP && i > 0 ? ob : M[o + 2]; fr.bpmConfidence = LOOP && i > 0 ? oc : M[o + 3]; fr.kickAnchorMs = fr.beatAnchorMs = M[o + 4]; fr.kickAtMs = M[o + 5]; fr.barShift = M[o + 6];
     fr.onset.kick = M[o + 7]; fr.onset.highMid = M[o + 8]; fr.onset.treble = M[o + 9]; fr.specAbs.sub = M[o + 10]; fr.specAbs.kick = M[o + 11]; fr.specAbs.bass = M[o + 12];
     target.trackBoundaries = M[o + 13]; target.quietMs = M[o + 14]; target.boundSure = M[o + 15] === 1; target.bodyUnderDb = M[o + 16];
-    feed.update(fr, cfg, target, now);
+    feed.update(fr, cfg, target, now);   // fr.beatAnchorMs: byggen före steg 23 (--dist)
     const b = cfg.beat; ob = b ? b.bpm : 0; oc = b ? (b.confidence ?? 0) : 0;
     if (!VAR && !(ob === M[o + 18] && (b ? b.anchorMs : 0) === M[o + 19] && oc === M[o + 20])) { diff++; if (!first) first = `vid ${M[o].toFixed(2)} s: ensam ${ob.toFixed(3)} bpm, hela ${M[o + 18].toFixed(3)}`; }
     if (i % 188 === 0) tl.push([M[o], ob]);

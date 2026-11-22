@@ -180,7 +180,7 @@ Vid `S_LOST_FLAGS = 23`:
 Vid `S_LOST_FLAGS = 23 /* flaggor aterskapade ur raknarna efter tapp */, S_BUILD_AT = 24, S_...`:
 
 ```text
- uppbyggnadens start / senast sedd (frame.buildProg)
+ uppbyggnadens start / senast sedd (frame.sectionBuildProg)
 ```
 
 ## SplitBuffers

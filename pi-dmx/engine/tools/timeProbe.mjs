@@ -121,7 +121,7 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
   let t0 = hr(); const fr = an.process(buf); tA.push(hr() - t0);
   boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
-  if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
+  if (fr.bpm > 0) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
   lastRender = ms; t0 = hr(); eng.render(fr); tR.push(hr() - t0);
 }

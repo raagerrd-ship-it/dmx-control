@@ -60,7 +60,7 @@ function run(mode) {
   const lvl = [];   // riggens ljus per ruta
   for (const { fr, ms } of frames) {
     Date.now = () => ms; performance.now = () => ms - EPOCH;
-    if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
+    if (fr.bpm > 0) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
     const u = eng.render(structuredClone(fr));
     let s = 0;
     for (const L of lamps) s += Math.max(u[L.r] ?? 0, u[L.g] ?? 0, u[L.b] ?? 0) + (L.dim >= 0 ? (u[L.dim] ?? 0) : 0);

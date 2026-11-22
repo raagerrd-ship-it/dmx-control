@@ -453,7 +453,7 @@ export async function startServer(
   // Beat-lås-prick: räkna takt-index ur den STABILA PLL-taktklockan (cfg.beat,
   // samma som effekternas beatPulse) och flagga `beat:true` den push där indexet
   // går fram. Servern kör på Pi:n → samma klocka som anchorMs (klient-oberoende).
-  // OBS: använd cfg.beat.anchorMs (stabilt, PLL-fasat), INTE frame.beatAnchorMs
+  // OBS: använd cfg.beat.anchorMs (stabilt, PLL-fasat), INTE frame.kickAnchorMs
   // som hoppar till varje ny kick och nollar indexet → sporadiska blink.
   // Mätarvärdena skickas 20 Hz till mobilen. Ett rått 0.42837192612 kostar 13
   // tecken i varje paket och UI:t visar tre decimaler i bästa fall — tre
@@ -509,7 +509,7 @@ export async function startServer(
                                     // percentiltabell ser exakt ut som en nolla.
                                     // Det ledde till slutsatsen "signalen är död"
                                     // och en revert av en korrekt fix (820e7b6).
-      inZone: frame.inZone,
+      inZone: frame.levelInZone,
       // karaktarsprofil (diagnostik) — rundad som resten
       profile: p ? { punch: r3(p.punch), bass: r3(p.bass), bright: r3(p.bright), beat: r3(p.beat) } : p,
       beat: pkBeat,

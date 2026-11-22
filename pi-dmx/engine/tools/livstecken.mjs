@@ -46,7 +46,7 @@ for (const [k, a] of [...tot].sort((x, y) => x[0].localeCompare(y[0]))) {
   const counter = /Count$|Spaced$|Demoted$|låtgräns/.test(k);   // räknare för sällsynta händelser döms inte som nästan döda
   const dom = cpm === 0 ? "DÖD" : !counter && (cpm < 0.5 || (on > 0 && on < 0.5)) ? "nästan död" : "";
   if (dom === "DÖD" && VANTAT[k]) vantade++; else if (dom === "DÖD") dead++; else if (dom) weak++;
-  if (!ALLA && !dom && !/Count$|låtgräns|inRiser|inZone|buildUp$|^bpm$|^section$/.test(k)) continue;
+  if (!ALLA && !dom && !/Count$|låtgräns|inRiser|levelInZone|buildUp$|^bpm$|^section$/.test(k)) continue;
   console.log(`${k.padEnd(26)} ${(dom === "DÖD" && VANTAT[k] ? "död*" : dom).padEnd(10)} ${a.map(x => f(x.on)).join(" / ").padEnd(26)} ${a.map(x => f(x.cpm)).join(" / ").padEnd(26)} ${a.map(x => x.str ? "text" : x.max === -Infinity ? "ja/nej" : f(x.max, 2)).join(" / ")}`);
 }
 console.log(`${tot.size} fält: ${dead} OVÄNTAT döda, ${weak} nästan döda, ${vantade} döda med flit (* = ${[...new Set(Object.values(VANTAT))].join("; ")}).`);

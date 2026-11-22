@@ -30,7 +30,7 @@ function run(gain) {
     const v = fr.bassEnergy; if (!(typeof v === "number" && v >= 0 && v <= 1)) ok = false; e[i] = ok ? v : 0; sil[i] = fr.silent ? 1 : 0; kick[i] = fr.kick ? 1 : 0;
     row[0] = fr.bpm; row[1] = fr.bpmConfidence; row[2] = fr.level; row[3] = fr.energy; row[4] = fr.intensity; row[5] = fr.bodyDb ?? 0; row[6] = fr.kick ? 1 : 0;
     row[7] = fr.dropCount; row[8] = fr.miniDropCount; row[9] = fr.section.length + fr.section.charCodeAt(0); row[10] = fr.sectionTier; row[11] = fr.buildUp;
-    row[12] = fr.levelVsHighDb; row[13] = fr.specAbs?.sub ?? 0; row[14] = fr.specAbs?.kick ?? 0; row[15] = fr.onset?.kick ?? 0; row[16] = fr.beatTrust ?? 0;
+    row[12] = fr.sectionLevelVsHighDb ?? fr.levelVsHighDb; row[13] = fr.specAbs?.sub ?? 0; row[14] = fr.specAbs?.kick ?? 0; row[15] = fr.onset?.kick ?? 0; row[16] = fr.beatTrust ?? 0;
     h.update(Buffer.from(row.buffer));
   }
   const cpu = process.threadCpuUsage(cpu0); an.__stopWorker?.();

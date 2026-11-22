@@ -86,7 +86,7 @@ for (const e of EFFECTS) {
   let lit = 0, all3 = 0, one = 0, satSum = 0, chSpread = 0, lampSpread = 0, nRuta = 0;
   for (const { fr, ms } of frames) {
     Date.now = () => ms; performance.now = () => ms - EPOCH;
-    if (fr.bpm > 0) cfg.beat = { anchorMs: fr.beatAnchorMs || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
+    if (fr.bpm > 0) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
     const u = eng.render(structuredClone(fr));   // egen kopia: render far mutera utan att smitta nasta effekt
     if (!u) continue;
     const lampVals = [];
