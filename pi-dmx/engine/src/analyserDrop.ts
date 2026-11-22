@@ -34,6 +34,7 @@ const FLANK_SILENT_LV = 0.005, SVACKA_DB = 6, SVACKA_S = 2;   // SVACKAN: toppen
 const BUILD_SPACING_MS = 3000;   // UPPBYGGNADEN börjar när basen dras ur (kick-luckan), högst en gång per 3 s
 const TOPP_DB = 5;   // taket (0,15 dB/s) högst så här under sega toppen (0,04 dB/s)
 const SHOW_DROP_GAP_MS = 3000;   // spärr mellan full drops
+const UPPB_HI_DB = 5, UPPB_RISE_DB = 2, UPPB_MID_S = 6, UPPB_GROOVE_MS = 5000;   // UPPBYGGNADEN: diskanten >= 5 dB över 30 s-medlet OCH stiger (2 s >= 2 dB över 6 s), basen obruten >= 5 s
 const MINI_BACK_MIN_MS = 250, MINI_BACK_MAX_MS = 2000;   // MINIDROP EFTER ENERGIN: tidigast/senast efter lyftet
 const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;   // LYFT/NÄSTAN-DROP/STOPP
 
@@ -45,7 +46,7 @@ const HOLD_MS = [
   0,                     // HOGT      baskroppen inom MINI_PEAK_DB från sega toppen
   30000,                 // AKTIV     musik i > 2 s (hålls över breaket: tystnaden i breaket nollar activeMs)
   0,                     // UNDER     inte i taket: >= DROP_UNDERPEAK_MIN under sega toppen
-  3000,                  // SVACKA    breaket: toppen >= SVACKA_DB under taket i >= SVACKA_S (hålls 3 s: fillet före landningen)
+  3000,                  // SVACKA    breaket: toppen >= SVACKA_DB under taket i >= SVACKA_S, ELLER uppbyggnaden (diskanten stiger över obruten bas) (hålls 3 s: fillet/luckan före landningen)
   0,                     // LANDNING  baskroppen inom FLANK_LAND_DB från taket
   0,                     // STIGNING  >= FLANK_RISE_DB över 0,5 s-minimum (i ramen, inte i knippan)
   0,                     // LJUD      breaket inte helt tyst (låtlucka)
@@ -59,7 +60,7 @@ export const DROP_KEYS = MINI_KEYS | B(K.SVACKA, K.LANDNING, K.LJUD, K.DISKANT, 
 const VETO = B(K.LJUD, K.DISKANT, K.SPARR);   // hålls allt utom en veto-nyckel är händelsen avgjord (svackan förbrukad)
 export const MINI_NEAR = B(K.LUCKA, K.AKTIV), DROP_NEAR = MINI_NEAR | B(K.SVACKA, K.LJUD, K.DISKANT, K.SPARR, K.TOPP);   // förutsättningarna: knippan väntar bara på landningen
 
-const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdGone', 'fdSpan', 'fdQuietAt', 'lastShowDropMs', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'hiFast', 'hiNorm'] as const;   // Talfält som ska vara flyttal från start
+const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdGone', 'fdSpan', 'fdQuietAt', 'lastShowDropMs', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'hiFast', 'hiNorm', 'hiMid'] as const;   // Talfält som ska vara flyttal från start
 
 /** DET DROP LÄSER (workern). Inget annat går att nå. */
 export interface DropReads {
@@ -97,7 +98,7 @@ export class DropDetector {
   private fdT = new Float64Array(1024); private fdV = new Float64Array(1024); private fdS0 = 0; private fdN = 0;
   private nearOn = false; private nearB = -0; private nearNorm = -0; private nearFloor = 1e9; private liftCalm = -0; private liftLift = -0;
   private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftHistAt = -1e12; private stopRunS = -0;
-  private fdTop = -0; private miniEp = -1.5; private miniEpUsed = -2.5; private hiFast = -120.5; private hiNorm = -120.5;
+  private fdTop = -0; private miniEp = -1.5; private miniEpUsed = -2.5; private hiFast = -120.5; private hiNorm = -120.5; private hiMid = -120.5;
   private lastEpAt = -1.5e12;
   private keyAt = new Float64Array(HOLD_MS.length).fill(-1e12);   // när nyckelns villkor senast gällde
   private mbFast = -90.5; private mbSlow = -90.5; private mbPre = -90.5; private mbPeak = -200.5; private mbAt = -1e12;
@@ -113,7 +114,7 @@ export class DropDetector {
     this.bodyCeil = Math.max(this.bodyEnv, this.bodyCeil - dtHop * BODY_CEIL_DB_S);
     this.bodyPeak = Math.max(this.bodyEnv, this.bodyPeak - dtHop * 0.04);
     this.o.bodyUnderDb = this.bodyCeil - this.bodyEnv;
-    { const x = this.sp.bandDbRaw[6]; if (this.hiNorm < -120) { this.hiFast = x; this.hiNorm = x; } this.hiFast += (x - this.hiFast) * Math.min(1, dtHop / 2); this.hiNorm += (this.hiFast - this.hiNorm) * Math.min(1, dtHop / 30); }
+    { const x = this.sp.bandDbRaw[6]; if (this.hiNorm < -120) { this.hiFast = x; this.hiNorm = x; this.hiMid = x; } this.hiFast += (x - this.hiFast) * Math.min(1, dtHop / 2); this.hiNorm += (this.hiFast - this.hiNorm) * Math.min(1, dtHop / 30); this.hiMid += (this.hiFast - this.hiMid) * Math.min(1, dtHop / UPPB_MID_S); }
     this.flankStep(nowWallA, dtHop);
     this.liftStep(nowWallA, dtHop, bodyNow);
 
@@ -199,7 +200,7 @@ export class DropDetector {
       | this.key(K.HOGT, fast > peak - MINI_PEAK_DB, now)
       | this.key(K.AKTIV, this.lv.activeMs > 2000, now)
       | this.key(K.UNDER, DROP_UNDERPEAK_MIN <= 0 || peak - fast >= DROP_UNDERPEAK_MIN, now)
-      | this.key(K.SVACKA, this.fdGone >= SVACKA_S, now)
+      | this.key(K.SVACKA, this.fdGone >= SVACKA_S || (this.hiFast - this.hiNorm >= UPPB_HI_DB && this.hiFast - this.hiMid >= UPPB_RISE_DB && now - this.lastMiniGoneMs >= UPPB_GROOVE_MS), now)
       | this.key(K.LANDNING, f > ceil - FLANK_LAND_DB, now)
       | this.key(K.STIGNING, f - this.fdLow >= FLANK_RISE_DB, now)
       | this.key(K.LJUD, now - this.fdQuietAt >= span * 1000 + 500, now)

@@ -509,7 +509,7 @@ hålls är händelsen avgjord som förut: DISKANT -> `dropDemoted`, SPARR -> `dr
 | HOGT | baskroppen inom 10 dB från sega toppen | 0 | mini + drop |
 | AKTIV | musik i > 2 s | 30 s (tystnaden i breaket nollar activeMs) | mini + drop |
 | UNDER | >= 1,5 dB under sega toppen (DROP_UNDERPEAK_MIN) | 0 | mini + drop |
-| SVACKA | toppen >= 6 dB under taket i >= 2 s | 3 s (fillet före landningen) | drop |
+| SVACKA | toppen >= 6 dB under taket i >= 2 s, ELLER UPPBYGGNADEN: diskanten (2 s) >= 5 dB över sitt 30 s-medel OCH >= 2 dB över sitt 6 s-medel (`hiMid`) med obruten bas >= 5 s (steg 37) | 3 s (fillet/luckan före landningen) | drop |
 | LANDNING | baskroppen inom 1,5 dB från taket | 0 | drop |
 | STIGNING | >= 12 dB över 0,5 s-minimum | 0 | bara i ramen |
 | LJUD | breaket inte helt tyst | 0 | drop (veto) |
@@ -537,3 +537,13 @@ ljusdomaren v3 övning +0,0, kontroll +5,2.
 - Varv 5, steg 36 INLAGT (ägaren i ladan 19:45: "kanske skall minska avståndet nu dock, då den kan göra en å annan predrop"): SPARR 12 -> 3 s.
   Svep 2/3/4/6 s: 2 och 3 s lika (160345 218 s, 3,6 s efter 214 s, blir drop; 225 s minidrop blir falsk). Övning rätt 9 -> 10, falska 6 -> 7, kontroll lika,
   tidsfel lika. Ljusdomaren övning −2,4 (koreografi −4,5, lampspridning 160345 +8,4 %), ingen spärr; kontroll 0.
+- Steg 37 INLAGT (drop-nyckel-arenan 11-22/23, `.arena/droparena`, vinnare d1 "uppbyggnaden"): SVACKA fick ett andra villkor, en RISER: diskanten
+  (band 6, 2 s) ligger >= 5 dB över sitt 30 s-medel, STIGER (>= 2 dB över sitt 6 s-medel `hiMid`) och det sker över obruten bas (ingen kick-lucka
+  på 5 s). Det är det korta breakets uppbyggnad (svep/virvel 4–6 s, klipps, ~1 s lucka, landning); hålltiden 3 s täcker luckan. Utan riser krävs
+  som förr den långa svackan. Alla tre delarna behövs: utan "stiger" släpps 172432 471 (diskanten hög men platt), utan "obruten bas" diskantens
+  återkomst efter ett break (172432 259, 160345 350). Analysatorns egen `buildUp`/`inRiser` skiljer inte på materialet (p90 = 0).
+  Mätt (dom.py, 3 starter): övning rätt 10 -> 13 av 23 (172432 562/790/838), falska 7 = 7, tidsfel +187 -> +160 ms; kontroll rätt 5 -> 6 av 11
+  (193040 262, +0,9 s), falska 2 = 2; minidrop lika (29/49, 3/7). Ljusdomaren övning +0,0, kontroll −0,6, ingen spärr.
+  Förkastade i arenan: d4 "toppen tystnar" (band 6–7 faller >= 2,5 dB i breaket; övning 14/23 men 8 falska, kontroll falska 2 -> 3: 171840 250),
+  fusionen d1+d4 (övning 15/23, 8 falska; kontroll 3 falska), + d2 "8-takters-frasen" i DISKANT (16/23 men 10 falska), d2 ensam 11/23, d3 refrängen
+  ensam 11/23 (dess räddning 838 täcks av d1).
