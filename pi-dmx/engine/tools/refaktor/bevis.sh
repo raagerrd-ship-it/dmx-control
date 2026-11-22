@@ -41,7 +41,8 @@ for s in "" "--split inline"; do
   r=$(tail -1 $L/paritet${s:+-inline}.txt); echo "lotus ${s:-odelad}: $r"; echo "$r" | grep -q 'avvikande hop 0, avvikande loggrader 0' || ok=0
 done
 # 8. STARTVÄRDEN: varje flyttat fält har dagens värde före första hoppet (flyttkarta.json växer steg för steg).
-node tools/refaktor/startvarden.mjs $REF/analyser.js $NY/analyser.js tools/refaktor/flyttkarta.json || ok=0
+#    Mot bygget före flytten (kartan går från de gamla namnen), också när REF är en senare referens.
+node tools/refaktor/startvarden.mjs .arena/ref/dist-kedja1/analyser.js $NY/analyser.js tools/refaktor/flyttkarta.json || ok=0
 # 9. OMSTART: långsamma sidan byts var 60:e sekund (inline, resumeSeq), byte för byte mot ref, räknarna aldrig lägre.
 node tools/refaktor/omstart.mjs $REF $NY $SECS $F > .arena/flytten/omstart.txt 2>&1 || ok=0
 echo "omstart: $(tail -1 .arena/flytten/omstart.txt)"
