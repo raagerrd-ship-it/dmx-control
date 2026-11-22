@@ -185,3 +185,11 @@ Sektionens privata delar och ledningen mellan trådarna ligger i stenen (förr p
 - `bigRingPush` + `bigTick` står kvar hos anroparen, före `slowPart`. I `process` kör de före `fastBandStep`, trumkittet och `zoneStep`, i `drainBig` efter `zoneStep`.
   Att flytta in dem i `slowPart` (planens skiss) är byte-identiskt i båda profilerna men inte med `FAST_BANDS=0`: där läser trumkittet `bandOn`, som `bigStep` skriver
   (prov: 53 933 av 56 250 hopp avvek i `drum.snare`/`drum.hat`, `.arena/flytten/s15/B`).
+
+## Basen före pushBig (steg 17)
+
+`bassEnergyStep` står i `process` före `if (big)` (förr i `fillFrame`), så att basens fält (`beHi`, `beRef`, `beShort`, `energy`) är färdiga innan
+hopprecordet skrivs: en sten i workern kan få dem samma hopp. Flytten kommuterar: basen läser `hop.dtHop`, `clock.bpm` och `section.section`, och inget av
+dem skrivs mellan de två platserna (`setClock` kör före, i början av `process`; sektionen packas upp före, i `pullSlowState`; banden 0–1 skrivs av
+`fastBandStep`/`bigStep` före). Ingen läser basens fält däremellan (`pushBig` packar upp drop/uppbyggnad/karaktär, `slowPart` läser bara `bass.bassline`).
+Inget värde kommer senare: ramen läser samma tal på samma hopp. Mätt av h1 (hålets arena) 0 av 537 981 hopp, och av `bevis.sh` i steget.
