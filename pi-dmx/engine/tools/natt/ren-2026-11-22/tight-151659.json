@@ -1,0 +1,121 @@
+{
+ "wav": "tools/ladan-2026-11-13/lang-20261113T151659.wav",
+ "startS": 0,
+ "gainDb": 0,
+ "totS": 532,
+ "rutor": 19946,
+ "tajt": {
+  "kickLagMs": 144,
+  "kickLagP75": 189,
+  "kickLagRigg90": 150,
+  "lampUpp": 3543,
+  "kickar": 1577,
+  "kickTraff": 0.32213062777425494,
+  "kickHojd": 0.16078431372549015,
+  "energiR": 0.48808284172940536,
+  "nivaR": 0.7341423530969444,
+  "energiRtopp": 0.44610865099983327,
+  "energiRruta": 0.40134474254857616,
+  "energiR15": 0.5087956922715435,
+  "nivaR15": 0.734069388542429,
+  "bpmMed": 130.07348355582678,
+  "kickFonsterMs": 200,
+  "litLugn": 0.1484558823529412,
+  "litFart": 0.2179411764705883,
+  "litFull": 0.3736029411764705,
+  "toppLugn": 0.25049019607843137,
+  "toppFart": 0.39509803921568626,
+  "toppFull": 0.6622549019607843,
+  "sekLugn": 98,
+  "sekFart": 315,
+  "sekFull": 85,
+  "byten": 29,
+  "bytenPerMin": 3.271496615693156,
+  "musikByten": 1,
+  "orsaker": {
+   "sektion": 7,
+   "landning": 19,
+   "build": 2,
+   "drop": 1
+  },
+  "drops": 1,
+  "minidrops": 43,
+  "granser": 2,
+  "karaktarsskiften": 10,
+  "tempovaxlingar": 1,
+  "dropSprangLugn": 0.8939460784313725,
+  "dropSprangHog": null,
+  "dropsLugna": 1
+ },
+ "snygg": {
+  "alla3": 0.05283612040133779,
+  "en": 0.4362742474916388,
+  "matt": 1,
+  "lampspr": 60.201844981449916,
+  "lookar": 14,
+  "lookMedianS": 16.24000000000001,
+  "lookLangstaS": 59.30666666666666,
+  "morkt": 0.002857715832748421,
+  "litP10": 0.06862745098039215,
+  "litP50": 0.21764705882352942,
+  "litP90": 0.5843137254901961
+ },
+ "lookTime": [
+  [
+   "gallop",
+   110.80000000000912
+  ],
+  [
+   "tyngdlyft",
+   66.80000000000223
+  ],
+  [
+   "drumkit",
+   57.36000000000135
+  ],
+  [
+   "vagbrytare",
+   56.77333325195443
+  ],
+  [
+   "kickregn",
+   48.32000000000074
+  ],
+  [
+   "varannan",
+   35.013333496093594
+  ],
+  [
+   "rulle",
+   31.25333325195278
+  ],
+  [
+   "dansparet",
+   29.57333349609344
+  ],
+  [
+   "forvarning",
+   23.3066667480467
+  ],
+  [
+   "hiss",
+   21.54666650390611
+  ],
+  [
+   "wave",
+   20.211666748046763
+  ],
+  [
+   "stege",
+   12.213333251953099
+  ],
+  [
+   "kaskad",
+   9.919999999999972
+  ],
+  [
+   "sokljus",
+   8.79999999999997
+  ]
+ ]
+}
