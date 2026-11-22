@@ -1,9 +1,9 @@
 /**  DROP-DETEKTORN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserDrop.md */
 import { env, sysEnv, stabilise, BODY_CEIL_DB_S, BODY_HIGH_MS, BODY_HIGH_DB,
   type Ser, type DropOut } from "./analyserFack.js";
-import { BS_DROPS, BS_MINI, BS_BUILDSTART, BS_CAND, BS_UNDER, BS_DEMOTED, BS_SPACED, BS_DROPRISE,
-  BS_NEAR, BS_NEARDIP, BS_LIFT, BS_STOPS, BS_STOPSEC } from "./split.js";
+import { BS } from "./split.js";
 
+const P = BS.drop;   // platserna i storblocket
 const BODY_RISE_DB = Number(env('BODY_RISE_DB') ?? 17);   // DROP-DETEKTOR
 const BODY_GONE_MIN_MS = Number(env('BODY_GONE_MIN_MS') ?? 2000);   // breakdown-langd som kravs
 const DROP_QUALITY_DB = Number(env('DROP_QUALITY_DB') ?? 3.5);   // HARD KVALITETSGRIND vid fyrningen
@@ -223,21 +223,21 @@ export class DropDetector {
     }
   }
 
-  /** Transporten: workern packar dropens fält i BS_-blocket (drainBig), huvudtråden packar upp (pushBig); unpack saknar dropCand som förut. */
+  /** Transporten: workern packar dropens UT-fält i storblocket (drainBig), huvudtråden packar upp (pushBig). */
   pack(s: Float64Array): void {
     const o = this.o;
-    s[BS_DROPS] = o.dropCount; s[BS_MINI] = o.miniDropCount; s[BS_BUILDSTART] = o.buildStartCount; s[BS_CAND] = o.dropCand; s[BS_UNDER] = o.bodyUnderDb;
-    s[BS_DEMOTED] = o.dropDemoted; s[BS_SPACED] = o.dropSpaced; s[BS_DROPRISE] = o.dropRiseDb; s[BS_NEAR] = o.nearDropDb; s[BS_NEARDIP] = o.nearDipDb; s[BS_LIFT] = o.liftDb; s[BS_STOPS] = o.stopCount; s[BS_STOPSEC] = o.stopS;
+    s[P.dropCount] = o.dropCount; s[P.miniDropCount] = o.miniDropCount; s[P.buildStartCount] = o.buildStartCount; s[P.dropCand] = o.dropCand; s[P.bodyUnderDb] = o.bodyUnderDb;
+    s[P.dropDemoted] = o.dropDemoted; s[P.dropSpaced] = o.dropSpaced; s[P.dropRiseDb] = o.dropRiseDb; s[P.nearDropDb] = o.nearDropDb; s[P.nearDipDb] = o.nearDipDb; s[P.liftDb] = o.liftDb; s[P.stopCount] = o.stopCount; s[P.stopS] = o.stopS;
   }
   unpack(s: Float64Array): void {
     const o = this.o;
-    o.dropCount = s[BS_DROPS]; o.miniDropCount = s[BS_MINI]; o.buildStartCount = s[BS_BUILDSTART]; o.bodyUnderDb = s[BS_UNDER];
-    o.dropDemoted = s[BS_DEMOTED]; o.dropSpaced = s[BS_SPACED]; o.dropRiseDb = s[BS_DROPRISE]; o.nearDropDb = s[BS_NEAR]; o.nearDipDb = s[BS_NEARDIP]; o.liftDb = s[BS_LIFT]; o.stopCount = s[BS_STOPS]; o.stopS = s[BS_STOPSEC];
+    o.dropCount = s[P.dropCount]; o.miniDropCount = s[P.miniDropCount]; o.buildStartCount = s[P.buildStartCount]; o.dropCand = s[P.dropCand]; o.bodyUnderDb = s[P.bodyUnderDb];
+    o.dropDemoted = s[P.dropDemoted]; o.dropSpaced = s[P.dropSpaced]; o.dropRiseDb = s[P.dropRiseDb]; o.nearDropDb = s[P.nearDropDb]; o.nearDipDb = s[P.nearDipDb]; o.liftDb = s[P.liftDb]; o.stopCount = s[P.stopCount]; o.stopS = s[P.stopS];
   }
-  /** Workern startar om: räknarna ur senaste BS_-blocket (fem fält saknas som förut). */
+  /** Workern startar om: räknarna ur senaste storblocket (fem fält saknas som förut). */
   resume(s: Float64Array): void {
     const o = this.o;
-    o.dropCount = s[BS_DROPS]; o.miniDropCount = s[BS_MINI]; o.buildStartCount = s[BS_BUILDSTART]; o.dropCand = s[BS_CAND];
-    o.dropDemoted = s[BS_DEMOTED]; o.dropSpaced = s[BS_SPACED]; o.stopCount = s[BS_STOPS];
+    o.dropCount = s[P.dropCount]; o.miniDropCount = s[P.miniDropCount]; o.buildStartCount = s[P.buildStartCount]; o.dropCand = s[P.dropCand];
+    o.dropDemoted = s[P.dropDemoted]; o.dropSpaced = s[P.dropSpaced]; o.stopCount = s[P.stopCount];
   }
 }

@@ -1,6 +1,7 @@
 /**  KARAKTÄRSPROFILEN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserCharacter.md */
 import type { Ser, CharacterOut } from "./analyserFack.js";
-import { BS_PUNCH, BS_BASS, BS_BRIGHT, BS_BEAT, BS_BASSLINE } from "./split.js";
+import { BS } from "./split.js";
+const P = BS.character.profile;   // platserna i storblocket
 
 
 function cl01(x: number): number { return x < 0 ? 0 : x > 1 ? 1 : x; }
@@ -44,7 +45,7 @@ export class CharacterProfile {
     this.o.profile.bassline = this.bo.bassline;
   }
 
-  /** Transporten: workern packar profilen i BS_-blocket, huvudtråden packar upp. */
-  pack(s: Float64Array): void { const p = this.o.profile; s[BS_PUNCH] = p.punch; s[BS_BASS] = p.bass; s[BS_BRIGHT] = p.bright; s[BS_BEAT] = p.beat; s[BS_BASSLINE] = p.bassline; }
-  unpack(s: Float64Array): void { const p = this.o.profile; p.punch = s[BS_PUNCH]; p.bass = s[BS_BASS]; p.bright = s[BS_BRIGHT]; p.beat = s[BS_BEAT]; p.bassline = s[BS_BASSLINE]; }
+  /** Transporten: workern packar profilen i storblocket, huvudtråden packar upp. */
+  pack(s: Float64Array): void { const p = this.o.profile; s[P.punch] = p.punch; s[P.bass] = p.bass; s[P.bright] = p.bright; s[P.beat] = p.beat; s[P.bassline] = p.bassline; }
+  unpack(s: Float64Array): void { const p = this.o.profile; p.punch = s[P.punch]; p.bass = s[P.bass]; p.bright = s[P.bright]; p.beat = s[P.beat]; p.bassline = s[P.bassline]; }
 }

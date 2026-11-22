@@ -152,6 +152,30 @@ export type Synliga<T extends Trad, N extends FackNamn> = (MedTag<N, Synlig[T]> 
 /** En stens läsning: `hop: Ser<'L', 'hop', 'dtHop' | 'bpm'>`. Ett fält som skrivs i den andra tråden ger tsc-fel på raden. */
 export type Ser<T extends Trad, N extends FackNamn, K extends Synliga<T, N>> = Readonly<Pick<Fack[N], K>>;
 
+type PlatsAv<V> = V extends string ? number : { readonly [k in keyof V]: number };
+/** Platserna i ett block mellan trådarna: fälten med taggen G i facken F, efter kärnans `forst` platser. */
+export type Platser<G extends Tag, F extends FackNamn> = { readonly [N in F]: { readonly [K in MedTag<N, G>]: PlatsAv<TagAv<N>[K]> } } & { readonly LEN: number };
+/** Räknas en gång vid laddning (split.ts): ordningen = facklistans och TRAD-radens. */
+export function platser<G extends Tag, F extends FackNamn>(tag: G, fack: readonly F[], forst: number): Platser<G, F> {
+  let i = forst; const ut: Record<string, unknown> = {};
+  for (const n of fack) {
+    const t: Record<string, Tag | Record<string, Tag>> = FACK[n].TRAD, m: Record<string, unknown> = {};
+    for (const k in t) {
+      const v = t[k];
+      if (v === tag) m[k] = i++;
+      else if (typeof v === 'object' && Object.values(v).every((x) => x === tag)) { const d: Record<string, number> = {}; for (const j in v) d[j] = i++; m[k] = Object.freeze(d); }
+    }
+    ut[n] = Object.freeze(m);
+  }
+  ut.LEN = i; return Object.freeze(ut) as Platser<G, F>;
+}
+/** Antal fält med taggen i alla fack (split.ts: varje IN- och UT-fält ska ha en plats). */
+export function antal(tag: Tag): number {
+  let c = 0;
+  for (const n in FACK) { const t: Record<string, Tag | Record<string, Tag>> = FACK[n as FackNamn].TRAD; for (const k in t) { const v = t[k]; c += typeof v === 'string' ? +(v === tag) : Object.values(v).filter((x) => x === tag).length; } }
+  return c;
+}
+
 /** EN AVSTÄNGD STEN: facket får sitt neutrala värde och finns = false; det syns i loggen och i ramens stenarAv. */
 export function off(name: string, fack: { finns: boolean; neutral?(): void }): null {
   fack.neutral?.(); fack.finns = false;

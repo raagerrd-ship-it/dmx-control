@@ -543,3 +543,8 @@ dog mitt i skrivning
  Behandla alla hop-record sedan sist, publicera. Returnerar antal.
 ```
 
+## Steg 18b (flytten 2026-11-22): fackens platser ur taggarna
+
+Konstanterna `B_RMS` … `B_CONF`, `B_ENVBPM`, `BS_BODY` … `BS_BUILDSTART`, `S_PHASE_MS` … `S_BUILD_SEEN` och `R_CLOCK`/`R_CLOCK_CONF` finns inte längre:
+platserna räknas fram ur fackens taggar (`B`, `BS`, `S`, `R` i `split.ts`, se `analyserFack.md`). Anteckningarna ovan om de gamla konstanterna är historik.
+Kärnans egna platser (sekvens, längd, flaggor, telemetri) står kvar som konstanter, med nya nummer i `S_*` och `BS_*`.

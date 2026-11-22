@@ -5,16 +5,17 @@ import { sysEnv, stabilise, makeFack, off, stenarAv, type Fack, BODY_CEIL_DB_S, 
 export { BASS_SPAN_DB, SECTION_AGG_HOP, BODY_CEIL_DB_S };
 export type { BeatGrid, AnalyserDetection, Cfg, Role };
 import {
-  REC_LEN, RING_N, R_SEQ, R_PERF, R_WALL, R_ENV, R_BASS, R_HIGH, R_FLAGS, R_HINT_MS, R_VCLOCK, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS,
+  REC_LEN, RING_N, R_SEQ, R_PERF, R_WALL, R_ENV, R_BASS, R_HIGH, R_FLAGS, R_HINT_MS, R_VCLOCK, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, B, BS, S, R,
   packFlagCounts, lostFlags, seqLow, seqDelta, C_WAITING, C_STATE_SEQ, S_LOST_FLAGS,
   F_SIL350, F_SIL10, F_RESET_TEMPO, F_HINT, F_RESET_BAR, F_VCLOCK_SET, F_VCLOCK_NULL,
-  C_WRITE, C_READ, S_REC_SEQ, S_BPM, S_CONF, S_BPMF, S_PHASE_MS, S_PHASE_CONF, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
+  C_WRITE, C_READ, S_REC_SEQ, S_BPM, S_CONF, S_BPMF, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
   SECTIONS, sectionCode, viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader, type HopFeed,
-  R_BIGSEQ, R_CLOCK, R_CLOCK_CONF, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N, B_RMS, B_LVL, B_CENT, B_ACTIVE, B_WALL, B_KICK, B_KICKHIT, B_INT, B_BREAK, B_SEC, B_LVH, B_CONF,
-  B_ENVF, B_ENVBPM, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ, BS_BODY,
+  R_BIGSEQ, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N,
+  B_ENVF, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ,
   BS_SPEC_N, BS_SKIPPED, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
 } from './split.js';
+const Bh = B.hop, Bl = B.level, Bk = B.kick, Rc = R.clock, BSh = BS.hop, Sc = S.clock;   // kärnans platser ur taggarna
 import FFT from "fft.js";
 import { BeatFeed, publishPhase, type ClockCfg } from "./analyserClock.js";   // ANALYSATORNS KLOCKA
 import { DropDetector } from "./analyserDrop.js";
@@ -194,7 +195,7 @@ export class Analyser {
   private syncWorker = false;   // fast: vänta på workern efter varje record
   private inlinePeer: Analyser | null = null;
   private bigRing: Float64Array | null = null; private bigPcm: Float32Array | null = null; private bigState: Float64Array | null = null;   private bigSeq = 0; private bigCopy = new Float64Array(BIG_STATE_LEN); private bigRd = new StateReader();  private specDelivered = 0;  private bigSkipped = 0;
-  private bigEnvFlag = 0; private bigEnvBpm = 0.5;
+  private bigEnvFlag = 0;
   bigYield: (() => void) | null = null;   // PI:NS VERKLIGHET
   private slowBusyEmaUs = 0; private slowBusyMaxUs = 0; private slowLagMaxMs = 0; private slowSkipped = 0; private slowProcessed = 0;
   dbgBestLag = 0; dbgLagMin = 0; dbgLagMax = 0; dbgTgAt = (lag: number): number => this.tempoGram[lag] ?? 0;
@@ -259,7 +260,7 @@ export class Analyser {
     r[o + R_ENV] = e; r[o + R_BASS] = b; r[o + R_HIGH] = h; r[o + R_FLAGS] = this.pendFlags; r[o + R_HINT_MS] = this.pendHintMs; r[o + R_VCLOCK] = this.pendVclock;
     this.sections?.toRecord(r, o);
     r[o + R_FLAGCNT] = packFlagCounts(this.flagCnt);
-    r[o + R_CLOCK] = this.f.clock.bpm; r[o + R_CLOCK_CONF] = this.f.clock.conf;
+    r[o + Rc.bpm] = this.f.clock.bpm; r[o + Rc.conf] = this.f.clock.conf;
     r[o + R_BIGSEQ] = this.bigSeq;
     r[o + R_SEQ] = seq;
     this.pendFlags = 0;
@@ -276,7 +277,7 @@ export class Analyser {
   private pullSlowState(): void {
     if (!this.stateRd.read(this.splitCtrl!, this.splitState!, this.stateCopy)) return;
     const s = this.stateCopy; if (s[S_REC_SEQ] < this.barrierSeq) return;
-    this.f.clock.phaseMs = s[S_PHASE_MS]; this.f.clock.phaseConf = s[S_PHASE_CONF];
+    this.f.clock.phaseMs = s[Sc.phaseMs]; this.f.clock.phaseConf = s[Sc.phaseConf];
     this.sections?.unpack(s);
   }
   setInlinePeer(slow: Analyser | null): void { this.inlinePeer = slow; }
@@ -324,7 +325,7 @@ export class Analyser {
       Atomics.store(ctrl, C_READ, seqLow(this.recSeq));
       stateWrite(ctrl, this.splitState!, (s) => {
         s[S_REC_SEQ] = this.recSeq; s[S_BPM] = this.f.clock.bpm; s[S_CONF] = this.f.clock.conf; s[S_BPMF] = this.localBpmF;
-        s[S_PHASE_MS] = this.f.clock.phaseMs; s[S_PHASE_CONF] = this.f.clock.phaseConf;
+        s[Sc.phaseMs] = this.f.clock.phaseMs; s[Sc.phaseConf] = this.f.clock.phaseConf;
         this.sections?.pack(s);
         s[S_PROCESSED] = this.slowProcessed; s[S_LAG_MS] = lagMs; s[S_LAG_MAX] = this.slowLagMaxMs; s[S_BUSY_US] = this.slowBusyEmaUs; s[S_BUSY_MAX_US] = this.slowBusyMaxUs; s[S_SKIPPED] = this.slowSkipped; s[S_LOST_FLAGS] = this.slowLostFlags;
       });
@@ -337,14 +338,13 @@ export class Analyser {
   /** STORA VÄGEN. */
   private pushBig(samples: Float32Array): void {
     const h = this.f.hop;
-    const sc = this.f.section;
-    const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock;
+    const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick;
     const r = this.bigRing!, ctrl = this.splitCtrl!, seq = ++this.bigSeq, slot = seq % BIG_RING_N, o = slot * BIG_REC_LEN, n = samples.length;
     this.bigPcm!.set(samples, slot * BIG_HOP_MAX);
-    r[o + B_N] = n; r[o + B_RMS] = h.rms; r[o + B_LVL] = h.lvlSmooth; r[o + B_CENT] = h.centSmooth; r[o + B_ACTIVE] = lv.activeMs;
-    r[o + B_WALL] = h.nowWall; r[o + B_KICK] = kk.kick ? 1 : 0; r[o + B_KICKHIT] = h.kickHit; r[o + B_INT] = lv.intensity; r[o + B_BREAK] = h.breaking ? 1 : 0;
-    r[o + B_SEC] = sectionCode(sc.section); r[o + B_LVH] = sc.levelVsHighDb; r[o + B_CONF] = ck.conf;
-    r[o + B_ENVF] = this.bigEnvFlag; r[o + B_ENVBPM] = this.bigEnvBpm; this.bigEnvFlag = 0;
+    r[o + B_N] = n; r[o + Bh.rms] = h.rms; r[o + Bh.nowWall] = h.nowWall; r[o + Bh.lvlSmooth] = h.lvlSmooth; r[o + Bh.centSmooth] = h.centSmooth; r[o + Bh.breaking] = h.breaking ? 1 : 0;
+    r[o + Bh.kickHit] = h.kickHit; r[o + Bh.sec] = sectionCode(h.sec); r[o + Bh.lvh] = h.lvh; r[o + Bh.conf] = h.conf; r[o + Bh.bpm] = h.bpm;
+    r[o + Bl.activeMs] = lv.activeMs; r[o + Bl.intensity] = lv.intensity; r[o + Bk.kick] = kk.kick ? 1 : 0;
+    r[o + B_ENVF] = this.bigEnvFlag; this.bigEnvFlag = 0;
     r[o + B_SEQ] = seq;
     Atomics.store(ctrl, C_BIG_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
     if ((this.syncWorker || !this.hopLane) && (Atomics.load(ctrl, C_WAITING) || Atomics.load(ctrl, C_WAITING_B))) Atomics.notify(ctrl, C_WAKE);
@@ -352,7 +352,7 @@ export class Analyser {
     else if (this.syncWorker) syncWait(ctrl, C_BIG_SEQ, () => this.bigRd.read(ctrl, this.bigState!, this.bigCopy, C_BIG_SEQ) && this.bigCopy[BS_SEQ] >= seq);
     const s = this.bigCopy;
     if (!this.bigRd.read(ctrl, this.bigState!, s, C_BIG_SEQ) || s[BS_SEQ] === 0) return;
-    h.body = s[BS_BODY]; this.drop?.unpack(s); this.riser?.unpack(s); this.character?.unpack(s);
+    h.body = s[BSh.body]; this.drop?.unpack(s); this.riser?.unpack(s); this.character?.unpack(s);
     const sn = s[BS_SPEC_N];
     if (sn > this.specDelivered) {
       const sink = sp.sink, binHz = h.cfg.audio.rate / this.bands.bufferBig.length, R = this.bands.specRing!, c = this.bands.specCopy;
@@ -366,7 +366,7 @@ export class Analyser {
   /** slow: behandla hop-recorden t.o.m. */
   drainBig(limit: number): number {
     const h = this.f.hop;
-    const lv = this.f.level, sp = this.f.spectrum;
+    const lv = this.f.level, kk = this.f.kick;
     const ctrl = this.splitCtrl!, r = this.bigRing!, pcm = this.bigPcm!;
     let w = this.bigSeq + seqDelta(Atomics.load(ctrl, C_BIG_WRITE), this.bigSeq); if (limit < w) w = limit;
     if (w - this.bigSeq > BIG_RING_N - RING_MARGIN) { this.bigSkipped += (w - this.bigSeq) - (BIG_RING_N - RING_MARGIN); this.bigSeq = w - (BIG_RING_N - RING_MARGIN); }
@@ -376,22 +376,22 @@ export class Analyser {
       if (r[o + B_SEQ] !== seq) { this.bigSkipped++; continue; }
       const hn = r[o + B_N];
       this.bass?.accumulate();
-      if (r[o + B_ENVF] === 1) { h.bpm = r[o + B_ENVBPM]; this.bass?.stepBassline(); }
-      h.rms = r[o + B_RMS]; h.lvlSmooth = r[o + B_LVL]; h.centSmooth = r[o + B_CENT]; lv.activeMs = r[o + B_ACTIVE]; h.kickHit = r[o + B_KICKHIT];
+      h.rms = r[o + Bh.rms]; h.nowWall = r[o + Bh.nowWall]; h.lvlSmooth = r[o + Bh.lvlSmooth]; h.centSmooth = r[o + Bh.centSmooth]; h.breaking = r[o + Bh.breaking] === 1;
+      h.kickHit = r[o + Bh.kickHit]; h.sec = SECTIONS[r[o + Bh.sec]]; h.lvh = r[o + Bh.lvh]; h.conf = r[o + Bh.conf]; h.bpm = r[o + Bh.bpm];
+      lv.activeMs = r[o + Bl.activeMs]; lv.intensity = r[o + Bl.intensity]; kk.kick = r[o + Bk.kick] === 1;
+      if (r[o + B_ENVF] === 1) this.bass?.stepBassline();
       this.levels.zoneStep();
-      const wall = r[o + B_WALL];
       { const po = slot * BIG_HOP_MAX; this.bands.bigRingPush(pcm.subarray(po, po + hn)); }
       this.bands.bigTick();
-      h.nowWall = wall; h.sec = SECTIONS[r[o + B_SEC]]; h.lvh = r[o + B_LVH]; h.conf = r[o + B_CONF];
       this.slowPart();
-      this.sections?.bigAgg(r[o + B_INT], r[o + B_KICK] === 1, r[o + B_BREAK] === 1, wall);
+      this.sections?.bigAgg();
       n++;
       if (this.bigYield) this.bigYield();
     }
     if (n > 0) {
       Atomics.store(ctrl, C_BIG_READ, seqLow(this.bigSeq));
       stateWrite(ctrl, this.bigState!, (s) => {
-        s[BS_SEQ] = this.bigSeq; s[BS_BODY] = h.body; this.drop?.pack(s); this.riser?.pack(s); this.character?.pack(s); s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped;
+        s[BS_SEQ] = this.bigSeq; s[BSh.body] = h.body; this.drop?.pack(s); this.riser?.pack(s); this.character?.pack(s); s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped;
       }, C_BIG_SEQ);
       if (this.syncWorker) Atomics.notify(ctrl, C_BIG_SEQ);
     }
@@ -415,7 +415,7 @@ export class Analyser {
     this.envRing[this.envPos] = r[o + R_ENV]; this.envBassRing[this.envPos] = r[o + R_BASS];
     if (HIGH_ON) this.envHighRing[this.envPos] = r[o + R_HIGH];
     this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
-    this.f.clock.bpm = r[o + R_CLOCK], this.f.clock.conf = r[o + R_CLOCK_CONF];
+    this.f.clock.bpm = r[o + Rc.bpm], this.f.clock.conf = r[o + Rc.conf];
     this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
     this.sections?.fromRecord(r, o);
   }
@@ -727,13 +727,12 @@ export class Analyser {
     this.levels.zoneStep();
     const breaking = h.lvlSmooth < lv.levelCeil * 0.65;
 
-    h.nowWall = nowWallA;
+    h.nowWall = nowWallA; h.sec = sc.section; h.lvh = sc.levelVsHighDb; h.conf = ck.conf;   // IN: färdiga före pushBig
     { const A = Analyser.FAST_BANDS ? this.bands.fbAbs : sp.bandAbs; this.bass?.bassEnergyStep(A[0], A[1]); }   // basen före pushBig: workern kan få värdet samma hopp
     if (big) {
       h.breaking = breaking;
       this.pushBig(samples);
     } else {
-      h.sec = sc.section; h.lvh = sc.levelVsHighDb; h.conf = ck.conf;
       this.slowPart();
     }
     h.level = level; h.flux = fluxNorm; h.breaking = breaking;
@@ -767,7 +766,7 @@ export class Analyser {
       const _b = this.envBassAccum, _h = this.envHighAccum;
       this.envRing[this.envPos] = _e;
       this.envBassRing[this.envPos] = _b;
-      if (h.bigOn) { this.bigEnvFlag = 1; this.bigEnvBpm = ck.bpm; } else { h.bpm = ck.bpm; this.bass?.stepBassline(); }
+      h.bpm = ck.bpm; if (h.bigOn) this.bigEnvFlag = 1; else this.bass?.stepBassline();
       if (HIGH_ON) this.envHighRing[this.envPos] = _h;
       this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
       this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);

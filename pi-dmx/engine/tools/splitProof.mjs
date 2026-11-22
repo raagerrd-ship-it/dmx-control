@@ -6,7 +6,10 @@
  *  - barShift/beatPhaseMs/beatPhaseConf: DMX läser klockan ur cfg.beat; i delat läge körs publishPhase aldrig (samma lista som livstecken.mjs).
  *  - sektionens fält och det som läser sektionen (drop, basnivå, uppbyggnad): blocken stänger på 10 ms-rutnätet i delat läge mot
  *    2,67 ms i odelat (09-22), och en annan kant tidigt flyttar räknarna för resten av låten.
- *  Exit 1 om ett fält utanför VANTAT skiljer.
+ *  TRÅDARNA (steg 18): i det delade läget jämförs dessutom varje fackfält med taggen IN eller UT (analyserFack.ts TRAD)
+ *  mellan huvudtråden och workern, efter process() i varje hop (tempots IN-fält i recordet R bara i hopp med ett record).
+ *  Nya fält och nya taggar kommer med av sig själva. Ett fält som skiljer = taggen ljuger (eller raden i transporten saknas).
+ *  Exit 1 om ett fält utanför VANTAT skiljer, eller om ett IN/UT-fält skiljer mellan trådarna.
  *
  *    node tools/splitProof.mjs [--n 3] [--worker] [--dist <mapp>]
  *    SPLIT_DIR=<katalog med 48 kHz wav> (standard tools/ladan-2026-11-13)   SPLIT_MAX_S=120 (0 = hela)
@@ -31,6 +34,12 @@ const VANTAT = new Set(['barShift', 'beatPhaseMs', 'beatPhaseConf',
 
 const { createAnalyser } = await import(pathToFileURL(join(DIST, 'analyser.js')).href);
 const { defaultConfig } = await import(pathToFileURL(join(DIST, 'config.js')).href);
+const { FACK } = await import(pathToFileURL(join(DIST, 'analyserFack.js')).href);
+const { R } = await import(pathToFileURL(join(DIST, 'split.js')).href);
+const TRAD = [];   // [fack, fält, delfält, tagg, bara i hopp med record]
+for (const n in FACK) for (const [k, v] of Object.entries(FACK[n].TRAD)) for (const [j, t] of typeof v === 'string' ? [[null, v]] : Object.entries(v))
+  if (t === 'IN' || t === 'UT') TRAD.push([n, k, j, t, t === 'IN' && !!R[n] && k in R[n]]);
+const trad = new Map();
 
 function readWav(path) {
   const b = readFileSync(path);
@@ -57,7 +66,11 @@ function makeCfg(rate) { const cfg = JSON.parse(JSON.stringify(defaultConfig)); 
 /** Ett hop som motorn: klockan, process, taktvägen eller publishClock. */
 function step(an, ck, buf, ms) {
   an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  const f = an.process(buf);
+  const f = an.process(buf), w = an.inlinePeer;
+  if (w) { const rec = an.fastWriteSeq() !== an.__rec; an.__rec = an.fastWriteSeq();
+    for (const [n, k, j, t, perRec] of TRAD) { if (perRec && !rec) continue;
+      const a = j ? an.f[n][k][j] : an.f[n][k], b = j ? w.f[n][k][j] : w.f[n][k];
+      if (!Object.is(a, b)) { const id = `${t} ${n}.${k}${j ? '.' + j : ''}`; trad.set(id, (trad.get(id) ?? 0) + 1); } } }
   if (an.hopLane) an.hopLane.feed(f, ck, an); else an.publishClock(ck);
   return f;
 }
@@ -90,8 +103,10 @@ for (const [k, s] of [...diff].sort((a, b) => b[1].d - a[1].d)) {
   const ok = VANTAT.has(k); if (!ok) bad++;
   console.log(`${ok ? 'väntat ' : 'FEL    '} ${k.padEnd(24)} ${(100 * s.d / totHops).toFixed(2).padStart(6)} %   första ${s.first.toFixed(2)} s (${s.file.slice(0, 28)})`);
 }
-console.log(`\nSUMMA ${files.length} filer, ${totHops} hop: ${diff.size} fält skiljer, varav ${bad} utanför baslinjen -> ${bad ? 'DELNING FEL' : 'DELNING OK'}`);
-if (bad) process.exitCode = 1;
+for (const [id, d] of trad) console.log(`FEL tråd ${id.padEnd(30)} ${d} hop: huvudtråden och workern skiljer`);
+const nIn = TRAD.filter((x) => x[3] === 'IN').length, nUt = TRAD.length - nIn;
+console.log(`\nSUMMA ${files.length} filer, ${totHops} hop: ${diff.size} fält skiljer, varav ${bad} utanför baslinjen; trådarna ${nIn} IN + ${nUt} UT, ${trad.size} skiljer -> ${bad || trad.size ? 'DELNING FEL' : 'DELNING OK'}`);
+if (bad || trad.size) process.exitCode = 1;
 
 if (WORKER) {
   const { y, rate } = readWav(join(CORPUS, files[0]));

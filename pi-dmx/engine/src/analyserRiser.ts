@@ -1,7 +1,8 @@
 /**  UPPBYGGNADEN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserRiser.md */
 import { BODY_CEIL_DB_S, stabilise, type Ser, type RiserOut } from "./analyserFack.js";
-import { BS_BUILD, BS_RISER } from "./split.js";
+import { BS } from "./split.js";
 
+const P = BS.riser;   // platserna i storblocket
 const RISER_SPAN_DB = 60;   // RISERNS FÖNSTER
 const RISER_BAND0 = 3;   // RISERN LYSSNAR OVANFÖR BASKROPPEN
 const DOUBLE_FROM_START = ['novSlow'] as const;   // Talfält som ska vara flyttal från start
@@ -57,7 +58,7 @@ export class RiserDetector {
     this.o.inRiser = inRiser;
   }
 
-  /** Transporten: workern packar uppbyggnaden i BS_-blocket, huvudtråden packar upp. */
-  pack(s: Float64Array): void { s[BS_BUILD] = this.o.buildUp; s[BS_RISER] = this.o.inRiser ? 1 : 0; }
-  unpack(s: Float64Array): void { this.o.buildUp = s[BS_BUILD]; this.o.inRiser = s[BS_RISER] === 1; }
+  /** Transporten: workern packar uppbyggnaden i storblocket, huvudtråden packar upp. */
+  pack(s: Float64Array): void { s[P.buildUp] = this.o.buildUp; s[P.inRiser] = this.o.inRiser ? 1 : 0; }
+  unpack(s: Float64Array): void { this.o.buildUp = s[P.buildUp]; this.o.inRiser = s[P.inRiser] === 1; }
 }

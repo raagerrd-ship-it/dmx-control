@@ -2,8 +2,8 @@
 import { sysEnv, numEnv, stabilise, SECTION_AGG_HOP, BE_FALLBACK_MS, BE_MEM_BEATS, BODY_HIGH_MS, BASSON_LEN,
   type Ser, type SectionOut } from "./analyserFack.js";
 import { R_SEC_N, R_SEC_INT, R_SEC_KICKS, R_SEC_BREAK, R_SEC_RMS2, R_SEC_CENT, R_SEC_DT, R_SEC_WALL, R_SEC_SPEC0, R_SEC_BON, R_SEC_BPK, R_SEC_FLUX, R_SEC_RMS4,
-  R_DROPS, R_ACTIVE, R_BUILD, S_SECTION, S_SEC_START, S_SEC_INDEX, S_SEC_TIER, S_BUILD_AT, S_BUILD_SEEN, S_REP_SIM, S_REP_AGO, S_REP_SEC,
-  S_EXPECT_MS, S_EXPECT_SRC, S_PREV_SEC, S_LVL_HIGH, BS_CAND, SECTIONS, sectionCode } from "./split.js";
+  R_DROPS, R_ACTIVE, R_BUILD, S, BS, SECTIONS, sectionCode } from "./split.js";
+const P = S.section;   // platserna i tillståndsblocket
 
 const SECTION_SCORE_F32 = sysEnv('SECTION_SCORE_F32') === '1';   // Rangpoangens buffert i 32-bitars flyttal
 const SECTION_CARRY = numEnv('SECTION_CARRY', 0);   // block som bärs över låtgränsen
@@ -16,9 +16,9 @@ const DOUBLE_FROM_START = ['secHiStartMs', 'secHiEndMs', 'secPct', 'secSongStart
 
 /** DET SEKTIONEN LÄSER. Inget annat går att nå. L = workern (bigAgg, blocken), S = sectionAggStep (huvudtråden, bara odelat). */
 export interface SectionReads {
-  hop:      Ser<'L', 'hop', 'role' | 'bigOn' | 'rms' | 'nowWall' | 'dtHop' | 'centSmooth' | 'wallNow'> & Ser<'S', 'hop', 'breaking' | 'flux'>;
-  level:    Ser<'L', 'level', 'activeMs'> & Ser<'S', 'level', 'intensity'>;
-  kick:     Ser<'S', 'kick', 'kick'>;
+  hop:      Ser<'L', 'hop', 'role' | 'bigOn' | 'rms' | 'nowWall' | 'dtHop' | 'centSmooth' | 'wallNow' | 'breaking'> & Ser<'S', 'hop', 'flux'>;
+  level:    Ser<'L', 'level', 'activeMs' | 'intensity'>;
+  kick:     Ser<'L', 'kick', 'kick'>;
   clock:    Ser<'L', 'clock', 'bpm' | 'phaseMs'>;
   drop:     Ser<'L', 'drop', 'dropCand' | 'secBodyRet'>;
   riser:    Ser<'L', 'riser', 'buildUp'>;
@@ -385,9 +385,9 @@ export class SectionTracker {
       }
   }
 
-  /** slow + stora vägen: sektionens hopaggregat (förr Analyser.bigAgg, ordagrant). */
-  bigAgg(intensity: number, kick: boolean, breaking: boolean, wall: number): void {
-    const h = this.h;
+  /** slow + stora vägen: sektionens hopaggregat (förr Analyser.bigAgg); hoppets värden ur facken (hopprecordet). */
+  bigAgg(): void {
+    const h = this.h, intensity = this.lv.intensity, kick = this.kk.kick, breaking = h.breaking, wall = h.nowWall;
     const ri = this.ri, dp = this.dr;
     const lv = this.lv;
     const rms = h.rms;
@@ -433,21 +433,21 @@ export class SectionTracker {
   }
 
   /** Workern startar om: dropkandidaterna ur senaste BS_-blocket. */
-  resume(st: Float64Array): void { this.wire.drops = st[BS_CAND]; }
+  resume(st: Float64Array): void { this.wire.drops = st[BS.drop.dropCand]; }
 
   /** Workern: sektionens fält till tillståndsblocket (drainRecords). */
   pack(s: Float64Array): void {
     const o = this.o;
-    s[S_SECTION] = sectionCode(o.section); s[S_SEC_START] = o.sectionStartMs; s[S_SEC_INDEX] = o.sectionIndex; s[S_SEC_TIER] = o.sectionTier; s[S_BUILD_AT] = o.secBuildAt; s[S_BUILD_SEEN] = o.secBuildSeen;
-    s[S_REP_SIM] = o.repeatSim; s[S_REP_AGO] = o.repeatAgoMs; s[S_REP_SEC] = sectionCode(o.repeatSection);
-    s[S_EXPECT_MS] = o.expectHighMs; s[S_EXPECT_SRC] = o.expectSource; s[S_PREV_SEC] = sectionCode(o.prevSection); s[S_LVL_HIGH] = o.levelVsHighDb;
+    s[P.section] = sectionCode(o.section); s[P.sectionStartMs] = o.sectionStartMs; s[P.sectionIndex] = o.sectionIndex; s[P.sectionTier] = o.sectionTier; s[P.secBuildAt] = o.secBuildAt; s[P.secBuildSeen] = o.secBuildSeen;
+    s[P.repeatSim] = o.repeatSim; s[P.repeatAgoMs] = o.repeatAgoMs; s[P.repeatSection] = sectionCode(o.repeatSection);
+    s[P.expectHighMs] = o.expectHighMs; s[P.expectSource] = o.expectSource; s[P.prevSection] = sectionCode(o.prevSection); s[P.levelVsHighDb] = o.levelVsHighDb;
   }
   /** Huvudtråden: sektionens fält ur tillståndsblocket (pullSlowState). */
   unpack(s: Float64Array): void {
     const sc = this.o;
-    sc.section = SECTIONS[s[S_SECTION]] || 'intro'; sc.sectionStartMs = s[S_SEC_START]; sc.sectionIndex = s[S_SEC_INDEX]; sc.sectionTier = s[S_SEC_TIER]; sc.secBuildAt = s[S_BUILD_AT]; sc.secBuildSeen = s[S_BUILD_SEEN];
-    sc.repeatSim = s[S_REP_SIM]; sc.repeatAgoMs = s[S_REP_AGO]; sc.repeatSection = SECTIONS[s[S_REP_SEC]] || '';
-    sc.expectHighMs = s[S_EXPECT_MS]; sc.expectSource = s[S_EXPECT_SRC]; sc.prevSection = SECTIONS[s[S_PREV_SEC]] || ''; sc.levelVsHighDb = s[S_LVL_HIGH];
+    sc.section = SECTIONS[s[P.section]] || 'intro'; sc.sectionStartMs = s[P.sectionStartMs]; sc.sectionIndex = s[P.sectionIndex]; sc.sectionTier = s[P.sectionTier]; sc.secBuildAt = s[P.secBuildAt]; sc.secBuildSeen = s[P.secBuildSeen];
+    sc.repeatSim = s[P.repeatSim]; sc.repeatAgoMs = s[P.repeatAgoMs]; sc.repeatSection = SECTIONS[s[P.repeatSection]] || '';
+    sc.expectHighMs = s[P.expectHighMs]; sc.expectSource = s[P.expectSource]; sc.prevSection = SECTIONS[s[P.prevSection]] || ''; sc.levelVsHighDb = s[P.levelVsHighDb];
   }
 
   /** Låtgränsen (hintTrackChange): SECTION_CARRY block bärs över, annars nollning. */

@@ -229,3 +229,37 @@ Kända avvikelser i dagens kod (inte ändrade):
 - Ramen har `stenarAv` (skrivs en gång i konstruktorn, 0 per hopp): en bit per avstängd sten, 1 kick, 2 bas, 4 drop, 8 uppbyggnad, 16 karaktär, 32 sektion.
   Ett 0 i ett ramfält betyder "stenen säger 0" när biten är 0, och "ingen sten" när den är satt.
 - En sten som måste skilja de två fallen läser `<fack>.finns` (tagg `K`, syns i båda trådarna).
+
+## Platserna ur taggarna (steg 18b)
+
+`split.ts` har bara kärnans platser kvar som konstanter (`B_SEQ`, `B_N`, `B_ENVF`; `BS_SEQ`, `BS_SPEC_N`, `BS_SKIPPED`; `S_REC_SEQ` … `S_LOST_FLAGS`;
+recordets `R_*`). Fackens platser räknas fram en gång vid laddning med `platser(tagg, fack, först)` (analyserFack.ts):
+
+| block | taggen | facken | förr |
+|---|---|---|---|
+| `B` hopprecordet (huvud → worker, per hopp) | `IN` | alla utom `clock` | `B_RMS` … `B_CONF`, `B_ENVBPM` |
+| `R` recordet (huvud → worker, per env-sampel) | `IN` | `clock` | `R_CLOCK`, `R_CLOCK_CONF` |
+| `BS` storblocket (worker → huvud, per hopp) | `UT` | alla utom `clock`, `section` | `BS_BODY` … `BS_BUILDSTART` |
+| `S` tillståndsblocket (worker → huvud, per record) | `UT` | `clock`, `section` | `S_PHASE_MS` … `S_BUILD_SEEN` |
+
+Platsen heter som fältet: `B.hop.rms`, `BS.drop.dropCount`, `BS.character.profile.punch`, `S.section.section`. Längderna (`BIG_REC_LEN` 16, `REC_LEN` 37,
+`BIG_STATE_LEN` 24, `STATE_LEN` 26) räknas fram och är desamma som förut; ordningen inom blocken är TRAD-radernas. Vid laddning kontrolleras att varje
+`IN`- och `UT`-fält har fått en plats (annars startar analysatorn inte). Pack- och uppackraderna står kvar handskrivna där de stod (kärnans i `pushBig`/`drainBig`,
+stenarnas i deras `pack`/`unpack`/`resume`), så den heta vägen är samma raka laddning och lagring; platsobjekten är frysta och hissade till modulkonstanter
+(`const P = BS.drop`, `const Bh = B.hop`). En plats för ett fält som inte har taggen finns inte i typen: `B.bass.energy` ger tsc-fel tills taggen är `IN`.
+
+Ändringar i kärnan för att taggarna ska stämma (samma värden, bevisat av `bevis.sh`):
+- `h.sec`, `h.lvh`, `h.conf` skrivs i `process` före `pushBig` i alla roller (förr bara odelat; `pushBig` packade `section.section` m.fl. direkt).
+- `h.bpm = ck.bpm` i `envSampleStep` i alla roller och följer hopprecordet varje hopp (förr `bigEnvBpm` bara i hopp med env-sampel). Workern läser det bara i
+  `stepBassline`, som fortfarande bara kör när `B_ENVF` = 1, och då är talet detsamma. `bigEnvBpm` är borta.
+- Workern packar upp hela hoppets IN-fält på ett ställe, efter basens `accumulate` (som läser förra hoppets `kickHit`, som förut) och före `stepBassline`.
+  Det gäller nu också `level.intensity`, `kick.kick` och `hop.breaking`, så sektionens `bigAgg()` läser facken i stället för fyra argument.
+- `drop.dropCand` packas nu också upp i huvudtråden (taggen `UT`); ingen läser det där i det delade läget.
+
+## Skuggprovet (steg 18b): `tools/splitProof.mjs`
+
+Ramfälten jämförs som förut (unionen av alla nycklar, rekursivt; ett nytt ramfält kommer med av sig självt och måste stå i baslinjen `VANTAT` för att få skilja).
+Nytt: i det delade läget (inline) jämförs dessutom varje fackfält med taggen `IN` eller `UT` mellan huvudtråden (`an.f`) och workern (`an.inlinePeer.f`),
+efter `process()` i varje hopp, med `Object.is`; tempots `R`-fält bara i hopp då ett record skrevs. Listan läses ur `FACK[n].TRAD` i bygget, så ett nytt fält
+eller en ny tagg provas utan att någon skriver provet. Skiljer ett fält ljuger taggen (eller transportraden saknas, eller fältet skrivs efter `pushBig`),
+och provet säger `FEL tråd IN bass.energy …` och `DELNING FEL`.
