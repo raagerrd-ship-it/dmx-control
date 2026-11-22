@@ -139,3 +139,24 @@ Flaggorna blev räknare i `SpectrumOut`: `bigN` (ett steg per stor-FFT, sist i `
 (förr `bassOnPeak = true`). Läsaren minns senast sedda: `sections.specSeen` (start −1 = smutsigt, som förr `secSpecDirty = true`) och `sections.bpkSeen`
 (start 0, som förr `false`). Smutsigt ⇔ `bigN !== specSeen`; flera toppar mellan två läsningar ger ett `bpk`, som förr. `specSeen` läses också av kärnans
 `bigAgg` (samma fält, som förr den delade flaggan) tills sektionens steg flyttar `bigAgg` in i stenen.
+
+## Sektionen efter kontraktet (steg 13)
+
+`SectionReads` (hop: `role`, `bigOn`, `breaking`, `rms`, `flux`, `nowWall`, `dtHop`, `centSmooth`, `wallNow`; level: `activeMs`, `intensity`; kick: `kick`;
+clock: `bpm`, `phaseMs`; drop: `dropCand`, `secBodyRet`; riser: `buildUp`; spectrum: `bigN`, `bandDbRaw`, `bandAbs`, `bassOnRing`, `bassOnN`, `bassOnPeaks`), eget fack `f.section`.
+Sektionens privata delar och ledningen mellan trådarna ligger i stenen (förr på `Analyser`):
+
+- `agg` (förr `secAgg`, insamlarens summor), `secSpecHop`, `specSeen`/`bpkSeen` privata; `secDump`/`dbgSecBlock` (körbankens krokar) nås som `an.sections.x`.
+- `bigAgg(…)` ordagrant ur kärnan (workern med `bigOn`, anropas i `drainBig`).
+- `toRecord(r, o)`: recordets `R_SEC_*` och `R_DROPS`/`R_ACTIVE`/`R_BUILD` plus nollningen (förr i `pushSlowRecord`), på samma plats.
+- `fromRecord(r, o)`: sektionsdelen sist i `slowStep`, ordagrant. `wire = { drops, active, build }` är workerns indata: `drops` förr `secVDrops`,
+  `active`/`build` skrevs förr i nivåns och uppbyggnadens fack (bara i workern utan `bigOn`, där ingen annan läser dem).
+- Läsarna `dropsNow()` (slow: `wire.drops`, annars `dropCand + secBodyRet`), `activeNow()`, `buildNow()` (slow utan `bigOn`: `wire`, annars facken).
+- `resume(st)`: `wire.drops = st[BS_CAND]` (förr `secVDrops = drop.dropCand` direkt efter `drop.resume`).
+- `pack(s)`/`unpack(s)`: `S_SECTION` … `S_LVL_HIGH` i tillståndsblocket; `|| 'intro'` och `|| ''` följer med ordagrant.
+- `carry()`: SECTION_CARRY-blocket i `hintTrackChange` (ratten läses i stenen, därför inget argument).
+- Rattarna `SECTION_SCORE_F32`, `SECTION_CARRY`, `SECTION_WIN` (`RANK_WIN`), `SECTION_RUN`, `SECTION_RUN_IN`, `SECTION_REPEAT`, `SECTION_EARLY_DB`, `SECTION_DUMP`
+  är modulkonstanter i `analyserSection.ts` (förr statiska på `Analyser` och `export const SECTION_SCORE_F32`); `Analyser.BE_SPAN_DB`, `BE_MEM_BEATS`, `BASSON_LEN`,
+  `BODY_HIGH_MS/DB` borta (ingen läser dem längre; värdena i facket). `stabilise(secRank)` sist i stenens konstruktor (förr sist i Analysers).
+
+`tools/ensam.mjs tappa sections sectionHop` gick inte att spela upp före steget (AVVIKER i 162 337 steg) och provas inte här.
