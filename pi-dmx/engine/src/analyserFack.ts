@@ -48,12 +48,12 @@ type Taggat<O> = { readonly [K in Exclude<keyof O, Fn<O>>]: Tag | { readonly [k:
 /** HOPPET: kärnans fält per hopp. Skrivkartan per tråd: docs/analysator/analyserFack.md. */
 export class HopOut {
   static readonly TRAD = { role: 'K', bigOn: 'K', cfg: 'K', dtHop: 'K', hopMs: 'K', now: 'S', dt: 'S', nowWall: 'IN', gated: 'S',
-    body: 'UT', breaking: 'IN', kickHit: 'IN',
+    breaking: 'IN', kickHit: 'IN',
     sec: 'IN', lvh: 'IN', conf: 'IN', bpm: 'IN' } as const satisfies Taggat<HopOut>;
   role: Role = 'all'; bigOn = false; cfg!: Cfg;   // skrivs en gång i Analysers konstruktor
   dtHop = 0; hopMs = 0.5;
   now = 0.5; dt = 0.5; nowWall = 0.5; gated = false;
-  body = 0.5; breaking = false;
+  breaking = false;
   kickHit = 0;   // trumkittet
   sec = 'intro'; lvh = 0.5; conf = 0.5; bpm = 0.5;   // långsamma värden sedda vid hoppet
   constructor(readonly wallNow: () => number) { stabilise(this, ['kickHit']); }   // wallNow = analysatorns väggklocka
@@ -74,12 +74,13 @@ export class LevelOut {
 }
 /** SPEKTRUMET. Banden förblir Float32Array. sink = förr specSink. */
 export class SpectrumOut {
-  static readonly TRAD = { bandAbs: 'L', bandDbRaw: 'L', bandLvl: 'L', bandOn: 'L', fbOn: 'S', bigN: 'L', sink: 'S', hatHit: 'S', snareHit: 'S' } as const satisfies Taggat<SpectrumOut>;
+  static readonly TRAD = { bandAbs: 'L', bandDbRaw: 'L', bandLvl: 'L', bandOn: 'L', fbOn: 'S', bigN: 'L', sink: 'S', hatHit: 'S', snareHit: 'S', bodyDb: 'UT' } as const satisfies Taggat<SpectrumOut>;
   readonly bandAbs = new Float32Array(8); readonly bandDbRaw = new Float32Array(8);   // absolut magnitud före AGC, rå dB
   readonly bandLvl = new Float32Array(8); readonly bandOn = new Float32Array(8); readonly fbOn = new Float32Array(8);
   bigN = 0;   // räknare: stor-FFT:er (förr flaggan secSpecDirty)
   sink: ((mag: Float32Array, binHz: number) => void) | null = null;
   hatHit = 0; snareHit = 0;   // trumkittet: hi-hat och virvel (förr på Analyser)
+  bodyDb = 0.5;   // baskroppen: medel av de tre lägsta bandens råa dB (förr hop.body)
   constructor() { stabilise(this, ['hatHit', 'snareHit']); }
 }
 /** KICKEN. kick = förr hKick, kickAt = förr hKickAt. */

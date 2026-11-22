@@ -390,3 +390,9 @@ analys. Recordet: `R_FLAGS`…`R_BIGSEQ` omnumrerade (3 platser kortare). Kandid
 FFT:n: `mag512`/`prevMag` och `onsetPeak`/`onsetPeakDecay` (se analyserFft.md). Läsarna: inga i src/UI/server; lotus `tools/tempo-facit-pc/bench.mjs`
 och `tempoShift.mjs` läser med `?.`/`|| 0` (skriver tomt). `tools/evidence.mjs`, `offlineRefine.mjs`, `peaks.mjs` läste nollor sedan 97ac0bfb
 och stannar nu på `an.lagBounds` (kandidat att ta bort).
+
+## Baskroppen till spektrumet (steg 29)
+
+`hop.body` -> `spectrum.bodyDb` (`UT`, startvärde 0,5 som förr). Räknas i spektrumets `bigTick()` (spektrumet äger banden; Drop kan stängas av,
+ramens `bodyDb` ska finnas ändå). Läsare: Drop (`DropReads.spectrum: 'bandDbRaw' | 'bodyDb'`, `hop` utan `body`) och ramen. Kärnans `slowPart`
+är nu bara de tre stenarnas anrop. `flyttkarta.json`: `hBody` -> `f.spectrum.bodyDb`.

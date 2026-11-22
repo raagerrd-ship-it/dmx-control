@@ -116,7 +116,10 @@ specCopy = new Float32Array(0);specN = 0;  aBandLvl = 0;
   }
 
   /** Var BIG_EVERY:e hopp: stor-FFT:n. */
-  bigTick(): void { if (++this.bigCounter >= BIG_EVERY) this.bigStep(); }
+  bigTick(): void {
+    if (++this.bigCounter >= BIG_EVERY) this.bigStep();
+    const db = this.o.bandDbRaw; this.o.bodyDb = (db[0] + db[1] + db[2]) / 3;   // baskroppen
+  }
 
   /** Omstart av workern: specN ur bigState. */
   resume(st: Float64Array): void { this.specN = st[BS_SPEC_N]; }

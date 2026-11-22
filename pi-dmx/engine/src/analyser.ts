@@ -15,7 +15,7 @@ import {
   B_ENVF, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ,
   BS_SPEC_N, BS_SKIPPED, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
 } from './split.js';
-const Bh = B.hop, Bf = B.fft, Bl = B.level, Bk = B.kick, Rc = R.clock, BSh = BS.hop, Sc = S.clock;   // kärnans platser ur taggarna
+const Bh = B.hop, Bf = B.fft, Bl = B.level, Bk = B.kick, Rc = R.clock, BSs = BS.spectrum, Sc = S.clock;   // kärnans platser ur taggarna
 import FFT from "fft.js";
 import { BeatFeed, publishPhase, type ClockCfg } from "./analyserClock.js";   // ANALYSATORNS KLOCKA
 import { DropDetector } from "./analyserDrop.js";
@@ -299,7 +299,7 @@ export class Analyser {
     else if (this.syncWorker) syncWait(ctrl, C_BIG_SEQ, () => this.bigRd.read(ctrl, this.bigState!, this.bigCopy, C_BIG_SEQ) && this.bigCopy[BS_SEQ] >= seq);
     const s = this.bigCopy;
     if (!this.bigRd.read(ctrl, this.bigState!, s, C_BIG_SEQ) || s[BS_SEQ] === 0) return;
-    h.body = s[BSh.body]; this.drop?.unpack(s); this.riser?.unpack(s); this.character?.unpack(s);
+    sp.bodyDb = s[BSs.bodyDb]; this.drop?.unpack(s); this.riser?.unpack(s); this.character?.unpack(s);
     const sn = s[BS_SPEC_N];
     if (sn > this.specDelivered) {
       const sink = sp.sink, binHz = h.cfg.audio.rate / this.bands.bufferBig.length, R = this.bands.specRing!, c = this.bands.specCopy;
@@ -337,7 +337,7 @@ export class Analyser {
     if (n > 0) {
       Atomics.store(ctrl, C_BIG_READ, seqLow(this.bigSeq));
       stateWrite(ctrl, this.bigState!, (s) => {
-        s[BS_SEQ] = this.bigSeq; s[BSh.body] = h.body; this.drop?.pack(s); this.riser?.pack(s); this.character?.pack(s); s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped;
+        s[BS_SEQ] = this.bigSeq; s[BSs.bodyDb] = this.f.spectrum.bodyDb; this.drop?.pack(s); this.riser?.pack(s); this.character?.pack(s); s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped;
       }, C_BIG_SEQ);
       if (this.syncWorker) Atomics.notify(ctrl, C_BIG_SEQ);
     }
@@ -575,8 +575,6 @@ export class Analyser {
 
   /** DEN LÅNGSAMMA DELEN: stenarna efter stor-FFT:n, i workern (drainBig) eller odelat (process). En ny sten här. */
   private slowPart(): void {
-    const h = this.f.hop, sp = this.f.spectrum;
-    h.body = (sp.bandDbRaw[0] + sp.bandDbRaw[1] + sp.bandDbRaw[2]) / 3;
     this.drop?.dropStep();
     this.riser?.riserStep();
     this.character?.profileStep();
@@ -596,7 +594,7 @@ export class Analyser {
     const sc = this.f.section;
     const bo = this.f.bass, ri = this.f.riser, dp = this.f.drop;
     const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock, ff = this.f.fft;
-    const fluxNorm = ff.flux, kick = kk.kick, intensity = lv.intensity, bodyNow = h.body, inZone = lv.inZone, breaking = h.breaking,
+    const fluxNorm = ff.flux, kick = kk.kick, intensity = lv.intensity, bodyNow = sp.bodyDb, inZone = lv.inZone, breaking = h.breaking,
       inRiser = ri.inRiser, kickAtMs = kk.kickAt;
     const L = this.bands.fbLvl, A = this.bands.fbAbs, O = sp.fbOn;
     const spec = this.outSpec, specAbs = this.outSpecAbs, onset = this.outOnset;

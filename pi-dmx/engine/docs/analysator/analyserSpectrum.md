@@ -315,3 +315,9 @@ treble (3,5–10 kHz) och air (10–16 kHz) och ta den starkaste transienten.
 ```
 
 `drum.kick` (`hop.kickHit`, tau 150 ms) står kvar i kärnan: den drivs av kicken och går till workern (karaktärens punch, basen).
+
+## Baskroppen bodyDb (steg 29)
+
+`spectrum.bodyDb` = medel av de tre lägsta bandens råa dB (`bandDbRaw[0..2]`, 20–250 Hz), räknad sist i `bigTick()` varje hopp (förr `h.body`
+i kärnans `slowPart`, samma uttryck, samma hopp: inget mellan `bigTick` och `slowPart` skriver `bandDbRaw`). Taggen `UT`: workern räknar,
+storblocket bär den (`BS.spectrum.bodyDb`) till huvudtråden, ramens `bodyDb` läser facket. Drop läser den (`DropReads.spectrum`).

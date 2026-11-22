@@ -38,8 +38,8 @@ const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastG
 
 /** DET DROP LÄSER (workern). Inget annat går att nå. */
 export interface DropReads {
-  hop:      Ser<'L', 'hop', 'dtHop' | 'nowWall' | 'body' | 'sec' | 'lvh' | 'wallNow'>;
-  spectrum: Ser<'L', 'spectrum', 'bandDbRaw'>;
+  hop:      Ser<'L', 'hop', 'dtHop' | 'nowWall' | 'sec' | 'lvh' | 'wallNow'>;
+  spectrum: Ser<'L', 'spectrum', 'bandDbRaw' | 'bodyDb'>;
   level:    Ser<'L', 'level', 'activeMs' | 'lvlSmooth'>;
   riser:    Ser<'L', 'riser', 'buildUp'>;
 }
@@ -77,7 +77,7 @@ export class DropDetector {
 
   /** Drop-detektionen. */
   dropStep(): void {
-    const nowWallA = this.h.nowWall, bodyNow = this.h.body;
+    const nowWallA = this.h.nowWall, bodyNow = this.sp.bodyDb;
     const dtHop = this.h.dtHop;
     this.bodyEnv += (bodyNow - this.bodyEnv) * Math.min(1, dtHop / 0.35);
     this.bodyFast += (bodyNow - this.bodyFast) * Math.min(1, dtHop / BODY_FAST_S);
