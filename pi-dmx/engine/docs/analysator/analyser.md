@@ -1829,7 +1829,7 @@ Vid `const bodyNow = (this.bandDbRaw[0] + this.bandDbRaw[1] + this.bandDbRaw[2])
 ra dB
 ```
 
-### envSampleStep()
+### envSampleStep() (borta steg 27, se analyserFack.md)
 
 ```text
  Ett onset-envelope-sampel (ENV_HZ): dubbelslagsdampning, ringar, basgang, sektionsflush/record till workern.

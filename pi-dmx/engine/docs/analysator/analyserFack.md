@@ -367,3 +367,17 @@ Ordningen: `engSmooth`/`centSmooth` räknas nu först i hoppet i stället för e
 `kickFlux`/`energy`/`rms`, nivån `rms`; inline-workern läser hopprecord från tidigare hopp), och `pushBig` packar samma hopps värde som förr.
 `energy` läser nivåns `gain` före `levels.hopStep()`, som förr. `flyttkarta.json`: `hRms`, `hKickFlux`, `hEnergy`, `hFlux`, `centSmooth` pekar på
 `f.fft.*`, nya: `engSmooth`, `sumSq`, `rmsRecalc`, `fbMax`, `onsetPeakReady`, `onsetPeakDecay`, `aAtt`, `aRel`, `buffer.length/.constructor`.
+
+## Anslagskurvan bort, 100 Hz-steget kvar i kärnan (steg 27)
+
+Uppdraget var att göra anslagskurvan (`envAccum`/`envBassAccum`/`envHighAccum`, ringarna `envRing`/`envBassRing`/`envHighRing`, `envPos`/`envFilled`,
+dubbelslagsdämpningen `REFRAC_N`/`REFRAC_ATT`) till en egen sten, "klockans tempounderlag". Genomgången visade att ingen läser den: klockan
+(`analyserClock.ts`, `BeatFeed`) läser ramen (`onset`, `kick`, basbandets stigning), inte ringarna, sedan den gamla temposökningen togs bort
+(97ac0bfb "död tempokod bort"). Ringarna skrevs i huvudtråden och i workern (recordets `R_ENV`/`R_BASS`/`R_HIGH`), och det enda som läste dem var
+dubbelslagsdämpningen, vars värde bara gick tillbaka in i ringen och recordet. En sten för den hade varit en del som inte ändrar något ljus.
+Därför borta (byte-identiskt bevisat), med ratten `HIGH_DIAG` som bara fyllde diagnostikringen.
+
+Kvar i kärnan: **100 Hz-steget** `tickStep()` (`tickT`, förr `envAccumT`/`envSampleStep`): tempot sett vid hoppet (`h.bpm = ck.bpm`), basgångens steg
+(odelat direkt, delat via `bigEnvFlag` i hopprecordet) och recordet till workern (`pushSlowRecord`, utan argument). Det är kärnans transport, inte
+analys. Recordet: `R_FLAGS`…`R_BIGSEQ` omnumrerade (3 platser kortare). Kandidat, inte rört: kärnans tempotelemetri utan skrivare
+(`tempoGram`, `dbgTgAt`, `debugCandidates`, `lagBounds`, `evidence*`, `cand*`, `rawBpmLast`, `localBpmF`; `ENV_LEN`/`TEMPO_ENV_S` finns bara för `tempoGram`).

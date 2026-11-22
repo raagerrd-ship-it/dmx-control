@@ -49,7 +49,7 @@ let drainUs = 0;
 { const f = Analyser.prototype.drainRecords; Analyser.prototype.drainRecords = function (...a) { const t = hr(); try { return f.apply(this, a); } finally { drainUs += hr() - t; } }; }
 if (WRAP) {
   const A = Analyser.prototype;
-  for (const m of ["agcStep", "kickStep", "silenceStep", "envSampleStep", "kickRefine", "intensityStep", "bigStep", "dropStep", "riserStep", "profileStep",
+  for (const m of ["agcStep", "kickStep", "silenceStep", "tickStep", "kickRefine", "intensityStep", "bigStep", "dropStep", "riserStep", "profileStep",
     "sectionAggStep", "fillFrame", "pullSlowState", "pushSlowRecord", "stepBassline", "process",
     "slowStep", "applyFlags", "envStep", "computeBpm", "computeGridPhase", "sectionHop", "tempoGramStep", "scoreEnv"]) wrap(A, m, "an");
   const E = EffectEngine.prototype;

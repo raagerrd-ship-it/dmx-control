@@ -5,7 +5,7 @@ import { sysEnv, stabilise, makeFack, off, stenarAv, type Fack, BODY_CEIL_DB_S, 
 export { BASS_SPAN_DB, BODY_CEIL_DB_S };
 export type { BeatGrid, AnalyserDetection, Cfg, Role };
 import {
-  REC_LEN, RING_N, R_SEQ, R_PERF, R_WALL, R_ENV, R_BASS, R_HIGH, R_FLAGS, R_HINT_MS, R_VCLOCK, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, B, BS, S, R,
+  REC_LEN, RING_N, R_SEQ, R_PERF, R_WALL, R_FLAGS, R_HINT_MS, R_VCLOCK, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, B, BS, S, R,
   packFlagCounts, lostFlags, seqLow, seqDelta, C_WAITING, C_STATE_SEQ, S_LOST_FLAGS,
   F_SIL350, F_SIL10, F_RESET_TEMPO, F_HINT, F_RESET_BAR, F_VCLOCK_SET, F_VCLOCK_NULL,
   C_WRITE, C_READ, S_REC_SEQ, S_BPM, S_CONF, S_BPMF, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
@@ -30,7 +30,6 @@ import { SmallFft, hannWindow } from "./analyserFft.js";
 
 /** Sann om ratten ar satt till nagot icke-tomt. */
 function sysOn(name: string): boolean { return !!sysEnv(name); }
-const HIGH_ON = sysOn('HIGH_DIAG') || false;   // Rattar som lases i tatslingan
 const BPM_TRACE = sysOn('BPM_TRACE');
 
 export interface AnalyserConfig {
@@ -125,7 +124,7 @@ export interface Frame {
 }
 
 const DOUBLE_FROM_START = [
-  'lastT', 'envAccum', 'envAccumT', 'envBassAccum',
+  'lastT', 'tickT',
   'lvlVU',
   'rawBpmLast',
 ] as const;   // Instansfalt som MATT
@@ -154,16 +153,12 @@ export class Analyser {
   setSpectrumSink(fn: ((mag: Float32Array, binHz: number) => void) | null): void { this.f.spectrum.sink = fn; }
   private static readonly ENV_HZ = 100;
   private static readonly ENV_LEN = 100 * Math.max(3, Math.min(20, Number(sysEnv('TEMPO_ENV_S')) || 5));   // Onset-ringens langd i sekunder x 100 Hz
-  private envRing = new Float32Array(Analyser.ENV_LEN);
-  private envPos = 0;
 
 
   private static readonly GRID_PHASE_OFFSET_MS = Number(sysEnv('GRID_PHASE_OFFSET_MS')) || 0;   // Fasval
 
   dbgPhase = { conf: 0, bassOn: 0, bassAnti: 0, fullOn: 0, fullAnti: 0, bestPh: 0, nPh: 0, pending: 0 };   // Korbanks-telemetri for gridfasen
-  private envFilled = 0;
-  private envAccum = 0;
-  private envAccumT = 0;
+  private tickT = 0;   // 100 Hz-steget
   private splitCtrl: Int32Array | null = null; private splitRing: Float64Array | null = null; private splitState: Float64Array | null = null;
   private stateCopy = new Float64Array(STATE_LEN); private stateRd = new StateReader();   // a7: kopian bara när blocket ändrats
   private recSeq = 0;   // fast: senast skrivna record
@@ -195,12 +190,9 @@ export class Analyser {
     const out: Array<{ lag: number; bpm: number; tg: number; score: number; half: number; hit: number }> = []; for (let i = 0; i < this.evidenceCands; i++) out.push({ lag: this.candLag[i], bpm: Math.round(Analyser.ENV_HZ * 60 / this.candLag[i] * 10) / 10, tg: this.candVal[i], score: this.candScore[i], half: this.candHalf[i], hit: this.candHit[i] });
     return out;
   }
-  private static readonly REFRAC_N = 20;   // 200 ms @ ENV_HZ 100
 
   private aVU = 0;
   private dKick = 0;
-  private envBassRing = new Float32Array(Analyser.ENV_LEN);   // BASBANDETS onset-envelope
-  private envBassAccum = 0;
   private tempoGram = new Float32Array(Analyser.ENV_LEN);   // Ackumulerat tempogram
   private silenceLevel = SILENCE_LEVEL;
   /** Släckgränsen live. */
@@ -209,9 +201,6 @@ export class Analyser {
   /** Tempogrammets lagfonster i senaste anropet. */
   get lagBounds(): [number, number] { return [this.diagLagMin, this.diagLagMax]; }
   get tempoGramSnapshot(): Float32Array { return this.tempoGram; }
-  private static readonly REFRAC_ATT = 0;   // env-ringens refraktar
-  private envHighRing = new Float32Array(Analyser.ENV_LEN);   // DIAGNOSTIK
-  private envHighAccum = 0;
   private lvlVU = 0;
 
 
@@ -235,12 +224,12 @@ export class Analyser {
     this.pendFlags |= f; this.barrierSeq = this.recSeq + 1;
     for (let k = 0; k < FLAG_BITS; k++) if (f & (1 << k)) this.flagCnt[k]++;
   }
-  /** Ett record per env-sampel. */
-  private pushSlowRecord(e: number, b: number, h: number): void {
+  /** Ett record per 100 Hz-steg. */
+  private pushSlowRecord(): void {
     const r = this.splitRing!, ctrl = this.splitCtrl!;
     const seq = ++this.recSeq; const o = (seq % RING_N) * REC_LEN;
     r[o + R_PERF] = this.perfNow(); r[o + R_WALL] = this.wallNow(); r[o + R_TS] = Date.now();
-    r[o + R_ENV] = e; r[o + R_BASS] = b; r[o + R_HIGH] = h; r[o + R_FLAGS] = this.pendFlags; r[o + R_HINT_MS] = this.pendHintMs; r[o + R_VCLOCK] = this.pendVclock;
+    r[o + R_FLAGS] = this.pendFlags; r[o + R_HINT_MS] = this.pendHintMs; r[o + R_VCLOCK] = this.pendVclock;
     r[o + R_FLAGCNT] = packFlagCounts(this.flagCnt);
     r[o + Rc.bpm] = this.f.clock.bpm; r[o + Rc.conf] = this.f.clock.conf;
     r[o + R_BIGSEQ] = this.bigSeq;
@@ -390,11 +379,7 @@ export class Analyser {
     const r = this.splitRing!;
     this.applyFlags(r[o + R_FLAGS], r[o + R_HINT_MS], r[o + R_VCLOCK]);
     this.virtualMs = r[o + R_PERF]; this.virtualOn = true;
-    this.envRing[this.envPos] = r[o + R_ENV]; this.envBassRing[this.envPos] = r[o + R_BASS];
-    if (HIGH_ON) this.envHighRing[this.envPos] = r[o + R_HIGH];
-    this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
     this.f.clock.bpm = r[o + Rc.bpm], this.f.clock.conf = r[o + Rc.conf];
-    this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
     this.sections?.fromRecord();
   }
 
@@ -563,7 +548,7 @@ export class Analyser {
   process(samples: Float32Array): Frame {
     const h = this.f.hop;
     const sc = this.f.section;
-    const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ck = this.f.clock, ff = this.f.fft;
+    const lv = this.f.level, kk = this.f.kick, ck = this.f.clock, ff = this.f.fft;
     if (this.hopLane) this.setClock(this.hopLane.clockBpm, this.hopLane.clockConf);
     if (h.role === 'fast') this.pullSlowState();
     this.fft.hopStep(samples);
@@ -580,14 +565,10 @@ export class Analyser {
 
     const hopMs = h.hopMs;
 
-    this.envAccum = Math.max(this.envAccum, ff.flux);
-    const bassFluxNorm = Math.min(1, ff.kickFlux * (h.cfg.onset.enhancements ? 0.5 : 0.02));
-    if (bassFluxNorm > this.envBassAccum) this.envBassAccum = bassFluxNorm;
     const big = h.bigOn;
     if (!big) this.bass?.accumulate();
-    if (HIGH_ON) { const hi = sp.bandOn[6] > sp.bandOn[7] ? sp.bandOn[6] : sp.bandOn[7]; if (hi > this.envHighAccum) this.envHighAccum = hi; }
-    this.envAccumT += hopMs;
-    if (this.envAccumT >= 1000 / Analyser.ENV_HZ) this.envSampleStep();
+    this.tickT += hopMs;
+    if (this.tickT >= 1000 / Analyser.ENV_HZ) this.tickStep();
 
     this.lvlVU += (level - this.lvlVU) * this.aVU;
 
@@ -622,32 +603,12 @@ export class Analyser {
     this.character?.profileStep();
   }
 
-  /** Ett onset-envelope-sampel. */
-  private envSampleStep(): void {
-    const h = this.f.hop;
-    const ck = this.f.clock;
-      this.envAccumT -= 1000 / Analyser.ENV_HZ;
-      let _e = this.envAccum;
-      const _R = Analyser.REFRAC_N;
-      if (_R > 0 && _e > 0) {
-        let _big = false;
-        for (let _k = 1; _k <= _R; _k++) {
-          const _i = (this.envPos - _k + Analyser.ENV_LEN * 2) % Analyser.ENV_LEN;
-          if (this.envRing[_i] >= _e) { _big = true; break; }
-        }
-        if (_big) _e *= Analyser.REFRAC_ATT;
-      }
-      const _b = this.envBassAccum, _h = this.envHighAccum;
-      this.envRing[this.envPos] = _e;
-      this.envBassRing[this.envPos] = _b;
-      h.bpm = ck.bpm; if (h.bigOn) this.bigEnvFlag = 1; else this.bass?.stepBassline();
-      if (HIGH_ON) this.envHighRing[this.envPos] = _h;
-      this.envPos = (this.envPos + 1) % Analyser.ENV_LEN;
-      this.envFilled = Math.min(this.envFilled + 1, Analyser.ENV_LEN);
-      this.envAccum = 0;
-      this.envBassAccum = 0;
-      if (HIGH_ON) this.envHighAccum = 0;
-      if (h.role === 'fast') this.pushSlowRecord(_e, _b, _h);
+  /** 100 Hz-steget: tempot sett vid hoppet, basgångens steg, recordet till workern. */
+  private tickStep(): void {
+    const h = this.f.hop, ck = this.f.clock;
+    this.tickT -= 1000 / Analyser.ENV_HZ;
+    h.bpm = ck.bpm; if (h.bigOn) this.bigEnvFlag = 1; else this.bass?.stepBassline();
+    if (h.role === 'fast') this.pushSlowRecord();
   }
 
   /** Muterar det ateranvanda Frame:t. */

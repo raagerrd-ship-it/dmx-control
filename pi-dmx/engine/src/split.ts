@@ -5,8 +5,8 @@ import { platser, antal } from "./analyserFack.js";
 export const RING_N = 1024;
 export const RING_MARGIN = 8;   // records workern lämnar orörda mot skrivaren
 
-export const R_SEQ = 0, R_PERF = 1, R_WALL = 2, R_ENV = 3, R_BASS = 4, R_FLAGS = 5, R_HINT_MS = 6, R_VCLOCK = 7,
-  R_TS = 8, R_FLAGCNT = 9, R_HIGH = 10, R_BIGSEQ = 11;   // Record-fält (kärnan)
+export const R_SEQ = 0, R_PERF = 1, R_WALL = 2, R_FLAGS = 3, R_HINT_MS = 4, R_VCLOCK = 5,
+  R_TS = 6, R_FLAGCNT = 7, R_BIGSEQ = 8;   // Record-fält (kärnan)
 
 export const F_SIL350 = 1, F_SIL10 = 2, F_RESET_TEMPO = 4, F_HINT = 8, F_RESET_BAR = 16, F_VCLOCK_SET = 32, F_VCLOCK_NULL = 64;   // Flaggor
 export const FLAG_BITS = 7;
