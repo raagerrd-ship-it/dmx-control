@@ -15,7 +15,6 @@ alternativvärde när källor är oense; skillnader på exakt 2× är oktavtvety
 | `scoreCorpus.mjs` | hela inspelade korpusen mot katalogen, färsk analysator | `node tools/scoreCorpus.mjs tools/corpus` |
 | `carryOver.mjs` | **överhängande tillstånd mellan låtar** — kör A, hint, B | `node tools/carryOver.mjs` |
 | `scoreLive.mjs` | **live-motorns** lås ur korpusmanifestet | `node tools/scoreLive.mjs` |
-| `peaks.mjs` | tempogrammets toppstruktur mot facit | `node tools/peaks.mjs <wav> <bpm>` |
 | `testBpmHard.mjs` | 10 syntetiska scenarier | `node tools/testBpmHard.mjs` |
 
 `carryOver` är den viktigaste: de andra körde färska instanser per klipp, men

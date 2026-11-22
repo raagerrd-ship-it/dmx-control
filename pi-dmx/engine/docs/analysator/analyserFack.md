@@ -389,7 +389,7 @@ analys. Recordet: `R_FLAGS`…`R_BIGSEQ` omnumrerade (3 platser kortare). Kandid
 `rawBpmLast`, `localBpmF`, `dbgPhase`, `ENV_LEN` och env-läsningen `TEMPO_ENV_S`). Tillståndsblockets plats 3 (`S_BPMF`, alltid 0) är ledig. Ur lilla
 FFT:n: `mag512`/`prevMag` och `onsetPeak`/`onsetPeakDecay` (se analyserFft.md). Läsarna: inga i src/UI/server; lotus `tools/tempo-facit-pc/bench.mjs`
 och `tempoShift.mjs` läser med `?.`/`|| 0` (skriver tomt). `tools/evidence.mjs`, `offlineRefine.mjs`, `peaks.mjs` läste nollor sedan 97ac0bfb
-och stannar nu på `an.lagBounds` (kandidat att ta bort).
+och togs bort efter steg 30 (ägaren 11-22: "ta bort verktygen").
 
 ## Baskroppen till spektrumet (steg 29)
 
