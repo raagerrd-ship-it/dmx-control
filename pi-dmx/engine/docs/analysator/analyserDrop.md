@@ -515,6 +515,7 @@ hålls är händelsen avgjord som förut: DISKANT -> `dropDemoted`, SPARR -> `dr
 | LJUD | breaket inte helt tyst | 0 | drop (veto) |
 | DISKANT | diskanten (2 s) >= sitt 30 s-medel | 0 | drop (veto) |
 | SPARR | >= 12 s sedan förra drop | 0 | drop (veto) |
+| TOPP | taket högst 5 dB under sega toppen (basen har nyss varit full) | 0 | drop (steg 35) |
 
 Ramen: `dropKeys` = bit per hållen nyckel (bitarna i `K`), `dropNear` bit 1 = minidropens förutsättningar (LUCKA+AKTIV) hålls, bit 2 = dropens
 (+SVACKA LJUD DISKANT SPARR): knippan väntar bara på landningen. Dirigenten kan förbereda; analysatorn väljer inget åt den.
@@ -522,3 +523,11 @@ Slam-kandidaten (`dropCand`, sektionens drop-evidens) räknas som förut men är
 veto, slam utan flank) och flanken 10 dB/4 s (+ 24 dB-undantaget vid 2 s). Mätt (`.arena/nycklar`, ägarens facit, tre starter): drop rätt
 10 -> 14 av 34, falska 5 -> 10, tidsfel median övning +350 -> +187 ms, minidrop rätt 32 = 32 av 56 (minidrop totalt 173 -> 139);
 ljusdomaren v3 övning +0,0, kontroll +5,2.
+
+### Slingan (en nyckel i taget, `.arena/slinga`, status i `.arena/slinga/status.md`)
+
+- Varv 1 FÖRKASTAT: FULL (drop inom 6 dB från sega toppen vid landningen) ändrade inget: kroppen stiger vidare efter landningen och dörren
+  öppnas några hopp senare.
+- Varv 2, steg 35 INLAGT: TOPP = taket (sjunker 0,15 dB/s) högst 5 dB under sega toppen (0,04 dB/s). Fångar ett lugnare parti där basen inte
+  varit full på länge (taket har hunnit sjunka): 151659 430 och 445 s (taket 5,7 / 7,4 dB under toppen; ägarens riktiga drop högst 3,9).
+  Övning falska 8 -> 6, rätt 9 = 9, kontrollen orörd, tidsfel lika.
