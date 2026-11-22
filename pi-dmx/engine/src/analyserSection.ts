@@ -1,6 +1,6 @@
 /**  SEKTIONSFÖLJAREN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserSection.md */
 import { sysEnv, numEnv, stabilise, SECTION_AGG_HOP, BE_FALLBACK_MS, BE_MEM_BEATS, BODY_HIGH_MS, BASSON_LEN,
-  type HopOut, type LevelOut, type KickOut, type ClockOut, type DropOut, type RiserOut, type SpectrumOut, type SectionOut } from "./analyserFack.js";
+  type Ser, type SectionOut } from "./analyserFack.js";
 import { R_SEC_N, R_SEC_INT, R_SEC_KICKS, R_SEC_BREAK, R_SEC_RMS2, R_SEC_CENT, R_SEC_DT, R_SEC_WALL, R_SEC_SPEC0, R_SEC_BON, R_SEC_BPK, R_SEC_FLUX, R_SEC_RMS4,
   R_DROPS, R_ACTIVE, R_BUILD, S_SECTION, S_SEC_START, S_SEC_INDEX, S_SEC_TIER, S_BUILD_AT, S_BUILD_SEEN, S_REP_SIM, S_REP_AGO, S_REP_SEC,
   S_EXPECT_MS, S_EXPECT_SRC, S_PREV_SEC, S_LVL_HIGH, BS_CAND, SECTIONS, sectionCode } from "./split.js";
@@ -14,15 +14,15 @@ const REPEAT = Number(sysEnv('SECTION_REPEAT')) || 0;   // UPPREPNINGSMINNE v2
 const SECTION_EARLY_DB = Number(sysEnv('SECTION_EARLY_DB')) || 3;
 const DOUBLE_FROM_START = ['secHiStartMs', 'secHiEndMs', 'secPct', 'secSongStartMs', 'secBlkMs', 'secBlkInt', 'secBlkCent', 'secBlkRms2', 'secCurDbSum'] as const;   // Talfält som ska vara flyttal från start
 
-/** DET SEKTIONEN LÄSER. Inget annat går att nå. */
+/** DET SEKTIONEN LÄSER. Inget annat går att nå. L = workern (bigAgg, blocken), S = sectionAggStep (huvudtråden, bara odelat). */
 export interface SectionReads {
-  hop:      Readonly<Pick<HopOut, 'role' | 'bigOn' | 'breaking' | 'rms' | 'flux' | 'nowWall' | 'dtHop' | 'centSmooth' | 'wallNow'>>;
-  level:    Readonly<Pick<LevelOut, 'activeMs' | 'intensity'>>;
-  kick:     Readonly<Pick<KickOut, 'kick'>>;
-  clock:    Readonly<Pick<ClockOut, 'bpm' | 'phaseMs'>>;
-  drop:     Readonly<Pick<DropOut, 'dropCand' | 'secBodyRet'>>;
-  riser:    Readonly<Pick<RiserOut, 'buildUp'>>;
-  spectrum: Readonly<Pick<SpectrumOut, 'bigN' | 'bandDbRaw' | 'bandAbs' | 'bassOnRing' | 'bassOnN' | 'bassOnPeaks'>>;
+  hop:      Ser<'L', 'hop', 'role' | 'bigOn' | 'rms' | 'nowWall' | 'dtHop' | 'centSmooth' | 'wallNow'> & Ser<'S', 'hop', 'breaking' | 'flux'>;
+  level:    Ser<'L', 'level', 'activeMs'> & Ser<'S', 'level', 'intensity'>;
+  kick:     Ser<'S', 'kick', 'kick'>;
+  clock:    Ser<'L', 'clock', 'bpm' | 'phaseMs'>;
+  drop:     Ser<'L', 'drop', 'dropCand' | 'secBodyRet'>;
+  riser:    Ser<'L', 'riser', 'buildUp'>;
+  spectrum: Ser<'L', 'spectrum', 'bigN' | 'bandDbRaw' | 'bandAbs' | 'bassOnRing' | 'bassOnN' | 'bassOnPeaks'>;
 }
 
 export class SectionTracker {

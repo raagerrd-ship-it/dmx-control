@@ -1,5 +1,5 @@
 /**  KICKDETEKTORN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserKick.md */
-import { sysEnv, type HopOut, type LevelOut, type ClockOut, type KickOut } from "./analyserFack.js";
+import { sysEnv, type Ser, type KickOut } from "./analyserFack.js";
 
 const KICK_CAP_MS = 330;   // Ratt MED systemprefix
 const KICK_NOGATE = sysEnv('KICK_NOGATE') === '1';
@@ -8,9 +8,9 @@ const KICK_EFLOOR = Number(sysEnv('KICK_EFLOOR')) || 0.06;
 
 /** DET KICKEN LÄSER. Inget annat går att nå. */
 export interface KickReads {
-  hop:   Readonly<Pick<HopOut, 'kickFlux' | 'energy' | 'now' | 'hopMs' | 'rms' | 'wallNow'>>;
-  level: Readonly<Pick<LevelOut, 'gain' | 'envelope' | 'gainLocked'>>;
-  clock: Readonly<Pick<ClockOut, 'src'>>;
+  hop:   Ser<'S', 'hop', 'kickFlux' | 'energy' | 'now' | 'hopMs' | 'rms' | 'wallNow'>;
+  level: Ser<'S', 'level', 'gain' | 'envelope' | 'gainLocked'>;
+  clock: Ser<'S', 'clock', 'src'>;
 }
 
 export class KickDetector {

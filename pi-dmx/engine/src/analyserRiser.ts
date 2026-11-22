@@ -1,17 +1,17 @@
 /**  UPPBYGGNADEN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserRiser.md */
-import { BODY_CEIL_DB_S, stabilise, type HopOut, type SpectrumOut, type LevelOut, type DropOut, type RiserOut } from "./analyserFack.js";
+import { BODY_CEIL_DB_S, stabilise, type Ser, type RiserOut } from "./analyserFack.js";
 import { BS_BUILD, BS_RISER } from "./split.js";
 
 const RISER_SPAN_DB = 60;   // RISERNS FÖNSTER
 const RISER_BAND0 = 3;   // RISERN LYSSNAR OVANFÖR BASKROPPEN
 const DOUBLE_FROM_START = ['novSlow'] as const;   // Talfält som ska vara flyttal från start
 
-/** DET UPPBYGGNADEN LÄSER. Inget annat går att nå. */
+/** DET UPPBYGGNADEN LÄSER (workern). Inget annat går att nå. */
 export interface RiserReads {
-  hop:      Readonly<Pick<HopOut, 'nowWall' | 'dtHop' | 'centSmooth' | 'lvlSmooth'>>;
-  spectrum: Readonly<Pick<SpectrumOut, 'bandDbRaw'>>;
-  level:    Readonly<Pick<LevelOut, 'levelCeil' | 'activeMs'>>;
-  drop:     Readonly<Pick<DropOut, 'lastDropMs'>>;
+  hop:      Ser<'L', 'hop', 'nowWall' | 'dtHop' | 'centSmooth' | 'lvlSmooth'>;
+  spectrum: Ser<'L', 'spectrum', 'bandDbRaw'>;
+  level:    Ser<'L', 'level', 'levelCeil' | 'activeMs'>;
+  drop:     Ser<'L', 'drop', 'lastDropMs'>;
 }
 
 export class RiserDetector {

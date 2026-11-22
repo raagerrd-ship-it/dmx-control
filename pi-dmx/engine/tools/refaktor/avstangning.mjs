@@ -49,7 +49,7 @@ async function driver() {
     const p = join(d, 'src/analyser.ts'), s = readFileSync(p, 'utf8');
     const rad = `readonly ${falt}: ${cls} | null = new ${cls}(this.f, this.f.${fack});`;
     if (s.split(rad).length !== 2) throw new Error('kedjeraden saknas: ' + rad);
-    writeFileSync(p, s.replace(rad, `readonly ${falt}: ${cls} | null = off('${namn}'${neu ? `, this.f.${fack}` : ''});`));
+    writeFileSync(p, s.replace(rad, `readonly ${falt}: ${cls} | null = off('${namn}', this.f.${fack});`));
     sh(`npx tsc -p "${join(d, 'tsconfig.json')}"`);
     byggen[namn] = { dmx: join(d, 'dist'), lotus: join(d, 'lotus') };
     lotus(byggen[namn].dmx, byggen[namn].lotus);

@@ -1,11 +1,11 @@
 /**  NIVÅN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserLevel.md */
-import { type HopOut, type ClockOut, type LevelOut } from "./analyserFack.js";
+import { type Ser, type LevelOut } from "./analyserFack.js";
 import { F_SIL350, F_SIL10 } from './split.js';
 
-/** DET NIVÅN LÄSER. Inget annat går att nå. zeroBpm = kommando till klockan. */
+/** DET NIVÅN LÄSER. Inget annat går att nå. zeroBpm = kommando till klockan. L = zoneStep (också i workern). */
 export interface LevelReads {
-  hop:   Readonly<Pick<HopOut, 'rms' | 'now' | 'dt' | 'hopMs' | 'dtHop' | 'gated' | 'lvlSmooth' | 'role' | 'cfg'>>;
-  clock: Readonly<Pick<ClockOut, 'bpm' | 'zeroBpm'>>;
+  hop:   Ser<'S', 'hop', 'rms' | 'now' | 'dt' | 'hopMs' | 'dtHop' | 'gated' | 'lvlSmooth' | 'role' | 'cfg'> & Ser<'L', 'hop', 'lvlSmooth' | 'dtHop'>;
+  clock: Ser<'S', 'clock', 'bpm' | 'zeroBpm'>;
 }
 /** Nivåns kommando till kärnan: flagga tystnad till workern. */
 export interface LevelCmd { flagSlow(f: number): void }

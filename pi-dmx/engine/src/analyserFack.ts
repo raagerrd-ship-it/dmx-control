@@ -36,10 +36,22 @@ export interface AnalyserDetection { autoGainTarget: number; tauUp: number; tauD
 export interface Cfg { audio: { rate: number }; fft: { size: number; hop: number }; detection: AnalyserDetection; onset: { enhancements: boolean } }
 export type Role = 'all' | 'fast' | 'slow';
 
+// TRÅDARNA (steg 18): en tagg per fält = var fältet skrivs när analysatorn är delad. Anteckningar: docs/analysator/analyserFack.md
+/** S huvudtråden, L workern, IN huvudtråden före pushBig (recordet bär det till workern), UT workern (blocket bär det till huvudtråden), K konstruktorn. */
+export type Tag = 'S' | 'L' | 'IN' | 'UT' | 'K';
+export type Trad = 'S' | 'L';
+type Synlig = { S: 'S' | 'IN' | 'UT' | 'K'; L: 'L' | 'IN' | 'UT' | 'K' };
+type Fn<O> = { [K in keyof O]-?: O[K] extends (...a: never[]) => unknown ? K : never }[keyof O];
+/** Varje datafält har en tagg; ett inbäddat objekt har en tagg per fält. */
+type Taggat<O> = { readonly [K in Exclude<keyof O, Fn<O>>]: Tag | { readonly [k: string]: Tag } };
+
 // FACKEN. Startvärde = dagens startvärde (byte för byte).
 
 /** HOPPET: kärnans fält per hopp. Skrivkartan per tråd: docs/analysator/analyserFack.md. */
 export class HopOut {
+  static readonly TRAD = { role: 'K', bigOn: 'K', cfg: 'K', dtHop: 'K', hopMs: 'K', rms: 'IN', now: 'S', dt: 'S', nowWall: 'IN', gated: 'S',
+    kickFlux: 'S', energy: 'S', flux: 'S', level: 'S', lvlSmooth: 'IN', centSmooth: 'IN', body: 'UT', breaking: 'IN', kickHit: 'IN',
+    sec: 'IN', lvh: 'IN', conf: 'IN', bpm: 'IN' } as const satisfies Taggat<HopOut>;
   role: Role = 'all'; bigOn = false; cfg!: Cfg;   // skrivs en gång i Analysers konstruktor
   dtHop = 0; hopMs = 0.5;
   rms = 0.5; now = 0.5; dt = 0.5; nowWall = 0.5; gated = false;
@@ -51,11 +63,13 @@ export class HopOut {
 
 /** NIVÅN. intensity = förr hIntensity, inZone = förr levels.inZoneState. */
 export class LevelOut {
+  static readonly TRAD = { gain: 'S', envelope: 'S', activeMs: 'IN', silentMs: 'S', intensity: 'IN', levelCeil: 'L', inZone: 'S', gainLocked: 'S' } as const satisfies Taggat<LevelOut>;   // levelCeil/inZone: zoneStep i båda trådarna
   gain = 1; envelope!: number; activeMs = 0; silentMs = -0; intensity = 0.5; levelCeil = 0.5; inZone = false; gainLocked = false;
   constructor() { stabilise(this, ['activeMs']); }
 }
 /** SPEKTRUMET. Banden förblir Float32Array. sink = förr specSink. */
 export class SpectrumOut {
+  static readonly TRAD = { bandAbs: 'L', bandDbRaw: 'L', bandLvl: 'L', bandOn: 'L', fbOn: 'S', bassOnRing: 'L', bassOnN: 'L', bigN: 'L', bassOnPeaks: 'L', sink: 'S' } as const satisfies Taggat<SpectrumOut>;
   readonly bandAbs = new Float32Array(8); readonly bandDbRaw = new Float32Array(8);   // absolut magnitud före AGC, rå dB
   readonly bandLvl = new Float32Array(8); readonly bandOn = new Float32Array(8); readonly fbOn = new Float32Array(8);
   readonly bassOnRing = new Float32Array(BASSON_LEN); bassOnN = 0;
@@ -64,7 +78,8 @@ export class SpectrumOut {
 }
 /** KICKEN. kick = förr hKick, kickAt = förr hKickAt. */
 export class KickOut {
-  kick = false; kickAt = 0.5;
+  static readonly TRAD = { kick: 'IN', kickAt: 'S', beatAnchorMs: 'S', pendingKickMs: 'S', lastKick: 'S', kfPrev: 'S', kfPrev2: 'S', dbgKick: 'S', finns: 'K' } as const satisfies Taggat<KickOut>;
+  kick = false; kickAt = 0.5; finns = true;
   beatAnchorMs = 0; pendingKickMs = 0; lastKick = 0; kfPrev = 0; kfPrev2 = 0;
   dbgKick: { flux: number; thresh: number; med: number; mad: number; energy: number; gain: number; rms: number; env: number; locked: boolean } | null = null;
   constructor() { stabilise(this, ['pendingKickMs', 'kfPrev', 'kfPrev2', 'beatAnchorMs', 'lastKick']); }
@@ -72,6 +87,7 @@ export class KickOut {
 }
 /** KLOCKAN sedd av analysatorn: bpm/conf = förr localBpm/localBpmConfidence, phaseMs/phaseConf = gridfasen, src = förr beatSrc (samma objekt). */
 export class ClockOut {
+  static readonly TRAD = { bpm: 'IN', conf: 'IN', phaseMs: 'UT', phaseConf: 'UT', src: 'S' } as const satisfies Taggat<ClockOut>;
   bpm = 0; conf = 0; phaseMs = 0; phaseConf = 0;
   src!: { beat?: BeatGrid | null };
   constructor() { stabilise(this, ['conf']); }
@@ -81,40 +97,67 @@ export class ClockOut {
 
 /** SEKTIONEN: de 17 publicerade fälten (förr på Analyser). */
 export class SectionOut {
+  static readonly TRAD = { section: 'UT', sectionStartMs: 'UT', sectionIndex: 'UT', sectionTier: 'UT', prevSection: 'UT', levelVsHighDb: 'UT',
+    repeatSim: 'UT', repeatAgoMs: 'UT', repeatSection: 'UT', repeatTier: 'L', repeatHighAtMs: 'L', repeatHighEndAtMs: 'L',
+    expectHighMs: 'UT', expectSource: 'UT', secBuildAt: 'UT', secBuildSeen: 'UT', boundaryNov: 'L', finns: 'K' } as const satisfies Taggat<SectionOut>;
   section = 'intro'; sectionStartMs = 0; sectionIndex = 0; sectionTier = 1; prevSection = ''; levelVsHighDb = 0;
   repeatSim = 0; repeatAgoMs = 0; repeatSection = ''; repeatTier = -1; repeatHighAtMs = 0; repeatHighEndAtMs = 0;
-  expectHighMs = 0; expectSource = 0; secBuildAt = 0; secBuildSeen = 0; boundaryNov = 0;
+  expectHighMs = 0; expectSource = 0; secBuildAt = 0; secBuildSeen = 0; boundaryNov = 0; finns = true;
   constructor() { stabilise(this, ['expectHighMs', 'levelVsHighDb', 'sectionStartMs', 'secBuildAt', 'secBuildSeen', 'repeatSim', 'repeatAgoMs']); }
   neutral(): void { this.section = ''; }   // sektionen av: '' = okänd (sectionCode 0); 'intro' skulle ge drops lugn-veto
 }
 /** BASEN. bassline/onsetsPerBeat = förr profBassline/bassOnsetsPerBeat. */
 export class BassOut {
-  beHi = NaN; beRef = NaN; beShort = 0; energy = 0; bassline = 0; onsetsPerBeat = 0;
+  static readonly TRAD = { beHi: 'S', beRef: 'S', beShort: 'S', energy: 'S', bassline: 'L', onsetsPerBeat: 'L', finns: 'K' } as const satisfies Taggat<BassOut>;
+  beHi = NaN; beRef = NaN; beShort = 0; energy = 0; bassline = 0; onsetsPerBeat = 0; finns = true;
   constructor() { stabilise(this, ['bassline', 'onsetsPerBeat']); }
   neutral(): void { this.beHi = 0; this.beRef = 0; }   // basen av: bassLevel 1 i stället för NaN
 }
 /** UPPBYGGNADEN. inRiser = förr hInRiser. */
-export class RiserOut { buildUp = 0; inRiser = false; constructor() { stabilise(this, ['buildUp']); } }
+export class RiserOut {
+  static readonly TRAD = { buildUp: 'UT', inRiser: 'UT', finns: 'K' } as const satisfies Taggat<RiserOut>;
+  buildUp = 0; inRiser = false; finns = true; constructor() { stabilise(this, ['buildUp']); }
+}
 /** DROP. */
 export class DropOut {
+  static readonly TRAD = { dropCount: 'UT', miniDropCount: 'UT', buildStartCount: 'UT', dropCand: 'UT', secBodyRet: 'L', dropDemoted: 'UT', dropSpaced: 'UT',
+    dropRiseDb: 'UT', nearDropDb: 'UT', nearDipDb: 'UT', liftDb: 'UT', stopCount: 'UT', stopS: 'UT', lastDropMs: 'L', bodyUnderDb: 'UT', finns: 'K' } as const satisfies Taggat<DropOut>;
   dropCount = 0; miniDropCount = 0; buildStartCount = 0; dropCand = 0; secBodyRet = 0;
   dropDemoted = 0; dropSpaced = 0; dropRiseDb = -0; nearDropDb = -0; nearDipDb = -0; liftDb = -0; stopCount = 0; stopS = -0;
-  lastDropMs = -1.5e9; bodyUnderDb = 0;   // lastDropMs utanför Smi-intervallet
+  lastDropMs = -1.5e9; bodyUnderDb = 0; finns = true;   // lastDropMs utanför Smi-intervallet
   constructor() { stabilise(this, ['lastDropMs', 'dropRiseDb', 'nearDropDb', 'nearDipDb', 'liftDb', 'stopS']); }
 }
 /** KARAKTÄREN. profile = förr character.outProfile, ramens profile pekar hit. */
-export class CharacterOut { readonly profile = { punch: 0.4, bass: 0.5, bright: 0.3, beat: 0.5, bassline: 0 }; }
+export class CharacterOut {
+  static readonly TRAD = { profile: { punch: 'UT', bass: 'UT', bright: 'UT', beat: 'UT', bassline: 'UT' }, finns: 'K' } as const satisfies Taggat<CharacterOut>;
+  readonly profile = { punch: 0.4, bass: 0.5, bright: 0.3, beat: 0.5, bassline: 0 }; finns = true;
+}
 
-export interface Fack { hop: HopOut; level: LevelOut; spectrum: SpectrumOut; kick: KickOut; clock: ClockOut;
-  section: SectionOut; bass: BassOut; riser: RiserOut; drop: DropOut; character: CharacterOut }
+/** Registret: ett fack per sten. */
+export const FACK = { hop: HopOut, level: LevelOut, spectrum: SpectrumOut, kick: KickOut, clock: ClockOut,
+  section: SectionOut, bass: BassOut, riser: RiserOut, drop: DropOut, character: CharacterOut } as const;
+export type FackNamn = keyof typeof FACK;
+export type Fack = { [N in FackNamn]: InstanceType<(typeof FACK)[N]> };
 export function makeFack(wallNow: () => number): Fack {
   return { hop: new HopOut(wallNow), level: new LevelOut(), spectrum: new SpectrumOut(), kick: new KickOut(), clock: new ClockOut(),
     section: new SectionOut(), bass: new BassOut(), riser: new RiserOut(), drop: new DropOut(), character: new CharacterOut() };
 }
 
-/** EN AVSTÄNGD STEN: facket får sitt neutrala värde, och det syns i loggen. */
-export function off(name: string, fack?: { neutral(): void }): null {
-  fack?.neutral();
+type TagAv<N extends FackNamn> = (typeof FACK)[N]['TRAD'];
+type Har<V, G> = V extends string ? (V extends G ? 1 : 0) : V extends { readonly [k: string]: infer U } ? ([U] extends [G] ? 1 : 0) : 0;
+/** Fälten i fack N med en tagg ur G. */
+export type MedTag<N extends FackNamn, G> = { [K in keyof TagAv<N>]: Har<TagAv<N>[K], G> extends 1 ? K : never }[keyof TagAv<N>];
+/** Det en sten i tråden T får läsa i fack N: fälten med en synlig tagg, och fackets metoder. */
+export type Synliga<T extends Trad, N extends FackNamn> = (MedTag<N, Synlig[T]> | Fn<Fack[N]>) & keyof Fack[N];
+/** En stens läsning: `hop: Ser<'L', 'hop', 'dtHop' | 'bpm'>`. Ett fält som skrivs i den andra tråden ger tsc-fel på raden. */
+export type Ser<T extends Trad, N extends FackNamn, K extends Synliga<T, N>> = Readonly<Pick<Fack[N], K>>;
+
+/** EN AVSTÄNGD STEN: facket får sitt neutrala värde och finns = false; det syns i loggen och i ramens stenarAv. */
+export function off(name: string, fack: { finns: boolean; neutral?(): void }): null {
+  fack.neutral?.(); fack.finns = false;
   console.log(`[analysator] sten av: ${name}`);
   return null;
 }
+const STENAR = ['kick', 'bass', 'drop', 'riser', 'character', 'section'] as const;
+/** Ramens stenarAv: en bit per avstängd sten (1 kick, 2 bas, 4 drop, 8 uppbyggnad, 16 karaktär, 32 sektion). */
+export function stenarAv(f: Fack): number { let m = 0; for (let i = 0; i < STENAR.length; i++) if (!f[STENAR[i]].finns) m |= 1 << i; return m; }

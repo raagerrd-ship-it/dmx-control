@@ -1,15 +1,15 @@
 /**  KARAKTÄRSPROFILEN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserCharacter.md */
-import type { HopOut, SpectrumOut, BassOut, CharacterOut } from "./analyserFack.js";
+import type { Ser, CharacterOut } from "./analyserFack.js";
 import { BS_PUNCH, BS_BASS, BS_BRIGHT, BS_BEAT, BS_BASSLINE } from "./split.js";
 
 
 function cl01(x: number): number { return x < 0 ? 0 : x > 1 ? 1 : x; }
 
-/** DET KARAKTÄREN LÄSER. Inget annat går att nå. */
+/** DET KARAKTÄREN LÄSER (workern). Inget annat går att nå. */
 export interface CharacterReads {
-  hop:      Readonly<Pick<HopOut, 'kickHit' | 'conf'>>;
-  spectrum: Readonly<Pick<SpectrumOut, 'bandLvl' | 'bandOn'>>;
-  bass:     Readonly<Pick<BassOut, 'bassline'>>;
+  hop:      Ser<'L', 'hop', 'kickHit' | 'conf'>;
+  spectrum: Ser<'L', 'spectrum', 'bandLvl' | 'bandOn'>;
+  bass:     Ser<'L', 'bass', 'bassline'>;
 }
 
 export class CharacterProfile {

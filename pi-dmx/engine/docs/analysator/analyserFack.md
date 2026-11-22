@@ -193,3 +193,39 @@ hopprecordet skrivs: en sten i workern kan få dem samma hopp. Flytten kommutera
 dem skrivs mellan de två platserna (`setClock` kör före, i början av `process`; sektionen packas upp före, i `pullSlowState`; banden 0–1 skrivs av
 `fastBandStep`/`bigStep` före). Ingen läser basens fält däremellan (`pushBig` packar upp drop/uppbyggnad/karaktär, `slowPart` läser bara `bass.bassline`).
 Inget värde kommer senare: ramen läser samma tal på samma hopp. Mätt av h1 (hålets arena) 0 av 537 981 hopp, och av `bevis.sh` i steget.
+
+## Trådarna (steg 18a): en tagg per fält, läsningarna kontrolleras av tsc
+
+Varje fack har en rad `static readonly TRAD = { fält: 'tagg', … } as const satisfies Taggat<XOut>` bredvid fälten. Taggen säger var fältet
+skrivs när analysatorn är delad (huvudtråden `fast` + workern `slow`, med `bigOn` som i båda profilerna):
+
+| tagg | skrivs | syns för en sten i | korsar trådarna |
+|---|---|---|---|
+| `S` | huvudtråden | huvudtråden | nej |
+| `L` | workern | workern | nej |
+| `IN` | huvudtråden, färdigt före `pushBig` | båda (samma hopp) | hopprecordet (B), tempot recordet (R) |
+| `UT` | workern | båda (huvudtråden när blocket packats upp) | storblocket (BS), sektionen och tempot tillståndsblocket (S) |
+| `K` | konstruktorn | båda | nej (samma bygge i båda trådarna) |
+
+`BÅDA` (samma steg räknat i båda trådarna, hålets q1) finns inte: det vore två kopior av samma storhet. Odelat (`all`) kör allt i en tråd; taggarna gäller det delade läget.
+
+- `satisfies Taggat<XOut>`: ett nytt fält utan tagg, eller en tagg för ett fält som inte finns, ger tsc-fel. Metoder (`neutral`, `zeroBpm`) taggas inte och syns överallt.
+- Ett inbäddat objekt (`CharacterOut.profile`) har en tagg per fält i objektet.
+- Stenens läsning skrivs `Ser<tråd, fack, fält>` i dess `XReads` (förr `Readonly<Pick<XOut, …>>`): `hop: Ser<'L', 'hop', 'kickHit' | 'conf'>`.
+  Ett fält som inte syns i tråden ger `TS2344 … does not satisfy the constraint` med listan över det som syns. En sten med metoder i båda trådarna
+  (basen, nivån, spektrumet, sektionen) har en `Ser` per tråd på samma rad (`Ser<'S', …> & Ser<'L', …>`); kommentaren över `XReads` säger vilka metoder som kör var.
+- Kärnan (`analyser.ts`) läser facken direkt och kontrolleras inte av taggarna.
+
+Kända avvikelser i dagens kod (inte ändrade):
+- `level.levelCeil` och `level.inZone` räknas av `zoneStep` i båda trådarna ur `lvlSmooth` (IN). Taggen säger var en sten läser dem: `levelCeil` `L`
+  (uppbyggnaden i workern), `inZone` `S` (ramen). Att i stället bära taggen `IN` med transport vore samma tal men ett annat omstartsbeteende (workerns kopia
+  börjar om vid omstart), så det är inte byte-identiskt mot `omstart.mjs`.
+- Grenarna utan `bigOn` (`SECTION_AGG=env`, `FAST_BANDS=0`) följer inte taggarna (där kör stor-FFT:n i huvudtråden). De tas bort i steg 19.
+
+## Borttagen sten syns (steg 18a): `finns` och `stenarAv`
+
+- De sex avstängbara stenarnas fack (`kick`, `bass`, `drop`, `riser`, `character`, `section`) har `finns = true` (tagg `K`).
+- `off(namn, this.f.<fack>)` tar nu alltid facket: kör `neutral()` om det finns, sätter `finns = false` och loggar `[analysator] sten av: <namn>`.
+- Ramen har `stenarAv` (skrivs en gång i konstruktorn, 0 per hopp): en bit per avstängd sten, 1 kick, 2 bas, 4 drop, 8 uppbyggnad, 16 karaktär, 32 sektion.
+  Ett 0 i ett ramfält betyder "stenen säger 0" när biten är 0, och "ingen sten" när den är satt.
+- En sten som måste skilja de två fallen läser `<fack>.finns` (tagg `K`, syns i båda trådarna).

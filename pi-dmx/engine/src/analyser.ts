@@ -1,6 +1,6 @@
 /** ENAD ANALYSATOR (2026-09-24) — en fil, samma byte i lotus-light-link (pi/src/audio-analyser/) och dmx-control (pi-dmx/engine/src/). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyser.md */
 
-import { sysEnv, stabilise, makeFack, off, type Fack, BODY_CEIL_DB_S, BE_FALLBACK_MS, BASS_SPAN_DB, BIG_EVERY, SECTION_AGG_HOP,
+import { sysEnv, stabilise, makeFack, off, stenarAv, type Fack, BODY_CEIL_DB_S, BE_FALLBACK_MS, BASS_SPAN_DB, BIG_EVERY, SECTION_AGG_HOP,
   type BeatGrid, type AnalyserDetection, type Cfg, type Role } from './analyserFack.js';
 export { BASS_SPAN_DB, SECTION_AGG_HOP, BODY_CEIL_DB_S };
 export type { BeatGrid, AnalyserDetection, Cfg, Role };
@@ -120,6 +120,7 @@ export interface Frame {
   midHiDb: number;   // ABSOLUT mid+diskant-niva i dB
   onset: Spectrum;   // per-band ONSET/anslag
   drum: { kick: number; snare: number; hat: number; bass: number };   // TRUM-KIT-envelopes
+  stenarAv: number;   // en bit per avstängd sten (analyserFack.ts stenarAv)
 }
 
 const DOUBLE_FROM_START = [
@@ -591,7 +592,7 @@ export class Analyser {
       kick: false, gain: 1, bpm: 0, bpmConfidence: 0, intensity: 0.5,
       dropCount: 0, miniDropCount: 0, buildStartCount: 0, dropDemoted: 0, dropSpaced: 0, dropRiseDb: 0, nearDropDb: 0, nearDipDb: 0, liftDb: 0, stopCount: 0, stopS: 0, bodyDb: 0, bassEnergy: 0, bassEnergyShort: 0, bassLevel: 1, midHiDb: -120, inZone: false, breaking: false, buildUp: 0, buildProg: 0, inRiser: false, profile: this.f.character.profile, beatAnchorMs: 0,
       kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, repeatSection: '', expectHighInMs: -1, prevSection: '', levelVsHighDb: 0, sectionBars: 0,
-      spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum,
+      spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum, stenarAv: stenarAv(this.f),
     };
     for (const o of [this.outFrame, this.f.character.profile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum]) stabiliseNumbers(o);
     stabilise(this, DOUBLE_FROM_START);
@@ -823,7 +824,7 @@ export class Analyser {
   readonly clockOut: ClockCfg = { beat: undefined, beatErr: undefined };
   /** Klockans utfall till motorn. */
   publishClock(cfg: ClockCfg): void { cfg.beat = this.clockOut.beat; cfg.beatErr = this.clockOut.beatErr; }
-  // KEDJAN. Stäng av en sten = byt dess rad mot off('namn') (facket med neutral(): off('sektion', this.f.section)).
+  // KEDJAN. Stäng av en sten = byt dess rad mot off('namn', this.f.<fack>) (t.ex. off('sektion', this.f.section)).
   readonly drop: DropDetector | null = new DropDetector(this.f, this.f.drop);   // DROP: flanken, slam-kandidaten, minidrop, lyft/nästan-drop/stopp
   readonly sections: SectionTracker | null = new SectionTracker(this.f, this.f.section);   // SEKTIONER
   readonly riser: RiserDetector | null = new RiserDetector(this.f, this.f.riser);   // UPPBYGGNAD

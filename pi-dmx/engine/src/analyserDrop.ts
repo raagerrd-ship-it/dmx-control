@@ -1,6 +1,6 @@
 /**  DROP-DETEKTORN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserDrop.md */
 import { env, sysEnv, stabilise, BODY_CEIL_DB_S, BODY_HIGH_MS, BODY_HIGH_DB,
-  type HopOut, type SpectrumOut, type LevelOut, type RiserOut, type DropOut } from "./analyserFack.js";
+  type Ser, type DropOut } from "./analyserFack.js";
 import { BS_DROPS, BS_MINI, BS_BUILDSTART, BS_CAND, BS_UNDER, BS_DEMOTED, BS_SPACED, BS_DROPRISE,
   BS_NEAR, BS_NEARDIP, BS_LIFT, BS_STOPS, BS_STOPSEC } from "./split.js";
 
@@ -36,12 +36,12 @@ const SHOW_DROP_GAP_MS = 12000;   // spärr mellan full drops
 const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;   // LYFT/NÄSTAN-DROP/STOPP
 const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdGone', 'fdSpan', 'fdEnd', 'fdAt', 'fdQuietAt', 'lastShowDropMs', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'hiFast', 'hiNorm'] as const;   // Talfält som ska vara flyttal från start
 
-/** DET DROP LÄSER. Inget annat går att nå. */
+/** DET DROP LÄSER (workern). Inget annat går att nå. */
 export interface DropReads {
-  hop:      Readonly<Pick<HopOut, 'dtHop' | 'nowWall' | 'body' | 'lvlSmooth' | 'sec' | 'lvh' | 'wallNow'>>;
-  spectrum: Readonly<Pick<SpectrumOut, 'bandDbRaw'>>;
-  level:    Readonly<Pick<LevelOut, 'activeMs'>>;
-  riser:    Readonly<Pick<RiserOut, 'buildUp'>>;
+  hop:      Ser<'L', 'hop', 'dtHop' | 'nowWall' | 'body' | 'lvlSmooth' | 'sec' | 'lvh' | 'wallNow'>;
+  spectrum: Ser<'L', 'spectrum', 'bandDbRaw'>;
+  level:    Ser<'L', 'level', 'activeMs'>;
+  riser:    Ser<'L', 'riser', 'buildUp'>;
 }
 
 export class DropDetector {

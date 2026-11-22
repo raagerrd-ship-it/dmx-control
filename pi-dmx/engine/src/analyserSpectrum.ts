@@ -1,5 +1,5 @@
 /**  SPEKTRUM (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserSpectrum.md */
-import { BIG_EVERY, BASSON_LEN, SECTION_AGG_HOP, type HopOut, type LevelOut, type SpectrumOut } from "./analyserFack.js";
+import { BIG_EVERY, BASSON_LEN, SECTION_AGG_HOP, type Ser, type SpectrumOut } from "./analyserFack.js";
 import { SPEC_SLOTS, SPEC_MAX, BS_SPEC_N } from './split.js';
 import FFT from "fft.js";
 
@@ -7,8 +7,8 @@ const PEAK_DECAY = Math.pow(0.9993, BIG_EVERY);   // bandPeak-decay per stor-FFT
 
 /** DET SPEKTRUMET LÄSER. Inget annat går att nå. */
 export interface SpectrumReads {
-  hop:   Readonly<Pick<HopOut, 'lvlSmooth' | 'gated' | 'cfg' | 'bigOn'>>;
-  level: Readonly<Pick<LevelOut, 'activeMs'>>;
+  hop:   Ser<'S', 'hop', 'gated' | 'lvlSmooth'> & Ser<'L', 'hop', 'lvlSmooth' | 'cfg' | 'bigOn'>;   // S = fastBandStep, L = bigStep
+  level: Ser<'L', 'level', 'activeMs'>;
 }
 
 export class SpectrumBands {
