@@ -591,7 +591,7 @@ På raden: taket haller latens loud-referens lange
 På raden: sliding FFT window
 
 
-### prevMag
+### prevMag (borta steg 28, se analyserFack.md)
 
 På raden: transformed magnitude from the previous hop
 
@@ -620,7 +620,7 @@ På raden: fönstrad tidssignal (scratch)
 På raden: fft.js komplex-spektrum (scratch)
 
 
-### mag512
+### mag512 (borta steg 28, se analyserFack.md)
 
 På raden: magnitud denna hop (swap:as med prevMag)
 
@@ -692,7 +692,7 @@ På raden: kor stor-FFT var N:e hop → analysen ryms i realtid
 På raden:  Valfri avlyssnare på den stora magnituden (låtminnets fingeravtryck).
 
 
-### ENV_LEN
+### ENV_LEN (borta steg 28, se analyserFack.md)
 
 ```text
  Onset-ringens langd i sekunder x 100 Hz. Env LOTUS_TEMPO_ENV_S bara for korbanken (bench.mjs) - 5 s ar driftvardet.
@@ -840,7 +840,7 @@ Sektionsminne (se Frame.expectHighInMs): logg over avslutade sektioner + forutsa
  Matchat parti: tier med dagens rankning (-1 = inget), och nar 'high' vantas om det forflutna upprepas (absolut tid, 0 = ingen).
 ```
 
-### dbgPhase
+### dbgPhase (borta steg 28, se analyserFack.md)
 
 ```text
  Korbanks-telemetri for gridfasen: vald fas mot motfas per band.
@@ -957,31 +957,31 @@ På raden: fast: vänta på workern efter varje record; slow: notify efter publi
  Korbank: tempogrammets argmax-lag och sokfonster i senaste anropet.
 ```
 
-### tempoShifts
+### tempoShifts (borta steg 28, se analyserFack.md)
 
 ```text
  Telemetri: antal tempovaxlingar (TEMPO_SHIFT).
 ```
 
-### evidenceRelocks
+### evidenceRelocks (borta steg 28, se analyserFack.md)
 
 ```text
  Antal evidensomlasningar (telemetri/korbank) + lasets senaste slagpoang.
 ```
 
-### evidenceScore
+### evidenceScore (borta steg 28, se analyserFack.md)
 
 ```text
  Senaste evidensvalets telemetri: vald kandidats slagpoang, halvslagskvot, antal kandidater, tvaans poang.
 ```
 
-### rawBpmLast
+### rawBpmLast (borta steg 28, se analyserFack.md)
 
 ```text
  Senaste RA-estimatet (vikt till 80..160) fore las/median - for korbanken.
 ```
 
-### debugCandidates()
+### debugCandidates() (borta steg 28, se analyserFack.md)
 
 ```text
  Korbank: kandidaterna fran senaste evidensvalet.
@@ -1004,7 +1004,7 @@ Förberäknade EMA-alfor / decay-faktorer (fasta dtHop + fasta tidskonstanter).
  BASBANDETS onset-envelope (kick-flux), samma raster och position som envRing.
 ```
 
-### tempoGram
+### tempoGram (borta steg 28, se analyserFack.md)
 
 ```text
  Ackumulerat tempogram (EMA av hela lag-kurvan mellan anrop).
@@ -1021,7 +1021,7 @@ På raden: brusgrinden för hoppet (process)
  Släckgränsen live (index.ts, /setup-ratten cfg.silenceLevel).
 ```
 
-### lagBounds
+### lagBounds (borta steg 28, se analyserFack.md)
 
 ```text
  Tempogrammets lagfonster i senaste anropet (diagnostik).

@@ -39,8 +39,8 @@ export function seqLow(seq: number): number { return seq | 0; }
 /** Signerad skillnad. */
 export function seqDelta(ctrlLow: number, mySeq: number): number { return (ctrlLow - (mySeq | 0)) | 0; }
 
-export const S_REC_SEQ = 0, S_BPM = 1, S_CONF = 2, S_BPMF = 3, S_PROCESSED = 4, S_LAG_MS = 5, S_LAG_MAX = 6,
-  S_BUSY_US = 7, S_BUSY_MAX_US = 8, S_SKIPPED = 9, S_LOST_FLAGS = 10;   // Tillståndsblock (kärnan)
+export const S_REC_SEQ = 0, S_BPM = 1, S_CONF = 2, S_PROCESSED = 4, S_LAG_MS = 5, S_LAG_MAX = 6,
+  S_BUSY_US = 7, S_BUSY_MAX_US = 8, S_SKIPPED = 9, S_LOST_FLAGS = 10;   // Tillståndsblock (kärnan; 3 ledig)
 
 export const SECTIONS = ['', 'intro', 'low', 'build', 'high', 'break'];
 export function sectionCode(s: string): number { const i = SECTIONS.indexOf(s); return i < 0 ? 0 : i; }

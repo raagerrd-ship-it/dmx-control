@@ -8,7 +8,7 @@ import {
   REC_LEN, RING_N, R_SEQ, R_PERF, R_WALL, R_FLAGS, R_HINT_MS, R_VCLOCK, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, B, BS, S, R,
   packFlagCounts, lostFlags, seqLow, seqDelta, C_WAITING, C_STATE_SEQ, S_LOST_FLAGS,
   F_SIL350, F_SIL10, F_RESET_TEMPO, F_HINT, F_RESET_BAR, F_VCLOCK_SET, F_VCLOCK_NULL,
-  C_WRITE, C_READ, S_REC_SEQ, S_BPM, S_CONF, S_BPMF, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
+  C_WRITE, C_READ, S_REC_SEQ, S_BPM, S_CONF, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
   SECTIONS, sectionCode, viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader, type HopFeed,
   R_BIGSEQ, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N,
@@ -126,7 +126,6 @@ export interface Frame {
 const DOUBLE_FROM_START = [
   'lastT', 'tickT',
   'lvlVU',
-  'rawBpmLast',
 ] as const;   // Instansfalt som MATT
 /** TYPSTABILA TALFALT. */
 function stabiliseNumbers(o: object): void {
@@ -152,12 +151,10 @@ export class Analyser {
   private static readonly FB_TAU_MS = [12, 6, 3];
   setSpectrumSink(fn: ((mag: Float32Array, binHz: number) => void) | null): void { this.f.spectrum.sink = fn; }
   private static readonly ENV_HZ = 100;
-  private static readonly ENV_LEN = 100 * Math.max(3, Math.min(20, Number(sysEnv('TEMPO_ENV_S')) || 5));   // Onset-ringens langd i sekunder x 100 Hz
 
 
   private static readonly GRID_PHASE_OFFSET_MS = Number(sysEnv('GRID_PHASE_OFFSET_MS')) || 0;   // Fasval
 
-  dbgPhase = { conf: 0, bassOn: 0, bassAnti: 0, fullOn: 0, fullAnti: 0, bestPh: 0, nPh: 0, pending: 0 };   // Korbanks-telemetri for gridfasen
   private tickT = 0;   // 100 Hz-steget
   private splitCtrl: Int32Array | null = null; private splitRing: Float64Array | null = null; private splitState: Float64Array | null = null;
   private stateCopy = new Float64Array(STATE_LEN); private stateRd = new StateReader();   // a7: kopian bara när blocket ändrats
@@ -177,30 +174,12 @@ export class Analyser {
   private bigEnvFlag = 0;
   bigYield: (() => void) | null = null;   // PI:NS VERKLIGHET
   private slowBusyEmaUs = 0; private slowBusyMaxUs = 0; private slowLagMaxMs = 0; private slowSkipped = 0; private slowProcessed = 0;
-  dbgBestLag = 0; dbgLagMin = 0; dbgLagMax = 0; dbgTgAt = (lag: number): number => this.tempoGram[lag] ?? 0;
-  evidRelockVotes = 0;
-  tempoShifts = 0;   // Telemetri
- private localBpmF = 0;
-  evidenceRelocks = 0; evidenceLockScore = 0;   // Antal evidensomlasningar
-  private candLag = new Int32Array(12); private candVal = new Float32Array(12); private candScore = new Float32Array(12); private candHalf = new Float32Array(12); private candHit = new Float32Array(12);
-  evidenceScore = 0; evidenceHalf = 0; evidenceCands = 0; evidenceSecond = 0;   // Senaste evidensvalets telemetri
-  rawBpmLast = 0;   // Senaste RA-estimatet
-  /** Korbank. */
-  debugCandidates(): Array<{ lag: number; bpm: number; tg: number; score: number; half: number; hit: number }> {
-    const out: Array<{ lag: number; bpm: number; tg: number; score: number; half: number; hit: number }> = []; for (let i = 0; i < this.evidenceCands; i++) out.push({ lag: this.candLag[i], bpm: Math.round(Analyser.ENV_HZ * 60 / this.candLag[i] * 10) / 10, tg: this.candVal[i], score: this.candScore[i], half: this.candHalf[i], hit: this.candHit[i] });
-    return out;
-  }
 
   private aVU = 0;
   private dKick = 0;
-  private tempoGram = new Float32Array(Analyser.ENV_LEN);   // Ackumulerat tempogram
   private silenceLevel = SILENCE_LEVEL;
   /** Släckgränsen live. */
   setSilenceLevel(v: number | undefined): void { this.silenceLevel = silenceLevelLive = v ?? SILENCE_LEVEL; }
-  private diagLagMin = 0; private diagLagMax = 0;
-  /** Tempogrammets lagfonster i senaste anropet. */
-  get lagBounds(): [number, number] { return [this.diagLagMin, this.diagLagMax]; }
-  get tempoGramSnapshot(): Float32Array { return this.tempoGram; }
   private lvlVU = 0;
 
 
@@ -292,7 +271,7 @@ export class Analyser {
       this.slowProcessed += n;
       Atomics.store(ctrl, C_READ, seqLow(this.recSeq));
       stateWrite(ctrl, this.splitState!, (s) => {
-        s[S_REC_SEQ] = this.recSeq; s[S_BPM] = this.f.clock.bpm; s[S_CONF] = this.f.clock.conf; s[S_BPMF] = this.localBpmF;
+        s[S_REC_SEQ] = this.recSeq; s[S_BPM] = this.f.clock.bpm; s[S_CONF] = this.f.clock.conf;
         s[Sc.phaseMs] = this.f.clock.phaseMs; s[Sc.phaseConf] = this.f.clock.phaseConf;
         this.sections?.pack(s);
         s[S_PROCESSED] = this.slowProcessed; s[S_LAG_MS] = lagMs; s[S_LAG_MAX] = this.slowLagMaxMs; s[S_BUSY_US] = this.slowBusyEmaUs; s[S_BUSY_MAX_US] = this.slowBusyMaxUs; s[S_SKIPPED] = this.slowSkipped; s[S_LOST_FLAGS] = this.slowLostFlags;

@@ -33,10 +33,10 @@ Ett anrop per hopp, `fft.hopStep(samples)`, först i `process` (huvudtråden; wo
 Anropas i Analysers konstruktor när `cfg` och `dtHop` finns. `fbTop` = spektrumets högsta snabba bin + 1 (`bands.fbHi[7] + 1`), så
 FFT:n räknar magnitud bara så långt någon läser. Växer `fft.size` över 512 görs `fbMag`/`fbPrevMag` större (som förr i kärnan).
 
-## Döda rester (kandidat, inte rörda)
+## Döda rester borta (steg 28)
 
-`mag512`/`prevMag` skrivs varje hopp men läses aldrig (byts bara). `onsetPeakDecay` är alltid 0, så `onsetPeak` blir bara hoppets egen
-topp med `onsetEnhancements`. Kvar för att flytten ska vara en ren flytt.
+`mag512`/`prevMag` skrevs varje hopp men lästes aldrig: borta. `onsetPeakDecay` var alltid 0, så toppen var bara hoppets eget värde:
+`onsetPeak` och `onsetPeakDecay` borta, anslaget är `compressed / max(0,05, compressed)` (samma tal, byte-identiskt bevisat).
 
 ## Anteckningarna som stod i koden (fälten)
 

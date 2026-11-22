@@ -24,14 +24,10 @@ export class SmallFft {
   private fft!: FFT;
   private window!: Float32Array;
   private buffer!: Float32Array;   // glidande fönster
-  private prevMag!: Float32Array;
-  private onsetPeak!: Float32Array;   // per bin
   private onsetPrev!: Float32Array;
   private onsetPeakReady = false;
-  private onsetPeakDecay = 0;
   private windowed512!: Float32Array;   // scratch
   private spectrum512!: number[];
-  private mag512!: Float32Array;
   private sumSq = 0;   // löpande kvadratsumma över fönstret
   private rmsRecalc = 0;
   private fbMax = 0;   // spektrumets högsta snabba bin + 1
@@ -43,12 +39,9 @@ export class SmallFft {
     this.fft = new FFT(n);
     this.window = hannWindow(n);
     this.buffer = new Float32Array(n);
-    this.prevMag = new Float32Array(half);
-    this.onsetPeak = new Float32Array(half);
     this.onsetPrev = new Float32Array(half);
     this.windowed512 = new Float32Array(n);
     this.spectrum512 = this.fft.createComplexArray();
-    this.mag512 = new Float32Array(half);
     this.fbMax = Math.min(half, fbTop);
     if (this.o.fbMag.length < half) { this.o.fbMag = new Float32Array(half); this.o.fbPrevMag = new Float32Array(half); }
     this.aAtt = 1 - Math.exp(-dtHop / 0.015);
@@ -77,7 +70,6 @@ export class SmallFft {
     this.fft.realTransform(spectrum, windowed);
 
     const half = this.h.cfg.fft.size / 2;
-    const mag = this.mag512;
     let bassEnergy = 0;
     let flux = 0;
     let kickFlux = 0;
@@ -88,7 +80,7 @@ export class SmallFft {
 
     { const t = o.fbPrevMag; o.fbPrevMag = o.fbMag; o.fbMag = t; }   // spektrumets snabba band läser fbMag (nu) och fbPrevMag (förra hoppet)
     const fbMax = this.fbMax, fbMag = o.fbMag;
-    const onsetPeak = this.onsetPeak, onsetPrev = this.onsetPrev, peakDecay = this.onsetPeakDecay, peakReady = this.onsetPeakReady, PFLOOR = SmallFft.ONSET_PEAK_FLOOR;
+    const onsetPrev = this.onsetPrev, peakReady = this.onsetPeakReady, PFLOOR = SmallFft.ONSET_PEAK_FLOOR;
     for (let i = 0; i < bassBins; i++) {
       const re = spectrum[2 * i];
       const im = spectrum[2 * i + 1];
@@ -98,12 +90,8 @@ export class SmallFft {
       let onsetMag = m;
       if (enhancedOnset) {
         const compressed = Math.log1p(m);
-        let peak = onsetPeak[i] * peakDecay;
-        if (compressed > peak) peak = compressed;
-        onsetPeak[i] = peak;
-        onsetMag = peakReady ? compressed / Math.max(PFLOOR, peak) : 0;
+        onsetMag = peakReady ? compressed / Math.max(PFLOOR, compressed) : 0;   // toppen = hoppets eget värde
       }
-      mag[i] = m;
       const dd = onsetMag - onsetPrev[i];
       onsetPrev[i] = onsetMag;
       if (dd > 0) { flux += dd; if (i < kickBins) kickFlux += dd; }
@@ -121,11 +109,6 @@ export class SmallFft {
       powSum += p; powW += i * p;
     }
     this.onsetPeakReady = true;
-    if (enhancedOnset) {
-      for (let i = 0; i < bassBins; i++) this.prevMag[i] = this.onsetPrev[i];
-    }
-
-    { const t = this.prevMag; this.prevMag = this.mag512; this.mag512 = t; }
     const energy = Math.min(1, (bassEnergy / bassBins) * 0.02 * this.lv.gain);
     const centroid = powSum > 1e-12 ? Math.min(1, Math.sqrt(1.47 * (powW / powSum) / half)) : 0;
     o.flux = Math.min(1, flux * (enhancedOnset ? 0.08 : 0.005));
