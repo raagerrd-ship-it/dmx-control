@@ -1100,7 +1100,7 @@ export class EffectEngine {
         k[DK.TRAFF] = dropHit;                                                    // analysatorns drop, denna ruta
         k[DK.ENERGI] = !!this.cfg.energyDrivesMode;                               // energin får driva (inte chill)
         k[DK.HALLEN] = held > MIN_HOLD;                                           // looken hållen 8 s
-        k[DK.EJ_BASSTARK] = !this.bassStrong(this.smartMode);                     // looken är ingen droplook (build-lookerna är aldrig basstarka)
+        k[DK.EJ_BASSTARK] = !this.bassStrong(this.smartMode) || DROP_GLES.includes(this.smartMode);   // looken är ingen droplook: inte basstark (build-lookerna är det aldrig) eller gles (steg 51)
         k[DK.NY_DEL] = liveSecChanged;                                            // sektionen bytte, denna ruta
         k[DK.REFRANG] = liveSec === 'high';
         k[DK.DROP_NYSS] = nowWall - this.anaDropAt < 2000;                        // analysatorns drop som blev minidrop, hålls 2 s (ladan 11-01 17:48)
