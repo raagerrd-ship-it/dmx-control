@@ -429,3 +429,20 @@ Vid `const sp = this.a.secSpecHop;`:
 bandDbRaw ändras bara i bigStep (var BIG_EVERY:e hop): potensen räknas om då, samma värden (a7/a8)
 ```
 
+
+### carry()
+
+```text
+ Låtgränsen (hintTrackChange): SECTION_CARRY block bärs över, annars nollning.
+```
+Vid `const N = SECTION_CARRY, del = this.o.section;`:
+
+```text
+INGEN EGEN INTRO-GRÄNS (SEKTION2 varv 4, 2026-11-23): DMX:s låtgräns kommer ~8 s efter skarven (boundaryDetector) och ofta mitt i en
+mix. Förr satte nollningen 'intro' direkt och uppehållet (8 s) gav sedan intro -> low/high: två gränser per låtbyte som inte låg i
+musiken (55 av 242 gränser i de fem facit-filerna rörde intro). En del som inte är high behåller nu sin etikett över gränsen och nya
+låtens rang tar nästa gräns; high -> intro som förr (lotus låtbyte kommer på skarven, då ska refrängen släppa). Effekternas
+softenRange bär redan looken tills sektionen byts. Mätt (.arena/sektion2/status.md): gränser 3,59 -> 3,23/min, vid ägarens
+märken 55 -> 59 %, latens upp/ner 0 senare, ägarens låtbyten oförändrat (median -0,3 s), lookbyten 2,72 -> 2,62/min,
+ljus -0,6 / +1,2, high/inte high och lastHighDb identiska i alla 6250 block.
+```

@@ -407,7 +407,7 @@ export class SectionTracker {
 
   /** Låtgränsen (hintTrackChange): SECTION_CARRY block bärs över, annars nollning. */
   carry(): void {
-      const N = SECTION_CARRY;
+      const N = SECTION_CARRY, del = this.o.section;   // en del som inte är high behåller etiketten över låtgränsen
       if (N > 0) {
         const keep = <T>(x: T[]) => x.slice(Math.max(0, x.length - N)); const H = this.secBlkH;
         const c = [keep(this.secBlkDb), keep(this.secBlkDens), keep(this.secBlkCentH), keep(this.secBlkHighH), keep(this.secBlkT), keep(this.secBlkFeat), keep(this.secBlkHi), keep(H.bon), keep(H.bpk), keep(H.high), keep(H.flat), keep(H.flux), keep(H.dyn)];
@@ -417,5 +417,6 @@ export class SectionTracker {
         put(this.secBlkDb, c[0] as number[]); put(this.secBlkDens, c[1] as number[]); put(this.secBlkCentH, c[2] as number[]); put(this.secBlkHighH, c[3] as number[]); put(this.secBlkT, c[4] as number[]); put(this.secBlkFeat, c[5] as Float32Array[]); put(this.secBlkHi, c[6] as number[]);
         put(H.bon, c[7] as number[]); put(H.bpk, c[8] as number[]); put(H.high, c[9] as number[]); put(H.flat, c[10] as number[]); put(H.flux, c[11] as number[]); put(H.dyn, c[12] as number[]);
       } else this.sectionReset();
+      if (del !== 'high') this.o.section = del;
   }
 }
