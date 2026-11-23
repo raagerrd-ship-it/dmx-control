@@ -510,7 +510,7 @@ hålls är händelsen avgjord som förut: DISKANT -> `dropDemoted`, SPARR -> `dr
 | AKTIV | musik i > 2 s | 30 s (tystnaden i breaket nollar activeMs) | mini + drop |
 | UNDER | >= 1,5 dB under sega toppen (DROP_UNDERPEAK_MIN) | 0 | mini + drop |
 | SVACKA | toppen >= 6 dB under taket i >= 2 s, ELLER UPPBYGGNADEN: diskanten (2 s) >= 5 dB över sitt 30 s-medel OCH >= 2 dB över sitt 6 s-medel (`hiMid`) med obruten bas >= 5 s (steg 37) | 3 s (fillet/luckan före landningen) | drop |
-| LANDNING | baskroppen inom 1,5 dB från taket | 0 | drop |
+| LANDNING | ANSLAGET (steg 46): den råa baskroppen (stor-FFT:n, utan 60 ms-enveloppen) inom 0,5 dB från taket i 20 ms (`LAND_RAW_DB`, `LAND_RAW_MS`); förr 60 ms-enveloppen inom 1,5 dB | 0 | drop |
 | STIGNING | >= 12 dB över 0,5 s-minimum | 0 | bara i ramen |
 | LJUD | breaket inte helt tyst | 0 | drop (veto) |
 | DISKANT | diskanten (2 s) >= sitt 30 s-medel | 0 | drop (veto) |
@@ -558,3 +558,13 @@ ljusdomaren v3 övning +0,0, kontroll +5,2.
   godkänt av ägaren: "falska drop stör inte i ladan"), dropdom3 52,8 -> 52,6; minidrop lika. Prov som föll: inRiser direkt i SVACKA (33 falska), tröskel 0,2
   (17 falska), 0,3 (räddar inget), DISKANT-vetot släppt efter uppbyggnad (41 falska). De DISKANT-vetade dropen (151659 44, 172432 107, 171840 49, 193040 91)
   har ingen uppbyggnad före (uppbyggnaden kräver själv DISKANT).
+- Steg 46 INLAGT (ögonprovet 11-23, ägaren: "en halv/hel takt sent", "hellre fler snabba minidrop än sega riktiga DROP"): LANDNING på anslaget.
+  Förr väntade dörren tills 60 ms-enveloppen nått taket - från ett 25 dB-hål tar det 100-190 ms (exponentiell ansats), ibland en halv takt om basen
+  kommer i två steg (172432 166: +423 ms). Den råa baskroppen når taket vid ägarens märke (-5..+13 ms i 172432); 20 ms obruten krävs, annars öppnar en
+  kort upptaktston (193040 147/190/219: en basstöt 0,9 s före, rå 22,9 mot taket 24,2) dörren för tidigt. Den gamla enveloppvägen finns inte kvar:
+  en sen landning blir ingen drop - minidroppen har redan kommit (LYFT+HOGT, ~+30 ms). Sonden och simuleringen: `.arena/ogonprov1123/` (probe.mjs,
+  ana1-3.py, sim1.py). Mätt (dom.py, 3 starter, mot steg 45): övning tidsfel median +125 -> +52 ms, > 100 ms sent 73 -> 29 %, rätt 15 -> 14 av 23
+  (172432 166 blir minidrop +30 ms), falska 9 = 9; kontroll +105 -> +46 ms, > 100 ms sent 50 -> 0 %, rätt 6 = 6, falska 2,3 -> 3,0 (193040 279 vers: förr
+  minidrop på samma hopp); minidrop som kom före droppen i samma lucka försvinner (dropen kommer samma hopp). Prov som föll: rå utan hålltid (kontroll
+  3/11, för tidigt på upptakten), råa LYFT/HOGT också (fler för tidiga), 40 ms (falska upp). Ljusdomaren övning +2,4, kontroll +1,9 (lampspridningen
+  info enligt ägaren; t90 l193818 30 -> 50 bara i start 0, 3 starter 30/30/10 -> 50/30/10).

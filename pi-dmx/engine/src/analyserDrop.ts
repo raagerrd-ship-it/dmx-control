@@ -29,7 +29,8 @@ const HI_VETO_DB = 0;   // diskanten (band 6, 2 s) minst så här mot sitt 30 s-
 const DROP_SHORT_MS = 4000;   // minsta drop-avstand nar dropen ESKALERAR
 const DROP_LONG_MS = 20000;   // annars maste sa har lang tid ga
 const DROP_ESCALATE_DB = 3;   // tatare drops maste vara TYDLIGT starkare for att fyra
-const FLANK_GONE_DB = 10, FLANK_LAND_DB = 1.5, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6;   // FLANKENS FILTER
+const FLANK_GONE_DB = 10, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6;   // FLANKENS FILTER
+const LAND_RAW_DB = 0.5, LAND_RAW_MS = 20;   // LANDNING på anslaget: råa baskroppen (stor-FFT:n, utan 60 ms-enveloppen) inom 0,5 dB från taket i 20 ms
 const FLANK_SILENT_LV = 0.005, SVACKA_DB = 6, SVACKA_S = 2;   // SVACKAN: toppen >= SVACKA_DB under taket i >= SVACKA_S
 const BUILD_SPACING_MS = 3000;   // UPPBYGGNADEN börjar när basen dras ur (kick-luckan), högst en gång per 3 s
 const TOPP_DB = 5;   // taket (0,15 dB/s) högst så här under sega toppen (0,04 dB/s)
@@ -48,7 +49,7 @@ const HOLD_MS = [
   30000,                 // AKTIV     musik i > 2 s (hålls över breaket: tystnaden i breaket nollar activeMs)
   0,                     // UNDER     inte i taket: >= DROP_UNDERPEAK_MIN under sega toppen
   3000,                  // SVACKA    breaket: toppen >= SVACKA_DB under taket i >= SVACKA_S, ELLER uppbyggnaden (diskanten stiger över obruten bas) (hålls 3 s: fillet/luckan före landningen)
-  0,                     // LANDNING  baskroppen inom FLANK_LAND_DB från taket
+  0,                     // LANDNING  anslaget: råa baskroppen inom LAND_RAW_DB från taket i LAND_RAW_MS (en sen landning blir minidrop)
   0,                     // STIGNING  >= FLANK_RISE_DB över 0,5 s-minimum (i ramen, inte i knippan)
   0,                     // LJUD      breaket inte helt tyst (låtlucka)
   0,                     // DISKANT   diskanten (2 s) >= HI_VETO_DB mot sitt 30 s-medel
@@ -102,7 +103,7 @@ export class DropDetector {
   private nearOn = false; private nearB = -0; private nearNorm = -0; private nearFloor = 1e9; private liftCalm = -0; private liftLift = -0;
   private liftHist = new Float64Array(240); private liftW = 0; private liftN = 0; private liftHistAt = -1e12; private stopRunS = -0;
   private fdTop = -0; private miniEp = -1.5; private miniEpUsed = -2.5; private hiFast = -120.5; private hiNorm = -120.5; private hiMid = -120.5;
-  private lastEpAt = -1.5e12;
+  private lastEpAt = -1.5e12; private landRunMs = -0;
   private keyAt = new Float64Array(HOLD_MS.length).fill(-1e12);   // när nyckelns villkor senast gällde
   private mbFast = -90.5; private mbSlow = -90.5; private mbPre = -90.5; private mbPeak = -200.5; private mbAt = -1e12;
   private mbDem = 0; private mbSpaced = 0; private mbStop = 0; private mbLift = false; private mbSec = '';
@@ -199,13 +200,14 @@ export class DropDetector {
   /** NYCKLARNA OCH DÖRRARNA: varje hopp hålls nycklarna; en dörr öppnas när alla dess nycklar hålls, högst en gång per händelse. Drop vinner. */
   private keysStep(now: number, fast: number, mnRef: number): void {
     const o = this.o, f = this.bodyFast, ceil = this.bodyCeil, peak = this.bodyPeak, span = this.fdGone > 0 ? this.fdGone : this.fdSpan;
+    this.landRunMs = Math.max(f, this.sp.bodyDb) > ceil - LAND_RAW_DB ? this.landRunMs + this.h.dtHop * 1000 : 0;
     const held = this.key(K.LUCKA, this.miniGoneMs >= MINI_TOPGONE_MS, now)
       | this.key(K.LYFT, fast - mnRef > MINI_RISE_DB, now)
       | this.key(K.HOGT, fast > peak - MINI_PEAK_DB, now)
       | this.key(K.AKTIV, this.lv.activeMs > 2000, now)
       | this.key(K.UNDER, DROP_UNDERPEAK_MIN <= 0 || peak - fast >= DROP_UNDERPEAK_MIN, now)
       | this.key(K.SVACKA, this.fdGone >= SVACKA_S || (this.hiFast - this.hiNorm >= UPPB_HI_DB && this.hiFast - this.hiMid >= UPPB_RISE_DB && now - this.lastMiniGoneMs >= UPPB_GROOVE_MS), now)
-      | this.key(K.LANDNING, f > ceil - FLANK_LAND_DB, now)
+      | this.key(K.LANDNING, this.landRunMs >= LAND_RAW_MS, now)
       | this.key(K.STIGNING, f - this.fdLow >= FLANK_RISE_DB, now)
       | this.key(K.LJUD, now - this.fdQuietAt >= span * 1000 + 500, now)
       | this.key(K.DISKANT, this.hiFast - this.hiNorm >= HI_VETO_DB, now)
