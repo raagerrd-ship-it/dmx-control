@@ -15,7 +15,7 @@ export const andrum: EffectDef = {
     const dip = c.levelVsHighDb < 0 ? Math.max(-0.10, c.levelVsHighDb / 60) : 0;
     // 10-13 (effectDyn: spridning 0,10 - golvet 0,30 lyftes av motorns grundnivå (FX_FLOOR) till nästan fullt, alla fyra lika):
     // golvet är borta, driften går ner i nästan mörker och bär breakets nivå; kulören per fras (var c.t/13).
-    const deep = Math.max(0.2, 1 - 0.4 * age + c.frame.buildUp * 0.6 + dip * 3);   // morknar langsamt, oppnar mot uppbyggnad
+    const deep = Math.max(0.2, 1 - 0.4 * age + dip * 3);   // morknar langsamt, oppnar mot uppbyggnad
     const hue = (c.mixedSector(Math.floor(c.hueIdx / 16)) / 6 + 0.55) % 1;          // kall komplementton
     const drift = 0.5 + 0.5 * Math.sin(c.t * 0.4 + c.idx * 1.6);
     // HJARTSLAGET VANDRAR (2026-09-27): slaget landar pa en grupp i taget (jamn/udda eller inre/yttre via c.grouping) sa aven

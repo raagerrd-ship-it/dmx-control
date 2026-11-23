@@ -128,10 +128,10 @@ export class RiserOut {
 /** DROP. */
 export class DropOut {
   static readonly TRAD = { dropCount: 'UT', miniDropCount: 'UT', buildStartCount: 'UT', dropCand: 'UT', secBodyRet: 'L', dropDemoted: 'UT', dropSpaced: 'UT',
-    nearDropDb: 'UT', nearDipDb: 'UT', liftDb: 'UT', stopCount: 'UT', stopS: 'UT', lastDropMs: 'L', bodyUnderDb: 'UT', dropMiniBack: 'UT', dropKeys: 'UT', dropNear: 'UT', finns: 'K' } as const satisfies Taggat<DropOut>;
+    nearDropDb: 'UT', nearDipDb: 'UT', liftDb: 'UT', stopCount: 'UT', stopS: 'UT', lastDropMs: 'L', bodyUnderDb: 'UT', dropMiniBack: 'UT', dropKeys: 'UT', dropNear: 'UT', gap: 'L', finns: 'K' } as const satisfies Taggat<DropOut>;
   dropCount = 0; miniDropCount = 0; buildStartCount = 0; dropCand = 0; secBodyRet = 0;
   dropDemoted = 0; dropSpaced = 0; nearDropDb = -0; nearDipDb = -0; liftDb = -0; stopCount = 0; stopS = -0;
-  lastDropMs = -1.5e9; bodyUnderDb = 0; dropMiniBack = 0; dropKeys = 0; dropNear = 0; finns = true;   // lastDropMs utanför Smi-intervallet
+  lastDropMs = -1.5e9; bodyUnderDb = 0; dropMiniBack = 0; dropKeys = 0; dropNear = 0; gap = false; finns = true;   // lastDropMs utanför Smi-intervallet
   constructor() { stabilise(this, ['lastDropMs', 'nearDropDb', 'nearDipDb', 'liftDb', 'stopS']); }
 }
 /** KARAKTÄREN. profile = förr character.outProfile, ramens profile pekar hit. */

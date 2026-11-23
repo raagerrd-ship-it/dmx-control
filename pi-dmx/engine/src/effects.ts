@@ -1096,7 +1096,7 @@ export class EffectEngine {
         if (dropHit || frame.miniDropCount !== this.lastMiniSeen) this.gapUntil = -1;
         this.lastMiniSeen = frame.miniDropCount;
         const inGap = nowWall < this.gapUntil;
-        const inBuild = frame.inRiser || frame.buildUp > 0.35 || (frame.section === 'build');   // bara build-poolens inträde (allaBuild)
+        const inBuild = frame.section === 'build';   // bara build-poolens inträde (allaBuild)
         // ALLA_LOOKER (a): en uppbyggnad som hallit ALLA_BUILD_S = intrade -> ETT byte till build-poolen
         let allaBuild = false;
         if (!inBuild) { this.buildSince = -1; this.buildEntered = false; }
@@ -1555,7 +1555,7 @@ export class EffectEngine {
     this.showVel = Math.min(5, this.showVel * friction + this.pendingKick * 2.0);
     this.pendingKick = 0;
     // upp till 2.5× snabbare vid full uppbyggnad + kick-ryck ovanpå
-    this.showTime += _dtT * (1 + Math.max(frame.buildUp, this.buildProg) * 1.5 + this.showVel);
+    this.showTime += _dtT * (1 + this.buildProg * 1.5 + this.showVel);
     const t = this.showTime;
     if (kickHit) this.lastKickBoost = nowP;
 
@@ -1930,7 +1930,7 @@ export class EffectEngine {
     // på ladans material, så build-effekterna trappar upp på frame.sectionBuildProg = slag sedan sektionen blev build / 32 (0..1). Mätningen
     // ligger i analysatorns långsamma väg sedan 11-12; här väljs bara vilken av de två som bär ljuset (den större).
     this.buildProg = frame.sectionBuildProg;
-    ctx.wavePhase = this.wavePhase; ctx.buildUp = Math.max(frame.buildUp, this.buildProg);
+    ctx.wavePhase = this.wavePhase; ctx.buildUp = this.buildProg;
     ctx.phaseSpread = 1 + ctx.buildUp * 2.5; ctx.punchFloor = punchFloor;
     ctx.chasePos = this.chasePos; ctx.dropFired = this.dropFired;
     ctx.dropHue = this.dropHue; ctx.now = nowP;

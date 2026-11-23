@@ -1,7 +1,7 @@
 # analyserRiser.ts - anteckningar
 
 Kommentarerna som stod i koden fram till uppdelningen 2026-11-14, ordagrant, under den konstant, det fält eller den metod de hörde till.
-Koden har bara en kort etikett kvar per deklaration. Nya anteckningar skrivs här, inte i koden.
+Koden har bara en kort etikett kvar per deklaration. Nya anteckningar skrivs här, inte i koden. Sedan steg 40 (sist i filen) är riser-koden nedan borta: avsnitten fram till "Nyckelknippan" är historik.
 
 ## Filhuvudet
 
@@ -119,3 +119,35 @@ Stenen läser bara det `RiserReads` nämner (`f.hop.nowWall`, `dtHop`, `centSmoo
 lade i en lokal `inRiser` och skrev i facket sist i `process`; den kopian är borta, ramen läser facket). `rates(dtHop)` sätter
 `aSpecSlow`/`aNovSlow` (förr i Analysers konstruktor). `pack(s)`/`unpack(s)` är transporten av `buildUp` och `inRiser` i `BS_`-blocket
 (`BS_BUILD`, `BS_RISER`), anropade på samma ställen i `drainBig` resp. `pushBig`. Satserna i `riserStep` är ordagranna.
+
+
+## Nyckelknippan (flytten steg 40, 2026-11-23)
+
+Uppbyggnaden var död på ladans material, i ALLA byggen som gick att mäta: `dist0` (före uppdelningen 11-14), `dist-kedja1` (före flytten)
+och HEAD c7c4fbc8 ger bit för bit samma `buildUp`/`inRiser` på alla sju lang-inspelningar (sonden `.arena/uppbyggnad/probe.mjs`).
+buildUp p50 = p90 = 0,00, max 0,15-0,57 per KLAR fil, > 0,35 i 0 av ägarens 29 uppbyggnader. inRiser var på 2-4 % av tiden i
+100-650 flimmer per fil (median 0,07 s) och lika ofta utanför ägarens uppbyggnader som i dem (1,9-3,7 % mot 1,8-6,5 %).
+Effekterna har vetat det sedan 10-11 (`effects.ts`: "analysatorns riser (frame.buildUp) är död").
+
+Varför (ur koden):
+- `buildUp` steg bara med dtHop/3,5 s men föll med dtHop/1 s: det krävdes 3,5 s OBRUTEN inRiser för att nå 1, och flimret (0,07 s på,
+  längre av) höll den vid 0.
+- `novRiser` (summan av bandens positiva avvikelse ovanför 250 Hz mot ett 2 s-medel, mot en 8 s-baslinje, > 0,45) och klangvägen
+  (centroid + nivå stiger) är byggda för långa filtersvep. Ägarens uppbyggnader (markering till landning) är 1,5-15 s (median 3,6 s) och i nästan
+  alla dras basen ur (kick-luckan, `fdGone > 0` i 28 av 29): det är luckan med något kvar ovanpå, inte en spektral ramp.
+- Diskantens stigning över obruten bas (d1:s riser i SVACKA) träffar bara 2 av 21 i övningen.
+
+Knippan (en rad per nyckel, ingen hålltid utöver drop-stenens egna):
+- LUCKA      basen ur JUST NU: drop-stenens `miniGoneMs >= MINI_TOPGONE_MS` (`f.drop.gap`, nytt `L`-fält; drop-nyckeln LUCKA hålls 4 s och kan inte användas)
+- AKTIV      drop-nyckeln AKTIV (musik i > 2 s, hålls 30 s)
+- DISKANT    drop-nyckeln DISKANT (diskanten, 2 s, >= sitt 30 s-medel): något fortsätter ovanpå när basen är borta
+- EFTER DROP > 1,5 s sedan förra drop (som förr)
+`buildUp` = förloppet: stiger dtHop/3,5 s när knippan hålls, faller dtHop/1 s medan luckan varar, 0 när basen är tillbaka (landningen
+avslutar uppbyggnaden; annars valde dirigenten build-looken efter landningen).
+Bort: `bandTop`, `specSlow`, `novSlow`, `novBaseline`, `centSlow`, `lvlSlowR`, `rates()`, läsningarna av fft/spektrum/nivå.
+Uppbyggnaden läser drop-stenen samma hopp (drop körs före i `slowPart`). Drop läser `buildUp` från förra hoppet (lugn-grinden), som förr.
+Läsarna (ägaren 11-23, "v3b"): ingen läsare reagerar ännu på den nya signalen. Effekterna läste `frame.buildUp` (show-tidens fart, `ctx.buildUp`
+-> phaseSpread och build-effekterna, andrum) och dirigentens build-inträde läste `inRiser || buildUp > 0,35`; de kopplingarna är borta
+(effekterna går på `sectionBuildProg`, inträdet på sektionen 'build'). Uppbyggnaden är nyckeln för drop och dirigent framöver.
+Mätt: v2 med läsarna kvar gav ljusdomaren -4,0 på övningen och spärrar på kontrollen (allt ur dirigentens build-inträde, effektkopplingarna
+gjorde inget); utan läsare -1,3 / -0,2, ingen spärr, t90 5 -> 10 ms på övningen (godkänt av ägaren), lookbyten 244 -> 241.

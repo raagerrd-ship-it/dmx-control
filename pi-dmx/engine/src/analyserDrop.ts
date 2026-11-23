@@ -156,6 +156,7 @@ export class DropDetector {
     const armed = bodyOnsetEdge || nowWallA < this.dropArmUntil;
     if (this.fdTop < this.bodyCeil - FLANK_GONE_DB) { this.miniGoneMs += dtHop * 1000; if (this.miniGoneMs >= MINI_TOPGONE_MS) { if (this.miniGoneMs - dtHop * 1000 < MINI_TOPGONE_MS) { this.miniEp = nowWallA; if (nowWallA - this.lastEpAt >= BUILD_SPACING_MS) this.o.buildStartCount++; this.lastEpAt = nowWallA; } this.lastMiniGoneMs = nowWallA; } }
     else this.miniGoneMs = 0;
+    this.o.gap = this.miniGoneMs >= MINI_TOPGONE_MS;   // kick-luckan just nu (uppbyggnaden läser)
     const nv = hist[(this.bodyHistPos + HL - 1) % HL]; const mnRef = nv < riseRef ? nv : riseRef;
     this.keysStep(nowWallA, bodyPeek, mnRef);
     const fullSlam = this.bodyPeak - bodyPeek < DROP_QUALITY_DB;

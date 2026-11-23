@@ -510,7 +510,6 @@ export class Analyser {
     this.levels.rates(dtHop);
     this.bands.rates(dtHop);
     this.dKick = Math.exp(-dtHop / 0.15);
-    this.riser?.rates(dtHop);
     this.character?.rates(dtHop);
     this.outFrame = {
       silent: true, level: 0, levelVU: 0, energy: 0, centroid: 0, flux: 0,
