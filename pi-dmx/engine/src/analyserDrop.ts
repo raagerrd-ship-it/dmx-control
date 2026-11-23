@@ -24,6 +24,7 @@ const DROP_CALM_RISE_DB = 8;
 const DROP_CALM_LAND_MS = 0;
 const MINI_RISE_DB = 10;
 const MINI_PEAK_DB = 10;
+const MINI_GAP_DB = 8;   // LUCKA_MINI: minidropens kick-lucka = flankens topp >= 8 dB under taket i >= MINI_TOPGONE_MS (dropens LUCKA: FLANK_GONE_DB)
 const MINI_TOPGONE_MS = 250;   // en minidrop per kick-lucka: flankens topp >= FLANK_GONE_DB under taket så länge
 const HI_VETO_DB = 0;   // diskanten (band 6, 2 s) minst så här mot sitt 30 s-medel när flanken landar, annars minidrop
 const DROP_SHORT_MS = 4000;   // minsta drop-avstand nar dropen ESKALERAR
@@ -42,7 +43,7 @@ const MINI_BACK_MIN_MS = 250, MINI_BACK_MAX_MS = 2000;   // MINIDROP EFTER ENERG
 const NEAR_RISE_DB = 10, NEAR_DIP_DB = 8, LIFT_DB = 10, STOP_MINI_S = 0.6;   // LYFT/NÄSTAN-DROP/STOPP
 
 // NYCKLARNA: en rad per nyckel = bit, villkoret (i keysStep) och hålltiden i ms (nyckeln hålls så länge efter att villkoret senast gällde).
-export const K = { LUCKA: 0, LYFT: 1, HOGT: 2, AKTIV: 3, UNDER: 4, SVACKA: 5, LANDNING: 6, STIGNING: 7, LJUD: 8, DISKANT: 9, SPARR: 10, TOPP: 11, UPPBYGGNAD: 12 } as const;
+export const K = { LUCKA: 0, LYFT: 1, HOGT: 2, AKTIV: 3, UNDER: 4, SVACKA: 5, LANDNING: 6, STIGNING: 7, LJUD: 8, DISKANT: 9, SPARR: 10, TOPP: 11, UPPBYGGNAD: 12, LUCKA_MINI: 13 } as const;
 const HOLD_MS = [
   4000,                  // LUCKA     kick-luckan: flankens topp >= FLANK_GONE_DB under taket i >= MINI_TOPGONE_MS
   0,                     // LYFT      baskroppen >= MINI_RISE_DB över sitt 0,5 s-minimum
@@ -57,15 +58,16 @@ const HOLD_MS = [
   0,                     // SPARR     >= SHOW_DROP_GAP_MS sedan förra drop
   0,                     // TOPP      taket högst TOPP_DB under sega toppen (basen har nyss varit full, inte ett lugnt parti)
   3000,                  // UPPBYGGNAD uppbyggnadens förlopp >= UPPB_BUILD (~0,9 s i knippan; hålls 3 s som SVACKA: luckan före landningen)
+  4000,                  // LUCKA_MINI minidropens kick-lucka: flankens topp >= MINI_GAP_DB under taket i >= MINI_TOPGONE_MS
 ];
 const B = (...k: number[]): number => k.reduce((m, i) => m | (1 << i), 0);
-export const MINI_KEYS = B(K.LUCKA, K.LYFT, K.HOGT, K.AKTIV, K.UNDER);   // minidrop-knippan
-export const DROP_KEYS = MINI_KEYS | B(K.SVACKA, K.LANDNING, K.LJUD, K.DISKANT, K.SPARR, K.TOPP);   // drop-knippan = minidropens + de stränga
+export const MINI_KEYS = B(K.LUCKA_MINI, K.LYFT, K.HOGT, K.AKTIV, K.UNDER);   // minidrop-knippan
+export const DROP_KEYS = MINI_KEYS | B(K.LUCKA, K.SVACKA, K.LANDNING, K.LJUD, K.DISKANT, K.SPARR, K.TOPP);   // drop-knippan = minidropens + de stränga
 export const DROP_UPP_KEYS = (DROP_KEYS & ~B(K.SVACKA)) | B(K.UPPBYGGNAD);   // drop efter uppbyggnad = drop-knippan med UPPBYGGNAD i stället för SVACKA
 const VETO = B(K.LJUD, K.DISKANT, K.SPARR);   // hålls allt utom en veto-nyckel är händelsen avgjord (svackan förbrukad)
-export const MINI_NEAR = B(K.LUCKA, K.AKTIV), DROP_NEAR = MINI_NEAR | B(K.SVACKA, K.LJUD, K.DISKANT, K.SPARR, K.TOPP), DROP_UPP_NEAR = (DROP_NEAR & ~B(K.SVACKA)) | B(K.UPPBYGGNAD);   // förutsättningarna: knippan väntar bara på landningen
+export const MINI_NEAR = B(K.LUCKA_MINI, K.AKTIV), DROP_NEAR = MINI_NEAR | B(K.LUCKA, K.SVACKA, K.LJUD, K.DISKANT, K.SPARR, K.TOPP), DROP_UPP_NEAR = (DROP_NEAR & ~B(K.SVACKA)) | B(K.UPPBYGGNAD);   // förutsättningarna: knippan väntar bara på landningen
 
-const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdGone', 'fdSpan', 'fdQuietAt', 'lastShowDropMs', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'hiFast', 'hiNorm', 'hiMid'] as const;   // Talfält som ska vara flyttal från start
+const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'miniGapMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdGone', 'fdSpan', 'fdQuietAt', 'lastShowDropMs', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'hiFast', 'hiNorm', 'hiMid'] as const;   // Talfält som ska vara flyttal från start
 
 /** DET DROP LÄSER (workern). Inget annat går att nå. */
 export interface DropReads {
@@ -94,7 +96,7 @@ export class DropDetector {
   private bodyHistLen = 1;
   private bodyGoneMs = 0;   // Ihållande bas-FRÅNVARO
   private lastBodyGoneMs = -1e9;
-  private lastMiniMs = -1e9; private miniGoneMs = 0; private lastMiniGoneMs = -1e9;
+  private lastMiniMs = -1e9; private miniGoneMs = 0; private lastMiniGoneMs = -1e9; private miniGapMs = 0;
   private dropArmUntil = 0; private dropArmAt = 0; private dropArmGoneMs = -1.5;   // armerat drop-fonster
   private calmHoldStart = -0; private calmHoldRise = -0;   // DROP_CALM_LAND_MS
 
@@ -159,8 +161,9 @@ export class DropDetector {
     this.wasBodyOnset = bodyOnset;
     if (bodyOnsetEdge && this.goneEpisodeMs !== this.dropArmGoneMs) { this.dropArmUntil = nowWallA + DROP_ARM_MS; this.dropArmAt = nowWallA; this.dropArmGoneMs = this.goneEpisodeMs; }
     const armed = bodyOnsetEdge || nowWallA < this.dropArmUntil;
-    if (this.fdTop < this.bodyCeil - FLANK_GONE_DB) { this.miniGoneMs += dtHop * 1000; if (this.miniGoneMs >= MINI_TOPGONE_MS) { if (this.miniGoneMs - dtHop * 1000 < MINI_TOPGONE_MS) { this.miniEp = nowWallA; if (nowWallA - this.lastEpAt >= BUILD_SPACING_MS) this.o.buildStartCount++; this.lastEpAt = nowWallA; } this.lastMiniGoneMs = nowWallA; } }
+    if (this.fdTop < this.bodyCeil - FLANK_GONE_DB) { this.miniGoneMs += dtHop * 1000; if (this.miniGoneMs >= MINI_TOPGONE_MS) { if (this.miniGoneMs - dtHop * 1000 < MINI_TOPGONE_MS) { if (nowWallA - this.lastEpAt >= BUILD_SPACING_MS) this.o.buildStartCount++; this.lastEpAt = nowWallA; } this.lastMiniGoneMs = nowWallA; } }
     else this.miniGoneMs = 0;
+    if (this.fdTop < this.bodyCeil - MINI_GAP_DB) { this.miniGapMs += dtHop * 1000; if (this.miniGapMs >= MINI_TOPGONE_MS && this.miniGapMs - dtHop * 1000 < MINI_TOPGONE_MS) this.miniEp = nowWallA; } else this.miniGapMs = 0;   // minidropens kick-lucka (händelsen)
     this.o.gap = this.miniGoneMs >= MINI_TOPGONE_MS;   // kick-luckan just nu (uppbyggnaden läser)
     const nv = hist[(this.bodyHistPos + HL - 1) % HL]; const mnRef = nv < riseRef ? nv : riseRef;
     this.keysStep(nowWallA, bodyPeek, mnRef);
@@ -214,7 +217,8 @@ export class DropDetector {
       | this.key(K.DISKANT, this.hiFast - this.hiNorm >= HI_VETO_DB, now)
       | this.key(K.SPARR, now - this.lastShowDropMs >= SHOW_DROP_GAP_MS, now)
       | this.key(K.TOPP, peak - ceil <= TOPP_DB, now)
-      | this.key(K.UPPBYGGNAD, this.ri.buildUp >= UPPB_BUILD, now);
+      | this.key(K.UPPBYGGNAD, this.ri.buildUp >= UPPB_BUILD, now)
+      | this.key(K.LUCKA_MINI, this.miniGapMs >= MINI_TOPGONE_MS, now);
     o.dropKeys = held;
     o.dropNear = ((held & MINI_NEAR) === MINI_NEAR ? 1 : 0) | ((held & DROP_NEAR) === DROP_NEAR || (held & DROP_UPP_NEAR) === DROP_UPP_NEAR ? 2 : 0);
     const missS = DROP_KEYS & ~held, missU = DROP_UPP_KEYS & ~held, miss = (missS & ~VETO) === 0 ? missS : missU;   // två dörrar till drop: svackan eller uppbyggnaden
@@ -226,7 +230,7 @@ export class DropDetector {
       else o.dropSpaced++;
       this.keyAt[K.SVACKA] = -1e12; this.keyAt[K.UPPBYGGNAD] = -1e12; this.fdGone = 0; this.fdSpan = 0;
     }
-    if (this.miniEp === this.miniEpUsed) return;   // MINIDROP-DÖRREN (händelsen = kick-luckan)
+    if (this.miniEp === this.miniEpUsed) return;   // MINIDROP-DÖRREN (händelsen = minidropens kick-lucka, MINI_GAP_DB)
     if (drop) this.miniEpUsed = this.miniEp;
     else if (MINI_SPACING_MS > 0 && (held & MINI_KEYS) === MINI_KEYS && now - o.lastDropMs > MINI_SPACING_MS && now - this.lastMiniMs > MINI_SPACING_MS) {
       o.miniDropCount++; this.lastMiniMs = now; this.miniEpUsed = this.miniEp;

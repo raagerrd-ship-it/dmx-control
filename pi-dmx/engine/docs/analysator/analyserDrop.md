@@ -504,7 +504,8 @@ hålls är händelsen avgjord som förut: DISKANT -> `dropDemoted`, SPARR -> `dr
 
 | nyckel | villkor | hålltid | knippa |
 |---|---|---|---|
-| LUCKA | flankens 0,6 s-topp >= 10 dB under taket i >= 250 ms | 4 s | mini + drop |
+| LUCKA | flankens 0,6 s-topp >= 10 dB under taket i >= 250 ms | 4 s | drop |
+| LUCKA_MINI | flankens 0,6 s-topp >= 8 dB under taket i >= 250 ms (`MINI_GAP_DB`, steg 48; minidropens händelse `miniEp`) | 4 s | mini |
 | LYFT | baskroppen (60 ms) >= 10 dB över sitt 0,5 s-minimum | 0 | mini + drop |
 | HOGT | baskroppen inom 10 dB från sega toppen | 0 | mini + drop |
 | AKTIV | musik i > 2 s | 30 s (tystnaden i breaket nollar activeMs) | mini + drop |
@@ -574,3 +575,7 @@ ljusdomaren v3 övning +0,0, kontroll +5,2.
   "samma tempo genom tystnaden" provades inte: klockans tillit faller till 0 inom ~5 s utan kick (sonden 257,6-259 s), och tvärstoppet i ladan
   14:52:54 finns inte inspelat. Mätt (dom.py mot steg 46): övning rätt 14 -> 15, falska 9 = 9, tidsfel +52 -> +55 ms (> 100 ms sent 29 -> 27 %);
   kontroll identisk. Ljusdomaren övning -1,5 (l160345: 282 blir drop), kontroll 0,0, ingen spärr.
+- Steg 48 INLAGT (ögonprovet 11-23 varv 3, ägaren: minidrop "generöst och snabbt"; ladan 14:53:49 missad med dipp 9,4 dB): minidroppen har en egen
+  kick-lucka LUCKA_MINI 8 dB (händelsen `miniEp` räknas på den), dropen behåller LUCKA 10 dB, uppbyggnadens `gap`/`buildStartCount` som förut.
+  Mätt (dom.py mot steg 47): drop identisk; minidrop rätt övning 26 -> 28 av 49, kontroll 3 -> 4 av 7, alla minidrop 101 -> 119 / 16,7 -> 20,7
+  (falska +16 / +3), tidsfel +27 -> +23 ms (kontroll +38 -> -11). 7 dB gav samma rätt med fler falska. Ljusdomaren övning +1,3, kontroll 0,0, ingen spärr.
