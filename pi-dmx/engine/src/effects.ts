@@ -803,13 +803,14 @@ export class EffectEngine {
   /** DIRIGENTEN (kall väg ur render, 10-16 GC-jakten): tier, sektion, manus och lookbytet. Ordagrant flyttat ur render - samma ordning. */
   /** LOOKBYTET (kall väg ur stepDirigent, 10-16 GC-jakten): closures (enabled/req/fits ...) fångade frame/bpm och gav ett kontextobjekt
    *  per ruta i stepDirigent - här skapas de bara vid ett byte. Ordagrant flyttat. */
-  /** BASSTARK LOOK EFTER DROPEN (se DROP_BASS_LOOK): full-effekter med passform bas >= 0,6 och punch >= 0,75, bäst (bas + punch) först. */
+  /** BASSTARK LOOK EFTER DROPEN (se DROP_BASS_LOOK): full-effekter med passform bas >= 0,6 och punch >= 0,75, bäst (bas + punch) först.
+   *  Utan de glesa (DROP_GLES, steg 50): reserven valde dansparet/minnet i 2 av 53 drop. */
   private static bassDropLooks: Mode[] | null = null;
   // + TYDLIG TAKT (ägaren 11-01: 'välj effekter där takten syns tydligt'): passform beat >= DROP_BEAT_MIN - gallop, backbeat, party, kickregn,
   //   motor; drumkit (0,6), fyrverkeri (0,6) och duel (0,4) föll bort.
   private bassStrong(m: Mode): boolean { const f = FIT[m], e = EFFECT_MAP.get(m); return !!f && !!e && e.tier === 'full' && f.bass >= 0.6 && f.punch >= 0.75 && f.beat >= DROP_BEAT_MIN; }
   private bassDropLooks(): Mode[] {
-    if (!EffectEngine.bassDropLooks) EffectEngine.bassDropLooks = ([...EFFECT_MAP.keys()] as Mode[]).filter((m) => this.bassStrong(m)).sort((a, b) => (FIT[b]!.bass + FIT[b]!.punch) - (FIT[a]!.bass + FIT[a]!.punch));
+    if (!EffectEngine.bassDropLooks) EffectEngine.bassDropLooks = ([...EFFECT_MAP.keys()] as Mode[]).filter((m) => this.bassStrong(m) && !DROP_GLES.includes(m)).sort((a, b) => (FIT[b]!.bass + FIT[b]!.punch) - (FIT[a]!.bass + FIT[a]!.punch));
     return EffectEngine.bassDropLooks;
   }
   private switchLook(frame: Frame, bpm: number, tierS: Mode[], tierName: string, bassClear: boolean, allaBuild: boolean, buildEntry: boolean, buildExit: boolean, dropSwitch: boolean, liveSec: string, memSection: boolean, secEntry: boolean, tierChanged: boolean): void {
