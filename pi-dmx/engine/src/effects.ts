@@ -310,6 +310,29 @@ const PULSE_IDX_INIT = -2e9;
  *  (de gav high<->low-hopp pa 1-2 s nar refrangen uteblev). Bara den raa sektionen, och den maste vara minst DMX_SECTION_UNIT_MIN_MS gammal. */
 const LAND_HOLD_MS = 6000, LAND_ABSORB_MS = 24000;   // LANDNINGEN (a7): minsta hålltid före landningsbytet; sektionsbyten inom fönstret efter tas inte
 const GAP_HOLD_MS = 4000;   // I LUCKAN: spärren efter uppbyggnadssignalen släpper senast efter 4 s (signal -> landning median 1,8 s)
+/** DIRIGENTENS NYCKLAR OCH KNIPPOR (steg 42, ägarens nyckelmodell 11-22): villkoret och hålltiden står en rad per nyckel i stepDirigent.
+ *  En knippa per bytesskäl; ett byte när ALLA dess nycklar hålls. Ordningen = företräde ('land' prövas bara om ingen annan knippa öppnar). */
+const DK = { TRAFF: 0, ENERGI: 1, HALLEN: 2, EJ_BASSTARK: 3, NY_DEL: 4, REFRANG: 5, DROP_NYSS: 6, EJ_LANDAT: 7, GRANS: 8, DEL: 9, BUILD: 10, HALLEN_2S: 11, FRAS: 12, SLAG: 13, EJ_LUCKA: 14, EJ_BUILDLAS: 15,
+  BUILD_NY: 16, BUILDLOOK: 17, BUILDLOOK_2S: 18, TOPP: 19, INGEN_DEL: 20, TIER: 21, DWELL: 22, LANDNING: 23, HALLEN_LAND: 24, BASDEL: 25, NASTAN: 26, HALLEN_NARA: 27, EJ_BUILD_BREAK: 28, EJ_BUILD_BREAK_HIGH: 29,
+  EFTER_DL: 30, EJ_EFTER_DL: 31 } as const;
+const DK_NAMN = Object.keys(DK).map((s) => s.replace(/_/g, ' '));
+type Knippa = { namn: string; typ: 'drop' | 'byte' | 'land'; n: readonly number[]; slag: boolean };
+const knippa = (namn: string, typ: Knippa['typ'], ...n: number[]): Knippa => ({ namn, typ, n, slag: n.includes(DK.SLAG) });
+const KNIPPOR: readonly Knippa[] = [
+  knippa('DROP', 'drop', DK.TRAFF, DK.ENERGI, DK.HALLEN),
+  knippa('DROP FEL LOOK', 'drop', DK.TRAFF, DK.ENERGI, DK.EJ_BASSTARK),   // konsertläget: dropen avslutar builden direkt
+  knippa('DROP IN', 'byte', DK.NY_DEL, DK.REFRANG, DK.DROP_NYSS, DK.EJ_LANDAT),   // refrängen efter en drop som blev minidrop: direkt (ingen hålltid/fras/slag)
+  knippa('SEKTION', 'byte', DK.DEL, DK.GRANS, DK.HALLEN, DK.FRAS, DK.SLAG, DK.EJ_LUCKA),
+  knippa('BUILD IN', 'byte', DK.BUILD, DK.GRANS, DK.HALLEN_2S, DK.SLAG, DK.EJ_LUCKA, DK.EJ_BUILDLAS),   // konsertläget: in i build direkt
+  knippa('BUILD', 'byte', DK.BUILD, DK.BUILD_NY, DK.HALLEN_2S, DK.SLAG, DK.EJ_LUCKA, DK.EJ_BUILDLAS),
+  knippa('BUILD UT', 'byte', DK.BUILDLOOK, DK.REFRANG, DK.SLAG, DK.EJ_LUCKA),   // refrängen kom utan drop -> lämna builden direkt
+  knippa('BUILD UT TOPP', 'byte', DK.BUILDLOOK, DK.BUILDLOOK_2S, DK.TOPP, DK.SLAG, DK.EJ_LUCKA),
+  knippa('TIER', 'byte', DK.INGEN_DEL, DK.TIER, DK.HALLEN, DK.FRAS, DK.SLAG, DK.EJ_LUCKA),
+  knippa('DWELL', 'byte', DK.INGEN_DEL, DK.DWELL, DK.HALLEN, DK.FRAS, DK.SLAG, DK.EJ_LUCKA),
+  knippa('LANDNING', 'land', DK.LANDNING, DK.HALLEN_LAND, DK.BASDEL),
+  knippa('NASTAN', 'land', DK.NASTAN, DK.EJ_BUILD_BREAK, DK.EJ_EFTER_DL, DK.HALLEN_NARA),
+  knippa('NASTAN EFTER', 'land', DK.NASTAN, DK.EJ_BUILD_BREAK_HIGH, DK.EFTER_DL, DK.HALLEN_LAND),
+];
 /** LÅTMANUS (10-12 kväll, ägaren: "olika effekter hoppar hela tiden ... mer som att den är förprogrammerad" + "allt mer känns anpassat
  *  efter låten och som att de hänger ihop"). ERSÄTTER frasväxlingen (A/B-look var 8:e takt), basgångs-, karaktärs- och tempobytet,
  *  reservklockan och 'ny låt' på sektionen intro. Låten får ETT manus: första gången en sektionstyp (intro/low/build/high/break) kommer
@@ -652,6 +675,9 @@ export class EffectEngine {
    *  det ENDA skalet, alltsa ett byte utan musikalisk grund; alla andra varden ar nagot i laten. */
   switchWhy = '';
   switchCount = 0;
+  switchKnippa = '';   // knippan som öppnade senaste bytet (steg 42)
+  private dk: boolean[] = new Array(DK_NAMN.length).fill(false);   // nycklarna denna ruta (DK)
+  private knippa(n: readonly number[], skip: number): boolean { for (let i = 0; i < n.length; i++) if (n[i] !== skip && !this.dk[n[i]]) return false; return true; }
   // noteCharShift: bytesskal giltigt 6 s               // SECTION_UNIT: sektionsgrans passerad men bytet blockerat (riser/MIN_HOLD) -> gor det sa fort det gar
   private prevSongLook = new Map<string, Mode>();  // SECTION_UNIT: forra latens look per sektionstyp (straffas sa nasta lat far en annan)
   private lastSmartTier = "";
@@ -1040,112 +1066,87 @@ export class EffectEngine {
         // ögonblicken; energi-variation INOM en tier ska effekten själv svara på.
         const tierChanged = this.cfg.energyDrivesMode && tierName !== this.lastSmartTier;
         const held = now - this.lastSmartSwitchMs;
-        const MIN_HOLD = 8000;    // en effekt lever ALLTID minst 8s
-        const DROP_HOLD = 8000;   // drop byter inte oftare än nagot annat (detektorn fyrar tatt pa pulsande musik)
-        // Drop-byte bara när energin får driva → en LUGN stämning (chill,
-        // energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
-        const dropSwitch = dropHit && this.cfg.energyDrivesMode && (held > DROP_HOLD || (((!this.bassStrong(this.smartMode)) || BUILD_LOOKS.includes(this.smartMode))));   // konsertlaget: dropen avslutar builden direkt
+        const MIN_HOLD = 8000;    // en effekt lever ALLTID minst 8s (drop-bytet: samma hålltid, detektorn fyrar tätt på pulsande musik)
+        // Drop-byte bara när energin får driva → en LUGN stämning (chill, energyDrivesMode av) byter ENBART på dwell-timern, aldrig på drops.
         // (minidrop byter INTE look sedan 2026-10-10, agaren i ladan: 'minidrop maste ju inte orsaka look-byten' - den lyfter bara ljuset)
-        // MINNETS STRUKTUR: en tvättad låt vet var karaktären skiftar och var
-        // fraserna börjar. Ett byte DÄR känns komponerat; samma byte 1,5 takt fel
-        // känns slumpmässigt. Sektionsgräns = byt gärna nu; frasgräns = ok att byta.
-        // Har låten grid väntar dwell-timern in nästa gräns (men max 20 s extra, så
-        // showen aldrig fastnar om gridet skulle vara fel).
         // REALTIDSSEKTION (DMX_SECTION_SWITCH=1, 2026-09-21): analysatorns egen sektion (DMX_SECTION=1: intro/low/build/high/break)
         // ar ett bytesskal precis som latminnets sektionsgrans, och etiketten ger IDENTITET (samma look nar 'high' kommer tillbaka).
         const liveSec = frame.section || '';   // bara raa sektionen (forvarningens/drop-fonstrets 'high' raknas inte, se SECTION_UNIT_MIN_MS)
         const liveSecChanged = liveSec !== '' && this.lastLiveSection !== '' && liveSec !== this.lastLiveSection;
-        // REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP (ladan 11-01 17:48, inspelning: analysatorns drop 17:48:17,15 med 0,4 s break blev minidrop
-        // (FLANK_SHORT_S), sektionen gick high 0,7 s senare men lookbytet väntade in frasen till 17:48:20,2 = 'dropen blir sen'): går
-        // sektionen in i high inom 2 s efter en sådan drop byts looken direkt, som vid en full drop (ingen MIN_HOLD/fras/slag-väntan).
-        const dropEntry = liveSecChanged && liveSec === 'high' && nowWall - this.anaDropAt < 2000 && nowWall >= this.landAbsorbUntil;   // ägaren 11-20: landningen har redan bytt för samma händelse
         if (liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '') console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; }   // (intro glommer inte lookerna langre - LÅTMANUS glomms bara pa en verklig latgrans)
         if (liveSecChanged) this.pendingSecSwitch = nowWall >= this.landAbsorbUntil;   // LANDNINGEN: detektorns sena byte efter landningen är redan gjort
         const memSection = liveSecChanged && nowWall >= this.landAbsorbUntil;   // (latminnets sektionsgrans mem* borttagen 11-09 - sattes aldrig)
         const phraseMs = this.cfg.beat && this.cfg.beat.bpm > 0 ? 16 * 60000 / this.cfg.beat.bpm : 0;
-        // LÅTMANUS: sektionsbytet landar på sektionens EGET taktraster (början av takt 2, 4, 6 ... sedan sektionsstart) i stället för
-        // effektklockans 16-slagsfras, vars fas är godtycklig mot låten (bänken: bytet väntade upp till 24 s efter en hållen sektion).
-        const secBars = frame.sectionBars ?? 0, secBarOk = secBars > 0 && (SWITCH_ON > 0 || (Math.floor(secBars) % 2 === 0 && secBars % 1 < 0.25));   // SWITCH_ON: slaggrinden nedan tar tajmningen (fönstret missade ticken -> 2 takter extra)
-        const phraseOk = !hasBeat || this.beatTrust < 0.5 || (liveSec && secBars > 0 ? secBarOk : (this.beatCounter % 16) === 0) || held > MIN_HOLD + phraseMs;
-        // MED STRUKTUR AR SEKTIONEN ENHETEN. Dwell-timern och tier-bytet ar till
-        // for OKANDA latar, dar showen inte har nagot battre att ga pa. Har vi en
-        // analyserad struktur ska looken sitta HELA sektionen ut — annars byter
-        // den mitt i refrangen, vilket ar precis vad man vill undvika.
-        //   MATT 2026-08-08 i en och samma refrang: "ny look chase (tier fart)"
-        //   foljt 11 s senare av "ny look ripple (tier full)" — tre looker i en
-        //   refrang, driven av att tiern flaxade mellan fart och full.
+        const secBars = frame.sectionBars ?? 0;
         // BASGANG: tydlig basgang styr VALET av look (toggle-poolen), men byter inte look (LÅTMANUS).
         const bassClear = (frame.profile.bassline ?? 0) >= (this.lastBassClearForSwitch ? CLEAR_BASS - 0.2 : CLEAR_BASS);
-        // LÅTMANUS: med sektioner byts looken bara pa sektionsgrans (+ build/drop nedan); fras, basgang, karaktar, tempo och
-        // reservklockan byter inte langre. Utan sektion (ingen analys an) galler tier/halvering/dwell som forut.
-        const wantSwitch = liveSec
-            ? (memSection || this.pendingSecSwitch)
-            : (tierChanged || memSection || now > this.smartDwellUntil);
-
-        // STRUKTUR: analysatorn vet VAR i låten vi är — dirigenten ska lyssna på
-        // det, inte bara på energinivån. Två regler, båda dramaturgiska:
-        //
-        // 1) Byt ALDRIG mitt i en uppbyggnad. Publiken laddar mot dropen, och ett
-        //    effektbyte där släpper spänningen precis när den ska byggas. Håll
-        //    kvar genom hela risern — då landar bytet i stället PÅ dropen, vilket
-        //    är det enda ögonblick där ett byte förstärker musiken.
         // I LUCKAN (11-16): spärren följer analysatorns uppbyggnadssignal (25 av ägarens 29, den gamla riser/build-regeln 0 av 29) och släpper på drop/minidrop
-        const nearLand = this.nearBigAt === nowWall && !dropHit && liveSec !== 'build' && liveSec !== 'break' && (this.switchWhy !== 'drop' && this.switchWhy !== 'landning' ? held > NEAR_LAND_HOLD_MS : held > LAND_HOLD_MS && liveSec !== 'high');
         const landHit = frame.miniDropCount !== this.lastMiniSeen && !dropHit;   // LANDNINGEN (a7): basen tillbaka efter luckan = ny del, på ettan
         if (frame.dropBuildCount !== this.lastBuildStart) { this.lastBuildStart = frame.dropBuildCount; this.gapUntil = nowWall + GAP_HOLD_MS; }
         if (dropHit || frame.miniDropCount !== this.lastMiniSeen) this.gapUntil = -1;
         this.lastMiniSeen = frame.miniDropCount;
-        const inGap = nowWall < this.gapUntil;
         const inBuild = frame.section === 'build';   // bara build-poolens inträde (allaBuild)
-        // ALLA_LOOKER (a): en uppbyggnad som hallit ALLA_BUILD_S = intrade -> ETT byte till build-poolen
-        let allaBuild = false;
         if (!inBuild) { this.buildSince = -1; this.buildEntered = false; }
-        else { if (this.buildSince < 0) this.buildSince = now; allaBuild = !this.buildEntered && now - this.buildSince >= 500 && held > 2000; }
+        else if (this.buildSince < 0) this.buildSince = now;
         // (preDrop - kroppen borta 1,5 s -> build-looken - borttagen 10-11 kväll, V123: valde build-looker mitt i verserna; build-look 32 % av tiden mot sektion build 12 %)
-        // 2) I ett breakdown: gå till den lugna poolen oavsett vad energitiern
-        //    säger. Tiern hinner inte ner direkt (den är medvetet trög mot flapp),
-        //    så utan detta fortsätter riggen köra fullfart genom en svacka.
-        // LUGN-POOLEN BARA FRAN SEKTIONEN (2026-09-27, ladan): frame.levelBreaking ar 'nivan < 65 % av taket' och var sann sa ofta
-        // pa partypop att 27 av 40 look-val blev lugn-looker (viska/airglow/twin = nastan morka) mitt i sektion high med tier
-        // full -> "ser inte vad effekterna gor", "en lampa lyser konstant". Med sektionsstyrning pa ar 'break' den
-        // genomtankta signalen (av-brytaren DMX_CALM_FROM_BREAKING borttagen 10-10).
-        // 3) ETIKETTEN STYR INTE NIVÅN — SEKTIONENS UPPMÄTTA ENERGI GÖR DET.
-        //    Här stod tidigare musikaliska schabloner: refräng aldrig lugn, vers
-        //    aldrig full fart, intro/outro alltid lugnt. De byggde på att energin
-        //    kom från en trög EMA som inte gick att lita på.
-        //      MÄTT 2026-08-08, sektionsenergi ur ägarens egna låtar:
-        //        #1  intro 0.26 · chorus 0.31 · verse 0.76 · chorus 0.83
-        //            · inst 0.91 · chorus 0.45 · inst 0.93 · chorus 0.63 · end 0.07
-        //        #3  chorus 0.51 · inst 0.81 · verse 0.96 · chorus 0.66 · end 0.28
-        //      Refrängerna varierar mellan 0.31 och 0.83 i SAMMA låt, och i #3 är
-        //      VERSEN låtens starkaste parti (0.96). Schablonerna hade tvingat upp
-        //      en stillsam refräng och hållit tillbaka en väldig vers — fel åt båda
-        //      hållen. Etiketten far darfor styra IDENTITET (samma look aterkommer)
-        //      och NAR bytet sker (sektionsgransen), men inte hur starkt det lyser.
+        // ETIKETTEN STYR INTE NIVÅN (mätt 2026-08-08: refrängerna 0,31-0,83 i samma låt): etiketten styr IDENTITET (samma look återkommer)
+        // och NÄR bytet sker (sektionsgränsen), men inte hur starkt det lyser.
         const tierS = tier;
-        const buildEntry = this.pendingSecSwitch && liveSec === 'build';   // MIX_V2 (2): ett byte IN i build-poolen tillats (hålls tills ettan)
+        // DIRIGENTENS NYCKLAR (steg 42, ägarens nyckelmodell): en rad per nyckel = villkoret och hålltiden. Ett lookbyte sker när ALLA
+        // nycklar i en knippa hålls (KNIPPOR, en knippa per bytesskäl, ordningen = företräde). Loggen säger knippan och dess nycklar.
+        const k = this.dk;
+        k[DK.TRAFF] = dropHit;                                                    // analysatorns drop, denna ruta
+        k[DK.ENERGI] = !!this.cfg.energyDrivesMode;                               // energin får driva (inte chill)
+        k[DK.HALLEN] = held > MIN_HOLD;                                           // looken hållen 8 s
+        k[DK.EJ_BASSTARK] = !this.bassStrong(this.smartMode);                     // looken är ingen droplook (build-lookerna är aldrig basstarka)
+        k[DK.NY_DEL] = liveSecChanged;                                            // sektionen bytte, denna ruta
+        k[DK.REFRANG] = liveSec === 'high';
+        k[DK.DROP_NYSS] = nowWall - this.anaDropAt < 2000;                        // analysatorns drop som blev minidrop, hålls 2 s (ladan 11-01 17:48)
+        k[DK.EJ_LANDAT] = nowWall >= this.landAbsorbUntil;                        // inte i landningens skugga (LAND_ABSORB_MS 24 s)
+        k[DK.GRANS] = this.pendingSecSwitch;                                      // sektionsgräns passerad, hålls tills bytet (eller manuset höll looken)
+        k[DK.DEL] = liveSec !== '' && liveSec !== 'build';
+        k[DK.BUILD] = inBuild;
+        k[DK.HALLEN_2S] = held > 2000;
+        k[DK.FRAS] = !hasBeat || this.beatTrust < 0.5 || (liveSec !== '' && secBars > 0) || this.beatCounter % 16 === 0 || held > MIN_HOLD + phraseMs;   // LÅTMANUS: sektionens raster (slaget tar tajmningen), annars frasen; utan säker takt öppen
+        k[DK.EJ_LUCKA] = nowWall >= this.gapUntil;                                // I LUCKAN: uppbyggnadens spärr (GAP_HOLD_MS 4 s, släpps av drop/minidrop)
+        k[DK.EJ_BUILDLAS] = !(this.buildLookAt > 0 && BUILD_LOOKS.includes(this.smartMode) && nowWall - this.buildLookAt < 30000);   // BUILD SOM HÅLLER: build-looken får 30 s
+        k[DK.BUILD_NY] = this.buildSince >= 0 && !this.buildEntered && now - this.buildSince >= 500;   // ALLA_LOOKER (a): uppbyggnaden hållit 0,5 s, ett byte per uppbyggnad
+        k[DK.BUILDLOOK] = BUILD_LOOKS.includes(this.smartMode);
+        k[DK.BUILDLOOK_2S] = this.buildLookAt > 0 && nowWall - this.buildLookAt > 2000;
+        k[DK.TOPP] = (frame.intensity ?? 0) >= 0.95;                              // ladan 17:09 'miss': upptakt låg kvar 10 s i int 0,9-1,0
+        k[DK.INGEN_DEL] = liveSec === '';                                         // ingen analys än: tier/dwell som förut
+        k[DK.TIER] = !!tierChanged;
+        k[DK.DWELL] = now > this.smartDwellUntil;
+        k[DK.LANDNING] = landHit;
+        k[DK.HALLEN_LAND] = held > LAND_HOLD_MS;
+        k[DK.BASDEL] = liveSec === 'high' || liveSec === 'intro';
+        k[DK.NASTAN] = this.nearBigAt === nowWall && !dropHit;                    // STOR NÄSTAN-DROP (NEAR_LAND_DB), denna ruta
+        k[DK.HALLEN_NARA] = held > NEAR_LAND_HOLD_MS;
+        k[DK.EJ_BUILD_BREAK] = liveSec !== 'build' && liveSec !== 'break';
+        k[DK.EJ_BUILD_BREAK_HIGH] = liveSec !== 'build' && liveSec !== 'break' && liveSec !== 'high';
+        k[DK.EFTER_DL] = this.switchWhy === 'drop' || this.switchWhy === 'landning';
+        k[DK.EJ_EFTER_DL] = !k[DK.EFTER_DL];
+        // SLAG (BYTE PÅ SLAGET, SWITCH_ON): sista nyckeln. Väntan börjar när resten av en slagknippa hålls; öppen på ettan, utan säker takt, eller efter SWITCH_ON x 1,25 slag.
+        let rest = false;
+        for (let i = 0; i < KNIPPOR.length && !rest; i++) rest = KNIPPOR[i].slag && this.knippa(KNIPPOR[i].n, DK.SLAG);
+        if (!rest) this.slagWaitAt = -1; else if (this.slagWaitAt < 0) this.slagWaitAt = now;
+        k[DK.SLAG] = !(hasBeat && bpm > 0 && this.beatTrust >= 0.5) || (this.tickNow && this.lastBeatIdx % SWITCH_ON === 0) || now - this.slagWaitAt > SWITCH_ON * 1.25 * 60000 / bpm;
+        let door = -1;
+        for (let i = 0; i < KNIPPOR.length && door < 0; i++) if (this.knippa(KNIPPOR[i].n, -1)) door = i;
+        if (door < 0) return this.smartMode;
+        // Fakta till valet (samma för alla knippor): vilken del, build in/ut, drop.
+        const kn = KNIPPOR[door], n0 = this.switchCount; this.switchKnippa = kn.namn;
+        const allaBuild = k[DK.BUILD] && k[DK.BUILD_NY] && k[DK.HALLEN_2S];
+        const buildEntry = k[DK.BUILD] && k[DK.GRANS];   // MIX_V2 (2): ett byte IN i build-poolen tillats (hålls tills ettan)
         const secEntry = this.pendingSecSwitch && liveSec !== 'build';   // SECTION_UNIT: sektionen sager att risern ar over -> inBuild far inte halla kvar build-looken i refrangen
-        const concertBuild = buildEntry && held > 2000;   // konsertläget: in i build direkt
-        // refrängen kom utan drop -> lämna builden direkt; även ett energilyft/sektionslyft (ladan 16:05: virvel hängde kvar i 'low' efter lyftet)
-        // + intensiteten på topp (ladan 17:09 'miss': upptakt låg kvar 10 s i int 0,9-1,0 - sektionen gick low -> build -> intro, aldrig high)
-        // (ladan 17:12 'falsk': lyftet och int 0,86 kom UNDER builden - dropen fyrade före smällen. Lyft inom build räknas inte; topp = 0,95.)
-        const buildExit = BUILD_LOOKS.includes(this.smartMode) && (frame.section === 'high' || (this.buildLookAt > 0 && nowWall - this.buildLookAt > 2000 && (frame.intensity ?? 0) >= 0.95));
-        // (BUILDEN LANDAR I REFRÄNGEN - sektionen high efter >= 4 s build = drop - borttagen 10-11 kväll: 'falsk' 21:42:39, 17 % på baslyft; se DROP_JUMP_DB)
-        const buildLock = frame.section === 'build' && this.buildLookAt > 0 && BUILD_LOOKS.includes(this.smartMode) && nowWall - this.buildLookAt < 30000 && !dropSwitch && !buildExit;   // BUILD SOM HÅLLER - V123: bara så länge sektionen ÄR build
-        const ready = ((wantSwitch || buildEntry) && held > MIN_HOLD && phraseOk) || allaBuild || concertBuild || buildExit;
-        let slagOk = true;   // BYTE PÅ SLAGET (SWITCH_ON)
-        if (SWITCH_ON > 0) {
-          if (!ready || buildLock || (inGap && !dropEntry)) this.slagWaitAt = -1; else if (this.slagWaitAt < 0) this.slagWaitAt = now;
-          if (ready && hasBeat && bpm > 0 && this.beatTrust >= 0.5 && !(this.tickNow && this.lastBeatIdx % SWITCH_ON === 0))
-            slagOk = now - this.slagWaitAt > SWITCH_ON * 1.25 * 60000 / bpm;
+        const buildExit = k[DK.BUILDLOOK] && (k[DK.REFRANG] || (k[DK.BUILDLOOK_2S] && k[DK.TOPP]));
+        if (kn.typ !== 'land') this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, kn.typ === 'drop', liveSec, memSection, secEntry, tierChanged);
+        else {
+          this.landForce = true;   // basen är tillbaka: aldrig lugna poolen (tierEma bär fortfarande luckan)
+          this.switchLook(frame, bpm, tier === LUGN ? FART : tier, tier === LUGN ? 'fart' : tierName, bassClear, false, false, false, false, liveSec, false, false, tierChanged);
+          this.landForce = false; this.landAbsorbUntil = nowWall + LAND_ABSORB_MS;
         }
-        if (!buildLock && (!inGap || dropEntry) && (dropSwitch || dropEntry || (ready && slagOk))) {
-        this.switchLook(frame, bpm, tierS, tierName, bassClear, allaBuild, buildEntry, buildExit, dropSwitch, liveSec, memSection, secEntry, tierChanged);
-      } else if ((landHit && held > LAND_HOLD_MS && (liveSec === 'high' || liveSec === 'intro')) || nearLand) {
-        this.landForce = true;   // basen är tillbaka: aldrig lugna poolen (tierEma bär fortfarande luckan)
-        this.switchLook(frame, bpm, tier === LUGN ? FART : tier, tier === LUGN ? 'fart' : tierName, bassClear, false, false, false, false, liveSec, false, false, tierChanged);
-        this.landForce = false; this.landAbsorbUntil = nowWall + LAND_ABSORB_MS;
-      }
+        if (this.switchCount !== n0) console.log(`[dirigent] knippa ${kn.namn}: ${kn.n.map((i) => DK_NAMN[i]).join(' ')}`);
       return this.smartMode;
   }
 
