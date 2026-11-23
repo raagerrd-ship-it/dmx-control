@@ -1,0 +1,2 @@
+[quiet] console.log avstangd (DMX_QUIET=1) - PUT /api/debug/verbose {"enabled":true} slar pa
+{"wav":"tools/ladan-2026-11-14/lang-20261114T200719.wav","min":16.2,"kulorbytenPerMin":8.9,"kulorerPerSektion":3,"paletterPerSektion":1,"sektioner":69,"palettbytenPerMin":0.8,"palettPaGrans":0.85,"lookbytenPerMin":3.5,"bytePaFras":0.05,"allaTanda":0.65,"lampAntalR":0.21,"versRefrang":0.21,"aterseende":1,"aterkommande":34,"buildForeDrop":0,"buildLedS":null,"drops":8,"buildByten":6,"buildDrops":0}

@@ -1,0 +1,35 @@
+[quiet] console.log avstangd (DMX_QUIET=1) - PUT /api/debug/verbose {"enabled":true} slar pa
+
+=== tools/ladan-2026-11-14/lang-20261114T200719.wav  0-1038 s, 38931 rutor a 25 ms ===
+
+TAJT MOT LATEN
+  kick -> lampan pa mal 109 ms (median, p75 200, 6569 lampuppgangar; gamla riggmedel 90 %: 125 ms, fonster 225 ms vid 125 BPM) pa 1015/2955 kickar = 34.3 %
+  uppgangens storlek 0.13 av riggens 0-1 skala
+  ljus mot energi    r 0.17 pa 1 s-MEDEL, 0.16 pa 1 s-TOPP (ruta-mot-ruta 0.15), ljus mot niva r 0.22
+  ljus per tier      lugn 0.18/0.32  fart 0.16/0.27  full 0.31/0.53  (medel/topp, 179/593/201 s)
+  look-byten         62 st = 3.58/min, musikalisk orsak 100.0 %
+                     sektion 28  landning 18  drop 8  build 6  build-slut 2
+  drops              8 st, sprang lugna 0.75 (8 st) / hoga   -
+
+SNYGG LJUSSHOW
+  alla tre dioderna  3.4 % av tanda lamprutor   exakt en kanal 59.2 %
+  mattnad (median)   1.00      spridning mellan lampor 57 DMX-steg
+  lookar             29 distinkta, median 9 s, langsta stund 118 s
+  riggens ljus       p10 0.07  p50 0.16  p90 0.51   slackt 0.6 % av tiden
+
+-- dirigenten (280 rader, 12 forsta) --
+   [dirigent] nastan-drop: sprang 28.1 dB efter dipp 27.7 dB
+   [dirigent] sektion intro -> build (nr 0, tier 1)
+   [dirigent] manus build: ny look "hiss" (tier fart, pool 16, sektion build, basgang 0.25)
+   [dirigent] sektion build -> high (nr 1, tier 2)
+   [dirigent] manus high: ny look "frasraknare" (tier fart, pool 17, sektion high, basgang 0.99)
+   [dirigent] sektion high -> low (nr 1, tier 0)
+   [dirigent] manus low: ny look "chase" (tier fart, pool 15, sektion low, basgang 0.97, slakt med frasraknare)
+   [dirigent] sektion low -> high (nr 2, tier 2)
+   [dirigent] manus high: "frasraknare" igen
+   [dirigent] sektion high -> low (nr 2, tier 0)
+   [dirigent] manus low: "eko" igen
+   [dirigent] nastan-drop: sprang 18.0 dB efter dipp 17.7 dB
+
+TAJT = kick->ljus lagt, kickTraff hogt, r hogt, musikByten hogt. SNYGGT = alla3 lagt, mattnad och lampspr hoga,
+flera lookar utan langa stillastaende stunder, och ett ljusspann som anvands. Jamfor natt mot natt, aldrig i absoluta tal.

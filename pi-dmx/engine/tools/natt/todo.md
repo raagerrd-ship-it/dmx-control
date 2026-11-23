@@ -1,3 +1,19 @@
+Från kvällen 2026-11-22 (huvudsessionen, gäller natten 22/23): ORKESTRATORN KÖR ANALYSATORARBETE HELA NATTEN (.arena/natt-1122-plan.md). NATTAGENTEN: rör INTE src/ (analyser*, split, slowWorker, effects.ts, effects/, moods, index) och kör INGEN arena; ingen tools/ladan.py. Gör bara baslinjen/rapporten, och kör tunga bänkar bara när `ps -ef | grep -E 'bevis.sh|piBench|analyserParity|konsertReplay|lotusbank|bank.py' | grep -v grep` är tomt (vänta annars, högst en tung process).
+
+NATTEN 2026-11-23 (schemalagda körningen, ingen motorkod, ingen arena, ingen ladan.py - kvällens uppdrag 11-22 följt; väntade ut orkestratorns N5 till 02:51):
+KLART 2026-11-23: kvällens uppdrag 11-22 (bara baslinje/rapport). NÄSTA 11-22 (a) kräver ägarens fråga - inte gjort; (b) noterat, orkestratorns N4 mätte gravity (väljs 0 med alla basmått); (c) ingen arena.
+BASLINJE tools/natt/ren-2026-11-23/ (HEAD da320569, fryst bygge .arena/natt1123/bas via distHook, dist/ orörd; jämför: python tools/natt/renjmf.py ren-2026-11-22 ren-2026-11-23):
+  kick->ljus 147/115/128/163/115/109 ms (11-22: 144/109/131/163/107/107), energiR15 0,21/0,19/0,44/0,36/0,31/0,18 (0,51/0,29/0,40/0,21/0,32/0,18),
+  DROPS 0/10/2/6/12/8 = 38 (1/5/2/5/7/3 = 23; nyckelknipporna 671da83f..da320569), minidrop 35/32/8/14/44/47 (43/40/8/15/54/48), lampspr 63/74/72/63/56/57
+  (60/60/68/62/59/54), kulörbyten/min 9,3/10,3/11,1/7,5/7,7/8,9, byte på fras 27/31/27/23/17/5 %, längsta look lika.
+BISEKT 151659 (energiR15 0,51 -> 0,21, nivaR15 0,73 -> 0,29): 18118fa6 0,51 -> 671da83f 0,17 (drop som nyckelknippor) -> HEAD 0,21. På 4 lookfrön (KR_SEED 0-3):
+  före 0,51/0,24/0,52/0,40 = 0,42, efter 0,17/0,48/0,53/0,19 = 0,34 - BIMODALT: frö-läget avgör om full-nivån får en mörk look (litFull 0,17-0,19) eller ljus (0,36-0,37).
+  Mest lookvalets brus, inte droppen i sig. Inget ändrat (src fredad i natt).
+BRIST (dynamik): nivåtrappan går baklänges i 3 av 6 filer på HEAD: 151659 fart 0,22 > full 0,17, 171840 fart 0,30 > full 0,24 (även 11-22), 200719 lugn 0,18 > fart 0,16.
+  Full-nivåns ljus beror på VILKEN look som råkar spela (0,17 eller 0,37 i samma låt) - effektNiva/toppnormeringen ger inte full en garanterad kontrast mot fart.
+NÄSTA FÖR NATTAGENTEN: (a) när src är fri: mät per look ljuset i full mot fart (lookvalHook + showTight --trace LIT/LOOK) - vilka looker blir mörkare i full än fartens snitt,
+  och om dirigenten ska välja bort dem i full (en idé, domaren v3 + 4 frön); (b) ingen arena utan ARENA-uppdrag.
+
 FLYTTEN KLAR 2026-11-22 05:18 (a014 'varje sten får ett eget fack' + täpp hålet, steg 0-19, sista commit f02fdd75, varje steg bevis.sh OK mot .arena/ref/dist-kedja1; Pi-bänk på lotus +0,3 % huvudtråd / +0,2 % worker). LOTUS UTLAGD 05:17 (lotus 232d07e6, lotusbank 476/503 = oförändrat, backup tagg backup/fore-port-flytten-20261122 + /home/pi/lotus-dist-backup-20261122-fore-flytten.tgz). LADAN kör .arena/ladan8 (steg 10 + effekterna) - nästa besök med ägaren: ladan.py --bara-deploy (byte-identiskt beteende). Analysatorn är fri igen för natt/arena. Kvar som känd kopia: nivåtaket (levelCeil/inZone) räknas i båda trådarna (se .arena/flytten/logg.md).
 
 NATTEN 2026-11-22 (schemalagda körningen, ingen arena, ingen motorkod ändrad; FLYTTEN pågick i arbetskopian -> allt bänkat mot frysta byggen .arena/natt1122/<namn>/dist via distHook, dist/ orörd):

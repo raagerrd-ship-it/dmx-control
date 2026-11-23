@@ -1,0 +1,124 @@
+{
+ "wav": "tools/ladan-2026-11-13/lang-20261113T151659.wav",
+ "startS": 0,
+ "gainDb": 0,
+ "totS": 532,
+ "rutor": 19946,
+ "tajt": {
+  "kickLagMs": 147,
+  "kickLagP75": 195,
+  "kickLagRigg90": 150,
+  "lampUpp": 2834,
+  "kickar": 1594,
+  "kickTraff": 0.3074027603513174,
+  "kickHojd": 0.10588235294117646,
+  "energiR": 0.1804318099655436,
+  "nivaR": 0.28904162642494197,
+  "energiRtopp": 0.14946827657781928,
+  "energiRruta": 0.14117665757864492,
+  "energiR15": 0.21021825667839233,
+  "nivaR15": 0.2868257663589444,
+  "bpmMed": 130.07348355582678,
+  "kickFonsterMs": 200,
+  "litLugn": 0.12388480392156867,
+  "litFart": 0.21887254901960787,
+  "litFull": 0.17129901960784316,
+  "toppLugn": 0.22058823529411764,
+  "toppFart": 0.36911764705882366,
+  "toppFull": 0.2774509803921569,
+  "sekLugn": 98,
+  "sekFart": 316,
+  "sekFull": 84,
+  "byten": 26,
+  "bytenPerMin": 2.9330659313111056,
+  "musikByten": 1,
+  "orsaker": {
+   "sektion": 8,
+   "landning": 17,
+   "build": 1
+  },
+  "drops": 0,
+  "minidrops": 35,
+  "granser": 2,
+  "karaktarsskiften": 10,
+  "tempovaxlingar": 1,
+  "dropSprangLugn": null,
+  "dropSprangHog": null,
+  "dropsLugna": 0
+ },
+ "snygg": {
+  "alla3": 0.015293262068332498,
+  "en": 0.5052636781495576,
+  "matt": 1,
+  "lampspr": 62.610398074801964,
+  "lookar": 15,
+  "lookMedianS": 19.920000000000016,
+  "lookLangstaS": 59.30666666666666,
+  "morkt": 0.0018550085230121327,
+  "litP10": 0.06666666666666667,
+  "litP50": 0.17647058823529413,
+  "litP90": 0.4637254901960784
+ },
+ "lookTime": [
+  [
+   "kickregn",
+   95.36000000000669
+  ],
+  [
+   "dansparet",
+   65.86666650390833
+  ],
+  [
+   "gallop",
+   61.36000000000162
+  ],
+  [
+   "minnet",
+   57.70666674804825
+  ],
+  [
+   "tyngdlyft",
+   57.36000000000135
+  ],
+  [
+   "rulle",
+   37.0133332519531
+  ],
+  [
+   "forvarning",
+   35.013333496093594
+  ],
+  [
+   "drumkit",
+   23.813333496093563
+  ],
+  [
+   "varannan",
+   23.3066667480467
+  ],
+  [
+   "hiss",
+   21.54666650390611
+  ],
+  [
+   "wave",
+   20.211666748046763
+  ],
+  [
+   "stege",
+   12.213333251953099
+  ],
+  [
+   "kaskad",
+   9.919999999999972
+  ],
+  [
+   "sokljus",
+   8.79999999999997
+  ],
+  [
+   "pump",
+   2.4000000000000004
+  ]
+ ]
+}
