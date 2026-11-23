@@ -396,3 +396,19 @@ och togs bort efter steg 30 (ägaren 11-22: "ta bort verktygen").
 `hop.body` -> `spectrum.bodyDb` (`UT`, startvärde 0,5 som förr). Räknas i spektrumets `bigTick()` (spektrumet äger banden; Drop kan stängas av,
 ramens `bodyDb` ska finnas ändå). Läsare: Drop (`DropReads.spectrum: 'bandDbRaw' | 'bodyDb'`, `hop` utan `body`) och ramen. Kärnans `slowPart`
 är nu bara de tre stenarnas anrop. `flyttkarta.json`: `hBody` -> `f.spectrum.bodyDb`.
+
+## Taktpositionen till workern (steg 38)
+
+Workern hade ingen taktposition: ettan/ankaret, tilliten och `barShift` fanns bara i huvudtråden (taktvägens `cfg.beat`, `beatTrust`, `barKnown`).
+Nu skickar kärnans 100 Hz-steg (`tickStep`, samma ögonblick som `h.bpm = ck.bpm`) klockans utfall efter förra hoppet i hoppfacket, taggen `IN`
+(hopprecordet `B`, platserna ur taggarna): `hop.gridMs` = rutnätets ankare (på ettan: klockan har redan lagt `barOff` i ankaret, samma ankare som
+effekterna läser), omräknat till analysatorns väggklocka (`+ wallNow() - Date.now()`: klockan går i `Date.now`, stenarna i `hop.nowWall`; live samma,
+i bänkarna med `setVirtualClock(EPOCH + t)` en epok isär), `hop.trust` = klockans tillit (`frame.beatTrust`), `hop.barKnown` = ettan känd. Tempot är
+`hop.bpm` (samma rutnät). Källan: taktvägen (`HopLaneFast.clockAnchor`, ny, bredvid `clockBpm`) eller analysatorns egen klocka (`clockOut.beat`,
+`clock.barKnown()`). En sten i workern räknar slaget i takten som `floor((hop.nowWall - hop.gridMs) * hop.bpm / 60000) mod 4` (0 = ettan,
+giltigt när `bpm > 40`, `gridMs > 0` och `barKnown`), takter sedan en händelse som `(nu - då) * bpm / 240000`.
+Ankarets absoluta tal betyder inget utöver fasen (klockan flyttar det), så frasen (4/8/16 takter) räknas från en egen händelse.
+
+Bort (död, en källa): `clock.phaseMs`/`phaseConf` (`UT`, tillståndsblocket `S`) och `ClockOut.resetPhase()`. De skrevs inte sedan klockan flyttade
+ut (alltid 0). Ramens `beatPhaseMs`/`beatPhaseConf` skrivs av `publishPhase` (lotus, egen klocka); i DMX står de på 0 som förut (motorn läser
+klockan ur `cfg.beat`). Sektionens felsökningskrok (`dbgSecBlock`) tappade `beatPhaseMs` (alltid 0). `flyttkarta.json`: `beatPhaseMs`/`beatPhaseConf` borta.

@@ -49,14 +49,15 @@ type Taggat<O> = { readonly [K in Exclude<keyof O, Fn<O>>]: Tag | { readonly [k:
 export class HopOut {
   static readonly TRAD = { role: 'K', bigOn: 'K', cfg: 'K', dtHop: 'K', hopMs: 'K', now: 'S', dt: 'S', nowWall: 'IN', gated: 'S',
     breaking: 'IN', kickHit: 'IN',
-    sec: 'IN', lvh: 'IN', conf: 'IN', bpm: 'IN' } as const satisfies Taggat<HopOut>;
+    sec: 'IN', lvh: 'IN', conf: 'IN', bpm: 'IN', gridMs: 'IN', trust: 'IN', barKnown: 'IN' } as const satisfies Taggat<HopOut>;
   role: Role = 'all'; bigOn = false; cfg!: Cfg;   // skrivs en gång i Analysers konstruktor
   dtHop = 0; hopMs = 0.5;
   now = 0.5; dt = 0.5; nowWall = 0.5; gated = false;
   breaking = false;
   kickHit = 0;   // trumkittet
   sec = 'intro'; lvh = 0.5; conf = 0.5; bpm = 0.5;   // långsamma värden sedda vid hoppet
-  constructor(readonly wallNow: () => number) { stabilise(this, ['kickHit']); }   // wallNow = analysatorns väggklocka
+  gridMs = 0; trust = 0; barKnown = false;   // TAKTPOSITIONEN: klockans rutnät (ankaret på ettan, Date.now-tid; bpm ovan), tillit, ettan känd
+  constructor(readonly wallNow: () => number) { stabilise(this, ['kickHit', 'gridMs', 'trust']); }   // wallNow = analysatorns väggklocka
 }
 
 /** LILLA FFT:N (steg 26): fönstrets rms, 512-FFT:ns flöde/kickflöde/energi, utjämnad energi och centroid, snabba bandens magnitud (spektrumet läser). */
@@ -92,13 +93,12 @@ export class KickOut {
   constructor() { stabilise(this, ['pendingKickMs', 'kfPrev', 'kfPrev2', 'beatAnchorMs', 'lastKick']); }
   neutral(): void { this.kickAt = 0; }   // kicken av: ingen förfinad kick (0,5 vore en kick vid 0,5 ms för klockan)
 }
-/** KLOCKAN sedd av analysatorn: bpm/conf = förr localBpm/localBpmConfidence, phaseMs/phaseConf = gridfasen, src = förr beatSrc (samma objekt). */
+/** KLOCKAN sedd av analysatorn: bpm/conf = förr localBpm/localBpmConfidence, src = förr beatSrc (samma objekt). */
 export class ClockOut {
-  static readonly TRAD = { bpm: 'IN', conf: 'IN', phaseMs: 'UT', phaseConf: 'UT', src: 'S' } as const satisfies Taggat<ClockOut>;
-  bpm = 0; conf = 0; phaseMs = 0; phaseConf = 0;
+  static readonly TRAD = { bpm: 'IN', conf: 'IN', src: 'S' } as const satisfies Taggat<ClockOut>;
+  bpm = 0; conf = 0;
   src!: { beat?: BeatGrid | null };
   constructor() { stabilise(this, ['conf']); }
-  resetPhase(): void { this.phaseMs = 0; this.phaseConf = 0; }   // hopp i klockan (setVirtualClock)
   zeroBpm(): void { this.bpm = 0; }   // tystnad 10 s (nivån, F_SIL10)
 }
 

@@ -14,7 +14,7 @@
   "fbOn.constructor": "f.spectrum.fbOn.constructor", "fbOn.length": "f.spectrum.fbOn.length", "specSink": "f.spectrum.sink", "hatHit": "f.spectrum.hatHit", "snareHit": "f.spectrum.snareHit",
   "hKick": "f.kick.kick", "hKickAt": "f.kick.kickAt", "beatAnchorMs": "f.kick.beatAnchorMs", "pendingKickMs": "f.kick.pendingKickMs", "kicks.lastKick": "f.kick.lastKick",
   "kfPrev": "f.kick.kfPrev", "kfPrev2": "f.kick.kfPrev2", "dbgKick": "f.kick.dbgKick",
-  "localBpm": "f.clock.bpm", "localBpmConfidence": "f.clock.conf", "beatPhaseMs": "f.clock.phaseMs", "beatPhaseConf": "f.clock.phaseConf", "beatSrc.constructor": "f.clock.src.constructor",
+  "localBpm": "f.clock.bpm", "localBpmConfidence": "f.clock.conf", "beatSrc.constructor": "f.clock.src.constructor",
   "profBassline": "f.bass.bassline", "bassOnsetsPerBeat": "f.bass.onsetsPerBeat", "bass.beHi": "f.bass.beHi", "bass.beRef": "f.bass.beRef", "bass.beShort": "f.bass.beShort",
   "buildUp": "f.riser.buildUp", "hInRiser": "f.riser.inRiser", "bodyUnderDb": "f.drop.bodyUnderDb",
   "drop.dropCount": "f.drop.dropCount", "drop.miniDropCount": "f.drop.miniDropCount", "drop.buildStartCount": "f.drop.buildStartCount", "drop.dropCand": "f.drop.dropCand", "drop.secBodyRet": "f.drop.secBodyRet", "drop.dropDemoted": "f.drop.dropDemoted", "drop.dropSpaced": "f.drop.dropSpaced",

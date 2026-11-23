@@ -19,7 +19,7 @@ export interface SectionReads {
   fft:      Ser<'L', 'fft', 'rms' | 'centSmooth'>;
   level:    Ser<'L', 'level', 'activeMs' | 'intensity'>;
   kick:     Ser<'L', 'kick', 'kick'>;
-  clock:    Ser<'L', 'clock', 'bpm' | 'phaseMs'>;
+  clock:    Ser<'L', 'clock', 'bpm'>;
   drop:     Ser<'L', 'drop', 'dropCand' | 'secBodyRet'>;
   riser:    Ser<'L', 'riser', 'buildUp'>;
   spectrum: Ser<'L', 'spectrum', 'bigN' | 'bandDbRaw'>;
@@ -211,7 +211,7 @@ export class SectionTracker {
     if (this.o.section === 'high') { this.lastHighDb = this.secCurDbSum / this.secCurDbN; }
     this.o.levelVsHighDb = Number.isFinite(this.lastHighDb) ? blkDb - this.lastHighDb : 0;
     this.predictHigh(nowMs, bInt);
-    if (this.dbgSecBlock) this.dbgSecBlock({ nowMs, section: this.o.section, sectionStartMs: this.o.sectionStartMs, prev, label, bpm: this.ck.bpm, bInt, bKicks, bCent, blkDb, buildUp: this.ri.buildUp, riseRun: this.secRiseRun, rise, dropped, breaking, tier: this.o.sectionTier, repeatSim: this.o.repeatSim, repeatAgoMs: this.o.repeatAgoMs, spec: Array.from(this.secBlkSpec, (v) => v / n), lastHighDb: this.lastHighDb, expectHighMs: this.o.expectHighMs, expectSource: this.o.expectSource, beatPhaseMs: this.ck.phaseMs, secLogN: this.secLog.length, secLogLast: this.secLog[this.secLog.length - 1] ?? null, bBon, bBpk, bFlux, bDyn, bHigh, bFlat, pct: this.secPct });
+    if (this.dbgSecBlock) this.dbgSecBlock({ nowMs, section: this.o.section, sectionStartMs: this.o.sectionStartMs, prev, label, bpm: this.ck.bpm, bInt, bKicks, bCent, blkDb, buildUp: this.ri.buildUp, riseRun: this.secRiseRun, rise, dropped, breaking, tier: this.o.sectionTier, repeatSim: this.o.repeatSim, repeatAgoMs: this.o.repeatAgoMs, spec: Array.from(this.secBlkSpec, (v) => v / n), lastHighDb: this.lastHighDb, expectHighMs: this.o.expectHighMs, expectSource: this.o.expectSource, secLogN: this.secLog.length, secLogLast: this.secLog[this.secLog.length - 1] ?? null, bBon, bBpk, bFlux, bDyn, bHigh, bFlat, pct: this.secPct });
     if (REPEAT & 1) { this.repeatStep(nowMs, blkDb, bKicks, bCent, bInt); this.secBlkMs = 0; this.secBlkN = 0; this.secBlkInt = 0; this.secBlkKicks = 0; this.secBlkCent = 0; this.secBlkSpec.fill(0); this.secBlkRms2 = 0; this.secBlkBon = 0; this.secBlkBpk = 0; this.secBlkFlux = 0; this.secBlkRms4 = 0; return; }
     let sum = 0; for (let i = 0; i < 8; i++) sum += this.secBlkSpec[i];
     const acc = this.secFpAcc; for (let i = 0; i < 8; i++) acc[i] += sum > 0 ? this.secBlkSpec[i] / sum : 0;

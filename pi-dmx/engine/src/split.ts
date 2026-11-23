@@ -160,7 +160,7 @@ export class HopLaneFast {
   private readonly s = new Float64Array(FEED_STATE_LEN); private readonly sr = new StateReader();
   private seq = 0; private applied = 0; private rt = 0; private rb = 0;
   private readonly grid = { anchorMs: 0.5, bpm: 0.5, confidence: 0.5 };
-  clockBpm = 0; clockConf = 0; private trust = 0; private trustAt = 0;   // Klockans tempo/tillit efter senaste feed
+  clockBpm = 0; clockConf = 0; clockAnchor = 0; private trust = 0; private trustAt = 0;   // Klockans tempo/tillit efter senaste feed
   barKnown = false;   // EN ETTA
   peer: HopLaneSlow | null = null;   // inline-läget
   constructor(b: SplitBuffers, private readonly sync = false) {
@@ -182,7 +182,7 @@ export class HopLaneFast {
     if (this.peer) this.peer.drain();
     else if (this.sync) syncWait(ctrl, C_FEED_SEQ, () => this.sr.read(ctrl, this.state, this.s, C_FEED_SEQ) && this.s[FS_HOP_SEQ] >= seq);
     this.apply(cfg, an);
-    const b = cfg.beat; f.bpm = b ? b.bpm : 0; f.bpmConfidence = b ? (b.confidence ?? 0) : 0; this.clockBpm = f.bpm; this.clockConf = f.bpmConfidence;
+    const b = cfg.beat; f.bpm = b ? b.bpm : 0; f.bpmConfidence = b ? (b.confidence ?? 0) : 0; this.clockBpm = f.bpm; this.clockConf = f.bpmConfidence; this.clockAnchor = b ? b.anchorMs : 0;
     { const dt = this.trustAt > 0 ? now - this.trustAt : 0; this.trustAt = now; f.beatTrust = this.trust = trustStep(this.trust, f.bpmConfidence, cfg.beatErr ?? 0, dt > 250 ? 250 : dt); }
   }
   private apply(cfg: HopCfg, an: HopTarget): void {

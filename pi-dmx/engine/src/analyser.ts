@@ -224,7 +224,6 @@ export class Analyser {
   private pullSlowState(): void {
     if (!this.stateRd.read(this.splitCtrl!, this.splitState!, this.stateCopy)) return;
     const s = this.stateCopy; if (s[S_REC_SEQ] < this.barrierSeq) return;
-    this.f.clock.phaseMs = s[Sc.phaseMs]; this.f.clock.phaseConf = s[Sc.phaseConf];
     this.sections?.unpack(s);
   }
   setInlinePeer(slow: Analyser | null): void { this.inlinePeer = slow; }
@@ -272,7 +271,6 @@ export class Analyser {
       Atomics.store(ctrl, C_READ, seqLow(this.recSeq));
       stateWrite(ctrl, this.splitState!, (s) => {
         s[S_REC_SEQ] = this.recSeq; s[S_BPM] = this.f.clock.bpm; s[S_CONF] = this.f.clock.conf;
-        s[Sc.phaseMs] = this.f.clock.phaseMs; s[Sc.phaseConf] = this.f.clock.phaseConf;
         this.sections?.pack(s);
         s[S_PROCESSED] = this.slowProcessed; s[S_LAG_MS] = lagMs; s[S_LAG_MAX] = this.slowLagMaxMs; s[S_BUSY_US] = this.slowBusyEmaUs; s[S_BUSY_MAX_US] = this.slowBusyMaxUs; s[S_SKIPPED] = this.slowSkipped; s[S_LOST_FLAGS] = this.slowLostFlags;
       });
@@ -290,6 +288,7 @@ export class Analyser {
     this.bigPcm!.set(samples, slot * BIG_HOP_MAX);
     r[o + B_N] = n; r[o + Bf.rms] = ff.rms; r[o + Bh.nowWall] = h.nowWall; r[o + Bf.centSmooth] = ff.centSmooth; r[o + Bh.breaking] = h.breaking ? 1 : 0;
     r[o + Bh.kickHit] = h.kickHit; r[o + Bh.sec] = sectionCode(h.sec); r[o + Bh.lvh] = h.lvh; r[o + Bh.conf] = h.conf; r[o + Bh.bpm] = h.bpm;
+    r[o + Bh.gridMs] = h.gridMs; r[o + Bh.trust] = h.trust; r[o + Bh.barKnown] = h.barKnown ? 1 : 0;
     r[o + Bl.lvlSmooth] = lv.lvlSmooth; r[o + Bl.activeMs] = lv.activeMs; r[o + Bl.intensity] = lv.intensity; r[o + Bl.levelCeil] = lv.levelCeil; r[o + Bk.kick] = kk.kick ? 1 : 0;
     r[o + B_ENVF] = this.bigEnvFlag; this.bigEnvFlag = 0;
     r[o + B_SEQ] = seq;
@@ -325,6 +324,7 @@ export class Analyser {
       this.bass?.accumulate();
       ff.rms = r[o + Bf.rms]; h.nowWall = r[o + Bh.nowWall]; ff.centSmooth = r[o + Bf.centSmooth]; h.breaking = r[o + Bh.breaking] === 1;
       h.kickHit = r[o + Bh.kickHit]; h.sec = SECTIONS[r[o + Bh.sec]]; h.lvh = r[o + Bh.lvh]; h.conf = r[o + Bh.conf]; h.bpm = r[o + Bh.bpm];
+      h.gridMs = r[o + Bh.gridMs]; h.trust = r[o + Bh.trust]; h.barKnown = r[o + Bh.barKnown] === 1;
       lv.lvlSmooth = r[o + Bl.lvlSmooth]; lv.activeMs = r[o + Bl.activeMs]; lv.intensity = r[o + Bl.intensity]; lv.levelCeil = r[o + Bl.levelCeil]; kk.kick = r[o + Bk.kick] === 1;
       if (r[o + B_ENVF] === 1) this.bass?.stepBassline();
       { const po = slot * BIG_HOP_MAX; this.bands.bigRingPush(pcm.subarray(po, po + hn)); }
@@ -397,7 +397,7 @@ export class Analyser {
     const jump = ms === null || !this.virtualOn || ms < prev || ms - prev > 1000;
     if (ms === null) { this.virtualOn = false; this.virtualMs = NaN; } else { this.virtualOn = true; this.virtualMs = ms; }
     if (!jump) return;
-    this.kicks?.reset(); this.f.clock.resetPhase(); this.sections?.sectionReset();
+    this.kicks?.reset(); this.sections?.sectionReset();
     this.lastT = 0;
   }
   /** KORBANK. */
@@ -585,6 +585,9 @@ export class Analyser {
     const h = this.f.hop, ck = this.f.clock;
     this.tickT -= 1000 / Analyser.ENV_HZ;
     h.bpm = ck.bpm; if (h.bigOn) this.bigEnvFlag = 1; else this.bass?.stepBassline();
+    { const ln = this.hopLane, b = this.clockOut.beat, a = ln ? ln.clockAnchor : b ? b.anchorMs : 0;   // TAKTPOSITIONEN: klockans utfall efter förra hoppet, samma rutnät som effekterna
+      h.gridMs = a > 0 ? a + this.wallNow() - Date.now() : 0;   // ankaret i analysatorns väggklocka (klockan går i Date.now)
+      h.barKnown = ln ? ln.barKnown : !!this.clock?.barKnown(); h.trust = this.outFrame.beatTrust; }
     if (h.role === 'fast') this.pushSlowRecord();
   }
 
@@ -614,8 +617,6 @@ export class Analyser {
     f.dropCount = dp.dropCount; f.miniDropCount = dp.miniDropCount; f.dropBuildCount = dp.buildStartCount; f.dropDemoted = dp.dropDemoted; f.dropSpaced = dp.dropSpaced;
     f.nearDropDb = dp.nearDropDb; f.nearDipDb = dp.nearDipDb; f.liftDb = dp.liftDb; f.stopCount = dp.stopCount; f.stopS = dp.stopS; f.dropMiniBack = dp.dropMiniBack; f.dropKeys = dp.dropKeys; f.dropNear = dp.dropNear; f.levelInZone = inZone; f.levelBreaking = breaking; f.buildUp = ri.buildUp; f.inRiser = inRiser;
     f.kickAtMs = kickAtMs; f.barShift = -1;
-    f.beatPhaseMs = ck.phaseMs > 0 ? ck.phaseMs - Analyser.GRID_PHASE_OFFSET_MS : ck.phaseMs;
-    f.beatPhaseConf = ck.phaseConf;
     this.sections?.sectionAggStep();
     const nowS = this.wallNow();
     f.sectionBuildProg = sc.secBuildAt > 0 && nowS - sc.secBuildSeen <= 2000 ? Math.min(1, (nowS - sc.secBuildAt) / (32 * (ck.bpm > 0 ? 60000 / ck.bpm : Analyser.BE_FALLBACK_MS))) : 0;
