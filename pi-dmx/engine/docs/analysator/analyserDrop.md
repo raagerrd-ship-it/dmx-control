@@ -512,7 +512,7 @@ hålls är händelsen avgjord som förut: DISKANT -> `dropDemoted`, SPARR -> `dr
 | SVACKA | toppen >= 6 dB under taket i >= 2 s, ELLER UPPBYGGNADEN: diskanten (2 s) >= 5 dB över sitt 30 s-medel OCH >= 2 dB över sitt 6 s-medel (`hiMid`) med obruten bas >= 5 s (steg 37) | 3 s (fillet/luckan före landningen) | drop |
 | LANDNING | ANSLAGET (steg 46): den råa baskroppen (stor-FFT:n, utan 60 ms-enveloppen) inom 0,5 dB från taket i 20 ms (`LAND_RAW_DB`, `LAND_RAW_MS`); förr 60 ms-enveloppen inom 1,5 dB | 0 | drop |
 | STIGNING | >= 12 dB över 0,5 s-minimum | 0 | bara i ramen |
-| LJUD | breaket inte helt tyst | 0 | drop (veto) |
+| LJUD | breaket inte helt tyst de sista 8 s (`LJUD_MAX_S`, steg 47) | 0 | drop (veto) |
 | DISKANT | diskanten (2 s) >= sitt 30 s-medel | 0 | drop (veto) |
 | SPARR | >= 3 s sedan förra drop (steg 36; var 12 s) | 0 | drop (veto) |
 | TOPP | taket högst 5 dB under sega toppen (basen har nyss varit full) | 0 | drop (steg 35) |
@@ -568,3 +568,9 @@ ljusdomaren v3 övning +0,0, kontroll +5,2.
   minidrop på samma hopp); minidrop som kom före droppen i samma lucka försvinner (dropen kommer samma hopp). Prov som föll: rå utan hålltid (kontroll
   3/11, för tidigt på upptakten), råa LYFT/HOGT också (fler för tidiga), 40 ms (falska upp). Ljusdomaren övning +2,4, kontroll +1,9 (lampspridningen
   info enligt ägaren; t90 l193818 30 -> 50 bara i start 0, 3 starter 30/30/10 -> 50/30/10).
+- Steg 47 INLAGT (ögonprovet 11-23 varv 2, tvärstoppet): LJUD räknar tystnaden bara de sista 8 s av breaket (`LJUD_MAX_S`). Förr fällde en
+  tystnad var som helst i breaket droppen: 160345 282 är en låtgräns (131 bpm slutar, tyst 262,8-264,8, ny låt 120 bpm) följd av 17 s intro utan bas;
+  breaket (27 s) innehöll låtluckan och ägarens drop vetades. Nu: drop +70..+80 ms (knapptrycksfil, filens övriga drop +70..+150). Ägarens regel
+  "samma tempo genom tystnaden" provades inte: klockans tillit faller till 0 inom ~5 s utan kick (sonden 257,6-259 s), och tvärstoppet i ladan
+  14:52:54 finns inte inspelat. Mätt (dom.py mot steg 46): övning rätt 14 -> 15, falska 9 = 9, tidsfel +52 -> +55 ms (> 100 ms sent 29 -> 27 %);
+  kontroll identisk. Ljusdomaren övning -1,5 (l160345: 282 blir drop), kontroll 0,0, ingen spärr.

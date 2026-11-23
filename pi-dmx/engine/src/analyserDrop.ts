@@ -31,6 +31,7 @@ const DROP_LONG_MS = 20000;   // annars maste sa har lang tid ga
 const DROP_ESCALATE_DB = 3;   // tatare drops maste vara TYDLIGT starkare for att fyra
 const FLANK_GONE_DB = 10, FLANK_RISE_DB = 12, FLANK_HOLD_S = 0.6;   // FLANKENS FILTER
 const LAND_RAW_DB = 0.5, LAND_RAW_MS = 20;   // LANDNING på anslaget: råa baskroppen (stor-FFT:n, utan 60 ms-enveloppen) inom 0,5 dB från taket i 20 ms
+const LJUD_MAX_S = 8;   // LJUD: tystnaden räknas bara de sista 8 s av breaket (en låtlucka längre bak = nya låtens intro är breaket)
 const FLANK_SILENT_LV = 0.005, SVACKA_DB = 6, SVACKA_S = 2;   // SVACKAN: toppen >= SVACKA_DB under taket i >= SVACKA_S
 const BUILD_SPACING_MS = 3000;   // UPPBYGGNADEN börjar när basen dras ur (kick-luckan), högst en gång per 3 s
 const TOPP_DB = 5;   // taket (0,15 dB/s) högst så här under sega toppen (0,04 dB/s)
@@ -51,7 +52,7 @@ const HOLD_MS = [
   3000,                  // SVACKA    breaket: toppen >= SVACKA_DB under taket i >= SVACKA_S, ELLER uppbyggnaden (diskanten stiger över obruten bas) (hålls 3 s: fillet/luckan före landningen)
   0,                     // LANDNING  anslaget: råa baskroppen inom LAND_RAW_DB från taket i LAND_RAW_MS (en sen landning blir minidrop)
   0,                     // STIGNING  >= FLANK_RISE_DB över 0,5 s-minimum (i ramen, inte i knippan)
-  0,                     // LJUD      breaket inte helt tyst (låtlucka)
+  0,                     // LJUD      breaket inte helt tyst (låtlucka) de sista LJUD_MAX_S
   0,                     // DISKANT   diskanten (2 s) >= HI_VETO_DB mot sitt 30 s-medel
   0,                     // SPARR     >= SHOW_DROP_GAP_MS sedan förra drop
   0,                     // TOPP      taket högst TOPP_DB under sega toppen (basen har nyss varit full, inte ett lugnt parti)
@@ -209,7 +210,7 @@ export class DropDetector {
       | this.key(K.SVACKA, this.fdGone >= SVACKA_S || (this.hiFast - this.hiNorm >= UPPB_HI_DB && this.hiFast - this.hiMid >= UPPB_RISE_DB && now - this.lastMiniGoneMs >= UPPB_GROOVE_MS), now)
       | this.key(K.LANDNING, this.landRunMs >= LAND_RAW_MS, now)
       | this.key(K.STIGNING, f - this.fdLow >= FLANK_RISE_DB, now)
-      | this.key(K.LJUD, now - this.fdQuietAt >= span * 1000 + 500, now)
+      | this.key(K.LJUD, now - this.fdQuietAt >= Math.min(span, LJUD_MAX_S) * 1000 + 500, now)
       | this.key(K.DISKANT, this.hiFast - this.hiNorm >= HI_VETO_DB, now)
       | this.key(K.SPARR, now - this.lastShowDropMs >= SHOW_DROP_GAP_MS, now)
       | this.key(K.TOPP, peak - ceil <= TOPP_DB, now)
