@@ -314,7 +314,7 @@ const GAP_HOLD_MS = 4000;   // I LUCKAN: spärren efter uppbyggnadssignalen slä
  *  En knippa per bytesskäl; ett byte när ALLA dess nycklar hålls. Ordningen = företräde ('land' prövas bara om ingen annan knippa öppnar). */
 const DK = { TRAFF: 0, ENERGI: 1, HALLEN: 2, EJ_BASSTARK: 3, NY_DEL: 4, REFRANG: 5, DROP_NYSS: 6, EJ_LANDAT: 7, GRANS: 8, DEL: 9, BUILD: 10, HALLEN_2S: 11, FRAS: 12, SLAG: 13, EJ_LUCKA: 14, EJ_BUILDLAS: 15,
   BUILD_NY: 16, BUILDLOOK: 17, BUILDLOOK_2S: 18, TOPP: 19, INGEN_DEL: 20, TIER: 21, DWELL: 22, LANDNING: 23, HALLEN_LAND: 24, BASDEL: 25, NASTAN: 26, HALLEN_NARA: 27, EJ_BUILD_BREAK: 28, EJ_BUILD_BREAK_HIGH: 29,
-  EFTER_DL: 30, EJ_EFTER_DL: 31 } as const;
+  EFTER_DL: 30, EJ_EFTER_DL: 31, EJ_INTRO: 32 } as const;
 const DK_NAMN = Object.keys(DK).map((s) => s.replace(/_/g, ' '));
 type Knippa = { namn: string; typ: 'drop' | 'byte' | 'land'; n: readonly number[]; slag: boolean };
 const knippa = (namn: string, typ: Knippa['typ'], ...n: number[]): Knippa => ({ namn, typ, n, slag: n.includes(DK.SLAG) });
@@ -322,7 +322,7 @@ const KNIPPOR: readonly Knippa[] = [
   knippa('DROP', 'drop', DK.TRAFF, DK.ENERGI, DK.HALLEN),
   knippa('DROP FEL LOOK', 'drop', DK.TRAFF, DK.ENERGI, DK.EJ_BASSTARK),   // konsertläget: dropen avslutar builden direkt
   knippa('DROP IN', 'byte', DK.NY_DEL, DK.REFRANG, DK.DROP_NYSS, DK.EJ_LANDAT),   // refrängen efter en drop som blev minidrop: direkt (ingen hålltid/fras/slag)
-  knippa('SEKTION', 'byte', DK.DEL, DK.GRANS, DK.HALLEN, DK.FRAS, DK.SLAG, DK.EJ_LUCKA),
+  knippa('SEKTION', 'byte', DK.DEL, DK.GRANS, DK.HALLEN, DK.FRAS, DK.SLAG, DK.EJ_LUCKA, DK.EJ_INTRO),
   knippa('BUILD IN', 'byte', DK.BUILD, DK.GRANS, DK.HALLEN_2S, DK.SLAG, DK.EJ_LUCKA, DK.EJ_BUILDLAS),   // konsertläget: in i build direkt
   knippa('BUILD', 'byte', DK.BUILD, DK.BUILD_NY, DK.HALLEN_2S, DK.SLAG, DK.EJ_LUCKA, DK.EJ_BUILDLAS),
   knippa('BUILD UT', 'byte', DK.BUILDLOOK, DK.REFRANG, DK.SLAG, DK.EJ_LUCKA),   // refrängen kom utan drop -> lämna builden direkt
@@ -1126,6 +1126,7 @@ export class EffectEngine {
         k[DK.EJ_BUILD_BREAK_HIGH] = liveSec !== 'build' && liveSec !== 'break' && liveSec !== 'high';
         k[DK.EFTER_DL] = this.switchWhy === 'drop' || this.switchWhy === 'landning';
         k[DK.EJ_EFTER_DL] = !k[DK.EFTER_DL];
+        k[DK.EJ_INTRO] = liveSec !== 'intro';                                     // delen är inte analysatorns intro (lugnt parti mitt i låten)
         // SLAG (BYTE PÅ SLAGET, SWITCH_ON): sista nyckeln. Väntan börjar när resten av en slagknippa hålls; öppen på ettan, utan säker takt, eller efter SWITCH_ON x 1,25 slag.
         let rest = false;
         for (let i = 0; i < KNIPPOR.length && !rest; i++) rest = KNIPPOR[i].slag && this.knippa(KNIPPOR[i].n, DK.SLAG);
