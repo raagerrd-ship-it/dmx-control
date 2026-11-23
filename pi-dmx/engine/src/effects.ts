@@ -309,18 +309,19 @@ const PULSE_IDX_INIT = -2e9;
 /** SECTION_UNIT (ladan 16:45): forvarningens 'high' 600 ms fore en forutsedd refrang och drop-fonstrets 'high' raknas INTE som sektionsgrans
  *  (de gav high<->low-hopp pa 1-2 s nar refrangen uteblev). Bara den raa sektionen, och den maste vara minst DMX_SECTION_UNIT_MIN_MS gammal. */
 const LAND_HOLD_MS = 6000, LAND_ABSORB_MS = 24000;   // LANDNINGEN (a7): minsta hålltid före landningsbytet; sektionsbyten inom fönstret efter tas inte
+const SAMMA_MS = 300;   // EJ NYSS: ett byte inom 0,3 s efter förra är samma händelse (ögonprovet 11-23: NASTAN EFTER -> DROP FEL LOOK inom 56 ms)
 const GAP_HOLD_MS = 4000;   // I LUCKAN: spärren efter uppbyggnadssignalen släpper senast efter 4 s (signal -> landning median 1,8 s)
 /** DIRIGENTENS NYCKLAR OCH KNIPPOR (steg 42, ägarens nyckelmodell 11-22): villkoret och hålltiden står en rad per nyckel i stepDirigent.
  *  En knippa per bytesskäl; ett byte när ALLA dess nycklar hålls. Ordningen = företräde ('land' prövas bara om ingen annan knippa öppnar). */
 const DK = { TRAFF: 0, ENERGI: 1, HALLEN: 2, EJ_BASSTARK: 3, NY_DEL: 4, REFRANG: 5, DROP_NYSS: 6, EJ_LANDAT: 7, GRANS: 8, DEL: 9, BUILD: 10, HALLEN_2S: 11, FRAS: 12, SLAG: 13, EJ_LUCKA: 14, EJ_BUILDLAS: 15,
   BUILD_NY: 16, BUILDLOOK: 17, BUILDLOOK_2S: 18, TOPP: 19, INGEN_DEL: 20, TIER: 21, DWELL: 22, LANDNING: 23, HALLEN_LAND: 24, BASDEL: 25, NASTAN: 26, HALLEN_NARA: 27, EJ_BUILD_BREAK: 28, EJ_BUILD_BREAK_HIGH: 29,
-  EFTER_DL: 30, EJ_EFTER_DL: 31, EJ_INTRO: 32, UPPBYGGNAD: 33 } as const;
+  EFTER_DL: 30, EJ_EFTER_DL: 31, EJ_INTRO: 32, UPPBYGGNAD: 33, EJ_NYSS: 34 } as const;
 const DK_NAMN = Object.keys(DK).map((s) => s.replace(/_/g, ' '));
 type Knippa = { namn: string; typ: 'drop' | 'byte' | 'land'; n: readonly number[]; slag: boolean };
 const knippa = (namn: string, typ: Knippa['typ'], ...n: number[]): Knippa => ({ namn, typ, n, slag: n.includes(DK.SLAG) });
 const KNIPPOR: readonly Knippa[] = [
   knippa('DROP', 'drop', DK.TRAFF, DK.ENERGI, DK.HALLEN),
-  knippa('DROP FEL LOOK', 'drop', DK.TRAFF, DK.ENERGI, DK.EJ_BASSTARK),   // konsertläget: dropen avslutar builden direkt
+  knippa('DROP FEL LOOK', 'drop', DK.TRAFF, DK.ENERGI, DK.EJ_BASSTARK, DK.EJ_NYSS),   // konsertläget: dropen avslutar builden direkt
   knippa('DROP IN', 'byte', DK.NY_DEL, DK.REFRANG, DK.DROP_NYSS, DK.EJ_LANDAT),   // refrängen efter en drop som blev minidrop: direkt (ingen hålltid/fras/slag)
   knippa('SEKTION', 'byte', DK.DEL, DK.GRANS, DK.HALLEN, DK.FRAS, DK.SLAG, DK.EJ_LUCKA, DK.EJ_INTRO),
   knippa('BUILD IN', 'byte', DK.BUILD, DK.GRANS, DK.HALLEN_2S, DK.SLAG, DK.EJ_LUCKA, DK.EJ_BUILDLAS, DK.UPPBYGGNAD),   // konsertläget: in i build direkt
@@ -1127,6 +1128,7 @@ export class EffectEngine {
         k[DK.EFTER_DL] = this.switchWhy === 'drop' || this.switchWhy === 'landning';
         k[DK.EJ_EFTER_DL] = !k[DK.EFTER_DL];
         k[DK.UPPBYGGNAD] = (frame.buildUp ?? 0) >= 0.25;                         // analysatorns uppbyggnad (knippan LUCKA+AKTIV+DISKANT, steg 40), ~0,9 s in
+        k[DK.EJ_NYSS] = held > SAMMA_MS;                                         // inget byte de senaste 0,3 s (samma händelse: ett byte, inte två)
         k[DK.EJ_INTRO] = liveSec !== 'intro';                                     // delen är inte analysatorns intro (lugnt parti mitt i låten)
         // SLAG (BYTE PÅ SLAGET, SWITCH_ON): sista nyckeln. Väntan börjar när resten av en slagknippa hålls; öppen på ettan, utan säker takt, eller efter SWITCH_ON x 1,25 slag.
         let rest = false;
