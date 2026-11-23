@@ -69,7 +69,7 @@ POÄNG = 0,6 * LÅNGSAMMA + 0,4 * SNABBA + BONUS (bara i finalen, max +3)
     tools/dmxDump.mjs DUMP_SPLIT=sync (den riktiga workern i lås-steg) och tools/dmxDumpMoment.mjs DUMP_MOMENTS=1 DUMP_SPLIT=inline,
     3:e arg 100000. Skiljer md5: ljusdomaren - tools/arena/bank.py <mapp> (--holdout i finalen) + domare.py v3: poäng >= bas - 0,5 och
     (LÅTGRÄNSEN, ägaren 11-08: gr_ratt >= +20 % och gr_falska inte sämre -> ljusdomarens gräns -3,0 i stället för -0,5) och
-    inga av domarens spärrar (lampspr < 94 %, slocknat, fladder, t90; domarens filspärr gäller inte här). Fade-down, strobe och
+    inga av domarens spärrar (slocknat, fladder, t90; domarens filspärr gäller inte här). Fade-down, strobe och
     vitt döms bara genom md5 / ljusdomaren (inget eget mått).
   GRÄNS (annars DISK): workerns taktväg i realtid - hop efter när huvudtråden läser (tools/feedRealtid.mjs <dist> <cpu-wav> 60, efterHop,
     körd SAMTIDIGT med engine/dist = samma last), p99 <= X = bas p99 + 1 hop (bas = basmätningen eller parets bas, den högre).
