@@ -516,6 +516,7 @@ hålls är händelsen avgjord som förut: DISKANT -> `dropDemoted`, SPARR -> `dr
 | DISKANT | diskanten (2 s) >= sitt 30 s-medel | 0 | drop (veto) |
 | SPARR | >= 3 s sedan förra drop (steg 36; var 12 s) | 0 | drop (veto) |
 | TOPP | taket högst 5 dB under sega toppen (basen har nyss varit full) | 0 | drop (steg 35) |
+| UPPBYGGNAD | uppbyggnadens förlopp `buildUp` >= 0,25 (`UPPB_BUILD`, ~0,9 s av uppbyggnadens knippa, analyserRiser) | 3 s (som SVACKA: luckan före landningen) | drop efter uppbyggnad (steg 41) |
 
 Ramen: `dropKeys` = bit per hållen nyckel (bitarna i `K`), `dropNear` bit 1 = minidropens förutsättningar (LUCKA+AKTIV) hålls, bit 2 = dropens
 (+SVACKA LJUD DISKANT SPARR): knippan väntar bara på landningen. Dirigenten kan förbereda; analysatorn väljer inget åt den.
@@ -547,3 +548,13 @@ ljusdomaren v3 övning +0,0, kontroll +5,2.
   Förkastade i arenan: d4 "toppen tystnar" (band 6–7 faller >= 2,5 dB i breaket; övning 14/23 men 8 falska, kontroll falska 2 -> 3: 171840 250),
   fusionen d1+d4 (övning 15/23, 8 falska; kontroll 3 falska), + d2 "8-takters-frasen" i DISKANT (16/23 men 10 falska), d2 ensam 11/23, d3 refrängen
   ensam 11/23 (dess räddning 838 täcks av d1).
+- Steg 41 INLAGT (ägaren 11-23: "Lägg så"): DROP EFTER UPPBYGGNAD är en egen dörr, `DROP_UPP_KEYS` = drop-knippan med UPPBYGGNAD i stället för SVACKA
+  (samma minidrop-nycklar, LANDNING, LJUD, DISKANT, SPARR, TOPP). Droppen utlöses när någon av de två knipporna är upplåst; vetot och "händelsen avgjord"
+  räknas på den knippa där allt utom vetot hålls (de skiljer bara i SVACKA/UPPBYGGNAD), och båda nycklarna förbrukas vid avgörandet (`keyAt` = -1e12).
+  `dropNear` bit 2 sätts av vilken knippa som helst (`DROP_UPP_NEAR`). Bit 12 i `dropKeys` = UPPBYGGNAD. Drop läser `buildUp` från förra hoppet
+  (riser körs efter drop). Beteendet är exakt provet s41b (SVACKA || buildUp >= 0,25), dom.py lika tal.
+  Mätt (dom.py, 3 starter, mot steg 40): övning rätt 13 -> 15 av 23 (172432 869 och 160345 137, de korta breaken), falska 7 -> 9 (160345 44 inne i ägarens
+  uppbyggnad, 478; knapptrycksfil), dropdom3 33,2 -> 34,7, tidsfel +160 -> +125 ms; kontroll 6 = 6 av 11, falska 2,0 -> 2,3 (193040 280 i 1 av 3 starter,
+  godkänt av ägaren: "falska drop stör inte i ladan"), dropdom3 52,8 -> 52,6; minidrop lika. Prov som föll: inRiser direkt i SVACKA (33 falska), tröskel 0,2
+  (17 falska), 0,3 (räddar inget), DISKANT-vetot släppt efter uppbyggnad (41 falska). De DISKANT-vetade dropen (151659 44, 172432 107, 171840 49, 193040 91)
+  har ingen uppbyggnad före (uppbyggnaden kräver själv DISKANT).
