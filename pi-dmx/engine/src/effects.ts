@@ -15,6 +15,7 @@ import { isLogOn } from "./quiet.js";
 import type { ChannelRole, EngineConfig, Mode } from "./config.js";
 import { fixtureRoles } from "./config.js";
 import { FixtureOutput, keepLit, lampLevel, sameLight, LampGuard, type SpecialtyValues } from "./output.js";
+import { Rok } from "./rok.js";
 import { EffectFade } from "./effects/toning.js";   // minsta på-tiden = lampfysik (output.ts MINSTA PÅ-TID)
 import { beatPhase, beatMs as beatPeriod, beatIndex, hasBeat as beatLocked, GRID_EARLY_MS } from "./beatClock.js";
 import { SILENCE_LEVEL, BASS_SPAN_DB, type Frame } from "./analyser.js";
@@ -225,10 +226,6 @@ const NEAR_LAND_DB = 20, NEAR_LAND_HOLD_MS = 2000;   // STOR NÄSTAN-DROP = LAND
  *  ar ocksa ett bytesskal - looken byts direkt, med samma regel som minidropen (looken maste ha hallits MIN_HOLD 8 s). */
 /** (MINI_DELAY_MS borttagen 2026-10-08, agaren: 'varfor, bara vaxla till full annars?' - minidropen lyfter direkt; kommer en riktig
  *  drop tar den over. Vantan fran 09-12 gallde nar minidropen blixtrade vitt/dropfargat.) */
-/** ROK-HUNGER (agaren i ladan 2026-10-04: "har rokmaskinen inte kort pa kanske 5 min, gor det enklare att kora en puff"):
- *  efter DMX_FOG_HUNGRY_S utan puff racker en minidrop eller att musiken gar in i en high-sektion (i stallet for bara en
- *  riktig drop). Cooldownen och varmeskyddet i output.fogTick galler som forut. 0 = av. */
-const FOG_HUNGRY_S = 300;
 /** TYDLIG BASGANG -> TOGGLE-EFFEKTER (agaren 2026-09-12: "tydlig basgang = inner/outer; inte alltid men foredragen";
  *  ladan 2026-09-21: "kanns inte som den aktiverar den vid basgang - gor det tydligare att den skall valja dom").
  *  Forr: profile.bass (lag-endens ANDEL, 8 s trog) >= 0,4, bara innerouter, bara med DMX_HALVE_SHOW, tva av tre byten.
@@ -584,7 +581,7 @@ export class EffectEngine {
   private warmMs = 0;
   private bassBaseline = 0.35;   // bas-golv (tyst basnivå) för bas-punch
   private lastDropCount = 0;   // senast hanterade frame.dropCount → edge-säker drop-flank
-  private lastFogWall = Date.now(); private fogWasSpraying = false; private fogLastSec = '';   // rok-hungern (FOG_HUNGRY_S)
+  private rok = new Rok();   // rökens nyckelknippor (rok.ts)
   private lastDemoted = 0; private lastSpaced = 0; private lastStopCount = 0;   // analysatorns monotona räknare (a3: dropDemoted/dropSpaced/stopCount)
    private tickNow = false; private rNowP = 0; private rNowWall = 0; private rDt = 0; private rDtT = 0; private rBeatMs = 0; private rBeatEnv = 0; private rDTarget = 0; private rMd = 0; private rT = 0; private rAnchorHue = 0; private rDrive = 0; private rInputGate = 0;   // RUTANS TAL (se EN KLOCKA PER RUTA): fält i stället för argument - ett decimaltal som skickas till en metod packas in (GC-jakten 10-16)
   private anaDropAt = -1e12;   // analysatorns drop som blev minidrop (se REFRÄNGEN DIREKT EFTER EN MINIDROP-DROP)
@@ -747,7 +744,7 @@ export class EffectEngine {
     const fog = this.cfg.fog;
     if (!fog?.enabled) return null;
     const now = Date.now();
-    const warmLeftMs = fog.warmStartMs ? Math.max(0, (fog.warmupMs ?? 600000) - (now - fog.warmStartMs)) : 0;
+    const warmLeftMs = fog.warmStartMs ? Math.max(0, (fog.warmupMs ?? 600000) - (now - fog.warmStartMs)) : 0, rs = this.rok.state(now);
     // ADRESSKROCK. Rök-kanalen skrivs SIST i universumet (efter ballistiken, för
     // att få instant på/av) → den VINNER över en armatur som delar adressen, och
     // lampan slocknar utan förklaring. Vi flyttar den INTE automatiskt: ett tyst
@@ -760,9 +757,9 @@ export class EffectEngine {
     }
     return {
       conflict,
-      state: this.out.fogState(now).spraying ? "spraying" : warmLeftMs > 0 ? "heating" : "ready",
+      state: rs.spraying ? "spraying" : warmLeftMs > 0 ? "heating" : "ready",
       warmLeftMs,
-      heat: this.out.fogState(now).heat,
+      heat: rs.heat,
       sprayMs: fog.sprayMs ?? 0,
       bursts: fog.bursts ?? 0,
     };
@@ -779,7 +776,7 @@ export class EffectEngine {
   private lastRenderMs = performance.now();
   // (FULL DROP PÅ FLANKEN - flankStep - flyttad till analysatorn 11-09, a3: EN dropdetektor, frame.dropCount/dropDemoted/dropSpaced.)
 
-  constructor(private cfg: EngineConfig) { doubleFields(this); doubleFields(this.ctx); }
+  constructor(private cfg: EngineConfig) { doubleFields(this); doubleFields(this.ctx); doubleFields(this.rok); }
 
   /** AKUSTISK TRÖGHET: varje bastransient (kick) knuffar show-tiden framåt.
    *  Anropas i 375 Hz-chunkhanteraren så inga slag missas (render kör 100 Hz).
@@ -2017,27 +2014,12 @@ export class EffectEngine {
     }
     { const o = this.out; o.calMaster = this.cfg.master ?? 1; o.calNow = nowP; o.calDrop = this.dropColEnv * (1 - mw); o.calCeil = this.secCeil + (1 - this.secCeil) * mw; o.calRamp = this.levelRamp + (1 - this.levelRamp) * mw; o.calibrate(this.universe, this.cfg.fixtures); }   // talen via fält (se output.ts)
 
-    // Rök: motorn avgör OM den ska spruta, output-tjänsten var signalen hamnar.
-    // RÖK: motorn samlar önskemålen — drop, manuell knapp, eller en effekt som bett om
-    // det — och output-tjänsten avgör om maskinen KAN (värmebudget, cooldown, nödstopp).
+    // RÖK: motorn lämnar rutans händelser, röken avgör (nyckelknippor i rok.ts), output skriver kanalen.
     if (fog) {
-      // MANUELL puff (Rök nu) kringgår cooldownen: ägaren trycker medvetet. Värmeskyddet (heatOk)
-      // och pågående-puff-spärren gäller fortfarande. Utan detta tappades knappen TYST inom 2 min
-      // efter varje drop-rök (ladan 2026-09-04: bursts stod still, ingen feedback i UI:t).
-      const manualFog = !!this.cfg.fogTrigger || this.moment.puff;   // + första dansens puff vid start (moment.ts)
-      // HUNGER: lange sedan senaste puff -> aven en minidrop eller intrade i high-sektion far bli rok.
-      const sec = frame.section ?? '';
-      const highEntry = sec === 'high' && this.fogLastSec !== '' && this.fogLastSec !== 'high';
-      if (sec) this.fogLastSec = sec;
-      const hungry = FOG_HUNGRY_S > 0 && fog.onDrop && nowWall - this.lastFogWall > FOG_HUNGRY_S * 1000;
-      const miniNow = this.lastMiniWall === nowWall || this.nearAt === nowWall;   // fireMini satte looken i denna ruta (10-16: förr analysatorns miniHit, alltid falskt i konsertläget -> minidrop gav aldrig hungrig rök)
-      // (11-01 ladan, ägaren: 'det har gått flera 5 min, den borde kört' - loggen: 6 nästan-drops på 2,5 min, ingen minidrop -> hungern fick
-      //  aldrig sin signal. Nästan-dropen räknas nu som minidrop för den hungriga röken.)
-      const wantBurst = mw > 0 ? manualFog : (dropHitRaw && fog.onDrop) || manualFog || wantFogFx || (hungry && (miniNow || highEntry));   // stund: bara manuell puff
+      const knapp = !!this.cfg.fogTrigger || this.moment.puff;   // Rök nu + första dansens puff vid start (moment.ts)
       if (this.cfg.fogTrigger) this.cfg.fogTrigger = false;   // engångs-flagga
-      this.out.fogNow = nowWall; this.out.fogDt = _dtT * 1000; const spraying = this.out.fogTick(wantBurst, fog, manualFog);
-      if (spraying && !this.fogWasSpraying) this.lastFogWall = nowWall;   // puffen startade (vilken orsak som helst)
-      this.fogWasSpraying = spraying;
+      const r = this.rok; r.now = nowWall; r.dt = _dtT * 1000;
+      const spraying = r.step(fog, dropHitRaw, this.lastMiniWall === nowWall || this.nearAt === nowWall, frame.section ?? '', knapp, wantFogFx, mw > 0);   // minidrop = fireMini eller nästan-drop i denna ruta
       if (fog.enabled) this.out.writeFog(this.universe, fog.address, spraying ? fog.level : 0);
     }
     return this.universe;

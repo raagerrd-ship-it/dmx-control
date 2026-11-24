@@ -32,8 +32,6 @@ const MAP_TOP = 0.95;
  *  fastLight-effekter hoppar över de två första (effects/types.ts fastLight). */
 export const FADE_MIN_S = 0.25, MIN_ON_MS = 150, CH_MIN_ON_MS = 100;   // FADE_MIN_S = outputs golv mot strobe (LampGuard nedan) och effekternas snabbaste uttoning; de två hålltiderna är standardvärden för effects/toning.ts
 const HOLD_MS = 120;
-const FOG_HEAT_MAX = 45000;   // datablad: 40–50 s sprutning i sträck
-const FOG_RECOVER = 0.15;     // vila dränerar 15 % av realtid
 
 /** Kalibrering per lampa: cal.gamma (1..3) och cal.top (0,5..1); saknas/utanför = standard. */
 const lampGamma = (fx: FixtureConfig | undefined): number => { const g = fx?.cal?.gamma; return g !== undefined && g >= 1 && g <= 3 ? g : GAMMA; };
@@ -125,11 +123,6 @@ export class FixtureOutput {
   private builtFor: unknown = null;
   private lamps: Lamp[] = [];
   private byBase = new Map<number, Lamp>();
-  // Rökmaskinens tillstånd — enhetens egen, inte musikens.
-  private fogUntil = 0;         // pågående puff till (wall-clock ms)
-  private lastFogMs = -1e9;     // senaste puff (cooldown)
-  private fogHeat = 0;          // värmekonto (ms)
-  private fogWasEnabled = false;
 
   /** Förbered lamporna när fixture-listan byts (referensjämförelse → gratis per ruta). */
   build(fixtures: FixtureConfig[]): void {
@@ -164,7 +157,7 @@ export class FixtureOutput {
 
   /** Kalibreringens tal via fält, inte argument (10-18: decimaltal som argument packades in varje ruta). Sätts av motorn direkt före
    *  anropet; startvärdena är decimaltal så fälten har decimalform från början. */
-  calMaster = 0.5; calNow = 0.5; calDrop = 0.5; calCeil = 0.5; calRamp = 0.5; fogNow = 0.5; fogDt = 0.5;
+  calMaster = 0.5; calNow = 0.5; calDrop = 0.5; calCeil = 0.5; calRamp = 0.5;
 
   /** SISTA STEGET FÖRE UTGÅNG - EN mappning per kanal: 0 = släckt, 1..255 -> kanalens tändpunkt+1 .. lampans tak
    *  (cal.top x sektionens tak calCeil x master; en full drop calDrop öppnar resten upp till 100 %). VARJE färgkanal mappas för sig
@@ -210,44 +203,7 @@ export class FixtureOutput {
     }
   }
 
-  fogTick(want: boolean, fog: {
-    enabled?: boolean; burstMs: number; cooldownMs: number;
-    warmStartMs?: number; sprayMs?: number; bursts?: number;
-  }, manual = false): boolean {
-    const nowMs = this.fogNow, dtMs = this.fogDt;   // (se calMaster)
-    if (!fog.enabled) {
-      if (this.fogWasEnabled) {   // avstängd → glöm uppvärmning och släpp pågående puff,
-        this.fogWasEnabled = false;   // annars fastnar rök-kanalen tänd
-        fog.warmStartMs = 0;
-        this.fogUntil = 0;
-      }
-      return false;
-    }
-    // Flank: maskinen slogs precis på → starta uppvärmningsklockan. Sätts bara om den
-    // saknas, så en omstart ärver den riktiga påslagstiden.
-    if (!this.fogWasEnabled) { this.fogWasEnabled = true; if (!fog.warmStartMs) fog.warmStartMs = nowMs; }
-    const spraying = nowMs < this.fogUntil;
-    if (spraying) {
-      this.fogHeat += dtMs;
-      fog.sprayMs = (fog.sprayMs ?? 0) + dtMs;   // drifträknare (vätska + värmearbete)
-    } else {
-      this.fogHeat = Math.max(0, this.fogHeat - dtMs * FOG_RECOVER);
-    }
-    if (spraying && this.fogHeat >= FOG_HEAT_MAX) this.fogUntil = 0;   // nödstopp
-    const gapOk = manual || nowMs - this.lastFogMs > fog.cooldownMs;   // manuell puff (Rök nu) kringgår cooldownen
-    const heatOk = this.fogHeat + fog.burstMs <= FOG_HEAT_MAX;
-    if (want && !spraying && gapOk && heatOk) {
-      this.fogUntil = nowMs + fog.burstMs;
-      this.lastFogMs = nowMs;
-      fog.bursts = (fog.bursts ?? 0) + 1;
-    }
-    return nowMs < this.fogUntil;
-  }
-
-  fogState(nowMs: number): { spraying: boolean; heat: number } {
-    return { spraying: nowMs < this.fogUntil, heat: Math.min(1, this.fogHeat / FOG_HEAT_MAX) };
-  }
-
+  /** Rökkanalen (beslutet bor i rok.ts). */
   writeFog(u: Uint8Array, address: number, level: number): void {
     const ch = address - 1;
     if (ch >= 0 && ch < 512) u[ch] = Math.max(0, Math.min(255, (level + 0.5) | 0));
