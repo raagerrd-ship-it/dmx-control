@@ -1,3 +1,19 @@
+NATTEN 2026-11-24 (schemalagda körningen, ingen arena; motorkod: bara opt-in-provet nedan):
+KLART 2026-11-24: NÄSTA 11-23 (a) "ljuset per look i full mot fart" - nytt tools/natt/lookniva.py (showTight --trace, 1 s-block, tier ur tierEma).
+  5 filer x 4 frön: full 0,333 > fart 0,245 i snitt, men full < fart i 5 av 20 körningar (151659 frö 0/3, 171840 frö 0/1/3). I de körningarna
+  spelar landningen i refrängen/full de glesa minnet (0,22) och dansparet (0,12-0,14) (151659), och kickregn (0,24) (171840). Mörkare i full än
+  fartens snitt totalt: kickregn 200 s, minnet 93, dansparet 76, basgang 76, blixtnedslag 63, varannan 58, chase 46 = ~30 % av full-tiden.
+BASLINJE tools/natt/ren-2026-11-24/ (HEAD 1fc223a8 = 11-23 dagens steg 38-51): kick->ljus 149/96/120/155/107/107 ms (11-23: 147/115/128/163/115/109),
+  energiR15 0,16/0,32/0,46/0,45/0,28/0,11, drops 0/14/2/7/12/8 (0/10/2/6/12/8), byten 23/30/12/23/65/45 (26/35/16/29/76/62), längsta look
+  81/128/60/35/121/135 s, ljus per tier 151659 fart 0,23 / full 0,18, 171840 0,30 / 0,24 (fortfarande baklänges).
+PROV 9eea6a56 DMX_FULL_HEL=1 (opt-in, osatt = bit-identiskt): refrängen i full väljer inte heller DROP_GLES (minnet/dansparet), som droppen redan gör.
+  Mål: full < fart 5 -> 3 av 20, full 0,333 -> 0,345; 151659 frö 0 full 0,18 -> 0,34 (minnet -> drumkit, dansparet -> vagbrytare, samma bytestider).
+  Domaren v3 medel 9 lookföljder (.arena/natt1124): övning +0,42, KONTROLL +4,69, ingen DISK (ensam bänk +0,7 / -1,0; bruset ~±1,2 / ±4).
+  REDO FÖR LADAN: `python tools/ladan.py --env DMX_FULL_HEL=1` - ögat: ser refrängens topp ut som hela riggen i stället för 1-2 lampor?
+NÄSTA FÖR NATTAGENTEN: (a) godkänner ägaren FULL_HEL: gör det till standard (flaggan bort); (b) kvar i 171840: kickregn i full efter drop i
+  low (0,24 = fartens snitt) - slot-effekterna efter "8 egna" tänder 1-2 av 8; mät om SPARSAM-listan (mätt på 4 lampor 10-10) ska mätas om på
+  8 lampor (lampCount.mjs) innan något ändras; (c) ingen arena utan ARENA-uppdrag.
+
 Från kvällen 2026-11-22 (huvudsessionen, gäller natten 22/23): ORKESTRATORN KÖR ANALYSATORARBETE HELA NATTEN (.arena/natt-1122-plan.md). NATTAGENTEN: rör INTE src/ (analyser*, split, slowWorker, effects.ts, effects/, moods, index) och kör INGEN arena; ingen tools/ladan.py. Gör bara baslinjen/rapporten, och kör tunga bänkar bara när `ps -ef | grep -E 'bevis.sh|piBench|analyserParity|konsertReplay|lotusbank|bank.py' | grep -v grep` är tomt (vänta annars, högst en tung process).
 
 NATTEN 2026-11-23 (schemalagda körningen, ingen motorkod, ingen arena, ingen ladan.py - kvällens uppdrag 11-22 följt; väntade ut orkestratorns N5 till 02:51):
