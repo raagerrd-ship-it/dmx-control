@@ -1,0 +1,35 @@
+[quiet] console.log avstangd (DMX_QUIET=1) - PUT /api/debug/verbose {"enabled":true} slar pa
+
+=== tools/ladan-2026-11-14/lang-20261114T200719.wav  0-1038 s, 38931 rutor a 25 ms ===
+
+TAJT MOT LATEN
+  kick -> lampan pa mal 107 ms (median, p75 203, 6330 lampuppgangar; gamla riggmedel 90 %: 125 ms, fonster 225 ms vid 125 BPM) pa 1037/2944 kickar = 35.2 %
+  uppgangens storlek 0.13 av riggens 0-1 skala
+  ljus mot energi    r 0.11 pa 1 s-MEDEL, 0.07 pa 1 s-TOPP (ruta-mot-ruta 0.10), ljus mot niva r 0.27
+  ljus per tier      lugn 0.19/0.34  fart 0.18/0.35  full 0.32/0.48  (medel/topp, 180/605/188 s)
+  look-byten         45 st = 2.60/min, musikalisk orsak 100.0 %
+                     landning 23  sektion 19  drop 3
+  drops              8 st, sprang lugna 0.87 (7 st) / hoga 0.77
+
+SNYGG LJUSSHOW
+  alla tre dioderna  1.1 % av tanda lamprutor   exakt en kanal 56.6 %
+  mattnad (median)   1.00      spridning mellan lampor 69 DMX-steg
+  lookar             23 distinkta, median 15 s, langsta stund 135 s
+  riggens ljus       p10 0.07  p50 0.17  p90 0.47   slackt 0.8 % av tiden
+
+-- dirigenten (298 rader, 12 forsta) --
+   [dirigent] nastan-drop: sprang 28.1 dB efter dipp 27.7 dB
+   [dirigent] sektion intro -> build (nr 0, tier 1)
+   [dirigent] sektion build -> high (nr 1, tier 2)
+   [dirigent] manus high: tydlig basgang (0.99, 7 toggles) -> "frasraknare"
+   [dirigent] knippa SEKTION: DEL GRANS HALLEN FRAS SLAG EJ LUCKA EJ INTRO
+   [dirigent] sektion high -> low (nr 1, tier 0)
+   [dirigent] manus low: tydlig basgang (0.97, 6 toggles) -> "chase"
+   [dirigent] knippa SEKTION: DEL GRANS HALLEN FRAS SLAG EJ LUCKA EJ INTRO
+   [dirigent] sektion low -> high (nr 2, tier 2)
+   [dirigent] manus high: "frasraknare" igen
+   [dirigent] knippa SEKTION: DEL GRANS HALLEN FRAS SLAG EJ LUCKA EJ INTRO
+   [dirigent] sektion high -> low (nr 2, tier 0)
+
+TAJT = kick->ljus lagt, kickTraff hogt, r hogt, musikByten hogt. SNYGGT = alla3 lagt, mattnad och lampspr hoga,
+flera lookar utan langa stillastaende stunder, och ett ljusspann som anvands. Jamfor natt mot natt, aldrig i absoluta tal.
