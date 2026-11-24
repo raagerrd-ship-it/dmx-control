@@ -78,6 +78,9 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
   if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; eng.softenRange(); an.hintTrackChange(5000); LOG.push([+tS.toFixed(2), 'LATGRANS']); }
   if (FEED2048) { const ok = fr.onset.kick; fr.onset.kick = an.bandOn[1]; feed.update(fr, cfg, an); fr.onset.kick = ok; } else feed.update(fr, cfg, an);
+  // TAKTPOSITIONEN TILL ANALYSATORN SOM LIVE (11-24, del D): live ger klockan (hopLane) sitt rutnät till analysatorns hopp-fack (h.gridMs, analyser.ts tickStep). Här
+  // går klockan utanför analysatorn (feed), så utan den här raden är h.gridMs alltid 0 i bänken och en sten som läser taktpositionen syns inte i ljuset.
+  if (an.clockOut) { an.clockOut.beat = cfg.beat; an.clockOut.beatErr = cfg.beatErr; }
   // --live-kick (natt 10-22, MÄTFÄLLA 52): live (index.ts) matar registerKick och renderar direkt (KICK-BYPASS) på frame.kick - bänkarna
   // gjorde det inte. --kick-onset: händelsen = onset.kick-toppen (lokalt max över --kon-thr x avklingande toppen, tau 2 s, minst 150 ms isär) i stället för frame.kick.
   let kickEv = false;
