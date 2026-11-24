@@ -116,6 +116,9 @@ const EKO_BASS = 0.85;
 const SEC_CEIL = 0.65, SEC_CEIL_BUILD = 0.85;
 const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
 const DROP_GLES: Mode[] = ['dansparet', 'minnet'];   // droppen landar inte här (ägaren 11-22, .arena/dropdod: 1,3 / 2,5 av 8 lampor efter smällen)
+/** FULL_HEL (nattprov 2026-11-24, opt-in DMX_FULL_HEL=1, osatt = bit-identiskt): refrängen i full väljer inte heller de glesa (DROP_GLES) -
+ *  landningen drog minnet/dansparet i full så att full blev mörkare än fart (151659: full 0,19 mot fart 0,25 på 2 av 4 frön). */
+const FULL_HEL = (process.env.DMX_FULL_HEL ?? '') === '1';
 import { hsvToRgb, hsv as hsvFx } from "./effects/color.js";
 import { slotSize } from "./effects/rig.js";
 import { MomentLayer } from "./moment.js";
@@ -878,7 +881,7 @@ export class EffectEngine {
         { const show = pool.filter((m) => !(CALM_ONLY.includes(m) && !(bpm > 0 && bpm < CALM_BPM))); if (show.length) pool = show; }   // UNIFORM tillbaka 10-11 (energi pa utvalda lampor)
         if (secKey === 'build') { const b = pool.filter((m) => BUILD_LOOKS.includes(m)); pool = b.length ? b : enabled(BUILD_LOOKS); }   // BUILD SOM HÅLLER   // KONSERTLÄGET: ingen enhetlig look
         if (secKey === 'high') {                                   // LAMPTRAPPA: refrängen -> hela riggen
-          const full = pool.filter((m) => !SPARSAM.includes(m) && !(dropSwitch && DROP_GLES.includes(m))); if (full.length) pool = full;
+          const full = pool.filter((m) => !SPARSAM.includes(m) && !((dropSwitch || (FULL_HEL && tierName === 'full')) && DROP_GLES.includes(m))); if (full.length) pool = full;   // FULL_HEL (prov 11-24): i full ingen gles look heller
         }
         this.smartCount++;
         // DIRIGENTEN VÄLJER: poängsätt poolen mot musikens KARAKTÄR (frame.profile)
