@@ -135,10 +135,13 @@ export class DropOut {
   lastDropMs = -1.5e9; bodyUnderDb = 0; dropMiniBack = 0; dropKeys = 0; dropNear = 0; gap = false; finns = true;   // lastDropMs utanför Smi-intervallet
   constructor() { stabilise(this); }
 }
+/** Karaktärens fem tal. Egen klass och inget literal: ett literal delar form (V8 'map') med TRAD-literalet nedan (samma nycklar, men strängar),
+ *  och då blir fälten taggade och varje skrivning ger en ny låda på heapen. */
+class Profil { punch = 0.4; bass = 0.5; bright = 0.3; beat = 0.5; bassline = 0; constructor() { stabilise(this); } }
 /** KARAKTÄREN. profile = förr character.outProfile, ramens profile pekar hit. */
 export class CharacterOut {
   static readonly TRAD = { profile: { punch: 'UT', bass: 'UT', bright: 'UT', beat: 'UT', bassline: 'UT' }, finns: 'K' } as const satisfies Taggat<CharacterOut>;
-  readonly profile = { punch: 0.4, bass: 0.5, bright: 0.3, beat: 0.5, bassline: 0 }; finns = true;
+  readonly profile = new Profil(); finns = true;
 }
 
 /** Registret: ett fack per sten. */

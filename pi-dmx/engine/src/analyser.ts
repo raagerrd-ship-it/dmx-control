@@ -508,7 +508,7 @@ export class Analyser {
       kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, expectHighInMs: -1, prevSection: '', sectionLevelVsHighDb: 0, sectionBars: 0,
       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum, stenarAv: stenarAv(this.f),
     };
-    for (const o of [this.outFrame, this.f.character.profile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum, this]) stabilise(o);
+    for (const o of [this.outFrame, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum, this]) stabilise(o);
   }
 
   /** Feed a hop-sized chunk of mono samples, get a frame back. */
