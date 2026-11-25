@@ -4,6 +4,8 @@ dansgolv - ljuset ska öka känslan av takten man dansar till. Mer ljus i snitt 
  Läser <körning>/*/bank.json och dömer varje deltagare mot <körning>/bas/bank.json.
   python tools/arena/domare.py <körning> [--md] [--holdout]     (--md skriver även <körning>/ranking[-holdout].md)
   --holdout: dömer bank-holdout.json (KONTROLLMÄNGDEN, tre andra ladan-inspelningar, alla lika vikt, utan dynSet) - finalens dom
+  --hela (TILLÄGG 11-25, del M): dömer bank-hela.json / bank-hela-holdout.json (bank.py --hela: HELA inspelningarna, 172432 med i övningen).
+             Samma mått, samma regler, samma vikter (alla filer lika). Utan --hela är domen exakt som förr (de första 300 s).
 Domaren är bänken - ingen modell tycker något. Reglerna står här och i uppgiften, samma för alla:
 
 DOMAREN v2 (ägaren 11-07 under puls1: "målet är inte MER ljus i snitt utan bättre dynamik och känsla"):
@@ -34,10 +36,13 @@ SPÄRRAR (DISK = ute oavsett poäng):
 """
 import io, json, os, sys, filecmp
 HERE = os.path.dirname(os.path.abspath(__file__)); ENGINE = os.path.dirname(os.path.dirname(HERE))
-HOLD = '--holdout' in sys.argv; V2 = '--v2' in sys.argv
+HOLD = '--holdout' in sys.argv; V2 = '--v2' in sys.argv; HELA = '--hela' in sys.argv
 # 11-15: det rena ljudet (bank.py). Lika vikt: ingen av de tre är längre eller renare än de andra.
 WT = {'l193818': 1, 'l193040': 1, 'l200719': 1} if HOLD else {'l160345': 1, 'l151659': 1, 'l171840': 1}
 BANK = 'bank-holdout.json' if HOLD else 'bank.json'
+if HELA:   # 11-25, del M: hela filerna (bank.py --hela). Övningen får 172432, kontrollen har samma tre filer. Lika vikt som förr.
+    BANK = 'bank-hela-holdout.json' if HOLD else 'bank-hela.json'
+    if not HOLD: WT = {'l172432': 1, **WT}
 LANG = 'l193818' if HOLD else 'l160345'
 
 def load(p):
@@ -121,7 +126,7 @@ def main():
         if v: rows.append((name, doma(b, v, d)))
     rows.sort(key=lambda r: (bool(r[1]['disk']), -(r[1]['poang'] if r[1]['poang'] is not None else -1e9)))
     B = b['rytm'][LANG]
-    lines = [f"# Ranking {os.path.basename(run)}{' KONTROLLMÄNGDEN' if HOLD else ''} (domaren {'v2' if V2 else 'v3'}: tools/arena/domare.py, mot bas)", '',
+    lines = [f"# Ranking {os.path.basename(run)}{' KONTROLLMÄNGDEN' if HOLD else ''}{' HELA FILERNA' if HELA else ''} (domaren {'v2' if V2 else 'v3'}: tools/arena/domare.py, mot bas)", '',
              f"bas ({LANG}): rA {B['rAbest']:.3f}  rK {B['rK']:.3f}  slagK {B['slagK']:.3f}  ljusSteg {b['dyn'].get('levande', {}).get('ljusSteg')}  t90 {B['ljusLag'].get('t90')}", '',
              '| plats | deltagare | poäng | takt % | dynamik % | koreografi | jitter lang ms | betoning lang | avdrag | rA lang | rK lang | slagK lang | ljusSteg | ljus % | lampspr ' + '/'.join(WT) + ' % | t90 | DISK |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|']
     for i, (n, r) in enumerate(rows, 1):
@@ -129,7 +134,7 @@ def main():
         lp = '/'.join(f"{r['lampspr'][k]:+.1f}" for k in WT)
         lines.append(f"| {i} | {n} | {r['poang']:+.1f} | {r['takt']:+.1f} | {r['kontrast']:+.1f} | {r['kor']:+.1f} | {r['jitter']} | {r['betoning']} | {r['avdrag']:.1f} | {r['rA_lang']:.3f} | {r['rK_lang']:.3f} | {r['slagK_lang']:.3f} | {r['ljusSteg']} | {r['ljus']:+.1f} | {lp} | {r['t90']} | {'; '.join(r['disk']) or '-'} |")
     txt = '\n'.join(lines) + '\n'; print(txt)
-    if '--md' in sys.argv: io.open(os.path.join(run, 'ranking-holdout.md' if HOLD else 'ranking.md'), 'w', encoding='utf-8').write(txt)
+    if '--md' in sys.argv: io.open(os.path.join(run, ('ranking-hela-holdout.md' if HOLD else 'ranking-hela.md') if HELA else ('ranking-holdout.md' if HOLD else 'ranking.md')), 'w', encoding='utf-8').write(txt)
 
 if __name__ == '__main__':
     main()

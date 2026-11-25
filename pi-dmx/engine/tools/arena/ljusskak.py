@@ -8,7 +8,9 @@ domare.py:s doma(). bank.py och domaren är orörda: vanlig bank.py-körning ger
   Utskrift: (1) varje frö mot ordinarie bas (poäng + delmått + per fil), (2) BRUSET = alla par frö i mot frö j (bas mot bas),
   (3) medel över N frön mot medel över N andra frön (spärrens kostnad), (4) med fler id: id:s fröMEDEL mot basens fröMEDEL.
   Resultat även i <körning>/ljusskak.json.
-  --holdout (11-23): samma sak på KONTROLLMÄNGDEN (bank-holdout.json per frö, domare.py:s --holdout-vikter) -> ljusskak-holdout.json."""
+  --holdout (11-23): samma sak på KONTROLLMÄNGDEN (bank-holdout.json per frö, domare.py:s --holdout-vikter) -> ljusskak-holdout.json.
+  --hela (TILLÄGG 11-25, del M): samma sak på HELA inspelningarna (bank.py --hela, 172432 med i övningen; ~2,5 min per frö och mängd)
+    -> bank-hela[-holdout].json per frö och ljusskak-hela[-holdout].json. Utan --hela är allt som förr."""
 import io, itertools, json, os, shutil, statistics as st, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); ENGINE = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE); import domare
@@ -23,7 +25,7 @@ def bank(korn, i, fro):
     if i != 'bas':   # deltagarens dist via kroken (bank.py --bas tar env som den är; utan --bas kräver bank.py <mapp>/dist)
         import pathlib; env['DMX_DIST'] = os.path.join(korn, i, 'dist')
         env['NODE_OPTIONS'] = (env.get('NODE_OPTIONS', '') + ' --import=' + pathlib.Path(HERE, 'distHook.mjs').as_uri()).strip()
-    cmd = [sys.executable, os.path.join(HERE, 'bank.py'), d, '--bas'] + (['--holdout'] if domare.HOLD else []) + sum((['--env', e] for e in FRON[fro]), [])
+    cmd = [sys.executable, os.path.join(HERE, 'bank.py'), d, '--bas'] + (['--holdout'] if domare.HOLD else []) + (['--hela'] if domare.HELA else []) + sum((['--env', e] for e in FRON[fro]), [])
     print('bänkar', i, fro, flush=True); subprocess.run(cmd, cwd=ENGINE, env=env, check=True)
 
 def medel(bs):   # medel av alla tal (rekursivt) över bänkarna; annat tas från den första
@@ -100,4 +102,4 @@ if __name__ == '__main__':
         r = domare.doma(medel(list(B.values())), medel(list(V.values())), os.path.join(korn, i)); en = domare.doma(b0, V['0'], os.path.join(korn, i)) if '0' in V else None
         print(f"\n## {i}: fröMEDEL ({len(V)}) mot basens fröMEDEL ({len(B)}): poäng {r['poang']:+.2f}" + (f"  (ensam bänk {en['poang']:+.2f})" if en else '') + f"  DISK {'; '.join(r['disk']) or '-'}")
         res.setdefault('id', {})[i] = dict(medel=r['poang'], ensam=en and en['poang'], disk=r['disk'], n=len(V))
-    json.dump(res, io.open(os.path.join(korn, 'ljusskak-holdout.json' if domare.HOLD else 'ljusskak.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+    json.dump(res, io.open(os.path.join(korn, ('ljusskak-hela-holdout.json' if domare.HOLD else 'ljusskak-hela.json') if domare.HELA else ('ljusskak-holdout.json' if domare.HOLD else 'ljusskak.json')), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
