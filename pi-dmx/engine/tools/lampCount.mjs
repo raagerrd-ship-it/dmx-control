@@ -2,7 +2,9 @@
  * LAMPANTAL PER EFFEKT (2026-10-10 natt, KONSERTSHOW idé 3 "lamptrappa"): tvingar varje effekt i tur och ordning genom riktiga
  * analysatorn + motorn (beatFeed som live) och mäter hur många av de fyra lamporna som i snitt lyser (> 30 % DMX) när riggen alls lyser.
  * Underlag för dirigentens lamptrappa: sparsamma looks i vers/intro, fulla i refrängen.
- *   node tools/lampCount.mjs <wav> [--start 120] [--sek 60] [--json ut.json]
+ *   node tools/lampCount.mjs <wav> [--start 120] [--sek 60] [--json ut.json] [--ladan]
+ * --ladan (natt 2026-11-25): ladans config (8 lampor, tools/ladanCfg.json) och den delade analysatorn som live (som showTight) -
+ *   SPARSAM-listan mättes 10-10 på 4 lampor; utan flaggan = som förr (bit-identiskt).
  */
 import { readFileSync, writeFileSync } from "node:fs";
 const args = process.argv.slice(2);
@@ -14,14 +16,18 @@ const { EffectEngine } = await import("../dist/effects.js");
 const { BeatFeed } = await import("../dist/beatFeed.js");
 const { defaultConfig, fixtureRoles } = await import("../dist/config.js");
 const { EFFECT_KEYS } = await import("../dist/effects/registry.js");
+const LADAN = args.includes("--ladan");
+const { ladanCfg } = await import("./benchCfg.mjs");
+const { createSplitBuffers } = await import("../dist/split.js");
+const liveAnalyser = (c) => { const b = createSplitBuffers(); const fast = new Analyser(c, { role: "fast", split: b }); fast.setInlinePeer(new Analyser(structuredClone(c), { role: "slow", split: b })); return fast; };
 const d = readFileSync(path); const nSamples = (d.length - 44) >> 1;
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = 25;
 console.log = () => {};
 const out = {};
 for (const look of EFFECT_KEYS) {
-  const cfg = JSON.parse(JSON.stringify(defaultConfig)); cfg.mode = look; cfg.master = 1;
+  const cfg = LADAN ? ladanCfg(defaultConfig) : JSON.parse(JSON.stringify(defaultConfig)); cfg.mode = look; cfg.master = 1;
   const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = (fx.address ?? 1) - 1; const at = (r) => { const i = roles.indexOf(r); return i < 0 ? -1 : base + i; }; return [at("r"), at("g"), at("b")]; });
-  const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
+  const an = LADAN ? liveAnalyser(BeatFeed.analyserCfg(cfg)) : new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
   const feed = new BeatFeed();
   const t00 = EPOCH + startS * 1000; Date.now = () => t00; performance.now = () => t00 - EPOCH;
   const eng = new EffectEngine(cfg);
