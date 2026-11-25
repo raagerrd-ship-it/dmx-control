@@ -98,10 +98,13 @@ interface Lamp {
  *  (effects/toning.ts) håller alltid minst ett av dem (nivån vid skarpt kulörbyte, ljuset vid kulörtoning), så golvet griper bara in
  *  om en effekt bryter kontraktet. Då lyfts rutans kulör till golvets nivå (svart ruta: förra rutans kulör). */
 export class LampGuard {
-  private lvl = new Float32Array(64); private light = new Float32Array(64); private prev = new Float32Array(192);
+  private lvl = new Float32Array(64); private light = new Float32Array(64); private prev = new Float32Array(192); private dt = 0.5;   // rutans längd (s): 0,5 = flyttal från start
+  /** Rutans längd, en gång per ruta (inte per lampa i step: ett flyttal som argument blir en låda på heapen). */
+  tune(dtSec: number): void { this.dt = dtSec; }
   /** UTTRYCKLIGT SVART (effects.ts, ägaren 11-13 'svart är avstängd'): lampan släcks nu, golvet börjar om från noll. */
   cut(i: number): void { const o = i * 3; this.lvl[i] = 0; this.light[i] = 0; this.prev[o] = 0; this.prev[o + 1] = 0; this.prev[o + 2] = 0; }
-  step(i: number, fx: FixtureConfig | undefined, rgb: [number, number, number], dtSec: number): void {
+  step(i: number, fx: FixtureConfig | undefined, rgb: [number, number, number]): void {
+    const dtSec = this.dt;
     const G = lampGamma(fx), o = i * 3, l = this.lvl[i];
     let mT = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]), L = rgb[0] ** G + rgb[1] ** G + rgb[2] ** G;
     const fl = l * lampFadeK(fx, dtSec, FADE_MIN_S);

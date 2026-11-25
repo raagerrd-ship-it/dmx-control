@@ -1326,7 +1326,7 @@ export class EffectEngine {
   /** LAMPORNA: effekt -> effektNiva -> kulörtoning -> energi -> uttoning -> utgång, per lampa (utbrutet ur render 10-16, GC-jakten: ordagrant flyttat, samma ordning). */
   private renderLamps(effect: EffectDef | undefined, count: number, ordSel: number, useAnchor: boolean, fxToggle: boolean, fastLight: boolean, modE: boolean): boolean {
     const t = this.rT, anchorHue = this.rAnchorHue, nowWall = this.rNowWall, inputGate = this.rInputGate, md = this.rMd, drive = this.rDrive, renderNow = this.rNowP, dtSec = this.rDt;
-    const ctx = this.ctx, bands = this.bandsBuf, specialty = this.specBuf, xFrom = this.xfFrom, xw = this.rXw, xu = 1 - xw; this.lampFade.tune(this.cfg);
+    const ctx = this.ctx, bands = this.bandsBuf, specialty = this.specBuf, xFrom = this.xfFrom, xw = this.rXw, xu = 1 - xw; this.lampFade.tune(this.cfg, renderNow, dtSec); this.lampGuard.tune(dtSec);
     let wantStrobe = 0, wantBlinder = 0, wantUv = 0, wantLaser = 0, wantHazer = 0, wantCo2 = 0, wantFogFx = false;
     // BASGANG (a7): ledaren = förra rutans ljusaste lampa (före energin); bland lika ljusa (inom 5 %) den vars tur det är (en lampa per basnot)
     const bp = this.eBass * this.eBass, sm = this.spreadM0, spreadOn = !(effect && SPREAD_SKIP.has(effect.key)); let lead = -1, leadM = 0;
@@ -1402,8 +1402,8 @@ export class EffectEngine {
         rgb[0] = 0; rgb[1] = 0; rgb[2] = 0; this.lampFade.cut(i); this.lampGuard.cut(i);
       } else {
         if (!ask0) this.blackOn[i] = 0;
-        this.lampFade.step(i, fx, rgb, renderNow, dtSec, fastLight);
-        this.lampGuard.step(i, fx, rgb, dtSec);
+        this.lampFade.step(i, fx, rgb, fastLight);
+        this.lampGuard.step(i, fx, rgb);
       }
       this.out.writeFixture(this.universe, fx, rgb, 1, 0, specialty);
     }

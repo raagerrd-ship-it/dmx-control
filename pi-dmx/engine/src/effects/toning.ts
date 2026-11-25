@@ -12,15 +12,17 @@ const tal = (v: unknown, d: number, lo: number, hi: number): number => (typeof v
 export class EffectFade {
   private lvl = new Float32Array(64); private peakAt = new Float64Array(64); private chOnAt = new Float64Array(192); private ratio = new Float32Array(192);   // ljusstyrka + senaste kulör
   private prev = new Float32Array(192); private fo: [number, number, number] = [0, 0, 0]; private fn: [number, number, number] = [0, 0, 0];   // förra rutans färg per lampa
-  private fadeS = FADE_MIN_S; private minOn = MIN_ON_MS; private chMinOn = CH_MIN_ON_MS;
-  /** Läs inställningarna (en gång per ruta). */
-  tune(cfg: { fadeMinS?: number; minOnMs?: number; chMinOnMs?: number }): void {
+  private fadeS = FADE_MIN_S; private minOn = MIN_ON_MS; private chMinOn = CH_MIN_ON_MS; private now = 0.5; private dt = 0.5;   // rutans klocka (ms) och längd (s): 0,5 = flyttal från start
+  /** Läs inställningarna och rutans klocka (en gång per ruta). Klockan står här och inte i step: ett flyttal som argument per lampa blir en låda på heapen. */
+  tune(cfg: { fadeMinS?: number; minOnMs?: number; chMinOnMs?: number }, now: number, dtSec: number): void {
+    this.now = now; this.dt = dtSec;
     this.fadeS = tal(cfg.fadeMinS, FADE_MIN_S, FADE_MIN_S, 2); this.minOn = tal(cfg.minOnMs, MIN_ON_MS, 0, 500); this.chMinOn = tal(cfg.chMinOnMs, CH_MIN_ON_MS, 0, 500);
   }
   /** UTTRYCKLIGT SVART (effects.ts, ägaren 11-13 'svart är avstängd'): lampan släcks nu - ingen uttoning, inga hålltider kvar. */
   cut(i: number): void { const o = i * 3; this.lvl[i] = 0; this.peakAt[i] = 0; for (let c = 0; c < 3; c++) { this.chOnAt[o + c] = 0; this.ratio[o + c] = 0; this.prev[o + c] = 0; } }
-  /** En lampa, en ruta: rgb (effektens färg x energin, 0..1) skrivs om på plats. now = rutans klocka (ms), dtSec = rutans längd. */
-  step(i: number, fx: FixtureConfig | undefined, rgb: [number, number, number], now: number, dtSec: number, fast: boolean): void {
+  /** En lampa, en ruta: rgb (effektens färg x energin, 0..1) skrivs om på plats. Rutans klocka och längd kommer från tune. */
+  step(i: number, fx: FixtureConfig | undefined, rgb: [number, number, number], fast: boolean): void {
+    const now = this.now, dtSec = this.dt;
     const mT = rgb[0] > rgb[1] ? (rgb[0] > rgb[2] ? rgb[0] : rgb[2]) : (rgb[1] > rgb[2] ? rgb[1] : rgb[2]);
     // MINSTA PA-TID (output.ts MIN_ON_MS, agaren i ladan 10-10: "kan man ge effekterna en minsta tankt 'pa' tid? nu blev det lite
     // flimrande igen"): en nivå lampan nått hålls minst MIN_ON_MS innan uttoningen börjar - korta blixtar blir en puls. Upp direkt.
