@@ -1,5 +1,5 @@
 /**  KICKDETEKTORN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserKick.md */
-import { sysEnv, type Ser, type KickOut } from "./analyserFack.js";
+import { stabilise, sysEnv, type Ser, type KickOut } from "./analyserFack.js";
 
 const KICK_CAP_MS = 330;   // Ratt MED systemprefix
 const KICK_NOGATE = sysEnv('KICK_NOGATE') === '1';
@@ -18,6 +18,7 @@ export class KickDetector {
   private readonly h: KickReads['hop']; private readonly ff: KickReads['fft']; private readonly lv: KickReads['level']; private readonly ck: KickReads['clock'];
   constructor(r: KickReads, private readonly o: KickOut) {   // läser: r, lämnar ut: o
     this.h = r.hop; this.ff = r.fft; this.lv = r.level; this.ck = r.clock;
+    stabilise(this);
   }
 
   private kickMed = 0.1;   // robust glidande MEDIAN av kick-fluxen

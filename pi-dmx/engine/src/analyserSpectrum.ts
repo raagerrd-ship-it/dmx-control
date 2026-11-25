@@ -1,5 +1,5 @@
 /**  SPEKTRUM (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserSpectrum.md */
-import { BIG_EVERY, type Ser, type SpectrumOut } from "./analyserFack.js";
+import { stabilise, BIG_EVERY, type Ser, type SpectrumOut } from "./analyserFack.js";
 import { SPEC_SLOTS, SPEC_MAX, BS_SPEC_N } from './split.js';
 import FFT from "fft.js";
 
@@ -16,6 +16,7 @@ export class SpectrumBands {
   private readonly h: SpectrumReads['hop']; private readonly lv: SpectrumReads['level']; private readonly ff: SpectrumReads['fft'];
   constructor(r: SpectrumReads, private readonly o: SpectrumOut) {   // läser: r, lämnar ut: o
     this.h = r.hop; this.lv = r.level; this.ff = r.fft;
+    stabilise(this);
   }
   private bigCounter = 0;   // decimering av 2048-FFT:n
   fftBig!: FFT;   // DUBBEL-FFT

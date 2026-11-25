@@ -1,7 +1,6 @@
 /**  BASEN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserBass.md */
 import { BASS_SPAN_DB, BE_FALLBACK_MS, BE_MEM_BEATS, stabilise, type Ser, type BassOut } from "./analyserFack.js";
 
-const DOUBLE_FROM_START = ['blPrev1', 'blPrev2', 'blTrough', 'blAccum'] as const;   // Talfält som ska vara flyttal från start
 const BE_TOP_BEATS = 16, BE_FAST_BEATS = 2, BE_BEAT_MIN_MS = 300, BE_BEAT_MAX_MS = 600;   // BASENERGIN MED SLAGET SOM TIDSENHET
 
 /** DET BASEN LÄSER. Inget annat går att nå. S = bassEnergyStep (huvudtråden), L = accumulate/stepBassline (workern). */
@@ -17,7 +16,7 @@ export class BassTracker {
   private readonly sp: BassReads['spectrum'];
   constructor(r: BassReads, private readonly o: BassOut) {   // läser: r, lämnar ut: o
     this.hop = r.hop; this.clock = r.clock; this.sec = r.section; this.sp = r.spectrum;
-    stabilise(this, DOUBLE_FROM_START);
+    stabilise(this);
   }
   private beHiShort = NaN;
   /** Stegar skalorna ett hop. */

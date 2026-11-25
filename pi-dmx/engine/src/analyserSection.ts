@@ -11,7 +11,6 @@ const RANK_RUN = numEnv('SECTION_RUN', 3);
 const RANK_RUN_IN = numEnv('SECTION_RUN_IN', 0);   // SNABB ATTACK
 const REPEAT = Number(sysEnv('SECTION_REPEAT')) || 0;   // UPPREPNINGSMINNE v2
 const SECTION_EARLY_DB = Number(sysEnv('SECTION_EARLY_DB')) || 3;
-const DOUBLE_FROM_START = ['secHiStartMs', 'secHiEndMs', 'secPct', 'secSongStartMs', 'secBlkMs', 'secBlkInt', 'secBlkCent', 'secBlkRms2', 'secCurDbSum'] as const;   // Talfält som ska vara flyttal från start
 
 /** DET SEKTIONEN LÄSER (workern: bigAgg och blocken; odelat sectionAggStep). Inget annat går att nå. */
 export interface SectionReads {
@@ -30,8 +29,8 @@ export class SectionTracker {
   private readonly dr: SectionReads['drop']; private readonly ri: SectionReads['riser']; private readonly sp: SectionReads['spectrum'];
   constructor(r: SectionReads, private readonly o: SectionOut) {   // läser: r, lämnar ut: o
     this.h = r.hop; this.ff = r.fft; this.lv = r.level; this.kk = r.kick; this.ck = r.clock; this.dr = r.drop; this.ri = r.riser; this.sp = r.spectrum;
-    stabilise(this, DOUBLE_FROM_START);
-    stabilise(this.secRank, ['md', 'sd', 'mk', 'sk']);   // förr sist i Analysers konstruktor
+    stabilise(this);
+    stabilise(this.secRank);   // förr sist i Analysers konstruktor
   }
   private static readonly PREDICT_SRC = 2;   // Forutsagelsens kallor
 

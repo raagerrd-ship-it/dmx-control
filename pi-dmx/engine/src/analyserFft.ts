@@ -18,7 +18,7 @@ export class SmallFft {
   private readonly h: FftReads['hop']; private readonly lv: FftReads['level'];
   constructor(r: FftReads, private readonly o: FftOut) {   // läser: r, lämnar ut: o
     this.h = r.hop; this.lv = r.level;
-    stabilise(this, ['sumSq']);
+    stabilise(this);
   }
   private static readonly ONSET_PEAK_FLOOR = 0.05;
   private fft!: FFT;

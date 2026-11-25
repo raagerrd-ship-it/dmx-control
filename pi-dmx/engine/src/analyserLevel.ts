@@ -1,5 +1,5 @@
 /**  NIVÅN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserLevel.md */
-import { type Ser, type LevelOut } from "./analyserFack.js";
+import { stabilise, type Ser, type LevelOut } from "./analyserFack.js";
 import { F_SIL350, F_SIL10 } from './split.js';
 
 /** DET NIVÅN LÄSER. Inget annat går att nå. zeroBpm = kommando till klockan. Bara huvudtråden. */
@@ -15,6 +15,7 @@ export class LevelTracker {
   private readonly h: LevelReads['hop']; private readonly ff: LevelReads['fft']; private readonly ck: LevelReads['clock'];
   constructor(r: LevelReads, private readonly o: LevelOut, private readonly cmd: LevelCmd) {   // läser: r, lämnar ut: o
     this.h = r.hop; this.ff = r.fft; this.ck = r.clock;
+    stabilise(this);
   }
   private aAtt = 0; private aRel = 0; private aIUp = 0; private aIDown = 0;
   /** Takterna ur hoppets längd (konstruktorn): utjämningen och intensiteten. */

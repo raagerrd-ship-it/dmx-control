@@ -123,16 +123,6 @@ export interface Frame {
   stenarAv: number;   // en bit per avstängd sten (analyserFack.ts stenarAv)
 }
 
-const DOUBLE_FROM_START = [
-  'lastT', 'tickT',
-  'lvlVU',
-] as const;   // Instansfalt som MATT
-/** TYPSTABILA TALFALT. */
-function stabiliseNumbers(o: object): void {
-  const r = o as Record<string, unknown>;
-  for (const k of Object.keys(r)) { const v = r[k]; if (typeof v === 'number') { r[k] = 0.5; r[k] = v; } }
-}
-
 export class Analyser {
   readonly f: Fack = makeFack(() => this.wallNow());   // FACKEN
   get role(): Role { return this.f.hop.role; }   get bigOn(): boolean { return this.f.hop.bigOn; }   get cfg(): Cfg { return this.f.hop.cfg; }
@@ -518,8 +508,7 @@ export class Analyser {
       kickAtMs: 0, barShift: -1, beatPhaseMs: 0, beatPhaseConf: 0, beatTrust: 0, section: 'intro', sectionAgeMs: 0, sectionIndex: 0, sectionTier: 1, repeatSim: 0, repeatAgoMs: 0, expectHighInMs: -1, prevSection: '', sectionLevelVsHighDb: 0, sectionBars: 0,
       spec: this.outSpec, specAbs: this.outSpecAbs, onset: this.outOnset, drum: this.outDrum, stenarAv: stenarAv(this.f),
     };
-    for (const o of [this.outFrame, this.f.character.profile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum]) stabiliseNumbers(o);
-    stabilise(this, DOUBLE_FROM_START);
+    for (const o of [this.outFrame, this.f.character.profile, this.outSpec, this.outSpecAbs, this.outOnset, this.outDrum, this]) stabilise(o);
   }
 
   /** Feed a hop-sized chunk of mono samples, get a frame back. */

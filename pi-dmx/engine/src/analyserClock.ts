@@ -1,5 +1,6 @@
 /** TAKTMATNINGEN (utbruten ur index.ts 2026-10-10, ordagrant): fasprediktionstilliten, den löpande takten (10-19, ersatte kick-PLL:en och fasfoljaren), taktfasen (ettan) och coasten som haller cfg.beat (ankare + bpm + konfi Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserClock.md */
 import type { Frame } from "./analyser.js";   // ANALYSATORNS KLOCKA
+import { stabilise } from "./analyserFack.js";
 export const MIN_BEAT_CONFIDENCE = 0.20;   // Klockans grind
 export const SYNC_ERR_FRAC = 0.2, TRUST_TAU_MS = 81;   // TILLITEN TILL TAKTEN
 export function trustStep(prev: number, conf: number, beatErr: number, dtMs: number): number {
@@ -58,6 +59,7 @@ export function publishPhase(f: { beatPhaseMs: number; beatPhaseConf: number; ba
 }
 
 export class BeatFeed {
+  constructor() { stabilise(this); }
   private trustSm = 0; private trustAt = 0;   // dirigenternas tillit
   onBeatRate = 0;   // andel kickar med |fasfel| < 0.25
   repeatRate = 0;   // TRUST_REPEAT

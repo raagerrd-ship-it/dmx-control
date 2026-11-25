@@ -21,10 +21,11 @@ export const BASS_SPAN_DB = 36;   // frame.bassEnergy / bassEnergyShort
 export const BIG_EVERY = 3;   // kor stor-FFT var N:e hop
 export const BODY_HIGH_MS = numEnv('SECTION_BODY_HIGH', 0), BODY_HIGH_DB = numEnv('SECTION_BODY_HIGH_DB', 3);   // BASEN TILLBAKA
 
-/** Flyttal från start: skriv 0,5 och sedan värdet. */
-export function stabilise(o: object, keys: readonly string[]): void {
+/** Flyttal från start: skriv 0,5 och sedan värdet, för objektets alla egna talfält. Ett talfält som börjar som heltal och senare får ett
+ *  decimaltal byter objektets form (V8 'map') under körning, och då kastas den optimerade kod som läser objektet ('wrong map'). */
+export function stabilise(o: object): void {
   const r = o as Record<string, unknown>;
-  for (const k of keys) { const v = r[k]; if (typeof v === 'number') { r[k] = 0.5; r[k] = v; } }
+  for (const k of Object.keys(r)) { const v = r[k]; if (typeof v === 'number') { r[k] = 0.5; r[k] = v; } }
 }
 
 // TYPER
@@ -57,7 +58,7 @@ export class HopOut {
   kickHit = 0;   // trumkittet
   sec = 'intro'; lvh = 0.5; conf = 0.5; bpm = 0.5;   // långsamma värden sedda vid hoppet
   gridMs = 0; trust = 0; barKnown = false;   // TAKTPOSITIONEN: klockans rutnät (ankaret på ettan, Date.now-tid; bpm ovan), tillit, ettan känd
-  constructor(readonly wallNow: () => number) { stabilise(this, ['kickHit', 'gridMs', 'trust']); }   // wallNow = analysatorns väggklocka
+  constructor(readonly wallNow: () => number) { stabilise(this); }   // wallNow = analysatorns väggklocka
 }
 
 /** LILLA FFT:N (steg 26): fönstrets rms, 512-FFT:ns flöde/kickflöde/energi, utjämnad energi och centroid, snabba bandens magnitud (spektrumet läser). */
@@ -65,13 +66,13 @@ export class FftOut {
   static readonly TRAD = { rms: 'IN', energy: 'S', engSmooth: 'S', flux: 'S', kickFlux: 'S', centSmooth: 'IN', fbMag: 'S', fbPrevMag: 'S' } as const satisfies Taggat<FftOut>;
   rms = 0.5; energy = 0.5; engSmooth = 0; flux = 0.5; kickFlux = 0.5; centSmooth = 0.5;   // rms..centSmooth förr hop.*, engSmooth förr på Analyser
   fbMag = new Float32Array(256); fbPrevMag = new Float32Array(256);   // förr spektrumets
-  constructor() { stabilise(this, ['engSmooth']); }
+  constructor() { stabilise(this); }
 }
 /** NIVÅN. intensity = förr hIntensity, inZone = förr levels.inZoneState, level/lvlSmooth = förr hop.level/hop.lvlSmooth (steg 22). */
 export class LevelOut {
   static readonly TRAD = { gain: 'S', envelope: 'S', level: 'S', lvlSmooth: 'IN', activeMs: 'IN', silentMs: 'S', intensity: 'IN', levelCeil: 'IN', inZone: 'S', gainLocked: 'S' } as const satisfies Taggat<LevelOut>;   // levelCeil: räknas bara i huvudtråden, workern får den i hopprecordet
   gain = 1; envelope!: number; level = 0.5; lvlSmooth = 0; activeMs = 0; silentMs = -0; intensity = 0.5; levelCeil = 0.5; inZone = false; gainLocked = false;
-  constructor() { stabilise(this, ['activeMs', 'lvlSmooth']); }
+  constructor() { stabilise(this); }
 }
 /** SPEKTRUMET. Banden förblir Float32Array. sink = förr specSink. */
 export class SpectrumOut {
@@ -82,7 +83,7 @@ export class SpectrumOut {
   sink: ((mag: Float32Array, binHz: number) => void) | null = null;
   hatHit = 0; snareHit = 0;   // trumkittet: hi-hat och virvel (förr på Analyser)
   bodyDb = 0.5;   // baskroppen: medel av de tre lägsta bandens råa dB (förr hop.body)
-  constructor() { stabilise(this, ['hatHit', 'snareHit']); }
+  constructor() { stabilise(this); }
 }
 /** KICKEN. kick = förr hKick, kickAt = förr hKickAt. */
 export class KickOut {
@@ -90,7 +91,7 @@ export class KickOut {
   kick = false; kickAt = 0.5; finns = true;
   beatAnchorMs = 0; pendingKickMs = 0; lastKick = 0; kfPrev = 0; kfPrev2 = 0;
   dbgKick: { flux: number; thresh: number; med: number; mad: number; energy: number; gain: number; rms: number; env: number; locked: boolean } | null = null;
-  constructor() { stabilise(this, ['pendingKickMs', 'kfPrev', 'kfPrev2', 'beatAnchorMs', 'lastKick']); }
+  constructor() { stabilise(this); }
   neutral(): void { this.kickAt = 0; }   // kicken av: ingen förfinad kick (0,5 vore en kick vid 0,5 ms för klockan)
 }
 /** KLOCKAN sedd av analysatorn: bpm/conf = förr localBpm/localBpmConfidence, src = förr beatSrc (samma objekt). */
@@ -98,7 +99,7 @@ export class ClockOut {
   static readonly TRAD = { bpm: 'IN', conf: 'IN', src: 'S' } as const satisfies Taggat<ClockOut>;
   bpm = 0; conf = 0;
   src!: { beat?: BeatGrid | null };
-  constructor() { stabilise(this, ['conf']); }
+  constructor() { stabilise(this); }
   zeroBpm(): void { this.bpm = 0; }   // tystnad 10 s (nivån, F_SIL10)
 }
 
@@ -110,20 +111,20 @@ export class SectionOut {
   section = 'intro'; sectionStartMs = 0; sectionIndex = 0; sectionTier = 1; prevSection = ''; levelVsHighDb = 0;
   repeatSim = 0; repeatAgoMs = 0; repeatTier = -1; repeatHighAtMs = 0; repeatHighEndAtMs = 0;
   expectHighMs = 0; expectSource = 0; secBuildAt = 0; secBuildSeen = 0; boundaryNov = 0; finns = true;
-  constructor() { stabilise(this, ['expectHighMs', 'levelVsHighDb', 'sectionStartMs', 'secBuildAt', 'secBuildSeen', 'repeatSim', 'repeatAgoMs']); }
+  constructor() { stabilise(this); }
   neutral(): void { this.section = ''; }   // sektionen av: '' = okänd (sectionCode 0); 'intro' skulle ge drops lugn-veto
 }
 /** BASEN. bassline/onsetsPerBeat = förr profBassline/bassOnsetsPerBeat. */
 export class BassOut {
   static readonly TRAD = { beHi: 'S', beRef: 'S', beShort: 'S', energy: 'S', bassline: 'L', onsetsPerBeat: 'L', finns: 'K' } as const satisfies Taggat<BassOut>;
   beHi = NaN; beRef = NaN; beShort = 0; energy = 0; bassline = 0; onsetsPerBeat = 0; finns = true;
-  constructor() { stabilise(this, ['bassline', 'onsetsPerBeat']); }
+  constructor() { stabilise(this); }
   neutral(): void { this.beHi = 0; this.beRef = 0; }   // basen av: bassLevel 1 i stället för NaN
 }
 /** UPPBYGGNADEN. inRiser = förr hInRiser. */
 export class RiserOut {
   static readonly TRAD = { buildUp: 'UT', inRiser: 'UT', finns: 'K' } as const satisfies Taggat<RiserOut>;
-  buildUp = 0; inRiser = false; finns = true; constructor() { stabilise(this, ['buildUp']); }
+  buildUp = 0; inRiser = false; finns = true; constructor() { stabilise(this); }
 }
 /** DROP. */
 export class DropOut {
@@ -132,7 +133,7 @@ export class DropOut {
   dropCount = 0; miniDropCount = 0; buildStartCount = 0; dropCand = 0; secBodyRet = 0;
   dropDemoted = 0; dropSpaced = 0; nearDropDb = -0; nearDipDb = -0; liftDb = -0; stopCount = 0; stopS = -0;
   lastDropMs = -1.5e9; bodyUnderDb = 0; dropMiniBack = 0; dropKeys = 0; dropNear = 0; gap = false; finns = true;   // lastDropMs utanför Smi-intervallet
-  constructor() { stabilise(this, ['lastDropMs', 'nearDropDb', 'nearDipDb', 'liftDb', 'stopS']); }
+  constructor() { stabilise(this); }
 }
 /** KARAKTÄREN. profile = förr character.outProfile, ramens profile pekar hit. */
 export class CharacterOut {

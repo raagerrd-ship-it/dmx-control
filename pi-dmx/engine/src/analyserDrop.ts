@@ -67,7 +67,6 @@ export const DROP_UPP_KEYS = (DROP_KEYS & ~B(K.SVACKA)) | B(K.UPPBYGGNAD);   // 
 const VETO = B(K.LJUD, K.DISKANT, K.SPARR);   // hålls allt utom en veto-nyckel är händelsen avgjord (svackan förbrukad)
 export const MINI_NEAR = B(K.LUCKA_MINI, K.AKTIV), DROP_NEAR = MINI_NEAR | B(K.LUCKA, K.SVACKA, K.LJUD, K.DISKANT, K.SPARR, K.TOPP), DROP_UPP_NEAR = (DROP_NEAR & ~B(K.SVACKA)) | B(K.UPPBYGGNAD);   // förutsättningarna: knippan väntar bara på landningen
 
-const DOUBLE_FROM_START = ['bodyEnv', 'bodyFast', 'bodyCeil', 'bodyPeak', 'lastGoneSpanMs', 'lastMiniGoneMs', 'lastMiniMs', 'miniGoneMs', 'miniGapMs', 'bodyGoneMs', 'lastBodyGoneMs', 'dropArmUntil', 'dropArmAt', 'fdGone', 'fdSpan', 'fdQuietAt', 'lastShowDropMs', 'nearB', 'nearNorm', 'nearFloor', 'liftCalm', 'liftLift', 'liftHistAt', 'stopRunS', 'hiFast', 'hiNorm', 'hiMid'] as const;   // Talfält som ska vara flyttal från start
 
 /** DET DROP LÄSER (workern). Inget annat går att nå. */
 export interface DropReads {
@@ -81,7 +80,7 @@ export class DropDetector {
   private readonly h: DropReads['hop']; private readonly sp: DropReads['spectrum']; private readonly lv: DropReads['level']; private readonly ri: DropReads['riser'];
   constructor(r: DropReads, private readonly o: DropOut) {   // läser: r, lämnar ut: o
     this.h = r.hop; this.sp = r.spectrum; this.lv = r.level; this.ri = r.riser;
-    stabilise(this, DOUBLE_FROM_START);
+    stabilise(this);
   }
   private secBodyArmMs = 0;
   private bodyEnv = -120;   // BASKROPPEN

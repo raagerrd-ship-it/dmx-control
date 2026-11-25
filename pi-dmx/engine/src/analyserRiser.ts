@@ -1,5 +1,5 @@
 /**  UPPBYGGNADEN (utbruten ur analyser.ts 2026-11-14; nyckelknippa sedan steg 40). Anteckningar: docs/analysator/analyserRiser.md */
-import { type Ser, type RiserOut } from "./analyserFack.js";
+import { stabilise, type Ser, type RiserOut } from "./analyserFack.js";
 import { K } from "./analyserDrop.js";
 import { BS } from "./split.js";
 
@@ -17,6 +17,7 @@ export class RiserDetector {
   private readonly h: RiserReads['hop']; private readonly dp: RiserReads['drop'];
   constructor(r: RiserReads, private readonly o: RiserOut) {   // läser: r, lämnar ut: o
     this.h = r.hop; this.dp = r.drop;
+    stabilise(this);
   }
 
   /** Uppbyggnad: knippan LUCKA (basen ur just nu) + AKTIV + DISKANT + EFTER DROP; buildUp = förloppet 0..1 (0 när basen är tillbaka). */

@@ -1,5 +1,5 @@
 /**  KARAKTÄRSPROFILEN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserCharacter.md */
-import type { Ser, CharacterOut } from "./analyserFack.js";
+import { stabilise, type Ser, type CharacterOut } from "./analyserFack.js";
 import { BS } from "./split.js";
 const P = BS.character.profile;   // platserna i storblocket
 
@@ -17,6 +17,7 @@ export class CharacterProfile {
   private readonly h: CharacterReads['hop']; private readonly sp: CharacterReads['spectrum']; private readonly bo: CharacterReads['bass'];
   constructor(r: CharacterReads, private readonly o: CharacterOut) {   // läser: r, lämnar ut: o
     this.h = r.hop; this.sp = r.spectrum; this.bo = r.bass;
+    stabilise(this);
   }
   private aProf = 0;
   private profPunch = 0.4;   // KARAKTÄRSPROFIL
