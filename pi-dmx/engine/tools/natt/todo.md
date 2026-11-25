@@ -1,3 +1,18 @@
+NATTEN 2026-11-25 (schemalagda körningen, ingen arena, ingen motorkod; huvudsessionen körde delarna A-I parallellt i .arena/):
+UPPDRAG: inga nya. NÄSTA 11-24 (a) FULL_HEL: inget besked från ägaren - väntar. KLART 2026-11-25: NÄSTA 11-24 (b) SPARSAM mätt om på 8 lampor:
+  tools/lampCount.mjs --ladan (ny flagga: ladanCfg + delad analysator som live; utan flaggan som förr), 151659 + 171840 120-180 s, tools/natt/lamp-2026-11-25/.
+  Listan från 10-10 (4 lampor, pop) stämmer inte på 8: ripple 4,6 av 8, nedrakning 3,2, eq 2,3, vidga 2,2, split 1,7 räknas som glesa, medan
+  upptakt 0,3, ankomst 0,7, virvel 0,9, frasraknare 0,9, glimt 1,0, kickregn 1,0, blixtnedslag 1,1, dansparet 1,2, mellanslag 1,2 inte gör det.
+BASLINJE tools/natt/ren-2026-11-25/ (HEAD ec61fabd): alla 12 json BIT-IDENTISKA med ren-2026-11-24 (röken 7b720154 + konsertReplay-bänken ändrar inte ljuset).
+IDÉ, FÖRKASTAD: SPARSAM8 (opt-in DMX_SPARSAM8=1, listan = de som tänder < 1,65 av 8; aldrig committad, patch tools/natt/prov/sparsam8-20261125.patch).
+  Av-läget json-identiskt 12/12. Bänken: vers->refräng 0,26/0,16/0,04/0,22/0,26/0,06 -> 0,31/0,29/0,12/0,37/0,32/0,05, energiR15 4 av 6 upp
+  (160345 0,32 -> 0,15), full > fart i 171840 (0,24 -> 0,43) men 160345 vände (full 0,40 -> 0,27), alla tända 44-71 -> 50-74 %, lampspr 4 av 6 ner (171840 71 -> 48).
+  DOMAREN v3 medel 9 frön (.arena/natt1125): övning -0,55, KONTROLL -13,47 (ensam: takt -4,1, dynamik -7,2, koreografi -38,5, ljus +13 %), bruset ~±4.
+  Slutsats: att ta bort de glesa ur hela refrängen gör riggen jämnare tänd och dödar koreografin - glesheten ÄR betoningen. Pröva inte en bredare SPARSAM-lista igen;
+  om något: bara i full (FULL_HEL-vägen) och bara enstaka looker.
+NÄSTA FÖR NATTAGENTEN: (a) godkänner ägaren FULL_HEL: gör det till standard; (b) kickregn i full (171840) - om ägaren vill: pröva kickregn ensam
+  i FULL_HEL-listan (en look, domaren 9 frön); (c) ingen arena utan ARENA-uppdrag.
+
 NATTEN 2026-11-24 (schemalagda körningen, ingen arena; motorkod: bara opt-in-provet nedan):
 KLART 2026-11-24: NÄSTA 11-23 (a) "ljuset per look i full mot fart" - nytt tools/natt/lookniva.py (showTight --trace, 1 s-block, tier ur tierEma).
   5 filer x 4 frön: full 0,333 > fart 0,245 i snitt, men full < fart i 5 av 20 körningar (151659 frö 0/3, 171840 frö 0/1/3). I de körningarna

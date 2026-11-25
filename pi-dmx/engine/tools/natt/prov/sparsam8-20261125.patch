@@ -1,0 +1,19 @@
+diff --git a/pi-dmx/engine/src/effects.ts b/pi-dmx/engine/src/effects.ts
+index 2fbc6d2c..d41f4ef5 100644
+--- a/pi-dmx/engine/src/effects.ts
++++ b/pi-dmx/engine/src/effects.ts
+@@ -115,7 +115,13 @@ const EKO_BASS = 0.85;
+  *  refrängen (KICK_E_HIGH 0,6) och energigolv 0,8 där (dippen och golvet ersatta av BASENERGIN 10-12, taket kvar). Replay 22 ladan-filer: topp refräng 0,76 / build 0,66 / vers 0,62,
+  *  slagdjup refräng 68 % (djupast), tända lampor oförändrade (2,4). Grundton på mörka lampor och kickblixt på alla förkastade. */
+ const SEC_CEIL = 0.65, SEC_CEIL_BUILD = 0.85;
+-const SPARSAM: Mode[] = ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
++/** SPARSAM8 (nattprov 2026-11-25, opt-in DMX_SPARSAM8=1, osatt = bit-identiskt): listan ovan mättes 10-10 på 4 lampor och popmixen. På ladans
++ *  8 lampor (tools/lampCount.mjs --ladan, 151659 + 171840 120-180 s, tools/natt/lamp-2026-11-25/) tänder ripple 4,6 av 8 och split/vidga/eq/nedrakning
++ *  1,7-3,2 - medan kickregn 1,0, blixtnedslag 1,1, dansparet 1,2 m.fl. aldrig räknades som glesa. SPARSAM8 = de som tänder < 1,65 av 8 i snitt. */
++const SPARSAM8 = (process.env.DMX_SPARSAM8 ?? '') === '1';
++const SPARSAM: Mode[] = SPARSAM8
++  ? ['upptakt', 'ankomst', 'bounce', 'virvel', 'varannan', 'frasraknare', 'glimt', 'basgang', 'viska', 'kickregn', 'blixtnedslag', 'dansparet', 'mellanslag', 'morkerslag', 'uppvarmning', 'siren', 'chase', 'eko']
++  : ['basgang', 'chase', 'split', 'bounce', 'eko', 'vidga', 'varannan', 'nedrakning', 'eq', 'ripple'];
+ const DROP_GLES: Mode[] = ['dansparet', 'minnet'];   // droppen landar inte här (ägaren 11-22, .arena/dropdod: 1,3 / 2,5 av 8 lampor efter smällen)
+ /** FULL_HEL (nattprov 2026-11-24, opt-in DMX_FULL_HEL=1, osatt = bit-identiskt): refrängen i full väljer inte heller de glesa (DROP_GLES) -
+  *  landningen drog minnet/dansparet i full så att full blev mörkare än fart (151659: full 0,19 mot fart 0,25 på 2 av 4 frön). */
