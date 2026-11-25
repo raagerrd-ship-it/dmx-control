@@ -38,6 +38,7 @@ sr = 48000
 x = np.fromfile(wav, dtype='<i2', offset=44).astype(np.float64) / 32768.0
 x = x[: int(S * sr)]
 tin = opt('--trace-in')
+LOOKS = []   # lookavsnitten ur replayet (tom med --trace-in: då saknas jitterLook)
 NL = int(opt('--lampor', 4))   # bara för --trace-in: antal lampor i det sparade spåret
 if tin:
     tr = tin
@@ -51,7 +52,9 @@ else:
     # --live-kick (arena 11-07, mätfälla 52 igen - deltagaren a2 i puls1): live matar registerKick + KICK-BYPASS på frame.kick, utan flaggan står
     # lastKickBoost stilla i bänken och c.kickEnv är bara rutnätet. Domarens bänk (tools/arena/bank.py) skickar flaggan från runda 2 i puls1.
     subprocess.run(['node', os.path.join(here, 'konsertReplay.mjs'), clip, '--step', '5', '--delad-cfg', '--json', js, '--trace', tr, '--trace-alla'] + (['--live-kick'] if '--live-kick' in args else []), env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    NL = json.load(open(js, encoding='utf-8')).get('nLamps', 4)   # 11-15: spåret bär alla lampor (ladan har åtta), lampa 4.. i kolumn 10 och uppåt
+    _J = json.load(open(js, encoding='utf-8')); NL = _J.get('nLamps', 4)   # 11-15: spåret bär alla lampor (ladan har åtta), lampa 4.. i kolumn 10 och uppåt
+    for _r in _J['rows']:   # LOOKAVSNITTEN (11-25, del P): [starttid s, look] per sammanhängande look, ur replayets rader (0,1 s)
+        if not LOOKS or LOOKS[-1][1] != _r[1]: LOOKS.append([_r[0], _r[1]])
     os.remove(js)
     if clip != wav: os.remove(clip)
 T = np.fromfile(tr, dtype=np.float32).reshape(-1, 10 + max(0, NL - 4))
@@ -154,6 +157,23 @@ _lagv = [int(np.argmax(lig[i:i + 31])) * 5 for i, dd in zip(onsD, D) if dd >= 0.
 jitter = float((np.percentile(_lagv, 75) - np.percentile(_lagv, 25)) / 1.35) if len(_lagv) >= 20 else float('nan')
 _onB = [i for i in onsAll if i >= 200 and i + 200 < nb]
 betoning = float(spearmanr([rise[i] for i in _onB], [depth(i) for i in _onB])[0]) if len(_onB) >= 20 else float('nan')
+# ---- (f) JITTER PER LOOKAVSNITT (11-25, del P): PARALLELLT mått, domen (domare.py) läser fortfarande 'jitter' ----
+# 'jitter' är ETT spridningstal per fil: byter dirigenten look flyttar sig hela talet, för olika looks har olika fördröjning (bas -> ljustopp).
+# jitterLook = samma anslag och samma fördröjning som 'jitter', men varje anslag mäts mot SITT lookavsnitts median (lookavsnitt = tiden
+#   mellan två lookbyten): medelavvikelsen |fördröjning - avsnittets median| i ms över alla anslag i avsnitt med minst 5 anslag.
+#   Lågt = ljuset sitter på samma ställe varje slag INOM looken. jitterLookN = antal anslag som räknas, lookAvsnitt = antal avsnitt.
+_ti = [i for i, dd in zip(onsD, D) if dd >= 0.10]
+_seg = np.searchsorted([l[0] for l in LOOKS], np.array(_ti) * 0.005, side='right') - 1 if LOOKS and _ti else np.zeros(0, int)
+_la = np.array(_lagv, float); _dev = []; _nseg = 0
+for sg in np.unique(_seg):
+    v = _la[_seg == sg]
+    if len(v) >= 5: _dev.extend(np.abs(v - np.median(v))); _nseg += 1
+jitterLook = float(np.mean(_dev)) if len(_dev) >= 20 else None
+if os.environ.get('RYTM_ANSLAG_UT') and LOOKS:   # rådata per starkt anslag (för studier per look utan ombänkning): ljuset -150..+150 ms kring varje anslag, djup, styrka, lookavsnitt
+    _d = os.environ['RYTM_ANSLAG_UT']; os.makedirs(_d, exist_ok=True)
+    _tag = '-'.join([os.path.basename(os.path.dirname(env.get('DMX_DIST', ''))) or 'dist', 's' + env.get('KR_SEED', '0') + 't' + env.get('KR_TOG', 'x'), os.path.splitext(os.path.basename(wav))[0]])
+    np.savez_compressed(os.path.join(_d, _tag + '.npz'), ons=np.array(onsD), djup=D, styrka=np.array([rise[i] for i in onsD]), lig=np.array([lig[i - 30:i + 31] for i in onsD], np.float32),
+                        top=np.array([top[i - 30:i + 31] for i in onsD], np.float32), sek=np.array([sec[i] for i in onsD]), lookT=np.array([l[0] for l in LOOKS]), look=np.array([l[1] for l in LOOKS]), nb=nb)
 dark = (lig / 4) < 0.02
 runLong = np.zeros(nb, bool); i0 = None
 for i in range(start, end + 1):
@@ -188,6 +208,7 @@ res = {'wav': os.path.basename(wav), 's': round(len(x) / sr), 'env': [a for i, a
        'mork': round(float(dark[start:end].mean()), 4), 'slocknat1s': round(slock, 4), 'morktKort': round(morkK, 4),
        'lampspr': round(float((lamps.max(axis=1) - lamps.min(axis=1))[3000:].mean()), 4),
        'jitter': round(jitter, 1), 'jitterN': len(_lagv), 'betoning': round(betoning, 3),
+       'jitterLook': None if jitterLook is None else round(jitterLook, 2), 'jitterLookN': len(_dev), 'lookAvsnitt': _nseg,
        'ljusLag': LL, 'sektion': per}
 print(f"{res['wav']} {res['s']} s  rA {r0:.3f} best {rb:.3f}@{rbl} ms  rK {rk:.3f}@{rkl}  rS {rs_:.3f}@{rsl}  rTop {rt:.3f}  djup {res['djup']:.3f} (p25 {res['djupP25']:.3f}) synl {100*res['synl']:.0f} % av {len(D)}"
       f"  gapR {gapR:.3f} gapK {gapK:.3f}  ljus {res['ljus']:.3f}  ljusLag korskorr {lag} t90 {LL['t90']} lyft {LL['lyft']}\n"

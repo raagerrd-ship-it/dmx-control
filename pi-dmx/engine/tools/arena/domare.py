@@ -33,6 +33,12 @@ SPÄRRAR (DISK = ute oavsett poäng):
   basenergi  (bara när <körning>/bas/basenergi.json finns) frame.bassEnergy saknas, gainDiff > 0,05 eller befintliga ramfält ändrade
              (tools/arena/basenergi.mjs: analysatorn ska MÄTA musiken, oberoende av ingångsnivån, och inte röra andra fält)
   fel      en bänk som inte gick igenom
+PARALLELLT MÅTT (TILLÄGG 11-25, del P) - ändrar INGENTING i domen ovan (poäng, spärrar och ordning är orörda):
+  poäng2 = samma poäng, men delmåttet jitter räknat PER LOOKAVSNITT (rytm.py fältet jitterLook: medelavvikelsen i ms mellan varje
+           starkt basanslags fördröjning och medianen i SITT lookavsnitt) i stället för ett IQR-tal per fil (fältet jitter).
+           Dagens jitter mäter mest VILKA looker som låg på (varje look har sin egen typiska fördröjning), så det svänger med
+           lookföljden. Per avsnitt är lookens egen fördröjning borträknad. Visas bredvid poängen, dömer ingenting.
+           Saknar en bänk fältet (bänkad före 11-25): poäng2 = None och ingenting skrivs.
 """
 import io, json, os, sys, filecmp
 HERE = os.path.dirname(os.path.abspath(__file__)); ENGINE = os.path.dirname(os.path.dirname(HERE))
@@ -111,9 +117,13 @@ def doma(b, v, d):
         kor = (jit + bet) / 2
     poang = (0.7 * kontrast + 0.3 * takt if V2 else 0.45 * kontrast + 0.35 * kor + 0.2 * takt) - avdrag + bonus
     if gammal and not V2: disk.append('gammal bänk (saknar jitter/betoning) - bänka om')
+    jit2 = poang2 = None   # PARALLELLT MÅTT (11-25, del P): jitter per lookavsnitt. Rör inte poang, kor eller disk.
+    if not gammal and not V2 and all(R[n].get('jitterLook') and B[n].get('jitterLook') for n in WT):
+        jit2 = -sum(WT[n] * rel(R[n]['jitterLook'], B[n]['jitterLook']) for n in WT) / wsum
+        poang2 = poang + 0.35 * (jit2 - jit) / 2
     return {'takt': takt, 'kontrast': kontrast, 'kor': kor, 'jitter': R[LANG].get('jitter'), 'betoning': R[LANG].get('betoning'), 'avdrag': avdrag, 'poang': poang, 'ljus': 100 * (lj - 1),
             'lampspr': {n: 100 * (R[n]['lampspr'] / B[n]['lampspr'] - 1) for n in WT}, 'rA_lang': R[LANG]['rAbest'], 'rK_lang': R[LANG]['rK'],
-            'slagK_lang': R[LANG]['slagK'], 'ljusSteg': v['dyn']['levande']['ljusSteg'] if DYN else None, 't90': t9v, 'disk': disk}
+            'slagK_lang': R[LANG]['slagK'], 'ljusSteg': v['dyn']['levande']['ljusSteg'] if DYN else None, 't90': t9v, 'disk': disk, 'jit2': jit2, 'poang2': poang2}
 
 def main():
     run = os.path.abspath(sys.argv[1]); b = load(os.path.join(run, 'bas'))
@@ -128,11 +138,11 @@ def main():
     B = b['rytm'][LANG]
     lines = [f"# Ranking {os.path.basename(run)}{' KONTROLLMÄNGDEN' if HOLD else ''}{' HELA FILERNA' if HELA else ''} (domaren {'v2' if V2 else 'v3'}: tools/arena/domare.py, mot bas)", '',
              f"bas ({LANG}): rA {B['rAbest']:.3f}  rK {B['rK']:.3f}  slagK {B['slagK']:.3f}  ljusSteg {b['dyn'].get('levande', {}).get('ljusSteg')}  t90 {B['ljusLag'].get('t90')}", '',
-             '| plats | deltagare | poäng | takt % | dynamik % | koreografi | jitter lang ms | betoning lang | avdrag | rA lang | rK lang | slagK lang | ljusSteg | ljus % | lampspr ' + '/'.join(WT) + ' % | t90 | DISK |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|']
+             '| plats | deltagare | poäng | takt % | dynamik % | koreografi | jitter lang ms | betoning lang | avdrag | rA lang | rK lang | slagK lang | ljusSteg | ljus % | lampspr ' + '/'.join(WT) + ' % | t90 | DISK | poäng2 (jitter per lookavsnitt, bara info) |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|']
     for i, (n, r) in enumerate(rows, 1):
         if r['poang'] is None: lines.append(f"| {i} | {n} | - | | | | | | | | | | | | | | {'; '.join(r['disk'])} |"); continue
         lp = '/'.join(f"{r['lampspr'][k]:+.1f}" for k in WT)
-        lines.append(f"| {i} | {n} | {r['poang']:+.1f} | {r['takt']:+.1f} | {r['kontrast']:+.1f} | {r['kor']:+.1f} | {r['jitter']} | {r['betoning']} | {r['avdrag']:.1f} | {r['rA_lang']:.3f} | {r['rK_lang']:.3f} | {r['slagK_lang']:.3f} | {r['ljusSteg']} | {r['ljus']:+.1f} | {lp} | {r['t90']} | {'; '.join(r['disk']) or '-'} |")
+        lines.append(f"| {i} | {n} | {r['poang']:+.1f} | {r['takt']:+.1f} | {r['kontrast']:+.1f} | {r['kor']:+.1f} | {r['jitter']} | {r['betoning']} | {r['avdrag']:.1f} | {r['rA_lang']:.3f} | {r['rK_lang']:.3f} | {r['slagK_lang']:.3f} | {r['ljusSteg']} | {r['ljus']:+.1f} | {lp} | {r['t90']} | {'; '.join(r['disk']) or '-'} | {'-' if r['poang2'] is None else format(r['poang2'], '+.1f')} |")
     txt = '\n'.join(lines) + '\n'; print(txt)
     if '--md' in sys.argv: io.open(os.path.join(run, ('ranking-hela-holdout.md' if HOLD else 'ranking-hela.md') if HELA else ('ranking-holdout.md' if HOLD else 'ranking.md')), 'w', encoding='utf-8').write(txt)
 

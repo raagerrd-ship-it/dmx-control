@@ -10,7 +10,9 @@ domare.py:s doma(). bank.py och domaren är orörda: vanlig bank.py-körning ger
   Resultat även i <körning>/ljusskak.json.
   --holdout (11-23): samma sak på KONTROLLMÄNGDEN (bank-holdout.json per frö, domare.py:s --holdout-vikter) -> ljusskak-holdout.json.
   --hela (TILLÄGG 11-25, del M): samma sak på HELA inspelningarna (bank.py --hela, 172432 med i övningen; ~2,5 min per frö och mängd)
-    -> bank-hela[-holdout].json per frö och ljusskak-hela[-holdout].json. Utan --hela är allt som förr."""
+    -> bank-hela[-holdout].json per frö och ljusskak-hela[-holdout].json. Utan --hela är allt som förr.
+  PARALLELLT MÅTT (TILLÄGG 11-25, del P): har bänkarna fältet jitterLook (rytm.py från 11-25) skrivs också poäng2 (domare.py: jitter per
+    lookavsnitt): bruset i avsnitt 3b och en egen rad under varje id. Alla gamla rader och tal är orörda; utan fältet skrivs inget nytt."""
 import io, itertools, json, os, shutil, statistics as st, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__)); ENGINE = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, HERE); import domare
@@ -87,14 +89,18 @@ if __name__ == '__main__':
         print(f"\n## 2. BRUSET: alla par frö i mot frö j ({len(par)} par, samma kod)\n" + '\n'.join(f"  {n:16s} {fmt(res['par'][k])}" for k, n in KEYS))
         print(f"  poäng < -1,5 (dagens ljusspärr): {nd} av {len(par)} par;  andra spärrar fällde {ndisk} par: " + '; '.join(sorted({x for r in par for x in r['disk']}))[:300])
         res['parUnder15'] = nd; res['parDisk'] = ndisk
-    ks = list(B); res['N'] = {}
+    ks = list(B); res['N'] = {}; p2 = {}
     print('\n## 3. medel över N frön mot medel över N ANDRA frön (alla disjunkta par av grupper)\n')
     for N in range(1, len(ks) // 2 + 1):
         ps = []
         for A in itertools.combinations(ks, N):
             rest = [k for k in ks if k not in A]
-            for C in itertools.combinations(rest, N): ps.append(domare.doma(medel([B[k] for k in C]), medel([B[k] for k in A]), os.path.join(korn, '_ingen'))['poang'])
+            for C in itertools.combinations(rest, N):
+                r = domare.doma(medel([B[k] for k in C]), medel([B[k] for k in A]), os.path.join(korn, '_ingen')); ps.append(r['poang']); p2.setdefault(N, []).append(r['poang2'])
         s = res['N'][N] = stat(ps); print(f"  N {N}: poäng {fmt(s)}  -> 2·std {2 * s['std']:.2f}, bänktid ~{N} × 50 s per deltagare")
+    if p2 and all(x is not None for v in p2.values() for x in v):   # del P: samma räkning på poäng2 (jitter per lookavsnitt)
+        print('\n## 3b. samma med poäng2 (jitter per lookavsnitt, parallellt mått - dömer ingenting)\n'); res['N2'] = {}
+        for N, v in p2.items(): s = res['N2'][N] = stat(v); print(f"  N {N}: poäng2 {fmt(s)}  -> 2·std {2 * s['std']:.2f}")
     for i in ids:
         if i == 'bas': continue
         V = banker(i)
@@ -102,4 +108,7 @@ if __name__ == '__main__':
         r = domare.doma(medel(list(B.values())), medel(list(V.values())), os.path.join(korn, i)); en = domare.doma(b0, V['0'], os.path.join(korn, i)) if '0' in V else None
         print(f"\n## {i}: fröMEDEL ({len(V)}) mot basens fröMEDEL ({len(B)}): poäng {r['poang']:+.2f}" + (f"  (ensam bänk {en['poang']:+.2f})" if en else '') + f"  DISK {'; '.join(r['disk']) or '-'}")
         res.setdefault('id', {})[i] = dict(medel=r['poang'], ensam=en and en['poang'], disk=r['disk'], n=len(V))
+        if r['poang2'] is not None:   # del P: parallellt mått, egen rad
+            print(f"   poäng2 (jitter per lookavsnitt): {r['poang2']:+.2f}  (delmåttet jitter per lookavsnitt {r['jit2']:+.2f})" + (f"  (ensam bänk {en['poang2']:+.2f})" if en and en['poang2'] is not None else ''))
+            res['id'][i].update(medel2=r['poang2'], ensam2=en and en['poang2'])
     json.dump(res, io.open(os.path.join(korn, ('ljusskak-hela-holdout.json' if domare.HOLD else 'ljusskak-hela.json') if domare.HELA else ('ljusskak-holdout.json' if domare.HOLD else 'ljusskak.json')), 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
