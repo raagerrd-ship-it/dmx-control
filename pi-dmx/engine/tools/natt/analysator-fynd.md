@@ -23,7 +23,7 @@ Paritet (analyserParity.mjs, gammal = .arena/natt1126/foreN/dist byggd ur 018d31
 151659 + 193040 300 s = 0 avvikande hop av 225 000, loggrader 0. (Verktyget ser inte taktvägen; del N rör analyserClock.ts med 2 rader.)
 Var: analyser.ts, analyserFack.ts, analyserBass/Character/Clock/Drop/Fft/Kick/Level/Riser/Section/Spectrum.ts. Material: tools/ladan-2026-11-13/, -14/.
 Önskat: porta del N till lotus när ägaren säger ja (deployspärren kräver samma delade filer); bänka lotus klocka i egen kedja.
-Status:
+Status: VÄNTAR 2026-11-26 (lotus-morgonagenten): ej portad - huvudsessionens besked 11-22 "porta inte", fyndet säger själv "när ägaren säger ja"; lotus Pi-dist = abec7563-bygget (md5 lika).
 
 ## ÖPPET 2026-11-22 profile.bass är en bandandel och är lägst i refrängen - INGEN delad fil ändrad
 Vad: profile.bass vid dirigentens lookbyten (lookvalHook, sex ladan-inspelningar 76 min, 240 byten) median intro 0,14 / low 0,15 / high 0,09, p90
