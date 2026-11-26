@@ -1,0 +1,43 @@
+diff --git a/pi-dmx/engine/src/effects.ts b/pi-dmx/engine/src/effects.ts
+index 50a81d72..c7c991fd 100644
+--- a/pi-dmx/engine/src/effects.ts
++++ b/pi-dmx/engine/src/effects.ts
+@@ -428,6 +428,11 @@ const B_PART_DIM = 0.7, B_PART_AT = 0.5;
+  *  topp medan dropens lyft pågår; DMX_MINI_LIFT_FLOOR = minidropens lyft som golv (1 = som i dag). Fönstrets rattar
+  *  (DMX_B_LO_S/B_MIN_DB/B_WIN_S/B_SUBW/DROP_WIN_S) är borta: mätningen ligger i analysatorn (frame.bassEnergy). */
+ const envN = (k: string, d: number): number => { const v = process.env[k]; return v === undefined || v === '' ? d : Number(v); };
++/** PROV 2026-11-26 (nattagenten, opt-in DMX_FX_FLOOR_VERS 0..0,6; osatt = FX_FLOOR = bit-identiskt): grundnivån mellan slagen i
++ *  analysatorns lugna sektioner (low/intro/break = versen). Bänken 11-26: vers->refräng 0,04/0,06 i 171840/200719 och lugn lyser som fart
++ *  (200719 0,19/0,18) - golvet 0,6 lyfter varje tänd lampa lika i alla partier. Lägre golv i versen = djupare puls (slagen syns mer) och
++ *  mörkare vers mot refrängen; high/build orörda. Sänker bara (regel a). (Mot motorns lugn-tier gav 0,3 ~0: tiern är sällan lugn.) */
++const FX_FLOOR_VERS = Math.max(0, Math.min(FX_FLOOR, envN('DMX_FX_FLOOR_VERS', FX_FLOOR)));
+ const PB_CURVE = envN('DMX_B_CURVE', B_CURVE);
+ /** LJUSETS SPANN (arenan basenergi 11-11, fusionen): analysatorn mäter basens nivå över BASS_SPAN_DB (36 dB) under taket; ljuset använder
+  *  de översta B_SPAN_DB. 24 = bäst i bänken och på kontrollmängden (+3,4 / +3,3) men riggen mörknar i baslösa partier (megamix släckt
+@@ -559,7 +564,8 @@ export class EffectEngine {
+     if (E_NORM_S > 0) { const n = this.fxNorm; rgb[0] = Math.min(1, rgb[0] * n); rgb[1] = Math.min(1, rgb[1] * n); rgb[2] = Math.min(1, rgb[2] * n); m = Math.min(1, m * n); }
+     // TOGGLE-EFFEKTER UTAN GRUNDNIVA (ladan 10-10, agaren: parvisa effekter i takt syns inte): golvet lyfte 'av'-gruppen till ~55 % -
+     // parbanken (tools/pairBench.mjs) matte kontrast (max-min)/max 0,03-0,12. Den morka gruppen i en toggle-effekt ska vara mork.
+-    if (FX_FLOOR > 0 && !toggle && m > 0.001 && m < 1) { const k = (m + FX_FLOOR * (1 - m) * Math.min(1, m / 0.1)) / m; rgb[0] *= k; rgb[1] *= k; rgb[2] *= k; m *= k; }
++    const fl = this.versNu ? FX_FLOOR_VERS : FX_FLOOR;
++    if (fl > 0 && !toggle && m > 0.001 && m < 1) { const k = (m + fl * (1 - m) * Math.min(1, m / 0.1)) / m; rgb[0] *= k; rgb[1] *= k; rgb[2] *= k; m *= k; }
+     const liftK = this.dropEnv - this.dropColEnv;   // minidrop/nastan-drop: ljusstyrka mot fullt, kuloren kvar
+     if (liftK > 0.005 && m > 0.002 && m < 1) { const g = 1 + (1 / m - 1) * liftK; rgb[0] *= g; rgb[1] *= g; rgb[2] *= g; }
+     // MINIDROPEN TÄNDER BARA DE AKTIVA LAMPORNA TILL FULLT (ägaren i ladan 11-01: 'tänder alla aktiva lampor till fullt istället för att köra
+@@ -682,6 +688,8 @@ export class EffectEngine {
+   // noteCharShift: bytesskal giltigt 6 s               // SECTION_UNIT: sektionsgrans passerad men bytet blockerat (riser/MIN_HOLD) -> gor det sa fort det gar
+   private prevSongLook = new Map<string, Mode>();  // SECTION_UNIT: forra latens look per sektionstyp (straffas sa nasta lat far en annan)
+   private lastSmartTier = "";
++  /** Analysatorns sektion är low/intro/break (för FX_FLOOR_VERS); sätts en gång per ruta. */
++  private versNu = false;
+   private lastSmartSwitchMs = 0;   // tidsstämpel för senaste effektbyte → minsta-intervall
+   private activeMode: Mode = "smart";
+   // Regi-lager: fras-räknare + aktiv palett (byts var N:e takt).
+@@ -1019,6 +1027,7 @@ export class EffectEngine {
+         if ((frame.section === 'high' && (frame.sectionTier ?? 0) >= 2) && this.tierEma < SECTION_HIGH_SNAP) this.tierEma = SECTION_HIGH_SNAP;
+         else if ((frame.section === 'break' || frame.section === 'low') && this.tierEma > SECTION_LOW_SNAP) this.tierEma = SECTION_LOW_SNAP;
+       }
++      this.versNu = frame.section === 'low' || frame.section === 'intro' || frame.section === 'break';
+       const intensity = this.cfg.energyDrivesMode ? this.tierEma : 0.5;
+         // Three tiers by intensity + tempo; user checkboxes (cfg.rotation) pick
+         // which modes are in play. Full Fart kräver BÅDE hög energi och högt BPM.

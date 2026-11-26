@@ -1,3 +1,19 @@
+NATTEN 2026-11-26 (schemalagda körningen, ingen arena, ingen motorkod kvar - provet förkastat och återställt):
+UPPDRAG: inga nya. NÄSTA 11-25 (a) FULL_HEL: inget besked - väntar; (b) kickregn i FULL_HEL "om ägaren vill" - inte gjort utan hans ord; (c) ingen arena.
+BASLINJE tools/natt/ren-2026-11-26/ (HEAD 2d290551): alla 12 json BIT-IDENTISKA med ren-2026-11-25 - del N (skräpet, delade filer) och
+  ljusdomarens jitterLook ändrar inte ljuset. kick->ljus 149/96/120/155/107/107 ms (lika), vers->refräng 0,26/0,16/0,04/0,22/0,26/0,06.
+BRISTER: (1) vers->refräng 0,04 i 171840 och 0,06 i 200719; (2) lugn lyser som fart i 200719 (0,19/0,18) och 193818 (0,19/0,22);
+  (3) 151659: 0 drops på 532 s, 21 av 23 lookbyten är landning, full 0,18 < fart 0,23 (FULL_HEL väntar).
+IDÉ, FÖRKASTAD: lägre grundnivå (FX_FLOOR 0,6 -> 0,3) i versen (analysatorns low/intro/break), opt-in DMX_FX_FLOOR_VERS, aldrig committad,
+  patch tools/natt/prov/fxfloorvers-20261126.patch. (Först mot motorns lugn-tier: ~0 effekt - lastSmartTier är sällan 'lugn'.)
+  Av-läget json-identiskt 12/12. Bänken: vers->refräng 6 av 6 upp (0,04->0,07, 0,06->0,10, 0,26->0,29), energiR15 5 av 6 upp (+0,01..0,02),
+  kick->ljus 160345 96->91, 193818 107->99; dirigentens rader identiska (samma looker/byten). DOMAREN v3 9 frön (.arena/natt1126):
+  övning -0,35, kontroll -0,13, ingen DISK; PARVIS per frö: takt -0,56 / -0,55 (9 av 9 negativa på båda mängderna), kontrast +0,03 / -0,04,
+  ljus -0,65 / -0,47 %. Slutsats: djupare puls i versen syns inte som mer slagkontrast i domaren men ljuset följer basen sämre - golvet
+  är inte vägen till vers/refräng-kontrast. Pröva inte FX_FLOOR per sektion igen; kontrasten måste komma ur effektvalet/effekten.
+FYND: ÖPPET 2026-11-26 DELAD FIL ÄNDRAD del N - analyserParity LOTUS-stil 0 avvikande hop av 225 000 (lotus ej portad).
+NÄSTA FÖR NATTAGENTEN: (a) godkänner ägaren FULL_HEL: gör det till standard; (b) kickregn i FULL_HEL bara på ägarens ord; (c) ingen arena utan ARENA-uppdrag.
+
 NATTEN 2026-11-25 (schemalagda körningen, ingen arena, ingen motorkod; huvudsessionen körde delarna A-I parallellt i .arena/):
 UPPDRAG: inga nya. NÄSTA 11-24 (a) FULL_HEL: inget besked från ägaren - väntar. KLART 2026-11-25: NÄSTA 11-24 (b) SPARSAM mätt om på 8 lampor:
   tools/lampCount.mjs --ladan (ny flagga: ladanCfg + delad analysator som live; utan flaggan som förr), 151659 + 171840 120-180 s, tools/natt/lamp-2026-11-25/.

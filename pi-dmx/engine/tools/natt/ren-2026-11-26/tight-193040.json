@@ -1,0 +1,112 @@
+{
+ "wav": "tools/ladan-2026-11-14/lang-20261114T193040.wav",
+ "startS": 0,
+ "gainDb": 0,
+ "totS": 365,
+ "rutor": 13707,
+ "tajt": {
+  "kickLagMs": 155,
+  "kickLagP75": 221,
+  "kickLagRigg90": 150,
+  "lampUpp": 2538,
+  "kickar": 916,
+  "kickTraff": 0.39082969432314413,
+  "kickHojd": 0.13235294117647062,
+  "energiR": 0.44953670069327045,
+  "nivaR": 0.24761489000879816,
+  "energiRtopp": 0.4507956347266731,
+  "energiRruta": 0.3751464939144734,
+  "energiR15": 0.4548909394766033,
+  "nivaR15": 0.2615430363355061,
+  "bpmMed": 113.13532397627121,
+  "kickFonsterMs": 250,
+  "litLugn": 0.15914215686274513,
+  "litFart": 0.19192401960784317,
+  "litFull": 0.42810049019607843,
+  "toppLugn": 0.27990196078431373,
+  "toppFart": 0.2681372549019607,
+  "toppFull": 0.634313725490196,
+  "sekLugn": 85,
+  "sekFart": 175,
+  "sekFull": 82,
+  "byten": 23,
+  "bytenPerMin": 3.7757186633591124,
+  "musikByten": 1,
+  "orsaker": {
+   "sektion": 13,
+   "landning": 4,
+   "drop": 6
+  },
+  "drops": 7,
+  "minidrops": 12,
+  "granser": 2,
+  "karaktarsskiften": 5,
+  "tempovaxlingar": 1,
+  "dropSprangLugn": 0.6592565359477124,
+  "dropSprangHog": 0.6979718137254902,
+  "dropsLugna": 3
+ },
+ "snygg": {
+  "alla3": 0.02541769485111239,
+  "en": 0.3888341607576541,
+  "matt": 1,
+  "lampspr": 69.56912526446341,
+  "lookar": 12,
+  "lookMedianS": 15.600000000000023,
+  "lookLangstaS": 34.50666666666672,
+  "morkt": 0.0035018603633180127,
+  "litP10": 0.07254901960784313,
+  "litP50": 0.2068627450980392,
+  "litP90": 0.5411764705882354
+ },
+ "lookTime": [
+  [
+   "eko",
+   82.31999951172341
+  ],
+  [
+   "tryckvag",
+   71.20000000000293
+  ],
+  [
+   "kickregn",
+   39.920000244140795
+  ],
+  [
+   "backbeat",
+   34.50666674804668
+  ],
+  [
+   "slagga",
+   26.666666748046627
+  ],
+  [
+   "wave",
+   24.15833325195293
+  ],
+  [
+   "linjalen",
+   22.69333325195296
+  ],
+  [
+   "dansparet",
+   20.18666650390614
+  ],
+  [
+   "kaskad",
+   19.25333349609366
+  ],
+  [
+   "varannan",
+   16.426666748046845
+  ],
+  [
+   "gallop",
+   7.359999999999976
+  ],
+  [
+   "minnet",
+   0.826666748046875
+  ]
+ ]
+}

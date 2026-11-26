@@ -15,6 +15,16 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-26 DELAD FIL ÄNDRAD: skräpet del N (talfält som flyttal, karaktärens profil som klass, rutans klocka en gång per ruta)
+Vad: huvudsessionen lade in del N 2026-11-25 (6fea7319, 5375319f, b122fd9b; manifestet ANALYSER_SHARED.md5 uppdaterat), inte utlagd i ladan.
+Skräp 943 -> 574 kB/s ljud enligt LAGET.md. Nattagenten 11-26: DMX-baslinjen tools/natt/ren-2026-11-26 (HEAD 2d290551) är 12/12 json
+BIT-IDENTISK med ren-2026-11-25 (före del N); domarens basbänk (.arena/natt1126/bas) = 11-25:s utom det nya fältet jitterLook.
+Paritet (analyserParity.mjs, gammal = .arena/natt1126/foreN/dist byggd ur 018d31a6, ny = engine/dist): LOTUS-stil --split inline,
+151659 + 193040 300 s = 0 avvikande hop av 225 000, loggrader 0. (Verktyget ser inte taktvägen; del N rör analyserClock.ts med 2 rader.)
+Var: analyser.ts, analyserFack.ts, analyserBass/Character/Clock/Drop/Fft/Kick/Level/Riser/Section/Spectrum.ts. Material: tools/ladan-2026-11-13/, -14/.
+Önskat: porta del N till lotus när ägaren säger ja (deployspärren kräver samma delade filer); bänka lotus klocka i egen kedja.
+Status:
+
 ## ÖPPET 2026-11-22 profile.bass är en bandandel och är lägst i refrängen - INGEN delad fil ändrad
 Vad: profile.bass vid dirigentens lookbyten (lookvalHook, sex ladan-inspelningar 76 min, 240 byten) median intro 0,14 / low 0,15 / high 0,09, p90
 0,48 / 0,41 / 0,33 - andelen band 0-2 av alla åtta faller när hela mixen spelar. Effekter som ska bära basen (gravity FIT.bass 0,90, needsBass) får
