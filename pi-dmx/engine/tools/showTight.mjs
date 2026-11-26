@@ -56,12 +56,12 @@ const QUIET = flag("--tyst");
 
 const { pathToFileURL } = await import("node:url");
 const DIST = opt("--dist", null) ? pathToFileURL(opt("--dist") + "/").href : new URL("../dist/", import.meta.url).href;   // --dist: annan bygd kopia (A/B)
-const { Analyser } = await import(DIST + "analyser.js");
+const { Analyser, createAnalyser } = await import(DIST + "analyser.js");
 const { EffectEngine } = await import(DIST + "effects.js");
 const { BeatFeed } = await import(DIST + "beatFeed.js");   // taktmatningen som i motorn (matfalla 43)
 const { defaultConfig, fixtureRoles } = await import(DIST + "config.js");
 const { EFFECT_KEYS } = await import(DIST + "effects/registry.js");
-const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
+const { Hopp } = await import(DIST + "hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 
 const d = readFileSync(path);
 if (d.toString("ascii", 0, 4) !== "RIFF") { say("inte en WAV"); process.exit(2); }
@@ -93,21 +93,17 @@ const lamps = cfg.fixtures.map((fx) => {
 // MÄTFÄLLA 47 (rättad här 10-19): live får analysatorn MOTORNS cfg (index.ts), så kickgrinden mot taktgridet är på - med en egen kopia
 // fyrade 'kick' var ~290 ms oavsett låt. --egen-cfg = gamla vägen.
 // DELNINGEN SOM LIVE (10-19): ladan kör den delade analysatorn delad (DMX-profilen ANALYSER_SPLIT 'worker') - snabba sidan i motorns
-// tråd med motorns cfg, långsamma (tempo/gridfas/sektion) i en worker som får en KOPIA av cfg vid start (structured clone). Här
-// körs den långsamma sidan synkront (inline, deterministiskt) med en kopia som i workern. --odelad = en analysator i en tråd (förr).
-const { createSplitBuffers } = await import(DIST + "split.js");
-const liveAnalyser = (c) => { if (args.includes("--odelad")) return new Analyser(c); const b = createSplitBuffers(); const fast = new Analyser(c, { role: "fast", split: b }); fast.setInlinePeer(new Analyser(structuredClone(c), { role: "slow", split: b })); return fast; };
+// tråd med motorns cfg, långsamma (tempo/gridfas/sektion + taktvägen) i en worker. Här som motorns inline-läge (createAnalyser 'inline',
+// deterministiskt). --odelad = en analysator i en tråd med klockan i process().
+const liveAnalyser = (c) => { if (!args.includes("--odelad")) return createAnalyser(c, "inline"); const a = new Analyser(c); a.clock = new BeatFeed(); return a; };
 const an = liveAnalyser(flag("--egen-cfg") ? ladanCfg(defaultConfig) : BeatFeed.analyserCfg(cfg));
-const feed = new BeatFeed();
 // GAIN: motorn laser forstarkningen bara pa aux (index.ts: setGainLock(cfg.audioInput !== "mic", 1)).
 // Kor ladan pa mikrofon ar AGC:n aktiv dar men inte har; --agc kor som mikrofoningang.
 if (!flag("--agc")) an.setGainLock(true, 1);
-// LATGRANSENS SIDOKEDJA som i index.ts (se huvudet). Klockan ar Date.now = den virtuella.
-const bounds = new BoundaryDetector(() => Date.now());   // INTE standardklockan: den fangar Date.now-funktionen vid konstruktion, och banken byter den per hop
-an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
-let lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0;
+// LATGRANSENS SIDOKEDJA och taktvägen som i index.ts: hopp.js. Klockan ar Date.now = den virtuella.
 const EV = [];   // {t, typ, txt}
+let tNow = 0, lastCharShift = 0, lastTempoShift = 0;
+const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => EV.push({ t: tNow, typ: 'grans' }) }), bounds = hopp.bounds;
 
 // Klockan FORE motorn skapas (matfallan ovan).
 const t00 = EPOCH + startS * 1000;
@@ -144,16 +140,9 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
   // MÄTFÄLLA 48 (rättad här 10-19): analysatorns klocka = virtualEpoch + det som skickas in -> skicka t, inte EPOCH + t (annars hamnar
   // kickarna 1,7e12 ms före Date.now() och effekternas slag får en godtycklig fas mot kickarna). --epok-fel = gamla vägen.
   an.setVirtualClock(flag("--epok-fel") ? ms : ms - EPOCH); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  const fr = an.process(buf);
-  boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence;
-  bounds.tick(boundsArg);
-  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); EV.push({ t: tS, typ: 'karaktar' }); }
-  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); EV.push({ t: tS, typ: 'tempo', fran: bounds.tempoShiftFrom, till: bounds.tempoShiftTo }); }
-  if (bounds.boundaryCount !== lastBoundary) {
-    lastBoundary = bounds.boundaryCount; eng.softenRange(); EV.push({ t: tS, typ: 'grans' });
-    if (process.env.DMX_BOUNDARY_SOFT !== '0') an.hintTrackChange(5000); else { an.resetTempo(); if ((process.env.DMX_SECTION_HINT_LOWCONF ?? '0') === '0') an.hintTrackChange(5000); }
-  }
-  feed.update(fr, cfg, an);   // TAKTMATNINGEN SOM LIVE (beatFeed.ts, matfalla 43; forr anchorMs = fr.beatAnchorMs varje hop)
+  tNow = tS; const fr = hopp.analys(buf); hopp.koppla(fr);   // TAKTMATNINGEN SOM LIVE (hopp.js)
+  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; EV.push({ t: tS, typ: 'karaktar' }); }
+  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; EV.push({ t: tS, typ: 'tempo', fran: bounds.tempoShiftFrom, till: bounds.tempoShiftTo }); }
   if (process.env.ST_ONS) { ONS.push(+(fr.onset?.kick ?? 0).toFixed(4)); ANC.push(cfg.beat ? [cfg.beat.anchorMs - EPOCH, cfg.beat.bpm] : null); }
   if (process.env.ST_PHASE2 && cfg.beat && cfg.beat.bpm > 0) { const bm = 60000 / cfg.beat.bpm; const ph = ((((ms - cfg.beat.anchorMs) % bm) + bm) % bm) / bm; const bi = Math.floor(ph * 40); PH2[bi] += (fr.onset?.kick ?? 0); PH2N[bi]++; }
   if (fr.kick) { if (!kickPending) kickAtS = tS; kickPending = true; }                                   // tappa ingen kick mellan renderrutorna

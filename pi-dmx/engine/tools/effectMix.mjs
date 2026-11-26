@@ -7,13 +7,14 @@ const { Analyser } = await import("../dist/analyser.js");
 const { EffectEngine } = await import("../dist/effects.js");
 const { defaultConfig } = await import("../dist/config.js");
 const { EFFECTS, TIER } = await import("../dist/effects/registry.js");
-const { BoundaryDetector } = await import("../dist/boundaryDetector.js");   // 2026-09-23: latgransen (som index.ts) - utan den nollas aldrig sektion/lookminne vid latbyte i banken
+const { Hopp } = await import("../dist/hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1): latgransen, taktvagen som index.ts
+const { BeatFeed } = await import("../dist/analyserClock.js");
 const f = process.argv[2] || "tools/pop_ladan.wav", startS = Number(process.argv[3] || 0), secs = Number(process.argv[4] || 600);
 const d = readFileSync(f); const n = (d.readUInt32LE(40) || d.length - 44) / 2; const SR = 48000, HOP = 128;
 const cfg = JSON.parse(JSON.stringify(defaultConfig)); cfg.beatPulse = true; cfg.mode = "smart"; cfg.energyDrivesMode = true;
-const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
+const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.clock = new BeatFeed(); an.setGainLock(true, 1);   // odelad: klockan i process()
 const eng = new EffectEngine(cfg);
-let nowMs = 1700000000000; const bounds = new BoundaryDetector(() => nowMs); an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz)); let lastB = 0, nBounds = 0;
+let nBounds = 0; const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => { nBounds++; } });
 const logs = []; const origLog = console.log; console.log = (...a) => { const s = a.join(" "); if (s.startsWith("[dirigent]")) logs.push(s); };
 const buf = new Float32Array(HOP); let ms0 = 1700000000000; let lastRender = -1;
 const share = new Map(); const secFx = {}; const tierShare = { lugn: 0, fart: 0, full: 0 }; let switches = 0; let last = ""; let lastAt = 0; const dwells = []; const secShare = {};
@@ -21,11 +22,8 @@ for (let off = 0; off + HOP <= n && off < (startS + secs) * SR; off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
   const ms = ms0 + (off / SR) * 1000; an.setVirtualClock(ms);
   Date.now = () => ms; performance.now = () => ms - 1700000000000;
-  nowMs = ms; const fr = an.process(buf);
-  bounds.tick({ level: fr.level, bpm: fr.bpm, bpmConfidence: fr.bpmConfidence });
-  if (bounds.boundaryCount !== lastB) { lastB = bounds.boundaryCount; nBounds++; eng.softenRange(); if (process.env.DMX_BOUNDARY_SOFT) an.hintTrackChange(5000); else an.resetTempo(); }
+  const fr = hopp.analys(buf); hopp.koppla(fr);
   if (fr.kick) eng.registerKick(0.4 + Math.min(1, fr.energy * 1.4) * 0.6);   // som index.ts:394 (matfalla 36)
-  if (fr.bpm > 0) { if (!cfg.beat || Math.abs(cfg.beat.bpm / fr.bpm - 1) > 0.03) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence }; else cfg.beat.confidence = fr.bpmConfidence; }   // stabilt ankare som motorns PLL
   if (off / SR >= startS && ms - lastRender >= 25) {
     lastRender = ms; eng.render(fr); const t = off / SR;
     const m = eng.activeMode || eng.smartMode || "?"; share.set(m, (share.get(m) || 0) + 0.025);

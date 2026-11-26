@@ -7,14 +7,14 @@ import { readFileSync } from "node:fs"; import path from "node:path"; import { p
 const argv = process.argv.slice(2), ALLA = argv.includes("--alla"), wavs = argv.filter(a => a.endsWith(".wav"));
 const U = f => pathToFileURL(path.resolve("dist", f)).href;
 process.env.DMX_ANALYSER_SPLIT = "inline";
-const { createAnalyser } = await import(U("analyser.js")); const { defaultConfig } = await import(U("config.js")); const { BeatFeed } = await import(U("analyserClock.js")); const { BoundaryDetector } = await import(U("boundaryDetector.js"));
+const { createAnalyser } = await import(U("analyser.js")); const { defaultConfig } = await import(U("config.js")); const { BeatFeed } = await import(U("analyserClock.js")); const { Hopp } = await import(U("hopp.js"));   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 const log = console.log; const tot = new Map();   // fält -> per fil { on, ch, min, max, n }
 const flat = (o, pre, out) => { for (const k in o) { const v = o[k]; if (v && typeof v === "object" && !ArrayBuffer.isView(v) && !Array.isArray(v)) flat(v, pre + k + ".", out); else if (typeof v === "number" || typeof v === "boolean" || typeof v === "string") out.push([pre + k, v]); } return out; };
 for (const wav of wavs) {
   console.log = () => {};
   // DELAD cfg som live (index.ts): taktrastret (cfg.beat) når analysatorn
-  const cfg = ladanCfg(defaultConfig), an = createAnalyser(BeatFeed.analyserCfg ? BeatFeed.analyserCfg(cfg) : cfg, undefined), feed = new BeatFeed(); an.setGainLock(true, 1);
-  const bounds = new BoundaryDetector(() => Date.now()); an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz)); const ba = { level: 0, bpm: 0, bpmConfidence: 0, silent: false }; let lb = 0, nb = 0;
+  const cfg = ladanCfg(defaultConfig), an = createAnalyser(BeatFeed.analyserCfg ? BeatFeed.analyserCfg(cfg) : cfg, undefined); an.setGainLock(true, 1);
+  let nb = 0, tNow = 0; const hopp = new Hopp(an, cfg, { softenRange: () => {}, noteTrack: () => { if (tNow >= 20) nb++; } });
   const d = readFileSync(wav); let o = 12, start = 44, len = d.length - 44;
   while (o + 8 <= d.length) { const id = d.toString("latin1", o, o + 4), ln = d.readUInt32LE(o + 4); if (id === "data") { start = o + 8; len = Math.min(ln || d.length - start, d.length - start); break; } o += 8 + ln + (ln & 1); }
   const ch = d.readUInt16LE(22), SR = d.readUInt32LE(24), n = Math.floor(len / 2 / ch), HOP = 128, EPOCH = 1700000000000, buf = new Float32Array(HOP);
@@ -22,9 +22,7 @@ for (const wav of wavs) {
   for (let off = 0; off + HOP <= n; off += HOP) {
     for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(start + (off + i) * 2 * ch) / 32768;
     const t = off / SR, ms = EPOCH + t * 1000; an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
-    const fr = an.process(buf); ba.silent = fr.silent; ba.level = fr.level; ba.bpm = fr.bpm; ba.bpmConfidence = fr.bpmConfidence; bounds.tick(ba);
-    if (bounds.boundaryCount !== lb) { lb = bounds.boundaryCount; an.hintTrackChange(5000); if (t >= 20) nb++; }
-    if (an.hopLane) an.hopLane.feed(fr, cfg, an); else feed.update(fr, cfg, an);
+    tNow = t; const fr = hopp.analys(buf); hopp.koppla(fr);
     if (t < 20) continue; frames++;
     for (const [k, v] of flat(fr, "", [])) { let s = st.get(k); if (!s) st.set(k, s = { on: 0, ch: 0, min: Infinity, max: -Infinity, last: v, str: typeof v === "string" });
       if (typeof v === "string" ? v !== "" : v !== 0 && v !== false && v === v) s.on++; if (v !== s.last) { s.ch++; s.last = v; }

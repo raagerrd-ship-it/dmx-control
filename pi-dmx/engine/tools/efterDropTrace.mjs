@@ -21,14 +21,13 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const path = args.find((a) => a.endsWith(".wav"));
 const { pathToFileURL } = await import("node:url");
 const DIST = opt("--dist", null) ? pathToFileURL(opt("--dist") + "/").href : new URL("../dist/", import.meta.url).href;
-const { Analyser } = await import(DIST + "analyser.js");
+const { createAnalyser } = await import(DIST + "analyser.js");
 const FXD = opt("--fx-dist", null) ? pathToFileURL(opt("--fx-dist") + "/").href : DIST;   // --fx-dist: bara effektmotorn ur en patchad kopia (analysatorn behöver node_modules/fft.js)
 const { EffectEngine } = await import(FXD + "effects.js");
 const { BeatFeed } = await import(DIST + "beatFeed.js");
 const { defaultConfig, fixtureRoles } = await import(DIST + "config.js");
 const { EFFECT_KEYS } = await import(DIST + "effects/registry.js");
-const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
-const { createSplitBuffers } = await import(DIST + "split.js");
+const { Hopp } = await import(DIST + "hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 const d = readFileSync(path); const nSamples = (d.length - 44) >> 1;
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = Number(opt("--step", 5));
 const MAXS = Number(opt("--sek", 1e9));
@@ -37,12 +36,9 @@ const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.master = 1;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
 const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = (fx.address ?? 1) - 1; const at = (r) => { const i = roles.indexOf(r); return i < 0 ? -1 : base + i; }; return { r: at("r"), g: at("g"), b: at("b"), dim: at("dim") }; });
-const b0 = createSplitBuffers(); const acfg = BeatFeed.analyserCfg(cfg);
-const an = new Analyser(acfg, { role: "fast", split: b0 }); an.setInlinePeer(new Analyser(structuredClone(acfg), { role: "slow", split: b0 })); an.setGainLock(true, 1);
-const feed = new BeatFeed();
-const bounds = new BoundaryDetector(() => Date.now());
-an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
+const acfg = BeatFeed.analyserCfg(cfg);
+const an = createAnalyser(acfg, "inline"); an.setGainLock(true, 1);   // delad som motorn (inline: taktvägen i långsamma sidan, deterministiskt)
+const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => {} });
 Date.now = () => EPOCH; performance.now = () => 0;
 const eng = new EffectEngine(cfg);
 console.log = () => {};
@@ -50,18 +46,13 @@ const SEC = { intro: 0, low: 1, build: 2, high: 3, break: 4 };
 const COLS = ["t", "sec", "l0", "l1", "l2", "l3", "md", "secCeil", "ceil", "eBass", "liftLeft", "miniLeft", "dropCount", "bpm", "kick", "drv", "bangLeft", "eSm", "preDrop"];
 const NCOL = COLS.length, TR = [];
 const buf = new Float32Array(HOP);
-let lastRender = -1, lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0, kickPend = 0;
+let lastRender = -1, kickPend = 0;
 const end = Math.min(nSamples, Math.floor(MAXS * SR));
 for (let off = 0; off + HOP <= end; off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
   const tS = off / SR, ms = EPOCH + tS * 1000;
   an.setVirtualClock(ms - EPOCH); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  const fr = an.process(buf);
-  boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
-  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); }
-  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
-  if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; eng.softenRange(); an.hintTrackChange(5000); }
-  feed.update(fr, cfg, an);
+  const fr = hopp.analys(buf); hopp.koppla(fr);
   let kickEv = false;
   if (LIVE_KICK && fr.kick) { kickEv = true; eng.registerKick(0.4 + Math.min(1, fr.energy * 1.4) * 0.6); }
   if (fr.kick) kickPend = 1;

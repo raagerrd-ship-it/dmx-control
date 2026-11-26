@@ -12,11 +12,10 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const path = args.find((a) => a.endsWith(".wav"));
 const MAX_S = Number(opt("--s", 300));
 const DIST = new URL("../dist/", import.meta.url).href;
-const { Analyser } = await import(DIST + "analyser.js");
+const { createAnalyser } = await import(DIST + "analyser.js");
 const { BeatFeed } = await import(DIST + "beatFeed.js");
 const { defaultConfig } = await import(DIST + "config.js");
-const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
-const { createSplitBuffers } = await import(DIST + "split.js");
+const { Hopp } = await import(DIST + "hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 const d = readFileSync(path); const SR = 48000, HOP = 128, EPOCH = 1700000000000, HMS = HOP / SR * 1000;
 const n = Math.min((d.length - 44) >> 1, MAX_S * SR);
 const x = new Float64Array(n); for (let i = 0; i < n; i++) x[i] = d.readInt16LE(44 + i * 2) / 32768;
@@ -42,22 +41,18 @@ const thr = cand.map((h) => rise[h]).sort((a, b) => a - b)[Math.floor(cand.lengt
 const onsets = cand.filter((h) => rise[h] >= thr);
 
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
-const b = createSplitBuffers(); const an = new Analyser(BeatFeed.analyserCfg(cfg), { role: "fast", split: b }); an.setInlinePeer(new Analyser(structuredClone(cfg), { role: "slow", split: b }));
+const an = createAnalyser(BeatFeed.analyserCfg(cfg), "inline");   // delad som motorn (inline: taktvägen i långsamma sidan, deterministiskt)
 an.setGainLock(true, 1);
-const feed = new BeatFeed(); const bounds = new BoundaryDetector(() => Date.now());
-an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 }; let lastBoundary = 0;
+const hopp = new Hopp(an, cfg, { softenRange: () => {}, noteTrack: () => {} });
 console.log = () => {};
 const grid = new Array(H).fill(null); const okick = new Float64Array(H); const kb = new Float64Array(H); const buf = new Float32Array(HOP);
 for (let h = 0; h < H; h++) {
   for (let i = 0; i < HOP; i++) buf[i] = x[h * HOP + i];
   const ms = EPOCH + h * HMS; an.setVirtualClock(ms - EPOCH); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  const fr = an.process(buf);
-  boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
-  if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; an.hintTrackChange(5000); }
+  const fr = hopp.analys(buf);
   okick[h] = fr.onset.kick;
   kb[h] = fr.kick ? 1 : 0;
-  feed.update(fr, cfg, an);
+  hopp.koppla(fr);
   const g = cfg.beat; if (g && g.bpm > 40 && (g.confidence ?? 0) >= 0.2) grid[h] = [g.anchorMs, g.bpm];
 }
 // VIKNING: referensens stigning (och onset.kick) viks på rutnätets slag i 2 ms-fack över ±150 ms; toppen = var ljudets

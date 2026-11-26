@@ -7,22 +7,19 @@ while (p + 8 <= d.length) { const id = d.toString("ascii", p, p + 4), sz = d.rea
 const n = dataLen >> 1, samples = new Float32Array(n); for (let i = 0; i < n; i++) samples[i] = d.readInt16LE(dataOff + i * 2) / 32768;
 const imp = (f) => import(pathToFileURL(dist + "/" + f).href);
 const { Analyser } = await imp("analyser.js"); const { EffectEngine } = await imp("effects.js"); const { BeatFeed } = await imp("beatFeed.js");
-const { defaultConfig } = await imp("config.js"); const { EFFECT_KEYS } = await imp("effects/registry.js"); const { BoundaryDetector } = await imp("boundaryDetector.js");
+const { defaultConfig } = await imp("config.js"); const { EFFECT_KEYS } = await imp("effects/registry.js"); const { Hopp } = await imp("hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.beatPulse = true; cfg.master = 1; cfg.energyCeiling = true;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true; for (const fx of cfg.fixtures) fx.cal = { off: 0, on: 16 };
-const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); const feed = new BeatFeed(); an.setGainLock(true, 1);
-const bounds = new BoundaryDetector(() => Date.now()); an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const ba = { level: 0, bpm: 0, bpmConfidence: 0 }; let lb = 0;
+const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.clock = new BeatFeed(); an.setGainLock(true, 1);   // odelad: klockan i process()
+const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => {} });
 Date.now = () => EPOCH; performance.now = () => 0;
 const eng = new EffectEngine(cfg); console.log = () => {};
 const T = [], KDB = [], BODY = []; const drops = []; let lastShow = 0, lastFd = 0, lastRender = -1; const buf = new Float32Array(HOP);
 for (let off = 0; off + HOP <= Math.min(n, maxS * SR); off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = samples[off + i];
   const ms = EPOCH + off / SR * 1000; an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  const fr = an.process(buf); ba.level = fr.level; ba.bpm = fr.bpm; ba.bpmConfidence = fr.bpmConfidence; bounds.tick(ba);
-  if (bounds.boundaryCount !== lb) { lb = bounds.boundaryCount; eng.softenRange(); an.hintTrackChange(5000); }
-  feed.update(fr, cfg, an);
+  const fr = hopp.analys(buf); hopp.koppla(fr);
   const sa = fr.specAbs; T.push(off / SR); KDB.push(sa ? 10 * Math.log10((sa.sub + 1e-7) * (sa.kick + 1e-7)) : -140); BODY.push(fr.bodyDb ?? -90);
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue; lastRender = ms;
   eng.render(fr);

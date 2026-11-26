@@ -24,7 +24,7 @@ const { EffectEngine } = await import("../dist/effects.js");
 const { BeatFeed } = await import("../dist/beatFeed.js");
 const { defaultConfig, fixtureRoles } = await import("../dist/config.js");
 const { EFFECT_KEYS } = await import("../dist/effects/registry.js");
-const { BoundaryDetector } = await import("../dist/boundaryDetector.js");
+const { Hopp } = await import("../dist/hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 const d = readFileSync(path); const nSamples = (d.length - 44) >> 1;
 let GAIN = 1;
 if (opt("--norm", null) !== null) { const blk = 4800, rms = []; for (let o = 0; o + blk <= nSamples; o += blk) { let q = 0; for (let i = 0; i < blk; i++) { const x = d.readInt16LE(44 + (o + i) * 2) / 32768; q += x * x; } const r = Math.sqrt(q / blk); if (r > 1e-4) rms.push(r); } rms.sort((a, b) => a - b); if (rms.length) GAIN = Math.pow(10, Number(opt("--norm")) / 20) / rms[rms.length >> 1]; }
@@ -33,16 +33,13 @@ const cfg = ladanCfg(defaultConfig);
 cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.master = 1;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
 const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = (fx.address ?? 1) - 1; const at = (r) => { const i = roles.indexOf(r); return i < 0 ? -1 : base + i; }; return { r: at("r"), g: at("g"), b: at("b") }; });
-const an = new Analyser(ladanCfg(defaultConfig)); an.setGainLock(true, 1);
-const feed = new BeatFeed();
-const bounds = new BoundaryDetector(() => Date.now());
-an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
+const an = new Analyser(ladanCfg(defaultConfig)); an.clock = new BeatFeed(); an.setGainLock(true, 1);   // odelad: klockan i process(), som createAnalyser utan delning
+let song = 0; const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => { song++; } });
 const t00 = EPOCH + startS * 1000; Date.now = () => t00; performance.now = () => t00 - EPOCH;
 const eng = new EffectEngine(cfg);
 console.log = () => {};
 const buf = new Float32Array(HOP);
-let lastRender = -1, lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0, song = 0, lastDrop = 0;
+let lastRender = -1, lastDrop = 0;
 const DROPS = [], BUILDSW = [];   // drop-tider, tider for byten med orsak 'build'
 // per ruta
 const R = [];   // {t, sec, secIdx, song, look, pal, hueSet, nLit, allLit, light, int, beatIdx}
@@ -52,12 +49,7 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= end; off += HOP
   for (let i = 0; i < HOP; i++) { const x = d.readInt16LE(44 + (off + i) * 2) / 32768 * GAIN; buf[i] = x > 1 ? 1 : x < -1 ? -1 : x; }
   const tS = off / SR, ms = EPOCH + tS * 1000;
   an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  const fr = an.process(buf);
-  boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
-  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); }
-  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
-  if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; song++; eng.softenRange(); an.hintTrackChange(5000); }
-  feed.update(fr, cfg, an);
+  const fr = hopp.analys(buf); hopp.koppla(fr);
   if ((fr.dropCount ?? 0) !== lastDrop) { lastDrop = fr.dropCount ?? 0; DROPS.push(tS); }
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
   lastRender = ms; const prevLook = eng.getActiveMode(); eng.render(fr); const u = eng.universe; if (!u) continue;

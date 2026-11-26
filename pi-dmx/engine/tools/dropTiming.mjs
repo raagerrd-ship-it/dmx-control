@@ -18,24 +18,21 @@ const { EffectEngine } = await import(DIST + "effects.js");
 const { BeatFeed } = await import(DIST + "beatFeed.js");
 const { defaultConfig } = await import(DIST + "config.js");
 const { EFFECT_KEYS } = await import(DIST + "effects/registry.js");
-const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
+const { Hopp } = await import(DIST + "hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 const d = readFileSync(path); const nSamples = (d.length - 44) >> 1;
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = Number(opt("--step", 25));   // --step 5 = som live (200 Hz, mätfälla 46)
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.master = 1;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
-const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
-const feed = new BeatFeed();
-const bounds = new BoundaryDetector(() => Date.now());
-an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
+const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.clock = new BeatFeed(); an.setGainLock(true, 1);   // odelad: klockan i process()
+const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => {} });
 Date.now = () => EPOCH; performance.now = () => 0;
 const eng = new EffectEngine(cfg);
 let tNow = 0; const LINES = [];
 console.log = (...a) => { const s = a.join(" "); if (/^\[(dropfire|dropedge|dropcalm|dirigent)\]/.test(s)) LINES.push([+tNow.toFixed(3), s.slice(0, 260)]); };
 const buf = new Float32Array(HOP);
 const BODY = new Float32Array(Math.ceil(nSamples / HOP));
-let nb = 0, lastRender = -1, lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0;
+let nb = 0, lastRender = -1;
 let lastDrop = 0, lastBang = 0, lastMiniBang = 0, lastLift = 0;
 const EV = { fire: [], show: [], miniLook: [], lift: [], sec: [] };
 let prevSec = '';
@@ -43,15 +40,11 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
   const tS = off / SR, ms = EPOCH + tS * 1000; tNow = tS;
   an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  const fr = an.process(buf);
+  const fr = hopp.analys(buf);
   BODY[nb++] = fr.bodyDb ?? -90;
   if (fr.dropCount !== lastDrop) { lastDrop = fr.dropCount; EV.fire.push(+tS.toFixed(3)); }
   if ((fr.section ?? '') !== prevSec) { prevSec = fr.section ?? ''; EV.sec.push([+tS.toFixed(2), prevSec]); }
-  boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
-  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); }
-  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
-  if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; eng.softenRange(); an.hintTrackChange(5000); }
-  feed.update(fr, cfg, an);
+  hopp.koppla(fr);
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
   lastRender = ms; eng.render(fr);
   if (eng.dropBangUntil !== lastBang) { lastBang = eng.dropBangUntil; if (lastBang > 0) EV.show.push(+tS.toFixed(3)); }

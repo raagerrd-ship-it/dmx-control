@@ -1,6 +1,6 @@
-/** DELAT MOT ODELAT: samma ljud genom en ODELAD analysator och en DELAD i inline-läge, matad som motorn (index.ts):
- *  virtuell klocka (Date.now/performance.now per hop, som dmxDump.mjs), och efter process() taktvägen
- *  (hopLane.feed) eller publishClock. Jämför VARJE fält i ramen, hop för hop.
+/** DELAT MOT ODELAT: samma ljud genom en ODELAD analysator och en DELAD i inline-läge, matad som motorn: virtuell klocka
+ *  (Date.now/performance.now per hop, som dmxDump.mjs) och MOTORNS KOPPLING PER HOPP (<bygget>/hopp.js, kedjan steg 1: låtgränsen,
+ *  dropräknaren, taktvägen eller publishClock som index.ts). Jämför VARJE fält i ramen, hop för hop.
  *
  *  BASLINJEN (uppmätt 2026-11-21, tools/natt/delning-2026-11-21.md): fälten i VANTAT får skilja, alla andra ska vara lika.
  *  - barShift/beatPhaseMs/beatPhaseConf: DMX läser klockan ur cfg.beat; i delat läge körs publishPhase aldrig (samma lista som livstecken.mjs).
@@ -37,6 +37,7 @@ const { createAnalyser } = await import(pathToFileURL(join(DIST, 'analyser.js'))
 const { defaultConfig } = await import(pathToFileURL(join(DIST, 'config.js')).href);
 const { FACK } = await import(pathToFileURL(join(DIST, 'analyserFack.js')).href);
 const { R } = await import(pathToFileURL(join(DIST, 'split.js')).href);
+const { Hopp } = await import(pathToFileURL(join(DIST, 'hopp.js')).href);
 const TRAD = [];   // [fack, fält, delfält, tagg, bara i hopp med record]
 for (const n in FACK) for (const [k, v] of Object.entries(FACK[n].TRAD)) for (const [j, t] of typeof v === 'string' ? [[null, v]] : Object.entries(v))
   if (t === 'IN' || t === 'UT') TRAD.push([n, k, j, t, t === 'IN' && !!R[n] && k in R[n]]);
@@ -64,22 +65,22 @@ function flat(o, p, out) {
   return out;
 }
 function makeCfg(rate) { const cfg = JSON.parse(JSON.stringify(defaultConfig)); cfg.audio.rate = rate; cfg.fft.hop = HOP; return cfg; }
-/** Ett hop som motorn: klockan, process, taktvägen eller publishClock. */
-function step(an, ck, buf, ms) {
+/** Ett hop som motorn: klockan, sedan kopplingen (hopp.js) - analys, trådjämförelsen, koppla. */
+function step(an, hopp, buf, ms) {
   an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  const f = an.process(buf), w = an.inlinePeer;
+  const f = hopp.analys(buf), w = an.inlinePeer;
   if (w) { const rec = an.fastWriteSeq() !== an.__rec; an.__rec = an.fastWriteSeq();
     for (const [n, k, j, t, perRec] of TRAD) { if (perRec && !rec) continue;
       const a = j ? an.f[n][k][j] : an.f[n][k], b = j ? w.f[n][k][j] : w.f[n][k];
       if (!Object.is(a, b)) { const id = `${t} ${n}.${k}${j ? '.' + j : ''}`; trad.set(id, (trad.get(id) ?? 0) + 1); } } }
-  if (an.hopLane) an.hopLane.feed(f, ck, an); else an.publishClock(ck);
+  hopp.koppla(f);
   return f;
 }
 function run(y, rate, mode) {
   process.env.DMX_ANALYSER_SPLIT = mode;
-  const an = createAnalyser(makeCfg(rate)); an.setGainLock(true, 1);
-  const ck = { beat: undefined, beatErr: undefined }, buf = new Float32Array(HOP), out = [];
-  for (let h = 0; (h + 1) * HOP <= y.length; h++) { buf.set(y.subarray(h * HOP, (h + 1) * HOP)); out.push(flat(step(an, ck, buf, EPOCH + h * HOP / rate * 1000), '', {})); }
+  const cfg = makeCfg(rate), an = createAnalyser(cfg); an.setGainLock(true, 1);
+  const hopp = new Hopp(an, cfg, { softenRange: () => {}, noteTrack: () => {} }), buf = new Float32Array(HOP), out = [];
+  for (let h = 0; (h + 1) * HOP <= y.length; h++) { buf.set(y.subarray(h * HOP, (h + 1) * HOP)); out.push(flat(step(an, hopp, buf, EPOCH + h * HOP / rate * 1000), '', {})); }
   return out;
 }
 
@@ -112,12 +113,12 @@ if (bad || trad.size) process.exitCode = 1;
 if (WORKER) {
   const { y, rate } = readWav(join(CORPUS, files[0]));
   process.env.DMX_ANALYSER_SPLIT = 'worker';
-  const an = createAnalyser(makeCfg(rate)); an.setGainLock(true, 1);
-  const ck = { beat: undefined, beatErr: undefined }, buf = new Float32Array(HOP); let h = 0; const t0 = performance.now(); let lastBpm = 0;
+  const cfg = makeCfg(rate), an = createAnalyser(cfg); an.setGainLock(true, 1);
+  const hopp = new Hopp(an, cfg, { softenRange: () => {}, noteTrack: () => {} }), buf = new Float32Array(HOP); let h = 0; const t0 = performance.now(); let lastBpm = 0;
   await new Promise((res) => {
     const iv = setInterval(() => {
       const want = Math.floor((performance.now() - t0) / 1000 * rate / HOP);
-      while (h < want && (h + 1) * HOP <= y.length) { buf.set(y.subarray(h * HOP, (h + 1) * HOP)); const f = an.process(buf); if (an.hopLane) an.hopLane.feed(f, ck, an); lastBpm = f.bpm; h++; }
+      while (h < want && (h + 1) * HOP <= y.length) { buf.set(y.subarray(h * HOP, (h + 1) * HOP)); const f = hopp.analys(buf); hopp.koppla(f); lastBpm = f.bpm; h++; }
       if (performance.now() - t0 > 15000 || (h + 1) * HOP > y.length) { clearInterval(iv); res(); }
     }, 5);
   });

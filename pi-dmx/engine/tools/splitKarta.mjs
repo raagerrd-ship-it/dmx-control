@@ -5,7 +5,8 @@
  * klockan) per hop/ruta:
  *   snabb   = Analyser.process() minus den långsamma sidans drainRecords (i live: motorns tråd)
  *   långsam = drainRecords (i live: workern på egen kärna)
- *   gräns   = BoundaryDetector.tick + pushSpectrum (motorns tråd), takt = BeatFeed.update (motorns tråd)
+ *   koppla  = motorns koppling per hopp (hopp.js, kedjan steg 1: låtgränsen + taktvägens matning, motorns tråd); i --wrap syns
+ *             BoundaryDetector.tick/pushSpectrum som 'gräns' och BeatFeed.update/onsetStep (taktvägen, i live workern) som 'takt'
  *   render  = EffectEngine.render per ruta (motorns tråd), därav dirigent = stepDirigent (+ switchLook) och stepPalette
  * --wrap: EXKLUSIV tid per metod (barnens tid dras av) för analysatorns steg och effektmotorns steg. Omslagen kostar ~0,1 µs/anrop
  *   och stör JIT-inlining - använd --wrap för fördelningen, totalerna utan --wrap för p50/p99.
@@ -19,13 +20,12 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const path = args.find((a) => a.endsWith(".wav"));
 const WRAP = args.includes("--wrap"); const MAX_S = Number(opt("--s", 300));
 const DIST = new URL("../dist/", import.meta.url).href;
-const { Analyser } = await import(DIST + "analyser.js");
+const { Analyser, createAnalyser } = await import(DIST + "analyser.js");
 const { EffectEngine } = await import(DIST + "effects.js");
 const { BeatFeed } = await import(DIST + "beatFeed.js");
 const { defaultConfig } = await import(DIST + "config.js");
 const { EFFECT_KEYS } = await import(DIST + "effects/registry.js");
-const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
-const { createSplitBuffers } = await import(DIST + "split.js");
+const { BoundaryDetector } = await import(DIST + "boundaryDetector.js"); const { Hopp } = await import(DIST + "hopp.js");
 const hr = () => Number(process.hrtime.bigint()) / 1000;   // µs, verklig tid
 
 // EXKLUSIV TID: stack av starttider; ett barns tid dras av från förälderns
@@ -65,18 +65,15 @@ const pcm = new Float32Array(nSamples); for (let i = 0; i < nSamples; i++) pcm[i
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.master = 1;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
-const b = createSplitBuffers(); const an = new Analyser(BeatFeed.analyserCfg(cfg), { role: "fast", split: b }); an.setInlinePeer(new Analyser(structuredClone(cfg), { role: "slow", split: b }));
+const an = createAnalyser(BeatFeed.analyserCfg(cfg), "inline");   // delad som motorn (inline: taktvägen i långsamma sidan, deterministiskt)
 an.setGainLock(true, 1);
-const feed = new BeatFeed();
-const bounds = new BoundaryDetector(() => Date.now());
-an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
+const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => {} });   // MOTORNS KOPPLING PER HOPP
 Date.now = () => EPOCH; performance.now = () => 0;
 const eng = new EffectEngine(cfg);
 console.log = () => {};
 const buf = new Float32Array(HOP);
-const S = { fast: [], slow: [], bounds: [], feed: [], render: [] };
-let lastRender = -1, lastBoundary = 0, lastCharShift = 0, lastTempoShift = 0;
+const S = { fast: [], slow: [], koppla: [], render: [] };
+let lastRender = -1;
 const DUR = nSamples / SR;
 for (let pass = 0; pass < 2; pass++) {
   COUNT = pass === 1;
@@ -85,17 +82,10 @@ for (let pass = 0; pass < 2; pass++) {
     const ms = EPOCH + (pass * DUR + off / SR) * 1000;
     an.setVirtualClock(ms - EPOCH); Date.now = () => ms; performance.now = () => ms - EPOCH;
     drainUs = 0; let t = hr();
-    const fr = an.process(buf);
+    const fr = hopp.analys(buf);
     const tProc = hr() - t;
-    t = hr();
-    boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
-    if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); }
-    if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(""); }
-    if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; eng.softenRange(); an.hintTrackChange(5000); }
-    const tB = hr() - t; t = hr();
-    feed.update(fr, cfg, an);
-    const tF = hr() - t;
-    if (COUNT) { S.fast.push(tProc - drainUs); S.slow.push(drainUs); S.bounds.push(tB); S.feed.push(tF); }
+    t = hr(); hopp.koppla(fr); const tK = hr() - t;
+    if (COUNT) { S.fast.push(tProc - drainUs); S.slow.push(drainUs); S.koppla.push(tK); }
     if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
     lastRender = ms; t = hr(); eng.render(fr); const tR = hr() - t;
     if (COUNT) S.render.push(tR);

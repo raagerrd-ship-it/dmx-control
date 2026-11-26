@@ -1,4 +1,4 @@
-// OMSTARTSPROVET (flytten 2026-11-21): delad analysator i inline-läge (som createAnalyser), matad som motorn (index.ts:96, :206).
+// OMSTARTSPROVET (flytten 2026-11-21): delad analysator i inline-läge (som createAnalyser), matad som motorn med dess koppling per hopp (<bygget>/hopp.js, kedjan steg 1).
 // Var 60:e sekund byts den långsamma sidan mot en ny med resumeSeq (som workern efter en omstart, slowWorker.ts:9 / analyser.ts:1034).
 // Samma omstarter i ref och ny; VARJE ramfält i VARJE hopp jämförs med Object.is, och räknarna får aldrig bli lägre efter en omstart.
 //   node tools/refaktor/omstart.mjs <ref-dist> <ny-dist> [sek] <wav> ...
@@ -13,7 +13,7 @@ const SR = 48000, HOP = 128, EPOCH = 1.7e12, EVERY = 60 * SR / HOP, HINT = 97 * 
 const TILLATET = new Set(['buildUp', 'inRiser']);
 const RAKNARE = ['dropCount', 'miniDropCount', 'dropBuildCount', 'dropDemoted', 'dropSpaced', 'stopCount', 'dropMiniBack'];
 const load = async (d) => { const i = (f) => import(pathToFileURL(resolve(d, f)).href);
-  return { ...(await i('analyser.js')), ...(await i('split.js')), ...(await i('analyserClock.js')), defaultConfig: (await i('config.js')).defaultConfig }; };
+  return { ...(await i('analyser.js')), ...(await i('split.js')), ...(await i('analyserClock.js')), ...(await i('hopp.js')), defaultConfig: (await i('config.js')).defaultConfig }; };
 const mods = [await load(RA), await load(RB)];
 const build = (m) => {
   const cfg = JSON.parse(JSON.stringify(m.defaultConfig)), acfg = m.BeatFeed.analyserCfg(JSON.parse(JSON.stringify(m.defaultConfig)));
@@ -21,7 +21,7 @@ const build = (m) => {
   const fast = new m.Analyser(acfg, { role: 'fast', split: buffers }); fast.setGainLock(true, 1);
   if (feedMk) { fast.hopLane = new m.HopLaneFast(buffers, false); fast.hopLane.peer = new m.HopLaneSlow(buffers, feedMk()); } else fast.clock = new m.BeatFeed();
   fast.setInlinePeer(new m.Analyser(acfg, { role: 'slow', split: buffers }));
-  return { m, fast, cfg, acfg, buffers };
+  return { m, fast, cfg, acfg, buffers, hopp: new m.Hopp(fast, cfg, { softenRange: () => {}, noteTrack: () => {} }) };
 };
 const flat = (f, out = {}, pre = '') => { for (const k of Object.keys(f)) { const v = f[k]; if (!pre && BORT.has(k)) continue; if (v && typeof v === 'object') flat(v, out, pre + k + '.'); else out[pre + (pre ? k : NAMN.get(k) ?? k)] = v; } return out; };
 let side = 0; const logs = [[], []]; const log = console.log; console.log = (...a) => logs[side].push(a.join(' '));
@@ -39,8 +39,7 @@ for (const w of wavs) {
       Date.now = () => ms; performance.now = () => ms - EPOCH; x.fast.setVirtualClock(ms);
       if (hops > 0 && hops % HINT === 0) x.fast.hintTrackChange(5000);
       if (hops > 0 && hops % RESET === 0) x.fast.resetTempo();
-      const f = x.fast.process(buf);
-      if (x.fast.hopLane) x.fast.hopLane.feed(f, x.cfg, x.fast); else x.fast.publishClock(x.cfg);
+      const f = x.hopp.analys(buf); x.hopp.koppla(f);
       return flat(f); });
     if (hops > 0 && hops % EVERY === 0) restarts++;
     prev = fr[1]; let b = false;

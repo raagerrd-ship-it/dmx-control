@@ -17,7 +17,7 @@ const { EffectEngine } = await import(DIST + "effects.js");
 const { BeatFeed } = await import(DIST + "beatFeed.js");
 const { defaultConfig, fixtureRoles } = await import(DIST + "config.js");
 const { EFFECT_KEYS } = await import(DIST + "effects/registry.js");
-const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
+const { Hopp } = await import(DIST + "hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 const d = readFileSync(path); const nSamples = (d.length - 44) >> 1;
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = Number(opt("--step", 25));   // --step 5 = som live (200 Hz)
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
@@ -26,11 +26,8 @@ cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true;
 const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = (fx.address ?? 1) - 1; const at = (r) => { const i = roles.indexOf(r); return i < 0 ? -1 : base + i; }; return { r: at("r"), g: at("g"), b: at("b"), dim: at("dim") }; });
 // --delad-cfg (MÄTFÄLLA 47, 10-13): live får analysatorn MOTORNS cfg (index.ts createAnalyser(cfg)), så kickgrinden mot taktgridet
 // och taktfasen (analyser.ts beatSrc.beat = cfg.beat) är PÅ live - med en egen kopia (bänkarnas standard) är cfg.beat alltid null där.
-const an = new Analyser(args.includes("--delad-cfg") ? BeatFeed.analyserCfg(cfg) : JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
-const feed = new BeatFeed();
-const bounds = new BoundaryDetector(() => Date.now());
-an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
+const an = new Analyser(args.includes("--delad-cfg") ? BeatFeed.analyserCfg(cfg) : JSON.parse(JSON.stringify(defaultConfig))); an.clock = new BeatFeed(); an.setGainLock(true, 1);   // odelad: klockan i process()
+const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => LOG.push([+tNow.toFixed(2), 'LATGRANS']) });
 Date.now = () => EPOCH; performance.now = () => 0;
 const eng = new EffectEngine(cfg);
 const hue = (c) => { const [r, g, b] = c, v = Math.max(r, g, b), mn = Math.min(r, g, b); if (v < 0.3 * 255 || v - mn < 0.5 * v) return null; const d = v - mn;
@@ -49,7 +46,7 @@ const G = { glid: 0, flag: 0, ljus: 0, ny: 0 };
 let tNow = 0; const LOG = [];
 console.log = () => {};
 const buf = new Float32Array(HOP);
-let lastRender = -1, lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0, lastRow = -1;
+let lastRender = -1, lastRow = -1;
 const TRACE = opt("--trace", null) ? [] : null; const SEC = { intro: 0, low: 1, build: 2, high: 3, break: 4 };
 const ROWS = [];   // [t, look, why, sec, int, light, nLit, drops, near, lift, miniLook, upgrades, bpm]
 let acc = { light: 0, nLit: 0, n: 0, mini: 0, hi: 0, lo: 9, top: 0 };
@@ -61,12 +58,7 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   // effekternas slag satt en godtycklig, tempoberoende bit från kickarna (128 BPM: 0,67 slag). Live är båda Date.now().
   // --epok-fel = gamla (felaktiga) vägen för jämförelse mot äldre json.
   an.setVirtualClock(args.includes("--epok-fel") ? ms : ms - EPOCH); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  const fr = an.process(buf);
-  boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
-  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); }
-  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
-  if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; eng.softenRange(); an.hintTrackChange(5000); LOG.push([+tS.toFixed(2), 'LATGRANS']); }
-  feed.update(fr, cfg, an);
+  const fr = hopp.analys(buf); hopp.koppla(fr);
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
   lastRender = ms; eng.render(fr); const u = eng.universe; if (!u) continue;
   const lv = lamps.map((L) => { const k = L.dim >= 0 ? u[L.dim] / 255 : 1; return [u[L.r] * k, u[L.g] * k, u[L.b] * k]; });

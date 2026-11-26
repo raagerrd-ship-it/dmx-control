@@ -42,10 +42,11 @@ function inputsOf(del) {
 if (cmd === "tappa") {
   const [del, metod, wav, ut] = rest, utF = (opt("--ut", "") || "").split(",").filter(Boolean);
   process.env.DMX_ANALYSER_SPLIT = "inline";
-  const { createAnalyser } = await import(U("analyser.js")); const { defaultConfig } = await import(U("config.js")); const { BeatFeed } = await import(U("analyserClock.js"));
+  const { createAnalyser } = await import(U("analyser.js")); const { defaultConfig } = await import(U("config.js")); const { Hopp } = await import(U("hopp.js"));
   const mod = await import(U(FILES[del] + ".js")), Cls = Object.values(mod).find(v => typeof v === "function" && v.prototype && metod in v.prototype);
   if (!Cls) { console.error(`hittar inte ${metod} i ${FILES[del]}.js`); process.exit(1); }
-  const cfg = ladanCfg(defaultConfig), an = createAnalyser(ladanCfg(defaultConfig), undefined), feed = new BeatFeed(); an.setGainLock(true, 1);
+  const cfg = ladanCfg(defaultConfig), an = createAnalyser(ladanCfg(defaultConfig), undefined); an.setGainLock(true, 1);
+  const hopp = new Hopp(an, cfg, { softenRange: () => {}, noteTrack: () => {} });   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
   // vilka kedjor är värden (tal/bool/sträng/litet fält), klockläsare eller handlingar? Avgörs på den riktiga analysatorn vid första steget.
   const chains = [...inputsOf(del), ...(opt("--extra", "") || "").split(",").filter(Boolean)]; let plan = null; const rows = [], strs = [""], S = s => { let i = strs.indexOf(s); if (i < 0) { i = strs.length; strs.push(s); } return i; };
   const mkPlan = a => { const p = [], acts = [], skipped = []; const seen = new Set();
@@ -79,7 +80,7 @@ if (cmd === "tappa") {
   for (let off = 0; off + HOP <= n; off += HOP) {
     for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(start + (off + i) * 2 * ch) / 32768;
     curT = off / SR; const ms = EPOCH + curT * 1000; an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
-    const fr = an.process(buf); if (an.hopLane) an.hopLane.feed(fr, cfg, an); else feed.update(fr, cfg, an);
+    const fr = hopp.analys(buf); hopp.koppla(fr);
   }
   console.log = log;
   const W = rows[0].length, m = new Float64Array(rows.length * W); rows.forEach((r, i) => m.set(r, i * W));

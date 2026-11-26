@@ -11,14 +11,14 @@ const path = process.argv.find((a) => a.endsWith(".wav"));
 if (!path) { console.error("ange en wav-fil"); process.exit(2); }
 const { Analyser } = await import("../dist/analyser.js");
 const { defaultConfig } = await import("../dist/config.js");
-const { BoundaryDetector } = await import("../dist/boundaryDetector.js");
+const { Hopp } = await import("../dist/hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
+const { BeatFeed } = await import("../dist/analyserClock.js");
 
 const d = readFileSync(path); const nSamples = (d.length - 44) >> 1;
 const SR = 48000, HOP = 128, EPOCH = 1700000000000;
 let nowMs = EPOCH;
-const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
-const bounds = new BoundaryDetector(() => nowMs);
-an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
+const cfg = JSON.parse(JSON.stringify(defaultConfig)), an = new Analyser(cfg); an.clock = new BeatFeed(); an.setGainLock(true, 1);   // odelad: klockan i process()
+let tNow = 0; const hopp = new Hopp(an, cfg, { softenRange: () => {}, noteTrack: () => events.push({ t: tNow, why: hopp.bounds.lastBoundary, before: `${lastSec}#${lastIdx}` }) });
 const origLog = console.log; console.log = () => {};
 // HINT_RESETS=1: vem nollar sektionen? (privat metod, men nabar i drift - bara for matning)
 const resets = [];
@@ -28,13 +28,11 @@ if (process.env.HINT_RESETS && typeof an.sectionReset === "function") {
 }
 
 const buf = new Float32Array(HOP);
-let lastB = 0; const events = []; let lastSec = "", lastIdx = -1; const secLog = [];
+const events = []; let lastSec = "", lastIdx = -1; const secLog = [];
 for (let off = 0; off + HOP <= nSamples; off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
-  const tS = off / SR; nowMs = EPOCH + tS * 1000; an.setVirtualClock(nowMs);
-  const fr = an.process(buf);
-  bounds.tick({ level: fr.level, bpm: fr.bpm, bpmConfidence: fr.bpmConfidence });
-  if (bounds.boundaryCount !== lastB) { lastB = bounds.boundaryCount; events.push({ t: tS, why: bounds.lastBoundary, before: `${lastSec}#${lastIdx}` }); an.hintTrackChange(5000); }
+  const tS = off / SR; nowMs = EPOCH + tS * 1000; tNow = tS; an.setVirtualClock(nowMs); const ms = nowMs; Date.now = () => ms; performance.now = () => ms - EPOCH;
+  const fr = hopp.analys(buf); hopp.koppla(fr);
   if (fr.section !== lastSec || fr.sectionIndex !== lastIdx) { lastSec = fr.section; lastIdx = fr.sectionIndex; secLog.push([tS, lastSec, lastIdx]); }
 }
 console.log = origLog;

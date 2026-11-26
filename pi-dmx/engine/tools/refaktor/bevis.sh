@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # BEVISET FÖR UPPDELNINGEN (refaktorn 2026-11-14): bygger och jämför mot det frysta bygget .arena/ref/dist0 (taggen backup/fore-uppdelning-20261114).
 #   [REF=.arena/ref/dist-kedja0] bash tools/refaktor/bevis.sh [snabb]      (REF = referensbygget, standard .arena/ref/dist0; NY = nya bygget, standard dist)
-# 1. tsc   2. analyserParity: VARJE fält i VARJE ruta, odelad och delad (inline), med låtbytes-hint och temponollning, tre inspelningar
+# 1. tsc   2. analyserParity: VARJE fält i VARJE ruta, odelad och delad (inline), med låtbytes-hint och temponollning, tre inspelningar,
+#    matad med motorns koppling per hopp (<bygget>/hopp.js, kedjan steg 1: klockan körs, så pariteten prövar tempot i DMX)
 #    + splitProof: delat mot odelat i nya bygget, bara baslinjens fält får skilja
 # 3. dmxDump: md5 av hela DMX-sekvensen per lampa med den riktiga workern i lås-steg (sync)   4. tid per hopp gammal/ny (växelvis)
 # FLYTTEN (2026-11-21): 5. TID piBench 4 par  6. DEOPT  7. LOTUSGRINDEN  8. STARTVÄRDEN  9. OMSTART (a014-planen, avsnitt e/f)
@@ -11,9 +12,9 @@ W=tools/ladan-2026-11-13; F="$W/lang-20261113T160345.wav $W/lang-20261113T151659
 SECS=700; [ "$1" = snabb ] && { SECS=150; F="$W/lang-20261113T160345.wav"; }
 npx tsc -p tsconfig.json || { echo "BYGGFEL"; exit 1; }
 ok=1
-node tools/analyserParity.mjs --old $REF/analyser.js --new $NY/analyser.js --style dmx --cfg $NY/config.js --secs $SECS --grid --hint-every 97 --reset-every 211 $F > .arena/ref/paritet-odelad.txt 2>&1 || ok=0
+node tools/analyserParity.mjs --old $REF/analyser.js --new $NY/analyser.js --style dmx --cfg $NY/config.js --secs $SECS --hint-every 97 --reset-every 211 $F > .arena/ref/paritet-odelad.txt 2>&1 || ok=0
 echo "paritet odelad: $(tail -1 .arena/ref/paritet-odelad.txt)"
-node tools/analyserParity.mjs --old $REF/analyser.js --new $NY/analyser.js --style dmx --cfg $NY/config.js --secs $SECS --grid --hint-every 97 --reset-every 211 --split inline $F > .arena/ref/paritet-inline.txt 2>&1 || ok=0
+node tools/analyserParity.mjs --old $REF/analyser.js --new $NY/analyser.js --style dmx --cfg $NY/config.js --secs $SECS --hint-every 97 --reset-every 211 --split inline $F > .arena/ref/paritet-inline.txt 2>&1 || ok=0
 echo "paritet inline: $(tail -1 .arena/ref/paritet-inline.txt)"
 # DELAT MOT ODELAT i nya bygget (2026-11-21): bara fälten i splitProofs baslinje får skilja
 node tools/splitProof.mjs --dist $NY --n $([ "$1" = snabb ] && echo 1 || echo 3) > .arena/ref/delning.txt 2>&1 || ok=0

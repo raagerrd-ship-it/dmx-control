@@ -2,8 +2,8 @@
  * TVÅ VÄGAR - domarens mätkörning för LÅNGSAMMA VÄGEN (2026-11-08, anropas av tools/arena/tvavagar.py; brief + vikter står där).
  * Kör MOTORNS analysatorkedja som src/index.ts gör den, ur en valfri dist (deltagarens <mapp>/dist eller engine/dist):
  *   analyser = createAnalyser(BeatFeed.analyserCfg(cfg), 'inline')   (delad analysator, långsamma sidan + taktvägen i samma tråd =
- *              bit-identiskt med workern, deterministiskt), setGainLock(true, 1), BoundaryDetector + hintTrackChange(5000) vid låtgräns,
- *              analyser.hopLane.feed(frame, cfg, analyser) (eller BeatFeed.update om taktvägen saknas) - klockan som tempoMix/sektionLag
+ *              bit-identiskt med workern, deterministiskt), setGainLock(true, 1), och MOTORNS KOPPLING PER HOPP (<dist>/hopp.js, kedjan
+ *              steg 1: låtgränsen + hintTrackChange, dropräknaren, taktvägen eller publishClock som index.ts) - klockan som tempoMix/sektionLag
  *              (setVirtualClock(ms), Date.now = 1,7e12 + ms, MÄTFÄLLA 48).
  * Måttens DEFINITIONER är verktygens (se respektive jobb); bara kedjan är motorns i stället för verktygens egna (de flesta kör den
  * odelade analysatorn och BeatFeed i huvudtråden - då syns inte en ändring i den delade vägen).
@@ -21,7 +21,7 @@ import { resolve } from 'node:path';
 const [dist, job, listFile, outFile] = process.argv.slice(2);
 const imp = (f) => import(pathToFileURL(resolve(dist, f)).href);
 const { createAnalyser } = await imp('analyser.js'); const { BeatFeed } = await imp('beatFeed.js');
-const { defaultConfig } = await imp('config.js'); const { BoundaryDetector } = await imp('boundaryDetector.js');
+const { defaultConfig } = await imp('config.js'); const { Hopp } = await imp('hopp.js');
 const { beatIndex } = await imp('beatClock.js');
 const { fold } = await import(new URL('../catalog.mjs', import.meta.url).href);
 console.log = () => {};
@@ -44,19 +44,16 @@ function readClip(path) {
   return y;
 }
 
-/** Motorns kedja (index.ts rad 95-201 utan effekterna). step() = ett hop vid ljudtiden tMs. */
+/** Motorns kedja (index.ts + hopp.js utan effekterna). step() = ett hop vid ljudtiden tMs. */
 function chain() {
   const cfg = JSON.parse(JSON.stringify(defaultConfig));
   const an = createAnalyser(BeatFeed.analyserCfg(cfg), 'inline'); an.setGainLock(true, 1);
-  const feed = an.hopLane ? null : new BeatFeed();
-  const bounds = new BoundaryDetector(() => Date.now()); an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-  const ba = { level: 0, bpm: 0, bpmConfidence: 0 }; let lb = 0, ld = 0, lm = 0;
+  let ld = 0, lm = 0, tNow = 0;
   const C = { cfg, an, bounds: [], drops: [], minis: [] };
+  const hopp = new Hopp(an, cfg, { softenRange: () => {}, noteTrack: () => C.bounds.push(+(tNow / 1000).toFixed(2)) });
   C.step = (buf, tMs) => {
     const wall = EPOCH + tMs; an.setVirtualClock(tMs); Date.now = () => wall; performance.now = () => tMs;
-    const fr = an.process(buf); ba.level = fr.level; ba.bpm = fr.bpm; ba.bpmConfidence = fr.bpmConfidence; bounds.tick(ba);
-    if (bounds.boundaryCount !== lb) { lb = bounds.boundaryCount; an.hintTrackChange(5000); C.bounds.push(+(tMs / 1000).toFixed(2)); }
-    if (an.hopLane) an.hopLane.feed(fr, cfg, an); else feed.update(fr, cfg, an);
+    tNow = tMs; const fr = hopp.analys(buf); hopp.koppla(fr);
     if (fr.dropCount !== ld) { ld = fr.dropCount; C.drops.push(+(tMs / 1000).toFixed(3)); }
     if ((fr.miniDropCount ?? 0) !== lm) { lm = fr.miniDropCount ?? 0; C.minis.push(+(tMs / 1000).toFixed(3)); }
     return fr;

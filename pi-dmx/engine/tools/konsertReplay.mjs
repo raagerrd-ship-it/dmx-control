@@ -8,7 +8,6 @@
  *  --trace (10-12, energikedjan): varje renderruta (40 Hz) som Float32 x 10: t, sektion (0 intro 1 low 2 build 3 high 4 break 5 annat),
  *  lampa 0..3 (starkaste kanalen efter kalibreringen, 0..1), bodyDb, diskant-dB (specAbs treble+air), drop-look (dropColEnv>0 eller
  *  minidrop-looken), energin (eBass). Mäts med tools/energiMatt.mjs.
- *  --feed2048 (10-22): takten (beatFeed) får 2048-FFT:ns onset.kick som före FAST_BANDS - ljusfälten är fortfarande de snabba.
  *  --bas-ref subkick (10-16): trace-kolumnen 'bas' = sub+kick (20-120 Hz, medel av sub- och kick-dB som DMX_BASS_SUBKICK) i stället för bodyDb.
  */
 import { ladanCfg } from "./benchCfg.mjs";   // bänkens config = ladans (8 lampor, släckgräns, lead) - natt 11-14
@@ -18,12 +17,12 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const path = args.find((a) => a.endsWith(".wav"));
 const { pathToFileURL } = await import("node:url");
 const DIST = opt("--dist", null) ? pathToFileURL(opt("--dist") + "/").href : new URL("../dist/", import.meta.url).href;   // --dist: prova en patchad kopia
-const { Analyser } = await import(DIST + "analyser.js");
+const { Analyser, createAnalyser } = await import(DIST + "analyser.js");
 const { EffectEngine } = await import(DIST + "effects.js");
 const { BeatFeed } = await import(DIST + "beatFeed.js");
 const { defaultConfig, fixtureRoles } = await import(DIST + "config.js");
 const { EFFECT_KEYS } = await import(DIST + "effects/registry.js");
-const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
+const { Hopp } = await import(DIST + "hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1): låtgränsen, dropräknaren, taktvägen som index.ts
 const d = readFileSync(path); const nSamples = (d.length - 44) >> 1;
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, STEP_MS = Number(opt("--step", 25));   // --step 5 = som live (200 Hz)
 const cfg = ladanCfg(defaultConfig);
@@ -33,19 +32,13 @@ const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = 
 // --delad-cfg (MÄTFÄLLA 47, 10-13): live får analysatorn MOTORNS cfg (index.ts createAnalyser(cfg)), så kickgrinden mot taktgridet
 // och taktfasen (analyser.ts beatSrc.beat = cfg.beat) är PÅ live - med en egen kopia (bänkarnas standard) är cfg.beat alltid null där.
 // DELNINGEN SOM LIVE (10-19): ladan kör den delade analysatorn delad (DMX-profilen ANALYSER_SPLIT 'worker') - snabba sidan i motorns
-// tråd med motorns cfg, långsamma (tempo/gridfas/sektion) i en worker som får en KOPIA av cfg vid start (structured clone). Här
-// körs den långsamma sidan synkront (inline, deterministiskt) med en kopia som i workern. --odelad = en analysator i en tråd (förr).
-const { createSplitBuffers } = await import(DIST + "split.js");
-const liveAnalyser = (c) => { if (args.includes("--odelad")) return new Analyser(c); const b = createSplitBuffers(); const fast = new Analyser(c, { role: "fast", split: b }); fast.setInlinePeer(new Analyser(structuredClone(c), { role: "slow", split: b })); return fast; };
+// tråd med motorns cfg, långsamma (tempo/gridfas/sektion + taktvägen) i en worker. Här körs den som motorns inline-läge
+// (createAnalyser 'inline': samma tråd, deterministiskt, taktvägen i långsamma sidan). --odelad = en analysator i en tråd med klockan i process().
+const liveAnalyser = (c) => { if (!args.includes("--odelad")) return createAnalyser(c, "inline"); const a = new Analyser(c); a.clock = new BeatFeed(); return a; };
 const an = liveAnalyser(args.includes("--delad-cfg") ? BeatFeed.analyserCfg(cfg) : ladanCfg(defaultConfig)); an.setGainLock(true, 1);
-const feed = new BeatFeed();
-// --feed2048 (natt 10-22, röda trådens tapp): beatFeed viker 2048-vägens onset.kick (som före FAST_BANDS) i stället för ramens snabba.
-const FEED2048 = args.includes("--feed2048");
 const LIVE_KICK = args.includes("--live-kick") || args.includes("--kick-onset"), KICK_ONSET = args.includes("--kick-onset");
 const KON_THR = Number(opt("--kon-thr", 0.5)), KON_MIN = Number(opt("--kon-min", 0.05)); let konAvg = 0, konPrev = 0, konPrev2 = 0, konLast = -1e9, kickN = 0;
-const bounds = new BoundaryDetector(() => Date.now());
-an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
+const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => LOG.push([+tNow.toFixed(2), 'LATGRANS']) });
 Date.now = () => EPOCH; performance.now = () => 0;
 const eng = new EffectEngine(cfg);
 // KR_SEED (11-12, ljusdomarens spridning): dirigenten drar den MINST SPELADE av de bäst passande lookerna (pickLook), så ett annat
@@ -57,7 +50,7 @@ if (process.env.KR_TOG === '0' || process.env.KR_TOG === '1') { const v = proces
 let tNow = 0; const LOG = [];
 console.log = (...a) => { const s = a.join(" "); if (/^\[dirigent\]/.test(s)) LOG.push([+tNow.toFixed(2), s.slice(11, 140)]); };
 const buf = new Float32Array(HOP);
-let lastRender = -1, lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0, lastRow = -1;
+let lastRender = -1, lastRow = -1;
 const TRACE = opt("--trace", null) ? [] : null; const TRACE_ALLA = args.includes("--trace-alla"); /* 11-15: lampa 4.. sist i varje rad (kolumn 10 och uppåt) - rytm.py läser alla åtta */ const REF_SK = opt("--bas-ref", "body") === "subkick"; const SEC = { intro: 0, low: 1, build: 2, high: 3, break: 4 };
 // --slag (natt 10-25; 11-16: + frasläget lastBeatIdx % 16 per orsak, samma frasgräns som concertBench bytePaFras): var i takten landar varje lookbyte - på en taktklocka-tick (slaget), på ettan (beatIdx % 4 = 0, analysatorns
 // barShift), och ms sedan senaste tick - per orsak (switchWhy). Skrivs till stdout, json:en ändras inte.
@@ -72,15 +65,7 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   // effekternas slag satt en godtycklig, tempoberoende bit från kickarna (128 BPM: 0,67 slag). Live är båda Date.now().
   // --epok-fel = gamla (felaktiga) vägen för jämförelse mot äldre json.
   an.setVirtualClock(args.includes("--epok-fel") ? ms : ms - EPOCH); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  const fr = an.process(buf);
-  boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
-  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); }
-  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
-  if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; eng.softenRange(); an.hintTrackChange(5000); LOG.push([+tS.toFixed(2), 'LATGRANS']); }
-  if (FEED2048) { const ok = fr.onset.kick; fr.onset.kick = an.bandOn[1]; feed.update(fr, cfg, an); fr.onset.kick = ok; } else feed.update(fr, cfg, an);
-  // TAKTPOSITIONEN TILL ANALYSATORN SOM LIVE (11-24, del D): live ger klockan (hopLane) sitt rutnät till analysatorns hopp-fack (h.gridMs, analyser.ts tickStep). Här
-  // går klockan utanför analysatorn (feed), så utan den här raden är h.gridMs alltid 0 i bänken och en sten som läser taktpositionen syns inte i ljuset.
-  if (an.clockOut) { an.clockOut.beat = cfg.beat; an.clockOut.beatErr = cfg.beatErr; }
+  const fr = hopp.analys(buf); hopp.koppla(fr);
   // --live-kick (natt 10-22, MÄTFÄLLA 52): live (index.ts) matar registerKick och renderar direkt (KICK-BYPASS) på frame.kick - bänkarna
   // gjorde det inte. --kick-onset: händelsen = onset.kick-toppen (lokalt max över --kon-thr x avklingande toppen, tau 2 s, minst 150 ms isär) i stället för frame.kick.
   let kickEv = false;

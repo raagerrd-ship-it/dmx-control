@@ -34,7 +34,7 @@ const VAR = sets.length > 0 || rest.includes("--dist");   // en ändrad kod: ing
 
 if (cmd === "tappa") {
   const [wav, dir] = rest; process.env.DMX_ANALYSER_SPLIT = "inline";
-  const { createAnalyser } = await import(U("analyser.js")); const { defaultConfig } = await import(U("config.js")); const { BeatFeed } = await import(U("analyserClock.js")); const { BoundaryDetector } = await import(U("boundaryDetector.js"));
+  const { createAnalyser } = await import(U("analyser.js")); const { defaultConfig } = await import(U("config.js")); const { BeatFeed } = await import(U("analyserClock.js")); const { Hopp } = await import(U("hopp.js"));
   const d = readFileSync(wav); let o = 12, start = 44, len = d.length - 44;
   while (o + 8 <= d.length) { const id = d.toString("latin1", o, o + 4), ln = d.readUInt32LE(o + 4); if (id === "data") { start = o + 8; len = Math.min(ln || d.length - start, d.length - start); break; } o += 8 + ln + (ln & 1); }
   const ch = d.readUInt16LE(22), SR = d.readUInt32LE(24), n = Math.floor(len / 2 / ch), hops = Math.floor(n / HOP);
@@ -51,18 +51,17 @@ if (cmd === "tappa") {
   // låtgränsen: tick per hopp + spektrum per stor-FFT
   const T = new Float64Array(hops * 5), maxS = Math.ceil(hops / 3) + 64, S = new Float32Array(maxS * SPEC_N), ST = new Float64Array(maxS), SH = new Uint32Array(maxS); let tn = 0, sn = 0, binHz0 = 0, magLen = 0; const grans = [];
   console.log = () => {};
-  const cfg = ladanCfg(defaultConfig), an = createAnalyser(BeatFeed.analyserCfg ? BeatFeed.analyserCfg(cfg) : cfg, undefined), feed = new BeatFeed(); an.setGainLock(true, 1);
-  const bounds = new BoundaryDetector(() => Date.now());
+  const cfg = ladanCfg(defaultConfig), an = createAnalyser(BeatFeed.analyserCfg ? BeatFeed.analyserCfg(cfg) : cfg, undefined); an.setGainLock(true, 1);
+  // MOTORNS KOPPLING PER HOPP (hopp.js, kedjan steg 1); tappen lägger sig framför gränsdetektorns spektrum
+  const hopp = new Hopp(an, cfg, { softenRange: () => {}, noteTrack: () => grans.push([+curT.toFixed(2), hopp.bounds.active ? hopp.bounds.lastBoundary : "tystnad"]) }), bounds = hopp.bounds;
   an.setSpectrumSink((mag, binHz) => { if (sn < maxS) { S.set(mag.subarray(0, SPEC_N), sn * SPEC_N); ST[sn] = Date.now(); SH[sn] = tn; sn++; binHz0 = binHz; magLen = mag.length; } bounds.pushSpectrum(mag, binHz); });
-  const ba = { level: 0, bpm: 0, bpmConfidence: 0, silent: false }, buf = new Float32Array(HOP); let lb = 0;
+  const buf = new Float32Array(HOP);
   for (let off = 0; off + HOP <= n; off += HOP) {
     for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(start + (off + i) * 2 * ch) / 32768;
     curT = off / SR; const ms = EPOCH + curT * 1000; an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
-    const fr = an.process(buf); ba.silent = fr.silent; ba.level = fr.level; ba.bpm = fr.bpm; ba.bpmConfidence = fr.bpmConfidence;
+    const fr = hopp.analys(buf);
     const r = tn * 5; T[r] = ms; T[r + 1] = fr.level; T[r + 2] = fr.bpm; T[r + 3] = fr.bpmConfidence; T[r + 4] = fr.silent ? 1 : 0; tn++;
-    bounds.tick(ba);
-    if (bounds.boundaryCount !== lb) { lb = bounds.boundaryCount; an.hintTrackChange(5000); grans.push([+curT.toFixed(2), bounds.active ? bounds.lastBoundary : "tystnad"]); }
-    if (an.hopLane) an.hopLane.feed(fr, cfg, an); else feed.update(fr, cfg, an);
+    hopp.koppla(fr);
   }
   console.log = log; mkdirSync(dir, { recursive: true }); const namn = path.basename(wav).replace(/\.wav$/, "");
   const skrivJ = (fil, h, parts) => { let s = JSON.stringify(h); while ((4 + Buffer.byteLength(s, "utf8")) % 8) s += " "; const hb = Buffer.from(s, "utf8"), lb4 = Buffer.alloc(4); lb4.writeUInt32LE(hb.length); const fd = openSync(fil, "w"); writeSync(fd, lb4); writeSync(fd, hb); for (const p of parts) writeSync(fd, Buffer.from(p.buffer, p.byteOffset, p.byteLength)); closeSync(fd); };

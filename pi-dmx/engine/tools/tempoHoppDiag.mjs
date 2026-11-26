@@ -7,7 +7,7 @@ import { resolve } from 'node:path';
 const [dist, listFile, outFile] = process.argv.slice(2);
 const imp = (f) => import(pathToFileURL(resolve(dist, f)).href);
 const { createAnalyser } = await imp('analyser.js'); const { BeatFeed } = await imp('analyserClock.js');
-const { defaultConfig } = await imp('config.js'); const { BoundaryDetector } = await imp('boundaryDetector.js');
+const { defaultConfig } = await imp('config.js'); const { Hopp } = await imp('hopp.js');   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 const { fold } = await import(new URL('./catalog.mjs', import.meta.url).href);
 console.log = () => {}; const log = (...a) => process.stdout.write(a.join(' ') + '\n');
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, HMS = HOP / SR * 1000;
@@ -39,13 +39,10 @@ function readClip(path) {
 const ENG = new URL('../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
 const an = createAnalyser(BeatFeed.analyserCfg(cfg), 'inline'); an.setGainLock(true, 1);
-const bounds = new BoundaryDetector(() => Date.now()); an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const ba = { level: 0, bpm: 0, bpmConfidence: 0 }; let lb = 0; const bl = [];
+const bl = []; const hopp = new Hopp(an, cfg, { softenRange: () => {}, noteTrack: () => bl.push(+(curT / 1000).toFixed(2)) });
 const step = (buf, tMs) => {
   const wall = EPOCH + tMs; an.setVirtualClock(tMs); Date.now = () => wall; performance.now = () => tMs; curT = tMs;
-  const fr = an.process(buf); ba.level = fr.level; ba.bpm = fr.bpm; ba.bpmConfidence = fr.bpmConfidence; bounds.tick(ba);
-  if (bounds.boundaryCount !== lb) { lb = bounds.boundaryCount; an.hintTrackChange(5000); bl.push(+(tMs / 1000).toFixed(2)); }
-  an.hopLane.feed(fr, cfg, an); return fr;
+  const fr = hopp.analys(buf); hopp.koppla(fr); return fr;
 };
 let mix, seg;
 if (list.wav) {   // en lång inspelning: {wav, facit:[..], t0, t1}

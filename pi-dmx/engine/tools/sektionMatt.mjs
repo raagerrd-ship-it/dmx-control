@@ -1,6 +1,7 @@
 /**
  * SEKTIONSMÅTT (natten 10-14, ägarens prio 1 10-13: "sektioner som håller + inga falska låtgränser"). Kör en lang-*.wav genom
- * BARA analysatorn (DMX-profilen) + låtgränsdetektorn som konsertReplay (samma klocka, samma hint vid LATGRANS) - ingen effektmotor,
+ * BARA analysatorn (DMX-profilen, odelad med klockan i process()) + motorns koppling per hopp (<bygget>/hopp.js: låtgränsen, hinten,
+ * taktvägen/publishClock som index.ts) - ingen effektmotor,
  * så ett svep över alla 23 inspelningar tar ~1 min. Sektionen beror inte på motorn utom SECTION_HOLD_BARS (cfg.beat) som är av.
  *   node tools/sektionMatt.mjs <wav> [--json ut.json]
  * Skriver en rad JSON till stdout: { wav, min, segs: [[start_s, slut_s, etikett]], latgrans: [t_s], bpm: [[t_s, bpm]] (1 Hz), lvl: [[t_s, level]] (1 Hz) }.
@@ -13,25 +14,21 @@ const path = args.find((a) => a.endsWith(".wav"));
 const DIST = new URL("../dist/", import.meta.url).href;
 const { Analyser } = await import(DIST + "analyser.js");
 const { defaultConfig } = await import(DIST + "config.js");
-const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
+const { Hopp } = await import(DIST + "hopp.js"); const { BeatFeed } = await import(DIST + "analyserClock.js");
 const d = readFileSync(path); const nSamples = (d.length - 44) >> 1;
 const SR = 48000, HOP = 128, EPOCH = 1700000000000;
-const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1);
-const bounds = new BoundaryDetector(() => Date.now());
-an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
+const cfg = JSON.parse(JSON.stringify(defaultConfig)), an = new Analyser(cfg); an.clock = new BeatFeed(); an.setGainLock(true, 1);   // odelad som createAnalyser utan delning
+let tNow = 0; const hopp = new Hopp(an, cfg, { softenRange: () => {}, noteTrack: () => latgrans.push(+tNow.toFixed(2)) });
 Date.now = () => EPOCH; performance.now = () => 0;
 console.log = () => {};
 const buf = new Float32Array(HOP);
-let lastBoundary = 0, curSec = null, segStart = 0, lastSec1 = -1;
+let curSec = null, segStart = 0, lastSec1 = -1;
 const segs = [], latgrans = [], bpm = [], lvl = [];
 for (let off = 0; off + HOP <= nSamples; off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
-  const tS = off / SR, ms = EPOCH + tS * 1000;
+  const tS = off / SR, ms = EPOCH + tS * 1000; tNow = tS;
   an.setVirtualClock(ms - EPOCH); Date.now = () => ms; performance.now = () => ms - EPOCH;   // mätfälla 48
-  const fr = an.process(buf);
-  boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
-  if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; an.hintTrackChange(5000); latgrans.push(+tS.toFixed(2)); }
+  const fr = hopp.analys(buf); hopp.koppla(fr);
   const s = fr.section ?? '';
   if (s !== curSec) { if (curSec !== null) segs.push([+segStart.toFixed(2), +tS.toFixed(2), curSec]); curSec = s; segStart = tS; }
   const s1 = Math.floor(tS); if (s1 !== lastSec1) { lastSec1 = s1; bpm.push([s1, Math.round(fr.bpm ?? 0), +(fr.bpmConfidence ?? 0).toFixed(2)]); lvl.push([s1, +(fr.level ?? 0).toFixed(3), +(fr.bodyDb ?? -90).toFixed(1)]); }

@@ -3,21 +3,18 @@
 import { readFileSync } from "node:fs"; import { pathToFileURL } from "node:url";
 const [distDir, wav, secsArg] = process.argv.slice(2); const u = (f) => pathToFileURL(distDir + "/" + f).href;
 const { Analyser } = await import(u("analyser.js")); const { EffectEngine } = await import(u("effects.js")); const { defaultConfig } = await import(u("config.js"));
-const { BoundaryDetector } = await import(u("boundaryDetector.js"));
+const { Hopp } = await import(u("hopp.js")); const { BeatFeed } = await import(u("analyserClock.js"));   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 const d = readFileSync(wav); const n = (d.length - 44) / 2; const SR = 48000, HOP = 128; const SECS = Number(secsArg || 600);
 const cfg = JSON.parse(JSON.stringify(defaultConfig)); cfg.beatPulse = true; cfg.mode = "smart"; cfg.energyDrivesMode = true;
-const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.setGainLock(true, 1); const eng = new EffectEngine(cfg);
-let nowMs = 1700000000000; const bounds = new BoundaryDetector(() => nowMs); an.setSpectrumSink((m, b) => bounds.pushSpectrum(m, b)); let lastB = 0, lastC = 0;
+const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.clock = new BeatFeed(); an.setGainLock(true, 1); const eng = new EffectEngine(cfg);   // odelad: klockan i process()
+const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => {} });
 const logs = []; const origLog = console.log; let tNow = 0; console.log = (...a) => { const s = a.join(" "); if (/^\[(dirigent|song|dropfire|minidrop)\]/.test(s)) logs.push([tNow, s]); };
 const buf = new Float32Array(HOP); const ms0 = 1700000000000; let last = -1; const rows = [];
 for (let off = 0; off + HOP <= n && off < SECS * SR; off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
-  const ms = ms0 + (off / SR) * 1000; nowMs = ms; tNow = off / SR; an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - ms0;
-  const fr = an.process(buf); bounds.tick({ level: fr.level, bpm: fr.bpm, bpmConfidence: fr.bpmConfidence });
-  if (bounds.charShiftCount !== lastC) { lastC = bounds.charShiftCount; eng.noteCharShift?.(); }
-  if (bounds.boundaryCount !== lastB) { lastB = bounds.boundaryCount; eng.softenRange(); if (process.env.DMX_BOUNDARY_SOFT) an.hintTrackChange(5000); else { an.resetTempo(); if (process.env.DMX_SECTION_HINT_LOWCONF === '0') an.hintTrackChange(5000); } }
+  const ms = ms0 + (off / SR) * 1000; tNow = off / SR; an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - ms0;
+  const fr = hopp.analys(buf); hopp.koppla(fr);
   if (fr.kick) eng.registerKick(0.4 + Math.min(1, fr.energy * 1.4) * 0.6);
-  if (fr.bpm > 0) { if (!cfg.beat || Math.abs(cfg.beat.bpm / fr.bpm - 1) > 0.03) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence }; else cfg.beat.confidence = fr.bpmConfidence; }
   if (ms - last >= 25) { last = ms; const o = eng.render(fr); let v = 0; for (let f = 0; f < 4; f++) v += Math.max(o[f * 7], o[f * 7 + 1], o[f * 7 + 2]); rows.push({ t: tNow, look: eng.activeMode || eng.smartMode, sec: fr.section, lvl: 100 * v / 4 / 255, bw: eng.beatW ?? 1, bpm: fr.bpm, lvh: fr.sectionLevelVsHighDb ?? fr.levelVsHighDb ?? 0 }); }
 }
 console.log = origLog;

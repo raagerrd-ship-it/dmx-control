@@ -96,6 +96,7 @@ async function kor(DIST, MALL, NAMN, PROF, SECS, WAV) {
   const logs = []; const log0 = console.log; console.log = (...a) => logs.push(a.join(' ')); console.warn = console.log;
   const load = async (d) => { const i = (f) => import(pathToFileURL(resolve(d, f)).href);
     return { ...(await i('analyser.js')), ...(await i('split.js')), ...(await i('analyserClock.js')), sysEnv: (await i('analyserFack.js')).sysEnv,
+      Hopp: existsSync(resolve(d, 'hopp.js')) ? (await i('hopp.js')).Hopp : null,   // dmx: MOTORNS KOPPLING PER HOPP (kedjan steg 1)
       defaultConfig: existsSync(resolve(d, 'config.js')) ? (await i('config.js')).defaultConfig : null }; };
   const m = await load(DIST), mm = await load(MALL);
   const SR = 48000, HOP = 128, EPOCH = PROF === 'dmx' ? 1.7e12 : 1795274000000, EVERY = 60 * SR / HOP, HINT = 97 * SR / HOP, RESET = 211 * SR / HOP;
@@ -107,13 +108,14 @@ async function kor(DIST, MALL, NAMN, PROF, SECS, WAV) {
   // som createAnalyser: odelat med egen klocka, delat inline med taktväg (hopSelf i lotus)
   const build = (mod, mode) => {
     const { cfg, acfg } = cfgs(mod);
-    if (mode === 'odelad') { const a = new mod.Analyser(acfg); a.clock = new mod.BeatFeed(); gain(a); return { a, cfg, acfg }; }
+    const hopp = (a) => PROF === 'dmx' ? new mod.Hopp(a, cfg, { softenRange: () => {}, noteTrack: () => {} }) : null;
+    if (mode === 'odelad') { const a = new mod.Analyser(acfg); a.clock = new mod.BeatFeed(); gain(a); return { a, cfg, acfg, hopp: hopp(a) }; }
     const feedMk = mod.hopFeedFactory(), buffers = mod.createSplitBuffers(!!feedMk);
     const a = new mod.Analyser(acfg, { role: 'fast', split: buffers }); gain(a);
     if (!feedMk) a.clock = new mod.BeatFeed();
     else { a.hopLane = new mod.HopLaneFast(buffers, false); a.hopSelf = mod.sysEnv('BEAT_FEED') === undefined; a.hopLane.peer = new mod.HopLaneSlow(buffers, feedMk()); }
     a.setInlinePeer(new mod.Analyser(acfg, { role: 'slow', split: buffers }));
-    return { a, cfg, acfg, buffers };
+    return { a, cfg, acfg, buffers, hopp: hopp(a) };
   };
   const d = readFileSync(WAV); let p = 12, off0 = 44, len = d.length - 44;
   while (p + 8 <= d.length) { const id = d.toString('ascii', p, p + 4), sz = d.readUInt32LE(p + 4); if (id === 'data') { off0 = p + 8; len = sz > 0 ? Math.min(sz, d.length - off0) : d.length - off0; break; } p += 8 + sz + (sz & 1); }
@@ -133,8 +135,7 @@ async function kor(DIST, MALL, NAMN, PROF, SECS, WAV) {
           const ms = EPOCH + off / SR * 1000; Date.now = () => ms; performance.now = () => ms - EPOCH; X.a.setVirtualClock(ms);
           if (hops > 0 && hops % HINT === 0) X.a.hintTrackChange(5000);
           if (hops > 0 && hops % RESET === 0) X.a.resetTempo();
-          fr = X.a.process(buf);
-          if (X.a.hopLane && !X.a.hopSelf) X.a.hopLane.feed(fr, X.cfg, X.a); else X.a.publishClock(X.cfg);
+          fr = X.hopp.analys(buf); X.hopp.koppla(fr);
         } else {
           const ms = off / SR * 1000; Date.now = () => EPOCH + ms; performance.now = () => ms;
           X.a.setAudioClockMs(ms); if (hops === 0) X.a.setVirtualClock(0); else X.a.advanceVirtualClock(ms);

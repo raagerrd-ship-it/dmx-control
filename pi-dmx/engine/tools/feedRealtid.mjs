@@ -21,7 +21,7 @@ const SR = 48000, HOP = 128;
 process.env.DMX_ANALYSER_SPLIT = 'worker';
 const imp = (f) => import(pathToFileURL(resolve(dist, f)).href);
 const { createAnalyser } = await imp('analyser.js'); const { BeatFeed } = await imp('beatFeed.js');
-const { defaultConfig, fixtureRoles } = await imp('config.js'); const { BoundaryDetector } = await imp('boundaryDetector.js');
+const { defaultConfig, fixtureRoles } = await imp('config.js'); const { Hopp } = await imp('hopp.js');
 const { EffectEngine } = await imp('effects.js'); const { EFFECT_KEYS } = await imp('effects/registry.js');
 const d = readFileSync(wav); let p = 12, dataOff = 44, dataLen = d.length - 44;
 while (p + 8 <= d.length) { const id = d.toString('ascii', p, p + 4), sz = d.readUInt32LE(p + 4); if (id === 'data') { dataOff = p + 8; dataLen = Math.min(sz, d.length - p - 8); break; } p += 8 + sz + (sz & 1); }
@@ -31,9 +31,8 @@ const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.mode = 'smart'; cfg.energyDrivesMode = true; cfg.beatPulse = true; cfg.master = 1; cfg.energyCeiling = true;
 cfg.rotation = {}; for (const k of EFFECT_KEYS) cfg.rotation[k] = true; for (const fx of cfg.fixtures) fx.cal = { off: 0, on: 16 };
 const an = createAnalyser(BeatFeed.analyserCfg(cfg)); an.setGainLock(true, 1);
-const feed = new BeatFeed(); const eng = new EffectEngine(cfg); let lastRender = -1e9; console.log = () => {};
-const bounds = new BoundaryDetector(() => Date.now()); an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const ba = { level: 0, bpm: 0, bpmConfidence: 0 }; let lb = 0;
+const eng = new EffectEngine(cfg); let lastRender = -1e9; console.log = () => {};
+const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => {} });   // MOTORNS KOPPLING PER HOPP (hopp.js, kedjan steg 1)
 await new Promise((r) => setTimeout(r, 1000));   // workern startar (dynamisk import, som i motorn)
 
 const behindHist = new Map(); const lagS = []; const envLag = []; const jumps = []; let prevA = 0, prevB = 0, h = 0, rssMax = 0;
@@ -44,9 +43,7 @@ await new Promise((res) => {
     const want = Math.floor((performance.now() - t0) / 1000 * SR / HOP);
     while (h < want && (h + 1) * HOP <= n) {
       buf.set(y.subarray(h * HOP, (h + 1) * HOP));
-      const fr = an.process(buf); ba.level = fr.level; ba.bpm = fr.bpm; ba.bpmConfidence = fr.bpmConfidence; bounds.tick(ba);
-      if (bounds.boundaryCount !== lb) { lb = bounds.boundaryCount; an.hintTrackChange(5000); }
-      if (an.hopLane) an.hopLane.feed(fr, cfg, an); else feed.update(fr, cfg, an);
+      const fr = hopp.analys(buf); hopp.koppla(fr);
       const nowR = performance.now(); if (nowR - lastRender >= 25) { lastRender = nowR; eng.render(fr); }
       h++;
       if (an.hopLane) { const st = an.hopLane.stats(); behindHist.set(st.behind, (behindHist.get(st.behind) || 0) + 1); if (h % 37 === 0) lagS.push(st.lagMs); }

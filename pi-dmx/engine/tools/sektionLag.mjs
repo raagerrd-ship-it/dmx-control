@@ -20,11 +20,10 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const files = args.filter((a) => a.endsWith(".wav"));
 const SKIFT_DB = Number(opt("--skift", 5));
 const DIST = new URL("../dist/", import.meta.url).href;
-const { Analyser } = await import(DIST + "analyser.js");
+const { createAnalyser } = await import(DIST + "analyser.js");
 const { BeatFeed } = await import(DIST + "beatFeed.js");
 const { defaultConfig } = await import(DIST + "config.js");
-const { BoundaryDetector } = await import(DIST + "boundaryDetector.js");
-const { createSplitBuffers } = await import(DIST + "split.js");
+const { Hopp } = await import(DIST + "hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 console.log = () => {};
 const SR = 48000, HOP = 128, EPOCH = 1700000000000, HMS = HOP / SR * 1000;
 // SANNA TIDSAXLAR (arenan bygg 2026-11-12, fynd av b1/b2/b3): etiketten provtas var 38:e hop = 101,33 ms och nivåblocken är 188 hop = 501,33 ms,
@@ -37,11 +36,9 @@ const per = [];
 for (const path of files) {
   const d = readFileSync(path); const n = (d.length - 44) >> 1;
   const cfg = JSON.parse(JSON.stringify(defaultConfig));
-  const b = createSplitBuffers(); const an = new Analyser(BeatFeed.analyserCfg(cfg), { role: "fast", split: b }); an.setInlinePeer(new Analyser(structuredClone(cfg), { role: "slow", split: b }));
+  const an = createAnalyser(BeatFeed.analyserCfg(cfg), "inline");   // delad som motorn (inline: taktvägen i långsamma sidan, deterministiskt)
   an.setGainLock(true, 1);
-  const feed = new BeatFeed(); const bounds = new BoundaryDetector(() => Date.now());
-  an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-  const bArg = { level: 0, bpm: 0, bpmConfidence: 0 }; let lastB = 0;
+  const hopp = new Hopp(an, cfg, { softenRange: () => {}, noteTrack: () => {} });
   const H = Math.floor(n / HOP); const buf = new Float32Array(HOP);
   const secAt = []; const lvl = []; let acc = 0, accN = 0;   // etikett per 100 ms, nivå per 0,5 s
   const dbR = new Float64Array(16); let armed = true, lastOn = -1e9;   // gridfas: basens dB per hop (ring), ansatser
@@ -50,10 +47,7 @@ for (const path of files) {
     for (let i = 0; i < HOP; i++) { const v = d.readInt16LE(44 + (h * HOP + i) * 2) / 32768; buf[i] = v; acc += v * v; }
     accN += HOP; if (accN >= SR / 2) { lvl.push(10 * Math.log10(acc / accN + 1e-10)); acc = 0; accN = 0; }
     const ms = EPOCH + h * HMS; an.setVirtualClock(ms - EPOCH); Date.now = () => ms; performance.now = () => ms - EPOCH;
-    const fr = an.process(buf);
-    bArg.level = fr.level; bArg.bpm = fr.bpm; bArg.bpmConfidence = fr.bpmConfidence; bounds.tick(bArg);
-    if (bounds.boundaryCount !== lastB) { lastB = bounds.boundaryCount; an.hintTrackChange(5000); }
-    feed.update(fr, cfg, an);
+    const fr = hopp.analys(buf); hopp.koppla(fr);
     {   // GRIDFAS
       const sa = fr.specAbs, db = 20 * Math.log10((sa?.sub ?? 0) + (sa?.kick ?? 0) + 1e-7), tMs = h * HMS;
       dbR[h & 15] = db;

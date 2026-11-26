@@ -62,7 +62,8 @@ const { Analyser } = await import(pathToFileURL(process.env.DIST + "/analyser.js
 const { EffectEngine } = await import(pathToFileURL(process.env.DIST + "/effects.js").href);
 const { defaultConfig, fixtureRoles } = await import(pathToFileURL(process.env.DIST + "/config.js").href);
 const { EFFECT_KEYS } = await import(pathToFileURL(process.env.DIST + "/effects/registry.js").href);
-const { BoundaryDetector } = await import(pathToFileURL(process.env.DIST + "/boundaryDetector.js").href);
+const { Hopp } = await import(pathToFileURL(process.env.DIST + "/hopp.js").href);   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
+const { BeatFeed } = await import(pathToFileURL(process.env.DIST + "/analyserClock.js").href);
 
 const d = readFileSync(path);
 if (d.toString("ascii", 0, 4) !== "RIFF") { say("inte en WAV"); process.exit(2); }
@@ -91,15 +92,12 @@ const lamps = cfg.fixtures.map((fx) => {
   return { r: at("r"), g: at("g"), b: at("b"), dim: at("dim") };
 });
 
-const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig)));
+const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig))); an.clock = new BeatFeed();   // odelad: klockan i process(), som createAnalyser utan delning
 // GAIN: motorn laser forstarkningen bara pa aux (index.ts: setGainLock(cfg.audioInput !== "mic", 1)).
 // Kor ladan pa mikrofon ar AGC:n aktiv dar men inte har; --agc kor som mikrofoningang.
 if (!flag("--agc")) an.setGainLock(true, 1);
-// LATGRANSENS SIDOKEDJA som i index.ts (se huvudet). Klockan ar Date.now = den virtuella.
-const bounds = new BoundaryDetector(() => Date.now());   // INTE standardklockan: den fangar Date.now-funktionen vid konstruktion, och banken byter den per hop
-an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
-let lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0;
+// LATGRANSENS SIDOKEDJA och taktvägen som i index.ts: hopp.js. Klockan ar Date.now = den virtuella.
+const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => {} });
 const EV = [];   // {t, typ, txt}
 
 // Klockan FORE motorn skapas (matfallan ovan).
@@ -119,9 +117,8 @@ for (let off = 0; off + HOP <= nSamples; off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(44 + (off + i) * 2) / 32768;
   const tS = off / SR, ms = EPOCH + tS * 1000;
   an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  let t0 = hr(); const fr = an.process(buf); tA.push(hr() - t0);
-  boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence; bounds.tick(boundsArg);
-  if (fr.bpm > 0) cfg.beat = { anchorMs: (fr.kickAnchorMs ?? fr.beatAnchorMs) || ms, bpm: fr.bpm, confidence: fr.bpmConfidence };
+  let t0 = hr(); const fr = hopp.analys(buf); tA.push(hr() - t0);
+  hopp.koppla(fr);
   if (ms - lastRender < STEP_MS && lastRender >= 0) continue;
   lastRender = ms; t0 = hr(); eng.render(fr); tR.push(hr() - t0);
 }

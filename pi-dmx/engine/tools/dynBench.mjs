@@ -81,7 +81,7 @@ const { EffectEngine } = await import("../dist/effects.js");
 const { BeatFeed } = await import("../dist/beatFeed.js");   // taktmatningen som i motorn (matfalla 43)
 const { defaultConfig, fixtureRoles } = await import("../dist/config.js");
 const { EFFECT_KEYS } = await import("../dist/effects/registry.js");
-const { BoundaryDetector } = await import("../dist/boundaryDetector.js");
+const { Hopp } = await import("../dist/hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 
 const cfg = JSON.parse(JSON.stringify(defaultConfig));
 cfg.mode = "smart"; cfg.energyDrivesMode = true; cfg.beatPulse = true; cfg.master = 1; cfg.energyCeiling = true;
@@ -95,12 +95,10 @@ const lamps = cfg.fixtures.map((fx) => {
 });
 
 const an = new Analyser(JSON.parse(JSON.stringify(defaultConfig)));
-const feed = new BeatFeed();
+an.clock = new BeatFeed();   // odelad: klockan i process(), som createAnalyser utan delning
 an.setGainLock(true, 1);
-const bounds = new BoundaryDetector(() => Date.now());
-an.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0 };
-let lastCharShift = 0, lastTempoShift = 0, lastBoundary = 0;
+let curOff = 0; const hopp = new Hopp(an, cfg, { softenRange: () => eng.softenRange(), noteTrack: () => { if (process.env.DYN_GRANS_LOG) process.stderr.write(`GRANS ${(curOff / SR).toFixed(1)}
+`); } });
 const t00 = EPOCH + startS * 1000;
 Date.now = () => t00; performance.now = () => t00 - EPOCH;
 if (process.env.DYN_HIST) globalThis.__chHist = [];
@@ -117,14 +115,7 @@ for (let off = Math.floor(startS * SR / HOP) * HOP; off + HOP <= endSample; off 
   for (let i = 0; i < HOP; i++) buf[i] = samples[off + i];
   const tS = off / SR, ms = EPOCH + tS * 1000;
   an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  const fr = an.process(buf);
-  boundsArg.level = fr.level; boundsArg.bpm = fr.bpm; boundsArg.bpmConfidence = fr.bpmConfidence;
-  bounds.tick(boundsArg);
-  if (bounds.charShiftCount !== lastCharShift) { lastCharShift = bounds.charShiftCount; eng.noteCharShift?.(); }
-  if (bounds.tempoShiftCount !== lastTempoShift) { lastTempoShift = bounds.tempoShiftCount; eng.noteCharShift?.(`tempovaxling ${bounds.tempoShiftFrom}->${bounds.tempoShiftTo} BPM`); }
-  if (bounds.boundaryCount !== lastBoundary) { lastBoundary = bounds.boundaryCount; if (process.env.DYN_GRANS_LOG) process.stderr.write(`GRANS ${(off / SR).toFixed(1)}
-`); if (!process.env.DYN_INGEN_GRANS) { eng.softenRange(); an.hintTrackChange(5000); } }
-  feed.update(fr, cfg, an);   // TAKTMATNINGEN SOM LIVE (beatFeed.ts, matfalla 43; forr anchorMs = fr.beatAnchorMs varje hop)
+  curOff = off; const fr = hopp.analys(buf); hopp.koppla(fr);   // TAKTMATNINGEN SOM LIVE (hopp.js)
   if (fr.bpm > 0 && cfg.beat) {
     const per = 60000 / cfg.beat.bpm, idx = Math.floor((ms - cfg.beat.anchorMs) / per);
     if (lastBeatIdx !== null && idx !== lastBeatIdx) BEATT.push(cfg.beat.anchorMs + idx * per - EPOCH);

@@ -4,21 +4,22 @@
 import { readFileSync, writeFileSync } from "node:fs";
 const [wav, ut] = process.argv.slice(2);
 const { createAnalyser } = await import("../../dist/analyser.js");
-const { defaultConfig } = await import("../../dist/config.js"); const { BeatFeed } = await import("../../dist/beatFeed.js");
+const { defaultConfig } = await import("../../dist/config.js"); const { Hopp } = await import("../../dist/hopp.js");   // MOTORNS KOPPLING PER HOPP (kedjan steg 1)
 const d = readFileSync(wav); let o = 12, start = 44, len = d.length - 44;
 while (o + 8 <= d.length) { const id = d.toString("latin1", o, o + 4), ln = d.readUInt32LE(o + 4); if (id === "data") { start = o + 8; len = Math.min(ln || d.length - start, d.length - start); break; } o += 8 + ln + (ln & 1); }
 const ch = d.readUInt16LE(22), SR = d.readUInt32LE(24), n = Math.floor(len / 2 / ch), HOP = 128, EPOCH = 1700000000000;
 const realNow = performance.now.bind(performance), log = console.log; console.log = () => {};
 // MED KLOCKAN (v2, 11-13 kväll; a7:s fynd i runda 1: v1 skapade en naken Analyser utan taktmatning -> bpm 0 hela filen, tempospärren tom
-// och klockberoende mekanismer dömda på reservslaget). Nu som motorn: den delade analysatorn i lås-steg (createAnalyser sync) + taktmatningen.
+// och klockberoende mekanismer dömda på reservslaget). Nu som motorn: den delade analysatorn i lås-steg (createAnalyser sync) + motorns koppling per hopp (hopp.js).
 process.env.DMX_ANALYSER_SPLIT = "inline"; const cfg = JSON.parse(JSON.stringify(defaultConfig));
-const an = createAnalyser(JSON.parse(JSON.stringify(defaultConfig)), "sync"); const feed = new BeatFeed(); an.setGainLock(true, 1);
+const an = createAnalyser(JSON.parse(JSON.stringify(defaultConfig)), "sync"); an.setGainLock(true, 1);
+const hopp = new Hopp(an, cfg, { softenRange: () => {}, noteTrack: () => {} });
 const buf = new Float32Array(HOP); let lastD = 0, lastM = 0, cpu = 0, hops = 0;
 const drops = [], minis = [], bygg = [], bpm = [], sek = [];
 for (let off = 0; off + HOP <= n; off += HOP) {
   for (let i = 0; i < HOP; i++) buf[i] = d.readInt16LE(start + (off + i) * 2 * ch) / 32768;
   const t = off / SR, ms = EPOCH + t * 1000; an.setVirtualClock(ms); Date.now = () => ms; performance.now = () => ms - EPOCH;
-  const a = realNow(); const fr = an.process(buf); if (an.hopLane) an.hopLane.feed(fr, cfg, an); else feed.update(fr, cfg, an); cpu += realNow() - a; hops++;
+  const a = realNow(); const fr = hopp.analys(buf); hopp.koppla(fr); cpu += realNow() - a; hops++;
   if (fr.dropCount !== lastD) { lastD = fr.dropCount; drops.push(+t.toFixed(2)); }
   if ((fr.miniDropCount ?? 0) !== lastM) { lastM = fr.miniDropCount ?? 0; minis.push(+t.toFixed(2)); }
   const k = off / HOP;
