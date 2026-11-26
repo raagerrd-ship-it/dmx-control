@@ -15,7 +15,7 @@ import "./v8Tiering.js";   // FORST: V8 optimerar om efter 100 anrop i st f 3000
 import { isLogOn } from "./quiet.js";   // FORST: tystar console.log innan ovriga moduler hinner logga (DMX_QUIET)
 import { readFileSync, existsSync } from "node:fs";
 import { AudioCapture } from "./audio.js";
-import { BoundaryDetector } from "./boundaryDetector.js";
+import { Hopp } from "./hopp.js";
 import { createAnalyser, type Frame } from "./analyser.js";
 import { EffectEngine } from "./effects.js";
 import { warmUpInBackground } from "./warmup.js";
@@ -106,8 +106,11 @@ dmx.setMaxHz(cfg.dmxMaxHz);
 // pa PC:n och kostade i drift synkron disk-I/O + en BigInt-indexombyggnad (sekunder pa Pi:n) vid varje
 // latcommit. Gransdetektorn ar utbruten oforandrad (tools/boundaryEquiv.mjs bevisar samma hop) och matas
 // fran analysatorns stora FFT precis som forr - ingen extra transform.
-const bounds = new BoundaryDetector();
-analyser.setSpectrumSink((mag, binHz) => bounds.pushSpectrum(mag, binHz));
+// KOPPLINGEN PER HOPP (hopp.ts, kedjan steg 1): gransdetektorn, latgransen, dropraknaren och taktvagen - samma fil som verktygen kor.
+const hopp = new Hopp(analyser, cfg, {
+  softenRange: () => effects.softenRange(),
+  noteTrack: (n) => { if (recorder) { const name = "ladan-" + n; recorder.noteTrack(name, "dmx"); recorder.trackChanged("dmx", name); } },
+});
 if (analyser.hopLane) { const lane = analyser.hopLane; health.setSplitStats(() => lane.stats()); }   // /api/health-log split (2026-11-08)
 
 
@@ -129,9 +132,6 @@ let lastRenderMs = 0;
 let lastUniverse: Uint8Array | null = null;
 let fadeUniverse = new Uint8Array(0);
 const dmxProbe = { left: 0, chs: [] as number[], rows: [] as string[], t0: 0 };
-let lastLiveDrop = 0;        // senast sedda drop-räknare FRÅN analysatorn
-let lastBoundary = 0;        // senast sedda låtgräns-räknare (dynamikens omkalibrering)
-let outDrop = 0;             // drop-räknaren effekterna ser (live eller replay)
 const slotsFor = () => Math.max(activeSlots(cfg.fixtures), cfg.fog?.enabled ? cfg.fog.address : 0);
 let curSlots = slotsFor();
 
@@ -162,15 +162,12 @@ if (process.env.DMX_RECORDER === "1") {
   recorder.noteTrack("ladan-0", "dmx");
   recorder.start();
 }
-// Argumentobjekt som fylls per hop i stallet for nya literaler (skrapjakten 10-01: 375 Hz). Mottagarna laser dem synkront.
-const boundsArg = { level: 0, bpm: 0, bpmConfidence: 0, silent: true };
 capture.on("chunk", (samples: Float32Array) => {
   // MATNING BARA VID FELSOKNING (2026-10-04, agaren): runtimeHealth ar ren diagnostik (/api/health-log); watchdogens /health
   // bygger pa lastChunkAt och paverkas inte. PUT /api/debug/verbose {enabled:true} slar pa tidtagningen.
   const diag = isLogOn();
   const t0 = diag ? performance.now() : 0;
-  analyser.setSilenceLevel(cfg.silenceLevel);   // släckgränsen live (/setup) - EN tröskel, i analysatorn
-  const frame = analyser.process(samples);
+  const frame = hopp.analys(samples);   // släckgränsen live + analysatorn (hopp.ts)
   if (diag) {
     const anMs = performance.now() - t0;
     health.noteSlowCall("analyser.process", anMs);
@@ -183,28 +180,7 @@ capture.on("chunk", (samples: Float32Array) => {
   latestFrame = frame;
   lastChunkAt = Date.now();
 
-  const liveDrop = frame.dropCount !== lastLiveDrop;
-  lastLiveDrop = frame.dropCount;
-  // LATGRANS (se boundaryDetector.ts) -> mjuk omkalibrering av den lopande dynamiken (auto-rangen far krypa in
-  // pa nya latens nivaer inom sekunder i stallet for en minut) och latbytes-hint till tempot: medianfonstret
-  // (~5 s) och tempogrammet tillhor forra laten. Mjuk hint i st.f. hard nollstallning (brytaren DMX_BOUNDARY_SOFT borttagen 10-11) -
-  // falska latgranser pa pop kastade tempolaset 5x/5 min (ladan 2026-09-04).
-  boundsArg.silent = frame.silent; boundsArg.level = frame.level; boundsArg.bpm = frame.bpm; boundsArg.bpmConfidence = frame.bpmConfidence;
-  bounds.tick(boundsArg);
-  // (KARAKTARSSKIFTE och TEMPOVAXLING som lookbyte borttagna 10-12: LÅTMANUS i effects.ts - looken foljer latens sektioner, inte klangen.)
-  if (bounds.boundaryCount !== lastBoundary) {
-    lastBoundary = bounds.boundaryCount; effects.softenRange(); analyser.hintTrackChange(5000);   // riktig latgrans nollar sektionerna (tempotappet gor det inte langre)
-    if (recorder) { const name = "ladan-" + lastBoundary; recorder.noteTrack(name, "dmx"); recorder.trackChanged("dmx", name); }
-  }
-
-
-
-  if (liveDrop) outDrop++;   // realtidsdetektorn ager dropsen (latminnet borta 2026-09-23)
-
-  frame.dropCount = outDrop;
-  // tillit + taktklocka (beatFeed.ts). TAKTVÄGEN (profilens BEAT_FEED 'slow', 2026-11-08): körs i analysatorns worker - här bara
-  // hoppet in och senaste resultatet ut (cfg.beat, tilliten, analysatorns rutnät/kommandon). Odelad analysator: i huvudtråden som förr.
-  if (analyser.hopLane) analyser.hopLane.feed(frame, cfg, analyser); else analyser.publishClock(cfg);   // a7r: utan taktväg körde analysatorn klockan själv i process()
+  hopp.koppla(frame);   // latgransen, dropraknaren och taktvagen (hopp.ts)
   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
   // inga slag missas) → show-tiden får en knuff, starkare ju tyngre basen är.
   if (frame.kick) effects.registerKick(0.4 + Math.min(1, frame.energy * 1.4) * 0.6);
