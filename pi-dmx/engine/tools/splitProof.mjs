@@ -100,15 +100,23 @@ for (const f of files) {
   console.log(`${f.slice(0, 40).padEnd(40)} hop ${A.length}`);
 }
 Date.now = realNow; performance.now = realPerf;
-let bad = 0;
+// TAKET MOT B (kedjan steg 2, 2026-11-27): fält utanför VANTAT och trådfält som skilde redan i baslinjen B (.arena/ref/dist-k1,
+// rapporten .arena/ref/delning-k1.txt) får skilja i högst lika många hopp som där. Nya fält, eller fler hopp, är FEL.
+// Skillnaden kom med motorns koppling (låtgränsen, 160345 vid 48 s) och fanns i motorn före kedjan; steg 10/10N bör ta bort den.
+const TAK = new Map();
+try { for (const r of readFileSync(join(here, '..', '.arena', 'ref', 'delning-k1.txt'), 'utf8').split('\n')) {
+  const m = /^(?:FEL|tak) +(tråd \S+ \S+|\S+) .*?(\d+) hop/.exec(r); if (m) TAK.set(m[1], Number(m[2])); } } catch {}
+const inomTak = (id, d) => TAK.has(id) && d <= TAK.get(id);
+let bad = 0, tak = 0, tbad = 0;
 for (const [k, s] of [...diff].sort((a, b) => b[1].d - a[1].d)) {
-  const ok = VANTAT.has(k); if (!ok) bad++;
-  console.log(`${ok ? 'väntat ' : 'FEL    '} ${k.padEnd(24)} ${(100 * s.d / totHops).toFixed(2).padStart(6)} %   första ${s.first.toFixed(2)} s (${s.file.slice(0, 28)})`);
+  const ok = VANTAT.has(k), t = !ok && inomTak(k, s.d); if (!ok && !t) bad++; if (t) tak++;
+  console.log(`${ok ? 'väntat ' : t ? 'tak    ' : 'FEL    '} ${k.padEnd(24)} ${(100 * s.d / totHops).toFixed(2).padStart(6)} %  ${String(s.d).padStart(6)} hop${TAK.has(k) ? ` (B ${TAK.get(k)})` : ''}   första ${s.first.toFixed(2)} s (${s.file.slice(0, 28)})`);
 }
-for (const [id, d] of trad) console.log(`FEL tråd ${id.padEnd(30)} ${d} hop: huvudtråden och workern skiljer`);
+for (const [id, d] of trad) { const t = inomTak(`tråd ${id}`, d); if (!t) tbad++;
+  console.log(`${t ? 'tak' : 'FEL'} tråd ${id.padEnd(30)} ${d} hop${TAK.has(`tråd ${id}`) ? ` (B ${TAK.get(`tråd ${id}`)})` : ''}: huvudtråden och workern skiljer`); }
 const nIn = TRAD.filter((x) => x[3] === 'IN').length, nUt = TRAD.length - nIn;
-console.log(`\nSUMMA ${files.length} filer, ${totHops} hop: ${diff.size} fält skiljer, varav ${bad} utanför baslinjen; trådarna ${nIn} IN + ${nUt} UT, ${trad.size} skiljer -> ${bad || trad.size ? 'DELNING FEL' : 'DELNING OK'}`);
-if (bad || trad.size) process.exitCode = 1;
+console.log(`\nSUMMA ${files.length} filer, ${totHops} hop: ${diff.size} fält skiljer, varav ${bad + tak} utanför baslinjen (${tak} inom B:s tak); trådarna ${nIn} IN + ${nUt} UT, ${trad.size} skiljer (${trad.size - tbad} inom B:s tak) -> ${bad || tbad ? 'DELNING FEL' : 'DELNING OK'}`);
+if (bad || tbad) process.exitCode = 1;
 
 if (WORKER) {
   const { y, rate } = readWav(join(CORPUS, files[0]));
