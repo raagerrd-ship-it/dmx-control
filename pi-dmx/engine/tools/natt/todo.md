@@ -1,3 +1,25 @@
+NATTEN 2026-11-27 (schemalagda körningen, ingen arena, ingen motorkod; huvudsessionen körde KEDJAN steg 4 i arbetskopian -> src/ och dist/ orörda, allt mot fryst HEAD 8d905552 i .arena/natt1127/bas via distHook, under bänklåset):
+UPPDRAG: inga nya. NÄSTA 11-26 (a) FULL_HEL: inget besked - väntar; (b) kickregn i FULL_HEL: inget ord - inte gjort; (c) ingen arena.
+BASLINJE tools/natt/ren-2026-11-27/ (HEAD 8d905552 = kedjan steg 1a-3): alla 6 tight-json BIT-IDENTISKA med 11-26 (kedjan ändrar inte ljuset).
+  konsert-json skiljer = VERKTYGET: concertBench läser motorns koppling per hopp sedan 2dd7c6a0 (låtgränsen m.m.) -> ny referens:
+  kulörbyten/min 9,9/9,6/10,9/9,3/6,7/8,0, byte på fras 0,23/0,32/0,17/0,11/0,23/0,15, alla tända 0,51/0,49/0,55/0,59/0,73/0,55,
+  vers->refräng 0,25/0,20/0,24/0,20/0,21/0,04 (171840 0,04 -> 0,24 var verktygets fel). natt.py inte körd (engine/dist = kedjans bygge).
+  OBS kedjan/status.md rad 169: ren-körningen 02:40 gick på FRYST HEAD via DMX_DIST/distHook, inte på engine/dist k4.
+BRISTER: (1) vers->refräng 0,04 i 200719 (enda kvar efter verktygsrättningen); (2) energiR15 0,11 i 200719 och 0,16 i 151659;
+  (3) 151659 0 drops på 532 s (FULL_HEL väntar).
+IDÉ, FÖRKASTAD: VERS_GLES (opt-in DMX_VERS_GLES=1, aldrig committad, patch tools/natt/prov/versgles-20261127.patch): sektion low väljer bara
+  de glesa (<= 3 av 8 i lampCount --ladan: chase, eq, eko, varannan, basgang, frasraknare, vidga, sangare) = lamptrappan åt andra hållet.
+  Av-läget json-identiskt 12/12. Bänken: energiR15 4 av 6 upp (151659 0,16->0,23, 171840 0,46->0,53, 193818 0,28->0,38), vers->refräng
+  3 upp / 2 ner (0,25/0,20/0,24/0,20/0,21/0,04 -> 0,21/0,19/0,24/0,26/0,29/0,07), alla tända 5 av 6 ner (193818 0,73->0,60).
+  DOMAREN v3 9 frön (.arena/natt1127): övning -2,51 (dynamik -2,5, ljus -6 %), KONTROLL -1,20 (koreografi -22,9, dynamik -4,3, takt -3,2;
+  193818 -25,8). DISK-raden = huvudsessionens oincheckade analysatorfiler i engine/src, inte riktig. Slutsats: tvinga inte versen gles -
+  versens breda looker bär koreografin där; kontrasten vers/refräng ska inte tas ur lampantalet i versen heller (jfr SPARSAM8 11-25, FX_FLOOR_VERS 11-26).
+TAJTHET: kick->ljus 149/96/120/155/107/107 ms, identiskt med 11-26. FYND: inga nya. Kedjan steg 2-3 ändrar delade filer men lotus väntar på
+  ägarens ord (LAGET.md) - inget DELAD FIL-fynd skrivet av nattagenten (skulle trigga portning).
+NÄSTA FÖR NATTAGENTEN: (a) godkänner ägaren FULL_HEL: gör det till standard; (b) kickregn i FULL_HEL bara på ägarens ord; (c) ingen arena;
+  (d) tre nätter i rad har vers/refräng-kontrasten fallit i domaren (golv, gleshet i refräng, gleshet i vers) - pröva inte fler sektionsfilter;
+  nästa spår bör vara något annat (t.ex. 200719:s energiR15 0,11).
+
 NATTEN 2026-11-26 (schemalagda körningen, ingen arena, ingen motorkod kvar - provet förkastat och återställt):
 UPPDRAG: inga nya. NÄSTA 11-25 (a) FULL_HEL: inget besked - väntar; (b) kickregn i FULL_HEL "om ägaren vill" - inte gjort utan hans ord; (c) ingen arena.
 BASLINJE tools/natt/ren-2026-11-26/ (HEAD 2d290551): alla 12 json BIT-IDENTISKA med ren-2026-11-25 - del N (skräpet, delade filer) och

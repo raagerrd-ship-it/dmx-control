@@ -1,0 +1,21 @@
+--- .arena/natt1127/bas/src/effects.ts	2026-11-27 02:10:53.000000000 +0100
++++ .arena/natt1127/versgles/src/effects.ts	2026-11-27 02:41:11.122250600 +0100
+@@ -120,6 +120,10 @@
+ /** FULL_HEL (nattprov 2026-11-24, opt-in DMX_FULL_HEL=1, osatt = bit-identiskt): refrängen i full väljer inte heller de glesa (DROP_GLES) -
+  *  landningen drog minnet/dansparet i full så att full blev mörkare än fart (151659: full 0,19 mot fart 0,25 på 2 av 4 frön). */
+ const FULL_HEL = (process.env.DMX_FULL_HEL ?? '') === '1';
++/** VERS_GLES (nattprov 2026-11-27, opt-in DMX_VERS_GLES=1, osatt = bit-identiskt): versen (sektion low) väljer bara de glesa looker
++ *  (<= 3 av 8 lampor i lampCount --ladan 11-25) - lamptrappan åt andra hållet: refrängen hela riggen (SPARSAM bort), versen få lampor. */
++const VERS_GLES = (process.env.DMX_VERS_GLES ?? '') === '1';
++const GLES_LOW: Mode[] = ['chase', 'eq', 'eko', 'varannan', 'basgang', 'frasraknare', 'vidga', 'sangare'];
+ import { hsvToRgb, hsv as hsvFx } from "./effects/color.js";
+ import { slotSize } from "./effects/rig.js";
+ import { MomentLayer } from "./moment.js";
+@@ -877,6 +881,7 @@
+         // (innerouter borttagen 2026-09-23: rPerm 1,00 mot varannan - samma effekt upp till lampordning.)
+         { const show = pool.filter((m) => !(CALM_ONLY.includes(m) && !(bpm > 0 && bpm < CALM_BPM))); if (show.length) pool = show; }   // UNIFORM tillbaka 10-11 (energi pa utvalda lampor)
+         if (secKey === 'build') { const b = pool.filter((m) => BUILD_LOOKS.includes(m)); pool = b.length ? b : enabled(BUILD_LOOKS); }   // BUILD SOM HÅLLER   // KONSERTLÄGET: ingen enhetlig look
++        if (VERS_GLES && secKey === 'low') { const g = pool.filter((m) => GLES_LOW.includes(m)); if (g.length) pool = g; }   // VERS_GLES (prov 11-27): versen få lampor
+         if (secKey === 'high') {                                   // LAMPTRAPPA: refrängen -> hela riggen
+           const full = pool.filter((m) => !SPARSAM.includes(m) && !((dropSwitch || (FULL_HEL && tierName === 'full')) && DROP_GLES.includes(m))); if (full.length) pool = full;   // FULL_HEL (prov 11-24): i full ingen gles look heller
+         }
