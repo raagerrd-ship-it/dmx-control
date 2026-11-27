@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 import { NAMN, BORT } from './namnkarta.mjs';
 const [RA, RB, ...rest] = process.argv.slice(2);
 const SECS = /^\d+$/.test(rest[0]) ? Number(rest.shift()) : 700, wavs = rest;
-const SR = 48000, HOP = 128, EPOCH = 1.7e12, EVERY = 60 * SR / HOP, HINT = 97 * SR / HOP, RESET = 211 * SR / HOP;
+const SR = 48000, HOP = 128, EPOCH = 1.7e12, EVERY = 60 * SR / HOP, HINT = 97 * SR / HOP;
 // Steg 21 (ägaren 11-22: lägg in): workern får nivåtaket ur huvudtråden i stället för att börja om på 0,5, så uppbyggnaden skiljer efter en omstart. Bara de här två, bara efter en omstart.
 const TILLATET = new Set(['buildUp', 'inRiser']);
 const RAKNARE = ['dropCount', 'miniDropCount', 'dropBuildCount', 'dropDemoted', 'dropSpaced', 'stopCount', 'dropMiniBack'];
@@ -38,7 +38,6 @@ for (const w of wavs) {
       if (hops > 0 && hops % EVERY === 0) { if (k === 1) before = { ...prev }; x.fast.setInlinePeer(new x.m.Analyser(x.acfg, { role: 'slow', split: x.buffers, resumeSeq: x.fast.fastReadSeq() })); }
       Date.now = () => ms; performance.now = () => ms - EPOCH; x.fast.setVirtualClock(ms);
       if (hops > 0 && hops % HINT === 0) x.fast.hintTrackChange(5000);
-      if (hops > 0 && hops % RESET === 0) x.fast.resetTempo();
       const f = x.hopp.analys(buf); x.hopp.koppla(f);
       return flat(f); });
     if (hops > 0 && hops % EVERY === 0) restarts++;

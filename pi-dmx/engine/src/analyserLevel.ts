@@ -1,6 +1,6 @@
 /**  NIVÅN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserLevel.md */
 import { stabilise, type Ser, type LevelOut } from "./analyserFack.js";
-import { F_SIL350, F_SIL10 } from './split.js';
+import { F_SIL10 } from './split.js';
 
 /** DET NIVÅN LÄSER. Inget annat går att nå. zeroBpm = kommando till klockan. Bara huvudtråden. */
 export interface LevelReads {
@@ -100,7 +100,6 @@ export class LevelTracker {
       this.o.silentMs += hopMs;
       if (this.o.silentMs > 350 && !this.silenceArmed) {
         this.silenceArmed = true;
-        if (this.h.role === 'fast') this.cmd.flagSlow(F_SIL350);
       } else if (this.silenceArmed && this.o.silentMs > 10000 && this.ck.bpm !== 0) {
         this.ck.zeroBpm();
         this.cmd.flagSlow(F_SIL10);

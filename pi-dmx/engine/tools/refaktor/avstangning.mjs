@@ -99,7 +99,7 @@ async function kor(DIST, MALL, NAMN, PROF, SECS, WAV) {
       Hopp: existsSync(resolve(d, 'hopp.js')) ? (await i('hopp.js')).Hopp : null,   // dmx: MOTORNS KOPPLING PER HOPP (kedjan steg 1)
       defaultConfig: existsSync(resolve(d, 'config.js')) ? (await i('config.js')).defaultConfig : null }; };
   const m = await load(DIST), mm = await load(MALL);
-  const SR = 48000, HOP = 128, EPOCH = PROF === 'dmx' ? 1.7e12 : 1795274000000, EVERY = 60 * SR / HOP, HINT = 97 * SR / HOP, RESET = 211 * SR / HOP;
+  const SR = 48000, HOP = 128, EPOCH = PROF === 'dmx' ? 1.7e12 : 1795274000000, EVERY = 60 * SR / HOP, HINT = 97 * SR / HOP;
   const cfgs = (mod) => PROF === 'dmx'
     ? { cfg: JSON.parse(JSON.stringify(mod.defaultConfig)), acfg: mod.BeatFeed.analyserCfg(JSON.parse(JSON.stringify(mod.defaultConfig))) }
     : (() => { const c = { sampleRate: 48000, hopSize: 128, autoGainTarget: 0.75, maxGain: 200, noiseFloor: 0.0015, onsetEnhancements: false }; return { cfg: null, acfg: c }; })();
@@ -134,13 +134,11 @@ async function kor(DIST, MALL, NAMN, PROF, SECS, WAV) {
         if (PROF === 'dmx') {
           const ms = EPOCH + off / SR * 1000; Date.now = () => ms; performance.now = () => ms - EPOCH; X.a.setVirtualClock(ms);
           if (hops > 0 && hops % HINT === 0) X.a.hintTrackChange(5000);
-          if (hops > 0 && hops % RESET === 0) X.a.resetTempo();
           fr = X.hopp.analys(buf); X.hopp.koppla(fr);
         } else {
           const ms = off / SR * 1000; Date.now = () => EPOCH + ms; performance.now = () => ms;
           X.a.setAudioClockMs(ms); if (hops === 0) X.a.setVirtualClock(0); else X.a.advanceVirtualClock(ms);
           if (hops > 0 && hops % HINT === 0) X.a.hintTrackChange(5000);
-          if (hops > 0 && hops % RESET === 0) X.a.resetTempo();
           fr = X.a.process(buf);
           if (fr.bpm > 0 && fr.kickAnchorMs > 0) X.a.setBeatGrid({ bpm: fr.bpm, anchorMs: fr.kickAnchorMs });
         }

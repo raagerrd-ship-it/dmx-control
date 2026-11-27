@@ -7,8 +7,8 @@ export type { BeatGrid, AnalyserDetection, Cfg, Role };
 import {
   REC_LEN, RING_N, R_SEQ, R_PERF, R_WALL, R_FLAGS, R_HINT_MS, R_VCLOCK, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, B, BS, S, R,
   packFlagCounts, lostFlags, seqLow, seqDelta, C_WAITING, C_STATE_SEQ, S_LOST_FLAGS,
-  F_SIL350, F_SIL10, F_RESET_TEMPO, F_HINT, F_RESET_BAR, F_VCLOCK_SET, F_VCLOCK_NULL,
-  C_WRITE, C_READ, S_REC_SEQ, S_BPM, S_CONF, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
+  F_HINT, F_VCLOCK_SET, F_VCLOCK_NULL,
+  C_WRITE, C_READ, S_REC_SEQ, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
   SECTIONS, sectionCode, viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader, type HopFeed,
   R_BIGSEQ, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N,
@@ -260,7 +260,7 @@ export class Analyser {
       this.slowProcessed += n;
       Atomics.store(ctrl, C_READ, seqLow(this.recSeq));
       stateWrite(ctrl, this.splitState!, (s) => {
-        s[S_REC_SEQ] = this.recSeq; s[S_BPM] = this.f.clock.bpm; s[S_CONF] = this.f.clock.conf;
+        s[S_REC_SEQ] = this.recSeq;
         this.sections?.pack(s);
         s[S_PROCESSED] = this.slowProcessed; s[S_LAG_MS] = lagMs; s[S_LAG_MAX] = this.slowLagMaxMs; s[S_BUSY_US] = this.slowBusyEmaUs; s[S_BUSY_MAX_US] = this.slowBusyMaxUs; s[S_SKIPPED] = this.slowSkipped; s[S_LOST_FLAGS] = this.slowLostFlags;
       });
@@ -338,10 +338,7 @@ export class Analyser {
   /** Snabba sidans kommandon i exakt den ordning de restes. */
   private applyFlags(flags: number, hintMs: number, vclock: number): void {
     if (flags & F_VCLOCK_NULL) this.setVirtualClock(null); else if (flags & F_VCLOCK_SET) this.setVirtualClock(vclock);
-    if (flags & F_RESET_TEMPO) this.resetTempo();
     if (flags & F_HINT) this.hintTrackChange(hintMs);
-    if (flags & F_RESET_BAR) this.resetBar();
-    if (flags & F_SIL10) this.f.clock.zeroBpm();
   }
   /** Ett record. */
   private slowStep(o: number): void {
@@ -354,12 +351,6 @@ export class Analyser {
 
   /** Sparets tid. */
   private traceT(): number { return (this.wallNow() - 1700000000000) / 1000; }
-  /** Nollställ analysatorns kopia av klockans tempo. */
-  resetTempo(): void {
-    if (BPM_TRACE) console.log(`[bpmrst] t=${this.traceT().toFixed(1)} RESET bpm=${this.f.clock.bpm}`);
-    this.flagSlow(F_RESET_TEMPO);
-    this.f.clock.bpm = 0; this.f.clock.conf = 0;
-  }
 
   trackBoundaries = 0;   // LÅTGRÄNSEN
   boundSure = false;   // LÅTGRÄNSEN ÄR SÄKER
@@ -373,9 +364,6 @@ export class Analyser {
     if (this.f.hop.role === 'fast') { this.pendHintMs = windowMs; this.flagSlow(F_HINT); }
     if (sections) this.sections?.carry();
   }
-
-  /** Taktfasen är applicerad av motorn. */
-  resetBar(): void { this.flagSlow(F_RESET_BAR); }
 
   private lastT = 0;   // 0 = "ej satt"
 

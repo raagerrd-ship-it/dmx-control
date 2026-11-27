@@ -8,7 +8,7 @@ export const RING_MARGIN = 8;   // records workern lämnar orörda mot skrivare
 export const R_SEQ = 0, R_PERF = 1, R_WALL = 2, R_FLAGS = 3, R_HINT_MS = 4, R_VCLOCK = 5,
   R_TS = 6, R_FLAGCNT = 7, R_BIGSEQ = 8;   // Record-fält (kärnan)
 
-export const F_SIL350 = 1, F_SIL10 = 2, F_RESET_TEMPO = 4, F_HINT = 8, F_RESET_BAR = 16, F_VCLOCK_SET = 32, F_VCLOCK_NULL = 64;   // Flaggor
+export const F_SIL10 = 2, F_HINT = 8, F_VCLOCK_SET = 32, F_VCLOCK_NULL = 64;   // Flaggor (1, 4, 16 lediga)
 export const FLAG_BITS = 7;
 
 export const FLAG_MOD = 128;   // ROBUSTHET
@@ -39,8 +39,8 @@ export function seqLow(seq: number): number { return seq | 0; }
 /** Signerad skillnad. */
 export function seqDelta(ctrlLow: number, mySeq: number): number { return (ctrlLow - (mySeq | 0)) | 0; }
 
-export const S_REC_SEQ = 0, S_BPM = 1, S_CONF = 2, S_PROCESSED = 4, S_LAG_MS = 5, S_LAG_MAX = 6,
-  S_BUSY_US = 7, S_BUSY_MAX_US = 8, S_SKIPPED = 9, S_LOST_FLAGS = 10;   // Tillståndsblock (kärnan; 3 ledig)
+export const S_REC_SEQ = 0, S_PROCESSED = 4, S_LAG_MS = 5, S_LAG_MAX = 6,
+  S_BUSY_US = 7, S_BUSY_MAX_US = 8, S_SKIPPED = 9, S_LOST_FLAGS = 10;   // Tillståndsblock (kärnan; 1–3 lediga)
 
 export const SECTIONS = ['', 'intro', 'low', 'build', 'high', 'break'];
 export function sectionCode(s: string): number { const i = SECTIONS.indexOf(s); return i < 0 ? 0 : i; }
@@ -133,13 +133,13 @@ export const SPEC_SLOTS = 16, SPEC_MAX = 1024;   // 16 spektra
 export const HOP_REC_LEN = 22;   // TAKTVÄGEN
 export const HOP_RING_N = 4096;
 export const H_SEQ = 0, H_NOW = 1 , H_TS = 2 ,
-  H_BPM = 3, H_CONF = 4, H_ANCHOR = 5, H_KICKAT = 6, H_BARSHIFT = 7, H_ON_KICK = 8, H_ON_HIMID = 9, H_ON_TREBLE = 10, H_SA_SUB = 11, H_SA_KICK = 12, H_SA_BASS = 13 ,
+  H_ANCHOR = 5, H_KICKAT = 6, H_ON_KICK = 8, H_ON_HIMID = 9, H_ON_TREBLE = 10, H_SA_SUB = 11, H_SA_KICK = 12, H_SA_BASS = 13 ,
   H_BOUND = 14 , H_QUIET = 15 ,
   H_SURE = 16 , H_UNDER = 17 , H_SA_TREBLE = 18, H_SA_LOWMID = 19, H_SA_MID = 20, H_SA_HIMID = 21;
 export const C_HOP_WRITE = 4, C_HOP_READ = 5, C_FEED_SEQ = 6 , C_WAKE = 7 ;
 export const FS_HOP_SEQ = 0, FS_BEAT = 1 , FS_ANCHOR = 2, FS_BPM = 3, FS_BCONF = 4,
-  FS_BEATERR = 5 , FS_FCONF = 6 , FS_GRID = 7 ,
-  FS_GANCHOR = 8, FS_GBPM = 9, FS_GCONF = 10, FS_RT_CNT = 11 , FS_RB_CNT = 12 ,
+  FS_BEATERR = 5 , FS_GRID = 7 ,
+  FS_GANCHOR = 8, FS_GBPM = 9, FS_GCONF = 10,
   FS_PROCESSED = 13, FS_LAG_MS = 14, FS_LAG_MAX = 15, FS_BUSY_US = 16, FS_BUSY_MAX_US = 17, FS_SKIPPED = 18,
   FS_BARK = 19 ;
 export const FEED_STATE_LEN = 20;
@@ -149,7 +149,7 @@ export interface HopFrame { bpm: number; bpmConfidence: number; kickAnchorMs: nu
   onset: { kick: number; highMid: number; treble: number }; specAbs: { sub: number; kick: number; bass: number; treble: number; lowMid: number; mid: number; highMid: number } }
 export interface HopGrid { anchorMs: number; bpm: number; confidence?: number }
 export interface HopCfg { beat?: HopGrid | null; beatErr?: number }
-export interface HopTarget { resetTempo(): void; resetBar(): void; setClockGrid?(g: HopGrid | null): void; trackBoundaries?: number; quietMs?: number; boundSure?: boolean; bodyUnderDb?: number;
+export interface HopTarget { setClockGrid?(g: HopGrid | null): void; trackBoundaries?: number; quietMs?: number; boundSure?: boolean; bodyUnderDb?: number;
    setClock?(bpm: number, conf: number): void }   // EN KÄLLA
 /** Systemets taktmatning. */
 export interface HopFeed { update(frame: HopFrame, cfg: HopCfg, an: HopTarget, now: number): void;  barKnown?(): boolean }   // EN ETTA
@@ -158,7 +158,7 @@ export interface HopFeed { update(frame: HopFrame, cfg: HopCfg, an: HopTarget, n
 export class HopLaneFast {
   private readonly ctrl: Int32Array; private readonly ring: Float64Array; private readonly state: Float64Array;
   private readonly s = new Float64Array(FEED_STATE_LEN); private readonly sr = new StateReader();
-  private seq = 0; private applied = 0; private rt = 0; private rb = 0;
+  private seq = 0; private applied = 0;
   private readonly grid = { anchorMs: 0.5, bpm: 0.5, confidence: 0.5 };
   clockBpm = 0; clockConf = 0; clockAnchor = 0; private trust = 0; private trustAt = 0;   // Klockans tempo/tillit efter senaste feed
   barKnown = false;   // EN ETTA
@@ -171,7 +171,7 @@ export class HopLaneFast {
     const r = this.ring, ctrl = this.ctrl, seq = ++this.seq, o = (seq % HOP_RING_N) * HOP_REC_LEN;
     const now = Date.now();
     r[o + H_NOW] = now; r[o + H_TS] = performance.timeOrigin + performance.now();
-    r[o + H_BPM] = f.bpm; r[o + H_CONF] = f.bpmConfidence; r[o + H_ANCHOR] = f.kickAnchorMs; r[o + H_KICKAT] = f.kickAtMs; r[o + H_BARSHIFT] = f.barShift;
+    r[o + H_ANCHOR] = f.kickAnchorMs; r[o + H_KICKAT] = f.kickAtMs;
     r[o + H_ON_KICK] = f.onset?.kick ?? 0; r[o + H_ON_HIMID] = f.onset?.highMid ?? 0; r[o + H_ON_TREBLE] = f.onset?.treble ?? 0;
     r[o + H_SA_SUB] = f.specAbs?.sub ?? 0; r[o + H_SA_KICK] = f.specAbs?.kick ?? 0; r[o + H_SA_BASS] = f.specAbs?.bass ?? 0; r[o + H_SA_TREBLE] = f.specAbs?.treble ?? 0;
     r[o + H_SA_LOWMID] = f.specAbs?.lowMid ?? 0; r[o + H_SA_MID] = f.specAbs?.mid ?? 0; r[o + H_SA_HIMID] = f.specAbs?.highMid ?? 0;
@@ -190,8 +190,6 @@ export class HopLaneFast {
     if (!this.sr.read(ctrl, this.state, s, C_FEED_SEQ) || s[FS_HOP_SEQ] === 0) return;
     if (s[FS_HOP_SEQ] === this.applied) return;
     this.applied = s[FS_HOP_SEQ];
-    if (s[FS_RT_CNT] !== this.rt) { this.rt = s[FS_RT_CNT]; an.resetTempo(); }
-    if (s[FS_RB_CNT] !== this.rb) { this.rb = s[FS_RB_CNT]; an.resetBar(); }
     if (s[FS_GRID] === 1) { const g = this.grid; g.anchorMs = s[FS_GANCHOR]; g.bpm = s[FS_GBPM]; g.confidence = s[FS_GCONF]; an.setClockGrid?.(g); }
     else an.setClockGrid?.(null);
     const bc = s[FS_BEAT];
@@ -213,17 +211,17 @@ export class HopLaneFast {
 /** Taktvägen, långsamma sidan. */
 export class HopLaneSlow {
   private readonly ctrl: Int32Array; private readonly ring: Float64Array; private readonly state: Float64Array;
-  private seq: number; private rt: number; private rb: number; private processed: number;
-  private skipped = 0; private lagMaxMs = 0; private busyEmaUs = 0; private busyMaxUs = 0; private fconf = NaN;
+  private seq: number; private processed: number;
+  private skipped = 0; private lagMaxMs = 0; private busyEmaUs = 0; private busyMaxUs = 0;
   private readonly fr = { bpm: 0.5, bpmConfidence: 0.5, kickAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5,
     onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5, bass: 0.5, treble: 0.5, lowMid: 0.5, mid: 0.5, highMid: 0.5 } };
   private readonly cfg: HopCfg = { beat: undefined, beatErr: undefined };
   private grid: HopGrid | null = null;
-  private readonly target: HopTarget = { trackBoundaries: 0, quietMs: 0, resetTempo: () => { this.rt++; }, resetBar: () => { this.rb++; }, setClockGrid: (g) => { this.grid = g; } };
+  private readonly target: HopTarget = { trackBoundaries: 0, quietMs: 0, setClockGrid: (g) => { this.grid = g; } };
   constructor(b: SplitBuffers, private readonly feed: HopFeed, private readonly notify = false) {
     this.ctrl = new Int32Array(b.ctrl); this.ring = new Float64Array(b.hop!); this.state = new Float64Array(b.hopState!);
     const sq = Atomics.load(this.ctrl, C_FEED_SEQ); if (sq & 1) Atomics.store(this.ctrl, C_FEED_SEQ, sq + 1);
-    const st = this.state; this.seq = st[FS_HOP_SEQ]; this.rt = st[FS_RT_CNT]; this.rb = st[FS_RB_CNT]; this.processed = st[FS_PROCESSED];
+    const st = this.state; this.seq = st[FS_HOP_SEQ]; this.processed = st[FS_PROCESSED];
   }
   readSeq(): number { return this.seq; }
   /** Behandla alla hop-record sedan sist, publicera. */
@@ -236,13 +234,11 @@ export class HopLaneSlow {
       if (r[o + H_SEQ] !== seq) { this.skipped++; continue; }
       const t0 = performance.now();
       this.target.trackBoundaries = r[o + H_BOUND]; this.target.quietMs = r[o + H_QUIET]; this.target.boundSure = r[o + H_SURE] === 1; this.target.bodyUnderDb = r[o + H_UNDER];
-      fr.bpm = r[o + H_BPM]; fr.bpmConfidence = r[o + H_CONF]; fr.kickAnchorMs = r[o + H_ANCHOR]; fr.kickAtMs = r[o + H_KICKAT]; fr.barShift = r[o + H_BARSHIFT];
+      fr.kickAnchorMs = r[o + H_ANCHOR]; fr.kickAtMs = r[o + H_KICKAT];
       fr.onset.kick = r[o + H_ON_KICK]; fr.onset.highMid = r[o + H_ON_HIMID]; fr.onset.treble = r[o + H_ON_TREBLE];
       fr.specAbs.sub = r[o + H_SA_SUB]; fr.specAbs.kick = r[o + H_SA_KICK]; fr.specAbs.bass = r[o + H_SA_BASS]; fr.specAbs.treble = r[o + H_SA_TREBLE];
       fr.specAbs.lowMid = r[o + H_SA_LOWMID]; fr.specAbs.mid = r[o + H_SA_MID]; fr.specAbs.highMid = r[o + H_SA_HIMID];
-      const cin = fr.bpmConfidence;
       this.feed.update(fr, this.cfg, this.target, r[o + H_NOW]);
-      this.fconf = fr.bpmConfidence !== cin ? fr.bpmConfidence : NaN;
       const t1 = performance.now(), us = (t1 - t0) * 1000;
       this.busyEmaUs = this.busyEmaUs === 0 ? us : this.busyEmaUs + 0.02 * (us - this.busyEmaUs);
       if (us > this.busyMaxUs) this.busyMaxUs = us;
@@ -256,9 +252,8 @@ export class HopLaneSlow {
         const b = this.cfg.beat, g = this.grid;
         s[FS_HOP_SEQ] = this.seq; s[FS_BEAT] = b ? 1 : b === null ? -1 : 0;
         if (b) { s[FS_ANCHOR] = b.anchorMs; s[FS_BPM] = b.bpm; s[FS_BCONF] = b.confidence ?? 0; }
-        s[FS_BEATERR] = this.cfg.beatErr ?? NaN; s[FS_FCONF] = this.fconf;
+        s[FS_BEATERR] = this.cfg.beatErr ?? NaN;
         s[FS_GRID] = g ? 1 : 0; if (g) { s[FS_GANCHOR] = g.anchorMs; s[FS_GBPM] = g.bpm; s[FS_GCONF] = g.confidence ?? 0; }
-        s[FS_RT_CNT] = this.rt; s[FS_RB_CNT] = this.rb;
         s[FS_PROCESSED] = this.processed; s[FS_LAG_MS] = lagMs; s[FS_LAG_MAX] = this.lagMaxMs; s[FS_BUSY_US] = this.busyEmaUs; s[FS_BUSY_MAX_US] = this.busyMaxUs; s[FS_SKIPPED] = this.skipped;
         s[FS_BARK] = this.feed.barKnown?.() ? 1 : 0;
       }, C_FEED_SEQ);

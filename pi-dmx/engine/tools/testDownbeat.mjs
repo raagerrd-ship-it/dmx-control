@@ -35,7 +35,7 @@ for (let hop = 0; hop < hops; hop++) {
       const err = ph < 0.5 ? ph : ph - 1;
       if (Math.abs(err) < 0.25) cfg.beat.anchorMs += err * bMs * 0.18;
     }
-    if (f.barShift > 0) { cfg.beat.anchorMs += f.barShift * (60000 / cfg.beat.bpm); an.resetBar(); shifts++; }
+    if (f.barShift > 0) { cfg.beat.anchorMs += f.barShift * (60000 / cfg.beat.bpm); shifts++; }
   }
 }
 

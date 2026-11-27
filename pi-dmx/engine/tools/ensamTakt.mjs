@@ -74,9 +74,9 @@ if (cmd === "klocka") {
   const { h, body } = head(rest[0]), W = h.W, M = new Float64Array(body, 0, h.rows * W), LOOP = rest.includes("--aterkoppling") || VAR;
   console.log = () => {};
   const { BeatFeed } = await patched("analyserClock", sets);
-  const feed = new BeatFeed(), cfg = { beat: undefined, beatErr: undefined }; let rt = 0, rb = 0;
+  const feed = new BeatFeed(), cfg = { beat: undefined, beatErr: undefined };
   const fr = { bpm: 0.5, bpmConfidence: 0.5, kickAnchorMs: 0.5, beatAnchorMs: 0.5, kickAtMs: 0.5, barShift: 0.5, onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5, bass: 0.5 } };
-  const target = { trackBoundaries: 0, quietMs: 0, boundSure: false, bodyUnderDb: 0, resetTempo: () => { rt++; }, resetBar: () => { rb++; }, setClockGrid: () => {} };
+  const target = { trackBoundaries: 0, quietMs: 0, boundSure: false, bodyUnderDb: 0, setClockGrid: () => {} };
   const t0 = performance.now.bind(performance)(), realNow = performance.now.bind(performance); let diff = 0, first = "", ob = 0, oc = 0; const tl = [];
   for (let i = 0, o = 0; i < h.rows; i++, o += W) {
     const now = M[o + 1]; Date.now = () => now; performance.now = () => now - EPOCH;

@@ -6,14 +6,14 @@
  * (rattarna lases vid modulladdning), sa en korning per env-variant.
  *
  *   node tools/analyserParity.mjs --old <gammal modul> --new <ny modul> --style lotus|dmx [--cfg <config.js>]
- *        [--secs 120] [--from 0] [--grid] [--hint-every 0] [--reset-every 0] [--split inline] [--max-report 5] <wav> ...
+ *        [--secs 120] [--from 0] [--grid] [--hint-every 0] [--split inline] [--max-report 5] <wav> ...
  *
  * --style lotus: platt konfig som alsaMic, setVirtualClock(0) + advanceVirtualClock, ljudklocka (som bench.mjs).
  * --style dmx:   motorns defaultConfig (--cfg), setGainLock(true, 1), setVirtualClock + Date.now per hop, och MOTORNS KOPPLING PER HOPP
  *                (<bygget>/hopp.js, kedjan steg 1: låtgränsen, dropräknaren, taktvägen eller publishClock som index.ts). Odelad = klockan i
  *                process() (som createAnalyser utan delning), inline = taktvägen i långsamma sidan. Pariteten prövar alltså tempot i DMX.
  * --grid:        (bara lotus) taktrastret matas tillbaka fran ramen med setBeatGrid.
- * --hint-every/--reset-every N: hintTrackChange()/resetTempo() var N:e sekund (latbyten).
+ * --hint-every N: hintTrackChange() var N:e sekund (latbyten).
  * --split inline: bada skapas via createAnalyser med <prefix>ANALYSER_SPLIT=inline (delad analysator i samma trad).
  * Utskrift: per fil antal hop, avvikande hop/falt, forsta avvikelser; sist en summering. Exit 1 vid avvikelse.
  */
@@ -26,9 +26,9 @@ const opt = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] :
 const flag = (k) => argv.includes(k);
 const OLD = opt('--old'), NEW = opt('--new'), STYLE = opt('--style', 'lotus'), CFG = opt('--cfg');
 const SECS = Number(opt('--secs', 120)), FROM = Number(opt('--from', 0)), GRID = flag('--grid');
-const HINT_EVERY = Number(opt('--hint-every', 0)), RESET_EVERY = Number(opt('--reset-every', 0)), SPLIT = opt('--split', '');
+const HINT_EVERY = Number(opt('--hint-every', 0)), SPLIT = opt('--split', '');
 const MAXREP = Number(opt('--max-report', 5)), VEPOCH = 1700000000000;
-const valued = new Set(['--old', '--new', '--style', '--cfg', '--secs', '--from', '--hint-every', '--reset-every', '--split', '--max-report']);
+const valued = new Set(['--old', '--new', '--style', '--cfg', '--secs', '--from', '--hint-every', '--split', '--max-report']);
 const wavs = argv.filter((a, i) => a.endsWith('.wav') && !valued.has(argv[i - 1]));
 if (!OLD || !NEW || !wavs.length) { console.error('ange --old, --new och minst en wav'); process.exit(2); }
 
@@ -104,7 +104,6 @@ for (const w of wavs) {
       if (STYLE === 'dmx') { X.an.setVirtualClock(ms); Date.now = () => VEPOCH + ms; performance.now = () => ms; }   // analysatorns virtuella vägg = 1,7e12 + ms
       else { X.an.setAudioClockMs(ms); if (hops === 0) X.an.setVirtualClock(0); else X.an.advanceVirtualClock(ms); }
       if (HINT_EVERY > 0 && hops > 0 && hops % Math.round(HINT_EVERY * rate / HOP) === 0) X.an.hintTrackChange(5000);
-      if (RESET_EVERY > 0 && hops > 0 && hops % Math.round(RESET_EVERY * rate / HOP) === 0) X.an.resetTempo();
       let f;
       if (X.hopp) { f = X.hopp.analys(buf); X.hopp.koppla(f); }   // dmx: motorns koppling per hopp
       else {
