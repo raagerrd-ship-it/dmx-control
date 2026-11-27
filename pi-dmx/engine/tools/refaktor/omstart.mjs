@@ -17,9 +17,9 @@ const load = async (d) => { const i = (f) => import(pathToFileURL(resolve(d, f))
 const mods = [await load(RA), await load(RB)];
 const build = (m) => {
   const cfg = JSON.parse(JSON.stringify(m.defaultConfig)), acfg = m.BeatFeed.analyserCfg(JSON.parse(JSON.stringify(m.defaultConfig)));
-  const feedMk = m.hopFeedFactory(), buffers = m.createSplitBuffers(!!feedMk);
+  const buffers = m.createSplitBuffers(true);   // som createAnalyser: alltid taktvägen (kedjan steg 10N, BEAT_FEED borta)
   const fast = new m.Analyser(acfg, { role: 'fast', split: buffers }); fast.setGainLock(true, 1);
-  if (feedMk) { fast.hopLane = new m.HopLaneFast(buffers, false); fast.hopLane.peer = new m.HopLaneSlow(buffers, feedMk()); } else fast.clock = new m.BeatFeed();
+  fast.hopLane = new m.HopLaneFast(buffers, false); fast.hopLane.peer = new m.HopLaneSlow(buffers, new m.BeatFeed());
   fast.setInlinePeer(new m.Analyser(acfg, { role: 'slow', split: buffers }));
   return { m, fast, cfg, acfg, buffers, hopp: new m.Hopp(fast, cfg, { softenRange: () => {}, noteTrack: () => {} }) };
 };

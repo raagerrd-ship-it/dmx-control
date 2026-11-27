@@ -33,7 +33,7 @@ p=$(tid); echo "tid ny mot ref: $p %"; over "$p" && { p=$(tid); echo "tid omkör
 dc() { node --trace-deopt --single-threaded tools/dmxDump.mjs "$PWD/$1" $W/lang-20261113T160345.wav 150 2>/dev/null | grep -c 'bailout (kind: deopt'; }
 d0=$(dc $REF); d1=$(dc $NY); echo "deopt $d0 -> $d1"
 [ "$d0" -gt 0 ] && [ "$d1" -le $((d0 + 1)) ] || { d0=$(dc $REF); d1=$(dc $NY); echo "deopt omkörning $d0 -> $d1"; [ "$d0" -gt 0 ] && [ "$d1" -le $((d0 + 1)) ] || { echo "DEOPT FEL"; ok=0; }; }
-# 7. LOTUS: samma bygge med lotus profilfil (kopior under .arena/flytten/lotus). --style lotus odelat och inline (hopSelf), Date.now = ljudklockan.
+# 7. LOTUS: samma bygge med lotus profilfil (kopior under .arena/flytten/lotus). --style lotus odelat och inline (analysatorn matar klockan själv), Date.now = ljudklockan.
 L=.arena/flytten/lotus; LP=../../../lotus-light-link/pi/src/audio-analyser/analyserProfile.ts
 lp() { rm -rf "$2"; mkdir -p "$L"; cp -r "$1" "$2"; npx tsc $LP --outDir "$2" --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck --types node && grep -q "envPrefix: 'LOTUS_'" "$2/analyserProfile.js" || { echo "LOTUSBYGGE FEL $2"; ok=0; }; }
 lp $REF $L/ref; lp $NY $L/ny

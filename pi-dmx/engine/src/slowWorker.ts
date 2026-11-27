@@ -1,6 +1,7 @@
 /** Den LANGSAMMA analysatortraden (se split.ts). Anteckningar (kommentarerna som stod i koden): docs/analysator/slowWorker.md */
 import { workerData, parentPort, receiveMessageOnPort } from 'node:worker_threads';
-import { Analyser, hopFeedFactory, type AnalyserConfig } from './analyser.js';
+import { Analyser, type AnalyserConfig } from './analyser.js';
+import { BeatFeed } from './analyserClock.js';
 import { PROFILE } from './analyserProfile.js';
 import { C_WRITE, C_WAITING, C_WAITING_B, C_WAKE, C_HOP_WRITE, seqLow, HopLaneSlow, type HopFeed, type WorkerData, type WorkerMsg } from './split.js';
 
@@ -8,9 +9,7 @@ const { cfg, buffers, resumeSeq, sync, part = 'all' } = workerData as WorkerData
 const ctrl = new Int32Array(buffers.ctrl);
 const an = part === 'lane' ? null : new Analyser(cfg, { role: 'slow', split: buffers, resumeSeq, sync });
 const wantLane = !!buffers.hop && part !== 'slow';
-const feedMk = hopFeedFactory();   // analysatorns klocka
-if (wantLane && !feedMk) throw new Error('analyser-split: taktvagen utan klocka i profilen (BEAT_FEED)');
-const lane = wantLane && feedMk ? new HopLaneSlow(buffers, feedMk(), sync === true) : null;
+const lane = wantLane ? new HopLaneSlow(buffers, new BeatFeed(), sync === true) : null;   // analysatorns klocka
 lane?.connect(an);   // EN TEMPOKÄLLA (kedjan steg 4): klockan skriver tempot i workerns analysator
 if (lane && an) an.bigYield = () => { lane.drain(); };   // en tråd
 const TEST_CRASH = process.env[PROFILE.envPrefix + 'SPLIT_TEST_CRASH'] === '1';

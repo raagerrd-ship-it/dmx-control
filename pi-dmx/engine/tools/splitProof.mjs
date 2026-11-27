@@ -3,7 +3,7 @@
  *  dropräknaren, taktvägen eller publishClock som index.ts). Jämför VARJE fält i ramen, hop för hop.
  *
  *  BASLINJEN (uppmätt 2026-11-21, tools/natt/delning-2026-11-21.md): fälten i VANTAT får skilja, alla andra ska vara lika.
- *  - barShift/beatPhaseMs/beatPhaseConf: DMX läser klockan ur cfg.beat; i delat läge körs publishPhase aldrig (samma lista som livstecken.mjs).
+ *  - (barShift/beatPhaseMs/beatPhaseConf borta ur listan i kedjan steg 10N: publishPhase körs nu i delat läge också, och fälten är lika mellan trådarna.)
  *  - sektionens fält och det som läser sektionen (drop, basnivå, uppbyggnad): blocken stänger på 10 ms-rutnätet i delat läge mot
  *    2,67 ms i odelat (09-22), och en annan kant tidigt flyttar räknarna för resten av låten.
  *  TRÅDARNA (steg 18): i det delade läget jämförs dessutom varje fackfält med taggen IN eller UT (analyserFack.ts TRAD)
@@ -28,7 +28,7 @@ const CORPUS = process.env.SPLIT_DIR || join(here, 'ladan-2026-11-13');
 const MAX_S = Number(process.env.SPLIT_MAX_S ?? 120);
 const HOP = 128, EPOCH = 1.7e12;
 
-const VANTAT = new Set(['barShift', 'beatPhaseMs', 'beatPhaseConf',
+const VANTAT = new Set([
   'section', 'sectionAgeMs', 'sectionIndex', 'sectionTier', 'sectionBars', 'prevSection', 'sectionLevelVsHighDb', 'expectHighInMs',
   'repeatSim', 'repeatAgoMs', 'sectionBuildProg', 'miniDropCount', 'dropDemoted', 'bassLevel',
   'dropMiniBack']);   // steg 30: räknare som ärver sektionens och dropDemoted:s skillnad (öppnar fönstret på dem)

@@ -1,8 +1,8 @@
 /** TAKTVÄGEN I REALTID (2026-11-08): motorns riktiga worker-läge i realtidstakt på PC:n - analysator (DMX_ANALYSER_SPLIT=worker),
- *  låtgräns, taktmatningen via analyser.hopLane (profilens BEAT_FEED 'slow') - och mät hur långt workern ligger efter.
+ *  låtgräns, taktmatningen via analyser.hopLane (analysatorn matar den själv, kedjan steg 10N) - och mät hur långt workern ligger efter.
  *
  *    node tools/feedRealtid.mjs [dist] <wav> [sek=120]
- *  Utan taktväg (äldre dist / BEAT_FEED av) körs taktmatningen i huvudtråden som förr - för att jämföra huvudtrådens CPU per hop
+ *  Utan taktväg (äldre dist) körs taktmatningen i huvudtråden som förr - för att jämföra huvudtrådens CPU per hop
  *  (process.threadCpuUsage, analys + takt + effekter var 25 ms som dmxDump, exkl. wav-läsning).
  *
  *  Per hop: hur många hop huvudtrådens cfg.beat ligger efter (written - senast publicerade), taktvägens fördröjning i ms

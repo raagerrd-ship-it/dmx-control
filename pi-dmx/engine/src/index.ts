@@ -106,7 +106,7 @@ dmx.setMaxHz(cfg.dmxMaxHz);
 // pa PC:n och kostade i drift synkron disk-I/O + en BigInt-indexombyggnad (sekunder pa Pi:n) vid varje
 // latcommit. Gransdetektorn ar utbruten oforandrad (tools/boundaryEquiv.mjs bevisar samma hop) och matas
 // fran analysatorns stora FFT precis som forr - ingen extra transform.
-// KOPPLINGEN PER HOPP (hopp.ts, kedjan steg 1): gransdetektorn, latgransen, dropraknaren och taktvagen - samma fil som verktygen kor.
+// KOPPLINGEN PER HOPP (hopp.ts, kedjan steg 1): gransdetektorn, latgransen och klockans utfall - samma fil som verktygen kor.
 const hopp = new Hopp(analyser, cfg, {
   softenRange: () => effects.softenRange(),
   noteTrack: (n) => { if (recorder) { const name = "ladan-" + n; recorder.noteTrack(name, "dmx"); recorder.trackChanged("dmx", name); } },
@@ -180,7 +180,7 @@ capture.on("chunk", (samples: Float32Array) => {
   latestFrame = frame;
   lastChunkAt = Date.now();
 
-  hopp.koppla(frame);   // latgransen, dropraknaren och taktvagen (hopp.ts)
+  hopp.koppla(frame);   // latgransen och klockans utfall till motorn (hopp.ts)
   // Akustisk tröghet: mata bastransienten till effektmotorn (i full 375 Hz så
   // inga slag missas) → show-tiden får en knuff, starkare ju tyngre basen är.
   if (frame.kick) effects.registerKick(0.4 + Math.min(1, frame.energy * 1.4) * 0.6);

@@ -28,10 +28,6 @@ export const PROFILE: AnalyserProfile = {
     // och ar nu kodens sanning. Env vinner fortfarande (DMX_X=... slar profilen). Sparen (BPM_TRACE/DROP_TRACE/LIVE_TRACE)
     // ar INTE standard - de var inte live 09-27 (Pi:ns env lastes fore deployen); sla pa med ladan.py --env vid felsokning.
     ANALYSER_SPLIT: 'worker',     // tempo/gridfas/sektion i egen trad (ladan 09-24)
-    // TAKTMATNINGEN I LÅNGSAMMA VÄGEN (2026-11-08, ägaren: 'en analysator, två vägar - den snabba och den som ger dirigenten
-    // information'; backup-tagg backup/fore-taktmatning-slow-20261108): beatFeed.ts (~20 % av motorns CPU) körs i analysatorns
-    // worker i stället för i hop-loopen (split.ts TAKTVÄGEN). Inline/synk-läget bit-identiskt med huvudtråden (DMX-md5); lotus: saknas.
-    BEAT_FEED: 'slow',            // a7r: VAR ANALYSATORNS KLOCKA KÖRS (analyser.ts clockMode): 'slow' taktvägen, 'inline' i process(); lotus: osatt (analysatorn matar taktvägen själv, hopSelf)
     // SEKTIONER SOM HALLER (agaren i ladan 10-14: 'mycket go kansla nu'; 23 lang-*.wav: intro 17 -> 10 % av tiden, < 8 s 23 -> 15 %,
     // fladder 41 -> 22, sektionsbyten 3,12 -> 2,44/min, refrangstart oforandrad). Ur refrang/mellanlage kravs 5 raka block, in i refrangen 3.
     SECTION_RUN: '5',             // var 3

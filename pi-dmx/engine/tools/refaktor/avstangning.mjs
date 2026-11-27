@@ -105,15 +105,14 @@ async function kor(DIST, MALL, NAMN, PROF, SECS, WAV) {
     : (() => { const c = { sampleRate: 48000, hopSize: 128, autoGainTarget: 0.75, maxGain: 200, noiseFloor: 0.0015, onsetEnhancements: false }; return { cfg: null, acfg: c }; })();
   const flat = (f, out = {}, pre = '') => { for (const k of Object.keys(f)) { const v = f[k]; if (v && typeof v === 'object') flat(v, out, pre + k + '.'); else out[pre + k] = v; } return out; };
   const gain = (a) => PROF === 'dmx' ? a.setGainLock(true, 1) : a.setGainLock(false);
-  // som createAnalyser: odelat med egen klocka, delat inline med taktväg (hopSelf i lotus)
+  // som createAnalyser: odelat med egen klocka, delat inline med taktväg (analysatorn matar den själv, kedjan steg 10N)
   const build = (mod, mode) => {
     const { cfg, acfg } = cfgs(mod);
     const hopp = (a) => PROF === 'dmx' ? new mod.Hopp(a, cfg, { softenRange: () => {}, noteTrack: () => {} }) : null;
     if (mode === 'odelad') { const a = new mod.Analyser(acfg); a.clock = new mod.BeatFeed(); gain(a); return { a, cfg, acfg, hopp: hopp(a) }; }
-    const feedMk = mod.hopFeedFactory(), buffers = mod.createSplitBuffers(!!feedMk);
+    const buffers = mod.createSplitBuffers(true);
     const a = new mod.Analyser(acfg, { role: 'fast', split: buffers }); gain(a);
-    if (!feedMk) a.clock = new mod.BeatFeed();
-    else { a.hopLane = new mod.HopLaneFast(buffers, false); a.hopSelf = mod.sysEnv('BEAT_FEED') === undefined; a.hopLane.peer = new mod.HopLaneSlow(buffers, feedMk()); }
+    a.hopLane = new mod.HopLaneFast(buffers, false); a.hopLane.peer = new mod.HopLaneSlow(buffers, new mod.BeatFeed());
     a.setInlinePeer(new mod.Analyser(acfg, { role: 'slow', split: buffers }));
     return { a, cfg, acfg, buffers, hopp: hopp(a) };
   };

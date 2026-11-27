@@ -16,7 +16,7 @@ if (gL !== undefined && gL !== "-") cfg.fixtures[Number(gL)].cal.gamma = Number(
 if (tL !== undefined && tL !== "-") cfg.fixtures[Number(tL)].cal.top = Number(tV);
 const lamps = cfg.fixtures.map((fx) => { const roles = fixtureRoles(fx), base = fx.address - 1; return roles.map((_, i) => base + i); });
 // DUMP_SPLIT (bänken, 11-08): osatt = odelad analysator med klockan i process() (motorns odelade väg, createAnalyser); inline = delad analysator i samma tråd (motorns väg,
-// med profilens BEAT_FEED slow körs taktmatningen i långsamma sidan); sync = den RIKTIGA workern i lås-steg (createAnalyser(cfg, "sync")); worker = motorns asynkrona worker (bara CPU-mått, ljuset ej deterministiskt).
+// analysatorn matar taktvägen själv i långsamma sidan, kedjan steg 10N); sync = den RIKTIGA workern i lås-steg (createAnalyser(cfg, "sync")); worker = motorns asynkrona worker (bara CPU-mått, ljuset ej deterministiskt).
 const SPLIT = process.env.DUMP_SPLIT || ""; if (SPLIT) process.env.DMX_ANALYSER_SPLIT = SPLIT === "worker" ? "worker" : "inline";
 const acfg = JSON.parse(JSON.stringify(defaultConfig)); const an = SPLIT ? createAnalyser(acfg, SPLIT === "sync" ? "sync" : undefined) : new Analyser(acfg); if (!SPLIT) an.clock = new BeatFeed(); an.setGainLock(true, 1);
 // KOPPLINGEN PER HOPP = motorns (hopp.js, kedjan steg 1): låtgränsen, dropräknaren och taktvägen/publishClock som index.ts.

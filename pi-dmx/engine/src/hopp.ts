@@ -45,8 +45,7 @@ export class Hopp {
       this.motor.noteTrack(this.lastBoundary);
     }
     // frame.dropCount går rakt till effekterna: analysatorns räknare (kedjan steg 8, outDrop-kopian borta).
-    // tillit + taktklocka (beatFeed.ts). TAKTVÄGEN (profilens BEAT_FEED 'slow', 2026-11-08): körs i analysatorns worker - här bara
-    // hoppet in och senaste resultatet ut (cfg.beat, tilliten, analysatorns rutnät/kommandon). Odelad analysator: i huvudtråden som förr.
-    if (analyser.hopLane) analyser.hopLane.feed(frame, cfg, analyser); else analyser.publishClock(cfg);   // a7r: utan taktväg körde analysatorn klockan själv i process()
+    // KLOCKAN (kedjan steg 10N): analysatorn matar taktvägen själv sist i process(), i DMX som i lotus. Här bara utfallet till motorn (cfg.beat, cfg.beatErr).
+    analyser.publishClock(cfg);
   }
 }

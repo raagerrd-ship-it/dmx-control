@@ -1,4 +1,4 @@
-/** IDENTITETSBEVIS FÖR TAKTVÄGEN (2026-11-08, split.ts TAKTVÄGEN, profilens BEAT_FEED 'slow') - i stil med splitProof.mjs.
+/** IDENTITETSBEVIS FÖR TAKTVÄGEN (2026-11-08, split.ts TAKTVÄGEN; analysatorn matar den själv sedan kedjan steg 10N) - i stil med splitProof.mjs.
  *
  *  Kör samma ljud hop för hop genom två motorkedjor (analysator + låtgräns + taktmatning, som index.ts/dmxDump.mjs) och jämför
  *  per hop det taktmatningen lämnar: cfg.beat (finns/null/osatt, ankare, bpm, konfidens - ettan och coasten ligger i ankaret och
@@ -6,7 +6,7 @@
  *  KRAVET: 0 avvikelser.
  *
  *    node tools/feedProof.mjs --a <dist>:<läge> --b <dist>:<läge> [--secs 0] <wav> ...
- *    läge: odelad | inline | sync (riktiga workern i lås-steg) | inline-main (delad analysator, taktmatningen i huvudtråden)
+ *    läge: odelad | inline | sync (riktiga workern i lås-steg)   (inline-main borta i kedjan steg 10N: BEAT_FEED finns inte längre)
  *    Standard: --a dist:inline --b dist:sync (workern mot inline).
  */
 import { readFileSync } from 'node:fs';
@@ -40,9 +40,7 @@ async function make(spec) {
   if (mode === 'odelad') { an = new m.Analyser(acfg); an.clock = new m.BeatFeed(); }   // odelad: klockan i process(), som createAnalyser utan delning
   else {
     process.env.DMX_ANALYSER_SPLIT = 'inline';
-    if (mode === 'inline-main') process.env.DMX_BEAT_FEED = ''; else delete process.env.DMX_BEAT_FEED;
     an = m.createAnalyser(acfg, mode === 'sync' ? 'sync' : undefined);
-    delete process.env.DMX_BEAT_FEED;
   }
   an.setGainLock(true, 1);
   const cfg = JSON.parse(JSON.stringify(m.defaultConfig));

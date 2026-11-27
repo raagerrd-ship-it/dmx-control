@@ -10,7 +10,7 @@ import {
   F_HINT, F_VCLOCK_SET, F_VCLOCK_NULL,
   C_WRITE, C_READ, S_REC_SEQ, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
   viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
-  C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader, type HopFeed,
+  C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader,
   R_BIGSEQ, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N,
   B_ENVF, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ,
   BS_SPEC_N, BS_SKIPPED, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
@@ -157,7 +157,6 @@ export class Analyser {
   private slowLostFlags = 0;   // slow: antal flaggor som aterskapats ur raknarna efter tapp
   splitRestarts = 0;   // fast: antal omstarter av workern
   hopLane: HopLaneFast | null = null;   // TAKTVÄGEN
-  hopSelf = false;   // EN KLOCKA
   private syncWorker = false;   // fast: vänta på workern efter varje record
   private inlinePeer: Analyser | null = null;
   private bigRing: Float64Array | null = null; private bigPcm: Float32Array | null = null; private bigState: Float64Array | null = null;   private bigSeq = 0; private bigCopy = new Float64Array(BIG_STATE_LEN); private bigRd = new StateReader();  private specDelivered = 0;  private bigSkipped = 0;
@@ -499,7 +498,6 @@ export class Analyser {
   process(samples: Float32Array): Frame {
     const h = this.f.hop;
     const lv = this.f.level, kk = this.f.kick, ff = this.f.fft;
-    if (this.hopLane) this.setClock(this.hopLane.clockBpm, this.hopLane.clockConf);
     if (h.role === 'fast') this.pullSlowState();
     this.fft.hopStep(samples);
 
@@ -593,9 +591,9 @@ export class Analyser {
     f.expectHighInMs = sc.section === 'high' ? 0 : sc.expectHighMs > 0 ? Math.max(0, sc.expectHighMs - nowS) : -1;
     f.prevSection = sc.prevSection; f.sectionLevelVsHighDb = sc.levelVsHighDb;
     f.sectionBars = ck.bpm > 0 && sc.sectionStartMs > 0 ? (nowS - sc.sectionStartMs) / (240000 / ck.bpm) : 0;
-    if (this.clock || this.hopSelf) {
+    if (this.clock || this.hopLane) {   // EN KLOCKA (kedjan steg 10N): analysatorn matar taktvägen själv, i DMX som i lotus
       if (this.clock) this.clock.update(f, this.clockOut, this, Date.now());
-      else this.hopLane!.feed(f, this.clockOut, this);
+      else { this.hopLane!.feed(f, this.clockOut, this); this.setClock(this.hopLane!.clockBpm, this.hopLane!.clockConf); }   // huvudtrådens kopia direkt efter matningen (förr i början av nästa process)
       publishPhase(f, this.clockOut.beat, this.clock ? this.clock.barKnown() : this.hopLane!.barKnown, this.extGrid, Date.now(), Analyser.GRID_PHASE_OFFSET_MS);
     }
     return f;
@@ -622,16 +620,13 @@ export const WORKER_RESTART_WINDOW_MS = 10 * 60_000;
 
 export function createAnalyser(cfg: AnalyserConfig, modeIn?: 'worker' | 'inline' | 'sync'): Analyser {
   const mode = modeIn ?? sysEnv('ANALYSER_SPLIT');
-  const cm = clockMode();
   if (mode !== 'worker' && mode !== 'inline' && mode !== 'sync') { const a = new Analyser(cfg); a.clock = new BeatFeed(); return a; }
   const sync = mode === 'sync';
-  const feedMk = cm === 'slow' ? hopFeedFactory() : undefined;
-  const buffers = createSplitBuffers(!!feedMk);
+  const buffers = createSplitBuffers(true);
   const fast = new Analyser(cfg, { role: 'fast', split: buffers, sync });
-  if (cm === 'inline') fast.clock = new BeatFeed();
-  if (feedMk) { fast.hopLane = new HopLaneFast(buffers, sync); fast.hopSelf = sysEnv('BEAT_FEED') === undefined; }
+  fast.hopLane = new HopLaneFast(buffers, sync);
   if (mode === 'inline') {
-    if (feedMk) fast.hopLane!.peer = new HopLaneSlow(buffers, feedMk());
+    fast.hopLane.peer = new HopLaneSlow(buffers, new BeatFeed());
     fast.setInlinePeer(new Analyser(cfg, { role: 'slow', split: buffers }));   // efter taktvägen: kopplar klockan till den långsamma sidan
     return fast;
   }
@@ -673,10 +668,3 @@ export function createAnalyser(cfg: AnalyserConfig, modeIn?: 'worker' | 'inline'
   else import('node:worker_threads').then(withWorker).catch((e) => console.error('[analyser-split] kunde inte starta worker:', e?.message ?? e));
   return fast;
 }
-
-/** TAKTVÄGEN. */
-export function hopFeedFactory(): (() => HopFeed) | undefined {
-  return clockMode() === 'slow' ? () => new BeatFeed() : undefined;
-}
-/** VAR KLOCKAN KÖRS. */
-function clockMode(): 'slow' | 'inline' { return sysEnv('BEAT_FEED') === 'inline' ? 'inline' : 'slow'; }

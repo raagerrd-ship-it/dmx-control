@@ -1,4 +1,4 @@
-"""EN KLOCKA FÖR BÅDA - LOTUS-SIDANS DOMARE.  python tools/arena/lotusbank.py <mapp> [--bas] [--beat-feed inline] [--snabb] [--fas klocka] [--ref]
+"""EN KLOCKA FÖR BÅDA - LOTUS-SIDANS DOMARE.  python tools/arena/lotusbank.py <mapp> [--bas] [--snabb] [--fas klocka] [--ref]
 
 Bygger en lotus-analysator i <mapp>/lotus/ och kör lotus tempobänk (lotus-light-link/tools/tempo-facit-pc/bench.mjs) på den,
 skriver <mapp>/lotusbank.json. lotus-light-link LÄSES bara (källor, korpus, manifest, bench.mjs, typescript) - ingenting skrivs där.
@@ -8,7 +8,8 @@ BYGGET (<mapp>/lotus/src/audio-analyser -> <mapp>/lotus/dist/audio-analyser, lot
   - de delade filerna analyser.ts, split.ts, slowWorker.ts, analyserClock.ts ersätts med <mapp>/src/*.ts, med --bas med engine/src.
     (recorder.ts är delad men importeras inte av analysatorn - lotus kopia saknar den; den behövs inte för bänken.)
   - --ref: INGEN ersättning = lotus egen kopia orörd (referensen som --bas ska träffa).
-  - --beat-feed inline: BEAT_FEED: 'inline' skrivs in i profilens sys (samma som env LOTUS_BEAT_FEED=inline, sysEnv läser båda).
+  - (BORTTAGET i kedjan steg 10N, 2026-11-27: BEAT_FEED och clockMode finns inte längre i analyser.ts. Texten och tabellen står kvar som historik.)
+    --beat-feed inline: BEAT_FEED: 'inline' skrevs in i profilens sys (samma som env LOTUS_BEAT_FEED=inline, sysEnv läser båda).
     Då kör analyser.ts klockan (analyserClock.ts BeatFeed) sist i process(). KONTROLLERAT (engine/src HEAD 5e81d13):
       frame.bpm / frame.bpmConfidence = klockans (analyserClock.update skriver dem, och setClock -> analysatorns localBpm),
       frame.beatAnchorMs = INTE klockan - analysatorns senaste kick som förr. Klockans rutnät finns bara i an.clockOut.beat
@@ -93,7 +94,7 @@ export function createAnalyser(cfg, mode) {
 """
 
 
-def bygg(d, srcdir, inline):
+def bygg(d, srcdir):
     out = os.path.join(d, 'lotus')
     assert os.path.commonpath([out, os.path.join(ENGINE, '.arena')]) == os.path.join(ENGINE, '.arena'), 'mappen måste ligga under engine/.arena'
     if os.path.isdir(out): shutil.rmtree(out)
@@ -102,10 +103,6 @@ def bygg(d, srcdir, inline):
         if f.endswith('.ts'): shutil.copyfile(os.path.join(LSRC, f), os.path.join(aa, f))   # copyfile: bara bytes, inga länkar
     if srcdir:
         for f in SHARED: shutil.copyfile(os.path.join(srcdir, f), os.path.join(aa, f))
-    if inline:
-        p = os.path.join(aa, 'analyserProfile.ts'); s = io.open(p, encoding='utf-8', newline='').read()
-        assert 'BEAT_FEED' not in s and s.count('sys: {') == 1, 'profilen ser inte ut som väntat'
-        io.open(p, 'w', encoding='utf-8', newline='').write(s.replace('sys: {', "sys: {\n    BEAT_FEED: 'inline',   // lotusbank --beat-feed inline", 1))
     tc = json.load(io.open(os.path.join(LOTUS, 'pi', 'tsconfig.json'), encoding='utf-8'))
     tc['compilerOptions'].update({'outDir': 'dist', 'rootDir': 'src', 'declaration': False, 'sourceMap': False}); tc['include'] = ['src/**/*']
     io.open(os.path.join(out, 'tsconfig.json'), 'w', encoding='utf-8').write(json.dumps(tc, indent=1))
@@ -140,12 +137,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('mapp'); ap.add_argument('--bas', action='store_true', help='delade filer ur engine/src')
     ap.add_argument('--ref', action='store_true', help='lotus egen kopia orörd (ingen ersättning)')
-    ap.add_argument('--beat-feed', choices=['inline'], default=None); ap.add_argument('--snabb', action='store_true')
+    ap.add_argument('--snabb', action='store_true')
     ap.add_argument('--fas', choices=['analysator', 'klocka'], default='analysator')
     a = ap.parse_args(); d = os.path.abspath(a.mapp); os.makedirs(d, exist_ok=True)
     srcdir = None if a.ref else os.path.join(ENGINE, 'src') if a.bas else os.path.join(d, 'src')
     if srcdir: assert all(os.path.exists(os.path.join(srcdir, f)) for f in SHARED), f'saknar {SHARED} i {srcdir}'
-    t0 = time.time(); entry = bygg(d, srcdir, a.beat_feed == 'inline'); tBygg = time.time() - t0
+    t0 = time.time(); entry = bygg(d, srcdir); tBygg = time.time() - t0
     man = os.path.join(BENCHDIR, 'bench-manifest.txt')
     if a.snabb:
         rows = sorted(x.strip() for x in io.open(man, encoding='utf-8') if x.strip())
@@ -159,7 +156,7 @@ def main():
     io.open(os.path.join(d, 'lotusbank.out'), 'w', encoding='utf-8').write(r.stdout + ('\n--- stderr ---\n' + r.stderr if r.stderr else ''))
     res = tolka(r.stdout)
     out = {'mapp': os.path.relpath(d, ENGINE), 'kalla': 'ref (lotus orörd)' if a.ref else 'engine/src' if a.bas else '<mapp>/src',
-           'beatFeed': a.beat_feed, 'fas': a.fas, 'snabb': a.snabb, 'manifest': man, **res,
+           'fas': a.fas, 'snabb': a.snabb, 'manifest': man, **res,
            'tidS': round(tid), 'byggS': round(tBygg), 'fel': (r.stderr or '')[-800:] if r.returncode or not res.get('korpus') else ''}
     io.open(os.path.join(d, 'lotusbank.json'), 'w', encoding='utf-8').write(json.dumps(out, ensure_ascii=False, indent=1))
     k, s, ob, fa = res.get('korpus') or {}, res.get('synt') or {}, res.get('onBeat') or {}, res.get('fas') or {}

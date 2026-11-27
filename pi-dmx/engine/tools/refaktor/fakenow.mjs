@@ -1,4 +1,4 @@
-// LOTUSGRINDEN (flytten 2026-11-21): Date.now() följer ljudklockan, så att lotus klockväg (hopSelf) blir deterministisk.
+// LOTUSGRINDEN (flytten 2026-11-21): Date.now() följer ljudklockan, så att lotus klockväg (analysatorn matar klockan själv) blir deterministisk.
 //   node tools/refaktor/fakenow.mjs <samma argument som tools/analyserParity.mjs>
 import { pathToFileURL } from 'node:url';
 const argv = process.argv.slice(2);
