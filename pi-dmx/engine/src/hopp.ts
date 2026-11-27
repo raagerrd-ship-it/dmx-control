@@ -17,9 +17,7 @@ export interface HoppMotor {
 export class Hopp {
   // LATGRANS UR LJUDET (2026-09-23): gransdetektorn matas fran analysatorns stora FFT - ingen extra transform.
   readonly bounds = new BoundaryDetector(() => Date.now());
-  private lastLiveDrop = 0;        // senast sedda drop-räknare FRÅN analysatorn
   private lastBoundary = 0;        // senast sedda låtgräns-räknare (dynamikens omkalibrering)
-  private outDrop = 0;             // drop-räknaren effekterna ser (live eller replay)
   // Argumentobjekt som fylls per hop i stallet for nya literaler (skrapjakten 10-01: 375 Hz). Mottagarna laser dem synkront.
   private readonly boundsArg = { level: 0, bpm: 0, bpmConfidence: 0, silent: true };
 
@@ -35,8 +33,6 @@ export class Hopp {
 
   koppla(frame: Frame): void {
     const { analyser, cfg, bounds, boundsArg } = this;
-    const liveDrop = frame.dropCount !== this.lastLiveDrop;
-    this.lastLiveDrop = frame.dropCount;
     // LATGRANS (se boundaryDetector.ts) -> mjuk omkalibrering av den lopande dynamiken (auto-rangen far krypa in
     // pa nya latens nivaer inom sekunder i stallet for en minut) och latbytes-hint till tempot: medianfonstret
     // (~5 s) och tempogrammet tillhor forra laten. Mjuk hint i st.f. hard nollstallning (brytaren DMX_BOUNDARY_SOFT borttagen 10-11) -
@@ -48,10 +44,7 @@ export class Hopp {
       this.lastBoundary = bounds.boundaryCount; this.motor.softenRange(); analyser.hintTrackChange(5000);   // riktig latgrans nollar sektionerna (tempotappet gor det inte langre)
       this.motor.noteTrack(this.lastBoundary);
     }
-
-    if (liveDrop) this.outDrop++;   // realtidsdetektorn ager dropsen (latminnet borta 2026-09-23)
-
-    frame.dropCount = this.outDrop;
+    // frame.dropCount går rakt till effekterna: analysatorns räknare (kedjan steg 8, outDrop-kopian borta).
     // tillit + taktklocka (beatFeed.ts). TAKTVÄGEN (profilens BEAT_FEED 'slow', 2026-11-08): körs i analysatorns worker - här bara
     // hoppet in och senaste resultatet ut (cfg.beat, tilliten, analysatorns rutnät/kommandon). Odelad analysator: i huvudtråden som förr.
     if (analyser.hopLane) analyser.hopLane.feed(frame, cfg, analyser); else analyser.publishClock(cfg);   // a7r: utan taktväg körde analysatorn klockan själv i process()
