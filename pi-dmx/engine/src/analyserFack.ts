@@ -50,14 +50,13 @@ type Taggat<O> = { readonly [K in Exclude<keyof O, Fn<O>>]: Tag | { readonly [k:
 export class HopOut {
   static readonly TRAD = { role: 'K', bigOn: 'K', cfg: 'K', dtHop: 'K', hopMs: 'K', now: 'S', dt: 'S', nowWall: 'IN', gated: 'S',
     breaking: 'IN', kickHit: 'IN',
-    sec: 'IN', lvh: 'IN', conf: 'IN', bpm: 'IN', gridMs: 'IN', trust: 'IN', barKnown: 'IN' } as const satisfies Taggat<HopOut>;
+    sec: 'IN', lvh: 'IN' } as const satisfies Taggat<HopOut>;
   role: Role = 'all'; bigOn = false; cfg!: Cfg;   // skrivs en gång i Analysers konstruktor
   dtHop = 0; hopMs = 0.5;
   now = 0.5; dt = 0.5; nowWall = 0.5; gated = false;
   breaking = false;
   kickHit = 0;   // trumkittet
-  sec = 'intro'; lvh = 0.5; conf = 0.5; bpm = 0.5;   // långsamma värden sedda vid hoppet
-  gridMs = 0; trust = 0; barKnown = false;   // TAKTPOSITIONEN: klockans rutnät (ankaret på ettan, Date.now-tid; bpm ovan), tillit, ettan känd
+  sec = 'intro'; lvh = 0.5;   // långsamma värden sedda vid hoppet (tempot läser workern ur sin egen klocka, kedjan steg 4)
   constructor(readonly wallNow: () => number) { stabilise(this); }   // wallNow = analysatorns väggklocka
 }
 
@@ -94,9 +93,11 @@ export class KickOut {
   constructor() { stabilise(this); }
   neutral(): void { this.kickAt = 0; }   // kicken av: ingen förfinad kick (0,5 vore en kick vid 0,5 ms för klockan)
 }
-/** KLOCKAN sedd av analysatorn: bpm/conf = förr localBpm/localBpmConfidence, src = förr beatSrc (samma objekt). */
+/** KLOCKAN sedd av analysatorn: bpm/conf = förr localBpm/localBpmConfidence, src = förr beatSrc (samma objekt).
+ *  bpm/conf UT (kedjan steg 4, EN tempokälla): klockan i workern skriver dem i workerns analysator (taktvägens setClock), huvudtråden
+ *  får dem ur taktvägens svar (HopLaneFast). Platserna i S står tomma. */
 export class ClockOut {
-  static readonly TRAD = { bpm: 'IN', conf: 'IN', src: 'S' } as const satisfies Taggat<ClockOut>;
+  static readonly TRAD = { bpm: 'UT', conf: 'UT', src: 'S' } as const satisfies Taggat<ClockOut>;
   bpm = 0; conf = 0;
   src!: { beat?: BeatGrid | null };
   constructor() { stabilise(this); }

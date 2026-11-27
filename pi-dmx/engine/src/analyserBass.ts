@@ -5,8 +5,8 @@ const BE_TOP_BEATS = 16, BE_FAST_BEATS = 2, BE_BEAT_MIN_MS = 300, BE_BEAT_MAX_MS
 
 /** DET BASEN LÄSER. Inget annat går att nå. S = bassEnergyStep (huvudtråden), L = accumulate/stepBassline (workern). */
 export interface BassReads {
-  hop:      Ser<'S', 'hop', 'dtHop'> & Ser<'L', 'hop', 'bpm' | 'kickHit'>;
-  clock:    Ser<'S', 'clock', 'bpm'>;
+  hop:      Ser<'S', 'hop', 'dtHop'> & Ser<'L', 'hop', 'kickHit'>;
+  clock:    Ser<'S', 'clock', 'bpm'> & Ser<'L', 'clock', 'bpm'>;   // L: workerns egen klocka (kedjan steg 4)
   section:  Ser<'S', 'section', 'section'>;
   spectrum: Ser<'L', 'spectrum', 'bandLvl'>;
 }
@@ -53,7 +53,7 @@ export class BassTracker {
     } else if (this.blRef > 0.05) this.blRef *= 0.999;
     this.blPrev2 = p1; this.blPrev1 = v;
     let n = 0; for (let i = 0; i < 32; i++) if (seq - this.blOnsets[i] <= 200 && this.blOnsets[i] > 0) n++;
-    const beats2s = (this.hop.bpm > 0 ? this.hop.bpm : 120) / 30;
+    const beats2s = (this.clock.bpm > 0 ? this.clock.bpm : 120) / 30;
     const opb = n / beats2s;
     this.o.onsetsPerBeat = opb;
     const raw = Math.max(0, Math.min(1, (opb - 0.4) / 0.8));

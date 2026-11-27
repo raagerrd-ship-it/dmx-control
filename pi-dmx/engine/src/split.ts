@@ -121,7 +121,7 @@ export const B_SEQ = 0, B_N = 1, B_ENVF = 2;   // hopprecordet (kärnan)
 export const C_BIG_WRITE = 8, C_BIG_READ = 9, C_BIG_SEQ = 10 , C_WAITING_B = 11 ;
 export const BS_SEQ = 0, BS_SPEC_N = 1, BS_SKIPPED = 2;   // storblocket (kärnan)
 
-// FACKENS PLATSER (steg 18) ur taggarna (analyserFack.ts TRAD): IN följer hopprecordet B (tempot recordet R), UT storblocket BS (tempot och sektionen tillståndsblocket S).
+// FACKENS PLATSER (steg 18) ur taggarna (analyserFack.ts TRAD): IN följer hopprecordet B (recordet R bär inga fackfält sedan kedjan steg 4), UT storblocket BS (sektionen tillståndsblocket S; klockans platser där står tomma, tempot går med taktvägen).
 export const B = platser('IN', ['hop', 'fft', 'level', 'spectrum', 'kick', 'bass', 'riser', 'drop', 'character', 'section'], B_ENVF + 1);
 export const R = platser('IN', ['clock'], R_BIGSEQ + 1);
 export const BS = platser('UT', ['hop', 'level', 'spectrum', 'kick', 'bass', 'riser', 'drop', 'character'], BS_SKIPPED + 1);
@@ -151,6 +151,8 @@ export interface HopGrid { anchorMs: number; bpm: number; confidence?: number }
 export interface HopCfg { beat?: HopGrid | null; beatErr?: number }
 export interface HopTarget { setClockGrid?(g: HopGrid | null): void; trackBoundaries?: number; quietMs?: number; boundSure?: boolean; bodyUnderDb?: number;
    setClock?(bpm: number, conf: number): void }   // EN KÄLLA
+/** Det taktvägen skriver i workerns analysator (Analyser.setClock, spärren bpm > 40). */
+export interface LaneReader { setClock(bpm: number, conf: number): void }
 /** Systemets taktmatning. */
 export interface HopFeed { update(frame: HopFrame, cfg: HopCfg, an: HopTarget, now: number): void;  barKnown?(): boolean }   // EN ETTA
 
@@ -160,7 +162,7 @@ export class HopLaneFast {
   private readonly s = new Float64Array(FEED_STATE_LEN); private readonly sr = new StateReader();
   private seq = 0; private applied = 0;
   private readonly grid = { anchorMs: 0.5, bpm: 0.5, confidence: 0.5 };
-  clockBpm = 0; clockConf = 0; clockAnchor = 0; private trust = 0; private trustAt = 0;   // Klockans tempo/tillit efter senaste feed
+  clockBpm = 0; clockConf = 0; private trust = 0; private trustAt = 0;   // Klockans tempo/tillit efter senaste feed
   barKnown = false;   // EN ETTA
   peer: HopLaneSlow | null = null;   // inline-läget
   constructor(b: SplitBuffers, private readonly sync = false) {
@@ -182,7 +184,7 @@ export class HopLaneFast {
     if (this.peer) this.peer.drain();
     else if (this.sync) syncWait(ctrl, C_FEED_SEQ, () => this.sr.read(ctrl, this.state, this.s, C_FEED_SEQ) && this.s[FS_HOP_SEQ] >= seq);
     this.apply(cfg, an);
-    const b = cfg.beat; f.bpm = b ? b.bpm : 0; f.bpmConfidence = b ? (b.confidence ?? 0) : 0; this.clockBpm = f.bpm; this.clockConf = f.bpmConfidence; this.clockAnchor = b ? b.anchorMs : 0;
+    const b = cfg.beat; f.bpm = b ? b.bpm : 0; f.bpmConfidence = b ? (b.confidence ?? 0) : 0; this.clockBpm = f.bpm; this.clockConf = f.bpmConfidence;
     { const dt = this.trustAt > 0 ? now - this.trustAt : 0; this.trustAt = now; f.beatTrust = this.trust = trustStep(this.trust, f.bpmConfidence, cfg.beatErr ?? 0, dt > 250 ? 250 : dt); }
   }
   private apply(cfg: HopCfg, an: HopTarget): void {
@@ -217,12 +219,16 @@ export class HopLaneSlow {
     onset: { kick: 0.5, highMid: 0.5, treble: 0.5 }, specAbs: { sub: 0.5, kick: 0.5, bass: 0.5, treble: 0.5, lowMid: 0.5, mid: 0.5, highMid: 0.5 } };
   private readonly cfg: HopCfg = { beat: undefined, beatErr: undefined };
   private grid: HopGrid | null = null;
-  private readonly target: HopTarget = { trackBoundaries: 0, quietMs: 0, setClockGrid: (g) => { this.grid = g; } };
+  private an: LaneReader | null = null;   // workerns analysator (EN TEMPOKÄLLA, kedjan steg 4)
+  private readonly target: HopTarget = { trackBoundaries: 0, quietMs: 0, setClockGrid: (g) => { this.grid = g; },
+    setClock: (bpm, conf) => { this.an?.setClock(bpm, conf); } };   // klockan skriver tempot direkt i workerns analysator
   constructor(b: SplitBuffers, private readonly feed: HopFeed, private readonly notify = false) {
     this.ctrl = new Int32Array(b.ctrl); this.ring = new Float64Array(b.hop!); this.state = new Float64Array(b.hopState!);
     const sq = Atomics.load(this.ctrl, C_FEED_SEQ); if (sq & 1) Atomics.store(this.ctrl, C_FEED_SEQ, sq + 1);
     const st = this.state; this.seq = st[FS_HOP_SEQ]; this.processed = st[FS_PROCESSED];
   }
+  /** Workerns analysator läser klockan direkt. En ny analysator (inline-omstart) får klockans senaste tempo, som ramen bär (bpm 0,5 från start = 0). */
+  connect(an: LaneReader | null): void { this.an = an; an?.setClock(this.fr.bpm, this.fr.bpmConfidence); }
   readSeq(): number { return this.seq; }
   /** Behandla alla hop-record sedan sist, publicera. */
   drain(): number {

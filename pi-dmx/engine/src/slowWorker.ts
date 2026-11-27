@@ -11,6 +11,7 @@ const wantLane = !!buffers.hop && part !== 'slow';
 const feedMk = hopFeedFactory();   // analysatorns klocka
 if (wantLane && !feedMk) throw new Error('analyser-split: taktvagen utan klocka i profilen (BEAT_FEED)');
 const lane = wantLane && feedMk ? new HopLaneSlow(buffers, feedMk(), sync === true) : null;
+lane?.connect(an);   // EN TEMPOKÄLLA (kedjan steg 4): klockan skriver tempot i workerns analysator
 if (lane && an) an.bigYield = () => { lane.drain(); };   // en tråd
 const TEST_CRASH = process.env[PROFILE.envPrefix + 'SPLIT_TEST_CRASH'] === '1';
 let stop = false;

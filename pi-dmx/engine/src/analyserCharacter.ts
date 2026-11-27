@@ -8,15 +8,16 @@ function cl01(x: number): number { return x < 0 ? 0 : x > 1 ? 1 : x; }
 
 /** DET KARAKTÄREN LÄSER (workern). Inget annat går att nå. */
 export interface CharacterReads {
-  hop:      Ser<'L', 'hop', 'kickHit' | 'conf'>;
+  hop:      Ser<'L', 'hop', 'kickHit'>;
+  clock:    Ser<'L', 'clock', 'conf'>;   // workerns egen klocka (kedjan steg 4)
   spectrum: Ser<'L', 'spectrum', 'bandLvl' | 'bandOn'>;
   bass:     Ser<'L', 'bass', 'bassline'>;
 }
 
 export class CharacterProfile {
-  private readonly h: CharacterReads['hop']; private readonly sp: CharacterReads['spectrum']; private readonly bo: CharacterReads['bass'];
+  private readonly h: CharacterReads['hop']; private readonly ck: CharacterReads['clock']; private readonly sp: CharacterReads['spectrum']; private readonly bo: CharacterReads['bass'];
   constructor(r: CharacterReads, private readonly o: CharacterOut) {   // läser: r, lämnar ut: o
-    this.h = r.hop; this.sp = r.spectrum; this.bo = r.bass;
+    this.h = r.hop; this.ck = r.clock; this.sp = r.spectrum; this.bo = r.bass;
     stabilise(this);
   }
   private aProf = 0;
@@ -38,7 +39,7 @@ export class CharacterProfile {
     this.profPunch += (punchNow - this.profPunch) * pr;
     this.profBass += (bassW - this.profBass) * pr;
     this.profBright += (brightW - this.profBright) * pr;
-    this.profBeat += (this.h.conf - this.profBeat) * pr;
+    this.profBeat += (this.ck.conf - this.profBeat) * pr;
     this.o.profile.punch = cl01((this.profPunch - 0.05) / 0.40);
     this.o.profile.bass = cl01((this.profBass - 0.28) / 0.30);
     this.o.profile.bright = cl01((this.profBright - 0.14) / 0.19);

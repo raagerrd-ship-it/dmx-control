@@ -5,7 +5,7 @@ import { sysEnv, stabilise, makeFack, off, stenarAv, type Fack, BODY_CEIL_DB_S, 
 export { BASS_SPAN_DB, BODY_CEIL_DB_S };
 export type { BeatGrid, AnalyserDetection, Cfg, Role };
 import {
-  REC_LEN, RING_N, R_SEQ, R_PERF, R_WALL, R_FLAGS, R_HINT_MS, R_VCLOCK, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, B, BS, S, R,
+  REC_LEN, RING_N, R_SEQ, R_PERF, R_WALL, R_FLAGS, R_HINT_MS, R_VCLOCK, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, B, BS, S,
   packFlagCounts, lostFlags, seqLow, seqDelta, C_WAITING, C_STATE_SEQ, S_LOST_FLAGS,
   F_HINT, F_VCLOCK_SET, F_VCLOCK_NULL,
   C_WRITE, C_READ, S_REC_SEQ, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
@@ -15,7 +15,7 @@ import {
   B_ENVF, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ,
   BS_SPEC_N, BS_SKIPPED, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
 } from './split.js';
-const Bh = B.hop, Bf = B.fft, Bl = B.level, Bk = B.kick, Rc = R.clock, BSs = BS.spectrum, Sc = S.clock;   // kärnans platser ur taggarna
+const Bh = B.hop, Bf = B.fft, Bl = B.level, Bk = B.kick, BSs = BS.spectrum, Sc = S.clock;   // kärnans platser ur taggarna
 import FFT from "fft.js";
 import { BeatFeed, publishPhase, type ClockCfg } from "./analyserClock.js";   // ANALYSATORNS KLOCKA
 import { DropDetector } from "./analyserDrop.js";
@@ -200,7 +200,6 @@ export class Analyser {
     r[o + R_PERF] = this.perfNow(); r[o + R_WALL] = this.wallNow(); r[o + R_TS] = Date.now();
     r[o + R_FLAGS] = this.pendFlags; r[o + R_HINT_MS] = this.pendHintMs; r[o + R_VCLOCK] = this.pendVclock;
     r[o + R_FLAGCNT] = packFlagCounts(this.flagCnt);
-    r[o + Rc.bpm] = this.f.clock.bpm; r[o + Rc.conf] = this.f.clock.conf;
     r[o + R_BIGSEQ] = this.bigSeq;
     r[o + R_SEQ] = seq;
     this.pendFlags = 0;
@@ -216,7 +215,7 @@ export class Analyser {
     const s = this.stateCopy; if (s[S_REC_SEQ] < this.barrierSeq) return;
     this.sections?.unpack(s);
   }
-  setInlinePeer(slow: Analyser | null): void { this.inlinePeer = slow; }
+  setInlinePeer(slow: Analyser | null): void { this.inlinePeer = slow; this.hopLane?.peer?.connect(slow); }   // EN TEMPOKÄLLA: taktvägen skriver tempot i den långsamma sidan
   /** Halsa for /api/live. */
   getSplitStats(): { role: string; written: number; processed: number; behind: number; lagMs: number; lagMaxMs: number; busyUs: number; busyMaxUs: number; skipped: number; lostFlags: number; restarts: number } | null {
     if (this.f.hop.role !== 'fast') return null;
@@ -277,8 +276,7 @@ export class Analyser {
     const r = this.bigRing!, ctrl = this.splitCtrl!, seq = ++this.bigSeq, slot = seq % BIG_RING_N, o = slot * BIG_REC_LEN, n = samples.length;
     this.bigPcm!.set(samples, slot * BIG_HOP_MAX);
     r[o + B_N] = n; r[o + Bf.rms] = ff.rms; r[o + Bh.nowWall] = h.nowWall; r[o + Bf.centSmooth] = ff.centSmooth; r[o + Bh.breaking] = h.breaking ? 1 : 0;
-    r[o + Bh.kickHit] = h.kickHit; r[o + Bh.sec] = sectionCode(h.sec); r[o + Bh.lvh] = h.lvh; r[o + Bh.conf] = h.conf; r[o + Bh.bpm] = h.bpm;
-    r[o + Bh.gridMs] = h.gridMs; r[o + Bh.trust] = h.trust; r[o + Bh.barKnown] = h.barKnown ? 1 : 0;
+    r[o + Bh.kickHit] = h.kickHit; r[o + Bh.sec] = sectionCode(h.sec); r[o + Bh.lvh] = h.lvh;
     r[o + Bl.lvlSmooth] = lv.lvlSmooth; r[o + Bl.activeMs] = lv.activeMs; r[o + Bl.intensity] = lv.intensity; r[o + Bl.levelCeil] = lv.levelCeil; r[o + Bk.kick] = kk.kick ? 1 : 0;
     r[o + B_ENVF] = this.bigEnvFlag; this.bigEnvFlag = 0;
     r[o + B_SEQ] = seq;
@@ -313,8 +311,7 @@ export class Analyser {
       const hn = r[o + B_N];
       this.bass?.accumulate();
       ff.rms = r[o + Bf.rms]; h.nowWall = r[o + Bh.nowWall]; ff.centSmooth = r[o + Bf.centSmooth]; h.breaking = r[o + Bh.breaking] === 1;
-      h.kickHit = r[o + Bh.kickHit]; h.sec = SECTIONS[r[o + Bh.sec]]; h.lvh = r[o + Bh.lvh]; h.conf = r[o + Bh.conf]; h.bpm = r[o + Bh.bpm];
-      h.gridMs = r[o + Bh.gridMs]; h.trust = r[o + Bh.trust]; h.barKnown = r[o + Bh.barKnown] === 1;
+      h.kickHit = r[o + Bh.kickHit]; h.sec = SECTIONS[r[o + Bh.sec]]; h.lvh = r[o + Bh.lvh];
       lv.lvlSmooth = r[o + Bl.lvlSmooth]; lv.activeMs = r[o + Bl.activeMs]; lv.intensity = r[o + Bl.intensity]; lv.levelCeil = r[o + Bl.levelCeil]; kk.kick = r[o + Bk.kick] === 1;
       if (r[o + B_ENVF] === 1) this.bass?.stepBassline();
       { const po = slot * BIG_HOP_MAX; this.bands.bigRingPush(pcm.subarray(po, po + hn)); }
@@ -345,7 +342,6 @@ export class Analyser {
     const r = this.splitRing!;
     this.applyFlags(r[o + R_FLAGS], r[o + R_HINT_MS], r[o + R_VCLOCK]);
     this.virtualMs = r[o + R_PERF]; this.virtualOn = true;
-    this.f.clock.bpm = r[o + Rc.bpm], this.f.clock.conf = r[o + Rc.conf];
     this.sections?.fromRecord();
   }
 
@@ -503,7 +499,7 @@ export class Analyser {
   process(samples: Float32Array): Frame {
     const h = this.f.hop;
     const sc = this.f.section;
-    const lv = this.f.level, kk = this.f.kick, ck = this.f.clock, ff = this.f.fft;
+    const lv = this.f.level, kk = this.f.kick, ff = this.f.fft;
     if (this.hopLane) this.setClock(this.hopLane.clockBpm, this.hopLane.clockConf);
     if (h.role === 'fast') this.pullSlowState();
     this.fft.hopStep(samples);
@@ -537,7 +533,7 @@ export class Analyser {
     const nowWallA = this.wallNow();
     const breaking = lv.lvlSmooth < lv.levelCeil * 0.65;
 
-    h.nowWall = nowWallA; h.sec = sc.section; h.lvh = sc.levelVsHighDb; h.conf = ck.conf;   // IN: färdiga före pushBig
+    h.nowWall = nowWallA; h.sec = sc.section; h.lvh = sc.levelVsHighDb;   // IN: färdiga före pushBig
     this.bass?.bassEnergyStep(this.bands.fbAbs[0], this.bands.fbAbs[1]);   // basen före pushBig: workern kan få värdet samma hopp
     if (big) {
       h.breaking = breaking;
@@ -556,14 +552,11 @@ export class Analyser {
     this.character?.profileStep();
   }
 
-  /** 100 Hz-steget: tempot sett vid hoppet, basgångens steg, recordet till workern. */
+  /** 100 Hz-steget: basgångens steg, recordet till workern. */
   private tickStep(): void {
-    const h = this.f.hop, ck = this.f.clock;
+    const h = this.f.hop;
     this.tickT -= 1000 / Analyser.ENV_HZ;
-    h.bpm = ck.bpm; if (h.bigOn) this.bigEnvFlag = 1; else this.bass?.stepBassline();
-    { const ln = this.hopLane, b = this.clockOut.beat, a = ln ? ln.clockAnchor : b ? b.anchorMs : 0;   // TAKTPOSITIONEN: klockans utfall efter förra hoppet, samma rutnät som effekterna
-      h.gridMs = a > 0 ? a + this.wallNow() - Date.now() : 0;   // ankaret i analysatorns väggklocka (klockan går i Date.now)
-      h.barKnown = ln ? ln.barKnown : !!this.clock?.barKnown(); h.trust = this.outFrame.beatTrust; }
+    if (h.bigOn) this.bigEnvFlag = 1; else this.bass?.stepBassline();
     if (h.role === 'fast') this.pushSlowRecord();
   }
 
@@ -639,8 +632,8 @@ export function createAnalyser(cfg: AnalyserConfig, modeIn?: 'worker' | 'inline'
   if (cm === 'inline') fast.clock = new BeatFeed();
   if (feedMk) { fast.hopLane = new HopLaneFast(buffers, sync); fast.hopSelf = sysEnv('BEAT_FEED') === undefined; }
   if (mode === 'inline') {
-    fast.setInlinePeer(new Analyser(cfg, { role: 'slow', split: buffers }));
     if (feedMk) fast.hopLane!.peer = new HopLaneSlow(buffers, feedMk());
+    fast.setInlinePeer(new Analyser(cfg, { role: 'slow', split: buffers }));   // efter taktvägen: kopplar klockan till den långsamma sidan
     return fast;
   }
   const withWorker = ({ Worker }: typeof import('node:worker_threads')) => {
