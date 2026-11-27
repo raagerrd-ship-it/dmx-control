@@ -3,7 +3,7 @@
   "hopMs": "f.hop.hopMs", "hNowWall": "f.hop.nowWall", "hBody": "f.spectrum.bodyDb", "hLevel": "f.level.level", "hFlux": "f.fft.flux",
   "hBreaking": "f.hop.breaking", "hGated": "f.hop.gated", "dtHop": "f.hop.dtHop", "lvlSmooth": "f.level.lvlSmooth", "centSmooth": "f.fft.centSmooth", "engSmooth": "f.fft.engSmooth", "sumSq": "fft.sumSq", "rmsRecalc": "fft.rmsRecalc", "fbMax": "fft.fbMax",
   "onsetPeakReady": "fft.onsetPeakReady", "aAtt": "fft.aAtt", "aRel": "fft.aRel", "buffer.length": "fft.buffer.length", "buffer.constructor": "fft.buffer.constructor",
-  "kickHit": "f.hop.kickHit", "dSec": "f.hop.sec", "dLvh": "f.hop.lvh",
+  "kickHit": "f.hop.kickHit",
   "role": "f.hop.role", "bigOn": "f.hop.bigOn",
   "cfg.audio.rate": "f.hop.cfg.audio.rate", "cfg.fft.size": "cfg.fft.size", "cfg.fft.hop": "f.hop.cfg.fft.hop",
   "cfg.detection.autoGainTarget": "f.hop.cfg.detection.autoGainTarget", "cfg.detection.noiseFloor": "cfg.detection.noiseFloor", "cfg.onset.enhancements": "f.hop.cfg.onset.enhancements",

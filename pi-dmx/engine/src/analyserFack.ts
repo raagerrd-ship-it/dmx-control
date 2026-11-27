@@ -49,14 +49,12 @@ type Taggat<O> = { readonly [K in Exclude<keyof O, Fn<O>>]: Tag | { readonly [k:
 /** HOPPET: kärnans fält per hopp. Skrivkartan per tråd: docs/analysator/analyserFack.md. */
 export class HopOut {
   static readonly TRAD = { role: 'K', bigOn: 'K', cfg: 'K', dtHop: 'K', hopMs: 'K', now: 'S', dt: 'S', nowWall: 'IN', gated: 'S',
-    breaking: 'IN', kickHit: 'IN',
-    sec: 'IN', lvh: 'IN' } as const satisfies Taggat<HopOut>;
+    breaking: 'IN', kickHit: 'IN' } as const satisfies Taggat<HopOut>;
   role: Role = 'all'; bigOn = false; cfg!: Cfg;   // skrivs en gång i Analysers konstruktor
   dtHop = 0; hopMs = 0.5;
   now = 0.5; dt = 0.5; nowWall = 0.5; gated = false;
   breaking = false;
   kickHit = 0;   // trumkittet
-  sec = 'intro'; lvh = 0.5;   // långsamma värden sedda vid hoppet (tempot läser workern ur sin egen klocka, kedjan steg 4)
   constructor(readonly wallNow: () => number) { stabilise(this); }   // wallNow = analysatorns väggklocka
 }
 

@@ -70,16 +70,17 @@ export const MINI_NEAR = B(K.LUCKA_MINI, K.AKTIV), DROP_NEAR = MINI_NEAR | B(K.L
 
 /** DET DROP LÄSER (workern). Inget annat går att nå. */
 export interface DropReads {
-  hop:      Ser<'L', 'hop', 'dtHop' | 'nowWall' | 'sec' | 'lvh' | 'wallNow'>;
+  hop:      Ser<'L', 'hop', 'dtHop' | 'nowWall' | 'wallNow'>;
+  section:  Ser<'L', 'section', 'section' | 'levelVsHighDb'>;   // sektionen direkt i workern (kedjan steg 6, knut 1)
   spectrum: Ser<'L', 'spectrum', 'bandDbRaw' | 'bodyDb'>;
   level:    Ser<'L', 'level', 'activeMs' | 'lvlSmooth'>;
   riser:    Ser<'L', 'riser', 'buildUp'>;
 }
 
 export class DropDetector {
-  private readonly h: DropReads['hop']; private readonly sp: DropReads['spectrum']; private readonly lv: DropReads['level']; private readonly ri: DropReads['riser'];
+  private readonly h: DropReads['hop']; private readonly sp: DropReads['spectrum']; private readonly lv: DropReads['level']; private readonly ri: DropReads['riser']; private readonly sc: DropReads['section'];
   constructor(r: DropReads, private readonly o: DropOut) {   // läser: r, lämnar ut: o
-    this.h = r.hop; this.sp = r.spectrum; this.lv = r.level; this.ri = r.riser;
+    this.h = r.hop; this.sp = r.spectrum; this.lv = r.level; this.ri = r.riser; this.sc = r.section;
     stabilise(this);
   }
   private secBodyArmMs = 0;
@@ -173,13 +174,13 @@ export class DropDetector {
     let fireTag = '';
     const underNow = this.bodyPeak - bodyPeek;
     if (fireNow) {
-      const calm = (this.h.sec === 'low' || this.h.sec === 'intro') || this.h.lvh <= -DROP_CALM_DB;
+      const calm = (this.sc.section === 'low' || this.sc.section === 'intro') || this.sc.levelVsHighDb <= -DROP_CALM_DB;
       let strong = this.ri.buildUp >= DROP_CALM_BUILD || underNow < DROP_CALM_Q || bodyRise >= BODY_RISE_DB + DROP_CALM_RISE_DB;
-      if (this.h.sec === 'intro') strong = this.ri.buildUp >= DROP_CALM_BUILD;
+      if (this.sc.section === 'intro') strong = this.ri.buildUp >= DROP_CALM_BUILD;
       if (calm && !strong) {
         fireNow = false;
         if (DROP_CALM_LAND_MS > 0 && this.calmHoldStart === 0) { this.calmHoldStart = nowWallA; this.calmHoldRise = bodyRise; }
-        if (DROP_TRACE && bodyOnsetEdge) console.log(`[dropcalm] wall ${this.h.wallNow()} ${DROP_CALM_LAND_MS > 0 ? 'HALLS' : 'NEKAD'} sect ${this.h.sec} lvh ${this.h.lvh.toFixed(1)} build ${this.ri.buildUp.toFixed(2)} underPeak ${underNow.toFixed(1)} rise ${bodyRise.toFixed(1)}`);
+        if (DROP_TRACE && bodyOnsetEdge) console.log(`[dropcalm] wall ${this.h.wallNow()} ${DROP_CALM_LAND_MS > 0 ? 'HALLS' : 'NEKAD'} sect ${this.sc.section} lvh ${this.sc.levelVsHighDb.toFixed(1)} build ${this.ri.buildUp.toFixed(2)} underPeak ${underNow.toFixed(1)} rise ${bodyRise.toFixed(1)}`);
       }
     }
     if (this.calmHoldStart > 0) {
@@ -240,7 +241,7 @@ export class DropDetector {
   /** MINIDROP EFTER ENERGIN: ett lyft (spärrad/nedgraderad drop, stopp, energilyft, sektion -> high) öppnar ett fönster; dropMiniBack++ när
    *  baskroppen (30 ms) fallit under halva lyftet från nivån före (1 s-medel, fryst i fönstret). */
   private miniBackStep(now: number, dt: number, body: number): void {
-    const o = this.o, x = Math.max(-90, body), sec = this.h.sec, lift = o.liftDb > 0;
+    const o = this.o, x = Math.max(-90, body), sec = this.sc.section, lift = o.liftDb > 0;
     this.mbFast += (x - this.mbFast) * Math.min(1, dt / 0.03);
     const ev = o.dropDemoted !== this.mbDem || o.dropSpaced !== this.mbSpaced || o.stopCount !== this.mbStop || (lift && !this.mbLift) || (sec === 'high' && this.mbSec !== '' && this.mbSec !== 'high');
     this.mbDem = o.dropDemoted; this.mbSpaced = o.dropSpaced; this.mbStop = o.stopCount; this.mbLift = lift; if (sec !== '') this.mbSec = sec;
