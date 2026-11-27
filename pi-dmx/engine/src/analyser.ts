@@ -619,8 +619,7 @@ export class Analyser {
   readonly character: CharacterProfile | null = new CharacterProfile(this.f, this.f.character);   // KARAKTÄR
   readonly kicks: KickDetector | null = new KickDetector(this.f, this.f.kick);   // KICK: anslag i snabba vägen
   readonly bass: BassTracker | null = new BassTracker(this.f, this.f.bass);   // BAS: basenergin per slag och basgången
-  private readonly cmd = { flagSlow: (fl: number) => this.flagSlow(fl) };   // bunden en gång: nivån flaggar tystnad till workern
-  readonly levels = new LevelTracker(this.f, this.f.level, this.cmd);   // NIVÅ: förstärkning/AGC, tystnad, intensitet, nivåtak och topp-zon
+  readonly levels = new LevelTracker(this.f, this.f.level);   // NIVÅ: förstärkning/AGC, tystnad, intensitet, nivåtak och topp-zon
   readonly bands = new SpectrumBands(this.f, this.f.spectrum);   // SPEKTRUM
   readonly fft = new SmallFft(this.f, this.f.fft);   // LILLA FFT:N: fönstrets rms, energi, flöde, kickflöde, centroid
 }

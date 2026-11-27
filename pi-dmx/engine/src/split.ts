@@ -8,7 +8,7 @@ export const RING_MARGIN = 8;   // records workern lämnar orörda mot skrivare
 export const R_SEQ = 0, R_PERF = 1, R_WALL = 2, R_FLAGS = 3, R_HINT_MS = 4, R_VCLOCK = 5,
   R_TS = 6, R_FLAGCNT = 7, R_BIGSEQ = 8;   // Record-fält (kärnan)
 
-export const F_SIL10 = 2, F_HINT = 8, F_VCLOCK_SET = 32, F_VCLOCK_NULL = 64;   // Flaggor (1, 4, 16 lediga)
+export const F_HINT = 8, F_VCLOCK_SET = 32, F_VCLOCK_NULL = 64;   // Flaggor (1, 2, 4, 16 lediga)
 export const FLAG_BITS = 7;
 
 export const FLAG_MOD = 128;   // ROBUSTHET

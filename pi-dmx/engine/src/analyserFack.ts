@@ -100,7 +100,6 @@ export class ClockOut {
   bpm = 0; conf = 0;
   src!: { beat?: BeatGrid | null };
   constructor() { stabilise(this); }
-  zeroBpm(): void { this.bpm = 0; }   // tystnad 10 s (nivån, F_SIL10)
 }
 
 /** SEKTIONEN: de 17 publicerade fälten (förr på Analyser). */

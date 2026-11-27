@@ -1,20 +1,16 @@
 /**  NIVÅN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserLevel.md */
 import { stabilise, type Ser, type LevelOut } from "./analyserFack.js";
-import { F_SIL10 } from './split.js';
 
-/** DET NIVÅN LÄSER. Inget annat går att nå. zeroBpm = kommando till klockan. Bara huvudtråden. */
+/** DET NIVÅN LÄSER. Inget annat går att nå. Bara huvudtråden. */
 export interface LevelReads {
   hop:   Ser<'S', 'hop', 'now' | 'dt' | 'hopMs' | 'dtHop' | 'gated' | 'role' | 'cfg'>;
   fft:   Ser<'S', 'fft', 'rms'>;
-  clock: Ser<'S', 'clock', 'bpm' | 'zeroBpm'>;
 }
-/** Nivåns kommando till kärnan: flagga tystnad till workern. */
-export interface LevelCmd { flagSlow(f: number): void }
 
 export class LevelTracker {
-  private readonly h: LevelReads['hop']; private readonly ff: LevelReads['fft']; private readonly ck: LevelReads['clock'];
-  constructor(r: LevelReads, private readonly o: LevelOut, private readonly cmd: LevelCmd) {   // läser: r, lämnar ut: o
-    this.h = r.hop; this.ff = r.fft; this.ck = r.clock;
+  private readonly h: LevelReads['hop']; private readonly ff: LevelReads['fft'];
+  constructor(r: LevelReads, private readonly o: LevelOut) {   // läser: r, lämnar ut: o
+    this.h = r.hop; this.ff = r.fft;
     stabilise(this);
   }
   private aAtt = 0; private aRel = 0; private aIUp = 0; private aIDown = 0;
@@ -25,7 +21,6 @@ export class LevelTracker {
     this.aIUp = 1 - Math.exp(-dtHop / 1.5);
     this.aIDown = 1 - Math.exp(-dtHop / 3.0);
   }
-  private silenceArmed = false;   // true = tystnadssläppningen redan gjord för denna tystnad
   private intensityEma = 0.5;   // sektionsenergi
   private intensityFloor = 0.5;   // dess robusta P50-baslinje
   private intensitySpread = 0.05;   // glidande medelabsolutavvikelse
@@ -93,21 +88,10 @@ export class LevelTracker {
       }
   }
 
-  /** Tystnadsflanken. */
+  /** Tystnaden i ms. Klockan släpper tempot själv efter 10 s (analyserClock.ts, quietMs). */
   private silenceStep(): void {
-    const hopMs = this.h.hopMs;
-    if (!this.h.gated) {
-      this.o.silentMs += hopMs;
-      if (this.o.silentMs > 350 && !this.silenceArmed) {
-        this.silenceArmed = true;
-      } else if (this.silenceArmed && this.o.silentMs > 10000 && this.ck.bpm !== 0) {
-        this.ck.zeroBpm();
-        this.cmd.flagSlow(F_SIL10);
-      }
-    } else {
-      this.o.silentMs = 0;
-      this.silenceArmed = false;
-    }
+    if (!this.h.gated) this.o.silentMs += this.h.hopMs;
+    else this.o.silentMs = 0;
   }
 
   /** Sektionsenergi 0..1. */
