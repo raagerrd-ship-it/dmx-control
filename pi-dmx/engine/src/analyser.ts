@@ -273,8 +273,7 @@ export class Analyser {
   }
 
   /** POSTEN (kedjan steg 11N): EN väg in. En post per hopp, direkt efter de snabba banden: ljudet, stammens IN-fält, klockans del och
-   *  100 Hz-delen när tickStep slagit. Inline tar klockan och sedan högerspalten posten här. I lås-läget väntar posten på storblocket,
-   *  och i ett 100 Hz-steg hämtas sektionen, så att basenergin och ramen läser samma steg som förr. */
+   *  100 Hz-delen när tickStep slagit. Inline tar klockan och sedan högerspalten posten här. Svaret läses direkt efter (svar, kedjan steg 13). */
   private post(samples: Float32Array): void {
     const h = this.f.hop;
     const lv = this.f.level, kk = this.f.kick, ff = this.f.fft;
@@ -295,10 +294,17 @@ export class Analyser {
     Atomics.store(ctrl, C_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
     if (Atomics.load(ctrl, C_WAITING) || Atomics.load(ctrl, C_WAITING_B)) Atomics.notify(ctrl, C_WAKE);
     if (this.inlinePeer) { this.hopLane?.peer?.drain(); this.inlinePeer.drainRecords(); }
-    else if (this.syncWorker) syncWait(ctrl, C_FORM_SEQ, () => this.bigRd.read(ctrl, this.bigState!, this.bigCopy, C_FORM_SEQ) && this.bigCopy[BS_SEQ] >= seq);
-    if (rec > 0 && (this.inlinePeer || this.syncWorker)) this.pullSlowState();
   }
-  /** Svarets formdel, storbiten (droppet, uppbyggnaden, karaktären, baskroppen, spektrumet), läst efter basenergin som förr i pushBig. */
+  /** V1 SVARET (kedjan steg 13): ETT läsställe, direkt efter posten. I lås-läget väntar det på båda delarna för hoppets post (formdelen här, klockdelen i feed).
+   *  Klockdelen (tempot, rutnätet och tilliten, i ramen och i huvudtrådens klocka), sedan formdelen: sektionsbiten och storbiten. */
+  private svar(): void {
+    const ctrl = this.splitCtrl!, seq = this.postSeq;
+    if (this.syncWorker) syncWait(ctrl, C_FORM_SEQ, () => this.bigRd.read(ctrl, this.bigState!, this.bigCopy, C_FORM_SEQ) && this.bigCopy[BS_SEQ] >= seq);
+    if (this.hopLane) { this.hopLane.feed(this.outFrame, this.clockOut, this); this.setClock(this.hopLane.clockBpm, this.hopLane.clockConf); }
+    this.pullSlowState();
+    this.pullBig();
+  }
+  /** Svarets formdel, storbiten (droppet, uppbyggnaden, karaktären, baskroppen, spektrumet). */
   private pullBig(): void {
     const h = this.f.hop, sp = this.f.spectrum, ctrl = this.splitCtrl!;
     const s = this.bigCopy;
@@ -342,7 +348,7 @@ export class Analyser {
     if (this.f.hop.role !== 'slow') this.trackBoundaries++;
     if (BPM_TRACE) console.log(`[bpmrst] t=${this.traceT().toFixed(1)} HINT bpm=${this.f.clock.bpm} conf=${this.f.clock.conf.toFixed(2)}`);
     if (this.f.hop.role === 'fast') { this.pendHintMs = windowMs; this.flagSlow(F_HINT); }
-    if (sections) this.sections?.carry();
+    if (sections && this.f.hop.role !== 'fast') this.sections?.carry();   // huvudtråden bär ingen egen kopia (kedjan steg 13): sektionen kommer ur svaret
   }
 
   private lastT = 0;   // 0 = "ej satt"
@@ -482,7 +488,6 @@ export class Analyser {
   process(samples: Float32Array): Frame {
     const h = this.f.hop;
     const lv = this.f.level, kk = this.f.kick, ff = this.f.fft;
-    if (h.role === 'fast') this.pullSlowState();
     this.fft.hopStep(samples);
 
     const now = this.perfNow();
@@ -515,9 +520,9 @@ export class Analyser {
     const breaking = lv.lvlSmooth < lv.levelCeil * 0.65;
 
     h.nowWall = nowWallA;   // IN: färdig före posten
-    if (big) { h.breaking = breaking; this.post(samples); }   // S5 POSTEN (kedjan steg 11N), direkt efter de snabba banden
-    this.bass?.bassEnergyStep(this.bands.fbAbs[0], this.bands.fbAbs[1]);   // basen läser sektionen: i lås-läget ur postens 100 Hz-steg, som förr
-    if (big) this.pullBig(); else this.slowPart();
+    if (big) { h.breaking = breaking; this.post(samples); this.svar(); }   // S5 POSTEN (kedjan steg 11N) och V1 SVARET (kedjan steg 13), direkt efter de snabba banden
+    this.bass?.bassEnergyStep(this.bands.fbAbs[0], this.bands.fbAbs[1]);   // V2 (kedjan steg 13): basen läser klockan och sektionen ur hoppets svar
+    if (!big) this.slowPart();
     h.breaking = breaking;
     return this.fillFrame();
   }
@@ -557,7 +562,8 @@ export class Analyser {
     f.silent = lv.lvlSmooth <= this.silenceLevel; f.level = lv.lvlSmooth; f.levelVU = this.lvlVU;
     f.energy = ff.engSmooth;
     f.centroid = ff.centSmooth; f.flux = fluxNorm; f.kick = kick; f.gain = lv.gain;
-    f.bpm = ck.bpm; f.bpmConfidence = ck.conf; f.intensity = intensity; f.kickAnchorMs = kk.beatAnchorMs;
+    if (!this.hopLane) { f.bpm = ck.bpm; f.bpmConfidence = ck.conf; }   // delat: svaret har skrivit tempot i ramen (kedjan steg 13)
+    f.intensity = intensity; f.kickAnchorMs = kk.beatAnchorMs;
     f.bodyDb = bodyNow; f.bassEnergy = f.silent ? 0 : bo.energy; f.bassEnergyShort = f.silent ? 0 : bo.beShort; f.bassLevel = Math.pow(10, (bo.beHi - bo.beRef) / 20);
     { let s2 = 1e-12; for (let b = 3; b < 8; b++) { const lin = Math.pow(10, this.bands.fbDbRaw[b] / 20); s2 += lin * lin; } f.midHiDb = 20 * Math.log10(Math.sqrt(s2)); }
     f.dropCount = dp.dropCount; f.miniDropCount = dp.miniDropCount; f.dropBuildCount = dp.buildStartCount; f.dropDemoted = dp.dropDemoted; f.dropSpaced = dp.dropSpaced;
@@ -571,11 +577,8 @@ export class Analyser {
     f.expectHighInMs = sc.section === 'high' ? 0 : sc.expectHighMs > 0 ? Math.max(0, sc.expectHighMs - nowS) : -1;
     f.prevSection = sc.prevSection; f.sectionLevelVsHighDb = sc.levelVsHighDb;
     f.sectionBars = ck.bpm > 0 && sc.sectionStartMs > 0 ? (nowS - sc.sectionStartMs) / (240000 / ck.bpm) : 0;
-    if (this.clock || this.hopLane) {   // EN KLOCKA (kedjan steg 10N): analysatorn matar taktvägen själv, i DMX som i lotus
-      if (this.clock) this.clock.update(f, this.clockOut, this, Date.now());
-      else { this.hopLane!.feed(f, this.clockOut, this); this.setClock(this.hopLane!.clockBpm, this.hopLane!.clockConf); }   // huvudtrådens kopia direkt efter matningen (förr i början av nästa process)
-      publishPhase(f, this.clockOut.beat, this.clock ? this.clock.barKnown() : this.hopLane!.barKnown, this.extGrid, Date.now(), Analyser.GRID_PHASE_OFFSET_MS);
-    }
+    if (this.clock) this.clock.update(f, this.clockOut, this, Date.now());   // EN KLOCKA: odelat räknar klockan här; delat läser klockdelen i svaret (V1, kedjan steg 13)
+    if (this.clock || this.hopLane) publishPhase(f, this.clockOut.beat, this.clock ? this.clock.barKnown() : this.hopLane!.barKnown, this.extGrid, Date.now(), Analyser.GRID_PHASE_OFFSET_MS);
     return f;
   }
   clock: BeatFeed | null = null;   // ANALYSATORNS KLOCKA utan taktväg

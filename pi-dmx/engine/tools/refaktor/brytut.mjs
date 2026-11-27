@@ -18,7 +18,7 @@ const sf = files.find(f => norm(f.fileName) === norm("src/analyser.ts")), text =
 const A = sf.statements.find(s => ts.isClassDeclaration(s) && s.name?.text === "Analyser");
 const fail = m => { console.error("FEL: " + m); process.exit(1); };
 const warn = []; const W = m => warn.push(m);
-const G = new Set(cfg.methods), PLUMB = new Set(cfg.plumbing ?? ["constructor", "pullSlowState", "pushSlowRecord", "post", "pullBig", "drainRecords", "slowRecord", "slowStep", "fillFrame", "hintTrackChange", "setVirtualClock", "sectionReset", "debugCandidates"]);
+const G = new Set(cfg.methods), PLUMB = new Set(cfg.plumbing ?? ["constructor", "pullSlowState", "pushSlowRecord", "post", "svar", "pullBig", "drainRecords", "slowRecord", "slowStep", "fillFrame", "hintTrackChange", "setVirtualClock", "sectionReset", "debugCandidates"]);
 for (const g of G) PLUMB.delete(g);
 const ADD = new Set(cfg.fields?.add ?? []), SKIP = new Set(cfg.fields?.skip ?? []), CSKIP = new Set(cfg.consts?.skip ?? []);
 const has = (n, k) => (ts.getModifiers(n) ?? []).some(m => m.kind === k);
