@@ -6,12 +6,12 @@ export { BASS_SPAN_DB, BODY_CEIL_DB_S };
 export type { BeatGrid, AnalyserDetection, Cfg, Role };
 import {
   POST_N, POST_PCM, POST_LEN, P_SEQ, P_N, P_ENVF, P_NOW, P_REC, P_PERF, P_FLAGS, P_HINT_MS, P_VCLOCK, P_FLAGCNT, RING_MARGIN, FLAG_BITS, B, BS, S,
-  packFlagCounts, lostFlags, seqLow, seqDelta, C_WAITING, C_STATE_SEQ, S_LOST_FLAGS,
+  packFlagCounts, lostFlags, seqLow, seqDelta, C_WAITING, C_FORM_SEQ, S_LOST_FLAGS,
   F_HINT, F_VCLOCK_SET, F_VCLOCK_NULL,
   C_WRITE, C_READ, S_REC_SEQ, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
   stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader,
-  C_WAITING_B, C_BIG_READ, C_BIG_SEQ, BS_SEQ,
+  C_WAITING_B, C_BIG_READ, BS_SEQ, svarDelar,
   BS_SPEC_N, BS_SKIPPED, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
 } from './split.js';
 const Bh = B.hop, Bf = B.fft, Bl = B.level, Bk = B.kick, BSs = BS.spectrum, Sc = S.clock;   // kärnans platser ur taggarna
@@ -193,7 +193,7 @@ export class Analyser {
   }
   /** Ett record per 100 Hz-steg: det åker med i hoppets post (kedjan steg 11N), med tiden från steget. */
   private pushSlowRecord(): void { this.recPost = ++this.recSeq; this.recPerf = this.perfNow(); }
-  /** Hamta tempo/gridfas/sektion ur tillstandsblocket. */
+  /** Sektionen ur svarets formdel (sektionsbiten). */
   private pullSlowState(): void {
     if (!this.stateRd.read(this.splitCtrl!, this.splitState!, this.stateCopy)) return;
     const s = this.stateCopy; if (s[S_REC_SEQ] < this.barrierSeq) return;
@@ -245,8 +245,8 @@ export class Analyser {
       Atomics.store(ctrl, C_BIG_READ, seqLow(this.postSeq));
       stateWrite(ctrl, this.bigState!, (s) => {
         s[BS_SEQ] = this.postSeq; s[BSs.bodyDb] = this.f.spectrum.bodyDb; this.drop?.pack(s); this.riser?.pack(s); this.character?.pack(s); s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.postSkipped;
-      }, C_BIG_SEQ);
-      if (this.syncWorker) Atomics.notify(ctrl, C_BIG_SEQ);
+      }, C_FORM_SEQ);
+      if (this.syncWorker) Atomics.notify(ctrl, C_FORM_SEQ);
     }
     return n;
   }
@@ -269,7 +269,7 @@ export class Analyser {
       this.sections?.pack(s);
       s[S_PROCESSED] = this.slowProcessed; s[S_LAG_MS] = lagMs; s[S_LAG_MAX] = this.slowLagMaxMs; s[S_BUSY_US] = this.slowBusyEmaUs; s[S_BUSY_MAX_US] = this.slowBusyMaxUs; s[S_SKIPPED] = this.postSkipped; s[S_LOST_FLAGS] = this.slowLostFlags;
     });
-    if (this.syncWorker) Atomics.notify(ctrl, C_STATE_SEQ);
+    if (this.syncWorker) Atomics.notify(ctrl, C_FORM_SEQ);
   }
 
   /** POSTEN (kedjan steg 11N): EN väg in. En post per hopp, direkt efter de snabba banden: ljudet, stammens IN-fält, klockans del och
@@ -295,14 +295,14 @@ export class Analyser {
     Atomics.store(ctrl, C_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
     if (Atomics.load(ctrl, C_WAITING) || Atomics.load(ctrl, C_WAITING_B)) Atomics.notify(ctrl, C_WAKE);
     if (this.inlinePeer) { this.hopLane?.peer?.drain(); this.inlinePeer.drainRecords(); }
-    else if (this.syncWorker) syncWait(ctrl, C_BIG_SEQ, () => this.bigRd.read(ctrl, this.bigState!, this.bigCopy, C_BIG_SEQ) && this.bigCopy[BS_SEQ] >= seq);
+    else if (this.syncWorker) syncWait(ctrl, C_FORM_SEQ, () => this.bigRd.read(ctrl, this.bigState!, this.bigCopy, C_FORM_SEQ) && this.bigCopy[BS_SEQ] >= seq);
     if (rec > 0 && (this.inlinePeer || this.syncWorker)) this.pullSlowState();
   }
-  /** Storblocket ur workern (droppet, uppbyggnaden, karaktären, baskroppen, spektrumet), läst efter basenergin som förr i pushBig. */
+  /** Svarets formdel, storbiten (droppet, uppbyggnaden, karaktären, baskroppen, spektrumet), läst efter basenergin som förr i pushBig. */
   private pullBig(): void {
     const h = this.f.hop, sp = this.f.spectrum, ctrl = this.splitCtrl!;
     const s = this.bigCopy;
-    if (!this.bigRd.read(ctrl, this.bigState!, s, C_BIG_SEQ) || s[BS_SEQ] === 0) return;
+    if (!this.bigRd.read(ctrl, this.bigState!, s, C_FORM_SEQ) || s[BS_SEQ] === 0) return;
     sp.bodyDb = s[BSs.bodyDb]; this.drop?.unpack(s); this.riser?.unpack(s); this.character?.unpack(s);
     const sn = s[BS_SPEC_N];
     if (sn > this.specDelivered) {
@@ -392,19 +392,18 @@ export class Analyser {
     const splitBuf = splitIn?.split ?? cfgIn.split;
     if (h.role !== 'all') {
       if (!splitBuf) throw new Error('Analyser: roll ' + h.role + ' kraver split-buffertar');
-      const v = { ctrl: new Int32Array(splitBuf.ctrl), state: new Float64Array(splitBuf.state) }; this.splitCtrl = v.ctrl; this.splitState = v.state;
+      const v = { ctrl: new Int32Array(splitBuf.ctrl), state: svarDelar(splitBuf).sektion }; this.splitCtrl = v.ctrl; this.splitState = v.state;
       this.recSeq = splitIn?.resumeSeq ?? cfgIn.resumeSeq ?? 0;
       this.syncWorker = splitIn?.sync === true;
       if (h.role === 'slow') {
         this.slowGap = true;
-        const sq = Atomics.load(v.ctrl, C_STATE_SEQ); if (sq & 1) Atomics.store(v.ctrl, C_STATE_SEQ, sq + 1);
+        const sq = Atomics.load(v.ctrl, C_FORM_SEQ); if (sq & 1) Atomics.store(v.ctrl, C_FORM_SEQ, sq + 1);
       }
-      if (!splitBuf.post || !splitBuf.postPcm || !splitBuf.bigState || !splitBuf.spec) throw new Error('Analyser: delat läge kräver postringen och svarsblocken (createSplitBuffers)');
+      if (!splitBuf.post || !splitBuf.postPcm || !splitBuf.svar || !splitBuf.spec) throw new Error('Analyser: delat läge kräver postringen och svarsblocket (createSplitBuffers)');
       {
         h.bigOn = true;
-        this.postRing = new Float64Array(splitBuf.post); this.postPcm = new Float32Array(splitBuf.postPcm); this.bigState = new Float64Array(splitBuf.bigState); this.bands.specRing = new Float32Array(splitBuf.spec);
+        this.postRing = new Float64Array(splitBuf.post); this.postPcm = new Float32Array(splitBuf.postPcm); this.bigState = svarDelar(splitBuf).stor; this.bands.specRing = new Float32Array(splitBuf.spec);
         if (h.role === 'slow') {
-          const sq = Atomics.load(v.ctrl, C_BIG_SEQ); if (sq & 1) Atomics.store(v.ctrl, C_BIG_SEQ, sq + 1);
           const st = this.bigState; this.postSeq = st[BS_SEQ]; this.bands.resume(st); this.drop?.resume(st);
         }
       }

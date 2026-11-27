@@ -27,7 +27,7 @@ export function lostFlags(before: number, after: number, ownFlags: number): numb
 
 export const C_WRITE = 0;   // Kontrollord: antal skrivna poster (kedjan steg 11N)
 export const C_READ = 1;   // antal lästa records (postens 100 Hz-del)
-export const C_STATE_SEQ = 2;   // seqlock för tillståndsblocket
+export const C_FORM_SEQ = 2;   // seqlock för svarets formdel (kedjan steg 12; förr tillståndsblocket på ord 2 och storblocket på ord 10)
 export const C_WAITING = 3;   // 1 = workern ligger i Atomics.wait
 
 /** SEQ-WRAP. */
@@ -41,8 +41,8 @@ export const S_REC_SEQ = 0, S_PROCESSED = 4, S_LAG_MS = 5, S_LAG_MAX = 6,
 export const SECTIONS = ['', 'intro', 'low', 'build', 'high', 'break'];
 export function sectionCode(s: string): number { const i = SECTIONS.indexOf(s); return i < 0 ? 0 : i; }
 
-export interface SplitBuffers { ctrl: SharedArrayBuffer; state: SharedArrayBuffer; hopState: SharedArrayBuffer;   // tillståndsblocket (sektionen), klockans block
-  post: SharedArrayBuffer; postPcm: SharedArrayBuffer; bigState: SharedArrayBuffer; spec: SharedArrayBuffer }   // POSTRINGEN (kedjan steg 11N), storblocket, spektra
+export interface SplitBuffers { ctrl: SharedArrayBuffer; svar: SharedArrayBuffer;   // SVARET (kedjan steg 12): ett block, klockdelen och formdelen (svarDelar)
+  post: SharedArrayBuffer; postPcm: SharedArrayBuffer; spec: SharedArrayBuffer }   // POSTRINGEN (kedjan steg 11N), spektra
 
 /** Meddelanden main ↔ worker. */
 export type WorkerMsg = { type: 'stop' } | { type: 'crash' };
@@ -50,25 +50,25 @@ export type WorkerMsg = { type: 'stop' } | { type: 'crash' };
 export interface WorkerData { cfg: unknown; buffers: SplitBuffers; resumeSeq: number ; sync?: boolean ;   // senast lästa record
   part?: 'all' | 'lane' | 'slow'  }   // två trådar med stora vägen
 
-/** Buffertarna: EN postring in (kedjan steg 11N; förr recordringen, storringen och taktringen), tre svarsblock ut och spektra. */
+/** Buffertarna: EN postring in (kedjan steg 11N; förr recordringen, storringen och taktringen), ETT svarsblock ut (kedjan steg 12; förr tillståndsblocket, storblocket och klockans block) och spektra. */
 export function createSplitBuffers(): SplitBuffers {
   return {
-    ctrl: new SharedArrayBuffer(16 * 4), state: new SharedArrayBuffer(STATE_LEN * 8), hopState: new SharedArrayBuffer(FEED_STATE_LEN * 8),
+    ctrl: new SharedArrayBuffer(16 * 4), svar: new SharedArrayBuffer(SVAR_LEN * 8),
     post: new SharedArrayBuffer(POST_N * POST_LEN * 8), postPcm: new SharedArrayBuffer(POST_N * POST_PCM * 4),
-    bigState: new SharedArrayBuffer(BIG_STATE_LEN * 8), spec: new SharedArrayBuffer(SPEC_SLOTS * SPEC_MAX * 4),
+    spec: new SharedArrayBuffer(SPEC_SLOTS * SPEC_MAX * 4),
   };
 }
 
-/** Skriv tillståndsblocket under seqlock. */
-export function stateWrite(ctrl: Int32Array, state: Float64Array, fill: (s: Float64Array) => void, word = C_STATE_SEQ): void {
+/** Skriv en del av svaret under seqlock. */
+export function stateWrite(ctrl: Int32Array, state: Float64Array, fill: (s: Float64Array) => void, word = C_FORM_SEQ): void {
   const s = Atomics.load(ctrl, word);
   Atomics.store(ctrl, word, s + 1);
   fill(state);
   Atomics.store(ctrl, word, s + 2);
 }
 
-/** Läs tillståndsblocket konsistent till `out`. */
-export function stateRead(ctrl: Int32Array, state: Float64Array, out: Float64Array, word = C_STATE_SEQ): boolean {
+/** Läs en del av svaret konsistent till `out`. */
+export function stateRead(ctrl: Int32Array, state: Float64Array, out: Float64Array, word = C_FORM_SEQ): boolean {
   for (let tries = 0; tries < 4; tries++) {
     const s1 = Atomics.load(ctrl, word);
     if (s1 & 1) continue;
@@ -82,7 +82,7 @@ export function stateRead(ctrl: Int32Array, state: Float64Array, out: Float64Arr
 /** stateRead med minne. */
 export class StateReader {
   private w = -1;   // ordet vid senaste lyckade läsningen
-  read(ctrl: Int32Array, state: Float64Array, out: Float64Array, word = C_STATE_SEQ): boolean {
+  read(ctrl: Int32Array, state: Float64Array, out: Float64Array, word = C_FORM_SEQ): boolean {
     if (Atomics.load(ctrl, word) === this.w) return true;
     for (let tries = 0; tries < 4; tries++) {
       const s1 = Atomics.load(ctrl, word);
@@ -111,10 +111,10 @@ export const P_SEQ = 0, P_N = 1, P_ENVF = 2, P_NOW = 3,   // postens kärna: num
   P_TS = 10, P_ANCHOR = 11, P_KICKAT = 12, P_ON_KICK = 13, P_ON_HIMID = 14, P_ON_TREBLE = 15,   // klockans del (förr taktringen, HopLaneFast.write)
   P_SA_SUB = 16, P_SA_KICK = 17, P_SA_BASS = 18, P_SA_LOWMID = 19, P_SA_MID = 20, P_SA_HIMID = 21, P_SA_TREBLE = 22,
   P_BOUND = 23, P_QUIET = 24, P_SURE = 25;   // låtgränsen (trackBoundaries, förr H_BOUND), tystnaden, Sonos-gränsen säker
-export const C_BIG_READ = 9, C_BIG_SEQ = 10 , C_WAITING_B = 11 ;   // högerspaltens lästa poster, storblockets seqlock (ord 4 och 8 lediga)
-export const BS_SEQ = 0, BS_SPEC_N = 1, BS_SKIPPED = 2;   // storblocket (kärnan)
+export const C_BIG_READ = 9, C_WAITING_B = 11 ;   // högerspaltens lästa poster (ord 4, 8 och 10 lediga)
+export const BS_SEQ = 0, BS_SPEC_N = 1, BS_SKIPPED = 2;   // formdelens storbit (kärnan)
 
-// FACKENS PLATSER (steg 18) ur taggarna (analyserFack.ts TRAD): IN följer postens kärna (kedjan steg 11N), UT storblocket BS (sektionen tillståndsblocket S; klockans platser där står tomma, tempot går med taktvägen).
+// FACKENS PLATSER (steg 18) ur taggarna (analyserFack.ts TRAD): IN följer postens kärna (kedjan steg 11N), UT svarets formdel: storbiten BS och sektionsbiten S (klockans platser i S står tomma, tempot går i klockdelen).
 export const B = platser('IN', ['hop', 'fft', 'level', 'spectrum', 'kick', 'bass', 'riser', 'drop', 'character', 'section'], P_SURE + 1);
 export const BS = platser('UT', ['hop', 'level', 'spectrum', 'kick', 'bass', 'riser', 'drop', 'character'], BS_SKIPPED + 1);
 export const S = platser('UT', ['clock', 'section'], S_LOST_FLAGS + 1);
@@ -122,13 +122,18 @@ if (B.LEN - P_SURE - 1 !== antal('IN') || BS.LEN - BS_SKIPPED - 1 + S.LEN - S_LO
 export const POST_LEN = B.LEN, BIG_STATE_LEN = BS.LEN, STATE_LEN = S.LEN;
 export const SPEC_SLOTS = 16, SPEC_MAX = 1024;   // 16 spektra
 
-export const C_HOP_READ = 5, C_FEED_SEQ = 6 , C_WAKE = 7 ;   // TAKTVÄGEN: klockans lästa poster, klockblockets seqlock; väckningen
+export const C_HOP_READ = 5, C_FEED_SEQ = 6 , C_WAKE = 7 ;   // TAKTVÄGEN: klockans lästa poster, svarets klockdel (seqlock); väckningen
 export const FS_HOP_SEQ = 0, FS_BEAT = 1 , FS_ANCHOR = 2, FS_BPM = 3, FS_BCONF = 4,
   FS_BEATERR = 5 , FS_GRID = 7 ,
   FS_GANCHOR = 8, FS_GBPM = 9, FS_GCONF = 10,
   FS_PROCESSED = 13, FS_LAG_MS = 14, FS_LAG_MAX = 15, FS_BUSY_US = 16, FS_BUSY_MAX_US = 17, FS_SKIPPED = 18,
   FS_BARK = 19 ;
 export const FEED_STATE_LEN = 20;
+/** SVARET (kedjan steg 12): ett block i två delar. Klockdelen (FS_*, seqlock C_FEED_SEQ) och formdelen: sektionsbiten S och storbiten BS under ett seqlock (C_FORM_SEQ). Platserna i varje bit är som förr. */
+export const SVAR_FORM = FEED_STATE_LEN, SVAR_STOR = SVAR_FORM + STATE_LEN, SVAR_LEN = SVAR_STOR + BIG_STATE_LEN;
+export function svarDelar(b: SplitBuffers): { klocka: Float64Array; sektion: Float64Array; stor: Float64Array } {
+  return { klocka: new Float64Array(b.svar, 0, FEED_STATE_LEN), sektion: new Float64Array(b.svar, SVAR_FORM * 8, STATE_LEN), stor: new Float64Array(b.svar, SVAR_STOR * 8, BIG_STATE_LEN) };
+}
 
 /** Det taktmatningen läser ur ramen, och det den skriver. */
 export interface HopFrame { bpm: number; bpmConfidence: number; kickAnchorMs: number; kickAtMs: number; barShift: number; beatTrust?: number;
@@ -152,7 +157,7 @@ export class HopLaneFast {
   barKnown = false;   // EN ETTA
   peer: HopLaneSlow | null = null;   // inline-läget (Analyser.post tömmer den först)
   constructor(b: SplitBuffers, private readonly sync = false) {
-    this.ctrl = new Int32Array(b.ctrl); this.state = new Float64Array(b.hopState);
+    this.ctrl = new Int32Array(b.ctrl); this.state = svarDelar(b).klocka;
   }
   /** Klockans del av hoppets post (kedjan steg 11N, förr taktringen): skrivs i Analyser.post. on = onset per band, sa = absolut magnitud per band. */
   write(r: Float64Array, o: number, seq: number, anchorMs: number, kickAtMs: number, on: Float32Array, sa: Float32Array, an: HopTarget): void {
@@ -208,7 +213,7 @@ export class HopLaneSlow {
   private readonly target: HopTarget = { trackBoundaries: 0, quietMs: 0, setClockGrid: (g) => { this.grid = g; },
     setClock: (bpm, conf) => { this.an?.setClock(bpm, conf); } };   // klockan skriver tempot direkt i workerns analysator
   constructor(b: SplitBuffers, private readonly feed: HopFeed, private readonly notify = false) {
-    this.ctrl = new Int32Array(b.ctrl); this.ring = new Float64Array(b.post); this.state = new Float64Array(b.hopState);
+    this.ctrl = new Int32Array(b.ctrl); this.ring = new Float64Array(b.post); this.state = svarDelar(b).klocka;
     const sq = Atomics.load(this.ctrl, C_FEED_SEQ); if (sq & 1) Atomics.store(this.ctrl, C_FEED_SEQ, sq + 1);
     const st = this.state; this.seq = st[FS_HOP_SEQ]; this.processed = st[FS_PROCESSED];
   }
