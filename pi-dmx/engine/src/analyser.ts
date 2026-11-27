@@ -5,14 +5,13 @@ import { sysEnv, stabilise, makeFack, off, stenarAv, type Fack, BODY_CEIL_DB_S, 
 export { BASS_SPAN_DB, BODY_CEIL_DB_S };
 export type { BeatGrid, AnalyserDetection, Cfg, Role };
 import {
-  REC_LEN, RING_N, R_SEQ, R_PERF, R_WALL, R_FLAGS, R_HINT_MS, R_VCLOCK, R_TS, R_FLAGCNT, RING_MARGIN, FLAG_BITS, B, BS, S,
+  POST_N, POST_PCM, POST_LEN, P_SEQ, P_N, P_ENVF, P_NOW, P_REC, P_PERF, P_FLAGS, P_HINT_MS, P_VCLOCK, P_FLAGCNT, RING_MARGIN, FLAG_BITS, B, BS, S,
   packFlagCounts, lostFlags, seqLow, seqDelta, C_WAITING, C_STATE_SEQ, S_LOST_FLAGS,
   F_HINT, F_VCLOCK_SET, F_VCLOCK_NULL,
   C_WRITE, C_READ, S_REC_SEQ, S_PROCESSED, S_LAG_MS, S_LAG_MAX, S_BUSY_US, S_BUSY_MAX_US, S_SKIPPED, STATE_LEN,
-  viewsOf, stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
+  stateWrite, stateRead, createSplitBuffers, type SplitBuffers, type WorkerData,
   C_WAKE, syncWait, HopLaneFast, HopLaneSlow, StateReader,
-  R_BIGSEQ, BIG_REC_LEN, BIG_RING_N, BIG_HOP_MAX, B_SEQ, B_N,
-  B_ENVF, C_WAITING_B, C_BIG_WRITE, C_BIG_READ, C_BIG_SEQ, BS_SEQ,
+  C_WAITING_B, C_BIG_READ, C_BIG_SEQ, BS_SEQ,
   BS_SPEC_N, BS_SKIPPED, BIG_STATE_LEN, SPEC_SLOTS, SPEC_MAX,
 } from './split.js';
 const Bh = B.hop, Bf = B.fft, Bl = B.level, Bk = B.kick, BSs = BS.spectrum, Sc = S.clock;   // kärnans platser ur taggarna
@@ -146,23 +145,23 @@ export class Analyser {
   private static readonly GRID_PHASE_OFFSET_MS = Number(sysEnv('GRID_PHASE_OFFSET_MS')) || 0;   // Fasval
 
   private tickT = 0;   // 100 Hz-steget
-  private splitCtrl: Int32Array | null = null; private splitRing: Float64Array | null = null; private splitState: Float64Array | null = null;
+  private splitCtrl: Int32Array | null = null; private splitState: Float64Array | null = null;
   private stateCopy = new Float64Array(STATE_LEN); private stateRd = new StateReader();   // a7: kopian bara när blocket ändrats
   private recSeq = 0;   // fast: senast skrivna record
   private barrierSeq = 0;   // fast: tillstand aldre an detta record ignoreras
-  private pendFlags = 0; private pendHintMs = 0; private pendVclock = 0;
+  private pendFlags = 0; private pendHintMs = 0; private pendVclock = 0; private recPost = 0; private recPerf = 0;   // fast: recordet som åker med i hoppets post (kedjan steg 11N)
   private flagCnt = new Int32Array(FLAG_BITS);   // fast: antal ganger varje flagga rests
-  private slowLastCnt = -1;   // slow: R_FLAGCNT i senast behandlade record
-  private slowGap = false;   // slow: records tappade sedan senast behandlade
+  private slowLastCnt = -1;   // slow: P_FLAGCNT i senast behandlade record
+  private slowGap = false;   // slow: poster tappade sedan senast behandlade
   private slowLostFlags = 0;   // slow: antal flaggor som aterskapats ur raknarna efter tapp
   splitRestarts = 0;   // fast: antal omstarter av workern
   hopLane: HopLaneFast | null = null;   // TAKTVÄGEN
   private syncWorker = false;   // fast: vänta på workern efter varje record
   private inlinePeer: Analyser | null = null;
-  private bigRing: Float64Array | null = null; private bigPcm: Float32Array | null = null; private bigState: Float64Array | null = null;   private bigSeq = 0; private bigCopy = new Float64Array(BIG_STATE_LEN); private bigRd = new StateReader();  private specDelivered = 0;  private bigSkipped = 0;
+  private postRing: Float64Array | null = null; private postPcm: Float32Array | null = null; private bigState: Float64Array | null = null;   private postSeq = 0; private bigCopy = new Float64Array(BIG_STATE_LEN); private bigRd = new StateReader();  private specDelivered = 0;  private postSkipped = 0;
   private bigEnvFlag = 0;
   bigYield: (() => void) | null = null;   // PI:NS VERKLIGHET
-  private slowBusyEmaUs = 0; private slowBusyMaxUs = 0; private slowLagMaxMs = 0; private slowSkipped = 0; private slowProcessed = 0;
+  private slowBusyEmaUs = 0; private slowBusyMaxUs = 0; private slowLagMaxMs = 0; private slowProcessed = 0;
 
   private aVU = 0;
   private dKick = 0;
@@ -192,22 +191,8 @@ export class Analyser {
     this.pendFlags |= f; this.barrierSeq = this.recSeq + 1;
     for (let k = 0; k < FLAG_BITS; k++) if (f & (1 << k)) this.flagCnt[k]++;
   }
-  /** Ett record per 100 Hz-steg. */
-  private pushSlowRecord(): void {
-    const r = this.splitRing!, ctrl = this.splitCtrl!;
-    const seq = ++this.recSeq; const o = (seq % RING_N) * REC_LEN;
-    r[o + R_PERF] = this.perfNow(); r[o + R_WALL] = this.wallNow(); r[o + R_TS] = Date.now();
-    r[o + R_FLAGS] = this.pendFlags; r[o + R_HINT_MS] = this.pendHintMs; r[o + R_VCLOCK] = this.pendVclock;
-    r[o + R_FLAGCNT] = packFlagCounts(this.flagCnt);
-    r[o + R_BIGSEQ] = this.bigSeq;
-    r[o + R_SEQ] = seq;
-    this.pendFlags = 0;
-    Atomics.store(ctrl, C_WRITE, seqLow(seq));
-    Atomics.add(ctrl, C_WAKE, 1);
-    if ((this.syncWorker || !this.hopLane) && (Atomics.load(ctrl, C_WAITING) || Atomics.load(ctrl, C_WAITING_B))) Atomics.notify(ctrl, C_WAKE);
-    if (this.inlinePeer) { this.inlinePeer.drainRecords(); this.pullSlowState(); }
-    else if (this.syncWorker) { syncWait(ctrl, C_STATE_SEQ, () => this.stateRd.read(ctrl, this.splitState!, this.stateCopy) && this.stateCopy[S_REC_SEQ] >= seq); this.pullSlowState(); }
-  }
+  /** Ett record per 100 Hz-steg: det åker med i hoppets post (kedjan steg 11N), med tiden från steget. */
+  private pushSlowRecord(): void { this.recPost = ++this.recSeq; this.recPerf = this.perfNow(); }
   /** Hamta tempo/gridfas/sektion ur tillstandsblocket. */
   private pullSlowState(): void {
     if (!this.stateRd.read(this.splitCtrl!, this.splitState!, this.stateCopy)) return;
@@ -215,74 +200,107 @@ export class Analyser {
     this.sections?.unpack(s);
   }
   setInlinePeer(slow: Analyser | null): void { this.inlinePeer = slow; this.hopLane?.peer?.connect(slow); }   // EN TEMPOKÄLLA: taktvägen skriver tempot i den långsamma sidan
-  /** Halsa for /api/live. */
+  /** Halsa for /api/live. Posterna: skrivna, lästa av högerspalten och efter (kedjan steg 11N); lagMs = 100 Hz-delens eftersläp. */
   getSplitStats(): { role: string; written: number; processed: number; behind: number; lagMs: number; lagMaxMs: number; busyUs: number; busyMaxUs: number; skipped: number; lostFlags: number; restarts: number } | null {
     if (this.f.hop.role !== 'fast') return null;
     const s = this.stateCopy;
-    return { role: this.f.hop.role, written: this.recSeq, processed: s[S_PROCESSED], behind: this.recSeq - s[S_REC_SEQ], lagMs: +s[S_LAG_MS].toFixed(1), lagMaxMs: +s[S_LAG_MAX].toFixed(1),
+    return { role: this.f.hop.role, written: this.postSeq, processed: s[S_PROCESSED], behind: this.postSeq - this.bigCopy[BS_SEQ], lagMs: +s[S_LAG_MS].toFixed(1), lagMaxMs: +s[S_LAG_MAX].toFixed(1),
       busyUs: Math.round(s[S_BUSY_US]), busyMaxUs: Math.round(s[S_BUSY_MAX_US]), skipped: s[S_SKIPPED], lostFlags: s[S_LOST_FLAGS], restarts: this.splitRestarts };
   }
   /** fast: senast skrivna record. */
   fastWriteSeq(): number { return this.recSeq; }
   fastReadSeq(): number { const d = seqDelta(Atomics.load(this.splitCtrl!, C_READ), this.recSeq); return d > 0 ? this.recSeq : this.recSeq + d; }
 
-  /** DELAD ANALYSATOR. */
-  slowReadSeq(): number { return this.recSeq; }
-  /** Behandla alla records som skrivits sedan sist, publicera tillstandet. */
+  /** Workern, HÖGERSPALTEN (kedjan steg 11N): posterna en i taget. Klockan först: före varje post tar den alla nya poster (bigYield).
+   *  Per post: 100 Hz-delen (kommandona, sektionens steg, tillståndsblocket) och sedan stenarna; storblocket efter de nya posterna. */
   drainRecords(): number {
-    const ctrl = this.splitCtrl!, r = this.splitRing!;
-    const w = this.recSeq + seqDelta(Atomics.load(ctrl, C_WRITE), this.recSeq); let n = 0;
-    if (w - this.recSeq > RING_N - RING_MARGIN) { this.slowSkipped += (w - this.recSeq) - (RING_N - RING_MARGIN); this.recSeq = w - (RING_N - RING_MARGIN); this.slowGap = true; }
-    let lagMs = 0;
-    while (this.recSeq < w) {
-      const seq = ++this.recSeq; const o = (seq % RING_N) * REC_LEN;
-      if (r[o + R_SEQ] !== seq) { this.slowSkipped++; this.slowGap = true; continue; }
+    const h = this.f.hop;
+    const lv = this.f.level, kk = this.f.kick, ff = this.f.fft;
+    const ctrl = this.splitCtrl!, r = this.postRing!, pcm = this.postPcm!;
+    const w = this.postSeq + seqDelta(Atomics.load(ctrl, C_WRITE), this.postSeq);
+    if (w - this.postSeq > POST_N - RING_MARGIN) { this.postSkipped += (w - this.postSeq) - (POST_N - RING_MARGIN); this.postSeq = w - (POST_N - RING_MARGIN); this.slowGap = true; }
+    let n = 0;
+    while (this.postSeq < w) {
+      if (this.bigYield) this.bigYield();   // klockan först
+      const seq = ++this.postSeq, slot = seq % POST_N, o = slot * POST_LEN;
+      if (r[o + P_SEQ] !== seq) { this.postSkipped++; this.slowGap = true; continue; }
       const t0 = performance.now();
-      if (this.slowGap) {
-        if (this.slowLastCnt >= 0) {
-          const lost = lostFlags(this.slowLastCnt, r[o + R_FLAGCNT], r[o + R_FLAGS]);
-          if (lost) { this.slowLostFlags++; this.applyFlags(lost, 5000, r[o + R_PERF]); }
-        }
-        this.slowGap = false;
-      }
-      this.drainBig(r[o + R_BIGSEQ]);
-      this.slowStep(o); this.slowLastCnt = r[o + R_FLAGCNT];
-      if (this.bigYield) this.bigYield();
+      if (r[o + P_REC] > 0) this.slowRecord(o);
+      const hn = r[o + P_N];
+      this.bass?.accumulate();
+      ff.rms = r[o + Bf.rms]; h.nowWall = r[o + Bh.nowWall]; ff.centSmooth = r[o + Bf.centSmooth]; h.breaking = r[o + Bh.breaking] === 1;
+      h.kickHit = r[o + Bh.kickHit];
+      lv.lvlSmooth = r[o + Bl.lvlSmooth]; lv.activeMs = r[o + Bl.activeMs]; lv.intensity = r[o + Bl.intensity]; lv.levelCeil = r[o + Bl.levelCeil]; kk.kick = r[o + Bk.kick] === 1;
+      if (r[o + P_ENVF] === 1) this.bass?.stepBassline();
+      { const po = slot * POST_PCM; this.bands.bigRingPush(pcm.subarray(po, po + hn)); }
+      this.bands.bigTick();
+      this.slowPart();
+      this.sections?.bigAgg();
       const us = (performance.now() - t0) * 1000;
       this.slowBusyEmaUs = this.slowBusyEmaUs === 0 ? us : this.slowBusyEmaUs + 0.02 * (us - this.slowBusyEmaUs);
       if (us > this.slowBusyMaxUs) this.slowBusyMaxUs = us;
-      lagMs = Date.now() - r[o + R_TS]; if (lagMs > this.slowLagMaxMs) this.slowLagMaxMs = lagMs;
-      n++;
+      this.slowProcessed++; n++;
     }
     if (n > 0) {
-      this.slowProcessed += n;
-      Atomics.store(ctrl, C_READ, seqLow(this.recSeq));
-      stateWrite(ctrl, this.splitState!, (s) => {
-        s[S_REC_SEQ] = this.recSeq;
-        this.sections?.pack(s);
-        s[S_PROCESSED] = this.slowProcessed; s[S_LAG_MS] = lagMs; s[S_LAG_MAX] = this.slowLagMaxMs; s[S_BUSY_US] = this.slowBusyEmaUs; s[S_BUSY_MAX_US] = this.slowBusyMaxUs; s[S_SKIPPED] = this.slowSkipped; s[S_LOST_FLAGS] = this.slowLostFlags;
-      });
-      if (this.syncWorker) Atomics.notify(ctrl, C_STATE_SEQ);
+      Atomics.store(ctrl, C_BIG_READ, seqLow(this.postSeq));
+      stateWrite(ctrl, this.bigState!, (s) => {
+        s[BS_SEQ] = this.postSeq; s[BSs.bodyDb] = this.f.spectrum.bodyDb; this.drop?.pack(s); this.riser?.pack(s); this.character?.pack(s); s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.postSkipped;
+      }, C_BIG_SEQ);
+      if (this.syncWorker) Atomics.notify(ctrl, C_BIG_SEQ);
     }
-    this.drainBig(Infinity);
     return n;
   }
+  /** 100 Hz-delen av en post (förr recordet): tappade kommandon ur räknarna, kommandona, sektionens steg och tillståndsblocket, före postens stenar som förr. */
+  private slowRecord(o: number): void {
+    const ctrl = this.splitCtrl!, r = this.postRing!;
+    if (this.slowGap) {
+      if (this.slowLastCnt >= 0) {
+        const lost = lostFlags(this.slowLastCnt, r[o + P_FLAGCNT], r[o + P_FLAGS]);
+        if (lost) { this.slowLostFlags++; this.applyFlags(lost, 5000, r[o + P_PERF]); }
+      }
+      this.slowGap = false;
+    }
+    this.recSeq = r[o + P_REC];
+    this.slowStep(o); this.slowLastCnt = r[o + P_FLAGCNT];
+    const lagMs = Date.now() - r[o + P_NOW]; if (lagMs > this.slowLagMaxMs) this.slowLagMaxMs = lagMs;
+    Atomics.store(ctrl, C_READ, seqLow(this.recSeq));
+    stateWrite(ctrl, this.splitState!, (s) => {
+      s[S_REC_SEQ] = this.recSeq;
+      this.sections?.pack(s);
+      s[S_PROCESSED] = this.slowProcessed; s[S_LAG_MS] = lagMs; s[S_LAG_MAX] = this.slowLagMaxMs; s[S_BUSY_US] = this.slowBusyEmaUs; s[S_BUSY_MAX_US] = this.slowBusyMaxUs; s[S_SKIPPED] = this.postSkipped; s[S_LOST_FLAGS] = this.slowLostFlags;
+    });
+    if (this.syncWorker) Atomics.notify(ctrl, C_STATE_SEQ);
+  }
 
-  /** STORA VÄGEN. */
-  private pushBig(samples: Float32Array): void {
+  /** POSTEN (kedjan steg 11N): EN väg in. En post per hopp, direkt efter de snabba banden: ljudet, stammens IN-fält, klockans del och
+   *  100 Hz-delen när tickStep slagit. Inline tar klockan och sedan högerspalten posten här. I lås-läget väntar posten på storblocket,
+   *  och i ett 100 Hz-steg hämtas sektionen, så att basenergin och ramen läser samma steg som förr. */
+  private post(samples: Float32Array): void {
     const h = this.f.hop;
-    const lv = this.f.level, sp = this.f.spectrum, kk = this.f.kick, ff = this.f.fft;
-    const r = this.bigRing!, ctrl = this.splitCtrl!, seq = ++this.bigSeq, slot = seq % BIG_RING_N, o = slot * BIG_REC_LEN, n = samples.length;
-    this.bigPcm!.set(samples, slot * BIG_HOP_MAX);
-    r[o + B_N] = n; r[o + Bf.rms] = ff.rms; r[o + Bh.nowWall] = h.nowWall; r[o + Bf.centSmooth] = ff.centSmooth; r[o + Bh.breaking] = h.breaking ? 1 : 0;
+    const lv = this.f.level, kk = this.f.kick, ff = this.f.fft;
+    const r = this.postRing!, ctrl = this.splitCtrl!, seq = ++this.postSeq, slot = seq % POST_N, o = slot * POST_LEN, n = samples.length;
+    if (n > POST_PCM) throw new Error(`Analyser: hoppet har ${n} sampel, posten rymmer ${POST_PCM}`);
+    this.postPcm!.set(samples, slot * POST_PCM);
+    r[o + P_N] = n; r[o + P_NOW] = Date.now(); r[o + Bf.rms] = ff.rms; r[o + Bh.nowWall] = h.nowWall; r[o + Bf.centSmooth] = ff.centSmooth; r[o + Bh.breaking] = h.breaking ? 1 : 0;
     r[o + Bh.kickHit] = h.kickHit;
     r[o + Bl.lvlSmooth] = lv.lvlSmooth; r[o + Bl.activeMs] = lv.activeMs; r[o + Bl.intensity] = lv.intensity; r[o + Bl.levelCeil] = lv.levelCeil; r[o + Bk.kick] = kk.kick ? 1 : 0;
-    r[o + B_ENVF] = this.bigEnvFlag; this.bigEnvFlag = 0;
-    r[o + B_SEQ] = seq;
-    Atomics.store(ctrl, C_BIG_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
-    if ((this.syncWorker || !this.hopLane) && (Atomics.load(ctrl, C_WAITING) || Atomics.load(ctrl, C_WAITING_B))) Atomics.notify(ctrl, C_WAKE);
-    if (this.inlinePeer) this.inlinePeer.drainBig(Infinity);
+    r[o + P_ENVF] = this.bigEnvFlag; this.bigEnvFlag = 0;
+    const rec = this.recPost; r[o + P_REC] = rec;
+    if (rec > 0) {
+      r[o + P_PERF] = this.recPerf; r[o + P_FLAGS] = this.pendFlags; r[o + P_HINT_MS] = this.pendHintMs; r[o + P_VCLOCK] = this.pendVclock;
+      r[o + P_FLAGCNT] = packFlagCounts(this.flagCnt); this.pendFlags = 0; this.recPost = 0;
+    }
+    if (this.hopLane) this.hopLane.write(r, o, seq, kk.beatAnchorMs, kk.kickAt, this.f.spectrum.fbOn, this.bands.fbAbs, this);   // klockans del (förr taktringen)
+    r[o + P_SEQ] = seq;
+    Atomics.store(ctrl, C_WRITE, seqLow(seq)); Atomics.add(ctrl, C_WAKE, 1);
+    if (Atomics.load(ctrl, C_WAITING) || Atomics.load(ctrl, C_WAITING_B)) Atomics.notify(ctrl, C_WAKE);
+    if (this.inlinePeer) { this.hopLane?.peer?.drain(); this.inlinePeer.drainRecords(); }
     else if (this.syncWorker) syncWait(ctrl, C_BIG_SEQ, () => this.bigRd.read(ctrl, this.bigState!, this.bigCopy, C_BIG_SEQ) && this.bigCopy[BS_SEQ] >= seq);
+    if (rec > 0 && (this.inlinePeer || this.syncWorker)) this.pullSlowState();
+  }
+  /** Storblocket ur workern (droppet, uppbyggnaden, karaktären, baskroppen, spektrumet), läst efter basenergin som förr i pushBig. */
+  private pullBig(): void {
+    const h = this.f.hop, sp = this.f.spectrum, ctrl = this.splitCtrl!;
     const s = this.bigCopy;
     if (!this.bigRd.read(ctrl, this.bigState!, s, C_BIG_SEQ) || s[BS_SEQ] === 0) return;
     sp.bodyDb = s[BSs.bodyDb]; this.drop?.unpack(s); this.riser?.unpack(s); this.character?.unpack(s);
@@ -296,51 +314,18 @@ export class Analyser {
     }
   }
 
-  /** slow: behandla hop-recorden t.o.m. */
-  drainBig(limit: number): number {
-    const h = this.f.hop;
-    const lv = this.f.level, kk = this.f.kick, ff = this.f.fft;
-    const ctrl = this.splitCtrl!, r = this.bigRing!, pcm = this.bigPcm!;
-    let w = this.bigSeq + seqDelta(Atomics.load(ctrl, C_BIG_WRITE), this.bigSeq); if (limit < w) w = limit;
-    if (w - this.bigSeq > BIG_RING_N - RING_MARGIN) { this.bigSkipped += (w - this.bigSeq) - (BIG_RING_N - RING_MARGIN); this.bigSeq = w - (BIG_RING_N - RING_MARGIN); }
-    let n = 0;
-    while (this.bigSeq < w) {
-      const seq = ++this.bigSeq, slot = seq % BIG_RING_N, o = slot * BIG_REC_LEN;
-      if (r[o + B_SEQ] !== seq) { this.bigSkipped++; continue; }
-      const hn = r[o + B_N];
-      this.bass?.accumulate();
-      ff.rms = r[o + Bf.rms]; h.nowWall = r[o + Bh.nowWall]; ff.centSmooth = r[o + Bf.centSmooth]; h.breaking = r[o + Bh.breaking] === 1;
-      h.kickHit = r[o + Bh.kickHit];
-      lv.lvlSmooth = r[o + Bl.lvlSmooth]; lv.activeMs = r[o + Bl.activeMs]; lv.intensity = r[o + Bl.intensity]; lv.levelCeil = r[o + Bl.levelCeil]; kk.kick = r[o + Bk.kick] === 1;
-      if (r[o + B_ENVF] === 1) this.bass?.stepBassline();
-      { const po = slot * BIG_HOP_MAX; this.bands.bigRingPush(pcm.subarray(po, po + hn)); }
-      this.bands.bigTick();
-      this.slowPart();
-      this.sections?.bigAgg();
-      n++;
-      if (this.bigYield) this.bigYield();
-    }
-    if (n > 0) {
-      Atomics.store(ctrl, C_BIG_READ, seqLow(this.bigSeq));
-      stateWrite(ctrl, this.bigState!, (s) => {
-        s[BS_SEQ] = this.bigSeq; s[BSs.bodyDb] = this.f.spectrum.bodyDb; this.drop?.pack(s); this.riser?.pack(s); this.character?.pack(s); s[BS_SPEC_N] = this.bands.specN; s[BS_SKIPPED] = this.bigSkipped;
-      }, C_BIG_SEQ);
-      if (this.syncWorker) Atomics.notify(ctrl, C_BIG_SEQ);
-    }
-    return n;
-  }
-  /** slow: alla hop-record lästa?. */
-  bigIdle(): boolean { return seqLow(this.bigSeq) === Atomics.load(this.splitCtrl!, C_BIG_WRITE); }
+  /** slow: alla poster lästa av högerspalten? */
+  bigIdle(): boolean { return seqLow(this.postSeq) === Atomics.load(this.splitCtrl!, C_WRITE); }
   /** Snabba sidans kommandon i exakt den ordning de restes. */
   private applyFlags(flags: number, hintMs: number, vclock: number): void {
     if (flags & F_VCLOCK_NULL) this.setVirtualClock(null); else if (flags & F_VCLOCK_SET) this.setVirtualClock(vclock);
     if (flags & F_HINT) this.hintTrackChange(hintMs);
   }
-  /** Ett record. */
+  /** 100 Hz-delen av en post: kommandona, workerns tid och sektionens steg. */
   private slowStep(o: number): void {
-    const r = this.splitRing!;
-    this.applyFlags(r[o + R_FLAGS], r[o + R_HINT_MS], r[o + R_VCLOCK]);
-    this.virtualMs = r[o + R_PERF]; this.virtualOn = true;
+    const r = this.postRing!;
+    this.applyFlags(r[o + P_FLAGS], r[o + P_HINT_MS], r[o + P_VCLOCK]);
+    this.virtualMs = r[o + P_PERF]; this.virtualOn = true;
     this.sections?.fromRecord();
   }
 
@@ -407,20 +392,20 @@ export class Analyser {
     const splitBuf = splitIn?.split ?? cfgIn.split;
     if (h.role !== 'all') {
       if (!splitBuf) throw new Error('Analyser: roll ' + h.role + ' kraver split-buffertar');
-      const v = viewsOf(splitBuf); this.splitCtrl = v.ctrl; this.splitRing = v.ring; this.splitState = v.state;
+      const v = { ctrl: new Int32Array(splitBuf.ctrl), state: new Float64Array(splitBuf.state) }; this.splitCtrl = v.ctrl; this.splitState = v.state;
       this.recSeq = splitIn?.resumeSeq ?? cfgIn.resumeSeq ?? 0;
       this.syncWorker = splitIn?.sync === true;
       if (h.role === 'slow') {
         this.slowGap = true;
         const sq = Atomics.load(v.ctrl, C_STATE_SEQ); if (sq & 1) Atomics.store(v.ctrl, C_STATE_SEQ, sq + 1);
       }
-      if (!splitBuf.big || !splitBuf.bigPcm || !splitBuf.bigState || !splitBuf.spec) throw new Error('Analyser: delat läge kräver stora vägens buffertar (createSplitBuffers)');
+      if (!splitBuf.post || !splitBuf.postPcm || !splitBuf.bigState || !splitBuf.spec) throw new Error('Analyser: delat läge kräver postringen och svarsblocken (createSplitBuffers)');
       {
         h.bigOn = true;
-        this.bigRing = new Float64Array(splitBuf.big); this.bigPcm = new Float32Array(splitBuf.bigPcm); this.bigState = new Float64Array(splitBuf.bigState); this.bands.specRing = new Float32Array(splitBuf.spec);
+        this.postRing = new Float64Array(splitBuf.post); this.postPcm = new Float32Array(splitBuf.postPcm); this.bigState = new Float64Array(splitBuf.bigState); this.bands.specRing = new Float32Array(splitBuf.spec);
         if (h.role === 'slow') {
           const sq = Atomics.load(v.ctrl, C_BIG_SEQ); if (sq & 1) Atomics.store(v.ctrl, C_BIG_SEQ, sq + 1);
-          const st = this.bigState; this.bigSeq = st[BS_SEQ]; this.bands.resume(st); this.drop?.resume(st);
+          const st = this.bigState; this.postSeq = st[BS_SEQ]; this.bands.resume(st); this.drop?.resume(st);
         }
       }
     }
@@ -530,19 +515,15 @@ export class Analyser {
     const nowWallA = this.wallNow();
     const breaking = lv.lvlSmooth < lv.levelCeil * 0.65;
 
-    h.nowWall = nowWallA;   // IN: färdig före pushBig
-    this.bass?.bassEnergyStep(this.bands.fbAbs[0], this.bands.fbAbs[1]);   // basen före pushBig: workern kan få värdet samma hopp
-    if (big) {
-      h.breaking = breaking;
-      this.pushBig(samples);
-    } else {
-      this.slowPart();
-    }
+    h.nowWall = nowWallA;   // IN: färdig före posten
+    if (big) { h.breaking = breaking; this.post(samples); }   // S5 POSTEN (kedjan steg 11N), direkt efter de snabba banden
+    this.bass?.bassEnergyStep(this.bands.fbAbs[0], this.bands.fbAbs[1]);   // basen läser sektionen: i lås-läget ur postens 100 Hz-steg, som förr
+    if (big) this.pullBig(); else this.slowPart();
     h.breaking = breaking;
     return this.fillFrame();
   }
 
-  /** DEN LÅNGSAMMA DELEN: stenarna efter stor-FFT:n, i workern (drainBig) eller odelat (process). En ny sten här. */
+  /** DEN LÅNGSAMMA DELEN: stenarna efter stor-FFT:n, i workern (drainRecords) eller odelat (process). En ny sten här. */
   private slowPart(): void {
     this.drop?.dropStep();
     this.riser?.riserStep();
@@ -622,7 +603,7 @@ export function createAnalyser(cfg: AnalyserConfig, modeIn?: 'worker' | 'inline'
   const mode = modeIn ?? sysEnv('ANALYSER_SPLIT');
   if (mode !== 'worker' && mode !== 'inline' && mode !== 'sync') { const a = new Analyser(cfg); a.clock = new BeatFeed(); return a; }
   const sync = mode === 'sync';
-  const buffers = createSplitBuffers(true);
+  const buffers = createSplitBuffers();
   const fast = new Analyser(cfg, { role: 'fast', split: buffers, sync });
   fast.hopLane = new HopLaneFast(buffers, sync);
   if (mode === 'inline') {

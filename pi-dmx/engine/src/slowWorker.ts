@@ -3,12 +3,12 @@ import { workerData, parentPort, receiveMessageOnPort } from 'node:worker_thread
 import { Analyser, type AnalyserConfig } from './analyser.js';
 import { BeatFeed } from './analyserClock.js';
 import { PROFILE } from './analyserProfile.js';
-import { C_WRITE, C_WAITING, C_WAITING_B, C_WAKE, C_HOP_WRITE, seqLow, HopLaneSlow, type HopFeed, type WorkerData, type WorkerMsg } from './split.js';
+import { C_WRITE, C_WAITING, C_WAITING_B, C_WAKE, seqLow, HopLaneSlow, type HopFeed, type WorkerData, type WorkerMsg } from './split.js';
 
 const { cfg, buffers, resumeSeq, sync, part = 'all' } = workerData as WorkerData & { cfg: AnalyserConfig };   // TVÅ TRÅDAR
 const ctrl = new Int32Array(buffers.ctrl);
 const an = part === 'lane' ? null : new Analyser(cfg, { role: 'slow', split: buffers, resumeSeq, sync });
-const wantLane = !!buffers.hop && part !== 'slow';
+const wantLane = part !== 'slow';
 const lane = wantLane ? new HopLaneSlow(buffers, new BeatFeed(), sync === true) : null;   // analysatorns klocka
 lane?.connect(an);   // EN TEMPOKÄLLA (kedjan steg 4): klockan skriver tempot i workerns analysator
 if (lane && an) an.bigYield = () => { lane.drain(); };   // en tråd
@@ -26,8 +26,8 @@ function pollMessages(): void {
   }
 }
 
-const idleSlow = (): boolean => !an || (seqLow(an.slowReadSeq()) === Atomics.load(ctrl, C_WRITE) && an.bigIdle());   // Sov aldrig langre an 200 ms sa ett 'stop' hinner fram
-const idleLane = (): boolean => !lane || seqLow(lane.readSeq()) === Atomics.load(ctrl, C_HOP_WRITE);
+const idleSlow = (): boolean => !an || an.bigIdle();   // Sov aldrig langre an 200 ms sa ett 'stop' hinner fram
+const idleLane = (): boolean => !lane || seqLow(lane.readSeq()) === Atomics.load(ctrl, C_WRITE);   // EN POSTRING (kedjan steg 11N): klockan och högerspalten läser samma poster
 const WAIT_FLAG = part === 'slow' ? C_WAITING_B : C_WAITING;
 while (!stop) {
   const k = Atomics.load(ctrl, C_WAKE);

@@ -36,7 +36,7 @@ const VANTAT = new Set([
 const { createAnalyser } = await import(pathToFileURL(join(DIST, 'analyser.js')).href);
 const { defaultConfig } = await import(pathToFileURL(join(DIST, 'config.js')).href);
 const { FACK } = await import(pathToFileURL(join(DIST, 'analyserFack.js')).href);
-const { R } = await import(pathToFileURL(join(DIST, 'split.js')).href);
+const { R = {} } = await import(pathToFileURL(join(DIST, 'split.js')).href);   // R = recordets IN-platser; borta sedan kedjan steg 11N (posten bär allt)
 const { Hopp } = await import(pathToFileURL(join(DIST, 'hopp.js')).href);
 const TRAD = [];   // [fack, fält, delfält, tagg, bara i hopp med record]
 for (const n in FACK) for (const [k, v] of Object.entries(FACK[n].TRAD)) for (const [j, t] of typeof v === 'string' ? [[null, v]] : Object.entries(v))
