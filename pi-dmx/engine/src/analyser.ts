@@ -421,7 +421,7 @@ export class Analyser {
         this.bigRing = new Float64Array(splitBuf.big); this.bigPcm = new Float32Array(splitBuf.bigPcm); this.bigState = new Float64Array(splitBuf.bigState); this.bands.specRing = new Float32Array(splitBuf.spec);
         if (h.role === 'slow') {
           const sq = Atomics.load(v.ctrl, C_BIG_SEQ); if (sq & 1) Atomics.store(v.ctrl, C_BIG_SEQ, sq + 1);
-          const st = this.bigState; this.bigSeq = st[BS_SEQ]; this.bands.resume(st); this.drop?.resume(st); this.sections?.resume(st);
+          const st = this.bigState; this.bigSeq = st[BS_SEQ]; this.bands.resume(st); this.drop?.resume(st);
         }
       }
     }

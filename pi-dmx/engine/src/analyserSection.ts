@@ -1,7 +1,7 @@
 /**  SEKTIONSFÖLJAREN (utbruten ur analyser.ts 2026-11-14). Anteckningar (kommentarerna som stod i koden): docs/analysator/analyserSection.md */
 import { sysEnv, numEnv, stabilise, BE_FALLBACK_MS, BE_MEM_BEATS, BODY_HIGH_MS,
   type Ser, type SectionOut } from "./analyserFack.js";
-import { S, BS, SECTIONS, sectionCode } from "./split.js";
+import { S, SECTIONS, sectionCode } from "./split.js";
 const P = S.section;   // platserna i tillståndsblocket
 
 const SECTION_SCORE_F32 = sysEnv('SECTION_SCORE_F32') === '1';   // Rangpoangens buffert i 32-bitars flyttal
@@ -14,7 +14,7 @@ const SECTION_EARLY_DB = Number(sysEnv('SECTION_EARLY_DB')) || 3;
 
 /** DET SEKTIONEN LÄSER (workern: bigAgg och blocken; odelat sectionAggStep). Inget annat går att nå. */
 export interface SectionReads {
-  hop:      Ser<'L', 'hop', 'role' | 'bigOn' | 'nowWall' | 'dtHop' | 'wallNow' | 'breaking'>;
+  hop:      Ser<'L', 'hop', 'bigOn' | 'nowWall' | 'dtHop' | 'wallNow' | 'breaking'>;
   fft:      Ser<'L', 'fft', 'rms' | 'centSmooth'>;
   level:    Ser<'L', 'level', 'activeMs' | 'intensity'>;
   kick:     Ser<'L', 'kick', 'kick'>;
@@ -85,8 +85,7 @@ export class SectionTracker {
   private repeatHighRun = 0; private secHighRunMs = 0;
   private shIn = { hops: 0.5, intSum: 0.5, kicks: 0.5, breaking: false, nowMs: 0.5, dtMs: 0.5, rms2Sum: 0.5, centSum: 0.5, specOff: 0.5, bonSum: 0.5, bpk: 0.5, fluxSum: 0.5, rms4Sum: 0.5 };   // sectionHop:s summor
   private specSeen = -1;   // senast sedda bigN; -1 = smutsigt från start
-  private readonly agg = { n: 0, int: 0, kicks: 0, breaking: 0, rms2: 0, cent: 0, dt: 0, wall: 0, drops: 0, spec: new Float64Array(8), bon: 0, bpk: 0, flux: 0, rms4: 0 };   // insamlarens summor (förr Analyser.secAgg)
-  private readonly wire = { drops: 0 };   // workerns indata (förr secVDrops)
+  private readonly agg = { n: 0, int: 0, kicks: 0, breaking: 0, rms2: 0, cent: 0, dt: 0, wall: 0, spec: new Float64Array(8), bon: 0, bpk: 0, flux: 0, rms4: 0 };   // insamlarens summor (förr Analyser.secAgg)
   private readonly secSpecHop = new Float64Array(8);   // Bandens absoluta magnitud for sektionsblocket
   secDump: number[][] | null = sysEnv('SECTION_DUMP') === '1' ? [] : null;   // Korbanks-dump
   dbgSecBlock: ((b: Record<string, unknown>) => void) | null = null;   // Korbanks-krok
@@ -94,7 +93,7 @@ export class SectionTracker {
 
 
   /** SEKTION. */
-  private dropsNow(): number { return this.h.role === 'slow' ? this.wire.drops : this.dr.dropCand + this.dr.secBodyRet; }
+  private dropsNow(): number { return this.dr.dropCand + this.dr.secBodyRet; }   // EN DROPRÄKNING: droppets egna räknare i alla roller
   sectionReset(): void {
     this.o.secBuildAt = 0; this.o.secBuildSeen = 0;
     this.o.section = 'intro'; this.o.sectionStartMs = 0; this.o.sectionIndex = 0; this.o.sectionTier = 1; this.o.repeatSim = 0; this.o.repeatAgoMs = 0;
@@ -365,19 +364,17 @@ export class SectionTracker {
   /** slow + stora vägen: sektionens hopaggregat (förr Analyser.bigAgg); hoppets värden ur facken (hopprecordet). */
   bigAgg(): void {
     const h = this.h, intensity = this.lv.intensity, kick = this.kk.kick, breaking = h.breaking, wall = h.nowWall;
-    const dp = this.dr;
     const rms = this.ff.rms;
     const sp = this.secSpecHop;
     if (this.sp.bigN !== this.specSeen) { this.specSeen = this.sp.bigN; for (let i = 0; i < 8; i++) sp[i] = Math.pow(10, this.sp.bandDbRaw[i] / 20); }
     const g = this.agg; g.n++; g.int += intensity; if (kick) g.kicks++; g.rms2 += rms * rms; g.cent += this.ff.centSmooth; g.dt += h.dtHop * 1000;
-    g.breaking = breaking ? 1 : 0; g.wall = wall; g.drops = dp.dropCand + dp.secBodyRet;
+    g.breaking = breaking ? 1 : 0; g.wall = wall;
     for (let i = 0; i < 8; i++) g.spec[i] += sp[i];
   }
 
   /** Workern: ett record stänger blocket ur hoppens summor (förr sist i slowStep). */
   fromRecord(): void {
       const g = this.agg;
-      if (g.n > 0) this.wire.drops = g.drops;
       if (g.n > 0) {
         const I = this.shIn; I.hops = g.n; I.intSum = g.int; I.kicks = g.kicks; I.breaking = g.breaking > 0; I.nowMs = g.wall; I.dtMs = g.dt; I.rms2Sum = g.rms2; I.centSum = g.cent;
         I.specOff = 0; I.bonSum = g.bon; I.bpk = g.bpk; I.fluxSum = g.flux; I.rms4Sum = g.rms4;
@@ -385,9 +382,6 @@ export class SectionTracker {
         g.n = 0; g.int = 0; g.kicks = 0; g.breaking = 0; g.rms2 = 0; g.cent = 0; g.dt = 0; g.spec.fill(0); g.bon = 0; g.bpk = 0; g.flux = 0; g.rms4 = 0;
       }
   }
-
-  /** Workern startar om: dropkandidaterna ur senaste BS_-blocket. */
-  resume(st: Float64Array): void { this.wire.drops = st[BS.drop.dropCand]; }
 
   /** Workern: sektionens fält till tillståndsblocket (drainRecords). */
   pack(s: Float64Array): void {
