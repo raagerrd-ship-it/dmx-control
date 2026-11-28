@@ -1,0 +1,35 @@
+[quiet] console.log avstangd (DMX_QUIET=1) - PUT /api/debug/verbose {"enabled":true} slar pa
+
+=== tools/ladan-2026-11-13/lang-20261113T160345.wav  0-603 s, 22603 rutor a 25 ms ===
+
+TAJT MOT LATEN
+  kick -> lampan pa mal 107 ms (median, p75 189, 4779 lampuppgangar; gamla riggmedel 90 %: 150 ms, fonster 200 ms vid 132 BPM) pa 495/1640 kickar = 30.2 %
+  uppgangens storlek 0.22 av riggens 0-1 skala
+  ljus mot energi    r 0.33 pa 1 s-MEDEL, 0.36 pa 1 s-TOPP (ruta-mot-ruta 0.26), ljus mot niva r 0.54
+  ljus per tier      lugn 0.11/0.16  fart 0.32/0.61  full 0.41/0.66  (medel/topp, 94/319/152 s)
+  look-byten         34 st = 3.38/min, musikalisk orsak 100.0 %
+                     landning 16  sektion 11  drop 7
+  drops              14 st, sprang lugna 0.72 (7 st) / hoga 0.54
+
+SNYGG LJUSSHOW
+  alla tre dioderna  3.0 % av tanda lamprutor   exakt en kanal 43.9 %
+  mattnad (median)   1.00      spridning mellan lampor 66 DMX-steg
+  lookar             14 distinkta, median 13 s, langsta stund 135 s
+  riggens ljus       p10 0.07  p50 0.28  p90 0.65   slackt 2.7 % av tiden
+
+-- dirigenten (141 rader, 12 forsta) --
+   [dirigent] nastan-drop: sprang 28.5 dB efter dipp 8.0 dB
+   [dirigent] manus intro: ny look "mellanslag" (tier fart, pool 7, sektion intro, basgang 0.45)
+   [dirigent] knippa NASTAN: NASTAN EJ BUILD BREAK EJ EFTER DL HALLEN NARA
+   [dirigent] manus intro: ny look "dunk" (tier fart, pool 7, sektion intro, basgang 0.77)
+   [dirigent] knippa LANDNING: LANDNING HALLEN LAND BASDEL
+   [dirigent] sektion intro -> build (nr 0, tier 1)
+   [dirigent] nastan-drop: sprang 10.1 dB efter dipp 11.0 dB
+   [dirigent] sektion build -> high (nr 1, tier 2)
+   [dirigent] manus high: ny look "kickregn" (tier full, pool 12, sektion high, basgang 0.31, slakt med dunk)
+   [dirigent] knippa SEKTION: DEL GRANS HALLEN FRAS SLAG EJ LUCKA EJ INTRO
+   [dirigent] nastan-drop: sprang 14.9 dB efter dipp 15.8 dB
+   [dirigent] manus high: ny look "tyngdlyft" (tier fart, pool 12, sektion high, basgang 0.05, slakt med dunk)
+
+TAJT = kick->ljus lagt, kickTraff hogt, r hogt, musikByten hogt. SNYGGT = alla3 lagt, mattnad och lampspr hoga,
+flera lookar utan langa stillastaende stunder, och ett ljusspann som anvands. Jamfor natt mot natt, aldrig i absoluta tal.

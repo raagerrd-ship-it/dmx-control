@@ -15,6 +15,19 @@ DMX-sidan kan ändra sådant som bara ligger i DMX-profilen (src/analyserProfile
 
 ---
 
+## ÖPPET 2026-11-28 Nästan-dropen fyller: frame.nearDropDb > 0 i långa stråk, DMX:s refraktärtid 4 s är det enda som glesar - INGEN delad fil ändrad
+Vad: på HEAD ea84d55c (ladan16) ger analysatorns nearDropDb 452 nästan-drop på de sex långinspelningarna (4563 s = en per 10 s), 221 av dem
+med 4,0-4,6 s mellanrum = de kommer så fort DMX:s NEAR_REFRACT_MS (4 s) släpper. Per fil (antal / >= 20 dB / i följd / landningar via NASTAN):
+151659 54/11/19/4, 160345 39/14/4/7, 171840 (300 s) 30/6/18/3, 193040 (365 s) 29/5/8/2, 193818 175/28/110/15, 200719 125/30/62/9.
+200719 190-450 s: 59 i rad, alla 4-5 s isär, "sprang 10-36 dB efter dipp 9-29 dB" - en fyllig refräng, ingen paus hörbar i måtten.
+Följd i DMX: varje stor (>= 20 dB) blir en landning (knippa NASTAN EFTER) med 24 s skugga som slukar nästa sektionsgräns - i 200719 302-437 s
+spelade introts look (ankomst/chase) hela refrängen i 135 s. Var: analyserDrop.ts (near / rise / dip -> o.nearDropDb, o.nearDipDb).
+Material: tools/ladan-2026-11-14/lang-20261114T200719.wav 190-450 s, lang-20261114T193818.wav. Önskat: en nästan-drop ska vara en händelse
+(en dipp som musiken verkligen gör - ägaren: "nästan-drops ska synas"), inte ett tillstånd; dippen bör mätas mot en referens som inte
+följer varje takts transient, eller kräva att dippen håller > ~1 slag. DMX prövade 11-28 att låta sektionsgränsen gå före landningens skugga
+(DMX_LAND_SEKTION, förkastat: domaren -3,80/-2,06) - roten sitter här.
+Status:
+
 ## ÖPPET 2026-11-26 DELAD FIL ÄNDRAD: skräpet del N (talfält som flyttal, karaktärens profil som klass, rutans klocka en gång per ruta)
 Vad: huvudsessionen lade in del N 2026-11-25 (6fea7319, 5375319f, b122fd9b; manifestet ANALYSER_SHARED.md5 uppdaterat), inte utlagd i ladan.
 Skräp 943 -> 574 kB/s ljud enligt LAGET.md. Nattagenten 11-26: DMX-baslinjen tools/natt/ren-2026-11-26 (HEAD 2d290551) är 12/12 json

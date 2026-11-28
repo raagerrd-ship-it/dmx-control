@@ -1,0 +1,111 @@
+{
+ "wav": "tools/ladan-2026-11-13/lang-20261113T151659.wav",
+ "startS": 0,
+ "gainDb": 0,
+ "totS": 532,
+ "rutor": 19946,
+ "tajt": {
+  "kickLagMs": 144,
+  "kickLagP75": 195,
+  "kickLagRigg90": 125,
+  "lampUpp": 2920,
+  "kickar": 1515,
+  "kickTraff": 0.3141914191419142,
+  "kickHojd": 0.11764705882352941,
+  "energiR": 0.1504685114297498,
+  "nivaR": 0.3140243484104401,
+  "energiRtopp": 0.15217001146403958,
+  "energiRruta": 0.12297213164723621,
+  "energiR15": 0.17331196712273755,
+  "nivaR15": 0.31204432670992976,
+  "bpmMed": 130.07348355582678,
+  "kickFonsterMs": 200,
+  "litLugn": 0.16454656862745107,
+  "litFart": 0.24553921568627457,
+  "litFull": 0.20688725490196083,
+  "toppLugn": 0.22352941176470592,
+  "toppFart": 0.46176470588235297,
+  "toppFull": 0.31176470588235294,
+  "sekLugn": 98,
+  "sekFart": 312,
+  "sekFull": 88,
+  "byten": 35,
+  "bytenPerMin": 3.9483579844572576,
+  "musikByten": 1,
+  "orsaker": {
+   "sektion": 13,
+   "landning": 22
+  },
+  "drops": 0,
+  "minidrops": 45,
+  "granser": 2,
+  "karaktarsskiften": 10,
+  "tempovaxlingar": 1,
+  "dropSprangLugn": null,
+  "dropSprangHog": null,
+  "dropsLugna": 0
+ },
+ "snygg": {
+  "alla3": 0.0008439860845221186,
+  "en": 0.5123613083842813,
+  "matt": 1,
+  "lampspr": 63.08964203349042,
+  "lookar": 12,
+  "lookMedianS": 12.880000000000052,
+  "lookLangstaS": 59.30666666666666,
+  "morkt": 0.0015541963300912463,
+  "litP10": 0.07058823529411765,
+  "litP50": 0.1931372549019608,
+  "litP90": 0.49313725490196086
+ },
+ "lookTime": [
+  [
+   "gallop",
+   96.66666650391316
+  ],
+  [
+   "kickregn",
+   71.92000000000303
+  ],
+  [
+   "dansparet",
+   64.37333276367372
+  ],
+  [
+   "duel",
+   51.81333349609473
+  ],
+  [
+   "minnet",
+   50.7200000000009
+  ],
+  [
+   "forvarning",
+   41.86666699218781
+  ],
+  [
+   "wave",
+   41.75833325195342
+  ],
+  [
+   "linjalen",
+   39.09333349609387
+  ],
+  [
+   "varannan",
+   33.38666674804661
+  ],
+  [
+   "kaskad",
+   19.919999999999895
+  ],
+  [
+   "basgang",
+   17.973333496093687
+  ],
+  [
+   "pump",
+   2.4000000000000004
+  ]
+ ]
+}

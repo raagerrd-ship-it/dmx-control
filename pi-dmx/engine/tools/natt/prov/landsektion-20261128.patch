@@ -1,0 +1,27 @@
+diff --git a/pi-dmx/engine/src/effects.ts b/pi-dmx/engine/src/effects.ts
+index 50a81d72..dac7dac8 100644
+--- a/pi-dmx/engine/src/effects.ts
++++ b/pi-dmx/engine/src/effects.ts
+@@ -120,6 +120,10 @@ const DROP_GLES: Mode[] = ['dansparet', 'minnet'];   // droppen landar inte här
+ /** FULL_HEL (nattprov 2026-11-24, opt-in DMX_FULL_HEL=1, osatt = bit-identiskt): refrängen i full väljer inte heller de glesa (DROP_GLES) -
+  *  landningen drog minnet/dansparet i full så att full blev mörkare än fart (151659: full 0,19 mot fart 0,25 på 2 av 4 frön). */
+ const FULL_HEL = (process.env.DMX_FULL_HEL ?? '') === '1';
++/** LAND_SEKTION (nattprov 2026-11-28, opt-in DMX_LAND_SEKTION=1, osatt = bit-identiskt): landningens skugga (LAND_ABSORB_MS 24 s) tar inte
++ *  ett sektionsbyte till en del som den spelande looken inte är taggad för (EffectDef.section). 200719 302-437 s: landningen i introt valde
++ *  intro-looken ankomst (1 lampa), refrängen kom 13 s senare och slukades - ankomst spelade hela refrängen i 135 s. */
++const LAND_SEKTION = (process.env.DMX_LAND_SEKTION ?? '') === '1';
+ import { hsvToRgb, hsv as hsvFx } from "./effects/color.js";
+ import { slotSize } from "./effects/rig.js";
+ import { MomentLayer } from "./moment.js";
+@@ -1076,8 +1080,9 @@ export class EffectEngine {
+         const liveSec = frame.section || '';   // bara raa sektionen (forvarningens/drop-fonstrets 'high' raknas inte, se SECTION_UNIT_MIN_MS)
+         const liveSecChanged = liveSec !== '' && this.lastLiveSection !== '' && liveSec !== this.lastLiveSection;
+         if (liveSec !== '' && liveSec !== this.lastLiveSection) { if (this.lastLiveSection !== '') console.log(`[dirigent] sektion ${this.lastLiveSection} -> ${liveSec} (nr ${frame.sectionIndex ?? 0}, tier ${frame.sectionTier ?? '-'})`); this.lastLiveSection = liveSec; }   // (intro glommer inte lookerna langre - LÅTMANUS glomms bara pa en verklig latgrans)
+-        if (liveSecChanged) this.pendingSecSwitch = nowWall >= this.landAbsorbUntil;   // LANDNINGEN: detektorns sena byte efter landningen är redan gjort
+-        const memSection = liveSecChanged && nowWall >= this.landAbsorbUntil;   // (latminnets sektionsgrans mem* borttagen 11-09 - sattes aldrig)
++        const fel = LAND_SEKTION && liveSecChanged && (() => { const t = EFFECT_MAP.get(this.smartMode as Mode)?.section; return !!t && !t.includes(liveSec); })();   // LAND_SEKTION (prov 11-28)
++        if (liveSecChanged) this.pendingSecSwitch = nowWall >= this.landAbsorbUntil || fel;   // LANDNINGEN: detektorns sena byte efter landningen är redan gjort
++        const memSection = liveSecChanged && (nowWall >= this.landAbsorbUntil || fel);   // (latminnets sektionsgrans mem* borttagen 11-09 - sattes aldrig)
+         const phraseMs = this.cfg.beat && this.cfg.beat.bpm > 0 ? 16 * 60000 / this.cfg.beat.bpm : 0;
+         const secBars = frame.sectionBars ?? 0;
+         // BASGANG: tydlig basgang styr VALET av look (toggle-poolen), men byter inte look (LÅTMANUS).

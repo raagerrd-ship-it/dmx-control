@@ -1,0 +1,35 @@
+[quiet] console.log avstangd (DMX_QUIET=1) - PUT /api/debug/verbose {"enabled":true} slar pa
+
+=== tools/ladan-2026-11-14/lang-20261114T193040.wav  0-365 s, 13707 rutor a 25 ms ===
+
+TAJT MOT LATEN
+  kick -> lampan pa mal 133 ms (median, p75 229, 2725 lampuppgangar; gamla riggmedel 90 %: 150 ms, fonster 250 ms vid 113 BPM) pa 373/911 kickar = 40.9 %
+  uppgangens storlek 0.14 av riggens 0-1 skala
+  ljus mot energi    r 0.44 pa 1 s-MEDEL, 0.45 pa 1 s-TOPP (ruta-mot-ruta 0.37), ljus mot niva r 0.19
+  ljus per tier      lugn 0.16/0.28  fart 0.20/0.27  full 0.43/0.63  (medel/topp, 89/172/81 s)
+  look-byten         23 st = 3.78/min, musikalisk orsak 100.0 %
+                     sektion 13  drop 6  landning 4
+  drops              7 st, sprang lugna 0.67 (4 st) / hoga 0.65
+
+SNYGG LJUSSHOW
+  alla tre dioderna  2.6 % av tanda lamprutor   exakt en kanal 38.1 %
+  mattnad (median)   1.00      spridning mellan lampor 65 DMX-steg
+  lookar             12 distinkta, median 16 s, langsta stund 35 s
+  riggens ljus       p10 0.08  p50 0.22  p90 0.57   slackt 0.3 % av tiden
+
+-- dirigenten (109 rader, 12 forsta) --
+   [dirigent] nastan-drop: sprang 10.3 dB efter dipp 8.0 dB
+   [dirigent] sektion intro -> build (nr 0, tier 1)
+   [dirigent] sektion build -> high (nr 1, tier 1)
+   [dirigent] manus high: ny look "kickregn" (tier fart, pool 17, sektion high, basgang 0.20)
+   [dirigent] knippa SEKTION: DEL GRANS HALLEN FRAS SLAG EJ LUCKA EJ INTRO
+   [dirigent] sektion high -> break (nr 1, tier 1)
+   [dirigent] manus break: ny look "sokljus" (tier fart, pool 18, sektion break, basgang 0.92, lugn)
+   [dirigent] knippa SEKTION: DEL GRANS HALLEN FRAS SLAG EJ LUCKA EJ INTRO
+   [dirigent] nastan-drop: sprang 13.6 dB efter dipp 14.3 dB
+   [dirigent] sektion break -> high (nr 2, tier 0)
+   [dirigent] nastan-drop: sprang 12.0 dB efter dipp 12.2 dB
+   [dirigent] manus high: "kickregn" igen
+
+TAJT = kick->ljus lagt, kickTraff hogt, r hogt, musikByten hogt. SNYGGT = alla3 lagt, mattnad och lampspr hoga,
+flera lookar utan langa stillastaende stunder, och ett ljusspann som anvands. Jamfor natt mot natt, aldrig i absoluta tal.

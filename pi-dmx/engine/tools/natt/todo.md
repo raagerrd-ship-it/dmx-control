@@ -1,3 +1,20 @@
+NATTEN 2026-11-28 (schemalagda körningen, ingen arena, ingen motorkod kvar - provet förkastat och återställt; HEAD ea84d55c = ladan16 = live):
+UPPDRAG: inga nya. NÄSTA 11-27 (a) FULL_HEL: inget besked - väntar; (b) kickregn: inget ord; (c) ingen arena; (d) inget sektionsfilter prövat.
+BASLINJE tools/natt/ren-2026-11-28/ (fryst HEAD .arena/natt1128/bas): konsert 6/6 BIT-IDENTISKA med 11-27; tight 6/6 skiljer = kedjan steg 4-13
+  (k10N/k13, väntat): kick->ljus 149/96/120/155/107/107 -> 144/107/109/133/115/101 ms (medel 122 -> 118), energiR15 0,16/0,32/0,46/0,45/0,28/0,11
+  -> 0,20/0,30/0,47/0,44/0,29/0,18, lampspr 81/57/71/70/49/69 -> 71/66/60/65/57/68, längsta look 151659 81 -> 59 s. Ordning 151659/160345/171840/193040/193818/200719.
+BRISTER: (1) 200719 fart 0,16 < lugn 0,18 på 4 av 4 lookfrön (KR_SEED 0-3: fart 0,15-0,18, lugn 0,17-0,23) - inte lookvalets brus, inte toggle-låten
+  (KR_TOG=0 lika: 0,16); (2) ORSAKEN: 200719 302-437 s spelar introts look (ankomst 0,05 / chase 0,12) hela refrängen 135 s - landningen (NASTAN EFTER
+  302,1) sätter 24 s skugga, refrängen 314,9 slukas, sedan ingen gräns; (3) nästan-dropen fyller: 452 på 4563 s, 221 på refraktärgränsen 4 s (FYND).
+IDÉ, FÖRKASTAD: LAND_SEKTION (opt-in DMX_LAND_SEKTION=1, patch tools/natt/prov/landsektion-20261128.patch): skuggan tar inte ett sektionsbyte till en del
+  som looken inte är taggad för. Av-läget 6/6 json-identiskt. Bänken: vers->refräng 0,25/0,20/0,24/0,20/0,21/0,04 -> 0,21/0,33/0,23/0,20/0,23/0,19,
+  byten 26/31/12/23/62/47 -> 35/34/13/25/79/55, kick->ljus 171840 109 -> 128, 200719 101 -> 115. Frö 0 i 200719 spelade chase (otaggad) - fallet kvar.
+  DOMAREN v3 9 frön, HELA filerna (.arena/natt1128): övning -3,80, kontroll -2,06, ingen DISK. Fler byten kostar koreografi; roten är nästan-dropen.
+TAJTHET: kick->ljus medel 122 -> 118 ms (kedjan); inget nattarbete.
+FYND: ÖPPET 2026-11-28 Nästan-dropen fyller (analyserDrop.ts nearDropDb) - INGEN delad fil ändrad.
+NÄSTA FÖR NATTAGENTEN: (a) FULL_HEL väntar ägaren; (b) när lotus/huvudsessionen gjort nästan-dropen till en händelse: mät om 200719 302-437 s och
+  landningarna (NASTAN-landningar 4/7/3/2/15/9); (c) pröva inte LAND_SEKTION igen; (d) ingen arena utan ARENA-uppdrag.
+
 NATTEN 2026-11-27 (schemalagda körningen, ingen arena, ingen motorkod; huvudsessionen körde KEDJAN steg 4 i arbetskopian -> src/ och dist/ orörda, allt mot fryst HEAD 8d905552 i .arena/natt1127/bas via distHook, under bänklåset):
 UPPDRAG: inga nya. NÄSTA 11-26 (a) FULL_HEL: inget besked - väntar; (b) kickregn i FULL_HEL: inget ord - inte gjort; (c) ingen arena.
 BASLINJE tools/natt/ren-2026-11-27/ (HEAD 8d905552 = kedjan steg 1a-3): alla 6 tight-json BIT-IDENTISKA med 11-26 (kedjan ändrar inte ljuset).

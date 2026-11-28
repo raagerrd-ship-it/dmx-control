@@ -1,0 +1,35 @@
+[quiet] console.log avstangd (DMX_QUIET=1) - PUT /api/debug/verbose {"enabled":true} slar pa
+
+=== tools/ladan-2026-11-13/lang-20261113T171840.wav  0-300 s, 11250 rutor a 25 ms ===
+
+TAJT MOT LATEN
+  kick -> lampan pa mal 109 ms (median, p75 179, 2287 lampuppgangar; gamla riggmedel 90 %: 125 ms, fonster 200 ms vid 135 BPM) pa 304/880 kickar = 34.5 %
+  uppgangens storlek 0.10 av riggens 0-1 skala
+  ljus mot energi    r 0.47 pa 1 s-MEDEL, 0.42 pa 1 s-TOPP (ruta-mot-ruta 0.38), ljus mot niva r 0.49
+  ljus per tier      lugn 0.14/0.22  fart 0.34/0.56  full 0.24/0.34  (medel/topp, 96/109/76 s)
+  look-byten         12 st = 2.40/min, musikalisk orsak 100.0 %
+                     sektion 6  landning 4  drop 2
+  drops              2 st, sprang lugna 0.88 (2 st) / hoga   -
+
+SNYGG LJUSSHOW
+  alla tre dioderna  4.3 % av tanda lamprutor   exakt en kanal 41.0 %
+  mattnad (median)   1.00      spridning mellan lampor 60 DMX-steg
+  lookar             8 distinkta, median 18 s, langsta stund 60 s
+  riggens ljus       p10 0.08  p50 0.21  p90 0.55   slackt 0.2 % av tiden
+
+-- dirigenten (71 rader, 12 forsta) --
+   [dirigent] nastan-drop: sprang 26.9 dB efter dipp 27.5 dB
+   [dirigent] manus intro: ny look "mellanslag" (tier fart, pool 7, sektion intro, basgang 0.32)
+   [dirigent] knippa NASTAN: NASTAN EJ BUILD BREAK EJ EFTER DL HALLEN NARA
+   [dirigent] manus intro: ny look "dunk" (tier fart, pool 7, sektion intro, basgang 0.26)
+   [dirigent] knippa LANDNING: LANDNING HALLEN LAND BASDEL
+   [dirigent] sektion intro -> high (nr 1, tier 1)
+   [dirigent] sektion high -> low (nr 1, tier 0)
+   [dirigent] nastan-drop: sprang 32.4 dB efter dipp 33.0 dB
+   [dirigent] manus low: ny look "varannan" (tier fart, pool 15, sektion low, basgang 0.00, slakt med dunk)
+   [dirigent] knippa NASTAN EFTER: NASTAN EJ BUILD BREAK HIGH EFTER DL HALLEN LAND
+   [dirigent] sektion low -> high (nr 2, tier 2)
+   [dirigent] nastan-drop: sprang 26.5 dB efter dipp 26.4 dB
+
+TAJT = kick->ljus lagt, kickTraff hogt, r hogt, musikByten hogt. SNYGGT = alla3 lagt, mattnad och lampspr hoga,
+flera lookar utan langa stillastaende stunder, och ett ljusspann som anvands. Jamfor natt mot natt, aldrig i absoluta tal.
